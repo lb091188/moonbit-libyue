@@ -43,6 +43,51 @@ pub(all) struct Browser {
 }
 
 ///|
+pub(all) struct Slider {
+  view : View
+}
+
+///|
+pub impl ViewLike for Slider with view(self) {
+  self.view
+}
+
+///|
+pub(all) struct Picker {
+  view : View
+}
+
+///|
+pub impl ViewLike for Picker with view(self) {
+  self.view
+}
+
+///|
+pub(all) struct ComboBox {
+  view : View
+}
+
+///|
+pub impl ViewLike for ComboBox with view(self) {
+  self.view
+}
+
+///|
+pub(all) struct ProgressBar {
+  view : View
+}
+
+///|
+pub impl ViewLike for ProgressBar with view(self) {
+  self.view
+}
+
+///|
+/// 弹出层（非 View，独立句柄）。
+#external
+pub type Popover
+
+///|
 /// 能作为视图传入容器/窗口的类型。
 /// 通用视图能力（焦点/启停/布局/背景）作为 trait 默认方法，
 /// 所有控件自动获得（默认实现见 view.mbt）。

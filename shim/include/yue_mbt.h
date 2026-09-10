@@ -284,6 +284,41 @@ void *yue_mbt_image_from_handle(int64_t h);
 int64_t yue_mbt_image_to_handle(void *image);
 void yue_mbt_painter_set_color(void *painter, const char *hex);
 
+/* ---------- 组合控件（Slider/Picker/ComboBox/ProgressBar/Popover） ---------- */
+
+void *yue_mbt_slider_new(void);
+void yue_mbt_slider_set_value(void *slider, double value);
+double yue_mbt_slider_get_value(void *slider);
+void yue_mbt_slider_set_step(void *slider, double step);
+void yue_mbt_slider_set_range(void *slider, double min, double max);
+void yue_mbt_slider_on_value_change(void *slider, void (*invoke)(void *), void *closure);
+void yue_mbt_slider_on_sliding_complete(void *slider, void (*invoke)(void *), void *closure);
+
+void *yue_mbt_picker_new(void);
+void yue_mbt_picker_add_item(void *picker, const char *text);
+void yue_mbt_picker_remove_item_at(void *picker, int32_t index);
+void yue_mbt_picker_clear(void *picker);
+void yue_mbt_picker_select_item_at(void *picker, int32_t index);
+void *yue_mbt_picker_get_selected_item(void *picker);
+int32_t yue_mbt_picker_get_selected_item_index(void *picker);
+void yue_mbt_picker_on_selection_change(void *picker, void (*invoke)(void *), void *closure);
+
+void *yue_mbt_combo_box_new(void);
+void yue_mbt_combo_box_set_text(void *combobox, const char *text);
+void *yue_mbt_combo_box_get_text(void *combobox);
+void yue_mbt_combo_box_on_text_change(void *combobox, void (*invoke)(void *), void *closure);
+
+void *yue_mbt_progress_bar_new(void);
+void yue_mbt_progress_bar_set_value(void *bar, double value);
+void yue_mbt_progress_bar_set_indeterminate(void *bar, int32_t yes);
+
+void *yue_mbt_popover_new(void);
+void yue_mbt_popover_set_content(void *popover, void *content);
+void yue_mbt_popover_set_content_size(void *popover, double w, double h);
+void yue_mbt_popover_show_relative_to(void *popover, void *view);
+void yue_mbt_popover_close(void *popover);
+void yue_mbt_popover_on_close(void *popover, void (*invoke)(void *), void *closure);
+
 /* ---------- 托盘 ---------- */
 
 int32_t yue_mbt_tray_supported(void);

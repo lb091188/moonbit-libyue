@@ -16,15 +16,55 @@
 #include <cstring>
 #include <dlfcn.h>
 #include <fstream>
+#include <new>
 #include <unordered_map>
 
 #include "base/command_line.h"
 #include "nativeui/nativeui.h"
+#include "nativeui/popover.h"
 
 // 不包含 <moonbit.h>：它在 extern "C" 里声明的 memcpy 与 glibc 的
 // C++ noexcept 声明冲突。只声明用到的运行时入口，签名照抄
 // ~/.moon/include/moonbit.h。
 extern "C" void *moonbit_make_bytes(int32_t size, int value);
+
+// C++ 对象一律走 glibc 堆：MoonBit 运行时初始化后接管进程的 mimalloc 段
+// 作为 GC 堆，普通 new 分配的对象会被 GC 扫描/移动破坏（Table 实测必崩）。
+// glibc 导出 __libc_malloc/__libc_free 绕开一切接管。
+extern "C" void *__libc_malloc(size_t size);
+extern "C" void __libc_free(void *ptr);
+
+void *operator new(std::size_t size) {
+  void *p = __libc_malloc(size);
+  if (p == nullptr) {
+    throw std::bad_alloc();
+  }
+  return p;
+}
+
+void *operator new[](std::size_t size) {
+  void *p = __libc_malloc(size);
+  if (p == nullptr) {
+    throw std::bad_alloc();
+  }
+  return p;
+}
+
+void operator delete(void *p) noexcept {
+  __libc_free(p);
+}
+
+void operator delete[](void *p) noexcept {
+  __libc_free(p);
+}
+
+void operator delete(void *p, std::size_t) noexcept {
+  __libc_free(p);
+}
+
+void operator delete[](void *p, std::size_t) noexcept {
+  __libc_free(p);
+}
 
 namespace {
 
@@ -67,6 +107,7 @@ using ImageStore = Store<nu::Image>;
 using CanvasStore = Store<nu::Canvas>;
 using AttributedTextStore = Store<nu::AttributedText>;
 using FontStore = Store<nu::Font>;
+using PopoverStore = Store<nu::Popover>;
 
 // CastTo：从注册表取对象，并用 GetClassName 校验运行时类型。
 // （View 自身无 kClassName，故模板仅用于具体控件类型。）
@@ -1263,6 +1304,195 @@ void yue_mbt_view_on_mouse_down(void *view, int32_t (*invoke)(void *), void *clo
 
 void yue_mbt_painter_set_color(void *painter, const char *hex) {
   static_cast<nu::Painter *>(painter)->SetColor(nu::Color(std::string(hex)));
+}
+
+
+// ---------- 组合控件（Slider/Picker/ComboBox/ProgressBar/Popover） ----------
+
+namespace {
+
+// ComboBox 继承 Picker 但 GetClassName 不同，名字双匹配
+nu::Picker *CastToPickerLike(void *handle) {
+  auto *r = ViewStore::get(handle);
+  if (r == nullptr) {
+    return nullptr;
+  }
+  const char *name = r->GetClassName();
+  if (std::strcmp(name, nu::Picker::kClassName) == 0 ||
+      std::strcmp(name, nu::ComboBox::kClassName) == 0) {
+    return static_cast<nu::Picker *>(r);
+  }
+  std::fprintf(stderr, "yue_mbt: 类型不匹配，期望 Picker/ComboBox，实际 %s\\n", name);
+  return nullptr;
+}
+
+}  // namespace
+
+void *yue_mbt_slider_new(void) {
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Slider()));
+}
+
+void yue_mbt_slider_set_value(void *slider, double value) {
+  if (auto *s = CastTo<nu::Slider>(slider)) {
+    s->SetValue(static_cast<float>(value));
+  }
+}
+
+double yue_mbt_slider_get_value(void *slider) {
+  if (auto *s = CastTo<nu::Slider>(slider)) {
+    return s->GetValue();
+  }
+  return 0;
+}
+
+void yue_mbt_slider_set_step(void *slider, double step) {
+  if (auto *s = CastTo<nu::Slider>(slider)) {
+    s->SetStep(static_cast<float>(step));
+  }
+}
+
+void yue_mbt_slider_set_range(void *slider, double min, double max) {
+  if (auto *s = CastTo<nu::Slider>(slider)) {
+    s->SetRange(static_cast<float>(min), static_cast<float>(max));
+  }
+}
+
+void yue_mbt_slider_on_value_change(void *slider, void (*invoke)(void *), void *closure) {
+  if (auto *s = CastTo<nu::Slider>(slider)) {
+    s->on_value_change.Connect([invoke, closure](nu::Slider *) { invoke(closure); });
+  }
+}
+
+void yue_mbt_slider_on_sliding_complete(void *slider, void (*invoke)(void *), void *closure) {
+  if (auto *s = CastTo<nu::Slider>(slider)) {
+    s->on_sliding_complete.Connect([invoke, closure](nu::Slider *) { invoke(closure); });
+  }
+}
+
+void *yue_mbt_picker_new(void) {
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Picker()));
+}
+
+void yue_mbt_picker_add_item(void *picker, const char *text) {
+  if (auto *p = CastToPickerLike(picker)) {
+    p->AddItem(text);
+  }
+}
+
+void yue_mbt_picker_remove_item_at(void *picker, int32_t index) {
+  if (auto *p = CastToPickerLike(picker)) {
+    p->RemoveItemAt(index);
+  }
+}
+
+void yue_mbt_picker_clear(void *picker) {
+  if (auto *p = CastToPickerLike(picker)) {
+    p->Clear();
+  }
+}
+
+void yue_mbt_picker_select_item_at(void *picker, int32_t index) {
+  if (auto *p = CastToPickerLike(picker)) {
+    p->SelectItemAt(index);
+  }
+}
+
+void *yue_mbt_picker_get_selected_item(void *picker) {
+  if (auto *p = CastToPickerLike(picker)) {
+    return BytesFromString(p->GetSelectedItem());
+  }
+  return moonbit_make_bytes(0, 0);
+}
+
+int32_t yue_mbt_picker_get_selected_item_index(void *picker) {
+  if (auto *p = CastToPickerLike(picker)) {
+    return p->GetSelectedItemIndex();
+  }
+  return -1;
+}
+
+void yue_mbt_picker_on_selection_change(void *picker, void (*invoke)(void *), void *closure) {
+  if (auto *p = CastToPickerLike(picker)) {
+    p->on_selection_change.Connect([invoke, closure](nu::Picker *) { invoke(closure); });
+  }
+}
+
+void *yue_mbt_combo_box_new(void) {
+  return reinterpret_cast<void *>(ViewStore::put(new nu::ComboBox()));
+}
+
+void yue_mbt_combo_box_set_text(void *combobox, const char *text) {
+  if (auto *c = CastTo<nu::ComboBox>(combobox)) {
+    c->SetText(text);
+  }
+}
+
+void *yue_mbt_combo_box_get_text(void *combobox) {
+  if (auto *c = CastTo<nu::ComboBox>(combobox)) {
+    return BytesFromString(c->GetText());
+  }
+  return moonbit_make_bytes(0, 0);
+}
+
+void yue_mbt_combo_box_on_text_change(void *combobox, void (*invoke)(void *), void *closure) {
+  if (auto *c = CastTo<nu::ComboBox>(combobox)) {
+    c->on_text_change.Connect([invoke, closure](nu::ComboBox *) { invoke(closure); });
+  }
+}
+
+void *yue_mbt_progress_bar_new(void) {
+  return reinterpret_cast<void *>(ViewStore::put(new nu::ProgressBar()));
+}
+
+void yue_mbt_progress_bar_set_value(void *bar, double value) {
+  if (auto *b = CastTo<nu::ProgressBar>(bar)) {
+    b->SetValue(static_cast<float>(value));
+  }
+}
+
+void yue_mbt_progress_bar_set_indeterminate(void *bar, int32_t yes) {
+  if (auto *b = CastTo<nu::ProgressBar>(bar)) {
+    b->SetIndeterminate(yes != 0);
+  }
+}
+
+void *yue_mbt_popover_new(void) {
+  return reinterpret_cast<void *>(PopoverStore::put(new nu::Popover()));
+}
+
+void yue_mbt_popover_set_content(void *popover, void *content) {
+  auto *p = PopoverStore::get(popover);
+  auto *c = CastToView(content);
+  if (p != nullptr && c != nullptr) {
+    p->SetContentView(scoped_refptr<nu::View>(c));
+  }
+}
+
+void yue_mbt_popover_set_content_size(void *popover, double w, double h) {
+  if (auto *p = PopoverStore::get(popover)) {
+    p->SetContentSize(
+        nu::SizeF(static_cast<float>(w), static_cast<float>(h)));
+  }
+}
+
+void yue_mbt_popover_show_relative_to(void *popover, void *view) {
+  auto *p = PopoverStore::get(popover);
+  auto *v = CastToView(view);
+  if (p != nullptr && v != nullptr) {
+    p->ShowRelativeTo(v);
+  }
+}
+
+void yue_mbt_popover_close(void *popover) {
+  if (auto *p = PopoverStore::get(popover)) {
+    p->Close();
+  }
+}
+
+void yue_mbt_popover_on_close(void *popover, void (*invoke)(void *), void *closure) {
+  if (auto *p = PopoverStore::get(popover)) {
+    p->on_close.Connect([invoke, closure](nu::Popover *) { invoke(closure); });
+  }
 }
 
 // ---------- 托盘 ----------

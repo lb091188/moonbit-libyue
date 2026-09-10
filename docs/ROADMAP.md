@@ -34,16 +34,21 @@
 - ✅ drawing 复刻（examples/drawing）：9 组绘制全通过，Canvas 离屏、AttributedText、Font、Image 实测
 - ✅ Table + AbstractTableModel 桥接（examples/table）：TableModel trait 挂 C++ 虚表桥，
   10000 行虚拟数据 + Edit 列回写 + Custom 列自绘色块，运行存活
-- ⬜ Drag & Drop（drag_source / drag_destination 复刻）：DraggingInfo、Clipboard 数据、View 拖拽事件
-- ⬜ Popover、ComboBox、Picker、Slider、ProgressBar、GroupBox、ScrollView（示例带控件组合）
+- ✅ Drag & Drop（examples/drag_source、examples/drag_destination）：DraggingInfo 数据读取、
+  View 拖拽委托（enter/update/drop/leave）、RegisterDraggedTypes、DoDrag 文件拖动、SchedulePaint
+- ✅ 组合控件（examples/widgets）：Slider（值/步进/范围/双信号）、Picker、ComboBox（文本+选项）、
+  ProgressBar（含不定态）、Popover（内容/尺寸/相对弹出/关闭回调）——全部构建通过 + 运行存活
 
 阶段 2 踩坑实录（都是 MoonBit native FFI 的硬约束）：
 1. **opaque type 值参与引用计数**：extern 句柄存 C 指针/id 会被 GC incref/decref，
    必须声明 `#external type`（值不参与 RC）。崩溃点 moonbit_incref(0x2) 即此。
 2. **MoonBit 运行时 mimalloc 段与 C++ new 混用**：C++ 对象落进 GC 管理段被
-   扫描/移动，vtable 损坏。解法：shim 自管句柄注册表（id → scoped_refptr），
-   C++ 对象全在系统堆。
-3. libyue 按无 RTTI 惯例构建，dynamic_cast 段错误，运行时类型校验用
+   扫描/移动，vtable 损坏。解法：shim 重载 operator new/delete 重定向到
+   `__libc_malloc/__libc_free`（glibc 堆与 GC 段彻底隔离）。
+3. **extern 句柄往返**：整数 id 作为 #external 值经 MoonBit 装箱后往返不一致
+   （id=4 传回变堆地址）；C++ 对象指针往返无损。故句柄 = C++ 对象指针，
+   生命周期由 shim 侧 scoped_refptr 注册表进程级持有。
+4. libyue 按无 RTTI 惯例构建，dynamic_cast 段错误，运行时类型校验用
    虚函数 GetClassName 字符串比较。
 
 ## 阶段 3：全量 API 面

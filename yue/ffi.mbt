@@ -656,6 +656,133 @@ extern "c" fn ffi_view_on_mouse_down(
 ) -> Unit = "yue_mbt_view_on_mouse_down"
 
 ///|
+extern "c" fn ffi_slider_new() -> View = "yue_mbt_slider_new"
+
+///|
+#borrow(slider)
+extern "c" fn ffi_slider_set_value(slider : Slider, value : Double) -> Unit = "yue_mbt_slider_set_value"
+
+///|
+#borrow(slider)
+extern "c" fn ffi_slider_get_value(slider : Slider) -> Double = "yue_mbt_slider_get_value"
+
+///|
+#borrow(slider)
+extern "c" fn ffi_slider_set_step(slider : Slider, step : Double) -> Unit = "yue_mbt_slider_set_step"
+
+///|
+#borrow(slider)
+extern "c" fn ffi_slider_set_range(slider : Slider, min : Double, max : Double) -> Unit = "yue_mbt_slider_set_range"
+
+///|
+#borrow(slider, invoke, callback)
+extern "c" fn ffi_slider_on_value_change(
+  slider : Slider,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_slider_on_value_change"
+
+///|
+#borrow(slider, invoke, callback)
+extern "c" fn ffi_slider_on_sliding_complete(
+  slider : Slider,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_slider_on_sliding_complete"
+
+///|
+extern "c" fn ffi_picker_new() -> View = "yue_mbt_picker_new"
+
+///|
+#borrow(picker, text)
+extern "c" fn ffi_picker_add_item(picker : View, text : Bytes) -> Unit = "yue_mbt_picker_add_item"
+
+///|
+#borrow(picker)
+extern "c" fn ffi_picker_remove_item_at(picker : View, index : Int) -> Unit = "yue_mbt_picker_remove_item_at"
+
+///|
+#borrow(picker)
+extern "c" fn ffi_picker_clear(picker : View) -> Unit = "yue_mbt_picker_clear"
+
+///|
+#borrow(picker)
+extern "c" fn ffi_picker_select_item_at(picker : View, index : Int) -> Unit = "yue_mbt_picker_select_item_at"
+
+///|
+#borrow(picker)
+extern "c" fn ffi_picker_get_selected_item(picker : View) -> Bytes = "yue_mbt_picker_get_selected_item"
+
+///|
+#borrow(picker)
+extern "c" fn ffi_picker_get_selected_item_index(picker : View) -> Int = "yue_mbt_picker_get_selected_item_index"
+
+///|
+#borrow(picker, invoke, callback)
+extern "c" fn ffi_picker_on_selection_change(
+  picker : View,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_picker_on_selection_change"
+
+///|
+extern "c" fn ffi_combo_box_new() -> View = "yue_mbt_combo_box_new"
+
+///|
+#borrow(combobox, text)
+extern "c" fn ffi_combo_box_set_text(combobox : ComboBox, text : Bytes) -> Unit = "yue_mbt_combo_box_set_text"
+
+///|
+#borrow(combobox)
+extern "c" fn ffi_combo_box_get_text(combobox : ComboBox) -> Bytes = "yue_mbt_combo_box_get_text"
+
+///|
+#borrow(combobox, invoke, callback)
+extern "c" fn ffi_combo_box_on_text_change(
+  combobox : ComboBox,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_combo_box_on_text_change"
+
+///|
+extern "c" fn ffi_progress_bar_new() -> View = "yue_mbt_progress_bar_new"
+
+///|
+#borrow(bar)
+extern "c" fn ffi_progress_bar_set_value(bar : ProgressBar, value : Double) -> Unit = "yue_mbt_progress_bar_set_value"
+
+///|
+#borrow(bar)
+extern "c" fn ffi_progress_bar_set_indeterminate(bar : ProgressBar, yes : Int) -> Unit = "yue_mbt_progress_bar_set_indeterminate"
+
+///|
+extern "c" fn ffi_popover_new() -> Popover = "yue_mbt_popover_new"
+
+///|
+#borrow(popover, content)
+extern "c" fn ffi_popover_set_content(popover : Popover, content : View) -> Unit = "yue_mbt_popover_set_content"
+
+///|
+#borrow(popover)
+extern "c" fn ffi_popover_set_content_size(popover : Popover, w : Double, h : Double) -> Unit = "yue_mbt_popover_set_content_size"
+
+///|
+#borrow(popover, view)
+extern "c" fn ffi_popover_show_relative_to(popover : Popover, view : View) -> Unit = "yue_mbt_popover_show_relative_to"
+
+///|
+#borrow(popover)
+extern "c" fn ffi_popover_close(popover : Popover) -> Unit = "yue_mbt_popover_close"
+
+///|
+#borrow(popover, invoke, callback)
+extern "c" fn ffi_popover_on_close(
+  popover : Popover,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_popover_on_close"
+
+///|
 /// 托盘后端可用性探测。Linux 上等价于检查 AppIndicator 运行库能否加载。
 extern "c" fn ffi_tray_supported() -> Bool = "yue_mbt_tray_supported"
 
