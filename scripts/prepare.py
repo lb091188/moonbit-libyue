@@ -120,19 +120,31 @@ def pkg_config_libs() -> list[str]:
 
 
 def patch_moon_pkg(lib_path: Path) -> None:
-    """把绝对库路径与系统库写回 yue/moon.pkg.json 的 cc-link-flags。"""
+    """把绝对库路径与系统库写回仓库内所有 moon.pkg.json 的 cc-link-flags。
+
+    moon 的 link 段只作用于所在包，且只对 main 包的最终二进制生效，
+    因此只给 is-main 的包回写（库包 yue/ 放 link 段会让 moon 生成
+    无 main 的 yue.exe 导致构建失败）。
+    """
     if system() == "Linux":
-        extra = pkg_config_libs() + ["-lpthread", "-ldl"]
+        extra = pkg_config_libs() + ["-lpthread", "-ldl", "-lm", "-lstdc++"]
     elif system() == "Darwin":
         extra = ["-lpthread"]
     else:
-        print("Windows 平台链接参数暂未自动化，请手工核对 yue/moon.pkg.json")
+        print("Windows 平台链接参数暂未自动化，请手工核对各 moon.pkg.json")
         return
     flags = f"-L {lib_path.parent} -lyue_mbt " + " ".join(extra)
-    pkg = json.loads(MOON_PKG.read_text())
-    pkg.setdefault("link", {}).setdefault("native", {})["cc-link-flags"] = flags
-    MOON_PKG.write_text(json.dumps(pkg, indent=2, ensure_ascii=False) + "\n")
-    print(f"已写入链接参数：{flags}")
+    for pkg_path in sorted(REPO_ROOT.rglob("moon.pkg.json")):
+        if any(part in {"vendor", "build", ".prepare", "_build", "target"} for part in pkg_path.parts):
+            continue
+        pkg = json.loads(pkg_path.read_text())
+        if not pkg.get("is-main"):
+            pkg.pop("link", None)
+            pkg_path.write_text(json.dumps(pkg, indent=2, ensure_ascii=False) + "\n")
+            continue
+        pkg.setdefault("link", {}).setdefault("native", {})["cc-link-flags"] = flags
+        pkg_path.write_text(json.dumps(pkg, indent=2, ensure_ascii=False) + "\n")
+        print(f"已写入链接参数：{pkg_path.relative_to(REPO_ROOT)}")
 
 
 def main() -> None:

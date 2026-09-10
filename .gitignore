@@ -4,5 +4,6 @@
 /.prepare/
 
 # moon 构建产物
+/_build/
 /target/
 *.core

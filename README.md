@@ -62,10 +62,13 @@ Linux 托盘依赖 AppIndicator（GNOME 等桌面的托盘协议），运行库�
 - shim 提供 `yue_mbt_tray_supported()`：按 ayatana / 传统 appindicator 两个分支探测（覆盖 Ubuntu 22.04+ 与更早发行版）；
 - MoonBit 暴露统一的 `Tray::is_supported()` 与 `Tray::new() -> Result[Tray, TrayError]`，消费方 `match` 错误即可，不写任何平台判断。
 
-## 已知边界
+## 已知边界（实测结论）
 
-- `yue/moon.pkg.json` 的 `cc-link-flags` 由 `prepare.py` 托管回写（绝对路径），手动改动会被覆盖。
-- macOS 分支含 ARC/no-ARC 双库结构，未实测，首次构建按官方 CMakeLists 微调；Windows 链接参数未自动化。
+- `moon` 的 `link` 段只作用于所在包、且只对 main 包的二进制生效；库包 `yue/` 放 link 段会生成无 main 的 `yue.exe` 导致构建失败。`prepare.py` 只回写 `is-main` 的包，`cc-link-flags` 为本机绝对路径。
+- `extern "c"` 不能返回可空类型（ABI 与 C 指针不兼容，直接段错误）：成败经 `Ref[Int]` 出参报告，句柄按非空返回。
+- FFI 指针参数必须标 `#borrow`（编译器强制）；同函数多参数写在同一个 `#borrow(a, b)` 里。
+- Linux 托盘探测列表必须与 libyue 内部 dlopen 列表严格一致（只认 `libappindicator3`）；本机存在 ayatana 分支也不代表可用，nativeui 内部加载失败时只打日志，后续调用会踩空指针（shim 侧已加空指针防御）。
+- macOS 分支含 ARC/no-ARC 双库结构，未实测；Windows 链接参数未自动化。
 - 当前只封装了 App / Window / Label / Tray 一条最小链路；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。
 - 回调闭包由 `window.mbt` 的注册表保活，窗口销毁后条目暂不回收（骨架阶段可接受）。
 

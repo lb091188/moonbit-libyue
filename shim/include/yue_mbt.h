@@ -57,8 +57,10 @@ void yue_mbt_label_set_text(void *label, const char *text);
  * Windows/macOS 恒返回 1。 */
 int32_t yue_mbt_tray_supported(void);
 
-/* icon_path 为 UTF-8 图片路径。后端缺失或图标读取失败返回 NULL。 */
-void *yue_mbt_tray_new(const char *icon_path);
+/* icon_path 为 UTF-8 图片路径。成败经 *ok 报告（1/0）：
+ * 句柄返回值不表达可空（extern 可空返回的 ABI 与 C 指针不兼容），
+ * 失败时返回值无意义，调用方必须先看 ok。 */
+void *yue_mbt_tray_new(const char *icon_path, int32_t *ok);
 
 /* title 为 UTF-8。Linux 上映射为 AppIndicator label。 */
 void yue_mbt_tray_set_title(void *tray, const char *title);

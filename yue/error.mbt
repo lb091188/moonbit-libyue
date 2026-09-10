@@ -7,3 +7,11 @@ pub(all) enum TrayError {
   /// 图标文件读取或解码失败
   IconLoadFailed
 }
+
+///|
+pub impl Show for TrayError with fn output(self, logger) {
+  match self {
+    Unsupported => logger.write_string("TrayError::Unsupported")
+    IconLoadFailed => logger.write_string("TrayError::IconLoadFailed")
+  }
+}

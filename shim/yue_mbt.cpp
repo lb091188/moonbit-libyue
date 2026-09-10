@@ -4,9 +4,15 @@
 #include "yue_mbt.h"
 
 #include <dlfcn.h>
-#include <moonbit.h>
 
+#include "base/command_line.h"
 #include "nativeui/nativeui.h"
+
+// 不包含 <moonbit.h>：它在 extern "C" 里声明的 memcpy 与 glibc 的
+// C++ noexcept 声明冲突。shim 只用这一个运行时入口，签名照抄
+// ~/.moon/include/moonbit.h:218。
+extern "C" void *moonbit_make_external_object(void (*finalize)(void *),
+                                              uint32_t payload_size);
 
 namespace {
 
@@ -120,12 +126,11 @@ void yue_mbt_label_set_text(void *label, const char *text) {
 
 // libyue 的 Linux 托盘在运行期 dlopen AppIndicator，加载失败只打日志，
 // 对外无任何查询接口。这里补一个同语义的探测，让 MoonBit 层能提前降级。
-// 探测列表覆盖 gnome/libappindicator 与 ayatana 两个分支（Ubuntu 22.04+
-// 只带 ayatana），比 libyue 内置列表更宽。
+// 注意：探测列表必须与 libyue 内部的 dlopen 列表严格一致（只认传统
+// libappindicator3，不含 ayatana 分支），否则会"探测可用、实际失效"，
+// 后续调用在 nativeui 内部踩空指针。
 int32_t yue_mbt_tray_supported(void) {
   const char *candidates[] = {
-      "libayatana-appindicator3.so.1",
-      "libayatana-appindicator3.so",
       "libappindicator3.so.1",
       "libappindicator3.so",
   };
@@ -145,7 +150,8 @@ int32_t yue_mbt_tray_supported(void) {
 
 #endif
 
-void *yue_mbt_tray_new(const char *icon_path) {
+void *yue_mbt_tray_new(const char *icon_path, int32_t *ok) {
+  *ok = 0;
   if (!yue_mbt_tray_supported()) {
     return nullptr;
   }
@@ -156,13 +162,21 @@ void *yue_mbt_tray_new(const char *icon_path) {
   auto *box = static_cast<TrayBox *>(
       moonbit_make_external_object(ReleaseRef<TrayBox>, sizeof(TrayBox)));
   new (&box->tray) scoped_refptr<nu::Tray>(new nu::Tray(image));
+  *ok = 1;
   return box;
 }
 
 void yue_mbt_tray_set_title(void *tray, const char *title) {
-  static_cast<TrayBox *>(tray)->tray->SetTitle(title);
+  // 构造失败（后端缺失）时 nativeui 内部句柄为空，防御性跳过而非崩溃
+  auto *t = static_cast<TrayBox *>(tray)->tray.get();
+  if (t != nullptr) {
+    t->SetTitle(title);
+  }
 }
 
 void yue_mbt_tray_remove(void *tray) {
-  static_cast<TrayBox *>(tray)->tray->Remove();
+  auto *t = static_cast<TrayBox *>(tray)->tray.get();
+  if (t != nullptr) {
+    t->Remove();
+  }
 }
