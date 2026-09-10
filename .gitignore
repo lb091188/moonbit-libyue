@@ -1,0 +1,8 @@
+# prepare.py 产物
+/vendor/
+/build/
+/.prepare/
+
+# moon 构建产物
+/target/
+*.core

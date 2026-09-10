@@ -1,0 +1,4 @@
+{
+  "is-main": true,
+  "import": ["lkyh/moonbit-libyue/yue"]
+}

@@ -1,0 +1,11 @@
+{
+  "import": ["moonbitlang/core/encoding/utf8"],
+  "link": {
+    "native": {
+      "cc-link-flags": "-L build -lyue_mbt"
+    }
+  },
+  "targets": {
+    "ffi.mbt": ["native"]
+  }
+}
