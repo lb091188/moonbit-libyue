@@ -1,6 +1,7 @@
 {
   "import": [
-    "moonbitlang/core/encoding/utf8"
+    "moonbitlang/core/encoding/utf8",
+    "lkyh/moonbit-libyue/yue/traybus"
   ],
   "targets": {
     "ffi.mbt": [

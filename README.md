@@ -30,7 +30,8 @@ yue/                 MoonBit 库包（对外 API）
   app.mbt            init / run / quit
   window.mbt         窗口 + 关闭回调（FuncRef trampoline）
   label.mbt          标签
-  tray.mbt           托盘（平台降级示范）
+  tray.mbt           托盘（SNI 自实现优先，AppIndicator 回退）
+traybus/           纯 MoonBit 的 DBus + StatusNotifierItem 协议栈（Linux 托盘）
   error.mbt          结构化错误
 shim/                C ABI 封装层 + CMakeLists
 scripts/prepare.py   固定版本下载 libyue + 构建静态库 + 回写链接参数
@@ -55,21 +56,27 @@ python3 scripts/prepare.py   # 下载 libyue v0.15.6（校验 sha256）+ CMake �
 moon run examples/hello
 ```
 
-## Linux 托盘方案
+## Linux 托盘方案（纯 MoonBit 自实现，2026-09 落地）
 
-Linux 托盘依赖 AppIndicator（GNOME 等桌面的托盘协议），运行库不保证存在，且 libyue 内部 dlopen 失败后只打日志、对象静默失效。库内处理方式：
+AppIndicator 运行库（Ubuntu 24.04 已移除传统版）不可依赖，且 libyue 内部加载失败只打日志、对象静默失效。
+现改为 **MoonBit 直连面板的 StatusNotifierItem 协议**，不再依赖任何 AppIndicator 运行库：
 
-- shim 提供 `yue_mbt_tray_supported()`：按 ayatana / 传统 appindicator 两个分支探测（覆盖 Ubuntu 22.04+ 与更早发行版）；
-- MoonBit 暴露统一的 `Tray::is_supported()` 与 `Tray::new() -> Result[Tray, TrayError]`，消费方 `match` 错误即可，不写任何平台判断。
+- `yue/traybus/` 纯 MoonBit 实现：DBus 线路编解码、SASL EXTERNAL 握手、消息收发循环（glib fd 监视接入 GTK 主循环）、SNI 属性/信号/Activate 分发、桌面环境识别（XDG_CURRENT_DESKTOP）、程序内置生成月牙位图；
+- shim 只转发 8 个 fd 级系统调用（connect/read/write/poll/close/watch_fd/getuid/getenv），非 Linux 为失败桩；
+- 后端优先级：SNI watcher 在线 → 自实现托盘；不在线 → 回退 nativeui AppIndicator；两者皆无 → `Err(Unsupported)`。XFCE/KDE/MATE/Cinnamon/Budgie/LXQt 及装 AppIndicator 扩展的 GNOME 可用，纯净 GNOME 无托盘协议则明确报错；
+- 消费方面向统一 API：`Tray::new / set_title / set_tooltip / set_icon_name / on_click / remove`，另有 `desktop_environment()` 诊断。
+- 已知坑（实测入档）：DBus 数组长度前缀**不含首元素前的对齐填充**，算进去会被 dbus-daemon 判协议违规直接断连；DBus 头部 SIGNATURE 字段的 variant 签名是 "g"（u8 长度编码），按 "s" 编能过自洽单测但会被真实总线拒绝——单测证自洽，互操作必须上真总线验证。
 
 ## 已知边界（实测结论）
 
 - `moon` 的 `link` 段只作用于所在包、且只对 main 包的二进制生效；库包 `yue/` 放 link 段会让 moon 生成无 main 的可执行文件（moon 对所有平台的产物统一加 `.exe` 后缀）导致构建失败。`prepare.py` 只回写 `is-main` 的包，`cc-link-flags` 为本机绝对路径。
 - `extern "c"` 不能返回可空类型（ABI 与 C 指针不兼容，直接段错误）：成败经 `Ref[Int]` 出参报告，句柄按非空返回。
 - FFI 指针参数必须标 `#borrow`（编译器强制）；同函数多参数写在同一个 `#borrow(a, b)` 里。
-- Linux 托盘探测列表必须与 libyue 内部 dlopen 列表严格一致（只认 `libappindicator3`）；本机存在 ayatana 分支也不代表可用，nativeui 内部加载失败时只打日志，后续调用会踩空指针（shim 侧已加空指针防御）。
+- Linux 托盘探测列表必须与 libyue 内部 dlopen 列表严格一致（只认 `libappindicator3`）；本机存在 ayatana 分支也不代表可用，nativeui 内部加载失败时只打日志，后续调用会踩空指针（shim 侧已加空指针防御）。SNI 自实现后端上线后此路径仅作回退。
+- MoonBit 闭包/函数值跨 C ABI：只允许无捕获的顶层函数字面量（编译为真实 C 函数指针），带捕获闭包经"函数指针 + 闭包指针"双参数模式传递（`on_click` 系）。
+- Table（GTK）放进 Notebook 页签内会在尺寸测量时段错误（negative allocation），必须放普通容器或独立窗口（showcase 采用独立子窗口方案）。
 - macOS 分支含 ARC/no-ARC 双库结构，未实测；Windows 链接参数未自动化。
-- 当前封装面约 130 个 ABI 函数：App/Lifetime、Window、View 通用能力与拖拽、Container/Label/Button/Entry/TextEdit、Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer、Browser、Menu/MenuBar、Table+模型桥、Painter/Canvas、Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog、Screen/Appearance/Locale/Cursor；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。
+- 当前封装面约 145 个 ABI 函数：App/Lifetime、Window、View 通用能力与拖拽、Container/Label/Button/Entry/TextEdit、Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer、Browser、Menu/MenuBar、Table+模型桥、Painter/Canvas、Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog、Screen/Appearance/Locale/Cursor；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。
 - extern 声明的控件参数必须写底层句柄类型 `View` 而非 MoonBit 包装 struct（如 `Slider`）：struct 经 ABI 传入的是包装对象而非句柄值，运行时全部"句柄无效"且被静默丢弃（Slider/Table 系列曾因此整体失效，2026-09 修复）。
 - 回调闭包由 `window.mbt` 的注册表保活，窗口销毁后条目暂不回收（骨架阶段可接受）。
 

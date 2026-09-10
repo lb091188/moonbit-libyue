@@ -20,7 +20,8 @@
 | browser | Browser(WebView) 全套信号与导航、Entry、View 启停（SetEnabled）、style 透传 | ✅ 构建通过 + 运行存活 |
 | floating_heart | 无边框透明窗口、Container 自绘（Painter 路径/填充/变换）、鼠标拖动窗口 | ✅ 构建通过 + 运行存活 |
 | auto_height_edit | TextEdit 自动高度联动窗口、View::focus | ✅ 构建通过 + 运行存活 |
-| hello | App/Window/Label/Tray（含 Linux 托盘探测降级） | ✅ 构建通过 + 运行存活 |
+| hello | App/Window/Label/Tray（SNI 自实现优先，AppIndicator 回退） | ✅ 构建通过 + 运行存活 |
+| showcase | 全功能展示：页签 + 托盘 + 菜单 + 表格子窗口 + Browser | ✅ 构建通过 + XFCE 实测 |
 
 不追求 1:1 还原的偏离（均有注释说明）：editor 的图片按钮改为文字按钮（不引入 Image 编码依赖）、 Vibrant 跳过（macOS 专属）。
 
@@ -70,6 +71,8 @@ shim + ffi + MoonBit 包装 + 示例触达：
 
 - ✅ `moon check` / `moon build` 全仓零错误零警告
 - ✅ 全部 12 个 `examples/*` 依次 `moon run` 试跑：进程存活、无 SIGSEGV
+- ✅ Linux 托盘改为纯 MoonBit SNI 自实现（yue/traybus），XFCE 面板实测：图标可见、Activate 点击回调贯通、watcher 注册表收录（2026-09）
+- ✅ showcase 全功能示例：页签覆盖基础控件/输入/画布/网页/对话框/系统集成，托盘+菜单条+独立表格窗口（Table 在 Notebook 内会崩，入档）
 - ⬜ 托盘/菜单/对话框/WebView 在 GNOME(X11) 下人工确认功能表现（程序化验证已覆盖：
   进程存活 + 退出行为；人工项为视觉/交互细节），差异记入 README"已知边界"
 - ✅ 纯 MoonBit 部分：`moon test` 7/7 通过（argb_hex 颜色转换、表格值编解码）

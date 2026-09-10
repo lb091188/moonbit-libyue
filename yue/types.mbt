@@ -174,7 +174,7 @@ pub type FileDialog
 
 ///|
 #external
-pub type Tray
+pub type NativeTray
 
 ///|
 #external

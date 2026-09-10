@@ -2086,3 +2086,155 @@ void yue_mbt_tray_remove(void *tray) {
     t->Remove();
   }
 }
+
+// ---------- 托盘：nativeui 后端补充 ----------
+
+extern "C" void yue_mbt_tray_set_image(void *tray, void *image) {
+  auto *t = TrayStore::get(tray);
+  auto *img = ImageStore::get(image);
+  if (t != nullptr && img != nullptr) {
+    t->SetImage(scoped_refptr<nu::Image>(img));
+  }
+}
+
+extern "C" void yue_mbt_tray_on_click(void *tray, void (*invoke)(void *), void *closure) {
+  auto *t = TrayStore::get(tray);
+  if (t != nullptr) {
+    t->on_click.Connect([invoke, closure](nu::Tray *) { invoke(closure); });
+  }
+}
+
+// ---------- 托盘：MoonBit 自实现后端的系统调用转发 ----------
+//
+// SNI（StatusNotifierItem）协议逻辑全部在 MoonBit 侧（yue/traybus 包），
+// 这里只暴露最小化的 fd 级系统调用。全部按"失败返回负值/0"实现，
+// 非 Linux 平台走桩函数，MoonBit 侧据此回退 nativeui 托盘。
+
+#if defined(OS_LINUX)
+
+#include <glib-unix.h>
+
+#include <poll.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+extern "C" int32_t yue_mbt_sys_getuid(void) {
+  return static_cast<int32_t>(getuid());
+}
+
+extern "C" int32_t yue_mbt_sys_getenv(const char *name, char *out, int32_t out_len) {
+  const char *v = getenv(name);
+  if (v == nullptr) {
+    return -1;
+  }
+  size_t n = strlen(v);
+  if (n + 1 > static_cast<size_t>(out_len)) {
+    return -2;
+  }
+  memcpy(out, v, n + 1);
+  return static_cast<int32_t>(n);
+}
+
+// 连接会话总线（AF_UNIX，非阻塞），失败返回 -1
+extern "C" int32_t yue_mbt_sys_unix_connect(const char *path) {
+  if (strlen(path) == 0 || strlen(path) >= 108) {
+    return -1;
+  }
+  int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+  if (fd < 0) {
+    return -1;
+  }
+  sockaddr_un addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sun_family = AF_UNIX;
+  strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+  if (connect(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) != 0 &&
+      errno != EINPROGRESS) {
+    close(fd);
+    return -1;
+  }
+  return fd;
+}
+
+// >0 = 读到字节数；0 = 对端关闭；-1 = 暂无数据；-2 = 错误
+extern "C" int32_t yue_mbt_sys_read(int32_t fd, uint8_t *buf, int32_t off, int32_t len) {
+  ssize_t n = read(fd, buf + off, static_cast<size_t>(len));
+  if (n > 0) {
+    return static_cast<int32_t>(n);
+  }
+  if (n == 0) {
+    return 0;
+  }
+  return (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) ? -1 : -2;
+}
+
+// >=0 = 已写出字节数（可能小于 len）；-1 = 暂不可写；-2 = 错误
+extern "C" int32_t yue_mbt_sys_write(int32_t fd, const uint8_t *buf, int32_t off, int32_t len) {
+  ssize_t n = write(fd, buf + off, static_cast<size_t>(len));
+  if (n >= 0) {
+    return static_cast<int32_t>(n);
+  }
+  return (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) ? -1 : -2;
+}
+
+// events: 1 = 可读，4 = 可写。>0 = 就绪事件位，0 = 超时，-1 = 错误
+extern "C" int32_t yue_mbt_sys_poll(int32_t fd, int32_t events, int32_t timeout_ms) {
+  pollfd p;
+  p.fd = fd;
+  p.events = static_cast<short>(events);
+  p.revents = 0;
+  int n = poll(&p, 1, timeout_ms);
+  if (n < 0) {
+    return -1;
+  }
+  if (n == 0) {
+    return 0;
+  }
+  return p.revents;
+}
+
+extern "C" void yue_mbt_sys_close(int32_t fd) {
+  close(fd);
+}
+
+// GTK 主循环 fd 监视：回调是无捕获 MoonBit 顶层函数（与 on_click 同一跨
+// ABI 模式）。进程级只支持一条 SNI 连接，与 traybus 的全局连接约定一致。
+static int32_t (*g_mbt_fd_cb)(int32_t, int32_t) = nullptr;
+
+static gboolean mbt_fd_source_cb(gint fd, GIOCondition cond, gpointer) {
+  return g_mbt_fd_cb != nullptr ? g_mbt_fd_cb(fd, static_cast<int32_t>(cond))
+                                : TRUE;
+}
+
+extern "C" int32_t yue_mbt_sys_watch_fd(int32_t fd, int32_t events,
+                             int32_t (*cb)(int32_t, int32_t)) {
+  g_mbt_fd_cb = cb;
+  return static_cast<int32_t>(g_unix_fd_add(
+      fd, static_cast<GIOCondition>(events), mbt_fd_source_cb, nullptr));
+}
+
+#else  // 非 Linux：桩实现，托盘回退 nativeui 后端
+
+extern "C" extern "C" int32_t yue_mbt_sys_getuid(void) { return -1; }
+
+extern "C" extern "C" int32_t yue_mbt_sys_getenv(const char *, char *, int32_t) { return -1; }
+
+extern "C" extern "C" int32_t yue_mbt_sys_unix_connect(const char *) { return -1; }
+
+extern "C" extern "C" int32_t yue_mbt_sys_read(int32_t, uint8_t *, int32_t, int32_t) { return -2; }
+
+extern "C" extern "C" int32_t yue_mbt_sys_write(int32_t, const uint8_t *, int32_t, int32_t) {
+  return -2;
+}
+
+extern "C" extern "C" int32_t yue_mbt_sys_poll(int32_t, int32_t, int32_t) { return -1; }
+
+extern "C" void yue_mbt_sys_close(int32_t) {}
+
+extern "C" extern "C" int32_t yue_mbt_sys_watch_fd(int32_t, int32_t,
+                                        int32_t (*)(int32_t, int32_t)) {
+  return 0;
+}
+
+#endif

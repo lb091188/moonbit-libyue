@@ -1132,15 +1132,26 @@ extern "c" fn ffi_tray_supported() -> Bool = "yue_mbt_tray_supported"
 
 ///|
 #borrow(icon_path, ok)
-extern "c" fn ffi_tray_new(icon_path : Bytes, ok : Ref[Int]) -> Tray = "yue_mbt_tray_new"
+extern "c" fn ffi_tray_new(icon_path : Bytes, ok : Ref[Int]) -> NativeTray = "yue_mbt_tray_new"
 
 ///|
 #borrow(tray, title)
-extern "c" fn ffi_tray_set_title(tray : Tray, title : Bytes) -> Unit = "yue_mbt_tray_set_title"
+extern "c" fn ffi_tray_set_title(tray : NativeTray, title : Bytes) -> Unit = "yue_mbt_tray_set_title"
 
 ///|
 #borrow(tray)
-extern "c" fn ffi_tray_remove(tray : Tray) -> Unit = "yue_mbt_tray_remove"
+extern "c" fn ffi_tray_remove(tray : NativeTray) -> Unit = "yue_mbt_tray_remove"
+
+///|
+extern "c" fn ffi_tray_set_image(tray : NativeTray, image : Image) -> Unit = "yue_mbt_tray_set_image"
+
+///|
+#borrow(tray, invoke, callback)
+extern "c" fn ffi_tray_on_click(
+  tray : NativeTray,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_tray_on_click"
 
 ///|
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，
