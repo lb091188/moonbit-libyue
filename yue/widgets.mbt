@@ -9,39 +9,39 @@ pub fn Slider::new() -> Slider {
 ///|
 /// 设置当前值。
 pub fn Slider::set_value(self : Slider, value : Double) -> Unit {
-  ffi_slider_set_value(self, value)
+  ffi_slider_set_value(self.view, value)
 }
 
 ///|
 /// 读取当前值。
 pub fn Slider::get_value(self : Slider) -> Double {
-  ffi_slider_get_value(self)
+  ffi_slider_get_value(self.view)
 }
 
 ///|
 /// 设置步进（0 表示连续）。
 pub fn Slider::set_step(self : Slider, step : Double) -> Unit {
-  ffi_slider_set_step(self, step)
+  ffi_slider_set_step(self.view, step)
 }
 
 ///|
 /// 设置取值范围。
 pub fn Slider::set_range(self : Slider, min : Double, max : Double) -> Unit {
-  ffi_slider_set_range(self, min, max)
+  ffi_slider_set_range(self.view, min, max)
 }
 
 ///|
 /// 注册值变化回调（拖动过程中持续触发）。
 pub fn Slider::on_value_change(self : Slider, callback : () -> Unit) -> Unit {
   keep_alive(callback)
-  ffi_slider_on_value_change(self, fn(f) { f() }, callback)
+  ffi_slider_on_value_change(self.view, fn(f) { f() }, callback)
 }
 
 ///|
 /// 注册拖动结束回调。
 pub fn Slider::on_sliding_complete(self : Slider, callback : () -> Unit) -> Unit {
   keep_alive(callback)
-  ffi_slider_on_sliding_complete(self, fn(f) { f() }, callback)
+  ffi_slider_on_sliding_complete(self.view, fn(f) { f() }, callback)
 }
 
 ///|
@@ -102,20 +102,20 @@ pub fn ComboBox::new() -> ComboBox {
 ///|
 /// 设置文本。
 pub fn ComboBox::set_text(self : ComboBox, text : String) -> Unit {
-  ffi_combo_box_set_text(self, utf8_bytes(text))
+  ffi_combo_box_set_text(self.view, utf8_bytes(text))
 }
 
 ///|
 /// 读取文本。
 pub fn ComboBox::get_text(self : ComboBox) -> String {
-  from_utf8_bytes(ffi_combo_box_get_text(self))
+  from_utf8_bytes(ffi_combo_box_get_text(self.view))
 }
 
 ///|
 /// 注册文本变化回调。
 pub fn ComboBox::on_text_change(self : ComboBox, callback : () -> Unit) -> Unit {
   keep_alive(callback)
-  ffi_combo_box_on_text_change(self, fn(f) { f() }, callback)
+  ffi_combo_box_on_text_change(self.view, fn(f) { f() }, callback)
 }
 
 ///|
@@ -127,13 +127,13 @@ pub fn ProgressBar::new() -> ProgressBar {
 ///|
 /// 设置进度值（0.0 ~ 1.0；-1 与不定态配合）。
 pub fn ProgressBar::set_value(self : ProgressBar, value : Double) -> Unit {
-  ffi_progress_bar_set_value(self, value)
+  ffi_progress_bar_set_value(self.view, value)
 }
 
 ///|
 /// 设置不定态（如加载中的来回动画）。
 pub fn ProgressBar::set_indeterminate(self : ProgressBar, yes : Bool) -> Unit {
-  ffi_progress_bar_set_indeterminate(self, if yes { 1 } else { 0 })
+  ffi_progress_bar_set_indeterminate(self.view, if yes { 1 } else { 0 })
 }
 
 ///|
@@ -347,14 +347,14 @@ pub fn DatePicker::on_date_change(self : DatePicker, callback : () -> Unit) -> U
 pub fn Table::on_row_activate(self : Table, callback : (Int) -> Unit) -> Unit {
   let wrapped : (Int) -> Unit = fn(row) { callback(row) }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_table_on_row_activate(self, fn(f, row) { f(row) }, wrapped)
+  ffi_table_on_row_activate(self.view, fn(f, row) { f(row) }, wrapped)
 }
 
 ///|
 /// 注册选择变化回调。
 pub fn Table::on_selection_change(self : Table, callback : () -> Unit) -> Unit {
   keep_alive(callback)
-  ffi_table_on_selection_change(self, fn(f) { f() }, callback)
+  ffi_table_on_selection_change(self.view, fn(f) { f() }, callback)
 }
 
 ///|
@@ -365,7 +365,7 @@ pub fn Table::on_toggle_checkbox(
 ) -> Unit {
   let wrapped : (Int, Int) -> Unit = fn(column, row) { callback(column, row) }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_table_on_toggle_checkbox(self, fn(f, column, row) { f(column, row) }, wrapped)
+  ffi_table_on_toggle_checkbox(self.view, fn(f, column, row) { f(column, row) }, wrapped)
 }
 
 ///|

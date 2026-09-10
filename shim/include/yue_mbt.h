@@ -78,6 +78,22 @@ double yue_mbt_text_edit_get_text_bounds_height(void *edit);
 void yue_mbt_text_edit_on_text_change(void *edit,
                                       void (*invoke)(void *closure),
                                       void *closure);
+int32_t yue_mbt_text_edit_can_undo(void *edit);
+void yue_mbt_text_edit_undo(void *edit);
+int32_t yue_mbt_text_edit_can_redo(void *edit);
+void yue_mbt_text_edit_redo(void *edit);
+void yue_mbt_text_edit_cut(void *edit);
+void yue_mbt_text_edit_copy(void *edit);
+void yue_mbt_text_edit_paste(void *edit);
+void yue_mbt_text_edit_select_all(void *edit);
+void yue_mbt_text_edit_select_range(void *edit, int32_t start, int32_t end);
+void *yue_mbt_text_edit_get_text_in_range(void *edit, int32_t start,
+                                          int32_t end);
+void yue_mbt_text_edit_insert_text(void *edit, const char *text);
+void yue_mbt_text_edit_insert_text_at(void *edit, const char *text,
+                                      int32_t pos);
+void yue_mbt_text_edit_delete(void *edit);
+void yue_mbt_text_edit_delete_range(void *edit, int32_t start, int32_t end);
 
 /* ---------- Button ---------- */
 
@@ -91,6 +107,22 @@ void yue_mbt_button_on_click(void *button, void (*invoke)(void *closure),
 void *yue_mbt_entry_new(void);
 void yue_mbt_entry_set_text(void *entry, const char *text);
 void *yue_mbt_entry_get_text(void *entry);
+void yue_mbt_entry_on_text_change(void *entry, void (*invoke)(void *closure),
+                                  void *closure);
+void yue_mbt_entry_on_activate(void *entry, void (*invoke)(void *closure),
+                               void *closure);
+
+/* ---------- Tab（句柄=View） ---------- */
+
+void *yue_mbt_tab_new(void);
+void yue_mbt_tab_add_page(void *tab, const char *title, void *view);
+void yue_mbt_tab_remove_page(void *tab, void *view);
+int32_t yue_mbt_tab_page_count(void *tab);
+void yue_mbt_tab_select_page_at(void *tab, int32_t index);
+int32_t yue_mbt_tab_selected_page_index(void *tab);
+void yue_mbt_tab_on_selected_page_change(void *tab,
+                                         void (*invoke)(void *closure),
+                                         void *closure);
 
 /* ---------- Browser（WebView） ---------- */
 

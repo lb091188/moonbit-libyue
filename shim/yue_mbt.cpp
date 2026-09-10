@@ -373,6 +373,95 @@ void yue_mbt_text_edit_on_text_change(void *edit, void (*invoke)(void *),
   }
 }
 
+int32_t yue_mbt_text_edit_can_undo(void *edit) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    return e->CanUndo() ? 1 : 0;
+  }
+  return 0;
+}
+
+void yue_mbt_text_edit_undo(void *edit) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    e->Undo();
+  }
+}
+
+int32_t yue_mbt_text_edit_can_redo(void *edit) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    return e->CanRedo() ? 1 : 0;
+  }
+  return 0;
+}
+
+void yue_mbt_text_edit_redo(void *edit) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    e->Redo();
+  }
+}
+
+void yue_mbt_text_edit_cut(void *edit) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    e->Cut();
+  }
+}
+
+void yue_mbt_text_edit_copy(void *edit) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    e->Copy();
+  }
+}
+
+void yue_mbt_text_edit_paste(void *edit) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    e->Paste();
+  }
+}
+
+void yue_mbt_text_edit_select_all(void *edit) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    e->SelectAll();
+  }
+}
+
+void yue_mbt_text_edit_select_range(void *edit, int32_t start, int32_t end) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    e->SelectRange(start, end);
+  }
+}
+
+void *yue_mbt_text_edit_get_text_in_range(void *edit, int32_t start,
+                                          int32_t end) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    return BytesFromString(e->GetTextInRange(start, end));
+  }
+  return moonbit_make_bytes(0, 0);
+}
+
+void yue_mbt_text_edit_insert_text(void *edit, const char *text) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    e->InsertText(text);
+  }
+}
+
+void yue_mbt_text_edit_insert_text_at(void *edit, const char *text,
+                                      int32_t pos) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    e->InsertTextAt(text, pos);
+  }
+}
+
+void yue_mbt_text_edit_delete(void *edit) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    e->Delete();
+  }
+}
+
+void yue_mbt_text_edit_delete_range(void *edit, int32_t start, int32_t end) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
+    e->DeleteRange(start, end);
+  }
+}
+
 // ---------- Button ----------
 
 void *yue_mbt_button_new(const char *title) {
@@ -408,6 +497,70 @@ void *yue_mbt_entry_get_text(void *entry) {
     return BytesFromString(e->GetText());
   }
   return moonbit_make_bytes(0, 0);
+}
+
+void yue_mbt_entry_on_text_change(void *entry, void (*invoke)(void *),
+                                  void *closure) {
+  if (auto *e = CastTo<nu::Entry>(entry)) {
+    e->on_text_change.Connect([invoke, closure](nu::Entry *) { invoke(closure); });
+  }
+}
+
+void yue_mbt_entry_on_activate(void *entry, void (*invoke)(void *),
+                               void *closure) {
+  if (auto *e = CastTo<nu::Entry>(entry)) {
+    e->on_activate.Connect([invoke, closure](nu::Entry *) { invoke(closure); });
+  }
+}
+
+// ---------- Tab ----------
+
+void *yue_mbt_tab_new(void) {
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Tab()));
+}
+
+void yue_mbt_tab_add_page(void *tab, const char *title, void *view) {
+  if (auto *t = CastTo<nu::Tab>(tab)) {
+    if (auto *v = CastToView(view)) {
+      t->AddPage(title, v);
+    }
+  }
+}
+
+void yue_mbt_tab_remove_page(void *tab, void *view) {
+  if (auto *t = CastTo<nu::Tab>(tab)) {
+    if (auto *v = CastToView(view)) {
+      t->RemovePage(v);
+    }
+  }
+}
+
+int32_t yue_mbt_tab_page_count(void *tab) {
+  if (auto *t = CastTo<nu::Tab>(tab)) {
+    return t->PageCount();
+  }
+  return 0;
+}
+
+void yue_mbt_tab_select_page_at(void *tab, int32_t index) {
+  if (auto *t = CastTo<nu::Tab>(tab)) {
+    t->SelectPageAt(index);
+  }
+}
+
+int32_t yue_mbt_tab_selected_page_index(void *tab) {
+  if (auto *t = CastTo<nu::Tab>(tab)) {
+    return t->GetSelectedPageIndex();
+  }
+  return -1;
+}
+
+void yue_mbt_tab_on_selected_page_change(void *tab, void (*invoke)(void *),
+                                         void *closure) {
+  if (auto *t = CastTo<nu::Tab>(tab)) {
+    t->on_selected_page_change.Connect(
+        [invoke, closure](nu::Tab *) { invoke(closure); });
+  }
 }
 
 // ---------- Browser ----------

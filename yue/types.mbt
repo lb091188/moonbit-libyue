@@ -268,6 +268,17 @@ pub impl ViewLike for GifPlayer with view(self) {
 }
 
 ///|
+/// 页签控件（多页切换）。
+pub(all) struct Tab {
+  view : View
+}
+
+///|
+pub impl ViewLike for Tab with view(self) {
+  self.view
+}
+
+///|
 
 ///|
 

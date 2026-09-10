@@ -65,19 +65,19 @@ pub fn Table::new() -> Table {
 ///|
 /// 添加文本列（宽度 -1 为自动）。
 pub fn Table::add_column_text(self : Table, title : String, width : Int) -> Unit {
-  ffi_table_add_column_text(self, utf8_bytes(title), width)
+  ffi_table_add_column_text(self.view, utf8_bytes(title), width)
 }
 
 ///|
 /// 添加可编辑文本列（编辑结果经 set_value 回写模型）。
 pub fn Table::add_column_edit(self : Table, title : String, width : Int) -> Unit {
-  ffi_table_add_column_edit(self, utf8_bytes(title), width)
+  ffi_table_add_column_edit(self.view, utf8_bytes(title), width)
 }
 
 ///|
 /// 添加复选框列（切换经 set_value 回写模型）。
 pub fn Table::add_column_checkbox(self : Table, title : String, width : Int) -> Unit {
-  ffi_table_add_column_checkbox(self, utf8_bytes(title), width)
+  ffi_table_add_column_checkbox(self.view, utf8_bytes(title), width)
 }
 
 ///|
@@ -95,7 +95,7 @@ pub fn Table::add_column_custom(
     }
   keep_alive_draw(fn(painter) { wrapped(painter, 0.0, 0.0, 0.0, 0.0, Bytes::make(0, 0), Bytes::make(0, 0)) })
   ffi_table_add_column_custom(
-    self,
+    self.view,
     utf8_bytes(title),
     width,
     fn(f, painter, x, y, w, h, name, color) { f(painter, x, y, w, h, name, color) },
@@ -106,7 +106,7 @@ pub fn Table::add_column_custom(
 ///|
 /// 是否显示边框。
 pub fn Table::set_has_border(self : Table, yes : Bool) -> Unit {
-  ffi_table_set_has_border(self, if yes { 1 } else { 0 })
+  ffi_table_set_has_border(self.view, if yes { 1 } else { 0 })
 }
 
 ///|
@@ -119,7 +119,7 @@ pub fn[M : TableModel] Table::set_model(self : Table, model : M, column_count : 
   }
   keep_alive(fn() { ignore(box) })
   ffi_table_bind_model(
-    self,
+    self.view,
     column_count,
     box,
     fn(b : ModelBox) -> Int { (b.row_count)() },

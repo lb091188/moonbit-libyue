@@ -36,3 +36,17 @@ pub fn Entry::set_text(self : Entry, text : String) -> Unit {
 pub fn Entry::get_text(self : Entry) -> String {
   from_utf8_bytes(ffi_entry_get_text(self.view))
 }
+
+///|
+/// 注册文本变化回调（每次输入触发）。
+pub fn Entry::on_text_change(self : Entry, callback : () -> Unit) -> Unit {
+  keep_alive(callback)
+  ffi_entry_on_text_change(self.view, fn(f : (() -> Unit)) -> Unit { f() }, callback)
+}
+
+///|
+/// 注册回车激活回调（输入框内按 Enter）。
+pub fn Entry::on_activate(self : Entry, callback : () -> Unit) -> Unit {
+  keep_alive(callback)
+  ffi_entry_on_activate(self.view, fn(f : (() -> Unit)) -> Unit { f() }, callback)
+}

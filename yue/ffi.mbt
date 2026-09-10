@@ -144,6 +144,62 @@ extern "c" fn ffi_text_edit_on_text_change(
 ) -> Unit = "yue_mbt_text_edit_on_text_change"
 
 ///|
+#borrow(edit)
+extern "c" fn ffi_text_edit_can_undo(edit : View) -> Int = "yue_mbt_text_edit_can_undo"
+
+///|
+#borrow(edit)
+extern "c" fn ffi_text_edit_undo(edit : View) -> Unit = "yue_mbt_text_edit_undo"
+
+///|
+#borrow(edit)
+extern "c" fn ffi_text_edit_can_redo(edit : View) -> Int = "yue_mbt_text_edit_can_redo"
+
+///|
+#borrow(edit)
+extern "c" fn ffi_text_edit_redo(edit : View) -> Unit = "yue_mbt_text_edit_redo"
+
+///|
+#borrow(edit)
+extern "c" fn ffi_text_edit_cut(edit : View) -> Unit = "yue_mbt_text_edit_cut"
+
+///|
+#borrow(edit)
+extern "c" fn ffi_text_edit_copy(edit : View) -> Unit = "yue_mbt_text_edit_copy"
+
+///|
+#borrow(edit)
+extern "c" fn ffi_text_edit_paste(edit : View) -> Unit = "yue_mbt_text_edit_paste"
+
+///|
+#borrow(edit)
+extern "c" fn ffi_text_edit_select_all(edit : View) -> Unit = "yue_mbt_text_edit_select_all"
+
+///|
+#borrow(edit)
+extern "c" fn ffi_text_edit_select_range(edit : View, start : Int, end : Int) -> Unit = "yue_mbt_text_edit_select_range"
+
+///|
+#borrow(edit)
+extern "c" fn ffi_text_edit_get_text_in_range(edit : View, start : Int, end : Int) -> Bytes = "yue_mbt_text_edit_get_text_in_range"
+
+///|
+#borrow(edit, text)
+extern "c" fn ffi_text_edit_insert_text(edit : View, text : Bytes) -> Unit = "yue_mbt_text_edit_insert_text"
+
+///|
+#borrow(edit, text)
+extern "c" fn ffi_text_edit_insert_text_at(edit : View, text : Bytes, pos : Int) -> Unit = "yue_mbt_text_edit_insert_text_at"
+
+///|
+#borrow(edit)
+extern "c" fn ffi_text_edit_delete(edit : View) -> Unit = "yue_mbt_text_edit_delete"
+
+///|
+#borrow(edit)
+extern "c" fn ffi_text_edit_delete_range(edit : View, start : Int, end : Int) -> Unit = "yue_mbt_text_edit_delete_range"
+
+///|
 #borrow(title)
 extern "c" fn ffi_button_new(title : Bytes) -> View = "yue_mbt_button_new"
 
@@ -169,6 +225,53 @@ extern "c" fn ffi_entry_set_text(entry : View, text : Bytes) -> Unit = "yue_mbt_
 ///|
 #borrow(entry)
 extern "c" fn ffi_entry_get_text(entry : View) -> Bytes = "yue_mbt_entry_get_text"
+
+///|
+#borrow(entry, invoke, callback)
+extern "c" fn ffi_entry_on_text_change(
+  entry : View,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_entry_on_text_change"
+
+///|
+#borrow(entry, invoke, callback)
+extern "c" fn ffi_entry_on_activate(
+  entry : View,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_entry_on_activate"
+
+///|
+extern "c" fn ffi_tab_new() -> View = "yue_mbt_tab_new"
+
+///|
+#borrow(tab, title)
+extern "c" fn ffi_tab_add_page(tab : View, title : Bytes, view : View) -> Unit = "yue_mbt_tab_add_page"
+
+///|
+#borrow(tab)
+extern "c" fn ffi_tab_remove_page(tab : View, view : View) -> Unit = "yue_mbt_tab_remove_page"
+
+///|
+#borrow(tab)
+extern "c" fn ffi_tab_page_count(tab : View) -> Int = "yue_mbt_tab_page_count"
+
+///|
+#borrow(tab)
+extern "c" fn ffi_tab_select_page_at(tab : View, index : Int) -> Unit = "yue_mbt_tab_select_page_at"
+
+///|
+#borrow(tab)
+extern "c" fn ffi_tab_selected_page_index(tab : View) -> Int = "yue_mbt_tab_selected_page_index"
+
+///|
+#borrow(tab, invoke, callback)
+extern "c" fn ffi_tab_on_selected_page_change(
+  tab : View,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_tab_on_selected_page_change"
 
 ///|
 extern "c" fn ffi_browser_new() -> View = "yue_mbt_browser_new"
@@ -533,20 +636,20 @@ extern "c" fn ffi_table_new() -> View = "yue_mbt_table_new"
 
 ///|
 #borrow(table, title)
-extern "c" fn ffi_table_add_column_text(table : Table, title : Bytes, width : Int) -> Unit = "yue_mbt_table_add_column_text"
+extern "c" fn ffi_table_add_column_text(table : View, title : Bytes, width : Int) -> Unit = "yue_mbt_table_add_column_text"
 
 ///|
 #borrow(table, title)
-extern "c" fn ffi_table_add_column_edit(table : Table, title : Bytes, width : Int) -> Unit = "yue_mbt_table_add_column_edit"
+extern "c" fn ffi_table_add_column_edit(table : View, title : Bytes, width : Int) -> Unit = "yue_mbt_table_add_column_edit"
 
 ///|
 #borrow(table, title)
-extern "c" fn ffi_table_add_column_checkbox(table : Table, title : Bytes, width : Int) -> Unit = "yue_mbt_table_add_column_checkbox"
+extern "c" fn ffi_table_add_column_checkbox(table : View, title : Bytes, width : Int) -> Unit = "yue_mbt_table_add_column_checkbox"
 
 ///|
 #borrow(table, title, invoke, closure)
 extern "c" fn ffi_table_add_column_custom(
-  table : Table,
+  table : View,
   title : Bytes,
   width : Int,
   invoke : FuncRef[((Painter, Double, Double, Double, Double, Bytes, Bytes) -> Unit, Painter, Double, Double, Double, Double, Bytes, Bytes) -> Unit],
@@ -555,12 +658,12 @@ extern "c" fn ffi_table_add_column_custom(
 
 ///|
 #borrow(table)
-extern "c" fn ffi_table_set_has_border(table : Table, yes : Int) -> Unit = "yue_mbt_table_set_has_border"
+extern "c" fn ffi_table_set_has_border(table : View, yes : Int) -> Unit = "yue_mbt_table_set_has_border"
 
 ///|
 #borrow(table, closure, invoke_row_count, invoke_get_value, invoke_set_value)
 extern "c" fn ffi_table_bind_model(
-  table : Table,
+  table : View,
   column_count : Int,
   closure : ModelBox,
   invoke_row_count : FuncRef[(ModelBox) -> Int],
@@ -657,24 +760,24 @@ extern "c" fn ffi_slider_new() -> View = "yue_mbt_slider_new"
 
 ///|
 #borrow(slider)
-extern "c" fn ffi_slider_set_value(slider : Slider, value : Double) -> Unit = "yue_mbt_slider_set_value"
+extern "c" fn ffi_slider_set_value(slider : View, value : Double) -> Unit = "yue_mbt_slider_set_value"
 
 ///|
 #borrow(slider)
-extern "c" fn ffi_slider_get_value(slider : Slider) -> Double = "yue_mbt_slider_get_value"
+extern "c" fn ffi_slider_get_value(slider : View) -> Double = "yue_mbt_slider_get_value"
 
 ///|
 #borrow(slider)
-extern "c" fn ffi_slider_set_step(slider : Slider, step : Double) -> Unit = "yue_mbt_slider_set_step"
+extern "c" fn ffi_slider_set_step(slider : View, step : Double) -> Unit = "yue_mbt_slider_set_step"
 
 ///|
 #borrow(slider)
-extern "c" fn ffi_slider_set_range(slider : Slider, min : Double, max : Double) -> Unit = "yue_mbt_slider_set_range"
+extern "c" fn ffi_slider_set_range(slider : View, min : Double, max : Double) -> Unit = "yue_mbt_slider_set_range"
 
 ///|
 #borrow(slider, invoke, callback)
 extern "c" fn ffi_slider_on_value_change(
-  slider : Slider,
+  slider : View,
   invoke : FuncRef[((() -> Unit) -> Unit)],
   callback : () -> Unit,
 ) -> Unit = "yue_mbt_slider_on_value_change"
@@ -682,7 +785,7 @@ extern "c" fn ffi_slider_on_value_change(
 ///|
 #borrow(slider, invoke, callback)
 extern "c" fn ffi_slider_on_sliding_complete(
-  slider : Slider,
+  slider : View,
   invoke : FuncRef[((() -> Unit) -> Unit)],
   callback : () -> Unit,
 ) -> Unit = "yue_mbt_slider_on_sliding_complete"
@@ -727,16 +830,16 @@ extern "c" fn ffi_combo_box_new() -> View = "yue_mbt_combo_box_new"
 
 ///|
 #borrow(combobox, text)
-extern "c" fn ffi_combo_box_set_text(combobox : ComboBox, text : Bytes) -> Unit = "yue_mbt_combo_box_set_text"
+extern "c" fn ffi_combo_box_set_text(combobox : View, text : Bytes) -> Unit = "yue_mbt_combo_box_set_text"
 
 ///|
 #borrow(combobox)
-extern "c" fn ffi_combo_box_get_text(combobox : ComboBox) -> Bytes = "yue_mbt_combo_box_get_text"
+extern "c" fn ffi_combo_box_get_text(combobox : View) -> Bytes = "yue_mbt_combo_box_get_text"
 
 ///|
 #borrow(combobox, invoke, callback)
 extern "c" fn ffi_combo_box_on_text_change(
-  combobox : ComboBox,
+  combobox : View,
   invoke : FuncRef[((() -> Unit) -> Unit)],
   callback : () -> Unit,
 ) -> Unit = "yue_mbt_combo_box_on_text_change"
@@ -746,11 +849,11 @@ extern "c" fn ffi_progress_bar_new() -> View = "yue_mbt_progress_bar_new"
 
 ///|
 #borrow(bar)
-extern "c" fn ffi_progress_bar_set_value(bar : ProgressBar, value : Double) -> Unit = "yue_mbt_progress_bar_set_value"
+extern "c" fn ffi_progress_bar_set_value(bar : View, value : Double) -> Unit = "yue_mbt_progress_bar_set_value"
 
 ///|
 #borrow(bar)
-extern "c" fn ffi_progress_bar_set_indeterminate(bar : ProgressBar, yes : Int) -> Unit = "yue_mbt_progress_bar_set_indeterminate"
+extern "c" fn ffi_progress_bar_set_indeterminate(bar : View, yes : Int) -> Unit = "yue_mbt_progress_bar_set_indeterminate"
 
 ///|
 extern "c" fn ffi_popover_new() -> Popover = "yue_mbt_popover_new"
@@ -963,7 +1066,7 @@ extern "c" fn ffi_date_picker_on_date_change(
 ///|
 #borrow(table, invoke, callback)
 extern "c" fn ffi_table_on_row_activate(
-  table : Table,
+  table : View,
   invoke : FuncRef[((Int) -> Unit, Int) -> Unit],
   callback : (Int) -> Unit,
 ) -> Unit = "yue_mbt_table_on_row_activate"
@@ -971,7 +1074,7 @@ extern "c" fn ffi_table_on_row_activate(
 ///|
 #borrow(table, invoke, callback)
 extern "c" fn ffi_table_on_selection_change(
-  table : Table,
+  table : View,
   invoke : FuncRef[((() -> Unit) -> Unit)],
   callback : () -> Unit,
 ) -> Unit = "yue_mbt_table_on_selection_change"
@@ -979,7 +1082,7 @@ extern "c" fn ffi_table_on_selection_change(
 ///|
 #borrow(table, invoke, callback)
 extern "c" fn ffi_table_on_toggle_checkbox(
-  table : Table,
+  table : View,
   invoke : FuncRef[((Int, Int) -> Unit, Int, Int) -> Unit],
   callback : (Int, Int) -> Unit,
 ) -> Unit = "yue_mbt_table_on_toggle_checkbox"
