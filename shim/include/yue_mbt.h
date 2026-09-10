@@ -242,6 +242,48 @@ void *yue_mbt_table_model_new(int32_t column_count, void *closure,
                                                 int32_t kind, void *data, int32_t flag));
 void yue_mbt_table_set_model(void *table, void *model);
 
+/* ---------- 拖放（DraggingInfo 仅拖拽回调期内有效，裸指针借出） ---------- */
+
+/* 数据种类：1=Text 2=HTML 3=Image 4=FilePaths（与 Clipboard::Data::Type 一致） */
+int32_t yue_mbt_dragging_is_available(void *info, int32_t kind);
+/* 返回编码 Bytes [kind:i32le][payload]：
+ *   1/2 payload 为 UTF-8 文本；4 payload 为 UTF-8 文本（路径 \n 连接）；
+ *   3 payload 为 Image 句柄 i64（由注册表托管）。 */
+void *yue_mbt_dragging_get_data(void *info, int32_t kind);
+int32_t yue_mbt_dragging_get_operations(void *info);
+
+/* ---------- View 拖放 ---------- */
+
+/* kinds 打包为 [k0:i32le][k1:i32le]... */
+void yue_mbt_view_register_dragged_types(void *view, const int32_t *kinds, int32_t len);
+/* 发起文件拖动：paths 为 UTF-8 文本（路径 \n 连接），drag_image 为拖动预览图
+ * 句柄（0 表示无）。阻塞至拖动结束，返回拖动操作。 */
+int32_t yue_mbt_view_do_drag_file_paths(void *view, const char *paths,
+                                        int32_t operations, int64_t drag_image);
+/* 委托回调：invoke(closure, info, x, y) 返回拖动操作（drop 返回 0/1 表示接受） */
+void yue_mbt_view_handle_drag_enter(void *view,
+    int32_t (*invoke)(void *closure, void *info, double x, double y), void *closure);
+void yue_mbt_view_handle_drag_update(void *view,
+    int32_t (*invoke)(void *closure, void *info, double x, double y), void *closure);
+void yue_mbt_view_handle_drop(void *view,
+    int32_t (*invoke)(void *closure, void *info, double x, double y), void *closure);
+void yue_mbt_view_on_drag_leave(void *view, void (*invoke)(void *), void *closure);
+
+void yue_mbt_view_schedule_paint(void *view);
+/* 鼠标按下（Responder 信号）：callback 返回 true 表示事件已处理。
+ * invoke(closure, modifiers, button_flags)——精简为仅回调无参版本，
+ * 拖拽发起不需要修饰键信息。 */
+void yue_mbt_view_on_mouse_down(void *view,
+                                int32_t (*invoke)(void *closure), void *closure);
+/* 视图边界（相对自身坐标系的尺寸 + 原点） */
+double yue_mbt_view_get_bounds_x(void *view);
+double yue_mbt_view_get_bounds_y(void *view);
+double yue_mbt_view_get_bounds_width(void *view);
+double yue_mbt_view_get_bounds_height(void *view);
+void *yue_mbt_image_from_handle(int64_t h);
+int64_t yue_mbt_image_to_handle(void *image);
+void yue_mbt_painter_set_color(void *painter, const char *hex);
+
 /* ---------- 托盘 ---------- */
 
 int32_t yue_mbt_tray_supported(void);

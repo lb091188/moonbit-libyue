@@ -167,3 +167,170 @@ pub fn Label::new(text : String) -> Label {
 pub fn Label::set_text(self : Label, text : String) -> Unit {
   ffi_label_set_text(self.view, utf8_bytes(text))
 }
+
+///|
+/// 拖拽数据种类。
+pub(all) enum DataKind {
+  Text
+  Html
+  Image
+  FilePaths
+}
+
+///|
+fn data_kind_id(k : DataKind) -> Int {
+  match k {
+    Text => 1
+    Html => 2
+    Image => 3
+    FilePaths => 4
+  }
+}
+
+///|
+/// 拖拽会话中读取的数据。
+pub(all) enum DragData {
+  Text(String)
+  Paths(Array[String])
+  Img(Image)
+}
+
+///|
+/// Image 值与注册表句柄互转（句柄即 Image 值的底层表示）。
+#borrow(image)
+extern "c" fn ffi_image_to_handle(image : Image) -> Int64 = "yue_mbt_image_to_handle"
+
+///|
+extern "c" fn ffi_image_from_handle(h : Int64) -> Image = "yue_mbt_image_from_handle"
+
+///|
+let drag_callbacks : Ref[Array[(DraggingInfo, Double, Double) -> Int]] = Ref([])
+
+fn keep_alive_drag(callback : (DraggingInfo, Double, Double) -> Int) -> Unit {
+  drag_callbacks.val.push(callback)
+}
+
+///|
+/// 从拖拽会话读取指定种类的数据（仅在拖拽回调内有效）。
+pub fn DraggingInfo::get_data(self : DraggingInfo, kind : DataKind) -> DragData? {
+  let id = data_kind_id(kind)
+  if ffi_dragging_is_available(self, id) != 1 {
+    return None
+  }
+  let data = ffi_dragging_get_data(self, id)
+  let pk = (data[0].to_int() | (data[1].to_int() << 8) |
+           (data[2].to_int() << 16) | (data[3].to_int() << 24))
+  if pk == 3 {
+    let mut h : Int64 = 0L
+    for i = 0; i < 8; i = i + 1 {
+      h = h | (data[4 + i].to_int().to_int64() << (i * 8))
+    }
+    if h == 0L {
+      return None
+    }
+    Some(Img(ffi_image_from_handle(h)))
+  } else {
+    let text = @utf8.decode_lossy(data[4:data.length()])
+    if pk == 4 {
+      Some(Paths(text.split("\n").collect().map(fn(s) { s.to_owned() })))
+    } else {
+      Some(Text(text))
+    }
+  }
+}
+
+///|
+impl ViewLike with fn register_dragged_types(self, kinds : Array[DataKind]) -> Unit {
+  let buf = FixedArray::make(kinds.length() * 4, b'\x00')
+  for i, k in kinds {
+    let id = data_kind_id(k)
+    buf[i * 4] = (id & 255).to_byte()
+    buf[i * 4 + 1] = ((id >> 8) & 255).to_byte()
+    buf[i * 4 + 2] = ((id >> 16) & 255).to_byte()
+    buf[i * 4 + 3] = ((id >> 24) & 255).to_byte()
+  }
+  ffi_view_register_dragged_types(self.view(), Bytes::from_array(buf), kinds.length())
+}
+
+///|
+/// 拖动操作位：复制。
+pub const DRAG_OPERATION_COPY : Int = 1
+
+///|
+impl ViewLike with fn do_drag_file_paths(self, paths : Array[String], drag_image : Image?) -> Int {
+  let sb = StringBuilder()
+  for i, p in paths {
+    if i > 0 {
+      sb.write_char('\n')
+    }
+    sb.write_string(p)
+  }
+  let img : Int64 = match drag_image {
+    Some(image) => ffi_image_to_handle(image)
+    None => 0L
+  }
+  ffi_view_do_drag_file_paths(self.view(), utf8_bytes(sb.to_string()),
+                              DRAG_OPERATION_COPY, img)
+}
+
+///|
+impl ViewLike with fn handle_drag_enter(
+  self,
+  callback : (DraggingInfo, Double, Double) -> Int,
+) -> Unit {
+  keep_alive_drag(callback)
+  ffi_view_handle_drag_enter(self.view(),
+    fn(f, info, x, y) { f(info, x, y) }, callback)
+}
+
+///|
+impl ViewLike with fn handle_drag_update(
+  self,
+  callback : (DraggingInfo, Double, Double) -> Int,
+) -> Unit {
+  keep_alive_drag(callback)
+  ffi_view_handle_drag_update(self.view(),
+    fn(f, info, x, y) { f(info, x, y) }, callback)
+}
+
+///|
+impl ViewLike with fn handle_drop(
+  self,
+  callback : (DraggingInfo, Double, Double) -> Bool,
+) -> Unit {
+  let wrapped : (DraggingInfo, Double, Double) -> Int =
+    fn(info, x, y) { if callback(info, x, y) { 1 } else { 0 } }
+  keep_alive_drag(wrapped)
+  ffi_view_handle_drop(self.view(),
+    fn(f, info, x, y) { f(info, x, y) }, wrapped)
+}
+
+///|
+impl ViewLike with fn on_drag_leave(self, callback : () -> Unit) -> Unit {
+  keep_alive(callback)
+  ffi_view_on_drag_leave(self.view(), fn(f) { f() }, callback)
+}
+
+///|
+impl ViewLike with fn schedule_paint(self) -> Unit {
+  ffi_view_schedule_paint(self.view())
+}
+
+///|
+impl ViewLike with fn get_bounds(self) -> (Double, Double, Double, Double) {
+  (ffi_view_get_bounds_x(self.view()), ffi_view_get_bounds_y(self.view()),
+   ffi_view_get_bounds_width(self.view()), ffi_view_get_bounds_height(self.view()))
+}
+
+///|
+/// 设置绘制颜色（笔触/文本默认色）。
+pub fn Painter::set_color(self : Painter, hex : String) -> Unit {
+  ffi_painter_set_color(self, utf8_bytes(hex))
+}
+
+///|
+impl ViewLike with fn on_mouse_down(self, callback : () -> Bool) -> Unit {
+  let wrapped : () -> Int = fn() { if callback() { 1 } else { 0 } }
+  keep_alive(fn() { ignore(wrapped) })
+  ffi_view_on_mouse_down(self.view(), fn(f) { f() }, wrapped)
+}

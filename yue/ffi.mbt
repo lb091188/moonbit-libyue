@@ -572,6 +572,90 @@ extern "c" fn ffi_table_model_new(
 extern "c" fn ffi_table_set_model(table : View, model : TableModelHandle) -> Unit = "yue_mbt_table_set_model"
 
 ///|
+#borrow(info)
+extern "c" fn ffi_dragging_is_available(info : DraggingInfo, kind : Int) -> Int = "yue_mbt_dragging_is_available"
+
+///|
+#borrow(info)
+extern "c" fn ffi_dragging_get_data(info : DraggingInfo, kind : Int) -> Bytes = "yue_mbt_dragging_get_data"
+
+///|
+#borrow(info)
+extern "c" fn ffi_dragging_get_operations(info : DraggingInfo) -> Int = "yue_mbt_dragging_get_operations"
+
+///|
+#borrow(view, kinds)
+extern "c" fn ffi_view_register_dragged_types(view : View, kinds : Bytes, len : Int) -> Unit = "yue_mbt_view_register_dragged_types"
+
+///|
+#borrow(view, paths)
+extern "c" fn ffi_view_do_drag_file_paths(view : View, paths : Bytes, operations : Int, drag_image : Int64) -> Int = "yue_mbt_view_do_drag_file_paths"
+
+///|
+#borrow(view, invoke, closure)
+extern "c" fn ffi_view_handle_drag_enter(
+  view : View,
+  invoke : FuncRef[((DraggingInfo, Double, Double) -> Int, DraggingInfo, Double, Double) -> Int],
+  closure : (DraggingInfo, Double, Double) -> Int,
+) -> Unit = "yue_mbt_view_handle_drag_enter"
+
+///|
+#borrow(view, invoke, closure)
+extern "c" fn ffi_view_handle_drag_update(
+  view : View,
+  invoke : FuncRef[((DraggingInfo, Double, Double) -> Int, DraggingInfo, Double, Double) -> Int],
+  closure : (DraggingInfo, Double, Double) -> Int,
+) -> Unit = "yue_mbt_view_handle_drag_update"
+
+///|
+#borrow(view, invoke, closure)
+extern "c" fn ffi_view_handle_drop(
+  view : View,
+  invoke : FuncRef[((DraggingInfo, Double, Double) -> Int, DraggingInfo, Double, Double) -> Int],
+  closure : (DraggingInfo, Double, Double) -> Int,
+) -> Unit = "yue_mbt_view_handle_drop"
+
+///|
+#borrow(view, invoke, callback)
+extern "c" fn ffi_view_on_drag_leave(
+  view : View,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_view_on_drag_leave"
+
+///|
+#borrow(view)
+extern "c" fn ffi_view_schedule_paint(view : View) -> Unit = "yue_mbt_view_schedule_paint"
+
+///|
+#borrow(view)
+extern "c" fn ffi_view_get_bounds_x(view : View) -> Double = "yue_mbt_view_get_bounds_x"
+
+///|
+#borrow(view)
+extern "c" fn ffi_view_get_bounds_y(view : View) -> Double = "yue_mbt_view_get_bounds_y"
+
+///|
+#borrow(view)
+extern "c" fn ffi_view_get_bounds_width(view : View) -> Double = "yue_mbt_view_get_bounds_width"
+
+///|
+#borrow(view)
+extern "c" fn ffi_view_get_bounds_height(view : View) -> Double = "yue_mbt_view_get_bounds_height"
+
+///|
+#borrow(painter, hex)
+extern "c" fn ffi_painter_set_color(painter : Painter, hex : Bytes) -> Unit = "yue_mbt_painter_set_color"
+
+///|
+#borrow(view, invoke, callback)
+extern "c" fn ffi_view_on_mouse_down(
+  view : View,
+  invoke : FuncRef[((() -> Int) -> Int)],
+  callback : () -> Int,
+) -> Unit = "yue_mbt_view_on_mouse_down"
+
+///|
 /// 托盘后端可用性探测。Linux 上等价于检查 AppIndicator 运行库能否加载。
 extern "c" fn ffi_tray_supported() -> Bool = "yue_mbt_tray_supported"
 

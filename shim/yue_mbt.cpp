@@ -1080,6 +1080,191 @@ void yue_mbt_table_set_model(void *table, void *model) {
   }
 }
 
+
+// ---------- 拖放 ----------
+
+namespace {
+
+// Clipboard::Data::Type: None=0 Text=1 HTML=2 Image=3 FilePaths=4
+nu::Clipboard::Data::Type ToDataType(int32_t kind) {
+  return static_cast<nu::Clipboard::Data::Type>(kind);
+}
+
+}  // namespace
+
+int32_t yue_mbt_dragging_is_available(void *info, int32_t kind) {
+  auto *i = static_cast<nu::DraggingInfo *>(info);
+  return i != nullptr && i->IsDataAvailable(ToDataType(kind)) ? 1 : 0;
+}
+
+void *yue_mbt_dragging_get_data(void *info, int32_t kind) {
+  auto *i = static_cast<nu::DraggingInfo *>(info);
+  if (i == nullptr || !i->IsDataAvailable(ToDataType(kind))) {
+    return moonbit_make_bytes(0, 0);
+  }
+  nu::Clipboard::Data data = i->GetData(ToDataType(kind));
+  if (kind == 3) {
+    // Image：句柄 i64 编码进 Bytes
+    nu::Image *img = data.image();
+    int64_t handle = img != nullptr ? ImageStore::put(img) : 0;
+    void *bytes = moonbit_make_bytes(12, 0);
+    int32_t k = 3;
+    std::memcpy(bytes, &k, 4);
+    std::memcpy(static_cast<char *>(bytes) + 4, &handle, 8);
+    return bytes;
+  }
+  std::string text;
+  if (kind == 4) {
+    for (const base::FilePath &path : data.file_paths()) {
+      if (!text.empty()) {
+        text += '\n';
+      }
+      text += path.value();
+    }
+  } else {
+    text = data.str();
+  }
+  void *bytes = moonbit_make_bytes(static_cast<int32_t>(4 + text.size()), 0);
+  int32_t k = kind;
+  std::memcpy(bytes, &k, 4);
+  if (!text.empty()) {
+    std::memcpy(static_cast<char *>(bytes) + 4, text.data(), text.size());
+  }
+  return bytes;
+}
+
+int32_t yue_mbt_dragging_get_operations(void *info) {
+  auto *i = static_cast<nu::DraggingInfo *>(info);
+  return i != nullptr ? i->GetDragOperations() : 0;
+}
+
+// ---------- View 拖放 ----------
+
+void yue_mbt_view_register_dragged_types(void *view, const int32_t *kinds, int32_t len) {
+  if (auto *v = CastToView(view)) {
+    std::set<nu::Clipboard::Data::Type> types;
+    for (int32_t i = 0; i < len; i++) {
+      types.insert(ToDataType(kinds[i]));
+    }
+    v->RegisterDraggedTypes(types);
+  }
+}
+
+int32_t yue_mbt_view_do_drag_file_paths(void *view, const char *paths,
+                                        int32_t operations, int64_t drag_image) {
+  auto *v = CastToView(view);
+  if (v == nullptr) {
+    return 0;
+  }
+  std::vector<nu::Clipboard::Data> data;
+  nu::Clipboard::Data paths_data(nu::Clipboard::Data::Type::FilePaths,
+                                 std::string(paths));
+  data.push_back(std::move(paths_data));
+  nu::DragOptions options;
+  if (drag_image != 0) {
+    if (auto *img = ImageStore::get(reinterpret_cast<void *>(drag_image))) {
+      options.image = scoped_refptr<nu::Image>(img);
+    }
+  }
+  return v->DoDragWithOptions(std::move(data), operations, options);
+}
+
+void yue_mbt_view_handle_drag_enter(void *view,
+                                    int32_t (*invoke)(void *, void *, double, double),
+                                    void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->handle_drag_enter = [invoke, closure](nu::View *, nu::DraggingInfo *info,
+                                             const nu::PointF &point) {
+      return invoke(closure, info, point.x(), point.y());
+    };
+  }
+}
+
+void yue_mbt_view_handle_drag_update(void *view,
+                                     int32_t (*invoke)(void *, void *, double, double),
+                                     void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->handle_drag_update = [invoke, closure](nu::View *, nu::DraggingInfo *info,
+                                              const nu::PointF &point) {
+      return invoke(closure, info, point.x(), point.y());
+    };
+  }
+}
+
+void yue_mbt_view_handle_drop(void *view,
+                              int32_t (*invoke)(void *, void *, double, double),
+                              void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->handle_drop = [invoke, closure](nu::View *, nu::DraggingInfo *info,
+                                       const nu::PointF &point) {
+      return invoke(closure, info, point.x(), point.y()) != 0;
+    };
+  }
+}
+
+void yue_mbt_view_on_drag_leave(void *view, void (*invoke)(void *), void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->on_drag_leave.Connect([invoke, closure](nu::View *, nu::DraggingInfo *) {
+      invoke(closure);
+    });
+  }
+}
+
+void yue_mbt_view_schedule_paint(void *view) {
+  if (auto *v = CastToView(view)) {
+    v->SchedulePaint();
+  }
+}
+
+double yue_mbt_view_get_bounds_x(void *view) {
+  if (auto *v = CastToView(view)) {
+    return v->GetBounds().x();
+  }
+  return 0;
+}
+
+double yue_mbt_view_get_bounds_y(void *view) {
+  if (auto *v = CastToView(view)) {
+    return v->GetBounds().y();
+  }
+  return 0;
+}
+
+double yue_mbt_view_get_bounds_width(void *view) {
+  if (auto *v = CastToView(view)) {
+    return v->GetBounds().width();
+  }
+  return 0;
+}
+
+double yue_mbt_view_get_bounds_height(void *view) {
+  if (auto *v = CastToView(view)) {
+    return v->GetBounds().height();
+  }
+  return 0;
+}
+
+void *yue_mbt_image_from_handle(int64_t h) {
+  return reinterpret_cast<void *>(h);
+}
+
+int64_t yue_mbt_image_to_handle(void *image) {
+  return reinterpret_cast<int64_t>(image);
+}
+
+void yue_mbt_view_on_mouse_down(void *view, int32_t (*invoke)(void *), void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->on_mouse_down.Connect([invoke, closure](nu::Responder *,
+                                               const nu::MouseEvent &) {
+      return invoke(closure) != 0;
+    });
+  }
+}
+
+void yue_mbt_painter_set_color(void *painter, const char *hex) {
+  static_cast<nu::Painter *>(painter)->SetColor(nu::Color(std::string(hex)));
+}
+
 // ---------- 托盘 ----------
 
 #if defined(OS_LINUX)

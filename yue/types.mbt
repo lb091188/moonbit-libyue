@@ -5,8 +5,7 @@
 ///|
 /// 各控件共用的底层句柄（shim 注册表 id）。
 /// #external：值不参与 MoonBit 引用计数，GC 不扫描/移动它。
-#external
-type View
+pub extern type View
 
 ///|
 pub(all) struct Window {
@@ -55,6 +54,15 @@ pub(open) trait ViewLike {
   fn set_style(Self, String, Double) -> Unit = _
   fn set_style_str(Self, String, String) -> Unit = _
   fn set_background_color(Self, String) -> Unit = _
+  fn register_dragged_types(Self, Array[DataKind]) -> Unit = _
+  fn do_drag_file_paths(Self, Array[String], Image?) -> Int = _
+  fn handle_drag_enter(Self, (DraggingInfo, Double, Double) -> Int) -> Unit = _
+  fn handle_drag_update(Self, (DraggingInfo, Double, Double) -> Int) -> Unit = _
+  fn handle_drop(Self, (DraggingInfo, Double, Double) -> Bool) -> Unit = _
+  fn on_drag_leave(Self, () -> Unit) -> Unit = _
+  fn schedule_paint(Self) -> Unit = _
+  fn get_bounds(Self) -> (Double, Double, Double, Double) = _
+  fn on_mouse_down(Self, () -> Bool) -> Unit = _
 }
 
 pub impl ViewLike for Window with view(self) {
@@ -103,47 +111,40 @@ pub impl ViewLike for Table with view(self) {
 
 ///|
 /// 独立句柄：菜单条（继承 RefCounted 而非 Responder/View）。
-#external
-type MenuBar
+pub extern type MenuBar
 
 ///|
-#external
-type Menu
+pub extern type Menu
 
 ///|
-#external
-type MenuItem
+pub extern type MenuItem
 
 ///|
-#external
-type FileDialog
+pub extern type FileDialog
 
 ///|
-#external
-type Tray
+pub extern type Tray
 
 ///|
-#external
-type Image
+pub extern type Image
 
 ///|
-#external
-type Canvas
+pub extern type Canvas
 
 ///|
-#external
-type AttributedText
+pub extern type AttributedText
 
 ///|
-#external
-type Font
+pub extern type Font
 
 ///|
 /// 表格模型桥句柄（C++ TableModelBridge）。
-#external
-type TableModelHandle
+pub extern type TableModelHandle
 
 ///|
 /// 绘制回调期间由 C 借出的裸指针，无 GC 头，不得持有。
-#external
-type Painter
+pub extern type Painter
+
+///|
+/// 拖拽会话信息：仅拖拽回调期内有效（C 借出，无 GC 头）。
+pub extern type DraggingInfo

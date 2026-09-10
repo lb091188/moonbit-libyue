@@ -327,3 +327,24 @@ pub fn Image::get_width(self : Image) -> Double {
 pub fn Image::get_height(self : Image) -> Double {
   ffi_image_get_height(self)
 }
+
+///|
+/// 可选图片槽：供消费方保存/读取拖拽得到的图片而不必引用底层句柄类型。
+pub(all) struct ImageSlot {
+  mut value : Image?
+}
+
+///|
+pub fn ImageSlot::new() -> ImageSlot {
+  { value: None }
+}
+
+///|
+pub fn ImageSlot::set(self : ImageSlot, img : Image?) -> Unit {
+  self.value = img
+}
+
+///|
+pub fn ImageSlot::get(self : ImageSlot) -> Image? {
+  self.value
+}
