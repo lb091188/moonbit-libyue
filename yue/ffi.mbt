@@ -946,16 +946,16 @@ extern "c" fn ffi_notification_center_get() -> NotificationCenter = "yue_mbt_not
 
 ///|
 #borrow(picker)
-extern "c" fn ffi_date_picker_set_date(picker : DatePicker, epoch_seconds : Int64) -> Unit = "yue_mbt_date_picker_set_date"
+extern "c" fn ffi_date_picker_set_date(picker : View, epoch_seconds : Int64) -> Unit = "yue_mbt_date_picker_set_date"
 
 ///|
 #borrow(picker)
-extern "c" fn ffi_date_picker_get_date(picker : DatePicker) -> Int64 = "yue_mbt_date_picker_get_date"
+extern "c" fn ffi_date_picker_get_date(picker : View) -> Int64 = "yue_mbt_date_picker_get_date"
 
 ///|
 #borrow(picker, invoke, callback)
 extern "c" fn ffi_date_picker_on_date_change(
-  picker : DatePicker,
+  picker : View,
   invoke : FuncRef[((() -> Unit) -> Unit)],
   callback : () -> Unit,
 ) -> Unit = "yue_mbt_date_picker_on_date_change"

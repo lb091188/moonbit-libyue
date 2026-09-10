@@ -326,20 +326,20 @@ pub fn NotificationCenter::get() -> NotificationCenter {
 ///|
 /// 设置日期（Unix epoch 秒）。
 pub fn DatePicker::set_date(self : DatePicker, epoch_seconds : Int64) -> Unit {
-  ffi_date_picker_set_date(self, epoch_seconds)
+  ffi_date_picker_set_date(self.view(), epoch_seconds)
 }
 
 ///|
 /// 读取日期（Unix epoch 秒）。
 pub fn DatePicker::get_date(self : DatePicker) -> Int64 {
-  ffi_date_picker_get_date(self)
+  ffi_date_picker_get_date(self.view())
 }
 
 ///|
 /// 注册日期变化回调。
 pub fn DatePicker::on_date_change(self : DatePicker, callback : () -> Unit) -> Unit {
   keep_alive(callback)
-  ffi_date_picker_on_date_change(self, fn(f) { f() }, callback)
+  ffi_date_picker_on_date_change(self.view(), fn(f) { f() }, callback)
 }
 
 ///|
