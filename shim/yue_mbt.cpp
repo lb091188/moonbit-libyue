@@ -27,6 +27,10 @@
 #include "nativeui/global_shortcut.h"
 #include "nativeui/notification.h"
 #include "nativeui/notification_center.h"
+#include "nativeui/app.h"
+#include "nativeui/appearance.h"
+#include "nativeui/locale.h"
+#include "nativeui/screen.h"
 
 // 不包含 <moonbit.h>：它在 extern "C" 里声明的 memcpy 与 glibc 的
 // C++ noexcept 声明冲突。只声明用到的运行时入口，签名照抄
@@ -1109,22 +1113,18 @@ void yue_mbt_table_set_has_border(void *table, int32_t yes) {
   }
 }
 
-void *yue_mbt_table_model_new(int32_t column_count, void *closure,
+void yue_mbt_table_bind_model(void *table, int32_t column_count, void *closure,
                               uint32_t (*row_count)(void *),
                               void *(*get_value)(void *, uint32_t, uint32_t),
                               void (*set_value)(void *, uint32_t, uint32_t,
                                                 int32_t, void *, int32_t)) {
-  return reinterpret_cast<void *>(ModelStore::put(
+  auto *t = CastTo<nu::Table>(table);
+  if (t == nullptr) {
+    return;
+  }
+  t->SetModel(scoped_refptr<nu::TableModel>(
       new TableModelBridge(static_cast<uint32_t>(column_count), closure,
                            row_count, get_value, set_value)));
-}
-
-void yue_mbt_table_set_model(void *table, void *model) {
-  auto *t = CastTo<nu::Table>(table);
-  auto *m = ModelStore::get(model);
-  if (t != nullptr && m != nullptr) {
-    t->SetModel(scoped_refptr<nu::TableModel>(m));
-  }
 }
 
 
@@ -1686,6 +1686,10 @@ void yue_mbt_notification_close(void *n) {
   }
 }
 
+void *yue_mbt_notification_center_get(void) {
+  return nu::NotificationCenter::GetCurrent();
+}
+
 void yue_mbt_notification_center_add(void *n) {
   yue_mbt_notification_show(n);
 }
@@ -1716,6 +1720,48 @@ void yue_mbt_gif_player_set_image(void *player, void *image) {
   if (g != nullptr && img != nullptr) {
     g->SetImage(scoped_refptr<nu::Image>(img));
   }
+}
+
+
+// ---------- App / Appearance / Locale / Screen ----------
+
+void yue_mbt_app_set_name(const char *name) {
+  nu::App::GetCurrent()->SetName(name);
+}
+
+int32_t yue_mbt_app_get_name(char *name_buf) {
+  std::string name = nu::App::GetCurrent()->GetName();
+  int32_t len = static_cast<int32_t>(name.size());
+  std::memcpy(name_buf, name.data(), name.size());
+  return len;
+}
+
+int32_t yue_mbt_appearance_is_dark(void) {
+  return nu::Appearance::GetCurrent()->IsDarkScheme() ? 1 : 0;
+}
+
+int32_t yue_mbt_locale_get(char *buf, int32_t cap) {
+  std::string id = nu::Locale::GetCurrentIdentifier();
+  int32_t len = static_cast<int32_t>(id.size());
+  if (len > cap) {
+    len = cap;
+  }
+  std::memcpy(buf, id.data(), len);
+  return len;
+}
+
+double yue_mbt_screen_get_scale_factor(void) {
+  return nu::Screen::GetDefaultScaleFactor();
+}
+
+double yue_mbt_screen_get_primary_width(void) {
+  nu::Display display = nu::Screen::GetCurrent()->GetPrimaryDisplay();
+  return display.bounds.width();
+}
+
+double yue_mbt_screen_get_primary_height(void) {
+  nu::Display display = nu::Screen::GetCurrent()->GetPrimaryDisplay();
+  return display.bounds.height();
 }
 
 // ---------- 托盘 ----------

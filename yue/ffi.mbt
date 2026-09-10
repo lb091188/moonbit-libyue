@@ -558,18 +558,15 @@ extern "c" fn ffi_table_add_column_custom(
 extern "c" fn ffi_table_set_has_border(table : Table, yes : Int) -> Unit = "yue_mbt_table_set_has_border"
 
 ///|
-#borrow(closure, invoke_row_count, invoke_get_value, invoke_set_value)
-extern "c" fn ffi_table_model_new(
+#borrow(table, closure, invoke_row_count, invoke_get_value, invoke_set_value)
+extern "c" fn ffi_table_bind_model(
+  table : Table,
   column_count : Int,
   closure : ModelBox,
   invoke_row_count : FuncRef[(ModelBox) -> Int],
   invoke_get_value : FuncRef[((ModelBox, Int, Int) -> TableValue, ModelBox, Int, Int) -> Bytes],
   invoke_set_value : FuncRef[((ModelBox, Int, Int, TableValue) -> Unit, ModelBox, Int, Int, Int, Bytes, Int) -> Unit],
-) -> TableModelHandle = "yue_mbt_table_model_new"
-
-///|
-#borrow(table, model)
-extern "c" fn ffi_table_set_model(table : View, model : TableModelHandle) -> Unit = "yue_mbt_table_set_model"
+) -> Unit = "yue_mbt_table_bind_model"
 
 ///|
 #borrow(info)
@@ -918,6 +915,34 @@ extern "c" fn ffi_gif_player_new() -> View = "yue_mbt_gif_player_new"
 ///|
 #borrow(player, image)
 extern "c" fn ffi_gif_player_set_image(player : View, image : Image) -> Unit = "yue_mbt_gif_player_set_image"
+
+///|
+#borrow(name)
+extern "c" fn ffi_app_set_name(name : Bytes) -> Unit = "yue_mbt_app_set_name"
+
+///|
+#borrow(name_buf)
+extern "c" fn ffi_app_get_name(name_buf : Bytes) -> Int = "yue_mbt_app_get_name"
+
+///|
+extern "c" fn ffi_appearance_is_dark() -> Int = "yue_mbt_appearance_is_dark"
+
+///|
+/// 读取系统区域标识到容量 cap 的缓冲，返回实际长度。
+#borrow(buf)
+extern "c" fn ffi_locale_get(buf : Bytes, cap : Int) -> Int = "yue_mbt_locale_get"
+
+///|
+extern "c" fn ffi_screen_get_scale_factor() -> Double = "yue_mbt_screen_get_scale_factor"
+
+///|
+extern "c" fn ffi_screen_get_primary_width() -> Double = "yue_mbt_screen_get_primary_width"
+
+///|
+extern "c" fn ffi_screen_get_primary_height() -> Double = "yue_mbt_screen_get_primary_height"
+
+///|
+extern "c" fn ffi_notification_center_get() -> NotificationCenter = "yue_mbt_notification_center_get"
 
 ///|
 /// 托盘后端可用性探测。Linux 上等价于检查 AppIndicator 运行库能否加载。

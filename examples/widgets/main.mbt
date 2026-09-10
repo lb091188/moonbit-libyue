@@ -75,8 +75,15 @@ fn main {
     popover.show_relative_to(popover_btn)
   })
 
-  // 定时推进进度条演示（借用不定态展示）
   progress.set_value(0.0)
+
+  // 系统信息（阶段3 封装）
+  @yue.App::set_name("moonbit-libyue-widgets")
+  println("应用名：\{@yue.App::get_name()}")
+  println("系统区域：\{@yue.locale()}")
+  println("深色主题：\{@yue.Appearance::is_dark()}")
+  let (sw, sh) = @yue.Screen::primary_size()
+  println("主屏：\{sw}x\{sh}（缩放 \{@yue.Screen::scale_factor()}）")
 
   win.center()
   win.activate()

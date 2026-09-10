@@ -8,7 +8,7 @@ struct DemoModel {
 }
 
 ///|
-impl @yue.TableModel for DemoModel with fn row_count(self) {
+impl @yue.TableModel for DemoModel with fn row_count(_self) {
   10000
 }
 
@@ -77,7 +77,7 @@ fn main {
     painter.fill_rect(x, y, w, h)
     painter.draw_text(name, x, y, w, h, color="#FFF")
   })
-  table.set_model(DemoModel::{ edited_text: Ref(Map::new()) }, 3)
+  table.set_model(DemoModel::{ edited_text: Ref(Map([])) }, 3)
   table.set_has_border(true)
   table.set_style("margin", 10.0)
   table.set_style("flex", 1.0)

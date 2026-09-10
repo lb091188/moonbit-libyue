@@ -233,14 +233,13 @@ void yue_mbt_table_set_has_border(void *table, int32_t yes);
  * get_value 返回 MoonBit Bytes，编码 [kind:i32le][payload]：
  *   kind=0 payload 为 UTF-8 文本（Text/Edit 列）
  *   kind=1 payload 单字节 0/1（Checkbox 列）
- *   kind=2 payload 为 UTF-8 文本 + \0 + 颜色 hex（Custom 列）
- * set_value 的 kind/flag：kind=1 时 flag 为 0/1，否则 data 为 UTF-8 文本。 */
-void *yue_mbt_table_model_new(int32_t column_count, void *closure,
+ * set_value 的 kind/flag：kind=1 时 flag 为 0/1，否则 data 为 UTF-8 文本。
+ * 一次调用完成"创建模型桥 + 挂载到表格"。 */
+void yue_mbt_table_bind_model(void *table, int32_t column_count, void *closure,
                               uint32_t (*row_count)(void *closure),
                               void *(*get_value)(void *closure, uint32_t column, uint32_t row),
                               void (*set_value)(void *closure, uint32_t column, uint32_t row,
                                                 int32_t kind, void *data, int32_t flag));
-void yue_mbt_table_set_model(void *table, void *model);
 
 /* ---------- 拖放（DraggingInfo 仅拖拽回调期内有效，裸指针借出） ---------- */
 
@@ -357,6 +356,7 @@ void yue_mbt_message_box_close(void *box);
 /* ---------- 通知 / 全局快捷键 / 日期选择 / GIF 播放 ---------- */
 
 /* Notification 句柄独立；经系统通知中心弹出 */
+void *yue_mbt_notification_center_get(void);
 void *yue_mbt_notification_new(void);
 void yue_mbt_notification_set_title(void *n, const char *title);
 void yue_mbt_notification_set_body(void *n, const char *body);
@@ -374,6 +374,18 @@ void *yue_mbt_date_picker_new(void);
 
 void *yue_mbt_gif_player_new(void);
 void yue_mbt_gif_player_set_image(void *player, void *image);
+
+/* ---------- App / Appearance / Locale / Screen ---------- */
+
+void yue_mbt_app_set_name(const char *name);
+/* 输出参数：name_buf 容量 256 */
+int32_t yue_mbt_app_get_name(char *name_buf);
+int32_t yue_mbt_appearance_is_dark(void);
+/* 返回 UTF-8 字节到 buf，返回长度 */
+int32_t yue_mbt_locale_get(char *buf, int32_t cap);
+double yue_mbt_screen_get_scale_factor(void);
+double yue_mbt_screen_get_primary_width(void);
+double yue_mbt_screen_get_primary_height(void);
 
 /* ---------- 托盘 ---------- */
 

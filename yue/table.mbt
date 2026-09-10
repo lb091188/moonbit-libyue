@@ -118,7 +118,8 @@ pub fn[M : TableModel] Table::set_model(self : Table, model : M, column_count : 
     set_value: fn(c, r, v) { model.set_value(c, r, v) },
   }
   keep_alive(fn() { ignore(box) })
-  let handle = ffi_table_model_new(
+  ffi_table_bind_model(
+    self,
     column_count,
     box,
     fn(b : ModelBox) -> Int { (b.row_count)() },
@@ -129,5 +130,4 @@ pub fn[M : TableModel] Table::set_model(self : Table, model : M, column_count : 
       f(b, c, r, decode_table_value(kind, data, flag))
     },
   )
-  ffi_table_set_model(self.view, handle)
 }

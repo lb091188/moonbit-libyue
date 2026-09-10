@@ -259,3 +259,66 @@ pub fn GifPlayer::new() -> GifPlayer {
 pub fn GifPlayer::set_image(self : GifPlayer, image : Image) -> Unit {
   ffi_gif_player_set_image(self.view(), image)
 }
+
+///|
+/// 设置应用名（Linux 下影响通知等系统集成的标识）。
+pub fn App::set_name(name : String) -> Unit {
+  ffi_app_set_name(utf8_bytes(name))
+}
+
+///|
+/// 读取应用名。
+pub fn App::get_name() -> String {
+  let buf = Bytes::make(256, 0)
+  let len = ffi_app_get_name(buf)
+  @utf8.decode_lossy(buf[0:len])
+}
+
+///|
+/// 系统当前是否深色主题。
+pub fn Appearance::is_dark() -> Bool {
+  ffi_appearance_is_dark() == 1
+}
+
+///|
+/// 系统区域标识（如 zh_CN）。
+pub fn locale() -> String {
+  let buf = Bytes::make(128, 0)
+  let len = ffi_locale_get(buf, 128)
+  @utf8.decode_lossy(buf[0:len])
+}
+
+///|
+/// 主屏缩放系数。
+pub fn Screen::scale_factor() -> Double {
+  ffi_screen_get_scale_factor()
+}
+
+///|
+/// 主屏分辨率：返回 (宽, 高)。
+pub fn Screen::primary_size() -> (Double, Double) {
+  (ffi_screen_get_primary_width(), ffi_screen_get_primary_height())
+}
+
+///|
+/// 当前拖拽会话允许的操作位。
+pub fn DraggingInfo::get_operations(self : DraggingInfo) -> Int {
+  ffi_dragging_get_operations(self)
+}
+
+///|
+/// 经通知中心添加通知（等价 show）。
+pub fn NotificationCenter::add(n : Notification) -> Unit {
+  ffi_notification_center_add(n)
+}
+
+///|
+/// 通知中心单例句柄。
+#external
+pub type NotificationCenter
+
+///|
+/// 取通知中心单例。
+pub fn NotificationCenter::get() -> NotificationCenter {
+  ffi_notification_center_get()
+}

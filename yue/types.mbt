@@ -5,7 +5,8 @@
 ///|
 /// 各控件共用的底层句柄（shim 注册表 id）。
 /// #external：值不参与 MoonBit 引用计数，GC 不扫描/移动它。
-pub extern type View
+#external
+pub type View
 
 ///|
 pub(all) struct Window {
@@ -156,43 +157,55 @@ pub impl ViewLike for Table with view(self) {
 
 ///|
 /// 独立句柄：菜单条（继承 RefCounted 而非 Responder/View）。
-pub extern type MenuBar
+#external
+pub type MenuBar
 
 ///|
-pub extern type Menu
+#external
+pub type Menu
 
 ///|
-pub extern type MenuItem
+#external
+pub type MenuItem
 
 ///|
-pub extern type FileDialog
+#external
+pub type FileDialog
 
 ///|
-pub extern type Tray
+#external
+pub type Tray
 
 ///|
-pub extern type Image
+#external
+pub type Image
 
 ///|
-pub extern type Canvas
+#external
+pub type Canvas
 
 ///|
-pub extern type AttributedText
+#external
+pub type AttributedText
 
 ///|
-pub extern type Font
+#external
+pub type Font
 
 ///|
 /// 表格模型桥句柄（C++ TableModelBridge）。
-pub extern type TableModelHandle
+#external
+pub type TableModelHandle
 
 ///|
 /// 绘制回调期间由 C 借出的裸指针，无 GC 头，不得持有。
-pub extern type Painter
+#external
+pub type Painter
 
 ///|
 /// 拖拽会话信息：仅拖拽回调期内有效（C 借出，无 GC 头）。
-pub extern type DraggingInfo
+#external
+pub type DraggingInfo
 
 ///|
 /// 系统剪贴板单例句柄。
@@ -235,12 +248,6 @@ pub impl ViewLike for Separator with view(self) {
 }
 
 ///|
-/// 系统通知（独立句柄）。
-#external
-pub type Notification
-
-///|
-/// 日期选择控件。
 pub(all) struct DatePicker {
   view : View
 }
@@ -251,7 +258,6 @@ pub impl ViewLike for DatePicker with view(self) {
 }
 
 ///|
-/// GIF 动画播放控件。
 pub(all) struct GifPlayer {
   view : View
 }
@@ -260,3 +266,27 @@ pub(all) struct GifPlayer {
 pub impl ViewLike for GifPlayer with view(self) {
   self.view
 }
+
+///|
+
+///|
+
+///|
+/// 系统通知（独立句柄）。
+#external
+pub type Notification
+
+///|
+/// 应用单例（App 级 API 命名空间）。
+#external
+pub type App
+
+///|
+/// 系统外观（深色模式等）单例句柄。
+#external
+pub type Appearance
+
+///|
+/// 屏幕信息 API 命名空间。
+#external
+pub type Screen

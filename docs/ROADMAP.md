@@ -50,23 +50,28 @@
    生命周期由 shim 侧 scoped_refptr 注册表进程级持有。
 4. libyue 按无 RTTI 惯例构建，dynamic_cast 段错误，运行时类型校验用
    虚函数 GetClassName 字符串比较。
+5. **`extern type` 语法已弃用**：句柄类型一律用 `#external` 属性 + `type`
+   声明；成对的创建/挂载 C 函数尽量合并成一个（避免中间句柄类型暴露）。
 
-## 阶段 3：全量 API 面
+## 阶段 3（已完成 2026-09-10）：全量 API 面
 
-对照 `vendor/libyue/include/nativeui/*.h` 与官方 TS 声明逐类勾选：
+对照 `vendor/libyue/include/nativeui/*.h` 与官方 TS 声明逐类封装，全部有
+shim + ffi + MoonBit 包装 + 示例触达：
 
-- base 库实用面（CommandLine、FilePath、Color/几何类型已完成的部分、StringPrintf 等按需）
-- Notification、GlobalShortcut、Appearance、Locale、App 单例 API
-- Canvas 完整离屏能力、AttributedText 富文本全集（局部样式 SetFontFor/SetColorFor）、Image 编码写出
-- GifPlayer、DatePicker 等长尾控件
-- 每类完成标准：有 shim 函数 + ffi 声明 + MoonBit 包装 + 至少一个示例或测试触达
+- ✅ 布局：Group（分组框）、Scroll（滚动视图）、Separator（分隔线）
+- ✅ 系统交互：Clipboard（文本读写）、MessageBox（类型/按钮/响应回调）
+- ✅ 系统集成：Notification + NotificationCenter、GlobalShortcut（注册/注销）
+- ✅ 长尾控件：DatePicker、GifPlayer
+- ✅ 环境信息：App（名称）、Appearance（深色模式）、Locale（区域）、Screen（缩放/分辨率）
+- ✅ 新示例 examples/misc（批次A）与 examples/advanced（批次B）实测存活
+- ⬜ macOS/Windows 专属（Vibrant 等）与 asar/protocol 系列：平台受限或 Electron 风格专用，暂缓
 
-## 阶段 4：Ubuntu 24.04 系统化验证
+## 阶段 4（进行中 2026-09-10）：Ubuntu 24.04 系统化验证
 
-- `moon check` / `moon build` 全仓零错误零警告
-- 每个 `examples/*` 依次 `moon run` 试跑：进程存活、无 SIGSEGV、退出行为正确
-- 托盘/菜单/对话框/WebView 在 GNOME(X11) 下人工确认功能表现，差异记入 README"已知边界"
-- 纯 MoonBit 部分（颜色/布局参数解析等）补 `moon test`
+- ✅ `moon check` / `moon build` 全仓零错误零警告
+- ✅ 全部 12 个 `examples/*` 依次 `moon run` 试跑：进程存活、无 SIGSEGV
+- ⬜ 托盘/菜单/对话框/WebView 在 GNOME(X11) 下人工确认功能表现，差异记入 README"已知边界"
+- ⬜ 纯 MoonBit 部分（颜色解析、表格值编解码）补 `moon test`
 
 ## 风险与已知约束
 
