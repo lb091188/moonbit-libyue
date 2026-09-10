@@ -214,6 +214,34 @@ void *yue_mbt_image_new_from_file(const char *path);
 double yue_mbt_image_get_width(void *image);
 double yue_mbt_image_get_height(void *image);
 
+/* ---------- Table（表格；模型桥见下） ---------- */
+
+void *yue_mbt_table_new(void);
+void yue_mbt_table_add_column_text(void *table, const char *title, int32_t width);
+void yue_mbt_table_add_column_edit(void *table, const char *title, int32_t width);
+void yue_mbt_table_add_column_checkbox(void *table, const char *title, int32_t width);
+/* 自定义列：draw(closure, painter, x, y, w, h, name_utf8, color_utf8)，
+ * name/color 由模型 get_value 提供的字典键解析而来。 */
+void yue_mbt_table_add_column_custom(void *table, const char *title, int32_t width,
+                                     void (*draw)(void *closure, void *painter, double x,
+                                                  double y, double w, double h,
+                                                  void *name_utf8, void *color_utf8),
+                                     void *closure);
+void yue_mbt_table_set_has_border(void *table, int32_t yes);
+
+/* 模型桥：把 MoonBit 的 TableModel trait 挂到 libyue 的 AbstractTableModel。
+ * get_value 返回 MoonBit Bytes，编码 [kind:i32le][payload]：
+ *   kind=0 payload 为 UTF-8 文本（Text/Edit 列）
+ *   kind=1 payload 单字节 0/1（Checkbox 列）
+ *   kind=2 payload 为 UTF-8 文本 + \0 + 颜色 hex（Custom 列）
+ * set_value 的 kind/flag：kind=1 时 flag 为 0/1，否则 data 为 UTF-8 文本。 */
+void *yue_mbt_table_model_new(int32_t column_count, void *closure,
+                              uint32_t (*row_count)(void *closure),
+                              void *(*get_value)(void *closure, uint32_t column, uint32_t row),
+                              void (*set_value)(void *closure, uint32_t column, uint32_t row,
+                                                int32_t kind, void *data, int32_t flag));
+void yue_mbt_table_set_model(void *table, void *model);
+
 /* ---------- 托盘 ---------- */
 
 int32_t yue_mbt_tray_supported(void);

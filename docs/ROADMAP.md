@@ -29,12 +29,22 @@
 - shim 运行时 dynamic_cast 校验，错型调用拒绝并记日志而非崩溃
 - Painter/Canvas/AttributedText/Font/Image 封装已就绪（待 drawing 示例消纳）
 
-## 阶段 2：drawing 复刻 + 复杂模型桥接
+## 阶段 2（进行中 2026-09-10）：drawing 复刻 + 复杂模型桥接
 
-- drawing 复刻：Painter 全套已封装，补示例（含 Canvas 离屏、AttributedText 绘制、Image）
-- Table + AbstractTableModel：C++ 虚表桥接到 MoonBit 回调（取行数/取值/置值/回调刷新）
-- Drag & Drop（drag_source / drag_destination 复刻）：DraggingInfo、Clipboard 数据、View 拖拽事件
-- Popover、ComboBox、Picker、Slider、ProgressBar、GroupBox、ScrollView（示例带控件组合）
+- ✅ drawing 复刻（examples/drawing）：9 组绘制全通过，Canvas 离屏、AttributedText、Font、Image 实测
+- ✅ Table + AbstractTableModel 桥接（examples/table）：TableModel trait 挂 C++ 虚表桥，
+  10000 行虚拟数据 + Edit 列回写 + Custom 列自绘色块，运行存活
+- ⬜ Drag & Drop（drag_source / drag_destination 复刻）：DraggingInfo、Clipboard 数据、View 拖拽事件
+- ⬜ Popover、ComboBox、Picker、Slider、ProgressBar、GroupBox、ScrollView（示例带控件组合）
+
+阶段 2 踩坑实录（都是 MoonBit native FFI 的硬约束）：
+1. **opaque type 值参与引用计数**：extern 句柄存 C 指针/id 会被 GC incref/decref，
+   必须声明 `#external type`（值不参与 RC）。崩溃点 moonbit_incref(0x2) 即此。
+2. **MoonBit 运行时 mimalloc 段与 C++ new 混用**：C++ 对象落进 GC 管理段被
+   扫描/移动，vtable 损坏。解法：shim 自管句柄注册表（id → scoped_refptr），
+   C++ 对象全在系统堆。
+3. libyue 按无 RTTI 惯例构建，dynamic_cast 段错误，运行时类型校验用
+   虚函数 GetClassName 字符串比较。
 
 ## 阶段 3：全量 API 面
 

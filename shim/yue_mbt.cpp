@@ -2,31 +2,98 @@
 // 原则：本文件只做 ABI 翻译，不写业务逻辑；平台差异优先交给 libyue，
 // 只有 libyue 没暴露的（如托盘后端探测）才在这里补。
 //
-// 类型安全：View 系句柄经 GetClassName() 运行时校验（CastTo），
-// MoonBit 侧统一 View 类型后的错型调用在这里被拒绝而非踩空指针。
+// 句柄方案：所有控件/对象句柄是 shim 注册表的 id（int64 经 void* 传递）。
+// 不用 MoonBit external object：MoonBit native 的 GC 堆段与 C++ new 混用
+// 时对象内存会被破坏（Table 上必现 vtable 损坏）。注册表句柄进程级存活，
+// 不自动回收（GUI 对象生命周期≈进程，见 README 已知边界）。
+//
+// 类型安全：View 系句柄经 GetClassName() 运行时校验（CastTo），错型调用
+// 被拒绝并记日志而非踩空指针。
 #include "yue_mbt.h"
 
 #include <cmath>
 #include <cstdio>
-#include <typeinfo>
 #include <cstring>
 #include <dlfcn.h>
 #include <fstream>
+#include <unordered_map>
 
 #include "base/command_line.h"
 #include "nativeui/nativeui.h"
 
 // 不包含 <moonbit.h>：它在 extern "C" 里声明的 memcpy 与 glibc 的
-// C++ noexcept 声明冲突。只声明用到的两个运行时入口，
-// 签名照抄 ~/.moon/include/moonbit.h。
-extern "C" void *moonbit_make_external_object(void (*finalize)(void *),
-                                              uint32_t payload_size);
+// C++ noexcept 声明冲突。只声明用到的运行时入口，签名照抄
+// ~/.moon/include/moonbit.h。
 extern "C" void *moonbit_make_bytes(int32_t size, int value);
 
 namespace {
 
 nu::Lifetime *g_lifetime = nullptr;
 nu::State *g_state = nullptr;
+
+int64_t g_next_handle = 1;
+
+// 句柄注册表：id → scoped_refptr。
+template <typename T>
+struct Store {
+  static std::unordered_map<int64_t, scoped_refptr<T>> &map() {
+    static std::unordered_map<int64_t, scoped_refptr<T>> m;
+    return m;
+  }
+  static int64_t put(T *obj) {
+    int64_t id = g_next_handle++;
+    map()[id] = scoped_refptr<T>(obj);
+    return id;
+  }
+  static int64_t put(const scoped_refptr<T> &obj) {
+    int64_t id = g_next_handle++;
+    map()[id] = obj;
+    return id;
+  }
+  static T *get(void *handle) {
+    auto it = map().find(reinterpret_cast<int64_t>(handle));
+    return it == map().end() ? nullptr : it->second.get();
+  }
+};
+
+using ViewStore = Store<nu::Responder>;
+using MenuStore = Store<nu::Menu>;
+using ModelStore = Store<nu::TableModel>;
+using MenuBarStore = Store<nu::MenuBar>;
+using MenuItemStore = Store<nu::MenuItem>;
+using FileDialogStore = Store<nu::FileDialog>;
+using TrayStore = Store<nu::Tray>;
+using ImageStore = Store<nu::Image>;
+using CanvasStore = Store<nu::Canvas>;
+using AttributedTextStore = Store<nu::AttributedText>;
+using FontStore = Store<nu::Font>;
+
+// CastTo：从注册表取对象，并用 GetClassName 校验运行时类型。
+// （View 自身无 kClassName，故模板仅用于具体控件类型。）
+template <typename T>
+T *CastTo(void *handle) {
+  auto *r = ViewStore::get(handle);
+  if (r == nullptr) {
+    std::fprintf(stderr, "yue_mbt: 句柄无效\n");
+    return nullptr;
+  }
+  if (std::strcmp(r->GetClassName(), T::kClassName) == 0) {
+    return static_cast<T *>(r);
+  }
+  std::fprintf(stderr, "yue_mbt: 类型不匹配，期望 %s，实际 %s\n", T::kClassName,
+               r->GetClassName());
+  return nullptr;
+}
+
+// 通用 View 检查：View 无 kClassName，类型正确性由 MoonBit 侧
+// ViewLike 约束保证。
+nu::View *CastToView(void *handle) {
+  auto *r = ViewStore::get(handle);
+  if (r == nullptr) {
+    return nullptr;
+  }
+  return static_cast<nu::View *>(r);
+}
 
 // MoonBit Bytes 内容拷贝
 void *BytesFromString(const std::string &s) {
@@ -36,69 +103,6 @@ void *BytesFromString(const std::string &s) {
   }
   return bytes;
 }
-
-// View 系句柄：GC 管容器，finalizer 只释放 scoped_refptr
-struct HandleBox {
-  scoped_refptr<nu::Responder> resp;  // Window/MenuBar 是 Responder 而非 View
-};
-
-template <typename T>
-void ReleaseRef(void *ptr) {
-  if (ptr != nullptr) {
-    static_cast<T *>(ptr)->~T();
-  }
-}
-
-// 运行时类型校验：错型调用记日志并返回空，MoonBit/上层不踩空指针
-template <typename T>
-T *CastTo(HandleBox *box) {
-  auto *r = box->resp.get();
-  if (r == nullptr) {
-    std::fprintf(stderr, "yue_mbt: 句柄已释放\n");
-    return nullptr;
-  }
-  auto *t = dynamic_cast<T *>(r);
-  if (t == nullptr) {
-    std::fprintf(stderr, "yue_mbt: 类型不匹配，期望 %s，实际 %s\n",
-                 typeid(T).name(), typeid(*r).name());
-  }
-  return t;
-}
-
-// 通用 View 检查：View 自身无 kClassName，直接 dynamic_cast
-nu::View *CastToView(HandleBox *box) {
-  return dynamic_cast<nu::View *>(box->resp.get());
-}
-
-// 非 View 的独立句柄（MenuBar/Menu/MenuItem 继承 RefCounted 而非 Responder）
-
-struct MenuBarBox {
-  scoped_refptr<nu::MenuBar> bar;
-};
-struct MenuBox {
-  scoped_refptr<nu::Menu> menu;
-};
-struct MenuItemBox {
-  scoped_refptr<nu::MenuItem> item;
-};
-struct FileDialogBox {
-  scoped_refptr<nu::FileDialog> dialog;
-};
-struct TrayBox {
-  scoped_refptr<nu::Tray> tray;
-};
-struct ImageBox {
-  scoped_refptr<nu::Image> image;
-};
-struct CanvasBox {
-  scoped_refptr<nu::Canvas> canvas;
-};
-struct AttributedTextBox {
-  scoped_refptr<nu::AttributedText> text;
-};
-struct FontBox {
-  scoped_refptr<nu::Font> font;
-};
 
 }  // namespace
 
@@ -138,76 +142,74 @@ void *yue_mbt_window_new_ex(int32_t frame, int32_t transparent) {
   nu::Window::Options options;
   options.frame = frame != 0;
   options.transparent = transparent != 0;
-  auto *box = static_cast<HandleBox *>(
-      moonbit_make_external_object(ReleaseRef<HandleBox>, sizeof(HandleBox)));
-  new (&box->resp) scoped_refptr<nu::Responder>(new nu::Window(options));
-  return box;
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Window(options)));
 }
 
 void yue_mbt_window_set_title(void *window, const char *title) {
-  if (auto *w = CastTo<nu::Window>(static_cast<HandleBox *>(window))) {
+  if (auto *w = CastTo<nu::Window>(window)) {
     w->SetTitle(title);
   }
 }
 
 void yue_mbt_window_set_always_on_top(void *window, int32_t top) {
-  if (auto *w = CastTo<nu::Window>(static_cast<HandleBox *>(window))) {
+  if (auto *w = CastTo<nu::Window>(window)) {
     w->SetAlwaysOnTop(top != 0);
   }
 }
 
 double yue_mbt_window_get_content_size_width(void *window) {
-  if (auto *w = CastTo<nu::Window>(static_cast<HandleBox *>(window))) {
+  if (auto *w = CastTo<nu::Window>(window)) {
     return w->GetContentSize().width();
   }
   return 0;
 }
 
 double yue_mbt_window_get_content_size_height(void *window) {
-  if (auto *w = CastTo<nu::Window>(static_cast<HandleBox *>(window))) {
+  if (auto *w = CastTo<nu::Window>(window)) {
     return w->GetContentSize().height();
   }
   return 0;
 }
 
 void yue_mbt_window_set_content(void *window, void *content) {
-  auto *w = CastTo<nu::Window>(static_cast<HandleBox *>(window));
-  auto *c = CastToView(static_cast<HandleBox *>(content));
+  auto *w = CastTo<nu::Window>(window);
+  auto *c = CastToView(content);
   if (w != nullptr && c != nullptr) {
     w->SetContentView(scoped_refptr<nu::View>(c));
   }
 }
 
 void yue_mbt_window_set_content_size(void *window, double width, double height) {
-  if (auto *w = CastTo<nu::Window>(static_cast<HandleBox *>(window))) {
+  if (auto *w = CastTo<nu::Window>(window)) {
     w->SetContentSize(
         nu::SizeF(static_cast<float>(width), static_cast<float>(height)));
   }
 }
 
 void yue_mbt_window_center(void *window) {
-  if (auto *w = CastTo<nu::Window>(static_cast<HandleBox *>(window))) {
+  if (auto *w = CastTo<nu::Window>(window)) {
     w->Center();
   }
 }
 
 void yue_mbt_window_activate(void *window) {
-  if (auto *w = CastTo<nu::Window>(static_cast<HandleBox *>(window))) {
+  if (auto *w = CastTo<nu::Window>(window)) {
     w->Activate();
   }
 }
 
 void yue_mbt_window_set_menubar(void *window, void *menubar) {
-  auto *w = CastTo<nu::Window>(static_cast<HandleBox *>(window));
-  auto *mb = static_cast<MenuBarBox *>(menubar);
-  if (w == nullptr || mb == nullptr) {
+  auto *w = CastTo<nu::Window>(window);
+  if (w == nullptr || menubar == nullptr) {
     return;
   }
-  w->SetMenuBar(scoped_refptr<nu::MenuBar>(mb->bar));
+  if (auto *bar = MenuBarStore::get(menubar)) {
+    w->SetMenuBar(scoped_refptr<nu::MenuBar>(bar));
+  }
 }
 
 void yue_mbt_window_on_close(void *window, void (*invoke)(void *), void *closure) {
-  if (auto *w = CastTo<nu::Window>(static_cast<HandleBox *>(window))) {
+  if (auto *w = CastTo<nu::Window>(window)) {
     w->on_close.Connect([invoke, closure](nu::Window *) { invoke(closure); });
   }
 }
@@ -215,37 +217,37 @@ void yue_mbt_window_on_close(void *window, void (*invoke)(void *), void *closure
 // ---------- View 通用 ----------
 
 void yue_mbt_view_focus(void *view) {
-  if (auto *v = CastTo<nu::View>(static_cast<HandleBox *>(view))) {
+  if (auto *v = CastToView(view)) {
     v->Focus();
   }
 }
 
 void yue_mbt_view_set_enabled(void *view, int32_t enable) {
-  if (auto *v = CastTo<nu::View>(static_cast<HandleBox *>(view))) {
+  if (auto *v = CastToView(view)) {
     v->SetEnabled(enable != 0);
   }
 }
 
 void yue_mbt_view_set_mouse_down_can_move_window(void *view, int32_t yes) {
-  if (auto *v = CastTo<nu::View>(static_cast<HandleBox *>(view))) {
+  if (auto *v = CastToView(view)) {
     v->SetMouseDownCanMoveWindow(yes != 0);
   }
 }
 
 void yue_mbt_view_set_style_prop_float(void *view, const char *name, double value) {
-  if (auto *v = CastTo<nu::View>(static_cast<HandleBox *>(view))) {
+  if (auto *v = CastToView(view)) {
     v->SetStyleProperty(name, static_cast<float>(value));
   }
 }
 
 void yue_mbt_view_set_style_prop_str(void *view, const char *name, const char *value) {
-  if (auto *v = CastTo<nu::View>(static_cast<HandleBox *>(view))) {
+  if (auto *v = CastToView(view)) {
     v->SetStyleProperty(name, std::string(value));
   }
 }
 
 void yue_mbt_view_set_background_color(void *view, const char *hex) {
-  if (auto *v = CastTo<nu::View>(static_cast<HandleBox *>(view))) {
+  if (auto *v = CastToView(view)) {
     v->SetBackgroundColor(nu::Color(std::string(hex)));
   }
 }
@@ -253,15 +255,12 @@ void yue_mbt_view_set_background_color(void *view, const char *hex) {
 // ---------- Container ----------
 
 void *yue_mbt_container_new(void) {
-  auto *box = static_cast<HandleBox *>(
-      moonbit_make_external_object(ReleaseRef<HandleBox>, sizeof(HandleBox)));
-  new (&box->resp) scoped_refptr<nu::Responder>(new nu::Container());
-  return box;
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Container()));
 }
 
 void yue_mbt_container_add_child(void *container, void *child) {
-  auto *c = CastTo<nu::Container>(static_cast<HandleBox *>(container));
-  auto *k = CastToView(static_cast<HandleBox *>(child));
+  auto *c = CastTo<nu::Container>(container);
+  auto *k = CastToView(child);
   if (c != nullptr && k != nullptr) {
     c->AddChildView(scoped_refptr<nu::View>(k));
   }
@@ -269,7 +268,7 @@ void yue_mbt_container_add_child(void *container, void *child) {
 
 void yue_mbt_container_on_draw(void *container, void (*invoke)(void *, void *),
                                void *closure) {
-  if (auto *c = CastTo<nu::Container>(static_cast<HandleBox *>(container))) {
+  if (auto *c = CastTo<nu::Container>(container)) {
     c->on_draw.Connect(
         [invoke, closure](nu::Container *, nu::Painter *painter, const nu::RectF &) {
           invoke(closure, painter);
@@ -280,14 +279,11 @@ void yue_mbt_container_on_draw(void *container, void (*invoke)(void *, void *),
 // ---------- Label ----------
 
 void *yue_mbt_label_new(const char *text) {
-  auto *box = static_cast<HandleBox *>(
-      moonbit_make_external_object(ReleaseRef<HandleBox>, sizeof(HandleBox)));
-  new (&box->resp) scoped_refptr<nu::Responder>(new nu::Label(text));
-  return box;
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Label(text)));
 }
 
 void yue_mbt_label_set_text(void *label, const char *text) {
-  if (auto *l = CastTo<nu::Label>(static_cast<HandleBox *>(label))) {
+  if (auto *l = CastTo<nu::Label>(label)) {
     l->SetText(text);
   }
 }
@@ -295,27 +291,24 @@ void yue_mbt_label_set_text(void *label, const char *text) {
 // ---------- TextEdit ----------
 
 void *yue_mbt_text_edit_new(void) {
-  auto *box = static_cast<HandleBox *>(
-      moonbit_make_external_object(ReleaseRef<HandleBox>, sizeof(HandleBox)));
-  new (&box->resp) scoped_refptr<nu::Responder>(new nu::TextEdit());
-  return box;
+  return reinterpret_cast<void *>(ViewStore::put(new nu::TextEdit()));
 }
 
 void yue_mbt_text_edit_set_text(void *edit, const char *text) {
-  if (auto *e = CastTo<nu::TextEdit>(static_cast<HandleBox *>(edit))) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
     e->SetText(text);
   }
 }
 
 void *yue_mbt_text_edit_get_text(void *edit) {
-  if (auto *e = CastTo<nu::TextEdit>(static_cast<HandleBox *>(edit))) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
     return BytesFromString(e->GetText());
   }
   return moonbit_make_bytes(0, 0);
 }
 
 double yue_mbt_text_edit_get_text_bounds_height(void *edit) {
-  if (auto *e = CastTo<nu::TextEdit>(static_cast<HandleBox *>(edit))) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
     return e->GetTextBounds().height();
   }
   return 0;
@@ -323,7 +316,7 @@ double yue_mbt_text_edit_get_text_bounds_height(void *edit) {
 
 void yue_mbt_text_edit_on_text_change(void *edit, void (*invoke)(void *),
                                       void *closure) {
-  if (auto *e = CastTo<nu::TextEdit>(static_cast<HandleBox *>(edit))) {
+  if (auto *e = CastTo<nu::TextEdit>(edit)) {
     e->on_text_change.Connect([invoke, closure](nu::TextEdit *) { invoke(closure); });
   }
 }
@@ -331,20 +324,17 @@ void yue_mbt_text_edit_on_text_change(void *edit, void (*invoke)(void *),
 // ---------- Button ----------
 
 void *yue_mbt_button_new(const char *title) {
-  auto *box = static_cast<HandleBox *>(
-      moonbit_make_external_object(ReleaseRef<HandleBox>, sizeof(HandleBox)));
-  new (&box->resp) scoped_refptr<nu::Responder>(new nu::Button(title));
-  return box;
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Button(title)));
 }
 
 void yue_mbt_button_set_title(void *button, const char *title) {
-  if (auto *b = CastTo<nu::Button>(static_cast<HandleBox *>(button))) {
+  if (auto *b = CastTo<nu::Button>(button)) {
     b->SetTitle(title);
   }
 }
 
 void yue_mbt_button_on_click(void *button, void (*invoke)(void *), void *closure) {
-  if (auto *b = CastTo<nu::Button>(static_cast<HandleBox *>(button))) {
+  if (auto *b = CastTo<nu::Button>(button)) {
     b->on_click.Connect([invoke, closure](nu::Button *) { invoke(closure); });
   }
 }
@@ -352,20 +342,17 @@ void yue_mbt_button_on_click(void *button, void (*invoke)(void *), void *closure
 // ---------- Entry ----------
 
 void *yue_mbt_entry_new(void) {
-  auto *box = static_cast<HandleBox *>(
-      moonbit_make_external_object(ReleaseRef<HandleBox>, sizeof(HandleBox)));
-  new (&box->resp) scoped_refptr<nu::Responder>(new nu::Entry(nu::Entry::Type::Normal));
-  return box;
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Entry(nu::Entry::Type::Normal)));
 }
 
 void yue_mbt_entry_set_text(void *entry, const char *text) {
-  if (auto *e = CastTo<nu::Entry>(static_cast<HandleBox *>(entry))) {
+  if (auto *e = CastTo<nu::Entry>(entry)) {
     e->SetText(text);
   }
 }
 
 void *yue_mbt_entry_get_text(void *entry) {
-  if (auto *e = CastTo<nu::Entry>(static_cast<HandleBox *>(entry))) {
+  if (auto *e = CastTo<nu::Entry>(entry)) {
     return BytesFromString(e->GetText());
   }
   return moonbit_make_bytes(0, 0);
@@ -376,59 +363,56 @@ void *yue_mbt_entry_get_text(void *entry) {
 void *yue_mbt_browser_new(void) {
   nu::Browser::Options options;
   options.context_menu = true;
-  auto *box = static_cast<HandleBox *>(
-      moonbit_make_external_object(ReleaseRef<HandleBox>, sizeof(HandleBox)));
-  new (&box->resp) scoped_refptr<nu::Responder>(new nu::Browser(options));
-  return box;
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Browser(options)));
 }
 
 void yue_mbt_browser_load_url(void *browser, const char *url) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     b->LoadURL(url);
   }
 }
 
 void *yue_mbt_browser_get_url(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     return BytesFromString(b->GetURL());
   }
   return moonbit_make_bytes(0, 0);
 }
 
 void yue_mbt_browser_reload(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     b->Reload();
   }
 }
 
 void yue_mbt_browser_go_back(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     b->GoBack();
   }
 }
 
 void yue_mbt_browser_go_forward(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     b->GoForward();
   }
 }
 
 int32_t yue_mbt_browser_can_go_back(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     return b->CanGoBack() ? 1 : 0;
   }
   return 0;
 }
 
 int32_t yue_mbt_browser_can_go_forward(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     return b->CanGoForward() ? 1 : 0;
   }
   return 0;
 }
 
 int32_t yue_mbt_browser_is_loading(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     return b->IsLoading() ? 1 : 0;
   }
   return 0;
@@ -436,7 +420,7 @@ int32_t yue_mbt_browser_is_loading(void *browser) {
 
 void yue_mbt_browser_on_change_loading(void *browser, void (*invoke)(void *),
                                        void *closure) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     b->on_change_loading.Connect(
         [invoke, closure](nu::Browser *) { invoke(closure); });
   }
@@ -444,7 +428,7 @@ void yue_mbt_browser_on_change_loading(void *browser, void (*invoke)(void *),
 
 void yue_mbt_browser_on_update_command(void *browser, void (*invoke)(void *),
                                        void *closure) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     b->on_update_command.Connect(
         [invoke, closure](nu::Browser *) { invoke(closure); });
   }
@@ -453,7 +437,7 @@ void yue_mbt_browser_on_update_command(void *browser, void (*invoke)(void *),
 void yue_mbt_browser_on_update_title(void *browser,
                                      void (*invoke)(void *, void *),
                                      void *closure) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     b->on_update_title.Connect([invoke, closure](nu::Browser *,
                                                  const std::string &title) {
       invoke(closure, BytesFromString(title));
@@ -464,7 +448,7 @@ void yue_mbt_browser_on_update_title(void *browser,
 void yue_mbt_browser_on_commit_navigation(void *browser,
                                           void (*invoke)(void *, void *),
                                           void *closure) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     b->on_commit_navigation.Connect([invoke, closure](nu::Browser *,
                                                       const std::string &url) {
       invoke(closure, BytesFromString(url));
@@ -475,7 +459,7 @@ void yue_mbt_browser_on_commit_navigation(void *browser,
 void yue_mbt_browser_on_finish_navigation(void *browser,
                                           void (*invoke)(void *, void *),
                                           void *closure) {
-  if (auto *b = CastTo<nu::Browser>(static_cast<HandleBox *>(browser))) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
     b->on_finish_navigation.Connect([invoke, closure](nu::Browser *,
                                                       const std::string &url) {
       invoke(closure, BytesFromString(url));
@@ -486,33 +470,26 @@ void yue_mbt_browser_on_finish_navigation(void *browser,
 // ---------- 菜单 ----------
 
 void *yue_mbt_menu_bar_new(void) {
-  auto *box = static_cast<MenuBarBox *>(
-      moonbit_make_external_object(ReleaseRef<MenuBarBox>, sizeof(MenuBarBox)));
-  new (&box->bar) scoped_refptr<nu::MenuBar>(new nu::MenuBar());
-  return box;
+  return reinterpret_cast<void *>(MenuBarStore::put(new nu::MenuBar()));
 }
 
 // 在顶栏挂标题项并返回其子菜单；item 由 menu 的 items 持有引用
 void *yue_mbt_menu_bar_add_menu(void *menubar, const char *title) {
-  auto *mb = static_cast<MenuBarBox *>(menubar);
-  if (mb == nullptr) {
+  auto *bar = MenuBarStore::get(menubar);
+  if (bar == nullptr) {
     return nullptr;
   }
-  auto *bar = mb->bar.get();
   auto item = scoped_refptr<nu::MenuItem>(
       new nu::MenuItem(nu::MenuItem::Type::Submenu));
   item->SetLabel(title);
   auto menu = scoped_refptr<nu::Menu>(new nu::Menu());
   item->SetSubmenu(menu);
   bar->Append(item);
-  auto *box = static_cast<MenuBox *>(
-      moonbit_make_external_object(ReleaseRef<MenuBox>, sizeof(MenuBox)));
-  new (&box->menu) scoped_refptr<nu::Menu>(menu);
-  return box;
+  return reinterpret_cast<void *>(MenuStore::put(menu));
 }
 
 void *yue_mbt_menu_add_submenu(void *menu, const char *title) {
-  auto *parent = static_cast<MenuBox *>(menu);
+  auto *parent = MenuStore::get(menu);
   if (parent == nullptr) {
     return nullptr;
   }
@@ -521,97 +498,74 @@ void *yue_mbt_menu_add_submenu(void *menu, const char *title) {
   item->SetLabel(title);
   auto sub = scoped_refptr<nu::Menu>(new nu::Menu());
   item->SetSubmenu(sub);
-  parent->menu->Append(item);
-  auto *box = static_cast<MenuBox *>(
-      moonbit_make_external_object(ReleaseRef<MenuBox>, sizeof(MenuBox)));
-  new (&box->menu) scoped_refptr<nu::Menu>(sub);
-  return box;
+  parent->Append(item);
+  return reinterpret_cast<void *>(MenuStore::put(sub));
 }
 
 void *yue_mbt_menu_add_label_item(void *menu, const char *label) {
-  auto *m = static_cast<MenuBox *>(menu);
+  auto *m = MenuStore::get(menu);
   if (m == nullptr) {
     return nullptr;
   }
   auto item = scoped_refptr<nu::MenuItem>(new nu::MenuItem(nu::MenuItem::Type::Label));
   item->SetLabel(label);
-  m->menu->Append(item);
-  auto *box =
-      static_cast<MenuItemBox *>(moonbit_make_external_object(
-          ReleaseRef<MenuItemBox>, sizeof(MenuItemBox)));
-  new (&box->item) scoped_refptr<nu::MenuItem>(item);
-  return box;
+  m->Append(item);
+  return reinterpret_cast<void *>(MenuItemStore::put(item));
 }
 
 void *yue_mbt_menu_add_role_item(void *menu, int32_t role) {
-  auto *m = static_cast<MenuBox *>(menu);
+  auto *m = MenuStore::get(menu);
   if (m == nullptr) {
     return nullptr;
   }
   auto item = scoped_refptr<nu::MenuItem>(
       new nu::MenuItem(static_cast<nu::MenuItem::Role>(role)));
-  m->menu->Append(item);
-  auto *box = static_cast<MenuItemBox *>(
-      moonbit_make_external_object(ReleaseRef<MenuItemBox>, sizeof(MenuItemBox)));
-  new (&box->item) scoped_refptr<nu::MenuItem>(item);
-  return box;
+  m->Append(item);
+  return reinterpret_cast<void *>(MenuItemStore::put(item));
 }
 
 void *yue_mbt_menu_add_separator(void *menu) {
-  auto *m = static_cast<MenuBox *>(menu);
+  auto *m = MenuStore::get(menu);
   if (m == nullptr) {
     return nullptr;
   }
   auto item =
       scoped_refptr<nu::MenuItem>(new nu::MenuItem(nu::MenuItem::Type::Separator));
-  m->menu->Append(item);
-  auto *box = static_cast<MenuItemBox *>(
-      moonbit_make_external_object(ReleaseRef<MenuItemBox>, sizeof(MenuItemBox)));
-  new (&box->item) scoped_refptr<nu::MenuItem>(item);
-  return box;
+  m->Append(item);
+  return reinterpret_cast<void *>(MenuItemStore::put(item));
 }
 
 void yue_mbt_menu_item_set_label(void *item, const char *label) {
-  if (auto *i = static_cast<MenuItemBox *>(item)) {
-    i->item->SetLabel(label);
+  if (auto *i = MenuItemStore::get(item)) {
+    i->SetLabel(label);
   }
 }
 
-
-
 void yue_mbt_menu_item_set_accelerator(void *item, const char *accelerator) {
-  if (auto *i = static_cast<MenuItemBox *>(item)) {
-    i->item->SetAccelerator(nu::Accelerator(std::string(accelerator)));
+  if (auto *i = MenuItemStore::get(item)) {
+    i->SetAccelerator(nu::Accelerator(std::string(accelerator)));
   }
 }
 
 void yue_mbt_menu_item_on_click(void *item, void (*invoke)(void *), void *closure) {
-  if (auto *i = static_cast<MenuItemBox *>(item)) {
-    i->item->on_click.Connect([invoke, closure](nu::MenuItem *) { invoke(closure); });
+  if (auto *i = MenuItemStore::get(item)) {
+    i->on_click.Connect([invoke, closure](nu::MenuItem *) { invoke(closure); });
   }
 }
 
 // ---------- 文件对话框 ----------
 
 void *yue_mbt_file_open_dialog_new(void) {
-  auto *box = static_cast<FileDialogBox *>(
-      moonbit_make_external_object(ReleaseRef<FileDialogBox>,
-                                   sizeof(FileDialogBox)));
-  new (&box->dialog) scoped_refptr<nu::FileDialog>(new nu::FileOpenDialog());
-  return box;
+  return reinterpret_cast<void *>(FileDialogStore::put(new nu::FileOpenDialog()));
 }
 
 void *yue_mbt_file_save_dialog_new(void) {
-  auto *box = static_cast<FileDialogBox *>(
-      moonbit_make_external_object(ReleaseRef<FileDialogBox>,
-                                   sizeof(FileDialogBox)));
-  new (&box->dialog) scoped_refptr<nu::FileDialog>(new nu::FileSaveDialog());
-  return box;
+  return reinterpret_cast<void *>(FileDialogStore::put(new nu::FileSaveDialog()));
 }
 
 // filters 打包："描述:扩展1,扩展2|描述2:扩展3"
 void yue_mbt_file_dialog_set_filters(void *dialog, const char *filters) {
-  if (auto *d = static_cast<FileDialogBox *>(dialog)) {
+  if (auto *d = FileDialogStore::get(dialog)) {
     std::vector<nu::FileDialog::Filter> parsed;
     std::string input(filters);
     size_t pos = 0;
@@ -640,34 +594,34 @@ void yue_mbt_file_dialog_set_filters(void *dialog, const char *filters) {
       }
       pos = bar + 1;
     }
-    d->dialog->SetFilters(parsed);
+    d->SetFilters(parsed);
   }
 }
 
 void yue_mbt_file_dialog_set_folder(void *dialog, const char *folder) {
-  if (auto *d = static_cast<FileDialogBox *>(dialog)) {
-    d->dialog->SetFolder(base::FilePath(folder));
+  if (auto *d = FileDialogStore::get(dialog)) {
+    d->SetFolder(base::FilePath(folder));
   }
 }
 
 void yue_mbt_file_dialog_set_filename(void *dialog, const char *filename) {
-  if (auto *d = static_cast<FileDialogBox *>(dialog)) {
-    d->dialog->SetFilename(filename);
+  if (auto *d = FileDialogStore::get(dialog)) {
+    d->SetFilename(filename);
   }
 }
 
 int32_t yue_mbt_file_dialog_run_for_window(void *dialog, void *window) {
-  auto *d = static_cast<FileDialogBox *>(dialog);
-  auto *w = CastTo<nu::Window>(static_cast<HandleBox *>(window));
+  auto *d = FileDialogStore::get(dialog);
+  auto *w = CastTo<nu::Window>(window);
   if (d == nullptr || w == nullptr) {
     return 0;
   }
-  return d->dialog->RunForWindow(w) ? 1 : 0;
+  return d->RunForWindow(w) ? 1 : 0;
 }
 
 void *yue_mbt_file_dialog_get_result(void *dialog) {
-  if (auto *d = static_cast<FileDialogBox *>(dialog)) {
-    return BytesFromString(d->dialog->GetResult().value());
+  if (auto *d = FileDialogStore::get(dialog)) {
+    return BytesFromString(d->GetResult().value());
   }
   return moonbit_make_bytes(0, 0);
 }
@@ -737,16 +691,14 @@ void yue_mbt_painter_bezier_curve_to(void *painter, double cp1x, double cp1y,
 void yue_mbt_painter_arc(void *painter, double x, double y, double radius,
                          double start_angle, double end_angle, int32_t ccw) {
   auto *p = static_cast<nu::Painter *>(painter);
-  float cx = static_cast<float>(x);
-  float cy = static_cast<float>(y);
-  float r = static_cast<float>(radius);
   float sa = static_cast<float>(start_angle);
   float ea = static_cast<float>(end_angle);
-  // libyue 的 Arc 无反向参数：逆时针用负角跨度表达（等价于 canvas 语义）
+  // libyue 的 Arc 无反向参数：逆时针用负角跨度表达（等价 canvas 语义）
   if (ccw != 0 && ea > sa) {
     ea -= static_cast<float>(2 * M_PI);
   }
-  p->Arc(nu::PointF(cx, cy), r, sa, ea);
+  p->Arc(nu::PointF(static_cast<float>(x), static_cast<float>(y)),
+         static_cast<float>(radius), sa, ea);
 }
 
 void yue_mbt_painter_fill(void *painter) {
@@ -815,24 +767,24 @@ void yue_mbt_painter_draw_text(void *painter, const char *text, double x,
 void yue_mbt_painter_draw_attributed_text(void *painter, void *attributed_text,
                                           double x, double y, double w,
                                           double h) {
-  auto *at = static_cast<AttributedTextBox *>(attributed_text);
+  auto *at = AttributedTextStore::get(attributed_text);
   auto *p = static_cast<nu::Painter *>(painter);
   if (at == nullptr || p == nullptr) {
     return;
   }
-  p->DrawAttributedText(at->text,
+  p->DrawAttributedText(scoped_refptr<nu::AttributedText>(at),
                         nu::RectF(static_cast<float>(x), static_cast<float>(y),
                                   static_cast<float>(w), static_cast<float>(h)));
 }
 
 void yue_mbt_painter_draw_image(void *painter, void *image, double x, double y,
                                 double w, double h) {
-  auto *img = static_cast<ImageBox *>(image);
+  auto *img = ImageStore::get(image);
   auto *p = static_cast<nu::Painter *>(painter);
   if (img == nullptr || p == nullptr) {
     return;
   }
-  p->DrawImage(img->image.get(),
+  p->DrawImage(img,
                nu::RectF(static_cast<float>(x), static_cast<float>(y),
                          static_cast<float>(w), static_cast<float>(h)));
 }
@@ -841,13 +793,13 @@ void yue_mbt_painter_draw_image_from_rect(void *painter, void *image, double sx,
                                           double sy, double sw, double sh,
                                           double dx, double dy, double dw,
                                           double dh) {
-  auto *img = static_cast<ImageBox *>(image);
+  auto *img = ImageStore::get(image);
   auto *p = static_cast<nu::Painter *>(painter);
   if (img == nullptr || p == nullptr) {
     return;
   }
   p->DrawImageFromRect(
-      img->image.get(),
+      img,
       nu::RectF(static_cast<float>(sx), static_cast<float>(sy),
                 static_cast<float>(sw), static_cast<float>(sh)),
       nu::RectF(static_cast<float>(dx), static_cast<float>(dy),
@@ -856,12 +808,12 @@ void yue_mbt_painter_draw_image_from_rect(void *painter, void *image, double sx,
 
 void yue_mbt_painter_draw_canvas(void *painter, void *canvas, double x, double y,
                                  double w, double h) {
-  auto *c = static_cast<CanvasBox *>(canvas);
+  auto *c = CanvasStore::get(canvas);
   auto *p = static_cast<nu::Painter *>(painter);
   if (c == nullptr || p == nullptr) {
     return;
   }
-  p->DrawCanvas(c->canvas.get(),
+  p->DrawCanvas(c,
                 nu::RectF(static_cast<float>(x), static_cast<float>(y),
                           static_cast<float>(w), static_cast<float>(h)));
 }
@@ -870,13 +822,13 @@ void yue_mbt_painter_draw_canvas_from_rect(void *painter, void *canvas,
                                            double sx, double sy, double sw,
                                            double sh, double dx, double dy,
                                            double dw, double dh) {
-  auto *c = static_cast<CanvasBox *>(canvas);
+  auto *c = CanvasStore::get(canvas);
   auto *p = static_cast<nu::Painter *>(painter);
   if (c == nullptr || p == nullptr) {
     return;
   }
   p->DrawCanvasFromRect(
-      c->canvas.get(),
+      c,
       nu::RectF(static_cast<float>(sx), static_cast<float>(sy),
                 static_cast<float>(sw), static_cast<float>(sh)),
       nu::RectF(static_cast<float>(dx), static_cast<float>(dy),
@@ -886,17 +838,14 @@ void yue_mbt_painter_draw_canvas_from_rect(void *painter, void *canvas,
 // ---------- Canvas / AttributedText / Font / Image ----------
 
 void *yue_mbt_canvas_new(double width, double height) {
-  auto *box = static_cast<CanvasBox *>(
-      moonbit_make_external_object(ReleaseRef<CanvasBox>, sizeof(CanvasBox)));
-  new (&box->canvas)
-      scoped_refptr<nu::Canvas>(new nu::Canvas(nu::SizeF(
-          static_cast<float>(width), static_cast<float>(height))));
-  return box;
+  return reinterpret_cast<void *>(CanvasStore::put(
+      new nu::Canvas(nu::SizeF(static_cast<float>(width),
+                               static_cast<float>(height)))));
 }
 
 void *yue_mbt_canvas_get_painter(void *canvas) {
-  if (auto *c = static_cast<CanvasBox *>(canvas)) {
-    return c->canvas->GetPainter();
+  if (auto *c = CanvasStore::get(canvas)) {
+    return c->GetPainter();
   }
   return nullptr;
 }
@@ -905,33 +854,29 @@ void *yue_mbt_attributed_text_new(const char *text, int32_t align, int32_t valig
   nu::TextFormat format;
   format.align = static_cast<nu::TextAlign>(align);
   format.valign = static_cast<nu::TextAlign>(valign);
-  auto *box = static_cast<AttributedTextBox *>(
-      moonbit_make_external_object(ReleaseRef<AttributedTextBox>,
-                                   sizeof(AttributedTextBox)));
-  new (&box->text) scoped_refptr<nu::AttributedText>(
-      new nu::AttributedText(text, format));
-  return box;
+  return reinterpret_cast<void *>(AttributedTextStore::put(
+      new nu::AttributedText(text, format)));
 }
 
 void yue_mbt_attributed_text_set_font(void *at, void *font) {
-  auto *t = static_cast<AttributedTextBox *>(at);
-  auto *f = static_cast<FontBox *>(font);
+  auto *t = AttributedTextStore::get(at);
+  auto *f = FontStore::get(font);
   if (t != nullptr && f != nullptr) {
-    t->text->SetFont(scoped_refptr<nu::Font>(f->font));
+    t->SetFont(scoped_refptr<nu::Font>(f));
   }
 }
 
 void yue_mbt_attributed_text_set_color(void *at, const char *hex) {
-  if (auto *t = static_cast<AttributedTextBox *>(at)) {
-    t->text->SetColor(nu::Color(std::string(hex)));
+  if (auto *t = AttributedTextStore::get(at)) {
+    t->SetColor(nu::Color(std::string(hex)));
   }
 }
 
 void yue_mbt_attributed_text_get_bounds_for(void *at, double w, double h,
                                             double *out_w, double *out_h) {
-  if (auto *t = static_cast<AttributedTextBox *>(at)) {
-    nu::RectF bounds = t->text->GetBoundsFor(
-        nu::SizeF(static_cast<float>(w), static_cast<float>(h)));
+  if (auto *t = AttributedTextStore::get(at)) {
+    nu::RectF bounds =
+        t->GetBoundsFor(nu::SizeF(static_cast<float>(w), static_cast<float>(h)));
     *out_w = bounds.width();
     *out_h = bounds.height();
   } else {
@@ -942,35 +887,197 @@ void yue_mbt_attributed_text_get_bounds_for(void *at, double w, double h,
 
 void *yue_mbt_font_new(const char *name, double size, int32_t weight,
                        int32_t style) {
-  auto *box = static_cast<FontBox *>(
-      moonbit_make_external_object(ReleaseRef<FontBox>, sizeof(FontBox)));
-  new (&box->font) scoped_refptr<nu::Font>(
+  return reinterpret_cast<void *>(FontStore::put(
       new nu::Font(name, static_cast<float>(size),
                    static_cast<nu::Font::Weight>(weight),
-                   static_cast<nu::Font::Style>(style)));
-  return box;
+                   static_cast<nu::Font::Style>(style))));
 }
 
 void *yue_mbt_image_new_from_file(const char *path) {
-  auto *box = static_cast<ImageBox *>(
-      moonbit_make_external_object(ReleaseRef<ImageBox>, sizeof(ImageBox)));
-  new (&box->image)
-      scoped_refptr<nu::Image>(new nu::Image(base::FilePath(path)));
-  return box;
+  return reinterpret_cast<void *>(
+      ImageStore::put(new nu::Image(base::FilePath(path))));
 }
 
 double yue_mbt_image_get_width(void *image) {
-  if (auto *i = static_cast<ImageBox *>(image)) {
-    return i->image->GetSize().width();
+  if (auto *i = ImageStore::get(image)) {
+    return i->GetSize().width();
   }
   return 0;
 }
 
 double yue_mbt_image_get_height(void *image) {
-  if (auto *i = static_cast<ImageBox *>(image)) {
-    return i->image->GetSize().height();
+  if (auto *i = ImageStore::get(image)) {
+    return i->GetSize().height();
   }
   return 0;
+}
+
+// ---------- Table ----------
+
+namespace {
+
+// 表格模型桥：把 MoonBit 侧 trait 实现挂到 libyue 的 AbstractTableModel。
+// get_value 返回 MoonBit Bytes，编码 [kind:i32le][payload]：
+//   kind=0 payload 为 UTF-8 文本（Text/Edit 列）
+//   kind=1 payload 单字节 0/1（Checkbox 列）
+//   kind=2 payload 为 UTF-8 文本 + \0 + 颜色 hex（Custom 列）
+class TableModelBridge : public nu::AbstractTableModel {
+ public:
+  TableModelBridge(uint32_t column_count, void *closure,
+                   uint32_t (*row_count)(void *),
+                   void *(*get_value)(void *, uint32_t, uint32_t),
+                   void (*set_value)(void *, uint32_t, uint32_t, int32_t, void *,
+                                     int32_t))
+    : nu::AbstractTableModel(true), closure_(closure),
+      row_count_(row_count), get_value_(get_value), set_value_(set_value) {}
+
+  uint32_t GetRowCount() const override {
+    return row_count_(closure_);
+  }
+
+  base::Value GetValue(uint32_t column, uint32_t row) const override {
+    int32_t kind = 0;
+    std::string text, extra;
+    bool flag = false;
+    Decode(get_value_(closure_, column, row), &kind, &text, &extra, &flag);
+    switch (kind) {
+      case 1:
+        return base::Value(flag);
+      case 2: {
+        base::Value::Dict dict;
+        dict.Set("name", text);
+        dict.Set("color", extra);
+        return base::Value(std::move(dict));
+      }
+      default:
+        return base::Value(text);
+    }
+  }
+
+  void SetValue(uint32_t column, uint32_t row, base::Value value) override {
+    if (value.is_bool()) {
+      set_value_(closure_, column, row, 1, nullptr, value.GetBool() ? 1 : 0);
+    } else if (value.is_string()) {
+      set_value_(closure_, column, row, 0, BytesFromString(value.GetString()), 0);
+    }
+  }
+
+ private:
+  // 解析 MoonBit 编码：[kind:i32le][payload]
+  static void Decode(const void *bytes, int32_t *kind, std::string *text,
+                     std::string *extra, bool *flag) {
+    const uint8_t *b = static_cast<const uint8_t *>(bytes);
+    int32_t k = static_cast<int32_t>(b[0]) | (static_cast<int32_t>(b[1]) << 8) |
+                (static_cast<int32_t>(b[2]) << 16) |
+                (static_cast<int32_t>(b[3]) << 24);
+    const uint8_t *rest = b + 4;
+    switch (k) {
+      case 1:
+        *flag = rest[0] != 0;
+        break;
+      case 2:
+        *text = reinterpret_cast<const char *>(rest);
+        *extra = reinterpret_cast<const char *>(rest + text->size() + 1);
+        break;
+      default:
+        *text = reinterpret_cast<const char *>(rest);
+        break;
+    }
+    *kind = k;
+  }
+
+  void *closure_;
+  uint32_t (*row_count_)(void *);
+  void *(*get_value_)(void *, uint32_t, uint32_t);
+  void (*set_value_)(void *, uint32_t, uint32_t, int32_t, void *, int32_t);
+};
+
+}  // namespace
+
+void *yue_mbt_table_new(void) {
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Table()));
+}
+
+void yue_mbt_table_add_column_text(void *table, const char *title, int32_t width) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    nu::Table::ColumnOptions options;
+    options.type = nu::Table::ColumnType::Text;
+    options.width = width;
+    t->AddColumnWithOptions(title, options);
+  }
+}
+
+void yue_mbt_table_add_column_edit(void *table, const char *title, int32_t width) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    nu::Table::ColumnOptions options;
+    options.type = nu::Table::ColumnType::Edit;
+    options.width = width;
+    t->AddColumnWithOptions(title, options);
+  }
+}
+
+void yue_mbt_table_add_column_checkbox(void *table, const char *title, int32_t width) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    nu::Table::ColumnOptions options;
+    options.type = nu::Table::ColumnType::Checkbox;
+    options.width = width;
+    t->AddColumnWithOptions(title, options);
+  }
+}
+
+void yue_mbt_table_add_column_custom(void *table, const char *title, int32_t width,
+                                     void (*draw)(void *, void *, double, double,
+                                                  double, double, void *, void *),
+                                     void *closure) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    nu::Table::ColumnOptions options;
+    options.type = nu::Table::ColumnType::Custom;
+    options.width = width;
+    options.on_draw = [draw, closure](nu::Painter *painter, const nu::RectF &rect,
+                                      const base::Value &value) {
+      std::string name, color;
+      if (value.is_dict()) {
+        const base::Value::Dict &dict = value.GetDict();
+        if (const base::Value *n = dict.Find("name")) {
+          if (n->is_string()) {
+            name = n->GetString();
+          }
+        }
+        if (const base::Value *c = dict.Find("color")) {
+          if (c->is_string()) {
+            color = c->GetString();
+          }
+        }
+      }
+      draw(closure, painter, rect.x(), rect.y(), rect.width(), rect.height(),
+           BytesFromString(name), BytesFromString(color));
+    };
+    t->AddColumnWithOptions(title, options);
+  }
+}
+
+void yue_mbt_table_set_has_border(void *table, int32_t yes) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    t->SetHasBorder(yes != 0);
+  }
+}
+
+void *yue_mbt_table_model_new(int32_t column_count, void *closure,
+                              uint32_t (*row_count)(void *),
+                              void *(*get_value)(void *, uint32_t, uint32_t),
+                              void (*set_value)(void *, uint32_t, uint32_t,
+                                                int32_t, void *, int32_t)) {
+  return reinterpret_cast<void *>(ModelStore::put(
+      new TableModelBridge(static_cast<uint32_t>(column_count), closure,
+                           row_count, get_value, set_value)));
+}
+
+void yue_mbt_table_set_model(void *table, void *model) {
+  auto *t = CastTo<nu::Table>(table);
+  auto *m = ModelStore::get(model);
+  if (t != nullptr && m != nullptr) {
+    t->SetModel(scoped_refptr<nu::TableModel>(m));
+  }
 }
 
 // ---------- 托盘 ----------
@@ -1011,23 +1118,21 @@ void *yue_mbt_tray_new(const char *icon_path, int32_t *ok) {
   if (image->IsEmpty()) {
     return nullptr;
   }
-  auto *box = static_cast<TrayBox *>(
-      moonbit_make_external_object(ReleaseRef<TrayBox>, sizeof(TrayBox)));
-  new (&box->tray) scoped_refptr<nu::Tray>(new nu::Tray(image));
+  auto tray = scoped_refptr<nu::Tray>(new nu::Tray(image));
   *ok = 1;
-  return box;
+  return reinterpret_cast<void *>(TrayStore::put(tray));
 }
 
 void yue_mbt_tray_set_title(void *tray, const char *title) {
   // 构造失败（后端缺失）时 nativeui 内部句柄为空，防御性跳过而非崩溃
-  auto *t = static_cast<TrayBox *>(tray)->tray.get();
+  auto *t = TrayStore::get(tray);
   if (t != nullptr) {
     t->SetTitle(title);
   }
 }
 
 void yue_mbt_tray_remove(void *tray) {
-  auto *t = static_cast<TrayBox *>(tray)->tray.get();
+  auto *t = TrayStore::get(tray);
   if (t != nullptr) {
     t->Remove();
   }

@@ -529,6 +529,49 @@ extern "c" fn ffi_image_get_width(image : Image) -> Double = "yue_mbt_image_get_
 extern "c" fn ffi_image_get_height(image : Image) -> Double = "yue_mbt_image_get_height"
 
 ///|
+extern "c" fn ffi_table_new() -> View = "yue_mbt_table_new"
+
+///|
+#borrow(table, title)
+extern "c" fn ffi_table_add_column_text(table : Table, title : Bytes, width : Int) -> Unit = "yue_mbt_table_add_column_text"
+
+///|
+#borrow(table, title)
+extern "c" fn ffi_table_add_column_edit(table : Table, title : Bytes, width : Int) -> Unit = "yue_mbt_table_add_column_edit"
+
+///|
+#borrow(table, title)
+extern "c" fn ffi_table_add_column_checkbox(table : Table, title : Bytes, width : Int) -> Unit = "yue_mbt_table_add_column_checkbox"
+
+///|
+#borrow(table, title, invoke, closure)
+extern "c" fn ffi_table_add_column_custom(
+  table : Table,
+  title : Bytes,
+  width : Int,
+  invoke : FuncRef[((Painter, Double, Double, Double, Double, Bytes, Bytes) -> Unit, Painter, Double, Double, Double, Double, Bytes, Bytes) -> Unit],
+  closure : (Painter, Double, Double, Double, Double, Bytes, Bytes) -> Unit,
+) -> Unit = "yue_mbt_table_add_column_custom"
+
+///|
+#borrow(table)
+extern "c" fn ffi_table_set_has_border(table : Table, yes : Int) -> Unit = "yue_mbt_table_set_has_border"
+
+///|
+#borrow(closure, invoke_row_count, invoke_get_value, invoke_set_value)
+extern "c" fn ffi_table_model_new(
+  column_count : Int,
+  closure : ModelBox,
+  invoke_row_count : FuncRef[(ModelBox) -> Int],
+  invoke_get_value : FuncRef[((ModelBox, Int, Int) -> TableValue, ModelBox, Int, Int) -> Bytes],
+  invoke_set_value : FuncRef[((ModelBox, Int, Int, TableValue) -> Unit, ModelBox, Int, Int, Int, Bytes, Int) -> Unit],
+) -> TableModelHandle = "yue_mbt_table_model_new"
+
+///|
+#borrow(table, model)
+extern "c" fn ffi_table_set_model(table : View, model : TableModelHandle) -> Unit = "yue_mbt_table_set_model"
+
+///|
 /// 托盘后端可用性探测。Linux 上等价于检查 AppIndicator 运行库能否加载。
 extern "c" fn ffi_tray_supported() -> Bool = "yue_mbt_tray_supported"
 

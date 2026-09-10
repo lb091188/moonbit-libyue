@@ -3,7 +3,9 @@
 // 传入任何接受"任意视图"的 API（add_child / set_content 等）。
 
 ///|
-/// 各控件共用的底层句柄（外部对象，GC 管理生命周期）。
+/// 各控件共用的底层句柄（shim 注册表 id）。
+/// #external：值不参与 MoonBit 引用计数，GC 不扫描/移动它。
+#external
 type View
 
 ///|
@@ -90,32 +92,56 @@ pub impl ViewLike for Browser with view(self) {
 }
 
 ///|
+pub(all) struct Table {
+  view : View
+}
+
+///|
+pub impl ViewLike for Table with view(self) {
+  self.view
+}
+
+///|
 /// 独立句柄：菜单条（继承 RefCounted 而非 Responder/View）。
+#external
 type MenuBar
 
 ///|
+#external
 type Menu
 
 ///|
+#external
 type MenuItem
 
 ///|
+#external
 type FileDialog
 
 ///|
+#external
 type Tray
 
 ///|
+#external
 type Image
 
 ///|
+#external
 type Canvas
 
 ///|
+#external
 type AttributedText
 
 ///|
+#external
 type Font
+
+///|
+/// 表格模型桥句柄（C++ TableModelBridge）。
+#external
+type TableModelHandle
 
 ///|
 /// 绘制回调期间由 C 借出的裸指针，无 GC 头，不得持有。
