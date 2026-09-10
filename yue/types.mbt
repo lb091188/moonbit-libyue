@@ -193,3 +193,43 @@ pub extern type Painter
 ///|
 /// 拖拽会话信息：仅拖拽回调期内有效（C 借出，无 GC 头）。
 pub extern type DraggingInfo
+
+///|
+/// 系统剪贴板单例句柄。
+#external
+pub type Clipboard
+
+///|
+/// 消息框句柄（独立对象）。
+#external
+pub type MessageBox
+
+///|
+pub(all) struct Group {
+  view : View
+}
+
+///|
+pub impl ViewLike for Group with view(self) {
+  self.view
+}
+
+///|
+pub(all) struct Scroll {
+  view : View
+}
+
+///|
+pub impl ViewLike for Scroll with view(self) {
+  self.view
+}
+
+///|
+pub(all) struct Separator {
+  view : View
+}
+
+///|
+pub impl ViewLike for Separator with view(self) {
+  self.view
+}

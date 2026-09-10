@@ -319,6 +319,41 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view);
 void yue_mbt_popover_close(void *popover);
 void yue_mbt_popover_on_close(void *popover, void (*invoke)(void *), void *closure);
 
+/* ---------- Group / Scroll / Separator ---------- */
+
+void *yue_mbt_group_new(const char *title);
+void yue_mbt_group_set_content(void *group, void *view);
+void yue_mbt_group_set_title(void *group, const char *title);
+
+void *yue_mbt_scroll_new(void);
+void yue_mbt_scroll_set_content(void *scroll, void *view);
+void yue_mbt_scroll_set_content_size(void *scroll, double w, double h);
+void yue_mbt_scroll_set_scroll_position(void *scroll, double horizon, double vertical);
+void yue_mbt_scroll_set_overlay_scrollbar(void *scroll, int32_t yes);
+
+void *yue_mbt_separator_new(int32_t orientation);
+
+/* ---------- 剪贴板（句柄独立） ---------- */
+
+void *yue_mbt_clipboard_get(void);
+void yue_mbt_clipboard_set_text(void *clipboard, const char *text);
+void *yue_mbt_clipboard_get_text(void *clipboard);
+void yue_mbt_clipboard_clear(void *clipboard);
+
+/* ---------- 消息框（句柄独立；type 0=None 1=Information 2=Warning 3=Error） ---------- */
+
+void *yue_mbt_message_box_new(int32_t type);
+void yue_mbt_message_box_set_title(void *box, const char *title);
+void yue_mbt_message_box_set_text(void *box, const char *text);
+void yue_mbt_message_box_set_informative_text(void *box, const char *text);
+void yue_mbt_message_box_add_button(void *box, const char *title, int32_t response);
+void yue_mbt_message_box_on_response(void *box,
+                                     void (*invoke)(void *closure, int32_t response),
+                                     void *closure);
+void yue_mbt_message_box_show(void *box);
+void yue_mbt_message_box_show_for_window(void *box, void *window);
+void yue_mbt_message_box_close(void *box);
+
 /* ---------- 托盘 ---------- */
 
 int32_t yue_mbt_tray_supported(void);

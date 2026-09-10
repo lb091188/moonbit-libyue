@@ -783,6 +783,95 @@ extern "c" fn ffi_popover_on_close(
 ) -> Unit = "yue_mbt_popover_on_close"
 
 ///|
+#borrow(title)
+extern "c" fn ffi_group_new(title : Bytes) -> View = "yue_mbt_group_new"
+
+///|
+#borrow(group, view)
+extern "c" fn ffi_group_set_content(group : View, view : View) -> Unit = "yue_mbt_group_set_content"
+
+///|
+#borrow(group, title)
+extern "c" fn ffi_group_set_title(group : View, title : Bytes) -> Unit = "yue_mbt_group_set_title"
+
+///|
+extern "c" fn ffi_scroll_new() -> View = "yue_mbt_scroll_new"
+
+///|
+#borrow(scroll, view)
+extern "c" fn ffi_scroll_set_content(scroll : View, view : View) -> Unit = "yue_mbt_scroll_set_content"
+
+///|
+#borrow(scroll)
+extern "c" fn ffi_scroll_set_content_size(scroll : View, w : Double, h : Double) -> Unit = "yue_mbt_scroll_set_content_size"
+
+///|
+#borrow(scroll)
+extern "c" fn ffi_scroll_set_scroll_position(scroll : View, horizon : Double, vertical : Double) -> Unit = "yue_mbt_scroll_set_scroll_position"
+
+///|
+#borrow(scroll)
+extern "c" fn ffi_scroll_set_overlay_scrollbar(scroll : View, yes : Int) -> Unit = "yue_mbt_scroll_set_overlay_scrollbar"
+
+///|
+#borrow(orientation)
+extern "c" fn ffi_separator_new(orientation : Int) -> View = "yue_mbt_separator_new"
+
+///|
+extern "c" fn ffi_clipboard_get() -> Clipboard = "yue_mbt_clipboard_get"
+
+///|
+#borrow(clipboard, text)
+extern "c" fn ffi_clipboard_set_text(clipboard : Clipboard, text : Bytes) -> Unit = "yue_mbt_clipboard_set_text"
+
+///|
+#borrow(clipboard)
+extern "c" fn ffi_clipboard_get_text(clipboard : Clipboard) -> Bytes = "yue_mbt_clipboard_get_text"
+
+///|
+#borrow(clipboard)
+extern "c" fn ffi_clipboard_clear(clipboard : Clipboard) -> Unit = "yue_mbt_clipboard_clear"
+
+///|
+extern "c" fn ffi_message_box_new(type_ : Int) -> MessageBox = "yue_mbt_message_box_new"
+
+///|
+#borrow(box, title)
+extern "c" fn ffi_message_box_set_title(box : MessageBox, title : Bytes) -> Unit = "yue_mbt_message_box_set_title"
+
+///|
+#borrow(box, text)
+extern "c" fn ffi_message_box_set_text(box : MessageBox, text : Bytes) -> Unit = "yue_mbt_message_box_set_text"
+
+///|
+#borrow(box, text)
+extern "c" fn ffi_message_box_set_informative_text(box : MessageBox, text : Bytes) -> Unit = "yue_mbt_message_box_set_informative_text"
+
+///|
+#borrow(box, title)
+extern "c" fn ffi_message_box_add_button(box : MessageBox, title : Bytes, response : Int) -> Unit = "yue_mbt_message_box_add_button"
+
+///|
+#borrow(box, invoke, callback)
+extern "c" fn ffi_message_box_on_response(
+  box : MessageBox,
+  invoke : FuncRef[((Int) -> Unit, Int) -> Unit],
+  callback : (Int) -> Unit,
+) -> Unit = "yue_mbt_message_box_on_response"
+
+///|
+#borrow(box)
+extern "c" fn ffi_message_box_show(box : MessageBox) -> Unit = "yue_mbt_message_box_show"
+
+///|
+#borrow(box, window)
+extern "c" fn ffi_message_box_show_for_window(box : MessageBox, window : View) -> Unit = "yue_mbt_message_box_show_for_window"
+
+///|
+#borrow(box)
+extern "c" fn ffi_message_box_close(box : MessageBox) -> Unit = "yue_mbt_message_box_close"
+
+///|
 /// 托盘后端可用性探测。Linux 上等价于检查 AppIndicator 运行库能否加载。
 extern "c" fn ffi_tray_supported() -> Bool = "yue_mbt_tray_supported"
 

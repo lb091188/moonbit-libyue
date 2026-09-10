@@ -108,6 +108,7 @@ using CanvasStore = Store<nu::Canvas>;
 using AttributedTextStore = Store<nu::AttributedText>;
 using FontStore = Store<nu::Font>;
 using PopoverStore = Store<nu::Popover>;
+using MessageBoxStore = Store<nu::MessageBox>;
 
 // CastTo：从注册表取对象，并用 GetClassName 校验运行时类型。
 // （View 自身无 kClassName，故模板仅用于具体控件类型。）
@@ -1492,6 +1493,152 @@ void yue_mbt_popover_close(void *popover) {
 void yue_mbt_popover_on_close(void *popover, void (*invoke)(void *), void *closure) {
   if (auto *p = PopoverStore::get(popover)) {
     p->on_close.Connect([invoke, closure](nu::Popover *) { invoke(closure); });
+  }
+}
+
+
+// ---------- Group / Scroll / Separator / 剪贴板 / 消息框 ----------
+
+void *yue_mbt_group_new(const char *title) {
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Group(title)));
+}
+
+void yue_mbt_group_set_content(void *group, void *view) {
+  auto *g = CastTo<nu::Group>(group);
+  auto *c = CastToView(view);
+  if (g != nullptr && c != nullptr) {
+    g->SetContentView(scoped_refptr<nu::View>(c));
+  }
+}
+
+void yue_mbt_group_set_title(void *group, const char *title) {
+  if (auto *g = CastTo<nu::Group>(group)) {
+    g->SetTitle(title);
+  }
+}
+
+void *yue_mbt_scroll_new(void) {
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Scroll()));
+}
+
+void yue_mbt_scroll_set_content(void *scroll, void *view) {
+  auto *s = CastTo<nu::Scroll>(scroll);
+  auto *c = CastToView(view);
+  if (s != nullptr && c != nullptr) {
+    s->SetContentView(scoped_refptr<nu::View>(c));
+  }
+}
+
+void yue_mbt_scroll_set_content_size(void *scroll, double w, double h) {
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    s->SetContentSize(
+        nu::SizeF(static_cast<float>(w), static_cast<float>(h)));
+  }
+}
+
+void yue_mbt_scroll_set_scroll_position(void *scroll, double horizon, double vertical) {
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    s->SetScrollPosition(static_cast<float>(horizon), static_cast<float>(vertical));
+  }
+}
+
+void yue_mbt_scroll_set_overlay_scrollbar(void *scroll, int32_t yes) {
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    s->SetOverlayScrollbar(yes != 0);
+  }
+}
+
+void *yue_mbt_separator_new(int32_t orientation) {
+  return reinterpret_cast<void *>(ViewStore::put(
+      new nu::Separator(static_cast<nu::Orientation>(orientation))));
+}
+
+// ---------- 剪贴板 ----------
+
+// 系统剪贴板是静态单例，句柄即单例指针（进程级稳定，绝不 delete）
+void *yue_mbt_clipboard_get(void) {
+  static nu::Clipboard *g_clipboard = nu::Clipboard::Get();
+  return g_clipboard;
+}
+
+void yue_mbt_clipboard_set_text(void *clipboard, const char *text) {
+  if (auto *c = static_cast<nu::Clipboard *>(clipboard)) {
+    c->SetText(text);
+  }
+}
+
+void *yue_mbt_clipboard_get_text(void *clipboard) {
+  if (auto *c = static_cast<nu::Clipboard *>(clipboard)) {
+    return BytesFromString(c->GetText());
+  }
+  return moonbit_make_bytes(0, 0);
+}
+
+void yue_mbt_clipboard_clear(void *clipboard) {
+  if (auto *c = static_cast<nu::Clipboard *>(clipboard)) {
+    c->Clear();
+  }
+}
+
+// ---------- 消息框 ----------
+
+void *yue_mbt_message_box_new(int32_t type) {
+  auto *box = new nu::MessageBox();
+  box->SetType(static_cast<nu::MessageBox::Type>(type));
+  return reinterpret_cast<void *>(MessageBoxStore::put(box));
+}
+
+void yue_mbt_message_box_set_title(void *box, const char *title) {
+  if (auto *m = MessageBoxStore::get(box)) {
+    m->SetTitle(title);
+  }
+}
+
+void yue_mbt_message_box_set_text(void *box, const char *text) {
+  if (auto *m = MessageBoxStore::get(box)) {
+    m->SetText(text);
+  }
+}
+
+void yue_mbt_message_box_set_informative_text(void *box, const char *text) {
+  if (auto *m = MessageBoxStore::get(box)) {
+    m->SetInformativeText(text);
+  }
+}
+
+void yue_mbt_message_box_add_button(void *box, const char *title, int32_t response) {
+  if (auto *m = MessageBoxStore::get(box)) {
+    m->AddButton(title, response);
+  }
+}
+
+void yue_mbt_message_box_on_response(void *box,
+                                     void (*invoke)(void *, int32_t),
+                                     void *closure) {
+  if (auto *m = MessageBoxStore::get(box)) {
+    m->on_response.Connect([invoke, closure](nu::MessageBox *, int response) {
+      invoke(closure, response);
+    });
+  }
+}
+
+void yue_mbt_message_box_show(void *box) {
+  if (auto *m = MessageBoxStore::get(box)) {
+    m->Show();
+  }
+}
+
+void yue_mbt_message_box_show_for_window(void *box, void *window) {
+  auto *m = MessageBoxStore::get(box);
+  auto *w = CastTo<nu::Window>(window);
+  if (m != nullptr && w != nullptr) {
+    m->ShowForWindow(w);
+  }
+}
+
+void yue_mbt_message_box_close(void *box) {
+  if (auto *m = MessageBoxStore::get(box)) {
+    m->Close();
   }
 }
 
