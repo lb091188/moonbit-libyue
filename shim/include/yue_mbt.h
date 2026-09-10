@@ -387,6 +387,41 @@ double yue_mbt_screen_get_scale_factor(void);
 double yue_mbt_screen_get_primary_width(void);
 double yue_mbt_screen_get_primary_height(void);
 
+/* ---------- 追加：DatePicker 时间 / Table 信号 / 键盘 / 窗口状态 / Cursor ---------- */
+
+/* 日期以 Unix epoch 秒传递（base::Time 的 ToTimeT/FromTimeT） */
+void yue_mbt_date_picker_set_date(void *picker, int64_t epoch_seconds);
+int64_t yue_mbt_date_picker_get_date(void *picker);
+void yue_mbt_date_picker_on_date_change(void *picker, void (*invoke)(void *), void *closure);
+
+/* Table 事件 */
+void yue_mbt_table_on_row_activate(void *table,
+                                   void (*invoke)(void *closure, int32_t row),
+                                   void *closure);
+void yue_mbt_table_on_selection_change(void *table, void (*invoke)(void *), void *closure);
+void yue_mbt_table_on_toggle_checkbox(void *table,
+                                      void (*invoke)(void *closure, int32_t column, int32_t row),
+                                      void *closure);
+
+/* 键盘事件（Responder）：invoke(closure, key_code, modifiers) 返回是否已处理 */
+void yue_mbt_view_on_key_down(void *view,
+                              int32_t (*invoke)(void *closure, int32_t key_code, int32_t modifiers),
+                              void *closure);
+void yue_mbt_view_on_key_up(void *view,
+                            int32_t (*invoke)(void *closure, int32_t key_code, int32_t modifiers),
+                            void *closure);
+
+/* 窗口状态 */
+void yue_mbt_window_maximize(void *window);
+void yue_mbt_window_unmaximize(void *window);
+void yue_mbt_window_set_fullscreen(void *window, int32_t fullscreen);
+int32_t yue_mbt_window_is_fullscreen(void *window);
+
+/* 光标：type 与 Cursor::Type 枚举一致（0=Default 1=Hand 2=Crosshair 3=Progress
+ * 4=Text 5=NotAllowed 6=Help 7=Move 8=ResizeEW 9=ResizeNS 10=ResizeNESW 11=ResizeNWSE） */
+void *yue_mbt_cursor_new(int32_t type);
+void yue_mbt_view_set_cursor(void *view, void *cursor);
+
 /* ---------- 托盘 ---------- */
 
 int32_t yue_mbt_tray_supported(void);

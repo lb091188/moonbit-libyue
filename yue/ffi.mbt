@@ -945,6 +945,85 @@ extern "c" fn ffi_screen_get_primary_height() -> Double = "yue_mbt_screen_get_pr
 extern "c" fn ffi_notification_center_get() -> NotificationCenter = "yue_mbt_notification_center_get"
 
 ///|
+#borrow(picker)
+extern "c" fn ffi_date_picker_set_date(picker : DatePicker, epoch_seconds : Int64) -> Unit = "yue_mbt_date_picker_set_date"
+
+///|
+#borrow(picker)
+extern "c" fn ffi_date_picker_get_date(picker : DatePicker) -> Int64 = "yue_mbt_date_picker_get_date"
+
+///|
+#borrow(picker, invoke, callback)
+extern "c" fn ffi_date_picker_on_date_change(
+  picker : DatePicker,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_date_picker_on_date_change"
+
+///|
+#borrow(table, invoke, callback)
+extern "c" fn ffi_table_on_row_activate(
+  table : Table,
+  invoke : FuncRef[((Int) -> Unit, Int) -> Unit],
+  callback : (Int) -> Unit,
+) -> Unit = "yue_mbt_table_on_row_activate"
+
+///|
+#borrow(table, invoke, callback)
+extern "c" fn ffi_table_on_selection_change(
+  table : Table,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_table_on_selection_change"
+
+///|
+#borrow(table, invoke, callback)
+extern "c" fn ffi_table_on_toggle_checkbox(
+  table : Table,
+  invoke : FuncRef[((Int, Int) -> Unit, Int, Int) -> Unit],
+  callback : (Int, Int) -> Unit,
+) -> Unit = "yue_mbt_table_on_toggle_checkbox"
+
+///|
+#borrow(view, invoke, callback)
+extern "c" fn ffi_view_on_key_down(
+  view : View,
+  invoke : FuncRef[((Int, Int) -> Int, Int, Int) -> Int],
+  callback : (Int, Int) -> Int,
+) -> Unit = "yue_mbt_view_on_key_down"
+
+///|
+#borrow(view, invoke, callback)
+extern "c" fn ffi_view_on_key_up(
+  view : View,
+  invoke : FuncRef[((Int, Int) -> Int, Int, Int) -> Int],
+  callback : (Int, Int) -> Int,
+) -> Unit = "yue_mbt_view_on_key_up"
+
+///|
+#borrow(window)
+extern "c" fn ffi_window_maximize(window : View) -> Unit = "yue_mbt_window_maximize"
+
+///|
+#borrow(window)
+extern "c" fn ffi_window_unmaximize(window : View) -> Unit = "yue_mbt_window_unmaximize"
+
+///|
+#borrow(window)
+extern "c" fn ffi_window_set_fullscreen(window : View, fullscreen : Int) -> Unit = "yue_mbt_window_set_fullscreen"
+
+///|
+#borrow(window)
+extern "c" fn ffi_window_is_fullscreen(window : View) -> Int = "yue_mbt_window_is_fullscreen"
+
+///|
+extern "c" fn ffi_cursor_new(type_ : Int) -> Cursor = "yue_mbt_cursor_new"
+
+///|
+#borrow(view, cursor)
+extern "c" fn ffi_view_set_cursor(view : View, cursor : Cursor) -> Unit = "yue_mbt_view_set_cursor"
+
+///|
 /// 托盘后端可用性探测。Linux 上等价于检查 AppIndicator 运行库能否加载。
 extern "c" fn ffi_tray_supported() -> Bool = "yue_mbt_tray_supported"
 

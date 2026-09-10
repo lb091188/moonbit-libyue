@@ -19,6 +19,10 @@ fn main {
   date_group.set_style("marginBottom", 10.0)
   content.add_child(date_group)
   let date_picker = @yue.DatePicker::new()
+  // 时间读写：以 Unix epoch 秒设置为 2000-01-01（UTC），再读回
+  date_picker.set_date(946684800L)
+  println("日期读写往返：\{date_picker.get_date()}（应为 946684800）")
+  date_picker.on_date_change(fn() { println("日期已变化") })
   date_group.set_content(date_picker)
 
   // GIF 播放

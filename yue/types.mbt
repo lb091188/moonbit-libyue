@@ -290,3 +290,8 @@ pub type Appearance
 /// 屏幕信息 API 命名空间。
 #external
 pub type Screen
+
+///|
+/// 鼠标光标（独立句柄）。
+#external
+pub type Cursor

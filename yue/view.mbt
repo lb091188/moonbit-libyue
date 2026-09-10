@@ -334,3 +334,37 @@ impl ViewLike with fn on_mouse_down(self, callback : () -> Bool) -> Unit {
   keep_alive(fn() { ignore(wrapped) })
   ffi_view_on_mouse_down(self.view(), fn(f) { f() }, wrapped)
 }
+
+///|
+/// 键盘修饰位。
+pub(all) enum KeyMod {
+  Shift
+  Ctrl
+  Alt
+  Meta
+}
+
+///|
+/// 注册键盘按下回调：返回 true 表示事件已处理（阻止默认行为）。
+/// key_code 为平台虚拟键值，mods 为修饰位（1=Shift 2=Ctrl 4=Alt 8=Meta）。
+pub fn[T : ViewLike] View::on_key_down(
+  self : T,
+  callback : (Int, Int) -> Bool,
+) -> Unit {
+  let wrapped : (Int, Int) -> Int =
+    fn(key, mods) { if callback(key, mods) { 1 } else { 0 } }
+  keep_alive(fn() { ignore(wrapped) })
+  ffi_view_on_key_down(self.view(), fn(f, key, mods) { f(key, mods) }, wrapped)
+}
+
+///|
+/// 注册键盘抬起回调。
+pub fn[T : ViewLike] View::on_key_up(
+  self : T,
+  callback : (Int, Int) -> Bool,
+) -> Unit {
+  let wrapped : (Int, Int) -> Int =
+    fn(key, mods) { if callback(key, mods) { 1 } else { 0 } }
+  keep_alive(fn() { ignore(wrapped) })
+  ffi_view_on_key_up(self.view(), fn(f, key, mods) { f(key, mods) }, wrapped)
+}

@@ -53,44 +53,44 @@ pub fn Picker::new() -> Picker {
 ///|
 /// 添加选项。
 pub fn Picker::add_item(self : Picker, text : String) -> Unit {
-  ffi_picker_add_item(self.view(), utf8_bytes(text))
+  ffi_picker_add_item(ViewLike::view(self), utf8_bytes(text))
 }
 
 ///|
 /// 移除指定位置的选项。
 pub fn Picker::remove_item_at(self : Picker, index : Int) -> Unit {
-  ffi_picker_remove_item_at(self.view(), index)
+  ffi_picker_remove_item_at(ViewLike::view(self), index)
 }
 
 ///|
 /// 清空全部选项。
 pub fn Picker::clear(self : Picker) -> Unit {
-  ffi_picker_clear(self.view())
+  ffi_picker_clear(ViewLike::view(self))
 }
 
 ///|
 /// 选中指定位置的选项。
 pub fn Picker::select_item_at(self : Picker, index : Int) -> Unit {
-  ffi_picker_select_item_at(self.view(), index)
+  ffi_picker_select_item_at(ViewLike::view(self), index)
 }
 
 ///|
 /// 当前选中的选项文本。
 pub fn Picker::get_selected_item(self : Picker) -> String {
-  from_utf8_bytes(ffi_picker_get_selected_item(self.view()))
+  from_utf8_bytes(ffi_picker_get_selected_item(ViewLike::view(self)))
 }
 
 ///|
 /// 当前选中项下标（无选中为 -1）。
 pub fn Picker::get_selected_item_index(self : Picker) -> Int {
-  ffi_picker_get_selected_item_index(self.view())
+  ffi_picker_get_selected_item_index(ViewLike::view(self))
 }
 
 ///|
 /// 注册选择变化回调。
 pub fn Picker::on_selection_change(self : Picker, callback : () -> Unit) -> Unit {
   keep_alive(callback)
-  ffi_picker_on_selection_change(self.view(), fn(f) { f() }, callback)
+  ffi_picker_on_selection_change(ViewLike::view(self), fn(f) { f() }, callback)
 }
 
 ///|
@@ -176,23 +176,23 @@ pub fn Popover::on_close(self : Popover, callback : () -> Unit) -> Unit {
 ///|
 /// ComboBox 继承 Picker 的选项操作（MoonBit 侧显式委托）。
 pub fn ComboBox::add_item(self : ComboBox, text : String) -> Unit {
-  ffi_picker_add_item(self.view(), utf8_bytes(text))
+  ffi_picker_add_item(ViewLike::view(self), utf8_bytes(text))
 }
 
 ///|
 pub fn ComboBox::select_item_at(self : ComboBox, index : Int) -> Unit {
-  ffi_picker_select_item_at(self.view(), index)
+  ffi_picker_select_item_at(ViewLike::view(self), index)
 }
 
 ///|
 pub fn ComboBox::get_selected_item(self : ComboBox) -> String {
-  from_utf8_bytes(ffi_picker_get_selected_item(self.view()))
+  from_utf8_bytes(ffi_picker_get_selected_item(ViewLike::view(self)))
 }
 
 ///|
 pub fn ComboBox::on_selection_change(self : ComboBox, callback : () -> Unit) -> Unit {
   keep_alive(callback)
-  ffi_picker_on_selection_change(self.view(), fn(f) { f() }, callback)
+  ffi_picker_on_selection_change(ViewLike::view(self), fn(f) { f() }, callback)
 }
 
 ///|
@@ -257,7 +257,7 @@ pub fn GifPlayer::new() -> GifPlayer {
 ///|
 /// 设置要播放的 GIF 图片。
 pub fn GifPlayer::set_image(self : GifPlayer, image : Image) -> Unit {
-  ffi_gif_player_set_image(self.view(), image)
+  ffi_gif_player_set_image(ViewLike::view(self), image)
 }
 
 ///|
@@ -321,4 +321,120 @@ pub type NotificationCenter
 /// 取通知中心单例。
 pub fn NotificationCenter::get() -> NotificationCenter {
   ffi_notification_center_get()
+}
+
+///|
+/// 设置日期（Unix epoch 秒）。
+pub fn DatePicker::set_date(self : DatePicker, epoch_seconds : Int64) -> Unit {
+  ffi_date_picker_set_date(self, epoch_seconds)
+}
+
+///|
+/// 读取日期（Unix epoch 秒）。
+pub fn DatePicker::get_date(self : DatePicker) -> Int64 {
+  ffi_date_picker_get_date(self)
+}
+
+///|
+/// 注册日期变化回调。
+pub fn DatePicker::on_date_change(self : DatePicker, callback : () -> Unit) -> Unit {
+  keep_alive(callback)
+  ffi_date_picker_on_date_change(self, fn(f) { f() }, callback)
+}
+
+///|
+/// 注册行双击/激活回调（row 为行号）。
+pub fn Table::on_row_activate(self : Table, callback : (Int) -> Unit) -> Unit {
+  let wrapped : (Int) -> Unit = fn(row) { callback(row) }
+  keep_alive(fn() { ignore(wrapped) })
+  ffi_table_on_row_activate(self, fn(f, row) { f(row) }, wrapped)
+}
+
+///|
+/// 注册选择变化回调。
+pub fn Table::on_selection_change(self : Table, callback : () -> Unit) -> Unit {
+  keep_alive(callback)
+  ffi_table_on_selection_change(self, fn(f) { f() }, callback)
+}
+
+///|
+/// 注册复选框切换回调（column/row 为单元格位置）。
+pub fn Table::on_toggle_checkbox(
+  self : Table,
+  callback : (Int, Int) -> Unit,
+) -> Unit {
+  let wrapped : (Int, Int) -> Unit = fn(column, row) { callback(column, row) }
+  keep_alive(fn() { ignore(wrapped) })
+  ffi_table_on_toggle_checkbox(self, fn(f, column, row) { f(column, row) }, wrapped)
+}
+
+///|
+/// 最大化窗口。
+pub fn Window::maximize(self : Window) -> Unit {
+  ffi_window_maximize(ViewLike::view(self))
+}
+
+///|
+/// 取消最大化。
+pub fn Window::unmaximize(self : Window) -> Unit {
+  ffi_window_unmaximize(ViewLike::view(self))
+}
+
+///|
+/// 设置全屏。
+pub fn Window::set_fullscreen(self : Window, fullscreen : Bool) -> Unit {
+  ffi_window_set_fullscreen(ViewLike::view(self), if fullscreen { 1 } else { 0 })
+}
+
+///|
+/// 当前是否全屏。
+pub fn Window::is_fullscreen(self : Window) -> Bool {
+  ffi_window_is_fullscreen(ViewLike::view(self)) == 1
+}
+
+///|
+/// 光标种类。
+pub(all) enum CursorType {
+  Default
+  Hand
+  Crosshair
+  Progress
+  Text
+  NotAllowed
+  Help
+  Move
+  ResizeEW
+  ResizeNS
+  ResizeNESW
+  ResizeNWSE
+}
+
+///|
+fn cursor_type_id(t : CursorType) -> Int {
+  match t {
+    Default => 0
+    Hand => 1
+    Crosshair => 2
+    Progress => 3
+    Text => 4
+    NotAllowed => 5
+    Help => 6
+    Move => 7
+    ResizeEW => 8
+    ResizeNS => 9
+    ResizeNESW => 10
+    ResizeNWSE => 11
+  }
+}
+
+///|
+/// 创建指定类型光标。
+pub fn Cursor::new(type_ : CursorType) -> Cursor {
+  ffi_cursor_new(cursor_type_id(type_))
+}
+
+///|
+/// 设置视图悬停光标。
+pub fn[T : ViewLike] View::set_cursor(self : T, cursor : Cursor) -> Unit {
+  ffi_view_set_cursor(ViewLike::view(self), cursor)
 }

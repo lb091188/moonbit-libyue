@@ -27,6 +27,7 @@
 #include "nativeui/global_shortcut.h"
 #include "nativeui/notification.h"
 #include "nativeui/notification_center.h"
+#include "nativeui/cursor.h"
 #include "nativeui/app.h"
 #include "nativeui/appearance.h"
 #include "nativeui/locale.h"
@@ -1762,6 +1763,117 @@ double yue_mbt_screen_get_primary_width(void) {
 double yue_mbt_screen_get_primary_height(void) {
   nu::Display display = nu::Screen::GetCurrent()->GetPrimaryDisplay();
   return display.bounds.height();
+}
+
+
+// ---------- 追加：DatePicker 时间 / Table 信号 / 键盘 / 窗口状态 / Cursor ----------
+
+void yue_mbt_date_picker_set_date(void *picker, int64_t epoch_seconds) {
+  if (auto *d = CastTo<nu::DatePicker>(picker)) {
+    d->SetDate(base::Time::FromTimeT(static_cast<time_t>(epoch_seconds)));
+  }
+}
+
+int64_t yue_mbt_date_picker_get_date(void *picker) {
+  if (auto *d = CastTo<nu::DatePicker>(picker)) {
+    return static_cast<int64_t>(d->GetDate().ToTimeT());
+  }
+  return 0;
+}
+
+void yue_mbt_date_picker_on_date_change(void *picker, void (*invoke)(void *), void *closure) {
+  if (auto *d = CastTo<nu::DatePicker>(picker)) {
+    d->on_date_change.Connect([invoke, closure](nu::DatePicker *) { invoke(closure); });
+  }
+}
+
+void yue_mbt_table_on_row_activate(void *table,
+                                   void (*invoke)(void *, int32_t),
+                                   void *closure) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    t->on_row_activate.Connect([invoke, closure](nu::Table *, int row) {
+      invoke(closure, row);
+    });
+  }
+}
+
+void yue_mbt_table_on_selection_change(void *table, void (*invoke)(void *), void *closure) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    t->on_selection_change.Connect([invoke, closure](nu::Table *) { invoke(closure); });
+  }
+}
+
+void yue_mbt_table_on_toggle_checkbox(void *table,
+                                      void (*invoke)(void *, int32_t, int32_t),
+                                      void *closure) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    t->on_toggle_checkbox.Connect([invoke, closure](nu::Table *, int column, int row) {
+      invoke(closure, column, row);
+    });
+  }
+}
+
+void yue_mbt_view_on_key_down(void *view,
+                              int32_t (*invoke)(void *, int32_t, int32_t),
+                              void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->on_key_down.Connect([invoke, closure](nu::Responder *, const nu::KeyEvent &event) {
+      return invoke(closure, static_cast<int32_t>(event.key),
+                    static_cast<int32_t>(event.modifiers)) != 0;
+    });
+  }
+}
+
+void yue_mbt_view_on_key_up(void *view,
+                            int32_t (*invoke)(void *, int32_t, int32_t),
+                            void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->on_key_up.Connect([invoke, closure](nu::Responder *, const nu::KeyEvent &event) {
+      return invoke(closure, static_cast<int32_t>(event.key),
+                    static_cast<int32_t>(event.modifiers)) != 0;
+    });
+  }
+}
+
+void yue_mbt_window_maximize(void *window) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->Maximize();
+  }
+}
+
+void yue_mbt_window_unmaximize(void *window) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->Unmaximize();
+  }
+}
+
+void yue_mbt_window_set_fullscreen(void *window, int32_t fullscreen) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->SetFullscreen(fullscreen != 0);
+  }
+}
+
+int32_t yue_mbt_window_is_fullscreen(void *window) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    return w->IsFullscreen() ? 1 : 0;
+  }
+  return 0;
+}
+
+// Cursor 句柄独立（RefCounted）
+using CursorStore = Store<nu::Cursor>;
+
+void *yue_mbt_cursor_new(int32_t type) {
+  return reinterpret_cast<void *>(
+      CursorStore::put(new nu::Cursor(static_cast<nu::Cursor::Type>(type))));
+}
+
+void yue_mbt_view_set_cursor(void *view, void *cursor) {
+  auto *v = CastToView(view);
+  auto *c = CursorStore::get(cursor);
+  if (v != nullptr && c != nullptr) {
+    v->SetCursor(scoped_refptr<nu::Cursor>(c));
+  }
 }
 
 // ---------- 托盘 ----------

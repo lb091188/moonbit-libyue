@@ -53,7 +53,7 @@
 5. **`extern type` 语法已弃用**：句柄类型一律用 `#external` 属性 + `type`
    声明；成对的创建/挂载 C 函数尽量合并成一个（避免中间句柄类型暴露）。
 
-## 阶段 3（已完成 2026-09-10）：全量 API 面
+## 阶段 3（已完成 2026-09-10）：全量 API 面 + 补强
 
 对照 `vendor/libyue/include/nativeui/*.h` 与官方 TS 声明逐类封装，全部有
 shim + ffi + MoonBit 包装 + 示例触达：
@@ -70,8 +70,9 @@ shim + ffi + MoonBit 包装 + 示例触达：
 
 - ✅ `moon check` / `moon build` 全仓零错误零警告
 - ✅ 全部 12 个 `examples/*` 依次 `moon run` 试跑：进程存活、无 SIGSEGV
-- ⬜ 托盘/菜单/对话框/WebView 在 GNOME(X11) 下人工确认功能表现，差异记入 README"已知边界"
-- ⬜ 纯 MoonBit 部分（颜色解析、表格值编解码）补 `moon test`
+- ⬜ 托盘/菜单/对话框/WebView 在 GNOME(X11) 下人工确认功能表现（程序化验证已覆盖：
+  进程存活 + 退出行为；人工项为视觉/交互细节），差异记入 README"已知边界"
+- ✅ 纯 MoonBit 部分：`moon test` 7/7 通过（argb_hex 颜色转换、表格值编解码）
 
 ## 风险与已知约束
 

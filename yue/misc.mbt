@@ -9,13 +9,13 @@ pub fn Group::new(title : String) -> Group {
 ///|
 /// 设置分组框内容视图。
 pub fn[T : ViewLike] Group::set_content(self : Group, content : T) -> Unit {
-  ffi_group_set_content(self.view(), content.view())
+  ffi_group_set_content(ViewLike::view(self), content.view())
 }
 
 ///|
 /// 更新分组标题。
 pub fn Group::set_title(self : Group, title : String) -> Unit {
-  ffi_group_set_title(self.view(), utf8_bytes(title))
+  ffi_group_set_title(ViewLike::view(self), utf8_bytes(title))
 }
 
 ///|
@@ -42,25 +42,25 @@ pub fn Scroll::new() -> Scroll {
 ///|
 /// 设置滚动内容视图。
 pub fn[T : ViewLike] Scroll::set_content(self : Scroll, content : T) -> Unit {
-  ffi_scroll_set_content(self.view(), content.view())
+  ffi_scroll_set_content(ViewLike::view(self), content.view())
 }
 
 ///|
 /// 设置内容逻辑尺寸（超出可视区产生滚动）。
 pub fn Scroll::set_content_size(self : Scroll, width : Double, height : Double) -> Unit {
-  ffi_scroll_set_content_size(self.view(), width, height)
+  ffi_scroll_set_content_size(ViewLike::view(self), width, height)
 }
 
 ///|
 /// 设置滚动位置。
 pub fn Scroll::set_scroll_position(self : Scroll, horizon : Double, vertical : Double) -> Unit {
-  ffi_scroll_set_scroll_position(self.view(), horizon, vertical)
+  ffi_scroll_set_scroll_position(ViewLike::view(self), horizon, vertical)
 }
 
 ///|
 /// 是否使用覆盖式滚动条。
 pub fn Scroll::set_overlay_scrollbar(self : Scroll, yes : Bool) -> Unit {
-  ffi_scroll_set_overlay_scrollbar(self.view(), if yes { 1 } else { 0 })
+  ffi_scroll_set_overlay_scrollbar(ViewLike::view(self), if yes { 1 } else { 0 })
 }
 
 ///|
