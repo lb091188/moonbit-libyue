@@ -64,7 +64,7 @@ Linux 托盘依赖 AppIndicator（GNOME 等桌面的托盘协议），运行库�
 
 ## 已知边界（实测结论）
 
-- `moon` 的 `link` 段只作用于所在包、且只对 main 包的二进制生效；库包 `yue/` 放 link 段会生成无 main 的 `yue.exe` 导致构建失败。`prepare.py` 只回写 `is-main` 的包，`cc-link-flags` 为本机绝对路径。
+- `moon` 的 `link` 段只作用于所在包、且只对 main 包的二进制生效；库包 `yue/` 放 link 段会让 moon 生成无 main 的可执行文件（moon 对所有平台的产物统一加 `.exe` 后缀）导致构建失败。`prepare.py` 只回写 `is-main` 的包，`cc-link-flags` 为本机绝对路径。
 - `extern "c"` 不能返回可空类型（ABI 与 C 指针不兼容，直接段错误）：成败经 `Ref[Int]` 出参报告，句柄按非空返回。
 - FFI 指针参数必须标 `#borrow`（编译器强制）；同函数多参数写在同一个 `#borrow(a, b)` 里。
 - Linux 托盘探测列表必须与 libyue 内部 dlopen 列表严格一致（只认 `libappindicator3`）；本机存在 ayatana 分支也不代表可用，nativeui 内部加载失败时只打日志，后续调用会踩空指针（shim 侧已加空指针防御）。
