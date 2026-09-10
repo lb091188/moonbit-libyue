@@ -354,6 +354,27 @@ void yue_mbt_message_box_show(void *box);
 void yue_mbt_message_box_show_for_window(void *box, void *window);
 void yue_mbt_message_box_close(void *box);
 
+/* ---------- 通知 / 全局快捷键 / 日期选择 / GIF 播放 ---------- */
+
+/* Notification 句柄独立；经系统通知中心弹出 */
+void *yue_mbt_notification_new(void);
+void yue_mbt_notification_set_title(void *n, const char *title);
+void yue_mbt_notification_set_body(void *n, const char *body);
+void yue_mbt_notification_set_silent(void *n, int32_t silent);
+void yue_mbt_notification_show(void *n);
+void yue_mbt_notification_close(void *n);
+void yue_mbt_notification_center_add(void *n);
+
+/* GlobalShortcut 单例：register 返回 id */
+int32_t yue_mbt_global_shortcut_register(const char *accelerator,
+                                         void (*invoke)(void *), void *closure);
+void yue_mbt_global_shortcut_unregister(int32_t id);
+
+void *yue_mbt_date_picker_new(void);
+
+void *yue_mbt_gif_player_new(void);
+void yue_mbt_gif_player_set_image(void *player, void *image);
+
 /* ---------- 托盘 ---------- */
 
 int32_t yue_mbt_tray_supported(void);

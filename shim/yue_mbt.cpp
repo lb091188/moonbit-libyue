@@ -22,6 +22,11 @@
 #include "base/command_line.h"
 #include "nativeui/nativeui.h"
 #include "nativeui/popover.h"
+#include "nativeui/date_picker.h"
+#include "nativeui/gif_player.h"
+#include "nativeui/global_shortcut.h"
+#include "nativeui/notification.h"
+#include "nativeui/notification_center.h"
 
 // 不包含 <moonbit.h>：它在 extern "C" 里声明的 memcpy 与 glibc 的
 // C++ noexcept 声明冲突。只声明用到的运行时入口，签名照抄
@@ -1639,6 +1644,77 @@ void yue_mbt_message_box_show_for_window(void *box, void *window) {
 void yue_mbt_message_box_close(void *box) {
   if (auto *m = MessageBoxStore::get(box)) {
     m->Close();
+  }
+}
+
+
+// ---------- 通知 / 全局快捷键 / 日期选择 / GIF 播放 ----------
+
+using NotificationStore = Store<nu::Notification>;
+
+void *yue_mbt_notification_new(void) {
+  return reinterpret_cast<void *>(NotificationStore::put(new nu::Notification()));
+}
+
+void yue_mbt_notification_set_title(void *n, const char *title) {
+  if (auto *b = NotificationStore::get(n)) {
+    b->SetTitle(title);
+  }
+}
+
+void yue_mbt_notification_set_body(void *n, const char *body) {
+  if (auto *b = NotificationStore::get(n)) {
+    b->SetBody(body);
+  }
+}
+
+void yue_mbt_notification_set_silent(void *n, int32_t silent) {
+  if (auto *b = NotificationStore::get(n)) {
+    b->SetSilent(silent != 0);
+  }
+}
+
+void yue_mbt_notification_show(void *n) {
+  if (auto *b = NotificationStore::get(n)) {
+    nu::NotificationCenter::GetCurrent()->AddNotification(b);
+  }
+}
+
+void yue_mbt_notification_close(void *n) {
+  if (auto *b = NotificationStore::get(n)) {
+    b->Close();
+  }
+}
+
+void yue_mbt_notification_center_add(void *n) {
+  yue_mbt_notification_show(n);
+}
+
+int32_t yue_mbt_global_shortcut_register(const char *accelerator,
+                                         void (*invoke)(void *), void *closure) {
+  return nu::GlobalShortcut::GetCurrent()->Register(
+      nu::Accelerator(std::string(accelerator)),
+      [invoke, closure]() { invoke(closure); });
+}
+
+void yue_mbt_global_shortcut_unregister(int32_t id) {
+  nu::GlobalShortcut::GetCurrent()->Unregister(id);
+}
+
+void *yue_mbt_date_picker_new(void) {
+  nu::DatePicker::Options options;
+  return reinterpret_cast<void *>(ViewStore::put(new nu::DatePicker(options)));
+}
+
+void *yue_mbt_gif_player_new(void) {
+  return reinterpret_cast<void *>(ViewStore::put(new nu::GifPlayer()));
+}
+
+void yue_mbt_gif_player_set_image(void *player, void *image) {
+  auto *g = CastTo<nu::GifPlayer>(player);
+  auto *img = ImageStore::get(image);
+  if (g != nullptr && img != nullptr) {
+    g->SetImage(scoped_refptr<nu::Image>(img));
   }
 }
 

@@ -194,3 +194,68 @@ pub fn ComboBox::on_selection_change(self : ComboBox, callback : () -> Unit) -> 
   keep_alive(callback)
   ffi_picker_on_selection_change(self.view(), fn(f) { f() }, callback)
 }
+
+///|
+/// 系统通知。
+pub fn Notification::new() -> Notification {
+  ffi_notification_new()
+}
+
+///|
+pub fn Notification::set_title(self : Notification, title : String) -> Unit {
+  ffi_notification_set_title(self, utf8_bytes(title))
+}
+
+///|
+pub fn Notification::set_body(self : Notification, body : String) -> Unit {
+  ffi_notification_set_body(self, utf8_bytes(body))
+}
+
+///|
+/// 是否静音（不播放系统提示音）。
+pub fn Notification::set_silent(self : Notification, silent : Bool) -> Unit {
+  ffi_notification_set_silent(self, if silent { 1 } else { 0 })
+}
+
+///|
+/// 经系统通知中心弹出。
+pub fn Notification::show(self : Notification) -> Unit {
+  ffi_notification_show(self)
+}
+
+///|
+/// 关闭通知。
+pub fn Notification::close(self : Notification) -> Unit {
+  ffi_notification_close(self)
+}
+
+///|
+/// 注册全局快捷键（格式如 "CmdOrCtrl+Shift+M"），返回注册 id。
+pub fn register_global_shortcut(accelerator : String, callback : () -> Unit) -> Int {
+  keep_alive(callback)
+  ffi_global_shortcut_register(utf8_bytes(accelerator), fn(f) { f() }, callback)
+}
+
+///|
+/// 注销全局快捷键。
+pub fn unregister_global_shortcut(id : Int) -> Unit {
+  ffi_global_shortcut_unregister(id)
+}
+
+///|
+/// 创建日期选择控件。
+pub fn DatePicker::new() -> DatePicker {
+  { view: ffi_date_picker_new() }
+}
+
+///|
+/// 创建 GIF 播放控件。
+pub fn GifPlayer::new() -> GifPlayer {
+  { view: ffi_gif_player_new() }
+}
+
+///|
+/// 设置要播放的 GIF 图片。
+pub fn GifPlayer::set_image(self : GifPlayer, image : Image) -> Unit {
+  ffi_gif_player_set_image(self.view(), image)
+}

@@ -233,3 +233,30 @@ pub(all) struct Separator {
 pub impl ViewLike for Separator with view(self) {
   self.view
 }
+
+///|
+/// 系统通知（独立句柄）。
+#external
+pub type Notification
+
+///|
+/// 日期选择控件。
+pub(all) struct DatePicker {
+  view : View
+}
+
+///|
+pub impl ViewLike for DatePicker with view(self) {
+  self.view
+}
+
+///|
+/// GIF 动画播放控件。
+pub(all) struct GifPlayer {
+  view : View
+}
+
+///|
+pub impl ViewLike for GifPlayer with view(self) {
+  self.view
+}

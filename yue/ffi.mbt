@@ -872,6 +872,54 @@ extern "c" fn ffi_message_box_show_for_window(box : MessageBox, window : View) -
 extern "c" fn ffi_message_box_close(box : MessageBox) -> Unit = "yue_mbt_message_box_close"
 
 ///|
+extern "c" fn ffi_notification_new() -> Notification = "yue_mbt_notification_new"
+
+///|
+#borrow(n, title)
+extern "c" fn ffi_notification_set_title(n : Notification, title : Bytes) -> Unit = "yue_mbt_notification_set_title"
+
+///|
+#borrow(n, body)
+extern "c" fn ffi_notification_set_body(n : Notification, body : Bytes) -> Unit = "yue_mbt_notification_set_body"
+
+///|
+#borrow(n)
+extern "c" fn ffi_notification_set_silent(n : Notification, silent : Int) -> Unit = "yue_mbt_notification_set_silent"
+
+///|
+#borrow(n)
+extern "c" fn ffi_notification_show(n : Notification) -> Unit = "yue_mbt_notification_show"
+
+///|
+#borrow(n)
+extern "c" fn ffi_notification_close(n : Notification) -> Unit = "yue_mbt_notification_close"
+
+///|
+#borrow(n)
+extern "c" fn ffi_notification_center_add(n : Notification) -> Unit = "yue_mbt_notification_center_add"
+
+///|
+#borrow(accelerator, invoke, closure)
+extern "c" fn ffi_global_shortcut_register(
+  accelerator : Bytes,
+  invoke : FuncRef[((() -> Unit) -> Unit)],
+  closure : () -> Unit,
+) -> Int = "yue_mbt_global_shortcut_register"
+
+///|
+extern "c" fn ffi_global_shortcut_unregister(id : Int) -> Unit = "yue_mbt_global_shortcut_unregister"
+
+///|
+extern "c" fn ffi_date_picker_new() -> View = "yue_mbt_date_picker_new"
+
+///|
+extern "c" fn ffi_gif_player_new() -> View = "yue_mbt_gif_player_new"
+
+///|
+#borrow(player, image)
+extern "c" fn ffi_gif_player_set_image(player : View, image : Image) -> Unit = "yue_mbt_gif_player_set_image"
+
+///|
 /// 托盘后端可用性探测。Linux 上等价于检查 AppIndicator 运行库能否加载。
 extern "c" fn ffi_tray_supported() -> Bool = "yue_mbt_tray_supported"
 
