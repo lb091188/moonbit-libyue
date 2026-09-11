@@ -84,7 +84,7 @@
 
 - [x] 回调注册表(`yue/view.mbt`)窗口销毁后回收条目 — **决策:维持进程级保活**(2026-09-12 定案):回调与窗口无归属关系可循(同一闭包可被多窗口共享),精准回收需 weak-reference 注册表,当前 MoonBit 生态不成熟;GUI 工具场景(单窗口生命周期≈进程)无实际泄漏风险,已作为架构边界写入 docs/adaptation.md
 - [x] traybus 托盘图标:IconPixmap 提供多档尺寸(32 原图 + 16 缩小,适配高密度面板),downscale_pixmap 带单测;icon 主题名解析本就由面板侧完成(SNI 只透传 IconName,`set_icon_name` 已可用);XFCE 面板实测金色月牙正常渲染(2026-09-12 像素级确认)
-- [~] 发布 mooncakes 包(API 面稳定后) — 发布就绪:moon.mod.json(name/version)就位、README 双语补 `moon add lkyh/moonbit-libyue` 用法;`moon publish` 需 mooncakes 账号登录(credentials 缺失),**待仓库所有者执行 `moon login && moon publish`**
+- [~] 发布 mooncakes 包(API 面稳定后) — **发布就绪,暂不发布(2026-09-12 确认)**:一切就绪(moon.mod.json name/version、README 双语 `moon add lkyh/moonbit-libyue` 用法、API 面已核对);`moon publish` 实测受阻于账号凭据(`~/.moon/credentials.json` 不存在),`moon login` 为所有者的交互式账号授权,无法代执行。**剩余动作(仅一步)**:所有者执行 `moon login && moon publish`,完成后把本项改为 [x]
 
 ### 近期已完成(记录)
 
