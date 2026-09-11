@@ -319,6 +319,20 @@ fn Item::menu_layout(self : Item, id : Int, depth : Int) -> DVal {
 }
 
 ///|
+/// 按条目 id 触发点击回调（id 从 1 计，与布局/属性层一致）。
+fn Item::dispatch_menu_click(self : Item, id : Int) -> Unit {
+  if id >= 1 {
+    match self.menu_items.get(id - 1) {
+      Some(entry) =>
+        if !entry.is_separator {
+          (entry.on_click)()
+        }
+      None => ()
+    }
+  }
+}
+
+///|
 /// DBusMenu 服务端分发（菜单对象路径上的调用）。
 fn Conn::handle_menu_call(self : Conn, item : Item, msg : Msg) -> Unit {
   match msg.action {
@@ -336,6 +350,18 @@ fn Conn::handle_menu_call(self : Conn, item : Item, msg : Msg) -> Unit {
     }
     // 恒 false：libdbusmenu 不尊重返回值，菜单更新靠 LayoutUpdated 信号
     "AboutToShow" => self.reply(msg, "b", [VBool(false)])
+    // 批量版 AboutToShow：与 ids 平行的 ab，恒 false
+    "AboutToShowGroup" => {
+      let flags : Array[DVal] = []
+      match msg.body.get(0) {
+        Some(VArray(_, ids)) =>
+          for _ in ids {
+            flags.push(VBool(false))
+          }
+        _ => ()
+      }
+      self.reply(msg, "ab", [VArray("b", flags)])
+    }
     "Event" => {
       // (i id, s eventId, v data, u timestamp)
       let id = match msg.body.get(0) {
@@ -346,14 +372,31 @@ fn Conn::handle_menu_call(self : Conn, item : Item, msg : Msg) -> Unit {
         Some(VString(e)) => e
         _ => ""
       }
-      if event == "clicked" && id >= 1 {
-        match item.menu_items.get(id - 1) {
-          Some(entry) =>
-            if !entry.is_separator {
-              (entry.on_click)()
+      if event == "clicked" {
+        item.dispatch_menu_click(id)
+      }
+      self.reply(msg, "", [])
+    }
+    // 批量版 Event：XFCE 面板（libdbusmenu 客户端）实际发的是它而非单条
+    // Event；不实现会被 UnknownMethod 拒掉，表现为菜单点击全部无效。
+    "EventGroup" => {
+      // (a(iisvu) events)，每项 (id, eventId, data, timestamp)
+      match msg.body.get(0) {
+        Some(VArray(_, events)) =>
+          for ev in events {
+            match ev {
+              VStruct(fields) =>
+                match (fields.get(0), fields.get(1)) {
+                  (Some(VI32(id)), Some(VString(event))) =>
+                    if event == "clicked" {
+                      item.dispatch_menu_click(id)
+                    }
+                  (_, _) => ()
+                }
+              _ => ()
             }
-          None => ()
-        }
+          }
+        _ => ()
       }
       self.reply(msg, "", [])
     }
@@ -457,7 +500,30 @@ fn Item::property(self : Item, name : String) -> DVal? {
     "Status" => Some(VString("Active"))
     "WindowId" => Some(VI32(0))
     "IconName" => Some(VString(self.icon_name))
-    "IconPixmap" => Some(VArray("(iiay)", [self.pixmap_value()]))
+    "IconPixmap" =>
+      Some(
+        VArray(
+          "(iiay)",
+          [
+            self.pixmap_value(),
+            // 附加 16×16 小尺寸,供高密度面板选择
+            {
+              let (sw, sh, spx) = downscale_pixmap(
+                self.pixmap_w,
+                self.pixmap_h,
+                self.pixmap,
+                16,
+                16,
+              )
+              let pixels : Array[DVal] = []
+              for i in 0..<spx.length() {
+                pixels.push(VByte(spx[i].to_int()))
+              }
+              VStruct([VI32(sw), VI32(sh), VArray("y", pixels)])
+            },
+          ],
+        ),
+      )
     "OverlayIconName" => Some(VString(""))
     "OverlayIconPixmap" => Some(VArray("(iiay)", []))
     "AttentionIconName" => Some(VString(""))

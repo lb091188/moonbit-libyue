@@ -32,21 +32,15 @@ pub fn Menu::popup_at(self : Menu, x : Double, y : Double) -> Unit {
 }
 
 ///|
-/// 菜单项数量（遍历用；托盘 SNI 后端按它桥接 DBusMenu）。
-fn Menu::item_count(self : Menu) -> Int {
-  ffi_menu_item_count(self)
+/// 菜单项数量（MenuBase 遍历；托盘 SNI 后端按它桥接 DBusMenu）。
+pub fn Menu::item_count(self : Menu) -> Int {
+  ffi_menu_base_item_count(self)
 }
 
 ///|
-/// 取第 index 项，越界返回 None。
-fn Menu::item_at(self : Menu, index : Int) -> MenuItem? {
-  let ok = Ref(0)
-  let item = ffi_menu_item_at(self, index, ok)
-  if ok.val == 1 {
-    Some(item)
-  } else {
-    None
-  }
+/// 取第 index 个菜单项（越界由 shim 拒绝并返回空句柄）。
+pub fn Menu::item_at(self : Menu, index : Int) -> MenuItem {
+  ffi_menu_base_item_at(self, index)
 }
 
 ///|
@@ -83,12 +77,49 @@ pub fn Menu::add_role_item(self : Menu, role : MenuRole) -> MenuItem {
 
 ///|
 /// 添加分隔线。
+///|
+/// 添加复选菜单项。
+pub fn Menu::add_check_item(self : Menu, label : String) -> MenuItem {
+  ffi_menu_add_check_item(self, utf8_bytes(label))
+}
+
+///|
+/// 添加单选菜单项。
+pub fn Menu::add_radio_item(self : Menu, label : String) -> MenuItem {
+  ffi_menu_add_radio_item(self, utf8_bytes(label))
+}
+
+///|
+/// 菜单项选中态（复选/单选项）。
+pub fn MenuItem::set_checked(self : MenuItem, checked : Bool) -> Unit {
+  ffi_menu_item_set_checked(self, if checked { 1 } else { 0 })
+}
+
+///|
+pub fn MenuItem::is_checked(self : MenuItem) -> Bool {
+  ffi_menu_item_is_checked(self) == 1
+}
+
+///|
 pub fn Menu::add_separator(self : Menu) -> MenuItem {
   ffi_menu_add_separator(self)
 }
 
 ///|
 /// 更新菜单项文本。
+///|
+/// 读取菜单项文本。
+pub fn MenuItem::get_label(self : MenuItem) -> String {
+  let buf = Bytes::make(256, 0)
+  let n = ffi_menu_item_get_label(self, buf, 256)
+  if n < 0 {
+    ""
+  } else {
+    from_utf8_bytes(buf[0:n].to_owned())
+  }
+}
+
+///|
 pub fn MenuItem::set_label(self : MenuItem, label : String) -> Unit {
   ffi_menu_item_set_label(self, utf8_bytes(label))
 }
@@ -104,4 +135,15 @@ pub fn MenuItem::set_accelerator(self : MenuItem, accelerator : String) -> Unit 
 pub fn MenuItem::on_click(self : MenuItem, callback : () -> Unit) -> Unit {
   keep_alive(callback)
   ffi_menu_item_on_click(self, fn(f : (() -> Unit)) -> Unit { f() }, callback)
+}
+///|
+/// 菜单条顶级菜单数量。
+pub fn MenuBar::item_count(self : MenuBar) -> Int {
+  ffi_menubar_item_count(self)
+}
+
+///|
+/// 取菜单条第 index 个菜单。
+pub fn MenuBar::item_at(self : MenuBar, index : Int) -> MenuItem {
+  ffi_menubar_item_at(self, index)
 }

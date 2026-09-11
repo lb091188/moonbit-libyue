@@ -369,6 +369,7 @@ fn open_table_window(state : State) -> Unit {
 
   let table = @yue.Table::new()
   table.add_column_text("语言", 160)
+  table.add_column_checkbox("喜欢", 80)
   table.add_column_edit("星数", 120)
   table.set_has_border(true)
   table.set_style("flex", 1.0)

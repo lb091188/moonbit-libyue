@@ -19,7 +19,7 @@ fn main {
   if !@yue.initialize() {
     return
   }
-  let win = @yue.Window::new_with_options(false, true)
+  let win = @yue.Window::new_with_options(frame=false, transparent=true)
   win.set_always_on_top(true)
   win.set_content_size(150.0, 130.0)
   win.on_close(fn(_window) { @yue.quit() })

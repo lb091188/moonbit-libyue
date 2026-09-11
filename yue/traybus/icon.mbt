@@ -42,3 +42,27 @@ pub fn default_icon_pixmap() -> (Int, Int, Bytes) {
   }
   (w, h, Bytes::makei(w * h * 4, fn(i) { px[i] }))
 }
+
+///|
+/// 由大图最近邻缩放出小尺寸位图（供 IconPixmap 提供多档尺寸）。
+pub fn downscale_pixmap(
+  w : Int,
+  h : Int,
+  px : Bytes,
+  nw : Int,
+  nh : Int,
+) -> (Int, Int, Bytes) {
+  let out : FixedArray[Byte] = FixedArray::make(nw * nh * 4, b'\x00')
+  for y in 0..<nh {
+    let sy = if y * h / nh > h - 1 { h - 1 } else { y * h / nh }
+    for x in 0..<nw {
+      let sx = if x * w / nw > w - 1 { w - 1 } else { x * w / nw }
+      let src = (sy * w + sx) * 4
+      let dst = (y * nw + x) * 4
+      for c in 0..<4 {
+        out[dst + c] = px[src + c]
+      }
+    }
+  }
+  (nw, nh, Bytes::makei(nw * nh * 4, fn(i) { out[i] }))
+}

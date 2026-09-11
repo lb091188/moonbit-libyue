@@ -30,7 +30,7 @@ int32_t yue_mbt_platform(void);
 
 /* ---------- 窗口（句柄=View） ---------- */
 
-void *yue_mbt_window_new_ex(int32_t frame, int32_t transparent);
+void *yue_mbt_window_new_ex(int32_t frame, int32_t transparent, int32_t no_activate);
 void yue_mbt_window_set_title(void *window, const char *title);
 void yue_mbt_window_set_always_on_top(void *window, int32_t top);
 double yue_mbt_window_get_content_size_width(void *window);
@@ -98,6 +98,10 @@ void yue_mbt_text_edit_delete_range(void *edit, int32_t start, int32_t end);
 /* ---------- Button ---------- */
 
 void *yue_mbt_button_new(const char *title);
+/* Button::Type：0=Normal 1=Checkbox 2=Radio（Disclosure 为 macOS 专属不暴露） */
+void *yue_mbt_button_new_typed(const char *title, int32_t type);
+void yue_mbt_button_set_checked(void *button, int32_t checked);
+int32_t yue_mbt_button_is_checked(void *button);
 void yue_mbt_button_set_title(void *button, const char *title);
 void yue_mbt_button_on_click(void *button, void (*invoke)(void *closure),
                              void *closure);
@@ -105,6 +109,8 @@ void yue_mbt_button_on_click(void *button, void (*invoke)(void *closure),
 /* ---------- Entry ---------- */
 
 void *yue_mbt_entry_new(void);
+/* Entry::Type：0=Normal 1=Password */
+void *yue_mbt_entry_new_typed(int32_t type);
 void yue_mbt_entry_set_text(void *entry, const char *text);
 void *yue_mbt_entry_get_text(void *entry);
 void yue_mbt_entry_on_text_change(void *entry, void (*invoke)(void *closure),
@@ -126,6 +132,20 @@ void yue_mbt_tab_on_selected_page_change(void *tab,
 
 /* ---------- Browser（WebView） ---------- */
 
+void yue_mbt_browser_load_html(void *browser, const char *html, const char *base_url);
+void yue_mbt_browser_set_user_agent(void *browser, const char *agent);
+void yue_mbt_browser_set_magnifiable(void *browser, int32_t yes);
+int32_t yue_mbt_browser_is_magnifiable(void *browser);
+int32_t yue_mbt_browser_is_loading(void *browser);
+void yue_mbt_browser_execute_javascript(void *browser, const char *code);
+/* 自定义协议注册：回调返回 [ok:i32][mime_len:i32][mime][content] 编码,ok=0 拒绝 */
+void yue_mbt_browser_register_protocol(const char *scheme,
+                                       void *(*invoke)(void *, void *), void *closure);
+void yue_mbt_browser_unregister_protocol(const char *scheme);
+void *yue_mbt_browser_new_ex(int32_t devtools, int32_t context_menu, int32_t allow_file_access, int32_t hardware_acceleration);
+/* Cookie 回调：每行一条，字段 \x1f 分隔 name/value/domain/path/http_only/secure */
+void yue_mbt_browser_get_cookies_for_url(void *browser, const char *url,
+                                         void (*invoke)(void *closure, void *flat_bytes), void *closure);
 void *yue_mbt_browser_new(void);
 void yue_mbt_browser_load_url(void *browser, const char *url);
 void *yue_mbt_browser_get_url(void *browser);
@@ -162,6 +182,10 @@ void *yue_mbt_menu_add_submenu(void *menu, const char *title);
 void *yue_mbt_menu_add_label_item(void *menu, const char *label);
 void *yue_mbt_menu_add_role_item(void *menu, int32_t role);
 void *yue_mbt_menu_add_separator(void *menu);
+void *yue_mbt_menu_add_check_item(void *menu, const char *label);
+void *yue_mbt_menu_add_radio_item(void *menu, const char *label);
+void yue_mbt_menu_item_set_checked(void *item, int32_t checked);
+int32_t yue_mbt_menu_item_is_checked(void *item);
 void yue_mbt_menu_item_set_label(void *item, const char *label);
 void yue_mbt_menu_item_set_accelerator(void *item, const char *accelerator);
 void yue_mbt_menu_item_on_click(void *item, void (*invoke)(void *closure),
@@ -170,6 +194,8 @@ void yue_mbt_menu_item_on_click(void *item, void (*invoke)(void *closure),
 /* ---------- 文件对话框（句柄独立） ---------- */
 
 void *yue_mbt_file_open_dialog_new(void);
+/* FileDialog::Option 位：1<<0=选文件夹 1<<1=多选 1<<2=显示隐藏 */
+void yue_mbt_file_dialog_set_options(void *dialog, int32_t options);
 void *yue_mbt_file_save_dialog_new(void);
 /* filters 打包格式："描述:扩展1,扩展2|描述2:扩展3" */
 void yue_mbt_file_dialog_set_filters(void *dialog, const char *filters);
@@ -234,21 +260,40 @@ void yue_mbt_painter_draw_canvas_from_rect(void *painter, void *canvas,
 void *yue_mbt_canvas_new(double width, double height);
 void *yue_mbt_canvas_get_painter(void *canvas);
 void *yue_mbt_attributed_text_new(const char *text, int32_t align,
-                                  int32_t valign);
+                                  int32_t valign, int32_t wrap, int32_t ellipsis);
+void yue_mbt_attributed_text_set_format(void *at, int32_t align,
+                                        int32_t valign, int32_t wrap, int32_t ellipsis);
 void yue_mbt_attributed_text_set_font(void *at, void *font);
+/* 范围版属性（[start, end) 字符区间） */
+void yue_mbt_attributed_text_set_font_for(void *at, void *font, int32_t start, int32_t end);
 void yue_mbt_attributed_text_set_color(void *at, const char *hex);
+void yue_mbt_attributed_text_set_color_for(void *at, const char *hex, int32_t start, int32_t end);
+/* 返回 MoonBit Bytes（UTF-8 文本） */
+void *yue_mbt_attributed_text_get_text(void *at);
+void yue_mbt_attributed_text_set_text(void *at, const char *text);
+void yue_mbt_attributed_text_clear(void *at);
+/* Color::Name（0=Text 1=DisabledText 2=TextEditBackground 3=DisabledTextEditBackground
+ * 4=Control 5=WindowBackground 6=Border）→ ARGB uint32 */
+uint32_t yue_mbt_system_color(int32_t name);
 /* 出参 w/h 返回按 size 布局后的文本包围盒 */
 void yue_mbt_attributed_text_get_bounds_for(void *at, double w, double h,
                                             double *out_w, double *out_h);
 void *yue_mbt_font_new(const char *name, double size, int32_t weight,
                        int32_t style);
 void *yue_mbt_image_new_from_file(const char *path);
+/* 从内存 PNG/JPEG 解码 */
+void *yue_mbt_image_new_from_data(const void *data, int32_t len, double scale_factor);
+int32_t yue_mbt_image_is_empty(void *image);
+double yue_mbt_image_get_scale_factor(void *image);
+void *yue_mbt_image_resize(void *image, double w, double h, double scale_factor);
+int32_t yue_mbt_image_write_to_file(void *image, const char *format, const char *path);
 double yue_mbt_image_get_width(void *image);
 double yue_mbt_image_get_height(void *image);
 
 /* ---------- Table（表格；模型桥见下） ---------- */
 
 void *yue_mbt_table_new(void);
+void yue_mbt_table_add_column_with_options(void *table, const char *title, int32_t type, int32_t column, int32_t width);
 void yue_mbt_table_add_column_text(void *table, const char *title, int32_t width);
 void yue_mbt_table_add_column_edit(void *table, const char *title, int32_t width);
 void yue_mbt_table_add_column_checkbox(void *table, const char *title, int32_t width);
@@ -301,11 +346,62 @@ void yue_mbt_view_handle_drop(void *view,
 void yue_mbt_view_on_drag_leave(void *view, void (*invoke)(void *), void *closure);
 
 void yue_mbt_view_schedule_paint(void *view);
-/* 鼠标按下（Responder 信号）：callback 返回 true 表示事件已处理。
- * invoke(closure, modifiers, button_flags)——精简为仅回调无参版本，
- * 拖拽发起不需要修饰键信息。 */
+/* ---------- 鼠标/键盘事件（Responder 信号，对照 events_and_delegates 指南） ---------- */
+
+/* modifiers 一律归一化为 1=Shift 2=Ctrl 4=Alt 8=Meta（Linux 原始 GDK 位为
+ * 1/4/8/1<<26，在实现侧收敛，MoonBit 层拿到跨平台一致语义）。
+ * timestamp 为事件毫秒时间戳（系统启动起算）。 */
+/* 鼠标事件：invoke(closure, button, view_x, view_y, window_x, window_y,
+ * modifiers, timestamp)。button 语义：1=左 2=右 3=中（libyue 统一后的）。
+ * down/up 返回 true 表示事件已处理（阻止默认行为）。 */
 void yue_mbt_view_on_mouse_down(void *view,
-                                int32_t (*invoke)(void *closure), void *closure);
+    int32_t (*invoke)(void *closure, int32_t button, double view_x, double view_y,
+                      double window_x, double window_y, int32_t modifiers, int32_t timestamp),
+    void *closure);
+void yue_mbt_view_on_mouse_up(void *view,
+    int32_t (*invoke)(void *closure, int32_t button, double view_x, double view_y,
+                      double window_x, double window_y, int32_t modifiers, int32_t timestamp),
+    void *closure);
+void yue_mbt_view_on_mouse_move(void *view,
+    void (*invoke)(void *closure, int32_t button, double view_x, double view_y,
+                   double window_x, double window_y, int32_t modifiers, int32_t timestamp),
+    void *closure);
+void yue_mbt_view_on_mouse_enter(void *view,
+    void (*invoke)(void *closure, int32_t button, double view_x, double view_y,
+                   double window_x, double window_y, int32_t modifiers, int32_t timestamp),
+    void *closure);
+void yue_mbt_view_on_mouse_leave(void *view,
+    void (*invoke)(void *closure, int32_t button, double view_x, double view_y,
+                   double window_x, double window_y, int32_t modifiers, int32_t timestamp),
+    void *closure);
+/* 键盘事件：invoke(closure, key_code, modifiers, timestamp) 返回是否已处理 */
+void yue_mbt_view_on_key_down(void *view,
+                              int32_t (*invoke)(void *closure, int32_t key_code, int32_t modifiers, int32_t timestamp),
+                              void *closure);
+void yue_mbt_view_on_key_up(void *view,
+                            int32_t (*invoke)(void *closure, int32_t key_code, int32_t modifiers, int32_t timestamp),
+                            void *closure);
+/* 鼠标捕获（Responder）：捕获期间 move/up 事件持续送达捕获视图，直到释放或丢失 */
+void yue_mbt_view_set_capture(void *view);
+void yue_mbt_view_release_capture(void *view);
+int32_t yue_mbt_view_has_capture(void *view);
+void yue_mbt_view_on_capture_lost(void *view, void (*invoke)(void *), void *closure);
+/* Event 静态查询：全局鼠标位置（屏幕坐标）与修饰键实时状态 */
+double yue_mbt_mouse_location_x(void);
+double yue_mbt_mouse_location_y(void);
+int32_t yue_mbt_is_shift_pressed(void);
+int32_t yue_mbt_is_control_pressed(void);
+int32_t yue_mbt_is_alt_pressed(void);
+int32_t yue_mbt_is_meta_pressed(void);
+/* 视图尺寸变化信号 */
+void yue_mbt_view_on_size_changed(void *view, void (*invoke)(void *), void *closure);
+/* 返回 yoga 计算布局的文本转储（MoonBit Bytes，调试用） */
+void *yue_mbt_view_get_computed_layout(void *view);
+/* 视图间/视图到窗口的偏移（Vector2dF 拆传） */
+double yue_mbt_view_offset_from_window_x(void *view);
+double yue_mbt_view_offset_from_window_y(void *view);
+double yue_mbt_view_offset_from_view_x(void *view, void *from);
+double yue_mbt_view_offset_from_view_y(void *view, void *from);
 /* 视图边界（相对自身坐标系的尺寸 + 原点） */
 double yue_mbt_view_get_bounds_x(void *view);
 double yue_mbt_view_get_bounds_y(void *view);
@@ -314,6 +410,7 @@ double yue_mbt_view_get_bounds_height(void *view);
 void *yue_mbt_image_from_handle(int64_t h);
 int64_t yue_mbt_image_to_handle(void *image);
 void yue_mbt_painter_set_color(void *painter, const char *hex);
+void yue_mbt_painter_set_blend_mode(void *painter, int32_t mode);
 
 /* ---------- 组合控件（Slider/Picker/ComboBox/ProgressBar/Popover） ---------- */
 
@@ -359,6 +456,10 @@ void yue_mbt_group_set_title(void *group, const char *title);
 void *yue_mbt_scroll_new(void);
 void yue_mbt_scroll_set_content(void *scroll, void *view);
 void yue_mbt_scroll_set_content_size(void *scroll, double w, double h);
+/* ScrollbarPolicy：0=Always 1=Never 2=Automatic */
+void yue_mbt_scroll_set_scrollbar_policy(void *scroll, int32_t h, int32_t v);
+int32_t yue_mbt_scroll_get_scrollbar_policy_x(void *scroll);
+int32_t yue_mbt_scroll_get_scrollbar_policy_y(void *scroll);
 void yue_mbt_scroll_set_scroll_position(void *scroll, double horizon, double vertical);
 void yue_mbt_scroll_set_overlay_scrollbar(void *scroll, int32_t yes);
 
@@ -370,6 +471,20 @@ void *yue_mbt_clipboard_get(void);
 void yue_mbt_clipboard_set_text(void *clipboard, const char *text);
 void *yue_mbt_clipboard_get_text(void *clipboard);
 void yue_mbt_clipboard_clear(void *clipboard);
+/* Clipboard::Type：0=CopyPaste 1=Selection(Linux) */
+void *yue_mbt_clipboard_from_type(int32_t type);
+/* kind 1=Text 2=HTML 4=FilePaths(路径 \n 连接) */
+void yue_mbt_clipboard_set_data(void *clipboard, int32_t kind, const char *text);
+void yue_mbt_clipboard_set_data_image(void *clipboard, void *image);
+/* 读单条数据：[kind:i32][payload] 编码（与拖拽数据一致） */
+void *yue_mbt_clipboard_get_data(void *clipboard, int32_t kind);
+
+// ---------- MessageLoop（定时器/任务，跨平台） ----------
+void yue_mbt_post_task(void (*invoke)(void *), void *closure);
+void yue_mbt_post_delayed_task(int32_t ms, void (*invoke)(void *), void *closure);
+uint32_t yue_mbt_set_timeout(int32_t ms, void (*invoke)(void *), void *closure);
+void yue_mbt_set_timer(int32_t ms, int32_t (*invoke)(void *), void *closure);
+void yue_mbt_clear_timeout(uint32_t id);
 
 /* ---------- 消息框（句柄独立；type 0=None 1=Information 2=Warning 3=Error） ---------- */
 
@@ -389,6 +504,8 @@ void yue_mbt_message_box_close(void *box);
 
 /* Notification 句柄独立；经系统通知中心弹出 */
 void *yue_mbt_notification_center_get(void);
+/* 通知按钮：[count:i32le]（[len:i32le title][len:i32le info]） */
+void yue_mbt_notification_set_actions(void *notification, void *flat_bytes);
 void *yue_mbt_notification_new(void);
 void yue_mbt_notification_set_title(void *n, const char *title);
 void yue_mbt_notification_set_body(void *n, const char *body);
@@ -402,9 +519,17 @@ int32_t yue_mbt_global_shortcut_register(const char *accelerator,
                                          void (*invoke)(void *), void *closure);
 void yue_mbt_global_shortcut_unregister(int32_t id);
 
+/* MenuBase 遍历（Menu/MenuBar 共用） */
+int32_t yue_mbt_menu_base_item_count(void *menu);
+void *yue_mbt_menu_base_item_at(void *menu, int32_t index);
+/* elements 位组合：0xC0=年月 0xE0=年月日 0x0C=时分 0x0E=时分秒 */
+void *yue_mbt_date_picker_new_ex(int32_t elements, int32_t has_stepper);
 void *yue_mbt_date_picker_new(void);
 
 void *yue_mbt_gif_player_new(void);
+/* ImageScale：0=None 1=Fill 2=Down 3=UpOrDown */
+void yue_mbt_gif_player_set_scale(void *player, int32_t scale);
+int32_t yue_mbt_gif_player_get_scale(void *player);
 void yue_mbt_gif_player_set_image(void *player, void *image);
 
 /* ---------- App / Appearance / Locale / Screen ---------- */
@@ -435,15 +560,18 @@ void yue_mbt_table_on_toggle_checkbox(void *table,
                                       void (*invoke)(void *closure, int32_t column, int32_t row),
                                       void *closure);
 
-/* 键盘事件（Responder）：invoke(closure, key_code, modifiers) 返回是否已处理 */
-void yue_mbt_view_on_key_down(void *view,
-                              int32_t (*invoke)(void *closure, int32_t key_code, int32_t modifiers),
-                              void *closure);
-void yue_mbt_view_on_key_up(void *view,
-                            int32_t (*invoke)(void *closure, int32_t key_code, int32_t modifiers),
-                            void *closure);
+/* 键盘事件声明见上方「鼠标/键盘事件」区 */
 
 /* 窗口状态 */
+void yue_mbt_window_set_has_shadow(void *window, int32_t has);
+int32_t yue_mbt_window_has_shadow(void *window);
+void yue_mbt_window_set_resizable(void *window, int32_t yes);
+int32_t yue_mbt_window_is_resizable(void *window);
+void yue_mbt_window_set_maximizable(void *window, int32_t yes);
+void yue_mbt_window_set_minimizable(void *window, int32_t yes);
+int32_t yue_mbt_window_is_maximized(void *window);
+/* should_close 委托：返回 false 阻止关闭 */
+void yue_mbt_window_set_should_close(void *window, int32_t (*invoke)(void *), void *closure);
 void yue_mbt_window_maximize(void *window);
 void yue_mbt_window_unmaximize(void *window);
 void yue_mbt_window_set_fullscreen(void *window, int32_t fullscreen);

@@ -107,8 +107,20 @@ pub(open) trait ViewLike {
   fn handle_drop(Self, (DraggingInfo, Double, Double) -> Bool) -> Unit = _
   fn on_drag_leave(Self, () -> Unit) -> Unit = _
   fn schedule_paint(Self) -> Unit = _
-  fn get_bounds(Self) -> (Double, Double, Double, Double) = _
-  fn on_mouse_down(Self, () -> Bool) -> Unit = _
+  fn get_bounds(Self) -> RectF = _
+  fn on_mouse_down(Self, (MouseEvent) -> Bool) -> Unit = _
+  fn on_mouse_up(Self, (MouseEvent) -> Bool) -> Unit = _
+  fn on_mouse_move(Self, (MouseEvent) -> Unit) -> Unit = _
+  fn on_mouse_enter(Self, (MouseEvent) -> Unit) -> Unit = _
+  fn on_mouse_leave(Self, (MouseEvent) -> Unit) -> Unit = _
+  fn on_capture_lost(Self, () -> Unit) -> Unit = _
+  fn on_key_down(Self, (KeyEvent) -> Bool) -> Unit = _
+  fn on_key_up(Self, (KeyEvent) -> Bool) -> Unit = _
+  fn set_capture(Self) -> Unit = _
+  fn release_capture(Self) -> Unit = _
+  fn has_capture(Self) -> Bool = _
+  fn on_size_changed(Self, () -> Unit) -> Unit = _
+  fn get_computed_layout(Self) -> String = _
 }
 
 pub impl ViewLike for Window with view(self) {

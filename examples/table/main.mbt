@@ -70,8 +70,8 @@ fn main {
   win.on_close(fn(_window) { @yue.quit() })
 
   let table = @yue.Table::new()
-  table.add_column_text("ID", 40)
-  table.add_column_edit("Editable Text", 100)
+  table.add_column_with_options("ID", { column_type: @yue.Text, column: 0, width: 40 })
+  table.add_column_with_options("Editable Text", { column_type: @yue.Edit, column: -1, width: 100 })
   table.add_column_custom("Custom Color", -1, fn(painter, x, y, w, h, name, color) {
     painter.set_fill_color(color)
     painter.fill_rect(x, y, w, h)

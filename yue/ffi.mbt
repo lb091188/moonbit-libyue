@@ -22,7 +22,7 @@ extern "c" fn ffi_platform() -> Int = "yue_mbt_platform"
 
 ///|
 #borrow(frame, transparent)
-extern "c" fn ffi_window_new_ex(frame : Int, transparent : Int) -> View = "yue_mbt_window_new_ex"
+extern "c" fn ffi_window_new_ex(frame : Int, transparent : Int, no_activate : Int) -> View = "yue_mbt_window_new_ex"
 
 ///|
 #borrow(window, title)
@@ -204,6 +204,16 @@ extern "c" fn ffi_text_edit_delete_range(edit : View, start : Int, end : Int) ->
 extern "c" fn ffi_button_new(title : Bytes) -> View = "yue_mbt_button_new"
 
 ///|
+#borrow(title)
+extern "c" fn ffi_button_new_typed(title : Bytes, type_ : Int) -> View = "yue_mbt_button_new_typed"
+
+///|
+extern "c" fn ffi_button_set_checked(button : View, checked : Int) -> Unit = "yue_mbt_button_set_checked"
+
+///|
+extern "c" fn ffi_button_is_checked(button : View) -> Int = "yue_mbt_button_is_checked"
+
+///|
 #borrow(button, title)
 extern "c" fn ffi_button_set_title(button : View, title : Bytes) -> Unit = "yue_mbt_button_set_title"
 
@@ -217,6 +227,9 @@ extern "c" fn ffi_button_on_click(
 
 ///|
 extern "c" fn ffi_entry_new() -> View = "yue_mbt_entry_new"
+
+///|
+extern "c" fn ffi_entry_new_typed(type_ : Int) -> View = "yue_mbt_entry_new_typed"
 
 ///|
 #borrow(entry, text)
@@ -274,6 +287,18 @@ extern "c" fn ffi_tab_on_selected_page_change(
 ) -> Unit = "yue_mbt_tab_on_selected_page_change"
 
 ///|
+extern "c" fn ffi_browser_new_ex(devtools : Int, context_menu : Int, allow_file_access : Int, hardware_acceleration : Int) -> View = "yue_mbt_browser_new_ex"
+
+///|
+#borrow(browser, url, invoke, callback)
+extern "c" fn ffi_browser_get_cookies_for_url(
+  browser : View,
+  url : Bytes,
+  invoke : FuncRef[((Bytes) -> Unit, Bytes) -> Unit],
+  callback : (Bytes) -> Unit,
+) -> Unit = "yue_mbt_browser_get_cookies_for_url"
+
+///||
 extern "c" fn ffi_browser_new() -> View = "yue_mbt_browser_new"
 
 ///|
@@ -372,6 +397,20 @@ extern "c" fn ffi_menu_add_role_item(menu : Menu, role : Int) -> MenuItem = "yue
 extern "c" fn ffi_menu_add_separator(menu : Menu) -> MenuItem = "yue_mbt_menu_add_separator"
 
 ///|
+#borrow(menu, label)
+extern "c" fn ffi_menu_add_check_item(menu : Menu, label : Bytes) -> MenuItem = "yue_mbt_menu_add_check_item"
+
+///|
+#borrow(menu, label)
+extern "c" fn ffi_menu_add_radio_item(menu : Menu, label : Bytes) -> MenuItem = "yue_mbt_menu_add_radio_item"
+
+///|
+extern "c" fn ffi_menu_item_set_checked(item : MenuItem, checked : Int) -> Unit = "yue_mbt_menu_item_set_checked"
+
+///|
+extern "c" fn ffi_menu_item_is_checked(item : MenuItem) -> Int = "yue_mbt_menu_item_is_checked"
+
+///||
 #borrow(item, label)
 extern "c" fn ffi_menu_item_set_label(item : MenuItem, label : Bytes) -> Unit = "yue_mbt_menu_item_set_label"
 
@@ -391,6 +430,10 @@ extern "c" fn ffi_menu_item_on_click(
 extern "c" fn ffi_file_open_dialog_new() -> FileDialog = "yue_mbt_file_open_dialog_new"
 
 ///|
+#borrow(dialog)
+extern "c" fn ffi_file_dialog_set_options(dialog : FileDialog, options : Int) -> Unit = "yue_mbt_file_dialog_set_options"
+
+///||
 extern "c" fn ffi_file_save_dialog_new() -> FileDialog = "yue_mbt_file_save_dialog_new"
 
 ///|
@@ -595,15 +638,42 @@ extern "c" fn ffi_canvas_get_painter(canvas : Canvas) -> Painter = "yue_mbt_canv
 
 ///|
 #borrow(text)
-extern "c" fn ffi_attributed_text_new(text : Bytes, align : Int, valign : Int) -> AttributedText = "yue_mbt_attributed_text_new"
+extern "c" fn ffi_attributed_text_new(text : Bytes, align : Int, valign : Int, wrap : Int, ellipsis : Int) -> AttributedText = "yue_mbt_attributed_text_new"
+
+///|
+#borrow(at)
+extern "c" fn ffi_attributed_text_set_format(at : AttributedText, align : Int, valign : Int, wrap : Int, ellipsis : Int) -> Unit = "yue_mbt_attributed_text_set_format"
 
 ///|
 #borrow(at, font)
 extern "c" fn ffi_attributed_text_set_font(at : AttributedText, font : Font) -> Unit = "yue_mbt_attributed_text_set_font"
 
 ///|
+#borrow(at, font)
+extern "c" fn ffi_attributed_text_set_font_for(at : AttributedText, font : Font, start : Int, end : Int) -> Unit = "yue_mbt_attributed_text_set_font_for"
+
+///|
 #borrow(at, hex)
 extern "c" fn ffi_attributed_text_set_color(at : AttributedText, hex : Bytes) -> Unit = "yue_mbt_attributed_text_set_color"
+
+///|
+#borrow(at, hex)
+extern "c" fn ffi_attributed_text_set_color_for(at : AttributedText, hex : Bytes, start : Int, end : Int) -> Unit = "yue_mbt_attributed_text_set_color_for"
+
+///|
+#borrow(at)
+extern "c" fn ffi_attributed_text_get_text(at : AttributedText) -> Bytes = "yue_mbt_attributed_text_get_text"
+
+///|
+#borrow(at, text)
+extern "c" fn ffi_attributed_text_set_text(at : AttributedText, text : Bytes) -> Unit = "yue_mbt_attributed_text_set_text"
+
+///|
+#borrow(at)
+extern "c" fn ffi_attributed_text_clear(at : AttributedText) -> Unit = "yue_mbt_attributed_text_clear"
+
+///|
+extern "c" fn ffi_system_color(name : Int) -> Int = "yue_mbt_system_color"
 
 ///|
 #borrow(at, out_w, out_h)
@@ -636,6 +706,10 @@ extern "c" fn ffi_table_new() -> View = "yue_mbt_table_new"
 
 ///|
 #borrow(table, title)
+extern "c" fn ffi_table_add_column_with_options(table : View, title : Bytes, type_ : Int, column : Int, width : Int) -> Unit = "yue_mbt_table_add_column_with_options"
+
+///||
+#borrow(table, title)
 extern "c" fn ffi_table_add_column_text(table : View, title : Bytes, width : Int) -> Unit = "yue_mbt_table_add_column_text"
 
 ///|
@@ -667,8 +741,8 @@ extern "c" fn ffi_table_bind_model(
   column_count : Int,
   closure : ModelBox,
   invoke_row_count : FuncRef[(ModelBox) -> Int],
-  invoke_get_value : FuncRef[((ModelBox, Int, Int) -> TableValue, ModelBox, Int, Int) -> Bytes],
-  invoke_set_value : FuncRef[((ModelBox, Int, Int, TableValue) -> Unit, ModelBox, Int, Int, Int, Bytes, Int) -> Unit],
+  invoke_get_value : FuncRef[(ModelBox, Int, Int) -> Bytes],
+  invoke_set_value : FuncRef[(ModelBox, Int, Int, Int, Bytes, Int) -> Unit],
 ) -> Unit = "yue_mbt_table_bind_model"
 
 ///|
@@ -751,9 +825,102 @@ extern "c" fn ffi_painter_set_color(painter : Painter, hex : Bytes) -> Unit = "y
 #borrow(view, invoke, callback)
 extern "c" fn ffi_view_on_mouse_down(
   view : View,
-  invoke : FuncRef[((() -> Int) -> Int)],
-  callback : () -> Int,
+  invoke : FuncRef[(((Int, Double, Double, Double, Double, Int, Int) -> Int), Int, Double, Double, Double, Double, Int, Int) -> Int],
+  callback : (Int, Double, Double, Double, Double, Int, Int) -> Int,
 ) -> Unit = "yue_mbt_view_on_mouse_down"
+
+///|
+#borrow(view, invoke, callback)
+extern "c" fn ffi_view_on_mouse_up(
+  view : View,
+  invoke : FuncRef[(((Int, Double, Double, Double, Double, Int, Int) -> Int), Int, Double, Double, Double, Double, Int, Int) -> Int],
+  callback : (Int, Double, Double, Double, Double, Int, Int) -> Int,
+) -> Unit = "yue_mbt_view_on_mouse_up"
+
+///|
+#borrow(view, invoke, callback)
+extern "c" fn ffi_view_on_mouse_move(
+  view : View,
+  invoke : FuncRef[(((Int, Double, Double, Double, Double, Int, Int) -> Unit), Int, Double, Double, Double, Double, Int, Int) -> Unit],
+  callback : (Int, Double, Double, Double, Double, Int, Int) -> Unit,
+) -> Unit = "yue_mbt_view_on_mouse_move"
+
+///|
+#borrow(view, invoke, callback)
+extern "c" fn ffi_view_on_mouse_enter(
+  view : View,
+  invoke : FuncRef[(((Int, Double, Double, Double, Double, Int, Int) -> Unit), Int, Double, Double, Double, Double, Int, Int) -> Unit],
+  callback : (Int, Double, Double, Double, Double, Int, Int) -> Unit,
+) -> Unit = "yue_mbt_view_on_mouse_enter"
+
+///|
+#borrow(view, invoke, callback)
+extern "c" fn ffi_view_on_mouse_leave(
+  view : View,
+  invoke : FuncRef[(((Int, Double, Double, Double, Double, Int, Int) -> Unit), Int, Double, Double, Double, Double, Int, Int) -> Unit],
+  callback : (Int, Double, Double, Double, Double, Int, Int) -> Unit,
+) -> Unit = "yue_mbt_view_on_mouse_leave"
+
+///|
+#borrow(view, invoke, callback)
+extern "c" fn ffi_view_on_capture_lost(
+  view : View,
+  invoke : FuncRef[(() -> Unit) -> Unit],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_view_on_capture_lost"
+
+///|
+extern "c" fn ffi_view_set_capture(view : View) -> Unit = "yue_mbt_view_set_capture"
+
+///|
+extern "c" fn ffi_view_release_capture(view : View) -> Unit = "yue_mbt_view_release_capture"
+
+///|
+extern "c" fn ffi_view_has_capture(view : View) -> Int = "yue_mbt_view_has_capture"
+
+///|
+extern "c" fn ffi_mouse_location_x() -> Double = "yue_mbt_mouse_location_x"
+
+///|
+extern "c" fn ffi_mouse_location_y() -> Double = "yue_mbt_mouse_location_y"
+
+///|
+extern "c" fn ffi_is_shift_pressed() -> Int = "yue_mbt_is_shift_pressed"
+
+///|
+extern "c" fn ffi_is_control_pressed() -> Int = "yue_mbt_is_control_pressed"
+
+///|
+extern "c" fn ffi_is_alt_pressed() -> Int = "yue_mbt_is_alt_pressed"
+
+///|
+extern "c" fn ffi_is_meta_pressed() -> Int = "yue_mbt_is_meta_pressed"
+
+///|
+#borrow(view, invoke, callback)
+extern "c" fn ffi_view_on_size_changed(
+  view : View,
+  invoke : FuncRef[(() -> Unit) -> Unit],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_view_on_size_changed"
+
+///|
+#borrow(view)
+extern "c" fn ffi_view_get_computed_layout(view : View) -> Bytes = "yue_mbt_view_get_computed_layout"
+
+///|
+extern "c" fn ffi_view_offset_from_window_x(view : View) -> Double = "yue_mbt_view_offset_from_window_x"
+
+///|
+extern "c" fn ffi_view_offset_from_window_y(view : View) -> Double = "yue_mbt_view_offset_from_window_y"
+
+///|
+#borrow(view, from)
+extern "c" fn ffi_view_offset_from_view_x(view : View, from : View) -> Double = "yue_mbt_view_offset_from_view_x"
+
+///|
+#borrow(view, from)
+extern "c" fn ffi_view_offset_from_view_y(view : View, from : View) -> Double = "yue_mbt_view_offset_from_view_y"
 
 ///|
 extern "c" fn ffi_slider_new() -> View = "yue_mbt_slider_new"
@@ -910,6 +1077,15 @@ extern "c" fn ffi_scroll_set_content_size(scroll : View, w : Double, h : Double)
 extern "c" fn ffi_scroll_set_scroll_position(scroll : View, horizon : Double, vertical : Double) -> Unit = "yue_mbt_scroll_set_scroll_position"
 
 ///|
+extern "c" fn ffi_scroll_set_scrollbar_policy(scroll : View, h : Int, v : Int) -> Unit = "yue_mbt_scroll_set_scrollbar_policy"
+
+///|
+extern "c" fn ffi_scroll_get_scrollbar_policy_x(scroll : View) -> Int = "yue_mbt_scroll_get_scrollbar_policy_x"
+
+///|
+extern "c" fn ffi_scroll_get_scrollbar_policy_y(scroll : View) -> Int = "yue_mbt_scroll_get_scrollbar_policy_y"
+
+///||
 #borrow(scroll)
 extern "c" fn ffi_scroll_set_overlay_scrollbar(scroll : View, yes : Int) -> Unit = "yue_mbt_scroll_set_overlay_scrollbar"
 
@@ -929,6 +1105,21 @@ extern "c" fn ffi_clipboard_set_text(clipboard : Clipboard, text : Bytes) -> Uni
 extern "c" fn ffi_clipboard_get_text(clipboard : Clipboard) -> Bytes = "yue_mbt_clipboard_get_text"
 
 ///|
+extern "c" fn ffi_clipboard_from_type(type_ : Int) -> Clipboard = "yue_mbt_clipboard_from_type"
+
+///|
+#borrow(clipboard, text)
+extern "c" fn ffi_clipboard_set_data(clipboard : Clipboard, kind : Int, text : Bytes) -> Unit = "yue_mbt_clipboard_set_data"
+
+///|
+#borrow(clipboard, image)
+extern "c" fn ffi_clipboard_set_data_image(clipboard : Clipboard, image : Image) -> Unit = "yue_mbt_clipboard_set_data_image"
+
+///|
+#borrow(clipboard)
+extern "c" fn ffi_clipboard_get_data(clipboard : Clipboard, kind : Int) -> Bytes = "yue_mbt_clipboard_get_data"
+
+///||
 #borrow(clipboard)
 extern "c" fn ffi_clipboard_clear(clipboard : Clipboard) -> Unit = "yue_mbt_clipboard_clear"
 
@@ -972,6 +1163,10 @@ extern "c" fn ffi_message_box_show_for_window(box : MessageBox, window : View) -
 extern "c" fn ffi_message_box_close(box : MessageBox) -> Unit = "yue_mbt_message_box_close"
 
 ///|
+#borrow(notification, flat)
+extern "c" fn ffi_notification_set_actions(notification : Notification, flat : Bytes) -> Unit = "yue_mbt_notification_set_actions"
+
+///||
 extern "c" fn ffi_notification_new() -> Notification = "yue_mbt_notification_new"
 
 ///|
@@ -1091,16 +1286,16 @@ extern "c" fn ffi_table_on_toggle_checkbox(
 #borrow(view, invoke, callback)
 extern "c" fn ffi_view_on_key_down(
   view : View,
-  invoke : FuncRef[((Int, Int) -> Int, Int, Int) -> Int],
-  callback : (Int, Int) -> Int,
+  invoke : FuncRef[(((Int, Int, Int) -> Int), Int, Int, Int) -> Int],
+  callback : (Int, Int, Int) -> Int,
 ) -> Unit = "yue_mbt_view_on_key_down"
 
 ///|
 #borrow(view, invoke, callback)
 extern "c" fn ffi_view_on_key_up(
   view : View,
-  invoke : FuncRef[((Int, Int) -> Int, Int, Int) -> Int],
-  callback : (Int, Int) -> Int,
+  invoke : FuncRef[(((Int, Int, Int) -> Int), Int, Int, Int) -> Int],
+  callback : (Int, Int, Int) -> Int,
 ) -> Unit = "yue_mbt_view_on_key_up"
 
 ///|
@@ -1163,12 +1358,7 @@ extern "c" fn ffi_menu_new() -> Menu = "yue_mbt_menu_new"
 #borrow(menu)
 extern "c" fn ffi_menu_popup_at(menu : Menu, x : Double, y : Double) -> Unit = "yue_mbt_menu_popup_at"
 
-///|
-extern "c" fn ffi_menu_item_count(menu : Menu) -> Int = "yue_mbt_menu_item_count"
 
-///|
-#borrow(menu, ok)
-extern "c" fn ffi_menu_item_at(menu : Menu, index : Int, ok : Ref[Int]) -> MenuItem = "yue_mbt_menu_item_at"
 
 ///|
 #borrow(item, out)
@@ -1195,3 +1385,115 @@ fn utf8_bytes(text : String) -> Bytes {
 fn from_utf8_bytes(bytes : Bytes) -> String {
   @utf8.decode_lossy(bytes)
 }
+
+///|
+#borrow(invoke, callback)
+extern "c" fn ffi_post_task(invoke : FuncRef[(() -> Unit) -> Unit], callback : () -> Unit) -> Unit = "yue_mbt_post_task"
+
+///|
+#borrow(invoke, callback)
+extern "c" fn ffi_post_delayed_task(ms : Int, invoke : FuncRef[(() -> Unit) -> Unit], callback : () -> Unit) -> Unit = "yue_mbt_post_delayed_task"
+
+///|
+#borrow(invoke, callback)
+extern "c" fn ffi_set_timeout(ms : Int, invoke : FuncRef[(() -> Unit) -> Unit], callback : () -> Unit) -> Int = "yue_mbt_set_timeout"
+
+///|
+#borrow(invoke, callback)
+extern "c" fn ffi_set_timer(ms : Int, invoke : FuncRef[(() -> Int) -> Int], callback : () -> Int) -> Unit = "yue_mbt_set_timer"
+
+///|
+extern "c" fn ffi_clear_timeout(id : Int) -> Unit = "yue_mbt_clear_timeout"
+
+///|
+#borrow(data)
+extern "c" fn ffi_image_new_from_data(data : Bytes, len : Int, scale_factor : Double) -> Image = "yue_mbt_image_new_from_data"
+
+///|
+extern "c" fn ffi_image_is_empty(image : Image) -> Int = "yue_mbt_image_is_empty"
+
+///|
+extern "c" fn ffi_image_get_scale_factor(image : Image) -> Double = "yue_mbt_image_get_scale_factor"
+
+///|
+extern "c" fn ffi_image_resize(image : Image, w : Double, h : Double, scale_factor : Double) -> Image = "yue_mbt_image_resize"
+
+///|
+#borrow(image, format, path)
+extern "c" fn ffi_image_write_to_file(image : Image, format : Bytes, path : Bytes) -> Int = "yue_mbt_image_write_to_file"
+
+///|
+extern "c" fn ffi_gif_player_set_scale(player : View, scale : Int) -> Unit = "yue_mbt_gif_player_set_scale"
+
+///|
+extern "c" fn ffi_gif_player_get_scale(player : View) -> Int = "yue_mbt_gif_player_get_scale"
+
+///|
+extern "c" fn ffi_painter_set_blend_mode(painter : Painter, mode : Int) -> Unit = "yue_mbt_painter_set_blend_mode"
+
+///|
+extern "c" fn ffi_menu_base_item_count(menu : Menu) -> Int = "yue_mbt_menu_base_item_count"
+
+///|
+extern "c" fn ffi_menu_base_item_at(menu : Menu, index : Int) -> MenuItem = "yue_mbt_menu_base_item_at"
+
+///|
+extern "c" fn ffi_menubar_item_count(menubar : MenuBar) -> Int = "yue_mbt_menu_base_item_count"
+
+///|
+extern "c" fn ffi_menubar_item_at(menubar : MenuBar, index : Int) -> MenuItem = "yue_mbt_menu_base_item_at"
+
+///|
+extern "c" fn ffi_date_picker_new_ex(elements : Int, has_stepper : Int) -> View = "yue_mbt_date_picker_new_ex"
+
+///|
+#borrow(browser, html, base_url)
+extern "c" fn ffi_browser_load_html(browser : View, html : Bytes, base_url : Bytes) -> Unit = "yue_mbt_browser_load_html"
+
+///|
+#borrow(browser, agent)
+extern "c" fn ffi_browser_set_user_agent(browser : View, agent : Bytes) -> Unit = "yue_mbt_browser_set_user_agent"
+
+
+
+
+///|
+#borrow(browser, code)
+extern "c" fn ffi_browser_execute_javascript(browser : View, code : Bytes) -> Unit = "yue_mbt_browser_execute_javascript"
+
+///|
+extern "c" fn ffi_window_set_has_shadow(window : View, has : Int) -> Unit = "yue_mbt_window_set_has_shadow"
+
+///|
+extern "c" fn ffi_window_has_shadow(window : View) -> Int = "yue_mbt_window_has_shadow"
+
+///|
+extern "c" fn ffi_window_set_resizable(window : View, yes : Int) -> Unit = "yue_mbt_window_set_resizable"
+
+///|
+extern "c" fn ffi_window_is_resizable(window : View) -> Int = "yue_mbt_window_is_resizable"
+
+///|
+extern "c" fn ffi_window_set_maximizable(window : View, yes : Int) -> Unit = "yue_mbt_window_set_maximizable"
+
+///|
+extern "c" fn ffi_window_set_minimizable(window : View, yes : Int) -> Unit = "yue_mbt_window_set_minimizable"
+
+///|
+extern "c" fn ffi_window_is_maximized(window : View) -> Int = "yue_mbt_window_is_maximized"
+
+///|
+#borrow(window, invoke, callback)
+extern "c" fn ffi_window_set_should_close(window : View, invoke : FuncRef[(() -> Int) -> Int], callback : () -> Int) -> Unit = "yue_mbt_window_set_should_close"
+
+///|
+#borrow(scheme, invoke, callback)
+extern "c" fn ffi_browser_register_protocol(
+  scheme : Bytes,
+  invoke : FuncRef[((Bytes) -> Bytes, Bytes) -> Bytes],
+  callback : (Bytes) -> Bytes,
+) -> Unit = "yue_mbt_browser_register_protocol"
+
+///|
+#borrow(scheme)
+extern "c" fn ffi_browser_unregister_protocol(scheme : Bytes) -> Unit = "yue_mbt_browser_unregister_protocol"

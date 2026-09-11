@@ -227,13 +227,86 @@ pub fn Canvas::get_painter(self : Canvas) -> Painter {
 }
 
 ///|
-/// 创建富文本（可设字体/颜色，可查询布局包围盒）。
+/// 创建富文本（可设字体/颜色/换行/省略，可查询布局包围盒）。
 pub fn AttributedText::new(
   text : String,
   align? : TextAlign = Start,
   valign? : TextAlign = Start,
+  wrap? : Bool = true,
+  ellipsis? : Bool = false,
 ) -> AttributedText {
-  ffi_attributed_text_new(utf8_bytes(text), align_id(align), align_id(valign))
+  ffi_attributed_text_new(
+    utf8_bytes(text),
+    align_id(align),
+    align_id(valign),
+    if wrap { 1 } else { 0 },
+    if ellipsis { 1 } else { 0 },
+  )
+}
+
+///|
+/// 文本布局选项（对照 nu::TextFormat）。
+pub(all) struct TextFormat {
+  align : TextAlign
+  valign : TextAlign
+  wrap : Bool
+  ellipsis : Bool
+}
+
+///|
+/// 默认布局选项（start 对齐、自动换行、无省略，同 libyue 默认值）。
+pub fn TextFormat::new() -> TextFormat {
+  { align: Start, valign: Start, wrap: true, ellipsis: false }
+}
+
+///|
+/// 文本属性（对照 nu::TextAttributes = TextFormat + 字体 + 颜色）。
+pub(all) struct TextAttributes {
+  align : TextAlign
+  valign : TextAlign
+  wrap : Bool
+  ellipsis : Bool
+  font : Font?
+  color : String?
+}
+
+///|
+/// 默认属性（无字体/颜色覆盖）。
+pub fn TextAttributes::new() -> TextAttributes {
+  { align: Start, valign: Start, wrap: true, ellipsis: false, font: None, color: None }
+}
+
+///|
+/// 按属性创建富文本。
+pub fn AttributedText::new_with(text : String, attrs : TextAttributes) -> AttributedText {
+  let at = ffi_attributed_text_new(
+    utf8_bytes(text),
+    align_id(attrs.align),
+    align_id(attrs.valign),
+    if attrs.wrap { 1 } else { 0 },
+    if attrs.ellipsis { 1 } else { 0 },
+  )
+  match attrs.font {
+    Some(f) => at.set_font(f)
+    None => ()
+  }
+  match attrs.color {
+    Some(hex) => at.set_color(hex)
+    None => ()
+  }
+  at
+}
+
+///|
+/// 整体重设布局选项。
+pub fn AttributedText::set_format(self : AttributedText, format : TextFormat) -> Unit {
+  ffi_attributed_text_set_format(
+    self,
+    align_id(format.align),
+    align_id(format.valign),
+    if format.wrap { 1 } else { 0 },
+    if format.ellipsis { 1 } else { 0 },
+  )
 }
 
 ///|
@@ -242,17 +315,47 @@ pub fn AttributedText::set_font(self : AttributedText, font : Font) -> Unit {
 }
 
 ///|
+/// 对 [start, end) 字符区间设字体。
+pub fn AttributedText::set_font_for(self : AttributedText, font : Font, start : Int, end : Int) -> Unit {
+  ffi_attributed_text_set_font_for(self, font, start, end)
+}
+
+///|
 pub fn AttributedText::set_color(self : AttributedText, hex : String) -> Unit {
   ffi_attributed_text_set_color(self, utf8_bytes(hex))
 }
 
 ///|
-/// 查询在给定可用空间内布局后的文本包围盒。
-pub fn AttributedText::get_bounds_for(self : AttributedText, w : Double, h : Double) -> (Double, Double) {
+/// 查询在给定可用空间内布局后的文本包围盒尺寸。
+pub fn AttributedText::get_bounds_for(self : AttributedText, w : Double, h : Double) -> SizeF {
   let out_w = Ref(0.0)
   let out_h = Ref(0.0)
   ffi_attributed_text_get_bounds_for(self, w, h, out_w, out_h)
-  (out_w.val, out_h.val)
+  { width: out_w.val, height: out_h.val }
+}
+
+///|
+/// 对 [start, end) 字符区间设颜色。
+pub fn AttributedText::set_color_for(self : AttributedText, hex : String, start : Int, end : Int) -> Unit {
+  ffi_attributed_text_set_color_for(self, utf8_bytes(hex), start, end)
+}
+
+///|
+/// 取当前文本。
+pub fn AttributedText::get_text(self : AttributedText) -> String {
+  @utf8.decode_lossy(ffi_attributed_text_get_text(self))
+}
+
+///|
+/// 替换文本（保留属性）。
+pub fn AttributedText::set_text(self : AttributedText, text : String) -> Unit {
+  ffi_attributed_text_set_text(self, utf8_bytes(text))
+}
+
+///|
+/// 清空文本。
+pub fn AttributedText::clear(self : AttributedText) -> Unit {
+  ffi_attributed_text_clear(self)
 }
 
 ///|
@@ -308,6 +411,103 @@ pub fn Font::new(
       Italic => 1
     },
   )
+}
+
+///|
+/// 混合模式（对照 nu::BlendMode，数值直传）。
+pub(all) enum BlendMode {
+  Normal
+  Multiply
+  Screen
+  Overlay
+  Darken
+  Lighten
+  ColorDodge
+  ColorBurn
+  SoftLight
+  HardLight
+  Difference
+  Exclusion
+  Hue
+  Saturation
+  Color
+  Luminosity
+  Clear
+  Copy
+  SourceIn
+  SourceOut
+  SourceAtop
+  DestinationOver
+  DestinationIn
+  DestinationAtop
+  Xor
+}
+
+///|
+fn blend_mode_id(m : BlendMode) -> Int {
+  match m {
+    Normal => 0
+    Multiply => 1
+    Screen => 2
+    Overlay => 3
+    Darken => 4
+    Lighten => 5
+    ColorDodge => 6
+    ColorBurn => 7
+    SoftLight => 8
+    HardLight => 9
+    Difference => 10
+    Exclusion => 11
+    Hue => 12
+    Saturation => 13
+    Color => 14
+    Luminosity => 15
+    Clear => 16
+    Copy => 17
+    SourceIn => 18
+    SourceOut => 19
+    SourceAtop => 20
+    DestinationOver => 21
+    DestinationIn => 22
+    DestinationAtop => 23
+    Xor => 24
+  }
+}
+
+///|
+/// 设置绘制混合模式（后续绘制操作生效）。
+pub fn Painter::set_blend_mode(self : Painter, mode : BlendMode) -> Unit {
+  ffi_painter_set_blend_mode(self, blend_mode_id(mode))
+}
+
+///|
+/// 从内存解码图片（PNG/JPEG，对照 Image(Buffer, scale_factor)）。
+pub fn Image::new_from_png(data : Bytes, scale? : Double = 1.0) -> Image {
+  ffi_image_new_from_data(data, data.length(), scale)
+}
+
+
+///|
+/// 图片是否为空（加载失败等）。
+pub fn Image::is_empty(self : Image) -> Bool {
+  ffi_image_is_empty(self) == 1
+}
+
+///|
+pub fn Image::get_scale_factor(self : Image) -> Double {
+  ffi_image_get_scale_factor(self)
+}
+
+///|
+/// 缩放为新图片（原图不变）。
+pub fn Image::resize(self : Image, width : Double, height : Double, scale? : Double = 1.0) -> Image {
+  ffi_image_resize(self, width, height, scale)
+}
+
+///|
+/// 导出为图片文件（Linux 支持 "png"）。
+pub fn Image::write_to_file(self : Image, format : String, path : String) -> Bool {
+  ffi_image_write_to_file(self, utf8_bytes(format), utf8_bytes(path)) == 1
 }
 
 ///|
