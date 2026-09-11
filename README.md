@@ -111,6 +111,8 @@ The AppIndicator runtime library cannot be relied upon (Ubuntu 24.04 dropped the
 
 Platform-specific pitfalls observed on real desktops (XFCE 4.18, GNOME, …) are catalogued in [docs/adaptation.md](docs/adaptation.md).
 
+Widget API quick reference (including upstream pitfalls) lives in [docs/components.md](docs/components.md); the declarative layer — `X::make` props constructors, `Node`/`mount` render trees and `Store` reactive bindings — is documented in [docs/declarative.md](docs/declarative.md).
+
 ## Notes
 
 - The current binding surface is roughly 260 ABI functions (262 `extern "c"` declarations in `yue/ffi.mbt`): App/Lifetime, Window, common View capabilities and drag & drop, Container/Label/Button/Entry/TextEdit, Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer, Browser, Menu/MenuBar, Table + model bridge, Painter/Canvas, Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog, Screen/Appearance/Locale/Cursor. New widgets follow the established pattern: add a mechanical translation function in the shim → add the extern in `ffi.mbt` → add the type and methods in a new `*.mbt`.

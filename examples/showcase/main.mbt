@@ -4,7 +4,6 @@
 ///|
 /// 全局状态：跨页签共享的可变演示数据。
 struct State {
-  mut click_count : Int
   mut canvas_hue : Int
   mut tray_clicks : Int
   log_lines : Array[String]
@@ -68,7 +67,6 @@ fn main {
 ///|
 fn State::init() -> State {
   {
-    click_count: 0,
     canvas_hue: 0,
     tray_clicks: 0,
     log_lines: [],
@@ -202,92 +200,92 @@ fn build_tabs(win : @yue.Window, state : State) -> @yue.Tab {
 
 ///|
 /// 页 1：标签 / 按钮 / 输入回显 / 滑块联动进度条。
+/// 声明式写法对照版（Node/mount + Store/bind + handle；旧命令式版本见 git 历史）。
 fn build_basics(state : State) -> @yue.Container {
-  let page = @yue.Container::new()
-  page.set_style("padding", 12.0)
-
-  let head = @yue.Label::new("基础控件 —— 标签 / 按钮 / 输入框 / 滑块 / 进度条")
-  head.set_style_str("color", "#356AA0")
-  head.set_style("marginBottom", 10.0)
-  page.add_child(head)
-
-  // 按钮：点击计数
-  let btn = @yue.Button::new("点我 (0)")
-  btn.set_style("marginBottom", 8.0)
-  page.add_child(btn)
-
-  // 输入框：回显
-  let entry = @yue.Entry::new()
-  entry.set_text("在这里输入…")
-  entry.set_style("marginBottom", 8.0)
-  page.add_child(entry)
-
-  let echo = @yue.Label::new("回显：")
-  echo.set_style("marginBottom", 8.0)
-  page.add_child(echo)
-
-  // 滑块联动进度条
-  let slider = @yue.Slider::new()
-  slider.set_range(0.0, 100.0)
-  slider.set_step(1.0)
-  slider.set_style("marginBottom", 8.0)
-  page.add_child(slider)
-
-  let progress = @yue.ProgressBar::new()
-  progress.set_style("marginBottom", 8.0)
-  page.add_child(progress)
-
-  let slider_label = @yue.Label::new("滑块值：0")
-  slider_label.set_style("marginBottom", 8.0)
-  page.add_child(slider_label)
-
-  let pulse = @yue.Button::new("切换进度条滚动模式")
-  page.add_child(pulse)
-
-  // 复选 / 单选按钮(Button::Type)
-  let check = @yue.Button::new_of(@yue.Checkbox, "启用扩展")
-  check.set_style("marginBottom", 8.0)
-  page.add_child(check)
-  let radio_row = @yue.Container::new()
-  radio_row.set_style_str("flexDirection", "row")
-  radio_row.set_style("marginBottom", 8.0)
-  page.add_child(radio_row)
-  let radio_a = @yue.Button::new_of(@yue.Radio, "主题甲")
-  let radio_b = @yue.Button::new_of(@yue.Radio, "主题乙")
-  radio_b.set_checked(true)
-  radio_a.set_style("marginRight", 12.0)
-  radio_row.add_child(radio_a)
-  radio_row.add_child(radio_b)
-
-  // 密码输入框(Entry::Type)
-  let password = @yue.Entry::new_of(@yue.Password)
-  password.set_text("口令")
-  password.set_style("marginBottom", 8.0)
-  page.add_child(password)
-
+  let clicks : @yue.Store[Int] = @yue.Store::new(0)
+  let echo_text : @yue.Store[String] = @yue.Store::new("")
+  let slider_val : @yue.Store[Double] = @yue.Store::new(0.0)
   let mut indeterminate = false
-  btn.on_click(fn() {
-    state.click_count += 1
-    btn.set_title("点我 (\{state.click_count})")
-    state.log("按钮点击 \{state.click_count}")
-  })
-  entry.on_text_change(fn() { echo.set_text("回显：\{entry.get_text()}") })
-  entry.on_activate(fn() { state.log("输入框回车：\{entry.get_text()}") })
-  slider.on_value_change(fn() {
-    let v = slider.get_value().round()
-    progress.set_value(v / 100.0)
-    slider_label.set_text("滑块值：\{v}")
-  })
-  pulse.on_click(fn() {
-    indeterminate = !indeterminate
-    progress.set_indeterminate(indeterminate)
-    state.log("进度条滚动模式：\{indeterminate}")
-  })
-  check.on_click(fn() { state.log("复选 =\{check.is_checked()}") })
-  radio_a.on_click(fn() { state.log("单选 甲") })
-  radio_b.on_click(fn() { state.log("单选 乙") })
-  password.on_activate(fn() { state.log("密码长度 \{password.get_text().length()}") })
-  page
+  let progress_handle : Ref[@yue.ProgressBar?] = Ref(None)
+
+  @yue.mount(
+    [
+      @yue.label(
+        "基础控件 —— 标签 / 按钮 / 输入框 / 滑块 / 进度条",
+        style_str=[("color", "#356AA0")],
+        style=[("marginBottom", 10.0)],
+      ),
+      // 按钮：点击计数，标题由 Store 自动驱动
+      @yue.button(
+        "点我",
+        on_click=fn() {
+          clicks.update(fn(n) { n + 1 })
+          state.log("按钮点击 \{clicks.get()}")
+        },
+        style=[("marginBottom", 8.0)],
+      ),
+      @yue.bind_label(clicks, fn(n) { "已点 \{n} 次" }, style=[("marginBottom", 8.0)]),
+      // 输入框：回显与回车
+      @yue.entry(
+        text="在这里输入…",
+        on_input=fn(s) { echo_text.set(s) },
+        on_enter=fn(s) { state.log("输入框回车：\{s}") },
+        style=[("marginBottom", 8.0)],
+      ),
+      @yue.bind_label(echo_text, fn(s) { "回显：\{s}" }, style=[("marginBottom", 8.0)]),
+      // 滑块联动进度条（进度条经 handle 命令式更新）
+      @yue.slider(
+        range=Some((0.0, 100.0)),
+        step=Some(1.0),
+        on_change=fn(v) {
+          slider_val.set(v)
+          match progress_handle.val {
+            Some(p) => p.set_value(v.round() / 100.0)
+            None => ()
+          }
+        },
+        style=[("marginBottom", 8.0)],
+      ),
+      @yue.progress(
+        style=[("marginBottom", 8.0)],
+        handle=fn(p) { progress_handle.val = Some(p) },
+      ),
+      @yue.bind_label(slider_val, fn(v) { "滑块值：\{v.round()}" }, style=[("marginBottom", 8.0)]),
+      @yue.button(
+        "切换进度条滚动模式",
+        on_click=fn() {
+          indeterminate = !indeterminate
+          match progress_handle.val {
+            Some(p) => p.set_indeterminate(indeterminate)
+            None => ()
+          }
+          state.log("进度条滚动模式：\{indeterminate}")
+        },
+        style=[("marginBottom", 8.0)],
+      ),
+      // 复选 / 单选
+      @yue.checkbox(
+        "启用扩展",
+        on_change=fn(v) { state.log("复选 =\{v}") },
+        style=[("marginBottom", 8.0)],
+      ),
+      @yue.hbox(
+        [
+          @yue.radio("主题甲", on_change=fn(_v) { state.log("单选 甲") }, style=[("marginRight", 12.0)]),
+          @yue.radio("主题乙", checked=true, on_change=fn(_v) { state.log("单选 乙") }),
+        ],
+        style=[("marginBottom", 8.0)],
+      ),
+      // 密码输入框
+      @yue.entry(
+        text="口令",
+        password=true,
+        on_enter=fn(s) { state.log("密码长度 \{s.length()}") },
+        style=[("marginBottom", 8.0)],
+      ),
+    ],
+    style=[("padding", 12.0)],
+  )
 }
 
 ///|
