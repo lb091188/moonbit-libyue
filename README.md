@@ -1,6 +1,16 @@
 # moonbit-libyue
 
-libyue 的 MoonBit 封装。目标：消费方写一份 MoonBit 代码，Windows / macOS / Linux 三平台行为一致，感受不到平台差异。
+[libyue](https://libyue.com/docs/latest/cpp/) 的 MoonBit 封装。  
+原库支持 Windows Mac OS，迁移第一阶段以跑通 Ubuntu Xcfe4 环境为第一目标后续在此基础上再推进
+
+- [x] Linux X11
+- [ ] Linux Wayland
+- [ ] Windows
+- [ ] Mac OS
+
+## Yue
+A library for creating native cross-platform GUI apps.  
+一个跨平台原生桌面应用库
 
 ## 三层架构
 
@@ -25,18 +35,18 @@ libyue 的 MoonBit 封装。目标：消费方写一份 MoonBit 代码，Windows
 ## 目录
 
 ```
-yue/                 MoonBit 库包（对外 API）
+yue/                 MoonBit 库包
   ffi.mbt            私有 extern "c" 声明（仅 native 编译）
   app.mbt            init / run / quit
   window.mbt         窗口 + 关闭回调（FuncRef trampoline）
   label.mbt          标签
-  tray.mbt           托盘（SNI 自实现优先，AppIndicator 回退）
-traybus/           纯 MoonBit 的 DBus + StatusNotifierItem 协议栈（Linux 托盘）
+  tray.mbt           托盘
+traybus/             纯 MoonBit 的 DBus + StatusNotifierItem 协议栈（Linux 托盘）
   error.mbt          结构化错误
 shim/                C ABI 封装层 + CMakeLists
 scripts/prepare.py   固定版本下载 libyue + 构建静态库 + 回写链接参数
 examples/hello/      使用者示例
-.agents/skills/      moonbitlang/skills 全量技能（开发时给 agent 参考）
+.agents/skills/      moonbitlang/skills 全量技能
 ```
 
 ## 快速开始
@@ -50,13 +60,13 @@ sudo apt install build-essential cmake pkg-config \
 ```
 
 构建原生库并运行示例：
-
+ **注意会到 github 下载 libyue 相关依赖** 
 ```sh
-python3 scripts/prepare.py   # 下载 libyue v0.15.6（校验 sha256）+ CMake 构建
+python3 scripts/prepare.py
 moon run examples/hello
 ```
 
-## Linux 托盘方案（纯 MoonBit 自实现，2026-09 落地）
+## Linux 托盘方案
 
 AppIndicator 运行库（Ubuntu 24.04 已移除传统版）不可依赖，且 libyue 内部加载失败只打日志、对象静默失效。
 现改为 **MoonBit 直连面板的 StatusNotifierItem 协议**，不再依赖任何 AppIndicator 运行库：
@@ -67,7 +77,7 @@ AppIndicator 运行库（Ubuntu 24.04 已移除传统版）不可依赖，且 li
 - 消费方面向统一 API：`Tray::new / set_title / set_tooltip / set_icon_name / on_click / remove`，另有 `desktop_environment()` 诊断。
 - 已知坑（实测入档）：DBus 数组长度前缀**不含首元素前的对齐填充**，算进去会被 dbus-daemon 判协议违规直接断连；DBus 头部 SIGNATURE 字段的 variant 签名是 "g"（u8 长度编码），按 "s" 编能过自洽单测但会被真实总线拒绝——单测证自洽，互操作必须上真总线验证。
 
-## 已知边界（实测结论）
+## 已知边界
 
 - `moon` 的 `link` 段只作用于所在包、且只对 main 包的二进制生效；库包 `yue/` 放 link 段会让 moon 生成无 main 的可执行文件（moon 对所有平台的产物统一加 `.exe` 后缀）导致构建失败。`prepare.py` 只回写 `is-main` 的包，`cc-link-flags` 为本机绝对路径。
 - `extern "c"` 不能返回可空类型（ABI 与 C 指针不兼容，直接段错误）：成败经 `Ref[Int]` 出参报告，句柄按非空返回。
