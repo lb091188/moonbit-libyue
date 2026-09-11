@@ -3,8 +3,11 @@
 MoonBit bindings for [libyue](https://libyue.com/docs/latest/cpp/).  
 The upstream library supports Windows, macOS and Linux; the first milestone of this port targets Ubuntu + Xfce4 (X11), with the remaining platforms to follow.
 
-- [x] Linux X11
-- [ ] Linux Wayland
+- [x] Ubuntu 24.04 Xfce
+- [ ] Ubuntu 24.04 GNOME
+- [ ] Ubuntu 24.04 KDE
+- [ ] Deepin 25
+- [ ] OpenKylin 3
 - [ ] Windows
 - [ ] macOS
 
@@ -65,9 +68,9 @@ yue/                 MoonBit library package
     sys.mbt          fd-level syscall surface (all forwarded via shim)
 shim/                C ABI wrapper layer (yue_mbt.cpp + include/yue_mbt.h) + CMakeLists
 scripts/prepare.py   Pinned-version libyue download + static library build + link-flag writeback
-examples/            13 examples: hello / editor / browser / drawing / table / widgets /
+examples/            14 examples: hello / editor / browser / drawing / table / widgets /
                      drag_source / drag_destination / floating_heart /
-                     auto_height_edit / showcase / misc / advanced
+                     auto_height_edit / showcase / misc / advanced / events / events
 .agents/skills/      MoonBit skill library (the FFI conventions referenced throughout)
 ```
 
@@ -104,24 +107,18 @@ The AppIndicator runtime library cannot be relied upon (Ubuntu 24.04 dropped the
 - `yue/traybus/` is a pure-MoonBit implementation: DBus wire codec, SASL EXTERNAL handshake, message send/receive loop (wired into the GTK main loop via a glib fd watch), SNI property/signal/Activate dispatch, desktop environment detection (XDG_CURRENT_DESKTOP), and a procedurally generated crescent bitmap;
 - the shim forwards only 8 fd-level syscalls (connect/read/write/poll/close/watch_fd/getuid/getenv), non-Linux platforms get failing stubs;
 - backend priority: SNI watcher online → self-implemented tray; not online → fall back to nativeui AppIndicator; neither available → `Err(Unsupported)`. Works on XFCE/KDE/MATE/Cinnamon/Budgie/LXQt and GNOME with the AppIndicator extension installed; plain GNOME without a tray protocol reports a clear error;
-- consumers face a unified API: `Tray::new / is_supported / set_title / set_icon / set_icon_name / set_tooltip / on_click / set_menu / remove`, plus `desktop_environment()` for diagnostics;
-- known pitfalls (documented from real-world testing): the DBus array length prefix **excludes alignment padding before the first element** — including it makes dbus-daemon disconnect as a protocol violation; the SIGNATURE field in the DBus header uses the variant signature "g" (u8-length encoded) — encoding it as "s" passes self-consistent unit tests but gets rejected by the real bus. Unit tests prove self-consistency; interop must be verified against a real bus.
+- consumers face a unified API: `Tray::new / is_supported / set_title / set_icon / set_icon_name / set_tooltip / on_click / set_menu / remove`, plus `desktop_environment()` for diagnostics.
 
-## Known Limitations
+Platform-specific pitfalls observed on real desktops (XFCE 4.18, GNOME, …) are catalogued in [docs/adaptation.md](docs/adaptation.md).
 
-- moon's `link` section only applies to the package it belongs to, and only to the final binary of a main package; putting a link section in the library package `yue/` makes moon emit a main-less executable (moon appends `.exe` to artifacts on all platforms) and the build fails. `prepare.py` only writes back to `is-main` packages, and `cc-link-flags` uses the repo-root-relative `-L build`, so `moon` must be invoked from the repository root (calling it from a subdirectory will not find `libyue_mbt.a`).
-- `extern "c"` cannot return nullable types (the ABI is incompatible with C pointers — instant segfault): success/failure is reported through `Ref[Int]` out-params, handles are returned as non-null.
-- FFI pointer parameters must be annotated `#borrow` (compiler-enforced); multiple such parameters in one function go in a single `#borrow(a, b)`.
-- The Linux tray probe list must exactly match libyue's internal dlopen list (`libappindicator3` only); having the ayatana variant installed does not mean it is usable — nativeui only logs when loading fails and later calls hit a null pointer (the shim adds null-pointer defenses). With the SNI self-implemented backend in place, this path is fallback-only.
-- MoonBit closures/function values across the C ABI: only capture-less top-level function literals are allowed (compiled to real C function pointers); closures with captures use the "function pointer + closure pointer" two-parameter pattern (`on_click` family).
-- A Table (GTK) inside a Notebook tab segfaults during size measurement (negative allocation); it must go in a plain container or its own window (showcase uses a separate child window).
-- The macOS branch has dual ARC/no-ARC library variants, untested; Windows link flags are not automated yet.
-- The current binding surface is roughly 250 ABI functions (248 `extern "c"` declarations in `yue/ffi.mbt`): App/Lifetime, Window, common View capabilities and drag & drop, Container/Label/Button/Entry/TextEdit, Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer, Browser, Menu/MenuBar, Table + model bridge, Painter/Canvas, Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog, Screen/Appearance/Locale/Cursor. New widgets follow the established pattern: add a mechanical translation function in the shim → add the extern in `ffi.mbt` → add the type and methods in a new `*.mbt`.
-- extern declarations must use the underlying handle type `View` for widget parameters, not MoonBit wrapper structs (e.g. `Slider`): passing a struct over the ABI delivers the wrapper object instead of the handle value, so every call reports "invalid handle" and is silently dropped (the Slider/Table families were entirely broken by this, fixed 2026-09).
-- Callback closures are kept alive by the registry in `view.mbt`; entries are not yet reclaimed after window destruction (acceptable at this stage).
+## Notes
+
+- The current binding surface is roughly 260 ABI functions (262 `extern "c"` declarations in `yue/ffi.mbt`): App/Lifetime, Window, common View capabilities and drag & drop, Container/Label/Button/Entry/TextEdit, Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer, Browser, Menu/MenuBar, Table + model bridge, Painter/Canvas, Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog, Screen/Appearance/Locale/Cursor. New widgets follow the established pattern: add a mechanical translation function in the shim → add the extern in `ffi.mbt` → add the type and methods in a new `*.mbt`.
+- Known limitations, ABI pitfalls and per-platform adaptation lessons live in `AGENTS.md` and [docs/adaptation.md](docs/adaptation.md) instead of this README.
 
 ## References
 
 - libyue documentation: <https://libyue.com/docs/latest/cpp/guides/getting_started.html>
 - Lua bindings (architectural reference): `lua_yue/` in github.com/yue/yue
 - MoonBit skill library: `.agents/skills/` (including `moonbit-c-binding` and `make-moonbit-c-bindings` — the authoritative FFI conventions)
+- AI collaboration rules: `AGENTS.md` · platform adaptation experience: [docs/adaptation.md](docs/adaptation.md)

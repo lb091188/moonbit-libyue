@@ -3,8 +3,11 @@
 [libyue](https://libyue.com/docs/latest/cpp/) 的 MoonBit 封装。  
 原库支持 Windows、Mac OS、Linux，迁移第一阶段以跑通 Ubuntu Xfce4 环境为第一目标，后续在此基础上再推进。
 
-- [x] Linux X11
-- [ ] Linux Wayland
+- [x] Ubuntu 24.04 Xfce
+- [ ] Ubuntu 24.04 Gnome
+- [ ] Ubuntu 24.04 KDE
+- [ ] Deepin 25
+- [ ] OpenKyLin 3
 - [ ] Windows
 - [ ] Mac OS
 
@@ -62,9 +65,9 @@ yue/                 MoonBit 库包
     sys.mbt          fd 级系统调用面（全部经 shim 转发）
 shim/                C ABI 封装层（yue_mbt.cpp + include/yue_mbt.h）+ CMakeLists
 scripts/prepare.py   固定版本下载 libyue + 构建静态库 + 回写链接参数
-examples/            13 个示例：hello / editor / browser / drawing / table / widgets /
+examples/            14 个示例：hello / editor / browser / drawing / table / widgets /
                      drag_source / drag_destination / floating_heart /
-                     auto_height_edit / showcase / misc / advanced
+                     auto_height_edit / showcase / misc / advanced / events
 .agents/skills/      MoonBit 技能库（FFI 规范以此为准）
 ```
 
@@ -88,6 +91,16 @@ moon run examples/hello
 
 `prepare.py` 与 `moon` 都需在仓库根目录执行：回写的链接参数是仓库根相对的 `-L build`（链接器按 moon 的调用目录解析相对路径）。`prepare.py` 幂等可重跑——缓存包 sha256 不匹配（如下载被中断截断）会自动删除重下；内容未变的 moon.pkg.json 不会回写。
 
+### 作为依赖使用（mooncakes）
+
+```sh
+moon add lkyh/moonbit-libyue
+```
+
+库代码（`yue/`）发布在 mooncakes；原生层（shim + vendored libyue）需在本仓库执行
+`python3 scripts/prepare.py` 构建静态库，并在使用方的 `moon.pkg.json` 链接参数中加
+`-L <本仓库>/build -lyue_mbt` 与对应系统库。
+
 纯 MoonBit 部分（DBus 线路编解码、颜色工具、表格值编解码）不依赖原生库，可直接跑测试：
 
 ```sh
@@ -103,23 +116,17 @@ AppIndicator 运行库（Ubuntu 24.04 已移除传统版）不可依赖，且 li
 - shim 只转发 8 个 fd 级系统调用（connect/read/write/poll/close/watch_fd/getuid/getenv），非 Linux 为失败桩；
 - 后端优先级：SNI watcher 在线 → 自实现托盘；不在线 → 回退 nativeui AppIndicator；两者皆无 → `Err(Unsupported)`。XFCE/KDE/MATE/Cinnamon/Budgie/LXQt 及装 AppIndicator 扩展的 GNOME 可用，纯净 GNOME 无托盘协议则明确报错；
 - 消费方面向统一 API：`Tray::new / is_supported / set_title / set_icon / set_icon_name / set_tooltip / on_click / set_menu / remove`，另有 `desktop_environment()` 诊断。
-- 已知坑（实测入档）：DBus 数组长度前缀**不含首元素前的对齐填充**，算进去会被 dbus-daemon 判协议违规直接断连；DBus 头部 SIGNATURE 字段的 variant 签名是 "g"（u8 长度编码），按 "s" 编能过自洽单测但会被真实总线拒绝——单测证自洽，互操作必须上真总线验证。
 
-## 已知边界
+真实桌面（XFCE 4.18、GNOME 等）上实测出的平台差异与坑，统一记录在 [docs/adaptation.md](docs/adaptation.md)。
 
-- `moon` 的 `link` 段只作用于所在包、且只对 main 包的二进制生效；库包 `yue/` 放 link 段会让 moon 生成无 main 的可执行文件（moon 对所有平台的产物统一加 `.exe` 后缀）导致构建失败。`prepare.py` 只回写 `is-main` 的包，`cc-link-flags` 写仓库根相对的 `-L build`，因此 `moon` 命令必须在仓库根目录执行（在子目录调用会找不到 `libyue_mbt.a`）。
-- `extern "c"` 不能返回可空类型（ABI 与 C 指针不兼容，直接段错误）：成败经 `Ref[Int]` 出参报告，句柄按非空返回。
-- FFI 指针参数必须标 `#borrow`（编译器强制）；同函数多参数写在同一个 `#borrow(a, b)` 里。
-- Linux 托盘探测列表必须与 libyue 内部 dlopen 列表严格一致（只认 `libappindicator3`）；本机存在 ayatana 分支也不代表可用，nativeui 内部加载失败时只打日志，后续调用会踩空指针（shim 侧已加空指针防御）。SNI 自实现后端上线后此路径仅作回退。
-- MoonBit 闭包/函数值跨 C ABI：只允许无捕获的顶层函数字面量（编译为真实 C 函数指针），带捕获闭包经"函数指针 + 闭包指针"双参数模式传递（`on_click` 系）。
-- Table（GTK）放进 Notebook 页签内会在尺寸测量时段错误（negative allocation），必须放普通容器或独立窗口（showcase 采用独立子窗口方案）。
-- macOS 分支含 ARC/no-ARC 双库结构，未实测；Windows 链接参数未自动化。
-- 当前封装面约 250 个 ABI 函数（`yue/ffi.mbt` 中 248 个 `extern "c"` 声明）：App/Lifetime、Window、View 通用能力与拖拽、Container/Label/Button/Entry/TextEdit、Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer、Browser、Menu/MenuBar、Table+模型桥、Painter/Canvas、Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog、Screen/Appearance/Locale/Cursor；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。
-- extern 声明的控件参数必须写底层句柄类型 `View` 而非 MoonBit 包装 struct（如 `Slider`）：struct 经 ABI 传入的是包装对象而非句柄值，运行时全部"句柄无效"且被静默丢弃（Slider/Table 系列曾因此整体失效，2026-09 修复）。
-- 回调闭包由 `view.mbt` 的注册表保活，窗口销毁后条目暂不回收（骨架阶段可接受）。
+## 说明
+
+- 当前封装面约 260 个 ABI 函数（`yue/ffi.mbt` 中 262 个 `extern "c"` 声明）：App/Lifetime、Window、View 通用能力与拖拽、Container/Label/Button/Entry/TextEdit、Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer、Browser、Menu/MenuBar、Table+模型桥、Painter/Canvas、Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog、Screen/Appearance/Locale/Cursor；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。
+- 已知边界、ABI 坑与各平台适配经验不在 README 展开，见 `AGENTS.md`（AI 协作规则）与 [docs/adaptation.md](docs/adaptation.md)。
 
 ## 参考
 
 - libyue 文档：<https://libyue.com/docs/latest/cpp/guides/getting_started.html>
 - Lua 绑定参考（架构对照）：github.com/yue/yue 的 `lua_yue/`
 - MoonBit 技能库：`.agents/skills/`（含 `moonbit-c-binding`、`make-moonbit-c-bindings`，FFI 规范以此为准）
+- AI 协作规则：`AGENTS.md` · 平台适配经验：[docs/adaptation.md](docs/adaptation.md)
