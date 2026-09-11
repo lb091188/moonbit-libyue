@@ -314,6 +314,114 @@ pub const VKEY_OEM_6 : Int = 0x05d
 ///|
 pub const VKEY_OEM_7 : Int = 0x027
 
+///|
+pub const VKEY_0 : Int = 0x030
+
+///|
+pub const VKEY_1 : Int = 0x031
+
+///|
+pub const VKEY_2 : Int = 0x032
+
+///|
+pub const VKEY_3 : Int = 0x033
+
+///|
+pub const VKEY_4 : Int = 0x034
+
+///|
+pub const VKEY_5 : Int = 0x035
+
+///|
+pub const VKEY_6 : Int = 0x036
+
+///|
+pub const VKEY_7 : Int = 0x037
+
+///|
+pub const VKEY_8 : Int = 0x038
+
+///|
+pub const VKEY_9 : Int = 0x039
+
+///|
+pub const VKEY_A : Int = 0x041
+
+///|
+pub const VKEY_B : Int = 0x042
+
+///|
+pub const VKEY_C : Int = 0x043
+
+///|
+pub const VKEY_D : Int = 0x044
+
+///|
+pub const VKEY_E : Int = 0x045
+
+///|
+pub const VKEY_F : Int = 0x046
+
+///|
+pub const VKEY_G : Int = 0x047
+
+///|
+pub const VKEY_H : Int = 0x048
+
+///|
+pub const VKEY_I : Int = 0x049
+
+///|
+pub const VKEY_J : Int = 0x04a
+
+///|
+pub const VKEY_K : Int = 0x04b
+
+///|
+pub const VKEY_L : Int = 0x04c
+
+///|
+pub const VKEY_M : Int = 0x04d
+
+///|
+pub const VKEY_N : Int = 0x04e
+
+///|
+pub const VKEY_O : Int = 0x04f
+
+///|
+pub const VKEY_P : Int = 0x050
+
+///|
+pub const VKEY_Q : Int = 0x051
+
+///|
+pub const VKEY_R : Int = 0x052
+
+///|
+pub const VKEY_S : Int = 0x053
+
+///|
+pub const VKEY_T : Int = 0x054
+
+///|
+pub const VKEY_U : Int = 0x055
+
+///|
+pub const VKEY_V : Int = 0x056
+
+///|
+pub const VKEY_W : Int = 0x057
+
+///|
+pub const VKEY_X : Int = 0x058
+
+///|
+pub const VKEY_Y : Int = 0x059
+
+///|
+pub const VKEY_Z : Int = 0x05a
+
 /// ---------- 事件注册（Responder 信号，全部 View/Window 可用） ----------
 
 ///|

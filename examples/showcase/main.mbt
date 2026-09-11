@@ -9,10 +9,12 @@ struct State {
   mut tray_clicks : Int
   log_lines : Array[String]
   log_labels : Array[@yue.Label]
+  veto_close : Ref[Bool]
 }
 
 ///|
 fn State::log(self : State, line : String) -> Unit {
+  println("LOG \{line}")
   self.log_lines.push(line)
   // 只保留最近 6 条
   if self.log_lines.length() > 6 {
@@ -46,6 +48,13 @@ fn main {
   win.set_title("moonbit-libyue 全功能 Showcase")
   win.set_content_size(960.0, 640.0)
   win.on_close(fn(_w) { @yue.quit() })
+  win.set_should_close(fn() {
+    if state.veto_close.val {
+      state.log("窗口关闭被 should_close 拦截(系统页可解除)")
+      return false
+    }
+    true
+  })
 
   win.set_content(build_tabs(win, state))
   win.set_menubar(build_menubar(win, state))
@@ -64,6 +73,7 @@ fn State::init() -> State {
     tray_clicks: 0,
     log_lines: [],
     log_labels: [],
+    veto_close: Ref(false),
   }
 }
 
@@ -90,6 +100,21 @@ fn build_menubar(win : @yue.Window, state : State) -> @yue.MenuBar {
   let demos = bar.add_menu("演示")
   let table_item = demos.add_label_item("表格（独立窗口）")
   table_item.on_click(fn() { open_table_window(state) })
+  let check_item = demos.add_check_item("显示详细日志")
+  check_item.set_checked(true)
+  check_item.on_click(fn() { state.log("菜单勾选 =\{check_item.is_checked()}") })
+  let _r1 = demos.add_radio_item("模式一")
+  let r2 = demos.add_radio_item("模式二")
+  r2.set_checked(true)
+  r2.on_click(fn() { state.log("菜单单选 模式二") })
+  let traverse = demos.add_label_item("打印演示菜单结构")
+  traverse.on_click(fn() {
+    state.log("菜单共 \{demos.item_count()} 项:")
+    for i in 0..<demos.item_count() {
+      let it = demos.item_at(i)
+      state.log("  [\{i}] \{it.get_label()}")
+    }
+  })
 
   let help = bar.add_menu("帮助")
   let env_item = help.add_label_item("桌面环境信息")
@@ -103,6 +128,12 @@ fn build_menubar(win : @yue.Window, state : State) -> @yue.MenuBar {
     ignore(id)
   })
   bar
+}
+
+///|
+/// Browser 页的无 state 日志(写入 stdout)。
+fn state_log_helper(line : String) -> Unit {
+  println("showcase: \{line}")
 }
 
 ///|
@@ -163,7 +194,9 @@ fn build_tabs(win : @yue.Window, state : State) -> @yue.Tab {
   tabs.add_page("画布", build_canvas(state))
   tabs.add_page("网页", build_browser(win))
   tabs.add_page("对话框", build_dialogs(win, state))
-  tabs.add_page("系统集成", build_system(state))
+  tabs.add_page("系统集成", fn() { build_system(win, state) }())
+  tabs.add_page("事件", fn() { build_events(win, state) }())
+  tabs.add_page("富文本", build_richtext(state))
   tabs
 }
 
@@ -211,6 +244,27 @@ fn build_basics(state : State) -> @yue.Container {
   let pulse = @yue.Button::new("切换进度条滚动模式")
   page.add_child(pulse)
 
+  // 复选 / 单选按钮(Button::Type)
+  let check = @yue.Button::new_of(@yue.Checkbox, "启用扩展")
+  check.set_style("marginBottom", 8.0)
+  page.add_child(check)
+  let radio_row = @yue.Container::new()
+  radio_row.set_style_str("flexDirection", "row")
+  radio_row.set_style("marginBottom", 8.0)
+  page.add_child(radio_row)
+  let radio_a = @yue.Button::new_of(@yue.Radio, "主题甲")
+  let radio_b = @yue.Button::new_of(@yue.Radio, "主题乙")
+  radio_b.set_checked(true)
+  radio_a.set_style("marginRight", 12.0)
+  radio_row.add_child(radio_a)
+  radio_row.add_child(radio_b)
+
+  // 密码输入框(Entry::Type)
+  let password = @yue.Entry::new_of(@yue.Password)
+  password.set_text("口令")
+  password.set_style("marginBottom", 8.0)
+  page.add_child(password)
+
   let mut indeterminate = false
   btn.on_click(fn() {
     state.click_count += 1
@@ -229,6 +283,10 @@ fn build_basics(state : State) -> @yue.Container {
     progress.set_indeterminate(indeterminate)
     state.log("进度条滚动模式：\{indeterminate}")
   })
+  check.on_click(fn() { state.log("复选 =\{check.is_checked()}") })
+  radio_a.on_click(fn() { state.log("单选 甲") })
+  radio_b.on_click(fn() { state.log("单选 乙") })
+  password.on_activate(fn() { state.log("密码长度 \{password.get_text().length()}") })
   page
 }
 
@@ -264,8 +322,11 @@ fn build_inputs(win : @yue.Window, state : State) -> @yue.Container {
   picker.set_style("marginBottom", 8.0)
   page.add_child(picker)
 
-  // 日期选择
-  let date = @yue.DatePicker::new()
+  // 日期选择(带选项:仅时分 + 步进器)
+  let date = @yue.DatePicker::new_with({
+    elements: @yue.HourMinute,
+    has_stepper: true,
+  })
   date.set_style("marginBottom", 8.0)
   page.add_child(date)
 
@@ -284,6 +345,12 @@ fn build_inputs(win : @yue.Window, state : State) -> @yue.Container {
   group.set_content(scroll)
   page.add_child(group)
 
+  // 滚动条策略切换(Scroll::Policy)
+  let policy_btn = @yue.Button::new("滚动条策略: 自动 → 常显")
+  policy_btn.set_style("marginBottom", 8.0)
+  page.add_child(policy_btn)
+  let mut policy_on = false
+
   // 气泡
   let pop_btn = @yue.Button::new("在按钮旁弹出气泡")
   page.add_child(pop_btn)
@@ -295,7 +362,27 @@ fn build_inputs(win : @yue.Window, state : State) -> @yue.Container {
   picker.on_selection_change(fn() {
     state.log("选择器 → \{picker.get_selected_item()}")
   })
-  date.on_date_change(fn() { state.log("日期变更为 \{date.get_date()}") })
+  date.on_date_change(fn() { state.log("时间变更为 \{date.get_date()}") })
+  policy_btn.on_click(fn() {
+    policy_on = !policy_on
+    if policy_on {
+      scroll.set_scrollbar_policy(@yue.Always, @yue.Always)
+    } else {
+      scroll.set_scrollbar_policy(@yue.Automatic, @yue.Automatic)
+    }
+    let p = scroll.get_scrollbar_policy()
+    let name = fn(v : @yue.ScrollPolicy) -> String {
+      if v is @yue.Always {
+        "常显"
+      } else if v is @yue.Never {
+        "隐藏"
+      } else {
+        "自动"
+      }
+    }
+    policy_btn.set_title("滚动条策略: \{name(p.0)}/\{name(p.1)}")
+    state.log("滚动条策略 =\{name(p.0)}/\{name(p.1)}")
+  })
   edit.on_text_change(fn() { state.log("文本编辑变化") })
   pop_btn.on_click(fn() {
     let pop = @yue.Popover::new()
@@ -368,9 +455,9 @@ fn open_table_window(state : State) -> Unit {
   page.set_style("padding", 12.0)
 
   let table = @yue.Table::new()
-  table.add_column_text("语言", 160)
-  table.add_column_checkbox("喜欢", 80)
-  table.add_column_edit("星数", 120)
+  table.add_column_with_options("语言", { column_type: @yue.Text, column: 0, width: 160 })
+  table.add_column_with_options("喜欢", { column_type: @yue.Checkbox, column: -1, width: 80 })
+  table.add_column_with_options("星数", { column_type: @yue.Edit, column: -1, width: 120 })
   table.set_has_border(true)
   table.set_style("flex", 1.0)
   table.set_model(
@@ -410,8 +497,32 @@ fn build_canvas(state : State) -> @yue.Container {
   canvas.set_style("marginBottom", 8.0)
   page.add_child(canvas)
 
+  let btn_row = @yue.Container::new()
+  btn_row.set_style_str("flexDirection", "row")
+  btn_row.set_style("marginBottom", 8.0)
+  page.add_child(btn_row)
   let repaint = @yue.Button::new("旋转色相重绘")
-  page.add_child(repaint)
+  btn_row.add_child(repaint)
+  let blend_btn = @yue.Button::new("混合模式: Normal")
+  blend_btn.set_style("marginRight", 8.0)
+  btn_row.add_child(blend_btn)
+  let img_btn = @yue.Button::new("绘制/导出图片")
+  btn_row.add_child(img_btn)
+  let blends = [@yue.BlendMode::Normal, @yue.Multiply, @yue.Screen, @yue.Difference, @yue.Xor]
+  let mut blend_i = 0
+  let icon_img : @yue.Image? = match @yue.read_binary_file("examples/drag_source/drag.png") {
+    Some(bytes) => {
+      let img = @yue.Image::new_from_png(bytes)
+      if img.is_empty() {
+        state.log("图片解码失败")
+        None
+      } else {
+        state.log("图片解码 \{img.get_width()}×\{img.get_height()} sf=\{img.get_scale_factor()}")
+        Some(img)
+      }
+    }
+    None => None
+  }
 
   let draw = fn(painter : @yue.Painter) {
     let hue = state.canvas_hue
@@ -443,12 +554,51 @@ fn build_canvas(state : State) -> @yue.Container {
     )
     let _ = hue
   }
-  canvas.on_draw(fn(p) { draw(p) })
+  // 图片叠加进绘制管线(混合模式对它生效)
+  let draw_with_image = fn(painter : @yue.Painter) {
+    draw(painter)
+    match icon_img {
+      Some(img) => {
+        painter.set_blend_mode(blends[blend_i])
+        let b = canvas.get_bounds()
+        painter.draw_image(img, b.width - 90.0, 10.0, 80.0, 80.0)
+        painter.set_blend_mode(@yue.Normal)
+      }
+      None => ()
+    }
+  }
+  canvas.on_draw(fn(p) { draw_with_image(p) })
   canvas.schedule_paint()
   repaint.on_click(fn() {
     state.canvas_hue = (state.canvas_hue + 1) % 3
     canvas.schedule_paint()
     state.log("画布重绘 hue=\{state.canvas_hue}")
+  })
+  blend_btn.on_click(fn() {
+    blend_i = (blend_i + 1) % blends.length()
+    blend_btn.set_title("混合模式: \{blend_i}")
+    canvas.schedule_paint()
+    state.log("混合模式切换 ->\{blend_i}")
+  })
+  img_btn.on_click(fn() {
+    match icon_img {
+      Some(img) => {
+        let half = img.resize(img.get_width() / 2.0, img.get_height() / 2.0)
+        let ok = half.write_to_file("png", "/tmp/showcase_icon_half.png")
+        state.log("图片缩放导出 /tmp/showcase_icon_half.png ok=\{ok}")
+        canvas.schedule_paint()
+      }
+      None => state.log("无图片可导出")
+    }
+  })
+  // 尺寸变化 + 计算布局转储(几何族/布局调试)
+  let mut resize_count = 0
+  canvas.on_size_changed(fn() {
+    resize_count += 1
+    if resize_count == 1 {
+      let b = canvas.get_bounds()
+      state.log("画布首布局 \{b.width}×\{b.height} 窗口偏移 (\{@yue.offset_from_window(canvas).dx}, \{@yue.offset_from_window(canvas).dy})")
+    }
   })
   page
 }
@@ -483,6 +633,23 @@ fn build_browser(win : @yue.Window) -> @yue.Container {
   browser.set_style("flex", 1.0)
   page.add_child(browser)
 
+  // 自定义协议 demo://hello — 演示注册/渲染/注销
+  @yue.Browser::register_protocol("demo", fn(_url) {
+    Some((
+      "text/html",
+      "<html><body style='font-family:sans-serif'><h2>demo:// 自定义协议 ✓</h2><p>由 ProtocolStringJob 提供,通过 register_protocol 注册。</p></body></html>",
+    ))
+  })
+
+  let js_btn = @yue.Button::new("执行 JS")
+  js_btn.set_style("marginRight", 8.0)
+  bar.add_child(js_btn)
+  let html_btn = @yue.Button::new("本地 HTML")
+  html_btn.set_style("marginRight", 8.0)
+  bar.add_child(html_btn)
+  let demo_btn = @yue.Button::new("demo://")
+  bar.add_child(demo_btn)
+
   go.on_click(fn() { browser.load_url(url.get_text()) })
   url.on_activate(fn() { browser.load_url(url.get_text()) })
   back.on_click(fn() { browser.go_back() })
@@ -490,6 +657,14 @@ fn build_browser(win : @yue.Window) -> @yue.Container {
   browser.on_update_title(fn(_url) {
     win.set_title("Showcase — \{browser.get_url()}")
   })
+  js_btn.on_click(fn() {
+    browser.execute_javascript("document.title = 'JS-OK'")
+    state_log_helper("已执行 JS(若生效标题会变为 JS-OK)")
+  })
+  html_btn.on_click(fn() {
+    browser.load_html("<h3>load_html 本地片段</h3><p>不经过网络。</p>")
+  })
+  demo_btn.on_click(fn() { browser.load_url("demo://hello") })
   browser.load_url(url.get_text())
   page
 }
@@ -523,6 +698,7 @@ fn build_dialogs(win : @yue.Window, state : State) -> @yue.Container {
   open_btn.on_click(fn() {
     let dlg = @yue.FileDialog::new_open()
     dlg.set_filters("文本文件:txt,md|所有文件:*")
+    dlg.set_options(@yue.FILE_OPTION_MULTI_SELECT)
     if dlg.run_for_window(win) {
       let path = dlg.get_result()
       result.set_text("已选：\{path}")
@@ -559,7 +735,7 @@ fn build_dialogs(win : @yue.Window, state : State) -> @yue.Container {
 
 ///|
 /// 页 7：系统集成 —— 托盘 / 剪贴板 / 通知 / 快捷键 / 环境信息。
-fn build_system(state : State) -> @yue.Container {
+fn build_system(win : @yue.Window, state : State) -> @yue.Container {
   let page = @yue.Container::new()
   page.set_style("padding", 12.0)
 
@@ -591,9 +767,31 @@ fn build_system(state : State) -> @yue.Container {
   clip_row.add_child(clip_out)
   page.add_child(clip_row)
 
-  let notify_btn = @yue.Button::new("发送桌面通知")
+  let notify_btn = @yue.Button::new("发送桌面通知(带按钮)")
   notify_btn.set_style("marginBottom", 8.0)
   page.add_child(notify_btn)
+
+  let data_row = @yue.Container::new()
+  data_row.set_style_str("flexDirection", "row")
+  data_row.set_style("marginBottom", 8.0)
+  let html_clip_btn = @yue.Button::new("剪贴板写 HTML")
+  let sel_clip_btn = @yue.Button::new("主选区读回")
+  html_clip_btn.set_style("marginRight", 8.0)
+  data_row.add_child(html_clip_btn)
+  data_row.add_child(sel_clip_btn)
+  page.add_child(data_row)
+
+  let timer_btn = @yue.Button::new("定时器演示(500ms×3)")
+  timer_btn.set_style("marginBottom", 8.0)
+  page.add_child(timer_btn)
+
+  let winopt_btn = @yue.Button::new("窗口: 切换可调整大小")
+  winopt_btn.set_style("marginBottom", 8.0)
+  page.add_child(winopt_btn)
+
+  let veto_btn = @yue.Button::new("关闭拦截: 关")
+  veto_btn.set_style("marginBottom", 8.0)
+  page.add_child(veto_btn)
 
   let shortcut_btn = @yue.Button::new("注册全局快捷键 Ctrl+Alt+S")
   shortcut_btn.set_style("marginBottom", 8.0)
@@ -612,10 +810,51 @@ fn build_system(state : State) -> @yue.Container {
   notify_btn.on_click(fn() {
     let n = @yue.Notification::new()
     n.set_title("来自 Showcase")
-    n.set_body("桌面通知正常工作 ✓")
+    n.set_body("桌面通知正常工作 ✓(带两个按钮)")
+    n.set_actions([("查看", "view"), ("忽略", "ignore")])
     @yue.NotificationCenter::add(n)
     n.show()
-    state.log("通知已发送")
+    state.log("通知(带按钮)已发送")
+  })
+  html_clip_btn.on_click(fn() {
+    @yue.Clipboard::get().set_data(@yue.Html, "<b>showcase 富文本剪贴板</b>")
+    state.log("剪贴板写入 HTML 数据")
+  })
+  sel_clip_btn.on_click(fn() {
+    let sel = @yue.Clipboard::from_type(@yue.Selection)
+    sel.set_data(@yue.Text, "主选区内容")
+    match sel.get_data(@yue.Text) {
+      Some(@yue.Text(t)) => state.log("主选区读回: \{t}")
+      _ => state.log("主选区读回失败")
+    }
+  })
+  timer_btn.on_click(fn() {
+    let ticks = Ref(0)
+    let _id = @yue.set_timer(500, fn() {
+      ticks.val += 1
+      state.log("定时器 tick \{ticks.val}")
+      if ticks.val >= 3 {
+        state.log("定时器自动停止")
+        return false
+      }
+      true
+    })
+    ignore(_id)
+    let _tid2 = @yue.set_timeout(1700, fn() {
+      state.log("单次延时任务触发")
+    })
+    ignore(_tid2)
+  })
+  winopt_btn.on_click(fn() {
+    let now = win.is_resizable()
+    win.set_resizable(!now)
+    win.set_has_shadow(now)
+    state.log("窗口 resizable=\{!now} shadow=\{now} maximized=\{win.is_maximized()}")
+  })
+  veto_btn.on_click(fn() {
+    state.veto_close.val = !state.veto_close.val
+    veto_btn.set_title("关闭拦截: \{state.veto_close.val}")
+    state.log("关闭拦截 =\{state.veto_close.val}")
   })
   table_btn.on_click(fn() { open_table_window(state) })
   shortcut_btn.on_click(fn() {
