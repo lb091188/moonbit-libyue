@@ -190,10 +190,11 @@ int32_t yue_mbt_platform(void) {
 
 // ---------- 窗口 ----------
 
-void *yue_mbt_window_new_ex(int32_t frame, int32_t transparent) {
+void *yue_mbt_window_new_ex(int32_t frame, int32_t transparent, int32_t no_activate) {
   nu::Window::Options options;
   options.frame = frame != 0;
   options.transparent = transparent != 0;
+  options.no_activate = no_activate != 0;
   return reinterpret_cast<void *>(ViewStore::put(new nu::Window(options)));
 }
 
@@ -468,6 +469,32 @@ void *yue_mbt_button_new(const char *title) {
   return reinterpret_cast<void *>(ViewStore::put(new nu::Button(title)));
 }
 
+/* Button::Type：0=Normal 1=Checkbox 2=Radio（Disclosure 为 macOS 专属不暴露） */
+void *yue_mbt_button_new_typed(const char *title, int32_t type) {
+  static const nu::Button::Type kTypes[] = {
+    nu::Button::Type::Normal,
+    nu::Button::Type::Checkbox,
+    nu::Button::Type::Radio,
+  };
+  if (type < 0 || type >= 3) {
+    type = 0;
+  }
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Button(title, kTypes[type])));
+}
+
+void yue_mbt_button_set_checked(void *button, int32_t checked) {
+  if (auto *b = CastTo<nu::Button>(button)) {
+    b->SetChecked(checked != 0);
+  }
+}
+
+int32_t yue_mbt_button_is_checked(void *button) {
+  if (auto *b = CastTo<nu::Button>(button)) {
+    return b->IsChecked() ? 1 : 0;
+  }
+  return 0;
+}
+
 void yue_mbt_button_set_title(void *button, const char *title) {
   if (auto *b = CastTo<nu::Button>(button)) {
     b->SetTitle(title);
@@ -484,6 +511,12 @@ void yue_mbt_button_on_click(void *button, void (*invoke)(void *), void *closure
 
 void *yue_mbt_entry_new(void) {
   return reinterpret_cast<void *>(ViewStore::put(new nu::Entry(nu::Entry::Type::Normal)));
+}
+
+/* Entry::Type：0=Normal 1=Password */
+void *yue_mbt_entry_new_typed(int32_t type) {
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Entry(
+      type == 1 ? nu::Entry::Type::Password : nu::Entry::Type::Normal)));
 }
 
 void yue_mbt_entry_set_text(void *entry, const char *text) {
@@ -564,6 +597,88 @@ void yue_mbt_tab_on_selected_page_change(void *tab, void (*invoke)(void *),
 }
 
 // ---------- Browser ----------
+
+/* GetCookiesForURL：回调收到扁平 UTF-8 文本，每行一条 Cookie，
+ * 字段以 \x1f 分隔：name/value/domain/path/http_only/secure */
+void yue_mbt_browser_get_cookies_for_url(void *browser, const char *url,
+                                         void (*invoke)(void *, void *), void *closure) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->GetCookiesForURL(std::string(url),
+                        [invoke, closure](std::vector<nu::Cookie> cookies) {
+                          std::string flat;
+                          for (const auto &c : cookies) {
+                            flat += c.name;
+                            flat += '\x1f';
+                            flat += c.value;
+                            flat += '\x1f';
+                            flat += c.domain;
+                            flat += '\x1f';
+                            flat += c.path;
+                            flat += '\x1f';
+                            flat += c.http_only ? "1" : "0";
+                            flat += '\x1f';
+                            flat += c.secure ? "1" : "0";
+                            flat += '\n';
+                          }
+                          invoke(closure, BytesFromString(flat));
+                        });
+  }
+}
+
+void yue_mbt_browser_load_html(void *browser, const char *html, const char *base_url) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->LoadHTML(std::string(html), std::string(base_url));
+  }
+}
+
+void yue_mbt_browser_set_user_agent(void *browser, const char *agent) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->SetUserAgent(std::string(agent));
+  }
+}
+
+void yue_mbt_browser_execute_javascript(void *browser, const char *code) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->ExecuteJavaScript(std::string(code), nu::Browser::ExecutionCallback());
+  }
+}
+
+/* 自定义协议：MoonBit 回调返回 [ok:i32][mime_len:i32][mime][content] 编码,ok=0 表示拒绝 */
+void yue_mbt_browser_register_protocol(const char *scheme,
+                                       void *(*invoke)(void *, void *), void *closure) {
+  nu::Browser::RegisterProtocol(
+      std::string(scheme),
+      [invoke, closure](std::string url) -> nu::ProtocolJob * {
+        void *bytes = invoke(closure, BytesFromString(url));
+        auto *p = static_cast<const char *>(bytes);
+        int32_t ok = 0;
+        std::memcpy(&ok, p, 4);
+        if (ok == 0) {
+          return nullptr;
+        }
+        int32_t mime_len = 0;
+        std::memcpy(&mime_len, p + 4, 4);
+        std::string mime(p + 8, mime_len);
+        int32_t content_len = 0;
+        std::memcpy(&content_len, p + 8 + mime_len, 4);
+        std::string content(p + 8 + mime_len + 4, content_len);
+        return new nu::ProtocolStringJob(mime, content);
+      });
+}
+
+void yue_mbt_browser_unregister_protocol(const char *scheme) {
+  nu::Browser::UnregisterProtocol(std::string(scheme));
+}
+
+void *yue_mbt_browser_new_ex(int32_t devtools, int32_t context_menu,
+                             int32_t allow_file_access, int32_t hardware_acceleration) {
+  nu::Browser::Options options;
+  options.devtools = devtools != 0;
+  options.context_menu = context_menu != 0;
+  options.allow_file_access_from_files = allow_file_access != 0;
+  options.hardware_acceleration = hardware_acceleration != 0;
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Browser(options)));
+}
 
 void *yue_mbt_browser_new(void) {
   nu::Browser::Options options;
@@ -740,6 +855,41 @@ void *yue_mbt_menu_add_separator(void *menu) {
   return reinterpret_cast<void *>(MenuItemStore::put(item));
 }
 
+void *yue_mbt_menu_add_check_item(void *menu, const char *label) {
+  auto *m = MenuStore::get(menu);
+  if (m == nullptr) {
+    return nullptr;
+  }
+  auto item = scoped_refptr<nu::MenuItem>(new nu::MenuItem(nu::MenuItem::Type::Checkbox));
+  item->SetLabel(label);
+  m->Append(item);
+  return reinterpret_cast<void *>(MenuItemStore::put(item));
+}
+
+void *yue_mbt_menu_add_radio_item(void *menu, const char *label) {
+  auto *m = MenuStore::get(menu);
+  if (m == nullptr) {
+    return nullptr;
+  }
+  auto item = scoped_refptr<nu::MenuItem>(new nu::MenuItem(nu::MenuItem::Type::Radio));
+  item->SetLabel(label);
+  m->Append(item);
+  return reinterpret_cast<void *>(MenuItemStore::put(item));
+}
+
+void yue_mbt_menu_item_set_checked(void *item, int32_t checked) {
+  if (auto *i = MenuItemStore::get(item)) {
+    i->SetChecked(checked != 0);
+  }
+}
+
+int32_t yue_mbt_menu_item_is_checked(void *item) {
+  if (auto *i = MenuItemStore::get(item)) {
+    return i->IsChecked() ? 1 : 0;
+  }
+  return 0;
+}
+
 void yue_mbt_menu_item_set_label(void *item, const char *label) {
   if (auto *i = MenuItemStore::get(item)) {
     i->SetLabel(label);
@@ -758,10 +908,44 @@ void yue_mbt_menu_item_on_click(void *item, void (*invoke)(void *), void *closur
   }
 }
 
+/* MenuBase 遍历（Menu 与 MenuBar 共用基类） */
+namespace {
+nu::MenuBase *CastToMenuBase(void *handle) {
+  if (auto *m = MenuStore::get(handle)) {
+    return static_cast<nu::MenuBase *>(m);
+  }
+  if (auto *mb = MenuBarStore::get(handle)) {
+    return static_cast<nu::MenuBase *>(mb);
+  }
+  return nullptr;
+}
+}  // namespace
+
+int32_t yue_mbt_menu_base_item_count(void *menu) {
+  if (auto *m = CastToMenuBase(menu)) {
+    return m->ItemCount();
+  }
+  return 0;
+}
+
+void *yue_mbt_menu_base_item_at(void *menu, int32_t index) {
+  if (auto *m = CastToMenuBase(menu)) {
+    return reinterpret_cast<void *>(MenuItemStore::put(m->ItemAt(index)));
+  }
+  return nullptr;
+}
+
 // ---------- 文件对话框 ----------
 
 void *yue_mbt_file_open_dialog_new(void) {
   return reinterpret_cast<void *>(FileDialogStore::put(new nu::FileOpenDialog()));
+}
+
+/* FileDialog::Option 位：1<<0=选文件夹 1<<1=多选 1<<2=显示隐藏 */
+void yue_mbt_file_dialog_set_options(void *dialog, int32_t options) {
+  if (auto *d = FileDialogStore::get(dialog)) {
+    d->SetOptions(options);
+  }
 }
 
 void *yue_mbt_file_save_dialog_new(void) {
@@ -1055,12 +1239,27 @@ void *yue_mbt_canvas_get_painter(void *canvas) {
   return nullptr;
 }
 
-void *yue_mbt_attributed_text_new(const char *text, int32_t align, int32_t valign) {
+void *yue_mbt_attributed_text_new(const char *text, int32_t align, int32_t valign,
+                                  int32_t wrap, int32_t ellipsis) {
   nu::TextFormat format;
   format.align = static_cast<nu::TextAlign>(align);
   format.valign = static_cast<nu::TextAlign>(valign);
+  format.wrap = wrap != 0;
+  format.ellipsis = ellipsis != 0;
   return reinterpret_cast<void *>(AttributedTextStore::put(
       new nu::AttributedText(text, format)));
+}
+
+void yue_mbt_attributed_text_set_format(void *at, int32_t align, int32_t valign,
+                                        int32_t wrap, int32_t ellipsis) {
+  if (auto *t = AttributedTextStore::get(at)) {
+    nu::TextFormat format;
+    format.align = static_cast<nu::TextAlign>(align);
+    format.valign = static_cast<nu::TextAlign>(valign);
+    format.wrap = wrap != 0;
+    format.ellipsis = ellipsis != 0;
+    t->SetFormat(format);
+  }
 }
 
 void yue_mbt_attributed_text_set_font(void *at, void *font) {
@@ -1071,10 +1270,60 @@ void yue_mbt_attributed_text_set_font(void *at, void *font) {
   }
 }
 
+void yue_mbt_attributed_text_set_font_for(void *at, void *font, int32_t start, int32_t end) {
+  auto *t = AttributedTextStore::get(at);
+  auto *f = FontStore::get(font);
+  if (t != nullptr && f != nullptr) {
+    t->SetFontFor(scoped_refptr<nu::Font>(f), start, end);
+  }
+}
+
 void yue_mbt_attributed_text_set_color(void *at, const char *hex) {
   if (auto *t = AttributedTextStore::get(at)) {
     t->SetColor(nu::Color(std::string(hex)));
   }
+}
+
+void yue_mbt_attributed_text_set_color_for(void *at, const char *hex, int32_t start, int32_t end) {
+  if (auto *t = AttributedTextStore::get(at)) {
+    t->SetColorFor(nu::Color(std::string(hex)), start, end);
+  }
+}
+
+void *yue_mbt_attributed_text_get_text(void *at) {
+  if (auto *t = AttributedTextStore::get(at)) {
+    return BytesFromString(t->GetText());
+  }
+  return moonbit_make_bytes(0, 0);
+}
+
+void yue_mbt_attributed_text_set_text(void *at, const char *text) {
+  if (auto *t = AttributedTextStore::get(at)) {
+    t->SetText(std::string(text));
+  }
+}
+
+void yue_mbt_attributed_text_clear(void *at) {
+  if (auto *t = AttributedTextStore::get(at)) {
+    t->Clear();
+  }
+}
+
+/* Color::Name → ARGB（系统语义色，MoonBit 侧用 argb_hex 格式化） */
+uint32_t yue_mbt_system_color(int32_t name) {
+  static const nu::Color::Name kNames[] = {
+    nu::Color::Name::Text,
+    nu::Color::Name::DisabledText,
+    nu::Color::Name::TextEditBackground,
+    nu::Color::Name::DisabledTextEditBackground,
+    nu::Color::Name::Control,
+    nu::Color::Name::WindowBackground,
+    nu::Color::Name::Border,
+  };
+  if (name < 0 || name >= static_cast<int32_t>(std::size(kNames))) {
+    return 0;
+  }
+  return nu::Color::Get(kNames[name]).value();
 }
 
 void yue_mbt_attributed_text_get_bounds_for(void *at, double w, double h,
@@ -1101,6 +1350,47 @@ void *yue_mbt_font_new(const char *name, double size, int32_t weight,
 void *yue_mbt_image_new_from_file(const char *path) {
   return reinterpret_cast<void *>(
       ImageStore::put(new nu::Image(base::FilePath(path))));
+}
+
+/* 从内存 PNG/JPEG 解码（对照 Image(Buffer, scale_factor)） */
+void *yue_mbt_image_new_from_data(const void *data, int32_t len, double scale_factor) {
+  nu::Buffer buffer = nu::Buffer::Wrap(data, static_cast<size_t>(len));
+  return reinterpret_cast<void *>(
+      ImageStore::put(new nu::Image(buffer, static_cast<float>(scale_factor))));
+}
+
+
+
+int32_t yue_mbt_image_is_empty(void *image) {
+  if (auto *i = ImageStore::get(image)) {
+    return i->IsEmpty() ? 1 : 0;
+  }
+  return 1;
+}
+
+double yue_mbt_image_get_scale_factor(void *image) {
+  if (auto *i = ImageStore::get(image)) {
+    return i->GetScaleFactor();
+  }
+  return 1;
+}
+
+/* 返回新 Image 句柄 */
+void *yue_mbt_image_resize(void *image, double w, double h, double scale_factor) {
+  if (auto *i = ImageStore::get(image)) {
+    return reinterpret_cast<void *>(ImageStore::put(i->Resize(
+        nu::SizeF(static_cast<float>(w), static_cast<float>(h)),
+        static_cast<float>(scale_factor))));
+  }
+  return nullptr;
+}
+
+/* format 如 "png"；路径 UTF-8 */
+int32_t yue_mbt_image_write_to_file(void *image, const char *format, const char *path) {
+  if (auto *i = ImageStore::get(image)) {
+    return i->WriteToFile(std::string(format), base::FilePath(path)) ? 1 : 0;
+  }
+  return 0;
 }
 
 double yue_mbt_image_get_width(void *image) {
@@ -1216,6 +1506,30 @@ void yue_mbt_table_add_column_edit(void *table, const char *title, int32_t width
   if (auto *t = CastTo<nu::Table>(table)) {
     nu::Table::ColumnOptions options;
     options.type = nu::Table::ColumnType::Edit;
+    options.width = width;
+    t->AddColumnWithOptions(title, options);
+  }
+}
+
+/* ColumnType：0=Text 1=Edit 2=Checkbox 3=Custom；column=-1 追加到模型末列 */
+void yue_mbt_table_add_column_with_options(void *table, const char *title,
+                                           int32_t type, int32_t column, int32_t width) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    nu::Table::ColumnOptions options;
+    switch (type) {
+      case 1:
+        options.type = nu::Table::ColumnType::Edit;
+        break;
+      case 2:
+        options.type = nu::Table::ColumnType::Checkbox;
+        break;
+      case 3:
+        options.type = nu::Table::ColumnType::Custom;
+        break;
+      default:
+        options.type = nu::Table::ColumnType::Text;
+    }
+    options.column = column;
     options.width = width;
     t->AddColumnWithOptions(title, options);
   }
@@ -1453,17 +1767,222 @@ int64_t yue_mbt_image_to_handle(void *image) {
   return reinterpret_cast<int64_t>(image);
 }
 
-void yue_mbt_view_on_mouse_down(void *view, int32_t (*invoke)(void *), void *closure) {
+// ---------- 事件（Responder 信号，见 events_and_delegates 指南） ----------
+
+// 修饰键归一化：MoonBit 层统一拿到 1=Shift 2=Ctrl 4=Alt 8=Meta。
+// Linux 原始 GDK 位：SHIFT=1<<0 CONTROL=1<<2 ALT(MOD1)=1<<3 META=1<<26（libyue
+// 的 KeyboardModifier::MASK_META，实为 GDK Super 位）；Mac 为 NSEventModifierFlags
+// 位（Shift=1<<17 Control=1<<18 Alt=1<<19 Cmd=1<<20，未实测）；Windows 暂透传。
+static int32_t NormalizeModifiers(int32_t raw) {
+#if defined(OS_LINUX)
+  int32_t out = 0;
+  if (raw & 0x1) {
+    out |= 1;
+  }
+  if (raw & 0x4) {
+    out |= 2;
+  }
+  if (raw & 0x8) {
+    out |= 4;
+  }
+  if (raw & 0x1c000000) {
+    out |= 8;
+  }
+  return out;
+#elif defined(OS_MAC)
+  int32_t out = 0;
+  if (raw & (1 << 17)) {
+    out |= 1;
+  }
+  if (raw & (1 << 18)) {
+    out |= 2;
+  }
+  if (raw & (1 << 19)) {
+    out |= 4;
+  }
+  if (raw & (1 << 20)) {
+    out |= 8;
+  }
+  return out;
+#else
+  return raw;
+#endif
+}
+
+void yue_mbt_view_on_mouse_down(void *view,
+    int32_t (*invoke)(void *, int32_t, double, double, double, double, int32_t, int32_t),
+    void *closure) {
   if (auto *v = CastToView(view)) {
     v->on_mouse_down.Connect([invoke, closure](nu::Responder *,
-                                               const nu::MouseEvent &) {
-      return invoke(closure) != 0;
+                                               const nu::MouseEvent &e) {
+      return invoke(closure, static_cast<int32_t>(e.button),
+                    e.position_in_view.x(), e.position_in_view.y(),
+                    e.position_in_window.x(), e.position_in_window.y(),
+                    NormalizeModifiers(e.modifiers),
+                    static_cast<int32_t>(e.timestamp)) != 0;
     });
   }
 }
 
+void yue_mbt_view_on_mouse_up(void *view,
+    int32_t (*invoke)(void *, int32_t, double, double, double, double, int32_t, int32_t),
+    void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->on_mouse_up.Connect([invoke, closure](nu::Responder *,
+                                             const nu::MouseEvent &e) {
+      return invoke(closure, static_cast<int32_t>(e.button),
+                    e.position_in_view.x(), e.position_in_view.y(),
+                    e.position_in_window.x(), e.position_in_window.y(),
+                    NormalizeModifiers(e.modifiers),
+                    static_cast<int32_t>(e.timestamp)) != 0;
+    });
+  }
+}
+
+void yue_mbt_view_on_mouse_move(void *view,
+    void (*invoke)(void *, int32_t, double, double, double, double, int32_t, int32_t),
+    void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->on_mouse_move.Connect([invoke, closure](nu::Responder *,
+                                               const nu::MouseEvent &e) {
+      invoke(closure, static_cast<int32_t>(e.button),
+             e.position_in_view.x(), e.position_in_view.y(),
+             e.position_in_window.x(), e.position_in_window.y(),
+             NormalizeModifiers(e.modifiers),
+             static_cast<int32_t>(e.timestamp));
+    });
+  }
+}
+
+void yue_mbt_view_on_mouse_enter(void *view,
+    void (*invoke)(void *, int32_t, double, double, double, double, int32_t, int32_t),
+    void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->on_mouse_enter.Connect([invoke, closure](nu::Responder *,
+                                                const nu::MouseEvent &e) {
+      invoke(closure, static_cast<int32_t>(e.button),
+             e.position_in_view.x(), e.position_in_view.y(),
+             e.position_in_window.x(), e.position_in_window.y(),
+             NormalizeModifiers(e.modifiers),
+             static_cast<int32_t>(e.timestamp));
+    });
+  }
+}
+
+void yue_mbt_view_on_mouse_leave(void *view,
+    void (*invoke)(void *, int32_t, double, double, double, double, int32_t, int32_t),
+    void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->on_mouse_leave.Connect([invoke, closure](nu::Responder *,
+                                                const nu::MouseEvent &e) {
+      invoke(closure, static_cast<int32_t>(e.button),
+             e.position_in_view.x(), e.position_in_view.y(),
+             e.position_in_window.x(), e.position_in_window.y(),
+             NormalizeModifiers(e.modifiers),
+             static_cast<int32_t>(e.timestamp));
+    });
+  }
+}
+
+void yue_mbt_view_on_capture_lost(void *view, void (*invoke)(void *), void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->on_capture_lost.Connect([invoke, closure](nu::Responder *) { invoke(closure); });
+  }
+}
+
+void yue_mbt_view_set_capture(void *view) {
+  if (auto *v = CastToView(view)) {
+    v->SetCapture();
+  }
+}
+
+void yue_mbt_view_release_capture(void *view) {
+  if (auto *v = CastToView(view)) {
+    v->ReleaseCapture();
+  }
+}
+
+int32_t yue_mbt_view_has_capture(void *view) {
+  auto *v = CastToView(view);
+  return v != nullptr && v->HasCapture() ? 1 : 0;
+}
+
+double yue_mbt_mouse_location_x(void) {
+  return nu::Event::GetMouseLocation().x();
+}
+
+double yue_mbt_mouse_location_y(void) {
+  return nu::Event::GetMouseLocation().y();
+}
+
+int32_t yue_mbt_is_shift_pressed(void) {
+  return nu::Event::IsShiftPressed() ? 1 : 0;
+}
+
+int32_t yue_mbt_is_control_pressed(void) {
+  return nu::Event::IsControlPressed() ? 1 : 0;
+}
+
+int32_t yue_mbt_is_alt_pressed(void) {
+  return nu::Event::IsAltPressed() ? 1 : 0;
+}
+
+int32_t yue_mbt_is_meta_pressed(void) {
+  return nu::Event::IsMetaPressed() ? 1 : 0;
+}
+
+void yue_mbt_view_on_size_changed(void *view, void (*invoke)(void *), void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->on_size_changed.Connect([invoke, closure](nu::View *) { invoke(closure); });
+  }
+}
+
+void *yue_mbt_view_get_computed_layout(void *view) {
+  if (auto *v = CastToView(view)) {
+    return BytesFromString(v->GetComputedLayout());
+  }
+  return moonbit_make_bytes(0, 0);
+}
+
+double yue_mbt_view_offset_from_window_x(void *view) {
+  if (auto *v = CastToView(view)) {
+    return v->OffsetFromWindow().x();
+  }
+  return 0;
+}
+
+double yue_mbt_view_offset_from_window_y(void *view) {
+  if (auto *v = CastToView(view)) {
+    return v->OffsetFromWindow().y();
+  }
+  return 0;
+}
+
+double yue_mbt_view_offset_from_view_x(void *view, void *from) {
+  auto *a = CastToView(view);
+  auto *b = CastToView(from);
+  if (a != nullptr && b != nullptr) {
+    return a->OffsetFromView(b).x();
+  }
+  return 0;
+}
+
+double yue_mbt_view_offset_from_view_y(void *view, void *from) {
+  auto *a = CastToView(view);
+  auto *b = CastToView(from);
+  if (a != nullptr && b != nullptr) {
+    return a->OffsetFromView(b).y();
+  }
+  return 0;
+}
+
 void yue_mbt_painter_set_color(void *painter, const char *hex) {
   static_cast<nu::Painter *>(painter)->SetColor(nu::Color(std::string(hex)));
+}
+
+/* BlendMode 枚举直传（0=Normal ... 对照 painter.h） */
+void yue_mbt_painter_set_blend_mode(void *painter, int32_t mode) {
+  static_cast<nu::Painter *>(painter)->SetBlendMode(static_cast<nu::BlendMode>(mode));
 }
 
 
@@ -1701,6 +2220,28 @@ void yue_mbt_scroll_set_scroll_position(void *scroll, double horizon, double ver
   }
 }
 
+/* ScrollbarPolicy：0=Always 1=Never 2=Automatic */
+void yue_mbt_scroll_set_scrollbar_policy(void *scroll, int32_t h, int32_t v) {
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    s->SetScrollbarPolicy(static_cast<nu::Scroll::Policy>(h),
+                          static_cast<nu::Scroll::Policy>(v));
+  }
+}
+
+int32_t yue_mbt_scroll_get_scrollbar_policy_x(void *scroll) {
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    return static_cast<int32_t>(std::get<0>(s->GetScrollbarPolicy()));
+  }
+  return 2;
+}
+
+int32_t yue_mbt_scroll_get_scrollbar_policy_y(void *scroll) {
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    return static_cast<int32_t>(std::get<1>(s->GetScrollbarPolicy()));
+  }
+  return 2;
+}
+
 void yue_mbt_scroll_set_overlay_scrollbar(void *scroll, int32_t yes) {
   if (auto *s = CastTo<nu::Scroll>(scroll)) {
     s->SetOverlayScrollbar(yes != 0);
@@ -1737,6 +2278,93 @@ void yue_mbt_clipboard_clear(void *clipboard) {
   if (auto *c = static_cast<nu::Clipboard *>(clipboard)) {
     c->Clear();
   }
+}
+
+/* Clipboard::Type：0=CopyPaste 1=Selection(Linux)。返回进程级单例裸指针 */
+void *yue_mbt_clipboard_from_type(int32_t type) {
+  return static_cast<void *>(nu::Clipboard::FromType(
+      type == 1 ? nu::Clipboard::Type::Selection : nu::Clipboard::Type::CopyPaste));
+}
+
+/* 写入单条数据：kind 1=Text 2=HTML 4=FilePaths(路径 \n 连接) */
+void yue_mbt_clipboard_set_data(void *clipboard, int32_t kind, const char *text) {
+  if (auto *c = static_cast<nu::Clipboard *>(clipboard)) {
+    std::vector<nu::Clipboard::Data> datas;
+    datas.push_back(nu::Clipboard::Data(ToDataType(kind), std::string(text)));
+    c->SetData(std::move(datas));
+  }
+}
+
+void yue_mbt_clipboard_set_data_image(void *clipboard, void *image) {
+  auto *img = ImageStore::get(image);
+  if (auto *c = static_cast<nu::Clipboard *>(clipboard)) {
+    if (img != nullptr) {
+      std::vector<nu::Clipboard::Data> datas;
+      datas.push_back(nu::Clipboard::Data(scoped_refptr<nu::Image>(img)));
+      c->SetData(std::move(datas));
+    }
+  }
+}
+
+/* 读单条数据：与 dragging_get_data 相同的 [kind:i32][payload] 编码 */
+void *yue_mbt_clipboard_get_data(void *clipboard, int32_t kind) {
+  auto *c = static_cast<nu::Clipboard *>(clipboard);
+  if (c == nullptr) {
+    return moonbit_make_bytes(0, 0);
+  }
+  nu::Clipboard::Data data = c->GetData(ToDataType(kind));
+  if (kind == 3) {
+    nu::Image *img = data.image();
+    int64_t handle = img != nullptr ? ImageStore::put(img) : 0;
+    void *bytes = moonbit_make_bytes(12, 0);
+    int32_t k = 3;
+    std::memcpy(bytes, &k, 4);
+    std::memcpy(static_cast<char *>(bytes) + 4, &handle, 8);
+    return bytes;
+  }
+  std::string text;
+  if (kind == 4) {
+    for (const base::FilePath &path : data.file_paths()) {
+      if (!text.empty()) {
+        text += '\n';
+      }
+      text += path.value();
+    }
+  } else {
+    text = data.str();
+  }
+  void *bytes = moonbit_make_bytes(static_cast<int32_t>(4 + text.size()), 0);
+  int32_t k = kind;
+  std::memcpy(bytes, &k, 4);
+  if (!text.empty()) {
+    std::memcpy(static_cast<char *>(bytes) + 4, text.data(), text.size());
+  }
+  return bytes;
+}
+
+// ---------- MessageLoop（定时器/任务，跨平台） ----------
+
+void yue_mbt_post_task(void (*invoke)(void *), void *closure) {
+  nu::MessageLoop::PostTask([invoke, closure]() { invoke(closure); });
+}
+
+void yue_mbt_post_delayed_task(int32_t ms, void (*invoke)(void *), void *closure) {
+  nu::MessageLoop::PostDelayedTask(ms, [invoke, closure]() { invoke(closure); });
+}
+
+uint32_t yue_mbt_set_timeout(int32_t ms, void (*invoke)(void *), void *closure) {
+  return nu::MessageLoop::SetTimeout(ms, [invoke, closure]() { invoke(closure); });
+}
+
+/* 周期任务：返回 true 继续下一次触发，false 停止（libyue SetTimer 无 id） */
+void yue_mbt_set_timer(int32_t ms, int32_t (*invoke)(void *), void *closure) {
+  nu::MessageLoop::SetTimer(ms, [invoke, closure]() -> bool {
+    return invoke(closure) != 0;
+  });
+}
+
+void yue_mbt_clear_timeout(uint32_t id) {
+  nu::MessageLoop::ClearTimeout(id);
 }
 
 // ---------- 消息框 ----------
@@ -1806,6 +2434,34 @@ void yue_mbt_message_box_close(void *box) {
 
 using NotificationStore = Store<nu::Notification>;
 
+/* 设置通知按钮：flat_bytes 协议 [count:i32le]（[len:i32le title][len:i32le info]）*
+ */
+void yue_mbt_notification_set_actions(void *notification, void *flat_bytes) {
+  auto *n = NotificationStore::get(notification);
+  if (n == nullptr) {
+    return;
+  }
+  const char *p = static_cast<const char *>(flat_bytes);
+  int32_t count = 0;
+  std::memcpy(&count, p, 4);
+  p += 4;
+  std::vector<nu::Notification::Action> actions;
+  for (int32_t i = 0; i < count; i++) {
+    int32_t title_len = 0;
+    std::memcpy(&title_len, p, 4);
+    p += 4;
+    std::string title(p, title_len);
+    p += title_len;
+    int32_t info_len = 0;
+    std::memcpy(&info_len, p, 4);
+    p += 4;
+    std::string info(p, info_len);
+    p += info_len;
+    actions.push_back(nu::Notification::Action{title, info});
+  }
+  n->SetActions(actions);
+}
+
 void *yue_mbt_notification_new(void) {
   return reinterpret_cast<void *>(NotificationStore::put(new nu::Notification()));
 }
@@ -1859,6 +2515,14 @@ void yue_mbt_global_shortcut_unregister(int32_t id) {
   nu::GlobalShortcut::GetCurrent()->Unregister(id);
 }
 
+/* DatePicker::Options：elements 位组合（0xC0=年月 0xE0=年月日 0x0C=时分 0x0E=时分秒） */
+void *yue_mbt_date_picker_new_ex(int32_t elements, int32_t has_stepper) {
+  nu::DatePicker::Options options;
+  options.elements = elements;
+  options.has_stepper = has_stepper != 0;
+  return reinterpret_cast<void *>(ViewStore::put(new nu::DatePicker(options)));
+}
+
 void *yue_mbt_date_picker_new(void) {
   nu::DatePicker::Options options;
   return reinterpret_cast<void *>(ViewStore::put(new nu::DatePicker(options)));
@@ -1866,6 +2530,20 @@ void *yue_mbt_date_picker_new(void) {
 
 void *yue_mbt_gif_player_new(void) {
   return reinterpret_cast<void *>(ViewStore::put(new nu::GifPlayer()));
+}
+
+/* ImageScale：0=None 1=Fill 2=Down 3=UpOrDown */
+void yue_mbt_gif_player_set_scale(void *player, int32_t scale) {
+  if (auto *p = CastTo<nu::GifPlayer>(player)) {
+    p->SetScale(static_cast<nu::ImageScale>(scale));
+  }
+}
+
+int32_t yue_mbt_gif_player_get_scale(void *player) {
+  if (auto *p = CastTo<nu::GifPlayer>(player)) {
+    return static_cast<int32_t>(p->GetScale());
+  }
+  return 0;
 }
 
 void yue_mbt_gif_player_set_image(void *player, void *image) {
@@ -1967,24 +2645,81 @@ void yue_mbt_table_on_toggle_checkbox(void *table,
 }
 
 void yue_mbt_view_on_key_down(void *view,
-                              int32_t (*invoke)(void *, int32_t, int32_t),
+                              int32_t (*invoke)(void *, int32_t, int32_t, int32_t),
                               void *closure) {
   if (auto *v = CastToView(view)) {
     v->on_key_down.Connect([invoke, closure](nu::Responder *, const nu::KeyEvent &event) {
       return invoke(closure, static_cast<int32_t>(event.key),
-                    static_cast<int32_t>(event.modifiers)) != 0;
+                    NormalizeModifiers(event.modifiers),
+                    static_cast<int32_t>(event.timestamp)) != 0;
     });
   }
 }
 
 void yue_mbt_view_on_key_up(void *view,
-                            int32_t (*invoke)(void *, int32_t, int32_t),
+                            int32_t (*invoke)(void *, int32_t, int32_t, int32_t),
                             void *closure) {
   if (auto *v = CastToView(view)) {
     v->on_key_up.Connect([invoke, closure](nu::Responder *, const nu::KeyEvent &event) {
       return invoke(closure, static_cast<int32_t>(event.key),
-                    static_cast<int32_t>(event.modifiers)) != 0;
+                    NormalizeModifiers(event.modifiers),
+                    static_cast<int32_t>(event.timestamp)) != 0;
     });
+  }
+}
+
+void yue_mbt_window_set_has_shadow(void *window, int32_t has) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->SetHasShadow(has != 0);
+  }
+}
+
+int32_t yue_mbt_window_has_shadow(void *window) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    return w->HasShadow() ? 1 : 0;
+  }
+  return 0;
+}
+
+void yue_mbt_window_set_resizable(void *window, int32_t yes) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->SetResizable(yes != 0);
+  }
+}
+
+int32_t yue_mbt_window_is_resizable(void *window) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    return w->IsResizable() ? 1 : 0;
+  }
+  return 0;
+}
+
+void yue_mbt_window_set_maximizable(void *window, int32_t yes) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->SetMaximizable(yes != 0);
+  }
+}
+
+void yue_mbt_window_set_minimizable(void *window, int32_t yes) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->SetMinimizable(yes != 0);
+  }
+}
+
+int32_t yue_mbt_window_is_maximized(void *window) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    return w->IsMaximized() ? 1 : 0;
+  }
+  return 0;
+}
+
+/* should_close 委托：返回 false 阻止关闭 */
+void yue_mbt_window_set_should_close(void *window,
+                                     int32_t (*invoke)(void *), void *closure) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->should_close = [invoke, closure](nu::Window *) {
+      return invoke(closure) != 0;
+    };
   }
 }
 

@@ -28,13 +28,24 @@ fn keep_alive_draw(callback : (Painter) -> Unit) -> Unit {
 ///|
 /// 创建默认有边框的窗口。
 pub fn Window::new() -> Window {
-  { view: ffi_window_new_ex(1, 0) }
+  { view: ffi_window_new_ex(1, 0, 0) }
 }
 
 ///|
-/// 创建指定外观的窗口（frame=false 为无边框，transparent=true 透明背景）。
-pub fn Window::new_with_options(frame : Bool, transparent : Bool) -> Window {
-  { view: ffi_window_new_ex(if frame { 1 } else { 0 }, if transparent { 1 } else { 0 }) }
+/// 创建指定外观的窗口（对照 Window::Options；show_traffic_lights 为 macOS 专属）。
+/// no_activate=true 时窗口不抢焦点（浮层/面板类窗口）。
+pub fn Window::new_with_options(
+  frame? : Bool = true,
+  transparent? : Bool = false,
+  no_activate? : Bool = false,
+) -> Window {
+  {
+    view: ffi_window_new_ex(
+      if frame { 1 } else { 0 },
+      if transparent { 1 } else { 0 },
+      if no_activate { 1 } else { 0 },
+    )
+  }
 }
 
 ///|
@@ -50,15 +61,9 @@ pub fn Window::set_always_on_top(self : Window, top : Bool) -> Unit {
 }
 
 ///|
-/// 内容区当前宽度（逻辑像素）。
-pub fn Window::get_content_size_width(self : Window) -> Double {
-  ffi_window_get_content_size_width(self.view)
-}
-
-///|
-/// 内容区当前高度（逻辑像素）。
-pub fn Window::get_content_size_height(self : Window) -> Double {
-  ffi_window_get_content_size_height(self.view)
+/// 内容区当前尺寸（逻辑像素）。
+pub fn Window::get_content_size(self : Window) -> SizeF {
+  { width: ffi_window_get_content_size_width(self.view), height: ffi_window_get_content_size_height(self.view) }
 }
 
 ///|
@@ -217,7 +222,12 @@ pub fn DraggingInfo::get_data(self : DraggingInfo, kind : DataKind) -> DragData?
   if ffi_dragging_is_available(self, id) != 1 {
     return None
   }
-  let data = ffi_dragging_get_data(self, id)
+  decode_data(ffi_dragging_get_data(self, id))
+}
+
+///|
+/// 解码 [kind:i32][payload] 编码（拖拽与剪贴板共用）。
+fn decode_data(data : Bytes) -> DragData? {
   let pk = (data[0].to_int() | (data[1].to_int() << 8) |
            (data[2].to_int() << 16) | (data[3].to_int() << 24))
   if pk == 3 {
@@ -253,8 +263,14 @@ impl ViewLike with fn register_dragged_types(self, kinds : Array[DataKind]) -> U
 }
 
 ///|
-/// 拖动操作位：复制。
-pub const DRAG_OPERATION_COPY : Int = 1
+/// 拖动操作位（对照 DragOperation，取 GTK 表值）。
+pub const DRAG_OPERATION_COPY : Int = 2
+
+///|
+pub const DRAG_OPERATION_MOVE : Int = 4
+
+///|
+pub const DRAG_OPERATION_LINK : Int = 8
 
 ///|
 impl ViewLike with fn do_drag_file_paths(self, paths : Array[String], drag_image : Image?) -> Int {
@@ -317,9 +333,13 @@ impl ViewLike with fn schedule_paint(self) -> Unit {
 }
 
 ///|
-impl ViewLike with fn get_bounds(self) -> (Double, Double, Double, Double) {
-  (ffi_view_get_bounds_x(self.view()), ffi_view_get_bounds_y(self.view()),
-   ffi_view_get_bounds_width(self.view()), ffi_view_get_bounds_height(self.view()))
+impl ViewLike with fn get_bounds(self) -> RectF {
+  {
+    x: ffi_view_get_bounds_x(self.view()),
+    y: ffi_view_get_bounds_y(self.view()),
+    width: ffi_view_get_bounds_width(self.view()),
+    height: ffi_view_get_bounds_height(self.view()),
+  }
 }
 
 ///|
@@ -329,42 +349,49 @@ pub fn Painter::set_color(self : Painter, hex : String) -> Unit {
 }
 
 ///|
-impl ViewLike with fn on_mouse_down(self, callback : () -> Bool) -> Unit {
+/// 鼠标/键盘事件已迁至 events.mbt（对照 events_and_delegates 指南的完整封装）。
+
+///|
+/// 窗口阴影。
+pub fn Window::set_has_shadow(self : Window, has : Bool) -> Unit {
+  ffi_window_set_has_shadow(self.view, if has { 1 } else { 0 })
+}
+
+///|
+pub fn Window::has_shadow(self : Window) -> Bool {
+  ffi_window_has_shadow(self.view) == 1
+}
+
+///|
+/// 是否允许用户调整大小。
+pub fn Window::set_resizable(self : Window, resizable : Bool) -> Unit {
+  ffi_window_set_resizable(self.view, if resizable { 1 } else { 0 })
+}
+
+///|
+pub fn Window::is_resizable(self : Window) -> Bool {
+  ffi_window_is_resizable(self.view) == 1
+}
+
+///|
+pub fn Window::set_maximizable(self : Window, yes : Bool) -> Unit {
+  ffi_window_set_maximizable(self.view, if yes { 1 } else { 0 })
+}
+
+///|
+pub fn Window::set_minimizable(self : Window, yes : Bool) -> Unit {
+  ffi_window_set_minimizable(self.view, if yes { 1 } else { 0 })
+}
+
+///|
+pub fn Window::is_maximized(self : Window) -> Bool {
+  ffi_window_is_maximized(self.view) == 1
+}
+
+///|
+/// 关闭前询问：返回 false 阻止窗口关闭（对照 should_close 委托）。
+pub fn Window::set_should_close(self : Window, callback : () -> Bool) -> Unit {
   let wrapped : () -> Int = fn() { if callback() { 1 } else { 0 } }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_view_on_mouse_down(self.view(), fn(f) { f() }, wrapped)
-}
-
-///|
-/// 键盘修饰位。
-pub(all) enum KeyMod {
-  Shift
-  Ctrl
-  Alt
-  Meta
-}
-
-///|
-/// 注册键盘按下回调：返回 true 表示事件已处理（阻止默认行为）。
-/// key_code 为平台虚拟键值，mods 为修饰位（1=Shift 2=Ctrl 4=Alt 8=Meta）。
-pub fn[T : ViewLike] View::on_key_down(
-  self : T,
-  callback : (Int, Int) -> Bool,
-) -> Unit {
-  let wrapped : (Int, Int) -> Int =
-    fn(key, mods) { if callback(key, mods) { 1 } else { 0 } }
-  keep_alive(fn() { ignore(wrapped) })
-  ffi_view_on_key_down(self.view(), fn(f, key, mods) { f(key, mods) }, wrapped)
-}
-
-///|
-/// 注册键盘抬起回调。
-pub fn[T : ViewLike] View::on_key_up(
-  self : T,
-  callback : (Int, Int) -> Bool,
-) -> Unit {
-  let wrapped : (Int, Int) -> Int =
-    fn(key, mods) { if callback(key, mods) { 1 } else { 0 } }
-  keep_alive(fn() { ignore(wrapped) })
-  ffi_view_on_key_up(self.view(), fn(f, key, mods) { f(key, mods) }, wrapped)
+  ffi_window_set_should_close(self.view, fn(f) { f() }, wrapped)
 }

@@ -31,12 +31,14 @@ fn main {
 
   // 画图片
   drag.on_draw(fn(painter) {
-    let (_, _, w, h) = drag.get_bounds()
+    let rbounds = drag.get_bounds()
+    let w = rbounds.width
+    let h = rbounds.height
     painter.draw_image(image, 0.0, 0.0, w, h)
   })
 
   // 按下即发起拖动：文件路径 + 图片两种数据
-  drag.on_mouse_down(fn() {
+  drag.on_mouse_down(fn(_event) {
     let _ = drag.do_drag_file_paths(
       ["examples/drag_source/drag.png"],
       Some(image),
@@ -47,7 +49,11 @@ fn main {
   // 右侧提示框绘制
   drop.on_draw(fn(painter) {
     painter.set_color("#F23")
-    let (x, y, w, h) = drop.get_bounds()
+    let dbounds = drop.get_bounds()
+    let x = dbounds.x
+    let y = dbounds.y
+    let w = dbounds.width
+    let h = dbounds.height
     painter.stroke_rect(x, y, w, h)
     painter.draw_text("Drag image here", x + 1.0, y + 1.0, w - 2.0, h - 2.0,
                       align=@yue.Center, valign=@yue.Center, color="#999")

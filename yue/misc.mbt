@@ -59,6 +59,44 @@ pub fn Scroll::set_scroll_position(self : Scroll, horizon : Double, vertical : D
 
 ///|
 /// 是否使用覆盖式滚动条。
+///|
+/// 滚动条策略（对照 Scroll::Policy）。
+pub(all) enum ScrollPolicy {
+  Always
+  Never
+  Automatic
+}
+
+///|
+fn scroll_policy_id(p : ScrollPolicy) -> Int {
+  match p {
+    Always => 0
+    Never => 1
+    Automatic => 2
+  }
+}
+
+///|
+fn scroll_policy_of(id : Int) -> ScrollPolicy {
+  match id {
+    0 => Always
+    1 => Never
+    _ => Automatic
+  }
+}
+
+///|
+/// 设置横/纵滚动条策略。
+pub fn Scroll::set_scrollbar_policy(self : Scroll, h : ScrollPolicy, v : ScrollPolicy) -> Unit {
+  ffi_scroll_set_scrollbar_policy(self.view, scroll_policy_id(h), scroll_policy_id(v))
+}
+
+///|
+pub fn Scroll::get_scrollbar_policy(self : Scroll) -> (ScrollPolicy, ScrollPolicy) {
+  (scroll_policy_of(ffi_scroll_get_scrollbar_policy_x(self.view)), scroll_policy_of(ffi_scroll_get_scrollbar_policy_y(self.view)))
+}
+
+///|
 pub fn Scroll::set_overlay_scrollbar(self : Scroll, yes : Bool) -> Unit {
   ffi_scroll_set_overlay_scrollbar(ViewLike::view(self), if yes { 1 } else { 0 })
 }
@@ -89,6 +127,41 @@ pub fn Clipboard::get_text(self : Clipboard) -> String {
 
 ///|
 /// 清空剪贴板。
+///|
+/// 剪贴板类型（对照 Clipboard::Type；Linux 有主选区 Selection）。
+pub(all) enum ClipboardType {
+  CopyPaste
+  Selection
+}
+
+///|
+/// 取指定类型剪贴板（进程级单例）。
+pub fn Clipboard::from_type(clipboard_type : ClipboardType) -> Clipboard {
+  ffi_clipboard_from_type(match clipboard_type {
+    CopyPaste => 0
+    Selection => 1
+  })
+}
+
+///|
+/// 写入一条数据（文本类：Text/Html/FilePaths，路径以 \n 连接）。
+pub fn Clipboard::set_data(self : Clipboard, kind : DataKind, text : String) -> Unit {
+  ffi_clipboard_set_data(self, data_kind_id(kind), utf8_bytes(text))
+}
+
+///|
+/// 写入图片数据。
+pub fn Clipboard::set_data_image(self : Clipboard, image : Image) -> Unit {
+  ffi_clipboard_set_data_image(self, image)
+}
+
+///|
+/// 读取指定种类数据（编码与拖拽数据一致）。
+pub fn Clipboard::get_data(self : Clipboard, kind : DataKind) -> DragData? {
+  decode_data(ffi_clipboard_get_data(self, data_kind_id(kind)))
+}
+
+///|
 pub fn Clipboard::clear(self : Clipboard) -> Unit {
   ffi_clipboard_clear(self)
 }

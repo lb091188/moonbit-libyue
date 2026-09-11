@@ -66,6 +66,24 @@ fn main {
     println("下拉框文本：\{combobox.get_text()}")
   })
 
+  // 复选/单选按钮（Button::Type）
+  let check = @yue.Button::new_of(@yue.Checkbox, "启用")
+  check.set_style("marginBottom", 8.0)
+  page1.add_child(check)
+  check.on_click(fn() {
+    println("复选：\{check.is_checked()}")
+  })
+  let radio_row = @yue.Container::new()
+  radio_row.set_style_str("flexDirection", "row")
+  radio_row.set_style("marginBottom", 8.0)
+  page1.add_child(radio_row)
+  let radio_a = @yue.Button::new_of(@yue.Radio, "甲")
+  let radio_b = @yue.Button::new_of(@yue.Radio, "乙")
+  radio_b.set_checked(true)
+  radio_a.set_style("marginRight", 12.0)
+  radio_row.add_child(radio_a)
+  radio_row.add_child(radio_b)
+
   // 弹出层按钮
   let popover_btn = @yue.Button::new("弹出菜单")
   page1.add_child(popover_btn)
@@ -94,6 +112,15 @@ fn main {
   })
   entry.on_activate(fn() {
     println("回车提交：\{entry.get_text()}")
+  })
+
+  // 密码输入框（Entry::Type::Password）
+  let password = @yue.Entry::new_of(@yue.Password)
+  password.set_text("口令")
+  password.set_style("marginBottom", 8.0)
+  page2.add_child(password)
+  password.on_activate(fn() {
+    println("密码长度：\{password.get_text().length()}")
   })
 
   let edit = @yue.TextEdit::new()

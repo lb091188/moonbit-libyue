@@ -64,6 +64,38 @@ pub fn Table::new() -> Table {
 
 ///|
 /// 添加文本列（宽度 -1 为自动）。
+///|
+/// 列类型（对照 Table::ColumnType）。
+pub(all) enum ColumnType {
+  Text
+  Edit
+  Checkbox
+  Custom
+}
+
+///|
+/// 列选项（对照 Table::ColumnOptions；on_draw 绘制回调经 add_column_custom）。
+pub(all) struct ColumnOptions {
+  column_type : ColumnType
+  /// 对应模型的列，-1 = 追加到末列
+  column : Int
+  /// 初始宽度，-1 = 默认
+  width : Int
+}
+
+///|
+/// 按完整选项加列（Custom 型的自绘回调不支持，需自绘用 add_column_custom）。
+pub fn Table::add_column_with_options(self : Table, title : String, options : ColumnOptions) -> Unit {
+  let type_id = match options.column_type {
+    Text => 0
+    Edit => 1
+    Checkbox => 2
+    Custom => 3
+  }
+  ffi_table_add_column_with_options(self.view, utf8_bytes(title), type_id, options.column, options.width)
+}
+
+///|
 pub fn Table::add_column_text(self : Table, title : String, width : Int) -> Unit {
   ffi_table_add_column_text(self.view, utf8_bytes(title), width)
 }
@@ -118,16 +150,17 @@ pub fn[M : TableModel] Table::set_model(self : Table, model : M, column_count : 
     set_value: fn(c, r, v) { model.set_value(c, r, v) },
   }
   keep_alive(fn() { ignore(box) })
+  // 蹦床形参须与 C 函数指针原型逐位对应：C 以 (closure, args...) 调用，
+  // 首参数收到的就是 ModelBox（FuncRef+Callback 约定，多带一位少一位都会
+  // 形参错位——get_value 曾多带一位导致把 ModelBox 当函数指针调用而段错误）。
   ffi_table_bind_model(
     self.view,
     column_count,
     box,
     fn(b : ModelBox) -> Int { (b.row_count)() },
-    fn(f : ((ModelBox, Int, Int) -> TableValue), b : ModelBox, c : Int, r : Int) -> Bytes {
-      encode_table_value(f(b, c, r))
-    },
-    fn(f : ((ModelBox, Int, Int, TableValue) -> Unit), b : ModelBox, c : Int, r : Int, kind : Int, data : Bytes, flag : Int) -> Unit {
-      f(b, c, r, decode_table_value(kind, data, flag))
+    fn(b : ModelBox, c : Int, r : Int) -> Bytes { encode_table_value((b.get_value)(c, r)) },
+    fn(b : ModelBox, c : Int, r : Int, kind : Int, data : Bytes, flag : Int) -> Unit {
+      (b.set_value)(c, r, decode_table_value(kind, data, flag))
     },
   )
 }

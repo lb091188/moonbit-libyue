@@ -225,6 +225,42 @@ pub fn Notification::show(self : Notification) -> Unit {
 
 ///|
 /// 关闭通知。
+///|
+///|
+/// 设置通知按钮（对照 Notification::Action；Linux 经 libnotify action 生效）。
+pub fn Notification::set_actions(self : Notification, actions : Array[(String, String)]) -> Unit {
+  // 协议：[count:i32le]（[len:i32le title][len:i32le info]）*
+  let parts : Array[Bytes] = []
+  for a in actions {
+    parts.push(utf8_bytes(a.0))
+    parts.push(utf8_bytes(a.1))
+  }
+  let mut size = 4
+  for b in parts {
+    size += 4 + b.length()
+  }
+  let buf = FixedArray::make(size, b'\x00')
+  fn put_i32(buf : FixedArray[Byte], off : Int, v : Int) -> Unit {
+    buf[off] = (v & 255).to_byte()
+    buf[off + 1] = ((v >> 8) & 255).to_byte()
+    buf[off + 2] = ((v >> 16) & 255).to_byte()
+    buf[off + 3] = ((v >> 24) & 255).to_byte()
+  }
+
+  put_i32(buf, 0, actions.length())
+  let mut off = 4
+  for b in parts {
+    put_i32(buf, off, b.length())
+    off += 4
+    for j = 0; j < b.length(); j = j + 1 {
+      buf[off + j] = b[j]
+    }
+    off += b.length()
+  }
+  ffi_notification_set_actions(self, Bytes::from_array(buf))
+}
+
+///|
 pub fn Notification::close(self : Notification) -> Unit {
   ffi_notification_close(self)
 }
@@ -256,6 +292,36 @@ pub fn GifPlayer::new() -> GifPlayer {
 
 ///|
 /// 设置要播放的 GIF 图片。
+///|
+/// 图片缩放模式（对照 ImageScale）。
+pub(all) enum ImageScale {
+  None
+  Fill
+  Down
+  UpOrDown
+}
+
+///|
+pub fn GifPlayer::set_scale(self : GifPlayer, scale : ImageScale) -> Unit {
+  ffi_gif_player_set_scale(self.view, match scale {
+    None => 0
+    Fill => 1
+    Down => 2
+    UpOrDown => 3
+  })
+}
+
+///|
+pub fn GifPlayer::get_scale(self : GifPlayer) -> ImageScale {
+  match ffi_gif_player_get_scale(self.view) {
+    1 => Fill
+    2 => Down
+    3 => UpOrDown
+    _ => None
+  }
+}
+
+///|
 pub fn GifPlayer::set_image(self : GifPlayer, image : Image) -> Unit {
   ffi_gif_player_set_image(ViewLike::view(self), image)
 }
@@ -326,20 +392,20 @@ pub fn NotificationCenter::get() -> NotificationCenter {
 ///|
 /// 设置日期（Unix epoch 秒）。
 pub fn DatePicker::set_date(self : DatePicker, epoch_seconds : Int64) -> Unit {
-  ffi_date_picker_set_date(self.view(), epoch_seconds)
+  ffi_date_picker_set_date(ViewLike::view(self), epoch_seconds)
 }
 
 ///|
 /// 读取日期（Unix epoch 秒）。
 pub fn DatePicker::get_date(self : DatePicker) -> Int64 {
-  ffi_date_picker_get_date(self.view())
+  ffi_date_picker_get_date(ViewLike::view(self))
 }
 
 ///|
 /// 注册日期变化回调。
 pub fn DatePicker::on_date_change(self : DatePicker, callback : () -> Unit) -> Unit {
   keep_alive(callback)
-  ffi_date_picker_on_date_change(self.view(), fn(f) { f() }, callback)
+  ffi_date_picker_on_date_change(ViewLike::view(self), fn(f) { f() }, callback)
 }
 
 ///|
@@ -438,3 +504,37 @@ pub fn Cursor::new(type_ : CursorType) -> Cursor {
 pub fn[T : ViewLike] View::set_cursor(self : T, cursor : Cursor) -> Unit {
   ffi_view_set_cursor(ViewLike::view(self), cursor)
 }
+
+///|
+/// 日期选择器元素组合（对照 DatePicker::Element 位标志）。
+pub(all) enum DatePickerElement {
+  YearMonth
+  YearMonthDay
+  HourMinute
+  HourMinuteSecond
+}
+
+///|
+/// 日期选择器选项（对照 DatePicker::Options）。
+pub(all) struct DatePickerOptions {
+  elements : DatePickerElement
+  has_stepper : Bool
+}
+
+///|
+pub fn DatePickerOptions::new() -> DatePickerOptions {
+  { elements: YearMonthDay, has_stepper: true }
+}
+
+///|
+/// 按选项创建日期选择器。
+pub fn DatePicker::new_with(options : DatePickerOptions) -> DatePicker {
+  let elements = match options.elements {
+    YearMonth => 0x00C0
+    YearMonthDay => 0x00E0
+    HourMinute => 0x000C
+    HourMinuteSecond => 0x000E
+  }
+  { view: ffi_date_picker_new_ex(elements, if options.has_stepper { 1 } else { 0 }) }
+}
+

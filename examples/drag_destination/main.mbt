@@ -62,9 +62,9 @@ fn main {
 
   drop.on_draw(fn(painter) {
     painter.set_color(if is_dragging.val { "#F23" } else { "#A89" })
-    let (bx, by, bw, bh) = drop.get_bounds()
-    painter.stroke_rect(bx, by, bw, bh)
-    let (x, y, w, h) = (bx + 1.0, by + 1.0, bw - 2.0, bh - 2.0)
+    let r = drop.get_bounds()
+    painter.stroke_rect(r.x, r.y, r.width, r.height)
+    let (x, y, w, h) = (r.x + 1.0, r.y + 1.0, r.width - 2.0, r.height - 2.0)
     match dropped_image.get() {
       Some(image) => painter.draw_image(image, x, y, w, h)
       None =>

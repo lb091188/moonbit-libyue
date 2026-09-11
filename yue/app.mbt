@@ -30,3 +30,38 @@ pub fn platform() -> String {
     _ => "unknown"
   }
 }
+
+///|
+/// 向主循环投递一个立即任务（跨线程安全性见 libyue；GUI 回调内常用）。
+pub fn post_task(task : () -> Unit) -> Unit {
+  keep_alive(task)
+  ffi_post_task(fn(f) { f() }, task)
+}
+
+///|
+/// 延迟 ms 毫秒执行一次。
+pub fn post_delayed_task(ms : Int, task : () -> Unit) -> Unit {
+  keep_alive(task)
+  ffi_post_delayed_task(ms, fn(f) { f() }, task)
+}
+
+///|
+/// ms 毫秒后执行一次，返回可用于取消的 id。
+pub fn set_timeout(ms : Int, task : () -> Unit) -> Int {
+  keep_alive(task)
+  ffi_set_timeout(ms, fn(f) { f() }, task)
+}
+
+///|
+/// 周期定时器：回调返回 true 继续，false 自动停止（libyue 定时器无取消 id）。
+pub fn set_timer(ms : Int, task : () -> Bool) -> Unit {
+  let wrapped : () -> Int = fn() { if task() { 1 } else { 0 } }
+  keep_alive(fn() { ignore(wrapped) })
+  ffi_set_timer(ms, fn(f) { f() }, wrapped)
+}
+
+///|
+/// 取消 set_timeout/set_timer 设置的任务。
+pub fn clear_timeout(id : Int) -> Unit {
+  ffi_clear_timeout(id)
+}

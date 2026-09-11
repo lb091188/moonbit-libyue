@@ -139,22 +139,18 @@ pub fn Tray::set_menu(self : Tray, menu : Menu) -> Unit {
       item.set_context_menu_handler(fn(x, y) { menu.popup_at(x, y) })
       let count = menu.item_count()
       for i in 0..<count {
-        match menu.item_at(i) {
-          Some(h) => {
-            let kind = ffi_menu_item_get_type(h)
-            if kind == 3 {
-              item.add_menu_separator()
-            } else if kind == 0 || kind == 1 || kind == 2 {
-              let buf = Bytes::make(256, 0)
-              let n = ffi_menu_item_get_label(h, buf, 256)
-              let label = if n < 0 { "" } else { from_utf8_bytes(buf[0:n].to_owned()) }
-              let enabled = ffi_menu_item_is_enabled(h) == 1
-              item.add_menu_entry(label, enabled, fn() { ffi_menu_item_click(h) })
-            }
-            // kind == 4 子菜单暂不支持，跳过
-          }
-          None => ()
+        let h = menu.item_at(i)
+        let kind = ffi_menu_item_get_type(h)
+        if kind == 3 {
+          item.add_menu_separator()
+        } else if kind == 0 || kind == 1 || kind == 2 {
+          let buf = Bytes::make(256, 0)
+          let n = ffi_menu_item_get_label(h, buf, 256)
+          let label = if n < 0 { "" } else { from_utf8_bytes(buf[0:n].to_owned()) }
+          let enabled = ffi_menu_item_is_enabled(h) == 1
+          item.add_menu_entry(label, enabled, fn() { ffi_menu_item_click(h) })
         }
+        // kind == 4 子菜单暂不支持，跳过
       }
     }
   }

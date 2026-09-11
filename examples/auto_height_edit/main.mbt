@@ -29,9 +29,9 @@ fn main {
     } else if height > max_height {
       height = max_height
     }
-    let cur = win.get_content_size_height()
+    let cur = win.get_content_size().height
     if height != cur {
-      win.set_content_size(win.get_content_size_width(), height)
+      win.set_content_size(win.get_content_size().width, height)
     }
   })
   win.set_content_size(200.0, min_height)
