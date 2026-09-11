@@ -25,7 +25,9 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - FFI 指针参数必须标 `#borrow`(编译器强制);同函数多参数写在同一个 `#borrow(a, b)` 里。
 - extern 声明的控件参数必须写底层句柄类型 `View`,不能写 MoonBit 包装 struct(如 `Slider`):struct 经 ABI 传入的是包装对象而非句柄值,运行时全部"句柄无效"且被静默丢弃(Slider/Table 系列曾因此整体失效,2026-09 修复 22 处)。
 - 闭包跨 C ABI:只允许无捕获的顶层函数字面量(编译为真实 C 函数指针);带捕获闭包走"函数指针 + 闭包指针"双参数模式(`on_click` 系)。
-- 回调闭包由注册表保活(`yue/view.mbt`),窗口销毁后条目暂不回收(骨架阶段可接受,TODO 已列)。
+- 回调闭包由注册表保活(`yue/view.mbt`),窗口销毁后条目暂不回收——**已定案维持进程级保活**(2026-09-12):回调与窗口无归属关系可循,精准回收需 weak-reference 注册表,当前 MoonBit 生态不成熟;单窗口工具场景泄漏量可忽略(2026-09-12 定案)。
+- **Toolbar / Vibrant 在 Linux 不可用**:libyue 头文件无平台 guard,但 Linux 静态库未编入任何相关符号(nm 实测零符号),调用会链接失败;Binding 侧已明确标注不暴露。
+- **Browser::GetCookiesForURL 空 Cookie 列表会 FATAL**:libyue 0.15.6 内部 `CHECK(cookies)` 对空列表直接崩溃(上游缺陷),查询前须确保页面已种 Cookie。
 
 ---
 
