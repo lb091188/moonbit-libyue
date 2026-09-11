@@ -6,7 +6,7 @@
   ],
   "link": {
     "native": {
-      "cc-link-flags": "-L /home/lkyh/ownCode/moonbit-libyue/build -lyue_mbt -lgtk-3 -lgdk-3 -lz -lpangocairo-1.0 -lpango-1.0 -lharfbuzz -latk-1.0 -lcairo-gobject -lcairo -lgdk_pixbuf-2.0 -lgio-2.0 -lgobject-2.0 -lglib-2.0 -lpangoft2-1.0 -lpango-1.0 -lgobject-2.0 -lglib-2.0 -lharfbuzz -lfontconfig -lfreetype -lfontconfig -lfreetype -lX11 -lwebkit2gtk-4.1 -lgtk-3 -lgdk-3 -lz -lpangocairo-1.0 -lpango-1.0 -lharfbuzz -latk-1.0 -lcairo-gobject -lcairo -lgdk_pixbuf-2.0 -lsoup-3.0 -Wl,--export-dynamic -lgmodule-2.0 -pthread -lglib-2.0 -lgio-2.0 -ljavascriptcoregtk-4.1 -lgobject-2.0 -lglib-2.0 -lpthread -ldl -lm -lstdc++"
+      "cc-link-flags": "-L build -lyue_mbt -lgtk-3 -lgdk-3 -lz -lpangocairo-1.0 -lpango-1.0 -lharfbuzz -latk-1.0 -lcairo-gobject -lcairo -lgdk_pixbuf-2.0 -lgio-2.0 -lgobject-2.0 -lglib-2.0 -lpangoft2-1.0 -lpango-1.0 -lgobject-2.0 -lglib-2.0 -lharfbuzz -lfontconfig -lfreetype -lfontconfig -lfreetype -lX11 -lwebkit2gtk-4.1 -lgtk-3 -lgdk-3 -lz -lpangocairo-1.0 -lpango-1.0 -lharfbuzz -latk-1.0 -lcairo-gobject -lcairo -lgdk_pixbuf-2.0 -lsoup-3.0 -Wl,--export-dynamic -lgmodule-2.0 -pthread -lglib-2.0 -lgio-2.0 -ljavascriptcoregtk-4.1 -lgobject-2.0 -lglib-2.0 -lpthread -ldl -lm -lstdc++"
     }
   }
 }

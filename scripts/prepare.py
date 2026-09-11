@@ -8,6 +8,10 @@
 
 用法：python3 scripts/prepare.py
 网络走标准环境变量 http_proxy/https_proxy。
+缓存包 sha256 不匹配（如上次下载被中断截断）时自动删除重下；
+下载先写临时文件，校验通过才原子落盘，坏包不会进缓存。
+回写的库路径是仓库根相对的 -L build（链接器按 moon 的调用目录解析
+相对路径），因此 moon 命令必须在仓库根目录执行。
 """
 
 from __future__ import annotations
@@ -54,16 +58,30 @@ def system() -> str:
 
 
 def download(url: str, expected_sha256: str) -> Path:
+    """取回发行包并校验 sha256；坏缓存自动重下，网络错误重试一次。"""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     archive = CACHE_DIR / url.rsplit("/", 1)[-1]
     if archive.exists():
-        print(f"已存在缓存 {archive}")
+        if sha256(archive) == expected_sha256:
+            print(f"复用缓存 {archive}")
+            return archive
+        print(f"缓存 sha256 不匹配，多半是上次下载被中断，删除后重新下载")
+        archive.unlink()
+    partial = archive.with_suffix(archive.suffix + ".part")
+    last_err: Exception | None = None
+    for attempt in (1, 2):
+        try:
+            print(f"下载 {url}" + ("（重试）" if attempt > 1 else ""))
+            urllib.request.urlretrieve(url, partial)
+            break
+        except OSError as e:
+            last_err = e
     else:
-        print(f"下载 {url}")
-        urllib.request.urlretrieve(url, archive)
-    actual = sha256(archive)
+        raise SystemExit(f"下载失败（检查网络或 http_proxy/https_proxy）：{last_err}")
+    actual = sha256(partial)
     if actual != expected_sha256:
-        raise SystemExit(f"sha256 不匹配：期望 {expected_sha256}，实际 {actual}")
+        raise SystemExit(f"下载后 sha256 仍不匹配：期望 {expected_sha256}，实际 {actual}")
+    partial.replace(archive)  # 校验通过才落盘，缓存里永远只放完整包
     return archive
 
 
@@ -119,12 +137,16 @@ def pkg_config_libs() -> list[str]:
     return flags
 
 
-def patch_moon_pkg(lib_path: Path) -> None:
-    """把绝对库路径与系统库写回仓库内所有 moon.pkg.json 的 cc-link-flags。
+def patch_moon_pkg() -> None:
+    """把链接参数写回仓库内所有 moon.pkg.json 的 cc-link-flags。
 
     moon 的 link 段只作用于所在包，且只对 main 包的最终二进制生效，
     因此只给 is-main 的包回写（库包 yue/ 放 link 段会让 moon 生成
     无 main 的 yue.exe 导致构建失败）。
+
+    库路径写仓库根相对的 `-L build`：链接器按 moon 的调用目录解析相对
+    路径，所以 moon 命令必须在仓库根执行。好处是回写结果与机器无关，
+    换机重跑不再产生绝对路径噪音 diff。
     """
     if system() == "Linux":
         extra = pkg_config_libs() + ["-lpthread", "-ldl", "-lm", "-lstdc++"]
@@ -133,17 +155,20 @@ def patch_moon_pkg(lib_path: Path) -> None:
     else:
         print("Windows 平台链接参数暂未自动化，请手工核对各 moon.pkg.json")
         return
-    flags = f"-L {lib_path.parent} -lyue_mbt " + " ".join(extra)
+    flags = "-L build -lyue_mbt " + " ".join(extra)
     for pkg_path in sorted(REPO_ROOT.rglob("moon.pkg.json")):
         if any(part in {"vendor", "build", ".prepare", "_build", "target"} for part in pkg_path.parts):
             continue
-        pkg = json.loads(pkg_path.read_text())
+        old_text = pkg_path.read_text()
+        pkg = json.loads(old_text)
         if not pkg.get("is-main"):
             pkg.pop("link", None)
-            pkg_path.write_text(json.dumps(pkg, indent=2, ensure_ascii=False) + "\n")
-            continue
-        pkg.setdefault("link", {}).setdefault("native", {})["cc-link-flags"] = flags
-        pkg_path.write_text(json.dumps(pkg, indent=2, ensure_ascii=False) + "\n")
+        else:
+            pkg.setdefault("link", {}).setdefault("native", {})["cc-link-flags"] = flags
+        new_text = json.dumps(pkg, indent=2, ensure_ascii=False) + "\n"
+        if new_text == old_text:
+            continue  # 内容未变不回写，避免改动 mtime 触发 moon 无谓重链
+        pkg_path.write_text(new_text)
         print(f"已写入链接参数：{pkg_path.relative_to(REPO_ROOT)}")
 
 
@@ -154,8 +179,8 @@ def main() -> None:
     url = URL.format(v=LIBYUE_VERSION, os=os_name.lower())
     archive = download(url, SHA256[os_name])
     extract(archive)
-    lib_dir = cmake_build()
-    patch_moon_pkg(next(lib_dir.glob("libyue_mbt*.a"), lib_dir / "libyue_mbt.a"))
+    cmake_build()
+    patch_moon_pkg()
     print("prepare 完成")
 
 
