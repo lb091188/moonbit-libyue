@@ -1154,6 +1154,36 @@ extern "c" fn ffi_tray_on_click(
 ) -> Unit = "yue_mbt_tray_on_click"
 
 ///|
+extern "c" fn ffi_tray_set_menu(tray : NativeTray, menu : Menu) -> Unit = "yue_mbt_tray_set_menu"
+
+///|
+extern "c" fn ffi_menu_new() -> Menu = "yue_mbt_menu_new"
+
+///|
+#borrow(menu)
+extern "c" fn ffi_menu_popup_at(menu : Menu, x : Double, y : Double) -> Unit = "yue_mbt_menu_popup_at"
+
+///|
+extern "c" fn ffi_menu_item_count(menu : Menu) -> Int = "yue_mbt_menu_item_count"
+
+///|
+#borrow(menu, ok)
+extern "c" fn ffi_menu_item_at(menu : Menu, index : Int, ok : Ref[Int]) -> MenuItem = "yue_mbt_menu_item_at"
+
+///|
+#borrow(item, out)
+extern "c" fn ffi_menu_item_get_label(item : MenuItem, out : Bytes, len : Int) -> Int = "yue_mbt_menu_item_get_label"
+
+///|
+extern "c" fn ffi_menu_item_get_type(item : MenuItem) -> Int = "yue_mbt_menu_item_get_type"
+
+///|
+extern "c" fn ffi_menu_item_is_enabled(item : MenuItem) -> Int = "yue_mbt_menu_item_is_enabled"
+
+///|
+extern "c" fn ffi_menu_item_click(item : MenuItem) -> Unit = "yue_mbt_menu_item_click"
+
+///|
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，
 // FFI 边界上一律转成 C 侧期望的 UTF-8，转换成本留在库内。
 fn utf8_bytes(text : String) -> Bytes {

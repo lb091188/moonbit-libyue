@@ -2089,11 +2089,87 @@ void yue_mbt_tray_remove(void *tray) {
 
 // ---------- 托盘：nativeui 后端补充 ----------
 
-extern "C" void yue_mbt_tray_set_image(void *tray, void *image) {
+extern "C" // ---------- 菜单桥：供 SNI 自实现托盘遍历统一 Menu 模型 ----------
+
+extern "C" void *yue_mbt_menu_new(void) {
+  return reinterpret_cast<void *>(MenuStore::put(new nu::Menu()));
+}
+
+extern "C" int32_t yue_mbt_menu_item_count(void *menu) {
+  auto *m = MenuStore::get(menu);
+  return m != nullptr ? m->ItemCount() : 0;
+}
+
+// ItemAt 返回裸指针，登记进注册表；ok=0 表示越界
+extern "C" void *yue_mbt_menu_item_at(void *menu, int32_t index, int32_t *ok) {
+  *ok = 0;
+  auto *m = MenuStore::get(menu);
+  if (m == nullptr) {
+    return nullptr;
+  }
+  auto *item = m->ItemAt(index);
+  if (item == nullptr) {
+    return nullptr;
+  }
+  *ok = 1;
+  return reinterpret_cast<void *>(
+      MenuItemStore::put(scoped_refptr<nu::MenuItem>(item)));
+}
+
+extern "C" int32_t yue_mbt_menu_item_get_label(void *item, char *out, int32_t len) {
+  auto *i = MenuItemStore::get(item);
+  if (i == nullptr) {
+    return -1;
+  }
+  std::string label = i->GetLabel();
+  int32_t n = static_cast<int32_t>(label.size());
+  if (n >= len) {
+    return -2;
+  }
+  memcpy(out, label.c_str(), n + 1);
+  return n;
+}
+
+// nu::MenuItem::Type：0 Label, 1 Checkbox, 2 Radio, 3 Separator, 4 Submenu
+extern "C" int32_t yue_mbt_menu_item_get_type(void *item) {
+  auto *i = MenuItemStore::get(item);
+  return i != nullptr ? static_cast<int32_t>(i->GetType()) : -1;
+}
+
+extern "C" int32_t yue_mbt_menu_item_is_enabled(void *item) {
+  auto *i = MenuItemStore::get(item);
+  return i != nullptr && i->IsEnabled() ? 1 : 0;
+}
+
+// 触发菜单项：原生信号 → 已注册的 MoonBit 回调
+extern "C" void yue_mbt_menu_item_click(void *item) {
+  auto *i = MenuItemStore::get(item);
+  if (i != nullptr) {
+    i->Click();
+  }
+}
+
+void yue_mbt_tray_set_image(void *tray, void *image) {
   auto *t = TrayStore::get(tray);
   auto *img = ImageStore::get(image);
   if (t != nullptr && img != nullptr) {
     t->SetImage(scoped_refptr<nu::Image>(img));
+  }
+}
+
+// 在屏幕坐标处弹出菜单（Qt 模式：ContextMenu 调用后由应用自绘菜单）
+extern "C" void yue_mbt_menu_popup_at(void *menu, double x, double y) {
+  auto *m = MenuStore::get(menu);
+  if (m != nullptr) {
+    m->PopupAt(nu::PointF(x, y));
+  }
+}
+
+extern "C" void yue_mbt_tray_set_menu(void *tray, void *menu) {
+  auto *t = TrayStore::get(tray);
+  auto *m = MenuStore::get(menu);
+  if (t != nullptr && m != nullptr) {
+    t->SetMenu(scoped_refptr<nu::Menu>(m));
   }
 }
 
@@ -2216,23 +2292,23 @@ extern "C" int32_t yue_mbt_sys_watch_fd(int32_t fd, int32_t events,
 
 #else  // 非 Linux：桩实现，托盘回退 nativeui 后端
 
-extern "C" extern "C" int32_t yue_mbt_sys_getuid(void) { return -1; }
+extern "C" int32_t yue_mbt_sys_getuid(void) { return -1; }
 
-extern "C" extern "C" int32_t yue_mbt_sys_getenv(const char *, char *, int32_t) { return -1; }
+extern "C" int32_t yue_mbt_sys_getenv(const char *, char *, int32_t) { return -1; }
 
-extern "C" extern "C" int32_t yue_mbt_sys_unix_connect(const char *) { return -1; }
+extern "C" int32_t yue_mbt_sys_unix_connect(const char *) { return -1; }
 
-extern "C" extern "C" int32_t yue_mbt_sys_read(int32_t, uint8_t *, int32_t, int32_t) { return -2; }
+extern "C" int32_t yue_mbt_sys_read(int32_t, uint8_t *, int32_t, int32_t) { return -2; }
 
-extern "C" extern "C" int32_t yue_mbt_sys_write(int32_t, const uint8_t *, int32_t, int32_t) {
+extern "C" int32_t yue_mbt_sys_write(int32_t, const uint8_t *, int32_t, int32_t) {
   return -2;
 }
 
-extern "C" extern "C" int32_t yue_mbt_sys_poll(int32_t, int32_t, int32_t) { return -1; }
+extern "C" int32_t yue_mbt_sys_poll(int32_t, int32_t, int32_t) { return -1; }
 
 extern "C" void yue_mbt_sys_close(int32_t) {}
 
-extern "C" extern "C" int32_t yue_mbt_sys_watch_fd(int32_t, int32_t,
+extern "C" int32_t yue_mbt_sys_watch_fd(int32_t, int32_t,
                                         int32_t (*)(int32_t, int32_t)) {
   return 0;
 }

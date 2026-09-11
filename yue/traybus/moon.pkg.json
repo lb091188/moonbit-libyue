@@ -3,12 +3,26 @@
     "moonbitlang/core/encoding/utf8"
   ],
   "targets": {
-    "sys.mbt": ["native"],
-    "wire.mbt": ["native"],
-    "bus.mbt": ["native"],
-    "sni.mbt": ["native"],
-    "icon.mbt": ["native"],
-    "detect.mbt": ["native"],
-    "wire_wbtest.mbt": ["native"]
+    "sys.mbt": [
+      "native"
+    ],
+    "wire.mbt": [
+      "native"
+    ],
+    "bus.mbt": [
+      "native"
+    ],
+    "sni.mbt": [
+      "native"
+    ],
+    "icon.mbt": [
+      "native"
+    ],
+    "detect.mbt": [
+      "native"
+    ],
+    "wire_wbtest.mbt": [
+      "native"
+    ]
   }
 }

@@ -10,6 +10,7 @@ priv struct Conn {
   mut acc : FixedArray[Byte] // 收包累积缓冲
   mut acc_len : Int
   items : Map[String, Item] // 对象路径 → 托盘项
+  menus : Map[String, Item] // 菜单对象路径 → 托盘项（DBusMenu）
   pending : Map[Int, (Msg) -> Unit] // 串号 → 应答处理
   mut match_added : Bool
 }
@@ -120,6 +121,7 @@ fn connect_session() -> Result[Conn, String] {
     acc: FixedArray::make(4096, b'\x00'),
     acc_len: 0,
     items: (Map([]) : Map[String, Item]),
+    menus: (Map([]) : Map[String, Item]),
     pending: (Map([]) : Map[Int, (Msg) -> Unit]),
     match_added: false,
   }
@@ -316,7 +318,13 @@ fn Conn::reply(self : Conn, req : Msg, sig : String, args : Array[DVal]) -> Unit
       if !self.send_all(b) {
         self.alive = false
       }
-    Err(_) => ()
+    // 编码失败也要回错误，否则对端干等超时（面板会当作托盘无响应）
+    Err(e) =>
+      self.reply_error(
+        req,
+        "org.freedesktop.DBus.Error.Failed",
+        "应答编码失败: \{e}",
+      )
   }
 }
 

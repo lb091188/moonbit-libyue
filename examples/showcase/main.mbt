@@ -49,7 +49,7 @@ fn main {
 
   win.set_content(build_tabs(win, state))
   win.set_menubar(build_menubar(win, state))
-  setup_tray(state)
+  setup_tray(state, win)
 
   win.center()
   win.activate()
@@ -118,7 +118,7 @@ fn show_about(win : @yue.Window) -> Unit {
 
 ///|
 /// 系统托盘：自实现 SNI 后端（Linux）/ 原生托盘（其他平台）。
-fn setup_tray(state : State) -> Unit {
+fn setup_tray(state : State, main_win : @yue.Window) -> Unit {
   if !@yue.Tray::is_supported() {
     state.log("托盘：当前环境不可用")
     return
@@ -126,7 +126,18 @@ fn setup_tray(state : State) -> Unit {
   match @yue.Tray::new("examples/showcase/icon.png") {
     Ok(tray) => {
       tray.set_title("showcase")
-      tray.set_tooltip("moonbit-libyue", "点我试试：\{@yue.desktop_environment()}")
+      tray.set_tooltip("moonbit-libyue", "右键打开菜单")
+      // 托盘菜单：显示主窗口 / 退出（Linux 走 DBusMenu，其他平台原生菜单）
+      let menu = @yue.Menu::new()
+      let show_item = menu.add_label_item("显示主窗口")
+      show_item.on_click(fn() {
+        state.log("托盘菜单：显示主窗口")
+        main_win.activate()
+      })
+      let _ = menu.add_separator()
+      let quit_item = menu.add_label_item("退出")
+      quit_item.on_click(fn() { @yue.quit() })
+      tray.set_menu(menu)
       tray.on_click(fn() {
         state.tray_clicks += 1
         state.log("托盘点击 第\{state.tray_clicks} 次")

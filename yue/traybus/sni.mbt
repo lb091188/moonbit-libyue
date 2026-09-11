@@ -21,9 +21,39 @@ pub struct Item {
   mut pixmap : Bytes // ARGB 大端序（网络字节序），长度 4*w*h
   mut tip_title : String
   mut tip_body : String
-  has_menu : Bool
+  menu_path : String
+  menu_items : Array[MenuEntry]
+  mut menu_revision : Int
   mut on_click : (() -> Unit)?
   mut on_context : (() -> Unit)?
+  mut on_context_menu : ((Double, Double) -> Unit)?
+}
+
+///|
+/// 注册 ContextMenu(x, y) 回调（带图标屏幕坐标，用于应用自绘菜单）。
+pub fn Item::set_context_menu_handler(
+  self : Item,
+  cb : (Double, Double) -> Unit,
+) -> Unit {
+  self.on_context_menu = Some(cb)
+}
+
+///|
+fn Item::emit_context_menu(self : Item, x : Double, y : Double) -> Unit {
+  match self.on_context_menu {
+    Some(cb) => cb(x, y)
+    None => ()
+  }
+}
+
+///|
+/// 托盘菜单条目（一级；DBusMenu id = 数组下标 + 1，0 是根）。
+pub struct MenuEntry {
+  id : Int
+  label : String
+  is_separator : Bool
+  enabled : Bool
+  on_click : () -> Unit
 }
 
 ///|
@@ -55,13 +85,18 @@ pub fn Item::create(id : String, icon_path : String) -> Result[Item, String] {
     pixmap: Bytes::make(0, 0),
     tip_title: "",
     tip_body: icon_path,
-    has_menu: false,
+    // DBusMenu 对象路径：跟随 ksni/fcitx5 的约定用 /MenuBar（固定名）
+    menu_path: "/MenuBar",
+    menu_items: [],
+    menu_revision: 1,
     on_click: None,
     on_context: None,
+    on_context_menu: None,
   }
   let (w, h, px) = default_icon_pixmap()
   item.set_pixmap(w, h, px)
   c.items.set(path, item)
+  c.menus.set(item.menu_path, item)
   match c.register_item_path(path) {
     Ok(_) => Ok(item)
     Err(e) => {
@@ -199,6 +234,207 @@ pub fn Item::set_context_handler(self : Item, cb : () -> Unit) -> Unit {
 }
 
 ///|
+/// 追加一个菜单项（一级菜单；点击触发 on_click）。
+pub fn Item::add_menu_entry(
+  self : Item,
+  label : String,
+  enabled : Bool,
+  on_click : () -> Unit,
+) -> Unit {
+  let id = self.menu_items.length() + 1
+  self.menu_items.push({ id, label, is_separator: false, enabled, on_click })
+  self.menu_revision += 1
+  self.emit_layout_updated()
+}
+
+///|
+/// 追加一条菜单分隔线。
+pub fn Item::add_menu_separator(self : Item) -> Unit {
+  let id = self.menu_items.length() + 1
+  self.menu_items.push({
+    id,
+    label: "",
+    is_separator: true,
+    enabled: true,
+    on_click: fn() { () },
+  })
+  self.menu_revision += 1
+  self.emit_layout_updated()
+}
+
+///|
+fn Item::emit_layout_updated(self : Item) -> Unit {
+  match g_conn.val {
+    Some(c) =>
+      c.emit_signal(
+        self.menu_path,
+        "com.canonical.dbusmenu",
+        "LayoutUpdated",
+        "ui",
+        [VU32(self.menu_revision), VI32(0)],
+      )
+    None => ()
+  }
+}
+
+///|
+/// 条目属性对列表（DBusMenu 约定的属性名），外层按需包 a{sv}。
+fn menu_entry_prop_pairs(entry : MenuEntry) -> Array[DVal] {
+  let props : Array[DVal] = []
+  if entry.is_separator {
+    props.push(VStruct([VString("type"), VVariant(VString("separator"))]))
+  } else {
+    props.push(VStruct([VString("label"), VVariant(VString(entry.label))]))
+  }
+  props.push(VStruct([VString("enabled"), VVariant(VBool(entry.enabled))]))
+  props.push(VStruct([VString("visible"), VVariant(VBool(true))]))
+  props
+}
+
+///|
+/// DBusMenu 布局节点：(id, 属性, 子节点 av)。
+fn Item::menu_layout(self : Item, id : Int, depth : Int) -> DVal {
+  let props : Array[DVal] = []
+  if id == 0 {
+    props.push(VStruct([VString("children-display"), VVariant(VString("submenu"))]))
+  } else {
+    match self.menu_items.get(id - 1) {
+      Some(entry) => {
+        let pairs = menu_entry_prop_pairs(entry)
+        for pair in pairs {
+          props.push(pair)
+        }
+      }
+      None => ()
+    }
+  }
+  let children : Array[DVal] = []
+  if id == 0 && depth != 0 {
+    for entry in self.menu_items {
+      let child_depth = if depth > 0 { depth - 1 } else { 0 }
+      children.push(VVariant(self.menu_layout(entry.id, child_depth)))
+    }
+  }
+  VStruct([VI32(id), VArray("{sv}", props), VArray("v", children)])
+}
+
+///|
+/// DBusMenu 服务端分发（菜单对象路径上的调用）。
+fn Conn::handle_menu_call(self : Conn, item : Item, msg : Msg) -> Unit {
+  match msg.action {
+    "GetLayout" => {
+      let depth = match msg.body.get(1) {
+        Some(VI32(d)) => d
+        _ => 1
+      }
+      let layout = item.menu_layout(0, depth)
+      // 出参逐个排列：revision(u) + 布局(ia{sv}av)。
+      // 签名不能再带外层括号——reply 的 sig 按参数列表编码，
+      // 写 "(u(ia{sv}av))" 会把整个元组当成单个结构体参数双重包装，
+      // GDBus 客户端签名校验失败，布局解析随之整段跳过。
+      self.reply(msg, "u(ia{sv}av)", [VU32(item.menu_revision), layout])
+    }
+    // 恒 false：libdbusmenu 不尊重返回值，菜单更新靠 LayoutUpdated 信号
+    "AboutToShow" => self.reply(msg, "b", [VBool(false)])
+    "Event" => {
+      // (i id, s eventId, v data, u timestamp)
+      let id = match msg.body.get(0) {
+        Some(VI32(id)) => id
+        _ => 0
+      }
+      let event = match msg.body.get(1) {
+        Some(VString(e)) => e
+        _ => ""
+      }
+      if event == "clicked" && id >= 1 {
+        match item.menu_items.get(id - 1) {
+          Some(entry) =>
+            if !entry.is_separator {
+              (entry.on_click)()
+            }
+          None => ()
+        }
+      }
+      self.reply(msg, "", [])
+    }
+    "GetProperty" => {
+      let id = match msg.body.get(0) {
+        Some(VI32(id)) => id
+        _ => 0
+      }
+      let name = match msg.body.get(1) {
+        Some(VString(n)) => n
+        _ => ""
+      }
+      let value : DVal = match (id, name) {
+        (0, "children-display") => VString("submenu")
+        (_, "label") =>
+          match item.menu_items.get(id - 1) {
+            Some(e) => VString(e.label)
+            None => VString("")
+          }
+        (_, "enabled") =>
+          match item.menu_items.get(id - 1) {
+            Some(e) => VBool(e.enabled)
+            None => VBool(false)
+          }
+      (_, "visible") => VBool(true)
+      (_, "type") =>
+        match item.menu_items.get(id - 1) {
+          Some(e) => VString(if e.is_separator { "separator" } else { "standard" })
+          None => VString("standard")
+        }
+      // 接口级属性（Qt 适配器同款），客户端经 GetAll 缓存后一般不再单独问
+      (0, "Status") => VString("normal")
+      (0, "TextDirection") => VString("ltr")
+      (_, _) => VString("")
+      }
+      self.reply(msg, "v", [VVariant(value)])
+    }
+    "GetGroupProperties" => {
+      // libdbusmenu 客户端要求每个请求 id 都有条目：缺失的节点会收到
+      // "Error getting properties for ID" 而永不 realize，Gtk 菜单随之留空。
+      // root(id=0) 也会排队拉属性，须以空属性集应答。
+      let entries : Array[DVal] = []
+      match msg.body.get(0) {
+        Some(VArray(_, ids)) =>
+          for idv in ids {
+            let id = match idv {
+              VI32(n) => n
+              _ => -1
+            }
+            if id >= 1 {
+              match item.menu_items.get(id - 1) {
+                Some(entry) =>
+                  entries.push(
+                    VStruct([
+                      VI32(id),
+                      VArray("{sv}", menu_entry_prop_pairs(entry)),
+                    ]),
+                  )
+                None => entries.push(VStruct([VI32(id), VArray("{sv}", [])]))
+              }
+            } else if id == 0 {
+              entries.push(VStruct([VI32(0), VArray("{sv}", [])]))
+            }
+          }
+        _ => ()
+      }
+      self.reply(msg, "a(ia{sv})", [VArray("(ia{sv})", entries)])
+    }
+    _ =>
+      self.reply_error(
+        msg,
+        "org.freedesktop.DBus.Error.UnknownMethod",
+        "未知 DBusMenu 方法: \{msg.action}",
+      )
+  }
+}
+
+///|
+let dbusmenu_introspect_xml : String = "<!DOCTYPE node PUBLIC '-//freedesktop//DTD D-BUS Object Introspection 1.0//EN' 'http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd'><node><interface name='com.canonical.dbusmenu'><method name='GetLayout'><arg direction='in' type='i'/><arg direction='in' type='i'/><arg direction='in' type='as'/><arg direction='out' type='u'/><arg direction='out' type='(ia{sv}av)'/></method><method name='AboutToShow'><arg direction='in' type='i'/><arg direction='out' type='b'/></method><method name='Event'><arg direction='in' type='i'/><arg direction='in' type='s'/><arg direction='in' type='v'/><arg direction='in' type='u'/></method><method name='GetProperty'><arg direction='in' type='i'/><arg direction='in' type='s'/><arg direction='out' type='v'/></method><method name='GetGroupProperties'><arg direction='in' type='ai'/><arg direction='in' type='as'/><arg direction='out' type='a(ia{sv})'/></method><signal name='LayoutUpdated'><arg type='u'/><arg type='i'/></signal></interface></node>"
+
+///|
 fn Item::pixmap_value(self : Item) -> DVal {
   let pixels : Array[DVal] = []
   for i in 0..<self.pixmap.length() {
@@ -236,8 +472,10 @@ fn Item::property(self : Item, name : String) -> DVal? {
           VString(self.tip_body),
         ]),
       )
-    "Menu" => Some(VPath("/StatusNotifierMenu"))
-    "ItemIsMenu" => Some(VBool(self.has_menu))
+    "Menu" =>
+      Some(VPath(if self.menu_items.is_empty() { "/" } else { self.menu_path }))
+    // 恒 false：true 会让面板把左键当菜单键、不再发 Activate（ksni 同款语义）
+    "ItemIsMenu" => Some(VBool(false))
     _ => None
   }
 }
@@ -269,10 +507,40 @@ let introspect_xml : String = "<!DOCTYPE node PUBLIC '-//freedesktop//DTD D-BUS 
 ///|
 /// 处理发往托盘对象的入站调用（面板侧查询与激活）。
 fn Conn::handle_call(self : Conn, msg : Msg) -> Unit {
+  // DBusMenu：托盘菜单对象路径上的全部调用
+  if msg.iface == "com.canonical.dbusmenu" {
+    match self.menus.get(msg.path) {
+      Some(item) => self.handle_menu_call(item, msg)
+      None => self.unknown_object(msg)
+    }
+    return
+  }
+  // 面板会经 Properties 接口查询 DBusMenu 版本
+  if (msg.iface, msg.action) == ("org.freedesktop.DBus.Properties", "GetAll") {
+    match (self.menus.get(msg.path), msg.body.get(0)) {
+      (Some(_), Some(VString("com.canonical.dbusmenu"))) => {
+        // 与 Qt QDBusMenuAdaptor 对齐：客户端缓存这些接口级属性
+        let entries : Array[DVal] = [
+          VStruct([VString("Version"), VVariant(VU32(3))]),
+          VStruct([VString("TextDirection"), VVariant(VString("ltr"))]),
+          VStruct([VString("Status"), VVariant(VString("normal"))]),
+        ]
+        self.reply(msg, "a{sv}", [VArray("{sv}", entries)])
+        return
+      }
+      (_, _) => ()
+    }
+  }
   match (msg.iface, msg.action) {
     ("org.freedesktop.DBus.Peer", "Ping") => self.reply(msg, "", [])
-    ("org.freedesktop.DBus.Introspectable", "Introspect") =>
-      self.reply(msg, "s", [VString(introspect_xml)])
+    ("org.freedesktop.DBus.Introspectable", "Introspect") => {
+      let xml = if self.menus.contains(msg.path) {
+        dbusmenu_introspect_xml
+      } else {
+        introspect_xml
+      }
+      self.reply(msg, "s", [VString(xml)])
+    }
     ("org.freedesktop.DBus.Properties", "Get") =>
       match self.items.get(msg.path) {
         Some(item) =>
@@ -324,22 +592,35 @@ fn Conn::handle_call(self : Conn, msg : Msg) -> Unit {
     ("org.kde.StatusNotifierItem", "Activate") => self.fire_click(msg)
     ("org.kde.StatusNotifierItem", "SecondaryActivate") =>
       self.fire_click(msg)
-    ("org.kde.StatusNotifierItem", "ContextMenu") =>
+    ("org.kde.StatusNotifierItem", "ContextMenu") => {
+      // Qt 模式（XFCE 等面板的约定）：应答成功，由应用自己在图标处弹菜单；
+      // KDE/GNOME 扩展则走 Menu 属性的 DBusMenu
+      let x = match msg.body.get(0) {
+        Some(VI32(v)) => v.to_double()
+        _ => 0.0
+      }
+      let y = match msg.body.get(1) {
+        Some(VI32(v)) => v.to_double()
+        _ => 0.0
+      }
       match self.items.get(msg.path) {
         Some(item) => {
+          self.reply(msg, "", [])
           match item.on_context {
             Some(cb) => cb()
             None => ()
           }
-          self.reply(msg, "", [])
+          item.emit_context_menu(x, y)
         }
         None => self.unknown_object(msg)
       }
+    }
     ("org.kde.StatusNotifierItem", "Scroll") =>
-      match self.items.get(msg.path) {
-        Some(_) => self.reply(msg, "", [])
-        None => self.unknown_object(msg)
-      }
+      self.reply_error(
+        msg,
+        "org.freedesktop.DBus.Error.UnknownMethod",
+        "Scroll 暂不支持",
+      )
     (_, _) =>
       self.reply_error(
         msg,

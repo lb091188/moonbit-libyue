@@ -20,6 +20,36 @@ pub fn MenuBar::new() -> MenuBar {
 }
 
 ///|
+/// 创建独立弹出菜单（可挂托盘：Tray::set_menu）。
+pub fn Menu::new() -> Menu {
+  ffi_menu_new()
+}
+
+///|
+/// 在屏幕坐标处弹出菜单（XFCE 等面板的托盘右键菜单由应用自绘）。
+pub fn Menu::popup_at(self : Menu, x : Double, y : Double) -> Unit {
+  ffi_menu_popup_at(self, x, y)
+}
+
+///|
+/// 菜单项数量（遍历用；托盘 SNI 后端按它桥接 DBusMenu）。
+fn Menu::item_count(self : Menu) -> Int {
+  ffi_menu_item_count(self)
+}
+
+///|
+/// 取第 index 项，越界返回 None。
+fn Menu::item_at(self : Menu, index : Int) -> MenuItem? {
+  let ok = Ref(0)
+  let item = ffi_menu_item_at(self, index, ok)
+  if ok.val == 1 {
+    Some(item)
+  } else {
+    None
+  }
+}
+
+///|
 /// 在顶栏添加标题菜单，返回该菜单（继续往里加项）。
 pub fn MenuBar::add_menu(self : MenuBar, title : String) -> Menu {
   ffi_menu_bar_add_menu(self, utf8_bytes(title))

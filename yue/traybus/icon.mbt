@@ -32,7 +32,7 @@ pub fn default_icon_pixmap() -> (Int, Int, Bytes) {
       if hit > 0.0 {
         let a = (hit / 4.0 * 255.0).to_int()
         let off = (y * w + x) * 4
-        // 大端序 AARRGGBB
+        // 大端序 AARRGGBB，金色月牙
         px[off] = a.to_byte()
         px[off + 1] = (0xE8).to_byte() // R
         px[off + 2] = (0xB3).to_byte() // G
