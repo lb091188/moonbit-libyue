@@ -13,6 +13,13 @@
 #if defined(_MSC_VER)
 #define _USE_MATH_DEFINES
 #endif
+#if defined(_WIN32)
+// 通知 AUMID 注册与气泡替代窗口所需（shobjidl 提供
+// SetCurrentProcessExplicitAppUserModelID）
+#include <windows.h>
+#include <shobjidl.h>
+#include <winreg.h>
+#endif
 #include "yue_mbt.h"
 
 #include <cmath>
@@ -40,6 +47,9 @@
 #include "nativeui/appearance.h"
 #include "nativeui/locale.h"
 #include "nativeui/screen.h"
+#if defined(OS_WIN)
+#include "nativeui/win/window_win.h" // WindowImpl::hwnd()（气泡替代窗口定位/置顶）
+#endif
 
 // 不包含 <moonbit.h>：它在 extern "C" 里声明的 memcpy 与 glibc 的
 // C++ noexcept 声明冲突。只声明用到的运行时入口，签名照抄
@@ -145,6 +155,9 @@ using AttributedTextStore = Store<nu::AttributedText>;
 using FontStore = Store<nu::Font>;
 #if !defined(OS_WIN)
 using PopoverStore = Store<nu::Popover>;
+#else
+// Windows 版 libyue 无 Popover：用无边框、不激活、置顶的小窗口替代
+using PopoverStore = Store<nu::Window>;
 #endif
 using MessageBoxStore = Store<nu::MessageBox>;
 
@@ -729,6 +742,10 @@ void *yue_mbt_browser_new_ex(int32_t devtools, int32_t context_menu,
 void *yue_mbt_browser_new(void) {
   nu::Browser::Options options;
   options.context_menu = true;
+#if defined(WEBVIEW2_SUPPORT)
+  // Windows 优先 WebView2（loader/运行时缺失时 libyue 内部自动回退 IE）
+  options.webview2_support = true;
+#endif
   return reinterpret_cast<void *>(ViewStore::put(new nu::Browser(options)));
 }
 
@@ -2195,10 +2212,24 @@ void *yue_mbt_popover_new(void) {
   return reinterpret_cast<void *>(PopoverStore::put(new nu::Popover()));
 }
 #else
-// Windows 版 libyue 无 Popover：保留 ABI，new 返回空句柄、其余空操作，
-// MoonBit 侧方法随之全部空转（运行期降级）。
+// 替代窗口存储：展示中的气泡（供自动关闭定时器使用）
+nu::Window *g_active_popover_window = nullptr;
+
+void CALLBACK PopoverAutoCloseTimer(HWND, UINT, UINT_PTR id, DWORD) {
+  ::KillTimer(nullptr, id);
+  std::fprintf(stderr, "popover: autoclose\n");
+  if (g_active_popover_window != nullptr &&
+      g_active_popover_window->IsVisible()) {
+    g_active_popover_window->Close();
+  }
+  g_active_popover_window = nullptr;
+}
+
 void *yue_mbt_popover_new(void) {
-  return nullptr;
+  nu::Window::Options options;
+  options.frame = false;       // 无边框
+  options.no_activate = true;  // 弹出不抢焦点
+  return reinterpret_cast<void *>(PopoverStore::put(new nu::Window(options)));
 }
 #endif
 
@@ -2211,7 +2242,13 @@ void yue_mbt_popover_set_content(void *popover, void *content) {
   }
 }
 #else
-void yue_mbt_popover_set_content(void *, void *) {}
+void yue_mbt_popover_set_content(void *popover, void *content) {
+  auto *w = PopoverStore::get(popover);
+  auto *c = CastToView(content);
+  if (w != nullptr && c != nullptr) {
+    w->SetContentView(scoped_refptr<nu::View>(c));
+  }
+}
 #endif
 
 #if !defined(OS_WIN)
@@ -2222,7 +2259,12 @@ void yue_mbt_popover_set_content_size(void *popover, double w, double h) {
   }
 }
 #else
-void yue_mbt_popover_set_content_size(void *, double, double) {}
+void yue_mbt_popover_set_content_size(void *popover, double w, double h) {
+  if (auto *win = PopoverStore::get(popover)) {
+    win->SetContentSize(
+        nu::SizeF(static_cast<float>(w), static_cast<float>(h)));
+  }
+}
 #endif
 
 #if !defined(OS_WIN)
@@ -2234,7 +2276,28 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view) {
   }
 }
 #else
-void yue_mbt_popover_show_relative_to(void *, void *) {}
+void yue_mbt_popover_show_relative_to(void *popover, void *view) {
+  auto *win = PopoverStore::get(popover);
+  auto *v = CastToView(view);
+  if (win == nullptr || v == nullptr) {
+    return;
+  }
+  // 锚定到当前光标位置（触发弹出的点击就在锚点控件上）的右下方，
+  // ViewImpl 不公开 hwnd，用光标避免触碰 libyue 私有接口
+  POINT pt{};
+  if (!::GetCursorPos(&pt)) {
+    pt.x = 0;
+    pt.y = 0;
+  }
+  win->SetVisible(true);
+  ::SetWindowPos(win->GetNative()->hwnd(), HWND_TOPMOST, pt.x + 8, pt.y + 18, 0,
+                 0, SWP_NOSIZE | SWP_NOACTIVATE);
+  std::fprintf(stderr, "popover: shown visible=%d at (%ld,%ld)\n",
+               (int)win->IsVisible(), (long)pt.x + 8, (long)pt.y + 18);
+  // 8 秒后自动关闭（无外部点击关闭钩子，定时兜底）
+  g_active_popover_window = win;
+  ::SetTimer(nullptr, 0, 8000, PopoverAutoCloseTimer);
+}
 #endif
 
 #if !defined(OS_WIN)
@@ -2244,7 +2307,11 @@ void yue_mbt_popover_close(void *popover) {
   }
 }
 #else
-void yue_mbt_popover_close(void *) {}
+void yue_mbt_popover_close(void *popover) {
+  if (auto *win = PopoverStore::get(popover)) {
+    win->Close();
+  }
+}
 #endif
 
 #if !defined(OS_WIN)
@@ -2254,7 +2321,11 @@ void yue_mbt_popover_on_close(void *popover, void (*invoke)(void *), void *closu
   }
 }
 #else
-void yue_mbt_popover_on_close(void *, void (*)(void *), void *) {}
+void yue_mbt_popover_on_close(void *popover, void (*invoke)(void *), void *closure) {
+  if (auto *win = PopoverStore::get(popover)) {
+    win->on_close.Connect([invoke, closure](nu::Window *) { invoke(closure); });
+  }
+}
 #endif
 
 
@@ -2578,9 +2649,49 @@ void yue_mbt_notification_set_silent(void *n, int32_t silent) {
   }
 }
 
+#if defined(OS_WIN)
+// WinRT toast 的 notifier 按 AUMID 查找：进程级设置 AUMID 并在
+// HKCU\Software\Classes\AppUserModelId\<AUMID> 写 DisplayName
+// （仅显示通知无需 COM 激活注册；缺这一步 Show() 会静默失败）。
+static void EnsureToastAumid() {
+  static bool done = false;
+  if (done) {
+    return;
+  }
+  done = true;
+  wchar_t exe_path[MAX_PATH] = L"";
+  UINT n = ::GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+  if (n == 0 || n >= MAX_PATH) {
+    return;
+  }
+  std::wstring base(exe_path);
+  size_t slash = base.find_last_of(L"\\/");
+  base = (slash == std::wstring::npos) ? base : base.substr(slash + 1);
+  if (base.size() > 4 && base.compare(base.size() - 4, 4, L".exe") == 0) {
+    base.resize(base.size() - 4);
+  }
+  std::wstring aumid = L"moonbit.libyue." + base;
+  if (FAILED(::SetCurrentProcessExplicitAppUserModelID(aumid.c_str()))) {
+    return;
+  }
+  std::wstring key = L"SOFTWARE\\Classes\\AppUserModelId\\" + aumid;
+  HKEY handle = nullptr;
+  if (::RegCreateKeyExW(HKEY_CURRENT_USER, key.c_str(), 0, nullptr,
+                        REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &handle,
+                        nullptr) == ERROR_SUCCESS) {
+    std::wstring display = base + L" (moonbit-libyue)";
+    ::RegSetValueExW(handle, L"DisplayName", 0, REG_SZ,
+                     reinterpret_cast<const BYTE *>(display.data()),
+                     static_cast<DWORD>((display.size() + 1) * sizeof(wchar_t)));
+    ::RegCloseKey(handle);
+  }
+}
+#endif
+
 void yue_mbt_notification_show(void *n) {
   if (auto *b = NotificationStore::get(n)) {
 #if defined(OS_WIN)
+    EnsureToastAumid();
     b->Show(); // Windows 走公开 API；AddNotification 是 Linux 内部管理接口
 #else
     nu::NotificationCenter::GetCurrent()->AddNotification(b);

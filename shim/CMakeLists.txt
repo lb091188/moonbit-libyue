@@ -105,6 +105,16 @@ if(WIN32)
     gdiplus.lib urlmon.lib userenv.lib uxtheme.lib delayimp.lib
     runtimeobject.lib ntdll.lib shcore.lib pdh.lib)
   target_compile_options(yue_mbt PRIVATE /wd4005 /wd4101 /wd4244 /wd4267 /wd4996)
+
+  # 浏览器优先 WebView2：需要 prepare.py 从 NuGet 补齐的头文件
+  # （loader DLL 由 libyue 运行时动态加载，无需链接导入库）
+  set(WEBVIEW2_SDK "${LIBYUE_DIR}/include/third_party/Microsoft.Web.WebView2.1.0.2903.40")
+  if(EXISTS "${WEBVIEW2_SDK}/build/native/include/WebView2.h")
+    target_compile_definitions(yue_mbt PUBLIC WEBVIEW2_SUPPORT)
+    target_include_directories(yue_mbt PUBLIC "${WEBVIEW2_SDK}/build/native/include")
+  else()
+    message(FATAL_ERROR "缺少 WebView2.h：请先运行 python3 scripts/prepare.py 补齐 WebView2 SDK")
+  endif()
 endif()
 
 # ---------- Linux ----------

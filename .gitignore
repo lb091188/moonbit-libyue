@@ -7,3 +7,6 @@
 /_build/
 /target/
 *.core
+
+# WebView2 loader(prepare.py 复制到仓库根,运行期按工作目录搜索)
+/WebView2Loader.dll
