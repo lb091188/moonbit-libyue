@@ -119,7 +119,12 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **`AttributedText::SetFontFor/SetColorFor` 局部区间直接 CHECK 崩溃**(`nativeui_jumbo_2.cc`: "does not work on Windows"),只支持全文范围(0,-1)。修复:yue/painter.mbt 按 `platform()=="windows"` 对区间调用降级为无操作并告警一次(showcase 富文本页因此从启动崩溃变为正常渲染,区间样式按平台优雅退化)。
 - **`Color::Get(Border)` 触发 NOTREACHED**(Windows 实现无 Border 分支,ERROR 日志且返回垃圾色):shim 对 Border 直接 `GetSysColor(COLOR_WINDOWFRAME)`,showcase 系统语义色行输出正常、日志零 CHECK。
 - 托盘为原生后端:`Shell_NotifyIconW` 创建成功(日志"托盘:已创建");`set_title` 无对应概念为空操作;图标加载会有 libpng iCCP 警告(无害)。
-- 浏览器仅 IE(MSHTML)引擎——v0.15.6 官方构建未定义 `WEBVIEW2_SUPPORT`,即便本机有 WebView2 运行时也不启用;加载 https 站点可能弹 IE 的"证书吊销信息不可用"提示,属系统安全设置(IE Internet 选项),非库缺陷。`load_html`/本地协议不受影响。
+- **字体发虚(GDI+ 灰度抗锯齿)**:libyue 的 GDI+ 画笔写死 `TextRenderingHintAntiAlias`(灰度 AA),Windows 上自绘的 Tab/按钮/标签小字明显发虚。修复:prepare.py 解压后对 vendor 做幂等文本替换(AntiAlias → `TextRenderingHintClearTypeGridFit`),重建即锐利;vendor 不进版本库,重跑脚本自动重新应用。
+- **系统通知静默失败**:WinRT toast 的 notifier 按 AUMID 查找,进程未设置 `AppUserModelID` 时 `GetNotifier` 直接返回 null,`Show()` 静默失败。修复:shim 在首次通知前自动设置 AUMID(基于 exe 名)并写 `HKCU\Software\Classes\AppUserModelId\<AUMID>` 的 DisplayName;横幅是否弹出还受系统专注助手/全屏抑制影响,通知历史在操作中心可查。
+- **浏览器优先 WebView2**:发行包 vendor 只带 WebView2Loader.dll 不带头文件,官方 CMake 也未启用;prepare.py 现从 NuGet 固定版本补齐 `WebView2.h`(sha256 钉死)并把 loader DLL 复制到仓库根(libyue 按 exe 目录→工作目录搜索)。shim 构建定义 `WEBVIEW2_SUPPORT` 并加 include;`Browser::new` 在 Windows 默认 `webview2_support=true`,loader/运行时缺失时 libyue 自动回退 IE。验证:本地 HTML(load_html)、ExecuteScript 正常;远程站点依赖系统代理可用。
+- **demo:// 自定义协议在 WebView2 下静默无效**(注册/拦截链齐全但导航无效果,IE 引擎可用):上游待查;IE 兜底路径保留。
+- **滚动区内容零高度(跨平台统一默认值原则)**:win32 的 Group/Scroll 不按内容自增长(GTK 有自然首选尺寸),showcase 里"滚动区里的文本编辑"整块塌陷。修复:给 Group 显式 `set_style("height", 128)`——同一默认值两端表现一致;遇到类似不一致一律用统一默认值吸收,不做平台分支。
+- **Popover 气泡在 Windows 的替代实现**:libyue 无 Popover(见下),shim 用无边框、不抢焦点、置顶的小窗口替代,弹在点击位置右下,8 秒定时自动关闭(无外部点击关闭钩子),`close`/`on_close` 语义保留;验证:showcase 气泡按钮弹出/自动关闭/日志闭环。
 - 平台信息(`platform()=="windows"`、区域、缩放、屏幕)、剪贴板、定时器、全局快捷键注册、全局鼠标轮询、画布(GDI+)与浮动爱心窗口均实测正常。
 
 #### 验证方式

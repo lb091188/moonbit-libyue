@@ -335,6 +335,9 @@ fn build_inputs(win : @yue.Window, state : State) -> @yue.Container {
   // 分组内嵌滚动文本编辑
   let group = @yue.Group::new("分组：滚动区里的文本编辑")
   group.set_style("marginBottom", 8.0)
+  // 统一默认高度：win32 的 Group 不会按内容自增长(GTK 会按自然尺寸撑开)，
+  // 显式给两端同一个高度值，保证滚动区在各平台表现一致
+  group.set_style("height", 128.0)
   let scroll = @yue.Scroll::new()
   scroll.set_content_size(640.0, 96.0)
   let edit = @yue.TextEdit::new()
