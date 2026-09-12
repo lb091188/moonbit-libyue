@@ -8,7 +8,7 @@ The upstream library supports Windows, macOS and Linux; the first milestone of t
 - [ ] Ubuntu 24.04 KDE
 - [ ] Deepin 25
 - [ ] OpenKylin 3
-- [ ] Windows
+- [x] Windows 10 / 11 (first verified 2026-09, full showcase runs; see [docs/adaptation.md](docs/adaptation.md))
 - [ ] macOS
 
 English | [简体中文](README_ZH.md)
@@ -76,7 +76,9 @@ examples/            14 examples: hello / editor / browser / drawing / table / w
 
 ## Quick Start
 
-System dependencies (Ubuntu 24.04):
+### Ubuntu 24.04
+
+System dependencies:
 
 ```sh
 sudo apt install build-essential cmake pkg-config \
@@ -92,7 +94,38 @@ python3 scripts/prepare.py
 moon run examples/hello
 ```
 
-Both `prepare.py` and `moon` must be run from the repository root: the written link flags use a repo-root-relative `-L build` (the linker resolves relative paths from moon's working directory). `prepare.py` is idempotent — a cached archive whose sha256 does not match (e.g. an interrupted download) is deleted and re-downloaded; unchanged moon.pkg.json files are not rewritten.
+Both `prepare.py` and `moon` must be run from the repository root: the written link flags use a repo-root-relative `-L build` (the linker resolves relative paths from moon's working directory). `prepare.py` is idempotent — a cached archive whose sha256 does not match (e.g. an interrupted download) is deleted and re-downloaded; unchanged moon.pkg.json files are not rewritten. When switching the same checkout between Linux and Windows, re-run `prepare.py` to switch the link flags to that platform.
+
+### Windows (10/11, x64)
+
+Requires Python 3, the MoonBit toolchain (`moon`), CMake, and the MSVC C++ toolchain (with ATL). All commands below were verified on a real machine in this project:
+
+1. Install the MoonBit toolchain (PowerShell):
+
+```powershell
+irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
+```
+
+2. Install CMake and the MSVC C++ toolchain (`winget`, or install the equivalent components via the VS Installer):
+
+```powershell
+winget install Kitware.CMake
+winget install Microsoft.VisualStudio.2022.BuildTools -e --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+```
+
+3. Add the ATL component (libyue's Windows sources include ATL headers such as `atldef.h`, which are not installed by default; needs elevation):
+
+```powershell
+Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe' -ArgumentList 'modify','--installPath','"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"','--add','Microsoft.VisualStudio.Component.VC.ATL','--quiet','--norestart' -Verb RunAs -Wait
+```
+
+4. Build and run. **On Windows moon looks for `cl` on PATH when compiling native code, so run it from the "x64 Native Tools Command Prompt for VS 2022", or call `vcvars64.bat` first**:
+
+```bat
+call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+python3 scripts\prepare.py
+moon run examples/hello
+```
 
 The pure-MoonBit parts (DBus wire codec, color utilities, table value codec) do not require the native library and can be tested directly:
 

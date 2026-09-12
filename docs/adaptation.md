@@ -12,7 +12,7 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 
 ### 构建与链接
 
-- `moon` 命令必须在**仓库根**执行:`cc-link-flags` 回写的是仓库根相对的 `-L build`,链接器按 moon 的调用目录解析相对路径,子目录调用直接找不到 `libyue_mbt.a`(2026-09-11 实测确认)。
+- `moon` 命令必须在**仓库根**执行:`cc-link-flags` 回写的是仓库根相对的库路径(Linux/macOS 为 `-L build`,Windows 为 `build/yue_mbt_manifest.res build/yue_mbt.lib …`),链接器按 moon 的调用目录解析相对路径,子目录调用直接找不到静态库(2026-09-11 实测确认)。
 - moon 的 `link` 段只作用于所在包、只对 main 包的二进制生效;库包(如 `yue/`)放 link 段会让 moon 生成无 main 的 `.exe` 导致构建失败。`prepare.py` 只回写 `is-main` 的包。
 - `prepare.py` 幂等可重跑:缓存 zip sha256 不匹配(下载被截断)自动删除重下;下载先写 `.part` 临时文件、校验通过才原子落盘;内容未变的 `moon.pkg.json` 不回写(避免 mtime 触发无谓重链)。网络走标准 `http_proxy/https_proxy` 环境变量。
 - libyue 版本钉死在 `scripts/prepare.py`(`LIBYUE_VERSION` + 三平台 sha256),升级需同步更新三个校验和。
@@ -84,13 +84,49 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 
 ---
 
-## Windows ❓ 未实测
+## Windows ✅ 首次实测通过
 
-### Windows 10 / 11(libyue v0.15.6 发行包含 Windows 源码,本项目未实测)
+### Windows 10 / 11 ✅(2026-09-12 实测:Windows 10.0.19045 x64 + MSVC 14.44 + Windows SDK 10.0.26100 + moon 0.1.20260904)
 
-- `prepare.py` 对 Windows **直接跳过链接参数回写**,需手工核对各 `moon.pkg.json`;链接参数自动化在 TODO(中期)。
-- FFI 层注意:设置 `cc`/`cc-flags`(含 `-I`/`-L`)会破坏 Windows 可移植性,仅在链接系统库时使用(见 `.agents/skills/moonbit-c-binding/`)。
-- 版本细分(Win10 与 Win11 的 WebView2/工具链差异)待实测后补充。
+#### 工具链准备(现象→根因→修复)
+
+- **moon 原生后端要求系统 C 编译器**:PATH 上找不到 `cl/cc/gcc/clang` 直接报 "no system C compiler found"。修复:装 VS Build Tools(`Microsoft.VisualStudio.Workload.VCTools`),并在 **x64 Native Tools Command Prompt**(或先 call `vcvars64.bat`)里执行 moon/cmake。
+- **libyue Windows 源码需要 ATL 头**(`base/win/atl_throw.h` → `atldef.h`),VCTools 工作负载默认不带:报 C1083 找不到 atldef.h。修复:VS Installer `modify --add Microsoft.VisualStudio.Component.VC.ATL`。注意 **quiet/passive 模式必须从提权进程启动**,否则立即退出且 Exit Code 5007(日志在 `%TEMP%\dd_installer_*.log`)。
+- **`prepare.py` 下载 404**:发行包资产名与 `platform.system()` 不同名——实际是 `libyue_{v}_win.zip` / `_mac.zip`(不是 windows/darwin)。已修 `prepare.py`(ASSET_OS 映射),macOS 路径顺带修好。
+
+#### 链接参数(moon → cl/link 的真实行为,全部实测)
+
+- **`cc-link-flags` 被 moon 原样拼进 `cl` 命令行**,不是直接给 link:GNU 风格 `-L/-l` 报 D9002/D9024;`/LIBPATH:` 也是 cl 不认识的编译器选项,只告警不转发。**正确做法是写链接输入**:`build/yue_mbt.lib setupapi.lib …`,cl 会把 .lib/.res 位置参数转交 link;系统库由 vcvars 注入的 `LIB` 环境变量解析,无需写参数。
+- **分隔符必须用正斜杠**:`build\yue_mbt.lib` 会被 moon 的参数解析当转义吃掉反斜杠,link 收到 `buildyue_mbt.lib` 报 LNK1104。
+- 官方 CMakeLists 的系统库清单本身缺项(无 user32/ole32/oleaut32/shell32 等),直接照抄会报 144+ 个 LNK2019(DefWindowProcW/VariantClear/SysStringLen 等);`prepare.py`/shim 清单已补齐 GUI 基础库,多余库 link 会忽略。
+- **CRT 必须与 moon 一致为静态 /MT**:moon 生成代码固定 `/MT`(debug 亦然)。CMake 多配置生成器**忽略 `CMAKE_BUILD_TYPE`**,`cmake --build` 不带 `--config` 默认按 Debug(/MDd)编,最终链接报 LNK4098(MSVCRTD 冲突)+ 约 200 个 `__imp__*` 未解析。修复:shim 库 `cmake_policy(SET CMP0091 NEW)` + `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded`(须在 add_library 之前)+ 构建 `--config Release`(prepare.py 已自动化)。
+- **moon 不因静态库更新自动重链**:cc-link-flags 与 MoonBit 源都没变时,换 `yue_mbt.lib` 后 `moon build` 报 "no work to do",需 touch 主包任一源文件强制重链。
+
+#### 应用清单(manifest)
+
+- **进程启动即弹"无法定位于序数 345 于动态链接库 …exe"**:comctl32 的 `TaskDialogIndirect` 仅以**序数 345** 在 Common-Controls v6 导出,exe 无清单时加载旧版 comctl32,解析静态导入阶段就失败。官方 sample_app 靠自带 `exe.manifest` 解决。修复:官方清单编译为 `build/yue_mbt_manifest.res`(shim/CMakeLists 的 rc 自定义命令),经链接参数进入每个示例 exe(RT_MANIFEST 声明 Common-Controls v6 依赖)。运行验证:showcase 消息框(TaskDialog)正常弹出。
+
+#### shim 平台差异(首次 Windows 编译暴露,均已条件编译修复)
+
+- `dlfcn.h` 的 include 要按 `__linux__` 守卫(使用点本来就在 `OS_LINUX` 块内);MSVC 的 `M_PI` 需 `#define _USE_MATH_DEFINES`。
+- **`base::FilePath` 在 UNICODE 构建下 StringType 是 `std::wstring`**,`FilePath(const char*)`、`+= path.value()` 全部编不过:统一经 `FromUTF8Unsafe/AsUTF8Unsafe` 进出(见 shim 的 `FilePathFromUTF8/FilePathValueToUTF8`)。
+- **Windows 版 libyue 无 Popover**(发行包不含 popover.h,jumbo 源零实现):shim 保留 6 个 ABI 但降级为空操作/空句柄,MoonBit 侧 `Popover` 方法空转。
+- 其余 API 面差异(对照发行包头文件的平台 guard 逐一修复):`Browser::Options` 无 `allow_file_access_from_files`(MAC/LINUX)/`hardware_acceleration`(LINUX);`Scroll::SetOverlayScrollbar`、`Clipboard::Type::Selection`、`Tray::SetTitle`(MAC/LINUX)不存在,均降级空操作;`NotificationCenter::AddNotification` 是 Linux 内部接口,Windows 走 `Notification::Show()`。
+- `operator new/delete` 接管:Linux 用 glibc `__libc_malloc/free` 绕开 mimalloc 接管;**Windows 下 moon 以 `MOONBIT_ALLOCATOR=SYSTEM` 编译运行时**,CRT 堆即系统堆,重定向到 `malloc/free` 即可。
+
+#### 运行期差异(showcase 真机逐页验证发现)
+
+- **`AttributedText::SetFontFor/SetColorFor` 局部区间直接 CHECK 崩溃**(`nativeui_jumbo_2.cc`: "does not work on Windows"),只支持全文范围(0,-1)。修复:yue/painter.mbt 按 `platform()=="windows"` 对区间调用降级为无操作并告警一次(showcase 富文本页因此从启动崩溃变为正常渲染,区间样式按平台优雅退化)。
+- **`Color::Get(Border)` 触发 NOTREACHED**(Windows 实现无 Border 分支,ERROR 日志且返回垃圾色):shim 对 Border 直接 `GetSysColor(COLOR_WINDOWFRAME)`,showcase 系统语义色行输出正常、日志零 CHECK。
+- 托盘为原生后端:`Shell_NotifyIconW` 创建成功(日志"托盘:已创建");`set_title` 无对应概念为空操作;图标加载会有 libpng iCCP 警告(无害)。
+- 浏览器仅 IE(MSHTML)引擎——v0.15.6 官方构建未定义 `WEBVIEW2_SUPPORT`,即便本机有 WebView2 运行时也不启用;加载 https 站点可能弹 IE 的"证书吊销信息不可用"提示,属系统安全设置(IE Internet 选项),非库缺陷。`load_html`/本地协议不受影响。
+- 平台信息(`platform()=="windows"`、区域、缩放、屏幕)、剪贴板、定时器、全局快捷键注册、全局鼠标轮询、画布(GDI+)与浮动爱心窗口均实测正常。
+
+#### 验证方式
+
+- `moon run examples/hello`:窗口渲染 + 托盘 + 点关闭经 `on_close→quit()` 优雅退出。
+- `moon run examples/showcase`:8 页签逐一点击(基础控件/输入与选择/画布/网页/对话框/系统集成/事件/富文本)、菜单(勾选/单选/表格独立窗口)、消息框、画布色相重绘、鼠标事件实时回显、全局鼠标、浮动爱心、关闭退出,全程日志零 CHECK 失败。
+- `moon check` / `moon test` 全仓通过(2026-09-12)。
 
 ---
 

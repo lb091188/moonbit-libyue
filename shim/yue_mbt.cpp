@@ -9,19 +9,27 @@
 //
 // 类型安全：View 系句柄经 GetClassName() 运行时校验（CastTo），错型调用
 // 被拒绝并记日志而非踩空指针。
+// MSVC 的 M_PI 需要显式开启（painter 角度换算用到）
+#if defined(_MSC_VER)
+#define _USE_MATH_DEFINES
+#endif
 #include "yue_mbt.h"
 
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#if defined(__linux__)
 #include <dlfcn.h>
+#endif
 #include <fstream>
 #include <new>
 #include <unordered_map>
 
 #include "base/command_line.h"
 #include "nativeui/nativeui.h"
+#if !defined(OS_WIN) // Windows 版 libyue 无 Popover（发行包不含 popover.h/实现）
 #include "nativeui/popover.h"
+#endif
 #include "nativeui/date_picker.h"
 #include "nativeui/gif_player.h"
 #include "nativeui/global_shortcut.h"
@@ -38,14 +46,32 @@
 // ~/.moon/include/moonbit.h。
 extern "C" void *moonbit_make_bytes(int32_t size, int value);
 
-// C++ 对象一律走 glibc 堆：MoonBit 运行时初始化后接管进程的 mimalloc 段
-// 作为 GC 堆，普通 new 分配的对象会被 GC 扫描/移动破坏（Table 实测必崩）。
-// glibc 导出 __libc_malloc/__libc_free 绕开一切接管。
+// C++ 对象一律走系统堆：MoonBit 运行时初始化后可能接管进程分配器作为
+// GC 堆，普通 new 分配的对象会被 GC 扫描/移动破坏（Table 实测必崩）。
+// Linux 用 glibc 导出的 __libc_malloc/__libc_free 绕开一切接管；Windows
+// 下 moon 以 MOONBIT_ALLOCATOR=SYSTEM 编译运行时，CRT 堆即系统堆，
+// new/delete 重定向到 malloc/free 即可。
+#if defined(_WIN32)
+#include <cstdlib>
+static void *raw_heap_malloc(std::size_t size) {
+  return std::malloc(size);
+}
+static void raw_heap_free(void *p) {
+  std::free(p);
+}
+#else
 extern "C" void *__libc_malloc(size_t size);
 extern "C" void __libc_free(void *ptr);
+static void *raw_heap_malloc(std::size_t size) {
+  return __libc_malloc(size);
+}
+static void raw_heap_free(void *p) {
+  __libc_free(p);
+}
+#endif
 
 void *operator new(std::size_t size) {
-  void *p = __libc_malloc(size);
+  void *p = raw_heap_malloc(size);
   if (p == nullptr) {
     throw std::bad_alloc();
   }
@@ -53,7 +79,7 @@ void *operator new(std::size_t size) {
 }
 
 void *operator new[](std::size_t size) {
-  void *p = __libc_malloc(size);
+  void *p = raw_heap_malloc(size);
   if (p == nullptr) {
     throw std::bad_alloc();
   }
@@ -61,19 +87,19 @@ void *operator new[](std::size_t size) {
 }
 
 void operator delete(void *p) noexcept {
-  __libc_free(p);
+  raw_heap_free(p);
 }
 
 void operator delete[](void *p) noexcept {
-  __libc_free(p);
+  raw_heap_free(p);
 }
 
 void operator delete(void *p, std::size_t) noexcept {
-  __libc_free(p);
+  raw_heap_free(p);
 }
 
 void operator delete[](void *p, std::size_t) noexcept {
-  __libc_free(p);
+  raw_heap_free(p);
 }
 
 namespace {
@@ -117,7 +143,9 @@ using ImageStore = Store<nu::Image>;
 using CanvasStore = Store<nu::Canvas>;
 using AttributedTextStore = Store<nu::AttributedText>;
 using FontStore = Store<nu::Font>;
+#if !defined(OS_WIN)
 using PopoverStore = Store<nu::Popover>;
+#endif
 using MessageBoxStore = Store<nu::MessageBox>;
 
 // CastTo：从注册表取对象，并用 GetClassName 校验运行时类型。
@@ -154,6 +182,16 @@ void *BytesFromString(const std::string &s) {
     std::memcpy(bytes, s.data(), s.size());
   }
   return bytes;
+}
+
+// base::FilePath 在 Windows（UNICODE 构建）的 StringType 是 std::wstring；
+// ABI 边界统一 UTF-8，进出都经 libyue 的 FromUTF8Unsafe/AsUTF8Unsafe。
+base::FilePath FilePathFromUTF8(const char *utf8) {
+  return base::FilePath::FromUTF8Unsafe(utf8);
+}
+
+std::string FilePathValueToUTF8(const base::FilePath &path) {
+  return path.AsUTF8Unsafe();
 }
 
 }  // namespace
@@ -675,8 +713,16 @@ void *yue_mbt_browser_new_ex(int32_t devtools, int32_t context_menu,
   nu::Browser::Options options;
   options.devtools = devtools != 0;
   options.context_menu = context_menu != 0;
+#if defined(OS_MAC) || defined(OS_LINUX)
   options.allow_file_access_from_files = allow_file_access != 0;
+#else
+  (void)allow_file_access;
+#endif
+#if defined(OS_LINUX)
   options.hardware_acceleration = hardware_acceleration != 0;
+#else
+  (void)hardware_acceleration;
+#endif
   return reinterpret_cast<void *>(ViewStore::put(new nu::Browser(options)));
 }
 
@@ -989,7 +1035,7 @@ void yue_mbt_file_dialog_set_filters(void *dialog, const char *filters) {
 
 void yue_mbt_file_dialog_set_folder(void *dialog, const char *folder) {
   if (auto *d = FileDialogStore::get(dialog)) {
-    d->SetFolder(base::FilePath(folder));
+    d->SetFolder(FilePathFromUTF8(folder));
   }
 }
 
@@ -1010,7 +1056,7 @@ int32_t yue_mbt_file_dialog_run_for_window(void *dialog, void *window) {
 
 void *yue_mbt_file_dialog_get_result(void *dialog) {
   if (auto *d = FileDialogStore::get(dialog)) {
-    return BytesFromString(d->GetResult().value());
+    return BytesFromString(FilePathValueToUTF8(d->GetResult()));
   }
   return moonbit_make_bytes(0, 0);
 }
@@ -1323,6 +1369,15 @@ uint32_t yue_mbt_system_color(int32_t name) {
   if (name < 0 || name >= static_cast<int32_t>(std::size(kNames))) {
     return 0;
   }
+#if defined(OS_WIN)
+  // Windows 版 libyue 的 Color::Get 无 Border 分支（内部 NOTREACHED），
+  // 这里直接取窗口边框系统色
+  if (kNames[name] == nu::Color::Name::Border) {
+    DWORD c = ::GetSysColor(COLOR_WINDOWFRAME);
+    return (0xFFu << 24) | (GetRValue(c) << 16) | (GetGValue(c) << 8) |
+           GetBValue(c);
+  }
+#endif
   return nu::Color::Get(kNames[name]).value();
 }
 
@@ -1349,7 +1404,7 @@ void *yue_mbt_font_new(const char *name, double size, int32_t weight,
 
 void *yue_mbt_image_new_from_file(const char *path) {
   return reinterpret_cast<void *>(
-      ImageStore::put(new nu::Image(base::FilePath(path))));
+      ImageStore::put(new nu::Image(FilePathFromUTF8(path))));
 }
 
 /* 从内存 PNG/JPEG 解码（对照 Image(Buffer, scale_factor)） */
@@ -1388,7 +1443,7 @@ void *yue_mbt_image_resize(void *image, double w, double h, double scale_factor)
 /* format 如 "png"；路径 UTF-8 */
 int32_t yue_mbt_image_write_to_file(void *image, const char *format, const char *path) {
   if (auto *i = ImageStore::get(image)) {
-    return i->WriteToFile(std::string(format), base::FilePath(path)) ? 1 : 0;
+    return i->WriteToFile(std::string(format), FilePathFromUTF8(path)) ? 1 : 0;
   }
   return 0;
 }
@@ -1634,7 +1689,7 @@ void *yue_mbt_dragging_get_data(void *info, int32_t kind) {
       if (!text.empty()) {
         text += '\n';
       }
-      text += path.value();
+      text += FilePathValueToUTF8(path);
     }
   } else {
     text = data.str();
@@ -2135,10 +2190,19 @@ void yue_mbt_progress_bar_set_indeterminate(void *bar, int32_t yes) {
   }
 }
 
+#if !defined(OS_WIN)
 void *yue_mbt_popover_new(void) {
   return reinterpret_cast<void *>(PopoverStore::put(new nu::Popover()));
 }
+#else
+// Windows 版 libyue 无 Popover：保留 ABI，new 返回空句柄、其余空操作，
+// MoonBit 侧方法随之全部空转（运行期降级）。
+void *yue_mbt_popover_new(void) {
+  return nullptr;
+}
+#endif
 
+#if !defined(OS_WIN)
 void yue_mbt_popover_set_content(void *popover, void *content) {
   auto *p = PopoverStore::get(popover);
   auto *c = CastToView(content);
@@ -2146,14 +2210,22 @@ void yue_mbt_popover_set_content(void *popover, void *content) {
     p->SetContentView(scoped_refptr<nu::View>(c));
   }
 }
+#else
+void yue_mbt_popover_set_content(void *, void *) {}
+#endif
 
+#if !defined(OS_WIN)
 void yue_mbt_popover_set_content_size(void *popover, double w, double h) {
   if (auto *p = PopoverStore::get(popover)) {
     p->SetContentSize(
         nu::SizeF(static_cast<float>(w), static_cast<float>(h)));
   }
 }
+#else
+void yue_mbt_popover_set_content_size(void *, double, double) {}
+#endif
 
+#if !defined(OS_WIN)
 void yue_mbt_popover_show_relative_to(void *popover, void *view) {
   auto *p = PopoverStore::get(popover);
   auto *v = CastToView(view);
@@ -2161,18 +2233,29 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view) {
     p->ShowRelativeTo(v);
   }
 }
+#else
+void yue_mbt_popover_show_relative_to(void *, void *) {}
+#endif
 
+#if !defined(OS_WIN)
 void yue_mbt_popover_close(void *popover) {
   if (auto *p = PopoverStore::get(popover)) {
     p->Close();
   }
 }
+#else
+void yue_mbt_popover_close(void *) {}
+#endif
 
+#if !defined(OS_WIN)
 void yue_mbt_popover_on_close(void *popover, void (*invoke)(void *), void *closure) {
   if (auto *p = PopoverStore::get(popover)) {
     p->on_close.Connect([invoke, closure](nu::Popover *) { invoke(closure); });
   }
 }
+#else
+void yue_mbt_popover_on_close(void *, void (*)(void *), void *) {}
+#endif
 
 
 // ---------- Group / Scroll / Separator / 剪贴板 / 消息框 ----------
@@ -2243,9 +2326,14 @@ int32_t yue_mbt_scroll_get_scrollbar_policy_y(void *scroll) {
 }
 
 void yue_mbt_scroll_set_overlay_scrollbar(void *scroll, int32_t yes) {
+#if !defined(OS_WIN)
   if (auto *s = CastTo<nu::Scroll>(scroll)) {
     s->SetOverlayScrollbar(yes != 0);
   }
+#else
+  (void)scroll; // Windows 滚动条策略由系统决定，无 overlay 概念
+  (void)yes;
+#endif
 }
 
 void *yue_mbt_separator_new(int32_t orientation) {
@@ -2282,8 +2370,14 @@ void yue_mbt_clipboard_clear(void *clipboard) {
 
 /* Clipboard::Type：0=CopyPaste 1=Selection(Linux)。返回进程级单例裸指针 */
 void *yue_mbt_clipboard_from_type(int32_t type) {
+#if defined(OS_LINUX)
   return static_cast<void *>(nu::Clipboard::FromType(
       type == 1 ? nu::Clipboard::Type::Selection : nu::Clipboard::Type::CopyPaste));
+#else
+  (void)type; // Windows/macOS 无 Selection 剪贴板
+  return static_cast<void *>(
+      nu::Clipboard::FromType(nu::Clipboard::Type::CopyPaste));
+#endif
 }
 
 /* 写入单条数据：kind 1=Text 2=HTML 4=FilePaths(路径 \n 连接) */
@@ -2328,7 +2422,7 @@ void *yue_mbt_clipboard_get_data(void *clipboard, int32_t kind) {
       if (!text.empty()) {
         text += '\n';
       }
-      text += path.value();
+      text += FilePathValueToUTF8(path);
     }
   } else {
     text = data.str();
@@ -2486,7 +2580,11 @@ void yue_mbt_notification_set_silent(void *n, int32_t silent) {
 
 void yue_mbt_notification_show(void *n) {
   if (auto *b = NotificationStore::get(n)) {
+#if defined(OS_WIN)
+    b->Show(); // Windows 走公开 API；AddNotification 是 Linux 内部管理接口
+#else
     nu::NotificationCenter::GetCurrent()->AddNotification(b);
+#endif
   }
 }
 
@@ -2798,7 +2896,7 @@ void *yue_mbt_tray_new(const char *icon_path, int32_t *ok) {
   if (!yue_mbt_tray_supported()) {
     return nullptr;
   }
-  auto image = scoped_refptr<nu::Image>(new nu::Image(base::FilePath(icon_path)));
+  auto image = scoped_refptr<nu::Image>(new nu::Image(FilePathFromUTF8(icon_path)));
   if (image->IsEmpty()) {
     return nullptr;
   }
@@ -2808,11 +2906,16 @@ void *yue_mbt_tray_new(const char *icon_path, int32_t *ok) {
 }
 
 void yue_mbt_tray_set_title(void *tray, const char *title) {
+#if defined(OS_MAC) || defined(OS_LINUX)
   // 构造失败（后端缺失）时 nativeui 内部句柄为空，防御性跳过而非崩溃
   auto *t = TrayStore::get(tray);
   if (t != nullptr) {
     t->SetTitle(title);
   }
+#else
+  (void)tray; // Windows 托盘无标题概念（原生不支持）
+  (void)title;
+#endif
 }
 
 void yue_mbt_tray_remove(void *tray) {

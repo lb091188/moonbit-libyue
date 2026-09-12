@@ -41,6 +41,8 @@ SHA256 = {
     "Windows": "7e65b85b27e14ec097e866956a4ac9283ae4455eb296f89d86d106796385f846",
 }
 URL = "https://github.com/yue/yue/releases/download/{v}/libyue_{v}_{os}.zip"
+# 发行包资产名与 platform.system() 不同名：mac 是 mac、Windows 是 win
+ASSET_OS = {"Linux": "linux", "Darwin": "mac", "Windows": "win"}
 
 # Linux 最终链接需要的系统库，与 shim/CMakeLists.txt 的依赖一致
 LINUX_PKG_CONFIG_LIBS = [
@@ -51,6 +53,19 @@ LINUX_PKG_CONFIG_LIBS = [
 ]
 # webkit2gtk 在不同发行版包名不同，4.0/4.1 任一存在即可
 LINUX_PKG_CONFIG_LIBS_ANY = ["webkit2gtk-4.0", "webkit2gtk-4.1"]
+
+# Windows 最终链接需要的系统库。在官方 CMakeLists 清单基础上补齐
+# user32/ole32/oleaut32/shell32 等 GUI 基础库（官方清单缺项，实测链接
+# 大量 user32/COM 符号未解析）；多余的库链接器会忽略，无害。
+WINDOWS_LINK_LIBS = [
+    "user32.lib", "gdi32.lib", "shell32.lib", "ole32.lib", "oleaut32.lib",
+    "advapi32.lib", "comdlg32.lib", "imm32.lib", "msimg32.lib", "oleacc.lib",
+    "usp10.lib", "setupapi.lib", "powrprof.lib", "ws2_32.lib", "dbghelp.lib",
+    "shlwapi.lib", "version.lib", "winmm.lib", "wbemuuid.lib", "psapi.lib",
+    "dwmapi.lib", "propsys.lib", "comctl32.lib", "gdiplus.lib", "urlmon.lib",
+    "userenv.lib", "uxtheme.lib", "delayimp.lib", "runtimeobject.lib",
+    "ntdll.lib", "shcore.lib", "pdh.lib",
+]
 
 
 def system() -> str:
@@ -108,6 +123,10 @@ def cmake_build() -> Path:
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
     build = ["cmake", "--build", str(BUILD_DIR), "--parallel"]
+    if system() == "Windows":
+        # VS 多配置生成器忽略 CMAKE_BUILD_TYPE，必须显式 --config；
+        # 且默认按 Debug（/MDd）构建会与 moon 的 /MT 链接冲突
+        build += ["--config", "Release"]
     print(" ".join(configure))
     subprocess.run(configure, check=True)
     print(" ".join(build))
@@ -137,6 +156,29 @@ def pkg_config_libs() -> list[str]:
     return flags
 
 
+def link_flags() -> str:
+    """各平台链接参数：Linux/macOS 为 GNU ld 风格，Windows 为 cl 命令行风格。
+
+    moon 在 Windows 把 cc-link-flags 原样拼进 cl 命令行（实测 -L/-l 报
+    D9002/D9024，/LIBPATH: 报 D9002 且不转发给 link）。因此静态库直接以
+    相对路径作为链接输入（cl 会把 .lib 传给 link），系统库不写参数、
+    由 vcvars64 注入的 LIB 环境变量解析；相对路径按 moon 的调用目录
+    （仓库根）解析。注意分隔符必须用正斜杠：moon 的参数解析会把
+    反斜杠当转义吃掉（实测 `build\yue_mbt.lib` 变成 `buildyue_mbt.lib`）。
+    """
+    if system() == "Linux":
+        extra = pkg_config_libs() + ["-lpthread", "-ldl", "-lm", "-lstdc++"]
+        return "-L build -lyue_mbt " + " ".join(extra)
+    if system() == "Darwin":
+        return "-L build -lyue_mbt -lpthread"
+    if system() == "Windows":
+        # yue_mbt_manifest.res 是嵌入 exe 的应用清单（comctl32 v6 依赖），
+        # 由 shim/CMakeLists 的 rc 编译产出；cl 会把 .res 输入转发给 link
+        return ("build/yue_mbt_manifest.res build/yue_mbt.lib "
+                + " ".join(WINDOWS_LINK_LIBS))
+    raise SystemExit(f"暂不支持的平台：{system()}")
+
+
 def patch_moon_pkg() -> None:
     """把链接参数写回仓库内所有 moon.pkg.json 的 cc-link-flags。
 
@@ -144,18 +186,12 @@ def patch_moon_pkg() -> None:
     因此只给 is-main 的包回写（库包 yue/ 放 link 段会让 moon 生成
     无 main 的 yue.exe 导致构建失败）。
 
-    库路径写仓库根相对的 `-L build`：链接器按 moon 的调用目录解析相对
-    路径，所以 moon 命令必须在仓库根执行。好处是回写结果与机器无关，
-    换机重跑不再产生绝对路径噪音 diff。
+    库路径写仓库根相对（`-L build` / `/LIBPATH:build`）：链接器按 moon
+    的调用目录解析相对路径，所以 moon 命令必须在仓库根执行。好处是
+    回写结果与机器无关，换机重跑不再产生绝对路径噪音 diff。同一仓库
+    在不同平台切换时重跑本脚本即可换到对应平台的链接参数。
     """
-    if system() == "Linux":
-        extra = pkg_config_libs() + ["-lpthread", "-ldl", "-lm", "-lstdc++"]
-    elif system() == "Darwin":
-        extra = ["-lpthread"]
-    else:
-        print("Windows 平台链接参数暂未自动化，请手工核对各 moon.pkg.json")
-        return
-    flags = "-L build -lyue_mbt " + " ".join(extra)
+    flags = link_flags()
     for pkg_path in sorted(REPO_ROOT.rglob("moon.pkg.json")):
         if any(part in {"vendor", "build", ".prepare", "_build", "target"} for part in pkg_path.parts):
             continue
@@ -176,7 +212,7 @@ def main() -> None:
     os_name = system()
     if os_name not in SHA256:
         raise SystemExit(f"暂不支持的平台：{os_name}")
-    url = URL.format(v=LIBYUE_VERSION, os=os_name.lower())
+    url = URL.format(v=LIBYUE_VERSION, os=ASSET_OS[os_name])
     archive = download(url, SHA256[os_name])
     extract(archive)
     cmake_build()

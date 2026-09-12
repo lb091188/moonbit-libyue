@@ -1,0 +1,4 @@
+// RT_MANIFEST(ID=1) 嵌入应用清单：声明 Common-Controls v6（TaskDialogIndirect
+// 等仅以序号 345 导出，无 v6 依赖时进程启动即报“无法定位于序数 345”）。
+// 由 shim/CMakeLists 编译为 build/yue_mbt_manifest.res，随链接参数进入每个示例。
+1 24 "app.manifest"
