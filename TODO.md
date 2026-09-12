@@ -77,8 +77,8 @@
 - [ ] Ubuntu 24.04 KDE — 托盘与 DBusMenu 行为实测(KDE 面板自渲染菜单,关注与 XFCE 的批量方法差异)
 - [ ] Deepin 25 — 托盘协议与整体表现实测
 - [ ] OpenKylin 3 — 托盘协议与整体表现实测
-- [ ] Windows 10/11 — 实测 + `prepare.py` 链接参数自动化(当前直接跳过回写)
-- [ ] macOS — 实测(CMake 已备 ARC/no-ARC 双库分支,先验证哪条走通)
+- [x] Windows 10/11 — 实测通过(2026-09-12,showcase 全功能跑通)+ `prepare.py` 链接参数自动化(Windows 资产名/cl 命令行风格/CRT/manifest 一并处理;经验入档 docs/adaptation.md)
+- [ ] macOS — 实测(CMake 已备 ARC/no-ARC 双库分支,先验证哪条走通;prepare.py 的 mac 资产名已顺带修正)
 
 ## 工程债 / 发布
 

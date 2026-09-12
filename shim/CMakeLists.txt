@@ -2,7 +2,21 @@
 # 平台源码分支与依赖完全对照 libyue 发行包自带的 CMakeLists.txt，
 # 由 scripts/prepare.py 驱动，一般不手动调用。
 cmake_minimum_required(VERSION 3.13)
+# 官方指定 Windows 10 SDK；须在 project() 之前设置
+if(WIN32)
+  set(CMAKE_SYSTEM_VERSION 10.0)
+  # moon 侧固定用 /MT 静态 CRT 链接，shim 库必须一致，否则混入调试/动态
+  # CRT 会在最终链接报 LNK4098 冲突与大量 __imp_ 未解析符号。
+  # 须在 add_library 之前设置且显式启用 CMP0091（3.13 基线下默认为 OLD）
+  cmake_policy(SET CMP0091 NEW)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
+endif()
 project(yue_mbt CXX C)
+
+# ---------- Windows ----------
+if(WIN32)
+  enable_language(RC)
+endif()
 
 set(LIBYUE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../vendor/libyue")
 
@@ -62,13 +76,33 @@ if(APPLE)
 endif()
 
 # ---------- Windows ----------
+# 对照官方 CMakeLists 的 win32 段；差异：不带 /SUBSYSTEM:WINDOWS——
+# moon 生成的是控制台 main（无 WinMain），保持控制台子系统即可弹 GUI 窗口。
 if(WIN32)
+  # 应用清单编译成独立 .res：链接示例 exe 时作为输入嵌入（见 prepare.py
+  # 的 Windows 链接参数），声明 Common-Controls v6——comctl32 的
+  # TaskDialogIndirect 仅以序数 345 导出，缺清单时进程启动即失败。
+  set(MANIFEST_RES "${CMAKE_BINARY_DIR}/yue_mbt_manifest.res")
+  add_custom_command(OUTPUT ${MANIFEST_RES}
+    COMMAND ${CMAKE_RC_COMPILER} /Fo ${MANIFEST_RES} "${CMAKE_CURRENT_SOURCE_DIR}/app.rc"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/app.rc" "${CMAKE_CURRENT_SOURCE_DIR}/app.manifest"
+    VERBATIM)
+  add_custom_target(yue_mbt_manifest ALL DEPENDS ${MANIFEST_RES})
+  # MSVC 多配置生成器默认输出到 build/Release，平铺到 build/ 以匹配 -L build
+  set_target_properties(yue_mbt PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}
+    ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR})
   target_compile_definitions(yue_mbt PUBLIC
-    _WINDOWS WIN32 WIN32_LEAN_AND_MEAN NOMINMAX _UNICODE UNICODE)
+    _WINDOWS WIN32 WIN32_LEAN_AND_MEAN NOMINMAX _UNICODE UNICODE
+    # base::StackContainer 在 Debug 下要求（官方注释）
+    $<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=0>)
   target_link_libraries(yue_mbt PUBLIC
+    user32.lib gdi32.lib shell32.lib ole32.lib oleaut32.lib advapi32.lib
+    comdlg32.lib imm32.lib msimg32.lib oleacc.lib usp10.lib
     setupapi.lib powrprof.lib ws2_32.lib dbghelp.lib shlwapi.lib version.lib
     winmm.lib wbemuuid.lib psapi.lib dwmapi.lib propsys.lib comctl32.lib
-    gdi32.lib gdiplus.lib urlmon.lib userenv.lib uxtheme.lib delayimp.lib
+    gdiplus.lib urlmon.lib userenv.lib uxtheme.lib delayimp.lib
     runtimeobject.lib ntdll.lib shcore.lib pdh.lib)
   target_compile_options(yue_mbt PRIVATE /wd4005 /wd4101 /wd4244 /wd4267 /wd4996)
 endif()

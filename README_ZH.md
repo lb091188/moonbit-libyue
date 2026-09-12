@@ -7,8 +7,8 @@
 - [ ] Ubuntu 24.04 Gnome
 - [ ] Ubuntu 24.04 KDE
 - [ ] Deepin 25
-- [ ] OpenKyLin 3
-- [ ] Windows
+- [ ] OpenKylin 3
+- [x] Windows 10 / 11(2026-09 首次实测,showcase 全功能跑通;经验见 [docs/adaptation.md](docs/adaptation.md))
 - [ ] Mac OS
 
 简体中文 | [English](README.md)
@@ -73,7 +73,9 @@ examples/            14 个示例：hello / editor / browser / drawing / table /
 
 ## 快速开始
 
-系统依赖（Ubuntu 24.04）：
+### Ubuntu 24.04
+
+系统依赖：
 
 ```sh
 sudo apt install build-essential cmake pkg-config \
@@ -89,7 +91,38 @@ python3 scripts/prepare.py
 moon run examples/hello
 ```
 
-`prepare.py` 与 `moon` 都需在仓库根目录执行：回写的链接参数是仓库根相对的 `-L build`（链接器按 moon 的调用目录解析相对路径）。`prepare.py` 幂等可重跑——缓存包 sha256 不匹配（如下载被中断截断）会自动删除重下；内容未变的 moon.pkg.json 不会回写。
+`prepare.py` 与 `moon` 都需在仓库根目录执行：回写的链接参数是仓库根相对的 `-L build`（链接器按 moon 的调用目录解析相对路径）。`prepare.py` 幂等可重跑——缓存包 sha256 不匹配（如下载被中断截断）会自动删除重下；内容未变的 moon.pkg.json 不会回写。同一仓库在 Linux/Windows 间切换时重跑 `prepare.py` 即可换到对应平台的链接参数。
+
+### Windows（10/11，x64）
+
+需要：Python 3、MoonBit 工具链（`moon`）、CMake、MSVC C++ 工具链（含 ATL）。以下命令均在本项目 Windows 实测通过：
+
+1. 安装 MoonBit 工具链（PowerShell）：
+
+```powershell
+irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
+```
+
+2. 安装 CMake 与 MSVC C++ 工具链（`winget`，或手动装 VS Installer 里的对应组件）：
+
+```powershell
+winget install Kitware.CMake
+winget install Microsoft.VisualStudio.2022.BuildTools -e --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+```
+
+3. 补装 ATL 组件（libyue 的 Windows 源码包含 `atldef.h` 等 ATL 头，默认不装；需管理员权限）：
+
+```powershell
+Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe' -ArgumentList 'modify','--installPath','"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"','--add','Microsoft.VisualStudio.Component.VC.ATL','--quiet','--norestart' -Verb RunAs -Wait
+```
+
+4. 构建、运行。**moon 在 Windows 编译原生代码时会从 PATH 里找 `cl`，须在「x64 Native Tools Command Prompt for VS 2022」里执行，或先在命令行里 call `vcvars64.bat`**：
+
+```bat
+call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+python3 scripts\prepare.py
+moon run examples/hello
+```
 
 ### 作为依赖使用（mooncakes）
 
