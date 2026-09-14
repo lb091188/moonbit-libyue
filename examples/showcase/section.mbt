@@ -46,10 +46,9 @@ fn section(
 }
 
 ///|
-/// 一页 = 整页滚动区包住全部分段。flex 1 让 Scroll 填满页签：
-/// 没有显式尺寸时 GTK 的 Notebook 会出现负尺寸布局断言。
+/// 一页 = 全部分段的纵排容器(对照实验:暂不套滚动区)。
 fn scroll_page(sections : Array[@yue.Node]) -> @yue.Node {
-  @yue.scroll(@yue.vbox(sections, style=[("padding", 14.0)]), style=[("flex", 1.0)])
+  @yue.vbox(sections, style=[("padding", 14.0)])
 }
 
 ///|
