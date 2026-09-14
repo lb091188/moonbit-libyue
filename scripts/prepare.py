@@ -155,6 +155,36 @@ def patch_win_text_rendering() -> None:
             print(f"已应用文本渲染补丁：{source.name}")
 
 
+def patch_vendor_headers() -> None:
+    """vendor 补丁：修复 vendored 头里两处上游笔误（clang 实例化即报错）。
+
+    libyue 的发行包头文件在 GCC/MSVC 下碰巧未被实例化而"看似能编译"，
+    AppleClang（Xcode 16/26 实测）在实例化处直接报错，只能解压后修正
+    （幂等；vendor 目录不进版本库，重跑本脚本自动重新应用）：
+    - partition_alloc 的 no_destructor.h：PlacementStorage::get() const
+      调用了不存在的 storage()，按同类非 const 版本改为读 storage_ 成员；
+    - base/containers/id_map.h：operator= 写成 iter.map/iter.iter，
+      按同类拷贝构造改为 iter.map_/iter.iter_。
+    """
+    patches = [
+        (VENDOR_DIR / "libyue/include/base/allocator/partition_allocator/src"
+         "/partition_alloc/partition_alloc_base/no_destructor.h",
+         "return const_cast<PlacementStorage*>(this)->storage();",
+         "return reinterpret_cast<const T*>(storage_);"),
+        (VENDOR_DIR / "libyue/include/base/containers/id_map.h",
+         "      map_ = iter.map;\n      iter_ = iter.iter;",
+         "      map_ = iter.map_;\n      iter_ = iter.iter_;"),
+    ]
+    for path, old, new in patches:
+        text = path.read_text(encoding="utf-8")
+        if new in text:
+            continue  # 已应用（理论不可达：extract 每次还原原文件）
+        if old not in text:
+            raise SystemExit(f"vendor 补丁目标文本未找到（上游可能已变）：{path}")
+        path.write_text(text.replace(old, new), encoding="utf-8")
+        print(f"已应用 vendor 头补丁：{path.name}")
+
+
 def cmake_build() -> None:
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
@@ -183,6 +213,7 @@ def main() -> None:
     url = URL.format(v=LIBYUE_VERSION, os=ASSET_OS[os_name])
     archive = download(url, SHA256[os_name])
     extract(archive)
+    patch_vendor_headers()
     if os_name == "Windows":
         patch_win_text_rendering()
         fetch_webview2_sdk()
