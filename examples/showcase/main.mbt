@@ -10,7 +10,11 @@ fn main {
     return
   }
   let _ = @yue.mount_window(
-    [@yue.tab(build_tabs(), style=[("padding", 8.0)])],
+    // Tab 无 measure 函数,yoga 叶子尺寸在构造时固化(当时 0 页,min 高≈页头),
+    // 且 add_page 不刷新;挂在容器里必须给显式外框,flex 1 让页签区撑满窗口。
+    // 页内布局不经过 Tab 的 yoga 树:add_page 只挂 GTK 页,每页容器各自是
+    // 独立 yoga 子树的根。
+    [@yue.tab(build_tabs(), style=[("padding", 8.0), ("flex", 1.0)])],
     title="moonbit-libyue 全功能 Showcase",
     size=Some((960.0, 640.0)),
     center=true,

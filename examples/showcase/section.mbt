@@ -46,9 +46,10 @@ fn section(
 }
 
 ///|
-/// 一页 = 全部分段的纵排容器(对照实验:暂不套滚动区)。
+/// 一页 = 整页滚动区包住全部分段。flex 1 让 Scroll 填满页签的可用区域
+/// （notebook 页区域由 GTK 分配,页容器是独立 yoga 子树的根）。
 fn scroll_page(sections : Array[@yue.Node]) -> @yue.Node {
-  @yue.vbox(sections, style=[("padding", 14.0)])
+  @yue.scroll(@yue.vbox(sections, style=[("padding", 14.0)]), style=[("flex", 1.0)])
 }
 
 ///|

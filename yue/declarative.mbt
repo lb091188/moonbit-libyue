@@ -261,7 +261,9 @@ pub fn combo(
 }
 
 ///|
-/// 分组框节点：标题 + 内容（内容是任意 Node）。
+/// 分组框节点：标题 + 内容（内容是任意 Node）。Group 是 View 不是
+/// Container,内容必须走 SetContentView（AddChild 会被 shim 类型校验拒绝）,
+/// 故先把内容挂进一个容器再整块设为 Group 内容。
 pub fn group(
   title : String,
   content : Node,
@@ -272,13 +274,17 @@ pub fn group(
     let g = Group::new(title)
     apply_style(g, style=style, style_str=style_str)
     attach(parent, g.view())
-    ignore((content.mount)(g.view()))
+    let holder = Container::new()
+    ignore((content.mount)(holder.view()))
+    g.set_content(holder)
     g.view()
   } }
 }
 
 ///|
-/// 滚动容器节点：内容是任意 Node。
+/// 滚动容器节点：内容是任意 Node。Scroll 是 View 不是 Container,内容必须
+/// 走 SetContentView（AddChild 会被 shim 类型校验拒绝）,故先把内容挂进
+/// 一个容器再整块设为滚动内容。
 pub fn scroll(
   content : Node,
   content_size? : (Double, Double)? = None,
@@ -298,7 +304,9 @@ pub fn scroll(
     }
     apply_style(s, style=style, style_str=style_str)
     attach(parent, s.view())
-    ignore((content.mount)(s.view()))
+    let holder = Container::new()
+    ignore((content.mount)(holder.view()))
+    s.set_content(holder)
     s.view()
   } }
 }
