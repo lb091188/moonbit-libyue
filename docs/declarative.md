@@ -11,7 +11,7 @@ moonbit-libyue 在经典命令式 API 之上提供三层可自由组合的糖，
 
 三层都建立在公开 setter 之上，不改变库的行为；与既有命令式代码可以
 随意混用（`node_of` 是两个世界的桥）。完整对照示例见
-`examples/showcase` 的「基础控件」页（由命令式版本迁移而来）。
+`examples/showcase`（全部页面用声明式实现）。
 
 ## L1：props 构造器
 
@@ -52,11 +52,30 @@ fn page(state : State) -> @yue.Container {
 win.set_content(page(state))   // mount 返回根 Container，直接喂给窗口
 ```
 
+### 窗口作声明式根：mount_window
+
+`Window` 没有父视图，不做成 Node，而是作为挂载入口：创建窗口、把子树
+挂为内容、返回窗口句柄；菜单栏、托盘等非视图资产经 `handle` 补挂：
+
+```moonbit
+let win = @yue.mount_window(
+  [
+    @yue.label("你好"),
+    @yue.button("退出", on_click=fn() { @yue.quit() }),
+  ],
+  title="Demo",
+  size=Some((960.0, 640.0)),
+  center=true,
+  handle=fn(w) { w.set_menubar(build_menubar()) },
+)
+```
+
 ### 节点构造器一览
 
 | 节点 | 对应控件 | 备注 |
 |---|---|---|
 | `vbox(children, …)` / `hbox(children, …)` | Container | 纵排 / 横排 |
+| `container(on_draw, handle, …)` | Container | 自绘画布 / 拿容器句柄 |
 | `label(text, …)` | Label | |
 | `button(title, on_click, …)` | Button | |
 | `checkbox(title, checked, on_change, …)` | Checkbox | `on_change(Bool)` |
@@ -73,7 +92,7 @@ win.set_content(page(state))   // mount 返回根 Container，直接喂给窗口
 | `tab(pages, on_change, …)` | Tab | 每页自动包容器 |
 | `date_picker(epoch, on_change)` | DatePicker | |
 | `gif(image, scale)` | GifPlayer | |
-| `browser(url, html)` | Browser | 二选一 |
+| `browser(url, html, …)` | Browser | 二选一 |
 | `bind_label(store, f, …)` | Label | L3 响应式绑定，见下 |
 
 所有节点都带 `style` / `style_str`；常用节点另有 **`handle`** 参数。
