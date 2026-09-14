@@ -23,6 +23,7 @@ import platform
 import re
 import shutil
 import subprocess
+import sys
 import urllib.request
 import zipfile
 from pathlib import Path
