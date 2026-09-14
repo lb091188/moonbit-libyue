@@ -36,8 +36,11 @@ fn page_inputs() -> @yue.Node {
       @yue.node_of(date, style=[("marginBottom", 8.0)]),
       @yue.bind_label(date_val, fn(t) { "当前 epoch 秒：\{t}" }),
     ]),
-    section("GIF 播放", "GifPlayer 播放 GIF（示例资产 examples/advanced/dot.gif），无解码器依赖。", [
-      @yue.gif(image=Some(@yue.Image::new_from_file("examples/advanced/dot.gif"))),
+    section("GIF 播放", "GifPlayer 播放 GIF（示例资产 examples/advanced/dot.gif），无解码器依赖。GifPlayer 是 yoga 叶子且默认缩放模式下最小尺寸为空，需显式给宽高。", [
+      @yue.gif(
+        image=Some(@yue.Image::new_from_file("examples/advanced/dot.gif")),
+        style=[("width", 120.0), ("height", 120.0)],
+      ),
     ]),
     section("多行文本编辑", "TextEdit 编辑 API：撤销重做 / 剪切复制粘贴 / 选区与插入（按钮经 handle 操作句柄）。", [
       @yue.text_edit(
