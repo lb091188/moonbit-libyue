@@ -3,35 +3,34 @@
 
 产物：
   vendor/libyue/          libyue 发行包（头文件 + 平台源码）
-  build/libyue_mbt.a      libyue + shim 的静态库
-  yue/moon.pkg.json       自动回写 cc-link-flags（托管字段，勿手改）
+  build/libyue_mbt.a      libyue + shim 的静态库（Windows 为 yue_mbt.lib 等）
+
+链接参数不落盘：由 scripts/prebuild.py 在 moon 构建时按当前系统输出
+link_configs 传播给依赖方（使用方零配置）。本脚本只负责产出静态库，
+可由 scripts/postadd.py（moon add 自动触发）或 prebuild.py（产物缺失
+时自动补建）调用，也可手动执行。
 
 用法：python3 scripts/prepare.py
 网络走标准环境变量 http_proxy/https_proxy。
 缓存包 sha256 不匹配（如上次下载被中断截断）时自动删除重下；
 下载先写临时文件，校验通过才原子落盘，坏包不会进缓存。
-回写的库路径是仓库根相对的 -L build（链接器按 moon 的调用目录解析
-相对路径），因此 moon 命令必须在仓库根目录执行。
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
 import platform
 import re
 import shutil
 import subprocess
-import sys
 import urllib.request
 import zipfile
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parent.parent
 VENDOR_DIR = REPO_ROOT / "vendor"
 BUILD_DIR = REPO_ROOT / "build"
 CACHE_DIR = REPO_ROOT / ".prepare"
-MOON_PKG = REPO_ROOT / "yue" / "moon.pkg.json"
 
 # 固定版本：升级时同步更新 sha256
 LIBYUE_VERSION = "v0.15.6"
@@ -51,29 +50,6 @@ WEBVIEW2_NUGET_URL = ("https://api.nuget.org/v3-flatcontainer/"
                       "microsoft.web.webview2/1.0.2903.40/"
                       "microsoft.web.webview2.1.0.2903.40.nupkg")
 WEBVIEW2_NUGET_SHA256 = "ef128016dd1e51c59178c827ed5b8aa3322c57afa8675d930f8109505542ad74"
-
-# Linux 最终链接需要的系统库，与 shim/CMakeLists.txt 的依赖一致
-LINUX_PKG_CONFIG_LIBS = [
-    "gtk+-3.0",
-    "pangoft2",
-    "fontconfig",
-    "x11",
-]
-# webkit2gtk 在不同发行版包名不同，4.0/4.1 任一存在即可
-LINUX_PKG_CONFIG_LIBS_ANY = ["webkit2gtk-4.0", "webkit2gtk-4.1"]
-
-# Windows 最终链接需要的系统库。在官方 CMakeLists 清单基础上补齐
-# user32/ole32/oleaut32/shell32 等 GUI 基础库（官方清单缺项，实测链接
-# 大量 user32/COM 符号未解析）；多余的库链接器会忽略，无害。
-WINDOWS_LINK_LIBS = [
-    "user32.lib", "gdi32.lib", "shell32.lib", "ole32.lib", "oleaut32.lib",
-    "advapi32.lib", "comdlg32.lib", "imm32.lib", "msimg32.lib", "oleacc.lib",
-    "usp10.lib", "setupapi.lib", "powrprof.lib", "ws2_32.lib", "dbghelp.lib",
-    "shlwapi.lib", "version.lib", "winmm.lib", "wbemuuid.lib", "psapi.lib",
-    "dwmapi.lib", "propsys.lib", "comctl32.lib", "gdiplus.lib", "urlmon.lib",
-    "userenv.lib", "uxtheme.lib", "delayimp.lib", "runtimeobject.lib",
-    "ntdll.lib", "shcore.lib", "pdh.lib",
-]
 
 
 def system() -> str:
@@ -178,7 +154,7 @@ def patch_win_text_rendering() -> None:
             print(f"已应用文本渲染补丁：{source.name}")
 
 
-def cmake_build() -> Path:
+def cmake_build() -> None:
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
     build = ["cmake", "--build", str(BUILD_DIR), "--parallel"]
@@ -190,81 +166,6 @@ def cmake_build() -> Path:
     subprocess.run(configure, check=True)
     print(" ".join(build))
     subprocess.run(build, check=True)
-    return BUILD_DIR
-
-
-def pkg_config_libs() -> list[str]:
-    """Linux 链接期系统库（-l 形式）。webkit 包名做 4.0/4.1 兼容。"""
-    flags: list[str] = []
-    for pkg in LINUX_PKG_CONFIG_LIBS:
-        out = subprocess.run(["pkg-config", "--libs", pkg],
-                             capture_output=True, text=True)
-        if out.returncode != 0:
-            raise SystemExit(f"缺少系统依赖：请安装 {pkg} 的开发包（pkg-config 找不到）")
-        flags += out.stdout.split()
-    for pkg in LINUX_PKG_CONFIG_LIBS_ANY:
-        out = subprocess.run(["pkg-config", "--libs", pkg],
-                             capture_output=True, text=True)
-        if out.returncode == 0:
-            flags += out.stdout.split()
-            break
-    else:
-        raise SystemExit("缺少系统依赖：webkit2gtk-4.0 或 4.1 的开发包至少装一个")
-    if "-lwebkit2gtk-4.1" in flags and "-ljavascriptcoregtk-4.1" not in flags:
-        flags.append("-ljavascriptcoregtk-4.1")
-    return flags
-
-
-def link_flags() -> str:
-    """各平台链接参数：Linux/macOS 为 GNU ld 风格，Windows 为 cl 命令行风格。
-
-    moon 在 Windows 把 cc-link-flags 原样拼进 cl 命令行（实测 -L/-l 报
-    D9002/D9024，/LIBPATH: 报 D9002 且不转发给 link）。因此静态库直接以
-    相对路径作为链接输入（cl 会把 .lib 传给 link），系统库不写参数、
-    由 vcvars64 注入的 LIB 环境变量解析；相对路径按 moon 的调用目录
-    （仓库根）解析。注意分隔符必须用正斜杠：moon 的参数解析会把
-    反斜杠会被 moon 的参数解析当转义吃掉（分隔符丢失），故用正斜杠。
-    """
-    if system() == "Linux":
-        extra = pkg_config_libs() + ["-lpthread", "-ldl", "-lm", "-lstdc++"]
-        return "-L build -lyue_mbt " + " ".join(extra)
-    if system() == "Darwin":
-        return "-L build -lyue_mbt -lpthread"
-    if system() == "Windows":
-        # yue_mbt_manifest.res 是嵌入 exe 的应用清单（comctl32 v6 依赖），
-        # 由 shim/CMakeLists 的 rc 编译产出；cl 会把 .res 输入转发给 link
-        return ("build/yue_mbt_manifest.res build/yue_mbt.lib "
-                + " ".join(WINDOWS_LINK_LIBS))
-    raise SystemExit(f"暂不支持的平台：{system()}")
-
-
-def patch_moon_pkg() -> None:
-    """把链接参数写回仓库内所有 moon.pkg.json 的 cc-link-flags。
-
-    moon 的 link 段只作用于所在包，且只对 main 包的最终二进制生效，
-    因此只给 is-main 的包回写（库包 yue/ 放 link 段会让 moon 生成
-    无 main 的 yue.exe 导致构建失败）。
-
-    库路径写仓库根相对（`-L build` / `/LIBPATH:build`）：链接器按 moon
-    的调用目录解析相对路径，所以 moon 命令必须在仓库根执行。好处是
-    回写结果与机器无关，换机重跑不再产生绝对路径噪音 diff。同一仓库
-    在不同平台切换时重跑本脚本即可换到对应平台的链接参数。
-    """
-    flags = link_flags()
-    for pkg_path in sorted(REPO_ROOT.rglob("moon.pkg.json")):
-        if any(part in {"vendor", "build", ".prepare", "_build", "target"} for part in pkg_path.parts):
-            continue
-        old_text = pkg_path.read_text()
-        pkg = json.loads(old_text)
-        if not pkg.get("is-main"):
-            pkg.pop("link", None)
-        else:
-            pkg.setdefault("link", {}).setdefault("native", {})["cc-link-flags"] = flags
-        new_text = json.dumps(pkg, indent=2, ensure_ascii=False) + "\n"
-        if new_text == old_text:
-            continue  # 内容未变不回写，避免改动 mtime 触发 moon 无谓重链
-        pkg_path.write_text(new_text)
-        print(f"已写入链接参数：{pkg_path.relative_to(REPO_ROOT)}")
 
 
 def main() -> None:
@@ -278,7 +179,6 @@ def main() -> None:
         patch_win_text_rendering()
         fetch_webview2_sdk()
     cmake_build()
-    patch_moon_pkg()
     print("prepare 完成")
 
 

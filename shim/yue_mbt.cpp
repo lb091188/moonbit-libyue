@@ -2692,10 +2692,8 @@ void yue_mbt_notification_show(void *n) {
   if (auto *b = NotificationStore::get(n)) {
 #if defined(OS_WIN)
     EnsureToastAumid();
-    b->Show(); // Windows 走公开 API；AddNotification 是 Linux 内部管理接口
-#else
-    nu::NotificationCenter::GetCurrent()->AddNotification(b);
 #endif
+    b->Show();
   }
 }
 

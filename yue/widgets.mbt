@@ -266,7 +266,9 @@ pub fn Notification::close(self : Notification) -> Unit {
 }
 
 ///|
-/// 注册全局快捷键（格式如 "CmdOrCtrl+Shift+M"），返回注册 id。
+/// 注册全局快捷键（格式如 "CmdOrCtrl+Shift+M"），返回注册 id；
+/// 返回 -1 表示注册失败（X11 下 XGrabKey 排他，组合键被系统或
+/// 桌面环境占用即失败，需换键）。
 pub fn register_global_shortcut(accelerator : String, callback : () -> Unit) -> Int {
   keep_alive(callback)
   ffi_global_shortcut_register(utf8_bytes(accelerator), fn(f) { f() }, callback)

@@ -12,9 +12,17 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 
 ### 构建与链接
 
-- `moon` 命令必须在**仓库根**执行:`cc-link-flags` 回写的是仓库根相对的库路径(Linux/macOS 为 `-L build`,Windows 为 `build/yue_mbt_manifest.res build/yue_mbt.lib …`),链接器按 moon 的调用目录解析相对路径,子目录调用直接找不到静态库(2026-09-11 实测确认)。
-- moon 的 `link` 段只作用于所在包、只对 main 包的二进制生效;库包(如 `yue/`)放 link 段会让 moon 生成无 main 的 `.exe` 导致构建失败。`prepare.py` 只回写 `is-main` 的包。
-- `prepare.py` 幂等可重跑:缓存 zip sha256 不匹配(下载被截断)自动删除重下;下载先写 `.part` 临时文件、校验通过才原子落盘;内容未变的 `moon.pkg.json` 不回写(避免 mtime 触发无谓重链)。网络走标准 `http_proxy/https_proxy` 环境变量。
+- `moon` 命令必须在**仓库根**执行的习惯保留:链接参数虽已改为绝对路径(见下条),但 vendor/build 产物与 WebView2Loader.dll 的运行期搜索仍按工作目录。
+- moon 的 `link` 段只作用于所在包、只对 main 包的二进制生效;库包(如 `yue/`)放 link 段会让 moon 生成无 main 的 `.exe` 导致构建失败。链接配置已全部收敛到 `scripts/prebuild.py`,任何包的 moon.pkg.json 都不再写 `cc-link-flags`。
+- **双平台链接参数由 pre-build 钩子传播(当前方案,2026-09-12 实测入档)**:moon 的 `cc-link-flags` 是单一字符串、`targets` 条件编译无 OS 维度,链接参数无法按平台入库。现行机制:moon.mod.json 声明 `--moonbit-unstable-prebuild: scripts/prebuild.py`,moon 每次构建执行它,脚本按 `platform.system()` 输出 `link_configs` JSON,moon 把它**自动传播给所有依赖 yue 包的 main 包**——本仓 examples 与 mooncakes 使用方统一零配置,切换平台自动换参数。实测要点:
+  - 脚本 **stdout 只能是最终 JSON**:任何 print(含子进程透传)都会导致 moon 反序列化失败(`invalid number at line 1 column 2`),进度信息一律走 stderr。
+  - **不要用 `link_libs` 放 libyue_mbt**:moon 组装命令行时 `link_flags` 在 `link_libs` 之前,GNU ld 从左到右解析,`-lyue_mbt` 排在 `-lstdc++` 之后会 `undefined reference to __cxa_guard_acquire`。全部参数放 `link_flags` 单一字符串自控顺序(与旧响应文件同序)。
+  - 脚本 cwd 是 **moon 调用目录(使用方项目根)**,定位自身必须 `Path(__file__)`;传播的库路径必须是**绝对路径**(链接命令的 cwd 在使用方侧)。
+  - 原生产物缺失时脚本自动调 prepare.py 补建(产物存在时毫秒级返回),首次构建走 GitHub 下载。
+  - 该机制官方标注实验性(`--moonbit-unstable-prebuild`),API 可能随 moon 升级变动;Windows 下 `python3` 命令可用性待真机验证。
+  - 历史方案:先按系统回写 moon.pkg.json(两平台互相覆盖)→ `@build/link.flags` 响应文件(gcc/clang 与 cl 都支持 `@文件`,双平台同一份入库)。均已被传播机制替代。
+- `prepare.py` 幂等可重跑:缓存 zip sha256 不匹配(下载被截断)自动删除重下;下载先写 `.part` 临时文件、校验通过才原子落盘。网络走标准 `http_proxy/https_proxy` 环境变量。
+- **`postadd` 脚本仅在 registry `moon add` 安装时触发**,path/git 依赖与模块自身构建不触发;产物缺失的兜底由 prebuild.py 的检查承担。
 - libyue 版本钉死在 `scripts/prepare.py`(`LIBYUE_VERSION` + 三平台 sha256),升级需同步更新三个校验和。
 
 ### MoonBit ↔ C ABI
@@ -56,6 +64,9 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - 右键菜单:面板**自己镜像 DBusMenu 渲染**,不走 SNI `ContextMenu` 让应用自绘(实测 dbus-monitor 只有 `AboutToShowGroup` + `GetLayout`/`GetGroupProperties`,无 `ContextMenu` 调用)。
 - **xfce4-panel 4.18(libdbusmenu 客户端)只发批量版 `EventGroup` / `AboutToShowGroup`,不发单条 `Event` / `AboutToShow`**(2026-09-11 实测入档):只实现单条版会被 UnknownMethod 静默拒掉,表现为菜单弹出正常但点击全部无效。dbus-monitor 抓真总线才能发现。
 - 桌面识别:`XDG_CURRENT_DESKTOP=XFCE`,`@traybus.desktop_name()` 可用于诊断。
+- **桌面通知走 `Notification::Show()`,不是 `NotificationCenter::AddNotification`**(2026-09-12 实测入档):libyue Linux 的 `AddNotification` 只把对象登记进内部列表,**从不发 DBus `Notify` 调用**;发通知必须调 `Show()`(内部 GDBus 异步 `org.freedesktop.Notifications.Notify`)。shim 曾在 Linux 分支只调 AddNotification,表现为通知静默失败无任何报错。判据:`dbus-monitor "type='method_call',interface='org.freedesktop.Notifications'"` 抓真总线,`member=Notify` 计数为 0 即调用未发出;修复后实测 xfce4-notifyd 正常弹气泡(含 actions 按钮)。
+- **全局快捷键是 X11 `XGrabKey` 排他注册,被占用即返回 -1**(2026-09-12 实测入档):XFCE 自定义快捷键(xfconf-query `/commands/custom/`,如本机 `<Primary><Alt>s` 绑了钉钉切换脚本)已抓取的组合键,再注册会 BadAccess,libyue 用 error trap 吞掉后 `Register` 返回 -1——不崩溃但静默失败,使用方必须检查 -1 并提示换键。验证键位占用:`xfconf-query -c xfce4-keyboard-shortcuts -l -v`。
+- **焦点在桌面时 xfwm4 抢占键盘,全局快捷键不触发**(2026-09-12 实测入档):`XGrabKey` passive grab 已挂、焦点在任意应用窗口时按键正常触发;但焦点落在桌面(xfdesktop)时 xfwm4 的键盘处理抢先,事件到不了应用。自动化验证用 `xdotool windowfocus <窗口>` 先把键盘焦点移入被测窗口再 `xdotool key ctrl+alt+<k>`,仅 `windowactivate` 不转移键盘焦点,会得到"没触发"的假阴性。
 
 #### GNOME ❓ 未实测
 
