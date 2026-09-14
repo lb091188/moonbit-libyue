@@ -164,6 +164,7 @@ win.set_menubar(menubar)                   // 菜单条构建见 MenuBar
 
 Linux 托盘推荐纯 MoonBit 实现的 `yue/traybus`（SNI 直连面板，无 AppIndicator
 运行库依赖）；`Tray::set_menu` 可直接挂上面的 `Menu` 模型（XFCE 下自绘弹出）。
+方案设计（后端降级、桌面兼容性、调试方法）见 [docs/tray.md](tray.md)。
 
 ## 事件（所有控件通用）
 
