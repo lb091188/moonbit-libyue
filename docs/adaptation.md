@@ -101,6 +101,8 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 ### GTK 相关
 
 - Table(GTK)放进 Notebook 页签内会在尺寸测量时段错误(negative allocation),必须放普通容器或独立窗口(showcase 采用独立子窗口方案;2026-09-11 在 showcase 复现:崩前先出现 `Negative content width -1 (… owner GtkFrame)` 与 `GtkScrollbar` 的 `size >= 0` 断言)。
+- **复合控件(Tab/Scroll/Group)在 yoga 树里是"无 measure 函数的叶节点",外框尺寸必须显式给出(flex/宽高),否则塌缩**。实测(2026-09-14,Ubuntu 24.04 + XFCE,showcase 声明式重写后):把 `Tab` 从直接作窗口内容(`SetContentView`,不进任何 yoga 树)改为挂进根 `Container` 后,整窗口签内容空白、页签以下不可交互,日志 `gtk_box_gadget_distribute: assertion 'size >= 0' failed in GtkNotebook` + `Negative content width -1 … owner GtkFrame`。根因三层:`Tab::Tab()` 构造时经 `UpdateDefaultStyle()` 把当时的 `GetMinimumSize()`(空 notebook ≈ 页签头高度)固化进 yoga minWidth/minHeight;`AddPage` 只设 View 层 parent、**不刷新该值**(libyue 上游局限);无 flex 时叶节点高度就停在固化值,notebook 页区域 = 分配高 − 页签头 ≤ 0。修复:给 `tab()` 节点 `("flex", 1.0)`(yoga 只管外框;页签页不进 Tab 的 yoga 树——`AddPage` 不做 yoga 插入,每页容器各自是独立 yoga 子树的根,由 GTK 分配页区域)。注意 `scroll_page` 曾误判为页内问题(490826b 对照实验),塌缩在 notebook 外框,与页内布局无关。
+- **内容型控件的内容不走 `AddChild`**:`Group`/`Scroll` 直接继承 `View`(非 `Container`),挂内容必须用各自的 `SetContentView`;走 `Container::AddChild` 会被 shim 的 `CastTo<Container>` 类型校验拒绝(日志「类型不匹配，期望 Container，实际 Group/Scroll」),内容静默丢失。声明式层(`yue/declarative.mbt`)的 `group()`/`scroll()` 节点因此先把内容 mount 进一个临时 `Container`,再整块 `set_content`。切页瞬间的 `GtkNotebook` 断言在修复后仍少量残留(启动/切页瞬时布局噪音,CRITICAL 不致命),界面功能已全部恢复。
 
 ---
 
