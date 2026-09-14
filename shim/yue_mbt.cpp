@@ -60,8 +60,17 @@ extern "C" void *moonbit_make_bytes(int32_t size, int value);
 // GC 堆，普通 new 分配的对象会被 GC 扫描/移动破坏（Table 实测必崩）。
 // Linux 用 glibc 导出的 __libc_malloc/__libc_free 绕开一切接管；Windows
 // 下 moon 以 MOONBIT_ALLOCATOR=SYSTEM 编译运行时，CRT 堆即系统堆，
-// new/delete 重定向到 malloc/free 即可。
+// new/delete 重定向到 malloc/free 即可；macOS 的 libSystem 不导出
+// libc_malloc/free（CI 实测 undefined），直接用 libc 的 malloc/free。
 #if defined(_WIN32)
+#include <cstdlib>
+static void *raw_heap_malloc(std::size_t size) {
+  return std::malloc(size);
+}
+static void raw_heap_free(void *p) {
+  std::free(p);
+}
+#elif defined(OS_MAC)
 #include <cstdlib>
 static void *raw_heap_malloc(std::size_t size) {
   return std::malloc(size);
@@ -1471,10 +1480,19 @@ void *yue_mbt_image_resize(void *image, double w, double h, double scale_factor)
 
 /* format 如 "png"；路径 UTF-8 */
 int32_t yue_mbt_image_write_to_file(void *image, const char *format, const char *path) {
+#if defined(OS_MAC)
+  // mac 发行包声明了 Image::WriteToFile 但未编译进库（CI 实测链接期
+  // undefined），降级为恒失败
+  (void)image;
+  (void)format;
+  (void)path;
+  return 0;
+#else
   if (auto *i = ImageStore::get(image)) {
     return i->WriteToFile(std::string(format), FilePathFromUTF8(path)) ? 1 : 0;
   }
   return 0;
+#endif
 }
 
 double yue_mbt_image_get_width(void *image) {

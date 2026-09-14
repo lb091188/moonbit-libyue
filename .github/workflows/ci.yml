@@ -7,6 +7,9 @@
 #   → Linux 侧 xvfb 虚拟显示跑 hello 冒烟(GUI 事件循环存活即通过)
 #
 # 说明:
+# - moon 版本钉在 0.1.20260904(Windows 真机验证通过的版本):最新版
+#   moon 的测试可执行文件自带 MANIFEST 资源,与 libyue 的 manifest.res
+#   重复,链接报 CVT1100(CI 实测)。
 # - 链接参数由 scripts/prebuild.py(moon 构建钩子)按当前系统生成并传播,
 #   workflow 不写任何链接配置;原生层产物缓存命中时 prepare.py 秒级返回。
 # - Windows / macOS 不做运行冒烟(headless 会话不可靠:无窗口会话/
@@ -28,7 +31,7 @@ jobs:
     name: Linux(构建 + 测试 + xvfb 冒烟)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 安装系统依赖(GTK/webkit/X11 开发包 + xvfb)
         run: |
@@ -38,13 +41,13 @@ jobs:
             libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev \
             libwebkit2gtk-4.1-dev xvfb
 
-      - name: 安装 moon 工具链
+      - name: 安装 moon 工具链(钉版本)
         run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s 0.1.20260904
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: 缓存原生层产物(build + vendor + 下载缓存)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             build
@@ -76,11 +79,12 @@ jobs:
     name: Windows(MSVC 构建 + 测试)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: 安装 moon 工具链
+      - name: 安装 moon 工具链(钉版本)
         shell: pwsh
         run: |
+          $env:MOONBIT_INSTALL_VERSION = "0.1.20260904"
           iwr https://cli.moonbitlang.com/install/powershell.ps1 -useb | iex
           echo "$env:USERPROFILE\.moon\bin" >> $env:GITHUB_PATH
 
@@ -94,7 +98,7 @@ jobs:
           Copy-Item $py "$env:USERPROFILE\.moon\bin\python3.exe"
 
       - name: 缓存原生层产物(build + vendor + 下载缓存)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             build
@@ -121,7 +125,7 @@ jobs:
     # 需 Xcode 16 的 clang;首跑失败与修复记录见 docs/adaptation.md
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 选用 Xcode 16(AppleClang 21 编不动 vendored 老头文件)
         run: |
@@ -134,13 +138,13 @@ jobs:
           sudo xcode-select -s "$latest16"
           clang++ --version
 
-      - name: 安装 moon 工具链
+      - name: 安装 moon 工具链(钉版本)
         run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s 0.1.20260904
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: 缓存原生层产物(build + vendor + 下载缓存)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             build

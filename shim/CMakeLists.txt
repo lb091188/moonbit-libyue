@@ -55,6 +55,10 @@ target_include_directories(yue_mbt PRIVATE ${MOONBIT_INCLUDE_DIR})
 
 # ---------- macOS ----------
 if(APPLE)
+  # 官方源码树含 .S 汇编单元（base_jumbo_S.S 定义 CallWithEHFrame 等，
+  # ObjC 消息泵依赖）；不启用 ASM 语言时 CMake 静默跳过，链接期报
+  # undefined symbol（CI 实测）
+  enable_language(ASM)
   find_library(APPKIT AppKit)
   find_library(CARBON Carbon)
   find_library(IOKIT IOKit)
@@ -74,7 +78,7 @@ if(APPLE)
     ${LIBYUE_DIR}/include
     ${LIBYUE_DIR}/include/base/allocator/partition_allocator/src)
   target_compile_features(${LIBYUE_NO_ARC} PUBLIC cxx_std_20)
-  set_property(TARGET yue_mbt APPEND PROPERTY COMPILE_OPTIONS -fobjc-arc)
+  set_property(TARGET yue_mbt APPEND PROPERTY COMPILE_OPTIONS -fobjc-arc -fno-objc-arc-exceptions)
 endif()
 
 # ---------- Windows ----------
