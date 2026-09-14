@@ -143,6 +143,13 @@ def link_configs() -> dict:
 
 
 def main() -> None:
+    # Windows CI/控制台常为 cp1252 等无法编码中文的代码页，stderr 进度
+    # 输出会 UnicodeEncodeError；转 UTF-8（stdout 是纯 ASCII JSON，不受影响）。
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass
     try:
         json.load(sys.stdin)  # moon 传入构建环境，当前无需使用
     except json.JSONDecodeError:
