@@ -151,6 +151,8 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 ### macOS(libyue v0.15.6 发行包含 ARC / no-ARC 双库结构)
 
 - CMake 已备 ARC/no-ARC 双库分支,均未验证;首次实测先确认两种链接形态哪条走通。
+- 首次 macOS 实测以 CI 承担(2026-09-14 起,`.github/workflows/ci.yml` 的 macos job,macos-latest ARM64 Runner):构建 + 测试级验证,不做 GUI 运行冒烟(headless Runner 无 WindowServer)。实测结果待首跑后回写本节。
+- prebuild 的 Darwin 分支已按官方构建结构**预修**(尚未实测):链接参数补第二个静态库 `-lyue_mbt_noarc`(no-ARC 库符号被主库引用,GNU ld 从左到右须排其后)+ 全部框架(AppKit/Carbon/IOKit/Security/WebKit/OpenDirectory)+ `-lobjc -lc++ -lpthread`——静态库的系统依赖不会自动传播到 moon 的链接命令行,必须显式给出(与 Linux 侧 pkg-config 补系统库同构)。
 - 版本细分(按 macOS 大版本)待实测后补充。
 
 ---
