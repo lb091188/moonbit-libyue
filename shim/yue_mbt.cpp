@@ -2247,7 +2247,13 @@ void *yue_mbt_progress_bar_new(void) {
 
 void yue_mbt_progress_bar_set_value(void *bar, double value) {
   if (auto *b = CastTo<nu::ProgressBar>(bar)) {
+#if defined(OS_LINUX)
+    // libyue Linux 端 SetValue 语义为 0..100(内部再除以 100),yue 层统一
+    // 0..1,此处换算;其余平台上游直接收 0..1。
+    b->SetValue(static_cast<float>(value * 100.0));
+#else
     b->SetValue(static_cast<float>(value));
+#endif
   }
 }
 

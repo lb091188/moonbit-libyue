@@ -262,10 +262,63 @@ def patch_linux_container_events() -> None:
       强制写入 size_request，声明式整页滚动（高度动态、未调 SetContentSize）
       的滚动范围因此恒 0。改为仅延续显式设置过的 size_request，否则复位
       -1 让 viewport 按（补丁修正后的）自然尺寸计算。
+    - Container::UpdateChildBounds 开头的 IsVisibleInHierarchy 守卫整体
+      return：GTK 首次 size-allocate 在 map 之前发生，此时被跳过后 map 后
+      无人再以真实分配尺寸重跑 yoga 布局，独立 yoga 根（Scroll 内容/Tab 页
+      容器）永久停留在挂载时的自然尺寸布局——页内容时不占满容器宽。
+      改为布局总是执行（GetBounds() 即 GTK allocation），孩子传播仍受可见性限制。
+    - GifPlayer 动画只在 "show" 信号补启动：挂载时（如 Notebook 非当前页）
+      SetAnimating 因 IsVisibleInHierarchy=false 跳过启动，而 show 信号只在
+      gtk_widget_show 时发射一次（时机早于 SetImage 时再次错过），切页 map
+      后无人再触发 ScheduleFrame——GIF 永停第一帧。补连接 "map" 信号（每次
+      实际映射都发射，与 "unmap"→OnHide 停 timer 对称；OnShow 幂等）。
     """
     container_src = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_2.cc"
     scroll_src = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_3.cc"
+    root_src = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_1.cc"
     patches = [
+        (scroll_src,
+         "  g_signal_connect(GetNative(), \"show\", G_CALLBACK(OnShow), this);\n"
+         "  g_signal_connect(GetNative(), \"hide\", G_CALLBACK(OnHide), this);\n",
+         "  g_signal_connect(GetNative(), \"show\", G_CALLBACK(OnShow), this);\n"
+         "  g_signal_connect(GetNative(), \"hide\", G_CALLBACK(OnHide), this);\n"
+         "  // moonbit-libyue 补丁:补连 map 信号。挂载时不可见(SetAnimating 跳过)\n"
+         "  // 且 show 信号早于 SetImage 的情况下,切页 map 后无人再启动动画。\n"
+         "  g_signal_connect(GetNative(), \"map\", G_CALLBACK(OnShow), this);\n"),
+        (scroll_src,
+         "GifPlayer::GifPlayer() {\n"
+         "  TakeOverView(gtk_drawing_area_new());\n",
+         "GifPlayer::GifPlayer() {\n"
+         "  // moonbit-libyue 补丁:drawing area 自建 GdkWindow(默认 no-window)。\n"
+         "  // no-window 自绘控件嵌 NUContainer 链再进 Scroll 视口时,queue_draw 的\n"
+         "  // 失效区域沿父链上传的坐标归属错位——静止时投到视口外(画面不动、\n"
+         "  // 甚至整段空白),滚动时才重绘出一帧(留下多帧残影)。自建窗口后绘制与\n"
+         "  // 失效都相对自身 window,彻底绕开 NUContainer 链的坐标问题。\n"
+         "  GtkWidget* area = gtk_drawing_area_new();\n"
+         "  gtk_widget_set_has_window(area, TRUE);\n"
+         "  TakeOverView(area);\n"),
+        (root_src,
+         "void Container::UpdateChildBounds() {\n"
+         "  dirty_ = false;\n"
+         "  if (!IsVisibleInHierarchy())\n"
+         "    return;\n"
+         "  // For root CSS node, calculate the layout before setting bounds.\n"
+         "  if (IsRootYGNode(this)) {\n"
+         "    SizeF size = GetBounds().size();\n"
+         "    YGNodeCalculateLayout(node(), size.width(), size.height(), YGDirectionLTR);\n"
+         "  }\n",
+         "void Container::UpdateChildBounds() {\n"
+         "  dirty_ = false;\n"
+         "  // moonbit-libyue 补丁:去掉整体 IsVisibleInHierarchy 守卫。GTK 的首次\n"
+         "  // size-allocate 发生在 map 之前,原实现此时整体 return,map 后无人再以\n"
+         "  // 真实分配尺寸重跑 yoga 布局,独立 yoga 根(Scroll 内容/Tab 页容器)便\n"
+         "  // 永久停留在挂载时的自然尺寸布局,内容不占满容器宽。GetBounds() 读的\n"
+         "  // 就是 GTK allocation(size_allocate vfunc 里已先更新),提前布局总是\n"
+         "  // 安全的;GTK 本身也允许对未映射 widget 预分配,映射后即按此生效。\n"
+         "  if (IsRootYGNode(this)) {\n"
+         "    SizeF size = GetBounds().size();\n"
+         "    YGNodeCalculateLayout(node(), size.width(), size.height(), YGDirectionLTR);\n"
+         "  }\n"),
         (container_src,
          "  if (priv->event_window)\n    gdk_window_show(priv->event_window);\n\n"
          "  GTK_WIDGET_CLASS(nu_container_parent_class)->map(widget);",
@@ -275,40 +328,11 @@ def patch_linux_container_events() -> None:
         (container_src,
          "  attributes.y = allocation.x;",
          "  attributes.y = allocation.y;  // moonbit-libyue 补丁:上游笔误 y 误用 x"),
-        (container_src,
-         "static void nu_container_get_preferred_width(GtkWidget* widget,\n"
-         "                                             gint* minimum,\n"
-         "                                             gint* natural) {\n"
-         "  // We are not using GTK's layout system, so just return 0.\n"
-         "  *minimum = 0;\n"
-         "  *natural = 0;\n"
-         "}\n"
-         "\n"
-         "static void nu_container_get_preferred_height(GtkWidget* widget,\n"
-         "                                              gint* minimum,\n"
-         "                                              gint* natural) {\n"
-         "  // We are not using GTK's layout system, so just return 0.\n"
-         "  *minimum = 0;\n"
-         "  *natural = 0;\n"
-         "}",
-         "static void nu_container_get_preferred_width(GtkWidget* widget,\n"
-         "                                             gint* minimum,\n"
-         "                                             gint* natural) {\n"
-         "  // moonbit-libyue 补丁:报告 yoga 自然尺寸,原生容器(ScrolledWindow/\n"
-         "  // Notebook 页/Group)才能感知内容大小;原实现返回 0 使滚动范围恒 0。\n"
-         "  // minimum 不能给 0:GtkViewport 用 minimum(而非 natural)算滚动范围。\n"
-         "  SizeF size = NU_CONTAINER(widget)->priv->delegate->GetPreferredSize();\n"
-         "  *minimum = static_cast<gint>(size.width());\n"
-         "  *natural = *minimum;\n"
-         "}\n"
-         "\n"
-         "static void nu_container_get_preferred_height(GtkWidget* widget,\n"
-         "                                              gint* minimum,\n"
-         "                                              gint* natural) {\n"
-         "  SizeF size = NU_CONTAINER(widget)->priv->delegate->GetPreferredSize();\n"
-         "  *minimum = static_cast<gint>(size.height());\n"
-         "  *natural = *minimum;\n"
-         "}"),
+        # nu_container_get_preferred_width/height 保持上游 0/0 不动:实测
+        # (2026-09-15)向 GTK 报告 yoga 动态自然尺寸会让尺寸协商震荡
+        # (allocate 污染 yoga 状态 → requisition 漂移 365→466→598→907
+        # 不收敛,布局停在中间帧)。滚动范围改由 Scroll 补丁以内容自然
+        # 高度显式给出(见 Scroll::PlatformSetContentView)。
         (scroll_src,
          "void Scroll::PlatformSetContentView(View* view) {\n"
          "  // Receive the content size from current content view.\n"
@@ -319,15 +343,22 @@ def patch_linux_container_events() -> None:
          "    csize = Size(w, h);\n"
          "  }\n",
          "void Scroll::PlatformSetContentView(View* view) {\n"
-         "  // moonbit-libyue 补丁:仅延续显式设置过的 size_request(与 SetContentSize\n"
-         "  // 配套);原实现对未挂载视图取 GetPixelBounds()=0×0 强制写入,声明式整页\n"
-         "  // 滚动(高度动态)的滚动范围恒 0。未显式设置时复位 -1,viewport 按\n"
-         "  // 自然尺寸(nu_container preferred 补丁)计算滚动范围。\n"
+         "  // moonbit-libyue 补丁:无显式 SetContentSize 时,宽度保持 -1(随视口\n"
+         "  // 拉伸),高度取内容 yoga 自然高度并固化为 size_request——GtkViewport\n"
+         "  // 以 child 的 size_request 计算滚动范围,动态高度内容(声明式整页\n"
+         "  // 滚动)由此获得正确滚动范围;原实现对未挂载视图取 GetPixelBounds()\n"
+         "  // =0×0 强制写入,滚动范围恒 0。固定值也让 GTK 尺寸协商一次收敛,\n"
+         "  // 避免动态 requisition 反复震荡。\n"
          "  int req_w = -1, req_h = -1;\n"
          "  if (content_view_) {\n"
          "    gtk_widget_get_size_request(content_view_->GetNative(), &req_w, &req_h);\n"
          "    if (req_w == 0 && req_h == 0)  // 上游写入过的 0×0 视为未设置\n"
          "      req_w = req_h = -1;\n"
+         "  }\n"
+         "  if (req_w == -1 && req_h == -1 && view->IsContainer()) {\n"
+         "    SizeF natural = static_cast<Container*>(view)->GetPreferredSize();\n"
+         "    if (natural.height() > 0)\n"
+         "      req_h = static_cast<int>(natural.height());\n"
          "  }\n"),
         (scroll_src,
          "  gtk_container_add(GTK_CONTAINER(viewport), view->GetNative());\n"
@@ -335,6 +366,19 @@ def patch_linux_container_events() -> None:
          "}",
          "  gtk_container_add(GTK_CONTAINER(viewport), view->GetNative());\n"
          "  gtk_widget_set_size_request(view->GetNative(), req_w, req_h);\n"
+         "}"),
+        (scroll_src,
+         "void Slider::SetValue(float value) {\n"
+         "  g_object_set_data(G_OBJECT(GetNative()), \"ignore-value-change\", this);\n"
+         "  gtk_range_set_value(GTK_RANGE(GetNative()), value);\n"
+         "}",
+         "void Slider::SetValue(float value) {\n"
+         "  // moonbit-libyue 补丁:仅当值真的变化才设 ignore 标记。原实现无条件设,\n"
+         "  // 而 GTK 对\"设置相同值\"(如初始化 value=0)不发 value-changed,标记残留\n"
+         "  // ——用户此后第一次拖动的首个 on_value_change 被吞,滑块联动失效。\n"
+         "  if (GetValue() != value)\n"
+         "    g_object_set_data(G_OBJECT(GetNative()), \"ignore-value-change\", this);\n"
+         "  gtk_range_set_value(GTK_RANGE(GetNative()), value);\n"
          "}"),
     ]
     texts: dict[Path, str] = {}
