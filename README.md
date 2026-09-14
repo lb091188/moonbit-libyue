@@ -1,5 +1,7 @@
 # moonbit-libyue
 
+[![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
+
 MoonBit bindings for [libyue](https://libyue.com/docs/latest/cpp/).  
 The upstream library supports Windows, macOS and Linux; the first milestone of this port targets Ubuntu + Xfce4 (X11), with the remaining platforms to follow.
 

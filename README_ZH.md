@@ -1,5 +1,7 @@
 # moonbit-libyue
 
+[![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
+
 [libyue](https://libyue.com/docs/latest/cpp/) 的 MoonBit 封装。  
 原库支持 Windows、Mac OS、Linux，迁移第一阶段以跑通 Ubuntu Xfce4 环境为第一目标，后续在此基础上再推进。
 

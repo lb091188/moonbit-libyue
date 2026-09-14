@@ -120,7 +120,22 @@ def link_configs() -> dict:
     if platform.system() == "Linux":
         extra = pkg_config_libs() + ["-lpthread", "-ldl", "-lm", "-lstdc++"]
     else:  # Darwin
-        extra = ["-lpthread"]
+        # shim/CMakeLists 在 macOS 产出 ARC 主库 + no-ARC 第二库两个静态库，
+        # 官方构建链接时两个都要（no-ARC 库符号被主库引用，须排在其后）。
+        # 框架与运行时库对照 shim/CMakeLists 的 APPLE 段；静态库的系统依赖
+        # 不会自动传播到 moon 的链接命令行，必须在此显式给出（与 Linux 侧
+        # pkg-config 补系统库同构）。首次 macOS 实测在 CI（见
+        # .github/workflows/ci.yml 的 macos job），结果回写 docs/adaptation.md。
+        extra = [
+            "-lyue_mbt_noarc",
+            "-framework", "AppKit",
+            "-framework", "Carbon",
+            "-framework", "IOKit",
+            "-framework", "Security",
+            "-framework", "WebKit",
+            "-framework", "OpenDirectory",
+            "-lobjc", "-lc++", "-lpthread",
+        ]
     return {"link_configs": [{
         "package": "lkyh/moonbit-libyue/yue",
         "link_flags": f"-L{build} -lyue_mbt " + " ".join(extra),

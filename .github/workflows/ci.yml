@@ -1,0 +1,146 @@
+# CI 流水线:三平台(Linux + Windows + macOS)
+#
+# 链路与 AGENTS.md 规则 6 的提交门禁一致:
+#   依赖装齐 → prepare.py 原生层(钉版本 libyue + CMake 静态库)
+#   → moon check(零错误零警告)→ moon test(纯 MoonBit 单测)
+#   → moon build --target native(全包构建 + 链接)
+#   → Linux 侧 xvfb 虚拟显示跑 hello 冒烟(GUI 事件循环存活即通过)
+#
+# 说明:
+# - 链接参数由 scripts/prebuild.py(moon 构建钩子)按当前系统生成并传播,
+#   workflow 不写任何链接配置;原生层产物缓存命中时 prepare.py 秒级返回。
+# - Windows / macOS 不做运行冒烟(headless 会话不可靠:无窗口会话/
+#   无 WindowServer),链接成功即强验证。
+# - 冒烟判定:hello 是常驻事件循环,timeout 到期返回 124 = 进程存活 20 秒;
+#   启动崩溃/链接失败会以其他退出码失败。
+# - macOS 是本仓库首次实测该平台构建链(此前 macOS 分支"已备未实测"),
+#   ARM64 Runner;libyue 的 mac 源码与 Cocoa 均架构无关。
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  linux:
+    name: Linux(构建 + 测试 + xvfb 冒烟)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装系统依赖(GTK/webkit/X11 开发包 + xvfb)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config \
+            libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev \
+            libwebkit2gtk-4.1-dev xvfb
+
+      - name: 安装 moon 工具链
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: 缓存原生层产物(build + vendor + 下载缓存)
+        uses: actions/cache@v4
+        with:
+          path: |
+            build
+            vendor
+            .prepare
+          key: native-linux-${{ hashFiles('scripts/prepare.py') }}
+
+      - name: 构建原生层(钉版本下载 libyue + CMake 静态库)
+        run: python3 scripts/prepare.py
+
+      - name: 静态检查 + 单元测试 + 全量构建
+        run: |
+          moon check
+          moon test
+          moon build --target native
+
+      - name: GUI 冒烟(hello 在虚拟显示下存活 20 秒即通过)
+        run: |
+          set +e
+          timeout 20s xvfb-run -a moon run examples/hello
+          code=$?
+          set -e
+          if [ "$code" -ne 124 ]; then
+            echo "::error::冒烟失败,退出码 $code(预期 124 = GUI 进程存活到超时)"
+            exit 1
+          fi
+
+  windows:
+    name: Windows(MSVC 构建 + 测试)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 moon 工具链
+        shell: pwsh
+        run: |
+          iwr https://cli.moonbitlang.com/install/powershell.ps1 -useb | iex
+          echo "$env:USERPROFILE\.moon\bin" >> $env:GITHUB_PATH
+
+      # moon.mod.json 的 prebuild 钩子写死 `python3 scripts/prebuild.py`,
+      # Windows runner 只有 python.exe——复制一份改名放进已入 PATH 的
+      # ~/.moon/bin,后续步骤的 python3 命令即可解析。
+      - name: 提供 python3 命令别名
+        shell: pwsh
+        run: |
+          $py = (Get-Command python).Source
+          Copy-Item $py "$env:USERPROFILE\.moon\bin\python3.exe"
+
+      - name: 缓存原生层产物(build + vendor + 下载缓存)
+        uses: actions/cache@v4
+        with:
+          path: |
+            build
+            vendor
+            .prepare
+          key: native-windows-${{ hashFiles('scripts/prepare.py') }}
+
+      # vcvars64 用 vswhere 定位(不依赖 VS 具体版本/ Edition 路径);
+      # prepare.py 会自动从 NuGet 补 WebView2 头文件与 loader DLL。
+      - name: 构建原生层 + 检查/测试/构建(MSVC 环境)
+        shell: cmd
+        run: >-
+          for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath')
+          do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
+          && python scripts\prepare.py
+          && moon check
+          && moon test
+          && moon build --target native
+
+  macos:
+    name: macOS(构建 + 测试)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 moon 工具链
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: 缓存原生层产物(build + vendor + 下载缓存)
+        uses: actions/cache@v4
+        with:
+          path: |
+            build
+            vendor
+            .prepare
+          key: native-macos-${{ hashFiles('scripts/prepare.py') }}
+
+      # Xcode/CLT 与 CMake 为 Runner 自带;macOS 侧无 pkg-config 依赖
+      # (prebuild 的 Darwin 分支直接给框架链接参数,不走 pkg-config)。
+      - name: 构建原生层(钉版本下载 libyue + CMake 静态库)
+        run: python3 scripts/prepare.py
+
+      - name: 静态检查 + 单元测试 + 全量构建
+        run: |
+          moon check
+          moon test
+          moon build --target native
