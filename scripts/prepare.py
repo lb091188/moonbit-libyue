@@ -185,6 +185,64 @@ def patch_vendor_headers() -> None:
         print(f"已应用 vendor 头补丁：{path.name}")
 
 
+def patch_win_task_dialog() -> None:
+    """vendor 补丁：TaskDialogIndirect 改为 GetProcAddress 动态解析。
+
+    libyue 的 Windows 消息框静态导入 comctl32 的 TaskDialogIndirect（仅以
+    序数 345 导出，v6 才有）。exe 无 Common-Controls v6 清单时加载旧版
+    comctl32，解析静态导入阶段即崩（0xc0000138 ENTRYPOINT_NOT_FOUND，
+    CI 的 moon 测试驱动实测）——moon 新版给链接的 exe 自带的清单不含
+    Common-Controls，故不能依赖链接期清单兜底。改为运行时动态解析：
+    有 v6（真机，带我们的 manifest）行为不变；无 v6 按取消降级。
+    幂等；vendor 目录不进版本库，重跑本脚本自动重新应用。
+    """
+    helper = (
+        "static const auto task_dialog_indirect =\n"
+        "    reinterpret_cast<decltype(&::TaskDialogIndirect)>(\n"
+        "        ::GetProcAddress(::GetModuleHandleW(L\"comctl32.dll\"),\n"
+        "                         MAKEINTRESOURCEA(345)));"
+    )
+    patches = [
+        # MessageBoxImpl::ThreadMain：后台线程模态弹窗
+        ("    BOOL flag = FALSE;\n"
+         "    int res = 0;\n"
+         "    ::TaskDialogIndirect(&config, &res, nullptr, &flag);",
+         "    BOOL flag = FALSE;\n"
+         "    int res = 0;\n"
+         "    // moonbit-libyue 补丁：动态解析序数 345，无 v6 清单的 exe 加载期不再崩\n"
+         f"    {helper.replace(chr(10), chr(10) + '    ')}\n"
+         "    if (task_dialog_indirect == nullptr) {  // 无 v6 comctl32：按取消关闭\n"
+         "      box->OnClose();\n"
+         "      return;\n"
+         "    }\n"
+         "    task_dialog_indirect(&config, &res, nullptr, &flag);"),
+        # MessageBox::PlatformRunForWindow：同步模态弹窗
+        ("  int res = cancel_response_;\n"
+         "  BOOL flag = FALSE;\n"
+         "  ::TaskDialogIndirect(&box_->config, &res, nullptr, &flag);",
+         "  int res = cancel_response_;\n"
+         "  BOOL flag = FALSE;\n"
+         "    // moonbit-libyue 补丁：动态解析序数 345，无 v6 时返回取消响应\n"
+         f"    {helper.replace(chr(10), chr(10) + '    ')}\n"
+         "    if (task_dialog_indirect != nullptr)\n"
+         "      task_dialog_indirect(&box_->config, &res, nullptr, &flag);"),
+    ]
+    patched = False
+    for source in (VENDOR_DIR / "libyue/src/win/nativeui").glob("*.cc"):
+        text = source.read_text(encoding="utf-8", errors="replace")
+        for old, new in patches:
+            if new in text:
+                patched = True  # 已应用（理论不可达：extract 每次还原原文件）
+                continue
+            if old in text:
+                text = text.replace(old, new)
+                patched = True
+                print(f"已应用 TaskDialog 补丁：{source.name}")
+        source.write_text(text, encoding="utf-8")
+    if not patched:
+        raise SystemExit("TaskDialog 补丁未命中任何目标（上游源码可能已变）")
+
+
 def cmake_build() -> None:
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
@@ -216,6 +274,7 @@ def main() -> None:
     patch_vendor_headers()
     if os_name == "Windows":
         patch_win_text_rendering()
+        patch_win_task_dialog()
         fetch_webview2_sdk()
     cmake_build()
     print("prepare 完成")
