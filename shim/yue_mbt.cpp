@@ -19,12 +19,15 @@
 #include <windows.h>
 #include <shobjidl.h>
 #include <winreg.h>
+#include <shellapi.h>
 #endif
 #include "yue_mbt.h"
 
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <csignal>
 #if defined(__linux__)
 #include <dlfcn.h>
 #endif
@@ -49,6 +52,7 @@
 #include "nativeui/screen.h"
 #if defined(OS_WIN)
 #include "nativeui/win/window_win.h" // WindowImpl::hwnd()（气泡替代窗口定位/置顶）
+#include "nativeui/win/util/tray_host.h" // TrayHost::hwnd()（托盘幽灵图标防护）
 #endif
 
 // 不包含 <moonbit.h>：它在 extern "C" 里声明的 memcpy 与 glibc 的
@@ -3081,6 +3085,83 @@ int32_t yue_mbt_tray_supported(void) {
 
 #endif
 
+#if defined(OS_WIN)
+// ---------- 托盘幽灵图标防护 ----------
+// nu::Tray 的引用被 TrayStore 全局持有,正常退出靠 CRT 静态析构链释放
+// (Store 析构 → 引用归零 → TrayImpl 析构 → NIM_DELETE);崩溃、abort、
+// 关闭控制台等异常退出这条链不跑,而 Explorer 对死进程的托盘图标是惰性
+// 清理(鼠标扫过才移除),于是留下「幽灵托盘」。首次创建托盘时捕获
+// TrayHost 属主窗口并安装进程级钩子,凡是还有机会执行代码的退出路径都
+// 按属主窗口 + ID 区间补发 NIM_DELETE(libyue 的图标 ID 从 2 起连续分配、
+// 只增不复用,对已删除 ID 的 NIM_DELETE 是无害空操作)。
+// TerminateProcess/taskkill /F 式硬杀没有任何进程代码可执行,幽灵仍由
+// 系统惰性清理,无法在进程侧根除。
+struct TrayGhostGuard {
+  HWND host_hwnd = nullptr;  // TrayHost 窗口,创建首个托盘时捕获
+  UINT max_icon_id = 1;      // 已分配的最大图标 ID(初始 1 = 尚未分配过)
+  LPTOP_LEVEL_EXCEPTION_FILTER prev_seh_filter = nullptr;
+  bool hooks_installed = false;
+
+  static TrayGhostGuard &get() {
+    static TrayGhostGuard guard;
+    return guard;
+  }
+
+  void register_tray(HWND hwnd) {
+    if (hwnd != nullptr) {
+      host_hwnd = hwnd;
+    }
+    ++max_icon_id;
+    install_hooks();
+  }
+
+  void sweep() {
+    if (host_hwnd == nullptr) {
+      return;
+    }
+    for (UINT id = 2; id <= max_icon_id; ++id) {
+      NOTIFYICONDATAW data;
+      memset(&data, 0, sizeof(data));
+      data.cbSize = sizeof(data);
+      data.hWnd = host_hwnd;
+      data.uID = id;
+      ::Shell_NotifyIconW(NIM_DELETE, &data);
+    }
+  }
+
+  static void sweep_at_exit() { get().sweep(); }
+
+  static void on_sigabrt(int) {
+    get().sweep();  // libyue CHECK 失败走 abort;扫完让默认终止流程继续
+  }
+
+  static BOOL WINAPI on_console_ctrl(DWORD event) {
+    (void)event;  // Ctrl+C / Ctrl+Break / 关闭控制台 / 注销一律先扫再放行
+    get().sweep();
+    return FALSE;  // 交回默认处理,进程退出语义不变
+  }
+
+  static LONG WINAPI on_seh(EXCEPTION_POINTERS *info) {
+    get().sweep();
+    // 不吞崩溃:清扫后交还前一过滤器/默认处理
+    return TrayGhostGuard::get().prev_seh_filter != nullptr
+               ? TrayGhostGuard::get().prev_seh_filter(info)
+               : EXCEPTION_CONTINUE_SEARCH;
+  }
+
+  void install_hooks() {
+    if (hooks_installed) {
+      return;
+    }
+    hooks_installed = true;
+    std::atexit(&sweep_at_exit);
+    std::signal(SIGABRT, &on_sigabrt);
+    ::SetConsoleCtrlHandler(&on_console_ctrl, TRUE);
+    prev_seh_filter = ::SetUnhandledExceptionFilter(&on_seh);
+  }
+};
+#endif  // OS_WIN
+
 void *yue_mbt_tray_new(const char *icon_path, int32_t *ok) {
   *ok = 0;
   if (!yue_mbt_tray_supported()) {
@@ -3090,7 +3171,15 @@ void *yue_mbt_tray_new(const char *icon_path, int32_t *ok) {
   if (image->IsEmpty()) {
     return nullptr;
   }
+#if defined(OS_WIN)
+  // 捕获 TrayHost 窗口,供异常退出时补发 NIM_DELETE(见 TrayGhostGuard)
+  nu::TrayHost *tray_host = g_state != nullptr ? g_state->GetTrayHost() : nullptr;
+  HWND tray_host_hwnd = tray_host != nullptr ? tray_host->hwnd() : nullptr;
+#endif
   auto tray = scoped_refptr<nu::Tray>(new nu::Tray(image));
+#if defined(OS_WIN)
+  TrayGhostGuard::get().register_tray(tray_host_hwnd);
+#endif
   *ok = 1;
   return reinterpret_cast<void *>(TrayStore::put(tray));
 }
