@@ -1,6 +1,6 @@
 {
   "is-main": true,
   "import": [
-    "lkyh/moonbit-libyue/yue"
+    "NoahLiu/moonbit-libyue/yue"
   ]
 }

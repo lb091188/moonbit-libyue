@@ -130,13 +130,13 @@ moon run examples/hello
 ### 作为依赖使用（mooncakes）
 
 ```sh
-moon add lkyh/moonbit-libyue
+moon add NoahLiu/moonbit-libyue
 ```
 
 库代码（`yue/`）发布在 mooncakes，使用方零配置：
 
 ```sh
-moon add lkyh/moonbit-libyue
+moon add NoahLiu/moonbit-libyue
 moon run src   # 无需任何链接配置；安装时自动构建原生层，缺失时构建钩子自动补建
 ```
 
