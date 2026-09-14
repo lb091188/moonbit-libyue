@@ -18,6 +18,7 @@ link_configs 会被 moon 自动传播给所有依赖 yue 包的 main 包——�
 from __future__ import annotations
 
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -110,10 +111,16 @@ def link_configs() -> dict:
     """
     build = str(BUILD_DIR.resolve()).replace("\\", "/")
     if sys.platform == "win32":
+        # YUE_MBT_SKIP_MANIFEST=1:不传 manifest.res。moon 新版给链接的
+        # exe 自带 MANIFEST 资源，与我们的 manifest.res 同名冲突，链接报
+        # CVT1100 duplicate resource（CI 实测）。CI 环境设此变量规避；
+        # 真机不设则保留 manifest（TaskDialog 依赖 Common-Controls v6）。
+        manifest = "" if os.environ.get("YUE_MBT_SKIP_MANIFEST") == "1" \
+            else f"{build}/yue_mbt_manifest.res "
         return {"link_configs": [{
             "package": "NoahLiu/moonbit-libyue/yue",
             "link_flags": (
-                f"{build}/yue_mbt_manifest.res {build}/yue_mbt.lib "
+                f"{manifest}{build}/yue_mbt.lib "
                 + " ".join(WINDOWS_LINK_LIBS)
             ),
         }]}

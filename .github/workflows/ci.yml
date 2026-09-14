@@ -7,9 +7,9 @@
 #   → Linux 侧 xvfb 虚拟显示跑 hello 冒烟(GUI 事件循环存活即通过)
 #
 # 说明:
-# - moon 版本钉在 0.1.20260904(Windows 真机验证通过的版本):最新版
-#   moon 的测试可执行文件自带 MANIFEST 资源,与 libyue 的 manifest.res
-#   重复,链接报 CVT1100(CI 实测)。
+# - Windows 构建步设 YUE_MBT_SKIP_MANIFEST=1:moon 新版给链接的 exe 自带
+#   MANIFEST 资源,与 libyue 所需的 manifest.res 同名冲突(CVT1100,实测);
+#   CI 跳过我们的 manifest 让 moon 的顶上。真机不设此变量,行为不变。
 # - 链接参数由 scripts/prebuild.py(moon 构建钩子)按当前系统生成并传播,
 #   workflow 不写任何链接配置;原生层产物缓存命中时 prepare.py 秒级返回。
 # - Windows / macOS 不做运行冒烟(headless 会话不可靠:无窗口会话/
@@ -41,9 +41,9 @@ jobs:
             libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev \
             libwebkit2gtk-4.1-dev xvfb
 
-      - name: 安装 moon 工具链(钉版本)
+      - name: 安装 moon 工具链
         run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s 0.1.20260904
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: 缓存原生层产物(build + vendor + 下载缓存)
@@ -81,10 +81,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: 安装 moon 工具链(钉版本)
+      - name: 安装 moon 工具链
         shell: pwsh
         run: |
-          $env:MOONBIT_INSTALL_VERSION = "0.1.20260904"
           iwr https://cli.moonbitlang.com/install/powershell.ps1 -useb | iex
           echo "$env:USERPROFILE\.moon\bin" >> $env:GITHUB_PATH
 
@@ -108,8 +107,12 @@ jobs:
 
       # vcvars64 用 vswhere 定位(不依赖 VS 具体版本/ Edition 路径);
       # prepare.py 会自动从 NuGet 补 WebView2 头文件与 loader DLL。
+      # YUE_MBT_SKIP_MANIFEST:moon 新版 exe 自带 MANIFEST,与 libyue 的
+      # manifest.res 同名冲突(CVT1100);CI 跳过我们的 manifest 规避。
       - name: 构建原生层 + 检查/测试/构建(MSVC 环境)
         shell: cmd
+        env:
+          YUE_MBT_SKIP_MANIFEST: "1"
         run: >-
           for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath')
           do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
@@ -138,9 +141,9 @@ jobs:
           sudo xcode-select -s "$latest16"
           clang++ --version
 
-      - name: 安装 moon 工具链(钉版本)
+      - name: 安装 moon 工具链
         run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s 0.1.20260904
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: 缓存原生层产物(build + vendor + 下载缓存)
