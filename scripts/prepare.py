@@ -169,6 +169,13 @@ def cmake_build() -> None:
 
 
 def main() -> None:
+    # Windows CI/控制台常为 cp1252 等无法编码中文的代码页，print 直接崩
+    # （UnicodeEncodeError）；统一转 UTF-8，无法表示的字符替换而非报错。
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass
     os_name = system()
     if os_name not in SHA256:
         raise SystemExit(f"暂不支持的平台：{os_name}")

@@ -34,7 +34,7 @@
 
 #include "base/command_line.h"
 #include "nativeui/nativeui.h"
-#if !defined(OS_WIN) // Windows 版 libyue 无 Popover（发行包不含 popover.h/实现）
+#if defined(OS_LINUX) // Popover 仅 Linux 发行包提供（win/mac 均无 popover.h/实现）
 #include "nativeui/popover.h"
 #endif
 #include "nativeui/date_picker.h"
@@ -153,10 +153,11 @@ using ImageStore = Store<nu::Image>;
 using CanvasStore = Store<nu::Canvas>;
 using AttributedTextStore = Store<nu::AttributedText>;
 using FontStore = Store<nu::Font>;
-#if !defined(OS_WIN)
+#if defined(OS_LINUX)
 using PopoverStore = Store<nu::Popover>;
 #else
-// Windows 版 libyue 无 Popover：用无边框、不激活、置顶的小窗口替代
+// Windows/macOS 版 libyue 无 Popover：用无边框小窗口替代
+// （mac 的 Window::Options 无 no_activate 字段，弹窗可能抢焦点，桩级可接受）
 using PopoverStore = Store<nu::Window>;
 #endif
 using MessageBoxStore = Store<nu::MessageBox>;
@@ -2207,11 +2208,19 @@ void yue_mbt_progress_bar_set_indeterminate(void *bar, int32_t yes) {
   }
 }
 
-#if !defined(OS_WIN)
+#if defined(OS_LINUX)
 void *yue_mbt_popover_new(void) {
   return reinterpret_cast<void *>(PopoverStore::put(new nu::Popover()));
 }
+#elif defined(OS_MAC)
+// macOS 桩：无边框小窗口（Options 无 no_activate 字段）
+void *yue_mbt_popover_new(void) {
+  nu::Window::Options options;
+  options.frame = false;  // 无边框
+  return reinterpret_cast<void *>(PopoverStore::put(new nu::Window(options)));
+}
 #else
+// Windows 桩：无边框、不激活的小窗口 + 8 秒自动关闭
 // 替代窗口存储：展示中的气泡（供自动关闭定时器使用）
 nu::Window *g_active_popover_window = nullptr;
 
@@ -2233,7 +2242,7 @@ void *yue_mbt_popover_new(void) {
 }
 #endif
 
-#if !defined(OS_WIN)
+#if defined(OS_LINUX)
 void yue_mbt_popover_set_content(void *popover, void *content) {
   auto *p = PopoverStore::get(popover);
   auto *c = CastToView(content);
@@ -2251,7 +2260,7 @@ void yue_mbt_popover_set_content(void *popover, void *content) {
 }
 #endif
 
-#if !defined(OS_WIN)
+#if defined(OS_LINUX)
 void yue_mbt_popover_set_content_size(void *popover, double w, double h) {
   if (auto *p = PopoverStore::get(popover)) {
     p->SetContentSize(
@@ -2267,13 +2276,27 @@ void yue_mbt_popover_set_content_size(void *popover, double w, double h) {
 }
 #endif
 
-#if !defined(OS_WIN)
+#if defined(OS_LINUX)
 void yue_mbt_popover_show_relative_to(void *popover, void *view) {
   auto *p = PopoverStore::get(popover);
   auto *v = CastToView(view);
   if (p != nullptr && v != nullptr) {
     p->ShowRelativeTo(v);
   }
+}
+#elif defined(OS_MAC)
+// macOS 桩：锚定控件屏幕坐标的右下方弹窗（无 Win32 定时器，不自动关闭）
+void yue_mbt_popover_show_relative_to(void *popover, void *view) {
+  auto *win = PopoverStore::get(popover);
+  auto *v = CastToView(view);
+  if (win == nullptr || v == nullptr) {
+    return;
+  }
+  const nu::RectF anchor = v->GetBoundsInScreen();
+  const nu::SizeF size = win->GetContentSize();
+  const float x = anchor.right() + 8.0f;
+  const float y = anchor.bottom() + 8.0f;
+  win->SetBounds(nu::RectF(x, y, size.width(), size.height()));
 }
 #else
 void yue_mbt_popover_show_relative_to(void *popover, void *view) {
@@ -2300,7 +2323,7 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view) {
 }
 #endif
 
-#if !defined(OS_WIN)
+#if defined(OS_LINUX)
 void yue_mbt_popover_close(void *popover) {
   if (auto *p = PopoverStore::get(popover)) {
     p->Close();
@@ -2314,7 +2337,7 @@ void yue_mbt_popover_close(void *popover) {
 }
 #endif
 
-#if !defined(OS_WIN)
+#if defined(OS_LINUX)
 void yue_mbt_popover_on_close(void *popover, void (*invoke)(void *), void *closure) {
   if (auto *p = PopoverStore::get(popover)) {
     p->on_close.Connect([invoke, closure](nu::Popover *) { invoke(closure); });

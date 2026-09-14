@@ -116,9 +116,23 @@ jobs:
 
   macos:
     name: macOS(构建 + 测试)
-    runs-on: macos-latest
+    # 不用 macos-latest(现挂 Xcode 26/AppleClang 21):vendored 的
+    # partition_alloc/id_map 头文件编不动(no_destructor.h/id_map.h 报错),
+    # 需 Xcode 16 的 clang;首跑失败与修复记录见 docs/adaptation.md
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: 选用 Xcode 16(AppleClang 21 编不动 vendored 老头文件)
+        run: |
+          ls -d /Applications/Xcode*.app || true
+          latest16=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$latest16" ]; then
+            echo "::error::镜像上没有 Xcode 16,请改用其他 macOS 镜像或给 libyue 打头文件补丁"
+            exit 1
+          fi
+          sudo xcode-select -s "$latest16"
+          clang++ --version
 
       - name: 安装 moon 工具链
         run: |
