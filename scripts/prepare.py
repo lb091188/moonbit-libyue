@@ -351,6 +351,105 @@ def patch_linux_container_events() -> None:
         path.write_text(text, encoding="utf-8")
 
 
+def patch_win_scroll_natural_size() -> None:
+    """vendor 补丁（Windows）：Scroll 滚动范围跟随内容自然尺寸。
+
+    Windows 的 ScrollImpl 用自绘滚动条，滚动范围只来自 content_size_，而它
+    只能经 Scroll::SetContentSize 显式写入（初值 0×0）。声明式整页滚动
+    （内容高度动态、从不 SetContentSize）的范围因此恒 0，滚轮/滚动条全
+    失效——与 Linux 端 nu_container preferred 尺寸 + size_request 两处补丁
+    同一根因的 Windows 版（幂等；vendor 不进版本库，重跑本脚本自动重新
+    应用）。改为：未显式 SetContentSize 过（打补丁新增标记位）时，Layout
+    里实时向内容视图的 yoga 树查自然尺寸，尺寸变化时重建滚动条。
+    """
+    header = VENDOR_DIR / "libyue/include/nativeui/win/scroll_win.h"
+    source = VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc"
+    patches = [
+        (header,
+         "  Size content_size_;\n  Vector2d origin_;",
+         "  Size content_size_;\n"
+         "  // moonbit-libyue 补丁:是否显式 SetContentSize 过;false 时滚动范围\n"
+         "  // 跟随内容自然尺寸(Layout 时实时向 yoga 查询)。\n"
+         "  bool content_size_explicit_ = false;\n"
+         "  Vector2d origin_;"),
+        (source,
+         "void ScrollImpl::SetContentSize(const Size& size) {\n"
+         "  content_size_ = size;",
+         "void ScrollImpl::SetContentSize(const Size& size) {\n"
+         "  content_size_ = size;\n"
+         "  content_size_explicit_ = true;  // moonbit-libyue 补丁:显式设置过,Layout 不再用自然尺寸覆盖"),
+        (source,
+         "void ScrollImpl::Layout() {\n"
+         "  if (h_scrollbar_)\n"
+         "    h_scrollbar_->SizeAllocate(GetScrollbarRect(false) +\n"
+         "                               size_allocation().OffsetFromOrigin());",
+         "void ScrollImpl::Layout() {\n"
+         "  // moonbit-libyue 补丁:未显式 SetContentSize 时滚动范围跟随内容自然\n"
+         "  // 尺寸。上游 content_size_ 初值 0×0 且只能经 SetContentSize 写入,\n"
+         "  // 声明式整页滚动(高度动态)的范围恒 0,滚轮/滚动条全失效;内容是\n"
+         "  // yoga 容器时向其查自然尺寸,尺寸变化时重建滚动条。\n"
+         "  if (delegate_->GetContentView() && !content_size_explicit_ &&\n"
+         "      delegate_->GetContentView()->IsContainer()) {\n"
+         "    const SizeF pref = static_cast<Container*>(\n"
+         "        delegate_->GetContentView())->GetPreferredSize();\n"
+         "    const Size natural = ToCeiledSize(ScaleSize(pref, scale_factor()));\n"
+         "    if (natural != content_size_) {\n"
+         "      content_size_ = natural;\n"
+         "      UpdateScrollbar();\n"
+         "    }\n"
+         "  }\n"
+         "  if (h_scrollbar_)\n"
+         "    h_scrollbar_->SizeAllocate(GetScrollbarRect(false) +\n"
+         "                               size_allocation().OffsetFromOrigin());"),
+    ]
+    texts: dict[Path, str] = {}
+    for path, old, new in patches:
+        if path not in texts:
+            texts[path] = path.read_text(encoding="utf-8")
+        if new in texts[path]:
+            continue  # 已应用（理论不可达：extract 每次还原原文件）
+        if old not in texts[path]:
+            raise SystemExit(f"vendor 补丁目标文本未找到（上游可能已变）：{path}")
+        texts[path] = texts[path].replace(old, new)
+        print(f"已应用 Windows 滚动自然尺寸补丁：{path.name}")
+    for path, text in texts.items():
+        path.write_text(text, encoding="utf-8")
+
+
+def patch_win_webview2_args() -> None:
+    """vendor 补丁（Windows）：环境变量 LIBYUE_WEBVIEW2_ARGS 追加浏览器参数。
+
+    WebView2（Chromium）默认跟随系统代理，系统代理指向的本地进程不在时
+    （如 Clash 退出未还原代理设置）所有页面一律报「无网络」错误页，而应用
+    直连正常，IE 回退路径也会因 WinInet 同样配置受影响。libyue 未暴露
+    AdditionalBrowserArguments，故在此补丁里支持经环境变量注入：如设
+    LIBYUE_WEBVIEW2_ARGS=--no-proxy-server 强制直连（幂等；vendor 不进版本
+    库，重跑本脚本自动重新应用）。
+    """
+    source = VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc"
+    old = ("Microsoft::WRL::ComPtr<CoreWebView2EnvironmentOptions> GetWebView2Options() {\n"
+           "  auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();\n"
+           "  Microsoft::WRL::ComPtr<ICoreWebView2EnvironmentOptions4> options4;")
+    new = ("Microsoft::WRL::ComPtr<CoreWebView2EnvironmentOptions> GetWebView2Options() {\n"
+           "  auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();\n"
+           "  // moonbit-libyue 补丁:环境变量 LIBYUE_WEBVIEW2_ARGS 追加 WebView2 浏览器\n"
+           "  // 参数。典型用途:系统代理失效时设 --no-proxy-server 直连(WebView2\n"
+           "  // 默认跟随系统代理,代理进程不在时页面一律报「无网络」)。\n"
+           "  {\n"
+           "    wchar_t extra_args[2048] = L\"\";\n"
+           "    if (::GetEnvironmentVariableW(L\"LIBYUE_WEBVIEW2_ARGS\", extra_args, 2048) > 0)\n"
+           "      options->put_AdditionalBrowserArguments(extra_args);\n"
+           "  }\n"
+           "  Microsoft::WRL::ComPtr<ICoreWebView2EnvironmentOptions4> options4;")
+    text = source.read_text(encoding="utf-8")
+    if new in text:
+        return  # 已应用（理论不可达：extract 每次还原原文件）
+    if old not in text:
+        raise SystemExit(f"vendor 补丁目标文本未找到（上游可能已变）：{source}")
+    source.write_text(text.replace(old, new), encoding="utf-8")
+    print("已应用 WebView2 浏览器参数补丁：nativeui_jumbo_4.cc")
+
+
 def cmake_build() -> None:
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
@@ -383,6 +482,8 @@ def main() -> None:
     if os_name == "Windows":
         patch_win_text_rendering()
         patch_win_task_dialog()
+        patch_win_scroll_natural_size()
+        patch_win_webview2_args()
         fetch_webview2_sdk()
     if os_name == "Linux":
         patch_linux_container_events()

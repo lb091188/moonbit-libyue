@@ -147,6 +147,10 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **浏览器优先 WebView2**:发行包 vendor 只带 WebView2Loader.dll 不带头文件,官方 CMake 也未启用;prepare.py 现从 NuGet 固定版本补齐 `WebView2.h`(sha256 钉死)并把 loader DLL 复制到仓库根(libyue 按 exe 目录→工作目录搜索)。shim 构建定义 `WEBVIEW2_SUPPORT` 并加 include;`Browser::new` 在 Windows 默认 `webview2_support=true`,loader/运行时缺失时 libyue 自动回退 IE。验证:本地 HTML(load_html)、ExecuteScript 正常;远程站点依赖系统代理可用。
 - **demo:// 自定义协议在 WebView2 下静默无效**(注册/拦截链齐全但导航无效果,IE 引擎可用):上游待查;IE 兜底路径保留。
 - **滚动区内容零高度(跨平台统一默认值原则)**:win32 的 Group/Scroll 不按内容自增长(GTK 有自然首选尺寸),showcase 里"滚动区里的文本编辑"整块塌陷。修复:给 Group 显式 `set_style("height", 128)`——同一默认值两端表现一致;遇到类似不一致一律用统一默认值吸收,不做平台分支。
+- **声明式整页滚动失效(2026-09-14 实测,与 Linux GTK 同根因的 Windows 版)**:现象是各页签内容只能看开头、滚轮无反应、滚动条不出现。根因:Windows 的 `ScrollImpl` 用自绘滚动条,滚动范围只来自 `content_size_`,而它只能经 `Scroll::SetContentSize` 显式写入(初值 0×0);声明式 `scroll()` 节点内容高度动态、从不调 SetContentSize,范围恒 0。修复:prepare.py 新增 vendor 补丁——`scroll_win.h` 加 `content_size_explicit_` 标记,`ScrollImpl::Layout` 在未显式设置时向内容视图的 yoga 树实时查自然尺寸(`GetPreferredSize`),尺寸变化即重建滚动条;与 Linux 端 nu_container preferred 尺寸 + size_request 两处补丁同一思路。验证:showcase 各页签滚轮整页滚动、滚动条出现并随内容更新。
+- **WebView2 页面一律报「无网络」(2026-09-14 实测)**:现象是 WebView2 引擎加载任意远程站点都出错误页,应用本身与直连网络正常(直连 curl 200)。根因:WebView2(Chromium)默认跟随系统代理,本机系统代理 `ProxyEnable=1` 指向 `127.0.0.1:7890`(Clash 类工具退出未还原设置),代理端口无监听 → 所有请求 ERR_PROXY_*;IE 回退路径走 WinInet 同样受影响。修复:libyue 未暴露 AdditionalBrowserArguments,prepare.py 补丁让 `GetWebView2Options` 读环境变量 `LIBYUE_WEBVIEW2_ARGS` 并 `put_AdditionalBrowserArguments` 注入——代理失效的机器设 `LIBYUE_WEBVIEW2_ARGS=--no-proxy-server` 即直连(见 showcase 网页页说明)。验证:设变量后 `moon run examples/showcase` 网页页完整渲染 moonbitlang.com(Chrome Legacy Window 确认 WebView2 引擎)。
+- **按键键码与修饰键跨平台不一致(2026-09-14 实测)**:现象一,Windows 上按键显示的数字与 yue 常量表(VKEY_ESCAPE=65307 等)对不上,比较恒 false。根因:libyue Windows 的 KeyboardCode 是 Win32 VK 值(Esc=0x1B),常量表取的是 keyboard_codes_gtk.h 键值(Esc=0xFF1B);修复:`yue/events.mbt` 事件入口 `normalize_win_vk` 把 VK 码归一化到常量表(字母/数字/空格两表本就同值),并新增 `KeyEvent::describe()` 输出 "Ctrl+A" 形式可读描述。现象二,Ctrl+A 显示成 Alt+A、Shift+Enter 显示成 Ctrl+Enter。根因:libyue Windows 修饰键位是 `Shift=2 Ctrl=4 Alt=8 Meta=16`,shim 的 `NormalizeModifiers` 只有 Linux/macOS 分支做归一化、Windows 原样透传,位值撞上 MoonBit 层 `KEY_MOD_ALT=4`。修复:shim 补 `OS_WIN` 分支映射到统一的 `1/2/4/8`。验证:真机按 Ctrl+A 显示「按键 Ctrl+A(键码 65,Esc=65307 A=65)」,键码与常量一致、修饰键正确;纯函数部分白盒单测覆盖(`events_wbtest.mbt`)。
+- **本轮复测还确认**:`moon test` 的测试驱动在安装新版 moon 后需 `YUE_MBT_SKIP_MANIFEST=1`(CI 同款,规避新版 moon 自带 MANIFEST 与 manifest.res 的 CVT1100);且 moon 不因静态库更新重链对测试驱动/showcase 同样成立——换 `yue_mbt.lib` 后要删 `_build` 下对应 exe 再跑,否则拿到旧链接产物误判(见上「链接参数」节)。
 - **Popover 气泡在 Windows 的替代实现**:libyue 无 Popover(见下),shim 用无边框、不抢焦点、置顶的小窗口替代,弹在点击位置右下,8 秒定时自动关闭(无外部点击关闭钩子),`close`/`on_close` 语义保留;验证:showcase 气泡按钮弹出/自动关闭/日志闭环。
 - 平台信息(`platform()=="windows"`、区域、缩放、屏幕)、剪贴板、定时器、全局快捷键注册、全局鼠标轮询、画布(GDI+)与浮动爱心窗口均实测正常。
 
@@ -154,7 +158,7 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 
 - `moon run examples/hello`:窗口渲染 + 托盘 + 点关闭经 `on_close→quit()` 优雅退出。
 - `moon run examples/showcase`:8 页签逐一点击(基础控件/输入与选择/画布/网页/对话框/系统集成/事件/富文本)、菜单(勾选/单选/表格独立窗口)、消息框、画布色相重绘、鼠标事件实时回显、全局鼠标、浮动爱心、关闭退出,全程日志零 CHECK 失败。
-- `moon check` / `moon test` 全仓通过(2026-09-12)。
+- 2026-09-14 复测(新版 moon + 声明式 showcase 12 页签):`moon check` 零警告、`YUE_MBT_SKIP_MANIFEST=1 moon test` 30/30 全过;真机逐页截图确认——整页滚轮滚动、滚动条出现;网页页 WebView2 完整渲染 moonbitlang.com(设 LIBYUE_WEBVIEW2_ARGS=--no-proxy-server);事件页按键显示 Ctrl+A/Esc,键码与常量表一致。
 
 ---
 

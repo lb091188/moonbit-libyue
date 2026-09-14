@@ -1874,7 +1874,8 @@ int64_t yue_mbt_image_to_handle(void *image) {
 // 修饰键归一化：MoonBit 层统一拿到 1=Shift 2=Ctrl 4=Alt 8=Meta。
 // Linux 原始 GDK 位：SHIFT=1<<0 CONTROL=1<<2 ALT(MOD1)=1<<3 META=1<<26（libyue
 // 的 KeyboardModifier::MASK_META，实为 GDK Super 位）；Mac 为 NSEventModifierFlags
-// 位（Shift=1<<17 Control=1<<18 Alt=1<<19 Cmd=1<<20，未实测）；Windows 暂透传。
+// 位（Shift=1<<17 Control=1<<18 Alt=1<<19 Cmd=1<<20，未实测）；Windows 为
+// libyue 的 MASK 位：SHIFT=1<<1 CONTROL=1<<2 ALT=1<<3 META=1<<4。
 static int32_t NormalizeModifiers(int32_t raw) {
 #if defined(OS_LINUX)
   int32_t out = 0;
@@ -1888,6 +1889,21 @@ static int32_t NormalizeModifiers(int32_t raw) {
     out |= 4;
   }
   if (raw & 0x1c000000) {
+    out |= 8;
+  }
+  return out;
+#elif defined(OS_WIN)
+  int32_t out = 0;
+  if (raw & 0x2) {
+    out |= 1;
+  }
+  if (raw & 0x4) {
+    out |= 2;
+  }
+  if (raw & 0x8) {
+    out |= 4;
+  }
+  if (raw & 0x10) {
     out |= 8;
   }
   return out;

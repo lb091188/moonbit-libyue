@@ -102,17 +102,7 @@ fn setup_close_guard(win : @yue.Window) -> Unit {
 /// 键盘钩子：窗口级 on_key_down 更新事件页显示。
 fn setup_key_hook(win : @yue.Window) -> Unit {
   win.on_key_down(fn(e) {
-    let mut mods = ""
-    if e.has_mod(@yue.KEY_MOD_SHIFT) {
-      mods = mods + "Shift+"
-    }
-    if e.has_mod(@yue.KEY_MOD_CTRL) {
-      mods = mods + "Ctrl+"
-    }
-    if e.has_mod(@yue.KEY_MOD_ALT) {
-      mods = mods + "Alt+"
-    }
-    key_info.set("按键 \{mods}\{e.code}（Esc=\{@yue.VKEY_ESCAPE} A=\{@yue.VKEY_A}）")
+    key_info.set("按键 \{e.describe()}（键码 \{e.code}，Esc=\{@yue.VKEY_ESCAPE} A=\{@yue.VKEY_A}）")
     false
   })
 }

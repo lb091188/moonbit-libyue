@@ -11,7 +11,7 @@ fn page_browser() -> @yue.Node {
     }
   }
   let browser_desc = if is_windows() {
-    "Windows 优先 WebView2（缺运行时回退 IE）。地址栏回车或「转到」加载。"
+    "Windows 优先 WebView2（缺运行时回退 IE）。WebView2 走系统代理，代理失效可设环境变量 LIBYUE_WEBVIEW2_ARGS=--no-proxy-server 直连。地址栏回车或「转到」加载。"
   } else {
     "Linux 为 WebKitGTK。地址栏回车或「转到」加载；页面标题会联动窗口标题。"
   }

@@ -79,7 +79,7 @@ fn page_events() -> @yue.Node {
       ),
       @yue.bind_label(cap_info, fn(s) { s }, style=[("marginTop", 8.0)]),
     ]),
-    section("键盘（窗口级）", "on_key_down 挂在主窗口；修饰键合成显示，键码为 VKEY 常量（GTK 键值表）。", [
+    section("键盘（窗口级）", "on_key_down 挂在主窗口；键码统一为跨平台常量表（Windows VK 码自动换算），describe() 输出如 Ctrl+A。", [
       @yue.bind_label(key_info, fn(s) { s }),
     ]),
     section("全局鼠标轮询", "mouse_location + 修饰键静态查询，200ms 定时器轮询（无需事件回调）。", [
