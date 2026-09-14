@@ -136,23 +136,10 @@ The pure-MoonBit parts (DBus wire codec, color utilities, table value codec) do 
 moon test
 ```
 
-## Linux Tray
-
-The AppIndicator runtime library cannot be relied upon (Ubuntu 24.04 dropped the legacy version), and libyue only logs when loading fails internally — the object silently goes dead. So this project instead **speaks the StatusNotifierItem protocol directly to the panel from MoonBit**, with no AppIndicator runtime dependency:
-
-- `yue/traybus/` is a pure-MoonBit implementation: DBus wire codec, SASL EXTERNAL handshake, message send/receive loop (wired into the GTK main loop via a glib fd watch), SNI property/signal/Activate dispatch, desktop environment detection (XDG_CURRENT_DESKTOP), and a procedurally generated crescent bitmap;
-- the shim forwards only 8 fd-level syscalls (connect/read/write/poll/close/watch_fd/getuid/getenv), non-Linux platforms get failing stubs;
-- backend priority: SNI watcher online → self-implemented tray; not online → fall back to nativeui AppIndicator; neither available → `Err(Unsupported)`. Works on XFCE/KDE/MATE/Cinnamon/Budgie/LXQt and GNOME with the AppIndicator extension installed; plain GNOME without a tray protocol reports a clear error;
-- consumers face a unified API: `Tray::new / is_supported / set_title / set_icon / set_icon_name / set_tooltip / on_click / set_menu / remove`, plus `desktop_environment()` for diagnostics.
-
-Platform-specific pitfalls observed on real desktops (XFCE 4.18, GNOME, …) are catalogued in [docs/adaptation.md](docs/adaptation.md).
-
-Widget API quick reference (including upstream pitfalls) lives in [docs/components.md](docs/components.md); the declarative layer — `X::make` props constructors, `Node`/`mount` render trees and `Store` reactive bindings — is documented in [docs/declarative.md](docs/declarative.md).
-
 ## Notes
 
 - The current binding surface is roughly 260 ABI functions (262 `extern "c"` declarations in `yue/ffi.mbt`): App/Lifetime, Window, common View capabilities and drag & drop, Container/Label/Button/Entry/TextEdit, Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer, Browser, Menu/MenuBar, Table + model bridge, Painter/Canvas, Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog, Screen/Appearance/Locale/Cursor. New widgets follow the established pattern: add a mechanical translation function in the shim → add the extern in `ffi.mbt` → add the type and methods in a new `*.mbt`.
-- Known limitations, ABI pitfalls and per-platform adaptation lessons live in `AGENTS.md` and [docs/adaptation.md](docs/adaptation.md) instead of this README.
+- Known limitations, ABI pitfalls and per-platform adaptation lessons live in `AGENTS.md` and [docs/adaptation.md](docs/adaptation.md) instead of this README. The Linux tray design — motivation, architecture, backend fallback, desktop compatibility, debugging — is documented separately in [docs/tray.md](docs/tray.md) (Chinese). The widget API quick reference (including upstream pitfalls) lives in [docs/components.md](docs/components.md); the declarative layer — `X::make` props constructors, `Node`/`mount` render trees and `Store` reactive bindings — in [docs/declarative.md](docs/declarative.md).
 
 ## References
 

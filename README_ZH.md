@@ -10,7 +10,7 @@
 - [ ] Ubuntu 24.04 KDE
 - [ ] Deepin 25
 - [ ] OpenKylin 3
-- [x] Windows 10 / 11(2026-09 首次实测,showcase 全功能跑通;经验见 [docs/adaptation.md](docs/adaptation.md))
+- [x] Windows 10 / 11
 - [ ] Mac OS
 
 简体中文 | [English](README.md)
@@ -24,11 +24,9 @@
 ┌─────────────────────────────────────────────┐
 │ 使用者（examples/*）                          │  纯 MoonBit，零平台代码
 ├─────────────────────────────────────────────┤
-│ MoonBit 库（yue/）                           │  统一 API：类型、闭包、编码转换、
-│                                             │  平台探测与降级都在这里消化
+│ MoonBit 库（yue/）                           │  统一 API：平台探测与降级都在这里消化
 ├─────────────────────────────────────────────┤
 │ 平台封装（shim/ + vendor/libyue）             │  最薄 C ABI（机械转换）+ libyue
-│                                             │  吸收 win/linux/macos 差异
 └─────────────────────────────────────────────┘
 ```
 
@@ -146,22 +144,10 @@ moon run src   # 无需任何链接配置；安装时自动构建原生层，缺
 moon test
 ```
 
-## Linux 托盘方案
-
-AppIndicator 运行库（Ubuntu 24.04 已移除传统版）不可依赖，且 libyue 内部加载失败只打日志、对象静默失效。
-现改为 **MoonBit 直连面板的 StatusNotifierItem 协议**，不再依赖任何 AppIndicator 运行库：
-
-- `yue/traybus/` 纯 MoonBit 实现：DBus 线路编解码、SASL EXTERNAL 握手、消息收发循环（glib fd 监视接入 GTK 主循环）、SNI 属性/信号/Activate 分发、桌面环境识别（XDG_CURRENT_DESKTOP）、程序内置生成月牙位图；
-- shim 只转发 8 个 fd 级系统调用（connect/read/write/poll/close/watch_fd/getuid/getenv），非 Linux 为失败桩；
-- 后端优先级：SNI watcher 在线 → 自实现托盘；不在线 → 回退 nativeui AppIndicator；两者皆无 → `Err(Unsupported)`。XFCE/KDE/MATE/Cinnamon/Budgie/LXQt 及装 AppIndicator 扩展的 GNOME 可用，纯净 GNOME 无托盘协议则明确报错；
-- 消费方面向统一 API：`Tray::new / is_supported / set_title / set_icon / set_icon_name / set_tooltip / on_click / set_menu / remove`，另有 `desktop_environment()` 诊断。
-
-真实桌面（XFCE 4.18、GNOME 等）上实测出的平台差异与坑，统一记录在 [docs/adaptation.md](docs/adaptation.md)。
-
 ## 说明
 
 - 当前封装面约 260 个 ABI 函数（`yue/ffi.mbt` 中 262 个 `extern "c"` 声明）：App/Lifetime、Window、View 通用能力与拖拽、Container/Label/Button/Entry/TextEdit、Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer、Browser、Menu/MenuBar、Table+模型桥、Painter/Canvas、Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog、Screen/Appearance/Locale/Cursor；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。
-- 已知边界、ABI 坑与各平台适配经验不在 README 展开，见 `AGENTS.md`（AI 协作规则）与 [docs/adaptation.md](docs/adaptation.md)。
+- 已知边界、ABI 坑与各平台适配经验不在 README 展开，见 `AGENTS.md`（AI 协作规则）与 [docs/adaptation.md](docs/adaptation.md)；Linux 托盘方案（设计动机、架构、后端降级、桌面兼容性、调试）独立成文：[docs/tray.md](docs/tray.md)。
 
 ## 参考
 
