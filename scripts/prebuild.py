@@ -111,7 +111,7 @@ def link_configs() -> dict:
     build = str(BUILD_DIR.resolve()).replace("\\", "/")
     if sys.platform == "win32":
         return {"link_configs": [{
-            "package": "lkyh/moonbit-libyue/yue",
+            "package": "NoahLiu/moonbit-libyue/yue",
             "link_flags": (
                 f"{build}/yue_mbt_manifest.res {build}/yue_mbt.lib "
                 + " ".join(WINDOWS_LINK_LIBS)
@@ -134,10 +134,13 @@ def link_configs() -> dict:
             "-framework", "Security",
             "-framework", "WebKit",
             "-framework", "OpenDirectory",
+            # audit_token_to_pid（MachPortRendezvous）在 libbsm；
+            # -Wl,-dead_strip 为官方构建的链接选项（CI 实测缺失即 undefined）
+            "-lbsm", "-Wl,-dead_strip",
             "-lobjc", "-lc++", "-lpthread",
         ]
     return {"link_configs": [{
-        "package": "lkyh/moonbit-libyue/yue",
+        "package": "NoahLiu/moonbit-libyue/yue",
         "link_flags": f"-L{build} -lyue_mbt " + " ".join(extra),
     }]}
 
