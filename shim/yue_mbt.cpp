@@ -246,7 +246,11 @@ void *yue_mbt_window_new_ex(int32_t frame, int32_t transparent, int32_t no_activ
   nu::Window::Options options;
   options.frame = frame != 0;
   options.transparent = transparent != 0;
-  options.no_activate = no_activate != 0;
+#if !defined(OS_MAC)
+  options.no_activate = no_activate != 0; // mac 的 Options 无此字段，忽略
+#else
+  (void)no_activate;
+#endif
   return reinterpret_cast<void *>(ViewStore::put(new nu::Window(options)));
 }
 
@@ -304,6 +308,12 @@ void yue_mbt_window_activate(void *window) {
 }
 
 void yue_mbt_window_set_menubar(void *window, void *menubar) {
+#if defined(OS_MAC)
+  // mac 的 Window 无 SetMenuBar（菜单挂 App 级），降级为提示
+  (void)window;
+  (void)menubar;
+  std::fprintf(stderr, "yue_mbt: macOS 暂不支持窗口级菜单栏\n");
+#else
   auto *w = CastTo<nu::Window>(window);
   if (w == nullptr || menubar == nullptr) {
     return;
@@ -311,6 +321,7 @@ void yue_mbt_window_set_menubar(void *window, void *menubar) {
   if (auto *bar = MenuBarStore::get(menubar)) {
     w->SetMenuBar(scoped_refptr<nu::MenuBar>(bar));
   }
+#endif
 }
 
 void yue_mbt_window_on_close(void *window, void (*invoke)(void *), void *closure) {
@@ -2564,9 +2575,15 @@ void *yue_mbt_message_box_new(int32_t type) {
 }
 
 void yue_mbt_message_box_set_title(void *box, const char *title) {
+#if defined(OS_MAC)
+  // mac 的 MessageBox 无 SetTitle（仅 Linux/Win 提供），忽略
+  (void)box;
+  (void)title;
+#else
   if (auto *m = MessageBoxStore::get(box)) {
     m->SetTitle(title);
   }
+#endif
 }
 
 void yue_mbt_message_box_set_text(void *box, const char *text) {
@@ -2598,9 +2615,16 @@ void yue_mbt_message_box_on_response(void *box,
 }
 
 void yue_mbt_message_box_show(void *box) {
+#if defined(OS_MAC)
+  // mac 无异步 Show()，用模态 Run() 替代（阻塞至关闭，on_response 照常回调）
+  if (auto *m = MessageBoxStore::get(box)) {
+    m->Run();
+  }
+#else
   if (auto *m = MessageBoxStore::get(box)) {
     m->Show();
   }
+#endif
 }
 
 void yue_mbt_message_box_show_for_window(void *box, void *window) {

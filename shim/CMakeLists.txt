@@ -46,8 +46,10 @@ target_include_directories(yue_mbt PUBLIC
 target_compile_features(yue_mbt PUBLIC cxx_std_20)
 
 # ---------- moonbit.h（moon 工具链自带） ----------
+# Windows CI 的 cmd 环境无 HOME/常用 MOON_HOME，只有 USERPROFILE
 find_path(MOONBIT_INCLUDE_DIR moonbit.h
   PATHS $ENV{MOON_HOME}/include $ENV{HOME}/.moon/include
+        $ENV{USERPROFILE}/.moon/include
   REQUIRED)
 target_include_directories(yue_mbt PRIVATE ${MOONBIT_INCLUDE_DIR})
 
