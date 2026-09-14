@@ -362,11 +362,34 @@ pub fn gif(
 
 ///|
 /// 内嵌浏览器节点（html 与 url 二选一，都给时以 url 为准）。
-pub fn browser(url? : String = "", html? : String = "") -> Node {
+pub fn browser(
+  url? : String = "",
+  html? : String = "",
+  handle? : (Browser) -> Unit = fn(_b) { },
+) -> Node {
   { mount: fn(parent) {
     let b = Browser::make(url=url, html=html)
+    handle(b)
     attach(parent, b.view())
     b.view()
+  } }
+}
+
+///|
+/// 容器节点：需要自绘（on_draw）或要拿 Container 句柄时用；纯布局用
+/// vbox/hbox。
+pub fn container(
+  on_draw? : (Painter) -> Unit = fn(_p) { },
+  handle? : (Container) -> Unit = fn(_c) { },
+  style? : Array[(String, Double)] = [],
+  style_str? : Array[(String, String)] = [],
+) -> Node {
+  { mount: fn(parent) {
+    let c = Container::make(style=style, style_str=style_str)
+    c.on_draw(on_draw)
+    handle(c)
+    attach(parent, c.view())
+    c.view()
   } }
 }
 
@@ -383,4 +406,22 @@ pub fn mount(
     ignore((ch.mount)(root.view()))
   }
   root
+}
+
+///|
+/// 声明一棵 UI 树并装进窗口：窗口是声明式树的根（Window 无父视图，
+/// 故不做 Node，而作为挂载入口）。创建窗口、挂载全部子节点为内容，
+/// 返回窗口；菜单栏、托盘、全局快捷键等非视图资产经 handle 回调补挂。
+pub fn mount_window(
+  children : Array[Node],
+  title? : String = "",
+  size? : (Double, Double)? = None,
+  center? : Bool = false,
+  on_close? : (Window) -> Unit = fn(_w) { },
+  handle? : (Window) -> Unit = fn(_w) { },
+) -> Window {
+  let win = Window::make(title=title, size=size, on_close=on_close, center=center)
+  win.set_content(mount(children))
+  handle(win)
+  win
 }
