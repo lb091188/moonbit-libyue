@@ -243,6 +243,114 @@ def patch_win_task_dialog() -> None:
         raise SystemExit("TaskDialog 补丁未命中任何目标（上游源码可能已变）")
 
 
+def patch_linux_container_events() -> None:
+    """vendor 补丁（Linux/GTK）：容器事件窗口不再拦截子控件鼠标 + 自然尺寸感知。
+
+    三处都出在 GTK 后端把 yoga 布局嫁接到 GTK 上的接缝（幂等；vendor 目录
+    不进版本库，重跑本脚本自动重新应用）：
+    - nu_container_map 里 gdk_window_show（=map+raise）会把覆盖整个容器
+      区域的 INPUT_ONLY 事件窗口抬到子原生控件（GtkNotebook 页签头、
+      GtkScrolledWindow 滚动区）之上，X/GDK 命中被它截走——页签点不动、
+      滚轮失效，键盘走焦点不受影响。改用 show_unraised：仅映射不抬高，
+      子控件窗口随后 raise 天然盖在其上，容器空白区域仍可命中。
+    - CreateEventWindow 的 attributes.y 误写成 allocation.x（笔误，无实害
+      但顺手修正）。
+    - nu_container_get_preferred_width/height 硬编码返回 0：GtkScrolledWindow
+      等原生容器完全感知不到内容大小，滚动范围恒 0（无法滚动）、Notebook
+      页与 Group 的自然尺寸塌缩。改为向 yoga 询问自然尺寸（GetPreferredSize）。
+    - Scroll::PlatformSetContentView 对未挂载视图取 GetPixelBounds()=0×0
+      强制写入 size_request，声明式整页滚动（高度动态、未调 SetContentSize）
+      的滚动范围因此恒 0。改为仅延续显式设置过的 size_request，否则复位
+      -1 让 viewport 按（补丁修正后的）自然尺寸计算。
+    """
+    container_src = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_2.cc"
+    scroll_src = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_3.cc"
+    patches = [
+        (container_src,
+         "  if (priv->event_window)\n    gdk_window_show(priv->event_window);\n\n"
+         "  GTK_WIDGET_CLASS(nu_container_parent_class)->map(widget);",
+         "  if (priv->event_window)\n"
+         "    gdk_window_show_unraised(priv->event_window);  // moonbit-libyue 补丁:映射但不抬高,避免盖住子原生控件拦截鼠标\n\n"
+         "  GTK_WIDGET_CLASS(nu_container_parent_class)->map(widget);"),
+        (container_src,
+         "  attributes.y = allocation.x;",
+         "  attributes.y = allocation.y;  // moonbit-libyue 补丁:上游笔误 y 误用 x"),
+        (container_src,
+         "static void nu_container_get_preferred_width(GtkWidget* widget,\n"
+         "                                             gint* minimum,\n"
+         "                                             gint* natural) {\n"
+         "  // We are not using GTK's layout system, so just return 0.\n"
+         "  *minimum = 0;\n"
+         "  *natural = 0;\n"
+         "}\n"
+         "\n"
+         "static void nu_container_get_preferred_height(GtkWidget* widget,\n"
+         "                                              gint* minimum,\n"
+         "                                              gint* natural) {\n"
+         "  // We are not using GTK's layout system, so just return 0.\n"
+         "  *minimum = 0;\n"
+         "  *natural = 0;\n"
+         "}",
+         "static void nu_container_get_preferred_width(GtkWidget* widget,\n"
+         "                                             gint* minimum,\n"
+         "                                             gint* natural) {\n"
+         "  // moonbit-libyue 补丁:报告 yoga 自然尺寸,原生容器(ScrolledWindow/\n"
+         "  // Notebook 页/Group)才能感知内容大小;原实现返回 0 使滚动范围恒 0。\n"
+         "  // minimum 不能给 0:GtkViewport 用 minimum(而非 natural)算滚动范围。\n"
+         "  SizeF size = NU_CONTAINER(widget)->priv->delegate->GetPreferredSize();\n"
+         "  *minimum = static_cast<gint>(size.width());\n"
+         "  *natural = *minimum;\n"
+         "}\n"
+         "\n"
+         "static void nu_container_get_preferred_height(GtkWidget* widget,\n"
+         "                                              gint* minimum,\n"
+         "                                              gint* natural) {\n"
+         "  SizeF size = NU_CONTAINER(widget)->priv->delegate->GetPreferredSize();\n"
+         "  *minimum = static_cast<gint>(size.height());\n"
+         "  *natural = *minimum;\n"
+         "}"),
+        (scroll_src,
+         "void Scroll::PlatformSetContentView(View* view) {\n"
+         "  // Receive the content size from current content view.\n"
+         "  Size csize = view->GetPixelBounds().size();\n"
+         "  if (content_view_) {\n"
+         "    int w, h;\n"
+         "    gtk_widget_get_size_request(content_view_->GetNative(), &w, &h);\n"
+         "    csize = Size(w, h);\n"
+         "  }\n",
+         "void Scroll::PlatformSetContentView(View* view) {\n"
+         "  // moonbit-libyue 补丁:仅延续显式设置过的 size_request(与 SetContentSize\n"
+         "  // 配套);原实现对未挂载视图取 GetPixelBounds()=0×0 强制写入,声明式整页\n"
+         "  // 滚动(高度动态)的滚动范围恒 0。未显式设置时复位 -1,viewport 按\n"
+         "  // 自然尺寸(nu_container preferred 补丁)计算滚动范围。\n"
+         "  int req_w = -1, req_h = -1;\n"
+         "  if (content_view_) {\n"
+         "    gtk_widget_get_size_request(content_view_->GetNative(), &req_w, &req_h);\n"
+         "    if (req_w == 0 && req_h == 0)  // 上游写入过的 0×0 视为未设置\n"
+         "      req_w = req_h = -1;\n"
+         "  }\n"),
+        (scroll_src,
+         "  gtk_container_add(GTK_CONTAINER(viewport), view->GetNative());\n"
+         "  gtk_widget_set_size_request(view->GetNative(), csize.width(), csize.height());\n"
+         "}",
+         "  gtk_container_add(GTK_CONTAINER(viewport), view->GetNative());\n"
+         "  gtk_widget_set_size_request(view->GetNative(), req_w, req_h);\n"
+         "}"),
+    ]
+    texts: dict[Path, str] = {}
+    for path, old, new in patches:
+        if path not in texts:
+            texts[path] = path.read_text(encoding="utf-8")
+        if new in texts[path]:
+            continue  # 已应用（理论不可达：extract 每次还原原文件）
+        if old not in texts[path]:
+            raise SystemExit(f"vendor 补丁目标文本未找到（上游可能已变）：{path}")
+        texts[path] = texts[path].replace(old, new)
+        print(f"已应用 GTK 容器事件补丁：{path.name}")
+    for path, text in texts.items():
+        path.write_text(text, encoding="utf-8")
+
+
 def cmake_build() -> None:
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
@@ -276,6 +384,8 @@ def main() -> None:
         patch_win_text_rendering()
         patch_win_task_dialog()
         fetch_webview2_sdk()
+    if os_name == "Linux":
+        patch_linux_container_events()
     cmake_build()
     print("prepare 完成")
 
