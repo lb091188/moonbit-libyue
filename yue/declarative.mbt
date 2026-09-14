@@ -305,9 +305,14 @@ pub fn scroll(
 
 ///|
 /// 分隔线节点。
-pub fn separator(orientation? : Orientation = Horizontal) -> Node {
+pub fn separator(
+  orientation? : Orientation = Horizontal,
+  style? : Array[(String, Double)] = [],
+  style_str? : Array[(String, String)] = [],
+) -> Node {
   { mount: fn(parent) {
     let s = Separator::new(orientation)
+    apply_style(s, style=style, style_str=style_str)
     attach(parent, s.view())
     s.view()
   } }
@@ -319,9 +324,12 @@ pub fn tab(
   pages : Array[(String, Node)],
   on_change? : () -> Unit = fn() { },
   handle? : (Tab) -> Unit = fn(_t) { },
+  style? : Array[(String, Double)] = [],
+  style_str? : Array[(String, String)] = [],
 ) -> Node {
   { mount: fn(parent) {
     let t = Tab::new()
+    apply_style(t, style=style, style_str=style_str)
     t.on_selected_page_change(on_change)
     for (title, page) in pages {
       let holder = Container::new()
@@ -339,9 +347,12 @@ pub fn tab(
 pub fn date_picker(
   epoch? : Int64? = None,
   on_change? : () -> Unit = fn() { },
+  style? : Array[(String, Double)] = [],
+  style_str? : Array[(String, String)] = [],
 ) -> Node {
   { mount: fn(parent) {
     let d = DatePicker::make(epoch=epoch, on_date_change=on_change)
+    apply_style(d, style=style, style_str=style_str)
     attach(parent, d.view())
     d.view()
   } }
@@ -352,9 +363,12 @@ pub fn date_picker(
 pub fn gif(
   image? : Image? = None,
   scale? : ImageScale = Down,
+  style? : Array[(String, Double)] = [],
+  style_str? : Array[(String, String)] = [],
 ) -> Node {
   { mount: fn(parent) {
     let g = GifPlayer::make(image=image, scale=scale)
+    apply_style(g, style=style, style_str=style_str)
     attach(parent, g.view())
     g.view()
   } }
@@ -366,9 +380,12 @@ pub fn browser(
   url? : String = "",
   html? : String = "",
   handle? : (Browser) -> Unit = fn(_b) { },
+  style? : Array[(String, Double)] = [],
+  style_str? : Array[(String, String)] = [],
 ) -> Node {
   { mount: fn(parent) {
     let b = Browser::make(url=url, html=html)
+    apply_style(b, style=style, style_str=style_str)
     handle(b)
     attach(parent, b.view())
     b.view()

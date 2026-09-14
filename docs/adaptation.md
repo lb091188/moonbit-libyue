@@ -25,6 +25,15 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **`postadd` 脚本仅在 registry `moon add` 安装时触发**,path/git 依赖与模块自身构建不触发;产物缺失的兜底由 prebuild.py 的检查承担。
 - libyue 版本钉死在 `scripts/prepare.py`(`LIBYUE_VERSION` + 三平台 sha256),升级需同步更新三个校验和。
 
+### MoonBit cfg(platform=) 平台条件编译
+
+- **现状(2026-09-14 实测入档)**:moonc 已实现 `#cfg(platform="windows"/"linux"/"macos")` 条件编译(官方文档未写),求值依据是传给 moonc 的 `-target` **三元组**(`x86_64-unknown-linux-gnu` / `x86_64-pc-windows-msvc` / `aarch64-apple-darwin`);`not/any/all` 组合器可用。moonbitlang/openseek 生产在用(仅 `platform="windows"` 及其反)。
+- **但当前可安装的 moon(stable 0.1.20260904 与 nightly 0.1.20260911)构建时只给 moonc 传无 OS 信息的泛用 `native`**,所有 `platform=` 条件恒 false——Linux 上连 `platform="linux"` 都不命中;`MOONBIT_NEW_NATIVE=1` 与 `moon.mod` 新格式(直出目标文件后端已生效,产物为 .o)也不传三元组。moon main 分支已有按宿主选三元组的逻辑(`NativeTarget::from_host`:x86_64 Linux / Apple Silicon 默认启用、Windows 需 env=1),**待发布版本携带后条件才会点亮**。
+- 迁移信号:任意构建加 `-v`,moonc 命令行出现 `-target x86_64-unknown-linux-gnu` 即可用;届时 showcase 的运行时平台段可一行替换为 `#cfg`。
+- 当前替代:运行时 `platform()` 判断——声明式树按条件组装节点,不满足就不创建控件,效果等同编译期隐藏;showcase 的平台段(桌面环境、剪贴板主选区、自定义协议等)即此方案,见 `examples/showcase/section.mbt` 头注释。
+- 验证方式:临时工程双分支(`#cfg(platform="linux")` / `#cfg(not(platform="linux"))`)编译运行看走哪支;moonc 直调带 `-target x86_64-unknown-linux-gnu` 可证编译器侧已生效(实测三分支各归各位)。另:`moon.pkg.json` 的 `targets` 文件级条件仍只有后端(wasm/js/native)+ debug/release 维度,喂 OS 值直接 schema 加载失败;裸标识符条件(如 `#cfg(linux)`)恒真,无意义。
+- 顺带:nightly 0911 对全仓 `impl ViewLike for X` 报 19 处 `implicit_impl_as_method` 弃用警告(stable 0904 无),属工具链前向收紧,非库代码回归。
+
 ### MoonBit ↔ C ABI
 
 - **FuncRef+Callback 蹦床的形参个数必须与 C 函数指针原型逐位相等**(2026-09-11 实测入档)。约定:C 以 `callback(closure, args...)` 调用,MoonBit 蹦床为 `fn(f, args...)`,首参 `f` 收到的就是 closure。
