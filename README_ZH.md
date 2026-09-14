@@ -64,7 +64,9 @@ yue/                 MoonBit 库包
     icon.mbt         程序内置生成托盘位图（不依赖图片资源与解码器）
     sys.mbt          fd 级系统调用面（全部经 shim 转发）
 shim/                C ABI 封装层（yue_mbt.cpp + include/yue_mbt.h）+ CMakeLists
-scripts/prepare.py   固定版本下载 libyue + 构建静态库 + 回写链接参数
+scripts/prepare.py   固定版本下载 libyue + 构建静态库（链接参数由 prebuild.py 托管）
+scripts/prebuild.py  moon 构建钩子：按当前系统输出链接配置，自动传播给依赖方
+scripts/postadd.py   moon add 安装本库时自动触发首次构建
 examples/            14 个示例：hello / editor / browser / drawing / table / widgets /
                      drag_source / drag_destination / floating_heart /
                      auto_height_edit / showcase / misc / advanced / events
@@ -84,14 +86,13 @@ sudo apt install build-essential cmake pkg-config \
 ```
 
 构建原生库并运行示例：
- **注意会到 github 下载 libyue 相关依赖** 
+ **注意首次构建会到 github 下载 libyue 相关依赖**
 
 ```sh
-python3 scripts/prepare.py
 moon run examples/hello
 ```
 
-`prepare.py` 与 `moon` 都需在仓库根目录执行：回写的链接参数是仓库根相对的 `-L build`（链接器按 moon 的调用目录解析相对路径）。`prepare.py` 幂等可重跑——缓存包 sha256 不匹配（如下载被中断截断）会自动删除重下；内容未变的 moon.pkg.json 不会回写。同一仓库在 Linux/Windows 间切换时重跑 `prepare.py` 即可换到对应平台的链接参数。
+无需任何手动准备：链接参数由 `scripts/prebuild.py`（moon.mod.json 声明的构建钩子）在构建时按当前系统生成并自动传播，静态库缺失时会自动执行 `scripts/prepare.py` 补建（下载 libyue + CMake）。`prepare.py` 幂等可重跑——缓存包 sha256 不匹配（如下载被中断截断）会自动删除重下。同一仓库在 Linux/Windows 间切换时同样直接 `moon run`，钩子按新系统重新输出链接配置（静态库为平台产物，切换后首次构建会自动重建）。
 
 ### Windows（10/11，x64）
 
@@ -130,9 +131,12 @@ moon run examples/hello
 moon add lkyh/moonbit-libyue
 ```
 
-库代码（`yue/`）发布在 mooncakes；原生层（shim + vendored libyue）需在本仓库执行
-`python3 scripts/prepare.py` 构建静态库，并在使用方的 `moon.pkg.json` 链接参数中加
-`-L <本仓库>/build -lyue_mbt` 与对应系统库。
+库代码（`yue/`）发布在 mooncakes，使用方零配置：
+
+```sh
+moon add lkyh/moonbit-libyue
+moon run src   # 无需任何链接配置；安装时自动构建原生层，缺失时构建钩子自动补建
+```
 
 纯 MoonBit 部分（DBus 线路编解码、颜色工具、表格值编解码）不依赖原生库，可直接跑测试：
 

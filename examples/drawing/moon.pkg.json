@@ -3,10 +3,5 @@
   "import": [
     "lkyh/moonbit-libyue/yue",
     "moonbitlang/core/math"
-  ],
-  "link": {
-    "native": {
-      "cc-link-flags": "build/yue_mbt_manifest.res build/yue_mbt.lib user32.lib gdi32.lib shell32.lib ole32.lib oleaut32.lib advapi32.lib comdlg32.lib imm32.lib msimg32.lib oleacc.lib usp10.lib setupapi.lib powrprof.lib ws2_32.lib dbghelp.lib shlwapi.lib version.lib winmm.lib wbemuuid.lib psapi.lib dwmapi.lib propsys.lib comctl32.lib gdiplus.lib urlmon.lib userenv.lib uxtheme.lib delayimp.lib runtimeobject.lib ntdll.lib shcore.lib pdh.lib"
-    }
-  }
+  ]
 }

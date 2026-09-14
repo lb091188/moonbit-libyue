@@ -98,7 +98,12 @@
 3. `yue/ffi.mbt` 加 extern
 4. 新建 `yue/<控件>.mbt` 写类型和方法,字符串统一走 `utf8_bytes()`
 5. 有事件的控件:照抄 `yue/view.mbt` 的注册表 + trampoline 模式
-6. 新增示例放 `examples/<name>/`(`is-main` 包,`prepare.py` 会自动回写链接参数)
+6. 新增示例放 `examples/<name>/`(`is-main` 包,链接由 `scripts/prebuild.py` 自动传播,无需写 link 段)
+
+## 上游跟踪(moon 工具链)
+
+- `--moonbit-unstable-prebuild`(构建钩子 + link_configs 传播):当前链接方案依赖它,官方标注实验性,API 可能随 moon 升级变动,升级 moon 后必须回归验证 hello/showcase 与模拟使用方三条链路;Windows 下 `python3` 命令可用性待真机验证(必要时 postadd/prebuild 命令改 `python`)。
+- MoonBit `#cfg` 条件编译暂无 OS 维度(moon 不注入 platform 标志,自定义标志无构建入口):若上游加入按 OS 的 cfg 或 link 段平台字段,可撤掉 prebuild 脚本直接入库双平台参数,并把 `ffi_platform()` 运行时探测改为编译期常量。
 
 ## 随手可查
 

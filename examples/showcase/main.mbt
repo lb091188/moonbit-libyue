@@ -117,13 +117,17 @@ fn build_menubar(win : @yue.Window, state : State) -> @yue.MenuBar {
   let help = bar.add_menu("帮助")
   let env_item = help.add_label_item("桌面环境信息")
   env_item.on_click(fn() { show_about(win) })
-  let shortcut = help.add_label_item("注册全局快捷键 Ctrl+Alt+S")
+  let shortcut = help.add_label_item("注册全局快捷键 Ctrl+Alt+K")
   shortcut.on_click(fn() {
-    let id = @yue.register_global_shortcut("Ctrl+Alt+S", fn() {
+    let id = @yue.register_global_shortcut("Ctrl+Alt+K", fn() {
       show_about(win)
     })
-    state.log("全局快捷键已注册 id=\{id}")
-    ignore(id)
+    // -1 = X11 XGrabKey 失败（组合键被系统/桌面环境占用）
+    if id == -1 {
+      state.log("全局快捷键注册失败：Ctrl+Alt+K 被系统占用")
+    } else {
+      state.log("全局快捷键已注册 id=\{id}")
+    }
   })
   bar
 }
@@ -794,7 +798,7 @@ fn build_system(win : @yue.Window, state : State) -> @yue.Container {
   veto_btn.set_style("marginBottom", 8.0)
   page.add_child(veto_btn)
 
-  let shortcut_btn = @yue.Button::new("注册全局快捷键 Ctrl+Alt+S")
+  let shortcut_btn = @yue.Button::new("注册全局快捷键 Ctrl+Alt+K")
   shortcut_btn.set_style("marginBottom", 8.0)
   page.add_child(shortcut_btn)
 
@@ -813,7 +817,6 @@ fn build_system(win : @yue.Window, state : State) -> @yue.Container {
     n.set_title("来自 Showcase")
     n.set_body("桌面通知正常工作 ✓(带两个按钮)")
     n.set_actions([("查看", "view"), ("忽略", "ignore")])
-    @yue.NotificationCenter::add(n)
     n.show()
     state.log("通知(带按钮)已发送")
   })
@@ -859,15 +862,19 @@ fn build_system(win : @yue.Window, state : State) -> @yue.Container {
   })
   table_btn.on_click(fn() { open_table_window(state) })
   shortcut_btn.on_click(fn() {
-    let id = @yue.register_global_shortcut("Ctrl+Alt+S", fn() {
+    let id = @yue.register_global_shortcut("Ctrl+Alt+K", fn() {
       state.log("全局快捷键触发！")
       let n = @yue.Notification::new()
       n.set_title("全局快捷键")
-      n.set_body("Ctrl+Alt+S 被按下（全局，无需聚焦）")
-      @yue.NotificationCenter::add(n)
+      n.set_body("Ctrl+Alt+K 被按下（全局，无需聚焦）")
       n.show()
     })
-    state.log("快捷键注册 id=\{id}")
+    // -1 = X11 XGrabKey 失败（组合键被系统/桌面环境占用）
+    if id == -1 {
+      state.log("快捷键注册失败：Ctrl+Alt+K 被系统占用")
+    } else {
+      state.log("快捷键注册 id=\{id}")
+    }
   })
   page
 }

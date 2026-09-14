@@ -67,7 +67,9 @@ yue/                 MoonBit library package
     icon.mbt         Procedurally generated tray bitmap (no image assets or decoders)
     sys.mbt          fd-level syscall surface (all forwarded via shim)
 shim/                C ABI wrapper layer (yue_mbt.cpp + include/yue_mbt.h) + CMakeLists
-scripts/prepare.py   Pinned-version libyue download + static library build + link-flag writeback
+scripts/prepare.py   Pinned-version libyue download + static library build (link flags are owned by prebuild.py)
+scripts/prebuild.py  Moon build hook: emits per-OS link config, propagated to all dependents
+scripts/postadd.py   Auto-triggered on `moon add` for the first native build
 examples/            14 examples: hello / editor / browser / drawing / table / widgets /
                      drag_source / drag_destination / floating_heart /
                      auto_height_edit / showcase / misc / advanced / events / events
@@ -87,14 +89,13 @@ sudo apt install build-essential cmake pkg-config \
 ```
 
 Build the native library and run an example:
- **Note: this downloads libyue and its dependencies from GitHub.** 
+ **Note: the first build downloads libyue from GitHub.**
 
 ```sh
-python3 scripts/prepare.py
 moon run examples/hello
 ```
 
-Both `prepare.py` and `moon` must be run from the repository root: the written link flags use a repo-root-relative `-L build` (the linker resolves relative paths from moon's working directory). `prepare.py` is idempotent — a cached archive whose sha256 does not match (e.g. an interrupted download) is deleted and re-downloaded; unchanged moon.pkg.json files are not rewritten. When switching the same checkout between Linux and Windows, re-run `prepare.py` to switch the link flags to that platform.
+No manual setup is required: link flags are emitted per-OS at build time by `scripts/prebuild.py` (a hook declared in moon.mod.json) and propagated automatically to every dependent package. When the static library is missing, the hook runs `scripts/prepare.py` to build it (downloads libyue + CMake). `prepare.py` is idempotent — a cached archive whose sha256 does not match (e.g. an interrupted download) is deleted and re-downloaded. Switching the same checkout between Linux and Windows is likewise just `moon run`: the hook emits fresh link config for the new system (the static library is a per-platform artifact and is rebuilt automatically on first use).
 
 ### Windows (10/11, x64)
 
