@@ -73,9 +73,10 @@ shim/                C ABI 封装层（yue_mbt.cpp + include/yue_mbt.h）+ CMake
 scripts/prepare.py   固定版本下载 libyue + 构建静态库（链接参数由 prebuild.py 托管）
 scripts/prebuild.py  moon 构建钩子：按当前系统输出链接配置，自动传播给依赖方
 scripts/postadd.py   moon add 安装本库时自动触发首次构建
-examples/            16 个示例：hello / editor / browser / drawing / table / widgets /
+examples/            17 个示例：hello / editor / browser / drawing / table / widgets /
                      drag_source / drag_destination / floating_heart /
-                     auto_height_edit / showcase / misc / advanced / events / layout / trayprobe
+                     auto_height_edit / showcase / misc / advanced / events / layout /
+                     components / trayprobe
 .agents/skills/      MoonBit 技能库（FFI 规范以此为准）
 ```
 

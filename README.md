@@ -78,9 +78,10 @@ shim/                C ABI wrapper layer (yue_mbt.cpp + include/yue_mbt.h) + CMa
 scripts/prepare.py   Pinned-version libyue download + static library build (link flags are owned by prebuild.py)
 scripts/prebuild.py  Moon build hook: emits per-OS link config, propagated to all dependents
 scripts/postadd.py   Auto-triggered on `moon add` for the first native build
-examples/            16 examples: hello / editor / browser / drawing / table / widgets /
+examples/            17 examples: hello / editor / browser / drawing / table / widgets /
                      drag_source / drag_destination / floating_heart /
-                     auto_height_edit / showcase / misc / advanced / events / layout / trayprobe
+                     auto_height_edit / showcase / misc / advanced / events / layout /
+                     components / trayprobe
 .agents/skills/      MoonBit skill library (the FFI conventions referenced throughout)
 ```
 

@@ -130,6 +130,23 @@ fn tagged(label_text : String, body : Node) -> Node {
 }
 ```
 
+#### 自定义组件封装路径（`examples/components` 实测总结）
+
+1. **组合式组件**（推荐）：普通函数返回 Node，参数即 props，闭包即私有状态
+   （如 `card`/`nav_item`）。
+2. **自绘组件**：`container(on_draw=...)` + Painter，零图片资源画出徽标等元素。
+3. **有状态组件**：组件内部持私有 `Store`，用 `bind_label` 自动刷新；
+   每个实例状态独立（如 `counter_widget`）。跨组件协调用共享 Store + `map`
+   派生（侧边栏导航高亮即此法）。
+4. **扩展内置节点**：`vbox`/`hbox` 支持 `handle`（挂载时拿回 Container 句柄，
+   可设背景色等）。注意：**`Node` 的 `mount` 收到的 `parent : View` 只在
+   `yue` 包内有 `attach` 可用**，包外无法直接写"往 parent 挂容器"的
+   Node 字面量——需在库内扩展，或用 `node_of` 包已有视图。
+5. **现代化布局**：纯 vbox/hbox/scroll 弹性盒可排出「深色侧边栏 + 顶栏 +
+   滚动卡片」外壳；要点是**根节点必须 `style=[("flex", 1.0)]` 才撑满窗口**，
+   侧栏定宽（width）不放 flex，主区 flex=1；根容器加
+   `style_str=[("alignItems", "stretch")]` 让子列占满高度。
+
 ## L3：Store 与 bind_label
 
 `Store[T]` 是可订阅的值：`set` 时通知所有订阅者，`map` 派生只读视图，
