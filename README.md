@@ -59,7 +59,13 @@ yue/                 MoonBit library package
   painter.mbt        2D drawing (Painter / offscreen Canvas)
   misc.mbt           Group / Scroll / Separator / Clipboard / MessageBox
   color.mbt          Color utilities (pure MoonBit)
+  geometry.mbt       Geometry value types (pure MoonBit)
   error.mbt          Structured errors
+  events.mbt         Event system (mouse/keyboard, modifier normalization, VKEY constants, click tracking)
+  button.mbt         Button / single-line Entry (Checkbox/Radio/Password)
+  props.mbt          L1 props constructors (X::make / apply_style)
+  declarative.mbt    L2 declarative nodes (Node/mount/vbox/label/…)
+  store.mbt          L3 reactive Store (subscribe / map / bind_label)
   tray.mbt           Unified tray API
   traybus/           Pure-MoonBit DBus + StatusNotifierItem protocol stack (Linux tray)
     wire.mbt         DBus wire format codec
@@ -138,7 +144,7 @@ moon test
 
 ## Notes
 
-- The current binding surface is roughly 260 ABI functions (262 `extern "c"` declarations in `yue/ffi.mbt`): App/Lifetime, Window, common View capabilities and drag & drop, Container/Label/Button/Entry/TextEdit, Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer, Browser, Menu/MenuBar, Table + model bridge, Painter/Canvas, Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog, Screen/Appearance/Locale/Cursor. New widgets follow the established pattern: add a mechanical translation function in the shim → add the extern in `ffi.mbt` → add the type and methods in a new `*.mbt`.
+- The current binding surface is roughly 320 ABI functions (324 `extern "c"` declarations in `yue/ffi.mbt`): App/Lifetime, Window, common View capabilities and drag & drop, Container/Label/Button/Entry/TextEdit, Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer, Browser, Menu/MenuBar, Table + model bridge, Painter/Canvas, Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog, Screen/Appearance/Locale/Cursor. New widgets follow the established pattern: add a mechanical translation function in the shim → add the extern in `ffi.mbt` → add the type and methods in a new `*.mbt`.
 - Known limitations, ABI pitfalls and per-platform adaptation lessons live in `AGENTS.md` and [docs/adaptation.md](docs/adaptation.md) instead of this README. The Linux tray design — motivation, architecture, backend fallback, desktop compatibility, debugging — is documented separately in [docs/tray.md](docs/tray.md) (Chinese). The widget API quick reference (including upstream pitfalls) lives in [docs/components.md](docs/components.md); the declarative layer — `X::make` props constructors, `Node`/`mount` render trees and `Store` reactive bindings — in [docs/declarative.md](docs/declarative.md).
 - Shim/vendor changes or a re-run of `prepare.py` require forcing a relink: `moon clean`, or delete the linked executable — see [docs/relink.md](docs/relink.md) (Chinese).
 - Documentation index: [docs/README.md](docs/README.md).

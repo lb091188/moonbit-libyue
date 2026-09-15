@@ -120,8 +120,8 @@ b.set_title("新标题")
 ## 单行输入 Entry
 
 ```moonbit
-let e = @yue.Entry::make(text="预填", entry_type=Password,
-                         on_activate=fn() { e.get_text() })
+let e = @yue.Entry::make(text="预填", entry_type=Password)
+e.on_activate(fn() { check(e.get_text()) })
 ```
 
 | 参数 | 类型 | 默认 | 说明 |
@@ -140,7 +140,8 @@ let e = @yue.Entry::make(text="预填", entry_type=Password,
 ## 多行文本 TextEdit
 
 ```moonbit
-let t = @yue.TextEdit::make(text="正文", on_text_change=fn() { t.get_text() })
+let t = @yue.TextEdit::make(text="正文")
+t.on_text_change(fn() { sync(t.get_text()) })
 ```
 
 | 参数 | 类型 | 默认 | 说明 |
@@ -163,8 +164,8 @@ let t = @yue.TextEdit::make(text="正文", on_text_change=fn() { t.get_text() })
 ## 滑块 Slider
 
 ```moonbit
-let s = @yue.Slider::make(value=0.0, range=Some((0.0, 100.0)), step=Some(1.0),
-                          on_value_change=fn() { s.get_value() })
+let s = @yue.Slider::make(value=0.0, range=Some((0.0, 100.0)), step=Some(1.0))
+s.on_value_change(fn() { update(s.get_value()) })
 ```
 
 | 参数 | 类型 | 默认 | 说明 |
@@ -200,8 +201,8 @@ let p = @yue.ProgressBar::make(value=0.43)
 ## 选择器 Picker
 
 ```moonbit
-let p = @yue.Picker::make(items=["甲", "乙", "丙"], selected=0,
-                          on_selection_change=fn() { p.get_selected_item_index() })
+let p = @yue.Picker::make(items=["甲", "乙", "丙"], selected=0)
+p.on_selection_change(fn() { refresh(p.get_selected_item_index()) })
 ```
 
 | 参数 | 类型 | 默认 | 说明 |
@@ -220,7 +221,8 @@ let p = @yue.Picker::make(items=["甲", "乙", "丙"], selected=0,
 ## 组合框 ComboBox（可编辑）
 
 ```moonbit
-let c = @yue.ComboBox::make(items=["红", "绿"], on_text_change=fn() { c.get_text() })
+let c = @yue.ComboBox::make(items=["红", "绿"])
+c.on_text_change(fn() { refresh(c.get_text()) })
 ```
 
 | 参数 | 类型 | 默认 | 说明 |
@@ -239,8 +241,8 @@ let c = @yue.ComboBox::make(items=["红", "绿"], on_text_change=fn() { c.get_te
 ## 日期 DatePicker
 
 ```moonbit
-let d = @yue.DatePicker::make(epoch=Some(1700000000L),
-                              on_date_change=fn() { d.get_date() })
+let d = @yue.DatePicker::make(epoch=Some(1700000000L))
+d.on_date_change(fn() { show(d.get_date()) })
 ```
 
 | 参数 | 类型 | 默认 | 说明 |
@@ -292,8 +294,8 @@ let sep = @yue.Separator::make(Horizontal)   // 或 Vertical
 ## 页签 Tab
 
 ```moonbit
-let t = @yue.Tab::make(pages=[("第一页", page1), ("第二页", page2)],
-                       on_change=fn() { t.get_selected_page_index() })
+let t = @yue.Tab::make(pages=[("第一页", page1), ("第二页", page2)])
+t.on_selected_page_change(fn() { switch_to(t.get_selected_page_index()) })
 ```
 
 | 参数 | 类型 | 默认 | 说明 |
