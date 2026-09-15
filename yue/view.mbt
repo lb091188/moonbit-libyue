@@ -13,14 +13,17 @@ let bytes_callbacks : Ref[Array[(Bytes) -> Unit]] = Ref([])
 ///|
 let draw_callbacks : Ref[Array[(Painter) -> Unit]] = Ref([])
 
+///|
 fn keep_alive(callback : () -> Unit) -> Unit {
   callbacks.val.push(callback)
 }
 
+///|
 fn keep_alive_bytes(callback : (Bytes) -> Unit) -> Unit {
   bytes_callbacks.val.push(callback)
 }
 
+///|
 fn keep_alive_draw(callback : (Painter) -> Unit) -> Unit {
   draw_callbacks.val.push(callback)
 }
@@ -28,7 +31,7 @@ fn keep_alive_draw(callback : (Painter) -> Unit) -> Unit {
 ///|
 /// 创建默认有边框的窗口。
 pub fn Window::new() -> Window {
-  { view: ffi_window_new_ex(1, 0, 0) }
+  { view: ffi_window_new_ex(1, 0, 0), }
 }
 
 ///|
@@ -41,10 +44,22 @@ pub fn Window::new_with_options(
 ) -> Window {
   {
     view: ffi_window_new_ex(
-      if frame { 1 } else { 0 },
-      if transparent { 1 } else { 0 },
-      if no_activate { 1 } else { 0 },
-    )
+      if frame {
+        1
+      } else {
+        0
+      },
+      if transparent {
+        1
+      } else {
+        0
+      },
+      if no_activate {
+        1
+      } else {
+        0
+      },
+    ),
   }
 }
 
@@ -63,7 +78,10 @@ pub fn Window::set_always_on_top(self : Window, top : Bool) -> Unit {
 ///|
 /// 内容区当前尺寸（逻辑像素）。
 pub fn Window::get_content_size(self : Window) -> SizeF {
-  { width: ffi_window_get_content_size_width(self.view), height: ffi_window_get_content_size_height(self.view) }
+  {
+    width: ffi_window_get_content_size_width(self.view),
+    height: ffi_window_get_content_size_height(self.view),
+  }
 }
 
 ///|
@@ -74,7 +92,11 @@ pub fn[T : ViewLike] Window::set_content(self : Window, content : T) -> Unit {
 
 ///|
 /// 设置内容区尺寸（逻辑像素）。
-pub fn Window::set_content_size(self : Window, width : Double, height : Double) -> Unit {
+pub fn Window::set_content_size(
+  self : Window,
+  width : Double,
+  height : Double,
+) -> Unit {
   ffi_window_set_content_size(self.view, width, height)
 }
 
@@ -102,13 +124,13 @@ pub fn Window::on_close(self : Window, callback : (Window) -> Unit) -> Unit {
   let win = self
   let wrapped : () -> Unit = fn() { callback(win) }
   keep_alive(wrapped)
-  ffi_window_on_close(self.view, fn(f : (() -> Unit)) -> Unit { f() }, wrapped)
+  ffi_window_on_close(self.view, fn(f : () -> Unit) -> Unit { f() }, wrapped)
 }
 
 ///|
 /// 创建容器（可嵌套子视图、可自绘）。
 pub fn Container::new() -> Container {
-  { view: ffi_container_new() }
+  { view: ffi_container_new(), }
 }
 
 ///|
@@ -119,10 +141,17 @@ pub fn[T : ViewLike] Container::add_child(self : Container, child : T) -> Unit {
 
 ///|
 /// 注册自绘回调。painter 仅回调期内有效。
-pub fn Container::on_draw(self : Container, callback : (Painter) -> Unit) -> Unit {
+pub fn Container::on_draw(
+  self : Container,
+  callback : (Painter) -> Unit,
+) -> Unit {
   let wrapped : (Painter) -> Unit = fn(painter) { callback(painter) }
   keep_alive_draw(wrapped)
-  ffi_container_on_draw(self.view, fn(f : ((Painter) -> Unit), p : Painter) -> Unit { f(p) }, wrapped)
+  ffi_container_on_draw(
+    self.view,
+    fn(f : (Painter) -> Unit, p : Painter) -> Unit { f(p) },
+    wrapped,
+  )
 }
 
 ///|
@@ -164,7 +193,7 @@ impl ViewLike with fn set_background_color(self, hex) -> Unit {
 ///|
 /// 创建静态文本标签。
 pub fn Label::new(text : String) -> Label {
-  { view: ffi_label_new(utf8_bytes(text)) }
+  { view: ffi_label_new(utf8_bytes(text)), }
 }
 
 ///|
@@ -211,13 +240,17 @@ extern "c" fn ffi_image_from_handle(h : Int64) -> Image = "yue_mbt_image_from_ha
 ///|
 let drag_callbacks : Ref[Array[(DraggingInfo, Double, Double) -> Int]] = Ref([])
 
+///|
 fn keep_alive_drag(callback : (DraggingInfo, Double, Double) -> Int) -> Unit {
   drag_callbacks.val.push(callback)
 }
 
 ///|
 /// 从拖拽会话读取指定种类的数据（仅在拖拽回调内有效）。
-pub fn DraggingInfo::get_data(self : DraggingInfo, kind : DataKind) -> DragData? {
+pub fn DraggingInfo::get_data(
+  self : DraggingInfo,
+  kind : DataKind,
+) -> DragData? {
   let id = data_kind_id(kind)
   if ffi_dragging_is_available(self, id) != 1 {
     return None
@@ -228,8 +261,10 @@ pub fn DraggingInfo::get_data(self : DraggingInfo, kind : DataKind) -> DragData?
 ///|
 /// 解码 [kind:i32][payload] 编码（拖拽与剪贴板共用）。
 fn decode_data(data : Bytes) -> DragData? {
-  let pk = (data[0].to_int() | (data[1].to_int() << 8) |
-           (data[2].to_int() << 16) | (data[3].to_int() << 24))
+  let pk = data[0].to_int() |
+    (data[1].to_int() << 8) |
+    (data[2].to_int() << 16) |
+    (data[3].to_int() << 24)
   if pk == 3 {
     let mut h : Int64 = 0L
     for i = 0; i < 8; i = i + 1 {
@@ -259,7 +294,11 @@ impl ViewLike with fn register_dragged_types(self, kinds : Array[DataKind]) -> U
     buf[i * 4 + 2] = ((id >> 16) & 255).to_byte()
     buf[i * 4 + 3] = ((id >> 24) & 255).to_byte()
   }
-  ffi_view_register_dragged_types(self.view(), Bytes::from_array(buf), kinds.length())
+  ffi_view_register_dragged_types(
+    self.view(),
+    Bytes::from_array(buf),
+    kinds.length(),
+  )
 }
 
 ///|
@@ -273,7 +312,11 @@ pub const DRAG_OPERATION_MOVE : Int = 4
 pub const DRAG_OPERATION_LINK : Int = 8
 
 ///|
-impl ViewLike with fn do_drag_file_paths(self, paths : Array[String], drag_image : Image?) -> Int {
+impl ViewLike with fn do_drag_file_paths(
+  self,
+  paths : Array[String],
+  drag_image : Image?,
+) -> Int {
   let sb = StringBuilder()
   for i, p in paths {
     if i > 0 {
@@ -285,8 +328,12 @@ impl ViewLike with fn do_drag_file_paths(self, paths : Array[String], drag_image
     Some(image) => ffi_image_to_handle(image)
     None => 0L
   }
-  ffi_view_do_drag_file_paths(self.view(), utf8_bytes(sb.to_string()),
-                              DRAG_OPERATION_COPY, img)
+  ffi_view_do_drag_file_paths(
+    self.view(),
+    utf8_bytes(sb.to_string()),
+    DRAG_OPERATION_COPY,
+    img,
+  )
 }
 
 ///|
@@ -295,8 +342,11 @@ impl ViewLike with fn handle_drag_enter(
   callback : (DraggingInfo, Double, Double) -> Int,
 ) -> Unit {
   keep_alive_drag(callback)
-  ffi_view_handle_drag_enter(self.view(),
-    fn(f, info, x, y) { f(info, x, y) }, callback)
+  ffi_view_handle_drag_enter(
+    self.view(),
+    fn(f, info, x, y) { f(info, x, y) },
+    callback,
+  )
 }
 
 ///|
@@ -305,8 +355,11 @@ impl ViewLike with fn handle_drag_update(
   callback : (DraggingInfo, Double, Double) -> Int,
 ) -> Unit {
   keep_alive_drag(callback)
-  ffi_view_handle_drag_update(self.view(),
-    fn(f, info, x, y) { f(info, x, y) }, callback)
+  ffi_view_handle_drag_update(
+    self.view(),
+    fn(f, info, x, y) { f(info, x, y) },
+    callback,
+  )
 }
 
 ///|
@@ -314,11 +367,19 @@ impl ViewLike with fn handle_drop(
   self,
   callback : (DraggingInfo, Double, Double) -> Bool,
 ) -> Unit {
-  let wrapped : (DraggingInfo, Double, Double) -> Int =
-    fn(info, x, y) { if callback(info, x, y) { 1 } else { 0 } }
+  let wrapped : (DraggingInfo, Double, Double) -> Int = fn(info, x, y) {
+    if callback(info, x, y) {
+      1
+    } else {
+      0
+    }
+  }
   keep_alive_drag(wrapped)
-  ffi_view_handle_drop(self.view(),
-    fn(f, info, x, y) { f(info, x, y) }, wrapped)
+  ffi_view_handle_drop(
+    self.view(),
+    fn(f, info, x, y) { f(info, x, y) },
+    wrapped,
+  )
 }
 
 ///|

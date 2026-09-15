@@ -77,6 +77,7 @@ pub fn Menu::add_role_item(self : Menu, role : MenuRole) -> MenuItem {
 
 ///|
 /// 添加分隔线。
+
 ///|
 /// 添加复选菜单项。
 pub fn Menu::add_check_item(self : Menu, label : String) -> MenuItem {
@@ -107,6 +108,7 @@ pub fn Menu::add_separator(self : Menu) -> MenuItem {
 
 ///|
 /// 更新菜单项文本。
+
 ///|
 /// 读取菜单项文本。
 pub fn MenuItem::get_label(self : MenuItem) -> String {
@@ -134,8 +136,9 @@ pub fn MenuItem::set_accelerator(self : MenuItem, accelerator : String) -> Unit 
 /// 注册菜单项点击回调。
 pub fn MenuItem::on_click(self : MenuItem, callback : () -> Unit) -> Unit {
   keep_alive(callback)
-  ffi_menu_item_on_click(self, fn(f : (() -> Unit)) -> Unit { f() }, callback)
+  ffi_menu_item_on_click(self, fn(f : () -> Unit) -> Unit { f() }, callback)
 }
+
 ///|
 /// 菜单条顶级菜单数量。
 pub fn MenuBar::item_count(self : MenuBar) -> Int {

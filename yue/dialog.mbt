@@ -20,6 +20,7 @@ pub fn FileDialog::set_filters(self : FileDialog, filters : String) -> Unit {
 
 ///|
 /// 设置初始目录。
+
 ///|
 /// 对话框选项位（对照 FileDialog::Option，可组合）。
 pub const FILE_OPTION_PICK_FOLDERS : Int = 1
@@ -49,7 +50,10 @@ pub fn FileDialog::set_filename(self : FileDialog, filename : String) -> Unit {
 
 ///|
 /// 模态运行：返回 true 表示用户确认。
-pub fn[T : ViewLike] FileDialog::run_for_window(self : FileDialog, window : T) -> Bool {
+pub fn[T : ViewLike] FileDialog::run_for_window(
+  self : FileDialog,
+  window : T,
+) -> Bool {
   ffi_file_dialog_run_for_window(self, window.view()) == 1
 }
 

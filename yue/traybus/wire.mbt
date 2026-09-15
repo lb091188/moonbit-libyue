@@ -91,12 +91,11 @@ fn parse_one_sig(p : SigParser) -> Result[Sig, String] {
     111 => Ok(SigPath) // o
     103 => Ok(SigSig) // g
     118 => Ok(SigVariant) // v
-    97 => { // a
+    97 => // a
       match parse_one_sig(p) {
         Ok(elem) => Ok(SigArray(elem))
         Err(e) => Err(e)
       }
-    }
     40 => { // ( 结构体
       let fields : Array[Sig] = []
       let mut closed = false
@@ -107,12 +106,11 @@ fn parse_one_sig(p : SigParser) -> Result[Sig, String] {
             closed = true
           }
           -1 => return Err("结构体签名未闭合")
-          _ => {
+          _ =>
             match parse_one_sig(p) {
               Ok(f) => fields.push(f)
               Err(e) => return Err(e)
             }
-          }
         }
       }
       Ok(SigStruct(fields))
@@ -138,7 +136,7 @@ fn parse_one_sig(p : SigParser) -> Result[Sig, String] {
 
 ///|
 fn parse_signature(sig : String) -> Result[Array[Sig], String] {
-  let p : SigParser = { sig, pos: 0 }
+  let p : SigParser = { sig, pos: 0, }
   let out : Array[Sig] = []
   while p.pos < sig.length() {
     match parse_one_sig(p) {
@@ -180,7 +178,6 @@ fn sig_of(v : DVal) -> String {
   }
 }
 
-
 // ---------- 写缓冲 ----------
 
 ///|
@@ -192,7 +189,7 @@ priv struct Buf {
 
 ///|
 fn Buf::new() -> Buf {
-  { data: FixedArray::make(256, b'\x00'), len: 0, base: 0 }
+  { data: FixedArray::make(256, b'\x00'), len: 0, base: 0, }
 }
 
 ///|
@@ -573,8 +570,7 @@ fn Rd::u8v(self : Rd) -> Int {
 
 ///|
 fn Rd::u32v(self : Rd) -> Int {
-  let v =
-    self.data[self.pos].to_int() |
+  let v = self.data[self.pos].to_int() |
     (self.data[self.pos + 1].to_int() << 8) |
     (self.data[self.pos + 2].to_int() << 16) |
     (self.data[self.pos + 3].to_int() << 24)
@@ -595,7 +591,7 @@ fn Rd::i64v(self : Rd) -> Int64 {
 ///|
 fn Rd::read_string(self : Rd) -> String {
   let len = self.u32v()
-  let s = @utf8.decode_lossy(self.data[self.pos : self.pos + len])
+  let s = @utf8.decode_lossy(self.data[self.pos:self.pos + len])
   self.pos += len + 1 // 跳过 '\0'
   s
 }
@@ -603,7 +599,7 @@ fn Rd::read_string(self : Rd) -> String {
 ///|
 fn Rd::read_sig(self : Rd) -> String {
   let len = self.u8v()
-  let s = @utf8.decode_lossy(self.data[self.pos : self.pos + len])
+  let s = @utf8.decode_lossy(self.data[self.pos:self.pos + len])
   self.pos += len + 1
   s
 }
@@ -750,7 +746,7 @@ fn parse_message(data : BytesView) -> Msg? {
     // variant：签名 g + 值
     let sig_len = data[p].to_int()
     p += 1
-    let fs = @utf8.decode_lossy(data[p : p + sig_len])
+    let fs = @utf8.decode_lossy(data[p:p + sig_len])
     p += sig_len + 1
     match (tag, fs) {
       (1, "o") | (2, "s") | (3, "s") | (4, "s") | (6, "s") | (7, "s") => {
@@ -759,7 +755,7 @@ fn parse_message(data : BytesView) -> Msg? {
         }
         let len = rd_u32_at(data, p)
         p += 4
-        let s = @utf8.decode_lossy(data[p : p + len])
+        let s = @utf8.decode_lossy(data[p:p + len])
         p += len + 1
         match tag {
           1 => msg.path = s
@@ -783,7 +779,7 @@ fn parse_message(data : BytesView) -> Msg? {
         }
         let len = data[p].to_int()
         p += 1
-        msg.sig = @utf8.decode_lossy(data[p : p + len])
+        msg.sig = @utf8.decode_lossy(data[p:p + len])
         p += len + 1
       }
       _ => return None // 未知字段
@@ -791,13 +787,12 @@ fn parse_message(data : BytesView) -> Msg? {
   }
   // 体：对齐相对消息起点（base 0），解析位置从 body_start 起
   if msg.sig != "" {
-    let rd : Rd = { data, pos: body_start }
+    let rd : Rd = { data, pos: body_start, }
     match parse_signature(msg.sig) {
-      Ok(nodes) => {
+      Ok(nodes) =>
         for node in nodes {
           msg.body.push(decode_in(rd, node, 0))
         }
-      }
       Err(_) => return None
     }
   }

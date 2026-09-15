@@ -9,7 +9,6 @@ fn main {
   win.set_content_size(420.0, 320.0)
   win.on_close(fn(_window) { @yue.quit() })
 
-
   let content = @yue.Container::new()
   content.set_style("padding", 10.0)
   win.set_content(content)
@@ -93,9 +92,7 @@ fn main {
     @yue.clear_timeout(timeout_id)
     println("CHECK cleanup done ok=true")
   })
-  @yue.post_task(fn() {
-    println("CHECK post_task ok=true")
-  })
+  @yue.post_task(fn() { println("CHECK post_task ok=true") })
 
   // ---- 结构体族自检（真实总线/真机断言，结果打印 stdout，Esc 退出） ----
   win.on_key_down(fn(event) {
@@ -110,7 +107,9 @@ fn main {
 
   // 滚动条策略往返
   let policy = scroll.get_scrollbar_policy()
-  println("CHECK scroll_policy ok=\{policy.0 is @yue.Automatic && policy.1 is @yue.Automatic}")
+  println(
+    "CHECK scroll_policy ok=\{policy.0 is @yue.Automatic && policy.1 is @yue.Automatic}",
+  )
 
   // 剪贴板 Selection 主选区 + 数据往返
   let selection = @yue.Clipboard::from_type(@yue.Selection)
@@ -129,7 +128,10 @@ fn main {
   }
 
   // 带选项窗口（不抢焦点）+ 浏览器选项 + Cookie 查询
-  let _panel = @yue.Window::new_with_options(transparent=false, no_activate=true)
+  let _panel = @yue.Window::new_with_options(
+    transparent=false,
+    no_activate=true,
+  )
   let browser = @yue.Browser::new_with_options({
     devtools: false,
     context_menu: true,
@@ -162,10 +164,15 @@ fn main {
   let _i1 = m2.add_label_item("乙")
   let _i2 = m2.add_label_item("丙")
   let probe = m2.item_at(1)
-  println("CHECK menu_traverse count=\{m2.item_count()} at1=\{probe.get_label()}")
+  println(
+    "CHECK menu_traverse count=\{m2.item_count()} at1=\{probe.get_label()}",
+  )
 
   // DatePicker 带选项
-  let _dp = @yue.DatePicker::new_with({ elements: @yue.HourMinute, has_stepper: false })
+  let _dp = @yue.DatePicker::new_with({
+    elements: @yue.HourMinute,
+    has_stepper: false,
+  })
   println("CHECK datepicker_options ok=true")
 
   // Browser:load_html + execute_javascript(不崩即 ABI 通)
@@ -179,7 +186,9 @@ fn main {
   })
   browser.load_url("demo://hello")
   @yue.post_delayed_task(1500, fn() {
-    println("CHECK protocol_url got=\{browser.get_url()} ok=\{browser.get_url().has_prefix("demo://")}")
+    println(
+      "CHECK protocol_url got=\{browser.get_url()} ok=\{browser.get_url().has_prefix("demo://")}",
+    )
   })
 
   // Window 选项族运行时

@@ -63,12 +63,21 @@ fn mouse_event(
   mods : Int,
   ts : Int,
 ) -> MouseEvent {
-  { kind, button, view_x: vx, view_y: vy, window_x: wx, window_y: wy, modifiers: mods, timestamp: ts }
+  {
+    kind,
+    button,
+    view_x: vx,
+    view_y: vy,
+    window_x: wx,
+    window_y: wy,
+    modifiers: mods,
+    timestamp: ts,
+  }
 }
 
 ///|
 fn key_event(kind : EventType, code : Int, mods : Int, ts : Int) -> KeyEvent {
-  { kind, code: normalize_key_code(code), modifiers: mods, timestamp: ts }
+  { kind, code: normalize_key_code(code), modifiers: mods, timestamp: ts, }
 }
 
 ///|
@@ -587,120 +596,193 @@ pub const VKEY_Z : Int = 0x05a
 
 ///|
 /// 鼠标按下：返回 true 表示事件已处理（阻止默认行为）。
-impl ViewLike with on_mouse_down(self, callback : (MouseEvent) -> Bool) -> Unit {
-  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Int =
-    fn(button, vx, vy, wx, wy, mods, ts) {
-      if callback(mouse_event(MouseDown, button, vx, vy, wx, wy, mods, ts)) {
-        1
-      } else {
-        0
-      }
+impl ViewLike with fn on_mouse_down(self, callback : (MouseEvent) -> Bool) -> Unit {
+  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Int = fn(
+    button,
+    vx,
+    vy,
+    wx,
+    wy,
+    mods,
+    ts,
+  ) {
+    if callback(mouse_event(MouseDown, button, vx, vy, wx, wy, mods, ts)) {
+      1
+    } else {
+      0
     }
+  }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_view_on_mouse_down(self.view(), fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) }, wrapped)
+  ffi_view_on_mouse_down(
+    self.view(),
+    fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
+    wrapped,
+  )
 }
 
 ///|
 /// 鼠标抬起：返回 true 表示事件已处理。
-impl ViewLike with on_mouse_up(self, callback : (MouseEvent) -> Bool) -> Unit {
-  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Int =
-    fn(button, vx, vy, wx, wy, mods, ts) {
-      if callback(mouse_event(MouseUp, button, vx, vy, wx, wy, mods, ts)) {
-        1
-      } else {
-        0
-      }
+impl ViewLike with fn on_mouse_up(self, callback : (MouseEvent) -> Bool) -> Unit {
+  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Int = fn(
+    button,
+    vx,
+    vy,
+    wx,
+    wy,
+    mods,
+    ts,
+  ) {
+    if callback(mouse_event(MouseUp, button, vx, vy, wx, wy, mods, ts)) {
+      1
+    } else {
+      0
     }
+  }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_view_on_mouse_up(self.view(), fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) }, wrapped)
+  ffi_view_on_mouse_up(
+    self.view(),
+    fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
+    wrapped,
+  )
 }
 
 ///|
 /// 鼠标在视图内移动（高频，回调保持轻量）。
-impl ViewLike with on_mouse_move(self, callback : (MouseEvent) -> Unit) -> Unit {
-  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Unit =
-    fn(button, vx, vy, wx, wy, mods, ts) {
-      callback(mouse_event(MouseMove, button, vx, vy, wx, wy, mods, ts))
-    }
+impl ViewLike with fn on_mouse_move(self, callback : (MouseEvent) -> Unit) -> Unit {
+  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Unit = fn(
+    button,
+    vx,
+    vy,
+    wx,
+    wy,
+    mods,
+    ts,
+  ) {
+    callback(mouse_event(MouseMove, button, vx, vy, wx, wy, mods, ts))
+  }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_view_on_mouse_move(self.view(), fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) }, wrapped)
+  ffi_view_on_mouse_move(
+    self.view(),
+    fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
+    wrapped,
+  )
 }
 
 ///|
 /// 鼠标进入视图。
-impl ViewLike with on_mouse_enter(self, callback : (MouseEvent) -> Unit) -> Unit {
-  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Unit =
-    fn(button, vx, vy, wx, wy, mods, ts) {
-      callback(mouse_event(MouseEnter, button, vx, vy, wx, wy, mods, ts))
-    }
+impl ViewLike with fn on_mouse_enter(self, callback : (MouseEvent) -> Unit) -> Unit {
+  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Unit = fn(
+    button,
+    vx,
+    vy,
+    wx,
+    wy,
+    mods,
+    ts,
+  ) {
+    callback(mouse_event(MouseEnter, button, vx, vy, wx, wy, mods, ts))
+  }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_view_on_mouse_enter(self.view(), fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) }, wrapped)
+  ffi_view_on_mouse_enter(
+    self.view(),
+    fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
+    wrapped,
+  )
 }
 
 ///|
 /// 鼠标离开视图。
-impl ViewLike with on_mouse_leave(self, callback : (MouseEvent) -> Unit) -> Unit {
-  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Unit =
-    fn(button, vx, vy, wx, wy, mods, ts) {
-      callback(mouse_event(MouseLeave, button, vx, vy, wx, wy, mods, ts))
-    }
+impl ViewLike with fn on_mouse_leave(self, callback : (MouseEvent) -> Unit) -> Unit {
+  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Unit = fn(
+    button,
+    vx,
+    vy,
+    wx,
+    wy,
+    mods,
+    ts,
+  ) {
+    callback(mouse_event(MouseLeave, button, vx, vy, wx, wy, mods, ts))
+  }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_view_on_mouse_leave(self.view(), fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) }, wrapped)
+  ffi_view_on_mouse_leave(
+    self.view(),
+    fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
+    wrapped,
+  )
 }
 
 ///|
 /// 键盘按下：返回 true 表示事件已处理（阻止默认行为）。
-impl ViewLike with on_key_down(self, callback : (KeyEvent) -> Bool) -> Unit {
-  let wrapped : (Int, Int, Int) -> Int =
-    fn(code, mods, ts) { if callback(key_event(KeyDown, code, mods, ts)) { 1 } else { 0 } }
+impl ViewLike with fn on_key_down(self, callback : (KeyEvent) -> Bool) -> Unit {
+  let wrapped : (Int, Int, Int) -> Int = fn(code, mods, ts) {
+    if callback(key_event(KeyDown, code, mods, ts)) {
+      1
+    } else {
+      0
+    }
+  }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_view_on_key_down(self.view(), fn(f, code, mods, ts) { f(code, mods, ts) }, wrapped)
+  ffi_view_on_key_down(
+    self.view(),
+    fn(f, code, mods, ts) { f(code, mods, ts) },
+    wrapped,
+  )
 }
 
 ///|
 /// 键盘抬起：返回 true 表示事件已处理。
-impl ViewLike with on_key_up(self, callback : (KeyEvent) -> Bool) -> Unit {
-  let wrapped : (Int, Int, Int) -> Int =
-    fn(code, mods, ts) { if callback(key_event(KeyUp, code, mods, ts)) { 1 } else { 0 } }
+impl ViewLike with fn on_key_up(self, callback : (KeyEvent) -> Bool) -> Unit {
+  let wrapped : (Int, Int, Int) -> Int = fn(code, mods, ts) {
+    if callback(key_event(KeyUp, code, mods, ts)) {
+      1
+    } else {
+      0
+    }
+  }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_view_on_key_up(self.view(), fn(f, code, mods, ts) { f(code, mods, ts) }, wrapped)
+  ffi_view_on_key_up(
+    self.view(),
+    fn(f, code, mods, ts) { f(code, mods, ts) },
+    wrapped,
+  )
 }
 
 /// ---------- 鼠标捕获（Responder） ----------
 
 ///|
 /// 捕获鼠标：捕获期间 move/up 持续送达本视图（拖拽选区等场景）。
-impl ViewLike with set_capture(self) -> Unit {
+impl ViewLike with fn set_capture(self) -> Unit {
   ffi_view_set_capture(self.view())
 }
 
 ///|
-impl ViewLike with release_capture(self) -> Unit {
+impl ViewLike with fn release_capture(self) -> Unit {
   ffi_view_release_capture(self.view())
 }
 
 ///|
-impl ViewLike with has_capture(self) -> Bool {
+impl ViewLike with fn has_capture(self) -> Bool {
   ffi_view_has_capture(self.view()) == 1
 }
 
 ///|
 /// 捕获被系统/他人夺走时回调。
-impl ViewLike with on_capture_lost(self, callback : () -> Unit) -> Unit {
+impl ViewLike with fn on_capture_lost(self, callback : () -> Unit) -> Unit {
   keep_alive(callback)
   ffi_view_on_capture_lost(self.view(), fn(f) { f() }, callback)
 }
 
 ///|
 /// 视图尺寸变化（首次布局、窗口缩放等时机）。
-impl ViewLike with on_size_changed(self, callback : () -> Unit) -> Unit {
+impl ViewLike with fn on_size_changed(self, callback : () -> Unit) -> Unit {
   keep_alive(callback)
   ffi_view_on_size_changed(self.view(), fn(f) { f() }, callback)
 }
 
 ///|
 /// yoga 计算布局的文本转储（调试布局用）。
-impl ViewLike with get_computed_layout(self) -> String {
+impl ViewLike with fn get_computed_layout(self) -> String {
   @utf8.decode_lossy(ffi_view_get_computed_layout(self.view()))
 }
 
@@ -754,7 +836,10 @@ pub fn ClickTracker::new() -> ClickTracker {
 }
 
 ///|
-pub fn ClickTracker::new_with(window_ms : Int, distance_px : Double) -> ClickTracker {
+pub fn ClickTracker::new_with(
+  window_ms : Int,
+  distance_px : Double,
+) -> ClickTracker {
   {
     window_ms,
     distance_px,

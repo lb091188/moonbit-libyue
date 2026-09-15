@@ -21,15 +21,16 @@ test "签名解析" {
 
 ///|
 test "消息往返：方法调用" {
-  match build_call(
-    7,
-    "org.example.Dest",
-    "/obj/path",
-    "org.if.Iface",
-    "Member",
-    "s",
-    [VString("hello")],
-  ) {
+  match
+    build_call(
+      7,
+      "org.example.Dest",
+      "/obj/path",
+      "org.if.Iface",
+      "Member",
+      "s",
+      [VString("hello")],
+    ) {
     Ok(bytes) =>
       match parse_message(bytes[:]) {
         Some(msg) => {
@@ -49,7 +50,15 @@ test "消息往返：方法调用" {
 
 ///|
 test "消息往返：空体信号" {
-  match build_signal(3, "/StatusNotifierItem", "org.kde.StatusNotifierItem", "NewIcon", "", []) {
+  match
+    build_signal(
+      3,
+      "/StatusNotifierItem",
+      "org.kde.StatusNotifierItem",
+      "NewIcon",
+      "",
+      [],
+    ) {
     Ok(bytes) =>
       match parse_message(bytes[:]) {
         Some(msg) => {
@@ -67,13 +76,10 @@ test "消息往返：空体信号" {
 
 ///|
 test "消息往返：a{sv} 属性字典" {
-  let dict = VArray(
-    "{sv}",
-    [
-      VStruct([VString("Id"), VVariant(VString("demo"))]),
-      VStruct([VString("ItemIsMenu"), VVariant(VBool(true))]),
-    ],
-  )
+  let dict = VArray("{sv}", [
+    VStruct([VString("Id"), VVariant(VString("demo"))]),
+    VStruct([VString("ItemIsMenu"), VVariant(VBool(true))]),
+  ])
   match build_reply(1, 2, ":1.5", "a{sv}", [dict]) {
     Ok(bytes) =>
       match parse_message(bytes[:]) {
@@ -89,14 +95,16 @@ test "消息往返：a{sv} 属性字典" {
                   inspect(name, content="Id")
                   inspect(value, content="demo")
                 }
-                _ => inspect("结构不符", content="VStruct[VString, VVariant]")
+                _ =>
+                  inspect("结构不符", content="VStruct[VString, VVariant]")
               }
               match entries[1] {
                 VStruct([VString(name), VVariant(VBool(b))]) => {
                   inspect(name, content="ItemIsMenu")
                   inspect(b, content="true")
                 }
-                _ => inspect("结构不符", content="VStruct[VString, VVariant]")
+                _ =>
+                  inspect("结构不符", content="VStruct[VString, VVariant]")
               }
             }
             _ => inspect("不是数组", content="VArray")
@@ -189,35 +197,28 @@ test "桌面环境识别" {
   inspect(parse_desktop_env(None) is Unknown, content="true")
 }
 
-
-
 ///|
 test "DBusMenu GetLayout 应答构造" {
   let entries : Array[DVal] = [
     VStruct([
       VI32(1),
-      VArray(
-        "{sv}",
-        [
-          VStruct([VString("label"), VVariant(VString("退出"))]),
-          VStruct([VString("enabled"), VVariant(VBool(true))]),
-          VStruct([VString("visible"), VVariant(VBool(true))]),
-        ],
-      ),
+      VArray("{sv}", [
+        VStruct([VString("label"), VVariant(VString("退出"))]),
+        VStruct([VString("enabled"), VVariant(VBool(true))]),
+        VStruct([VString("visible"), VVariant(VBool(true))]),
+      ]),
       VArray("v", []),
     ]),
   ]
   let root = VStruct([
     VI32(0),
-    VArray(
-      "{sv}",
-      [VStruct([VString("children-display"), VVariant(VString("submenu"))])],
-    ),
+    VArray("{sv}", [
+      VStruct([VString("children-display"), VVariant(VString("submenu"))]),
+    ]),
     VArray("v", [VVariant(entries[0])]),
   ])
-  match build_reply(1, 2, ":1.32", "(u(ia{sv}av))", [
-    VStruct([VU32(3), root]),
-  ]) {
+  match
+    build_reply(1, 2, ":1.32", "(u(ia{sv}av))", [VStruct([VU32(3), root])]) {
     Ok(bytes) => {
       inspect(bytes.length() > 40, content="true")
       inspect(parse_message(bytes[:]) is Some(_), content="true")
@@ -230,42 +231,51 @@ test "DBusMenu GetLayout 应答构造" {
 test "scratch3: GetLayout 应答字节" {
   let entry = VStruct([
     VI32(1),
-    VArray(
-      "{sv}",
-      [
-        VStruct([VString("label"), VVariant(VString("退出"))]),
-        VStruct([VString("enabled"), VVariant(VBool(true))]),
-        VStruct([VString("visible"), VVariant(VBool(true))]),
-      ],
-    ),
+    VArray("{sv}", [
+      VStruct([VString("label"), VVariant(VString("退出"))]),
+      VStruct([VString("enabled"), VVariant(VBool(true))]),
+      VStruct([VString("visible"), VVariant(VBool(true))]),
+    ]),
     VArray("v", []),
   ])
   let root = VStruct([
     VI32(0),
-    VArray(
-      "{sv}",
-      [VStruct([VString("children-display"), VVariant(VString("submenu"))])],
-    ),
+    VArray("{sv}", [
+      VStruct([VString("children-display"), VVariant(VString("submenu"))]),
+    ]),
     VArray("v", [VVariant(entry)]),
   ])
-  match build_reply(1, 2, ":1.32", "(u(ia{sv}av))", [VStruct([VU32(3), root])]) {
+  match
+    build_reply(1, 2, ":1.32", "(u(ia{sv}av))", [VStruct([VU32(3), root])]) {
     Ok(bytes) => {
       let sb = StringBuilder()
       for i in 0..<bytes.length() {
         let b = bytes[i].to_int()
         let hi = b >> 4
         let lo = b & 15
-        sb.write_char(if hi < 10 { (48 + hi).unsafe_to_char() } else { (87 + hi).unsafe_to_char() })
-        sb.write_char(if lo < 10 { (48 + lo).unsafe_to_char() } else { (87 + lo).unsafe_to_char() })
+        sb.write_char(
+          if hi < 10 {
+            (48 + hi).unsafe_to_char()
+          } else {
+            (87 + hi).unsafe_to_char()
+          },
+        )
+        sb.write_char(
+          if lo < 10 {
+            (48 + lo).unsafe_to_char()
+          } else {
+            (87 + lo).unsafe_to_char()
+          },
+        )
       }
       println(sb.to_string())
       // 体前 24 字节按 u32 打印
       for k in 0..<6 {
         let off = 64 + k * 4
         let v = bytes[off].to_int() |
-          (bytes[off+1].to_int() << 8) |
-          (bytes[off+2].to_int() << 16) |
-          (bytes[off+3].to_int() << 24)
+          (bytes[off + 1].to_int() << 8) |
+          (bytes[off + 2].to_int() << 16) |
+          (bytes[off + 3].to_int() << 24)
         println("body[\{k}] @\{off} = \{v}")
       }
     }

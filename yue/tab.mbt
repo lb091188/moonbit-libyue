@@ -3,12 +3,16 @@
 ///|
 /// 创建空页签控件。
 pub fn Tab::new() -> Tab {
-  { view: ffi_tab_new() }
+  { view: ffi_tab_new(), }
 }
 
 ///|
 /// 追加一页（title 为页签标题，view 为页内容）。
-pub fn[T : ViewLike] Tab::add_page(self : Tab, title : String, page : T) -> Unit {
+pub fn[T : ViewLike] Tab::add_page(
+  self : Tab,
+  title : String,
+  page : T,
+) -> Unit {
   ffi_tab_add_page(self.view, utf8_bytes(title), page.view())
 }
 
@@ -40,5 +44,9 @@ pub fn Tab::get_selected_page_index(self : Tab) -> Int {
 /// 注册页切换回调（点击页签或程序切换均触发）。
 pub fn Tab::on_selected_page_change(self : Tab, callback : () -> Unit) -> Unit {
   keep_alive(callback)
-  ffi_tab_on_selected_page_change(self.view, fn(f : (() -> Unit)) -> Unit { f() }, callback)
+  ffi_tab_on_selected_page_change(
+    self.view,
+    fn(f : () -> Unit) -> Unit { f() },
+    callback,
+  )
 }

@@ -14,7 +14,9 @@ fn page_table() -> @yue.Node {
         style_str=[("color", desc_color)],
         style=[("marginBottom", 8.0)],
       ),
-      @yue.button("打开表格演示窗口", on_click=fn() { open_table_window() }),
+      @yue.button("打开表格演示窗口", on_click=fn() {
+        open_table_window()
+      }),
     ]),
   ])
 }

@@ -3,7 +3,7 @@
 ///|
 /// 创建浏览器视图。
 pub fn Browser::new() -> Browser {
-  { view: ffi_browser_new() }
+  { view: ffi_browser_new(), }
 }
 
 ///|
@@ -20,7 +20,12 @@ pub(all) struct BrowserOptions {
 ///|
 /// 默认选项（devtools/右键菜单关，硬件加速开）。
 pub fn BrowserOptions::new() -> BrowserOptions {
-  { devtools: false, context_menu: false, allow_file_access_from_files: false, hardware_acceleration: true }
+  {
+    devtools: false,
+    context_menu: false,
+    allow_file_access_from_files: false,
+    hardware_acceleration: true,
+  }
 }
 
 ///|
@@ -28,11 +33,27 @@ pub fn BrowserOptions::new() -> BrowserOptions {
 pub fn Browser::new_with_options(options : BrowserOptions) -> Browser {
   {
     view: ffi_browser_new_ex(
-      if options.devtools { 1 } else { 0 },
-      if options.context_menu { 1 } else { 0 },
-      if options.allow_file_access_from_files { 1 } else { 0 },
-      if options.hardware_acceleration { 1 } else { 0 },
-    )
+      if options.devtools {
+        1
+      } else {
+        0
+      },
+      if options.context_menu {
+        1
+      } else {
+        0
+      },
+      if options.allow_file_access_from_files {
+        1
+      } else {
+        0
+      },
+      if options.hardware_acceleration {
+        1
+      } else {
+        0
+      },
+    ),
   }
 }
 
@@ -76,7 +97,12 @@ pub fn Browser::get_cookies_for_url(
     callback(cookies)
   }
   keep_alive_bytes(wrapped)
-  ffi_browser_get_cookies_for_url(self.view, utf8_bytes(url), fn(f, b) { f(b) }, wrapped)
+  ffi_browser_get_cookies_for_url(
+    self.view,
+    utf8_bytes(url),
+    fn(f, b) { f(b) },
+    wrapped,
+  )
 }
 
 ///|
@@ -129,7 +155,11 @@ pub fn Browser::is_loading(self : Browser) -> Bool {
 
 ///|
 /// 加载 HTML 片段（可指定 base URL）。
-pub fn Browser::load_html(self : Browser, html : String, base_url? : String = "about:blank") -> Unit {
+pub fn Browser::load_html(
+  self : Browser,
+  html : String,
+  base_url? : String = "about:blank",
+) -> Unit {
   ffi_browser_load_html(self.view, utf8_bytes(html), utf8_bytes(base_url))
 }
 
@@ -147,40 +177,75 @@ pub fn Browser::execute_javascript(self : Browser, code : String) -> Unit {
 
 ///|
 /// 加载状态变化。
-pub fn Browser::on_change_loading(self : Browser, callback : () -> Unit) -> Unit {
+pub fn Browser::on_change_loading(
+  self : Browser,
+  callback : () -> Unit,
+) -> Unit {
   keep_alive(callback)
-  ffi_browser_on_change_loading(self.view, fn(f : (() -> Unit)) -> Unit { f() }, callback)
+  ffi_browser_on_change_loading(
+    self.view,
+    fn(f : () -> Unit) -> Unit { f() },
+    callback,
+  )
 }
 
 ///|
 /// 命令状态更新（后退/前进可用性等）。
-pub fn Browser::on_update_command(self : Browser, callback : () -> Unit) -> Unit {
+pub fn Browser::on_update_command(
+  self : Browser,
+  callback : () -> Unit,
+) -> Unit {
   keep_alive(callback)
-  ffi_browser_on_update_command(self.view, fn(f : (() -> Unit)) -> Unit { f() }, callback)
+  ffi_browser_on_update_command(
+    self.view,
+    fn(f : () -> Unit) -> Unit { f() },
+    callback,
+  )
 }
 
 ///|
 /// 页面标题更新。
-pub fn Browser::on_update_title(self : Browser, callback : (String) -> Unit) -> Unit {
+pub fn Browser::on_update_title(
+  self : Browser,
+  callback : (String) -> Unit,
+) -> Unit {
   let wrapped : (Bytes) -> Unit = fn(title) { callback(from_utf8_bytes(title)) }
   keep_alive_bytes(wrapped)
-  ffi_browser_on_update_title(self.view, fn(f : ((Bytes) -> Unit), b : Bytes) -> Unit { f(b) }, wrapped)
+  ffi_browser_on_update_title(
+    self.view,
+    fn(f : (Bytes) -> Unit, b : Bytes) -> Unit { f(b) },
+    wrapped,
+  )
 }
 
 ///|
 /// 导航提交（开始加载目标 URL）。
-pub fn Browser::on_commit_navigation(self : Browser, callback : (String) -> Unit) -> Unit {
+pub fn Browser::on_commit_navigation(
+  self : Browser,
+  callback : (String) -> Unit,
+) -> Unit {
   let wrapped : (Bytes) -> Unit = fn(url) { callback(from_utf8_bytes(url)) }
   keep_alive_bytes(wrapped)
-  ffi_browser_on_commit_navigation(self.view, fn(f : ((Bytes) -> Unit), b : Bytes) -> Unit { f(b) }, wrapped)
+  ffi_browser_on_commit_navigation(
+    self.view,
+    fn(f : (Bytes) -> Unit, b : Bytes) -> Unit { f(b) },
+    wrapped,
+  )
 }
 
 ///|
 /// 导航完成。
-pub fn Browser::on_finish_navigation(self : Browser, callback : (String) -> Unit) -> Unit {
+pub fn Browser::on_finish_navigation(
+  self : Browser,
+  callback : (String) -> Unit,
+) -> Unit {
   let wrapped : (Bytes) -> Unit = fn(url) { callback(from_utf8_bytes(url)) }
   keep_alive_bytes(wrapped)
-  ffi_browser_on_finish_navigation(self.view, fn(f : ((Bytes) -> Unit), b : Bytes) -> Unit { f(b) }, wrapped)
+  ffi_browser_on_finish_navigation(
+    self.view,
+    fn(f : (Bytes) -> Unit, b : Bytes) -> Unit { f(b) },
+    wrapped,
+  )
 }
 
 ///|

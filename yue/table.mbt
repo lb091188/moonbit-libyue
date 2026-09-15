@@ -14,9 +14,9 @@ pub(all) enum TableValue {
 ///|
 /// 表格数据模型。行数与取值由消费方实现，100 万行也只按需取数。
 pub(open) trait TableModel {
-  row_count(Self) -> Int
-  get_value(Self, column : Int, row : Int) -> TableValue
-  set_value(Self, column : Int, row : Int, value : TableValue) -> Unit
+  fn row_count(Self) -> Int
+  fn get_value(Self, column : Int, row : Int) -> TableValue
+  fn set_value(Self, column : Int, row : Int, value : TableValue) -> Unit
 }
 
 ///|
@@ -59,11 +59,12 @@ fn decode_table_value(kind : Int, data : Bytes, flag : Int) -> TableValue {
 ///|
 /// 创建表格。
 pub fn Table::new() -> Table {
-  { view: ffi_table_new() }
+  { view: ffi_table_new(), }
 }
 
 ///|
 /// 添加文本列（宽度 -1 为自动）。
+
 ///|
 /// 列类型（对照 Table::ColumnType）。
 pub(all) enum ColumnType {
@@ -85,30 +86,52 @@ pub(all) struct ColumnOptions {
 
 ///|
 /// 按完整选项加列（Custom 型的自绘回调不支持，需自绘用 add_column_custom）。
-pub fn Table::add_column_with_options(self : Table, title : String, options : ColumnOptions) -> Unit {
+pub fn Table::add_column_with_options(
+  self : Table,
+  title : String,
+  options : ColumnOptions,
+) -> Unit {
   let type_id = match options.column_type {
     Text => 0
     Edit => 1
     Checkbox => 2
     Custom => 3
   }
-  ffi_table_add_column_with_options(self.view, utf8_bytes(title), type_id, options.column, options.width)
+  ffi_table_add_column_with_options(
+    self.view,
+    utf8_bytes(title),
+    type_id,
+    options.column,
+    options.width,
+  )
 }
 
 ///|
-pub fn Table::add_column_text(self : Table, title : String, width : Int) -> Unit {
+pub fn Table::add_column_text(
+  self : Table,
+  title : String,
+  width : Int,
+) -> Unit {
   ffi_table_add_column_text(self.view, utf8_bytes(title), width)
 }
 
 ///|
 /// 添加可编辑文本列（编辑结果经 set_value 回写模型）。
-pub fn Table::add_column_edit(self : Table, title : String, width : Int) -> Unit {
+pub fn Table::add_column_edit(
+  self : Table,
+  title : String,
+  width : Int,
+) -> Unit {
   ffi_table_add_column_edit(self.view, utf8_bytes(title), width)
 }
 
 ///|
 /// 添加复选框列（切换经 set_value 回写模型）。
-pub fn Table::add_column_checkbox(self : Table, title : String, width : Int) -> Unit {
+pub fn Table::add_column_checkbox(
+  self : Table,
+  title : String,
+  width : Int,
+) -> Unit {
   ffi_table_add_column_checkbox(self.view, utf8_bytes(title), width)
 }
 
@@ -121,16 +144,27 @@ pub fn Table::add_column_custom(
   width : Int,
   draw : (Painter, Double, Double, Double, Double, String, String) -> Unit,
 ) -> Unit {
-  let wrapped : (Painter, Double, Double, Double, Double, Bytes, Bytes) -> Unit =
-    fn(painter, x, y, w, h, name, color) {
-      draw(painter, x, y, w, h, from_utf8_bytes(name), from_utf8_bytes(color))
-    }
-  keep_alive_draw(fn(painter) { wrapped(painter, 0.0, 0.0, 0.0, 0.0, Bytes::make(0, 0), Bytes::make(0, 0)) })
+  let wrapped : (Painter, Double, Double, Double, Double, Bytes, Bytes) -> Unit = fn(
+    painter,
+    x,
+    y,
+    w,
+    h,
+    name,
+    color,
+  ) {
+    draw(painter, x, y, w, h, from_utf8_bytes(name), from_utf8_bytes(color))
+  }
+  keep_alive_draw(fn(painter) {
+    wrapped(painter, 0.0, 0.0, 0.0, 0.0, Bytes::make(0, 0), Bytes::make(0, 0))
+  })
   ffi_table_add_column_custom(
     self.view,
     utf8_bytes(title),
     width,
-    fn(f, painter, x, y, w, h, name, color) { f(painter, x, y, w, h, name, color) },
+    fn(f, painter, x, y, w, h, name, color) {
+      f(painter, x, y, w, h, name, color)
+    },
     wrapped,
   )
 }
@@ -143,7 +177,11 @@ pub fn Table::set_has_border(self : Table, yes : Bool) -> Unit {
 
 ///|
 /// 挂载数据模型（column_count 为列数）。
-pub fn[M : TableModel] Table::set_model(self : Table, model : M, column_count : Int) -> Unit {
+pub fn[M : TableModel] Table::set_model(
+  self : Table,
+  model : M,
+  column_count : Int,
+) -> Unit {
   let box = ModelBox::{
     row_count: fn() { model.row_count() },
     get_value: fn(c, r) { model.get_value(c, r) },
@@ -157,8 +195,17 @@ pub fn[M : TableModel] Table::set_model(self : Table, model : M, column_count : 
     column_count,
     box,
     fn(b : ModelBox) -> Int { (b.row_count)() },
-    fn(b : ModelBox, c : Int, r : Int) -> Bytes { encode_table_value((b.get_value)(c, r)) },
-    fn(b : ModelBox, c : Int, r : Int, kind : Int, data : Bytes, flag : Int) -> Unit {
+    fn(b : ModelBox, c : Int, r : Int) -> Bytes {
+      encode_table_value((b.get_value)(c, r))
+    },
+    fn(
+      b : ModelBox,
+      c : Int,
+      r : Int,
+      kind : Int,
+      data : Bytes,
+      flag : Int,
+    ) -> Unit {
       (b.set_value)(c, r, decode_table_value(kind, data, flag))
     },
   )

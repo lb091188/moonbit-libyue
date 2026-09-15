@@ -23,7 +23,7 @@ pub fn[V : ViewLike] apply_style(
 pub fn Window::make(
   title? : String = "",
   size? : (Double, Double)? = None,
-  on_close? : (Window) -> Unit = fn(_w) { },
+  on_close? : (Window) -> Unit = fn(_w) {  },
   center? : Bool = false,
 ) -> Window {
   let win = Window::new()
@@ -48,7 +48,7 @@ pub fn Container::make(
   style_str? : Array[(String, String)] = [],
 ) -> Container {
   let c = Container::new()
-  apply_style(c, style=style, style_str=style_str)
+  apply_style(c, style~, style_str~)
   c
 }
 
@@ -60,7 +60,7 @@ pub fn Label::make(
   style_str? : Array[(String, String)] = [],
 ) -> Label {
   let l = Label::new(text)
-  apply_style(l, style=style, style_str=style_str)
+  apply_style(l, style~, style_str~)
   l
 }
 
@@ -69,7 +69,7 @@ pub fn Label::make(
 pub fn Button::make(
   title : String,
   button_type? : ButtonType = Normal,
-  on_click? : () -> Unit = fn() { },
+  on_click? : () -> Unit = fn() {  },
   checked? : Bool = false,
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
@@ -79,7 +79,7 @@ pub fn Button::make(
   if checked {
     b.set_checked(true)
   }
-  apply_style(b, style=style, style_str=style_str)
+  apply_style(b, style~, style_str~)
   b
 }
 
@@ -88,8 +88,8 @@ pub fn Button::make(
 pub fn Entry::make(
   text? : String = "",
   entry_type? : EntryType = Normal,
-  on_activate? : () -> Unit = fn() { },
-  on_text_change? : () -> Unit = fn() { },
+  on_activate? : () -> Unit = fn() {  },
+  on_text_change? : () -> Unit = fn() {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Entry {
@@ -99,7 +99,7 @@ pub fn Entry::make(
   }
   e.on_activate(on_activate)
   e.on_text_change(on_text_change)
-  apply_style(e, style=style, style_str=style_str)
+  apply_style(e, style~, style_str~)
   e
 }
 
@@ -107,7 +107,7 @@ pub fn Entry::make(
 /// 创建多行文本框：初始文本与内容变化回调。
 pub fn TextEdit::make(
   text? : String = "",
-  on_text_change? : () -> Unit = fn() { },
+  on_text_change? : () -> Unit = fn() {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> TextEdit {
@@ -116,7 +116,7 @@ pub fn TextEdit::make(
     t.set_text(text)
   }
   t.on_text_change(on_text_change)
-  apply_style(t, style=style, style_str=style_str)
+  apply_style(t, style~, style_str~)
   t
 }
 
@@ -126,7 +126,7 @@ pub fn Slider::make(
   value? : Double = 0.0,
   range? : (Double, Double)? = None,
   step? : Double? = None,
-  on_value_change? : () -> Unit = fn() { },
+  on_value_change? : () -> Unit = fn() {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Slider {
@@ -141,7 +141,7 @@ pub fn Slider::make(
   }
   s.set_value(value)
   s.on_value_change(on_value_change)
-  apply_style(s, style=style, style_str=style_str)
+  apply_style(s, style~, style_str~)
   s
 }
 
@@ -158,7 +158,7 @@ pub fn ProgressBar::make(
   if indeterminate {
     p.set_indeterminate(true)
   }
-  apply_style(p, style=style, style_str=style_str)
+  apply_style(p, style~, style_str~)
   p
 }
 
@@ -167,7 +167,7 @@ pub fn ProgressBar::make(
 pub fn Picker::make(
   items? : Array[String] = [],
   selected? : Int = 0,
-  on_selection_change? : () -> Unit = fn() { },
+  on_selection_change? : () -> Unit = fn() {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Picker {
@@ -179,7 +179,7 @@ pub fn Picker::make(
     p.select_item_at(selected)
   }
   p.on_selection_change(on_selection_change)
-  apply_style(p, style=style, style_str=style_str)
+  apply_style(p, style~, style_str~)
   p
 }
 
@@ -188,8 +188,8 @@ pub fn Picker::make(
 pub fn ComboBox::make(
   items? : Array[String] = [],
   selected? : Int = 0,
-  on_selection_change? : () -> Unit = fn() { },
-  on_text_change? : () -> Unit = fn() { },
+  on_selection_change? : () -> Unit = fn() {  },
+  on_text_change? : () -> Unit = fn() {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> ComboBox {
@@ -202,7 +202,7 @@ pub fn ComboBox::make(
   }
   c.on_selection_change(on_selection_change)
   c.on_text_change(on_text_change)
-  apply_style(c, style=style, style_str=style_str)
+  apply_style(c, style~, style_str~)
   c
 }
 
@@ -216,7 +216,7 @@ pub fn[T : ViewLike] Group::make(
 ) -> Group {
   let g = Group::new(title)
   g.set_content(content)
-  apply_style(g, style=style, style_str=style_str)
+  apply_style(g, style~, style_str~)
   g
 }
 
@@ -254,7 +254,7 @@ pub fn Separator::make(orientation? : Orientation = Horizontal) -> Separator {
 /// 创建页签控件：页标题与页内容（每页通常是一个 Container）。
 pub fn Tab::make(
   pages? : Array[(String, Container)] = [],
-  on_change? : () -> Unit = fn() { },
+  on_change? : () -> Unit = fn() {  },
 ) -> Tab {
   let t = Tab::new()
   for (title, page) in pages {
@@ -268,7 +268,7 @@ pub fn Tab::make(
 /// 创建日期选择器：初始日期（epoch 秒）与变化回调。
 pub fn DatePicker::make(
   epoch? : Int64? = None,
-  on_date_change? : () -> Unit = fn() { },
+  on_date_change? : () -> Unit = fn() {  },
 ) -> DatePicker {
   let d = DatePicker::new()
   match epoch {
