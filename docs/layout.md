@@ -14,7 +14,7 @@ MoonBit 侧入口(`yue/view.mbt` / `yue/events.mbt`):
 **键名解析**(`ParseName`):只保留 ASCII 字母并转小写——`flexDirection` / `flex-direction` /
 `FLEX_DIRECTION` 等价,推荐统一用小写无分隔(如 `justifycontent`)。
 
-## 基本概念(不懂 flex 先读这四条)
+## 基本概念
 
 - 布局就是「容器把空间分给子项」:子项沿**主轴**依次排列,主轴方向由
   `flexdirection` 决定(默认 `column` 纵向,从上到下);与主轴垂直的方向叫**交叉轴**。
