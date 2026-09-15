@@ -20,33 +20,6 @@ fn badge(letter : String, color : String) -> @yue.Node {
 }
 
 ///|
-/// 组合式组件:卡片 = 强调条 + 标题 + 内容列。
-fn card(
-  title : String,
-  accent : String,
-  children : Array[@yue.Node],
-) -> @yue.Node {
-  @yue.vbox(
-    [
-      @yue.hbox(
-        [
-          @yue.container(style=[("width", 4.0), ("height", 18.0)], handle=fn(
-            c,
-          ) {
-            c.set_background_color(accent)
-          }),
-          @yue.label(title, style=[("marginLeft", 8.0)]),
-        ],
-        style_str=[("alignItems", "center")],
-      ),
-      @yue.vbox(children, style=[("marginTop", 10.0), ("marginLeft", 12.0)]),
-    ],
-    style=[("padding", 14.0), ("marginBottom", 12.0)],
-    handle=fn(c) { c.set_background_color("#FFFFFF") },
-  )
-}
-
-///|
 /// 有状态组件:计数器。私有 Store,每个实例独立计数。
 fn counter_widget(start : Int) -> @yue.Node {
   let count : @yue.Store[Int] = @yue.Store::new(start)
@@ -88,6 +61,7 @@ fn main {
   }
   // 全局导航状态:侧边菜单与顶栏分段导航共享,谁点都联动。
   let selected : @yue.Store[String] = @yue.Store::new("总览")
+  let page_no : @yue.Store[Int] = @yue.Store::new(2)
   let counter_a = counter_widget(0)
   let window = @yue.mount_window(
     [
@@ -108,29 +82,50 @@ fn main {
               style_str=[("alignItems", "center")],
               handle=fn(c) { c.set_background_color("#FFFFFF") },
             ),
+            // 面包屑(与侧栏/分段共享状态)
+            @yue.hbox(
+              [@yue.breadcrumb(["MoonShell", "后台", "总览"], selected)],
+              style=[("paddingLeft", 14.0), ("paddingBottom", 8.0)],
+            ),
             // 页面:总览
             page("总览", selected, [
-              card("组合式组件", "#4C8BF5", [
-                @yue.label(
-                  "普通函数返回 Node 即组件,可接收任意参数。",
-                ),
-                counter_a,
-              ]),
+              @yue.alert(
+                "组件库已就绪:点击侧栏或顶栏切换页面。",
+                @yue.Success,
+              ),
+              @yue.card(
+                "组合式组件",
+                [
+                  @yue.label(
+                    "普通函数返回 Node 即组件,可接收任意参数。",
+                  ),
+                  counter_a,
+                  @yue.pagination(page_no, 5),
+                ],
+                height=200.0,
+              ),
             ]),
             // 页面:组件
             page("组件", selected, [
-              card("自绘徽标与标签", "#34A853", [
-                @yue.hbox(
-                  [
-                    badge("A", "#4C8BF5"),
-                    @yue.label(" "),
-                    badge("B", "#EA4335"),
-                    @yue.label("   "),
-                    @yue.tag("纯 MoonBit", "#E6A23C"),
-                  ],
-                  style_str=[("alignItems", "center")],
-                ),
-              ]),
+              @yue.hbox(
+                [
+                  badge("A", "#4C8BF5"),
+                  @yue.label("  "),
+                  badge("B", "#EA4335"),
+                  @yue.label("   "),
+                  @yue.tag_of_type("Primary", @yue.Primary),
+                  @yue.tag_of_type("Success", @yue.Success),
+                  @yue.tag_of_type("Warning", @yue.Warning),
+                  @yue.tag_of_type("Danger", @yue.Danger),
+                  @yue.tag_of_type("Info", @yue.Info),
+                  @yue.badge_count(9),
+                ],
+                style_str=[("alignItems", "center")],
+              ),
+              @yue.alert(
+                "警告横幅:EP Alert 的类型浅底样式。",
+                @yue.Warning,
+              ),
             ]),
             // 页面:代码(逐 token 自绘高亮,全平台一致)
             page("代码", selected, [
