@@ -1749,6 +1749,33 @@ void yue_mbt_table_bind_model(void *table, int32_t column_count, void *closure,
 namespace {
 
 // Clipboard::Data::Type: None=0 Text=1 HTML=2 Image=3 FilePaths=4
+/* 拖拽 FilePaths 数据构造:逐行解析并相对路径转绝对
+   (g_filename_to_uri 不接受相对路径,且 Data(FilePaths, string) 构造
+    会被上游强制改写为 Text 导致拖出数据为空) */
+static std::vector<base::FilePath> MakeFilePathsForDrag(const char *paths) {
+  std::vector<base::FilePath> out;
+  std::string cur;
+  for (const char *p = paths;; ++p) {
+    if (*p == '\n' || *p == '\0') {
+      if (!cur.empty()) {
+        if (cur[0] == '/') {
+          out.emplace_back(cur);
+        } else {
+          gchar *cwd = g_get_current_dir();
+          out.emplace_back(std::string(cwd) + "/" + cur);
+          g_free(cwd);
+        }
+      }
+      cur.clear();
+      if (*p == '\0')
+        break;
+    } else {
+      cur += *p;
+    }
+  }
+  return out;
+}
+
 nu::Clipboard::Data::Type ToDataType(int32_t kind) {
   return static_cast<nu::Clipboard::Data::Type>(kind);
 }
@@ -1820,9 +1847,7 @@ int32_t yue_mbt_view_do_drag_file_paths(void *view, const char *paths,
     return 0;
   }
   std::vector<nu::Clipboard::Data> data;
-  nu::Clipboard::Data paths_data(nu::Clipboard::Data::Type::FilePaths,
-                                 std::string(paths));
-  data.push_back(std::move(paths_data));
+  data.emplace_back(MakeFilePathsForDrag(paths));
   nu::DragOptions options;
   if (drag_image != 0) {
     if (auto *img = ImageStore::get(reinterpret_cast<void *>(drag_image))) {
@@ -4189,8 +4214,7 @@ int32_t yue_mbt_view_do_drag_data(void *view, const char *text,
     data.emplace_back(nu::Clipboard::Data::Type::Text, std::string(text));
   }
   if (file_paths != nullptr && file_paths[0] != '\0') {
-    data.emplace_back(nu::Clipboard::Data::Type::FilePaths,
-                      std::string(file_paths));
+    data.emplace_back(MakeFilePathsForDrag(file_paths));
   }
   if (data.empty()) {
     return 0;
