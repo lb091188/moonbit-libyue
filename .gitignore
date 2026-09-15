@@ -16,3 +16,7 @@ __pycache__/
 
 # 本地文档(不发布、不入库)
 /9月黑客松.md
+
+# 发布包排除(文件已在版本库,gitignore 只影响未跟踪文件,git 照常跟踪)
+/AGENTS.md
+/TODO.md
