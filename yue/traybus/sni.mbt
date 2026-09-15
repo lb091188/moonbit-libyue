@@ -538,8 +538,11 @@ fn Item::property(self : Item, name : String) -> DVal? {
           VString(self.tip_body),
         ]),
       )
-    "Menu" =>
-      Some(VPath(if self.menu_items.is_empty() { "/" } else { self.menu_path }))
+    // 恒返回真实路径：GNOME AppIndicator 扩展在注册瞬间就读 Menu，若此时
+    // set_menu 未执行而返回 "/"，其 DBusMenu 客户端会永久指向无效对象
+    // （UnknownObject: /），之后点击图标再也不发 Activate/不开菜单。
+    // 空菜单也导出 /MenuBar（Qt 同款语义），后续靠 LayoutUpdated 通知填充。
+    "Menu" => Some(VPath(self.menu_path))
     // 恒 false：true 会让面板把左键当菜单键、不再发 Activate（ksni 同款语义）
     "ItemIsMenu" => Some(VBool(false))
     _ => None
