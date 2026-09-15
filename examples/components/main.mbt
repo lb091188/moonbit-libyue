@@ -77,6 +77,14 @@ fn main {
   let counter : @yue.Store[Int] = @yue.Store::new(0)
   counter.subscribe(fn(n) { visits.set((n * 1601 + 12804).to_string()) })
   let ratio : @yue.Store[Double] = @yue.Store::new(0.25)
+  let sync : @yue.Store[Bool] = @yue.Store::new(false)
+  let notify : @yue.Store[Bool] = @yue.Store::new(true)
+  let theme_mode : @yue.Store[String] = @yue.Store::new("深色")
+  let radio_disabled : @yue.Store[String] = @yue.Store::new("选项一")
+  let wifi_on : @yue.Store[Bool] = @yue.Store::new(true)
+  let locked : @yue.Store[Bool] = @yue.Store::new(false)
+  sync.subscribe(fn(_v) { ignore(sync) })
+  notify.subscribe(fn(_v) { ignore(notify) })
   counter.subscribe(fn(n) {
     let r = 0.25 + n.to_double() * 0.1
     ratio.set(if r > 1.0 { 1.0 } else { r })
@@ -108,8 +116,63 @@ fn main {
       [
         @yue.vbox([
           @yue.entry_t(text="输入点什么…"),
-          @yue.label(""), @yue.entry_t(text="密码", password=true),
+          @yue.label(""),
+          @yue.entry_t(text="密码", password=true),
         ]),
+      ],
+    ),
+    section(
+      "Checkbox 复选框",
+      "原生勾选态 + 主题字体颜色;第三项为禁用态。",
+      [
+        @yue.vbox([
+          @yue.checkbox_t("启用自动同步", on_change=fn(v) { sync.set(v) }),
+          @yue.checkbox_t("接收通知", checked=true, on_change=fn(v) {
+            notify.set(v)
+          }),
+          @yue.checkbox_t("禁用项(不可点)", disabled=true),
+        ]),
+      ],
+    ),
+    section(
+      "Radio 单选组",
+      "选中项实心方块 + 主题色文字,悬停变色,点击互斥;第二组为禁用态。",
+      [
+        @yue.hbox([
+          @yue.vbox([
+            @yue.radio_group(["浅色", "深色", "跟随系统"], theme_mode),
+          ]),
+          @yue.label("        "),
+          @yue.vbox([
+            @yue.radio_group(
+              ["选项一", "选项二"],
+              radio_disabled,
+              disabled=true,
+            ),
+          ]),
+        ]),
+      ],
+    ),
+    section(
+      "Switch 开关",
+      "开=主题蓝轨道滑块靠右,关=浅灰轨道滑块靠左;点击切换,含禁用态。",
+      [
+        @yue.hbox(
+          [
+            @yue.switch_t(wifi_on),
+            @yue.bind_label(wifi_on, fn(v) {
+              if v {
+                "已开启"
+              } else {
+                "已关闭"
+              }
+            }),
+            @yue.label("     "),
+            @yue.switch_t(locked, disabled=true),
+            @yue.label(" 禁用"),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
       ],
     ),
     section(
