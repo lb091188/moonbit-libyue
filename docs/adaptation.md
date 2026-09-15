@@ -106,7 +106,7 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **协议行为与 XFCE 4.18 相反:KDE 发单条 `Event` / `AboutToShow`,不发批量版**(dbus-monitor 实证);traybus 两种都实现,无需分支。
 - 环境准备:openssh-server 默认未装(GUI 终端 `sudo apt-get install openssh-server`);libwebkit2gtk-4.1-0 需补装运行库。
 
-#### Deepin ✅ 实测通过(Deepin 23 社区版,DDE,2026-09-15;Deepin 25 见下)
+#### Deepin ✅ 实测通过(Deepin 23 社区版 + Deepin 25,DDE,2026-09-15)
 
 - 实测环境:deepin 23 社区版虚拟机,glibc 2.38(Debian GLIBC 2.38-6deepin13),gcc 12.3,内核 6.6.84-amd64-desktop-hwe,X11 会话,`XDG_CURRENT_DESKTOP=DDE`。
 - **dde-dock 实现 `org.kde.StatusNotifierWatcher`**,SNI 直连可用;新图标默认收进 dock 右侧「应用托盘」折叠区(点 `^` 展开),用户可拖出到常驻区。
@@ -114,6 +114,12 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **宿主机二进制直接可跑**:Ubuntu 24.04(glibc 2.39)构建的探针在 deepin 23(glibc 2.38)运行正常——二进制 GLIBC 符号上限恰好 2.38,且 deepin 23 带 webkit2gtk-4.1 运行库(ldd 全解析);跨发行版分发不必逐环境重编,先查 glibc 符号需求(`objdump -T | grep GLIBC_`)。
 - deepin 23 仓库**没有 openssh-server 包**(被引用但无可安装候选),远程管理走 virtiofs 共享 + GUI 终端执行脚本(安装器建的用户 noahliu 可 sudo)。
 - 深度终端的 `script` 是 util-linux 标准版,注意命令须经 `-c` 传入(`script -q -f -c "cmd" log`),裸 `script -qf cmd log` 会报参数数错误。
+
+- **Deepin 25(25.2)实测全链路通过**(Wayland 会话由用户确认;环境 glibc 2.38 / gcc 12.3 / 内核 6.6.143,`XDG_CURRENT_DESKTOP=Deepin`,宿主机二进制直跑):托盘探针折叠区图标/Activate/右键菜单/退出闭环。
+- **DDE(23/25)下 Popover 气泡不可见且点击卡顿**(2026-09-15 实测入档):现象是点击「弹出气泡」无窗口出现、全局鼠标变钝。根因:libyue 的 Popover 是透明无边框窗 + `SetCapture` 指针抓取,DDE 合成器不渲染该透明窗、抓取又拖慢指针。修复:shim 检测 `XDG_CURRENT_DESKTOP`(23 为 `DDE`、25 为 `Deepin`,两种都要认),DDE 下回退无边框普通窗口(锚定控件 `GetBoundsInScreen` 正下方居中,不做指针抓取,点窗内关闭)。其余桌面仍走原生气泡。
+- **deepin 25 移除了 openssh-server**(仓库无可安装候选):远程管理走 virtiofs 共享 + GUI 终端执行;deepin 23 同样没有该包。
+- **`TextEdit::Delete()` 是删选区不是清空**(2026-09-15 实测):无选中时为空操作,「清空」语义要用 `set_text("")`(showcase 已改)。
+- **showcase 在 DDE 的崩溃噪音**:DDE 剪贴板管理器交互时 libyue `Clipboard::Data` 构造报 `String data must be string type` CHECK(容错降级为 Text,不崩);`g_value_set_boxed` CRITICAL 为 GTK 与 DDE 主题交互噪音,不影响功能。
 
 #### KDE / MATE / Cinnamon / Budgie / LXQt ❓ 未实测
 
@@ -140,6 +146,9 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **`Container::UpdateChildBounds` 开头的 `IsVisibleInHierarchy` 守卫让独立 yoga 根错过首次真实分配(2026-09-15 实测,同补丁函数)**。GTK 首次 size-allocate 发生在 map **之前**,此时整体可见性为 false → 守卫直接 return;map 后无人再以真实 allocation 重跑 yoga 布局,独立 yoga 根(每页 holder、Scroll 内容容器)永久停留在挂载时的自然尺寸布局——页内容"有时"不占满容器宽(是否必现取决于有无后续 resize 重分配)。修复:去掉整体守卫,布局计算无条件执行(`GetBounds()` 读的就是 size_allocate vfunc 已更新的 GTK allocation,提前布局安全;GTK 也允许对未映射 widget 预分配),孩子 bounds 传播仍受各自可见性限制;`nu_container_size_allocate` 里分配变化时补 `gtk_widget_queue_draw`。
 - **`Slider::SetValue` 的 ignore 标记残留使滑块联动失效(2026-09-15 实测,同补丁函数)**:Linux 端拖动滑块,进度条与绑定标签不动。`Slider::SetValue` 无条件设 `ignore-value-change` 标记防回调循环,而 GTK 对"设置相同值"(yue 层 `Slider::make` 默认 `set_value(0)`,初值即 0)不发 `value-changed` → 标记残留,用户第一次拖动的首个回调被吞;xdotool 单点跳值场景恰只发一次信号,表现为完全失效。修复:仅当 `GetValue() != value` 才设标记。
 - **`ProgressBar::SetValue` 的值域平台差异(2026-09-15 实测,修复在 shim)**:libyue Linux 端 `SetValue` 语义为 0..100(内部再 /100),yue 层统一 0..1 → 进度条只走到 1%(`v/100` 再被 /100)。已在 shim `yue_mbt_progress_bar_set_value` 按 `OS_LINUX` 条件编译换算 ×100;其余平台上游直接收 0..1。
+- **`View::GetBoundsInScreen` 在 Scroll/嵌套容器下坐标叠错(全 Linux 桌面,2026-09-15 实测,补丁 `patch_linux_view_bounds_in_screen`)**:上游实现手动累加各级 allocation,视口文档坐标混入——showcase 页面滚到中下部时锚点 y 实测 1221(屏幕仅 1080 高),气泡被定位到屏幕外,表现为「窗口最大化才显示气泡、非最大化不出现」。修复:改用 `gtk_widget_translate_coordinates` + `gtk_window_get_position`(GTK 原生感知 viewport 滚动与嵌套),原逻辑保留为回退。所有屏幕坐标消费方(`popup_at`、气泡锚定)随之修正;新增 `ViewLike::get_bounds_in_screen` API(shim 4 个 ABI)。
+- **表格 Checkbox 列指示器随行高缩放(XFCE 实测,2026-09-15,补丁 `patch_linux_table_checkbox_size`)**:GTK `CellRendererToggle` 的指示器随 renderer 高度放大,行高 60 时 checkbox 填满整格;补丁把 checkbox renderer 高度限到 20,行高仍由文本列决定(fixed height mode 取各列最大值)。`examples/table` 截图像素级验证。
+
 - **GifPlayer(GTK)不动画/不可见的三层修复(2026-09-15 实测,同补丁函数)**:①动画启动依赖 `IsVisibleInHierarchy()`(挂载于 Notebook 非当前页时为 false 跳过)与 `"show"` 信号(仅 `gtk_widget_show` 时发射一次,早于 SetImage 则错过)——切页 map 后无人启动 timer,永停首帧;补连 `"map"` 信号(每次实际映射发射,与 `"unmap"`→OnHide 对称,OnShow 幂等)。②drawing area 默认 no-window,嵌 NUContainer 链再进 Scroll 视口时 queue_draw 失效区域坐标归属错位——静止不重绘、整段空白、滚动时才留下一帧残影;改 `gtk_widget_set_has_window(TRUE)` 自建窗口。③**素材兼容性**:ImageMagick `convert` 生成的多帧 GIF 会让 gdk-pixbuf 的 iter 以约 1/9 速度爬行(纯 gdk-pixbuf C 程序可复现,advance 返回真但帧不轮换),换 PIL(pillow)生成即正常;且原素材本身是 45 字节损坏文件。GifPlayer 是 yoga 叶子且 `GetMinimumSize` 在默认 `ImageScale::Down` 下返回空,消费方需显式给宽高(showcase 用 `style=[("width",120),("height",120)]`)。
 
 ---
