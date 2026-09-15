@@ -54,7 +54,13 @@ yue/                 MoonBit 库包
   painter.mbt        2D 绘制（Painter / 离屏 Canvas）
   misc.mbt           分组框 / 滚动视图 / 分隔线 / 剪贴板 / 消息框
   color.mbt          颜色工具（纯 MoonBit）
+  geometry.mbt       几何值类型（纯 MoonBit）
   error.mbt          结构化错误
+  events.mbt         事件系统（鼠标/键盘/修饰键归一化/VKEY 常量/连击）
+  button.mbt         按钮 / 单行输入框（Checkbox/Radio/Password）
+  props.mbt          L1 props 构造器（X::make / apply_style）
+  declarative.mbt    L2 声明式节点（Node/mount/vbox/label/…）
+  store.mbt          L3 响应式 Store（订阅 / map 派生 / bind_label）
   tray.mbt           托盘统一 API
   traybus/           纯 MoonBit 的 DBus + StatusNotifierItem 协议栈（Linux 托盘）
     wire.mbt         DBus 线路格式编解码
@@ -146,7 +152,7 @@ moon test
 
 ## 说明
 
-- 当前封装面约 260 个 ABI 函数（`yue/ffi.mbt` 中 262 个 `extern "c"` 声明）：App/Lifetime、Window、View 通用能力与拖拽、Container/Label/Button/Entry/TextEdit、Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer、Browser、Menu/MenuBar、Table+模型桥、Painter/Canvas、Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog、Screen/Appearance/Locale/Cursor；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。
+- 当前封装面约 320 个 ABI 函数（`yue/ffi.mbt` 中 324 个 `extern "c"` 声明）：App/Lifetime、Window、View 通用能力与拖拽、Container/Label/Button/Entry/TextEdit、Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer、Browser、Menu/MenuBar、Table+模型桥、Painter/Canvas、Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog、Screen/Appearance/Locale/Cursor；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。
 - 已知边界、ABI 坑与各平台适配经验不在 README 展开，见 `AGENTS.md`（AI 协作规则）与 [docs/adaptation.md](docs/adaptation.md)；Linux 托盘方案（设计动机、架构、后端降级、桌面兼容性、调试）独立成文：[docs/tray.md](docs/tray.md)。
 - shim/vendor 改动或重跑 `prepare.py` 后须强制重链：`moon clean` 或删对应 exe，见 [docs/relink.md](docs/relink.md)。
 - 文档索引：[docs/README.md](docs/README.md)。

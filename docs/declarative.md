@@ -1,7 +1,6 @@
 # 声明式 UI：Node/mount 与 Store
 
-moonbit-libyue 在经典命令式 API 之上提供三层可自由组合的糖，
-体验对标 Vue 的 render 函数（`h()`）+ 轻量响应式：
+moonbit-libyue 在经典命令式 API 之上提供三层可自由组合的语法糖
 
 | 层 | 内容 | 典型场景 |
 |---|---|---|
@@ -9,9 +8,8 @@ moonbit-libyue 在经典命令式 API 之上提供三层可自由组合的糖，
 | L2 | `Node` 树 + `mount` / `vbox` / `label` / `button` … | 声明整棵界面结构 |
 | L3 | `Store[T]` + `bind_label` | 数据变化自动更新界面 |
 
-三层都建立在公开 setter 之上，不改变库的行为；与既有命令式代码可以
-随意混用（`node_of` 是两个世界的桥）。完整对照示例见
-`examples/showcase`（全部页面用声明式实现）。
+完整对照示例见
+`examples/showcase`
 
 ## L1：props 构造器
 
@@ -21,8 +19,13 @@ moonbit-libyue 在经典命令式 API 之上提供三层可自由组合的糖，
 ```moonbit
 let btn = @yue.Button::make("确定", on_click=fn() { save() })
 let slider = @yue.Slider::make(range=Some((0.0, 100.0)), step=Some(1.0))
-let entry = @yue.Entry::make(password=true, on_enter=fn(s) { check(s) })
+let entry = @yue.Entry::make(entry_type=Password)
+entry.on_activate(fn() { check(entry.get_text()) })
 ```
+
+注意 L1 构造器与 L2 同名节点的回调参数不同：`Entry::make` 是
+`entry_type` / `on_activate()`（回调不带参），L2 `entry` 节点则是
+`password` / `on_enter(String)`（回调携带文本，见下节）。
 
 `style`（数值型样式键值对）与 `style_str`（字符串型）几乎在每个构造器上都有：
 
@@ -157,7 +160,6 @@ API 一览：
 
 ## 固有坑
 
-1. **构造器叫 `make` 不叫 `with`**：`with` 是 MoonBit 保留字（struct 更新语法）。
 2. **节点挂载时才实例化**：`button(...)` 返回时控件还不存在，别在构建树时保存
    控件引用；需要引用就用 `handle`（挂载时触发）。一棵树通常只 `mount` 一次，
    对同一节点再次挂载会实例化出**第二份**控件。
