@@ -166,6 +166,13 @@ using AttributedTextStore = Store<nu::AttributedText>;
 using FontStore = Store<nu::Font>;
 #if defined(OS_LINUX)
 using PopoverStore = Store<nu::Popover>;
+// DDE(deepin 23/25 实测)下透明气泡窗不可见且 SetCapture 拖慢全局鼠标:
+// 回退为无边框普通窗口(非 DDE 桌面仍用原生气泡)
+using PopoverWindowStore = Store<nu::Window>;
+static bool IsDeepinDesktop() {
+  const char *cur = std::getenv("XDG_CURRENT_DESKTOP");
+  return cur != nullptr && std::strstr(cur, "Deepin") != nullptr;
+}
 #else
 // Windows/macOS 版 libyue 无 Popover：用无边框小窗口替代
 // （mac 的 Window::Options 无 no_activate 字段，弹窗可能抢焦点，桩级可接受）
@@ -1862,6 +1869,34 @@ double yue_mbt_view_get_bounds_height(void *view) {
   return 0;
 }
 
+double yue_mbt_view_get_bounds_in_screen_x(void *view) {
+  if (auto *v = CastToView(view)) {
+    return v->GetBoundsInScreen().x();
+  }
+  return 0;
+}
+
+double yue_mbt_view_get_bounds_in_screen_y(void *view) {
+  if (auto *v = CastToView(view)) {
+    return v->GetBoundsInScreen().y();
+  }
+  return 0;
+}
+
+double yue_mbt_view_get_bounds_in_screen_width(void *view) {
+  if (auto *v = CastToView(view)) {
+    return v->GetBoundsInScreen().width();
+  }
+  return 0;
+}
+
+double yue_mbt_view_get_bounds_in_screen_height(void *view) {
+  if (auto *v = CastToView(view)) {
+    return v->GetBoundsInScreen().height();
+  }
+  return 0;
+}
+
 void *yue_mbt_image_from_handle(int64_t h) {
   return reinterpret_cast<void *>(h);
 }
@@ -2262,6 +2297,19 @@ void yue_mbt_progress_bar_set_indeterminate(void *bar, int32_t yes) {
 
 #if defined(OS_LINUX)
 void *yue_mbt_popover_new(void) {
+  if (IsDeepinDesktop()) {
+    nu::Window::Options options;
+    options.frame = false;
+    options.no_activate = true;
+    auto *win = new nu::Window(options);
+    win->SetSkipTaskbar(true);
+    win->SetResizable(false);
+    win->on_mouse_up.Connect([win](nu::Responder *, const nu::MouseEvent &) {
+      win->Close();
+      return true;
+    });
+    return reinterpret_cast<void *>(PopoverWindowStore::put(win));
+  }
   return reinterpret_cast<void *>(PopoverStore::put(new nu::Popover()));
 }
 #elif defined(OS_MAC)
@@ -2296,9 +2344,17 @@ void *yue_mbt_popover_new(void) {
 
 #if defined(OS_LINUX)
 void yue_mbt_popover_set_content(void *popover, void *content) {
-  auto *p = PopoverStore::get(popover);
   auto *c = CastToView(content);
-  if (p != nullptr && c != nullptr) {
+  if (c == nullptr) {
+    return;
+  }
+  if (IsDeepinDesktop()) {
+    if (auto *win = PopoverWindowStore::get(popover)) {
+      win->SetContentView(scoped_refptr<nu::View>(c));
+    }
+    return;
+  }
+  if (auto *p = PopoverStore::get(popover)) {
     p->SetContentView(scoped_refptr<nu::View>(c));
   }
 }
@@ -2314,6 +2370,13 @@ void yue_mbt_popover_set_content(void *popover, void *content) {
 
 #if defined(OS_LINUX)
 void yue_mbt_popover_set_content_size(void *popover, double w, double h) {
+  if (IsDeepinDesktop()) {
+    if (auto *win = PopoverWindowStore::get(popover)) {
+      win->SetContentSize(
+          nu::SizeF(static_cast<float>(w), static_cast<float>(h)));
+    }
+    return;
+  }
   if (auto *p = PopoverStore::get(popover)) {
     p->SetContentSize(
         nu::SizeF(static_cast<float>(w), static_cast<float>(h)));
@@ -2330,8 +2393,25 @@ void yue_mbt_popover_set_content_size(void *popover, double w, double h) {
 
 #if defined(OS_LINUX)
 void yue_mbt_popover_show_relative_to(void *popover, void *view) {
-  auto *p = PopoverStore::get(popover);
   auto *v = CastToView(view);
+  if (v == nullptr) {
+    return;
+  }
+  if (IsDeepinDesktop()) {
+    auto *win = PopoverWindowStore::get(popover);
+    if (win == nullptr) {
+      return;
+    }
+    // 锚定控件屏幕包围盒正下方居中;不做指针抓取(DDE 下会拖慢全局鼠标)
+    const nu::RectF anchor = v->GetBoundsInScreen();
+    const nu::SizeF size = win->GetContentSize();
+    const float x = anchor.x() + (anchor.width() - size.width()) / 2.0f;
+    const float y = anchor.bottom() + 2.0f;
+    win->SetBounds(nu::RectF(x, y, size.width(), size.height()));
+    win->SetVisible(true);
+    return;
+  }
+  auto *p = PopoverStore::get(popover);
   if (p != nullptr && v != nullptr) {
     p->ShowRelativeTo(v);
   }
@@ -2377,6 +2457,12 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view) {
 
 #if defined(OS_LINUX)
 void yue_mbt_popover_close(void *popover) {
+  if (IsDeepinDesktop()) {
+    if (auto *win = PopoverWindowStore::get(popover)) {
+      win->Close();
+    }
+    return;
+  }
   if (auto *p = PopoverStore::get(popover)) {
     p->Close();
   }
@@ -2391,6 +2477,12 @@ void yue_mbt_popover_close(void *popover) {
 
 #if defined(OS_LINUX)
 void yue_mbt_popover_on_close(void *popover, void (*invoke)(void *), void *closure) {
+  if (IsDeepinDesktop()) {
+    if (auto *win = PopoverWindowStore::get(popover)) {
+      win->on_close.Connect([invoke, closure](nu::Window *) { invoke(closure); });
+    }
+    return;
+  }
   if (auto *p = PopoverStore::get(popover)) {
     p->on_close.Connect([invoke, closure](nu::Popover *) { invoke(closure); });
   }

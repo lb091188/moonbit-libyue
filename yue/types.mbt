@@ -108,6 +108,7 @@ pub(open) trait ViewLike {
   fn on_drag_leave(Self, () -> Unit) -> Unit = _
   fn schedule_paint(Self) -> Unit = _
   fn get_bounds(Self) -> RectF = _
+  fn get_bounds_in_screen(Self) -> RectF = _
   fn on_mouse_down(Self, (MouseEvent) -> Bool) -> Unit = _
   fn on_mouse_up(Self, (MouseEvent) -> Bool) -> Unit = _
   fn on_mouse_move(Self, (MouseEvent) -> Unit) -> Unit = _

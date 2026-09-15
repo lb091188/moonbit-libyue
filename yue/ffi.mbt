@@ -1001,6 +1001,18 @@ extern "c" fn ffi_view_get_bounds_width(view : View) -> Double = "yue_mbt_view_g
 extern "c" fn ffi_view_get_bounds_height(view : View) -> Double = "yue_mbt_view_get_bounds_height"
 
 ///|
+extern "c" fn ffi_view_get_bounds_in_screen_x(view : View) -> Double = "yue_mbt_view_get_bounds_in_screen_x"
+
+///|
+extern "c" fn ffi_view_get_bounds_in_screen_y(view : View) -> Double = "yue_mbt_view_get_bounds_in_screen_y"
+
+///|
+extern "c" fn ffi_view_get_bounds_in_screen_width(view : View) -> Double = "yue_mbt_view_get_bounds_in_screen_width"
+
+///|
+extern "c" fn ffi_view_get_bounds_in_screen_height(view : View) -> Double = "yue_mbt_view_get_bounds_in_screen_height"
+
+///|
 #borrow(painter, hex)
 extern "c" fn ffi_painter_set_color(painter : Painter, hex : Bytes) -> Unit = "yue_mbt_painter_set_color"
 

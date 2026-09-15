@@ -33,7 +33,9 @@ fn page_menu() -> @yue.Node {
                 })
                 let _ = menu.add_separator()
                 let _item_b = menu.add_label_item("弹出菜单项乙")
-                menu.popup_at(e.view_x, e.view_y)
+                // popup_at 收屏幕坐标：视图屏幕原点 + 视图内偏移
+                let b = c.get_bounds_in_screen()
+                menu.popup_at(b.x + e.view_x, b.y + e.view_y)
               }
               mouse_btn(e.button)
               false
