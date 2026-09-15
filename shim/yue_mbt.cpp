@@ -170,8 +170,13 @@ using PopoverStore = Store<nu::Popover>;
 // 回退为无边框普通窗口(非 DDE 桌面仍用原生气泡)
 using PopoverWindowStore = Store<nu::Window>;
 static bool IsDeepinDesktop() {
+  // deepin 23 环境值为 DDE、25 为 Deepin,两种都要认
   const char *cur = std::getenv("XDG_CURRENT_DESKTOP");
-  return cur != nullptr && std::strstr(cur, "Deepin") != nullptr;
+  if (cur == nullptr) {
+    return false;
+  }
+  return std::strstr(cur, "Deepin") != nullptr ||
+         std::strstr(cur, "DDE") != nullptr;
 }
 #else
 // Windows/macOS 版 libyue 无 Popover：用无边框小窗口替代
