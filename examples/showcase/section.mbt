@@ -1,9 +1,7 @@
 // 小程序式分段的构建函数：每段 = 标题 + 一句说明 + 可交互演示区 + 分隔留白。
 //
 // 平台差异内容按 platform() 运行时条件组装：条件不满足就整段不创建，
-// 效果等同"编译期隐藏"。不用 #cfg(platform=) 的原因：moonc 已实现该维度
-// （按 target 三元组取 OS），但当前发布的 moon 构建时只传无 OS 信息的
-// 泛用 native，所有 platform= 条件恒 false；结论与迁移信号见
+// 效果等同"编译期隐藏"。不用 #cfg(platform=) 的原因与迁移信号见
 // docs/adaptation.md「MoonBit cfg(platform=) 现状」。
 
 ///|
