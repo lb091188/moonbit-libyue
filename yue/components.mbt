@@ -1183,3 +1183,28 @@ pub fn statistic(title : String, value : Store[String]) -> Node {
     },
   }
 }
+
+///|
+/// 线性进度条(EP Progress):背景浅灰轨道 + 主题色填充,
+/// value 为 Store(0..1),变化自动重绘。
+pub fn progress_line(value : Store[Double], height? : Double = 8.0) -> Node {
+  {
+    mount: fn(parent) {
+      let v = Container::make(
+        style=[("flex", 1.0), ("height", height)],
+      )
+      v.set_background_color(theme_info_light)
+      v.on_draw(fn(p) {
+        let b = v.get_bounds()
+        let frac = value.get()
+        if frac > 0.0 {
+          p.set_fill_color(theme_primary)
+          p.fill_rect(0.0, 0.0, b.width * frac, b.height)
+        }
+      })
+      value.subscribe(fn(_x) { v.schedule_paint() })
+      attach(parent, v.view())
+      v.view()
+    },
+  }
+}

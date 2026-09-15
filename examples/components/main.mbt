@@ -76,6 +76,11 @@ fn main {
   let visits : @yue.Store[String] = @yue.Store::new("12,804")
   let counter : @yue.Store[Int] = @yue.Store::new(0)
   counter.subscribe(fn(n) { visits.set((n * 1601 + 12804).to_string()) })
+  let ratio : @yue.Store[Double] = @yue.Store::new(0.25)
+  counter.subscribe(fn(n) {
+    let r = 0.25 + n.to_double() * 0.1
+    ratio.set(if r > 1.0 { 1.0 } else { r })
+  })
   // ---------- 基础组件 ----------
   let p_basic = scroll_page([
     section(
@@ -162,6 +167,18 @@ fn main {
           "刷新访问量",
           on_click=fn() { counter.update(fn(n) { n + 1 }) },
           style=[("marginTop", 8.0)],
+        ),
+      ],
+    ),
+    section(
+      "Progress 线性进度条",
+      "主题色填充 + 浅灰轨道,数值响应式(随上面的刷新按钮联动变化)。",
+      [
+        @yue.progress_line(ratio),
+        @yue.bind_label(
+          ratio,
+          fn(v) { "当前进度 \{((v * 100.0)).round()}%" },
+          style=[("marginTop", 6.0)],
         ),
       ],
     ),
