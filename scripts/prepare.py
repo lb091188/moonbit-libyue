@@ -391,6 +391,34 @@ def patch_linux_view_bounds_in_screen() -> None:
     print("已应用 GetBoundsInScreen 滚动坐标补丁")
 
 
+def patch_linux_table_checkbox_size() -> None:
+    """vendor 补丁（Linux/GTK）：表格 Checkbox 列的 toggle 指示器随
+    renderer 高度缩放，行高较大时（如 60px）checkbox 填满整格（XFCE 实测）。
+    限制 checkbox renderer 高度 ≤20，行高仍由文本列决定（幂等）。
+    """
+    src = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_3.cc"
+    old = (
+        "  // Set row height.\n"
+        "  g_object_set(G_OBJECT(renderer), \"height\",\n"
+        "               static_cast<int>(GetRowHeight()), nullptr);\n"
+    )
+    new = (
+        "  // Set row height.\n"
+        "  // moonbit-libyue 补丁:toggle 指示器随 renderer 高度缩放,\n"
+        "  // 行高大时 checkbox 填满单元格;限高 20,行高由文本列决定\n"
+        "  int renderer_height = static_cast<int>(GetRowHeight());\n"
+        "  if (options.type == Table::ColumnType::Checkbox && renderer_height > 20)\n"
+        "    renderer_height = 20;\n"
+        "  g_object_set(G_OBJECT(renderer), \"height\", renderer_height, nullptr);\n"
+    )
+    text = src.read_text(encoding="utf-8")
+    if new not in text:
+        if old not in text:
+            raise SystemExit(f"vendor 补丁目标文本未找到（上游可能已变）：{src}")
+        src.write_text(text.replace(old, new, 1), encoding="utf-8")
+    print("已应用表格 Checkbox 限高补丁")
+
+
 def patch_linux_global_shortcut_wayland() -> None:
     """vendor 补丁（Linux/GTK）：GlobalShortcut 在 Wayland 会话优雅失败（幂等）。
     上游 global_shortcut_gtk.cc 直接用 GDK_WINDOW_XDISPLAY（X11 专属宏），
@@ -565,6 +593,7 @@ def main() -> None:
         patch_linux_container_events()
         patch_linux_global_shortcut_wayland()
         patch_linux_view_bounds_in_screen()
+        patch_linux_table_checkbox_size()
     cmake_build()
     print("prepare 完成")
 
