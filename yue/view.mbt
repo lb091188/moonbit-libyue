@@ -191,6 +191,12 @@ impl ViewLike with fn set_background_color(self, hex) -> Unit {
 }
 
 ///|
+/// 设置视图显隐（隐藏的视图不参与布局）。
+impl ViewLike with fn set_visible(self, visible : Bool) -> Unit {
+  ffi_view_set_visible(self.view(), if visible { 1 } else { 0 })
+}
+
+///|
 /// 创建静态文本标签。
 pub fn Label::new(text : String) -> Label {
   { view: ffi_label_new(utf8_bytes(text)), }

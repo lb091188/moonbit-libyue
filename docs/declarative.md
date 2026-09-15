@@ -134,6 +134,17 @@ fn tagged(label_text : String, body : Node) -> Node {
 4. **Extending built-in nodes**: `vbox`/`hbox` accept `handle` (returns the Container handle at mount time, for background colors etc.). Note: the `parent : View` received by a `Node`'s `mount` only has `attach` available **inside the `yue` package** — outside the package you cannot write a Node literal that mounts a container into the parent directly; extend the library instead, or wrap existing views with `node_of`.
 5. **Modern layouts**: plain vbox/hbox/scroll flex boxes can produce a "dark sidebar + header bar + scrolling cards" shell; the key points are that **the root node needs `style=[("flex", 1.0)]` to fill the window**, the fixed-width sidebar sets `width` without flex, the main area takes `flex=1`, and the root container uses `style_str=[("alignItems", "stretch")]` so child columns fill the height.
 
+### Component library (yue/components.mbt)
+
+Element-Plus-style non-form components built on top of the declarative layer, pure MoonBit with zero platform code:
+
+- `side_menu(items, selected)` — sidebar navigation menu (deepin-style, selected item with accent bar and light-blue background);
+- `segmented(options, selected)` — segmented control / top-bar navigation (selected item floats on white);
+- `tag(text, color)` — colored rounded label (width auto-fits the text at mount time);
+- `code_view(lines)` — syntax-highlighted code view: one AttributedText per token (whole-range coloring) measured and drawn manually. **Visually equivalent to range coloring and consistent across platforms** — on Windows, AttributedText range font/color is an upstream deficiency (see adaptation.md); this approach bypasses it and is a viable alternative for code highlighting / terminal rendering. The built-in `tokenize_moonbit` is a demo tokenizer; consumers can feed any lexical analysis result.
+
+Component state coordination goes through `Store`; main-area page switching uses "subscribe to Store + `ViewLike::set_visible`" (the ABI was added on 2026-09-16). Full demo in `examples/components` (sidebar + top bar + page switching + code page).
+
 ## L3: Store and bind_label
 
 A `Store[T]` is a subscribable value: `set` notifies all subscribers, `map` derives read-only views, and `bind_label` plugs a Store into a declarative tree — when the state changes, the text updates automatically:

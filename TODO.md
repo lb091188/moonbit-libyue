@@ -36,6 +36,26 @@
 - [x] [DatePicker](https://libyue.com/docs/latest/cpp/api/datepicker.html) — `new_with(DatePickerOptions)`(Element 四种组合 + has_stepper);misc 示例实测创建
 - [x] [Browser](https://libyue.com/docs/latest/cpp/api/browser.html) — new_with_options、load_html、set_user_agent、execute_javascript、get_cookies_for_url 已补;Cookie 空列表触发上游 CHECK 崩溃一事已记录(Browser 族)
 
+### 部分封装·第二批(shim 遗漏盘点,2026-09-16 对照 vendor 头文件全量排查)
+
+按价值排序的新增补齐目标(每条 = shim 函数 + ffi extern + MoonBit pub fn 三件套):
+
+- [~] **Window 窗口管理补全**:`Close`/`Minimize`/`Restore`/`IsMinimized`/`on_focus`/`on_blur`/`SetVisible`/`SetContentSizeConstraints(min,max)`/`SetSkipTaskbar`(Win/Linux)/`SetIcon`(Win/Linux)— 托盘类应用与常规窗口控制的关键面,价值高且实现直接
+- [~] **View 体验补全**:`SetTooltip`/`AddTooltipForRect`/`RemoveTooltip`(工具提示完全缺失)、`SetFont`/`SetColor`(全局前景)、`on_focus_in`/`on_focus_out`、`SetFocusable`/`HasFocus`
+- [~] **Container 动态子视图**:`RemoveChildView`/`AddChildViewAt`/`ChildCount` — 目前只能加不能删,动态 UI(列表项增删)必需
+- [~] **Table 选择与刷新**:`EnableMultipleSelection`/`SelectRow(s)`/`GetSelectedRow(s)` + TableModel `NotifyRowInsertion/Deletion/ValueChange`(MoonBit 侧改数据后目前无法刷新表格,高频刚需)
+- [~] **Browser 深度能力**:`ExecuteJavaScript` 回调版(取 JS 结果)、`Stop`、`AddBinding`/`SetBindingName`(JS↔原生双向绑定 RPC,libyue 内置,完全未封装)
+- [~] **Popover 补完**(仅 MoonBit 层):shim 已有 `yue_mbt_popover_set_content/show_relative_to`,widgets.mbt 未暴露 pub fn,等于不可用
+- [~] **Scroll::on_scroll 信号**(滚动位置监听,价值高)+ `GetScrollPosition`/`GetMaximumScrollPosition`
+- [~] **Label 富文本**:`SetAlign`/`SetAttributedText`/`SetFont`/`SetColor`(彩色文字标签,组件库 tag 等可大幅简化)
+- [~] **MessageBox 模态**:`SetDefaultResponse`/`SetCancelResponse`/`Run`/`RunForWindow`(阻塞询问对话框)
+- [~] **剪贴板**:`IsDataAvailable(type)`、`StartWatching`/`StopWatching` + `on_change`(剪贴板监听)
+- [~] **通知回调**:`NotificationCenter on_notification_show/close/click/action`(actions 按钮点击目前收不到)、`Clear`/`RemoveNotification`、Notification 富字段(SetImage/SetInfo 等)
+- [~] **多显示器与外观**:`Screen::GetPrimaryDisplay`/`GetDisplayNearestWindow`/`GetCursorScreenPoint`、`Appearance::SetDarkModeEnabled` + `on_color_scheme_change`
+- [~] **文本测量**:`AttributedText::GetOneLineSize`/`GetOneLineHeight`(自绘排版测宽的正规接口,现用 get_bounds_for 替代)、`Font::Default`/`GetName`/`GetSize`
+- [~] **杂项中价值**:App `SetID`(Linux/Win)、Window `GetScaleFactor`/`SetBackgroundColor`/`AddChildWindow`、MenuItem `SetEnabled`/`SetVisible`/`Click`、FileDialog `SetTitle`/`SetButtonLabel`、GifPlayer 播放控制、TextEdit 选区/滚动条策略、Canvas `GetScaleFactor`(HiDPI)、GlobalShortcut `UnregisterAll`、View `DoDrag` 通用数据版
+- 低价值缓办:标题/状态类 getter(GetTitle/IsActive/IsAlwaysOnTop 等)、mac 专属(Template icon、ScrollElasticity、Notification 回复、Lifetime 事件)、Accelerator 独立类、Tray 原生后端 SetImage/GetBounds(本仓 Linux 走 traybus)
+
 ### 已封装(实测通过即勾,后续仅回归)
 
 - [x] App、Lifetime — init / run / quit

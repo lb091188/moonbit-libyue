@@ -147,6 +147,24 @@ fn tagged(label_text : String, body : Node) -> Node {
    侧栏定宽（width）不放 flex，主区 flex=1；根容器加
    `style_str=[("alignItems", "stretch")]` 让子列占满高度。
 
+### 组件库（yue/components.mbt）
+
+在声明式层之上沉淀的 Element Plus 风格非表单组件，纯 MoonBit 零平台代码：
+
+- `side_menu(items, selected)` —— 侧边导航菜单（deepin/火绒桌面软件风格，
+  选中项强调条 + 浅蓝底）；
+- `segmented(options, selected)` —— 分段控制器 / 顶栏导航（选中白底浮起）；
+- `tag(text, color)` —— 彩色圆角标签（挂载时按文本测宽自适应）；
+- `code_view(lines)` —— 代码高亮视图：逐 token 建 AttributedText（整段设色）
+  测宽后自绘排版。**等价于区间设色的视觉效果且全平台一致**——Windows 的
+  AttributedText 区间字体/颜色是上游缺陷（见 adaptation.md），此法绕开，
+  是做代码高亮 / 终端渲染的可行替代。内置 `tokenize_moonbit` 极简着色器
+  仅作演示，消费方可传入任意词法分析结果。
+
+组件间状态协调统一走 `Store`；主区页面联动用「订阅 Store +
+`ViewLike::set_visible`」（2026-09-16 补齐该 ABI）。完整演示见
+`examples/components`（侧栏 + 顶栏 + 页面切换 + 代码页）。
+
 ## L3：Store 与 bind_label
 
 `Store[T]` 是可订阅的值：`set` 时通知所有订阅者，`map` 派生只读视图，
