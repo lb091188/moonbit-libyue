@@ -15,49 +15,49 @@
 
 ///|
 /// 主题色板（Element Plus 默认色）。
-pub let theme_primary : String = "#409EFF"
+pub let theme_primary : String = "#2D68C4"
 
 ///|
-pub let theme_primary_light : String = "#ECF5FF"
+pub let theme_primary_light : String = "#E8F0FB"
 
 ///|
-pub let theme_success : String = "#67C23A"
+pub let theme_success : String = "#2E9E5B"
 
 ///|
-pub let theme_success_light : String = "#F0F9EB"
+pub let theme_success_light : String = "#E9F5EE"
 
 ///|
-pub let theme_warning : String = "#E6A23C"
+pub let theme_warning : String = "#D9822B"
 
 ///|
-pub let theme_warning_light : String = "#FDF6EC"
+pub let theme_warning_light : String = "#FBF3E8"
 
 ///|
-pub let theme_danger : String = "#F56C6C"
+pub let theme_danger : String = "#D64550"
 
 ///|
-pub let theme_danger_light : String = "#FEF0F0"
+pub let theme_danger_light : String = "#FBEDED"
 
 ///|
-pub let theme_info : String = "#909399"
+pub let theme_info : String = "#6B7480"
 
 ///|
-pub let theme_info_light : String = "#F4F4F5"
+pub let theme_info_light : String = "#F0F2F4"
 
 ///|
-pub let theme_text_primary : String = "#303133"
+pub let theme_text_primary : String = "#2A2F36"
 
 ///|
-pub let theme_text_regular : String = "#606266"
+pub let theme_text_regular : String = "#4E5560"
 
 ///|
-pub let theme_text_secondary : String = "#909399"
+pub let theme_text_secondary : String = "#6B7480"
 
 ///|
-pub let theme_border : String = "#E4E7ED"
+pub let theme_border : String = "#D8DCE1"
 
 ///|
-pub let theme_fill_hover : String = "#F5F7FA"
+pub let theme_fill_hover : String = "#EFF1F3"
 
 ///|
 /// 语义类型（EP Tag/Alert 的 type）。
@@ -122,11 +122,9 @@ fn stateful_item(
       let style2 = if has_w {
         style
       } else {
-        {
-          let copy = style.copy()
-          copy.push(("width", text_w + pad_x * 2.0))
-          copy
-        }
+        let copy = style.copy()
+        copy.push(("width", text_w + pad_x * 2.0))
+        copy
       }
       let v = Container::make(style=style2)
       fn draw_item(p : Painter) -> Unit {
@@ -218,11 +216,9 @@ pub fn side_menu(
       ),
     )
   }
-  vbox(
-    nodes,
-    style=[("width", width), ("padding", 6.0)],
-    handle=fn(c) { c.set_background_color("#FFFFFF") },
-  )
+  vbox(nodes, style=[("width", width), ("padding", 6.0)], handle=fn(c) {
+    c.set_background_color("#FFFFFF")
+  })
 }
 
 ///|
@@ -262,12 +258,11 @@ pub fn segmented(options : Array[String], selected : Store[String]) -> Node {
       ),
     )
   }
-  hbox(
-    items,
-    style=[("padding", 2.0)],
-    style_str=[("alignItems", "center")],
-    handle=fn(c) { c.set_background_color("#DEE0E3") },
-  )
+  hbox(items, style=[("padding", 2.0)], style_str=[("alignItems", "center")], handle=fn(
+    c,
+  ) {
+    c.set_background_color("#DEE0E3")
+  })
 }
 
 ///|
@@ -282,9 +277,11 @@ pub fn tag_of_type(text : String, t : SemanticType) -> Node {
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
       let w = text_w + 16.0
       let h = 24.0
-      let c = Container::make(
-        style=[("width", w), ("height", h), ("marginRight", 8.0)],
-      )
+      let c = Container::make(style=[
+        ("width", w),
+        ("height", h),
+        ("marginRight", 8.0),
+      ])
       c.on_draw(fn(p) {
         p.set_fill_color(type_light_color(t))
         p.fill_rect(0.0, 0.0, w, h)
@@ -315,9 +312,11 @@ pub fn tag(text : String, color : String, height? : Double = 24.0) -> Node {
       probe.set_font(font)
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
       let w = text_w + 16.0
-      let c = Container::make(
-        style=[("width", w), ("height", height), ("marginRight", 8.0)],
-      )
+      let c = Container::make(style=[
+        ("width", w),
+        ("height", height),
+        ("marginRight", 8.0),
+      ])
       c.on_draw(fn(p) {
         p.set_fill_color(color)
         p.fill_rect(0.0, 0.0, w, height)
@@ -404,9 +403,7 @@ fn crumb_fg_static(_act : Bool, _hov : Bool) -> String {
 pub fn alert(text : String, t : SemanticType, height? : Double = 40.0) -> Node {
   {
     mount: fn(parent) {
-      let v = Container::make(
-        style=[("height", height), ("marginBottom", 10.0)],
-      )
+      let v = Container::make(style=[("height", height), ("marginBottom", 10.0)])
       v.on_draw(fn(p) {
         let b = v.get_bounds()
         let w = b.width
@@ -538,19 +535,19 @@ pub fn card(
       let title_at = AttributedText::new(title, wrap=false)
       title_at.set_font(Font::new("Sans", 14.0, weight=Bold))
       title_at.set_color(theme_text_primary)
-      let title = Container::make(
-        style=[("height", head_h), ("paddingLeft", 16.0)],
-      )
+      let title = Container::make(style=[
+        ("height", head_h),
+        ("paddingLeft", 16.0),
+      ])
       title.on_draw(fn(p) {
         let b = title.get_bounds()
         p.draw_attributed_text(title_at, 0.0, 0.0, b.width, head_h)
       })
       outer.add_child(title)
       // 内容区
-      let body = Container::make(
-        style=[("padding", 14.0)],
-        style_str=[("flexDirection", "column")],
-      )
+      let body = Container::make(style=[("padding", 14.0)], style_str=[
+        ("flexDirection", "column"),
+      ])
       for ch in children {
         ignore((ch.mount)(body.view()))
       }
@@ -573,8 +570,8 @@ pub(all) struct Token {
 /// 仅供演示;消费方可换成任意词法分析结果后直接用 code_view。
 pub fn tokenize_moonbit(line : String) -> Array[Token] {
   let keywords = [
-    "fn", "let", "mut", "if", "else", "for", "while", "match", "return",
-    "struct", "impl", "pub", "enum", "trait", "true", "false",
+    "fn", "let", "mut", "if", "else", "for", "while", "match", "return", "struct",
+    "impl", "pub", "enum", "trait", "true", "false",
   ]
   let out : Array[Token] = []
   let cs : Array[Char] = []
@@ -589,7 +586,7 @@ pub fn tokenize_moonbit(line : String) -> Array[Token] {
     buf.val = StringBuilder()
     if s.length() > 0 {
       if in_string.val {
-        out.push({ text: s, color: "#98C379" })
+        out.push({ text: s, color: "#98C379", })
       } else {
         out.push(classify_token(s, keywords))
       }
@@ -617,11 +614,11 @@ pub fn tokenize_moonbit(line : String) -> Array[Token] {
         comment.write_char(cs[i])
         i = i + 1
       }
-      out.push({ text: comment.to_string(), color: "#5C6370" })
+      out.push({ text: comment.to_string(), color: "#5C6370", })
       break
     } else if ch == ' ' {
       flush()
-      out.push({ text: " ", color: "#ABB2BF" })
+      out.push({ text: " ", color: "#ABB2BF", })
     } else {
       buf.val.write_char(ch)
     }
@@ -635,20 +632,20 @@ pub fn tokenize_moonbit(line : String) -> Array[Token] {
 fn classify_token(word : String, keywords : Array[String]) -> Token {
   for k in keywords {
     if k == word {
-      return { text: word, color: "#C678DD" }
+      return { text: word, color: "#C678DD", }
     }
   }
   let is_num = word.length() > 0
   for i in 0..<word.length() {
     let c = word.unsafe_get(i).to_int()
     if !((c >= 48 && c <= 57) || c == 46) {
-      return { text: word, color: "#ABB2BF" }
+      return { text: word, color: "#ABB2BF", }
     }
   }
   if is_num {
-    return { text: word, color: "#D19A66" }
+    return { text: word, color: "#D19A66", }
   }
-  { text: word, color: "#ABB2BF" }
+  { text: word, color: "#ABB2BF", }
 }
 
 ///|
@@ -671,10 +668,8 @@ pub fn code_view(
       }
 
       // 挂载时预排版:逐 token 测宽,避免每次重绘重复分词/测量
-      let line_h = make_at(
-        "Ag",
-        "#FFFFFF",
-      ).get_bounds_for(10000.0, 100.0).height + 5.0
+      let line_h = make_at("Ag", "#FFFFFF").get_bounds_for(10000.0, 100.0).height +
+        5.0
       let laid : Array[(Array[(AttributedText, Double)], Double)] = []
       let mut max_line_w = 0.0
       for line in lines {
@@ -708,6 +703,483 @@ pub fn code_view(
       })
       attach(parent, c.view())
       c.view()
+    },
+  }
+}
+
+///|
+/// 头像:方形实底 + 白字居中(EP Avatar 的 square 形态)。
+pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
+  {
+    mount: fn(parent) {
+      let c = Container::make(style=[
+        ("width", size),
+        ("height", size),
+        ("marginRight", 8.0),
+      ])
+      c.set_background_color(color)
+      c.on_draw(fn(p) {
+        let b = c.get_bounds()
+        p.draw_text(
+          letter,
+          0.0,
+          0.0,
+          b.width,
+          b.height,
+          align=Center,
+          valign=Center,
+          color="#FFFFFF",
+        )
+      })
+      attach(parent, c.view())
+      c.view()
+    },
+  }
+}
+
+///|
+/// 圆点徽标(EP Badge 的 dot 形态):8×8 色点。
+pub fn badge_dot(color? : String = theme_danger) -> Node {
+  container(
+    on_draw=fn(p) {
+      p.set_fill_color(color)
+      p.fill_rect(0.0, 0.0, 10000.0, 10000.0)
+    },
+    style=[("width", 8.0), ("height", 8.0), ("marginRight", 6.0)],
+  )
+}
+
+///|
+/// 可关闭横幅:alert + 右侧关闭钮(点击整条隐藏)。
+pub fn alert_closeable(text : String, t : SemanticType) -> Node {
+  {
+    mount: fn(parent) {
+      let v = Container::make(
+        style=[("height", 40.0), ("marginBottom", 10.0)],
+        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+      )
+      let color = type_color(t)
+      v.set_background_color(type_light_color(t))
+      let label = Label::new("  " + text)
+      label.set_color(color)
+      v.add_child(label)
+      // 弹性空白把关闭钮推到右端
+      let spacer = Container::make(style=[("flex", 1.0), ("height", 1.0)])
+      v.add_child(spacer)
+      let close = Container::make(style=[("width", 32.0), ("height", 40.0)])
+      let hover = Ref(false)
+      close.on_draw(fn(p) {
+        let b = close.get_bounds()
+        p.draw_text(
+          "✕",
+          0.0,
+          0.0,
+          b.width,
+          b.height,
+          align=Center,
+          valign=Center,
+          color=if hover.val { color } else { theme_text_secondary },
+        )
+      })
+      close.on_mouse_down(fn(e) {
+        if e.button == 1 {
+          v.set_visible(false)
+          true
+        } else {
+          false
+        }
+      })
+      close.on_mouse_enter(fn(_e) {
+        hover.val = true
+        close.schedule_paint()
+      })
+      close.on_mouse_leave(fn(_e) {
+        hover.val = false
+        close.schedule_paint()
+      })
+      v.add_child(close)
+      // 让关闭钮靠右:中间垫一个弹性空白
+      attach(parent, v.view())
+      v.view()
+    },
+  }
+}
+
+///|
+/// 步骤条(EP Steps):数字方块(完成浅蓝/当前实底/待办灰)+ 文字 + 连线。
+pub fn steps(items : Array[String], current : Store[Int]) -> Node {
+  {
+    mount: fn(parent) {
+      let row = Container::make(
+        style=[("height", 40.0), ("marginBottom", 12.0)],
+        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+      )
+      let font = Font::new("Sans", 13.0)
+      let n = items.length()
+      // 数字方块们,重绘时按 current 着色
+      let boxes : Array[Container] = []
+      for i in 0..<n {
+        if i > 0 {
+          let line = Container::make(style=[
+            ("flex", 1.0),
+            ("height", 2.0),
+            ("marginRight", 6.0),
+          ])
+          let idx = i
+          line.on_draw(fn(p) {
+            let b = line.get_bounds()
+            p.set_fill_color(
+              if current.get() >= idx {
+                theme_primary
+              } else {
+                theme_border
+              },
+            )
+            p.fill_rect(0.0, 0.0, b.width, b.height)
+          })
+          row.add_child(line)
+        }
+        let bx = Container::make(style=[
+          ("width", 24.0),
+          ("height", 24.0),
+          ("marginRight", 6.0),
+        ])
+        bx.on_draw(fn(p) {
+          let b = bx.get_bounds()
+          let cur = current.get()
+          let st = if i < cur {
+            0 // done
+          } else if i == cur {
+            1 // active
+          } else {
+            2 // todo
+          }
+          p.set_fill_color(
+            match st {
+              0 => theme_primary_light
+              1 => theme_primary
+              _ => theme_info_light
+            },
+          )
+          p.fill_rect(0.0, 0.0, b.width, b.height)
+          p.draw_text(
+            (i + 1).to_string(),
+            0.0,
+            0.0,
+            b.width,
+            b.height,
+            align=Center,
+            valign=Center,
+            color=match st {
+              0 => theme_primary
+              1 => "#FFFFFF"
+              _ => theme_text_secondary
+            },
+          )
+        })
+        current.subscribe(fn(_v) { bx.schedule_paint() })
+        row.add_child(bx)
+        boxes.push(bx)
+      }
+      for i in 0..<n {
+        let l = Label::new(items[i])
+        l.set_font(font)
+        let cur_ref = current
+        cur_ref.subscribe(fn(v) {
+          l.set_color(
+            if i <= v {
+              theme_text_primary
+            } else {
+              theme_text_secondary
+            },
+          )
+        })
+        l.set_color(
+          if i <= current.get() {
+            theme_text_primary
+          } else {
+            theme_text_secondary
+          },
+        )
+        row.add_child(l)
+      }
+      attach(parent, row.view())
+      row.view()
+    },
+  }
+}
+
+///|
+/// 折叠面板(EP Collapse):点击标题行切换内容显隐,各面板独立开合,
+/// 初始仅第一面板展开。
+pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
+  {
+    mount: fn(parent) {
+      let outer = Container::make(style=[("marginBottom", 12.0)], style_str=[
+        ("flexDirection", "column"),
+      ])
+      let mut first = true
+      for entry in panels {
+        let open = Ref(first)
+        first = false
+        let head = Container::make(
+          style=[("height", 34.0), ("paddingLeft", 12.0)],
+          style_str=[("flexDirection", "row"), ("alignItems", "center")],
+        )
+        head.set_background_color(theme_info_light)
+        let arrow = Label::new(if open.val { "− " } else { "+ " })
+        arrow.set_color(theme_primary)
+        let title = Label::new(entry.0)
+        title.set_color(theme_text_primary)
+        head.add_child(arrow)
+        head.add_child(title)
+        let body = Container::make(style=[("padding", 10.0)], style_str=[
+          ("flexDirection", "column"),
+        ])
+        body.set_background_color("#FFFFFF")
+        for ch in entry.1 {
+          ignore((ch.mount)(body.view()))
+        }
+        let apply = fn() -> Unit {
+          body.set_visible(open.val)
+          arrow.set_text(if open.val { "− " } else { "+ " })
+        }
+
+        apply()
+        head.on_mouse_down(fn(e) {
+          if e.button == 1 {
+            open.val = !open.val
+            apply()
+            true
+          } else {
+            false
+          }
+        })
+        let panel = Container::make(style=[("marginBottom", 6.0)], style_str=[
+          ("flexDirection", "column"),
+        ])
+        panel.add_child(head)
+        panel.add_child(body)
+        outer.add_child(panel)
+      }
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}
+
+///|
+/// 时间线(EP Timeline):左列色点+竖线,右列标题+描述。item 高固定 56。
+pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
+  {
+    mount: fn(parent) {
+      let outer = Container::make(style=[("marginBottom", 12.0)], style_str=[
+        ("flexDirection", "column"),
+      ])
+      let n = items.length()
+      let mut i = 0
+      for entry in items {
+        let is_last = i == n - 1
+        let row = Container::make(
+          style=[("height", 56.0)],
+          style_str=[("flexDirection", "row")],
+        )
+        let node_col = Container::make(style=[("width", 20.0), ("height", 56.0)])
+        let color = type_color(entry.2)
+        node_col.on_draw(fn(p) {
+          // 竖线贯穿(末项无线),节点色块居中
+          let b = node_col.get_bounds()
+          if !is_last {
+            p.set_fill_color(theme_border)
+            p.fill_rect(9.0, 0.0, 2.0, b.height)
+          }
+          p.set_fill_color(color)
+          p.fill_rect(5.0, b.height / 2.0 - 5.0, 10.0, 10.0)
+        })
+        let text_col = Container::make(
+          style=[("paddingLeft", 8.0), ("flex", 1.0)],
+          style_str=[("flexDirection", "column")],
+        )
+        let title = Label::new(entry.0)
+        title.set_color(theme_text_primary)
+        title.set_align(Start)
+        let desc = Label::new(entry.1)
+        desc.set_color(theme_text_secondary)
+        desc.set_align(Start)
+        text_col.add_child(title)
+        text_col.add_child(desc)
+        row.add_child(node_col)
+        row.add_child(text_col)
+        outer.add_child(row)
+        i = i + 1
+      }
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}
+
+///|
+/// 描述列表(EP Descriptions):键灰值深的两列网格。
+pub fn descriptions(pairs : Array[(String, String)]) -> Node {
+  {
+    mount: fn(parent) {
+      let outer = Container::make(style=[("marginBottom", 12.0)], style_str=[
+        ("flexDirection", "column"),
+      ])
+      for kv in pairs {
+        let row = Container::make(style=[("height", 26.0)], style_str=[
+          ("flexDirection", "row"),
+          ("alignItems", "center"),
+        ])
+        let k = Label::new(kv.0)
+        k.set_color(theme_text_secondary)
+        k.set_align(Start)
+        let v = Label::new(kv.1)
+        v.set_color(theme_text_primary)
+        v.set_align(Start)
+        let key_wrap = Container::make(style=[("width", 110.0)])
+        key_wrap.add_child(k)
+        row.add_child(key_wrap)
+        row.add_child(v)
+        outer.add_child(row)
+      }
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}
+
+///|
+/// 结果页(EP Result):大色块符号 + 标题 + 描述 + 自定义按钮区。
+pub fn result(
+  t : SemanticType,
+  title : String,
+  desc : String,
+  children : Array[Node],
+) -> Node {
+  {
+    mount: fn(parent) {
+      let outer = Container::make(
+        style=[("height", 180.0), ("marginBottom", 12.0)],
+        style_str=[("flexDirection", "column"), ("alignItems", "center")],
+      )
+      let icon = Container::make(style=[
+        ("width", 56.0),
+        ("height", 56.0),
+        ("marginTop", 16.0),
+      ])
+      let color = type_color(t)
+      let symbol = match t {
+        Success => "✓"
+        Danger => "✕"
+        _ => "!"
+      }
+
+      icon.set_background_color(type_light_color(t))
+      icon.on_draw(fn(p) {
+        let b = icon.get_bounds()
+        p.draw_text(
+          symbol,
+          0.0,
+          0.0,
+          b.width,
+          b.height,
+          align=Center,
+          valign=Center,
+          color~,
+        )
+      })
+      let big = Container::make(style=[("height", 30.0)], style_str=[
+        ("alignItems", "center"),
+      ])
+      let t1 = Label::new(title)
+      t1.set_font(Font::new("Sans", 18.0, weight=SemiBold))
+      t1.set_color(theme_text_primary)
+      big.add_child(t1)
+      let sub = Container::make(style=[("height", 24.0)], style_str=[
+        ("alignItems", "center"),
+      ])
+      let t2 = Label::new(desc)
+      t2.set_color(theme_text_secondary)
+      sub.add_child(t2)
+      let btns = Container::make(style=[("marginTop", 8.0)], style_str=[
+        ("flexDirection", "row"),
+        ("alignItems", "center"),
+      ])
+      for ch in children {
+        ignore((ch.mount)(btns.view()))
+      }
+      outer.add_child(icon)
+      outer.add_child(big)
+      outer.add_child(sub)
+      outer.add_child(btns)
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}
+
+///|
+/// 空状态(EP Empty):灰块占位 + 居中说明。
+pub fn empty(desc : String) -> Node {
+  {
+    mount: fn(parent) {
+      let outer = Container::make(
+        style=[("height", 140.0), ("marginBottom", 12.0)],
+        style_str=[("flexDirection", "column"), ("alignItems", "center")],
+      )
+      let box = Container::make(style=[
+        ("width", 64.0),
+        ("height", 64.0),
+        ("marginTop", 14.0),
+      ])
+      box.set_background_color(theme_info_light)
+      box.on_draw(fn(p) {
+        let b = box.get_bounds()
+        p.draw_text(
+          "∅",
+          0.0,
+          0.0,
+          b.width,
+          b.height,
+          align=Center,
+          valign=Center,
+          color=theme_text_secondary,
+        )
+      })
+      let cap = Container::make(style=[("height", 26.0), ("marginTop", 6.0)], style_str=[
+        ("alignItems", "center"),
+      ])
+      let l = Label::new(desc)
+      l.set_color(theme_text_secondary)
+      cap.add_child(l)
+      outer.add_child(box)
+      outer.add_child(cap)
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}
+
+///|
+/// 数值统计(EP Statistic):大号数值(响应式)+ 灰色标题。
+pub fn statistic(title : String, value : Store[String]) -> Node {
+  {
+    mount: fn(parent) {
+      let outer = Container::make(style=[("marginRight", 24.0)], style_str=[
+        ("flexDirection", "column"),
+      ])
+      let num = Label::new(value.get())
+      num.set_font(Font::new("Sans", 24.0, weight=SemiBold))
+      num.set_color(theme_text_primary)
+      let cap = Label::new(title)
+      cap.set_color(theme_text_secondary)
+      value.subscribe(fn(v) { num.set_text(v) })
+      outer.add_child(num)
+      outer.add_child(cap)
+      attach(parent, outer.view())
+      outer.view()
     },
   }
 }

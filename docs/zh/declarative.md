@@ -151,16 +151,30 @@ fn tagged(label_text : String, body : Node) -> Node {
 
 在声明式层之上沉淀的 Element Plus 风格非表单组件，纯 MoonBit 零平台代码：
 
-- `side_menu(items, selected)` —— 侧边导航菜单（deepin/火绒桌面软件风格，
-  选中项强调条 + 浅蓝底）；
-- `segmented(options, selected)` —— 分段控制器 / 顶栏导航（选中白底浮起）；
-- `tag(text, color)` —— 彩色圆角标签（挂载时按文本测宽自适应）；
+- `side_menu(items, selected)` —— 侧边导航菜单(hover 灰底、选中浅蓝底 +
+  主题色文字 + 左侧强调条,与页面 set_visible 联动);
+- `segmented(options, selected)` —— 分段控制器 / 顶栏导航;
+- `tag` / `tag_of_type` —— 标签(自定义色实底 / 五语义类型浅底);
+- `breadcrumb(items, selected)` —— 面包屑(层级随选中态联动);
+- `pagination(current, pages)` —— 分页(当前页主题色实底白字);
+- `alert` / `alert_closeable` —— 提示横幅(四语义类型 / 可关闭);
+- `steps(items, current)` —— 步骤条(完成/当前/待办三态);
+- `collapse(panels)` —— 折叠面板(点击标题开合);
+- `timeline(items)` —— 时间线(色点 + 竖线,语义色);
+- `descriptions(pairs)` —— 描述列表(键值网格);
+- `result(t, title, desc, children)` —— 结果页;
+- `empty(desc)` —— 空状态;
+- `statistic(title, value)` —— 数值统计(响应式);
+- `avatar` / `badge_count` / `badge_dot` —— 头像 / 角标 / 圆点;
+- `card(title, children, height?)` —— 卡片(标题栏 + 分隔线 + 边框);
 - `code_view(lines)` —— 代码高亮视图：逐 token 建 AttributedText（整段设色）
   测宽后自绘排版。**等价于区间设色的视觉效果且全平台一致**——Windows 的
   AttributedText 区间字体/颜色是上游缺陷（见 adaptation.md），此法绕开，
   是做代码高亮 / 终端渲染的可行替代。内置 `tokenize_moonbit` 极简着色器
   仅作演示，消费方可传入任意词法分析结果。
 
+全部组件配色取自 `theme_*` 主题常量(深色高级变体:蓝 #2D68C4 /
+绿 #2E9E5B / 橙 #D9822B / 红 #D64550,低饱和深色调);文字一律垂直居中。
 组件间状态协调统一走 `Store`；主区页面联动用「订阅 Store +
 `ViewLike::set_visible`」（2026-09-16 补齐该 ABI）。完整演示见
 `examples/components`（侧栏 + 顶栏 + 页面切换 + 代码页）。

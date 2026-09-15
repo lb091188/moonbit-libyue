@@ -78,11 +78,7 @@ pub fn Window::set_icon(self : Window, icon : Image) -> Unit {
 pub fn Window::on_focus(self : Window, callback : () -> Bool) -> Unit {
   let wrapped : () -> Int = fn() { if callback() { 1 } else { 0 } }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_window_on_focus_in(
-    self.view,
-    fn(f : () -> Int) -> Int { f() },
-    wrapped,
-  )
+  ffi_window_on_focus_in(self.view, fn(f : () -> Int) -> Int { f() }, wrapped)
 }
 
 ///|
@@ -90,11 +86,7 @@ pub fn Window::on_focus(self : Window, callback : () -> Bool) -> Unit {
 pub fn Window::on_blur(self : Window, callback : () -> Bool) -> Unit {
   let wrapped : () -> Int = fn() { if callback() { 1 } else { 0 } }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_window_on_blur(
-    self.view,
-    fn(f : () -> Int) -> Int { f() },
-    wrapped,
-  )
+  ffi_window_on_blur(self.view, fn(f : () -> Int) -> Int { f() }, wrapped)
 }
 
 ///|
@@ -105,11 +97,7 @@ impl ViewLike with fn set_tooltip(self, text : String) -> Unit {
 
 ///|
 /// 为视图内子矩形添加工具提示,返回其 id(供 remove_tooltip 用)。
-impl ViewLike with fn add_tooltip_for_rect(
-  self,
-  text : String,
-  rect : RectF,
-) -> Int {
+impl ViewLike with fn add_tooltip_for_rect(self, text : String, rect : RectF) -> Int {
   ffi_view_add_tooltip_for_rect(
     self.view(),
     utf8_bytes(text),
@@ -155,11 +143,7 @@ impl ViewLike with fn schedule_paint_rect(self, rect : RectF) -> Unit {
 impl ViewLike with fn on_focus_in(self, callback : () -> Bool) -> Unit {
   let wrapped : () -> Int = fn() { if callback() { 1 } else { 0 } }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_view_on_focus_in(
-    self.view(),
-    fn(f : () -> Int) -> Int { f() },
-    wrapped,
-  )
+  ffi_view_on_focus_in(self.view(), fn(f : () -> Int) -> Int { f() }, wrapped)
 }
 
 ///|
@@ -167,11 +151,7 @@ impl ViewLike with fn on_focus_in(self, callback : () -> Bool) -> Unit {
 impl ViewLike with fn on_focus_out(self, callback : () -> Bool) -> Unit {
   let wrapped : () -> Int = fn() { if callback() { 1 } else { 0 } }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_view_on_focus_out(
-    self.view(),
-    fn(f : () -> Int) -> Int { f() },
-    wrapped,
-  )
+  ffi_view_on_focus_out(self.view(), fn(f : () -> Int) -> Int { f() }, wrapped)
 }
 
 ///|
@@ -225,11 +205,7 @@ pub fn Scroll::get_max_scroll_position_y(self : Scroll) -> Double {
 pub fn Scroll::on_scroll(self : Scroll, callback : () -> Bool) -> Unit {
   let wrapped : () -> Int = fn() { if callback() { 1 } else { 0 } }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_scroll_on_scroll(
-    self.view(),
-    fn(f : () -> Int) -> Int { f() },
-    wrapped,
-  )
+  ffi_scroll_on_scroll(self.view(), fn(f : () -> Int) -> Int { f() }, wrapped)
 }
 
 ///|
@@ -262,7 +238,10 @@ pub fn MessageBox::set_default_response(
 
 ///|
 /// 设置 Esc 触发的取消按钮。
-pub fn MessageBox::set_cancel_response(self : MessageBox, response : Int) -> Unit {
+pub fn MessageBox::set_cancel_response(
+  self : MessageBox,
+  response : Int,
+) -> Unit {
   ffi_message_box_set_cancel_response(self, response)
 }
 
@@ -300,11 +279,7 @@ pub fn Clipboard::stop_watching(self : Clipboard) -> Unit {
 /// 剪贴板内容变化回调。
 pub fn Clipboard::on_change(self : Clipboard, callback : () -> Unit) -> Unit {
   keep_alive(callback)
-  ffi_clipboard_on_change(
-    self,
-    fn(f : () -> Unit) -> Unit { f() },
-    callback,
-  )
+  ffi_clipboard_on_change(self, fn(f : () -> Unit) -> Unit { f() }, callback)
 }
 
 ///|
@@ -558,9 +533,7 @@ pub fn clear_notifications() -> Unit {
 ///|
 /// 通知显示回调(参数为通知 id)。
 pub fn on_notification_show(callback : (String) -> Unit) -> Unit {
-  let wrapped : (Bytes) -> Unit = fn(id) {
-    callback(from_utf8_bytes(id))
-  }
+  let wrapped : (Bytes) -> Unit = fn(id) { callback(from_utf8_bytes(id)) }
   keep_alive(fn() { ignore(wrapped) })
   ffi_notification_center_on_notification_show(
     fn(f : (Bytes) -> Unit, id : Bytes) -> Unit { f(id) },
@@ -571,9 +544,7 @@ pub fn on_notification_show(callback : (String) -> Unit) -> Unit {
 ///|
 /// 通知关闭回调。
 pub fn on_notification_close(callback : (String) -> Unit) -> Unit {
-  let wrapped : (Bytes) -> Unit = fn(id) {
-    callback(from_utf8_bytes(id))
-  }
+  let wrapped : (Bytes) -> Unit = fn(id) { callback(from_utf8_bytes(id)) }
   keep_alive(fn() { ignore(wrapped) })
   ffi_notification_center_on_notification_close(
     fn(f : (Bytes) -> Unit, id : Bytes) -> Unit { f(id) },
@@ -584,9 +555,7 @@ pub fn on_notification_close(callback : (String) -> Unit) -> Unit {
 ///|
 /// 通知点击回调(点击通知本体)。
 pub fn on_notification_click(callback : (String) -> Unit) -> Unit {
-  let wrapped : (Bytes) -> Unit = fn(id) {
-    callback(from_utf8_bytes(id))
-  }
+  let wrapped : (Bytes) -> Unit = fn(id) { callback(from_utf8_bytes(id)) }
   keep_alive(fn() { ignore(wrapped) })
   ffi_notification_center_on_notification_click(
     fn(f : (Bytes) -> Unit, id : Bytes) -> Unit { f(id) },
@@ -597,9 +566,7 @@ pub fn on_notification_click(callback : (String) -> Unit) -> Unit {
 ///|
 /// 通知动作按钮回调(点击 actions 按钮)。
 pub fn on_notification_action(callback : (String) -> Unit) -> Unit {
-  let wrapped : (Bytes) -> Unit = fn(id) {
-    callback(from_utf8_bytes(id))
-  }
+  let wrapped : (Bytes) -> Unit = fn(id) { callback(from_utf8_bytes(id)) }
   keep_alive(fn() { ignore(wrapped) })
   ffi_notification_center_on_notification_action(
     fn(f : (Bytes) -> Unit, id : Bytes) -> Unit { f(id) },
@@ -621,9 +588,7 @@ pub fn Browser::execute_javascript_with_result(
   ffi_browser_execute_javascript_callback(
     self.view,
     utf8_bytes(code),
-    fn(f : (Int, Bytes) -> Unit, ok : Int, json : Bytes) -> Unit {
-      f(ok, json)
-    },
+    fn(f : (Int, Bytes) -> Unit, ok : Int, json : Bytes) -> Unit { f(ok, json) },
     wrapped,
   )
 }
@@ -636,9 +601,7 @@ pub fn Browser::add_raw_binding(
   name : String,
   callback : (String) -> Unit,
 ) -> Unit {
-  let wrapped : (Bytes) -> Unit = fn(json) {
-    callback(from_utf8_bytes(json))
-  }
+  let wrapped : (Bytes) -> Unit = fn(json) { callback(from_utf8_bytes(json)) }
   keep_alive(fn() { ignore(wrapped) })
   ffi_browser_add_raw_binding(
     self.view,

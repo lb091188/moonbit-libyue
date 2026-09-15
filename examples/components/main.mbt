@@ -1,50 +1,60 @@
-// 探索:用组件库(yue/components.mbt 的 side_menu/segmented/tag/code_view)
-// 拼装 deepin / 360 / 火绒风格的现代桌面应用外壳:
-//   浅色侧边导航 + 顶栏分段导航 + 主区页面联动(Store + set_visible)。
-// 本文件里的 badge/card/counter_widget 是「自定义组件」三种封装路径的演示。
+// 组件库演示板(showcase 风格):侧边导航切换分页,每页内多个
+// 「标题 + 描述 + 全状态演示」分段。覆盖组件:
+//   tag/tag_of_type · avatar · badge · statistic · alert(四类型/可关闭)
+//   side_menu · segmented · breadcrumb · pagination · steps
+//   descriptions · timeline · collapse · card · code_view
+//   result · empty
+// 配色为深色高级变体主题(theme_* 常量)。
 
 ///|
-/// 自绘组件:圆形徽标(纯 Painter,零图片资源)。
-fn badge(letter : String, color : String) -> @yue.Node {
-  @yue.container(
-    on_draw=fn(p) {
-      p.set_fill_color(color)
-      p.begin_path()
-      p.arc(20.0, 20.0, 18.0, 0.0, 6.2832)
-      p.fill()
-      p.set_fill_color("#FFFFFF")
-      p.draw_text(letter, 0.0, 0.0, 40.0, 40.0, align=Center, valign=Center)
-    },
-    style=[("width", 40.0), ("height", 40.0)],
+let title_color : String = "#356AA0"
+
+///|
+let desc_color : String = "#8A9199"
+
+///|
+/// 一段演示:标题 + 一句说明 + 演示区 + 分隔留白。
+fn section(
+  title : String,
+  desc : String,
+  content : Array[@yue.Node],
+) -> @yue.Node {
+  let t = @yue.label(
+    title,
+    style_str=[("color", title_color)],
+    style=[("marginBottom", 4.0)],
+    handle=fn(l) { l.set_align(@yue.Start) },
   )
+  let d = @yue.label(
+    desc,
+    style_str=[("color", desc_color)],
+    style=[("marginBottom", 10.0)],
+    handle=fn(l) { l.set_align(@yue.Start) },
+  )
+  let nodes : Array[@yue.Node] = [t, d]
+  for c in content {
+    nodes.push(c)
+  }
+  nodes.push(@yue.separator(style=[("marginTop", 4.0), ("marginBottom", 20.0)]))
+  @yue.vbox(nodes, style=[("marginBottom", 6.0)])
 }
 
 ///|
-/// 有状态组件:计数器。私有 Store,每个实例独立计数。
-fn counter_widget(start : Int) -> @yue.Node {
-  let count : @yue.Store[Int] = @yue.Store::new(start)
-  @yue.hbox(
-    [
-      @yue.button("-", on_click=fn() { count.update(fn(n) { n - 1 }) }),
-      @yue.bind_label(count, fn(n) { " \{n} " }, style=[
-        ("marginLeft", 12.0),
-        ("marginRight", 12.0),
-      ]),
-      @yue.button("+", on_click=fn() { count.update(fn(n) { n + 1 }) }),
-    ],
-    style=[("marginTop", 8.0)],
-    style_str=[("alignItems", "center")],
-  )
+/// 一页 = 整页滚动区包住全部分段。
+fn scroll_page(sections : Array[@yue.Node]) -> @yue.Node {
+  @yue.scroll(@yue.vbox(sections, style=[("padding", 14.0)]), style=[
+    ("flex", 1.0),
+  ])
 }
 
 ///|
-/// 主区页面:挂载后订阅 selected 做 set_visible 联动。
+/// 主区页面:挂载后订阅导航状态做 set_visible 切换。
 fn page(
   name : String,
   selected : @yue.Store[String],
-  children : Array[@yue.Node],
+  content : @yue.Node,
 ) -> @yue.Node {
-  @yue.vbox(children, style=[("flex", 1.0), ("padding", 14.0)], handle=fn(c) {
+  @yue.vbox([content], style=[("flex", 1.0)], handle=fn(c) {
     fn apply(s : String) -> Unit {
       c.set_visible(s == name)
     }
@@ -59,90 +69,307 @@ fn main {
   if !@yue.initialize() {
     return
   }
-  // 全局导航状态:侧边菜单与顶栏分段导航共享,谁点都联动。
-  let selected : @yue.Store[String] = @yue.Store::new("总览")
+  let selected : @yue.Store[String] = @yue.Store::new("基础组件")
+  // 演示用状态
   let page_no : @yue.Store[Int] = @yue.Store::new(2)
-  let counter_a = counter_widget(0)
+  let step : @yue.Store[Int] = @yue.Store::new(1)
+  let visits : @yue.Store[String] = @yue.Store::new("12,804")
+  let counter : @yue.Store[Int] = @yue.Store::new(0)
+  counter.subscribe(fn(n) { visits.set((n * 1601 + 12804).to_string()) })
+  // ---------- 基础组件 ----------
+  let p_basic = scroll_page([
+    section(
+      "Tag 标签",
+      "五种语义类型(浅底深字)+ 自定义实底色;宽度按文本自适应,文字垂直居中。",
+      [
+        @yue.hbox(
+          [
+            @yue.tag_of_type("Primary", @yue.Primary),
+            @yue.tag_of_type("Success", @yue.Success),
+            @yue.tag_of_type("Warning", @yue.Warning),
+            @yue.tag_of_type("Danger", @yue.Danger),
+            @yue.tag_of_type("Info", @yue.Info),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
+        @yue.hbox(
+          [@yue.tag("自定义实底", "#2D68C4"), @yue.tag("v1.0", "#2E9E5B")],
+          style=[("marginTop", 8.0)],
+          style_str=[("alignItems", "center")],
+        ),
+      ],
+    ),
+    section(
+      "Avatar 头像",
+      "方形实底色块 + 白色字母,三种尺寸。",
+      [
+        @yue.hbox(
+          [
+            @yue.avatar("M", "#2D68C4", size=44.0),
+            @yue.avatar("N", "#2E9E5B", size=36.0),
+            @yue.avatar("X", "#D64550", size=30.0),
+            @yue.avatar("L", "#D9822B", size=26.0),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
+      ],
+    ),
+    section(
+      "Badge 徽标",
+      "数字角标(红底白字,宽度自适应)与圆点两种形态。",
+      [
+        @yue.hbox(
+          [
+            @yue.badge_count(9),
+            @yue.badge_count(128),
+            @yue.label("   消息"),
+            @yue.label("      "),
+            @yue.badge_dot(),
+            @yue.label(" 在线"),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
+      ],
+    ),
+    section(
+      "Alert 提示横幅",
+      "四种语义类型:左侧色条 + 类型浅底 + 同族深字,文字垂直居中。",
+      [
+        @yue.alert("成功提示:配置已保存。", @yue.Success),
+        @yue.alert("信息提示:有新版本可用。", @yue.Info),
+        @yue.alert("警告提示:磁盘剩余空间不足。", @yue.Warning),
+        @yue.alert("错误提示:网络连接已断开。", @yue.Danger),
+      ],
+    ),
+    section("Alert 可关闭", "点击右侧 ✕ 关闭整条横幅。", [
+      @yue.alert_closeable(
+        "可关闭横幅:点我右侧的 ✕ 试试。",
+        @yue.Warning,
+      ),
+    ]),
+    section(
+      "Statistic 数值统计",
+      "大号数值响应式:点下面的按钮,数值经 Store 自动刷新。",
+      [
+        @yue.hbox(
+          [
+            @yue.statistic("访问量", visits),
+            @yue.statistic("任务数", @yue.Store::new("36")),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
+        @yue.button(
+          "刷新访问量",
+          on_click=fn() { counter.update(fn(n) { n + 1 }) },
+          style=[("marginTop", 8.0)],
+        ),
+      ],
+    ),
+  ])
+  // ---------- 导航 ----------
+  let p_nav = scroll_page([
+    section(
+      "Segmented 分段控制器",
+      "顶栏导航:选中白底 + 主题色文字,悬停灰底过渡;与左侧菜单共享状态。",
+      [
+        @yue.segmented(
+          ["基础组件", "导航", "数据展示", "反馈"],
+          selected,
+        ),
+      ],
+    ),
+    section(
+      "Breadcrumb 面包屑",
+      "层级随选中态联动:当前项深色,其余灰色可点、悬停变主题色。",
+      [@yue.breadcrumb(["MoonShell", "控制台", "基础组件"], selected)],
+    ),
+    section(
+      "Steps 步骤条",
+      "完成/当前/待办三态:浅蓝、实底白字、灰;点按钮推进或回退。",
+      [
+        @yue.steps(["填写", "确认", "完成"], step),
+        @yue.hbox(
+          [
+            @yue.button("上一步", on_click=fn() {
+              step.update(fn(n) {
+                let m = n - 1
+                if m < 0 {
+                  0
+                } else {
+                  m
+                }
+              })
+            }),
+            @yue.button(
+              "下一步",
+              on_click=fn() {
+                step.update(fn(n) {
+                  let m = n + 1
+                  if m > 2 {
+                    2
+                  } else {
+                    m
+                  }
+                })
+              },
+              style=[("marginLeft", 8.0)],
+            ),
+          ],
+          style=[("marginTop", 8.0)],
+        ),
+      ],
+    ),
+    section(
+      "Pagination 分页",
+      "当前页主题色实底白字,悬停浅蓝;点击页码切换。",
+      [@yue.pagination(page_no, 5)],
+    ),
+    section(
+      "Side Menu 侧边导航",
+      "窗口左侧即本组件:悬停灰底、选中浅蓝底 + 主题色文字 + 左侧强调条,点击切换页面。",
+      [
+        @yue.descriptions([
+          ("悬停态", "浅灰底"),
+          ("选中态", "主题浅蓝底 + 主题色文字 + 3px 强调条"),
+          ("联动", "与分段控制器、面包屑共享同一 Store"),
+        ]),
+      ],
+    ),
+  ])
+  // ---------- 数据展示 ----------
+  let p_data = scroll_page([
+    section("Descriptions 描述列表", "键灰值深的键值网格。", [
+      @yue.descriptions([
+        ("框架", "moonbit-libyue"),
+        ("渲染", "GTK 3 (Linux) / Win32 (Windows)"),
+        ("组件层", "纯 MoonBit,零平台代码"),
+      ]),
+    ]),
+    section(
+      "Timeline 时间线",
+      "左侧色点 + 竖线,节点颜色跟随语义类型;末项无连线。",
+      [
+        @yue.timeline([
+          ("发布 1.0", "2026-01-01,首个稳定版。", @yue.Success),
+          ("发布 1.1", "2026-05-01,新增组件库。", @yue.Primary),
+          ("进行中", "2.0 规划:终端组件。", @yue.Warning),
+        ]),
+      ],
+    ),
+    section(
+      "Collapse 折叠面板",
+      "点击标题展开/收起,各面板独立;初始第一个展开。",
+      [
+        @yue.collapse([
+          (
+            "如何使用组件库?",
+            [
+              @yue.label(
+                "moon add NoahLiu/moonbit-libyue 后即可用 @yue.* 访问。",
+              ),
+            ],
+          ),
+          (
+            "支持哪些平台?",
+            [@yue.label("Linux(X11)/ Windows;macOS 进行中。")],
+          ),
+        ]),
+      ],
+    ),
+    section(
+      "Card 卡片",
+      "标题栏 + 底部分隔线 + 边框,内容区自动留出标题高度。",
+      [
+        @yue.card(
+          "卡片标题",
+          [
+            @yue.label(
+              "卡片内容:组件库全部用 theme_* 常量着色。",
+            ),
+          ],
+          height=110.0,
+        ),
+      ],
+    ),
+    section(
+      "Code View 代码高亮",
+      "逐 token 整段设色 + 测宽自绘,全平台一致(绕开 Windows 区间设色缺陷)。",
+      [
+        @yue.code_view(
+          [
+            "// 深色主题 · 关键字/字符串/数字/注释", "fn main {",
+            "  let msg = \"hello 组件库\"", "  println(msg + \"!\" )  // 2026",
+            "}",
+          ],
+          width=430.0,
+        ),
+      ],
+    ),
+  ])
+  // ---------- 反馈 ----------
+  let p_feedback = scroll_page([
+    section(
+      "Result 结果页",
+      "大色块符号 + 标题 + 描述 + 操作区;四种语义类型。",
+      [
+        @yue.result(
+          @yue.Success,
+          "操作成功",
+          "配置已写入并生效。",
+          [@yue.button("返回首页")],
+        ),
+        @yue.result(
+          @yue.Danger,
+          "操作失败",
+          "网络异常,请稍后重试。",
+          [@yue.button("重新加载")],
+        ),
+      ],
+    ),
+    section("Empty 空状态", "占位图 + 说明文字。", [
+      @yue.empty("这里还没有内容"),
+    ]),
+    section("Statistic 复习", "统计数值也是响应式组件。", [
+      @yue.hbox([@yue.statistic("在线用户", @yue.Store::new("1,024"))], style_str=[
+        ("alignItems", "center"),
+      ]),
+    ]),
+  ])
   let window = @yue.mount_window(
     [
       @yue.hbox(style=[("flex", 1.0)], style_str=[("alignItems", "stretch")], [
-        // 侧边导航(deepin / 火绒桌面软件风格)
-        @yue.side_menu(["总览", "组件", "代码"], selected),
-        // 主区:顶栏 + 页面
+        @yue.side_menu(
+          ["基础组件", "导航", "数据展示", "反馈"],
+          selected,
+        ),
         @yue.vbox(
           [
-            // 顶栏:分段导航 + 彩色标签
             @yue.hbox(
               [
-                @yue.segmented(["总览", "组件", "代码"], selected),
-                @yue.tag("MoonShell", "#409EFF"),
-                @yue.tag("v0.1", "#67C23A"),
+                @yue.segmented(
+                  ["基础组件", "导航", "数据展示", "反馈"],
+                  selected,
+                ),
+                @yue.label("      "),
+                @yue.tag("MoonShell", "#2D68C4"),
+                @yue.tag("v0.2", "#2E9E5B"),
               ],
               style=[("padding", 10.0)],
               style_str=[("alignItems", "center")],
               handle=fn(c) { c.set_background_color("#FFFFFF") },
             ),
-            // 面包屑(与侧栏/分段共享状态)
-            @yue.hbox(
-              [@yue.breadcrumb(["MoonShell", "后台", "总览"], selected)],
-              style=[("paddingLeft", 14.0), ("paddingBottom", 8.0)],
-            ),
-            // 页面:总览
-            page("总览", selected, [
-              @yue.alert(
-                "组件库已就绪:点击侧栏或顶栏切换页面。",
-                @yue.Success,
-              ),
-              @yue.card(
-                "组合式组件",
-                [
-                  @yue.label(
-                    "普通函数返回 Node 即组件,可接收任意参数。",
-                  ),
-                  counter_a,
-                  @yue.pagination(page_no, 5),
-                ],
-                height=200.0,
-              ),
-            ]),
-            // 页面:组件
-            page("组件", selected, [
-              @yue.hbox(
-                [
-                  badge("A", "#4C8BF5"),
-                  @yue.label("  "),
-                  badge("B", "#EA4335"),
-                  @yue.label("   "),
-                  @yue.tag_of_type("Primary", @yue.Primary),
-                  @yue.tag_of_type("Success", @yue.Success),
-                  @yue.tag_of_type("Warning", @yue.Warning),
-                  @yue.tag_of_type("Danger", @yue.Danger),
-                  @yue.tag_of_type("Info", @yue.Info),
-                  @yue.badge_count(9),
-                ],
-                style_str=[("alignItems", "center")],
-              ),
-              @yue.alert(
-                "警告横幅:EP Alert 的类型浅底样式。",
-                @yue.Warning,
-              ),
-            ]),
-            // 页面:代码(逐 token 自绘高亮,全平台一致)
-            page("代码", selected, [
-              @yue.code_view([
-                "// 代码高亮:逐 token 自绘,Windows 也能逐字着色", "fn add(a : Double, b : Double) -> Double {",
-                "  // 关键字 字符串 数字", "  let tag = \"结果: \"", "  return a + b * 2",
-                "}",
-              ]),
-            ]),
+            page("基础组件", selected, p_basic),
+            page("导航", selected, p_nav),
+            page("数据展示", selected, p_data),
+            page("反馈", selected, p_feedback),
           ],
           style=[("flex", 1.0)],
-          handle=fn(c) { c.set_background_color("#F2F3F5") },
+          handle=fn(c) { c.set_background_color("#F5F6F7") },
         ),
       ]),
     ],
-    title="自定义组件与现代化布局",
-    size=Some((820.0, 560.0)),
+    title="组件库演示板",
+    size=Some((880.0, 600.0)),
     center=true,
     on_close=fn(_w) { @yue.quit() },
   )

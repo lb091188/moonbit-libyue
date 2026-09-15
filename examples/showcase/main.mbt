@@ -4,18 +4,48 @@
 // 主选区、自定义协议等只在对应平台出现）。
 
 ///|
+/// 主区页面:挂载后订阅导航状态做 set_visible 切换(替代旧 Tab 页签)。
+fn showcase_page(
+  name : String,
+  selected : @yue.Store[String],
+  content : @yue.Node,
+) -> @yue.Node {
+  @yue.vbox([content], style=[("flex", 1.0)], handle=fn(c) {
+    fn apply(s : String) -> Unit {
+      c.set_visible(s == name)
+    }
+
+    apply(selected.get())
+    selected.subscribe(apply)
+  })
+}
+
+///|
 fn main {
   if !@yue.initialize() {
     println("GUI 初始化失败")
     return
   }
+  // 导航状态:自研 side_menu 组件(替代旧 Tab 页签),与页面联动。
+  let selected : @yue.Store[String] = @yue.Store::new("基础控件")
+  let tabs = build_tabs()
+  let names : Array[String] = []
+  let page_nodes : Array[@yue.Node] = []
+  for entry in tabs {
+    names.push(entry.0)
+    page_nodes.push(showcase_page(entry.0, selected, entry.1))
+  }
   let _ = @yue.mount_window(
-    // Tab 无 measure 函数,yoga 叶子尺寸构造时固化且 add_page 不刷新,
-    // 挂在容器里必须给显式外框,flex 1 让页签区撑满窗口。页内布局不经过
-    // Tab 的 yoga 树:add_page 只挂 GTK 页,每页容器是独立 yoga 子树的根。
-    [@yue.tab(build_tabs(), style=[("padding", 8.0), ("flex", 1.0)])],
+    [
+      @yue.hbox(style=[("flex", 1.0)], style_str=[("alignItems", "stretch")], [
+        @yue.side_menu(names, selected),
+        @yue.vbox(page_nodes, style=[("flex", 1.0)], handle=fn(c) {
+          c.set_background_color("#FFFFFF")
+        }),
+      ]),
+    ],
     title="moonbit-libyue 全功能 Showcase",
-    size=Some((960.0, 640.0)),
+    size=Some((1020.0, 660.0)),
     center=true,
     on_close=fn(_w) { @yue.quit() },
     handle=fn(win) {
@@ -32,7 +62,7 @@ fn main {
 }
 
 ///|
-/// 十二个页签：名称 + 声明式页面节点。
+/// 十二个页面:名称 + 声明式页面节点。
 fn build_tabs() -> Array[(String, @yue.Node)] {
   [
     ("基础控件", page_basics()),
