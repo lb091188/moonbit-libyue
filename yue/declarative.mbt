@@ -44,12 +44,14 @@ fn container_node(
   children : Array[Node],
   style : Array[(String, Double)],
   style_str : Array[(String, String)],
+  handle~ : (Container) -> Unit,
 ) -> Node {
   let sstr = style_str.copy()
   sstr.push(("flexDirection", direction))
   {
     mount: fn(parent) {
       let c = Container::make(style~, style_str=sstr)
+      handle(c)
       attach(parent, c.view())
       for ch in children {
         ignore((ch.mount)(c.view()))
@@ -65,8 +67,9 @@ pub fn vbox(
   children : Array[Node],
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
-  container_node("column", children, style, style_str)
+  container_node("column", children, style, style_str, handle~)
 }
 
 ///|
@@ -75,8 +78,9 @@ pub fn hbox(
   children : Array[Node],
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
-  container_node("row", children, style, style_str)
+  container_node("row", children, style, style_str, handle~)
 }
 
 ///|

@@ -126,6 +126,14 @@ fn tagged(label_text : String, body : Node) -> Node {
 }
 ```
 
+#### Custom component recipes (summarized from `examples/components`)
+
+1. **Composite components** (recommended): an ordinary function returning a Node; parameters are props, closures are private state (e.g. `card`/`nav_item`).
+2. **Drawn components**: `container(on_draw=...)` + Painter draws badges etc. with zero image assets.
+3. **Stateful components**: the component holds a private `Store`, refreshed automatically via `bind_label`; each instance has independent state (e.g. `counter_widget`). Cross-component coordination uses a shared Store + `map` derivation (the sidebar highlight works this way).
+4. **Extending built-in nodes**: `vbox`/`hbox` accept `handle` (returns the Container handle at mount time, for background colors etc.). Note: the `parent : View` received by a `Node`'s `mount` only has `attach` available **inside the `yue` package** — outside the package you cannot write a Node literal that mounts a container into the parent directly; extend the library instead, or wrap existing views with `node_of`.
+5. **Modern layouts**: plain vbox/hbox/scroll flex boxes can produce a "dark sidebar + header bar + scrolling cards" shell; the key points are that **the root node needs `style=[("flex", 1.0)]` to fill the window**, the fixed-width sidebar sets `width` without flex, the main area takes `flex=1`, and the root container uses `style_str=[("alignItems", "stretch")]` so child columns fill the height.
+
 ## L3: Store and bind_label
 
 A `Store[T]` is a subscribable value: `set` notifies all subscribers, `map` derives read-only views, and `bind_label` plugs a Store into a declarative tree — when the state changes, the text updates automatically:
