@@ -44,7 +44,7 @@
 - [x] **View 体验**:set_tooltip/add_tooltip_for_rect/remove_tooltip(工具提示全缺失→全补)、set_font/set_color(原生文字样式,自绘组件的主力替代)、on_focus_in/on_focus_out、set_focusable/has_focus、schedule_paint_rect
 - [x] **Container 动态子视图**:add_child_view_at/remove_child_view/child_count
 - [x] **Table 选择与刷新**:enable_multiple_selection/select_row/get_selected_row + notify_row_insertion/notify_row_deletion/notify_value_change(MoonBit 改数据后刷新表格)
-- [~] **Browser**:get_title/stop 已补;ExecuteJavaScript 回调版与 AddBinding(JS↔原生 RPC)因回调链复杂留下一批
+- [x] **Browser**:get_title/stop/execute_javascript_with_result(执行结果 JSON 回传)/add_raw_binding+remove_binding+has_bindings(JS 调原生,JSON 参数;typed AddBinding 的类型自动转换由消费方在 MoonBit 侧解析 JSON 替代)
 - [x] **Scroll**:on_scroll 信号 + get_scroll_position_x/y + get_max_scroll_position_x/y
 - [x] **Label 富文本**:set_align/set_valign/set_attributed_text/set_font/set_color
 - [x] **MessageBox 模态**:set_default_response/set_cancel_response/set_informative_text/run/run_for_window
@@ -53,7 +53,8 @@
 - [x] **多显示器与外观**:primary_work_area_*/primary_scale_factor/cursor_screen_x/y、set_dark_mode_enabled/on_color_scheme_change
 - [x] **文本测量与字体**:AttributedText get_one_line_width/height、Font::default/get_name/get_size
 - [x] **杂项**:app set_id/get_id、menu_item click/set_enabled/is_enabled/set_visible/is_visible、file_dialog set_title/set_button_label、gif_player set_animating/is_animating/is_playing/stop_animation_timer、canvas get_scale_factor/get_width/get_height、global_shortcut unregister_all、view set_visible/schedule_paint(组件库先行补的)
-- [~] **缓办**:View::DoDrag 通用数据版、Display 全字段枚举(GetAllDisplays)、mac 专属(Template/ScrollElasticity/Notification 回复/Lifetime)、Accelerator 独立类、Tray 原生后端(本仓 Linux 走 traybus)
+- [x] **拖拽通用版**:start_drag(文本+文件路径混合,DragOperation 位组合,可选拖拽预览图)+ cancel_drag/is_dragging(2026-09-16 补齐)
+- [~] **缓办**:Display 全字段枚举(GetAllDisplays)、mac 专属(Template/ScrollElasticity/Notification 回复/Lifetime)、Accelerator 独立类、Tray 原生后端(本仓 Linux 走 traybus)
 
 ### 已封装(实测通过即勾,后续仅回归)
 
