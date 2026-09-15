@@ -4,9 +4,9 @@
 每个控件都有两种用法：**逐个 setter 的经典写法**（`X::new` + setter），
 或 **props 风格一步到位**（`X::make`）。两者语义完全一致，`make` 只是 setter 的打包。
 
-声明式写法（`@yue.mount` 树 + `Store` 绑定）见 [docs/declarative.md](declarative.md)；
-布局样式键全集见 [docs/layout.md](layout.md)；
-平台适配与上游缺陷的完整记录见 [docs/adaptation.md](adaptation.md)。
+声明式写法（`@yue.mount` 树 + `Store` 绑定）见 [docs/declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/declarative.md)；
+布局样式键全集见 [docs/layout.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/layout.md)；
+平台适配与上游缺陷的完整记录见 [docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/adaptation.md)。
 
 通用约定：
 
@@ -70,7 +70,7 @@ col.add_child(child)
 
 入参只有 `style` / `style_str`（见文首）。默认 `flexDirection=column`、
 `alignItems=stretch`，水平排列 `set_style_str("flexDirection", "row")`；
-键的解析规则见 [docs/layout.md](layout.md)。
+键的解析规则见 [docs/layout.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/layout.md)。
 
 | 方法 | 用途 |
 |---|---|
@@ -309,7 +309,7 @@ t.on_selected_page_change(fn() { switch_to(t.get_selected_page_index()) })
 | select_page_at(i) / get_selected_page_index() / page_count() | 选中与查询 |
 | on_selected_page_change(fn()) | 切页回调 |
 
-页内容器是独立 yoga 子树的根；声明式建页见 [docs/declarative.md](declarative.md) 的 `tab` 节点。
+页内容器是独立 yoga 子树的根；声明式建页见 [docs/declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/declarative.md) 的 `tab` 节点。
 
 ## 画布与图片
 
@@ -423,7 +423,7 @@ n.show()
 | set_title(t) / set_body(s) | 内容 |
 | set_silent(b) | 静默 |
 | set_actions([(id, 标题)]) | 按钮（配合 NotificationCenter 的 action 回调） |
-| show() | 发送（Linux 必须经此，见 [docs/adaptation.md](adaptation.md)） |
+| show() | 发送（Linux 必须经此，见 [docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/adaptation.md)） |
 | close() | 关闭 |
 | NotificationCenter::get() + add(n) | 经通知中心发送 |
 
@@ -505,7 +505,7 @@ let tray = match @yue.Tray::new("icon.png") {
 | remove() | 移除图标 |
 
 Linux 推荐纯 MoonBit 的 `yue/traybus` 后端（`Tray` 统一 API 内部自动选择），
-方案见 [docs/tray.md](tray.md)。
+方案见 [docs/tray.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/tray.md)。
 
 ## 气泡 Popover
 
@@ -578,11 +578,11 @@ pop.show_relative_to(anchor_view)
    VK 值；字母与数字与 ASCII 相同。跨平台代码不要混用两张表。
 6. **样式键的解析规则**：只保留 ASCII 字母并转小写，`flexDirection` /
    `flex-direction` / `flexdirection` 等价；**数字和连字符以外的符号会被丢弃**，
-   不要用特殊字符拼键名。键值全集见 [docs/layout.md](layout.md)。
+   不要用特殊字符拼键名。键值全集见 [docs/layout.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/layout.md)。
 7. **回调自动保活，但别在回调里同步弹事件循环**：`on_*` 注册的闭包由库持有
    强引用；`Store` 订阅同理。回调里调用 `@yue.quit()` 等终止流程后不要再
    操作控件。
 8. **平台专属 API 未封装**：Toolbar / Vibrant（Linux 静态库无符号）、
    Button 样式与 ControlSize、Scroll 弹性、App 激活策略、Browser 缩放、
    Image 模板图（macOS），ShortcutOptions / Lifetime::Reply / 通知
-   COMServerOptions（Windows）等，完整清单见 [docs/adaptation.md](adaptation.md)。
+   COMServerOptions（Windows）等，完整清单见 [docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/adaptation.md)。
