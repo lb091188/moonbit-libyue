@@ -315,8 +315,8 @@ pub fn AttributedText::set_font(self : AttributedText, font : Font) -> Unit {
 }
 
 ///|
-// Windows 的 AttributedText 只支持全文范围的字体/颜色（libyue 内部对区间
-// 调用 CHECK 崩溃），区间 API 在此统一降级为无操作并只告警一次。
+// Windows 的 AttributedText 只支持全文范围的字体/颜色（上游限制，见
+// docs/adaptation.md），区间 API 在此统一降级为无操作并只告警一次。
 let ranged_attribute_warned : Ref[Bool] = Ref(false)
 
 ///|

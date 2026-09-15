@@ -60,12 +60,10 @@
 // ~/.moon/include/moonbit.h。
 extern "C" void *moonbit_make_bytes(int32_t size, int value);
 
-// C++ 对象一律走系统堆：MoonBit 运行时初始化后可能接管进程分配器作为
-// GC 堆，普通 new 分配的对象会被 GC 扫描/移动破坏（Table 实测必崩）。
-// Linux 用 glibc 导出的 __libc_malloc/__libc_free 绕开一切接管；Windows
-// 下 moon 以 MOONBIT_ALLOCATOR=SYSTEM 编译运行时，CRT 堆即系统堆，
-// new/delete 重定向到 malloc/free 即可；macOS 的 libSystem 不导出
-// libc_malloc/free（CI 实测 undefined），直接用 libc 的 malloc/free。
+// C++ 对象一律走系统堆（MoonBit 运行时可能接管进程分配器，普通 new 会被
+// GC 破坏）：Linux 用 __libc_malloc/__libc_free；Windows 下 moon 以
+// MOONBIT_ALLOCATOR=SYSTEM 编译运行时，重定向到 malloc/free；macOS 用
+// libc 的 malloc/free。原理见 docs/adaptation.md。
 #if defined(_WIN32)
 #include <cstdlib>
 static void *raw_heap_malloc(std::size_t size) {
@@ -1485,8 +1483,7 @@ void *yue_mbt_image_resize(void *image, double w, double h, double scale_factor)
 /* format 如 "png"；路径 UTF-8 */
 int32_t yue_mbt_image_write_to_file(void *image, const char *format, const char *path) {
 #if defined(OS_MAC)
-  // mac 发行包声明了 Image::WriteToFile 但未编译进库（CI 实测链接期
-  // undefined），降级为恒失败
+  // mac 发行包声明了 Image::WriteToFile 但未编译进库，降级为恒失败
   (void)image;
   (void)format;
   (void)path;
@@ -3093,15 +3090,12 @@ int32_t yue_mbt_tray_supported(void) {
 
 #if defined(OS_WIN)
 // ---------- 托盘幽灵图标防护 ----------
-// nu::Tray 的引用被 TrayStore 全局持有,正常退出靠 CRT 静态析构链释放
-// (Store 析构 → 引用归零 → TrayImpl 析构 → NIM_DELETE);崩溃、abort、
-// 关闭控制台等异常退出这条链不跑,而 Explorer 对死进程的托盘图标是惰性
-// 清理(鼠标扫过才移除),于是留下「幽灵托盘」。首次创建托盘时捕获
-// TrayHost 属主窗口并安装进程级钩子,凡是还有机会执行代码的退出路径都
-// 按属主窗口 + ID 区间补发 NIM_DELETE(libyue 的图标 ID 从 2 起连续分配、
-// 只增不复用,对已删除 ID 的 NIM_DELETE 是无害空操作)。
-// TerminateProcess/taskkill /F 式硬杀没有任何进程代码可执行,幽灵仍由
-// 系统惰性清理,无法在进程侧根除。
+// TrayStore 全局持有 nu::Tray 引用，异常退出（崩溃/abort/关控制台）不走
+// CRT 静态析构链。首次创建托盘时捕获 TrayHost 属主窗口并安装进程级钩子，
+// 凡还有机会执行代码的退出路径都按属主窗口 + ID 区间补发 NIM_DELETE
+// （图标 ID 从 2 起连续分配、只增不复用，对已删除 ID 是无害空操作）；
+// 硬杀（TerminateProcess/taskkill /F）无法在进程侧根除，由系统惰性清理。
+// 原理见 docs/adaptation.md「运行期差异」。
 struct TrayGhostGuard {
   HWND host_hwnd = nullptr;  // TrayHost 窗口,创建首个托盘时捕获
   UINT max_icon_id = 1;      // 已分配的最大图标 ID(初始 1 = 尚未分配过)

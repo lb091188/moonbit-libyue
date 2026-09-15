@@ -151,8 +151,7 @@ pub fn[M : TableModel] Table::set_model(self : Table, model : M, column_count : 
   }
   keep_alive(fn() { ignore(box) })
   // 蹦床形参须与 C 函数指针原型逐位对应：C 以 (closure, args...) 调用，
-  // 首参数收到的就是 ModelBox（FuncRef+Callback 约定，多带一位少一位都会
-  // 形参错位——get_value 曾多带一位导致把 ModelBox 当函数指针调用而段错误）。
+  // 首参数收到的就是 ModelBox（FuncRef+Callback 约定）。
   ffi_table_bind_model(
     self.view,
     column_count,
