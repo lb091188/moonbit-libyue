@@ -19,13 +19,13 @@ fn page_menu() -> @yue.Node {
     ),
     section(
       "右键弹出菜单",
-      "在蓝色区按下鼠标右键（键位号显示在提示行，GTK 惯例右键为 3），Menu::popup_at 在指针位置弹出自建菜单。",
+      "在蓝色区按下鼠标右键（yue 统一键位语义：1=左 2=右 3=中），Menu::popup_at 在指针位置弹出自建菜单。",
       [
         @yue.container(
           handle=fn(c) {
             popup_area.val = Some(c)
             c.on_mouse_down(fn(e) {
-              if e.button == 3 {
+              if e.button == 2 {
                 let menu = @yue.Menu::new()
                 let item_a = menu.add_label_item("弹出菜单项甲")
                 item_a.on_click(fn() {
@@ -85,9 +85,9 @@ fn page_menu() -> @yue.Node {
 }
 
 ///|
-/// 记录按下键位号（区分左/中/右键，GTK 惯例 1/2/3）。
+/// 记录按下键位号（yue 统一语义 1=左 2=右 3=中）。
 fn mouse_btn(button : Int) -> Unit {
-  if button != 3 {
-    menu_info.set("按下键位 \{button}（右键为 3）")
+  if button != 2 {
+    menu_info.set("按下键位 \{button}（右键为 2）")
   }
 }
