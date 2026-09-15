@@ -17,6 +17,8 @@ libyue(libyue.com)的 MoonBit 封装,跨平台原生桌面 GUI。
 7. **开发中积累的封装/适配经验必须回写 `docs/adaptation.md`**——每次真实环境实测/踩坑后,按其维护约定把「环境(发行版/桌面环境/版本)+ 现象 + 根因 + 修复 + 验证方式」写进对应小节,与对应代码改动同批提交;只留在提交说明或会话记忆里视为未完成。
 8. **与用户交流必须全部使用中文**——所有回复、说明、总结、提问一律用中文书写,不夹杂英文段落(代码、命令、路径、专有名词除外)。
 9. **每完成一个批次的需求就提交到仓库**——一个批次=一组内聚的改动(一个功能/一次修复/一批文档),完成即 `git commit` 并推送 origin,不积压到工作区;提交信息沿用「【标签】范围:说明」中文格式(【新增】/【修复】/【文档】/【构建】)。
+10. **代码注释与使用文档只说内容**——注释、README、docs 使用类文档(components/declarative/layout/relink)只写「是什么/怎么用/怎么做」;原理、根因、实测过程一律写进专门文档(`docs/adaptation.md`、`docs/tray.md`),不在内容文档与注释里重复展开。
+11. **提交信息不得包含活动申报相关内容**(活动名称、申报字样等),格式仍按规则 9。
 
 ## 常用命令
 
@@ -29,6 +31,7 @@ moon check && moon test       # 纯 MoonBit 部分(线格式/编解码等)不装
 
 ## 文档地图
 
+- 使用文档索引(内容类):docs/README.md
 - **平台适配经验**(Windows/macOS 分版本,Linux 分发行版→桌面环境→版本,含全部实测坑与维护约定;经验回写是硬性规则,见规则 7):@docs/adaptation.md
 - FFI 规范与坑清单:`.agents/skills/moonbit-c-binding/`、`.agents/skills/make-moonbit-c-bindings/`(权威,以此为准)
 - MoonBit 语言与工具链:`.agents/skills/moonbit-agent-guide/`
