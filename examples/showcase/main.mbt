@@ -27,7 +27,7 @@ fn main {
     return
   }
   // 导航状态:自研 side_menu 组件(替代旧 Tab 页签),与页面联动。
-  let selected : @yue.Store[String] = @yue.Store::new("基础控件")
+  let selected : @yue.Store[String] = @yue.Store::new("事件与拖拽")
   let tabs = build_tabs()
   let names : Array[String] = []
   let page_nodes : Array[@yue.Node] = []

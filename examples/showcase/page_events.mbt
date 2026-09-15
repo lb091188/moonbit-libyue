@@ -147,8 +147,10 @@ fn page_events() -> @yue.Node {
                   @yue.DRAG_OPERATION_COPY
                 })
                 c.handle_drop(fn(info, _x, _y) {
-                  match info.get_data(@yue.FilePaths) {
-                    Some(@yue.Paths(paths)) => {
+                  let has_fp = info.get_data(@yue.FilePaths)
+                  let has_tx = info.get_data(@yue.Text)
+                  match (has_fp, has_tx) {
+                    (Some(@yue.Paths(paths)), _) => {
                       let sb = StringBuilder()
                       for i, p in paths {
                         if i > 0 {
@@ -158,12 +160,15 @@ fn page_events() -> @yue.Node {
                       }
                       drag_info.set("拖入文件：\{sb.to_string()}")
                     }
-                    _ =>
-                      match info.get_data(@yue.Text) {
-                        Some(@yue.Text(t)) =>
-                          drag_info.set("拖入文本：\{t}")
-                        _ => drag_info.set("拖入内容无法识别")
-                      }
+                    (_, Some(@yue.Text(t))) =>
+                      drag_info.set("拖入文本：\{t}")
+                    (_, _) => {
+                      let fp_avail = info.is_data_available(@yue.FilePaths)
+                      let tx_avail = info.is_data_available(@yue.Text)
+                      drag_info.set(
+                        "无法识别：FilePaths 可用=\{fp_avail}，Text 可用=\{tx_avail}",
+                      )
+                    }
                   }
                   true
                 })
