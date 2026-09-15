@@ -436,15 +436,17 @@ pub fn alert(text : String, t : SemanticType, height? : Double = 40.0) -> Node {
 pub fn pagination(current : Store[Int], pages : Int) -> Node {
   {
     mount: fn(parent) {
-      let row = Container::make(
-        style=[("height", 30.0)],
-        style_str=[("flexDirection", "row"), ("alignItems", "center")],
-      )
+      let row = Container::make(style=[("height", 30.0)], style_str=[
+        ("flexDirection", "row"),
+        ("alignItems", "center"),
+      ])
       fn add_btn(label : String, target : Int, is_page : Bool) -> Unit {
         let hover = Ref(false)
-        let b = Container::make(
-          style=[("width", 28.0), ("height", 28.0), ("marginRight", 4.0)],
-        )
+        let b = Container::make(style=[
+          ("width", 28.0),
+          ("height", 28.0),
+          ("marginRight", 4.0),
+        ])
         b.on_draw(fn(p) {
           let bd = b.get_bounds()
           let cur = current.get()
@@ -512,6 +514,7 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
     },
   }
 }
+
 ///|
 /// 卡片(对应 EP Card):白底 + 边框,标题栏(加粗、底部分隔线),
 /// 内容区从标题栏下方开始。children 经内层容器挂载,自动留出标题高度。
@@ -984,10 +987,9 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
       let mut i = 0
       for entry in items {
         let is_last = i == n - 1
-        let row = Container::make(
-          style=[("height", 56.0)],
-          style_str=[("flexDirection", "row")],
-        )
+        let row = Container::make(style=[("height", 56.0)], style_str=[
+          ("flexDirection", "row"),
+        ])
         let node_col = Container::make(style=[("width", 20.0), ("height", 56.0)])
         let color = type_color(entry.2)
         node_col.on_draw(fn(p) {
@@ -1194,9 +1196,7 @@ pub fn statistic(title : String, value : Store[String]) -> Node {
 pub fn progress_line(value : Store[Double], height? : Double = 8.0) -> Node {
   {
     mount: fn(parent) {
-      let v = Container::make(
-        style=[("flex", 1.0), ("height", height)],
-      )
+      let v = Container::make(style=[("flex", 1.0), ("height", height)])
       v.set_background_color(theme_info_light)
       v.on_draw(fn(p) {
         let b = v.get_bounds()
@@ -1314,6 +1314,166 @@ pub fn entry_t(
       e.on_text_change(fn() { on_input(e.get_text()) })
       attach(parent, e.view())
       e.view()
+    },
+  }
+}
+
+///|
+/// 主题化复选框:原生 Checkbox(勾选状态由系统渲染) + 主题字体/颜色,
+/// 可设禁用态。
+pub fn checkbox_t(
+  title : String,
+  checked? : Bool = false,
+  disabled? : Bool = false,
+  on_change? : (Bool) -> Unit = fn(_v) {  },
+) -> Node {
+  {
+    mount: fn(parent) {
+      let b = Button::make(title, button_type=Checkbox, checked~)
+      b.set_font(Font::new("Sans", 13.0))
+      b.set_color(theme_text_regular)
+      if disabled {
+        b.set_enabled(false)
+      }
+      b.on_click(fn() { on_change(b.is_checked()) })
+      attach(parent, b.view())
+      b.view()
+    },
+  }
+}
+
+///|
+/// 单选组:选中项实心方块 + 主题色文字,未选中空心方块,点击互斥。
+/// (GTK 端原生 Radio 不共享组无法互斥,故自绘指示器。)
+pub fn radio_group(
+  options : Array[String],
+  selected : Store[String],
+  disabled? : Bool = false,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let outer = Container::make(style=[("marginBottom", 10.0)], style_str=[
+        ("flexDirection", "column"),
+      ])
+      let font = Font::new("Sans", 13.0)
+      for opt in options {
+        let row = Container::make(style=[("height", 28.0)], style_str=[
+          ("flexDirection", "row"),
+          ("alignItems", "center"),
+        ])
+        let dot = Container::make(style=[
+          ("width", 14.0),
+          ("height", 14.0),
+          ("marginRight", 8.0),
+        ])
+        let hover = Ref(false)
+        dot.on_draw(fn(p) {
+          let act = selected.get() == opt
+          p.set_stroke_color(
+            if disabled {
+              theme_border
+            } else if act || hover.val {
+              theme_primary
+            } else {
+              theme_border
+            },
+          )
+          p.stroke_rect(0.5, 0.5, 13.0, 13.0)
+          if act {
+            p.set_fill_color(
+              if disabled {
+                theme_border
+              } else {
+                theme_primary
+              },
+            )
+            p.fill_rect(4.0, 4.0, 6.0, 6.0)
+          }
+        })
+        let label = Label::new(opt)
+        label.set_font(font)
+        label.set_color(
+          if disabled || selected.get() != opt {
+            theme_text_regular
+          } else {
+            theme_text_primary
+          },
+        )
+        fn repaint() -> Unit {
+          if disabled {
+            return
+          }
+          dot.schedule_paint()
+          label.set_color(
+            if selected.get() == opt {
+              theme_text_primary
+            } else if hover.val {
+              theme_primary
+            } else {
+              theme_text_regular
+            },
+          )
+        }
+
+        row.on_mouse_enter(fn(_e) {
+          hover.val = true
+          repaint()
+        })
+        row.on_mouse_leave(fn(_e) {
+          hover.val = false
+          repaint()
+        })
+        selected.subscribe(fn(_s) { repaint() })
+        row.on_mouse_down(fn(e) {
+          if e.button == 1 && !disabled {
+            selected.set(opt)
+            true
+          } else {
+            false
+          }
+        })
+        row.add_child(dot)
+        row.add_child(label)
+        outer.add_child(row)
+      }
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}
+
+///|
+/// 开关(EP Switch 的直角形态):轨道 + 滑块,开=主题蓝轨道滑块靠右,
+/// 关=浅灰轨道滑块靠左;点击切换,状态存于 Store[Bool]。
+pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
+  {
+    mount: fn(parent) {
+      let v = Container::make(style=[
+        ("width", 40.0),
+        ("height", 18.0),
+        ("marginBottom", 10.0),
+      ])
+      let slider_w = 14.0
+      v.on_draw(fn(p) {
+        let b = v.get_bounds()
+        let on = checked.get()
+        p.set_fill_color(if on { theme_primary } else { theme_border })
+        p.fill_rect(0.0, 0.0, b.width, b.height)
+        let sx = if on { b.width - slider_w - 2.0 } else { 2.0 }
+        p.set_fill_color(if disabled { theme_info_light } else { "#FFFFFF" })
+        p.fill_rect(sx, 2.0, slider_w, b.height - 4.0)
+      })
+      v.on_mouse_down(fn(e) {
+        if e.button == 1 && !disabled {
+          checked.set(!checked.get())
+          true
+        } else {
+          false
+        }
+      })
+      checked.subscribe(fn(_v) { v.schedule_paint() })
+      attach(parent, v.view())
+      v.view()
     },
   }
 }
