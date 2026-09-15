@@ -4021,33 +4021,23 @@ void yue_mbt_global_shortcut_unregister_all() {
 }
 
 /* MenuItem:状态与程序化点击 */
-void yue_mbt_menu_item_click(void *item) {
-  if (auto *i = CastTo<nu::MenuItem>(item)) {
-    i->Click();
-  }
-}
-
 void yue_mbt_menu_item_set_enabled(void *item, int32_t enabled) {
-  if (auto *i = CastTo<nu::MenuItem>(item)) {
+  auto *i = MenuItemStore::get(item);
+  if (i != nullptr) {
     i->SetEnabled(enabled != 0);
   }
 }
 
-int32_t yue_mbt_menu_item_is_enabled(void *item) {
-  if (auto *i = CastTo<nu::MenuItem>(item)) {
-    return i->IsEnabled() ? 1 : 0;
-  }
-  return 0;
-}
-
 void yue_mbt_menu_item_set_visible(void *item, int32_t visible) {
-  if (auto *i = CastTo<nu::MenuItem>(item)) {
+  auto *i = MenuItemStore::get(item);
+  if (i != nullptr) {
     i->SetVisible(visible != 0);
   }
 }
 
 int32_t yue_mbt_menu_item_is_visible(void *item) {
-  if (auto *i = CastTo<nu::MenuItem>(item)) {
+  auto *i = MenuItemStore::get(item);
+  if (i != nullptr) {
     return i->IsVisible() ? 1 : 0;
   }
   return 0;
@@ -4144,5 +4134,93 @@ MBT_NOTIF_SIG(on_notification_click, on_notification_click)
 MBT_NOTIF_SIG(on_notification_action, on_notification_action)
 
 #undef MBT_NOTIF_SIG
+
+
+/* 方法级审计补齐二:Browser JS 回调/绑定与通用拖拽 */
+
+void yue_mbt_browser_execute_javascript_callback(
+    void *browser, const char *code,
+    void (*invoke)(void *, int32_t, void *), void *closure) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->ExecuteJavaScript(
+        code,
+        [invoke, closure](bool ok, base::Value value) {
+          std::string json;
+          base::JSONWriter::Write(base::ValueView(&value), &json);
+          invoke(closure, ok ? 1 : 0, BytesFromString(json));
+        });
+  }
+}
+
+void yue_mbt_browser_add_raw_binding(void *browser, const char *name,
+                                     void (*invoke)(void *, void *),
+                                     void *closure) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->AddRawBinding(name, [invoke, closure](nu::Browser *, base::Value args) {
+      std::string json;
+      base::JSONWriter::Write(base::ValueView(&args), &json);
+      invoke(closure, BytesFromString(json));
+    });
+  }
+}
+
+void yue_mbt_browser_remove_binding(void *browser, const char *name) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->RemoveBinding(name);
+  }
+}
+
+int32_t yue_mbt_browser_has_bindings(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    return b->HasBindings() ? 1 : 0;
+  }
+  return 0;
+}
+
+int32_t yue_mbt_view_do_drag_data(void *view, const char *text,
+                                  const char *file_paths, int32_t operations,
+                                  int64_t drag_image) {
+  auto *v = CastToView(view);
+  if (v == nullptr) {
+    return 0;
+  }
+  std::vector<nu::Clipboard::Data> data;
+  if (text != nullptr && text[0] != '\0') {
+    data.emplace_back(nu::Clipboard::Data::Type::Text, std::string(text));
+  }
+  if (file_paths != nullptr && file_paths[0] != '\0') {
+    data.emplace_back(nu::Clipboard::Data::Type::FilePaths,
+                      std::string(file_paths));
+  }
+  if (data.empty()) {
+    return 0;
+  }
+  nu::DragOptions options;
+  if (drag_image != 0) {
+    if (auto *img = ImageStore::get(reinterpret_cast<void *>(drag_image))) {
+      options.image = scoped_refptr<nu::Image>(img);
+    }
+  }
+  return v->DoDragWithOptions(std::move(data), operations, options);
+}
+
+int32_t yue_mbt_view_cancel_drag(void *view) {
+  if (auto *v = CastToView(view)) {
+    v->CancelDrag();
+    return 1;
+  }
+  return 0;
+}
+
+int32_t yue_mbt_view_is_dragging(void *view) {
+  if (auto *v = CastToView(view)) {
+    return v->IsDragging() ? 1 : 0;
+  }
+  return 0;
+}
+
+void *yue_mbt_null_image() {
+  return nullptr;
+}
 
 #endif
