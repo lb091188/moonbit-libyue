@@ -1,228 +1,228 @@
-# 平台适配经验
+# Platform Adaptation Notes
 
-moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真实环境验证。
-主 AI 文档(仓库根 `AGENTS.md`,ZCode 读取)经 `@docs/adaptation.md` 引入本文件;以本文为平台适配坑的持续更新详版(README 只留指针,不再展开)。
+Hands-on experience and pitfalls from moonbit-libyue's adaptation on each platform, all verified in real environments.
+The main AI document (repo root `AGENTS.md`, read by ZCode) pulls in this file via `@docs/adaptation.md`; this document is the continuously updated, detailed version of platform adaptation pitfalls (the README keeps only a pointer and does not elaborate).
 
-**组织维度**:
+**Organization dimensions**:
 
-- Linux 按「发行版 → 桌面环境 → 版本」三层;
-- Windows / macOS 按「版本」。
+- Linux follows a three-level scheme: "distribution → desktop environment → version";
+- Windows / macOS follow "version".
 
-**状态标记**:
+**Status markers**:
 
-- ✅ 实测通过
--  ⚠️ 部分可用或带条件 
--  ❌ 不可用
--  ❓ 未实测(占位,待补)
+- ✅ Verified in real environment
+- ⚠️ Partially usable or conditional
+- ❌ Not usable
+- ❓ Not yet tested (placeholder, to be filled in)
 
 ---
 
-## 跨平台通用(构建链 / FFI,不分平台)
+## Cross-Platform (build chain / FFI, platform-independent)
 
-### 构建与链接
+### Build and Linking
 
-- `moon` 命令必须在**仓库根**执行的习惯保留:链接参数虽已改为绝对路径(见下条),但 vendor/build 产物与 WebView2Loader.dll 的运行期搜索仍按工作目录。
-- moon 的 `link` 段只作用于所在包、只对 main 包的二进制生效;库包(如 `yue/`)放 link 段会让 moon 生成无 main 的 `.exe` 导致构建失败。链接配置已全部收敛到 `scripts/prebuild.py`,任何包的 `moon.pkg` 都不再写 `cc-link-flags`。
-- **manifest 迁移到 `moon.mod` / `moon.pkg` 新格式(2026-09-15 实测入档)**:moon 新版弃用 `moon.mod.json` / `moon.pkg.json`,`moon fmt` 一键迁移(字段改 DSL 风格:`preferred_target`、`options(...)` 块;pkg 的 import/targets 同步迁移);`moondoc` / `moon doc` 只认新格式——mooncakes 0.1.0 的「Documentation failed to generate」即服务端 moondoc 找不到 `moon.mod` 所致,迁移后发新版本号即恢复。注意:旧版 moon(stable 20260904 等)不认新格式,消费方需较新工具链。
-- **双平台链接参数由 pre-build 钩子传播(当前方案,2026-09-12 实测入档)**:moon 的 `cc-link-flags` 是单一字符串、`targets` 条件编译无 OS 维度,链接参数无法按平台入库。现行机制:`moon.mod` 声明 `--moonbit-unstable-prebuild: scripts/prebuild.py`,moon 每次构建执行它,脚本按 `platform.system()` 输出 `link_configs` JSON,moon 把它**自动传播给所有依赖 yue 包的 main 包**——本仓 examples 与 mooncakes 使用方统一零配置,切换平台自动换参数。实测要点:
-  - 脚本 **stdout 只能是最终 JSON**:任何 print(含子进程透传)都会导致 moon 反序列化失败(`invalid number at line 1 column 2`),进度信息一律走 stderr。
-  - **不要用 `link_libs` 放 libyue_mbt**:moon 组装命令行时 `link_flags` 在 `link_libs` 之前,GNU ld 从左到右解析,`-lyue_mbt` 排在 `-lstdc++` 之后会 `undefined reference to __cxa_guard_acquire`。全部参数放 `link_flags` 单一字符串自控顺序(与旧响应文件同序)。
-  - 脚本 cwd 是 **moon 调用目录(使用方项目根)**,定位自身必须 `Path(__file__)`;传播的库路径必须是**绝对路径**(链接命令的 cwd 在使用方侧)。
-  - 原生产物缺失时脚本自动调 prepare.py 补建(产物存在时毫秒级返回),首次构建走 GitHub 下载。
-  - 该机制官方标注实验性(`--moonbit-unstable-prebuild`),API 可能随 moon 升级变动;Windows 下 `python3` 命令可用性待真机验证。
-  - 历史方案:先按系统回写 moon.pkg.json(两平台互相覆盖)→ `@build/link.flags` 响应文件(gcc/clang 与 cl 都支持 `@文件`,双平台同一份入库)。均已被传播机制替代。
-- `prepare.py` 幂等可重跑:缓存 zip sha256 不匹配(下载被截断)自动删除重下;下载先写 `.part` 临时文件、校验通过才原子落盘。网络走标准 `http_proxy/https_proxy` 环境变量。
-- **moon 不因静态库更新自动重链(跨平台,2026-09-15 Linux 实测)**:prebuild 只在静态库**缺失**时才调 prepare,且 moon 的重链判定只看 MoonBit 源与 link_configs 输出、不看静态库内容——shim/vendor 变更重跑 prepare 后,链接产物仍指向旧库。判别与处理见 [docs/relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/relink.md)。
-- **`postadd` 脚本仅在 registry `moon add` 安装时触发**,path/git 依赖与模块自身构建不触发;产物缺失的兜底由 prebuild.py 的检查承担。
-- libyue 版本钉死在 `scripts/prepare.py`(`LIBYUE_VERSION` + 三平台 sha256),升级需同步更新三个校验和。
+- Keep the habit of running `moon` commands from the **repo root**: although link arguments have been switched to absolute paths (see below), runtime lookup of vendor/build artifacts and WebView2Loader.dll still depends on the working directory.
+- moon's `link` section only applies to the package it resides in and only takes effect for main-package binaries; putting a link section in a library package (such as `yue/`) makes moon generate a main-less `.exe` and breaks the build. Link configuration has been fully consolidated into `scripts/prebuild.py`; no package's `moon.pkg` writes `cc-link-flags` anymore.
+- **Manifest migration to the new `moon.mod` / `moon.pkg` format (verified 2026-09-15)**: new moon versions deprecate `moon.mod.json` / `moon.pkg.json`; `moon fmt` migrates in one step (fields become DSL-style: `preferred_target`, `options(...)` blocks; pkg imports/targets migrate accordingly). `moondoc` / `moon doc` only recognizes the new format — mooncakes 0.1.0's "Documentation failed to generate" was caused by the server-side moondoc not finding `moon.mod`; publishing a new version number after migration restored it. Note: older moon (stable 20260904 etc.) does not recognize the new format, so consumers need a fairly recent toolchain.
+- **Link arguments for both platforms are propagated by the pre-build hook (current approach, verified 2026-09-12)**: moon's `cc-link-flags` is a single string and `targets` conditional compilation has no OS dimension, so link arguments cannot be stored per-platform. Current mechanism: `moon.mod` declares `--moonbit-unstable-prebuild: scripts/prebuild.py`; moon executes it on every build, the script outputs a `link_configs` JSON based on `platform.system()`, and moon **automatically propagates it to all main packages that depend on the yue package** — this repo's examples and mooncakes consumers need zero configuration, and switching platforms swaps arguments automatically. Field-tested key points:
+  - The script's **stdout may contain only the final JSON**: any print (including passthrough from subprocesses) makes moon's deserialization fail (`invalid number at line 1 column 2`); progress messages must go to stderr.
+  - **Do not put libyue_mbt in `link_libs`**: when moon assembles the command line, `link_flags` comes before `link_libs`; GNU ld resolves left to right, so `-lyue_mbt` placed after `-lstdc++` yields `undefined reference to __cxa_guard_acquire`. Put all arguments in `link_flags` as a single string to control the order yourself (same order as the old response file).
+  - The script's cwd is **moon's invocation directory (the consumer project root)**; to locate itself it must use `Path(__file__)`; the propagated library paths must be **absolute paths** (the cwd of the link command is on the consumer side).
+  - When build artifacts are missing, the script automatically invokes prepare.py to rebuild them (returns in milliseconds when artifacts exist); the first build downloads from GitHub.
+  - This mechanism is officially marked experimental (`--moonbit-unstable-prebuild`); the API may change with moon upgrades; availability of the `python3` command on Windows is pending real-machine verification.
+  - Historical approaches: first, writing back moon.pkg.json per OS (the two platforms overwrote each other) → then an `@build/link.flags` response file (both gcc/clang and cl support `@file`; one shared file for both platforms). Both have been superseded by the propagation mechanism.
+- `prepare.py` is idempotent and re-runnable: a cache zip with mismatched sha256 (truncated download) is deleted and re-downloaded automatically; downloads go to a `.part` temp file first and are atomically placed only after checksum verification. Networking honors the standard `http_proxy/https_proxy` environment variables.
+- **moon does not automatically relink when static libraries change (cross-platform, verified on Linux 2026-09-15)**: prebuild invokes prepare only when a static library is **missing**, and moon's relink decision only looks at MoonBit sources and the link_configs output, not at static library contents — after re-running prepare following shim/vendor changes, the linked artifact still points to the old library. For detection and handling see [docs/relink.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/relink.md).
+- **The `postadd` script is triggered only when installed via registry `moon add`**; path/git dependencies and building the module itself do not trigger it; the fallback for missing artifacts is handled by prebuild.py's checks.
+- The libyue version is pinned in `scripts/prepare.py` (`LIBYUE_VERSION` + sha256 for the three platforms); upgrading requires updating all three checksums in sync.
 
-### MoonBit cfg(platform=) 平台条件编译
+### MoonBit cfg(platform=) platform conditional compilation
 
-- **现状(2026-09-14 实测入档)**:moonc 已实现 `#cfg(platform="windows"/"linux"/"macos")` 条件编译(官方文档未写),求值依据是传给 moonc 的 `-target` **三元组**(`x86_64-unknown-linux-gnu` / `x86_64-pc-windows-msvc` / `aarch64-apple-darwin`);`not/any/all` 组合器可用。moonbitlang/openseek 生产在用(仅 `platform="windows"` 及其反)。
-- **但当前可安装的 moon(stable 0.1.20260904 与 nightly 0.1.20260911)构建时只给 moonc 传无 OS 信息的泛用 `native`**,所有 `platform=` 条件恒 false——Linux 上连 `platform="linux"` 都不命中;`MOONBIT_NEW_NATIVE=1` 与 `moon.mod` 新格式(直出目标文件后端已生效,产物为 .o)也不传三元组。moon main 分支已有按宿主选三元组的逻辑(`NativeTarget::from_host`:x86_64 Linux / Apple Silicon 默认启用、Windows 需 env=1),**待发布版本携带后条件才会点亮**。
-- 迁移信号:任意构建加 `-v`,moonc 命令行出现 `-target x86_64-unknown-linux-gnu` 即可用;届时 showcase 的运行时平台段可一行替换为 `#cfg`。
-- 当前替代:运行时 `platform()` 判断——声明式树按条件组装节点,不满足就不创建控件,效果等同编译期隐藏;showcase 的平台段(桌面环境、剪贴板主选区、自定义协议等)即此方案,见 `examples/showcase/section.mbt` 头注释。
-- 验证方式:临时工程双分支(`#cfg(platform="linux")` / `#cfg(not(platform="linux"))`)编译运行看走哪支;moonc 直调带 `-target x86_64-unknown-linux-gnu` 可证编译器侧已生效(实测三分支各归各位)。另:`moon.pkg.json` 的 `targets` 文件级条件仍只有后端(wasm/js/native)+ debug/release 维度,喂 OS 值直接 schema 加载失败;裸标识符条件(如 `#cfg(linux)`)恒真,无意义。
-- 顺带:nightly 0911 对全仓 `impl ViewLike for X` 报 19 处 `implicit_impl_as_method` 弃用警告(stable 0904 无),属工具链前向收紧,非库代码回归。
+- **Current state (verified 2026-09-15)**: moonc already implements `#cfg(platform="windows"/"linux"/"macos")` conditional compilation (not documented officially); evaluation is based on the `-target` **triple** passed to moonc (`x86_64-unknown-linux-gnu` / `x86_64-pc-windows-msvc` / `aarch64-apple-darwin`); the `not/any/all` combinators work. moonbitlang/openseek uses it in production (only `platform="windows"` and its negation).
+- **However, the currently installable moon builds (stable 0.1.20260904 and nightly 0.1.20260911) only pass the generic `native` without OS info to moonc**, so all `platform=` conditions are constantly false — on Linux even `platform="linux"` does not hit; `MOONBIT_NEW_NATIVE=1` and the new `moon.mod` format (the direct-object-file backend is in effect, producing .o) also do not pass the triple. The moon main branch already has logic to select the triple by host (`NativeTarget::from_host`: x86_64 Linux / Apple Silicon enabled by default, Windows requires env=1); **the conditions will light up only once a release carries it**.
+- Migration signal: add `-v` to any build; once `x86_64-unknown-linux-gnu` appears as `-target` in the moonc command line, it is usable; at that point showcase's runtime platform sections can be replaced with `#cfg` in one line.
+- Current substitute: runtime `platform()` checks — the declarative tree assembles nodes conditionally and simply does not create controls when a condition fails, which is equivalent to compile-time hiding; showcase's platform sections (desktop environment, clipboard primary selection, custom protocol, etc.) use this approach, see the header comment in `examples/showcase/section.mbt`.
+- Verification method: in a temporary project build and run both branches (`#cfg(platform="linux")` / `#cfg(not(platform="linux"))`) to see which one is taken; invoking moonc directly with `-target x86_64-unknown-linux-gnu` proves the compiler side already works (in testing, each of the three branches landed where expected). Also: file-level `targets` in `moon.pkg.json` still only has backend (wasm/js/native) + debug/release dimensions; feeding it an OS value fails schema loading outright; bare-identifier conditions (e.g. `#cfg(linux)`) are always true and meaningless.
+- Side note: nightly 0911 emits 19 `implicit_impl_as_method` deprecation warnings for the repo-wide `impl ViewLike for X` (stable 0904 does not) — forward tightening by the toolchain, not a library regression.
 
 ### MoonBit ↔ C ABI
 
-- **FuncRef+Callback 蹦床的形参个数必须与 C 函数指针原型逐位相等**(2026-09-11 实测入档)。约定:C 以 `callback(closure, args...)` 调用,MoonBit 蹦床为 `fn(f, args...)`,首参 `f` 收到的就是 closure。
-  - 案例:Table 的 `get_value`/`set_value` 蹦床比 C 原型各多带一位(4↔3、8↔6),形参错位后 ModelBox 被当函数指针调用 → 首次渲染直接段错误;而 `row_count`(1↔1)正确,所以行数正常、窗口能建——**部分接口"看起来能跑"会掩盖 arity 错位**,必须让每个回调都真实触发一次才算验证过。
-- `extern "c"` 不能返回可空类型(ABI 与 C 指针不兼容,直接段错误):成败经 `Ref[Int]` 出参报告,句柄按非空返回。
-- FFI 指针参数必须标 `#borrow`(编译器强制);同函数多参数写在同一个 `#borrow(a, b)` 里。
-- extern 声明的控件参数必须写底层句柄类型 `View`,不能写 MoonBit 包装 struct(如 `Slider`):struct 经 ABI 传入的是包装对象而非句柄值,运行时全部"句柄无效"且被静默丢弃(Slider/Table 系列曾因此整体失效,2026-09 修复 22 处)。
-- 闭包跨 C ABI:只允许无捕获的顶层函数字面量(编译为真实 C 函数指针);带捕获闭包走"函数指针 + 闭包指针"双参数模式(`on_click` 系)。
-- 回调闭包由注册表保活(`yue/view.mbt`),窗口销毁后条目暂不回收——**已定案维持进程级保活**(2026-09-12):回调与窗口无归属关系可循,精准回收需 weak-reference 注册表,当前 MoonBit 生态不成熟;单窗口工具场景泄漏量可忽略(2026-09-12 定案)。
-- **Toolbar / Vibrant 在 Linux 不可用**:libyue 头文件无平台 guard,但 Linux 静态库未编入任何相关符号(nm 实测零符号),调用会链接失败;Binding 侧已明确标注不暴露。
-- **Browser::GetCookiesForURL 空 Cookie 列表会 FATAL**:libyue 0.15.6 内部 `CHECK(cookies)` 对空列表直接崩溃(上游缺陷),查询前须确保页面已种 Cookie。
+- **The arity of the FuncRef+Callback trampoline must match the C function-pointer prototype argument for argument** (verified 2026-09-11). Convention: C calls `callback(closure, args...)`, and the MoonBit trampoline is `fn(f, args...)` where the first parameter `f` receives the closure.
+  - Case: Table's `get_value`/`set_value` trampolines each carried one extra argument versus the C prototype (4↔3, 8↔6); after argument misalignment the ModelBox was invoked as a function pointer → segfault on first render; whereas `row_count` (1↔1) was correct, so row counts were fine and the window could be created — **some interfaces "appearing to work" can mask arity misalignment**; a callback counts as verified only after it has actually fired once.
+- `extern "c"` cannot return nullable types (ABI incompatible with C pointers, immediate segfault): report success/failure via a `Ref[Int]` out-parameter and return handles as non-null.
+- FFI pointer parameters must be marked `#borrow` (compiler-enforced); multiple parameters of the same function go into a single `#borrow(a, b)`.
+- Control parameters in extern declarations must use the underlying handle type `View`, not a MoonBit wrapper struct (such as `Slider`): what crosses the ABI for a struct is the wrapper object, not the handle value, and at runtime everything reports "invalid handle" and is silently dropped (the Slider/Table families were wholly broken by this; 22 sites fixed in 2026-09).
+- Closures crossing the C ABI: only capture-free top-level function literals are allowed (compiled into real C function pointers); closures with captures use the "function pointer + closure pointer" two-parameter pattern (the `on_click` family).
+- Callback closures are kept alive by a registry (`yue/view.mbt`); entries are not reclaimed after window destruction — **the decision is to keep them alive for the process lifetime** (2026-09-12): there is no ownership relationship between callbacks and windows to follow, precise reclamation would need a weak-reference registry, and the current MoonBit ecosystem is not mature; the leak is negligible for single-window tool scenarios (decided 2026-09-12).
+- **Toolbar / Vibrant are unavailable on Linux**: the libyue headers have no platform guard, but the Linux static library does not compile in any related symbols (nm shows zero symbols in testing), so calling them fails at link time; the Binding side is explicitly marked as not exposed.
+- **Browser::GetCookiesForURL FATALs on an empty cookie list**: libyue 0.15.6's internal `CHECK(cookies)` crashes outright on an empty list (upstream defect); ensure the page has set cookies before querying.
 
 ---
 
 ## Linux
 
-### 发行版
+### Distributions
 
-#### Ubuntu 24.04 LTS (Noble) ✅ 主链路实测
+#### Ubuntu 24.04 LTS (Noble) ✅ mainline, verified in real environment
 
-- 实测环境:24.04.4,内核 7.0.0-31-generic,X11 会话;GTK 3.24.41 / webkit2gtk 2.52.6(4.1 API)/ dbus-daemon 1.14.10。
-- 系统依赖:`build-essential cmake pkg-config libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev libwebkit2gtk-4.1-dev`。
-- AppIndicator:24.04 已移除传统 `libappindicator3` 运行库,libyue 内置托盘不可用(内部 dlopen 失败只打日志、对象静默失效)→ 本项目用 `yue/traybus/` 纯 MoonBit SNI 直连面板替代。
-- libyue 的托盘探测列表只认 `libappindicator3`;本机装有 ayatana 分支不代表可用,shim 侧已加空指针防御。SNI 后端上线后此路径仅作回退。
-- webkit2gtk 包名 4.0/4.1 因发行版而异:`prepare.py` 用 pkg-config 探测,任一存在即可(4.1 需补 `-ljavascriptcoregtk-4.1`)。
+- Verified environment: 24.04.4, kernel 7.0.0-31-generic, X11 session; GTK 3.24.41 / webkit2gtk 2.52.6 (4.1 API) / dbus-daemon 1.14.10.
+- System dependencies: `build-essential cmake pkg-config libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev libwebkit2gtk-4.1-dev`.
+- AppIndicator: 24.04 has removed the traditional `libappindicator3` runtime library, so libyue's built-in tray is unusable (the internal dlopen failure only logs and the object silently becomes inert) → this project replaces it with `yue/traybus/`, a pure MoonBit SNI direct connection to the panel.
+- libyue's tray probing list only recognizes `libappindicator3`; having the ayatana fork installed does not mean it works, and the shim side has added null-pointer defenses. Since the SNI backend came online, this path is only a fallback.
+- The webkit2gtk package name differs 4.0/4.1 by distribution: `prepare.py` probes via pkg-config and accepts either (4.1 needs the extra `-ljavascriptcoregtk-4.1`).
 
-#### 其他发行版 ❓ 未实测
+#### Other distributions ❓ untested
 
-- Debian(包名与 Ubuntu 接近)、Fedora(`webkit2gtk4.1-devel` 命名不同)、Arch 等待实测;移植第一步是核对各依赖的 pkg-config 名称,再跑 `prepare.py`。
+- Debian (package names close to Ubuntu), Fedora (`webkit2gtk4.1-devel` naming differs), Arch, etc. await testing; the first porting step is checking each dependency's pkg-config name, then running `prepare.py`.
 
-### 桌面环境(托盘 / 菜单行为差异)
+### Desktop environments (tray / menu behavior differences)
 
-#### XFCE ✅ 实测通过
+#### XFCE ✅ verified
 
-- 实测版本:Xfce 4.18.4(xfce4-panel 4.18.4),托盘插件 `panel-8-systray`。
-- SNI watcher 在线:托盘图标、Activate 点击回调贯通;`Tray::on_click` 正常。
-- 右键菜单:面板**自己镜像 DBusMenu 渲染**,不走 SNI `ContextMenu` 让应用自绘(实测 dbus-monitor 只有 `AboutToShowGroup` + `GetLayout`/`GetGroupProperties`,无 `ContextMenu` 调用)。
-- **xfce4-panel 4.18(libdbusmenu 客户端)只发批量版 `EventGroup` / `AboutToShowGroup`,不发单条 `Event` / `AboutToShow`**(2026-09-11 实测入档):只实现单条版会被 UnknownMethod 静默拒掉,表现为菜单弹出正常但点击全部无效。dbus-monitor 抓真总线才能发现。
-- 桌面识别:`XDG_CURRENT_DESKTOP=XFCE`,`@traybus.desktop_name()` 可用于诊断。
-- **桌面通知走 `Notification::Show()`,不是 `NotificationCenter::AddNotification`**(2026-09-12 实测入档):libyue Linux 的 `AddNotification` 只把对象登记进内部列表,**从不发 DBus `Notify` 调用**;发通知必须调 `Show()`(内部 GDBus 异步 `org.freedesktop.Notifications.Notify`)。shim 曾在 Linux 分支只调 AddNotification,表现为通知静默失败无任何报错。判据:`dbus-monitor "type='method_call',interface='org.freedesktop.Notifications'"` 抓真总线,`member=Notify` 计数为 0 即调用未发出;修复后实测 xfce4-notifyd 正常弹气泡(含 actions 按钮)。
-- **全局快捷键是 X11 `XGrabKey` 排他注册,被占用即返回 -1**(2026-09-12 实测入档):XFCE 自定义快捷键(xfconf-query `/commands/custom/`,如本机 `<Primary><Alt>s` 绑了钉钉切换脚本)已抓取的组合键,再注册会 BadAccess,libyue 用 error trap 吞掉后 `Register` 返回 -1——不崩溃但静默失败,使用方必须检查 -1 并提示换键。验证键位占用:`xfconf-query -c xfce4-keyboard-shortcuts -l -v`。
-- **焦点在桌面时 xfwm4 抢占键盘,全局快捷键不触发**(2026-09-12 实测入档):`XGrabKey` passive grab 已挂、焦点在任意应用窗口时按键正常触发;但焦点落在桌面(xfdesktop)时 xfwm4 的键盘处理抢先,事件到不了应用。自动化验证用 `xdotool windowfocus <窗口>` 先把键盘焦点移入被测窗口再 `xdotool key ctrl+alt+<k>`,仅 `windowactivate` 不转移键盘焦点,会得到"没触发"的假阴性。
+- Verified version: Xfce 4.18.4 (xfce4-panel 4.18.4), tray plugin `panel-8-systray`.
+- SNI watcher online: tray icon and Activate click callback work end to end; `Tray::on_click` works.
+- Right-click menu: the panel **renders the DBusMenu mirror itself** instead of using SNI `ContextMenu` to let the app draw it (dbus-monitor captured only `AboutToShowGroup` + `GetLayout`/`GetGroupProperties`, no `ContextMenu` calls).
+- **xfce4-panel 4.18 (a libdbusmenu client) sends only the batch versions `EventGroup` / `AboutToShowGroup`, never the single-item `Event` / `AboutToShow`** (verified 2026-09-11): implementing only the single-item versions gets silently rejected with UnknownMethod — the menu pops up fine but every click does nothing. Only capturing the real bus with dbus-monitor reveals this.
+- Desktop detection: `XDG_CURRENT_DESKTOP=XFCE`; `@traybus.desktop_name()` can be used for diagnostics.
+- **Desktop notifications go through `Notification::Show()`, not `NotificationCenter::AddNotification`** (verified 2026-09-12): on Linux libyue's `AddNotification` only registers the object into an internal list and **never issues a DBus `Notify` call**; to send a notification you must call `Show()` (internally an async GDBus `org.freedesktop.Notifications.Notify`). The shim once called only AddNotification on the Linux branch, which manifested as notifications silently failing without any error. Diagnostic: capture the real bus with `dbus-monitor "type='method_call',interface='org.freedesktop.Notifications'"`; a `member=Notify` count of 0 means the call was never issued; after the fix, xfce4-notifyd was verified to pop the bubble normally (including action buttons).
+- **Global shortcuts are exclusive X11 `XGrabKey` registrations; if a combo is already taken, -1 is returned** (verified 2026-09-12): combos already grabbed by XFCE custom shortcuts (xfconf-query `/commands/custom/`, e.g. `<Primary><Alt>s` bound to a DingTalk-toggle script on this machine) cause BadAccess on re-registration; libyue swallows it with an error trap and `Register` returns -1 — no crash but a silent failure, so consumers must check for -1 and prompt for another key. To check key occupancy: `xfconf-query -c xfce4-keyboard-shortcuts -l -v`.
+- **When focus is on the desktop, xfwm4 preempts the keyboard and global shortcuts do not fire** (verified 2026-09-12): the `XGrabKey` passive grab is installed and keys fire normally while any application window has focus; but when focus lands on the desktop (xfdesktop), xfwm4's keyboard handling wins and the event never reaches the app. For automated verification, first move keyboard focus into the window under test with `xdotool windowfocus <window>`, then `xdotool key ctrl+alt+<k>`; `windowactivate` alone does not transfer keyboard focus and yields a false negative "did not fire".
 
-#### GNOME ✅ 实测通过(Ubuntu 24.04 原版,Wayland 与 X11 双会话,2026-09-15)
+#### GNOME ✅ verified (stock Ubuntu 24.04, both Wayland and X11 sessions, 2026-09-15)
 
-- 实测环境:ubuntu-24.04 虚拟机,GNOME Shell 46,`ubuntu-appindicators@ubuntu.com` 扩展默认启用(`gsettings enabled-extensions` 显示 `@as []` 是"默认值"表象,实际生效),`org.kde.StatusNotifierWatcher` 由 gnome-shell 持有。24.04.4 全新安装(原版桌面,默认 Wayland 会话;改 `/etc/gdm3/custom.conf` `WaylandEnable=false` 可切 Xorg 复测,两-session 均通过)。
-- 托盘图标:顶栏正常渲染(IconPixmap 32+16 双档);SNI watcher 在线。
-- **【修复】Menu 属性空菜单返回 `/` 导致 GNOME 点击图标全程无反应**(2026-09-15 实测入档):现象是图标显示正常但点击无菜单也无 Activate、dbus 零调用。根因:GNOME AppIndicator 扩展在**注册瞬间**就读 `Menu` 属性构造 DBusMenu 代理,而消费方 `Tray::new` 与 `set_menu` 之间有时间差,当时 `menu_items` 为空、属性返回根路径 `/` → 扩展代理指向无效对象(`journalctl` 可见 `UnknownObject: /`),菜单客户端永久坏死。XFCE/KDE/deepin 都是点击时才拉菜单所以不触发。修复:traybus 的 `Menu` 属性恒返回真实 `/MenuBar`(空菜单也导出,Qt 同款语义),后续靠 `LayoutUpdated` 通知填充。验证:dbus-monitor 见 Event/AboutToShow 流动、真机点击菜单三项回调闭环。
-- 点击行为(GNOME 特有,`ItemIsMenu=false` 语义):左键/右键均发 Activate;实测菜单可弹出、项可点选,但弹出路径与 XFCE/KDE 不同(用户实测:菜单可开可点,退出闭环正常)。
-- **全局快捷键在 Wayland 会话注册即段错误**(2026-09-15 实测入档):上游 `global_shortcut_gtk.cc` 直接用 `GDK_WINDOW_XDISPLAY(root)`(X11 专属宏),Wayland 下根窗口 impl 是 Wayland 类型,强转读出垃圾 `Display*` 传给 `XKeysymToKeycode` → SIGSEGV。修复:prepare.py `patch_linux_global_shortcut_wayland` 给 `Start/StopWatching` 与 `PlatformRegister` 加 `GDK_IS_X11_DISPLAY` 守卫,非 X11 会话 `Register` 返回 -1(既有失败语义)。X11 会话下 XGrabKey 行为不变。
-- **鼠标键位是 yue 统一语义 1=左 2=右 3=中,不是 GDK 原始值**(2026-09-15 实测入档):libyue `ButtonFromGdkEvent` 把 GDK 的 2(中)/3(右)交换,全平台语义一致;showcase 菜单页曾按 GTK 惯例判 `==3` 为右键,导致"中键弹菜单、右键显示 2"(XFCE 同样存在,非 GNOME 特有)。
-- 环境噪音(非本项目问题):spice-vdagent 在 Wayland 会话反复 SIGSEGV 弹 Apport 对话框(`/etc/default/apport` `enabled=0` 屏蔽);Wayland 空闲锁屏/息屏干扰自动化(`gsettings org.gnome.desktop.session idle-delay 0` + `lock-enabled false`)。
-- SSH 远程起 GUI 进程的环境变量:X11 会话 `XAUTHORITY=/run/user/1000/gdm/Xauthority`;Wayland 会话 `XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.*`、`WAYLAND_DISPLAY=wayland-0`;两者都需要 `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus`。SSH 环境缺 `XDG_CURRENT_DESKTOP` 会使 `desktop_name()` 返回 unknown(仅诊断信息,不影响功能)。
+- Verified environment: ubuntu-24.04 virtual machine, GNOME Shell 46, the `ubuntu-appindicators@ubuntu.com` extension enabled by default (`gsettings enabled-extensions` showing `@as []` is the "default value" appearance while it is actually in effect), `org.kde.StatusNotifierWatcher` held by gnome-shell. Fresh install of 24.04.4 (stock desktop, default Wayland session; switching to Xorg for re-testing by setting `WaylandEnable=false` in `/etc/gdm3/custom.conf`; both sessions passed).
+- Tray icon: renders normally in the top bar (IconPixmap dual sizes 32+16); SNI watcher online.
+- **【修复】("Fix" commit tag) Menu property returning `/` for an empty menu made GNOME completely unresponsive to icon clicks** (verified 2026-09-15): the symptom was an icon displaying fine but clicking produced no menu and no Activate, with zero DBus calls. Root cause: the GNOME AppIndicator extension reads the `Menu` property **at the instant of registration** to construct the DBusMenu proxy, while there is a time gap between the consumer's `Tray::new` and `set_menu` — at that moment `menu_items` is empty and the property returns the root path `/` → the extension's proxy points at an invalid object (`journalctl` shows `UnknownObject: /`) and the menu client is permanently dead. XFCE/KDE/deepin all pull the menu only on click, so they are unaffected. Fix: traybus's `Menu` property always returns a real `/MenuBar` (exported even when empty, same semantics as Qt), filled in later via `LayoutUpdated` notifications. Verification: dbus-monitor showed Event/AboutToShow flowing, and real-machine clicks completed the three-item menu callback loop.
+- Click behavior (GNOME-specific, `ItemIsMenu=false` semantics): both left and right clicks send Activate; in testing the menu could pop up and items could be selected, but the popup path differs from XFCE/KDE (user-verified: menu opens and is clickable, quit loop works).
+- **Registering a global shortcut in a Wayland session segfaults immediately** (verified 2026-09-15): upstream `global_shortcut_gtk.cc` directly uses `GDK_WINDOW_XDISPLAY(root)` (an X11-only macro); under Wayland the root window impl is a Wayland type, the forced cast reads a garbage `Display*` passed to `XKeysymToKeycode` → SIGSEGV. Fix: prepare.py's `patch_linux_global_shortcut_wayland` adds a `GDK_IS_X11_DISPLAY` guard to `Start/StopWatching` and `PlatformRegister`; in non-X11 sessions `Register` returns -1 (the existing failure semantics). XGrabKey behavior in X11 sessions is unchanged.
+- **Mouse button semantics are yue's unified 1=left 2=right 3=middle, not the raw GDK values** (verified 2026-09-15): libyue's `ButtonFromGdkEvent` swaps GDK's 2 (middle) / 3 (right), making semantics consistent across platforms; showcase's menu page once followed the GTK convention of treating `==3` as right-click, resulting in "middle-click pops the menu, right-click shows 2" (present on XFCE too, not GNOME-specific).
+- Environmental noise (not this project's problem): spice-vdagent repeatedly SIGSEGVs in Wayland sessions popping Apport dialogs (suppressed via `/etc/default/apport` `enabled=0`); Wayland idle lock-screen/screen-off interferes with automation (`gsettings org.gnome.desktop.session idle-delay 0` + `lock-enabled false`).
+- Environment variables for launching GUI processes over SSH: X11 session `XAUTHORITY=/run/user/1000/gdm/Xauthority`; Wayland session `XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.*`, `WAYLAND_DISPLAY=wayland-0`; both also need `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus`. An SSH environment missing `XDG_CURRENT_DESKTOP` makes `desktop_name()` return unknown (diagnostic only, does not affect functionality).
 
-#### KDE ✅ 实测通过(Kubuntu 24.04,Plasma 5.27,2026-09-15)
+#### KDE ✅ verified (Kubuntu 24.04, Plasma 5.27, 2026-09-15)
 
-- 实测环境:Kubuntu 24.04.5 虚拟机(X11 会话),面板托盘直收 SNI,新图标直接进可见托盘区(无折叠)。
-- 全链路通过:图标显示 → 左键发 `Activate(x,y)`(回调贯通)→ 右键 Plasma 镜像渲染 DBusMenu(显示窗口/换图标/退出)→ 点「退出」回调触发 → `quit()` 干净退出(exit 0),图标即时消失。
-- **协议行为与 XFCE 4.18 相反:KDE 发单条 `Event` / `AboutToShow`,不发批量版**(dbus-monitor 实证);traybus 两种都实现,无需分支。
-- 环境准备:openssh-server 默认未装(GUI 终端 `sudo apt-get install openssh-server`);libwebkit2gtk-4.1-0 需补装运行库。
+- Verified environment: Kubuntu 24.04.5 virtual machine (X11 session); the panel tray accepts SNI directly, and new icons go straight into the visible tray area (no collapsing).
+- Full chain passed: icon display → left click sends `Activate(x,y)` (callback works) → right click has Plasma render the DBusMenu mirror (show window / change icon / quit) → clicking "Quit" fires the callback → `quit()` exits cleanly (exit 0), icon disappears immediately.
+- **Protocol behavior is the opposite of XFCE 4.18: KDE sends the single-item `Event` / `AboutToShow`, not the batch versions** (confirmed by dbus-monitor); traybus implements both, so no branching is needed.
+- Environment setup: openssh-server is not installed by default (`sudo apt-get install openssh-server` in a GUI terminal); libwebkit2gtk-4.1-0 runtime libraries need to be installed.
 
-#### Deepin ✅ 实测通过(Deepin 23 社区版 + Deepin 25,DDE,2026-09-15)
+#### Deepin ✅ verified (Deepin 23 Community + Deepin 25, DDE, 2026-09-15)
 
-- 实测环境:deepin 23 社区版虚拟机,glibc 2.38(Debian GLIBC 2.38-6deepin13),gcc 12.3,内核 6.6.84-amd64-desktop-hwe,X11 会话,`XDG_CURRENT_DESKTOP=DDE`。
-- **dde-dock 实现 `org.kde.StatusNotifierWatcher`**,SNI 直连可用;新图标默认收进 dock 右侧「应用托盘」折叠区(点 `^` 展开),用户可拖出到常驻区。
-- 全链路通过:折叠区图标显示 → 左键 `Activate` 回调贯通 → 右键 dde-dock 渲染 DBusMenu(三项齐全)→ 菜单点击回调 → 干净退出(exit 0),图标消失。协议为单条 `Event`。
-- **宿主机二进制直接可跑**:Ubuntu 24.04(glibc 2.39)构建的探针在 deepin 23(glibc 2.38)运行正常——二进制 GLIBC 符号上限恰好 2.38,且 deepin 23 带 webkit2gtk-4.1 运行库(ldd 全解析);跨发行版分发不必逐环境重编,先查 glibc 符号需求(`objdump -T | grep GLIBC_`)。
-- deepin 23 仓库**没有 openssh-server 包**(被引用但无可安装候选),远程管理走 virtiofs 共享 + GUI 终端执行脚本(安装器建的用户 noahliu 可 sudo)。
-- 深度终端的 `script` 是 util-linux 标准版,注意命令须经 `-c` 传入(`script -q -f -c "cmd" log`),裸 `script -qf cmd log` 会报参数数错误。
+- Verified environment: deepin 23 Community virtual machine, glibc 2.38 (Debian GLIBC 2.38-6deepin13), gcc 12.3, kernel 6.6.84-amd64-desktop-hwe, X11 session, `XDG_CURRENT_DESKTOP=DDE`.
+- **dde-dock implements `org.kde.StatusNotifierWatcher`**, so direct SNI connection works; new icons are collected by default into the collapsed "application tray" area on the right of the dock (click `^` to expand), and users can drag them out to the persistent area.
+- Full chain passed: collapsed-area icon display → left click `Activate` callback works → right click has dde-dock render the DBusMenu (all three items present) → menu click callback → clean exit (exit 0), icon disappears. Protocol is the single-item `Event`.
+- **Host-machine binaries run directly**: a probe built on Ubuntu 24.04 (glibc 2.39) runs fine on deepin 23 (glibc 2.38) — the binary's GLIBC symbol ceiling is exactly 2.38, and deepin 23 ships the webkit2gtk-4.1 runtime (ldd resolves everything); cross-distribution distribution does not require per-environment rebuilds — first check the glibc symbol requirements (`objdump -T | grep GLIBC_`).
+- The deepin 23 repository **has no openssh-server package** (referenced but no installable candidate); remote management goes through a virtiofs share plus scripts run in a GUI terminal (the user noahliu created by the installer can sudo).
+- The deepin terminal's `script` is the standard util-linux version; note that commands must be passed via `-c` (`script -q -f -c "cmd" log`); bare `script -qf cmd log` reports a wrong argument count.
 
-- **Deepin 25(25.2)实测全链路通过**(Wayland 会话由用户确认;环境 glibc 2.38 / gcc 12.3 / 内核 6.6.143,`XDG_CURRENT_DESKTOP=Deepin`,宿主机二进制直跑):托盘探针折叠区图标/Activate/右键菜单/退出闭环。
-- **DDE(23/25)下 Popover 气泡不可见且点击卡顿**(2026-09-15 实测入档):现象是点击「弹出气泡」无窗口出现、全局鼠标变钝。根因:libyue 的 Popover 是透明无边框窗 + `SetCapture` 指针抓取,DDE 合成器不渲染该透明窗、抓取又拖慢指针。修复:shim 检测 `XDG_CURRENT_DESKTOP`(23 为 `DDE`、25 为 `Deepin`,两种都要认),DDE 下回退无边框普通窗口(锚定控件 `GetBoundsInScreen` 正下方居中,不做指针抓取,点窗内关闭)。其余桌面仍走原生气泡。
-- **deepin 25 移除了 openssh-server**(仓库无可安装候选):远程管理走 virtiofs 共享 + GUI 终端执行;deepin 23 同样没有该包。
-- **`TextEdit::Delete()` 是删选区不是清空**(2026-09-15 实测):无选中时为空操作,「清空」语义要用 `set_text("")`(showcase 已改)。
-- **showcase 在 DDE 的崩溃噪音**:DDE 剪贴板管理器交互时 libyue `Clipboard::Data` 构造报 `String data must be string type` CHECK(容错降级为 Text,不崩);`g_value_set_boxed` CRITICAL 为 GTK 与 DDE 主题交互噪音,不影响功能。
+- **Deepin 25 (25.2) full chain verified** (Wayland session confirmed by the user; environment glibc 2.38 / gcc 12.3 / kernel 6.6.143, `XDG_CURRENT_DESKTOP=Deepin`, host binary run directly): tray probe collapsed-area icon / Activate / right-click menu / quit all closed the loop.
+- **Popover bubbles are invisible and clicks stutter under DDE (23/25)** (verified 2026-09-15): the symptom is that clicking "pop bubble" shows no window and the global mouse turns sluggish. Root cause: libyue's Popover is a transparent frameless window plus `SetCapture` pointer grabbing; the DDE compositor does not render the transparent window and the grab drags down the pointer. Fix: the shim detects `XDG_CURRENT_DESKTOP` (23 is `DDE`, 25 is `Deepin` — both must be recognized) and under DDE falls back to a frameless normal window (centered directly below the anchor control's `GetBoundsInScreen`, no pointer grabbing, click inside the window to close). Other desktops keep the native bubble.
+- **deepin 25 removed openssh-server** (no installable candidate in the repository): remote management goes through a virtiofs share plus a GUI terminal; deepin 23 likewise lacks the package.
+- **`TextEdit::Delete()` deletes the selection, it does not clear** (verified 2026-09-15): with no selection it is a no-op; "clear" semantics require `set_text("")` (showcase updated).
+- **showcase crash noise on DDE**: when interacting with the DDE clipboard manager, libyue's `Clipboard::Data` constructor hits the `String data must be string type` CHECK (degrades gracefully to Text, no crash); the `g_value_set_boxed` CRITICALs are GTK-versus-DDE-theme noise and do not affect functionality.
 
-#### KDE / MATE / Cinnamon / Budgie / LXQt ❓ 未实测
+#### KDE / MATE / Cinnamon / Budgie / LXQt ❓ untested
 
-- 协议层均支持 SNI(StatusNotifierItem),traybus 已按协议实现,预期可用;待逐一真实环境实测后在本节补充版本号与差异。
+- All support SNI (StatusNotifierItem) at the protocol level, and traybus is implemented per the protocol, so they are expected to work; version numbers and differences will be added here after real-environment testing one by one.
 
-### DBus 线路协议坑(traybus 实测,桌面环境无关)
+### DBus wire-protocol pitfalls (traybus field tests, desktop-environment-independent)
 
-- DBus 数组长度前缀**不含首元素前的对齐填充**:算进去会被 dbus-daemon 判协议违规直接断连。
-- DBus 头部 SIGNATURE 字段的 variant 签名是 "g"(u8 长度编码),按 "s" 编能过自洽单测但会被真实总线拒绝。
-- **SNI `Menu` 属性必须恒返回真实菜单对象路径,空菜单也不能回 `/`**:GNOME AppIndicator 扩展注册瞬间即读该属性建代理,返回 `/` 会令菜单客户端永久坏死(详见「GNOME」节);Qt/ksni 同款语义是始终导出 `/MenuBar`。
-- 教训:**单测证自洽,互操作必须上真总线验证**;discovery 类问题用 `dbus-monitor` 抓包定位,扩展/面板侧的 JS 异常看 `journalctl --user -u org.gnome.Shell@wayland.service`(gnome-shell 的 Gio.DBusError 行就是面板侧代理构建失败的第一现场)。
+- The DBus array length prefix **does not include the alignment padding before the first element**: counting it in is judged a protocol violation by dbus-daemon, which drops the connection.
+- The variant signature of the DBus header SIGNATURE field is "g" (u8 length encoding); encoding it as "s" passes self-consistent unit tests but is rejected by the real bus.
+- **The SNI `Menu` property must always return a real menu object path; even an empty menu must not return `/`**: the GNOME AppIndicator extension reads this property at the instant of registration to build its proxy, and returning `/` permanently kills the menu client (see the "GNOME" section); the Qt/ksni semantics are to always export `/MenuBar`.
+- Lesson: **unit tests prove self-consistency; interop must be verified on the real bus**; diagnose discovery-type issues by capturing packets with `dbus-monitor`, and for JS exceptions on the extension/panel side check `journalctl --user -u org.gnome.Shell@wayland.service` (gnome-shell's Gio.DBusError lines are the first crime scene of proxy-construction failure on the panel side).
 
-### 显示协议
+### Display protocols
 
-- X11 ✅(当前唯一主链路)。
-- Wayland ❌ 未支持(TODO 已列);libyue 的 GTK 后端以 X11 为准,迁移前不要在 Wayland 会话里验证 GUI 行为。
+- X11 ✅ (currently the only mainline).
+- Wayland ❌ unsupported (listed in TODO); libyue's GTK backend targets X11 — do not verify GUI behavior in a Wayland session before the migration.
 
-### GTK 相关
+### GTK-related
 
-- Table(GTK)放进 Notebook 页签内会在尺寸测量时段错误(negative allocation),必须放普通容器或独立窗口(showcase 采用独立子窗口方案;2026-09-11 在 showcase 复现:崩前先出现 `Negative content width -1 (… owner GtkFrame)` 与 `GtkScrollbar` 的 `size >= 0` 断言)。
-- **复合控件(Tab/Scroll/Group)在 yoga 树里是"无 measure 函数的叶节点",外框尺寸必须显式给出(flex/宽高),否则塌缩**。实测(2026-09-14,Ubuntu 24.04 + XFCE,showcase 声明式重写后):把 `Tab` 从直接作窗口内容(`SetContentView`,不进任何 yoga 树)改为挂进根 `Container` 后,整窗口签内容空白、页签以下不可交互,日志 `gtk_box_gadget_distribute: assertion 'size >= 0' failed in GtkNotebook` + `Negative content width -1 … owner GtkFrame`。根因三层:`Tab::Tab()` 构造时经 `UpdateDefaultStyle()` 把当时的 `GetMinimumSize()`(空 notebook ≈ 页签头高度)固化进 yoga minWidth/minHeight;`AddPage` 只设 View 层 parent、**不刷新该值**(libyue 上游局限);无 flex 时叶节点高度就停在固化值,notebook 页区域 = 分配高 − 页签头 ≤ 0。修复:给 `tab()` 节点 `("flex", 1.0)`(yoga 只管外框;页签页不进 Tab 的 yoga 树——`AddPage` 不做 yoga 插入,每页容器各自是独立 yoga 子树的根,由 GTK 分配页区域)。注意 `scroll_page` 曾误判为页内问题(490826b 对照实验),塌缩在 notebook 外框,与页内布局无关。
-- **内容型控件的内容不走 `AddChild`**:`Group`/`Scroll` 直接继承 `View`(非 `Container`),挂内容必须用各自的 `SetContentView`;走 `Container::AddChild` 会被 shim 的 `CastTo<Container>` 类型校验拒绝(日志「类型不匹配，期望 Container，实际 Group/Scroll」),内容静默丢失。声明式层(`yue/declarative.mbt`)的 `group()`/`scroll()` 节点因此先把内容 mount 进一个临时 `Container`,再整块 `set_content`。切页瞬间的 `GtkNotebook` 断言在修复后仍少量残留(启动/切页瞬时布局噪音,CRITICAL 不致命),界面功能已全部恢复。
-- **GTK 后端 NUContainer 的接缝缺陷(2026-09-14/15 实测,补丁见 `prepare.py patch_linux_container_events`)**。声明式重写把 Tab 包进根 `Container`、每页多包 `holder` 容器后暴露(旧版 Tab 直接做窗口内容视图,不经过这些路径):①`nu_container_map` 里事件窗口用 `gdk_window_show`(=map+**raise**),把覆盖容器全域的 INPUT_ONLY 窗口抬到子原生控件之上——X/GDK 命中被截走,**页签头点不动、滚轮失效,而按钮/键盘正常**(键盘走焦点,按钮/可编辑控件的窗口 map 更晚抬得更高);改 `gdk_window_show_unraised` 仅映射不抬高。②`nu_container_get_preferred_width/height` 硬编码返回 0,GtkViewport 以 child 的 size_request(上游被写为 0×0)计算滚动范围 → 滚动范围恒 0、滚动条不出现。**注意不要改成向 GTK 报告 yoga 动态自然尺寸**——allocate 会污染 yoga 状态,导致 requisition 协商震荡(实测 365→466→598→907 不收敛,布局停在中间帧,页面"有时不占满宽度");正确做法见③。③`Scroll::PlatformSetContentView` 对未挂载视图取 `GetPixelBounds()`=0×0 强制写入 size_request;改为:无显式 `SetContentSize` 时宽度保持 -1(随视口拉伸)、高度固化为内容 yoga 自然高度(经 `IsContainer()` 判别后向 `Container::GetPreferredSize` 查询)——滚动范围一次收敛且正确。`CreateEventWindow` 的 `attributes.y` 误写 `allocation.x` 笔误一并修正。
-- **`Container::UpdateChildBounds` 开头的 `IsVisibleInHierarchy` 守卫让独立 yoga 根错过首次真实分配(2026-09-15 实测,同补丁函数)**。GTK 首次 size-allocate 发生在 map **之前**,此时整体可见性为 false → 守卫直接 return;map 后无人再以真实 allocation 重跑 yoga 布局,独立 yoga 根(每页 holder、Scroll 内容容器)永久停留在挂载时的自然尺寸布局——页内容"有时"不占满容器宽(是否必现取决于有无后续 resize 重分配)。修复:去掉整体守卫,布局计算无条件执行(`GetBounds()` 读的就是 size_allocate vfunc 已更新的 GTK allocation,提前布局安全;GTK 也允许对未映射 widget 预分配),孩子 bounds 传播仍受各自可见性限制;`nu_container_size_allocate` 里分配变化时补 `gtk_widget_queue_draw`。
-- **`Slider::SetValue` 的 ignore 标记残留使滑块联动失效(2026-09-15 实测,同补丁函数)**:Linux 端拖动滑块,进度条与绑定标签不动。`Slider::SetValue` 无条件设 `ignore-value-change` 标记防回调循环,而 GTK 对"设置相同值"(yue 层 `Slider::make` 默认 `set_value(0)`,初值即 0)不发 `value-changed` → 标记残留,用户第一次拖动的首个回调被吞;xdotool 单点跳值场景恰只发一次信号,表现为完全失效。修复:仅当 `GetValue() != value` 才设标记。
-- **`ProgressBar::SetValue` 的值域平台差异(2026-09-15 实测,修复在 shim)**:libyue Linux 端 `SetValue` 语义为 0..100(内部再 /100),yue 层统一 0..1 → 进度条只走到 1%(`v/100` 再被 /100)。已在 shim `yue_mbt_progress_bar_set_value` 按 `OS_LINUX` 条件编译换算 ×100;其余平台上游直接收 0..1。
-- **`View::GetBoundsInScreen` 在 Scroll/嵌套容器下坐标叠错(全 Linux 桌面,2026-09-15 实测,补丁 `patch_linux_view_bounds_in_screen`)**:上游实现手动累加各级 allocation,视口文档坐标混入——showcase 页面滚到中下部时锚点 y 实测 1221(屏幕仅 1080 高),气泡被定位到屏幕外,表现为「窗口最大化才显示气泡、非最大化不出现」。修复:改用 `gtk_widget_translate_coordinates` + `gtk_window_get_position`(GTK 原生感知 viewport 滚动与嵌套),原逻辑保留为回退。所有屏幕坐标消费方(`popup_at`、气泡锚定)随之修正;新增 `ViewLike::get_bounds_in_screen` API(shim 4 个 ABI)。
-- **表格 Checkbox 列指示器随行高缩放(XFCE 实测,2026-09-15,补丁 `patch_linux_table_checkbox_size`)**:GTK `CellRendererToggle` 的指示器随 renderer 高度放大,行高 60 时 checkbox 填满整格;补丁把 checkbox renderer 高度限到 20,行高仍由文本列决定(fixed height mode 取各列最大值)。`examples/table` 截图像素级验证。
+- Putting a Table (GTK) inside a Notebook tab segfaults during size negotiation (negative allocation); it must go into a plain container or a standalone window (showcase uses standalone subwindows; reproduced in showcase on 2026-09-11: before the crash, `Negative content width -1 (… owner GtkFrame)` and the `GtkScrollbar` `size >= 0` assertion appear first).
+- **Composite controls (Tab/Scroll/Group) are "leaf nodes without a measure function" in the yoga tree; their outer dimensions must be given explicitly (flex/width/height), otherwise they collapse**. Field test (2026-09-14, Ubuntu 24.04 + XFCE, after the declarative showcase rewrite): changing `Tab` from being the window content directly (`SetContentView`, entering no yoga tree) to being attached under the root `Container` left the whole tab area blank below the tab strip and uninteractive, with logs `gtk_box_gadget_distribute: assertion 'size >= 0' failed in GtkNotebook` + `Negative content width -1 … owner GtkFrame`. Root cause in three layers: `Tab::Tab()`'s constructor bakes the then-current `GetMinimumSize()` (empty notebook ≈ tab-header height) into yoga minWidth/minHeight via `UpdateDefaultStyle()`; `AddPage` only sets the View-level parent and **never refreshes that value** (an upstream libyue limitation); with no flex, a leaf node's height stays at the baked value, so the notebook page area = allocated height − tab header ≤ 0. Fix: give the `tab()` node `("flex", 1.0)` (yoga only governs the outer frame; tab pages do not enter Tab's yoga tree — `AddPage` performs no yoga insertion; each page container is the root of its own independent yoga subtree, with GTK allocating the page area). Note that `scroll_page` was initially misdiagnosed as a within-page issue (490826b controlled experiment); the collapse was in the notebook's outer frame and unrelated to within-page layout.
+- **The content of content-type controls does not go through `AddChild`**: `Group`/`Scroll` inherit directly from `View` (not `Container`); content must be attached via their own `SetContentView`; going through `Container::AddChild` is rejected by the shim's `CastTo<Container>` type check (log: "type mismatch, expected Container, got Group/Scroll") and the content is silently lost. That is why the declarative layer's (`yue/declarative.mbt`) `group()`/`scroll()` nodes first mount the content into a temporary `Container` and then `set_content` the whole block. Transient `GtkNotebook` assertions at page-switch moments remain in small numbers after the fix (start-up/page-switch transient layout noise, CRITICAL but not fatal); all UI functionality has been restored.
+- **Seam defects of the GTK backend's NUContainer (verified 2026-09-14/15; patches in `prepare.py patch_linux_container_events`)**. Exposed by the declarative rewrite wrapping Tab in a root `Container` and adding a `holder` container per page (the old Tab was the window content view directly and never went through these paths): ① in `nu_container_map` the event window used `gdk_window_show` (= map + **raise**), lifting the INPUT_ONLY window covering the whole container above child native controls — X/GDK hits got intercepted, so **tab headers were unclickable and the scroll wheel dead, while buttons/keyboard were fine** (keyboard goes through focus; the windows of buttons/editable controls are mapped later and lifted higher); switching to `gdk_window_show_unraised` only maps without raising. ② `nu_container_get_preferred_width/height` hardcode a return of 0, and GtkViewport computes the scroll range from the child's size_request (written as 0×0 upstream) → the scroll range is always 0 and no scrollbar appears. **Do not "fix" this by reporting yoga's dynamic natural size to GTK** — allocate pollutes yoga state and causes requisition-negotiation oscillation (measured 365→466→598→907, non-converging, layout stuck on an intermediate frame, pages "sometimes not filling the width"); the correct fix is in ③. ③ `Scroll::PlatformSetContentView` forced the size_request from `GetPixelBounds()` = 0×0 for unmounted views; changed to: without an explicit `SetContentSize`, width stays -1 (stretches with the viewport) and height is fixed to the content's yoga natural height (queried via `Container::GetPreferredSize` after discriminating with `IsContainer()`) — the scroll range converges in one pass and is correct. The `CreateEventWindow` typo where `attributes.y` was wrongly assigned `allocation.x` was also fixed.
+- **The `IsVisibleInHierarchy` guard at the start of `Container::UpdateChildBounds` makes independent yoga roots miss the first real allocation (verified 2026-09-15, same patch function)**. GTK's first size-allocate happens **before** map, when overall visibility is false → the guard returns immediately; after map nobody re-runs the yoga layout with the real allocation, so independent yoga roots (each page's holder, the Scroll content container) permanently stay at their mount-time natural-size layout — page content "sometimes" does not fill the container width (whether it reproduces depends on subsequent resize re-allocations). Fix: remove the overall guard and run the layout computation unconditionally (`GetBounds()` reads the GTK allocation already updated by the size_allocate vfunc, so early layout is safe; GTK also permits pre-allocating unmapped widgets); child bounds propagation is still subject to each child's visibility; `nu_container_size_allocate` adds a `gtk_widget_queue_draw` when the allocation changes.
+- **The lingering ignore flag in `Slider::SetValue` broke slider linkage (verified 2026-09-15, same patch function)**: dragging the slider on Linux left the progress bar and the bound label unmoved. `Slider::SetValue` unconditionally sets the `ignore-value-change` flag to prevent callback loops, but GTK emits no `value-changed` for "setting the same value" (the yue layer's `Slider::make` defaults to `set_value(0)`, and the initial value is already 0) → the flag lingers and the first callback of the user's first drag is swallowed; the xdotool single-tap jump-value scenario emits exactly one signal, manifesting as total failure. Fix: set the flag only when `GetValue() != value`.
+- **Platform difference in the value range of `ProgressBar::SetValue` (verified 2026-09-15, fix in shim)**: libyue's Linux `SetValue` semantics are 0..100 (internally divided by 100 again), while the yue layer unifies on 0..1 → the progress bar only reaches 1% (`v/100` then divided by 100 again). The shim's `yue_mbt_progress_bar_set_value` now converts ×100 under `OS_LINUX` conditional compilation; on other platforms upstream directly accepts 0..1.
+- **`View::GetBoundsInScreen` stacked coordinates wrongly under Scroll/nested containers (all Linux desktops, verified 2026-09-15, patch `patch_linux_view_bounds_in_screen`)**: the upstream implementation manually accumulates allocations at each level, mixing in viewport document coordinates — with the showcase page scrolled to the middle-lower part, the anchor y measured 1221 (screen only 1080 tall), placing the bubble off-screen, manifesting as "the bubble shows only when maximized, never otherwise". Fix: switch to `gtk_widget_translate_coordinates` + `gtk_window_get_position` (GTK natively understands viewport scrolling and nesting), keeping the original logic as a fallback. All screen-coordinate consumers (`popup_at`, bubble anchoring) were fixed accordingly; a new `ViewLike::get_bounds_in_screen` API was added (4 shims in the ABI).
+- **Table checkbox column indicator scaling with row height (verified on XFCE, 2026-09-15, patch `patch_linux_table_checkbox_size`)**: the GTK `CellRendererToggle` indicator scales with the renderer's height, so at row height 60 the checkbox filled the entire cell; the patch caps the checkbox renderer height at 20 while row height is still decided by the text column (fixed-height mode takes the max across columns). Verified pixel-for-pixel with `examples/table` screenshots.
 
-- **GifPlayer(GTK)不动画/不可见的三层修复(2026-09-15 实测,同补丁函数)**:①动画启动依赖 `IsVisibleInHierarchy()`(挂载于 Notebook 非当前页时为 false 跳过)与 `"show"` 信号(仅 `gtk_widget_show` 时发射一次,早于 SetImage 则错过)——切页 map 后无人启动 timer,永停首帧;补连 `"map"` 信号(每次实际映射发射,与 `"unmap"`→OnHide 对称,OnShow 幂等)。②drawing area 默认 no-window,嵌 NUContainer 链再进 Scroll 视口时 queue_draw 失效区域坐标归属错位——静止不重绘、整段空白、滚动时才留下一帧残影;改 `gtk_widget_set_has_window(TRUE)` 自建窗口。③**素材兼容性**:ImageMagick `convert` 生成的多帧 GIF 会让 gdk-pixbuf 的 iter 以约 1/9 速度爬行(纯 gdk-pixbuf C 程序可复现,advance 返回真但帧不轮换),换 PIL(pillow)生成即正常;且原素材本身是 45 字节损坏文件。GifPlayer 是 yoga 叶子且 `GetMinimumSize` 在默认 `ImageScale::Down` 下返回空,消费方需显式给宽高(showcase 用 `style=[("width",120),("height",120)]`)。
-
----
-
-## Windows ✅ 首次实测通过
-
-### Windows 10 / 11 ✅(2026-09-12 实测:Windows 10.0.19045 x64 + MSVC 14.44 + Windows SDK 10.0.26100 + moon 0.1.20260904)
-
-#### 工具链准备(现象→根因→修复)
-
-- **moon 原生后端要求系统 C 编译器**:PATH 上找不到 `cl/cc/gcc/clang` 直接报 "no system C compiler found"。修复:装 VS Build Tools(`Microsoft.VisualStudio.Workload.VCTools`),并在 **x64 Native Tools Command Prompt**(或先 call `vcvars64.bat`)里执行 moon/cmake。
-- **libyue Windows 源码需要 ATL 头**(`base/win/atl_throw.h` → `atldef.h`),VCTools 工作负载默认不带:报 C1083 找不到 atldef.h。修复:VS Installer `modify --add Microsoft.VisualStudio.Component.VC.ATL`。注意 **quiet/passive 模式必须从提权进程启动**,否则立即退出且 Exit Code 5007(日志在 `%TEMP%\dd_installer_*.log`)。
-- **`prepare.py` 下载 404**:发行包资产名与 `platform.system()` 不同名——实际是 `libyue_{v}_win.zip` / `_mac.zip`(不是 windows/darwin)。已修 `prepare.py`(ASSET_OS 映射),macOS 路径顺带修好。
-
-#### 链接参数(moon → cl/link 的真实行为,全部实测)
-
-- **`cc-link-flags` 被 moon 原样拼进 `cl` 命令行**,不是直接给 link:GNU 风格 `-L/-l` 报 D9002/D9024;`/LIBPATH:` 也是 cl 不认识的编译器选项,只告警不转发。**正确做法是写链接输入**:`build/yue_mbt.lib setupapi.lib …`,cl 会把 .lib/.res 位置参数转交 link;系统库由 vcvars 注入的 `LIB` 环境变量解析,无需写参数。
-- **分隔符必须用正斜杠**:`build\yue_mbt.lib` 会被 moon 的参数解析当转义吃掉反斜杠,link 收到 `buildyue_mbt.lib` 报 LNK1104。
-- 官方 CMakeLists 的系统库清单本身缺项(无 user32/ole32/oleaut32/shell32 等),直接照抄会报 144+ 个 LNK2019(DefWindowProcW/VariantClear/SysStringLen 等);`prepare.py`/shim 清单已补齐 GUI 基础库,多余库 link 会忽略。
-- **CRT 必须与 moon 一致为静态 /MT**:moon 生成代码固定 `/MT`(debug 亦然)。CMake 多配置生成器**忽略 `CMAKE_BUILD_TYPE`**,`cmake --build` 不带 `--config` 默认按 Debug(/MDd)编,最终链接报 LNK4098(MSVCRTD 冲突)+ 约 200 个 `__imp__*` 未解析。修复:shim 库 `cmake_policy(SET CMP0091 NEW)` + `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded`(须在 add_library 之前)+ 构建 `--config Release`(prepare.py 已自动化)。
-- **moon 不因静态库更新自动重链**:cc-link-flags 与 MoonBit 源都没变时,换 `yue_mbt.lib` 后 `moon build` 报 "no work to do",需 touch 主包任一源文件强制重链。
-
-#### 应用清单(manifest)
-
-- **进程启动即弹"无法定位于序数 345 于动态链接库 …exe"**:comctl32 的 `TaskDialogIndirect` 仅以**序数 345** 在 Common-Controls v6 导出,exe 无清单时加载旧版 comctl32,解析静态导入阶段就失败。官方 sample_app 靠自带 `exe.manifest` 解决。修复:官方清单编译为 `build/yue_mbt_manifest.res`(shim/CMakeLists 的 rc 自定义命令),经链接参数进入每个示例 exe(RT_MANIFEST 声明 Common-Controls v6 依赖)。运行验证:showcase 消息框(TaskDialog)正常弹出。
-
-#### shim 平台差异(首次 Windows 编译暴露,均已条件编译修复)
-
-- `dlfcn.h` 的 include 要按 `__linux__` 守卫(使用点本来就在 `OS_LINUX` 块内);MSVC 的 `M_PI` 需 `#define _USE_MATH_DEFINES`。
-- **`base::FilePath` 在 UNICODE 构建下 StringType 是 `std::wstring`**,`FilePath(const char*)`、`+= path.value()` 全部编不过:统一经 `FromUTF8Unsafe/AsUTF8Unsafe` 进出(见 shim 的 `FilePathFromUTF8/FilePathValueToUTF8`)。
-- **Windows 版 libyue 无 Popover**(发行包不含 popover.h,jumbo 源零实现):shim 保留 6 个 ABI 但降级为空操作/空句柄,MoonBit 侧 `Popover` 方法空转。
-- 其余 API 面差异(对照发行包头文件的平台 guard 逐一修复):`Browser::Options` 无 `allow_file_access_from_files`(MAC/LINUX)/`hardware_acceleration`(LINUX);`Scroll::SetOverlayScrollbar`、`Clipboard::Type::Selection`、`Tray::SetTitle`(MAC/LINUX)不存在,均降级空操作;`NotificationCenter::AddNotification` 是 Linux 内部接口,Windows 走 `Notification::Show()`。
-- `operator new/delete` 接管:Linux 用 glibc `__libc_malloc/free` 绕开 mimalloc 接管;**Windows 下 moon 以 `MOONBIT_ALLOCATOR=SYSTEM` 编译运行时**,CRT 堆即系统堆,重定向到 `malloc/free` 即可。
-
-#### 运行期差异(showcase 真机逐页验证发现)
-
-- **`AttributedText::SetFontFor/SetColorFor` 局部区间直接 CHECK 崩溃**(`nativeui_jumbo_2.cc`: "does not work on Windows"),只支持全文范围(0,-1)。修复:yue/painter.mbt 按 `platform()=="windows"` 对区间调用降级为无操作并告警一次(showcase 富文本页因此从启动崩溃变为正常渲染,区间样式按平台优雅退化)。
-- **`Color::Get(Border)` 触发 NOTREACHED**(Windows 实现无 Border 分支,ERROR 日志且返回垃圾色):shim 对 Border 直接 `GetSysColor(COLOR_WINDOWFRAME)`,showcase 系统语义色行输出正常、日志零 CHECK。
-- 托盘为原生后端:`Shell_NotifyIconW` 创建成功(日志"托盘:已创建");`set_title` 无对应概念为空操作;图标加载会有 libpng iCCP 警告(无害)。
-- **字体发虚(GDI+ 灰度抗锯齿)**:libyue 的 GDI+ 画笔写死 `TextRenderingHintAntiAlias`(灰度 AA),Windows 上自绘的 Tab/按钮/标签小字明显发虚。修复:prepare.py 解压后对 vendor 做幂等文本替换(AntiAlias → `TextRenderingHintClearTypeGridFit`),重建即锐利;vendor 不进版本库,重跑脚本自动重新应用。
-- **系统通知静默失败**:WinRT toast 的 notifier 按 AUMID 查找,进程未设置 `AppUserModelID` 时 `GetNotifier` 直接返回 null,`Show()` 静默失败。修复:shim 在首次通知前自动设置 AUMID(基于 exe 名)并写 `HKCU\Software\Classes\AppUserModelId\<AUMID>` 的 DisplayName;横幅是否弹出还受系统专注助手/全屏抑制影响,通知历史在操作中心可查。
-- **浏览器优先 WebView2**:发行包 vendor 只带 WebView2Loader.dll 不带头文件,官方 CMake 也未启用;prepare.py 现从 NuGet 固定版本补齐 `WebView2.h`(sha256 钉死)并把 loader DLL 复制到仓库根(libyue 按 exe 目录→工作目录搜索)。shim 构建定义 `WEBVIEW2_SUPPORT` 并加 include;`Browser::new` 在 Windows 默认 `webview2_support=true`,loader/运行时缺失时 libyue 自动回退 IE。验证:本地 HTML(load_html)、ExecuteScript 正常;远程站点依赖系统代理可用。
-- **demo:// 自定义协议在 WebView2 下静默无效**(注册/拦截链齐全但导航无效果,IE 引擎可用):上游待查;IE 兜底路径保留。
-- **滚动区内容零高度(跨平台统一默认值原则)**:win32 的 Group/Scroll 不按内容自增长(GTK 有自然首选尺寸),showcase 里"滚动区里的文本编辑"整块塌陷。修复:给 Group 显式 `set_style("height", 128)`——同一默认值两端表现一致;遇到类似不一致一律用统一默认值吸收,不做平台分支。
-- **声明式整页滚动失效(2026-09-14 实测,与 Linux GTK 同根因的 Windows 版)**:现象是各页签内容只能看开头、滚轮无反应、滚动条不出现。根因:Windows 的 `ScrollImpl` 用自绘滚动条,滚动范围只来自 `content_size_`,而它只能经 `Scroll::SetContentSize` 显式写入(初值 0×0);声明式 `scroll()` 节点内容高度动态、从不调 SetContentSize,范围恒 0。修复:prepare.py 新增 vendor 补丁——`scroll_win.h` 加 `content_size_explicit_` 标记,`ScrollImpl::Layout` 在未显式设置时向内容视图的 yoga 树实时查自然尺寸(`GetPreferredSize`),尺寸变化即重建滚动条;与 Linux 端 nu_container preferred 尺寸 + size_request 两处补丁同一思路。验证:showcase 各页签滚轮整页滚动、滚动条出现并随内容更新。
-- **WebView2 页面一律报「无网络」(2026-09-14 实测)**:现象是 WebView2 引擎加载任意远程站点都出错误页,应用本身与直连网络正常(直连 curl 200)。根因:WebView2(Chromium)默认跟随系统代理,本机系统代理 `ProxyEnable=1` 指向 `127.0.0.1:7890`(Clash 类工具退出未还原设置),代理端口无监听 → 所有请求 ERR_PROXY_*;IE 回退路径走 WinInet 同样受影响。修复:libyue 未暴露 AdditionalBrowserArguments,prepare.py 补丁让 `GetWebView2Options` 读环境变量 `LIBYUE_WEBVIEW2_ARGS` 并 `put_AdditionalBrowserArguments` 注入——代理失效的机器设 `LIBYUE_WEBVIEW2_ARGS=--no-proxy-server` 即直连(见 showcase 网页页说明)。验证:设变量后 `moon run examples/showcase` 网页页完整渲染 moonbitlang.com(Chrome Legacy Window 确认 WebView2 引擎)。
-- **按键键码与修饰键跨平台不一致(2026-09-14 实测)**:现象一,Windows 上按键显示的数字与 yue 常量表(VKEY_ESCAPE=65307 等)对不上,比较恒 false。根因:libyue Windows 的 KeyboardCode 是 Win32 VK 值(Esc=0x1B),常量表取的是 keyboard_codes_gtk.h 键值(Esc=0xFF1B);修复:`yue/events.mbt` 事件入口 `normalize_win_vk` 把 VK 码归一化到常量表(字母/数字/空格两表本就同值),并新增 `KeyEvent::describe()` 输出 "Ctrl+A" 形式可读描述。现象二,Ctrl+A 显示成 Alt+A、Shift+Enter 显示成 Ctrl+Enter。根因:libyue Windows 修饰键位是 `Shift=2 Ctrl=4 Alt=8 Meta=16`,shim 的 `NormalizeModifiers` 只有 Linux/macOS 分支做归一化、Windows 原样透传,位值撞上 MoonBit 层 `KEY_MOD_ALT=4`。修复:shim 补 `OS_WIN` 分支映射到统一的 `1/2/4/8`。验证:真机按 Ctrl+A 显示「按键 Ctrl+A(键码 65,Esc=65307 A=65)」,键码与常量一致、修饰键正确;纯函数部分白盒单测覆盖(`events_wbtest.mbt`)。
-- **非正常退出留「幽灵托盘」图标(2026-09-14 实测)**:现象是进程崩溃/被关控制台/abort 后,托盘残留月亮图标,直到鼠标扫过才被 Explorer 惰性清理。根因:图标删除全靠 `nu::Tray` 析构时 `NIM_DELETE`;shim 的 TrayStore 全局持有引用,正常退出靠 CRT 静态析构链(Store 析构 → 引用归零 → TrayImpl 析构)兜底,异常退出这条链不跑。修复:shim 在首次创建托盘时捕获 TrayHost 属主窗口并安装四道进程级钩子(`atexit`/`SetConsoleCtrlHandler`/`SetUnhandledExceptionFilter`(链式传递前一过滤器)/`signal(SIGABRT)`,libyue 的 CHECK 失败走 abort),凡还有代码可执行的退出路径都按「属主窗口 + 图标 ID 区间」补发 `NIM_DELETE`——libyue 的 ID 从 2 起连续分配、只增不复用,对已删除 ID 是无害空操作。`taskkill /F`/TerminateProcess 式硬杀没有任何进程代码可执行,幽灵无法在进程侧根除,由系统悬停时惰性清理。验证:真机图标可见 → 关闭其控制台窗口 → 图标立即消失(鼠标移开排除悬停清理干扰)。另注:新托盘图标默认进溢出区,是否常驻可见区由系统/用户逐图标设置(设置 → 个性化 → 任务栏 → 选择哪些图标显示在任务栏上),应用无法强制。
-- **托盘图标显示为空白不是引擎问题,先查图标资产(2026-09-14 实测)**:showcase/hello 的 `icon.png` 从建库起就是 1×1 占位图,libyue 按其像素拉伸到托盘尺寸(SM_CXSMICON),结果就是一团白——表现像「图标没渲染」,实为资产问题。修复:用 PIL 绘制抗锯齿月牙(512×512 绘制后 LANCZOS 缩到 64×64)替换两处。排查顺序:确认 Image 非空(shim 已有 IsEmpty 拦截)→ 看资产本身尺寸/内容 → 再怀疑 GetHICON/NIM_MODIFY 链路。
-- **本轮复测还确认**:`moon test` 的测试驱动在安装新版 moon 后需 `YUE_MBT_SKIP_MANIFEST=1`(CI 同款,规避新版 moon 自带 MANIFEST 与 manifest.res 的 CVT1100);且 moon 不因静态库更新重链对测试驱动/showcase 同样成立——换 `yue_mbt.lib` 后要删 `_build` 下对应 exe 再跑,否则拿到旧链接产物误判(见上「链接参数」节)。
-- **Popover 气泡在 Windows 的替代实现**:libyue 无 Popover(见下),shim 用无边框、不抢焦点、置顶的小窗口替代,弹在点击位置右下,8 秒定时自动关闭(无外部点击关闭钩子),`close`/`on_close` 语义保留;验证:showcase 气泡按钮弹出/自动关闭/日志闭环。
-- 平台信息(`platform()=="windows"`、区域、缩放、屏幕)、剪贴板、定时器、全局快捷键注册、全局鼠标轮询、画布(GDI+)与浮动爱心窗口均实测正常。
-
-#### 验证方式
-
-- `moon run examples/hello`:窗口渲染 + 托盘 + 点关闭经 `on_close→quit()` 优雅退出。
-- `moon run examples/showcase`:8 页签逐一点击(基础控件/输入与选择/画布/网页/对话框/系统集成/事件/富文本)、菜单(勾选/单选/表格独立窗口)、消息框、画布色相重绘、鼠标事件实时回显、全局鼠标、浮动爱心、关闭退出,全程日志零 CHECK 失败。
-- 2026-09-14 复测(新版 moon + 声明式 showcase 12 页签):`moon check` 零警告、`YUE_MBT_SKIP_MANIFEST=1 moon test` 30/30 全过;真机逐页截图确认——整页滚轮滚动、滚动条出现;网页页 WebView2 完整渲染 moonbitlang.com(设 LIBYUE_WEBVIEW2_ARGS=--no-proxy-server);事件页按键显示 Ctrl+A/Esc,键码与常量表一致。
+- **Three-layer fix for GifPlayer (GTK) not animating / being invisible (verified 2026-09-15, same patch function)**: ① animation start depends on `IsVisibleInHierarchy()` (false when mounted on a non-current Notebook page, so skipped) and the `"show"` signal (emitted only once by `gtk_widget_show`, missed if earlier than SetImage) — after the page switch mapped it, nobody started the timer and it stayed on the first frame forever; patched to also connect the `"map"` signal (emitted on every actual mapping, symmetric with `"unmap"`→OnHide; OnShow is idempotent). ② the drawing area defaults to no-window; when nested in an NUContainer chain and then in a Scroll viewport, queue_draw's invalidated-region coordinates were attributed to the wrong window — no redraw while static, a whole blank area, and a one-frame ghost left behind only while scrolling; fixed with `gtk_widget_set_has_window(TRUE)` to create its own window. ③ **asset compatibility**: multi-frame GIFs generated by ImageMagick `convert` make gdk-pixbuf's iter crawl at about 1/9 speed (reproducible with a pure gdk-pixbuf C program: advance returns true but frames do not rotate); regenerating with PIL (pillow) works fine; moreover the original asset was itself a 45-byte corrupted file. GifPlayer is a yoga leaf and `GetMinimumSize` returns empty under the default `ImageScale::Down`, so consumers must give explicit width/height (showcase uses `style=[("width",120),("height",120)]`).
 
 ---
 
-## macOS ❓ 未实测
+## Windows ✅ first real-machine pass
 
-### macOS(libyue v0.15.6 发行包含 ARC / no-ARC 双库结构)
+### Windows 10 / 11 ✅ (verified 2026-09-12: Windows 10.0.19045 x64 + MSVC 14.44 + Windows SDK 10.0.26100 + moon 0.1.20260904)
 
-- CMake 已备 ARC/no-ARC 双库分支,均未验证;首次实测先确认两种链接形态哪条走通。
-- 首次 macOS 实测以 CI 承担(2026-09-14 起,`.github/workflows/ci.yml` 的 macos job,macos-latest ARM64 Runner):构建 + 测试级验证,不做 GUI 运行冒烟(headless Runner 无 WindowServer)。实测结果待首跑后回写本节。
-- prebuild 的 Darwin 分支已按官方构建结构**预修**(尚未实测):链接参数补第二个静态库 `-lyue_mbt_noarc`(no-ARC 库符号被主库引用,GNU ld 从左到右须排其后)+ 全部框架(AppKit/Carbon/IOKit/Security/WebKit/OpenDirectory)+ `-lobjc -lc++ -lpthread`——静态库的系统依赖不会自动传播到 moon 的链接命令行,必须显式给出(与 Linux 侧 pkg-config 补系统库同构)。
-- 版本细分(按 macOS 大版本)待实测后补充。
+#### Toolchain preparation (symptom → root cause → fix)
+
+- **moon's native backend requires a system C compiler**: with no `cl/cc/gcc/clang` on PATH it directly reports "no system C compiler found". Fix: install VS Build Tools (`Microsoft.VisualStudio.Workload.VCTools`) and run moon/cmake from an **x64 Native Tools Command Prompt** (or call `vcvars64.bat` first).
+- **libyue's Windows sources need ATL headers** (`base/win/atl_throw.h` → `atldef.h`), which the VCTools workload does not include by default: C1083 cannot find atldef.h. Fix: VS Installer `modify --add Microsoft.VisualStudio.Component.VC.ATL`. Note **quiet/passive mode must be launched from an elevated process**, otherwise it exits immediately with Exit Code 5007 (logs in `%TEMP%\dd_installer_*.log`).
+- **`prepare.py` download 404**: release asset names differ from `platform.system()` — they are actually `libyue_{v}_win.zip` / `_mac.zip` (not windows/darwin). `prepare.py` fixed (ASSET_OS mapping); the macOS path fixed as a side effect.
+
+#### Link arguments (actual moon → cl/link behavior, all field-tested)
+
+- **`cc-link-flags` is concatenated verbatim into the `cl` command line**, not passed directly to link: GNU-style `-L/-l` yields D9002/D9024; `/LIBPATH:` is likewise a compiler option cl doesn't recognize and is only warned about, not forwarded. **The correct approach is to write link inputs**: `build/yue_mbt.lib setupapi.lib …` — cl passes positional .lib/.res arguments to link; system libraries are resolved via the `LIB` environment variable injected by vcvars, no arguments needed.
+- **Separators must be forward slashes**: `build\yue_mbt.lib` has its backslash eaten as an escape by moon's argument parsing, and link receives `buildyue_mbt.lib`, yielding LNK1104.
+- The official CMakeLists' system library list is itself incomplete (missing user32/ole32/oleaut32/shell32 etc.); copying it directly yields 144+ LNK2019s (DefWindowProcW/VariantClear/SysStringLen etc.); `prepare.py`/shim lists have been completed with the GUI basics — link ignores surplus libraries.
+- **The CRT must match moon's static /MT**: the code generated by moon is fixed to `/MT` (debug included). CMake multi-config generators **ignore `CMAKE_BUILD_TYPE`**, and `cmake --build` without `--config` builds Debug (/MDd) by default, ultimately failing the link with LNK4098 (MSVCRTD conflict) + about 200 unresolved `__imp__*`. Fix: shim library `cmake_policy(SET CMP0091 NEW)` + `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded` (must be set before add_library) + build with `--config Release` (automated in prepare.py).
+- **moon does not automatically relink when static libraries change**: when neither cc-link-flags nor MoonBit sources changed, after swapping `yue_mbt.lib`, `moon build` reports "no work to do"; touch any source file of the main package to force a relink.
+
+#### Application manifest
+
+- **At process start, "The procedure entry point 345 could not be located in the dynamic link library …exe" pops up**: comctl32's `TaskDialogIndirect` is exported only by **ordinal 345** in Common-Controls v6; without a manifest the exe loads the old comctl32 and fails during static-import resolution. The official sample_app relies on a bundled `exe.manifest`. Fix: the official manifest is compiled into `build/yue_mbt_manifest.res` (rc custom command in shim/CMakeLists) and enters every example exe via link arguments (RT_MANIFEST declaring the Common-Controls v6 dependency). Run verification: showcase's message box (TaskDialog) pops up normally.
+
+#### shim platform differences (exposed by the first Windows build, all fixed with conditional compilation)
+
+- The `dlfcn.h` include needs an `__linux__` guard (the use site is already inside an `OS_LINUX` block); MSVC's `M_PI` needs `#define _USE_MATH_DEFINES`.
+- **Under UNICODE builds `base::FilePath`'s StringType is `std::wstring`**, so `FilePath(const char*)` and `+= path.value()` all fail to compile: go in and out uniformly via `FromUTF8Unsafe/AsUTF8Unsafe` (see the shim's `FilePathFromUTF8/FilePathValueToUTF8`).
+- **Windows libyue has no Popover** (the release package lacks popover.h, zero implementation in jumbo sources): the shim keeps the 6 ABIs but degrades them to no-ops/empty handles, and the MoonBit-side `Popover` methods are inert.
+- Other API-surface differences (fixed one by one against the platform guards in the release headers): `Browser::Options` lacks `allow_file_access_from_files` (MAC/LINUX) and `hardware_acceleration` (LINUX); `Scroll::SetOverlayScrollbar`, `Clipboard::Type::Selection`, `Tray::SetTitle` (MAC/LINUX) do not exist — all degraded to no-ops; `NotificationCenter::AddNotification` is a Linux-internal interface; Windows goes through `Notification::Show()`.
+- Taking over `operator new/delete`: on Linux, glibc's `__libc_malloc/free` bypasses mimalloc's takeover; **on Windows, moon compiles the runtime with `MOONBIT_ALLOCATOR=SYSTEM`**, so the CRT heap is the system heap and redirecting to `malloc/free` suffices.
+
+#### Runtime differences (found by real-machine page-by-page verification of showcase)
+
+- **`AttributedText::SetFontFor/SetColorFor` crash outright with CHECK on partial ranges** (`nativeui_jumbo_2.cc`: "does not work on Windows"); only the full-text range (0,-1) is supported. Fix: yue/painter.mbt degrades range calls to no-ops with a one-time warning when `platform()=="windows"` (showcase's rich-text page went from crashing at startup to rendering normally, with range styles degrading gracefully per platform).
+- **`Color::Get(Border)` hits NOTREACHED** (the Windows implementation has no Border branch; ERROR log and a garbage color returned): the shim returns `GetSysColor(COLOR_WINDOWFRAME)` directly for Border; showcase's system-semantic-color row outputs normally with zero CHECK failures in the log.
+- The tray uses the native backend: `Shell_NotifyIconW` creates successfully (log "tray: created"); `set_title` has no corresponding concept and is a no-op; icon loading shows harmless libpng iCCP warnings.
+- **Blurry fonts (GDI+ grayscale anti-aliasing)**: libyue's GDI+ pen hardcodes `TextRenderingHintAntiAlias` (grayscale AA), so the small text of self-drawn Tabs/buttons/labels is visibly blurry on Windows. Fix: after extraction prepare.py performs an idempotent text replacement on vendor (AntiAlias → `TextRenderingHintClearTypeGridFit`); rebuilding makes it crisp; vendor is not checked into version control, and re-running the script re-applies automatically.
+- **System notifications fail silently**: the WinRT toast notifier is looked up by AUMID; if the process has not set an `AppUserModelID`, `GetNotifier` returns null outright and `Show()` fails silently. Fix: before the first notification the shim automatically sets the AUMID (based on the exe name) and writes the DisplayName under `HKCU\Software\Classes\AppUserModelId\<AUMID>`; whether the banner pops is also affected by the system focus-assist/full-screen suppression; notification history is available in Action Center.
+- **The browser prefers WebView2**: the release vendor ships only WebView2Loader.dll without headers, and the official CMake does not enable it; prepare.py now fetches `WebView2.h` from a pinned NuGet version (sha256 pinned) and copies the loader DLL to the repo root (libyue searches exe directory → working directory). The shim build defines `WEBVIEW2_SUPPORT` and adds the include; `Browser::new` defaults to `webview2_support=true` on Windows, and libyue automatically falls back to IE if the loader/runtime is missing. Verification: local HTML (load_html) and ExecuteScript work; remote sites work depending on the system proxy.
+- **The demo:// custom protocol is silently ineffective under WebView2** (registration/interception chain complete but navigation has no effect; the IE engine works): pending upstream investigation; the IE fallback path is retained.
+- **Zero-height scroll content (principle of unified cross-platform defaults)**: win32's Group/Scroll do not grow with content (GTK has a natural preferred size); showcase's "text editor inside a scroll area" collapsed entirely. Fix: give Group an explicit `set_style("height", 128)` — the same default value behaves identically on both ends; whenever a similar inconsistency appears, absorb it with a unified default instead of platform branching.
+- **Declarative full-page scrolling broken (verified 2026-09-14, the Windows counterpart of the same root cause as Linux GTK)**: the symptom was that each tab's content showed only the beginning, the scroll wheel did nothing, and no scrollbar appeared. Root cause: Windows's `ScrollImpl` uses self-drawn scrollbars and the scroll range comes only from `content_size_`, which can only be written explicitly via `Scroll::SetContentSize` (initial value 0×0); the declarative `scroll()` node's content height is dynamic and never calls SetContentSize, so the range stays 0. Fix: prepare.py adds a new vendor patch — `scroll_win.h` gains a `content_size_explicit_` flag, and `ScrollImpl::Layout`, when not explicitly set, queries the content view's yoga tree in real time for its natural size (`GetPreferredSize`), rebuilding the scrollbars whenever the size changes; the same idea as the two Linux-side patches (nu_container preferred size + size_request). Verification: every showcase tab scrolls the whole page with the wheel and scrollbars appear and track the content.
+- **WebView2 pages always report "no network" (verified 2026-09-14)**: the symptom was that the WebView2 engine showed an error page for any remote site, while the app itself and direct connections were fine (direct curl 200). Root cause: WebView2 (Chromium) follows the system proxy by default; the machine's system proxy `ProxyEnable=1` pointed at `127.0.0.1:7890` (a Clash-type tool exited without restoring the setting), and with nothing listening on the proxy port all requests got ERR_PROXY_*; the IE fallback path uses WinInet and is equally affected. Fix: libyue does not expose AdditionalBrowserArguments, so a prepare.py patch makes `GetWebView2Options` read the environment variable `LIBYUE_WEBVIEW2_ARGS` and inject it via `put_AdditionalBrowserArguments` — on machines with a broken proxy, set `LIBYUE_WEBVIEW2_ARGS=--no-proxy-server` to connect directly (see the showcase web-page section). Verification: with the variable set, `moon run examples/showcase`'s web page fully rendered moonbitlang.com (Chrome Legacy Window confirmed the WebView2 engine).
+- **Key codes and modifiers inconsistent across platforms (verified 2026-09-14)**: symptom one — the numbers displayed for keys on Windows did not match the yue constant table (VKEY_ESCAPE=65307 etc.), so comparisons were always false. Root cause: libyue Windows's KeyboardCode is the Win32 VK value (Esc=0x1B) while the constant table takes keyboard_codes_gtk.h keyvals (Esc=0xFF1B); fix: `yue/events.mbt`'s event entry `normalize_win_vk` normalizes VK codes to the constant table (letters/digits/space already match between the two tables), plus a new `KeyEvent::describe()` emitting readable descriptions like "Ctrl+A". Symptom two — Ctrl+A displayed as Alt+A and Shift+Enter as Ctrl+Enter. Root cause: libyue Windows's modifier bits are `Shift=2 Ctrl=4 Alt=8 Meta=16`, while the shim's `NormalizeModifiers` only normalized the Linux/macOS branches and passed Windows through unchanged, so the bit values collided with the MoonBit layer's `KEY_MOD_ALT=4`. Fix: the shim adds an `OS_WIN` branch mapping to the unified `1/2/4/8`. Verification: on a real machine pressing Ctrl+A shows "key Ctrl+A (code 65, Esc=65307 A=65)", codes matching the constants and modifiers correct; the pure-function parts are covered by white-box unit tests (`events_wbtest.mbt`).
+- **Abnormal exits leave "ghost tray" icons (verified 2026-09-14)**: the symptom was that after a process crash/console close/abort, the tray kept a moon icon until the mouse swept over it and Explorer lazily cleaned it up. Root cause: icon deletion relies entirely on `NIM_DELETE` in `nu::Tray`'s destructor; the shim's TrayStore holds references globally, and normal exits rely on the CRT static-destructor chain (Store destructor → reference count to zero → TrayImpl destructor) as a backstop — a chain that does not run on abnormal exits. Fix: on first tray creation the shim captures the TrayHost owner window and installs four process-level hooks (`atexit` / `SetConsoleCtrlHandler` / `SetUnhandledExceptionFilter` (chaining the previous filter) / `signal(SIGABRT)` (libyue's CHECK failures go through abort)); every exit path that still has executable code re-issues `NIM_DELETE` by "owner window + icon ID range" — libyue's IDs are allocated consecutively from 2 and never reused, so deleting already-deleted IDs is a harmless no-op. Hard kills like `taskkill /F`/TerminateProcess leave no process code to run, so the ghost cannot be eradicated from the process side and is left to the system's lazy hover cleanup. Verification: on a real machine the icon was visible → its console window was closed → the icon disappeared immediately (mouse moved away to rule out hover-cleanup interference). Additional note: new tray icons go to the overflow area by default; whether they stay in the visible area is a per-icon system/user setting (Settings → Personalization → Taskbar → Select which icons appear on the taskbar) and cannot be forced by the app.
+- **A blank tray icon is not an engine problem — check the icon asset first (verified 2026-09-14)**: showcase/hello's `icon.png` had been a 1×1 placeholder since the repo's creation; libyue stretches its pixels to the tray size (SM_CXSMICON), yielding a blob of white — looking like "icon not rendered" but actually an asset problem. Fix: replace both with a PIL-drawn anti-aliased crescent (drawn at 512×512 then LANCZOS-resized to 64×64). Triage order: confirm the Image is non-empty (the shim already has an IsEmpty interception) → inspect the asset's size/content → only then suspect the GetHICON/NIM_MODIFY chain.
+- **Also confirmed in this round of re-testing**: after installing a new moon, `moon test`'s test driver needs `YUE_MBT_SKIP_MANIFEST=1` (same as CI, to avoid CVT1100 between the new moon's own MANIFEST and manifest.res); and moon's no-relink-on-static-library-update applies equally to the test driver/showcase — after swapping `yue_mbt.lib`, delete the corresponding exe under `_build` before running, otherwise you get the old linked artifact and misjudge (see the "Link arguments" section above).
+- **Popover bubble replacement implementation on Windows**: libyue has no Popover (see below); the shim substitutes a frameless, non-focus-stealing, topmost small window that pops at the lower right of the click position and auto-closes after 8 seconds (no external-click-close hook), with `close`/`on_close` semantics preserved; verification: showcase's bubble button pops/auto-closes/logs the loop.
+- Platform info (`platform()=="windows"`, locale, scaling, screens), clipboard, timers, global shortcut registration, global mouse polling, canvas (GDI+), and the floating-hearts window were all verified working.
+
+#### Verification method
+
+- `moon run examples/hello`: window rendering + tray + graceful exit via `on_close→quit()` on close.
+- `moon run examples/showcase`: click through the 8 tabs one by one (basic controls / input & selection / canvas / web / dialogs / system integration / events / rich text), menus (check/radio/table standalone window), message boxes, canvas hue repaint, live mouse-event echo, global mouse, floating hearts, close-to-exit, with zero CHECK failures in the log throughout.
+- 2026-09-14 re-test (new moon + declarative showcase with 12 tabs): `moon check` zero warnings, `YUE_MBT_SKIP_MANIFEST=1 moon test` 30/30 all passing; page-by-page real-machine screenshot confirmation — full-page wheel scrolling with scrollbars appearing; the web page fully rendering moonbitlang.com via WebView2 (with LIBYUE_WEBVIEW2_ARGS=--no-proxy-server set); the events page showing Ctrl+A/Esc with codes matching the constant table.
 
 ---
 
-## 维护约定
+## macOS ❓ untested
 
-1. 每次真实环境实测后,把「发行版 / 桌面环境 / 版本 + 现象 + 根因 + 修复 + 验证方式」写进对应小节;新发行版/桌面从 ❓ 占位小节开始。
-2. 涉及协议互操作(DBus / DBusMenu / SNI)的结论必须来自真总线、真面板;单测自洽 ≠ 互操作通过。
-3. 简短结论同步 README「Known Limitations / known pitfalls」;本文保留完整过程与版本细节。
+### macOS (libyue v0.15.6 release ships an ARC / no-ARC dual-library structure)
+
+- CMake already has both ARC/no-ARC library branches prepared, both unverified; the first real test should determine which link form works.
+- The first macOS test is carried by CI (since 2026-09-14, the macos job in `.github/workflows/ci.yml`, macos-latest ARM64 Runner): build + test-level verification, no GUI run smoke test (headless Runner has no WindowServer). Results will be written back to this section after the first run.
+- prebuild's Darwin branch has been **pre-fixed** per the official build structure (not yet field-tested): link arguments add the second static library `-lyue_mbt_noarc` (no-ARC library symbols are referenced by the main library; GNU ld resolves left to right so it must come after) + all frameworks (AppKit/Carbon/IOKit/Security/WebKit/OpenDirectory) + `-lobjc -lc++ -lpthread` — a static library's system dependencies are not automatically propagated to moon's link command line and must be given explicitly (isomorphic to the Linux side's pkg-config supplementing system libraries).
+- Version breakdowns (by macOS major version) to be added after testing.
+
+---
+
+## Maintenance conventions
+
+1. After each real-environment test, write "distribution / desktop environment / version + symptom + root cause + fix + verification method" into the corresponding section; start new distributions/desktops from a ❓ placeholder section.
+2. Conclusions involving protocol interop (DBus / DBusMenu / SNI) must come from a real bus and a real panel; self-consistent unit tests ≠ interop passing.
+3. Sync short conclusions to the README's "Known Limitations / known pitfalls"; this document retains the full process and version details.

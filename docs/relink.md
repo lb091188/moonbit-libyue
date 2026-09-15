@@ -1,24 +1,24 @@
-# 原生层变更后强制重链
+# Forcing a Relink After Native-Layer Changes
 
-改 `shim/`、vendor 补丁或 libyue 版本后：重跑 `scripts/prepare.py`，
-再强制重链，否则 `moon run` 复用旧 exe。原理见
-[docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/adaptation.md)「跨平台通用 → 构建与链接」。
+After changing `shim/`, vendor patches, or the libyue version: re-run `scripts/prepare.py`,
+then force a relink — otherwise `moon run` reuses the old exe. For the rationale see
+[docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md), "Cross-Platform → Build and Linking".
 
-## 判别
+## Detection
 
-exe 的 mtime 早于 `build/libyue_mbt.a` 即命中：
+You are affected if the exe's mtime is older than `build/libyue_mbt.a`:
 
 ```sh
 ls -la --time-style=full-iso \
-  _build/native/debug/build/examples/<示例>/<示例>.exe build/libyue_mbt.a
+  _build/native/debug/build/examples/<example>/<example>.exe build/libyue_mbt.a
 ```
 
-## 处理
+## Handling
 
 ```sh
-moon clean        # 全量重建
-# 或只删链接产物：
-rm _build/native/debug/build/examples/<示例>/<示例>.exe
+moon clean        # full rebuild
+# or delete only the link artifact:
+rm _build/native/debug/build/examples/<example>/<example>.exe
 ```
 
-处理后 exe 的 mtime 应晚于 `build/libyue_mbt.a`。
+After handling, the exe's mtime should be newer than `build/libyue_mbt.a`.

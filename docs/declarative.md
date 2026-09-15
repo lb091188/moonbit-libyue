@@ -1,70 +1,68 @@
-# 声明式 UI：Node/mount 与 Store
+# Declarative UI: Node/mount and Store
 
-moonbit-libyue 在经典命令式 API 之上提供三层可自由组合的语法糖
+moonbit-libyue provides three freely composable layers of syntactic sugar on top of the classic imperative API:
 
-| 层 | 内容 | 典型场景 |
+| Layer | Content | Typical scenario |
 |---|---|---|
-| L1 | `X::make(...)` props 构造器、`apply_style` | 一行创建一个控件（可单独用） |
-| L2 | `Node` 树 + `mount` / `vbox` / `label` / `button` … | 声明整棵界面结构 |
-| L3 | `Store[T]` + `bind_label` | 数据变化自动更新界面 |
+| L1 | `X::make(...)` props constructors, `apply_style` | Create a widget in one line (usable standalone) |
+| L2 | `Node` tree + `mount` / `vbox` / `label` / `button` … | Declare the whole UI structure |
+| L3 | `Store[T]` + `bind_label` | UI updates automatically when data changes |
 
-完整对照示例见
-`examples/showcase`
+For a full side-by-side example, see
+`examples/showcase`.
 
-## L1：props 构造器
+## L1: props constructors
 
-每个控件有一个 `X::make` 构造器，把"创建 + 属性 + 回调"合并成一个表达式。
-除"内容性"参数（如 Label 的文本）外全部可选具名，不传即用默认值：
+Every widget has an `X::make` constructor that merges "create + properties + callbacks" into a single expression.
+Apart from "content" parameters (such as a Label's text), everything is optional and named; omitting a parameter uses the default:
 
 ```moonbit
-let btn = @yue.Button::make("确定", on_click=fn() { save() })
+let btn = @yue.Button::make("OK", on_click=fn() { save() })
 let slider = @yue.Slider::make(range=Some((0.0, 100.0)), step=Some(1.0))
 let entry = @yue.Entry::make(entry_type=Password)
 entry.on_activate(fn() { check(entry.get_text()) })
 ```
 
-注意 L1 构造器与 L2 同名节点的回调参数不同：`Entry::make` 是
-`entry_type` / `on_activate()`（回调不带参），L2 `entry` 节点则是
-`password` / `on_enter(String)`（回调携带文本，见下节）。
+Note that L1 constructors and their same-named L2 nodes differ in callback parameters: `Entry::make` takes
+`entry_type` / `on_activate()` (callback without arguments), while the L2 `entry` node takes
+`password` / `on_enter(String)` (callback receives the text, see the next section).
 
-`style`（数值型样式键值对）与 `style_str`（字符串型）几乎在每个构造器上都有：
+`style` (numeric style key-value pairs) and `style_str` (string-typed) are available on almost every constructor:
 
 ```moonbit
-@yue.Label::make("标题", style=[("marginBottom", 10.0)],
+@yue.Label::make("Title", style=[("marginBottom", 10.0)],
                  style_str=[("color", "#356AA0")])
 ```
 
-已有控件想批量应用样式，用自由函数 `apply_style(view, style=..., style_str=...)`。
+To batch-apply styles to an existing widget, use the free function `apply_style(view, style=..., style_str=...)`.
 
-## L2：Node 树与 mount
+## L2: the Node tree and mount
 
-`Node` 表示"还没挂载的界面片段"。构造节点只是建树，**挂载时才真正创建控件、
-注册回调**——因此同一份代码可以先声明后装配：
+A `Node` represents "a UI fragment not yet mounted". Constructing nodes only builds the tree; **widgets are actually created and callbacks registered at mount time** — so the same code can declare first and assemble later:
 
 ```moonbit
 fn page(state : State) -> @yue.Container {
   @yue.mount([
-    @yue.label("设置", style_str=[("color", "#356AA0")]),
-    @yue.entry(text="昵称", on_enter=fn(s) { state.save(s) }),
+    @yue.label("Settings", style_str=[("color", "#356AA0")]),
+    @yue.entry(text="Nickname", on_enter=fn(s) { state.save(s) }),
     @yue.hbox([
-      @yue.button("保存", on_click=fn() { state.flush() }),
-      @yue.button("取消"),
+      @yue.button("Save", on_click=fn() { state.flush() }),
+      @yue.button("Cancel"),
     ]),
   ])
 }
-win.set_content(page(state))   // mount 返回根 Container，直接喂给窗口
+win.set_content(page(state))   // mount returns the root Container; feed it straight to the window
 ```
 
-### 窗口作声明式根：mount_window
+### Windows as the declarative root: mount_window
 
-`Window` 没有父视图，不做成 Node，而是作为挂载入口：创建窗口、把子树
-挂为内容、返回窗口句柄；菜单栏、托盘等非视图资产经 `handle` 补挂：
+A `Window` has no parent view, so instead of being a Node it serves as the mount entry point: it creates the window, mounts the subtree as its content, and returns the window handle; non-view assets such as menu bars and tray icons are attached via `handle`:
 
 ```moonbit
 let win = @yue.mount_window(
   [
-    @yue.label("你好"),
-    @yue.button("退出", on_click=fn() { @yue.quit() }),
+    @yue.label("Hello"),
+    @yue.button("Quit", on_click=fn() { @yue.quit() }),
   ],
   title="Demo",
   size=Some((960.0, 640.0)),
@@ -73,56 +71,54 @@ let win = @yue.mount_window(
 )
 ```
 
-### 节点构造器一览
+### Node constructor overview
 
-| 节点 | 对应控件 | 备注 |
+| Node | Corresponding widget | Notes |
 |---|---|---|
-| `vbox(children, …)` / `hbox(children, …)` | Container | 纵排 / 横排 |
-| `container(on_draw, handle, …)` | Container | 自绘画布 / 拿容器句柄 |
+| `vbox(children, …)` / `hbox(children, …)` | Container | vertical / horizontal layout |
+| `container(on_draw, handle, …)` | Container | custom-paint canvas / get container handle |
 | `label(text, …)` | Label | |
 | `button(title, on_click, …)` | Button | |
 | `checkbox(title, checked, on_change, …)` | Checkbox | `on_change(Bool)` |
-| `radio(title, checked, on_change, …)` | Radio | 同组互斥 |
-| `entry(text, password, on_enter, on_input, …)` | Entry | 回调携带文本 |
-| `text_edit(text, on_input, …)` | TextEdit | 回调携带文本 |
+| `radio(title, checked, on_change, …)` | Radio | mutually exclusive within a group |
+| `entry(text, password, on_enter, on_input, …)` | Entry | callbacks receive the text |
+| `text_edit(text, on_input, …)` | TextEdit | callback receives the text |
 | `slider(value, range, step, on_change, …)` | Slider | `on_change(Double)` |
 | `progress(value, indeterminate, …)` | ProgressBar | |
 | `picker(items, selected, on_change, …)` | Picker | |
 | `combo(items, selected, on_select, on_input, …)` | ComboBox | |
-| `group(title, content, …)` | Group | content 是单个 Node |
-| `scroll(content, content_size, policy, …)` | Scroll | content 是单个 Node |
+| `group(title, content, …)` | Group | content is a single Node |
+| `scroll(content, content_size, policy, …)` | Scroll | content is a single Node |
 | `separator(orientation)` | Separator | |
-| `tab(pages, on_change, …)` | Tab | 每页自动包容器 |
+| `tab(pages, on_change, …)` | Tab | each page gets an automatic container |
 | `date_picker(epoch, on_change)` | DatePicker | |
 | `gif(image, scale)` | GifPlayer | |
-| `browser(url, html, …)` | Browser | 二选一 |
-| `bind_label(store, f, …)` | Label | L3 响应式绑定，见下 |
+| `browser(url, html, …)` | Browser | one of the two |
+| `bind_label(store, f, …)` | Label | L3 reactive binding, see below |
 
-所有节点都带 `style` / `style_str`；常用节点另有 **`handle`** 参数。
+All nodes accept `style` / `style_str`; common nodes also have a **`handle`** parameter.
 
-### handle：拿回控件句柄
+### handle: getting the widget handle back
 
-声明式树里控件到挂载时才存在。想在挂载后命令式地操作某个控件
-（更新进度条、聚焦输入框……），传一个 `handle` 回调，挂载时它收到具体句柄：
+In a declarative tree, widgets only exist once mounted. If you want to imperatively operate on a widget after mounting (update a progress bar, focus an input…), pass a `handle` callback that receives the concrete handle at mount time:
 
 ```moonbit
 let bar : Ref[@yue.ProgressBar?] = Ref(None)
 @yue.progress(handle=fn(p) { bar.val = Some(p) })
-// 之后任意时刻：bar.val 里的 p.set_value(0.5)
+// any time later: p.set_value(0.5) on the value in bar.val
 ```
 
-### 混用命令式代码：node_of
+### Mixing in imperative code: node_of
 
-任何已有的 ViewLike 控件都能包成节点，嵌进声明树：
+Any existing ViewLike widget can be wrapped as a node and embedded in a declarative tree:
 
 ```moonbit
 @yue.node_of(my_legacy_view, style=[("marginBottom", 8.0)])
 ```
 
-### 自定义节点
+### Custom nodes
 
-`Node` 是开放结构（一个挂载函数字段），封装自己的复合控件只需返回 Node 的
-普通函数；要更底层的控制可以直接写字面量：
+`Node` is an open structure (a single mount-function field); to wrap your own composite widget, just write an ordinary function returning a Node; for lower-level control you can write a literal directly:
 
 ```moonbit
 fn tagged(label_text : String, body : Node) -> Node {
@@ -130,49 +126,38 @@ fn tagged(label_text : String, body : Node) -> Node {
 }
 ```
 
-## L3：Store 与 bind_label
+## L3: Store and bind_label
 
-`Store[T]` 是可订阅的值：`set` 时通知所有订阅者，`map` 派生只读视图，
-`bind_label` 把 Store 接进声明树——状态变化，文本自动更新：
+A `Store[T]` is a subscribable value: `set` notifies all subscribers, `map` derives read-only views, and `bind_label` plugs a Store into a declarative tree — when the state changes, the text updates automatically:
 
 ```moonbit
 let count : @yue.Store[Int] = @yue.Store::new(0)
 
 win.set_content(@yue.mount([
-  @yue.bind_label(count, fn(n) { "已点 \{n} 次" }),
-  @yue.button("点我", on_click=fn() { count.update(fn(n) { n + 1 }) }),
+  @yue.bind_label(count, fn(n) { "Clicked \{n} times" }),
+  @yue.button("Click me", on_click=fn() { count.update(fn(n) { n + 1 }) }),
 ]))
 ```
 
-点击按钮 → `count` 变化 → `bind_label` 的文本自动变为「已点 1 次」。
-不用 Store 的地方照旧用 `handle` + setter，两者共存。
+Clicking the button → `count` changes → the `bind_label` text automatically becomes "Clicked 1 times".
+Where you don't use a Store, keep using `handle` + setter as before; both coexist.
 
-API 一览：
+API overview:
 
-| 函数 | 说明 |
+| Function | Description |
 |---|---|
-| `Store::new(v)` | 创建 |
-| `get()` / `set(v)` | 读 / 写并通知 |
+| `Store::new(v)` | create |
+| `get()` / `set(v)` | read / write and notify |
 | `update(f)` | `set(f(get()))` |
-| `subscribe(f)` | 订阅；**注册时不回调**，初始值请直接 `get` |
-| `map(f)` | 派生 Store，源变化时自动跟随（可链式） |
-| `bind_label(store, f, …)` | 声明树里绑定文本，`f` 把状态映射为字符串 |
+| `subscribe(f)` | subscribe; **no callback at registration time**, read the initial value via `get` directly |
+| `map(f)` | derive a Store that follows the source automatically on change (chainable) |
+| `bind_label(store, f, …)` | bind text inside a declarative tree; `f` maps the state to a string |
 
-## 固有坑
+## Inherent pitfalls
 
-1. **节点挂载时才实例化**：`button(...)` 返回时控件还不存在，别在构建树时保存
-   控件引用；需要引用就用 `handle`（挂载时触发）。一棵树通常只 `mount` 一次，
-   对同一节点再次挂载会实例化出**第二份**控件。
-2. **`handle` 不叫 `ref`**：`ref` 也是 MoonBit 保留字。
-3. **Store 无退订**：订阅存活整个应用期，`set` 也不去重（相同值照样通知）。
-   在订阅回调里再 `set` 别的 Store 是安全的（快照遍历），但别让两条 Store
-   互相触发形成死循环。
-4. **bind_label 的订阅发生在挂载时**：未挂载的 bind 节点不订阅、不收通知；
-   初值在挂载时用 `f(store.get())` 直接渲染。
-5. **复选/单选的初始化回调**：`checkbox`/`radio` 以 `checked=true` 挂载后，
-   进入事件循环时会异步收到一次 `on_change`（GTK toggled 信号语义）；
-   **单选组切换时被取消选中的旧项也会收到一次 `on_change(false)`**。
-   业务判断以 `is_checked()` 为准。
-6. **异构 children 只有 Node 一条路**：MoonBit 的 trait 不能作数组元素类型，
-   `Array[ViewLike]` 装不了混排控件——这正是 `Node` 存在的原因；
-   `X::make` 层的单内容参数（`Group::make` / `Scroll::make`）则直接接受具体控件。
+1. **Nodes are instantiated only at mount time**: when `button(...)` returns, the widget does not exist yet — do not save widget references while building the tree; if you need a reference, use `handle` (triggered at mount time). A tree is normally `mount`ed only once; mounting the same node again instantiates a **second** copy of the widget.
+2. **`handle` is not called `ref`**: `ref` is also a MoonBit reserved word.
+3. **Store has no unsubscription**: subscriptions live for the whole application lifetime, and `set` does not deduplicate (identical values still notify). Calling `set` on another Store inside a subscription callback is safe (snapshot iteration), but do not let two Stores trigger each other into an infinite loop.
+4. **bind_label's subscription happens at mount time**: an unmounted bind node does not subscribe and receives no notifications; the initial value is rendered at mount time directly with `f(store.get())`.
+5. **Checkbox/radio initialization callbacks**: after `checkbox`/`radio` mounts with `checked=true`, it asynchronously receives one `on_change` when entering the event loop (GTK toggled-signal semantics); **when a radio group switches, the old item that got deselected also receives one `on_change(false)`**. Base business logic on `is_checked()`.
+6. **Heterogeneous children only via Node**: MoonBit traits cannot be used as array element types, so `Array[ViewLike]` cannot hold mixed widgets — this is exactly why `Node` exists; at the `X::make` layer, the single-content parameters (`Group::make` / `Scroll::make`) accept concrete widgets directly.
