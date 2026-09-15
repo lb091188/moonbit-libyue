@@ -119,6 +119,9 @@ pub(open) trait ViewLike {
   fn schedule_paint_rect(Self, RectF) -> Unit = _
   fn on_focus_in(Self, () -> Bool) -> Unit = _
   fn on_focus_out(Self, () -> Bool) -> Unit = _
+  fn do_drag_data_full(Self, String, String, Int, Image) -> Int = _
+  fn cancel_drag(Self) -> Unit = _
+  fn is_dragging(Self) -> Bool = _
   fn get_bounds_in_screen(Self) -> RectF = _
   fn on_mouse_down(Self, (MouseEvent) -> Bool) -> Unit = _
   fn on_mouse_up(Self, (MouseEvent) -> Bool) -> Unit = _

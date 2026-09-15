@@ -665,9 +665,7 @@ void *yue_mbt_font_default();
 void *yue_mbt_font_get_name(void *font);
 double yue_mbt_font_get_size(void *font);
 void yue_mbt_global_shortcut_unregister_all();
-void yue_mbt_menu_item_click(void *item);
 void yue_mbt_menu_item_set_enabled(void *item, int32_t enabled);
-int32_t yue_mbt_menu_item_is_enabled(void *item);
 void yue_mbt_menu_item_set_visible(void *item, int32_t visible);
 int32_t yue_mbt_menu_item_is_visible(void *item);
 void yue_mbt_file_dialog_set_title(void *dialog, const char *title);
@@ -687,6 +685,16 @@ void yue_mbt_notification_center_on_notification_close(void (*invoke)(void *, vo
 void yue_mbt_notification_center_on_notification_click(void (*invoke)(void *, void *), void *closure);
 void yue_mbt_notification_center_on_notification_action(void (*invoke)(void *, void *), void *closure);
 
+
+void yue_mbt_browser_execute_javascript_callback(void *browser, const char *code, void (*invoke)(void *, int32_t, void *), void *closure);
+void yue_mbt_browser_add_raw_binding(void *browser, const char *name, void (*invoke)(void *, void *), void *closure);
+void yue_mbt_browser_remove_binding(void *browser, const char *name);
+int32_t yue_mbt_browser_has_bindings(void *browser);
+int32_t yue_mbt_view_do_drag_data(void *view, const char *text, const char *file_paths, int32_t operations, int64_t drag_image);
+int32_t yue_mbt_view_cancel_drag(void *view);
+int32_t yue_mbt_view_is_dragging(void *view);
+
+void *yue_mbt_null_image();
 #endif
 
 #endif /* YUE_MBT_H */

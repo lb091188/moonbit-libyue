@@ -606,3 +606,104 @@ pub fn on_notification_action(callback : (String) -> Unit) -> Unit {
     wrapped,
   )
 }
+
+///|
+/// 执行 JS 并异步取回结果:ok 表示执行成功,json 为结果值的 JSON 文本。
+pub fn Browser::execute_javascript_with_result(
+  self : Browser,
+  code : String,
+  callback : (Bool, String) -> Unit,
+) -> Unit {
+  let wrapped : (Int, Bytes) -> Unit = fn(ok, json) {
+    callback(ok == 1, from_utf8_bytes(json))
+  }
+  keep_alive(fn() { ignore(wrapped) })
+  ffi_browser_execute_javascript_callback(
+    self.view,
+    utf8_bytes(code),
+    fn(f : (Int, Bytes) -> Unit, ok : Int, json : Bytes) -> Unit {
+      f(ok, json)
+    },
+    wrapped,
+  )
+}
+
+///|
+/// 注册 JS↔原生绑定:网页 JS 调用 name(name) 时收到 JSON 参数文本。
+/// 仅原始绑定(返回值不经类型转换回传);SetBindingName 改协议名。
+pub fn Browser::add_raw_binding(
+  self : Browser,
+  name : String,
+  callback : (String) -> Unit,
+) -> Unit {
+  let wrapped : (Bytes) -> Unit = fn(json) {
+    callback(from_utf8_bytes(json))
+  }
+  keep_alive(fn() { ignore(wrapped) })
+  ffi_browser_add_raw_binding(
+    self.view,
+    utf8_bytes(name),
+    fn(f : (Bytes) -> Unit, json : Bytes) -> Unit { f(json) },
+    wrapped,
+  )
+}
+
+///|
+/// 移除绑定。
+pub fn Browser::remove_binding(self : Browser, name : String) -> Unit {
+  ffi_browser_remove_binding(self.view, utf8_bytes(name))
+}
+
+///|
+/// 是否存在已注册绑定。
+pub fn Browser::has_bindings(self : Browser) -> Bool {
+  ffi_browser_has_bindings(self.view) == 1
+}
+
+///|
+/// 以文本/文件路径混合数据发起拖拽(空串跳过该类数据),
+/// operations 为 DragOperation 位组合,返回最终生效的操作。
+impl ViewLike with fn do_drag_data_full(
+  self,
+  text : String,
+  file_paths : String,
+  operations : Int,
+  drag_image : Image,
+) -> Int {
+  ffi_view_do_drag_data(
+    self.view(),
+    utf8_bytes(text),
+    utf8_bytes(file_paths),
+    operations,
+    drag_image,
+  )
+}
+
+///|
+/// 以文本/文件路径混合数据发起拖拽(operations 为 DragOperation 位组合,
+/// 默认 COPY=2;drag_image 为可选拖拽预览图),返回最终生效的操作。
+pub fn[T : ViewLike] start_drag(
+  v : T,
+  text? : String = "",
+  file_paths? : String = "",
+  operations? : Int = 2,
+  drag_image? : Image? = None,
+) -> Int {
+  let img : Image = match drag_image {
+    Some(i) => i
+    None => ffi_null_image()
+  }
+  v.do_drag_data_full(text, file_paths, operations, img)
+}
+
+///|
+/// 取消进行中的拖拽。
+impl ViewLike with fn cancel_drag(self) -> Unit {
+  ignore(ffi_view_cancel_drag(self.view()))
+}
+
+///|
+/// 是否正在拖拽。
+impl ViewLike with fn is_dragging(self) -> Bool {
+  ffi_view_is_dragging(self.view()) == 1
+}

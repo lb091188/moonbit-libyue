@@ -2237,3 +2237,53 @@ extern "c" fn ffi_notification_center_on_notification_action(
   invoke : FuncRef[((Bytes) -> Unit, Bytes) -> Unit],
   callback : (Bytes) -> Unit,
 ) -> Unit = "yue_mbt_notification_center_on_notification_action"
+
+///|
+// 方法级审计补齐二:Browser JS 回调/绑定与通用拖拽
+
+///|
+#borrow(b, code, invoke, callback)
+extern "c" fn ffi_browser_execute_javascript_callback(
+  b : View,
+  code : Bytes,
+  invoke : FuncRef[((Int, Bytes) -> Unit, Int, Bytes) -> Unit],
+  callback : (Int, Bytes) -> Unit,
+) -> Unit = "yue_mbt_browser_execute_javascript_callback"
+
+///|
+#borrow(b, name, invoke, callback)
+extern "c" fn ffi_browser_add_raw_binding(
+  b : View,
+  name : Bytes,
+  invoke : FuncRef[((Bytes) -> Unit, Bytes) -> Unit],
+  callback : (Bytes) -> Unit,
+) -> Unit = "yue_mbt_browser_add_raw_binding"
+
+///|
+#borrow(b, name)
+extern "c" fn ffi_browser_remove_binding(b : View, name : Bytes) -> Unit = "yue_mbt_browser_remove_binding"
+
+///|
+#borrow(b)
+extern "c" fn ffi_browser_has_bindings(b : View) -> Int = "yue_mbt_browser_has_bindings"
+
+///|
+#borrow(v, text, paths, image)
+extern "c" fn ffi_view_do_drag_data(
+  v : View,
+  text : Bytes,
+  paths : Bytes,
+  operations : Int,
+  image : Image,
+) -> Int = "yue_mbt_view_do_drag_data"
+
+///|
+#borrow(v)
+extern "c" fn ffi_view_cancel_drag(v : View) -> Int = "yue_mbt_view_cancel_drag"
+
+///|
+#borrow(v)
+extern "c" fn ffi_view_is_dragging(v : View) -> Int = "yue_mbt_view_is_dragging"
+
+///|
+extern "c" fn ffi_null_image() -> Image = "yue_mbt_null_image"
