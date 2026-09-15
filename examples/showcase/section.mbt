@@ -32,14 +32,19 @@ fn section(
   desc : String,
   content : Array[@yue.Node],
 ) -> @yue.Node {
-  let nodes : Array[@yue.Node] = [
-    @yue.label(title, style_str=[("color", title_color)], style=[
-      ("marginBottom", 4.0),
-    ]),
-    @yue.label(desc, style_str=[("color", desc_color)], style=[
-      ("marginBottom", 10.0),
-    ]),
-  ]
+  let t = @yue.label(
+    title,
+    style_str=[("color", title_color)],
+    style=[("marginBottom", 4.0)],
+    handle=fn(l) { l.set_align(@yue.Start) },
+  )
+  let d = @yue.label(
+    desc,
+    style_str=[("color", desc_color)],
+    style=[("marginBottom", 10.0)],
+    handle=fn(l) { l.set_align(@yue.Start) },
+  )
+  let nodes : Array[@yue.Node] = [t, d]
   for c in content {
     nodes.push(c)
   }
