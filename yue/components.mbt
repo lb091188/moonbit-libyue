@@ -430,84 +430,88 @@ pub fn alert(text : String, t : SemanticType, height? : Double = 40.0) -> Node {
 }
 
 ///|
-/// 分页(对应 EP Pagination):‹ 页码 ›,当前页主题色底白字,
-/// hover 浅蓝,28×28 直角。current 为共享状态(从 1 开始)。
+/// 分页(EP Pagination):‹ 页码 ›,当前页主题色实底白字,
+/// 悬停浅蓝,28×28 直角,文字垂直居中。current 为共享状态(从 1 开始),
+/// 点击直接写源 Store,全部按钮同步高亮。
 pub fn pagination(current : Store[Int], pages : Int) -> Node {
-  let items : Array[Node] = []
-  let prev = stateful_item(
-    "‹",
-    [("width", 28.0), ("height", 28.0), ("marginRight", 4.0)],
-    Store::new(""),
-    nav_btn_bg,
-    nav_btn_fg,
-  )
-  items.push(prev)
-  let mut i = 1
-  while i <= pages {
-    let page = i.to_string()
-    items.push(
-      stateful_item(
-        page,
-        [("width", 28.0), ("height", 28.0), ("marginRight", 4.0)],
-        int_store_adapter(current, pages),
-        page_btn_bg,
-        page_btn_fg,
-      ),
-    )
-    i = i + 1
+  {
+    mount: fn(parent) {
+      let row = Container::make(
+        style=[("height", 30.0)],
+        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+      )
+      fn add_btn(label : String, target : Int, is_page : Bool) -> Unit {
+        let hover = Ref(false)
+        let b = Container::make(
+          style=[("width", 28.0), ("height", 28.0), ("marginRight", 4.0)],
+        )
+        b.on_draw(fn(p) {
+          let bd = b.get_bounds()
+          let cur = current.get()
+          let act = is_page && cur == target
+          if act {
+            p.set_fill_color(theme_primary)
+            p.fill_rect(0.0, 0.0, bd.width, bd.height)
+          } else if hover.val {
+            p.set_fill_color(theme_primary_light)
+            p.fill_rect(0.0, 0.0, bd.width, bd.height)
+          }
+          p.draw_text(
+            label,
+            0.0,
+            0.0,
+            bd.width,
+            bd.height,
+            align=Center,
+            valign=Center,
+            color=if act { "#FFFFFF" } else { theme_text_regular },
+          )
+        })
+        b.on_mouse_down(fn(e) {
+          if e.button == 1 {
+            if is_page {
+              current.set(target)
+            } else {
+              current.update(fn(n) {
+                let m = n + target
+                if m < 1 {
+                  1
+                } else if m > pages {
+                  pages
+                } else {
+                  m
+                }
+              })
+            }
+            true
+          } else {
+            false
+          }
+        })
+        b.on_mouse_enter(fn(_e) {
+          hover.val = true
+          b.schedule_paint()
+        })
+        b.on_mouse_leave(fn(_e) {
+          hover.val = false
+          b.schedule_paint()
+        })
+        current.subscribe(fn(_v) { b.schedule_paint() })
+        row.add_child(b)
+      }
+
+      add_btn("‹", -1, false)
+      let mut i = 1
+      while i <= pages {
+        add_btn(i.to_string(), i, true)
+        i = i + 1
+      }
+      add_btn("›", 1, false)
+      attach(parent, row.view())
+      row.view()
+    },
   }
-  let next = stateful_item(
-    "›",
-    [("width", 28.0), ("height", 28.0)],
-    Store::new(""),
-    nav_btn_bg,
-    nav_btn_fg,
-  )
-  items.push(next)
-  hbox(items, style_str=[("alignItems", "center")])
 }
-
-///|
-fn nav_btn_bg(_act : Bool, hov : Bool) -> String {
-  if hov {
-    theme_primary_light
-  } else {
-    ""
-  }
-}
-
-///|
-fn nav_btn_fg(_act : Bool, _hov : Bool) -> String {
-  theme_text_regular
-}
-
-///|
-fn page_btn_bg(act : Bool, hov : Bool) -> String {
-  if act {
-    theme_primary
-  } else if hov {
-    theme_primary_light
-  } else {
-    ""
-  }
-}
-
-///|
-fn page_btn_fg(act : Bool, _hov : Bool) -> String {
-  if act {
-    "#FFFFFF"
-  } else {
-    theme_text_regular
-  }
-}
-
-///|
-/// 把 Store[Int] 适配成 stateful_item 需要的 Store[String]
-/// (页码 active 判定:store 值 == 页码文本)。
-fn int_store_adapter(current : Store[Int], _pages : Int) -> Store[String] {
-  current.map(fn(n) { n.to_string() })
-}
-
 ///|
 /// 卡片(对应 EP Card):白底 + 边框,标题栏(加粗、底部分隔线),
 /// 内容区从标题栏下方开始。children 经内层容器挂载,自动留出标题高度。
