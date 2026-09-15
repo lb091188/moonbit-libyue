@@ -72,9 +72,9 @@ shim/                C ABI wrapper layer (yue_mbt.cpp + include/yue_mbt.h) + CMa
 scripts/prepare.py   Pinned-version libyue download + static library build (link flags are owned by prebuild.py)
 scripts/prebuild.py  Moon build hook: emits per-OS link config, propagated to all dependents
 scripts/postadd.py   Auto-triggered on `moon add` for the first native build
-examples/            14 examples: hello / editor / browser / drawing / table / widgets /
+examples/            15 examples: hello / editor / browser / drawing / table / widgets /
                      drag_source / drag_destination / floating_heart /
-                     auto_height_edit / showcase / misc / advanced / events / events
+                     auto_height_edit / showcase / misc / advanced / events / layout
 .agents/skills/      MoonBit skill library (the FFI conventions referenced throughout)
 ```
 
@@ -97,7 +97,7 @@ Build the native library and run an example:
 moon run examples/hello
 ```
 
-No manual setup is required: link flags are emitted per-OS at build time by `scripts/prebuild.py` (a hook declared in moon.mod.json) and propagated automatically to every dependent package. When the static library is missing, the hook runs `scripts/prepare.py` to build it (downloads libyue + CMake). `prepare.py` is idempotent — a cached archive whose sha256 does not match (e.g. an interrupted download) is deleted and re-downloaded. Switching the same checkout between Linux and Windows is likewise just `moon run`: the hook emits fresh link config for the new system (the static library is a per-platform artifact and is rebuilt automatically on first use).
+Zero configuration: link flags are emitted per-OS at build time by the `scripts/prebuild.py` hook and propagated automatically; when the static library is missing, `scripts/prepare.py` runs to build it. `prepare.py` is idempotent; after switching OS, the first build rebuilds it.
 
 ### Windows (10/11, x64)
 
@@ -140,7 +140,7 @@ moon test
 
 - The current binding surface is roughly 260 ABI functions (262 `extern "c"` declarations in `yue/ffi.mbt`): App/Lifetime, Window, common View capabilities and drag & drop, Container/Label/Button/Entry/TextEdit, Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer, Browser, Menu/MenuBar, Table + model bridge, Painter/Canvas, Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog, Screen/Appearance/Locale/Cursor. New widgets follow the established pattern: add a mechanical translation function in the shim → add the extern in `ffi.mbt` → add the type and methods in a new `*.mbt`.
 - Known limitations, ABI pitfalls and per-platform adaptation lessons live in `AGENTS.md` and [docs/adaptation.md](docs/adaptation.md) instead of this README. The Linux tray design — motivation, architecture, backend fallback, desktop compatibility, debugging — is documented separately in [docs/tray.md](docs/tray.md) (Chinese). The widget API quick reference (including upstream pitfalls) lives in [docs/components.md](docs/components.md); the declarative layer — `X::make` props constructors, `Node`/`mount` render trees and `Store` reactive bindings — in [docs/declarative.md](docs/declarative.md).
-- Shim/vendor changes or a re-run of `prepare.py` having no effect: force relinking with `moon clean` (why: [docs/relink.md](docs/relink.md), Chinese).
+- Shim/vendor changes or a re-run of `prepare.py` require forcing a relink: `moon clean`, or delete the linked executable — see [docs/relink.md](docs/relink.md) (Chinese).
 - Documentation index: [docs/README.md](docs/README.md).
 
 ## References

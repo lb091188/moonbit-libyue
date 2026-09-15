@@ -67,9 +67,9 @@ shim/                C ABI 封装层（yue_mbt.cpp + include/yue_mbt.h）+ CMake
 scripts/prepare.py   固定版本下载 libyue + 构建静态库（链接参数由 prebuild.py 托管）
 scripts/prebuild.py  moon 构建钩子：按当前系统输出链接配置，自动传播给依赖方
 scripts/postadd.py   moon add 安装本库时自动触发首次构建
-examples/            14 个示例：hello / editor / browser / drawing / table / widgets /
+examples/            15 个示例：hello / editor / browser / drawing / table / widgets /
                      drag_source / drag_destination / floating_heart /
-                     auto_height_edit / showcase / misc / advanced / events
+                     auto_height_edit / showcase / misc / advanced / events / layout
 .agents/skills/      MoonBit 技能库（FFI 规范以此为准）
 ```
 
@@ -92,7 +92,7 @@ sudo apt install build-essential cmake pkg-config \
 moon run examples/hello
 ```
 
-无需任何手动准备：链接参数由 `scripts/prebuild.py`（moon.mod.json 声明的构建钩子）在构建时按当前系统生成并自动传播，静态库缺失时会自动执行 `scripts/prepare.py` 补建（下载 libyue + CMake）。`prepare.py` 幂等可重跑——缓存包 sha256 不匹配（如下载被中断截断）会自动删除重下。同一仓库在 Linux/Windows 间切换时同样直接 `moon run`，钩子按新系统重新输出链接配置（静态库为平台产物，切换后首次构建会自动重建）。
+零配置：链接参数由构建钩子 `scripts/prebuild.py` 按当前系统生成并自动传播，静态库缺失时自动执行 `scripts/prepare.py` 补建。`prepare.py` 幂等可重跑；Linux/Windows 切换后首次构建自动重建。
 
 ### Windows（10/11，x64）
 
@@ -148,7 +148,7 @@ moon test
 
 - 当前封装面约 260 个 ABI 函数（`yue/ffi.mbt` 中 262 个 `extern "c"` 声明）：App/Lifetime、Window、View 通用能力与拖拽、Container/Label/Button/Entry/TextEdit、Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer、Browser、Menu/MenuBar、Table+模型桥、Painter/Canvas、Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog、Screen/Appearance/Locale/Cursor；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。
 - 已知边界、ABI 坑与各平台适配经验不在 README 展开，见 `AGENTS.md`（AI 协作规则）与 [docs/adaptation.md](docs/adaptation.md)；Linux 托盘方案（设计动机、架构、后端降级、桌面兼容性、调试）独立成文：[docs/tray.md](docs/tray.md)。
-- shim/vendor 改动或重跑 `prepare.py` 后行为不变：`moon clean` 强制重链（原理：[docs/relink.md](docs/relink.md)）。
+- shim/vendor 改动或重跑 `prepare.py` 后须强制重链：`moon clean` 或删对应 exe，见 [docs/relink.md](docs/relink.md)。
 - 文档索引：[docs/README.md](docs/README.md)。
 
 ## 参考
