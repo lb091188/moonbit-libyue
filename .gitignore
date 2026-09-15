@@ -10,3 +10,9 @@
 
 # WebView2 loader(prepare.py 复制到仓库根,运行期按工作目录搜索)
 /WebView2Loader.dll
+
+# Python 缓存(moon package 与 git 同样排除)
+__pycache__/
+
+# 本地文档(不发布、不入库)
+/9月黑客松.md
