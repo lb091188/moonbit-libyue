@@ -88,11 +88,32 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **全局快捷键是 X11 `XGrabKey` 排他注册,被占用即返回 -1**(2026-09-12 实测入档):XFCE 自定义快捷键(xfconf-query `/commands/custom/`,如本机 `<Primary><Alt>s` 绑了钉钉切换脚本)已抓取的组合键,再注册会 BadAccess,libyue 用 error trap 吞掉后 `Register` 返回 -1——不崩溃但静默失败,使用方必须检查 -1 并提示换键。验证键位占用:`xfconf-query -c xfce4-keyboard-shortcuts -l -v`。
 - **焦点在桌面时 xfwm4 抢占键盘,全局快捷键不触发**(2026-09-12 实测入档):`XGrabKey` passive grab 已挂、焦点在任意应用窗口时按键正常触发;但焦点落在桌面(xfdesktop)时 xfwm4 的键盘处理抢先,事件到不了应用。自动化验证用 `xdotool windowfocus <窗口>` 先把键盘焦点移入被测窗口再 `xdotool key ctrl+alt+<k>`,仅 `windowactivate` 不转移键盘焦点,会得到"没触发"的假阴性。
 
-#### GNOME ❓ 未实测
+#### GNOME ✅ 实测通过(Ubuntu 24.04 原版,Wayland 与 X11 双会话,2026-09-15)
 
-- 纯净 GNOME 无托盘协议 → `Tray::is_supported()` 为 false,`Tray::new` 返回结构化 `Err(Unsupported)`,属预期行为。
-- 装 AppIndicator 扩展后协议层可用(traybus 已实现 SNI),待实测入档。
-- GNOME (X11) 下托盘/菜单/对话框/WebView 的视觉与交互表现在 TODO,待人工确认。
+- 实测环境:ubuntu-24.04 虚拟机,GNOME Shell 46,`ubuntu-appindicators@ubuntu.com` 扩展默认启用(`gsettings enabled-extensions` 显示 `@as []` 是"默认值"表象,实际生效),`org.kde.StatusNotifierWatcher` 由 gnome-shell 持有。24.04.4 全新安装(原版桌面,默认 Wayland 会话;改 `/etc/gdm3/custom.conf` `WaylandEnable=false` 可切 Xorg 复测,两-session 均通过)。
+- 托盘图标:顶栏正常渲染(IconPixmap 32+16 双档);SNI watcher 在线。
+- **【修复】Menu 属性空菜单返回 `/` 导致 GNOME 点击图标全程无反应**(2026-09-15 实测入档):现象是图标显示正常但点击无菜单也无 Activate、dbus 零调用。根因:GNOME AppIndicator 扩展在**注册瞬间**就读 `Menu` 属性构造 DBusMenu 代理,而消费方 `Tray::new` 与 `set_menu` 之间有时间差,当时 `menu_items` 为空、属性返回根路径 `/` → 扩展代理指向无效对象(`journalctl` 可见 `UnknownObject: /`),菜单客户端永久坏死。XFCE/KDE/deepin 都是点击时才拉菜单所以不触发。修复:traybus 的 `Menu` 属性恒返回真实 `/MenuBar`(空菜单也导出,Qt 同款语义),后续靠 `LayoutUpdated` 通知填充。验证:dbus-monitor 见 Event/AboutToShow 流动、真机点击菜单三项回调闭环。
+- 点击行为(GNOME 特有,`ItemIsMenu=false` 语义):左键/右键均发 Activate;实测菜单可弹出、项可点选,但弹出路径与 XFCE/KDE 不同(用户实测:菜单可开可点,退出闭环正常)。
+- **全局快捷键在 Wayland 会话注册即段错误**(2026-09-15 实测入档):上游 `global_shortcut_gtk.cc` 直接用 `GDK_WINDOW_XDISPLAY(root)`(X11 专属宏),Wayland 下根窗口 impl 是 Wayland 类型,强转读出垃圾 `Display*` 传给 `XKeysymToKeycode` → SIGSEGV。修复:prepare.py `patch_linux_global_shortcut_wayland` 给 `Start/StopWatching` 与 `PlatformRegister` 加 `GDK_IS_X11_DISPLAY` 守卫,非 X11 会话 `Register` 返回 -1(既有失败语义)。X11 会话下 XGrabKey 行为不变。
+- **鼠标键位是 yue 统一语义 1=左 2=右 3=中,不是 GDK 原始值**(2026-09-15 实测入档):libyue `ButtonFromGdkEvent` 把 GDK 的 2(中)/3(右)交换,全平台语义一致;showcase 菜单页曾按 GTK 惯例判 `==3` 为右键,导致"中键弹菜单、右键显示 2"(XFCE 同样存在,非 GNOME 特有)。
+- 环境噪音(非本项目问题):spice-vdagent 在 Wayland 会话反复 SIGSEGV 弹 Apport 对话框(`/etc/default/apport` `enabled=0` 屏蔽);Wayland 空闲锁屏/息屏干扰自动化(`gsettings org.gnome.desktop.session idle-delay 0` + `lock-enabled false`)。
+- SSH 远程起 GUI 进程的环境变量:X11 会话 `XAUTHORITY=/run/user/1000/gdm/Xauthority`;Wayland 会话 `XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.*`、`WAYLAND_DISPLAY=wayland-0`;两者都需要 `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus`。SSH 环境缺 `XDG_CURRENT_DESKTOP` 会使 `desktop_name()` 返回 unknown(仅诊断信息,不影响功能)。
+
+#### KDE ✅ 实测通过(Kubuntu 24.04,Plasma 5.27,2026-09-15)
+
+- 实测环境:Kubuntu 24.04.5 虚拟机(X11 会话),面板托盘直收 SNI,新图标直接进可见托盘区(无折叠)。
+- 全链路通过:图标显示 → 左键发 `Activate(x,y)`(回调贯通)→ 右键 Plasma 镜像渲染 DBusMenu(显示窗口/换图标/退出)→ 点「退出」回调触发 → `quit()` 干净退出(exit 0),图标即时消失。
+- **协议行为与 XFCE 4.18 相反:KDE 发单条 `Event` / `AboutToShow`,不发批量版**(dbus-monitor 实证);traybus 两种都实现,无需分支。
+- 环境准备:openssh-server 默认未装(GUI 终端 `sudo apt-get install openssh-server`);libwebkit2gtk-4.1-0 需补装运行库。
+
+#### Deepin ✅ 实测通过(Deepin 23 社区版,DDE,2026-09-15;Deepin 25 见下)
+
+- 实测环境:deepin 23 社区版虚拟机,glibc 2.38(Debian GLIBC 2.38-6deepin13),gcc 12.3,内核 6.6.84-amd64-desktop-hwe,X11 会话,`XDG_CURRENT_DESKTOP=DDE`。
+- **dde-dock 实现 `org.kde.StatusNotifierWatcher`**,SNI 直连可用;新图标默认收进 dock 右侧「应用托盘」折叠区(点 `^` 展开),用户可拖出到常驻区。
+- 全链路通过:折叠区图标显示 → 左键 `Activate` 回调贯通 → 右键 dde-dock 渲染 DBusMenu(三项齐全)→ 菜单点击回调 → 干净退出(exit 0),图标消失。协议为单条 `Event`。
+- **宿主机二进制直接可跑**:Ubuntu 24.04(glibc 2.39)构建的探针在 deepin 23(glibc 2.38)运行正常——二进制 GLIBC 符号上限恰好 2.38,且 deepin 23 带 webkit2gtk-4.1 运行库(ldd 全解析);跨发行版分发不必逐环境重编,先查 glibc 符号需求(`objdump -T | grep GLIBC_`)。
+- deepin 23 仓库**没有 openssh-server 包**(被引用但无可安装候选),远程管理走 virtiofs 共享 + GUI 终端执行脚本(安装器建的用户 noahliu 可 sudo)。
+- 深度终端的 `script` 是 util-linux 标准版,注意命令须经 `-c` 传入(`script -q -f -c "cmd" log`),裸 `script -qf cmd log` 会报参数数错误。
 
 #### KDE / MATE / Cinnamon / Budgie / LXQt ❓ 未实测
 
@@ -102,7 +123,8 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 
 - DBus 数组长度前缀**不含首元素前的对齐填充**:算进去会被 dbus-daemon 判协议违规直接断连。
 - DBus 头部 SIGNATURE 字段的 variant 签名是 "g"(u8 长度编码),按 "s" 编能过自洽单测但会被真实总线拒绝。
-- 教训:**单测证自洽,互操作必须上真总线验证**;discovery 类问题用 `dbus-monitor` 抓包定位。
+- **SNI `Menu` 属性必须恒返回真实菜单对象路径,空菜单也不能回 `/`**:GNOME AppIndicator 扩展注册瞬间即读该属性建代理,返回 `/` 会令菜单客户端永久坏死(详见「GNOME」节);Qt/ksni 同款语义是始终导出 `/MenuBar`。
+- 教训:**单测证自洽,互操作必须上真总线验证**;discovery 类问题用 `dbus-monitor` 抓包定位,扩展/面板侧的 JS 异常看 `journalctl --user -u org.gnome.Shell@wayland.service`(gnome-shell 的 Gio.DBusError 行就是面板侧代理构建失败的第一现场)。
 
 ### 显示协议
 

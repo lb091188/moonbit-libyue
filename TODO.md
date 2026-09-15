@@ -73,9 +73,10 @@
 ## 平台适配目标(对齐 README 支持矩阵,与上面并行,做完入档 docs/adaptation.md)
 
 - [x] Ubuntu 24.04 Xfce — 主链路实测通过
-- [ ] Ubuntu 24.04 GNOME — 托盘(纯净 GNOME 无托盘协议,需 AppIndicator 扩展)/菜单/对话框/WebView 人工确认,差异入档
-- [ ] Ubuntu 24.04 KDE — 托盘与 DBusMenu 行为实测(KDE 面板自渲染菜单,关注与 XFCE 的批量方法差异)
-- [ ] Deepin 25 — 托盘协议与整体表现实测
+- [x] Ubuntu 24.04 GNOME — Wayland/X11 双会话实测通过(2026-09-15):ubuntu-appindicators 默认启用;修复 SNI Menu 属性空菜单返回 `/` 致 GNOME 点击无反应(恒返回 /MenuBar);全局快捷键 Wayland 段错误加 X11 守卫;差异入档 adaptation.md
+- [x] Ubuntu 24.04 KDE(Kubuntu 24.04)— 实测通过(2026-09-15):KDE 发单条 Event/AboutToShow(与 XFCE 批量版相反),托盘/Activate/右键菜单/退出闭环全通
+- [x] Deepin 23 社区版 — 实测通过(2026-09-15):dde-dock SNI 可用,新图标在「应用托盘」折叠区;宿主机二进制直接可跑(glibc 2.38 恰好满足)
+- [ ] Deepin 25 — 托盘协议与整体表现实测(进行中)
 - [ ] OpenKylin 3 — 托盘协议与整体表现实测
 - [x] Windows 10/11 — 实测通过(2026-09-12,showcase 全功能跑通)+ `prepare.py` 链接参数自动化(Windows 资产名/cl 命令行风格/CRT/manifest 一并处理;经验入档 docs/adaptation.md)
 - [ ] macOS — 实测(CMake 已备 ARC/no-ARC 双库分支,先验证哪条走通;prepare.py 的 mac 资产名已顺带修正)
