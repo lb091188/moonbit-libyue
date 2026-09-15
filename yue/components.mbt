@@ -1212,3 +1212,108 @@ pub fn progress_line(value : Store[Double], height? : Double = 8.0) -> Node {
     },
   }
 }
+
+///|
+/// 文字角色(主题排版体系):字号与颜色随角色统一。
+pub(all) enum TextRole {
+  Title
+  Section
+  Body
+  Secondary
+  Accent
+}
+
+///|
+fn role_font(role : TextRole) -> Font {
+  match role {
+    Title => Font::new("Sans", 18.0, weight=SemiBold)
+    Section => Font::new("Sans", 14.0, weight=SemiBold)
+    Body => Font::new("Sans", 13.0)
+    Secondary => Font::new("Sans", 12.0)
+    Accent => Font::new("Sans", 13.0, weight=SemiBold)
+  }
+}
+
+///|
+fn role_color(role : TextRole) -> String {
+  match role {
+    Title => theme_text_primary
+    Section => theme_text_primary
+    Body => theme_text_regular
+    Secondary => theme_text_secondary
+    Accent => theme_primary
+  }
+}
+
+///|
+/// 主题化标签:文字角色统一字号/颜色,左对齐。
+pub fn label_t(text : String, role? : TextRole = Body) -> Node {
+  {
+    mount: fn(parent) {
+      let l = Label::new(text)
+      l.set_font(role_font(role))
+      l.set_color(role_color(role))
+      l.set_align(Start)
+      attach(parent, l.view())
+      l.view()
+    },
+  }
+}
+
+///|
+/// 按钮变体:Solid 主题色实底白字 / Soft 浅底主题色字 /
+/// Text 浅灰底主题色字 / Danger 红色实底白字。
+pub(all) enum ButtonVariant {
+  Solid
+  Soft
+  Text
+  Danger
+}
+
+///|
+/// 主题化按钮:背景色 + 文字颜色统一走主题,hover 由原生样式接管。
+pub fn button_t(
+  text : String,
+  on_click? : () -> Unit = fn() {  },
+  variant? : ButtonVariant = Soft,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let b = Button::make(text)
+      let (bg, fg) = match variant {
+        Solid => (theme_primary, "#FFFFFF")
+        Soft => (theme_primary_light, theme_primary)
+        Text => (theme_info_light, theme_primary)
+        Danger => (theme_danger, "#FFFFFF")
+      }
+      b.set_background_color(bg)
+      b.set_color(fg)
+      b.set_font(Font::new("Sans", 13.0))
+      b.on_click(fn() { on_click() })
+      attach(parent, b.view())
+      b.view()
+    },
+  }
+}
+
+///|
+/// 主题化单行输入:统一字体与前景色。
+pub fn entry_t(
+  text? : String = "",
+  password? : Bool = false,
+  on_input? : (String) -> Unit = fn(_s) {  },
+) -> Node {
+  {
+    mount: fn(parent) {
+      let e = match password {
+        true => Entry::make(text~, entry_type=Password)
+        false => Entry::make(text~, entry_type=Normal)
+      }
+      // 注:GTK Entry 上 set_color 会连带渲染背景变黑,故只统一字体
+      e.set_font(Font::new("Sans", 13.0))
+      e.on_text_change(fn() { on_input(e.get_text()) })
+      attach(parent, e.view())
+      e.view()
+    },
+  }
+}

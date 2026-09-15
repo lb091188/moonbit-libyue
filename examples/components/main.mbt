@@ -84,6 +84,46 @@ fn main {
   // ---------- 基础组件 ----------
   let p_basic = scroll_page([
     section(
+      "Button 按钮变体",
+      "Solid 主题色实底 / Soft 浅底 / Text 浅灰底 / Danger 红色实底,文字颜色与字体统一走主题。",
+      [
+        @yue.hbox(
+          [
+            @yue.button_t(
+              "主要操作",
+              on_click=fn() { counter.update(fn(n) { n + 1 }) },
+              variant=@yue.Solid,
+            ),
+            @yue.button_t("次要操作", variant=@yue.Soft),
+            @yue.button_t("文字按钮", variant=@yue.Text),
+            @yue.button_t("危险操作", variant=@yue.Danger),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
+      ],
+    ),
+    section(
+      "Entry 输入框",
+      "普通与密码输入,字体统一走主题(前景色保留系统样式)。",
+      [
+        @yue.vbox([
+          @yue.entry_t(text="输入点什么…"),
+          @yue.label(""), @yue.entry_t(text="密码", password=true),
+        ]),
+      ],
+    ),
+    section(
+      "Label 文字角色",
+      "Title / Section / Body / Secondary / Accent 五级排版,字号颜色随角色。",
+      [
+        @yue.label_t("标题文字(Title)", role=@yue.Title),
+        @yue.label_t("小节标题(Section)", role=@yue.Section),
+        @yue.label_t("正文文字(Body)", role=@yue.Body),
+        @yue.label_t("辅助文字(Secondary)", role=@yue.Secondary),
+        @yue.label_t("强调文字(Accent)", role=@yue.Accent),
+      ],
+    ),
+    section(
       "Tag 标签",
       "五种语义类型(浅底深字)+ 自定义实底色;宽度按文本自适应,文字垂直居中。",
       [
@@ -163,10 +203,10 @@ fn main {
           ],
           style_str=[("alignItems", "center")],
         ),
-        @yue.button(
+        @yue.button_t(
           "刷新访问量",
           on_click=fn() { counter.update(fn(n) { n + 1 }) },
-          style=[("marginTop", 8.0)],
+          variant=@yue.Solid,
         ),
       ],
     ),
