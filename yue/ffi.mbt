@@ -111,6 +111,8 @@ extern "c" fn ffi_view_set_style_prop_str(
 ///|
 #borrow(view, hex)
 extern "c" fn ffi_view_set_background_color(view : View, hex : Bytes) -> Unit = "yue_mbt_view_set_background_color"
+
+///|
 extern "c" fn ffi_view_set_visible(view : View, visible : Int) -> Unit = "yue_mbt_view_set_visible"
 
 ///|
@@ -336,6 +338,7 @@ extern "c" fn ffi_browser_get_cookies_for_url(
 ) -> Unit = "yue_mbt_browser_get_cookies_for_url"
 
 ///|
+
 ///|
 extern "c" fn ffi_browser_new() -> View = "yue_mbt_browser_new"
 
@@ -449,6 +452,7 @@ extern "c" fn ffi_menu_item_set_checked(item : MenuItem, checked : Int) -> Unit 
 extern "c" fn ffi_menu_item_is_checked(item : MenuItem) -> Int = "yue_mbt_menu_item_is_checked"
 
 ///|
+
 ///|
 #borrow(item, label)
 extern "c" fn ffi_menu_item_set_label(item : MenuItem, label : Bytes) -> Unit = "yue_mbt_menu_item_set_label"
@@ -479,6 +483,7 @@ extern "c" fn ffi_file_dialog_set_options(
 ) -> Unit = "yue_mbt_file_dialog_set_options"
 
 ///|
+
 ///|
 extern "c" fn ffi_file_save_dialog_new() -> FileDialog = "yue_mbt_file_save_dialog_new"
 
@@ -854,6 +859,7 @@ extern "c" fn ffi_table_add_column_with_options(
 ) -> Unit = "yue_mbt_table_add_column_with_options"
 
 ///|
+
 ///|
 #borrow(table, title)
 extern "c" fn ffi_table_add_column_text(
@@ -984,10 +990,16 @@ extern "c" fn ffi_view_on_drag_leave(
 ///|
 #borrow(view)
 extern "c" fn ffi_view_schedule_paint(view : View) -> Unit = "yue_mbt_view_schedule_paint"
+
+///|
 #borrow(view, font)
 extern "c" fn ffi_view_set_font(view : View, font : Font) -> Unit = "yue_mbt_view_set_font"
+
+///|
 #borrow(view, hex)
 extern "c" fn ffi_view_set_color(view : View, hex : Bytes) -> Unit = "yue_mbt_view_set_color"
+
+///|
 #borrow(view)
 extern "c" fn ffi_label_set_align(view : View, align : Int) -> Unit = "yue_mbt_label_set_align"
 
@@ -1369,6 +1381,7 @@ extern "c" fn ffi_scroll_get_scrollbar_policy_x(scroll : View) -> Int = "yue_mbt
 extern "c" fn ffi_scroll_get_scrollbar_policy_y(scroll : View) -> Int = "yue_mbt_scroll_get_scrollbar_policy_y"
 
 ///|
+
 ///|
 #borrow(scroll)
 extern "c" fn ffi_scroll_set_overlay_scrollbar(
@@ -1420,6 +1433,7 @@ extern "c" fn ffi_clipboard_get_data(
 ) -> Bytes = "yue_mbt_clipboard_get_data"
 
 ///|
+
 ///|
 #borrow(clipboard)
 extern "c" fn ffi_clipboard_clear(clipboard : Clipboard) -> Unit = "yue_mbt_clipboard_clear"
@@ -1484,6 +1498,7 @@ extern "c" fn ffi_notification_set_actions(
 ) -> Unit = "yue_mbt_notification_set_actions"
 
 ///|
+
 ///|
 extern "c" fn ffi_notification_new() -> Notification = "yue_mbt_notification_new"
 
@@ -1989,7 +2004,11 @@ extern "c" fn ffi_view_on_focus_out(
 
 ///|
 #borrow(c, v)
-extern "c" fn ffi_container_add_child_view_at(c : View, v : View, index : Int) -> Unit = "yue_mbt_container_add_child_view_at"
+extern "c" fn ffi_container_add_child_view_at(
+  c : View,
+  v : View,
+  index : Int,
+) -> Unit = "yue_mbt_container_add_child_view_at"
 
 ///|
 #borrow(c, v)
@@ -2029,13 +2048,22 @@ extern "c" fn ffi_label_set_valign(l : View, align : Int) -> Unit = "yue_mbt_lab
 
 ///|
 #borrow(l, at)
-extern "c" fn ffi_label_set_attributed_text(l : View, at : AttributedText) -> Unit = "yue_mbt_label_set_attributed_text"
+extern "c" fn ffi_label_set_attributed_text(
+  l : View,
+  at : AttributedText,
+) -> Unit = "yue_mbt_label_set_attributed_text"
 
 ///|
-extern "c" fn ffi_message_box_set_default_response(box : MessageBox, response : Int) -> Unit = "yue_mbt_message_box_set_default_response"
+extern "c" fn ffi_message_box_set_default_response(
+  box : MessageBox,
+  response : Int,
+) -> Unit = "yue_mbt_message_box_set_default_response"
 
 ///|
-extern "c" fn ffi_message_box_set_cancel_response(box : MessageBox, response : Int) -> Unit = "yue_mbt_message_box_set_cancel_response"
+extern "c" fn ffi_message_box_set_cancel_response(
+  box : MessageBox,
+  response : Int,
+) -> Unit = "yue_mbt_message_box_set_cancel_response"
 
 ///|
 
@@ -2044,7 +2072,10 @@ extern "c" fn ffi_message_box_run(box : MessageBox) -> Int = "yue_mbt_message_bo
 
 ///|
 #borrow(box, w)
-extern "c" fn ffi_message_box_run_for_window(box : MessageBox, w : Window) -> Int = "yue_mbt_message_box_run_for_window"
+extern "c" fn ffi_message_box_run_for_window(
+  box : MessageBox,
+  w : Window,
+) -> Int = "yue_mbt_message_box_run_for_window"
 
 ///|
 #borrow(c)
@@ -2068,7 +2099,10 @@ extern "c" fn ffi_clipboard_on_change(
 
 ///|
 #borrow(t)
-extern "c" fn ffi_table_enable_multiple_selection(t : View, enable : Int) -> Unit = "yue_mbt_table_enable_multiple_selection"
+extern "c" fn ffi_table_enable_multiple_selection(
+  t : View,
+  enable : Int,
+) -> Unit = "yue_mbt_table_enable_multiple_selection"
 
 ///|
 #borrow(t)
@@ -2088,7 +2122,11 @@ extern "c" fn ffi_table_notify_row_deletion(t : View, row : Int) -> Int = "yue_m
 
 ///|
 #borrow(t)
-extern "c" fn ffi_table_notify_value_change(t : View, column : Int, row : Int) -> Int = "yue_mbt_table_notify_value_change"
+extern "c" fn ffi_table_notify_value_change(
+  t : View,
+  column : Int,
+  row : Int,
+) -> Int = "yue_mbt_table_notify_value_change"
 
 ///|
 #borrow(b)
@@ -2131,11 +2169,15 @@ extern "c" fn ffi_appearance_on_color_scheme_change(
 
 ///|
 #borrow(at)
-extern "c" fn ffi_attributed_text_get_one_line_width(at : AttributedText) -> Double = "yue_mbt_attributed_text_get_one_line_width"
+extern "c" fn ffi_attributed_text_get_one_line_width(
+  at : AttributedText,
+) -> Double = "yue_mbt_attributed_text_get_one_line_width"
 
 ///|
 #borrow(at)
-extern "c" fn ffi_attributed_text_get_one_line_height(at : AttributedText) -> Double = "yue_mbt_attributed_text_get_one_line_height"
+extern "c" fn ffi_attributed_text_get_one_line_height(
+  at : AttributedText,
+) -> Double = "yue_mbt_attributed_text_get_one_line_height"
 
 ///|
 extern "c" fn ffi_font_default() -> Font = "yue_mbt_font_default"
@@ -2170,7 +2212,10 @@ extern "c" fn ffi_file_dialog_set_title(d : FileDialog, title : Bytes) -> Unit =
 
 ///|
 #borrow(d, label)
-extern "c" fn ffi_file_dialog_set_button_label(d : FileDialog, label : Bytes) -> Unit = "yue_mbt_file_dialog_set_button_label"
+extern "c" fn ffi_file_dialog_set_button_label(
+  d : FileDialog,
+  label : Bytes,
+) -> Unit = "yue_mbt_file_dialog_set_button_label"
 
 ///|
 #borrow(id)

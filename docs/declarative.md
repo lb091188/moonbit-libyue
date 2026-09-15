@@ -138,7 +138,11 @@ fn tagged(label_text : String, body : Node) -> Node {
 
 Element-Plus-style non-form components built on top of the declarative layer, pure MoonBit with zero platform code:
 
-- `side_menu(items, selected)` — sidebar navigation menu (deepin-style, selected item with accent bar and light-blue background);
+- `side_menu(items, selected)` — sidebar navigation (hover grey, selected light-blue + accent bar, syncs pages via `set_visible`);
+- `segmented(options, selected)` — segmented control / top-bar navigation;
+- `tag` / `tag_of_type` — labels (solid custom color / five semantic types);
+- `breadcrumb` · `pagination` · `steps` · `alert` / `alert_closeable` · `timeline` · `collapse` · `descriptions` · `result` · `empty` · `statistic` · `avatar` · `badge_count` / `badge_dot` · `card`;
+- `code_view(lines)` — syntax-highlighted code view
 - `segmented(options, selected)` — segmented control / top-bar navigation (selected item floats on white);
 - `tag(text, color)` — colored rounded label (width auto-fits the text at mount time);
 - `code_view(lines)` — syntax-highlighted code view: one AttributedText per token (whole-range coloring) measured and drawn manually. **Visually equivalent to range coloring and consistent across platforms** — on Windows, AttributedText range font/color is an upstream deficiency (see adaptation.md); this approach bypasses it and is a viable alternative for code highlighting / terminal rendering. The built-in `tokenize_moonbit` is a demo tokenizer; consumers can feed any lexical analysis result.
