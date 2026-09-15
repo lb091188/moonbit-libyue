@@ -32,7 +32,7 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
   - 该机制官方标注实验性(`--moonbit-unstable-prebuild`),API 可能随 moon 升级变动;Windows 下 `python3` 命令可用性待真机验证。
   - 历史方案:先按系统回写 moon.pkg.json(两平台互相覆盖)→ `@build/link.flags` 响应文件(gcc/clang 与 cl 都支持 `@文件`,双平台同一份入库)。均已被传播机制替代。
 - `prepare.py` 幂等可重跑:缓存 zip sha256 不匹配(下载被截断)自动删除重下;下载先写 `.part` 临时文件、校验通过才原子落盘。网络走标准 `http_proxy/https_proxy` 环境变量。
-- **moon 不因静态库更新自动重链(跨平台,2026-09-15 Linux 实测)**:prebuild 只在静态库**缺失**时才调 prepare,且 moon 的重链判定只看 MoonBit 源与 link_configs 输出、不看静态库内容——shim/vendor 变更重跑 prepare 后,链接产物仍指向旧库。判别与处理见 [docs/relink.md](relink.md)。
+- **moon 不因静态库更新自动重链(跨平台,2026-09-15 Linux 实测)**:prebuild 只在静态库**缺失**时才调 prepare,且 moon 的重链判定只看 MoonBit 源与 link_configs 输出、不看静态库内容——shim/vendor 变更重跑 prepare 后,链接产物仍指向旧库。判别与处理见 [docs/relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/relink.md)。
 - **`postadd` 脚本仅在 registry `moon add` 安装时触发**,path/git 依赖与模块自身构建不触发;产物缺失的兜底由 prebuild.py 的检查承担。
 - libyue 版本钉死在 `scripts/prepare.py`(`LIBYUE_VERSION` + 三平台 sha256),升级需同步更新三个校验和。
 
