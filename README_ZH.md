@@ -148,6 +148,8 @@ moon test
 
 - 当前封装面约 260 个 ABI 函数（`yue/ffi.mbt` 中 262 个 `extern "c"` 声明）：App/Lifetime、Window、View 通用能力与拖拽、Container/Label/Button/Entry/TextEdit、Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer、Browser、Menu/MenuBar、Table+模型桥、Painter/Canvas、Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog、Screen/Appearance/Locale/Cursor；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。
 - 已知边界、ABI 坑与各平台适配经验不在 README 展开，见 `AGENTS.md`（AI 协作规则）与 [docs/adaptation.md](docs/adaptation.md)；Linux 托盘方案（设计动机、架构、后端降级、桌面兼容性、调试）独立成文：[docs/tray.md](docs/tray.md)。
+- shim/vendor 改动或重跑 `prepare.py` 后行为不变：`moon clean` 强制重链（原理：[docs/relink.md](docs/relink.md)）。
+- 文档索引：[docs/README.md](docs/README.md)。
 
 ## 参考
 
