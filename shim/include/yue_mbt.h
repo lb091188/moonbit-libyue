@@ -54,6 +54,10 @@ void yue_mbt_view_set_style_prop_float(void *view, const char *name, double valu
 void yue_mbt_view_set_style_prop_str(void *view, const char *name, const char *value);
 void yue_mbt_view_set_background_color(void *view, const char *hex);
 void yue_mbt_view_set_visible(void *view, int visible);
+void yue_mbt_view_schedule_paint(void *view);
+void yue_mbt_view_set_font(void *view, void *font);
+void yue_mbt_view_set_color(void *view, const char *hex);
+void yue_mbt_label_set_align(void *label, int32_t align);
 
 /* ---------- Container ---------- */
 
@@ -596,6 +600,93 @@ void yue_mbt_tray_remove(void *tray);
 
 #ifdef __cplusplus
 }
+
+/* 方法级审计补齐(2026-09-16) */
+void yue_mbt_window_close(void *window);
+void yue_mbt_window_minimize(void *window);
+void yue_mbt_window_restore(void *window);
+int32_t yue_mbt_window_is_minimized(void *window);
+void yue_mbt_window_set_content_size_constraints(void *window, double min_w, double min_h, double max_w, double max_h);
+void yue_mbt_window_set_movable(void *window, int32_t movable);
+void *yue_mbt_window_get_title(void *window);
+void yue_mbt_window_set_background_color(void *window, const char *hex);
+double yue_mbt_window_get_scale_factor(void *window);
+void yue_mbt_window_set_skip_taskbar(void *window, int32_t skip);
+void yue_mbt_window_set_icon(void *window, void *image);
+void yue_mbt_window_on_focus_in(void *window, int32_t (*invoke)(void *), void *closure);
+void yue_mbt_window_on_blur(void *window, int32_t (*invoke)(void *), void *closure);
+void yue_mbt_view_set_tooltip(void *view, const char *text);
+int32_t yue_mbt_view_add_tooltip_for_rect(void *view, const char *text, double x, double y, double w, double h);
+void yue_mbt_view_remove_tooltip(void *view, int32_t id);
+void yue_mbt_view_set_focusable(void *view, int32_t focusable);
+int32_t yue_mbt_view_has_focus(void *view);
+void yue_mbt_view_schedule_paint_rect(void *view, double x, double y, double w, double h);
+void yue_mbt_view_on_focus_in(void *view, int32_t (*invoke)(void *), void *closure);
+void yue_mbt_view_on_focus_out(void *view, int32_t (*invoke)(void *), void *closure);
+void yue_mbt_container_add_child_view_at(void *container, void *view, int32_t index);
+int32_t yue_mbt_container_remove_child_view(void *container, void *view);
+int32_t yue_mbt_container_child_count(void *container);
+double yue_mbt_scroll_get_position_x(void *scroll);
+double yue_mbt_scroll_get_position_y(void *scroll);
+double yue_mbt_scroll_get_max_position_x(void *scroll);
+double yue_mbt_scroll_get_max_position_y(void *scroll);
+void yue_mbt_scroll_on_scroll(void *scroll, int32_t (*invoke)(void *), void *closure);
+void yue_mbt_label_set_valign(void *label, int32_t align);
+void yue_mbt_label_set_attributed_text(void *label, void *at);
+void yue_mbt_message_box_set_default_response(void *box, int32_t response);
+void yue_mbt_message_box_set_cancel_response(void *box, int32_t response);
+void yue_mbt_message_box_set_informative_text(void *box, const char *text);
+int32_t yue_mbt_message_box_run(void *box);
+int32_t yue_mbt_message_box_run_for_window(void *box, void *window);
+int32_t yue_mbt_clipboard_is_data_available(void *clipboard, int32_t kind);
+void yue_mbt_clipboard_start_watching(void *clipboard);
+void yue_mbt_clipboard_stop_watching(void *clipboard);
+void yue_mbt_clipboard_on_change(void *clipboard, void (*invoke)(void *), void *closure);
+void yue_mbt_table_enable_multiple_selection(void *table, int32_t enable);
+void yue_mbt_table_select_row(void *table, int32_t row);
+int32_t yue_mbt_table_get_selected_row(void *table);
+int32_t yue_mbt_table_notify_row_insertion(void *table, int32_t row);
+int32_t yue_mbt_table_notify_row_deletion(void *table, int32_t row);
+int32_t yue_mbt_table_notify_value_change(void *table, int32_t column, int32_t row);
+void *yue_mbt_browser_get_title(void *browser);
+void yue_mbt_browser_stop(void *browser);
+double yue_mbt_screen_primary_scale_factor();
+double yue_mbt_screen_primary_work_area_x();
+double yue_mbt_screen_primary_work_area_y();
+double yue_mbt_screen_primary_work_area_width();
+double yue_mbt_screen_primary_work_area_height();
+double yue_mbt_screen_cursor_x();
+double yue_mbt_screen_cursor_y();
+void yue_mbt_appearance_set_dark_mode_enabled(int32_t enable);
+void yue_mbt_appearance_on_color_scheme_change(void (*invoke)(void *), void *closure);
+double yue_mbt_attributed_text_get_one_line_width(void *at);
+double yue_mbt_attributed_text_get_one_line_height(void *at);
+void *yue_mbt_font_default();
+void *yue_mbt_font_get_name(void *font);
+double yue_mbt_font_get_size(void *font);
+void yue_mbt_global_shortcut_unregister_all();
+void yue_mbt_menu_item_click(void *item);
+void yue_mbt_menu_item_set_enabled(void *item, int32_t enabled);
+int32_t yue_mbt_menu_item_is_enabled(void *item);
+void yue_mbt_menu_item_set_visible(void *item, int32_t visible);
+int32_t yue_mbt_menu_item_is_visible(void *item);
+void yue_mbt_file_dialog_set_title(void *dialog, const char *title);
+void yue_mbt_file_dialog_set_button_label(void *dialog, const char *label);
+void yue_mbt_app_set_id(const char *id);
+void *yue_mbt_app_get_id();
+void yue_mbt_gif_player_set_animating(void *gif, int32_t animating);
+int32_t yue_mbt_gif_player_is_animating(void *gif);
+int32_t yue_mbt_gif_player_is_playing(void *gif);
+void yue_mbt_gif_player_stop_animation_timer(void *gif);
+double yue_mbt_canvas_get_scale_factor(void *canvas);
+double yue_mbt_canvas_get_width(void *canvas);
+double yue_mbt_canvas_get_height(void *canvas);
+void yue_mbt_notification_center_clear();
+void yue_mbt_notification_center_on_notification_show(void (*invoke)(void *, void *), void *closure);
+void yue_mbt_notification_center_on_notification_close(void (*invoke)(void *, void *), void *closure);
+void yue_mbt_notification_center_on_notification_click(void (*invoke)(void *, void *), void *closure);
+void yue_mbt_notification_center_on_notification_action(void (*invoke)(void *, void *), void *closure);
+
 #endif
 
 #endif /* YUE_MBT_H */

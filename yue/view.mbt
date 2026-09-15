@@ -197,6 +197,37 @@ impl ViewLike with fn set_visible(self, visible : Bool) -> Unit {
 }
 
 ///|
+/// 设置视图字体（原生渲染，交互控件的文字样式首选此路）。
+impl ViewLike with fn set_font(self, font : Font) -> Unit {
+  ffi_view_set_font(self.view(), font)
+}
+
+///|
+/// 设置视图前景/文字颜色。
+impl ViewLike with fn set_color(self, hex : String) -> Unit {
+  ffi_view_set_color(self.view(), utf8_bytes(hex))
+}
+
+///|
+/// 设置 Label 文字水平对齐。
+pub fn Label::set_align(self : Label, align : TextAlign) -> Unit {
+  ffi_label_set_align(
+    self.view,
+    match align {
+      Start => 0
+      Center => 1
+      End => 2
+    },
+  )
+}
+
+///|
+/// 请求重绘整个视图（自绘组件状态变化后调用）。
+impl ViewLike with fn schedule_paint(self) -> Unit {
+  ffi_view_schedule_paint(self.view())
+}
+
+///|
 /// 创建静态文本标签。
 pub fn Label::new(text : String) -> Label {
   { view: ffi_label_new(utf8_bytes(text)), }
@@ -395,9 +426,6 @@ impl ViewLike with fn on_drag_leave(self, callback : () -> Unit) -> Unit {
 }
 
 ///|
-impl ViewLike with fn schedule_paint(self) -> Unit {
-  ffi_view_schedule_paint(self.view())
-}
 
 ///|
 impl ViewLike with fn get_bounds(self) -> RectF {

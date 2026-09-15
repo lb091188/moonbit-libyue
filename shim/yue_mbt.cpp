@@ -397,6 +397,33 @@ void yue_mbt_view_set_visible(void *view, int visible) {
   }
 }
 
+void yue_mbt_view_schedule_paint(void *view) {
+  if (auto *v = CastToView(view)) {
+    v->SchedulePaint();
+  }
+}
+
+void yue_mbt_view_set_font(void *view, void *font) {
+  auto *f = FontStore::get(font);
+  if (auto *v = CastToView(view)) {
+    if (f != nullptr) {
+      v->SetFont(scoped_refptr<nu::Font>(f));
+    }
+  }
+}
+
+void yue_mbt_view_set_color(void *view, const char *hex) {
+  if (auto *v = CastToView(view)) {
+    v->SetColor(nu::Color(std::string(hex)));
+  }
+}
+
+void yue_mbt_label_set_align(void *label, int32_t align) {
+  if (auto *l = CastTo<nu::Label>(label)) {
+    l->SetAlign(static_cast<nu::TextAlign>(align));
+  }
+}
+
 // ---------- Container ----------
 
 void *yue_mbt_container_new(void) {
@@ -1846,11 +1873,6 @@ void yue_mbt_view_on_drag_leave(void *view, void (*invoke)(void *), void *closur
   }
 }
 
-void yue_mbt_view_schedule_paint(void *view) {
-  if (auto *v = CastToView(view)) {
-    v->SchedulePaint();
-  }
-}
 
 double yue_mbt_view_get_bounds_x(void *view) {
   if (auto *v = CastToView(view)) {
@@ -3532,5 +3554,595 @@ extern "C" int32_t yue_mbt_sys_watch_fd(int32_t, int32_t,
                                         int32_t (*)(int32_t, int32_t)) {
   return 0;
 }
+
+
+/* ---------------- 方法级审计补齐(2026-09-16) ---------------- */
+
+/* Window */
+void yue_mbt_window_close(void *window) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->Close();
+  }
+}
+
+void yue_mbt_window_minimize(void *window) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->Minimize();
+  }
+}
+
+void yue_mbt_window_restore(void *window) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->Restore();
+  }
+}
+
+int32_t yue_mbt_window_is_minimized(void *window) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    return w->IsMinimized() ? 1 : 0;
+  }
+  return 0;
+}
+
+void yue_mbt_window_set_content_size_constraints(void *window, double min_w,
+                                                 double min_h, double max_w,
+                                                 double max_h) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->SetContentSizeConstraints(nu::SizeF(min_w, min_h),
+                                 nu::SizeF(max_w, max_h));
+  }
+}
+
+void yue_mbt_window_set_movable(void *window, int32_t movable) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->SetMovable(movable != 0);
+  }
+}
+
+void *yue_mbt_window_get_title(void *window) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    return BytesFromString(w->GetTitle());
+  }
+  return moonbit_make_bytes(0, 0);
+}
+
+void yue_mbt_window_set_background_color(void *window, const char *hex) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->SetBackgroundColor(nu::Color(std::string(hex)));
+  }
+}
+
+double yue_mbt_window_get_scale_factor(void *window) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    return w->GetScaleFactor();
+  }
+  return 1.0;
+}
+
+void yue_mbt_window_set_skip_taskbar(void *window, int32_t skip) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->SetSkipTaskbar(skip != 0);
+  }
+}
+
+void yue_mbt_window_set_icon(void *window, void *image) {
+  auto *img = ImageStore::get(image);
+  if (auto *w = CastTo<nu::Window>(window)) {
+    if (img != nullptr) {
+      w->SetIcon(scoped_refptr<nu::Image>(img));
+    }
+  }
+}
+
+void yue_mbt_window_on_focus_in(void *window,
+                                int32_t (*invoke)(void *), void *closure) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->on_focus_in.Connect(
+        [invoke, closure](nu::View *) { return invoke(closure) != 0; });
+  }
+}
+
+void yue_mbt_window_on_blur(void *window,
+                            int32_t (*invoke)(void *), void *closure) {
+  if (auto *w = CastTo<nu::Window>(window)) {
+    w->on_blur.Connect(
+        [invoke, closure](nu::View *) { return invoke(closure) != 0; });
+  }
+}
+
+/* View:tooltip / focus */
+void yue_mbt_view_set_tooltip(void *view, const char *text) {
+  if (auto *v = CastToView(view)) {
+    v->SetTooltip(text);
+  }
+}
+
+int32_t yue_mbt_view_add_tooltip_for_rect(void *view, const char *text,
+                                          double x, double y, double w,
+                                          double h) {
+  if (auto *v = CastToView(view)) {
+    return v->AddTooltipForRect(text, nu::RectF(x, y, w, h));
+  }
+  return -1;
+}
+
+void yue_mbt_view_remove_tooltip(void *view, int32_t id) {
+  if (auto *v = CastToView(view)) {
+    v->RemoveTooltip(id);
+  }
+}
+
+void yue_mbt_view_set_focusable(void *view, int32_t focusable) {
+  if (auto *v = CastToView(view)) {
+    v->SetFocusable(focusable != 0);
+  }
+}
+
+int32_t yue_mbt_view_has_focus(void *view) {
+  if (auto *v = CastToView(view)) {
+    return v->HasFocus() ? 1 : 0;
+  }
+  return 0;
+}
+
+void yue_mbt_view_schedule_paint_rect(void *view, double x, double y,
+                                      double w, double h) {
+  if (auto *v = CastToView(view)) {
+    v->SchedulePaintRect(nu::RectF(x, y, w, h));
+  }
+}
+
+void yue_mbt_view_on_focus_in(void *view, int32_t (*invoke)(void *),
+                              void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->on_focus_in.Connect(
+        [invoke, closure](nu::View *) { return invoke(closure) != 0; });
+  }
+}
+
+void yue_mbt_view_on_focus_out(void *view, int32_t (*invoke)(void *),
+                               void *closure) {
+  if (auto *v = CastToView(view)) {
+    v->on_focus_out.Connect(
+        [invoke, closure](nu::View *) { return invoke(closure) != 0; });
+  }
+}
+
+/* Container:动态子视图 */
+void yue_mbt_container_add_child_view_at(void *container, void *view,
+                                         int32_t index) {
+  auto *child = CastToView(view);
+  if (auto *c = CastTo<nu::Container>(container)) {
+    if (child != nullptr) {
+      c->AddChildViewAt(scoped_refptr<nu::View>(child), index);
+    }
+  }
+}
+
+int32_t yue_mbt_container_remove_child_view(void *container, void *view) {
+  auto *child = CastToView(view);
+  if (auto *c = CastTo<nu::Container>(container)) {
+    if (child != nullptr) {
+      c->RemoveChildView(child);
+      return 1;
+    }
+  }
+  return 0;
+}
+
+int32_t yue_mbt_container_child_count(void *container) {
+  if (auto *c = CastTo<nu::Container>(container)) {
+    return c->ChildCount();
+  }
+  return 0;
+}
+
+/* Scroll:位置与滚动信号 */
+double yue_mbt_scroll_get_position_x(void *scroll) {
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    return std::get<0>(s->GetScrollPosition());
+  }
+  return 0.0;
+}
+
+double yue_mbt_scroll_get_position_y(void *scroll) {
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    return std::get<1>(s->GetScrollPosition());
+  }
+  return 0.0;
+}
+
+double yue_mbt_scroll_get_max_position_x(void *scroll) {
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    return std::get<0>(s->GetMaximumScrollPosition());
+  }
+  return 0.0;
+}
+
+double yue_mbt_scroll_get_max_position_y(void *scroll) {
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    return std::get<1>(s->GetMaximumScrollPosition());
+  }
+  return 0.0;
+}
+
+void yue_mbt_scroll_on_scroll(void *scroll, int32_t (*invoke)(void *),
+                              void *closure) {
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    s->on_scroll.Connect(
+        [invoke, closure](nu::Scroll *) { return invoke(closure) != 0; });
+  }
+}
+
+/* Label:对齐与富文本 */
+void yue_mbt_label_set_valign(void *label, int32_t align) {
+  if (auto *l = CastTo<nu::Label>(label)) {
+    l->SetVAlign(static_cast<nu::TextAlign>(align));
+  }
+}
+
+void yue_mbt_label_set_attributed_text(void *label, void *at) {
+  auto *t = AttributedTextStore::get(at);
+  if (auto *l = CastTo<nu::Label>(label)) {
+    if (t != nullptr) {
+      l->SetAttributedText(scoped_refptr<nu::AttributedText>(t));
+    }
+  }
+}
+
+/* MessageBox:模态与默认按钮 */
+void yue_mbt_message_box_set_default_response(void *box, int32_t response) {
+  if (auto *m = CastTo<nu::MessageBox>(box)) {
+    m->SetDefaultResponse(response);
+  }
+}
+
+void yue_mbt_message_box_set_cancel_response(void *box, int32_t response) {
+  if (auto *m = CastTo<nu::MessageBox>(box)) {
+    m->SetCancelResponse(response);
+  }
+}
+
+void yue_mbt_message_box_set_informative_text(void *box, const char *text) {
+  if (auto *m = CastTo<nu::MessageBox>(box)) {
+    m->SetInformativeText(text);
+  }
+}
+
+int32_t yue_mbt_message_box_run(void *box) {
+  if (auto *m = CastTo<nu::MessageBox>(box)) {
+    return m->Run();
+  }
+  return -1;
+}
+
+int32_t yue_mbt_message_box_run_for_window(void *box, void *window) {
+  auto *w = CastTo<nu::Window>(window);
+  if (auto *m = CastTo<nu::MessageBox>(box)) {
+    return m->RunForWindow(w);
+  }
+  return -1;
+}
+
+/* Clipboard:类型探测与变化监听 */
+int32_t yue_mbt_clipboard_is_data_available(void *clipboard, int32_t kind) {
+  if (auto *c = static_cast<nu::Clipboard *>(clipboard)) {
+    return c->IsDataAvailable(ToDataType(kind)) ? 1 : 0;
+  }
+  return 0;
+}
+
+void yue_mbt_clipboard_start_watching(void *clipboard) {
+  if (auto *c = static_cast<nu::Clipboard *>(clipboard)) {
+    c->StartWatching();
+  }
+}
+
+void yue_mbt_clipboard_stop_watching(void *clipboard) {
+  if (auto *c = static_cast<nu::Clipboard *>(clipboard)) {
+    c->StopWatching();
+  }
+}
+
+void yue_mbt_clipboard_on_change(void *clipboard, void (*invoke)(void *),
+                                 void *closure) {
+  if (auto *c = static_cast<nu::Clipboard *>(clipboard)) {
+    c->on_change.Connect([invoke, closure](nu::Clipboard *) {
+      invoke(closure);
+    });
+  }
+}
+
+/* Table:选择模式与模型刷新 */
+void yue_mbt_table_enable_multiple_selection(void *table, int32_t enable) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    t->EnableMultipleSelection(enable != 0);
+  }
+}
+
+void yue_mbt_table_select_row(void *table, int32_t row) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    t->SelectRow(row);
+  }
+}
+
+int32_t yue_mbt_table_get_selected_row(void *table) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    return t->GetSelectedRow();
+  }
+  return -1;
+}
+
+int32_t yue_mbt_table_notify_row_insertion(void *table, int32_t row) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    t->NotifyRowInsertion(row);
+    return 1;
+  }
+  return 0;
+}
+
+int32_t yue_mbt_table_notify_row_deletion(void *table, int32_t row) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    t->NotifyRowDeletion(row);
+    return 1;
+  }
+  return 0;
+}
+
+int32_t yue_mbt_table_notify_value_change(void *table, int32_t column,
+                                          int32_t row) {
+  if (auto *t = CastTo<nu::Table>(table)) {
+    t->NotifyValueChange(column, row);
+    return 1;
+  }
+  return 0;
+}
+
+/* Browser:标题与停止(回调版 JS 执行与 AddBinding 另批) */
+void *yue_mbt_browser_get_title(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    return BytesFromString(b->GetTitle());
+  }
+  return moonbit_make_bytes(0, 0);
+}
+
+void yue_mbt_browser_stop(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->Stop();
+  }
+}
+
+/* Screen:主显示器与光标 */
+static nu::Display g_screen_display;
+static bool g_screen_display_valid = false;
+
+static void RefreshPrimaryDisplay() {
+  g_screen_display = nu::Screen::GetCurrent()->GetPrimaryDisplay();
+  g_screen_display_valid = true;
+}
+
+double yue_mbt_screen_primary_scale_factor() {
+  if (!g_screen_display_valid) {
+    RefreshPrimaryDisplay();
+  }
+  return g_screen_display.scale_factor;
+}
+
+double yue_mbt_screen_primary_work_area_x() {
+  if (!g_screen_display_valid) {
+    RefreshPrimaryDisplay();
+  }
+  return g_screen_display.work_area.x();
+}
+
+double yue_mbt_screen_primary_work_area_y() {
+  if (!g_screen_display_valid) {
+    RefreshPrimaryDisplay();
+  }
+  return g_screen_display.work_area.y();
+}
+
+double yue_mbt_screen_primary_work_area_width() {
+  if (!g_screen_display_valid) {
+    RefreshPrimaryDisplay();
+  }
+  return g_screen_display.work_area.width();
+}
+
+double yue_mbt_screen_primary_work_area_height() {
+  if (!g_screen_display_valid) {
+    RefreshPrimaryDisplay();
+  }
+  return g_screen_display.work_area.height();
+}
+
+double yue_mbt_screen_cursor_x() {
+  return nu::Screen::GetCurrent()->GetCursorScreenPoint().x();
+}
+
+double yue_mbt_screen_cursor_y() {
+  return nu::Screen::GetCurrent()->GetCursorScreenPoint().y();
+}
+
+/* Appearance:暗色模式切换 */
+void yue_mbt_appearance_set_dark_mode_enabled(int32_t enable) {
+  nu::Appearance::GetCurrent()->SetDarkModeEnabled(enable != 0);
+}
+
+void yue_mbt_appearance_on_color_scheme_change(void (*invoke)(void *),
+                                                void *closure) {
+  nu::Appearance::GetCurrent()->on_color_scheme_change.Connect(
+      [invoke, closure]() { invoke(closure); });
+}
+
+/* AttributedText:单行测量 */
+double yue_mbt_attributed_text_get_one_line_width(void *at) {
+  auto *t = AttributedTextStore::get(at);
+  if (t != nullptr) {
+    return t->GetOneLineSize().width();
+  }
+  return 0.0;
+}
+
+double yue_mbt_attributed_text_get_one_line_height(void *at) {
+  auto *t = AttributedTextStore::get(at);
+  if (t != nullptr) {
+    return t->GetOneLineSize().height();
+  }
+  return 0.0;
+}
+
+/* Font:默认字体与元信息 */
+void *yue_mbt_font_default() {
+  nu::Font *f = nu::Font::Default();
+  return f != nullptr ? reinterpret_cast<void *>(FontStore::put(f))
+                      : nullptr;
+}
+
+void *yue_mbt_font_get_name(void *font) {
+  auto *f = FontStore::get(font);
+  if (f != nullptr) {
+    return BytesFromString(f->GetName());
+  }
+  return moonbit_make_bytes(0, 0);
+}
+
+double yue_mbt_font_get_size(void *font) {
+  auto *f = FontStore::get(font);
+  if (f != nullptr) {
+    return f->GetSize();
+  }
+  return 0.0;
+}
+
+/* GlobalShortcut */
+void yue_mbt_global_shortcut_unregister_all() {
+  nu::GlobalShortcut::GetCurrent()->UnregisterAll();
+}
+
+/* MenuItem:状态与程序化点击 */
+void yue_mbt_menu_item_click(void *item) {
+  if (auto *i = CastTo<nu::MenuItem>(item)) {
+    i->Click();
+  }
+}
+
+void yue_mbt_menu_item_set_enabled(void *item, int32_t enabled) {
+  if (auto *i = CastTo<nu::MenuItem>(item)) {
+    i->SetEnabled(enabled != 0);
+  }
+}
+
+int32_t yue_mbt_menu_item_is_enabled(void *item) {
+  if (auto *i = CastTo<nu::MenuItem>(item)) {
+    return i->IsEnabled() ? 1 : 0;
+  }
+  return 0;
+}
+
+void yue_mbt_menu_item_set_visible(void *item, int32_t visible) {
+  if (auto *i = CastTo<nu::MenuItem>(item)) {
+    i->SetVisible(visible != 0);
+  }
+}
+
+int32_t yue_mbt_menu_item_is_visible(void *item) {
+  if (auto *i = CastTo<nu::MenuItem>(item)) {
+    return i->IsVisible() ? 1 : 0;
+  }
+  return 0;
+}
+
+/* FileDialog */
+void yue_mbt_file_dialog_set_title(void *dialog, const char *title) {
+  if (auto *d = CastTo<nu::FileDialog>(dialog)) {
+    d->SetTitle(title);
+  }
+}
+
+void yue_mbt_file_dialog_set_button_label(void *dialog, const char *label) {
+  if (auto *d = CastTo<nu::FileDialog>(dialog)) {
+    d->SetButtonLabel(label);
+  }
+}
+
+/* App:应用 ID */
+void yue_mbt_app_set_id(const char *id) {
+  nu::App::GetCurrent()->SetID(id);
+}
+
+void *yue_mbt_app_get_id() {
+  return BytesFromString(nu::App::GetCurrent()->GetID());
+}
+
+/* GifPlayer:播放控制 */
+void yue_mbt_gif_player_set_animating(void *gif, int32_t animating) {
+  if (auto *g = CastTo<nu::GifPlayer>(gif)) {
+    g->SetAnimating(animating != 0);
+  }
+}
+
+int32_t yue_mbt_gif_player_is_animating(void *gif) {
+  if (auto *g = CastTo<nu::GifPlayer>(gif)) {
+    return g->IsAnimating() ? 1 : 0;
+  }
+  return 0;
+}
+
+int32_t yue_mbt_gif_player_is_playing(void *gif) {
+  if (auto *g = CastTo<nu::GifPlayer>(gif)) {
+    return g->IsPlaying() ? 1 : 0;
+  }
+  return 0;
+}
+
+void yue_mbt_gif_player_stop_animation_timer(void *gif) {
+  if (auto *g = CastTo<nu::GifPlayer>(gif)) {
+    g->StopAnimationTimer();
+  }
+}
+
+/* Canvas:尺寸与密度 */
+double yue_mbt_canvas_get_scale_factor(void *canvas) {
+  if (auto *c = CastTo<nu::Canvas>(canvas)) {
+    return c->GetScaleFactor();
+  }
+  return 1.0;
+}
+
+double yue_mbt_canvas_get_width(void *canvas) {
+  if (auto *c = CastTo<nu::Canvas>(canvas)) {
+    return c->GetSize().width();
+  }
+  return 0.0;
+}
+
+double yue_mbt_canvas_get_height(void *canvas) {
+  if (auto *c = CastTo<nu::Canvas>(canvas)) {
+    return c->GetSize().height();
+  }
+  return 0.0;
+}
+
+/* NotificationCenter:清除与通知回调 */
+void yue_mbt_notification_center_clear() {
+  nu::NotificationCenter::GetCurrent()->Clear();
+}
+
+#define MBT_NOTIF_SIG(name, field)                                          \
+  void yue_mbt_notification_center_##name(void (*invoke)(void *, void *),    \
+                                          void *closure) {                   \
+    nu::NotificationCenter::GetCurrent()->field.Connect(                      \
+        [invoke, closure](const std::string &id) {                            \
+          invoke(closure, BytesFromString(id));                               \
+        });                                                                   \
+  }
+
+MBT_NOTIF_SIG(on_notification_show, on_notification_show)
+MBT_NOTIF_SIG(on_notification_close, on_notification_close)
+MBT_NOTIF_SIG(on_notification_click, on_notification_click)
+MBT_NOTIF_SIG(on_notification_action, on_notification_action)
+
+#undef MBT_NOTIF_SIG
 
 #endif
