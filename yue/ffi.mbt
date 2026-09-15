@@ -111,6 +111,7 @@ extern "c" fn ffi_view_set_style_prop_str(
 ///|
 #borrow(view, hex)
 extern "c" fn ffi_view_set_background_color(view : View, hex : Bytes) -> Unit = "yue_mbt_view_set_background_color"
+extern "c" fn ffi_view_set_visible(view : View, visible : Int) -> Unit = "yue_mbt_view_set_visible"
 
 ///|
 extern "c" fn ffi_container_new() -> View = "yue_mbt_container_new"

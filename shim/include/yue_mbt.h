@@ -53,6 +53,7 @@ void yue_mbt_view_set_mouse_down_can_move_window(void *view, int32_t yes);
 void yue_mbt_view_set_style_prop_float(void *view, const char *name, double value);
 void yue_mbt_view_set_style_prop_str(void *view, const char *name, const char *value);
 void yue_mbt_view_set_background_color(void *view, const char *hex);
+void yue_mbt_view_set_visible(void *view, int visible);
 
 /* ---------- Container ---------- */
 

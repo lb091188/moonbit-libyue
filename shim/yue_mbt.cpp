@@ -391,6 +391,12 @@ void yue_mbt_view_set_background_color(void *view, const char *hex) {
   }
 }
 
+void yue_mbt_view_set_visible(void *view, int visible) {
+  if (auto *v = CastToView(view)) {
+    v->SetVisible(visible != 0);
+  }
+}
+
 // ---------- Container ----------
 
 void *yue_mbt_container_new(void) {
