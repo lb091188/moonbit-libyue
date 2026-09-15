@@ -317,6 +317,134 @@ def patch_linux_container_events() -> None:
         path.write_text(text, encoding="utf-8")
 
 
+def patch_linux_view_bounds_in_screen() -> None:
+    """vendor 补丁（Linux/GTK）：View::GetBoundsInScreen 在 Scroll/嵌套容器
+    下坐标叠错（上游手动累加各级 allocation，视口文档坐标混入，实测锚点
+    y 可远超屏幕高度，气泡/菜单定位到屏幕外）。改用 GTK 官方
+    gtk_widget_translate_coordinates（原生感知 viewport 滚动与嵌套）（幂等）。
+    """
+    src = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_3.cc"
+    old = (
+        "RectF View::GetBoundsInScreen() const {\n"
+        "  if (!GetWindow())\n"
+        "    return GetBounds();\n"
+        "  // If the widget has a window, then get the position of window directly.\n"
+        "  GdkWindow* window = nullptr;\n"
+        "  if (NU_IS_CONTAINER(view_))\n"
+        "    window = nu_container_get_window(NU_CONTAINER(view_));\n"
+        "  else if (gtk_widget_get_has_window(view_))\n"
+        "    window = gtk_widget_get_window(view_);\n"
+        "  if (window) {\n"
+        "    gint x, y, width, height;\n"
+        "    gdk_window_get_origin(window, &x, &y);\n"
+        "    gdk_window_get_geometry(window, NULL, NULL, &width, &height);\n"
+        "    return RectF(x, y, width, height);\n"
+        "  }\n"
+        "  // Otherwise fallback to manual computing, they shouldn't make a difference\n"
+        "  // but we want to use raw APIs when possible for correctness.\n"
+        "  return nu::RectF(GetBounds().size()) +\n"
+        "         OffsetFromWindow() +\n"
+        "         GetWindow()->GetBounds().OffsetFromOrigin();\n"
+        "}"
+    )
+    new = (
+        "RectF View::GetBoundsInScreen() const {\n"
+        "  if (!GetWindow())\n"
+        "    return GetBounds();\n"
+        "  // moonbit-libyue 补丁:上游手动累加 allocation 在 Scroll/嵌套容器下\n"
+        "  // 坐标叠错;改用 translate_coordinates(原生感知 viewport 滚动与嵌套)\n"
+        "  GtkWidget* toplevel = gtk_widget_get_toplevel(view_);\n"
+        "  if (toplevel != nullptr && gtk_widget_is_toplevel(toplevel)) {\n"
+        "    gint tx = 0, ty = 0;\n"
+        "    if (gtk_widget_translate_coordinates(view_, toplevel, 0, 0, &tx, &ty)) {\n"
+        "      gint wx = 0, wy = 0;\n"
+        "      gtk_window_get_position(GTK_WINDOW(toplevel), &wx, &wy);\n"
+        "      GtkAllocation alloc;\n"
+        "      gtk_widget_get_allocation(view_, &alloc);\n"
+        "      return RectF(static_cast<float>(wx + tx),\n"
+        "                    static_cast<float>(wy + ty),\n"
+        "                    static_cast<float>(alloc.width),\n"
+        "                    static_cast<float>(alloc.height));\n"
+        "    }\n"
+        "  }\n"
+        "  GdkWindow* window = nullptr;\n"
+        "  if (NU_IS_CONTAINER(view_))\n"
+        "    window = nu_container_get_window(NU_CONTAINER(view_));\n"
+        "  else if (gtk_widget_get_has_window(view_))\n"
+        "    window = gtk_widget_get_window(view_);\n"
+        "  if (window) {\n"
+        "    gint x, y, width, height;\n"
+        "    gdk_window_get_origin(window, &x, &y);\n"
+        "    gdk_window_get_geometry(window, NULL, NULL, &width, &height);\n"
+        "    return RectF(x, y, width, height);\n"
+        "  }\n"
+        "  return nu::RectF(GetBounds().size()) +\n"
+        "         OffsetFromWindow() +\n"
+        "         GetWindow()->GetBounds().OffsetFromOrigin();\n"
+        "}"
+    )
+    text = src.read_text(encoding="utf-8")
+    if new not in text:
+        if old not in text:
+            raise SystemExit(f"vendor 补丁目标文本未找到（上游可能已变）：{src}")
+        src.write_text(text.replace(old, new, 1), encoding="utf-8")
+    print("已应用 GetBoundsInScreen 滚动坐标补丁")
+
+
+def patch_linux_global_shortcut_wayland() -> None:
+    """vendor 补丁（Linux/GTK）：GlobalShortcut 在 Wayland 会话优雅失败（幂等）。
+    上游 global_shortcut_gtk.cc 直接用 GDK_WINDOW_XDISPLAY（X11 专属宏），
+    Wayland 下 GTK 根窗口的 impl 是 Wayland 类型，宏强转读出垃圾 Display* 传给
+    XKeysymToKeycode/XGrabKey → 段错误。补丁：非 X11 display 时 Start/StopWatching
+    直接返回、PlatformRegister 返回 false（上层 Register 得 -1，走既有失败语义）。
+    """
+    src = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_3.cc"
+    patches = [
+        (src,
+         "void GlobalShortcut::StartWatching() {\n"
+         "  auto func = reinterpret_cast<GdkFilterFunc>(&RootWindowKeyFilter);\n"
+         "  gdk_window_add_filter(gdk_get_default_root_window(), func, this);\n"
+         "}\n"
+         "\n"
+         "void GlobalShortcut::StopWatching() {\n"
+         "  auto func = reinterpret_cast<GdkFilterFunc>(&RootWindowKeyFilter);\n"
+         "  gdk_window_remove_filter(gdk_get_default_root_window(), func, this);\n"
+         "}",
+         "void GlobalShortcut::StartWatching() {\n"
+         "  // moonbit-libyue 补丁:Wayland 会话无 X11 根窗口事件可过滤\n"
+         "  if (!GDK_IS_X11_DISPLAY(gdk_display_get_default()))\n"
+         "    return;\n"
+         "  auto func = reinterpret_cast<GdkFilterFunc>(&RootWindowKeyFilter);\n"
+         "  gdk_window_add_filter(gdk_get_default_root_window(), func, this);\n"
+         "}\n"
+         "\n"
+         "void GlobalShortcut::StopWatching() {\n"
+         "  if (!GDK_IS_X11_DISPLAY(gdk_display_get_default()))\n"
+         "    return;\n"
+         "  auto func = reinterpret_cast<GdkFilterFunc>(&RootWindowKeyFilter);\n"
+         "  gdk_window_remove_filter(gdk_get_default_root_window(), func, this);\n"
+         "}"),
+        (src,
+         "bool GlobalShortcut::PlatformRegister(const Accelerator& accelerator, int id) {\n"
+         "  int modifiers = GetNativeModifiers(accelerator);",
+         "bool GlobalShortcut::PlatformRegister(const Accelerator& accelerator, int id) {\n"
+         "  // moonbit-libyue 补丁:Wayland 会话下 GDK_WINDOW_XDISPLAY 是类型混淆,\n"
+         "  // 后续 XKeysymToKeycode 拿垃圾 Display* 直接段错误;返回 false 走 -1 失败语义\n"
+         "  if (!GDK_IS_X11_DISPLAY(gdk_display_get_default()))\n"
+         "    return false;\n"
+         "  int modifiers = GetNativeModifiers(accelerator);"),
+    ]
+    text = src.read_text(encoding="utf-8")
+    for _, old, new in patches:
+        if new in text:
+            continue
+        if old not in text:
+            raise SystemExit(f"vendor 补丁目标文本未找到（上游可能已变）：{src}")
+        text = text.replace(old, new)
+    src.write_text(text, encoding="utf-8")
+    print("已应用 GlobalShortcut Wayland 守卫补丁")
+
+
 def patch_win_scroll_natural_size() -> None:
     """vendor 补丁（Windows）：Scroll 滚动范围跟随内容自然尺寸（幂等）。
     原理见 docs/adaptation.md「运行期差异」。
@@ -435,6 +563,8 @@ def main() -> None:
         fetch_webview2_sdk()
     if os_name == "Linux":
         patch_linux_container_events()
+        patch_linux_global_shortcut_wayland()
+        patch_linux_view_bounds_in_screen()
     cmake_build()
     print("prepare 完成")
 
