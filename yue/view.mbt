@@ -283,6 +283,15 @@ fn keep_alive_drag(callback : (DraggingInfo, Double, Double) -> Int) -> Unit {
 }
 
 ///|
+/// 拖拽会话中指定种类的数据是否可用（仅在拖拽回调内有效）。
+pub fn DraggingInfo::is_data_available(
+  self : DraggingInfo,
+  kind : DataKind,
+) -> Bool {
+  ffi_dragging_is_available(self, data_kind_id(kind)) == 1
+}
+
+///|
 /// 从拖拽会话读取指定种类的数据（仅在拖拽回调内有效）。
 pub fn DraggingInfo::get_data(
   self : DraggingInfo,

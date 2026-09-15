@@ -426,6 +426,39 @@ def patch_linux_table_checkbox_size() -> None:
     print("已应用表格 Checkbox 限高补丁")
 
 
+def patch_linux_drag_icon_hotspot() -> None:
+    """vendor 补丁（Linux/GTK）：DoDrag 的拖拽预览图 hotspot 原为 (0,0)，
+    图片主体垂在光标右下（XFCE 实测）；改为图片中心对齐光标（幂等）。"""
+    src = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_3.cc"
+    old = (
+        "  // Provide drag image if available.\n"
+        "  if (options.image)\n"
+        "    gtk_drag_set_icon_pixbuf(\n"
+        "        priv->drag_context,\n"
+        "        gdk_pixbuf_animation_get_static_image(options.image->GetNative()),\n"
+        "        0, 0);\n"
+    )
+    new = (
+        "  // Provide drag image if available.\n"
+        "  // moonbit-libyue 补丁:hotspot 改图片中心,避免预览图垂在光标右下\n"
+        "  if (options.image) {\n"
+        "    GdkPixbuf* pixbuf =\n"
+        "        gdk_pixbuf_animation_get_static_image(options.image->GetNative());\n"
+        "    if (pixbuf)\n"
+        "      gtk_drag_set_icon_pixbuf(\n"
+        "          priv->drag_context, pixbuf,\n"
+        "          gdk_pixbuf_get_width(pixbuf) / 2,\n"
+        "          gdk_pixbuf_get_height(pixbuf) / 2);\n"
+        "  }\n"
+    )
+    text = src.read_text(encoding="utf-8")
+    if new not in text:
+        if old not in text:
+            raise SystemExit(f"vendor 补丁目标文本未找到（上游可能已变）：{src}")
+        src.write_text(text.replace(old, new, 1), encoding="utf-8")
+    print("已应用拖拽图标 hotspot 居中补丁")
+
+
 def patch_linux_global_shortcut_wayland() -> None:
     """vendor 补丁（Linux/GTK）：GlobalShortcut 在 Wayland 会话优雅失败（幂等）。
     上游 global_shortcut_gtk.cc 直接用 GDK_WINDOW_XDISPLAY（X11 专属宏），
@@ -601,6 +634,7 @@ def main() -> None:
         patch_linux_global_shortcut_wayland()
         patch_linux_view_bounds_in_screen()
         patch_linux_table_checkbox_size()
+    patch_linux_drag_icon_hotspot()
     cmake_build()
     print("prepare 完成")
 
