@@ -404,12 +404,19 @@ def patch_linux_table_checkbox_size() -> None:
     )
     new = (
         "  // Set row height.\n"
-        "  // moonbit-libyue 补丁:toggle 指示器随 renderer 高度缩放,\n"
-        "  // 行高大时 checkbox 填满单元格;限高 20,行高由文本列决定\n"
+        "  // moonbit-libyue 补丁(XFCE 实测):toggle 指示器在部分主题(XFCE)下\n"
+        "  // 不受 renderer height 控制,会随行高放大填满单元格;\n"
+        "  // 显式设 indicator-size 固定勾选框像素大小,并限高 20(行高由文本列决定)。\n"
         "  int renderer_height = static_cast<int>(GetRowHeight());\n"
         "  if (options.type == Table::ColumnType::Checkbox && renderer_height > 20)\n"
         "    renderer_height = 20;\n"
         "  g_object_set(G_OBJECT(renderer), \"height\", renderer_height, nullptr);\n"
+        "  if (options.type == Table::ColumnType::Checkbox) {\n"
+        "    GParamSpec *spec = g_object_class_find_property(\n"
+        "        G_OBJECT_GET_CLASS(renderer), \"indicator-size\");\n"
+        "    if (spec != nullptr)\n"
+        "      g_object_set(G_OBJECT(renderer), \"indicator-size\", 16, nullptr);\n"
+        "  }\n"
     )
     text = src.read_text(encoding="utf-8")
     if new not in text:
