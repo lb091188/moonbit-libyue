@@ -3,9 +3,9 @@
 ///|
 test "Windows VK 码归一化到统一常量表" {
   // 字母/数字/空格两表恰好相同，透传
-  inspect(normalize_win_vk(0x41), content="65")   // VK_A == VKEY_A
-  inspect(normalize_win_vk(0x39), content="57")   // VK_9 == VKEY_9
-  inspect(normalize_win_vk(0x20), content="32")   // VK_SPACE == VKEY_SPACE
+  inspect(normalize_win_vk(0x41), content="65") // VK_A == VKEY_A
+  inspect(normalize_win_vk(0x39), content="57") // VK_9 == VKEY_9
+  inspect(normalize_win_vk(0x20), content="32") // VK_SPACE == VKEY_SPACE
   // 功能/编辑/方向键：VK 码 → 表内 GDK 键值
   inspect(normalize_win_vk(0x1b), content="65307") // VK_ESCAPE → VKEY_ESCAPE
   inspect(normalize_win_vk(0x0d), content="65293") // VK_RETURN → VKEY_RETURN
@@ -16,7 +16,7 @@ test "Windows VK 码归一化到统一常量表" {
   inspect(normalize_win_vk(0x11), content="65507") // VK_CONTROL → VKEY_CONTROL
   inspect(normalize_win_vk(0x2e), content="65535") // VK_DELETE → VKEY_DELETE
   inspect(normalize_win_vk(0x60), content="65456") // VK_NUMPAD0 → VKEY_NUMPAD0
-  inspect(normalize_win_vk(0xba), content="59")    // VK_OEM_1 → VKEY_OEM_1
+  inspect(normalize_win_vk(0xba), content="59") // VK_OEM_1 → VKEY_OEM_1
   // 表外键码原样透传
   inspect(normalize_win_vk(0xe7), content="231")
 }

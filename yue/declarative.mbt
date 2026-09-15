@@ -29,11 +29,13 @@ pub fn[T : ViewLike] node_of(
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Node {
-  apply_style(v, style=style, style_str=style_str)
-  { mount: fn(parent) {
-    attach(parent, v.view())
-    v.view()
-  } }
+  apply_style(v, style~, style_str~)
+  {
+    mount: fn(parent) {
+      attach(parent, v.view())
+      v.view()
+    },
+  }
 }
 
 ///|
@@ -45,14 +47,16 @@ fn container_node(
 ) -> Node {
   let sstr = style_str.copy()
   sstr.push(("flexDirection", direction))
-  { mount: fn(parent) {
-    let c = Container::make(style=style, style_str=sstr)
-    attach(parent, c.view())
-    for ch in children {
-      ignore((ch.mount)(c.view()))
-    }
-    c.view()
-  } }
+  {
+    mount: fn(parent) {
+      let c = Container::make(style~, style_str=sstr)
+      attach(parent, c.view())
+      for ch in children {
+        ignore((ch.mount)(c.view()))
+      }
+      c.view()
+    },
+  }
 }
 
 ///|
@@ -81,31 +85,35 @@ pub fn label(
   text : String,
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
-  handle? : (Label) -> Unit = fn(_l) { },
+  handle? : (Label) -> Unit = fn(_l) {  },
 ) -> Node {
-  { mount: fn(parent) {
-    let l = Label::make(text, style=style, style_str=style_str)
-    handle(l)
-    attach(parent, l.view())
-    l.view()
-  } }
+  {
+    mount: fn(parent) {
+      let l = Label::make(text, style~, style_str~)
+      handle(l)
+      attach(parent, l.view())
+      l.view()
+    },
+  }
 }
 
 ///|
 /// 按钮节点：标题、点击回调一步到位。
 pub fn button(
   title : String,
-  on_click? : () -> Unit = fn() { },
+  on_click? : () -> Unit = fn() {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
-  handle? : (Button) -> Unit = fn(_b) { },
+  handle? : (Button) -> Unit = fn(_b) {  },
 ) -> Node {
-  { mount: fn(parent) {
-    let b = Button::make(title, on_click=on_click, style=style, style_str=style_str)
-    handle(b)
-    attach(parent, b.view())
-    b.view()
-  } }
+  {
+    mount: fn(parent) {
+      let b = Button::make(title, on_click~, style~, style_str~)
+      handle(b)
+      attach(parent, b.view())
+      b.view()
+    },
+  }
 }
 
 ///|
@@ -113,18 +121,26 @@ pub fn button(
 pub fn checkbox(
   title : String,
   checked? : Bool = false,
-  on_change? : (Bool) -> Unit = fn(_v) { },
+  on_change? : (Bool) -> Unit = fn(_v) {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
-  handle? : (Button) -> Unit = fn(_b) { },
+  handle? : (Button) -> Unit = fn(_b) {  },
 ) -> Node {
-  { mount: fn(parent) {
-    let b = Button::make(title, button_type=Checkbox, checked=checked, style=style, style_str=style_str)
-    b.on_click(fn() { on_change(b.is_checked()) })
-    handle(b)
-    attach(parent, b.view())
-    b.view()
-  } }
+  {
+    mount: fn(parent) {
+      let b = Button::make(
+        title,
+        button_type=Checkbox,
+        checked~,
+        style~,
+        style_str~,
+      )
+      b.on_click(fn() { on_change(b.is_checked()) })
+      handle(b)
+      attach(parent, b.view())
+      b.view()
+    },
+  }
 }
 
 ///|
@@ -133,38 +149,47 @@ pub fn checkbox(
 pub fn entry(
   text? : String = "",
   password? : Bool = false,
-  on_enter? : (String) -> Unit = fn(_s) { },
-  on_input? : (String) -> Unit = fn(_s) { },
+  on_enter? : (String) -> Unit = fn(_s) {  },
+  on_input? : (String) -> Unit = fn(_s) {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
-  handle? : (Entry) -> Unit = fn(_e) { },
+  handle? : (Entry) -> Unit = fn(_e) {  },
 ) -> Node {
-  { mount: fn(parent) {
-    let e = Entry::make(text=text, entry_type=if password { Password } else { Normal }, style=style, style_str=style_str)
-    e.on_activate(fn() { on_enter(e.get_text()) })
-    e.on_text_change(fn() { on_input(e.get_text()) })
-    handle(e)
-    attach(parent, e.view())
-    e.view()
-  } }
+  {
+    mount: fn(parent) {
+      let e = Entry::make(
+        text~,
+        entry_type=if password { Password } else { Normal },
+        style~,
+        style_str~,
+      )
+      e.on_activate(fn() { on_enter(e.get_text()) })
+      e.on_text_change(fn() { on_input(e.get_text()) })
+      handle(e)
+      attach(parent, e.view())
+      e.view()
+    },
+  }
 }
 
 ///|
 /// 多行文本框节点：on_input 携带当前文本。
 pub fn text_edit(
   text? : String = "",
-  on_input? : (String) -> Unit = fn(_s) { },
+  on_input? : (String) -> Unit = fn(_s) {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
-  handle? : (TextEdit) -> Unit = fn(_t) { },
+  handle? : (TextEdit) -> Unit = fn(_t) {  },
 ) -> Node {
-  { mount: fn(parent) {
-    let t = TextEdit::make(text=text, style=style, style_str=style_str)
-    t.on_text_change(fn() { on_input(t.get_text()) })
-    handle(t)
-    attach(parent, t.view())
-    t.view()
-  } }
+  {
+    mount: fn(parent) {
+      let t = TextEdit::make(text~, style~, style_str~)
+      t.on_text_change(fn() { on_input(t.get_text()) })
+      handle(t)
+      attach(parent, t.view())
+      t.view()
+    },
+  }
 }
 
 ///|
@@ -172,18 +197,26 @@ pub fn text_edit(
 pub fn radio(
   title : String,
   checked? : Bool = false,
-  on_change? : (Bool) -> Unit = fn(_v) { },
+  on_change? : (Bool) -> Unit = fn(_v) {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
-  handle? : (Button) -> Unit = fn(_b) { },
+  handle? : (Button) -> Unit = fn(_b) {  },
 ) -> Node {
-  { mount: fn(parent) {
-    let b = Button::make(title, button_type=Radio, checked=checked, style=style, style_str=style_str)
-    b.on_click(fn() { on_change(b.is_checked()) })
-    handle(b)
-    attach(parent, b.view())
-    b.view()
-  } }
+  {
+    mount: fn(parent) {
+      let b = Button::make(
+        title,
+        button_type=Radio,
+        checked~,
+        style~,
+        style_str~,
+      )
+      b.on_click(fn() { on_change(b.is_checked()) })
+      handle(b)
+      attach(parent, b.view())
+      b.view()
+    },
+  }
 }
 
 ///|
@@ -192,18 +225,20 @@ pub fn slider(
   value? : Double = 0.0,
   range? : (Double, Double)? = None,
   step? : Double? = None,
-  on_change? : (Double) -> Unit = fn(_v) { },
+  on_change? : (Double) -> Unit = fn(_v) {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
-  handle? : (Slider) -> Unit = fn(_s) { },
+  handle? : (Slider) -> Unit = fn(_s) {  },
 ) -> Node {
-  { mount: fn(parent) {
-    let s = Slider::make(value=value, range=range, step=step, style=style, style_str=style_str)
-    s.on_value_change(fn() { on_change(s.get_value()) })
-    handle(s)
-    attach(parent, s.view())
-    s.view()
-  } }
+  {
+    mount: fn(parent) {
+      let s = Slider::make(value~, range~, step~, style~, style_str~)
+      s.on_value_change(fn() { on_change(s.get_value()) })
+      handle(s)
+      attach(parent, s.view())
+      s.view()
+    },
+  }
 }
 
 ///|
@@ -213,14 +248,16 @@ pub fn progress(
   indeterminate? : Bool = false,
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
-  handle? : (ProgressBar) -> Unit = fn(_p) { },
+  handle? : (ProgressBar) -> Unit = fn(_p) {  },
 ) -> Node {
-  { mount: fn(parent) {
-    let p = ProgressBar::make(value=value, indeterminate=indeterminate, style=style, style_str=style_str)
-    handle(p)
-    attach(parent, p.view())
-    p.view()
-  } }
+  {
+    mount: fn(parent) {
+      let p = ProgressBar::make(value~, indeterminate~, style~, style_str~)
+      handle(p)
+      attach(parent, p.view())
+      p.view()
+    },
+  }
 }
 
 ///|
@@ -228,17 +265,25 @@ pub fn progress(
 pub fn picker(
   items? : Array[String] = [],
   selected? : Int = 0,
-  on_change? : () -> Unit = fn() { },
+  on_change? : () -> Unit = fn() {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
-  handle? : (Picker) -> Unit = fn(_p) { },
+  handle? : (Picker) -> Unit = fn(_p) {  },
 ) -> Node {
-  { mount: fn(parent) {
-    let p = Picker::make(items=items, selected=selected, on_selection_change=on_change, style=style, style_str=style_str)
-    handle(p)
-    attach(parent, p.view())
-    p.view()
-  } }
+  {
+    mount: fn(parent) {
+      let p = Picker::make(
+        items~,
+        selected~,
+        on_selection_change=on_change,
+        style~,
+        style_str~,
+      )
+      handle(p)
+      attach(parent, p.view())
+      p.view()
+    },
+  }
 }
 
 ///|
@@ -246,18 +291,27 @@ pub fn picker(
 pub fn combo(
   items? : Array[String] = [],
   selected? : Int = 0,
-  on_select? : () -> Unit = fn() { },
-  on_input? : () -> Unit = fn() { },
+  on_select? : () -> Unit = fn() {  },
+  on_input? : () -> Unit = fn() {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
-  handle? : (ComboBox) -> Unit = fn(_c) { },
+  handle? : (ComboBox) -> Unit = fn(_c) {  },
 ) -> Node {
-  { mount: fn(parent) {
-    let c = ComboBox::make(items=items, selected=selected, on_selection_change=on_select, on_text_change=on_input, style=style, style_str=style_str)
-    handle(c)
-    attach(parent, c.view())
-    c.view()
-  } }
+  {
+    mount: fn(parent) {
+      let c = ComboBox::make(
+        items~,
+        selected~,
+        on_selection_change=on_select,
+        on_text_change=on_input,
+        style~,
+        style_str~,
+      )
+      handle(c)
+      attach(parent, c.view())
+      c.view()
+    },
+  }
 }
 
 ///|
@@ -270,15 +324,17 @@ pub fn group(
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Node {
-  { mount: fn(parent) {
-    let g = Group::new(title)
-    apply_style(g, style=style, style_str=style_str)
-    attach(parent, g.view())
-    let holder = Container::new()
-    ignore((content.mount)(holder.view()))
-    g.set_content(holder)
-    g.view()
-  } }
+  {
+    mount: fn(parent) {
+      let g = Group::new(title)
+      apply_style(g, style~, style_str~)
+      attach(parent, g.view())
+      let holder = Container::new()
+      ignore((content.mount)(holder.view()))
+      g.set_content(holder)
+      g.view()
+    },
+  }
 }
 
 ///|
@@ -292,23 +348,25 @@ pub fn scroll(
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Node {
-  { mount: fn(parent) {
-    let s = Scroll::new()
-    match content_size {
-      Some((w, h)) => s.set_content_size(w, h)
-      None => ()
-    }
-    match policy {
-      Some((h, v)) => s.set_scrollbar_policy(h, v)
-      None => ()
-    }
-    apply_style(s, style=style, style_str=style_str)
-    attach(parent, s.view())
-    let holder = Container::new()
-    ignore((content.mount)(holder.view()))
-    s.set_content(holder)
-    s.view()
-  } }
+  {
+    mount: fn(parent) {
+      let s = Scroll::new()
+      match content_size {
+        Some((w, h)) => s.set_content_size(w, h)
+        None => ()
+      }
+      match policy {
+        Some((h, v)) => s.set_scrollbar_policy(h, v)
+        None => ()
+      }
+      apply_style(s, style~, style_str~)
+      attach(parent, s.view())
+      let holder = Container::new()
+      ignore((content.mount)(holder.view()))
+      s.set_content(holder)
+      s.view()
+    },
+  }
 }
 
 ///|
@@ -318,52 +376,58 @@ pub fn separator(
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Node {
-  { mount: fn(parent) {
-    let s = Separator::new(orientation)
-    apply_style(s, style=style, style_str=style_str)
-    attach(parent, s.view())
-    s.view()
-  } }
+  {
+    mount: fn(parent) {
+      let s = Separator::new(orientation)
+      apply_style(s, style~, style_str~)
+      attach(parent, s.view())
+      s.view()
+    },
+  }
 }
 
 ///|
 /// 页签节点：每页自动包一层容器挂载；页内容异构无限制。
 pub fn tab(
   pages : Array[(String, Node)],
-  on_change? : () -> Unit = fn() { },
-  handle? : (Tab) -> Unit = fn(_t) { },
+  on_change? : () -> Unit = fn() {  },
+  handle? : (Tab) -> Unit = fn(_t) {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Node {
-  { mount: fn(parent) {
-    let t = Tab::new()
-    apply_style(t, style=style, style_str=style_str)
-    t.on_selected_page_change(on_change)
-    for (title, page) in pages {
-      let holder = Container::new()
-      ignore((page.mount)(holder.view()))
-      t.add_page(title, holder)
-    }
-    handle(t)
-    attach(parent, t.view())
-    t.view()
-  } }
+  {
+    mount: fn(parent) {
+      let t = Tab::new()
+      apply_style(t, style~, style_str~)
+      t.on_selected_page_change(on_change)
+      for (title, page) in pages {
+        let holder = Container::new()
+        ignore((page.mount)(holder.view()))
+        t.add_page(title, holder)
+      }
+      handle(t)
+      attach(parent, t.view())
+      t.view()
+    },
+  }
 }
 
 ///|
 /// 日期选择器节点。
 pub fn date_picker(
   epoch? : Int64? = None,
-  on_change? : () -> Unit = fn() { },
+  on_change? : () -> Unit = fn() {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Node {
-  { mount: fn(parent) {
-    let d = DatePicker::make(epoch=epoch, on_date_change=on_change)
-    apply_style(d, style=style, style_str=style_str)
-    attach(parent, d.view())
-    d.view()
-  } }
+  {
+    mount: fn(parent) {
+      let d = DatePicker::make(epoch~, on_date_change=on_change)
+      apply_style(d, style~, style_str~)
+      attach(parent, d.view())
+      d.view()
+    },
+  }
 }
 
 ///|
@@ -374,12 +438,14 @@ pub fn gif(
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Node {
-  { mount: fn(parent) {
-    let g = GifPlayer::make(image=image, scale=scale)
-    apply_style(g, style=style, style_str=style_str)
-    attach(parent, g.view())
-    g.view()
-  } }
+  {
+    mount: fn(parent) {
+      let g = GifPlayer::make(image~, scale~)
+      apply_style(g, style~, style_str~)
+      attach(parent, g.view())
+      g.view()
+    },
+  }
 }
 
 ///|
@@ -387,35 +453,39 @@ pub fn gif(
 pub fn browser(
   url? : String = "",
   html? : String = "",
-  handle? : (Browser) -> Unit = fn(_b) { },
+  handle? : (Browser) -> Unit = fn(_b) {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Node {
-  { mount: fn(parent) {
-    let b = Browser::make(url=url, html=html)
-    apply_style(b, style=style, style_str=style_str)
-    handle(b)
-    attach(parent, b.view())
-    b.view()
-  } }
+  {
+    mount: fn(parent) {
+      let b = Browser::make(url~, html~)
+      apply_style(b, style~, style_str~)
+      handle(b)
+      attach(parent, b.view())
+      b.view()
+    },
+  }
 }
 
 ///|
 /// 容器节点：需要自绘（on_draw）或要拿 Container 句柄时用；纯布局用
 /// vbox/hbox。
 pub fn container(
-  on_draw? : (Painter) -> Unit = fn(_p) { },
-  handle? : (Container) -> Unit = fn(_c) { },
+  on_draw? : (Painter) -> Unit = fn(_p) {  },
+  handle? : (Container) -> Unit = fn(_c) {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Node {
-  { mount: fn(parent) {
-    let c = Container::make(style=style, style_str=style_str)
-    c.on_draw(on_draw)
-    handle(c)
-    attach(parent, c.view())
-    c.view()
-  } }
+  {
+    mount: fn(parent) {
+      let c = Container::make(style~, style_str~)
+      c.on_draw(on_draw)
+      handle(c)
+      attach(parent, c.view())
+      c.view()
+    },
+  }
 }
 
 ///|
@@ -426,7 +496,7 @@ pub fn mount(
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Container {
-  let root = Container::make(style=style, style_str=style_str)
+  let root = Container::make(style~, style_str~)
   for ch in children {
     ignore((ch.mount)(root.view()))
   }
@@ -442,10 +512,10 @@ pub fn mount_window(
   title? : String = "",
   size? : (Double, Double)? = None,
   center? : Bool = false,
-  on_close? : (Window) -> Unit = fn(_w) { },
-  handle? : (Window) -> Unit = fn(_w) { },
+  on_close? : (Window) -> Unit = fn(_w) {  },
+  handle? : (Window) -> Unit = fn(_w) {  },
 ) -> Window {
-  let win = Window::make(title=title, size=size, on_close=on_close, center=center)
+  let win = Window::make(title~, size~, on_close~, center~)
   win.set_content(mount(children))
   handle(win)
   win

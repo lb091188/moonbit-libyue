@@ -70,9 +70,7 @@ fn main {
   let check = @yue.Button::new_of(@yue.Checkbox, "启用")
   check.set_style("marginBottom", 8.0)
   page1.add_child(check)
-  check.on_click(fn() {
-    println("复选：\{check.is_checked()}")
-  })
+  check.on_click(fn() { println("复选：\{check.is_checked()}") })
   let radio_row = @yue.Container::new()
   radio_row.set_style_str("flexDirection", "row")
   radio_row.set_style("marginBottom", 8.0)
@@ -107,12 +105,8 @@ fn main {
   entry.set_text("输入后按回车")
   entry.set_style("marginBottom", 8.0)
   page2.add_child(entry)
-  entry.on_text_change(fn() {
-    println("输入框变化：\{entry.get_text()}")
-  })
-  entry.on_activate(fn() {
-    println("回车提交：\{entry.get_text()}")
-  })
+  entry.on_text_change(fn() { println("输入框变化：\{entry.get_text()}") })
+  entry.on_activate(fn() { println("回车提交：\{entry.get_text()}") })
 
   // 密码输入框（Entry::Type::Password）
   let password = @yue.Entry::new_of(@yue.Password)
@@ -124,7 +118,9 @@ fn main {
   })
 
   let edit = @yue.TextEdit::new()
-  edit.set_text("TextEdit 撤销/选区/插入演示。\n可在此输入多行文本。")
+  edit.set_text(
+    "TextEdit 撤销/选区/插入演示。\n可在此输入多行文本。",
+  )
   edit.set_style("flex", 1.0)
   edit.set_style("marginBottom", 8.0)
   page2.add_child(edit)
@@ -161,7 +157,9 @@ fn main {
   tabs.add_page("控件", page1)
   tabs.add_page("文本", page2)
   tabs.on_selected_page_change(fn() {
-    println("切到第 \{tabs.get_selected_page_index()} 页（共 \{tabs.page_count()} 页）")
+    println(
+      "切到第 \{tabs.get_selected_page_index()} 页（共 \{tabs.page_count()} 页）",
+    )
   })
 
   progress.set_value(0.0)

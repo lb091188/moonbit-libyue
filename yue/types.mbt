@@ -49,7 +49,7 @@ pub(all) struct Slider {
 }
 
 ///|
-pub impl ViewLike for Slider with view(self) {
+pub impl ViewLike for Slider with fn view(self) {
   self.view
 }
 
@@ -59,7 +59,7 @@ pub(all) struct Picker {
 }
 
 ///|
-pub impl ViewLike for Picker with view(self) {
+pub impl ViewLike for Picker with fn view(self) {
   self.view
 }
 
@@ -69,7 +69,7 @@ pub(all) struct ComboBox {
 }
 
 ///|
-pub impl ViewLike for ComboBox with view(self) {
+pub impl ViewLike for ComboBox with fn view(self) {
   self.view
 }
 
@@ -79,7 +79,7 @@ pub(all) struct ProgressBar {
 }
 
 ///|
-pub impl ViewLike for ProgressBar with view(self) {
+pub impl ViewLike for ProgressBar with fn view(self) {
   self.view
 }
 
@@ -93,7 +93,7 @@ pub type Popover
 /// 通用视图能力（焦点/启停/布局/背景）作为 trait 默认方法，
 /// 所有控件自动获得（默认实现见 view.mbt）。
 pub(open) trait ViewLike {
-  view(Self) -> View
+  fn view(Self) -> View
   fn focus(Self) -> Unit = _
   fn set_enabled(Self, Bool) -> Unit = _
   fn set_mouse_down_can_move_window(Self, Bool) -> Unit = _
@@ -123,37 +123,38 @@ pub(open) trait ViewLike {
   fn get_computed_layout(Self) -> String = _
 }
 
-pub impl ViewLike for Window with view(self) {
+///|
+pub impl ViewLike for Window with fn view(self) {
   self.view
 }
 
 ///|
-pub impl ViewLike for Container with view(self) {
+pub impl ViewLike for Container with fn view(self) {
   self.view
 }
 
 ///|
-pub impl ViewLike for Label with view(self) {
+pub impl ViewLike for Label with fn view(self) {
   self.view
 }
 
 ///|
-pub impl ViewLike for TextEdit with view(self) {
+pub impl ViewLike for TextEdit with fn view(self) {
   self.view
 }
 
 ///|
-pub impl ViewLike for Button with view(self) {
+pub impl ViewLike for Button with fn view(self) {
   self.view
 }
 
 ///|
-pub impl ViewLike for Entry with view(self) {
+pub impl ViewLike for Entry with fn view(self) {
   self.view
 }
 
 ///|
-pub impl ViewLike for Browser with view(self) {
+pub impl ViewLike for Browser with fn view(self) {
   self.view
 }
 
@@ -163,7 +164,7 @@ pub(all) struct Table {
 }
 
 ///|
-pub impl ViewLike for Table with view(self) {
+pub impl ViewLike for Table with fn view(self) {
   self.view
 }
 
@@ -235,7 +236,7 @@ pub(all) struct Group {
 }
 
 ///|
-pub impl ViewLike for Group with view(self) {
+pub impl ViewLike for Group with fn view(self) {
   self.view
 }
 
@@ -245,7 +246,7 @@ pub(all) struct Scroll {
 }
 
 ///|
-pub impl ViewLike for Scroll with view(self) {
+pub impl ViewLike for Scroll with fn view(self) {
   self.view
 }
 
@@ -255,7 +256,7 @@ pub(all) struct Separator {
 }
 
 ///|
-pub impl ViewLike for Separator with view(self) {
+pub impl ViewLike for Separator with fn view(self) {
   self.view
 }
 
@@ -265,7 +266,7 @@ pub(all) struct DatePicker {
 }
 
 ///|
-pub impl ViewLike for DatePicker with view(self) {
+pub impl ViewLike for DatePicker with fn view(self) {
   self.view
 }
 
@@ -275,7 +276,7 @@ pub(all) struct GifPlayer {
 }
 
 ///|
-pub impl ViewLike for GifPlayer with view(self) {
+pub impl ViewLike for GifPlayer with fn view(self) {
   self.view
 }
 
@@ -286,7 +287,7 @@ pub(all) struct Tab {
 }
 
 ///|
-pub impl ViewLike for Tab with view(self) {
+pub impl ViewLike for Tab with fn view(self) {
   self.view
 }
 

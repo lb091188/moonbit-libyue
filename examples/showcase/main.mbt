@@ -90,7 +90,9 @@ fn build_menubar(win : @yue.Window) -> @yue.MenuBar {
 fn setup_close_guard(win : @yue.Window) -> Unit {
   win.set_should_close(fn() {
     if close_veto.val {
-      veto_info.set("关闭请求被 set_should_close 拦截（回「剪贴板与系统」页解除）")
+      veto_info.set(
+        "关闭请求被 set_should_close 拦截（回「剪贴板与系统」页解除）",
+      )
       return false
     }
     true
@@ -101,7 +103,9 @@ fn setup_close_guard(win : @yue.Window) -> Unit {
 /// 键盘钩子：窗口级 on_key_down 更新事件页显示。
 fn setup_key_hook(win : @yue.Window) -> Unit {
   win.on_key_down(fn(e) {
-    key_info.set("按键 \{e.describe()}（键码 \{e.code}，Esc=\{@yue.VKEY_ESCAPE} A=\{@yue.VKEY_A}）")
+    key_info.set(
+      "按键 \{e.describe()}（键码 \{e.code}，Esc=\{@yue.VKEY_ESCAPE} A=\{@yue.VKEY_A}）",
+    )
     false
   })
 }
@@ -110,10 +114,11 @@ fn setup_key_hook(win : @yue.Window) -> Unit {
 /// 自定义协议 demo://：注册一次供网页页使用（Windows WebView2 下静默无效）。
 fn setup_custom_protocol() -> Unit {
   @yue.Browser::register_protocol("demo", fn(_url) {
-    Some((
-      "text/html",
-      "<html><body style='font-family:sans-serif;background:#20242C;color:#eee'><h2>demo:// 自定义协议 ✓</h2><p>由 register_protocol 注册，ProtocolStringJob 应答。</p></body></html>",
-    ))
+    Some(
+      (
+        "text/html", "<html><body style='font-family:sans-serif;background:#20242C;color:#eee'><h2>demo:// 自定义协议 ✓</h2><p>由 register_protocol 注册，ProtocolStringJob 应答。</p></body></html>",
+      ),
+    )
   })
 }
 

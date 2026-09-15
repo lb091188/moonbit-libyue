@@ -1,0 +1,8 @@
+import {
+  "moonbitlang/core/encoding/utf8",
+  "NoahLiu/moonbit-libyue/yue/traybus",
+}
+
+options(
+  targets: { "ffi.mbt": [ "native" ] },
+)

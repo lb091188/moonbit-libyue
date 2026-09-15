@@ -18,7 +18,9 @@ fn main {
   root.set_style("padding", 12.0)
   window.set_content(root)
 
-  let status = @yue.Label::new("把鼠标移进蓝色区域 / 点击 / 按 Esc 退出")
+  let status = @yue.Label::new(
+    "把鼠标移进蓝色区域 / 点击 / 按 Esc 退出",
+  )
   status.set_style("marginBottom", 8.0)
   root.add_child(status)
 
@@ -43,8 +45,12 @@ fn main {
   })
   area.on_mouse_down(fn(event) {
     let clicks = tracker.feed(event)
-    status.set_text("down btn=\{event.button} 第\{clicks}次点击 mods=\{event.modifiers}")
-    println("EVENT down btn=\{event.button} clicks=\{clicks} mods=\{event.modifiers} ts=\{event.timestamp}")
+    status.set_text(
+      "down btn=\{event.button} 第\{clicks}次点击 mods=\{event.modifiers}",
+    )
+    println(
+      "EVENT down btn=\{event.button} clicks=\{clicks} mods=\{event.modifiers} ts=\{event.timestamp}",
+    )
     false
   })
   area.on_mouse_up(fn(event) {
@@ -69,7 +75,13 @@ fn main {
     } else {
       area.set_capture()
     }
-    capture_state.set_text(if area.has_capture() { "已捕获" } else { "未捕获" })
+    capture_state.set_text(
+      if area.has_capture() {
+        "已捕获"
+      } else {
+        "未捕获"
+      },
+    )
     println("EVENT capture_toggle now=\{area.has_capture()}")
   })
   area.on_capture_lost(fn() {

@@ -117,7 +117,10 @@ fn main {
     check("D.w", rd.width, 50.0)
     check("D.h", rd.height, 30.0)
     // 文本族：TextFormat/TextAttributes/文本往返/系统语义色
-    let at = @yue.AttributedText::new_with("hello 文本", @yue.TextAttributes::new())
+    let at = @yue.AttributedText::new_with(
+      "hello 文本",
+      @yue.TextAttributes::new(),
+    )
     at.set_text("文本 A~Z 往返")
     let rt_ok = at.get_text() == "文本 A~Z 往返"
     if !rt_ok {
@@ -150,9 +153,7 @@ fn main {
   })
 
   // 首次布局完成后转储一次根节点计算布局（调试参考）
-  window.on_size_changed(fn() {
-    println("LAYOUT_DUMP size_changed")
-  })
+  window.on_size_changed(fn() { println("LAYOUT_DUMP size_changed") })
 
   window.activate()
   @yue.run()

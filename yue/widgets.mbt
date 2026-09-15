@@ -3,7 +3,7 @@
 ///|
 /// 创建滑块（默认范围 0.0 ~ 1.0）。
 pub fn Slider::new() -> Slider {
-  { view: ffi_slider_new() }
+  { view: ffi_slider_new(), }
 }
 
 ///|
@@ -39,7 +39,10 @@ pub fn Slider::on_value_change(self : Slider, callback : () -> Unit) -> Unit {
 
 ///|
 /// 注册拖动结束回调。
-pub fn Slider::on_sliding_complete(self : Slider, callback : () -> Unit) -> Unit {
+pub fn Slider::on_sliding_complete(
+  self : Slider,
+  callback : () -> Unit,
+) -> Unit {
   keep_alive(callback)
   ffi_slider_on_sliding_complete(self.view, fn(f) { f() }, callback)
 }
@@ -47,7 +50,7 @@ pub fn Slider::on_sliding_complete(self : Slider, callback : () -> Unit) -> Unit
 ///|
 /// 创建下拉选择器。
 pub fn Picker::new() -> Picker {
-  { view: ffi_picker_new() }
+  { view: ffi_picker_new(), }
 }
 
 ///|
@@ -88,7 +91,10 @@ pub fn Picker::get_selected_item_index(self : Picker) -> Int {
 
 ///|
 /// 注册选择变化回调。
-pub fn Picker::on_selection_change(self : Picker, callback : () -> Unit) -> Unit {
+pub fn Picker::on_selection_change(
+  self : Picker,
+  callback : () -> Unit,
+) -> Unit {
   keep_alive(callback)
   ffi_picker_on_selection_change(ViewLike::view(self), fn(f) { f() }, callback)
 }
@@ -96,7 +102,7 @@ pub fn Picker::on_selection_change(self : Picker, callback : () -> Unit) -> Unit
 ///|
 /// 创建可编辑下拉框。
 pub fn ComboBox::new() -> ComboBox {
-  { view: ffi_combo_box_new() }
+  { view: ffi_combo_box_new(), }
 }
 
 ///|
@@ -121,7 +127,7 @@ pub fn ComboBox::on_text_change(self : ComboBox, callback : () -> Unit) -> Unit 
 ///|
 /// 创建进度条。
 pub fn ProgressBar::new() -> ProgressBar {
-  { view: ffi_progress_bar_new() }
+  { view: ffi_progress_bar_new(), }
 }
 
 ///|
@@ -150,13 +156,20 @@ pub fn[T : ViewLike] Popover::set_content(self : Popover, content : T) -> Unit {
 
 ///|
 /// 设置内容区尺寸。
-pub fn Popover::set_content_size(self : Popover, width : Double, height : Double) -> Unit {
+pub fn Popover::set_content_size(
+  self : Popover,
+  width : Double,
+  height : Double,
+) -> Unit {
   ffi_popover_set_content_size(self, width, height)
 }
 
 ///|
 /// 在指定视图附近弹出。
-pub fn[T : ViewLike] Popover::show_relative_to(self : Popover, view : T) -> Unit {
+pub fn[T : ViewLike] Popover::show_relative_to(
+  self : Popover,
+  view : T,
+) -> Unit {
   ffi_popover_show_relative_to(self, view.view())
 }
 
@@ -190,7 +203,10 @@ pub fn ComboBox::get_selected_item(self : ComboBox) -> String {
 }
 
 ///|
-pub fn ComboBox::on_selection_change(self : ComboBox, callback : () -> Unit) -> Unit {
+pub fn ComboBox::on_selection_change(
+  self : ComboBox,
+  callback : () -> Unit,
+) -> Unit {
   keep_alive(callback)
   ffi_picker_on_selection_change(ViewLike::view(self), fn(f) { f() }, callback)
 }
@@ -225,10 +241,15 @@ pub fn Notification::show(self : Notification) -> Unit {
 
 ///|
 /// 关闭通知。
+
 ///|
+
 ///|
 /// 设置通知按钮（对照 Notification::Action；Linux 经 libnotify action 生效）。
-pub fn Notification::set_actions(self : Notification, actions : Array[(String, String)]) -> Unit {
+pub fn Notification::set_actions(
+  self : Notification,
+  actions : Array[(String, String)],
+) -> Unit {
   // 协议：[count:i32le]（[len:i32le title][len:i32le info]）*
   let parts : Array[Bytes] = []
   for a in actions {
@@ -269,7 +290,10 @@ pub fn Notification::close(self : Notification) -> Unit {
 /// 注册全局快捷键（格式如 "CmdOrCtrl+Shift+M"），返回注册 id；
 /// 返回 -1 表示注册失败（X11 下 XGrabKey 排他，组合键被系统或
 /// 桌面环境占用即失败，需换键）。
-pub fn register_global_shortcut(accelerator : String, callback : () -> Unit) -> Int {
+pub fn register_global_shortcut(
+  accelerator : String,
+  callback : () -> Unit,
+) -> Int {
   keep_alive(callback)
   ffi_global_shortcut_register(utf8_bytes(accelerator), fn(f) { f() }, callback)
 }
@@ -283,17 +307,18 @@ pub fn unregister_global_shortcut(id : Int) -> Unit {
 ///|
 /// 创建日期选择控件。
 pub fn DatePicker::new() -> DatePicker {
-  { view: ffi_date_picker_new() }
+  { view: ffi_date_picker_new(), }
 }
 
 ///|
 /// 创建 GIF 播放控件。
 pub fn GifPlayer::new() -> GifPlayer {
-  { view: ffi_gif_player_new() }
+  { view: ffi_gif_player_new(), }
 }
 
 ///|
 /// 设置要播放的 GIF 图片。
+
 ///|
 /// 图片缩放模式（对照 ImageScale）。
 pub(all) enum ImageScale {
@@ -305,12 +330,15 @@ pub(all) enum ImageScale {
 
 ///|
 pub fn GifPlayer::set_scale(self : GifPlayer, scale : ImageScale) -> Unit {
-  ffi_gif_player_set_scale(self.view, match scale {
-    None => 0
-    Fill => 1
-    Down => 2
-    UpOrDown => 3
-  })
+  ffi_gif_player_set_scale(
+    self.view,
+    match scale {
+      None => 0
+      Fill => 1
+      Down => 2
+      UpOrDown => 3
+    },
+  )
 }
 
 ///|
@@ -405,7 +433,10 @@ pub fn DatePicker::get_date(self : DatePicker) -> Int64 {
 
 ///|
 /// 注册日期变化回调。
-pub fn DatePicker::on_date_change(self : DatePicker, callback : () -> Unit) -> Unit {
+pub fn DatePicker::on_date_change(
+  self : DatePicker,
+  callback : () -> Unit,
+) -> Unit {
   keep_alive(callback)
   ffi_date_picker_on_date_change(ViewLike::view(self), fn(f) { f() }, callback)
 }
@@ -433,7 +464,11 @@ pub fn Table::on_toggle_checkbox(
 ) -> Unit {
   let wrapped : (Int, Int) -> Unit = fn(column, row) { callback(column, row) }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_table_on_toggle_checkbox(self.view, fn(f, column, row) { f(column, row) }, wrapped)
+  ffi_table_on_toggle_checkbox(
+    self.view,
+    fn(f, column, row) { f(column, row) },
+    wrapped,
+  )
 }
 
 ///|
@@ -451,7 +486,14 @@ pub fn Window::unmaximize(self : Window) -> Unit {
 ///|
 /// 设置全屏。
 pub fn Window::set_fullscreen(self : Window, fullscreen : Bool) -> Unit {
-  ffi_window_set_fullscreen(ViewLike::view(self), if fullscreen { 1 } else { 0 })
+  ffi_window_set_fullscreen(
+    ViewLike::view(self),
+    if fullscreen {
+      1
+    } else {
+      0
+    },
+  )
 }
 
 ///|
@@ -525,7 +567,7 @@ pub(all) struct DatePickerOptions {
 
 ///|
 pub fn DatePickerOptions::new() -> DatePickerOptions {
-  { elements: YearMonthDay, has_stepper: true }
+  { elements: YearMonthDay, has_stepper: true, }
 }
 
 ///|
@@ -537,6 +579,14 @@ pub fn DatePicker::new_with(options : DatePickerOptions) -> DatePicker {
     HourMinute => 0x000C
     HourMinuteSecond => 0x000E
   }
-  { view: ffi_date_picker_new_ex(elements, if options.has_stepper { 1 } else { 0 }) }
+  {
+    view: ffi_date_picker_new_ex(
+      elements,
+      if options.has_stepper {
+        1
+      } else {
+        0
+      },
+    ),
+  }
 }
-

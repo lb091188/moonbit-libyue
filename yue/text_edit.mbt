@@ -3,7 +3,7 @@
 ///|
 /// 创建文本编辑框。
 pub fn TextEdit::new() -> TextEdit {
-  { view: ffi_text_edit_new() }
+  { view: ffi_text_edit_new(), }
 }
 
 ///|
@@ -28,7 +28,11 @@ pub fn TextEdit::get_text_bounds_height(self : TextEdit) -> Double {
 /// 注册文本变化回调。
 pub fn TextEdit::on_text_change(self : TextEdit, callback : () -> Unit) -> Unit {
   keep_alive(callback)
-  ffi_text_edit_on_text_change(self.view, fn(f : (() -> Unit)) -> Unit { f() }, callback)
+  ffi_text_edit_on_text_change(
+    self.view,
+    fn(f : () -> Unit) -> Unit { f() },
+    callback,
+  )
 }
 
 ///|
@@ -87,7 +91,11 @@ pub fn TextEdit::select_range(self : TextEdit, start : Int, end : Int) -> Unit {
 
 ///|
 /// 读取 [start, end) 字符区间内的文本。
-pub fn TextEdit::get_text_in_range(self : TextEdit, start : Int, end : Int) -> String {
+pub fn TextEdit::get_text_in_range(
+  self : TextEdit,
+  start : Int,
+  end : Int,
+) -> String {
   from_utf8_bytes(ffi_text_edit_get_text_in_range(self.view, start, end))
 }
 
@@ -99,7 +107,11 @@ pub fn TextEdit::insert_text(self : TextEdit, text : String) -> Unit {
 
 ///|
 /// 在指定位置插入文本。
-pub fn TextEdit::insert_text_at(self : TextEdit, text : String, pos : Int) -> Unit {
+pub fn TextEdit::insert_text_at(
+  self : TextEdit,
+  text : String,
+  pos : Int,
+) -> Unit {
   ffi_text_edit_insert_text_at(self.view, utf8_bytes(text), pos)
 }
 

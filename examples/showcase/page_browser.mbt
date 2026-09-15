@@ -26,8 +26,12 @@ fn page_browser() -> @yue.Node {
             style=[("flex", 1.0)],
           ),
           @yue.button("转到", on_click=fn() { go() }),
-          @yue.button("←", on_click=fn() { when_some(b, fn(x) { x.go_back() }) }),
-          @yue.button("→", on_click=fn() { when_some(b, fn(x) { x.go_forward() }) }),
+          @yue.button("←", on_click=fn() {
+            when_some(b, fn(x) { x.go_back() })
+          }),
+          @yue.button("→", on_click=fn() {
+            when_some(b, fn(x) { x.go_forward() })
+          }),
         ],
         style=[("marginBottom", 8.0)],
       ),
@@ -36,19 +40,37 @@ fn page_browser() -> @yue.Node {
           b.val = Some(x)
           x.load_url("https://www.moonbitlang.com")
           x.on_update_title(fn(_url) {
-            when_some(main_win, fn(w) { w.set_title("Showcase — \{x.get_url()}") })
+            when_some(main_win, fn(w) {
+              w.set_title("Showcase — \{x.get_url()}")
+            })
           })
         },
         style=[("height", 360.0)],
       ),
     ]),
-    section("JS / 本地 HTML / UA", "execute_javascript 改页面标题（生效即变 JS-OK）；load_html 免网络片段；set_user_agent 改请求标识。", [
-      @yue.hbox([
-        @yue.button("执行 JS", on_click=fn() { when_some(b, fn(x) { x.execute_javascript("document.title = 'JS-OK'") }) }),
-        @yue.button("本地 HTML", on_click=fn() { when_some(b, fn(x) { x.load_html("<h3>load_html 本地片段</h3><p>不经过网络。</p>") }) }),
-        @yue.button("切换 UA", on_click=fn() { when_some(b, fn(x) { x.set_user_agent("MoonBitShowcase/1.0") }) }),
-      ]),
-    ]),
+    section(
+      "JS / 本地 HTML / UA",
+      "execute_javascript 改页面标题（生效即变 JS-OK）；load_html 免网络片段；set_user_agent 改请求标识。",
+      [
+        @yue.hbox([
+          @yue.button("执行 JS", on_click=fn() {
+            when_some(b, fn(x) {
+              x.execute_javascript("document.title = 'JS-OK'")
+            })
+          }),
+          @yue.button("本地 HTML", on_click=fn() {
+            when_some(b, fn(x) {
+              x.load_html(
+                "<h3>load_html 本地片段</h3><p>不经过网络。</p>",
+              )
+            })
+          }),
+          @yue.button("切换 UA", on_click=fn() {
+            when_some(b, fn(x) { x.set_user_agent("MoonBitShowcase/1.0") })
+          }),
+        ]),
+      ],
+    ),
   ]
   // 自定义协议在 Windows WebView2 下静默无效：非 Linux 平台不创建演示按钮
   if is_linux() {
@@ -57,7 +79,9 @@ fn page_browser() -> @yue.Node {
         "自定义协议 demo://（仅 Linux）",
         "register_protocol 注册 demo://，由 ProtocolStringJob 应答；其他平台整段不创建。",
         [
-          @yue.button("加载 demo://hello", on_click=fn() { when_some(b, fn(x) { x.load_url("demo://hello") }) }),
+          @yue.button("加载 demo://hello", on_click=fn() {
+            when_some(b, fn(x) { x.load_url("demo://hello") })
+          }),
         ],
       ),
     )

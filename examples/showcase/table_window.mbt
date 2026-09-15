@@ -11,12 +11,12 @@ struct LangModel {
 }
 
 ///|
-impl @yue.TableModel for LangModel with row_count(self) {
+impl @yue.TableModel for LangModel with fn row_count(self) {
   self.names.length()
 }
 
 ///|
-impl @yue.TableModel for LangModel with get_value(self, column, row) {
+impl @yue.TableModel for LangModel with fn get_value(self, column, row) {
   match column {
     0 => @yue.Str(self.names[row])
     1 => @yue.Flag(self.likes[row])
@@ -26,7 +26,7 @@ impl @yue.TableModel for LangModel with get_value(self, column, row) {
 }
 
 ///|
-impl @yue.TableModel for LangModel with set_value(self, column, row, value) {
+impl @yue.TableModel for LangModel with fn set_value(self, column, row, value) {
   match (column, value) {
     (1, @yue.Flag(b)) => self.likes[row] = b
     (2, @yue.Str(s)) => {
@@ -49,7 +49,9 @@ impl @yue.TableModel for LangModel with set_value(self, column, row, value) {
 }
 
 ///|
-let table_events : @yue.Store[String] = @yue.Store::new("（行激活 / 勾选 / 编辑事件）")
+let table_events : @yue.Store[String] = @yue.Store::new(
+  "（行激活 / 勾选 / 编辑事件）",
+)
 
 ///|
 fn open_table_window() -> Unit {
@@ -59,9 +61,21 @@ fn open_table_window() -> Unit {
   let page = @yue.Container::new()
   page.set_style("padding", 12.0)
   let table = @yue.Table::new()
-  table.add_column_with_options("语言", { column_type: @yue.Text, column: 0, width: 160 })
-  table.add_column_with_options("喜欢", { column_type: @yue.Checkbox, column: -1, width: 80 })
-  table.add_column_with_options("星数", { column_type: @yue.Edit, column: -1, width: 120 })
+  table.add_column_with_options("语言", {
+    column_type: @yue.Text,
+    column: 0,
+    width: 160,
+  })
+  table.add_column_with_options("喜欢", {
+    column_type: @yue.Checkbox,
+    column: -1,
+    width: 80,
+  })
+  table.add_column_with_options("星数", {
+    column_type: @yue.Edit,
+    column: -1,
+    width: 120,
+  })
   table.set_has_border(true)
   table.set_style("flex", 1.0)
   table.set_model(
@@ -72,7 +86,9 @@ fn open_table_window() -> Unit {
     },
     3,
   )
-  table.on_row_activate(fn(row) { table_events.set("行激活：第 \{row} 行") })
+  table.on_row_activate(fn(row) {
+    table_events.set("行激活：第 \{row} 行")
+  })
   table.on_selection_change(fn() { table_events.set("选择变化") })
   page.add_child(table)
   let log = @yue.Label::new(table_events.get())

@@ -8,7 +8,7 @@ libyue(libyue.com)的 MoonBit 封装,跨平台原生桌面 GUI。
 
 ## 硬性规则
 
-1. **链接参数由 `scripts/prebuild.py` 全权托管**——moon 构建时执行该脚本（moon.mod.json 的 `--moonbit-unstable-prebuild`），按当前系统输出 link_configs 自动传播给所有依赖 yue 的 main 包；任何包的 moon.pkg.json 都不写链接参数，勿手改。脚本 stdout 只允许输出 JSON，进度信息走 stderr。
+1. **链接参数由 `scripts/prebuild.py` 全权托管**——moon 构建时执行该脚本（`moon.mod` 的 `options(--moonbit-unstable-prebuild)`），按当前系统输出 link_configs 自动传播给所有依赖 yue 的 main 包；任何包的 `moon.pkg` 都不写链接参数，勿手改。脚本 stdout 只允许输出 JSON，进度信息走 stderr。
 2. **库包(如 `yue/`)不得放 `link` 段**——moon 会生成无 main 的 `.exe` 导致构建失败;链接配置统一走 prebuild 传播,任何包都不写 `cc-link-flags`。
 3. **FFI 改动必须对照 `.agents/skills/moonbit-c-binding/` 规范**;新增控件按固定流程:`shim/yue_mbt.cpp` 机械转换 → `shim/include/yue_mbt.h` 声明 → `yue/ffi.mbt` extern → `yue/<控件>.mbt` 类型与方法(字符串统一 `utf8_bytes()`,事件照抄 `yue/view.mbt` 注册表+蹦床模式)。
 4. **extern 蹦床与 C 函数指针原型逐位对齐,含参数个数**——C 以 `(closure, args...)` 调用,蹦床首参收 closure;多带/少带一位会形参错位,部分接口"看似能跑"掩盖问题。案例与更多 ABI 坑见适配经验文档。

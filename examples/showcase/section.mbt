@@ -33,8 +33,12 @@ fn section(
   content : Array[@yue.Node],
 ) -> @yue.Node {
   let nodes : Array[@yue.Node] = [
-    @yue.label(title, style_str=[("color", title_color)], style=[("marginBottom", 4.0)]),
-    @yue.label(desc, style_str=[("color", desc_color)], style=[("marginBottom", 10.0)]),
+    @yue.label(title, style_str=[("color", title_color)], style=[
+      ("marginBottom", 4.0),
+    ]),
+    @yue.label(desc, style_str=[("color", desc_color)], style=[
+      ("marginBottom", 10.0),
+    ]),
   ]
   for c in content {
     nodes.push(c)
@@ -47,7 +51,9 @@ fn section(
 /// 一页 = 整页滚动区包住全部分段。flex 1 让 Scroll 填满页签的可用区域
 /// （notebook 页区域由 GTK 分配,页容器是独立 yoga 子树的根）。
 fn scroll_page(sections : Array[@yue.Node]) -> @yue.Node {
-  @yue.scroll(@yue.vbox(sections, style=[("padding", 14.0)]), style=[("flex", 1.0)])
+  @yue.scroll(@yue.vbox(sections, style=[("padding", 14.0)]), style=[
+    ("flex", 1.0),
+  ])
 }
 
 ///|

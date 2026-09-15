@@ -3,7 +3,7 @@
 ///|
 /// 创建带标题的分组框。
 pub fn Group::new(title : String) -> Group {
-  { view: ffi_group_new(utf8_bytes(title)) }
+  { view: ffi_group_new(utf8_bytes(title)), }
 }
 
 ///|
@@ -36,7 +36,7 @@ fn orientation_id(o : Orientation) -> Int {
 ///|
 /// 创建滚动视图。
 pub fn Scroll::new() -> Scroll {
-  { view: ffi_scroll_new() }
+  { view: ffi_scroll_new(), }
 }
 
 ///|
@@ -47,18 +47,27 @@ pub fn[T : ViewLike] Scroll::set_content(self : Scroll, content : T) -> Unit {
 
 ///|
 /// 设置内容逻辑尺寸（超出可视区产生滚动）。
-pub fn Scroll::set_content_size(self : Scroll, width : Double, height : Double) -> Unit {
+pub fn Scroll::set_content_size(
+  self : Scroll,
+  width : Double,
+  height : Double,
+) -> Unit {
   ffi_scroll_set_content_size(ViewLike::view(self), width, height)
 }
 
 ///|
 /// 设置滚动位置。
-pub fn Scroll::set_scroll_position(self : Scroll, horizon : Double, vertical : Double) -> Unit {
+pub fn Scroll::set_scroll_position(
+  self : Scroll,
+  horizon : Double,
+  vertical : Double,
+) -> Unit {
   ffi_scroll_set_scroll_position(ViewLike::view(self), horizon, vertical)
 }
 
 ///|
 /// 是否使用覆盖式滚动条。
+
 ///|
 /// 滚动条策略（对照 Scroll::Policy）。
 pub(all) enum ScrollPolicy {
@@ -87,24 +96,44 @@ fn scroll_policy_of(id : Int) -> ScrollPolicy {
 
 ///|
 /// 设置横/纵滚动条策略。
-pub fn Scroll::set_scrollbar_policy(self : Scroll, h : ScrollPolicy, v : ScrollPolicy) -> Unit {
-  ffi_scroll_set_scrollbar_policy(self.view, scroll_policy_id(h), scroll_policy_id(v))
+pub fn Scroll::set_scrollbar_policy(
+  self : Scroll,
+  h : ScrollPolicy,
+  v : ScrollPolicy,
+) -> Unit {
+  ffi_scroll_set_scrollbar_policy(
+    self.view,
+    scroll_policy_id(h),
+    scroll_policy_id(v),
+  )
 }
 
 ///|
-pub fn Scroll::get_scrollbar_policy(self : Scroll) -> (ScrollPolicy, ScrollPolicy) {
-  (scroll_policy_of(ffi_scroll_get_scrollbar_policy_x(self.view)), scroll_policy_of(ffi_scroll_get_scrollbar_policy_y(self.view)))
+pub fn Scroll::get_scrollbar_policy(
+  self : Scroll,
+) -> (ScrollPolicy, ScrollPolicy) {
+  (
+    scroll_policy_of(ffi_scroll_get_scrollbar_policy_x(self.view)),
+    scroll_policy_of(ffi_scroll_get_scrollbar_policy_y(self.view)),
+  )
 }
 
 ///|
 pub fn Scroll::set_overlay_scrollbar(self : Scroll, yes : Bool) -> Unit {
-  ffi_scroll_set_overlay_scrollbar(ViewLike::view(self), if yes { 1 } else { 0 })
+  ffi_scroll_set_overlay_scrollbar(
+    ViewLike::view(self),
+    if yes {
+      1
+    } else {
+      0
+    },
+  )
 }
 
 ///|
 /// 创建分隔线。
 pub fn Separator::new(orientation : Orientation) -> Separator {
-  { view: ffi_separator_new(orientation_id(orientation)) }
+  { view: ffi_separator_new(orientation_id(orientation)), }
 }
 
 ///|
@@ -127,6 +156,7 @@ pub fn Clipboard::get_text(self : Clipboard) -> String {
 
 ///|
 /// 清空剪贴板。
+
 ///|
 /// 剪贴板类型（对照 Clipboard::Type；Linux 有主选区 Selection）。
 pub(all) enum ClipboardType {
@@ -137,15 +167,21 @@ pub(all) enum ClipboardType {
 ///|
 /// 取指定类型剪贴板（进程级单例）。
 pub fn Clipboard::from_type(clipboard_type : ClipboardType) -> Clipboard {
-  ffi_clipboard_from_type(match clipboard_type {
-    CopyPaste => 0
-    Selection => 1
-  })
+  ffi_clipboard_from_type(
+    match clipboard_type {
+      CopyPaste => 0
+      Selection => 1
+    },
+  )
 }
 
 ///|
 /// 写入一条数据（文本类：Text/Html/FilePaths，路径以 \n 连接）。
-pub fn Clipboard::set_data(self : Clipboard, kind : DataKind, text : String) -> Unit {
+pub fn Clipboard::set_data(
+  self : Clipboard,
+  kind : DataKind,
+  text : String,
+) -> Unit {
   ffi_clipboard_set_data(self, data_kind_id(kind), utf8_bytes(text))
 }
 
@@ -205,7 +241,10 @@ pub fn MessageBox::set_text(self : MessageBox, text : String) -> Unit {
 
 ///|
 /// 设置补充说明文本。
-pub fn MessageBox::set_informative_text(self : MessageBox, text : String) -> Unit {
+pub fn MessageBox::set_informative_text(
+  self : MessageBox,
+  text : String,
+) -> Unit {
   ffi_message_box_set_informative_text(self, utf8_bytes(text))
 }
 
@@ -238,7 +277,10 @@ pub fn MessageBox::show(self : MessageBox) -> Unit {
 
 ///|
 /// 以模态方式挂在指定窗口显示。
-pub fn[T : ViewLike] MessageBox::show_for_window(self : MessageBox, window : T) -> Unit {
+pub fn[T : ViewLike] MessageBox::show_for_window(
+  self : MessageBox,
+  window : T,
+) -> Unit {
   ffi_message_box_show_for_window(self, window.view())
 }
 

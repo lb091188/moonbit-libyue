@@ -42,7 +42,7 @@ pub fn Tray::is_supported() -> Bool {
 pub fn Tray::new(icon_path : String) -> Result[Tray, TrayError] {
   if @traybus.sni_available() {
     match @traybus.Item::create(basename_no_ext(icon_path), icon_path) {
-      Ok(item) => return Ok({ backend: Sni(item) })
+      Ok(item) => return Ok({ backend: Sni(item), })
       Err(_) => () // watcher 不在线等，继续回退
     }
   }
@@ -50,7 +50,7 @@ pub fn Tray::new(icon_path : String) -> Result[Tray, TrayError] {
     let ok = Ref(0)
     let tray = ffi_tray_new(utf8_bytes(icon_path), ok)
     if ok.val == 1 {
-      return Ok({ backend: Native(tray) })
+      return Ok({ backend: Native(tray), })
     }
     return Err(IconLoadFailed)
   }
@@ -118,7 +118,7 @@ pub fn Tray::on_click(self : Tray, callback : () -> Unit) -> Unit {
   match self.backend {
     Native(t) => {
       keep_alive(callback)
-      ffi_tray_on_click(t, fn(f : (() -> Unit)) -> Unit { f() }, callback)
+      ffi_tray_on_click(t, fn(f : () -> Unit) -> Unit { f() }, callback)
     }
     Sni(item) => {
       keep_alive(callback)
@@ -146,7 +146,11 @@ pub fn Tray::set_menu(self : Tray, menu : Menu) -> Unit {
         } else if kind == 0 || kind == 1 || kind == 2 {
           let buf = Bytes::make(256, 0)
           let n = ffi_menu_item_get_label(h, buf, 256)
-          let label = if n < 0 { "" } else { from_utf8_bytes(buf[0:n].to_owned()) }
+          let label = if n < 0 {
+            ""
+          } else {
+            from_utf8_bytes(buf[0:n].to_owned())
+          }
           let enabled = ffi_menu_item_is_enabled(h) == 1
           item.add_menu_entry(label, enabled, fn() { ffi_menu_item_click(h) })
         }

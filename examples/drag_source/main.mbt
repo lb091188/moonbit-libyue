@@ -55,8 +55,16 @@ fn main {
     let w = dbounds.width
     let h = dbounds.height
     painter.stroke_rect(x, y, w, h)
-    painter.draw_text("Drag image here", x + 1.0, y + 1.0, w - 2.0, h - 2.0,
-                      align=@yue.Center, valign=@yue.Center, color="#999")
+    painter.draw_text(
+      "Drag image here",
+      x + 1.0,
+      y + 1.0,
+      w - 2.0,
+      h - 2.0,
+      align=@yue.Center,
+      valign=@yue.Center,
+      color="#999",
+    )
   })
 
   win.center()

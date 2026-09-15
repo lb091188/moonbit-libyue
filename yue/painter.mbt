@@ -55,7 +55,19 @@ pub fn Painter::arc(
   end_angle : Double,
   ccw? : Bool = false,
 ) -> Unit {
-  ffi_painter_arc(self, x, y, radius, start_angle, end_angle, if ccw { 1 } else { 0 })
+  ffi_painter_arc(
+    self,
+    x,
+    y,
+    radius,
+    start_angle,
+    end_angle,
+    if ccw {
+      1
+    } else {
+      0
+    },
+  )
 }
 
 ///|
@@ -69,17 +81,35 @@ pub fn Painter::stroke(self : Painter) -> Unit {
 }
 
 ///|
-pub fn Painter::clip_rect(self : Painter, x : Double, y : Double, w : Double, h : Double) -> Unit {
+pub fn Painter::clip_rect(
+  self : Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+) -> Unit {
   ffi_painter_clip_rect(self, x, y, w, h)
 }
 
 ///|
-pub fn Painter::fill_rect(self : Painter, x : Double, y : Double, w : Double, h : Double) -> Unit {
+pub fn Painter::fill_rect(
+  self : Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+) -> Unit {
   ffi_painter_fill_rect(self, x, y, w, h)
 }
 
 ///|
-pub fn Painter::stroke_rect(self : Painter, x : Double, y : Double, w : Double, h : Double) -> Unit {
+pub fn Painter::stroke_rect(
+  self : Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+) -> Unit {
   ffi_painter_stroke_rect(self, x, y, w, h)
 }
 
@@ -138,7 +168,17 @@ pub fn Painter::draw_text(
   valign? : TextAlign = Start,
   color? : String = "#000",
 ) -> Unit {
-  ffi_painter_draw_text(self, utf8_bytes(text), x, y, w, h, align_id(align), align_id(valign), utf8_bytes(color))
+  ffi_painter_draw_text(
+    self,
+    utf8_bytes(text),
+    x,
+    y,
+    w,
+    h,
+    align_id(align),
+    align_id(valign),
+    utf8_bytes(color),
+  )
 }
 
 ///|
@@ -211,7 +251,9 @@ pub fn Painter::draw_canvas_from_rect(
   dw : Double,
   dh : Double,
 ) -> Unit {
-  ffi_painter_draw_canvas_from_rect(self, canvas, sx, sy, sw, sh, dx, dy, dw, dh)
+  ffi_painter_draw_canvas_from_rect(
+    self, canvas, sx, sy, sw, sh, dx, dy, dw, dh,
+  )
 }
 
 ///|
@@ -239,8 +281,16 @@ pub fn AttributedText::new(
     utf8_bytes(text),
     align_id(align),
     align_id(valign),
-    if wrap { 1 } else { 0 },
-    if ellipsis { 1 } else { 0 },
+    if wrap {
+      1
+    } else {
+      0
+    },
+    if ellipsis {
+      1
+    } else {
+      0
+    },
   )
 }
 
@@ -256,7 +306,7 @@ pub(all) struct TextFormat {
 ///|
 /// 默认布局选项（start 对齐、自动换行、无省略，同 libyue 默认值）。
 pub fn TextFormat::new() -> TextFormat {
-  { align: Start, valign: Start, wrap: true, ellipsis: false }
+  { align: Start, valign: Start, wrap: true, ellipsis: false, }
 }
 
 ///|
@@ -273,18 +323,36 @@ pub(all) struct TextAttributes {
 ///|
 /// 默认属性（无字体/颜色覆盖）。
 pub fn TextAttributes::new() -> TextAttributes {
-  { align: Start, valign: Start, wrap: true, ellipsis: false, font: None, color: None }
+  {
+    align: Start,
+    valign: Start,
+    wrap: true,
+    ellipsis: false,
+    font: None,
+    color: None,
+  }
 }
 
 ///|
 /// 按属性创建富文本。
-pub fn AttributedText::new_with(text : String, attrs : TextAttributes) -> AttributedText {
+pub fn AttributedText::new_with(
+  text : String,
+  attrs : TextAttributes,
+) -> AttributedText {
   let at = ffi_attributed_text_new(
     utf8_bytes(text),
     align_id(attrs.align),
     align_id(attrs.valign),
-    if attrs.wrap { 1 } else { 0 },
-    if attrs.ellipsis { 1 } else { 0 },
+    if attrs.wrap {
+      1
+    } else {
+      0
+    },
+    if attrs.ellipsis {
+      1
+    } else {
+      0
+    },
   )
   match attrs.font {
     Some(f) => at.set_font(f)
@@ -299,13 +367,24 @@ pub fn AttributedText::new_with(text : String, attrs : TextAttributes) -> Attrib
 
 ///|
 /// 整体重设布局选项。
-pub fn AttributedText::set_format(self : AttributedText, format : TextFormat) -> Unit {
+pub fn AttributedText::set_format(
+  self : AttributedText,
+  format : TextFormat,
+) -> Unit {
   ffi_attributed_text_set_format(
     self,
     align_id(format.align),
     align_id(format.valign),
-    if format.wrap { 1 } else { 0 },
-    if format.ellipsis { 1 } else { 0 },
+    if format.wrap {
+      1
+    } else {
+      0
+    },
+    if format.ellipsis {
+      1
+    } else {
+      0
+    },
   )
 }
 
@@ -337,7 +416,12 @@ fn is_whole_range(start : Int, end : Int) -> Bool {
 
 ///|
 /// 对 [start, end) 字符区间设字体。
-pub fn AttributedText::set_font_for(self : AttributedText, font : Font, start : Int, end : Int) -> Unit {
+pub fn AttributedText::set_font_for(
+  self : AttributedText,
+  font : Font,
+  start : Int,
+  end : Int,
+) -> Unit {
   if ffi_platform() == 2 && !is_whole_range(start, end) {
     warn_ranged_attribute_once()
     return
@@ -352,16 +436,25 @@ pub fn AttributedText::set_color(self : AttributedText, hex : String) -> Unit {
 
 ///|
 /// 查询在给定可用空间内布局后的文本包围盒尺寸。
-pub fn AttributedText::get_bounds_for(self : AttributedText, w : Double, h : Double) -> SizeF {
+pub fn AttributedText::get_bounds_for(
+  self : AttributedText,
+  w : Double,
+  h : Double,
+) -> SizeF {
   let out_w = Ref(0.0)
   let out_h = Ref(0.0)
   ffi_attributed_text_get_bounds_for(self, w, h, out_w, out_h)
-  { width: out_w.val, height: out_h.val }
+  { width: out_w.val, height: out_h.val, }
 }
 
 ///|
 /// 对 [start, end) 字符区间设颜色。
-pub fn AttributedText::set_color_for(self : AttributedText, hex : String, start : Int, end : Int) -> Unit {
+pub fn AttributedText::set_color_for(
+  self : AttributedText,
+  hex : String,
+  start : Int,
+  end : Int,
+) -> Unit {
   if ffi_platform() == 2 && !is_whole_range(start, end) {
     warn_ranged_attribute_once()
     return
@@ -515,7 +608,6 @@ pub fn Image::new_from_png(data : Bytes, scale? : Double = 1.0) -> Image {
   ffi_image_new_from_data(data, data.length(), scale)
 }
 
-
 ///|
 /// 图片是否为空（加载失败等）。
 pub fn Image::is_empty(self : Image) -> Bool {
@@ -529,13 +621,22 @@ pub fn Image::get_scale_factor(self : Image) -> Double {
 
 ///|
 /// 缩放为新图片（原图不变）。
-pub fn Image::resize(self : Image, width : Double, height : Double, scale? : Double = 1.0) -> Image {
+pub fn Image::resize(
+  self : Image,
+  width : Double,
+  height : Double,
+  scale? : Double = 1.0,
+) -> Image {
   ffi_image_resize(self, width, height, scale)
 }
 
 ///|
 /// 导出为图片文件（Linux 支持 "png"）。
-pub fn Image::write_to_file(self : Image, format : String, path : String) -> Bool {
+pub fn Image::write_to_file(
+  self : Image,
+  format : String,
+  path : String,
+) -> Bool {
   ffi_image_write_to_file(self, utf8_bytes(format), utf8_bytes(path)) == 1
 }
 
@@ -565,7 +666,7 @@ pub(all) struct ImageSlot {
 
 ///|
 pub fn ImageSlot::new() -> ImageSlot {
-  { value: None }
+  { value: None, }
 }
 
 ///|

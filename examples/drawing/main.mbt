@@ -81,7 +81,15 @@ fn draw_example4(painter : @yue.Painter, pi : Double) -> Unit {
 }
 
 ///|
-fn rounded_rect(painter : @yue.Painter, x : Double, y : Double, w : Double, h : Double, radius : Double, pi : Double) -> Unit {
+fn rounded_rect(
+  painter : @yue.Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+  radius : Double,
+  pi : Double,
+) -> Unit {
   let deg = pi / 180.0
   painter.begin_path()
   painter.arc(x + w - radius, y + radius, radius, -90.0 * deg, 0.0)
@@ -174,7 +182,13 @@ fn draw_example7(painter : @yue.Painter) -> Unit {
   painter.save()
   painter.scale(1.0, -1.0)
   text.set_color("#888")
-  painter.draw_attributed_text(text, (150.0 - bw) / 2.0, -150.0 + (75.0 - bh), bw, bh)
+  painter.draw_attributed_text(
+    text,
+    (150.0 - bw) / 2.0,
+    -150.0 + (75.0 - bh),
+    bw,
+    bh,
+  )
   painter.restore()
 }
 
@@ -192,7 +206,9 @@ fn draw_example8(painter : @yue.Painter) -> Unit {
 ///|
 fn draw_example9(painter : @yue.Painter) -> Unit {
   let picture = @yue.Image::new_from_file("\{image_prefix}rhino.jpg")
-  painter.draw_image_from_rect(picture, 33.0, 71.0, 104.0, 124.0, 32.0, 21.0, 85.0, 102.0)
+  painter.draw_image_from_rect(
+    picture, 33.0, 71.0, 104.0, 124.0, 32.0, 21.0, 85.0, 102.0,
+  )
   let frame = @yue.Image::new_from_file("\{image_prefix}frame.png")
   let fw = frame.get_width()
   let fh = frame.get_height()

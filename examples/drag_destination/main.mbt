@@ -71,8 +71,16 @@ fn main {
         if dropped_text.val != "" {
           painter.draw_text(dropped_text.val, x, y, w, h)
         } else {
-          painter.draw_text("Please drag things here", x, y, w, h,
-                            align=@yue.Center, valign=@yue.Center, color="#999")
+          painter.draw_text(
+            "Please drag things here",
+            x,
+            y,
+            w,
+            h,
+            align=@yue.Center,
+            valign=@yue.Center,
+            color="#999",
+          )
         }
     }
   })

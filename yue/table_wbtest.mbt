@@ -26,7 +26,10 @@ test "decode_table_value 布尔往返" {
   // kind 从编码头解出
   let kind = enc[0].to_int()
   // payload：kind=1 时 enc[4] 为 0/1
-  inspect(decode_table_value(kind, enc, enc[4].to_int()) is Flag(false), content="true")
+  inspect(
+    decode_table_value(kind, enc, enc[4].to_int()) is Flag(false),
+    content="true",
+  )
   let enc_t = encode_table_value(Flag(true))
   inspect(decode_table_value(1, enc_t, 1) is Flag(true), content="true")
 }

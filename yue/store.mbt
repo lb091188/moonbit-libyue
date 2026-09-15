@@ -13,7 +13,7 @@ pub struct Store[T] {
 
 ///|
 pub fn[T] Store::new(value : T) -> Store[T] {
-  { value, subs: [] }
+  { value, subs: [], }
 }
 
 ///|
@@ -62,10 +62,12 @@ pub fn[A] bind_label(
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Node {
-  { mount: fn(parent) {
-    let l = Label::make(f(store.get()), style=style, style_str=style_str)
-    store.subscribe(fn(v) { l.set_text(f(v)) })
-    attach(parent, l.view())
-    l.view()
-  } }
+  {
+    mount: fn(parent) {
+      let l = Label::make(f(store.get()), style~, style_str~)
+      store.subscribe(fn(v) { l.set_text(f(v)) })
+      attach(parent, l.view())
+      l.view()
+    },
+  }
 }

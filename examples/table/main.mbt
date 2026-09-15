@@ -16,14 +16,15 @@ impl @yue.TableModel for DemoModel with fn row_count(_self) {
 impl @yue.TableModel for DemoModel with fn get_value(self, column, row) {
   match column {
     0 => @yue.Str("\{row}")
-    1 => match self.edited_text.val.get(row) {
-      Some(text) => @yue.Str(text)
-      None => @yue.Str("Edit Me \{row}")
-    }
+    1 =>
+      match self.edited_text.val.get(row) {
+        Some(text) => @yue.Str(text)
+        None => @yue.Str("Edit Me \{row}")
+      }
     _ => {
-      let r = (row % 5) * 40 + (row % 55) * 1
-      let g = (row % 4) * 40 + (row % 20) * 4
-      let b = (row % 3) * 40 + (row % 10) * 13
+      let r = row % 5 * 40 + row % 55 * 1
+      let g = row % 4 * 40 + row % 20 * 4
+      let b = row % 3 * 40 + row % 10 * 13
       @yue.ColorText("rgb(\{r}, \{g}, \{b})", "#\{hex2(r)}\{hex2(g)}\{hex2(b)}")
     }
   }
@@ -39,7 +40,7 @@ impl @yue.TableModel for DemoModel with fn set_value(self, column, row, value) {
 
 ///|
 fn hex2(v : Int) -> String {
-  let hi = (v / 16) % 16
+  let hi = v / 16 % 16
   let lo = v % 16
   "\{digit(hi)}\{digit(lo)}"
 }
@@ -70,14 +71,30 @@ fn main {
   win.on_close(fn(_window) { @yue.quit() })
 
   let table = @yue.Table::new()
-  table.add_column_with_options("ID", { column_type: @yue.Text, column: 0, width: 40 })
-  table.add_column_with_options("Editable Text", { column_type: @yue.Edit, column: -1, width: 100 })
-  table.add_column_custom("Custom Color", -1, fn(painter, x, y, w, h, name, color) {
+  table.add_column_with_options("ID", {
+    column_type: @yue.Text,
+    column: 0,
+    width: 40,
+  })
+  table.add_column_with_options("Editable Text", {
+    column_type: @yue.Edit,
+    column: -1,
+    width: 100,
+  })
+  table.add_column_custom("Custom Color", -1, fn(
+    painter,
+    x,
+    y,
+    w,
+    h,
+    name,
+    color,
+  ) {
     painter.set_fill_color(color)
     painter.fill_rect(x, y, w, h)
     painter.draw_text(name, x, y, w, h, color="#FFF")
   })
-  table.set_model(DemoModel::{ edited_text: Ref(Map([])) }, 3)
+  table.set_model(DemoModel::{ edited_text: Ref(Map([])), }, 3)
   table.set_has_border(true)
   table.set_style("margin", 10.0)
   table.set_style("flex", 1.0)

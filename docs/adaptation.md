@@ -22,8 +22,9 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 ### 构建与链接
 
 - `moon` 命令必须在**仓库根**执行的习惯保留:链接参数虽已改为绝对路径(见下条),但 vendor/build 产物与 WebView2Loader.dll 的运行期搜索仍按工作目录。
-- moon 的 `link` 段只作用于所在包、只对 main 包的二进制生效;库包(如 `yue/`)放 link 段会让 moon 生成无 main 的 `.exe` 导致构建失败。链接配置已全部收敛到 `scripts/prebuild.py`,任何包的 moon.pkg.json 都不再写 `cc-link-flags`。
-- **双平台链接参数由 pre-build 钩子传播(当前方案,2026-09-12 实测入档)**:moon 的 `cc-link-flags` 是单一字符串、`targets` 条件编译无 OS 维度,链接参数无法按平台入库。现行机制:moon.mod.json 声明 `--moonbit-unstable-prebuild: scripts/prebuild.py`,moon 每次构建执行它,脚本按 `platform.system()` 输出 `link_configs` JSON,moon 把它**自动传播给所有依赖 yue 包的 main 包**——本仓 examples 与 mooncakes 使用方统一零配置,切换平台自动换参数。实测要点:
+- moon 的 `link` 段只作用于所在包、只对 main 包的二进制生效;库包(如 `yue/`)放 link 段会让 moon 生成无 main 的 `.exe` 导致构建失败。链接配置已全部收敛到 `scripts/prebuild.py`,任何包的 `moon.pkg` 都不再写 `cc-link-flags`。
+- **manifest 迁移到 `moon.mod` / `moon.pkg` 新格式(2026-09-15 实测入档)**:moon 新版弃用 `moon.mod.json` / `moon.pkg.json`,`moon fmt` 一键迁移(字段改 DSL 风格:`preferred_target`、`options(...)` 块;pkg 的 import/targets 同步迁移);`moondoc` / `moon doc` 只认新格式——mooncakes 0.1.0 的「Documentation failed to generate」即服务端 moondoc 找不到 `moon.mod` 所致,迁移后发新版本号即恢复。注意:旧版 moon(stable 20260904 等)不认新格式,消费方需较新工具链。
+- **双平台链接参数由 pre-build 钩子传播(当前方案,2026-09-12 实测入档)**:moon 的 `cc-link-flags` 是单一字符串、`targets` 条件编译无 OS 维度,链接参数无法按平台入库。现行机制:`moon.mod` 声明 `--moonbit-unstable-prebuild: scripts/prebuild.py`,moon 每次构建执行它,脚本按 `platform.system()` 输出 `link_configs` JSON,moon 把它**自动传播给所有依赖 yue 包的 main 包**——本仓 examples 与 mooncakes 使用方统一零配置,切换平台自动换参数。实测要点:
   - 脚本 **stdout 只能是最终 JSON**:任何 print(含子进程透传)都会导致 moon 反序列化失败(`invalid number at line 1 column 2`),进度信息一律走 stderr。
   - **不要用 `link_libs` 放 libyue_mbt**:moon 组装命令行时 `link_flags` 在 `link_libs` 之前,GNU ld 从左到右解析,`-lyue_mbt` 排在 `-lstdc++` 之后会 `undefined reference to __cxa_guard_acquire`。全部参数放 `link_flags` 单一字符串自控顺序(与旧响应文件同序)。
   - 脚本 cwd 是 **moon 调用目录(使用方项目根)**,定位自身必须 `Path(__file__)`;传播的库路径必须是**绝对路径**(链接命令的 cwd 在使用方侧)。

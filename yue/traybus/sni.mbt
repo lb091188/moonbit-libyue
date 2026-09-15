@@ -128,36 +128,43 @@ fn Conn::register_item_path(self : Conn, path : String) -> Result[Unit, String] 
       "org.freedesktop.DBus",
       "AddMatch",
       "s",
-      [VString(
-        "type='signal',sender='org.freedesktop.DBus',interface='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.kde.StatusNotifierWatcher'",
-      )],
+      [
+        VString(
+          "type='signal',sender='org.freedesktop.DBus',interface='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.kde.StatusNotifierWatcher'",
+        ),
+      ],
       fn(_m) { () },
     )
     self.match_added = true
   }
-  match self.call_sync(
-    "org.freedesktop.DBus",
-    "/org/freedesktop/DBus",
-    "org.freedesktop.DBus",
-    "NameHasOwner",
-    "s",
-    [VString(watcher_name)],
-  ) {
+  match
+    self.call_sync(
+      "org.freedesktop.DBus",
+      "/org/freedesktop/DBus",
+      "org.freedesktop.DBus",
+      "NameHasOwner",
+      "s",
+      [VString(watcher_name)],
+    ) {
     Ok(m) =>
       match m.body.get(0) {
         Some(VBool(true)) => ()
-        _ => return Err("面板没有 StatusNotifierWatcher（GNOME 需安装 AppIndicator 扩展）")
+        _ =>
+          return Err(
+            "面板没有 StatusNotifierWatcher（GNOME 需安装 AppIndicator 扩展）",
+          )
       }
     Err(e) => return Err(e)
   }
-  match self.call_sync(
-    watcher_name,
-    "/StatusNotifierWatcher",
-    "org.kde.StatusNotifierWatcher",
-    "RegisterStatusNotifierItem",
-    "s",
-    [VString(path)],
-  ) {
+  match
+    self.call_sync(
+      watcher_name,
+      "/StatusNotifierWatcher",
+      "org.kde.StatusNotifierWatcher",
+      "RegisterStatusNotifierItem",
+      "s",
+      [VString(path)],
+    ) {
     Ok(_) => Ok(())
     Err(e) => Err("托盘注册失败: \{e}")
   }
@@ -242,7 +249,7 @@ pub fn Item::add_menu_entry(
   on_click : () -> Unit,
 ) -> Unit {
   let id = self.menu_items.length() + 1
-  self.menu_items.push({ id, label, is_separator: false, enabled, on_click })
+  self.menu_items.push({ id, label, is_separator: false, enabled, on_click, })
   self.menu_revision += 1
   self.emit_layout_updated()
 }
@@ -296,7 +303,9 @@ fn menu_entry_prop_pairs(entry : MenuEntry) -> Array[DVal] {
 fn Item::menu_layout(self : Item, id : Int, depth : Int) -> DVal {
   let props : Array[DVal] = []
   if id == 0 {
-    props.push(VStruct([VString("children-display"), VVariant(VString("submenu"))]))
+    props.push(
+      VStruct([VString("children-display"), VVariant(VString("submenu"))]),
+    )
   } else {
     match self.menu_items.get(id - 1) {
       Some(entry) => {
@@ -323,10 +332,7 @@ fn Item::menu_layout(self : Item, id : Int, depth : Int) -> DVal {
 fn Item::dispatch_menu_click(self : Item, id : Int) -> Unit {
   if id >= 1 {
     match self.menu_items.get(id - 1) {
-      Some(entry) =>
-        if !entry.is_separator {
-          (entry.on_click)()
-        }
+      Some(entry) => if !entry.is_separator { (entry.on_click)() }
       None => ()
     }
   }
@@ -421,16 +427,17 @@ fn Conn::handle_menu_call(self : Conn, item : Item, msg : Msg) -> Unit {
             Some(e) => VBool(e.enabled)
             None => VBool(false)
           }
-      (_, "visible") => VBool(true)
-      (_, "type") =>
-        match item.menu_items.get(id - 1) {
-          Some(e) => VString(if e.is_separator { "separator" } else { "standard" })
-          None => VString("standard")
-        }
-      // 接口级属性（Qt 适配器同款），客户端经 GetAll 缓存后一般不再单独问
-      (0, "Status") => VString("normal")
-      (0, "TextDirection") => VString("ltr")
-      (_, _) => VString("")
+        (_, "visible") => VBool(true)
+        (_, "type") =>
+          match item.menu_items.get(id - 1) {
+            Some(e) =>
+              VString(if e.is_separator { "separator" } else { "standard" })
+            None => VString("standard")
+          }
+        // 接口级属性（Qt 适配器同款），客户端经 GetAll 缓存后一般不再单独问
+        (0, "Status") => VString("normal")
+        (0, "TextDirection") => VString("ltr")
+        (_, _) => VString("")
       }
       self.reply(msg, "v", [VVariant(value)])
     }
@@ -483,11 +490,7 @@ fn Item::pixmap_value(self : Item) -> DVal {
   for i in 0..<self.pixmap.length() {
     pixels.push(VByte(self.pixmap[i].to_int()))
   }
-  VStruct([
-    VI32(self.pixmap_w),
-    VI32(self.pixmap_h),
-    VArray("y", pixels),
-  ])
+  VStruct([VI32(self.pixmap_w), VI32(self.pixmap_h), VArray("y", pixels)])
 }
 
 ///|
@@ -502,27 +505,24 @@ fn Item::property(self : Item, name : String) -> DVal? {
     "IconName" => Some(VString(self.icon_name))
     "IconPixmap" =>
       Some(
-        VArray(
-          "(iiay)",
-          [
-            self.pixmap_value(),
-            // 附加 16×16 小尺寸,供高密度面板选择
-            {
-              let (sw, sh, spx) = downscale_pixmap(
-                self.pixmap_w,
-                self.pixmap_h,
-                self.pixmap,
-                16,
-                16,
-              )
-              let pixels : Array[DVal] = []
-              for i in 0..<spx.length() {
-                pixels.push(VByte(spx[i].to_int()))
-              }
-              VStruct([VI32(sw), VI32(sh), VArray("y", pixels)])
-            },
-          ],
-        ),
+        VArray("(iiay)", [
+          self.pixmap_value(),
+          // 附加 16×16 小尺寸,供高密度面板选择
+          {
+            let (sw, sh, spx) = downscale_pixmap(
+              self.pixmap_w,
+              self.pixmap_h,
+              self.pixmap,
+              16,
+              16,
+            )
+            let pixels : Array[DVal] = []
+            for i in 0..<spx.length() {
+              pixels.push(VByte(spx[i].to_int()))
+            }
+            VStruct([VI32(sw), VI32(sh), VArray("y", pixels)])
+          },
+        ]),
       )
     "OverlayIconName" => Some(VString(""))
     "OverlayIconPixmap" => Some(VArray("(iiay)", []))
@@ -549,21 +549,9 @@ fn Item::property(self : Item, name : String) -> DVal? {
 ///|
 fn item_property_names() -> Array[String] {
   [
-    "Category",
-    "Id",
-    "Title",
-    "Status",
-    "WindowId",
-    "IconName",
-    "IconPixmap",
-    "OverlayIconName",
-    "OverlayIconPixmap",
-    "AttentionIconName",
-    "AttentionIconPixmap",
-    "AttentionMovieName",
-    "ToolTip",
-    "Menu",
-    "ItemIsMenu",
+    "Category", "Id", "Title", "Status", "WindowId", "IconName", "IconPixmap", "OverlayIconName",
+    "OverlayIconPixmap", "AttentionIconName", "AttentionIconPixmap", "AttentionMovieName",
+    "ToolTip", "Menu", "ItemIsMenu",
   ]
 }
 
@@ -624,16 +612,12 @@ fn Conn::handle_call(self : Conn, msg : Msg) -> Unit {
                 }
               _ =>
                 self.reply_error(
-                  msg,
-                  "org.freedesktop.DBus.Error.InvalidArgs",
-                  "参数类型错误",
+                  msg, "org.freedesktop.DBus.Error.InvalidArgs", "参数类型错误",
                 )
             }
           } else {
             self.reply_error(
-              msg,
-              "org.freedesktop.DBus.Error.InvalidArgs",
-              "缺少参数",
+              msg, "org.freedesktop.DBus.Error.InvalidArgs", "缺少参数",
             )
           }
         None => self.unknown_object(msg)
@@ -656,8 +640,7 @@ fn Conn::handle_call(self : Conn, msg : Msg) -> Unit {
       // 面板不改我们的属性；按规范回 InvalidArgs 以外的常规应答即可
       self.reply(msg, "", [])
     ("org.kde.StatusNotifierItem", "Activate") => self.fire_click(msg)
-    ("org.kde.StatusNotifierItem", "SecondaryActivate") =>
-      self.fire_click(msg)
+    ("org.kde.StatusNotifierItem", "SecondaryActivate") => self.fire_click(msg)
     ("org.kde.StatusNotifierItem", "ContextMenu") => {
       // Qt 模式（XFCE 等面板的约定）：应答成功，由应用自己在图标处弹菜单；
       // KDE/GNOME 扩展则走 Menu 属性的 DBusMenu
@@ -683,9 +666,7 @@ fn Conn::handle_call(self : Conn, msg : Msg) -> Unit {
     }
     ("org.kde.StatusNotifierItem", "Scroll") =>
       self.reply_error(
-        msg,
-        "org.freedesktop.DBus.Error.UnknownMethod",
-        "Scroll 暂不支持",
+        msg, "org.freedesktop.DBus.Error.UnknownMethod", "Scroll 暂不支持",
       )
     (_, _) =>
       self.reply_error(

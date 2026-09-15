@@ -24,13 +24,14 @@ let g_conn : Ref[Conn?] = Ref(None)
 pub fn sni_available() -> Bool {
   match g_conn.val {
     Some(c) => c.alive
-    None => match connect_session() {
-      Ok(c) => {
-        g_conn.val = Some(c)
-        true
+    None =>
+      match connect_session() {
+        Ok(c) => {
+          g_conn.val = Some(c)
+          true
+        }
+        Err(_) => false
       }
-      Err(_) => false
-    }
   }
 }
 
@@ -107,7 +108,10 @@ fn on_bus_ready(fd : Int, cond : Int) -> Int {
 fn connect_session() -> Result[Conn, String] {
   let path = match session_bus_path() {
     Some(p) => p
-    None => return Err("找不到会话总线地址（DBUS_SESSION_BUS_ADDRESS / XDG_RUNTIME_DIR 未设置）")
+    None =>
+      return Err(
+        "找不到会话总线地址（DBUS_SESSION_BUS_ADDRESS / XDG_RUNTIME_DIR 未设置）",
+      )
   }
   let fd = sys_unix_connect(utf8(path))
   if fd < 0 {
@@ -147,14 +151,15 @@ fn connect_session() -> Result[Conn, String] {
       return Err("SASL 应答超时")
     }
   }
-  match c.call_sync(
-    "org.freedesktop.DBus",
-    "/org/freedesktop/DBus",
-    "org.freedesktop.DBus",
-    "Hello",
-    "",
-    [],
-  ) {
+  match
+    c.call_sync(
+      "org.freedesktop.DBus",
+      "/org/freedesktop/DBus",
+      "org.freedesktop.DBus",
+      "Hello",
+      "",
+      [],
+    ) {
     Ok(m) =>
       match m.body.get(0) {
         Some(v) =>
@@ -281,12 +286,7 @@ fn Conn::call_sync(
   })
   let _ = self.pump_until(done, 1500)
   match resp.val {
-    Some(m) =>
-      if m.kind == 3 {
-        Err(m.error_name)
-      } else {
-        Ok(m)
-      }
+    Some(m) => if m.kind == 3 { Err(m.error_name) } else { Ok(m) }
     None => Err("总线应答超时: \{iface}.\{action}")
   }
 }
@@ -302,22 +302,21 @@ fn Conn::emit_signal(
   args : Array[DVal],
 ) -> Unit {
   match build_signal(self.next_serial(), path, iface, action, sig, args) {
-    Ok(b) =>
-      if !self.send_all(b) {
-        self.alive = false
-      }
+    Ok(b) => if !self.send_all(b) { self.alive = false }
     Err(_) => ()
   }
 }
 
 ///|
 /// 应答一条调用。
-fn Conn::reply(self : Conn, req : Msg, sig : String, args : Array[DVal]) -> Unit {
+fn Conn::reply(
+  self : Conn,
+  req : Msg,
+  sig : String,
+  args : Array[DVal],
+) -> Unit {
   match build_reply(self.next_serial(), req.serial, req.sender, sig, args) {
-    Ok(b) =>
-      if !self.send_all(b) {
-        self.alive = false
-      }
+    Ok(b) => if !self.send_all(b) { self.alive = false }
     // 编码失败也要回错误，否则对端干等超时（面板会当作托盘无响应）
     Err(e) =>
       self.reply_error(
@@ -329,12 +328,14 @@ fn Conn::reply(self : Conn, req : Msg, sig : String, args : Array[DVal]) -> Unit
 }
 
 ///|
-fn Conn::reply_error(self : Conn, req : Msg, name : String, text : String) -> Unit {
+fn Conn::reply_error(
+  self : Conn,
+  req : Msg,
+  name : String,
+  text : String,
+) -> Unit {
   match build_error(self.next_serial(), req.serial, req.sender, name, text) {
-    Ok(b) =>
-      if !self.send_all(b) {
-        self.alive = false
-      }
+    Ok(b) => if !self.send_all(b) { self.alive = false }
     Err(_) => ()
   }
 }
