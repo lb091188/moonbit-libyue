@@ -13,7 +13,7 @@
 - [x] Windows 10 / 11
 - [ ] Mac OS
 
-简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
+简体中文 | [English](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README.md)
 
 ## Yue
 一个跨平台原生桌面应用库（A library for creating native cross-platform GUI apps）。
@@ -153,13 +153,13 @@ moon test
 ## 说明
 
 - 当前封装面约 320 个 ABI 函数（`yue/ffi.mbt` 中 324 个 `extern "c"` 声明）：App/Lifetime、Window、View 通用能力与拖拽、Container/Label/Button/Entry/TextEdit、Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer、Browser、Menu/MenuBar、Table+模型桥、Painter/Canvas、Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog、Screen/Appearance/Locale/Cursor；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。
-- 已知边界、ABI 坑与各平台适配经验不在 README 展开，见 `AGENTS.md`（AI 协作规则）与 [docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/adaptation.md)；Linux 托盘方案（设计动机、架构、后端降级、桌面兼容性、调试）独立成文：[docs/tray.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/tray.md)。
-- shim/vendor 改动或重跑 `prepare.py` 后须强制重链：`moon clean` 或删对应 exe，见 [docs/relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/relink.md)。
-- 文档索引：[docs/README.md](docs/README.md)。
+- 已知边界、ABI 坑与各平台适配经验不在 README 展开，见 `AGENTS.md`（AI 协作规则）与 [docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md)；Linux 托盘方案（设计动机、架构、后端降级、桌面兼容性、调试）独立成文：[docs/tray.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/tray.md)。
+- shim/vendor 改动或重跑 `prepare.py` 后须强制重链：`moon clean` 或删对应 exe，见 [docs/relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/relink.md)。
+- 文档索引：[docs/README.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/README.md)。
 
 ## 参考
 
 - libyue 文档：<https://libyue.com/docs/latest/cpp/guides/getting_started.html>
 - Lua 绑定参考（架构对照）：github.com/yue/yue 的 `lua_yue/`
 - MoonBit 技能库：`.agents/skills/`（`moonbit-c-binding`、`make-moonbit-c-bindings`）
-- AI 协作规则：`AGENTS.md` · 平台适配经验：[docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/adaptation.md)
+- AI 协作规则：`AGENTS.md` · 平台适配经验：[docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md)

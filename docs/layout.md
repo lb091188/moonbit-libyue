@@ -1,88 +1,98 @@
-# 布局系统样式键参考
+# Layout System Style Key Reference
 
-libyue 的布局引擎是 **Yoga flexbox**(`View::SetStyleProperty` 直写 yoga 节点)。
-本文是从 vendored libyue 源码(`yoga_util.cc` 属性分发表 + `View::SetStyleProperty`)提取的
-**完整可用键清单**,并附 Ubuntu 24.04/X11 实测记录;消费方照此表设置样式即可,不用查 yoga 文档。
+libyue's layout engine is **Yoga flexbox** (`View::SetStyleProperty` writes directly to the yoga node).
+This document is a **complete list of usable keys** extracted from the vendored libyue source
+(the `yoga_util.cc` property dispatch table + `View::SetStyleProperty`), with real-world test records
+on Ubuntu 24.04/X11. Consumers can set styles according to this table without consulting yoga docs.
 
-MoonBit 侧入口(`yue/view.mbt` / `yue/events.mbt`):
+MoonBit-side entry points (`yue/view.mbt` / `yue/events.mbt`):
 
-- `set_style(name, Double)` 数值型;`set_style_str(name, String)` 枚举/百分比/auto 型
-- `get_bounds() -> (x, y, w, h)` 相对父节点的计算几何
-- `get_computed_layout() -> String` yoga 布局树文本转储(调试)
-- `on_size_changed(callback)` 尺寸变化时机
+- `set_style(name, Double)` for numeric values; `set_style_str(name, String)` for enum/percentage/auto values
+- `get_bounds() -> (x, y, w, h)` computed geometry relative to the parent node
+- `get_computed_layout() -> String` text dump of the yoga layout tree (debugging)
+- `on_size_changed(callback)` size-change timing
 
-**键名解析**(`ParseName`):只保留 ASCII 字母并转小写——`flexDirection` / `flex-direction` /
-`FLEX_DIRECTION` 等价,推荐统一用小写无分隔(如 `justifycontent`)。
+**Key name resolution** (`ParseName`): only ASCII letters are kept and lowercased — `flexDirection` /
+`flex-direction` / `FLEX_DIRECTION` are all equivalent; lowercase without separators (e.g. `justifycontent`)
+is recommended as the uniform style.
 
-## 基本概念
+## Basic Concepts
 
-- 布局就是「容器把空间分给子项」:子项沿**主轴**依次排列,主轴方向由
-  `flexdirection` 决定(默认 `column` 纵向,从上到下);与主轴垂直的方向叫**交叉轴**。
-- `justifycontent` 决定子项在**主轴**上怎么分布(靠头/居中/平分空隙),
-  `alignitems` 决定在**交叉轴**上怎么对齐(贴上/居中/拉伸)。
-- 子项不设任何尺寸时,大小由内容决定,交叉轴默认拉伸填满容器(`alignitems=stretch`)。
-- 所有像素值都可以写成字符串百分比(如 `"50%"`,相对父容器**内容区**,即扣掉
-  padding 后的区域);`"auto"` 恢复自动(由内容决定)。
+- Layout is simply "the container distributing space among children": children are laid out one after
+  another along the **main axis**, whose direction is determined by `flexdirection` (default `column`,
+  vertical, top to bottom); the direction perpendicular to the main axis is the **cross axis**.
+- `justifycontent` determines how children are distributed along the **main axis** (packed at start /
+  centered / equal spacing), while `alignitems` determines alignment along the **cross axis**
+  (top / centered / stretched).
+- When a child has no size set, its size is determined by content, and by default it stretches to fill
+  the container on the cross axis (`alignitems=stretch`).
+- All pixel values can be written as string percentages (e.g. `"50%"`, relative to the parent
+  container's **content area**, i.e. the region after subtracting padding); `"auto"` restores automatic
+  sizing (determined by content).
 
-## 枚举键(set_style_str,值为字符串)
+## Enum Keys (set_style_str, value is a string)
 
-| 键 | 合法值 | 说明 |
+| Key | Legal values | Description |
 |---|---|---|
-| `flexdirection` | `column`(默认) `column-reverse` `row` `row-reverse` | 排列方向:`column` 纵向从上到下;`row` 横向从左到右;`-reverse` 反向(从下到上 / 从右到左) |
-| `justifycontent` | `flex-start`(默认) `flex-end` `center` `space-between` `space-around` | 子项在**主轴**上的分布:`flex-start` 全靠起点、`flex-end` 全靠终点、`center` 居中、`space-between` 两端顶满中间平分空隙、`space-around` 每个子项两侧留相等的空隙 |
-| `alignitems` | `stretch`(默认) `flex-start` `flex-end` `center` | 子项在**交叉轴**上的对齐:`stretch` 拉伸填满、`flex-start` / `flex-end` / `center` 贴起点 / 终点 / 居中 |
-| `aligncontent` | `flex-start` `flex-end` `center` `stretch` `space-between` `space-around` | 多行内容的行间分布(仅 `flexwrap=wrap` 换行后生效),取值含义同 `justifycontent`,作用对象从「子项」换成「行」 |
-| `alignself` | `auto`(默认) `flex-start` `flex-end` `center` `stretch` | 单个子项覆盖父容器的 `alignitems`;`auto` 表示跟随父容器设置 |
-| `flexwrap` | `nowrap`(默认) `wrap` `wrap-reverse` | 一行放不下时:`nowrap` 挤在一行不换行、`wrap` 换行、`wrap-reverse` 反向换行 |
-| `position` | `relative`(默认) `absolute` | `relative` 参与正常排列;`absolute` 脱离排列,改用 `top`/`bottom`/`left`/`right` 相对父节点定位 |
-| `direction` | `inherit`(默认) `ltr` `rtl` | 内容书写方向(从左 / 从右),一般不用动 |
-| `display` | `flex`(默认) `none` | `none` 隐藏且**不占布局空间**(`View::SetVisible(false)` 内部即此);恢复显示设回 `flex` |
-| `overflow` | `visible`(默认) `hidden` `scroll` | 内容超出容器时:`visible` 溢出照画、`hidden` 裁掉、`scroll` 可滚动查看 |
+| `flexdirection` | `column` (default) `column-reverse` `row` `row-reverse` | Arrangement direction: `column` is vertical top-to-bottom; `row` is horizontal left-to-right; `-reverse` reverses the direction (bottom-to-top / right-to-left) |
+| `justifycontent` | `flex-start` (default) `flex-end` `center` `space-between` `space-around` | Distribution of children along the **main axis**: `flex-start` all packed at the start, `flex-end` all at the end, `center` centered, `space-between` flush at both ends with equal spacing in between, `space-around` equal space on both sides of each child |
+| `alignitems` | `stretch` (default) `flex-start` `flex-end` `center` | Alignment of children along the **cross axis**: `stretch` stretches to fill, `flex-start` / `flex-end` / `center` align to start / end / center |
+| `aligncontent` | `flex-start` `flex-end` `center` `stretch` `space-between` `space-around` | Distribution between rows of multi-line content (effective only when wrapping with `flexwrap=wrap`); values have the same meaning as `justifycontent`, but applied to "rows" instead of "children" |
+| `alignself` | `auto` (default) `flex-start` `flex-end` `center` `stretch` | Per-child override of the parent container's `alignitems`; `auto` means follow the parent container's setting |
+| `flexwrap` | `nowrap` (default) `wrap` `wrap-reverse` | When one line doesn't fit: `nowrap` squeezes into a single line without wrapping, `wrap` wraps, `wrap-reverse` wraps in reverse |
+| `position` | `relative` (default) `absolute` | `relative` participates in normal flow; `absolute` leaves the flow and is positioned relative to the parent using `top`/`bottom`/`left`/`right` |
+| `direction` | `inherit` (default) `ltr` `rtl` | Content writing direction (left-to-right / right-to-left), usually no need to change |
+| `display` | `flex` (default) `none` | `none` hides and **takes no layout space** (this is what `View::SetVisible(false)` does internally); set back to `flex` to restore visibility |
+| `overflow` | `visible` (default) `hidden` `scroll` | When content overflows the container: `visible` draws the overflow, `hidden` clips it, `scroll` allows scrolling to view it |
 
-## 数值键(set_style,值为像素;标 % 后缀走百分比)
+## Numeric Keys (set_style, value in pixels; % suffix goes through percentage)
 
-值传 `Double` 像素;字符串 `"50%"` 为相对父容器内容区的百分比;字符串 `"auto"`
-恢复自动。主轴 / 交叉轴概念见上一节。
+The value is a `Double` in pixels; the string `"50%"` is a percentage relative to the parent container's
+content area; the string `"auto"` restores automatic sizing. See the previous section for main axis /
+cross axis concepts.
 
-| 键 | 说明 |
+| Key | Description |
 |---|---|
-| `flex` | 伸缩简写,最常用:`flex=1` 表示「剩余空间按比例平分,不够用时按同比例收缩」——两个子项都设 1 就各占一半,设 2 的拿到的空间是设 1 的两倍;`flex=0`(默认)表示固定尺寸不参与分配 |
-| `flexgrow` | 只管「有剩余空间时怎么分」:按值比例伸展,0(默认)不伸展 |
-| `flexshrink` | 只管「空间不够时怎么缩」:按值比例收缩,0(默认)不收缩(内容可能溢出) |
-| `flexbasis` | 主轴方向的「基准尺寸」:分配剩余空间前先按它占位,再分剩下的;不设则由 `width`/`height` 或内容决定;`"auto"` 恢复 |
-| `width` / `height` | 固定尺寸(像素);`"50%"` 为父内容区宽/高的一半;`"auto"` 恢复由内容决定 |
-| `minwidth` / `minheight` / `maxwidth` / `maxheight` | 尺寸上下限:先做 flex 分配,再钳制到范围内(实测 `flex=1` + `minwidth=150` 在剩余 100px 时得 150px,见下文实测记录) |
-| `aspectratio` | 宽 / 高比值(如 1.78 ≈ 16:9):已知一边自动推出另一边,常配 `width` 或 `flex` 用 |
-| `gap` / `rowgap` / `columngap` | 相邻子项的间距(像素):`gap` 统一设,`rowgap` 只管行间、`columngap` 只管列间;不与 `margin` 叠加 |
+| `flex` | Shorthand for flexing, the most commonly used: `flex=1` means "distribute remaining space proportionally, and shrink proportionally when space is insufficient" — two children both set to 1 each take half; one set to 2 gets twice the space of one set to 1; `flex=0` (default) means fixed size, not participating in distribution |
+| `flexgrow` | Only governs "how to distribute when there is remaining space": grows proportionally to the value; 0 (default) does not grow |
+| `flexshrink` | Only governs "how to shrink when space is insufficient": shrinks proportionally to the value; 0 (default) does not shrink (content may overflow) |
+| `flexbasis` | The "base size" along the main axis: it is allocated first before distributing remaining space; if unset, it is determined by `width`/`height` or content; `"auto"` restores |
+| `width` / `height` | Fixed size (pixels); `"50%"` is half of the parent content area's width/height; `"auto"` restores content-determined sizing |
+| `minwidth` / `minheight` / `maxwidth` / `maxheight` | Size bounds: flex distribution happens first, then the result is clamped into range (measured: `flex=1` + `minwidth=150` yields 150px when 100px remains; see test records below) |
+| `aspectratio` | Width/height ratio (e.g. 1.78 ≈ 16:9): given one side, the other is derived automatically; commonly used with `width` or `flex` |
+| `gap` / `rowgap` / `columngap` | Spacing between adjacent children (pixels): `gap` sets it uniformly, `rowgap` only between rows, `columngap` only between columns; does not stack with `margin` |
 
-## 边缘键(set_style,值为像素;支持 % 后缀)
+## Edge Keys (set_style, value in pixels; % suffix supported)
 
 `padding` `paddingtop` `paddingbottom` `paddingleft` `paddingright`
 `margin` `margintop` `marginbottom` `marginleft` `marginright`
-`border` `bordertop` `borderbottom` `borderleft` `borderright`(border 是绘线宽,不影响布局外尺寸之外的部分)
-`top` `bottom` `left` `right`(仅 `position=absolute` 时生效,相对父节点偏移)
+`border` `bordertop` `borderbottom` `borderleft` `borderright` (border is the drawn line width and affects nothing beyond the outer layout size)
+`top` `bottom` `left` `right` (effective only with `position=absolute`, offset relative to the parent node)
 
-## 特殊键(View 直收,不走 yoga)
+## Special Keys (received directly by View, not routed through yoga)
 
-| 键 | 值 | 等价 API |
+| Key | Value | Equivalent API |
 |---|---|---|
 | `color` | `"#RGB/#RRGGBB/#RRGGBBAA"` | `View::SetColor` |
-| `backgroundcolor` | 同上 | `View::SetBackgroundColor` |
+| `backgroundcolor` | same as above | `View::SetBackgroundColor` |
 
-## 布局模型要点
+## Layout Model Essentials
 
-- 容器默认 `flexDirection=column`、`alignItems=stretch`:子项默认拉伸填满交叉轴。
-- **Group / Scroll 的内容视图是布局根节点**,不是其父容器的子节点(父容器样式不影响它)。
-- libyue 不支持 CSS 文本/表格/float,只有 flexbox 概念。
-- 尺寸冲突时:min/max 钳制优先于 flex 分配(实测:`flex=1` + `minwidth=150` 在剩余 100px 时得 150px)。
-- 调试:`get_computed_layout()` 直接输出 yoga 树的最终计算值。
+- Containers default to `flexDirection=column`, `alignItems=stretch`: children stretch to fill the cross axis by default.
+- **The content view of a Group / Scroll is the layout root node**, not a child of its parent container (the parent container's styles do not affect it).
+- libyue does not support CSS text/tables/float; only flexbox concepts exist.
+- On size conflicts: min/max clamping takes priority over flex distribution (measured: `flex=1` + `minwidth=150` yields 150px when 100px remains).
+- Debugging: `get_computed_layout()` directly outputs the yoga tree's final computed values.
 
-## Ubuntu 24.04 / X11 / XFCE 4.18 实测记录(2026-09-11)
+## Ubuntu 24.04 / X11 / XFCE 4.18 Test Records (2026-09-11)
 
-`examples/layout` 内置 16 项几何断言(flex 平分、gap 间距、百分比宽、justify/align 居中、
-min-width 托底、absolute 定位),真实窗口实测 **16/16 全过(failures=0)**,±1px 容差。
-叠加规律与手算一致:内容区 = 容器 − 2×padding;gap 不与 margin 叠加;百分比基准为父内容区宽。
+`examples/layout` includes 16 geometry assertions (flex equal split, gap spacing, percentage width,
+justify/align centering, min-width floor, absolute positioning); measured in a real window,
+**all 16/16 passed (failures=0)** with a ±1px tolerance.
+The composition rules match hand calculation: content area = container − 2×padding; gap does not stack
+with margin; percentage basis is the parent content area width.
 
-**GUI 自动化经验**(入档):坐标点击受 WM 框架偏移与窗口遮挡影响、不稳定;
-**键盘驱动(Tab 聚焦 + Space 激活)是触发控件的首选方式**;
-`xdotool key --window` 走 XSendEvent 合成事件会被 GTK 丢弃,必须用 XTEST(不带 --window)。
+**GUI automation experience** (on record): coordinate-based clicks are unstable due to WM frame offsets
+and window occlusion; **keyboard-driven interaction (Tab focus + Space activation) is the preferred way
+to trigger controls**; `xdotool key --window` uses XSendEvent synthetic events which GTK drops —
+XTEST must be used (without --window).

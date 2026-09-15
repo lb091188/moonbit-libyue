@@ -1,12 +1,14 @@
-# 文档索引
+# Documentation Index
 
-| 文档 | 内容 |
+| Document | Content |
 |---|---|
-| [adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/adaptation.md) | 平台适配经验:各平台实测坑、根因与验证结论(持续更新) |
-| [components.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/components.md) | 组件 API 速查:经典 setter 与 `X::make` props 两种写法,含上游坑 |
-| [declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/declarative.md) | 声明式 UI:`Node`/`mount` 渲染树 + `Store` 响应式绑定 |
-| [layout.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/layout.md) | 布局样式键全集(Yoga flexbox),含实测记录 |
-| [tray.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/tray.md) | Linux 托盘方案:SNI 协议栈设计、架构、后端降级、桌面兼容性 |
-| [relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/relink.md) | 原生层(shim/vendor)变更后强制重链:判别与处理 |
+| [adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md) | Platform adaptation experience: real-world pitfalls per platform, root causes, and verification conclusions (continuously updated) |
+| [components.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components.md) | Component API quick reference: both classic setter and `X::make` props styles, including upstream pitfalls |
+| [declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md) | Declarative UI: `Node`/`mount` render tree + `Store` reactive bindings |
+| [layout.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/layout.md) | Complete set of layout style keys (Yoga flexbox), with real-world test records |
+| [tray.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/tray.md) | Linux tray solution: SNI protocol stack design, architecture, backend fallback, desktop compatibility |
+| [relink.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/relink.md) | Forcing a relink after native layer (shim/vendor) changes: detection and handling |
 
-快速开始与架构总览见仓库根 [README_ZH.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)。
+For a quick start and architecture overview, see the repository root [README.md](https://github.com/lb091188/moonbit-libyue/blob/master/README.md).
+
+[中文版文档索引](https://github.com/lb091188/moonbit-libyue/blob/master/docs/zh/README.md)

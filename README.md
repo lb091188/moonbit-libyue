@@ -10,10 +10,10 @@ The upstream library supports Windows, macOS and Linux; the first milestone of t
 - [ ] Ubuntu 24.04 KDE
 - [ ] Deepin 25
 - [ ] OpenKylin 3
-- [x] Windows 10 / 11 (first verified 2026-09, full showcase runs; see [docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/adaptation.md))
+- [x] Windows 10 / 11 (first verified 2026-09, full showcase runs; see [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md))
 - [ ] macOS
 
-English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)
+English | [简体中文](https://github.com/lb091188/moonbit-libyue/blob/master/README_ZH.md)
 
 ## Yue
 
@@ -145,13 +145,13 @@ moon test
 ## Notes
 
 - The current binding surface is roughly 320 ABI functions (324 `extern "c"` declarations in `yue/ffi.mbt`): App/Lifetime, Window, common View capabilities and drag & drop, Container/Label/Button/Entry/TextEdit, Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer, Browser, Menu/MenuBar, Table + model bridge, Painter/Canvas, Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog, Screen/Appearance/Locale/Cursor. New widgets follow the established pattern: add a mechanical translation function in the shim → add the extern in `ffi.mbt` → add the type and methods in a new `*.mbt`.
-- Known limitations, ABI pitfalls and per-platform adaptation lessons live in `AGENTS.md` and [docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/adaptation.md) instead of this README. The Linux tray design — motivation, architecture, backend fallback, desktop compatibility, debugging — is documented separately in [docs/tray.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/tray.md) (Chinese). The widget API quick reference (including upstream pitfalls) lives in [docs/components.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/components.md); the declarative layer — `X::make` props constructors, `Node`/`mount` render trees and `Store` reactive bindings — in [docs/declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/declarative.md).
-- Shim/vendor changes or a re-run of `prepare.py` require forcing a relink: `moon clean`, or delete the linked executable — see [docs/relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/relink.md) (Chinese).
-- Documentation index: [docs/README.md](docs/README.md).
+- Known limitations, ABI pitfalls and per-platform adaptation lessons live in `AGENTS.md` and [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md) instead of this README. The Linux tray design — motivation, architecture, backend fallback, desktop compatibility, debugging — is documented separately in [docs/tray.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/tray.md). The widget API quick reference (including upstream pitfalls) lives in [docs/components.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components.md); the declarative layer — `X::make` props constructors, `Node`/`mount` render trees and `Store` reactive bindings — in [docs/declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md).
+- Shim/vendor changes or a re-run of `prepare.py` require forcing a relink: `moon clean`, or delete the linked executable — see [docs/relink.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/relink.md).
+- Documentation index: [docs/README.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/README.md).
 
 ## References
 
 - libyue documentation: <https://libyue.com/docs/latest/cpp/guides/getting_started.html>
 - Lua bindings (architectural reference): `lua_yue/` in github.com/yue/yue
 - MoonBit skill library: `.agents/skills/` (`moonbit-c-binding`, `make-moonbit-c-bindings`)
-- AI collaboration rules: `AGENTS.md` · platform adaptation experience: [docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/adaptation.md)
+- AI collaboration rules: `AGENTS.md` · platform adaptation experience: [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md)

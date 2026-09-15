@@ -14,10 +14,10 @@ libyue(libyue.com)的 MoonBit 封装,跨平台原生桌面 GUI。
 4. **extern 蹦床与 C 函数指针原型逐位对齐,含参数个数**——C 以 `(closure, args...)` 调用,蹦床首参收 closure;多带/少带一位会形参错位,部分接口"看似能跑"掩盖问题。案例与更多 ABI 坑见适配经验文档。
 5. **协议级互操作(DBus/DBusMenu/SNI)必须上真实总线、真实面板验证**——单测自洽 ≠ 互操作通过(XFCE 只发批量版 `EventGroup`/`AboutToShowGroup` 就是 dbus-monitor 抓出来的)。
 6. **真机 GUI 测试由用户执行,助手只提供操作步骤并等待反馈**——助手负责:代码修复、`moon check`/`moon test`/`moon build` 全仓零错误零警告通过(提交门槛)、启动冒烟(进程存活 + 退出行为,仅限助手所在宿主机);涉及虚拟机/其他桌面环境的视觉与交互验证,一律给出明确的操作步骤清单,由用户在真机执行并回反馈结果,助手不得自行远程驱动 GUI 测试,也不得在用户反馈前下结论。
-7. **开发中积累的封装/适配经验必须回写 `docs/adaptation.md`**——每次真实环境实测/踩坑后,按其维护约定把「环境(发行版/桌面环境/版本)+ 现象 + 根因 + 修复 + 验证方式」写进对应小节,与对应代码改动同批提交;只留在提交说明或会话记忆里视为未完成。
+7. **开发中积累的封装/适配经验必须回写 `docs/zh/adaptation.md`**——每次真实环境实测/踩坑后,按其维护约定把「环境(发行版/桌面环境/版本)+ 现象 + 根因 + 修复 + 验证方式」写进对应小节,与对应代码改动同批提交;只留在提交说明或会话记忆里视为未完成。
 8. **与用户交流必须全部使用中文**——所有回复、说明、总结、提问一律用中文书写,不夹杂英文段落(代码、命令、路径、专有名词除外)。
 9. **每完成一个批次的需求就提交到仓库**——一个批次=一组内聚的改动(一个功能/一次修复/一批文档),完成即 `git commit` 并推送 origin,不积压到工作区;提交信息沿用「【标签】范围:说明」中文格式(【新增】/【修复】/【文档】/【构建】)。
-10. **代码注释与使用文档只说内容**——注释、README、docs 使用类文档(components/declarative/layout/relink)只写「是什么/怎么用/怎么做」;原理、根因、实测过程一律写进专门文档(`docs/adaptation.md`、`docs/tray.md`),不在内容文档与注释里重复展开。
+10. **代码注释与使用文档只说内容**——注释、README、docs 使用类文档(components/declarative/layout/relink)只写「是什么/怎么用/怎么做」;原理、根因、实测过程一律写进专门文档(`docs/zh/adaptation.md`、`docs/tray.md`),不在内容文档与注释里重复展开。
 ## 常用命令
 
 ```sh
@@ -31,7 +31,7 @@ moon check && moon test       # 纯 MoonBit 测试
 ## 文档地图
 
 - 使用文档索引(内容类): `docs/README.md`
-- **平台适配经验**(Windows/macOS 分版本,Linux 分发行版→桌面环境→版本,含全部实测坑与维护约定): `docs/adaptation.md`
+- **平台适配经验**(Windows/macOS 分版本,Linux 分发行版→桌面环境→版本,含全部实测坑与维护约定): `docs/zh/adaptation.md`
 - FFI 规范与坑清单:`.agents/skills/moonbit-c-binding/`、`.agents/skills/make-moonbit-c-bindings/`
 - MoonBit 语言与工具链:`.agents/skills/moonbit-agent-guide/`
 - 路线图与下一步: `TODO.md`
