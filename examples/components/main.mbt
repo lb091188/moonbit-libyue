@@ -489,7 +489,7 @@ fn main {
       ]),
     ],
     title="组件库演示板",
-    size=Some((880.0, 600.0)),
+    size=Some((880.0, 720.0)),
     center=true,
     on_close=fn(_w) { @yue.quit() },
   )
