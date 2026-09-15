@@ -150,6 +150,63 @@ moon run src   # 无需任何链接配置；安装时自动构建原生层，缺
 moon test
 ```
 
+## 声明式 UI 两段示例
+
+窗口可以用声明式节点树(`@yue.mount_window`)描述,不必手写 `new + set_content`。以下示例均可直接运行(截图链接指向 Gitee 仓库内文件)。
+
+**1. Hello 窗口** —— 标签与按钮两个节点,直接挂进窗口:
+
+```moonbit
+fn main {
+  if !@yue.initialize() {
+    return
+  }
+  let window = @yue.mount_window(
+    [
+      @yue.label("Hello, MoonBit + libyue!", style=[("margin", 20.0)]),
+      @yue.button("退出", on_click=fn() { @yue.quit() }),
+    ],
+    title="Hello",
+    size=Some((420.0, 160.0)),
+    center=true,
+    on_close=fn(_w) { @yue.quit() },
+  )
+  window.activate()
+  @yue.run()
+}
+```
+
+![Hello 窗口](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/hello.png)
+
+**2. 响应式计数器** —— 状态放在 `Store`,`bind_label` 在每次更新时自动刷新标签,无需手写「点击后改文本」:
+
+```moonbit
+let clicks : @yue.Store[Int] = @yue.Store::new(0)
+let window = @yue.mount_window(
+  [
+    @yue.vbox(
+      [
+        @yue.button("点我", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
+        @yue.bind_label(clicks, fn(n) { "已点 \{n} 次" }),
+      ],
+      style=[("padding", 24.0)],
+    ),
+  ],
+  title="Counter",
+  size=Some((320.0, 160.0)),
+  center=true,
+  on_close=fn(_w) { @yue.quit() },
+)
+```
+
+![计数器窗口](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/counter.png)
+
+完整的 [showcase](https://gitee.com/noahliu0911/moonbit-libyue/tree/master/examples/showcase)(12 个页签:基础控件/输入与选择/画布/网页/对话框/系统集成/事件/富文本/菜单/表格…)全部用这套声明式写法完成——控件页截图:
+
+![showcase 控件页](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/widgets.png)
+
+布局(yoga 弹性盒)、滚动、分组等更多节点类型见 [docs/declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/declarative.md)。
+
 ## 说明
 
 - 当前封装面约 320 个 ABI 函数（`yue/ffi.mbt` 中 324 个 `extern "c"` 声明）：App/Lifetime、Window、View 通用能力与拖拽、Container/Label/Button/Entry/TextEdit、Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer、Browser、Menu/MenuBar、Table+模型桥、Painter/Canvas、Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog、Screen/Appearance/Locale/Cursor；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。

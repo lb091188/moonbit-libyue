@@ -142,6 +142,63 @@ The pure-MoonBit parts (DBus wire codec, color utilities, table value codec) do 
 moon test
 ```
 
+## Declarative UI in Two Snippets
+
+Windows can be described as declarative node trees (`@yue.mount_window`) instead of imperative `new + set_content` calls. Both examples below run as-is (screenshot links point at the raw files on GitHub).
+
+**1. Hello window** — nodes for a label and a button, mounted straight into a window:
+
+```moonbit
+fn main {
+  if !@yue.initialize() {
+    return
+  }
+  let window = @yue.mount_window(
+    [
+      @yue.label("Hello, MoonBit + libyue!", style=[("margin", 20.0)]),
+      @yue.button("Quit", on_click=fn() { @yue.quit() }),
+    ],
+    title="Hello",
+    size=Some((420.0, 160.0)),
+    center=true,
+    on_close=fn(_w) { @yue.quit() },
+  )
+  window.activate()
+  @yue.run()
+}
+```
+
+![Hello window](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/hello.png)
+
+**2. Reactive counter** — a `Store` holds the state; `bind_label` re-renders the label on every update. No manual "set text after click" wiring:
+
+```moonbit
+let clicks : @yue.Store[Int] = @yue.Store::new(0)
+let window = @yue.mount_window(
+  [
+    @yue.vbox(
+      [
+        @yue.button("Click me", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
+        @yue.bind_label(clicks, fn(n) { "Clicked \{n} times" }),
+      ],
+      style=[("padding", 24.0)],
+    ),
+  ],
+  title="Counter",
+  size=Some((320.0, 160.0)),
+  center=true,
+  on_close=fn(_w) { @yue.quit() },
+)
+```
+
+![Counter window](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/counter.png)
+
+The full [showcase](https://github.com/lb091188/moonbit-libyue/tree/master/examples/showcase) (12 tabs: widgets, inputs, canvas, browser, dialogs, system integration, events, rich text, menus, tables…) is written entirely in this declarative style — widgets page:
+
+![Showcase widgets page](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/widgets.png)
+
+Layout (flexbox via yoga), scrolling, grouping and more node types are covered in [docs/declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md).
+
 ## Notes
 
 - The current binding surface is roughly 320 ABI functions (324 `extern "c"` declarations in `yue/ffi.mbt`): App/Lifetime, Window, common View capabilities and drag & drop, Container/Label/Button/Entry/TextEdit, Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer, Browser, Menu/MenuBar, Table + model bridge, Painter/Canvas, Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog, Screen/Appearance/Locale/Cursor. New widgets follow the established pattern: add a mechanical translation function in the shim → add the extern in `ffi.mbt` → add the type and methods in a new `*.mbt`.
