@@ -95,7 +95,7 @@ fn page_inputs() -> @yue.Node {
               when_some(edit, fn(t) { t.insert_text("\n（插入）") })
             }),
             @yue.button("清空", on_click=fn() {
-              when_some(edit, fn(t) { t.delete() })
+              when_some(edit, fn(t) { t.set_text("") })
             }),
           ],
           style=[("marginTop", 8.0)],
