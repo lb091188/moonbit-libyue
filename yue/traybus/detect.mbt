@@ -12,6 +12,7 @@ pub enum DesktopEnv {
   Budgie
   Lxqt
   Unity
+  Deepin
   Unknown
 }
 
@@ -34,6 +35,8 @@ fn parse_desktop_value(s : String) -> DesktopEnv {
     Lxqt
   } else if lower == "unity" {
     Unity
+  } else if lower == "deepin" {
+    Deepin
   } else {
     Unknown
   }
@@ -73,6 +76,7 @@ pub fn desktop_name() -> String {
     Budgie => "Budgie"
     Lxqt => "LXQt"
     Unity => "Unity"
+    Deepin => "Deepin"
     Unknown => "unknown"
   }
 }

@@ -404,6 +404,17 @@ impl ViewLike with fn get_bounds(self) -> RectF {
 }
 
 ///|
+/// 视图在屏幕坐标系中的包围盒（含窗口原点，popup_at 等屏幕坐标 API 的换算依据）。
+impl ViewLike with fn get_bounds_in_screen(self) -> RectF {
+  {
+    x: ffi_view_get_bounds_in_screen_x(self.view()),
+    y: ffi_view_get_bounds_in_screen_y(self.view()),
+    width: ffi_view_get_bounds_in_screen_width(self.view()),
+    height: ffi_view_get_bounds_in_screen_height(self.view()),
+  }
+}
+
+///|
 /// 设置绘制颜色（笔触/文本默认色）。
 pub fn Painter::set_color(self : Painter, hex : String) -> Unit {
   ffi_painter_set_color(self, utf8_bytes(hex))
