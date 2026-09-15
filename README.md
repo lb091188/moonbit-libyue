@@ -81,7 +81,7 @@ scripts/postadd.py   Auto-triggered on `moon add` for the first native build
 examples/            15 examples: hello / editor / browser / drawing / table / widgets /
                      drag_source / drag_destination / floating_heart /
                      auto_height_edit / showcase / misc / advanced / events / layout
-.agents/skills/      MoonBit skill library (the FFI conventions referenced throughout)
+.agents/skills/      MoonBit skill library
 ```
 
 ## Quick Start
@@ -153,5 +153,5 @@ moon test
 
 - libyue documentation: <https://libyue.com/docs/latest/cpp/guides/getting_started.html>
 - Lua bindings (architectural reference): `lua_yue/` in github.com/yue/yue
-- MoonBit skill library: `.agents/skills/` (including `moonbit-c-binding` and `make-moonbit-c-bindings` — the authoritative FFI conventions)
+- MoonBit skill library: `.agents/skills/` (`moonbit-c-binding`, `make-moonbit-c-bindings`)
 - AI collaboration rules: `AGENTS.md` · platform adaptation experience: [docs/adaptation.md](docs/adaptation.md)

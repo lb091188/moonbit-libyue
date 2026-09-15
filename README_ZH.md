@@ -76,7 +76,7 @@ scripts/postadd.py   moon add 安装本库时自动触发首次构建
 examples/            15 个示例：hello / editor / browser / drawing / table / widgets /
                      drag_source / drag_destination / floating_heart /
                      auto_height_edit / showcase / misc / advanced / events / layout
-.agents/skills/      MoonBit 技能库（FFI 规范以此为准）
+.agents/skills/      MoonBit 技能库
 ```
 
 ## 快速开始
@@ -161,5 +161,5 @@ moon test
 
 - libyue 文档：<https://libyue.com/docs/latest/cpp/guides/getting_started.html>
 - Lua 绑定参考（架构对照）：github.com/yue/yue 的 `lua_yue/`
-- MoonBit 技能库：`.agents/skills/`（含 `moonbit-c-binding`、`make-moonbit-c-bindings`，FFI 规范以此为准）
+- MoonBit 技能库：`.agents/skills/`（`moonbit-c-binding`、`make-moonbit-c-bindings`）
 - AI 协作规则：`AGENTS.md` · 平台适配经验：[docs/adaptation.md](docs/adaptation.md)

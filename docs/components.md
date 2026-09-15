@@ -560,9 +560,9 @@ pop.show_relative_to(anchor_view)
 
 ---
 
-## 固有坑（务必了解）
+## 固有坑
 
-以下坑由上游 libyue 或平台行为带来，使用对应 API 前先读一遍：
+上游 libyue 或平台行为带来，使用对应 API 前先读：
 
 1. **`Browser::get_cookies_for_url` 可能崩溃**：目标站点尚无任何 Cookie 时，
    上游内部 `CHECK(cookies)` 直接 FATAL（libyue 0.15.6 实测）。只对确定已

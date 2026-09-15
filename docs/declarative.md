@@ -160,19 +160,19 @@ API 一览：
 
 ## 固有坑
 
-2. **节点挂载时才实例化**：`button(...)` 返回时控件还不存在，别在构建树时保存
+1. **节点挂载时才实例化**：`button(...)` 返回时控件还不存在，别在构建树时保存
    控件引用；需要引用就用 `handle`（挂载时触发）。一棵树通常只 `mount` 一次，
    对同一节点再次挂载会实例化出**第二份**控件。
-3. **`handle` 不叫 `ref`**：`ref` 也是 MoonBit 保留字。
-4. **Store 无退订**：订阅存活整个应用期，`set` 也不去重（相同值照样通知）。
+2. **`handle` 不叫 `ref`**：`ref` 也是 MoonBit 保留字。
+3. **Store 无退订**：订阅存活整个应用期，`set` 也不去重（相同值照样通知）。
    在订阅回调里再 `set` 别的 Store 是安全的（快照遍历），但别让两条 Store
    互相触发形成死循环。
-5. **bind_label 的订阅发生在挂载时**：未挂载的 bind 节点不订阅、不收通知；
+4. **bind_label 的订阅发生在挂载时**：未挂载的 bind 节点不订阅、不收通知；
    初值在挂载时用 `f(store.get())` 直接渲染。
-6. **复选/单选的初始化回调**：`checkbox`/`radio` 以 `checked=true` 挂载后，
+5. **复选/单选的初始化回调**：`checkbox`/`radio` 以 `checked=true` 挂载后，
    进入事件循环时会异步收到一次 `on_change`（GTK toggled 信号语义）；
    **单选组切换时被取消选中的旧项也会收到一次 `on_change(false)`**。
    业务判断以 `is_checked()` 为准。
-7. **异构 children 只有 Node 一条路**：MoonBit 的 trait 不能作数组元素类型，
+6. **异构 children 只有 Node 一条路**：MoonBit 的 trait 不能作数组元素类型，
    `Array[ViewLike]` 装不了混排控件——这正是 `Node` 存在的原因；
    `X::make` 层的单内容参数（`Group::make` / `Scroll::make`）则直接接受具体控件。

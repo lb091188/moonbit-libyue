@@ -2,7 +2,7 @@
 
 | 文档 | 内容 |
 |---|---|
-| [adaptation.md](adaptation.md) | 平台适配经验:各平台实测坑、根因与验证结论(持续更新,硬性回写目标) |
+| [adaptation.md](adaptation.md) | 平台适配经验:各平台实测坑、根因与验证结论(持续更新) |
 | [components.md](components.md) | 组件 API 速查:经典 setter 与 `X::make` props 两种写法,含上游坑 |
 | [declarative.md](declarative.md) | 声明式 UI:`Node`/`mount` 渲染树 + `Store` 响应式绑定 |
 | [layout.md](layout.md) | 布局样式键全集(Yoga flexbox),含实测记录 |
