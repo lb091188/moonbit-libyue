@@ -427,9 +427,11 @@ void yue_mbt_view_set_borderless(void *view, int on) {
       gtk_style_context_remove_class(ctx, "yue-borderless");
   }
 #else
-  // Windows:Entry 是 Win32 EDIT,内阴影来自 WS_EX_CLIENTEDGE 边缘样式
+  // Windows:Entry 是 Win32 EDIT,内阴影来自 WS_EX_CLIENTEDGE 边缘样式。
+  // 注意 GetNative() 返回 ViewImpl*,必须经 hwnd() 取窗口句柄,
+  // 直接 cast 成 HWND 是野指针,样式操作会静默失败(实测踩坑)。
   if (auto *v = CastToView(view)) {
-    HWND hwnd = reinterpret_cast<HWND>(v->GetNative());
+    HWND hwnd = v->GetNative()->hwnd();
     if (hwnd) {
       LONG_PTR ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
       LONG_PTR st = GetWindowLongPtrW(hwnd, GWL_STYLE);
