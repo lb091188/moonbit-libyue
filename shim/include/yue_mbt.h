@@ -598,9 +598,6 @@ void *yue_mbt_tray_new(const char *icon_path, int32_t *ok);
 void yue_mbt_tray_set_title(void *tray, const char *title);
 void yue_mbt_tray_remove(void *tray);
 
-#ifdef __cplusplus
-}
-
 /* 方法级审计补齐(2026-09-16) */
 void yue_mbt_window_close(void *window);
 void yue_mbt_window_minimize(void *window);
@@ -695,6 +692,9 @@ int32_t yue_mbt_view_cancel_drag(void *view);
 int32_t yue_mbt_view_is_dragging(void *view);
 
 void *yue_mbt_null_image();
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* YUE_MBT_H */

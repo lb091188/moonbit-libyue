@@ -36,6 +36,7 @@
 #include <unordered_map>
 
 #include "base/command_line.h"
+#include "base/json/json_writer.h"
 #include "nativeui/nativeui.h"
 #if defined(OS_LINUX) // Popover 仅 Linux 发行包提供（win/mac 均无 popover.h/实现）
 #include "nativeui/popover.h"
@@ -3580,6 +3581,11 @@ extern "C" int32_t yue_mbt_sys_watch_fd(int32_t, int32_t,
   return 0;
 }
 
+#endif  // sys_* 平台分支结束;以下为全平台通用函数
+
+// 本段函数统一包进 extern "C":MoonBit ffi 按 C 名字解析符号,
+// 缺 extern "C" 会被 C++ name mangling 改名导致链接期 undefined reference。
+extern "C" {
 
 /* ---------------- 方法级审计补齐(2026-09-16) ---------------- */
 
@@ -3662,8 +3668,8 @@ void yue_mbt_window_set_icon(void *window, void *image) {
 void yue_mbt_window_on_focus_in(void *window,
                                 int32_t (*invoke)(void *), void *closure) {
   if (auto *w = CastTo<nu::Window>(window)) {
-    w->on_focus_in.Connect(
-        [invoke, closure](nu::View *) { return invoke(closure) != 0; });
+    w->on_focus.Connect(
+        [invoke, closure](nu::Window *) { return invoke(closure) != 0; });
   }
 }
 
@@ -3671,7 +3677,7 @@ void yue_mbt_window_on_blur(void *window,
                             int32_t (*invoke)(void *), void *closure) {
   if (auto *w = CastTo<nu::Window>(window)) {
     w->on_blur.Connect(
-        [invoke, closure](nu::View *) { return invoke(closure) != 0; });
+        [invoke, closure](nu::Window *) { return invoke(closure) != 0; });
   }
 }
 
@@ -3817,25 +3823,19 @@ void yue_mbt_label_set_attributed_text(void *label, void *at) {
 
 /* MessageBox:模态与默认按钮 */
 void yue_mbt_message_box_set_default_response(void *box, int32_t response) {
-  if (auto *m = CastTo<nu::MessageBox>(box)) {
+  if (auto *m = MessageBoxStore::get(box)) {
     m->SetDefaultResponse(response);
   }
 }
 
 void yue_mbt_message_box_set_cancel_response(void *box, int32_t response) {
-  if (auto *m = CastTo<nu::MessageBox>(box)) {
+  if (auto *m = MessageBoxStore::get(box)) {
     m->SetCancelResponse(response);
   }
 }
 
-void yue_mbt_message_box_set_informative_text(void *box, const char *text) {
-  if (auto *m = CastTo<nu::MessageBox>(box)) {
-    m->SetInformativeText(text);
-  }
-}
-
 int32_t yue_mbt_message_box_run(void *box) {
-  if (auto *m = CastTo<nu::MessageBox>(box)) {
+  if (auto *m = MessageBoxStore::get(box)) {
     return m->Run();
   }
   return -1;
@@ -3843,7 +3843,7 @@ int32_t yue_mbt_message_box_run(void *box) {
 
 int32_t yue_mbt_message_box_run_for_window(void *box, void *window) {
   auto *w = CastTo<nu::Window>(window);
-  if (auto *m = CastTo<nu::MessageBox>(box)) {
+  if (auto *m = MessageBoxStore::get(box)) {
     return m->RunForWindow(w);
   }
   return -1;
@@ -3899,28 +3899,49 @@ int32_t yue_mbt_table_get_selected_row(void *table) {
 }
 
 int32_t yue_mbt_table_notify_row_insertion(void *table, int32_t row) {
+  // Notify* 是 libyue 的私有 API;Linux(GTK) 端模型变更由 GtkTreeModel
+  // 自动通知视图,无需手动触发。
+#if defined(OS_LINUX)
+  (void)table;
+  (void)row;
+  return 0;
+#else
   if (auto *t = CastTo<nu::Table>(table)) {
     t->NotifyRowInsertion(row);
     return 1;
   }
   return 0;
+#endif
 }
 
 int32_t yue_mbt_table_notify_row_deletion(void *table, int32_t row) {
+#if defined(OS_LINUX)
+  (void)table;
+  (void)row;
+  return 0;
+#else
   if (auto *t = CastTo<nu::Table>(table)) {
     t->NotifyRowDeletion(row);
     return 1;
   }
   return 0;
+#endif
 }
 
 int32_t yue_mbt_table_notify_value_change(void *table, int32_t column,
                                           int32_t row) {
+#if defined(OS_LINUX)
+  (void)table;
+  (void)column;
+  (void)row;
+  return 0;
+#else
   if (auto *t = CastTo<nu::Table>(table)) {
     t->NotifyValueChange(column, row);
     return 1;
   }
   return 0;
+#endif
 }
 
 /* Browser:标题与停止(回调版 JS 执行与 AddBinding 另批) */
@@ -3989,9 +4010,14 @@ double yue_mbt_screen_cursor_y() {
   return nu::Screen::GetCurrent()->GetCursorScreenPoint().y();
 }
 
-/* Appearance:暗色模式切换 */
+/* Appearance:暗色模式切换(SetDarkModeEnabled 为 Windows 独有 API;
+ * Linux 由 GTK 主题决定,无此设置) */
 void yue_mbt_appearance_set_dark_mode_enabled(int32_t enable) {
+#if defined(OS_WIN)
   nu::Appearance::GetCurrent()->SetDarkModeEnabled(enable != 0);
+#else
+  (void)enable;
+#endif
 }
 
 void yue_mbt_appearance_on_color_scheme_change(void (*invoke)(void *),
@@ -4070,13 +4096,13 @@ int32_t yue_mbt_menu_item_is_visible(void *item) {
 
 /* FileDialog */
 void yue_mbt_file_dialog_set_title(void *dialog, const char *title) {
-  if (auto *d = CastTo<nu::FileDialog>(dialog)) {
+  if (auto *d = FileDialogStore::get(dialog)) {
     d->SetTitle(title);
   }
 }
 
 void yue_mbt_file_dialog_set_button_label(void *dialog, const char *label) {
-  if (auto *d = CastTo<nu::FileDialog>(dialog)) {
+  if (auto *d = FileDialogStore::get(dialog)) {
     d->SetButtonLabel(label);
   }
 }
@@ -4119,21 +4145,21 @@ void yue_mbt_gif_player_stop_animation_timer(void *gif) {
 
 /* Canvas:尺寸与密度 */
 double yue_mbt_canvas_get_scale_factor(void *canvas) {
-  if (auto *c = CastTo<nu::Canvas>(canvas)) {
+  if (auto *c = CanvasStore::get(canvas)) {
     return c->GetScaleFactor();
   }
   return 1.0;
 }
 
 double yue_mbt_canvas_get_width(void *canvas) {
-  if (auto *c = CastTo<nu::Canvas>(canvas)) {
+  if (auto *c = CanvasStore::get(canvas)) {
     return c->GetSize().width();
   }
   return 0.0;
 }
 
 double yue_mbt_canvas_get_height(void *canvas) {
-  if (auto *c = CastTo<nu::Canvas>(canvas)) {
+  if (auto *c = CanvasStore::get(canvas)) {
     return c->GetSize().height();
   }
   return 0.0;
@@ -4171,7 +4197,7 @@ void yue_mbt_browser_execute_javascript_callback(
         code,
         [invoke, closure](bool ok, base::Value value) {
           std::string json;
-          base::JSONWriter::Write(base::ValueView(&value), &json);
+          base::JSONWriter::Write(base::ValueView(value), &json);
           invoke(closure, ok ? 1 : 0, BytesFromString(json));
         });
   }
@@ -4183,7 +4209,7 @@ void yue_mbt_browser_add_raw_binding(void *browser, const char *name,
   if (auto *b = CastTo<nu::Browser>(browser)) {
     b->AddRawBinding(name, [invoke, closure](nu::Browser *, base::Value args) {
       std::string json;
-      base::JSONWriter::Write(base::ValueView(&args), &json);
+      base::JSONWriter::Write(base::ValueView(args), &json);
       invoke(closure, BytesFromString(json));
     });
   }
@@ -4247,4 +4273,5 @@ void *yue_mbt_null_image() {
   return nullptr;
 }
 
-#endif
+}  // extern "C"
+

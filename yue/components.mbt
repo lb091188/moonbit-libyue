@@ -101,9 +101,49 @@ fn type_light_color(t : SemanticType) -> String {
 }
 
 ///|
+/// 焦点环:双层 1px 主题色描边(叠加近似 2px),聚焦的自绘交互项画在内容之上。
+fn draw_focus_ring(p : Painter, w : Double, h : Double, color? : String = theme_primary) -> Unit {
+  p.set_stroke_color(color)
+  p.stroke_rect(0.5, 0.5, w - 1.0, h - 1.0)
+  p.stroke_rect(1.5, 1.5, w - 3.0, h - 3.0)
+}
+
+///|
+/// 自绘交互项的焦点接线:可聚焦(Tab 链由 GTK 按挂载顺序遍历)、
+/// 聚焦变化时重绘、Enter/Space 触发激活。点击聚焦由各组件在
+/// on_mouse_down 里调 focus()。
+fn bind_focus(
+  v : Container,
+  repaint : () -> Unit,
+  focused : Ref[Bool],
+  on_activate : () -> Unit,
+) -> Unit {
+  v.set_focusable(true)
+  v.on_focus_in(fn() {
+    focused.val = true
+    repaint()
+    false
+  })
+  v.on_focus_out(fn() {
+    focused.val = false
+    repaint()
+    false
+  })
+  v.on_key_down(fn(e) {
+    if e.code == VKEY_RETURN || e.code == VKEY_SPACE {
+      on_activate()
+      true
+    } else {
+      false
+    }
+  })
+}
+
+///|
 /// 自绘交互项通用挂载器:背景色表达 hover/active,文字垂直居中。
 /// bg_of(active, hover) 返回背景色(空串表示透明);fg_of(active) 返回文字色。
 /// align_start=false 时文字水平居中(分段/分页),true 时左对齐(菜单)。
+/// (GTK 端水平 align 未实现,居中一律手动:测文本宽、x=(w-文本宽)/2。)
 fn stateful_item(
   text : String,
   style : Array[(String, Double)],
@@ -117,6 +157,7 @@ fn stateful_item(
   {
     mount: fn(parent) {
       let hover = Ref(false)
+      let focused = Ref(false)
       // 自绘文字不占布局空间:无显式 width 时按文本测宽自动定宽
       let font = Font::new("Sans", font_size)
       let probe = AttributedText::new(text, wrap=false)
@@ -147,21 +188,30 @@ fn stateful_item(
           p.fill_rect(0.0, 0.0, w, h)
         }
         // 文字:AttributedText 支持指定字号,垂直居中交给 valign=Center;
-        // 水平居中由 pad 对称实现(width=text_w+pad_x*2 时 pad_x 即居中起点)
-        let at = AttributedText::new(
-          text,
-          align=if align_start { Start } else { Center },
-          valign=Center,
-          wrap=false,
-        )
+        // 水平位置手动计算(见函数注释)
+        let at = AttributedText::new(text, valign=Center, wrap=false)
         at.set_font(font)
         at.set_color(fg_of(act, hover.val))
-        p.draw_attributed_text(at, pad_x, 0.0, w, h)
+        p.draw_attributed_text(
+          at,
+          if align_start {
+            pad_x
+          } else {
+            (w - text_w) / 2.0
+          },
+          0.0,
+          w,
+          h,
+        )
+        if focused.val {
+          draw_focus_ring(p, w, h)
+        }
       }
 
       v.on_draw(draw_item)
       v.on_mouse_down(fn(e) {
         if e.button == 1 {
+          v.focus()
           selected.set(text)
           true
         } else {
@@ -175,6 +225,9 @@ fn stateful_item(
       v.on_mouse_leave(fn(_e) {
         hover.val = false
         v.schedule_paint()
+      })
+      bind_focus(v, fn() { v.schedule_paint() }, focused, fn() {
+        selected.set(text)
       })
       selected.subscribe(fn(_s) { v.schedule_paint() })
       attach(parent, v.view())
@@ -451,6 +504,7 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
       ])
       fn add_btn(label : String, target : Int, is_page : Bool) -> Unit {
         let hover = Ref(false)
+        let focused = Ref(false)
         let probe = AttributedText::new(label, wrap=false)
         let label_w = probe.get_bounds_for(10000.0, 100.0).width
         let b = Container::make(style=[
@@ -458,6 +512,23 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
           ("height", 28.0),
           ("marginRight", 4.0),
         ])
+        let activate = fn() -> Unit {
+          if is_page {
+            current.set(target)
+          } else {
+            current.update(fn(n) {
+              let m = n + target
+              if m < 1 {
+                1
+              } else if m > pages {
+                pages
+              } else {
+                m
+              }
+            })
+          }
+        }
+
         b.on_draw(fn(p) {
           let bd = b.get_bounds()
           let cur = current.get()
@@ -478,28 +549,20 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
             valign=Center,
             color=if act { "#FFFFFF" } else { theme_text_regular },
           )
+          if focused.val {
+            draw_focus_ring(p, bd.width, bd.height, color="#FFFFFF")
+          }
         })
         b.on_mouse_down(fn(e) {
           if e.button == 1 {
-            if is_page {
-              current.set(target)
-            } else {
-              current.update(fn(n) {
-                let m = n + target
-                if m < 1 {
-                  1
-                } else if m > pages {
-                  pages
-                } else {
-                  m
-                }
-              })
-            }
+            b.focus()
+            activate()
             true
           } else {
             false
           }
         })
+        bind_focus(b, fn() { b.schedule_paint() }, focused, activate)
         b.on_mouse_enter(fn(_e) {
           hover.val = true
           b.schedule_paint()
@@ -786,8 +849,13 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
       v.add_child(spacer)
       let close = Container::make(style=[("width", 32.0), ("height", 40.0)])
       let hover = Ref(false)
+      let close_focused = Ref(false)
       let close_probe = AttributedText::new("✕", wrap=false)
       let close_w = close_probe.get_bounds_for(10000.0, 100.0).width
+      let close_it = fn() -> Unit {
+        v.set_visible(false)
+      }
+
       close.on_draw(fn(p) {
         let b = close.get_bounds()
         p.draw_text(
@@ -799,15 +867,20 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
           valign=Center,
           color=if hover.val { color } else { theme_text_secondary },
         )
+        if close_focused.val {
+          draw_focus_ring(p, b.width, b.height)
+        }
       })
       close.on_mouse_down(fn(e) {
         if e.button == 1 {
-          v.set_visible(false)
+          close.focus()
+          close_it()
           true
         } else {
           false
         }
       })
+      bind_focus(close, fn() { close.schedule_paint() }, close_focused, close_it)
       close.on_mouse_enter(fn(_e) {
         hover.val = true
         close.schedule_paint()
@@ -947,6 +1020,13 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
           style_str=[("flexDirection", "row"), ("alignItems", "center")],
         )
         head.set_background_color(theme_info_light)
+        let head_focused = Ref(false)
+        head.on_draw(fn(p) {
+          if head_focused.val {
+            let b = head.get_bounds()
+            draw_focus_ring(p, b.width, b.height)
+          }
+        })
         let arrow = Label::new(if open.val { "− " } else { "+ " })
         arrow.set_color(theme_primary)
         let title = Label::new(entry.0)
@@ -964,17 +1044,22 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
           body.set_visible(open.val)
           arrow.set_text(if open.val { "− " } else { "+ " })
         }
+        let toggle = fn() -> Unit {
+          open.val = !open.val
+          apply()
+        }
 
         apply()
         head.on_mouse_down(fn(e) {
           if e.button == 1 {
-            open.val = !open.val
-            apply()
+            head.focus()
+            toggle()
             true
           } else {
             false
           }
         })
+        bind_focus(head, fn() { head.schedule_paint() }, head_focused, toggle)
         let panel = Container::make(style=[("marginBottom", 6.0)], style_str=[
           ("flexDirection", "column"),
         ])
@@ -1297,6 +1382,7 @@ pub fn button_t(
   {
     mount: fn(parent) {
       let hover = Ref(false)
+      let focused = Ref(false)
       let font = Font::new("Sans", 13.0)
       let probe = AttributedText::new(text, wrap=false)
       probe.set_font(font)
@@ -1357,15 +1443,30 @@ pub fn button_t(
           b.width,
           b.height,
         )
+        // 实底变体上主题色环不可见,焦点环用白色
+        if focused.val {
+          draw_focus_ring(
+            p,
+            b.width,
+            b.height,
+            color=match variant {
+              Solid => "#FFFFFF"
+              Danger => "#FFFFFF"
+              _ => theme_primary
+            },
+          )
+        }
       })
       v.on_mouse_down(fn(e) {
         if e.button == 1 {
+          v.focus()
           on_click()
           true
         } else {
           false
         }
       })
+      bind_focus(v, fn() { v.schedule_paint() }, focused, on_click)
       v.on_mouse_enter(fn(_e) {
         hover.val = true
         v.schedule_paint()
@@ -1416,6 +1517,7 @@ pub fn checkbox_t(
     mount: fn(parent) {
       let state = Ref(checked)
       let hover = Ref(false)
+      let focused = Ref(false)
       let font = Font::new("Sans", 13.0)
       let probe = AttributedText::new(title, wrap=false)
       probe.set_font(font)
@@ -1425,6 +1527,12 @@ pub fn checkbox_t(
         ("height", 24.0),
         ("marginBottom", 6.0),
       ])
+      let activate = fn() -> Unit {
+        state.val = !state.val
+        on_change(state.val)
+        v.schedule_paint()
+      }
+
       v.on_draw(fn(p) {
         let by = 5.0
         p.set_stroke_color(
@@ -1456,6 +1564,9 @@ pub fn checkbox_t(
         at.set_font(font)
         at.set_color(if disabled { theme_border } else { theme_text_regular })
         p.draw_attributed_text(at, 22.0, 0.0, w, 24.0)
+        if focused.val {
+          draw_focus_ring(p, w, 24.0)
+        }
       })
       let repaint = fn() -> Unit {
         if !disabled {
@@ -1464,9 +1575,8 @@ pub fn checkbox_t(
       }
       v.on_mouse_down(fn(e) {
         if e.button == 1 && !disabled {
-          state.val = !state.val
-          on_change(state.val)
-          repaint()
+          v.focus()
+          activate()
           true
         } else {
           false
@@ -1480,6 +1590,9 @@ pub fn checkbox_t(
         hover.val = false
         repaint()
       })
+      if !disabled {
+        bind_focus(v, repaint, focused, activate)
+      }
       attach(parent, v.view())
       v.view()
     },
@@ -1501,12 +1614,20 @@ pub fn radio_group(
         ("flexDirection", "column"),
       ])
       let font = Font::new("Sans", 13.0)
+      let rows : Array[Container] = []
+      let mut idx = 0
       for opt in options {
+        let i = idx
         let probe = AttributedText::new(opt, wrap=false)
         probe.set_font(font)
         let w = probe.get_bounds_for(10000.0, 100.0).width + 30.0
         let hover = Ref(false)
+        let focused = Ref(false)
         let row = Container::make(style=[("width", w), ("height", 28.0)])
+        let activate = fn() -> Unit {
+          selected.set(opt)
+        }
+
         row.on_draw(fn(p) {
           let act = selected.get() == opt
           p.set_stroke_color(
@@ -1543,12 +1664,24 @@ pub fn radio_group(
             },
           )
           p.draw_attributed_text(at, 22.0, 0.0, w, 28.0)
+          if focused.val {
+            draw_focus_ring(p, w, 28.0)
+          }
         })
         let repaint = fn() -> Unit {
           if !disabled {
             row.schedule_paint()
           }
         }
+        row.on_mouse_down(fn(e) {
+          if e.button == 1 && !disabled {
+            row.focus()
+            activate()
+            true
+          } else {
+            false
+          }
+        })
         row.on_mouse_enter(fn(_e) {
           hover.val = true
           repaint()
@@ -1557,16 +1690,48 @@ pub fn radio_group(
           hover.val = false
           repaint()
         })
-        selected.subscribe(fn(_s) { repaint() })
-        row.on_mouse_down(fn(e) {
-          if e.button == 1 && !disabled {
-            selected.set(opt)
-            true
-          } else {
+        if !disabled {
+          row.set_focusable(true)
+          row.on_focus_in(fn() {
+            focused.val = true
+            repaint()
             false
-          }
-        })
+          })
+          row.on_focus_out(fn() {
+            focused.val = false
+            repaint()
+            false
+          })
+          // Enter/Space 选中;方向键在组内移动选中并跟随焦点
+          row.on_key_down(fn(e) {
+            if e.code == VKEY_RETURN || e.code == VKEY_SPACE {
+              activate()
+              true
+            } else if e.code == VKEY_DOWN || e.code == VKEY_RIGHT {
+              if i + 1 < options.length() {
+                selected.set(options[i + 1])
+                rows[i + 1].focus()
+                true
+              } else {
+                false
+              }
+            } else if e.code == VKEY_UP || e.code == VKEY_LEFT {
+              if i > 0 {
+                selected.set(options[i - 1])
+                rows[i - 1].focus()
+                true
+              } else {
+                false
+              }
+            } else {
+              false
+            }
+          })
+        }
+        selected.subscribe(fn(_s) { repaint() })
+        rows.push(row)
         outer.add_child(row)
+        idx = idx + 1
       }
       attach(parent, outer.view())
       outer.view()
@@ -1581,6 +1746,11 @@ pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
   {
     mount: fn(parent) {
       let v = Container::make(style=[("width", 40.0), ("height", 18.0)])
+      let focused = Ref(false)
+      let activate = fn() -> Unit {
+        checked.set(!checked.get())
+      }
+
       let slider_w = 14.0
       v.on_draw(fn(p) {
         let b = v.get_bounds()
@@ -1590,16 +1760,23 @@ pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
         let sx = if on { b.width - slider_w - 2.0 } else { 2.0 }
         p.set_fill_color(if disabled { theme_info_light } else { "#FFFFFF" })
         p.fill_rect(sx, 2.0, slider_w, b.height - 4.0)
+        if focused.val {
+          draw_focus_ring(p, b.width, b.height)
+        }
       })
       v.on_mouse_down(fn(e) {
         if e.button == 1 && !disabled {
-          checked.set(!checked.get())
+          v.focus()
+          activate()
           true
         } else {
           false
         }
       })
       checked.subscribe(fn(_v) { v.schedule_paint() })
+      if !disabled {
+        bind_focus(v, fn() { v.schedule_paint() }, focused, activate)
+      }
       attach(parent, v.view())
       v.view()
     },
