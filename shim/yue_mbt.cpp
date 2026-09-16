@@ -3899,16 +3899,18 @@ int32_t yue_mbt_table_get_selected_row(void *table) {
 }
 
 int32_t yue_mbt_table_notify_row_insertion(void *table, int32_t row) {
-  // Notify* 是 libyue 的私有 API;Linux(GTK) 端模型变更由 GtkTreeModel
-  // 自动通知视图,无需手动触发。
+  // Notify* 由 TableModel 公开转发(Table 侧同名方法为 private);
+  // Linux(GTK) 端模型变更由 GtkTreeModel 自动通知视图,无需手动触发。
 #if defined(OS_LINUX)
   (void)table;
   (void)row;
   return 0;
 #else
   if (auto *t = CastTo<nu::Table>(table)) {
-    t->NotifyRowInsertion(row);
-    return 1;
+    if (auto *m = t->GetModel()) {
+      m->NotifyRowInsertion(row);
+      return 1;
+    }
   }
   return 0;
 #endif
@@ -3921,8 +3923,10 @@ int32_t yue_mbt_table_notify_row_deletion(void *table, int32_t row) {
   return 0;
 #else
   if (auto *t = CastTo<nu::Table>(table)) {
-    t->NotifyRowDeletion(row);
-    return 1;
+    if (auto *m = t->GetModel()) {
+      m->NotifyRowDeletion(row);
+      return 1;
+    }
   }
   return 0;
 #endif
@@ -3937,8 +3941,10 @@ int32_t yue_mbt_table_notify_value_change(void *table, int32_t column,
   return 0;
 #else
   if (auto *t = CastTo<nu::Table>(table)) {
-    t->NotifyValueChange(column, row);
-    return 1;
+    if (auto *m = t->GetModel()) {
+      m->NotifyValueChange(column, row);
+      return 1;
+    }
   }
   return 0;
 #endif
