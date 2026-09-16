@@ -2,87 +2,60 @@
 
 [![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
 
-[libyue](https://libyue.com/docs/latest/cpp/) 的 MoonBit 封装。  
-原库支持 Windows、Mac OS、Linux，迁移第一阶段以跑通 Ubuntu Xfce4 环境为第一目标，后续在此基础上再推进。
+[libyue](https://libyue.com/docs/latest/cpp/) 的 MoonBit 封装——用纯 MoonBit 编写 Windows / macOS / Linux 原生跨平台桌面应用。
+
+## 测试支持
 
 - [x] Ubuntu 24.04 Xfce
-- [ ] Ubuntu 24.04 Gnome
-- [ ] Ubuntu 24.04 KDE
-- [ ] Deepin 25
-- [ ] OpenKylin 3
-- [x] Windows 10 / 11
-- [ ] Mac OS
+- [x] Ubuntu 24.04 GNOME
+- [x] Ubuntu 24.04 KDE
+- [x] Deepin 25
+- [x] Windows 10 / 11（2026-09 首次实测通过，showcase 全功能可跑；见 [docs/zh/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md)）
+- [?] macOS（暂无设备，未能测试）
 
-简体中文 | [English](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README.md)
+简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
 
 ## Yue
+
 一个跨平台原生桌面应用库（A library for creating native cross-platform GUI apps）。
 
-## 三层架构
+## 三种写界面的方式
 
-```
-┌─────────────────────────────────────────────┐
-│ 使用者（examples/*）                          │  纯 MoonBit，零平台代码
-├─────────────────────────────────────────────┤
-│ MoonBit 库（yue/）                           │  统一 API：平台探测与降级都在这里消化
-├─────────────────────────────────────────────┤
-│ 平台封装（shim/ + vendor/libyue）             │  最薄 C ABI（机械转换）+ libyue
-└─────────────────────────────────────────────┘
-```
+| 层 | 用法 | 典型代码 | 适合 |
+|---|---|---|---|
+| 1 | **主题组件库 + 声明式 + 响应式** | `button_t` / `side_menu` / `tag` / `alert` … 节点 + `Store` 绑定 | 现代化应用外壳，推荐 |
+| 2 | **libyue 原版控件 + 声明式 + 响应式** | `button` / `entry` / `slider` … 节点 + `Store` 绑定 | 原生外观 + 声明式写法 |
+| 3 | **libyue 原版控件 + 命令式** | `Window::new` + `set_content` + setter | 贴近 libyue 原生 API |
 
-分层原则：
+主题层在保持原生渲染与体积的同时，提供 Element Plus 风格的现代外观、声明式节点树与响应式数据绑定——原生，但好用。
 
-1. **能 MoonBit 解决的不进 C/C++**——字符串 UTF-16↔UTF-8、闭包保活注册表、错误枚举、托盘降级逻辑全部在 `yue/` 内完成。
-2. **C++ shim 只做 ABI 翻译**——`shim/yue_mbt.cpp` 逐函数对照 `shim/include/yue_mbt.h`，无业务逻辑。
-3. **平台差异两级收敛**——libyue 已统一的（窗口、控件）直接用；libyue 未暴露的（如 Linux 托盘后端探测，它内部 dlopen 失败只打日志）由 shim 补探测接口，MoonBit 层翻译成 `Result` / `is_supported()` 统一语义。
+## 演示
 
-## 目录
+### 主题样式——组件库
 
-```
-yue/                 MoonBit 库包
-  ffi.mbt            私有 extern "c" 声明（仅 native 编译）
-  types.mbt          控件类型定义（Window/Label/View 等句柄与包装）
-  app.mbt            应用生命周期：init / run / quit
-  view.mbt           View 通用能力 + 回调注册表（focus/启停/style/拖拽）
-  widgets.mbt        基础与组合控件（Button/Entry/Slider/Picker/ComboBox/ProgressBar/Popover…）
-  browser.mbt        内嵌浏览器（WebView）
-  menu.mbt           菜单条 / 弹出菜单 / 菜单项
-  dialog.mbt         文件打开/保存对话框
-  text_edit.mbt      多行文本编辑框
-  tab.mbt            页签
-  table.mbt          表格 + 可挂 MoonBit trait 的数据模型桥
-  painter.mbt        2D 绘制（Painter / 离屏 Canvas）
-  misc.mbt           分组框 / 滚动视图 / 分隔线 / 剪贴板 / 消息框
-  color.mbt          颜色工具（纯 MoonBit）
-  geometry.mbt       几何值类型（纯 MoonBit）
-  error.mbt          结构化错误
-  events.mbt         事件系统（鼠标/键盘/修饰键归一化/VKEY 常量/连击）
-  button.mbt         按钮 / 单行输入框（Checkbox/Radio/Password）
-  props.mbt          L1 props 构造器（X::make / apply_style）
-  declarative.mbt    L2 声明式节点（Node/mount/vbox/label/…）
-  store.mbt          L3 响应式 Store（订阅 / map 派生 / bind_label）
-  tray.mbt           托盘统一 API
-  traybus/           纯 MoonBit 的 DBus + StatusNotifierItem 协议栈（Linux 托盘）
-    wire.mbt         DBus 线路格式编解码
-    bus.mbt          会话总线连接、SASL EXTERNAL 握手、消息收发分发
-    sni.mbt          SNI 协议实现
-    detect.mbt       桌面环境识别（XDG_CURRENT_DESKTOP）
-    icon.mbt         程序内置生成托盘位图（不依赖图片资源与解码器）
-    sys.mbt          fd 级系统调用面（全部经 shim 转发）
-shim/                C ABI 封装层（yue_mbt.cpp + include/yue_mbt.h）+ CMakeLists
-scripts/prepare.py   固定版本下载 libyue + 构建静态库（链接参数由 prebuild.py 托管）
-scripts/prebuild.py  moon 构建钩子：按当前系统输出链接配置，自动传播给依赖方
-scripts/postadd.py   moon add 安装本库时自动触发首次构建
-examples/            17 个示例：hello / editor / browser / drawing / table / widgets /
-                     drag_source / drag_destination / floating_heart /
-                     auto_height_edit / showcase / misc / advanced / events / layout /
-                     components / trayprobe
-.agents/skills/      MoonBit 技能库（FFI 规范以此为准）
-```
+`moon run examples/components` —— 四页演示板，覆盖全部组件与状态；API 一览见 [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md)：
 
-## 快速开始
+![基础组件](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-basic.png)
 
-### Ubuntu 24.04
+![导航](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-nav.png)
+
+![数据展示](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-data.png)
+
+![反馈](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-feedback.png)
+
+### 基础样式——原版控件
+
+`moon run examples/showcase` —— 12 个页签的全功能演示，全部声明式写法完成——控件页：
+
+![showcase 控件页](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/widgets.png)
+
+更多示例（共 17 个：hello / editor / browser / drawing / table / 拖拽 / 托盘 …）见 [examples/](https://gitee.com/noahliu0911/moonbit-libyue/tree/master/examples)。
+
+## 使用说明
+
+### 快速开始
+
+#### Ubuntu 24.04
 
 系统依赖：
 
@@ -101,7 +74,7 @@ moon run examples/hello
 
 零配置：链接参数由构建钩子 `scripts/prebuild.py` 按当前系统生成并自动传播，静态库缺失时自动执行 `scripts/prepare.py` 补建。`prepare.py` 幂等可重跑；Linux/Windows 切换后首次构建自动重建。
 
-### Windows（10/11，x64）
+#### Windows（10/11，x64）
 
 需要：Python 3、MoonBit 工具链（`moon`）、CMake、MSVC C++ 工具链（含 ATL）。以下命令均在本项目 Windows 实测通过：
 
@@ -136,22 +109,10 @@ moon run examples/hello
 
 ```sh
 moon add NoahLiu/moonbit-libyue
-```
-
-库代码（`yue/`）发布在 mooncakes，使用方零配置：
-
-```sh
-moon add NoahLiu/moonbit-libyue
 moon run src   # 无需任何链接配置；安装时自动构建原生层，缺失时构建钩子自动补建
 ```
 
-纯 MoonBit 部分（DBus 线路编解码、颜色工具、表格值编解码）不依赖原生库，可直接跑测试：
-
-```sh
-moon test
-```
-
-## 声明式 UI 两段示例
+### 声明式 UI
 
 窗口可以用声明式节点树(`@yue.mount_window`)描述,不必手写 `new + set_content`。以下示例均可直接运行(截图链接指向 Gitee 仓库内文件)。
 
@@ -202,22 +163,33 @@ let window = @yue.mount_window(
 
 ![计数器窗口](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/counter.png)
 
-完整的 [showcase](https://gitee.com/noahliu0911/moonbit-libyue/tree/master/examples/showcase)(12 个页签:基础控件/输入与选择/画布/网页/对话框/系统集成/事件/富文本/菜单/表格…)全部用这套声明式写法完成——控件页截图:
+布局(yoga 弹性盒)、滚动、分组等更多节点类型见 [docs/zh/declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/declarative.md)。
 
-![showcase 控件页](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/widgets.png)
+### 文档索引
 
-布局(yoga 弹性盒)、滚动、分组等更多节点类型见 [docs/declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/declarative.md)。
+| 文档 | 内容 |
+|---|---|
+| [components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md) | 主题组件库 API 一览,含演示截图 |
+| [declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/declarative.md) | 声明式 `Node`/`mount` 渲染树 + `Store` 响应式绑定 |
+| [components.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components.md) | 控件 API 速查:经典 setter 与 `X::make` props 两种写法 |
+| [layout.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/layout.md) | 布局样式键全集(Yoga flexbox) |
+| [adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md) | 各平台实测坑、根因与验证结论 |
+| [tray.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/tray.md) | Linux 托盘:SNI 协议栈设计与后端降级 |
+| [relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/relink.md) | 原生层变更后强制重链 |
 
-## 说明
+完整索引:[docs/zh/README.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/README.md)。
 
-- 当前封装面约 320 个 ABI 函数（`yue/ffi.mbt` 中 324 个 `extern "c"` 声明）：App/Lifetime、Window、View 通用能力与拖拽、Container/Label/Button/Entry/TextEdit、Slider/Picker/ComboBox/ProgressBar/Tab/Group/Scroll/Separator/DatePicker/GifPlayer、Browser、Menu/MenuBar、Table+模型桥、Painter/Canvas、Tray/Notification/GlobalShortcut/Clipboard/MessageBox/Popover/FileDialog、Screen/Appearance/Locale/Cursor；继续扩展控件时按既有模式：shim 加机械转换函数 → `ffi.mbt` 加 extern → 新 `*.mbt` 加类型与方法。
-- 已知边界、ABI 坑与各平台适配经验不在 README 展开，见 `AGENTS.md`（AI 协作规则）与 [docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md)；Linux 托盘方案（设计动机、架构、后端降级、桌面兼容性、调试）独立成文：[docs/tray.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/tray.md)。
-- shim/vendor 改动或重跑 `prepare.py` 后须强制重链：`moon clean` 或删对应 exe，见 [docs/relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/relink.md)。
-- 文档索引：[docs/README.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/README.md)。
+## 开发贡献
+
+- 构建与测试:`moon check && moon test`——纯 MoonBit 部分(DBus 线路编解码、颜色/表格值编解码)不依赖原生库,可直接测试。
+- 新增控件:`shim/yue_mbt.cpp` 机械转换 → `shim/include/yue_mbt.h` 声明 → `yue/ffi.mbt` 加 extern → 新 `yue/*.mbt` 加类型与方法(FFI 规范见 `.agents/skills/moonbit-c-binding/`)。
+- 当前封装面约 320 个 ABI 函数(`yue/ffi.mbt` 中 324 个 `extern "c"` 声明)。
+- 实测踩坑与平台适配经验一律回写 [docs/zh/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md);使用文档与代码注释只写用法。
+- shim/vendor 变更后须强制重链:`moon clean` 或删对应可执行文件,见 [docs/zh/relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/relink.md)。
 
 ## 参考
 
 - libyue 文档：<https://libyue.com/docs/latest/cpp/guides/getting_started.html>
 - Lua 绑定参考（架构对照）：github.com/yue/yue 的 `lua_yue/`
 - MoonBit 技能库：`.agents/skills/`（`moonbit-c-binding`、`make-moonbit-c-bindings`）
-- AI 协作规则：`AGENTS.md` · 平台适配经验：[docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md)
+- AI 协作规则：`AGENTS.md` · 平台适配经验：[docs/zh/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md)

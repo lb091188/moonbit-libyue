@@ -10,6 +10,6 @@
 | [tray.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/tray.md) | Linux tray solution: SNI protocol stack design, architecture, backend fallback, desktop compatibility |
 | [relink.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/relink.md) | Forcing a relink after native layer (shim/vendor) changes: detection and handling |
 
-For a quick start and architecture overview, see the repository root [README.md](https://github.com/lb091188/moonbit-libyue/blob/master/README.md).
+For a quick start, demos and usage, see the repository root [README.md](https://github.com/lb091188/moonbit-libyue/blob/master/README.md).
 
 [中文版文档索引](https://github.com/lb091188/moonbit-libyue/blob/master/docs/zh/README.md)

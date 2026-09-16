@@ -10,4 +10,4 @@
 | [tray.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/tray.md) | Linux 托盘方案:SNI 协议栈设计、架构、后端降级、桌面兼容性 |
 | [relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/relink.md) | 原生层(shim/vendor)变更后强制重链:判别与处理 |
 
-快速开始与架构总览见仓库根 [README_ZH.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)。
+快速开始、演示与使用说明见仓库根 [README_ZH.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)。
