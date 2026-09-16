@@ -31,6 +31,7 @@
 | `avatar(letter, color, size?)` | 方形实底,白字居中 |
 | `badge_count(n)` / `badge_dot(color?)` | 数字角标 / 圆点 |
 | `statistic(title, value : Store[String])` | 响应式大号数值 |
+| `progress_line(value : Store[Double], height?)` | 主题色填充 + 浅灰轨道,数值响应式 |
 | `descriptions(pairs)` | 键值网格 |
 | `timeline(items)` | 语义色节点 + 连线 |
 | `collapse(panels)` | 点击标题开合,面板独立 |

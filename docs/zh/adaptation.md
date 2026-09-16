@@ -33,6 +33,7 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
   - 历史方案:先按系统回写 moon.pkg.json(两平台互相覆盖)→ `@build/link.flags` 响应文件(gcc/clang 与 cl 都支持 `@文件`,双平台同一份入库)。均已被传播机制替代。
 - `prepare.py` 幂等可重跑:缓存 zip sha256 不匹配(下载被截断)自动删除重下;下载先写 `.part` 临时文件、校验通过才原子落盘。网络走标准 `http_proxy/https_proxy` 环境变量。
 - **moon 不因静态库更新自动重链(跨平台,2026-09-15 Linux 实测)**:prebuild 只在静态库**缺失**时才调 prepare,且 moon 的重链判定只看 MoonBit 源与 link_configs 输出、不看静态库内容——shim/vendor 变更重跑 prepare 后,链接产物仍指向旧库。判别与处理见 [docs/relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/relink.md)。
+- **moon nightly 0911 起全仓 `moon test` 的测试二进制不应用 prebuild link_configs(2026-09-16 实测入档,根因待查)**:moon 0.1.20260911 下 `moon build` 的 main 可执行链接正常,但全仓 `moon test` 会为依赖 yue 的包(如 examples/*,含无测试文件的包)生成 blackbox_test 测试二进制,链接报 `undefined reference to yue_mbt_*`——prebuild 每次构建都输出 link_configs,build 侧生效、test 侧不注入。`moon test yue/ yue/traybus/` 单包跑纯 MoonBit 测试(color/geometry/store/events/SNI 编解码 30 例)不受影响;stable 0904 时代全仓 moon test 通过(2026-09-12 前记录),回归来自工具链升级而非库代码。临时验证方式:纯 MoonBit 包单包 `moon test`,main 链接用 `moon build examples/<x>` 验证。修复方向待 moon 上游确认后回填。
 - **`postadd` 脚本仅在 registry `moon add` 安装时触发**,path/git 依赖与模块自身构建不触发;产物缺失的兜底由 prebuild.py 的检查承担。
 - libyue 版本钉死在 `scripts/prepare.py`(`LIBYUE_VERSION` + 三平台 sha256),升级需同步更新三个校验和。
 

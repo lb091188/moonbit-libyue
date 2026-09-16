@@ -1,7 +1,8 @@
-// 布局与容器页：Group / Scroll / Separator / 嵌套布局 / 光标。
+// 布局与容器页：Group / Scroll / Separator / Tab / 嵌套布局 / 光标。
 
 ///|
 fn page_layout() -> @yue.Node {
+  let tab_switches : @yue.Store[Int] = @yue.Store::new(0)
   let scroll_box : Ref[@yue.Scroll?] = Ref(None)
   let policy_on = Ref(false)
   let cursor_area : Ref[@yue.Container?] = Ref(None)
@@ -51,6 +52,28 @@ fn page_layout() -> @yue.Node {
         @yue.label("上下两条水平分隔线之间"),
         @yue.separator(),
         @yue.label("（上方是 Separator）"),
+      ],
+    ),
+    section(
+      "页签 Tab",
+      "原版 Tab 控件：声明式 tab 节点逐个加页，切换时 on_change 回调计数。",
+      [
+        @yue.tab(
+          [
+            ("文本", @yue.label("第一个页签的内容", style=[("padding", 8.0)])),
+            (
+              "输入",
+              @yue.entry(text="页签里的输入框", style=[("padding", 8.0)]),
+            ),
+            (
+              "按钮",
+              @yue.hbox([@yue.button("页签内按钮")], style=[("padding", 8.0)]),
+            ),
+          ],
+          on_change=fn() { tab_switches.update(fn(n) { n + 1 }) },
+          style=[("height", 120.0), ("marginBottom", 8.0)],
+        ),
+        @yue.bind_label(tab_switches, fn(n) { "切换次数：\{n}" }),
       ],
     ),
     section(

@@ -10,7 +10,7 @@
 - [x] Ubuntu 24.04 GNOME
 - [x] Ubuntu 24.04 KDE
 - [x] Deepin 25
-- [x] Windows 10 / 11（2026-09 首次实测通过，showcase 全功能可跑；见 [docs/zh/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md)）
+- [x] Windows 10 / 11
 - [?] macOS（暂无设备，未能测试）
 
 简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
@@ -31,9 +31,9 @@
 
 ## 演示
 
-### 主题样式——组件库
+### 现代示例——主题组件库（第 1 层）
 
-`moon run examples/components` —— 四页演示板，覆盖全部组件与状态；API 一览见 [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md)：
+`moon run examples/components` —— 四页演示板，覆盖主题组件库全部功能：每个组件、每种状态；API 一览见 [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md)：
 
 ![基础组件](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-basic.png)
 
@@ -43,9 +43,9 @@
 
 ![反馈](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-feedback.png)
 
-### 基础样式——原版控件
+### 传统示例——原版控件（第 2/3 层）
 
-`moon run examples/showcase` —— 12 个页签的全功能演示，全部声明式写法完成——控件页：
+`moon run examples/showcase` —— 12 页演示，覆盖原版控件全部能力（基础控件/输入/画布/网页/表格/对话框/菜单/托盘/剪贴板/事件…）——控件页：
 
 ![showcase 控件页](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/widgets.png)
 
