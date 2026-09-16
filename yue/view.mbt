@@ -197,6 +197,13 @@ impl ViewLike with fn set_visible(self, visible : Bool) -> Unit {
 }
 
 ///|
+/// 去除控件原生边框/内阴影(Linux/GTK 经 CSS;其余平台暂无操作),
+/// 供自绘外壳包原生输入类控件时使用。
+impl ViewLike with fn set_borderless(self, on : Bool) -> Unit {
+  ffi_view_set_borderless(self.view(), if on { 1 } else { 0 })
+}
+
+///|
 /// 设置视图字体（原生渲染，交互控件的文字样式首选此路）。
 impl ViewLike with fn set_font(self, font : Font) -> Unit {
   ffi_view_set_font(self.view(), font)

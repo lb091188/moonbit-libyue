@@ -38,6 +38,7 @@
 #include "base/command_line.h"
 #include "base/json/json_writer.h"
 #include "nativeui/nativeui.h"
+#include <gtk/gtk.h>
 #if defined(OS_LINUX) // Popover 仅 Linux 发行包提供（win/mac 均无 popover.h/实现）
 #include "nativeui/popover.h"
 #endif
@@ -403,6 +404,32 @@ void yue_mbt_view_schedule_paint(void *view) {
   if (auto *v = CastToView(view)) {
     v->SchedulePaint();
   }
+}
+
+void yue_mbt_view_set_borderless(void *view, int on) {
+#if defined(OS_LINUX)
+  if (auto *v = CastToView(view)) {
+    static GtkCssProvider *provider = nullptr;
+    if (provider == nullptr) {
+      provider = gtk_css_provider_new();
+      gtk_css_provider_load_from_data(provider,
+          ".yue-borderless { border: none; box-shadow: none; "
+          "background-image: none; }", -1, nullptr);
+      gtk_style_context_add_provider_for_screen(
+          gdk_screen_get_default(), GTK_STYLE_PROVIDER(provider),
+          G_MAXUINT);
+    }
+    GtkStyleContext *ctx =
+        gtk_widget_get_style_context(v->GetNative());
+    if (on)
+      gtk_style_context_add_class(ctx, "yue-borderless");
+    else
+      gtk_style_context_remove_class(ctx, "yue-borderless");
+  }
+#else
+  (void)view;
+  (void)on;
+#endif
 }
 
 void yue_mbt_view_set_font(void *view, void *font) {

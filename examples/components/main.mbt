@@ -122,6 +122,16 @@ fn main {
       ],
     ),
     section(
+      "Input 边框输入框",
+      "外层自绘 1px 边框(聚焦变主题蓝)+ 白底,内部 Entry 去原生边框与内阴影;margin 控制外边距,直角。",
+      [
+        @yue.vbox([
+          @yue.input_t(text="边框输入框", margin=10.0),
+          @yue.input_t(text="密码框", password=true),
+        ]),
+      ],
+    ),
+    section(
       "Checkbox 复选框",
       "自绘直角勾选框:选中实心主题色 + 白勾,hover 边框变主题色;第三项为禁用态。",
       [

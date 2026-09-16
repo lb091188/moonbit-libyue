@@ -1782,3 +1782,59 @@ pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
     },
   }
 }
+
+
+///|
+/// 边框输入框:外层自绘 1px 边框(聚焦变主题色)+ 白底,
+/// 内部 Entry 去 native 边框只负责文字;margin 控制外边距,直角。
+pub fn input_t(
+  text? : String = "",
+  password? : Bool = false,
+  margin? : Double = 0.0,
+  width? : Double = 280.0,
+  height? : Double = 32.0,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let focused = Ref(false)
+      let outer = Container::make(
+        style=[
+          ("width", width),
+          ("height", height),
+          ("marginTop", margin),
+          ("marginBottom", margin),
+        ],
+      )
+      outer.set_background_color("#FFFFFF")
+      outer.on_draw(fn(p) {
+        let b = outer.get_bounds()
+        p.set_stroke_color(
+          if focused.val { theme_primary } else { theme_border },
+        )
+        p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+      })
+      let entry = match password {
+        true => Entry::make(text~, entry_type=Password)
+        false => Entry::make(text~, entry_type=Normal)
+      }
+      entry.set_borderless(true)
+      entry.set_background_color("#FFFFFF")
+      entry.set_style("flex", 1.0)
+      entry.set_style("marginTop", 5.0)
+      entry.set_style("marginBottom", 5.0)
+      entry.on_focus_in(fn() {
+        focused.val = true
+        outer.schedule_paint()
+        false
+      })
+      entry.on_focus_out(fn() {
+        focused.val = false
+        outer.schedule_paint()
+        false
+      })
+      outer.add_child(entry)
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}
