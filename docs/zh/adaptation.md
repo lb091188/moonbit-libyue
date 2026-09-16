@@ -239,6 +239,7 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - prebuild 的 Darwin 分支已按官方构建结构**预修**(尚未实测):链接参数补第二个静态库 `-lyue_mbt_noarc`(no-ARC 库符号被主库引用,GNU ld 从左到右须排其后)+ 全部框架(AppKit/Carbon/IOKit/Security/WebKit/OpenDirectory)+ `-lobjc -lc++ -lpthread`——静态库的系统依赖不会自动传播到 moon 的链接命令行,必须显式给出(与 Linux 侧 pkg-config 补系统库同构)。
 - 版本细分(按 macOS 大版本)待实测后补充。
 - **shim 平台分支漏 macOS 守卫(2026-09-16 CI 首跑实测)**:环境 macos-latest(ARM64,Xcode 16.4/AppleClang 17)。现象:CMake 编 `yue_mbt.cpp` 报 20 个错误——`HWND`/`GetWindowLongPtrW`/`WS_*` 未定义、`gchar`/`g_get_current_dir` 未声明;libyue 源码本身只出弃用 warning(无害)。根因:①`yue_mbt_view_set_borderless` 的 `#if defined(OS_LINUX)` 后直接 `#else` 落 Win32 分支,macOS 被兜进去;②`CurrentDirForDrag` 的 `#else` 分支用 glib(Linux 才有 gtk/glib 头与 USE_GLIB 宏)。修复:borderless 补 `#elif defined(OS_WIN)`,macOS 空操作(NSScrollView 自身无边框);CurrentDirForDrag 拆三支,macOS 用 `getcwd`(顶层补 `#if !defined(_WIN32) #include <unistd.h>`);顺修 `yue_mbt.h` 块注释内 `yue/*.mbt` 触发的 `-Wcomment`。验证:Linux 本地 prepare + check + test(31/31)+ build 全绿;macOS 侧待 CI 复跑确认。
+- **shim 调用 mac 版头文件不存在的 API(2026-09-16 CI 第二轮)**:`Window::SetSkipTaskbar`/`Window::SetIcon`/`App::SetID` 三处——发行包头文件里它们在 `#if defined(OS_WIN) || defined(OS_LINUX)` 块内,mac 无声明。修复:三处调用补同样守卫,mac 分支空操作(mac 窗口图标/应用身份随 Bundle 走,本就无对应语义);顺修悬空 `extern "C" //注释` 与下一行前缀重复触发的 `-Wduplicate-decl-specifier`(注意本文件无全局 extern "C" 块,各导出函数前缀不能顺手删)。排查方法:用 Linux 版 vendor 头文件的平台 guard 全量对照 shim 的 `->method(` 调用逐个核对——`SetOverlayScrollbar`(`#if !OS_WIN`)、`MessageBox::Show/SetTitle`(已有 mac 分支)、`SetMenuBar`(已有 mac 降级)均安全。
 
 ---
 

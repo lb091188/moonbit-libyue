@@ -432,7 +432,8 @@ void yue_mbt_view_set_borderless(void *view, int on) {
       gtk_style_context_remove_class(ctx, "yue-borderless");
   }
 #elif defined(OS_WIN)
-  // Windows:Entry 是 Win32 EDIT,内阴影来自 WS_EX_CLIENTEDGE 边缘样式。
+  // Windows:Entry 是 Win32 EDIT,内阴影来自扩展边缘样式——上游 EntryImpl
+  // 创建用 WS_EX_STATICEDGE(不是 CLIENTEDGE!),一并清 CLIENTEDGE/WS_BORDER。
   // ViewImpl 不公开 hwnd;原生子控件(EDIT/DATETIMEPICK 等)的实现在
   // SubwinView(经 Win32Window 暴露 hwnd()),dynamic_cast 取,非子窗口
   // 控件(Container 等自绘)无 HWND 属预期,跳过。
@@ -440,10 +441,11 @@ void yue_mbt_view_set_borderless(void *view, int on) {
     auto *subwin = dynamic_cast<nu::SubwinView *>(v->GetNative());
     HWND hwnd = subwin != nullptr ? subwin->hwnd() : nullptr;
     if (hwnd) {
+      static bool logged = false;
       LONG_PTR ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
       LONG_PTR st = GetWindowLongPtrW(hwnd, GWL_STYLE);
       if (on) {
-        ex &= ~WS_EX_CLIENTEDGE;
+        ex &= ~(WS_EX_STATICEDGE | WS_EX_CLIENTEDGE);
         st &= ~WS_BORDER;
       } else {
         ex |= WS_EX_CLIENTEDGE;
@@ -454,6 +456,10 @@ void yue_mbt_view_set_borderless(void *view, int on) {
       SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE |
                        SWP_FRAMECHANGED);
+      if (!logged) {
+        logged = true;
+        std::fprintf(stderr, "yue_mbt: set_borderless(on=%d) applied\n", on);
+      }
     }
   }
 #else
@@ -3459,7 +3465,7 @@ void yue_mbt_tray_remove(void *tray) {
 
 // ---------- 托盘：nativeui 后端补充 ----------
 
-extern "C" // ---------- 菜单桥：供 SNI 自实现托盘遍历统一 Menu 模型 ----------
+// ---------- 菜单桥：供 SNI 自实现托盘遍历统一 Menu 模型 ----------
 
 extern "C" void *yue_mbt_menu_new(void) {
   return reinterpret_cast<void *>(MenuStore::put(new nu::Menu()));
@@ -3753,18 +3759,29 @@ double yue_mbt_window_get_scale_factor(void *window) {
 }
 
 void yue_mbt_window_set_skip_taskbar(void *window, int32_t skip) {
+#if defined(OS_WIN) || defined(OS_LINUX)
   if (auto *w = CastTo<nu::Window>(window)) {
     w->SetSkipTaskbar(skip != 0);
   }
+#else
+  (void)window;
+  (void)skip;
+#endif
 }
 
 void yue_mbt_window_set_icon(void *window, void *image) {
+#if defined(OS_WIN) || defined(OS_LINUX)
   auto *img = ImageStore::get(image);
   if (auto *w = CastTo<nu::Window>(window)) {
     if (img != nullptr) {
       w->SetIcon(scoped_refptr<nu::Image>(img));
     }
   }
+#else
+  // mac 的 Window 无 SetIcon(窗口图标随 Bundle 走)
+  (void)window;
+  (void)image;
+#endif
 }
 
 void yue_mbt_window_on_focus_in(void *window,
@@ -4249,7 +4266,12 @@ void yue_mbt_file_dialog_set_button_label(void *dialog, const char *label) {
 
 /* App:应用 ID */
 void yue_mbt_app_set_id(const char *id) {
+#if defined(OS_WIN) || defined(OS_LINUX)
   nu::App::GetCurrent()->SetID(id);
+#else
+  // mac 的 App 无 SetID(应用身份随 Bundle 走)
+  (void)id;
+#endif
 }
 
 void *yue_mbt_app_get_id() {
