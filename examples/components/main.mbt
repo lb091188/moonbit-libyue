@@ -118,22 +118,11 @@ fn main {
       ],
     ),
     section(
-      "Entry 输入框",
-      "普通与密码输入,字体统一走主题(前景色保留系统样式)。",
+      "Input 输入框",
+      "现代化主题唯一输入框:外层自绘 1px 边框(聚焦变主题蓝)+ 白底,内部 Entry 去原生边框与内阴影;margin 控制外边距,直角。",
       [
         @yue.vbox([
-          @yue.entry_t(text="输入点什么…"),
-          @yue.label(""),
-          @yue.entry_t(text="密码", password=true),
-        ]),
-      ],
-    ),
-    section(
-      "Input 边框输入框",
-      "外层自绘 1px 边框(聚焦变主题蓝)+ 白底,内部 Entry 去原生边框与内阴影;margin 控制外边距,直角。",
-      [
-        @yue.vbox([
-          @yue.input_t(text="边框输入框", margin=10.0),
+          @yue.input_t(text="输入点什么…", margin=10.0),
           @yue.input_t(text="密码框", password=true),
         ]),
       ],
@@ -327,7 +316,7 @@ fn main {
         @yue.steps(["填写", "确认", "完成"], step),
         @yue.hbox(
           [
-            @yue.button("上一步", on_click=fn() {
+            @yue.button_t("上一步", variant=@yue.Soft, on_click=fn() {
               step.update(fn(n) {
                 let m = n - 1
                 if m < 0 {
@@ -337,8 +326,10 @@ fn main {
                 }
               })
             }),
-            @yue.button(
+            @yue.label(" "),
+            @yue.button_t(
               "下一步",
+              variant=@yue.Solid,
               on_click=fn() {
                 step.update(fn(n) {
                   let m = n + 1
@@ -349,7 +340,6 @@ fn main {
                   }
                 })
               },
-              style=[("marginLeft", 8.0)],
             ),
           ],
           style=[("marginTop", 8.0)],
@@ -606,7 +596,7 @@ fn main {
     [
       @yue.hbox(style=[("flex", 1.0)], style_str=[("alignItems", "stretch")], [
         @yue.side_menu(
-          ["基础组件", "导航", "数据展示", "反馈"],
+          ["基础组件", "导航", "数据展示", "反馈", "进阶"],
           selected,
         ),
         @yue.vbox(

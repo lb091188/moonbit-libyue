@@ -177,6 +177,8 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **`prepare.py` 的 Linux 补丁调用漏在平台分支外(2026-09-16 Windows 实测抓到)**:`patch_linux_drag_icon_hotspot()` 缩进错误落在 `if os_name == "Linux"` 之外,Windows 上 prepare 必崩(`FileNotFoundError: vendor\libyue\src\linux\...`,Linux 恰好能跑故一直未暴露)。修复:挪回 Linux 分支内。教训:平台分支补丁的新增调用务必确认缩进在对应 `if` 内;Windows 侧跑一遍 prepare 是发现此类问题的最快手段。
 - **shim 的 `gtk/gtk.h` include 未加平台隔离(2026-09-16 Windows 实测)**:主题组件库的 `set_borderless` 用 GtkCssProvider 注入样式,实现已 `#if defined(OS_LINUX)` 隔离,但顶部 `#include <gtk/gtk.h>` 是裸的——Windows 上 MSVC 报 C1083 找不到 gtk/gtk.h(文件名含 gtk 的报错易误判为 GTK 依赖缺失,实际只是 include 没进分支)。修复:并入现有 `OS_LINUX` 分支。教训:shim 新增平台专属代码时 include 与实现要同一批隔离,只隔离实现不隔离头文件等于没隔离。
 
+- **原生子控件在滚动容器里的四类 Windows 差异(2026-09-16 三轮实测)**:①滚动后原生 EDIT 的 HWND 不随容器实时移动,悬浮遮挡已滚上来的内容——`View::Layout()` 可强制重摆,`scroll()` 声明式封装已在 Windows 分支注册 `on_scroll` 强制重摆(shim 补 `yue_mbt_view_layout`);②输入框"内阴影"是 WS_EX_CLIENTEDGE 边缘样式,`set_borderless` 的 Windows 分支清该样式 + `SWP_FRAMECHANGED` 生效;③DatePicker 走系统主题按内容最小宽布局,不显式给宽只显示年份四位数(`set_style("width",130)`);④字体字形小图标(tree ▸/collapse +/−/checkbox ✓)在 Windows 渲染发虚且跨平台不一致——组件内一律改 Painter 矢量自绘(折线/实心三角),libyue Image 只支持位图无 SVG 解码,引入 SVG/字体图标库均不合算。
+
 
 #### 链接参数(moon → cl/link 的真实行为,全部实测)
 

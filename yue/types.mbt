@@ -107,6 +107,7 @@ pub(open) trait ViewLike {
   fn handle_drop(Self, (DraggingInfo, Double, Double) -> Bool) -> Unit = _
   fn on_drag_leave(Self, () -> Unit) -> Unit = _
   fn schedule_paint(Self) -> Unit = _
+  fn update_layout(Self) -> Unit = _
   fn set_borderless(Self, Bool) -> Unit = _
   fn set_font(Self, Font) -> Unit = _
   fn set_color(Self, String) -> Unit = _

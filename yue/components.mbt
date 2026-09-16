@@ -688,7 +688,7 @@ pub fn card(
         p.fill_rect(0.0, head_h, w, 1.0)
       })
       // 标题(加粗,垂直居中)
-      let title_at = AttributedText::new(title, wrap=false)
+      let title_at = AttributedText::new(title, valign=Center, wrap=false)
       title_at.set_font(Font::new("Sans", 14.0, weight=Bold))
       title_at.set_color(theme_text_primary())
       let title = Container::make(style=[
@@ -1103,8 +1103,26 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
             draw_focus_ring(p, b.width, b.height)
           }
         })
-        let arrow = Label::new(if open.val { "− " } else { "+ " })
-        arrow.set_color(theme_primary())
+        // 自绘折叠指示(V 形折线,不依赖字体字形)
+        let arrow = Container::make(
+          style=[("width", 12.0), ("height", 12.0), ("marginRight", 5.0)],
+        )
+        arrow.on_draw(fn(p) {
+          p.set_stroke_color(theme_primary())
+          for off in [0.0, 0.6] {
+            p.begin_path()
+            if open.val {
+              p.move_to(1.5 + off, 4.0)
+              p.line_to(6.0 + off, 8.0)
+              p.line_to(10.5 + off, 4.0)
+            } else {
+              p.move_to(4.0, 1.5 + off)
+              p.line_to(8.0, 6.0 + off)
+              p.line_to(4.0, 10.5 + off)
+            }
+            p.stroke()
+          }
+        })
         let title = Label::new(entry.0)
         title.set_color(theme_text_primary())
         head.add_child(arrow)
@@ -1118,7 +1136,7 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
         }
         let apply = fn() -> Unit {
           body.set_visible(open.val)
-          arrow.set_text(if open.val { "− " } else { "+ " })
+          arrow.schedule_paint()
         }
         let toggle = fn() -> Unit {
           open.val = !open.val
@@ -1245,8 +1263,8 @@ pub fn result(
         style_str=[("flexDirection", "column"), ("alignItems", "center")],
       )
       let icon = Container::make(style=[
-        ("width", 56.0),
-        ("height", 56.0),
+        ("width", 76.0),
+        ("height", 76.0),
         ("marginTop", 16.0),
       ])
       let color = type_color(t)
@@ -1255,20 +1273,20 @@ pub fn result(
         Danger => "✕"
         _ => "!"
       }
-      let symbol_probe = AttributedText::new(symbol, wrap=false)
-      let symbol_w = symbol_probe.get_bounds_for(10000.0, 100.0).width
+      let symbol_at = AttributedText::new(symbol, valign=Center, wrap=false)
+      symbol_at.set_font(Font::new("Sans", 38.0, weight=Bold))
+      symbol_at.set_color(color)
+      let symbol_w = symbol_at.get_bounds_for(10000.0, 100.0).width
 
       icon.set_background_color(type_light_color(t))
       icon.on_draw(fn(p) {
         let b = icon.get_bounds()
-        p.draw_text(
-          symbol,
+        p.draw_attributed_text(
+          symbol_at,
           (b.width - symbol_w) / 2.0,
           0.0,
           b.width,
           b.height,
-          valign=Center,
-          color~,
         )
       })
       let big = Container::make(style=[("height", 30.0)], style_str=[
@@ -1311,24 +1329,23 @@ pub fn empty(desc : String) -> Node {
         style_str=[("flexDirection", "column"), ("alignItems", "center")],
       )
       let box = Container::make(style=[
-        ("width", 64.0),
-        ("height", 64.0),
-        ("marginTop", 14.0),
+        ("width", 96.0),
+        ("height", 88.0),
+        ("marginTop", 12.0),
       ])
-      box.set_background_color(theme_info_light())
-      let empty_probe = AttributedText::new("∅", wrap=false)
-      let empty_w = empty_probe.get_bounds_for(10000.0, 100.0).width
+      // 自绘简约空箱:盖 + 盒体,不依赖字体符号
       box.on_draw(fn(p) {
         let b = box.get_bounds()
-        p.draw_text(
-          "∅",
-          (b.width - empty_w) / 2.0,
-          0.0,
-          b.width,
-          b.height,
-          valign=Center,
-          color=theme_text_secondary(),
-        )
+        let cx = b.width / 2.0
+        // 盒体
+        p.set_fill_color(theme_fill_hover())
+        p.fill_rect(cx - 26.0, 36.0, 52.0, 34.0)
+        p.set_stroke_color(theme_border())
+        p.stroke_rect(cx - 26.0, 36.0, 52.0, 34.0)
+        // 盖(比体宽,略上叠)
+        p.set_fill_color(theme_info_light())
+        p.fill_rect(cx - 34.0, 22.0, 68.0, 14.0)
+        p.stroke_rect(cx - 34.0, 22.0, 68.0, 14.0)
       })
       let cap = Container::make(style=[("height", 26.0), ("marginTop", 6.0)], style_str=[
         ("alignItems", "center"),
@@ -1620,26 +1637,24 @@ pub fn checkbox_t(
             theme_border()
           },
         )
-        p.stroke_rect(0.5, by + 0.5, 13.0, 13.0)
+        p.stroke_rect(3.5, by + 0.5, 13.0, 13.0)
         if state.val {
           p.set_fill_color(if disabled { theme_border() } else { theme_primary() })
-          p.fill_rect(2.0, by + 2.0, 10.0, 10.0)
-          let check = AttributedText::new("✓", wrap=false)
-          check.set_font(font)
-          check.set_color("#FFFFFF")
-          let check_w = check.get_bounds_for(10000.0, 100.0).width
-          p.draw_attributed_text(
-            check,
-            (14.0 - check_w) / 2.0,
-            by,
-            14.0,
-            14.0,
-          )
+          p.fill_rect(5.0, by + 2.0, 10.0, 10.0)
+          // 白勾:折线两段,描两遍(错位 0.5px)近似 2px 线宽,不依赖字体
+          p.set_stroke_color("#FFFFFF")
+          for off in [0.0, 0.5] {
+            p.begin_path()
+            p.move_to(6.9 + off, by + 7.4)
+            p.line_to(9.0 + off, by + 9.5)
+            p.line_to(13.8 + off, by + 4.4)
+            p.stroke()
+          }
         }
         let at = AttributedText::new(title, valign=Center, wrap=false)
         at.set_font(font)
         at.set_color(if disabled { theme_border() } else { theme_text_regular() })
-        p.draw_attributed_text(at, 22.0, 0.0, w, 24.0)
+        p.draw_attributed_text(at, 25.0, 0.0, w, 24.0)
         if focused.val {
           draw_focus_ring(p, w, 24.0)
         }
@@ -1715,7 +1730,7 @@ pub fn radio_group(
               theme_border()
             },
           )
-          p.stroke_rect(0.5, 7.5, 13.0, 13.0)
+          p.stroke_rect(3.5, 7.5, 13.0, 13.0)
           if act {
             p.set_fill_color(
               if disabled {
@@ -1724,7 +1739,7 @@ pub fn radio_group(
                 theme_primary()
               },
             )
-            p.fill_rect(4.0, 11.0, 6.0, 6.0)
+            p.fill_rect(7.0, 11.0, 6.0, 6.0)
           }
           let at = AttributedText::new(opt, valign=Center, wrap=false)
           at.set_font(font)
@@ -1739,7 +1754,7 @@ pub fn radio_group(
               theme_text_regular()
             },
           )
-          p.draw_attributed_text(at, 22.0, 0.0, w, 28.0)
+          p.draw_attributed_text(at, 25.0, 0.0, w, 28.0)
           if focused.val {
             draw_focus_ring(p, w, 28.0)
           }
@@ -1991,15 +2006,16 @@ pub fn input_number(
       num.set_background_color("#FFFFFF")
       let t = AttributedText::new(
         value.get().to_string(),
-        align=Center,
         valign=Center,
         wrap=false,
       )
       t.set_font(font)
       t.set_color(theme_text_primary())
       num.on_draw(fn(p) {
+        // GTK 端 DrawAttributedText 不实现水平 align,手动测宽居中
         let b = num.get_bounds()
-        p.draw_attributed_text(t, 0.0, 0.0, b.width, b.height)
+        let tw = t.get_bounds_for(10000.0, 100.0).width
+        p.draw_attributed_text(t, (b.width - tw) / 2.0, 0.0, b.width, b.height)
       })
       value.subscribe(fn(v) {
         t.set_text(v.to_string())
@@ -2166,22 +2182,44 @@ pub fn tree(root : Array[TreeNode]) -> Node {
   {
     mount: fn(parent) {
       let outer = Container::make(
-        style=[("marginBottom", 10.0)],
+        style=[("marginBottom", 10.0), ("paddingTop", 2.0)],
         style_str=[("flexDirection", "column")],
       )
       let font = Font::new("Sans", 13.0)
+      // 实心小三角箭头(矢量自绘,不依赖字体字形,避免 Windows 端字符发虚)
+      fn draw_caret(p : Painter, open : Bool) -> Unit {
+        p.set_fill_color(theme_text_secondary())
+        p.begin_path()
+        if open {
+          p.move_to(2.0, 3.5)
+          p.line_to(8.0, 3.5)
+          p.line_to(5.0, 7.5)
+        } else {
+          p.move_to(3.5, 2.0)
+          p.line_to(7.5, 5.0)
+          p.line_to(3.5, 8.0)
+        }
+        p.close_path()
+        p.fill()
+      }
+
       fn build(nodes : Array[TreeNode], level : Int, into : Container) -> Unit {
         for nd in nodes {
           let has_children = nd.children.length() > 0
           let open = Ref(false)
           let indent = level.to_double() * 18.0
           let row = Container::make(
-            style=[("height", 30.0), ("marginLeft", indent)],
+            style=[("height", 32.0), ("marginLeft", indent)],
             style_str=[("flexDirection", "row"), ("alignItems", "center")],
           )
-          let arrow = Label::new(if has_children { "▸" } else { " " })
-          arrow.set_font(font)
-          arrow.set_color(theme_text_secondary())
+          let arrow = Container::make(
+            style=[("width", 10.0), ("height", 10.0), ("marginRight", 3.0)],
+          )
+          arrow.on_draw(fn(p) {
+            if has_children {
+              draw_caret(p, open.val)
+            }
+          })
           let label = Label::new(" " + nd.label)
           label.set_font(font)
           label.set_color(theme_text_primary())
@@ -2197,7 +2235,7 @@ pub fn tree(root : Array[TreeNode]) -> Node {
           row.on_mouse_down(fn(e) {
             if e.button == 1 && has_children {
               open.val = !open.val
-              arrow.set_text(if open.val { "▾" } else { "▸" })
+              arrow.schedule_paint()
               kids.set_visible(open.val)
               true
             } else {
@@ -2264,7 +2302,8 @@ pub fn transfer(
         out
       }
 
-      let list_rows : Ref[Array[View]] = Ref([])
+      let left_rows : Ref[Array[View]] = Ref([])
+      let right_rows : Ref[Array[View]] = Ref([])
       fn clear_list(box : Container, rows : Ref[Array[View]]) -> Unit {
         for v in rows.val {
           ignore(box.remove_child_view(v))
@@ -2340,10 +2379,10 @@ pub fn transfer(
       }
 
       fn render_all() -> Unit {
-        clear_list(left_box, list_rows)
-        clear_list(right_box, list_rows)
-        build_list(left_box, left_items, left_sel, list_rows)
-        build_list(right_box, right_items, right_sel, list_rows)
+        clear_list(left_box, left_rows)
+        clear_list(right_box, right_rows)
+        build_list(left_box, left_items, left_sel, left_rows)
+        build_list(right_box, right_items, right_sel, right_rows)
       }
 
       left_items.subscribe(fn(_v) { render_all() })
@@ -2394,8 +2433,8 @@ pub fn transfer(
 }
 
 ///|
-/// 自动补全(EP Autocomplete):entry_t 输入,下方按子串过滤显示候选项,
-/// 点击候选项写回 value 并清空输入。
+/// 自动补全(EP Autocomplete):entry_t 输入,候选项经过滤后弹出。
+/// Linux 用 Popover 原生弹层(不被窗口裁剪);其余平台回退为内联列表。
 pub fn autocomplete(
   options : Array[String],
   value : Store[String],
@@ -2409,71 +2448,118 @@ pub fn autocomplete(
       )
       let entry = Entry::make(entry_type=Normal)
       entry.set_font(Font::new("Sans", 13.0))
+      entry.set_borderless(true)
       entry.set_style("height", 30.0)
+      entry.set_background_color("#FFFFFF")
+      let font = Font::new("Sans", 13.0)
+      fn make_row(opt : String, on_pick : () -> Unit) -> Container {
+        let row = Container::make(
+          style=[("height", 28.0), ("paddingLeft", 10.0)],
+          style_str=[("flexDirection", "row"), ("alignItems", "center")],
+        )
+        let l = Label::new(opt)
+        l.set_font(font)
+        l.set_color(theme_text_regular())
+        row.add_child(l)
+        let hover = Ref(false)
+        row.on_draw(fn(p) {
+          let b = row.get_bounds()
+          if hover.val {
+            p.set_fill_color(theme_primary_light())
+            p.fill_rect(0.0, 0.0, b.width, b.height)
+          }
+        })
+        row.on_mouse_enter(fn(_e) {
+          hover.val = true
+          row.schedule_paint()
+        })
+        row.on_mouse_leave(fn(_e) {
+          hover.val = false
+          row.schedule_paint()
+        })
+        row.on_mouse_down(fn(e) {
+          if e.button == 1 {
+            on_pick()
+            true
+          } else {
+            false
+          }
+        })
+        row
+      }
+
+      fn pick(opt : String) -> Unit {
+        value.set(opt)
+        entry.set_text(opt)
+      }
+
+      let use_popover = platform() == "linux"
       let list = Container::make(
-        style=[("marginTop", 4.0)],
+        style=[("marginTop", 4.0), ("width", width)],
         style_str=[("flexDirection", "column")],
       )
-      let font = Font::new("Sans", 13.0)
-      let rows : Ref[Array[View]] = Ref([])
-      fn rebuild(filter : String) -> Unit {
-        for v in rows.val {
+      let inline_rows : Ref[Array[View]] = Ref([])
+      let pop : Ref[Popover?] = Ref(None)
+      fn refresh(filter : String) -> Unit {
+        // 清空已有候选
+        for v in inline_rows.val {
           ignore(list.remove_child_view(v))
         }
-        rows.val = []
+        inline_rows.val = []
+        let mut count = 0
+        let picked = Ref(false)
         for opt in options {
           if filter != "" && !opt.contains(filter) {
             continue
           }
-          let row = Container::make(
-            style=[("height", 28.0), ("paddingLeft", 10.0)],
-            style_str=[("flexDirection", "row"), ("alignItems", "center")],
-          )
-          let l = Label::new(opt)
-          l.set_font(font)
-          l.set_color(theme_text_regular())
-          row.add_child(l)
-          let hover = Ref(false)
-          row.on_draw(fn(p) {
-            let b = row.get_bounds()
-            if hover.val {
-              p.set_fill_color(theme_primary_light())
-              p.fill_rect(0.0, 0.0, b.width, b.height)
+          count = count + 1
+          let o = opt
+          let row = make_row(o, fn() {
+            picked.val = true
+            pick(o)
+            match pop.val {
+              Some(p) => p.close()
+              None => ()
             }
-          })
-          row.on_mouse_enter(fn(_e) {
-            hover.val = true
-            row.schedule_paint()
-          })
-          row.on_mouse_leave(fn(_e) {
-            hover.val = false
-            row.schedule_paint()
-          })
-          row.on_mouse_down(fn(e) {
-            if e.button == 1 {
-              value.set(opt)
-              entry.set_text(opt)
-              for v in rows.val {
-                ignore(list.remove_child_view(v))
-              }
-              rows.val = []
-              true
-            } else {
-              false
+            for v in inline_rows.val {
+              ignore(list.remove_child_view(v))
             }
+            inline_rows.val = []
           })
           list.add_child(row)
-          rows.val.push(row.view())
+          inline_rows.val.push(row.view())
+        }
+        if use_popover {
+          match pop.val {
+            Some(p) => {
+              if count > 0 && !picked.val {
+                p.set_content(list)
+                p.set_content_size(width, count.to_double() * 28.0 + 8.0)
+                p.show_relative_to(entry)
+              } else {
+                p.close()
+              }
+            }
+            None => ()
+          }
         }
       }
 
-      rebuild("")
-      entry.on_text_change(fn() {
-        rebuild(entry.get_text())
+      if use_popover {
+        pop.val = Some(Popover::new())
+      }
+      value.subscribe(fn(v) {
+        if !use_popover || !entry.has_focus() {
+          entry.set_text(v)
+        }
       })
-      value.subscribe(fn(v) { entry.set_text(v) })
+      entry.on_text_change(fn() {
+        refresh(entry.get_text())
+      })
       outer.add_child(entry)
-      outer.add_child(list)
+      if !use_popover {
+        outer.add_child(list)
+      }
       attach(parent, outer.view())
       outer.view()
     },
@@ -2498,6 +2584,8 @@ pub fn date_picker_t(label : String, on_change? : () -> Unit = fn() {  }) -> Nod
       row.add_child(kwrap)
       let dp = DatePicker::new()
       dp.set_font(Font::new("Sans", 13.0))
+      // 显式给足宽度:Windows 主题按内容最小宽布局,过窄只显示年份
+      dp.set_style("width", 130.0)
       dp.on_date_change(fn() { on_change() })
       row.add_child(dp)
       attach(parent, row.view())

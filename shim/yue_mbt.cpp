@@ -427,9 +427,35 @@ void yue_mbt_view_set_borderless(void *view, int on) {
       gtk_style_context_remove_class(ctx, "yue-borderless");
   }
 #else
-  (void)view;
-  (void)on;
+  // Windows:Entry 是 Win32 EDIT,内阴影来自 WS_EX_CLIENTEDGE 边缘样式
+  if (auto *v = CastToView(view)) {
+    HWND hwnd = reinterpret_cast<HWND>(v->GetNative());
+    if (hwnd) {
+      LONG_PTR ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+      LONG_PTR st = GetWindowLongPtrW(hwnd, GWL_STYLE);
+      if (on) {
+        ex |= WS_EX_CLIENTEDGE;
+        st |= WS_BORDER;
+      } else {
+        ex &= ~WS_EX_CLIENTEDGE;
+        st &= ~WS_BORDER;
+      }
+      SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex);
+      SetWindowLongPtrW(hwnd, GWL_STYLE, st);
+      SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE |
+                       SWP_FRAMECHANGED);
+    }
+  }
 #endif
+}
+
+void yue_mbt_view_layout(void *view) {
+  if (auto *v = CastToView(view)) {
+    // 强制重算布局并同步原生子控件位置(Windows 上滚动后
+    // 原生 EDIT HWND 不随容器滚动移动,需在 on_scroll 里补一次)
+    v->Layout();
+  }
 }
 
 void yue_mbt_view_set_font(void *view, void *font) {

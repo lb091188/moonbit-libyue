@@ -994,6 +994,10 @@ extern "c" fn ffi_view_schedule_paint(view : View) -> Unit = "yue_mbt_view_sched
 extern "c" fn ffi_view_set_borderless(view : View, on : Int) -> Unit = "yue_mbt_view_set_borderless"
 
 ///|
+#borrow(view)
+extern "c" fn ffi_view_layout(view : View) -> Unit = "yue_mbt_view_layout"
+
+///|
 #borrow(view, font)
 extern "c" fn ffi_view_set_font(view : View, font : Font) -> Unit = "yue_mbt_view_set_font"
 

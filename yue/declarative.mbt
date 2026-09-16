@@ -370,6 +370,14 @@ pub fn scroll(
       let holder = Container::new()
       ignore((content.mount)(holder.view()))
       s.set_content(holder)
+      // Windows 上原生子控件(Entry 等)的 HWND 不随容器滚动实时移动,
+      // 会浮在滚动内容之上遮挡其它组件;每次滚动后强制重摆一次布局。
+      if platform() == "windows" {
+        s.on_scroll(fn() {
+          holder.update_layout()
+          false
+        })
+      }
       s.view()
     },
   }

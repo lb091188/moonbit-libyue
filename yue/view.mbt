@@ -197,10 +197,16 @@ impl ViewLike with fn set_visible(self, visible : Bool) -> Unit {
 }
 
 ///|
-/// 去除控件原生边框/内阴影(Linux/GTK 经 CSS;其余平台暂无操作),
+/// 去除控件原生边框/内阴影(Linux/GTK 经 CSS;Windows 清 WS_EX_CLIENTEDGE),
 /// 供自绘外壳包原生输入类控件时使用。
 impl ViewLike with fn set_borderless(self, on : Bool) -> Unit {
   ffi_view_set_borderless(self.view(), if on { 1 } else { 0 })
+}
+
+///|
+/// 强制重算布局并同步原生子控件位置(Windows 滚动后原生控件不跟手时调用)。
+impl ViewLike with fn update_layout(self) -> Unit {
+  ffi_view_layout(self.view())
 }
 
 ///|
