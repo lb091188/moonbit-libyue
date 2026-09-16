@@ -27,7 +27,7 @@ A library for creating native cross-platform GUI apps.
 | 2 | **Native libyue widgets + declarative + reactive** | `button` / `entry` / `slider` … nodes + `Store` bindings | Native look with declarative code |
 | 3 | **Native libyue widgets + imperative** | `Window::new` + `set_content` + setters | Close to the raw libyue API |
 
-The themed layer keeps native rendering while providing a modern Element-Plus-style look, declarative node trees and reactive data binding — native, and pleasant to use.
+The themed layer keeps native rendering while providing a modern Element-Plus-style look, declarative node trees and reactive data binding — native, and pleasant to use. The default palette is deep and low-saturation, and the whole theme is customizable: `theme_apply({ ..default_theme(), primary: "#1E4FA3" })` before mounting reskins everything — see "Customizing the theme" in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md).
 
 ## Demos
 

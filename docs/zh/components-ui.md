@@ -23,6 +23,8 @@ let t = @yue.default_theme()
 | `entry_t(text?, password?, on_input?)` | 普通 / 密码 | 仅统一字体(GTK Entry `SetColor` 会整体染黑,见 adaptation.md) |
 | `input_t(text?, password?, margin?, width?, height?)` | 直角边框 / 密码 | 外层自绘 1px 边框(聚焦变主题色),内部 Entry 经 `set_borderless` 去原生边框与内阴影 |
 | `checkbox_t(title, checked?, disabled?, on_change?)` | 正常 / 禁用 | 自绘直角勾选框:选中实心主题色 + 白勾,hover 边框变主题色 |
+| `autocomplete(options, value : Store[String], width?)` | 普通过滤 | 输入实时过滤候选,悬浮弹层(不挤压内容):Linux 原生 Popover、Windows 无边框置顶小窗口;点击候选项写入 Store,失焦/清空自动收起 |
+| `date_picker_t(label, on_change?)` | 日期 | 行内标签 + 原生日期选择器,组件内已给显式宽度(Windows 主题按内容最小宽布局) |
 
 ## 导航
 
