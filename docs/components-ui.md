@@ -8,10 +8,10 @@ Element-Plus-style, theme-unified non-form components built in pure MoonBit on t
 
 | API | Variants / roles | Notes |
 |---|---|---|
-| `button_t(text, on_click?, variant?)` | `Solid` / `Soft` / `Text` / `Danger` | native Button, background+foreground themed |
+| `button_t(text, on_click?, variant?)` | `Solid` / `Soft` / `Text` / `Danger` | self-drawn, hover stays within the theme (Solid/Danger darken, Soft goes solid white, Text grey fill) |
 | `label_t(text, role?)` | `Title` / `Section` / `Body` / `Secondary` / `Accent` | font size+color by role |
 | `entry_t(text?, password?, on_input?)` | normal / password | font themed only (GTK Entry `SetColor` paints the whole input dark — see adaptation.md) |
-| `checkbox_t(title, checked?, disabled?, on_change?)` | normal / disabled | native checkbox visual, themed font/color |
+| `checkbox_t(title, checked?, disabled?, on_change?)` | normal / disabled | self-drawn square check + white tick, border turns primary on hover |
 
 ## Navigation
 
