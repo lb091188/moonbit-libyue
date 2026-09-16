@@ -2434,7 +2434,8 @@ pub fn transfer(
 
 ///|
 /// 自动补全(EP Autocomplete):entry_t 输入,候选项经过滤后弹出。
-/// Linux 用 Popover 原生弹层(不被窗口裁剪);其余平台回退为内联列表。
+/// Linux 用 Popover 原生弹层,Windows 用无边框置顶小窗口(均悬浮不裁剪);
+/// macOS 回退为内联列表。
 pub fn autocomplete(
   options : Array[String],
   value : Store[String],
@@ -2493,7 +2494,9 @@ pub fn autocomplete(
         entry.set_text(opt)
       }
 
-      let use_popover = platform() == "linux"
+      // Linux 原生 Popover;Windows 走 shim 的无边框置顶小窗口弹层;
+      // macOS 暂回退内联列表
+      let use_popover = platform() == "linux" || platform() == "windows"
       let list = Container::make(
         style=[("marginTop", 4.0), ("width", width)],
         style_str=[("flexDirection", "column")],
