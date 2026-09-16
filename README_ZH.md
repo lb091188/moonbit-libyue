@@ -11,6 +11,7 @@
 - [x] Ubuntu 24.04 KDE
 - [x] Deepin 25
 - [x] Windows 10 / 11
+- [ ] Mac （没有设备测试）
 
 简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
 
@@ -30,7 +31,7 @@
 
 ## 演示
 
-### 现代示例——主题组件库（第 1 层）
+### 现代示例——主题组件库
 
 `moon run examples/components` —— 四页演示板，覆盖主题组件库全部功能：每个组件、每种状态；API 一览见 [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md)：
 
@@ -42,13 +43,13 @@
 
 ![反馈](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-feedback.png)
 
-### 传统示例——原版控件（第 2/3 层）
+### 传统示例——原版控件
 
 `moon run examples/showcase` —— 12 页演示，覆盖原版控件全部能力（基础控件/输入/画布/网页/表格/对话框/菜单/托盘/剪贴板/事件…）——控件页：
 
 ![showcase 控件页](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/widgets.png)
 
-更多示例（共 17 个：hello / editor / browser / drawing / table / 拖拽 / 托盘 …）见 [examples/](https://gitee.com/noahliu0911/moonbit-libyue/tree/master/examples)。
+更多示例见 [examples/](https://gitee.com/noahliu0911/moonbit-libyue/tree/master/examples)。
 
 ## 使用说明
 
@@ -71,26 +72,25 @@ sudo apt install build-essential cmake pkg-config \
 moon run examples/hello
 ```
 
-零配置：链接参数由构建钩子 `scripts/prebuild.py` 按当前系统生成并自动传播，静态库缺失时自动执行 `scripts/prepare.py` 补建。`prepare.py` 幂等可重跑；Linux/Windows 切换后首次构建自动重建。
 
 #### Windows（10/11，x64）
 
-需要：Python 3、MoonBit 工具链（`moon`）、CMake、MSVC C++ 工具链（含 ATL）。以下命令均在本项目 Windows 实测通过：
+需要：Python 3、MoonBit、CMake、MSVC C++ 工具链（含 ATL）等环境与工具。
 
-1. 安装 MoonBit 工具链（PowerShell）：
+1. 安装 MoonBit 工具链：
 
 ```powershell
 irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
 ```
 
-2. 安装 CMake 与 MSVC C++ 工具链（`winget`，或手动装 VS Installer 里的对应组件）：
+2. 安装 CMake 与 MSVC C++ 工具链：
 
 ```powershell
 winget install Kitware.CMake
 winget install Microsoft.VisualStudio.2022.BuildTools -e --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 ```
 
-3. 补装 ATL 组件（libyue 的 Windows 源码包含 `atldef.h` 等 ATL 头，默认不装；需管理员权限）：
+3. 补装 ATL 组件：
 
 ```powershell
 Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe' -ArgumentList 'modify','--installPath','"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"','--add','Microsoft.VisualStudio.Component.VC.ATL','--quiet','--norestart' -Verb RunAs -Wait
@@ -104,16 +104,16 @@ python3 scripts\prepare.py
 moon run examples/hello
 ```
 
-### 作为依赖使用（mooncakes）
+### 作为依赖使用
 
 ```sh
 moon add NoahLiu/moonbit-libyue
-moon run src   # 无需任何链接配置；安装时自动构建原生层，缺失时构建钩子自动补建
+moon run src
 ```
 
 ### 声明式 UI
 
-窗口可以用声明式节点树(`@yue.mount_window`)描述,不必手写 `new + set_content`。以下示例均可直接运行(截图链接指向 Gitee 仓库内文件)。
+窗口可以用声明式节点树(`@yue.mount_window`)描述,不必手写 `new + set_content`。
 
 **1. Hello 窗口** —— 标签与按钮两个节点,直接挂进窗口:
 
@@ -162,7 +162,7 @@ let window = @yue.mount_window(
 
 ![计数器窗口](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/counter.png)
 
-布局(yoga 弹性盒)、滚动、分组等更多节点类型见 [docs/zh/declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/declarative.md)。
+更多节点类型见 [docs/zh/declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/declarative.md)。
 
 ### 文档索引
 
@@ -180,7 +180,7 @@ let window = @yue.mount_window(
 
 ## 开发贡献
 
-- 构建与测试:`moon check && moon test`——纯 MoonBit 部分(DBus 线路编解码、颜色/表格值编解码)不依赖原生库,可直接测试。
+- 构建与测试:`moon check && moon test`
 - 新增控件:`shim/yue_mbt.cpp` 机械转换 → `shim/include/yue_mbt.h` 声明 → `yue/ffi.mbt` 加 extern → 新 `yue/*.mbt` 加类型与方法(FFI 规范见 `.agents/skills/moonbit-c-binding/`)。
 - 当前封装面约 320 个 ABI 函数(`yue/ffi.mbt` 中 324 个 `extern "c"` 声明)。
 - 实测踩坑与平台适配经验一律回写 [docs/zh/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md);使用文档与代码注释只写用法。
@@ -189,6 +189,7 @@ let window = @yue.mount_window(
 ## 参考
 
 - libyue 文档：<https://libyue.com/docs/latest/cpp/guides/getting_started.html>
-- Lua 绑定参考（架构对照）：github.com/yue/yue 的 `lua_yue/`
+- Lua 绑定参考（架构对照）：github.com/yue/yue
 - MoonBit 技能库：`.agents/skills/`（`moonbit-c-binding`、`make-moonbit-c-bindings`）
-- AI 协作规则：`AGENTS.md` · 平台适配经验：[docs/zh/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md)
+- AI 协作规则：`AGENTS.md`
+- 平台适配经验：[docs/zh/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md)

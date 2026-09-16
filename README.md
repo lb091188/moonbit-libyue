@@ -10,7 +10,8 @@ MoonBit bindings for [libyue](https://libyue.com/docs/latest/cpp/) — build nat
 - [x] Ubuntu 24.04 GNOME
 - [x] Ubuntu 24.04 KDE
 - [x] Deepin 25
-- [x] Windows 10 / 11 (first verified 2026-09, full showcase runs; see [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md))
+- [x] Windows 10 / 11
+- [ ] Mac (no device to test)
 
 English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)
 
@@ -30,7 +31,7 @@ The themed layer keeps native rendering while providing a modern Element-Plus-st
 
 ## Demos
 
-### Modern — themed component library (layer 1)
+### Modern — themed component library
 
 `moon run examples/components` — a four-page demo board covering the full themed library, every component and state; API reference in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md):
 
@@ -42,13 +43,13 @@ The themed layer keeps native rendering while providing a modern Element-Plus-st
 
 ![Feedback](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-feedback.png)
 
-### Classic — native widgets (layers 2–3)
+### Classic — native widgets
 
-`moon run examples/showcase` — a 12-page demo covering the full native widget set (widgets / inputs / canvas / browser / table / dialogs / menus / tray / clipboard / events …) — widgets tab:
+`moon run examples/showcase` — a 12-page demo covering the full native widget set (widgets / inputs / canvas / browser / table / dialogs / menus / tray / clipboard / events …):
 
 ![Showcase widgets page](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/widgets.png)
 
-More examples (17 total: hello / editor / browser / drawing / table / drag & drop / tray …) live in [examples/](https://github.com/lb091188/moonbit-libyue/tree/master/examples).
+More examples in [examples/](https://github.com/lb091188/moonbit-libyue/tree/master/examples).
 
 ## Usage
 
@@ -71,26 +72,24 @@ Build the native library and run an example:
 moon run examples/hello
 ```
 
-Zero configuration: link flags are emitted per-OS at build time by the `scripts/prebuild.py` hook and propagated automatically; when the static library is missing, `scripts/prepare.py` runs to build it. `prepare.py` is idempotent; after switching OS, the first build rebuilds it.
-
 #### Windows (10/11, x64)
 
-Requires Python 3, the MoonBit toolchain (`moon`), CMake, and the MSVC C++ toolchain (with ATL). All commands below were verified on a real machine in this project:
+Requires Python 3, MoonBit, CMake, the MSVC C++ toolchain (with ATL), etc.
 
-1. Install the MoonBit toolchain (PowerShell):
+1. Install the MoonBit toolchain:
 
 ```powershell
 irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
 ```
 
-2. Install CMake and the MSVC C++ toolchain (`winget`, or install the equivalent components via the VS Installer):
+2. Install CMake and the MSVC C++ toolchain:
 
 ```powershell
 winget install Kitware.CMake
 winget install Microsoft.VisualStudio.2022.BuildTools -e --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 ```
 
-3. Add the ATL component (libyue's Windows sources include ATL headers such as `atldef.h`, which are not installed by default; needs elevation):
+3. Add the ATL component:
 
 ```powershell
 Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe' -ArgumentList 'modify','--installPath','"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"','--add','Microsoft.VisualStudio.Component.VC.ATL','--quiet','--norestart' -Verb RunAs -Wait
@@ -104,16 +103,16 @@ python3 scripts\prepare.py
 moon run examples/hello
 ```
 
-### Use as a dependency (mooncakes)
+### Use as a dependency
 
 ```sh
 moon add NoahLiu/moonbit-libyue
-moon run src   # no link configuration needed; the native layer builds on install, the build hook rebuilds it when missing
+moon run src
 ```
 
 ### Declarative UI
 
-Windows can be described as declarative node trees (`@yue.mount_window`) instead of imperative `new + set_content` calls. Both examples below run as-is (screenshot links point at the raw files on GitHub).
+Windows can be described as declarative node trees (`@yue.mount_window`) instead of imperative `new + set_content` calls.
 
 **1. Hello window** — nodes for a label and a button, mounted straight into a window:
 
@@ -162,7 +161,7 @@ let window = @yue.mount_window(
 
 ![Counter window](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/counter.png)
 
-Layout (flexbox via yoga), scrolling, grouping and more node types are covered in [docs/declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md).
+More node types are covered in [docs/declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md).
 
 ### Documentation
 
@@ -180,7 +179,7 @@ Full index: [docs/README.md](https://github.com/lb091188/moonbit-libyue/blob/mas
 
 ## Development
 
-- Build & test: `moon check && moon test` — the pure-MoonBit parts (DBus wire codec, color/table value codecs) run without the native library.
+- Build & test: `moon check && moon test`
 - Adding a widget: mechanical translation in `shim/yue_mbt.cpp` → declaration in `shim/include/yue_mbt.h` → `extern "c"` in `yue/ffi.mbt` → type & methods in a new `yue/*.mbt` (FFI conventions in `.agents/skills/moonbit-c-binding/`).
 - Current binding surface: ~320 ABI functions (324 `extern "c"` declarations in `yue/ffi.mbt`).
 - Real-world pitfalls and platform lessons go to [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md); usage docs and code comments stay content-only.
@@ -189,6 +188,7 @@ Full index: [docs/README.md](https://github.com/lb091188/moonbit-libyue/blob/mas
 ## References
 
 - libyue documentation: <https://libyue.com/docs/latest/cpp/guides/getting_started.html>
-- Lua bindings (architectural reference): `lua_yue/` in github.com/yue/yue
+- Lua bindings: github.com/yue/yue
 - MoonBit skill library: `.agents/skills/` (`moonbit-c-binding`, `make-moonbit-c-bindings`)
-- AI collaboration rules: `AGENTS.md` · platform adaptation experience: [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md)
+- AI collaboration rules: `AGENTS.md`
+- Platform adaptation experience: [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md)
