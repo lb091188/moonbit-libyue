@@ -351,10 +351,12 @@ pub fn scroll(
   policy? : (ScrollPolicy, ScrollPolicy)? = None,
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
+  handle? : (Scroll) -> Unit = fn(_s) {  },
 ) -> Node {
   {
     mount: fn(parent) {
       let s = Scroll::new()
+      handle(s)
       match content_size {
         Some((w, h)) => s.set_content_size(w, h)
         None => ()
