@@ -38,8 +38,8 @@
 #include "base/command_line.h"
 #include "base/json/json_writer.h"
 #include "nativeui/nativeui.h"
+#if defined(OS_LINUX) // set_borderless 的 GtkCssProvider 注入(仅 Linux GTK)
 #include <gtk/gtk.h>
-#if defined(OS_LINUX) // Popover 仅 Linux 发行包提供（win/mac 均无 popover.h/实现）
 #include "nativeui/popover.h"
 #endif
 #include "nativeui/date_picker.h"
