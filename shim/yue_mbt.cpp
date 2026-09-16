@@ -36,6 +36,7 @@
 #endif
 #include <fstream>
 #include <new>
+#include <map>
 #include <unordered_map>
 
 #include "base/command_line.h"
@@ -58,6 +59,7 @@
 #include "nativeui/screen.h"
 #if defined(OS_WIN)
 #include "nativeui/win/window_win.h" // WindowImpl::hwnd()（气泡替代窗口定位/置顶）
+#include "nativeui/win/subwin_view.h" // SubwinView::hwnd()（原生子控件 HWND 操作）
 #include "nativeui/win/util/tray_host.h" // TrayHost::hwnd()（托盘幽灵图标防护）
 #endif
 
@@ -431,10 +433,12 @@ void yue_mbt_view_set_borderless(void *view, int on) {
   }
 #elif defined(OS_WIN)
   // Windows:Entry 是 Win32 EDIT,内阴影来自 WS_EX_CLIENTEDGE 边缘样式。
-  // 注意 GetNative() 返回 ViewImpl*,必须经 hwnd() 取窗口句柄,
-  // 直接 cast 成 HWND 是野指针,样式操作会静默失败(实测踩坑)。
+  // ViewImpl 不公开 hwnd;原生子控件(EDIT/DATETIMEPICK 等)的实现在
+  // SubwinView(经 Win32Window 暴露 hwnd()),dynamic_cast 取,非子窗口
+  // 控件(Container 等自绘)无 HWND 属预期,跳过。
   if (auto *v = CastToView(view)) {
-    HWND hwnd = v->GetNative()->hwnd();
+    auto *subwin = dynamic_cast<nu::SubwinView *>(v->GetNative());
+    HWND hwnd = subwin != nullptr ? subwin->hwnd() : nullptr;
     if (hwnd) {
       LONG_PTR ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
       LONG_PTR st = GetWindowLongPtrW(hwnd, GWL_STYLE);
