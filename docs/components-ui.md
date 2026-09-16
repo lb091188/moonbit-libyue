@@ -11,6 +11,7 @@ Element-Plus-style, theme-unified non-form components built in pure MoonBit on t
 | `button_t(text, on_click?, variant?)` | `Solid` / `Soft` / `Text` / `Danger` | self-drawn, hover stays within the theme (Solid/Danger darken, Soft goes solid white, Text grey fill) |
 | `label_t(text, role?)` | `Title` / `Section` / `Body` / `Secondary` / `Accent` | font size+color by role |
 | `entry_t(text?, password?, on_input?)` | normal / password | font themed only (GTK Entry `SetColor` paints the whole input dark — see adaptation.md) |
+| `input_t(text?, password?, margin?, width?, height?)` | bordered / password | outer self-drawn 1px border (focus turns primary), inner Entry stripped of native border & inner shadow via `set_borderless` |
 | `checkbox_t(title, checked?, disabled?, on_change?)` | normal / disabled | self-drawn square check + white tick, border turns primary on hover |
 
 ## Navigation

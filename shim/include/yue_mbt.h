@@ -55,6 +55,7 @@ void yue_mbt_view_set_style_prop_str(void *view, const char *name, const char *v
 void yue_mbt_view_set_background_color(void *view, const char *hex);
 void yue_mbt_view_set_visible(void *view, int visible);
 void yue_mbt_view_schedule_paint(void *view);
+void yue_mbt_view_set_borderless(void *view, int on);
 void yue_mbt_view_set_font(void *view, void *font);
 void yue_mbt_view_set_color(void *view, const char *hex);
 void yue_mbt_label_set_align(void *label, int32_t align);

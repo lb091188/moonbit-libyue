@@ -11,6 +11,7 @@
 | `button_t(text, on_click?, variant?)` | `Solid` / `Soft` / `Text` / `Danger` | 自绘按钮,hover 收敛在主题内(Solid/Danger 加深、Soft 变实底白字、Text 浅灰底) |
 | `label_t(text, role?)` | `Title` / `Section` / `Body` / `Secondary` / `Accent` | 字号颜色随角色 |
 | `entry_t(text?, password?, on_input?)` | 普通 / 密码 | 仅统一字体(GTK Entry `SetColor` 会整体染黑,见 adaptation.md) |
+| `input_t(text?, password?, margin?, width?, height?)` | 直角边框 / 密码 | 外层自绘 1px 边框(聚焦变主题色),内部 Entry 经 `set_borderless` 去原生边框与内阴影 |
 | `checkbox_t(title, checked?, disabled?, on_change?)` | 正常 / 禁用 | 自绘直角勾选框:选中实心主题色 + 白勾,hover 边框变主题色 |
 
 ## 导航
