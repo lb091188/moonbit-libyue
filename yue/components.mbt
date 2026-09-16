@@ -1,6 +1,8 @@
 // Element Plus 风格非表单组件（纯 MoonBit，构建在声明式层之上）。
 // 样式约定：直角（无圆角）；hover/active 一律用背景色表达；
-// 所有文字经 draw_text(valign=Center) 垂直居中。
+// 所有文字经 draw_text(valign=Center) 垂直居中；水平居中必须手动
+// （测文本宽、x=(区域宽-文本宽)/2，GTK 端 DrawAttributedText 不实现
+// 水平 align，见 docs/adaptation.md）。
 //   - side_menu   侧边导航菜单（对应 EP Menu）
 //   - segmented   分段控制器 / 顶栏导航（对应 EP Segmented）
 //   - tag / tag_of_type  标签（对应 EP Tag）
@@ -144,7 +146,8 @@ fn stateful_item(
           p.set_fill_color(bg)
           p.fill_rect(0.0, 0.0, w, h)
         }
-        // 文字:AttributedText 支持指定字号,垂直居中交给 valign=Center
+        // 文字:AttributedText 支持指定字号,垂直居中交给 valign=Center;
+        // 水平居中由 pad 对称实现(width=text_w+pad_x*2 时 pad_x 即居中起点)
         let at = AttributedText::new(
           text,
           align=if align_start { Start } else { Center },
@@ -292,13 +295,13 @@ pub fn tag_of_type(text : String, t : SemanticType) -> Node {
       c.on_draw(fn(p) {
         p.set_fill_color(type_light_color(t))
         p.fill_rect(0.0, 0.0, w, h)
+        // 水平手动居中(GTK 端 DrawAttributedText 不实现水平 align)
         p.draw_text(
           text,
-          0.0,
+          (w - text_w) / 2.0,
           0.0,
           w,
           h,
-          align=Center,
           valign=Center,
           color=type_color(t),
         )
@@ -329,11 +332,10 @@ pub fn tag(text : String, color : String, height? : Double = 24.0) -> Node {
         p.fill_rect(0.0, 0.0, w, height)
         p.draw_text(
           text,
-          0.0,
+          (w - text_w) / 2.0,
           0.0,
           w,
           height,
-          align=Center,
           valign=Center,
           color="#FFFFFF",
         )
@@ -449,6 +451,8 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
       ])
       fn add_btn(label : String, target : Int, is_page : Bool) -> Unit {
         let hover = Ref(false)
+        let probe = AttributedText::new(label, wrap=false)
+        let label_w = probe.get_bounds_for(10000.0, 100.0).width
         let b = Container::make(style=[
           ("width", 28.0),
           ("height", 28.0),
@@ -467,11 +471,10 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
           }
           p.draw_text(
             label,
-            0.0,
+            (bd.width - label_w) / 2.0,
             0.0,
             bd.width,
             bd.height,
-            align=Center,
             valign=Center,
             color=if act { "#FFFFFF" } else { theme_text_regular },
           )
@@ -726,6 +729,8 @@ pub fn code_view(
 pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
   {
     mount: fn(parent) {
+      let probe = AttributedText::new(letter, wrap=false)
+      let letter_w = probe.get_bounds_for(10000.0, 100.0).width
       let c = Container::make(style=[
         ("width", size),
         ("height", size),
@@ -736,11 +741,10 @@ pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
         let b = c.get_bounds()
         p.draw_text(
           letter,
-          0.0,
+          (b.width - letter_w) / 2.0,
           0.0,
           b.width,
           b.height,
-          align=Center,
           valign=Center,
           color="#FFFFFF",
         )
@@ -782,15 +786,16 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
       v.add_child(spacer)
       let close = Container::make(style=[("width", 32.0), ("height", 40.0)])
       let hover = Ref(false)
+      let close_probe = AttributedText::new("✕", wrap=false)
+      let close_w = close_probe.get_bounds_for(10000.0, 100.0).width
       close.on_draw(fn(p) {
         let b = close.get_bounds()
         p.draw_text(
           "✕",
-          0.0,
+          (b.width - close_w) / 2.0,
           0.0,
           b.width,
           b.height,
-          align=Center,
           valign=Center,
           color=if hover.val { color } else { theme_text_secondary },
         )
@@ -858,6 +863,8 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
           ("height", 24.0),
           ("marginRight", 6.0),
         ])
+        let num_probe = AttributedText::new((i + 1).to_string(), wrap=false)
+        let num_w = num_probe.get_bounds_for(10000.0, 100.0).width
         bx.on_draw(fn(p) {
           let b = bx.get_bounds()
           let cur = current.get()
@@ -878,11 +885,10 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
           p.fill_rect(0.0, 0.0, b.width, b.height)
           p.draw_text(
             (i + 1).to_string(),
-            0.0,
+            (b.width - num_w) / 2.0,
             0.0,
             b.width,
             b.height,
-            align=Center,
             valign=Center,
             color=match st {
               0 => theme_primary
@@ -1088,17 +1094,18 @@ pub fn result(
         Danger => "✕"
         _ => "!"
       }
+      let symbol_probe = AttributedText::new(symbol, wrap=false)
+      let symbol_w = symbol_probe.get_bounds_for(10000.0, 100.0).width
 
       icon.set_background_color(type_light_color(t))
       icon.on_draw(fn(p) {
         let b = icon.get_bounds()
         p.draw_text(
           symbol,
-          0.0,
+          (b.width - symbol_w) / 2.0,
           0.0,
           b.width,
           b.height,
-          align=Center,
           valign=Center,
           color~,
         )
@@ -1148,15 +1155,16 @@ pub fn empty(desc : String) -> Node {
         ("marginTop", 14.0),
       ])
       box.set_background_color(theme_info_light)
+      let empty_probe = AttributedText::new("∅", wrap=false)
+      let empty_w = empty_probe.get_bounds_for(10000.0, 100.0).width
       box.on_draw(fn(p) {
         let b = box.get_bounds()
         p.draw_text(
           "∅",
-          0.0,
+          (b.width - empty_w) / 2.0,
           0.0,
           b.width,
           b.height,
-          align=Center,
           valign=Center,
           color=theme_text_secondary,
         )
@@ -1292,7 +1300,8 @@ pub fn button_t(
       let font = Font::new("Sans", 13.0)
       let probe = AttributedText::new(text, wrap=false)
       probe.set_font(font)
-      let w = probe.get_bounds_for(10000.0, 100.0).width + 32.0
+      let text_w = probe.get_bounds_for(10000.0, 100.0).width
+      let w = text_w + 32.0
       let v = Container::make(style=[
         ("width", w),
         ("height", 32.0),
@@ -1336,15 +1345,18 @@ pub fn button_t(
           p.set_fill_color(bg)
           p.fill_rect(0.0, 0.0, b.width, b.height)
         }
-        let at = AttributedText::new(
-          text,
-          align=Center,
-          valign=Center,
-          wrap=false,
-        )
+        // GTK 端 DrawAttributedText 只实现 valign,水平 align 无效——
+        // 用 mount 时测的文本宽手动水平居中。
+        let at = AttributedText::new(text, valign=Center, wrap=false)
         at.set_font(font)
         at.set_color(fg)
-        p.draw_attributed_text(at, 0.0, 0.0, b.width, b.height)
+        p.draw_attributed_text(
+          at,
+          (b.width - text_w) / 2.0,
+          0.0,
+          b.width,
+          b.height,
+        )
       })
       v.on_mouse_down(fn(e) {
         if e.button == 1 {
@@ -1428,15 +1440,17 @@ pub fn checkbox_t(
         if state.val {
           p.set_fill_color(if disabled { theme_border } else { theme_primary })
           p.fill_rect(2.0, by + 2.0, 10.0, 10.0)
-          let check = AttributedText::new(
-            "✓",
-            align=Center,
-            valign=Center,
-            wrap=false,
-          )
+          let check = AttributedText::new("✓", wrap=false)
           check.set_font(font)
           check.set_color("#FFFFFF")
-          p.draw_attributed_text(check, 0.0, by, 14.0, 14.0)
+          let check_w = check.get_bounds_for(10000.0, 100.0).width
+          p.draw_attributed_text(
+            check,
+            (14.0 - check_w) / 2.0,
+            by,
+            14.0,
+            14.0,
+          )
         }
         let at = AttributedText::new(title, valign=Center, wrap=false)
         at.set_font(font)
