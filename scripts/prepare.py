@@ -118,6 +118,13 @@ def fetch_webview2_sdk() -> None:
                 dest.write_bytes(zf.read(name))
     loader = sdk_dir / "build/native/x64/WebView2Loader.dll"
     shutil.copyfile(loader, REPO_ROOT / "WebView2Loader.dll")
+    # 大小写敏感卷(hostshare/网络挂载等)上,libyue 的
+    # #include <webview2.h>(小写)解析不到 SDK 的 WebView2.h——补小写
+    # 别名;NTFS 上多一份不同大小写副本,无害。
+    sdk_include = sdk_dir / "build/native/include"
+    sdk_include.joinpath("webview2.h").write_bytes(
+        sdk_include.joinpath("WebView2.h").read_bytes()
+    )
     print("WebView2 SDK 头文件已补齐，loader DLL 已复制到仓库根")
 
 
