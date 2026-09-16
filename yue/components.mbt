@@ -1259,8 +1259,9 @@ pub fn result(
 ) -> Node {
   {
     mount: fn(parent) {
+      // 图标(76+16) + 标题 30 + 描述 24 + 按钮区(8+按钮高约 32)+ 底部留白
       let outer = Container::make(
-        style=[("height", 180.0), ("marginBottom", 12.0)],
+        style=[("height", 208.0), ("marginBottom", 12.0)],
         style_str=[("flexDirection", "column"), ("alignItems", "center")],
       )
       let icon = Container::make(style=[
