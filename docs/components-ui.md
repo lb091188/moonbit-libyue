@@ -23,6 +23,8 @@ let t = @yue.default_theme()
 | `entry_t(text?, password?, on_input?)` | normal / password | font themed only (GTK Entry `SetColor` paints the whole input dark — see adaptation.md) |
 | `input_t(text?, password?, margin?, width?, height?)` | bordered / password | outer self-drawn 1px border (focus turns primary), inner Entry stripped of native border & inner shadow via `set_borderless` |
 | `checkbox_t(title, checked?, disabled?, on_change?)` | normal / disabled | self-drawn square check + white tick, border turns primary on hover |
+| `autocomplete(options, value : Store[String], width?)` | plain filtering | live-filtered candidates in a floating layer (never pushes content): native Popover on Linux, borderless topmost mini-window on Windows; picking a row writes the Store, blur/empty input collapses it |
+| `date_picker_t(label, on_change?)` | date | inline label + native date picker; explicit width applied inside (Windows themes size to content minimum) |
 
 ## Navigation
 

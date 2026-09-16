@@ -27,7 +27,7 @@
 | 2 | **libyue 原版控件 + 声明式 + 响应式** | `button` / `entry` / `slider` … 节点 + `Store` 绑定 | 原生外观 + 声明式写法 |
 | 3 | **libyue 原版控件 + 命令式** | `Window::new` + `set_content` + setter | 贴近 libyue 原生 API |
 
-主题层在保持原生渲染与体积的同时，提供 Element Plus 风格的现代外观、声明式节点树与响应式数据绑定——原生，但好用。
+主题层在保持原生渲染与体积的同时，提供 Element Plus 风格的现代外观、声明式节点树与响应式数据绑定——原生，但好用。默认深色低饱和色板，整体可定制：挂载前 `theme_apply({ ..default_theme(), primary: "#1E4FA3" })` 一行换肤，详见 [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md) 的「定制主题」。
 
 ## 演示
 
