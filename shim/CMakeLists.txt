@@ -50,6 +50,15 @@ target_compile_features(yue_mbt PUBLIC cxx_std_20)
 # 「意外的 #endif」类假错误。/utf-8 强制按 UTF-8 解码源与执行字符集。
 if(MSVC)
   target_compile_options(yue_mbt PRIVATE /utf-8)
+  # MSVC 的标准库头(iosfwd/optional 等)经 INCLUDE 环境变量定位,该变量由
+  # vcvars64 注入;未注入时 C1083 报标准库头找不到,难以直读根因,在此拦截。
+  if("$ENV{INCLUDE}" STREQUAL "")
+    message(FATAL_ERROR
+      "未检测到 INCLUDE 环境变量:MSVC 标准库头无法定位。请在 x64 Native "
+      "Tools Command Prompt 中执行,或先 call vcvars64.bat 再运行 cmake/moon:\n"
+      "call \"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools"
+      "\\VC\\Auxiliary\\Build\\vcvars64.bat\"")
+  endif()
 endif()
 
 # ---------- moonbit.h（moon 工具链自带） ----------
