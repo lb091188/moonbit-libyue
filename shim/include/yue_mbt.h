@@ -2,7 +2,7 @@
  * moonbit-libyue 的 C ABI 边界（唯一稳定接口）。
  *
  * 分层约定：
- *   MoonBit 层(yue/*.mbt)  --extern-->  本头文件  --C++-->  libyue
+ *   MoonBit 层(yue 源码)  --extern-->  本头文件  --C++-->  libyue
  *
  * 句柄约定：
  * - View 系控件（Window/Container/Label/TextEdit/Button/Entry/Browser/MenuBar）
