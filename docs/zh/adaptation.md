@@ -175,6 +175,7 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **hostshare/大小写敏感卷上编译 WebView2 头 C1083(2026-09-16 实测)**:仓库经大小写敏感的共享卷挂载到 Windows(Z: hostshare)时,libyue 的 `browser_impl_webview2.h` 写死 `#include <webview2.h>`(小写),而 SDK 只给 `WebView2.h`(大写 W)——普通 NTFS 大小写不敏感无感,敏感卷上 cl 直接 C1083。修复:`prepare.py` 的 `fetch_webview2_sdk` 解压后自动补 `webview2.h` 小写别名(NTFS 上无害)。同卷还有一个文件语义坑:`st_ino`/`st_dev` 不可靠,`shutil.copyfile` 内部 `os.path.samefile` 会把两个独立文件误判为同一文件直接抛 `SameFileError`(仓库根的 WebView2Loader.dll 与 SDK 内副本被判相同)——复制前先删目标绕开判定。同类坑:挂载卷上建 `.caseprobe_AAA.txt` 后按小写名查不到即敏感卷,构建 libyue 前先探。
 
 - **`prepare.py` 的 Linux 补丁调用漏在平台分支外(2026-09-16 Windows 实测抓到)**:`patch_linux_drag_icon_hotspot()` 缩进错误落在 `if os_name == "Linux"` 之外,Windows 上 prepare 必崩(`FileNotFoundError: vendor\libyue\src\linux\...`,Linux 恰好能跑故一直未暴露)。修复:挪回 Linux 分支内。教训:平台分支补丁的新增调用务必确认缩进在对应 `if` 内;Windows 侧跑一遍 prepare 是发现此类问题的最快手段。
+- **shim 的 `gtk/gtk.h` include 未加平台隔离(2026-09-16 Windows 实测)**:主题组件库的 `set_borderless` 用 GtkCssProvider 注入样式,实现已 `#if defined(OS_LINUX)` 隔离,但顶部 `#include <gtk/gtk.h>` 是裸的——Windows 上 MSVC 报 C1083 找不到 gtk/gtk.h(文件名含 gtk 的报错易误判为 GTK 依赖缺失,实际只是 include 没进分支)。修复:并入现有 `OS_LINUX` 分支。教训:shim 新增平台专属代码时 include 与实现要同一批隔离,只隔离实现不隔离头文件等于没隔离。
 
 
 #### 链接参数(moon → cl/link 的真实行为,全部实测)
