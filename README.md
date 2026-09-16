@@ -31,9 +31,9 @@ The themed layer keeps native rendering while providing a modern Element-Plus-st
 
 ## Demos
 
-### Themed style — component library
+### Modern — themed component library (layer 1)
 
-`moon run examples/components` — a four-page demo board covering every component and state; API reference in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md):
+`moon run examples/components` — a four-page demo board covering the full themed library, every component and state; API reference in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md):
 
 ![Basic](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-basic.png)
 
@@ -43,9 +43,9 @@ The themed layer keeps native rendering while providing a modern Element-Plus-st
 
 ![Feedback](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-feedback.png)
 
-### Basic style — native widgets
+### Classic — native widgets (layers 2–3)
 
-`moon run examples/showcase` — a 12-tab full-feature demo written entirely in the declarative style — widgets tab:
+`moon run examples/showcase` — a 12-page demo covering the full native widget set (widgets / inputs / canvas / browser / table / dialogs / menus / tray / clipboard / events …) — widgets tab:
 
 ![Showcase widgets page](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/widgets.png)
 

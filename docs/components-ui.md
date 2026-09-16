@@ -31,6 +31,7 @@ Element-Plus-style, theme-unified non-form components built in pure MoonBit on t
 | `avatar(letter, color, size?)` | square, white letter centered |
 | `badge_count(n)` / `badge_dot(color?)` | number chip / dot |
 | `statistic(title, value : Store[String])` | reactive big number |
+| `progress_line(value : Store[Double], height?)` | themed fill on a light track, reactive value |
 | `descriptions(pairs)` | key–value grid |
 | `timeline(items)` | colored node + connector, semantic colors |
 | `collapse(panels)` | click title to expand/collapse, independent panels |
