@@ -117,7 +117,12 @@ def fetch_webview2_sdk() -> None:
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(zf.read(name))
     loader = sdk_dir / "build/native/x64/WebView2Loader.dll"
-    shutil.copyfile(loader, REPO_ROOT / "WebView2Loader.dll")
+    # hostshare 等共享卷的 st_ino/st_dev 不可靠,os.path.samefile 会把
+    # 两个独立文件误判为同一文件(SameFileError);先删目标再复制绕开该判定。
+    target = REPO_ROOT / "WebView2Loader.dll"
+    if target.exists():
+        target.unlink()
+    shutil.copyfile(loader, target)
     # 大小写敏感卷(hostshare/网络挂载等)上,libyue 的
     # #include <webview2.h>(小写)解析不到 SDK 的 WebView2.h——补小写
     # 别名;NTFS 上多一份不同大小写副本,无害。
