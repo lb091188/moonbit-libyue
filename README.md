@@ -11,7 +11,6 @@ MoonBit bindings for [libyue](https://libyue.com/docs/latest/cpp/) — build nat
 - [x] Ubuntu 24.04 KDE
 - [x] Deepin 25
 - [x] Windows 10 / 11 (first verified 2026-09, full showcase runs; see [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md))
-- [?] macOS (no devices can't test)
 
 English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)
 

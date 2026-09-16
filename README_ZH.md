@@ -11,7 +11,6 @@
 - [x] Ubuntu 24.04 KDE
 - [x] Deepin 25
 - [x] Windows 10 / 11
-- [?] macOS（暂无设备，未能测试）
 
 简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
 
