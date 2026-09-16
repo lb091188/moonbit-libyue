@@ -31,6 +31,9 @@
 #if defined(__linux__)
 #include <dlfcn.h>
 #endif
+#if !defined(_WIN32)
+#include <unistd.h> // CurrentDirForDrag 的 getcwd(macOS 分支)
+#endif
 #include <fstream>
 #include <new>
 #include <unordered_map>
@@ -426,7 +429,7 @@ void yue_mbt_view_set_borderless(void *view, int on) {
     else
       gtk_style_context_remove_class(ctx, "yue-borderless");
   }
-#else
+#elif defined(OS_WIN)
   // Windows:Entry 是 Win32 EDIT,内阴影来自 WS_EX_CLIENTEDGE 边缘样式。
   // 注意 GetNative() 返回 ViewImpl*,必须经 hwnd() 取窗口句柄,
   // 直接 cast 成 HWND 是野指针,样式操作会静默失败(实测踩坑)。
@@ -449,6 +452,10 @@ void yue_mbt_view_set_borderless(void *view, int on) {
                        SWP_FRAMECHANGED);
     }
   }
+#else
+  // macOS:NSScrollView 自身无内嵌边框,无需处理
+  (void)view;
+  (void)on;
 #endif
 }
 
@@ -1823,11 +1830,14 @@ static std::string CurrentDirForDrag() {
   char buf[MAX_PATH];
   DWORD n = GetCurrentDirectoryA(MAX_PATH, buf);
   return std::string(buf, n);
-#else
+#elif defined(OS_LINUX)
   gchar *cwd = g_get_current_dir();
   std::string s(cwd);
   g_free(cwd);
   return s;
+#else
+  char buf[4096];
+  return getcwd(buf, sizeof(buf)) ? std::string(buf) : std::string();
 #endif
 }
 
