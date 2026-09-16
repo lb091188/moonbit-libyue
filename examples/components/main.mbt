@@ -81,6 +81,13 @@ fn main {
   let notify : @yue.Store[Bool] = @yue.Store::new(true)
   let theme_mode : @yue.Store[String] = @yue.Store::new("深色")
   let radio_disabled : @yue.Store[String] = @yue.Store::new("选项一")
+  let qty : @yue.Store[Double] = @yue.Store::new(3.0)
+  let qty2 : @yue.Store[Double] = @yue.Store::new(1.0)
+  let picked_lang : @yue.Store[String] = @yue.Store::new("")
+  let transfer_left : @yue.Store[Array[String]] = @yue.Store::new([
+    "北京", "上海", "广州",
+  ])
+  let transfer_right : @yue.Store[Array[String]] = @yue.Store::new(["深圳"])
   let wifi_on : @yue.Store[Bool] = @yue.Store::new(true)
   let locked : @yue.Store[Bool] = @yue.Store::new(false)
   sync.subscribe(fn(_v) { ignore(sync) })
@@ -436,6 +443,136 @@ fn main {
       ],
     ),
   ])
+  // ---------- 进阶 ----------
+  let sc_handle : Ref[@yue.Scroll?] = Ref(None)
+  let tall : Array[@yue.Node] = []
+  for i in 0..<20 {
+    tall.push(
+      @yue.label_t(
+        "\{i + 1}. 向下滚动的内容行,点右下角 ↑ 回顶部",
+        role=@yue.Body,
+      ),
+    )
+  }
+  let p_adv = scroll_page([
+    section(
+      "InputNumber 数字输入器",
+      "-/+ 按钮步进(步长 1),范围 0..10 钳制,数值响应式。",
+      [
+        @yue.input_number(qty, min=0.0, max=10.0, step=1.0),
+        @yue.bind_label(qty, fn(v) { "当前数量:\{v.round()}" }, style=[
+          ("marginTop", 6.0),
+        ]),
+      ],
+    ),
+    section(
+      "Form 表单",
+      "form_item 行布局(标签右对齐 + 控件区)+ form 分组标题。",
+      [
+        @yue.form("用户设置", [
+          @yue.form_item("用户名", @yue.entry_t(text="moonbit")),
+          @yue.form_item("城市", @yue.entry_t(text="杭州")),
+          @yue.form_item("数量", @yue.input_number(qty2, min=1.0, max=9.0)),
+        ]),
+      ],
+    ),
+    section(
+      "Link 链接文字",
+      "主题色文字,悬停显示下划线,点击回调。",
+      [
+        @yue.hbox([
+          @yue.link("打开文档", fn() { picked_lang.set("docs") }),
+          @yue.label("   "),
+          @yue.link("帮助中心", fn() { picked_lang.set("help") }),
+          @yue.label("   最近点击:"),
+          @yue.bind_label(picked_lang, fn(s) { s }),
+        ]),
+      ],
+    ),
+    section(
+      "PageHeader 页头",
+      "‹ 返回(悬停变主题色)+ 标题 + 右侧操作区;点返回回到基础组件页。",
+      [
+        @yue.page_header(
+          "进阶组件",
+          fn() { selected.set("基础组件") },
+          actions=[@yue.button_t("页面操作", variant=@yue.Soft)],
+        ),
+      ],
+    ),
+    section(
+      "Backtop 返回顶部",
+      "滚动下方区域,点右下角 ↑ 按钮回顶部(scroll 句柄 + 定位 API)。",
+      [
+        @yue.vbox(
+          [
+            @yue.scroll(
+              @yue.vbox(tall, style=[("padding", 8.0)]),
+              style=[("flex", 1.0)],
+              handle=fn(s) { sc_handle.val = Some(s) },
+            ),
+            @yue.hbox(
+              [
+                @yue.label("        "),
+                @yue.backtop_t(fn() {
+                  match sc_handle.val {
+                    Some(s) => s.set_scroll_position(0.0, 0.0)
+                    None => ()
+                  }
+                }),
+              ],
+              style=[("padding", 4.0)],
+              style_str=[("alignItems", "center")],
+            ),
+          ],
+          style=[("height", 150.0)],
+          style_str=[("position", "relative"), ("flexDirection", "column")],
+        ),
+      ],
+    ),
+    section(
+      "Tree 树形控件",
+      "缩进层级 + 点击展开/折叠(▸/▾)。",
+      [
+        @yue.tree([
+          {
+            label: "src",
+            children: [
+              { label: "components.mbt", children: [], },
+              {
+                label: "examples",
+                children: [{ label: "components", children: [], }],
+              },
+            ],
+          },
+          {
+            label: "docs",
+            children: [{ label: "components-ui.md", children: [], }],
+          },
+        ]),
+      ],
+    ),
+    section(
+      "Transfer 穿梭框",
+      "点击行选中(方块标记),中间 ›/‹ 把选中项移到对侧。",
+      [@yue.transfer(transfer_left, transfer_right)],
+    ),
+    section(
+      "Autocomplete 自动补全",
+      "输入过滤候选项,点击候选项回填。",
+      [
+        @yue.autocomplete(
+          ["MoonBit", "MoonShell", "组件库", "演示板", "深色主题"],
+          picked_lang,
+        ),
+      ],
+    ),
+    section(
+      "DatePicker 日期字段",
+      "主题行内标签 + 原生日期选择器。",
+      [@yue.date_picker_t("开始日期")],
+    ),
+  ])
   // ---------- 反馈 ----------
   let p_feedback = scroll_page([
     section(
@@ -477,7 +614,7 @@ fn main {
             @yue.hbox(
               [
                 @yue.segmented(
-                  ["基础组件", "导航", "数据展示", "反馈"],
+                  ["基础组件", "导航", "数据展示", "反馈", "进阶"],
                   selected,
                 ),
                 @yue.label("      "),
@@ -492,6 +629,7 @@ fn main {
             page("导航", selected, p_nav),
             page("数据展示", selected, p_data),
             page("反馈", selected, p_feedback),
+            page("进阶", selected, p_adv),
           ],
           style=[("flex", 1.0)],
           handle=fn(c) { c.set_background_color("#F5F6F7") },

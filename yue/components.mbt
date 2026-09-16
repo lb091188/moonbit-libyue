@@ -1792,11 +1792,12 @@ pub fn input_t(
   password? : Bool = false,
   margin? : Double = 0.0,
   width? : Double = 280.0,
-  height? : Double = 32.0,
+  height? : Double = 40.0,
 ) -> Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
+      // 外框比内部输入区大:Entry 四周留 margin,高度给足避免溢出
       let outer = Container::make(
         style=[
           ("width", width),
@@ -1820,8 +1821,10 @@ pub fn input_t(
       entry.set_borderless(true)
       entry.set_background_color("#FFFFFF")
       entry.set_style("flex", 1.0)
-      entry.set_style("marginTop", 5.0)
-      entry.set_style("marginBottom", 5.0)
+      entry.set_style("marginLeft", 10.0)
+      entry.set_style("marginRight", 10.0)
+      entry.set_style("marginTop", 4.0)
+      entry.set_style("marginBottom", 4.0)
       entry.on_focus_in(fn() {
         focused.val = true
         outer.schedule_paint()
@@ -1835,6 +1838,639 @@ pub fn input_t(
       outer.add_child(entry)
       attach(parent, outer.view())
       outer.view()
+    },
+  }
+}
+
+///|
+/// 数字输入器(EP InputNumber):-/+ 按钮步进,范围钳制,状态存 Store[Double]。
+pub fn input_number(
+  value : Store[Double],
+  min? : Double = 0.0,
+  max? : Double = 100.0,
+  step? : Double = 1.0,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let row = Container::make(
+        style=[("height", 30.0)],
+        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+      )
+      let font = Font::new("Sans", 13.0)
+      fn step_btn(label : String, dir : Double) -> Unit {
+        let b = Container::make(
+          style=[("width", 28.0), ("height", 28.0)],
+          style_str=[("alignItems", "center")],
+        )
+        b.set_background_color(theme_info_light)
+        let hover = Ref(false)
+        b.on_draw(fn(p) {
+          let bd = b.get_bounds()
+          p.set_fill_color(if hover.val { theme_primary_light } else { theme_info_light })
+          p.fill_rect(0.0, 0.0, bd.width, bd.height)
+          p.draw_text(
+            label,
+            0.0,
+            0.0,
+            bd.width,
+            bd.height,
+            align=Center,
+            valign=Center,
+            color=theme_text_regular,
+          )
+        })
+        b.on_mouse_down(fn(e) {
+          if e.button == 1 {
+            value.update(fn(n) {
+              let m = n + dir * step
+              if m < min {
+                min
+              } else if m > max {
+                max
+              } else {
+                m
+              }
+            })
+            true
+          } else {
+            false
+          }
+        })
+        b.on_mouse_enter(fn(_e) {
+          hover.val = true
+          b.schedule_paint()
+        })
+        b.on_mouse_leave(fn(_e) {
+          hover.val = false
+          b.schedule_paint()
+        })
+        row.add_child(b)
+      }
+
+      step_btn("-", -1.0)
+      let num = Container::make(
+        style=[("width", 64.0), ("height", 28.0), ("marginRight", 6.0)],
+        style_str=[("alignItems", "center")],
+      )
+      num.set_background_color("#FFFFFF")
+      let t = AttributedText::new(
+        value.get().to_string(),
+        align=Center,
+        valign=Center,
+        wrap=false,
+      )
+      t.set_font(font)
+      t.set_color(theme_text_primary)
+      num.on_draw(fn(p) {
+        let b = num.get_bounds()
+        p.draw_attributed_text(t, 0.0, 0.0, b.width, b.height)
+      })
+      value.subscribe(fn(v) {
+        t.set_text(v.to_string())
+        num.schedule_paint()
+      })
+      row.add_child(num)
+      step_btn("+", 1.0)
+      attach(parent, row.view())
+      row.view()
+    },
+  }
+}
+
+///|
+/// 表单项:左侧标签(灰,定宽)+ 右侧控件区,垂直居中。
+pub fn form_item(label : String, control : Node, label_width? : Double = 90.0) -> Node {
+  {
+    mount: fn(parent) {
+      let row = Container::make(
+        style=[("marginBottom", 10.0)],
+        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+      )
+      let k = Label::new(label)
+      k.set_font(Font::new("Sans", 13.0))
+      k.set_color(theme_text_secondary)
+      k.set_align(End)
+      let kwrap = Container::make(style=[("width", label_width), ("marginRight", 12.0)])
+      kwrap.add_child(k)
+      row.add_child(kwrap)
+      ignore((control.mount)(row.view()))
+      attach(parent, row.view())
+      row.view()
+    },
+  }
+}
+
+///|
+/// 表单:分组标题 + 一组表单项。
+pub fn form(title : String, items : Array[Node]) -> Node {
+  let nodes : Array[Node] = [label_t(title, role=Section)]
+  for it in items {
+    nodes.push(it)
+  }
+  vbox(nodes, style=[("marginBottom", 14.0)])
+}
+
+///|
+/// 链接文字:主题色,悬停加深并显示下划线色条,点击回调。
+pub fn link(text : String, on_click : () -> Unit) -> Node {
+  {
+    mount: fn(parent) {
+      let hover = Ref(false)
+      let row = Container::make(
+        style=[("paddingRight", 6.0)],
+        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+      )
+      let l = Label::new(text)
+      l.set_font(Font::new("Sans", 13.0))
+      l.set_color(theme_primary)
+      row.add_child(l)
+      let underline = Container::make(style=[("height", 1.0)])
+      underline.set_background_color(theme_primary)
+      row.add_child(underline)
+      fn apply() -> Unit {
+        underline.set_visible(hover.val)
+      }
+
+      apply()
+      row.on_mouse_enter(fn(_e) {
+        hover.val = true
+        apply()
+      })
+      row.on_mouse_leave(fn(_e) {
+        hover.val = false
+        apply()
+      })
+      row.on_mouse_down(fn(e) {
+        if e.button == 1 {
+          on_click()
+          true
+        } else {
+          false
+        }
+      })
+      attach(parent, row.view())
+      row.view()
+    },
+  }
+}
+
+///|
+/// 页头(EP PageHeader):返回链接 + 标题 + 弹性空白 + 右侧操作区。
+pub fn page_header(
+  title : String,
+  on_back : () -> Unit,
+  actions? : Array[Node] = [],
+) -> Node {
+  {
+    mount: fn(parent) {
+      let row = Container::make(
+        style=[("height", 40.0), ("marginBottom", 12.0)],
+        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+      )
+      let back = Container::make(
+        style=[("width", 56.0), ("height", 40.0)],
+        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+      )
+      let hover = Ref(false)
+      back.on_draw(fn(p) {
+        let b = back.get_bounds()
+        p.draw_text(
+          "‹ 返回",
+          0.0,
+          0.0,
+          b.width,
+          b.height,
+          align=Start,
+          valign=Center,
+          color=if hover.val { theme_primary } else { theme_text_regular },
+        )
+      })
+      back.on_mouse_down(fn(e) {
+        if e.button == 1 {
+          on_back()
+          true
+        } else {
+          false
+        }
+      })
+      back.on_mouse_enter(fn(_e) {
+        hover.val = true
+        back.schedule_paint()
+      })
+      back.on_mouse_leave(fn(_e) {
+        hover.val = false
+        back.schedule_paint()
+      })
+      row.add_child(back)
+      let t = Label::new(title)
+      t.set_font(Font::new("Sans", 15.0, weight=SemiBold))
+      t.set_color(theme_text_primary)
+      row.add_child(t)
+      let spacer = Container::make(style=[("flex", 1.0), ("height", 1.0)])
+      row.add_child(spacer)
+      for a in actions {
+        ignore((a.mount)(row.view()))
+      }
+      attach(parent, row.view())
+      row.view()
+    },
+  }
+}
+
+///|
+/// 树节点数据。
+pub(all) struct TreeNode {
+  label : String
+  children : Array[TreeNode]
+}
+
+///|
+/// 树形控件(EP Tree):缩进层级 + 点击展开/折叠(有子节点时箭头指示)。
+pub fn tree(root : Array[TreeNode]) -> Node {
+  {
+    mount: fn(parent) {
+      let outer = Container::make(
+        style=[("marginBottom", 10.0)],
+        style_str=[("flexDirection", "column")],
+      )
+      let font = Font::new("Sans", 13.0)
+      fn build(nodes : Array[TreeNode], level : Int, into : Container) -> Unit {
+        for nd in nodes {
+          let has_children = nd.children.length() > 0
+          let open = Ref(false)
+          let indent = level.to_double() * 18.0
+          let row = Container::make(
+            style=[("height", 30.0), ("marginLeft", indent)],
+            style_str=[("flexDirection", "row"), ("alignItems", "center")],
+          )
+          let arrow = Label::new(if has_children { "▸" } else { " " })
+          arrow.set_font(font)
+          arrow.set_color(theme_text_secondary)
+          let label = Label::new(" " + nd.label)
+          label.set_font(font)
+          label.set_color(theme_text_primary)
+          row.add_child(arrow)
+          row.add_child(label)
+          let kids = Container::make(
+            style_str=[("flexDirection", "column")],
+          )
+          kids.set_visible(false)
+          if has_children {
+            build(nd.children, level + 1, kids)
+          }
+          row.on_mouse_down(fn(e) {
+            if e.button == 1 && has_children {
+              open.val = !open.val
+              arrow.set_text(if open.val { "▾" } else { "▸" })
+              kids.set_visible(open.val)
+              true
+            } else {
+              false
+            }
+          })
+          into.add_child(row)
+          into.add_child(kids)
+        }
+      }
+
+      build(root, 0, outer)
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}
+
+///|
+/// 穿梭框(EP Transfer):左右两列,点击行选中(实心方块标记),
+/// 中间 ›/‹ 按钮把选中项在两列间移动。数据经双 Store 驱动。
+pub fn transfer(
+  left_items : Store[Array[String]],
+  right_items : Store[Array[String]],
+  width? : Double = 160.0,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let row = Container::make(
+        style=[("marginBottom", 10.0)],
+        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+      )
+      let font = Font::new("Sans", 13.0)
+      // 选中集合(按值),用 Ref 可变数组
+      let left_sel : Ref[Array[String]] = Ref([])
+      let right_sel : Ref[Array[String]] = Ref([])
+      let left_box = Container::make(
+        style=[("width", width)],
+        style_str=[("flexDirection", "column")],
+      )
+      let right_box = Container::make(
+        style=[("width", width)],
+        style_str=[("flexDirection", "column")],
+      )
+      fn contains(arr : Array[String], s : String) -> Bool {
+        for x in arr {
+          if x == s {
+            return true
+          }
+        }
+        false
+      }
+
+      fn remove_one(arr : Array[String], s : String) -> Array[String] {
+        let out : Array[String] = []
+        let mut removed = false
+        for x in arr {
+          if !removed && x == s {
+            removed = true
+          } else {
+            out.push(x)
+          }
+        }
+        out
+      }
+
+      let list_rows : Ref[Array[View]] = Ref([])
+      fn clear_list(box : Container, rows : Ref[Array[View]]) -> Unit {
+        for v in rows.val {
+          ignore(box.remove_child_view(v))
+        }
+        rows.val = []
+      }
+
+      fn build_list(
+        box : Container,
+        items : Store[Array[String]],
+        sel : Ref[Array[String]],
+        rows : Ref[Array[View]],
+      ) -> Unit {
+        for it in items.get() {
+          let it_ref = it
+          let row = Container::make(
+            style=[("height", 26.0), ("paddingLeft", 8.0)],
+            style_str=[("flexDirection", "row"), ("alignItems", "center")],
+          )
+          let mark = Container::make(
+            style=[("width", 10.0), ("height", 10.0), ("marginRight", 6.0)],
+          )
+          mark.on_draw(fn(p) {
+            let is_sel = contains(sel.val, it_ref)
+            p.set_stroke_color(if is_sel { theme_primary } else { theme_border })
+            p.stroke_rect(0.5, 0.5, 9.0, 9.0)
+            if is_sel {
+              p.set_fill_color(theme_primary)
+              p.fill_rect(3.0, 3.0, 4.0, 4.0)
+            }
+          })
+          let l = Label::new(it_ref)
+          l.set_font(font)
+          l.set_color(theme_text_regular)
+          row.add_child(mark)
+          row.add_child(l)
+          let mark_ref = mark
+          row.on_mouse_down(fn(e) {
+            if e.button == 1 {
+              if contains(sel.val, it_ref) {
+                sel.val = remove_one(sel.val, it_ref)
+              } else {
+                let grown = sel.val.copy()
+                grown.push(it_ref)
+                sel.val = grown
+              }
+              mark_ref.schedule_paint()
+              true
+            } else {
+              false
+            }
+          })
+          box.add_child(row)
+          rows.val.push(row.view())
+        }
+      }
+
+      fn move_items(from : Store[Array[String]], to : Store[Array[String]], sel : Ref[Array[String]]) -> Unit {
+        let moving = sel.val
+        let remain : Array[String] = []
+        for x in from.get() {
+          if !contains(moving, x) {
+            remain.push(x)
+          }
+        }
+        let merged = to.get().copy()
+        for x in moving {
+          merged.push(x)
+        }
+        from.set(remain)
+        to.set(merged)
+        sel.val = []
+      }
+
+      fn render_all() -> Unit {
+        clear_list(left_box, list_rows)
+        clear_list(right_box, list_rows)
+        build_list(left_box, left_items, left_sel, list_rows)
+        build_list(right_box, right_items, right_sel, list_rows)
+      }
+
+      left_items.subscribe(fn(_v) { render_all() })
+      right_items.subscribe(fn(_v) { render_all() })
+      fn mid_btn(label : String, to_right : Bool) -> Unit {
+        let b = Container::make(
+          style=[("width", 32.0), ("height", 28.0), ("marginRight", 8.0)],
+          style_str=[("alignItems", "center")],
+        )
+        b.set_background_color(theme_info_light)
+        b.on_draw(fn(p) {
+          let bd = b.get_bounds()
+          p.draw_text(
+            label,
+            0.0,
+            0.0,
+            bd.width,
+            bd.height,
+            align=Center,
+            valign=Center,
+            color=theme_text_regular,
+          )
+        })
+        b.on_mouse_down(fn(e) {
+          if e.button == 1 {
+            if to_right {
+              move_items(left_items, right_items, left_sel)
+            } else {
+              move_items(right_items, left_items, right_sel)
+            }
+            true
+          } else {
+            false
+          }
+        })
+        row.add_child(b)
+      }
+
+      row.add_child(left_box)
+      mid_btn("›", true)
+      mid_btn("‹", false)
+      row.add_child(right_box)
+      render_all()
+      attach(parent, row.view())
+      row.view()
+    },
+  }
+}
+
+///|
+/// 自动补全(EP Autocomplete):entry_t 输入,下方按子串过滤显示候选项,
+/// 点击候选项写回 value 并清空输入。
+pub fn autocomplete(
+  options : Array[String],
+  value : Store[String],
+  width? : Double = 280.0,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let outer = Container::make(
+        style=[("width", width), ("marginBottom", 10.0)],
+        style_str=[("flexDirection", "column")],
+      )
+      let entry = Entry::make(entry_type=Normal)
+      entry.set_font(Font::new("Sans", 13.0))
+      entry.set_style("height", 30.0)
+      let list = Container::make(
+        style=[("marginTop", 4.0)],
+        style_str=[("flexDirection", "column")],
+      )
+      let font = Font::new("Sans", 13.0)
+      let rows : Ref[Array[View]] = Ref([])
+      fn rebuild(filter : String) -> Unit {
+        for v in rows.val {
+          ignore(list.remove_child_view(v))
+        }
+        rows.val = []
+        for opt in options {
+          if filter != "" && !opt.contains(filter) {
+            continue
+          }
+          let row = Container::make(
+            style=[("height", 28.0), ("paddingLeft", 10.0)],
+            style_str=[("flexDirection", "row"), ("alignItems", "center")],
+          )
+          let l = Label::new(opt)
+          l.set_font(font)
+          l.set_color(theme_text_regular)
+          row.add_child(l)
+          let hover = Ref(false)
+          row.on_draw(fn(p) {
+            let b = row.get_bounds()
+            if hover.val {
+              p.set_fill_color(theme_primary_light)
+              p.fill_rect(0.0, 0.0, b.width, b.height)
+            }
+          })
+          row.on_mouse_enter(fn(_e) {
+            hover.val = true
+            row.schedule_paint()
+          })
+          row.on_mouse_leave(fn(_e) {
+            hover.val = false
+            row.schedule_paint()
+          })
+          row.on_mouse_down(fn(e) {
+            if e.button == 1 {
+              value.set(opt)
+              entry.set_text(opt)
+              for v in rows.val {
+                ignore(list.remove_child_view(v))
+              }
+              rows.val = []
+              true
+            } else {
+              false
+            }
+          })
+          list.add_child(row)
+          rows.val.push(row.view())
+        }
+      }
+
+      rebuild("")
+      entry.on_text_change(fn() {
+        rebuild(entry.get_text())
+      })
+      value.subscribe(fn(v) { entry.set_text(v) })
+      outer.add_child(entry)
+      outer.add_child(list)
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}
+
+///|
+/// 日期字段:主题化行内标签 + 原生日期选择器。
+pub fn date_picker_t(label : String, on_change? : () -> Unit = fn() {  }) -> Node {
+  {
+    mount: fn(parent) {
+      let row = Container::make(
+        style=[("height", 34.0), ("marginBottom", 10.0)],
+        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+      )
+      let k = Label::new(label)
+      k.set_font(Font::new("Sans", 13.0))
+      k.set_color(theme_text_secondary)
+      k.set_align(End)
+      let kwrap = Container::make(style=[("width", 90.0), ("marginRight", 12.0)])
+      kwrap.add_child(k)
+      row.add_child(kwrap)
+      let dp = DatePicker::new()
+      dp.set_font(Font::new("Sans", 13.0))
+      dp.on_date_change(fn() { on_change() })
+      row.add_child(dp)
+      attach(parent, row.view())
+      row.view()
+    },
+  }
+}
+
+///|
+/// 返回顶部浮动按钮:配合 scroll 句柄使用,点击回滚到顶部。
+/// 放置于 relative 容器内时经 absolute 定位悬浮右下。
+pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
+  {
+    mount: fn(parent) {
+      let hover = Ref(false)
+      let b = Container::make(
+        style=[("width", size), ("height", size)],
+      )
+      b.set_background_color(theme_primary)
+      b.on_draw(fn(p) {
+        p.draw_text(
+          "↑",
+          0.0,
+          0.0,
+          size,
+          size,
+          align=Center,
+          valign=Center,
+          color="#FFFFFF",
+        )
+      })
+      b.on_mouse_down(fn(e) {
+        if e.button == 1 {
+          on_click()
+          true
+        } else {
+          false
+        }
+      })
+      b.on_mouse_enter(fn(_e) {
+        hover.val = true
+        b.set_background_color("#1E56A8")
+      })
+      b.on_mouse_leave(fn(_e) {
+        hover.val = false
+        b.set_background_color(theme_primary)
+      })
+      attach(parent, b.view())
+      b.view()
     },
   }
 }

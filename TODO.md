@@ -86,20 +86,20 @@
 - [x] 数据展示:tag / avatar / badge / statistic / descriptions / timeline / collapse / card / code_view / progress_line
 - [x] 反馈:alert / result / empty
 
-### 第一批
+### 第一批(2026-09-16 全部完成,组件库演示板「进阶」页逐个演示)
 
-- [ ] input-number 数字输入器 — entry_t + 加减按钮 + 范围钳制
-- [ ] form 表单布局 — label 对齐 + 控件区 + 分组
-- [ ] link 链接文字 — label_t 变体
-- [ ] page-header 页头 — 返回 + 标题 + 操作区
-- [ ] backtop 返回顶部 — Scroll 定位 + 浮动按钮
+- [x] input-number 数字输入器 — `-`/`+` 步进按钮 + Store[Double] + 范围钳制;演示板实测渲染
+- [x] form 表单布局 — form_item(标签右对齐定宽 + 控件区)+ form 分组标题
+- [x] link 链接文字 — 主题色 + 悬停下划线 + 点击回调
+- [x] page-header 页头 — ‹ 返回(悬停变主题色)+ 标题 + 右侧操作区
+- [x] backtop 返回顶部 — backtop_t 回调按钮 + Scroll::set_scroll_position(既有 ABI);演示页含滚动区实测
 
-### 第二批
+### 第二批(2026-09-16 全部完成)
 
-- [ ] tree 树形控件 — 递归行 + 缩进 + 展开折叠
-- [ ] transfer 穿梭框 — 双列表互移
-- [ ] autocomplete 自动补全 — entry_t + 候选下拉
-- [ ] date_picker_t / time_picker_t — 原生 DatePicker 主题化封装
+- [x] tree 树形控件 — TreeNode 嵌套 + 缩进层级 + 点击 ▸/▾ 展开折叠
+- [x] transfer 穿梭框 — 双列 + 行点击选中(方块标记)+ ›/‹ 互移(动态行经 remove_child_view 重建)
+- [x] autocomplete 自动补全 — entry_t 输入过滤 + 候选行点击回填(动态行重建)
+- [x] date_picker_t — 主题行内标签 + 原生 DatePicker;time picker 上游无独立控件,随平台目标
 
 ### 候选
 

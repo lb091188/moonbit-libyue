@@ -2020,8 +2020,6 @@ extern "c" fn ffi_container_remove_child_view(c : View, v : View) -> Int = "yue_
 #borrow(c)
 extern "c" fn ffi_container_child_count(c : View) -> Int = "yue_mbt_container_child_count"
 
-///|
-#borrow(s)
 extern "c" fn ffi_scroll_get_position_x(s : View) -> Double = "yue_mbt_scroll_get_position_x"
 
 ///|
