@@ -49,6 +49,7 @@
 #include "nativeui/cursor.h"
 #include "nativeui/app.h"
 #include "nativeui/appearance.h"
+#include "base/strings/sys_string_conversions.h"
 #include "nativeui/locale.h"
 #include "nativeui/screen.h"
 #if defined(OS_WIN)
@@ -1789,7 +1790,12 @@ static std::vector<base::FilePath> MakeFilePathsForDrag(const char *paths) {
         if (!IsAbsPathForDrag(cur)) {
           cur = CurrentDirForDrag() + sep + cur;
         }
+        // Windows 端 FilePath::StringPieceType 为宽字符,窄 string 需转宽
+#if defined(OS_WIN)
+        out.emplace_back(base::SysUTF8ToWide(cur));
+#else
         out.emplace_back(cur);
+#endif
       }
       cur.clear();
       if (*p == '\0')
