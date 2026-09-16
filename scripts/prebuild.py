@@ -41,12 +41,42 @@ WINDOWS_LINK_LIBS = [
 ]
 
 
+def _native_lib_path() -> Path:
+    return BUILD_DIR / ("yue_mbt.lib" if sys.platform == "win32" else "libyue_mbt.a")
+
+
+def _shim_newer_than_lib() -> bool:
+    """shim 源码比静态库新 → 需要增量重编（防止链接旧库误判修复无效）。"""
+    lib = _native_lib_path()
+    if not lib.exists():
+        return False
+    lib_mtime = lib.stat().st_mtime
+    for pattern in ("shim/*.cpp", "shim/*.h", "shim/include/*.h"):
+        for src in (MODULE_ROOT / "shim").glob(pattern.removeprefix("shim/")):
+            if src.stat().st_mtime > lib_mtime:
+                return True
+    return False
+
+
 def ensure_native_artifacts() -> None:
-    """静态库缺失时现场调 prepare.py 构建；进度一律走 stderr。"""
-    if sys.platform == "win32":
-        ready = (BUILD_DIR / "yue_mbt.lib").exists()
-    else:
-        ready = (BUILD_DIR / "libyue_mbt.a").exists()
+    """静态库缺失时现场调 prepare.py 构建；shim 源码更新时增量重编；
+    进度一律走 stderr。"""
+    ready = _native_lib_path().exists()
+    if ready and _shim_newer_than_lib():
+        print("[moonbit-libyue] shim 源码已更新，增量重编原生库；"
+              "编完请删除 _build 下已生成的 exe 以触发重链…", file=sys.stderr)
+        build_cmd = ["cmake", "--build", str(BUILD_DIR), "--parallel"]
+        if sys.platform == "win32":
+            # VS 多配置生成器必须显式 --config，与 prepare.py 的 cmake_build 一致
+            build_cmd += ["--config", "Release"]
+        proc = subprocess.run(build_cmd, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, text=True)
+        sys.stderr.write(proc.stdout or "")
+        if proc.returncode != 0:
+            raise SystemExit(
+                f"[moonbit-libyue] 原生库增量重编失败（退出码 {proc.returncode}）；"
+                "可手动执行 python3 scripts/prepare.py 排查")
+        return
     if ready:
         return
     print("[moonbit-libyue] 原生库缺失，开始自动构建（首次需 GitHub 网络）…",
