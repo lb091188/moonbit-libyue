@@ -21,6 +21,13 @@ pub let theme_primary : String = "#2D68C4"
 pub let theme_primary_light : String = "#E8F0FB"
 
 ///|
+/// 实底类组件 hover 加深色(Solid/Danger 按钮等)。
+pub let theme_primary_hover : String = "#2459A8"
+
+///|
+pub let theme_danger_hover : String = "#BC3440"
+
+///|
 pub let theme_success : String = "#2E9E5B"
 
 ///|
@@ -1262,7 +1269,7 @@ pub fn label_t(text : String, role? : TextRole = Body) -> Node {
 
 ///|
 /// 按钮变体:Solid 主题色实底白字 / Soft 浅底主题色字 /
-/// Text 浅灰底主题色字 / Danger 红色实底白字。
+/// Text 透明底主题色字 / Danger 红色实底白字。
 pub(all) enum ButtonVariant {
   Solid
   Soft
@@ -1271,7 +1278,9 @@ pub(all) enum ButtonVariant {
 }
 
 ///|
-/// 主题化按钮:背景色 + 文字颜色统一走主题,hover 由原生样式接管。
+/// 主题化按钮(自绘,hover 全程收敛在主题内,不交给原生样式):
+/// Solid hover 加深 / Soft hover 变实底白字 / Text hover 浅灰底 /
+/// Danger hover 加深。
 pub fn button_t(
   text : String,
   on_click? : () -> Unit = fn() {  },
@@ -1279,19 +1288,82 @@ pub fn button_t(
 ) -> Node {
   {
     mount: fn(parent) {
-      let b = Button::make(text)
-      let (bg, fg) = match variant {
-        Solid => (theme_primary, "#FFFFFF")
-        Soft => (theme_primary_light, theme_primary)
-        Text => (theme_info_light, theme_primary)
-        Danger => (theme_danger, "#FFFFFF")
-      }
-      b.set_background_color(bg)
-      b.set_color(fg)
-      b.set_font(Font::new("Sans", 13.0))
-      b.on_click(fn() { on_click() })
-      attach(parent, b.view())
-      b.view()
+      let hover = Ref(false)
+      let font = Font::new("Sans", 13.0)
+      let probe = AttributedText::new(text, wrap=false)
+      probe.set_font(font)
+      let w = probe.get_bounds_for(10000.0, 100.0).width + 32.0
+      let v = Container::make(style=[
+        ("width", w),
+        ("height", 32.0),
+        ("marginRight", 8.0),
+      ])
+      v.on_draw(fn(p) {
+        let b = v.get_bounds()
+        let bg = match variant {
+          Solid =>
+            if hover.val {
+              theme_primary_hover
+            } else {
+              theme_primary
+            }
+          Soft =>
+            if hover.val {
+              theme_primary
+            } else {
+              theme_primary_light
+            }
+          Text =>
+            if hover.val {
+              theme_fill_hover
+            } else {
+              ""
+            }
+          Danger =>
+            if hover.val {
+              theme_danger_hover
+            } else {
+              theme_danger
+            }
+        }
+        let fg = match variant {
+          Solid => "#FFFFFF"
+          Soft => if hover.val { "#FFFFFF" } else { theme_primary }
+          Text => theme_primary
+          Danger => "#FFFFFF"
+        }
+        if bg != "" {
+          p.set_fill_color(bg)
+          p.fill_rect(0.0, 0.0, b.width, b.height)
+        }
+        let at = AttributedText::new(
+          text,
+          align=Center,
+          valign=Center,
+          wrap=false,
+        )
+        at.set_font(font)
+        at.set_color(fg)
+        p.draw_attributed_text(at, 0.0, 0.0, b.width, b.height)
+      })
+      v.on_mouse_down(fn(e) {
+        if e.button == 1 {
+          on_click()
+          true
+        } else {
+          false
+        }
+      })
+      v.on_mouse_enter(fn(_e) {
+        hover.val = true
+        v.schedule_paint()
+      })
+      v.on_mouse_leave(fn(_e) {
+        hover.val = false
+        v.schedule_paint()
+      })
+      attach(parent, v.view())
+      v.view()
     },
   }
 }
@@ -1319,8 +1391,9 @@ pub fn entry_t(
 }
 
 ///|
-/// 主题化复选框:原生 Checkbox(勾选状态由系统渲染) + 主题字体/颜色,
-/// 可设禁用态。
+/// 主题化复选框(自绘,替代原生控件:GTK 原生 Checkbox 的 hover 高亮圈
+/// 与直角主题冲突):14x14 直角方框,选中实心主题色 + 白勾,
+/// hover 边框变主题色,含禁用态。
 pub fn checkbox_t(
   title : String,
   checked? : Bool = false,
@@ -1329,22 +1402,80 @@ pub fn checkbox_t(
 ) -> Node {
   {
     mount: fn(parent) {
-      let b = Button::make(title, button_type=Checkbox, checked~)
-      b.set_font(Font::new("Sans", 13.0))
-      b.set_color(theme_text_regular)
-      if disabled {
-        b.set_enabled(false)
+      let state = Ref(checked)
+      let hover = Ref(false)
+      let font = Font::new("Sans", 13.0)
+      let probe = AttributedText::new(title, wrap=false)
+      probe.set_font(font)
+      let w = probe.get_bounds_for(10000.0, 100.0).width + 30.0
+      let v = Container::make(style=[
+        ("width", w),
+        ("height", 24.0),
+        ("marginBottom", 6.0),
+      ])
+      v.on_draw(fn(p) {
+        let by = 5.0
+        p.set_stroke_color(
+          if disabled {
+            theme_border
+          } else if state.val || hover.val {
+            theme_primary
+          } else {
+            theme_border
+          },
+        )
+        p.stroke_rect(0.5, by + 0.5, 13.0, 13.0)
+        if state.val {
+          p.set_fill_color(if disabled { theme_border } else { theme_primary })
+          p.fill_rect(2.0, by + 2.0, 10.0, 10.0)
+          let check = AttributedText::new(
+            "✓",
+            align=Center,
+            valign=Center,
+            wrap=false,
+          )
+          check.set_font(font)
+          check.set_color("#FFFFFF")
+          p.draw_attributed_text(check, 0.0, by, 14.0, 14.0)
+        }
+        let at = AttributedText::new(title, valign=Center, wrap=false)
+        at.set_font(font)
+        at.set_color(if disabled { theme_border } else { theme_text_regular })
+        p.draw_attributed_text(at, 22.0, 0.0, w, 24.0)
+      })
+      let repaint = fn() -> Unit {
+        if !disabled {
+          v.schedule_paint()
+        }
       }
-      b.on_click(fn() { on_change(b.is_checked()) })
-      attach(parent, b.view())
-      b.view()
+      v.on_mouse_down(fn(e) {
+        if e.button == 1 && !disabled {
+          state.val = !state.val
+          on_change(state.val)
+          repaint()
+          true
+        } else {
+          false
+        }
+      })
+      v.on_mouse_enter(fn(_e) {
+        hover.val = true
+        repaint()
+      })
+      v.on_mouse_leave(fn(_e) {
+        hover.val = false
+        repaint()
+      })
+      attach(parent, v.view())
+      v.view()
     },
   }
 }
 
 ///|
 /// 单选组:选中项实心方块 + 主题色文字,未选中空心方块,点击互斥。
-/// (GTK 端原生 Radio 不共享组无法互斥,故自绘指示器。)
+/// 整行自绘(文字不挂子件,hover 全行生效);GTK 端原生 Radio 不共享组
+/// 无法互斥,故自绘指示器。
 pub fn radio_group(
   options : Array[String],
   selected : Store[String],
@@ -1357,17 +1488,12 @@ pub fn radio_group(
       ])
       let font = Font::new("Sans", 13.0)
       for opt in options {
-        let row = Container::make(style=[("height", 28.0)], style_str=[
-          ("flexDirection", "row"),
-          ("alignItems", "center"),
-        ])
-        let dot = Container::make(style=[
-          ("width", 14.0),
-          ("height", 14.0),
-          ("marginRight", 8.0),
-        ])
+        let probe = AttributedText::new(opt, wrap=false)
+        probe.set_font(font)
+        let w = probe.get_bounds_for(10000.0, 100.0).width + 30.0
         let hover = Ref(false)
-        dot.on_draw(fn(p) {
+        let row = Container::make(style=[("width", w), ("height", 28.0)])
+        row.on_draw(fn(p) {
           let act = selected.get() == opt
           p.set_stroke_color(
             if disabled {
@@ -1378,7 +1504,7 @@ pub fn radio_group(
               theme_border
             },
           )
-          p.stroke_rect(0.5, 0.5, 13.0, 13.0)
+          p.stroke_rect(0.5, 7.5, 13.0, 13.0)
           if act {
             p.set_fill_color(
               if disabled {
@@ -1387,25 +1513,14 @@ pub fn radio_group(
                 theme_primary
               },
             )
-            p.fill_rect(4.0, 4.0, 6.0, 6.0)
+            p.fill_rect(4.0, 11.0, 6.0, 6.0)
           }
-        })
-        let label = Label::new(opt)
-        label.set_font(font)
-        label.set_color(
-          if disabled || selected.get() != opt {
-            theme_text_regular
-          } else {
-            theme_text_primary
-          },
-        )
-        fn repaint() -> Unit {
-          if disabled {
-            return
-          }
-          dot.schedule_paint()
-          label.set_color(
-            if selected.get() == opt {
+          let at = AttributedText::new(opt, valign=Center, wrap=false)
+          at.set_font(font)
+          at.set_color(
+            if disabled {
+              theme_border
+            } else if act {
               theme_text_primary
             } else if hover.val {
               theme_primary
@@ -1413,8 +1528,13 @@ pub fn radio_group(
               theme_text_regular
             },
           )
+          p.draw_attributed_text(at, 22.0, 0.0, w, 28.0)
+        })
+        let repaint = fn() -> Unit {
+          if !disabled {
+            row.schedule_paint()
+          }
         }
-
         row.on_mouse_enter(fn(_e) {
           hover.val = true
           repaint()
@@ -1432,8 +1552,6 @@ pub fn radio_group(
             false
           }
         })
-        row.add_child(dot)
-        row.add_child(label)
         outer.add_child(row)
       }
       attach(parent, outer.view())
@@ -1448,11 +1566,7 @@ pub fn radio_group(
 pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
   {
     mount: fn(parent) {
-      let v = Container::make(style=[
-        ("width", 40.0),
-        ("height", 18.0),
-        ("marginBottom", 10.0),
-      ])
+      let v = Container::make(style=[("width", 40.0), ("height", 18.0)])
       let slider_w = 14.0
       v.on_draw(fn(p) {
         let b = v.get_bounds()

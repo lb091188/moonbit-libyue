@@ -93,7 +93,7 @@ fn main {
   let p_basic = scroll_page([
     section(
       "Button 按钮变体",
-      "Solid 主题色实底 / Soft 浅底 / Text 浅灰底 / Danger 红色实底,文字颜色与字体统一走主题。",
+      "Solid 主题色实底 / Soft 浅底(hover 变实底白字) / Text 透明底(hover 浅灰) / Danger 红色实底,hover 全程主题内收敛。",
       [
         @yue.hbox(
           [
@@ -123,7 +123,7 @@ fn main {
     ),
     section(
       "Checkbox 复选框",
-      "原生勾选态 + 主题字体颜色;第三项为禁用态。",
+      "自绘直角勾选框:选中实心主题色 + 白勾,hover 边框变主题色;第三项为禁用态。",
       [
         @yue.vbox([
           @yue.checkbox_t("启用自动同步", on_change=fn(v) { sync.set(v) }),
@@ -136,7 +136,7 @@ fn main {
     ),
     section(
       "Radio 单选组",
-      "选中项实心方块 + 主题色文字,悬停变色,点击互斥;第二组为禁用态。",
+      "选中项实心方块 + 主题色文字,整行悬停变色,点击互斥;第二组为禁用态。",
       [
         @yue.hbox([
           @yue.vbox([

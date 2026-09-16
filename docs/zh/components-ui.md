@@ -8,10 +8,10 @@
 
 | API | 变体 / 角色 | 说明 |
 |---|---|---|
-| `button_t(text, on_click?, variant?)` | `Solid` / `Soft` / `Text` / `Danger` | 原生 Button,背景前景统一主题 |
+| `button_t(text, on_click?, variant?)` | `Solid` / `Soft` / `Text` / `Danger` | 自绘按钮,hover 收敛在主题内(Solid/Danger 加深、Soft 变实底白字、Text 浅灰底) |
 | `label_t(text, role?)` | `Title` / `Section` / `Body` / `Secondary` / `Accent` | 字号颜色随角色 |
 | `entry_t(text?, password?, on_input?)` | 普通 / 密码 | 仅统一字体(GTK Entry `SetColor` 会整体染黑,见 adaptation.md) |
-| `checkbox_t(title, checked?, disabled?, on_change?)` | 正常 / 禁用 | 原生勾选态,主题字体颜色 |
+| `checkbox_t(title, checked?, disabled?, on_change?)` | 正常 / 禁用 | 自绘直角勾选框:选中实心主题色 + 白勾,hover 边框变主题色 |
 
 ## 导航
 
