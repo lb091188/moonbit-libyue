@@ -16,57 +16,133 @@
 // 变化经 schedule_paint 触发重绘。组件间状态协调统一走 Store，无平台代码。
 
 ///|
-/// 主题色板（Element Plus 默认色）。
-pub let theme_primary : String = "#2D68C4"
+/// 主题色板。经 [theme_apply] 定制（initialize 之后、mount 之前调用最佳）；
+/// 组件每次绘制/挂载经 getter 读取当前值。
+///|
+fn theme_primary() -> String { theme_box.t.primary }
 
 ///|
-pub let theme_primary_light : String = "#E8F0FB"
+fn theme_primary_light() -> String { theme_box.t.primary_light }
 
 ///|
-/// 实底类组件 hover 加深色(Solid/Danger 按钮等)。
-pub let theme_primary_hover : String = "#2459A8"
+fn theme_primary_hover() -> String { theme_box.t.primary_hover }
 
 ///|
-pub let theme_danger_hover : String = "#BC3440"
+fn theme_danger_hover() -> String { theme_box.t.danger_hover }
 
 ///|
-pub let theme_success : String = "#2E9E5B"
+fn theme_success() -> String { theme_box.t.success }
 
 ///|
-pub let theme_success_light : String = "#E9F5EE"
+fn theme_success_light() -> String { theme_box.t.success_light }
 
 ///|
-pub let theme_warning : String = "#D9822B"
+fn theme_warning() -> String { theme_box.t.warning }
 
 ///|
-pub let theme_warning_light : String = "#FBF3E8"
+fn theme_warning_light() -> String { theme_box.t.warning_light }
 
 ///|
-pub let theme_danger : String = "#D64550"
+fn theme_danger() -> String { theme_box.t.danger }
 
 ///|
-pub let theme_danger_light : String = "#FBEDED"
+fn theme_danger_light() -> String { theme_box.t.danger_light }
 
 ///|
-pub let theme_info : String = "#6B7480"
+fn theme_info() -> String { theme_box.t.info }
 
 ///|
-pub let theme_info_light : String = "#F0F2F4"
+fn theme_info_light() -> String { theme_box.t.info_light }
 
 ///|
-pub let theme_text_primary : String = "#2A2F36"
+fn theme_text_primary() -> String { theme_box.t.text_primary }
 
 ///|
-pub let theme_text_regular : String = "#4E5560"
+fn theme_text_regular() -> String { theme_box.t.text_regular }
 
 ///|
-pub let theme_text_secondary : String = "#6B7480"
+fn theme_text_secondary() -> String { theme_box.t.text_secondary }
 
 ///|
-pub let theme_border : String = "#D8DCE1"
+fn theme_border() -> String { theme_box.t.border }
 
 ///|
-pub let theme_fill_hover : String = "#EFF1F3"
+fn theme_fill_hover() -> String { theme_box.t.fill_hover }
+
+///|
+/// 主题色板快照。用结构体更新语法做局部定制：
+///
+/// ```moonbit
+/// @yue.theme_apply(
+///   @yue.Theme::{ primary: "#1E4FA3", primary_light: "#E3EDFA", ..@yue.default_theme() },
+/// )
+/// ```
+pub struct Theme {
+  primary : String
+  primary_light : String
+  primary_hover : String
+  danger_hover : String
+  success : String
+  success_light : String
+  warning : String
+  warning_light : String
+  danger : String
+  danger_light : String
+  info : String
+  info_light : String
+  text_primary : String
+  text_regular : String
+  text_secondary : String
+  border : String
+  fill_hover : String
+}
+
+///|
+/// 当前内置默认主题（深色高级变体）。
+pub fn default_theme() -> Theme {
+  {
+    primary: "#2D68C4",
+    primary_light: "#E8F0FB",
+    primary_hover: "#2459A8",
+    danger_hover: "#BC3440",
+    success: "#2E9E5B",
+    success_light: "#E9F5EE",
+    warning: "#D9822B",
+    warning_light: "#FBF3E8",
+    danger: "#D64550",
+    danger_light: "#FBEDED",
+    info: "#6B7480",
+    info_light: "#F0F2F4",
+    text_primary: "#2A2F36",
+    text_regular: "#4E5560",
+    text_secondary: "#6B7480",
+    border: "#D8DCE1",
+    fill_hover: "#EFF1F3",
+  }
+}
+
+///|
+/// 主题存储：单个可变快照，theme_apply 整体替换。
+priv struct ThemeBox {
+  mut t : Theme
+}
+
+///|
+let theme_box : ThemeBox = { t: default_theme() }
+
+///|
+/// 读取当前主题快照。
+pub fn theme_current() -> Theme {
+  theme_box.t
+}
+
+///|
+/// 应用主题。推荐在 initialize() 之后、创建界面（mount）之前调用：
+/// 已挂载的自绘交互组件重绘时读到新色（hover/选中立即生效），
+/// 挂载时定死的静态色（Label 文字、边框等）需重建界面才生效。
+pub fn theme_apply(t : Theme) -> Unit {
+  theme_box.t = t
+}
 
 ///|
 /// 语义类型（EP Tag/Alert 的 type）。
@@ -81,28 +157,28 @@ pub(all) enum SemanticType {
 ///|
 fn type_color(t : SemanticType) -> String {
   match t {
-    Primary => theme_primary
-    Success => theme_success
-    Warning => theme_warning
-    Danger => theme_danger
-    Info => theme_info
+    Primary => theme_primary()
+    Success => theme_success()
+    Warning => theme_warning()
+    Danger => theme_danger()
+    Info => theme_info()
   }
 }
 
 ///|
 fn type_light_color(t : SemanticType) -> String {
   match t {
-    Primary => theme_primary_light
-    Success => theme_success_light
-    Warning => theme_warning_light
-    Danger => theme_danger_light
-    Info => theme_info_light
+    Primary => theme_primary_light()
+    Success => theme_success_light()
+    Warning => theme_warning_light()
+    Danger => theme_danger_light()
+    Info => theme_info_light()
   }
 }
 
 ///|
 /// 焦点环:双层 1px 主题色描边(叠加近似 2px),聚焦的自绘交互项画在内容之上。
-fn draw_focus_ring(p : Painter, w : Double, h : Double, color? : String = theme_primary) -> Unit {
+fn draw_focus_ring(p : Painter, w : Double, h : Double, color? : String = theme_primary()) -> Unit {
   p.set_stroke_color(color)
   p.stroke_rect(0.5, 0.5, w - 1.0, h - 1.0)
   p.stroke_rect(1.5, 1.5, w - 3.0, h - 3.0)
@@ -239,9 +315,9 @@ fn stateful_item(
 ///|
 fn side_menu_bg(act : Bool, hov : Bool) -> String {
   if act {
-    theme_primary_light
+    theme_primary_light()
   } else if hov {
-    theme_fill_hover
+    theme_fill_hover()
   } else {
     ""
   }
@@ -250,9 +326,9 @@ fn side_menu_bg(act : Bool, hov : Bool) -> String {
 ///|
 fn side_menu_fg(act : Bool, _hov : Bool) -> String {
   if act {
-    theme_primary
+    theme_primary()
   } else {
-    theme_text_primary
+    theme_text_primary()
   }
 }
 
@@ -298,9 +374,9 @@ fn segmented_bg(act : Bool, hov : Bool) -> String {
 ///|
 fn segmented_fg(act : Bool, _hov : Bool) -> String {
   if act {
-    theme_primary
+    theme_primary()
   } else {
-    theme_text_regular
+    theme_text_regular()
   }
 }
 
@@ -402,7 +478,7 @@ pub fn tag(text : String, color : String, height? : Double = 24.0) -> Node {
 ///|
 /// 数字角标(对应 EP Badge 的数字形态):红底白字小块,宽度自适应。
 pub fn badge_count(count : Int) -> Node {
-  tag(count.to_string(), theme_danger, height=18.0)
+  tag(count.to_string(), theme_danger(), height=18.0)
 }
 
 ///|
@@ -448,15 +524,15 @@ pub fn breadcrumb(items : Array[String], selected : Store[String]) -> Node {
 ///|
 fn crumb_fg(_act : Bool, hov : Bool) -> String {
   if hov {
-    theme_primary
+    theme_primary()
   } else {
-    theme_text_secondary
+    theme_text_secondary()
   }
 }
 
 ///|
 fn crumb_fg_static(_act : Bool, _hov : Bool) -> String {
-  theme_text_secondary
+  theme_text_secondary()
 }
 
 ///|
@@ -534,10 +610,10 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
           let cur = current.get()
           let act = is_page && cur == target
           if act {
-            p.set_fill_color(theme_primary)
+            p.set_fill_color(theme_primary())
             p.fill_rect(0.0, 0.0, bd.width, bd.height)
           } else if hover.val {
-            p.set_fill_color(theme_primary_light)
+            p.set_fill_color(theme_primary_light())
             p.fill_rect(0.0, 0.0, bd.width, bd.height)
           }
           p.draw_text(
@@ -547,7 +623,7 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
             bd.width,
             bd.height,
             valign=Center,
-            color=if act { "#FFFFFF" } else { theme_text_regular },
+            color=if act { "#FFFFFF" } else { theme_text_regular() },
           )
           if focused.val {
             draw_focus_ring(p, bd.width, bd.height, color="#FFFFFF")
@@ -614,7 +690,7 @@ pub fn card(
       // 标题(加粗,垂直居中)
       let title_at = AttributedText::new(title, wrap=false)
       title_at.set_font(Font::new("Sans", 14.0, weight=Bold))
-      title_at.set_color(theme_text_primary)
+      title_at.set_color(theme_text_primary())
       let title = Container::make(style=[
         ("height", head_h),
         ("paddingLeft", 16.0),
@@ -820,7 +896,7 @@ pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
 
 ///|
 /// 圆点徽标(EP Badge 的 dot 形态):8×8 色点。
-pub fn badge_dot(color? : String = theme_danger) -> Node {
+pub fn badge_dot(color? : String = theme_danger()) -> Node {
   container(
     on_draw=fn(p) {
       p.set_fill_color(color)
@@ -865,7 +941,7 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
           b.width,
           b.height,
           valign=Center,
-          color=if hover.val { color } else { theme_text_secondary },
+          color=if hover.val { color } else { theme_text_secondary() },
         )
         if close_focused.val {
           draw_focus_ring(p, b.width, b.height)
@@ -922,9 +998,9 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
             let b = line.get_bounds()
             p.set_fill_color(
               if current.get() >= idx {
-                theme_primary
+                theme_primary()
               } else {
-                theme_border
+                theme_border()
               },
             )
             p.fill_rect(0.0, 0.0, b.width, b.height)
@@ -950,9 +1026,9 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
           }
           p.set_fill_color(
             match st {
-              0 => theme_primary_light
-              1 => theme_primary
-              _ => theme_info_light
+              0 => theme_primary_light()
+              1 => theme_primary()
+              _ => theme_info_light()
             },
           )
           p.fill_rect(0.0, 0.0, b.width, b.height)
@@ -964,9 +1040,9 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
             b.height,
             valign=Center,
             color=match st {
-              0 => theme_primary
+              0 => theme_primary()
               1 => "#FFFFFF"
-              _ => theme_text_secondary
+              _ => theme_text_secondary()
             },
           )
         })
@@ -981,17 +1057,17 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
         cur_ref.subscribe(fn(v) {
           l.set_color(
             if i <= v {
-              theme_text_primary
+              theme_text_primary()
             } else {
-              theme_text_secondary
+              theme_text_secondary()
             },
           )
         })
         l.set_color(
           if i <= current.get() {
-            theme_text_primary
+            theme_text_primary()
           } else {
-            theme_text_secondary
+            theme_text_secondary()
           },
         )
         row.add_child(l)
@@ -1019,7 +1095,7 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
           style=[("height", 34.0), ("paddingLeft", 12.0)],
           style_str=[("flexDirection", "row"), ("alignItems", "center")],
         )
-        head.set_background_color(theme_info_light)
+        head.set_background_color(theme_info_light())
         let head_focused = Ref(false)
         head.on_draw(fn(p) {
           if head_focused.val {
@@ -1028,9 +1104,9 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
           }
         })
         let arrow = Label::new(if open.val { "− " } else { "+ " })
-        arrow.set_color(theme_primary)
+        arrow.set_color(theme_primary())
         let title = Label::new(entry.0)
-        title.set_color(theme_text_primary)
+        title.set_color(theme_text_primary())
         head.add_child(arrow)
         head.add_child(title)
         let body = Container::make(style=[("padding", 10.0)], style_str=[
@@ -1094,7 +1170,7 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
           // 竖线贯穿(末项无线),节点色块居中
           let b = node_col.get_bounds()
           if !is_last {
-            p.set_fill_color(theme_border)
+            p.set_fill_color(theme_border())
             p.fill_rect(9.0, 0.0, 2.0, b.height)
           }
           p.set_fill_color(color)
@@ -1105,10 +1181,10 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
           style_str=[("flexDirection", "column")],
         )
         let title = Label::new(entry.0)
-        title.set_color(theme_text_primary)
+        title.set_color(theme_text_primary())
         title.set_align(Start)
         let desc = Label::new(entry.1)
-        desc.set_color(theme_text_secondary)
+        desc.set_color(theme_text_secondary())
         desc.set_align(Start)
         text_col.add_child(title)
         text_col.add_child(desc)
@@ -1137,10 +1213,10 @@ pub fn descriptions(pairs : Array[(String, String)]) -> Node {
           ("alignItems", "center"),
         ])
         let k = Label::new(kv.0)
-        k.set_color(theme_text_secondary)
+        k.set_color(theme_text_secondary())
         k.set_align(Start)
         let v = Label::new(kv.1)
-        v.set_color(theme_text_primary)
+        v.set_color(theme_text_primary())
         v.set_align(Start)
         let key_wrap = Container::make(style=[("width", 110.0)])
         key_wrap.add_child(k)
@@ -1200,13 +1276,13 @@ pub fn result(
       ])
       let t1 = Label::new(title)
       t1.set_font(Font::new("Sans", 18.0, weight=SemiBold))
-      t1.set_color(theme_text_primary)
+      t1.set_color(theme_text_primary())
       big.add_child(t1)
       let sub = Container::make(style=[("height", 24.0)], style_str=[
         ("alignItems", "center"),
       ])
       let t2 = Label::new(desc)
-      t2.set_color(theme_text_secondary)
+      t2.set_color(theme_text_secondary())
       sub.add_child(t2)
       let btns = Container::make(style=[("marginTop", 8.0)], style_str=[
         ("flexDirection", "row"),
@@ -1239,7 +1315,7 @@ pub fn empty(desc : String) -> Node {
         ("height", 64.0),
         ("marginTop", 14.0),
       ])
-      box.set_background_color(theme_info_light)
+      box.set_background_color(theme_info_light())
       let empty_probe = AttributedText::new("∅", wrap=false)
       let empty_w = empty_probe.get_bounds_for(10000.0, 100.0).width
       box.on_draw(fn(p) {
@@ -1251,14 +1327,14 @@ pub fn empty(desc : String) -> Node {
           b.width,
           b.height,
           valign=Center,
-          color=theme_text_secondary,
+          color=theme_text_secondary(),
         )
       })
       let cap = Container::make(style=[("height", 26.0), ("marginTop", 6.0)], style_str=[
         ("alignItems", "center"),
       ])
       let l = Label::new(desc)
-      l.set_color(theme_text_secondary)
+      l.set_color(theme_text_secondary())
       cap.add_child(l)
       outer.add_child(box)
       outer.add_child(cap)
@@ -1278,9 +1354,9 @@ pub fn statistic(title : String, value : Store[String]) -> Node {
       ])
       let num = Label::new(value.get())
       num.set_font(Font::new("Sans", 24.0, weight=SemiBold))
-      num.set_color(theme_text_primary)
+      num.set_color(theme_text_primary())
       let cap = Label::new(title)
-      cap.set_color(theme_text_secondary)
+      cap.set_color(theme_text_secondary())
       value.subscribe(fn(v) { num.set_text(v) })
       outer.add_child(num)
       outer.add_child(cap)
@@ -1297,12 +1373,12 @@ pub fn progress_line(value : Store[Double], height? : Double = 8.0) -> Node {
   {
     mount: fn(parent) {
       let v = Container::make(style=[("flex", 1.0), ("height", height)])
-      v.set_background_color(theme_info_light)
+      v.set_background_color(theme_info_light())
       v.on_draw(fn(p) {
         let b = v.get_bounds()
         let frac = value.get()
         if frac > 0.0 {
-          p.set_fill_color(theme_primary)
+          p.set_fill_color(theme_primary())
           p.fill_rect(0.0, 0.0, b.width * frac, b.height)
         }
       })
@@ -1337,11 +1413,11 @@ fn role_font(role : TextRole) -> Font {
 ///|
 fn role_color(role : TextRole) -> String {
   match role {
-    Title => theme_text_primary
-    Section => theme_text_primary
-    Body => theme_text_regular
-    Secondary => theme_text_secondary
-    Accent => theme_primary
+    Title => theme_text_primary()
+    Section => theme_text_primary()
+    Body => theme_text_regular()
+    Secondary => theme_text_secondary()
+    Accent => theme_primary()
   }
 }
 
@@ -1398,33 +1474,33 @@ pub fn button_t(
         let bg = match variant {
           Solid =>
             if hover.val {
-              theme_primary_hover
+              theme_primary_hover()
             } else {
-              theme_primary
+              theme_primary()
             }
           Soft =>
             if hover.val {
-              theme_primary
+              theme_primary()
             } else {
-              theme_primary_light
+              theme_primary_light()
             }
           Text =>
             if hover.val {
-              theme_fill_hover
+              theme_fill_hover()
             } else {
               ""
             }
           Danger =>
             if hover.val {
-              theme_danger_hover
+              theme_danger_hover()
             } else {
-              theme_danger
+              theme_danger()
             }
         }
         let fg = match variant {
           Solid => "#FFFFFF"
-          Soft => if hover.val { "#FFFFFF" } else { theme_primary }
-          Text => theme_primary
+          Soft => if hover.val { "#FFFFFF" } else { theme_primary() }
+          Text => theme_primary()
           Danger => "#FFFFFF"
         }
         if bg != "" {
@@ -1452,7 +1528,7 @@ pub fn button_t(
             color=match variant {
               Solid => "#FFFFFF"
               Danger => "#FFFFFF"
-              _ => theme_primary
+              _ => theme_primary()
             },
           )
         }
@@ -1537,16 +1613,16 @@ pub fn checkbox_t(
         let by = 5.0
         p.set_stroke_color(
           if disabled {
-            theme_border
+            theme_border()
           } else if state.val || hover.val {
-            theme_primary
+            theme_primary()
           } else {
-            theme_border
+            theme_border()
           },
         )
         p.stroke_rect(0.5, by + 0.5, 13.0, 13.0)
         if state.val {
-          p.set_fill_color(if disabled { theme_border } else { theme_primary })
+          p.set_fill_color(if disabled { theme_border() } else { theme_primary() })
           p.fill_rect(2.0, by + 2.0, 10.0, 10.0)
           let check = AttributedText::new("✓", wrap=false)
           check.set_font(font)
@@ -1562,7 +1638,7 @@ pub fn checkbox_t(
         }
         let at = AttributedText::new(title, valign=Center, wrap=false)
         at.set_font(font)
-        at.set_color(if disabled { theme_border } else { theme_text_regular })
+        at.set_color(if disabled { theme_border() } else { theme_text_regular() })
         p.draw_attributed_text(at, 22.0, 0.0, w, 24.0)
         if focused.val {
           draw_focus_ring(p, w, 24.0)
@@ -1632,20 +1708,20 @@ pub fn radio_group(
           let act = selected.get() == opt
           p.set_stroke_color(
             if disabled {
-              theme_border
+              theme_border()
             } else if act || hover.val {
-              theme_primary
+              theme_primary()
             } else {
-              theme_border
+              theme_border()
             },
           )
           p.stroke_rect(0.5, 7.5, 13.0, 13.0)
           if act {
             p.set_fill_color(
               if disabled {
-                theme_border
+                theme_border()
               } else {
-                theme_primary
+                theme_primary()
               },
             )
             p.fill_rect(4.0, 11.0, 6.0, 6.0)
@@ -1654,13 +1730,13 @@ pub fn radio_group(
           at.set_font(font)
           at.set_color(
             if disabled {
-              theme_border
+              theme_border()
             } else if act {
-              theme_text_primary
+              theme_text_primary()
             } else if hover.val {
-              theme_primary
+              theme_primary()
             } else {
-              theme_text_regular
+              theme_text_regular()
             },
           )
           p.draw_attributed_text(at, 22.0, 0.0, w, 28.0)
@@ -1755,10 +1831,10 @@ pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
       v.on_draw(fn(p) {
         let b = v.get_bounds()
         let on = checked.get()
-        p.set_fill_color(if on { theme_primary } else { theme_border })
+        p.set_fill_color(if on { theme_primary() } else { theme_border() })
         p.fill_rect(0.0, 0.0, b.width, b.height)
         let sx = if on { b.width - slider_w - 2.0 } else { 2.0 }
-        p.set_fill_color(if disabled { theme_info_light } else { "#FFFFFF" })
+        p.set_fill_color(if disabled { theme_info_light() } else { "#FFFFFF" })
         p.fill_rect(sx, 2.0, slider_w, b.height - 4.0)
         if focused.val {
           draw_focus_ring(p, b.width, b.height)
@@ -1810,7 +1886,7 @@ pub fn input_t(
       outer.on_draw(fn(p) {
         let b = outer.get_bounds()
         p.set_stroke_color(
-          if focused.val { theme_primary } else { theme_border },
+          if focused.val { theme_primary() } else { theme_border() },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
       })
@@ -1862,11 +1938,11 @@ pub fn input_number(
           style=[("width", 28.0), ("height", 28.0)],
           style_str=[("alignItems", "center")],
         )
-        b.set_background_color(theme_info_light)
+        b.set_background_color(theme_info_light())
         let hover = Ref(false)
         b.on_draw(fn(p) {
           let bd = b.get_bounds()
-          p.set_fill_color(if hover.val { theme_primary_light } else { theme_info_light })
+          p.set_fill_color(if hover.val { theme_primary_light() } else { theme_info_light() })
           p.fill_rect(0.0, 0.0, bd.width, bd.height)
           p.draw_text(
             label,
@@ -1876,7 +1952,7 @@ pub fn input_number(
             bd.height,
             align=Center,
             valign=Center,
-            color=theme_text_regular,
+            color=theme_text_regular(),
           )
         })
         b.on_mouse_down(fn(e) {
@@ -1920,7 +1996,7 @@ pub fn input_number(
         wrap=false,
       )
       t.set_font(font)
-      t.set_color(theme_text_primary)
+      t.set_color(theme_text_primary())
       num.on_draw(fn(p) {
         let b = num.get_bounds()
         p.draw_attributed_text(t, 0.0, 0.0, b.width, b.height)
@@ -1948,7 +2024,7 @@ pub fn form_item(label : String, control : Node, label_width? : Double = 90.0) -
       )
       let k = Label::new(label)
       k.set_font(Font::new("Sans", 13.0))
-      k.set_color(theme_text_secondary)
+      k.set_color(theme_text_secondary())
       k.set_align(End)
       let kwrap = Container::make(style=[("width", label_width), ("marginRight", 12.0)])
       kwrap.add_child(k)
@@ -1982,10 +2058,10 @@ pub fn link(text : String, on_click : () -> Unit) -> Node {
       )
       let l = Label::new(text)
       l.set_font(Font::new("Sans", 13.0))
-      l.set_color(theme_primary)
+      l.set_color(theme_primary())
       row.add_child(l)
       let underline = Container::make(style=[("height", 1.0)])
-      underline.set_background_color(theme_primary)
+      underline.set_background_color(theme_primary())
       row.add_child(underline)
       fn apply() -> Unit {
         underline.set_visible(hover.val)
@@ -2042,7 +2118,7 @@ pub fn page_header(
           b.height,
           align=Start,
           valign=Center,
-          color=if hover.val { theme_primary } else { theme_text_regular },
+          color=if hover.val { theme_primary() } else { theme_text_regular() },
         )
       })
       back.on_mouse_down(fn(e) {
@@ -2064,7 +2140,7 @@ pub fn page_header(
       row.add_child(back)
       let t = Label::new(title)
       t.set_font(Font::new("Sans", 15.0, weight=SemiBold))
-      t.set_color(theme_text_primary)
+      t.set_color(theme_text_primary())
       row.add_child(t)
       let spacer = Container::make(style=[("flex", 1.0), ("height", 1.0)])
       row.add_child(spacer)
@@ -2105,10 +2181,10 @@ pub fn tree(root : Array[TreeNode]) -> Node {
           )
           let arrow = Label::new(if has_children { "▸" } else { " " })
           arrow.set_font(font)
-          arrow.set_color(theme_text_secondary)
+          arrow.set_color(theme_text_secondary())
           let label = Label::new(" " + nd.label)
           label.set_font(font)
-          label.set_color(theme_text_primary)
+          label.set_color(theme_text_primary())
           row.add_child(arrow)
           row.add_child(label)
           let kids = Container::make(
@@ -2213,16 +2289,16 @@ pub fn transfer(
           )
           mark.on_draw(fn(p) {
             let is_sel = contains(sel.val, it_ref)
-            p.set_stroke_color(if is_sel { theme_primary } else { theme_border })
+            p.set_stroke_color(if is_sel { theme_primary() } else { theme_border() })
             p.stroke_rect(0.5, 0.5, 9.0, 9.0)
             if is_sel {
-              p.set_fill_color(theme_primary)
+              p.set_fill_color(theme_primary())
               p.fill_rect(3.0, 3.0, 4.0, 4.0)
             }
           })
           let l = Label::new(it_ref)
           l.set_font(font)
-          l.set_color(theme_text_regular)
+          l.set_color(theme_text_regular())
           row.add_child(mark)
           row.add_child(l)
           let mark_ref = mark
@@ -2277,7 +2353,7 @@ pub fn transfer(
           style=[("width", 32.0), ("height", 28.0), ("marginRight", 8.0)],
           style_str=[("alignItems", "center")],
         )
-        b.set_background_color(theme_info_light)
+        b.set_background_color(theme_info_light())
         b.on_draw(fn(p) {
           let bd = b.get_bounds()
           p.draw_text(
@@ -2288,7 +2364,7 @@ pub fn transfer(
             bd.height,
             align=Center,
             valign=Center,
-            color=theme_text_regular,
+            color=theme_text_regular(),
           )
         })
         b.on_mouse_down(fn(e) {
@@ -2355,13 +2431,13 @@ pub fn autocomplete(
           )
           let l = Label::new(opt)
           l.set_font(font)
-          l.set_color(theme_text_regular)
+          l.set_color(theme_text_regular())
           row.add_child(l)
           let hover = Ref(false)
           row.on_draw(fn(p) {
             let b = row.get_bounds()
             if hover.val {
-              p.set_fill_color(theme_primary_light)
+              p.set_fill_color(theme_primary_light())
               p.fill_rect(0.0, 0.0, b.width, b.height)
             }
           })
@@ -2415,7 +2491,7 @@ pub fn date_picker_t(label : String, on_change? : () -> Unit = fn() {  }) -> Nod
       )
       let k = Label::new(label)
       k.set_font(Font::new("Sans", 13.0))
-      k.set_color(theme_text_secondary)
+      k.set_color(theme_text_secondary())
       k.set_align(End)
       let kwrap = Container::make(style=[("width", 90.0), ("marginRight", 12.0)])
       kwrap.add_child(k)
@@ -2440,7 +2516,7 @@ pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
       let b = Container::make(
         style=[("width", size), ("height", size)],
       )
-      b.set_background_color(theme_primary)
+      b.set_background_color(theme_primary())
       b.on_draw(fn(p) {
         p.draw_text(
           "↑",
@@ -2467,7 +2543,7 @@ pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
       })
       b.on_mouse_leave(fn(_e) {
         hover.val = false
-        b.set_background_color(theme_primary)
+        b.set_background_color(theme_primary())
       })
       attach(parent, b.view())
       b.view()
