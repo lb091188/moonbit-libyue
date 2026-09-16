@@ -2556,6 +2556,14 @@ pub fn autocomplete(
       entry.on_text_change(fn() {
         refresh(entry.get_text())
       })
+      // 输入框失焦(点击别处/窗口最小化)时收起弹层
+      entry.on_focus_out(fn() {
+        match pop.val {
+          Some(p) => p.close()
+          None => ()
+        }
+        false
+      })
       outer.add_child(entry)
       if !use_popover {
         outer.add_child(list)
