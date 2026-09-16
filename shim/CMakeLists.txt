@@ -45,6 +45,13 @@ target_include_directories(yue_mbt PUBLIC
 
 target_compile_features(yue_mbt PUBLIC cxx_std_20)
 
+# 源码为无 BOM UTF-8 且含中文注释:MSVC 默认按系统代码页(如 cp936/GBK)
+# 逐字节解码,中文双字节序列会吞掉后续字符(如下一行行首的 #),产生
+# 「意外的 #endif」类假错误。/utf-8 强制按 UTF-8 解码源与执行字符集。
+if(MSVC)
+  target_compile_options(yue_mbt PRIVATE /utf-8)
+endif()
+
 # ---------- moonbit.h（moon 工具链自带） ----------
 # Windows CI 的 cmd 环境无 HOME/常用 MOON_HOME，只有 USERPROFILE
 find_path(MOONBIT_INCLUDE_DIR moonbit.h

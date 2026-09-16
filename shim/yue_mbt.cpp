@@ -1751,21 +1751,45 @@ namespace {
 
 // Clipboard::Data::Type: None=0 Text=1 HTML=2 Image=3 FilePaths=4
 /* 拖拽 FilePaths 数据构造:逐行解析并相对路径转绝对
-   (g_filename_to_uri 不接受相对路径,且 Data(FilePaths, string) 构造
-    会被上游强制改写为 Text 导致拖出数据为空) */
+   (Linux 端 g_filename_to_uri 不接受相对路径,且 Data(FilePaths, string)
+    构造会被上游强制改写为 Text 导致拖出数据为空) */
+static bool IsAbsPathForDrag(const std::string &p) {
+#if defined(OS_WIN)
+  return p.size() >= 2 && p[1] == ':' ||
+         (!p.empty() && (p[0] == '/' || p[0] == '\\'));
+#else
+  return !p.empty() && p[0] == '/';
+#endif
+}
+
+static std::string CurrentDirForDrag() {
+#if defined(OS_WIN)
+  char buf[MAX_PATH];
+  DWORD n = GetCurrentDirectoryA(MAX_PATH, buf);
+  return std::string(buf, n);
+#else
+  gchar *cwd = g_get_current_dir();
+  std::string s(cwd);
+  g_free(cwd);
+  return s;
+#endif
+}
+
 static std::vector<base::FilePath> MakeFilePathsForDrag(const char *paths) {
   std::vector<base::FilePath> out;
+#if defined(OS_WIN)
+  const char *sep = "\\";
+#else
+  const char *sep = "/";
+#endif
   std::string cur;
   for (const char *p = paths;; ++p) {
     if (*p == '\n' || *p == '\0') {
       if (!cur.empty()) {
-        if (cur[0] == '/') {
-          out.emplace_back(cur);
-        } else {
-          gchar *cwd = g_get_current_dir();
-          out.emplace_back(std::string(cwd) + "/" + cur);
-          g_free(cwd);
+        if (!IsAbsPathForDrag(cur)) {
+          cur = CurrentDirForDrag() + sep + cur;
         }
+        out.emplace_back(cur);
       }
       cur.clear();
       if (*p == '\0')
