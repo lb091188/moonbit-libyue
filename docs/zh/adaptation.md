@@ -169,6 +169,8 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **moon 原生后端要求系统 C 编译器**:PATH 上找不到 `cl/cc/gcc/clang` 直接报 "no system C compiler found"。修复:装 VS Build Tools(`Microsoft.VisualStudio.Workload.VCTools`),并在 **x64 Native Tools Command Prompt**(或先 call `vcvars64.bat`)里执行 moon/cmake。
 - **libyue Windows 源码需要 ATL 头**(`base/win/atl_throw.h` → `atldef.h`),VCTools 工作负载默认不带:报 C1083 找不到 atldef.h。修复:VS Installer `modify --add Microsoft.VisualStudio.Component.VC.ATL`。注意 **quiet/passive 模式必须从提权进程启动**,否则立即退出且 Exit Code 5007(日志在 `%TEMP%\dd_installer_*.log`)。
 - **`prepare.py` 下载 404**:发行包资产名与 `platform.system()` 不同名——实际是 `libyue_{v}_win.zip` / `_mac.zip`(不是 windows/darwin)。已修 `prepare.py`(ASSET_OS 映射),macOS 路径顺带修好。
+- **hostshare/大小写敏感卷上编译 WebView2 头 C1083(2026-09-16 实测)**:仓库经大小写敏感的共享卷挂载到 Windows(Z: hostshare)时,libyue 的 `browser_impl_webview2.h` 写死 `#include <webview2.h>`(小写),而 SDK 只给 `WebView2.h`(大写 W)——普通 NTFS 大小写不敏感无感,敏感卷上 cl 直接 C1083。修复:`prepare.py` 的 `fetch_webview2_sdk` 解压后自动补 `webview2.h` 小写别名(NTFS 上无害)。同类坑:挂载卷上建 `.caseprobe_AAA.txt` 后按小写名查不到即敏感卷,构建 libyue 前先探。
+
 - **`prepare.py` 的 Linux 补丁调用漏在平台分支外(2026-09-16 Windows 实测抓到)**:`patch_linux_drag_icon_hotspot()` 缩进错误落在 `if os_name == "Linux"` 之外,Windows 上 prepare 必崩(`FileNotFoundError: vendor\libyue\src\linux\...`,Linux 恰好能跑故一直未暴露)。修复:挪回 Linux 分支内。教训:平台分支补丁的新增调用务必确认缩进在对应 `if` 内;Windows 侧跑一遍 prepare 是发现此类问题的最快手段。
 
 
