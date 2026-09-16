@@ -166,6 +166,8 @@ The main AI document (repo root `AGENTS.md`, read by ZCode) pulls in this file v
 - **moon's native backend requires a system C compiler**: with no `cl/cc/gcc/clang` on PATH it directly reports "no system C compiler found". Fix: install VS Build Tools (`Microsoft.VisualStudio.Workload.VCTools`) and run moon/cmake from an **x64 Native Tools Command Prompt** (or call `vcvars64.bat` first).
 - **libyue's Windows sources need ATL headers** (`base/win/atl_throw.h` → `atldef.h`), which the VCTools workload does not include by default: C1083 cannot find atldef.h. Fix: VS Installer `modify --add Microsoft.VisualStudio.Component.VC.ATL`. Note **quiet/passive mode must be launched from an elevated process**, otherwise it exits immediately with Exit Code 5007 (logs in `%TEMP%\dd_installer_*.log`).
 - **`prepare.py` download 404**: release asset names differ from `platform.system()` — they are actually `libyue_{v}_win.zip` / `_mac.zip` (not windows/darwin). `prepare.py` fixed (ASSET_OS mapping); the macOS path fixed as a side effect.
+- **A Linux-only patch call in prepare.py sat outside the platform branch (caught on Windows, 2026-09-16)**: `patch_linux_drag_icon_hotspot()` was mis-indented outside the `if os_name == "Linux"` block, so prepare crashed on Windows (`FileNotFoundError: vendor\libyue\src\linux\...`) while Linux happened to work, hiding the bug. Fix: moved back inside the Linux branch. Lesson: when adding calls to platform-conditional patches, verify the indentation lands inside the right `if`; running prepare once on Windows is the fastest way to surface this class of bug.
+
 
 #### Link arguments (actual moon → cl/link behavior, all field-tested)
 

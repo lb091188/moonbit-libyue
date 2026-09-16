@@ -634,7 +634,7 @@ def main() -> None:
         patch_linux_global_shortcut_wayland()
         patch_linux_view_bounds_in_screen()
         patch_linux_table_checkbox_size()
-    patch_linux_drag_icon_hotspot()
+        patch_linux_drag_icon_hotspot()
     cmake_build()
     print("prepare 完成")
 
