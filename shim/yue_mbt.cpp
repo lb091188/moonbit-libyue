@@ -434,11 +434,11 @@ void yue_mbt_view_set_borderless(void *view, int on) {
       LONG_PTR ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
       LONG_PTR st = GetWindowLongPtrW(hwnd, GWL_STYLE);
       if (on) {
-        ex |= WS_EX_CLIENTEDGE;
-        st |= WS_BORDER;
-      } else {
         ex &= ~WS_EX_CLIENTEDGE;
         st &= ~WS_BORDER;
+      } else {
+        ex |= WS_EX_CLIENTEDGE;
+        st |= WS_BORDER;
       }
       SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex);
       SetWindowLongPtrW(hwnd, GWL_STYLE, st);
@@ -2466,6 +2466,8 @@ void *yue_mbt_popover_new(void) {
 // Windows 桩：无边框、不激活的小窗口 + 8 秒自动关闭
 // 替代窗口存储：展示中的气泡（供自动关闭定时器使用）
 nu::Window *g_active_popover_window = nullptr;
+// 固定定时器 id：重复 show 时重置同一计时
+constexpr UINT_PTR kPopoverAutoCloseTimerId = 0x705D;
 
 void CALLBACK PopoverAutoCloseTimer(HWND, UINT, UINT_PTR id, DWORD) {
   ::KillTimer(nullptr, id);
@@ -2580,21 +2582,21 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view) {
   if (win == nullptr || v == nullptr) {
     return;
   }
-  // 锚定到当前光标位置（触发弹出的点击就在锚点控件上）的右下方，
-  // ViewImpl 不公开 hwnd，用光标避免触碰 libyue 私有接口
-  POINT pt{};
-  if (!::GetCursorPos(&pt)) {
-    pt.x = 0;
-    pt.y = 0;
-  }
+  // 锚定控件屏幕包围盒正下方(libyue 公开 API,不依赖光标位置)
+  const nu::RectF anchor = v->GetBoundsInScreen();
+  const nu::SizeF size = win->GetContentSize();
+  const float x = anchor.x() + (anchor.width() - size.width()) / 2.0f;
+  const float y = anchor.bottom() + 2.0f;
   win->SetVisible(true);
-  ::SetWindowPos(win->GetNative()->hwnd(), HWND_TOPMOST, pt.x + 8, pt.y + 18, 0,
-                 0, SWP_NOSIZE | SWP_NOACTIVATE);
-  std::fprintf(stderr, "popover: shown visible=%d at (%ld,%ld)\n",
-               (int)win->IsVisible(), (long)pt.x + 8, (long)pt.y + 18);
-  // 8 秒后自动关闭（无外部点击关闭钩子，定时兜底）
+  ::SetWindowPos(win->GetNative()->hwnd(), HWND_TOPMOST,
+                 static_cast<int>(x), static_cast<int>(y), 0, 0,
+                 SWP_NOSIZE | SWP_NOACTIVATE);
+  std::fprintf(stderr, "popover: shown visible=%d at (%f,%f)\n",
+               (int)win->IsVisible(), x, y);
+  // 8 秒后自动关闭（无外部点击关闭钩子，定时兜底）；固定 id，
+  // 每次 show 重置同一计时，避免旧计时器在输入中途误关弹层
   g_active_popover_window = win;
-  ::SetTimer(nullptr, 0, 8000, PopoverAutoCloseTimer);
+  ::SetTimer(nullptr, kPopoverAutoCloseTimerId, 8000, PopoverAutoCloseTimer);
 }
 #endif
 
@@ -3881,11 +3883,43 @@ double yue_mbt_scroll_get_max_position_y(void *scroll) {
   return 0.0;
 }
 
+#if defined(OS_WIN)
+// Windows:on_scroll 信号发射在 ScrollImpl::Layout 重摆内容之前,
+// 回调里立即强制 Layout 会用滚动前的旧 size_allocation 定位原生
+// HWND(EDIT/DATETIMEPICK),控件被钉在旧位置遮挡已滚上来的内容。
+// 用 0ms 定时器把回调推迟到本次滚动布局全部完成之后执行。
+namespace {
+struct DeferredScrollCallback {
+  int32_t (*invoke)(void *);
+  void *closure;
+};
+std::map<UINT_PTR, DeferredScrollCallback> g_deferred_scroll_callbacks;
+void CALLBACK DeferredScrollTimer(HWND, UINT, UINT_PTR id, DWORD) {
+  ::KillTimer(nullptr, id);
+  const auto it = g_deferred_scroll_callbacks.find(id);
+  if (it == g_deferred_scroll_callbacks.end())
+    return;
+  const DeferredScrollCallback cb = it->second;
+  g_deferred_scroll_callbacks.erase(it);
+  cb.invoke(cb.closure);
+}
+}  // namespace
+#endif
+
 void yue_mbt_scroll_on_scroll(void *scroll, int32_t (*invoke)(void *),
                               void *closure) {
   if (auto *s = CastTo<nu::Scroll>(scroll)) {
+#if defined(OS_WIN)
+    s->on_scroll.Connect([invoke, closure](nu::Scroll *) -> bool {
+      const UINT_PTR id = ::SetTimer(nullptr, 0, 0, DeferredScrollTimer);
+      if (id != 0)
+        g_deferred_scroll_callbacks[id] = {invoke, closure};
+      return false;  // 回调已推迟,本次发射不吃返回值
+    });
+#else
     s->on_scroll.Connect(
         [invoke, closure](nu::Scroll *) { return invoke(closure) != 0; });
+#endif
   }
 }
 

@@ -475,6 +475,36 @@ def patch_linux_drag_icon_hotspot() -> None:
     print("已应用拖拽图标 hotspot 居中补丁")
 
 
+def patch_linux_popover_no_focus() -> None:
+    """vendor 补丁（Linux/GTK）：Popover 弹出不抢键盘焦点（幂等）。
+    上游 Popover::ShowRelativeTo 调 window_->Activate()（GTK 下
+    focus_on_map=true + present），键盘焦点被弹层窗口夺走——自动补全
+    弹出后退格/继续输入全部失效。改为仅 SetVisible（gtk_widget_set_visible
+    映射不带焦点），保留 SetCapture（指针抓取维持点击外部关闭）。
+    """
+    src = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_2.cc"
+    old = (
+        "  bounds.set_y(vbounds.bottom() + 1);\n"
+        "  window_->SetBounds(bounds);\n"
+        "  window_->Activate();\n"
+        "  window_->SetCapture();\n"
+    )
+    new = (
+        "  bounds.set_y(vbounds.bottom() + 1);\n"
+        "  window_->SetBounds(bounds);\n"
+        "  // moonbit-libyue 补丁:Activate 会抢键盘焦点(present+focus_on_map),\n"
+        "  // 弹层打开后输入框退格失效;仅映射窗口,焦点留在锚点控件\n"
+        "  window_->SetVisible(true);\n"
+        "  window_->SetCapture();\n"
+    )
+    text = src.read_text(encoding="utf-8")
+    if new not in text:
+        if old not in text:
+            raise SystemExit(f"vendor 补丁目标文本未找到（上游可能已变）：{src}")
+        src.write_text(text.replace(old, new, 1), encoding="utf-8")
+    print("已应用 Popover 不抢焦点补丁")
+
+
 def patch_linux_global_shortcut_wayland() -> None:
     """vendor 补丁（Linux/GTK）：GlobalShortcut 在 Wayland 会话优雅失败（幂等）。
     上游 global_shortcut_gtk.cc 直接用 GDK_WINDOW_XDISPLAY（X11 专属宏），
@@ -651,6 +681,7 @@ def main() -> None:
         patch_linux_view_bounds_in_screen()
         patch_linux_table_checkbox_size()
         patch_linux_drag_icon_hotspot()
+        patch_linux_popover_no_focus()
     cmake_build()
     print("prepare 完成")
 
