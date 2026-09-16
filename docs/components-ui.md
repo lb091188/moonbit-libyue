@@ -2,7 +2,17 @@
 
 Element-Plus-style, theme-unified non-form components built in pure MoonBit on top of the declarative layer — zero platform code. Together with the themed controls (`label_t` / `button_t` / `entry_t`) they form the recommended way to build modern desktop app shells (sidebar navigation + top bar + scrolling content), as seen in `examples/components`.
 
-**Theme**: all colors come from the `theme_*` constants — a deep, low-saturation palette (not Element Plus defaults): blue `#2D68C4`, green `#2E9E5B`, orange `#D9822B`, red `#D64550`, plus greys for text/border/fill. Components render straight corners, use background colors for hover/active states, and center text vertically.
+**Theme**: all colors come from the `theme_*` palette — a deep, low-saturation scheme (not Element Plus defaults): blue `#2D68C4`, green `#2E9E5B`, orange `#D9822B`, red `#D64550`, plus greys for text/border/fill. Components render straight corners, use background colors for hover/active states, and center text vertically.
+
+### Customizing the theme
+
+Call `theme_apply` after `initialize()` and before mounting the UI. Colors are read at draw/mount time, so self-drawn interactive components pick up the new palette on repaint; colors fixed at mount (static label text, borders) need a rebuilt UI. A full snapshot can be read back with `theme_current`.
+
+```moonbit
+@yue.initialize()
+let t = @yue.default_theme()
+@yue.theme_apply({ ..t, primary: "#1E4FA3", primary_light: "#E3EDFA" })
+```
 
 ## Themed controls
 

@@ -2,7 +2,17 @@
 
 纯 MoonBit 构建在声明式层之上的 Element Plus 风格、主题统一的非表单组件,零平台代码。与主题化控件(`label_t` / `button_t` / `entry_t`)一起,是搭建现代桌面应用外壳(侧边导航 + 顶栏 + 滚动内容)的推荐方式,完整演示见 `examples/components`。
 
-**主题**:全部颜色来自 `theme_*` 常量——深色低饱和配色(非 Element Plus 默认色):蓝 `#2D68C4`、绿 `#2E9E5B`、橙 `#D9822B`、红 `#D64550`,以及文字/边框/填充灰阶。组件一律直角,hover/active 用背景色表达,文字垂直居中。
+**主题**:全部颜色来自 `theme_*` 色板——深色低饱和配色(非 Element Plus 默认色):蓝 `#2D68C4`、绿 `#2E9E5B`、橙 `#D9822B`、红 `#D64550`,以及文字/边框/填充灰阶。组件一律直角,hover/active 用背景色表达,文字垂直居中。
+
+### 定制主题
+
+在 `initialize()` 之后、挂载界面之前调用 `theme_apply`。颜色在绘制/挂载时读取:自绘交互组件重绘即用新色;挂载时定死的颜色(静态文字、边框等)需重建界面才生效。当前值可用 `theme_current` 读回快照。
+
+```moonbit
+@yue.initialize()
+let t = @yue.default_theme()
+@yue.theme_apply({ ..t, primary: "#1E4FA3", primary_light: "#E3EDFA" })
+```
 
 ## 主题化控件
 
