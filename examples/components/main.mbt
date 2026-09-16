@@ -470,8 +470,8 @@ fn main {
       "form_item 行布局(标签右对齐 + 控件区)+ form 分组标题。",
       [
         @yue.form("用户设置", [
-          @yue.form_item("用户名", @yue.entry_t(text="moonbit")),
-          @yue.form_item("城市", @yue.entry_t(text="杭州")),
+          @yue.form_item("用户名", @yue.input_t(text="moonbit", width=200.0)),
+          @yue.form_item("城市", @yue.input_t(text="杭州", width=200.0)),
           @yue.form_item("数量", @yue.input_number(qty2, min=1.0, max=9.0)),
         ]),
       ],
