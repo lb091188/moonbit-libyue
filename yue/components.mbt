@@ -346,7 +346,8 @@ pub fn side_menu(
     nodes.push(
       stateful_item(
         it,
-        [("width", width), ("height", 40.0)],
+        // 外层 vbox 有 padding 6,项宽 = 总宽 − 两侧 padding,防向右溢出
+        [("width", width - 12.0), ("height", 40.0)],
         selected,
         side_menu_bg,
         side_menu_fg,
