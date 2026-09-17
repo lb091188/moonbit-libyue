@@ -135,13 +135,20 @@ def _copy_webview2_loader() -> None:
                MODULE_ROOT / "WebView2Loader.dll"]
     target = Path.cwd() / "WebView2Loader.dll"
     for src in sources:
-        if src is not None and src.exists():
-            # 先删目标再复制：共享卷上 os.path.samefile 会把独立文件误判
-            # 为同一文件(SameFileError)。
+        if src is None or not src.exists():
+            continue
+        if target.exists() and target.resolve() == src.resolve():
+            return  # cwd 即模块根：目标就是源文件，无需复制
+        # 共享卷上 os.path.samefile 会把独立文件误判为同一文件
+        # (SameFileError)，且先删目标再复制会在「目标即源」时自毁——
+        # 上面已用 resolve() 精确比较排除该情形，此处再兜底跳过异常。
+        try:
             if target.exists():
                 target.unlink()
             shutil.copyfile(src, target)
-            return
+        except (SameFileError, PermissionError):
+            pass
+        return
 
 
 def ensure_native_artifacts() -> None:
