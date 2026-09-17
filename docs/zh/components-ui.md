@@ -43,6 +43,7 @@ let t = @yue.default_theme()
 | API | 覆盖状态 |
 |---|---|
 | `side_menu(items, selected, width?)` | 悬停灰底、选中浅蓝底 + 强调条;经 `set_visible` 联动页面 |
+| `side_menu_sections(sections : Array[(String, Array[String])], selected, width?)` | 分组侧边菜单:组标题(次要色小字,不可点)+ 组内项(画法联动同 side_menu) |
 | `segmented(options, selected)` | 选中白底 + 主题色文字,悬停灰底 |
 | `breadcrumb(items, selected)` | 当前项深色,其余可点悬停变主题色 |
 | `pagination(current : Store[Int], pages)` | 当前页主题色实底,悬停浅蓝;‹ › 边界钳制 |
@@ -78,7 +79,7 @@ let t = @yue.default_theme()
 
 ## 演示
 
-`moon run examples/components` —— 四页演示板,覆盖每个组件与状态:
+`moon run examples/components` —— 五页演示板(按 EP 官方分类:基础/表单/导航/数据展示/反馈),左侧分组菜单(基础/进阶两组),覆盖每个组件与状态:
 
 ![基础组件](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-basic.png)
 

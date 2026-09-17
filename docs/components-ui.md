@@ -43,6 +43,7 @@ let t = @yue.default_theme()
 | API | States covered |
 |---|---|
 | `side_menu(items, selected, width?)` | hover grey, selected light-blue + accent bar; syncs pages via `set_visible` |
+| `side_menu_sections(sections : Array[(String, Array[String])], selected, width?)` | grouped side menu: group captions (secondary small text, not clickable) + items (same rendering/selection as side_menu) |
 | `segmented(options, selected)` | selected white + primary text, hover grey |
 | `breadcrumb(items, selected)` | current dark, others clickable with hover accent |
 | `pagination(current : Store[Int], pages)` | current page solid primary, hover light-blue; ‹ › clamped |
