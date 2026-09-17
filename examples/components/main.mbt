@@ -91,12 +91,39 @@ fn main {
   let wifi_on : @yue.Store[Bool] = @yue.Store::new(true)
   let locked : @yue.Store[Bool] = @yue.Store::new(false)
   let table_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new([
-    { cells: ["MoonBit", "2023", "多范式,云 + 端"], },
-    { cells: ["Rust", "2015", "系统编程"], },
-    { cells: ["Go", "2012", "云原生后端"], },
-    { cells: ["TypeScript", "2012", "前端大规模工程"], },
+    @yue.TableRow::make(["MoonBit", "2023", "多范式,云 + 端"]),
+    @yue.TableRow::make(["Rust", "2015", "系统编程"]),
+    @yue.TableRow::make(["Go", "2012", "云原生后端"]),
+    @yue.TableRow::make(["TypeScript", "2012", "前端大规模工程"]),
   ])
   let table_picked : @yue.Store[String] = @yue.Store::new("未选中")
+  let table_sel : @yue.Store[Array[Int]] = @yue.Store::new([])
+  let rich_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new([
+    {
+      cells: [
+        @yue.CellText("MoonBit"),
+        @yue.CellTag("编译型", @yue.Primary),
+        @yue.CellColorBox("#2D68C4", "主题蓝"),
+        @yue.CellLines(["多范式", "云 + 端"]),
+      ],
+    },
+    {
+      cells: [
+        @yue.CellText("Rust"),
+        @yue.CellTag("编译型", @yue.Primary),
+        @yue.CellColorBox("#D9822B", "主题橙"),
+        @yue.CellLines(["系统编程", "无 GC"]),
+      ],
+    },
+    {
+      cells: [
+        @yue.CellText("Python"),
+        @yue.CellTag("解释型", @yue.Warning),
+        @yue.CellColorBox("#2E9E5B", "主题绿"),
+        @yue.CellLines(["脚本", "AI 生态"]),
+      ],
+    },
+  ])
   sync.subscribe(fn(_v) { ignore(sync) })
   notify.subscribe(fn(_v) { ignore(notify) })
   counter.subscribe(fn(n) {
@@ -452,7 +479,11 @@ fn main {
           table_rows,
           width=440.0,
           on_row_click=fn(i, r) {
-            table_picked.set("第 \{i + 1} 行:\{r.cells[0]}")
+            let name = match r.cells[0] {
+              @yue.CellText(s) => s
+              _ => ""
+            }
+            table_picked.set("第 \{i + 1} 行:\{name}")
           },
         ),
         @yue.hbox(
@@ -460,7 +491,9 @@ fn main {
             @yue.button_t("添加一行", on_click=fn() {
               let n = table_rows.get().length() + 1
               let grown = table_rows.get().copy()
-              grown.push({ cells: ["新语言 \{n}", "2026", "演示 Store 驱动"] })
+              grown.push(
+                @yue.TableRow::make(["新语言 \{n}", "2026", "演示 Store 驱动"]),
+              )
               table_rows.set(grown)
             }),
             @yue.label("   "),
@@ -469,6 +502,24 @@ fn main {
           style=[("marginTop", 8.0)],
           style_str=[("alignItems", "center")],
         ),
+      ],
+    ),
+    section(
+      "Table 表格(多选 + 富单元格)",
+      "复选框列:行点击勾选,表头全选/清空(部分选中画横条);单元格支持 tag/颜色块/多行文本(行自动撑高)。",
+      [
+        @yue.table_t(
+          [
+            @yue.TableColumn::make("语言", 120.0),
+            @yue.TableColumn::make("类型", 100.0),
+            @yue.TableColumn::make("色板", 110.0),
+            @yue.TableColumn::make("特性", 0.0),
+          ],
+          rich_rows,
+          selection=table_sel,
+          width=460.0,
+        ),
+        @yue.bind_label(table_sel, fn(s) { "已选 \{s.length()} 行" }),
       ],
     ),
   ])

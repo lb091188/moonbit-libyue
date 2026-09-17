@@ -95,12 +95,12 @@
 - [x] autocomplete 自动补全 — entry_t 输入过滤 + 候选行点击回填(动态行重建)
 
 ### 第三批:table_t 全自绘表格
-- [ ] date_picker_t — 
+- [ ] date_picker_t — 和日历共用算法逻辑，采用和 自动补全的方式进行日历的自渲染，和 Element Pluas date Picker 样式
 
 纯 MoonBit 自绘(Container+Painter+Store,tree/transfer 同路线),零平台原生控件,三平台像素一致、theme_apply 即暗色。按级迭代,每级可独立交付:
 
 - [x] L1 静态表格 — 列定义(标题/宽/对齐)+ 行渲染 + 行点击选中 + hover 底 + 斑马纹 + 表头样式;数据经 Store[Array[Row]] 驱动(演示板「数据展示」页实测挂载;hover/斑马纹视觉待真机复验)
-- [ ] L2 选择与自定义单元格 — 复选框列(checkbox_t 画法)+ 多选/全选 + 自定义单元格(颜色块/tag/多行文本)
+- [x] L2 选择与自定义单元格 — 复选框列(checkbox_t 画法)+ 多选/全选 + 自定义单元格(颜色块/tag/多行文本)(演示板「数据展示」页实测挂载;勾选/全选交互待真机复验)
 - [ ] L3 虚拟化 — 按滚动 offset 只画可见行,万行级流畅(scroll 基座 + schedule_paint_rect 局部重绘)
 
 - [ ] select_t 下拉选择 — autocomplete 转正:未输入时弹出全量候选(Linux GtkEntryCompletion min key length=0 + 空 key 放行;Win/mac focus 时全量 refresh);只读形态可选

@@ -2778,17 +2778,67 @@ pub fn TableColumn::make(
 }
 
 ///|
-/// 表格行数据:单元格文本按列顺序排列,缺位补空。
+/// 表格单元格内容(自定义单元格):纯文本 / 语义 tag / 颜色块 / 多行文本。
+pub(all) enum TableCell {
+  CellText(String)
+  CellTag(String, SemanticType)
+  CellColorBox(String, String)
+  CellLines(Array[String])
+}
+
+///|
+/// 表格行数据:单元格按列顺序排列,缺位补空文本。
 pub(all) struct TableRow {
-  cells : Array[String]
+  cells : Array[TableCell]
+}
+
+///|
+/// 用纯文本数组建行(全部 CellText 的快捷方式)。
+pub fn TableRow::make(cells : Array[String]) -> TableRow {
+  let out : Array[TableCell] = []
+  for c in cells {
+    out.push(CellText(c))
+  }
+  { cells: out }
+}
+
+///|
+/// 表格复选框画法(同 checkbox_t):直角方框,选中实心主题色 + 白勾,
+/// 部分选中画横条;(x, y) 为 14x14 方框左上角。
+fn table_draw_check(
+  p : Painter,
+  x : Double,
+  y : Double,
+  checked : Bool,
+  partial : Bool,
+) -> Unit {
+  p.set_stroke_color(
+    if checked || partial { theme_primary() } else { theme_border() },
+  )
+  p.stroke_rect(x + 0.5, y + 0.5, 13.0, 13.0)
+  if checked {
+    p.set_fill_color(theme_primary())
+    p.fill_rect(x + 2.0, y + 2.0, 10.0, 10.0)
+    p.set_stroke_color("#FFFFFF")
+    for off in [0.0, 0.5] {
+      p.begin_path()
+      p.move_to(x + 3.9 + off, y + 7.4)
+      p.line_to(x + 6.0 + off, y + 9.5)
+      p.line_to(x + 10.8 + off, y + 4.4)
+      p.stroke()
+    }
+  } else if partial {
+    p.set_fill_color(theme_primary())
+    p.fill_rect(x + 4.0, y + 6.0, 6.0, 2.0)
+  }
 }
 
 ///|
 /// 行底色:选中 > 悬停 > 斑马纹(奇数行) > 透明。
-fn table_row_bg(i : Int, selected : Int, hover : Int) -> String {
-  if i == selected {
+fn table_row_bg(i : Int, selected : Bool, hover : Bool) -> String {
+  if selected {
     theme_primary_light()
-  } else if i == hover {
+  } else if hover {
     theme_fill_hover()
   } else if i % 2 == 1 {
     theme_fill_zebra()
@@ -2798,23 +2848,30 @@ fn table_row_bg(i : Int, selected : Int, hover : Int) -> String {
 }
 
 ///|
-/// 表格(EP Table,L1 静态):表头 + 斑马纹 + 悬停底色 + 行点击单选,
-/// 数据经 Store 驱动,set 后整表重建行。行底色/主题色在重绘时读取
-/// 当前主题快照,theme_apply 即时生效。
+/// 表格(EP Table):表头 + 斑马纹 + 悬停底色 + Store 驱动(set 后整表
+/// 重建行并清空选择)。不传 selection 时行点击单选高亮;传入
+/// selection(Store[Array[Int]])启用复选框列:行点击勾选,表头全选/
+/// 清空(部分选中画横条),选中行浅蓝底。单元格支持 CellText/CellTag/
+/// CellColorBox/CellLines(多行文本的行自动撑高)。主题色在重绘时读取
+/// 当前快照,theme_apply 即时生效。
 pub fn table_t(
   columns : Array[TableColumn],
   rows : Store[Array[TableRow]],
   width? : Double = 560.0,
   row_height? : Double = 36.0,
+  selection? : Store[Array[Int]],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) { },
 ) -> Node {
   {
     mount: fn(parent) {
       let font = Font::new("Sans", 13.0)
+      let small_font = Font::new("Sans", 12.0)
       let head_font = Font::new("Sans", 13.0, weight=SemiBold)
+      let sel = selection
       let selected_i = Ref(-1)
       let hover_i = Ref(-1)
       let row_cs : Ref[Array[Container]] = Ref([])
+      let data_r : Ref[Array[TableRow]] = Ref([])
       let head_h = 40.0
       // 1px 内边距让外框描边落在 padding 环里,不被行/表头背景盖住
       let outer = Container::make(
@@ -2826,23 +2883,121 @@ pub fn table_t(
         p.set_stroke_color(theme_border())
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
       })
-      // 单元格:定宽列给 width,弹性列给 flex;左右各留 12px 内边距
-      fn cell(
-        text : String,
+
+      fn sel_has(i : Int) -> Bool {
+        match sel {
+          Some(s) => {
+            for x in s.get() {
+              if x == i {
+                return true
+              }
+            }
+            false
+          }
+          None => false
+        }
+      }
+
+      fn toggle_sel(i : Int) -> Unit {
+        match sel {
+          Some(s) => {
+            let out : Array[Int] = []
+            let mut had = false
+            for x in s.get() {
+              if x == i {
+                had = true
+              } else {
+                out.push(x)
+              }
+            }
+            if !had {
+              out.push(i)
+            }
+            s.set(out)
+          }
+          None => ()
+        }
+      }
+
+      // 单元格:定宽列给 width,弹性列给 flex,左右各留 12px 内边距
+      fn cell_view(
+        content : TableCell,
         col : TableColumn,
         fnt : Font,
         color : String,
-      ) -> Label {
+      ) -> Container {
         let base : Array[(String, Double)] = if col.width > 0.0 {
           [("width", col.width), ("paddingLeft", 12.0), ("paddingRight", 12.0)]
         } else {
           [("flex", 1.0), ("paddingLeft", 12.0), ("paddingRight", 12.0)]
         }
-        let l = Label::make(text, style=base)
-        l.set_font(fnt)
-        l.set_color(color)
-        l.set_align(col.align)
-        l
+        let wrap = Container::make(
+          style=base,
+          style_str=[("flexDirection", "row"), ("alignItems", "center")],
+        )
+        match content {
+          CellText(text) => {
+            let l = Label::new(text)
+            l.set_font(fnt)
+            l.set_color(color)
+            l.set_align(col.align)
+            l.set_style("flex", 1.0)
+            wrap.add_child(l)
+          }
+          CellTag(text, t) => {
+            let probe = AttributedText::new(text, wrap=false)
+            probe.set_font(small_font)
+            let text_w = probe.get_bounds_for(10000.0, 100.0).width
+            let w = text_w + 14.0
+            let tg = Container::make(style=[("width", w), ("height", 20.0)])
+            tg.on_draw(fn(p) {
+              p.set_fill_color(type_light_color(t))
+              p.fill_rect(0.0, 0.0, w, 20.0)
+              p.draw_text(
+                text,
+                (w - text_w) / 2.0,
+                0.0,
+                w,
+                20.0,
+                valign=Center,
+                color=type_color(t),
+              )
+            })
+            wrap.add_child(tg)
+          }
+          CellColorBox(hex, name) => {
+            let sw = Container::make(style=[("width", 14.0), ("height", 14.0)])
+            sw.on_draw(fn(p) {
+              p.set_fill_color(hex)
+              p.fill_rect(0.0, 0.0, 14.0, 14.0)
+              p.set_stroke_color(theme_border())
+              p.stroke_rect(0.5, 0.5, 13.0, 13.0)
+            })
+            wrap.add_child(sw)
+            let l = Label::new(name)
+            l.set_font(small_font)
+            l.set_color(color)
+            l.set_align(col.align)
+            l.set_style("flex", 1.0)
+            l.set_style("marginLeft", 6.0)
+            wrap.add_child(l)
+          }
+          CellLines(lines) => {
+            let stack = Container::make(
+              style=[("paddingTop", 6.0), ("paddingBottom", 6.0)],
+              style_str=[("flexDirection", "column")],
+            )
+            for ln in lines {
+              let l = Label::new(ln)
+              l.set_font(small_font)
+              l.set_color(theme_text_regular())
+              stack.add_child(l)
+            }
+            stack.set_style("flex", 1.0)
+            wrap.add_child(stack)
+          }
+        }
+        wrap
       }
 
       // 表头:主题斑马色打底 + 底边分隔线,次级色加粗文字
@@ -2860,8 +3015,58 @@ pub fn table_t(
         p.line_to(b.width, b.height - 0.5)
         p.stroke()
       })
+      // 表头复选框(仅 selection 启用时):全选 / 清空,部分选中画横条
+      let head_cb = Container::make(style=[("width", 36.0), ("height", head_h)])
+      head_cb.on_draw(fn(p) {
+        let b = head_cb.get_bounds()
+        let n = data_r.val.length()
+        let k = match sel {
+          Some(s) => s.get().length()
+          None => 0
+        }
+        table_draw_check(
+          p,
+          11.0,
+          (b.height - 14.0) / 2.0,
+          n > 0 && k == n,
+          k > 0 && k < n,
+        )
+      })
+      head_cb.on_mouse_down(fn(e) {
+        if e.button == 1 {
+          match sel {
+            Some(s) => {
+              let n = data_r.val.length()
+              if n > 0 && s.get().length() == n {
+                s.set([])
+              } else {
+                let all : Array[Int] = []
+                for i in 0..<n {
+                  all.push(i)
+                }
+                s.set(all)
+              }
+            }
+            None => ()
+          }
+          true
+        } else {
+          false
+        }
+      })
+      match sel {
+        Some(_) => head.add_child(head_cb)
+        None => ()
+      }
       for col in columns {
-        head.add_child(cell(col.title, col, head_font, theme_text_secondary()))
+        head.add_child(
+          cell_view(
+            CellText(col.title),
+            col,
+            head_font,
+            theme_text_secondary(),
+          ),
+        )
       }
       let body = Container::make(style_str=[("flexDirection", "column")])
 
@@ -2877,26 +3082,55 @@ pub fn table_t(
           ignore(body.remove_child_view(v.view()))
         }
         row_cs.val = []
+        data_r.val = data
         selected_i.val = -1
         hover_i.val = -1
+        match sel {
+          Some(s) => s.set([])
+          None => ()
+        }
         for i in 0..<data.length() {
           let r = data[i]
           let idx = i
+          // minHeight:普通行 = row_height,含多行文本时自动撑高
           let row = Container::make(
-            style=[("height", row_height)],
+            style=[("minHeight", row_height)],
             style_str=[("flexDirection", "row"), ("alignItems", "center")],
           )
           row.on_draw(fn(p) {
-            let bg = table_row_bg(idx, selected_i.val, hover_i.val)
+            let bg = table_row_bg(idx, sel_has(idx), hover_i.val == idx)
             if bg != "" {
               let b = row.get_bounds()
               p.set_fill_color(bg)
               p.fill_rect(0.0, 0.0, b.width, b.height)
             }
           })
+          match sel {
+            Some(_) => {
+              let cb = Container::make(style=[("width", 36.0)])
+              cb.on_draw(fn(p) {
+                let b = cb.get_bounds()
+                table_draw_check(
+                  p,
+                  11.0,
+                  (b.height - 14.0) / 2.0,
+                  sel_has(idx),
+                  false,
+                )
+              })
+              row.add_child(cb)
+            }
+            None => ()
+          }
           for j in 0..<columns.length() {
-            let text = if j < r.cells.length() { r.cells[j] } else { "" }
-            row.add_child(cell(text, columns[j], font, theme_text_regular()))
+            let content = if j < r.cells.length() {
+              r.cells[j]
+            } else {
+              CellText("")
+            }
+            row.add_child(
+              cell_view(content, columns[j], font, theme_text_regular()),
+            )
           }
           row.on_mouse_enter(fn(_e) {
             hover_i.val = idx
@@ -2909,10 +3143,15 @@ pub fn table_t(
           })
           row.on_mouse_down(fn(e) {
             if e.button == 1 {
-              let prev = selected_i.val
-              selected_i.val = idx
-              refresh_row(prev)
-              refresh_row(idx)
+              match sel {
+                Some(_) => toggle_sel(idx)
+                None => {
+                  let prev = selected_i.val
+                  selected_i.val = idx
+                  refresh_row(prev)
+                  refresh_row(idx)
+                }
+              }
               on_row_click(idx, r)
               true
             } else {
@@ -2922,10 +3161,21 @@ pub fn table_t(
           body.add_child(row)
           row_cs.val.push(row)
         }
+        head_cb.schedule_paint()
       }
 
       rebuild(rows.get())
       rows.subscribe(rebuild)
+      match sel {
+        Some(s) =>
+          s.subscribe(fn(_v) {
+            for c in row_cs.val {
+              c.schedule_paint()
+            }
+            head_cb.schedule_paint()
+          })
+        None => ()
+      }
       outer.add_child(head)
       outer.add_child(body)
       attach(parent, outer.view())
