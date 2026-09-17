@@ -104,10 +104,10 @@
 - [x] L3 虚拟化 — 按滚动 offset 只画可见行,万行级流畅(实现为 table_v_t:整面 canvas 自绘 + 自管滚动,滚轮走 shim 新增 yue_mbt_view_on_wheel(Linux scroll-event);演示板 1 万行;流畅度与滚轮手感待真机复验)
 
 - [ ] select_t 下拉选择 — autocomplete 转正:未输入时弹出全量候选(Linux GtkEntryCompletion min key length=0 + 空 key 放行;Win/mac focus 时全量 refresh);只读形态可选
-- [ ] textarea_t 多行输入 — input_t 同套路(TextEdit + 自绘边框/聚焦色)
+- [x] textarea_t 多行输入 — input_t 同套路(TextEdit + 自绘边框/聚焦色/8px 内边距)(演示板「基础组件」页;滚动行为待真机复验)
 - [ ] slider_t 滑杆 — 自绘轨道+thumb+拖拽;进度条配色经验可复用
 - [ ] tabs_t 页签 — 顶部页签形态(side_menu 为侧边形态)
-- [ ] divider 分隔线 — 最便宜,顺手
+- [x] divider 分隔线 — 水平/竖直,1px 主题边框色(演示板「基础组件」页)
 - [ ] tooltip_t / popover_t — 悬浮提示与气泡;autocomplete 的弹层机制可复用(Linux 弹层基座已探明)
 - [x] calendar_t 日历面板 — 日期网格自绘(独立于原生 DatePicker;与 date_picker_t 共用 build_calendar,42 格月网格 + ‹/› 切月 + 今天高亮;演示板「进阶」页)
 - [ ] rate_t 评分 — 星级自绘 + hover 预选
