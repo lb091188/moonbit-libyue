@@ -45,7 +45,7 @@ The themed layer keeps native rendering while providing a modern Element-Plus-st
 
 ### Classic — native widgets
 
-`moon run examples/showcase` — a 12-page demo covering the full native widget set (widgets / inputs / canvas / browser / table / dialogs / menus / tray / clipboard / events …):
+`moon run examples/showcase` — a 12-page demo of the full native widget set, grouped in the side menu (Basics / Layout & Drawing / Data Views / Window & System Integration; widgets / inputs / canvas / browser / table / dialogs / menus / tray / clipboard / events …):
 
 ![Showcase widgets page](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/widgets.png)
 

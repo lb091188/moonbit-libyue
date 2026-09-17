@@ -45,7 +45,7 @@
 
 ### 传统示例——原版控件
 
-`moon run examples/showcase` —— 12 页演示，覆盖原版控件全部能力（基础控件/输入/画布/网页/表格/对话框/菜单/托盘/剪贴板/事件…）——控件页：
+`moon run examples/showcase` —— 12 页演示，覆盖原版控件全部能力，侧边菜单四组导航（基础/布局与绘制/数据视图/窗口与系统集成；控件/输入/事件/画布/表格/网页/对话框/菜单/托盘/剪贴板/环境…）——控件页：
 
 ![showcase 控件页](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/widgets.png)
 

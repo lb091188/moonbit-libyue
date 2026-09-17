@@ -1,5 +1,6 @@
 // moonbit-libyue 全功能 Showcase：全部页面用声明式 API（Node/mount/Store）实现。
-// 结构：Tab 页签 × 小程序式分段（标题 + 说明 + 可玩演示），见 section.mbt；
+// 结构：分组侧边菜单（基础/布局与绘制/数据视图/系统集成）× 小程序式分段
+// （标题 + 说明 + 可玩演示），见 section.mbt；
 // 平台差异内容按 platform() 运行时条件组装（桌面环境、托盘后端、剪贴板
 // 主选区、自定义协议等只在对应平台出现）。
 
@@ -27,18 +28,32 @@ fn main {
     return
   }
   // 导航状态:自研 side_menu 组件(替代旧 Tab 页签),与页面联动。
-  let selected : @yue.Store[String] = @yue.Store::new("事件与拖拽")
+  let selected : @yue.Store[String] = @yue.Store::new("基础控件")
   let tabs = build_tabs()
-  let names : Array[String] = []
+  // 四组菜单:基础 → 布局与绘制 → 数据视图 → 窗口与系统集成
+  let menu_groups : Array[(String, Array[String])] = [
+    ("基础", ["基础控件", "输入与选择", "事件与拖拽"]),
+    ("布局与绘制", ["布局与容器", "画布与绘制"]),
+    ("数据视图", ["表格", "网页"]),
+    (
+      "窗口与系统集成",
+      [
+        "对话框与消息",
+        "菜单与快捷键",
+        "托盘与通知",
+        "剪贴板与系统",
+        "环境信息",
+      ],
+    ),
+  ]
   let page_nodes : Array[@yue.Node] = []
   for entry in tabs {
-    names.push(entry.0)
     page_nodes.push(showcase_page(entry.0, selected, entry.1))
   }
   let _ = @yue.mount_window(
     [
       @yue.hbox(style=[("flex", 1.0)], style_str=[("alignItems", "stretch")], [
-        @yue.side_menu(names, selected),
+        @yue.side_menu_sections(menu_groups, selected),
         @yue.vbox(page_nodes, style=[("flex", 1.0)], handle=fn(c) {
           c.set_background_color("#FFFFFF")
         }),
@@ -64,19 +79,20 @@ fn main {
 ///|
 /// 十二个页面:名称 + 声明式页面节点。
 fn build_tabs() -> Array[(String, @yue.Node)] {
+  // 顺序与侧边菜单四组一致:基础 → 布局与绘制 → 数据视图 → 系统集成
   [
     ("基础控件", page_basics()),
     ("输入与选择", page_inputs()),
+    ("事件与拖拽", page_events()),
     ("布局与容器", page_layout()),
     ("画布与绘制", page_canvas()),
-    ("网页", page_browser()),
     ("表格", page_table()),
+    ("网页", page_browser()),
     ("对话框与消息", page_dialogs()),
     ("菜单与快捷键", page_menu()),
     ("托盘与通知", page_tray()),
     ("剪贴板与系统", page_system()),
     ("环境信息", page_env()),
-    ("事件与拖拽", page_events()),
   ]
 }
 
