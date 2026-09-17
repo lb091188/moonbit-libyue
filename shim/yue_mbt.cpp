@@ -4729,10 +4729,27 @@ void yue_mbt_probe_dark(void *view) {
     ::SendMessageW(h, EM_SETCHARFORMAT, SCF_DEFAULT, reinterpret_cast<LPARAM>(&cf));
   }
   if (::lstrcmpiW(cls, L"msctls_progress32") == 0) {
+    // 启用视觉样式的进度条忽略 PBM 颜色消息, 先卸掉 theme 再上色
+    auto set_theme2 =
+        reinterpret_cast<HRESULT(__stdcall *)(HWND, LPCWSTR, LPCWSTR)>(
+            ::GetProcAddress(::GetModuleHandleW(L"uxtheme.dll"),
+                             "SetWindowTheme"));
+    if (set_theme2 != nullptr) {
+      set_theme2(h, L"", L"");
+    }
     ::SendMessageW(h, PBM_SETBKCOLOR, 0,
                    static_cast<LPARAM>(RGB(0x2A, 0x2D, 0x31)));
     ::SendMessageW(h, PBM_SETBARCOLOR, 0,
                    static_cast<LPARAM>(RGB(0x5B, 0x8D, 0xEF)));
+  }
+  if (::lstrcmpiW(cls, L"SysListView32") == 0) {
+    // Darkmode_Explorer 只覆盖滚动条/边框, 底色与文字色仍要 LVM 消息
+    ::SendMessageW(h, LVM_SETBKCOLOR, 0,
+                   static_cast<LPARAM>(RGB(0x20, 0x21, 0x24)));
+    ::SendMessageW(h, LVM_SETTEXTBKCOLOR, 0,
+                   static_cast<LPARAM>(RGB(0x20, 0x21, 0x24)));
+    ::SendMessageW(h, LVM_SETTEXTCOLOR, 0,
+                   static_cast<LPARAM>(RGB(0xE8, 0xEA, 0xED)));
   }
   ::RedrawWindow(h, nullptr, nullptr,
                  RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
