@@ -2719,12 +2719,25 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view) {
   const nu::SizeF size = win->GetContentSize();
   const float x = anchor.x() + (anchor.width() - size.width()) / 2.0f;
   const float y = anchor.bottom() + 2.0f;
+  // libyue 的 SetVisible 在此场景观测为不可见(Win10 真机 visible=0),
+  // 直接走 Win32:带尺寸定位 + SW_SHOWNOACTIVATE(不抢输入框焦点)
   win->SetVisible(true);
-  ::SetWindowPos(win->GetNative()->hwnd(), HWND_TOPMOST,
-                 static_cast<int>(x), static_cast<int>(y), 0, 0,
-                 SWP_NOSIZE | SWP_NOACTIVATE);
-  std::fprintf(stderr, "popover: shown visible=%d at (%f,%f)\n",
-               (int)win->IsVisible(), x, y);
+  HWND popup_hwnd = win->GetNative()->hwnd();
+  std::fprintf(stderr, "popover: show at (%.0f,%.0f) size (%.0fx%.0f) hwnd=%p\n",
+               x, y, size.width(), size.height(), static_cast<void *>(popup_hwnd));
+  if (popup_hwnd != nullptr) {
+    ::SetWindowPos(popup_hwnd, HWND_TOPMOST, static_cast<int>(x),
+                   static_cast<int>(y), static_cast<int>(size.width()),
+                   static_cast<int>(size.height()), SWP_NOACTIVATE);
+    ::ShowWindow(popup_hwnd, SW_SHOWNOACTIVATE);
+    RECT after;
+    if (::GetWindowRect(popup_hwnd, &after)) {
+      std::fprintf(stderr,
+                   "popover: after rect=(%ld,%ld,%ld,%ld) visible=%d\n",
+                   after.left, after.top, after.right, after.bottom,
+                   ::IsWindowVisible(popup_hwnd) ? 1 : 0);
+    }
+  }
   // 8 秒后自动关闭（无外部点击关闭钩子，定时兜底）；固定 id，
   // 每次 show 重置同一计时，避免旧计时器在输入中途误关弹层
   g_active_popover_window = win;
