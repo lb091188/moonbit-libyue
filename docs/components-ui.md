@@ -29,6 +29,7 @@ let t = @yue.default_theme()
 | `divider(vertical?, spacing?)` | divider line: horizontal (default) or vertical, 1px theme border color, spacing on both sides |
 | `slider_t(value : Store[Double], min?, max?, step?, width?, on_change?)` | self-drawn slider: light track + themed fill + square thumb, click/drag to set (step-quantized), external Store set also applies |
 | `tabs_t(pages : Array[(String, Node)], selected?)` | top tabs: active tab themed text + 2px bottom indicator, content switched via set_visible; `selected` is an index Store (internal 0 by default) |
+| `select_t(options, value : Store[String], width?, on_change?)` | dropdown select (EP style, fully self-drawn): read-only field + popover option list (hover highlight / ✓ on current), pick to fill, blur to close; use autocomplete for long lists (no in-popover scrolling) |
 | `calendar_t(on_pick?, value? : Store[DateYMD?])` | self-drawn month panel: ‹/› month nav + weekday row + 42-cell grid, adjacent-month days dimmed, "today" in theme primary, selected day as solid square; `DateYMD::format()` renders `YYYY-MM-DD` |
 
 ## Navigation

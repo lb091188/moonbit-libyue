@@ -29,6 +29,7 @@ let t = @yue.default_theme()
 | `divider(vertical?, spacing?)` | 分隔线:水平(默认)/竖直,1px 主题边框色,spacing 为两侧留白 |
 | `slider_t(value : Store[Double], min?, max?, step?, width?, on_change?)` | 自绘滑杆:浅灰轨道 + 主题色填充 + 方形 thumb,点击/拖拽调值(step 量化),外部 set 同样生效 |
 | `tabs_t(pages : Array[(String, Node)], selected?)` | 顶部页签:选中主题色文字 + 底部 2px 指示条,内容区 set_visible 切换;selected 为页序号 Store(缺省内部建 0) |
+| `select_t(options, value : Store[String], width?, on_change?)` | 下拉选择(EP 样式,全自绘):只读字段 + Popover 候选列表(悬停高亮/选中 ✓ 标记),点选回填,失焦收起;长列表用 autocomplete(弹层内不滚动) |
 | `calendar_t(on_pick?, value? : Store[DateYMD?])` | 自绘月历面板:‹/› 切月 + 星期行 + 42 格月网格,跨月灰显、「今天」主题色、选中实心方块;`DateYMD::format()` 出 `YYYY-MM-DD` |
 
 ## 导航

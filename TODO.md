@@ -103,7 +103,7 @@
 - [x] L2 选择与自定义单元格 — 复选框列(checkbox_t 画法)+ 多选/全选 + 自定义单元格(颜色块/tag/多行文本)(演示板「数据展示」页实测挂载;勾选/全选交互待真机复验)
 - [x] L3 虚拟化 — 按滚动 offset 只画可见行,万行级流畅(实现为 table_v_t:整面 canvas 自绘 + 自管滚动,滚轮走 shim 新增 yue_mbt_view_on_wheel(Linux scroll-event);演示板 1 万行;流畅度与滚轮手感待真机复验)
 
-- [ ] select_t 下拉选择 — autocomplete 转正:未输入时弹出全量候选(Linux GtkEntryCompletion min key length=0 + 空 key 放行;Win/mac focus 时全量 refresh);只读形态可选
+- [x] select_t 下拉选择 — 全自绘路线(date_picker_t 同款:只读字段 + Popover 候选列表,选中 ✓ 标记;演示板「进阶」页;弹层交互待真机复验)
 - [x] textarea_t 多行输入 — input_t 同套路(TextEdit + 自绘边框/聚焦色/8px 内边距)(演示板「基础组件」页;滚动行为待真机复验)
 - [x] slider_t 滑杆 — 自绘轨道+thumb+拖拽(step 量化/Store 驱动;演示板「基础组件」页;拖拽手感待真机复验)
 - [x] tabs_t 页签 — 顶部页签形态(选中指示条 + set_visible 切换;演示板「导航」页)
