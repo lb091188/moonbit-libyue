@@ -117,6 +117,11 @@ moon add NoahLiu/moonbit-libyue
 moon run src
 ```
 
+**注意工程须以 native 为目标**：本库仅支持 native 后端；`moon new` 模板默认
+`preferred_target = "wasm"`，会因 FFI 文件不参与编译而报 `ffi_* is unbound`，
+把工程 moon.mod 的 `preferred_target` 改为 `"native"`（或命令行加
+`--target native`）即可。
+
 Linux 侧链接期仍需 GTK 等系统开发包（见上文 apt 清单）；其他平台（如
 linux/arm64）自动回退源码构建，需具备 CMake 与 C++ 工具链。
 

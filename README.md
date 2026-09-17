@@ -119,6 +119,12 @@ moon add NoahLiu/moonbit-libyue
 moon run src
 ```
 
+**The project must target native**: this library only supports the native
+backend. The `moon new` template defaults to `preferred_target = "wasm"`,
+which fails with `ffi_* is unbound` because the FFI files are excluded from
+the wasm build; set `preferred_target = "native"` in the project's moon.mod
+(or pass `--target native`).
+
 On Linux the GTK development packages are still required at link time (see
 the apt list above); other platforms (e.g. linux/arm64) fall back to a
 source build that needs CMake and a C++ toolchain.
