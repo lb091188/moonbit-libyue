@@ -178,7 +178,14 @@ fn main {
     ],
   )
   let window = @yue.mount_window(
-    [@yue.scroll(content)],
+    [
+      // flex 1 让 Scroll 填满窗口可用区(与 showcase 同式,否则高度塌 0 空白)
+      @yue.scroll(
+        content,
+        style=[("flex", 1.0)],
+        style_str=[("alignItems", "stretch")],
+      ),
+    ],
     title="原生控件探测",
     size=Some((560.0, 720.0)),
     handle=fn(w) { win_holder.val = Some(w) },
