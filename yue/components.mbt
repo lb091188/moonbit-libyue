@@ -5146,3 +5146,44 @@ pub fn color_picker_t(
     },
   }
 }
+
+///|
+/// 分组侧边菜单(side_menu 的分组形态):每组一段小标题(不可点,次要色
+/// 小字)+ 组内菜单项(画法与 side_menu 一致,选中/悬停联动 selected)。
+pub fn side_menu_sections(
+  sections : Array[(String, Array[String])],
+  selected : Store[String],
+  width? : Double = 180.0,
+) -> Node {
+  let nodes : Array[Node] = []
+  for (group, items) in sections {
+    // 组标题:次要色小字,不可点
+    nodes.push(
+      label(
+        group,
+        style=[("paddingLeft", 16.0), ("paddingTop", 10.0), ("height", 24.0)],
+        handle=fn(l) {
+          l.set_font(Font::new("Sans", 12.0))
+          l.set_color(theme_text_secondary())
+        },
+      ),
+    )
+    for it in items {
+      nodes.push(
+        stateful_item(
+          it,
+          // 外层 vbox 有 padding 6,项宽 = 总宽 − 两侧 padding,防向右溢出
+          [("width", width - 12.0), ("height", 36.0)],
+          selected,
+          side_menu_bg,
+          side_menu_fg,
+          pad_x=20.0,
+          align_start=true,
+        ),
+      )
+    }
+  }
+  vbox(nodes, style=[("width", width), ("padding", 6.0)], handle=fn(c) {
+    c.set_background_color("#FFFFFF")
+  })
+}

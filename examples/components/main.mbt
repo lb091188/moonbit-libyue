@@ -152,7 +152,19 @@ fn main {
     let r = 0.25 + n.to_double() * 0.1
     ratio.set(if r > 1.0 { 1.0 } else { r })
   })
-  // ---------- 基础组件 ----------
+
+  let sc_handle : Ref[@yue.Scroll?] = Ref(None)
+  let tall : Array[@yue.Node] = []
+  for i in 0..<20 {
+    tall.push(
+      @yue.label_t(
+        "\{i + 1}. 向下滚动的内容行,点右下角 ↑ 回顶部",
+        role=@yue.Body,
+      ),
+    )
+  }
+
+  // ---------- 基础组件(EP Basic) ----------
   let p_basic = scroll_page([
     section(
       "Button 按钮变体",
@@ -174,6 +186,55 @@ fn main {
       ],
     ),
     section(
+      "Label 文字角色",
+      "Title / Section / Body / Secondary / Accent 五级排版,字号颜色随角色。",
+      [
+        @yue.label_t("标题文字(Title)", role=@yue.Title),
+        @yue.label_t("小节标题(Section)", role=@yue.Section),
+        @yue.label_t("正文文字(Body)", role=@yue.Body),
+        @yue.label_t("辅助文字(Secondary)", role=@yue.Secondary),
+        @yue.label_t("强调文字(Accent)", role=@yue.Accent),
+      ],
+    ),
+    section(
+      "Link 链接文字",
+      "主题色文字,悬停显示下划线,点击回调。",
+      [
+        @yue.hbox([
+          @yue.link("打开文档", fn() { picked_lang.set("docs") }),
+          @yue.label("   "),
+          @yue.link("帮助中心", fn() { picked_lang.set("help") }),
+          @yue.label("   最近点击:"),
+          @yue.bind_label(picked_lang, fn(s) { s }),
+        ]),
+      ],
+    ),
+    section(
+      "Divider 分隔线",
+      "水平(默认)/竖直 1px 主题边框色,spacing 控制两侧留白。",
+      [
+        @yue.label("上方内容"),
+        @yue.divider(spacing=6.0),
+        @yue.label("下方内容"),
+      ],
+    ),
+    section(
+      "Tooltip 悬浮提示",
+      "tooltip_t 给任意节点包原生悬浮提示(系统样式;主题化气泡见反馈页 Popover)。",
+      [
+        @yue.hbox(
+          [
+            @yue.tooltip_t(@yue.button_t("悬停看提示"), "原生 tooltip:系统样式"),
+            @yue.tooltip_t(@yue.button_t("再来一个", variant=@yue.Soft), "第二个提示"),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
+      ],
+    ),
+  ])
+  // ---------- 表单组件(EP Form) ----------
+  let p_form = scroll_page([
+    section(
       "Input 输入框",
       "现代化主题唯一输入框:外层自绘 1px 边框(聚焦变主题蓝)+ 白底,内部 Entry 去原生边框与内阴影;margin 控制外边距,直角。",
       [
@@ -181,6 +242,84 @@ fn main {
           @yue.input_t(text="输入点什么…", margin=10.0),
           @yue.input_t(text="密码框", password=true),
         ]),
+      ],
+    ),
+    section(
+      "Textarea 多行输入",
+      "外层自绘边框(聚焦变主题色)+ 8px 内边距,内容超出按平台滚动。",
+      [
+        @yue.textarea_t(
+          text="多行文本输入演示。\n第二行内容。",
+          height=90.0,
+          width=300.0,
+        ),
+      ],
+    ),
+    section(
+      "InputNumber 数字输入器",
+      "-/+ 按钮步进(步长 1),范围 0..10 钳制,数值响应式。",
+      [
+        @yue.input_number(qty, min=0.0, max=10.0, step=1.0),
+        @yue.bind_label(qty, fn(v) { "当前数量:\{v.round()}" }, style=[
+          ("marginTop", 6.0),
+        ]),
+      ],
+    ),
+    section(
+      "Autocomplete 自动补全",
+      "输入过滤候选项,点击候选项回填。",
+      [
+        @yue.autocomplete(
+          ["MoonBit", "MoonShell", "组件库", "演示板", "深色主题"],
+          picked_lang,
+        ),
+      ],
+    ),
+    section(
+      "Select 下拉选择",
+      "只读字段 + 弹层候选(EP 样式):当前选中 ✓ 标记,点选回填。",
+      [
+        @yue.select_t(
+          ["杭州", "北京", "上海", "深圳", "广州"],
+          picked_lang,
+          width=170.0,
+        ),
+      ],
+    ),
+    section(
+      "DatePicker 日期选择",
+      "全自绘日历(EP 样式):点字段弹月历,‹/› 切月,点选回填;下方为内联 calendar_t 面板。",
+      [
+        @yue.hbox(
+          [
+            @yue.date_picker_t(value=dp_val, width=170.0),
+            @yue.label("   选中:"),
+            @yue.bind_label(dp_val, fn(d) {
+              match d {
+                Some(v) => v.format()
+                None => "未选"
+              }
+            }),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
+        @yue.calendar_t(),
+      ],
+    ),
+    section(
+      "Slider 滑杆",
+      "自绘轨道 + thumb,点击/拖拽调值(step 5 量化),值响应式。",
+      [
+        @yue.slider_t(slider_val, min=0.0, max=100.0, step=5.0),
+        @yue.bind_label(slider_val, fn(v) { "当前值:\{v.round()}" }),
+      ],
+    ),
+    section(
+      "Rate 评分",
+      "五角星:选中实心主题色、未选中描边灰,hover 预亮,点击评分。",
+      [
+        @yue.rate_t(rate_val, on_change=fn(v) { ignore(v) }),
+        @yue.bind_label(rate_val, fn(v) { "评分:\{v} 星" }),
       ],
     ),
     section(
@@ -238,16 +377,169 @@ fn main {
       ],
     ),
     section(
-      "Label 文字角色",
-      "Title / Section / Body / Secondary / Accent 五级排版,字号颜色随角色。",
+      "ColorPicker 取色器",
+      "预设色板:点击选色,选中主题色描边 + 白勾;hex 值响应式。",
+      [@yue.color_picker_t(picked_color)],
+    ),
+    section(
+      "Form 表单",
+      "form_item 行布局(标签右对齐 + 控件区)+ form 分组标题。",
       [
-        @yue.label_t("标题文字(Title)", role=@yue.Title),
-        @yue.label_t("小节标题(Section)", role=@yue.Section),
-        @yue.label_t("正文文字(Body)", role=@yue.Body),
-        @yue.label_t("辅助文字(Secondary)", role=@yue.Secondary),
-        @yue.label_t("强调文字(Accent)", role=@yue.Accent),
+        @yue.form("用户设置", [
+          @yue.form_item("用户名", @yue.input_t(text="moonbit", width=200.0)),
+          @yue.form_item("城市", @yue.input_t(text="杭州", width=200.0)),
+          @yue.form_item("数量", @yue.input_number(qty2, min=1.0, max=9.0)),
+        ]),
       ],
     ),
+  ])
+  // ---------- 导航组件(EP Navigation) ----------
+  let p_nav = scroll_page([
+    section(
+      "Side Menu 侧边导航",
+      "窗口左侧即本组件(分组形态 side_menu_sections):组标题不可点,菜单项悬停灰底、选中浅蓝底 + 主题色文字 + 左侧强调条,点击切换页面。",
+      [
+        @yue.descriptions([
+          ("悬停态", "浅灰底"),
+          ("选中态", "主题浅蓝底 + 主题色文字 + 3px 强调条"),
+          ("联动", "与分段控制器、面包屑共享同一 Store"),
+        ]),
+      ],
+    ),
+    section(
+      "Segmented 分段控制器",
+      "顶栏导航:选中白底 + 主题色文字,悬停灰底过渡;与左侧菜单共享状态。",
+      [
+        @yue.segmented(
+          ["基础组件", "表单组件", "导航组件", "数据展示", "反馈组件"],
+          selected,
+        ),
+      ],
+    ),
+    section(
+      "Tabs 页签",
+      "顶部页签形态:选中主题色文字 + 底部指示条,内容区切换。",
+      [
+        @yue.tabs_t([
+          (
+            "概览",
+            @yue.label_t("这里是概览页内容。", role=@yue.Body),
+          ),
+          (
+            "配置",
+            @yue.label_t("这里是配置页内容。", role=@yue.Body),
+          ),
+          (
+            "日志",
+            @yue.label_t("这里是日志页内容。", role=@yue.Body),
+          ),
+        ]),
+      ],
+    ),
+    section(
+      "Breadcrumb 面包屑",
+      "层级随选中态联动:当前项深色,其余灰色可点、悬停变主题色。",
+      [@yue.breadcrumb(["MoonShell", "控制台", "基础组件"], selected)],
+    ),
+    section(
+      "Pagination 分页",
+      "当前页主题色实底白字,悬停浅蓝;点击页码切换。",
+      [@yue.pagination(page_no, 5)],
+    ),
+    section(
+      "Steps 步骤条",
+      "完成/当前/待办三态:浅蓝、实底白字、灰;点按钮推进或回退。",
+      [
+        @yue.steps(["填写", "确认", "完成"], step),
+        @yue.hbox(
+          [
+            @yue.button_t("上一步", variant=@yue.Soft, on_click=fn() {
+              step.update(fn(n) {
+                let m = n - 1
+                if m < 0 {
+                  0
+                } else {
+                  m
+                }
+              })
+            }),
+            @yue.label(" "),
+            @yue.button_t(
+              "下一步",
+              variant=@yue.Solid,
+              on_click=fn() {
+                step.update(fn(n) {
+                  let m = n + 1
+                  if m > 2 {
+                    2
+                  } else {
+                    m
+                  }
+                })
+              },
+            ),
+          ],
+          style=[("marginTop", 8.0)],
+        ),
+      ],
+    ),
+    section(
+      "PageHeader 页头",
+      "‹ 返回(悬停变主题色)+ 标题 + 右侧操作区;点返回回到基础组件页。",
+      [
+        @yue.page_header(
+          "进阶组件",
+          fn() { selected.set("基础组件") },
+          actions=[@yue.button_t("页面操作", variant=@yue.Soft)],
+        ),
+      ],
+    ),
+    section(
+      "Backtop 返回顶部",
+      "滚动下方区域,点右下角 ↑ 按钮回顶部(scroll 句柄 + 定位 API)。",
+      [
+        @yue.vbox(
+          [
+            @yue.scroll(
+              @yue.vbox(tall, style=[("padding", 8.0)]),
+              style=[("flex", 1.0)],
+              handle=fn(s) { sc_handle.val = Some(s) },
+            ),
+            @yue.hbox(
+              [
+                @yue.label("        "),
+                @yue.backtop_t(fn() {
+                  match sc_handle.val {
+                    Some(s) => s.set_scroll_position(0.0, 0.0)
+                    None => ()
+                  }
+                }),
+              ],
+              style=[("padding", 4.0)],
+              style_str=[("alignItems", "center")],
+            ),
+          ],
+          style=[("height", 150.0)],
+          style_str=[("position", "relative"), ("flexDirection", "column")],
+        ),
+      ],
+    ),
+    section(
+      "DropdownMenu 下拉菜单",
+      "触发字段弹菜单项列表(\"-\" 为分隔线),悬停高亮,点击回调序号。",
+      [
+        @yue.dropdown_menu(
+              "操作",
+              ["打开", "保存", "-", "复制链接", "删除"],
+              fn(i) { picked_lang.set("菜单项 \{i}") },
+          width=140.0,
+        ),
+        @yue.bind_label(picked_lang, fn(s) { "最近操作:\{s}" }),
+      ],
+    ),
+  ])
+  // ---------- 数据展示(EP Data Display) ----------
+  let p_data = scroll_page([
     section(
       "Tag 标签",
       "五种语义类型(浅底深字)+ 自定义实底色;宽度按文本自适应,文字垂直居中。",
@@ -302,22 +594,6 @@ fn main {
       ],
     ),
     section(
-      "Alert 提示横幅",
-      "四种语义类型:左侧色条 + 类型浅底 + 同族深字,文字垂直居中。",
-      [
-        @yue.alert("成功提示:配置已保存。", @yue.Success),
-        @yue.alert("信息提示:有新版本可用。", @yue.Info),
-        @yue.alert("警告提示:磁盘剩余空间不足。", @yue.Warning),
-        @yue.alert("错误提示:网络连接已断开。", @yue.Danger),
-      ],
-    ),
-    section("Alert 可关闭", "点击右侧 ✕ 关闭整条横幅。", [
-      @yue.alert_closeable(
-        "可关闭横幅:点我右侧的 ✕ 试试。",
-        @yue.Warning,
-      ),
-    ]),
-    section(
       "Statistic 数值统计",
       "大号数值响应式:点下面的按钮,数值经 Store 自动刷新。",
       [
@@ -348,135 +624,18 @@ fn main {
       ],
     ),
     section(
-      "Slider 滑杆",
-      "自绘轨道 + thumb,点击/拖拽调值(step 5 量化),值响应式。",
+      "Card 卡片",
+      "标题栏 + 底部分隔线 + 边框,内容区自动留出标题高度。",
       [
-        @yue.slider_t(slider_val, min=0.0, max=100.0, step=5.0),
-        @yue.bind_label(slider_val, fn(v) { "当前值:\{v.round()}" }),
-      ],
-    ),
-    section(
-      "Textarea 多行输入 + Divider 分隔线",
-      "外层自绘边框(聚焦变主题色)+ 内边距;分隔线上方一条水平线。",
-      [
-        @yue.divider(),
-        @yue.textarea_t(
-          text="多行文本输入演示。\n第二行内容。",
-          height=90.0,
-          width=300.0,
-        ),
-      ],
-    ),
-  ])
-  // ---------- 导航 ----------
-  let p_nav = scroll_page([
-    section(
-      "Segmented 分段控制器",
-      "顶栏导航:选中白底 + 主题色文字,悬停灰底过渡;与左侧菜单共享状态。",
-      [
-        @yue.segmented(
-          ["基础组件", "导航", "数据展示", "反馈"],
-          selected,
-        ),
-      ],
-    ),
-    section(
-      "Tabs 页签",
-      "顶部页签形态:选中主题色文字 + 底部指示条,内容区切换。",
-      [
-        @yue.tabs_t([
-          (
-            "概览",
-            @yue.label_t("这里是概览页内容。", role=@yue.Body),
-          ),
-          (
-            "配置",
-            @yue.label_t("这里是配置页内容。", role=@yue.Body),
-          ),
-          (
-            "日志",
-            @yue.label_t("这里是日志页内容。", role=@yue.Body),
-          ),
-        ]),
-      ],
-    ),
-    section(
-      "Breadcrumb 面包屑",
-      "层级随选中态联动:当前项深色,其余灰色可点、悬停变主题色。",
-      [@yue.breadcrumb(["MoonShell", "控制台", "基础组件"], selected)],
-    ),
-    section(
-      "Steps 步骤条",
-      "完成/当前/待办三态:浅蓝、实底白字、灰;点按钮推进或回退。",
-      [
-        @yue.steps(["填写", "确认", "完成"], step),
-        @yue.hbox(
+        @yue.card(
+          "卡片标题",
           [
-            @yue.button_t("上一步", variant=@yue.Soft, on_click=fn() {
-              step.update(fn(n) {
-                let m = n - 1
-                if m < 0 {
-                  0
-                } else {
-                  m
-                }
-              })
-            }),
-            @yue.label(" "),
-            @yue.button_t(
-              "下一步",
-              variant=@yue.Solid,
-              on_click=fn() {
-                step.update(fn(n) {
-                  let m = n + 1
-                  if m > 2 {
-                    2
-                  } else {
-                    m
-                  }
-                })
-              },
+            @yue.label(
+              "卡片内容:组件库全部用 theme_* 主题色着色。",
             ),
           ],
-          style=[("marginTop", 8.0)],
+          height=110.0,
         ),
-      ],
-    ),
-    section(
-      "Pagination 分页",
-      "当前页主题色实底白字,悬停浅蓝;点击页码切换。",
-      [@yue.pagination(page_no, 5)],
-    ),
-    section(
-      "Side Menu 侧边导航",
-      "窗口左侧即本组件:悬停灰底、选中浅蓝底 + 主题色文字 + 左侧强调条,点击切换页面。",
-      [
-        @yue.descriptions([
-          ("悬停态", "浅灰底"),
-          ("选中态", "主题浅蓝底 + 主题色文字 + 3px 强调条"),
-          ("联动", "与分段控制器、面包屑共享同一 Store"),
-        ]),
-      ],
-    ),
-  ])
-  // ---------- 数据展示 ----------
-  let p_data = scroll_page([
-    section("Descriptions 描述列表", "键灰值深的键值网格。", [
-      @yue.descriptions([
-        ("框架", "moonbit-libyue"),
-        ("渲染", "GTK 3 (Linux) / Win32 (Windows)"),
-        ("组件层", "纯 MoonBit,零平台代码"),
-      ]),
-    ]),
-    section(
-      "Timeline 时间线",
-      "左侧色点 + 竖线,节点颜色跟随语义类型;末项无连线。",
-      [
-        @yue.timeline([
-          ("发布 1.0", "2026-01-01,首个稳定版。", @yue.Success),
-          ("发布 1.1", "2026-05-01,新增组件库。", @yue.Primary),
-          ("进行中", "2.0 规划:终端组件。", @yue.Warning),
-        ]),
       ],
     ),
     section(
@@ -499,19 +658,22 @@ fn main {
         ]),
       ],
     ),
+    section("Descriptions 描述列表", "键灰值深的键值网格。", [
+      @yue.descriptions([
+        ("框架", "moonbit-libyue"),
+        ("渲染", "GTK 3 (Linux) / Win32 (Windows)"),
+        ("组件层", "纯 MoonBit,零平台代码"),
+      ]),
+    ]),
     section(
-      "Card 卡片",
-      "标题栏 + 底部分隔线 + 边框,内容区自动留出标题高度。",
+      "Timeline 时间线",
+      "左侧色点 + 竖线,节点颜色跟随语义类型;末项无连线。",
       [
-        @yue.card(
-          "卡片标题",
-          [
-            @yue.label(
-              "卡片内容:组件库全部用 theme_* 主题色着色。",
-            ),
-          ],
-          height=110.0,
-        ),
+        @yue.timeline([
+          ("发布 1.0", "2026-01-01,首个稳定版。", @yue.Success),
+          ("发布 1.1", "2026-05-01,新增组件库。", @yue.Primary),
+          ("进行中", "2.0 规划:终端组件。", @yue.Warning),
+        ]),
       ],
     ),
     section(
@@ -601,114 +763,6 @@ fn main {
       ],
     ),
     section(
-      "Carousel 轮播",
-      "面板序列 + 左右箭头 + 底部指示点,3 秒自动切换(悬停暂停)。",
-      [
-        @yue.carousel_t(
-          [
-            @yue.label_t("第一屏:轮播内容可为任意 Node。", role=@yue.Body),
-            @yue.label_t("第二屏:自动轮播 3s 一切。", role=@yue.Body),
-            @yue.label_t("第三屏:悬停暂停,箭头/圆点手动切。", role=@yue.Body),
-          ],
-          width=320.0,
-          height=80.0,
-        ),
-      ],
-    ),
-    section(
-      "ColorPicker 取色器",
-      "预设色板:点击选色,选中主题色描边 + 白勾;hex 值响应式。",
-      [@yue.color_picker_t(picked_color)],
-    ),
-  ])
-  // ---------- 进阶 ----------
-  let sc_handle : Ref[@yue.Scroll?] = Ref(None)
-  let tall : Array[@yue.Node] = []
-  for i in 0..<20 {
-    tall.push(
-      @yue.label_t(
-        "\{i + 1}. 向下滚动的内容行,点右下角 ↑ 回顶部",
-        role=@yue.Body,
-      ),
-    )
-  }
-  let p_adv = scroll_page([
-    section(
-      "InputNumber 数字输入器",
-      "-/+ 按钮步进(步长 1),范围 0..10 钳制,数值响应式。",
-      [
-        @yue.input_number(qty, min=0.0, max=10.0, step=1.0),
-        @yue.bind_label(qty, fn(v) { "当前数量:\{v.round()}" }, style=[
-          ("marginTop", 6.0),
-        ]),
-      ],
-    ),
-    section(
-      "Form 表单",
-      "form_item 行布局(标签右对齐 + 控件区)+ form 分组标题。",
-      [
-        @yue.form("用户设置", [
-          @yue.form_item("用户名", @yue.input_t(text="moonbit", width=200.0)),
-          @yue.form_item("城市", @yue.input_t(text="杭州", width=200.0)),
-          @yue.form_item("数量", @yue.input_number(qty2, min=1.0, max=9.0)),
-        ]),
-      ],
-    ),
-    section(
-      "Link 链接文字",
-      "主题色文字,悬停显示下划线,点击回调。",
-      [
-        @yue.hbox([
-          @yue.link("打开文档", fn() { picked_lang.set("docs") }),
-          @yue.label("   "),
-          @yue.link("帮助中心", fn() { picked_lang.set("help") }),
-          @yue.label("   最近点击:"),
-          @yue.bind_label(picked_lang, fn(s) { s }),
-        ]),
-      ],
-    ),
-    section(
-      "PageHeader 页头",
-      "‹ 返回(悬停变主题色)+ 标题 + 右侧操作区;点返回回到基础组件页。",
-      [
-        @yue.page_header(
-          "进阶组件",
-          fn() { selected.set("基础组件") },
-          actions=[@yue.button_t("页面操作", variant=@yue.Soft)],
-        ),
-      ],
-    ),
-    section(
-      "Backtop 返回顶部",
-      "滚动下方区域,点右下角 ↑ 按钮回顶部(scroll 句柄 + 定位 API)。",
-      [
-        @yue.vbox(
-          [
-            @yue.scroll(
-              @yue.vbox(tall, style=[("padding", 8.0)]),
-              style=[("flex", 1.0)],
-              handle=fn(s) { sc_handle.val = Some(s) },
-            ),
-            @yue.hbox(
-              [
-                @yue.label("        "),
-                @yue.backtop_t(fn() {
-                  match sc_handle.val {
-                    Some(s) => s.set_scroll_position(0.0, 0.0)
-                    None => ()
-                  }
-                }),
-              ],
-              style=[("padding", 4.0)],
-              style_str=[("alignItems", "center")],
-            ),
-          ],
-          style=[("height", 150.0)],
-          style_str=[("position", "relative"), ("flexDirection", "column")],
-        ),
-      ],
-    ),
-    section(
       "Tree 树形控件",
       "缩进层级 + 点击展开/折叠(▸/▾)。",
       [
@@ -736,82 +790,42 @@ fn main {
       [@yue.transfer(transfer_left, transfer_right)],
     ),
     section(
-      "Autocomplete 自动补全",
-      "输入过滤候选项,点击候选项回填。",
+      "Carousel 轮播",
+      "面板序列 + 左右箭头 + 底部指示点,3 秒自动切换(悬停暂停)。",
       [
-        @yue.autocomplete(
-          ["MoonBit", "MoonShell", "组件库", "演示板", "深色主题"],
-          picked_lang,
-        ),
-      ],
-    ),
-    section(
-      "Select 下拉选择",
-      "只读字段 + 弹层候选(EP 样式):当前选中 ✓ 标记,点选回填。",
-      [
-        @yue.select_t(
-          ["杭州", "北京", "上海", "深圳", "广州"],
-          picked_lang,
-          width=170.0,
-        ),
-      ],
-    ),
-    section(
-      "DropdownMenu 下拉菜单 + Popover 气泡",
-      "触发字段弹菜单项(\"-\" 为分隔线);popover_t 给任意节点包点击弹层。",
-      [
-        @yue.hbox(
+        @yue.carousel_t(
           [
-            @yue.dropdown_menu(
-              "操作",
-              ["打开", "保存", "-", "复制链接", "删除"],
-              fn(i) { picked_lang.set("菜单项 \{i}") },
-              width=140.0,
-            ),
-            @yue.label("  "),
-            @yue.popover_t(
-              @yue.button_t("气泡"),
-              @yue.label_t("气泡内容:任意 Node。", role=@yue.Body),
-              180.0,
-              60.0,
-            ),
+            @yue.label_t("第一屏:轮播内容可为任意 Node。", role=@yue.Body),
+            @yue.label_t("第二屏:自动轮播 3s 一切。", role=@yue.Body),
+            @yue.label_t("第三屏:悬停暂停,箭头/圆点手动切。", role=@yue.Body),
           ],
-          style_str=[("alignItems", "center")],
+          width=320.0,
+          height=80.0,
         ),
       ],
     ),
-    section(
-      "Rate 评分 + Tooltip",
-      "五角星 hover 预亮、点击评分;tooltip_t 包原生悬浮提示(鼠标悬停按钮上看提示)。",
-      [
-        @yue.rate_t(rate_val, on_change=fn(v) { ignore(v) }),
-        @yue.bind_label(rate_val, fn(v) { "评分:\{v} 星" }),
-        @yue.tooltip_t(@yue.button_t("悬停看提示"), "原生 tooltip:系统样式"),
-      ],
-    ),
-    section(
-      "DatePicker 日期选择",
-      "全自绘日历(EP 样式):点字段弹月历,‹/› 切月,点选回填;下方为内联 calendar_t 面板。",
-      [
-        @yue.hbox(
-          [
-            @yue.date_picker_t(value=dp_val, width=170.0),
-            @yue.label("   选中:"),
-            @yue.bind_label(dp_val, fn(d) {
-              match d {
-                Some(v) => v.format()
-                None => "未选"
-              }
-            }),
-          ],
-          style_str=[("alignItems", "center")],
-        ),
-        @yue.calendar_t(),
-      ],
-    ),
+    section("Empty 空状态", "占位图 + 说明文字。", [
+      @yue.empty("这里还没有内容"),
+    ]),
   ])
-  // ---------- 反馈 ----------
+  // ---------- 反馈组件(EP Feedback) ----------
   let p_feedback = scroll_page([
+    section(
+      "Alert 提示横幅",
+      "四种语义类型:左侧色条 + 类型浅底 + 同族深字,文字垂直居中。",
+      [
+        @yue.alert("成功提示:配置已保存。", @yue.Success),
+        @yue.alert("信息提示:有新版本可用。", @yue.Info),
+        @yue.alert("警告提示:磁盘剩余空间不足。", @yue.Warning),
+        @yue.alert("错误提示:网络连接已断开。", @yue.Danger),
+      ],
+    ),
+    section("Alert 可关闭", "点击右侧 ✕ 关闭整条横幅。", [
+      @yue.alert_closeable(
+        "可关闭横幅:点我右侧的 ✕ 试试。",
+        @yue.Warning,
+      ),
+    ]),
     section(
       "Result 结果页",
       "大色块符号 + 标题 + 描述 + 操作区;四种语义类型。",
@@ -830,20 +844,27 @@ fn main {
         ),
       ],
     ),
-    section("Empty 空状态", "占位图 + 说明文字。", [
-      @yue.empty("这里还没有内容"),
-    ]),
-    section("Statistic 复习", "统计数值也是响应式组件。", [
-      @yue.hbox([@yue.statistic("在线用户", @yue.Store::new("1,024"))], style_str=[
-        ("alignItems", "center"),
-      ]),
-    ]),
+    section(
+      "Popover 气泡弹层",
+      "popover_t 给任意节点包点击弹层:内容为任意 Node,再次点击收起。",
+      [
+        @yue.popover_t(
+          @yue.button_t("打开气泡"),
+          @yue.label_t("气泡内容:任意 Node。", role=@yue.Body),
+          180.0,
+          60.0,
+        ),
+      ],
+    ),
   ])
   let window = @yue.mount_window(
     [
       @yue.hbox(style=[("flex", 1.0)], style_str=[("alignItems", "stretch")], [
-        @yue.side_menu(
-          ["基础组件", "导航", "数据展示", "反馈", "进阶"],
+        @yue.side_menu_sections(
+          [
+            ("基础", ["基础组件", "表单组件"]),
+            ("进阶", ["导航组件", "数据展示", "反馈组件"]),
+          ],
           selected,
         ),
         @yue.vbox(
@@ -851,7 +872,7 @@ fn main {
             @yue.hbox(
               [
                 @yue.segmented(
-                  ["基础组件", "导航", "数据展示", "反馈", "进阶"],
+                  ["基础组件", "表单组件", "导航组件", "数据展示", "反馈组件"],
                   selected,
                 ),
                 @yue.label("      "),
@@ -863,10 +884,10 @@ fn main {
               handle=fn(c) { c.set_background_color("#FFFFFF") },
             ),
             page("基础组件", selected, p_basic),
-            page("导航", selected, p_nav),
+            page("表单组件", selected, p_form),
+            page("导航组件", selected, p_nav),
             page("数据展示", selected, p_data),
-            page("反馈", selected, p_feedback),
-            page("进阶", selected, p_adv),
+            page("反馈组件", selected, p_feedback),
           ],
           style=[("flex", 1.0)],
           handle=fn(c) { c.set_background_color("#F5F6F7") },
