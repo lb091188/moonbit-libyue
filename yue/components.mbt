@@ -4997,9 +4997,11 @@ pub fn carousel_t(
 
       // 面板与指示点先建好,切换只动 set_visible
       for i in 0..<n {
+        // 面板填满舞台(flex 拉高 + stretch 拉宽):固定宽会横向溢出
+        // 舞台(两侧箭头各占 24px),盖住右侧切换箭头的事件窗口
         let pc = Container::make(
-          style=[("width", width), ("height", height)],
-          style_str=[("flexDirection", "column")],
+          style=[("flex", 1.0)],
+          style_str=[("flexDirection", "column"), ("alignSelf", "stretch")],
         )
         pc.set_visible(i == 0)
         ignore((pages[i].mount)(pc.view()))
