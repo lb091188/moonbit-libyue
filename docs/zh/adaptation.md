@@ -172,6 +172,7 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **Windows 弹层「下拉用后卡死」(2026-09-17 真机反馈,静态定位)**:select/dropdown/color/autocomplete 的弹层根容器无显式尺寸时,Win 替代窗口(无边框置顶窗)与内容尺寸协商会布局震荡死循环(NUContainer preferred=0,与 GTK requisition 震荡同族);而 date 面板有显式宽高故正常。修复:**凡 Popover 弹层根容器一律显式宽高,且与 `set_content_size` 公式严格一致**(autocomplete 复用列表在 refresh 时同步)。若复验仍卡死,shim 的 Windows popover 已带 stderr 日志(`popover: show at …`/`popover: autoclose`),按「重定向日志→复现→取尾部」流程定位。
 - **carousel 右箭头点击多不生效(2026-09-17 真机反馈)**:面板容器用固定宽(= 舞台宽参数),但舞台被两侧箭头各占 24px,实际仅 272px——面板横向溢出 32px 盖住右箭头的事件窗口(溢出可见且事件窗口参与命中),点击多落在面板上。教训:**横向排布中兄弟控件旁的内容容器用 flex/stretch 填满,别用外层同宽的固定值**;溢出盖事件窗口的命中顺序不保证「后添加者在上」。
 - **日历「周六」列被裁一半(2026-09-17 真机反馈)**:面板显式宽给了内容需求 252(7×36),但 yoga 的 width 是 **border-box 语义(含 padding)**——加 padding 8×2 后内容区只剩 236,最后一列被裁 16px。教训:**显式 width + padding 的组合,width 必须写「内容需求 + 两侧 padding」**;此前高度公式已含 padding、宽度漏了,同一处公式两种口径就是这种 bug 的形状。
+- **取色器弹层「弹了但看不见」(2026-09-17 真机反馈,实证定位到锚点贴底越界)**:color_picker 在表单页深处,滚动后锚点贴近窗口底,弹层固定往锚点下方弹 → 越出工作区不可见。定位过程可复用:①临时 debug 例编程触发弹层 + 读 get_bounds——布局全部正常(grid 176×112/每格 26×26 在位);②程序化截图 + 像素统计(import -window root + PIL 数色块像素)——渲染正常。排除布局/绘制后唯一剩下的就是弹层窗口位置。修复(EP 同款行为):**锚点下方放不下时翻转到上方**——fork 的 `Popover::ShowRelativeTo` 补工作区判断(fork v0.15.6-mbt.2),shim 的 Windows 替代弹层(MonitorFromPoint + GetMonitorInfo 工作区)与 macOS 桩(nu::Screen)同步对齐,三平台一致。**注意**:moonbit-libyue 侧需等 fork 的 prebuilt CI 出包后把 LIBYUE_VERSION 升到 v0.15.6-mbt.2 并补 sha256,Linux 弹层翻转才生效(Win/mac 走 shim 即时生效)。
 
 ---
 
