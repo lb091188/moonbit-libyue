@@ -2686,29 +2686,500 @@ pub fn autocomplete(
 }
 
 ///|
-/// 日期字段:主题化行内标签 + 原生日期选择器。
-pub fn date_picker_t(label : String, on_change? : () -> Unit = fn() {  }) -> Node {
+/// 日期值(年月日,月/日按日常习惯 1 起始)。
+pub(all) struct DateYMD {
+  y : Int
+  m : Int
+  d : Int
+}
+
+///|
+fn date_leap(y : Int) -> Bool {
+  y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)
+}
+
+///|
+fn date_days_in_month(y : Int, m : Int) -> Int {
+  let days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  if m == 2 && date_leap(y) {
+    29
+  } else {
+    days[m - 1]
+  }
+}
+
+///|
+/// 星期几(0 = 周日 .. 6 = 周六),Sakamoto 算法。
+fn date_weekday(y : Int, m : Int, d : Int) -> Int {
+  let t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]
+  let yy = if m < 3 { y - 1 } else { y }
+  (yy + yy / 4 - yy / 100 + yy / 400 + t[m - 1] + d) % 7
+}
+
+///|
+/// 格式化为 YYYY-MM-DD(月/日不足两位补零)。
+pub fn DateYMD::format(self : DateYMD) -> String {
+  fn two(n : Int) -> String {
+    if n < 10 {
+      "0\{n}"
+    } else {
+      n.to_string()
+    }
+  }
+
+  "\{self.y}-\{two(self.m)}-\{two(self.d)}"
+}
+
+///|
+/// 本地时区的今天(日历"今天"高亮用)。
+fn local_date() -> DateYMD {
+  let v = ffi_local_date()
+  {
+    y: (v / 10000).to_int(),
+    m: ((v % 10000) / 100).to_int(),
+    d: (v % 100).to_int(),
+  }
+}
+
+///|
+/// 构建自绘日历面板(头部 ‹/› 导航 + 星期行 + 42 格月网格),calendar_t
+/// 与 date_picker_t 共用。点击当月日期写入 sel 后回调 on_pick;返回面板
+/// 与「按当前状态重建网格」函数(外部改 sel 后手动调用刷新)。
+fn build_calendar(
+  today : DateYMD,
+  sel : Ref[DateYMD?],
+  on_pick : (DateYMD) -> Unit,
+) -> (Container, () -> Unit) {
+  let cell_w = 36.0
+  let cell_h = 30.0
+  let small_font = Font::new("Sans", 12.0)
+  let panel = Container::make(
+    style=[("width", cell_w * 7.0), ("padding", 8.0)],
+    style_str=[("flexDirection", "column")],
+  )
+  panel.set_background_color("#FFFFFF")
+  panel.on_draw(fn(p) {
+    let b = panel.get_bounds()
+    p.set_stroke_color(theme_border())
+    p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+  })
+  let view_y = Ref(today.y)
+  let view_m = Ref(today.m)
+  // 文本水平居中(GTK 端 draw_text 的 align 未实现,一律测宽手动摆位)
+  fn draw_center(
+    p : Painter,
+    text : String,
+    y : Double,
+    h : Double,
+    color : String,
+  ) -> Unit {
+    let probe = AttributedText::new(text, wrap=false)
+    probe.set_font(small_font)
+    let tw = probe.get_bounds_for(10000.0, 100.0).width
+    p.draw_text(text, (cell_w - tw) / 2.0, y, cell_w, h, valign=Center, color=color)
+  }
+
+  let head_h = 32.0
+  let head = Container::make(
+    style=[("height", head_h), ("marginBottom", 4.0)],
+    style_str=[("flexDirection", "row"), ("alignItems", "center")],
+  )
+  let title_text = Ref("")
+  let title = Container::make(
+    style=[("flex", 1.0), ("height", head_h)],
+  )
+  title.on_draw(fn(p) {
+    let b = title.get_bounds()
+    let probe = AttributedText::new(title_text.val, wrap=false)
+    probe.set_font(small_font)
+    let tw = probe.get_bounds_for(10000.0, 100.0).width
+    p.draw_text(
+      title_text.val,
+      (b.width - tw) / 2.0,
+      0.0,
+      b.width,
+      b.height,
+      valign=Center,
+      color=theme_text_primary(),
+    )
+  })
+  fn nav_btn(glyph : String, on_click : () -> Unit) -> Container {
+    let hover = Ref(false)
+    let b = Container::make(style=[("width", 28.0), ("height", head_h)])
+    b.on_draw(fn(p) {
+      let bb = b.get_bounds()
+      if hover.val {
+        p.set_fill_color(theme_fill_hover())
+        p.fill_rect(0.0, 0.0, bb.width, bb.height)
+      }
+      let probe = AttributedText::new(glyph, wrap=false)
+      probe.set_font(small_font)
+      let tw = probe.get_bounds_for(10000.0, 100.0).width
+      p.draw_text(
+        glyph,
+        (bb.width - tw) / 2.0,
+        0.0,
+        bb.width,
+        bb.height,
+        valign=Center,
+        color=theme_text_regular(),
+      )
+    })
+    b.on_mouse_enter(fn(_e) {
+      hover.val = true
+      b.schedule_paint()
+    })
+    b.on_mouse_leave(fn(_e) {
+      hover.val = false
+      b.schedule_paint()
+    })
+    b.on_mouse_down(fn(e) {
+      if e.button == 1 {
+        on_click()
+        true
+      } else {
+        false
+      }
+    })
+    b
+  }
+
+  // 导航按钮先于网格创建,经 Ref 间接调用重建函数
+  let rebuild_ref : Ref[() -> Unit] = Ref(fn() {  })
+  fn nav(delta : Int) -> Unit {
+    let mut m = view_m.val + delta
+    let mut y = view_y.val
+    if m < 1 {
+      m = 12
+      y = y - 1
+    }
+    if m > 12 {
+      m = 1
+      y = y + 1
+    }
+    view_y.val = y
+    view_m.val = m
+    (rebuild_ref.val)()
+  }
+
+  head.add_child(nav_btn("‹", fn() { nav(-1) }))
+  head.add_child(title)
+  head.add_child(nav_btn("›", fn() { nav(1) }))
+  let week_h = 26.0
+  let wk = Container::make(
+    style=[("height", week_h)],
+    style_str=[("flexDirection", "row")],
+  )
+  for name in ["日", "一", "二", "三", "四", "五", "六"] {
+    let wref = name
+    let c = Container::make(style=[("width", cell_w), ("height", week_h)])
+    c.on_draw(fn(p) {
+      let b = c.get_bounds()
+      draw_center(p, wref, 0.0, b.height, theme_text_secondary())
+    })
+    wk.add_child(c)
+  }
+  let grid = Container::make(style_str=[("flexDirection", "column")])
+  let cells : Ref[Array[Container]] = Ref([])
+  let grid_rows : Ref[Array[Container]] = Ref([])
+
+  fn rebuild_grid() -> Unit {
+    for v in grid_rows.val {
+      ignore(grid.remove_child_view(v.view()))
+    }
+    grid_rows.val = []
+    cells.val = []
+    let y = view_y.val
+    let m = view_m.val
+    title_text.val = "\{y} 年 \{m} 月"
+    title.schedule_paint()
+    let first_wd = date_weekday(y, m, 1)
+    let dim = date_days_in_month(y, m)
+    let dim_prev = date_days_in_month(
+      if m == 1 { y - 1 } else { y },
+      if m == 1 { 12 } else { m - 1 },
+    )
+    for row_i in 0..<6 {
+      let r = Container::make(style_str=[("flexDirection", "row")])
+      for col_i in 0..<7 {
+        let idx = row_i * 7 + col_i
+        let in_month = idx >= first_wd && idx < first_wd + dim
+        let dd = if idx < first_wd {
+          dim_prev - (first_wd - 1 - idx)
+        } else if in_month {
+          idx - first_wd + 1
+        } else {
+          idx - first_wd - dim + 1
+        }
+        let dy = if in_month || idx < first_wd {
+          if idx < first_wd && m == 1 {
+            y - 1
+          } else {
+            y
+          }
+        } else if m == 12 {
+          y + 1
+        } else {
+          y
+        }
+        let dm = if idx < first_wd {
+          if m == 1 {
+            12
+          } else {
+            m - 1
+          }
+        } else if in_month {
+          m
+        } else if m == 12 {
+          1
+        } else {
+          m + 1
+        }
+        let dymd : DateYMD = { y: dy, m: dm, d: dd }
+        let in_m = in_month
+        let hover = Ref(false)
+        let c = Container::make(style=[("width", cell_w), ("height", cell_h)])
+        c.on_draw(fn(p) {
+          let b = c.get_bounds()
+          let d = dymd
+          let is_sel = match sel.val {
+            Some(s) => s.y == d.y && s.m == d.m && s.d == d.d
+            None => false
+          }
+          if hover.val && !is_sel {
+            p.set_fill_color(theme_fill_hover())
+            p.fill_rect(0.0, 0.0, b.width, b.height)
+          }
+          if is_sel {
+            p.set_fill_color(theme_primary())
+            p.fill_rect(
+              (b.width - 28.0) / 2.0,
+              (b.height - 28.0) / 2.0,
+              28.0,
+              28.0,
+            )
+            draw_center(p, d.d.to_string(), 0.0, b.height, "#FFFFFF")
+          } else {
+            let color = if !in_m {
+              theme_text_secondary()
+            } else if today.y == d.y && today.m == d.m && today.d == d.d {
+              theme_primary()
+            } else {
+              theme_text_primary()
+            }
+            draw_center(p, d.d.to_string(), 0.0, b.height, color)
+          }
+        })
+        if in_m {
+          c.on_mouse_down(fn(e) {
+            if e.button == 1 {
+              sel.val = Some(dymd)
+              for cc in cells.val {
+                cc.schedule_paint()
+              }
+              on_pick(dymd)
+              true
+            } else {
+              false
+            }
+          })
+          c.on_mouse_enter(fn(_e) {
+            hover.val = true
+            c.schedule_paint()
+          })
+          c.on_mouse_leave(fn(_e) {
+            hover.val = false
+            c.schedule_paint()
+          })
+        }
+        r.add_child(c)
+        cells.val.push(c)
+      }
+      grid.add_child(r)
+      grid_rows.val.push(r)
+    }
+  }
+
+  rebuild_ref.val = rebuild_grid
+  rebuild_grid()
+  panel.add_child(head)
+  panel.add_child(wk)
+  panel.add_child(grid)
+  (panel, rebuild_grid)
+}
+
+///|
+/// 日历面板(EP DatePicker 的面板形态,全自绘):‹/› 切月 + 星期行 +
+/// 42 格月网格,跨月日期灰显,「今天」主题色,选中日期实心主题色方块。
+/// 点击当月日期回调 on_pick 并写入 value。
+pub fn calendar_t(
+  on_pick? : (DateYMD) -> Unit = fn(_d) {  },
+  value? : Store[DateYMD?],
+) -> Node {
   {
     mount: fn(parent) {
-      let row = Container::make(
-        style=[("height", 34.0), ("marginBottom", 10.0)],
+      let today = local_date()
+      let sel : Ref[DateYMD?] = Ref(match value {
+        Some(s) => s.get()
+        None => None
+      })
+      let (panel, refresh) = build_calendar(today, sel, fn(d) {
+        match value {
+          Some(s) => s.set(Some(d))
+          None => ()
+        }
+        on_pick(d)
+      })
+      match value {
+        Some(s) => s.subscribe(fn(_v) { refresh() })
+        None => ()
+      }
+      attach(parent, panel.view())
+      panel.view()
+    },
+  }
+}
+
+///|
+/// 日期选择器(EP DatePicker,全自绘):输入框样式字段,点击弹出
+/// 自绘日历面板(Popover 承载,三平台弹层基座见 shim),点选回填并收起;
+/// 点击其他区域(字段失焦)收起。选中间经 value 同步,回调收 DateYMD。
+pub fn date_picker_t(
+  value? : Store[DateYMD?],
+  on_change? : (DateYMD) -> Unit = fn(_d) {  },
+  width? : Double = 200.0,
+  placeholder? : String = "请选择日期",
+) -> Node {
+  {
+    mount: fn(parent) {
+      let today = local_date()
+      let fnt = Font::new("Sans", 13.0)
+      let sel : Ref[DateYMD?] = Ref(match value {
+        Some(s) => s.get()
+        None => None
+      })
+      let text = Ref(match sel.val {
+        Some(d) => d.format()
+        None => placeholder
+      })
+      let has_val = Ref(match sel.val {
+        Some(_) => true
+        None => false
+      })
+      let field = Container::make(
+        style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
-      let k = Label::new(label)
-      k.set_font(Font::new("Sans", 13.0))
-      k.set_color(theme_text_secondary())
-      k.set_align(End)
-      let kwrap = Container::make(style=[("width", 90.0), ("marginRight", 12.0)])
-      kwrap.add_child(k)
-      row.add_child(kwrap)
-      let dp = DatePicker::new()
-      dp.set_font(Font::new("Sans", 13.0))
-      // 显式给足宽度:Windows 主题按内容最小宽布局,过窄只显示年份
-      dp.set_style("width", 130.0)
-      dp.on_date_change(fn() { on_change() })
-      row.add_child(dp)
-      attach(parent, row.view())
-      row.view()
+      let focused = Ref(false)
+      field.on_draw(fn(p) {
+        let b = field.get_bounds()
+        p.set_stroke_color(
+          if focused.val { theme_primary() } else { theme_border() },
+        )
+        p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+        let probe = AttributedText::new(text.val, wrap=false)
+        probe.set_font(fnt)
+        p.draw_text(
+          text.val,
+          10.0,
+          0.0,
+          b.width - 30.0,
+          b.height,
+          valign=Center,
+          color=if has_val.val {
+            theme_text_primary()
+          } else {
+            theme_text_secondary()
+          },
+        )
+        // 右侧下拉小箭头(矢量自绘,不依赖字体字形)
+        p.set_fill_color(theme_text_secondary())
+        p.begin_path()
+        p.move_to(b.width - 20.0, b.height / 2.0 - 2.0)
+        p.line_to(b.width - 12.0, b.height / 2.0 - 2.0)
+        p.line_to(b.width - 16.0, b.height / 2.0 + 3.0)
+        p.close_path()
+        p.fill()
+      })
+      // 弹层与面板:首开时创建,面板重建函数挂入 grid_refresh 供外部同步
+      let pop : Ref[Popover?] = Ref(None)
+      let grid_refresh : Ref[() -> Unit] = Ref(fn() {  })
+      fn apply_date(d : DateYMD) -> Unit {
+        sel.val = Some(d)
+        text.val = d.format()
+        has_val.val = true
+        field.schedule_paint()
+        match value {
+          Some(s) => s.set(Some(d))
+          None => ()
+        }
+        on_change(d)
+      }
+
+      field.set_focusable(true)
+      field.on_focus_in(fn() {
+        focused.val = true
+        field.schedule_paint()
+        false
+      })
+      field.on_focus_out(fn() {
+        focused.val = false
+        field.schedule_paint()
+        match pop.val {
+          Some(p) => p.close()
+          None => ()
+        }
+        false
+      })
+      field.on_mouse_down(fn(e) {
+        if e.button == 1 {
+          field.focus()
+          match pop.val {
+            Some(_) => ()
+            None => {
+              let p = Popover::new()
+              let (panel, refresh) = build_calendar(today, sel, fn(d) {
+                apply_date(d)
+                p.close()
+              })
+              ignore(refresh)
+              grid_refresh.val = refresh
+              p.set_content(panel)
+              // 面板高:上下 padding 16 + 头 36 + 星期 26 + 6 行 x 30
+              p.set_content_size(268.0, 258.0)
+              pop.val = Some(p)
+            }
+          }
+          match pop.val {
+            Some(p) => p.show_relative_to(field)
+            None => ()
+          }
+          true
+        } else {
+          false
+        }
+      })
+      match value {
+        Some(s) =>
+          s.subscribe(fn(v) {
+            sel.val = v
+            match v {
+              Some(d) => {
+                text.val = d.format()
+                has_val.val = true
+              }
+              None => {
+                text.val = placeholder
+                has_val.val = false
+              }
+            }
+            field.schedule_paint()
+            ((grid_refresh.val))()
+          })
+        None => ()
+      }
+      attach(parent, field.view())
+      field.view()
     },
   }
 }

@@ -24,7 +24,8 @@ let t = @yue.default_theme()
 | `input_t(text?, password?, margin?, width?, height?)` | 直角边框 / 密码 | 外层自绘 1px 边框(聚焦变主题色),内部 Entry 经 `set_borderless` 去原生边框与内阴影 |
 | `checkbox_t(title, checked?, disabled?, on_change?)` | 正常 / 禁用 | 自绘直角勾选框:选中实心主题色 + 白勾,hover 边框变主题色 |
 | `autocomplete(options, value : Store[String], width?)` | 普通过滤 | 输入实时过滤候选,悬浮弹层(不挤压内容):Linux 原生 Popover、Windows 无边框置顶小窗口;点击候选项写入 Store,失焦/清空自动收起 |
-| `date_picker_t(label, on_change?)` | 日期 | 行内标签 + 原生日期选择器,组件内已给显式宽度(Windows 主题按内容最小宽布局) |
+| `date_picker_t(value? : Store[DateYMD?], on_change?, width?, placeholder?)` | 日期选择(EP 样式,全自绘):输入框样式字段,点击弹出 `calendar_t` 日历面板(Popover 承载),‹/› 切月,点选回填并收起,失焦收起 |
+| `calendar_t(on_pick?, value? : Store[DateYMD?])` | 自绘月历面板:‹/› 切月 + 星期行 + 42 格月网格,跨月灰显、「今天」主题色、选中实心方块;`DateYMD::format()` 出 `YYYY-MM-DD` |
 
 ## 导航
 

@@ -30,6 +30,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <csignal>
+#include <ctime>
 #include <typeinfo>
 #if defined(__linux__)
 #include <dlfcn.h>
@@ -3256,6 +3257,19 @@ int32_t yue_mbt_app_get_name(char *name_buf) {
 
 int32_t yue_mbt_appearance_is_dark(void) {
   return nu::Appearance::GetCurrent()->IsDarkScheme() ? 1 : 0;
+}
+
+/* 本地时区的今天,打包 Int64:y*10000+m*100+d(日历组件"今天"高亮用) */
+int64_t yue_mbt_local_date(void) {
+  std::time_t t = std::time(nullptr);
+  std::tm lt{};
+#if defined(_WIN32)
+  localtime_s(&lt, &t);
+#else
+  localtime_r(&t, &lt);
+#endif
+  return static_cast<int64_t>(lt.tm_year + 1900) * 10000 +
+         static_cast<int64_t>(lt.tm_mon + 1) * 100 + lt.tm_mday;
 }
 
 int32_t yue_mbt_locale_get(char *buf, int32_t cap) {

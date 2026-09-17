@@ -98,6 +98,7 @@ fn main {
   ])
   let table_picked : @yue.Store[String] = @yue.Store::new("未选中")
   let table_sel : @yue.Store[Array[Int]] = @yue.Store::new([])
+  let dp_val : @yue.Store[@yue.DateYMD?] = @yue.Store::new(None)
   let rich_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new([
     {
       cells: [
@@ -648,9 +649,24 @@ fn main {
       ],
     ),
     section(
-      "DatePicker 日期字段",
-      "主题行内标签 + 原生日期选择器。",
-      [@yue.date_picker_t("开始日期")],
+      "DatePicker 日期选择",
+      "全自绘日历(EP 样式):点字段弹月历,‹/› 切月,点选回填;下方为内联 calendar_t 面板。",
+      [
+        @yue.hbox(
+          [
+            @yue.date_picker_t(value=dp_val, width=170.0),
+            @yue.label("   选中:"),
+            @yue.bind_label(dp_val, fn(d) {
+              match d {
+                Some(v) => v.format()
+                None => "未选"
+              }
+            }),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
+        @yue.calendar_t(),
+      ],
     ),
   ])
   // ---------- 反馈 ----------
