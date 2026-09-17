@@ -475,6 +475,32 @@ def patch_linux_drag_icon_hotspot() -> None:
     print("已应用拖拽图标 hotspot 居中补丁")
 
 
+def patch_linux_view_style_selection() -> None:
+    """vendor 补丁（Linux/GTK）：SetColor/SetBackgroundColor 的通配 CSS
+    排除 selection 子节点（幂等）。上游用 `* { ... }` 且 provider 以
+    G_MAXUINT 挂在控件自身 style context 上，会把 GtkEntry/GtkTextView
+    的 selection 子节点一并染色：给 Entry 设白底后选区高亮也被刷成白色，
+    选中文字前景仍是主题定义的白色 → 白底白字看不见。改为
+    `*:not(selection)` 后 selection 恢复主题高亮色。
+    """
+    src = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_3.cc"
+    patches = [
+        ('base::StringPrintf("* { color: %s; }",',
+         'base::StringPrintf("*:not(selection) { color: %s; }",'),
+        ('base::StringPrintf("* { background-color: %s; }",',
+         'base::StringPrintf("*:not(selection) { background-color: %s; }",'),
+    ]
+    text = src.read_text(encoding="utf-8")
+    for old, new in patches:
+        if new in text:
+            continue  # 已应用（理论不可达：extract 每次还原原文件）
+        if old not in text:
+            raise SystemExit(f"vendor 补丁目标文本未找到（上游可能已变）：{src}")
+        text = text.replace(old, new)
+    src.write_text(text, encoding="utf-8")
+    print("已应用 View 颜色 CSS 排除 selection 补丁")
+
+
 def patch_linux_popover_no_focus() -> None:
     """vendor 补丁（Linux/GTK）：Popover 弹出不抢键盘焦点（幂等）。
     上游 Popover::ShowRelativeTo 调 window_->Activate()（GTK 下
@@ -682,6 +708,7 @@ def main() -> None:
         patch_linux_table_checkbox_size()
         patch_linux_drag_icon_hotspot()
         patch_linux_popover_no_focus()
+        patch_linux_view_style_selection()
     cmake_build()
     print("prepare 完成")
 
