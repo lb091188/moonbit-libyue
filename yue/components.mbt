@@ -3615,7 +3615,10 @@ pub fn table_t(
           })
           match sel {
             Some(_) => {
-              let cb = Container::make(style=[("width", 36.0)])
+              let cb = Container::make(
+                style=[("width", 36.0)],
+                style_str=[("alignSelf", "stretch")],
+              )
               cb.on_draw(fn(p) {
                 let b = cb.get_bounds()
                 table_draw_check(
@@ -3897,7 +3900,9 @@ pub fn table_v_t(
             theme_text_secondary(),
           )
         }
-        // 可见行窗口
+        // 可见行窗口(裁剪到表头以下,行滚动经过时不遮盖表头)
+        p.save()
+        p.clip_rect(0.0, head_h, b.width, vis_h)
         let first = (offset.val / row_height).to_int()
         let mut last = ((offset.val + vis_h) / row_height).ceil().to_int() + 1
         if last > n {
@@ -3997,6 +4002,7 @@ pub fn table_v_t(
             }
           }
         }
+        p.restore()
         // 滚动条(细 thumb,可拖拽)
         let th = total_h()
         if th > vis_h {
@@ -4760,7 +4766,9 @@ pub fn popover_t(
         match pop.val {
           None => {
             let p = Popover::new()
-            let holder = Container::make()
+            let holder = Container::make(
+              style=[("width", width), ("height", height)],
+            )
             ignore((content.mount)(holder.view()))
             p.set_content(holder)
             p.set_content_size(width, height)
