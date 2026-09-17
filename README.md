@@ -66,7 +66,9 @@ sudo apt install build-essential cmake pkg-config \
 ```
 
 Build the native library and run an example:
- **Note: the first build downloads libyue from GitHub.**
+**The first build downloads a prebuilt libyue static library from GitHub
+(seconds, no local C++ compilation of libyue); only the small shim file is
+compiled. Set `LIBYUE_FORCE_SOURCE=1` to fall back to a full source build.**
 
 ```sh
 moon run examples/hello
@@ -99,16 +101,27 @@ Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installe
 
 ```bat
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-python3 scripts\prepare.py
 moon run examples/hello
 ```
 
+(When the native artifacts are missing, moon invokes
+`python3 scripts\prepare.py` automatically; run it manually only inside
+the MSVC environment above.)
+
 ### Use as a dependency
+
+Prebuilt native libraries (Linux x64 / macOS universal / Windows x64) ship
+inside the package: after `moon add` everything builds and runs without
+compiling libyue's C++ sources locally:
 
 ```sh
 moon add NoahLiu/moonbit-libyue
 moon run src
 ```
+
+On Linux the GTK development packages are still required at link time (see
+the apt list above); other platforms (e.g. linux/arm64) fall back to a
+source build that needs CMake and a C++ toolchain.
 
 ### Declarative UI
 

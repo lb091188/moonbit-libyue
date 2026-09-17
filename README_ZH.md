@@ -66,7 +66,8 @@ sudo apt install build-essential cmake pkg-config \
 ```
 
 构建原生库并运行示例：
- **注意首次构建会到 github 下载 libyue 相关依赖**
+**首次构建从 GitHub 下载预编译的 libyue 静态库（秒级，无需本地编译 C++），
+仅 shim 单文件参与编译；设 `LIBYUE_FORCE_SOURCE=1` 可回退为源码全量构建。**
 
 ```sh
 moon run examples/hello
@@ -100,16 +101,24 @@ Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installe
 
 ```bat
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-python3 scripts\prepare.py
 moon run examples/hello
 ```
 
+（原生层缺失时 moon 会自动调 `python3 scripts\prepare.py` 补建；如需手动执行，
+须在上述 MSVC 环境中运行。）
+
 ### 作为依赖使用
+
+预编译的原生库（Linux x64 / macOS 通用二进制 / Windows x64）随包分发，
+`moon add` 后直接构建运行，无需本地编译 libyue 的 C++ 源码：
 
 ```sh
 moon add NoahLiu/moonbit-libyue
 moon run src
 ```
+
+Linux 侧链接期仍需 GTK 等系统开发包（见上文 apt 清单）；其他平台（如
+linux/arm64）自动回退源码构建，需具备 CMake 与 C++ 工具链。
 
 ### 声明式 UI
 

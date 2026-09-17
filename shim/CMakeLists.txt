@@ -1,6 +1,8 @@
 # 构建 libyue_mbt 静态库 = vendored libyue 源码 + 本 shim。
 # 平台源码分支与依赖完全对照 libyue 发行包自带的 CMakeLists.txt，
 # 由 scripts/prepare.py 驱动，一般不手动调用。
+# YUE_MBT_PREBUILT=ON 时只编译 shim（头文件来自预构建发行包），
+# libyue 本体直接用 build/ 下解出的预构建静态库，链接期并入。
 cmake_minimum_required(VERSION 3.13)
 # 官方指定 Windows 10 SDK；须在 project() 之前设置
 if(WIN32)
@@ -20,20 +22,27 @@ endif()
 
 set(LIBYUE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../vendor/libyue")
 
+option(YUE_MBT_PREBUILT "只编译 shim，libyue 用预构建静态库" OFF)
+
 # ---------- libyue 平台源码（与官方 CMakeLists 一致） ----------
-if(APPLE)
-  file(GLOB_RECURSE YUE_SOURCES
-       ${LIBYUE_DIR}/src/mac/*.cc ${LIBYUE_DIR}/src/mac/*.mm
-       ${LIBYUE_DIR}/src/mac/*.S ${LIBYUE_DIR}/src/mac/*.c)
-  set(YUE_NO_ARC_SOURCES ${YUE_SOURCES})
-  list(FILTER YUE_SOURCES EXCLUDE REGEX "allocator|nativeui")
-  list(FILTER YUE_NO_ARC_SOURCES INCLUDE REGEX "allocator|nativeui")
-elseif(WIN32)
-  file(GLOB_RECURSE YUE_SOURCES
-       ${LIBYUE_DIR}/src/win/*.cc ${LIBYUE_DIR}/src/win/*.c)
+if(NOT YUE_MBT_PREBUILT)
+  if(APPLE)
+    file(GLOB_RECURSE YUE_SOURCES
+         ${LIBYUE_DIR}/src/mac/*.cc ${LIBYUE_DIR}/src/mac/*.mm
+         ${LIBYUE_DIR}/src/mac/*.S ${LIBYUE_DIR}/src/mac/*.c)
+    set(YUE_NO_ARC_SOURCES ${YUE_SOURCES})
+    list(FILTER YUE_SOURCES EXCLUDE REGEX "allocator|nativeui")
+    list(FILTER YUE_NO_ARC_SOURCES INCLUDE REGEX "allocator|nativeui")
+  elseif(WIN32)
+    file(GLOB_RECURSE YUE_SOURCES
+         ${LIBYUE_DIR}/src/win/*.cc ${LIBYUE_DIR}/src/win/*.c)
+  else()
+    file(GLOB_RECURSE YUE_SOURCES
+         ${LIBYUE_DIR}/src/linux/*.cc ${LIBYUE_DIR}/src/linux/*.c)
+  endif()
 else()
-  file(GLOB_RECURSE YUE_SOURCES
-       ${LIBYUE_DIR}/src/linux/*.cc ${LIBYUE_DIR}/src/linux/*.c)
+  set(YUE_SOURCES "")
+  set(YUE_NO_ARC_SOURCES "")
 endif()
 
 add_library(yue_mbt STATIC ${YUE_SOURCES} yue_mbt.cpp)
@@ -71,10 +80,12 @@ target_include_directories(yue_mbt PRIVATE ${MOONBIT_INCLUDE_DIR})
 
 # ---------- macOS ----------
 if(APPLE)
-  # 官方源码树含 .S 汇编单元（base_jumbo_S.S 定义 CallWithEHFrame 等，
-  # ObjC 消息泵依赖）；不启用 ASM 语言时 CMake 静默跳过，链接期报
-  # undefined symbol（CI 实测）
-  enable_language(ASM)
+  if(NOT YUE_MBT_PREBUILT)
+    # 官方源码树含 .S 汇编单元（base_jumbo_S.S 定义 CallWithEHFrame 等，
+    # ObjC 消息泵依赖）；不启用 ASM 语言时 CMake 静默跳过，链接期报
+    # undefined symbol（CI 实测）
+    enable_language(ASM)
+  endif()
   find_library(APPKIT AppKit)
   find_library(CARBON Carbon)
   find_library(IOKIT IOKit)
@@ -88,13 +99,15 @@ if(APPLE)
     -Wno-deprecated-declarations -Wno-unguarded-availability-new)
   # 官方构建把禁用 ARC 的源文件单独编成第二个库，链接时两个都要。
   # 未在 macOS 上验证过，首次构建时按官方 CMakeLists 微调。
-  set(LIBYUE_NO_ARC "yue_mbt_noarc")
-  add_library(${LIBYUE_NO_ARC} STATIC ${YUE_NO_ARC_SOURCES})
-  target_include_directories(${LIBYUE_NO_ARC} PUBLIC
-    ${LIBYUE_DIR}/include
-    ${LIBYUE_DIR}/include/base/allocator/partition_allocator/src)
-  target_compile_features(${LIBYUE_NO_ARC} PUBLIC cxx_std_20)
-  set_property(TARGET yue_mbt APPEND PROPERTY COMPILE_OPTIONS -fobjc-arc -fno-objc-arc-exceptions)
+  if(NOT YUE_MBT_PREBUILT)
+    set(LIBYUE_NO_ARC "yue_mbt_noarc")
+    add_library(${LIBYUE_NO_ARC} STATIC ${YUE_NO_ARC_SOURCES})
+    target_include_directories(${LIBYUE_NO_ARC} PUBLIC
+      ${LIBYUE_DIR}/include
+      ${LIBYUE_DIR}/include/base/allocator/partition_allocator/src)
+    target_compile_features(${LIBYUE_NO_ARC} PUBLIC cxx_std_20)
+    set_property(TARGET yue_mbt APPEND PROPERTY COMPILE_OPTIONS -fobjc-arc -fno-objc-arc-exceptions)
+  endif()
 endif()
 
 # ---------- Windows ----------
@@ -128,14 +141,17 @@ if(WIN32)
     runtimeobject.lib ntdll.lib shcore.lib pdh.lib)
   target_compile_options(yue_mbt PRIVATE /wd4005 /wd4101 /wd4244 /wd4267 /wd4996)
 
-  # 浏览器优先 WebView2：需要 prepare.py 从 NuGet 补齐的头文件
-  # （loader DLL 由 libyue 运行时动态加载，无需链接导入库）
-  set(WEBVIEW2_SDK "${LIBYUE_DIR}/include/third_party/Microsoft.Web.WebView2.1.0.2903.40")
-  if(EXISTS "${WEBVIEW2_SDK}/build/native/include/WebView2.h")
+  # 浏览器优先 WebView2：需要发行包/预构建包自带的 SDK 头文件
+  # （loader DLL 由 libyue 运行时动态加载，无需链接导入库）。
+  # 版本号通配，跟随发行包内实际捆绑的 WebView2 SDK。
+  file(GLOB WEBVIEW2_SDK_DIRS
+       "${LIBYUE_DIR}/include/third_party/Microsoft.Web.WebView2.*")
+  if(WEBVIEW2_SDK_DIRS)
+    list(GET WEBVIEW2_SDK_DIRS 0 WEBVIEW2_SDK)
     target_compile_definitions(yue_mbt PUBLIC WEBVIEW2_SUPPORT)
     target_include_directories(yue_mbt PUBLIC "${WEBVIEW2_SDK}/build/native/include")
   else()
-    message(FATAL_ERROR "缺少 WebView2.h：请先运行 python3 scripts/prepare.py 补齐 WebView2 SDK")
+    message(FATAL_ERROR "缺少 WebView2 SDK：请先运行 python3 scripts/prepare.py")
   endif()
 endif()
 
