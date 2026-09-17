@@ -2581,7 +2581,9 @@ void CALLBACK PopoverAutoCloseTimer(HWND, UINT, UINT_PTR id, DWORD) {
   std::fprintf(stderr, "popover: autoclose\n");
   if (g_active_popover_window != nullptr &&
       g_active_popover_window->IsVisible()) {
-    g_active_popover_window->Close();
+    // 隐藏而非 Close:弹层窗口需复用(文本再变时重新 show),
+    // Close 在 Windows 是销毁窗口,销毁后句柄失效弹层再也弹不出
+    g_active_popover_window->SetVisible(false);
   }
   g_active_popover_window = nullptr;
 }
@@ -2760,7 +2762,11 @@ void yue_mbt_popover_close(void *popover) {
 #else
 void yue_mbt_popover_close(void *popover) {
   if (auto *win = PopoverStore::get(popover)) {
-    win->Close();
+    // 隐藏而非 Close:Close 在 Windows 是销毁窗口,自动补全弹层复用同一
+    // 实例(文本变化重新 show),销毁后句柄失效弹层再也弹不出;
+    // on_close 语义照 GTK 版 Close 手动补发
+    win->SetVisible(false);
+    win->on_close.Emit(win);
   }
 }
 #endif

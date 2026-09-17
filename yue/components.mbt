@@ -2457,7 +2457,11 @@ pub fn autocomplete(
       entry.set_style("height", if platform() == "windows" { 22.0 } else { 30.0 })
       entry.set_background_color("#FFFFFF")
       let font = Font::new("Sans", 13.0)
-      fn make_row(opt : String, on_pick : () -> Unit) -> Container {
+      fn make_row(
+        opt : String,
+        selected : Ref[Bool],
+        on_pick : () -> Unit,
+      ) -> Container {
         let row = Container::make(
           style=[("height", 28.0), ("paddingLeft", 10.0)],
           style_str=[("flexDirection", "row"), ("alignItems", "center")],
@@ -2469,7 +2473,7 @@ pub fn autocomplete(
         let hover = Ref(false)
         row.on_draw(fn(p) {
           let b = row.get_bounds()
-          if hover.val {
+          if hover.val || selected.val {
             p.set_fill_color(theme_primary_light())
             p.fill_rect(0.0, 0.0, b.width, b.height)
           }
@@ -2506,14 +2510,38 @@ pub fn autocomplete(
         style=[("marginTop", 4.0), ("width", width)],
         style_str=[("flexDirection", "column")],
       )
-      let inline_rows : Ref[Array[View]] = Ref([])
+      let inline_rows : Ref[Array[Container]] = Ref([])
       let pop : Ref[Popover?] = Ref(None)
+      // 键盘导航状态(Windows 替代弹层无原生键盘交互,焦点保持在输入框,
+      // 由 entry.on_key_down 驱动):sel 为当前高亮行下标,-1 表示无
+      let sel : Ref[Int] = Ref(-1)
+      let pick_fns : Ref[Array[() -> Unit]] = Ref([])
+      let sel_marks : Ref[Array[Ref[Bool]]] = Ref([])
+      fn set_sel(i : Int) -> Unit {
+        let n = sel_marks.val.length()
+        let ni = if i < -1 { -1 } else if i > n - 1 { n - 1 } else { i }
+        if ni == sel.val {
+          return
+        }
+        if sel.val >= 0 && sel.val < n {
+          sel_marks.val[sel.val].val = false
+          inline_rows.val[sel.val].schedule_paint()
+        }
+        sel.val = ni
+        if ni >= 0 {
+          sel_marks.val[ni].val = true
+          inline_rows.val[ni].schedule_paint()
+        }
+      }
       fn refresh(filter : String) -> Unit {
         // 清空已有候选
         for v in inline_rows.val {
-          ignore(list.remove_child_view(v))
+          ignore(list.remove_child_view(v.view()))
         }
         inline_rows.val = []
+        pick_fns.val = []
+        sel_marks.val = []
+        sel.val = -1
         let mut count = 0
         let picked = Ref(false)
         for opt in options {
@@ -2522,7 +2550,8 @@ pub fn autocomplete(
           }
           count = count + 1
           let o = opt
-          let row = make_row(o, fn() {
+          let mark = Ref(false)
+          fn do_pick() -> Unit {
             picked.val = true
             pick(o)
             match pop.val {
@@ -2530,12 +2559,15 @@ pub fn autocomplete(
               None => ()
             }
             for v in inline_rows.val {
-              ignore(list.remove_child_view(v))
+              ignore(list.remove_child_view(v.view()))
             }
             inline_rows.val = []
-          })
+          }
+          let row = make_row(o, mark, do_pick)
           list.add_child(row)
-          inline_rows.val.push(row.view())
+          inline_rows.val.push(row)
+          sel_marks.val.push(mark)
+          pick_fns.val.push(do_pick)
         }
         if use_popover {
           match pop.val {
@@ -2558,6 +2590,41 @@ pub fn autocomplete(
       }
       if use_popover {
         pop.val = Some(Popover::new())
+        // 替代弹层无原生键盘导航(焦点保持在输入框),这里自行处理:
+        // ↑↓ 移动高亮、回车选中当前项、Esc 收起
+        entry.on_key_down(fn(e) {
+          let n = pick_fns.val.length()
+          if n == 0 {
+            return false
+          }
+          match e.code {
+            VKEY_DOWN => {
+              set_sel(sel.val + 1)
+              true
+            }
+            VKEY_UP => {
+              set_sel(if sel.val < 0 { n - 1 } else { sel.val - 1 })
+              true
+            }
+            VKEY_RETURN => {
+              if sel.val >= 0 && sel.val < n {
+                pick_fns.val[sel.val]()
+                true
+              } else {
+                false
+              }
+            }
+            VKEY_ESCAPE => {
+              match pop.val {
+                Some(p) => p.close()
+                None => ()
+              }
+              sel.val = -1
+              true
+            }
+            _ => false
+          }
+        })
       }
       value.subscribe(fn(v) {
         if !use_popover || !entry.has_focus() {
