@@ -4690,13 +4690,16 @@ void yue_mbt_probe_view(void *view, const char *label) {
  * (动态加载 SetWindowTheme,避免引入 uxtheme.lib 链接依赖);
  * RichEdit 不吃 theme,发 EM_SETBKCOLOR+CHARFORMAT 暗底白字;
  * 进度条走 PBM_SETBKCOLOR/PBM_SETBARCOLOR 消息自定色。 */
-static HRESULT CALLBACK ProbeApplyDark(HWND h, LPARAM) {
+#ifndef EM_SETBKCOLOR // 部分 SDK 的 richedit.h 未定义,值 WM_USER+271 稳定
+#define EM_SETBKCOLOR (WM_USER + 271)
+#endif
+static BOOL CALLBACK ProbeApplyDark(HWND h, LPARAM) {
   auto set_theme = reinterpret_cast<HRESULT(__stdcall *)(HWND, LPCWSTR, LPCWSTR)>(
       ::GetProcAddress(::GetModuleHandleW(L"uxtheme.dll"), "SetWindowTheme"));
   if (set_theme != nullptr) {
     set_theme(h, L"Darkmode_Explorer", nullptr);
   }
-  return TRUE;
+  return TRUE; // WNDENUMPROC 要求 BOOL
 }
 #endif
 
