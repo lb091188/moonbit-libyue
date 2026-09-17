@@ -5,11 +5,11 @@
 
 ## libyue 迁移
 
-- [x] [Getting started](https://libyue.com/docs/latest/cpp/guides/getting_started.html) — 主链路跑通,hello/showcase 实测
-- [x] [Events and delegates](https://libyue.com/docs/latest/cpp/guides/events_and_delegates.html) — 鼠标/键盘全信号 + 捕获,`yue/events.mbt`;examples/events 实测(键值/修饰位/双击);modifiers 在 shim 归一化(1=Shift 2=Ctrl 4=Alt 8=Meta)
-- [x] [Layout system](https://libyue.com/docs/latest/cpp/guides/layout_system.html) — set_style 全键覆盖,样式键全集见 [docs/layout.md](docs/layout.md);examples/layout 16 项几何断言实测全过
-- [x] [Drag and drop](https://libyue.com/docs/latest/cpp/guides/drag_and_drop.html) — drag_source / drag_destination 实测通过
-- [ ] [FAQ](https://libyue.com/docs/latest/cpp/guides/faq.html) — 随查随用,不单独立目标
+- [x] [Getting started](https://libyue.com/docs/latest/cpp/guides/getting_started.html) — 主链路跑通
+- [x] [Events and delegates](https://libyue.com/docs/latest/cpp/guides/events_and_delegates.html) — 鼠标/键盘全信号 + 捕获
+- [x] [Layout system](https://libyue.com/docs/latest/cpp/guides/layout_system.html) — set_style 全键覆盖,样式键全集见 [docs/layout.md](docs/layout.md);examples/layout
+- [x] [Drag and drop](https://libyue.com/docs/latest/cpp/guides/drag_and_drop.html) — drag_source / drag_destination
+- [ ] [FAQ](https://libyue.com/docs/latest/cpp/guides/faq.html)
 
 ## 组件(55)
 
@@ -85,56 +85,39 @@
 - [x] 导航:side_menu / segmented / breadcrumb / pagination / steps
 - [x] 数据展示:tag / avatar / badge / statistic / descriptions / timeline / collapse / card / code_view / progress_line
 - [x] 反馈:alert / result / empty
-
-### 第一批(2026-09-16 全部完成,组件库演示板「进阶」页逐个演示)
-
 - [x] input-number 数字输入器 — `-`/`+` 步进按钮 + Store[Double] + 范围钳制;演示板实测渲染
 - [x] form 表单布局 — form_item(标签右对齐定宽 + 控件区)+ form 分组标题
 - [x] link 链接文字 — 主题色 + 悬停下划线 + 点击回调
 - [x] page-header 页头 — ‹ 返回(悬停变主题色)+ 标题 + 右侧操作区
 - [x] backtop 返回顶部 — backtop_t 回调按钮 + Scroll::set_scroll_position(既有 ABI);演示页含滚动区实测
-
-### 第二批(2026-09-16 全部完成)
-
 - [x] tree 树形控件 — TreeNode 嵌套 + 缩进层级 + 点击 ▸/▾ 展开折叠
 - [x] transfer 穿梭框 — 双列 + 行点击选中(方块标记)+ ›/‹ 互移(动态行经 remove_child_view 重建)
 - [x] autocomplete 自动补全 — entry_t 输入过滤 + 候选行点击回填(动态行重建)
-- [x] date_picker_t — 主题行内标签 + 原生 DatePicker;time picker 上游无独立控件,随平台目标
 
-### 第三批:table_t 全自绘表格(2026-09-17 定案;暗色探测定稿后原生 Table 不可暗色,自绘是暗色完整性前置)
+### 第三批:table_t 全自绘表格
+- [ ] date_picker_t — 
 
 纯 MoonBit 自绘(Container+Painter+Store,tree/transfer 同路线),零平台原生控件,三平台像素一致、theme_apply 即暗色。按级迭代,每级可独立交付:
 
-- [ ] L1 静态表格 — 列定义(标题/宽/对齐)+ 行渲染 + 行点击选中 + hover 底 + 斑马纹 + 表头样式;数据经 Store[Array[Row]] 驱动
+- [x] L1 静态表格 — 列定义(标题/宽/对齐)+ 行渲染 + 行点击选中 + hover 底 + 斑马纹 + 表头样式;数据经 Store[Array[Row]] 驱动(演示板「数据展示」页实测挂载;hover/斑马纹视觉待真机复验)
 - [ ] L2 选择与自定义单元格 — 复选框列(checkbox_t 画法)+ 多选/全选 + 自定义单元格(颜色块/tag/多行文本)
 - [ ] L3 虚拟化 — 按滚动 offset 只画可见行,万行级流畅(scroll 基座 + schedule_paint_rect 局部重绘)
-- [ ] L4 编辑与交互增强 — 行内单元格编辑(自绘输入框)、列宽拖拽、排序;可无限后置
-
-### 第四批:Element 对照补齐(常用高价值优先)
 
 - [ ] select_t 下拉选择 — autocomplete 转正:未输入时弹出全量候选(Linux GtkEntryCompletion min key length=0 + 空 key 放行;Win/mac focus 时全量 refresh);只读形态可选
 - [ ] textarea_t 多行输入 — input_t 同套路(TextEdit + 自绘边框/聚焦色)
 - [ ] slider_t 滑杆 — 自绘轨道+thumb+拖拽;进度条配色经验可复用
 - [ ] tabs_t 页签 — 顶部页签形态(side_menu 为侧边形态)
 - [ ] divider 分隔线 — 最便宜,顺手
-- [ ] toast_t / message_t 轻提示 — 应用内浮层,替代系统 Notification(系统样式不可主题化)
-- [ ] modal_t 模态对话框 — 遮罩 + 居中浮层(relative 容器 + absolute 定位)
 - [ ] tooltip_t / popover_t — 悬浮提示与气泡;autocomplete 的弹层机制可复用(Linux 弹层基座已探明)
-- [ ] loading 加载态 — 转圈动画(set_timeout 逐帧 + schedule_paint,仓库首个动效组件)
-- [ ] skeleton_t 骨架屏 — 静态占位块,便宜
-
-### 第五批(可选,按需)
-
-- [ ] drawer_t 抽屉 — 贴边滑出浮层
 - [ ] calendar_t 日历面板 — 日期网格自绘(独立于原生 DatePicker)
 - [ ] rate_t 评分 — 星级自绘 + hover 预选
 - [ ] dropdown_menu 下拉菜单 — 自绘菜单(原生 Menu 是系统样式)
-- [ ] carousel_t 轮播 / infinite_scroll 无限滚动 / cascader_t 级联
-- [ ] upload_t 上传 / color_picker_t 取色器(原生 ColorPicker 在 libyue 无对应,自绘 HSL 面板)
+- [ ] carousel_t 
+- [ ] color_picker_t 取色器
 
-### 已知边界(暗色相关,2026-09-17 Windows 真机探测定稿,详见 docs/zh/adaptation.md)
+### 已知边界(详见 docs/zh/adaptation.md)
 
-- 原生控件不跟暗色:Table(自绘白底覆盖外部消息)/ DatePicker / Picker / ComboBox / 原生 Button;RichEdit 输入框可经消息通道暗色化(已验证,待收编)
+- 原生控件不跟暗色:Table/ DatePicker / Picker / ComboBox / 原生 Button;RichEdit 输入框可经消息通道暗色化
 - 主题库新组件一律全自绘,不再引入新的原生皮肤依赖
 
 ## 随手可查

@@ -50,6 +50,7 @@ let t = @yue.default_theme()
 | `collapse(panels)` | 点击标题开合,面板独立 |
 | `card(title, children, height?)` | 标题栏 + 分隔线 + 边框 |
 | `code_view(lines, font_size?, width?)` | 代码高亮;逐 token 建 AttributedText(整段设色)测宽自绘,全平台一致,绕开 Windows 区间属性缺陷 |
+| `table_t(columns, rows : Store[Array[TableRow]], width?, row_height?, on_row_click?)` | 表格:表头 + 斑马纹 + 悬停底色 + 行点击单选;列用 `TableColumn::make(标题, 宽, align?)`(宽 ≤0 为弹性列均分剩余宽),行数据 `{ cells: [...] }` 按 Store 驱动,set 后整表重建;回调收 `(行号, 行)` |
 
 ## 反馈
 

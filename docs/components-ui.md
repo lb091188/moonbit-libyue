@@ -50,6 +50,7 @@ let t = @yue.default_theme()
 | `collapse(panels)` | click title to expand/collapse, independent panels |
 | `card(title, children, height?)` | header bar + separator + border |
 | `code_view(lines, font_size?, width?)` | syntax highlighting; one `AttributedText` per token (whole-range coloring), measured and drawn manually — consistent on all platforms, bypassing the Windows range-attribute deficiency |
+| `table_t(columns, rows : Store[Array[TableRow]], width?, row_height?, on_row_click?)` | table: header + zebra stripes + hover highlight + single row selection; columns via `TableColumn::make(title, width, align?)` (width ≤ 0 = flexible column), rows `{ cells: [...] }` driven by a Store — full rebuild on set; callback receives `(index, row)` |
 
 ## Feedback
 
