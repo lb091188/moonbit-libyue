@@ -35,7 +35,7 @@ let t = @yue.default_theme()
 | `popover_t(trigger : Node, content : Node, width, height)` | popover bubble: clicking the trigger opens arbitrary Node content below it, click again to close |
 | `dropdown_menu(trigger, items, on_select, width?)` | dropdown menu: trigger field + item popover, hover highlight, click calls back the index; `"-"` in items draws a separator |
 | `carousel_t(pages : Array[Node], width?, height?, interval_ms?)` | carousel: panel sequence + side arrows + bottom dots, auto-advance every interval_ms ms (hover pauses, enabled when > 0), arrows/dots switch manually |
-| `color_picker_t(value : Store[String], colors?)` | color picker (preset swatch form): swatch grid, click to pick, theme outline + white check on current, hex shown below; custom palette supported |
+| `color_picker_t(value : Store[String], colors?, width?)` | color picker (dropdown form): trigger field (current swatch + hex) opens the preset palette popover; theme outline + white check on current, click to fill; custom palette supported |
 | `calendar_t(on_pick?, value? : Store[DateYMD?])` | self-drawn month panel: ‹/› month nav + weekday row + 42-cell grid, adjacent-month days dimmed, "today" in theme primary, selected day as solid square; `DateYMD::format()` renders `YYYY-MM-DD` |
 
 ## Navigation
