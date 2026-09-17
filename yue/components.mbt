@@ -1382,8 +1382,9 @@ pub fn empty(desc : String) -> Node {
       ])
       // 自绘简约空箱:盖 + 盒体,不依赖字体符号
       box.on_draw(fn(p) {
-        let b = box.get_bounds()
-        let cx = b.width / 2.0
+        // 不读运行时 bounds:容器宽固定 96,首绘若布局未就绪 cx=0,
+        // 图案画到负坐标被裁且无重绘时机("偶尔不显示"根因)
+        let cx = 48.0
         // 盒体
         p.set_fill_color(theme_fill_hover())
         p.fill_rect(cx - 26.0, 36.0, 52.0, 34.0)
@@ -4756,6 +4757,7 @@ pub fn popover_t(
     mount: fn(parent) {
       let tv = (trigger.mount)(parent)
       let pop : Ref[Popover?] = Ref(None)
+      let open = Ref(false)
       let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Int = fn(
         button,
         _vx,
@@ -4777,10 +4779,20 @@ pub fn popover_t(
             ignore((content.mount)(holder.view()))
             p.set_content(holder)
             p.set_content_size(width, height)
+            // 点外关闭(Linux 系统行为)/显式关闭都同步状态,
+            // 否则下次点击误走 close 分支,弹层再也打不开
+            p.on_close(fn() { open.val = false })
             pop.val = Some(p)
             ffi_popover_show_relative_to(p, tv)
+            open.val = true
           }
-          Some(p) => p.close()
+          Some(p) =>
+            if open.val {
+              p.close()
+            } else {
+              ffi_popover_show_relative_to(p, tv)
+              open.val = true
+            }
         }
         1
       }
