@@ -52,6 +52,7 @@ let t = @yue.default_theme()
 | `card(title, children, height?)` | header bar + separator + border |
 | `code_view(lines, font_size?, width?)` | syntax highlighting; one `AttributedText` per token (whole-range coloring), measured and drawn manually — consistent on all platforms, bypassing the Windows range-attribute deficiency |
 | `table_t(columns, rows : Store[Array[TableRow]], width?, row_height?, selection?, on_row_click?)` | table: header + zebra stripes + hover highlight; columns via `TableColumn::make(title, width, align?)` (width ≤ 0 = flexible), full rebuild on Store set. Cells are `TableCell`: `CellText` / `CellTag(text, semantic type)` / `CellColorBox(hex, name)` / `CellLines(multi-line, row auto-grows)`; `TableRow::make(string array)` for plain rows. Without `selection` rows single-select on click; pass `selection : Store[Array[Int]]` for a checkbox column (row click toggles, header select-all/clear, dash when partial). Callback receives `(index, row)` |
+| `table_v_t(columns, rows : Store[Array[TableRow]], width?, height?, row_height?, selection?, on_row_click?)` | virtualized table (10k+ rows): whole surface canvas-drawn, only visible rows painted, self-managed scrolling (wheel / drag scrollbar / keyboard); same cell types and selection semantics as `table_t` (CellLines clamps to two lines per fixed row height) |
 
 ## Feedback
 

@@ -99,6 +99,24 @@ fn main {
   let table_picked : @yue.Store[String] = @yue.Store::new("未选中")
   let table_sel : @yue.Store[Array[Int]] = @yue.Store::new([])
   let dp_val : @yue.Store[@yue.DateYMD?] = @yue.Store::new(None)
+  let v_rows_data : Array[@yue.TableRow] = []
+  for i in 0..<10000 {
+    v_rows_data.push(
+      @yue.TableRow::make([
+        (i + 1).to_string(),
+        "条目 \{i + 1}",
+        if i % 3 == 0 {
+          "甲组"
+        } else if i % 3 == 1 {
+          "乙组"
+        } else {
+          "丙组"
+        },
+        "虚拟滚动演示行",
+      ]),
+    )
+  }
+  let v_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new(v_rows_data)
   let rich_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new([
     {
       cells: [
@@ -521,6 +539,22 @@ fn main {
           width=460.0,
         ),
         @yue.bind_label(table_sel, fn(s) { "已选 \{s.length()} 行" }),
+      ],
+    ),
+    section(
+      "Table 虚拟滚动表格",
+      "整面自绘只画可见行,万行流畅;滚轮/拖右侧滚动条/键盘 ↑↓ PageUp PageDown 翻页。",
+      [
+        @yue.table_v_t(
+          [
+            @yue.TableColumn::make("序号", 90.0, align=@yue.End),
+            @yue.TableColumn::make("名称", 160.0),
+            @yue.TableColumn::make("分组", 110.0, align=@yue.Center),
+            @yue.TableColumn::make("备注", 0.0),
+          ],
+          v_rows,
+          height=220.0,
+        ),
       ],
     ),
   ])

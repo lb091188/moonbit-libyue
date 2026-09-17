@@ -49,6 +49,7 @@
 #if defined(OS_LINUX) // set_borderless 的 GtkCssProvider 注入(仅 Linux GTK)
 #include <gtk/gtk.h>
 #include "nativeui/popover.h"
+#include "nativeui/gtk/nu_container.h"
 #endif
 #include "nativeui/date_picker.h"
 #include "nativeui/gif_player.h"
@@ -2266,7 +2267,7 @@ void yue_mbt_view_on_mouse_enter(void *view,
     void *closure) {
   if (auto *v = CastToView(view)) {
     v->on_mouse_enter.Connect([invoke, closure](nu::Responder *,
-                                                const nu::MouseEvent &e) {
+                                               const nu::MouseEvent &e) {
       invoke(closure, static_cast<int32_t>(e.button),
              e.position_in_view.x(), e.position_in_view.y(),
              e.position_in_window.x(), e.position_in_window.y(),
@@ -2274,6 +2275,67 @@ void yue_mbt_view_on_mouse_enter(void *view,
              static_cast<int32_t>(e.timestamp));
     });
   }
+}
+
+/* ---------- 滚轮(canvas 自绘视图的虚拟滚动用,如 table_v_t) ----------
+ * libyue 无滚轮信号;Linux GTK 在控件上直连 scroll-event(容器的事件
+ * 窗口经 nu_container_add_event_mask 加 GDK_SCROLL_MASK 后可收到)。
+ * 回调带 delta_y:+1 向下滚、-1 向上滚,平滑滚轮为累计增量。
+ * 返回 TRUE 消费事件,不冒泡给外层 GtkScrolledWindow。 */
+#if defined(OS_LINUX)
+struct WheelCb {
+  void (*invoke)(void *, double);
+  void *closure;
+};
+
+static gboolean ViewWheelTrampoline(GtkWidget *, GdkEventScroll *event,
+                                    gpointer data) {
+  auto *cb = static_cast<WheelCb *>(data);
+  double delta = 0;
+  switch (event->direction) {
+    case GDK_SCROLL_UP:
+      delta = -1;
+      break;
+    case GDK_SCROLL_DOWN:
+      delta = 1;
+      break;
+    case GDK_SCROLL_SMOOTH:
+      delta = event->delta_y;
+      break;
+    default:
+      return FALSE;
+  }
+  if (delta != 0)
+    cb->invoke(cb->closure, delta);
+  return TRUE;
+}
+
+// NU_CONTAINER 系宏只能在 nu 命名空间内展开(内部用非限定类型函数)
+namespace nu {
+inline void container_add_scroll_mask(GtkWidget *w) {
+  if (NU_IS_CONTAINER(w))
+    nu_container_add_event_mask(NU_CONTAINER(w),
+                                GDK_SCROLL_MASK | GDK_SMOOTH_SCROLL_MASK);
+}
+}  // namespace nu
+#endif
+
+void yue_mbt_view_on_wheel(void *view,
+                           void (*invoke)(void *, double),
+                           void *closure) {
+#if defined(OS_LINUX)
+  if (auto *v = CastToView(view)) {
+    GtkWidget *w = v->GetNative();
+    // NUContainer 系用事件窗口收事件,补 GDK_SCROLL_MASK 才有滚轮
+    nu::container_add_scroll_mask(w);
+    auto *cb = new WheelCb{invoke, closure};
+    g_signal_connect(w, "scroll-event", G_CALLBACK(ViewWheelTrampoline), cb);
+  }
+#else
+  (void)view;
+  (void)invoke;
+  (void)closure; // Win/mac 滚轮接入待补(见 adaptation.md),先静默不挂
+#endif
 }
 
 void yue_mbt_view_on_mouse_leave(void *view,
