@@ -98,6 +98,7 @@ fn main {
   ])
   let table_picked : @yue.Store[String] = @yue.Store::new("未选中")
   let table_sel : @yue.Store[Array[Int]] = @yue.Store::new([])
+  let slider_val : @yue.Store[Double] = @yue.Store::new(30.0)
   let dp_val : @yue.Store[@yue.DateYMD?] = @yue.Store::new(None)
   let v_rows_data : Array[@yue.TableRow] = []
   for i in 0..<10000 {
@@ -345,6 +346,14 @@ fn main {
       ],
     ),
     section(
+      "Slider 滑杆",
+      "自绘轨道 + thumb,点击/拖拽调值(step 5 量化),值响应式。",
+      [
+        @yue.slider_t(slider_val, min=0.0, max=100.0, step=5.0),
+        @yue.bind_label(slider_val, fn(v) { "当前值:\{v.round()}" }),
+      ],
+    ),
+    section(
       "Textarea 多行输入 + Divider 分隔线",
       "外层自绘边框(聚焦变主题色)+ 内边距;分隔线上方一条水平线。",
       [
@@ -367,6 +376,26 @@ fn main {
           ["基础组件", "导航", "数据展示", "反馈"],
           selected,
         ),
+      ],
+    ),
+    section(
+      "Tabs 页签",
+      "顶部页签形态:选中主题色文字 + 底部指示条,内容区切换。",
+      [
+        @yue.tabs_t([
+          (
+            "概览",
+            @yue.label_t("这里是概览页内容。", role=@yue.Body),
+          ),
+          (
+            "配置",
+            @yue.label_t("这里是配置页内容。", role=@yue.Body),
+          ),
+          (
+            "日志",
+            @yue.label_t("这里是日志页内容。", role=@yue.Body),
+          ),
+        ]),
       ],
     ),
     section(
