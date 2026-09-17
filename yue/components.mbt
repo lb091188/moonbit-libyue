@@ -2452,7 +2452,9 @@ pub fn autocomplete(
       let entry = Entry::make(entry_type=Normal)
       entry.set_font(Font::new("Sans", 13.0))
       entry.set_borderless(true)
-      entry.set_style("height", 30.0)
+      // Win32 单行 EDIT 文字贴顶绘制(无垂直居中样式),压低控件高度
+      // 使文字近似垂直居中;GTK/macOS 原生居中,维持 30
+      entry.set_style("height", if platform() == "windows" { 22.0 } else { 30.0 })
       entry.set_background_color("#FFFFFF")
       let font = Font::new("Sans", 13.0)
       fn make_row(opt : String, on_pick : () -> Unit) -> Container {
