@@ -1,8 +1,8 @@
 // Element Plus 风格非表单组件（纯 MoonBit，构建在声明式层之上）。
 // 样式约定：直角（无圆角）；hover/active 一律用背景色表达；
-// 所有文字经 draw_text(valign=Center) 垂直居中；水平居中必须手动
-// （测文本宽、x=(区域宽-文本宽)/2，GTK 端 DrawAttributedText 不实现
-// 水平 align，见 docs/adaptation.md）。
+// 所有文字经 draw_text 对齐参数居中（水平 align / 垂直 valign），
+// 勿用测宽手动摆位（Windows 的测量与绘制格式不一致会偏左，
+// 见 docs/adaptation.md）。
 //   - side_menu   侧边导航菜单（对应 EP Menu）
 //   - segmented   分段控制器 / 顶栏导航（对应 EP Segmented）
 //   - tag / tag_of_type  标签（对应 EP Tag）
@@ -908,8 +908,6 @@ pub fn code_view(
 pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
   {
     mount: fn(parent) {
-      let probe = AttributedText::new(letter, wrap=false)
-      let letter_w = probe.get_bounds_for(10000.0, 100.0).width
       let c = Container::make(style=[
         ("width", size),
         ("height", size),
@@ -920,10 +918,11 @@ pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
         let b = c.get_bounds()
         p.draw_text(
           letter,
-          (b.width - letter_w) / 2.0,
+          0.0,
           0.0,
           b.width,
           b.height,
+          align=Center,
           valign=Center,
           color="#FFFFFF",
         )
@@ -966,8 +965,6 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
       let close = Container::make(style=[("width", 32.0), ("height", 40.0)])
       let hover = Ref(false)
       let close_focused = Ref(false)
-      let close_probe = AttributedText::new("✕", wrap=false)
-      let close_w = close_probe.get_bounds_for(10000.0, 100.0).width
       let close_it = fn() -> Unit {
         v.set_visible(false)
       }
@@ -976,10 +973,11 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
         let b = close.get_bounds()
         p.draw_text(
           "✕",
-          (b.width - close_w) / 2.0,
+          0.0,
           0.0,
           b.width,
           b.height,
+          align=Center,
           valign=Center,
           color=if hover.val { color } else { theme_text_secondary() },
         )
@@ -1053,8 +1051,6 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
           ("height", 24.0),
           ("marginRight", 6.0),
         ])
-        let num_probe = AttributedText::new((i + 1).to_string(), wrap=false)
-        let num_w = num_probe.get_bounds_for(10000.0, 100.0).width
         bx.on_draw(fn(p) {
           let b = bx.get_bounds()
           let cur = current.get()
@@ -1075,10 +1071,11 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
           p.fill_rect(0.0, 0.0, b.width, b.height)
           p.draw_text(
             (i + 1).to_string(),
-            (b.width - num_w) / 2.0,
+            0.0,
             0.0,
             b.width,
             b.height,
+            align=Center,
             valign=Center,
             color=match st {
               0 => theme_primary()
@@ -1320,21 +1317,21 @@ pub fn result(
         Danger => "✕"
         _ => "!"
       }
-      let symbol_at = AttributedText::new(symbol, valign=Center, wrap=false)
+      // 水平居中交给平台布局引擎(align=Center):Windows 的测宽带内边距,
+      // 手动按测量宽摆位必偏左(见 adaptation.md)
+      let symbol_at = AttributedText::new(
+        symbol,
+        align=Center,
+        valign=Center,
+        wrap=false,
+      )
       symbol_at.set_font(Font::new("Sans", 38.0, weight=Bold))
       symbol_at.set_color(color)
-      let symbol_w = symbol_at.get_bounds_for(10000.0, 100.0).width
 
       icon.set_background_color(type_light_color(t))
       icon.on_draw(fn(p) {
         let b = icon.get_bounds()
-        p.draw_attributed_text(
-          symbol_at,
-          (b.width - symbol_w) / 2.0,
-          0.0,
-          b.width,
-          b.height,
-        )
+        p.draw_attributed_text(symbol_at, 0.0, 0.0, b.width, b.height)
       })
       let big = Container::make(style=[("height", 30.0)], style_str=[
         ("alignItems", "center"),
@@ -2781,7 +2778,6 @@ fn build_calendar(
 ) -> (Container, () -> Unit) {
   let cell_w = 36.0
   let cell_h = 30.0
-  let small_font = Font::new("Sans", 12.0)
   // 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然高度
   // (高 = 上下 padding 16 + 头 32+4 + 星期行 26 + 6 行 x 30)
   let panel = Container::make(
@@ -2802,7 +2798,7 @@ fn build_calendar(
   })
   let view_y = Ref(today.y)
   let view_m = Ref(today.m)
-  // 文本水平居中(GTK 端 draw_text 的 align 未实现,一律测宽手动摆位)
+  // 文本水平居中走 draw_text 的 align 参数(平台布局引擎居中)
   fn draw_center(
     p : Painter,
     text : String,
@@ -2810,10 +2806,7 @@ fn build_calendar(
     h : Double,
     color : String,
   ) -> Unit {
-    let probe = AttributedText::new(text, wrap=false)
-    probe.set_font(small_font)
-    let tw = probe.get_bounds_for(10000.0, 100.0).width
-    p.draw_text(text, (cell_w - tw) / 2.0, y, cell_w, h, valign=Center, color=color)
+    p.draw_text(text, 0.0, y, cell_w, h, align=Center, valign=Center, color=color)
   }
 
   let head_h = 32.0
@@ -2827,15 +2820,13 @@ fn build_calendar(
   )
   title.on_draw(fn(p) {
     let b = title.get_bounds()
-    let probe = AttributedText::new(title_text.val, wrap=false)
-    probe.set_font(small_font)
-    let tw = probe.get_bounds_for(10000.0, 100.0).width
     p.draw_text(
       title_text.val,
-      (b.width - tw) / 2.0,
+      0.0,
       0.0,
       b.width,
       b.height,
+      align=Center,
       valign=Center,
       color=theme_text_primary(),
     )
@@ -2849,15 +2840,13 @@ fn build_calendar(
         p.set_fill_color(theme_fill_hover())
         p.fill_rect(0.0, 0.0, bb.width, bb.height)
       }
-      let probe = AttributedText::new(glyph, wrap=false)
-      probe.set_font(small_font)
-      let tw = probe.get_bounds_for(10000.0, 100.0).width
       p.draw_text(
         glyph,
-        (bb.width - tw) / 2.0,
+        0.0,
         0.0,
         bb.width,
         bb.height,
+        align=Center,
         valign=Center,
         color=theme_text_regular(),
       )
@@ -3468,10 +3457,11 @@ pub fn table_t(
               p.fill_rect(0.0, 0.0, w, 20.0)
               p.draw_text(
                 text,
-                (w - text_w) / 2.0,
+                0.0,
                 0.0,
                 w,
                 20.0,
+                align=Center,
                 valign=Center,
                 color=type_color(t),
               )
@@ -3719,8 +3709,6 @@ pub fn table_v_t(
 ) -> Node {
   {
     mount: fn(parent) {
-      let font = Font::new("Sans", 13.0)
-      let head_font = Font::new("Sans", 13.0, weight=SemiBold)
       let small_font = Font::new("Sans", 12.0)
       let sel = selection
       let data_r : Ref[Array[TableRow]] = Ref([])
@@ -3835,7 +3823,9 @@ pub fn table_v_t(
         }
       }
 
-      // 文本按列对齐摆位(GTK 端 draw_text 无水平 align,手动测宽)
+      // 文本按列对齐交给平台布局引擎(align 参数):Windows 的测宽与绘制
+      // 格式不一致,手动按测量宽摆位会偏左(见 adaptation.md)。水平方向
+      // 两侧统一留 12px。
       fn draw_align_text(
         p : Painter,
         text : String,
@@ -3844,28 +3834,21 @@ pub fn table_v_t(
         w : Double,
         y : Double,
         h : Double,
-        fnt : Font,
         color : String,
       ) -> Unit {
         if text == "" {
           return
         }
-        let px = match align {
-          End => {
-            let probe = AttributedText::new(text, wrap=false)
-            probe.set_font(fnt)
-            let tw = probe.get_bounds_for(10000.0, 100.0).width
-            x + w - 12.0 - tw
-          }
-          Center => {
-            let probe = AttributedText::new(text, wrap=false)
-            probe.set_font(fnt)
-            let tw = probe.get_bounds_for(10000.0, 100.0).width
-            x + (w - tw) / 2.0
-          }
-          _ => x + 12.0
-        }
-        p.draw_text(text, px, y, w, h, valign=Center, color=color)
+        p.draw_text(
+          text,
+          x + 12.0,
+          y,
+          w - 24.0,
+          h,
+          align=align,
+          valign=Center,
+          color=color,
+        )
       }
 
       cv.on_draw(fn(p) {
@@ -3902,7 +3885,6 @@ pub fn table_v_t(
             col_w[j],
             0.0,
             head_h,
-            head_font,
             theme_text_secondary(),
           )
         }
@@ -3949,7 +3931,6 @@ pub fn table_v_t(
                   w,
                   row_y,
                   row_height,
-                  font,
                   theme_text_regular(),
                 )
               CellTag(text, t) => {
@@ -3962,10 +3943,11 @@ pub fn table_v_t(
                 p.fill_rect(x + 12.0, ty, tag_w, 20.0)
                 p.draw_text(
                   text,
-                  x + 12.0 + 7.0,
+                  x + 12.0,
                   ty,
-                  tw,
+                  tag_w,
                   20.0,
+                  align=Center,
                   valign=Center,
                   color=type_color(t),
                 )

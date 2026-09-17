@@ -65,6 +65,7 @@
 #if defined(OS_WIN)
 #include "nativeui/win/window_win.h" // WindowImpl::hwnd()（气泡替代窗口定位/置顶）
 #include "nativeui/win/subwin_view.h" // SubwinView::hwnd()（原生子控件 HWND 操作）
+#include "nativeui/win/view_win.h" // ViewImpl::wheel_hook（滚轮消费钩子）
 #include "nativeui/win/util/tray_host.h" // TrayHost::hwnd()（托盘幽灵图标防护）
 #endif
 
@@ -2279,15 +2280,19 @@ void yue_mbt_view_on_mouse_enter(void *view,
 
 /* ---------- 滚轮(canvas 自绘视图的虚拟滚动用,如 table_v_t) ----------
  * libyue 无滚轮信号;Linux GTK 在控件上直连 scroll-event(容器的事件
- * 窗口经 nu_container_add_event_mask 加 GDK_SCROLL_MASK 后可收到)。
+ * 窗口经 nu_container_add_event_mask 加 GDK_SCROLL_MASK 后可收到);
+ * Windows 走 ViewImpl::wheel_hook 补丁钩子(vendor 补丁让滚轮按光标命中
+ * 下发,不再被外层 Scroll 直接消费)。
  * 回调带 delta_y:+1 向下滚、-1 向上滚,平滑滚轮为累计增量。
- * 返回 TRUE 消费事件,不冒泡给外层 GtkScrolledWindow。 */
-#if defined(OS_LINUX)
+ * 返回 TRUE 消费事件,不冒泡给外层滚动容器。 */
+#if defined(OS_LINUX) || defined(OS_WIN)
 struct WheelCb {
   void (*invoke)(void *, double);
   void *closure;
 };
+#endif
 
+#if defined(OS_LINUX)
 static gboolean ViewWheelTrampoline(GtkWidget *, GdkEventScroll *event,
                                     gpointer data) {
   auto *cb = static_cast<WheelCb *>(data);
@@ -2331,10 +2336,22 @@ void yue_mbt_view_on_wheel(void *view,
     auto *cb = new WheelCb{invoke, closure};
     g_signal_connect(w, "scroll-event", G_CALLBACK(ViewWheelTrampoline), cb);
   }
+#elif defined(OS_WIN)
+  if (auto *v = CastToView(view)) {
+    auto *impl = static_cast<nu::ViewImpl *>(v->GetNative());
+    // WM_MOUSEWHEEL 原始 delta 以 WHEEL_DELTA(120)为单位,正值上滚;
+    // 换算对齐 GTK 语义(+1 下滚),精密触控板为小数增量
+    auto *cb = new WheelCb{invoke, closure};
+    impl->wheel_hook = [cb](int raw) {
+      cb->invoke(cb->closure,
+                 -static_cast<double>(static_cast<int16_t>(raw)) / 120.0);
+      return true;
+    };
+  }
 #else
   (void)view;
   (void)invoke;
-  (void)closure; // Win/mac 滚轮接入待补(见 adaptation.md),先静默不挂
+  (void)closure; // mac 滚轮接入待补(见 adaptation.md),先静默不挂
 #endif
 }
 

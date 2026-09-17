@@ -119,7 +119,7 @@
 
 - 原生控件不跟暗色:Table/ DatePicker / Picker / ComboBox / 原生 Button;RichEdit 输入框可经消息通道暗色化
 - 主题库新组件一律全自绘,不再引入新的原生皮肤依赖——第三批交付后,表格(table_t/table_v_t)、日历(calendar_t/date_picker_t)、下拉(select_t/dropdown_menu)、输入(textarea_t)等全部走自绘/Popover 弹层路线,原生 DatePicker 仅存于底层封装,组件库不再使用
-- 滚轮事件仅 Linux 接入(shim scroll-event);Win/mac 的 canvas 自绘视图滚轮待补
+- 滚轮事件 Linux( GTK scroll-event)/ Windows(WM_MOUSEWHEEL 命中下发补丁)已接入;mac 的 canvas 自绘视图滚轮待补
 - color_picker_t 为预设色板形态,HSL 面板未做;carousel_t 无切换动画
 
 ## 随手可查

@@ -666,6 +666,96 @@ def patch_win_webview2_args() -> None:
     print("已应用 WebView2 浏览器参数补丁：nativeui_jumbo_4.cc")
 
 
+def patch_win_wheel_dispatch() -> None:
+    """vendor 补丁（Windows）：滚轮事件按光标命中下发给子视图（幂等）。
+    上游 ScrollImpl::OnMouseWheel 直接消费滚轮并滚动自身、不做子视图命中
+    下发，嵌套 Scroll（内层局部滚动区）永远收不到滚轮，外层页面滚动抢走
+    一切；同时给 ViewImpl 补 shim 滚轮消费钩子（自绘视图虚拟滚动，对应
+    shim 的 yue_mbt_view_on_wheel）。原理见 docs/adaptation.md「运行期差异」。
+    """
+    header = VENDOR_DIR / "libyue/include/nativeui/win/view_win.h"
+    container_header = VENDOR_DIR / "libyue/include/nativeui/win/container_win.h"
+    jumbo3 = VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_3.cc"
+    jumbo4 = VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc"
+    patches = [
+        (header,
+         "#include <set>\n",
+         "#include <functional>\n#include <set>\n"),
+        (header,
+         "  // Called when the view lost capture.\n"
+         "  virtual void OnCaptureLost();\n",
+         "  // Called when the view lost capture.\n"
+         "  virtual void OnCaptureLost();\n"
+         "\n"
+         "  // moonbit-libyue 补丁：shim 挂的滚轮消费钩子（自绘视图的虚拟滚动），\n"
+         "  // 参数为 WM_MOUSEWHEEL 原始 wheel delta，返回 true 表示消费不再上浮。\n"
+         "  std::function<bool(int)> wheel_hook;\n"),
+        (container_header,
+         " protected:\n"
+         "  void DrawChild(ViewImpl* child, PainterWin* painter, const Rect& dirty);\n"
+         "\n"
+         " private:\n"
+         "  void RefreshParentTree();\n"
+         "  ViewImpl* FindChildFromPoint(const Point& point) const;\n",
+         " protected:\n"
+         "  void DrawChild(ViewImpl* child, PainterWin* painter, const Rect& dirty);\n"
+         "\n"
+         "  // moonbit-libyue 补丁：改为 protected，子类滚动视图滚轮下发时命中测试\n"
+         "  ViewImpl* FindChildFromPoint(const Point& point) const;\n"
+         "\n"
+         " private:\n"
+         "  void RefreshParentTree();\n"),
+        (jumbo4,
+         "bool ViewImpl::OnMouseWheel(NativeEvent event) {\n"
+         "  return false;\n"
+         "}\n",
+         "bool ViewImpl::OnMouseWheel(NativeEvent event) {\n"
+         "  // moonbit-libyue 补丁：shim 挂的滚轮钩子（自绘视图的虚拟滚动）\n"
+         "  if (wheel_hook)\n"
+         "    return wheel_hook(static_cast<int>(\n"
+         "        static_cast<int16_t>(HIWORD(event->w_param))));\n"
+         "  return false;\n"
+         "}\n"),
+        (jumbo3,
+         "bool ContainerImpl::OnMouseWheel(NativeEvent event) {\n"
+         "  ViewImpl* child = FindChildFromPoint(Point(event->l_param));\n"
+         "  if (child)\n"
+         "    return child->OnMouseWheel(event);\n"
+         "  return false;\n"
+         "}\n",
+         "bool ContainerImpl::OnMouseWheel(NativeEvent event) {\n"
+         "  // moonbit-libyue 补丁：子视图未消费时回落自身滚轮钩子\n"
+         "  // （无子视图命中的自绘容器自身可消费滚轮）\n"
+         "  ViewImpl* child = FindChildFromPoint(Point(event->l_param));\n"
+         "  if (child && child->OnMouseWheel(event))\n"
+         "    return true;\n"
+         "  return ViewImpl::OnMouseWheel(event);\n"
+         "}\n"),
+        (jumbo4,
+         "bool ScrollImpl::OnMouseWheel(NativeEvent event) {\n"
+         "  int16_t delta = static_cast<int16_t>(HIWORD(event->w_param));\n",
+         "bool ScrollImpl::OnMouseWheel(NativeEvent event) {\n"
+         "  // moonbit-libyue 补丁：先下发光标下子视图（嵌套滚动/自绘虚拟滚动优先），\n"
+         "  // 未消费才滚动自身——上游直接消费导致嵌套 Scroll 永远抢走滚轮\n"
+         "  ViewImpl* child = FindChildFromPoint(Point(event->l_param));\n"
+         "  if (child && child->OnMouseWheel(event))\n"
+         "    return true;\n"
+         "  int16_t delta = static_cast<int16_t>(HIWORD(event->w_param));\n"),
+    ]
+    texts: dict[Path, str] = {}
+    for path, old, new in patches:
+        if path not in texts:
+            texts[path] = path.read_text(encoding="utf-8")
+        if new in texts[path]:
+            continue  # 已应用（理论不可达：extract 每次还原原文件）
+        if old not in texts[path]:
+            raise SystemExit(f"vendor 补丁目标文本未找到（上游可能已变）：{path}")
+        texts[path] = texts[path].replace(old, new)
+        print(f"已应用 Windows 滚轮下发补丁：{path.name}")
+    for path, text in texts.items():
+        path.write_text(text, encoding="utf-8")
+
+
 def cmake_build() -> None:
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
@@ -700,6 +790,7 @@ def main() -> None:
         patch_win_task_dialog()
         patch_win_scroll_natural_size()
         patch_win_webview2_args()
+        patch_win_wheel_dispatch()
         fetch_webview2_sdk()
     if os_name == "Linux":
         patch_linux_container_events()
