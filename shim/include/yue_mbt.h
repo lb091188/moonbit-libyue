@@ -704,6 +704,7 @@ void *yue_mbt_null_image();
 
 void yue_mbt_probe_env(void *window);
 void yue_mbt_probe_view(void *view, const char *label);
+void yue_mbt_probe_dark(void *view);
 
 #ifdef __cplusplus
 }

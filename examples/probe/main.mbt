@@ -14,6 +14,9 @@ extern "c" fn ffi_probe_view(
 ) -> Unit = "yue_mbt_probe_view"
 
 ///|
+extern "c" fn ffi_probe_dark(view : @yue.View) -> Unit = "yue_mbt_probe_dark"
+
+///|
 /// 探测表格数据模型:名称 / 完成(复选) / 状态(自绘色块)。
 struct ProbeModel {
   data : Array[Array[@yue.TableValue]]
@@ -166,6 +169,19 @@ fn main {
           }),
           @yue.button("切浅色主题", on_click=fn() {
             @yue.theme_apply(@yue.default_theme())
+          }),
+          @yue.button("尝试暗色化原生控件", on_click=fn() {
+            // 对每个原生子控件注入暗色手段并打日志:
+            // Explorer 系(ListView/Header/DateTimePick/ComboBox)走
+            // Darkmode_Explorer;RichEdit 走消息;进度条走 PBM 自定色
+            ffi_probe_dark(entry.view)
+            ffi_probe_dark(text_edit.view)
+            ffi_probe_dark(date_picker.view)
+            ffi_probe_dark(picker.view)
+            ffi_probe_dark(combo.view)
+            ffi_probe_dark(progress.view)
+            ffi_probe_dark(native_btn.view)
+            ffi_probe_dark(table.view)
           }),
         ],
         style=[("padding", 14.0)],

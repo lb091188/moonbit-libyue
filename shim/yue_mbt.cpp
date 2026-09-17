@@ -20,6 +20,8 @@
 #include <shobjidl.h>
 #include <winreg.h>
 #include <shellapi.h>
+#include <richedit.h>
+#include <commctrl.h>
 #endif
 #include "yue_mbt.h"
 
@@ -4681,6 +4683,60 @@ void yue_mbt_probe_view(void *view, const char *label) {
   } else {
     std::fprintf(stderr, "PROBE [%s]: 句柄无效\n", label);
   }
+}
+
+#if defined(OS_WIN)
+/* 暗色化:Explorer 系控件经 uxtheme 的 Darkmode_Explorer 变体
+ * (动态加载 SetWindowTheme,避免引入 uxtheme.lib 链接依赖);
+ * RichEdit 不吃 theme,发 EM_SETBKCOLOR+CHARFORMAT 暗底白字;
+ * 进度条走 PBM_SETBKCOLOR/PBM_SETBARCOLOR 消息自定色。 */
+static HRESULT CALLBACK ProbeApplyDark(HWND h, LPARAM) {
+  auto set_theme = reinterpret_cast<HRESULT(__stdcall *)(HWND, LPCWSTR, LPCWSTR)>(
+      ::GetProcAddress(::GetModuleHandleW(L"uxtheme.dll"), "SetWindowTheme"));
+  if (set_theme != nullptr) {
+    set_theme(h, L"Darkmode_Explorer", nullptr);
+  }
+  return TRUE;
+}
+#endif
+
+void yue_mbt_probe_dark(void *view) {
+#if defined(OS_WIN)
+  auto *v = CastToView(view);
+  auto *subwin =
+      v != nullptr ? dynamic_cast<nu::SubwinView *>(v->GetNative()) : nullptr;
+  HWND h = subwin != nullptr ? subwin->hwnd() : nullptr;
+  if (h == nullptr) {
+    std::fprintf(stderr, "DARK: 无原生子控件, 跳过\n");
+    return;
+  }
+  WCHAR cls[256] = L"";
+  ::GetClassNameW(h, cls, 256);
+  std::fprintf(stderr, "DARK: %ls\n", cls);
+  ::EnumChildWindows(h, ProbeApplyDark, 0); // 含 Table 的 SysHeader32 表头
+  ProbeApplyDark(h, 0);
+  if (::lstrcmpiW(cls, L"RICHEDIT50W") == 0) {
+    ::SendMessageW(h, EM_SETBKCOLOR, 0,
+                   static_cast<LPARAM>(RGB(0x20, 0x21, 0x24)));
+    CHARFORMAT2W cf{};
+    cf.cbSize = sizeof(cf);
+    cf.dwMask = CFM_COLOR;
+    cf.dwEffects &= ~CFE_AUTOCOLOR; // 清自动色, 启用 crTextColor
+    cf.crTextColor = RGB(0xE8, 0xEA, 0xED);
+    ::SendMessageW(h, EM_SETCHARFORMAT, SCF_DEFAULT, reinterpret_cast<LPARAM>(&cf));
+  }
+  if (::lstrcmpiW(cls, L"msctls_progress32") == 0) {
+    ::SendMessageW(h, PBM_SETBKCOLOR, 0,
+                   static_cast<LPARAM>(RGB(0x2A, 0x2D, 0x31)));
+    ::SendMessageW(h, PBM_SETBARCOLOR, 0,
+                   static_cast<LPARAM>(RGB(0x5B, 0x8D, 0xEF)));
+  }
+  ::RedrawWindow(h, nullptr, nullptr,
+                 RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+#else
+  (void)view;
+  std::fprintf(stderr, "DARK: 非 Windows, 略\n");
+#endif
 }
 
 }  // extern "C"
