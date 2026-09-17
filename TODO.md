@@ -112,8 +112,8 @@
 - [x] calendar_t 日历面板 — 日期网格自绘(独立于原生 DatePicker;与 date_picker_t 共用 build_calendar,42 格月网格 + ‹/› 切月 + 今天高亮;演示板「进阶」页)
 - [x] rate_t 评分 — 五角星矢量自绘 + hover 预亮 + 点击评分(演示板「进阶」页)
 - [x] dropdown_menu 下拉菜单 — 触发字段 + 自绘菜单弹层("-" 分隔线;演示板「进阶」页)
-- [ ] carousel_t 
-- [ ] color_picker_t 取色器
+- [x] carousel_t 轮播 — 面板/箭头/指示点 + 自动轮播(悬停暂停;演示板「数据展示」页;切换动画未做)
+- [x] color_picker_t 取色器 — 预设色板形态(选中描边+白勾/hex 响应式;HSL 面板未做,按需后置)(演示板「数据展示」页)
 
 ### 已知边界(详见 docs/zh/adaptation.md)
 

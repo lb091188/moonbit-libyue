@@ -4883,3 +4883,266 @@ pub fn dropdown_menu(
     },
   }
 }
+
+///|
+/// 轮播(EP Carousel):面板序列 + 左右箭头 + 底部指示点,自动轮播
+/// (interval_ms > 0 时,interval 毫秒一切,悬停暂停),点击箭头/指示点
+/// 手动切换。面板为任意 Node,统一按给定宽高展示。
+pub fn carousel_t(
+  pages : Array[Node],
+  width? : Double = 360.0,
+  height? : Double = 180.0,
+  interval_ms? : Int = 3000,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let n = pages.length()
+      let cur = Ref(0)
+      let paused = Ref(false)
+      let dots : Array[Container] = []
+      let panels : Array[Container] = []
+      let outer = Container::make(
+        style=[("width", width), ("height", height + 24.0), ("marginBottom", 10.0)],
+        style_str=[("flexDirection", "column")],
+      )
+      let stage = Container::make(
+        style=[("width", width), ("height", height)],
+        style_str=[("flexDirection", "column")],
+      )
+      // 切页:越界回绕
+      fn do_switch(i : Int) -> Unit {
+        let idx = if i < 0 {
+          n - 1
+        } else if i >= n {
+          0
+        } else {
+          i
+        }
+        let prev = cur.val
+        cur.val = idx
+        if prev != idx {
+          panels[prev].set_visible(false)
+          dots[prev].schedule_paint()
+          panels[idx].set_visible(true)
+          dots[idx].schedule_paint()
+        }
+      }
+
+      // 面板与指示点先建好,切换只动 set_visible
+      for i in 0..<n {
+        let pc = Container::make(
+          style=[("width", width), ("height", height)],
+          style_str=[("flexDirection", "column")],
+        )
+        pc.set_visible(i == 0)
+        ignore((pages[i].mount)(pc.view()))
+        stage.add_child(pc)
+        panels.push(pc)
+        let dot = Container::make(
+          style=[
+            ("width", 8.0),
+            ("height", 8.0),
+            ("marginLeft", 4.0),
+            ("marginRight", 4.0),
+            ("marginTop", 8.0),
+          ],
+        )
+        let di = i
+        dot.on_draw(fn(p) {
+          p.set_fill_color(
+            if cur.val == di { theme_primary() } else { theme_border() },
+          )
+          p.fill_rect(0.0, 0.0, 8.0, 8.0)
+        })
+        dot.on_mouse_down(fn(e) {
+          if e.button == 1 {
+            do_switch(di)
+            true
+          } else {
+            false
+          }
+        })
+        dots.push(dot)
+      }
+      // 左右箭头(矢量三角,悬浮在舞台两侧的窄热区)
+      fn arrow(right : Bool) -> Container {
+        let a = Container::make(style=[("width", 24.0), ("height", height)])
+        let hover = Ref(false)
+        a.on_draw(fn(p) {
+          if hover.val {
+            let b = a.get_bounds()
+            p.set_fill_color(theme_fill_hover())
+            p.fill_rect(0.0, 0.0, b.width, b.height)
+          }
+          let cx = 12.0
+          let cy = height / 2.0
+          p.set_fill_color(theme_text_regular())
+          p.begin_path()
+          if right {
+            p.move_to(cx - 4.0, cy - 5.0)
+            p.line_to(cx + 4.0, cy)
+            p.line_to(cx - 4.0, cy + 5.0)
+          } else {
+            p.move_to(cx + 4.0, cy - 5.0)
+            p.line_to(cx - 4.0, cy)
+            p.line_to(cx + 4.0, cy + 5.0)
+          }
+          p.close_path()
+          p.fill()
+        })
+        a.on_mouse_enter(fn(_e) {
+          hover.val = true
+          a.schedule_paint()
+        })
+        a.on_mouse_leave(fn(_e) {
+          hover.val = false
+          a.schedule_paint()
+        })
+        a.on_mouse_down(fn(e) {
+          if e.button == 1 {
+            do_switch(if right { cur.val + 1 } else { cur.val - 1 })
+            true
+          } else {
+            false
+          }
+        })
+        a
+      }
+
+      // 布局:舞台行 = 左箭头 + 舞台 + 右箭头;下行为指示点
+      let stage_row = Container::make(style_str=[("flexDirection", "row")])
+      stage_row.add_child(arrow(false))
+      stage.set_style("flex", 1.0)
+      stage_row.add_child(stage)
+      stage_row.add_child(arrow(true))
+      let dots_row = Container::make(style_str=[("flexDirection", "row")])
+      for d in dots {
+        dots_row.add_child(d)
+      }
+      outer.add_child(stage_row)
+      outer.add_child(dots_row)
+      // 悬停暂停自动轮播;set_timeout 一次性,回调里自排下一个
+      outer.on_mouse_enter(fn(_e) { paused.val = true })
+      outer.on_mouse_leave(fn(_e) { paused.val = false })
+      if interval_ms > 0 && n > 1 {
+        let tick : Ref[() -> Unit] = Ref(fn() {  })
+        tick.val = fn() {
+          ignore(set_timeout(interval_ms, fn() {
+            if !paused.val {
+              do_switch(cur.val + 1)
+            }
+            (tick.val)()
+          }))
+        }
+        (tick.val)()
+      }
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}
+
+
+///|
+/// 取色器(EP ColorPicker 预设色板形态):色块网格,点击写入 value
+/// (Store[String],"#RRGGBB");当前选中画主题色描边 + 内勾,色板下方
+/// 显示当前 hex。自定义色板经 colors 传入。
+pub fn color_picker_t(
+  value : Store[String],
+  colors? : Array[String] = [
+    "#2D68C4", "#2E9E5B", "#D9822B", "#D64550", "#6B7480",
+    "#1E4FA3", "#3F6E9E", "#7A9E4E", "#B86E2B", "#9AA0A6",
+    "#E8EAED", "#BDC1C6", "#4E5560", "#2A2F36", "#F5F7FA",
+  ],
+) -> Node {
+  {
+    mount: fn(parent) {
+      let swatch = 26.0
+      let gap = 6.0
+      let per_row = 5
+      let outer = Container::make(
+        style=[("marginBottom", 10.0)],
+        style_str=[("flexDirection", "column")],
+      )
+      let grid = Container::make(style_str=[("flexDirection", "column")])
+      let rows : Array[(Container, Array[Container])] = []
+      let hex_label = Container::make(
+        style=[("height", 20.0), ("marginTop", 6.0)],
+      )
+      hex_label.on_draw(fn(p) {
+        let b = hex_label.get_bounds()
+        p.set_fill_color(value.get())
+        p.fill_rect(0.0, 3.0, 14.0, 14.0)
+        p.set_stroke_color(theme_border())
+        p.stroke_rect(0.5, 3.5, 13.0, 13.0)
+        p.draw_text(
+          value.get(),
+          20.0,
+          0.0,
+          b.width,
+          b.height,
+          valign=Center,
+          color=theme_text_regular(),
+        )
+      })
+      for i in 0..<colors.length() {
+        if i % per_row == 0 {
+          rows.push((
+            Container::make(
+              style=[("height", swatch + gap)],
+              style_str=[("flexDirection", "row")],
+            ),
+            [],
+          ))
+        }
+        let (row, cells) = rows[rows.length() - 1]
+        let c = colors[i]
+        let cell = Container::make(
+          style=[("width", swatch), ("height", swatch), ("marginRight", gap)],
+        )
+        cell.on_draw(fn(p) {
+          p.set_fill_color(c)
+          p.fill_rect(0.0, 0.0, swatch, swatch)
+          p.set_stroke_color(theme_border())
+          p.stroke_rect(0.5, 0.5, swatch - 1.0, swatch - 1.0)
+          if value.get() == c {
+            // 选中:主题色描边 + 白勾
+            p.set_stroke_color(theme_primary())
+            p.stroke_rect(1.5, 1.5, swatch - 3.0, swatch - 3.0)
+            p.set_stroke_color("#FFFFFF")
+            p.begin_path()
+            p.move_to(swatch / 2.0 - 5.0, swatch / 2.0)
+            p.line_to(swatch / 2.0 - 1.0, swatch / 2.0 + 4.0)
+            p.line_to(swatch / 2.0 + 6.0, swatch / 2.0 - 5.0)
+            p.stroke()
+          }
+        })
+        cell.on_mouse_down(fn(e) {
+          if e.button == 1 {
+            value.set(c)
+            true
+          } else {
+            false
+          }
+        })
+        row.add_child(cell)
+        cells.push(cell)
+      }
+      for (row, _cells) in rows {
+        grid.add_child(row)
+      }
+      value.subscribe(fn(_v) {
+        for (_row, cells) in rows {
+          for cell in cells {
+            cell.schedule_paint()
+          }
+        }
+        hex_label.schedule_paint()
+      })
+      outer.add_child(grid)
+      outer.add_child(hex_label)
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}
