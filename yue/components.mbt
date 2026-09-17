@@ -73,6 +73,12 @@ fn theme_fill_hover() -> String { theme_box.t.fill_hover }
 fn theme_fill_zebra() -> String { theme_box.t.fill_zebra }
 
 ///|
+/// 可点击自绘控件统一手型光标。
+fn hand() -> Cursor {
+  Cursor::new(Hand)
+}
+
+///|
 /// 主题色板快照。用结构体更新语法做局部定制：
 ///
 /// ```moonbit
@@ -316,6 +322,7 @@ fn stateful_item(
       }
 
       v.on_draw(draw_item)
+      View::set_cursor(v, hand())
       v.on_mouse_down(fn(e) {
         if e.button == 1 {
           v.focus()
@@ -661,6 +668,7 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
             draw_focus_ring(p, bd.width, bd.height, color="#FFFFFF")
           }
         })
+        View::set_cursor(b, hand())
         b.on_mouse_down(fn(e) {
           if e.button == 1 {
             b.focus()
@@ -979,6 +987,7 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
           draw_focus_ring(p, b.width, b.height)
         }
       })
+      View::set_cursor(close, hand())
       close.on_mouse_down(fn(e) {
         if e.button == 1 {
           close.focus()
@@ -1176,6 +1185,7 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
         }
 
         apply()
+        View::set_cursor(head, hand())
         head.on_mouse_down(fn(e) {
           if e.button == 1 {
             head.focus()
@@ -1216,12 +1226,16 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
         ])
         let node_col = Container::make(style=[("width", 20.0), ("height", 56.0)])
         let color = type_color(entry.2)
+        let is_first = i == 0
         node_col.on_draw(fn(p) {
-          // 竖线贯穿(末项无线),节点色块居中
+          // 竖线:首行从点心起、末行到点心止,中间整行贯通(节点色块居中)
           let b = node_col.get_bounds()
-          if !is_last {
+          let cy = b.height / 2.0
+          let top = if is_first { cy } else { 0.0 }
+          let bottom = if is_last { cy } else { b.height }
+          if bottom > top {
             p.set_fill_color(theme_border())
-            p.fill_rect(9.0, 0.0, 2.0, b.height)
+            p.fill_rect(9.0, top, 2.0, bottom - top)
           }
           p.set_fill_color(color)
           p.fill_rect(5.0, b.height / 2.0 - 5.0, 10.0, 10.0)
@@ -1583,6 +1597,7 @@ pub fn button_t(
           )
         }
       })
+      View::set_cursor(v, hand())
       v.on_mouse_down(fn(e) {
         if e.button == 1 {
           v.focus()
@@ -1697,6 +1712,7 @@ pub fn checkbox_t(
           v.schedule_paint()
         }
       }
+      View::set_cursor(v, hand())
       v.on_mouse_down(fn(e) {
         if e.button == 1 && !disabled {
           v.focus()
@@ -1797,6 +1813,7 @@ pub fn radio_group(
             row.schedule_paint()
           }
         }
+        View::set_cursor(row, hand())
         row.on_mouse_down(fn(e) {
           if e.button == 1 && !disabled {
             row.focus()
@@ -1888,6 +1905,7 @@ pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
           draw_focus_ring(p, b.width, b.height)
         }
       })
+      View::set_cursor(v, hand())
       v.on_mouse_down(fn(e) {
         if e.button == 1 && !disabled {
           v.focus()
@@ -2003,6 +2021,7 @@ pub fn input_number(
             color=theme_text_regular(),
           )
         })
+        View::set_cursor(b, hand())
         b.on_mouse_down(fn(e) {
           if e.button == 1 {
             value.update(fn(n) {
@@ -2125,6 +2144,7 @@ pub fn link(text : String, on_click : () -> Unit) -> Node {
         hover.val = false
         apply()
       })
+      View::set_cursor(row, hand())
       row.on_mouse_down(fn(e) {
         if e.button == 1 {
           on_click()
@@ -2170,6 +2190,7 @@ pub fn page_header(
           color=if hover.val { theme_primary() } else { theme_text_regular() },
         )
       })
+      View::set_cursor(back, hand())
       back.on_mouse_down(fn(e) {
         if e.button == 1 {
           on_back()
@@ -2265,6 +2286,7 @@ pub fn tree(root : Array[TreeNode]) -> Node {
           if has_children {
             build(nd.children, level + 1, kids)
           }
+          View::set_cursor(row, hand())
           row.on_mouse_down(fn(e) {
             if e.button == 1 && has_children {
               open.val = !open.val
@@ -2374,6 +2396,7 @@ pub fn transfer(
           row.add_child(mark)
           row.add_child(l)
           let mark_ref = mark
+          View::set_cursor(row, hand())
           row.on_mouse_down(fn(e) {
             if e.button == 1 {
               if contains(sel.val, it_ref) {
@@ -2439,6 +2462,7 @@ pub fn transfer(
             color=theme_text_regular(),
           )
         })
+        View::set_cursor(b, hand())
         b.on_mouse_down(fn(e) {
           if e.button == 1 {
             if to_right {
@@ -2517,6 +2541,7 @@ pub fn autocomplete(
           hover.val = false
           row.schedule_paint()
         })
+        View::set_cursor(row, hand())
         row.on_mouse_down(fn(e) {
           if e.button == 1 {
             on_pick()
@@ -2753,8 +2778,14 @@ fn build_calendar(
   let cell_w = 36.0
   let cell_h = 30.0
   let small_font = Font::new("Sans", 12.0)
+  // 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然高度
+  // (高 = 上下 padding 16 + 头 32+4 + 星期行 26 + 6 行 x 30)
   let panel = Container::make(
-    style=[("width", cell_w * 7.0), ("padding", 8.0)],
+    style=[
+      ("width", cell_w * 7.0),
+      ("height", 16.0 + 32.0 + 4.0 + 26.0 + 6.0 * cell_h),
+      ("padding", 8.0),
+    ],
     style_str=[("flexDirection", "column")],
   )
   panel.set_background_color("#FFFFFF")
@@ -2833,6 +2864,7 @@ fn build_calendar(
       hover.val = false
       b.schedule_paint()
     })
+    View::set_cursor(b, hand())
     b.on_mouse_down(fn(e) {
       if e.button == 1 {
         on_click()
@@ -2971,6 +3003,7 @@ fn build_calendar(
           }
         })
         if in_m {
+          View::set_cursor(c, hand())
           c.on_mouse_down(fn(e) {
             if e.button == 1 {
               sel.val = Some(dymd)
@@ -3070,6 +3103,8 @@ pub fn date_picker_t(
         style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
+      field.set_background_color("#FFFFFF")
+      View::set_cursor(field, hand())
       let focused = Ref(false)
       field.on_draw(fn(p) {
         let b = field.get_bounds()
@@ -3131,7 +3166,7 @@ pub fn date_picker_t(
         }
         false
       })
-      field.on_mouse_down(fn(e) {
+      field.on_mouse_up(fn(e) {
         if e.button == 1 {
           field.focus()
           match pop.val {
@@ -3146,7 +3181,7 @@ pub fn date_picker_t(
               grid_refresh.val = refresh
               p.set_content(panel)
               // 面板高:上下 padding 16 + 头 36 + 星期 26 + 6 行 x 30
-              p.set_content_size(268.0, 258.0)
+              p.set_content_size(268.0, 262.0)
               pop.val = Some(p)
             }
           }
@@ -3207,6 +3242,7 @@ pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
           color="#FFFFFF",
         )
       })
+      View::set_cursor(b, hand())
       b.on_mouse_down(fn(e) {
         if e.button == 1 {
           on_click()
@@ -3503,6 +3539,7 @@ pub fn table_t(
           k > 0 && k < n,
         )
       })
+      View::set_cursor(head_cb, hand())
       head_cb.on_mouse_down(fn(e) {
         if e.button == 1 {
           match sel {
@@ -3612,6 +3649,7 @@ pub fn table_t(
             hover_i.val = -1
             refresh_row(prev)
           })
+          View::set_cursor(row, hand())
           row.on_mouse_down(fn(e) {
             if e.button == 1 {
               match sel {
@@ -3991,6 +4029,7 @@ pub fn table_v_t(
         cv.schedule_paint()
       }
 
+      View::set_cursor(cv, hand())
       cv.on_mouse_down(fn(e) {
         if e.button != 1 {
           return false
@@ -4154,6 +4193,7 @@ pub fn textarea_t(
           ("marginBottom", margin),
         ],
       )
+      outer.set_background_color("#FFFFFF")
       outer.on_draw(fn(p) {
         let b = outer.get_bounds()
         p.set_stroke_color(
@@ -4263,6 +4303,7 @@ pub fn slider_t(
         )
         p.fill_rect(tx, (h - thumb) / 2.0, thumb, thumb)
       })
+      View::set_cursor(v, hand())
       v.on_mouse_down(fn(e) {
         if e.button == 1 {
           dragging.val = true
@@ -4368,6 +4409,7 @@ pub fn tabs_t(
             p.fill_rect(0.0, 34.0, b.width, 2.0)
           }
         })
+        View::set_cursor(tab, hand())
         tab.on_mouse_down(fn(e) {
           if e.button == 1 {
             sel.set(idx)
@@ -4427,6 +4469,8 @@ pub fn select_t(
       let field = Container::make(
         style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
       )
+      field.set_background_color("#FFFFFF")
+      View::set_cursor(field, hand())
       fn apply(text : String) -> Unit {
         ignore(text)
         field.schedule_paint()
@@ -4480,7 +4524,7 @@ pub fn select_t(
         }
         false
       })
-      field.on_mouse_down(fn(e) {
+      field.on_mouse_up(fn(e) {
         if e.button == 1 {
           field.focus()
           match pop.val {
@@ -4539,6 +4583,7 @@ pub fn select_t(
                   hover.val = false
                   row.schedule_paint()
                 })
+                View::set_cursor(row, hand())
                 row.on_mouse_down(fn(e2) {
                   if e2.button == 1 {
                     pick(o)
@@ -4655,6 +4700,7 @@ pub fn rate_t(
           v.schedule_paint()
         }
       })
+      View::set_cursor(v, hand())
       v.on_mouse_down(fn(e) {
         if e.button == 1 {
           value.set(star_at(e.view_x))
@@ -4725,8 +4771,9 @@ pub fn popover_t(
         }
         1
       }
+      ffi_view_set_cursor(tv, hand())
       keep_alive(fn() { ignore(wrapped) })
-      ffi_view_on_mouse_down(
+      ffi_view_on_mouse_up(
         tv,
         fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
         wrapped,
@@ -4752,6 +4799,8 @@ pub fn dropdown_menu(
       let field = Container::make(
         style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
       )
+      field.set_background_color("#FFFFFF")
+      View::set_cursor(field, hand())
       field.on_draw(fn(p) {
         let b = field.get_bounds()
         if focused.val {
@@ -4795,7 +4844,7 @@ pub fn dropdown_menu(
         }
         false
       })
-      field.on_mouse_down(fn(e) {
+      field.on_mouse_up(fn(e) {
         if e.button == 1 {
           field.focus()
           match pop.val {
@@ -4847,6 +4896,7 @@ pub fn dropdown_menu(
                   hover.val = false
                   row.schedule_paint()
                 })
+                View::set_cursor(row, hand())
                 row.on_mouse_down(fn(e2) {
                   if e2.button == 1 {
                     on_select(idx)
@@ -4954,6 +5004,7 @@ pub fn carousel_t(
           )
           p.fill_rect(0.0, 0.0, 8.0, 8.0)
         })
+        View::set_cursor(dot, hand())
         dot.on_mouse_down(fn(e) {
           if e.button == 1 {
             do_switch(di)
@@ -4998,6 +5049,7 @@ pub fn carousel_t(
           hover.val = false
           a.schedule_paint()
         })
+        View::set_cursor(a, hand())
         a.on_mouse_down(fn(e) {
           if e.button == 1 {
             do_switch(if right { cur.val + 1 } else { cur.val - 1 })
@@ -5044,9 +5096,9 @@ pub fn carousel_t(
 
 
 ///|
-/// 取色器(EP ColorPicker 预设色板形态):色块网格,点击写入 value
-/// (Store[String],"#RRGGBB");当前选中画主题色描边 + 内勾,色板下方
-/// 显示当前 hex。自定义色板经 colors 传入。
+/// 取色器(EP ColorPicker,下拉形态):触发字段(当前色块 + hex + 箭头)
+/// 点击弹出预设色板(Popover 承载):点击色块写入 value("#RRGGBB")并
+/// 收起;选中色块主题色描边 + 白勾。失焦收起。
 pub fn color_picker_t(
   value : Store[String],
   colors? : Array[String] = [
@@ -5054,95 +5106,167 @@ pub fn color_picker_t(
     "#1E4FA3", "#3F6E9E", "#7A9E4E", "#B86E2B", "#9AA0A6",
     "#E8EAED", "#BDC1C6", "#4E5560", "#2A2F36", "#F5F7FA",
   ],
+  width? : Double = 200.0,
 ) -> Node {
   {
     mount: fn(parent) {
-      let swatch = 26.0
-      let gap = 6.0
-      let per_row = 5
-      let outer = Container::make(
-        style=[("marginBottom", 10.0)],
-        style_str=[("flexDirection", "column")],
+      let focused = Ref(false)
+      let field = Container::make(
+        style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
       )
-      let grid = Container::make(style_str=[("flexDirection", "column")])
-      let rows : Array[(Container, Array[Container])] = []
-      let hex_label = Container::make(
-        style=[("height", 20.0), ("marginTop", 6.0)],
-      )
-      hex_label.on_draw(fn(p) {
-        let b = hex_label.get_bounds()
+      field.set_background_color("#FFFFFF")
+      View::set_cursor(field, hand())
+      field.on_draw(fn(p) {
+        let b = field.get_bounds()
+        p.set_stroke_color(
+          if focused.val { theme_primary() } else { theme_border() },
+        )
+        p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+        // 当前色块
         p.set_fill_color(value.get())
-        p.fill_rect(0.0, 3.0, 14.0, 14.0)
+        p.fill_rect(10.0, 8.0, 14.0, 14.0)
         p.set_stroke_color(theme_border())
-        p.stroke_rect(0.5, 3.5, 13.0, 13.0)
+        p.stroke_rect(10.5, 8.5, 13.0, 13.0)
         p.draw_text(
           value.get(),
-          20.0,
+          32.0,
           0.0,
-          b.width,
+          b.width - 52.0,
           b.height,
           valign=Center,
-          color=theme_text_regular(),
+          color=theme_text_primary(),
         )
+        p.set_fill_color(theme_text_secondary())
+        p.begin_path()
+        p.move_to(b.width - 20.0, b.height / 2.0 - 2.0)
+        p.line_to(b.width - 12.0, b.height / 2.0 - 2.0)
+        p.line_to(b.width - 16.0, b.height / 2.0 + 3.0)
+        p.close_path()
+        p.fill()
       })
-      for i in 0..<colors.length() {
-        if i % per_row == 0 {
-          rows.push((
-            Container::make(
-              style=[("height", swatch + gap)],
-              style_str=[("flexDirection", "row")],
-            ),
-            [],
-          ))
+      let pop : Ref[Popover?] = Ref(None)
+      fn pick(c : String) -> Unit {
+        value.set(c)
+        match pop.val {
+          Some(p) => p.close()
+          None => ()
         }
-        let (row, cells) = rows[rows.length() - 1]
-        let c = colors[i]
-        let cell = Container::make(
-          style=[("width", swatch), ("height", swatch), ("marginRight", gap)],
-        )
-        cell.on_draw(fn(p) {
-          p.set_fill_color(c)
-          p.fill_rect(0.0, 0.0, swatch, swatch)
-          p.set_stroke_color(theme_border())
-          p.stroke_rect(0.5, 0.5, swatch - 1.0, swatch - 1.0)
-          if value.get() == c {
-            // 选中:主题色描边 + 白勾
-            p.set_stroke_color(theme_primary())
-            p.stroke_rect(1.5, 1.5, swatch - 3.0, swatch - 3.0)
-            p.set_stroke_color("#FFFFFF")
-            p.begin_path()
-            p.move_to(swatch / 2.0 - 5.0, swatch / 2.0)
-            p.line_to(swatch / 2.0 - 1.0, swatch / 2.0 + 4.0)
-            p.line_to(swatch / 2.0 + 6.0, swatch / 2.0 - 5.0)
-            p.stroke()
-          }
-        })
-        cell.on_mouse_down(fn(e) {
-          if e.button == 1 {
-            value.set(c)
-            true
-          } else {
-            false
-          }
-        })
-        row.add_child(cell)
-        cells.push(cell)
       }
-      for (row, _cells) in rows {
-        grid.add_child(row)
-      }
-      value.subscribe(fn(_v) {
-        for (_row, cells) in rows {
-          for cell in cells {
-            cell.schedule_paint()
-          }
-        }
-        hex_label.schedule_paint()
+
+      field.set_focusable(true)
+      field.on_focus_in(fn() {
+        focused.val = true
+        field.schedule_paint()
+        false
       })
-      outer.add_child(grid)
-      outer.add_child(hex_label)
-      attach(parent, outer.view())
-      outer.view()
+      field.on_focus_out(fn() {
+        focused.val = false
+        field.schedule_paint()
+        match pop.val {
+          Some(p) => p.close()
+          None => ()
+        }
+        false
+      })
+      field.on_mouse_up(fn(e) {
+        if e.button == 1 {
+          field.focus()
+          match pop.val {
+            Some(_) => ()
+            None => {
+              let p = Popover::new()
+              // 色板网格:5 列布局,选中描边 + 白勾
+              let swatch = 26.0
+              let gap = 6.0
+              let per_row = 5
+              let grid = Container::make(
+                style=[("padding", 8.0)],
+                style_str=[("flexDirection", "column")],
+              )
+              grid.set_background_color("#FFFFFF")
+              let rows : Array[(Container, Array[Container])] = []
+              for i in 0..<colors.length() {
+                if i % per_row == 0 {
+                  rows.push((
+                    Container::make(
+                      style=[("height", swatch + gap)],
+                      style_str=[("flexDirection", "row")],
+                    ),
+                    [],
+                  ))
+                }
+                let (row, cells) = rows[rows.length() - 1]
+                let c = colors[i]
+                let cell = Container::make(
+                  style=[
+                    ("width", swatch),
+                    ("height", swatch),
+                    ("marginRight", gap),
+                  ],
+                )
+                View::set_cursor(cell, hand())
+                cell.on_draw(fn(p2) {
+                  p2.set_fill_color(c)
+                  p2.fill_rect(0.0, 0.0, swatch, swatch)
+                  p2.set_stroke_color(theme_border())
+                  p2.stroke_rect(0.5, 0.5, swatch - 1.0, swatch - 1.0)
+                  if value.get() == c {
+                    p2.set_stroke_color(theme_primary())
+                    p2.stroke_rect(1.5, 1.5, swatch - 3.0, swatch - 3.0)
+                    p2.set_stroke_color("#FFFFFF")
+                    p2.begin_path()
+                    p2.move_to(swatch / 2.0 - 5.0, swatch / 2.0)
+                    p2.line_to(swatch / 2.0 - 1.0, swatch / 2.0 + 4.0)
+                    p2.line_to(swatch / 2.0 + 6.0, swatch / 2.0 - 5.0)
+                    p2.stroke()
+                  }
+                })
+                cell.on_mouse_down(fn(e2) {
+                  if e2.button == 1 {
+                    pick(c)
+                    true
+                  } else {
+                    false
+                  }
+                })
+                row.add_child(cell)
+                cells.push(cell)
+              }
+              for (row, _cells) in rows {
+                grid.add_child(row)
+              }
+              value.subscribe(fn(_v) {
+                for (_r, cells) in rows {
+                  for cell in cells {
+                    cell.schedule_paint()
+                  }
+                }
+                field.schedule_paint()
+              })
+              let n_rows = colors.length() / per_row + 1
+              let grid_w = per_row.to_double() * (swatch + gap) + 16.0
+              ignore(n_rows)
+              p.set_content(grid)
+              // 高度 = padding 16 + 行数 x 32(色块 26 + 间距 6)
+              let rows_n = (colors.length() + per_row - 1) / per_row
+              p.set_content_size(
+                grid_w,
+                16.0 + rows_n.to_double() * (swatch + gap),
+              )
+              pop.val = Some(p)
+            }
+          }
+          match pop.val {
+            Some(p) => p.show_relative_to(field)
+            None => ()
+          }
+          true
+        } else {
+          false
+        }
+      })
+      attach(parent, field.view())
+      field.view()
     },
   }
 }
