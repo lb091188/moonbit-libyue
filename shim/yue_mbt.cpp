@@ -2771,7 +2771,13 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view) {
   const nu::RectF anchor = v->GetBoundsInScreen();
   const nu::SizeF size = win->GetContentSize();
   const float x = anchor.right() + 8.0f;
-  const float y = anchor.bottom() + 8.0f;
+  float y = anchor.bottom() + 8.0f;
+  // 所在显示器工作区放不下时翻到锚点上方(与 fork 翻转补丁对齐)
+  nu::Display display =
+      nu::Screen::GetCurrent()->GetDisplayNearestPoint(anchor.origin());
+  if (y + size.height() > display.work_area.bottom()) {
+    y = anchor.y() - size.height() - 8.0f;
+  }
   win->SetBounds(nu::RectF(x, y, size.width(), size.height()));
 }
 #else
@@ -2803,7 +2809,20 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view) {
   }
   const nu::SizeF size = win->GetContentSize();
   const float x = anchor.x() + (anchor.width() - size.width()) / 2.0f;
-  const float y = anchor.bottom() + 2.0f;
+  float y = anchor.bottom() + 2.0f;
+  // 锚点所在显示器的工作区放不下时翻转到锚点上方(与 fork 的
+  // Popover::ShowRelativeTo 翻转补丁对齐),贴屏底的取色器/下拉保持可见
+  {
+    POINT apt = {static_cast<LONG>(anchor.x() + anchor.width() / 2.0f),
+                 static_cast<LONG>(anchor.y())};
+    HMONITOR mon = ::MonitorFromPoint(apt, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi;
+    mi.cbSize = sizeof(mi);
+    if (mon != nullptr && ::GetMonitorInfoW(mon, &mi) &&
+        y + size.height() > static_cast<float>(mi.rcWork.bottom)) {
+      y = anchor.y() - size.height() - 2.0f;
+    }
+  }
   // libyue 的 SetVisible 在此场景观测为不可见(Win10 真机 visible=0),
   // 直接走 Win32:带尺寸定位 + SW_SHOWNOACTIVATE(不抢输入框焦点)
   win->SetVisible(true);
