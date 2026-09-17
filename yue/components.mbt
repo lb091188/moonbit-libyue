@@ -2630,6 +2630,9 @@ pub fn autocomplete(
             Some(p) => {
               if count > 0 && !picked.val {
                 p.set_content(list)
+                // 弹层根容器显式高:Win 替代窗口按内容协商尺寸,
+                // 无显式高会布局震荡;与 content_size 公式一致
+                list.set_style("height", count.to_double() * 28.0 + 8.0)
                 p.set_content_size(width, count.to_double() * 28.0 + 8.0)
                 p.show_relative_to(entry)
               } else {
@@ -4600,11 +4603,13 @@ pub fn select_t(
                 })
                 list.add_child(row)
               }
-              p.set_content(list)
               let mut rows_h = options.length().to_double() * 28.0 + 8.0
               if rows_h > 300.0 {
                 rows_h = 300.0
               }
+              // 弹层根容器显式尺寸(与 content_size 一致),防布局协商震荡
+              list.set_style("height", rows_h)
+              p.set_content(list)
               p.set_content_size(width, rows_h)
               pop.val = Some(p)
             }
@@ -4919,6 +4924,10 @@ pub fn dropdown_menu(
                 })
                 list.add_child(row)
               }
+              list.set_style(
+                "height",
+                items.length().to_double() * 28.0 + 8.0,
+              )
               p.set_content(list)
               p.set_content_size(
                 width,
@@ -5251,16 +5260,15 @@ pub fn color_picker_t(
                 }
                 field.schedule_paint()
               })
-              let n_rows = colors.length() / per_row + 1
-              let grid_w = per_row.to_double() * (swatch + gap) + 16.0
-              ignore(n_rows)
-              p.set_content(grid)
-              // 高度 = padding 16 + 行数 x 32(色块 26 + 间距 6)
+              // 高度 = padding 16 + 行数 x 32(色块 26 + 间距 6);
+              // 根容器显式尺寸与 content_size 一致,防布局协商震荡
               let rows_n = (colors.length() + per_row - 1) / per_row
-              p.set_content_size(
-                grid_w,
-                16.0 + rows_n.to_double() * (swatch + gap),
-              )
+              let grid_w = per_row.to_double() * (swatch + gap) + 16.0
+              let grid_h = 16.0 + rows_n.to_double() * (swatch + gap)
+              grid.set_style("width", grid_w)
+              grid.set_style("height", grid_h)
+              p.set_content(grid)
+              p.set_content_size(grid_w, grid_h)
               pop.val = Some(p)
             }
           }
