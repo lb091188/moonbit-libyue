@@ -2696,8 +2696,26 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view) {
   if (win == nullptr || v == nullptr) {
     return;
   }
-  // 锚定控件屏幕包围盒正下方(libyue 公开 API,不依赖光标位置)
-  const nu::RectF anchor = v->GetBoundsInScreen();
+  // 锚点坐标:原生子控件(Entry=EDIT)直接取 GetWindowRect——
+  // View::GetBoundsInScreen 在嵌套滚动容器下累加出巨幅偏移(Win10 真机
+  // 实测 x=-5.9 亿,弹层被定位到屏幕外不显示),不可信;取不到 HWND 再
+  // 回退。坐标系与下方 SetWindowPos 一致按物理像素。
+  nu::RectF anchor;
+  bool anchored = false;
+  if (auto *subwin = dynamic_cast<nu::SubwinView *>(v->GetNative())) {
+    HWND anchor_hwnd = subwin->hwnd();
+    RECT r;
+    if (anchor_hwnd != nullptr && ::GetWindowRect(anchor_hwnd, &r)) {
+      anchor = nu::RectF(static_cast<float>(r.left),
+                         static_cast<float>(r.top),
+                         static_cast<float>(r.right - r.left),
+                         static_cast<float>(r.bottom - r.top));
+      anchored = true;
+    }
+  }
+  if (!anchored) {
+    anchor = v->GetBoundsInScreen();
+  }
   const nu::SizeF size = win->GetContentSize();
   const float x = anchor.x() + (anchor.width() - size.width()) / 2.0f;
   const float y = anchor.bottom() + 2.0f;
