@@ -122,6 +122,31 @@ pub fn default_theme() -> Theme {
 }
 
 ///|
+/// 内置暗色主题变体：深底浅字，语义 light 变体取深色调。
+/// 注意：仅自绘组件即时生效；原生控件与挂载时定死的静态色不受影响。
+pub fn dark_theme() -> Theme {
+  {
+    primary: "#5B8DEF",
+    primary_light: "#1E3A5F",
+    primary_hover: "#7BA4F4",
+    danger_hover: "#E9707A",
+    success: "#4CB878",
+    success_light: "#1D3B2A",
+    warning: "#E5A04C",
+    warning_light: "#43351F",
+    danger: "#E5646E",
+    danger_light: "#45242A",
+    info: "#9AA0A6",
+    info_light: "#2A2D31",
+    text_primary: "#E8EAED",
+    text_regular: "#BDC1C6",
+    text_secondary: "#9AA0A6",
+    border: "#3C4043",
+    fill_hover: "#2A2D31",
+  }
+}
+
+///|
 /// 主题存储：单个可变快照，theme_apply 整体替换。
 priv struct ThemeBox {
   mut t : Theme

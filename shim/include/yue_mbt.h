@@ -700,6 +700,11 @@ int32_t yue_mbt_view_is_dragging(void *view);
 
 void *yue_mbt_null_image();
 
+/* ---------- 探测示例(examples/probe) ---------- */
+
+void yue_mbt_probe_env(void *window);
+void yue_mbt_probe_view(void *view, const char *label);
+
 #ifdef __cplusplus
 }
 #endif

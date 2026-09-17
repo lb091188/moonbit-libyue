@@ -28,6 +28,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <csignal>
+#include <typeinfo>
 #if defined(__linux__)
 #include <dlfcn.h>
 #endif
@@ -4562,6 +4563,124 @@ int32_t yue_mbt_view_is_dragging(void *view) {
 
 void *yue_mbt_null_image() {
   return nullptr;
+}
+
+// ---------- 探测示例(examples/probe):真机原生控件信息收集 ----------
+// 输出全部走 stderr;Windows 真机以 `moon run examples/probe > probe.log 2>&1` 收集
+
+#if defined(OS_WIN)
+static BOOL CALLBACK ProbeEnumChildProc(HWND h, LPARAM) {
+  WCHAR cls[256] = L"";
+  ::GetClassNameW(h, cls, 256);
+  WCHAR title[96] = L"";
+  ::GetWindowTextW(h, title, 96);
+  RECT r;
+  ::GetWindowRect(h, &r);
+  std::fprintf(stderr,
+               "  child hwnd=%p class=%ls title=%ls rect=(%ld,%ld,%ld,%ld) "
+               "style=0x%lx\n",
+               static_cast<void *>(h), cls, title, static_cast<long>(r.left),
+               static_cast<long>(r.top), static_cast<long>(r.right),
+               static_cast<long>(r.bottom),
+               static_cast<unsigned long>(::GetWindowLongPtrW(h, GWL_STYLE)));
+  return TRUE;
+}
+#endif
+
+/* 环境探针:系统版本/窗口 DPI/系统暗色开关/全部原生子控件枚举。 */
+void yue_mbt_probe_env(void *window) {
+#if defined(OS_WIN)
+  std::fprintf(stderr, "==== PROBE env ====\n");
+  auto *win = CastTo<nu::Window>(window);
+  HWND h = (win != nullptr && win->GetNative() != nullptr)
+               ? win->GetNative()->hwnd()
+               : nullptr;
+  // 系统版本:RtlGetVersion(GetVersionEx 在新 SDK 一律谎报 6.2)
+  struct ProbeOSVersion {
+    unsigned long size;
+    unsigned long major;
+    unsigned long minor;
+    unsigned long build;
+    unsigned long platform;
+    WCHAR pad[128];
+  };
+  HMODULE ntdll = ::GetModuleHandleW(L"ntdll");
+  if (ntdll != nullptr) {
+    auto rtl = reinterpret_cast<long(__stdcall *)(ProbeOSVersion *)>(
+        ::GetProcAddress(ntdll, "RtlGetVersion"));
+    if (rtl != nullptr) {
+      ProbeOSVersion v{};
+      v.size = sizeof(v);
+      rtl(&v);
+      std::fprintf(stderr, "  os=%lu.%lu build=%lu\n", v.major, v.minor,
+                   v.build);
+    }
+  }
+  // 窗口 DPI(96=100% 缩放)
+  HMODULE user32 = ::GetModuleHandleW(L"user32.dll");
+  auto get_dpi = reinterpret_cast<UINT(__stdcall *)(HWND)>(
+      user32 != nullptr ? ::GetProcAddress(user32, "GetDpiForWindow")
+                        : nullptr);
+  std::fprintf(stderr, "  window-dpi=%u\n",
+               (h != nullptr && get_dpi != nullptr) ? get_dpi(h) : 0);
+  // 系统应用暗色开关(1=浅色 0=暗色)
+  DWORD light = 1;
+  DWORD sz = sizeof(light);
+  if (::RegGetValueW(
+          HKEY_CURRENT_USER,
+          L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+          L"AppsUseLightTheme", RRF_RT_DWORD, nullptr, &light, &sz) ==
+      ERROR_SUCCESS) {
+    std::fprintf(stderr, "  system-apps-light=%lu\n",
+                 static_cast<unsigned long>(light));
+  }
+  if (h != nullptr) {
+    WCHAR cls[256] = L"";
+    ::GetClassNameW(h, cls, 256);
+    std::fprintf(stderr, "  top hwnd=%p class=%ls\n", static_cast<void *>(h),
+                 cls);
+    std::fprintf(stderr, "  ---- 原生子控件枚举 ----\n");
+    ::EnumChildWindows(h, ProbeEnumChildProc, 0);
+  }
+#else
+  (void)window;
+  std::fprintf(stderr, "==== PROBE env: 非 Windows,略 ====\n");
+#endif
+}
+
+/* 单控件探针:nu 类名/实现 C++ 类型(RTTI)/原生子 HWND 的窗口类名与几何。 */
+void yue_mbt_probe_view(void *view, const char *label) {
+  if (auto *v = CastToView(view)) {
+    std::fprintf(stderr, "PROBE [%s]: nu-class=%s\n", label, v->GetClassName());
+#if defined(OS_WIN)
+    if (v->GetNative() != nullptr) {
+      std::fprintf(stderr, "  impl-typeid=%s\n",
+                   typeid(*v->GetNative()).name());
+    }
+    if (auto *subwin = dynamic_cast<nu::SubwinView *>(v->GetNative())) {
+      HWND h = subwin->hwnd();
+      if (h != nullptr) {
+        WCHAR cls[256] = L"";
+        ::GetClassNameW(h, cls, 256);
+        RECT r;
+        ::GetWindowRect(h, &r);
+        std::fprintf(stderr,
+                     "  hwnd=%p win-class=%ls rect=(%ld,%ld,%ld,%ld)\n",
+                     static_cast<void *>(h), cls, static_cast<long>(r.left),
+                     static_cast<long>(r.top), static_cast<long>(r.right),
+                     static_cast<long>(r.bottom));
+      } else {
+        std::fprintf(stderr, "  SubwinView 但 hwnd=null\n");
+      }
+    } else {
+      std::fprintf(stderr, "  无 SubwinView: 自绘 view(无原生子 HWND)\n");
+    }
+#else
+    (void)label;
+#endif
+  } else {
+    std::fprintf(stderr, "PROBE [%s]: 句柄无效\n", label);
+  }
 }
 
 }  // extern "C"
