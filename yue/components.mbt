@@ -4184,3 +4184,228 @@ pub fn textarea_t(
     },
   }
 }
+
+///|
+/// 滑杆(EP Slider,自绘):浅灰轨道 + 主题色填充段 + 方形 thumb,支持
+/// 点击轨道/拖拽 thumb 调值,值按 step 量化后写入 value(Store[Double]),
+/// 外部 set 同样生效。on_change 在值变化时回调(含拖拽过程)。
+pub fn slider_t(
+  value : Store[Double],
+  min? : Double = 0.0,
+  max? : Double = 100.0,
+  step? : Double = 1.0,
+  width? : Double = 240.0,
+  on_change? : (Double) -> Unit = fn(_v) {  },
+) -> Node {
+  {
+    mount: fn(parent) {
+      let h = 24.0
+      let track_h = 4.0
+      let thumb = 12.0
+      let dragging = Ref(false)
+      let hover = Ref(false)
+      let v = Container::make(
+        style=[("width", width), ("height", h), ("marginBottom", 10.0)],
+      )
+      fn clamp01(x : Double) -> Double {
+        if x < 0.0 {
+          0.0
+        } else if x > 1.0 {
+          1.0
+        } else {
+          x
+        }
+      }
+
+      fn ratio_of(val : Double) -> Double {
+        if max <= min {
+          return 0.0
+        }
+        clamp01((val - min) / (max - min))
+      }
+
+      // 值按 step 量化(对齐到网格,再回钳范围)
+      fn quantize(val : Double) -> Double {
+        if step <= 0.0 {
+          return val
+        }
+        let k = ((val - min) / step).round()
+        let q = min + k * step
+        if q < min {
+          min
+        } else if q > max {
+          max
+        } else {
+          q
+        }
+      }
+
+      fn set_from_x(x : Double) -> Unit {
+        let r = clamp01((x - thumb / 2.0) / (width - thumb))
+        value.set(quantize(min + r * (max - min)))
+      }
+
+      v.on_draw(fn(p) {
+        let ratio = ratio_of(value.get())
+        let ty = (h - track_h) / 2.0
+        p.set_fill_color(theme_fill_zebra())
+        p.fill_rect(0.0, ty, width, track_h)
+        p.set_fill_color(theme_primary())
+        p.fill_rect(0.0, ty, ratio * (width - thumb) + thumb / 2.0, track_h)
+        // thumb:主题色实心方块,hover/拖拽加深
+        let tx = ratio * (width - thumb)
+        p.set_fill_color(
+          if hover.val || dragging.val {
+            theme_primary_hover()
+          } else {
+            theme_primary()
+          },
+        )
+        p.fill_rect(tx, (h - thumb) / 2.0, thumb, thumb)
+      })
+      v.on_mouse_down(fn(e) {
+        if e.button == 1 {
+          dragging.val = true
+          v.set_capture()
+          set_from_x(e.view_x)
+          true
+        } else {
+          false
+        }
+      })
+      v.on_mouse_move(fn(e) {
+        if dragging.val {
+          set_from_x(e.view_x)
+        }
+      })
+      v.on_mouse_up(fn(_e) {
+        if dragging.val {
+          dragging.val = false
+          v.release_capture()
+          true
+        } else {
+          false
+        }
+      })
+      v.on_mouse_enter(fn(_e) {
+        hover.val = true
+        v.schedule_paint()
+      })
+      v.on_mouse_leave(fn(_e) {
+        hover.val = false
+        v.schedule_paint()
+      })
+      v.on_focus_out(fn() {
+        if dragging.val {
+          dragging.val = false
+          v.release_capture()
+        }
+        false
+      })
+      value.subscribe(fn(new_v) {
+        on_change(new_v)
+        v.schedule_paint()
+      })
+      attach(parent, v.view())
+      v.view()
+    },
+  }
+}
+
+///|
+/// 页签(EP Tabs,顶部形态):页签头行(选中主题色文字 + 底部 2px 指示条,
+/// 悬停变深)+ 内容区经 set_visible 切换。selected 为页序号 Store,默认
+/// 内部建 0。
+pub fn tabs_t(
+  pages : Array[(String, Node)],
+  selected? : Store[Int],
+) -> Node {
+  {
+    mount: fn(parent) {
+      let sel = match selected {
+        Some(s) => s
+        None => Store::new(0)
+      }
+      let fnt = Font::new("Sans", 13.0)
+      let outer = Container::make(
+        style=[("width", 360.0), ("marginBottom", 10.0)],
+        style_str=[("flexDirection", "column")],
+      )
+      let head = Container::make(
+        style=[("height", 36.0)],
+        style_str=[("flexDirection", "row")],
+      )
+      let contents : Array[Container] = []
+      let cur = Ref(sel.get())
+      for i in 0..<pages.length() {
+        let (title, node) = pages[i]
+        let idx = i
+        // 页签头:宽度自适应(测字宽 + 两侧 14px)
+        let probe = AttributedText::new(title, wrap=false)
+        probe.set_font(fnt)
+        let tw = probe.get_bounds_for(10000.0, 100.0).width
+        let tab = Container::make(
+          style=[("width", tw + 28.0), ("height", 36.0), ("marginRight", 8.0)],
+        )
+        let hover = Ref(false)
+        tab.on_draw(fn(p) {
+          let b = tab.get_bounds()
+          let act = cur.val == idx
+          let at = AttributedText::new(title, valign=Center, wrap=false)
+          at.set_font(fnt)
+          at.set_color(
+            if act {
+              theme_primary()
+            } else if hover.val {
+              theme_text_regular()
+            } else {
+              theme_text_secondary()
+            },
+          )
+          p.draw_attributed_text(at, 14.0, 0.0, b.width - 14.0, 36.0)
+          if act {
+            p.set_fill_color(theme_primary())
+            p.fill_rect(0.0, 34.0, b.width, 2.0)
+          }
+        })
+        tab.on_mouse_down(fn(e) {
+          if e.button == 1 {
+            sel.set(idx)
+            true
+          } else {
+            false
+          }
+        })
+        tab.on_mouse_enter(fn(_e) {
+          hover.val = true
+          tab.schedule_paint()
+        })
+        tab.on_mouse_leave(fn(_e) {
+          hover.val = false
+          tab.schedule_paint()
+        })
+        head.add_child(tab)
+        // 内容页:默认只显示当前页
+        let page_c = Container::make(
+          style_str=[("flexDirection", "column")],
+        )
+        page_c.set_visible(cur.val == idx)
+        ignore((node.mount)(page_c.view()))
+        contents.push(page_c)
+      }
+      outer.add_child(head)
+      for c in contents {
+        outer.add_child(c)
+      }
+      sel.subscribe(fn(i) {
+        cur.val = i
+        for j in 0..<contents.length() {
+          contents[j].set_visible(j == i)
+        }
+        head.schedule_paint()
+      })
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}
