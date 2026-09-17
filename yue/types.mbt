@@ -130,6 +130,7 @@ pub(open) trait ViewLike {
   fn on_mouse_move(Self, (MouseEvent) -> Unit) -> Unit = _
   fn on_mouse_enter(Self, (MouseEvent) -> Unit) -> Unit = _
   fn on_mouse_leave(Self, (MouseEvent) -> Unit) -> Unit = _
+  fn on_wheel(Self, (Double) -> Unit) -> Unit = _
   fn on_capture_lost(Self, () -> Unit) -> Unit = _
   fn on_key_down(Self, (KeyEvent) -> Bool) -> Unit = _
   fn on_key_up(Self, (KeyEvent) -> Bool) -> Unit = _

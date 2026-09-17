@@ -3654,3 +3654,456 @@ pub fn table_t(
     },
   }
 }
+
+///|
+/// 虚拟滚动表格(table_t 的 L3 万行级形态):整面 canvas 自绘、只画可见行,
+/// 自管滚动——滚轮(Linux 经 shim scroll-event)/拖拽滚动条/键盘,不受原生
+/// 滚动容器的内容高度上限约束(X11 子窗口高度 65535,万行内容放不进
+/// GtkViewport)。单元格画法与 table_t 一致(CellLines 在行高内最多画
+/// 两行);selection 语义同 table_t(复选框列 + 表头全选)。
+pub fn table_v_t(
+  columns : Array[TableColumn],
+  rows : Store[Array[TableRow]],
+  width? : Double = 560.0,
+  height? : Double = 360.0,
+  row_height? : Double = 32.0,
+  selection? : Store[Array[Int]],
+  on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) { },
+) -> Node {
+  {
+    mount: fn(parent) {
+      let font = Font::new("Sans", 13.0)
+      let head_font = Font::new("Sans", 13.0, weight=SemiBold)
+      let small_font = Font::new("Sans", 12.0)
+      let sel = selection
+      let data_r : Ref[Array[TableRow]] = Ref([])
+      let selected_i = Ref(-1)
+      let hover_i = Ref(-1)
+      let offset = Ref(0.0)
+      let dragging = Ref(false)
+      let head_h = 40.0
+      let bar_w = 10.0
+      let body_w = width - bar_w
+      let vis_h = height - head_h
+      // 列几何:固定宽直接用,弹性列均分剩余宽度
+      let mut fixed = 0.0
+      let mut flex_count = 0
+      for col in columns {
+        if col.width > 0.0 {
+          fixed = fixed + col.width
+        } else {
+          flex_count = flex_count + 1
+        }
+      }
+      let flex_w = if flex_count > 0 {
+        ((body_w - fixed) / flex_count.to_double()).max(0.0)
+      } else {
+        0.0
+      }
+      let col_x : Array[Double] = []
+      let col_w : Array[Double] = []
+      let mut acc = 0.0
+      for col in columns {
+        let w = if col.width > 0.0 {
+          col.width
+        } else {
+          flex_w
+        }
+        col_x.push(acc)
+        col_w.push(w)
+        acc = acc + w
+      }
+      let cv = Container::make(
+        style=[("width", width), ("height", height), ("marginBottom", 10.0)],
+      )
+
+      fn sel_has(i : Int) -> Bool {
+        match sel {
+          Some(s) => {
+            for x in s.get() {
+              if x == i {
+                return true
+              }
+            }
+            false
+          }
+          None => false
+        }
+      }
+
+      fn toggle_sel(i : Int) -> Unit {
+        match sel {
+          Some(s) => {
+            let out : Array[Int] = []
+            let mut had = false
+            for x in s.get() {
+              if x == i {
+                had = true
+              } else {
+                out.push(x)
+              }
+            }
+            if !had {
+              out.push(i)
+            }
+            s.set(out)
+          }
+          None => ()
+        }
+      }
+
+      fn toggle_all() -> Unit {
+        match sel {
+          Some(s) => {
+            let n = data_r.val.length()
+            if n > 0 && s.get().length() == n {
+              s.set([])
+            } else {
+              let all : Array[Int] = []
+              for i in 0..<n {
+                all.push(i)
+              }
+              s.set(all)
+            }
+          }
+          None => ()
+        }
+      }
+
+      fn total_h() -> Double {
+        head_h + data_r.val.length().to_double() * row_height
+      }
+
+      fn max_offset() -> Double {
+        (total_h() - vis_h).max(0.0)
+      }
+
+      fn clamp_offset() -> Unit {
+        let m = max_offset()
+        if offset.val > m {
+          offset.val = m
+        }
+        if offset.val < 0.0 {
+          offset.val = 0.0
+        }
+      }
+
+      // 文本按列对齐摆位(GTK 端 draw_text 无水平 align,手动测宽)
+      fn draw_align_text(
+        p : Painter,
+        text : String,
+        align : TextAlign,
+        x : Double,
+        w : Double,
+        y : Double,
+        h : Double,
+        fnt : Font,
+        color : String,
+      ) -> Unit {
+        if text == "" {
+          return
+        }
+        let px = match align {
+          End => {
+            let probe = AttributedText::new(text, wrap=false)
+            probe.set_font(fnt)
+            let tw = probe.get_bounds_for(10000.0, 100.0).width
+            x + w - 12.0 - tw
+          }
+          Center => {
+            let probe = AttributedText::new(text, wrap=false)
+            probe.set_font(fnt)
+            let tw = probe.get_bounds_for(10000.0, 100.0).width
+            x + (w - tw) / 2.0
+          }
+          _ => x + 12.0
+        }
+        p.draw_text(text, px, y, w, h, valign=Center, color=color)
+      }
+
+      cv.on_draw(fn(p) {
+        let b = cv.get_bounds()
+        let data = data_r.val
+        let n = data.length()
+        // 表头
+        p.set_fill_color(theme_fill_zebra())
+        p.fill_rect(0.0, 0.0, b.width, head_h)
+        p.set_stroke_color(theme_border())
+        p.begin_path()
+        p.move_to(0.0, head_h - 0.5)
+        p.line_to(b.width, head_h - 0.5)
+        p.stroke()
+        match sel {
+          Some(s) => {
+            let k = s.get().length()
+            table_draw_check(
+              p,
+              11.0,
+              (head_h - 14.0) / 2.0,
+              n > 0 && k == n,
+              k > 0 && k < n,
+            )
+          }
+          None => ()
+        }
+        for j in 0..<columns.length() {
+          draw_align_text(
+            p,
+            columns[j].title,
+            columns[j].align,
+            col_x[j],
+            col_w[j],
+            0.0,
+            head_h,
+            head_font,
+            theme_text_secondary(),
+          )
+        }
+        // 可见行窗口
+        let first = (offset.val / row_height).to_int()
+        let mut last = ((offset.val + vis_h) / row_height).ceil().to_int() + 1
+        if last > n {
+          last = n
+        }
+        for i in first..<last {
+          let row_y = head_h + i.to_double() * row_height - offset.val
+          let bg = table_row_bg(i, sel_has(i), hover_i.val == i)
+          if bg != "" {
+            p.set_fill_color(bg)
+            p.fill_rect(0.0, row_y, body_w, row_height)
+          }
+          if sel is Some(_) {
+            table_draw_check(
+              p,
+              11.0,
+              row_y + (row_height - 14.0) / 2.0,
+              sel_has(i),
+              false,
+            )
+          }
+          let r = data[i]
+          for j in 0..<columns.length() {
+            let content = if j < r.cells.length() {
+              r.cells[j]
+            } else {
+              CellText("")
+            }
+            let x = col_x[j]
+            let w = col_w[j]
+            match content {
+              CellText(text) =>
+                draw_align_text(
+                  p,
+                  text,
+                  columns[j].align,
+                  x,
+                  w,
+                  row_y,
+                  row_height,
+                  font,
+                  theme_text_regular(),
+                )
+              CellTag(text, t) => {
+                let probe = AttributedText::new(text, wrap=false)
+                probe.set_font(small_font)
+                let tw = probe.get_bounds_for(10000.0, 100.0).width
+                let tag_w = tw + 14.0
+                let ty = row_y + (row_height - 20.0) / 2.0
+                p.set_fill_color(type_light_color(t))
+                p.fill_rect(x + 12.0, ty, tag_w, 20.0)
+                p.draw_text(
+                  text,
+                  x + 12.0 + 7.0,
+                  ty,
+                  tw,
+                  20.0,
+                  valign=Center,
+                  color=type_color(t),
+                )
+              }
+              CellColorBox(hex, name) => {
+                let sy = row_y + (row_height - 14.0) / 2.0
+                p.set_fill_color(hex)
+                p.fill_rect(x + 12.0, sy, 14.0, 14.0)
+                p.set_stroke_color(theme_border())
+                p.stroke_rect(x + 12.5, sy + 0.5, 13.0, 13.0)
+                p.draw_text(
+                  name,
+                  x + 12.0 + 20.0,
+                  row_y,
+                  w - 32.0,
+                  row_height,
+                  valign=Center,
+                  color=theme_text_regular(),
+                )
+              }
+              CellLines(lines) => {
+                // 行高内最多画两行,超出截断(虚拟滚动行高固定)
+                let mut ly = row_y + (row_height - 28.0) / 2.0
+                let limit = row_y + row_height - 2.0
+                for ln in lines {
+                  if ly > limit - 12.0 {
+                    break
+                  }
+                  p.draw_text(
+                    ln,
+                    x + 12.0,
+                    ly,
+                    w,
+                    14.0,
+                    color=theme_text_regular(),
+                  )
+                  ly = ly + 14.0
+                }
+              }
+            }
+          }
+        }
+        // 滚动条(细 thumb,可拖拽)
+        let th = total_h()
+        if th > vis_h {
+          let thumb_h = (vis_h * vis_h / th).max(30.0)
+          let t = if max_offset() > 0.0 {
+            offset.val / max_offset()
+          } else {
+            0.0
+          }
+          let thumb_y = head_h + (vis_h - thumb_h) * t
+          p.set_fill_color(theme_border())
+          p.fill_rect(b.width - bar_w + 2.0, thumb_y, bar_w - 4.0, thumb_h)
+        }
+        p.set_stroke_color(theme_border())
+        p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+      })
+
+      fn thumb_geo() -> (Double, Double) {
+        let th = total_h()
+        let thumb_h = (vis_h * vis_h / th).max(30.0)
+        (thumb_h, th)
+      }
+
+      fn scroll_to_thumb(evy : Double) -> Unit {
+        let (thumb_h, _) = thumb_geo()
+        let t = ((evy - head_h - thumb_h / 2.0) / (vis_h - thumb_h))
+          .max(0.0)
+          .min(1.0)
+        offset.val = t * max_offset()
+        cv.schedule_paint()
+      }
+
+      cv.on_mouse_down(fn(e) {
+        if e.button != 1 {
+          return false
+        }
+        let n = data_r.val.length()
+        if e.view_x >= body_w && max_offset() > 0.0 {
+          scroll_to_thumb(e.view_y)
+          dragging.val = true
+          cv.set_capture()
+          return true
+        }
+        if e.view_y < head_h {
+          if e.view_x < 36.0 {
+            match sel {
+              Some(_) => toggle_all()
+              None => ()
+            }
+          }
+          cv.schedule_paint()
+          return true
+        }
+        let idx = ((e.view_y - head_h + offset.val) / row_height).to_int()
+        if idx >= 0 && idx < n {
+          match sel {
+            Some(_) => toggle_sel(idx)
+            None => selected_i.val = idx
+          }
+          on_row_click(idx, data_r.val[idx])
+        }
+        cv.schedule_paint()
+        true
+      })
+      cv.on_mouse_move(fn(e) {
+        if dragging.val {
+          scroll_to_thumb(e.view_y)
+          return
+        }
+        let n = data_r.val.length()
+        let idx = ((e.view_y - head_h + offset.val) / row_height).to_int()
+        let inside = e.view_x < body_w && e.view_y >= head_h
+        let new_hover = if inside && idx >= 0 && idx < n {
+          idx
+        } else {
+          -1
+        }
+        if new_hover != hover_i.val {
+          hover_i.val = new_hover
+          cv.schedule_paint()
+        }
+      })
+      cv.on_mouse_up(fn(_e) {
+        if dragging.val {
+          dragging.val = false
+          cv.release_capture()
+          true
+        } else {
+          false
+        }
+      })
+      cv.on_mouse_leave(fn(_e) {
+        if hover_i.val != -1 {
+          hover_i.val = -1
+          cv.schedule_paint()
+        }
+      })
+      cv.on_wheel(fn(delta) {
+        offset.val = offset.val + delta * 60.0
+        clamp_offset()
+        cv.schedule_paint()
+      })
+      cv.set_focusable(true)
+      cv.on_key_down(fn(e) {
+        let page = (vis_h - row_height).max(row_height)
+        if e.code == VKEY_DOWN {
+          offset.val = offset.val + row_height
+        } else if e.code == VKEY_UP {
+          offset.val = offset.val - row_height
+        } else if e.code == VKEY_NEXT {
+          offset.val = offset.val + page
+        } else if e.code == VKEY_PRIOR {
+          offset.val = offset.val - page
+        } else if e.code == VKEY_END {
+          offset.val = max_offset()
+        } else if e.code == VKEY_HOME {
+          offset.val = 0.0
+        } else {
+          return false
+        }
+        clamp_offset()
+        cv.schedule_paint()
+        true
+      })
+
+      fn load(data : Array[TableRow]) -> Unit {
+        data_r.val = data
+        selected_i.val = -1
+        hover_i.val = -1
+        offset.val = 0.0
+        match sel {
+          Some(s) => s.set([])
+          None => ()
+        }
+        cv.schedule_paint()
+      }
+
+      load(rows.get())
+      rows.subscribe(load)
+      match sel {
+        Some(s) => s.subscribe(fn(_v) { cv.schedule_paint() })
+        None => ()
+      }
+      attach(parent, cv.view())
+      cv.view()
+    },
+  }
+}

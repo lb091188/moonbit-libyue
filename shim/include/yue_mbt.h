@@ -386,6 +386,10 @@ void yue_mbt_view_on_mouse_leave(void *view,
     void (*invoke)(void *closure, int32_t button, double view_x, double view_y,
                    double window_x, double window_y, int32_t modifiers, int32_t timestamp),
     void *closure);
+/* 滚轮(Linux GTK):invoke(closure, delta_y),+1 下滚 / -1 上滚 / 平滑增量为累计值 */
+void yue_mbt_view_on_wheel(void *view,
+                           void (*invoke)(void *closure, double delta_y),
+                           void *closure);
 /* 键盘事件：invoke(closure, key_code, modifiers, timestamp) 返回是否已处理 */
 void yue_mbt_view_on_key_down(void *view,
                               int32_t (*invoke)(void *closure, int32_t key_code, int32_t modifiers, int32_t timestamp),
