@@ -1580,6 +1580,10 @@ extern "c" fn ffi_app_get_name(name_buf : Bytes) -> Int = "yue_mbt_app_get_name"
 extern "c" fn ffi_appearance_is_dark() -> Int = "yue_mbt_appearance_is_dark"
 
 ///|
+/// 本地时区的今天,打包 Int64:y*10000+m*100+d(日历组件"今天"高亮用)。
+extern "c" fn ffi_local_date() -> Int64 = "yue_mbt_local_date"
+
+///|
 /// 读取系统区域标识到容量 cap 的缓冲，返回实际长度。
 #borrow(buf)
 extern "c" fn ffi_locale_get(buf : Bytes, cap : Int) -> Int = "yue_mbt_locale_get"

@@ -554,6 +554,8 @@ void yue_mbt_app_set_name(const char *name);
 /* 输出参数：name_buf 容量 256 */
 int32_t yue_mbt_app_get_name(char *name_buf);
 int32_t yue_mbt_appearance_is_dark(void);
+/* 本地时区的今天,打包 Int64:y*10000+m*100+d */
+int64_t yue_mbt_local_date(void);
 /* 返回 UTF-8 字节到 buf，返回长度 */
 int32_t yue_mbt_locale_get(char *buf, int32_t cap);
 double yue_mbt_screen_get_scale_factor(void);

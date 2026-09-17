@@ -95,7 +95,7 @@
 - [x] autocomplete 自动补全 — entry_t 输入过滤 + 候选行点击回填(动态行重建)
 
 ### 第三批:table_t 全自绘表格
-- [ ] date_picker_t — 和日历共用算法逻辑，采用和 自动补全的方式进行日历的自渲染，和 Element Pluas date Picker 样式
+- [x] date_picker_t — 和日历共用算法逻辑，采用和 自动补全的方式进行日历的自渲染，和 Element Pluas date Picker 样式(全自绘月历面板经 Popover 弹出,与 calendar_t 共用 build_calendar;演示板「进阶」页;弹层焦点/选中回填待真机复验)
 
 纯 MoonBit 自绘(Container+Painter+Store,tree/transfer 同路线),零平台原生控件,三平台像素一致、theme_apply 即暗色。按级迭代,每级可独立交付:
 
@@ -109,7 +109,7 @@
 - [ ] tabs_t 页签 — 顶部页签形态(side_menu 为侧边形态)
 - [ ] divider 分隔线 — 最便宜,顺手
 - [ ] tooltip_t / popover_t — 悬浮提示与气泡;autocomplete 的弹层机制可复用(Linux 弹层基座已探明)
-- [ ] calendar_t 日历面板 — 日期网格自绘(独立于原生 DatePicker)
+- [x] calendar_t 日历面板 — 日期网格自绘(独立于原生 DatePicker;与 date_picker_t 共用 build_calendar,42 格月网格 + ‹/› 切月 + 今天高亮;演示板「进阶」页)
 - [ ] rate_t 评分 — 星级自绘 + hover 预选
 - [ ] dropdown_menu 下拉菜单 — 自绘菜单(原生 Menu 是系统样式)
 - [ ] carousel_t 
