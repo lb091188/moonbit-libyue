@@ -101,9 +101,41 @@
 - [x] autocomplete 自动补全 — entry_t 输入过滤 + 候选行点击回填(动态行重建)
 - [x] date_picker_t — 主题行内标签 + 原生 DatePicker;time picker 上游无独立控件,随平台目标
 
-### 候选
+### 第三批:table_t 全自绘表格(2026-09-17 定案;暗色探测定稿后原生 Table 不可暗色,自绘是暗色完整性前置)
 
-skeleton / loading / ellipsis / infinite-scroll / calendar / color-picker / rate
+纯 MoonBit 自绘(Container+Painter+Store,tree/transfer 同路线),零平台原生控件,三平台像素一致、theme_apply 即暗色。按级迭代,每级可独立交付:
+
+- [ ] L1 静态表格 — 列定义(标题/宽/对齐)+ 行渲染 + 行点击选中 + hover 底 + 斑马纹 + 表头样式;数据经 Store[Array[Row]] 驱动
+- [ ] L2 选择与自定义单元格 — 复选框列(checkbox_t 画法)+ 多选/全选 + 自定义单元格(颜色块/tag/多行文本)
+- [ ] L3 虚拟化 — 按滚动 offset 只画可见行,万行级流畅(scroll 基座 + schedule_paint_rect 局部重绘)
+- [ ] L4 编辑与交互增强 — 行内单元格编辑(自绘输入框)、列宽拖拽、排序;可无限后置
+
+### 第四批:Element 对照补齐(常用高价值优先)
+
+- [ ] select_t 下拉选择 — autocomplete 转正:未输入时弹出全量候选(Linux GtkEntryCompletion min key length=0 + 空 key 放行;Win/mac focus 时全量 refresh);只读形态可选
+- [ ] textarea_t 多行输入 — input_t 同套路(TextEdit + 自绘边框/聚焦色)
+- [ ] slider_t 滑杆 — 自绘轨道+thumb+拖拽;进度条配色经验可复用
+- [ ] tabs_t 页签 — 顶部页签形态(side_menu 为侧边形态)
+- [ ] divider 分隔线 — 最便宜,顺手
+- [ ] toast_t / message_t 轻提示 — 应用内浮层,替代系统 Notification(系统样式不可主题化)
+- [ ] modal_t 模态对话框 — 遮罩 + 居中浮层(relative 容器 + absolute 定位)
+- [ ] tooltip_t / popover_t — 悬浮提示与气泡;autocomplete 的弹层机制可复用(Linux 弹层基座已探明)
+- [ ] loading 加载态 — 转圈动画(set_timeout 逐帧 + schedule_paint,仓库首个动效组件)
+- [ ] skeleton_t 骨架屏 — 静态占位块,便宜
+
+### 第五批(可选,按需)
+
+- [ ] drawer_t 抽屉 — 贴边滑出浮层
+- [ ] calendar_t 日历面板 — 日期网格自绘(独立于原生 DatePicker)
+- [ ] rate_t 评分 — 星级自绘 + hover 预选
+- [ ] dropdown_menu 下拉菜单 — 自绘菜单(原生 Menu 是系统样式)
+- [ ] carousel_t 轮播 / infinite_scroll 无限滚动 / cascader_t 级联
+- [ ] upload_t 上传 / color_picker_t 取色器(原生 ColorPicker 在 libyue 无对应,自绘 HSL 面板)
+
+### 已知边界(暗色相关,2026-09-17 Windows 真机探测定稿,详见 docs/zh/adaptation.md)
+
+- 原生控件不跟暗色:Table(自绘白底覆盖外部消息)/ DatePicker / Picker / ComboBox / 原生 Button;RichEdit 输入框可经消息通道暗色化(已验证,待收编)
+- 主题库新组件一律全自绘,不再引入新的原生皮肤依赖
 
 ## 随手可查
 
