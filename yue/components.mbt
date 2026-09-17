@@ -4107,3 +4107,80 @@ pub fn table_v_t(
     },
   }
 }
+
+///|
+/// 分隔线(EP Divider):水平(默认,height 1px,宽 flex)或竖直(宽 1px,
+/// 高随父容器);spacing 为两侧留白。底色挂载时读主题(重建界面生效)。
+pub fn divider(vertical? : Bool = false, spacing? : Double = 10.0) -> Node {
+  {
+    mount: fn(parent) {
+      let style : Array[(String, Double)] = if vertical {
+        [("width", 1.0), ("marginLeft", spacing), ("marginRight", spacing)]
+      } else {
+        [("height", 1.0), ("marginTop", spacing), ("marginBottom", spacing)]
+      }
+      if !vertical {
+        style.push(("flex", 1.0))
+      }
+      let c = Container::make(style=style)
+      c.set_background_color(theme_border())
+      attach(parent, c.view())
+      c.view()
+    },
+  }
+}
+
+///|
+/// 多行输入(EP Input textarea 形态,input_t 同套路):外层自绘 1px 边框
+/// (聚焦变主题色)+ 内边距,内部 TextEdit 去 native 边框只负责文字,
+/// 内容超出按平台自身滚动(GTK TextView/RichEdit 滚轮)。文本变化经
+/// on_input 回调。
+pub fn textarea_t(
+  text? : String = "",
+  width? : Double = 280.0,
+  height? : Double = 110.0,
+  margin? : Double = 0.0,
+  on_input? : (String) -> Unit = fn(_s) {  },
+) -> Node {
+  {
+    mount: fn(parent) {
+      let focused = Ref(false)
+      let outer = Container::make(
+        style=[
+          ("width", width),
+          ("height", height),
+          ("padding", 8.0),
+          ("marginTop", margin),
+          ("marginBottom", margin),
+        ],
+      )
+      outer.on_draw(fn(p) {
+        let b = outer.get_bounds()
+        p.set_stroke_color(
+          if focused.val { theme_primary() } else { theme_border() },
+        )
+        p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+      })
+      let edit = TextEdit::new()
+      edit.set_text(text)
+      edit.set_font(Font::new("Sans", 13.0))
+      edit.set_borderless(true)
+      edit.set_background_color("#FFFFFF")
+      edit.set_style("flex", 1.0)
+      edit.on_text_change(fn() { on_input(edit.get_text()) })
+      edit.on_focus_in(fn() {
+        focused.val = true
+        outer.schedule_paint()
+        false
+      })
+      edit.on_focus_out(fn() {
+        focused.val = false
+        outer.schedule_paint()
+        false
+      })
+      outer.add_child(edit)
+      attach(parent, outer.view())
+      outer.view()
+    },
+  }
+}

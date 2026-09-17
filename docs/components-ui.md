@@ -25,6 +25,8 @@ let t = @yue.default_theme()
 | `checkbox_t(title, checked?, disabled?, on_change?)` | normal / disabled | self-drawn square check + white tick, border turns primary on hover |
 | `autocomplete(options, value : Store[String], width?)` | plain filtering | live-filtered candidates in a floating layer (never pushes content): native Popover on Linux, borderless topmost mini-window on Windows; picking a row writes the Store, blur/empty input collapses it |
 | `date_picker_t(value? : Store[DateYMD?], on_change?, width?, placeholder?)` | date picker (EP style, fully self-drawn): input-style field; clicking opens the `calendar_t` month panel in a popover, ‹/› switch months, pick to fill and close, blur closes |
+| `textarea_t(text?, width?, height?, margin?, on_input?)` | multi-line input: self-drawn border (focus turns theme primary) + 8px inset, inner TextEdit with native border removed; overflow scrolls per platform |
+| `divider(vertical?, spacing?)` | divider line: horizontal (default) or vertical, 1px theme border color, spacing on both sides |
 | `calendar_t(on_pick?, value? : Store[DateYMD?])` | self-drawn month panel: ‹/› month nav + weekday row + 42-cell grid, adjacent-month days dimmed, "today" in theme primary, selected day as solid square; `DateYMD::format()` renders `YYYY-MM-DD` |
 
 ## Navigation

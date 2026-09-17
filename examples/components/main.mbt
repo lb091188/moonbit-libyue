@@ -344,6 +344,18 @@ fn main {
         ),
       ],
     ),
+    section(
+      "Textarea 多行输入 + Divider 分隔线",
+      "外层自绘边框(聚焦变主题色)+ 内边距;分隔线上方一条水平线。",
+      [
+        @yue.divider(),
+        @yue.textarea_t(
+          text="多行文本输入演示。\n第二行内容。",
+          height=90.0,
+          width=300.0,
+        ),
+      ],
+    ),
   ])
   // ---------- 导航 ----------
   let p_nav = scroll_page([
