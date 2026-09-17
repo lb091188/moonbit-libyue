@@ -70,6 +70,9 @@ fn theme_border() -> String { theme_box.t.border }
 fn theme_fill_hover() -> String { theme_box.t.fill_hover }
 
 ///|
+fn theme_fill_zebra() -> String { theme_box.t.fill_zebra }
+
+///|
 /// 主题色板快照。用结构体更新语法做局部定制：
 ///
 /// ```moonbit
@@ -95,6 +98,7 @@ pub struct Theme {
   text_secondary : String
   border : String
   fill_hover : String
+  fill_zebra : String
 }
 
 ///|
@@ -118,6 +122,7 @@ pub fn default_theme() -> Theme {
     text_secondary: "#6B7480",
     border: "#D8DCE1",
     fill_hover: "#EFF1F3",
+    fill_zebra: "#F5F7FA",
   }
 }
 
@@ -143,6 +148,7 @@ pub fn dark_theme() -> Theme {
     text_secondary: "#9AA0A6",
     border: "#3C4043",
     fill_hover: "#2A2D31",
+    fill_zebra: "#232629",
   }
 }
 
@@ -2748,6 +2754,182 @@ pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
       })
       attach(parent, b.view())
       b.view()
+    },
+  }
+}
+
+///|
+/// 表格列定义(EP Table):标题 + 宽度(<=0 为弹性列,均分剩余宽)
+/// + 单元格文字对齐。
+pub(all) struct TableColumn {
+  title : String
+  width : Double
+  align : TextAlign
+}
+
+///|
+/// 创建列定义(align 默认左对齐)。
+pub fn TableColumn::make(
+  title : String,
+  width : Double,
+  align? : TextAlign = Start,
+) -> TableColumn {
+  { title, width, align }
+}
+
+///|
+/// 表格行数据:单元格文本按列顺序排列,缺位补空。
+pub(all) struct TableRow {
+  cells : Array[String]
+}
+
+///|
+/// 行底色:选中 > 悬停 > 斑马纹(奇数行) > 透明。
+fn table_row_bg(i : Int, selected : Int, hover : Int) -> String {
+  if i == selected {
+    theme_primary_light()
+  } else if i == hover {
+    theme_fill_hover()
+  } else if i % 2 == 1 {
+    theme_fill_zebra()
+  } else {
+    ""
+  }
+}
+
+///|
+/// 表格(EP Table,L1 静态):表头 + 斑马纹 + 悬停底色 + 行点击单选,
+/// 数据经 Store 驱动,set 后整表重建行。行底色/主题色在重绘时读取
+/// 当前主题快照,theme_apply 即时生效。
+pub fn table_t(
+  columns : Array[TableColumn],
+  rows : Store[Array[TableRow]],
+  width? : Double = 560.0,
+  row_height? : Double = 36.0,
+  on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) { },
+) -> Node {
+  {
+    mount: fn(parent) {
+      let font = Font::new("Sans", 13.0)
+      let head_font = Font::new("Sans", 13.0, weight=SemiBold)
+      let selected_i = Ref(-1)
+      let hover_i = Ref(-1)
+      let row_cs : Ref[Array[Container]] = Ref([])
+      let head_h = 40.0
+      // 1px 内边距让外框描边落在 padding 环里,不被行/表头背景盖住
+      let outer = Container::make(
+        style=[("width", width), ("padding", 1.0), ("marginBottom", 10.0)],
+        style_str=[("flexDirection", "column")],
+      )
+      outer.on_draw(fn(p) {
+        let b = outer.get_bounds()
+        p.set_stroke_color(theme_border())
+        p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+      })
+      // 单元格:定宽列给 width,弹性列给 flex;左右各留 12px 内边距
+      fn cell(
+        text : String,
+        col : TableColumn,
+        fnt : Font,
+        color : String,
+      ) -> Label {
+        let base : Array[(String, Double)] = if col.width > 0.0 {
+          [("width", col.width), ("paddingLeft", 12.0), ("paddingRight", 12.0)]
+        } else {
+          [("flex", 1.0), ("paddingLeft", 12.0), ("paddingRight", 12.0)]
+        }
+        let l = Label::make(text, style=base)
+        l.set_font(fnt)
+        l.set_color(color)
+        l.set_align(col.align)
+        l
+      }
+
+      // 表头:主题斑马色打底 + 底边分隔线,次级色加粗文字
+      let head = Container::make(
+        style=[("height", head_h)],
+        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+      )
+      head.on_draw(fn(p) {
+        let b = head.get_bounds()
+        p.set_fill_color(theme_fill_zebra())
+        p.fill_rect(0.0, 0.0, b.width, b.height)
+        p.set_stroke_color(theme_border())
+        p.begin_path()
+        p.move_to(0.0, b.height - 0.5)
+        p.line_to(b.width, b.height - 0.5)
+        p.stroke()
+      })
+      for col in columns {
+        head.add_child(cell(col.title, col, head_font, theme_text_secondary()))
+      }
+      let body = Container::make(style_str=[("flexDirection", "column")])
+
+      fn refresh_row(i : Int) -> Unit {
+        let cs = row_cs.val
+        if i >= 0 && i < cs.length() {
+          cs[i].schedule_paint()
+        }
+      }
+
+      fn rebuild(data : Array[TableRow]) -> Unit {
+        for v in row_cs.val {
+          ignore(body.remove_child_view(v.view()))
+        }
+        row_cs.val = []
+        selected_i.val = -1
+        hover_i.val = -1
+        for i in 0..<data.length() {
+          let r = data[i]
+          let idx = i
+          let row = Container::make(
+            style=[("height", row_height)],
+            style_str=[("flexDirection", "row"), ("alignItems", "center")],
+          )
+          row.on_draw(fn(p) {
+            let bg = table_row_bg(idx, selected_i.val, hover_i.val)
+            if bg != "" {
+              let b = row.get_bounds()
+              p.set_fill_color(bg)
+              p.fill_rect(0.0, 0.0, b.width, b.height)
+            }
+          })
+          for j in 0..<columns.length() {
+            let text = if j < r.cells.length() { r.cells[j] } else { "" }
+            row.add_child(cell(text, columns[j], font, theme_text_regular()))
+          }
+          row.on_mouse_enter(fn(_e) {
+            hover_i.val = idx
+            refresh_row(idx)
+          })
+          row.on_mouse_leave(fn(_e) {
+            let prev = hover_i.val
+            hover_i.val = -1
+            refresh_row(prev)
+          })
+          row.on_mouse_down(fn(e) {
+            if e.button == 1 {
+              let prev = selected_i.val
+              selected_i.val = idx
+              refresh_row(prev)
+              refresh_row(idx)
+              on_row_click(idx, r)
+              true
+            } else {
+              false
+            }
+          })
+          body.add_child(row)
+          row_cs.val.push(row)
+        }
+      }
+
+      rebuild(rows.get())
+      rows.subscribe(rebuild)
+      outer.add_child(head)
+      outer.add_child(body)
+      attach(parent, outer.view())
+      outer.view()
     },
   }
 }
