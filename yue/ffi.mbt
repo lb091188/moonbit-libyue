@@ -290,6 +290,15 @@ extern "c" fn ffi_entry_on_activate(
 ) -> Unit = "yue_mbt_entry_on_activate"
 
 ///|
+#borrow(entry, items, invoke, callback)
+extern "c" fn ffi_entry_set_completion(
+  entry : View,
+  items : Bytes,
+  invoke : FuncRef[((Bytes) -> Unit, Bytes) -> Unit],
+  callback : (Bytes) -> Unit,
+) -> Unit = "yue_mbt_entry_set_completion"
+
+///|
 extern "c" fn ffi_tab_new() -> View = "yue_mbt_tab_new"
 
 ///|
