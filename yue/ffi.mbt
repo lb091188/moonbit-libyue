@@ -1146,7 +1146,7 @@ extern "c" fn ffi_view_on_mouse_leave(
 ) -> Unit = "yue_mbt_view_on_mouse_leave"
 
 ///|
-/// 滚轮(Linux GTK):callback 收 delta_y,+1 下滚 / -1 上滚 / 平滑增量累计。
+/// 滚轮(Linux GTK / Windows 补丁钩子):callback 收 delta_y,+1 下滚 / -1 上滚 / 平滑增量累计。
 #borrow(view, invoke, callback)
 extern "c" fn ffi_view_on_wheel(
   view : View,

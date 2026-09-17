@@ -713,9 +713,10 @@ impl ViewLike with fn on_mouse_leave(self, callback : (MouseEvent) -> Unit) -> U
 }
 
 ///|
-/// 滚轮(Linux GTK,canvas 自绘视图的虚拟滚动用):callback 收 delta_y,
+/// 滚轮(canvas 自绘视图的虚拟滚动用):callback 收 delta_y,
 /// +1 向下滚、-1 向上滚,平滑滚轮为累计增量;事件已消费,不冒泡给外层
-/// 滚动容器。Win/mac 接入待补(见 adaptation.md),当前不产生回调。
+/// 滚动容器。Linux 经 GTK scroll-event / Windows 经滚轮命中下发补丁接入
+/// (见 adaptation.md);mac 接入待补,当前不产生回调。
 impl ViewLike with fn on_wheel(self, callback : (Double) -> Unit) -> Unit {
   let wrapped : (Double) -> Unit = fn(delta) { callback(delta) }
   keep_alive(fn() { ignore(wrapped) })
