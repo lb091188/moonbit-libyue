@@ -2786,7 +2786,9 @@ fn build_calendar(
   // (高 = 上下 padding 16 + 头 32+4 + 星期行 26 + 6 行 x 30)
   let panel = Container::make(
     style=[
-      ("width", cell_w * 7.0),
+      // yoga 的 width 是 border-box 语义(含 padding),须加 16;
+      // 只给内容宽 252 会把最后一列(周六)裁掉 16px
+      ("width", cell_w * 7.0 + 16.0),
       ("height", 16.0 + 32.0 + 4.0 + 26.0 + 6.0 * cell_h),
       ("padding", 8.0),
     ],

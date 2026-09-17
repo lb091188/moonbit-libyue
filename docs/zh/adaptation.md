@@ -171,6 +171,7 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **二轮复验三补(2026-09-17)**:①table_t 勾选框列容器无显式高度且行 `alignItems:center`,yoga 自然高 0 → 勾只露一条边;修为 `alignSelf:stretch` 拉满行高。**自绘指示器子容器要么给显式高、要么 alignSelf:stretch,别依赖空容器自然高**。②table_v_t 滚动时行绘制越过表头区(可见窗口只算行起止,没约束绘制区域);修为行循环外包 `painter.save()+clip_rect(0, head_h, w, vis_h)+restore()`——**自管滚动的自绘视图,内容必须裁剪出固定区**。③popover_t 的内容容器无显式尺寸,Popover 窗口立不住(与 content_size 硬分配同根因);修为容器显式宽高。
 - **Windows 弹层「下拉用后卡死」(2026-09-17 真机反馈,静态定位)**:select/dropdown/color/autocomplete 的弹层根容器无显式尺寸时,Win 替代窗口(无边框置顶窗)与内容尺寸协商会布局震荡死循环(NUContainer preferred=0,与 GTK requisition 震荡同族);而 date 面板有显式宽高故正常。修复:**凡 Popover 弹层根容器一律显式宽高,且与 `set_content_size` 公式严格一致**(autocomplete 复用列表在 refresh 时同步)。若复验仍卡死,shim 的 Windows popover 已带 stderr 日志(`popover: show at …`/`popover: autoclose`),按「重定向日志→复现→取尾部」流程定位。
 - **carousel 右箭头点击多不生效(2026-09-17 真机反馈)**:面板容器用固定宽(= 舞台宽参数),但舞台被两侧箭头各占 24px,实际仅 272px——面板横向溢出 32px 盖住右箭头的事件窗口(溢出可见且事件窗口参与命中),点击多落在面板上。教训:**横向排布中兄弟控件旁的内容容器用 flex/stretch 填满,别用外层同宽的固定值**;溢出盖事件窗口的命中顺序不保证「后添加者在上」。
+- **日历「周六」列被裁一半(2026-09-17 真机反馈)**:面板显式宽给了内容需求 252(7×36),但 yoga 的 width 是 **border-box 语义(含 padding)**——加 padding 8×2 后内容区只剩 236,最后一列被裁 16px。教训:**显式 width + padding 的组合,width 必须写「内容需求 + 两侧 padding」**;此前高度公式已含 padding、宽度漏了,同一处公式两种口径就是这种 bug 的形状。
 
 ---
 
