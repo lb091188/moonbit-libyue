@@ -724,6 +724,17 @@ fn main {
       ],
     ),
     section(
+      "Select 下拉选择",
+      "只读字段 + 弹层候选(EP 样式):当前选中 ✓ 标记,点选回填。",
+      [
+        @yue.select_t(
+          ["杭州", "北京", "上海", "深圳", "广州"],
+          picked_lang,
+          width=170.0,
+        ),
+      ],
+    ),
+    section(
       "DatePicker 日期选择",
       "全自绘日历(EP 样式):点字段弹月历,‹/› 切月,点选回填;下方为内联 calendar_t 面板。",
       [
