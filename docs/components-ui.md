@@ -30,6 +30,10 @@ let t = @yue.default_theme()
 | `slider_t(value : Store[Double], min?, max?, step?, width?, on_change?)` | self-drawn slider: light track + themed fill + square thumb, click/drag to set (step-quantized), external Store set also applies |
 | `tabs_t(pages : Array[(String, Node)], selected?)` | top tabs: active tab themed text + 2px bottom indicator, content switched via set_visible; `selected` is an index Store (internal 0 by default) |
 | `select_t(options, value : Store[String], width?, on_change?)` | dropdown select (EP style, fully self-drawn): read-only field + popover option list (hover highlight / ✓ on current), pick to fill, blur to close; use autocomplete for long lists (no in-popover scrolling) |
+| `rate_t(value : Store[Int], max?, on_change?)` | star rating (self-drawn): filled theme color when on, outlined gray when off, hover preview, click sets stars |
+| `tooltip_t(content : Node, tip)` | wrap any node with the native tooltip (system style; use popover_t for themed bubbles) |
+| `popover_t(trigger : Node, content : Node, width, height)` | popover bubble: clicking the trigger opens arbitrary Node content below it, click again to close |
+| `dropdown_menu(trigger, items, on_select, width?)` | dropdown menu: trigger field + item popover, hover highlight, click calls back the index; `"-"` in items draws a separator |
 | `calendar_t(on_pick?, value? : Store[DateYMD?])` | self-drawn month panel: ‹/› month nav + weekday row + 42-cell grid, adjacent-month days dimmed, "today" in theme primary, selected day as solid square; `DateYMD::format()` renders `YYYY-MM-DD` |
 
 ## Navigation

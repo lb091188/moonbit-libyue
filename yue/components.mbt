@@ -4573,3 +4573,313 @@ pub fn select_t(
     },
   }
 }
+
+///|
+/// 五角星路径(矢量自绘,不依赖字体字形):cx/cy 星心,R 外半径,
+/// 内半径取 0.382R(正五角星比例)。
+fn star_path(p : Painter, cx : Double, cy : Double, r_out : Double) -> Unit {
+  let r_in = r_out * 0.382
+  p.begin_path()
+  for k in 0..<10 {
+    let rad = if k % 2 == 0 { r_out } else { r_in }
+    // 起点朝上(-90°),每步 36°
+    let ang = (-90.0 + k.to_double() * 36.0) * 3.141592653589793 / 180.0
+    let x = cx + rad * @math.cos(ang)
+    let y = cy + rad * @math.sin(ang)
+    if k == 0 {
+      p.move_to(x, y)
+    } else {
+      p.line_to(x, y)
+    }
+  }
+  p.close_path()
+}
+
+///|
+/// 评分(EP Rate,自绘):五角星序列,选中实心主题色、未选中描边灰,
+/// 悬停预亮(实心),点击写入 value(Store[Int],0..max)。
+pub fn rate_t(
+  value : Store[Int],
+  max? : Int = 5,
+  on_change? : (Int) -> Unit = fn(_v) {  },
+) -> Node {
+  {
+    mount: fn(parent) {
+      let size = 22.0
+      let gap = 4.0
+      let hover = Ref(0) // 0 = 无预览,否则预亮到第 N 颗
+      let v = Container::make(
+        style=[
+          ("width", size * max.to_double() + gap * (max - 1).to_double()),
+          ("height", size),
+          ("marginBottom", 10.0),
+        ],
+      )
+      fn star_at(x : Double) -> Int {
+        let idx = ((x + gap / 2.0) / (size + gap)).to_int() + 1
+        if idx < 1 {
+          1
+        } else if idx > max {
+          max
+        } else {
+          idx
+        }
+      }
+
+      v.on_draw(fn(p) {
+        for i in 1..=max {
+          let cx = (i - 1).to_double() * (size + gap) + size / 2.0
+          let cy = size / 2.0
+          let lit = if hover.val > 0 { i <= hover.val } else { i <= value.get() }
+          if lit {
+            p.set_fill_color(theme_primary())
+            star_path(p, cx, cy, size / 2.0 - 1.0)
+            p.fill()
+          } else {
+            p.set_stroke_color(theme_border())
+            star_path(p, cx, cy, size / 2.0 - 1.0)
+            p.stroke()
+          }
+        }
+      })
+      v.on_mouse_move(fn(e) {
+        let h = star_at(e.view_x)
+        if h != hover.val {
+          hover.val = h
+          v.schedule_paint()
+        }
+      })
+      v.on_mouse_leave(fn(_e) {
+        if hover.val != 0 {
+          hover.val = 0
+          v.schedule_paint()
+        }
+      })
+      v.on_mouse_down(fn(e) {
+        if e.button == 1 {
+          value.set(star_at(e.view_x))
+          true
+        } else {
+          false
+        }
+      })
+      value.subscribe(fn(new_v) {
+        on_change(new_v)
+        v.schedule_paint()
+      })
+      attach(parent, v.view())
+      v.view()
+    },
+  }
+}
+
+///|
+/// 悬浮提示:给任意节点包原生 tooltip(系统样式,零成本;主题化气泡
+/// 请用 popover_t)。
+pub fn tooltip_t(content : Node, tip : String) -> Node {
+  {
+    mount: fn(parent) {
+      let v = (content.mount)(parent)
+      ffi_view_set_tooltip(v, utf8_bytes(tip))
+      v
+    },
+  }
+}
+
+///|
+/// 气泡弹层(EP Popover):trigger 点击后在自身下方弹出任意内容
+/// (Node,Popover 承载,内容先挂进临时容器),再次点击切换收起。
+pub fn popover_t(
+  trigger : Node,
+  content : Node,
+  width : Double,
+  height : Double,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let tv = (trigger.mount)(parent)
+      let pop : Ref[Popover?] = Ref(None)
+      let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Int = fn(
+        button,
+        _vx,
+        _vy,
+        _wx,
+        _wy,
+        _m,
+        _t,
+      ) {
+        if button != 1 {
+          return 0
+        }
+        match pop.val {
+          None => {
+            let p = Popover::new()
+            let holder = Container::make()
+            ignore((content.mount)(holder.view()))
+            p.set_content(holder)
+            p.set_content_size(width, height)
+            pop.val = Some(p)
+            ffi_popover_show_relative_to(p, tv)
+          }
+          Some(p) => p.close()
+        }
+        1
+      }
+      keep_alive(fn() { ignore(wrapped) })
+      ffi_view_on_mouse_down(
+        tv,
+        fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
+        wrapped,
+      )
+      tv
+    },
+  }
+}
+
+///|
+/// 下拉菜单(EP Dropdown):触发文字 + 下拉箭头,点击弹菜单项列表
+/// (Popover 承载):悬停高亮,点击回调序号并收起;"-" 项画分隔线。
+pub fn dropdown_menu(
+  trigger : String,
+  items : Array[String],
+  on_select : (Int) -> Unit,
+  width? : Double = 160.0,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let fnt = Font::new("Sans", 13.0)
+      let focused = Ref(false)
+      let field = Container::make(
+        style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
+      )
+      field.on_draw(fn(p) {
+        let b = field.get_bounds()
+        if focused.val {
+          p.set_fill_color(theme_fill_hover())
+          p.fill_rect(0.0, 0.0, b.width, b.height)
+        }
+        p.set_stroke_color(
+          if focused.val { theme_primary() } else { theme_border() },
+        )
+        p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+        p.draw_text(
+          trigger,
+          10.0,
+          0.0,
+          b.width - 30.0,
+          b.height,
+          valign=Center,
+          color=theme_text_primary(),
+        )
+        p.set_fill_color(theme_text_secondary())
+        p.begin_path()
+        p.move_to(b.width - 20.0, b.height / 2.0 - 2.0)
+        p.line_to(b.width - 12.0, b.height / 2.0 - 2.0)
+        p.line_to(b.width - 16.0, b.height / 2.0 + 3.0)
+        p.close_path()
+        p.fill()
+      })
+      let pop : Ref[Popover?] = Ref(None)
+      field.set_focusable(true)
+      field.on_focus_in(fn() {
+        focused.val = true
+        field.schedule_paint()
+        false
+      })
+      field.on_focus_out(fn() {
+        focused.val = false
+        field.schedule_paint()
+        match pop.val {
+          Some(p) => p.close()
+          None => ()
+        }
+        false
+      })
+      field.on_mouse_down(fn(e) {
+        if e.button == 1 {
+          field.focus()
+          match pop.val {
+            Some(_) => ()
+            None => {
+              let p = Popover::new()
+              let list = Container::make(
+                style=[("width", width), ("padding", 4.0)],
+                style_str=[("flexDirection", "column")],
+              )
+              list.set_background_color("#FFFFFF")
+              for i in 0..<items.length() {
+                let it = items[i]
+                let idx = i
+                if it == "-" {
+                  let sep = Container::make(style=[("height", 9.0)])
+                  sep.on_draw(fn(p2) {
+                    let b = sep.get_bounds()
+                    p2.set_stroke_color(theme_border())
+                    p2.begin_path()
+                    p2.move_to(8.0, 4.5)
+                    p2.line_to(b.width - 8.0, 4.5)
+                    p2.stroke()
+                  })
+                  list.add_child(sep)
+                  continue
+                }
+                let hover = Ref(false)
+                let row = Container::make(
+                  style=[("height", 28.0), ("paddingLeft", 8.0)],
+                  style_str=[("flexDirection", "row"), ("alignItems", "center")],
+                )
+                row.on_draw(fn(p2) {
+                  let b = row.get_bounds()
+                  if hover.val {
+                    p2.set_fill_color(theme_fill_hover())
+                    p2.fill_rect(0.0, 0.0, b.width, b.height)
+                  }
+                  let at = AttributedText::new(it, valign=Center, wrap=false)
+                  at.set_font(fnt)
+                  at.set_color(theme_text_regular())
+                  p2.draw_attributed_text(at, 8.0, 0.0, b.width - 16.0, 28.0)
+                })
+                row.on_mouse_enter(fn(_e) {
+                  hover.val = true
+                  row.schedule_paint()
+                })
+                row.on_mouse_leave(fn(_e) {
+                  hover.val = false
+                  row.schedule_paint()
+                })
+                row.on_mouse_down(fn(e2) {
+                  if e2.button == 1 {
+                    on_select(idx)
+                    match pop.val {
+                      Some(p3) => p3.close()
+                      None => ()
+                    }
+                    true
+                  } else {
+                    false
+                  }
+                })
+                list.add_child(row)
+              }
+              p.set_content(list)
+              p.set_content_size(
+                width,
+                items.length().to_double() * 28.0 + 8.0,
+              )
+              pop.val = Some(p)
+            }
+          }
+          match pop.val {
+            Some(p) => p.show_relative_to(field)
+            None => ()
+          }
+          true
+        } else {
+          false
+        }
+      })
+      attach(parent, field.view())
+      field.view()
+    },
+  }
+}

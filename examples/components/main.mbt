@@ -99,6 +99,7 @@ fn main {
   let table_picked : @yue.Store[String] = @yue.Store::new("未选中")
   let table_sel : @yue.Store[Array[Int]] = @yue.Store::new([])
   let slider_val : @yue.Store[Double] = @yue.Store::new(30.0)
+  let rate_val : @yue.Store[Int] = @yue.Store::new(3)
   let dp_val : @yue.Store[@yue.DateYMD?] = @yue.Store::new(None)
   let v_rows_data : Array[@yue.TableRow] = []
   for i in 0..<10000 {
@@ -732,6 +733,39 @@ fn main {
           picked_lang,
           width=170.0,
         ),
+      ],
+    ),
+    section(
+      "DropdownMenu 下拉菜单 + Popover 气泡",
+      "触发字段弹菜单项(\"-\" 为分隔线);popover_t 给任意节点包点击弹层。",
+      [
+        @yue.hbox(
+          [
+            @yue.dropdown_menu(
+              "操作",
+              ["打开", "保存", "-", "复制链接", "删除"],
+              fn(i) { picked_lang.set("菜单项 \{i}") },
+              width=140.0,
+            ),
+            @yue.label("  "),
+            @yue.popover_t(
+              @yue.button_t("气泡"),
+              @yue.label_t("气泡内容:任意 Node。", role=@yue.Body),
+              180.0,
+              60.0,
+            ),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
+      ],
+    ),
+    section(
+      "Rate 评分 + Tooltip",
+      "五角星 hover 预亮、点击评分;tooltip_t 包原生悬浮提示(鼠标悬停按钮上看提示)。",
+      [
+        @yue.rate_t(rate_val, on_change=fn(v) { ignore(v) }),
+        @yue.bind_label(rate_val, fn(v) { "评分:\{v} 星" }),
+        @yue.tooltip_t(@yue.button_t("悬停看提示"), "原生 tooltip:系统样式"),
       ],
     ),
     section(
