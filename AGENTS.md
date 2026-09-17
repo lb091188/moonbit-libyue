@@ -3,7 +3,7 @@
 libyue(libyue.com)的 MoonBit 封装,跨平台原生桌面 GUI。
 当前主链路:**Ubuntu 24.04 + X11 + XFCE**(其余平台状态见适配经验文档)。
 
-三层架构: `examples/*`(纯 MoonBit,零平台代码)→ `yue/`(统一 API,平台探测与降级在此消化)→ `shim/ + vendor/libyue`(最薄 C ABI + 平台库)。
+三层架构: `examples/*`(纯 MoonBit,零平台代码)→ `yue/`(统一 API,平台探测与降级在此消化)→ `shim/ + libyue`(最薄 C ABI + 平台库)。libyue 来自 fork(lb091188/yue,补丁以独立提交进 fork 源码),预构建静态库随 mooncakes 包分发(`lib/<平台>/`),prepare.py 仅服务开发/回退链路。
 分层原则: 能用 MoonBit 解决的不进 C/C++;shim 只做 ABI 翻译无业务逻辑;libyue 没暴露的能力由 shim 补探测接口,MoonBit 层统一成语义化结果。
 
 ## 硬性规则
@@ -21,7 +21,7 @@ libyue(libyue.com)的 MoonBit 封装,跨平台原生桌面 GUI。
 ## 常用命令
 
 ```sh
-python3 scripts/prepare.py    # 手动构建原生层:钉版本下载 libyue + CMake 静态库(需 GitHub 网络;)
+python3 scripts/prepare.py    # 手动构建原生层:优先下 fork 预构建库(秒级),回退源码全量构建(需 GitHub 网络)
 moon clean                    # 清理缓存
 moon run examples/hello       # 最小示例
 moon run examples/showcase    # 全功能演示

@@ -16,6 +16,5 @@ repository = "https://github.com/lb091188/moonbit-libyue"
 
 options(
   homepage: "https://github.com/lb091188/moonbit-libyue",
-  scripts: { "postadd": "python3 scripts/postadd.py" },
   "--moonbit-unstable-prebuild": "scripts/prebuild.py",
 )

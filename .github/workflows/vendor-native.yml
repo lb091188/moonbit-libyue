@@ -1,0 +1,103 @@
+# 三平台固化 vendored 原生库：拉 fork 预构建资产 + 编译 shim，
+# 产出的 lib/<平台>/ 目录以 release 资产（lib-<平台>.zip）汇聚，
+# 维护机执行 `python3 scripts/vendor_native.py --fetch <tag>` 拉齐后提交，
+# 随 moon publish 一起分发——用户 moon add 后零 C++ 编译。
+#
+# 触发：推送 vendor-* 标签（如 vendor-v0.15.6-mbt.2）。
+# 前置：标签对应的 fork release 已发布（prepare.py 预构建路径可下载）。
+name: vendor-native
+
+on:
+  push:
+    tags:
+      - 'vendor-*'
+
+permissions:
+  contents: write
+
+jobs:
+  vendor:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { plat: linux-x64, os: ubuntu-latest }
+          - { plat: macos-universal, os: macos-15 }
+          - { plat: windows-x64, os: windows-latest }
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 安装 Linux 依赖
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config \
+            libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev \
+            libwebkit2gtk-4.1-dev
+
+      - name: 选用 Xcode 16(AppleClang 21 编不动 vendored 老头文件)
+        if: runner.os == 'macOS'
+        run: |
+          latest16=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$latest16" ]; then
+            echo "::error::镜像上没有 Xcode 16"
+            exit 1
+          fi
+          sudo xcode-select -s "$latest16"
+
+      - name: 安装 moon 工具链
+        if: runner.os != 'Windows'
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+
+      - name: 安装 moon 工具链 + python3 别名
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          iwr https://cli.moonbitlang.com/install/powershell.ps1 -useb | iex
+          echo "$env:USERPROFILE\.moon\bin" >> $env:GITHUB_PATH
+          $py = (Get-Command python).Source
+          Copy-Item $py "$env:USERPROFILE\.moon\bin\python3.exe"
+
+      - name: 固化 vendored 库(MSVC 环境)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: >-
+          for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath')
+          do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
+          && python scripts\vendor_native.py
+
+      - name: 固化 vendored 库
+        if: runner.os != 'Windows'
+        run: python3 scripts/vendor_native.py
+
+      - name: 打包上传
+        run: |
+          cd lib/${{ matrix.plat }} && zip -r ../../lib-${{ matrix.plat }}.zip . && cd ../..
+        shell: bash
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lib-${{ matrix.plat }}
+          path: lib-${{ matrix.plat }}.zip
+          retention-days: 5
+
+  release:
+    needs: [vendor]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: 发布资产 release(供维护机 --fetch 拉取)
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          name: Native assets ${{ github.ref_name }}
+          files: 'lib-*.zip'
