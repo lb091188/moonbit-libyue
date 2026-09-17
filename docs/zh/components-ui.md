@@ -30,6 +30,10 @@ let t = @yue.default_theme()
 | `slider_t(value : Store[Double], min?, max?, step?, width?, on_change?)` | 自绘滑杆:浅灰轨道 + 主题色填充 + 方形 thumb,点击/拖拽调值(step 量化),外部 set 同样生效 |
 | `tabs_t(pages : Array[(String, Node)], selected?)` | 顶部页签:选中主题色文字 + 底部 2px 指示条,内容区 set_visible 切换;selected 为页序号 Store(缺省内部建 0) |
 | `select_t(options, value : Store[String], width?, on_change?)` | 下拉选择(EP 样式,全自绘):只读字段 + Popover 候选列表(悬停高亮/选中 ✓ 标记),点选回填,失焦收起;长列表用 autocomplete(弹层内不滚动) |
+| `rate_t(value : Store[Int], max?, on_change?)` | 评分(自绘五角星):选中实心主题色/未选中描边灰,hover 预亮,点击写入星级 |
+| `tooltip_t(content : Node, tip)` | 给任意节点包原生悬浮提示(系统样式;主题化气泡用 popover_t) |
+| `popover_t(trigger : Node, content : Node, width, height)` | 气泡弹层:trigger 点击在自身下方弹任意 Node 内容,再点切换收起 |
+| `dropdown_menu(trigger, items, on_select, width?)` | 下拉菜单:触发字段 + 菜单项弹层,悬停高亮,点击回调序号;items 中 `"-"` 画分隔线 |
 | `calendar_t(on_pick?, value? : Store[DateYMD?])` | 自绘月历面板:‹/› 切月 + 星期行 + 42 格月网格,跨月灰显、「今天」主题色、选中实心方块;`DateYMD::format()` 出 `YYYY-MM-DD` |
 
 ## 导航

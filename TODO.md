@@ -108,10 +108,10 @@
 - [x] slider_t 滑杆 — 自绘轨道+thumb+拖拽(step 量化/Store 驱动;演示板「基础组件」页;拖拽手感待真机复验)
 - [x] tabs_t 页签 — 顶部页签形态(选中指示条 + set_visible 切换;演示板「导航」页)
 - [x] divider 分隔线 — 水平/竖直,1px 主题边框色(演示板「基础组件」页)
-- [ ] tooltip_t / popover_t — 悬浮提示与气泡;autocomplete 的弹层机制可复用(Linux 弹层基座已探明)
+- [x] tooltip_t / popover_t — tooltip 走原生悬浮提示;popover_t 任意 Node 弹层(Popover 承载,点击开关)(演示板「进阶」页;弹层交互待真机复验)
 - [x] calendar_t 日历面板 — 日期网格自绘(独立于原生 DatePicker;与 date_picker_t 共用 build_calendar,42 格月网格 + ‹/› 切月 + 今天高亮;演示板「进阶」页)
-- [ ] rate_t 评分 — 星级自绘 + hover 预选
-- [ ] dropdown_menu 下拉菜单 — 自绘菜单(原生 Menu 是系统样式)
+- [x] rate_t 评分 — 五角星矢量自绘 + hover 预亮 + 点击评分(演示板「进阶」页)
+- [x] dropdown_menu 下拉菜单 — 触发字段 + 自绘菜单弹层("-" 分隔线;演示板「进阶」页)
 - [ ] carousel_t 
 - [ ] color_picker_t 取色器
 
