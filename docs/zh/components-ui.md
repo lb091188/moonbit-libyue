@@ -34,6 +34,8 @@ let t = @yue.default_theme()
 | `tooltip_t(content : Node, tip)` | 给任意节点包原生悬浮提示(系统样式;主题化气泡用 popover_t) |
 | `popover_t(trigger : Node, content : Node, width, height)` | 气泡弹层:trigger 点击在自身下方弹任意 Node 内容,再点切换收起 |
 | `dropdown_menu(trigger, items, on_select, width?)` | 下拉菜单:触发字段 + 菜单项弹层,悬停高亮,点击回调序号;items 中 `"-"` 画分隔线 |
+| `carousel_t(pages : Array[Node], width?, height?, interval_ms?)` | 轮播:面板序列 + 左右箭头 + 底部指示点,interval_ms 毫秒自动切换(悬停暂停,>0 启用),点击箭头/圆点手动切 |
+| `color_picker_t(value : Store[String], colors?)` | 取色器(预设色板形态):色块网格点击选色,选中主题色描边 + 白勾,下方显示当前 hex;色板可自定义 |
 | `calendar_t(on_pick?, value? : Store[DateYMD?])` | 自绘月历面板:‹/› 切月 + 星期行 + 42 格月网格,跨月灰显、「今天」主题色、选中实心方块;`DateYMD::format()` 出 `YYYY-MM-DD` |
 
 ## 导航

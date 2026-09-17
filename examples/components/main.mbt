@@ -100,6 +100,7 @@ fn main {
   let table_sel : @yue.Store[Array[Int]] = @yue.Store::new([])
   let slider_val : @yue.Store[Double] = @yue.Store::new(30.0)
   let rate_val : @yue.Store[Int] = @yue.Store::new(3)
+  let picked_color : @yue.Store[String] = @yue.Store::new("#2D68C4")
   let dp_val : @yue.Store[@yue.DateYMD?] = @yue.Store::new(None)
   let v_rows_data : Array[@yue.TableRow] = []
   for i in 0..<10000 {
@@ -598,6 +599,26 @@ fn main {
           height=220.0,
         ),
       ],
+    ),
+    section(
+      "Carousel 轮播",
+      "面板序列 + 左右箭头 + 底部指示点,3 秒自动切换(悬停暂停)。",
+      [
+        @yue.carousel_t(
+          [
+            @yue.label_t("第一屏:轮播内容可为任意 Node。", role=@yue.Body),
+            @yue.label_t("第二屏:自动轮播 3s 一切。", role=@yue.Body),
+            @yue.label_t("第三屏:悬停暂停,箭头/圆点手动切。", role=@yue.Body),
+          ],
+          width=320.0,
+          height=80.0,
+        ),
+      ],
+    ),
+    section(
+      "ColorPicker 取色器",
+      "预设色板:点击选色,选中主题色描边 + 白勾;hex 值响应式。",
+      [@yue.color_picker_t(picked_color)],
     ),
   ])
   // ---------- 进阶 ----------
