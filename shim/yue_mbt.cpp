@@ -739,6 +739,91 @@ void yue_mbt_entry_on_activate(void *entry, void (*invoke)(void *),
   }
 }
 
+#if defined(OS_LINUX)
+// match-selected 用户数据：蹦床 + MoonBit 闭包。completion 生命周期随
+// Entry（句柄进程级存活，见文件头），结构体内存在 closure 销毁时释放。
+struct EntryCompletionCb {
+  void (*invoke)(void *, void *);
+  void *closure;
+};
+
+// contains 过滤：key 为输入框当前文本，原样字节级子串匹配（与
+// MoonBit String::contains 语义一致）；空 key 无匹配即不弹层。
+gboolean EntryCompletionMatchFunc(GtkEntryCompletion *completion,
+                                  const char *key, GtkTreeIter *iter,
+                                  gpointer) {
+  if (key == nullptr || *key == '\0') {
+    return FALSE;
+  }
+  GtkTreeModel *model = gtk_entry_completion_get_model(completion);
+  gchar *text = nullptr;
+  gtk_tree_model_get(model, iter, 0, &text, -1);
+  gboolean hit = text != nullptr && std::strstr(text, key) != nullptr;
+  g_free(text);
+  return hit;
+}
+
+// 选中候选项：先回填输入框再通知 MoonBit，返回 TRUE 接管默认填充。
+gboolean EntryCompletionMatchSelected(GtkEntryCompletion *completion,
+                                      GtkTreeModel *model, GtkTreeIter *iter,
+                                      gpointer data) {
+  auto *cb = static_cast<EntryCompletionCb *>(data);
+  gchar *text = nullptr;
+  gtk_tree_model_get(model, iter, 0, &text, -1);
+  if (text == nullptr) {
+    return TRUE;
+  }
+  gtk_entry_set_text(
+      GTK_ENTRY(gtk_entry_completion_get_entry(completion)), text);
+  cb->invoke(cb->closure, BytesFromString(text));
+  g_free(text);
+  return TRUE;
+}
+#endif
+
+/* 挂接原生自动补全（Linux GtkEntryCompletion）：items 为 UTF-8 候选串
+ * 按 \x1F 连接。弹层由 GTK 托管（popup 型窗口），不触碰键盘焦点；
+ * store/model/completion 均由 GTK 持有，无手动释放。非 Linux 空操作。 */
+void yue_mbt_entry_set_completion(void *entry, const char *items,
+                                  void (*invoke)(void *, void *),
+                                  void *closure) {
+#if defined(OS_LINUX)
+  auto *e = CastTo<nu::Entry>(entry);
+  if (e == nullptr || items == nullptr) {
+    return;
+  }
+  GtkListStore *store = gtk_list_store_new(1, G_TYPE_STRING);
+  const char *p = items;
+  while (*p != '\0') {
+    const char *q = std::strchr(p, '\x1F');
+    const size_t len =
+        q != nullptr ? static_cast<size_t>(q - p) : std::strlen(p);
+    GtkTreeIter iter;
+    gtk_list_store_append(store, &iter);
+    gtk_list_store_set(store, &iter, 0, std::string(p, len).c_str(), -1);
+    if (q == nullptr) {
+      break;
+    }
+    p = q + 1;
+  }
+  GtkEntryCompletion *completion = gtk_entry_completion_new();
+  gtk_entry_completion_set_model(completion, GTK_TREE_MODEL(store));
+  g_object_unref(store); // completion 已持引用
+  gtk_entry_completion_set_text_column(completion, 0);
+  gtk_entry_completion_set_match_func(completion, EntryCompletionMatchFunc,
+                                      nullptr, nullptr);
+  gtk_entry_completion_set_inline_completion(completion, FALSE);
+  auto *cb = new EntryCompletionCb{invoke, closure};
+  g_signal_connect_data(completion, "match-selected",
+                        G_CALLBACK(EntryCompletionMatchSelected), cb,
+                        [](gpointer data, GClosure *) {
+                          delete static_cast<EntryCompletionCb *>(data);
+                        },
+                        static_cast<GConnectFlags>(0));
+  gtk_entry_set_completion(GTK_ENTRY(e->GetNative()), completion);
+#endif
+}
+
 // ---------- Tab ----------
 
 void *yue_mbt_tab_new(void) {
@@ -2505,7 +2590,14 @@ void *yue_mbt_popover_new(void) {
   nu::Window::Options options;
   options.frame = false;       // 无边框
   options.no_activate = true;  // 弹出不抢焦点
-  return reinterpret_cast<void *>(PopoverStore::put(new nu::Window(options)));
+  auto *win = new nu::Window(options);
+  // 点击弹层本身也不得激活弹窗:一旦激活,Entry 收 EN_KILLFOCUS,
+  // autocomplete 组件按失焦收起弹层,点击候选项落空
+  if (HWND hwnd = win->GetNative()->hwnd()) {
+    LONG_PTR ex = ::GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+    ::SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | WS_EX_NOACTIVATE);
+  }
+  return reinterpret_cast<void *>(PopoverStore::put(win));
 }
 #endif
 

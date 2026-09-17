@@ -124,6 +124,11 @@ void yue_mbt_entry_on_text_change(void *entry, void (*invoke)(void *closure),
                                   void *closure);
 void yue_mbt_entry_on_activate(void *entry, void (*invoke)(void *closure),
                                void *closure);
+/* 挂接原生自动补全：items 为 UTF-8 候选串按 \x1F 连接，选中项经
+ * invoke(closure, Bytes) 回调。仅 Linux 有实现，其余平台空操作。 */
+void yue_mbt_entry_set_completion(void *entry, const char *items,
+                                  void (*invoke)(void *closure, void *bytes),
+                                  void *closure);
 
 /* ---------- Tab（句柄=View） ---------- */
 

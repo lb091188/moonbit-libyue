@@ -2436,8 +2436,8 @@ pub fn transfer(
 
 ///|
 /// 自动补全(EP Autocomplete):entry_t 输入,候选项经过滤后弹出。
-/// Linux 用 Popover 原生弹层,Windows 用无边框置顶小窗口(均悬浮不裁剪);
-/// macOS 回退为内联列表。
+/// Linux 用 Entry::set_completion(GTK 原生补全弹层,不抢键盘焦点);
+/// Windows 用无边框置顶小窗口弹层(悬浮不裁剪);macOS 回退为内联列表。
 pub fn autocomplete(
   options : Array[String],
   value : Store[String],
@@ -2496,9 +2496,10 @@ pub fn autocomplete(
         entry.set_text(opt)
       }
 
-      // Linux 原生 Popover;Windows 走 shim 的无边框置顶小窗口弹层;
-      // macOS 暂回退内联列表
-      let use_popover = platform() == "linux" || platform() == "windows"
+      // Linux 走 GTK 原生补全(选中项的文本回填由弹层完成,这里只更新值);
+      // Windows 走 shim 的无边框置顶小窗口弹层;macOS 暂回退内联列表
+      let use_completion = platform() == "linux"
+      let use_popover = platform() == "windows"
       let list = Container::make(
         style=[("marginTop", 4.0), ("width", width)],
         style_str=[("flexDirection", "column")],
@@ -2550,6 +2551,9 @@ pub fn autocomplete(
         }
       }
 
+      if use_completion {
+        entry.set_completion(options, fn(opt) { value.set(opt) })
+      }
       if use_popover {
         pop.val = Some(Popover::new())
       }
@@ -2558,9 +2562,11 @@ pub fn autocomplete(
           entry.set_text(v)
         }
       })
-      entry.on_text_change(fn() {
-        refresh(entry.get_text())
-      })
+      if !use_completion {
+        entry.on_text_change(fn() {
+          refresh(entry.get_text())
+        })
+      }
       // 输入框失焦(点击别处/窗口最小化)时收起弹层
       entry.on_focus_out(fn() {
         match pop.val {
@@ -2570,7 +2576,7 @@ pub fn autocomplete(
         false
       })
       outer.add_child(entry)
-      if !use_popover {
+      if !use_popover && !use_completion {
         outer.add_child(list)
       }
       attach(parent, outer.view())
