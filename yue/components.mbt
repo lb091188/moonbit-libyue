@@ -1345,19 +1345,23 @@ pub fn result(
       }
       // 水平居中交给平台布局引擎(align=Center):Windows 的测宽带内边距,
       // 手动按测量宽摆位必偏左(见 adaptation.md)
-      let symbol_at = AttributedText::new(
-        symbol,
-        align=Center,
-        valign=Center,
-        wrap=false,
-      )
+      // GTK 端 DrawAttributedText 水平 align 未实现,align=Center 无效,
+      // mount 时测宽手动水平居中(库内惯例,见 adaptation)
+      let symbol_at = AttributedText::new(symbol, valign=Center, wrap=false)
       symbol_at.set_font(Font::new("Sans", 38.0, weight=Bold))
       symbol_at.set_color(color)
+      let symbol_w = symbol_at.get_bounds_for(10000.0, 100.0).width
 
       icon.set_background_color(type_light_color(t))
       icon.on_draw(fn(p) {
         let b = icon.get_bounds()
-        p.draw_attributed_text(symbol_at, 0.0, 0.0, b.width, b.height)
+        p.draw_attributed_text(
+          symbol_at,
+          (b.width - symbol_w) / 2.0,
+          0.0,
+          symbol_w,
+          b.height,
+        )
       })
       let big = Container::make(style=[("height", 30.0)], style_str=[
         ("alignItems", "center"),
@@ -2082,8 +2086,9 @@ pub fn input_number(
       }
 
       step_btn("-", -1.0)
+      // marginRight 0:EP InputNumber 的按钮与输入区紧贴
       let num = Container::make(
-        style=[("width", 64.0), ("height", 28.0), ("marginRight", 6.0)],
+        style=[("width", 64.0), ("height", 28.0), ("marginRight", 0.0)],
         style_str=[("alignItems", "center")],
       )
       num.set_background_color("#FFFFFF")
@@ -4420,8 +4425,19 @@ pub fn select_t(
             Some(_) => ()
             None => {
               let p = Popover::new()
+              // 高度 = 项数 x 28 + padding 8,上限 300;根容器宽高必须
+              // 创建期给定(事后 set_style 会被弹层分配时序吞掉),
+              // 公式与 content_size 一致
+              let mut rows_h = options.length().to_double() * 28.0 + 8.0
+              if rows_h > 300.0 {
+                rows_h = 300.0
+              }
               let list = Container::make(
-                style=[("width", width), ("padding", 4.0)],
+                style=[
+                  ("width", width),
+                  ("height", rows_h),
+                  ("padding", 4.0),
+                ],
                 style_str=[("flexDirection", "column")],
               )
               list.set_background_color("#FFFFFF")
@@ -4429,12 +4445,6 @@ pub fn select_t(
                 let o = opt
                 list.add_child(select_row(o, value, fn() { pick(o) }))
               }
-              let mut rows_h = options.length().to_double() * 28.0 + 8.0
-              if rows_h > 300.0 {
-                rows_h = 300.0
-              }
-              // 弹层根容器显式尺寸(与 content_size 一致),防布局协商震荡
-              list.set_style("height", rows_h)
               p.set_content(list)
               p.set_content_size(width, rows_h)
               pop.val = Some(p)
@@ -4986,8 +4996,14 @@ pub fn dropdown_menu(
             Some(_) => ()
             None => {
               let p = Popover::new()
+              // 根容器宽高创建期给定(事后 set_style 会被弹层时序吞掉),
+              // 高度 = 项数 x 28 + padding 8,与 content_size 一致
               let list = Container::make(
-                style=[("width", width), ("padding", 4.0)],
+                style=[
+                  ("width", width),
+                  ("height", items.length().to_double() * 28.0 + 8.0),
+                  ("padding", 4.0),
+                ],
                 style_str=[("flexDirection", "column")],
               )
               list.set_background_color("#FFFFFF")
@@ -5046,10 +5062,6 @@ pub fn dropdown_menu(
                 })
                 list.add_child(row)
               }
-              list.set_style(
-                "height",
-                items.length().to_double() * 28.0 + 8.0,
-              )
               p.set_content(list)
               p.set_content_size(
                 width,
@@ -5320,8 +5332,18 @@ pub fn color_picker_t(
               let swatch = 26.0
               let gap = 6.0
               let per_row = 5
+              // 弹层根容器宽高必须创建期给定(公式与 content_size 一致):
+              // 事后 set_style 会被弹层分配时序吞掉——实测色板整体不绘制
+              // 但事件窗口仍在(能点击看不到)
+              let rows_n0 = (colors.length() + per_row - 1) / per_row
+              let grid_w0 = per_row.to_double() * (swatch + gap) + 16.0
+              let grid_h0 = 16.0 + rows_n0.to_double() * (swatch + gap)
               let grid = Container::make(
-                style=[("padding", 8.0)],
+                style=[
+                  ("width", grid_w0),
+                  ("height", grid_h0),
+                  ("padding", 8.0),
+                ],
                 style_str=[("flexDirection", "column")],
               )
               grid.set_background_color("#FFFFFF")
@@ -5385,14 +5407,9 @@ pub fn color_picker_t(
                 field.schedule_paint()
               })
               // 高度 = padding 16 + 行数 x 32(色块 26 + 间距 6);
-              // 根容器显式尺寸与 content_size 一致,防布局协商震荡
-              let rows_n = (colors.length() + per_row - 1) / per_row
-              let grid_w = per_row.to_double() * (swatch + gap) + 16.0
-              let grid_h = 16.0 + rows_n.to_double() * (swatch + gap)
-              grid.set_style("width", grid_w)
-              grid.set_style("height", grid_h)
+              // content_size 与创建期根容器尺寸公式一致
               p.set_content(grid)
-              p.set_content_size(grid_w, grid_h)
+              p.set_content_size(grid_w0, grid_h0)
               pop.val = Some(p)
             }
           }
