@@ -116,6 +116,7 @@ void yue_mbt_button_on_click(void *button, void (*invoke)(void *closure),
 /* ---------- Entry ---------- */
 
 void *yue_mbt_entry_new(void);
+void *yue_mbt_entry_new_ex(int32_t type, int32_t width_chars);
 /* Entry::Type：0=Normal 1=Password */
 void *yue_mbt_entry_new_typed(int32_t type);
 void yue_mbt_entry_set_text(void *entry, const char *text);

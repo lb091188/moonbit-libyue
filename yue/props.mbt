@@ -92,8 +92,13 @@ pub fn Entry::make(
   on_text_change? : () -> Unit = fn() {  },
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
+  width_chars? : Int = -1,
 ) -> Entry {
-  let e = Entry::new_of(entry_type)
+  let e = if width_chars == -1 {
+    Entry::new_of(entry_type)
+  } else {
+    Entry::new_ex(entry_type, width_chars)
+  }
   if text != "" {
     e.set_text(text)
   }
