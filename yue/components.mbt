@@ -180,7 +180,8 @@ pub fn theme_current() -> Theme {
 fn apply_native_theme_css(t : Theme) -> Unit {
   let buf = StringBuilder()
   buf.write_string("label { color: \{t.text_primary}; }")
-  buf.write_string("entry { color: \{t.text_primary}; caret-color: \{t.primary}; background-color: #FFFFFF; background-image: none; border: 1px solid \{t.border}; }")
+  buf.write_string("entry { color: \{t.text_primary}; caret-color: \{t.primary}; background-color: #FFFFFF; background-image: none; }")
+  buf.write_string("entry:not(.yue-borderless) { border: 1px solid \{t.border}; }")
   buf.write_string("entry selection { background-color: \{t.primary_light}; color: \{t.text_primary}; }")
   buf.write_string("entry placeholder { color: \{t.text_secondary}; }")
   buf.write_string("textview { background-color: #FFFFFF; color: \{t.text_primary}; }")
@@ -1991,6 +1992,9 @@ pub fn input_t(
       entry.set_style("flex", 1.0)
       entry.set_style("marginLeft", 10.0)
       entry.set_style("marginRight", 10.0)
+      // 原生子窗口绘制在自绘之上:上下留 2 让出边框线
+      entry.set_style("marginTop", 2.0)
+      entry.set_style("marginBottom", 2.0)
       entry.on_focus_in(fn() {
         focused.val = true
         outer.schedule_paint()
@@ -4497,6 +4501,9 @@ fn select_t_filterable(
       entry.set_style("flex", 1.0)
       entry.set_style("marginLeft", 10.0)
       entry.set_style("marginRight", 26.0)
+      // 原生子窗口绘制在自绘之上:上下留 2 让出边框线
+      entry.set_style("marginTop", 2.0)
+      entry.set_style("marginBottom", 2.0)
       outer.add_child(entry)
       let pop : Ref[Popover?] = Ref(None)
       let open = Ref(false)
