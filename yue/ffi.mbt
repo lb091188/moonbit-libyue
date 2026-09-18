@@ -266,6 +266,10 @@ extern "c" fn ffi_entry_new() -> View = "yue_mbt_entry_new"
 extern "c" fn ffi_entry_new_ex(type_ : Int, width_chars : Int) -> View = "yue_mbt_entry_new_ex"
 
 ///|
+#borrow(css)
+extern "c" fn ffi_apply_native_theme_css(css : Bytes) -> Unit = "yue_mbt_apply_native_theme_css"
+
+///|
 #borrow(entry, text)
 extern "c" fn ffi_entry_set_text(entry : View, text : Bytes) -> Unit = "yue_mbt_entry_set_text"
 
