@@ -290,15 +290,6 @@ extern "c" fn ffi_entry_on_activate(
 ) -> Unit = "yue_mbt_entry_on_activate"
 
 ///|
-#borrow(entry, items, invoke, callback)
-extern "c" fn ffi_entry_set_completion(
-  entry : View,
-  items : Bytes,
-  invoke : FuncRef[((Bytes) -> Unit, Bytes) -> Unit],
-  callback : (Bytes) -> Unit,
-) -> Unit = "yue_mbt_entry_set_completion"
-
-///|
 extern "c" fn ffi_tab_new() -> View = "yue_mbt_tab_new"
 
 ///|
@@ -1344,6 +1335,21 @@ extern "c" fn ffi_popover_show_relative_to(
   popover : Popover,
   view : View,
 ) -> Unit = "yue_mbt_popover_show_relative_to"
+
+///|
+#borrow(popover)
+extern "c" fn ffi_popover_set_accept_focus(
+  popover : Popover,
+  accept : Int,
+) -> Unit = "yue_mbt_popover_set_accept_focus"
+
+///|
+#borrow(invoke, callback)
+extern "c" fn ffi_call_delayed(
+  ms : Int,
+  invoke : FuncRef[(() -> Unit) -> Unit],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_call_delayed"
 
 ///|
 #borrow(popover)

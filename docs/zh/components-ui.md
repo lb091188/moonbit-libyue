@@ -23,13 +23,12 @@ let t = @yue.default_theme()
 | `entry_t(text?, password?, on_input?)` | 普通 / 密码 | 仅统一字体(GTK Entry `SetColor` 会整体染黑,见 adaptation.md) |
 | `input_t(text?, password?, margin?, width?, height?)` | 直角边框 / 密码 | 外层自绘 1px 边框(聚焦变主题色),内部 Entry 经 `set_borderless` 去原生边框与内阴影 |
 | `checkbox_t(title, checked?, disabled?, on_change?)` | 正常 / 禁用 | 自绘直角勾选框:选中实心主题色 + 白勾,hover 边框变主题色 |
-| `autocomplete(options, value : Store[String], width?)` | 普通过滤 | 输入实时过滤候选,悬浮弹层(不挤压内容):Linux 原生 Popover、Windows 无边框置顶小窗口;点击候选项写入 Store,失焦/清空自动收起 |
 | `date_picker_t(value? : Store[DateYMD?], on_change?, width?, placeholder?)` | 日期选择(EP 样式,全自绘):输入框样式字段,点击弹出 `calendar_t` 日历面板(Popover 承载),‹/› 切月,点选回填并收起,失焦收起 |
 | `textarea_t(text?, width?, height?, margin?, on_input?)` | 多行输入:外层自绘边框(聚焦变主题色)+ 8px 内边距,内部 TextEdit 去原生边框,内容超出按平台自身滚动 |
 | `divider(vertical?, spacing?)` | 分隔线:水平(默认)/竖直,1px 主题边框色,spacing 为两侧留白 |
 | `slider_t(value : Store[Double], min?, max?, step?, width?, on_change?)` | 自绘滑杆:浅灰轨道 + 主题色填充 + 方形 thumb,点击/拖拽调值(step 量化),外部 set 同样生效 |
 | `tabs_t(pages : Array[(String, Node)], selected?)` | 顶部页签:选中主题色文字 + 底部 2px 指示条,内容区 set_visible 切换;selected 为页序号 Store(缺省内部建 0) |
-| `select_t(options, value : Store[String], width?, on_change?)` | 下拉选择(EP 样式,全自绘):只读字段 + Popover 候选列表(悬停高亮/选中 ✓ 标记),点选回填,失焦收起;长列表用 autocomplete(弹层内不滚动) |
+| `select_t(options, value : Store[String], width?, on_change?)` | 下拉选择(EP 样式,全自绘):悬停高亮/当前选中 ✓ 标记,点选回填。Linux 为可过滤形态:字段可输入,输入实时筛选,弹层自动展开/收起,↑↓ 高亮、回车选中、Esc 收起;其余平台为只读字段点选 |
 | `rate_t(value : Store[Int], max?, on_change?)` | 评分(自绘五角星):选中实心主题色/未选中描边灰,hover 预亮,点击写入星级 |
 | `tooltip_t(content : Node, tip)` | 给任意节点包原生悬浮提示(系统样式;主题化气泡用 popover_t) |
 | `popover_t(trigger : Node, content : Node, width, height)` | 气泡弹层:trigger 点击在自身下方弹任意 Node 内容,再点切换收起 |

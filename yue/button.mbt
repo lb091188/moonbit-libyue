@@ -104,30 +104,3 @@ pub fn Entry::on_activate(self : Entry, callback : () -> Unit) -> Unit {
   keep_alive(callback)
   ffi_entry_on_activate(self.view, fn(f : () -> Unit) -> Unit { f() }, callback)
 }
-
-///|
-/// 挂接原生自动补全：输入时按候选过滤弹出原生气泡，点选/回车选中后
-/// 回填文本并触发 on_pick。仅 Linux 有原生实现（弹层由 GTK 托管，
-/// 不抢键盘焦点），其余平台空操作，由调用方按平台降级。
-pub fn Entry::set_completion(
-  self : Entry,
-  options : Array[String],
-  on_pick : (String) -> Unit,
-) -> Unit {
-  // 候选串经 \x1F(ASCII 单元分隔符)连接过 ABI,正常文本不会含此字节
-  let mut joined = ""
-  for i, opt in options {
-    if i > 0 {
-      joined = joined + "\u{1f}"
-    }
-    joined = joined + opt
-  }
-  let wrapped : (Bytes) -> Unit = fn(s) { on_pick(from_utf8_bytes(s)) }
-  keep_alive_bytes(wrapped)
-  ffi_entry_set_completion(
-    self.view,
-    utf8_bytes(joined),
-    fn(f : (Bytes) -> Unit, s : Bytes) -> Unit { f(s) },
-    wrapped,
-  )
-}

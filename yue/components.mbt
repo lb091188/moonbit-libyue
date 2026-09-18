@@ -2488,230 +2488,6 @@ pub fn transfer(
 }
 
 ///|
-/// 自动补全(EP Autocomplete):entry_t 输入,候选项经过滤后弹出。
-/// Linux 用 Entry::set_completion(GTK 原生补全弹层,不抢键盘焦点);
-/// Windows 用无边框置顶小窗口弹层(悬浮不裁剪);macOS 回退为内联列表。
-pub fn autocomplete(
-  options : Array[String],
-  value : Store[String],
-  width? : Double = 280.0,
-) -> Node {
-  {
-    mount: fn(parent) {
-      let outer = Container::make(
-        style=[("width", width), ("marginBottom", 10.0)],
-        style_str=[("flexDirection", "column")],
-      )
-      let entry = Entry::make(entry_type=Normal)
-      entry.set_font(Font::new("Sans", 13.0))
-      entry.set_borderless(true)
-      // Win32 单行 EDIT 文字贴顶绘制(无垂直居中样式),压低控件高度
-      // 使文字近似垂直居中;GTK/macOS 原生居中,维持 30
-      entry.set_style("height", if platform() == "windows" { 22.0 } else { 30.0 })
-      entry.set_background_color("#FFFFFF")
-      let font = Font::new("Sans", 13.0)
-      fn make_row(
-        opt : String,
-        selected : Ref[Bool],
-        on_pick : () -> Unit,
-      ) -> Container {
-        let row = Container::make(
-          style=[("height", 28.0), ("paddingLeft", 10.0)],
-          style_str=[("flexDirection", "row"), ("alignItems", "center")],
-        )
-        let l = Label::new(opt)
-        l.set_font(font)
-        l.set_color(theme_text_regular())
-        row.add_child(l)
-        let hover = Ref(false)
-        row.on_draw(fn(p) {
-          let b = row.get_bounds()
-          if hover.val || selected.val {
-            p.set_fill_color(theme_primary_light())
-            p.fill_rect(0.0, 0.0, b.width, b.height)
-          }
-        })
-        row.on_mouse_enter(fn(_e) {
-          hover.val = true
-          row.schedule_paint()
-        })
-        row.on_mouse_leave(fn(_e) {
-          hover.val = false
-          row.schedule_paint()
-        })
-        View::set_cursor(row, hand())
-        row.on_mouse_down(fn(e) {
-          if e.button == 1 {
-            on_pick()
-            true
-          } else {
-            false
-          }
-        })
-        row
-      }
-
-      fn pick(opt : String) -> Unit {
-        value.set(opt)
-        entry.set_text(opt)
-      }
-
-      // Linux 走 GTK 原生补全(选中项的文本回填由弹层完成,这里只更新值);
-      // Windows 走 shim 的无边框置顶小窗口弹层;macOS 暂回退内联列表
-      let use_completion = platform() == "linux"
-      let use_popover = platform() == "windows"
-      let list = Container::make(
-        style=[("marginTop", 4.0), ("width", width)],
-        style_str=[("flexDirection", "column")],
-      )
-      let inline_rows : Ref[Array[Container]] = Ref([])
-      let pop : Ref[Popover?] = Ref(None)
-      // 键盘导航状态(Windows 替代弹层无原生键盘交互,焦点保持在输入框,
-      // 由 entry.on_key_down 驱动):sel 为当前高亮行下标,-1 表示无
-      let sel : Ref[Int] = Ref(-1)
-      let pick_fns : Ref[Array[() -> Unit]] = Ref([])
-      let sel_marks : Ref[Array[Ref[Bool]]] = Ref([])
-      fn set_sel(i : Int) -> Unit {
-        let n = sel_marks.val.length()
-        let ni = if i < -1 { -1 } else if i > n - 1 { n - 1 } else { i }
-        if ni == sel.val {
-          return
-        }
-        if sel.val >= 0 && sel.val < n {
-          sel_marks.val[sel.val].val = false
-          inline_rows.val[sel.val].schedule_paint()
-        }
-        sel.val = ni
-        if ni >= 0 {
-          sel_marks.val[ni].val = true
-          inline_rows.val[ni].schedule_paint()
-        }
-      }
-      fn refresh(filter : String) -> Unit {
-        // 清空已有候选
-        for v in inline_rows.val {
-          ignore(list.remove_child_view(v.view()))
-        }
-        inline_rows.val = []
-        pick_fns.val = []
-        sel_marks.val = []
-        sel.val = -1
-        let mut count = 0
-        let picked = Ref(false)
-        for opt in options {
-          if filter != "" && !opt.contains(filter) {
-            continue
-          }
-          count = count + 1
-          let o = opt
-          let mark = Ref(false)
-          fn do_pick() -> Unit {
-            picked.val = true
-            pick(o)
-            match pop.val {
-              Some(p) => p.close()
-              None => ()
-            }
-            for v in inline_rows.val {
-              ignore(list.remove_child_view(v.view()))
-            }
-            inline_rows.val = []
-          }
-          let row = make_row(o, mark, do_pick)
-          list.add_child(row)
-          inline_rows.val.push(row)
-          sel_marks.val.push(mark)
-          pick_fns.val.push(do_pick)
-        }
-        if use_popover {
-          match pop.val {
-            Some(p) => {
-              if count > 0 && !picked.val {
-                p.set_content(list)
-                // 弹层根容器显式高:Win 替代窗口按内容协商尺寸,
-                // 无显式高会布局震荡;与 content_size 公式一致
-                list.set_style("height", count.to_double() * 28.0 + 8.0)
-                p.set_content_size(width, count.to_double() * 28.0 + 8.0)
-                p.show_relative_to(entry)
-              } else {
-                p.close()
-              }
-            }
-            None => ()
-          }
-        }
-      }
-
-      if use_completion {
-        entry.set_completion(options, fn(opt) { value.set(opt) })
-      }
-      if use_popover {
-        pop.val = Some(Popover::new())
-        // 替代弹层无原生键盘导航(焦点保持在输入框),这里自行处理:
-        // ↑↓ 移动高亮、回车选中当前项、Esc 收起
-        entry.on_key_down(fn(e) {
-          let n = pick_fns.val.length()
-          if n == 0 {
-            return false
-          }
-          match e.code {
-            VKEY_DOWN => {
-              set_sel(sel.val + 1)
-              true
-            }
-            VKEY_UP => {
-              set_sel(if sel.val < 0 { n - 1 } else { sel.val - 1 })
-              true
-            }
-            VKEY_RETURN => {
-              if sel.val >= 0 && sel.val < n {
-                pick_fns.val[sel.val]()
-                true
-              } else {
-                false
-              }
-            }
-            VKEY_ESCAPE => {
-              match pop.val {
-                Some(p) => p.close()
-                None => ()
-              }
-              sel.val = -1
-              true
-            }
-            _ => false
-          }
-        })
-      }
-      value.subscribe(fn(v) {
-        if !use_popover || !entry.has_focus() {
-          entry.set_text(v)
-        }
-      })
-      if !use_completion {
-        entry.on_text_change(fn() {
-          refresh(entry.get_text())
-        })
-      }
-      // 输入框失焦(点击别处/窗口最小化)时收起弹层
-      entry.on_focus_out(fn() {
-        match pop.val {
-          Some(p) => p.close()
-          None => ()
-        }
-        false
-      })
-      outer.add_child(entry)
-      if !use_popover && !use_completion {
-        outer.add_child(list)
-      }
-      attach(parent, outer.view())
-      outer.view()
-    },
-  }
-}
-
-///|
 /// 日期值(年月日,月/日按日常习惯 1 起始)。
 pub(all) struct DateYMD {
   y : Int
@@ -4447,16 +4223,87 @@ pub fn tabs_t(
 }
 
 ///|
-/// 下拉选择(EP Select,全自绘):只读字段(当前选中 + 下拉箭头),点击弹
-/// 候选列表(Popover 承载):悬停高亮、当前选中主题色标记,点选回填并
-/// 收起,失焦收起。选中经 value(Store[String])同步;长列表请用
-/// autocomplete(本组件不做弹层内滚动)。
+/// 下拉候选行(EP 样式,select_t 各平台共用):当前选中浅蓝底 + 主题色字 +
+/// 右侧 ✓,hover/键盘高亮灰底。mark 为键盘高亮标记(非鼠标路径)。
+fn select_row(
+  opt : String,
+  value : Store[String],
+  on_pick : () -> Unit,
+  mark? : Ref[Bool] = Ref(false),
+) -> Container {
+  let row = Container::make(
+    style=[("height", 28.0), ("paddingLeft", 8.0)],
+    style_str=[("flexDirection", "row"), ("alignItems", "center")],
+  )
+  let hover = Ref(false)
+  row.on_draw(fn(p) {
+    let b = row.get_bounds()
+    let act = value.get() == opt
+    if act {
+      p.set_fill_color(theme_primary_light())
+      p.fill_rect(0.0, 0.0, b.width, b.height)
+    } else if hover.val || mark.val {
+      p.set_fill_color(theme_fill_hover())
+      p.fill_rect(0.0, 0.0, b.width, b.height)
+    }
+    p.draw_text(
+      opt,
+      8.0,
+      0.0,
+      b.width - 26.0,
+      b.height,
+      valign=Center,
+      color=if act {
+        theme_primary()
+      } else {
+        theme_text_regular()
+      },
+    )
+    if act {
+      // 选中项右侧 ✓(矢量小勾,不依赖字体)
+      p.set_stroke_color(theme_primary())
+      p.begin_path()
+      p.move_to(b.width - 18.0, b.height / 2.0)
+      p.line_to(b.width - 14.0, b.height / 2.0 + 4.0)
+      p.line_to(b.width - 8.0, b.height / 2.0 - 4.0)
+      p.stroke()
+    }
+  })
+  row.on_mouse_enter(fn(_e) {
+    hover.val = true
+    row.schedule_paint()
+  })
+  row.on_mouse_leave(fn(_e) {
+    hover.val = false
+    row.schedule_paint()
+  })
+  View::set_cursor(row, hand())
+  row.on_mouse_down(fn(e) {
+    if e.button == 1 {
+      on_pick()
+      true
+    } else {
+      false
+    }
+  })
+  row
+}
+
+///|
+/// 下拉选择(EP Select,全自绘):点击弹候选列表(Popover 承载):悬停
+/// 高亮、当前选中主题色 ✓,点选回填并收起,失焦收起;选中经
+/// value(Store[String])同步。Linux 为可过滤形态(字段可输入,输入实时
+/// 筛选,↑↓ 高亮、回车选中、Esc 收起,见 select_t_filterable),
+/// 其余平台维持只读字段点选。
 pub fn select_t(
   options : Array[String],
   value : Store[String],
   width? : Double = 200.0,
   on_change? : (String) -> Unit = fn(_s) {  },
 ) -> Node {
+  if platform() == "linux" {
+    return select_t_filterable(options, value, width, on_change)
+  }
   {
     mount: fn(parent) {
       let focused = Ref(false)
@@ -4532,61 +4379,7 @@ pub fn select_t(
               list.set_background_color("#FFFFFF")
               for opt in options {
                 let o = opt
-                let hover = Ref(false)
-                let row = Container::make(
-                  style=[("height", 28.0), ("paddingLeft", 8.0)],
-                  style_str=[("flexDirection", "row"), ("alignItems", "center")],
-                )
-                row.on_draw(fn(p2) {
-                  let b = row.get_bounds()
-                  let act = value.get() == o
-                  if hover.val || act {
-                    p2.set_fill_color(
-                      if act { theme_primary_light() } else { theme_fill_hover() },
-                    )
-                    p2.fill_rect(0.0, 0.0, b.width, b.height)
-                  }
-                  p2.draw_text(
-                    o,
-                    8.0,
-                    0.0,
-                    b.width - 26.0,
-                    b.height,
-                    valign=Center,
-                    color=if act {
-                      theme_primary()
-                    } else {
-                      theme_text_regular()
-                    },
-                  )
-                  if act {
-                    // 选中项右侧 ✓(矢量小勾,不依赖字体)
-                    p2.set_stroke_color(theme_primary())
-                    p2.begin_path()
-                    p2.move_to(b.width - 18.0, b.height / 2.0)
-                    p2.line_to(b.width - 14.0, b.height / 2.0 + 4.0)
-                    p2.line_to(b.width - 8.0, b.height / 2.0 - 4.0)
-                    p2.stroke()
-                  }
-                })
-                row.on_mouse_enter(fn(_e) {
-                  hover.val = true
-                  row.schedule_paint()
-                })
-                row.on_mouse_leave(fn(_e) {
-                  hover.val = false
-                  row.schedule_paint()
-                })
-                View::set_cursor(row, hand())
-                row.on_mouse_down(fn(e2) {
-                  if e2.button == 1 {
-                    pick(o)
-                    true
-                  } else {
-                    false
-                  }
-                })
-                list.add_child(row)
+                list.add_child(select_row(o, value, fn() { pick(o) }))
               }
               let mut rows_h = options.length().to_double() * 28.0 + 8.0
               if rows_h > 300.0 {
@@ -4611,6 +4404,283 @@ pub fn select_t(
       value.subscribe(fn(v) { apply(v) })
       attach(parent, field.view())
       field.view()
+    },
+  }
+}
+
+///|
+/// 可过滤下拉(Linux):字段 = 自绘边框 + 内嵌无边框 Entry(input_t 式)。
+/// 弹层经 set_accept_focus(false) 弃焦——出现/点击都不夺走 X 焦点,键入、
+/// ↑↓、回车全程发生在 Entry 上:输入实时筛选,有匹配自动展开、无匹配
+/// 自动收起,↑↓ 移动高亮(收起时按 ↓/↑ 展开全量并置首/置尾),回车选中
+/// 当前高亮项,Esc 收起;点击外部由 libyue 指针抓取关闭,open 经 on_close
+/// 同步,防关闭后状态错位弹不出。弹出时机避开 press(focus_in 经
+/// call_delayed 推迟到 release 之后),防指针抓取把悬着的 release 判成
+/// 点外闪关。
+fn select_t_filterable(
+  options : Array[String],
+  value : Store[String],
+  width : Double,
+  on_change : (String) -> Unit,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let focused = Ref(false)
+      let outer = Container::make(
+        style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
+      )
+      outer.set_background_color("#FFFFFF")
+      outer.on_draw(fn(p) {
+        let b = outer.get_bounds()
+        p.set_stroke_color(
+          if focused.val { theme_primary() } else { theme_border() },
+        )
+        p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+        p.set_fill_color(theme_text_secondary())
+        p.begin_path()
+        p.move_to(b.width - 20.0, b.height / 2.0 - 2.0)
+        p.line_to(b.width - 12.0, b.height / 2.0 - 2.0)
+        p.line_to(b.width - 16.0, b.height / 2.0 + 3.0)
+        p.close_path()
+        p.fill()
+      })
+      let entry = Entry::make(entry_type=Normal)
+      entry.set_text(value.get())
+      entry.set_font(Font::new("Sans", 13.0))
+      entry.set_borderless(true)
+      entry.set_background_color("#FFFFFF")
+      entry.set_style("flex", 1.0)
+      entry.set_style("marginLeft", 10.0)
+      entry.set_style("marginRight", 26.0)
+      entry.set_style("marginTop", 4.0)
+      entry.set_style("marginBottom", 4.0)
+      outer.add_child(entry)
+      let pop : Ref[Popover?] = Ref(None)
+      let open = Ref(false)
+      // 吃掉 pick 里 set_text 触发的 text_change,避免选中后弹层回弹
+      let picking = Ref(false)
+      let rows : Ref[Array[Container]] = Ref([])
+      let marks : Ref[Array[Ref[Bool]]] = Ref([])
+      let picks : Ref[Array[() -> Unit]] = Ref([])
+      let sel = Ref(-1)
+      let list = Container::make(
+        style=[("width", width), ("padding", 4.0)],
+        style_str=[("flexDirection", "column")],
+      )
+      list.set_background_color("#FFFFFF")
+      fn clear_rows() -> Unit {
+        for v in rows.val {
+          ignore(list.remove_child_view(v.view()))
+        }
+        rows.val = []
+        marks.val = []
+        picks.val = []
+        sel.val = -1
+      }
+
+      fn set_sel(i : Int) -> Unit {
+        let n = marks.val.length()
+        let ni = if i < -1 {
+          -1
+        } else if i > n - 1 {
+          n - 1
+        } else {
+          i
+        }
+        if ni == sel.val {
+          return
+        }
+        if sel.val >= 0 && sel.val < n {
+          marks.val[sel.val].val = false
+          rows.val[sel.val].schedule_paint()
+        }
+        sel.val = ni
+        if ni >= 0 {
+          marks.val[ni].val = true
+          rows.val[ni].schedule_paint()
+        }
+      }
+
+      fn pick(opt : String) -> Unit {
+        picking.val = true
+        value.set(opt)
+        on_change(opt)
+        entry.set_text(opt)
+        match pop.val {
+          Some(p) => p.close()
+          None => ()
+        }
+      }
+
+      // 重建候选;Entry 持焦点且有匹配时弹出/刷新,无匹配或失焦收起
+      fn refresh(filter : String) -> Unit {
+        clear_rows()
+        let mut count = 0
+        for opt in options {
+          if filter != "" && !opt.contains(filter) {
+            continue
+          }
+          count = count + 1
+          let o = opt
+          let mark = Ref(false)
+          let row = select_row(o, value, fn() { pick(o) }, mark~)
+          list.add_child(row)
+          rows.val.push(row)
+          marks.val.push(mark)
+          picks.val.push(fn() { pick(o) })
+        }
+        let h = count.to_double() * 28.0 + 8.0
+        list.set_style("height", h)
+        if count > 0 && entry.has_focus() {
+          match pop.val {
+            Some(p) => {
+              p.set_content(list)
+              // 弹层根容器显式高,且与 content_size 一致,防布局协商震荡
+              p.set_content_size(width, h)
+              open.val = true
+              p.show_relative_to(outer)
+            }
+            None => ()
+          }
+        } else {
+          match pop.val {
+            Some(p) => p.close()
+            None => ()
+          }
+        }
+      }
+
+      pop.val = Some(Popover::new())
+      match pop.val {
+        Some(p) => {
+          // 弹层弃焦是键盘筛选的前提(XFCE 实测弹层映射/点击会拿走焦点,
+          // Entry 一失焦这里就按失焦收起了)
+          p.set_accept_focus(false)
+          p.on_close(fn() { open.val = false })
+        }
+        None => ()
+      }
+      outer.on_mouse_down(fn(e) {
+        // 只聚焦不弹层:press 时刻开层,悬着的 release 会被弹层指针抓取
+        // 判成点外立即闪关(adaptation「按下不动松开即闪关」)
+        if e.button == 1 {
+          entry.focus()
+          true
+        } else {
+          false
+        }
+      })
+      // 容器事件窗口盖不到原生 Entry 区域,这里只兜住边框/箭头窄条的点击
+      outer.on_mouse_up(fn(e) {
+        if e.button == 1 && !open.val && entry.has_focus() {
+          refresh("")
+        }
+        false
+      })
+      entry.on_mouse_up(fn(_e) {
+        // 已聚焦时再点字段不会重触发 focus_in,Entry 侧补一个展开入口;
+        // GTK 原生 Entry 若不下发鼠标事件,此路不通也无副作用(focus_in 已覆盖)
+        if !open.val && entry.has_focus() {
+          refresh("")
+        }
+        false
+      })
+      entry.on_focus_in(fn() {
+        focused.val = true
+        outer.schedule_paint()
+        // focus_in 由 press 触发,此刻 release 还悬着,不能立刻开层;
+        // 推迟到主循环下一拍(release 之后)再展开
+        if !open.val {
+          call_delayed(0, fn() {
+            if !open.val && entry.has_focus() {
+              refresh("")
+            }
+          })
+        }
+        false
+      })
+      entry.on_focus_out(fn() {
+        focused.val = false
+        outer.schedule_paint()
+        match pop.val {
+          Some(p) => p.close()
+          None => ()
+        }
+        false
+      })
+      entry.on_text_change(fn() {
+        if picking.val {
+          picking.val = false
+          return
+        }
+        refresh(entry.get_text())
+      })
+      // 键盘导航:焦点保持在 Entry;↑↓ 移动高亮(收起时展开全量并置首/尾),
+      // 回车选中当前高亮项,Esc 收起
+      entry.on_key_down(fn(e) {
+        match e.code {
+          VKEY_DOWN => {
+            if !open.val {
+              refresh("")
+              set_sel(0)
+            } else {
+              set_sel(sel.val + 1)
+            }
+            true
+          }
+          VKEY_UP => {
+            if !open.val {
+              refresh("")
+            }
+            set_sel(
+              if sel.val < 0 {
+                marks.val.length() - 1
+              } else {
+                sel.val - 1
+              },
+            )
+            true
+          }
+          VKEY_RETURN => {
+            if open.val && sel.val >= 0 && sel.val < picks.val.length() {
+              picks.val[sel.val]()
+            } else if open.val {
+              match pop.val {
+                Some(p) => p.close()
+                None => ()
+              }
+            }
+            true
+          }
+          VKEY_ESCAPE => {
+            match pop.val {
+              Some(p) => p.close()
+              None => ()
+            }
+            true
+          }
+          _ => false
+        }
+      })
+      // GTK 原生 Entry 若把回车送进 activate 信号而不经 on_key_down,
+      // 这里兜底同一选中逻辑(两者只会有一个到达)
+      entry.on_activate(fn() {
+        if open.val && sel.val >= 0 && sel.val < picks.val.length() {
+          picks.val[sel.val]()
+        } else if open.val {
+          match pop.val {
+            Some(p) => p.close()
+            None => ()
+          }
+        }
+      })
+      value.subscribe(fn(v) {
+        if !entry.has_focus() {
+          entry.set_text(v)
+        }
+      })
+      attach(parent, outer.view())
+      outer.view()
     },
   }
 }

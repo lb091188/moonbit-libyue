@@ -266,18 +266,8 @@ fn main {
       ],
     ),
     section(
-      "Autocomplete 自动补全",
-      "输入过滤候选项,点击候选项回填。",
-      [
-        @yue.autocomplete(
-          ["MoonBit", "MoonShell", "组件库", "演示板", "深色主题"],
-          picked_lang,
-        ),
-      ],
-    ),
-    section(
       "Select 下拉选择",
-      "只读字段 + 弹层候选(EP 样式):当前选中 ✓ 标记,点选回填。",
+      "可过滤下拉(EP 样式):点字段弹候选,输入实时筛选,↑↓ 高亮、回车选中,Esc 收起;当前选中 ✓ 标记。",
       [
         @yue.select_t(
           ["杭州", "北京", "上海", "深圳", "广州"],

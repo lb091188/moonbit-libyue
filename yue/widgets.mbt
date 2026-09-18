@@ -187,6 +187,14 @@ pub fn Popover::on_close(self : Popover, callback : () -> Unit) -> Unit {
 }
 
 ///|
+/// 设置弹层是否接受键盘焦点。传 false 时弹层出现与点击都不夺走当前
+/// 焦点控件，键盘事件持续进入锚点（弹层展开期间持续键入的组件依赖
+/// 此语义，如 select_t 的输入筛选）。仅 Linux 有实现，其余平台空操作。
+pub fn Popover::set_accept_focus(self : Popover, accept : Bool) -> Unit {
+  ffi_popover_set_accept_focus(self, if accept { 1 } else { 0 })
+}
+
+///|
 /// ComboBox 继承 Picker 的选项操作（MoonBit 侧显式委托）。
 pub fn ComboBox::add_item(self : ComboBox, text : String) -> Unit {
   ffi_picker_add_item(ViewLike::view(self), utf8_bytes(text))
