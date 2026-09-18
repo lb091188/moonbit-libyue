@@ -1961,12 +1961,11 @@ pub fn input_t(
   password? : Bool = false,
   margin? : Double = 0.0,
   width? : Double = 280.0,
-  height? : Double = 40.0,
+  height? : Double = 30.0,
 ) -> Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
-      // 外框比内部输入区大:Entry 四周留 margin,高度给足避免溢出
       let outer = Container::make(
         style=[
           ("width", width),
@@ -1992,8 +1991,6 @@ pub fn input_t(
       entry.set_style("flex", 1.0)
       entry.set_style("marginLeft", 10.0)
       entry.set_style("marginRight", 10.0)
-      entry.set_style("marginTop", 4.0)
-      entry.set_style("marginBottom", 4.0)
       entry.on_focus_in(fn() {
         focused.val = true
         outer.schedule_paint()
@@ -3987,7 +3984,7 @@ pub fn textarea_t(
         style=[
           ("width", width),
           ("height", height),
-          ("padding", 8.0),
+          ("padding", 10.0),
           ("marginTop", margin),
           ("marginBottom", margin),
         ],
@@ -4470,12 +4467,10 @@ fn select_t_filterable(
   {
     mount: fn(parent) {
       let focused = Ref(false)
-      // 字段结构照抄 input_t:外层 40 高自绘边框,内嵌 Entry 上下 margin 4
-      // ——分配 32 恰好装下 Entry 的主题自然高度,边框线另有 4px 让位
-      // 不被原生子窗口盖住;压高度(30/2)会溢出边框(GTK3 class 作用域的
-      // CSS 压不过主题 entry{min-height},见 adaptation.md)
+      // 字段高 30 与 date_picker/input_t 一致;Entry 尺寸全由容器分配
+      // (构造期归一化,见 adaptation.md),占满字段高,GTK 单行垂直居中
       let outer = Container::make(
-        style=[("width", width), ("height", 40.0), ("marginBottom", 10.0)],
+        style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
       )
       outer.set_background_color("#FFFFFF")
       outer.on_draw(fn(p) {
@@ -4502,8 +4497,6 @@ fn select_t_filterable(
       entry.set_style("flex", 1.0)
       entry.set_style("marginLeft", 10.0)
       entry.set_style("marginRight", 26.0)
-      entry.set_style("marginTop", 4.0)
-      entry.set_style("marginBottom", 4.0)
       outer.add_child(entry)
       let pop : Ref[Popover?] = Ref(None)
       let open = Ref(false)
