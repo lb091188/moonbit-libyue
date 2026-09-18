@@ -58,12 +58,23 @@ pub fn Entry::new() -> Entry {
 ///|
 /// 创建指定类型输入框（Password 为掩码显示）。
 pub fn Entry::new_of(entry_type : EntryType) -> Entry {
+  Entry::new_ex(entry_type, -1)
+}
+
+///|
+/// 创建指定类型输入框并钉住首选宽度（width_chars，仅 Linux 有意义）：
+/// GTK 主题的 entry 最小宽(GTK3 另有 150px 硬编码下限)大于窄容器给
+/// Entry 的分配时,原生子窗口在构造期即以主题自然宽创建、横向溢出盖住
+/// 相邻内容;构造期传入小 width_chars 把首选宽压到分配以内。其余平台
+/// width_chars 被忽略。
+pub fn Entry::new_ex(entry_type : EntryType, width_chars : Int) -> Entry {
   {
-    view: ffi_entry_new_typed(
+    view: ffi_entry_new_ex(
       match entry_type {
         Normal => 0
         Password => 1
       },
+      width_chars,
     ),
   }
 }

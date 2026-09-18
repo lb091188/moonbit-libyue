@@ -1635,6 +1635,11 @@ pub fn entry_t(
       }
       // 注:GTK Entry 上 set_color 会连带渲染背景变黑,故只统一字体
       e.set_font(Font::new("Sans", 13.0))
+      // Linux 端 Entry 尺寸已归一化(min-height:0),裸 Entry 自然高只剩
+      // 文字行高,补显式高度维持输入框观感
+      if platform() == "linux" {
+        e.set_style("height", 30.0)
+      }
       e.on_text_change(fn() { on_input(e.get_text()) })
       attach(parent, e.view())
       e.view()
@@ -4441,8 +4446,12 @@ fn select_t_filterable(
   {
     mount: fn(parent) {
       let focused = Ref(false)
+      // 字段结构照抄 input_t:外层 40 高自绘边框,内嵌 Entry 上下 margin 4
+      // ——分配 32 恰好装下 Entry 的主题自然高度,边框线另有 4px 让位
+      // 不被原生子窗口盖住;压高度(30/2)会溢出边框(GTK3 class 作用域的
+      // CSS 压不过主题 entry{min-height},见 adaptation.md)
       let outer = Container::make(
-        style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
+        style=[("width", width), ("height", 40.0), ("marginBottom", 10.0)],
       )
       outer.set_background_color("#FFFFFF")
       outer.on_draw(fn(p) {
@@ -4459,17 +4468,18 @@ fn select_t_filterable(
         p.close_path()
         p.fill()
       })
-      let entry = Entry::make(entry_type=Normal)
+      // width_chars 构造期压低首选宽:窄字段(演示 170)给 Entry 的分配
+      // (宽-36)小于主题默认最小宽(166)时,原生子窗口会横向溢出盖住箭头
+      let entry = Entry::make(entry_type=Normal, width_chars=6)
       entry.set_text(value.get())
       entry.set_font(Font::new("Sans", 13.0))
       entry.set_borderless(true)
       entry.set_background_color("#FFFFFF")
-      // 上下不留 margin 占满字段高:主题 min-height 已由 borderless 的
-      // min-height:0 归零,Entry 按分配的 30px 绘制,文字垂直居中,
-      // 不再溢出自绘边框
       entry.set_style("flex", 1.0)
       entry.set_style("marginLeft", 10.0)
       entry.set_style("marginRight", 26.0)
+      entry.set_style("marginTop", 4.0)
+      entry.set_style("marginBottom", 4.0)
       outer.add_child(entry)
       let pop : Ref[Popover?] = Ref(None)
       let open = Ref(false)

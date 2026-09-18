@@ -263,7 +263,7 @@ extern "c" fn ffi_button_on_click(
 extern "c" fn ffi_entry_new() -> View = "yue_mbt_entry_new"
 
 ///|
-extern "c" fn ffi_entry_new_typed(type_ : Int) -> View = "yue_mbt_entry_new_typed"
+extern "c" fn ffi_entry_new_ex(type_ : Int, width_chars : Int) -> View = "yue_mbt_entry_new_ex"
 
 ///|
 #borrow(entry, text)

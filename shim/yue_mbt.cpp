@@ -426,13 +426,13 @@ void yue_mbt_view_set_borderless(void *view, int on) {
     static GtkCssProvider *provider = nullptr;
     if (provider == nullptr) {
       provider = gtk_css_provider_new();
-      // min-height/min-width: 0 允许原生控件压进外层自绘容器给的分配尺寸
-      // (主题 min 尺寸会作为 GTK minimum 上报,yoga 分配不足时原生窗口
-      // 按自然尺寸绘制,溢出自绘边框)
+      // 注意:本 class 只做视觉去边框;GTK3 里 class 作用域的 min-height
+      // 等尺寸属性压不过主题的 entry{min-height}(实测 G_MAXUINT 优先级
+      // 也不行,仅全局 entry{} 类型选择器可,但会波及全应用),内嵌原生
+      // 控件的自绘容器必须给足分配尺寸(参照 input_t:外层 40、margin 4)
       gtk_css_provider_load_from_data(provider,
           ".yue-borderless { border: none; box-shadow: none; "
-          "background-image: none; min-height: 0; min-width: 0; }", -1,
-          nullptr);
+          "background-image: none; }", -1, nullptr);
       gtk_style_context_add_provider_for_screen(
           gdk_screen_get_default(), GTK_STYLE_PROVIDER(provider),
           G_MAXUINT);
@@ -715,14 +715,50 @@ void yue_mbt_button_on_click(void *button, void (*invoke)(void *), void *closure
 
 // ---------- Entry ----------
 
+#if defined(OS_LINUX)
+/* Entry 尺寸归一化(仅 Linux,首次创建 Entry 时注册一次):GTK 主题给
+ * entry 的 min-height(Orchis 实测 32px)会被 libyue 在构造期读走钉成
+ * yoga 最小值,系统主题一换数值就变,内嵌窄容器的原生子窗口随之溢出
+ * (「自定义主题被顶爆」)。全局类型选择器 entry{...} 是唯一能压过主题
+ * min-height 的写法(class 作用域与 * 通配实测均无效,G_MAXUINT 优先级
+ * 亦然);归零后自然高度≈文字行高,尺寸完全由容器分配决定,与主题无关。
+ * 宽度另有 GTK 硬编码 150px 下限,CSS 压不过,由 width_chars 参数绕过。 */
+void yue_mbt_entry_normalize_metrics(void) {
+  static GtkCssProvider *provider = nullptr;
+  if (provider == nullptr) {
+    provider = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(provider,
+        "entry { min-height: 0px; padding: 0px 2px; }", -1, nullptr);
+    gtk_style_context_add_provider_for_screen(
+        gdk_screen_get_default(), GTK_STYLE_PROVIDER(provider),
+        G_MAXUINT);
+  }
+}
+#endif
+
+/* width_chars:可见字符数,-1 用 GTK 默认;仅 Linux 有意义(构造期钉住
+ * 首选宽度,运行期再改不生效,见上),其余平台忽略。 */
+void *yue_mbt_entry_new_ex(int32_t type, int32_t width_chars) {
+#if defined(OS_LINUX)
+  yue_mbt_entry_normalize_metrics();
+  auto *e = new nu::Entry(
+      type == 1 ? nu::Entry::Type::Password : nu::Entry::Type::Normal);
+  if (width_chars >= 0) {
+    gtk_entry_set_width_chars(GTK_ENTRY(e->GetNative()), width_chars);
+  }
+  return reinterpret_cast<void *>(ViewStore::put(e));
+#else
+  return yue_mbt_entry_new_typed(type);
+#endif
+}
+
 void *yue_mbt_entry_new(void) {
-  return reinterpret_cast<void *>(ViewStore::put(new nu::Entry(nu::Entry::Type::Normal)));
+  return yue_mbt_entry_new_ex(0, -1);
 }
 
 /* Entry::Type：0=Normal 1=Password */
 void *yue_mbt_entry_new_typed(int32_t type) {
-  return reinterpret_cast<void *>(ViewStore::put(new nu::Entry(
-      type == 1 ? nu::Entry::Type::Password : nu::Entry::Type::Normal)));
+  return yue_mbt_entry_new_ex(type, -1);
 }
 
 void yue_mbt_entry_set_text(void *entry, const char *text) {
