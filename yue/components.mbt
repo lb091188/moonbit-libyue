@@ -180,7 +180,7 @@ pub fn theme_current() -> Theme {
 fn apply_native_theme_css(t : Theme) -> Unit {
   let buf = StringBuilder()
   buf.write_string("label { color: \{t.text_primary}; }")
-  buf.write_string("entry { color: \{t.text_primary}; caret-color: \{t.primary}; background-color: #FFFFFF; background-image: none; }")
+  buf.write_string("entry { color: \{t.text_primary}; caret-color: \{t.primary}; background-color: #FFFFFF; background-image: none; outline-width: 0px; }")
   buf.write_string("entry:not(.yue-borderless) { border: 1px solid \{t.border}; }")
   buf.write_string("entry selection { background-color: \{t.primary_light}; color: \{t.text_primary}; }")
   buf.write_string("entry placeholder { color: \{t.text_secondary}; }")

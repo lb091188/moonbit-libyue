@@ -745,7 +745,8 @@ static GtkCssProvider *g_native_color_provider = nullptr;
 static const char *kDefaultNativeColors =
     "label { color: #2A2F36; }"
     "entry { color: #2A2F36; caret-color: #2D68C4;"
-    "  background-color: #FFFFFF; background-image: none; }"
+    "  background-color: #FFFFFF; background-image: none;"
+    "  outline-width: 0px; }"
     "entry:not(.yue-borderless) { border: 1px solid #D8DCE1; }"
     "entry selection { background-color: #E8F0FB; color: #2A2F36; }"
     "entry placeholder { color: #9AA0A6; }"
