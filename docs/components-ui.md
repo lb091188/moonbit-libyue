@@ -23,13 +23,12 @@ let t = @yue.default_theme()
 | `entry_t(text?, password?, on_input?)` | normal / password | font themed only (GTK Entry `SetColor` paints the whole input dark — see adaptation.md) |
 | `input_t(text?, password?, margin?, width?, height?)` | bordered / password | outer self-drawn 1px border (focus turns primary), inner Entry stripped of native border & inner shadow via `set_borderless` |
 | `checkbox_t(title, checked?, disabled?, on_change?)` | normal / disabled | self-drawn square check + white tick, border turns primary on hover |
-| `autocomplete(options, value : Store[String], width?)` | plain filtering | live-filtered candidates in a floating layer (never pushes content): native Popover on Linux, borderless topmost mini-window on Windows; picking a row writes the Store, blur/empty input collapses it |
 | `date_picker_t(value? : Store[DateYMD?], on_change?, width?, placeholder?)` | date picker (EP style, fully self-drawn): input-style field; clicking opens the `calendar_t` month panel in a popover, ‹/› switch months, pick to fill and close, blur closes |
 | `textarea_t(text?, width?, height?, margin?, on_input?)` | multi-line input: self-drawn border (focus turns theme primary) + 8px inset, inner TextEdit with native border removed; overflow scrolls per platform |
 | `divider(vertical?, spacing?)` | divider line: horizontal (default) or vertical, 1px theme border color, spacing on both sides |
 | `slider_t(value : Store[Double], min?, max?, step?, width?, on_change?)` | self-drawn slider: light track + themed fill + square thumb, click/drag to set (step-quantized), external Store set also applies |
 | `tabs_t(pages : Array[(String, Node)], selected?)` | top tabs: active tab themed text + 2px bottom indicator, content switched via set_visible; `selected` is an index Store (internal 0 by default) |
-| `select_t(options, value : Store[String], width?, on_change?)` | dropdown select (EP style, fully self-drawn): read-only field + popover option list (hover highlight / ✓ on current), pick to fill, blur to close; use autocomplete for long lists (no in-popover scrolling) |
+| `select_t(options, value : Store[String], width?, on_change?)` | dropdown select (EP style, fully self-drawn): hover highlight / ✓ on current, pick to fill. On Linux it is filterable: the field accepts typing, options live-filter as you type, the popover opens/collapses automatically, ↑↓ to move the highlight, Enter to pick, Esc to close; other platforms keep the read-only click-to-pick field |
 | `rate_t(value : Store[Int], max?, on_change?)` | star rating (self-drawn): filled theme color when on, outlined gray when off, hover preview, click sets stars |
 | `tooltip_t(content : Node, tip)` | wrap any node with the native tooltip (system style; use popover_t for themed bubbles) |
 | `popover_t(trigger : Node, content : Node, width, height)` | popover bubble: clicking the trigger opens arbitrary Node content below it, click again to close |

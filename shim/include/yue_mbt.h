@@ -124,12 +124,6 @@ void yue_mbt_entry_on_text_change(void *entry, void (*invoke)(void *closure),
                                   void *closure);
 void yue_mbt_entry_on_activate(void *entry, void (*invoke)(void *closure),
                                void *closure);
-/* 挂接原生自动补全：items 为 UTF-8 候选串按 \x1F 连接，选中项经
- * invoke(closure, Bytes) 回调。仅 Linux 有实现，其余平台空操作。 */
-void yue_mbt_entry_set_completion(void *entry, const char *items,
-                                  void (*invoke)(void *closure, void *bytes),
-                                  void *closure);
-
 /* ---------- Tab（句柄=View） ---------- */
 
 void *yue_mbt_tab_new(void);
@@ -466,6 +460,12 @@ void yue_mbt_popover_set_content_size(void *popover, double w, double h);
 void yue_mbt_popover_show_relative_to(void *popover, void *view);
 void yue_mbt_popover_close(void *popover);
 void yue_mbt_popover_on_close(void *popover, void (*invoke)(void *), void *closure);
+/* 标记弹层放弃键盘焦点(仅 Linux 有实现):accept=0 时弹层出现/点击
+ * 均不夺走 X 焦点,供弹层展开期间持续键入的组件(可过滤下拉)使用。 */
+void yue_mbt_popover_set_accept_focus(void *popover, int32_t accept);
+/* 延迟回调(仅 Linux 有实现):挂到主循环下一拍,待决输入事件处理完
+ * 之后执行;其余平台空操作。 */
+void yue_mbt_call_delayed(int32_t ms, void (*invoke)(void *), void *closure);
 
 /* ---------- Group / Scroll / Separator ---------- */
 
