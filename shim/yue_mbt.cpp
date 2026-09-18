@@ -729,7 +729,7 @@ void yue_mbt_entry_normalize_metrics(void) {
     yue_mbt_apply_native_theme_css(nullptr); // 默认浅色接管
     provider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(provider,
-        "entry { min-height: 0px; padding: 0px 2px; }", -1, nullptr);
+        "entry { min-height: 0px; padding: 0px 6px; }", -1, nullptr);
     gtk_style_context_add_provider_for_screen(
         gdk_screen_get_default(), GTK_STYLE_PROVIDER(provider),
         G_MAXUINT);
@@ -794,6 +794,17 @@ void yue_mbt_apply_native_theme_css(const char *css) {
       css != nullptr ? css : kDefaultNativeColors, -1, nullptr);
 }
 #endif
+
+/* 设置光标位置(index 负值=末尾,-1 默认;仅 Linux):GtkEntry 溢出滚动
+ * 按像素裁切,左缘余量随光标位置在 0~一个字宽间变化(观感为"内边距
+ * 跳变");失焦时把光标归 0 可让文本滚回首端,静态观感固定左对齐。 */
+void yue_mbt_entry_set_position(void *entry, int32_t index) {
+#if defined(OS_LINUX)
+  if (auto *e = CastTo<nu::Entry>(entry)) {
+    gtk_editable_set_position(GTK_EDITABLE(e->GetNative()), index);
+  }
+#endif
+}
 
 /* width_chars:可见字符数,-1 用 GTK 默认;仅 Linux 有意义(构造期钉住
  * 首选宽度,运行期再改不生效,见上),其余平台忽略。 */
