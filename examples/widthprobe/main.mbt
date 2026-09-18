@@ -14,6 +14,11 @@ fn main {
     @yue.select_t(["杭州", "北京", "上海", "深圳", "广州"], picked, width=300.0),
     @yue.label_t("input_t 300"),
     @yue.input_t(width=300.0),
+    @yue.label_t("input_t 300 + 超长文本(验证溢出指示已隐)"),
+    @yue.input_t(
+      width=300.0,
+      text="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    ),
     @yue.label_t("textarea_t 300"),
     @yue.textarea_t(width=300.0, height=70.0),
     @yue.label_t("date_picker_t 300"),

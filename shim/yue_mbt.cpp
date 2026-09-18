@@ -748,6 +748,7 @@ static const char *kDefaultNativeColors =
     "  background-color: #FFFFFF; background-image: none;"
     "  outline-width: 0px; }"
     "entry:not(.yue-borderless) { border: 1px solid #D8DCE1; }"
+    "entry undershoot { background: none; }"
     "entry selection { background-color: #E8F0FB; color: #2A2F36; }"
     "entry placeholder { color: #9AA0A6; }"
     "textview { background-color: #FFFFFF; color: #2A2F36; }"
