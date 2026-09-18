@@ -725,7 +725,8 @@ void yue_mbt_button_on_click(void *button, void (*invoke)(void *), void *closure
  * 宽度另有 GTK 硬编码 150px 下限,CSS 压不过,由 width_chars 参数绕过。 */
 void yue_mbt_entry_normalize_metrics(void) {
   static GtkCssProvider *provider = nullptr;
-  if (provider == nullptr) {
+  if (provider == nullptr && gdk_screen_get_default() != nullptr) {
+    yue_mbt_apply_native_theme_css(nullptr); // 默认浅色接管
     provider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(provider,
         "entry { min-height: 0px; padding: 0px 2px; }", -1, nullptr);
@@ -733,6 +734,62 @@ void yue_mbt_entry_normalize_metrics(void) {
         gdk_screen_get_default(), GTK_STYLE_PROVIDER(provider),
         G_MAXUINT);
   }
+}
+
+/* 原生控件颜色接管(仅 Linux):文字/插入符/占位符/选区/滚动条/弹层底
+ * 全部钉死,不再跟随系统主题(深色系统主题下白底输入框会白字白底、
+ * 多行输入框被刷成主题深底)。默认浅色与组件库自绘面一致;theme_apply
+ * 经 yue_mbt_apply_native_theme_css 用主题色板整体覆盖。 */
+static GtkCssProvider *g_native_color_provider = nullptr;
+
+static const char *kDefaultNativeColors =
+    "label { color: #2A2F36; }"
+    "entry { color: #2A2F36; caret-color: #2D68C4;"
+    "  background-color: #FFFFFF; background-image: none;"
+    "  border: 1px solid #D8DCE1; }"
+    "entry selection { background-color: #E8F0FB; color: #2A2F36; }"
+    "entry placeholder { color: #9AA0A6; }"
+    "textview { background-color: #FFFFFF; color: #2A2F36; }"
+    "textview text { background-color: #FFFFFF; color: #2A2F36; }"
+    "textview text selection { background-color: #E8F0FB; color: #2A2F36; }"
+    "scrollbar { background-color: transparent; background-image: none;"
+    "  border: none; box-shadow: none; }"
+    "scrollbar slider { background-color: #C4C9D0; background-image: none;"
+    "  border: none; box-shadow: none; border-radius: 0px; }"
+    "scrollbar slider:hover { background-color: #9AA0A6; }"
+    "scrolledwindow junction { background-color: #FFFFFF; background-image: none; }"
+    "scrolledwindow undershoot { background: none; box-shadow: none; }"
+    "window { background-color: #FFFFFF; background-image: none;"
+    "  border: none; box-shadow: none; }"
+    "decoration { border: none; box-shadow: none; }";
+
+void yue_mbt_apply_native_theme_css(const char *css) {
+  // 无显示(纯 MoonBit 测试等)时 screen 为 NULL,直接跳过:接管本就
+  // 依赖屏幕,此处不注册也不影响有显示时的后续注册
+  GdkScreen *screen = gdk_screen_get_default();
+  if (screen == nullptr) {
+    return;
+  }
+  if (g_native_color_provider == nullptr) {
+    g_native_color_provider = gtk_css_provider_new();
+    // G_MAXUINT-1:仍碾压系统主题(200),但低于 metrics/borderless 的
+    // G_MAXUINT——libyue 弹层边框色取「GtkEntry#entry 渲染 frame」采样,
+    // 这里的 entry border 规则就是给它上浅色的;带 .yue-borderless 的
+    // 真实输入框由 borderless 规则去边,不受此 border 影响
+    gtk_style_context_add_provider_for_screen(
+        screen, GTK_STYLE_PROVIDER(g_native_color_provider), G_MAXUINT - 1);
+    // 关闭 overlay 滚动条:滚动时才浮现的条无法稳定呈现钉色,
+    // 常驻经典式与 EP 风格一致(属性 3.24 起,缺席时跳过)
+    auto *settings = gtk_settings_get_for_screen(screen);
+    if (settings != nullptr &&
+        g_object_class_find_property(
+            G_OBJECT_GET_CLASS(settings), "gtk-overlay-scrolling") != nullptr) {
+      g_object_set(settings, "gtk-overlay-scrolling", FALSE, (void *)nullptr);
+    }
+  }
+  gtk_css_provider_load_from_data(
+      g_native_color_provider,
+      css != nullptr ? css : kDefaultNativeColors, -1, nullptr);
 }
 #endif
 

@@ -174,11 +174,35 @@ pub fn theme_current() -> Theme {
 }
 
 ///|
+/// 把主题色板生成 CSS 下发 Linux 原生控件(输入框文字/插入符/占位符/
+/// 选区、多行输入、滚动条、弹层底色),使原生观感跟随本主题而非系统
+/// 主题。其余平台原生控件已由组件全自绘,空操作。
+fn apply_native_theme_css(t : Theme) -> Unit {
+  let buf = StringBuilder()
+  buf.write_string("label { color: \{t.text_primary}; }")
+  buf.write_string("entry { color: \{t.text_primary}; caret-color: \{t.primary}; background-color: #FFFFFF; background-image: none; border: 1px solid \{t.border}; }")
+  buf.write_string("entry selection { background-color: \{t.primary_light}; color: \{t.text_primary}; }")
+  buf.write_string("entry placeholder { color: \{t.text_secondary}; }")
+  buf.write_string("textview { background-color: #FFFFFF; color: \{t.text_primary}; }")
+  buf.write_string("textview text { background-color: #FFFFFF; color: \{t.text_primary}; }")
+  buf.write_string("textview text selection { background-color: \{t.primary_light}; color: \{t.text_primary}; }")
+  buf.write_string("scrollbar { background-color: transparent; }")
+  buf.write_string("scrollbar slider { background-color: \{t.border}; border-radius: 0px; }")
+  buf.write_string("scrollbar slider:hover { background-color: \{t.text_secondary}; }")
+  buf.write_string("window { background-color: #FFFFFF; }")
+  ffi_apply_native_theme_css(utf8_bytes(buf.to_string()))
+}
+
+///|
 /// 应用主题。推荐在 initialize() 之后、创建界面（mount）之前调用：
 /// 已挂载的自绘交互组件重绘时读到新色（hover/选中立即生效），
 /// 挂载时定死的静态色（Label 文字、边框等）需重建界面才生效。
+/// Linux 端原生控件(输入框/多行/滚动条/弹层底)颜色一并跟随本主题。
 pub fn theme_apply(t : Theme) -> Unit {
   theme_box.t = t
+  if platform() == "linux" {
+    apply_native_theme_css(t)
+  }
 }
 
 ///|
