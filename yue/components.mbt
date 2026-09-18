@@ -4230,6 +4230,7 @@ fn select_row(
   value : Store[String],
   on_pick : () -> Unit,
   mark? : Ref[Bool] = Ref(false),
+  pick_on_up? : Bool = false,
 ) -> Container {
   let row = Container::make(
     style=[("height", 28.0), ("paddingLeft", 8.0)],
@@ -4278,14 +4279,28 @@ fn select_row(
     row.schedule_paint()
   })
   View::set_cursor(row, hand())
-  row.on_mouse_down(fn(e) {
-    if e.button == 1 {
-      on_pick()
-      true
-    } else {
-      false
-    }
-  })
+  if pick_on_up {
+    // release 才选中:press 时刻 pick+关层会解除弹层指针抓取,悬着的
+    // release 穿透到弹层下方控件(实测触发 date_picker 开层);release
+    // 由弹层抓取派发给行,pick 后无待决事件
+    row.on_mouse_up(fn(e) {
+      if e.button == 1 {
+        on_pick()
+        true
+      } else {
+        false
+      }
+    })
+  } else {
+    row.on_mouse_down(fn(e) {
+      if e.button == 1 {
+        on_pick()
+        true
+      } else {
+        false
+      }
+    })
+  }
   row
 }
 
@@ -4449,11 +4464,12 @@ fn select_t_filterable(
       entry.set_font(Font::new("Sans", 13.0))
       entry.set_borderless(true)
       entry.set_background_color("#FFFFFF")
+      // 上下不留 margin 占满字段高:主题 min-height 已由 borderless 的
+      // min-height:0 归零,Entry 按分配的 30px 绘制,文字垂直居中,
+      // 不再溢出自绘边框
       entry.set_style("flex", 1.0)
       entry.set_style("marginLeft", 10.0)
       entry.set_style("marginRight", 26.0)
-      entry.set_style("marginTop", 4.0)
-      entry.set_style("marginBottom", 4.0)
       outer.add_child(entry)
       let pop : Ref[Popover?] = Ref(None)
       let open = Ref(false)
@@ -4523,7 +4539,7 @@ fn select_t_filterable(
           count = count + 1
           let o = opt
           let mark = Ref(false)
-          let row = select_row(o, value, fn() { pick(o) }, mark~)
+          let row = select_row(o, value, fn() { pick(o) }, mark~, pick_on_up=true)
           list.add_child(row)
           rows.val.push(row)
           marks.val.push(mark)

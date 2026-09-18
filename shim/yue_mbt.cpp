@@ -426,9 +426,13 @@ void yue_mbt_view_set_borderless(void *view, int on) {
     static GtkCssProvider *provider = nullptr;
     if (provider == nullptr) {
       provider = gtk_css_provider_new();
+      // min-height/min-width: 0 允许原生控件压进外层自绘容器给的分配尺寸
+      // (主题 min 尺寸会作为 GTK minimum 上报,yoga 分配不足时原生窗口
+      // 按自然尺寸绘制,溢出自绘边框)
       gtk_css_provider_load_from_data(provider,
           ".yue-borderless { border: none; box-shadow: none; "
-          "background-image: none; }", -1, nullptr);
+          "background-image: none; min-height: 0; min-width: 0; }", -1,
+          nullptr);
       gtk_style_context_add_provider_for_screen(
           gdk_screen_get_default(), GTK_STYLE_PROVIDER(provider),
           G_MAXUINT);
