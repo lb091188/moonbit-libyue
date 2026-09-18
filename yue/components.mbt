@@ -2004,6 +2004,8 @@ pub fn input_t(
       entry.on_focus_out(fn() {
         focused.val = false
         outer.schedule_paint()
+        // 光标归 0:文本回滚首端,左缘固定(见 select_t_filterable 同款注释)
+        entry.set_position(0)
         false
       })
       outer.add_child(entry)
@@ -4653,6 +4655,9 @@ fn select_t_filterable(
       entry.on_focus_out(fn() {
         focused.val = false
         outer.schedule_paint()
+        // 光标归 0:文本滚回首端,溢出裁切固定发生在右缘,
+        // 左侧不再出现随光标位置变化的余量
+        entry.set_position(0)
         match pop.val {
           Some(p) => p.close()
           None => ()

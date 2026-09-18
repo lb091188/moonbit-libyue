@@ -62,6 +62,14 @@ pub fn Entry::new_of(entry_type : EntryType) -> Entry {
 }
 
 ///|
+/// 设置光标位置（仅 Linux 有实现）：index 负值表示末尾。GtkEntry 的
+/// 溢出滚动按像素裁切，左缘余量随光标位置变化；失焦时归 0 可让文本
+/// 滚回首端，静态观感固定左对齐。其余平台空操作。
+pub fn Entry::set_position(self : Entry, index : Int) -> Unit {
+  ffi_entry_set_position(self.view, index)
+}
+
+///|
 /// 创建指定类型输入框并钉住首选宽度（width_chars，仅 Linux 有意义）：
 /// GTK 主题的 entry 最小宽(GTK3 另有 150px 硬编码下限)大于窄容器给
 /// Entry 的分配时,原生子窗口在构造期即以主题自然宽创建、横向溢出盖住
