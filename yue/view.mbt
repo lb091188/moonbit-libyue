@@ -253,6 +253,12 @@ pub fn Label::set_text(self : Label, text : String) -> Unit {
 }
 
 ///|
+/// 读取标签当前文本。
+pub fn Label::get_text(self : Label) -> String {
+  from_utf8_bytes(ffi_label_get_text(self.view))
+}
+
+///|
 /// 拖拽数据种类。
 pub(all) enum DataKind {
   Text

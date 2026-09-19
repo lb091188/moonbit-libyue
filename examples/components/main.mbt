@@ -203,7 +203,7 @@ fn main {
           @yue.link("打开文档", fn() { picked_lang.set("docs") }),
           @yue.label("   "),
           @yue.link("帮助中心", fn() { picked_lang.set("help") }),
-          @yue.label("   最近点击:"),
+          @yue.label_t("最近点击:", role=@yue.Body),
           @yue.bind_label(picked_lang, fn(s) { s }),
         ]),
       ],
@@ -212,9 +212,9 @@ fn main {
       "Divider 分隔线",
       "水平(默认)/竖直 1px 主题边框色,spacing 控制两侧留白。",
       [
-        @yue.label("上方内容"),
+        @yue.label_t("上方内容"),
         @yue.divider(spacing=6.0),
-        @yue.label("下方内容"),
+        @yue.label_t("下方内容"),
       ],
     ),
     section(
@@ -285,7 +285,7 @@ fn main {
         @yue.hbox(
           [
             @yue.date_picker_t(value=dp_val, width=170.0, clearable=true),
-            @yue.label("   选中:"),
+            @yue.label_t("选中:", role=@yue.Body),
             @yue.bind_label(dp_val, fn(d) {
               match d {
                 Some(v) => v.format()
@@ -362,7 +362,7 @@ fn main {
             }),
             @yue.label("     "),
             @yue.switch_t(locked, disabled=true),
-            @yue.label(" 禁用"),
+            @yue.label_t("禁用", role=@yue.Body),
           ],
           style_str=[("alignItems", "center")],
         ),
@@ -622,9 +622,7 @@ fn main {
         @yue.card(
           "卡片标题",
           [
-            @yue.label(
-              "卡片内容:组件库全部用 theme_* 主题色着色。",
-            ),
+            @yue.label_t("卡片内容:组件库全部用 theme_* 主题色着色。"),
           ],
           height=110.0,
         ),
@@ -638,14 +636,14 @@ fn main {
           (
             "如何使用组件库?",
             [
-              @yue.label(
+              @yue.label_t(
                 "moon add NoahLiu/moonbit-libyue 后即可用 @yue.* 访问。",
               ),
             ],
           ),
           (
             "支持哪些平台?",
-            [@yue.label("Linux(X11)/ Windows;macOS 进行中。")],
+            [@yue.label_t("Linux(X11)/ Windows;macOS 进行中。")],
           ),
         ]),
       ],
