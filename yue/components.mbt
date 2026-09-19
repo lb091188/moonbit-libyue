@@ -3391,6 +3391,9 @@ pub fn date_picker_t(
 ///|
 /// 返回顶部浮动按钮:配合 scroll 句柄使用,点击回滚到顶部。
 /// 放置于 relative 容器内时经 absolute 定位悬浮右下。
+/// hover 底色用 on_draw 表达,不在 enter 里 set_background_color——
+/// 运行期 CSS 改写会扰动事件窗口,实测吞掉紧随的首次 press(点两次
+/// 才生效);全库 hover 一律 on_draw,此处是最后一只漏网。
 pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
   {
     mount: fn(parent) {
@@ -3398,8 +3401,12 @@ pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
       let b = themed_container(
         style=[("width", size), ("height", size)],
       )
-      bind_bg(b, fn() { theme_primary() })
       b.on_draw(fn(p) {
+        let bd = ViewLike::get_bounds(b)
+        p.set_fill_color(
+          if hover.val { theme_primary_hover() } else { theme_primary() },
+        )
+        p.fill_rect(0.0, 0.0, bd.width, bd.height)
         // ↑ 矢量折线箭头(字形图标跨平台发虚,GTK align 亦无效)
         draw_glyph_up(p, size / 2.0, size / 2.0 + 1.0, 6.0, "#FFFFFF")
       })
@@ -3414,11 +3421,11 @@ pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
       })
       ViewLike::on_mouse_enter(b, fn(_e) {
         hover.val = true
-        ViewLike::set_background_color(b, theme_primary_hover())
+        ViewLike::schedule_paint(b)
       })
       ViewLike::on_mouse_leave(b, fn(_e) {
         hover.val = false
-        ViewLike::set_background_color(b, theme_primary())
+        ViewLike::schedule_paint(b)
       })
       attach(parent, ViewLike::view(b))
       ViewLike::view(b)
