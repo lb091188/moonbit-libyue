@@ -57,10 +57,10 @@ fn page_inputs() -> @yue.Node {
     ),
     section(
       "GIF 播放",
-      "GifPlayer 播放 GIF（示例资产 examples/advanced/dot.gif），无解码器依赖。GifPlayer 是 yoga 叶子且默认缩放模式下最小尺寸为空，需显式给宽高。",
+      "GifPlayer 播放 GIF（示例资产 dot.gif），无解码器依赖。GifPlayer 是 yoga 叶子且默认缩放模式下最小尺寸为空，需显式给宽高。",
       [
         @yue.gif(
-          image=Some(@yue.Image::new_from_file("examples/advanced/dot.gif")),
+          image=Some(@yue.Image::new_from_file("examples/showcase/dot.gif")),
           style=[("width", 120.0), ("height", 120.0)],
         ),
       ],

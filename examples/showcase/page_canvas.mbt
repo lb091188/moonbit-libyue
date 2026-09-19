@@ -15,7 +15,7 @@ fn page_canvas() -> @yue.Node {
   let blend_info : @yue.Store[String] = @yue.Store::new("Normal")
   let canvas : Ref[@yue.Container?] = Ref(None)
   let icon_img : @yue.Image? = match
-    @yue.read_binary_file("examples/drag_source/drag.png") {
+    @yue.read_binary_file("examples/showcase/drag.png") {
     Some(bytes) => {
       let img = @yue.Image::new_from_png(bytes)
       if img.is_empty() {
