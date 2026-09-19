@@ -835,7 +835,13 @@ void *yue_mbt_entry_new_ex(int32_t type, int32_t width_chars) {
   }
   return reinterpret_cast<void *>(ViewStore::put(e));
 #else
-  return yue_mbt_entry_new_typed(type);
+  // width_chars 仅 Linux 有意义(构造期钉住 GTK 首选宽度),其余平台忽略;
+  // 此前分支误转调 entry_new_typed,而后者又转调回本函数,非 Linux 上
+  // 创建任何 Entry 都无限互相递归
+  static_cast<void>(width_chars);
+  auto *e = new nu::Entry(
+      type == 1 ? nu::Entry::Type::Password : nu::Entry::Type::Normal);
+  return reinterpret_cast<void *>(ViewStore::put(e));
 #endif
 }
 
