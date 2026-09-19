@@ -79,7 +79,7 @@ let win = @yue.mount_window(
 |---|---|---|
 | `vbox(children, …)` / `hbox(children, …)` | Container | 纵排 / 横排 |
 | `container(on_draw, handle, …)` | Container | 自绘画布 / 拿容器句柄 |
-| `label(text, …)` | Label | |
+| `label(text, …)` | Label | 文字默认跟随主题常规色(theme_apply 切换深浅即变色);固定色经 handle set_color |
 | `button(title, on_click, …)` | Button | |
 | `checkbox(title, checked, on_change, …)` | Checkbox | `on_change(Bool)` |
 | `radio(title, checked, on_change, …)` | Radio | 同组互斥 |

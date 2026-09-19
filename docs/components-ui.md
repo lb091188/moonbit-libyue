@@ -6,7 +6,17 @@ Element-Plus-style, theme-unified non-form components built in pure MoonBit on t
 
 ### Customizing the theme / dark mode
 
-Call `theme_apply` at any time after `initialize()` (built-in palettes: `default_theme` light / `dark_theme` dark). Switching takes effect immediately without rebuilding the UI: self-drawn components repaint via theme subscriptions, colors fixed at mount (container backgrounds, label text colors) are re-applied internally, the Linux native-control CSS (entries/text views/scrollbars/window & popover backgrounds) is rebuilt, and every visible window gets a full repaint as a safety net. To follow the system dark mode: `system_prefers_dark()` reads the system preference and `on_system_theme_change(f)` fires when it changes (both currently implemented on Linux only) — pick the initial theme from the system preference and re-apply inside the callback. To make custom containers follow the theme, register a re-apply callback with `on_theme_change` and read the snapshot (including page background `bg_page` / panel background `bg_panel`) via `theme_current`. Focus rings and focused field borders use a neutral grey single stroke (not the theme color) to stay unobtrusive.
+Call `theme_apply` at any time after `initialize()` (built-in palettes: `default_theme` light / `dark_theme` dark). Switching takes effect immediately without rebuilding the UI: self-drawn components repaint via theme subscriptions, colors fixed at mount (container backgrounds, label text colors) are re-applied internally, the Linux native-control CSS (entries/text views/scrollbars/window & popover backgrounds) is rebuilt, and every visible window gets a full repaint as a safety net. To follow the system dark mode: `system_prefers_dark()` reads the system preference and `on_system_theme_change(f)` fires when it changes (both currently implemented on Linux only) — pick the initial theme from the system preference and re-apply inside the callback. Focus rings and focused field borders use a neutral grey single stroke (not the theme color) to stay unobtrusive.
+
+**Colors are fully internalized — zero burden on consumers**: every component in the library (including the plain `label()`, which defaults to the theme's regular text color) follows the theme out of the box. Custom components hook in via three rules, with the platform pitfalls already encapsulated:
+
+| Case | How |
+|---|---|
+| Self-drawn (on_draw) | Read colors from `theme_current()` inside the draw callback — no subscription needed (theme switches force a full repaint) |
+| Label text with theme color | `theme_bind_fg(l, fn() { theme_current().text_regular })` — handles the "must re-set text after set_color" platform pitfall internally; bare `set_color` won't follow the theme, and hand-rolled subscriptions without the re-set leave stale colors |
+| Container background with theme color | `theme_bind_bg(v, fn() { theme_current().bg_panel })` — fixed backgrounds don't update on repaint, they must be re-set |
+
+Fixed colors (brand swatches etc.) can be set directly and stay theme-independent.
 
 ```moonbit
 @yue.initialize()

@@ -77,7 +77,7 @@ let win = @yue.mount_window(
 |---|---|---|
 | `vbox(children, …)` / `hbox(children, …)` | Container | vertical / horizontal layout |
 | `container(on_draw, handle, …)` | Container | custom-paint canvas / get container handle |
-| `label(text, …)` | Label | |
+| `label(text, …)` | Label | text follows the theme regular color by default (changes with `theme_apply`); fixed colors via handle `set_color` |
 | `button(title, on_click, …)` | Button | |
 | `checkbox(title, checked, on_change, …)` | Checkbox | `on_change(Bool)` |
 | `radio(title, checked, on_change, …)` | Radio | mutually exclusive within a group |

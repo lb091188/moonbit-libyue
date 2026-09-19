@@ -133,6 +133,23 @@ fn bind_fg(v : Label, color_of : () -> String) -> Unit {
 }
 
 ///|
+/// 自定义组件的文字颜色接入主题(公开版 bind_fg):挂载即设色,
+/// theme_apply 切换深浅时自动重设并重排。自定义组件里给 Label
+/// 设主题色一律用它,别裸 set_color(不跟主题)也别自己订阅
+/// (漏同文重排会残留旧色)。
+pub fn theme_bind_fg(l : Label, color_of : () -> String) -> Unit {
+  bind_fg(l, color_of)
+}
+
+///|
+/// 自定义组件的背景色接入主题(公开版 bind_bg):挂载即设色,
+/// theme_apply 切换深浅时自动重设(set_background_color 定死的底色
+/// 不会因重绘更新,必须重设)。
+pub fn[T : ViewLike] theme_bind_bg(v : T, color_of : () -> String) -> Unit {
+  bind_bg(v, color_of)
+}
+
+///|
 /// 可点击自绘控件统一手型光标。
 fn hand() -> Cursor {
   Cursor::new(Hand)
