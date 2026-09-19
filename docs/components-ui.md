@@ -4,9 +4,9 @@ Element-Plus-style, theme-unified non-form components built in pure MoonBit on t
 
 **Theme**: all colors come from the `theme_*` palette — a deep, low-saturation scheme (not Element Plus defaults): blue `#2D68C4`, green `#2E9E5B`, orange `#D9822B`, red `#D64550`, plus greys for text/border/fill. Components render straight corners, use background colors for hover/active states, and center text vertically.
 
-### Customizing the theme
+### Customizing the theme / dark mode
 
-Call `theme_apply` after `initialize()` and before mounting the UI. Colors are read at draw/mount time, so self-drawn interactive components pick up the new palette on repaint; colors fixed at mount (static label text, borders) need a rebuilt UI. A full snapshot can be read back with `theme_current`.
+Call `theme_apply` at any time after `initialize()` (built-in palettes: `default_theme` light / `dark_theme` dark). Switching takes effect immediately without rebuilding the UI: self-drawn components repaint via theme subscriptions, colors fixed at mount (container backgrounds, label text colors) are re-applied internally, and on Linux the native-control CSS (entries/text views/scrollbars/window & popover backgrounds) is rebuilt too. To make custom containers follow the theme, register a re-apply callback with `on_theme_change` and read the snapshot (including page background `bg_page` / panel background `bg_panel`) via `theme_current`. Focus rings default to a single 1px stroke at 40% primary alpha to stay unobtrusive.
 
 ```moonbit
 @yue.initialize()

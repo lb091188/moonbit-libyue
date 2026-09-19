@@ -73,6 +73,50 @@ fn theme_fill_hover() -> String { theme_box.t.fill_hover }
 fn theme_fill_zebra() -> String { theme_box.t.fill_zebra }
 
 ///|
+fn theme_bg_panel() -> String { theme_box.t.bg_panel }
+
+///|
+/// 焦点环颜色:主色 40% 透明(primary 恒为 #RRGGBB,直接拼 alpha 通道;
+/// 自带 alpha 的自定义 primary 会被追加覆盖,定制主题请用不带 alpha 的主色)。
+fn theme_focus_ring() -> String { theme_primary() + "66" }
+
+///|
+/// 组件库自绘容器:Container::make + 主题切换时自动重绘
+/// (draw 回调现取 theme_* 色,重绘即跟随新主题)。
+fn themed_container(
+  style? : Array[(String, Double)] = [],
+  style_str? : Array[(String, String)] = [],
+) -> Container {
+  let c = Container::make(style~, style_str~)
+  on_theme_change(fn() { c.schedule_paint() })
+  c
+}
+
+///|
+/// 面板底色(挂载即设 + 主题切换重设):set_background_color 定死的
+/// 底色不经 draw,须订阅重设。
+fn[T : ViewLike] set_panel_bg(v : T) -> Unit {
+  fn apply() -> Unit {
+    v.set_background_color(theme_bg_panel())
+  }
+
+  apply()
+  on_theme_change(apply)
+}
+
+///|
+/// 底色绑定:挂载即设 color_of() + 主题切换重设(语义浅底/禁用底等
+/// 取自主题色板的静态底色)。
+fn[T : ViewLike] bind_bg(v : T, color_of : () -> String) -> Unit {
+  fn apply() -> Unit {
+    v.set_background_color(color_of())
+  }
+
+  apply()
+  on_theme_change(apply)
+}
+
+///|
 /// 可点击自绘控件统一手型光标。
 fn hand() -> Cursor {
   Cursor::new(Hand)
@@ -105,6 +149,10 @@ pub struct Theme {
   border : String
   fill_hover : String
   fill_zebra : String
+  /// 页面底色(窗口/滚动区最底层)。
+  bg_page : String
+  /// 面板底色(卡片/侧栏/输入框/弹层等内容面板)。
+  bg_panel : String
 }
 
 ///|
@@ -129,12 +177,15 @@ pub fn default_theme() -> Theme {
     border: "#D8DCE1",
     fill_hover: "#EFF1F3",
     fill_zebra: "#F5F7FA",
+    bg_page: "#F5F6F7",
+    bg_panel: "#FFFFFF",
   }
 }
 
 ///|
 /// 内置暗色主题变体：深底浅字，语义 light 变体取深色调。
-/// 注意：仅自绘组件即时生效；原生控件与挂载时定死的静态色不受影响。
+/// theme_apply 切换后,常驻界面经主题订阅即时重着色(自绘重绘 /
+/// 定死色重设 / Linux 原生控件 CSS 重建);弹层内容在下次刷新时跟随。
 pub fn dark_theme() -> Theme {
   {
     primary: "#5B8DEF",
@@ -155,17 +206,21 @@ pub fn dark_theme() -> Theme {
     border: "#3C4043",
     fill_hover: "#2A2D31",
     fill_zebra: "#232629",
+    bg_page: "#141518",
+    bg_panel: "#1E2126",
   }
 }
 
 ///|
-/// 主题存储：单个可变快照，theme_apply 整体替换。
+/// 主题存储：单个可变快照 + 主题变更订阅（theme_apply 整体替换并通知，
+/// 已挂载组件借此即时重着色，暗/浅切换不需要重建界面）。
 priv struct ThemeBox {
   mut t : Theme
+  subs : Array[() -> Unit]
 }
 
 ///|
-let theme_box : ThemeBox = { t: default_theme() }
+let theme_box : ThemeBox = { t: default_theme(), subs: [] }
 
 ///|
 /// 读取当前主题快照。
@@ -174,24 +229,34 @@ pub fn theme_current() -> Theme {
 }
 
 ///|
+/// 订阅主题变更（theme_apply 时回调，快照遍历）。组件在挂载时注册,
+/// 用于重设挂载期定死的颜色（容器底色/Label 文字色等）；draw 回调
+/// 现取 theme_* 的自绘组件只需在回调里 schedule_paint。
+/// 订阅随应用存活,不退订。
+pub fn on_theme_change(f : () -> Unit) -> Unit {
+  theme_box.subs.push(f)
+}
+
+///|
 /// 把主题色板生成 CSS 下发 Linux 原生控件(输入框文字/插入符/占位符/
-/// 选区、多行输入、滚动条、弹层底色),使原生观感跟随本主题而非系统
-/// 主题。其余平台原生控件已由组件全自绘,空操作。
+/// 选区、多行输入、滚动条、窗口与弹层底色),使原生观感跟随本主题而非
+/// 系统主题。其余平台原生控件已由组件全自绘,空操作。
 fn apply_native_theme_css(t : Theme) -> Unit {
   let buf = StringBuilder()
   buf.write_string("label { color: \{t.text_primary}; }")
-  buf.write_string("entry { color: \{t.text_primary}; caret-color: \{t.primary}; background-color: #FFFFFF; background-image: none; outline-width: 0px; }")
+  buf.write_string("entry { color: \{t.text_primary}; caret-color: \{t.primary}; background-color: \{t.bg_panel}; background-image: none; outline-width: 0px; }")
   buf.write_string("entry:not(.yue-borderless) { border: 1px solid \{t.border}; }")
   buf.write_string("entry undershoot { background: none; }")
   buf.write_string("entry selection { background-color: \{t.primary_light}; color: \{t.text_primary}; }")
   buf.write_string("entry placeholder { color: \{t.text_secondary}; }")
-  buf.write_string("textview { background-color: #FFFFFF; color: \{t.text_primary}; }")
-  buf.write_string("textview text { background-color: #FFFFFF; color: \{t.text_primary}; }")
+  buf.write_string("textview { background-color: \{t.bg_panel}; color: \{t.text_primary}; }")
+  buf.write_string("textview text { background-color: \{t.bg_panel}; color: \{t.text_primary}; }")
   buf.write_string("textview text selection { background-color: \{t.primary_light}; color: \{t.text_primary}; }")
   buf.write_string("scrollbar { background-color: transparent; }")
   buf.write_string("scrollbar slider { background-color: \{t.border}; border-radius: 0px; }")
   buf.write_string("scrollbar slider:hover { background-color: \{t.text_secondary}; }")
-  buf.write_string("window { background-color: #FFFFFF; }")
+  buf.write_string("window { background-color: \{t.bg_page}; }")
+  buf.write_string("scrolledwindow junction { background-color: \{t.bg_page}; }")
   // 原生 tooltip 恒深底白字(EP 语义,不随色板):系统主题的 tooltip
   // 底/字色来自两处配置,深色系统主题下常见深底深字不可读
   buf.write_string(
@@ -202,12 +267,16 @@ fn apply_native_theme_css(t : Theme) -> Unit {
 }
 
 ///|
-/// 应用主题。推荐在 initialize() 之后、创建界面（mount）之前调用：
-/// 已挂载的自绘交互组件重绘时读到新色（hover/选中立即生效），
-/// 挂载时定死的静态色（Label 文字、边框等）需重建界面才生效。
-/// Linux 端原生控件(输入框/多行/滚动条/弹层底)颜色一并跟随本主题。
+/// 应用主题:整体替换色板并通知全部订阅者(已挂载组件即时重着色),
+/// Linux 端原生控件(输入框/多行/滚动条/窗口与弹层底)CSS 一并重建。
+/// 自绘组件的 draw 现取色重绘即生效;挂载期定死的色(容器底色/
+/// Label 文字色等)由组件经 on_theme_change 重设,无需重建界面。
 pub fn theme_apply(t : Theme) -> Unit {
   theme_box.t = t
+  let snapshot = theme_box.subs.copy()
+  for f in snapshot {
+    f()
+  }
   if platform() == "linux" {
     apply_native_theme_css(t)
   }
@@ -246,11 +315,11 @@ fn type_light_color(t : SemanticType) -> String {
 }
 
 ///|
-/// 焦点环:双层 1px 主题色描边(叠加近似 2px),聚焦的自绘交互项画在内容之上。
-fn draw_focus_ring(p : Painter, w : Double, h : Double, color? : String = theme_primary()) -> Unit {
+/// 焦点环:单层 1px 淡主色描边(默认 40% 透明,不喧宾夺主;
+/// 需在深色实底上使用时可传实底友好的颜色,如白色)。
+fn draw_focus_ring(p : Painter, w : Double, h : Double, color? : String = theme_focus_ring()) -> Unit {
   p.set_stroke_color(color)
   p.stroke_rect(0.5, 0.5, w - 1.0, h - 1.0)
-  p.stroke_rect(1.5, 1.5, w - 3.0, h - 3.0)
 }
 
 ///|
@@ -334,7 +403,7 @@ fn stateful_item(
         copy.push(("width", text_w + pad_x * 2.0))
         copy
       }
-      let v = Container::make(style=style2)
+      let v = themed_container(style=style2)
       fn draw_item(p : Painter) -> Unit {
         let b = v.get_bounds()
         let w = b.width
@@ -440,16 +509,16 @@ pub fn side_menu(
     )
   }
   vbox(nodes, style=[("width", width), ("padding", 6.0)], handle=fn(c) {
-    c.set_background_color("#FFFFFF")
+    set_panel_bg(c)
   })
 }
 
 ///|
 fn segmented_bg(act : Bool, hov : Bool) -> String {
   if act {
-    "#FFFFFF"
+    theme_bg_panel()
   } else if hov {
-    "#D9DCDF"
+    theme_border()
   } else {
     ""
   }
@@ -484,7 +553,7 @@ pub fn segmented(options : Array[String], selected : Store[String]) -> Node {
   hbox(items, style=[("padding", 2.0)], style_str=[("alignItems", "center")], handle=fn(
     c,
   ) {
-    c.set_background_color("#DEE0E3")
+    bind_bg(c, fn() { theme_border() })
   })
 }
 
@@ -500,7 +569,7 @@ pub fn tag_of_type(text : String, t : SemanticType) -> Node {
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
       let w = text_w + 16.0
       let h = 24.0
-      let c = Container::make(style=[
+      let c = themed_container(style=[
         ("width", w),
         ("height", h),
         ("marginRight", 8.0),
@@ -535,7 +604,7 @@ pub fn tag(text : String, color : String, height? : Double = 24.0) -> Node {
       probe.set_font(font)
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
       let w = text_w + 16.0
-      let c = Container::make(style=[
+      let c = themed_container(style=[
         ("width", w),
         ("height", height),
         ("marginRight", 8.0),
@@ -625,7 +694,7 @@ fn crumb_fg_static(_act : Bool, _hov : Bool) -> String {
 pub fn alert(text : String, t : SemanticType, height? : Double = 40.0) -> Node {
   {
     mount: fn(parent) {
-      let v = Container::make(style=[("height", height), ("marginBottom", 10.0)])
+      let v = themed_container(style=[("height", height), ("marginBottom", 10.0)])
       v.on_draw(fn(p) {
         let b = v.get_bounds()
         let w = b.width
@@ -658,7 +727,7 @@ pub fn alert(text : String, t : SemanticType, height? : Double = 40.0) -> Node {
 pub fn pagination(current : Store[Int], pages : Int) -> Node {
   {
     mount: fn(parent) {
-      let row = Container::make(style=[("height", 30.0)], style_str=[
+      let row = themed_container(style=[("height", 30.0)], style_str=[
         ("flexDirection", "row"),
         ("alignItems", "center"),
       ])
@@ -667,7 +736,7 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
         let focused = Ref(false)
         let probe = AttributedText::new(label, wrap=false)
         let label_w = probe.get_bounds_for(10000.0, 100.0).width
-        let b = Container::make(style=[
+        let b = themed_container(style=[
           ("width", 28.0),
           ("height", 28.0),
           ("marginRight", 4.0),
@@ -760,33 +829,40 @@ pub fn card(
   {
     mount: fn(parent) {
       let head_h = 40.0
-      let outer = Container::make(style=[("height", height)])
+      let outer = themed_container(style=[("height", height)])
       outer.on_draw(fn(p) {
         let b = outer.get_bounds()
         let w = b.width
         let h = b.height
         // 边框
-        p.set_stroke_color("#EBEEF5")
+        p.set_stroke_color(theme_border())
         p.stroke_rect(0.0, 0.0, w, h)
         // 标题栏底部分隔线
-        p.set_fill_color("#EBEEF5")
+        p.set_fill_color(theme_border())
         p.fill_rect(0.0, head_h, w, 1.0)
       })
       // 标题(加粗,垂直居中)
       let title_at = AttributedText::new(title, valign=Center, wrap=false)
       title_at.set_font(Font::new("Sans", 14.0, weight=Bold))
       title_at.set_color(theme_text_primary())
-      let title = Container::make(style=[
+      let title = themed_container(style=[
         ("height", head_h),
         ("paddingLeft", 16.0),
       ])
+      fn apply_title_color() -> Unit {
+        title_at.set_color(theme_text_primary())
+        title.schedule_paint()
+      }
+
+      apply_title_color()
+      on_theme_change(apply_title_color)
       title.on_draw(fn(p) {
         let b = title.get_bounds()
         p.draw_attributed_text(title_at, 0.0, 0.0, b.width, head_h)
       })
       outer.add_child(title)
       // 内容区
-      let body = Container::make(style=[("padding", 14.0)], style_str=[
+      let body = themed_container(style=[("padding", 14.0)], style_str=[
         ("flexDirection", "column"),
       ])
       for ch in children {
@@ -930,7 +1006,7 @@ pub fn code_view(
       let content_w = max_line_w + 32.0
       let view_w = if width > content_w { width } else { content_w }
       let view_h = line_h * laid.length().to_double() + 28.0
-      let c = Container::make(style=[("width", view_w), ("height", view_h)])
+      let c = themed_container(style=[("width", view_w), ("height", view_h)])
       c.set_background_color("#282C34")
       c.on_draw(fn(p) {
         let mut y = 14.0
@@ -953,7 +1029,7 @@ pub fn code_view(
 pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
   {
     mount: fn(parent) {
-      let c = Container::make(style=[
+      let c = themed_container(style=[
         ("width", size),
         ("height", size),
         ("marginRight", 8.0),
@@ -995,19 +1071,19 @@ pub fn badge_dot(color? : String = theme_danger()) -> Node {
 pub fn alert_closeable(text : String, t : SemanticType) -> Node {
   {
     mount: fn(parent) {
-      let v = Container::make(
+      let v = themed_container(
         style=[("height", 40.0), ("marginBottom", 10.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
       let color = type_color(t)
-      v.set_background_color(type_light_color(t))
+      bind_bg(v, fn() { type_light_color(t) })
       let label = Label::new("  " + text)
       label.set_color(color)
       v.add_child(label)
       // 弹性空白把关闭钮推到右端
-      let spacer = Container::make(style=[("flex", 1.0), ("height", 1.0)])
+      let spacer = themed_container(style=[("flex", 1.0), ("height", 1.0)])
       v.add_child(spacer)
-      let close = Container::make(style=[("width", 32.0), ("height", 40.0)])
+      let close = themed_container(style=[("width", 32.0), ("height", 40.0)])
       let hover = Ref(false)
       let close_focused = Ref(false)
       let close_it = fn() -> Unit {
@@ -1062,7 +1138,7 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
 pub fn steps(items : Array[String], current : Store[Int]) -> Node {
   {
     mount: fn(parent) {
-      let row = Container::make(
+      let row = themed_container(
         style=[("height", 40.0), ("marginBottom", 12.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
@@ -1072,7 +1148,7 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
       let boxes : Array[Container] = []
       for i in 0..<n {
         if i > 0 {
-          let line = Container::make(style=[
+          let line = themed_container(style=[
             ("flex", 1.0),
             ("height", 2.0),
             ("marginRight", 6.0),
@@ -1091,7 +1167,7 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
           })
           row.add_child(line)
         }
-        let bx = Container::make(style=[
+        let bx = themed_container(style=[
           ("width", 24.0),
           ("height", 24.0),
           ("marginRight", 6.0),
@@ -1167,18 +1243,18 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
 pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
   {
     mount: fn(parent) {
-      let outer = Container::make(style=[("marginBottom", 12.0)], style_str=[
+      let outer = themed_container(style=[("marginBottom", 12.0)], style_str=[
         ("flexDirection", "column"),
       ])
       let mut first = true
       for entry in panels {
         let open = Ref(first)
         first = false
-        let head = Container::make(
+        let head = themed_container(
           style=[("height", 34.0), ("paddingLeft", 12.0)],
           style_str=[("flexDirection", "row"), ("alignItems", "center")],
         )
-        head.set_background_color(theme_info_light())
+        bind_bg(head, fn() { theme_info_light() })
         let head_focused = Ref(false)
         head.on_draw(fn(p) {
           if head_focused.val {
@@ -1187,7 +1263,7 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
           }
         })
         // 自绘折叠指示(V 形折线,不依赖字体字形)
-        let arrow = Container::make(
+        let arrow = themed_container(
           style=[("width", 12.0), ("height", 12.0), ("marginRight", 5.0)],
         )
         arrow.on_draw(fn(p) {
@@ -1207,13 +1283,18 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
           }
         })
         let title = Label::new(entry.0)
-        title.set_color(theme_text_primary())
+        fn apply_title_color() -> Unit {
+          title.set_color(theme_text_primary())
+        }
+
+        apply_title_color()
+        on_theme_change(apply_title_color)
         head.add_child(arrow)
         head.add_child(title)
-        let body = Container::make(style=[("padding", 10.0)], style_str=[
+        let body = themed_container(style=[("padding", 10.0)], style_str=[
           ("flexDirection", "column"),
         ])
-        body.set_background_color("#FFFFFF")
+        set_panel_bg(body)
         for ch in entry.1 {
           ignore((ch.mount)(body.view()))
         }
@@ -1238,7 +1319,7 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
           }
         })
         bind_focus(head, fn() { head.schedule_paint() }, head_focused, toggle)
-        let panel = Container::make(style=[("marginBottom", 6.0)], style_str=[
+        let panel = themed_container(style=[("marginBottom", 6.0)], style_str=[
           ("flexDirection", "column"),
         ])
         panel.add_child(head)
@@ -1256,17 +1337,17 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
 pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
   {
     mount: fn(parent) {
-      let outer = Container::make(style=[("marginBottom", 12.0)], style_str=[
+      let outer = themed_container(style=[("marginBottom", 12.0)], style_str=[
         ("flexDirection", "column"),
       ])
       let n = items.length()
       let mut i = 0
       for entry in items {
         let is_last = i == n - 1
-        let row = Container::make(style=[("height", 56.0)], style_str=[
+        let row = themed_container(style=[("height", 56.0)], style_str=[
           ("flexDirection", "row"),
         ])
-        let node_col = Container::make(style=[("width", 20.0), ("height", 56.0)])
+        let node_col = themed_container(style=[("width", 20.0), ("height", 56.0)])
         let color = type_color(entry.2)
         let is_first = i == 0
         node_col.on_draw(fn(p) {
@@ -1282,12 +1363,17 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
           p.set_fill_color(color)
           p.fill_rect(5.0, b.height / 2.0 - 5.0, 10.0, 10.0)
         })
-        let text_col = Container::make(
+        let text_col = themed_container(
           style=[("paddingLeft", 8.0), ("flex", 1.0)],
           style_str=[("flexDirection", "column")],
         )
         let title = Label::new(entry.0)
-        title.set_color(theme_text_primary())
+        fn apply_title_color() -> Unit {
+          title.set_color(theme_text_primary())
+        }
+
+        apply_title_color()
+        on_theme_change(apply_title_color)
         title.set_align(Start)
         let desc = Label::new(entry.1)
         desc.set_color(theme_text_secondary())
@@ -1310,11 +1396,11 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
 pub fn descriptions(pairs : Array[(String, String)]) -> Node {
   {
     mount: fn(parent) {
-      let outer = Container::make(style=[("marginBottom", 12.0)], style_str=[
+      let outer = themed_container(style=[("marginBottom", 12.0)], style_str=[
         ("flexDirection", "column"),
       ])
       for kv in pairs {
-        let row = Container::make(style=[("height", 26.0)], style_str=[
+        let row = themed_container(style=[("height", 26.0)], style_str=[
           ("flexDirection", "row"),
           ("alignItems", "center"),
         ])
@@ -1324,7 +1410,7 @@ pub fn descriptions(pairs : Array[(String, String)]) -> Node {
         let v = Label::new(kv.1)
         v.set_color(theme_text_primary())
         v.set_align(Start)
-        let key_wrap = Container::make(style=[("width", 110.0)])
+        let key_wrap = themed_container(style=[("width", 110.0)])
         key_wrap.add_child(k)
         row.add_child(key_wrap)
         row.add_child(v)
@@ -1347,11 +1433,11 @@ pub fn result(
   {
     mount: fn(parent) {
       // 图标(76+16) + 标题 30 + 描述 24 + 按钮区(8+按钮高约 32)+ 底部留白
-      let outer = Container::make(
+      let outer = themed_container(
         style=[("height", 208.0), ("marginBottom", 12.0)],
         style_str=[("flexDirection", "column"), ("alignItems", "center")],
       )
-      let icon = Container::make(style=[
+      let icon = themed_container(style=[
         ("width", 76.0),
         ("height", 76.0),
         ("marginTop", 16.0),
@@ -1371,7 +1457,7 @@ pub fn result(
       symbol_at.set_color(color)
       let symbol_w = symbol_at.get_bounds_for(10000.0, 100.0).width
 
-      icon.set_background_color(type_light_color(t))
+      bind_bg(icon, fn() { type_light_color(t) })
       icon.on_draw(fn(p) {
         let b = icon.get_bounds()
         p.draw_attributed_text(
@@ -1382,20 +1468,20 @@ pub fn result(
           b.height,
         )
       })
-      let big = Container::make(style=[("height", 30.0)], style_str=[
+      let big = themed_container(style=[("height", 30.0)], style_str=[
         ("alignItems", "center"),
       ])
       let t1 = Label::new(title)
       t1.set_font(Font::new("Sans", 18.0, weight=SemiBold))
       t1.set_color(theme_text_primary())
       big.add_child(t1)
-      let sub = Container::make(style=[("height", 24.0)], style_str=[
+      let sub = themed_container(style=[("height", 24.0)], style_str=[
         ("alignItems", "center"),
       ])
       let t2 = Label::new(desc)
       t2.set_color(theme_text_secondary())
       sub.add_child(t2)
-      let btns = Container::make(style=[("marginTop", 8.0)], style_str=[
+      let btns = themed_container(style=[("marginTop", 8.0)], style_str=[
         ("flexDirection", "row"),
         ("alignItems", "center"),
       ])
@@ -1417,11 +1503,11 @@ pub fn result(
 pub fn empty(desc : String) -> Node {
   {
     mount: fn(parent) {
-      let outer = Container::make(
+      let outer = themed_container(
         style=[("height", 140.0), ("marginBottom", 12.0)],
         style_str=[("flexDirection", "column"), ("alignItems", "center")],
       )
-      let box = Container::make(style=[
+      let box = themed_container(style=[
         ("width", 96.0),
         ("height", 88.0),
         ("marginTop", 12.0),
@@ -1441,7 +1527,7 @@ pub fn empty(desc : String) -> Node {
         p.fill_rect(cx - 34.0, 22.0, 68.0, 14.0)
         p.stroke_rect(cx - 34.0, 22.0, 68.0, 14.0)
       })
-      let cap = Container::make(style=[("height", 26.0), ("marginTop", 6.0)], style_str=[
+      let cap = themed_container(style=[("height", 26.0), ("marginTop", 6.0)], style_str=[
         ("alignItems", "center"),
       ])
       let l = Label::new(desc)
@@ -1460,7 +1546,7 @@ pub fn empty(desc : String) -> Node {
 pub fn statistic(title : String, value : Store[String]) -> Node {
   {
     mount: fn(parent) {
-      let outer = Container::make(style=[("marginRight", 24.0)], style_str=[
+      let outer = themed_container(style=[("marginRight", 24.0)], style_str=[
         ("flexDirection", "column"),
       ])
       let num = Label::new(value.get())
@@ -1483,8 +1569,8 @@ pub fn statistic(title : String, value : Store[String]) -> Node {
 pub fn progress_line(value : Store[Double], height? : Double = 8.0) -> Node {
   {
     mount: fn(parent) {
-      let v = Container::make(style=[("flex", 1.0), ("height", height)])
-      v.set_background_color(theme_info_light())
+      let v = themed_container(style=[("flex", 1.0), ("height", height)])
+      bind_bg(v, fn() { theme_info_light() })
       v.on_draw(fn(p) {
         let b = v.get_bounds()
         let frac = value.get()
@@ -1545,7 +1631,12 @@ pub fn label_t(
     mount: fn(parent) {
       let l = Label::new(text)
       l.set_font(role_font(role))
-      l.set_color(role_color(role))
+      fn apply_color() -> Unit {
+        l.set_color(role_color(role))
+      }
+
+      apply_color()
+      on_theme_change(apply_color)
       l.set_align(Start)
       apply_style(l, style~, style_str~)
       handle(l)
@@ -1583,7 +1674,7 @@ pub fn button_t(
       probe.set_font(font)
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
       let w = text_w + 32.0
-      let v = Container::make(style=[
+      let v = themed_container(style=[
         ("width", w),
         ("height", 32.0),
         ("marginRight", 8.0),
@@ -1723,7 +1814,7 @@ pub fn checkbox_t(
       let probe = AttributedText::new(title, wrap=false)
       probe.set_font(font)
       let w = probe.get_bounds_for(10000.0, 100.0).width + 30.0
-      let v = Container::make(style=[
+      let v = themed_container(style=[
         ("width", w),
         ("height", 24.0),
         ("marginBottom", 6.0),
@@ -1810,7 +1901,7 @@ pub fn radio_group(
 ) -> Node {
   {
     mount: fn(parent) {
-      let outer = Container::make(style=[("marginBottom", 10.0)], style_str=[
+      let outer = themed_container(style=[("marginBottom", 10.0)], style_str=[
         ("flexDirection", "column"),
       ])
       let font = Font::new("Sans", 13.0)
@@ -1823,7 +1914,7 @@ pub fn radio_group(
         let w = probe.get_bounds_for(10000.0, 100.0).width + 30.0
         let hover = Ref(false)
         let focused = Ref(false)
-        let row = Container::make(style=[("width", w), ("height", 28.0)])
+        let row = themed_container(style=[("width", w), ("height", 28.0)])
         let activate = fn() -> Unit {
           selected.set(opt)
         }
@@ -1946,7 +2037,7 @@ pub fn radio_group(
 pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
   {
     mount: fn(parent) {
-      let v = Container::make(style=[("width", 40.0), ("height", 18.0)])
+      let v = themed_container(style=[("width", 40.0), ("height", 18.0)])
       let focused = Ref(false)
       let activate = fn() -> Unit {
         checked.set(!checked.get())
@@ -1959,7 +2050,7 @@ pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
         p.set_fill_color(if on { theme_primary() } else { theme_border() })
         p.fill_rect(0.0, 0.0, b.width, b.height)
         let sx = if on { b.width - slider_w - 2.0 } else { 2.0 }
-        p.set_fill_color(if disabled { theme_info_light() } else { "#FFFFFF" })
+        p.set_fill_color(if disabled { theme_info_light() } else { theme_bg_panel() })
         p.fill_rect(sx, 2.0, slider_w, b.height - 4.0)
         if focused.val {
           draw_focus_ring(p, b.width, b.height)
@@ -2004,7 +2095,7 @@ pub fn input_t(
       let focused = Ref(false)
       let hover = Ref(false)
       let has_text = Ref(text != "")
-      let outer = Container::make(
+      let outer = themed_container(
         style=[
           ("width", width),
           ("height", height),
@@ -2012,7 +2103,7 @@ pub fn input_t(
           ("marginBottom", margin),
         ],
       )
-      outer.set_background_color("#FFFFFF")
+      set_panel_bg(outer)
       // 清空带宽 24(✕ 中心在带中央),不显示时也留白,避免 ✕ 被 Entry 盖住
       let clear_x = width - 12.0
       outer.on_draw(fn(p) {
@@ -2030,7 +2121,7 @@ pub fn input_t(
         false => Entry::make(text~, entry_type=Normal)
       }
       entry.set_borderless(true)
-      entry.set_background_color("#FFFFFF")
+      set_panel_bg(entry)
       entry.set_style("flex", 1.0)
       entry.set_style("marginLeft", 10.0)
       entry.set_style("marginRight", if clearable { 26.0 } else { 10.0 })
@@ -2092,17 +2183,17 @@ pub fn input_number(
 ) -> Node {
   {
     mount: fn(parent) {
-      let row = Container::make(
+      let row = themed_container(
         style=[("height", 30.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
       let font = Font::new("Sans", 13.0)
       fn step_btn(label : String, dir : Double) -> Unit {
-        let b = Container::make(
+        let b = themed_container(
           style=[("width", 28.0), ("height", 28.0)],
           style_str=[("alignItems", "center")],
         )
-        b.set_background_color(theme_info_light())
+        bind_bg(b, fn() { theme_info_light() })
         let hover = Ref(false)
         b.on_draw(fn(p) {
           let bd = b.get_bounds()
@@ -2150,11 +2241,11 @@ pub fn input_number(
 
       step_btn("-", -1.0)
       // marginRight 0:EP InputNumber 的按钮与输入区紧贴
-      let num = Container::make(
+      let num = themed_container(
         style=[("width", 64.0), ("height", 28.0), ("marginRight", 0.0)],
         style_str=[("alignItems", "center")],
       )
-      num.set_background_color("#FFFFFF")
+      set_panel_bg(num)
       let t = AttributedText::new(
         value.get().to_string(),
         valign=Center,
@@ -2185,7 +2276,7 @@ pub fn input_number(
 pub fn form_item(label : String, control : Node, label_width? : Double = 90.0) -> Node {
   {
     mount: fn(parent) {
-      let row = Container::make(
+      let row = themed_container(
         style=[("marginBottom", 10.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
@@ -2193,7 +2284,7 @@ pub fn form_item(label : String, control : Node, label_width? : Double = 90.0) -
       k.set_font(Font::new("Sans", 13.0))
       k.set_color(theme_text_secondary())
       k.set_align(End)
-      let kwrap = Container::make(style=[("width", label_width), ("marginRight", 12.0)])
+      let kwrap = themed_container(style=[("width", label_width), ("marginRight", 12.0)])
       kwrap.add_child(k)
       row.add_child(kwrap)
       ignore((control.mount)(row.view()))
@@ -2219,16 +2310,21 @@ pub fn link(text : String, on_click : () -> Unit) -> Node {
   {
     mount: fn(parent) {
       let hover = Ref(false)
-      let row = Container::make(
+      let row = themed_container(
         style=[("paddingRight", 6.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
       let l = Label::new(text)
       l.set_font(Font::new("Sans", 13.0))
-      l.set_color(theme_primary())
+      fn apply_color() -> Unit {
+        l.set_color(theme_primary())
+      }
+
+      apply_color()
+      on_theme_change(apply_color)
       row.add_child(l)
-      let underline = Container::make(style=[("height", 1.0)])
-      underline.set_background_color(theme_primary())
+      let underline = themed_container(style=[("height", 1.0)])
+      bind_bg(underline, fn() { theme_primary() })
       row.add_child(underline)
       fn apply() -> Unit {
         underline.set_visible(hover.val)
@@ -2267,11 +2363,11 @@ pub fn page_header(
 ) -> Node {
   {
     mount: fn(parent) {
-      let row = Container::make(
+      let row = themed_container(
         style=[("height", 40.0), ("marginBottom", 12.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
-      let back = Container::make(
+      let back = themed_container(
         style=[("width", 56.0), ("height", 40.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
@@ -2311,7 +2407,7 @@ pub fn page_header(
       t.set_font(Font::new("Sans", 15.0, weight=SemiBold))
       t.set_color(theme_text_primary())
       row.add_child(t)
-      let spacer = Container::make(style=[("flex", 1.0), ("height", 1.0)])
+      let spacer = themed_container(style=[("flex", 1.0), ("height", 1.0)])
       row.add_child(spacer)
       for a in actions {
         ignore((a.mount)(row.view()))
@@ -2334,7 +2430,7 @@ pub(all) struct TreeNode {
 pub fn tree(root : Array[TreeNode]) -> Node {
   {
     mount: fn(parent) {
-      let outer = Container::make(
+      let outer = themed_container(
         style=[("marginBottom", 10.0), ("paddingTop", 2.0)],
         style_str=[("flexDirection", "column")],
       )
@@ -2361,11 +2457,11 @@ pub fn tree(root : Array[TreeNode]) -> Node {
           let has_children = nd.children.length() > 0
           let open = Ref(false)
           let indent = level.to_double() * 18.0
-          let row = Container::make(
+          let row = themed_container(
             style=[("height", 32.0), ("marginLeft", indent)],
             style_str=[("flexDirection", "row"), ("alignItems", "center")],
           )
-          let arrow = Container::make(
+          let arrow = themed_container(
             style=[("width", 10.0), ("height", 10.0), ("marginRight", 3.0)],
           )
           arrow.on_draw(fn(p) {
@@ -2378,7 +2474,7 @@ pub fn tree(root : Array[TreeNode]) -> Node {
           label.set_color(theme_text_primary())
           row.add_child(arrow)
           row.add_child(label)
-          let kids = Container::make(
+          let kids = themed_container(
             style_str=[("flexDirection", "column")],
           )
           kids.set_visible(false)
@@ -2418,7 +2514,7 @@ pub fn transfer(
 ) -> Node {
   {
     mount: fn(parent) {
-      let row = Container::make(
+      let row = themed_container(
         style=[("marginBottom", 10.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
@@ -2426,11 +2522,11 @@ pub fn transfer(
       // 选中集合(按值),用 Ref 可变数组
       let left_sel : Ref[Array[String]] = Ref([])
       let right_sel : Ref[Array[String]] = Ref([])
-      let left_box = Container::make(
+      let left_box = themed_container(
         style=[("width", width)],
         style_str=[("flexDirection", "column")],
       )
-      let right_box = Container::make(
+      let right_box = themed_container(
         style=[("width", width)],
         style_str=[("flexDirection", "column")],
       )
@@ -2473,11 +2569,11 @@ pub fn transfer(
       ) -> Unit {
         for it in items.get() {
           let it_ref = it
-          let row = Container::make(
+          let row = themed_container(
             style=[("height", 26.0), ("paddingLeft", 8.0)],
             style_str=[("flexDirection", "row"), ("alignItems", "center")],
           )
-          let mark = Container::make(
+          let mark = themed_container(
             style=[("width", 10.0), ("height", 10.0), ("marginRight", 6.0)],
           )
           mark.on_draw(fn(p) {
@@ -2543,11 +2639,11 @@ pub fn transfer(
       left_items.subscribe(fn(_v) { render_all() })
       right_items.subscribe(fn(_v) { render_all() })
       fn mid_btn(label : String, to_right : Bool) -> Unit {
-        let b = Container::make(
+        let b = themed_container(
           style=[("width", 32.0), ("height", 28.0), ("marginRight", 8.0)],
           style_str=[("alignItems", "center")],
         )
-        b.set_background_color(theme_info_light())
+        bind_bg(b, fn() { theme_info_light() })
         b.on_draw(fn(p) {
           let bd = b.get_bounds()
           p.draw_text(
@@ -2657,7 +2753,7 @@ fn build_calendar(
   let cell_h = 30.0
   // 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然高度
   // (高 = 上下 padding 16 + 头 32+4 + 星期行 26 + 6 行 x 30)
-  let panel = Container::make(
+  let panel = themed_container(
     style=[
       // yoga 的 width 是 border-box 语义(含 padding),须加 16;
       // 只给内容宽 252 会把最后一列(周六)裁掉 16px
@@ -2667,7 +2763,7 @@ fn build_calendar(
     ],
     style_str=[("flexDirection", "column")],
   )
-  panel.set_background_color("#FFFFFF")
+  set_panel_bg(panel)
   panel.on_draw(fn(p) {
     let b = panel.get_bounds()
     p.set_stroke_color(theme_border())
@@ -2687,12 +2783,12 @@ fn build_calendar(
   }
 
   let head_h = 32.0
-  let head = Container::make(
+  let head = themed_container(
     style=[("height", head_h), ("marginBottom", 4.0)],
     style_str=[("flexDirection", "row"), ("alignItems", "center")],
   )
   let title_text = Ref("")
-  let title = Container::make(
+  let title = themed_container(
     style=[("flex", 1.0), ("height", head_h)],
   )
   title.on_draw(fn(p) {
@@ -2710,7 +2806,7 @@ fn build_calendar(
   })
   fn nav_btn(glyph : String, on_click : () -> Unit) -> Container {
     let hover = Ref(false)
-    let b = Container::make(style=[("width", 28.0), ("height", head_h)])
+    let b = themed_container(style=[("width", 28.0), ("height", head_h)])
     b.on_draw(fn(p) {
       let bb = b.get_bounds()
       if hover.val {
@@ -2770,20 +2866,20 @@ fn build_calendar(
   head.add_child(title)
   head.add_child(nav_btn("›", fn() { nav(1) }))
   let week_h = 26.0
-  let wk = Container::make(
+  let wk = themed_container(
     style=[("height", week_h)],
     style_str=[("flexDirection", "row")],
   )
   for name in ["日", "一", "二", "三", "四", "五", "六"] {
     let wref = name
-    let c = Container::make(style=[("width", cell_w), ("height", week_h)])
+    let c = themed_container(style=[("width", cell_w), ("height", week_h)])
     c.on_draw(fn(p) {
       let b = c.get_bounds()
       draw_center(p, wref, 0.0, b.height, theme_text_secondary())
     })
     wk.add_child(c)
   }
-  let grid = Container::make(style_str=[("flexDirection", "column")])
+  let grid = themed_container(style_str=[("flexDirection", "column")])
   let cells : Ref[Array[Container]] = Ref([])
   let grid_rows : Ref[Array[Container]] = Ref([])
 
@@ -2804,7 +2900,7 @@ fn build_calendar(
       if m == 1 { 12 } else { m - 1 },
     )
     for row_i in 0..<6 {
-      let r = Container::make(style_str=[("flexDirection", "row")])
+      let r = themed_container(style_str=[("flexDirection", "row")])
       for col_i in 0..<7 {
         let idx = row_i * 7 + col_i
         let in_month = idx >= first_wd && idx < first_wd + dim
@@ -2842,7 +2938,7 @@ fn build_calendar(
         let dymd : DateYMD = { y: dy, m: dm, d: dd }
         let in_m = in_month
         let hover = Ref(false)
-        let c = Container::make(style=[("width", cell_w), ("height", cell_h)])
+        let c = themed_container(style=[("width", cell_w), ("height", cell_h)])
         c.on_draw(fn(p) {
           let b = c.get_bounds()
           let d = dymd
@@ -2975,11 +3071,11 @@ pub fn date_picker_t(
         Some(_) => true
         None => false
       })
-      let field = Container::make(
+      let field = themed_container(
         style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
-      field.set_background_color("#FFFFFF")
+      set_panel_bg(field)
       View::set_cursor(field, hand())
       let focused = Ref(false)
       field.on_draw(fn(p) {
@@ -3126,10 +3222,10 @@ pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
   {
     mount: fn(parent) {
       let hover = Ref(false)
-      let b = Container::make(
+      let b = themed_container(
         style=[("width", size), ("height", size)],
       )
-      b.set_background_color(theme_primary())
+      bind_bg(b, fn() { theme_primary() })
       b.on_draw(fn(p) {
         p.draw_text(
           "↑",
@@ -3153,7 +3249,7 @@ pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
       })
       b.on_mouse_enter(fn(_e) {
         hover.val = true
-        b.set_background_color("#1E56A8")
+        b.set_background_color(theme_primary_hover())
       })
       b.on_mouse_leave(fn(_e) {
         hover.val = false
@@ -3281,7 +3377,7 @@ pub fn table_t(
       let data_r : Ref[Array[TableRow]] = Ref([])
       let head_h = 40.0
       // 1px 内边距让外框描边落在 padding 环里,不被行/表头背景盖住
-      let outer = Container::make(
+      let outer = themed_container(
         style=[("width", width), ("padding", 1.0), ("marginBottom", 10.0)],
         style_str=[("flexDirection", "column")],
       )
@@ -3338,7 +3434,7 @@ pub fn table_t(
         } else {
           [("flex", 1.0), ("paddingLeft", 12.0), ("paddingRight", 12.0)]
         }
-        let wrap = Container::make(
+        let wrap = themed_container(
           style=base,
           style_str=[("flexDirection", "row"), ("alignItems", "center")],
         )
@@ -3356,7 +3452,7 @@ pub fn table_t(
             probe.set_font(small_font)
             let text_w = probe.get_bounds_for(10000.0, 100.0).width
             let w = text_w + 14.0
-            let tg = Container::make(style=[("width", w), ("height", 20.0)])
+            let tg = themed_container(style=[("width", w), ("height", 20.0)])
             tg.on_draw(fn(p) {
               p.set_fill_color(type_light_color(t))
               p.fill_rect(0.0, 0.0, w, 20.0)
@@ -3374,7 +3470,7 @@ pub fn table_t(
             wrap.add_child(tg)
           }
           CellColorBox(hex, name) => {
-            let sw = Container::make(style=[("width", 14.0), ("height", 14.0)])
+            let sw = themed_container(style=[("width", 14.0), ("height", 14.0)])
             sw.on_draw(fn(p) {
               p.set_fill_color(hex)
               p.fill_rect(0.0, 0.0, 14.0, 14.0)
@@ -3391,7 +3487,7 @@ pub fn table_t(
             wrap.add_child(l)
           }
           CellLines(lines) => {
-            let stack = Container::make(
+            let stack = themed_container(
               style=[("paddingTop", 6.0), ("paddingBottom", 6.0)],
               style_str=[("flexDirection", "column")],
             )
@@ -3409,7 +3505,7 @@ pub fn table_t(
       }
 
       // 表头:主题斑马色打底 + 底边分隔线,次级色加粗文字
-      let head = Container::make(
+      let head = themed_container(
         style=[("height", head_h)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
@@ -3424,7 +3520,7 @@ pub fn table_t(
         p.stroke()
       })
       // 表头复选框(仅 selection 启用时):全选 / 清空,部分选中画横条
-      let head_cb = Container::make(style=[("width", 36.0), ("height", head_h)])
+      let head_cb = themed_container(style=[("width", 36.0), ("height", head_h)])
       head_cb.on_draw(fn(p) {
         let b = head_cb.get_bounds()
         let n = data_r.val.length()
@@ -3477,7 +3573,7 @@ pub fn table_t(
           ),
         )
       }
-      let body = Container::make(style_str=[("flexDirection", "column")])
+      let body = themed_container(style_str=[("flexDirection", "column")])
 
       fn refresh_row(i : Int) -> Unit {
         let cs = row_cs.val
@@ -3502,7 +3598,7 @@ pub fn table_t(
           let r = data[i]
           let idx = i
           // minHeight:普通行 = row_height,含多行文本时自动撑高
-          let row = Container::make(
+          let row = themed_container(
             style=[("minHeight", row_height)],
             style_str=[("flexDirection", "row"), ("alignItems", "center")],
           )
@@ -3516,7 +3612,7 @@ pub fn table_t(
           })
           match sel {
             Some(_) => {
-              let cb = Container::make(
+              let cb = themed_container(
                 style=[("width", 36.0)],
                 style_str=[("alignSelf", "stretch")],
               )
@@ -3653,7 +3749,7 @@ pub fn table_v_t(
         col_w.push(w)
         acc = acc + w
       }
-      let cv = Container::make(
+      let cv = themed_container(
         style=[("width", width), ("height", height), ("marginBottom", 10.0)],
       )
 
@@ -4060,8 +4156,8 @@ pub fn divider(vertical? : Bool = false, spacing? : Double = 10.0) -> Node {
       if !vertical {
         style.push(("flex", 1.0))
       }
-      let c = Container::make(style=style)
-      c.set_background_color(theme_border())
+      let c = themed_container(style=style)
+      bind_bg(c, fn() { theme_border() })
       attach(parent, c.view())
       c.view()
     },
@@ -4087,7 +4183,7 @@ pub fn textarea_t(
       let focused = Ref(false)
       let hover = Ref(false)
       let has_text = Ref(text != "")
-      let outer = Container::make(
+      let outer = themed_container(
         style=[
           ("width", width),
           ("height", height),
@@ -4096,7 +4192,7 @@ pub fn textarea_t(
           ("marginBottom", margin),
         ],
       )
-      outer.set_background_color("#FFFFFF")
+      set_panel_bg(outer)
       // 清空带在 padding 区右侧(TextEdit 恒定让出,防 ✕ 被原生子窗口盖住)
       let clear_x = width - 20.0
       outer.on_draw(fn(p) {
@@ -4113,7 +4209,7 @@ pub fn textarea_t(
       edit.set_text(text)
       edit.set_font(Font::new("Sans", 13.0))
       edit.set_borderless(true)
-      edit.set_background_color("#FFFFFF")
+      set_panel_bg(edit)
       edit.set_style("flex", 1.0)
       if clearable {
         edit.set_style("marginRight", 24.0)
@@ -4180,7 +4276,7 @@ pub fn slider_t(
       let thumb = 12.0
       let dragging = Ref(false)
       let hover = Ref(false)
-      let v = Container::make(
+      let v = themed_container(
         style=[("width", width), ("height", h), ("marginBottom", 10.0)],
       )
       fn clamp01(x : Double) -> Double {
@@ -4304,11 +4400,11 @@ pub fn tabs_t(
         None => Store::new(0)
       }
       let fnt = Font::new("Sans", 13.0)
-      let outer = Container::make(
+      let outer = themed_container(
         style=[("width", 360.0), ("marginBottom", 10.0)],
         style_str=[("flexDirection", "column")],
       )
-      let head = Container::make(
+      let head = themed_container(
         style=[("height", 36.0)],
         style_str=[("flexDirection", "row")],
       )
@@ -4321,7 +4417,7 @@ pub fn tabs_t(
         let probe = AttributedText::new(title, wrap=false)
         probe.set_font(fnt)
         let tw = probe.get_bounds_for(10000.0, 100.0).width
-        let tab = Container::make(
+        let tab = themed_container(
           style=[("width", tw + 28.0), ("height", 36.0), ("marginRight", 8.0)],
         )
         let hover = Ref(false)
@@ -4364,7 +4460,7 @@ pub fn tabs_t(
         })
         head.add_child(tab)
         // 内容页:默认只显示当前页
-        let page_c = Container::make(
+        let page_c = themed_container(
           style_str=[("flexDirection", "column")],
         )
         page_c.set_visible(cur.val == idx)
@@ -4396,7 +4492,7 @@ fn select_row(
   value : Store[String],
   on_pick : () -> Unit,
 ) -> Container {
-  let row = Container::make(
+  let row = themed_container(
     style=[("height", 28.0), ("paddingLeft", 8.0)],
     style_str=[("flexDirection", "row"), ("alignItems", "center")],
   )
@@ -4473,10 +4569,10 @@ pub fn select_t(
     mount: fn(parent) {
       let focused = Ref(false)
       let hover = Ref(false)
-      let field = Container::make(
+      let field = themed_container(
         style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
       )
-      field.set_background_color("#FFFFFF")
+      set_panel_bg(field)
       View::set_cursor(field, hand())
       fn apply(text : String) -> Unit {
         ignore(text)
@@ -4563,7 +4659,7 @@ pub fn select_t(
               if rows_h > 300.0 {
                 rows_h = 300.0
               }
-              let list = Container::make(
+              let list = themed_container(
                 style=[
                   ("width", width),
                   ("height", rows_h),
@@ -4571,7 +4667,7 @@ pub fn select_t(
                 ],
                 style_str=[("flexDirection", "column")],
               )
-              list.set_background_color("#FFFFFF")
+              set_panel_bg(list)
               for opt in options {
                 let o = opt
                 list.add_child(select_row(o, value, fn() { pick(o) }))
@@ -4631,7 +4727,7 @@ pub fn rate_t(
       let size = 22.0
       let gap = 4.0
       let hover = Ref(0) // 0 = 无预览,否则预亮到第 N 颗
-      let v = Container::make(
+      let v = themed_container(
         style=[
           ("width", size * max.to_double() + gap * (max - 1).to_double()),
           ("height", size),
@@ -4739,7 +4835,7 @@ pub fn popover_t(
         match pop.val {
           None => {
             let p = Popover::new()
-            let holder = Container::make(
+            let holder = themed_container(
               style=[("width", width), ("height", height)],
             )
             ignore((content.mount)(holder.view()))
@@ -4787,10 +4883,10 @@ pub fn dropdown_menu(
     mount: fn(parent) {
       let fnt = Font::new("Sans", 13.0)
       let focused = Ref(false)
-      let field = Container::make(
+      let field = themed_container(
         style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
       )
-      field.set_background_color("#FFFFFF")
+      set_panel_bg(field)
       View::set_cursor(field, hand())
       field.on_draw(fn(p) {
         let b = field.get_bounds()
@@ -4844,7 +4940,7 @@ pub fn dropdown_menu(
               let p = Popover::new()
               // 根容器宽高创建期给定(事后 set_style 会被弹层时序吞掉),
               // 高度 = 项数 x 28 + padding 8,与 content_size 一致
-              let list = Container::make(
+              let list = themed_container(
                 style=[
                   ("width", width),
                   ("height", items.length().to_double() * 28.0 + 8.0),
@@ -4852,12 +4948,12 @@ pub fn dropdown_menu(
                 ],
                 style_str=[("flexDirection", "column")],
               )
-              list.set_background_color("#FFFFFF")
+              set_panel_bg(list)
               for i in 0..<items.length() {
                 let it = items[i]
                 let idx = i
                 if it == "-" {
-                  let sep = Container::make(style=[("height", 9.0)])
+                  let sep = themed_container(style=[("height", 9.0)])
                   sep.on_draw(fn(p2) {
                     let b = sep.get_bounds()
                     p2.set_stroke_color(theme_border())
@@ -4870,7 +4966,7 @@ pub fn dropdown_menu(
                   continue
                 }
                 let hover = Ref(false)
-                let row = Container::make(
+                let row = themed_container(
                   style=[("height", 28.0), ("paddingLeft", 8.0)],
                   style_str=[("flexDirection", "row"), ("alignItems", "center")],
                 )
@@ -4948,11 +5044,11 @@ pub fn carousel_t(
       let paused = Ref(false)
       let dots : Array[Container] = []
       let panels : Array[Container] = []
-      let outer = Container::make(
+      let outer = themed_container(
         style=[("width", width), ("height", height + 24.0), ("marginBottom", 10.0)],
         style_str=[("flexDirection", "column")],
       )
-      let stage = Container::make(
+      let stage = themed_container(
         style=[("width", width), ("height", height)],
         style_str=[("flexDirection", "column")],
       )
@@ -4979,7 +5075,7 @@ pub fn carousel_t(
       for i in 0..<n {
         // 面板填满舞台(flex 拉高 + stretch 拉宽):固定宽会横向溢出
         // 舞台(两侧箭头各占 24px),盖住右侧切换箭头的事件窗口
-        let pc = Container::make(
+        let pc = themed_container(
           style=[("flex", 1.0)],
           style_str=[("flexDirection", "column"), ("alignSelf", "stretch")],
         )
@@ -4987,7 +5083,7 @@ pub fn carousel_t(
         ignore((pages[i].mount)(pc.view()))
         stage.add_child(pc)
         panels.push(pc)
-        let dot = Container::make(
+        let dot = themed_container(
           style=[
             ("width", 8.0),
             ("height", 8.0),
@@ -5016,7 +5112,7 @@ pub fn carousel_t(
       }
       // 左右箭头(矢量三角,悬浮在舞台两侧的窄热区)
       fn arrow(right : Bool) -> Container {
-        let a = Container::make(style=[("width", 24.0), ("height", height)])
+        let a = themed_container(style=[("width", 24.0), ("height", height)])
         let hover = Ref(false)
         a.on_draw(fn(p) {
           if hover.val {
@@ -5061,12 +5157,12 @@ pub fn carousel_t(
       }
 
       // 布局:舞台行 = 左箭头 + 舞台 + 右箭头;下行为指示点
-      let stage_row = Container::make(style_str=[("flexDirection", "row")])
+      let stage_row = themed_container(style_str=[("flexDirection", "row")])
       stage_row.add_child(arrow(false))
       stage.set_style("flex", 1.0)
       stage_row.add_child(stage)
       stage_row.add_child(arrow(true))
-      let dots_row = Container::make(style_str=[("flexDirection", "row")])
+      let dots_row = themed_container(style_str=[("flexDirection", "row")])
       for d in dots {
         dots_row.add_child(d)
       }
@@ -5110,10 +5206,10 @@ pub fn color_picker_t(
   {
     mount: fn(parent) {
       let focused = Ref(false)
-      let field = Container::make(
+      let field = themed_container(
         style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
       )
-      field.set_background_color("#FFFFFF")
+      set_panel_bg(field)
       View::set_cursor(field, hand())
       field.on_draw(fn(p) {
         let b = field.get_bounds()
@@ -5184,7 +5280,7 @@ pub fn color_picker_t(
               let rows_n0 = (colors.length() + per_row - 1) / per_row
               let grid_w0 = per_row.to_double() * (swatch + gap) + 16.0
               let grid_h0 = 16.0 + rows_n0.to_double() * (swatch + gap)
-              let grid = Container::make(
+              let grid = themed_container(
                 style=[
                   ("width", grid_w0),
                   ("height", grid_h0),
@@ -5192,12 +5288,12 @@ pub fn color_picker_t(
                 ],
                 style_str=[("flexDirection", "column")],
               )
-              grid.set_background_color("#FFFFFF")
+              set_panel_bg(grid)
               let rows : Array[(Container, Array[Container])] = []
               for i in 0..<colors.length() {
                 if i % per_row == 0 {
                   rows.push((
-                    Container::make(
+                    themed_container(
                       style=[("height", swatch + gap)],
                       style_str=[("flexDirection", "row")],
                     ),
@@ -5206,7 +5302,7 @@ pub fn color_picker_t(
                 }
                 let (row, cells) = rows[rows.length() - 1]
                 let c = colors[i]
-                let cell = Container::make(
+                let cell = themed_container(
                   style=[
                     ("width", swatch),
                     ("height", swatch),
@@ -5310,6 +5406,6 @@ pub fn side_menu_sections(
     }
   }
   vbox(nodes, style=[("width", width), ("padding", 6.0)], handle=fn(c) {
-    c.set_background_color("#FFFFFF")
+    set_panel_bg(c)
   })
 }
