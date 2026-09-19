@@ -3151,6 +3151,7 @@ void yue_mbt_popover_close(void *popover) {
 }
 #else
 void yue_mbt_popover_close(void *popover) {
+#if defined(OS_WIN)
   if (auto *win = PopoverStore::get(popover)) {
     if (win == g_active_popover_window) {
       HideActivePopover();
@@ -3164,6 +3165,16 @@ void yue_mbt_popover_close(void *popover) {
       win->on_close.Emit(win);
     }
   }
+#else
+  // macOS 桩:隐藏复用 + 手动补发 on_close,同 Windows 语义;无点外
+  // 钩子/定时器桩可拆,不引用仅 Windows 定义的收起状态
+  if (auto *win = PopoverStore::get(popover)) {
+    if (win->IsVisible()) {
+      win->SetVisible(false);
+      win->on_close.Emit(win);
+    }
+  }
+#endif
 }
 #endif
 
