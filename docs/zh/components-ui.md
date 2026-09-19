@@ -6,7 +6,17 @@
 
 ### 定制主题 / 深浅切换
 
-在 `initialize()` 之后任意时刻调用 `theme_apply`(内置 `default_theme` 浅色 / `dark_theme` 暗色)。切换即时生效、无需重建界面:自绘组件经主题订阅自动重绘,挂载期定死的色(容器底色/Label 文字色等)由组件内部重设,Linux 端原生控件(输入框/多行/滚动条/窗口与弹层底)CSS 一并重建,并对全部可见窗口做整体重绘兜底。跟随系统深浅:`system_prefers_dark()` 读系统偏好,`on_system_theme_change(f)` 在系统切换时回调(两者当前仅 Linux 有实现)——典型接法是启动时按系统偏好选主题、回调里重读并重新 `theme_apply`。自定义容器想跟随主题,用 `on_theme_change` 注册重设回调,色板快照经 `theme_current` 读取(含页面底 `bg_page` / 面板底 `bg_panel`)。焦点环与字段聚焦边框为中性灰单层描亮(不用主题色),不喧宾夺主。
+在 `initialize()` 之后任意时刻调用 `theme_apply`(内置 `default_theme` 浅色 / `dark_theme` 暗色)。切换即时生效、无需重建界面:自绘组件经主题订阅自动重绘,挂载期定死的色(容器底色/Label 文字色等)由组件内部重设,Linux 端原生控件(输入框/多行/滚动条/窗口与弹层底)CSS 一并重建,并对全部可见窗口做整体重绘兜底。跟随系统深浅:`system_prefers_dark()` 读系统偏好,`on_system_theme_change(f)` 在系统切换时回调(两者当前仅 Linux 有实现)——典型接法是启动时按系统偏好选主题、回调里重读并重新 `theme_apply`。焦点环与字段聚焦边框为中性灰单层描亮(不用主题色),不喧宾夺主。
+
+**颜色全部内敛,使用方零负担**:库内全部组件(含基础 `label()`,默认主题常规色)开箱即跟主题,不需要调用方做任何颜色处理。自定义组件按三条法则接入,坑已封装:
+
+| 场景 | 做法 |
+|---|---|
+| 自绘(on_draw) | 颜色在 draw 回调里现取 `theme_current()` 色板,无需任何订阅(主题切换时整窗强制重绘) |
+| Label 文字设主题色 | `theme_bind_fg(l, fn() { theme_current().text_regular })`——内部处理了「设色后必须同文重排」的平台坑,裸 `set_color` 不跟主题、自行订阅漏重排会残留旧色 |
+| 容器背景设主题色 | `theme_bind_bg(v, fn() { theme_current().bg_panel })`——定死背景不会因重绘更新,必须重设 |
+
+固定色(品牌色块等)直接设即可,不受主题影响。
 
 ```moonbit
 @yue.initialize()

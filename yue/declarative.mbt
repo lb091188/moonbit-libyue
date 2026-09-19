@@ -84,7 +84,11 @@ pub fn hbox(
 }
 
 ///|
-/// 标签节点。handle 在挂载时收到 Label 句柄，便于后续命令式补充。
+/// 标签节点:文字默认跟随主题常规色(theme_apply 切换深浅即变色),
+/// 无需调用方做任何颜色处理。需要自定义颜色时经 handle set_color,
+/// 注意主题切换会重置回主题色;固定色场景请改用 label_t 的角色体系
+/// 或自行订阅 on_theme_change。handle 在挂载时收到 Label 句柄，
+/// 便于后续命令式补充。
 pub fn label(
   text : String,
   style? : Array[(String, Double)] = [],
@@ -94,6 +98,7 @@ pub fn label(
   {
     mount: fn(parent) {
       let l = Label::make(text, style~, style_str~)
+      bind_fg(l, fn() { theme_text_regular() })
       handle(l)
       attach(parent, l.view())
       l.view()
