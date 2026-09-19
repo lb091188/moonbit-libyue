@@ -1372,6 +1372,10 @@ extern "c" fn ffi_popover_set_accept_focus(
 extern "c" fn ffi_popover_close(popover : Popover) -> Unit = "yue_mbt_popover_close"
 
 ///|
+#borrow(popover, hex)
+extern "c" fn ffi_popover_set_bg(popover : Popover, hex : Bytes) -> Unit = "yue_mbt_popover_set_bg"
+
+///|
 #borrow(popover, invoke, callback)
 extern "c" fn ffi_popover_on_close(
   popover : Popover,

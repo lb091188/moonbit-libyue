@@ -180,6 +180,14 @@ pub fn Popover::close(self : Popover) -> Unit {
 }
 
 ///|
+/// 设置弹层窗口背景（主题跟随通道）：Windows 的替代弹层是独立小窗，
+/// 应用内全局主题 CSS 罩不到（默认白底，深色主题下不可读），需显式
+/// 设色；Linux/macOS 的弹层在应用窗口体系内由接管 CSS 覆盖，空操作。
+pub fn Popover::set_background_color(self : Popover, hex : String) -> Unit {
+  ffi_popover_set_bg(self, utf8_bytes(hex))
+}
+
+///|
 /// 注册弹出层关闭回调。
 pub fn Popover::on_close(self : Popover, callback : () -> Unit) -> Unit {
   keep_alive(callback)
