@@ -59,7 +59,7 @@ let t = @yue.default_theme()
 | `breadcrumb(items, selected)` | 当前项深色,其余可点悬停变主题色 |
 | `pagination(current : Store[Int], pages)` | 当前页主题色实底,悬停浅蓝;‹ › 边界钳制 |
 | `steps(items, current : Store[Int])` | 完成 / 当前 / 待办三态 + 连线 |
-| `hsplit(first, second, ratio?, min_first?, min_second?)` / `vsplit(...)` | 可拖动分隔布局(Qt QSplitter / GTK Paned 对位):6px 自绘把手悬停浅灰、拖动中主题色+点纹,拖动经鼠标捕获不丢事件;ratio 为初始占比,min 钳制两栏下限 |
+| `hsplit(first, second, ratio?, min_first?, min_second?)` / `vsplit(...)` | 可拖动分隔布局(Qt QSplitter / GTK Paned 对位):8px 自绘把手常显分隔线+点纹(不靠 hover 就能找到),悬停浅灰底、拖动中主题色底白点,拖动经鼠标捕获不丢事件;ratio 为初始占比,min 钳制两栏下限 |
 
 ## 数据展示
 
