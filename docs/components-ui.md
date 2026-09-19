@@ -19,7 +19,7 @@ let t = @yue.default_theme()
 | API | Variants / roles | Notes |
 |---|---|---|
 | `button_t(text, on_click?, variant?)` | `Solid` / `Soft` / `Text` / `Danger` | self-drawn, hover stays within the theme (Solid/Danger darken, Soft goes solid white, Text grey fill) |
-| `label_t(text, role?)` | `Title` / `Section` / `Body` / `Secondary` / `Accent` | font size+color by role |
+| `label_t(text, role?, style?, style_str?, handle?)` | `Title` / `Section` / `Body` / `Secondary` / `Accent` | font size+color by role, left-aligned, accepts layout styles and a handle callback |
 | `entry_t(text?, password?, on_input?)` | normal / password | font themed only (GTK Entry `SetColor` paints the whole input dark — see adaptation.md) |
 | `input_t(text?, password?, margin?, width?, height?)` | bordered / password | outer self-drawn 1px border (focus turns primary), inner Entry stripped of native border & inner shadow via `set_borderless` |
 | `checkbox_t(title, checked?, disabled?, on_change?)` | normal / disabled | self-drawn square check + white tick, border turns primary on hover |
@@ -30,7 +30,7 @@ let t = @yue.default_theme()
 | `tabs_t(pages : Array[(String, Node)], selected?)` | top tabs: active tab themed text + 2px bottom indicator, content switched via set_visible; `selected` is an index Store (internal 0 by default) |
 | `select_t(options, value : Store[String], width?, on_change?)` | dropdown select (EP style, fully self-drawn): hover highlight / ✓ on current, pick to fill. On Linux it is filterable: the field accepts typing, options live-filter as you type, the popover opens/collapses automatically, ↑↓ to move the highlight, Enter to pick, Esc to close; other platforms keep the read-only click-to-pick field |
 | `rate_t(value : Store[Int], max?, on_change?)` | star rating (self-drawn): filled theme color when on, outlined gray when off, hover preview, click sets stars |
-| `tooltip_t(content : Node, tip)` | wrap any node with the native tooltip (system style; use popover_t for themed bubbles) |
+| `tooltip_t(content : Node, tip)` | wrap any node with the native tooltip; on Linux the tooltip color is pinned to dark background + white text (independent of the system theme), other platforms keep the system style |
 | `popover_t(trigger : Node, content : Node, width, height)` | popover bubble: clicking the trigger opens arbitrary Node content below it, click again to close |
 | `dropdown_menu(trigger, items, on_select, width?)` | dropdown menu: trigger field + item popover, hover highlight, click calls back the index; `"-"` in items draws a separator |
 | `carousel_t(pages : Array[Node], width?, height?, interval_ms?)` | carousel: panel sequence + side arrows + bottom dots, auto-advance every interval_ms ms (hover pauses, enabled when > 0), arrows/dots switch manually |

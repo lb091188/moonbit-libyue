@@ -56,6 +56,10 @@ pub fn[A, B] Store::map(self : Store[A], f : (A) -> B) -> Store[B] {
 ///|
 /// 声明式文本绑定：节点挂载时创建 Label（初值 f(get)）并订阅，
 /// 之后每次 set 自动更新文本。Store[A] 通常来自 map 派生。
+/// 文本恒单行：默认富文本自动换行，在 hbox 里剩余宽度不足时回显会被
+/// 压成两行；这里替换为 wrap=false 的富文本（之后的 set_text 仍在
+/// 同一富文本上改写，单行测宽持续生效），并显式钉主题常规文字色
+/// （富文本路径不走系统文字色）。
 pub fn[A] bind_label(
   store : Store[A],
   f : (A) -> String,
@@ -64,7 +68,12 @@ pub fn[A] bind_label(
 ) -> Node {
   {
     mount: fn(parent) {
-      let l = Label::make(f(store.get()), style~, style_str~)
+      let init = f(store.get())
+      let l = Label::make(init, style~, style_str~)
+      let at = AttributedText::new(init, valign=Center, wrap=false)
+      at.set_font(Font::new("Sans", 13.0))
+      at.set_color(theme_text_regular())
+      l.set_attributed_text(at)
       store.subscribe(fn(v) { l.set_text(f(v)) })
       attach(parent, l.view())
       l.view()

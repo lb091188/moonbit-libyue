@@ -9,9 +9,9 @@ fn page_table() -> @yue.Node {
   }
   scroll_page([
     section("表格 Table", desc, [
-      @yue.label(
+      @yue.label_t(
         "列类型：Text / Edit（可编辑回写）/ Checkbox（勾选回写）/ Custom（自绘列）；行激活与选择变化有事件回调。",
-        style_str=[("color", desc_color)],
+        role=@yue.Secondary,
         style=[("marginBottom", 8.0)],
       ),
       @yue.button("打开表格演示窗口", on_click=fn() {

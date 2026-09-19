@@ -763,7 +763,12 @@ static const char *kDefaultNativeColors =
     "scrolledwindow undershoot { background: none; box-shadow: none; }"
     "window { background-color: #FFFFFF; background-image: none;"
     "  border: none; box-shadow: none; }"
-    "decoration { border: none; box-shadow: none; }";
+    "decoration { border: none; box-shadow: none; }"
+    /* 原生 tooltip 恒深底白字:系统主题 tooltip 底/字色是两处独立配置,
+     * 深色系统主题下常见深底深字不可读(与 MoonBit 侧
+     * apply_native_theme_css 的规则保持一致) */
+    "tooltip { background-color: #303133; border-radius: 3px; }"
+    "tooltip label { color: #FFFFFF; }";
 
 #endif
 

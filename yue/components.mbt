@@ -192,6 +192,12 @@ fn apply_native_theme_css(t : Theme) -> Unit {
   buf.write_string("scrollbar slider { background-color: \{t.border}; border-radius: 0px; }")
   buf.write_string("scrollbar slider:hover { background-color: \{t.text_secondary}; }")
   buf.write_string("window { background-color: #FFFFFF; }")
+  // 原生 tooltip 恒深底白字(EP 语义,不随色板):系统主题的 tooltip
+  // 底/字色来自两处配置,深色系统主题下常见深底深字不可读
+  buf.write_string(
+    "tooltip { background-color: #303133; border-radius: 3px; }",
+  )
+  buf.write_string("tooltip label { color: #FFFFFF; }")
   ffi_apply_native_theme_css(utf8_bytes(buf.to_string()))
 }
 
@@ -1514,14 +1520,22 @@ fn role_color(role : TextRole) -> String {
 }
 
 ///|
-/// 主题化标签:文字角色统一字号/颜色,左对齐。
-pub fn label_t(text : String, role? : TextRole = Body) -> Node {
+/// 主题化标签:文字角色统一字号/颜色,左对齐;可叠加布局样式。
+pub fn label_t(
+  text : String,
+  role? : TextRole = Body,
+  style? : Array[(String, Double)] = [],
+  style_str? : Array[(String, String)] = [],
+  handle? : (Label) -> Unit = fn(_l) {  },
+) -> Node {
   {
     mount: fn(parent) {
       let l = Label::new(text)
       l.set_font(role_font(role))
       l.set_color(role_color(role))
       l.set_align(Start)
+      apply_style(l, style~, style_str~)
+      handle(l)
       attach(parent, l.view())
       l.view()
     },
@@ -5438,11 +5452,12 @@ pub fn side_menu_sections(
 ) -> Node {
   let nodes : Array[Node] = []
   for (group, items) in sections {
-    // 组标题:次要色小字,不可点
+    // 组标题:次要色小字,不可点;paddingLeft 与菜单项文字的 pad_x
+    // 一致(同一父容器的 padding 下两者左缘对齐)
     nodes.push(
       label(
         group,
-        style=[("paddingLeft", 16.0), ("paddingTop", 10.0), ("height", 24.0)],
+        style=[("paddingLeft", 20.0), ("paddingTop", 10.0), ("height", 24.0)],
         handle=fn(l) {
           l.set_font(Font::new("Sans", 12.0))
           l.set_color(theme_text_secondary())
