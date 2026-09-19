@@ -744,7 +744,7 @@ static GtkCssProvider *g_native_color_provider = nullptr;
 
 static const char *kDefaultNativeColors =
     "label { color: #2A2F36; }"
-    "entry { color: #2A2F36; caret-color: #2D68C4;"
+    "entry { color: #2A2F36; caret-color: #2A2F36;"
     "  background-color: #FFFFFF; background-image: none;"
     "  outline-width: 0px; }"
     "entry:not(.yue-borderless) { border: 1px solid #D8DCE1; }"
@@ -767,8 +767,8 @@ static const char *kDefaultNativeColors =
     /* 原生 tooltip 恒深底白字:系统主题 tooltip 底/字色是两处独立配置,
      * 深色系统主题下常见深底深字不可读(与 MoonBit 侧
      * apply_native_theme_css 的规则保持一致) */
-    "tooltip { background-color: #303133; border-radius: 3px; }"
-    "tooltip label { color: #FFFFFF; }";
+    "tooltip, tooltip.background, window.tooltip { background-color: #303133; border-radius: 3px; color: #FFFFFF; }"
+    "tooltip label, tooltip.background label, window.tooltip label { color: #FFFFFF; }";
 
 #endif
 
@@ -4140,6 +4140,89 @@ void yue_mbt_view_set_tooltip(void *view, const char *text) {
   if (auto *v = CastToView(view)) {
     v->SetTooltip(text);
   }
+}
+
+/* 系统深色偏好检测(仅 Linux):读 GtkSettings 的
+ * gtk-application-prefer-dark-theme,再按主题名含 dark 兜底判定
+ * (部分主题只改名字不改该属性)。其余平台当前恒 false,联动接入待补。 */
+bool yue_mbt_system_prefers_dark(void) {
+#if defined(OS_LINUX)
+  GtkSettings *settings = gtk_settings_get_default();
+  if (settings != nullptr) {
+    gboolean prefer_dark = FALSE;
+    g_object_get(settings, "gtk-application-prefer-dark-theme", &prefer_dark,
+                 nullptr);
+    if (prefer_dark) {
+      return true;
+    }
+    gchar *theme_name = nullptr;
+    g_object_get(settings, "gtk-theme-name", &theme_name, nullptr);
+    if (theme_name != nullptr) {
+      // 主题名大小写不定(Greybird-dark / Adwaita-dark / OrchisDark),
+      // 统一小写后按子串判定
+      gchar *lower = g_ascii_strdown(theme_name, -1);
+      bool dark = strstr(lower, "dark") != nullptr;
+      g_free(lower);
+      g_free(theme_name);
+      if (dark) {
+        return true;
+      }
+    }
+  }
+#endif
+  return false;
+}
+
+/* 系统深色偏好变化通知(仅 Linux):监听 GtkSettings 的深色开关与主题名
+ * 两个属性,任一变化即回调 MoonBit;信号只挂一份,后续注册直接回调。
+ * 回调用具名函数——G_CALLBACK 是宏,lambda 参数列表的逗号会被预处理器劈开。 */
+void yue_mbt_settings_notify(GObject *, GParamSpec *, gpointer d) {
+  auto *p = static_cast<std::pair<void (*)(void *), void *> *>(d);
+  p->first(p->second);
+}
+
+void yue_mbt_on_system_theme_change(void (*invoke)(void *), void *closure) {
+#if defined(OS_LINUX)
+  GtkSettings *settings = gtk_settings_get_default();
+  if (settings == nullptr) {
+    return;
+  }
+  static gulong connected = 0;
+  if (connected == 0) {
+    connected = 1;
+    // 两个信号共用同一份闭包载体,释放钩子挂在其中一个上
+    auto *cb = new std::pair<void (*)(void *), void *>(invoke, closure);
+    g_signal_connect_data(settings, "notify::gtk-application-prefer-dark-theme",
+                          G_CALLBACK(yue_mbt_settings_notify), cb,
+                          +[](gpointer d, GClosure *) {
+                            delete static_cast<
+                                std::pair<void (*)(void *), void *> *>(d);
+                          },
+                          (GConnectFlags)0);
+    g_signal_connect_data(settings, "notify::gtk-theme-name",
+                          G_CALLBACK(yue_mbt_settings_notify), cb, nullptr,
+                          (GConnectFlags)0);
+  } else {
+    // 已有监听:仍回调一次,让后注册的 MoonBit 订阅者立即拿到当前状态
+    invoke(closure);
+  }
+#endif
+}
+
+/* 全窗口整体重绘(仅 Linux):主题切换兜底——对每个可见顶层窗口
+ * queue_draw 一次(GDK 按窗口无效化区域重绘,覆盖整棵子树),杀死
+ * 「draw 现取色但停留在旧帧」的残留。 */
+void yue_mbt_repaint_all(void) {
+#if defined(OS_LINUX)
+  GList *toplevels = gtk_window_list_toplevels();
+  for (GList *l = toplevels; l != nullptr; l = l->next) {
+    if (gtk_widget_is_toplevel(GTK_WIDGET(l->data)) &&
+        gtk_widget_get_visible(GTK_WIDGET(l->data))) {
+      gtk_widget_queue_draw(GTK_WIDGET(l->data));
+    }
+  }
+  g_list_free(toplevels);
+#endif
 }
 
 int32_t yue_mbt_view_add_tooltip_for_rect(void *view, const char *text,

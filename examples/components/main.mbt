@@ -59,8 +59,8 @@ fn main {
     return
   }
   let selected : @yue.Store[String] = @yue.Store::new("基础组件")
-  // 深浅主题切换:theme_apply 通知全部已挂载组件重着色,无需重建界面
-  let dark_mode : @yue.Store[Bool] = @yue.Store::new(false)
+  // 深浅主题:启动跟随系统,系统切换时实时联动;「切换深浅」按钮手动覆盖
+  let dark_mode : @yue.Store[Bool] = @yue.Store::new(@yue.system_prefers_dark())
   dark_mode.subscribe(fn(v) {
     if v {
       @yue.theme_apply(@yue.dark_theme())
@@ -68,6 +68,7 @@ fn main {
       @yue.theme_apply(@yue.default_theme())
     }
   })
+  @yue.on_system_theme_change(fn() { dark_mode.set(@yue.system_prefers_dark()) })
   // 演示用状态
   let page_no : @yue.Store[Int] = @yue.Store::new(2)
   let step : @yue.Store[Int] = @yue.Store::new(1)

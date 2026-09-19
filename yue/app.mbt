@@ -65,3 +65,21 @@ pub fn set_timer(ms : Int, task : () -> Bool) -> Unit {
 pub fn clear_timeout(id : Int) -> Unit {
   ffi_clear_timeout(id)
 }
+
+///|
+/// 系统是否偏好深色(Linux 读 GtkSettings 的深色开关与主题名;其余
+/// 平台当前恒 false,联动接入待补)。适合 initialize 后决定初始主题:
+/// `theme_apply(if system_prefers_dark() { dark_theme() } else { default_theme() })`。
+pub fn system_prefers_dark() -> Bool {
+  ffi_system_prefers_dark() == 1
+}
+
+///|
+/// 系统深浅偏好变化通知(Linux 监听 GtkSettings;其余平台当前不触发)。
+/// 回调时机:系统切换深/浅色或更换主题名时;重复注册安全,已有监听时
+/// 后注册者立即收到一次回调。配合 system_prefers_dark 在回调里重读,
+/// 即可实时跟随系统。
+pub fn on_system_theme_change(f : () -> Unit) -> Unit {
+  keep_alive(f)
+  ffi_on_system_theme_change(fn(g : () -> Unit) -> Unit { g() }, f)
+}

@@ -118,6 +118,18 @@ fn[T : ViewLike] bind_bg(v : T, color_of : () -> String) -> Unit {
 }
 
 ///|
+/// 前景(文字)色绑定:挂载即设 color_of() + 主题切换重设。
+/// 用于挂载期 set_color 定死的文字(Label);主题切换时按表达式重取。
+fn[T : ViewLike] bind_fg(v : T, color_of : () -> String) -> Unit {
+  fn apply() -> Unit {
+    v.set_color(color_of())
+  }
+
+  apply()
+  on_theme_change(apply)
+}
+
+///|
 /// 可点击自绘控件统一手型光标。
 fn hand() -> Cursor {
   Cursor::new(Hand)
@@ -261,9 +273,11 @@ fn apply_native_theme_css(t : Theme) -> Unit {
   // 原生 tooltip 恒深底白字(EP 语义,不随色板):系统主题的 tooltip
   // 底/字色来自两处配置,深色系统主题下常见深底深字不可读
   buf.write_string(
-    "tooltip { background-color: #303133; border-radius: 3px; }",
+    "tooltip, tooltip.background, window.tooltip { background-color: #303133; border-radius: 3px; color: #FFFFFF; }",
   )
-  buf.write_string("tooltip label { color: #FFFFFF; }")
+  buf.write_string(
+    "tooltip label, tooltip.background label, window.tooltip label { color: #FFFFFF; }",
+  )
   ffi_apply_native_theme_css(utf8_bytes(buf.to_string()))
 }
 
@@ -280,6 +294,9 @@ pub fn theme_apply(t : Theme) -> Unit {
   }
   if platform() == "linux" {
     apply_native_theme_css(t)
+    // 整体重绘兜底:订阅回调覆盖库内组件,GTK 侧再对全部可见顶层窗口
+    // queue_draw,杀掉个别「现取色但停留旧帧」的残留
+    ffi_repaint_all()
   }
 }
 
@@ -1057,10 +1074,11 @@ pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
 
 ///|
 /// 圆点徽标(EP Badge 的 dot 形态):8×8 色点。
-pub fn badge_dot(color? : String = theme_danger()) -> Node {
+pub fn badge_dot(color? : String = "") -> Node {
   container(
     on_draw=fn(p) {
-      p.set_fill_color(color)
+      // 空串=默认语义红,draw 现取跟随主题;显式传色则恒定
+      p.set_fill_color(if color == "" { theme_danger() } else { color })
       p.fill_rect(0.0, 0.0, 10000.0, 10000.0)
     },
     style=[("width", 8.0), ("height", 8.0), ("marginRight", 6.0)],
@@ -1076,10 +1094,9 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
         style=[("height", 40.0), ("marginBottom", 10.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
-      let color = type_color(t)
       bind_bg(v, fn() { type_light_color(t) })
       let label = Label::new("  " + text)
-      label.set_color(color)
+      bind_fg(label, fn() { type_color(t) })
       v.add_child(label)
       // 弹性空白把关闭钮推到右端
       let spacer = themed_container(style=[("flex", 1.0), ("height", 1.0)])
@@ -1101,7 +1118,7 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
           b.height,
           align=Center,
           valign=Center,
-          color=if hover.val { color } else { theme_text_secondary() },
+          color=if hover.val { type_color(t) } else { theme_text_secondary() },
         )
         if close_focused.val {
           draw_focus_ring(p, b.width, b.height)
@@ -1349,7 +1366,6 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
           ("flexDirection", "row"),
         ])
         let node_col = themed_container(style=[("width", 20.0), ("height", 56.0)])
-        let color = type_color(entry.2)
         let is_first = i == 0
         node_col.on_draw(fn(p) {
           // 竖线:首行从点心起、末行到点心止,中间整行贯通(节点色块居中)
@@ -1361,7 +1377,7 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
             p.set_fill_color(theme_border())
             p.fill_rect(9.0, top, 2.0, bottom - top)
           }
-          p.set_fill_color(color)
+          p.set_fill_color(type_color(entry.2))
           p.fill_rect(5.0, b.height / 2.0 - 5.0, 10.0, 10.0)
         })
         let text_col = themed_container(
@@ -1377,7 +1393,7 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
         on_theme_change(apply_title_color)
         title.set_align(Start)
         let desc = Label::new(entry.1)
-        desc.set_color(theme_text_secondary())
+        bind_fg(desc, fn() { theme_text_secondary() })
         desc.set_align(Start)
         text_col.add_child(title)
         text_col.add_child(desc)
@@ -1406,10 +1422,10 @@ pub fn descriptions(pairs : Array[(String, String)]) -> Node {
           ("alignItems", "center"),
         ])
         let k = Label::new(kv.0)
-        k.set_color(theme_text_secondary())
+        bind_fg(k, fn() { theme_text_secondary() })
         k.set_align(Start)
         let v = Label::new(kv.1)
-        v.set_color(theme_text_primary())
+        bind_fg(v, fn() { theme_text_primary() })
         v.set_align(Start)
         let key_wrap = themed_container(style=[("width", 110.0)])
         key_wrap.add_child(k)
@@ -1474,13 +1490,13 @@ pub fn result(
       ])
       let t1 = Label::new(title)
       t1.set_font(Font::new("Sans", 18.0, weight=SemiBold))
-      t1.set_color(theme_text_primary())
+      bind_fg(t1, fn() { theme_text_primary() })
       big.add_child(t1)
       let sub = themed_container(style=[("height", 24.0)], style_str=[
         ("alignItems", "center"),
       ])
       let t2 = Label::new(desc)
-      t2.set_color(theme_text_secondary())
+      bind_fg(t2, fn() { theme_text_secondary() })
       sub.add_child(t2)
       let btns = themed_container(style=[("marginTop", 8.0)], style_str=[
         ("flexDirection", "row"),
@@ -1532,7 +1548,7 @@ pub fn empty(desc : String) -> Node {
         ("alignItems", "center"),
       ])
       let l = Label::new(desc)
-      l.set_color(theme_text_secondary())
+      bind_fg(l, fn() { theme_text_secondary() })
       cap.add_child(l)
       outer.add_child(box)
       outer.add_child(cap)
@@ -1552,9 +1568,9 @@ pub fn statistic(title : String, value : Store[String]) -> Node {
       ])
       let num = Label::new(value.get())
       num.set_font(Font::new("Sans", 24.0, weight=SemiBold))
-      num.set_color(theme_text_primary())
+      bind_fg(num, fn() { theme_text_primary() })
       let cap = Label::new(title)
-      cap.set_color(theme_text_secondary())
+      bind_fg(cap, fn() { theme_text_secondary() })
       value.subscribe(fn(v) { num.set_text(v) })
       outer.add_child(num)
       outer.add_child(cap)
@@ -2283,7 +2299,7 @@ pub fn form_item(label : String, control : Node, label_width? : Double = 90.0) -
       )
       let k = Label::new(label)
       k.set_font(Font::new("Sans", 13.0))
-      k.set_color(theme_text_secondary())
+      bind_fg(k, fn() { theme_text_secondary() })
       k.set_align(End)
       let kwrap = themed_container(style=[("width", label_width), ("marginRight", 12.0)])
       kwrap.add_child(k)
@@ -2406,7 +2422,7 @@ pub fn page_header(
       row.add_child(back)
       let t = Label::new(title)
       t.set_font(Font::new("Sans", 15.0, weight=SemiBold))
-      t.set_color(theme_text_primary())
+      bind_fg(t, fn() { theme_text_primary() })
       row.add_child(t)
       let spacer = themed_container(style=[("flex", 1.0), ("height", 1.0)])
       row.add_child(spacer)
@@ -2472,7 +2488,7 @@ pub fn tree(root : Array[TreeNode]) -> Node {
           })
           let label = Label::new(" " + nd.label)
           label.set_font(font)
-          label.set_color(theme_text_primary())
+          bind_fg(label, fn() { theme_text_primary() })
           row.add_child(arrow)
           row.add_child(label)
           let kids = themed_container(
@@ -2588,7 +2604,7 @@ pub fn transfer(
           })
           let l = Label::new(it_ref)
           l.set_font(font)
-          l.set_color(theme_text_regular())
+          bind_fg(l, fn() { theme_text_regular() })
           row.add_child(mark)
           row.add_child(l)
           let mark_ref = mark
@@ -3428,7 +3444,7 @@ pub fn table_t(
         content : TableCell,
         col : TableColumn,
         fnt : Font,
-        color : String,
+        color_of : () -> String,
       ) -> Container {
         let base : Array[(String, Double)] = if col.width > 0.0 {
           [("width", col.width), ("paddingLeft", 12.0), ("paddingRight", 12.0)]
@@ -3443,7 +3459,7 @@ pub fn table_t(
           CellText(text) => {
             let l = Label::new(text)
             l.set_font(fnt)
-            l.set_color(color)
+            bind_fg(l, color_of)
             l.set_align(col.align)
             l.set_style("flex", 1.0)
             wrap.add_child(l)
@@ -3481,7 +3497,7 @@ pub fn table_t(
             wrap.add_child(sw)
             let l = Label::new(name)
             l.set_font(small_font)
-            l.set_color(color)
+            bind_fg(l, color_of)
             l.set_align(col.align)
             l.set_style("flex", 1.0)
             l.set_style("marginLeft", 6.0)
@@ -3495,7 +3511,7 @@ pub fn table_t(
             for ln in lines {
               let l = Label::new(ln)
               l.set_font(small_font)
-              l.set_color(theme_text_regular())
+              bind_fg(l, fn() { theme_text_regular() })
               stack.add_child(l)
             }
             stack.set_style("flex", 1.0)
@@ -3570,7 +3586,7 @@ pub fn table_t(
             CellText(col.title),
             col,
             head_font,
-            theme_text_secondary(),
+            fn() { theme_text_secondary() },
           ),
         )
       }
@@ -3638,7 +3654,9 @@ pub fn table_t(
               CellText("")
             }
             row.add_child(
-              cell_view(content, columns[j], font, theme_text_regular()),
+              cell_view(content, columns[j], font, fn() {
+                theme_text_regular()
+              }),
             )
           }
           row.on_mouse_enter(fn(_e) {

@@ -632,6 +632,9 @@ void yue_mbt_window_on_blur(void *window, int32_t (*invoke)(void *), void *closu
 void yue_mbt_view_set_tooltip(void *view, const char *text);
 int32_t yue_mbt_view_add_tooltip_for_rect(void *view, const char *text, double x, double y, double w, double h);
 void yue_mbt_view_remove_tooltip(void *view, int32_t id);
+bool yue_mbt_system_prefers_dark(void);
+void yue_mbt_on_system_theme_change(void (*invoke)(void *), void *closure);
+void yue_mbt_repaint_all(void);
 void yue_mbt_view_set_focusable(void *view, int32_t focusable);
 int32_t yue_mbt_view_has_focus(void *view);
 void yue_mbt_view_schedule_paint_rect(void *view, double x, double y, double w, double h);
