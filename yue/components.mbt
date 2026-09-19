@@ -2236,6 +2236,8 @@ pub fn input_t(
   width? : Double = 280.0,
   height? : Double = 30.0,
   clearable? : Bool = false,
+  on_input? : (String) -> Unit = fn(_s) {  },
+  invalid? : Store[Bool] = Store::new(false),
 ) -> Node {
   {
     mount: fn(parent) {
@@ -2256,13 +2258,20 @@ pub fn input_t(
       outer.on_draw(fn(p) {
         let b = ViewLike::get_bounds(outer, )
         p.set_stroke_color(
-          if focused.val { theme_focus_accent() } else { theme_border() },
+          if invalid.get() {
+            theme_danger()
+          } else if focused.val {
+            theme_focus_accent()
+          } else {
+            theme_border()
+          },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         if clearable && hover.val && has_text.val {
           draw_clear_x(p, clear_x, b.height / 2.0)
         }
       })
+      invalid.subscribe(fn(_v) { ViewLike::schedule_paint(outer) })
       let entry = match password {
         true => Entry::make(text~, entry_type=Password)
         false => Entry::make(text~, entry_type=Normal)
@@ -2288,11 +2297,13 @@ pub fn input_t(
         entry.set_position(0)
         false
       })
+      entry.on_text_change(fn() {
+        let cur = entry.get_text()
+        has_text.val = cur != ""
+        on_input(cur)
+        ViewLike::schedule_paint(outer, )
+      })
       if clearable {
-        entry.on_text_change(fn() {
-          has_text.val = entry.get_text() != ""
-          ViewLike::schedule_paint(outer, )
-        })
         ViewLike::on_mouse_enter(outer, fn(_e) {
           hover.val = true
           ViewLike::schedule_paint(outer, )
@@ -2415,12 +2426,20 @@ pub fn input_number(
 }
 
 ///|
-/// 表单项:左侧标签(灰,定宽)+ 右侧控件区,垂直居中。
-pub fn form_item(label : String, control : Node, label_width? : Double = 90.0) -> Node {
+/// 表单项:左侧标签(灰,定宽)+ 右侧控件区,垂直居中。error 为校验
+/// 错误文案 Store:非空时控件行下方显示 danger 红字;行高固定预留,
+/// 错误出现/消失不引起布局跳动。
+pub fn form_item(
+  label : String,
+  control : Node,
+  label_width? : Double = 90.0,
+  error? : Store[String] = Store::new(""),
+) -> Node {
   {
     mount: fn(parent) {
+      let outer = themed_container(style_str=[("flexDirection", "column")])
       let row = themed_container(
-        style=[("marginBottom", 10.0)],
+        style=[("marginBottom", 2.0)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
       let k = Label::new(label)
@@ -2431,8 +2450,22 @@ pub fn form_item(label : String, control : Node, label_width? : Double = 90.0) -
       kwrap.add_child(k)
       row.add_child(kwrap)
       ignore((control.mount)(ViewLike::view(row, )))
-      attach(parent, ViewLike::view(row, ))
-      ViewLike::view(row, )
+      outer.add_child(row)
+      let err = Label::new(error.get())
+      ViewLike::set_font(err, Font::new("Sans", 12.0))
+      bind_fg(err, fn() { theme_danger() })
+      ViewLike::set_style(err, "height", 18.0)
+      ViewLike::set_style(err, "marginLeft", label_width + 12.0)
+      outer.add_child(err)
+      error.subscribe(fn(msg) {
+        err.set_text(msg)
+        // set_color 的 Pango 属性不触发重排,同文重排一次(见 adaptation.md)
+        ViewLike::set_color(err, err.get_text())
+      })
+      let spacer = themed_container(style=[("height", 8.0)])
+      outer.add_child(spacer)
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -4312,6 +4345,7 @@ pub fn textarea_t(
   margin? : Double = 0.0,
   on_input? : (String) -> Unit = fn(_s) {  },
   clearable? : Bool = false,
+  invalid? : Store[Bool] = Store::new(false),
 ) -> Node {
   {
     mount: fn(parent) {
@@ -4333,13 +4367,20 @@ pub fn textarea_t(
       outer.on_draw(fn(p) {
         let b = ViewLike::get_bounds(outer, )
         p.set_stroke_color(
-          if focused.val { theme_focus_accent() } else { theme_border() },
+          if invalid.get() {
+            theme_danger()
+          } else if focused.val {
+            theme_focus_accent()
+          } else {
+            theme_border()
+          },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         if clearable && hover.val && has_text.val {
           draw_clear_x(p, clear_x, b.height / 2.0)
         }
       })
+      invalid.subscribe(fn(_v) { ViewLike::schedule_paint(outer) })
       let edit = TextEdit::new()
       edit.set_text(text)
       ViewLike::set_font(edit, Font::new("Sans", 13.0))

@@ -63,6 +63,12 @@ fn main {
   let dlg_basic : @yue.Store[Bool] = @yue.Store::new(false)
   let dlg_form : @yue.Store[Bool] = @yue.Store::new(false)
   let dlg_name : @yue.Store[String] = @yue.Store::new("")
+  let vfy_name : @yue.Store[String] = @yue.Store::new("")
+  let vfy_mail : @yue.Store[String] = @yue.Store::new("")
+  let vfy_name_bad : @yue.Store[Bool] = @yue.Store::new(false)
+  let vfy_name_err : @yue.Store[String] = @yue.Store::new("")
+  let vfy_mail_bad : @yue.Store[Bool] = @yue.Store::new(false)
+  let vfy_mail_err : @yue.Store[String] = @yue.Store::new("")
   // 深浅主题:启动跟随系统,系统切换时实时联动;「切换深浅」按钮手动覆盖
   let dark_mode : @yue.Store[Bool] = @yue.Store::new(@yue.system_prefers_dark())
   dark_mode.subscribe(fn(v) {
@@ -295,6 +301,62 @@ fn main {
           width=300.0,
           clearable=true,
         ),
+      ],
+    ),
+    section(
+      "表单校验(轻量)",
+      "input_t 传 invalid Store(边框变 danger 红)、form_item 传 error Store(下方红字,行高固定不跳);提交回调里跑规则、写两个 Store 即成,输入合法时按钮清除错误并弹 toast。",
+      [
+        @yue.form(
+          "注册信息",
+          [
+            @yue.form_item(
+              "名称",
+              @yue.input_t(
+                text="",
+                width=240.0,
+                on_input=fn(t) {
+                  vfy_name.set(t)
+                  vfy_name_bad.set(false)
+                  vfy_name_err.set("")
+                },
+                invalid=vfy_name_bad,
+              ),
+              error=vfy_name_err,
+            ),
+            @yue.form_item(
+              "邮箱",
+              @yue.input_t(
+                text="",
+                width=240.0,
+                on_input=fn(t) {
+                  vfy_mail.set(t)
+                  vfy_mail_bad.set(false)
+                  vfy_mail_err.set("")
+                },
+                invalid=vfy_mail_bad,
+              ),
+              error=vfy_mail_err,
+            ),
+          ],
+        ),
+        @yue.hbox([
+          @yue.button_t(
+            "提交校验",
+            variant=@yue.Solid,
+            on_click=fn() {
+              let name_bad = vfy_name.get() == ""
+              vfy_name_bad.set(name_bad)
+              vfy_name_err.set(if name_bad { "名称不能为空" } else { "" })
+              let mail_bad = !vfy_mail.get().contains("@")
+              vfy_mail_bad.set(mail_bad)
+              vfy_mail_err.set(if mail_bad { "邮箱格式需包含 @" } else { "" })
+              if !name_bad && !mail_bad {
+                toast_push("校验通过,已提交", @yue.Success)
+              }
+            },
+          ),
+        ]),
       ],
     ),
     section(
