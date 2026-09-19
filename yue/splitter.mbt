@@ -1,9 +1,11 @@
 // 可拖动分隔布局:hsplit(水平排布,左右两栏)/ vsplit(垂直排布,
 // 上下两栏)。桌面多栏界面的标配件(Qt QSplitter / GTK Paned 对位):
-// 6px 自绘把手,悬停浅灰底、拖动中主题色 + 双列点纹;拖动经 set_capture
-// 捕获鼠标(拖出把手范围事件不丢),window 坐标累计位移改写首栏
-// flexbasis(像素),release_capture 收势;min_first/min_second 钳制
-// 两栏最小尺寸。主题切换经 themed_container 自动重绘。
+// 8px 自绘把手常显点纹(不靠 hover 也能找到),悬停浅灰底、拖动中
+// 主题色 + 白点;拖动经 set_capture 捕获鼠标(拖出把手范围事件不丢),
+// window 坐标累计位移改写首栏 flexbasis(像素),release_capture 收势;
+// min_first/min_second 钳制两栏最小尺寸。挂载序即排列序与 z 序:
+// pane_a → 把手 → pane_b,把手必须挂在两栏之间。主题切换经
+// themed_container 自动重绘。
 
 ///|
 /// 水平分隔:左右两栏,中间纵向把手左右拖动。
@@ -46,7 +48,7 @@ fn splitter_impl(
       // 累计值准,中途窗口缩放/外部改布局都不漂)
       let start_pos = Ref(0.0)
       let start_basis = Ref(0.0)
-      let handle_w = 6.0
+      let handle_w = 8.0
       let outer = themed_container(
         style=[("flex", 1.0)],
         style_str=[
@@ -60,6 +62,7 @@ fn splitter_impl(
       ViewLike::set_style_str(pane_a, "flexbasis", basis_pct)
       ViewLike::set_style(pane_a, if horizontal { "minwidth" } else { "minheight" }, min_a)
       ignore((first.mount)(ViewLike::view(pane_a)))
+      attach(ViewLike::view(outer), ViewLike::view(pane_a))
       let handle = themed_container(style=[
         if horizontal {
           ("width", handle_w)
@@ -67,16 +70,15 @@ fn splitter_impl(
           ("height", handle_w)
         },
       ])
-      // 挂载序即排列序与 z 序:pane_a → 把手 → pane_b(把手在建好样式后
-      // 立即挂入,pane_b 的 mount 随后追加)
       attach(ViewLike::view(outer), ViewLike::view(handle))
       let pane_b = themed_container(style_str=[("flexDirection", "column")])
       ViewLike::set_style(pane_b, "flex", 1.0)
       ViewLike::set_style(pane_b, if horizontal { "minwidth" } else { "minheight" }, min_b)
       ignore((second.mount)(ViewLike::view(pane_b)))
       attach(ViewLike::view(outer), ViewLike::view(pane_b))
-      // 把手盖在两栏之间(z 序按挂载序),先挂 pane_a 再挂把手再挂 pane_b
       View::set_cursor(handle, Cursor::new(if horizontal { ResizeEW } else { ResizeNS }))
+      // 常显视觉:中间 1px 分隔线 + 双列点纹(border 色),不靠 hover;
+      // hover 浅灰底、拖动主题色底白点(把手状态一眼可辨)
       handle.on_draw(fn(p) {
         let b = ViewLike::get_bounds(handle)
         if dragging.val {
@@ -86,12 +88,24 @@ fn splitter_impl(
           p.set_fill_color(theme_fill_hover())
           p.fill_rect(0.0, 0.0, b.width, b.height)
         }
-        // 双列点纹:横把手两列三点,竖把手两行三点(中间点用主题描边色)
         let cx = b.width / 2.0
         let cy = b.height / 2.0
+        if horizontal {
+          p.set_stroke_color(theme_border())
+          p.begin_path()
+          p.move_to(cx, 2.0)
+          p.line_to(cx, b.height - 2.0)
+          p.stroke()
+        } else {
+          p.set_stroke_color(theme_border())
+          p.begin_path()
+          p.move_to(2.0, cy)
+          p.line_to(b.width - 2.0, cy)
+          p.stroke()
+        }
         let dot_r = 1.0
-        let gap = 3.5
-        let c = if dragging.val { "#FFFFFF" } else { theme_border() }
+        let gap = 3.0
+        let c = if dragging.val { "#FFFFFF" } else { theme_text_secondary() }
         p.set_fill_color(c)
         for i in [-1, 0, 1] {
           if horizontal {
@@ -102,6 +116,14 @@ fn splitter_impl(
             icon_dot(p, cx + Double::from_int(i) * gap, cy + gap, dot_r)
           }
         }
+      })
+      ViewLike::on_mouse_enter(handle, fn(_e) {
+        hover.val = true
+        ViewLike::schedule_paint(handle)
+      })
+      ViewLike::on_mouse_leave(handle, fn(_e) {
+        hover.val = false
+        ViewLike::schedule_paint(handle)
       })
       ViewLike::on_mouse_down(handle, fn(e) {
         if e.button == 1 {
@@ -157,16 +179,6 @@ fn splitter_impl(
           ViewLike::schedule_paint(handle)
         }
       })
-      ViewLike::on_mouse_enter(handle,fn(_e) {
-        hover.val = true
-        ViewLike::schedule_paint(handle)
-      })
-      ViewLike::on_mouse_leave(handle,fn(_e) {
-        hover.val = false
-        ViewLike::schedule_paint(handle)
-      })
-      // 挂载序即排列序:pane_a、把手、pane_b
-      attach(ViewLike::view(outer), ViewLike::view(pane_a))
       attach(parent, ViewLike::view(outer))
       ViewLike::view(outer)
     },
