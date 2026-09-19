@@ -29,15 +29,6 @@ fn keep_alive_draw(callback : (Painter) -> Unit) -> Unit {
 }
 
 ///|
-/// 把回调推迟到主循环下一拍执行(当前这批输入事件——含悬着的鼠标
-/// release——处理完之后)。仅 Linux 有实现(其余平台空操作),调用方
-/// 只应在 Linux 分支使用;用于「焦点/按下事件里不能立刻开弹层」的场景。
-fn call_delayed(ms : Int, callback : () -> Unit) -> Unit {
-  keep_alive(callback)
-  ffi_call_delayed(ms, fn(f : () -> Unit) -> Unit { f() }, callback)
-}
-
-///|
 /// 创建默认有边框的窗口。
 pub fn Window::new() -> Window {
   { view: ffi_window_new_ex(1, 0, 0), }

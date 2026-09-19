@@ -188,8 +188,10 @@ pub fn Popover::on_close(self : Popover, callback : () -> Unit) -> Unit {
 
 ///|
 /// 设置弹层是否接受键盘焦点。传 false 时弹层出现与点击都不夺走当前
-/// 焦点控件，键盘事件持续进入锚点（弹层展开期间持续键入的组件依赖
-/// 此语义，如 select_t 的输入筛选）。仅 Linux 有实现，其余平台空操作。
+/// 焦点控件,键盘事件持续进入锚点。仅 Linux 有实现,其余平台空操作。
+/// 注意:XFCE 下弹层窗口映射仍可能按 WM 策略拿走 X 焦点,此开关不能
+/// 完全保证锚点持焦(可过滤下拉三轮验证均败于此,见 adaptation.md),
+/// 键盘交互型弹层慎用。
 pub fn Popover::set_accept_focus(self : Popover, accept : Bool) -> Unit {
   ffi_popover_set_accept_focus(self, if accept { 1 } else { 0 })
 }

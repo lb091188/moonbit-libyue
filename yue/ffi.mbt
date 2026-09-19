@@ -1351,14 +1351,6 @@ extern "c" fn ffi_popover_set_accept_focus(
 ) -> Unit = "yue_mbt_popover_set_accept_focus"
 
 ///|
-#borrow(invoke, callback)
-extern "c" fn ffi_call_delayed(
-  ms : Int,
-  invoke : FuncRef[(() -> Unit) -> Unit],
-  callback : () -> Unit,
-) -> Unit = "yue_mbt_call_delayed"
-
-///|
 #borrow(popover)
 extern "c" fn ffi_popover_close(popover : Popover) -> Unit = "yue_mbt_popover_close"
 

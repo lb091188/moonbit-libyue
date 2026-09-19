@@ -28,7 +28,7 @@ let t = @yue.default_theme()
 | `divider(vertical?, spacing?)` | divider line: horizontal (default) or vertical, 1px theme border color, spacing on both sides |
 | `slider_t(value : Store[Double], min?, max?, step?, width?, on_change?)` | self-drawn slider: light track + themed fill + square thumb, click/drag to set (step-quantized), external Store set also applies |
 | `tabs_t(pages : Array[(String, Node)], selected?)` | top tabs: active tab themed text + 2px bottom indicator, content switched via set_visible; `selected` is an index Store (internal 0 by default) |
-| `select_t(options, value : Store[String], width?, on_change?)` | dropdown select (EP style, fully self-drawn): hover highlight / ✓ on current, pick to fill. On Linux it is filterable: the field accepts typing, options live-filter as you type, the popover opens/collapses automatically, ↑↓ to move the highlight, Enter to pick, Esc to close; other platforms keep the read-only click-to-pick field |
+| `select_t(options, value : Store[String], width?, on_change?)` | dropdown select (EP style, fully self-drawn): click to open the candidate list, hover highlight, ✓ on the current pick, click to fill and close; same behavior on all platforms |
 | `rate_t(value : Store[Int], max?, on_change?)` | star rating (self-drawn): filled theme color when on, outlined gray when off, hover preview, click sets stars |
 | `tooltip_t(content : Node, tip)` | wrap any node with the native tooltip; on Linux the tooltip color is pinned to dark background + white text (independent of the system theme), other platforms keep the system style |
 | `popover_t(trigger : Node, content : Node, width, height)` | popover bubble: clicking the trigger opens arbitrary Node content below it, click again to close |
