@@ -2446,9 +2446,10 @@ pub fn form_item(
       ViewLike::set_style(err, "marginLeft", label_width + 12.0)
       outer.add_child(err)
       error.subscribe(fn(msg) {
+        // set_text 新文本本身触发 GTK 重排,重排取 bind_fg 已设的 danger
+        // 颜色属性;红字色固定由 bind_fg 管,此处 set_color 反而错(参数
+        // 是颜色不是文本)
         err.set_text(msg)
-        // set_color 的 Pango 属性不触发重排,同文重排一次(见 adaptation.md)
-        ViewLike::set_color(err, err.get_text())
       })
       let spacer = themed_container(style=[("height", 8.0)])
       outer.add_child(spacer)
