@@ -163,11 +163,13 @@ def _copy_webview2_loader() -> None:
         # 共享卷上 os.path.samefile 会把独立文件误判为同一文件
         # (SameFileError)，且先删目标再复制会在「目标即源」时自毁——
         # 上面已用 resolve() 精确比较排除该情形，此处再兜底跳过异常。
+        # 注意 except 名字仅在异常发生时求值：曾写成裸 SameFileError
+        # (未导入)潜伏数轮，直到目标 DLL 被占用真正抛异常才以 NameError 炸出
         try:
             if target.exists():
                 target.unlink()
             shutil.copyfile(src, target)
-        except (SameFileError, PermissionError):
+        except (shutil.SameFileError, PermissionError):
             pass
         return
 
