@@ -94,7 +94,7 @@ let t = @yue.default_theme()
 
 ## Demo
 
-`moon run examples/components` — four-page showcase with every component and state:
+`moon run examples/components` — seven-page showcase (Basic / Form / Navigation / Data Display / Feedback + System Integration / Window & Web) covering every component and system capability:
 
 ![Basic](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-basic.png)
 
@@ -103,5 +103,7 @@ let t = @yue.default_theme()
 ![Data display](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-data.png)
 
 ![Feedback](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-feedback.png)
+
+**System capabilities**: the "System Integration" page (file dialogs / message boxes / system notifications / clipboard / timers) and "Window & Web" page (window APIs / global shortcuts / drop target / embedded WebView) wrap libyue system pieces in the modern theme; full-capability default-theme demos (complete browser, drag-out, custom protocol) live in `examples/showcase`.
 
 State coordination across components goes through `Store` (subscribe / map / bind_label); see [docs/declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md). Chinese version: [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md).

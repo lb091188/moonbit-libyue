@@ -71,7 +71,7 @@ Build the native library and run an example:
 compiled. Set `LIBYUE_FORCE_SOURCE=1` to fall back to a full source build.**
 
 ```sh
-moon run examples/hello
+moon run examples/showcase
 ```
 
 #### Windows (10/11, x64)
@@ -101,7 +101,7 @@ Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installe
 
 ```bat
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-moon run examples/hello
+moon run examples/showcase
 ```
 
 (When the native artifacts are missing, moon invokes

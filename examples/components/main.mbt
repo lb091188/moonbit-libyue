@@ -60,6 +60,8 @@ fn main {
   }
   let selected : @yue.Store[String] = @yue.Store::new("基础组件")
   let (toast_node, toast_push) = @yue.toast_layer()
+  let win_ref : Ref[@yue.Window?] = Ref(None)
+  let ontop : Ref[Bool] = Ref(false)
   let dlg_basic : @yue.Store[Bool] = @yue.Store::new(false)
   let dlg_form : @yue.Store[Bool] = @yue.Store::new(false)
   let dlg_name : @yue.Store[String] = @yue.Store::new("")
@@ -989,6 +991,241 @@ fn main {
       ],
     ),
   ])
+  // ---------- 系统能力(现代主题包装的 libyue 系统件) ----------
+  let p_sys = scroll_page([
+    section(
+      "文件对话框",
+      "FileDialog 模态打开/保存,回显所选路径;配套 read/write_text_file 直读直写。",
+      [
+        @yue.hbox([
+          @yue.button_t("打开文件…", on_click=fn() {
+            match win_ref.val {
+              Some(w) => {
+                let dlg = @yue.FileDialog::new_open()
+                dlg.set_filters("文本文件:txt,md|所有文件:*")
+                if dlg.run_for_window(w) {
+                  toast_push("已选 \{dlg.get_result()}", @yue.Success)
+                } else {
+                  toast_push("已取消", @yue.Info)
+                }
+              }
+              None => ()
+            }
+          }),
+          @yue.button_t("保存文件…", on_click=fn() {
+            match win_ref.val {
+              Some(w) => {
+                let dlg = @yue.FileDialog::new_save()
+                dlg.set_filename("components.txt")
+                if dlg.run_for_window(w) {
+                  let ok = @yue.write_text_file(dlg.get_result(), "由 components 写入\n")
+                  toast_push(
+                    if ok { "已保存 \{dlg.get_result()}" } else { "保存失败" },
+                    if ok { @yue.Success } else { @yue.Danger },
+                  )
+                } else {
+                  toast_push("已取消", @yue.Info)
+                }
+              }
+              None => ()
+            }
+          }),
+        ]),
+      ],
+    ),
+    section(
+      "消息框",
+      "原生 MessageBox(模态对话):标题/正文/按钮,响应 id 回传。",
+      [
+        @yue.hbox([
+          @yue.button_t("询问框", on_click=fn() {
+            match win_ref.val {
+              Some(w) => {
+                let box = @yue.MessageBox::new(@yue.Information)
+                box.set_title("确认操作")
+                box.set_text("要执行该操作吗?")
+                box.add_button("确定", 1)
+                box.add_button("取消", 2)
+                box.on_response(fn(code) {
+                  toast_push("消息框响应 id=\{code}", @yue.Info)
+                })
+                box.show_for_window(w)
+              }
+              None => ()
+            }
+          }),
+          @yue.button_t("警告框", on_click=fn() {
+            match win_ref.val {
+              Some(w) => {
+                let box = @yue.MessageBox::new(@yue.Warning)
+                box.set_title("警告")
+                box.set_text("此操作不可撤销!")
+                box.show_for_window(w)
+              }
+              None => ()
+            }
+          }),
+        ]),
+      ],
+    ),
+    section(
+      "系统通知",
+      "Notification 提交系统通知中心(桌面端右上角弹出,应用外可见)。",
+      [
+        @yue.button_t("发送通知", on_click=fn() {
+          let n = @yue.Notification::new()
+          n.set_title("components 演示")
+          n.set_body("这是一条系统通知,点击后已提交通知中心。")
+          n.show()
+          toast_push("通知已提交", @yue.Success)
+        }),
+      ],
+    ),
+    section(
+      "剪贴板",
+      "Clipboard 读写系统剪贴板文本。",
+      [
+        @yue.hbox([
+          @yue.button_t("写入文本", on_click=fn() {
+            @yue.Clipboard::get().set_text("来自 components 的剪贴板内容")
+            toast_push("已写入剪贴板", @yue.Success)
+          }),
+          @yue.button_t("读回显示", variant=@yue.Solid, on_click=fn() {
+            let t = @yue.Clipboard::get().get_text()
+            toast_push(
+              if t == "" { "剪贴板为空" } else { "读到: \{t}" },
+              if t == "" { @yue.Warning } else { @yue.Info },
+            )
+          }),
+        ]),
+      ],
+    ),
+    section(
+      "定时器与延迟任务",
+      "set_timeout 单次延时 / set_timer 周期回调(返回 false 自动停)/ post_delayed_task 主线程任务。",
+      [
+        @yue.hbox([
+          @yue.button_t("1.5 秒后提示", on_click=fn() {
+            ignore(@yue.set_timeout(1500, fn() { toast_push("延时任务触发", @yue.Success) }))
+          }),
+          @yue.button_t("周期计数到 3", variant=@yue.Solid, on_click=fn() {
+            let n = Ref(0)
+            @yue.set_timer(700, fn() {
+              n.val = n.val + 1
+              toast_push("第 \{n.val} 次周期回调", @yue.Info)
+              n.val < 3
+            })
+          }),
+        ]),
+      ],
+    ),
+  ])
+  let p_win = scroll_page([
+    section(
+      "窗口 API",
+      "运行期操作窗口:改标题 / 全屏切换 / 置顶切换。",
+      [
+        @yue.hbox([
+          @yue.button_t("改标题", on_click=fn() {
+            match win_ref.val {
+              Some(w) => {
+                w.set_title("components · 标题已改")
+                toast_push("窗口标题已更新", @yue.Success)
+              }
+              None => ()
+            }
+          }),
+          @yue.button_t("全屏切换", on_click=fn() {
+            match win_ref.val {
+              Some(w) => {
+                w.set_fullscreen(!w.is_fullscreen())
+                toast_push("全屏状态已切换", @yue.Info)
+              }
+              None => ()
+            }
+          }),
+          @yue.button_t("置顶切换", variant=@yue.Solid, on_click=fn() {
+            match win_ref.val {
+              Some(w) => {
+                ontop.val = !ontop.val
+                w.set_always_on_top(ontop.val)
+                toast_push(
+                  if ontop.val { "已置顶" } else { "已取消置顶" },
+                  @yue.Info,
+                )
+              }
+              None => ()
+            }
+          }),
+        ]),
+      ],
+    ),
+    section(
+      "全局快捷键",
+      "register_global_shortcut 注册应用外生效的系统快捷键(Ctrl+Alt+C),触发弹 toast;unregister_all_global_shortcuts 注销全部。",
+      [
+        @yue.hbox([
+          @yue.button_t("注册 Ctrl+Alt+C", on_click=fn() {
+            ignore(
+              @yue.register_global_shortcut("Ctrl+Alt+C", fn() {
+                toast_push("全局快捷键触发!", @yue.Success)
+              }),
+            )
+            toast_push("已注册,切到别的窗口按 Ctrl+Alt+C 试试", @yue.Info)
+          }),
+          @yue.button_t("注销全部", on_click=fn() {
+            @yue.unregister_all_global_shortcuts()
+            toast_push("全局快捷键已清空", @yue.Warning)
+          }),
+        ]),
+      ],
+    ),
+    section(
+      "拖放接收",
+      "register_dragged_types 注册接收文件/文本,从文件管理器拖入下方色块。",
+      [
+        @yue.vbox(
+          [
+            @yue.label_t("把文件拖进来", role=@yue.Body, handle=fn(_l) {  }),
+          ],
+          style=[("height", 70.0), ("width", 420.0), ("padding", 10.0)],
+          handle=fn(c) {
+            @yue.theme_bind_bg(c, fn() { @yue.theme_current().primary_light })
+            c.register_dragged_types([@yue.FilePaths, @yue.Text])
+            c.handle_drag_enter(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })
+            c.handle_drop(fn(info, _x, _y) {
+              match info.get_data(@yue.FilePaths) {
+                Some(@yue.Paths(paths)) => {
+                  let sb = StringBuilder()
+                  for i, p in paths {
+                    if i > 0 {
+                      sb.write_string("、")
+                    }
+                    sb.write_string(p)
+                  }
+                  toast_push("拖入 \{paths.length()} 个文件", @yue.Success)
+                }
+                _ => toast_push("拖入文本", @yue.Info)
+              }
+              true
+            })
+          },
+        ),
+      ],
+    ),
+    section(
+      "内嵌网页",
+      "Browser(WebView)加载本地 HTML;完整浏览器演示(地址栏/自定义协议)见 showcase。",
+      [
+        @yue.browser(handle=fn(x) {
+          x.load_html(
+            "<html><body style='font-family:sans-serif;background:#fff;color:#222;display:flex;align-items:center;justify-content:center;height:100%'><h3>WebView 内嵌页 ✓</h3></body></html>",
+          )
+        }, style=[("width", 480.0), ("height", 160.0)]),
+      ],
+    ),
+  ])
+
   let window = @yue.mount_window(
     [
       @yue.hbox(style=[("flex", 1.0)], style_str=[("alignItems", "stretch")], [
@@ -996,6 +1233,7 @@ fn main {
           [
             ("基础", ["基础组件", "表单组件"]),
             ("进阶", ["导航组件", "数据展示", "反馈组件"]),
+            ("系统", ["系统集成", "窗口与网页"]),
           ],
           selected,
         ),
@@ -1004,7 +1242,15 @@ fn main {
             @yue.hbox(
               [
                 @yue.segmented(
-                  ["基础组件", "表单组件", "导航组件", "数据展示", "反馈组件"],
+                  [
+                    "基础组件",
+                    "表单组件",
+                    "导航组件",
+                    "数据展示",
+                    "反馈组件",
+                    "系统集成",
+                    "窗口与网页",
+                  ],
                   selected,
                 ),
                 @yue.button_t(
@@ -1032,6 +1278,8 @@ fn main {
             page("导航组件", selected, p_nav),
             page("数据展示", selected, p_data),
             page("反馈组件", selected, p_feedback),
+            page("系统集成", selected, p_sys),
+            page("窗口与网页", selected, p_win),
           ],
           style=[("flex", 1.0)],
           handle=fn(c) {
@@ -1075,6 +1323,7 @@ fn main {
     size=Some((880.0, 720.0)),
     center=true,
     on_close=fn(_w) { @yue.quit() },
+    handle=fn(w) { win_ref.val = Some(w) },
   )
   window.activate()
   @yue.run()

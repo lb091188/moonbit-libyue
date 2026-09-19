@@ -79,7 +79,7 @@ MoonBit 侧入口(`yue/view.mbt` / `yue/events.mbt`):
 
 ## Ubuntu 24.04 / X11 / XFCE 4.18 实测记录(2026-09-11)
 
-`examples/layout` 内置 16 项几何断言(flex 平分、gap 间距、百分比宽、justify/align 居中、
+布局系统内置 16 项几何断言(flex 平分、gap 间距、百分比宽、justify/align 居中、
 min-width 托底、absolute 定位),真实窗口实测 **16/16 全过(failures=0)**,±1px 容差。
 叠加规律与手算一致:内容区 = 容器 − 2×padding;gap 不与 margin 叠加;百分比基准为父内容区宽。
 
