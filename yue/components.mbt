@@ -1238,22 +1238,22 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
         let l = Label::new(items[i])
         l.set_font(font)
         let cur_ref = current
-        cur_ref.subscribe(fn(v) {
+        // 步骤文字色随「当前步」与主题双状态变化;set_color 后须同文
+        // set_text 触发重排(否则重绘仍用旧色,见 adaptation.md)
+        fn apply_step_label() -> Unit {
           l.set_color(
-            if i <= v {
+            if i <= cur_ref.get() {
               theme_text_primary()
             } else {
               theme_text_secondary()
             },
           )
-        })
-        l.set_color(
-          if i <= current.get() {
-            theme_text_primary()
-          } else {
-            theme_text_secondary()
-          },
-        )
+          l.set_text(l.get_text())
+        }
+
+        apply_step_label()
+        on_theme_change(apply_step_label)
+        cur_ref.subscribe(fn(_v) { apply_step_label() })
         row.add_child(l)
       }
       attach(parent, row.view())

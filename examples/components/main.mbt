@@ -576,10 +576,10 @@ fn main {
           [
             @yue.badge_count(9),
             @yue.badge_count(128),
-            @yue.label("   消息"),
+            @yue.label_t("消息", role=@yue.Body),
             @yue.label("      "),
             @yue.badge_dot(),
-            @yue.label(" 在线"),
+            @yue.label_t("在线", role=@yue.Body),
           ],
           style_str=[("alignItems", "center")],
         ),
