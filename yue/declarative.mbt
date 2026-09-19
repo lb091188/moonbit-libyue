@@ -52,11 +52,11 @@ fn container_node(
     mount: fn(parent) {
       let c = Container::make(style~, style_str=sstr)
       handle(c)
-      attach(parent, c.view())
+      attach(parent, ViewLike::view(c, ))
       for ch in children {
-        ignore((ch.mount)(c.view()))
+        ignore((ch.mount)(ViewLike::view(c, )))
       }
-      c.view()
+      ViewLike::view(c, )
     },
   }
 }
@@ -100,8 +100,8 @@ pub fn label(
       let l = Label::make(text, style~, style_str~)
       bind_fg(l, fn() { theme_text_regular() })
       handle(l)
-      attach(parent, l.view())
-      l.view()
+      attach(parent, ViewLike::view(l, ))
+      ViewLike::view(l, )
     },
   }
 }
@@ -119,8 +119,8 @@ pub fn button(
     mount: fn(parent) {
       let b = Button::make(title, on_click~, style~, style_str~)
       handle(b)
-      attach(parent, b.view())
-      b.view()
+      attach(parent, ViewLike::view(b, ))
+      ViewLike::view(b, )
     },
   }
 }
@@ -146,8 +146,8 @@ pub fn checkbox(
       )
       b.on_click(fn() { on_change(b.is_checked()) })
       handle(b)
-      attach(parent, b.view())
-      b.view()
+      attach(parent, ViewLike::view(b, ))
+      ViewLike::view(b, )
     },
   }
 }
@@ -175,8 +175,8 @@ pub fn entry(
       e.on_activate(fn() { on_enter(e.get_text()) })
       e.on_text_change(fn() { on_input(e.get_text()) })
       handle(e)
-      attach(parent, e.view())
-      e.view()
+      attach(parent, ViewLike::view(e, ))
+      ViewLike::view(e, )
     },
   }
 }
@@ -195,8 +195,8 @@ pub fn text_edit(
       let t = TextEdit::make(text~, style~, style_str~)
       t.on_text_change(fn() { on_input(t.get_text()) })
       handle(t)
-      attach(parent, t.view())
-      t.view()
+      attach(parent, ViewLike::view(t, ))
+      ViewLike::view(t, )
     },
   }
 }
@@ -222,8 +222,8 @@ pub fn radio(
       )
       b.on_click(fn() { on_change(b.is_checked()) })
       handle(b)
-      attach(parent, b.view())
-      b.view()
+      attach(parent, ViewLike::view(b, ))
+      ViewLike::view(b, )
     },
   }
 }
@@ -244,8 +244,8 @@ pub fn slider(
       let s = Slider::make(value~, range~, step~, style~, style_str~)
       s.on_value_change(fn() { on_change(s.get_value()) })
       handle(s)
-      attach(parent, s.view())
-      s.view()
+      attach(parent, ViewLike::view(s, ))
+      ViewLike::view(s, )
     },
   }
 }
@@ -263,8 +263,8 @@ pub fn progress(
     mount: fn(parent) {
       let p = ProgressBar::make(value~, indeterminate~, style~, style_str~)
       handle(p)
-      attach(parent, p.view())
-      p.view()
+      attach(parent, ViewLike::view(p, ))
+      ViewLike::view(p, )
     },
   }
 }
@@ -289,8 +289,8 @@ pub fn picker(
         style_str~,
       )
       handle(p)
-      attach(parent, p.view())
-      p.view()
+      attach(parent, ViewLike::view(p, ))
+      ViewLike::view(p, )
     },
   }
 }
@@ -317,8 +317,8 @@ pub fn combo(
         style_str~,
       )
       handle(c)
-      attach(parent, c.view())
-      c.view()
+      attach(parent, ViewLike::view(c, ))
+      ViewLike::view(c, )
     },
   }
 }
@@ -337,11 +337,11 @@ pub fn group(
     mount: fn(parent) {
       let g = Group::new(title)
       apply_style(g, style~, style_str~)
-      attach(parent, g.view())
+      attach(parent, ViewLike::view(g, ))
       let holder = Container::new()
-      ignore((content.mount)(holder.view()))
+      ignore((content.mount)(ViewLike::view(holder, )))
       g.set_content(holder)
-      g.view()
+      ViewLike::view(g, )
     },
   }
 }
@@ -371,19 +371,19 @@ pub fn scroll(
         None => ()
       }
       apply_style(s, style~, style_str~)
-      attach(parent, s.view())
+      attach(parent, ViewLike::view(s, ))
       let holder = Container::new()
-      ignore((content.mount)(holder.view()))
+      ignore((content.mount)(ViewLike::view(holder, )))
       s.set_content(holder)
       // Windows 上原生子控件(Entry 等)的 HWND 不随容器滚动实时移动,
       // 会浮在滚动内容之上遮挡其它组件;每次滚动后强制重摆一次布局。
       if platform() == "windows" {
         s.on_scroll(fn() {
-          holder.update_layout()
+          ViewLike::update_layout(holder, )
           false
         })
       }
-      s.view()
+      ViewLike::view(s, )
     },
   }
 }
@@ -399,8 +399,8 @@ pub fn separator(
     mount: fn(parent) {
       let s = Separator::new(orientation)
       apply_style(s, style~, style_str~)
-      attach(parent, s.view())
-      s.view()
+      attach(parent, ViewLike::view(s, ))
+      ViewLike::view(s, )
     },
   }
 }
@@ -421,12 +421,12 @@ pub fn tab(
       t.on_selected_page_change(on_change)
       for (title, page) in pages {
         let holder = Container::new()
-        ignore((page.mount)(holder.view()))
+        ignore((page.mount)(ViewLike::view(holder, )))
         t.add_page(title, holder)
       }
       handle(t)
-      attach(parent, t.view())
-      t.view()
+      attach(parent, ViewLike::view(t, ))
+      ViewLike::view(t, )
     },
   }
 }
@@ -443,8 +443,8 @@ pub fn date_picker(
     mount: fn(parent) {
       let d = DatePicker::make(epoch~, on_date_change=on_change)
       apply_style(d, style~, style_str~)
-      attach(parent, d.view())
-      d.view()
+      attach(parent, ViewLike::view(d, ))
+      ViewLike::view(d, )
     },
   }
 }
@@ -461,8 +461,8 @@ pub fn gif(
     mount: fn(parent) {
       let g = GifPlayer::make(image~, scale~)
       apply_style(g, style~, style_str~)
-      attach(parent, g.view())
-      g.view()
+      attach(parent, ViewLike::view(g, ))
+      ViewLike::view(g, )
     },
   }
 }
@@ -481,8 +481,8 @@ pub fn browser(
       let b = Browser::make(url~, html~)
       apply_style(b, style~, style_str~)
       handle(b)
-      attach(parent, b.view())
-      b.view()
+      attach(parent, ViewLike::view(b, ))
+      ViewLike::view(b, )
     },
   }
 }
@@ -501,8 +501,8 @@ pub fn container(
       let c = Container::make(style~, style_str~)
       c.on_draw(on_draw)
       handle(c)
-      attach(parent, c.view())
-      c.view()
+      attach(parent, ViewLike::view(c, ))
+      ViewLike::view(c, )
     },
   }
 }
@@ -517,7 +517,7 @@ pub fn mount(
 ) -> Container {
   let root = Container::make(style~, style_str~)
   for ch in children {
-    ignore((ch.mount)(root.view()))
+    ignore((ch.mount)(ViewLike::view(root, )))
   }
   root
 }

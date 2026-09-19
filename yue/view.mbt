@@ -529,3 +529,5 @@ pub fn Window::set_should_close(self : Window, callback : () -> Bool) -> Unit {
   keep_alive(fn() { ignore(wrapped) })
   ffi_window_set_should_close(self.view, fn(f) { f() }, wrapped)
 }
+
+
