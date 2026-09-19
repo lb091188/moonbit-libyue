@@ -4220,8 +4220,6 @@ static void yue_mbt_repaint_walk(GtkWidget *widget, gpointer) {
   gtk_widget_queue_draw(widget);
   if (GdkWindow *gw = gtk_widget_get_window(widget)) {
     gdk_window_invalidate_rect(gw, nullptr, TRUE);
-    // 立即同步走完 expose→draw→flush,不等帧时钟
-    gdk_window_process_updates(gw, TRUE);
   }
   if (GTK_IS_CONTAINER(widget)) {
     gtk_container_foreach(GTK_CONTAINER(widget), yue_mbt_repaint_walk,
@@ -4239,6 +4237,8 @@ void yue_mbt_repaint_all(void) {
     }
   }
   g_list_free(toplevels);
+  // 全部失效完成后再一次性同步绘制
+  gdk_window_process_all_updates();
 #endif
 }
 
