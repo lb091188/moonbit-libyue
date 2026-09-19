@@ -2263,15 +2263,73 @@ static int32_t NormalizeModifiers(int32_t raw) {
 #endif
 }
 
+/* ---------- 鼠标事件屏幕坐标 ----------
+ * 原生事件自带的系统真相,绕开 View::GetBoundsInScreen 在 Windows 嵌套
+ * 滚动容器下累加垃圾偏移的缺陷(Win10 真机实测,见 adaptation.md),供
+ * 右键菜单等"事件位置弹出"场景直接使用:
+ * - GTK: GdkEvent 的 x_root/y_root 即根窗口(X11 全局)坐标;
+ * - Windows: 所属顶层窗口 client 原点的屏幕物理坐标 + position_in_window
+ *   (同为物理像素;不取 MSG.hwnd,它可能是原生子控件、与客户区偏移错位);
+ * - mac: NSEvent 无等价 root 坐标且 shim 为纯 .cpp,回退 (0,0)。 */
+void MouseEventScreenPoint(const nu::MouseEvent &e, nu::Responder *r,
+                           double *sx, double *sy) {
+  *sx = 0.0;
+  *sy = 0.0;
+#if defined(OS_LINUX)
+  GdkEvent *ev = e.native_event;
+  if (ev == nullptr) {
+    return;
+  }
+  switch (ev->type) {
+    case GDK_BUTTON_PRESS:
+    case GDK_2BUTTON_PRESS:
+    case GDK_3BUTTON_PRESS:
+    case GDK_BUTTON_RELEASE:
+      *sx = reinterpret_cast<GdkEventButton *>(ev)->x_root;
+      *sy = reinterpret_cast<GdkEventButton *>(ev)->y_root;
+      break;
+    case GDK_MOTION_NOTIFY:
+      *sx = reinterpret_cast<GdkEventMotion *>(ev)->x_root;
+      *sy = reinterpret_cast<GdkEventMotion *>(ev)->y_root;
+      break;
+    case GDK_ENTER_NOTIFY:
+    case GDK_LEAVE_NOTIFY:
+      *sx = reinterpret_cast<GdkEventCrossing *>(ev)->x_root;
+      *sy = reinterpret_cast<GdkEventCrossing *>(ev)->y_root;
+      break;
+    default:
+      break;
+  }
+#elif defined(OS_WIN)
+  auto *v = dynamic_cast<nu::View *>(r);
+  if (v == nullptr) {
+    return;
+  }
+  nu::Window *w = v->GetWindow();
+  if (w == nullptr) {
+    return;
+  }
+  HWND hwnd = w->GetNative()->hwnd();
+  POINT pt = {0, 0};
+  if (hwnd != nullptr && ::ClientToScreen(hwnd, &pt)) {
+    *sx = static_cast<double>(pt.x) + e.position_in_window.x();
+    *sy = static_cast<double>(pt.y) + e.position_in_window.y();
+  }
+#endif
+}
+
 void yue_mbt_view_on_mouse_down(void *view,
-    int32_t (*invoke)(void *, int32_t, double, double, double, double, int32_t, int32_t),
+    int32_t (*invoke)(void *, int32_t, double, double, double, double, double, double, int32_t, int32_t),
     void *closure) {
   if (auto *v = CastToView(view)) {
-    v->on_mouse_down.Connect([invoke, closure](nu::Responder *,
+    v->on_mouse_down.Connect([invoke, closure](nu::Responder *r,
                                                const nu::MouseEvent &e) {
+      double sx = 0.0, sy = 0.0;
+      MouseEventScreenPoint(e, r, &sx, &sy);
       return invoke(closure, static_cast<int32_t>(e.button),
                     e.position_in_view.x(), e.position_in_view.y(),
                     e.position_in_window.x(), e.position_in_window.y(),
+                    sx, sy,
                     NormalizeModifiers(e.modifiers),
                     static_cast<int32_t>(e.timestamp)) != 0;
     });
@@ -2279,14 +2337,17 @@ void yue_mbt_view_on_mouse_down(void *view,
 }
 
 void yue_mbt_view_on_mouse_up(void *view,
-    int32_t (*invoke)(void *, int32_t, double, double, double, double, int32_t, int32_t),
+    int32_t (*invoke)(void *, int32_t, double, double, double, double, double, double, int32_t, int32_t),
     void *closure) {
   if (auto *v = CastToView(view)) {
-    v->on_mouse_up.Connect([invoke, closure](nu::Responder *,
+    v->on_mouse_up.Connect([invoke, closure](nu::Responder *r,
                                              const nu::MouseEvent &e) {
+      double sx = 0.0, sy = 0.0;
+      MouseEventScreenPoint(e, r, &sx, &sy);
       return invoke(closure, static_cast<int32_t>(e.button),
                     e.position_in_view.x(), e.position_in_view.y(),
                     e.position_in_window.x(), e.position_in_window.y(),
+                    sx, sy,
                     NormalizeModifiers(e.modifiers),
                     static_cast<int32_t>(e.timestamp)) != 0;
     });
@@ -2294,14 +2355,17 @@ void yue_mbt_view_on_mouse_up(void *view,
 }
 
 void yue_mbt_view_on_mouse_move(void *view,
-    void (*invoke)(void *, int32_t, double, double, double, double, int32_t, int32_t),
+    void (*invoke)(void *, int32_t, double, double, double, double, double, double, int32_t, int32_t),
     void *closure) {
   if (auto *v = CastToView(view)) {
-    v->on_mouse_move.Connect([invoke, closure](nu::Responder *,
+    v->on_mouse_move.Connect([invoke, closure](nu::Responder *r,
                                                const nu::MouseEvent &e) {
+      double sx = 0.0, sy = 0.0;
+      MouseEventScreenPoint(e, r, &sx, &sy);
       invoke(closure, static_cast<int32_t>(e.button),
              e.position_in_view.x(), e.position_in_view.y(),
              e.position_in_window.x(), e.position_in_window.y(),
+             sx, sy,
              NormalizeModifiers(e.modifiers),
              static_cast<int32_t>(e.timestamp));
     });
@@ -2309,14 +2373,17 @@ void yue_mbt_view_on_mouse_move(void *view,
 }
 
 void yue_mbt_view_on_mouse_enter(void *view,
-    void (*invoke)(void *, int32_t, double, double, double, double, int32_t, int32_t),
+    void (*invoke)(void *, int32_t, double, double, double, double, double, double, int32_t, int32_t),
     void *closure) {
   if (auto *v = CastToView(view)) {
-    v->on_mouse_enter.Connect([invoke, closure](nu::Responder *,
-                                               const nu::MouseEvent &e) {
+    v->on_mouse_enter.Connect([invoke, closure](nu::Responder *r,
+                                                const nu::MouseEvent &e) {
+      double sx = 0.0, sy = 0.0;
+      MouseEventScreenPoint(e, r, &sx, &sy);
       invoke(closure, static_cast<int32_t>(e.button),
              e.position_in_view.x(), e.position_in_view.y(),
              e.position_in_window.x(), e.position_in_window.y(),
+             sx, sy,
              NormalizeModifiers(e.modifiers),
              static_cast<int32_t>(e.timestamp));
     });
@@ -2401,14 +2468,17 @@ void yue_mbt_view_on_wheel(void *view,
 }
 
 void yue_mbt_view_on_mouse_leave(void *view,
-    void (*invoke)(void *, int32_t, double, double, double, double, int32_t, int32_t),
+    void (*invoke)(void *, int32_t, double, double, double, double, double, double, int32_t, int32_t),
     void *closure) {
   if (auto *v = CastToView(view)) {
-    v->on_mouse_leave.Connect([invoke, closure](nu::Responder *,
+    v->on_mouse_leave.Connect([invoke, closure](nu::Responder *r,
                                                 const nu::MouseEvent &e) {
+      double sx = 0.0, sy = 0.0;
+      MouseEventScreenPoint(e, r, &sx, &sy);
       invoke(closure, static_cast<int32_t>(e.button),
              e.position_in_view.x(), e.position_in_view.y(),
              e.position_in_window.x(), e.position_in_window.y(),
+             sx, sy,
              NormalizeModifiers(e.modifiers),
              static_cast<int32_t>(e.timestamp));
     });

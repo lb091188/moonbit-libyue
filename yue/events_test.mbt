@@ -9,6 +9,8 @@ fn down(x : Double, ts : Int, btn : Int) -> MouseEvent {
     view_y: 10.0,
     window_x: 0.0,
     window_y: 0.0,
+    screen_x: 0.0,
+    screen_y: 0.0,
     modifiers: 0,
     timestamp: ts,
   }
@@ -44,6 +46,8 @@ test "事件结构字段与修饰位" {
     view_y: 2.5,
     window_x: 11.0,
     window_y: 22.0,
+    screen_x: 33.0,
+    screen_y: 44.0,
     modifiers: KEY_MOD_SHIFT,
     timestamp: 42,
   }
@@ -51,6 +55,7 @@ test "事件结构字段与修饰位" {
   inspect(me.button, content="3")
   inspect(me.view_x, content="1.5")
   inspect(me.window_y, content="22")
+  inspect(me.screen_x, content="33")
   inspect(me.timestamp, content="42")
   inspect(me.has_mod(KEY_MOD_SHIFT), content="true")
   inspect(me.has_mod(KEY_MOD_CTRL), content="false")
