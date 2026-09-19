@@ -366,13 +366,76 @@ fn draw_focus_ring(p : Painter, w : Double, h : Double, color? : String = theme_
 ///|
 /// 清空按钮 ✕(矢量自绘,不依赖字体字形):中心 (cx,cy),半径 r。
 /// 供 clearable 形态的字段在「有值且悬停」时画在右侧清空带内。
-fn draw_clear_x(p : Painter, cx : Double, cy : Double, r? : Double = 4.0) -> Unit {
-  p.set_stroke_color(theme_text_secondary())
+fn draw_clear_x(
+  p : Painter,
+  cx : Double,
+  cy : Double,
+  r? : Double = 4.0,
+  color? : String = theme_text_secondary(),
+) -> Unit {
+  p.set_stroke_color(color)
   p.begin_path()
   p.move_to(cx - r, cy - r)
   p.line_to(cx + r, cy + r)
   p.move_to(cx + r, cy - r)
   p.line_to(cx - r, cy + r)
+  p.stroke()
+}
+
+///|
+/// 自绘小图标(矢量,不依赖字体字形——字形图标 Windows 渲染发虚且
+/// 跨平台不一致,库内一律矢量;GTK 端 align=Center 无效,顺带解决
+/// 字形居中问题)。中心 (cx,cy),s 为半径。
+
+///| + 号(步进按钮)
+fn draw_glyph_plus(p : Painter, cx : Double, cy : Double, s : Double, color : String) -> Unit {
+  p.set_stroke_color(color)
+  p.begin_path()
+  p.move_to(cx - s, cy)
+  p.line_to(cx + s, cy)
+  p.move_to(cx, cy - s)
+  p.line_to(cx, cy + s)
+  p.stroke()
+}
+
+///| − 号(步进按钮)
+fn draw_glyph_minus(p : Painter, cx : Double, cy : Double, s : Double, color : String) -> Unit {
+  p.set_stroke_color(color)
+  p.begin_path()
+  p.move_to(cx - s, cy)
+  p.line_to(cx + s, cy)
+  p.stroke()
+}
+
+///| ‹ 朝左三角(实心)
+fn draw_glyph_left(p : Painter, cx : Double, cy : Double, s : Double, color : String) -> Unit {
+  p.set_fill_color(color)
+  p.begin_path()
+  p.move_to(cx + s / 2.0, cy - s)
+  p.line_to(cx + s / 2.0, cy + s)
+  p.line_to(cx - s / 2.0 - 1.0, cy)
+  p.close_path()
+  p.fill()
+}
+
+///| › 朝右三角(实心)
+fn draw_glyph_right(p : Painter, cx : Double, cy : Double, s : Double, color : String) -> Unit {
+  p.set_fill_color(color)
+  p.begin_path()
+  p.move_to(cx - s / 2.0, cy - s)
+  p.line_to(cx - s / 2.0, cy + s)
+  p.line_to(cx + s / 2.0 + 1.0, cy)
+  p.close_path()
+  p.fill()
+}
+
+///| ↑ 朝上箭头(折线,返回顶部)
+fn draw_glyph_up(p : Painter, cx : Double, cy : Double, s : Double, color : String) -> Unit {
+  p.set_stroke_color(color)
+  p.begin_path()
+  p.move_to(cx - s, cy + s / 2.0)
+  p.line_to(cx, cy - s / 2.0)
+  p.line_to(cx + s, cy + s / 2.0)
   p.stroke()
 }
 
@@ -1108,15 +1171,18 @@ pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
         ("marginRight", 8.0),
       ])
       c.set_background_color(color)
+      // 字母水平居中:GTK 端 align 无效,mount 时测宽手动摆位
+      let letter_probe = AttributedText::new(letter, wrap=false)
+      letter_probe.set_font(Font::new("Sans", size / 2.2))
+      let letter_w = letter_probe.get_bounds_for(10000.0, 1000.0).width
       c.on_draw(fn(p) {
         let b = c.get_bounds()
         p.draw_text(
           letter,
-          0.0,
+          (b.width - letter_w) / 2.0,
           0.0,
           b.width,
           b.height,
-          align=Center,
           valign=Center,
           color="#FFFFFF",
         )
@@ -1165,16 +1231,8 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
 
       close.on_draw(fn(p) {
         let b = close.get_bounds()
-        p.draw_text(
-          "✕",
-          0.0,
-          0.0,
-          b.width,
-          b.height,
-          align=Center,
-          valign=Center,
-          color=if hover.val { type_color(t) } else { theme_text_secondary() },
-        )
+        let c = if hover.val { type_color(t) } else { theme_text_secondary() }
+        draw_clear_x(p, b.width / 2.0, b.height / 2.0, color=c)
         if close_focused.val {
           draw_focus_ring(p, b.width, b.height)
         }
@@ -1220,6 +1278,11 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
       // 数字方块们,重绘时按 current 着色
       let boxes : Array[Container] = []
       for i in 0..<n {
+        // 数字水平居中:GTK 端 align 无效,构造期测宽存闭包
+        let num_txt = (i + 1).to_string()
+        let num_probe = AttributedText::new(num_txt, wrap=false)
+        num_probe.set_font(Font::new("Sans", 12.0, weight=SemiBold))
+        let num_w = num_probe.get_bounds_for(10000.0, 1000.0).width
         if i > 0 {
           let line = themed_container(style=[
             ("flex", 1.0),
@@ -1264,12 +1327,11 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
           )
           p.fill_rect(0.0, 0.0, b.width, b.height)
           p.draw_text(
-            (i + 1).to_string(),
-            0.0,
+            num_txt,
+            (b.width - num_w) / 2.0,
             0.0,
             b.width,
             b.height,
-            align=Center,
             valign=Center,
             color=match st {
               0 => theme_primary()
@@ -2273,7 +2335,7 @@ pub fn input_number(
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
       let font = Font::new("Sans", 13.0)
-      fn step_btn(label : String, dir : Double) -> Unit {
+      fn step_btn(dir : Double) -> Unit {
         let b = themed_container(
           style=[("width", 28.0), ("height", 28.0)],
           style_str=[("alignItems", "center")],
@@ -2284,16 +2346,12 @@ pub fn input_number(
           let bd = b.get_bounds()
           p.set_fill_color(if hover.val { theme_primary_light() } else { theme_info_light() })
           p.fill_rect(0.0, 0.0, bd.width, bd.height)
-          p.draw_text(
-            label,
-            0.0,
-            0.0,
-            bd.width,
-            bd.height,
-            align=Center,
-            valign=Center,
-            color=theme_text_regular(),
-          )
+          // +/− 矢量自绘(字形图标跨平台发虚,GTK align 亦无效)
+          if dir > 0.0 {
+            draw_glyph_plus(p, bd.width / 2.0, bd.height / 2.0, 4.0, theme_text_regular())
+          } else {
+            draw_glyph_minus(p, bd.width / 2.0, bd.height / 2.0, 4.0, theme_text_regular())
+          }
         })
         View::set_cursor(b, hand())
         b.on_mouse_down(fn(e) {
@@ -2324,7 +2382,7 @@ pub fn input_number(
         row.add_child(b)
       }
 
-      step_btn("-", -1.0)
+      step_btn(-1.0)
       // marginRight 0:EP InputNumber 的按钮与输入区紧贴
       let num = themed_container(
         style=[("width", 64.0), ("height", 28.0), ("marginRight", 0.0)],
@@ -2349,7 +2407,7 @@ pub fn input_number(
         num.schedule_paint()
       })
       row.add_child(num)
-      step_btn("+", 1.0)
+      step_btn(1.0)
       attach(parent, row.view())
       row.view()
     },
@@ -2724,7 +2782,7 @@ pub fn transfer(
 
       left_items.subscribe(fn(_v) { render_all() })
       right_items.subscribe(fn(_v) { render_all() })
-      fn mid_btn(label : String, to_right : Bool) -> Unit {
+      fn mid_btn(to_right : Bool) -> Unit {
         let b = themed_container(
           style=[("width", 32.0), ("height", 28.0), ("marginRight", 8.0)],
           style_str=[("alignItems", "center")],
@@ -2732,16 +2790,12 @@ pub fn transfer(
         bind_bg(b, fn() { theme_info_light() })
         b.on_draw(fn(p) {
           let bd = b.get_bounds()
-          p.draw_text(
-            label,
-            0.0,
-            0.0,
-            bd.width,
-            bd.height,
-            align=Center,
-            valign=Center,
-            color=theme_text_regular(),
-          )
+          // ‹/› 矢量三角(字形图标跨平台发虚,GTK align 亦无效)
+          if to_right {
+            draw_glyph_right(p, bd.width / 2.0, bd.height / 2.0, 4.0, theme_text_regular())
+          } else {
+            draw_glyph_left(p, bd.width / 2.0, bd.height / 2.0, 4.0, theme_text_regular())
+          }
         })
         View::set_cursor(b, hand())
         b.on_mouse_down(fn(e) {
@@ -2760,8 +2814,8 @@ pub fn transfer(
       }
 
       row.add_child(left_box)
-      mid_btn("›", true)
-      mid_btn("‹", false)
+      mid_btn(true)
+      mid_btn(false)
       row.add_child(right_box)
       render_all()
       attach(parent, row.view())
@@ -2877,15 +2931,18 @@ fn build_calendar(
   let title = themed_container(
     style=[("flex", 1.0), ("height", head_h)],
   )
+  // 月标题水平居中:GTK 端 align 无效,绘制时测宽手动摆位
   title.on_draw(fn(p) {
     let b = title.get_bounds()
+    let probe = AttributedText::new(title_text.val, wrap=false)
+    probe.set_font(Font::new("Sans", 14.0, weight=SemiBold))
+    let tw = probe.get_bounds_for(10000.0, 1000.0).width
     p.draw_text(
       title_text.val,
-      0.0,
+      (b.width - tw) / 2.0,
       0.0,
       b.width,
       b.height,
-      align=Center,
       valign=Center,
       color=theme_text_primary(),
     )
@@ -2893,22 +2950,19 @@ fn build_calendar(
   fn nav_btn(glyph : String, on_click : () -> Unit) -> Container {
     let hover = Ref(false)
     let b = themed_container(style=[("width", 28.0), ("height", head_h)])
+    let to_left = glyph == "‹"
     b.on_draw(fn(p) {
       let bb = b.get_bounds()
       if hover.val {
         p.set_fill_color(theme_fill_hover())
         p.fill_rect(0.0, 0.0, bb.width, bb.height)
       }
-      p.draw_text(
-        glyph,
-        0.0,
-        0.0,
-        bb.width,
-        bb.height,
-        align=Center,
-        valign=Center,
-        color=theme_text_regular(),
-      )
+      // ‹/› 矢量三角(字形图标跨平台发虚,GTK align 亦无效)
+      if to_left {
+        draw_glyph_left(p, bb.width / 2.0, bb.height / 2.0, 4.0, theme_text_regular())
+      } else {
+        draw_glyph_right(p, bb.width / 2.0, bb.height / 2.0, 4.0, theme_text_regular())
+      }
     })
     b.on_mouse_enter(fn(_e) {
       hover.val = true
@@ -3058,7 +3112,9 @@ fn build_calendar(
         })
         if in_m {
           View::set_cursor(c, hand())
-          c.on_mouse_down(fn(e) {
+          // release 才选中:date_picker 弹层内点项一律 release 防穿透;
+          // calendar_t 内联面板同语义无副作用(松开选中,标准按钮感)
+          c.on_mouse_up(fn(e) {
             if e.button == 1 {
               sel.val = Some(dymd)
               for cc in cells.val {
@@ -3313,16 +3369,8 @@ pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
       )
       bind_bg(b, fn() { theme_primary() })
       b.on_draw(fn(p) {
-        p.draw_text(
-          "↑",
-          0.0,
-          0.0,
-          size,
-          size,
-          align=Center,
-          valign=Center,
-          color="#FFFFFF",
-        )
+        // ↑ 矢量折线箭头(字形图标跨平台发虚,GTK align 亦无效)
+        draw_glyph_up(p, size / 2.0, size / 2.0 + 1.0, 6.0, "#FFFFFF")
       })
       View::set_cursor(b, hand())
       b.on_mouse_down(fn(e) {
@@ -4032,11 +4080,10 @@ pub fn table_v_t(
                 p.fill_rect(x + 12.0, ty, tag_w, 20.0)
                 p.draw_text(
                   text,
-                  x + 12.0,
+                  x + 12.0 + (tag_w - tw) / 2.0,
                   ty,
                   tag_w,
                   20.0,
-                  align=Center,
                   valign=Center,
                   color=type_color(t),
                 )
@@ -4627,7 +4674,9 @@ fn select_row(
     row.schedule_paint()
   })
   View::set_cursor(row, hand())
-  row.on_mouse_down(fn(e) {
+  // release 才选中:press 时刻 pick+关层会解除弹层指针抓取,悬着的
+  // release 穿透到弹层下方控件;release 由弹层抓取派发给行,无待决事件
+  row.on_mouse_up(fn(e) {
     if e.button == 1 {
       on_pick()
       true
@@ -5078,7 +5127,10 @@ pub fn dropdown_menu(
                   row.schedule_paint()
                 })
                 View::set_cursor(row, hand())
-                row.on_mouse_down(fn(e2) {
+                // release 才选中+关层:防 press 关层后悬着的 release
+                // 穿透到弹层下方控件(弹层点项一律 release,见
+                // adaptation.md)
+                row.on_mouse_up(fn(e2) {
                   if e2.button == 1 {
                     on_select(idx)
                     match pop.val {
@@ -5414,7 +5466,8 @@ pub fn color_picker_t(
                     p2.stroke()
                   }
                 })
-                cell.on_mouse_down(fn(e2) {
+                // release 才选中:弹层点项一律 release,防穿透
+                cell.on_mouse_up(fn(e2) {
                   if e2.button == 1 {
                     pick(c)
                     true
