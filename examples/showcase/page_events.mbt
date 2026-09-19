@@ -15,7 +15,7 @@ fn page_events() -> @yue.Node {
   let drag_src : Ref[@yue.Container?] = Ref(None)
   let tracker = @yue.ClickTracker::new()
   let drag_icon : @yue.Image? = match
-    @yue.read_binary_file("examples/drag_source/drag.png") {
+    @yue.read_binary_file("examples/showcase/drag.png") {
     Some(bytes) => {
       let img = @yue.Image::new_from_png(bytes)
       if img.is_empty() {
@@ -131,7 +131,7 @@ fn page_events() -> @yue.Node {
                 drag_src.val = Some(c)
                 c.on_mouse_down(fn(_e) {
                   let _ = c.do_drag_file_paths(
-                    ["examples/drag_source/drag.png"],
+                    ["examples/showcase/drag.png"],
                     drag_icon,
                   )
                   true

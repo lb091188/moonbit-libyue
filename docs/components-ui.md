@@ -94,7 +94,7 @@ let t = @yue.default_theme()
 
 ## Demo
 
-`moon run examples/components` — seven-page showcase (Basic / Form / Navigation / Data Display / Feedback + System Integration / Window & Web) covering every component and system capability:
+`moon run examples/components` — ten-page showcase (Basic / Form / Navigation / Data Display / Feedback + Native Widgets / Canvas & Rich Text + System Integration / Window & Web / Environment) covering the component library and all libyue capabilities:
 
 ![Basic](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-basic.png)
 
@@ -104,6 +104,7 @@ let t = @yue.default_theme()
 
 ![Feedback](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-feedback.png)
 
-**System capabilities**: the "System Integration" page (file dialogs / message boxes / system notifications / clipboard / timers) and "Window & Web" page (window APIs / global shortcuts / drop target / embedded WebView) wrap libyue system pieces in the modern theme; full-capability default-theme demos (complete browser, drag-out, custom protocol) live in `examples/showcase`.
+**Native & drawing**: the "Native Widgets" page (Entry/Slider/ProgressBar/Checkbox/Radio/ComboBox/Picker/DatePicker/TextEdit/GifPlayer/Popover) and "Canvas & Rich Text" page (container self-drawing + Painter primitives/blend modes/PNG, AttributedText range styling).
+**System capabilities**: the "System Integration" page (file dialogs / message boxes / system notifications / clipboard / timers) and "Window & Web" page (window APIs / global shortcuts / drag in & out / native context menu / embedded WebView + custom protocol) wrap libyue system pieces in the modern theme; the menu bar and system tray are attached at demo startup. Full-capability default-theme demos live in `examples/showcase`.
 
 State coordination across components goes through `Store` (subscribe / map / bind_label); see [docs/declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md). Chinese version: [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md).

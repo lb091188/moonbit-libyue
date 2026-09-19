@@ -62,6 +62,114 @@ fn main {
   let (toast_node, toast_push) = @yue.toast_layer()
   let win_ref : Ref[@yue.Window?] = Ref(None)
   let ontop : Ref[Bool] = Ref(false)
+  // 原生控件页状态
+  let nat_clicks : @yue.Store[Int] = @yue.Store::new(0)
+  let nat_echo : @yue.Store[String] = @yue.Store::new("")
+  let nat_slider : @yue.Store[Double] = @yue.Store::new(0.0)
+  let nat_pick : @yue.Store[String] = @yue.Store::new("乙")
+  let nat_combo : @yue.Store[String] = @yue.Store::new("MoonBit")
+  let nat_picker : @yue.Store[String] = @yue.Store::new("(未选择)")
+  let nat_bar : Ref[@yue.ProgressBar?] = Ref(None)
+  let nat_indet : Ref[Bool] = Ref(false)
+  let nat_cb : Ref[@yue.ComboBox?] = Ref(None)
+  let nat_pk : Ref[@yue.Picker?] = Ref(None)
+  let nat_edit : Ref[@yue.TextEdit?] = Ref(None)
+  let nat_pop : Ref[@yue.Button?] = Ref(None)
+  let nat_date_val : @yue.Store[Int64] = @yue.Store::new(946684800L)
+  let nat_date = @yue.DatePicker::new_with({
+    elements: @yue.HourMinute,
+    has_stepper: true,
+  })
+  nat_date.set_date(946684800L)
+  nat_date.on_date_change(fn() { nat_date_val.set(nat_date.get_date()) })
+  // 画布页状态与资产
+  let canvas_hue = Ref(0)
+  let canvas_blend = Ref(0)
+  let canvas_blends = [
+    @yue.BlendMode::Normal,
+    @yue.Multiply,
+    @yue.Screen,
+    @yue.Difference,
+    @yue.Xor,
+  ]
+  let canvas_blend_names = ["Normal", "Multiply", "Screen", "Difference", "Xor"]
+  let canvas_info : @yue.Store[String] = @yue.Store::new("Normal")
+  let canvas_ref : Ref[@yue.Container?] = Ref(None)
+  let canvas_rt : Ref[@yue.Container?] = Ref(None)
+  let canvas_img : Ref[@yue.Image?] = Ref(
+    match @yue.read_binary_file("examples/components/icon.png") {
+      Some(bytes) => {
+        let img = @yue.Image::new_from_png(bytes)
+        if img.is_empty() {
+          None
+        } else {
+          Some(img)
+        }
+      }
+      None => None
+    },
+  )
+  let canvas_repaint = fn() -> Unit {
+    match canvas_ref.val {
+      Some(c) => c.schedule_paint()
+      None => ()
+    }
+  }
+  let draw_canvas_scene = fn(painter : @yue.Painter) -> Unit {
+    painter.set_fill_color("#20242C")
+    painter.fill_rect(0.0, 0.0, 640.0, 300.0)
+    let colors = ["#E8B34B", "#4B8BE8", "#4BE888"]
+    for i in 0..<3 {
+      painter.set_fill_color(colors[(i + canvas_hue.val) % 3])
+      painter.arc(160.0 + i.to_double() * 160.0, 130.0, 60.0, 0.0, 6.28318)
+      painter.fill()
+    }
+    painter.set_stroke_color("#4A5060")
+    for k in 0..<9 {
+      painter.stroke_rect(24.0, 205.0 + k.to_double() * 10.0, 592.0, 1.0)
+    }
+    painter.draw_text(
+      "MoonBit × libyue 自绘文本",
+      24.0,
+      262.0,
+      592.0,
+      30.0,
+      align=@yue.TextAlign::Center,
+      color="#F0F0F0",
+    )
+    match (canvas_ref.val, canvas_img.val) {
+      (Some(c), Some(img)) => {
+        painter.set_blend_mode(canvas_blends[canvas_blend.val])
+        let b = c.get_bounds()
+        painter.draw_image(img, b.width - 90.0, 10.0, 80.0, 80.0)
+        painter.set_blend_mode(@yue.Normal)
+      }
+      (_, _) => ()
+    }
+  }
+  // 富文本对象
+  let rt = @yue.AttributedText::new_with(
+    "MoonBit 富文本:这段文字有范围着色与粗体。",
+    @yue.TextAttributes::new(),
+  )
+  rt.set_font(@yue.Font::new("Sans", 20.0, weight=@yue.Bold))
+  rt.set_font_for(@yue.Font::new("Sans", 24.0, weight=@yue.Black), 0, 6)
+  rt.set_color("#356AA0")
+  rt.set_color_for("#E5534B", 8, 11)
+  let rt_wrap = Ref(true)
+  let rt_ellipsis = Ref(false)
+  // 环境页状态
+  let key_info : @yue.Store[String] = @yue.Store::new("(无)")
+  let web_ref : Ref[@yue.Browser?] = Ref(None)
+  // 自定义协议(Browser 段 demo:// 链接用;Windows 静默无效)
+  @yue.Browser::register_protocol("demo", fn(_url) {
+    Some(
+      (
+        "text/html",
+        "<html><body style='font-family:sans-serif;background:#fff;color:#222'><h2>demo:// 自定义协议 ✓</h2><p>由 register_protocol 注册,ProtocolStringJob 应答。</p></body></html>",
+      ),
+    )
+  })
   let dlg_basic : @yue.Store[Bool] = @yue.Store::new(false)
   let dlg_form : @yue.Store[Bool] = @yue.Store::new(false)
   let dlg_name : @yue.Store[String] = @yue.Store::new("")
@@ -1159,14 +1267,363 @@ fn main {
       ],
     ),
     section(
-      "内嵌网页",
-      "Browser(WebView)加载本地 HTML;完整浏览器演示(地址栏/自定义协议)见 showcase。",
+      "原生右键菜单",
+      "Menu::new + popup_at 原生菜单(区别于基础页主题化的 context_menu_for)。",
       [
+        @yue.context_menu_for(
+          @yue.tag("右键我(原生菜单)", "#2D68C4"),
+          [
+            ("原生菜单项 A", fn() { toast_push("原生菜单 A", @yue.Info) }),
+            ("-", fn() {  }),
+            ("原生菜单项 B", fn() { toast_push("原生菜单 B", @yue.Info) }),
+          ],
+        ),
+      ],
+    ),
+    section(
+      "拖出发起",
+      "do_drag_file_paths 发起系统拖拽:按住下方色块拖到文件管理器即拖出 icon.png。",
+      [
+        @yue.vbox(
+          [@yue.label_t("按住我拖出去", role=@yue.Body)],
+          style=[("height", 60.0), ("width", 200.0), ("padding", 10.0)],
+          handle=fn(c) {
+            @yue.theme_bind_bg(c, fn() { @yue.theme_current().primary_light })
+            let img : @yue.Image? = match @yue.read_binary_file("examples/components/icon.png") {
+              Some(bytes) => {
+                let i = @yue.Image::new_from_png(bytes)
+                if i.is_empty() { None } else { Some(i) }
+              }
+              None => None
+            }
+            c.on_mouse_down(fn(_e) {
+              ignore(c.do_drag_file_paths(["examples/components/icon.png"], img))
+              true
+            })
+          },
+        ),
+      ],
+    ),
+    section(
+      "内嵌网页",
+      "Browser(WebView):load_html 本地页;demo:// 走 register_protocol 自定义协议(Windows 静默无效);执行 JS 回传结果。",
+      [
+        @yue.hbox([
+          @yue.button_t("加载 demo:// 协议", on_click=fn() {
+            match web_ref.val {
+              Some(b) => b.load_url("demo://hello")
+              None => ()
+            }
+          }),
+          @yue.button_t("执行 JS 取标题", variant=@yue.Solid, on_click=fn() {
+            match web_ref.val {
+              Some(b) => b.execute_javascript(
+                "document.title = 'JS 已执行 ✓'",
+              )
+              None => ()
+            }
+          }),
+        ]),
         @yue.browser(handle=fn(x) {
+          web_ref.val = Some(x)
           x.load_html(
             "<html><body style='font-family:sans-serif;background:#fff;color:#222;display:flex;align-items:center;justify-content:center;height:100%'><h3>WebView 内嵌页 ✓</h3></body></html>",
           )
         }, style=[("width", 480.0), ("height", 160.0)]),
+      ],
+    ),
+  ])
+
+  // ---------- 原生控件(libyue 原生件 × 主题包装) ----------
+  let p_native = scroll_page([
+    section(
+      "原生标签 / 按钮",
+      "libyue 原生 Button/Label(系统主题外观),点击计数由 Store 驱动回显。",
+      [
+        @yue.hbox([
+          @yue.button("原生按钮", on_click=fn() { nat_clicks.update(fn(n) { n + 1 }) }),
+          @yue.bind_label(nat_clicks, fn(n) { "已点 \{n} 次" }, style=[("marginLeft", 10.0)]),
+        ]),
+      ],
+    ),
+    section(
+      "单行输入 Entry",
+      "原生输入框:on_input 实时回显、on_enter 回车、password 密码框。",
+      [
+        @yue.entry(text="在这里输入…", on_input=fn(t) { nat_echo.set(t) }, on_enter=fn(t) {
+          nat_echo.set("\{t}(回车)")
+        }),
+        @yue.bind_label(nat_echo, fn(s) { "回显:\{s}" }, style=[("marginTop", 8.0)]),
+        @yue.entry(text="口令", password=true, style=[("marginTop", 8.0)]),
+      ],
+    ),
+    section(
+      "滑块联动进度条",
+      "原生 Slider + ProgressBar(handle 命令式 set_value);按钮切换不确定态。",
+      [
+        @yue.slider(range=Some((0.0, 100.0)), step=Some(1.0), on_change=fn(v) {
+          nat_slider.set(v)
+          match nat_bar.val {
+            Some(p) => p.set_value(v / 100.0)
+            None => ()
+          }
+        }),
+        @yue.progress(handle=fn(p) { nat_bar.val = Some(p) }, style=[("marginTop", 8.0)]),
+        @yue.bind_label(nat_slider, fn(v) { "滑块值:\{v.round()}" }, style=[("marginTop", 8.0)]),
+        @yue.button_t("切换不确定态", on_click=fn() {
+          nat_indet.val = !nat_indet.val
+          match nat_bar.val {
+            Some(p) => p.set_indeterminate(nat_indet.val)
+            None => ()
+          }
+        }),
+      ],
+    ),
+    section(
+      "复选框 / 单选组",
+      "原生 checkbox 独立勾选;同组 radio 自动互斥。",
+      [
+        @yue.checkbox("启用扩展", on_change=fn(v) { if v { nat_pick.set("扩展已启用") } }),
+        @yue.hbox(
+          [
+            @yue.radio("甲", on_change=fn(v) { if v { nat_pick.set("甲") } }),
+            @yue.radio("乙", checked=true, on_change=fn(v) { if v { nat_pick.set("乙") } }),
+            @yue.radio("丙", on_change=fn(v) { if v { nat_pick.set("丙") } }),
+          ],
+          style=[("marginTop", 8.0)],
+        ),
+        @yue.bind_label(nat_pick, fn(s) { "当前:\{s}" }, style=[("marginTop", 8.0)]),
+      ],
+    ),
+    section(
+      "下拉组合框 / 只读选择器",
+      "ComboBox 可编辑(on_select/on_input);Picker 只读列表选择。",
+      [
+        @yue.combo(
+          items=["MoonBit", "libyue", "GTK"],
+          selected=0,
+          on_select=fn() {
+            match nat_cb.val {
+              Some(c) => nat_combo.set(c.get_selected_item())
+              None => ()
+            }
+          },
+          handle=fn(c) { nat_cb.val = Some(c) },
+        ),
+        @yue.picker(
+          items=["红", "绿", "蓝"],
+          on_change=fn() {
+            match nat_pk.val {
+              Some(p) => nat_picker.set(p.get_selected_item())
+              None => ()
+            }
+          },
+          handle=fn(p) { nat_pk.val = Some(p) },
+          style=[("marginTop", 8.0)],
+        ),
+        @yue.bind_label(nat_combo, fn(s) { "组合框:\{s}" }, style=[("marginTop", 8.0)]),
+        @yue.bind_label(nat_picker, fn(s) { "选择器:\{s}" }),
+      ],
+    ),
+    section(
+      "日期时间选择",
+      "原生 DatePicker(HourMinute 元素 + 步进器),epoch 秒读写。",
+      [
+        @yue.node_of(nat_date, style=[("marginBottom", 8.0)]),
+        @yue.bind_label(nat_date_val, fn(t) { "当前 epoch 秒:\{t}" }),
+      ],
+    ),
+    section(
+      "GIF 播放",
+      "GifPlayer 无解码器依赖播放 GIF(dot.gif);yoga 叶子需显式宽高。",
+      [
+        @yue.gif(
+          image=Some(@yue.Image::new_from_file("examples/components/dot.gif")),
+          style=[("width", 120.0), ("height", 120.0)],
+        ),
+      ],
+    ),
+    section(
+      "多行文本编辑",
+      "TextEdit 编辑 API:撤销重做/剪切复制粘贴/选区与插入。",
+      [
+        @yue.text_edit(
+          text="多行文本…\n试试撤销 / 重做 / 全选 / 插入。",
+          handle=fn(t) { nat_edit.val = Some(t) },
+          style=[("height", 96.0)],
+        ),
+        @yue.hbox(
+          [
+            @yue.button_t("撤销", on_click=fn() { match nat_edit.val { Some(t) => t.undo() 
+ None => () } }),
+            @yue.button_t("重做", on_click=fn() { match nat_edit.val { Some(t) => t.redo() 
+ None => () } }),
+            @yue.button_t("全选", on_click=fn() { match nat_edit.val { Some(t) => t.select_all() 
+ None => () } }),
+            @yue.button_t("粘贴", on_click=fn() { match nat_edit.val { Some(t) => t.paste() 
+ None => () } }),
+            @yue.button_t("插入一行", on_click=fn() { match nat_edit.val { Some(t) => t.insert_text("\n(插入)") 
+ None => () } }),
+          ],
+          style=[("marginTop", 8.0)],
+        ),
+      ],
+    ),
+    section(
+      "气泡 Popover",
+      "原生 Popover 气泡(Linux 原生气泡;Windows 右下 8 秒自动关)。",
+      [
+        @yue.button("弹出气泡", handle=fn(b) { nat_pop.val = Some(b) }, on_click=fn() {
+          match nat_pop.val {
+            Some(b) => {
+              let pop = @yue.Popover::new()
+              let tip = @yue.Label::new("这是一个 Popover 气泡")
+              tip.set_style("padding", 10.0)
+              pop.set_content(tip)
+              pop.set_content_size(180.0, 44.0)
+              pop.show_relative_to(b)
+            }
+            None => ()
+          }
+        }),
+      ],
+    ),
+  ])
+
+  // ---------- 画布与富文本(Painter / Image / AttributedText) ----------
+  let p_canvas = scroll_page([
+    section(
+      "自绘画布",
+      "container on_draw 自绘:圆环 / 网格 / 文本 / PNG 图片叠加(混合模式);schedule_paint 触发重绘。",
+      [
+        @yue.container(
+          on_draw=fn(p) { draw_canvas_scene(p) },
+          handle=fn(c) {
+            canvas_ref.val = Some(c)
+            c.on_size_changed(fn() { c.schedule_paint() })
+          },
+          style=[("height", 300.0), ("marginBottom", 8.0), ("width", 640.0)],
+        ),
+        @yue.hbox([
+          @yue.button_t("旋转色相", on_click=fn() {
+            canvas_hue.val = (canvas_hue.val + 1) % 3
+            canvas_repaint()
+          }),
+          @yue.button_t("切换混合模式", on_click=fn() {
+            canvas_blend.val = (canvas_blend.val + 1) % canvas_blends.length()
+            canvas_info.set(canvas_blend_names[canvas_blend.val])
+            canvas_repaint()
+          }),
+          @yue.button_t("导出缩放图", variant=@yue.Solid, on_click=fn() {
+            match canvas_img.val {
+              Some(img) => {
+                let half = img.resize(img.get_width() / 2.0, img.get_height() / 2.0)
+                let ok = half.write_to_file("png", "/tmp/components_half.png")
+                canvas_info.set(
+                  if ok { "已导出 /tmp/components_half.png" } else { "导出失败" },
+                )
+              }
+              None => canvas_info.set("无图片可导出")
+            }
+          }),
+        ]),
+        @yue.bind_label(canvas_info, fn(s) { "混合模式:\{s}" }, style=[("marginTop", 8.0)]),
+      ],
+    ),
+    section(
+      "富文本 AttributedText",
+      "范围属性:0-6 号字符 Black 24 号字,8-11 号字符红色(set_font_for/set_color_for);换行/省略号/改写。",
+      [
+        @yue.container(
+          on_draw=fn(painter) {
+            match canvas_rt.val {
+              Some(c) => {
+                let size = c.get_bounds()
+                painter.fill_rect(0.0, 0.0, size.width, size.height)
+                painter.draw_attributed_text(rt, 10.0, 20.0, size.width - 20.0, 100.0)
+              }
+              None => ()
+            }
+          },
+          handle=fn(c) {
+            canvas_rt.val = Some(c)
+            c.on_size_changed(fn() { c.schedule_paint() })
+          },
+          style=[("height", 120.0), ("marginBottom", 8.0), ("width", 640.0)],
+          style_str=[("backgroundcolor", "#F4F4F0")],
+        ),
+        @yue.hbox([
+          @yue.button_t("换行开关", on_click=fn() {
+            rt_wrap.val = !rt_wrap.val
+            rt.set_format({
+              align: @yue.Start,
+              valign: @yue.Start,
+              wrap: rt_wrap.val,
+              ellipsis: rt_ellipsis.val,
+            })
+            match canvas_rt.val {
+              Some(c) => c.schedule_paint()
+              None => ()
+            }
+          }),
+          @yue.button_t("省略号开关", on_click=fn() {
+            rt_ellipsis.val = !rt_ellipsis.val
+            rt.set_format({
+              align: @yue.Start,
+              valign: @yue.Start,
+              wrap: true,
+              ellipsis: rt_ellipsis.val,
+            })
+            match canvas_rt.val {
+              Some(c) => c.schedule_paint()
+              None => ()
+            }
+          }),
+          @yue.button_t("改写文本", variant=@yue.Solid, on_click=fn() {
+            rt.set_text("文本已替换 ✓(属性保留)")
+            match canvas_rt.val {
+              Some(c) => c.schedule_paint()
+              None => ()
+            }
+          }),
+        ]),
+        @yue.label_t(
+          "系统语义色 Text=\{@yue.system_color(@yue.Text)} WindowBackground=\{@yue.system_color(@yue.WindowBackground)} Border=\{@yue.system_color(@yue.Border)}",
+          role=@yue.Secondary,
+          style=[("marginTop", 8.0)],
+        ),
+      ],
+    ),
+  ])
+
+  // ---------- 环境与平台(运行环境快照) ----------
+  let p_env = scroll_page([
+    section(
+      "运行环境",
+      "环境查询 API(本次启动快照);键盘钩子显示窗口级 on_key_down。",
+      [
+        @yue.label_t("platform = \{@yue.platform()}", role=@yue.Body),
+        @yue.label_t("locale = \{@yue.locale()}", role=@yue.Body),
+        @yue.label_t("深色模式 is_dark = \{@yue.Appearance::is_dark()}", role=@yue.Body),
+        @yue.label_t("屏幕缩放 scale_factor = \{@yue.Screen::scale_factor()}", role=@yue.Body),
+        @yue.label_t(
+          "主屏尺寸 = \{@yue.Screen::primary_size().0} × \{@yue.Screen::primary_size().1}",
+          role=@yue.Body,
+        ),
+        @yue.label_t("应用名 = \{@yue.App::get_name()}", role=@yue.Body),
+        @yue.label_t("托盘可用 = \{@yue.Tray::is_supported()}", role=@yue.Body),
+        @yue.bind_label(key_info, fn(s) { "最后按键:\{s}" }, style=[("marginTop", 8.0)]),
+      ],
+    ),
+    section(
+      "平台差异速览",
+      "本仓已文档化的主要平台差异;完整清单与实测记录见 docs/zh/adaptation.md。",
+      [
+        @yue.label_t("· 托盘:Linux SNI 直连 / Windows Shell_NotifyIconW / macOS 原生", role=@yue.Secondary),
+        @yue.label_t("· 通知:Linux 必须走 Show()(DBus Notify)/ Windows WinRT toast", role=@yue.Secondary),
+        @yue.label_t("· 剪贴板主选区 Selection:仅 X11 存在", role=@yue.Secondary),
+        @yue.label_t("· 浏览器自定义协议:Linux 可用,Windows WebView2 静默无效", role=@yue.Secondary),
+        @yue.label_t("· 富文本范围属性:Windows 降级为全文应用", role=@yue.Secondary),
       ],
     ),
   ])
@@ -1178,7 +1635,8 @@ fn main {
           [
             ("基础", ["基础组件", "表单组件"]),
             ("进阶", ["导航组件", "数据展示", "反馈组件"]),
-            ("系统", ["系统集成", "窗口与网页"]),
+            ("原生", ["原生控件", "画布与富文本"]),
+            ("系统", ["系统集成", "窗口与网页", "环境与平台"]),
           ],
           selected,
         ),
@@ -1193,8 +1651,11 @@ fn main {
                     "导航组件",
                     "数据展示",
                     "反馈组件",
+                    "原生控件",
+                    "画布与富文本",
                     "系统集成",
                     "窗口与网页",
+                    "环境与平台",
                   ],
                   selected,
                 ),
@@ -1225,6 +1686,9 @@ fn main {
             page("反馈组件", selected, p_feedback),
             page("系统集成", selected, p_sys),
             page("窗口与网页", selected, p_win),
+            page("原生控件", selected, p_native),
+            page("画布与富文本", selected, p_canvas),
+            page("环境与平台", selected, p_env),
           ],
           style=[("flex", 1.0)],
           handle=fn(c) {
@@ -1268,7 +1732,66 @@ fn main {
     size=Some((880.0, 720.0)),
     center=true,
     on_close=fn(_w) { @yue.quit() },
-    handle=fn(w) { win_ref.val = Some(w) },
+    handle=fn(w) {
+      win_ref.val = Some(w)
+      // 菜单栏(原生 MenuBar):关于 + 退出 + 编辑角色项
+      let bar = @yue.MenuBar::new()
+      let file = bar.add_menu("文件")
+      let about = file.add_label_item("关于本演示")
+      about.set_accelerator("CmdOrCtrl+I")
+      about.on_click(fn() {
+        match win_ref.val {
+          Some(w) => {
+            let box = @yue.MessageBox::new(@yue.Information)
+            box.set_title("关于")
+            box.set_text("moonbit-libyue 组件库演示板")
+            box.set_informative_text(
+              "平台 \{@yue.platform()} ｜ 桌面 \{@yue.desktop_environment()} ｜ 区域 \{@yue.locale()}",
+            )
+            box.show_for_window(w)
+          }
+          None => ()
+        }
+      })
+      let _ = file.add_separator()
+      let quit = file.add_label_item("退出")
+      quit.set_accelerator("CmdOrCtrl+Q")
+      quit.on_click(fn() { @yue.quit() })
+      let edit = bar.add_menu("编辑")
+      let _c = edit.add_role_item(@yue.Copy)
+      let _x = edit.add_role_item(@yue.Cut)
+      let _p = edit.add_role_item(@yue.Paste)
+      let _s = edit.add_role_item(@yue.SelectAll)
+      w.set_menubar(bar)
+      // 系统托盘:Linux SNI / 其他平台原生
+      if @yue.Tray::is_supported() {
+        match @yue.Tray::new("examples/components/icon.png") {
+          Ok(tray) => {
+            tray.set_title("components")
+            tray.set_tooltip("moonbit-libyue 组件库演示板", "左键弹通知")
+            let menu = @yue.Menu::new()
+            let show_item = menu.add_label_item("显示主窗口")
+            show_item.on_click(fn() { w.activate() })
+            let _ = menu.add_separator()
+            let quit_item = menu.add_label_item("退出")
+            quit_item.on_click(fn() { @yue.quit() })
+            tray.set_menu(menu)
+            tray.on_click(fn() {
+              let n = @yue.Notification::new()
+              n.set_title("components")
+              n.set_body("托盘图标被点击")
+              n.show()
+            })
+          }
+          Err(_e) => ()
+        }
+      }
+      // 窗口级键盘钩子(环境页显示)
+      w.on_key_down(fn(e) {
+        key_info.set("键码 \{e.code}(Esc=\{@yue.VKEY_ESCAPE} A=\{@yue.VKEY_A})")
+        false
+      })
+    },
   )
   window.activate()
   @yue.run()
