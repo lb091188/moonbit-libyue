@@ -72,7 +72,13 @@ pub fn[A] bind_label(
       let l = Label::make(init, style~, style_str~)
       let at = AttributedText::new(init, valign=Center, wrap=false)
       at.set_font(Font::new("Sans", 13.0))
-      at.set_color(theme_text_regular())
+      fn apply_color() -> Unit {
+        at.set_color(theme_text_regular())
+        l.schedule_paint()
+      }
+
+      apply_color()
+      on_theme_change(apply_color)
       l.set_attributed_text(at)
       store.subscribe(fn(v) { l.set_text(f(v)) })
       attach(parent, l.view())

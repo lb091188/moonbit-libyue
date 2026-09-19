@@ -59,6 +59,15 @@ fn main {
     return
   }
   let selected : @yue.Store[String] = @yue.Store::new("基础组件")
+  // 深浅主题切换:theme_apply 通知全部已挂载组件重着色,无需重建界面
+  let dark_mode : @yue.Store[Bool] = @yue.Store::new(false)
+  dark_mode.subscribe(fn(v) {
+    if v {
+      @yue.theme_apply(@yue.dark_theme())
+    } else {
+      @yue.theme_apply(@yue.default_theme())
+    }
+  })
   // 演示用状态
   let page_no : @yue.Store[Int] = @yue.Store::new(2)
   let step : @yue.Store[Int] = @yue.Store::new(1)
@@ -857,13 +866,25 @@ fn main {
                   ["基础组件", "表单组件", "导航组件", "数据展示", "反馈组件"],
                   selected,
                 ),
+                @yue.button_t(
+                  "切换深浅",
+                  variant=@yue.Soft,
+                  on_click=fn() { dark_mode.update(fn(v) { !v }) },
+                ),
                 @yue.label("      "),
                 @yue.tag("MoonShell", "#2D68C4"),
                 @yue.tag("v0.2", "#2E9E5B"),
               ],
               style=[("padding", 10.0)],
               style_str=[("alignItems", "center")],
-              handle=fn(c) { c.set_background_color("#FFFFFF") },
+              handle=fn(c) {
+                fn apply() -> Unit {
+                  c.set_background_color(@yue.theme_current().bg_panel)
+                }
+
+                apply()
+                @yue.on_theme_change(apply)
+              },
             ),
             page("基础组件", selected, p_basic),
             page("表单组件", selected, p_form),
@@ -872,7 +893,14 @@ fn main {
             page("反馈组件", selected, p_feedback),
           ],
           style=[("flex", 1.0)],
-          handle=fn(c) { c.set_background_color("#F5F6F7") },
+          handle=fn(c) {
+            fn apply() -> Unit {
+              c.set_background_color(@yue.theme_current().bg_page)
+            }
+
+            apply()
+            @yue.on_theme_change(apply)
+          },
         ),
       ]),
     ],
