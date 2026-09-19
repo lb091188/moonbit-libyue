@@ -1057,8 +1057,10 @@ extern "c" fn ffi_view_on_mouse_down(
   view : View,
   invoke : FuncRef[
     (
-      (Int, Double, Double, Double, Double, Int, Int) -> Int,
+      (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Int,
       Int,
+      Double,
+      Double,
       Double,
       Double,
       Double,
@@ -1067,7 +1069,7 @@ extern "c" fn ffi_view_on_mouse_down(
       Int,
     ) -> Int,
   ],
-  callback : (Int, Double, Double, Double, Double, Int, Int) -> Int,
+  callback : (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Int,
 ) -> Unit = "yue_mbt_view_on_mouse_down"
 
 ///|
@@ -1076,8 +1078,10 @@ extern "c" fn ffi_view_on_mouse_up(
   view : View,
   invoke : FuncRef[
     (
-      (Int, Double, Double, Double, Double, Int, Int) -> Int,
+      (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Int,
       Int,
+      Double,
+      Double,
       Double,
       Double,
       Double,
@@ -1086,7 +1090,7 @@ extern "c" fn ffi_view_on_mouse_up(
       Int,
     ) -> Int,
   ],
-  callback : (Int, Double, Double, Double, Double, Int, Int) -> Int,
+  callback : (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Int,
 ) -> Unit = "yue_mbt_view_on_mouse_up"
 
 ///|
@@ -1095,8 +1099,10 @@ extern "c" fn ffi_view_on_mouse_move(
   view : View,
   invoke : FuncRef[
     (
-      (Int, Double, Double, Double, Double, Int, Int) -> Unit,
+      (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Unit,
       Int,
+      Double,
+      Double,
       Double,
       Double,
       Double,
@@ -1105,7 +1111,7 @@ extern "c" fn ffi_view_on_mouse_move(
       Int,
     ) -> Unit,
   ],
-  callback : (Int, Double, Double, Double, Double, Int, Int) -> Unit,
+  callback : (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Unit,
 ) -> Unit = "yue_mbt_view_on_mouse_move"
 
 ///|
@@ -1114,8 +1120,10 @@ extern "c" fn ffi_view_on_mouse_enter(
   view : View,
   invoke : FuncRef[
     (
-      (Int, Double, Double, Double, Double, Int, Int) -> Unit,
+      (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Unit,
       Int,
+      Double,
+      Double,
       Double,
       Double,
       Double,
@@ -1124,7 +1132,7 @@ extern "c" fn ffi_view_on_mouse_enter(
       Int,
     ) -> Unit,
   ],
-  callback : (Int, Double, Double, Double, Double, Int, Int) -> Unit,
+  callback : (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Unit,
 ) -> Unit = "yue_mbt_view_on_mouse_enter"
 
 ///|
@@ -1133,8 +1141,10 @@ extern "c" fn ffi_view_on_mouse_leave(
   view : View,
   invoke : FuncRef[
     (
-      (Int, Double, Double, Double, Double, Int, Int) -> Unit,
+      (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Unit,
       Int,
+      Double,
+      Double,
       Double,
       Double,
       Double,
@@ -1143,7 +1153,7 @@ extern "c" fn ffi_view_on_mouse_leave(
       Int,
     ) -> Unit,
   ],
-  callback : (Int, Double, Double, Double, Double, Int, Int) -> Unit,
+  callback : (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Unit,
 ) -> Unit = "yue_mbt_view_on_mouse_leave"
 
 ///|

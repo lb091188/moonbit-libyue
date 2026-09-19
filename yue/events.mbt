@@ -18,7 +18,9 @@ pub(all) enum EventType {
 
 ///|
 /// 鼠标事件（对照 nu::MouseEvent；仅在回调期内有效，勿长期持有）。
-/// button：1=左 2=右 3=中（libyue 统一语义）。view_* 相对视图，window_* 相对窗口。
+/// button：1=左 2=右 3=中（libyue 统一语义）。view_* 相对视图，window_* 相对窗口，
+/// screen_* 为屏幕全局坐标（原生事件自带，右键菜单等"事件位置弹出"直接用；
+/// Windows 上不受 GetBoundsInScreen 布局累加污染，见 adaptation.md）。
 pub(all) struct MouseEvent {
   kind : EventType
   button : Int
@@ -26,6 +28,8 @@ pub(all) struct MouseEvent {
   view_y : Double
   window_x : Double
   window_y : Double
+  screen_x : Double
+  screen_y : Double
   modifiers : Int
   timestamp : Int
 }
@@ -60,6 +64,8 @@ fn mouse_event(
   vy : Double,
   wx : Double,
   wy : Double,
+  sx : Double,
+  sy : Double,
   mods : Int,
   ts : Int,
 ) -> MouseEvent {
@@ -70,6 +76,8 @@ fn mouse_event(
     view_y: vy,
     window_x: wx,
     window_y: wy,
+    screen_x: sx,
+    screen_y: sy,
     modifiers: mods,
     timestamp: ts,
   }
@@ -597,16 +605,18 @@ pub const VKEY_Z : Int = 0x05a
 ///|
 /// 鼠标按下：返回 true 表示事件已处理（阻止默认行为）。
 impl ViewLike with fn on_mouse_down(self, callback : (MouseEvent) -> Bool) -> Unit {
-  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Int = fn(
+  let wrapped : (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Int = fn(
     button,
     vx,
     vy,
     wx,
     wy,
+    sx,
+    sy,
     mods,
     ts,
   ) {
-    if callback(mouse_event(MouseDown, button, vx, vy, wx, wy, mods, ts)) {
+    if callback(mouse_event(MouseDown, button, vx, vy, wx, wy, sx, sy, mods, ts)) {
       1
     } else {
       0
@@ -615,7 +625,7 @@ impl ViewLike with fn on_mouse_down(self, callback : (MouseEvent) -> Bool) -> Un
   keep_alive(fn() { ignore(wrapped) })
   ffi_view_on_mouse_down(
     self.view(),
-    fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
     wrapped,
   )
 }
@@ -623,16 +633,18 @@ impl ViewLike with fn on_mouse_down(self, callback : (MouseEvent) -> Bool) -> Un
 ///|
 /// 鼠标抬起：返回 true 表示事件已处理。
 impl ViewLike with fn on_mouse_up(self, callback : (MouseEvent) -> Bool) -> Unit {
-  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Int = fn(
+  let wrapped : (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Int = fn(
     button,
     vx,
     vy,
     wx,
     wy,
+    sx,
+    sy,
     mods,
     ts,
   ) {
-    if callback(mouse_event(MouseUp, button, vx, vy, wx, wy, mods, ts)) {
+    if callback(mouse_event(MouseUp, button, vx, vy, wx, wy, sx, sy, mods, ts)) {
       1
     } else {
       0
@@ -641,7 +653,7 @@ impl ViewLike with fn on_mouse_up(self, callback : (MouseEvent) -> Bool) -> Unit
   keep_alive(fn() { ignore(wrapped) })
   ffi_view_on_mouse_up(
     self.view(),
-    fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
     wrapped,
   )
 }
@@ -649,21 +661,23 @@ impl ViewLike with fn on_mouse_up(self, callback : (MouseEvent) -> Bool) -> Unit
 ///|
 /// 鼠标在视图内移动（高频，回调保持轻量）。
 impl ViewLike with fn on_mouse_move(self, callback : (MouseEvent) -> Unit) -> Unit {
-  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Unit = fn(
+  let wrapped : (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Unit = fn(
     button,
     vx,
     vy,
     wx,
     wy,
+    sx,
+    sy,
     mods,
     ts,
   ) {
-    callback(mouse_event(MouseMove, button, vx, vy, wx, wy, mods, ts))
+    callback(mouse_event(MouseMove, button, vx, vy, wx, wy, sx, sy, mods, ts))
   }
   keep_alive(fn() { ignore(wrapped) })
   ffi_view_on_mouse_move(
     self.view(),
-    fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
     wrapped,
   )
 }
@@ -671,21 +685,23 @@ impl ViewLike with fn on_mouse_move(self, callback : (MouseEvent) -> Unit) -> Un
 ///|
 /// 鼠标进入视图。
 impl ViewLike with fn on_mouse_enter(self, callback : (MouseEvent) -> Unit) -> Unit {
-  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Unit = fn(
+  let wrapped : (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Unit = fn(
     button,
     vx,
     vy,
     wx,
     wy,
+    sx,
+    sy,
     mods,
     ts,
   ) {
-    callback(mouse_event(MouseEnter, button, vx, vy, wx, wy, mods, ts))
+    callback(mouse_event(MouseEnter, button, vx, vy, wx, wy, sx, sy, mods, ts))
   }
   keep_alive(fn() { ignore(wrapped) })
   ffi_view_on_mouse_enter(
     self.view(),
-    fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
     wrapped,
   )
 }
@@ -693,21 +709,23 @@ impl ViewLike with fn on_mouse_enter(self, callback : (MouseEvent) -> Unit) -> U
 ///|
 /// 鼠标离开视图。
 impl ViewLike with fn on_mouse_leave(self, callback : (MouseEvent) -> Unit) -> Unit {
-  let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Unit = fn(
+  let wrapped : (Int, Double, Double, Double, Double, Double, Double, Int, Int) -> Unit = fn(
     button,
     vx,
     vy,
     wx,
     wy,
+    sx,
+    sy,
     mods,
     ts,
   ) {
-    callback(mouse_event(MouseLeave, button, vx, vy, wx, wy, mods, ts))
+    callback(mouse_event(MouseLeave, button, vx, vy, wx, wy, sx, sy, mods, ts))
   }
   keep_alive(fn() { ignore(wrapped) })
   ffi_view_on_mouse_leave(
     self.view(),
-    fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
     wrapped,
   )
 }

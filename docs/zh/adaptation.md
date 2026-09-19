@@ -70,6 +70,7 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - 回调闭包由注册表保活(`yue/view.mbt`),窗口销毁后条目暂不回收——**已定案维持进程级保活**(2026-09-12):回调与窗口无归属关系可循,精准回收需 weak-reference 注册表,当前 MoonBit 生态不成熟;单窗口工具场景泄漏量可忽略(2026-09-12 定案)。
 - **Toolbar / Vibrant 在 Linux 不可用**:libyue 头文件无平台 guard,但 Linux 静态库未编入任何相关符号(nm 实测零符号),调用会链接失败;Binding 侧已明确标注不暴露。
 - **Browser::GetCookiesForURL 空 Cookie 列表会 FATAL**:libyue 0.15.6 内部 `CHECK(cookies)` 对空列表直接崩溃(上游缺陷),查询前须确保页面已种 Cookie。
+- **改 shim 函数签名必须同批同步 `include/yue_mbt.h`,否则断链形态是"mangle 分裂"而非直观报错**(2026-09-19 实测):`yue_mbt.h` 全部声明包在 `extern "C" {}` 内,.cpp 定义经 include 继承 C 链接——头文件声明一旦漏改,.cpp 的新签名定义不再匹配旧声明,C++ 视为重载、按 C++ mangle 导出(`_Z26yue_mbt_view_on_mouse_down...`),而 MoonBit 生成端引用的永远是纯 C 名 → `undefined reference to 'yue_mbt_view_on_mouse_down'`。中间排查易被带偏:库内其余数百个符号都是纯 C 名(头文件继承),唯独新签名的几个是 mangled,nm 对比即可定位。修复=头文件与 .cpp、ffi.mbt 三处签名同批改齐(事件屏幕坐标扩充 7→9 参即踩此坑)。
 
 ---
 
@@ -268,6 +269,7 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **嵌套滚动区滚轮被外层抢走、虚拟表格滚不动(2026-09-17 Win10 真机反馈)**:现象两个——Backtop 演示的局部 `scroll` 区域滚轮无反应(外层页面滚);`table_v_t` 虚拟表格上滚轮也是外层页面滚、表格自身不滚。根因一个:Windows 的 `ScrollImpl::OnMouseWheel` 收到滚轮**直接消费并滚动自身**,不做光标命中下发(GTK 端滚轮由原生事件传播天然到达光标下最深控件)——整棵视图树里最外层 Scroll 永远第一个吃掉滚轮,嵌套 Scroll 与自绘 canvas 都拿不到;且 `yue_mbt_view_on_wheel` 的 Windows 分支本就是空操作(滚轮接入一直"待补")。修复两层:①prepare.py 新增 `patch_win_wheel_dispatch` vendor 补丁——`ScrollImpl::OnMouseWheel`/`ContainerImpl::OnMouseWheel` 先按 `FindChildFromPoint` 下发光标下子视图、未消费才滚动自身(顺带 `FindChildFromPoint` 由 private 改 protected),`ViewImpl` 增 `wheel_hook`(`std::function<bool(int)>`)钩子成员;②shim `yue_mbt_view_on_wheel` 补 Windows 分支,把 `WM_MOUSEWHEEL` 原始 delta(±120/格)换算成 GTK 语义(+1 下滚)挂到钩子上。验证:`moon check` 零警告、`moon test` 31/31、components 演示冒烟进程存活;滚轮交互待真机复验。
 - **自绘文字"测宽手动摆位"在 Windows 全体偏左,result 图标最显眼(2026-09-17 Win10 真机反馈)**:现象是 result 大色块里的 ✓/✕ 明显偏左。根因:Windows 端 `AttributedText::GetBoundsFor` 的 `MeasureString` 用的是 **GenericDefault** 格式(带 overhang 内边距),而 `DrawAttributedText` 的 `DrawString` 用 **GenericTypographic**(不带),测出的宽度 > 实际绘制推进宽度,所有 `x=(区域宽-测量宽)/2` 式手动摆位必然左偏;GTK 端测量/绘制同走 pango 天然一致,故 Linux 上从未暴露。此前组件库头部注释「GTK 端 DrawAttributedText 不实现水平 align,水平居中必须手动测宽」是错误认知(`draw_text` 的 align 参数两端都实现,examples/drawing 早有全部对齐组合在用)。修复:组件库所有摆位用途一律改 `draw_text`/`AttributedText` 的 `align=Center/End` 交给平台布局引擎(result 图标、avatar、alert_closeable、steps 序号、calendar 三处、table_t/table_v_t 的 CellTag 与列对齐),测宽仅保留"算容器宽度"用途(tag 底色宽、页签头宽,背景稍宽几像素无视觉影响);组件库头部注释同步纠正,防止错误模式再被抄。验证:同上构建/冒烟,视觉待真机复验。
 - 平台信息(`platform()=="windows"`、区域、缩放、屏幕)、剪贴板、定时器、全局快捷键注册、全局鼠标轮询、画布(GDI+)与浮动爱心窗口均实测正常。
+- **右键菜单/弹层定位改用事件自带屏幕坐标,根治 GetBoundsInScreen 污染(2026-09-19 预防性修复,待真机复验)**:继 autocomplete 弹层(09-17 实测)后审计发现 `context_menu_for` 同样依赖 `GetBoundsInScreen`+相对坐标换算弹出位置,Windows 嵌套滚动容器下必踩同一垃圾偏移,且自绘 Container 无 HWND 可走 popover 的 `GetWindowRect` 绕行路。根治:shim 新增 `MouseEventScreenPoint` 在事件转换层直接提取屏幕坐标——GTK 取 `GdkEvent` 的 `x_root/y_root`(根窗口全局坐标);Windows 用 `View::GetWindow()` 顶层 HWND `ClientToScreen(0,0)` + `position_in_window` 合成(同为物理像素;**不取 `MSG.hwnd`**,它可能是原生子控件、与客户区偏移错位;mac shim 为纯 .cpp 无 root 坐标,回退 (0,0));随鼠标事件链路全量透传为 `MouseEvent.screen_x/screen_y`(5 个蹦床 7→9 参)。`context_menu_for` 改直接用 `e.screen_x/e.screen_y` 弹菜单。真机复验:components/showcase 基础页色块右键,菜单应弹在光标处。
 
 #### 验证方式
 

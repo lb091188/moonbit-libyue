@@ -368,23 +368,28 @@ void yue_mbt_view_schedule_paint(void *view);
  * down/up 返回 true 表示事件已处理（阻止默认行为）。 */
 void yue_mbt_view_on_mouse_down(void *view,
     int32_t (*invoke)(void *closure, int32_t button, double view_x, double view_y,
-                      double window_x, double window_y, int32_t modifiers, int32_t timestamp),
+                      double window_x, double window_y, double screen_x, double screen_y,
+                      int32_t modifiers, int32_t timestamp),
     void *closure);
 void yue_mbt_view_on_mouse_up(void *view,
     int32_t (*invoke)(void *closure, int32_t button, double view_x, double view_y,
-                      double window_x, double window_y, int32_t modifiers, int32_t timestamp),
+                      double window_x, double window_y, double screen_x, double screen_y,
+                      int32_t modifiers, int32_t timestamp),
     void *closure);
 void yue_mbt_view_on_mouse_move(void *view,
     void (*invoke)(void *closure, int32_t button, double view_x, double view_y,
-                   double window_x, double window_y, int32_t modifiers, int32_t timestamp),
+                   double window_x, double window_y, double screen_x, double screen_y,
+                   int32_t modifiers, int32_t timestamp),
     void *closure);
 void yue_mbt_view_on_mouse_enter(void *view,
     void (*invoke)(void *closure, int32_t button, double view_x, double view_y,
-                   double window_x, double window_y, int32_t modifiers, int32_t timestamp),
+                   double window_x, double window_y, double screen_x, double screen_y,
+                   int32_t modifiers, int32_t timestamp),
     void *closure);
 void yue_mbt_view_on_mouse_leave(void *view,
     void (*invoke)(void *closure, int32_t button, double view_x, double view_y,
-                   double window_x, double window_y, int32_t modifiers, int32_t timestamp),
+                   double window_x, double window_y, double screen_x, double screen_y,
+                   int32_t modifiers, int32_t timestamp),
     void *closure);
 /* 滚轮(Linux GTK):invoke(closure, delta_y),+1 下滚 / -1 上滚 / 平滑增量为累计值 */
 void yue_mbt_view_on_wheel(void *view,

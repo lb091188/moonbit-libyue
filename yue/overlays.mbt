@@ -196,9 +196,9 @@ pub fn toast_layer(
 
 ///|
 /// 右键上下文菜单:给任意节点包右键弹原生菜单。items 为 (文案, 回调)
-/// 序列,文案 "-" 画分隔线;弹出位置经 get_bounds_in_screen + 事件相对
-/// 坐标换算屏幕坐标(Menu::popup_at 收屏幕坐标)。菜单每次右键现建,
-/// 避免原生菜单复用的状态残留。
+/// 序列,文案 "-" 画分隔线;弹出位置直接用事件自带的屏幕坐标(原生事件
+/// 系统真相,不受 GetBoundsInScreen 在 Windows 嵌套滚动容器下的布局累加
+/// 污染,见 adaptation.md)。菜单每次右键现建,避免原生菜单复用的状态残留。
 pub fn context_menu_for(
   content : Node,
   items : Array[(String, () -> Unit)],
@@ -219,8 +219,7 @@ pub fn context_menu_for(
               mi.on_click(cb)
             }
           }
-          let sb = ViewLike::get_bounds_in_screen(wrap)
-          menu.popup_at(sb.x + e.view_x, sb.y + e.view_y)
+          menu.popup_at(e.screen_x, e.screen_y)
           true
         } else {
           false
