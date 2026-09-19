@@ -166,6 +166,43 @@ fn main {
   // ---------- 基础组件(EP Basic) ----------
   let p_basic = scroll_page([
     section(
+      "Icon 图标系统 / IconButton 图标按钮",
+      "37 个内置矢量图标(draw_icon 统一入口,悬停看名称);icon_button_t 方形 hover 收敛按钮,工具栏排列右侧统一 6px 间距。",
+      [
+        @yue.hbox(
+          (
+            {
+              let cells : Array[@yue.Node] = []
+              let icons = @yue.all_icons()
+              for row in 0..<4 {
+                let items : Array[@yue.Node] = []
+                for col in 0..<10 {
+                  let idx = row * 10 + col
+                  if idx < icons.length() {
+                    items.push(
+                      @yue.tooltip_t(@yue.icon(icons[idx], size=18.0), @yue.icon_name(icons[idx])),
+                    )
+                  }
+                }
+                cells.push(@yue.hbox(items, style=[("gap", 10.0)]))
+              }
+              cells
+            }
+          ),
+          style=[("gap", 10.0)],
+        ),
+        @yue.hbox([
+          @yue.icon_button_t(@yue.IconKind::Refresh, tip="刷新"),
+          @yue.icon_button_t(@yue.IconKind::Edit, tip="编辑"),
+          @yue.icon_button_t(@yue.IconKind::Copy, tip="复制"),
+          @yue.icon_button_t(@yue.IconKind::Save, tip="保存"),
+          @yue.icon_button_t(@yue.IconKind::Trash, tip="删除"),
+          @yue.icon_button_t(@yue.IconKind::Search, tip="搜索"),
+          @yue.icon_button_t(@yue.IconKind::Ellipsis, tip="更多"),
+        ]),
+      ],
+    ),
+    section(
       "Button 按钮变体",
       "Solid 主题色实底 / Soft 浅底(hover 变实底白字) / Text 透明底(hover 浅灰) / Danger 红色实底,hover 全程主题内收敛。",
       [
