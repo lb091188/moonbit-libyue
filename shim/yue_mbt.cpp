@@ -2554,7 +2554,19 @@ void yue_mbt_view_on_capture_lost(void *view, void (*invoke)(void *), void *clos
 
 void yue_mbt_view_set_capture(void *view) {
   if (auto *v = CastToView(view)) {
+#if defined(OS_WIN)
+    // Windows:挂有鼠标处理器的视图在按下时已被 libyue 隐式捕获
+    // (EmitMouseClickEvent 的 implicit capture);此时再显式 SetCapture
+    // 会触发 WM_CAPTURECHANGED,OnCaptureChanged 清空 captured_view_,
+    // 隐式捕获反被拆掉——拖拽中的 move 事件从此按光标位置分发给别的
+    // 视图,再也回不到捕获视图(splitter 拖拽失效即此)。已持有捕获时
+    // 跳过重复设置;GTK 端捕获为逐控件 grab,无此冲突,维持直调。
+    if (!v->HasCapture()) {
+      v->SetCapture();
+    }
+#else
     v->SetCapture();
+#endif
   }
 }
 
