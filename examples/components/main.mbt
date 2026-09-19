@@ -162,17 +162,6 @@ fn main {
     ratio.set(if r > 1.0 { 1.0 } else { r })
   })
 
-  let sc_handle : Ref[@yue.Scroll?] = Ref(None)
-  let tall : Array[@yue.Node] = []
-  for i in 0..<20 {
-    tall.push(
-      @yue.label_t(
-        "\{i + 1}. 向下滚动的内容行,点右下角 ↑ 回顶部",
-        role=@yue.Body,
-      ),
-    )
-  }
-
   // ---------- 基础组件(EP Basic) ----------
   let p_basic = scroll_page([
     section(
@@ -601,36 +590,6 @@ fn main {
           "进阶组件",
           fn() { selected.set("基础组件") },
           actions=[@yue.button_t("页面操作", variant=@yue.Soft)],
-        ),
-      ],
-    ),
-    section(
-      "Backtop 返回顶部",
-      "滚动下方区域,点右下角 ↑ 按钮回顶部(scroll 句柄 + 定位 API)。",
-      [
-        @yue.vbox(
-          [
-            @yue.scroll(
-              @yue.vbox(tall, style=[("padding", 8.0)]),
-              style=[("flex", 1.0)],
-              handle=fn(s) { sc_handle.val = Some(s) },
-            ),
-            @yue.hbox(
-              [
-                @yue.label("        "),
-                @yue.backtop_t(fn() {
-                  match sc_handle.val {
-                    Some(s) => s.scroll_to_top()
-                    None => ()
-                  }
-                }),
-              ],
-              style=[("padding", 4.0)],
-              style_str=[("alignItems", "center")],
-            ),
-          ],
-          style=[("height", 150.0)],
-          style_str=[("position", "relative"), ("flexDirection", "column")],
         ),
       ],
     ),

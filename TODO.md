@@ -96,7 +96,7 @@
 - [x] form 表单布局 — form_item(标签右对齐定宽 + 控件区)+ form 分组标题
 - [x] link 链接文字 — 主题色 + 悬停下划线 + 点击回调
 - [x] page-header 页头 — ‹ 返回(悬停变主题色)+ 标题 + 右侧操作区
-- [x] backtop 返回顶部 — backtop_t 回调按钮 + Scroll::set_scroll_position(既有 ABI);演示页含滚动区实测
+- [x] ~~backtop 返回顶部~~ — 已移除(2026-09-19):EP 网页端长页面组件,桌面端滚动条/Home 键即达,价值低;真机疑难(首点被吞)随组件删除而消除,过程经验入档 adaptation.md(运行期 set_background_color 规范/点两次形态判别);Scroll::scroll_to_top 通用 API 保留
 - [x] tree 树形控件 — TreeNode 嵌套 + 缩进层级 + 点击 ▸/▾ 展开折叠
 - [x] transfer 穿梭框 — 双列 + 行点击选中(方块标记)+ ›/‹ 互移(动态行经 remove_child_view 重建)
 - [x] autocomplete 自动补全 — 已移除(2026-09-18):过滤/键盘交互并入 select_t Linux 可过滤形态
