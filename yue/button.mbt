@@ -70,6 +70,15 @@ pub fn Entry::set_position(self : Entry, index : Int) -> Unit {
 }
 
 ///|
+/// 设置输入框前景/背景色（主题跟随通道）：Windows 原生 RichEdit 不吃
+/// View 的 SetColor，走专用消息通道；Linux 全局接管 CSS 已覆盖，此
+/// 方法为逐控件显式覆盖。颜色为 #RRGGBB，两个都显式给出，只设其一
+/// 会有连带渲染问题。
+pub fn Entry::set_colors(self : Entry, fg~ : String, bg~ : String) -> Unit {
+  ffi_entry_set_colors(self.view, utf8_bytes(fg), utf8_bytes(bg))
+}
+
+///|
 /// 创建指定类型输入框并钉住首选宽度（width_chars，仅 Linux 有意义）：
 /// GTK 主题的 entry 最小宽(GTK3 另有 150px 硬编码下限)大于窄容器给
 /// Entry 的分配时,原生子窗口在构造期即以主题自然宽创建、横向溢出盖住

@@ -1904,10 +1904,47 @@ pub fn button_t(
 }
 
 ///|
-/// 主题化单行输入:统一字体与前景色。
+/// Windows 原生单行输入文字贴顶(Win32 EDIT 自客户区顶部绘制,无垂直
+/// 居中样式):按字体行高把原生控件收窄到「行高(带原生边框时 +1px×2)」,
+/// 剩余高度均分为上下 margin,视觉垂直居中;其余平台原生居中,不动。
+fn entry_vcenter(e : Entry, box_height : Double, bordered : Bool) -> Unit {
+  if platform() != "windows" {
+    return
+  }
+  let probe = AttributedText::new("Ag", wrap=false)
+  probe.set_font(Font::new("Sans", 13.0))
+  let line = probe.get_bounds_for(10000.0, 1000.0).height
+  let ctrl = line + (if bordered { 2.0 } else { 0.0 })
+  ViewLike::set_style(e, "height", ctrl)
+  let rest = (box_height - ctrl) / 2.0
+  if rest > 0.0 {
+    ViewLike::set_style(e, "marginTop", rest)
+    ViewLike::set_style(e, "marginBottom", rest)
+  }
+}
+
+///|
+/// 输入框文字色跟随主题:Linux 由全局接管 CSS 负责,不逐控件设;其余
+/// 平台显式设当前主题前景/背景并订阅主题切换重设(Windows 原生
+/// RichEdit 恒黑字不随主题,是此函数存在的原因)。
+fn bind_entry_theme(e : Entry) -> Unit {
+  if platform() == "linux" {
+    return
+  }
+  fn apply() -> Unit {
+    e.set_colors(fg=theme_text_regular(), bg=theme_bg_panel())
+  }
+
+  apply()
+  on_theme_change(apply)
+}
+
+///|
+/// 主题化单行输入:统一字体与行高;文字色经主题通道跟随色板。
 pub fn entry_t(
   text? : String = "",
   password? : Bool = false,
+  height? : Double = 30.0,
   on_input? : (String) -> Unit = fn(_s) {  },
 ) -> Node {
   {
@@ -1916,13 +1953,16 @@ pub fn entry_t(
         true => Entry::make(text~, entry_type=Password)
         false => Entry::make(text~, entry_type=Normal)
       }
-      // 注:GTK Entry 上 set_color 会连带渲染背景变黑,故只统一字体
       ViewLike::set_font(e, Font::new("Sans", 13.0))
       // Linux 端 Entry 尺寸已归一化(min-height:0),裸 Entry 自然高只剩
-      // 文字行高,补显式高度维持输入框观感
+      // 文字行高,补显式高度维持输入框观感;Windows 文字贴顶,按行高
+      // 收窄控件 + 均分边距实现垂直居中
       if platform() == "linux" {
-        ViewLike::set_style(e, "height", 30.0)
+        ViewLike::set_style(e, "height", height)
+      } else {
+        entry_vcenter(e, height, true)
       }
+      bind_entry_theme(e)
       e.on_text_change(fn() { on_input(e.get_text()) })
       attach(parent, ViewLike::view(e))
       ViewLike::view(e)
@@ -2269,9 +2309,15 @@ pub fn input_t(
       ViewLike::set_style(entry, "flex", 1.0)
       ViewLike::set_style(entry, "marginLeft", 10.0)
       ViewLike::set_style(entry, "marginRight", if clearable { 26.0 } else { 10.0 })
-      // 原生子窗口绘制在自绘之上:上下留 2 让出边框线
-      ViewLike::set_style(entry, "marginTop", 2.0)
-      ViewLike::set_style(entry, "marginBottom", 2.0)
+      if platform() == "windows" {
+        // 文字贴顶:按行高收窄控件并垂直居中(外框线 1px×2 从可用高扣)
+        entry_vcenter(entry, height - 2.0, false)
+      } else {
+        // 原生子窗口绘制在自绘之上:上下留 2 让出边框线
+        ViewLike::set_style(entry, "marginTop", 2.0)
+        ViewLike::set_style(entry, "marginBottom", 2.0)
+      }
+      bind_entry_theme(entry)
       ViewLike::on_focus_in(entry, fn() {
         focused.val = true
         ViewLike::schedule_paint(outer)

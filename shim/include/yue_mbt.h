@@ -122,6 +122,9 @@ void yue_mbt_apply_native_theme_css(const char *css);
 void *yue_mbt_entry_new_ex(int32_t type, int32_t width_chars);
 /* 设置光标位置(仅 Linux):index 负值=末尾;失焦归 0 使文本回滚首端。 */
 void yue_mbt_entry_set_position(void *entry, int32_t index);
+/* 前景/背景色(主题跟随):Linux 逐控件 CssProvider,Windows RichEdit
+ * 消息通道,mac 空操作;fg/bg 为 #RRGGBB 十六进制串。 */
+void yue_mbt_entry_set_colors(void *entry, const char *fg, const char *bg);
 /* Entry::Type：0=Normal 1=Password */
 void *yue_mbt_entry_new_typed(int32_t type);
 void yue_mbt_entry_set_text(void *entry, const char *text);
