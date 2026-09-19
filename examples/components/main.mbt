@@ -1191,21 +1191,28 @@ fn main {
           style=[("height", 70.0), ("width", 420.0), ("padding", 10.0)],
           handle=fn(c) {
             @yue.theme_bind_bg(c, fn() { @yue.theme_current().primary_light })
-            c.register_dragged_types([@yue.FilePaths, @yue.Text])
+            c.register_dragged_types([@yue.FilePaths, @yue.Text, @yue.Image])
             c.handle_drag_enter(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })
+            // drag-motion 每次移动都按 update 返回值决定接收与否,
+            // 不注册则一律拒绝(光标禁止,drop 永不发生)
+            c.handle_drag_update(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })
             c.handle_drop(fn(info, _x, _y) {
-              match info.get_data(@yue.FilePaths) {
-                Some(@yue.Paths(paths)) => {
-                  let sb = StringBuilder()
-                  for i, p in paths {
-                    if i > 0 {
-                      sb.write_string("、")
+              match info.get_data(@yue.Image) {
+                Some(@yue.Img(_)) => toast_push("拖入图片", @yue.Success)
+                _ =>
+                  match info.get_data(@yue.FilePaths) {
+                    Some(@yue.Paths(paths)) => {
+                      let sb = StringBuilder()
+                      for i, p in paths {
+                        if i > 0 {
+                          sb.write_string("、")
+                        }
+                        sb.write_string(p)
+                      }
+                      toast_push("拖入 \{paths.length()} 个文件", @yue.Success)
                     }
-                    sb.write_string(p)
+                    _ => toast_push("拖入文本", @yue.Info)
                   }
-                  toast_push("拖入 \{paths.length()} 个文件", @yue.Success)
-                }
-                _ => toast_push("拖入文本", @yue.Info)
               }
               true
             })
