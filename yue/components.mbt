@@ -654,8 +654,39 @@ pub fn tag(text : String, color : String, height? : Double = 24.0) -> Node {
 
 ///|
 /// 数字角标(对应 EP Badge 的数字形态):红底白字小块,宽度自适应。
+/// 语义红 draw 现取跟随主题(不复用 tag——其 color 参数为固定色语义)。
 pub fn badge_count(count : Int) -> Node {
-  tag(count.to_string(), theme_danger(), height=18.0)
+  let text = count.to_string()
+  {
+    mount: fn(parent) {
+      let font = Font::new("Sans", 12.0)
+      let probe = AttributedText::new(text, wrap=false)
+      probe.set_font(font)
+      let text_w = probe.get_bounds_for(10000.0, 100.0).width
+      let w = text_w + 14.0
+      let h = 18.0
+      let c = themed_container(style=[
+        ("width", w),
+        ("height", h),
+        ("marginRight", 8.0),
+      ])
+      c.on_draw(fn(p) {
+        p.set_fill_color(theme_danger())
+        p.fill_rect(0.0, 0.0, w, h)
+        p.draw_text(
+          text,
+          (w - text_w) / 2.0,
+          0.0,
+          w,
+          h,
+          valign=Center,
+          color="#FFFFFF",
+        )
+      })
+      attach(parent, c.view())
+      c.view()
+    },
+  }
 }
 
 ///|
@@ -1468,7 +1499,6 @@ pub fn result(
         ("height", 76.0),
         ("marginTop", 16.0),
       ])
-      let color = type_color(t)
       let symbol = match t {
         Success => "✓"
         Danger => "✕"
@@ -1480,10 +1510,19 @@ pub fn result(
       // mount 时测宽手动水平居中(库内惯例,见 adaptation)
       let symbol_at = AttributedText::new(symbol, valign=Center, wrap=false)
       symbol_at.set_font(Font::new("Sans", 38.0, weight=Bold))
-      symbol_at.set_color(color)
+      symbol_at.set_color(type_color(t))
       let symbol_w = symbol_at.get_bounds_for(10000.0, 100.0).width
 
       bind_bg(icon, fn() { type_light_color(t) })
+      // 符号色随主题:set_color 后同文重排(AT 属性变更不自动失效)
+      fn apply_symbol_color() -> Unit {
+        symbol_at.set_color(type_color(t))
+        symbol_at.set_text(symbol_at.get_text())
+        icon.schedule_paint()
+      }
+
+      apply_symbol_color()
+      on_theme_change(apply_symbol_color)
       icon.on_draw(fn(p) {
         let b = icon.get_bounds()
         p.draw_attributed_text(
