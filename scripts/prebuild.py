@@ -67,8 +67,29 @@ def _shim_lib_name() -> str:
     return "yue_mbt.lib" if sys.platform == "win32" else "libyue_mbt.a"
 
 
+def _git(args: list[str]) -> str | None:
+    """git 只读查询；不可用（非仓库/无 git）返回 None，调用方回退 mtime。"""
+    try:
+        proc = subprocess.run(["git", *args], cwd=MODULE_ROOT,
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                              text=True, encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
 def _sources_newer(vendored: Path) -> bool:
-    """shim 源码比 vendored 库新 → 开发者在改 shim，回退 build/ 流程。"""
+    """shim 源码比 vendored 库新 → 开发者在改 shim，回退 build/ 流程。
+
+    git 仓库下按提交时间比较：克隆/检出按路径序写盘，lib/ 恒早于 shim/，
+    mtime 比较在每次拉取后都会误判回退；shim 有未提交改动视为更新。
+    vendored 目录未入库或非 git 环境回退 mtime 比较。"""
+    rel = vendored.relative_to(MODULE_ROOT).as_posix()
+    if _git(["status", "--porcelain", "--", "shim"]) == "":
+        t_shim = _git(["log", "-1", "--format=%ct", "--", "shim"])
+        t_lib = _git(["log", "-1", "--format=%ct", "--", rel])
+        if t_shim is not None and t_lib is not None and t_lib.strip():
+            return int(t_shim.strip() or 0) > int(t_lib.strip())
     lib_mtime = (vendored / _shim_lib_name()).stat().st_mtime
     for pattern in ("*.cpp", "*.h", "include/*.h"):
         for src in (MODULE_ROOT / "shim").glob(pattern):

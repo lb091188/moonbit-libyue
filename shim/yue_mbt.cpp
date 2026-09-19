@@ -4253,10 +4253,12 @@ bool yue_mbt_system_prefers_dark(void) {
 /* 系统深色偏好变化通知(仅 Linux):监听 GtkSettings 的深色开关与主题名
  * 两个属性,任一变化即回调 MoonBit;信号只挂一份,后续注册直接回调。
  * 回调用具名函数——G_CALLBACK 是宏,lambda 参数列表的逗号会被预处理器劈开。 */
+#if defined(OS_LINUX)
 void yue_mbt_settings_notify(GObject *, GParamSpec *, gpointer d) {
   auto *p = static_cast<std::pair<void (*)(void *), void *> *>(d);
   p->first(p->second);
 }
+#endif
 
 void yue_mbt_on_system_theme_change(void (*invoke)(void *), void *closure) {
 #if defined(OS_LINUX)
@@ -4286,6 +4288,7 @@ void yue_mbt_on_system_theme_change(void (*invoke)(void *), void *closure) {
 #endif
 }
 
+#if defined(OS_LINUX)
 static void yue_mbt_repaint_walk(GtkWidget *widget, gpointer) {
   gtk_widget_queue_draw(widget);
   if (GdkWindow *gw = gtk_widget_get_window(widget)) {
@@ -4296,6 +4299,7 @@ static void yue_mbt_repaint_walk(GtkWidget *widget, gpointer) {
                           nullptr);
   }
 }
+#endif
 
 void yue_mbt_repaint_all(void) {
 #if defined(OS_LINUX)
