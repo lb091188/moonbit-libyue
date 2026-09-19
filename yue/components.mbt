@@ -294,9 +294,10 @@ pub fn theme_apply(t : Theme) -> Unit {
   }
   if platform() == "linux" {
     apply_native_theme_css(t)
-    // 整体重绘兜底:订阅回调覆盖库内组件,GTK 侧再对全部可见顶层窗口
-    // queue_draw,杀掉个别「现取色但停留旧帧」的残留
-    ffi_repaint_all()
+    // 整体重绘兜底推迟一拍:按钮点击等输入事件回调里同步
+    // process_updates 会被 GTK 吞掉(定时器路径实测有效、点击路径实测
+    // 无效),脱离触发上下文后再逐窗口同步重绘
+    post_task(fn() { ffi_repaint_all() })
   }
 }
 
