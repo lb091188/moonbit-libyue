@@ -58,8 +58,6 @@ fn splitter_impl(
       // 首栏包装容器:尺寸/布局打在包装上,内容 mount 其内(View 句柄
       // 不实现 ViewLike,不能直接设样式)
       let pane_a = themed_container(style_str=[("flexDirection", "column")])
-      let basis_pct = (ratio * 100.0).to_string() + "%"
-      ViewLike::set_style_str(pane_a, "flexbasis", basis_pct)
       ViewLike::set_style(pane_a, if horizontal { "minwidth" } else { "minheight" }, min_a)
       ignore((first.mount)(ViewLike::view(pane_a)))
       attach(ViewLike::view(outer), ViewLike::view(pane_a))
@@ -76,6 +74,18 @@ fn splitter_impl(
       ViewLike::set_style(pane_b, if horizontal { "minwidth" } else { "minheight" }, min_b)
       ignore((second.mount)(ViewLike::view(pane_b)))
       attach(ViewLike::view(outer), ViewLike::view(pane_b))
+      // 初始比例:初次布局完成后按实际尺寸换算像素写 flexbasis。百分比
+      // 字符串仅 GTK 端解析,Windows 端静默忽略(首栏被压到最小宽),
+      // 统一走像素跨平台一致;与拖动写像素同一形态
+      let apply_ratio = fn() -> Unit {
+        let b = ViewLike::get_bounds(outer)
+        let total = (if horizontal { b.width } else { b.height }) - handle_w
+        if total > 0.0 {
+          ViewLike::set_style(pane_a, "flexbasis", total * ratio)
+          ViewLike::update_layout(outer)
+        }
+      }
+      post_task(apply_ratio)
       View::set_cursor(handle, Cursor::new(if horizontal { ResizeEW } else { ResizeNS }))
       // 常显视觉:中间 1px 分隔线 + 双列点纹(border 色),不靠 hover;
       // hover 浅灰底、拖动主题色底白点(把手状态一眼可辨)
