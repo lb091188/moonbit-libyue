@@ -5284,16 +5284,14 @@ pub fn side_menu_sections(
 ) -> Node {
   let nodes : Array[Node] = []
   for (group, items) in sections {
-    // 组标题:次要色小字,不可点;paddingLeft 与菜单项文字的 pad_x
-    // 一致(同一父容器的 padding 下两者左缘对齐)
+    // 组标题:次要色小字,不可点,恒左对齐(label_t;普通 label 底层
+    // 默认水平居中,满宽拉伸时文字会飘到中间);paddingLeft 与菜单项
+    // 文字的 pad_x 一致(同一父容器的 padding 下两者左缘对齐)
     nodes.push(
-      label(
+      label_t(
         group,
+        role=Secondary,
         style=[("paddingLeft", 20.0), ("paddingTop", 10.0), ("height", 24.0)],
-        handle=fn(l) {
-          l.set_font(Font::new("Sans", 12.0))
-          l.set_color(theme_text_secondary())
-        },
       ),
     )
     for it in items {
