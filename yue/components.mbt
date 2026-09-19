@@ -254,6 +254,19 @@ fn draw_focus_ring(p : Painter, w : Double, h : Double, color? : String = theme_
 }
 
 ///|
+/// 清空按钮 ✕(矢量自绘,不依赖字体字形):中心 (cx,cy),半径 r。
+/// 供 clearable 形态的字段在「有值且悬停」时画在右侧清空带内。
+fn draw_clear_x(p : Painter, cx : Double, cy : Double, r? : Double = 4.0) -> Unit {
+  p.set_stroke_color(theme_text_secondary())
+  p.begin_path()
+  p.move_to(cx - r, cy - r)
+  p.line_to(cx + r, cy + r)
+  p.move_to(cx + r, cy - r)
+  p.line_to(cx - r, cy + r)
+  p.stroke()
+}
+
+///|
 /// 自绘交互项的焦点接线:可聚焦(Tab 链由 GTK 按挂载顺序遍历)、
 /// 聚焦变化时重绘、Enter/Space 触发激活。点击聚焦由各组件在
 /// on_mouse_down 里调 focus()。
@@ -1976,16 +1989,21 @@ pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
 ///|
 /// 边框输入框:外层自绘 1px 边框(聚焦变主题色)+ 白底,
 /// 内部 Entry 去 native 边框只负责文字;margin 控制外边距,直角。
+/// clearable=true 时字段悬停且非空,右侧显示 ✕,点击清空文本
+/// (Entry 右侧恒定留出清空带——原生子窗口盖在自绘之上,带内不重叠)。
 pub fn input_t(
   text? : String = "",
   password? : Bool = false,
   margin? : Double = 0.0,
   width? : Double = 280.0,
   height? : Double = 30.0,
+  clearable? : Bool = false,
 ) -> Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
+      let hover = Ref(false)
+      let has_text = Ref(text != "")
       let outer = Container::make(
         style=[
           ("width", width),
@@ -1995,12 +2013,17 @@ pub fn input_t(
         ],
       )
       outer.set_background_color("#FFFFFF")
+      // 清空带宽 24(✕ 中心在带中央),不显示时也留白,避免 ✕ 被 Entry 盖住
+      let clear_x = width - 12.0
       outer.on_draw(fn(p) {
         let b = outer.get_bounds()
         p.set_stroke_color(
           if focused.val { theme_primary() } else { theme_border() },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+        if clearable && hover.val && has_text.val {
+          draw_clear_x(p, clear_x, b.height / 2.0)
+        }
       })
       let entry = match password {
         true => Entry::make(text~, entry_type=Password)
@@ -2010,7 +2033,7 @@ pub fn input_t(
       entry.set_background_color("#FFFFFF")
       entry.set_style("flex", 1.0)
       entry.set_style("marginLeft", 10.0)
-      entry.set_style("marginRight", 10.0)
+      entry.set_style("marginRight", if clearable { 26.0 } else { 10.0 })
       // 原生子窗口绘制在自绘之上:上下留 2 让出边框线
       entry.set_style("marginTop", 2.0)
       entry.set_style("marginBottom", 2.0)
@@ -2027,6 +2050,31 @@ pub fn input_t(
         entry.set_position(0)
         false
       })
+      if clearable {
+        entry.on_text_change(fn() {
+          has_text.val = entry.get_text() != ""
+          outer.schedule_paint()
+        })
+        outer.on_mouse_enter(fn(_e) {
+          hover.val = true
+          outer.schedule_paint()
+        })
+        outer.on_mouse_leave(fn(_e) {
+          hover.val = false
+          outer.schedule_paint()
+        })
+        // 清空带不与 Entry 重叠(其事件窗口只覆盖原生子窗口之外的区域),
+        // 点击落在带上即清空
+        outer.on_mouse_up(fn(e) {
+          let b = outer.get_bounds()
+          if e.button == 1 && has_text.val && e.view_x >= b.width - 24.0 {
+            entry.set_text("")
+            true
+          } else {
+            false
+          }
+        })
+      }
       outer.add_child(entry)
       attach(parent, outer.view())
       outer.view()
@@ -2901,16 +2949,20 @@ pub fn calendar_t(
 /// 日期选择器(EP DatePicker,全自绘):输入框样式字段,点击弹出
 /// 自绘日历面板(Popover 承载,三平台弹层基座见 shim),点选回填并收起;
 /// 点击其他区域(字段失焦)收起。选中间经 value 同步,回调收 DateYMD。
+/// clearable=true 时字段悬停且有值,箭头左侧显示 ✕,点击清空
+/// (value 置 None;on_change 签名不带空值,清空不触发回调)。
 pub fn date_picker_t(
   value? : Store[DateYMD?],
   on_change? : (DateYMD) -> Unit = fn(_d) {  },
   width? : Double = 200.0,
   placeholder? : String = "请选择日期",
+  clearable? : Bool = false,
 ) -> Node {
   {
     mount: fn(parent) {
       let today = local_date()
       let fnt = Font::new("Sans", 13.0)
+      let hover = Ref(false)
       let sel : Ref[DateYMD?] = Ref(match value {
         Some(s) => s.get()
         None => None
@@ -2959,6 +3011,9 @@ pub fn date_picker_t(
         p.line_to(b.width - 16.0, b.height / 2.0 + 3.0)
         p.close_path()
         p.fill()
+        if clearable && hover.val && has_val.val {
+          draw_clear_x(p, b.width - 30.0, b.height / 2.0)
+        }
       })
       // 弹层与面板:首开时创建,面板重建函数挂入 grid_refresh 供外部同步
       let pop : Ref[Popover?] = Ref(None)
@@ -2990,9 +3045,30 @@ pub fn date_picker_t(
         }
         false
       })
+      field.on_mouse_enter(fn(_e) {
+        hover.val = true
+        field.schedule_paint()
+      })
+      field.on_mouse_leave(fn(_e) {
+        hover.val = false
+        field.schedule_paint()
+      })
       field.on_mouse_up(fn(e) {
         if e.button == 1 {
           field.focus()
+          // 清空带(箭头左侧)优先:清空日期,不弹日历
+          let b = field.get_bounds()
+          if clearable && has_val.val && e.view_x >= b.width - 40.0 && e.view_x <= b.width - 20.0 {
+            sel.val = None
+            text.val = placeholder
+            has_val.val = false
+            match value {
+              Some(s) => s.set(None)
+              None => ()
+            }
+            field.schedule_paint()
+            return true
+          }
           match pop.val {
             Some(_) => ()
             None => {
@@ -3996,17 +4072,21 @@ pub fn divider(vertical? : Bool = false, spacing? : Double = 10.0) -> Node {
 /// 多行输入(EP Input textarea 形态,input_t 同套路):外层自绘 1px 边框
 /// (聚焦变主题色)+ 内边距,内部 TextEdit 去 native 边框只负责文字,
 /// 内容超出按平台自身滚动(GTK TextView/RichEdit 滚轮)。文本变化经
-/// on_input 回调。
+/// on_input 回调。clearable=true 时字段悬停且非空,右侧显示 ✕,
+/// 点击清空文本(on_input 收到空串)。
 pub fn textarea_t(
   text? : String = "",
   width? : Double = 280.0,
   height? : Double = 110.0,
   margin? : Double = 0.0,
   on_input? : (String) -> Unit = fn(_s) {  },
+  clearable? : Bool = false,
 ) -> Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
+      let hover = Ref(false)
+      let has_text = Ref(text != "")
       let outer = Container::make(
         style=[
           ("width", width),
@@ -4017,12 +4097,17 @@ pub fn textarea_t(
         ],
       )
       outer.set_background_color("#FFFFFF")
+      // 清空带在 padding 区右侧(TextEdit 恒定让出,防 ✕ 被原生子窗口盖住)
+      let clear_x = width - 20.0
       outer.on_draw(fn(p) {
         let b = outer.get_bounds()
         p.set_stroke_color(
           if focused.val { theme_primary() } else { theme_border() },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+        if clearable && hover.val && has_text.val {
+          draw_clear_x(p, clear_x, b.height / 2.0)
+        }
       })
       let edit = TextEdit::new()
       edit.set_text(text)
@@ -4030,7 +4115,16 @@ pub fn textarea_t(
       edit.set_borderless(true)
       edit.set_background_color("#FFFFFF")
       edit.set_style("flex", 1.0)
-      edit.on_text_change(fn() { on_input(edit.get_text()) })
+      if clearable {
+        edit.set_style("marginRight", 24.0)
+      }
+      edit.on_text_change(fn() {
+        if clearable {
+          has_text.val = edit.get_text() != ""
+          outer.schedule_paint()
+        }
+        on_input(edit.get_text())
+      })
       edit.on_focus_in(fn() {
         focused.val = true
         outer.schedule_paint()
@@ -4041,6 +4135,25 @@ pub fn textarea_t(
         outer.schedule_paint()
         false
       })
+      if clearable {
+        outer.on_mouse_enter(fn(_e) {
+          hover.val = true
+          outer.schedule_paint()
+        })
+        outer.on_mouse_leave(fn(_e) {
+          hover.val = false
+          outer.schedule_paint()
+        })
+        outer.on_mouse_up(fn(e) {
+          let b = outer.get_bounds()
+          if e.button == 1 && has_text.val && e.view_x >= b.width - 32.0 {
+            edit.set_text("")
+            true
+          } else {
+            false
+          }
+        })
+      }
       outer.add_child(edit)
       attach(parent, outer.view())
       outer.view()
@@ -4344,7 +4457,9 @@ fn select_row(
 ///|
 /// 下拉选择(EP Select,全自绘):点击弹候选列表(Popover 承载):悬停
 /// 高亮、当前选中主题色 ✓,点选回填并收起,失焦收起;选中经
-/// value(Store[String])同步。三平台同形态。
+/// value(Store[String])同步。三平台同形态。clearable=true 时字段悬停
+/// 且有值,箭头左侧显示 ✕,点击清空选择(value 置空串、on_change("")。
+/// 选项本身为空串时 ✕ 判定与「无值」同义)。
 /// (曾有 Linux 可过滤形态——字段可输入实时筛选 + ↑↓/回车键盘导航,
 /// 真机两轮验证均折在 X11 弹层焦点语义上,已移除,见 adaptation.md。)
 pub fn select_t(
@@ -4352,10 +4467,12 @@ pub fn select_t(
   value : Store[String],
   width? : Double = 200.0,
   on_change? : (String) -> Unit = fn(_s) {  },
+  clearable? : Bool = false,
 ) -> Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
+      let hover = Ref(false)
       let field = Container::make(
         style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
       )
@@ -4388,6 +4505,9 @@ pub fn select_t(
         p.line_to(b.width - 16.0, b.height / 2.0 + 3.0)
         p.close_path()
         p.fill()
+        if clearable && hover.val && value.get() != "" {
+          draw_clear_x(p, b.width - 30.0, b.height / 2.0)
+        }
       })
       let pop : Ref[Popover?] = Ref(None)
       fn pick(opt : String) -> Unit {
@@ -4414,9 +4534,24 @@ pub fn select_t(
         }
         false
       })
+      field.on_mouse_enter(fn(_e) {
+        hover.val = true
+        field.schedule_paint()
+      })
+      field.on_mouse_leave(fn(_e) {
+        hover.val = false
+        field.schedule_paint()
+      })
       field.on_mouse_up(fn(e) {
         if e.button == 1 {
           field.focus()
+          // 清空带(箭头左侧)优先:清空选择,不弹列表
+          let b = field.get_bounds()
+          if clearable && value.get() != "" && e.view_x >= b.width - 40.0 && e.view_x <= b.width - 20.0 {
+            value.set("")
+            on_change("")
+            return true
+          }
           match pop.val {
             Some(_) => ()
             None => {

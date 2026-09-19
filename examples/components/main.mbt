@@ -225,22 +225,24 @@ fn main {
   let p_form = scroll_page([
     section(
       "Input 输入框",
-      "现代化主题唯一输入框:外层自绘 1px 边框(聚焦变主题蓝)+ 白底,内部 Entry 去原生边框与内阴影;margin 控制外边距,直角。",
+      "现代化主题唯一输入框:外层自绘 1px 边框(聚焦变主题蓝)+ 白底,内部 Entry 去原生边框与内阴影;margin 控制外边距,直角。clearable=true:悬停且非空时右侧出现 ✕,点击清空。",
       [
         @yue.vbox([
           @yue.input_t(text="输入点什么…", margin=10.0),
           @yue.input_t(text="密码框", password=true),
+          @yue.input_t(text="悬停出现 ✕,点击清空", clearable=true),
         ]),
       ],
     ),
     section(
       "Textarea 多行输入",
-      "外层自绘边框(聚焦变主题色)+ 8px 内边距,内容超出按平台滚动。",
+      "外层自绘边框(聚焦变主题色)+ 8px 内边距,内容超出按平台滚动;clearable=true 悬停非空时 ✕ 清空。",
       [
         @yue.textarea_t(
           text="多行文本输入演示。\n第二行内容。",
           height=90.0,
           width=300.0,
+          clearable=true,
         ),
       ],
     ),
@@ -256,22 +258,23 @@ fn main {
     ),
     section(
       "Select 下拉选择",
-      "点击字段弹候选列表(EP 样式):悬停高亮、当前选中 ✓ 标记,点选回填并收起;三平台同形态。",
+      "点击字段弹候选列表(EP 样式):悬停高亮、当前选中 ✓ 标记,点选回填并收起;clearable=true 悬停有值时箭头旁 ✕ 清空选择;三平台同形态。",
       [
         @yue.select_t(
           ["杭州", "北京", "上海", "深圳", "广州"],
           picked_lang,
           width=170.0,
+          clearable=true,
         ),
       ],
     ),
     section(
       "DatePicker 日期选择",
-      "全自绘日历(EP 样式):点字段弹月历,‹/› 切月,点选回填;下方为内联 calendar_t 面板。",
+      "全自绘日历(EP 样式):点字段弹月历,‹/› 切月,点选回填;下方为内联 calendar_t 面板;clearable=true 悬停有值时 ✕ 清空。",
       [
         @yue.hbox(
           [
-            @yue.date_picker_t(value=dp_val, width=170.0),
+            @yue.date_picker_t(value=dp_val, width=170.0, clearable=true),
             @yue.label("   选中:"),
             @yue.bind_label(dp_val, fn(d) {
               match d {
