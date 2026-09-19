@@ -429,16 +429,6 @@ fn draw_glyph_right(p : Painter, cx : Double, cy : Double, s : Double, color : S
   p.fill()
 }
 
-///| ↑ 朝上箭头(折线,返回顶部)
-fn draw_glyph_up(p : Painter, cx : Double, cy : Double, s : Double, color : String) -> Unit {
-  p.set_stroke_color(color)
-  p.begin_path()
-  p.move_to(cx - s, cy + s / 2.0)
-  p.line_to(cx, cy - s / 2.0)
-  p.line_to(cx + s, cy + s / 2.0)
-  p.stroke()
-}
-
 ///|
 /// 自绘交互项的焦点接线:可聚焦(Tab 链由 GTK 按挂载顺序遍历)、
 /// 聚焦变化时重绘、Enter/Space 触发激活。点击聚焦由各组件在
@@ -3384,51 +3374,6 @@ pub fn date_picker_t(
       }
       attach(parent, ViewLike::view(field))
       ViewLike::view(field)
-    },
-  }
-}
-
-///|
-/// 返回顶部浮动按钮:配合 scroll 句柄使用,点击回滚到顶部。
-/// 放置于 relative 容器内时经 absolute 定位悬浮右下。
-/// hover 底色用 on_draw 表达,不在 enter 里 set_background_color——
-/// 运行期 CSS 改写会扰动事件窗口,实测吞掉紧随的首次 press(点两次
-/// 才生效);全库 hover 一律 on_draw,此处是最后一只漏网。
-pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
-  {
-    mount: fn(parent) {
-      let hover = Ref(false)
-      let b = themed_container(
-        style=[("width", size), ("height", size)],
-      )
-      b.on_draw(fn(p) {
-        let bd = ViewLike::get_bounds(b)
-        p.set_fill_color(
-          if hover.val { theme_primary_hover() } else { theme_primary() },
-        )
-        p.fill_rect(0.0, 0.0, bd.width, bd.height)
-        // ↑ 矢量折线箭头(字形图标跨平台发虚,GTK align 亦无效)
-        draw_glyph_up(p, size / 2.0, size / 2.0 + 1.0, 6.0, "#FFFFFF")
-      })
-      View::set_cursor(b, hand())
-      ViewLike::on_mouse_down(b, fn(e) {
-        if e.button == 1 {
-          on_click()
-          true
-        } else {
-          false
-        }
-      })
-      ViewLike::on_mouse_enter(b, fn(_e) {
-        hover.val = true
-        ViewLike::schedule_paint(b)
-      })
-      ViewLike::on_mouse_leave(b, fn(_e) {
-        hover.val = false
-        ViewLike::schedule_paint(b)
-      })
-      attach(parent, ViewLike::view(b))
-      ViewLike::view(b)
     },
   }
 }
