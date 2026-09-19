@@ -88,6 +88,7 @@ let t = @yue.default_theme()
 | `empty(desc)` | 占位块 + 说明 |
 | `switch_t(checked : Store[Bool], disabled?)` | 开 / 关 / 禁用 |
 | `dialog_t(visible : Store[Bool], title, children, width?, confirm_text?, cancel_text?, on_confirm?, on_cancel?, close_on_mask?)` | 应用内对话框:同窗遮罩(半透明黑,absolute 相对挂载容器——挂窗口根即盖全窗)+ 居中面板(标题栏 ✕ + 内容 + 右对齐按钮区);✕/取消/确定回调后自动收起;文案传空串隐藏按钮;视觉模态非键盘强模态 |
+| `toast_layer(duration_ms?) -> (Node, (String, SemanticType) -> Unit)` | 轻提示:层节点挂窗口根(absolute 顶部,不占布局),推送函数弹语义提示条(面板底+边框+类型图标),默认 2.6s 自动移除,多条自上而下堆叠;须在层 mount 后调用 |
 | `radio_group(options, selected, disabled?)` | 互斥单选 |
 
 ## 演示

@@ -118,3 +118,78 @@ pub fn dialog_t(
     },
   }
 }
+
+///|
+/// 轻提示层:返回 (层节点, 推送函数)。层节点挂在窗口根(absolute 顶部
+/// 横条区域,不占布局),推送函数 push(text, t) 弹一条语义提示,默认
+/// duration_ms 毫秒后自动移除;多条自上而下堆叠。推送须在层 mount 之后
+/// 调用(典型:按钮回调里推)。
+pub fn toast_layer(
+  duration_ms? : Int = 2600,
+) -> (Node, (String, SemanticType) -> Unit) {
+  let host : Ref[Container?] = Ref(None)
+  let layer = {
+    mount: fn(parent) {
+      let c = themed_container(
+        style=[("paddingTop", 8.0)],
+        style_str=[
+          ("position", "absolute"),
+          ("top", "0"),
+          ("left", "0"),
+          ("right", "0"),
+          ("flexDirection", "column"),
+          ("alignItems", "center"),
+        ],
+      )
+      host.val = Some(c)
+      attach(parent, ViewLike::view(c))
+      ViewLike::view(c)
+    },
+  }
+  fn push(text : String, t : SemanticType) -> Unit {
+    match host.val {
+      None => ()
+      Some(c) => {
+        let fnt = Font::new("Sans", 13.0)
+        let probe = AttributedText::new(text, wrap=false)
+        probe.set_font(fnt)
+        let text_w = probe.get_bounds_for(10000.0, 100.0).width
+        let w = text_w + 62.0
+        let bar = themed_container(
+          style=[
+            ("width", w),
+            ("height", 34.0),
+            ("marginBottom", 8.0),
+          ],
+        )
+        set_panel_bg(bar)
+        bar.on_draw(fn(p) {
+          let b = ViewLike::get_bounds(bar)
+          p.set_stroke_color(theme_border())
+          p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+          let kind : IconKind = match t {
+            Info => IconKind::Info
+            Success => IconKind::Success
+            Warning => IconKind::Warning
+            Danger => IconKind::Error
+            Primary => IconKind::Info
+          }
+          draw_icon(p, kind, 18.0, b.height / 2.0, 7.0, type_color(t))
+          let at = AttributedText::new(text, valign=Center, wrap=false)
+          at.set_font(fnt)
+          at.set_color(theme_text_regular())
+          // GTK 端水平 align 无效,按测宽手动居中(图标 24 + 右侧留白)
+          let x = 30.0 + (b.width - 30.0 - 16.0 - text_w) / 2.0
+          p.draw_attributed_text(at, x, 0.0, b.width, b.height)
+        })
+        c.add_child(bar)
+        ignore(
+          set_timeout(duration_ms, fn() {
+            ignore(Container::remove_child_view(c, ViewLike::view(bar)))
+          }),
+        )
+      }
+    }
+  }
+  (layer, push)
+}

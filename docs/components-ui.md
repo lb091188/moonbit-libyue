@@ -88,6 +88,7 @@ let t = @yue.default_theme()
 | `empty(desc)` | placeholder block + caption |
 | `switch_t(checked : Store[Bool], disabled?)` | on / off / disabled |
 | `dialog_t(visible : Store[Bool], title, children, width?, confirm_text?, cancel_text?, on_confirm?, on_cancel?, close_on_mask?)` | in-app dialog: same-window mask (semi-transparent black, absolute relative to the mount container — mounted at the window root it covers the whole window) + centered panel (title bar with ✕ + body + right-aligned buttons); ✕/cancel/confirm auto-close after the callback; empty text hides the button; visually modal, not keyboard-modal |
+| `toast_layer(duration_ms?) -> (Node, (String, SemanticType) -> Unit)` | light toast: mount the layer node at the window root (absolute top strip, no layout space), the push function shows a semantic toast bar (panel bg + border + type icon), auto-removed after 2.6s by default, multiple bars stack top-down; call after the layer is mounted |
 | `radio_group(options, selected, disabled?)` | mutually exclusive selection |
 
 ## Demo

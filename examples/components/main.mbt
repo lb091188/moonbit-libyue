@@ -59,6 +59,7 @@ fn main {
     return
   }
   let selected : @yue.Store[String] = @yue.Store::new("基础组件")
+  let (toast_node, toast_push) = @yue.toast_layer()
   let dlg_basic : @yue.Store[Bool] = @yue.Store::new(false)
   let dlg_form : @yue.Store[Bool] = @yue.Store::new(false)
   let dlg_name : @yue.Store[String] = @yue.Store::new("")
@@ -929,6 +930,18 @@ fn main {
       ],
     ),
     section(
+      "Toast 轻提示",
+      "操作反馈瞬态提示:推送后顶部居中出现,2.6 秒自动消失,多条堆叠;层挂在窗口根(absolute 顶部,不占布局)。",
+      [
+        @yue.hbox([
+          @yue.button_t("成功", on_click=fn() { toast_push("保存成功", @yue.Success) }),
+          @yue.button_t("警告", on_click=fn() { toast_push("连接超时,已重试", @yue.Warning) }),
+          @yue.button_t("错误", on_click=fn() { toast_push("提交失败:网络不可达", @yue.Danger) }),
+          @yue.button_t("普通", variant=@yue.Solid, on_click=fn() { toast_push("已加入下载队列", @yue.Info) }),
+        ]),
+      ],
+    ),
+    section(
       "Dialog 对话框",
       "同窗遮罩 + 居中面板(absolute 相对挂载容器,本演示挂在窗口根,遮罩盖全窗);✕/取消/确定触发回调后自动收起,visible 由 Store 驱动。",
       [
@@ -994,6 +1007,8 @@ fn main {
             @yue.on_theme_change(apply)
           },
         ),
+        // 轻提示层挂窗口根:absolute 顶部横条,不占布局
+        toast_node,
         // 对话框挂窗口根:absolute 遮罩相对挂载容器,盖全窗
         @yue.dialog_t(
           dlg_basic,
