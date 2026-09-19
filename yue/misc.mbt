@@ -66,6 +66,15 @@ pub fn Scroll::set_scroll_position(
 }
 
 ///|
+/// 回到顶部:设置位置后短延时复设一次——快速滚到底后 GTK smooth 滚动
+/// 仍有在途滚动事件,首次设置会被拉回旧值(真机实测「点两次才回顶」),
+/// 复设压过在途事件,一次点击即生效。
+pub fn Scroll::scroll_to_top(self : Scroll) -> Unit {
+  self.set_scroll_position(0.0, 0.0)
+  ignore(set_timeout(80, fn() { self.set_scroll_position(0.0, 0.0) }))
+}
+
+///|
 /// 是否使用覆盖式滚动条。
 
 ///|

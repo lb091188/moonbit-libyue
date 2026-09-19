@@ -620,7 +620,7 @@ fn main {
                 @yue.label("        "),
                 @yue.backtop_t(fn() {
                   match sc_handle.val {
-                    Some(s) => s.set_scroll_position(0.0, 0.0)
+                    Some(s) => s.scroll_to_top()
                     None => ()
                   }
                 }),
