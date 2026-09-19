@@ -566,6 +566,48 @@ fn main {
         @yue.bind_label(picked_lang, fn(s) { "最近操作:\{s}" }),
       ],
     ),
+    section(
+      "Splitter 可拖动分隔",
+      "桌面多栏布局标配件:6px 把手悬停浅灰、拖动中主题色,拖动经鼠标捕获(拖出范围不丢事件);min 钳制两栏下限。左例 hsplit 左树右详情,右例 vsplit 上下分栏。",
+      [
+        @yue.vbox(
+          [
+            @yue.hsplit(
+              @yue.tree([
+                {
+                  label: "组件",
+                  children: [
+                    {
+                      label: "基础",
+                      children: [{ label: "图标", children: [] }, { label: "分隔", children: [] }],
+                    },
+                    { label: "导航", children: [{ label: "分栏", children: [] }] },
+                  ],
+                },
+              ]),
+              @yue.vbox([@yue.label_t("右侧详情区:拖动中间把手调整占比", role=@yue.Body)], style=[("padding", 12.0)]),
+              min_first=120.0,
+            ),
+          ],
+          style=[("height", 200.0), ("width", 520.0), ("marginBottom", 10.0)],
+        ),
+        @yue.vbox(
+          [
+            @yue.vsplit(
+              @yue.vbox(
+                [@yue.label_t("上栏:列表区(可放 table / 列表)", role=@yue.Body)],
+                style=[("padding", 10.0)],
+              ),
+              @yue.vbox(
+                [@yue.label_t("下栏:详情/说明区", role=@yue.Secondary)],
+                style=[("padding", 10.0)],
+              ),
+            ),
+          ],
+          style=[("height", 160.0), ("width", 520.0)],
+        ),
+      ],
+    ),
   ])
   // ---------- 数据展示(EP Data Display) ----------
   let p_data = scroll_page([

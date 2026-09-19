@@ -59,6 +59,7 @@ let t = @yue.default_theme()
 | `breadcrumb(items, selected)` | current dark, others clickable with hover accent |
 | `pagination(current : Store[Int], pages)` | current page solid primary, hover light-blue; ‹ › clamped |
 | `steps(items, current : Store[Int])` | done / active / todo three states with connector lines |
+| `hsplit(first, second, ratio?, min_first?, min_second?)` / `vsplit(...)` | draggable split layout (Qt QSplitter / GTK Paned counterpart): 6px self-drawn handle, grey on hover, theme color + dots while dragging, mouse capture keeps events outside the handle; ratio is the initial share, min clamps both panes |
 
 ## Data display
 
