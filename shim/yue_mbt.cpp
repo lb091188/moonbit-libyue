@@ -2829,22 +2829,65 @@ void *yue_mbt_popover_new(void) {
   return reinterpret_cast<void *>(PopoverStore::put(new nu::Window(options)));
 }
 #else
-// Windows 桩：无边框、不激活的小窗口 + 8 秒自动关闭
-// 替代窗口存储：展示中的气泡（供自动关闭定时器使用）
+// Windows 桩：无边框、不激活的小窗口 + 点外收起 + 8 秒自动关闭
+// 替代窗口存储：展示中的气泡（供收起路径使用）
 nu::Window *g_active_popover_window = nullptr;
 // 固定定时器 id：重复 show 时重置同一计时
 constexpr UINT_PTR kPopoverAutoCloseTimerId = 0x705D;
+// 展示期间的 WH_MOUSE_LL 钩子：弹层外任意鼠标按下即收起，对齐 GTK
+// Popover 原生输入抓取的点外关闭语义（无此钩子时下拉只能点选项收起）
+HHOOK g_popover_mouse_hook = nullptr;
+
+/* 收起展示中的弹层（统一路径）：摘钩、杀定时器、隐藏而非 Close（弹层
+ * 窗口需复用，Close 在 Windows 是销毁，销毁后句柄失效弹层再也弹不出）
+ * 并按 GTK 版 Close 语义补发 on_close；已隐藏（重复关闭）不重发信号。 */
+static void HideActivePopover() {
+  if (g_active_popover_window == nullptr) {
+    return;
+  }
+  nu::Window *win = g_active_popover_window;
+  g_active_popover_window = nullptr;
+  if (g_popover_mouse_hook != nullptr) {
+    ::UnhookWindowsHookEx(g_popover_mouse_hook);
+    g_popover_mouse_hook = nullptr;
+  }
+  ::KillTimer(nullptr, kPopoverAutoCloseTimerId);
+  if (win->IsVisible()) {
+    win->SetVisible(false);
+    win->on_close.Emit(win);
+  }
+}
 
 void CALLBACK PopoverAutoCloseTimer(HWND, UINT, UINT_PTR id, DWORD) {
   ::KillTimer(nullptr, id);
   std::fprintf(stderr, "popover: autoclose\n");
-  if (g_active_popover_window != nullptr &&
-      g_active_popover_window->IsVisible()) {
-    // 隐藏而非 Close:弹层窗口需复用(文本再变时重新 show),
-    // Close 在 Windows 是销毁窗口,销毁后句柄失效弹层再也弹不出
-    g_active_popover_window->SetVisible(false);
+  HideActivePopover();
+}
+
+/* LL 钩子回调（装钩线程=主线程的消息间隙内被调）：按下点不在弹层矩形
+ * 内 → 经 PostTask 抛回主循环收层（不在钩子内直接动 GUI，防重入）；
+ * 捕获当时的弹层指针，任务执行前若已换了新弹层则不动它。不吞事件
+ * （照常 CallNextHookEx）：弹层外的点击本就属于外部视图，应照常送达；
+ * 弹层内的点击在矩形内，放行后正常路由给弹层行。pt 与 GetWindowRect
+ * 同为物理像素，坐标系一致。 */
+static LRESULT CALLBACK PopoverMouseHook(int code, WPARAM wp, LPARAM lp) {
+  if (code == HC_ACTION &&
+      (wp == WM_LBUTTONDOWN || wp == WM_RBUTTONDOWN || wp == WM_MBUTTONDOWN) &&
+      g_active_popover_window != nullptr) {
+    auto *info = reinterpret_cast<MSLLHOOKSTRUCT *>(lp);
+    HWND h = g_active_popover_window->GetNative()->hwnd();
+    RECT r;
+    if (h == nullptr || !::GetWindowRect(h, &r) ||
+        !::PtInRect(&r, info->pt)) {
+      nu::Window *target = g_active_popover_window;
+      nu::MessageLoop::PostTask([target] {
+        if (g_active_popover_window == target) {
+          HideActivePopover();
+        }
+      });
+    }
   }
-  g_active_popover_window = nullptr;
+  return ::CallNextHookEx(nullptr, code, wp, lp);
 }
 
 void *yue_mbt_popover_new(void) {
@@ -3071,9 +3114,13 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view) {
                    ::IsWindowVisible(popup_hwnd) ? 1 : 0);
     }
   }
-  // 8 秒后自动关闭（无外部点击关闭钩子，定时兜底）；固定 id，
-  // 每次 show 重置同一计时，避免旧计时器在输入中途误关弹层
+  // 8 秒自动关闭（点外收起的兜底）；固定 id，每次 show 重置同一计时，
+  // 避免旧计时器在输入中途误关弹层
   g_active_popover_window = win;
+  if (g_popover_mouse_hook == nullptr) {
+    g_popover_mouse_hook = ::SetWindowsHookExW(
+        WH_MOUSE_LL, PopoverMouseHook, ::GetModuleHandleW(nullptr), 0);
+  }
   ::SetTimer(nullptr, kPopoverAutoCloseTimerId, 8000, PopoverAutoCloseTimer);
 }
 #endif
@@ -3093,11 +3140,17 @@ void yue_mbt_popover_close(void *popover) {
 #else
 void yue_mbt_popover_close(void *popover) {
   if (auto *win = PopoverStore::get(popover)) {
+    if (win == g_active_popover_window) {
+      HideActivePopover();
+      return;
+    }
     // 隐藏而非 Close:Close 在 Windows 是销毁窗口,弹层实例需复用同一
     // 实例(文本变化重新 show),销毁后句柄失效弹层再也弹不出;
-    // on_close 语义照 GTK 版 Close 手动补发
-    win->SetVisible(false);
-    win->on_close.Emit(win);
+    // on_close 语义照 GTK 版 Close 手动补发;已隐藏不重发
+    if (win->IsVisible()) {
+      win->SetVisible(false);
+      win->on_close.Emit(win);
+    }
   }
 }
 #endif
