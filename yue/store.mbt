@@ -75,15 +75,15 @@ pub fn[A] bind_label(
       fn apply_color() -> Unit {
         at.set_color(theme_text_regular())
         at.set_text(at.get_text())
-        l.schedule_paint()
+        ViewLike::schedule_paint(l, )
       }
 
       apply_color()
       on_theme_change(apply_color)
       l.set_attributed_text(at)
       store.subscribe(fn(v) { l.set_text(f(v)) })
-      attach(parent, l.view())
-      l.view()
+      attach(parent, ViewLike::view(l, ))
+      ViewLike::view(l, )
     },
   }
 }

@@ -89,7 +89,7 @@ fn themed_container(
   style_str? : Array[(String, String)] = [],
 ) -> Container {
   let c = Container::make(style~, style_str~)
-  on_theme_change(fn() { c.schedule_paint() })
+  on_theme_change(fn() { ViewLike::schedule_paint(c, ) })
   c
 }
 
@@ -124,7 +124,7 @@ fn[T : ViewLike] bind_bg(v : T, color_of : () -> String) -> Unit {
 /// 不触发布局缓存失效,不同文重排则重绘仍用旧色(点击路径实测)。
 fn bind_fg(v : Label, color_of : () -> String) -> Unit {
   fn apply() -> Unit {
-    v.set_color(color_of())
+    ViewLike::set_color(v, color_of())
     v.set_text(v.get_text())
   }
 
@@ -449,18 +449,18 @@ fn bind_focus(
   focused : Ref[Bool],
   on_activate : () -> Unit,
 ) -> Unit {
-  v.set_focusable(true)
-  v.on_focus_in(fn() {
+  ViewLike::set_focusable(v, true)
+  ViewLike::on_focus_in(v, fn() {
     focused.val = true
     repaint()
     false
   })
-  v.on_focus_out(fn() {
+  ViewLike::on_focus_out(v, fn() {
     focused.val = false
     repaint()
     false
   })
-  v.on_key_down(fn(e) {
+  ViewLike::on_key_down(v, fn(e) {
     if e.code == VKEY_RETURN || e.code == VKEY_SPACE {
       on_activate()
       true
@@ -509,7 +509,7 @@ fn stateful_item(
       }
       let v = themed_container(style=style2)
       fn draw_item(p : Painter) -> Unit {
-        let b = v.get_bounds()
+        let b = ViewLike::get_bounds(v, )
         let w = b.width
         let h = b.height
         let act = selected.get() == text
@@ -541,29 +541,29 @@ fn stateful_item(
 
       v.on_draw(draw_item)
       View::set_cursor(v, hand())
-      v.on_mouse_down(fn(e) {
+      ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 {
-          v.focus()
+          ViewLike::focus(v, )
           selected.set(text)
           true
         } else {
           false
         }
       })
-      v.on_mouse_enter(fn(_e) {
+      ViewLike::on_mouse_enter(v, fn(_e) {
         hover.val = true
-        v.schedule_paint()
+        ViewLike::schedule_paint(v, )
       })
-      v.on_mouse_leave(fn(_e) {
+      ViewLike::on_mouse_leave(v, fn(_e) {
         hover.val = false
-        v.schedule_paint()
+        ViewLike::schedule_paint(v, )
       })
-      bind_focus(v, fn() { v.schedule_paint() }, focused, fn() {
+      bind_focus(v, fn() { ViewLike::schedule_paint(v, ) }, focused, fn() {
         selected.set(text)
       })
-      selected.subscribe(fn(_s) { v.schedule_paint() })
-      attach(parent, v.view())
-      v.view()
+      selected.subscribe(fn(_s) { ViewLike::schedule_paint(v, ) })
+      attach(parent, ViewLike::view(v, ))
+      ViewLike::view(v, )
     },
   }
 }
@@ -692,8 +692,8 @@ pub fn tag_of_type(text : String, t : SemanticType) -> Node {
           color=type_color(t),
         )
       })
-      attach(parent, c.view())
-      c.view()
+      attach(parent, ViewLike::view(c, ))
+      ViewLike::view(c, )
     },
   }
 }
@@ -726,8 +726,8 @@ pub fn tag(text : String, color : String, height? : Double = 24.0) -> Node {
           color="#FFFFFF",
         )
       })
-      attach(parent, c.view())
-      c.view()
+      attach(parent, ViewLike::view(c, ))
+      ViewLike::view(c, )
     },
   }
 }
@@ -763,8 +763,8 @@ pub fn badge_count(count : Int) -> Node {
           color="#FFFFFF",
         )
       })
-      attach(parent, c.view())
-      c.view()
+      attach(parent, ViewLike::view(c, ))
+      ViewLike::view(c, )
     },
   }
 }
@@ -831,7 +831,7 @@ pub fn alert(text : String, t : SemanticType, height? : Double = 40.0) -> Node {
     mount: fn(parent) {
       let v = themed_container(style=[("height", height), ("marginBottom", 10.0)])
       v.on_draw(fn(p) {
-        let b = v.get_bounds()
+        let b = ViewLike::get_bounds(v, )
         let w = b.width
         let h = b.height
         p.set_fill_color(type_light_color(t))
@@ -849,8 +849,8 @@ pub fn alert(text : String, t : SemanticType, height? : Double = 40.0) -> Node {
           color=type_color(t),
         )
       })
-      attach(parent, v.view())
-      v.view()
+      attach(parent, ViewLike::view(v, ))
+      ViewLike::view(v, )
     },
   }
 }
@@ -894,7 +894,7 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
         }
 
         b.on_draw(fn(p) {
-          let bd = b.get_bounds()
+          let bd = ViewLike::get_bounds(b, )
           let cur = current.get()
           let act = is_page && cur == target
           if act {
@@ -918,25 +918,25 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
           }
         })
         View::set_cursor(b, hand())
-        b.on_mouse_down(fn(e) {
+        ViewLike::on_mouse_down(b, fn(e) {
           if e.button == 1 {
-            b.focus()
+            ViewLike::focus(b, )
             activate()
             true
           } else {
             false
           }
         })
-        bind_focus(b, fn() { b.schedule_paint() }, focused, activate)
-        b.on_mouse_enter(fn(_e) {
+        bind_focus(b, fn() { ViewLike::schedule_paint(b, ) }, focused, activate)
+        ViewLike::on_mouse_enter(b, fn(_e) {
           hover.val = true
-          b.schedule_paint()
+          ViewLike::schedule_paint(b, )
         })
-        b.on_mouse_leave(fn(_e) {
+        ViewLike::on_mouse_leave(b, fn(_e) {
           hover.val = false
-          b.schedule_paint()
+          ViewLike::schedule_paint(b, )
         })
-        current.subscribe(fn(_v) { b.schedule_paint() })
+        current.subscribe(fn(_v) { ViewLike::schedule_paint(b, ) })
         row.add_child(b)
       }
 
@@ -947,8 +947,8 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
         i = i + 1
       }
       add_btn("›", 1, false)
-      attach(parent, row.view())
-      row.view()
+      attach(parent, ViewLike::view(row, ))
+      ViewLike::view(row, )
     },
   }
 }
@@ -966,7 +966,7 @@ pub fn card(
       let head_h = 40.0
       let outer = themed_container(style=[("height", height)])
       outer.on_draw(fn(p) {
-        let b = outer.get_bounds()
+        let b = ViewLike::get_bounds(outer, )
         let w = b.width
         let h = b.height
         // 边框
@@ -987,13 +987,13 @@ pub fn card(
       fn apply_title_color() -> Unit {
         title_at.set_color(theme_text_primary())
         title_at.set_text(title_at.get_text())
-        title.schedule_paint()
+        ViewLike::schedule_paint(title, )
       }
 
       apply_title_color()
       on_theme_change(apply_title_color)
       title.on_draw(fn(p) {
-        let b = title.get_bounds()
+        let b = ViewLike::get_bounds(title, )
         p.draw_attributed_text(title_at, 0.0, 0.0, b.width, head_h)
       })
       outer.add_child(title)
@@ -1002,11 +1002,11 @@ pub fn card(
         ("flexDirection", "column"),
       ])
       for ch in children {
-        ignore((ch.mount)(body.view()))
+        ignore((ch.mount)(ViewLike::view(body, )))
       }
       outer.add_child(body)
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -1143,7 +1143,7 @@ pub fn code_view(
       let view_w = if width > content_w { width } else { content_w }
       let view_h = line_h * laid.length().to_double() + 28.0
       let c = themed_container(style=[("width", view_w), ("height", view_h)])
-      c.set_background_color("#282C34")
+      ViewLike::set_background_color(c, "#282C34")
       c.on_draw(fn(p) {
         let mut y = 14.0
         for entry in laid {
@@ -1154,8 +1154,8 @@ pub fn code_view(
           y = y + line_h
         }
       })
-      attach(parent, c.view())
-      c.view()
+      attach(parent, ViewLike::view(c, ))
+      ViewLike::view(c, )
     },
   }
 }
@@ -1170,13 +1170,13 @@ pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
         ("height", size),
         ("marginRight", 8.0),
       ])
-      c.set_background_color(color)
+      ViewLike::set_background_color(c, color)
       // 字母水平居中:GTK 端 align 无效,mount 时测宽手动摆位
       let letter_probe = AttributedText::new(letter, wrap=false)
       letter_probe.set_font(Font::new("Sans", size / 2.2))
       let letter_w = letter_probe.get_bounds_for(10000.0, 1000.0).width
       c.on_draw(fn(p) {
-        let b = c.get_bounds()
+        let b = ViewLike::get_bounds(c, )
         p.draw_text(
           letter,
           (b.width - letter_w) / 2.0,
@@ -1187,8 +1187,8 @@ pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
           color="#FFFFFF",
         )
       })
-      attach(parent, c.view())
-      c.view()
+      attach(parent, ViewLike::view(c, ))
+      ViewLike::view(c, )
     },
   }
 }
@@ -1226,11 +1226,11 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
       let hover = Ref(false)
       let close_focused = Ref(false)
       let close_it = fn() -> Unit {
-        v.set_visible(false)
+        ViewLike::set_visible(v, false)
       }
 
       close.on_draw(fn(p) {
-        let b = close.get_bounds()
+        let b = ViewLike::get_bounds(close, )
         let c = if hover.val { type_color(t) } else { theme_text_secondary() }
         draw_clear_x(p, b.width / 2.0, b.height / 2.0, color=c)
         if close_focused.val {
@@ -1238,28 +1238,28 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
         }
       })
       View::set_cursor(close, hand())
-      close.on_mouse_down(fn(e) {
+      ViewLike::on_mouse_down(close, fn(e) {
         if e.button == 1 {
-          close.focus()
+          ViewLike::focus(close, )
           close_it()
           true
         } else {
           false
         }
       })
-      bind_focus(close, fn() { close.schedule_paint() }, close_focused, close_it)
-      close.on_mouse_enter(fn(_e) {
+      bind_focus(close, fn() { ViewLike::schedule_paint(close, ) }, close_focused, close_it)
+      ViewLike::on_mouse_enter(close, fn(_e) {
         hover.val = true
-        close.schedule_paint()
+        ViewLike::schedule_paint(close, )
       })
-      close.on_mouse_leave(fn(_e) {
+      ViewLike::on_mouse_leave(close, fn(_e) {
         hover.val = false
-        close.schedule_paint()
+        ViewLike::schedule_paint(close, )
       })
       v.add_child(close)
       // 让关闭钮靠右:中间垫一个弹性空白
-      attach(parent, v.view())
-      v.view()
+      attach(parent, ViewLike::view(v, ))
+      ViewLike::view(v, )
     },
   }
 }
@@ -1291,7 +1291,7 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
           ])
           let idx = i
           line.on_draw(fn(p) {
-            let b = line.get_bounds()
+            let b = ViewLike::get_bounds(line, )
             p.set_fill_color(
               if current.get() >= idx {
                 theme_primary()
@@ -1309,7 +1309,7 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
           ("marginRight", 6.0),
         ])
         bx.on_draw(fn(p) {
-          let b = bx.get_bounds()
+          let b = ViewLike::get_bounds(bx, )
           let cur = current.get()
           let st = if i < cur {
             0 // done
@@ -1340,18 +1340,18 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
             },
           )
         })
-        current.subscribe(fn(_v) { bx.schedule_paint() })
+        current.subscribe(fn(_v) { ViewLike::schedule_paint(bx, ) })
         row.add_child(bx)
         boxes.push(bx)
       }
       for i in 0..<n {
         let l = Label::new(items[i])
-        l.set_font(font)
+        ViewLike::set_font(l, font)
         let cur_ref = current
         // 步骤文字色随「当前步」与主题双状态变化;set_color 后须同文
         // set_text 触发重排(否则重绘仍用旧色,见 adaptation.md)
         fn apply_step_label() -> Unit {
-          l.set_color(
+          ViewLike::set_color(l, 
             if i <= cur_ref.get() {
               theme_text_primary()
             } else {
@@ -1366,8 +1366,8 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
         cur_ref.subscribe(fn(_v) { apply_step_label() })
         row.add_child(l)
       }
-      attach(parent, row.view())
-      row.view()
+      attach(parent, ViewLike::view(row, ))
+      ViewLike::view(row, )
     },
   }
 }
@@ -1393,7 +1393,7 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
         let head_focused = Ref(false)
         head.on_draw(fn(p) {
           if head_focused.val {
-            let b = head.get_bounds()
+            let b = ViewLike::get_bounds(head, )
             draw_focus_ring(p, b.width, b.height)
           }
         })
@@ -1419,7 +1419,7 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
         })
         let title = Label::new(entry.0)
         fn apply_title_color() -> Unit {
-          title.set_color(theme_text_primary())
+          ViewLike::set_color(title, theme_text_primary())
           title.set_text(title.get_text())
         }
 
@@ -1432,11 +1432,11 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
         ])
         set_panel_bg(body)
         for ch in entry.1 {
-          ignore((ch.mount)(body.view()))
+          ignore((ch.mount)(ViewLike::view(body, )))
         }
         let apply = fn() -> Unit {
-          body.set_visible(open.val)
-          arrow.schedule_paint()
+          ViewLike::set_visible(body, open.val)
+          ViewLike::schedule_paint(arrow, )
         }
         let toggle = fn() -> Unit {
           open.val = !open.val
@@ -1445,16 +1445,16 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
 
         apply()
         View::set_cursor(head, hand())
-        head.on_mouse_down(fn(e) {
+        ViewLike::on_mouse_down(head, fn(e) {
           if e.button == 1 {
-            head.focus()
+            ViewLike::focus(head, )
             toggle()
             true
           } else {
             false
           }
         })
-        bind_focus(head, fn() { head.schedule_paint() }, head_focused, toggle)
+        bind_focus(head, fn() { ViewLike::schedule_paint(head, ) }, head_focused, toggle)
         let panel = themed_container(style=[("marginBottom", 6.0)], style_str=[
           ("flexDirection", "column"),
         ])
@@ -1462,8 +1462,8 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
         panel.add_child(body)
         outer.add_child(panel)
       }
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -1487,7 +1487,7 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
         let is_first = i == 0
         node_col.on_draw(fn(p) {
           // 竖线:首行从点心起、末行到点心止,中间整行贯通(节点色块居中)
-          let b = node_col.get_bounds()
+          let b = ViewLike::get_bounds(node_col, )
           let cy = b.height / 2.0
           let top = if is_first { cy } else { 0.0 }
           let bottom = if is_last { cy } else { b.height }
@@ -1504,7 +1504,7 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
         )
         let title = Label::new(entry.0)
         fn apply_title_color() -> Unit {
-          title.set_color(theme_text_primary())
+          ViewLike::set_color(title, theme_text_primary())
           title.set_text(title.get_text())
         }
 
@@ -1521,8 +1521,8 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
         outer.add_child(row)
         i = i + 1
       }
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -1552,8 +1552,8 @@ pub fn descriptions(pairs : Array[(String, String)]) -> Node {
         row.add_child(v)
         outer.add_child(row)
       }
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -1597,13 +1597,13 @@ pub fn result(
       fn apply_symbol_color() -> Unit {
         symbol_at.set_color(type_color(t))
         symbol_at.set_text(symbol_at.get_text())
-        icon.schedule_paint()
+        ViewLike::schedule_paint(icon, )
       }
 
       apply_symbol_color()
       on_theme_change(apply_symbol_color)
       icon.on_draw(fn(p) {
-        let b = icon.get_bounds()
+        let b = ViewLike::get_bounds(icon, )
         p.draw_attributed_text(
           symbol_at,
           (b.width - symbol_w) / 2.0,
@@ -1616,7 +1616,7 @@ pub fn result(
         ("alignItems", "center"),
       ])
       let t1 = Label::new(title)
-      t1.set_font(Font::new("Sans", 18.0, weight=SemiBold))
+      ViewLike::set_font(t1, Font::new("Sans", 18.0, weight=SemiBold))
       bind_fg(t1, fn() { theme_text_primary() })
       big.add_child(t1)
       let sub = themed_container(style=[("height", 24.0)], style_str=[
@@ -1630,14 +1630,14 @@ pub fn result(
         ("alignItems", "center"),
       ])
       for ch in children {
-        ignore((ch.mount)(btns.view()))
+        ignore((ch.mount)(ViewLike::view(btns, )))
       }
       outer.add_child(icon)
       outer.add_child(big)
       outer.add_child(sub)
       outer.add_child(btns)
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -1679,8 +1679,8 @@ pub fn empty(desc : String) -> Node {
       cap.add_child(l)
       outer.add_child(box)
       outer.add_child(cap)
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -1694,15 +1694,15 @@ pub fn statistic(title : String, value : Store[String]) -> Node {
         ("flexDirection", "column"),
       ])
       let num = Label::new(value.get())
-      num.set_font(Font::new("Sans", 24.0, weight=SemiBold))
+      ViewLike::set_font(num, Font::new("Sans", 24.0, weight=SemiBold))
       bind_fg(num, fn() { theme_text_primary() })
       let cap = Label::new(title)
       bind_fg(cap, fn() { theme_text_secondary() })
       value.subscribe(fn(v) { num.set_text(v) })
       outer.add_child(num)
       outer.add_child(cap)
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -1716,16 +1716,16 @@ pub fn progress_line(value : Store[Double], height? : Double = 8.0) -> Node {
       let v = themed_container(style=[("flex", 1.0), ("height", height)])
       bind_bg(v, fn() { theme_info_light() })
       v.on_draw(fn(p) {
-        let b = v.get_bounds()
+        let b = ViewLike::get_bounds(v, )
         let frac = value.get()
         if frac > 0.0 {
           p.set_fill_color(theme_primary())
           p.fill_rect(0.0, 0.0, b.width * frac, b.height)
         }
       })
-      value.subscribe(fn(_x) { v.schedule_paint() })
-      attach(parent, v.view())
-      v.view()
+      value.subscribe(fn(_x) { ViewLike::schedule_paint(v, ) })
+      attach(parent, ViewLike::view(v, ))
+      ViewLike::view(v, )
     },
   }
 }
@@ -1774,9 +1774,9 @@ pub fn label_t(
   {
     mount: fn(parent) {
       let l = Label::new(text)
-      l.set_font(role_font(role))
+      ViewLike::set_font(l, role_font(role))
       fn apply_color() -> Unit {
-        l.set_color(role_color(role))
+        ViewLike::set_color(l, role_color(role))
         // 同文重写一次:set_color 改的 Pango 前景属性在部分控件上不被
         // 下次绘制拾取,重排强制生效
         l.set_text(l.get_text())
@@ -1787,8 +1787,8 @@ pub fn label_t(
       l.set_align(Start)
       apply_style(l, style~, style_str~)
       handle(l)
-      attach(parent, l.view())
-      l.view()
+      attach(parent, ViewLike::view(l, ))
+      ViewLike::view(l, )
     },
   }
 }
@@ -1827,7 +1827,7 @@ pub fn button_t(
         ("marginRight", 8.0),
       ])
       v.on_draw(fn(p) {
-        let b = v.get_bounds()
+        let b = ViewLike::get_bounds(v, )
         let bg = match variant {
           Solid =>
             if hover.val {
@@ -1891,26 +1891,26 @@ pub fn button_t(
         }
       })
       View::set_cursor(v, hand())
-      v.on_mouse_down(fn(e) {
+      ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 {
-          v.focus()
+          ViewLike::focus(v, )
           on_click()
           true
         } else {
           false
         }
       })
-      bind_focus(v, fn() { v.schedule_paint() }, focused, on_click)
-      v.on_mouse_enter(fn(_e) {
+      bind_focus(v, fn() { ViewLike::schedule_paint(v, ) }, focused, on_click)
+      ViewLike::on_mouse_enter(v, fn(_e) {
         hover.val = true
-        v.schedule_paint()
+        ViewLike::schedule_paint(v, )
       })
-      v.on_mouse_leave(fn(_e) {
+      ViewLike::on_mouse_leave(v, fn(_e) {
         hover.val = false
-        v.schedule_paint()
+        ViewLike::schedule_paint(v, )
       })
-      attach(parent, v.view())
-      v.view()
+      attach(parent, ViewLike::view(v, ))
+      ViewLike::view(v, )
     },
   }
 }
@@ -1929,15 +1929,15 @@ pub fn entry_t(
         false => Entry::make(text~, entry_type=Normal)
       }
       // 注:GTK Entry 上 set_color 会连带渲染背景变黑,故只统一字体
-      e.set_font(Font::new("Sans", 13.0))
+      ViewLike::set_font(e, Font::new("Sans", 13.0))
       // Linux 端 Entry 尺寸已归一化(min-height:0),裸 Entry 自然高只剩
       // 文字行高,补显式高度维持输入框观感
       if platform() == "linux" {
-        e.set_style("height", 30.0)
+        ViewLike::set_style(e, "height", 30.0)
       }
       e.on_text_change(fn() { on_input(e.get_text()) })
-      attach(parent, e.view())
-      e.view()
+      attach(parent, ViewLike::view(e, ))
+      ViewLike::view(e, )
     },
   }
 }
@@ -1969,7 +1969,7 @@ pub fn checkbox_t(
       let activate = fn() -> Unit {
         state.val = !state.val
         on_change(state.val)
-        v.schedule_paint()
+        ViewLike::schedule_paint(v, )
       }
 
       v.on_draw(fn(p) {
@@ -2007,32 +2007,32 @@ pub fn checkbox_t(
       })
       let repaint = fn() -> Unit {
         if !disabled {
-          v.schedule_paint()
+          ViewLike::schedule_paint(v, )
         }
       }
       View::set_cursor(v, hand())
-      v.on_mouse_down(fn(e) {
+      ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 && !disabled {
-          v.focus()
+          ViewLike::focus(v, )
           activate()
           true
         } else {
           false
         }
       })
-      v.on_mouse_enter(fn(_e) {
+      ViewLike::on_mouse_enter(v, fn(_e) {
         hover.val = true
         repaint()
       })
-      v.on_mouse_leave(fn(_e) {
+      ViewLike::on_mouse_leave(v, fn(_e) {
         hover.val = false
         repaint()
       })
       if !disabled {
         bind_focus(v, repaint, focused, activate)
       }
-      attach(parent, v.view())
-      v.view()
+      attach(parent, ViewLike::view(v, ))
+      ViewLike::view(v, )
     },
   }
 }
@@ -2108,48 +2108,48 @@ pub fn radio_group(
         })
         let repaint = fn() -> Unit {
           if !disabled {
-            row.schedule_paint()
+            ViewLike::schedule_paint(row, )
           }
         }
         View::set_cursor(row, hand())
-        row.on_mouse_down(fn(e) {
+        ViewLike::on_mouse_down(row, fn(e) {
           if e.button == 1 && !disabled {
-            row.focus()
+            ViewLike::focus(row, )
             activate()
             true
           } else {
             false
           }
         })
-        row.on_mouse_enter(fn(_e) {
+        ViewLike::on_mouse_enter(row, fn(_e) {
           hover.val = true
           repaint()
         })
-        row.on_mouse_leave(fn(_e) {
+        ViewLike::on_mouse_leave(row, fn(_e) {
           hover.val = false
           repaint()
         })
         if !disabled {
-          row.set_focusable(true)
-          row.on_focus_in(fn() {
+          ViewLike::set_focusable(row, true)
+          ViewLike::on_focus_in(row, fn() {
             focused.val = true
             repaint()
             false
           })
-          row.on_focus_out(fn() {
+          ViewLike::on_focus_out(row, fn() {
             focused.val = false
             repaint()
             false
           })
           // Enter/Space 选中;方向键在组内移动选中并跟随焦点
-          row.on_key_down(fn(e) {
+          ViewLike::on_key_down(row, fn(e) {
             if e.code == VKEY_RETURN || e.code == VKEY_SPACE {
               activate()
               true
             } else if e.code == VKEY_DOWN || e.code == VKEY_RIGHT {
               if i + 1 < options.length() {
                 selected.set(options[i + 1])
-                rows[i + 1].focus()
+                ViewLike::focus(rows[i + 1])
                 true
               } else {
                 false
@@ -2157,7 +2157,7 @@ pub fn radio_group(
             } else if e.code == VKEY_UP || e.code == VKEY_LEFT {
               if i > 0 {
                 selected.set(options[i - 1])
-                rows[i - 1].focus()
+                ViewLike::focus(rows[i - 1])
                 true
               } else {
                 false
@@ -2172,8 +2172,8 @@ pub fn radio_group(
         outer.add_child(row)
         idx = idx + 1
       }
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -2192,7 +2192,7 @@ pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
 
       let slider_w = 14.0
       v.on_draw(fn(p) {
-        let b = v.get_bounds()
+        let b = ViewLike::get_bounds(v, )
         let on = checked.get()
         p.set_fill_color(if on { theme_primary() } else { theme_border() })
         p.fill_rect(0.0, 0.0, b.width, b.height)
@@ -2204,21 +2204,21 @@ pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
         }
       })
       View::set_cursor(v, hand())
-      v.on_mouse_down(fn(e) {
+      ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 && !disabled {
-          v.focus()
+          ViewLike::focus(v, )
           activate()
           true
         } else {
           false
         }
       })
-      checked.subscribe(fn(_v) { v.schedule_paint() })
+      checked.subscribe(fn(_v) { ViewLike::schedule_paint(v, ) })
       if !disabled {
-        bind_focus(v, fn() { v.schedule_paint() }, focused, activate)
+        bind_focus(v, fn() { ViewLike::schedule_paint(v, ) }, focused, activate)
       }
-      attach(parent, v.view())
-      v.view()
+      attach(parent, ViewLike::view(v, ))
+      ViewLike::view(v, )
     },
   }
 }
@@ -2254,7 +2254,7 @@ pub fn input_t(
       // 清空带宽 24(✕ 中心在带中央),不显示时也留白,避免 ✕ 被 Entry 盖住
       let clear_x = width - 12.0
       outer.on_draw(fn(p) {
-        let b = outer.get_bounds()
+        let b = ViewLike::get_bounds(outer, )
         p.set_stroke_color(
           if focused.val { theme_focus_accent() } else { theme_border() },
         )
@@ -2267,22 +2267,22 @@ pub fn input_t(
         true => Entry::make(text~, entry_type=Password)
         false => Entry::make(text~, entry_type=Normal)
       }
-      entry.set_borderless(true)
+      ViewLike::set_borderless(entry, true)
       set_panel_bg(entry)
-      entry.set_style("flex", 1.0)
-      entry.set_style("marginLeft", 10.0)
-      entry.set_style("marginRight", if clearable { 26.0 } else { 10.0 })
+      ViewLike::set_style(entry, "flex", 1.0)
+      ViewLike::set_style(entry, "marginLeft", 10.0)
+      ViewLike::set_style(entry, "marginRight", if clearable { 26.0 } else { 10.0 })
       // 原生子窗口绘制在自绘之上:上下留 2 让出边框线
-      entry.set_style("marginTop", 2.0)
-      entry.set_style("marginBottom", 2.0)
-      entry.on_focus_in(fn() {
+      ViewLike::set_style(entry, "marginTop", 2.0)
+      ViewLike::set_style(entry, "marginBottom", 2.0)
+      ViewLike::on_focus_in(entry, fn() {
         focused.val = true
-        outer.schedule_paint()
+        ViewLike::schedule_paint(outer, )
         false
       })
-      entry.on_focus_out(fn() {
+      ViewLike::on_focus_out(entry, fn() {
         focused.val = false
-        outer.schedule_paint()
+        ViewLike::schedule_paint(outer, )
         // 光标归 0:文本滚回首端,溢出裁切固定发生在右缘,左侧不再出现
         // 随光标位置变化的余量
         entry.set_position(0)
@@ -2291,20 +2291,20 @@ pub fn input_t(
       if clearable {
         entry.on_text_change(fn() {
           has_text.val = entry.get_text() != ""
-          outer.schedule_paint()
+          ViewLike::schedule_paint(outer, )
         })
-        outer.on_mouse_enter(fn(_e) {
+        ViewLike::on_mouse_enter(outer, fn(_e) {
           hover.val = true
-          outer.schedule_paint()
+          ViewLike::schedule_paint(outer, )
         })
-        outer.on_mouse_leave(fn(_e) {
+        ViewLike::on_mouse_leave(outer, fn(_e) {
           hover.val = false
-          outer.schedule_paint()
+          ViewLike::schedule_paint(outer, )
         })
         // 清空带不与 Entry 重叠(其事件窗口只覆盖原生子窗口之外的区域),
         // 点击落在带上即清空
-        outer.on_mouse_up(fn(e) {
-          let b = outer.get_bounds()
+        ViewLike::on_mouse_up(outer, fn(e) {
+          let b = ViewLike::get_bounds(outer, )
           if e.button == 1 && has_text.val && e.view_x >= b.width - 24.0 {
             entry.set_text("")
             true
@@ -2314,8 +2314,8 @@ pub fn input_t(
         })
       }
       outer.add_child(entry)
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -2343,7 +2343,7 @@ pub fn input_number(
         bind_bg(b, fn() { theme_info_light() })
         let hover = Ref(false)
         b.on_draw(fn(p) {
-          let bd = b.get_bounds()
+          let bd = ViewLike::get_bounds(b, )
           p.set_fill_color(if hover.val { theme_primary_light() } else { theme_info_light() })
           p.fill_rect(0.0, 0.0, bd.width, bd.height)
           // +/− 矢量自绘(字形图标跨平台发虚,GTK align 亦无效)
@@ -2354,7 +2354,7 @@ pub fn input_number(
           }
         })
         View::set_cursor(b, hand())
-        b.on_mouse_down(fn(e) {
+        ViewLike::on_mouse_down(b, fn(e) {
           if e.button == 1 {
             value.update(fn(n) {
               let m = n + dir * step
@@ -2371,13 +2371,13 @@ pub fn input_number(
             false
           }
         })
-        b.on_mouse_enter(fn(_e) {
+        ViewLike::on_mouse_enter(b, fn(_e) {
           hover.val = true
-          b.schedule_paint()
+          ViewLike::schedule_paint(b, )
         })
-        b.on_mouse_leave(fn(_e) {
+        ViewLike::on_mouse_leave(b, fn(_e) {
           hover.val = false
-          b.schedule_paint()
+          ViewLike::schedule_paint(b, )
         })
         row.add_child(b)
       }
@@ -2398,18 +2398,18 @@ pub fn input_number(
       t.set_color(theme_text_primary())
       num.on_draw(fn(p) {
         // GTK 端 DrawAttributedText 不实现水平 align,手动测宽居中
-        let b = num.get_bounds()
+        let b = ViewLike::get_bounds(num, )
         let tw = t.get_bounds_for(10000.0, 100.0).width
         p.draw_attributed_text(t, (b.width - tw) / 2.0, 0.0, b.width, b.height)
       })
       value.subscribe(fn(v) {
         t.set_text(v.to_string())
-        num.schedule_paint()
+        ViewLike::schedule_paint(num, )
       })
       row.add_child(num)
       step_btn(1.0)
-      attach(parent, row.view())
-      row.view()
+      attach(parent, ViewLike::view(row, ))
+      ViewLike::view(row, )
     },
   }
 }
@@ -2424,15 +2424,15 @@ pub fn form_item(label : String, control : Node, label_width? : Double = 90.0) -
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
       let k = Label::new(label)
-      k.set_font(Font::new("Sans", 13.0))
+      ViewLike::set_font(k, Font::new("Sans", 13.0))
       bind_fg(k, fn() { theme_text_secondary() })
       k.set_align(End)
       let kwrap = themed_container(style=[("width", label_width), ("marginRight", 12.0)])
       kwrap.add_child(k)
       row.add_child(kwrap)
-      ignore((control.mount)(row.view()))
-      attach(parent, row.view())
-      row.view()
+      ignore((control.mount)(ViewLike::view(row, )))
+      attach(parent, ViewLike::view(row, ))
+      ViewLike::view(row, )
     },
   }
 }
@@ -2458,9 +2458,9 @@ pub fn link(text : String, on_click : () -> Unit) -> Node {
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
       let l = Label::new(text)
-      l.set_font(Font::new("Sans", 13.0))
+      ViewLike::set_font(l, Font::new("Sans", 13.0))
       fn apply_color() -> Unit {
-        l.set_color(theme_primary())
+        ViewLike::set_color(l, theme_primary())
         l.set_text(l.get_text())
       }
 
@@ -2471,20 +2471,20 @@ pub fn link(text : String, on_click : () -> Unit) -> Node {
       bind_bg(underline, fn() { theme_primary() })
       row.add_child(underline)
       fn apply() -> Unit {
-        underline.set_visible(hover.val)
+        ViewLike::set_visible(underline, hover.val)
       }
 
       apply()
-      row.on_mouse_enter(fn(_e) {
+      ViewLike::on_mouse_enter(row, fn(_e) {
         hover.val = true
         apply()
       })
-      row.on_mouse_leave(fn(_e) {
+      ViewLike::on_mouse_leave(row, fn(_e) {
         hover.val = false
         apply()
       })
       View::set_cursor(row, hand())
-      row.on_mouse_down(fn(e) {
+      ViewLike::on_mouse_down(row, fn(e) {
         if e.button == 1 {
           on_click()
           true
@@ -2492,8 +2492,8 @@ pub fn link(text : String, on_click : () -> Unit) -> Node {
           false
         }
       })
-      attach(parent, row.view())
-      row.view()
+      attach(parent, ViewLike::view(row, ))
+      ViewLike::view(row, )
     },
   }
 }
@@ -2517,7 +2517,7 @@ pub fn page_header(
       )
       let hover = Ref(false)
       back.on_draw(fn(p) {
-        let b = back.get_bounds()
+        let b = ViewLike::get_bounds(back, )
         p.draw_text(
           "‹ 返回",
           0.0,
@@ -2530,7 +2530,7 @@ pub fn page_header(
         )
       })
       View::set_cursor(back, hand())
-      back.on_mouse_down(fn(e) {
+      ViewLike::on_mouse_down(back, fn(e) {
         if e.button == 1 {
           on_back()
           true
@@ -2538,26 +2538,26 @@ pub fn page_header(
           false
         }
       })
-      back.on_mouse_enter(fn(_e) {
+      ViewLike::on_mouse_enter(back, fn(_e) {
         hover.val = true
-        back.schedule_paint()
+        ViewLike::schedule_paint(back, )
       })
-      back.on_mouse_leave(fn(_e) {
+      ViewLike::on_mouse_leave(back, fn(_e) {
         hover.val = false
-        back.schedule_paint()
+        ViewLike::schedule_paint(back, )
       })
       row.add_child(back)
       let t = Label::new(title)
-      t.set_font(Font::new("Sans", 15.0, weight=SemiBold))
+      ViewLike::set_font(t, Font::new("Sans", 15.0, weight=SemiBold))
       bind_fg(t, fn() { theme_text_primary() })
       row.add_child(t)
       let spacer = themed_container(style=[("flex", 1.0), ("height", 1.0)])
       row.add_child(spacer)
       for a in actions {
-        ignore((a.mount)(row.view()))
+        ignore((a.mount)(ViewLike::view(row, )))
       }
-      attach(parent, row.view())
-      row.view()
+      attach(parent, ViewLike::view(row, ))
+      ViewLike::view(row, )
     },
   }
 }
@@ -2614,23 +2614,23 @@ pub fn tree(root : Array[TreeNode]) -> Node {
             }
           })
           let label = Label::new(" " + nd.label)
-          label.set_font(font)
+          ViewLike::set_font(label, font)
           bind_fg(label, fn() { theme_text_primary() })
           row.add_child(arrow)
           row.add_child(label)
           let kids = themed_container(
             style_str=[("flexDirection", "column")],
           )
-          kids.set_visible(false)
+          ViewLike::set_visible(kids, false)
           if has_children {
             build(nd.children, level + 1, kids)
           }
           View::set_cursor(row, hand())
-          row.on_mouse_down(fn(e) {
+          ViewLike::on_mouse_down(row, fn(e) {
             if e.button == 1 && has_children {
               open.val = !open.val
-              arrow.schedule_paint()
-              kids.set_visible(open.val)
+              ViewLike::schedule_paint(arrow, )
+              ViewLike::set_visible(kids, open.val)
               true
             } else {
               false
@@ -2642,8 +2642,8 @@ pub fn tree(root : Array[TreeNode]) -> Node {
       }
 
       build(root, 0, outer)
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -2730,13 +2730,13 @@ pub fn transfer(
             }
           })
           let l = Label::new(it_ref)
-          l.set_font(font)
+          ViewLike::set_font(l, font)
           bind_fg(l, fn() { theme_text_regular() })
           row.add_child(mark)
           row.add_child(l)
           let mark_ref = mark
           View::set_cursor(row, hand())
-          row.on_mouse_down(fn(e) {
+          ViewLike::on_mouse_down(row, fn(e) {
             if e.button == 1 {
               if contains(sel.val, it_ref) {
                 sel.val = remove_one(sel.val, it_ref)
@@ -2745,14 +2745,14 @@ pub fn transfer(
                 grown.push(it_ref)
                 sel.val = grown
               }
-              mark_ref.schedule_paint()
+              ViewLike::schedule_paint(mark_ref, )
               true
             } else {
               false
             }
           })
           box.add_child(row)
-          rows.val.push(row.view())
+          rows.val.push(ViewLike::view(row, ))
         }
       }
 
@@ -2789,7 +2789,7 @@ pub fn transfer(
         )
         bind_bg(b, fn() { theme_info_light() })
         b.on_draw(fn(p) {
-          let bd = b.get_bounds()
+          let bd = ViewLike::get_bounds(b, )
           // ‹/› 矢量三角(字形图标跨平台发虚,GTK align 亦无效)
           if to_right {
             draw_glyph_right(p, bd.width / 2.0, bd.height / 2.0, 4.0, theme_text_regular())
@@ -2798,7 +2798,7 @@ pub fn transfer(
           }
         })
         View::set_cursor(b, hand())
-        b.on_mouse_down(fn(e) {
+        ViewLike::on_mouse_down(b, fn(e) {
           if e.button == 1 {
             if to_right {
               move_items(left_items, right_items, left_sel)
@@ -2818,8 +2818,8 @@ pub fn transfer(
       mid_btn(false)
       row.add_child(right_box)
       render_all()
-      attach(parent, row.view())
-      row.view()
+      attach(parent, ViewLike::view(row, ))
+      ViewLike::view(row, )
     },
   }
 }
@@ -2905,7 +2905,7 @@ fn build_calendar(
   )
   set_panel_bg(panel)
   panel.on_draw(fn(p) {
-    let b = panel.get_bounds()
+    let b = ViewLike::get_bounds(panel, )
     p.set_stroke_color(theme_border())
     p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
   })
@@ -2933,7 +2933,7 @@ fn build_calendar(
   )
   // 月标题水平居中:GTK 端 align 无效,绘制时测宽手动摆位
   title.on_draw(fn(p) {
-    let b = title.get_bounds()
+    let b = ViewLike::get_bounds(title, )
     let probe = AttributedText::new(title_text.val, wrap=false)
     probe.set_font(Font::new("Sans", 14.0, weight=SemiBold))
     let tw = probe.get_bounds_for(10000.0, 1000.0).width
@@ -2952,7 +2952,7 @@ fn build_calendar(
     let b = themed_container(style=[("width", 28.0), ("height", head_h)])
     let to_left = glyph == "‹"
     b.on_draw(fn(p) {
-      let bb = b.get_bounds()
+      let bb = ViewLike::get_bounds(b, )
       if hover.val {
         p.set_fill_color(theme_fill_hover())
         p.fill_rect(0.0, 0.0, bb.width, bb.height)
@@ -2964,16 +2964,16 @@ fn build_calendar(
         draw_glyph_right(p, bb.width / 2.0, bb.height / 2.0, 4.0, theme_text_regular())
       }
     })
-    b.on_mouse_enter(fn(_e) {
+    ViewLike::on_mouse_enter(b, fn(_e) {
       hover.val = true
-      b.schedule_paint()
+      ViewLike::schedule_paint(b, )
     })
-    b.on_mouse_leave(fn(_e) {
+    ViewLike::on_mouse_leave(b, fn(_e) {
       hover.val = false
-      b.schedule_paint()
+      ViewLike::schedule_paint(b, )
     })
     View::set_cursor(b, hand())
-    b.on_mouse_down(fn(e) {
+    ViewLike::on_mouse_down(b, fn(e) {
       if e.button == 1 {
         on_click()
         true
@@ -3014,7 +3014,7 @@ fn build_calendar(
     let wref = name
     let c = themed_container(style=[("width", cell_w), ("height", week_h)])
     c.on_draw(fn(p) {
-      let b = c.get_bounds()
+      let b = ViewLike::get_bounds(c, )
       draw_center(p, wref, 0.0, b.height, theme_text_secondary())
     })
     wk.add_child(c)
@@ -3025,14 +3025,14 @@ fn build_calendar(
 
   fn rebuild_grid() -> Unit {
     for v in grid_rows.val {
-      ignore(grid.remove_child_view(v.view()))
+      ignore(grid.remove_child_view(ViewLike::view(v, )))
     }
     grid_rows.val = []
     cells.val = []
     let y = view_y.val
     let m = view_m.val
     title_text.val = "\{y} 年 \{m} 月"
-    title.schedule_paint()
+    ViewLike::schedule_paint(title, )
     let first_wd = date_weekday(y, m, 1)
     let dim = date_days_in_month(y, m)
     let dim_prev = date_days_in_month(
@@ -3080,7 +3080,7 @@ fn build_calendar(
         let hover = Ref(false)
         let c = themed_container(style=[("width", cell_w), ("height", cell_h)])
         c.on_draw(fn(p) {
-          let b = c.get_bounds()
+          let b = ViewLike::get_bounds(c, )
           let d = dymd
           let is_sel = match sel.val {
             Some(s) => s.y == d.y && s.m == d.m && s.d == d.d
@@ -3114,11 +3114,11 @@ fn build_calendar(
           View::set_cursor(c, hand())
           // release 才选中:date_picker 弹层内点项一律 release 防穿透;
           // calendar_t 内联面板同语义无副作用(松开选中,标准按钮感)
-          c.on_mouse_up(fn(e) {
+          ViewLike::on_mouse_up(c, fn(e) {
             if e.button == 1 {
               sel.val = Some(dymd)
               for cc in cells.val {
-                cc.schedule_paint()
+                ViewLike::schedule_paint(cc, )
               }
               on_pick(dymd)
               true
@@ -3126,13 +3126,13 @@ fn build_calendar(
               false
             }
           })
-          c.on_mouse_enter(fn(_e) {
+          ViewLike::on_mouse_enter(c, fn(_e) {
             hover.val = true
-            c.schedule_paint()
+            ViewLike::schedule_paint(c, )
           })
-          c.on_mouse_leave(fn(_e) {
+          ViewLike::on_mouse_leave(c, fn(_e) {
             hover.val = false
-            c.schedule_paint()
+            ViewLike::schedule_paint(c, )
           })
         }
         r.add_child(c)
@@ -3177,8 +3177,8 @@ pub fn calendar_t(
         Some(s) => s.subscribe(fn(_v) { refresh() })
         None => ()
       }
-      attach(parent, panel.view())
-      panel.view()
+      attach(parent, ViewLike::view(panel, ))
+      ViewLike::view(panel, )
     },
   }
 }
@@ -3221,7 +3221,7 @@ pub fn date_picker_t(
       View::set_cursor(field, hand())
       let focused = Ref(false)
       field.on_draw(fn(p) {
-        let b = field.get_bounds()
+        let b = ViewLike::get_bounds(field, )
         p.set_stroke_color(
           if focused.val { theme_focus_accent() } else { theme_border() },
         )
@@ -3260,7 +3260,7 @@ pub fn date_picker_t(
         sel.val = Some(d)
         text.val = d.format()
         has_val.val = true
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
         match value {
           Some(s) => s.set(Some(d))
           None => ()
@@ -3268,34 +3268,34 @@ pub fn date_picker_t(
         on_change(d)
       }
 
-      field.set_focusable(true)
-      field.on_focus_in(fn() {
+      ViewLike::set_focusable(field, true)
+      ViewLike::on_focus_in(field, fn() {
         focused.val = true
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
         false
       })
-      field.on_focus_out(fn() {
+      ViewLike::on_focus_out(field, fn() {
         focused.val = false
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
         match pop.val {
           Some(p) => p.close()
           None => ()
         }
         false
       })
-      field.on_mouse_enter(fn(_e) {
+      ViewLike::on_mouse_enter(field, fn(_e) {
         hover.val = true
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
       })
-      field.on_mouse_leave(fn(_e) {
+      ViewLike::on_mouse_leave(field, fn(_e) {
         hover.val = false
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
       })
-      field.on_mouse_up(fn(e) {
+      ViewLike::on_mouse_up(field, fn(e) {
         if e.button == 1 {
-          field.focus()
+          ViewLike::focus(field, )
           // 清空带(箭头左侧)优先:清空日期,不弹日历
-          let b = field.get_bounds()
+          let b = ViewLike::get_bounds(field, )
           if clearable && has_val.val && e.view_x >= b.width - 40.0 && e.view_x <= b.width - 20.0 {
             sel.val = None
             text.val = placeholder
@@ -3304,7 +3304,7 @@ pub fn date_picker_t(
               Some(s) => s.set(None)
               None => ()
             }
-            field.schedule_paint()
+            ViewLike::schedule_paint(field, )
             return true
           }
           match pop.val {
@@ -3346,13 +3346,13 @@ pub fn date_picker_t(
                 has_val.val = false
               }
             }
-            field.schedule_paint()
+            ViewLike::schedule_paint(field, )
             ((grid_refresh.val))()
           })
         None => ()
       }
-      attach(parent, field.view())
-      field.view()
+      attach(parent, ViewLike::view(field, ))
+      ViewLike::view(field, )
     },
   }
 }
@@ -3373,7 +3373,7 @@ pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
         draw_glyph_up(p, size / 2.0, size / 2.0 + 1.0, 6.0, "#FFFFFF")
       })
       View::set_cursor(b, hand())
-      b.on_mouse_down(fn(e) {
+      ViewLike::on_mouse_down(b, fn(e) {
         if e.button == 1 {
           on_click()
           true
@@ -3381,16 +3381,16 @@ pub fn backtop_t(on_click : () -> Unit, size? : Double = 36.0) -> Node {
           false
         }
       })
-      b.on_mouse_enter(fn(_e) {
+      ViewLike::on_mouse_enter(b, fn(_e) {
         hover.val = true
-        b.set_background_color(theme_primary_hover())
+        ViewLike::set_background_color(b, theme_primary_hover())
       })
-      b.on_mouse_leave(fn(_e) {
+      ViewLike::on_mouse_leave(b, fn(_e) {
         hover.val = false
-        b.set_background_color(theme_primary())
+        ViewLike::set_background_color(b, theme_primary())
       })
-      attach(parent, b.view())
-      b.view()
+      attach(parent, ViewLike::view(b, ))
+      ViewLike::view(b, )
     },
   }
 }
@@ -3516,7 +3516,7 @@ pub fn table_t(
         style_str=[("flexDirection", "column")],
       )
       outer.on_draw(fn(p) {
-        let b = outer.get_bounds()
+        let b = ViewLike::get_bounds(outer, )
         p.set_stroke_color(theme_border())
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
       })
@@ -3575,10 +3575,10 @@ pub fn table_t(
         match content {
           CellText(text) => {
             let l = Label::new(text)
-            l.set_font(fnt)
+            ViewLike::set_font(l, fnt)
             bind_fg(l, color_of)
             l.set_align(col.align)
-            l.set_style("flex", 1.0)
+            ViewLike::set_style(l, "flex", 1.0)
             wrap.add_child(l)
           }
           CellTag(text, t) => {
@@ -3613,11 +3613,11 @@ pub fn table_t(
             })
             wrap.add_child(sw)
             let l = Label::new(name)
-            l.set_font(small_font)
+            ViewLike::set_font(l, small_font)
             bind_fg(l, color_of)
             l.set_align(col.align)
-            l.set_style("flex", 1.0)
-            l.set_style("marginLeft", 6.0)
+            ViewLike::set_style(l, "flex", 1.0)
+            ViewLike::set_style(l, "marginLeft", 6.0)
             wrap.add_child(l)
           }
           CellLines(lines) => {
@@ -3627,11 +3627,11 @@ pub fn table_t(
             )
             for ln in lines {
               let l = Label::new(ln)
-              l.set_font(small_font)
+              ViewLike::set_font(l, small_font)
               bind_fg(l, fn() { theme_text_regular() })
               stack.add_child(l)
             }
-            stack.set_style("flex", 1.0)
+            ViewLike::set_style(stack, "flex", 1.0)
             wrap.add_child(stack)
           }
         }
@@ -3644,7 +3644,7 @@ pub fn table_t(
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
       head.on_draw(fn(p) {
-        let b = head.get_bounds()
+        let b = ViewLike::get_bounds(head, )
         p.set_fill_color(theme_fill_zebra())
         p.fill_rect(0.0, 0.0, b.width, b.height)
         p.set_stroke_color(theme_border())
@@ -3656,7 +3656,7 @@ pub fn table_t(
       // 表头复选框(仅 selection 启用时):全选 / 清空,部分选中画横条
       let head_cb = themed_container(style=[("width", 36.0), ("height", head_h)])
       head_cb.on_draw(fn(p) {
-        let b = head_cb.get_bounds()
+        let b = ViewLike::get_bounds(head_cb, )
         let n = data_r.val.length()
         let k = match sel {
           Some(s) => s.get().length()
@@ -3671,7 +3671,7 @@ pub fn table_t(
         )
       })
       View::set_cursor(head_cb, hand())
-      head_cb.on_mouse_down(fn(e) {
+      ViewLike::on_mouse_down(head_cb, fn(e) {
         if e.button == 1 {
           match sel {
             Some(s) => {
@@ -3712,13 +3712,13 @@ pub fn table_t(
       fn refresh_row(i : Int) -> Unit {
         let cs = row_cs.val
         if i >= 0 && i < cs.length() {
-          cs[i].schedule_paint()
+          ViewLike::schedule_paint(cs[i])
         }
       }
 
       fn rebuild(data : Array[TableRow]) -> Unit {
         for v in row_cs.val {
-          ignore(body.remove_child_view(v.view()))
+          ignore(body.remove_child_view(ViewLike::view(v, )))
         }
         row_cs.val = []
         data_r.val = data
@@ -3739,7 +3739,7 @@ pub fn table_t(
           row.on_draw(fn(p) {
             let bg = table_row_bg(idx, sel_has(idx), hover_i.val == idx)
             if bg != "" {
-              let b = row.get_bounds()
+              let b = ViewLike::get_bounds(row, )
               p.set_fill_color(bg)
               p.fill_rect(0.0, 0.0, b.width, b.height)
             }
@@ -3751,7 +3751,7 @@ pub fn table_t(
                 style_str=[("alignSelf", "stretch")],
               )
               cb.on_draw(fn(p) {
-                let b = cb.get_bounds()
+                let b = ViewLike::get_bounds(cb, )
                 table_draw_check(
                   p,
                   11.0,
@@ -3776,17 +3776,17 @@ pub fn table_t(
               }),
             )
           }
-          row.on_mouse_enter(fn(_e) {
+          ViewLike::on_mouse_enter(row, fn(_e) {
             hover_i.val = idx
             refresh_row(idx)
           })
-          row.on_mouse_leave(fn(_e) {
+          ViewLike::on_mouse_leave(row, fn(_e) {
             let prev = hover_i.val
             hover_i.val = -1
             refresh_row(prev)
           })
           View::set_cursor(row, hand())
-          row.on_mouse_down(fn(e) {
+          ViewLike::on_mouse_down(row, fn(e) {
             if e.button == 1 {
               match sel {
                 Some(_) => toggle_sel(idx)
@@ -3806,7 +3806,7 @@ pub fn table_t(
           body.add_child(row)
           row_cs.val.push(row)
         }
-        head_cb.schedule_paint()
+        ViewLike::schedule_paint(head_cb, )
       }
 
       rebuild(rows.get())
@@ -3815,16 +3815,16 @@ pub fn table_t(
         Some(s) =>
           s.subscribe(fn(_v) {
             for c in row_cs.val {
-              c.schedule_paint()
+              ViewLike::schedule_paint(c, )
             }
-            head_cb.schedule_paint()
+            ViewLike::schedule_paint(head_cb, )
           })
         None => ()
       }
       outer.add_child(head)
       outer.add_child(body)
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -3989,7 +3989,7 @@ pub fn table_v_t(
       }
 
       cv.on_draw(fn(p) {
-        let b = cv.get_bounds()
+        let b = ViewLike::get_bounds(cv, )
         let data = data_r.val
         let n = data.length()
         // 表头
@@ -4156,11 +4156,11 @@ pub fn table_v_t(
           .max(0.0)
           .min(1.0)
         offset.val = t * max_offset()
-        cv.schedule_paint()
+        ViewLike::schedule_paint(cv, )
       }
 
       View::set_cursor(cv, hand())
-      cv.on_mouse_down(fn(e) {
+      ViewLike::on_mouse_down(cv, fn(e) {
         if e.button != 1 {
           return false
         }
@@ -4168,7 +4168,7 @@ pub fn table_v_t(
         if e.view_x >= body_w && max_offset() > 0.0 {
           scroll_to_thumb(e.view_y)
           dragging.val = true
-          cv.set_capture()
+          ViewLike::set_capture(cv, )
           return true
         }
         if e.view_y < head_h {
@@ -4178,7 +4178,7 @@ pub fn table_v_t(
               None => ()
             }
           }
-          cv.schedule_paint()
+          ViewLike::schedule_paint(cv, )
           return true
         }
         let idx = ((e.view_y - head_h + offset.val) / row_height).to_int()
@@ -4189,10 +4189,10 @@ pub fn table_v_t(
           }
           on_row_click(idx, data_r.val[idx])
         }
-        cv.schedule_paint()
+        ViewLike::schedule_paint(cv, )
         true
       })
-      cv.on_mouse_move(fn(e) {
+      ViewLike::on_mouse_move(cv, fn(e) {
         if dragging.val {
           scroll_to_thumb(e.view_y)
           return
@@ -4207,31 +4207,31 @@ pub fn table_v_t(
         }
         if new_hover != hover_i.val {
           hover_i.val = new_hover
-          cv.schedule_paint()
+          ViewLike::schedule_paint(cv, )
         }
       })
-      cv.on_mouse_up(fn(_e) {
+      ViewLike::on_mouse_up(cv, fn(_e) {
         if dragging.val {
           dragging.val = false
-          cv.release_capture()
+          ViewLike::release_capture(cv, )
           true
         } else {
           false
         }
       })
-      cv.on_mouse_leave(fn(_e) {
+      ViewLike::on_mouse_leave(cv, fn(_e) {
         if hover_i.val != -1 {
           hover_i.val = -1
-          cv.schedule_paint()
+          ViewLike::schedule_paint(cv, )
         }
       })
-      cv.on_wheel(fn(delta) {
+      ViewLike::on_wheel(cv, fn(delta) {
         offset.val = offset.val + delta * 60.0
         clamp_offset()
-        cv.schedule_paint()
+        ViewLike::schedule_paint(cv, )
       })
-      cv.set_focusable(true)
-      cv.on_key_down(fn(e) {
+      ViewLike::set_focusable(cv, true)
+      ViewLike::on_key_down(cv, fn(e) {
         let page = (vis_h - row_height).max(row_height)
         if e.code == VKEY_DOWN {
           offset.val = offset.val + row_height
@@ -4249,7 +4249,7 @@ pub fn table_v_t(
           return false
         }
         clamp_offset()
-        cv.schedule_paint()
+        ViewLike::schedule_paint(cv, )
         true
       })
 
@@ -4262,17 +4262,17 @@ pub fn table_v_t(
           Some(s) => s.set([])
           None => ()
         }
-        cv.schedule_paint()
+        ViewLike::schedule_paint(cv, )
       }
 
       load(rows.get())
       rows.subscribe(load)
       match sel {
-        Some(s) => s.subscribe(fn(_v) { cv.schedule_paint() })
+        Some(s) => s.subscribe(fn(_v) { ViewLike::schedule_paint(cv, ) })
         None => ()
       }
-      attach(parent, cv.view())
-      cv.view()
+      attach(parent, ViewLike::view(cv, ))
+      ViewLike::view(cv, )
     },
   }
 }
@@ -4293,8 +4293,8 @@ pub fn divider(vertical? : Bool = false, spacing? : Double = 10.0) -> Node {
       }
       let c = themed_container(style=style)
       bind_bg(c, fn() { theme_border() })
-      attach(parent, c.view())
-      c.view()
+      attach(parent, ViewLike::view(c, ))
+      ViewLike::view(c, )
     },
   }
 }
@@ -4331,7 +4331,7 @@ pub fn textarea_t(
       // 清空带在 padding 区右侧(TextEdit 恒定让出,防 ✕ 被原生子窗口盖住)
       let clear_x = width - 20.0
       outer.on_draw(fn(p) {
-        let b = outer.get_bounds()
+        let b = ViewLike::get_bounds(outer, )
         p.set_stroke_color(
           if focused.val { theme_focus_accent() } else { theme_border() },
         )
@@ -4342,41 +4342,41 @@ pub fn textarea_t(
       })
       let edit = TextEdit::new()
       edit.set_text(text)
-      edit.set_font(Font::new("Sans", 13.0))
-      edit.set_borderless(true)
+      ViewLike::set_font(edit, Font::new("Sans", 13.0))
+      ViewLike::set_borderless(edit, true)
       set_panel_bg(edit)
-      edit.set_style("flex", 1.0)
+      ViewLike::set_style(edit, "flex", 1.0)
       if clearable {
-        edit.set_style("marginRight", 24.0)
+        ViewLike::set_style(edit, "marginRight", 24.0)
       }
       edit.on_text_change(fn() {
         if clearable {
           has_text.val = edit.get_text() != ""
-          outer.schedule_paint()
+          ViewLike::schedule_paint(outer, )
         }
         on_input(edit.get_text())
       })
-      edit.on_focus_in(fn() {
+      ViewLike::on_focus_in(edit, fn() {
         focused.val = true
-        outer.schedule_paint()
+        ViewLike::schedule_paint(outer, )
         false
       })
-      edit.on_focus_out(fn() {
+      ViewLike::on_focus_out(edit, fn() {
         focused.val = false
-        outer.schedule_paint()
+        ViewLike::schedule_paint(outer, )
         false
       })
       if clearable {
-        outer.on_mouse_enter(fn(_e) {
+        ViewLike::on_mouse_enter(outer, fn(_e) {
           hover.val = true
-          outer.schedule_paint()
+          ViewLike::schedule_paint(outer, )
         })
-        outer.on_mouse_leave(fn(_e) {
+        ViewLike::on_mouse_leave(outer, fn(_e) {
           hover.val = false
-          outer.schedule_paint()
+          ViewLike::schedule_paint(outer, )
         })
-        outer.on_mouse_up(fn(e) {
-          let b = outer.get_bounds()
+        ViewLike::on_mouse_up(outer, fn(e) {
+          let b = ViewLike::get_bounds(outer, )
           if e.button == 1 && has_text.val && e.view_x >= b.width - 32.0 {
             edit.set_text("")
             true
@@ -4386,8 +4386,8 @@ pub fn textarea_t(
         })
       }
       outer.add_child(edit)
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -4471,51 +4471,51 @@ pub fn slider_t(
         p.fill_rect(tx, (h - thumb) / 2.0, thumb, thumb)
       })
       View::set_cursor(v, hand())
-      v.on_mouse_down(fn(e) {
+      ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 {
           dragging.val = true
-          v.set_capture()
+          ViewLike::set_capture(v, )
           set_from_x(e.view_x)
           true
         } else {
           false
         }
       })
-      v.on_mouse_move(fn(e) {
+      ViewLike::on_mouse_move(v, fn(e) {
         if dragging.val {
           set_from_x(e.view_x)
         }
       })
-      v.on_mouse_up(fn(_e) {
+      ViewLike::on_mouse_up(v, fn(_e) {
         if dragging.val {
           dragging.val = false
-          v.release_capture()
+          ViewLike::release_capture(v, )
           true
         } else {
           false
         }
       })
-      v.on_mouse_enter(fn(_e) {
+      ViewLike::on_mouse_enter(v, fn(_e) {
         hover.val = true
-        v.schedule_paint()
+        ViewLike::schedule_paint(v, )
       })
-      v.on_mouse_leave(fn(_e) {
+      ViewLike::on_mouse_leave(v, fn(_e) {
         hover.val = false
-        v.schedule_paint()
+        ViewLike::schedule_paint(v, )
       })
-      v.on_focus_out(fn() {
+      ViewLike::on_focus_out(v, fn() {
         if dragging.val {
           dragging.val = false
-          v.release_capture()
+          ViewLike::release_capture(v, )
         }
         false
       })
       value.subscribe(fn(new_v) {
         on_change(new_v)
-        v.schedule_paint()
+        ViewLike::schedule_paint(v, )
       })
-      attach(parent, v.view())
-      v.view()
+      attach(parent, ViewLike::view(v, ))
+      ViewLike::view(v, )
     },
   }
 }
@@ -4557,7 +4557,7 @@ pub fn tabs_t(
         )
         let hover = Ref(false)
         tab.on_draw(fn(p) {
-          let b = tab.get_bounds()
+          let b = ViewLike::get_bounds(tab, )
           let act = cur.val == idx
           let at = AttributedText::new(title, valign=Center, wrap=false)
           at.set_font(fnt)
@@ -4577,7 +4577,7 @@ pub fn tabs_t(
           }
         })
         View::set_cursor(tab, hand())
-        tab.on_mouse_down(fn(e) {
+        ViewLike::on_mouse_down(tab, fn(e) {
           if e.button == 1 {
             sel.set(idx)
             true
@@ -4585,21 +4585,21 @@ pub fn tabs_t(
             false
           }
         })
-        tab.on_mouse_enter(fn(_e) {
+        ViewLike::on_mouse_enter(tab, fn(_e) {
           hover.val = true
-          tab.schedule_paint()
+          ViewLike::schedule_paint(tab, )
         })
-        tab.on_mouse_leave(fn(_e) {
+        ViewLike::on_mouse_leave(tab, fn(_e) {
           hover.val = false
-          tab.schedule_paint()
+          ViewLike::schedule_paint(tab, )
         })
         head.add_child(tab)
         // 内容页:默认只显示当前页
         let page_c = themed_container(
           style_str=[("flexDirection", "column")],
         )
-        page_c.set_visible(cur.val == idx)
-        ignore((node.mount)(page_c.view()))
+        ViewLike::set_visible(page_c, cur.val == idx)
+        ignore((node.mount)(ViewLike::view(page_c, )))
         contents.push(page_c)
       }
       outer.add_child(head)
@@ -4609,12 +4609,12 @@ pub fn tabs_t(
       sel.subscribe(fn(i) {
         cur.val = i
         for j in 0..<contents.length() {
-          contents[j].set_visible(j == i)
+          ViewLike::set_visible(contents[j], j == i)
         }
-        head.schedule_paint()
+        ViewLike::schedule_paint(head, )
       })
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -4633,7 +4633,7 @@ fn select_row(
   )
   let hover = Ref(false)
   row.on_draw(fn(p) {
-    let b = row.get_bounds()
+    let b = ViewLike::get_bounds(row, )
     let act = value.get() == opt
     if act {
       p.set_fill_color(theme_primary_light())
@@ -4665,18 +4665,18 @@ fn select_row(
       p.stroke()
     }
   })
-  row.on_mouse_enter(fn(_e) {
+  ViewLike::on_mouse_enter(row, fn(_e) {
     hover.val = true
-    row.schedule_paint()
+    ViewLike::schedule_paint(row, )
   })
-  row.on_mouse_leave(fn(_e) {
+  ViewLike::on_mouse_leave(row, fn(_e) {
     hover.val = false
-    row.schedule_paint()
+    ViewLike::schedule_paint(row, )
   })
   View::set_cursor(row, hand())
   // release 才选中:press 时刻 pick+关层会解除弹层指针抓取,悬着的
   // release 穿透到弹层下方控件;release 由弹层抓取派发给行,无待决事件
-  row.on_mouse_up(fn(e) {
+  ViewLike::on_mouse_up(row, fn(e) {
     if e.button == 1 {
       on_pick()
       true
@@ -4713,11 +4713,11 @@ pub fn select_t(
       View::set_cursor(field, hand())
       fn apply(text : String) -> Unit {
         ignore(text)
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
       }
 
       field.on_draw(fn(p) {
-        let b = field.get_bounds()
+        let b = ViewLike::get_bounds(field, )
         p.set_stroke_color(
           if focused.val { theme_focus_accent() } else { theme_border() },
         )
@@ -4752,34 +4752,34 @@ pub fn select_t(
         }
       }
 
-      field.set_focusable(true)
-      field.on_focus_in(fn() {
+      ViewLike::set_focusable(field, true)
+      ViewLike::on_focus_in(field, fn() {
         focused.val = true
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
         false
       })
-      field.on_focus_out(fn() {
+      ViewLike::on_focus_out(field, fn() {
         focused.val = false
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
         match pop.val {
           Some(p) => p.close()
           None => ()
         }
         false
       })
-      field.on_mouse_enter(fn(_e) {
+      ViewLike::on_mouse_enter(field, fn(_e) {
         hover.val = true
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
       })
-      field.on_mouse_leave(fn(_e) {
+      ViewLike::on_mouse_leave(field, fn(_e) {
         hover.val = false
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
       })
-      field.on_mouse_up(fn(e) {
+      ViewLike::on_mouse_up(field, fn(e) {
         if e.button == 1 {
-          field.focus()
+          ViewLike::focus(field, )
           // 清空带(箭头左侧)优先:清空选择,不弹列表
-          let b = field.get_bounds()
+          let b = ViewLike::get_bounds(field, )
           if clearable && value.get() != "" && e.view_x >= b.width - 40.0 && e.view_x <= b.width - 20.0 {
             value.set("")
             on_change("")
@@ -4824,8 +4824,8 @@ pub fn select_t(
         }
       })
       value.subscribe(fn(v) { apply(v) })
-      attach(parent, field.view())
-      field.view()
+      attach(parent, ViewLike::view(field, ))
+      ViewLike::view(field, )
     },
   }
 }
@@ -4898,21 +4898,21 @@ pub fn rate_t(
           }
         }
       })
-      v.on_mouse_move(fn(e) {
+      ViewLike::on_mouse_move(v, fn(e) {
         let h = star_at(e.view_x)
         if h != hover.val {
           hover.val = h
-          v.schedule_paint()
+          ViewLike::schedule_paint(v, )
         }
       })
-      v.on_mouse_leave(fn(_e) {
+      ViewLike::on_mouse_leave(v, fn(_e) {
         if hover.val != 0 {
           hover.val = 0
-          v.schedule_paint()
+          ViewLike::schedule_paint(v, )
         }
       })
       View::set_cursor(v, hand())
-      v.on_mouse_down(fn(e) {
+      ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 {
           value.set(star_at(e.view_x))
           true
@@ -4922,10 +4922,10 @@ pub fn rate_t(
       })
       value.subscribe(fn(new_v) {
         on_change(new_v)
-        v.schedule_paint()
+        ViewLike::schedule_paint(v, )
       })
-      attach(parent, v.view())
-      v.view()
+      attach(parent, ViewLike::view(v, ))
+      ViewLike::view(v, )
     },
   }
 }
@@ -4975,7 +4975,7 @@ pub fn popover_t(
             let holder = themed_container(
               style=[("width", width), ("height", height)],
             )
-            ignore((content.mount)(holder.view()))
+            ignore((content.mount)(ViewLike::view(holder, )))
             p.set_content(holder)
             p.set_content_size(width, height)
             // 点外关闭(Linux 系统行为)/显式关闭都同步状态,
@@ -5026,7 +5026,7 @@ pub fn dropdown_menu(
       set_panel_bg(field)
       View::set_cursor(field, hand())
       field.on_draw(fn(p) {
-        let b = field.get_bounds()
+        let b = ViewLike::get_bounds(field, )
         if focused.val {
           p.set_fill_color(theme_fill_hover())
           p.fill_rect(0.0, 0.0, b.width, b.height)
@@ -5053,24 +5053,24 @@ pub fn dropdown_menu(
         p.fill()
       })
       let pop : Ref[Popover?] = Ref(None)
-      field.set_focusable(true)
-      field.on_focus_in(fn() {
+      ViewLike::set_focusable(field, true)
+      ViewLike::on_focus_in(field, fn() {
         focused.val = true
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
         false
       })
-      field.on_focus_out(fn() {
+      ViewLike::on_focus_out(field, fn() {
         focused.val = false
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
         match pop.val {
           Some(p) => p.close()
           None => ()
         }
         false
       })
-      field.on_mouse_up(fn(e) {
+      ViewLike::on_mouse_up(field, fn(e) {
         if e.button == 1 {
-          field.focus()
+          ViewLike::focus(field, )
           match pop.val {
             Some(_) => ()
             None => {
@@ -5092,7 +5092,7 @@ pub fn dropdown_menu(
                 if it == "-" {
                   let sep = themed_container(style=[("height", 9.0)])
                   sep.on_draw(fn(p2) {
-                    let b = sep.get_bounds()
+                    let b = ViewLike::get_bounds(sep, )
                     p2.set_stroke_color(theme_border())
                     p2.begin_path()
                     p2.move_to(8.0, 4.5)
@@ -5108,7 +5108,7 @@ pub fn dropdown_menu(
                   style_str=[("flexDirection", "row"), ("alignItems", "center")],
                 )
                 row.on_draw(fn(p2) {
-                  let b = row.get_bounds()
+                  let b = ViewLike::get_bounds(row, )
                   if hover.val {
                     p2.set_fill_color(theme_fill_hover())
                     p2.fill_rect(0.0, 0.0, b.width, b.height)
@@ -5118,19 +5118,19 @@ pub fn dropdown_menu(
                   at.set_color(theme_text_regular())
                   p2.draw_attributed_text(at, 8.0, 0.0, b.width - 16.0, 28.0)
                 })
-                row.on_mouse_enter(fn(_e) {
+                ViewLike::on_mouse_enter(row, fn(_e) {
                   hover.val = true
-                  row.schedule_paint()
+                  ViewLike::schedule_paint(row, )
                 })
-                row.on_mouse_leave(fn(_e) {
+                ViewLike::on_mouse_leave(row, fn(_e) {
                   hover.val = false
-                  row.schedule_paint()
+                  ViewLike::schedule_paint(row, )
                 })
                 View::set_cursor(row, hand())
                 // release 才选中+关层:防 press 关层后悬着的 release
                 // 穿透到弹层下方控件(弹层点项一律 release,见
                 // adaptation.md)
-                row.on_mouse_up(fn(e2) {
+                ViewLike::on_mouse_up(row, fn(e2) {
                   if e2.button == 1 {
                     on_select(idx)
                     match pop.val {
@@ -5161,8 +5161,8 @@ pub fn dropdown_menu(
           false
         }
       })
-      attach(parent, field.view())
-      field.view()
+      attach(parent, ViewLike::view(field, ))
+      ViewLike::view(field, )
     },
   }
 }
@@ -5204,10 +5204,10 @@ pub fn carousel_t(
         let prev = cur.val
         cur.val = idx
         if prev != idx {
-          panels[prev].set_visible(false)
-          dots[prev].schedule_paint()
-          panels[idx].set_visible(true)
-          dots[idx].schedule_paint()
+          ViewLike::set_visible(panels[prev], false)
+          ViewLike::schedule_paint(dots[prev])
+          ViewLike::set_visible(panels[idx], true)
+          ViewLike::schedule_paint(dots[idx])
         }
       }
 
@@ -5219,8 +5219,8 @@ pub fn carousel_t(
           style=[("flex", 1.0)],
           style_str=[("flexDirection", "column"), ("alignSelf", "stretch")],
         )
-        pc.set_visible(i == 0)
-        ignore((pages[i].mount)(pc.view()))
+        ViewLike::set_visible(pc, i == 0)
+        ignore((pages[i].mount)(ViewLike::view(pc, )))
         stage.add_child(pc)
         panels.push(pc)
         let dot = themed_container(
@@ -5240,7 +5240,7 @@ pub fn carousel_t(
           p.fill_rect(0.0, 0.0, 8.0, 8.0)
         })
         View::set_cursor(dot, hand())
-        dot.on_mouse_down(fn(e) {
+        ViewLike::on_mouse_down(dot, fn(e) {
           if e.button == 1 {
             do_switch(di)
             true
@@ -5256,7 +5256,7 @@ pub fn carousel_t(
         let hover = Ref(false)
         a.on_draw(fn(p) {
           if hover.val {
-            let b = a.get_bounds()
+            let b = ViewLike::get_bounds(a, )
             p.set_fill_color(theme_fill_hover())
             p.fill_rect(0.0, 0.0, b.width, b.height)
           }
@@ -5276,16 +5276,16 @@ pub fn carousel_t(
           p.close_path()
           p.fill()
         })
-        a.on_mouse_enter(fn(_e) {
+        ViewLike::on_mouse_enter(a, fn(_e) {
           hover.val = true
-          a.schedule_paint()
+          ViewLike::schedule_paint(a, )
         })
-        a.on_mouse_leave(fn(_e) {
+        ViewLike::on_mouse_leave(a, fn(_e) {
           hover.val = false
-          a.schedule_paint()
+          ViewLike::schedule_paint(a, )
         })
         View::set_cursor(a, hand())
-        a.on_mouse_down(fn(e) {
+        ViewLike::on_mouse_down(a, fn(e) {
           if e.button == 1 {
             do_switch(if right { cur.val + 1 } else { cur.val - 1 })
             true
@@ -5299,7 +5299,7 @@ pub fn carousel_t(
       // 布局:舞台行 = 左箭头 + 舞台 + 右箭头;下行为指示点
       let stage_row = themed_container(style_str=[("flexDirection", "row")])
       stage_row.add_child(arrow(false))
-      stage.set_style("flex", 1.0)
+      ViewLike::set_style(stage, "flex", 1.0)
       stage_row.add_child(stage)
       stage_row.add_child(arrow(true))
       let dots_row = themed_container(style_str=[("flexDirection", "row")])
@@ -5309,8 +5309,8 @@ pub fn carousel_t(
       outer.add_child(stage_row)
       outer.add_child(dots_row)
       // 悬停暂停自动轮播;set_timeout 一次性,回调里自排下一个
-      outer.on_mouse_enter(fn(_e) { paused.val = true })
-      outer.on_mouse_leave(fn(_e) { paused.val = false })
+      ViewLike::on_mouse_enter(outer, fn(_e) { paused.val = true })
+      ViewLike::on_mouse_leave(outer, fn(_e) { paused.val = false })
       if interval_ms > 0 && n > 1 {
         let tick : Ref[() -> Unit] = Ref(fn() {  })
         tick.val = fn() {
@@ -5323,8 +5323,8 @@ pub fn carousel_t(
         }
         (tick.val)()
       }
-      attach(parent, outer.view())
-      outer.view()
+      attach(parent, ViewLike::view(outer, ))
+      ViewLike::view(outer, )
     },
   }
 }
@@ -5352,7 +5352,7 @@ pub fn color_picker_t(
       set_panel_bg(field)
       View::set_cursor(field, hand())
       field.on_draw(fn(p) {
-        let b = field.get_bounds()
+        let b = ViewLike::get_bounds(field, )
         p.set_stroke_color(
           if focused.val { theme_focus_accent() } else { theme_border() },
         )
@@ -5388,24 +5388,24 @@ pub fn color_picker_t(
         }
       }
 
-      field.set_focusable(true)
-      field.on_focus_in(fn() {
+      ViewLike::set_focusable(field, true)
+      ViewLike::on_focus_in(field, fn() {
         focused.val = true
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
         false
       })
-      field.on_focus_out(fn() {
+      ViewLike::on_focus_out(field, fn() {
         focused.val = false
-        field.schedule_paint()
+        ViewLike::schedule_paint(field, )
         match pop.val {
           Some(p) => p.close()
           None => ()
         }
         false
       })
-      field.on_mouse_up(fn(e) {
+      ViewLike::on_mouse_up(field, fn(e) {
         if e.button == 1 {
-          field.focus()
+          ViewLike::focus(field, )
           match pop.val {
             Some(_) => ()
             None => {
@@ -5467,7 +5467,7 @@ pub fn color_picker_t(
                   }
                 })
                 // release 才选中:弹层点项一律 release,防穿透
-                cell.on_mouse_up(fn(e2) {
+                ViewLike::on_mouse_up(cell, fn(e2) {
                   if e2.button == 1 {
                     pick(c)
                     true
@@ -5484,10 +5484,10 @@ pub fn color_picker_t(
               value.subscribe(fn(_v) {
                 for (_r, cells) in rows {
                   for cell in cells {
-                    cell.schedule_paint()
+                    ViewLike::schedule_paint(cell, )
                   }
                 }
-                field.schedule_paint()
+                ViewLike::schedule_paint(field, )
               })
               // 高度 = padding 16 + 行数 x 32(色块 26 + 间距 6);
               // content_size 与创建期根容器尺寸公式一致
@@ -5505,8 +5505,8 @@ pub fn color_picker_t(
           false
         }
       })
-      attach(parent, field.view())
-      field.view()
+      attach(parent, ViewLike::view(field, ))
+      ViewLike::view(field, )
     },
   }
 }
