@@ -6,7 +6,7 @@
 
 ### 定制主题 / 深浅切换
 
-在 `initialize()` 之后任意时刻调用 `theme_apply`(内置 `default_theme` 浅色 / `dark_theme` 暗色)。切换即时生效、无需重建界面:自绘组件经主题订阅自动重绘,挂载期定死的色(容器底色/Label 文字色等)由组件内部重设,Linux 端原生控件(输入框/多行/滚动条/窗口与弹层底)CSS 一并重建。自定义容器想跟随主题,用 `on_theme_change` 注册重设回调,色板快照经 `theme_current` 读取(含页面底 `bg_page` / 面板底 `bg_panel`)。焦点环默认主色 40% 透明单层描边,不喧宾夺主。
+在 `initialize()` 之后任意时刻调用 `theme_apply`(内置 `default_theme` 浅色 / `dark_theme` 暗色)。切换即时生效、无需重建界面:自绘组件经主题订阅自动重绘,挂载期定死的色(容器底色/Label 文字色等)由组件内部重设,Linux 端原生控件(输入框/多行/滚动条/窗口与弹层底)CSS 一并重建。自定义容器想跟随主题,用 `on_theme_change` 注册重设回调,色板快照经 `theme_current` 读取(含页面底 `bg_page` / 面板底 `bg_panel`)。焦点环与字段聚焦边框为中性灰单层描亮(不用主题色),不喧宾夺主。
 
 ```moonbit
 @yue.initialize()

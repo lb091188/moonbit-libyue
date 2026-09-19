@@ -6,7 +6,7 @@ Element-Plus-style, theme-unified non-form components built in pure MoonBit on t
 
 ### Customizing the theme / dark mode
 
-Call `theme_apply` at any time after `initialize()` (built-in palettes: `default_theme` light / `dark_theme` dark). Switching takes effect immediately without rebuilding the UI: self-drawn components repaint via theme subscriptions, colors fixed at mount (container backgrounds, label text colors) are re-applied internally, and on Linux the native-control CSS (entries/text views/scrollbars/window & popover backgrounds) is rebuilt too. To make custom containers follow the theme, register a re-apply callback with `on_theme_change` and read the snapshot (including page background `bg_page` / panel background `bg_panel`) via `theme_current`. Focus rings default to a single 1px stroke at 40% primary alpha to stay unobtrusive.
+Call `theme_apply` at any time after `initialize()` (built-in palettes: `default_theme` light / `dark_theme` dark). Switching takes effect immediately without rebuilding the UI: self-drawn components repaint via theme subscriptions, colors fixed at mount (container backgrounds, label text colors) are re-applied internally, and on Linux the native-control CSS (entries/text views/scrollbars/window & popover backgrounds) is rebuilt too. To make custom containers follow the theme, register a re-apply callback with `on_theme_change` and read the snapshot (including page background `bg_page` / panel background `bg_panel`) via `theme_current`. Focus rings and focused field borders use a neutral grey single stroke (not the theme color) to stay unobtrusive.
 
 ```moonbit
 @yue.initialize()
