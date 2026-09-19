@@ -2003,6 +2003,19 @@ extern "c" fn ffi_view_add_tooltip_for_rect(
 extern "c" fn ffi_view_remove_tooltip(v : View, id : Int) -> Unit = "yue_mbt_view_remove_tooltip"
 
 ///|
+extern "c" fn ffi_system_prefers_dark() -> Int = "yue_mbt_system_prefers_dark"
+
+///|
+#borrow(invoke, callback)
+extern "c" fn ffi_on_system_theme_change(
+  invoke : FuncRef[(() -> Unit) -> Unit],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_on_system_theme_change"
+
+///|
+extern "c" fn ffi_repaint_all() -> Unit = "yue_mbt_repaint_all"
+
+///|
 #borrow(v)
 extern "c" fn ffi_view_set_focusable(v : View, focusable : Int) -> Unit = "yue_mbt_view_set_focusable"
 
