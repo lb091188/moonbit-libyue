@@ -59,6 +59,9 @@ fn main {
     return
   }
   let selected : @yue.Store[String] = @yue.Store::new("基础组件")
+  let dlg_basic : @yue.Store[Bool] = @yue.Store::new(false)
+  let dlg_form : @yue.Store[Bool] = @yue.Store::new(false)
+  let dlg_name : @yue.Store[String] = @yue.Store::new("")
   // 深浅主题:启动跟随系统,系统切换时实时联动;「切换深浅」按钮手动覆盖
   let dark_mode : @yue.Store[Bool] = @yue.Store::new(@yue.system_prefers_dark())
   dark_mode.subscribe(fn(v) {
@@ -925,6 +928,17 @@ fn main {
         ),
       ],
     ),
+    section(
+      "Dialog 对话框",
+      "同窗遮罩 + 居中面板(absolute 相对挂载容器,本演示挂在窗口根,遮罩盖全窗);✕/取消/确定触发回调后自动收起,visible 由 Store 驱动。",
+      [
+        @yue.hbox([
+          @yue.button_t("基础对话框", on_click=fn() { dlg_basic.set(true) }),
+          @yue.button_t("表单对话框", variant=@yue.Solid, on_click=fn() { dlg_form.set(true) }),
+          @yue.bind_label(dlg_name, fn(n) { if n == "" { "尚未提交" } else { "提交了:\\{n}" } }),
+        ]),
+      ],
+    ),
   ])
   let window = @yue.mount_window(
     [
@@ -979,6 +993,30 @@ fn main {
             apply()
             @yue.on_theme_change(apply)
           },
+        ),
+        // 对话框挂窗口根:absolute 遮罩相对挂载容器,盖全窗
+        @yue.dialog_t(
+          dlg_basic,
+          "删除确认",
+          [
+            @yue.alert_closeable("此操作不可撤销,请确认。", @yue.Warning),
+            @yue.label_t("确定要删除「示例项目」吗?", role=@yue.Body),
+          ],
+          confirm_text="删除",
+          cancel_text="取消",
+          on_confirm=fn() { dlg_name.set("(确认删除)") },
+          close_on_mask=true,
+        ),
+        @yue.dialog_t(
+          dlg_form,
+          "新建连接",
+          [
+            @yue.label_t("名称", role=@yue.Body),
+            @yue.entry_t(text="例如:开发库", on_input=fn(t) { dlg_name.set(t) }),
+            @yue.label_t("地址", role=@yue.Body),
+            @yue.input_t(text="host:port", width=320.0),
+          ],
+          width=380.0,
         ),
       ]),
     ],

@@ -87,6 +87,7 @@ let t = @yue.default_theme()
 | `result(t, title, desc, children)` | big symbol + title + description + action area |
 | `empty(desc)` | placeholder block + caption |
 | `switch_t(checked : Store[Bool], disabled?)` | on / off / disabled |
+| `dialog_t(visible : Store[Bool], title, children, width?, confirm_text?, cancel_text?, on_confirm?, on_cancel?, close_on_mask?)` | in-app dialog: same-window mask (semi-transparent black, absolute relative to the mount container — mounted at the window root it covers the whole window) + centered panel (title bar with ✕ + body + right-aligned buttons); ✕/cancel/confirm auto-close after the callback; empty text hides the button; visually modal, not keyboard-modal |
 | `radio_group(options, selected, disabled?)` | mutually exclusive selection |
 
 ## Demo
