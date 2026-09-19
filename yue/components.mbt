@@ -3041,68 +3041,24 @@ fn build_calendar(
     wk.add_child(c)
   }
   let grid = themed_container(style_str=[("flexDirection", "column")])
+  // 42 格一次性创建、永不增删:实测弹层窗口 map 过之后再加进来的行
+  // 不会被绘制(同面板一次创建的标题/星期行始终正常,增删过的格子
+  // 消失且导航重建也不恢复)——rebuild 只改每格数据+重绘
   let cells : Ref[Array[Container]] = Ref([])
-  let grid_rows : Ref[Array[Container]] = Ref([])
-
-  fn rebuild_grid() -> Unit {
-    for v in grid_rows.val {
-      ignore(grid.remove_child_view(ViewLike::view(v)))
-    }
-    grid_rows.val = []
-    cells.val = []
-    let y = view_y.val
-    let m = view_m.val
-    title_text.val = "\{y} 年 \{m} 月"
-    ViewLike::schedule_paint(title)
-    let first_wd = date_weekday(y, m, 1)
-    let dim = date_days_in_month(y, m)
-    let dim_prev = date_days_in_month(
-      if m == 1 { y - 1 } else { y },
-      if m == 1 { 12 } else { m - 1 },
-    )
-    for row_i in 0..<6 {
+  let cell_date : Ref[Array[Ref[DateYMD]]] = Ref([])
+  let cell_inm : Ref[Array[Ref[Bool]]] = Ref([])
+  {
+    for _row in 0..<6 {
       let r = themed_container(style_str=[("flexDirection", "row")])
-      for col_i in 0..<7 {
-        let idx = row_i * 7 + col_i
-        let in_month = idx >= first_wd && idx < first_wd + dim
-        let dd = if idx < first_wd {
-          dim_prev - (first_wd - 1 - idx)
-        } else if in_month {
-          idx - first_wd + 1
-        } else {
-          idx - first_wd - dim + 1
-        }
-        let dy = if in_month || idx < first_wd {
-          if idx < first_wd && m == 1 {
-            y - 1
-          } else {
-            y
-          }
-        } else if m == 12 {
-          y + 1
-        } else {
-          y
-        }
-        let dm = if idx < first_wd {
-          if m == 1 {
-            12
-          } else {
-            m - 1
-          }
-        } else if in_month {
-          m
-        } else if m == 12 {
-          1
-        } else {
-          m + 1
-        }
-        let dymd : DateYMD = { y: dy, m: dm, d: dd }
-        let in_m = in_month
+      for _col in 0..<7 {
+        let dref : Ref[DateYMD] = Ref({ y: 0, m: 1, d: 1 })
+        let inm : Ref[Bool] = Ref(false)
         let hover = Ref(false)
         let c = themed_container(style=[("width", cell_w), ("height", cell_h)])
         c.on_draw(fn(p) {
           let b = ViewLike::get_bounds(c)
-          let d = dymd
+          let d = dref.val
+          let in_m = inm.val
           let is_sel = match sel.val {
             Some(s) => s.y == d.y && s.m == d.m && s.d == d.d
             None => false
@@ -3131,36 +3087,87 @@ fn build_calendar(
             draw_center(p, d.d.to_string(), 0.0, b.height, color)
           }
         })
-        if in_m {
-          View::set_cursor(c, hand())
-          // release 才选中:date_picker 弹层内点项一律 release 防穿透;
-          // calendar_t 内联面板同语义无副作用(松开选中,标准按钮感)
-          ViewLike::on_mouse_up(c, fn(e) {
-            if e.button == 1 {
-              sel.val = Some(dymd)
-              for cc in cells.val {
-                ViewLike::schedule_paint(cc)
-              }
-              on_pick(dymd)
-              true
-            } else {
-              false
+        View::set_cursor(c, hand())
+        // release 才选中:date_picker 弹层内点项一律 release 防穿透;
+        // calendar_t 内联面板同语义无副作用(松开选中,标准按钮感)。
+        // 跨月格不可选(inm 校验在回调内,格子稳定不随月重建)
+        ViewLike::on_mouse_up(c, fn(e) {
+          if e.button == 1 && inm.val {
+            let d = dref.val
+            sel.val = Some(d)
+            for cc in cells.val {
+              ViewLike::schedule_paint(cc)
             }
-          })
-          ViewLike::on_mouse_enter(c, fn(_e) {
-            hover.val = true
-            ViewLike::schedule_paint(c)
-          })
-          ViewLike::on_mouse_leave(c, fn(_e) {
-            hover.val = false
-            ViewLike::schedule_paint(c)
-          })
-        }
+            on_pick(d)
+            true
+          } else {
+            false
+          }
+        })
+        ViewLike::on_mouse_enter(c, fn(_e) {
+          hover.val = true
+          ViewLike::schedule_paint(c)
+        })
+        ViewLike::on_mouse_leave(c, fn(_e) {
+          hover.val = false
+          ViewLike::schedule_paint(c)
+        })
         r.add_child(c)
         cells.val.push(c)
+        cell_date.val.push(dref)
+        cell_inm.val.push(inm)
       }
       grid.add_child(r)
-      grid_rows.val.push(r)
+    }
+  }
+
+  fn rebuild_grid() -> Unit {
+    let y = view_y.val
+    let m = view_m.val
+    title_text.val = "\{y} 年 \{m} 月"
+    ViewLike::schedule_paint(title)
+    let first_wd = date_weekday(y, m, 1)
+    let dim = date_days_in_month(y, m)
+    let dim_prev = date_days_in_month(
+      if m == 1 { y - 1 } else { y },
+      if m == 1 { 12 } else { m - 1 },
+    )
+    for idx in 0..<42 {
+      let in_month = idx >= first_wd && idx < first_wd + dim
+      let dd = if idx < first_wd {
+        dim_prev - (first_wd - 1 - idx)
+      } else if in_month {
+        idx - first_wd + 1
+      } else {
+        idx - first_wd - dim + 1
+      }
+      let dy = if in_month || idx < first_wd {
+        if idx < first_wd && m == 1 {
+          y - 1
+        } else {
+          y
+        }
+      } else if m == 12 {
+        y + 1
+      } else {
+        y
+      }
+      let dm = if idx < first_wd {
+        if m == 1 {
+          12
+        } else {
+          m - 1
+        }
+      } else if in_month {
+        m
+      } else if m == 12 {
+        1
+      } else {
+        m + 1
+      }
+      cell_date.val[idx].val = { y: dy, m: dm, d: dd }
+      cell_inm.val[idx].val = in_month
+      ViewLike::schedule_paint(cells.val[idx])
     }
   }
 
@@ -4959,12 +4966,24 @@ pub fn popover_t(
       let tv = (trigger.mount)(parent)
       let pop : Ref[Popover?] = Ref(None)
       let open = Ref(false)
-      let wrapped : (Int, Double, Double, Double, Double, Int, Int) -> Int = fn(
+      let wrapped : (
+        Int,
+        Double,
+        Double,
+        Double,
+        Double,
+        Double,
+        Double,
+        Int,
+        Int,
+      ) -> Int = fn(
         button,
         _vx,
         _vy,
         _wx,
         _wy,
+        _sx,
+        _sy,
         _m,
         _t,
       ) {
@@ -5001,7 +5020,9 @@ pub fn popover_t(
       keep_alive(fn() { ignore(wrapped) })
       ffi_view_on_mouse_up(
         tv,
-        fn(f, b, vx, vy, wx, wy, m, t) { f(b, vx, vy, wx, wy, m, t) },
+        fn(f, b, vx, vy, wx, wy, sx, sy, m, t) {
+          f(b, vx, vy, wx, wy, sx, sy, m, t)
+        },
         wrapped,
       )
       tv
