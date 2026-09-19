@@ -81,6 +81,7 @@
 ### 已完成(24)
 
 - [x] 主题化控件:button_t / label_t / entry_t / checkbox_t
+- [x] 图标系统 — IconKind 37 种矢量图标(draw_icon 统一入口,收编散落 glyph)+ icon 展示视图 + icon_button_t 图标按钮(演示板「基础组件」页图标墙;视觉细节待真机复验)
 - [x] 单选与开关:radio_group / switch_t
 - [x] 导航:side_menu / segmented / breadcrumb / pagination / steps
 - [x] 数据展示:tag / avatar / badge / statistic / descriptions / timeline / collapse / card / code_view / progress_line

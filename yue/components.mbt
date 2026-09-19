@@ -4401,7 +4401,7 @@ pub fn slider_t(
   min? : Double = 0.0,
   max? : Double = 100.0,
   step? : Double = 1.0,
-  width? : Double = 240.0,
+  width? : Double = 0.0,
   on_change? : (Double) -> Unit = fn(_v) {  },
 ) -> Node {
   {
@@ -4411,9 +4411,15 @@ pub fn slider_t(
       let thumb = 12.0
       let dragging = Ref(false)
       let hover = Ref(false)
-      let v = themed_container(
-        style=[("width", width), ("height", h), ("marginBottom", 10.0)],
-      )
+      // width<=0(缺省)flex 自适应父容器宽;显式正宽则定宽
+      let size_style : Array[(String, Double)] = if width > 0.0 {
+        [("width", width)]
+      } else {
+        [("flex", 1.0)]
+      }
+      size_style.push(("height", h))
+      size_style.push(("marginBottom", 10.0))
+      let v = themed_container(style=size_style)
       fn clamp01(x : Double) -> Double {
         if x < 0.0 {
           0.0
@@ -4448,19 +4454,24 @@ pub fn slider_t(
       }
 
       fn set_from_x(x : Double) -> Unit {
-        let r = clamp01((x - thumb / 2.0) / (width - thumb))
+        let w = ViewLike::get_bounds(v).width
+        let r = clamp01((x - thumb / 2.0) / (w - thumb))
         value.set(quantize(min + r * (max - min)))
       }
 
       v.on_draw(fn(p) {
+        let b = ViewLike::get_bounds(v)
+        let w = b.width
         let ratio = ratio_of(value.get())
         let ty = (h - track_h) / 2.0
-        p.set_fill_color(theme_fill_zebra())
-        p.fill_rect(0.0, ty, width, track_h)
+        // 轨道底用 border 灰:白底上的浅斑马纹几乎不可见,
+        // 轨道必须整条可见才能读出滑杆长度
+        p.set_fill_color(theme_border())
+        p.fill_rect(0.0, ty, w, track_h)
         p.set_fill_color(theme_primary())
-        p.fill_rect(0.0, ty, ratio * (width - thumb) + thumb / 2.0, track_h)
+        p.fill_rect(0.0, ty, ratio * (w - thumb) + thumb / 2.0, track_h)
         // thumb:主题色实心方块,hover/拖拽加深
-        let tx = ratio * (width - thumb)
+        let tx = ratio * (w - thumb)
         p.set_fill_color(
           if hover.val || dragging.val {
             theme_primary_hover()

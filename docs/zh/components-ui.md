@@ -36,6 +36,8 @@ let t = @yue.default_theme()
 | `date_picker_t(value? : Store[DateYMD?], on_change?, width?, placeholder?, clearable?)` | 日期选择(EP 样式,全自绘):输入框样式字段,点击弹出 `calendar_t` 日历面板(Popover 承载),‹/› 切月,点选回填并收起,失焦收起;clearable=true 悬停且有值时 ✕ 清空(不触发 on_change) |
 | `textarea_t(text?, width?, height?, margin?, on_input?, clearable?)` | 多行输入:外层自绘边框(聚焦变主题色)+ 8px 内边距,内部 TextEdit 去原生边框,内容超出按平台自身滚动;clearable=true 悬停且非空时右侧 ✕ 清空(on_input 收空串) |
 | `divider(vertical?, spacing?)` | 分隔线:水平(默认)/竖直,1px 主题边框色,spacing 为两侧留白 |
+| `icon(kind, size?, color?)` | 内置矢量图标展示:37 种(箭头/编辑/媒体/状态等,`all_icons()` 取全清单、`icon_name()` 取名),默认主题常规色,传 color 固定色;`draw_icon(p, kind, cx, cy, s, color)` 为统一自绘入口 |
+| `icon_button_t(kind, on_click?, size?, tip?)` | 方形图标按钮:hover 浅灰底 + 文字色提亮,Enter/Space 触发;tip 非空挂悬浮提示;marginRight 6 便于工具栏排列 |
 | `slider_t(value : Store[Double], min?, max?, step?, width?, on_change?)` | 自绘滑杆:浅灰轨道 + 主题色填充 + 方形 thumb,点击/拖拽调值(step 量化),外部 set 同样生效 |
 | `tabs_t(pages : Array[(String, Node)], selected?)` | 顶部页签:选中主题色文字 + 底部 2px 指示条,内容区 set_visible 切换;selected 为页序号 Store(缺省内部建 0) |
 | `select_t(options, value : Store[String], width?, on_change?, clearable?)` | 下拉选择(EP 样式,全自绘):点击弹候选列表,悬停高亮、当前选中 ✓ 标记,点选回填并收起,失焦收起;clearable=true 悬停且有值时箭头旁 ✕ 清空(value 置空串、on_change(""));三平台同形态 |
