@@ -976,14 +976,12 @@ pub fn card(
         p.set_fill_color(theme_border())
         p.fill_rect(0.0, head_h, w, 1.0)
       })
-      // 标题(加粗,垂直居中)
+      // 标题(加粗,垂直居中,左内边距 16;文字为自绘,padding 样式
+      // 只影响子项排列,起点须在 draw 坐标里给)
       let title_at = AttributedText::new(title, valign=Center, wrap=false)
       title_at.set_font(Font::new("Sans", 14.0, weight=Bold))
       title_at.set_color(theme_text_primary())
-      let title = themed_container(style=[
-        ("height", head_h),
-        ("paddingLeft", 16.0),
-      ])
+      let title = themed_container(style=[("height", head_h)])
       fn apply_title_color() -> Unit {
         title_at.set_color(theme_text_primary())
         title_at.set_text(title_at.get_text())
@@ -994,7 +992,7 @@ pub fn card(
       on_theme_change(apply_title_color)
       title.on_draw(fn(p) {
         let b = ViewLike::get_bounds(title)
-        p.draw_attributed_text(title_at, 0.0, 0.0, b.width, head_h)
+        p.draw_attributed_text(title_at, 16.0, 0.0, b.width - 16.0, head_h)
       })
       outer.add_child(title)
       // 内容区
