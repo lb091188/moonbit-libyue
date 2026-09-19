@@ -23,8 +23,8 @@ libyue(libyue.com)的 MoonBit 封装,跨平台原生桌面 GUI。
 ```sh
 python3 scripts/prepare.py    # 手动构建原生层:优先下 fork 预构建库(秒级),回退源码全量构建(需 GitHub 网络)
 moon clean                    # 清理缓存
-moon run examples/hello       # 最小示例
-moon run examples/showcase    # 全功能演示
+moon run examples/showcase    # 全能力展示(默认主题)
+moon run examples/components  # 组件库与系统能力(现代主题)
 moon check && moon test       # 纯 MoonBit 测试
 ```
 

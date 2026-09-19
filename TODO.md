@@ -7,7 +7,7 @@
 
 - [x] [Getting started](https://libyue.com/docs/latest/cpp/guides/getting_started.html) — 主链路跑通
 - [x] [Events and delegates](https://libyue.com/docs/latest/cpp/guides/events_and_delegates.html) — 鼠标/键盘全信号 + 捕获
-- [x] [Layout system](https://libyue.com/docs/latest/cpp/guides/layout_system.html) — set_style 全键覆盖,样式键全集见 [docs/layout.md](docs/layout.md);examples/layout
+- [x] [Layout system](https://libyue.com/docs/latest/cpp/guides/layout_system.html) — set_style 全键覆盖,样式键全集见 [docs/layout.md](docs/layout.md)
 - [x] [Drag and drop](https://libyue.com/docs/latest/cpp/guides/drag_and_drop.html) — drag_source / drag_destination
 - [ ] [FAQ](https://libyue.com/docs/latest/cpp/guides/faq.html)
 
@@ -96,6 +96,7 @@
 - [x] form 表单布局 — form_item(标签右对齐定宽 + 控件区)+ form 分组标题
 - [x] link 链接文字 — 主题色 + 悬停下划线 + 点击回调
 - [x] page-header 页头 — ‹ 返回(悬停变主题色)+ 标题 + 右侧操作区
+- [x] components 收编系统能力(2026-09-19):新增「系统集成」页(文件对话框/消息框/系统通知/剪贴板/定时器)与「窗口与网页」页(窗口 API/全局快捷键/拖放接收/内嵌 WebView),现代主题包装;示例收敛为两个——showcase=全能力×默认主题,components=现代主题×组件库+系统能力,其余 17 个示例移除(能力已并入 showcase 各页)
 - [x] ~~backtop 返回顶部~~ — 已移除(2026-09-19):EP 网页端长页面组件,桌面端滚动条/Home 键即达,价值低;真机疑难(首点被吞)随组件删除而消除,过程经验入档 adaptation.md(运行期 set_background_color 规范/点两次形态判别);Scroll::scroll_to_top 通用 API 保留
 - [x] tree 树形控件 — TreeNode 嵌套 + 缩进层级 + 点击 ▸/▾ 展开折叠
 - [x] transfer 穿梭框 — 双列 + 行点击选中(方块标记)+ ›/‹ 互移(动态行经 remove_child_view 重建)

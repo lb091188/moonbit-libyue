@@ -86,7 +86,7 @@ cross axis concepts.
 
 ## Ubuntu 24.04 / X11 / XFCE 4.18 Test Records (2026-09-11)
 
-`examples/layout` includes 16 geometry assertions (flex equal split, gap spacing, percentage width,
+The layout system ships 16 geometry assertions (flex equal split, gap spacing, percentage width,
 justify/align centering, min-width floor, absolute positioning); measured in a real window,
 **all 16/16 passed (failures=0)** with a ±1px tolerance.
 The composition rules match hand calculation: content area = container − 2×padding; gap does not stack

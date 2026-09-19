@@ -70,7 +70,7 @@ sudo apt install build-essential cmake pkg-config \
 仅 shim 单文件参与编译；设 `LIBYUE_FORCE_SOURCE=1` 可回退为源码全量构建。**
 
 ```sh
-moon run examples/hello
+moon run examples/showcase
 ```
 
 
@@ -101,7 +101,7 @@ Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installe
 
 ```bat
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-moon run examples/hello
+moon run examples/showcase
 ```
 
 （原生层缺失时 moon 会自动调 `python3 scripts\prepare.py` 补建；如需手动执行，
