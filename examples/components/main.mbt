@@ -265,6 +265,21 @@ fn main {
       ],
     ),
     section(
+      "ContextMenu 右键菜单",
+      "context_menu_for 给任意节点包右键原生菜单(\"-\" 分隔线),在下面色块上点右键试试。",
+      [
+        @yue.context_menu_for(
+          @yue.tag("右键我", "#2D68C4"),
+          [
+            ("复制", fn() { picked_lang.set("已复制") }),
+            ("重命名", fn() { picked_lang.set("重命名") }),
+            ("-", fn() {  }),
+            ("删除", fn() { picked_lang.set("已删除") }),
+          ],
+        ),
+      ],
+    ),
+    section(
       "Tooltip 悬浮提示",
       "tooltip_t 给任意节点包原生悬浮提示(系统样式;主题化气泡见反馈页 Popover)。",
       [

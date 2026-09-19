@@ -193,3 +193,41 @@ pub fn toast_layer(
   }
   (layer, push)
 }
+
+///|
+/// 右键上下文菜单:给任意节点包右键弹原生菜单。items 为 (文案, 回调)
+/// 序列,文案 "-" 画分隔线;弹出位置经 get_bounds_in_screen + 事件相对
+/// 坐标换算屏幕坐标(Menu::popup_at 收屏幕坐标)。菜单每次右键现建,
+/// 避免原生菜单复用的状态残留。
+pub fn context_menu_for(
+  content : Node,
+  items : Array[(String, () -> Unit)],
+) -> Node {
+  {
+    mount: fn(parent) {
+      let wrap = themed_container(style_str=[("flexDirection", "column")])
+      ignore((content.mount)(ViewLike::view(wrap)))
+      ViewLike::on_mouse_down(wrap, fn(e) {
+        if e.button == 2 {
+          let menu = Menu::new()
+          for it in items {
+            if it.0 == "-" {
+              ignore(menu.add_separator())
+            } else {
+              let (label, cb) = it
+              let mi = menu.add_label_item(label)
+              mi.on_click(cb)
+            }
+          }
+          let sb = ViewLike::get_bounds_in_screen(wrap)
+          menu.popup_at(sb.x + e.view_x, sb.y + e.view_y)
+          true
+        } else {
+          false
+        }
+      })
+      attach(parent, ViewLike::view(wrap))
+      ViewLike::view(wrap)
+    },
+  }
+}
