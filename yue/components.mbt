@@ -76,9 +76,10 @@ fn theme_fill_zebra() -> String { theme_box.t.fill_zebra }
 fn theme_bg_panel() -> String { theme_box.t.bg_panel }
 
 ///|
-/// 焦点环颜色:主色 40% 透明(primary 恒为 #RRGGBB,直接拼 alpha 通道;
-/// 自带 alpha 的自定义 primary 会被追加覆盖,定制主题请用不带 alpha 的主色)。
-fn theme_focus_ring() -> String { theme_primary() + "66" }
+/// 焦点/激活反馈色:中性灰(取 text_secondary),不用主题色——
+/// 主题蓝只用于主要按钮/选中态等强调语义,active 反馈不喧宾夺主。
+/// 焦点环与字段聚焦边框共用。
+fn theme_focus_accent() -> String { theme_text_secondary() }
 
 ///|
 /// 组件库自绘容器:Container::make + 主题切换时自动重绘
@@ -244,7 +245,7 @@ pub fn on_theme_change(f : () -> Unit) -> Unit {
 fn apply_native_theme_css(t : Theme) -> Unit {
   let buf = StringBuilder()
   buf.write_string("label { color: \{t.text_primary}; }")
-  buf.write_string("entry { color: \{t.text_primary}; caret-color: \{t.primary}; background-color: \{t.bg_panel}; background-image: none; outline-width: 0px; }")
+  buf.write_string("entry { color: \{t.text_primary}; caret-color: \{t.text_primary}; background-color: \{t.bg_panel}; background-image: none; outline-width: 0px; }")
   buf.write_string("entry:not(.yue-borderless) { border: 1px solid \{t.border}; }")
   buf.write_string("entry undershoot { background: none; }")
   buf.write_string("entry selection { background-color: \{t.primary_light}; color: \{t.text_primary}; }")
@@ -317,7 +318,7 @@ fn type_light_color(t : SemanticType) -> String {
 ///|
 /// 焦点环:单层 1px 淡主色描边(默认 40% 透明,不喧宾夺主;
 /// 需在深色实底上使用时可传实底友好的颜色,如白色)。
-fn draw_focus_ring(p : Painter, w : Double, h : Double, color? : String = theme_focus_ring()) -> Unit {
+fn draw_focus_ring(p : Painter, w : Double, h : Double, color? : String = theme_focus_accent()) -> Unit {
   p.set_stroke_color(color)
   p.stroke_rect(0.5, 0.5, w - 1.0, h - 1.0)
 }
@@ -2109,7 +2110,7 @@ pub fn input_t(
       outer.on_draw(fn(p) {
         let b = outer.get_bounds()
         p.set_stroke_color(
-          if focused.val { theme_primary() } else { theme_border() },
+          if focused.val { theme_focus_accent() } else { theme_border() },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         if clearable && hover.val && has_text.val {
@@ -3081,7 +3082,7 @@ pub fn date_picker_t(
       field.on_draw(fn(p) {
         let b = field.get_bounds()
         p.set_stroke_color(
-          if focused.val { theme_primary() } else { theme_border() },
+          if focused.val { theme_focus_accent() } else { theme_border() },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         let probe = AttributedText::new(text.val, wrap=false)
@@ -4198,7 +4199,7 @@ pub fn textarea_t(
       outer.on_draw(fn(p) {
         let b = outer.get_bounds()
         p.set_stroke_color(
-          if focused.val { theme_primary() } else { theme_border() },
+          if focused.val { theme_focus_accent() } else { theme_border() },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         if clearable && hover.val && has_text.val {
@@ -4582,7 +4583,7 @@ pub fn select_t(
       field.on_draw(fn(p) {
         let b = field.get_bounds()
         p.set_stroke_color(
-          if focused.val { theme_primary() } else { theme_border() },
+          if focused.val { theme_focus_accent() } else { theme_border() },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         p.draw_text(
@@ -4895,7 +4896,7 @@ pub fn dropdown_menu(
           p.fill_rect(0.0, 0.0, b.width, b.height)
         }
         p.set_stroke_color(
-          if focused.val { theme_primary() } else { theme_border() },
+          if focused.val { theme_focus_accent() } else { theme_border() },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         p.draw_text(
@@ -5214,7 +5215,7 @@ pub fn color_picker_t(
       field.on_draw(fn(p) {
         let b = field.get_bounds()
         p.set_stroke_color(
-          if focused.val { theme_primary() } else { theme_border() },
+          if focused.val { theme_focus_accent() } else { theme_border() },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         // 当前色块
