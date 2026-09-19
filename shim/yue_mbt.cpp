@@ -723,7 +723,7 @@ void yue_mbt_button_on_click(void *button, void (*invoke)(void *), void *closure
  * min-height 的写法(class 作用域与 * 通配实测均无效,G_MAXUINT 优先级
  * 亦然);归零后自然高度≈文字行高,尺寸完全由容器分配决定,与主题无关。
  * 宽度另有 GTK 硬编码 150px 下限,CSS 压不过,由 width_chars 参数绕过。 */
-void yue_mbt_entry_normalize_metrics(void) {
+static void yue_mbt_entry_normalize_metrics(void) {
   static GtkCssProvider *provider = nullptr;
   if (provider == nullptr && gdk_screen_get_default() != nullptr) {
     yue_mbt_apply_native_theme_css(nullptr); // 默认浅色接管
@@ -765,7 +765,11 @@ static const char *kDefaultNativeColors =
     "  border: none; box-shadow: none; }"
     "decoration { border: none; box-shadow: none; }";
 
+#endif
+
 void yue_mbt_apply_native_theme_css(const char *css) {
+#if defined(OS_LINUX)
+
   // 无显示(纯 MoonBit 测试等)时 screen 为 NULL,直接跳过:接管本就
   // 依赖屏幕,此处不注册也不影响有显示时的后续注册
   GdkScreen *screen = gdk_screen_get_default();
@@ -792,8 +796,9 @@ void yue_mbt_apply_native_theme_css(const char *css) {
   gtk_css_provider_load_from_data(
       g_native_color_provider,
       css != nullptr ? css : kDefaultNativeColors, -1, nullptr);
-}
 #endif
+}
+
 
 /* 设置光标位置(index 负值=末尾,-1 默认;仅 Linux):GtkEntry 溢出滚动
  * 按像素裁切,左缘余量随光标位置在 0~一个字宽间变化(观感为"内边距
