@@ -179,25 +179,25 @@ pub fn Container::child_count(self : Container) -> Int {
 ///|
 /// 当前滚动位置 X。
 pub fn Scroll::get_scroll_position_x(self : Scroll) -> Double {
-  ffi_scroll_get_position_x(ViewLike::view(self, ))
+  ffi_scroll_get_position_x(ViewLike::view(self))
 }
 
 ///|
 /// 当前滚动位置 Y。
 pub fn Scroll::get_scroll_position_y(self : Scroll) -> Double {
-  ffi_scroll_get_position_y(ViewLike::view(self, ))
+  ffi_scroll_get_position_y(ViewLike::view(self))
 }
 
 ///|
 /// 最大滚动位置 X。
 pub fn Scroll::get_max_scroll_position_x(self : Scroll) -> Double {
-  ffi_scroll_get_max_position_x(ViewLike::view(self, ))
+  ffi_scroll_get_max_position_x(ViewLike::view(self))
 }
 
 ///|
 /// 最大滚动位置 Y。
 pub fn Scroll::get_max_scroll_position_y(self : Scroll) -> Double {
-  ffi_scroll_get_max_position_y(ViewLike::view(self, ))
+  ffi_scroll_get_max_position_y(ViewLike::view(self))
 }
 
 ///|
@@ -205,7 +205,7 @@ pub fn Scroll::get_max_scroll_position_y(self : Scroll) -> Double {
 pub fn Scroll::on_scroll(self : Scroll, callback : () -> Bool) -> Unit {
   let wrapped : () -> Int = fn() { if callback() { 1 } else { 0 } }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_scroll_on_scroll(ViewLike::view(self, ), fn(f : () -> Int) -> Int { f() }, wrapped)
+  ffi_scroll_on_scroll(ViewLike::view(self), fn(f : () -> Int) -> Int { f() }, wrapped)
 }
 
 ///|
@@ -285,31 +285,31 @@ pub fn Clipboard::on_change(self : Clipboard, callback : () -> Unit) -> Unit {
 ///|
 /// 启用多选(Linux/Windows)。
 pub fn Table::enable_multiple_selection(self : Table, enable : Bool) -> Unit {
-  ffi_table_enable_multiple_selection(ViewLike::view(self, ), if enable { 1 } else { 0 })
+  ffi_table_enable_multiple_selection(ViewLike::view(self), if enable { 1 } else { 0 })
 }
 
 ///|
 /// 编程选中一行。
 pub fn Table::select_row(self : Table, row : Int) -> Unit {
-  ffi_table_select_row(ViewLike::view(self, ), row)
+  ffi_table_select_row(ViewLike::view(self), row)
 }
 
 ///|
 /// 当前选中行(无选中返回 -1)。
 pub fn Table::get_selected_row(self : Table) -> Int {
-  ffi_table_get_selected_row(ViewLike::view(self, ))
+  ffi_table_get_selected_row(ViewLike::view(self))
 }
 
 ///|
 /// 模型刷新:插入行后调用,同步视图。
 pub fn Table::notify_row_insertion(self : Table, row : Int) -> Unit {
-  ignore(ffi_table_notify_row_insertion(ViewLike::view(self, ), row))
+  ignore(ffi_table_notify_row_insertion(ViewLike::view(self), row))
 }
 
 ///|
 /// 模型刷新:删除行后调用,同步视图。
 pub fn Table::notify_row_deletion(self : Table, row : Int) -> Unit {
-  ignore(ffi_table_notify_row_deletion(ViewLike::view(self, ), row))
+  ignore(ffi_table_notify_row_deletion(ViewLike::view(self), row))
 }
 
 ///|
@@ -319,7 +319,7 @@ pub fn Table::notify_value_change(
   column : Int,
   row : Int,
 ) -> Unit {
-  ignore(ffi_table_notify_value_change(ViewLike::view(self, ), column, row))
+  ignore(ffi_table_notify_value_change(ViewLike::view(self), column, row))
 }
 
 ///|
@@ -485,25 +485,25 @@ pub fn get_app_id() -> String {
 ///|
 /// 设置 GIF 动画开关。
 pub fn GifPlayer::set_animating(self : GifPlayer, animating : Bool) -> Unit {
-  ffi_gif_player_set_animating(ViewLike::view(self, ), if animating { 1 } else { 0 })
+  ffi_gif_player_set_animating(ViewLike::view(self), if animating { 1 } else { 0 })
 }
 
 ///|
 /// GIF 是否处于动画状态。
 pub fn GifPlayer::is_animating(self : GifPlayer) -> Bool {
-  ffi_gif_player_is_animating(ViewLike::view(self, )) == 1
+  ffi_gif_player_is_animating(ViewLike::view(self)) == 1
 }
 
 ///|
 /// GIF 是否在播放。
 pub fn GifPlayer::is_playing(self : GifPlayer) -> Bool {
-  ffi_gif_player_is_playing(ViewLike::view(self, )) == 1
+  ffi_gif_player_is_playing(ViewLike::view(self)) == 1
 }
 
 ///|
 /// 停止 GIF 动画定时器。
 pub fn GifPlayer::stop_animation_timer(self : GifPlayer) -> Unit {
-  ffi_gif_player_stop_animation_timer(ViewLike::view(self, ))
+  ffi_gif_player_stop_animation_timer(ViewLike::view(self))
 }
 
 ///|
