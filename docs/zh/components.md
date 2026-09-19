@@ -545,13 +545,13 @@ pop.show_relative_to(anchor_view)
 | on_size_changed | 尺寸变化 |
 | set_capture(b) / release_capture() / has_capture() | 鼠标捕获 |
 | set_style(k, v) / set_style_str(k, v) | 布局样式 |
-| 拖拽注册与拖放回调 | 拖放（见 examples/drag_source、drag_destination） |
+| 拖拽注册与拖放回调 | 拖放（接收方必须注册 handle_drag_update 返回允许的操作位，缺省一律拒绝；演示见 components「窗口与网页」页） |
 
 事件载荷字段：
 
 | 结构 | 字段 |
 |---|---|
-| MouseEvent | kind、button（1=左 2=右 3=中）、view_x/view_y（相对视图）、window_x/window_y（相对窗口）、modifiers、timestamp |
+| MouseEvent | kind、button（1=左 2=右 3=中）、view_x/view_y（相对视图）、window_x/window_y（相对窗口）、screen_x/screen_y（屏幕全局坐标，右键菜单等按事件位置弹出直接用）、modifiers、timestamp |
 | KeyEvent | kind、code（VKEY_* 常量）、modifiers、timestamp |
 
 `modifiers` 位：1=Shift 2=Ctrl 4=Alt 8=Meta；`KeyEvent::describe()` 输出

@@ -402,6 +402,9 @@ impl ViewLike with fn do_drag_file_paths(
 }
 
 ///|
+/// 拖拽进入视图。返回 DRAG_OPERATION_* 操作位；接收方必须同时注册
+/// handle_drag_update——平台 drag-motion 每次移动都按其返回值决定
+/// 接收与否，缺省一律拒绝（光标显示禁止，drop 永不发生）。
 impl ViewLike with fn handle_drag_enter(
   self,
   callback : (DraggingInfo, Double, Double) -> Int,
@@ -415,6 +418,8 @@ impl ViewLike with fn handle_drag_enter(
 }
 
 ///|
+/// 拖拽在视图内移动（决定能否接收的回调）：返回允许的操作位
+/// （DRAG_OPERATION_* 组合），返回 0 拒绝本次拖放。
 impl ViewLike with fn handle_drag_update(
   self,
   callback : (DraggingInfo, Double, Double) -> Int,
@@ -428,6 +433,7 @@ impl ViewLike with fn handle_drag_update(
 }
 
 ///|
+/// 拖放落下：返回 true 表示已处理（否则平台按默认行为继续冒泡/回滚）。
 impl ViewLike with fn handle_drop(
   self,
   callback : (DraggingInfo, Double, Double) -> Bool,

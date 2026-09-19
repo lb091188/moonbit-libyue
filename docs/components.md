@@ -545,13 +545,13 @@ All widgets (`ViewLike`) support:
 | on_size_changed | Size changes |
 | set_capture(b) / release_capture() / has_capture() | Mouse capture |
 | set_style(k, v) / set_style_str(k, v) | Layout styles |
-| Drag registration and drop callbacks | Drag and drop (see examples/drag_source, drag_destination) |
+| Drag registration and drop callbacks | Drag and drop (receivers must also register handle_drag_update returning allowed operations; without it every drag is rejected; demo in the components example, "Windows & Web" page) |
 
 Event payload fields:
 
 | Struct | Fields |
 |---|---|
-| MouseEvent | kind, button (1=left 2=right 3=middle), view_x/view_y (relative to view), window_x/window_y (relative to window), modifiers, timestamp |
+| MouseEvent | kind, button (1=left 2=right 3=middle), view_x/view_y (relative to view), window_x/window_y (relative to window), screen_x/screen_y (global screen coordinates, use directly for event-position popups like context menus), modifiers, timestamp |
 | KeyEvent | kind, code (VKEY_* constants), modifiers, timestamp |
 
 `modifiers` bits: 1=Shift 2=Ctrl 4=Alt 8=Meta; `KeyEvent::describe()` outputs
