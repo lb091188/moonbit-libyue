@@ -119,10 +119,13 @@ fn[T : ViewLike] bind_bg(v : T, color_of : () -> String) -> Unit {
 
 ///|
 /// 前景(文字)色绑定:挂载即设 color_of() + 主题切换重设。
-/// 用于挂载期 set_color 定死的文字(Label);主题切换时按表达式重取。
-fn[T : ViewLike] bind_fg(v : T, color_of : () -> String) -> Unit {
+/// 用于挂载期 set_color 定死的文字;主题切换时按表达式重取。
+/// set_color 后必须同文 set_text 一次:set_color 改的 Pango 前景属性
+/// 不触发布局缓存失效,不同文重排则重绘仍用旧色(点击路径实测)。
+fn bind_fg(v : Label, color_of : () -> String) -> Unit {
   fn apply() -> Unit {
     v.set_color(color_of())
+    v.set_text(v.get_text())
   }
 
   apply()
@@ -296,8 +299,10 @@ pub fn theme_apply(t : Theme) -> Unit {
     apply_native_theme_css(t)
     // 整体重绘兜底推迟一拍:按钮点击等输入事件回调里同步
     // process_updates 会被 GTK 吞掉(定时器路径实测有效、点击路径实测
-    // 无效),脱离触发上下文后再逐窗口同步重绘
+    // 无效),脱离触发上下文后再逐窗口同步重绘;连刷两拍,第二拍兜住
+    // 第一拍漏掉的子窗口
     post_task(fn() { ffi_repaint_all() })
+    post_delayed_task(60, fn() { ffi_repaint_all() })
   }
 }
 
@@ -870,6 +875,7 @@ pub fn card(
       ])
       fn apply_title_color() -> Unit {
         title_at.set_color(theme_text_primary())
+        title_at.set_text(title_at.get_text())
         title.schedule_paint()
       }
 
@@ -1304,6 +1310,7 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
         let title = Label::new(entry.0)
         fn apply_title_color() -> Unit {
           title.set_color(theme_text_primary())
+          title.set_text(title.get_text())
         }
 
         apply_title_color()
@@ -1388,6 +1395,7 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
         let title = Label::new(entry.0)
         fn apply_title_color() -> Unit {
           title.set_color(theme_text_primary())
+          title.set_text(title.get_text())
         }
 
         apply_title_color()
@@ -1651,6 +1659,9 @@ pub fn label_t(
       l.set_font(role_font(role))
       fn apply_color() -> Unit {
         l.set_color(role_color(role))
+        // 同文重写一次:set_color 改的 Pango 前景属性在部分控件上不被
+        // 下次绘制拾取,重排强制生效
+        l.set_text(l.get_text())
       }
 
       apply_color()
@@ -2336,6 +2347,7 @@ pub fn link(text : String, on_click : () -> Unit) -> Node {
       l.set_font(Font::new("Sans", 13.0))
       fn apply_color() -> Unit {
         l.set_color(theme_primary())
+        l.set_text(l.get_text())
       }
 
       apply_color()

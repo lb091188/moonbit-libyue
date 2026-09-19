@@ -74,6 +74,7 @@ pub fn[A] bind_label(
       at.set_font(Font::new("Sans", 13.0))
       fn apply_color() -> Unit {
         at.set_color(theme_text_regular())
+        at.set_text(at.get_text())
         l.schedule_paint()
       }
 
