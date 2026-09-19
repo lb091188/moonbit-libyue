@@ -174,9 +174,9 @@ fn page_canvas() -> @yue.Node {
         ],
         style=[("marginBottom", 8.0)],
       ),
-      @yue.label(
+      @yue.label_t(
         "系统语义色 Text=\{@yue.system_color(@yue.Text)} WindowBackground=\{@yue.system_color(@yue.WindowBackground)} Border=\{@yue.system_color(@yue.Border)}",
-        style_str=[("color", desc_color)],
+        role=@yue.Secondary,
       ),
     ]),
   ])

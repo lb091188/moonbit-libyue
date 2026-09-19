@@ -7,30 +7,19 @@
 // 配色为深色高级变体主题(theme_* 常量)。
 
 ///|
-let title_color : String = "#356AA0"
-
-///|
-let desc_color : String = "#8A9199"
-
-///|
 /// 一段演示:标题 + 一句说明 + 演示区 + 分隔留白。
+/// 标题/说明走 label_t 文字角色(Section / Secondary)。
 fn section(
   title : String,
   desc : String,
   content : Array[@yue.Node],
 ) -> @yue.Node {
-  let t = @yue.label(
-    title,
-    style_str=[("color", title_color)],
-    style=[("marginBottom", 4.0)],
-    handle=fn(l) { l.set_align(@yue.Start) },
-  )
-  let d = @yue.label(
-    desc,
-    style_str=[("color", desc_color)],
-    style=[("marginBottom", 10.0)],
-    handle=fn(l) { l.set_align(@yue.Start) },
-  )
+  let t = @yue.label_t(title, role=@yue.Section, style=[
+    ("marginBottom", 4.0),
+  ])
+  let d = @yue.label_t(desc, role=@yue.Secondary, style=[
+    ("marginBottom", 10.0),
+  ])
   let nodes : Array[@yue.Node] = [t, d]
   for c in content {
     nodes.push(c)
