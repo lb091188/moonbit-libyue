@@ -3167,6 +3167,21 @@ void yue_mbt_popover_close(void *popover) {
 }
 #endif
 
+/* 弹层窗口背景(主题跟随):Windows 替代弹层是独立裸窗口(默认白底,
+ * 应用内的全局接管 CSS 罩不到它),深色主题下白底浅字不可读;显式设
+ * 主题面板色。Linux/macOS 的弹层在应用窗口体系内由接管 CSS 覆盖,
+ * 空操作。 */
+void yue_mbt_popover_set_bg(void *popover, const char *hex) {
+#if defined(OS_WIN)
+  if (auto *win = PopoverStore::get(popover)) {
+    win->SetBackgroundColor(nu::Color(std::string(hex)));
+  }
+#else
+  static_cast<void>(popover);
+  static_cast<void>(hex);
+#endif
+}
+
 #if defined(OS_LINUX)
 void yue_mbt_popover_on_close(void *popover, void (*invoke)(void *), void *closure) {
   if (IsDeepinDesktop()) {

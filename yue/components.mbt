@@ -106,6 +106,19 @@ fn[T : ViewLike] set_panel_bg(v : T) -> Unit {
 }
 
 ///|
+/// 弹层底色跟随主题:Windows 替代弹层是独立裸窗口(默认白底,应用内
+/// 全局接管 CSS 罩不到,深色主题下白底浅字不可读),显式设主题面板色
+/// 并订阅切换重设;其余平台弹层在应用窗口体系内由 CSS 覆盖,空操作。
+fn bind_popover_bg(p : Popover) -> Unit {
+  fn apply() -> Unit {
+    p.set_background_color(theme_bg_panel())
+  }
+
+  apply()
+  on_theme_change(apply)
+}
+
+///|
 /// 底色绑定:挂载即设 color_of() + 主题切换重设(语义浅底/禁用底等
 /// 取自主题色板的静态底色)。
 fn[T : ViewLike] bind_bg(v : T, color_of : () -> String) -> Unit {
@@ -3386,6 +3399,7 @@ pub fn date_picker_t(
             Some(_) => ()
             None => {
               let p = Popover::new()
+              bind_popover_bg(p)
               let (panel, refresh) = build_calendar(today, sel, fn(d) {
                 apply_date(d)
                 p.close()
@@ -4845,6 +4859,7 @@ pub fn select_t(
             Some(_) => ()
             None => {
               let p = Popover::new()
+              bind_popover_bg(p)
               // 高度 = 项数 x 28 + padding 8,上限 300;根容器宽高必须
               // 创建期给定(事后 set_style 会被弹层分配时序吞掉),
               // 公式与 content_size 一致
@@ -5040,6 +5055,7 @@ pub fn popover_t(
         match pop.val {
           None => {
             let p = Popover::new()
+            bind_popover_bg(p)
             let holder = themed_container(
               style=[("width", width), ("height", height)],
             )
@@ -5145,6 +5161,7 @@ pub fn dropdown_menu(
             Some(_) => ()
             None => {
               let p = Popover::new()
+              bind_popover_bg(p)
               // 根容器宽高创建期给定(事后 set_style 会被弹层时序吞掉),
               // 高度 = 项数 x 28 + padding 8,与 content_size 一致
               let list = themed_container(
@@ -5480,6 +5497,7 @@ pub fn color_picker_t(
             Some(_) => ()
             None => {
               let p = Popover::new()
+              bind_popover_bg(p)
               // 色板网格:5 列布局,选中描边 + 白勾
               let swatch = 26.0
               let gap = 6.0

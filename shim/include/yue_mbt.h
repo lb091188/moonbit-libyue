@@ -473,6 +473,9 @@ void yue_mbt_popover_set_content(void *popover, void *content);
 void yue_mbt_popover_set_content_size(void *popover, double w, double h);
 void yue_mbt_popover_show_relative_to(void *popover, void *view);
 void yue_mbt_popover_close(void *popover);
+/* 弹层窗口背景(主题跟随):仅 Windows 替代弹层(独立小窗)有意义,
+ * 其余平台由全局接管 CSS 覆盖。hex 为 #RRGGBB。 */
+void yue_mbt_popover_set_bg(void *popover, const char *hex);
 void yue_mbt_popover_on_close(void *popover, void (*invoke)(void *), void *closure);
 /* 标记弹层放弃键盘焦点(仅 Linux 有实现):accept=0 时弹层出现/点击
  * 均不夺走 X 焦点,供弹层展开期间持续键入的组件(可过滤下拉)使用。 */
