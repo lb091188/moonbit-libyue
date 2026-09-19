@@ -166,12 +166,29 @@ pub fn entry(
 ) -> Node {
   {
     mount: fn(parent) {
+      // Windows 上 height 不直接落到原生控件(文字贴顶),拆成
+      // 「行高控件 + 均分边距」由 entry_vcenter 垂直居中
+      let (make_style, box_height) = if platform() == "windows" {
+        let (h, rest) = take_style_height(style)
+        (rest, h)
+      } else {
+        (style, None)
+      }
       let e = Entry::make(
         text~,
         entry_type=if password { Password } else { Normal },
-        style~,
+        style=make_style,
         style_str~,
       )
+      if platform() == "windows" {
+        // 与 entry_t 一致的字体,保证行高测量与控件实际字体吻合
+        ViewLike::set_font(e, Font::new("Sans", 13.0))
+        match box_height {
+          Some(h) => entry_vcenter(e, h, true)
+          None => entry_vcenter(e, 30.0, true)
+        }
+        bind_entry_theme(e)
+      }
       e.on_activate(fn() { on_enter(e.get_text()) })
       e.on_text_change(fn() { on_input(e.get_text()) })
       handle(e)
@@ -179,6 +196,23 @@ pub fn entry(
       ViewLike::view(e)
     },
   }
+}
+
+///|
+/// 从数值样式表取出 height(重复出现以最后一个为准),返回剩余样式。
+fn take_style_height(
+  style : Array[(String, Double)],
+) -> (Double?, Array[(String, Double)]) {
+  let mut h : Double? = None
+  let rest : Array[(String, Double)] = []
+  for pair in style {
+    if pair.0 == "height" {
+      h = Some(pair.1)
+    } else {
+      rest.push(pair)
+    }
+  }
+  (h, rest)
 }
 
 ///|

@@ -823,6 +823,61 @@ void yue_mbt_entry_set_position(void *entry, int32_t index) {
 #endif
 }
 
+#if defined(OS_WIN)
+#ifndef EM_SETBKCOLOR // 部分 SDK 的 richedit.h 未定义,值 WM_USER+271 稳定
+#define EM_SETBKCOLOR (WM_USER + 271)
+#endif
+#endif
+
+/* 输入框前景/背景色(主题跟随通道):Linux 逐控件 GtkCssProvider(优先级
+ * G_MAXUINT 盖过全局接管 CSS,provider 挂在 widget 上复用,主题反复
+ * 切换不叠层);Windows 原生 RichEdit 不吃 View::SetColor,走
+ * EM_SETBKCOLOR+CHARFORMAT 消息(probe 暗色实验验证过的通道),默认
+ * 格式只影响新文本,既有文本重设一遍按新默认色重排;mac 无通道暂空操作。 */
+void yue_mbt_entry_set_colors(void *entry, const char *fg, const char *bg) {
+  auto *e = CastTo<nu::Entry>(entry);
+  if (e == nullptr || fg == nullptr || bg == nullptr) {
+    return;
+  }
+#if defined(OS_LINUX)
+  GtkWidget *w = GTK_WIDGET(e->GetNative());
+  auto *provider = GTK_CSS_PROVIDER(
+      g_object_get_data(G_OBJECT(w), "yue-entry-colors"));
+  if (provider == nullptr) {
+    provider = gtk_css_provider_new();
+    gtk_style_context_add_provider(
+        gtk_widget_get_style_context(w), GTK_STYLE_PROVIDER(provider),
+        G_MAXUINT);
+    g_object_set_data_full(G_OBJECT(w), "yue-entry-colors", provider,
+                           g_object_unref);
+  }
+  std::string css = std::string("* { color: ") + fg +
+                    "; caret-color: " + fg +
+                    "; background-color: " + bg + "; background-image: none; }";
+  gtk_css_provider_load_from_data(provider, css.c_str(), -1, nullptr);
+#elif defined(OS_WIN)
+  auto *subwin = dynamic_cast<nu::SubwinView *>(e->GetNative());
+  HWND h = subwin != nullptr ? subwin->hwnd() : nullptr;
+  if (h == nullptr) {
+    return;
+  }
+  nu::Color cfg(fg), cbg(bg);
+  ::SendMessageW(h, EM_SETBKCOLOR, 0,
+                 static_cast<LPARAM>(cbg.ToCOLORREF()));
+  CHARFORMAT2W cf{};
+  cf.cbSize = sizeof(cf);
+  cf.dwMask = CFM_COLOR;
+  cf.dwEffects &= ~CFE_AUTOCOLOR; // 清自动色,启用 crTextColor
+  cf.crTextColor = cfg.ToCOLORREF();
+  ::SendMessageW(h, EM_SETCHARFORMAT, SCF_DEFAULT,
+                 reinterpret_cast<LPARAM>(&cf));
+  std::string text = e->GetText();
+  if (!text.empty()) {
+    e->SetText(text);
+  }
+#endif
+}
+
 /* width_chars:可见字符数,-1 用 GTK 默认;仅 Linux 有意义(构造期钉住
  * 首选宽度,运行期再改不生效,见上),其余平台忽略。 */
 void *yue_mbt_entry_new_ex(int32_t type, int32_t width_chars) {
