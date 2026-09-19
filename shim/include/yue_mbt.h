@@ -18,6 +18,7 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
+#include <string>
 extern "C" {
 #endif
 
@@ -74,6 +75,7 @@ void yue_mbt_container_on_draw(void *container,
 /* ---------- Label ---------- */
 
 void *yue_mbt_label_new(const char *text);
+void *yue_mbt_label_get_text(void *label);
 void yue_mbt_label_set_text(void *label, const char *text);
 
 /* ---------- TextEdit ---------- */

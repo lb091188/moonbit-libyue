@@ -541,6 +541,13 @@ void *yue_mbt_label_new(const char *text) {
   return reinterpret_cast<void *>(ViewStore::put(new nu::Label(text)));
 }
 
+void *yue_mbt_label_get_text(void *label) {
+  if (auto *l = CastTo<nu::Label>(label)) {
+    return BytesFromString(l->GetText());
+  }
+  return moonbit_make_bytes(0, 0);
+}
+
 void yue_mbt_label_set_text(void *label, const char *text) {
   if (auto *l = CastTo<nu::Label>(label)) {
     l->SetText(text);
@@ -4209,16 +4216,26 @@ void yue_mbt_on_system_theme_change(void (*invoke)(void *), void *closure) {
 #endif
 }
 
-/* 全窗口整体重绘(仅 Linux):主题切换兜底——对每个可见顶层窗口
- * queue_draw 一次(GDK 按窗口无效化区域重绘,覆盖整棵子树),杀死
- * 「draw 现取色但停留在旧帧」的残留。 */
+static void yue_mbt_repaint_walk(GtkWidget *widget, gpointer) {
+  gtk_widget_queue_draw(widget);
+  if (GdkWindow *gw = gtk_widget_get_window(widget)) {
+    gdk_window_invalidate_rect(gw, nullptr, TRUE);
+    // 立即同步走完 expose→draw→flush,不等帧时钟
+    gdk_window_process_updates(gw, TRUE);
+  }
+  if (GTK_IS_CONTAINER(widget)) {
+    gtk_container_foreach(GTK_CONTAINER(widget), yue_mbt_repaint_walk,
+                          nullptr);
+  }
+}
+
 void yue_mbt_repaint_all(void) {
 #if defined(OS_LINUX)
   GList *toplevels = gtk_window_list_toplevels();
   for (GList *l = toplevels; l != nullptr; l = l->next) {
     if (gtk_widget_is_toplevel(GTK_WIDGET(l->data)) &&
         gtk_widget_get_visible(GTK_WIDGET(l->data))) {
-      gtk_widget_queue_draw(GTK_WIDGET(l->data));
+      yue_mbt_repaint_walk(GTK_WIDGET(l->data), nullptr);
     }
   }
   g_list_free(toplevels);
