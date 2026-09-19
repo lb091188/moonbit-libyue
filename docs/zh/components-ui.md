@@ -31,10 +31,10 @@ let t = @yue.default_theme()
 | `button_t(text, on_click?, variant?)` | `Solid` / `Soft` / `Text` / `Danger` | 自绘按钮,hover 收敛在主题内(Solid/Danger 加深、Soft 变实底白字、Text 浅灰底) |
 | `label_t(text, role?, style?, style_str?, handle?)` | `Title` / `Section` / `Body` / `Secondary` / `Accent` | 字号颜色随角色,左对齐,可叠加布局样式与句柄回调 |
 | `entry_t(text?, password?, on_input?)` | 普通 / 密码 | 仅统一字体(GTK Entry `SetColor` 会整体染黑,见 adaptation.md) |
-| `input_t(text?, password?, margin?, width?, height?, clearable?)` | 直角边框 / 密码 / 可清空 | 外层自绘 1px 边框(聚焦变主题色),内部 Entry 经 `set_borderless` 去原生边框与内阴影;clearable=true 悬停且非空时右侧 ✕ 点击清空 |
+| `input_t(text?, password?, margin?, width?, height?, clearable?, on_input?, invalid?)` | 直角边框 / 密码 / 可清空 / 校验红框 | 外层自绘 1px 边框(聚焦变主题色),内部 Entry 经 `set_borderless` 去原生边框与内阴影;clearable=true 悬停且非空时右侧 ✕ 点击清空;on_input 文本变化回调;invalid 传 Store[Bool] 边框变 danger 红(轻量表单校验) |
 | `checkbox_t(title, checked?, disabled?, on_change?)` | 正常 / 禁用 | 自绘直角勾选框:选中实心主题色 + 白勾,hover 边框变主题色 |
 | `date_picker_t(value? : Store[DateYMD?], on_change?, width?, placeholder?, clearable?)` | 日期选择(EP 样式,全自绘):输入框样式字段,点击弹出 `calendar_t` 日历面板(Popover 承载),‹/› 切月,点选回填并收起,失焦收起;clearable=true 悬停且有值时 ✕ 清空(不触发 on_change) |
-| `textarea_t(text?, width?, height?, margin?, on_input?, clearable?)` | 多行输入:外层自绘边框(聚焦变主题色)+ 8px 内边距,内部 TextEdit 去原生边框,内容超出按平台自身滚动;clearable=true 悬停且非空时右侧 ✕ 清空(on_input 收空串) |
+| `textarea_t(text?, width?, height?, margin?, on_input?, clearable?, invalid?)` | 多行输入:外层自绘边框(聚焦变主题色)+ 8px 内边距,内部 TextEdit 去原生边框,内容超出按平台自身滚动;clearable=true 悬停且非空时右侧 ✕ 清空(on_input 收空串);invalid 同 input_t 校验红框 |
 | `divider(vertical?, spacing?)` | 分隔线:水平(默认)/竖直,1px 主题边框色,spacing 为两侧留白 |
 | `icon(kind, size?, color?)` | 内置矢量图标展示:37 种(箭头/编辑/媒体/状态等,`all_icons()` 取全清单、`icon_name()` 取名),默认主题常规色,传 color 固定色;`draw_icon(p, kind, cx, cy, s, color)` 为统一自绘入口 |
 | `icon_button_t(kind, on_click?, size?, tip?)` | 方形图标按钮:hover 浅灰底 + 文字色提亮,Enter/Space 触发;tip 非空挂悬浮提示;marginRight 6 便于工具栏排列 |

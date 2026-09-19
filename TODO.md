@@ -85,6 +85,7 @@
 - [x] Splitter 可拖动分隔 — hsplit/vsplit:6px 把手 + set_capture 拖动 + flexbasis 改写 + min 钳制(演示板「导航组件」页左树右栏/上下分栏;拖动手感待真机复验)
 - [x] Dialog 应用内对话框 — dialog_t:同窗遮罩+居中面板(标题/内容/按钮区),Store[Bool] 驱动,回调后自动收起(演示板「反馈组件」页两个形态,挂窗口根盖全窗;遮罩点击/面板观感待真机复验)
 - [x] Toast 轻提示 — toast_layer:层+推送函数,语义提示条顶部居中堆叠、定时自动移除(演示板「反馈组件」页四语义;层不拦截下方点击待真机复验)
+- [x] 表单校验(轻量版) — input_t/textarea_t 增 invalid Store(边框红)+ on_input;form_item 增 error Store(下方红字,行高固定防跳)(演示板「表单组件」页提交校验;不引入 rules 引擎,提交回调跑规则即可)
 - [x] 单选与开关:radio_group / switch_t
 - [x] 导航:side_menu / segmented / breadcrumb / pagination / steps
 - [x] 数据展示:tag / avatar / badge / statistic / descriptions / timeline / collapse / card / code_view / progress_line
