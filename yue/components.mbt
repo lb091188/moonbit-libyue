@@ -3700,7 +3700,13 @@ fn build_time_panel(
   let (row1, sync1) = build_time_row("起", start_hm, mute, on_change)
   let (row2, sync2) = build_time_row("止", end_hm, mute, on_change)
   let panel = themed_container(
-    style=[("padding", 8.0), ("width", 268.0)],
+    style=[
+      // 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然
+      // 高度,漏显式高度会把两行压塌(高 = 上下 padding 16 + 两行 x 36)
+      ("padding", 8.0),
+      ("width", 268.0),
+      ("height", 16.0 + 2.0 * 36.0),
+    ],
     style_str=[("flexDirection", "column")],
   )
   set_panel_bg(panel)
@@ -3911,7 +3917,8 @@ pub fn time_range_picker_t(
                 on_change(start.val, end.val)
               })
               p.set_content(panel)
-              p.set_content_size(268.0, 96.0)
+              // 高 = 时间面板 88(+4 余量)
+              p.set_content_size(268.0, 92.0)
               pop.val = Some(p)
             }
           }
@@ -4087,7 +4094,10 @@ pub fn datetime_range_picker_t(
               })
               time_sync.val = sync
               grid_refresh_d.val = refresh
+              // 显式总宽高:PopoverRootView 按 content_size 硬分配,漏显式
+              // 高度会把时间面板/完成行压塌
               let body = themed_container(
+                style=[("width", 268.0), ("height", 258.0 + 1.0 + 88.0 + 32.0)],
                 style_str=[("flexDirection", "column")],
               )
               body.add_child(cal)
@@ -4108,8 +4118,8 @@ pub fn datetime_range_picker_t(
               }).mount_into(done_row.view())
               body.add_child(done_row)
               p.set_content(body)
-              // 高 = 日历 262 + 分隔 1 + 时间两行 ~78 + 完成行 32
-              p.set_content_size(268.0, 376.0)
+              // 高 = 日历面板 258 + 分隔 1 + 时间面板 88 + 完成行 32 = 379(+5 余量)
+              p.set_content_size(268.0, 384.0)
               pop.val = Some(p)
             }
           }
