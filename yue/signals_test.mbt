@@ -8,9 +8,9 @@ test "Signal 源:get/set/update/subscribe" {
   s.subscribe(fn(v) { seen.push(v) })
   inspect(seen.length(), content="0") // 注册不回调
   s.set(2)
-  inspect(seen, content="[2]")
+  debug_inspect(seen, content="[2]")
   s.update(fn(n) { n * 10 })
-  inspect(seen, content="[2, 20]")
+  debug_inspect(seen, content="[2, 20]")
   inspect(s.get(), content="20")
 }
 
@@ -119,7 +119,7 @@ test "Store 与 Signal 互转:共享同一状态" {
   let seen : Array[Int] = []
   back.subscribe(fn(v) { seen.push(v) })
   s.set(12)
-  inspect(seen, content="[12]")
+  debug_inspect(seen, content="[12]")
 }
 
 ///|
@@ -129,7 +129,7 @@ test "Store 语义回归:get/set/update/subscribe/map 与旧实现一致" {
   s.subscribe(fn(v) { seen.push(v) })
   s.set(2)
   s.update(fn(n) { n + 1 })
-  inspect(seen, content="[2, 3]")
+  debug_inspect(seen, content="[2, 3]")
   let derived = s.map(fn(n) { n * 100 })
   inspect(derived.get(), content="300")
   s.set(4)
