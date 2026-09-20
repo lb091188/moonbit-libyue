@@ -13,6 +13,9 @@ fn page_form(app : App) -> @yue.Node {
   let radio_disabled = @yue.Signal::new("选项一")
   let wifi_on = @yue.Signal::new(true)
   let locked = @yue.Signal::new(false)
+  let dr : @yue.Store[@yue.DateRange] = @yue.Store::new({ start: None, end: None })
+  let tr : @yue.Store[@yue.TimeRange] = @yue.Store::new({ start: None, end: None })
+  let dtr : @yue.Store[@yue.DateTimeRange] = @yue.Store::new({ start: None, end: None })
   scroll_page([
     section(
       "Input 输入框",
@@ -77,6 +80,37 @@ fn page_form(app : App) -> @yue.Node {
           style_str=[("alignItems", "center")],
         ),
         @yue.calendar_t(),
+      ],
+    ),
+    section(
+      "区间选择(日期 / 时间 / 日期时间)",
+      "date_range_picker_t:区间日历两段式点选起止(终点早于起点自动对调);time_range_picker_t:起/止时:分步进,步进即改;datetime_range_picker_t:日历选日 + 底部时间步进,「完成」或失焦收起。值经 Store 驱动回显。",
+      [
+        @yue.vbox([
+          @yue.date_range_picker_t(value=dr),
+          @yue.bind_label(dr, fn(r) {
+            match (r.start, r.end) {
+              (Some(s), Some(e)) => "日期区间:\{s.format()} ~ \{e.format()}"
+              (Some(s), None) => "日期区间:\{s.format()} ~ (再点终点日)"
+              _ => "日期区间:未选择"
+            }
+          }),
+          @yue.time_range_picker_t(value=tr),
+          @yue.bind_label(tr, fn(r) {
+            match (r.start, r.end) {
+              (Some(s), Some(e)) => "时间区间:\{s.format()} ~ \{e.format()}"
+              _ => "时间区间:未选择"
+            }
+          }),
+          @yue.datetime_range_picker_t(value=dtr, width=340.0),
+          @yue.bind_label(dtr, fn(r) {
+            match (r.start, r.end) {
+              (Some((sd, st)), Some((ed, et))) =>
+                "日期时间区间:\{sd.format()} \{st.format()} ~ \{ed.format()} \{et.format()}"
+              _ => "日期时间区间:未完成选择"
+            }
+          }),
+        ]),
       ],
     ),
     section(

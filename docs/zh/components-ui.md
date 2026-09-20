@@ -34,6 +34,9 @@ let t = @yue.default_theme()
 | `input_t(text?, password?, margin?, width?, height?, clearable?, on_input?, invalid?)` | 直角边框 / 密码 / 可清空 / 校验红框 | 外层自绘 1px 边框(聚焦变主题色),内部 Entry 经 `set_borderless` 去原生边框与内阴影;clearable=true 悬停且非空时右侧 ✕ 点击清空;on_input 文本变化回调;invalid 传 Store[Bool] 边框变 danger 红(轻量表单校验) |
 | `checkbox_t(title, checked?, disabled?, on_change?)` | 正常 / 禁用 | 自绘直角勾选框:选中实心主题色 + 白勾,hover 边框变主题色 |
 | `date_picker_t(value? : Store[DateYMD?], on_change?, width?, placeholder?, clearable?)` | 日期选择(EP 样式,全自绘):输入框样式字段,点击弹出 `calendar_t` 日历面板(Popover 承载),‹/› 切月,点选回填并收起,失焦收起;clearable=true 悬停且有值时 ✕ 清空(不触发 on_change) |
+| `date_range_picker_t(value? : Store[DateRange], on_change?, width?, placeholder?, clearable?)` | 日期区间(EP DateRange 样式,全自绘):字段显示「起 ~ 止」,弹区间日历——第一次点选起点,第二次点选终点(终点早于起点自动对调)后收起并回调 on_change(起, 止);中间日期浅主题色底,端点实心方块;再点字段重新开始新区间 |
+| `time_range_picker_t(value? : Store[TimeRange], on_change?, width?, placeholder?, clearable?)` | 时间区间:字段显示「起:止」时:分,弹起/止两行步进编辑器(时 0-23 / 分 0-59,input_number 承载),步进即改即回调;起止默认 00:00 |
+| `datetime_range_picker_t(value? : Store[DateTimeRange], on_change?, width?, placeholder?, clearable?)` | 日期时间区间:弹层 = 区间日历 + 分隔线 + 起/止两行时间步进 + 「完成」按钮;日期两段式选完或时间步进后区间完整即回调 on_change(起日, 起时, 止日, 止时);值类型 `DateTimeRange{ start : (DateYMD, TimeHM)?, end : (DateYMD, TimeHM)? }` |
 | `textarea_t(text?, width?, height?, margin?, on_input?, clearable?, invalid?)` | 多行输入:外层自绘边框(聚焦变主题色)+ 8px 内边距,内部 TextEdit 去原生边框,内容超出按平台自身滚动;clearable=true 悬停且非空时右侧 ✕ 清空(on_input 收空串);invalid 同 input_t 校验红框 |
 | `divider(vertical?, spacing?)` | 分隔线:水平(默认)/竖直,1px 主题边框色,spacing 为两侧留白 |
 | `icon(kind, size?, color?)` | 内置矢量图标展示:37 种(箭头/编辑/媒体/状态等,`all_icons()` 取全清单、`icon_name()` 取名),默认主题常规色,传 color 固定色;`draw_icon(p, kind, cx, cy, s, color)` 为统一自绘入口 |
