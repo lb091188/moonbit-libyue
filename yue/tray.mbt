@@ -81,14 +81,28 @@ pub fn Tray::set_title(self : Tray, title : String) -> Unit {
 
 ///|
 /// 更换托盘图标（图片文件）。
-/// Linux SNI 后端暂不支持 PNG 像素解码，此调用为空操作（保持现有图标）。
+/// Linux SNI 后端经 shim 解码像素后以 IconPixmap 直供面板（仅 Linux）；
+/// 其余平台 SNI 无解码通道时为空操作（保持现有图标）。
 pub fn Tray::set_icon(self : Tray, icon_path : String) -> Unit {
   match self.backend {
     Native(t) => {
       let image = ffi_image_new_from_file(utf8_bytes(icon_path))
       ffi_tray_set_image(t, image)
     }
-    Sni(_) => ()
+    Sni(item) => {
+      let image = ffi_image_new_from_file(utf8_bytes(icon_path))
+      if ffi_image_is_empty(image) == 0 {
+        let w = ffi_image_get_width(image).to_int()
+        let h = ffi_image_get_height(image).to_int()
+        if w > 0 && h > 0 {
+          let buf = Bytes::make(w * h * 4, 0)
+          if ffi_image_read_argb32(image, buf) == 1 {
+            item.set_pixmap(w, h, buf)
+            item.emit_new_icon()
+          }
+        }
+      }
+    }
   }
 }
 

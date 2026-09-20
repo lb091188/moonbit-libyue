@@ -1853,6 +1853,11 @@ extern "c" fn ffi_image_write_to_file(
 ) -> Int = "yue_mbt_image_write_to_file"
 
 ///|
+/// 读 Image 当前帧像素为 SNI IconPixmap 的 ARGB32 大端序;dst 须按 w*h*4 预分配。
+#borrow(image, dst)
+extern "c" fn ffi_image_read_argb32(image : Image, dst : Bytes) -> Int = "yue_mbt_image_read_argb32"
+
+///|
 extern "c" fn ffi_gif_player_set_scale(player : View, scale : Int) -> Unit = "yue_mbt_gif_player_set_scale"
 
 ///|

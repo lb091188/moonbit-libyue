@@ -1812,6 +1812,44 @@ int32_t yue_mbt_image_write_to_file(void *image, const char *format, const char 
 #endif
 }
 
+/* 读 Image 当前帧像素,写入调用方缓冲,格式为 SNI IconPixmap 要求的
+ * ARGB32 大端序(每像素 4 字节按 A,R,G,B 排列,无行距补齐)。
+ * dst 须由调用方按 width*height*4 预分配;成功返回 1,空图/失败返回 0。 */
+extern "C" int32_t yue_mbt_image_read_argb32(void *image, uint8_t *dst) {
+#if defined(OS_LINUX)
+  auto *i = ImageStore::get(image);
+  if (!i || i->IsEmpty())
+    return 0;
+  GdkPixbufAnimation *anim = i->GetNative();
+  if (!anim)
+    return 0;
+  GdkPixbuf *pb = gdk_pixbuf_animation_get_static_image(anim);
+  if (!pb)
+    return 0;
+  const int width = gdk_pixbuf_get_width(pb);
+  const int height = gdk_pixbuf_get_height(pb);
+  const int channels = gdk_pixbuf_get_n_channels(pb); // 3=RGB 4=RGBA
+  const int rowstride = gdk_pixbuf_get_rowstride(pb);
+  const uint8_t *src = gdk_pixbuf_get_pixels(pb);
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+      const uint8_t *p = src + static_cast<size_t>(y) * rowstride +
+                         static_cast<size_t>(x) * channels;
+      uint8_t *q = dst + (static_cast<size_t>(y) * width + x) * 4;
+      q[0] = channels == 4 ? p[3] : 0xFF;
+      q[1] = p[0];
+      q[2] = p[1];
+      q[3] = p[2];
+    }
+  }
+  return 1;
+#else
+  (void)image;
+  (void)dst;
+  return 0;
+#endif
+}
+
 double yue_mbt_image_get_width(void *image) {
   if (auto *i = ImageStore::get(image)) {
     return i->GetSize().width();

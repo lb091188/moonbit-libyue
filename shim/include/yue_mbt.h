@@ -302,6 +302,8 @@ int32_t yue_mbt_image_is_empty(void *image);
 double yue_mbt_image_get_scale_factor(void *image);
 void *yue_mbt_image_resize(void *image, double w, double h, double scale_factor);
 int32_t yue_mbt_image_write_to_file(void *image, const char *format, const char *path);
+/* 读当前帧像素为 SNI IconPixmap 的 ARGB32 大端序;dst 按 w*h*4 预分配 */
+int32_t yue_mbt_image_read_argb32(void *image, uint8_t *dst);
 double yue_mbt_image_get_width(void *image);
 double yue_mbt_image_get_height(void *image);
 
