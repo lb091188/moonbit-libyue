@@ -1,12 +1,6 @@
 # Component Method Quick Reference
 
-A quick reference of component APIs for moonbit-libyue users. All types are referenced via `@yue`;
-every widget has two usage styles: the **classic per-setter approach** (`X::new` + setters),
-or the **props-style one-shot approach** (`X::make`). Both are semantically identical; `make` is just a bundle of setters.
-
-For the declarative style (`@yue.mount` tree + `Store` binding), see [docs/declarative.md](declarative.md);
-for the full set of layout style keys, see [docs/layout.md](layout.md);
-for the complete record of platform adaptation and upstream defects, see [docs/adaptation.md](adaptation.md).
+For the usage overview (two styles), see [README.md](README.md); all types are referenced via `@yue`.
 
 General conventions:
 
@@ -128,6 +122,7 @@ e.on_activate(fn() { check(e.get_text()) })
 |---|---|---|---|
 | text | String | `""` | Initial text |
 | entry_type | EntryType | Normal | Normal / Password |
+| width_chars | Int | -1 | Initial width (in characters; -1 = no limit) |
 | on_activate | () -> Unit | no-op | Enter callback (no parameter; use get_text to read the text) |
 | on_text_change | () -> Unit | no-op | Content change callback (same as above) |
 
@@ -279,7 +274,7 @@ let sep = @yue.Separator::make(Horizontal)   // or Vertical
 | content | T : ViewLike | required | Content view |
 | content_size | (Double, Double)? | None | Content size; if omitted, the whole page scrolls following the content's natural height |
 | policy | (ScrollPolicy, ScrollPolicy)? | None | Scrollbar policy (horizontal, vertical): Always / Never / Automatic |
-| overlay | Bool | false | Overlay scrollbars |
+| overlay | Bool | true | Overlay scrollbars (floating, no layout space) |
 
 `Separator::make` parameters: `orientation : Orientation = Horizontal` (Horizontal / Vertical).
 
@@ -310,6 +305,37 @@ t.on_selected_page_change(fn() { switch_to(t.get_selected_page_index()) })
 | on_selected_page_change(fn()) | Page switch callback |
 
 Each page's container is the root of an independent yoga subtree; for building pages declaratively, see the `tab` node in [docs/declarative.md](declarative.md).
+
+## Table
+
+```moonbit
+let t = @yue.Table::new()
+t.add_column_text("Name", 120)
+t.add_column_checkbox("Enabled", 60)
+t.set_model(my_model, column_count=2)   // model see below
+```
+
+Column types: `add_column_text(title, width)` / `add_column_edit(title, width)` (edit results are written back to the model via `set_value`) /
+`add_column_checkbox(title, width)` (toggles are written back to the model via `set_value`) /
+`add_column_custom(title, width, draw)` (draw receives the Painter, the cell rect, and the ColorText text/color from the model, drawing each cell by hand). For full column options use `add_column_with_options(title, ColumnOptions)`.
+
+The data model goes through a MoonBit trait bridge; no matter how many rows, values are fetched on demand:
+
+```moonbit
+trait TableModel {
+  fn row_count(Self) -> Int
+  fn get_value(Self, column : Int, row : Int) -> TableValue   // Str / Flag / ColorText
+  fn set_value(Self, column : Int, row : Int, value : TableValue) -> Unit
+}
+```
+
+| Method | Purpose |
+|---|---|
+| set_model(m, column_count) | Attach a data model |
+| on_row_activate(fn(row)) / on_selection_change(fn()) / on_toggle_checkbox(fn(column, row)) | Row activation / selection change / checkbox toggle |
+| enable_multiple_selection(b) / select_row(i) / get_selected_row() | Multiple selection and selected row |
+| set_has_border(b) | Border |
+| notify_row_insertion(i) / notify_row_deletion(i) / notify_value_change(row, col) | The three refresh methods after model changes |
 
 ## Canvas and Images
 
@@ -364,10 +390,29 @@ at.set_color_for("#FF0000", 0, 2)
 | API | Purpose |
 |---|---|
 | AttributedText::new(text, align?, valign?, wrap?, ellipsis?) | Creation |
-| set_font_for(font, start, end) / set_color_for(hex, start, end) | Set attributes per range (degraded on Windows; see "Inherent Pitfalls") |
+| set_font_for(font, start, end) / set_color_for(hex, start, end) | Set attributes per range (consistent across platforms) |
 | set_font(f) / set_color(hex) / set_text / set_format | Whole-text attributes |
 | get_bounds_for(w, h) | Layout bounding box |
 | Font::new(name, size, weight?, style?) | Font |
+
+## Animated Images GifPlayer
+
+```moonbit
+let g = @yue.GifPlayer::make(image=Some(img))
+g.set_animating(true)
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| image | Image? | None | Initial image (GIF animation) |
+| scale | ImageScale | Down | Scale policy: None / Fill / Down / UpOrDown |
+
+| Method | Purpose |
+|---|---|
+| set_image(img) | Replace image |
+| set_scale(s) / get_scale() | Scale policy |
+| set_animating(b) / is_animating() | Play / pause |
+| is_playing() / stop_animation_timer() | Playback state / stop |
 
 ## Browser
 
@@ -383,15 +428,16 @@ let b = @yue.Browser::make(url="https://example.com")   // or html="<h1>本地</
 | Method | Purpose |
 |---|---|
 | load_url(u) / load_html(html, base_url?) | Loading |
-| get_url() / reload() | Current URL / reload |
+| get_url() / get_title() / reload() / stop() | Current URL / page title / reload / stop |
 | go_back() / go_forward() / can_go_back() / can_go_forward() | Navigation |
 | is_loading() | Loading state |
 | set_user_agent(s) | UA |
-| execute_javascript(code) | Execute JS |
+| execute_javascript(code) / execute_javascript_with_result(code, fn(ok, json)) | Execute JS; the latter fetches the result asynchronously (ok=success, json=result JSON text) |
+| add_raw_binding(name, fn(json)) / remove_binding(name) / has_bindings() | JS↔native bindings (when the page calls name(...), it receives JSON argument text) |
 | register_protocol(scheme, fn(url) -> (mime, content)?) | Custom protocol (return None to refuse) |
 | unregister_protocol(scheme) | Unregister protocol |
-| get_cookies_for_url(url, fn(cookies)) | Query cookies (see "Inherent Pitfalls") |
-| on_change_loading / on_update_title / on_commit_navigation / on_finish_navigation | Events |
+| get_cookies_for_url(url, fn(cookies)) | Query cookies |
+| on_change_loading / on_update_title / on_update_command / on_commit_navigation / on_finish_navigation | Events |
 
 For customization options, use `Browser::new_with_options(BrowserOptions)`.
 
@@ -543,7 +589,7 @@ All widgets (`ViewLike`) support:
 | on_mouse_down / up / move / enter / leave | Mouse |
 | on_key_down / up | Keyboard |
 | on_size_changed | Size changes |
-| set_capture(b) / release_capture() / has_capture() | Mouse capture |
+| set_capture() / release_capture() / has_capture() | Mouse capture |
 | set_style(k, v) / set_style_str(k, v) | Layout styles |
 | Drag registration and drop callbacks | Drag and drop (receivers must also register handle_drag_update returning allowed operations; without it every drag is rejected; demo in the components example, "Windows & Web" page) |
 
@@ -564,25 +610,21 @@ see `yue/events.mbt`; for click counting use `ClickTracker` (default 400ms / 5px
 
 Caused by upstream libyue or platform behavior; read before using the corresponding APIs:
 
-1. **`Browser::get_cookies_for_url` may crash**: when the target site has no cookies at all yet,
-   the upstream internal `CHECK(cookies)` hits FATAL directly (verified with libyue 0.15.6). Only call it on sites
-   that are known to already have cookies, or wait for an upstream fix.
-2. **Browser rewrites the window title**: after WebKitGTK loads a page, it syncs the page's `<title>` to
-   the window title and does not restore it after switching tabs. This affects tools that rely on window titles for window management.
-3. **Initial callback for Checkbox/Radio**: a Checkbox/Radio created with `checked=true`
+1. **Browser navigation rewrites the window title (Windows)**: after the WebView2 host control loads a page, it syncs the page's `<title>` to the host window title (no such behavior on Linux/GTK; verified 2026-09-19). Tools that rely on window titles for window management are affected; use `on_update_title` to manage the title display yourself when needed.
+2. **Initial callback for Checkbox/Radio**: a Checkbox/Radio created with `checked=true`
    will **asynchronously receive one callback** after mounting and entering the event loop (GTK toggled signal semantics).
    If callback logic depends on state, check `is_checked()` first, or tolerate this initial notification.
-4. **Radio group switching is a double notification**: when a new item is selected, the deselected old item also receives a callback
+3. **Radio group switching is a double notification**: when a new item is selected, the deselected old item also receives a callback
    (at which point the old item's `is_checked()==false`). Just handle the business based on "the newly selected one".
-5. **Virtual key codes use the GTK table**: `VKEY_ESCAPE = 0xFF1B` (65307), not the Windows
+4. **Virtual key codes use the GTK table**: `VKEY_ESCAPE = 0xFF1B` (65307), not the Windows
    VK value; letters and digits match ASCII. Do not mix the two tables in cross-platform code.
-6. **Style key parsing rules**: only ASCII letters are kept and lowercased, so `flexDirection` /
-   `flex-direction` / `flexdirection` are equivalent; **symbols other than digits and hyphens are dropped**,
+5. **Style key parsing rules**: key names keep only ASCII letters and lowercase them, so `flexDirection` /
+   `flex-direction` / `flexdirection` are equivalent; digits, hyphens and all other symbols are dropped,
    so do not use special characters in key names. See [docs/layout.md](layout.md) for the full key list.
-7. **Callbacks are kept alive automatically, but do not synchronously pump the event loop inside a callback**: closures registered via `on_*` are held
+6. **Callbacks are kept alive automatically, but do not synchronously pump the event loop inside a callback**: closures registered via `on_*` are held
    by the library with strong references; the same applies to `Store` subscriptions. After calling termination flows like `@yue.quit()` inside a callback,
    do not touch widgets anymore.
-8. **Platform-specific APIs not wrapped**: Toolbar / Vibrant (no symbols in the Linux static library),
+7. **Platform-specific APIs not wrapped**: Toolbar / Vibrant (no symbols in the Linux static library),
    Button styles and ControlSize, Scroll bounce, App activation policy, Browser zoom,
    Image template images (macOS), ShortcutOptions / Lifetime::Reply / notification
    COMServerOptions (Windows), etc.; see [docs/adaptation.md](adaptation.md) for the complete list.
