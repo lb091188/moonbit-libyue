@@ -45,6 +45,115 @@ pub(all) enum IconKind {
   Success
   Ellipsis
   Grip
+  // —— 文件/文档 ——
+  FilePlus
+  FolderOpen
+  FolderPlus
+  Clipboard
+  Book
+  Bookmark
+  FileCode
+  // —— 编辑 ——
+  Undo
+  Redo
+  Scissors
+  Paste
+  Bold
+  Italic
+  Underline
+  AlignLeft
+  AlignCenter
+  AlignRight
+  ListUl
+  ListOl
+  Link
+  Unlink
+  ExternalLink
+  // —— 视图 ——
+  ZoomIn
+  ZoomOut
+  Eye
+  EyeOff
+  Sun
+  Moon
+  Grid
+  Layout
+  Sidebar
+  // —— 导航 ——
+  ChevronsLeft
+  ChevronsRight
+  ChevronsUp
+  ChevronsDown
+  SkipBack
+  SkipForward
+  CornerUpLeft
+  CornerUpRight
+  // —— 媒体 ——
+  Square
+  CircleRecord
+  Volume
+  VolumeOff
+  Mic
+  Camera
+  Image
+  Music
+  // —— 通信 ——
+  Mail
+  Send
+  MessageCircle
+  Bell
+  BellOff
+  Phone
+  Rss
+  Globe
+  // —— 系统 ——
+  Power
+  LogOut
+  LogIn
+  Lock
+  Unlock
+  Key
+  Shield
+  Sliders
+  Database
+  Server
+  HardDrive
+  Printer
+  Monitor
+  Smartphone
+  Wifi
+  WifiOff
+  Bluetooth
+  Cpu
+  // —— 开发 ——
+  Terminal
+  Code
+  GitBranch
+  GitCommit
+  GitPullRequest
+  Package
+  Bug
+  Flask
+  Cloud
+  CloudDownload
+  CloudUpload
+  Layers
+  Zap
+  // —— 语义/状态 ——
+  Help
+  Heart
+  Flag
+  Clock
+  Tag
+  Archive
+  Inbox
+  ThumbsUp
+  // —— 数据 ——
+  TrendingUp
+  TrendingDown
+  BarChart
+  PieChart
+  TableRows
 } derive(Eq, Debug)
 
 ///| 整圆弧度(2π,圆/点绘制用)
@@ -86,6 +195,55 @@ fn icon_polygon(p : Painter, points : Array[(Double, Double)]) -> Unit {
   p.close_path()
   p.fill()
 }
+
+///|
+/// 闭合折线:依次连线后闭合并描边(轮廓图标)。
+fn icon_outline(p : Painter, points : Array[(Double, Double)]) -> Unit {
+  p.begin_path()
+  for i, pt in points {
+    if i == 0 {
+      p.move_to(pt.0, pt.1)
+    } else {
+      p.line_to(pt.0, pt.1)
+    }
+  }
+  p.close_path()
+  p.stroke()
+}
+
+///|
+/// 描边圆。
+fn icon_circle(p : Painter, x : Double, y : Double, r : Double) -> Unit {
+  p.begin_path()
+  p.arc(x, y, r, 0.0, ICON_TAU)
+  p.stroke()
+}
+
+///|
+/// 单线段。
+fn icon_line(p : Painter, x0 : Double, y0 : Double, x1 : Double, y1 : Double) -> Unit {
+  p.begin_path()
+  p.move_to(x0, y0)
+  p.line_to(x1, y1)
+  p.stroke()
+}
+
+///|
+/// 描边圆弧(起止角为弧度,canvas 语义:0 = 右,顺时针为正)。
+fn icon_arc(
+  p : Painter,
+  x : Double,
+  y : Double,
+  r : Double,
+  a0 : Double,
+  a1 : Double,
+  ccw? : Bool = false,
+) -> Unit {
+  p.begin_path()
+  p.arc(x, y, r, a0, a1, ccw=ccw)
+  p.stroke()
+}
+
 
 ///|
 /// 统一图标绘制入口:中心 (cx,cy),s 为内容半径,color 为十六进制色。
@@ -356,11 +514,639 @@ pub fn draw_icon(
         icon_dot(p, cx + s * 0.3, cy + s * dy, s * 0.13)
       }
     }
+    // —— 文件/文档(24 网格,u = s/9 为 Tabler 式坐标换算) ——
+    FilePlus => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 5 * u, cy - 9 * u), (cx + u, cy - 9 * u), (cx + 5 * u, cy - 5 * u), (cx + 5 * u, cy + 9 * u), (cx - 5 * u, cy + 9 * u)])
+      icon_polyline(p, [(cx + u, cy - 9 * u), (cx + u, cy - 5 * u), (cx + 5 * u, cy - 5 * u)])
+      icon_line(p, cx, cy + 3 * u, cx, cy + 7 * u)
+      icon_line(p, cx - 2 * u, cy + 5 * u, cx + 2 * u, cy + 5 * u)
+    }
+    FolderOpen => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 9 * u, cy - 6 * u), (cx - 3 * u, cy - 6 * u), (cx - u, cy - 4 * u), (cx + 8 * u, cy - 4 * u), (cx + 8 * u, cy - 1 * u)])
+      icon_outline(p, [(cx - 8.5 * u, cy - 1 * u), (cx + 8.5 * u, cy - 1 * u), (cx + 6.5 * u, cy + 6 * u), (cx - 6.5 * u, cy + 6 * u)])
+    }
+    FolderPlus => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 6 * u), (cx - 3 * u, cy - 6 * u), (cx - u, cy - 4 * u), (cx + 8 * u, cy - 4 * u), (cx + 8 * u, cy + 7 * u), (cx - 8 * u, cy + 7 * u)])
+      icon_line(p, cx, cy + 1 * u, cx, cy + 5 * u)
+      icon_line(p, cx - 2 * u, cy + 3 * u, cx + 2 * u, cy + 3 * u)
+    }
+    Clipboard => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 3 * u, cy - 5 * u), (cx - 6 * u, cy - 5 * u), (cx - 6 * u, cy + 9 * u), (cx + 6 * u, cy + 9 * u), (cx + 6 * u, cy - 5 * u), (cx + 3 * u, cy - 5 * u)])
+      icon_outline(p, [(cx - 3 * u, cy - 8 * u), (cx + 3 * u, cy - 8 * u), (cx + 3 * u, cy - 5 * u), (cx - 3 * u, cy - 5 * u)])
+    }
+    Book => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 7 * u, cy - 8 * u), (cx + 7 * u, cy - 8 * u), (cx + 7 * u, cy + 8 * u), (cx - 7 * u, cy + 8 * u)])
+      icon_line(p, cx - 3.5 * u, cy - 8 * u, cx - 3.5 * u, cy + 8 * u)
+    }
+    Bookmark => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 5 * u, cy - 8 * u), (cx + 5 * u, cy - 8 * u), (cx + 5 * u, cy + 8 * u), (cx, cy + 4 * u), (cx - 5 * u, cy + 8 * u)])
+    }
+    FileCode => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 5 * u, cy - 9 * u), (cx + u, cy - 9 * u), (cx + 5 * u, cy - 5 * u), (cx + 5 * u, cy + 9 * u), (cx - 5 * u, cy + 9 * u)])
+      icon_polyline(p, [(cx + u, cy - 9 * u), (cx + u, cy - 5 * u), (cx + 5 * u, cy - 5 * u)])
+      icon_polyline(p, [(cx - 0.5 * u, cy - 1.5 * u), (cx - 2.5 * u, cy + 0.5 * u), (cx - 0.5 * u, cy + 2.5 * u)])
+      icon_polyline(p, [(cx + 0.5 * u, cy - 1.5 * u), (cx + 2.5 * u, cy + 0.5 * u), (cx + 0.5 * u, cy + 2.5 * u)])
+    }
+    // —— 编辑 ——
+    Undo => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 3 * u, cy + 2 * u), (cx - 7 * u, cy - 2 * u), (cx - 3 * u, cy - 6 * u)])
+      icon_line(p, cx - 7 * u, cy - 2 * u, cx + 4 * u, cy - 2 * u)
+      icon_arc(p, cx + 4 * u, cy + 2 * u, 4 * u, -1.5708, 1.5708)
+    }
+    Redo => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx + 3 * u, cy + 2 * u), (cx + 7 * u, cy - 2 * u), (cx + 3 * u, cy - 6 * u)])
+      icon_line(p, cx + 7 * u, cy - 2 * u, cx - 4 * u, cy - 2 * u)
+      icon_arc(p, cx - 4 * u, cy + 2 * u, 4 * u, 1.5708, -1.5708, ccw=true)
+    }
+    Scissors => {
+      let u = s / 9.0
+      icon_circle(p, cx - 6 * u, cy - 6 * u, 2.2 * u)
+      icon_circle(p, cx - 6 * u, cy + 6 * u, 2.2 * u)
+      icon_line(p, cx - 4.2 * u, cy - 4.7 * u, cx + 8 * u, cy + 8 * u)
+      icon_line(p, cx - 4.2 * u, cy + 4.7 * u, cx + 8 * u, cy - 8 * u)
+      icon_line(p, cx - 4.8 * u, cy - 2 * u, cx - 1 * u, cy + 0.5 * u)
+    }
+    Paste => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 3 * u, cy - 5 * u), (cx - 6 * u, cy - 5 * u), (cx - 6 * u, cy + 9 * u), (cx + 6 * u, cy + 9 * u), (cx + 6 * u, cy - 5 * u), (cx + 3 * u, cy - 5 * u)])
+      icon_outline(p, [(cx - 3 * u, cy - 8 * u), (cx + 3 * u, cy - 8 * u), (cx + 3 * u, cy - 5 * u), (cx - 3 * u, cy - 5 * u)])
+      icon_line(p, cx - 3.5 * u, cy - 1 * u, cx + 3.5 * u, cy - 1 * u)
+      icon_line(p, cx - 3.5 * u, cy + 2 * u, cx + 3.5 * u, cy + 2 * u)
+    }
+    Bold => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 5 * u, cy - 7 * u), (cx + 1 * u, cy - 7 * u), (cx + 1 * u, cy), (cx - 5 * u, cy)])
+      icon_outline(p, [(cx - 5 * u, cy), (cx + 2.5 * u, cy), (cx + 2.5 * u, cy + 7 * u), (cx - 5 * u, cy + 7 * u)])
+      icon_line(p, cx - 5 * u, cy - 7 * u, cx - 5 * u, cy + 7 * u)
+    }
+    Italic => {
+      let u = s / 9.0
+      icon_line(p, cx - 2 * u, cy - 7 * u, cx + 4 * u, cy - 7 * u)
+      icon_line(p, cx - 4 * u, cy + 7 * u, cx + 2 * u, cy + 7 * u)
+      icon_line(p, cx + 2 * u, cy - 7 * u, cx - 2 * u, cy + 7 * u)
+    }
+    Underline => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 5 * u, cy - 8 * u), (cx - 5 * u, cy + 0.5 * u), (cx - 3 * u, cy + 3.5 * u), (cx, cy + 4.5 * u), (cx + 3 * u, cy + 3.5 * u), (cx + 5 * u, cy + 0.5 * u), (cx + 5 * u, cy - 8 * u)])
+      icon_line(p, cx - 6 * u, cy + 8 * u, cx + 6 * u, cy + 8 * u)
+    }
+    AlignLeft => {
+      let u = s / 9.0
+      icon_line(p, cx - 8 * u, cy - 6 * u, cx + 8 * u, cy - 6 * u)
+      icon_line(p, cx - 8 * u, cy, cx + 2 * u, cy)
+      icon_line(p, cx - 8 * u, cy + 6 * u, cx + 5 * u, cy + 6 * u)
+    }
+    AlignCenter => {
+      let u = s / 9.0
+      icon_line(p, cx - 7 * u, cy - 6 * u, cx + 7 * u, cy - 6 * u)
+      icon_line(p, cx - 5 * u, cy, cx + 5 * u, cy)
+      icon_line(p, cx - 8 * u, cy + 6 * u, cx + 8 * u, cy + 6 * u)
+    }
+    AlignRight => {
+      let u = s / 9.0
+      icon_line(p, cx - 8 * u, cy - 6 * u, cx + 8 * u, cy - 6 * u)
+      icon_line(p, cx - 2 * u, cy, cx + 8 * u, cy)
+      icon_line(p, cx - 5 * u, cy + 6 * u, cx + 8 * u, cy + 6 * u)
+    }
+    ListUl => {
+      let u = s / 9.0
+      p.set_fill_color(color)
+      icon_dot(p, cx - 7 * u, cy - 6 * u, 1.1 * u)
+      icon_dot(p, cx - 7 * u, cy, 1.1 * u)
+      icon_dot(p, cx - 7 * u, cy + 6 * u, 1.1 * u)
+      icon_line(p, cx - 3 * u, cy - 6 * u, cx + 8 * u, cy - 6 * u)
+      icon_line(p, cx - 3 * u, cy, cx + 8 * u, cy)
+      icon_line(p, cx - 3 * u, cy + 6 * u, cx + 8 * u, cy + 6 * u)
+    }
+    ListOl => {
+      let u = s / 9.0
+      icon_line(p, cx - 8 * u, cy - 7 * u, cx - 5.5 * u, cy - 7 * u)
+      icon_line(p, cx - 5.5 * u, cy - 7 * u, cx - 5.5 * u, cy - 4.5 * u)
+      icon_line(p, cx - 8 * u, cy - 1 * u, cx - 8.5 * u, cy + 0.5 * u)
+      icon_line(p, cx - 8 * u, cy - 1 * u, cx - 6 * u, cy - 1 * u)
+      icon_line(p, cx - 6 * u, cy - 1 * u, cx - 6 * u, cy + 1.5 * u)
+      icon_line(p, cx - 8 * u, cy + 6 * u, cx - 5.5 * u, cy + 6 * u)
+      icon_line(p, cx - 3 * u, cy - 6 * u, cx + 8 * u, cy - 6 * u)
+      icon_line(p, cx - 3 * u, cy, cx + 8 * u, cy)
+      icon_line(p, cx - 3 * u, cy + 6 * u, cx + 8 * u, cy + 6 * u)
+    }
+    Link => {
+      let u = s / 9.0
+      icon_line(p, cx - 3 * u, cy + 3 * u, cx + 3 * u, cy - 3 * u)
+      icon_outline(p, [(cx - 8 * u, cy - 2 * u), (cx - 4 * u, cy - 6 * u), (cx, cy - 2 * u), (cx - 4 * u, cy + 2 * u)])
+      icon_outline(p, [(cx, cy + 2 * u), (cx + 4 * u, cy - 2 * u), (cx + 8 * u, cy + 2 * u), (cx + 4 * u, cy + 6 * u)])
+    }
+    Unlink => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 9 * u, cy - 3 * u), (cx - 5 * u, cy - 7 * u), (cx - 1 * u, cy - 3 * u), (cx - 5 * u, cy + 1 * u)])
+      icon_outline(p, [(cx + 1 * u, cy + 3 * u), (cx + 5 * u, cy - 1 * u), (cx + 9 * u, cy + 3 * u), (cx + 5 * u, cy + 7 * u)])
+      icon_line(p, cx - 3 * u, cy + 3 * u, cx - 1.5 * u, cy + 1.5 * u)
+      icon_line(p, cx + 1.5 * u, cy - 1.5 * u, cx + 3 * u, cy - 3 * u)
+      icon_line(p, cx - 8 * u, cy + 8 * u, cx - 6 * u, cy + 6 * u)
+      icon_line(p, cx + 6 * u, cy - 6 * u, cx + 8 * u, cy - 8 * u)
+    }
+    ExternalLink => {
+      let u = s / 9.0
+      icon_outline(p, [(cx + 2 * u, cy - 7 * u), (cx - 7 * u, cy - 7 * u), (cx - 7 * u, cy + 7 * u), (cx + 7 * u, cy + 7 * u), (cx + 7 * u, cy - 2 * u)])
+      icon_polyline(p, [(cx + 2 * u, cy - 2 * u), (cx + 7 * u, cy - 7 * u)])
+      icon_line(p, cx + 3.5 * u, cy - 7 * u, cx + 7 * u, cy - 7 * u)
+      icon_line(p, cx + 7 * u, cy - 7 * u, cx + 7 * u, cy - 3.5 * u)
+    }
+    // —— 视图 ——
+    ZoomIn => {
+      let u = s / 9.0
+      icon_circle(p, cx - 2 * u, cy - 2 * u, 6 * u)
+      icon_line(p, cx + 2.5 * u, cy + 2.5 * u, cx + 8 * u, cy + 8 * u)
+      icon_line(p, cx - 4.5 * u, cy - 2 * u, cx + 0.5 * u, cy - 2 * u)
+      icon_line(p, cx - 2 * u, cy - 4.5 * u, cx - 2 * u, cy + 0.5 * u)
+    }
+    ZoomOut => {
+      let u = s / 9.0
+      icon_circle(p, cx - 2 * u, cy - 2 * u, 6 * u)
+      icon_line(p, cx + 2.5 * u, cy + 2.5 * u, cx + 8 * u, cy + 8 * u)
+      icon_line(p, cx - 4.5 * u, cy - 2 * u, cx + 0.5 * u, cy - 2 * u)
+    }
+    Eye => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 9.5 * u, cy), (cx - 6 * u, cy - 4 * u), (cx - 3 * u, cy - 5.5 * u), (cx, cy - 6 * u), (cx + 3 * u, cy - 5.5 * u), (cx + 6 * u, cy - 4 * u), (cx + 9.5 * u, cy)])
+      icon_polyline(p, [(cx - 9.5 * u, cy), (cx - 6 * u, cy + 4 * u), (cx - 3 * u, cy + 5.5 * u), (cx, cy + 6 * u), (cx + 3 * u, cy + 5.5 * u), (cx + 6 * u, cy + 4 * u), (cx + 9.5 * u, cy)])
+      icon_circle(p, cx, cy, 2.8 * u)
+    }
+    EyeOff => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 6 * u, cy - 4 * u), (cx - 3 * u, cy - 5.5 * u), (cx, cy - 6 * u), (cx + 3 * u, cy - 5.5 * u), (cx + 6 * u, cy - 4 * u)])
+      icon_polyline(p, [(cx + 9.5 * u, cy), (cx + 6 * u, cy + 4 * u), (cx + 3 * u, cy + 5.5 * u), (cx, cy + 6 * u), (cx - 3 * u, cy + 5.5 * u), (cx - 6 * u, cy + 4 * u), (cx - 9.5 * u, cy)])
+      icon_line(p, cx - 8 * u, cy - 8 * u, cx + 8 * u, cy + 8 * u)
+    }
+    Sun => {
+      let u = s / 9.0
+      icon_circle(p, cx, cy, 4 * u)
+      for (dx, dy, ex, ey) in [
+        (0.0, -4.0, 0.0, -7.5), (0.0, 4.0, 0.0, 7.5), (-4.0, 0.0, -7.5, 0.0), (4.0, 0.0, 7.5, 0.0),
+        (-3.0, -3.0, -5.5, -5.5), (3.0, 3.0, 5.5, 5.5), (-3.0, 3.0, -5.5, 5.5), (3.0, -3.0, 5.5, -5.5),
+      ] {
+        icon_line(p, cx + dx * u, cy + dy * u, cx + ex * u, cy + ey * u)
+      }
+    }
+    Moon => {
+      let u = s / 9.0
+      p.set_fill_color(color)
+      icon_polygon(p, [
+        (cx + 6 * u, cy - 7.5 * u), (cx + 1 * u, cy - 6.5 * u), (cx - 2.5 * u, cy - 3 * u), (cx - 3.5 * u, cy + 1.5 * u), (cx - 1.5 * u, cy + 5.5 * u), (cx + 2.5 * u, cy + 7.5 * u), (cx + 6 * u, cy + 7.5 * u), (cx + 1.5 * u, cy + 6.5 * u), (cx - 1.5 * u, cy + 3 * u), (cx - 2 * u, cy - 1 * u), (cx - 0.5 * u, cy - 5 * u), (cx + 2.5 * u, cy - 7.5 * u),
+      ])
+    }
+    Grid => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 8 * u), (cx + 8 * u, cy - 8 * u), (cx + 8 * u, cy + 8 * u), (cx - 8 * u, cy + 8 * u)])
+      icon_line(p, cx - 2.7 * u, cy - 8 * u, cx - 2.7 * u, cy + 8 * u)
+      icon_line(p, cx + 2.7 * u, cy - 8 * u, cx + 2.7 * u, cy + 8 * u)
+      icon_line(p, cx - 8 * u, cy - 2.7 * u, cx + 8 * u, cy - 2.7 * u)
+      icon_line(p, cx - 8 * u, cy + 2.7 * u, cx + 8 * u, cy + 2.7 * u)
+    }
+    Layout => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 8 * u), (cx + 8 * u, cy - 8 * u), (cx + 8 * u, cy + 8 * u), (cx - 8 * u, cy + 8 * u)])
+      icon_line(p, cx - 8 * u, cy - 3 * u, cx + 8 * u, cy - 3 * u)
+      icon_line(p, cx - 2 * u, cy - 3 * u, cx - 2 * u, cy + 8 * u)
+    }
+    Sidebar => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 8 * u), (cx + 8 * u, cy - 8 * u), (cx + 8 * u, cy + 8 * u), (cx - 8 * u, cy + 8 * u)])
+      icon_line(p, cx + 2 * u, cy - 8 * u, cx + 2 * u, cy + 8 * u)
+    }
+    // —— 导航 ——
+    ChevronsLeft => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - u, cy - 5 * u), (cx - 6 * u, cy), (cx - u, cy + 5 * u)])
+      icon_polyline(p, [(cx + 6 * u, cy - 5 * u), (cx + u, cy), (cx + 6 * u, cy + 5 * u)])
+    }
+    ChevronsRight => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx + u, cy - 5 * u), (cx + 6 * u, cy), (cx + u, cy + 5 * u)])
+      icon_polyline(p, [(cx - 6 * u, cy - 5 * u), (cx - u, cy), (cx - 6 * u, cy + 5 * u)])
+    }
+    ChevronsUp => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 5 * u, cy - u), (cx, cy - 6 * u), (cx + 5 * u, cy - u)])
+      icon_polyline(p, [(cx - 5 * u, cy + 6 * u), (cx, cy + u), (cx + 5 * u, cy + 6 * u)])
+    }
+    ChevronsDown => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 5 * u, cy + u), (cx, cy + 6 * u), (cx + 5 * u, cy + u)])
+      icon_polyline(p, [(cx - 5 * u, cy - 6 * u), (cx, cy - u), (cx + 5 * u, cy - 6 * u)])
+    }
+    SkipBack => {
+      let u = s / 9.0
+      p.set_fill_color(color)
+      icon_polygon(p, [(cx - 6 * u, cy - 7 * u), (cx - 4 * u, cy - 7 * u), (cx - 4 * u, cy + 7 * u), (cx - 6 * u, cy + 7 * u)])
+      icon_polygon(p, [(cx + 6 * u, cy - 7 * u), (cx - 3 * u, cy), (cx + 6 * u, cy + 7 * u)])
+    }
+    SkipForward => {
+      let u = s / 9.0
+      p.set_fill_color(color)
+      icon_polygon(p, [(cx + 4 * u, cy - 7 * u), (cx + 6 * u, cy - 7 * u), (cx + 6 * u, cy + 7 * u), (cx + 4 * u, cy + 7 * u)])
+      icon_polygon(p, [(cx - 6 * u, cy - 7 * u), (cx + 3 * u, cy), (cx - 6 * u, cy + 7 * u)])
+    }
+    CornerUpLeft => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 3 * u, cy + 2 * u), (cx - 8 * u, cy - 3 * u), (cx - 3 * u, cy - 8 * u)])
+      icon_polyline(p, [(cx - 8 * u, cy - 3 * u), (cx + 8 * u, cy - 3 * u), (cx + 8 * u, cy + 8 * u)])
+    }
+    CornerUpRight => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx + 3 * u, cy + 2 * u), (cx + 8 * u, cy - 3 * u), (cx + 3 * u, cy - 8 * u)])
+      icon_polyline(p, [(cx + 8 * u, cy - 3 * u), (cx - 8 * u, cy - 3 * u), (cx - 8 * u, cy + 8 * u)])
+    }
+    // —— 媒体 ——
+    Square => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 6 * u, cy - 6 * u), (cx + 6 * u, cy - 6 * u), (cx + 6 * u, cy + 6 * u), (cx - 6 * u, cy + 6 * u)])
+    }
+    CircleRecord => {
+      let u = s / 9.0
+      icon_circle(p, cx, cy, 8 * u)
+      p.set_fill_color(color)
+      icon_dot(p, cx, cy, 3 * u)
+    }
+    Volume => {
+      let u = s / 9.0
+      p.set_fill_color(color)
+      icon_polygon(p, [(cx - 8 * u, cy - 3 * u), (cx - 4 * u, cy - 3 * u), (cx + 1 * u, cy - 7 * u), (cx + 1 * u, cy + 7 * u), (cx - 4 * u, cy + 3 * u), (cx - 8 * u, cy + 3 * u)])
+      icon_arc(p, cx + 2 * u, cy, 4.5 * u, -0.8, 0.8)
+    }
+    VolumeOff => {
+      let u = s / 9.0
+      p.set_fill_color(color)
+      icon_polygon(p, [(cx - 8 * u, cy - 3 * u), (cx - 4 * u, cy - 3 * u), (cx + 1 * u, cy - 7 * u), (cx + 1 * u, cy + 7 * u), (cx - 4 * u, cy + 3 * u), (cx - 8 * u, cy + 3 * u)])
+      icon_line(p, cx + 5 * u, cy - 2.5 * u, cx + 9 * u, cy + 2.5 * u)
+      icon_line(p, cx + 9 * u, cy - 2.5 * u, cx + 5 * u, cy + 2.5 * u)
+    }
+    Mic => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 3 * u, cy - 9 * u), (cx + 3 * u, cy - 9 * u), (cx + 3 * u, cy - 1 * u), (cx - 3 * u, cy - 1 * u)])
+      icon_polyline(p, [(cx - 7 * u, cy - 1 * u), (cx - 7 * u, cy + 0.5 * u), (cx - 5 * u, cy + 3.5 * u), (cx, cy + 5 * u), (cx + 5 * u, cy + 3.5 * u), (cx + 7 * u, cy + 0.5 * u), (cx + 7 * u, cy - 1 * u)])
+      icon_line(p, cx, cy + 5 * u, cx, cy + 9 * u)
+      icon_line(p, cx - 3 * u, cy + 9 * u, cx + 3 * u, cy + 9 * u)
+    }
+    Camera => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 5 * u), (cx - 3 * u, cy - 5 * u), (cx - 1.5 * u, cy - 7 * u), (cx + 1.5 * u, cy - 7 * u), (cx + 3 * u, cy - 5 * u), (cx + 8 * u, cy - 5 * u), (cx + 8 * u, cy + 7 * u), (cx - 8 * u, cy + 7 * u)])
+      icon_circle(p, cx, cy + 1 * u, 3.2 * u)
+    }
+    Image => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 8 * u), (cx + 8 * u, cy - 8 * u), (cx + 8 * u, cy + 8 * u), (cx - 8 * u, cy + 8 * u)])
+      p.set_fill_color(color)
+      icon_dot(p, cx - 3 * u, cy - 2.5 * u, 1.4 * u)
+      icon_polyline(p, [(cx - 8 * u, cy + 6 * u), (cx - 2.5 * u, cy + 0.5 * u), (cx + 1 * u, cy + 4 * u), (cx + 3.5 * u, cy + 1.5 * u), (cx + 8 * u, cy + 6 * u)])
+    }
+    Music => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 3 * u, cy + 6 * u), (cx - 3 * u, cy - 6 * u), (cx + 8 * u, cy - 8 * u), (cx + 8 * u, cy + 4 * u)])
+      icon_circle(p, cx - 5.2 * u, cy + 6 * u, 2.2 * u)
+      icon_circle(p, cx + 5.8 * u, cy + 4 * u, 2.2 * u)
+    }
+    // —— 通信 ——
+    Mail => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 9 * u, cy - 7 * u), (cx + 9 * u, cy - 7 * u), (cx + 9 * u, cy + 7 * u), (cx - 9 * u, cy + 7 * u)])
+      icon_polyline(p, [(cx - 9 * u, cy - 6 * u), (cx, cy + 1 * u), (cx + 9 * u, cy - 6 * u)])
+    }
+    Send => {
+      let u = s / 9.0
+      icon_outline(p, [(cx + 9 * u, cy - 9 * u), (cx + 2.8 * u, cy + 7.5 * u), (cx - 1 * u, cy), (cx - 8.5 * u, cy - 2.8 * u)])
+      icon_line(p, cx + 9 * u, cy - 9 * u, cx - 1 * u, cy)
+    }
+    MessageCircle => {
+      let u = s / 9.0
+      icon_circle(p, cx, cy - 0.5 * u, 7.5 * u)
+      icon_polyline(p, [(cx - 5 * u, cy + 5.2 * u), (cx - 7.5 * u, cy + 8.5 * u), (cx - 2 * u, cy + 7.6 * u)])
+    }
+    Bell => {
+      let u = s / 9.0
+      icon_outline(p, [(cx + 6 * u, cy + 4 * u), (cx - 6 * u, cy + 4 * u), (cx - 6 * u, cy - 2 * u), (cx - 4.5 * u, cy - 6.2 * u), (cx - 2 * u, cy - 7.8 * u), (cx, cy - 8 * u), (cx + 2 * u, cy - 7.8 * u), (cx + 4.5 * u, cy - 6.2 * u), (cx + 6 * u, cy - 2 * u), (cx + 6 * u, cy + 4 * u)])
+      icon_line(p, cx - 2.5 * u, cy + 7 * u, cx + 2.5 * u, cy + 7 * u)
+    }
+    BellOff => {
+      let u = s / 9.0
+      icon_outline(p, [(cx + 6 * u, cy + 4 * u), (cx - 6 * u, cy + 4 * u), (cx - 6 * u, cy - 2 * u), (cx - 4.5 * u, cy - 6.2 * u), (cx - 2 * u, cy - 7.8 * u), (cx, cy - 8 * u), (cx + 2 * u, cy - 7.8 * u), (cx + 4.5 * u, cy - 6.2 * u), (cx + 6 * u, cy - 2 * u), (cx + 6 * u, cy + 4 * u)])
+      icon_line(p, cx - 2.5 * u, cy + 7 * u, cx + 2.5 * u, cy + 7 * u)
+      icon_line(p, cx - 8 * u, cy - 8 * u, cx + 8 * u, cy + 8 * u)
+    }
+    Phone => {
+      let u = s / 9.0
+      icon_outline(p, [(cx + 7.5 * u, cy + 4 * u), (cx + 7.5 * u, cy + 7 * u), (cx + 5 * u, cy + 8 * u), (cx - 1 * u, cy + 5.5 * u), (cx - 5.5 * u, cy + 1 * u), (cx - 8 * u, cy - 5 * u), (cx - 7 * u, cy - 7.5 * u), (cx - 4 * u, cy - 7.5 * u), (cx - 2.5 * u, cy - 3 * u), (cx - 4 * u, cy - 1.5 * u), (cx + 1.5 * u, cy + 4 * u), (cx + 3 * u, cy + 2.5 * u)])
+    }
+    Rss => {
+      let u = s / 9.0
+      p.set_fill_color(color)
+      icon_dot(p, cx - 6.5 * u, cy + 6.5 * u, 1.4 * u)
+      icon_arc(p, cx - 7 * u, cy + 7 * u, 5 * u, -1.4, -0.1)
+      icon_arc(p, cx - 7 * u, cy + 7 * u, 8.5 * u, -1.4, -0.1)
+    }
+    Globe => {
+      let u = s / 9.0
+      icon_circle(p, cx, cy, 9 * u)
+      icon_line(p, cx - 9 * u, cy, cx + 9 * u, cy)
+      icon_polyline(p, [(cx - 3.5 * u, cy - 7 * u), (cx - 5 * u, cy - 3.5 * u), (cx - 5 * u, cy), (cx - 5 * u, cy + 3.5 * u), (cx - 3.5 * u, cy + 7 * u)])
+      icon_polyline(p, [(cx + 3.5 * u, cy - 7 * u), (cx + 5 * u, cy - 3.5 * u), (cx + 5 * u, cy), (cx + 5 * u, cy + 3.5 * u), (cx + 3.5 * u, cy + 7 * u)])
+      icon_polyline(p, [(cx - 7.5 * u, cy - 3.5 * u), (cx - 3.5 * u, cy - 4.8 * u), (cx, cy - 5 * u), (cx + 3.5 * u, cy - 4.8 * u), (cx + 7.5 * u, cy - 3.5 * u)])
+      icon_polyline(p, [(cx - 7.5 * u, cy + 3.5 * u), (cx - 3.5 * u, cy + 4.8 * u), (cx, cy + 5 * u), (cx + 3.5 * u, cy + 4.8 * u), (cx + 7.5 * u, cy + 3.5 * u)])
+    }
+    // —— 系统 ——
+    Power => {
+      let u = s / 9.0
+      icon_line(p, cx, cy - 9 * u, cx, cy - 1 * u)
+      icon_arc(p, cx, cy + 1 * u, 7 * u, -0.55, 3.7)
+    }
+    LogOut => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 4 * u, cy - 8 * u), (cx + 4 * u, cy - 8 * u), (cx + 4 * u, cy + 8 * u), (cx - 4 * u, cy + 8 * u)])
+      icon_line(p, cx - 1 * u, cy, cx + 9 * u, cy)
+      icon_polyline(p, [(cx + 6 * u, cy - 3.5 * u), (cx + 9 * u, cy), (cx + 6 * u, cy + 3.5 * u)])
+    }
+    LogIn => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 4 * u, cy - 8 * u), (cx + 4 * u, cy - 8 * u), (cx + 4 * u, cy + 8 * u), (cx - 4 * u, cy + 8 * u)])
+      icon_line(p, cx - 9 * u, cy, cx + 1 * u, cy)
+      icon_polyline(p, [(cx - 2 * u, cy - 3.5 * u), (cx + 1 * u, cy), (cx - 2 * u, cy + 3.5 * u)])
+    }
+    Lock => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 7 * u, cy - 1 * u), (cx + 7 * u, cy - 1 * u), (cx + 7 * u, cy + 9 * u), (cx - 7 * u, cy + 9 * u)])
+      icon_arc(p, cx, cy - 1 * u, 4 * u, 3.1416, 6.2832)
+      icon_line(p, cx, cy + 3 * u, cx, cy + 5.5 * u)
+    }
+    Unlock => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 7 * u, cy - 1 * u), (cx + 7 * u, cy - 1 * u), (cx + 7 * u, cy + 9 * u), (cx - 7 * u, cy + 9 * u)])
+      icon_arc(p, cx - 1 * u, cy - 1 * u, 4 * u, 3.6, 6.2832)
+      icon_line(p, cx + 2.2 * u, cy - 4.8 * u, cx + 5.5 * u, cy - 4.8 * u)
+    }
+    Key => {
+      let u = s / 9.0
+      icon_circle(p, cx - 5.5 * u, cy + 5.5 * u, 3.2 * u)
+      icon_line(p, cx - 3.2 * u, cy + 3.2 * u, cx + 7.5 * u, cy - 7.5 * u)
+      icon_line(p, cx + 4.5 * u, cy - 3.5 * u, cx + 7 * u, cy - 1 * u)
+      icon_line(p, cx + 7 * u, cy - 5 * u, cx + 9.5 * u, cy - 2.5 * u)
+    }
+    Shield => {
+      let u = s / 9.0
+      icon_outline(p, [(cx, cy - 9 * u), (cx + 7 * u, cy - 6 * u), (cx + 7 * u, cy - 1 * u), (cx + 5.5 * u, cy + 4 * u), (cx, cy + 9 * u), (cx - 5.5 * u, cy + 4 * u), (cx - 7 * u, cy - 1 * u), (cx - 7 * u, cy - 6 * u)])
+    }
+    Sliders => {
+      let u = s / 9.0
+      p.set_fill_color(color)
+      icon_line(p, cx - 8 * u, cy - 5 * u, cx + 8 * u, cy - 5 * u)
+      icon_dot(p, cx + 2 * u, cy - 5 * u, 1.8 * u)
+      icon_line(p, cx - 8 * u, cy, cx + 8 * u, cy)
+      icon_dot(p, cx - 4 * u, cy, 1.8 * u)
+      icon_line(p, cx - 8 * u, cy + 5 * u, cx + 8 * u, cy + 5 * u)
+      icon_dot(p, cx + 4 * u, cy + 5 * u, 1.8 * u)
+    }
+    Database => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 7 * u, cy - 6 * u), (cx - 5.5 * u, cy - 4.5 * u), (cx - 2.5 * u, cy - 3.8 * u), (cx, cy - 3.5 * u), (cx + 2.5 * u, cy - 3.8 * u), (cx + 5.5 * u, cy - 4.5 * u), (cx + 7 * u, cy - 6 * u)])
+      icon_polyline(p, [(cx - 7 * u, cy + 0.5 * u), (cx - 5.5 * u, cy + 2 * u), (cx - 2.5 * u, cy + 2.7 * u), (cx, cy + 3 * u), (cx + 2.5 * u, cy + 2.7 * u), (cx + 5.5 * u, cy + 2 * u), (cx + 7 * u, cy + 0.5 * u)])
+      icon_polyline(p, [(cx - 7 * u, cy + 7 * u), (cx - 5.5 * u, cy + 8.5 * u), (cx - 2.5 * u, cy + 9.2 * u), (cx, cy + 9.5 * u), (cx + 2.5 * u, cy + 9.2 * u), (cx + 5.5 * u, cy + 8.5 * u), (cx + 7 * u, cy + 7 * u)])
+      icon_line(p, cx - 7 * u, cy - 6 * u, cx - 7 * u, cy + 7 * u)
+      icon_line(p, cx + 7 * u, cy - 6 * u, cx + 7 * u, cy + 7 * u)
+    }
+    Server => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 8 * u), (cx + 8 * u, cy - 8 * u), (cx + 8 * u, cy - 2 * u), (cx - 8 * u, cy - 2 * u)])
+      icon_outline(p, [(cx - 8 * u, cy + 2 * u), (cx + 8 * u, cy + 2 * u), (cx + 8 * u, cy + 8 * u), (cx - 8 * u, cy + 8 * u)])
+      p.set_fill_color(color)
+      icon_dot(p, cx - 5 * u, cy - 5 * u, 0.9 * u)
+      icon_dot(p, cx - 5 * u, cy + 5 * u, 0.9 * u)
+    }
+    HardDrive => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 7 * u, cy - 6 * u), (cx + 7 * u, cy - 6 * u), (cx + 9 * u, cy), (cx + 9 * u, cy + 6 * u), (cx - 9 * u, cy + 6 * u), (cx - 9 * u, cy)])
+      icon_line(p, cx - 9 * u, cy, cx + 9 * u, cy)
+      p.set_fill_color(color)
+      icon_dot(p, cx - 5 * u, cy + 3 * u, 0.9 * u)
+    }
+    Printer => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 3 * u, cy - 7 * u), (cx - 3 * u, cy - 9 * u), (cx + 3 * u, cy - 9 * u), (cx + 3 * u, cy - 7 * u)])
+      icon_outline(p, [(cx - 8 * u, cy - 7 * u), (cx + 8 * u, cy - 7 * u), (cx + 8 * u, cy + 2 * u), (cx + 5 * u, cy + 2 * u), (cx + 5 * u, cy), (cx - 5 * u, cy), (cx - 5 * u, cy + 2 * u), (cx - 8 * u, cy + 2 * u)])
+      icon_outline(p, [(cx - 5 * u, cy), (cx + 5 * u, cy), (cx + 5 * u, cy + 7 * u), (cx - 5 * u, cy + 7 * u)])
+    }
+    Monitor => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 9 * u, cy - 7 * u), (cx + 9 * u, cy - 7 * u), (cx + 9 * u, cy + 3 * u), (cx - 9 * u, cy + 3 * u)])
+      icon_line(p, cx, cy + 3 * u, cx, cy + 7 * u)
+      icon_line(p, cx - 4 * u, cy + 7 * u, cx + 4 * u, cy + 7 * u)
+    }
+    Smartphone => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 5 * u, cy - 9 * u), (cx + 5 * u, cy - 9 * u), (cx + 5 * u, cy + 9 * u), (cx - 5 * u, cy + 9 * u)])
+      icon_line(p, cx - 1.5 * u, cy + 6 * u, cx + 1.5 * u, cy + 6 * u)
+    }
+    Wifi => {
+      let u = s / 9.0
+      icon_arc(p, cx, cy + 8 * u, 4.2 * u, -2.36, -0.78)
+      icon_arc(p, cx, cy + 8 * u, 8 * u, -2.36, -0.78)
+      p.set_fill_color(color)
+      icon_dot(p, cx, cy + 6.5 * u, 1.2 * u)
+    }
+    WifiOff => {
+      let u = s / 9.0
+      icon_arc(p, cx, cy + 8 * u, 7 * u, -2.36, -0.78)
+      p.set_fill_color(color)
+      icon_dot(p, cx, cy + 6.5 * u, 1.1 * u)
+      icon_line(p, cx - 8 * u, cy - 8 * u, cx + 8 * u, cy + 8 * u)
+    }
+    Bluetooth => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 5.5 * u, cy - 5 * u), (cx + 5.5 * u, cy + 4 * u), (cx, cy + 8 * u), (cx, cy - 8 * u), (cx + 5.5 * u, cy - 4 * u), (cx - 5.5 * u, cy + 5 * u)])
+    }
+    Cpu => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 6 * u, cy - 6 * u), (cx + 6 * u, cy - 6 * u), (cx + 6 * u, cy + 6 * u), (cx - 6 * u, cy + 6 * u)])
+      icon_outline(p, [(cx - 2.5 * u, cy - 2.5 * u), (cx + 2.5 * u, cy - 2.5 * u), (cx + 2.5 * u, cy + 2.5 * u), (cx - 2.5 * u, cy + 2.5 * u)])
+      icon_line(p, cx - 3 * u, cy - 9 * u, cx - 3 * u, cy - 6 * u)
+      icon_line(p, cx + 3 * u, cy - 9 * u, cx + 3 * u, cy - 6 * u)
+      icon_line(p, cx - 3 * u, cy + 6 * u, cx - 3 * u, cy + 9 * u)
+      icon_line(p, cx + 3 * u, cy + 6 * u, cx + 3 * u, cy + 9 * u)
+      icon_line(p, cx - 9 * u, cy - 3 * u, cx - 6 * u, cy - 3 * u)
+      icon_line(p, cx - 9 * u, cy + 3 * u, cx - 6 * u, cy + 3 * u)
+      icon_line(p, cx + 6 * u, cy - 3 * u, cx + 9 * u, cy - 3 * u)
+      icon_line(p, cx + 6 * u, cy + 3 * u, cx + 9 * u, cy + 3 * u)
+    }
+    // —— 开发 ——
+    Terminal => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 9 * u, cy - 8 * u), (cx + 9 * u, cy - 8 * u), (cx + 9 * u, cy + 8 * u), (cx - 9 * u, cy + 8 * u)])
+      icon_polyline(p, [(cx - 5 * u, cy - 3 * u), (cx - 2 * u, cy), (cx - 5 * u, cy + 3 * u)])
+      icon_line(p, cx - 1 * u, cy + 3 * u, cx + 4 * u, cy + 3 * u)
+    }
+    Code => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 3.5 * u, cy - 5 * u), (cx - 8.5 * u, cy), (cx - 3.5 * u, cy + 5 * u)])
+      icon_polyline(p, [(cx + 3.5 * u, cy - 5 * u), (cx + 8.5 * u, cy), (cx + 3.5 * u, cy + 5 * u)])
+    }
+    GitBranch => {
+      let u = s / 9.0
+      icon_circle(p, cx - 6 * u, cy - 6.5 * u, 2 * u)
+      icon_circle(p, cx - 6 * u, cy + 6.5 * u, 2 * u)
+      icon_circle(p, cx + 5 * u, cy - 5 * u, 2 * u)
+      icon_line(p, cx - 6 * u, cy - 4.5 * u, cx - 6 * u, cy + 4.5 * u)
+      icon_polyline(p, [(cx + 5 * u, cy - 3 * u), (cx + 5 * u, cy + 0.5 * u), (cx + 1 * u, cy + 2 * u), (cx - 6 * u, cy + 2.2 * u)])
+    }
+    GitCommit => {
+      let u = s / 9.0
+      icon_circle(p, cx, cy, 3.2 * u)
+      icon_line(p, cx - 9 * u, cy, cx - 3.2 * u, cy)
+      icon_line(p, cx + 3.2 * u, cy, cx + 9 * u, cy)
+    }
+    GitPullRequest => {
+      let u = s / 9.0
+      icon_circle(p, cx - 6 * u, cy - 6.5 * u, 2 * u)
+      icon_circle(p, cx - 6 * u, cy + 6.5 * u, 2 * u)
+      icon_circle(p, cx + 6 * u, cy + 6.5 * u, 2 * u)
+      icon_line(p, cx - 6 * u, cy - 4.5 * u, cx - 6 * u, cy + 4.5 * u)
+      icon_polyline(p, [(cx + 1 * u, cy - 4.5 * u), (cx + 3.5 * u, cy - 7 * u), (cx + 6 * u, cy - 4.5 * u)])
+      icon_line(p, cx + 3.5 * u, cy - 7 * u, cx + 3.5 * u, cy + 4.5 * u)
+    }
+    Package => {
+      let u = s / 9.0
+      icon_outline(p, [(cx, cy - 9 * u), (cx + 8 * u, cy - 4.5 * u), (cx + 8 * u, cy + 4.5 * u), (cx, cy + 9 * u), (cx - 8 * u, cy + 4.5 * u), (cx - 8 * u, cy - 4.5 * u)])
+      icon_polyline(p, [(cx - 8 * u, cy - 4.5 * u), (cx, cy), (cx + 8 * u, cy - 4.5 * u)])
+      icon_line(p, cx, cy, cx, cy + 9 * u)
+      icon_polyline(p, [(cx - 4 * u, cy - 6.7 * u), (cx + 4 * u, cy - 2.2 * u)])
+    }
+    Bug => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 3 * u, cy - 4 * u), (cx + 3 * u, cy - 4 * u), (cx + 4 * u, cy + 0.5 * u), (cx + 2 * u, cy + 5.5 * u), (cx + 2 * u, cy + 8 * u), (cx - 2 * u, cy + 8 * u), (cx - 2 * u, cy + 5.5 * u), (cx - 4 * u, cy + 0.5 * u)])
+      icon_polyline(p, [(cx - 3 * u, cy - 7 * u), (cx - 1.5 * u, cy - 5.5 * u), (cx + 1.5 * u, cy - 5.5 * u), (cx + 3 * u, cy - 7 * u)])
+      icon_line(p, cx - 8 * u, cy - 1 * u, cx - 4.5 * u, cy - 0.5 * u)
+      icon_line(p, cx - 8 * u, cy + 2.5 * u, cx - 4.5 * u, cy + 2.5 * u)
+      icon_line(p, cx - 7 * u, cy + 5.5 * u, cx - 4.2 * u, cy + 4 * u)
+      icon_line(p, cx + 8 * u, cy - 1 * u, cx + 4.5 * u, cy - 0.5 * u)
+      icon_line(p, cx + 8 * u, cy + 2.5 * u, cx + 4.5 * u, cy + 2.5 * u)
+      icon_line(p, cx + 7 * u, cy + 5.5 * u, cx + 4.2 * u, cy + 4 * u)
+    }
+    Flask => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 2 * u, cy - 9 * u), (cx + 2 * u, cy - 9 * u), (cx + 2 * u, cy - 2 * u), (cx + 6.5 * u, cy + 6 * u), (cx + 5 * u, cy + 8 * u), (cx - 5 * u, cy + 8 * u), (cx - 6.5 * u, cy + 6 * u), (cx - 2 * u, cy - 2 * u)])
+      icon_line(p, cx - 5 * u, cy + 3 * u, cx + 5 * u, cy + 3 * u)
+    }
+    Cloud => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 6.5 * u, cy + 5 * u), (cx - 8 * u, cy + 3.5 * u), (cx - 8 * u, cy + 0.5 * u), (cx - 6.5 * u, cy - 1.5 * u), (cx - 4.5 * u, cy - 2.2 * u), (cx - 3 * u, cy - 1.5 * u), (cx - 2 * u, cy - 3.5 * u), (cx - 0.5 * u, cy - 4.5 * u), (cx + 1.5 * u, cy - 4.5 * u), (cx + 3.5 * u, cy - 3.5 * u), (cx + 4.5 * u, cy - 1.5 * u), (cx + 6 * u, cy - 1 * u), (cx + 7 * u, cy + 0.5 * u), (cx + 7 * u, cy + 2.5 * u), (cx + 5.5 * u, cy + 4.5 * u), (cx + 4 * u, cy + 5 * u)])
+    }
+    CloudDownload => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 6 * u, cy - 3 * u), (cx - 7.5 * u, cy - 4.5 * u), (cx - 7.5 * u, cy - 7 * u), (cx - 6 * u, cy - 8.5 * u), (cx - 4.5 * u, cy - 9 * u), (cx - 3.5 * u, cy - 9.8 * u), (cx - 2 * u, cy - 10.5 * u), (cx - 0.5 * u, cy - 10.5 * u), (cx + 1 * u, cy - 9.5 * u), (cx + 2 * u, cy - 8 * u), (cx + 3.5 * u, cy - 7.5 * u), (cx + 4.5 * u, cy - 6 * u), (cx + 4.5 * u, cy - 4.5 * u), (cx + 3.5 * u, cy - 3 * u)])
+      icon_line(p, cx, cy - 2 * u, cx, cy + 7 * u)
+      icon_polyline(p, [(cx - 3.5 * u, cy + 3.5 * u), (cx, cy + 7 * u), (cx + 3.5 * u, cy + 3.5 * u)])
+    }
+    CloudUpload => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 6 * u, cy - 3 * u), (cx - 7.5 * u, cy - 4.5 * u), (cx - 7.5 * u, cy - 7 * u), (cx - 6 * u, cy - 8.5 * u), (cx - 4.5 * u, cy - 9 * u), (cx - 3.5 * u, cy - 9.8 * u), (cx - 2 * u, cy - 10.5 * u), (cx - 0.5 * u, cy - 10.5 * u), (cx + 1 * u, cy - 9.5 * u), (cx + 2 * u, cy - 8 * u), (cx + 3.5 * u, cy - 7.5 * u), (cx + 4.5 * u, cy - 6 * u), (cx + 4.5 * u, cy - 4.5 * u), (cx + 3.5 * u, cy - 3 * u)])
+      icon_line(p, cx, cy + 7 * u, cx, cy - 2 * u)
+      icon_polyline(p, [(cx - 3.5 * u, cy + 1.5 * u), (cx, cy - 2 * u), (cx + 3.5 * u, cy + 1.5 * u)])
+    }
+    Layers => {
+      let u = s / 9.0
+      icon_outline(p, [(cx, cy - 9 * u), (cx + 9 * u, cy - 4 * u), (cx, cy + 1 * u), (cx - 9 * u, cy - 4 * u)])
+      icon_polyline(p, [(cx - 9 * u, cy), (cx, cy + 5 * u), (cx + 9 * u, cy)])
+      icon_polyline(p, [(cx - 9 * u, cy + 4 * u), (cx, cy + 9 * u), (cx + 9 * u, cy + 4 * u)])
+    }
+    Zap => {
+      let u = s / 9.0
+      p.set_fill_color(color)
+      icon_polygon(p, [(cx + 1 * u, cy - 9 * u), (cx - 7 * u, cy + 2 * u), (cx - 1 * u, cy + 2 * u), (cx - 1 * u, cy + 9 * u), (cx + 7 * u, cy - 2 * u), (cx + 1 * u, cy - 2 * u)])
+    }
+    // —— 语义/状态 ——
+    Help => {
+      let u = s / 9.0
+      icon_circle(p, cx, cy, 9 * u)
+      icon_polyline(p, [(cx - 2.5 * u, cy - 2.5 * u), (cx - 2 * u, cy - 4 * u), (cx - 0.5 * u, cy - 4.5 * u), (cx + 1 * u, cy - 4 * u), (cx + 1.5 * u, cy - 2.5 * u), (cx + 0.5 * u, cy - 1 * u), (cx, cy + 0.5 * u), (cx, cy + 1.5 * u)])
+      p.set_fill_color(color)
+      icon_dot(p, cx, cy + 4.5 * u, 1 * u)
+    }
+    Heart => {
+      let u = s / 9.0
+      icon_outline(p, [(cx, cy + 8 * u), (cx - 8 * u, cy + 0.5 * u), (cx - 9 * u, cy - 2.5 * u), (cx - 8 * u, cy - 5.5 * u), (cx - 5 * u, cy - 7.5 * u), (cx - 2 * u, cy - 7 * u), (cx, cy - 5 * u), (cx + 2 * u, cy - 7 * u), (cx + 5 * u, cy - 7.5 * u), (cx + 8 * u, cy - 5.5 * u), (cx + 9 * u, cy - 2.5 * u), (cx + 8 * u, cy + 0.5 * u)])
+    }
+    Flag => {
+      let u = s / 9.0
+      icon_line(p, cx - 7 * u, cy - 9 * u, cx - 7 * u, cy + 9 * u)
+      icon_outline(p, [(cx - 7 * u, cy - 8 * u), (cx + 6 * u, cy - 8 * u), (cx + 3.5 * u, cy - 4 * u), (cx + 6 * u, cy), (cx - 7 * u, cy)])
+    }
+    Clock => {
+      let u = s / 9.0
+      icon_circle(p, cx, cy, 9 * u)
+      icon_polyline(p, [(cx, cy - 5 * u), (cx, cy), (cx + 3.5 * u, cy + 2 * u)])
+    }
+    Tag => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 9 * u, cy), (cx, cy - 9 * u), (cx + 8 * u, cy - 9 * u), (cx + 8 * u, cy + 1 * u), (cx - 1 * u, cy + 9 * u)])
+      p.set_fill_color(color)
+      icon_dot(p, cx + 4 * u, cy - 4 * u, 1.2 * u)
+    }
+    Archive => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 9 * u, cy - 8 * u), (cx + 9 * u, cy - 8 * u), (cx + 9 * u, cy - 3 * u), (cx - 9 * u, cy - 3 * u)])
+      icon_outline(p, [(cx - 7 * u, cy - 3 * u), (cx + 7 * u, cy - 3 * u), (cx + 7 * u, cy + 8 * u), (cx - 7 * u, cy + 8 * u)])
+      icon_line(p, cx - 2 * u, cy + 1 * u, cx + 2 * u, cy + 1 * u)
+    }
+    Inbox => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 7 * u), (cx + 8 * u, cy - 7 * u), (cx + 8 * u, cy + 7 * u), (cx - 8 * u, cy + 7 * u)])
+      icon_polyline(p, [(cx - 8 * u, cy + 1 * u), (cx - 3 * u, cy + 1 * u), (cx - 2 * u, cy + 3 * u), (cx + 2 * u, cy + 3 * u), (cx + 3 * u, cy + 1 * u), (cx + 8 * u, cy + 1 * u)])
+    }
+    ThumbsUp => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 5 * u, cy - 1 * u), (cx - 5 * u, cy + 9 * u), (cx - 8 * u, cy + 9 * u), (cx - 8 * u, cy - 1 * u)])
+      icon_polyline(p, [(cx - 5 * u, cy - 1 * u), (cx - 0.5 * u, cy - 7.5 * u), (cx + 1 * u, cy - 7 * u), (cx + 0.5 * u, cy - 3 * u), (cx + 6.5 * u, cy - 3 * u), (cx + 8 * u, cy - 1.5 * u), (cx + 7 * u, cy + 7.5 * u), (cx - 5 * u, cy + 9 * u)])
+    }
+    // —— 数据 ——
+    TrendingUp => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 9 * u, cy + 5 * u), (cx - 3 * u, cy - 1 * u), (cx + 1 * u, cy + 3 * u), (cx + 9 * u, cy - 5 * u)])
+      icon_polyline(p, [(cx + 3 * u, cy - 5 * u), (cx + 9 * u, cy - 5 * u), (cx + 9 * u, cy + 1 * u)])
+    }
+    TrendingDown => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 9 * u, cy - 5 * u), (cx - 3 * u, cy + 1 * u), (cx + 1 * u, cy - 3 * u), (cx + 9 * u, cy + 5 * u)])
+      icon_polyline(p, [(cx + 3 * u, cy + 5 * u), (cx + 9 * u, cy + 5 * u), (cx + 9 * u, cy - 1 * u)])
+    }
+    BarChart => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 7 * u, cy - 1 * u), (cx - 4 * u, cy - 1 * u), (cx - 4 * u, cy + 8 * u), (cx - 7 * u, cy + 8 * u)])
+      icon_outline(p, [(cx - 1.5 * u, cy - 8 * u), (cx + 1.5 * u, cy - 8 * u), (cx + 1.5 * u, cy + 8 * u), (cx - 1.5 * u, cy + 8 * u)])
+      icon_outline(p, [(cx + 4 * u, cy - 4 * u), (cx + 7 * u, cy - 4 * u), (cx + 7 * u, cy + 8 * u), (cx + 4 * u, cy + 8 * u)])
+    }
+    PieChart => {
+      let u = s / 9.0
+      icon_circle(p, cx, cy, 9 * u)
+      icon_line(p, cx, cy - 9 * u, cx, cy)
+      icon_line(p, cx, cy, cx + 8 * u, cy + 4 * u)
+    }
+    TableRows => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 8 * u), (cx + 8 * u, cy - 8 * u), (cx + 8 * u, cy + 8 * u), (cx - 8 * u, cy + 8 * u)])
+      icon_line(p, cx - 8 * u, cy - 2.5 * u, cx + 8 * u, cy - 2.5 * u)
+      icon_line(p, cx - 8 * u, cy + 3 * u, cx + 8 * u, cy + 3 * u)
+    }
   }
 }
 
 ///|
-/// 全部图标种类清单(37 项,图标墙/选取器素材)。
+/// 全部图标种类清单(137 项,图标墙/选取器素材)。
 pub fn all_icons() -> Array[IconKind] {
   [
     ChevronLeft,
@@ -400,8 +1186,108 @@ pub fn all_icons() -> Array[IconKind] {
     Success,
     Ellipsis,
     Grip,
+    FilePlus,
+    FolderOpen,
+    FolderPlus,
+    Clipboard,
+    Book,
+    Bookmark,
+    FileCode,
+    Undo,
+    Redo,
+    Scissors,
+    Paste,
+    Bold,
+    Italic,
+    Underline,
+    AlignLeft,
+    AlignCenter,
+    AlignRight,
+    ListUl,
+    ListOl,
+    Link,
+    Unlink,
+    ExternalLink,
+    ZoomIn,
+    ZoomOut,
+    Eye,
+    EyeOff,
+    Sun,
+    Moon,
+    Grid,
+    Layout,
+    Sidebar,
+    ChevronsLeft,
+    ChevronsRight,
+    ChevronsUp,
+    ChevronsDown,
+    SkipBack,
+    SkipForward,
+    CornerUpLeft,
+    CornerUpRight,
+    Square,
+    CircleRecord,
+    Volume,
+    VolumeOff,
+    Mic,
+    Camera,
+    Image,
+    Music,
+    Mail,
+    Send,
+    MessageCircle,
+    Bell,
+    BellOff,
+    Phone,
+    Rss,
+    Globe,
+    Power,
+    LogOut,
+    LogIn,
+    Lock,
+    Unlock,
+    Key,
+    Shield,
+    Sliders,
+    Database,
+    Server,
+    HardDrive,
+    Printer,
+    Monitor,
+    Smartphone,
+    Wifi,
+    WifiOff,
+    Bluetooth,
+    Cpu,
+    Terminal,
+    Code,
+    GitBranch,
+    GitCommit,
+    GitPullRequest,
+    Package,
+    Bug,
+    Flask,
+    Cloud,
+    CloudDownload,
+    CloudUpload,
+    Layers,
+    Zap,
+    Help,
+    Heart,
+    Flag,
+    Clock,
+    Tag,
+    Archive,
+    Inbox,
+    ThumbsUp,
+    TrendingUp,
+    TrendingDown,
+    BarChart,
+    PieChart,
+    TableRows,
   ]
 }
+
 
 ///|
 /// 图标名称(图标墙/提示文案用)。
@@ -444,6 +1330,105 @@ pub fn icon_name(kind : IconKind) -> String {
     Success => "Success"
     Ellipsis => "Ellipsis"
     Grip => "Grip"
+    FilePlus => "FilePlus"
+    FolderOpen => "FolderOpen"
+    FolderPlus => "FolderPlus"
+    Clipboard => "Clipboard"
+    Book => "Book"
+    Bookmark => "Bookmark"
+    FileCode => "FileCode"
+    Undo => "Undo"
+    Redo => "Redo"
+    Scissors => "Scissors"
+    Paste => "Paste"
+    Bold => "Bold"
+    Italic => "Italic"
+    Underline => "Underline"
+    AlignLeft => "AlignLeft"
+    AlignCenter => "AlignCenter"
+    AlignRight => "AlignRight"
+    ListUl => "ListUl"
+    ListOl => "ListOl"
+    Link => "Link"
+    Unlink => "Unlink"
+    ExternalLink => "ExternalLink"
+    ZoomIn => "ZoomIn"
+    ZoomOut => "ZoomOut"
+    Eye => "Eye"
+    EyeOff => "EyeOff"
+    Sun => "Sun"
+    Moon => "Moon"
+    Grid => "Grid"
+    Layout => "Layout"
+    Sidebar => "Sidebar"
+    ChevronsLeft => "ChevronsLeft"
+    ChevronsRight => "ChevronsRight"
+    ChevronsUp => "ChevronsUp"
+    ChevronsDown => "ChevronsDown"
+    SkipBack => "SkipBack"
+    SkipForward => "SkipForward"
+    CornerUpLeft => "CornerUpLeft"
+    CornerUpRight => "CornerUpRight"
+    Square => "Square"
+    CircleRecord => "CircleRecord"
+    Volume => "Volume"
+    VolumeOff => "VolumeOff"
+    Mic => "Mic"
+    Camera => "Camera"
+    Image => "Image"
+    Music => "Music"
+    Mail => "Mail"
+    Send => "Send"
+    MessageCircle => "MessageCircle"
+    Bell => "Bell"
+    BellOff => "BellOff"
+    Phone => "Phone"
+    Rss => "Rss"
+    Globe => "Globe"
+    Power => "Power"
+    LogOut => "LogOut"
+    LogIn => "LogIn"
+    Lock => "Lock"
+    Unlock => "Unlock"
+    Key => "Key"
+    Shield => "Shield"
+    Sliders => "Sliders"
+    Database => "Database"
+    Server => "Server"
+    HardDrive => "HardDrive"
+    Printer => "Printer"
+    Monitor => "Monitor"
+    Smartphone => "Smartphone"
+    Wifi => "Wifi"
+    WifiOff => "WifiOff"
+    Bluetooth => "Bluetooth"
+    Cpu => "Cpu"
+    Terminal => "Terminal"
+    Code => "Code"
+    GitBranch => "GitBranch"
+    GitCommit => "GitCommit"
+    GitPullRequest => "GitPullRequest"
+    Package => "Package"
+    Bug => "Bug"
+    Flask => "Flask"
+    Cloud => "Cloud"
+    CloudDownload => "CloudDownload"
+    CloudUpload => "CloudUpload"
+    Layers => "Layers"
+    Zap => "Zap"
+    Help => "Help"
+    Heart => "Heart"
+    Flag => "Flag"
+    Clock => "Clock"
+    Tag => "Tag"
+    Archive => "Archive"
+    Inbox => "Inbox"
+    ThumbsUp => "ThumbsUp"
+    TrendingUp => "TrendingUp"
+    TrendingDown => "TrendingDown"
+    BarChart => "BarChart"
+    PieChart => "PieChart"
+    TableRows => "TableRows"
   }
 }
 

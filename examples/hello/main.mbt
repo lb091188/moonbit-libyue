@@ -12,13 +12,5 @@ fn main {
   window.center()
   window.on_close(fn(_window) { @yue.quit() })
   window.activate()
-  if @yue.Tray::is_supported() {
-    match @yue.Tray::new("examples/hello/icon.png") {
-      Ok(tray) => tray.set_title("moonbit-libyue")
-      Err(err) => println("托盘创建失败：\{err}")
-    }
-  } else {
-    println("当前系统无托盘后端，跳过托盘")
-  }
   @yue.run()
 }

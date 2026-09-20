@@ -16,7 +16,8 @@ fn page_basic(app : App) -> @yue.Node {
             {
               let cells : Array[@yue.Node] = []
               let icons = @yue.all_icons()
-              for row in 0..<4 {
+              let rows = (icons.length() + 9) / 10
+              for row in 0..<rows {
                 let items : Array[@yue.Node] = []
                 for col in 0..<10 {
                   let idx = row * 10 + col
