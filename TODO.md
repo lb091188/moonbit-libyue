@@ -91,6 +91,7 @@
 - [ ] 可关闭页签(chrome 式动态增删)— 后置:涉及 tabs_t API 形态重构(动态页数组 + Store 驱动),独立批次做
 - [x] 单选与开关:radio_group / switch_t
 - [x] 导航:side_menu / segmented / breadcrumb / pagination / steps
+- [x] steps 文字位移修复 + page_header 移除(2026-09-20 真机反馈)— steps 原实现把全部步骤文字追加到行尾(挤在最后一个方块后),重构为「数字方块+右侧文字」组合容器、连线夹在步骤之间;PageHeader 页头组件按需求整体移除(组件实现 + 导航组件页演示段,文档表格无此条目)
 - [x] 数据展示:tag / avatar / badge / statistic / descriptions / timeline / collapse / card / code_view / progress_line
 - [x] 反馈:alert / result / empty
 - [x] input-number 数字输入器 — `-`/`+` 步进按钮 + Store[Double] + 范围钳制;演示板实测渲染

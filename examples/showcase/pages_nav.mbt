@@ -98,17 +98,6 @@ fn page_nav(app : App) -> @yue.Node {
       ],
     ),
     section(
-      "PageHeader 页头",
-      "‹ 返回(悬停变主题色)+ 标题 + 右侧操作区;点返回回到基础组件页。",
-      [
-        @yue.page_header(
-          "进阶组件",
-          fn() { app.selected.set("基础组件") },
-          actions=[@yue.button_t("页面操作", variant=@yue.Soft)],
-        ),
-      ],
-    ),
-    section(
       "DropdownMenu 下拉菜单",
       "触发字段弹菜单项列表(\"-\" 为分隔线),悬停高亮,点击回调序号。",
       [
