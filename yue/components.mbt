@@ -2385,6 +2385,7 @@ pub fn input_number(
   min? : Double = 0.0,
   max? : Double = 100.0,
   step? : Double = 1.0,
+  num_width? : Double = 64.0,
 ) -> Node {
   {
     mount: fn(parent) {
@@ -2443,7 +2444,7 @@ pub fn input_number(
       step_btn(-1.0)
       // marginRight 0:EP InputNumber 的按钮与输入区紧贴
       let num = themed_container(
-        style=[("width", 64.0), ("height", 28.0), ("marginRight", 0.0)],
+        style=[("width", num_width), ("height", 28.0), ("marginRight", 0.0)],
         style_str=[("alignItems", "center")],
       )
       set_panel_bg(num)
@@ -3671,9 +3672,9 @@ fn build_time_row(
   let row = hbox(
     [
       label_t(label, role=Body, style=[("width", 28.0), ("marginRight", 6.0)]),
-      input_number(hs, min=0.0, max=23.0, step=1.0),
+      input_number(hs, min=0.0, max=23.0, step=1.0, num_width=40.0),
       label_t(":", role=Body),
-      input_number(ms, min=0.0, max=59.0, step=1.0),
+      input_number(ms, min=0.0, max=59.0, step=1.0, num_width=40.0),
     ],
     style=[("marginBottom", 6.0)],
     style_str=[("alignItems", "center")],
