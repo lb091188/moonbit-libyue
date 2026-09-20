@@ -6,7 +6,7 @@ MoonBit bindings for [libyue](https://libyue.com/docs/latest/cpp/) — build nat
 
 English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)
 
-![Component showcase](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/showcase-basic.png)
+![Component showcase](docs/images/showcase-basic.png)
 
 ## Highlights
 
@@ -38,7 +38,7 @@ let clicks = @yue.Signal::new(0)
 
 The three compose freely: the themed library is the recommended front door (unified look), while libyue native widgets and the imperative style remain fully available.
 
-> **New to MoonBit?** Start with the [five-minute tutorial](https://github.com/lb091188/moonbit-libyue/blob/master/docs/tutorial.md): from `moon new` to a running window, with links to the official MoonBit tutorial and the interactive Tour.
+> **New to MoonBit?** Start with the [five-minute tutorial](docs/tutorial.md): from `moon new` to a running window, with links to the official MoonBit tutorial and the interactive Tour.
 
 ## Quick start
 
@@ -89,23 +89,23 @@ moon run examples/hello-themed  # themed minimal example (theme_apply + button_t
 moon run examples/showcase      # full demo board: 15 pages, 3 collapsible side-menu groups
 ```
 
-The showcase covers Basic / Icons / Form / Navigation / Data / Feedback / Code & Docs / Events & Layout / Store comparison + Native widgets / Canvas & rich text + System / Window / Browser / Environment, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). More screenshots in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md).
+The showcase covers Basic / Icons / Form / Navigation / Data / Feedback / Code & Docs / Events & Layout / Store comparison + Native widgets / Canvas & rich text + System / Window / Browser / Environment, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). More screenshots in [docs/components-ui.md](docs/components-ui.md).
 
-![Navigation page](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/showcase-nav.png)
+![Navigation page](docs/images/showcase-nav.png)
 
 ## Documentation
 
 | Doc | Content |
 |---|---|
-| [components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md) | Themed component library API + theme customization |
-| [declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md) | Declarative `Node`/`mount` trees + `Store` reactive bindings |
-| [components.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components.md) | Widget API quick reference: classic setters and `X::make` props styles |
-| [layout.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/layout.md) | Layout style keys (Yoga flexbox) |
-| [adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md) | Platform pitfalls, root causes and verification conclusions |
-| [tray.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/tray.md) | Linux tray: SNI protocol stack design and backend fallback |
-| [relink.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/relink.md) | Forcing a relink after native-layer changes |
+| [components-ui.md](docs/components-ui.md) | Themed component library API + theme customization |
+| [declarative.md](docs/declarative.md) | Declarative `Node`/`mount` trees + `Store` reactive bindings |
+| [components.md](docs/components.md) | Widget API quick reference: classic setters and `X::make` props styles |
+| [layout.md](docs/layout.md) | Layout style keys (Yoga flexbox) |
+| [adaptation.md](docs/adaptation.md) | Platform pitfalls, root causes and verification conclusions |
+| [tray.md](docs/tray.md) | Linux tray: SNI protocol stack design and backend fallback |
+| [relink.md](docs/relink.md) | Forcing a relink after native-layer changes |
 
-Full index: [docs/README.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/README.md).
+Full index: [docs/README.md](docs/README.md).
 
 ## Platform support
 
@@ -115,7 +115,7 @@ Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 25 ✅ · Windows 10/11 ✅ · m
 
 - Build & test: `moon check && moon test` (gate: zero errors, zero warnings)
 - Adding a widget: mechanical translation in `shim/yue_mbt.cpp` → declaration in `shim/include/yue_mbt.h` → `extern` in `yue/ffi.mbt` → type & methods in a new `yue/*.mbt` (FFI guide in `.agents/skills/moonbit-c-binding/`)
-- Real-machine findings go to [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md); push `bin-*` tags for binary releases, `vendor-*` tags for native-layer updates
+- Real-machine findings go to [docs/adaptation.md](docs/adaptation.md); push `bin-*` tags for binary releases, `vendor-*` tags for native-layer updates
 
 ## Reference
 

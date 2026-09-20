@@ -3,9 +3,9 @@
 托盘是 moonbit-libyue 平台差异最大的一块:Linux 没有可直接依赖的托盘运行库,
 本项目为此用纯 MoonBit 实现了 StatusNotifierItem(SNI)协议栈,会话总线直连
 面板,不依赖任何 AppIndicator 运行库。本文讲清方案的设计动机、架构分层、
-后端降级与桌面兼容性;API 用法速查见 [docs/components.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components.md) 的
+后端降级与桌面兼容性;API 用法速查见 [docs/components.md](components.md) 的
 「菜单 / 托盘」一节,真实桌面实测出的坑与验证结论统一记录在
-[docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md)。
+[docs/adaptation.md](adaptation.md)。
 
 ## 背景与约束
 
@@ -95,7 +95,7 @@ SNI 规范要求的 ARGB 大端序),不依赖任何图片资源与解码器;要�
 
 XFCE 的 libdbusmenu 客户端只发批量版 `EventGroup` / `AboutToShowGroup`,
 单条版会被 UnknownMethod 静默拒掉——traybus 单条、批量两组方法都有实现。
-抓包定位过程见 [docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md)。
+抓包定位过程见 [docs/adaptation.md](adaptation.md)。
 
 ## 桌面环境兼容性
 
@@ -108,7 +108,7 @@ XFCE 的 libdbusmenu 客户端只发批量版 `EventGroup` / `AboutToShowGroup`,
 | Windows 10 / 11 | ✅ 实测 | 原生 `Shell_NotifyIconW` 后端 |
 | macOS | ❓ 未实测 | 原生后端 |
 
-状态标记与 [docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md) 一致:
+状态标记与 [docs/adaptation.md](adaptation.md) 一致:
 ✅ 实测通过 / ⚠️ 部分可用或带条件 / ❌ 不可用 / ❓ 未实测。
 逐一真机实测后,把版本号与差异按维护约定回写 adaptation.md 并更新本表。
 

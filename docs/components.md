@@ -4,9 +4,9 @@ A quick reference of component APIs for moonbit-libyue users. All types are refe
 every widget has two usage styles: the **classic per-setter approach** (`X::new` + setters),
 or the **props-style one-shot approach** (`X::make`). Both are semantically identical; `make` is just a bundle of setters.
 
-For the declarative style (`@yue.mount` tree + `Store` binding), see [docs/declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md);
-for the full set of layout style keys, see [docs/layout.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/layout.md);
-for the complete record of platform adaptation and upstream defects, see [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md).
+For the declarative style (`@yue.mount` tree + `Store` binding), see [docs/declarative.md](declarative.md);
+for the full set of layout style keys, see [docs/layout.md](layout.md);
+for the complete record of platform adaptation and upstream defects, see [docs/adaptation.md](adaptation.md).
 
 General conventions:
 
@@ -70,7 +70,7 @@ col.add_child(child)
 
 Parameters are only `style` / `style_str` (see the top of this document). Defaults are `flexDirection=column`,
 `alignItems=stretch`; for horizontal layout use `set_style_str("flexDirection", "row")`;
-see [docs/layout.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/layout.md) for key parsing rules.
+see [docs/layout.md](layout.md) for key parsing rules.
 
 | Method | Purpose |
 |---|---|
@@ -309,7 +309,7 @@ t.on_selected_page_change(fn() { switch_to(t.get_selected_page_index()) })
 | select_page_at(i) / get_selected_page_index() / page_count() | Selection and queries |
 | on_selected_page_change(fn()) | Page switch callback |
 
-Each page's container is the root of an independent yoga subtree; for building pages declaratively, see the `tab` node in [docs/declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md).
+Each page's container is the root of an independent yoga subtree; for building pages declaratively, see the `tab` node in [docs/declarative.md](declarative.md).
 
 ## Canvas and Images
 
@@ -423,7 +423,7 @@ n.show()
 | set_title(t) / set_body(s) | Content |
 | set_silent(b) | Silent |
 | set_actions([(id, title)]) | Buttons (used with NotificationCenter's action callbacks) |
-| show() | Send (on Linux this is mandatory; see [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md)) |
+| show() | Send (on Linux this is mandatory; see [docs/adaptation.md](adaptation.md)) |
 | close() | Close |
 | NotificationCenter::get() + add(n) | Send via the notification center |
 
@@ -505,7 +505,7 @@ let tray = match @yue.Tray::new("icon.png") {
 | remove() | Remove icon |
 
 On Linux the pure MoonBit `yue/traybus` backend is recommended (the unified `Tray` API selects it automatically);
-see [docs/tray.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/tray.md) for details.
+see [docs/tray.md](tray.md) for details.
 
 ## Popover
 
@@ -578,11 +578,11 @@ Caused by upstream libyue or platform behavior; read before using the correspond
    VK value; letters and digits match ASCII. Do not mix the two tables in cross-platform code.
 6. **Style key parsing rules**: only ASCII letters are kept and lowercased, so `flexDirection` /
    `flex-direction` / `flexdirection` are equivalent; **symbols other than digits and hyphens are dropped**,
-   so do not use special characters in key names. See [docs/layout.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/layout.md) for the full key list.
+   so do not use special characters in key names. See [docs/layout.md](layout.md) for the full key list.
 7. **Callbacks are kept alive automatically, but do not synchronously pump the event loop inside a callback**: closures registered via `on_*` are held
    by the library with strong references; the same applies to `Store` subscriptions. After calling termination flows like `@yue.quit()` inside a callback,
    do not touch widgets anymore.
 8. **Platform-specific APIs not wrapped**: Toolbar / Vibrant (no symbols in the Linux static library),
    Button styles and ControlSize, Scroll bounce, App activation policy, Browser zoom,
    Image template images (macOS), ShortcutOptions / Lifetime::Reply / notification
-   COMServerOptions (Windows), etc.; see [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md) for the complete list.
+   COMServerOptions (Windows), etc.; see [docs/adaptation.md](adaptation.md) for the complete list.

@@ -1,6 +1,6 @@
 # Linux Tray Design
 
-The tray is the area with the largest platform differences in moonbit-libyue: Linux has no tray runtime library that can be depended on directly, so this project implements the StatusNotifierItem (SNI) protocol stack in pure MoonBit, connecting directly to the panel over the session bus without depending on any AppIndicator runtime library. This document explains the design motivation, architecture layers, backend fallback, and desktop compatibility of the design; for a quick API reference see the "Menu / Tray" section of [docs/components.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components.md), and pitfalls and verification conclusions from real-desktop testing are recorded uniformly in [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md).
+The tray is the area with the largest platform differences in moonbit-libyue: Linux has no tray runtime library that can be depended on directly, so this project implements the StatusNotifierItem (SNI) protocol stack in pure MoonBit, connecting directly to the panel over the session bus without depending on any AppIndicator runtime library. This document explains the design motivation, architecture layers, backend fallback, and desktop compatibility of the design; for a quick API reference see the "Menu / Tray" section of [docs/components.md](components.md), and pitfalls and verification conclusions from real-desktop testing are recorded uniformly in [docs/adaptation.md](adaptation.md).
 
 ## Background and constraints
 
@@ -63,7 +63,7 @@ Different panels consume tray menus differently, so the SNI backend prepares bot
 - **Panel mirrors the DBusMenu for rendering** (XFCE 4.18, verified to take this path): `set_menu` walks the top-level items and separators of the unified `Menu` model to build the DBusMenu (id = array index + 1, 0 is the root); clicking a menu item triggers the original callback via `MenuItem::Click`; submenus are not yet supported. DBusMenu's `AboutToShow` always returns false — returning true would make the panel treat the left click as a menu click and stop sending Activate (same semantics as ksni).
 - **ContextMenu(x, y) → application self-draws** (Qt style): the panel calls `ContextMenu` with the icon's screen coordinates, and the application pops up its own menu at that point using `Menu::popup_at(x, y)`, with the callback registered via `set_context_menu_handler`.
 
-XFCE's libdbusmenu client only sends the batch versions `EventGroup` / `AboutToShowGroup`; single-item versions are silently rejected with UnknownMethod — traybus implements both the single-item and batch method groups. See [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md) for the packet-capture diagnosis process.
+XFCE's libdbusmenu client only sends the batch versions `EventGroup` / `AboutToShowGroup`; single-item versions are silently rejected with UnknownMethod — traybus implements both the single-item and batch method groups. See [docs/adaptation.md](adaptation.md) for the packet-capture diagnosis process.
 
 ## Desktop environment compatibility
 
@@ -76,7 +76,7 @@ XFCE's libdbusmenu client only sends the batch versions `EventGroup` / `AboutToS
 | Windows 10 / 11 | ✅ verified | native `Shell_NotifyIconW` backend |
 | macOS | ❓ untested | native backend |
 
-Status markers are consistent with [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md): ✅ verified working / ⚠️ partially working or conditional / ❌ not working / ❓ untested.
+Status markers are consistent with [docs/adaptation.md](adaptation.md): ✅ verified working / ⚠️ partially working or conditional / ❌ not working / ❓ untested.
 After real-machine testing of each, write version numbers and differences back into adaptation.md per the maintenance conventions and update this table.
 
 ## Debugging and verification

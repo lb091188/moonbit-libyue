@@ -2,7 +2,7 @@
 
 After changing `shim/`, vendor patches, or the libyue version: re-run `scripts/prepare.py`,
 then force a relink — otherwise `moon run` reuses the old exe. For the rationale see
-[docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md), "Cross-Platform → Build and Linking".
+[docs/adaptation.md](adaptation.md), "Cross-Platform → Build and Linking".
 
 ## Detection
 

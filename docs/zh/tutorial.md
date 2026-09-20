@@ -102,9 +102,9 @@ moon run .
 
 ## 5. 下一步
 
-- **换肤一行**:`@yue.theme_apply({ ..@yue.default_theme(), primary: "#1E4FA3" })`,深浅跟随系统见 [components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md) 的「定制主题」
+- **换肤一行**:`@yue.theme_apply({ ..@yue.default_theme(), primary: "#1E4FA3" })`,深浅跟随系统见 [components-ui.md](components-ui.md) 的「定制主题」
 - **组件大全**:`git clone` 本仓库后 `moon run examples/showcase`,15 页演示板对着抄;每页源码独立成文件(`examples/showcase/pages_*.mbt`),是最好的复制粘贴素材库
-- **系统学习**:声明式节点与响应式绑定看 [declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/declarative.md),布局样式键全集看 [layout.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/layout.md),组件 API 速查看 [components.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components.md)
+- **系统学习**:声明式节点与响应式绑定看 [declarative.md](declarative.md),布局样式键全集看 [layout.md](layout.md),组件 API 速查看 [components.md](components.md)
 
 ## 常见问题
 
@@ -115,4 +115,4 @@ moon run .
 | `Package "yue" not found` | `moon.pkg` 的 `import` 段没加 `"NoahLiu/moonbit-libyue/yue"` |
 | Linux 报 GTK 库缺失 | 第 1 节的 apt 清单没装全 |
 | `moon run my_app` 报找不到路径 | 根包用 `moon run .` |
-| 改了代码没生效 | 原生层(shim/vendor)变更后需强制重链,见 [relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/relink.md) |
+| 改了代码没生效 | 原生层(shim/vendor)变更后需强制重链,见 [relink.md](relink.md) |
