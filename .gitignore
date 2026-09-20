@@ -1,6 +1,7 @@
 # prepare.py 产物
 /vendor/
 /build/
+/shim/build/
 /.prepare/
 
 # moon 构建产物
