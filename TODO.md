@@ -87,6 +87,11 @@
 - [x] Toast 轻提示 — toast_layer:层+推送函数,语义提示条顶部居中堆叠、定时自动移除(演示板「反馈组件」页四语义;层不拦截下方点击待真机复验)
 - [x] 表单校验(轻量版) — input_t/textarea_t 增 invalid Store(边框红)+ on_input;form_item 增 error Store(下方红字,行高固定防跳)(演示板「表单组件」页提交校验;不引入 rules 引擎,提交回调跑规则即可)
 - [x] 区间选择三件套(2026-09-20)— date_range_picker_t(区间日历两段式点选,起止自动对调)/ time_range_picker_t(起止时:分步进)/ datetime_range_picker_t(日历+时间步进+完成按钮);build_calendar 改状态闭包内核(state_of/on_cell)单选与区间共用,选择器字段统一 build_picker_field;新增 TimeHM/DateRange/TimeRange/DateTimeRange 值类型;演示板「表单组件」页(弹层内 input 聚焦行为与跨月区间高亮待真机复验)
+- [x] 图标库扩至 136 种(2026-09-20)—— 桌面开发常用全集(文件/编辑/视图/导航/媒体/通信/系统/开发/语义/数据十类),Tabler/Lucide 风格矢量自绘,新增 outline/circle/arc/line 绘制原语(演示板「基础组件」页图标墙滚动查看,视觉待真机复验)
+- [x] Windows 富文本区间属性补齐(2026-09-20)—— fork v0.15.6-mbt.9:GDI+ 无富文本,自建分段布局器(区间 run 存储/流式折行/手动对齐,测量绘制同源),MoonBit 层 set_font_for/set_color_for 去 Windows 降级守卫,三平台语义一致;vendored 三平台同步 mbt.9(六资产 sha256 钉死);Windows 真机观感待复验
+- [x] markdown_view 展示组件(2026-09-20)—— 标题/段落/粗斜体/行内代码/链接/列表/引用/分隔线/围栏代码块(语言随 fence 标注),区间字体颜色基于富文本范围属性(演示板「数据展示」页;跨端观感待 Windows 真机复验)
+- [x] code_view 增强(2026-09-20)—— tokenize_lang 通用分词:moonbit/js/ts/python/rust/c/go/bash/sql 关键字集(大小写不敏感)+ 行注释前缀按语言 + 单双引号字符串;line_numbers 行号槽(演示板「数据展示」页三语言示例)
+- [x] 浏览器独立演示页(2026-09-20)—— 「窗口与网页」拆分:窗口页留窗口能力,新「浏览器」页 WebView 全能力(URL/demo:// 协议/本地 HTML、导航四按钮+能力查询、四导航回调+标题回调、JS 执行取结果/读 URL/改标题、raw binding 增删查、get_cookies_for_url 两 URL 查询(fork mbt.7 空崩溃修复资产已就绪)、BrowserOptions 平台差异说明;交互待真机复验)
 - [x] 右键菜单 helper — context_menu_for:任意节点包原生右键菜单("-" 分隔线,bounds_in_screen 换算屏幕坐标)(演示板「基础组件」页;右键弹出位置待真机复验)
 - [ ] 可关闭页签(chrome 式动态增删)— 后置:涉及 tabs_t API 形态重构(动态页数组 + Store 驱动),独立批次做
 - [x] 单选与开关:radio_group / switch_t
