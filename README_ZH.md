@@ -38,6 +38,10 @@ let text = @yue.Signal::computed(fn() { "已点 \{clicks.get()} 次" })  // 依�
 @yue.bind(text, fn(s) { s }),
 ```
 
+## 组件用法：两种写法
+
+每个控件都有两种用法，语义完全一致：**逐个 setter 的经典写法**（`X::new()` + `set_xxx()`），或 **props 风格一步到位**（`X::make(...)`，只是 setter 的打包）。所有类型经 `@yue` 引用，控件 API 速查（入参 / 方法表）见 [components.md](docs/zh/components.md)。
+
 ## 快速开始
 
 > **不会 MoonBit？** 有任意一门语言的编程基础就行——[五分钟上手教程](docs/zh/tutorial.md) 从 `moon new` 带你到窗口跑起来，附官方 MoonBit 教程与交互式 Tour 链接。

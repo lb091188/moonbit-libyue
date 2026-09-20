@@ -1,12 +1,6 @@
 # 组件方法速查
 
-面向 moonbit-libyue 使用者的组件 API 速查。所有类型经 `@yue` 引用；
-每个控件都有两种用法：**逐个 setter 的经典写法**（`X::new` + setter），
-或 **props 风格一步到位**（`X::make`）。两者语义完全一致，`make` 只是 setter 的打包。
-
-声明式写法（`@yue.mount` 树 + `Store` 绑定）见 [docs/declarative.md](declarative.md)；
-布局样式键全集见 [docs/layout.md](layout.md)；
-平台适配与上游缺陷的完整记录见 [docs/adaptation.md](adaptation.md)。
+用法总述（两种写法）见仓库 [README_ZH.md](../../README_ZH.md)；所有类型经 `@yue` 引用。
 
 通用约定：
 
