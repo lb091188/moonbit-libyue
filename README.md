@@ -38,6 +38,8 @@ let clicks = @yue.Signal::new(0)
 
 The three compose freely: the themed library is the recommended front door (unified look), while libyue native widgets and the imperative style remain fully available.
 
+> **New to MoonBit?** Start with the [five-minute tutorial](https://github.com/lb091188/moonbit-libyue/blob/master/docs/tutorial.md): from `moon new` to a running window, with links to the official MoonBit tutorial and the interactive Tour.
+
 ## Quick start
 
 ```sh

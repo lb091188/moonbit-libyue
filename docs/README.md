@@ -2,6 +2,7 @@
 
 | Document | Content |
 |---|---|
+| [tutorial.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/tutorial.md) | Five-minute tutorial for MoonBit newcomers: from `moon new` to a running window, with the three newcomer pitfalls resolved; includes links to the official MoonBit tutorial & Tour |
 | [adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md) | Platform adaptation experience: real-world pitfalls per platform, root causes, and verification conclusions (continuously updated) |
 | [components.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components.md) | Component API quick reference: both classic setter and `X::make` props styles, including upstream pitfalls |
 | [declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md) | Declarative UI: `Node`/`mount` render tree + `Store`/`Signal` reactive bindings (signals: computed with automatic dependency tracking + batch) |

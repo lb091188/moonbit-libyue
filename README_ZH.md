@@ -38,6 +38,8 @@ let clicks = @yue.Signal::new(0)
 
 三者可单独用也可叠加：主题组件库是对外唯一窗口（统一视觉），libyue 原生控件与命令式写法同样保留。
 
+> **不会 MoonBit？** 看 [五分钟上手教程](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/tutorial.md)：从 `moon new` 到窗口跑起来，附官方 MoonBit 教程与交互式 Tour 链接。
+
 ## 快速开始
 
 ```sh
