@@ -1022,6 +1022,167 @@ pub(all) struct Token {
 ///|
 /// MoonBit 风格的极简着色器:关键字 / 数字 / 字符串 / 注释 / 普通文本。
 /// 仅供演示;消费方可换成任意词法分析结果后直接用 code_view。
+///|
+/// ASCII 小写(关键字大小写不敏感比较用)。
+fn ascii_lower(s : String) -> String {
+  let out = Ref(StringBuilder())
+  for ch in s {
+    let c = ch.to_int()
+    if c >= 65 && c <= 90 {
+      out.val.write_char((c + 32).unsafe_to_char())
+    } else {
+      out.val.write_char(ch)
+    }
+  }
+  out.val.to_string()
+}
+
+///|
+/// 语言关键字集与行注释前缀(代码高亮通用参数表)。
+fn lang_keywords(lang : String) -> (Array[String], String) {
+  match lang {
+    "js" | "ts" =>
+      ([
+        "function", "const", "let", "var", "if", "else", "return", "class",
+        "extends", "import", "export", "new", "typeof", "await", "async",
+        "for", "while", "switch", "case", "break", "default", "try", "catch",
+        "throw", "this", "super", "null", "undefined", "true", "false",
+        "static", "get", "set", "of", "in", "yield", "delete", "void",
+      ], "//")
+    "python" =>
+      ([
+        "def", "class", "import", "from", "if", "elif", "else", "for",
+        "while", "in", "not", "and", "or", "lambda", "return", "None",
+        "True", "False", "self", "pass", "with", "as", "try", "except",
+        "finally", "raise", "yield", "global", "del", "assert", "break",
+        "continue", "is",
+      ], "#")
+    "rust" =>
+      ([
+        "fn", "let", "mut", "pub", "struct", "enum", "impl", "trait", "use",
+        "mod", "match", "if", "else", "loop", "while", "for", "in", "return",
+        "Some", "None", "Ok", "Err", "self", "crate", "move", "ref", "where",
+        "async", "await", "dyn", "as", "break", "const", "continue",
+        "static", "type", "unsafe", "true", "false",
+      ], "//")
+    "c" =>
+      ([
+        "include", "define", "typedef", "struct", "union", "enum", "static",
+        "const", "int", "void", "char", "float", "double", "return", "if",
+        "else", "for", "while", "switch", "case", "break", "default",
+        "sizeof", "long", "short", "unsigned", "signed", "extern", "goto",
+        "do",
+      ], "//")
+    "go" =>
+      ([
+        "func", "package", "import", "var", "const", "type", "struct",
+        "interface", "map", "chan", "go", "defer", "if", "else", "for",
+        "range", "return", "nil", "break", "continue", "switch", "case",
+        "default", "select", "fallthrough",
+      ], "//")
+    "bash" =>
+      ([
+        "echo", "if", "then", "else", "fi", "for", "do", "done", "while",
+        "case", "esac", "function", "local", "export", "return", "exit",
+        "read", "shift", "in",
+      ], "#")
+    "sql" =>
+      ([
+        "select", "from", "where", "insert", "into", "values", "update",
+        "set", "delete", "create", "table", "join", "left", "right", "inner",
+        "outer", "on", "group", "order", "by", "limit", "as", "and", "or",
+        "not", "null", "distinct", "count", "sum", "avg", "primary", "key",
+        "foreign", "references", "alter", "drop", "index", "view",
+      ], "--")
+    _ =>
+      ([
+        "fn", "let", "mut", "if", "else", "for", "while", "match", "return",
+        "struct", "impl", "pub", "enum", "trait", "type", "true", "false",
+        "using", "import", "test", "const", "view",
+      ], "//")
+  }
+}
+
+///|
+/// 通用语言分词:字符串("…"/'…')、行注释(按语言)、关键字(大小写
+/// 不敏感)、数字与默认文本。tokenize_moonbit 即本函数的 moonbit 特化。
+pub fn tokenize_lang(line : String, lang : String) -> Array[Token] {
+  let (keywords, comment_prefix) = lang_keywords(lang)
+  let out : Array[Token] = []
+  let cs : Array[Char] = []
+  for ch in line {
+    cs.push(ch)
+  }
+  let n = cs.length()
+  let buf = Ref(StringBuilder())
+  let in_string = Ref(false)
+  let quote : Ref[Char] = Ref('"')
+  fn flush() -> Unit {
+    let s = buf.val.to_string()
+    buf.val = StringBuilder()
+    if s.length() > 0 {
+      if in_string.val {
+        out.push({ text: s, color: "#98C379", })
+      } else {
+        out.push(classify_token(s, keywords))
+      }
+    }
+  }
+
+  let mut i = 0
+  while i < n {
+    let ch = cs[i]
+    if in_string.val {
+      buf.val.write_char(ch)
+      if ch == quote.val {
+        flush()
+        in_string.val = false
+      }
+    } else if ch == '"' || ch == '\'' {
+      flush()
+      in_string.val = true
+      quote.val = ch
+      buf.val.write_char(ch)
+    } else if ch == '/' && i + 1 < n && cs[i + 1] == '/' && comment_prefix == "//" {
+      flush()
+      let comment = StringBuilder()
+      while i < n {
+        comment.write_char(cs[i])
+        i = i + 1
+      }
+      out.push({ text: comment.to_string(), color: "#5C6370", })
+      break
+    } else if ch == '#' && comment_prefix == "#" {
+      flush()
+      let comment = StringBuilder()
+      while i < n {
+        comment.write_char(cs[i])
+        i = i + 1
+      }
+      out.push({ text: comment.to_string(), color: "#5C6370", })
+      break
+    } else if ch == '-' && i + 1 < n && cs[i + 1] == '-' && comment_prefix == "--" {
+      flush()
+      let comment = StringBuilder()
+      while i < n {
+        comment.write_char(cs[i])
+        i = i + 1
+      }
+      out.push({ text: comment.to_string(), color: "#5C6370", })
+      break
+    } else if ch == ' ' {
+      flush()
+      out.push({ text: " ", color: "#ABB2BF", })
+    } else {
+      buf.val.write_char(ch)
+    }
+    i = i + 1
+  }
+  flush()
+  out
+}
+
+///|
 pub fn tokenize_moonbit(line : String) -> Array[Token] {
   let keywords = [
     "fn", "let", "mut", "if", "else", "for", "while", "match", "return", "struct",
@@ -1084,8 +1245,9 @@ pub fn tokenize_moonbit(line : String) -> Array[Token] {
 
 ///|
 fn classify_token(word : String, keywords : Array[String]) -> Token {
+  let lowered = ascii_lower(word)
   for k in keywords {
-    if k == word {
+    if ascii_lower(k) == lowered {
       return { text: word, color: "#C678DD", }
     }
   }
@@ -1108,8 +1270,10 @@ fn classify_token(word : String, keywords : Array[String]) -> Token {
 /// AttributedText 区间字体/颜色是上游缺陷(见 docs/adaptation.md),此法绕开。
 pub fn code_view(
   lines : Array[String],
+  lang? : String = "moonbit",
   font_size? : Double = 13.0,
   width? : Double = 560.0,
+  line_numbers? : Bool = false,
 ) -> Node {
   {
     mount: fn(parent) {
@@ -1124,12 +1288,30 @@ pub fn code_view(
       // 挂载时预排版:逐 token 测宽,避免每次重绘重复分词/测量
       let line_h = make_at("Ag", "#FFFFFF").get_bounds_for(10000.0, 100.0).height +
         5.0
+      // 行号区:等宽数字位宽 × 最大位数 + 间距
+      let digit_probe = make_at("8", "#FFFFFF")
+      let digit_w = digit_probe.get_bounds_for(10000.0, 100.0).width
+      let digits = lines.length().to_string().length()
+      let num_off = if line_numbers {
+        digit_w * digits.to_double() + 24.0
+      } else {
+        0.0
+      }
       let laid : Array[(Array[(AttributedText, Double)], Double)] = []
       let mut max_line_w = 0.0
-      for line in lines {
+      for idx, line in lines {
         let segs : Array[(AttributedText, Double)] = []
-        let mut x = 0.0
-        for tok in tokenize_moonbit(line) {
+        let mut x = num_off
+        if line_numbers {
+          let num_txt = (idx + 1).to_string()
+          let pad = Ref(StringBuilder())
+          for _i in 0..<(digits - num_txt.length()) {
+            pad.val.write_char(' ')
+          }
+          let at_num = make_at(pad.val.to_string() + num_txt, "#6B7280")
+          segs.push((at_num, 16.0))
+        }
+        for tok in tokenize_lang(line, lang) {
           let at = make_at(tok.text, tok.color)
           let w = at.get_bounds_for(10000.0, 100.0).width
           segs.push((at, x))
@@ -1140,7 +1322,7 @@ pub fn code_view(
         }
         laid.push((segs, x))
       }
-      let content_w = max_line_w + 32.0
+      let content_w = max_line_w + num_off + 32.0
       let view_w = if width > content_w { width } else { content_w }
       let view_h = line_h * laid.length().to_double() + 28.0
       let c = themed_container(style=[("width", view_w), ("height", view_h)])
