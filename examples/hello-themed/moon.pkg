@@ -2,4 +2,6 @@ import {
   "NoahLiu/moonbit-libyue/yue",
 }
 
-pkgtype(kind: "executable")
+options(
+  "is-main": true,
+)

@@ -626,6 +626,7 @@ void yue_mbt_view_set_cursor(void *view, void *cursor);
 int32_t yue_mbt_tray_supported(void);
 void *yue_mbt_tray_new(const char *icon_path, int32_t *ok);
 void yue_mbt_tray_set_title(void *tray, const char *title);
+void yue_mbt_tray_set_image(void *tray, void *image);
 void yue_mbt_tray_remove(void *tray);
 
 /* 方法级审计补齐(2026-09-16) */

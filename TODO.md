@@ -96,7 +96,7 @@
 - [x] form 表单布局 — form_item(标签右对齐定宽 + 控件区)+ form 分组标题
 - [x] link 链接文字 — 主题色 + 悬停下划线 + 点击回调
 - [x] page-header 页头 — ‹ 返回(悬停变主题色)+ 标题 + 右侧操作区
-- [x] components 收编系统能力(2026-09-19):新增「系统集成」页(文件对话框/消息框/系统通知/剪贴板/定时器)与「窗口与网页」页(窗口 API/全局快捷键/拖放接收/内嵌 WebView),现代主题包装;示例收敛为两个——showcase=全能力×默认主题,components=现代主题×组件库+系统能力,其余 17 个示例移除(能力已并入 showcase 各页)
+- [x] 示例定案三示例制(2026-09-20):主题组件库为对外唯一窗口(统一视觉),旧 showcase(默认主题×全能力)删除、独有能力迁入演示板——新增「事件与布局」页(鼠标五事件/捕获/全局鼠标轮询/光标/嵌套布局三宽度),系统集成页补通知按钮与静默/剪贴板 HTML/主选区(Linux)/托盘主题图标/无边框透明心形窗/关闭拦截/窗口最大化,原生控件页补 Group/原生 Tab/滚动条策略/原生表格独立窗口,Browser 段补导航(go_forward/reload/stop/能力查询)/四导航回调/raw binding 增删查/JS 结果回传(get_cookies 待 v0.15.6-mbt.7 资产后补);components 重命名为 showcase,另建 hello(原版控件)与 hello-themed(主题版)两个最小示例;get_cookies_for_url 的空 Cookie 崩溃已在 fork v0.15.6-mbt.7 修复(CHECK 删除,待出包回填)
 - [x] ~~backtop 返回顶部~~ — 已移除(2026-09-19):EP 网页端长页面组件,桌面端滚动条/Home 键即达,价值低;真机疑难(首点被吞)随组件删除而消除,过程经验入档 adaptation.md(运行期 set_background_color 规范/点两次形态判别);Scroll::scroll_to_top 通用 API 保留
 - [x] tree 树形控件 — TreeNode 嵌套 + 缩进层级 + 点击 ▸/▾ 展开折叠
 - [x] transfer 穿梭框 — 双列 + 行点击选中(方块标记)+ ›/‹ 互移(动态行经 remove_child_view 重建)

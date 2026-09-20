@@ -4089,7 +4089,7 @@ extern "C" void yue_mbt_menu_item_click(void *item) {
   }
 }
 
-void yue_mbt_tray_set_image(void *tray, void *image) {
+extern "C" void yue_mbt_tray_set_image(void *tray, void *image) {
   auto *t = TrayStore::get(tray);
   auto *img = ImageStore::get(image);
   if (t != nullptr && img != nullptr) {

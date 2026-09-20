@@ -60,6 +60,11 @@ fn open_table_window() -> Unit {
   win.set_content_size(520.0, 380.0)
   let page = @yue.Container::new()
   page.set_style("padding", 12.0)
+  fn apply_bg() -> Unit {
+    page.set_background_color(@yue.theme_current().bg_page)
+  }
+  apply_bg()
+  @yue.on_theme_change(apply_bg)
   let table = @yue.Table::new()
   table.add_column_with_options("语言", {
     column_type: @yue.Text,

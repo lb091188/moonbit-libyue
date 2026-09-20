@@ -31,9 +31,16 @@ The themed layer keeps native rendering while providing a modern Element-Plus-st
 
 ## Demos
 
-### Modern — themed component library
+### Minimal examples
 
-`moon run examples/components` — a four-page demo board covering the full themed library, every component and state; API reference in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md):
+```sh
+moon run examples/hello         # native widgets: libyue default look
+moon run examples/hello-themed  # themed library: theme_apply + button_t/input_t/label_t
+```
+
+### Full showcase
+
+`moon run examples/showcase` — an 11-page themed demo board covering the component library and all libyue capabilities: Basic / Form / Events & Layout / Navigation / Data / Feedback + Native Widgets / Canvas & Rich Text + System / Window & Web / Environment, grouped in the side menu; API reference in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md):
 
 ![Basic](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-basic.png)
 
@@ -42,12 +49,6 @@ The themed layer keeps native rendering while providing a modern Element-Plus-st
 ![Data display](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-data.png)
 
 ![Feedback](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-feedback.png)
-
-### Classic — native widgets
-
-`moon run examples/showcase` — a 12-page demo of the full native widget set, grouped in the side menu (Basics / Layout & Drawing / Data Views / Window & System Integration; widgets / inputs / canvas / browser / table / dialogs / menus / tray / clipboard / events …):
-
-![Showcase widgets page](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/widgets.png)
 
 More examples in [examples/](https://github.com/lb091188/moonbit-libyue/tree/master/examples).
 
