@@ -77,7 +77,8 @@ let t = @yue.default_theme()
 | `timeline(items)` | 语义色节点 + 连线 |
 | `collapse(panels)` | 点击标题开合,面板独立 |
 | `card(title, children, height?)` | 标题栏 + 分隔线 + 边框 |
-| `code_view(lines, font_size?, width?)` | 代码高亮;逐 token 建 AttributedText(整段设色)测宽自绘,全平台一致,绕开 Windows 区间属性缺陷 |
+| `code_view(lines, lang?, font_size?, width?, line_numbers?)` | 代码高亮;逐 token 建 AttributedText(整段设色)测宽自绘,全平台一致(Windows 区间字体/颜色 v0.15.6-mbt.9 起同步);lang 关键字集:moonbit/js/ts/python/rust/c/go/bash/sql(大小写不敏感),line_numbers=true 左侧行号 |
+| `markdown_view(source, width?)` | Markdown 展示:标题 1-6/段落/**粗体**/*斜体*/`行内代码`/链接文字/无序有序列表/引用(主题色竖条)/分隔线/围栏代码块(语言随 fence 标注,复用 code_view);区间字体颜色经富文本范围属性,三平台一致,链接/代码色跟主题 |
 | `table_t(columns, rows : Store[Array[TableRow]], width?, row_height?, selection?, on_row_click?)` | 表格:表头 + 斑马纹 + 悬停底色;列用 `TableColumn::make(标题, 宽, align?)`(宽 ≤0 为弹性列均分剩余宽),Store set 后整表重建。单元格 `TableCell`:`CellText` / `CellTag(文本, 语义类型)` / `CellColorBox(色值, 名)` / `CellLines(多行,行自动撑高)`,`TableRow::make(字符串数组)` 建纯文本行。不传 `selection` 行点击单选高亮;传 `selection : Store[Array[Int]]` 启用复选框列(行点击勾选、表头全选/清空、部分选中画横条),回调收 `(行号, 行)` |
 | `table_v_t(columns, rows : Store[Array[TableRow]], width?, height?, row_height?, selection?, on_row_click?)` | 虚拟滚动表格(万行级):整面 canvas 自绘、只画可见行,自管滚动(滚轮/拖滚动条/键盘),不受原生滚动容器内容高度上限约束;单元格画法同 `table_t`(CellLines 行高内最多两行),列/selection 语义一致 |
 

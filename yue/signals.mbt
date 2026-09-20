@@ -225,5 +225,5 @@ pub fn[A] bind(
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
 ) -> Node {
-  bind_label({ sig }, f, style~, style_str~)
+  bind_label({ sig, }, f, style~, style_str~)
 }
