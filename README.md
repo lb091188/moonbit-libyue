@@ -4,189 +4,100 @@
 
 MoonBit bindings for [libyue](https://libyue.com/docs/latest/cpp/) — build native cross-platform desktop apps (Windows / macOS / Linux) in pure MoonBit.
 
-## Platform support
-
-- [x] Ubuntu 24.04 Xfce
-- [x] Ubuntu 24.04 GNOME
-- [x] Ubuntu 24.04 KDE
-- [x] Deepin 25
-- [x] Windows 10 / 11
-- [ ] Mac (no device to test)
-
 English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)
 
-## Yue
+![Component showcase](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/showcase-basic.png)
 
-A library for creating native cross-platform GUI apps.
+## Highlights
 
-## Three ways to build UI
-
-| # | Stack | Typical code | For |
-|---|---|---|---|
-| 1 | **Themed component library + declarative + reactive** | `button_t` / `side_menu` / `tag` / `alert` … nodes bound to `Store` | Modern app shells — recommended |
-| 2 | **Native libyue widgets + declarative + reactive** | `button` / `entry` / `slider` … nodes + `Store` bindings | Native look with declarative code |
-| 3 | **Native libyue widgets + imperative** | `Window::new` + `set_content` + setters | Close to the raw libyue API |
-
-The themed layer keeps native rendering while providing a modern Element-Plus-style look, declarative node trees and reactive data binding — native, and pleasant to use. The default palette is deep and low-saturation, and the whole theme is customizable: `theme_apply({ ..default_theme(), primary: "#1E4FA3" })` before mounting reskins everything — see "Customizing the theme" in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md).
-
-## Demos
-
-### Minimal examples
-
-```sh
-moon run examples/hello         # native widgets: libyue default look
-moon run examples/hello-themed  # themed library: theme_apply + button_t/input_t/label_t
-```
-
-### Full showcase
-
-`moon run examples/showcase` — a 15-page themed demo board covering the component library and all libyue capabilities: Basic / Icons (136 vector icons in ten groups) / Form / Events & Layout / Navigation / Data / Code & Docs / Feedback + Store comparison + Native Widgets / Canvas & Rich Text + System / Window / Browser (full WebView capabilities) / Environment, grouped in the side menu (Basic / Advanced / Reactive / Native / System), with the package version shown at the sidebar bottom (kept in sync with moon.mod); API reference in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md):
-
-![Basic](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-basic.png)
-
-![Navigation](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-nav.png)
-
-![Data display](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-data.png)
-
-![Feedback](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-feedback.png)
-
-More examples in [examples/](https://github.com/lb091188/moonbit-libyue/tree/master/examples).
-
-## Usage
-
-### Quick start
-
-#### Ubuntu 24.04
-
-System dependencies:
-
-```sh
-sudo apt install build-essential cmake pkg-config \
-  libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev \
-  libwebkit2gtk-4.1-dev
-```
-
-Build the native library and run an example:
-**The first build downloads a prebuilt libyue static library from GitHub
-(seconds, no local C++ compilation of libyue); only the small shim file is
-compiled. Set `LIBYUE_FORCE_SOURCE=1` to fall back to a full source build.**
-
-```sh
-moon run examples/showcase
-```
-
-#### Windows (10/11, x64)
-
-Requires Python 3, MoonBit, CMake, the MSVC C++ toolchain (with ATL), etc.
-
-1. Install the MoonBit toolchain:
-
-```powershell
-irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
-```
-
-2. Install CMake and the MSVC C++ toolchain:
-
-```powershell
-winget install Kitware.CMake
-winget install Microsoft.VisualStudio.2022.BuildTools -e --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
-```
-
-3. Add the ATL component:
-
-```powershell
-Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe' -ArgumentList 'modify','--installPath','"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"','--add','Microsoft.VisualStudio.Component.VC.ATL','--quiet','--norestart' -Verb RunAs -Wait
-```
-
-4. Build and run. **On Windows moon looks for `cl` on PATH when compiling native code, so run it from the "x64 Native Tools Command Prompt for VS 2022", or call `vcvars64.bat` first**:
-
-```bat
-call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-moon run examples/showcase
-```
-
-(When the native artifacts are missing, moon invokes
-`python3 scripts\prepare.py` automatically; run it manually only inside
-the MSVC environment above.)
-
-### Use as a dependency
-
-Prebuilt native libraries (Linux x64 / macOS universal / Windows x64) ship
-inside the package: after `moon add` everything builds and runs without
-compiling libyue's C++ sources locally:
-
-```sh
-moon add NoahLiu/moonbit-libyue
-moon run src
-```
-
-**The project must target native**: this library only supports the native
-backend. The `moon new` template defaults to `preferred_target = "wasm"`,
-which fails with `ffi_* is unbound` because the FFI files are excluded from
-the wasm build; set `preferred_target = "native"` in the project's moon.mod
-(or pass `--target native`).
-
-On Linux the GTK development packages are still required at link time (see
-the apt list above); other platforms (e.g. linux/arm64) fall back to a
-source build that needs CMake and a C++ toolchain.
-
-### Declarative UI
-
-Windows can be described as declarative node trees (`@yue.mount_window`) instead of imperative `new + set_content` calls.
-
-**1. Hello window** — nodes for a label and a button, mounted straight into a window:
+**🎨 Modern theme** — An Element-Plus-style themed component library (50+ widgets: buttons / forms / navigation / data display / feedback), fully self-drawn and visually consistent across all three platforms; reskin with one `theme_apply` call, light/dark follows the system:
 
 ```moonbit
-fn main {
-  if !@yue.initialize() {
-    return
-  }
-  let window = @yue.mount_window(
-    [
-      @yue.label("Hello, MoonBit + libyue!", style=[("margin", 20.0)]),
-      @yue.button("Quit", on_click=fn() { @yue.quit() }),
-    ],
-    title="Hello",
-    size=Some((420.0, 160.0)),
-    center=true,
-    on_close=fn(_w) { @yue.quit() },
-  )
-  @yue.run()
-}
+@yue.theme_apply({ ..@yue.default_theme(), primary: "#1E4FA3" })
 ```
 
-![Hello window](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/hello.png)
-
-**2. Reactive counter** — a `Store` holds the state; `bind_label` re-renders the label on every update. No manual "set text after click" wiring:
+**📝 Declarative** — Describe the UI as a node tree; no `new + set_content` plumbing:
 
 ```moonbit
-let clicks : @yue.Store[Int] = @yue.Store::new(0)
 let window = @yue.mount_window(
   [
-    @yue.vbox(
-      [
-        @yue.button("Click me", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
-        @yue.bind_label(clicks, fn(n) { "Clicked \{n} times" }),
-      ],
-      style=[("padding", 24.0)],
-    ),
+    @yue.label("Hello, MoonBit + libyue!", style=[("margin", 20.0)]),
+    @yue.button("Quit", on_click=fn() { @yue.quit() }),
   ],
-  title="Counter",
-  size=Some((320.0, 160.0)),
-  center=true,
-  on_close=fn(_w) { @yue.quit() },
+  title="Hello", size=Some((420.0, 160.0)), center=true, on_close=fn(_w) { @yue.quit() },
 )
 ```
 
-![Counter window](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/counter.png)
+**⚡ Reactive signals** — State lives in `Signal` / `Store`; bound views refresh automatically, no "on click update that label" glue:
 
-More node types are covered in [docs/declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md).
+```moonbit
+let clicks = @yue.Signal::new(0)
+@yue.button("Click me", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
+@yue.bind(clicks, fn(n) { "Clicked \{n} times" }),  // derived text, updates on click
+```
 
-### Documentation
+The three compose freely: the themed library is the recommended front door (unified look), while libyue native widgets and the imperative style remain fully available.
 
-| Document | Content |
+## Quick start
+
+```sh
+# Ubuntu 24.04: one-time system dependencies (GTK/WebKit dev packages)
+sudo apt install build-essential cmake pkg-config \
+  libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev libwebkit2gtk-4.1-dev
+
+# As a dependency: prebuilt native libraries ship with the package — zero C++ compilation
+moon add NoahLiu/moonbit-libyue
+moon run src
+
+# Run the demo board
+git clone https://github.com/lb091188/moonbit-libyue && cd moonbit-libyue
+moon run examples/showcase
+```
+
+<details>
+<summary>Windows (10/11, x64) setup</summary>
+
+Requires Python 3, MoonBit, CMake and the MSVC C++ toolchain (with ATL). moon locates `cl` via PATH when compiling native code, so run from "x64 Native Tools Command Prompt for VS 2022" or call `vcvars64.bat` first:
+
+```powershell
+irm https://cli.moonbitlang.com/install/powershell.ps1 | iex            # MoonBit
+winget install Kitware.CMake
+winget install Microsoft.VisualStudio.2022.BuildTools -e --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+# Add the ATL component:
+Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe' -ArgumentList 'modify','--installPath','"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"','--add','Microsoft.VisualStudio.Component.VC.ATL','--quiet','--norestart' -Verb RunAs -Wait
+```
+
+</details>
+
+**Projects must target native**: the `moon new` template defaults to `preferred_target = "wasm"` and fails with `ffi_* is unbound`; change `preferred_target` to `"native"` in moon.mod.
+
+## Three ways to build a UI
+
+| Layer | Style | Best for |
+|---|---|---|
+| 1 | **Themed library + declarative + reactive**: `button_t` / `side_menu` / `tag` … nodes + `Store` bindings | Modern app shells, recommended |
+| 2 | **libyue native widgets + declarative + reactive**: `button` / `entry` / `slider` … nodes + `Store` bindings | Native look with declarative code |
+| 3 | **libyue native widgets + imperative**: `Window::new` + `set_content` + setters | Closest to raw libyue |
+
+## Demo
+
+```sh
+moon run examples/hello         # minimal native-widget window
+moon run examples/hello-themed  # themed minimal example (theme_apply + button_t/input_t/label_t)
+moon run examples/showcase      # full demo board: 15 pages, 3 collapsible side-menu groups
+```
+
+The showcase covers Basic / Icons / Form / Navigation / Data / Feedback / Code & Docs / Events & Layout / Store comparison + Native widgets / Canvas & rich text + System / Window / Browser / Environment, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). More screenshots in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md).
+
+![Navigation page](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/showcase-nav.png)
+
+Prebuilt binaries: push a `bin-*` tag and the [Releases](https://github.com/lb091188/moonbit-libyue/releases) page carries executables for all three platforms (Linux needs the GTK3 runtime / Windows ships WebView2Loader.dll / macOS Apple Silicon).
+
+## Documentation
+
+| Doc | Content |
 |---|---|
-| [components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md) | Themed component library API with demo screenshots |
+| [components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md) | Themed component library API + theme customization |
 | [declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md) | Declarative `Node`/`mount` trees + `Store` reactive bindings |
 | [components.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components.md) | Widget API quick reference: classic setters and `X::make` props styles |
 | [layout.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/layout.md) | Layout style keys (Yoga flexbox) |
@@ -196,18 +107,17 @@ More node types are covered in [docs/declarative.md](https://github.com/lb091188
 
 Full index: [docs/README.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/README.md).
 
-## Development
+## Platform support
 
-- Build & test: `moon check && moon test`
-- Adding a widget: mechanical translation in `shim/yue_mbt.cpp` → declaration in `shim/include/yue_mbt.h` → `extern "c"` in `yue/ffi.mbt` → type & methods in a new `yue/*.mbt` (FFI conventions in `.agents/skills/moonbit-c-binding/`).
-- Current binding surface: ~320 ABI functions (324 `extern "c"` declarations in `yue/ffi.mbt`).
-- Real-world pitfalls and platform lessons go to [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md); usage docs and code comments stay content-only.
-- After shim/vendor changes, force a relink: `moon clean` or delete the executable — see [docs/relink.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/relink.md).
+Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 25 ✅ · Windows 10/11 ✅ · macOS builds on CI (no device)
 
-## References
+## Contributing
 
-- libyue documentation: <https://libyue.com/docs/latest/cpp/guides/getting_started.html>
-- Lua bindings: github.com/yue/yue
-- MoonBit skill library: `.agents/skills/` (`moonbit-c-binding`, `make-moonbit-c-bindings`)
-- AI collaboration rules: `AGENTS.md`
-- Platform adaptation experience: [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md)
+- Build & test: `moon check && moon test` (gate: zero errors, zero warnings)
+- Adding a widget: mechanical translation in `shim/yue_mbt.cpp` → declaration in `shim/include/yue_mbt.h` → `extern` in `yue/ffi.mbt` → type & methods in a new `yue/*.mbt` (FFI guide in `.agents/skills/moonbit-c-binding/`)
+- Real-machine findings go to [docs/adaptation.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/adaptation.md); push `bin-*` tags for binary releases, `vendor-*` tags for native-layer updates
+
+## Reference
+
+- libyue docs: <https://libyue.com/docs/latest/cpp/guides/getting_started.html>
+- Lua bindings (architecture reference): github.com/yue/yue
