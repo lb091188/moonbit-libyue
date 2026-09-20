@@ -262,7 +262,12 @@ def link_configs() -> dict:
         return {"link_configs": [{
             "package": "NoahLiu/moonbit-libyue/yue",
             "link_flags": (
-                f"{manifest}{build}/yue_mbt.lib"
+                # GUI 子系统:moon 的 MSVC 链接模板把本串拼进 /link 段且
+                # 位于其硬编码 /subsystem:console 之后,link.exe 后写覆盖
+                # 前写;入口点由 link 按已定义的 main 自动选
+                # mainCRTStartup,无需 /ENTRY。
+                "/SUBSYSTEM:WINDOWS "
+                + f"{manifest}{build}/yue_mbt.lib"
                 + (f" {prebuilt}" if prebuilt else "")
                 + " " + " ".join(WINDOWS_LINK_LIBS)
             ),
