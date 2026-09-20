@@ -138,21 +138,28 @@ fn main {
   let window = @yue.mount_window(
     [
       @yue.hbox(style=[("flex", 1.0)], style_str=[("alignItems", "stretch")], [
-        // 侧栏:菜单 + 弹性占位 + 底部包版本号(与 moon.mod 同步,
-        // scripts/prebuild.py 构建期校验)
+        // 侧栏:菜单(可滚动,窗口矮时滚到底部项) + 底部钉住包版本号
+        // (与 moon.mod 同步,scripts/prebuild.py 构建期校验)
         @yue.vbox(
           [
-            @yue.side_menu_sections(
-              [
-                ("基础", ["基础组件", "图标库", "表单组件", "事件与布局"]),
-                ("进阶", ["导航组件", "数据展示", "代码与文档", "反馈组件"]),
-                ("响应式", ["Store 对照"]),
-                ("原生", ["原生控件", "画布与富文本"]),
-                ("系统", ["系统集成", "窗口", "浏览器", "环境与平台"]),
-              ],
-              selected,
+            @yue.scroll(
+              @yue.vbox(
+                [
+                  @yue.side_menu_sections(
+                    [
+                      ("基础", ["基础组件", "图标库", "表单组件", "事件与布局"]),
+                      ("进阶", ["导航组件", "数据展示", "代码与文档", "反馈组件"]),
+                      ("响应式", ["Store 对照"]),
+                      ("原生", ["原生控件", "画布与富文本"]),
+                      ("系统", ["系统集成", "窗口", "浏览器", "环境与平台"]),
+                    ],
+                    selected,
+                  ),
+                ],
+                style=[("width", 180.0)],
+              ),
+              style=[("flex", 1.0), ("width", 180.0)],
             ),
-            @yue.vbox([], style=[("flex", 1.0)]),
             @yue.label_t(
               "moonbit-libyue \{@yue.VERSION}",
               role=@yue.Secondary,
