@@ -29,7 +29,7 @@ fn page_native(_app : App) -> @yue.Node {
   nat_date.set_date(946684800L)
   scroll_page([
     section(
-      "原生标签 / 按钮",
+      "标签 / 按钮",
       "libyue 原生 Button/Label(系统主题外观),点击计数由命令式 set_text 回显。",
       [
         @yue.hbox([
@@ -49,30 +49,52 @@ fn page_native(_app : App) -> @yue.Node {
       ],
     ),
     section(
-      "单行输入 Entry",
-      "原生输入框:on_input 实时回显、on_enter 回车、password 密码框。",
+      "文本输入(Entry / TextEdit)",
+      "原生 Entry:on_input 实时回显、on_enter 回车、password 密码框;TextEdit 撤销重做/剪切复制粘贴/选区与插入。",
       [
-        @yue.entry(text="在这里输入…", on_input=fn(t) {
-          match nat_echo_lb.val {
-            Some(l) => l.set_text("回显:\{t}")
-            None => ()
-          }
-        }, on_enter=fn(t) {
-          match nat_echo_lb.val {
-            Some(l) => l.set_text("回显:\{t}(回车)")
-            None => ()
-          }
-        }),
-        @yue.label(
-          "回显:",
-          style=[("marginTop", 8.0)],
-          handle=fn(l) { nat_echo_lb.val = Some(l) },
-        ),
-        @yue.entry(text="口令", password=true, style=[("marginTop", 8.0)]),
+        @yue.vbox([
+          @yue.entry(text="在这里输入…", on_input=fn(t) {
+            match nat_echo_lb.val {
+              Some(l) => l.set_text("回显:\{t}")
+              None => ()
+            }
+          }, on_enter=fn(t) {
+            match nat_echo_lb.val {
+              Some(l) => l.set_text("回显:\{t}(回车)")
+              None => ()
+            }
+          }),
+          @yue.label(
+            "回显:",
+            style=[("marginTop", 8.0)],
+            handle=fn(l) { nat_echo_lb.val = Some(l) },
+          ),
+          @yue.entry(text="口令", password=true, style=[("marginTop", 8.0)]),
+          @yue.text_edit(
+            text="多行文本…\n试试撤销 / 重做 / 全选 / 插入。",
+            handle=fn(t) { nat_edit.val = Some(t) },
+            style=[("height", 96.0), ("marginTop", 8.0)],
+          ),
+          @yue.hbox(
+            [
+              @yue.button_t("撤销", on_click=fn() { match nat_edit.val { Some(t) => t.undo()
+ None => () } }),
+              @yue.button_t("重做", on_click=fn() { match nat_edit.val { Some(t) => t.redo()
+ None => () } }),
+              @yue.button_t("全选", on_click=fn() { match nat_edit.val { Some(t) => t.select_all()
+ None => () } }),
+              @yue.button_t("粘贴", on_click=fn() { match nat_edit.val { Some(t) => t.paste()
+ None => () } }),
+              @yue.button_t("插入一行", on_click=fn() { match nat_edit.val { Some(t) => t.insert_text("\n(插入)")
+ None => () } }),
+            ],
+            style=[("marginTop", 8.0)],
+          ),
+        ]),
       ],
     ),
     section(
-      "滑块联动进度条",
+      "数值(Slider / ProgressBar)",
       "原生 Slider + ProgressBar(handle 命令式 set_value);按钮切换不确定态。",
       [
         @yue.slider(range=Some((0.0, 100.0)), step=Some(1.0), on_change=fn(v) {
@@ -101,17 +123,17 @@ fn page_native(_app : App) -> @yue.Node {
       ],
     ),
     section(
-      "复选框 / 单选组",
-      "原生 checkbox 独立勾选;同组 radio 自动互斥。",
+      "选择(Checkbox / Radio / ComboBox / Picker)",
+      "checkbox 独立勾选;radio 同组自动互斥;ComboBox 可编辑(on_select/on_input);Picker 只读列表选择。",
       [
-        @yue.checkbox("启用扩展", on_change=fn(v) {
-          match nat_pick_lb.val {
-            Some(l) => l.set_text("当前:\{if v { "扩展已启用" } else { "扩展已停用" }}")
-            None => ()
-          }
-        }),
-        @yue.hbox(
-          [
+        @yue.hbox([
+          @yue.vbox([
+            @yue.checkbox("启用扩展", on_change=fn(v) {
+              match nat_pick_lb.val {
+                Some(l) => l.set_text("当前:\{if v { "扩展已启用" } else { "扩展已停用" }}")
+                None => ()
+              }
+            }),
             @yue.radio("甲", on_change=fn(v) {
               if v {
                 match nat_pick_lb.val {
@@ -136,56 +158,47 @@ fn page_native(_app : App) -> @yue.Node {
                 }
               }
             }),
-          ],
-          style=[("marginTop", 8.0)],
-        ),
-        @yue.label(
-          "当前:乙",
-          style=[("marginTop", 8.0)],
-          handle=fn(l) { nat_pick_lb.val = Some(l) },
-        ),
-      ],
-    ),
-    section(
-      "下拉组合框 / 只读选择器",
-      "ComboBox 可编辑(on_select/on_input);Picker 只读列表选择。",
-      [
-        @yue.combo(
-          items=["MoonBit", "libyue", "GTK"],
-          selected=0,
-          on_select=fn() {
-            match nat_cb.val {
-              Some(c) =>
-                match nat_combo_lb.val {
-                  Some(l) => l.set_text("组合框:\{c.get_selected_item()}")
+          ]),
+          @yue.label("        "),
+          @yue.vbox([
+            @yue.combo(
+              items=["MoonBit", "libyue", "GTK"],
+              selected=0,
+              on_select=fn() {
+                match nat_cb.val {
+                  Some(c) =>
+                    match nat_combo_lb.val {
+                      Some(l) => l.set_text("组合框:\{c.get_selected_item()}")
+                      None => ()
+                    }
                   None => ()
                 }
-              None => ()
-            }
-          },
-          handle=fn(c) { nat_cb.val = Some(c) },
-        ),
-        @yue.picker(
-          items=["红", "绿", "蓝"],
-          on_change=fn() {
-            match nat_pk.val {
-              Some(p) =>
-                match nat_picker_lb.val {
-                  Some(l) => l.set_text("选择器:\{p.get_selected_item()}")
+              },
+              handle=fn(c) { nat_cb.val = Some(c) },
+            ),
+            @yue.picker(
+              items=["红", "绿", "蓝"],
+              on_change=fn() {
+                match nat_pk.val {
+                  Some(p) =>
+                    match nat_picker_lb.val {
+                      Some(l) => l.set_text("选择器:\{p.get_selected_item()}")
+                      None => ()
+                    }
                   None => ()
                 }
-              None => ()
-            }
-          },
-          handle=fn(p) { nat_pk.val = Some(p) },
-          style=[("marginTop", 8.0)],
-        ),
-        @yue.label(
-          "组合框:MoonBit",
-          style=[("marginTop", 8.0)],
-          handle=fn(l) { nat_combo_lb.val = Some(l) },
-        ),
-        @yue.label("选择器:-", handle=fn(l) { nat_picker_lb.val = Some(l) }),
+              },
+              handle=fn(p) { nat_pk.val = Some(p) },
+              style=[("marginTop", 8.0)],
+            ),
+            @yue.label(
+              "组合框:MoonBit",
+              style=[("marginTop", 8.0)],
+              handle=fn(l) { nat_combo_lb.val = Some(l) },
+            ),
+            @yue.label("选择器:-", handle=fn(l) { nat_picker_lb.val = Some(l) }),
+          ]),
+        ]),
       ],
     ),
     section(
@@ -211,75 +224,20 @@ fn page_native(_app : App) -> @yue.Node {
       ],
     ),
     section(
-      "GIF 播放",
-      "GifPlayer 无解码器依赖播放 GIF(dot.gif);yoga 叶子需显式宽高。",
+      "展示(GIF / Group / Tab)",
+      "GifPlayer 播放 GIF;分组 Group 标题 + 内容;原生 Tab 切换页签。",
       [
-        @yue.gif(
-          image=Some(@yue.Image::new_from_file("examples/showcase/dot.gif")),
-          style=[("width", 120.0), ("height", 120.0)],
-        ),
-      ],
-    ),
-    section(
-      "多行文本编辑",
-      "TextEdit 编辑 API:撤销重做/剪切复制粘贴/选区与插入。",
-      [
-        @yue.text_edit(
-          text="多行文本…\n试试撤销 / 重做 / 全选 / 插入。",
-          handle=fn(t) { nat_edit.val = Some(t) },
-          style=[("height", 96.0)],
-        ),
-        @yue.hbox(
-          [
-            @yue.button_t("撤销", on_click=fn() { match nat_edit.val { Some(t) => t.undo()
- None => () } }),
-            @yue.button_t("重做", on_click=fn() { match nat_edit.val { Some(t) => t.redo()
- None => () } }),
-            @yue.button_t("全选", on_click=fn() { match nat_edit.val { Some(t) => t.select_all()
- None => () } }),
-            @yue.button_t("粘贴", on_click=fn() { match nat_edit.val { Some(t) => t.paste()
- None => () } }),
-            @yue.button_t("插入一行", on_click=fn() { match nat_edit.val { Some(t) => t.insert_text("\n(插入)")
- None => () } }),
-          ],
-          style=[("marginTop", 8.0)],
-        ),
-      ],
-    ),
-    section(
-      "气泡 Popover",
-      "原生 Popover 气泡(Linux 原生气泡;Windows 右下 8 秒自动关)。",
-      [
-        @yue.button("弹出气泡", handle=fn(b) { nat_pop.val = Some(b) }, on_click=fn() {
-          match nat_pop.val {
-            Some(b) => {
-              let pop = @yue.Popover::new()
-              let tip = @yue.Label::new("这是一个 Popover 气泡")
-              tip.set_style("padding", 10.0)
-              pop.set_content(tip)
-              pop.set_content_size(180.0, 44.0)
-              pop.show_relative_to(b)
-            }
-            None => ()
-          }
-        }),
-      ],
-    ),
-    section(
-      "分组 Group",
-      "标题 + 内容;Windows 不按内容自增长,跨平台需显式高度。",
-      [
-        @yue.group(
-          "分组:内嵌标签",
-          @yue.label("分组里的内容", style=[("padding", 8.0)]),
-          style=[("height", 96.0)],
-        ),
-      ],
-    ),
-    section(
-      "原生页签 Tab",
-      "原版 Tab 控件:声明式 tab 节点逐个加页,切换时 on_change 回调计数(主题化页签见「导航组件」页 Tabs)。",
-      [
+        @yue.hbox([
+          @yue.gif(
+            image=Some(@yue.Image::new_from_file("examples/showcase/dot.gif")),
+            style=[("width", 120.0), ("height", 120.0)],
+          ),
+          @yue.group(
+            "分组:内嵌标签",
+            @yue.label("分组里的内容", style=[("padding", 8.0)]),
+            style=[("height", 96.0), ("marginLeft", 12.0)],
+          ),
+        ]),
         @yue.tab(
           [
             ("文本", @yue.label("第一个页签的内容", style=[("padding", 8.0)])),
@@ -302,8 +260,17 @@ fn page_native(_app : App) -> @yue.Node {
       ],
     ),
     section(
+      "原生表格 Table",
+      "TableModel 数据视图分离;列类型 Text/Checkbox/Edit;GTK 下放 Notebook 页签崩溃,故独立子窗口。",
+      [
+        @yue.button_t("打开表格演示窗口", variant=@yue.Solid, on_click=fn() {
+          open_table_window()
+        }),
+      ],
+    ),
+    section(
       "滚动区 Scroll",
-      "滚动条策略 Automatic/Always/Never 切换。",
+      "滚动条策略 Automatic/Always/Never 切换,验证悬浮条(空闲隐形)。",
       [
         @yue.scroll(
           @yue.vbox([
@@ -326,15 +293,6 @@ fn page_native(_app : App) -> @yue.Node {
               }
             None => ()
           }
-        }),
-      ],
-    ),
-    section(
-      "原生表格 Table",
-      "TableModel 数据视图分离;列类型 Text/Checkbox/Edit;GTK 下放 Notebook 页签崩溃,故独立子窗口。",
-      [
-        @yue.button_t("打开表格演示窗口", variant=@yue.Solid, on_click=fn() {
-          open_table_window()
         }),
       ],
     ),

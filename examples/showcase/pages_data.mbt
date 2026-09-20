@@ -62,8 +62,8 @@ fn page_data(app : App) -> @yue.Node {
   let transfer_right : @yue.Store[Array[String]] = @yue.Store::new(["深圳"])
   scroll_page([
     section(
-      "Tag 标签",
-      "五种语义类型(浅底深字)+ 自定义实底色;宽度按文本自适应,文字垂直居中。",
+      "Tag 标签与 Avatar 头像",
+      "五种语义 Tag(浅底深字)+ 自定义实底色,宽度自适应;Avatar 方形实底 + 白色字母,三种尺寸。",
       [
         @yue.hbox(
           [
@@ -72,20 +72,11 @@ fn page_data(app : App) -> @yue.Node {
             @yue.tag_of_type("Warning", @yue.Warning),
             @yue.tag_of_type("Danger", @yue.Danger),
             @yue.tag_of_type("Info", @yue.Info),
+            @yue.tag("自定义实底", "#2D68C4"),
+            @yue.tag("v1.0", "#2E9E5B"),
           ],
           style_str=[("alignItems", "center")],
         ),
-        @yue.hbox(
-          [@yue.tag("自定义实底", "#2D68C4"), @yue.tag("v1.0", "#2E9E5B")],
-          style=[("marginTop", 8.0)],
-          style_str=[("alignItems", "center")],
-        ),
-      ],
-    ),
-    section(
-      "Avatar 头像",
-      "方形实底色块 + 白色字母,三种尺寸。",
-      [
         @yue.hbox(
           [
             @yue.avatar("M", "#2D68C4", size=44.0),
@@ -93,6 +84,7 @@ fn page_data(app : App) -> @yue.Node {
             @yue.avatar("X", "#D64550", size=30.0),
             @yue.avatar("L", "#D9822B", size=26.0),
           ],
+          style=[("marginTop", 10.0)],
           style_str=[("alignItems", "center")],
         ),
       ],
@@ -115,8 +107,8 @@ fn page_data(app : App) -> @yue.Node {
       ],
     ),
     section(
-      "Statistic 数值统计",
-      "大号数值响应式:点下面的按钮,数值经 computed 派生信号自动刷新。",
+      "Statistic 数值统计与 Progress 进度条",
+      "大号数值经 computed 派生信号自动刷新;进度条主题色填充 + 浅灰轨道,随同一按钮联动。",
       [
         @yue.hbox(
           [
@@ -130,12 +122,6 @@ fn page_data(app : App) -> @yue.Node {
           on_click=fn() { app.counter.update(fn(n) { n + 1 }) },
           variant=@yue.Solid,
         ),
-      ],
-    ),
-    section(
-      "Progress 线性进度条",
-      "主题色填充 + 浅灰轨道,数值响应式(computed 派生,随上面的刷新按钮联动变化)。",
-      [
         @yue.progress_line(app.ratio.store()),
         @yue.bind(
           app.ratio,
@@ -145,8 +131,8 @@ fn page_data(app : App) -> @yue.Node {
       ],
     ),
     section(
-      "Card 卡片",
-      "标题栏 + 底部分隔线 + 边框,内容区自动留出标题高度。",
+      "Card 卡片与 Collapse 折叠面板",
+      "标题栏 + 底部分隔线 + 边框;折叠面板点击标题展开/收起,各面板独立,初始第一个展开。",
       [
         @yue.card(
           "卡片标题",
@@ -155,12 +141,6 @@ fn page_data(app : App) -> @yue.Node {
           ],
           height=110.0,
         ),
-      ],
-    ),
-    section(
-      "Collapse 折叠面板",
-      "点击标题展开/收起,各面板独立;初始第一个展开。",
-      [
         @yue.collapse([
           (
             "如何使用组件库?",
@@ -177,17 +157,15 @@ fn page_data(app : App) -> @yue.Node {
         ]),
       ],
     ),
-    section("Descriptions 描述列表", "键灰值深的键值网格。", [
-      @yue.descriptions([
-        ("框架", "moonbit-libyue"),
-        ("渲染", "GTK 3 (Linux) / Win32 (Windows)"),
-        ("组件层", "纯 MoonBit,零平台代码"),
-      ]),
-    ]),
     section(
-      "Timeline 时间线",
-      "左侧色点 + 竖线,节点颜色跟随语义类型;末项无连线。",
+      "Descriptions 描述列表与 Timeline 时间线",
+      "键灰值深的键值网格;左侧色点 + 竖线,节点颜色跟随语义类型,末项无连线。",
       [
+        @yue.descriptions([
+          ("框架", "moonbit-libyue"),
+          ("渲染", "GTK 3 (Linux) / Win32 (Windows)"),
+          ("组件层", "纯 MoonBit,零平台代码"),
+        ]),
         @yue.timeline([
           ("发布 1.0", "2026-01-01,首个稳定版。", @yue.Success),
           ("发布 1.1", "2026-05-01,新增组件库。", @yue.Primary),
@@ -196,8 +174,8 @@ fn page_data(app : App) -> @yue.Node {
       ],
     ),
     section(
-      "Table 表格",
-      "表头 + 斑马纹 + 悬停底色,点击行单选;「添加一行」经 Store 驱动整表重建,选中行信号回显。",
+      "Table 表格(单选)",
+      "表头 + 斑马纹 + 悬停底色,点击行单选;Store 驱动「添加一行」整表重建,选中行信号回显。",
       [
         @yue.table_t(
           [
@@ -234,8 +212,8 @@ fn page_data(app : App) -> @yue.Node {
       ],
     ),
     section(
-      "Table 表格(多选 + 富单元格)",
-      "复选框列:行点击勾选,表头全选/清空(部分选中画横条);单元格支持 tag/颜色块/多行文本(行自动撑高)。",
+      "Table 表格(多选)",
+      "复选框列:行点击勾选,表头全选/清空(部分选中画横条)。",
       [
         @yue.table_t(
           [
@@ -252,7 +230,34 @@ fn page_data(app : App) -> @yue.Node {
       ],
     ),
     section(
-      "Table 虚拟滚动表格",
+      "Table 表格(富单元格)",
+      "单元格支持 Tag / 颜色块 / 多行文本(行自动撑高)。",
+      [
+        @yue.hbox(
+          [
+            @yue.table_t(
+              [
+                @yue.TableColumn::make("语言", 120.0),
+                @yue.TableColumn::make("类型", 100.0),
+                @yue.TableColumn::make("色板", 110.0),
+                @yue.TableColumn::make("特性", 0.0),
+              ],
+              rich_rows,
+              selection=table_sel,
+              width=460.0,
+            ),
+            @yue.vbox([
+              @yue.label_t("CellTag:彩色语义标签", role=@yue.Secondary),
+              @yue.label_t("CellColorBox:色块 + 说明", role=@yue.Secondary),
+              @yue.label_t("CellLines:多行文本自动撑高", role=@yue.Secondary),
+            ], style=[("marginLeft", 12.0)]),
+          ],
+          style_str=[("alignItems", "start")],
+        ),
+      ],
+    ),
+    section(
+      "Table 虚拟滚动",
       "整面自绘只画可见行,万行流畅;滚轮/拖右侧滚动条/键盘 ↑↓ PageUp PageDown 翻页。",
       [
         @yue.table_v_t(
@@ -290,23 +295,22 @@ fn page_data(app : App) -> @yue.Node {
       ],
     ),
     section(
-      "Transfer 穿梭框",
-      "点击行选中(方块标记),中间 ›/‹ 把选中项移到对侧。",
-      [@yue.transfer(transfer_left, transfer_right)],
-    ),
-    section(
-      "Carousel 轮播",
-      "面板序列 + 左右箭头 + 底部指示点,3 秒自动切换(悬停暂停)。",
+      "Transfer 穿梭框与 Carousel 轮播",
+      "穿梭框:点击行选中,中间 ›/‹ 移对侧;轮播:箭头/圆点手动切,3 秒自动切换(悬停暂停)。",
       [
-        @yue.carousel_t(
-          [
-            @yue.label_t("第一屏:轮播内容可为任意 Node。", role=@yue.Body),
-            @yue.label_t("第二屏:自动轮播 3s 一切。", role=@yue.Body),
-            @yue.label_t("第三屏:悬停暂停,箭头/圆点手动切。", role=@yue.Body),
-          ],
-          width=320.0,
-          height=80.0,
-        ),
+        @yue.hbox([
+          @yue.transfer(transfer_left, transfer_right),
+          @yue.label("   "),
+          @yue.carousel_t(
+            [
+              @yue.label_t("第一屏:轮播内容可为任意 Node。", role=@yue.Body),
+              @yue.label_t("第二屏:自动轮播 3s 一切。", role=@yue.Body),
+              @yue.label_t("第三屏:悬停暂停,箭头/圆点手动切。", role=@yue.Body),
+            ],
+            width=320.0,
+            height=80.0,
+          ),
+        ]),
       ],
     ),
     section("Empty 空状态", "占位图 + 说明文字。", [

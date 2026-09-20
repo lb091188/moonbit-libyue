@@ -796,13 +796,14 @@ void yue_mbt_apply_native_theme_css(const char *css) {
     // 真实输入框由 borderless 规则去边,不受此 border 影响
     gtk_style_context_add_provider_for_screen(
         screen, GTK_STYLE_PROVIDER(g_native_color_provider), G_MAXUINT - 1);
-    // 关闭 overlay 滚动条:滚动时才浮现的条无法稳定呈现钉色,
-    // 常驻经典式与 EP 风格一致(属性 3.24 起,缺席时跳过)
+    // 开启 overlay 滚动条:空闲时悬浮不占位,悬停/拖拽时浮现;钉色
+    // 改由 CSS 三态(空闲透明 / hover 主题色 / dragging 深色)保证,
+    // 不再依赖常驻 classic 滚动条
     auto *settings = gtk_settings_get_for_screen(screen);
     if (settings != nullptr &&
         g_object_class_find_property(
             G_OBJECT_GET_CLASS(settings), "gtk-overlay-scrolling") != nullptr) {
-      g_object_set(settings, "gtk-overlay-scrolling", FALSE, (void *)nullptr);
+      g_object_set(settings, "gtk-overlay-scrolling", TRUE, (void *)nullptr);
     }
   }
   gtk_css_provider_load_from_data(

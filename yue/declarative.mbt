@@ -388,6 +388,7 @@ pub fn scroll(
   content : Node,
   content_size? : (Double, Double)? = None,
   policy? : (ScrollPolicy, ScrollPolicy)? = None,
+  overlay? : Bool = true,
   style? : Array[(String, Double)] = [],
   style_str? : Array[(String, String)] = [],
   handle? : (Scroll) -> Unit = fn(_s) {  },
@@ -403,6 +404,9 @@ pub fn scroll(
       match policy {
         Some((h, v)) => s.set_scrollbar_policy(h, v)
         None => ()
+      }
+      if overlay {
+        s.set_overlay_scrollbar(true)
       }
       apply_style(s, style~, style_str~)
       attach(parent, ViewLike::view(s))

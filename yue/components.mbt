@@ -299,8 +299,11 @@ fn apply_native_theme_css(t : Theme) -> Unit {
   buf.write_string("textview text { background-color: \{t.bg_panel}; color: \{t.text_primary}; }")
   buf.write_string("textview text selection { background-color: \{t.primary_light}; color: \{t.text_primary}; }")
   buf.write_string("scrollbar { background-color: transparent; }")
-  buf.write_string("scrollbar slider { background-color: \{t.border}; border-radius: 0px; }")
-  buf.write_string("scrollbar slider:hover { background-color: \{t.text_secondary}; }")
+  buf.write_string("scrollbar.overlay-indicator:not(.dragging):not(.hovering) { background-color: transparent; }")
+  buf.write_string("scrollbar.overlay-indicator:not(.dragging):not(.hovering) slider { min-width: 4px; min-height: 4px; margin: 3px; border-radius: 4px; background-color: \{t.border}; }")
+  buf.write_string("scrollbar.overlay-indicator.dragging, scrollbar.overlay-indicator.hovering { background-color: \{t.primary_light}; }")
+  buf.write_string("scrollbar.overlay-indicator.dragging slider, scrollbar.overlay-indicator.hovering slider { background-color: \{t.primary}; border-radius: 8px; }")
+  buf.write_string("scrollbar slider:hover { background-color: \{t.primary}; border-radius: 8px; }")
   buf.write_string("window { background-color: \{t.bg_page}; }")
   buf.write_string("scrolledwindow junction { background-color: \{t.bg_page}; }")
   // 原生 tooltip 恒深底白字(EP 语义,不随色板):系统主题的 tooltip
@@ -474,10 +477,39 @@ fn bind_focus(
 }
 
 ///|
+/// 圆角矩形填充(bezier 控制点按圆率 0.5522 近似四角)。r 自动钳到
+/// w/2、h/2 以内,窄条也不会画出负半径。
+fn fill_round_rect(
+  p : Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+  r : Double,
+) -> Unit {
+  let r = if r > w / 2.0 { w / 2.0 } else if r > h / 2.0 { h / 2.0 } else { r }
+  let k = 0.5522847498
+  p.begin_path()
+  p.move_to(x + r, y)
+  p.line_to(x + w - r, y)
+  p.bezier_curve_to(x + w - r + k * r, y, x + w, y + r - k * r, x + w, y + r)
+  p.line_to(x + w, y + h - r)
+  p.bezier_curve_to(x + w, y + h - r + k * r, x + w - r + k * r, y + h, x + w - r, y + h)
+  p.line_to(x + r, y + h)
+  p.bezier_curve_to(x + r - k * r, y + h, x, y + h - r + k * r, x, y + h - r)
+  p.line_to(x, y + r)
+  p.bezier_curve_to(x, y + r - k * r, x + r - k * r, y, x + r, y)
+  p.close_path()
+  p.fill()
+}
+
+///|
 /// 自绘交互项通用挂载器:背景色表达 hover/active,文字垂直居中。
 /// bg_of(active, hover) 返回背景色(空串表示透明);fg_of(active) 返回文字色。
 /// align_start=false 时文字水平居中(分段/分页),true 时左对齐(菜单)。
 /// (GTK 端水平 align 未实现,居中一律手动:测文本宽、x=(w-文本宽)/2。)
+/// icon 非空时画在 pad_x 起(16px,文字右移 24);accent 时选中态左缘
+/// 画 3px 强调条(与文字同色);rounded 时背景画 4px 圆角。
 fn stateful_item(
   text : String,
   style : Array[(String, Double)],
@@ -487,6 +519,9 @@ fn stateful_item(
   pad_x? : Double = 0.0,
   align_start? : Bool = false,
   font_size? : Double = 13.0,
+  icon? : IconKind? = None,
+  accent? : Bool = false,
+  rounded? : Bool = false,
 ) -> Node {
   {
     mount: fn(parent) {
@@ -519,24 +554,35 @@ fn stateful_item(
         let bg = bg_of(act, hover.val)
         if bg != "" {
           p.set_fill_color(bg)
-          p.fill_rect(0.0, 0.0, w, h)
+          if rounded {
+            fill_round_rect(p, 0.0, 0.0, w, h, 4.0)
+          } else {
+            p.fill_rect(0.0, 0.0, w, h)
+          }
+        }
+        if accent && act {
+          p.set_fill_color(fg_of(act, hover.val))
+          p.fill_rect(0.0, 8.0, 3.0, h - 16.0)
+        }
+        // 图标在 pad_x 起(16px),文字右移;无图标按 align_start/居中排
+        let text_x = match icon {
+          Some(k) => {
+            draw_icon(p, k, pad_x + 8.0, h / 2.0, 16.0 * 0.42, fg_of(act, hover.val))
+            pad_x + 24.0
+          }
+          None =>
+            if align_start {
+              pad_x
+            } else {
+              (w - text_w) / 2.0
+            }
         }
         // 文字:AttributedText 支持指定字号,垂直居中交给 valign=Center;
         // 水平位置手动计算(见函数注释)
         let at = AttributedText::new(text, valign=Center, wrap=false)
         at.set_font(font)
         at.set_color(fg_of(act, hover.val))
-        p.draw_attributed_text(
-          at,
-          if align_start {
-            pad_x
-          } else {
-            (w - text_w) / 2.0
-          },
-          0.0,
-          w,
-          h,
-        )
+        p.draw_attributed_text(at, text_x, 0.0, w, h)
         if focused.val {
           draw_focus_ring(p, w, h)
         }
@@ -592,16 +638,24 @@ fn side_menu_fg(act : Bool, _hov : Bool) -> String {
 }
 
 ///|
-/// 侧边导航菜单(对应 EP Menu):hover 浅蓝、选中浅蓝底 + 主题色文字,
-/// 直角,文字垂直居中。selected 为共享状态,主区页面可订阅同一 Store
+/// 侧边导航菜单(对应 EP Menu):hover 浅灰、选中主题浅蓝底 + 主题色
+/// 文字 + 左侧 3px 强调条,4px 圆角,文字垂直居中。icons 给「项文本 →
+/// 图标」(缺省不画);selected 为共享状态,主区页面可订阅同一 Store
 /// 做 set_visible 联动。
 pub fn side_menu(
   items : Array[String],
   selected : Store[String],
   width? : Double = 180.0,
+  icons? : Array[(String, IconKind)] = [],
 ) -> Node {
   let nodes : Array[Node] = []
   for it in items {
+    let mut kind : IconKind? = None
+    for kv in icons {
+      if kv.0 == it {
+        kind = Some(kv.1)
+      }
+    }
     nodes.push(
       stateful_item(
         it,
@@ -612,6 +666,9 @@ pub fn side_menu(
         side_menu_fg,
         pad_x=20.0,
         align_start=true,
+        icon=kind,
+        accent=true,
+        rounded=true,
       ),
     )
   }
@@ -6435,41 +6492,121 @@ pub fn color_picker_t(
 }
 
 ///|
-/// 分组侧边菜单(side_menu 的分组形态):每组一段小标题(不可点,次要色
-/// 小字)+ 组内菜单项(画法与 side_menu 一致,选中/悬停联动 selected)。
+/// 分组侧边菜单(side_menu 的分组形态):组标题行自绘(次要色小字 +
+/// 右侧折叠箭头),foldable 时可点收起/展开组内项(默认全展开,键盘
+/// Enter/Space 同效);组内菜单项画法与 side_menu 一致(图标/强调条/
+/// 圆角,选中/悬停联动 selected)。icons 给「项文本 → 图标」。
 pub fn side_menu_sections(
   sections : Array[(String, Array[String])],
   selected : Store[String],
   width? : Double = 180.0,
+  icons? : Array[(String, IconKind)] = [],
+  foldable? : Bool = true,
 ) -> Node {
-  let nodes : Array[Node] = []
-  for (group, items) in sections {
-    // 组标题:次要色小字,不可点,恒左对齐(label_t;普通 label 底层
-    // 默认水平居中,满宽拉伸时文字会飘到中间);paddingLeft 与菜单项
-    // 文字的 pad_x 一致(同一父容器的 padding 下两者左缘对齐)
-    nodes.push(
-      label_t(
-        group,
-        role=Secondary,
-        style=[("paddingLeft", 20.0), ("paddingTop", 10.0), ("height", 24.0)],
-      ),
-    )
-    for it in items {
-      nodes.push(
-        stateful_item(
-          it,
-          // 外层 vbox 有 padding 6,项宽 = 总宽 − 两侧 padding,防向右溢出
-          [("width", width - 12.0), ("height", 36.0)],
-          selected,
-          side_menu_bg,
-          side_menu_fg,
-          pad_x=20.0,
-          align_start=true,
-        ),
-      )
-    }
+  {
+    mount: fn(parent) {
+      let outer = themed_container(style=[("width", width), ("padding", 6.0)], style_str=[
+        ("flexDirection", "column"),
+      ])
+      set_panel_bg(outer)
+      let gfont = Font::new("Sans", 12.0)
+      for (group, items) in sections {
+        let open = Ref(true)
+        // 组标题行:自绘(组名 + 右侧折叠箭头),不挂子件保证 hover 全区域
+        let head = themed_container(
+          style=[("height", 30.0), ("width", width - 12.0)],
+        )
+        let head_hover = Ref(false)
+        let head_focused = Ref(false)
+        head.on_draw(fn(p) {
+          let b = ViewLike::get_bounds(head)
+          if foldable && head_hover.val {
+            p.set_fill_color(theme_fill_hover())
+            fill_round_rect(p, 0.0, 0.0, b.width, b.height, 4.0)
+          }
+          let at = AttributedText::new(group, valign=Center, wrap=false)
+          at.set_font(gfont)
+          at.set_color(theme_text_secondary())
+          p.draw_attributed_text(at, 14.0, 0.0, b.width, b.height)
+          if foldable {
+            draw_icon(
+              p,
+              if open.val {
+                ChevronDown
+              } else {
+                ChevronRight
+              },
+              b.width - 14.0,
+              b.height / 2.0,
+              5.0,
+              theme_text_secondary(),
+            )
+          }
+          if head_focused.val {
+            draw_focus_ring(p, b.width, b.height)
+          }
+        })
+        // 组内项容器 + 项(收起即整容器隐藏,不占布局)
+        let body = themed_container(style_str=[("flexDirection", "column")])
+        for it in items {
+          let mut kind : IconKind? = None
+          for kv in icons {
+            if kv.0 == it {
+              kind = Some(kv.1)
+            }
+          }
+          let item = stateful_item(
+            it,
+            // 项宽 = 总宽 − 两侧 padding,与标题行同宽防溢出
+            [("width", width - 12.0), ("height", 36.0)],
+            selected,
+            side_menu_bg,
+            side_menu_fg,
+            pad_x=14.0,
+            align_start=true,
+            icon=kind,
+            accent=true,
+            rounded=true,
+          )
+          ignore((item.mount)(ViewLike::view(body)))
+        }
+        fn apply_fold() -> Unit {
+          ViewLike::set_visible(body, open.val)
+          ViewLike::schedule_paint(head)
+        }
+
+        if foldable {
+          let toggle = fn() -> Unit {
+            open.val = !open.val
+            apply_fold()
+          }
+
+          apply_fold()
+          View::set_cursor(head, hand())
+          ViewLike::on_mouse_enter(head, fn(_e) {
+            head_hover.val = true
+            ViewLike::schedule_paint(head)
+          })
+          ViewLike::on_mouse_leave(head, fn(_e) {
+            head_hover.val = false
+            ViewLike::schedule_paint(head)
+          })
+          ViewLike::on_mouse_down(head, fn(e) {
+            if e.button == 1 {
+              ViewLike::focus(head)
+              toggle()
+              true
+            } else {
+              false
+            }
+          })
+          bind_focus(head, fn() { ViewLike::schedule_paint(head) }, head_focused, toggle)
+        }
+        outer.add_child(head)
+        outer.add_child(body)
+      }
+      attach(parent, ViewLike::view(outer))
+      ViewLike::view(outer)
+    },
   }
-  vbox(nodes, style=[("width", width), ("padding", 6.0)], handle=fn(c) {
-    set_panel_bg(c)
-  })
 }

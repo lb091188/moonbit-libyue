@@ -231,7 +231,7 @@ pub fn[T : ViewLike] Scroll::make(
   content : T,
   content_size? : (Double, Double)? = None,
   policy? : (ScrollPolicy, ScrollPolicy)? = None,
-  overlay? : Bool = false,
+  overlay? : Bool = true,
 ) -> Scroll {
   let s = Scroll::new()
   s.set_content(content)

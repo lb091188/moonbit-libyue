@@ -1,11 +1,9 @@
 // 基础组件页:Signal 驱动的主题组件演示。共享状态(counter 计数、
 // picked_lang 最近操作)在 App;页内状态用源信号,展示端用 bind 直连,
-// 无手动 subscribe 接线。
+// 无手动 subscribe 接线。勾选类在表单组件页,右键菜单在导航组件页。
 
 ///|
 fn page_basic(app : App) -> @yue.Node {
-  let sync = @yue.Signal::new(false)
-  let notify = @yue.Signal::new(true)
   scroll_page([
     section(
       "Button 按钮变体",
@@ -27,82 +25,40 @@ fn page_basic(app : App) -> @yue.Node {
       ],
     ),
     section(
-      "Label 文字角色",
-      "五级排版,字号颜色随角色。",
+      "Label 文字与 Link 链接",
+      "五级排版角色,字号颜色随角色;Link 主题色文字悬停下划线,最近点击信号回显。",
       [
         @yue.label_t("标题文字(Title)", role=@yue.Title),
         @yue.label_t("小节标题(Section)", role=@yue.Section),
         @yue.label_t("正文文字(Body)", role=@yue.Body),
         @yue.label_t("辅助文字(Secondary)", role=@yue.Secondary),
         @yue.label_t("强调文字(Accent)", role=@yue.Accent),
-      ],
-    ),
-    section(
-      "Link 链接文字",
-      "主题色文字,悬停下划线;最近点击信号回显。",
-      [
-        @yue.hbox([
-          @yue.link("打开文档", fn() { app.picked_lang.set("docs") }),
-          @yue.label("   "),
-          @yue.link("帮助中心", fn() { app.picked_lang.set("help") }),
-          @yue.label_t("最近点击:", role=@yue.Body),
-          @yue.bind(app.picked_lang, fn(s) { s }),
-        ]),
-      ],
-    ),
-    section(
-      "Divider 分隔线",
-      "水平(默认)/竖直 1px 主题边框色。",
-      [
-        @yue.label_t("上方内容"),
-        @yue.divider(spacing=6.0),
-        @yue.label_t("下方内容"),
-      ],
-    ),
-    section(
-      "ContextMenu 右键菜单",
-      "context_menu_for 给任意节点包右键原生菜单(\"-\" 分隔线),在下面色块上点右键试试。",
-      [
-        @yue.context_menu_for(
-          @yue.tag("右键我", "#2D68C4"),
+        @yue.hbox(
           [
-            ("复制", fn() { app.picked_lang.set("已复制") }),
-            ("重命名", fn() { app.picked_lang.set("重命名") }),
-            ("-", fn() {  }),
-            ("删除", fn() { app.picked_lang.set("已删除") }),
+            @yue.link("打开文档", fn() { app.picked_lang.set("docs") }),
+            @yue.label("   "),
+            @yue.link("帮助中心", fn() { app.picked_lang.set("help") }),
+            @yue.label_t("最近点击:", role=@yue.Body),
+            @yue.bind(app.picked_lang, fn(s) { s }),
           ],
+          style=[("marginTop", 8.0)],
+          style_str=[("alignItems", "center")],
         ),
       ],
     ),
     section(
-      "Checkbox 复选框(信号)",
-      "勾选态存 Signal,勾选即回显。",
+      "Divider 分隔线与 Tooltip 悬浮提示",
+      "水平(默认)/竖直 1px 主题边框色;tooltip_t 给任意节点包原生悬浮提示(系统样式,主题化气泡见反馈页 Popover)。",
       [
-        @yue.vbox([
-          @yue.checkbox_t("启用自动同步", on_change=fn(v) { sync.set(v) }),
-          @yue.checkbox_t("接收通知", checked=true, on_change=fn(v) {
-            notify.set(v)
-          }),
-          @yue.hbox(
-            [
-              @yue.bind(sync, fn(v) { if v { "同步:开" } else { "同步:关" } }),
-              @yue.label("   "),
-              @yue.bind(notify, fn(v) { if v { "通知:开" } else { "通知:关" } }),
-            ],
-            style=[("marginTop", 8.0)],
-          ),
-        ]),
-      ],
-    ),
-    section(
-      "Tooltip 悬浮提示",
-      "tooltip_t 给任意节点包原生悬浮提示(系统样式;主题化气泡见反馈页 Popover)。",
-      [
+        @yue.label_t("上方内容"),
+        @yue.divider(spacing=6.0),
+        @yue.label_t("下方内容"),
         @yue.hbox(
           [
             @yue.tooltip_t(@yue.button_t("悬停看提示"), "原生 tooltip:系统样式"),
             @yue.tooltip_t(@yue.button_t("再来一个", variant=@yue.Soft), "第二个提示"),
           ],
+          style=[("marginTop", 10.0)],
           style_str=[("alignItems", "center")],
         ),
       ],

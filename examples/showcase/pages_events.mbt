@@ -121,8 +121,29 @@ fn page_events(_app : App) -> @yue.Node {
     ),
     section(
       "嵌套布局",
-      "固定宽/百分比/flex 三种宽度模型(全集见 docs/zh/layout.md)。",
+      "固定宽 / 百分比 / flex 三种宽度模型(全集见 docs/zh/layout.md);6px Splitter 把手可拖动调整占比。",
       [
+        @yue.vbox(
+          [
+            @yue.hsplit(
+              @yue.tree([
+                {
+                  label: "组件",
+                  children: [
+                    {
+                      label: "基础",
+                      children: [{ label: "图标", children: [] }, { label: "分隔", children: [] }],
+                    },
+                    { label: "导航", children: [{ label: "分栏", children: [] }] },
+                  ],
+                },
+              ]),
+              @yue.vbox([@yue.label_t("右侧详情区:拖动中间把手调整占比", role=@yue.Body)], style=[("padding", 12.0)]),
+              min_first=120.0,
+            ),
+          ],
+          style=[("height", 200.0), ("width", 520.0), ("marginBottom", 10.0)],
+        ),
         @yue.hbox(
           [
             @yue.label_t(

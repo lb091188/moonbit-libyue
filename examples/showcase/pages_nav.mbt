@@ -8,12 +8,75 @@ fn page_nav(app : App) -> @yue.Node {
   scroll_page([
     section(
       "Side Menu 侧边导航",
-      "窗口左侧即本组件;组标题不可点,选中浅蓝底+强调条;底部版本号。",
+      "窗口左侧即本组件;组标题可折叠收起,选中浅蓝底 + 主题色强调条。",
       [
         @yue.descriptions([
           ("悬停态", "浅灰底"),
           ("选中态", "主题浅蓝底 + 主题色文字 + 3px 强调条"),
+          ("折叠", "组标题行点击收起/展开组内菜单项"),
           ("联动", "菜单项、面包屑共享同一导航状态"),
+        ]),
+      ],
+    ),
+    section(
+      "菜单(主题化 ContextMenu / DropdownMenu)",
+      "context_menu_for 包右键原生菜单(悬停高亮 + 点击);DropdownMenu 点字段弹候选(两套用途不同:前者右键显隐,后者顶部展开)。",
+      [
+        @yue.hbox(
+          [
+            @yue.context_menu_for(
+              @yue.tag("右键我", "#2D68C4"),
+              [
+                ("复制", fn() { app.picked_lang.set("已复制") }),
+                ("重命名", fn() { app.picked_lang.set("重命名") }),
+                ("-", fn() {  }),
+                ("删除", fn() { app.picked_lang.set("已删除") }),
+              ],
+            ),
+            @yue.dropdown_menu(
+                  "操作",
+                  ["打开", "保存", "-", "复制链接", "删除"],
+                  fn(i) { app.picked_lang.set("菜单项 \{i}") },
+              width=140.0,
+            ),
+            @yue.bind(app.picked_lang, fn(s) { "最近操作:\{s}" }),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
+      ],
+    ),
+    section(
+      "菜单(原生 Menu::popup_at)",
+      "Menu::new + popup_at 弹原生右键菜单(系统主题外观),与上面主题化段对照。",
+      [
+        @yue.hbox(
+          [
+            @yue.button_t("点我弹原生菜单", on_click=fn() {
+              let menu = @yue.Menu::new()
+              let a = menu.add_label_item("第一项")
+              a.on_click(fn() { app.picked_lang.set("原生菜单:第一项") })
+              let b = menu.add_label_item("第二项")
+              b.on_click(fn() { app.picked_lang.set("原生菜单:第二项") })
+              let _ = menu.add_separator()
+              let c = menu.add_label_item("关闭")
+              c.on_click(fn() { () })
+              let (mx, my) = @yue.mouse_location()
+              menu.popup_at(mx, my)
+            }),
+            @yue.bind(app.picked_lang, fn(s) { s }),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
+      ],
+    ),
+    section(
+      "菜单栏(窗口顶部 MenuBar)",
+      "窗口顶部原生菜单栏(文件/编辑/演示)由 main.mbt 挂载,此处仅示意结构:MenuItem 支持快捷键 + 角色项 + 分隔线,未注册项由系统自动省略。",
+      [
+        @yue.descriptions([
+          ("快捷键", "about.set_accelerator(\"CmdOrCtrl+I\") 注册系统级加速键"),
+          ("角色项", "edit.add_role_item(Copy/Cut/Paste/SelectAll) 取平台原生文案与图标"),
+          ("分隔线", "add_separator() 插入不可点分隔线;演示菜单可遍历 item_count/item_at"),
         ]),
       ],
     ),
@@ -80,7 +143,7 @@ fn page_nav(app : App) -> @yue.Node {
               variant=@yue.Solid,
               on_click=fn() {
                 step.update(fn(n) {
-                  let m = n + 1
+                  let m = n + 2
                   if m > 2 {
                     2
                   } else {
@@ -93,62 +156,6 @@ fn page_nav(app : App) -> @yue.Node {
             @yue.bind(step, fn(n) { "当前第 \{n + 1} 步" }),
           ],
           style=[("marginTop", 8.0)],
-          style_str=[("alignItems", "center")],
-        ),
-      ],
-    ),
-    section(
-      "DropdownMenu 下拉菜单",
-      "触发字段弹菜单项列表(\"-\" 为分隔线),悬停高亮,点击回调序号。",
-      [
-        @yue.dropdown_menu(
-              "操作",
-              ["打开", "保存", "-", "复制链接", "删除"],
-              fn(i) { app.picked_lang.set("菜单项 \{i}") },
-          width=140.0,
-        ),
-        @yue.bind(app.picked_lang, fn(s) { "最近操作:\{s}" }),
-      ],
-    ),
-    section(
-      "Splitter 可拖动分隔",
-      "6px 把手拖动改占比(鼠标捕获不丢事件,min 钳制);左例 hsplit 右例 vsplit。",
-      [
-        @yue.vbox(
-          [
-            @yue.hsplit(
-              @yue.tree([
-                {
-                  label: "组件",
-                  children: [
-                    {
-                      label: "基础",
-                      children: [{ label: "图标", children: [] }, { label: "分隔", children: [] }],
-                    },
-                    { label: "导航", children: [{ label: "分栏", children: [] }] },
-                  ],
-                },
-              ]),
-              @yue.vbox([@yue.label_t("右侧详情区:拖动中间把手调整占比", role=@yue.Body)], style=[("padding", 12.0)]),
-              min_first=120.0,
-            ),
-          ],
-          style=[("height", 200.0), ("width", 520.0), ("marginBottom", 10.0)],
-        ),
-        @yue.vbox(
-          [
-            @yue.vsplit(
-              @yue.vbox(
-                [@yue.label_t("上栏:列表区(可放 table / 列表)", role=@yue.Body)],
-                style=[("padding", 10.0)],
-              ),
-              @yue.vbox(
-                [@yue.label_t("下栏:详情/说明区", role=@yue.Secondary)],
-                style=[("padding", 10.0)],
-              ),
-            ),
-          ],
-          style=[("height", 160.0), ("width", 520.0)],
         ),
       ],
     ),
