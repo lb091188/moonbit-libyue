@@ -1,6 +1,6 @@
 # 组件库(`yue/components.mbt`)
 
-纯 MoonBit 构建在声明式层之上的 Element Plus 风格、主题统一的非表单组件,零平台代码。与主题化控件(`label_t` / `button_t` / `entry_t`)一起,是搭建现代桌面应用外壳(侧边导航 + 顶栏 + 滚动内容)的推荐方式,完整演示见 `examples/components`。
+纯 MoonBit 构建在声明式层之上的 Element Plus 风格、主题统一的非表单组件,零平台代码。与主题化控件(`label_t` / `button_t` / `entry_t`)一起,是搭建现代桌面应用外壳(侧边导航 + 顶栏 + 滚动内容)的推荐方式,完整演示见 `examples/showcase`。
 
 **主题**:全部颜色来自 `theme_*` 色板——深色低饱和配色(非 Element Plus 默认色):蓝 `#2D68C4`、绿 `#2E9E5B`、橙 `#D9822B`、红 `#D64550`,以及文字/边框/填充灰阶。组件一律直角,hover/active 用背景色表达,文字垂直居中。
 
@@ -94,7 +94,7 @@ let t = @yue.default_theme()
 
 ## 演示
 
-`moon run examples/components` —— 十页演示板(基础/表单/导航/数据展示/反馈 + 原生控件/画布与富文本 + 系统集成/窗口与网页/环境与平台),左侧分组菜单(基础/进阶/原生/系统四组),覆盖组件库与 libyue 全部能力:
+`moon run examples/showcase` —— 十一页演示板(基础/表单/事件与布局/导航/数据展示/反馈 + 原生控件/画布与富文本 + 系统集成/窗口与网页/环境与平台),左侧分组菜单(基础/进阶/原生/系统四组),覆盖组件库与 libyue 全部能力:
 
 ![基础组件](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-basic.png)
 

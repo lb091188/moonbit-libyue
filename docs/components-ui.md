@@ -1,6 +1,6 @@
 # UI Component Library (`yue/components.mbt`)
 
-Element-Plus-style, theme-unified non-form components built in pure MoonBit on top of the declarative layer — zero platform code. Together with the themed controls (`label_t` / `button_t` / `entry_t`) they form the recommended way to build modern desktop app shells (sidebar navigation + top bar + scrolling content), as seen in `examples/components`.
+Element-Plus-style, theme-unified non-form components built in pure MoonBit on top of the declarative layer — zero platform code. Together with the themed controls (`label_t` / `button_t` / `entry_t`) they form the recommended way to build modern desktop app shells (sidebar navigation + top bar + scrolling content), as seen in `examples/showcase`.
 
 **Theme**: all colors come from the `theme_*` palette — a deep, low-saturation scheme (not Element Plus defaults): blue `#2D68C4`, green `#2E9E5B`, orange `#D9822B`, red `#D64550`, plus greys for text/border/fill. Components render straight corners, use background colors for hover/active states, and center text vertically.
 
@@ -94,7 +94,7 @@ let t = @yue.default_theme()
 
 ## Demo
 
-`moon run examples/components` — ten-page showcase (Basic / Form / Navigation / Data Display / Feedback + Native Widgets / Canvas & Rich Text + System Integration / Window & Web / Environment) covering the component library and all libyue capabilities:
+`moon run examples/showcase` — eleven-page showcase (Basic / Form / Events & Layout / Navigation / Data Display / Feedback + Native Widgets / Canvas & Rich Text + System Integration / Window & Web / Environment) covering the component library and all libyue capabilities:
 
 ![Basic](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-basic.png)
 

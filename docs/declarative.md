@@ -126,7 +126,7 @@ fn tagged(label_text : String, body : Node) -> Node {
 }
 ```
 
-#### Custom component recipes (summarized from `examples/components`)
+#### Custom component recipes (summarized from `examples/showcase`)
 
 1. **Composite components** (recommended): an ordinary function returning a Node; parameters are props, closures are private state (e.g. `card`/`nav_item`).
 2. **Drawn components**: `container(on_draw=...)` + Painter draws badges etc. with zero image assets.
@@ -147,7 +147,7 @@ Element-Plus-style non-form components built on top of the declarative layer, pu
 - `tag(text, color)` — colored rounded label (width auto-fits the text at mount time);
 - `code_view(lines)` — syntax-highlighted code view: one AttributedText per token (whole-range coloring) measured and drawn manually. **Visually equivalent to range coloring and consistent across platforms** — on Windows, AttributedText range font/color is an upstream deficiency (see adaptation.md); this approach bypasses it and is a viable alternative for code highlighting / terminal rendering. The built-in `tokenize_moonbit` is a demo tokenizer; consumers can feed any lexical analysis result.
 
-Component state coordination goes through `Store`; main-area page switching uses "subscribe to Store + `ViewLike::set_visible`" (the ABI was added on 2026-09-16). Full demo in `examples/components` (sidebar + top bar + page switching + code page); component list and screenshots in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md).
+Component state coordination goes through `Store`; main-area page switching uses "subscribe to Store + `ViewLike::set_visible`" (the ABI was added on 2026-09-16). Full demo in `examples/showcase` (sidebar + top bar + page switching + code page); component list and screenshots in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md).
 
 ## L3: Store and bind_label
 

@@ -31,9 +31,16 @@
 
 ## 演示
 
-### 现代示例——主题组件库
+### 最小示例
 
-`moon run examples/components` —— 四页演示板，覆盖主题组件库全部功能：每个组件、每种状态；API 一览见 [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md)：
+```sh
+moon run examples/hello         # 原版控件:libyue 原生外观的最小窗口
+moon run examples/hello-themed  # 主题组件库:theme_apply + button_t/input_t/label_t
+```
+
+### 全功能演示板——showcase
+
+`moon run examples/showcase` —— 11 页演示板（现代主题），覆盖主题组件库与 libyue 全部能力：基础/表单/事件与布局/导航/数据展示/反馈 + 原生控件/画布与富文本 + 系统集成/窗口与网页/环境与平台，左侧分组菜单（基础/进阶/原生/系统）；API 一览见 [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md)：
 
 ![基础组件](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-basic.png)
 
@@ -42,12 +49,6 @@
 ![数据展示](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-data.png)
 
 ![反馈](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-feedback.png)
-
-### 传统示例——原版控件
-
-`moon run examples/showcase` —— 12 页演示，覆盖原版控件全部能力，侧边菜单四组导航（基础/布局与绘制/数据视图/窗口与系统集成；控件/输入/事件/画布/表格/网页/对话框/菜单/托盘/剪贴板/环境…）——控件页：
-
-![showcase 控件页](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/widgets.png)
 
 更多示例见 [examples/](https://gitee.com/noahliu0911/moonbit-libyue/tree/master/examples)。
 

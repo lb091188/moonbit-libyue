@@ -70,8 +70,8 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - 闭包跨 C ABI:只允许无捕获的顶层函数字面量(编译为真实 C 函数指针);带捕获闭包走"函数指针 + 闭包指针"双参数模式(`on_click` 系)。
 - 回调闭包由注册表保活(`yue/view.mbt`),窗口销毁后条目暂不回收——**已定案维持进程级保活**(2026-09-12):回调与窗口无归属关系可循,精准回收需 weak-reference 注册表,当前 MoonBit 生态不成熟;单窗口工具场景泄漏量可忽略(2026-09-12 定案)。
 - **Toolbar / Vibrant 在 Linux 不可用**:libyue 头文件无平台 guard,但 Linux 静态库未编入任何相关符号(nm 实测零符号),调用会链接失败;Binding 侧已明确标注不暴露。
-- **Browser::GetCookiesForURL 空 Cookie 列表会 FATAL**:libyue 0.15.6 内部 `CHECK(cookies)` 对空列表直接崩溃(上游缺陷),查询前须确保页面已种 Cookie。
-- **改 shim 函数签名必须同批同步 `include/yue_mbt.h`,否则断链形态是"mangle 分裂"而非直观报错**(2026-09-19 实测):`yue_mbt.h` 全部声明包在 `extern "C" {}` 内,.cpp 定义经 include 继承 C 链接——头文件声明一旦漏改,.cpp 的新签名定义不再匹配旧声明,C++ 视为重载、按 C++ mangle 导出(`_Z26yue_mbt_view_on_mouse_down...`),而 MoonBit 生成端引用的永远是纯 C 名 → `undefined reference to 'yue_mbt_view_on_mouse_down'`。中间排查易被带偏:库内其余数百个符号都是纯 C 名(头文件继承),唯独新签名的几个是 mangled,nm 对比即可定位。修复=头文件与 .cpp、ffi.mbt 三处签名同批改齐(事件屏幕坐标扩充 7→9 参即踩此坑)。
+- **Browser::GetCookiesForURL 空 Cookie 列表会 FATAL**:libyue 0.15.6 内部 `CHECK(cookies)` 对空列表直接崩溃(上游缺陷)——WebKitGTK 以 NULL 表示空 GList 属合法结果,vendored mbt.6 及以前查询无 Cookie 的 URL 必崩;fork v0.15.6-mbt.7 已删该断言(空列表正常回调,与 Windows 端语义对齐),待资产出包回填后解除此限制。
+- **改 shim 函数签名必须同批同步 `include/yue_mbt.h`,否则断链形态是"mangle 分裂"而非直观报错**(2026-09-19 实测):`yue_mbt.h` 全部声明包在 `extern "C" {}` 内,.cpp 定义经 include 继承 C 链接——头文件声明一旦漏改,.cpp 的新签名定义不再匹配旧声明,C++ 视为重载、按 C++ mangle 导出(`_Z26yue_mbt_view_on_mouse_down...`),而 MoonBit 生成端引用的永远是纯 C 名 → `undefined reference to 'yue_mbt_view_on_mouse_down'`。中间排查易被带偏:库内其余数百个符号都是纯 C 名(头文件继承),唯独新签名的几个是 mangled,nm 对比即可定位。修复=头文件与 .cpp、ffi.mbt 三处签名同批改齐(事件屏幕坐标扩充 7→9 参即踩此坑)。变体(2026-09-20 实测):新增 FFI 只写 .cpp 定义、头文件整段漏声明,同样 mangle 分裂——`yue_mbt_tray_set_image`(e0df994 引入)潜伏两个月无人触发,演示板补 `Tray::set_icon` 演示即断链;此形态比"改签名漏同步"更隐蔽(不是改漏,是整个没写),出包前用「cpp 全量函数定义 × 头文件声明」对照扫描可提前抓出(static/GTK 内部回调除外)。
 
 ---
 
