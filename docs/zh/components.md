@@ -1,6 +1,6 @@
 # 组件方法速查
 
-用法总述（两种写法）见仓库 [README_ZH.md](../../README_ZH.md)；所有类型经 `@yue` 引用。
+用法总述（两种写法）见 [README.md](README.md)；所有类型经 `@yue` 引用。
 
 通用约定：
 
