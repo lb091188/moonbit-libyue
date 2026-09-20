@@ -40,7 +40,7 @@ moon run examples/hello-themed  # 主题组件库:theme_apply + button_t/input_t
 
 ### 全功能演示板——showcase
 
-`moon run examples/showcase` —— 12 页演示板（现代主题），覆盖主题组件库与 libyue 全部能力：基础/表单/事件与布局/导航/数据展示/反馈 + Store 对照 + 原生控件/画布与富文本 + 系统集成/窗口与网页/环境与平台，左侧分组菜单（基础/进阶/响应式/原生/系统），底栏展示包版本号（与 moon.mod 同步）；API 一览见 [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md)：
+`moon run examples/showcase` —— 15 页演示板（现代主题），覆盖主题组件库与 libyue 全部能力：基础/图标库/表单/导航/数据展示/反馈/代码与文档/事件与布局/Store 对照 + 原生控件/画布与富文本 + 系统集成/窗口/浏览器/环境与平台，左侧三组折叠菜单（组件 / 原生与自绘 / 系统能力），底栏展示包版本号（与 moon.mod 同步）；API 一览见 [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md)：
 
 ![基础组件](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/components-basic.png)
 

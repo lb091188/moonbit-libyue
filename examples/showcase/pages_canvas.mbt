@@ -80,8 +80,8 @@ fn page_canvas(_app : App) -> @yue.Node {
   let rt_ellipsis = Ref(false)
   scroll_page([
     section(
-      "自绘画布",
-      "on_draw 自绘:圆环/网格/文本/PNG 叠加(混合模式)。",
+      "自绘原语(Painter)",
+      "fill_rect / arc / stroke_rect / draw_text 等基础绘制;线条色 + 填充色 + 圆环 + 网格 + 文本同屏。",
       [
         @yue.container(
           on_draw=fn(p) { draw_canvas_scene(p) },
@@ -115,6 +115,24 @@ fn page_canvas(_app : App) -> @yue.Node {
           }),
         ]),
         @yue.bind_label(canvas_info, fn(s) { "混合模式:\{s}" }, style=[("marginTop", 8.0)]),
+      ],
+    ),
+    section(
+      "图像与混合模式",
+      "draw_image 叠 PNG(右下角)+ blend_mode(Normal/Multiply/Screen/Difference/Xor);导出缩略图到 /tmp。",
+      [
+        @yue.descriptions([
+          ("Normal", "默认覆盖"),
+          ("Multiply", "正片叠底,暗部加深"),
+          ("Screen", "滤色,亮部提亮"),
+          ("Difference", "差值,反相差异"),
+          ("Xor", "异或,重叠区挖空"),
+        ]),
+        @yue.label_t(
+          "拖动/缩放图像由 Container on_size_changed + schedule_paint 驱动(本示例固定尺寸)。",
+          role=@yue.Secondary,
+          style=[("marginTop", 6.0)],
+        ),
       ],
     ),
     section(

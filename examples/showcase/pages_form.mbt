@@ -9,6 +9,8 @@ fn page_form(app : App) -> @yue.Node {
   let rate_val = @yue.Signal::new(3)
   let picked_color = @yue.Signal::new("#2D68C4")
   let dp_val : @yue.Signal[@yue.DateYMD?] = @yue.Signal::new(None)
+  let sync = @yue.Signal::new(false)
+  let notify = @yue.Signal::new(true)
   let theme_mode = @yue.Signal::new("深色")
   let radio_disabled = @yue.Signal::new("选项一")
   let wifi_on = @yue.Signal::new(true)
@@ -18,53 +20,107 @@ fn page_form(app : App) -> @yue.Node {
   let dtr : @yue.Store[@yue.DateTimeRange] = @yue.Store::new({ start: None, end: None })
   scroll_page([
     section(
-      "Input 输入框",
-      "自绘 1px 边框(聚焦变主题蓝)+ 白底;clearable 悬停非空时 ✕ 清空。",
+      "文本输入(Input / Textarea)",
+      "自绘 1px 边框(聚焦变主题蓝)+ 白底;clearable 悬停非空时 ✕ 清空;多行内容超出按平台滚动。",
       [
         @yue.vbox([
           @yue.input_t(text="输入点什么…", margin=10.0),
           @yue.input_t(text="密码框", password=true),
           @yue.input_t(text="悬停出现 ✕,点击清空", clearable=true),
+          @yue.textarea_t(
+            text="多行文本输入演示。\n第二行内容。",
+            height=90.0,
+            width=300.0,
+            clearable=true,
+          ),
         ]),
       ],
     ),
     section(
-      "Textarea 多行输入",
-      "外层自绘边框(聚焦变主题色)+ 8px 内边距,内容超出按平台滚动;clearable=true 悬停非空时 ✕ 清空。",
-      [
-        @yue.textarea_t(
-          text="多行文本输入演示。\n第二行内容。",
-          height=90.0,
-          width=300.0,
-          clearable=true,
-        ),
-      ],
-    ),
-    section(
-      "InputNumber 数字输入器",
-      "-/+ 按钮步进(步长 1),范围 0..10 钳制,数值响应式。",
+      "数值输入(InputNumber / Slider / Rate)",
+      "步进器 0..10 钳制;滑杆自绘轨道 + thumb(拖拽 step 5 量化);评分五角星 hover 预亮,值均响应式。",
       [
         @yue.input_number(qty.store(), min=0.0, max=10.0, step=1.0),
         @yue.bind(qty, fn(v) { "当前数量:\{v.round()}" }, style=[
           ("marginTop", 6.0),
         ]),
+        @yue.slider_t(slider_val.store(), min=0.0, max=100.0, step=5.0),
+        @yue.bind(slider_val, fn(v) { "当前值:\{v.round()}" }),
+        @yue.rate_t(rate_val.store(), on_change=fn(v) { ignore(v) }),
+        @yue.bind(rate_val, fn(v) { "评分:\{v} 星" }),
       ],
     ),
     section(
-      "Select 下拉选择",
-      "点字段弹候选(悬停高亮/选中 ✓);clearable ✕ 清空;三平台同形态。",
+      "选择器(Select / ColorPicker)",
+      "下拉点字段弹候选(悬停高亮/选中 ✓),clearable ✕ 清空;取色器预设色板点击选色,hex 值响应式。",
       [
-        @yue.select_t(
-          ["杭州", "北京", "上海", "深圳", "广州"],
-          app.picked_lang.store(),
-          width=170.0,
-          clearable=true,
+        @yue.hbox(
+          [
+            @yue.select_t(
+              ["杭州", "北京", "上海", "深圳", "广州"],
+              app.picked_lang.store(),
+              width=170.0,
+              clearable=true,
+            ),
+            @yue.color_picker_t(picked_color.store()),
+            @yue.bind(picked_color, fn(c) { c }),
+          ],
+          style_str=[("alignItems", "center")],
         ),
       ],
     ),
     section(
-      "DatePicker 日期选择",
-      "全自绘日历:点字段弹月历,‹/› 切月;内联 calendar_t;clearable ✕。",
+      "开关与勾选(Checkbox / Radio / Switch)",
+      "勾选态存 Signal 勾选即回显;单选组整行悬停变色点击互斥(第二组禁用);开关开=主题蓝靠右,含禁用态。",
+      [
+        @yue.vbox([
+          @yue.checkbox_t("启用自动同步", on_change=fn(v) { sync.set(v) }),
+          @yue.checkbox_t("接收通知", checked=true, on_change=fn(v) {
+            notify.set(v)
+          }),
+          @yue.hbox(
+            [
+              @yue.bind(sync, fn(v) { if v { "同步:开" } else { "同步:关" } }),
+              @yue.label("   "),
+              @yue.bind(notify, fn(v) { if v { "通知:开" } else { "通知:关" } }),
+            ],
+            style=[("marginTop", 8.0)],
+          ),
+        ]),
+        @yue.hbox(
+          [
+            @yue.radio_group(["浅色", "深色", "跟随系统"], theme_mode.store()),
+            @yue.label("        "),
+            @yue.radio_group(
+              ["选项一", "选项二"],
+              radio_disabled.store(),
+              disabled=true,
+            ),
+          ],
+          style=[("marginTop", 10.0)],
+        ),
+        @yue.hbox(
+          [
+            @yue.switch_t(wifi_on.store()),
+            @yue.bind(wifi_on, fn(v) {
+              if v {
+                "已开启"
+              } else {
+                "已关闭"
+              }
+            }),
+            @yue.label("     "),
+            @yue.switch_t(locked.store(), disabled=true),
+            @yue.label_t("禁用", role=@yue.Body),
+          ],
+          style=[("marginTop", 10.0)],
+          style_str=[("alignItems", "center")],
+        ),
+      ],
+    ),
+    section(
+      "日期与时间(DatePicker / 区间选择)",
+      "全自绘月历(‹/› 切月)+ 内联 calendar_t;日期/时间/日期时间三区间选择器,选中值响应式。",
       [
         @yue.hbox(
           [
@@ -80,12 +136,6 @@ fn page_form(app : App) -> @yue.Node {
           style_str=[("alignItems", "center")],
         ),
         @yue.calendar_t(),
-      ],
-    ),
-    section(
-      "区间选择(日期 / 时间 / 日期时间)",
-      "三区间选择器:日期(两段式点选)/时间(时:分步进)/日期时间(日历+时间步进+完成)。",
-      [
         @yue.vbox([
           @yue.date_range_picker_t(value=dr),
           @yue.bind_label(dr, fn(r) {
@@ -114,69 +164,7 @@ fn page_form(app : App) -> @yue.Node {
       ],
     ),
     section(
-      "Slider 滑杆",
-      "自绘轨道 + thumb,点击/拖拽调值(step 5 量化),值响应式。",
-      [
-        @yue.slider_t(slider_val.store(), min=0.0, max=100.0, step=5.0),
-        @yue.bind(slider_val, fn(v) { "当前值:\{v.round()}" }),
-      ],
-    ),
-    section(
-      "Rate 评分",
-      "五角星:选中实心主题色、未选中描边灰,hover 预亮,点击评分。",
-      [
-        @yue.rate_t(rate_val.store(), on_change=fn(v) { ignore(v) }),
-        @yue.bind(rate_val, fn(v) { "评分:\{v} 星" }),
-      ],
-    ),
-    section(
-      "Radio 单选组",
-      "选中项实心方块 + 主题色文字,整行悬停变色,点击互斥;第二组为禁用态。",
-      [
-        @yue.hbox([
-          @yue.vbox([
-            @yue.radio_group(["浅色", "深色", "跟随系统"], theme_mode.store()),
-          ]),
-          @yue.label("        "),
-          @yue.vbox([
-            @yue.radio_group(
-              ["选项一", "选项二"],
-              radio_disabled.store(),
-              disabled=true,
-            ),
-          ]),
-        ]),
-      ],
-    ),
-    section(
-      "Switch 开关",
-      "开=主题蓝轨道滑块靠右,关=浅灰轨道滑块靠左;点击切换,含禁用态。",
-      [
-        @yue.hbox(
-          [
-            @yue.switch_t(wifi_on.store()),
-            @yue.bind(wifi_on, fn(v) {
-              if v {
-                "已开启"
-              } else {
-                "已关闭"
-              }
-            }),
-            @yue.label("     "),
-            @yue.switch_t(locked.store(), disabled=true),
-            @yue.label_t("禁用", role=@yue.Body),
-          ],
-          style_str=[("alignItems", "center")],
-        ),
-      ],
-    ),
-    section(
-      "ColorPicker 取色器",
-      "预设色板:点击选色,选中主题色描边 + 白勾;hex 值响应式。",
-      [@yue.color_picker_t(picked_color.store())],
-    ),
-    section(
-      "Form 表单",
+      "Form 表单组合",
       "form_item 行布局(标签右对齐 + 控件区)+ form 分组标题。",
       [
         @yue.form("用户设置", [

@@ -545,7 +545,7 @@ pop.show_relative_to(anchor_view)
 | on_size_changed | 尺寸变化 |
 | set_capture(b) / release_capture() / has_capture() | 鼠标捕获 |
 | set_style(k, v) / set_style_str(k, v) | 布局样式 |
-| 拖拽注册与拖放回调 | 拖放（接收方必须注册 handle_drag_update 返回允许的操作位，缺省一律拒绝；发起方 do_drag_file_paths / do_drag_data_full 须在 on_mouse_down 回调内调用才生效；演示见 components「窗口与网页」页） |
+| 拖拽注册与拖放回调 | 拖放（接收方必须注册 handle_drag_update 返回允许的操作位，缺省一律拒绝；发起方 do_drag_file_paths / do_drag_data_full 须在 on_mouse_down 回调内调用才生效；演示见 components「窗口」页） |
 
 事件载荷字段：
 

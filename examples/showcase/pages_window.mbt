@@ -1,4 +1,4 @@
-// 窗口与网页页:窗口 API/快捷键/拖放/原生菜单/Browser。Browser 句柄
+// 窗口与网页页:窗口 API/快捷键/拖放/Browser。Browser 句柄
 // 与导航状态都是页内私有,协议注册在页构建时执行一次。
 
 ///|
@@ -126,20 +126,6 @@ fn page_window(_app : App) -> @yue.Node {
               true
             })
           },
-        ),
-      ],
-    ),
-    section(
-      "原生右键菜单",
-      "Menu::new + popup_at 原生菜单(区别于基础页主题化的 context_menu_for)。",
-      [
-        @yue.context_menu_for(
-          @yue.tag("右键我(原生菜单)", "#2D68C4"),
-          [
-            ("原生菜单项 A", fn() { win.toast_push("原生菜单 A", @yue.Info) }),
-            ("-", fn() {  }),
-            ("原生菜单项 B", fn() { win.toast_push("原生菜单 B", @yue.Info) }),
-          ],
         ),
       ],
     ),
