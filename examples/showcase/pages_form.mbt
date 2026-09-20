@@ -19,7 +19,7 @@ fn page_form(app : App) -> @yue.Node {
   scroll_page([
     section(
       "Input 输入框",
-      "现代化主题唯一输入框:外层自绘 1px 边框(聚焦变主题蓝)+ 白底,内部 Entry 去原生边框与内阴影;margin 控制外边距,直角。clearable=true:悬停且非空时右侧出现 ✕,点击清空。",
+      "自绘 1px 边框(聚焦变主题蓝)+ 白底;clearable 悬停非空时 ✕ 清空。",
       [
         @yue.vbox([
           @yue.input_t(text="输入点什么…", margin=10.0),
@@ -52,7 +52,7 @@ fn page_form(app : App) -> @yue.Node {
     ),
     section(
       "Select 下拉选择",
-      "点击字段弹候选列表(EP 样式):悬停高亮、当前选中 ✓ 标记,点选回填并收起;clearable=true 悬停有值时箭头旁 ✕ 清空选择;三平台同形态。",
+      "点字段弹候选(悬停高亮/选中 ✓);clearable ✕ 清空;三平台同形态。",
       [
         @yue.select_t(
           ["杭州", "北京", "上海", "深圳", "广州"],
@@ -64,7 +64,7 @@ fn page_form(app : App) -> @yue.Node {
     ),
     section(
       "DatePicker 日期选择",
-      "全自绘日历(EP 样式):点字段弹月历,‹/› 切月,点选回填;下方为内联 calendar_t 面板;clearable=true 悬停有值时 ✕ 清空。",
+      "全自绘日历:点字段弹月历,‹/› 切月;内联 calendar_t;clearable ✕。",
       [
         @yue.hbox(
           [
@@ -84,7 +84,7 @@ fn page_form(app : App) -> @yue.Node {
     ),
     section(
       "区间选择(日期 / 时间 / 日期时间)",
-      "date_range_picker_t:区间日历两段式点选起止(终点早于起点自动对调);time_range_picker_t:起/止时:分步进,步进即改;datetime_range_picker_t:日历选日 + 底部时间步进,「完成」或失焦收起。值经 Store 驱动回显。",
+      "三区间选择器:日期(两段式点选)/时间(时:分步进)/日期时间(日历+时间步进+完成)。",
       [
         @yue.vbox([
           @yue.date_range_picker_t(value=dr),

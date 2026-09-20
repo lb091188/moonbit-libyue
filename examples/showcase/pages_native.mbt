@@ -267,7 +267,7 @@ fn page_native(_app : App) -> @yue.Node {
     ),
     section(
       "分组 Group",
-      "原生 Group:标题 + 内容;Windows 的 Group 不按内容自增长(GTK 按自然尺寸撑开),跨平台一致需显式高度。",
+      "标题 + 内容;Windows 不按内容自增长,跨平台需显式高度。",
       [
         @yue.group(
           "分组:内嵌标签",
@@ -303,7 +303,7 @@ fn page_native(_app : App) -> @yue.Node {
     ),
     section(
       "滚动区 Scroll",
-      "内容尺寸 + 滚动条策略(Automatic/Always/Never)切换;overlay 滚动条仅 GTK 生效,Windows 无此概念。",
+      "滚动条策略 Automatic/Always/Never 切换。",
       [
         @yue.scroll(
           @yue.vbox([
@@ -331,7 +331,7 @@ fn page_native(_app : App) -> @yue.Node {
     ),
     section(
       "原生表格 Table",
-      "TableModel 是 trait,数据与视图分离;列类型 Text/Checkbox/Edit(勾选与编辑经 set_value 回写),行激活/选择变化有回调。Linux(GTK) 下 Table 放进 Notebook 页签测量尺寸会触发崩溃,演示放独立子窗口。",
+      "TableModel 数据视图分离;列类型 Text/Checkbox/Edit;GTK 下放 Notebook 页签崩溃,故独立子窗口。",
       [
         @yue.button_t("打开表格演示窗口", variant=@yue.Solid, on_click=fn() {
           open_table_window()

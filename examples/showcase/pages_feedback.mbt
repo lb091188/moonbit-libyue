@@ -64,7 +64,7 @@ fn page_feedback(app : App) -> @yue.Node {
     ),
     section(
       "Dialog 对话框",
-      "同窗遮罩 + 居中面板(absolute 相对挂载容器,本演示挂在窗口根,遮罩盖全窗);✕/取消/确定触发回调后自动收起,visible 由 Store 驱动(挂窗口根,状态在 App)。",
+      "同窗遮罩 + 居中面板;回调后自动收起,visible 由 Store 驱动。",
       [
         @yue.hbox([
           @yue.button_t("基础对话框", on_click=fn() { app.dlg_basic.set(true) }),

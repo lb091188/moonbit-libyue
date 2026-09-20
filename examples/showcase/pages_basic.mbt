@@ -8,46 +8,8 @@ fn page_basic(app : App) -> @yue.Node {
   let notify = @yue.Signal::new(true)
   scroll_page([
     section(
-      "Icon 图标系统 / IconButton 图标按钮",
-      "37 个内置矢量图标(draw_icon 统一入口,悬停看名称);icon_button_t 方形 hover 收敛按钮,工具栏排列右侧统一 6px 间距。",
-      [
-        @yue.hbox(
-          (
-            {
-              let cells : Array[@yue.Node] = []
-              let icons = @yue.all_icons()
-              let rows = (icons.length() + 9) / 10
-              for row in 0..<rows {
-                let items : Array[@yue.Node] = []
-                for col in 0..<10 {
-                  let idx = row * 10 + col
-                  if idx < icons.length() {
-                    items.push(
-                      @yue.tooltip_t(@yue.icon(icons[idx], size=18.0), @yue.icon_name(icons[idx])),
-                    )
-                  }
-                }
-                cells.push(@yue.hbox(items, style=[("gap", 10.0)]))
-              }
-              cells
-            }
-          ),
-          style=[("gap", 10.0)],
-        ),
-        @yue.hbox([
-          @yue.icon_button_t(@yue.IconKind::Refresh, tip="刷新"),
-          @yue.icon_button_t(@yue.IconKind::Edit, tip="编辑"),
-          @yue.icon_button_t(@yue.IconKind::Copy, tip="复制"),
-          @yue.icon_button_t(@yue.IconKind::Save, tip="保存"),
-          @yue.icon_button_t(@yue.IconKind::Trash, tip="删除"),
-          @yue.icon_button_t(@yue.IconKind::Search, tip="搜索"),
-          @yue.icon_button_t(@yue.IconKind::Ellipsis, tip="更多"),
-        ]),
-      ],
-    ),
-    section(
       "Button 按钮变体",
-      "Solid 主题色实底 / Soft 浅底(hover 变实底白字) / Text 透明底(hover 浅灰) / Danger 红色实底,hover 全程主题内收敛。点击主要操作联动数据展示页的访问量/进度条(信号驱动)。",
+      "四变体;「主要操作」联动数据页访问量/进度条(信号)。",
       [
         @yue.hbox(
           [
@@ -66,7 +28,7 @@ fn page_basic(app : App) -> @yue.Node {
     ),
     section(
       "Label 文字角色",
-      "Title / Section / Body / Secondary / Accent 五级排版,字号颜色随角色。",
+      "五级排版,字号颜色随角色。",
       [
         @yue.label_t("标题文字(Title)", role=@yue.Title),
         @yue.label_t("小节标题(Section)", role=@yue.Section),
@@ -77,7 +39,7 @@ fn page_basic(app : App) -> @yue.Node {
     ),
     section(
       "Link 链接文字",
-      "主题色文字,悬停显示下划线,点击回调;最近点击经信号自动回显。",
+      "主题色文字,悬停下划线;最近点击信号回显。",
       [
         @yue.hbox([
           @yue.link("打开文档", fn() { app.picked_lang.set("docs") }),
@@ -90,7 +52,7 @@ fn page_basic(app : App) -> @yue.Node {
     ),
     section(
       "Divider 分隔线",
-      "水平(默认)/竖直 1px 主题边框色,spacing 控制两侧留白。",
+      "水平(默认)/竖直 1px 主题边框色。",
       [
         @yue.label_t("上方内容"),
         @yue.divider(spacing=6.0),
@@ -114,7 +76,7 @@ fn page_basic(app : App) -> @yue.Node {
     ),
     section(
       "Checkbox 复选框(信号)",
-      "自绘直角勾选框:选中实心主题色 + 白勾;勾选态存 Signal,勾选即回显。",
+      "勾选态存 Signal,勾选即回显。",
       [
         @yue.vbox([
           @yue.checkbox_t("启用自动同步", on_change=fn(v) { sync.set(v) }),

@@ -25,7 +25,7 @@ fn page_browser(_app : App) -> @yue.Node {
   scroll_page([
     section(
       "WebView 与加载",
-      "Browser(WebView):load_url 加载站点 / demo:// 自定义协议 / load_html 本地片段(内嵌 JS 调原生按钮);宽度自适应内容区。",
+      "load_url / demo:// 协议 / load_html 本地片段(内嵌 JS 按钮可调原生绑定)。",
       [
         @yue.browser(handle=fn(x) {
           web_ref.val = Some(x)
@@ -81,7 +81,7 @@ fn page_browser(_app : App) -> @yue.Node {
     ),
     section(
       "导航与能力查询",
-      "go_back / go_forward / reload / stop,can_go_back / can_go_forward / is_loading / get_url 能力查询一键回显。",
+      "四导航按钮 + can_go_back/can_go_forward/is_loading 能力查询。",
       [
         @yue.hbox([
           @yue.button_t("← 后退", on_click=fn() {
@@ -124,7 +124,7 @@ fn page_browser(_app : App) -> @yue.Node {
     ),
     section(
       "执行 JavaScript",
-      "execute_javascript_with_result 异步取回 JSON 结果;execute_javascript 无结果执行(改页面内容)。",
+      "with_result 异步取回 JSON;无结果执行改页面。",
       [
         @yue.hbox([
           @yue.button_t("取结果 1+41", on_click=fn() {
@@ -170,7 +170,7 @@ fn page_browser(_app : App) -> @yue.Node {
     ),
     section(
       "JS ↔ 原生绑定",
-      "add_raw_binding 注册 demoBinding(网页侧按钮调用);remove_binding 移除,has_bindings 查询。",
+      "注册 demoBinding(网页按钮调用)/移除/has_bindings 查询。",
       [
         @yue.hbox([
           @yue.button_t("重新注册绑定", on_click=fn() {
@@ -201,7 +201,7 @@ fn page_browser(_app : App) -> @yue.Node {
     ),
     section(
       "Cookie 查询",
-      "get_cookies_for_url 异步查询指定 URL 的 Cookie(字段:名称/值/域/路径/httpOnly/secure);fork v0.15.6-mbt.7 修复空 Cookie 崩溃。",
+      "异步查询 URL 的 Cookie(名称/值/域/路径/httpOnly/secure)。",
       [
         @yue.hbox([
           @yue.button_t("查 example.com", on_click=fn() {
@@ -239,7 +239,7 @@ fn page_browser(_app : App) -> @yue.Node {
     ),
     section(
       "创建选项与平台差异",
-      "BrowserOptions:devtools / context_menu / allow_file_access_from_files(Linux/macOS)/ hardware_acceleration(Linux);默认全关(硬件加速开)。平台差异:自定义协议 Windows WebView2 静默无效;Cookie 存储跟 WebView 运行时。",
+      "BrowserOptions 四选项与平台差异速览(自定义协议 Windows 静默无效等)。",
       [
         @yue.descriptions([
           ("devtools", "默认关;开则右键可审查元素(Windows 需环境变量)"),

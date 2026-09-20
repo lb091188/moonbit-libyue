@@ -50,7 +50,7 @@ fn page_store_demo(_app : App) -> @yue.Node {
     ),
     section(
       "与信号版对照",
-      "同一组派生在信号页的写法:computed(fn() { counter.get() * 2 })——关系声明在定义处,依赖自动收集,多源合成、条件派生、链式派生都是同一个写法;展示端 bind(computed, f) 直连。",
+      "信号写法:computed(fn() { counter.get() * 2 })——关系声明在定义处,多源合成/条件派生同一写法。",
       [
         @yue.descriptions([
           ("手动(本页)", "动作里 set / subscribe 里 set / map 一对一"),

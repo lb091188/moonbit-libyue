@@ -81,7 +81,7 @@ fn page_canvas(_app : App) -> @yue.Node {
   scroll_page([
     section(
       "自绘画布",
-      "container on_draw 自绘:圆环 / 网格 / 文本 / PNG 图片叠加(混合模式);schedule_paint 触发重绘。",
+      "on_draw 自绘:圆环/网格/文本/PNG 叠加(混合模式)。",
       [
         @yue.container(
           on_draw=fn(p) { draw_canvas_scene(p) },
@@ -119,7 +119,7 @@ fn page_canvas(_app : App) -> @yue.Node {
     ),
     section(
       "富文本 AttributedText",
-      "范围属性:0-6 号字符 Black 24 号字,8-11 号字符红色(set_font_for/set_color_for);换行/省略号/改写。",
+      "范围字体/颜色(0-6 号加粗、8-11 号红色);换行/省略号/改写。",
       [
         @yue.container(
           on_draw=fn(painter) {
