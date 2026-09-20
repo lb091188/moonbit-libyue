@@ -176,6 +176,40 @@ API overview:
 | `map(f)` | derive a Store that follows the source automatically on change (chainable) |
 | `bind_label(store, f, …)` | bind text inside a declarative tree; `f` maps the state to a string |
 
+### Signal: derived values with automatic dependency tracking
+
+`Signal[T]` shares the same core as `Store` and adds **automatic dependency tracking**: inside `Signal::computed(fn() { ... })`, every signal read becomes a dependency automatically; when any dependency changes, the derived signal is invalidated and recomputed lazily on the next read — the derivation is declared where it is defined, with no manual `set` of another Store inside action callbacks:
+
+```moonbit
+let count = @yue.Signal::new(0)
+let doubled = @yue.Signal::computed(fn() { count.get() * 2 })
+
+@yue.bind(doubled, fn(n) { "Doubled: \{n}" })   // text binding, signal edition
+@yue.button("Click me", on_click=fn() { count.update(fn(n) { n + 1 }) })
+```
+
+Multiple `set` calls inside the same event callback trigger one notification round each; wrap them in `batch` to merge:
+
+```moonbit
+@yue.batch(fn() {
+  a.set(1)
+  b.set(2)   // subscribers are notified once, after the batch ends
+})
+```
+
+API overview:
+
+| Function | Description |
+|---|---|
+| `Signal::new(v)` | create a source signal |
+| `Signal::computed(f)` | derived signal; signals read in `f` become dependencies automatically, recomputed lazily |
+| `get()` / `set(v)` / `update(f)` | same semantics as Store |
+| `subscribe(f)` | same semantics as Store (callback receives the latest value) |
+| `map(f)` | one-to-one derivation, equivalent to a `computed` reading a single source |
+| `batch(fn)` | batch: multiple `set`s inside fn merge into one notification; nestable |
+| `bind(sig, f, …)` | bind text inside a declarative tree; accepts source or computed signals |
+| `Signal::store()` / `Store::signal()` | zero-cost conversion in both directions (shared value and subscriptions); pass `sig.store()` to component APIs taking a Store |
+
 ## Inherent pitfalls
 
 1. **Nodes are instantiated only at mount time**: when `button(...)` returns, the widget does not exist yet — do not save widget references while building the tree; if you need a reference, use `handle` (triggered at mount time). A tree is normally `mount`ed only once; mounting the same node again instantiates a **second** copy of the widget.

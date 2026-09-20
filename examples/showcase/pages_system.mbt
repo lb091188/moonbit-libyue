@@ -1,0 +1,272 @@
+// 系统集成页:文件对话框/消息框/通知/剪贴板/定时器/托盘/透明窗/
+// 关闭拦截。跨页状态(窗口与托盘句柄、关闭拦截)在 App。
+
+///|
+fn draw_heart(painter : @yue.Painter) -> Unit {
+  painter.begin_path()
+  painter.move_to(75.0, 40.0)
+  painter.bezier_curve_to(75.0, 37.0, 70.0, 25.0, 50.0, 25.0)
+  painter.bezier_curve_to(20.0, 25.0, 20.0, 62.5, 20.0, 62.5)
+  painter.bezier_curve_to(20.0, 80.0, 40.0, 102.0, 75.0, 120.0)
+  painter.bezier_curve_to(110.0, 102.0, 130.0, 80.0, 130.0, 62.5)
+  painter.bezier_curve_to(130.0, 62.5, 130.0, 25.0, 100.0, 25.0)
+  painter.bezier_curve_to(85.0, 25.0, 75.0, 37.0, 75.0, 40.0)
+  painter.fill()
+}
+
+///|
+/// 无边框透明置顶的心形小窗,整窗可拖动(悬浮件/桌面宠物的形态基础)。
+fn open_floating_heart() -> Unit {
+  let win = @yue.Window::new_with_options(frame=false, transparent=true)
+  win.set_always_on_top(true)
+  win.set_content_size(150.0, 130.0)
+  let content = @yue.Container::new()
+  content.set_mouse_down_can_move_window(true)
+  win.set_content(content)
+  content.on_draw(fn(painter) {
+    painter.set_fill_color("#3000")
+    draw_heart(painter)
+    painter.translate(-5.0, -5.0)
+    painter.set_fill_color("#D46A6A")
+    draw_heart(painter)
+  })
+  win.center()
+  win.activate()
+}
+
+///|
+fn page_system(app : App) -> @yue.Node {
+  let sel_out : @yue.Store[String] = @yue.Store::new("(主选区读回)")
+  // 主选区是 X11 概念:Windows/macOS 上 from_type(Selection) 降级为公共
+  // 剪贴板,整段只在 Linux 创建
+  let secs : Array[@yue.Node] = [
+    section(
+      "文件对话框",
+      "FileDialog 模态打开/保存,回显所选路径;配套 read/write_text_file 直读直写。",
+      [
+        @yue.hbox([
+          @yue.button_t("打开文件…", on_click=fn() {
+            match app.win_ref.val {
+              Some(w) => {
+                let dlg = @yue.FileDialog::new_open()
+                dlg.set_filters("文本文件:txt,md|所有文件:*")
+                if dlg.run_for_window(w) {
+                  app.toast_push("已选 \{dlg.get_result()}", @yue.Success)
+                } else {
+                  app.toast_push("已取消", @yue.Info)
+                }
+              }
+              None => ()
+            }
+          }),
+          @yue.button_t("保存文件…", on_click=fn() {
+            match app.win_ref.val {
+              Some(w) => {
+                let dlg = @yue.FileDialog::new_save()
+                dlg.set_filename("components.txt")
+                if dlg.run_for_window(w) {
+                  let ok = @yue.write_text_file(dlg.get_result(), "由 components 写入\n")
+                  app.toast_push(
+                    if ok { "已保存 \{dlg.get_result()}" } else { "保存失败" },
+                    if ok { @yue.Success } else { @yue.Danger },
+                  )
+                } else {
+                  app.toast_push("已取消", @yue.Info)
+                }
+              }
+              None => ()
+            }
+          }),
+        ]),
+      ],
+    ),
+    section(
+      "消息框",
+      "原生 MessageBox(模态对话):标题/正文/按钮,响应 id 回传。",
+      [
+        @yue.hbox([
+          @yue.button_t("询问框", on_click=fn() {
+            match app.win_ref.val {
+              Some(w) => {
+                let box = @yue.MessageBox::new(@yue.Information)
+                box.set_title("确认操作")
+                box.set_text("要执行该操作吗?")
+                box.add_button("确定", 1)
+                box.add_button("取消", 2)
+                box.on_response(fn(code) {
+                  app.toast_push("消息框响应 id=\{code}", @yue.Info)
+                })
+                box.show_for_window(w)
+              }
+              None => ()
+            }
+          }),
+          @yue.button_t("警告框", on_click=fn() {
+            match app.win_ref.val {
+              Some(w) => {
+                let box = @yue.MessageBox::new(@yue.Warning)
+                box.set_title("警告")
+                box.set_text("此操作不可撤销!")
+                box.show_for_window(w)
+              }
+              None => ()
+            }
+          }),
+        ]),
+      ],
+    ),
+    section(
+      "系统通知",
+      "Notification 提交系统通知中心(桌面端右上角弹出,应用外可见);set_actions 带操作按钮,set_silent 静默发送。",
+      [
+        @yue.hbox([
+          @yue.button_t("普通通知", on_click=fn() {
+            let n = @yue.Notification::new()
+            n.set_title("components 演示")
+            n.set_body("这是一条系统通知,点击后已提交通知中心。")
+            n.show()
+            app.toast_push("通知已提交", @yue.Success)
+          }),
+          @yue.button_t("带按钮", on_click=fn() {
+            let n = @yue.Notification::new()
+            n.set_title("带操作按钮的通知")
+            n.set_body("点通知上的按钮试试(查看 / 忽略)")
+            n.set_actions([("查看", "view"), ("忽略", "ignore")])
+            n.show()
+          }),
+          @yue.button_t("静默通知", variant=@yue.Soft, on_click=fn() {
+            let n = @yue.Notification::new()
+            n.set_title("静默通知")
+            n.set_body("set_silent(true):不发声不打扰")
+            n.set_silent(true)
+            @yue.NotificationCenter::add(n)
+          }),
+        ]),
+      ],
+    ),
+    section(
+      "剪贴板",
+      "Clipboard 读写系统剪贴板文本;set_data 写富文本(Html);X11 下另有主选区(见下方)。",
+      [
+        @yue.hbox([
+          @yue.button_t("写入文本", on_click=fn() {
+            @yue.Clipboard::get().set_text("来自 components 的剪贴板内容")
+            app.toast_push("已写入剪贴板", @yue.Success)
+          }),
+          @yue.button_t("读回显示", variant=@yue.Solid, on_click=fn() {
+            let t = @yue.Clipboard::get().get_text()
+            app.toast_push(
+              if t == "" { "剪贴板为空" } else { "读到: \{t}" },
+              if t == "" { @yue.Warning } else { @yue.Info },
+            )
+          }),
+          @yue.button_t("写 HTML 富文本", on_click=fn() {
+            @yue.Clipboard::get().set_data(
+              @yue.Html,
+              "<b>components 富文本剪贴板</b>",
+            )
+            app.toast_push("已写入 Html 富文本", @yue.Success)
+          }),
+        ]),
+      ],
+    ),
+    section(
+      "定时器与延迟任务",
+      "set_timeout 单次延时 / set_timer 周期回调(返回 false 自动停)/ post_delayed_task 主线程任务。",
+      [
+        @yue.hbox([
+          @yue.button_t("1.5 秒后提示", on_click=fn() {
+            ignore(@yue.set_timeout(1500, fn() { app.toast_push("延时任务触发", @yue.Success) }))
+          }),
+          @yue.button_t("周期计数到 3", variant=@yue.Solid, on_click=fn() {
+            let n = Ref(0)
+            @yue.set_timer(700, fn() {
+              n.val = n.val + 1
+              app.toast_push("第 \{n.val} 次周期回调", @yue.Info)
+              n.val < 3
+            })
+          }),
+        ]),
+      ],
+    ),
+    section(
+      "托盘状态",
+      "左下角托盘图标:左键点击计数联动(状态在 App,托盘在窗口 handle 里创建);Linux SNI 后端支持主题图标名(set_icon_name 跟随系统主题),其他平台为空操作。",
+      [
+        @yue.bind_label(app.tray_clicks, fn(n) { "托盘图标已被点击 \{n} 次" }),
+        @yue.hbox(
+          [
+            @yue.button_t("切主题图标(Linux)", on_click=fn() {
+              match app.tray_ref.val {
+                Some(t) => {
+                  t.set_icon_name("utilities-terminal")
+                  app.toast_push("托盘图标已切为系统主题图标", @yue.Success)
+                }
+                None => app.toast_push("托盘不可用", @yue.Warning)
+              }
+            }),
+            @yue.button_t("切回图片图标", on_click=fn() {
+              match app.tray_ref.val {
+                Some(t) => {
+                  t.set_icon("examples/showcase/icon.png")
+                  app.toast_push("已切回图片图标", @yue.Info)
+                }
+                None => ()
+              }
+            }),
+          ],
+          style=[("marginTop", 8.0)],
+        ),
+      ],
+    ),
+    section(
+      "无边框透明窗口",
+      "Window::new_with_options(frame=false, transparent=true) + always_on_top;整窗 set_mouse_down_can_move_window 可拖动(桌面宠物/悬浮件的形态基础)。窗口无编程关闭 API(上游未暴露),随应用退出。",
+      [
+        @yue.button_t("打开悬浮心形窗口", variant=@yue.Solid, on_click=fn() {
+          open_floating_heart()
+        }),
+      ],
+    ),
+    section(
+      "关闭拦截",
+      "勾选后点窗口关闭被 set_should_close 拦下(演示期间请从菜单「文件→退出」或解除勾选退出)。",
+      [
+        @yue.checkbox_t("开启关闭拦截", checked=false, on_change=fn(v) {
+          app.close_veto.val = v
+          if !v {
+            app.veto_info.set("(未开启拦截)")
+          }
+        }),
+        @yue.bind_label(app.veto_info, fn(s) { s }, style=[("marginTop", 8.0)]),
+      ],
+    ),
+  ]
+  if is_linux() {
+    secs.push(
+      section(
+        "主选区 Selection(仅 Linux)",
+        "X11 主选区:选中即写入、中键粘贴的那份;其他平台 from_type(Selection) 降级为公共剪贴板,故整段只在 Linux 出现。",
+        [
+          @yue.hbox([
+            @yue.button_t("写入主选区", on_click=fn() {
+              @yue.Clipboard::from_type(@yue.Selection).set_data(
+                @yue.Text,
+                "主选区内容",
+              )
+            }),
+            @yue.button_t("读回主选区", on_click=fn() {
+              match
+                @yue.Clipboard::from_type(@yue.Selection).get_data(@yue.Text) {
+                Some(@yue.Text(t)) => sel_out.set("主选区读回:\{t}")
+                _ => sel_out.set("主选区读回失败")
+              }
+            }),
+          ]),
+          @yue.bind_label(sel_out, fn(s) { s }, style=[("marginTop", 8.0)]),
+        ],
+      ),
+    )
+  }
+  scroll_page(secs)
+}
