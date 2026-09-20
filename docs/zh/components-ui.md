@@ -107,4 +107,4 @@ let t = @yue.default_theme()
 **原生与绘制**:「原生控件」页(Entry/Slider/ProgressBar/Checkbox/Radio/ComboBox/Picker/DatePicker/TextEdit/GifPlayer/Popover 等原生件)与「画布与富文本」页(container 自绘 + Painter 原语/混合模式/PNG、AttributedText 范围着色)。
 **系统能力**:「系统集成」页(文件对话框 / 消息框 / 系统通知 / 剪贴板 / 定时器与延迟任务)与「窗口与网页」页(窗口 API / 全局快捷键 / 拖放收发 / 原生右键菜单 / 内嵌 WebView + 自定义协议)以现代主题包装 libyue 系统件;菜单栏与系统托盘在演示板启动时挂载。全能力默认主题演示见 `examples/showcase`。
 
-组件间状态协调统一走 `Store`(subscribe / map / bind_label),见 [docs/zh/declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/declarative.md)。English version: [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md).
+组件间状态协调统一走 `Store`(subscribe / map / bind_label)或信号 `Signal`(computed 自动依赖收集,batch 批处理;组件 Store 参数可传 `sig.store()` 视图),见 [docs/zh/declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/declarative.md)。English version: [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md).

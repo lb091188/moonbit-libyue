@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -304,6 +305,28 @@ def link_configs() -> dict:
     }]}
 
 
+def check_package_version() -> None:
+    """yue/version.mbt 的 VERSION 与 moon.mod 的 version 一致性校验。
+
+    showcase 等示例在界面上展示 @yue.VERSION,两者脱节即构建期报错,
+    而不是等用户发现界面版本号对不上。
+    """
+    mod = (MODULE_ROOT / "moon.mod").read_text(encoding="utf-8")
+    vm = re.search(r'^version\s*=\s*"([^"]+)"', mod, re.M)
+    vv = re.search(
+        r'VERSION\s*:\s*String\s*=\s*"([^"]+)"',
+        (MODULE_ROOT / "yue" / "version.mbt").read_text(encoding="utf-8"),
+    )
+    mod_v = vm.group(1) if vm else "?"
+    yue_v = vv.group(1) if vv else "?"
+    if mod_v != yue_v:
+        sys.stderr.write(
+            f"[prebuild] 版本不同步: moon.mod={mod_v} yue/version.mbt={yue_v},"
+            "请同时更新两处\n"
+        )
+        sys.exit(1)
+
+
 def main() -> None:
     # Windows CI/控制台常为 cp1252 等无法编码中文的代码页，stderr 进度
     # 输出会 UnicodeEncodeError；转 UTF-8（stdout 是纯 ASCII JSON，不受影响）。
@@ -316,6 +339,7 @@ def main() -> None:
         json.load(sys.stdin)  # moon 传入构建环境，当前无需使用
     except json.JSONDecodeError:
         pass
+    check_package_version()
     ensure_native_artifacts()
     print(json.dumps(link_configs()))
 

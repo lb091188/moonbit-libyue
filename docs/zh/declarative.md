@@ -207,6 +207,43 @@ API 一览：
 | `map(f)` | 派生 Store，源变化时自动跟随（可链式） |
 | `bind_label(store, f, …)` | 声明树里绑定文本，`f` 把状态映射为字符串 |
 
+### Signal：自动依赖收集的派生
+
+`Signal[T]` 与 `Store` 共享同一内核，多一层**自动依赖收集**：
+`Signal::computed(fn() { ... })` 闭包里读到的每个信号自动成为依赖，任一依赖
+变化后该派生信号失效、下次读取时重算——派生关系写在定义处，不需要在动作
+回调里手动 `set` 另一个 Store：
+
+```moonbit
+let count = @yue.Signal::new(0)
+let doubled = @yue.Signal::computed(fn() { count.get() * 2 })
+
+@yue.bind(doubled, fn(n) { "双倍:\{n}" })   // 信号版文本绑定
+@yue.button("点我", on_click=fn() { count.update(fn(n) { n + 1 }) })
+```
+
+同一事件回调里多次 `set` 会触发多轮通知，需要合并时用 `batch` 包裹：
+
+```moonbit
+@yue.batch(fn() {
+  a.set(1)
+  b.set(2)   // 订阅者只在出 batch 时收到一次通知
+})
+```
+
+API 一览：
+
+| 函数 | 说明 |
+|---|---|
+| `Signal::new(v)` | 创建源信号 |
+| `Signal::computed(f)` | 派生信号，`f` 内读到的信号自动成为依赖，惰性重算 |
+| `get()` / `set(v)` / `update(f)` | 同 Store 语义 |
+| `subscribe(f)` | 同 Store 语义（回调收到最新值） |
+| `map(f)` | 一对一派生，等价只读一个源的 `computed` |
+| `batch(fn)` | 批处理：fn 内多次 set 合并为一次通知，可嵌套 |
+| `bind(sig, f, …)` | 声明树里绑定文本，接源信号或 computed 派生 |
+| `Signal::store()` / `Store::signal()` | 两者零成本互转（共享值与订阅）；组件 API 的 Store 参数传 `sig.store()` 即可 |
+
 ## 固有坑
 
 1. **节点挂载时才实例化**：`button(...)` 返回时控件还不存在，别在构建树时保存
