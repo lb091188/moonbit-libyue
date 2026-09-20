@@ -147,7 +147,6 @@ fn main {
     center=true,
     on_close=fn(_w) { @yue.quit() },
   )
-  window.activate()
   @yue.run()
 }
 ```

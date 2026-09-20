@@ -58,7 +58,9 @@ win.set_content(page(state))   // mount 返回根 Container，直接喂给窗口
 ### 窗口作声明式根：mount_window
 
 `Window` 没有父视图，不做成 Node，而是作为挂载入口：创建窗口、把子树
-挂为内容、返回窗口句柄；菜单栏、托盘等非视图资产经 `handle` 补挂：
+挂为内容、返回窗口句柄；菜单栏、托盘等非视图资产经 `handle` 补挂。
+`handle` 执行完后窗口自动激活显示，返回即可进 `run`，无需再手动
+`activate`；要抢在显示前调整窗口（无边框/透明等），写进 `handle`：
 
 ```moonbit
 let win = @yue.mount_window(
