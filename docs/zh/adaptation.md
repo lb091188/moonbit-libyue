@@ -286,6 +286,8 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - `moon run examples/hello`:窗口渲染 + 托盘 + 点关闭经 `on_close→quit()` 优雅退出。
 - `moon run examples/showcase`:8 页签逐一点击(基础控件/输入与选择/画布/网页/对话框/系统集成/事件/富文本)、菜单(勾选/单选/表格独立窗口)、消息框、画布色相重绘、鼠标事件实时回显、全局鼠标、浮动爱心、关闭退出,全程日志零 CHECK 失败。
 - 2026-09-14 复测(新版 moon + 声明式 showcase 12 页签):`moon check` 零警告、`YUE_MBT_SKIP_MANIFEST=1 moon test` 30/30 全过;真机逐页截图确认——整页滚轮滚动、滚动条出现;网页页 WebView2 完整渲染 moonbitlang.com(设 LIBYUE_WEBVIEW2_ARGS=--no-proxy-server);事件页按键显示 Ctrl+A/Esc,键码与常量表一致。
+- **AttributedText 区间字体/颜色补齐(fork v0.15.6-mbt.9,2026-09-20)**:上游 Windows 实现直接 `CHECK(start==0 && end==-1)` 崩溃——GDI+ 只有单一 font/brush,无富文本。修复:自建分段布局器(补丁提交进 fork `54979f8b`/`39613ee9`)——①区间属性按插入序存 run(`PlatformSetFontFor/SetColorFor` 全文设置重置同类型区间,`SetText` 后区间钳制到新文本);②`LayoutAttributedText`:按 `
+` 切逻辑行 → 区间边界切原子段(后设 run 按属性覆盖)→ 流式摆位(段放不下整段换行重排,行首放不下二分取最长前缀)→ 手动几何对齐(水平逐行/垂直整体);③`GetBoundsFor` 与 `DrawAttributedText` 在有区间属性时共用同一布局(测量绘制同源,无 runs 走原 GDI+ 直绘路径零回归)。**坑:`Gdiplus::Font::GetHeight` 重载是 `(const Graphics*)` 指针,传对象引用无匹配重载直接编译失败(mbt.8 CI win job 挂在这,mbt.9 修)**。MoonBit 层 `set_font_for/set_color_for` 的 Windows 降级守卫删除,`markdown_view` 等区间着色三平台一致。Windows 真机观感待复验。
 
 ---
 

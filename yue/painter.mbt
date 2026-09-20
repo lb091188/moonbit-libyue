@@ -396,24 +396,10 @@ pub fn AttributedText::set_font(self : AttributedText, font : Font) -> Unit {
 ///|
 // Windows 的 AttributedText 只支持全文范围的字体/颜色（上游限制，见
 // docs/adaptation.md），区间 API 在此统一降级为无操作并只告警一次。
-let ranged_attribute_warned : Ref[Bool] = Ref(false)
 
 ///|
-fn warn_ranged_attribute_once() -> Unit {
-  if !ranged_attribute_warned.val {
-    ranged_attribute_warned.val = true
-    println(
-      "yue: 当前平台(Windows)不支持 AttributedText 的区间字体/颜色，已忽略该调用",
-    )
-  }
-}
-
-///|
-// libyue 的「全文范围」约定：start == 0 && end == -1
-fn is_whole_range(start : Int, end : Int) -> Bool {
-  start == 0 && end == -1
-}
-
+// 区间字体/颜色:GDI+ 无富文本,fork v0.15.6-mbt.9 起 Windows 由 shim
+// 侧分段布局绘制,三平台语义一致,不再降级。
 ///|
 /// 对 [start, end) 字符区间设字体。
 pub fn AttributedText::set_font_for(
@@ -422,10 +408,6 @@ pub fn AttributedText::set_font_for(
   start : Int,
   end : Int,
 ) -> Unit {
-  if ffi_platform() == 2 && !is_whole_range(start, end) {
-    warn_ranged_attribute_once()
-    return
-  }
   ffi_attributed_text_set_font_for(self, font, start, end)
 }
 
@@ -455,10 +437,6 @@ pub fn AttributedText::set_color_for(
   start : Int,
   end : Int,
 ) -> Unit {
-  if ffi_platform() == 2 && !is_whole_range(start, end) {
-    warn_ranged_attribute_once()
-    return
-  }
   ffi_attributed_text_set_color_for(self, utf8_bytes(hex), start, end)
 }
 
