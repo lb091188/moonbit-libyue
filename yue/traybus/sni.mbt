@@ -208,16 +208,29 @@ pub fn Item::set_title(self : Item, title : String) -> Unit {
 
 ///|
 /// 设置主题图标名（跟随系统图标主题，如 "utilities-terminal"）。
+/// 同时清空位图：XFCE 等面板 IconPixmap 优先于 IconName，不清空则
+/// 换名后重读属性仍画旧位图，视觉上"无效"。
 pub fn Item::set_icon_name(self : Item, name : String) -> Unit {
   self.icon_name = name
+  self.pixmap_w = 0
+  self.pixmap_h = 0
+  self.pixmap = Bytes::make(0, 0)
   self.emit("NewIcon")
 }
 
 ///|
-fn Item::set_pixmap(self : Item, w : Int, h : Int, argb : Bytes) -> Unit {
+/// 设置位图图标（SNI 的 ARGB32 大端字节流，无行距补齐）。
+pub fn Item::set_pixmap(self : Item, w : Int, h : Int, argb : Bytes) -> Unit {
+  self.icon_name = ""
   self.pixmap_w = w
   self.pixmap_h = h
   self.pixmap = argb
+}
+
+///|
+/// 通知面板图标已变化（NewIcon 信号）。
+pub fn Item::emit_new_icon(self : Item) -> Unit {
+  self.emit("NewIcon")
 }
 
 ///|
