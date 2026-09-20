@@ -85,6 +85,13 @@ jobs:
         shell: python
         run: |
           import os, shutil, sys
+          # Windows CI 控制台常为 cp1252 等代码页,裸 print 中文会
+          # UnicodeEncodeError(prebuild.py 同款处理),先转 UTF-8
+          for stream in (sys.stdout, sys.stderr):
+              try:
+                  stream.reconfigure(encoding="utf-8", errors="replace")
+              except (AttributeError, OSError):
+                  pass
           # MoonBit native 后端三平台产物统一带 .exe 后缀(含 Linux/mac),
           # 仅 Windows 包内保留后缀,其余平台重命名去掉
           exes = ["hello", "hello-themed", "showcase"]
