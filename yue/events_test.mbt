@@ -1,7 +1,7 @@
 // 事件系统纯 MoonBit 部分测试（不依赖原生库）。
 
 ///|
-fn down(x : Double, ts : Int, btn : Int) -> MouseEvent {
+fn down(x : Double, ts : Int, btn : Int) -> @yue.MouseEvent {
   {
     kind: MouseDown,
     button: btn,
@@ -18,7 +18,7 @@ fn down(x : Double, ts : Int, btn : Int) -> MouseEvent {
 
 ///|
 test "ClickTracker 连击计数：时间窗/距离窗/换键重置" {
-  let t = ClickTracker::new()
+  let t = @yue.ClickTracker::new()
   // 单击
   inspect(t.feed(down(10.0, 1000, 1)), content="1")
   // 200ms 后 1px 内再点 → 双击
@@ -32,14 +32,14 @@ test "ClickTracker 连击计数：时间窗/距离窗/换键重置" {
   // 换键 → 重新计 1
   inspect(t.feed(down(40.0, 2200, 3)), content="1")
   // 自定义窗口：放宽距离
-  let wide = ClickTracker::new_with(1000, 50.0)
+  let wide = @yue.ClickTracker::new_with(1000, 50.0)
   inspect(wide.feed(down(0.0, 100, 2)), content="1")
   inspect(wide.feed(down(45.0, 800, 2)), content="2")
 }
 
 ///|
 test "事件结构字段与修饰位" {
-  let me : MouseEvent = {
+  let me : @yue.MouseEvent = {
     kind: MouseUp,
     button: 3,
     view_x: 1.5,
@@ -48,7 +48,7 @@ test "事件结构字段与修饰位" {
     window_y: 22.0,
     screen_x: 33.0,
     screen_y: 44.0,
-    modifiers: KEY_MOD_SHIFT,
+    modifiers: @yue.KEY_MOD_SHIFT,
     timestamp: 42,
   }
   inspect(me.kind is MouseUp, content="true")
@@ -57,17 +57,17 @@ test "事件结构字段与修饰位" {
   inspect(me.window_y, content="22")
   inspect(me.screen_x, content="33")
   inspect(me.timestamp, content="42")
-  inspect(me.has_mod(KEY_MOD_SHIFT), content="true")
-  inspect(me.has_mod(KEY_MOD_CTRL), content="false")
-  let ke : KeyEvent = {
+  inspect(me.has_mod(@yue.KEY_MOD_SHIFT), content="true")
+  inspect(me.has_mod(@yue.KEY_MOD_CTRL), content="false")
+  let ke : @yue.KeyEvent = {
     kind: KeyDown,
-    code: VKEY_ESCAPE,
-    modifiers: KEY_MOD_CTRL.lor(KEY_MOD_ALT),
+    code: @yue.VKEY_ESCAPE,
+    modifiers: @yue.KEY_MOD_CTRL.lor(@yue.KEY_MOD_ALT),
     timestamp: 7,
   }
   inspect(ke.kind is KeyDown, content="true")
   inspect(ke.code, content="65307")
-  inspect(ke.has_mod(KEY_MOD_CTRL), content="true")
-  inspect(ke.has_mod(KEY_MOD_ALT), content="true")
-  inspect(ke.has_mod(KEY_MOD_META), content="false")
+  inspect(ke.has_mod(@yue.KEY_MOD_CTRL), content="true")
+  inspect(ke.has_mod(@yue.KEY_MOD_ALT), content="true")
+  inspect(ke.has_mod(@yue.KEY_MOD_META), content="false")
 }
