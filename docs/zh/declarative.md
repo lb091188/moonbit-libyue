@@ -179,7 +179,7 @@ fn tagged(label_text : String, body : Node) -> Node {
 绿 #2E9E5B / 橙 #D9822B / 红 #D64550,低饱和深色调);文字一律垂直居中。
 组件间状态协调统一走 `Store`；主区页面联动用「订阅 Store +
 `ViewLike::set_visible`」（2026-09-16 补齐该 ABI）。完整演示见
-`examples/showcase`（侧栏 + 顶栏 + 页面切换 + 代码页）;组件清单与截图详见 [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md)。
+`examples/showcase`（侧栏 + 顶栏 + 页面切换 + 代码页）;组件清单与截图详见 [docs/zh/components-ui.md](components-ui.md)。
 
 ## L3：Store 与 bind_label
 

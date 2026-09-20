@@ -2,7 +2,7 @@
 
 改 `shim/`、vendor 补丁或 libyue 版本后：重跑 `scripts/prepare.py`，
 再强制重链，否则 `moon run` 复用旧 exe。原理见
-[docs/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md)「跨平台通用 → 构建与链接」。
+[docs/adaptation.md](adaptation.md)「跨平台通用 → 构建与链接」。
 
 ## 判别
 

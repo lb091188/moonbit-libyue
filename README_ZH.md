@@ -6,7 +6,7 @@
 
 简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
 
-![组件库演示板](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/showcase-basic.png)
+![组件库演示板](docs/images/showcase-basic.png)
 
 ## 三大特色
 
@@ -38,7 +38,7 @@ let clicks = @yue.Signal::new(0)
 
 三者可单独用也可叠加：主题组件库是对外唯一窗口（统一视觉），libyue 原生控件与命令式写法同样保留。
 
-> **不会 MoonBit？** 看 [五分钟上手教程](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/tutorial.md)：从 `moon new` 到窗口跑起来，附官方 MoonBit 教程与交互式 Tour 链接。
+> **不会 MoonBit？** 看 [五分钟上手教程](docs/zh/tutorial.md)：从 `moon new` 到窗口跑起来，附官方 MoonBit 教程与交互式 Tour 链接。
 
 ## 快速开始
 
@@ -89,23 +89,23 @@ moon run examples/hello-themed  # 主题组件库最小示例(theme_apply + butt
 moon run examples/showcase      # 全功能演示板:15 页三组侧栏,组件库 + 系统能力全集
 ```
 
-showcase 覆盖：基础/图标库/表单/导航/数据展示/反馈/代码与文档/事件与布局/Store 对照 + 原生控件/画布与富文本 + 系统集成/窗口/浏览器/环境与平台，左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。更多截图见 [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md)。
+showcase 覆盖：基础/图标库/表单/导航/数据展示/反馈/代码与文档/事件与布局/Store 对照 + 原生控件/画布与富文本 + 系统集成/窗口/浏览器/环境与平台，左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。更多截图见 [docs/zh/components-ui.md](docs/zh/components-ui.md)。
 
-![导航组件页](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/showcase-nav.png)
+![导航组件页](docs/images/showcase-nav.png)
 
 ## 文档索引
 
 | 文档 | 内容 |
 |---|---|
-| [components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md) | 主题组件库 API 一览 + 定制主题/深浅切换 |
-| [declarative.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/declarative.md) | 声明式 `Node`/`mount` 渲染树 + `Store` 响应式绑定 |
-| [components.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components.md) | 控件 API 速查:经典 setter 与 `X::make` props 两种写法 |
-| [layout.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/layout.md) | 布局样式键全集(Yoga flexbox) |
-| [adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md) | 各平台实测坑、根因与验证结论 |
-| [tray.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/tray.md) | Linux 托盘:SNI 协议栈设计与后端降级 |
-| [relink.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/relink.md) | 原生层变更后强制重链 |
+| [components-ui.md](docs/zh/components-ui.md) | 主题组件库 API 一览 + 定制主题/深浅切换 |
+| [declarative.md](docs/zh/declarative.md) | 声明式 `Node`/`mount` 渲染树 + `Store` 响应式绑定 |
+| [components.md](docs/zh/components.md) | 控件 API 速查:经典 setter 与 `X::make` props 两种写法 |
+| [layout.md](docs/zh/layout.md) | 布局样式键全集(Yoga flexbox) |
+| [adaptation.md](docs/zh/adaptation.md) | 各平台实测坑、根因与验证结论 |
+| [tray.md](docs/zh/tray.md) | Linux 托盘:SNI 协议栈设计与后端降级 |
+| [relink.md](docs/zh/relink.md) | 原生层变更后强制重链 |
 
-完整索引:[docs/zh/README.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/README.md)。
+完整索引:[docs/zh/README.md](docs/zh/README.md)。
 
 ## 平台支持
 
@@ -115,7 +115,7 @@ Ubuntu 24.04(XFCE / GNOME / KDE) ✅ · Deepin 25 ✅ · Windows 10/11 ✅ · ma
 
 - 构建与测试:`moon check && moon test`(提交门禁:零错误零警告)
 - 新增控件:`shim/yue_mbt.cpp` 机械转换 → `shim/include/yue_mbt.h` 声明 → `yue/ffi.mbt` 加 extern → 新 `yue/*.mbt` 加类型与方法(FFI 规范见 `.agents/skills/moonbit-c-binding/`)
-- 实测踩坑一律回写 [docs/zh/adaptation.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/adaptation.md);发布二进制推 `bin-*` 标签,原生层变更推 `vendor-*` 标签
+- 实测踩坑一律回写 [docs/zh/adaptation.md](docs/zh/adaptation.md);发布二进制推 `bin-*` 标签,原生层变更推 `vendor-*` 标签
 
 ## 参考
 

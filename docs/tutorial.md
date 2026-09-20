@@ -100,9 +100,9 @@ Learn the rest (pattern matching, structs, traits) from the official **[MoonBit 
 
 ## 5. Next steps
 
-- **Theming in one line**: `@yue.theme_apply({ ..@yue.default_theme(), primary: "#1E4FA3" })`; light/dark system following in [components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md)
+- **Theming in one line**: `@yue.theme_apply({ ..@yue.default_theme(), primary: "#1E4FA3" })`; light/dark system following in [components-ui.md](components-ui.md)
 - **The full widget gallery**: clone this repository and `moon run examples/showcase` — a 15-page demo board; each page's source is a standalone file (`examples/showcase/pages_*.mbt`), the best copy-paste material
-- **Go deeper**: declarative nodes & reactive bindings in [declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md), layout style keys in [layout.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/layout.md), widget API reference in [components.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components.md)
+- **Go deeper**: declarative nodes & reactive bindings in [declarative.md](declarative.md), layout style keys in [layout.md](layout.md), widget API reference in [components.md](components.md)
 
 ## FAQ
 
@@ -113,4 +113,4 @@ Learn the rest (pattern matching, structs, traits) from the official **[MoonBit 
 | `Package "yue" not found` | `import` section of `moon.pkg` missing `"NoahLiu/moonbit-libyue/yue"` |
 | Missing GTK libraries on Linux | apt list in step 1 not fully installed |
 | `moon run my_app` says path not found | The root package is run with `moon run .` |
-| Code changes not taking effect | After native-layer (shim/vendor) changes force a relink, see [relink.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/relink.md) |
+| Code changes not taking effect | After native-layer (shim/vendor) changes force a relink, see [relink.md](relink.md) |

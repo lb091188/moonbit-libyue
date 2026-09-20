@@ -100,15 +100,15 @@ let t = @yue.default_theme()
 
 `moon run examples/showcase` — eleven-page showcase (Basic / Form / Events & Layout / Navigation / Data Display / Feedback + Native Widgets / Canvas & Rich Text + System Integration / Window & Web / Environment) covering the component library and all libyue capabilities:
 
-![Basic](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-basic.png)
+![Basic](images/components-basic.png)
 
-![Navigation](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-nav.png)
+![Navigation](images/components-nav.png)
 
-![Data display](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-data.png)
+![Data display](images/components-data.png)
 
-![Feedback](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-feedback.png)
+![Feedback](images/components-feedback.png)
 
 **Native & drawing**: the "Native Widgets" page (Entry/Slider/ProgressBar/Checkbox/Radio/ComboBox/Picker/DatePicker/TextEdit/GifPlayer/Popover) and "Canvas & Rich Text" page (container self-drawing + Painter primitives/blend modes/PNG, AttributedText range styling).
 **System capabilities**: the "System Integration" page (file dialogs / message boxes / system notifications / clipboard / timers) and "Window & Web" page (window APIs / global shortcuts / drag in & out / native context menu / embedded WebView + custom protocol) wrap libyue system pieces in the modern theme; the menu bar and system tray are attached at demo startup. Full-capability default-theme demos live in `examples/showcase`.
 
-State coordination across components goes through `Store` (subscribe / map / bind_label) or signals (`Signal`: computed with automatic dependency tracking, batch updates; pass a `sig.store()` view to component APIs taking a Store); see [docs/declarative.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/declarative.md). Chinese version: [docs/zh/components-ui.md](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/docs/zh/components-ui.md).
+State coordination across components goes through `Store` (subscribe / map / bind_label) or signals (`Signal`: computed with automatic dependency tracking, batch updates; pass a `sig.store()` view to component APIs taking a Store); see [docs/declarative.md](declarative.md). Chinese version: [docs/zh/components-ui.md](zh/components-ui.md).
