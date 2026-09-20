@@ -19,7 +19,6 @@ fn page_native(_app : App) -> @yue.Node {
   let nat_cb : Ref[@yue.ComboBox?] = Ref(None)
   let nat_pk : Ref[@yue.Picker?] = Ref(None)
   let nat_edit : Ref[@yue.TextEdit?] = Ref(None)
-  let nat_pop : Ref[@yue.Button?] = Ref(None)
   let nat_scroll : Ref[@yue.Scroll?] = Ref(None)
   let nat_policy = Ref(false)
   let nat_date = @yue.DatePicker::new_with({
