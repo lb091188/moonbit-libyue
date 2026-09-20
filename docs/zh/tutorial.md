@@ -13,14 +13,34 @@ curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
 irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
 ```
 
-**Linux 还需要 GTK 系统库**(Ubuntu 24.04 一行):
+<details>
+<summary>Linux(Ubuntu 24.04) 环境准备</summary>
+
+需要 build-essential(gcc / g++ / make)、CMake、pkg-config，以及 GTK3 / Pango / FontConfig / X11 / WebKit2GTK 的开发包(Ubuntu 24.04 实测，Debian 系发行版包名相同)：
 
 ```sh
 sudo apt install build-essential cmake pkg-config \
   libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev libwebkit2gtk-4.1-dev
 ```
 
-Windows 的 MSVC 环境准备见仓库 README「快速开始」的折叠段。
+运行时若报 GTK 库缺失，多半是这份 apt 清单没装全。
+
+</details>
+
+<details>
+<summary>Windows(10/11, x64) 环境准备</summary>
+
+需要 Python 3、MoonBit、CMake、MSVC C++ 工具链(含 ATL)；moon 在 Windows 编译原生代码时从 PATH 找 `cl`，须在「x64 Native Tools Command Prompt for VS 2022」执行，或先 call `vcvars64.bat`：
+
+```powershell
+irm https://cli.moonbitlang.com/install/powershell.ps1 | iex            # MoonBit
+winget install Kitware.CMake
+winget install Microsoft.VisualStudio.2022.BuildTools -e --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+# 补装 ATL:
+Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe' -ArgumentList 'modify','--installPath','"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"','--add','Microsoft.VisualStudio.Component.VC.ATL','--quiet','--norestart' -Verb RunAs -Wait
+```
+
+</details>
 
 ## 2. 建工程(三个新手坑逐一避开)
 
@@ -32,25 +52,23 @@ moon add NoahLiu/moonbit-libyue
 
 `moon new` 生成的工程需要三处手工调整——都是实测踩过的坑:
 
-**① `moon.mod`:把 `preferred_target = "wasm"` 改为 `"native"`**
-本库走原生 FFI,只支持 native 后端;不改会在编译期报 `ffi_* is unbound`。
+- **① `moon.mod`:把 `preferred_target = "wasm"` 改为 `"native"`** —— 本库走原生 FFI,只支持 native 后端;不改会在编译期报 `ffi_* is unbound`。
 
-**② 入口文件改名:`my_app.mbt` → `main.mbt`**
-当前版本的 moon 只把名为 `main.mbt` 的文件识别为程序入口;用模板默认文件名会报 `Missing main function`。
+- **② 入口文件改名:`my_app.mbt` → `main.mbt`** —— 当前版本的 moon 只把名为 `main.mbt` 的文件识别为程序入口;用模板默认文件名会报 `Missing main function`。
 
-**③ `moon.pkg` 整个替换为**(注意这是 moon 的 DSL 格式,不是 JSON):
+- **③ `moon.pkg` 整个替换为**(注意这是 moon 的 DSL 格式,不是 JSON):
 
-```
-import {
-  "NoahLiu/moonbit-libyue/yue",
-}
+  ```
+  import {
+    "NoahLiu/moonbit-libyue/yue",
+  }
 
-options(
-  "is-main": true,
-)
-```
+  options(
+    "is-main": true,
+  )
+  ```
 
-`import` 让代码里能用 `@yue.*` 访问组件库;`is-main` 声明本包是可执行入口。
+  `import` 让代码里能用 `@yue.*` 访问组件库;`is-main` 声明本包是可执行入口。
 
 ## 3. 第一个窗口
 
@@ -105,14 +123,3 @@ moon run .
 - **换肤一行**:`@yue.theme_apply({ ..@yue.default_theme(), primary: "#1E4FA3" })`,深浅跟随系统见 [components-ui.md](components-ui.md) 的「定制主题」
 - **组件大全**:`git clone` 本仓库后 `moon run examples/showcase`,15 页演示板对着抄;每页源码独立成文件(`examples/showcase/pages_*.mbt`),是最好的复制粘贴素材库
 - **系统学习**:声明式节点与响应式绑定看 [declarative.md](declarative.md),布局样式键全集看 [layout.md](layout.md),组件 API 速查看 [components.md](components.md)
-
-## 常见问题
-
-| 现象 | 原因与修法 |
-|---|---|
-| `ffi_* is unbound` | `moon.mod` 的 `preferred_target` 没改成 `"native"` |
-| `Missing main function` | 入口文件没叫 `main.mbt`,或 `moon.pkg` 少 `options("is-main": true)` |
-| `Package "yue" not found` | `moon.pkg` 的 `import` 段没加 `"NoahLiu/moonbit-libyue/yue"` |
-| Linux 报 GTK 库缺失 | 第 1 节的 apt 清单没装全 |
-| `moon run my_app` 报找不到路径 | 根包用 `moon run .` |
-| 改了代码没生效 | 原生层(shim/vendor)变更后需强制重链,见 [relink.md](relink.md) |

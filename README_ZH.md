@@ -1,8 +1,8 @@
-# moonbit-libyue
+# moonbit-libyue [![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
 
-[![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
+> 感谢 [赵成(zcbenz)](https://github.com/zcbenz) 和他的 [Yue](https://github.com/yue/yue) 框架，以及 [MoonBit](https://github.com/moonbitlang)。很凑巧，这两个编程工具都有 “月”，现在我也很喜欢它们。 [关于我和 `libyue`](docs/zh/aboutlibyue.md)
 
-[libyue](https://libyue.com/docs/latest/cpp/) 的 MoonBit 封装——用纯 MoonBit 编写 Windows / macOS / Linux 原生跨平台桌面应用。
+[libyue](https://libyue.com/docs/latest/cpp/) 的 MoonBit 封装——兼容 Windows / macOS(待测试) / Linux 原生跨平台桌面应用。
 
 简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
 
@@ -10,13 +10,13 @@
 
 ## 三大特色
 
-**🎨 现代主题** —— Element Plus 风格主题组件库（按钮 / 表单 / 导航 / 数据展示 / 反馈等 50+ 组件），全部自绘、三平台视觉一致；`theme_apply` 一行换肤，深浅自动跟随系统：
+**🎨 现代主题** —— 全部自绘、三平台视觉一致；`theme_apply` 一行换肤，深浅自动跟随系统：
 
 ```moonbit
 @yue.theme_apply({ ..@yue.default_theme(), primary: "#1E4FA3" })
 ```
 
-**📝 声明式** —— 节点树描述界面，不手写 `new + set_content`：
+**📝 声明式** —— 节点树描述界面，不手写 `new + set_xxx`：
 
 ```moonbit
 let window = @yue.mount_window(
@@ -32,54 +32,22 @@ let window = @yue.mount_window(
 
 ```moonbit
 let clicks = @yue.Signal::new(0)
+let text = @yue.Signal::computed(fn() { "已点 \{clicks.get()} 次" })  // 依赖自动收集
+
 @yue.button("点我", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
-@yue.bind(clicks, fn(n) { "已点 \{n} 次" }),  // 派生文本,点击即变
+@yue.bind(text, fn(s) { s }),
 ```
-
-三者可单独用也可叠加：主题组件库是对外唯一窗口（统一视觉），libyue 原生控件与命令式写法同样保留。
-
-> **不会 MoonBit？** 看 [五分钟上手教程](docs/zh/tutorial.md)：从 `moon new` 到窗口跑起来，附官方 MoonBit 教程与交互式 Tour 链接。
 
 ## 快速开始
 
-```sh
-# Ubuntu 24.04:装一次系统依赖(GTK/Webkit 开发包)
-sudo apt install build-essential cmake pkg-config \
-  libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev libwebkit2gtk-4.1-dev
+> **不会 MoonBit？** 有任意一门语言的编程基础就行——[五分钟上手教程](docs/zh/tutorial.md) 从 `moon new` 带你到窗口跑起来，附官方 MoonBit 教程与交互式 Tour 链接。
 
-# 作为依赖使用:原生库随包分发(三平台预编译),moon add 后零 C++ 编译
-moon add NoahLiu/moonbit-libyue
-moon run src
+本项目基于 MoonBit 语言封装 libyue，使用本库需要了解 MoonBit，并准备各个系统的 C 编译环境，并且每个系统还有不同的依赖：
 
-# 跑演示板
-git clone https://github.com/lb091188/moonbit-libyue && cd moonbit-libyue
-moon run examples/showcase
-```
+- Linux 依赖 libwebkit2gtk 和 libgtk-3
+- Windows 依赖 WebView2
 
-<details>
-<summary>Windows(10/11, x64) 环境准备</summary>
-
-需要 Python 3、MoonBit、CMake、MSVC C++ 工具链(含 ATL)；moon 在 Windows 编译原生代码时从 PATH 找 `cl`，须在「x64 Native Tools Command Prompt for VS 2022」执行，或先 call `vcvars64.bat`：
-
-```powershell
-irm https://cli.moonbitlang.com/install/powershell.ps1 | iex            # MoonBit
-winget install Kitware.CMake
-winget install Microsoft.VisualStudio.2022.BuildTools -e --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
-# 补装 ATL:
-Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe' -ArgumentList 'modify','--installPath','"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"','--add','Microsoft.VisualStudio.Component.VC.ATL','--quiet','--norestart' -Verb RunAs -Wait
-```
-
-</details>
-
-**注意工程须以 native 为目标**：`moon new` 模板默认 `preferred_target = "wasm"`，会报 `ffi_* is unbound`，把 moon.mod 的 `preferred_target` 改为 `"native"` 即可。
-
-## 三种写界面的方式
-
-| 层 | 用法 | 适合 |
-|---|---|---|
-| 1 | **主题组件库 + 声明式 + 响应式**：`button_t` / `side_menu` / `tag` … 节点 + `Store` 绑定 | 现代化应用外壳，推荐 |
-| 2 | **libyue 原生控件 + 声明式 + 响应式**：`button` / `entry` / `slider` … 节点 + `Store` 绑定 | 原生外观 + 声明式写法 |
-| 3 | **libyue 原生控件 + 命令式**：`Window::new` + `set_content` + setter | 贴近 libyue 原生 API |
+[详细和开发使用教程](docs/zh/tutorial.md)
 
 ## 演示
 
