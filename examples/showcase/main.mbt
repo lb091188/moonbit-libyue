@@ -331,6 +331,5 @@ fn main {
       })
     },
   )
-  window.activate()
   @yue.run()
 }

@@ -56,7 +56,7 @@ win.set_content(page(state))   // mount returns the root Container; feed it stra
 
 ### Windows as the declarative root: mount_window
 
-A `Window` has no parent view, so instead of being a Node it serves as the mount entry point: it creates the window, mounts the subtree as its content, and returns the window handle; non-view assets such as menu bars and tray icons are attached via `handle`:
+A `Window` has no parent view, so instead of being a Node it serves as the mount entry point: it creates the window, mounts the subtree as its content, and returns the window handle; non-view assets such as menu bars and tray icons are attached via `handle`. The window is activated and shown right after `handle` returns — feed the result straight into `run`, no manual `activate` needed; adjustments that must happen before the window shows go inside `handle`:
 
 ```moonbit
 let win = @yue.mount_window(

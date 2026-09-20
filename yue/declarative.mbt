@@ -559,7 +559,8 @@ pub fn mount(
 ///|
 /// 声明一棵 UI 树并装进窗口：窗口是声明式树的根（Window 无父视图，
 /// 故不做 Node，而作为挂载入口）。创建窗口、挂载全部子节点为内容，
-/// 返回窗口；菜单栏、托盘、全局快捷键等非视图资产经 handle 回调补挂。
+/// handle 补挂菜单栏/托盘等非视图资产，随后激活显示——返回后直接
+/// run 即可，无需再手动 activate；需抢在显示前调整窗口，写进 handle。
 pub fn mount_window(
   children : Array[Node],
   title? : String = "",
@@ -571,5 +572,6 @@ pub fn mount_window(
   let win = Window::make(title~, size~, on_close~, center~)
   win.set_content(mount(children))
   handle(win)
+  win.activate()
   win
 }
