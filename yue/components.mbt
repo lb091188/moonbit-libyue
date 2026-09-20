@@ -2962,13 +2962,104 @@ fn local_date() -> DateYMD {
 }
 
 ///|
-/// 构建自绘日历面板(头部 ‹/› 导航 + 星期行 + 42 格月网格),calendar_t
-/// 与 date_picker_t 共用。点击当月日期写入 sel 后回调 on_pick;返回面板
-/// 与「按当前状态重建网格」函数(外部改 sel 后手动调用刷新)。
+/// 日期比较:负 = a 早于 b,0 = 同一天,正 = a 晚于 b。
+fn date_cmp(a : DateYMD, b : DateYMD) -> Int {
+  if a.y != b.y {
+    a.y - b.y
+  } else if a.m != b.m {
+    a.m - b.m
+  } else {
+    a.d - b.d
+  }
+}
+
+///|
+fn date_eq(a : DateYMD, b : DateYMD) -> Bool {
+  date_cmp(a, b) == 0
+}
+
+///|
+/// d 是否落在 [s, e] 闭区间内(s/e 顺序不限,内部归一)。
+fn date_in_range(d : DateYMD, s : DateYMD, e : DateYMD) -> Bool {
+  let (lo, hi) = if date_cmp(s, e) <= 0 { (s, e) } else { (e, s) }
+  date_cmp(d, lo) >= 0 && date_cmp(d, hi) <= 0
+}
+
+///|
+/// 时间值(时 0-23 / 分 0-59;区间/日期时间选择的组成部分)。
+pub(all) struct TimeHM {
+  h : Int
+  m : Int
+}
+
+///|
+/// 时间比较:负 = a 早于 b,0 = 相同,正 = a 晚于 b。
+pub fn TimeHM::compare(a : TimeHM, b : TimeHM) -> Int {
+  a.h * 60 + a.m - (b.h * 60 + b.m)
+}
+
+///|
+/// 格式化为 HH:MM(不足两位补零)。
+pub fn TimeHM::format(self : TimeHM) -> String {
+  fn two(n : Int) -> String {
+    if n < 10 {
+      "0\{n}"
+    } else {
+      n.to_string()
+    }
+  }
+
+  "\{two(self.h)}:\{two(self.m)}"
+}
+
+///|
+/// 钳制到合法时间(h 0-23 / m 0-59)。
+fn time_clamp(h : Int, m : Int) -> TimeHM {
+  let hc = if h < 0 { 0 } else if h > 23 { 23 } else { h }
+  let mc = if m < 0 { 0 } else if m > 59 { 59 } else { m }
+  { h: hc, m: mc }
+}
+
+///|
+/// 日期区间值(起点/终点各自可为空:选择过程的中间态)。
+pub(all) struct DateRange {
+  start : DateYMD?
+  end : DateYMD?
+}
+
+///|
+/// 时间区间值。
+pub(all) struct TimeRange {
+  start : TimeHM?
+  end : TimeHM?
+}
+
+///|
+/// 日期时间区间值(日期对 + 各自时:分)。
+pub(all) struct DateTimeRange {
+  start : (DateYMD, TimeHM)?
+  end : (DateYMD, TimeHM)?
+}
+
+///|
+/// 格子状态:普通 / 单选选中 / 区间端点 / 区间中间(浅蓝底)。
+priv enum CalCell {
+  Plain
+  Selected
+  RangeEdge
+  InRange
+}
+
+///|
+/// 构建自绘日历面板(头部 ‹/› 导航 + 星期行 + 42 格月网格),日历家族
+/// (calendar_t / date_picker_t / 区间选择器)共用。选中语义外置:
+/// state_of 决定每格画法(单选方块/区间端点/区间中浅底),on_cell 收
+/// 点击;on_cell 返回后全格重绘。返回面板与「按当前状态重建网格」函数
+/// (外部改状态后手动调用刷新)。
 fn build_calendar(
   today : DateYMD,
-  sel : Ref[DateYMD?],
-  on_pick : (DateYMD) -> Unit,
+  state_of : (DateYMD) -> CalCell,
+  on_cell : (DateYMD) -> Unit,
 ) -> (Container, () -> Unit) {
   let cell_w = 36.0
   let cell_h = 30.0
@@ -3119,15 +3210,23 @@ fn build_calendar(
           let b = ViewLike::get_bounds(c)
           let d = dref.val
           let in_m = inm.val
-          let is_sel = match sel.val {
-            Some(s) => s.y == d.y && s.m == d.m && s.d == d.d
-            None => false
+          let st = state_of(d)
+          let solid = match st {
+            Selected | RangeEdge => true
+            Plain | InRange => false
           }
-          if hover.val && !is_sel {
+          if hover.val && !solid {
             p.set_fill_color(theme_fill_hover())
             p.fill_rect(0.0, 0.0, b.width, b.height)
           }
-          if is_sel {
+          match st {
+            InRange => {
+              p.set_fill_color(theme_primary_light())
+              p.fill_rect(0.0, 0.0, b.width, b.height)
+            }
+            Plain | Selected | RangeEdge => ()
+          }
+          if solid {
             p.set_fill_color(theme_primary())
             p.fill_rect(
               (b.width - 28.0) / 2.0,
@@ -3141,6 +3240,8 @@ fn build_calendar(
               theme_text_secondary()
             } else if today.y == d.y && today.m == d.m && today.d == d.d {
               theme_primary()
+            } else if st is InRange {
+              theme_primary()
             } else {
               theme_text_primary()
             }
@@ -3148,17 +3249,15 @@ fn build_calendar(
           }
         })
         View::set_cursor(c, hand())
-        // release 才选中:date_picker 弹层内点项一律 release 防穿透;
+        // release 才选中:弹层内点项一律 release 防穿透;
         // calendar_t 内联面板同语义无副作用(松开选中,标准按钮感)。
         // 跨月格不可选(inm 校验在回调内,格子稳定不随月重建)
         ViewLike::on_mouse_up(c, fn(e) {
           if e.button == 1 && inm.val {
-            let d = dref.val
-            sel.val = Some(d)
+            on_cell(dref.val)
             for cc in cells.val {
               ViewLike::schedule_paint(cc)
             }
-            on_pick(d)
             true
           } else {
             false
@@ -3254,7 +3353,13 @@ pub fn calendar_t(
         Some(s) => s.get()
         None => None
       })
-      let (panel, refresh) = build_calendar(today, sel, fn(d) {
+      let (panel, refresh) = build_calendar(today, fn(d) {
+        match sel.val {
+          Some(s) => if date_eq(s, d) { Selected } else { Plain }
+          None => Plain
+        }
+      }, fn(d) {
+        sel.val = Some(d)
         match value {
           Some(s) => s.set(Some(d))
           None => ()
@@ -3287,8 +3392,6 @@ pub fn date_picker_t(
   {
     mount: fn(parent) {
       let today = local_date()
-      let fnt = Font::new("Sans", 13.0)
-      let hover = Ref(false)
       let sel : Ref[DateYMD?] = Ref(match value {
         Some(s) => s.get()
         None => None
@@ -3301,49 +3404,17 @@ pub fn date_picker_t(
         Some(_) => true
         None => false
       })
-      let field = themed_container(
-        style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
-        style_str=[("flexDirection", "row"), ("alignItems", "center")],
-      )
-      set_panel_bg(field)
-      View::set_cursor(field, hand())
-      let focused = Ref(false)
-      field.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(field)
-        p.set_stroke_color(
-          if focused.val { theme_focus_accent() } else { theme_border() },
-        )
-        p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
-        let probe = AttributedText::new(text.val, wrap=false)
-        probe.set_font(fnt)
-        p.draw_text(
-          text.val,
-          10.0,
-          0.0,
-          b.width - 30.0,
-          b.height,
-          valign=Center,
-          color=if has_val.val {
-            theme_text_primary()
-          } else {
-            theme_text_secondary()
-          },
-        )
-        // 右侧下拉小箭头(矢量自绘,不依赖字体字形)
-        p.set_fill_color(theme_text_secondary())
-        p.begin_path()
-        p.move_to(b.width - 20.0, b.height / 2.0 - 2.0)
-        p.line_to(b.width - 12.0, b.height / 2.0 - 2.0)
-        p.line_to(b.width - 16.0, b.height / 2.0 + 3.0)
-        p.close_path()
-        p.fill()
-        if clearable && hover.val && has_val.val {
-          draw_clear_x(p, b.width - 30.0, b.height / 2.0)
-        }
-      })
       // 弹层与面板:首开时创建,面板重建函数挂入 grid_refresh 供外部同步
       let pop : Ref[Popover?] = Ref(None)
       let grid_refresh : Ref[() -> Unit] = Ref(fn() {  })
+      let field = build_picker_field(width, text, has_val, clearable, on_focus_changed=fn(f) {
+        if !f {
+          match pop.val {
+            Some(p) => p.close()
+            None => ()
+          }
+        }
+      })
       fn apply_date(d : DateYMD) -> Unit {
         sel.val = Some(d)
         text.val = d.format()
@@ -3356,35 +3427,11 @@ pub fn date_picker_t(
         on_change(d)
       }
 
-      ViewLike::set_focusable(field, true)
-      ViewLike::on_focus_in(field, fn() {
-        focused.val = true
-        ViewLike::schedule_paint(field)
-        false
-      })
-      ViewLike::on_focus_out(field, fn() {
-        focused.val = false
-        ViewLike::schedule_paint(field)
-        match pop.val {
-          Some(p) => p.close()
-          None => ()
-        }
-        false
-      })
-      ViewLike::on_mouse_enter(field, fn(_e) {
-        hover.val = true
-        ViewLike::schedule_paint(field)
-      })
-      ViewLike::on_mouse_leave(field, fn(_e) {
-        hover.val = false
-        ViewLike::schedule_paint(field)
-      })
       ViewLike::on_mouse_up(field, fn(e) {
         if e.button == 1 {
           ViewLike::focus(field)
           // 清空带(箭头左侧)优先:清空日期,不弹日历
-          let b = ViewLike::get_bounds(field)
-          if clearable && has_val.val && e.view_x >= b.width - 40.0 && e.view_x <= b.width - 20.0 {
+          if picker_clear_hit(field, e, clearable, has_val.val) {
             sel.val = None
             text.val = placeholder
             has_val.val = false
@@ -3400,7 +3447,12 @@ pub fn date_picker_t(
             None => {
               let p = Popover::new()
               bind_popover_bg(p)
-              let (panel, refresh) = build_calendar(today, sel, fn(d) {
+              let (panel, refresh) = build_calendar(today, fn(d) {
+                match sel.val {
+                  Some(s) => if date_eq(s, d) { Selected } else { Plain }
+                  None => Plain
+                }
+              }, fn(d) {
                 apply_date(d)
                 p.close()
               })
@@ -3440,6 +3492,660 @@ pub fn date_picker_t(
           })
         None => ()
       }
+      attach(parent, ViewLike::view(field))
+      ViewLike::view(field)
+    },
+  }
+}
+
+///|
+/// 选择器家族共用的输入框样式字段(date_picker_t 与区间选择器):
+/// 边框(聚焦变主题色)+ 文本(有值主色/无值次色)+ 右侧下拉小箭头,
+/// clearable=true 悬停且有值时箭头左侧显示 ✕。焦点/悬停态内部管理;
+/// 聚焦变化回调 on_focus_changed(弹层随失焦关闭挂这里),点击行为
+/// (弹层与清空)由调用方注册 on_mouse_up。
+fn build_picker_field(
+  width : Double,
+  text : Ref[String],
+  has_val : Ref[Bool],
+  clearable : Bool,
+  on_focus_changed? : (Bool) -> Unit = fn(_f) {  },
+) -> Container {
+  let fnt = Font::new("Sans", 13.0)
+  let hover = Ref(false)
+  let focused = Ref(false)
+  let field = themed_container(
+    style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
+    style_str=[("flexDirection", "row"), ("alignItems", "center")],
+  )
+  set_panel_bg(field)
+  View::set_cursor(field, hand())
+  field.on_draw(fn(p) {
+    let b = ViewLike::get_bounds(field)
+    p.set_stroke_color(
+      if focused.val { theme_focus_accent() } else { theme_border() },
+    )
+    p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+    let probe = AttributedText::new(text.val, wrap=false)
+    probe.set_font(fnt)
+    p.draw_text(
+      text.val,
+      10.0,
+      0.0,
+      b.width - 30.0,
+      b.height,
+      valign=Center,
+      color=if has_val.val {
+        theme_text_primary()
+      } else {
+        theme_text_secondary()
+      },
+    )
+    // 右侧下拉小箭头(矢量自绘,不依赖字体字形)
+    p.set_fill_color(theme_text_secondary())
+    p.begin_path()
+    p.move_to(b.width - 20.0, b.height / 2.0 - 2.0)
+    p.line_to(b.width - 12.0, b.height / 2.0 - 2.0)
+    p.line_to(b.width - 16.0, b.height / 2.0 + 3.0)
+    p.close_path()
+    p.fill()
+    if clearable && hover.val && has_val.val {
+      draw_clear_x(p, b.width - 30.0, b.height / 2.0)
+    }
+  })
+  ViewLike::set_focusable(field, true)
+  ViewLike::on_focus_in(field, fn() {
+    focused.val = true
+    ViewLike::schedule_paint(field)
+    on_focus_changed(true)
+    false
+  })
+  ViewLike::on_focus_out(field, fn() {
+    focused.val = false
+    ViewLike::schedule_paint(field)
+    on_focus_changed(false)
+    false
+  })
+  ViewLike::on_mouse_enter(field, fn(_e) {
+    hover.val = true
+    ViewLike::schedule_paint(field)
+  })
+  ViewLike::on_mouse_leave(field, fn(_e) {
+    hover.val = false
+    ViewLike::schedule_paint(field)
+  })
+  field
+}
+
+///|
+/// 点击是否落在字段清空带(下拉箭头左侧的 ✕ 区域)。
+fn picker_clear_hit(
+  field : Container,
+  e : MouseEvent,
+  clearable : Bool,
+  has_val : Bool,
+) -> Bool {
+  if !(clearable && has_val) {
+    return false
+  }
+  let b = ViewLike::get_bounds(field)
+  e.view_x >= b.width - 40.0 && e.view_x <= b.width - 20.0
+}
+
+///|
+/// 区间日历的格子状态映射:两端点实心方块,闭区间内浅蓝底。
+fn range_state_of(
+  start : Ref[DateYMD?],
+  end : Ref[DateYMD?],
+) -> (DateYMD) -> CalCell {
+  fn state_of(d : DateYMD) -> CalCell {
+    match (start.val, end.val) {
+      (Some(s), Some(e)) => {
+        if date_eq(d, s) || date_eq(d, e) {
+          RangeEdge
+        } else if date_in_range(d, s, e) {
+          InRange
+        } else {
+          Plain
+        }
+      }
+      (Some(s), None) => if date_eq(d, s) { RangeEdge } else { Plain }
+      (None, None) | (None, Some(_)) => Plain
+    }
+  }
+
+  state_of
+}
+
+///|
+/// 区间两段式点击:尚无区间 → 写起点;只有起点 → 写终点(终点早于起点
+/// 自动对调)并回调 on_done;已有完整区间再点 → 重新从新起点开始。
+fn range_cell_click(
+  start : Ref[DateYMD?],
+  end : Ref[DateYMD?],
+  d : DateYMD,
+  on_done : (DateYMD, DateYMD) -> Unit,
+) -> Unit {
+  match (start.val, end.val) {
+    (Some(_), Some(_)) => {
+      start.val = Some(d)
+      end.val = None
+    }
+    (Some(s), None) => {
+      let (a, b) = if date_cmp(d, s) < 0 { (d, s) } else { (s, d) }
+      start.val = Some(a)
+      end.val = Some(b)
+      on_done(a, b)
+    }
+    (None, None) | (None, Some(_)) => {
+      start.val = Some(d)
+      end.val = None
+    }
+  }
+}
+
+///|
+/// 一行「时:分」编辑器(标签 + 时 0-23 / 分 0-59 两个 input_number):
+/// 任一步进写回 hm 并回调 on_change;sync 供外部值变化时回填步进器
+/// 显示,回填期间置 mute=true 避免回环触发 on_change。
+fn build_time_row(
+  label : String,
+  hm : Ref[TimeHM],
+  mute : Ref[Bool],
+  on_change : () -> Unit,
+) -> (Node, (TimeHM) -> Unit) {
+  let hs : Store[Double] = Store::new(hm.val.h.to_double())
+  let ms : Store[Double] = Store::new(hm.val.m.to_double())
+  hs.subscribe(fn(v) {
+    hm.val = time_clamp(v.round().to_int(), hm.val.m)
+    if !mute.val {
+      on_change()
+    }
+  })
+  ms.subscribe(fn(v) {
+    hm.val = time_clamp(hm.val.h, v.round().to_int())
+    if !mute.val {
+      on_change()
+    }
+  })
+  let row = hbox(
+    [
+      label_t(label, role=Body, style=[("width", 28.0), ("marginRight", 6.0)]),
+      input_number(hs, min=0.0, max=23.0, step=1.0),
+      label_t(":", role=Body),
+      input_number(ms, min=0.0, max=59.0, step=1.0),
+    ],
+    style=[("marginBottom", 6.0)],
+    style_str=[("alignItems", "center")],
+  )
+  fn sync(t : TimeHM) -> Unit {
+    mute.val = true
+    hs.set(t.h.to_double())
+    ms.set(t.m.to_double())
+    mute.val = false
+  }
+
+  (row, sync)
+}
+
+///|
+/// 弹层内的起/止两行时间编辑面板;sync(起, 止) 回填两行显示(mute
+/// 包裹,不触发 on_change),mute 供调用方在程序化写值期间整体静音。
+fn build_time_panel(
+  start_hm : Ref[TimeHM],
+  end_hm : Ref[TimeHM],
+  on_change : () -> Unit,
+) -> (Container, (TimeHM, TimeHM) -> Unit, Ref[Bool]) {
+  let mute = Ref(false)
+  let (row1, sync1) = build_time_row("起", start_hm, mute, on_change)
+  let (row2, sync2) = build_time_row("止", end_hm, mute, on_change)
+  let panel = themed_container(
+    style=[("padding", 8.0), ("width", 268.0)],
+    style_str=[("flexDirection", "column")],
+  )
+  set_panel_bg(panel)
+  let _ = row1.mount_into(panel.view())
+  let _ = row2.mount_into(panel.view())
+  fn sync(s : TimeHM, e : TimeHM) -> Unit {
+    sync1(s)
+    sync2(e)
+  }
+
+  (panel, sync, mute)
+}
+
+///|
+/// 日期区间选择器(EP DateRangePicker,全自绘):字段显示「起 ~ 止」,
+/// 点击弹区间日历——第一次点选起点,第二次点选终点(终点早于起点自动
+/// 对调)后收起,回调 on_change(起, 止);再点字段重新开始新区间。
+/// clearable=true 清空两端(value 置全空,on_change 不因清空触发)。
+pub fn date_range_picker_t(
+  value? : Store[DateRange],
+  on_change? : (DateYMD, DateYMD) -> Unit = fn(_s, _e) {  },
+  width? : Double = 260.0,
+  placeholder? : String = "请选择日期区间",
+  clearable? : Bool = false,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let today = local_date()
+      let pop : Ref[Popover?] = Ref(None)
+      let start : Ref[DateYMD?] = Ref(match value {
+        Some(v) => v.get().start
+        None => None
+      })
+      let end : Ref[DateYMD?] = Ref(match value {
+        Some(v) => v.get().end
+        None => None
+      })
+      let text = Ref("")
+      let has_val = Ref(false)
+      let grid_refresh : Ref[() -> Unit] = Ref(fn() {  })
+      let field = build_picker_field(width, text, has_val, clearable, on_focus_changed=fn(f) {
+        if !f {
+          match pop.val {
+            Some(p) => p.close()
+            None => ()
+          }
+        }
+      })
+      fn refresh_text() -> Unit {
+        match (start.val, end.val) {
+          (Some(s), Some(e)) => {
+            text.val = "\{s.format()} ~ \{e.format()}"
+            has_val.val = true
+          }
+          (Some(s), None) => {
+            text.val = "\{s.format()} ~"
+            has_val.val = true
+          }
+          (None, None) | (None, Some(_)) => {
+            text.val = placeholder
+            has_val.val = false
+          }
+        }
+        ViewLike::schedule_paint(field)
+      }
+
+      fn write_value(s : DateYMD?, e : DateYMD?) -> Unit {
+        match value {
+          Some(v) => v.set({ start: s, end: e })
+          None => ()
+        }
+      }
+
+      ViewLike::on_mouse_up(field, fn(e) {
+        if e.button == 1 {
+          ViewLike::focus(field)
+          if picker_clear_hit(field, e, clearable, has_val.val) {
+            start.val = None
+            end.val = None
+            write_value(None, None)
+            refresh_text()
+            match pop.val {
+              Some(p) => p.close()
+              None => ()
+            }
+            return true
+          }
+          match pop.val {
+            Some(_) => ()
+            None => {
+              let p = Popover::new()
+              bind_popover_bg(p)
+              let (panel, refresh) = build_calendar(today, range_state_of(start, end), fn(d) {
+                range_cell_click(start, end, d, fn(a, b) {
+                  refresh_text()
+                  write_value(Some(a), Some(b))
+                  on_change(a, b)
+                  p.close()
+                })
+                refresh_text()
+              })
+              grid_refresh.val = refresh
+              refresh()
+              p.set_content(panel)
+              p.set_content_size(268.0, 262.0)
+              pop.val = Some(p)
+            }
+          }
+          match pop.val {
+            Some(p) => p.show_relative_to(field)
+            None => ()
+          }
+          true
+        } else {
+          false
+        }
+      })
+      match value {
+        Some(v) =>
+          v.subscribe(fn(r) {
+            start.val = r.start
+            end.val = r.end
+            refresh_text()
+            ((grid_refresh.val))()
+          })
+        None => ()
+      }
+      refresh_text()
+      attach(parent, ViewLike::view(field))
+      ViewLike::view(field)
+    },
+  }
+}
+
+///|
+/// 时间区间选择器(EP TimeRangePicker,全自绘):字段显示「起:止」
+/// 时:分,点击弹起/止两行步进编辑器(时 0-23 / 分 0-59),步进即改
+/// 即回调 on_change;起止默认 00:00,弹层随字段失焦收起。clearable
+/// 清空两端(重开弹层后步进即重新写入)。
+pub fn time_range_picker_t(
+  value? : Store[TimeRange],
+  on_change? : (TimeHM, TimeHM) -> Unit = fn(_s, _e) {  },
+  width? : Double = 180.0,
+  placeholder? : String = "请选择时间区间",
+  clearable? : Bool = false,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let pop : Ref[Popover?] = Ref(None)
+      let start = Ref(time_clamp(0, 0))
+      let end = Ref(time_clamp(0, 0))
+      let touched = Ref(false) // 弹层内动过步进才视为有值
+      let text = Ref("")
+      let has_val = Ref(false)
+      let field = build_picker_field(width, text, has_val, clearable, on_focus_changed=fn(f) {
+        if !f {
+          match pop.val {
+            Some(p) => p.close()
+            None => ()
+          }
+        }
+      })
+      fn refresh_text() -> Unit {
+        if has_val.val {
+          text.val = "\{start.val.format()} ~ \{end.val.format()}"
+        } else {
+          text.val = placeholder
+        }
+        ViewLike::schedule_paint(field)
+      }
+
+      fn write_value(s : TimeHM, e : TimeHM) -> Unit {
+        match value {
+          Some(v) => v.set({ start: Some(s), end: Some(e) })
+          None => ()
+        }
+      }
+
+      ViewLike::on_mouse_up(field, fn(e) {
+        if e.button == 1 {
+          ViewLike::focus(field)
+          if picker_clear_hit(field, e, clearable, has_val.val) {
+            touched.val = false
+            has_val.val = false
+            match value {
+              Some(v) => v.set({ start: None, end: None })
+              None => ()
+            }
+            refresh_text()
+            match pop.val {
+              Some(p) => p.close()
+              None => ()
+            }
+            return true
+          }
+          match pop.val {
+            Some(_) => ()
+            None => {
+              let p = Popover::new()
+              bind_popover_bg(p)
+              let (panel, _sync, _mute) = build_time_panel(start, end, fn() {
+                if !touched.val {
+                  touched.val = true
+                  has_val.val = true
+                }
+                refresh_text()
+                write_value(start.val, end.val)
+                on_change(start.val, end.val)
+              })
+              p.set_content(panel)
+              p.set_content_size(268.0, 96.0)
+              pop.val = Some(p)
+            }
+          }
+          match pop.val {
+            Some(p) => p.show_relative_to(field)
+            None => ()
+          }
+          true
+        } else {
+          false
+        }
+      })
+      match value {
+        Some(v) =>
+          v.subscribe(fn(r) {
+            match (r.start, r.end) {
+              (Some(s), Some(e)) => {
+                start.val = s
+                end.val = e
+                touched.val = true
+                has_val.val = true
+              }
+              (_, _) => {
+                touched.val = false
+                has_val.val = false
+              }
+            }
+            refresh_text()
+          })
+        None => ()
+      }
+      refresh_text()
+      attach(parent, ViewLike::view(field))
+      ViewLike::view(field)
+    },
+  }
+}
+
+///|
+/// 日期时间区间选择器(EP DateTimeRangePicker,全自绘):字段显示
+/// 「起日期 起:分 ~ 止日期 止:分」,点击弹区间日历 + 底部起/止两行
+/// 时间步进;日期两段式选完或时间步进后,区间完整即回调 on_change
+/// (起日期, 起时间, 止日期, 止时间);「完成」按钮或字段失焦收起。
+pub fn datetime_range_picker_t(
+  value? : Store[DateTimeRange],
+  on_change? : (DateYMD, TimeHM, DateYMD, TimeHM) -> Unit = fn(_sd, _st, _ed, _et) {  },
+  width? : Double = 340.0,
+  placeholder? : String = "请选择日期时间区间",
+  clearable? : Bool = false,
+) -> Node {
+  {
+    mount: fn(parent) {
+      let today = local_date()
+      let pop : Ref[Popover?] = Ref(None)
+      let start_d : Ref[DateYMD?] = Ref(match value {
+        Some(v) =>
+          match v.get().start {
+            Some((d, _t)) => Some(d)
+            None => None
+          }
+        None => None
+      })
+      let end_d : Ref[DateYMD?] = Ref(match value {
+        Some(v) =>
+          match v.get().end {
+            Some((d, _t)) => Some(d)
+            None => None
+          }
+        None => None
+      })
+      let start_t = Ref(match value {
+        Some(v) =>
+          match v.get().start {
+            Some((_d, t)) => t
+            None => time_clamp(0, 0)
+          }
+        None => time_clamp(0, 0)
+      })
+      let end_t = Ref(match value {
+        Some(v) =>
+          match v.get().end {
+            Some((_d, t)) => t
+            None => time_clamp(0, 0)
+          }
+        None => time_clamp(0, 0)
+      })
+      let text = Ref("")
+      let has_val = Ref(false)
+      let time_sync : Ref[(TimeHM, TimeHM) -> Unit] = Ref(fn(_st, _et) {  })
+      let grid_refresh_d : Ref[() -> Unit] = Ref(fn() {  })
+      let field = build_picker_field(width, text, has_val, clearable, on_focus_changed=fn(f) {
+        if !f {
+          match pop.val {
+            Some(p) => p.close()
+            None => ()
+          }
+        }
+      })
+      fn refresh_text() -> Unit {
+        match (start_d.val, end_d.val) {
+          (Some(sd), Some(ed)) => {
+            text.val = "\{sd.format()} \{start_t.val.format()} ~ \{ed.format()} \{end_t.val.format()}"
+            has_val.val = true
+          }
+          (Some(sd), None) => {
+            text.val = "\{sd.format()} \{start_t.val.format()} ~"
+            has_val.val = true
+          }
+          (None, None) | (None, Some(_)) => {
+            text.val = placeholder
+            has_val.val = false
+          }
+        }
+        ViewLike::schedule_paint(field)
+      }
+
+      fn write_value() -> Unit {
+        match value {
+          Some(v) => {
+            let s : (DateYMD, TimeHM)? = match start_d.val {
+              Some(d) => Some((d, start_t.val))
+              None => None
+            }
+            let e : (DateYMD, TimeHM)? = match end_d.val {
+              Some(d) => Some((d, end_t.val))
+              None => None
+            }
+            v.set({ start: s, end: e })
+          }
+          None => ()
+        }
+      }
+
+      fn emit() -> Unit {
+        // 区间完整才对外回调;不完整只反映在 value 的中间态
+        match (start_d.val, end_d.val) {
+          (Some(sd), Some(ed)) => {
+            write_value()
+            on_change(sd, start_t.val, ed, end_t.val)
+          }
+          _ => write_value()
+        }
+      }
+
+      ViewLike::on_mouse_up(field, fn(e) {
+        if e.button == 1 {
+          ViewLike::focus(field)
+          if picker_clear_hit(field, e, clearable, has_val.val) {
+            start_d.val = None
+            end_d.val = None
+            write_value()
+            refresh_text()
+            match pop.val {
+              Some(p) => p.close()
+              None => ()
+            }
+            return true
+          }
+          match pop.val {
+            Some(_) => ()
+            None => {
+              let p = Popover::new()
+              bind_popover_bg(p)
+              let (cal, refresh) = build_calendar(today, range_state_of(start_d, end_d), fn(d) {
+                range_cell_click(start_d, end_d, d, fn(_a, _b) {
+                  emit()
+                })
+                refresh_text()
+              })
+              let (tpanel, sync, _mute) = build_time_panel(start_t, end_t, fn() {
+                emit()
+                refresh_text()
+              })
+              time_sync.val = sync
+              grid_refresh_d.val = refresh
+              let body = themed_container(
+                style_str=[("flexDirection", "column")],
+              )
+              body.add_child(cal)
+              let sep = themed_container(style=[("height", 1.0)])
+              sep.on_draw(fn(p2) {
+                let b2 = ViewLike::get_bounds(sep)
+                p2.set_stroke_color(theme_border())
+                p2.stroke_rect(0.5, 0.5, b2.width - 1.0, 0.0)
+              })
+              body.add_child(sep)
+              body.add_child(tpanel)
+              let done_row = themed_container(
+                style=[("height", 32.0), ("padding", 6.0)],
+                style_str=[("flexDirection", "row"), ("alignItems", "center"), ("justifyContent", "flex-end")],
+              )
+              let _ = button_t("完成", variant=Solid, on_click=fn() {
+                p.close()
+              }).mount_into(done_row.view())
+              body.add_child(done_row)
+              p.set_content(body)
+              // 高 = 日历 262 + 分隔 1 + 时间两行 ~78 + 完成行 32
+              p.set_content_size(268.0, 376.0)
+              pop.val = Some(p)
+            }
+          }
+          match pop.val {
+            Some(p) => p.show_relative_to(field)
+            None => ()
+          }
+          true
+        } else {
+          false
+        }
+      })
+      match value {
+        Some(v) =>
+          v.subscribe(fn(r) {
+            match r.start {
+              Some((d, t)) => {
+                start_d.val = Some(d)
+                start_t.val = t
+              }
+              None => start_d.val = None
+            }
+            match r.end {
+              Some((d, t)) => {
+                end_d.val = Some(d)
+                end_t.val = t
+              }
+              None => end_d.val = None
+            }
+            (time_sync.val)(start_t.val, end_t.val)
+            refresh_text()
+            ((grid_refresh_d.val))()
+          })
+        None => ()
+      }
+      refresh_text()
       attach(parent, ViewLike::view(field))
       ViewLike::view(field)
     },
