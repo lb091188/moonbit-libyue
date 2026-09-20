@@ -85,16 +85,18 @@ jobs:
         shell: python
         run: |
           import os, shutil, sys
+          # MoonBit native 后端三平台产物统一带 .exe 后缀(含 Linux/mac),
+          # 仅 Windows 包内保留后缀,其余平台重命名去掉
           exes = ["hello", "hello-themed", "showcase"]
-          suf = ".exe" if sys.platform == "win32" else ""
           stage = "staging"
           os.makedirs(stage, exist_ok=True)
           for name in exes:
-              src = f"_build/native/release/build/examples/{name}/{name}{suf}"
+              src = f"_build/native/release/build/examples/{name}/{name}.exe"
               if not os.path.exists(src):
                   raise SystemExit(f"产物缺失: {src}")
-              shutil.copy2(src, os.path.join(stage, name + suf))
-              print(f"打包: {name}{suf} ({os.path.getsize(src)} bytes)")
+              dst = name + (".exe" if sys.platform == "win32" else "")
+              shutil.copy2(src, os.path.join(stage, dst))
+              print(f"打包: {dst} ({os.path.getsize(src)} bytes)")
           if sys.platform == "win32":
               # prebuild 已把 loader 复制到工程根;exe 旁必须有它才能起 WebView
               shutil.copy2("WebView2Loader.dll", os.path.join(stage, "WebView2Loader.dll"))
