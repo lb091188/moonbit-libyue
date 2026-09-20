@@ -91,8 +91,6 @@ showcase 覆盖：基础/图标库/表单/导航/数据展示/反馈/代码与�
 
 ![导航组件页](https://gitee.com/noahliu0911/moonbit-libyue/raw/master/docs/images/showcase-nav.png)
 
-发布二进制：推 `bin-*` 标签后 [Release](https://github.com/lb091188/moonbit-libyue/releases) 提供三平台可执行包（Linux 需 GTK3 运行库 / Windows 含 WebView2Loader.dll / macOS Apple Silicon）。
-
 ## 文档索引
 
 | 文档 | 内容 |
