@@ -91,8 +91,6 @@ The showcase covers Basic / Icons / Form / Navigation / Data / Feedback / Code &
 
 ![Navigation page](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/showcase-nav.png)
 
-Prebuilt binaries: push a `bin-*` tag and the [Releases](https://github.com/lb091188/moonbit-libyue/releases) page carries executables for all three platforms (Linux needs the GTK3 runtime / Windows ships WebView2Loader.dll / macOS Apple Silicon).
-
 ## Documentation
 
 | Doc | Content |
