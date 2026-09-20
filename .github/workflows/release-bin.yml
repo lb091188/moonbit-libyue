@@ -1,0 +1,134 @@
+# 三平台二进制发布：推 bin-* 标签(如 bin-v0.1.0)触发，三平台矩阵各自
+# 编译 release 可执行文件(hello / hello-themed / showcase 三件套)，
+# 打包为 bin-<平台>.zip 汇聚到 GitHub Release 资产。
+#
+# 与 CI 的分工:CI 每次 push 验证「可编译可链接」，本工作流产出「可分发
+# 的二进制」。交叉编译不可行(MoonBit native 后端调本机 C 工具链链本机
+# 静态库，且各平台库格式与系统依赖 GTK3/WebView2/Cocoa 互不可移植)，
+# 必须三平台各自构建——与 vendor-native.yml 同构。
+#
+# 运行时依赖(release 说明里同步):
+# - Linux: 目标机需 GTK3/WebKit2gtk 运行库(Ubuntu 24.04 自带)
+# - Windows: exe 旁需 WebView2Loader.dll(已打进包)
+# - macOS: Apple Silicon(arm64)原生
+name: release-bin
+
+on:
+  push:
+    tags:
+      - 'bin-*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { plat: linux-x64, os: ubuntu-latest }
+          - { plat: macos-arm64, os: macos-15 }
+          - { plat: windows-x64, os: windows-latest }
+
+    runs-on: ${{ matrix.os }}
+    env:
+      BIN_PLAT: ${{ matrix.plat }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 安装 Linux 依赖
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config \
+            libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev \
+            libwebkit2gtk-4.1-dev
+
+      - name: 安装 moon 工具链
+        if: runner.os != 'Windows'
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+
+      - name: 安装 moon 工具链 + python3 别名
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          iwr https://cli.moonbitlang.com/install/powershell.ps1 -useb | iex
+          echo "$env:USERPROFILE\.moon\bin" >> $env:GITHUB_PATH
+          $py = (Get-Command python).Source
+          Copy-Item $py "$env:USERPROFILE\.moon\bin\python3.exe"
+
+      # YUE_MBT_SKIP_MANIFEST=1:moon 自带 manifest 与 libyue 的同名冲突
+      # (CVT1100),CI 同款;发布包用 moon 的 manifest,行为不变
+      - name: 构建(MSVC 环境)
+        if: runner.os == 'Windows'
+        shell: cmd
+        env:
+          YUE_MBT_SKIP_MANIFEST: '1'
+        run: >-
+          for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath')
+          do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
+          && python scripts\prepare.py
+          && moon build --target native --release --strip
+
+      - name: 构建
+        if: runner.os != 'Windows'
+        run: |
+          python3 scripts/prepare.py
+          moon build --target native --release --strip
+
+      - name: 收集三件套打包
+        shell: python
+        run: |
+          import os, shutil, sys
+          exes = ["hello", "hello-themed", "showcase"]
+          suf = ".exe" if sys.platform == "win32" else ""
+          stage = "staging"
+          os.makedirs(stage, exist_ok=True)
+          for name in exes:
+              src = f"_build/native/release/build/examples/{name}/{name}{suf}"
+              if not os.path.exists(src):
+                  raise SystemExit(f"产物缺失: {src}")
+              shutil.copy2(src, os.path.join(stage, name + suf))
+              print(f"打包: {name}{suf} ({os.path.getsize(src)} bytes)")
+          if sys.platform == "win32":
+              # prebuild 已把 loader 复制到工程根;exe 旁必须有它才能起 WebView
+              shutil.copy2("WebView2Loader.dll", os.path.join(stage, "WebView2Loader.dll"))
+              print("打包: WebView2Loader.dll")
+          shutil.make_archive(f"bin-{os.environ['BIN_PLAT']}", "zip", stage)
+          print(f"完成: bin-{os.environ['BIN_PLAT']}.zip")
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.plat }}
+          path: bin-${{ matrix.plat }}.zip
+          retention-days: 5
+
+  release:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: 发布三平台二进制到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          name: Binaries ${{ github.ref_name }}
+          body: |
+            三平台可执行包(hello / hello-themed / showcase 各三件):
+
+            | 包 | 运行要求 |
+            |---|---|
+            | bin-linux-x64.zip | x64 Linux,需 GTK3 / WebKit2gtk 运行库(Ubuntu 24.04 自带) |
+            | bin-windows-x64.zip | Windows 10/11 x64,需 WebView2 运行时(系统自带);包内已含 WebView2Loader.dll,解压即用 |
+            | bin-macos-arm64.zip | Apple Silicon(macOS 14+) |
+
+            解压后直接运行对应可执行文件;源码方式 `moon run examples/showcase` 见 README。
+          files: 'bin-*.zip'
