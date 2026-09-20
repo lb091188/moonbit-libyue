@@ -122,6 +122,7 @@ e.on_activate(fn() { check(e.get_text()) })
 |---|---|---|---|
 | text | String | `""` | 初始文本 |
 | entry_type | EntryType | Normal | Normal / Password |
+| width_chars | Int | -1 | 初始宽度（字符数；-1 为不限制） |
 | on_activate | () -> Unit | 空操作 | 回车回调（不带参数，取文本用 get_text） |
 | on_text_change | () -> Unit | 空操作 | 内容变化回调（同上） |
 
@@ -273,7 +274,7 @@ let sep = @yue.Separator::make(Horizontal)   // 或 Vertical
 | content | T : ViewLike | 必填 | 内容视图 |
 | content_size | (Double, Double)? | None | 内容尺寸；不传则整页滚动跟随内容自然高度 |
 | policy | (ScrollPolicy, ScrollPolicy)? | None | 滚动条策略（水平, 垂直）：Always / Never / Automatic |
-| overlay | Bool | false | 覆盖式滚动条 |
+| overlay | Bool | true | 覆盖式滚动条（悬浮不占位） |
 
 `Separator::make` 入参：`orientation : Orientation = Horizontal`（Horizontal / Vertical）。
 
@@ -304,6 +305,38 @@ t.on_selected_page_change(fn() { switch_to(t.get_selected_page_index()) })
 | on_selected_page_change(fn()) | 切页回调 |
 
 页内容器是独立 yoga 子树的根；声明式建页见 [docs/declarative.md](declarative.md) 的 `tab` 节点。
+
+## 表格 Table
+
+```moonbit
+let t = @yue.Table::new()
+t.add_column_text("姓名", 120)
+t.add_column_checkbox("启用", 60)
+t.set_model(my_model, column_count=2)   // 模型见下
+```
+
+列类型：`add_column_text(title, width)` / `add_column_edit(title, width)`（编辑结果经
+`set_value` 回写模型）/ `add_column_checkbox(title, width)`（切换经 `set_value` 回写）/
+`add_column_custom(title, width, draw)`（draw 收 Painter、单元格矩形与模型给出的
+ColorText 文本/颜色，逐格自绘）。完整列选项用 `add_column_with_options(title, ColumnOptions)`。
+
+数据模型走 MoonBit trait 桥，行数再大也只按需取数：
+
+```moonbit
+trait TableModel {
+  fn row_count(Self) -> Int
+  fn get_value(Self, column : Int, row : Int) -> TableValue   // Str / Flag / ColorText
+  fn set_value(Self, column : Int, row : Int, value : TableValue) -> Unit
+}
+```
+
+| 方法 | 用途 |
+|---|---|
+| set_model(m, column_count) | 挂数据模型 |
+| on_row_activate(fn(row)) / on_selection_change(fn()) / on_toggle_checkbox(fn(column, row)) | 行激活 / 选中变化 / 勾选切换 |
+| enable_multiple_selection(b) / select_row(i) / get_selected_row() | 多选与选中行 |
+| set_has_border(b) | 边框 |
+| notify_row_insertion(i) / notify_row_deletion(i) / notify_value_change(row, col) | 模型变更后刷新三件套 |
 
 ## 画布与图片
 
@@ -358,10 +391,29 @@ at.set_color_for("#FF0000", 0, 2)
 | API | 用途 |
 |---|---|
 | AttributedText::new(text, align?, valign?, wrap?, ellipsis?) | 创建 |
-| set_font_for(font, start, end) / set_color_for(hex, start, end) | 按区间设属性（Windows 降级，见「固有坑」） |
+| set_font_for(font, start, end) / set_color_for(hex, start, end) | 按区间设属性（三平台一致） |
 | set_font(f) / set_color(hex) / set_text / set_format | 全文属性 |
 | get_bounds_for(w, h) | 布局包围盒 |
 | Font::new(name, size, weight?, style?) | 字体 |
+
+## 动图 GifPlayer
+
+```moonbit
+let g = @yue.GifPlayer::make(image=Some(img))
+g.set_animating(true)
+```
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| image | Image? | None | 初始图片（GIF 动图） |
+| scale | ImageScale | Down | 缩放策略：None / Fill / Down / UpOrDown |
+
+| 方法 | 用途 |
+|---|---|
+| set_image(img) | 换图片 |
+| set_scale(s) / get_scale() | 缩放策略 |
+| set_animating(b) / is_animating() | 播放 / 暂停 |
+| is_playing() / stop_animation_timer() | 播放状态 / 停止 |
 
 ## 浏览器 Browser
 
@@ -377,15 +429,16 @@ let b = @yue.Browser::make(url="https://example.com")   // 或 html="<h1>本地<
 | 方法 | 用途 |
 |---|---|
 | load_url(u) / load_html(html, base_url?) | 加载 |
-| get_url() / reload() | 当前地址 / 重载 |
+| get_url() / get_title() / reload() / stop() | 当前地址 / 页面标题 / 重载 / 停止 |
 | go_back() / go_forward() / can_go_back() / can_go_forward() | 导航 |
 | is_loading() | 加载状态 |
 | set_user_agent(s) | UA |
-| execute_javascript(code) | 执行 JS |
+| execute_javascript(code) / execute_javascript_with_result(code, fn(ok, json)) | 执行 JS；后者异步取回结果（ok=成功，json 为结果 JSON 文本） |
+| add_raw_binding(name, fn(json)) / remove_binding(name) / has_bindings() | JS↔原生绑定（网页调 name(...) 时收到 JSON 参数文本） |
 | register_protocol(scheme, fn(url) -> (mime, content)?) | 自定义协议（返回 None 拒绝） |
 | unregister_protocol(scheme) | 注销协议 |
-| get_cookies_for_url(url, fn(cookies)) | 查 Cookie（见「固有坑」） |
-| on_change_loading / on_update_title / on_commit_navigation / on_finish_navigation | 事件 |
+| get_cookies_for_url(url, fn(cookies)) | 查 Cookie |
+| on_change_loading / on_update_title / on_update_command / on_commit_navigation / on_finish_navigation | 事件 |
 
 定制选项用 `Browser::new_with_options(BrowserOptions)`。
 
@@ -537,7 +590,7 @@ pop.show_relative_to(anchor_view)
 | on_mouse_down / up / move / enter / leave | 鼠标 |
 | on_key_down / up | 键盘 |
 | on_size_changed | 尺寸变化 |
-| set_capture(b) / release_capture() / has_capture() | 鼠标捕获 |
+| set_capture() / release_capture() / has_capture() | 鼠标捕获 |
 | set_style(k, v) / set_style_str(k, v) | 布局样式 |
 | 拖拽注册与拖放回调 | 拖放（接收方必须注册 handle_drag_update 返回允许的操作位，缺省一律拒绝；发起方 do_drag_file_paths / do_drag_data_full 须在 on_mouse_down 回调内调用才生效；演示见 components「窗口」页） |
 
@@ -558,25 +611,23 @@ pop.show_relative_to(anchor_view)
 
 上游 libyue 或平台行为带来，使用对应 API 前先读：
 
-1. **`Browser::get_cookies_for_url` 可能崩溃**：目标站点尚无任何 Cookie 时，
-   上游内部 `CHECK(cookies)` 直接 FATAL（libyue 0.15.6 实测）。只对确定已
-   存有 Cookie 的站点调用，或等上游修复。
-2. **Browser 会改写窗口标题**：WebKitGTK 加载网页后把页面 `<title>` 同步为
-   窗口标题，且切走页签后不会恢复。依赖窗口标题做窗口管理的工具会受影响。
-3. **复选/单选的初始化回调**：以 `checked=true` 创建的 Checkbox/Radio，
+1. **Browser 导航会改写窗口标题（Windows）**：WebView2 宿主控件加载网页后把页面
+   `<title>` 同步为宿主窗口标题（Linux/GTK 无此现象，2026-09-19 实测）。依赖窗口
+   标题做窗口管理的工具会受影响，需要时用 `on_update_title` 自行管理标题显示。
+2. **复选/单选的初始化回调**：以 `checked=true` 创建的 Checkbox/Radio，
    挂载完成进入事件循环后会**异步收到一次回调**（GTK toggled 信号语义）。
    回调逻辑依赖状态时先 `is_checked()` 判断，或容忍这次初始通知。
-4. **单选组切换是双通知**：点选新项时，被取消选中的旧项也会收到一次回调
+3. **单选组切换是双通知**：点选新项时，被取消选中的旧项也会收到一次回调
    （此时旧项 `is_checked()==false`）。按"新选中的那个"处理业务即可。
-5. **虚拟键码是 GTK 表**：`VKEY_ESCAPE = 0xFF1B`（65307），不是 Windows
+4. **虚拟键码是 GTK 表**：`VKEY_ESCAPE = 0xFF1B`（65307），不是 Windows
    VK 值；字母与数字与 ASCII 相同。跨平台代码不要混用两张表。
-6. **样式键的解析规则**：只保留 ASCII 字母并转小写，`flexDirection` /
-   `flex-direction` / `flexdirection` 等价；**数字和连字符以外的符号会被丢弃**，
+5. **样式键的解析规则**：键名只保留 ASCII 字母并转小写，`flexDirection` /
+   `flex-direction` / `flexdirection` 等价；数字、连字符与其他符号一律丢弃，
    不要用特殊字符拼键名。键值全集见 [docs/layout.md](layout.md)。
-7. **回调自动保活，但别在回调里同步弹事件循环**：`on_*` 注册的闭包由库持有
+6. **回调自动保活，但别在回调里同步弹事件循环**：`on_*` 注册的闭包由库持有
    强引用；`Store` 订阅同理。回调里调用 `@yue.quit()` 等终止流程后不要再
    操作控件。
-8. **平台专属 API 未封装**：Toolbar / Vibrant（Linux 静态库无符号）、
+7. **平台专属 API 未封装**：Toolbar / Vibrant（Linux 静态库无符号）、
    Button 样式与 ControlSize、Scroll 弹性、App 激活策略、Browser 缩放、
    Image 模板图（macOS），ShortcutOptions / Lifetime::Reply / 通知
    COMServerOptions（Windows）等，完整清单见 [docs/adaptation.md](adaptation.md)。
