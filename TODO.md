@@ -92,6 +92,7 @@
 - [x] markdown_view 展示组件(2026-09-20)—— 标题/段落/粗斜体/行内代码/链接/列表/引用/分隔线/围栏代码块(语言随 fence 标注),区间字体颜色基于富文本范围属性(演示板「数据展示」页;跨端观感待 Windows 真机复验)
 - [x] code_view 增强(2026-09-20)—— tokenize_lang 通用分词:moonbit/js/ts/python/rust/c/go/bash/sql 关键字集(大小写不敏感)+ 行注释前缀按语言 + 单双引号字符串;line_numbers 行号槽(演示板「数据展示」页三语言示例)
 - [x] 浏览器独立演示页(2026-09-20)—— 「窗口与网页」拆分:窗口页留窗口能力,新「浏览器」页 WebView 全能力(URL/demo:// 协议/本地 HTML、导航四按钮+能力查询、四导航回调+标题回调、JS 执行取结果/读 URL/改标题、raw binding 增删查、get_cookies_for_url 两 URL 查询(fork mbt.7 空崩溃修复资产已就绪)、BrowserOptions 平台差异说明;交互待真机复验)
+- [x] 演示板菜单重排 15 页 + 图标墙修复(2026-09-20 真机反馈)—— 图标墙首版外层误用 hbox,行组被水平排布超宽截断只显示 37 个中的部分;修复并独立成「图标库」页(136 个按十类分组,icon_grid 竖排 vbox 包行);「数据展示」拆出「代码与文档」页(Code View 三语言 + Markdown);全站 30+ 段描述精简(组件与功能一个不减)
 - [x] 右键菜单 helper — context_menu_for:任意节点包原生右键菜单("-" 分隔线,bounds_in_screen 换算屏幕坐标)(演示板「基础组件」页;右键弹出位置待真机复验)
 - [ ] 可关闭页签(chrome 式动态增删)— 后置:涉及 tabs_t API 形态重构(动态页数组 + Store 驱动),独立批次做
 - [x] 单选与开关:radio_group / switch_t

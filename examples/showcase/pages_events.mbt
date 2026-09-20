@@ -40,7 +40,7 @@ fn page_events(_app : App) -> @yue.Node {
   scroll_page([
     section(
       "鼠标事件",
-      "五个鼠标事件 + 连击计数(ClickTracker,400ms/5px GTK 惯例);事件对象带视图坐标/屏幕坐标/按键/修饰键。",
+      "五鼠标事件 + 连击计数;事件带视图/屏幕坐标、按键、修饰键。",
       [
         @yue.vbox(
           [@yue.label_t("鼠标操作区", role=@yue.Body)],
@@ -94,7 +94,7 @@ fn page_events(_app : App) -> @yue.Node {
     ),
     section(
       "全局鼠标轮询",
-      "mouse_location + 修饰键静态查询(shift/control/alt_pressed),200ms 定时器轮询,无需事件回调。",
+      "mouse_location + 修饰键查询,200ms 轮询。",
       [@yue.bind_label(evt_gmouse, fn(s) { s })],
     ),
     section(
@@ -121,7 +121,7 @@ fn page_events(_app : App) -> @yue.Node {
     ),
     section(
       "嵌套布局",
-      "hbox/vbox 嵌套、固定宽 / 百分比 / flex 权重三种宽度模型(yoga 样式,全集见 docs/zh/layout.md)。",
+      "固定宽/百分比/flex 三种宽度模型(全集见 docs/zh/layout.md)。",
       [
         @yue.hbox(
           [

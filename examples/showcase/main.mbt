@@ -144,8 +144,8 @@ fn main {
           [
             @yue.side_menu_sections(
               [
-                ("基础", ["基础组件", "表单组件", "事件与布局"]),
-                ("进阶", ["导航组件", "数据展示", "反馈组件"]),
+                ("基础", ["基础组件", "图标库", "表单组件", "事件与布局"]),
+                ("进阶", ["导航组件", "数据展示", "代码与文档", "反馈组件"]),
                 ("响应式", ["Store 对照"]),
                 ("原生", ["原生控件", "画布与富文本"]),
                 ("系统", ["系统集成", "窗口", "浏览器", "环境与平台"]),
@@ -193,10 +193,12 @@ fn main {
               },
             ),
             page("基础组件", selected, page_basic(app)),
+            page("图标库", selected, page_icons(app)),
             page("表单组件", selected, page_form(app)),
             page("事件与布局", selected, page_events(app)),
             page("导航组件", selected, page_nav(app)),
             page("数据展示", selected, page_data(app)),
+            page("代码与文档", selected, page_code(app)),
             page("反馈组件", selected, page_feedback(app)),
             page("Store 对照", selected, page_store_demo(app)),
             page("系统集成", selected, page_system(app)),
@@ -332,5 +334,6 @@ fn main {
       })
     },
   )
+  window.activate()
   @yue.run()
 }

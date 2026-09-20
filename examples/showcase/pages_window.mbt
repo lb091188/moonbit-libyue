@@ -71,7 +71,7 @@ fn page_window(_app : App) -> @yue.Node {
     ),
     section(
       "全局快捷键",
-      "register_global_shortcut 注册应用外生效的系统快捷键(Ctrl+Alt+C),触发弹 toast;unregister_all_global_shortcuts 注销全部。",
+      "应用外生效的系统快捷键(Ctrl+Alt+C)。",
       [
         @yue.hbox([
           @yue.button_t("注册 Ctrl+Alt+C", on_click=fn() {

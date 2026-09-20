@@ -8,7 +8,7 @@ fn page_nav(app : App) -> @yue.Node {
   scroll_page([
     section(
       "Side Menu 侧边导航",
-      "窗口左侧即本组件(分组形态 side_menu_sections):组标题不可点,菜单项悬停灰底、选中浅蓝底 + 主题色文字 + 左侧强调条,点击切换页面;底部展示包版本号。",
+      "窗口左侧即本组件;组标题不可点,选中浅蓝底+强调条;底部版本号。",
       [
         @yue.descriptions([
           ("悬停态", "浅灰底"),
@@ -112,7 +112,7 @@ fn page_nav(app : App) -> @yue.Node {
     ),
     section(
       "Splitter 可拖动分隔",
-      "桌面多栏布局标配件:6px 把手悬停浅灰、拖动中主题色,拖动经鼠标捕获(拖出范围不丢事件);min 钳制两栏下限。左例 hsplit 左树右详情,右例 vsplit 上下分栏。",
+      "6px 把手拖动改占比(鼠标捕获不丢事件,min 钳制);左例 hsplit 右例 vsplit。",
       [
         @yue.vbox(
           [

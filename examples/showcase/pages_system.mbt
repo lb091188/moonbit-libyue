@@ -117,7 +117,7 @@ fn page_system(app : App) -> @yue.Node {
     ),
     section(
       "系统通知",
-      "Notification 提交系统通知中心(桌面端右上角弹出,应用外可见);set_actions 带操作按钮,set_silent 静默发送。",
+      "提交系统通知中心;set_actions 带按钮,set_silent 静默。",
       [
         @yue.hbox([
           @yue.button_t("普通通知", on_click=fn() {
@@ -172,7 +172,7 @@ fn page_system(app : App) -> @yue.Node {
     ),
     section(
       "定时器与延迟任务",
-      "set_timeout 单次延时 / set_timer 周期回调(返回 false 自动停)/ post_delayed_task 主线程任务。",
+      "set_timeout 单次 / set_timer 周期(返回 false 停)。",
       [
         @yue.hbox([
           @yue.button_t("1.5 秒后提示", on_click=fn() {
@@ -191,7 +191,7 @@ fn page_system(app : App) -> @yue.Node {
     ),
     section(
       "托盘状态",
-      "左下角托盘图标:左键点击计数联动(状态在 App,托盘在窗口 handle 里创建);Linux SNI 后端支持主题图标名(set_icon_name 跟随系统主题),其他平台为空操作。",
+      "左键点击计数;Linux SNI 支持主题图标名,其他平台空操作。",
       [
         @yue.bind_label(app.tray_clicks, fn(n) { "托盘图标已被点击 \{n} 次" }),
         @yue.hbox(
@@ -221,7 +221,7 @@ fn page_system(app : App) -> @yue.Node {
     ),
     section(
       "无边框透明窗口",
-      "Window::new_with_options(frame=false, transparent=true) + always_on_top;整窗 set_mouse_down_can_move_window 可拖动(桌面宠物/悬浮件的形态基础)。窗口无编程关闭 API(上游未暴露),随应用退出。",
+      "无边框透明置顶,整窗可拖动;无编程关闭 API,随应用退出。",
       [
         @yue.button_t("打开悬浮心形窗口", variant=@yue.Solid, on_click=fn() {
           open_floating_heart()
@@ -246,7 +246,7 @@ fn page_system(app : App) -> @yue.Node {
     secs.push(
       section(
         "主选区 Selection(仅 Linux)",
-        "X11 主选区:选中即写入、中键粘贴的那份;其他平台 from_type(Selection) 降级为公共剪贴板,故整段只在 Linux 出现。",
+        "X11 选中即写入、中键粘贴;仅 Linux。",
         [
           @yue.hbox([
             @yue.button_t("写入主选区", on_click=fn() {

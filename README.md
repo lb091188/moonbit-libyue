@@ -40,7 +40,7 @@ moon run examples/hello-themed  # themed library: theme_apply + button_t/input_t
 
 ### Full showcase
 
-`moon run examples/showcase` — a 13-page themed demo board covering the component library and all libyue capabilities: Basic / Form / Events & Layout / Navigation / Data / Feedback + Store comparison + Native Widgets / Canvas & Rich Text + System / Window / Browser (full WebView capabilities) / Environment, grouped in the side menu (Basic / Advanced / Reactive / Native / System), with the package version shown at the sidebar bottom (kept in sync with moon.mod); API reference in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md):
+`moon run examples/showcase` — a 15-page themed demo board covering the component library and all libyue capabilities: Basic / Icons (136 vector icons in ten groups) / Form / Events & Layout / Navigation / Data / Code & Docs / Feedback + Store comparison + Native Widgets / Canvas & Rich Text + System / Window / Browser (full WebView capabilities) / Environment, grouped in the side menu (Basic / Advanced / Reactive / Native / System), with the package version shown at the sidebar bottom (kept in sync with moon.mod); API reference in [docs/components-ui.md](https://github.com/lb091188/moonbit-libyue/blob/master/docs/components-ui.md):
 
 ![Basic](https://github.com/lb091188/moonbit-libyue/raw/master/docs/images/components-basic.png)
 
