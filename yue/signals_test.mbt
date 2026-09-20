@@ -3,7 +3,7 @@
 
 ///|
 test "Signal 源:get/set/update/subscribe" {
-  let s : Signal[Int] = Signal::new(1)
+  let s : @yue.Signal[Int] = @yue.Signal::new(1)
   let seen : Array[Int] = []
   s.subscribe(fn(v) { seen.push(v) })
   inspect(seen.length(), content="0") // 注册不回调
@@ -16,10 +16,10 @@ test "Signal 源:get/set/update/subscribe" {
 
 ///|
 test "computed:依赖自动收集,依赖变自动失效" {
-  let a = Signal::new(1)
-  let b = Signal::new(2)
+  let a = @yue.Signal::new(1)
+  let b = @yue.Signal::new(2)
   let mut runs = 0
-  let c = Signal::computed(fn() {
+  let c = @yue.Signal::computed(fn() {
     runs += 1
     a.get() + b.get()
   })
@@ -38,8 +38,8 @@ test "computed:依赖自动收集,依赖变自动失效" {
 
 ///|
 test "computed:订阅者收到的值已重算" {
-  let a = Signal::new("x")
-  let c = Signal::computed(fn() { "v=\{a.get()}" })
+  let a = @yue.Signal::new("x")
+  let c = @yue.Signal::computed(fn() { "v=\{a.get()}" })
   let seen : Array[String] = []
   c.subscribe(fn(v) { seen.push(v) })
   a.set("y")
@@ -48,10 +48,10 @@ test "computed:订阅者收到的值已重算" {
 
 ///|
 test "computed:条件分支只依赖实际读到的信号" {
-  let flag = Signal::new(true)
-  let x = Signal::new(1)
-  let y = Signal::new(100)
-  let c = Signal::computed(fn() { if flag.get() { x.get() } else { y.get() } })
+  let flag = @yue.Signal::new(true)
+  let x = @yue.Signal::new(1)
+  let y = @yue.Signal::new(100)
+  let c = @yue.Signal::computed(fn() { if flag.get() { x.get() } else { y.get() } })
   inspect(c.get(), content="1")
   y.set(200)
   inspect(c.get(), content="1") // y 不是当前依赖
@@ -63,10 +63,10 @@ test "computed:条件分支只依赖实际读到的信号" {
 
 ///|
 test "computed:钻石依赖收敛到正确终值" {
-  let a = Signal::new(1)
-  let b = Signal::computed(fn() { a.get() * 2 })
-  let c = Signal::computed(fn() { a.get() + 10 })
-  let d = Signal::computed(fn() { b.get() + c.get() })
+  let a = @yue.Signal::new(1)
+  let b = @yue.Signal::computed(fn() { a.get() * 2 })
+  let c = @yue.Signal::computed(fn() { a.get() + 10 })
+  let d = @yue.Signal::computed(fn() { b.get() + c.get() })
   inspect(d.get(), content="13") // 1*2 + (1+10)
   a.set(2)
   inspect(d.get(), content="16") // 2*2 + (2+10)
@@ -74,10 +74,10 @@ test "computed:钻石依赖收敛到正确终值" {
 
 ///|
 test "batch:多次 set 合并为一次通知" {
-  let a = Signal::new(0)
+  let a = @yue.Signal::new(0)
   let mut calls = 0
   a.subscribe(fn(_v) { calls += 1 })
-  batch(fn() {
+  @yue.batch(fn() {
     a.set(1)
     a.set(2)
     a.set(3)
@@ -87,8 +87,8 @@ test "batch:多次 set 合并为一次通知" {
   // 嵌套 batch:最外层结束才冲刷
   calls = 0
   let mut inner_flushed = true
-  batch(fn() {
-    batch(fn() { a.set(4) })
+  @yue.batch(fn() {
+    @yue.batch(fn() { a.set(4) })
     inner_flushed = calls == 0
     a.set(5)
   })
@@ -99,7 +99,7 @@ test "batch:多次 set 合并为一次通知" {
 
 ///|
 test "map:派生只读信号" {
-  let a = Signal::new(3)
+  let a = @yue.Signal::new(3)
   let b = a.map(fn(n) { n * 2 })
   inspect(b.get(), content="6")
   a.set(5)
@@ -108,7 +108,7 @@ test "map:派生只读信号" {
 
 ///|
 test "Store 与 Signal 互转:共享同一状态" {
-  let s : Store[Int] = Store::new(7)
+  let s : @yue.Store[Int] = @yue.Store::new(7)
   let sig = s.signal()
   sig.set(9)
   inspect(s.get(), content="9")
@@ -124,7 +124,7 @@ test "Store 与 Signal 互转:共享同一状态" {
 
 ///|
 test "Store 语义回归:get/set/update/subscribe/map 与旧实现一致" {
-  let s : Store[Int] = Store::new(1)
+  let s : @yue.Store[Int] = @yue.Store::new(1)
   let seen : Array[Int] = []
   s.subscribe(fn(v) { seen.push(v) })
   s.set(2)
@@ -138,7 +138,7 @@ test "Store 语义回归:get/set/update/subscribe/map 与旧实现一致" {
 
 ///|
 test "信号驱动 Store 参数组件形态:computed 经 store() 只读接入" {
-  let count = Signal::new(2)
+  let count = @yue.Signal::new(2)
   let label = count.map(fn(n) { "共 \{n} 项" }).store()
   inspect(label.get(), content="共 2 项")
   count.set(5)

@@ -1,6 +1,6 @@
 ///|
 test "store 读写与订阅顺序" {
-  let s : Store[Int] = Store::new(1)
+  let s : @yue.Store[Int] = @yue.Store::new(1)
   let seen : Array[Int] = []
   s.subscribe(fn(v) { seen.push(v) })
   s.set(2)
@@ -11,7 +11,7 @@ test "store 读写与订阅顺序" {
 
 ///|
 test "store update 派生 map 链式跟随" {
-  let count : Store[Int] = Store::new(2)
+  let count : @yue.Store[Int] = @yue.Store::new(2)
   let doubled = count.map(fn(x) { x * 2 })
   let text = doubled.map(fn(x) { "n=\{x}" })
   count.update(fn(x) { x + 19 })
@@ -22,8 +22,8 @@ test "store update 派生 map 链式跟随" {
 
 ///|
 test "store 订阅者内再 set 安全(快照遍历)" {
-  let a : Store[Int] = Store::new(0)
-  let b : Store[Int] = Store::new(0)
+  let a : @yue.Store[Int] = @yue.Store::new(0)
+  let b : @yue.Store[Int] = @yue.Store::new(0)
   a.subscribe(fn(v) { b.set(v + 1) })
   a.set(10)
   inspect(b.get(), content="11")
@@ -31,7 +31,7 @@ test "store 订阅者内再 set 安全(快照遍历)" {
 
 ///|
 test "store 初始派生值在订阅前就绪" {
-  let src : Store[String] = Store::new("x")
+  let src : @yue.Store[String] = @yue.Store::new("x")
   let len = src.map(fn(s) { s.length() })
   inspect(len.get(), content="1")
 }

@@ -54,6 +54,9 @@ pub impl ViewLike for Slider with fn view(self) {
 }
 
 ///|
+pub extend Slider with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
+
+///|
 pub(all) struct Picker {
   view : View
 }
@@ -62,6 +65,9 @@ pub(all) struct Picker {
 pub impl ViewLike for Picker with fn view(self) {
   self.view
 }
+
+///|
+pub extend Picker with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
 
 ///|
 pub(all) struct ComboBox {
@@ -74,6 +80,9 @@ pub impl ViewLike for ComboBox with fn view(self) {
 }
 
 ///|
+pub extend ComboBox with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
+
+///|
 pub(all) struct ProgressBar {
   view : View
 }
@@ -82,6 +91,9 @@ pub(all) struct ProgressBar {
 pub impl ViewLike for ProgressBar with fn view(self) {
   self.view
 }
+
+///|
+pub extend ProgressBar with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
 
 ///|
 /// 弹出层（非 View，独立句柄）。
@@ -147,9 +159,15 @@ pub impl ViewLike for Window with fn view(self) {
 }
 
 ///|
+pub extend Window with ViewLike::{get_bounds_in_screen, on_key_up, view, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
+
+///|
 pub impl ViewLike for Container with fn view(self) {
   self.view
 }
+
+///|
+pub extend Container with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
 
 ///|
 pub impl ViewLike for Label with fn view(self) {
@@ -157,9 +175,15 @@ pub impl ViewLike for Label with fn view(self) {
 }
 
 ///|
+pub extend Label with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
+
+///|
 pub impl ViewLike for TextEdit with fn view(self) {
   self.view
 }
+
+///|
+pub extend TextEdit with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
 
 ///|
 pub impl ViewLike for Button with fn view(self) {
@@ -167,14 +191,23 @@ pub impl ViewLike for Button with fn view(self) {
 }
 
 ///|
+pub extend Button with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
+
+///|
 pub impl ViewLike for Entry with fn view(self) {
   self.view
 }
 
 ///|
+pub extend Entry with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
+
+///|
 pub impl ViewLike for Browser with fn view(self) {
   self.view
 }
+
+///|
+pub extend Browser with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
 
 ///|
 pub(all) struct Table {
@@ -185,6 +218,9 @@ pub(all) struct Table {
 pub impl ViewLike for Table with fn view(self) {
   self.view
 }
+
+///|
+pub extend Table with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
 
 ///|
 /// 独立句柄：菜单条（继承 RefCounted 而非 Responder/View）。
@@ -259,6 +295,9 @@ pub impl ViewLike for Group with fn view(self) {
 }
 
 ///|
+pub extend Group with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
+
+///|
 pub(all) struct Scroll {
   view : View
 }
@@ -267,6 +306,9 @@ pub(all) struct Scroll {
 pub impl ViewLike for Scroll with fn view(self) {
   self.view
 }
+
+///|
+pub extend Scroll with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
 
 ///|
 pub(all) struct Separator {
@@ -279,6 +321,9 @@ pub impl ViewLike for Separator with fn view(self) {
 }
 
 ///|
+pub extend Separator with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
+
+///|
 pub(all) struct DatePicker {
   view : View
 }
@@ -287,6 +332,9 @@ pub(all) struct DatePicker {
 pub impl ViewLike for DatePicker with fn view(self) {
   self.view
 }
+
+///|
+pub extend DatePicker with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
 
 ///|
 pub(all) struct GifPlayer {
@@ -299,6 +347,9 @@ pub impl ViewLike for GifPlayer with fn view(self) {
 }
 
 ///|
+pub extend GifPlayer with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
+
+///|
 /// 页签控件（多页切换）。
 pub(all) struct Tab {
   view : View
@@ -308,6 +359,9 @@ pub(all) struct Tab {
 pub impl ViewLike for Tab with fn view(self) {
   self.view
 }
+
+///|
+pub extend Tab with ViewLike::{get_bounds_in_screen, on_key_up, view, set_background_color, on_mouse_move, on_mouse_up, has_capture, set_visible, on_focus_out, has_focus, schedule_paint, add_tooltip_for_rect, set_enabled, handle_drop, set_color, set_focusable, remove_tooltip, set_style, on_mouse_enter, on_capture_lost, focus, register_dragged_types, set_font, schedule_paint_rect, get_computed_layout, set_mouse_down_can_move_window, set_tooltip, set_borderless, on_wheel, handle_drag_enter, handle_drag_update, on_mouse_down, on_focus_in, on_size_changed, is_dragging, on_mouse_leave, on_drag_leave, set_capture, set_style_str, update_layout, on_key_down, do_drag_file_paths, get_bounds, release_capture, do_drag_data_full, cancel_drag}
 
 ///|
 

@@ -156,6 +156,12 @@ pub(all) enum IconKind {
   TableRows
 } derive(Eq, Debug)
 
+///|
+pub extend IconKind with Eq::{equal, not_equal}
+
+///|
+pub extend IconKind with Debug::{to_repr}
+
 ///| 整圆弧度(2π,圆/点绘制用)
 const ICON_TAU : Double = 6.283185307179586
 

@@ -2,7 +2,7 @@
 
 ///|
 test "default_icon_pixmap 尺寸与非空" {
-  let (w, h, px) = default_icon_pixmap()
+  let (w, h, px) = @traybus.default_icon_pixmap()
   inspect(w, content="32")
   inspect(h, content="32")
   inspect(px.length(), content="4096")
@@ -18,8 +18,8 @@ test "default_icon_pixmap 尺寸与非空" {
 
 ///|
 test "downscale_pixmap 32 到 16" {
-  let (w, h, px) = default_icon_pixmap()
-  let (nw, nh, npx) = downscale_pixmap(w, h, px, 16, 16)
+  let (w, h, px) = @traybus.default_icon_pixmap()
+  let (nw, nh, npx) = @traybus.downscale_pixmap(w, h, px, 16, 16)
   inspect(nw, content="16")
   inspect(nh, content="16")
   inspect(npx.length(), content="1024")

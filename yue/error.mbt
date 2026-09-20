@@ -15,3 +15,6 @@ pub impl Show for TrayError with fn output(self, logger) {
     IconLoadFailed => logger.write_string("TrayError::IconLoadFailed")
   }
 }
+
+///|
+pub extend TrayError with Show::{to_string, output}
