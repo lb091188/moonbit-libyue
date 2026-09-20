@@ -1,5 +1,7 @@
 # Documentation Index
 
+This directory holds the usage documentation for moonbit-libyue. The component API has two usage styles, semantically identical: the **classic per-setter approach** (`X::new()` + `set_xxx()`), or the **props-style one-shot approach** (`X::make(...)`, just a bundle of setters); all types are referenced via `@yue`, and the component API quick reference (parameters / method tables) is in [components.md](components.md).
+
 | Document | Content |
 |---|---|
 | [tutorial.md](tutorial.md) | Five-minute tutorial for MoonBit newcomers: from `moon new` to a running window, with the three newcomer pitfalls resolved; includes links to the official MoonBit tutorial & Tour |
