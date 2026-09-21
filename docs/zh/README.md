@@ -18,7 +18,7 @@ moon run examples/showcase      # 全功能演示板：15 页三组侧栏，组�
 
 showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 反馈 / 代码与文档 / 事件与布局 / Store 对照 + 原生控件 / 画布与富文本 + 系统集成 / 窗口 / 浏览器 / 环境与平台；左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。每页源码独立成文件（`examples/showcase/pages_*.mbt`），是最好的复制粘贴素材库。更多截图见 [components-ui.md](components-ui.md)。
 
-![导航组件页](images/showcase-nav.png)
+![导航组件页](../images/showcase-nav.png)
 
 ## 分流
 
@@ -27,7 +27,7 @@ showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 反馈 /
 | [tutorial.md](tutorial.md) | 五分钟上手教程(面向 MoonBit 新手):从 `moon new` 到窗口跑起来,三个新手坑逐一避开;附官方 MoonBit 教程与 Tour 链接 |
 | [declarative.md](declarative.md) | 声明式 UI:`Node`/`mount` 渲染树 + `Store`/`Signal` 响应式绑定(信号 computed 自动依赖收集 + batch) |
 | [layout.md](layout.md) | 布局样式键全集(Yoga flexbox),含实测记录 |
-| [components-ui.md](components-ui.md) | 组件库:Element Plus 风格主题化非表单组件(导航/数据展示/反馈),含演示截图 |
+| [components-ui.md](components-ui.md) | 组件库速查:Element Plus 风格主题化组件(按钮/输入/选择/表单/导航/布局/数据展示/图标/反馈/浮层),逐 API 签名 + 参数表,含演示截图 |
 | [components.md](components.md) | 组件 API 速查:经典 setter 与 `X::make` props 两种写法,含上游坑 |
 | [adaptation.md](adaptation.md) | 平台适配经验:各平台实测坑、根因与验证结论(持续更新) |
 | [tray.md](tray.md) | Linux 托盘方案:SNI 协议栈设计、架构、后端降级、桌面兼容性 |
