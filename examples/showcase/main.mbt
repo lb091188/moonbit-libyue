@@ -93,7 +93,14 @@ fn App::toast_push(
 }
 
 ///|
+extern "c" fn ffi_gui_marker() -> Int = "yue_mbt_gui_marker"
+
+///|
 fn main {
+  // 实验探针:强制引用 win_gui.c 的符号,保证其归档成员被链接器抽取
+  if ffi_gui_marker() < 0 {
+    return
+  }
   if !@yue.initialize() {
     return
   }

@@ -3,3 +3,7 @@ import {
 }
 
 pkgtype(kind: "executable")
+
+options(
+  "native-stub": ["win_gui.c"],
+)

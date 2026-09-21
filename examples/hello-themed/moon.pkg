@@ -4,4 +4,5 @@ import {
 
 options(
   "is-main": true,
+  "native-stub": ["win_gui.c"],
 )
