@@ -44,25 +44,24 @@ let text = @yue.Signal::computed(fn() { "已点 \{clicks.get()} 次" })  // 依�
 @yue.bind(text, fn(s) { s }),
 ```
 
-**🖥 桌面级系统能力** —— 系统托盘（Linux 自研 DBus/SNI 直连，补齐 libyue 缺口）· 通知与通知中心 · 全局快捷键 · 剪贴板 · 原生菜单栏 · 文件对话框 · 拖放 · 多显示器：
+**🖥 桌面级系统能力** —— 系统托盘 · 通知 · 全局快捷键 · 剪贴板 · 原生菜单栏 · 文件对话框 · 拖放 · 多显示器：
 
 ```moonbit
-let tray = @yue.Tray::new("icon.png") // Result,错误可处理
-match tray {
+match @yue.Tray::new("icon.png") {
   Ok(t) => t.on_click(fn() { window.show() })
-  Err(e) => println("托盘不可用:\{e}")
+  Err(_e) => ()
 }
+
 let n = @yue.Notification::new()
-n.set_title("构建完成"); n.set_body("45/45 通过"); n.show()
+n.set_title("构建完成")
+n.show()
 ```
 
-> 55 个原生控件全量封装 · 57 个主题化自绘组件 · 封装层开销实测[启动与 C++ 持平、内存 <1 MB](docs/zh/adaptation.md) · 三平台 CI · [mooncakes](https://mooncakes.io/) 已发布
+> 55 个原生控件全量封装 · 57 个主题化自绘组件 · 封装开销[启动持平 C++、内存 +0.8MB](docs/zh/adaptation.md) · 三平台 CI · [mooncakes](https://mooncakes.io/) 已发布
 
 ## 快速开始
 
-不会 MoonBit？有任意一门语言的编程基础就行——[五分钟上手教程](docs/zh/tutorial.md) 从 `moon new` 带到窗口跑起来：装 MoonBit 工具链与各平台系统依赖、避开三个新手坑、建出第一个桌面应用，附官方 MoonBit 教程与交互式 Tour 链接。
-
-已经会 MoonBit？教程第 2 节从 `moon new` 到 `moon add` 引入本库，几分钟跑通。
+不会 MoonBit？[五分钟上手教程](docs/zh/tutorial.md) 从 `moon new` 带到第一个窗口。
 
 ## 文档索引
 
@@ -77,13 +76,13 @@ n.set_title("构建完成"); n.set_body("45/45 通过"); n.show()
 
 ## 平台支持
 
-Ubuntu 24.04(XFCE / GNOME / KDE) ✅ · Deepin 25 ✅ · Windows 10/11 ✅ · macOS 构建通过(CI,无真机)
+Ubuntu 24.04(XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 构建通过(CI,无真机)
 
-Windows 下,依赖本库构建的 exe 自动为 GUI 子系统,双击无控制台黑框;`moon run` 的输出经管道捕获,照常可见。
+Windows 下 exe 自动为 GUI 子系统,双击无控制台黑框。
 
 ## 开发贡献
 
-欢迎参与：报平台兼容问题、补控件、补文档都算，尤其欢迎 macOS 真机测试（目前仅 CI 构建通过、无真机验证）。几条基本要求：
+欢迎参与：报平台兼容问题、补控件、补文档都算，尤其欢迎 macOS 真机测试。几条基本要求：
 
 - **提交门槛**：`moon check && moon test` 全仓零错误零警告
 - **经验入档**：实测踩坑连同修复写进 [adaptation.md](docs/zh/adaptation.md)，不留只在提交说明里
