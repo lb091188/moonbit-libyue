@@ -262,10 +262,11 @@ def link_configs() -> dict:
         return {"link_configs": [{
             "package": "NoahLiu/moonbit-libyue/yue",
             "link_flags": (
-                # GUI 子系统意图:实测 link.exe 对重复 /SUBSYSTEM 先者优先,
-                # moon 模板把硬编码 /subsystem:console 放在用户串之前,本
-                # 参数当前不生效(bin 发布由 release-bin.yml 的 PE 头改写步骤
-                # 兜底)。保留待上游修正后自动生效,详见 adaptation.md。
+            # GUI 子系统意图:实测本参数到不了链接器——moon 把用户
+            # link_flags 拼在 /link 之前,cl.exe 将其当编译器选项丢弃
+            # (D9002);bin 发布由 release-bin.yml 的 PE 头改写步骤兜底,
+            # 正规出路为 pragma native-stub 路线(已实测成立),详见
+            # adaptation.md。
                 "/SUBSYSTEM:WINDOWS "
                 + f"{manifest}{build}/yue_mbt.lib"
                 + (f" {prebuilt}" if prebuilt else "")
