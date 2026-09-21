@@ -262,13 +262,7 @@ def link_configs() -> dict:
         return {"link_configs": [{
             "package": "NoahLiu/moonbit-libyue/yue",
             "link_flags": (
-            # GUI 子系统意图:实测本参数到不了链接器——moon 把用户
-            # link_flags 拼在 /link 之前,cl.exe 将其当编译器选项丢弃
-            # (D9002);bin 发布由 release-bin.yml 的 PE 头改写步骤兜底,
-            # 正规出路为 pragma native-stub 路线(已实测成立),详见
-            # adaptation.md。
-                "/SUBSYSTEM:WINDOWS "
-                + f"{manifest}{build}/yue_mbt.lib"
+                f"{manifest}{build}/yue_mbt.lib"
                 + (f" {prebuilt}" if prebuilt else "")
                 + " " + " ".join(WINDOWS_LINK_LIBS)
             ),

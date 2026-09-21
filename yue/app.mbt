@@ -5,6 +5,11 @@
 ///|
 /// 初始化 GUI 工具包。必须在创建任何 UI 对象之前调用一次。
 pub fn initialize() -> Bool {
+  // 调用仅为让链接器抽取 win_gui.c 的归档成员(否则其中的 GUI 子系统
+  // pragma 不会被处理);返回值恒 42,分支永不成立
+  if ffi_win_gui_marker() < 0 {
+    return false
+  }
   ffi_app_init()
 }
 
