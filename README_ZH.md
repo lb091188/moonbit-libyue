@@ -48,15 +48,12 @@ let text = @yue.Signal::computed(fn() { "已点 \{clicks.get()} 次" })  // 依�
 
 | 文档 | 内容 |
 |---|---|
-| [components-ui.md](docs/zh/components-ui.md) | 主题组件库 API 一览 + 定制主题/深浅切换 |
+| [tutorial.md](docs/zh/tutorial.md) | 五分钟上手:从 `moon new` 到窗口跑起来,避开三个新手坑 |
 | [declarative.md](docs/zh/declarative.md) | 声明式 `Node`/`mount` 渲染树 + `Store` 响应式绑定 |
-| [components.md](docs/zh/components.md) | 控件 API 速查:经典 setter 与 `X::make` props 两种写法 |
 | [layout.md](docs/zh/layout.md) | 布局样式键全集(Yoga flexbox) |
-| [adaptation.md](docs/zh/adaptation.md) | 各平台实测坑、根因与验证结论 |
-| [tray.md](docs/zh/tray.md) | Linux 托盘:SNI 协议栈设计与后端降级 |
-| [relink.md](docs/zh/relink.md) | 原生层变更后强制重链 |
-
-完整索引:[docs/zh/README.md](docs/zh/README.md)。
+| [components-ui.md](docs/zh/components-ui.md) | 主题组件库 API 一览 + 定制主题/深浅切换 |
+| [components.md](docs/zh/components.md) | 控件 API 速查:经典 setter 与 `X::make` props 两种写法 |
+| [排错与专题](docs/zh/README.md) | 平台适配经验 · Linux 托盘 · 原生层重链(三篇独立文档) |
 
 ## 平台支持
 
