@@ -49,6 +49,11 @@ The main AI document (repo root `AGENTS.md`, read by ZCode) pulls in this file v
 - Verification method: in a temporary project build and run both branches (`#cfg(platform="linux")` / `#cfg(not(platform="linux"))`) to see which one is taken; invoking moonc directly with `-target x86_64-unknown-linux-gnu` proves the compiler side already works (in testing, each of the three branches landed where expected). Also: file-level `targets` in `moon.pkg.json` still only has backend (wasm/js/native) + debug/release dimensions; feeding it an OS value fails schema loading outright; bare-identifier conditions (e.g. `#cfg(linux)`) are always true and meaningless.
 - Side note: nightly 0911 emits 19 `implicit_impl_as_method` deprecation warnings for the repo-wide `impl ViewLike for X` (stable 0904 does not) — forward tightening by the toolchain, not a library regression.
 
+### Layout geometry (Yoga flexbox)
+
+- **16 geometry assertions, all 16/16 passed in a real window (recorded 2026-09-11, measured on Ubuntu 24.04 + X11 + XFCE 4.18)**: the layout system ships 16 geometry assertions (flex equal split, gap spacing, percentage width, justify/align centering, min-width floor, absolute positioning); measured in a real window, **all 16/16 passed (failures=0)** with a ±1px tolerance. The composition rules match hand calculation: content area = container − 2×padding; gap does not stack with margin; the percentage basis is the parent content-area width.
+- **GUI automation experience (on record)**: coordinate-based clicks are unstable due to WM frame offsets and window occlusion; **keyboard-driven interaction (Tab focus + Space activation) is the preferred way to trigger controls**; `xdotool key --window` uses XSendEvent synthetic events which GTK drops — XTEST must be used (without --window).
+
 ### MoonBit ↔ C ABI
 
 - **The arity of the FuncRef+Callback trampoline must match the C function-pointer prototype argument for argument** (verified 2026-09-11). Convention: C calls `callback(closure, args...)`, and the MoonBit trampoline is `fn(f, args...)` where the first parameter `f` receives the closure.
