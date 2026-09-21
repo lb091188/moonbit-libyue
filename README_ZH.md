@@ -38,32 +38,11 @@ let text = @yue.Signal::computed(fn() { "已点 \{clicks.get()} 次" })  // 依�
 @yue.bind(text, fn(s) { s }),
 ```
 
-## 组件用法：两种写法
-
-每个控件都有两种用法，语义完全一致：**逐个 setter 的经典写法**（`X::new()` + `set_xxx()`），或 **props 风格一步到位**（`X::make(...)`，只是 setter 的打包）。所有类型经 `@yue` 引用，控件 API 速查（入参 / 方法表）见 [components.md](docs/zh/components.md)。
-
 ## 快速开始
 
-> **不会 MoonBit？** 有任意一门语言的编程基础就行——[五分钟上手教程](docs/zh/tutorial.md) 从 `moon new` 带你到窗口跑起来，附官方 MoonBit 教程与交互式 Tour 链接。
+不会 MoonBit？有任意一门语言的编程基础就行——[五分钟上手教程](docs/zh/tutorial.md) 从 `moon new` 带到窗口跑起来：装 MoonBit 工具链与各平台系统依赖、避开三个新手坑、建出第一个桌面应用，附官方 MoonBit 教程与交互式 Tour 链接。
 
-本项目基于 MoonBit 语言封装 libyue，使用本库需要了解 MoonBit，并准备各个系统的 C 编译环境，并且每个系统还有不同的依赖：
-
-- Linux 依赖 libwebkit2gtk 和 libgtk-3
-- Windows 依赖 WebView2
-
-[详细和开发使用教程](docs/zh/tutorial.md)
-
-## 演示
-
-```sh
-moon run examples/hello         # 原版控件最小窗口
-moon run examples/hello-themed  # 主题组件库最小示例(theme_apply + button_t/input_t/label_t)
-moon run examples/showcase      # 全功能演示板:15 页三组侧栏,组件库 + 系统能力全集
-```
-
-showcase 覆盖：基础/图标库/表单/导航/数据展示/反馈/代码与文档/事件与布局/Store 对照 + 原生控件/画布与富文本 + 系统集成/窗口/浏览器/环境与平台，左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。更多截图见 [docs/zh/components-ui.md](docs/zh/components-ui.md)。
-
-![导航组件页](docs/images/showcase-nav.png)
+已经会 MoonBit？教程第 2 节从 `moon new` 到 `moon add` 引入本库，几分钟跑通。
 
 ## 文档索引
 
