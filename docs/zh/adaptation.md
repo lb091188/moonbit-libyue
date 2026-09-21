@@ -82,6 +82,14 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 
 ---
 
+### 性能基准(MoonBit 全链路 vs C++ 原生基线;2026-09-21 实测)
+
+- **对比对象**:examples/hello(`moon build --target native --release`)vs 功能逐项对齐的纯 C++ libyue hello——链接同一 vendored 静态库 v0.15.6-mbt.12,C++ 侧不含 shim(`-std=c++20 -O2 -DNDEBUG`,链接参数照 prebuild.py Linux 分支),两侧差异即「shim + MoonBit 运行时」的全部开销。
+- **口径**:Ubuntu 24.04 XFCE(X11)同机同会话;热启动(预热 3 轮)各 20 轮取中位;启动时间=exec 到 X 窗口 map(wmctrl 按 pid 轮询,检测粒度约 10ms);内存=窗口出现后静置 3s 的 smaps_rollup 稳态 Rss;体积=最终链接产物。
+- **结果**:启动 70ms vs 73ms(差值小于检测粒度,视为持平);稳态内存 62.9MB vs 62.1MB(+0.8MB,+1.3%);二进制 7.39MB vs 6.52MB(+0.87MB,+13%)。
+- **结论**:封装层开销——内存 <1MB、启动持平、体积 +0.9MB,MoonBit 桌面应用与 C++ 原生几乎无差。
+- **复现要点**:C++ 侧头文件用同版 fork 树(nativeui)+预构建配套树(base/build,并把 `base/allocator/partition_allocator/src` 补为 include 根);须加 `-DNDEBUG` 关闭 DCHECK 引用,否则链接期缺 `RefCountedBase::CalledOnValidSequence`(release 库未含该符号)。
+
 ## Linux
 
 ### 发行版
