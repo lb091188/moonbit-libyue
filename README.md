@@ -44,25 +44,24 @@ let text = @yue.Signal::computed(fn() { "Clicked \{clicks.get()} times" })  // d
 @yue.bind(text, fn(s) { s }),
 ```
 
-**🖥 Desktop-grade system integration** — system tray (Linux via a self-built DBus/SNI link, closing a libyue gap) · notifications & notification center · global shortcuts · clipboard · native menu bar · file dialogs · drag & drop · multiple monitors:
+**🖥 Desktop-grade system integration** — system tray · notifications · global shortcuts · clipboard · native menu bar · file dialogs · drag & drop · multiple monitors:
 
 ```moonbit
-let tray = @yue.Tray::new("icon.png") // Result, errors are handleable
-match tray {
+match @yue.Tray::new("icon.png") {
   Ok(t) => t.on_click(fn() { window.show() })
-  Err(e) => println("Tray unavailable: \{e}")
+  Err(_e) => ()
 }
+
 let n = @yue.Notification::new()
-n.set_title("Build finished"); n.set_body("45/45 passed"); n.show()
+n.set_title("Build finished")
+n.show()
 ```
 
-> 55 native widgets fully bound · 57 themed self-drawn components · wrapper overhead [measured: startup on par with C++, memory under 1 MB](docs/adaptation.md) · three-platform CI · published on [mooncakes](https://mooncakes.io/)
+> 55 native widgets fully bound · 57 themed self-drawn components · wrapper overhead [startup on par with C++, memory +0.8MB](docs/adaptation.md) · three-platform CI · published on [mooncakes](https://mooncakes.io/)
 
 ## Quick start
 
-Don't know MoonBit? Any programming language background is enough — the [five-minute tutorial](docs/tutorial.md) takes you from `moon new` to a running window: installing the MoonBit toolchain and per-platform system dependencies, avoiding the three newcomer pitfalls, and building your first desktop app, with links to the official MoonBit tutorial and interactive Tour.
-
-Already know MoonBit? Section 2 of the tutorial covers adding this library from `moon new` to `moon add` — up and running in minutes.
+Don't know MoonBit? The [five-minute tutorial](docs/tutorial.md) takes you from `moon new` to your first window.
 
 ## Documentation index
 
@@ -77,13 +76,13 @@ Already know MoonBit? Section 2 of the tutorial covers adding this library from 
 
 ## Platform support
 
-Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 25 ✅ · Windows 10/11 ✅ · macOS builds pass (CI, no real machine)
+Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS builds pass (CI, no real machine)
 
-On Windows, exes built against this library automatically run as a GUI subsystem — no console window on double-click; `moon run` output is captured via pipes and stays visible.
+Exes built on Windows run as a GUI subsystem — no console window on double-click.
 
 ## Contributing
 
-Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — macOS real-machine testing is especially appreciated (currently only CI builds pass, no real-machine verification). A few basic requirements:
+Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — macOS real-machine testing is especially appreciated. A few basic requirements:
 
 - **Commit gate**: `moon check && moon test` zero errors and zero warnings repo-wide
 - **Experience on record**: write field-tested pitfalls together with their fixes into [adaptation.md](docs/adaptation.md) — not only in commit messages
