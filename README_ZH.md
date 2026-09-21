@@ -2,13 +2,19 @@
 
 > 感谢 [赵成(zcbenz)](https://github.com/zcbenz) 和他的 [Yue](https://github.com/yue/yue) 框架，以及 [MoonBit](https://github.com/moonbitlang)。很凑巧，这两个编程工具都有 “月”，现在我也很喜欢它们。 [关于我和 `libyue`](docs/zh/aboutlibyue.md)
 
-[libyue](https://libyue.com/docs/latest/cpp/) 的 MoonBit 封装——兼容 Windows / macOS(待测试) / Linux 原生跨平台桌面应用。
+[MoonBit](https://github.com/moonbitlang) 生态的**原生跨平台桌面 GUI 库**——对 [libyue](https://libyue.com/docs/latest/cpp/)(C++) 全量封装,一套 MoonBit 代码跑 Windows / macOS / Linux 原生窗口,`moon add` 后零配置直接运行。
 
 简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
 
 ![组件库演示板](docs/images/showcase-basic.png)
 
-## 三大特色
+<p align="center">
+  <img src="docs/images/showcase-data.png" width="32%" alt="数据展示">
+  <img src="docs/images/showcase-form.png" width="32%" alt="表单组件">
+  <img src="docs/images/showcase-system.png" width="32%" alt="系统集成">
+</p>
+
+## 核心特色
 
 **🎨 现代主题** —— 全部自绘、三平台视觉一致；`theme_apply` 一行换肤，深浅自动跟随系统：
 
@@ -37,6 +43,20 @@ let text = @yue.Signal::computed(fn() { "已点 \{clicks.get()} 次" })  // 依�
 @yue.button("点我", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
 @yue.bind(text, fn(s) { s }),
 ```
+
+**🖥 桌面级系统能力** —— 系统托盘（Linux 自研 DBus/SNI 直连，补齐 libyue 缺口）· 通知与通知中心 · 全局快捷键 · 剪贴板 · 原生菜单栏 · 文件对话框 · 拖放 · 多显示器：
+
+```moonbit
+let tray = @yue.Tray::new("icon.png") // Result,错误可处理
+match tray {
+  Ok(t) => t.on_click(fn() { window.show() })
+  Err(e) => println("托盘不可用:\{e}")
+}
+let n = @yue.Notification::new()
+n.set_title("构建完成"); n.set_body("45/45 通过"); n.show()
+```
+
+> 55 个原生控件全量封装 · 57 个主题化自绘组件 · 封装层开销实测[启动与 C++ 持平、内存 <1 MB](docs/zh/adaptation.md) · 三平台 CI · [mooncakes](https://mooncakes.io/) 已发布
 
 ## 快速开始
 

@@ -18,15 +18,15 @@ moon run examples/showcase      # full-capability demo board: 15 pages, three gr
 
 The showcase covers: Basic / Icons / Form / Navigation / Data Display / Feedback / Code & Docs / Events & Layout / Store comparison + Native widgets / Canvas & rich text + System Integration / Window / Browser / Environment & Platform, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). Each page's source is its own file (`examples/showcase/pages_*.mbt`) — the best copy-paste material library; screenshots of the component library:
 
-![Navigation page](images/showcase-nav.png)
+![Basic components](images/showcase-basic.png)
 
-![Basic components](images/components-basic.png)
+![Form components](images/showcase-form.png)
 
-![Navigation](images/components-nav.png)
+![Data display](images/showcase-data.png)
 
-![Data display](images/components-data.png)
+![Code & docs](images/showcase-code.png)
 
-![Feedback](images/components-feedback.png)
+![System integration](images/showcase-system.png)
 
 ## Routing
 
