@@ -2403,3 +2403,8 @@ extern "c" fn ffi_view_is_dragging(v : View) -> Int = "yue_mbt_view_is_dragging"
 
 ///|
 extern "c" fn ffi_null_image() -> Image = "yue_mbt_null_image"
+
+///|
+/// 实现在 win_gui.c:被 initialize 引用,保证其归档成员进链接,
+/// 使文件内的 GUI 子系统 pragma 生效。
+extern "c" fn ffi_win_gui_marker() -> Int = "yue_mbt_win_gui_marker"

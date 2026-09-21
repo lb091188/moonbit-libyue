@@ -59,6 +59,8 @@ Already know MoonBit? Section 2 of the tutorial covers adding this library from 
 
 Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 25 ✅ · Windows 10/11 ✅ · macOS builds pass (CI, no real machine)
 
+On Windows, exes built against this library automatically run as a GUI subsystem — no console window on double-click; `moon run` output is captured via pipes and stays visible.
+
 ## Contributing
 
 Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — macOS real-machine testing is especially appreciated (currently only CI builds pass, no real-machine verification). A few basic requirements:
