@@ -694,16 +694,4 @@ toast("Saved", @yue.Success)
 @yue.carousel_t([banner1, banner2], interval_ms=4000)
 ```
 
-## Demo
-
-`moon run examples/showcase` — the full-capability demo board, one page per capability area, each page's source in its own file (`examples/showcase/pages_*.mbt`) — the best copy-paste material library; the page list is in the [documentation index](README.md) "Demo" section.
-
-![Basic components](images/components-basic.png)
-
-![Navigation](images/components-nav.png)
-
-![Data display](images/components-data.png)
-
-![Feedback](images/components-feedback.png)
-
 State coordination across components goes through `Store` (subscribe / map / bind_label) or signals (`Signal`: computed with automatic dependency tracking, batch updates; pass a `sig.store()` view to component APIs taking a Store); see [declarative.md](declarative.md). Chinese version: [docs/zh/components-ui.md](zh/components-ui.md).

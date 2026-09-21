@@ -694,16 +694,4 @@ toast("已保存", @yue.Success)
 @yue.carousel_t([banner1, banner2], interval_ms=4000)
 ```
 
-## 演示
-
-`moon run examples/showcase`——全功能演示板，组件库与 libyue 全部能力按页演示，每页源码独立成文件（`examples/showcase/pages_*.mbt`），是最好的复制粘贴素材库；页面清单见[文档索引](README.md)「演示」节。
-
-![基础组件](../images/components-basic.png)
-
-![导航](../images/components-nav.png)
-
-![数据展示](../images/components-data.png)
-
-![反馈](../images/components-feedback.png)
-
 组件间状态协调统一走 `Store`（subscribe / map / bind_label）或信号 `Signal`（computed 自动依赖收集，batch 批处理；组件 Store 参数可传 `sig.store()` 视图），见 [declarative.md](declarative.md)。English version: [components-ui.md](../components-ui.md).

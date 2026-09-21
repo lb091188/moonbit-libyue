@@ -89,7 +89,7 @@ moon run examples/hello-themed  # themed minimal example (theme_apply + button_t
 moon run examples/showcase      # full demo board: 15 pages, 3 collapsible side-menu groups
 ```
 
-The showcase covers Basic / Icons / Form / Navigation / Data / Feedback / Code & Docs / Events & Layout / Store comparison + Native widgets / Canvas & rich text + System / Window / Browser / Environment, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). More screenshots in [docs/components-ui.md](docs/components-ui.md).
+The showcase covers Basic / Icons / Form / Navigation / Data / Feedback / Code & Docs / Events & Layout / Store comparison + Native widgets / Canvas & rich text + System / Window / Browser / Environment, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). More screenshots in [docs/README.md](docs/README.md).
 
 ![Navigation page](docs/images/showcase-nav.png)
 
