@@ -2,13 +2,19 @@
 
 > Thanks to [Cheng Zhao (zcbenz)](https://github.com/zcbenz) and his [Yue](https://github.com/yue/yue) framework, and to [MoonBit](https://github.com/moonbitlang). As it happens, both of these programming tools carry the character for "moon" — and I have grown fond of them both. [About me and `libyue`](docs/aboutlibyue.md)
 
-MoonBit bindings for [libyue](https://libyue.com/docs/latest/cpp/) — native cross-platform desktop apps for Windows / macOS (untested) / Linux.
+A **native cross-platform desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — a full binding of [libyue](https://libyue.com/docs/latest/cpp/) (C++): one MoonBit codebase runs native windows on Windows / macOS / Linux, zero-config right after `moon add`.
 
 English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)
 
 ![Component showcase](docs/images/showcase-basic.png)
 
-## Three highlights
+<p align="center">
+  <img src="docs/images/showcase-data.png" width="32%" alt="Data display">
+  <img src="docs/images/showcase-form.png" width="32%" alt="Form components">
+  <img src="docs/images/showcase-system.png" width="32%" alt="System integration">
+</p>
+
+## Core highlights
 
 **🎨 Modern theme** — everything self-drawn, visually consistent across the three platforms; `theme_apply` reskins in one line, light/dark follows the system automatically:
 
@@ -37,6 +43,20 @@ let text = @yue.Signal::computed(fn() { "Clicked \{clicks.get()} times" })  // d
 @yue.button("Click me", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
 @yue.bind(text, fn(s) { s }),
 ```
+
+**🖥 Desktop-grade system integration** — system tray (Linux via a self-built DBus/SNI link, closing a libyue gap) · notifications & notification center · global shortcuts · clipboard · native menu bar · file dialogs · drag & drop · multiple monitors:
+
+```moonbit
+let tray = @yue.Tray::new("icon.png") // Result, errors are handleable
+match tray {
+  Ok(t) => t.on_click(fn() { window.show() })
+  Err(e) => println("Tray unavailable: \{e}")
+}
+let n = @yue.Notification::new()
+n.set_title("Build finished"); n.set_body("45/45 passed"); n.show()
+```
+
+> 55 native widgets fully bound · 57 themed self-drawn components · wrapper overhead [measured: startup on par with C++, memory under 1 MB](docs/adaptation.md) · three-platform CI · published on [mooncakes](https://mooncakes.io/)
 
 ## Quick start
 
