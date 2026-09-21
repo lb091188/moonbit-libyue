@@ -1,6 +1,6 @@
 # Themed Component Library Quick Reference
 
-The component library (`yue/components.mbt`, plus the themed entry points in `icons.mbt` / `overlays.mbt` / `splitter.mbt`) is built in pure MoonBit on top of the declarative layer — Element-Plus style, zero platform code. Every function is called via `@yue` and returns a `Node` that goes straight into the render tree; they are all props-style one-shot calls, with no classic setter form (native control quick reference: [components.md](components.md)). Reactive `Store` / `Signal` parameters are covered in [declarative.md](declarative.md).
+Themed component library quick reference: a full set of Element-Plus-style UI components (buttons / input / selection / forms / navigation / layout / data display / icons / feedback / overlays). Every function is called via `@yue` and returns a `Node` that goes straight into the UI tree; all named parameters are optional. Reactive `Store` / `Signal` parameters are covered in [declarative.md](declarative.md); native controls (Window / Label / Button / Entry, etc.) are in [components.md](components.md).
 
 Full demo: `examples/showcase`.
 
@@ -14,8 +14,8 @@ All colors come from the theme palette — a deep, low-saturation scheme: blue `
 |---|---|
 | `default_theme()` / `dark_theme()` | built-in light / dark themes, return a `Theme` |
 | `theme_current()` | read the current theme snapshot |
-| `theme_apply(t)` | apply a theme: mounted components re-color immediately, and the Linux native-control CSS (entries / text views / scrollbars / window & popover backgrounds) is rebuilt — no UI rebuild needed |
-| `on_theme_change(f)` | subscribe to theme changes (registered at mount for re-applying colors fixed at mount; subscriptions live for the app's lifetime, no unsubscribe) |
+| `theme_apply(t)` | apply a theme: switching takes effect immediately, no UI rebuild needed (Linux native-control styling is rebuilt too) |
+| `on_theme_change(f)` | subscribe to theme changes (registered at mount for re-applying colors fixed at mount) |
 | `system_prefers_dark()` | read the system light/dark preference (currently implemented on Linux only) |
 | `on_system_theme_change(f)` | fires when the system preference changes (currently implemented on Linux only) |
 
@@ -47,7 +47,7 @@ Fixed colors (brand swatches etc.) can be set directly and stay theme-independen
 
 `button_t(text, on_click?, variant? = Soft)`
 
-Self-drawn button; hover stays entirely within the theme, never handed to native styling.
+Self-drawn button; hover changes stay within the theme palette.
 
 | Param | Type | Default | Notes |
 |---|---|---|---|
@@ -80,7 +80,7 @@ Unified font size / color per text role, left-aligned; accepts layout styles and
 
 `entry_t(text? = "", password? = false, height? = 30.0, on_input?)`
 
-Unified font and line height; the text color follows the palette through the theme channel (GTK Entry `SetColor` paints the whole input dark, so only the font is themed — see [adaptation.md](adaptation.md)).
+Unified font and line height; the text color follows the theme and cannot be customized (platform limitation, see [adaptation.md](adaptation.md)).
 
 | Param | Type | Default | Notes |
 |---|---|---|---|
@@ -91,7 +91,7 @@ Unified font and line height; the text color follows the palette through the the
 
 `input_t(text? = "", password? = false, margin? = 0.0, width? = 280.0, height? = 30.0, clearable? = false, on_input?, invalid? = Store::new(false))`
 
-Self-drawn 1px outer border (turns theme primary on focus) + white background, inner Entry stripped of the native border via `set_borderless`, straight corners.
+Self-drawn 1px outer border (turns theme primary on focus) + white background, straight corners.
 
 | Param | Type | Default | Notes |
 |---|---|---|---|
@@ -109,13 +109,13 @@ Self-drawn 1px outer border (turns theme primary on focus) + white background, i
 
 `textarea_t(text? = "", width? = 280.0, height? = 110.0, margin? = 0.0, on_input?, clearable? = false, invalid? = Store::new(false))`
 
-Same pattern as input_t: self-drawn 1px border (turns theme primary on focus) + 8px inset, inner TextEdit with the native border removed; overflow scrolls per platform. clearable / invalid semantics match input_t.
+Same pattern as input_t: self-drawn 1px border (turns theme primary on focus) + 8px inset; overflow scrolls per platform. clearable / invalid semantics match input_t.
 
 ### Checkbox checkbox_t
 
 `checkbox_t(title, checked? = false, disabled? = false, on_change?)`
 
-Self-drawn square checkbox (replaces the native control, whose GTK hover ring clashes with the straight-corner theme): solid theme fill + white tick when checked, border turns theme primary on hover, disabled state included.
+Self-drawn square checkbox (14×14): solid theme fill + white tick when checked, border turns theme primary on hover, disabled state included.
 
 | Param | Type | Default | Notes |
 |---|---|---|---|
@@ -127,7 +127,7 @@ Self-drawn square checkbox (replaces the native control, whose GTK hover ring cl
 
 `radio_group(options, selected : Store[String], disabled? = false)`
 
-Selected item shows a solid square + theme-colored text, unselected a hollow square; clicks are mutually exclusive (GTK native radios don't share a group, so the whole row is self-drawn).
+Selected item shows a solid square + theme-colored text, unselected a hollow square; clicks are mutually exclusive.
 
 ### Switch switch_t
 
@@ -145,13 +145,13 @@ Self-drawn: light-grey track + theme-colored fill + square thumb; click the trac
 
 `select_t(options, value : Store[String], width? = 200.0, on_change?, clearable? = false)`
 
-Fully self-drawn: click opens the candidate list (Popover-hosted), hover highlight, theme-colored ✓ on the current pick, click to fill and close, blur closes; same behavior on all platforms. With clearable=true, hovering a non-empty field shows ✕ beside the arrow; click clears the selection (value set to "", `on_change("")`).
+Fully self-drawn: click opens the candidate list, hover highlight, theme-colored ✓ on the current pick, click to fill and close, blur closes; same behavior on all platforms. With clearable=true, hovering a non-empty field shows ✕ beside the arrow; click clears the selection (value set to "", `on_change("")`).
 
 ### Date picker date_picker_t
 
 `date_picker_t(value? : Store[DateYMD?], on_change?, width? = 200.0, placeholder? = "请选择日期", clearable? = false)`
 
-Fully self-drawn: input-style field; clicking opens the `calendar_t` month panel (Popover-hosted), pick to fill and close, blur closes; with clearable=true, hovering a set value shows ✕ beside the arrow to clear (no on_change).
+Fully self-drawn: input-style field; clicking opens the `calendar_t` month panel, pick to fill and close, blur closes; with clearable=true, hovering a set value shows ✕ beside the arrow to clear (no on_change).
 
 ### Date range picker date_range_picker_t
 
@@ -181,7 +181,7 @@ Fully self-drawn month panel: ‹/› month nav + weekday row + 42-cell grid, ad
 
 `color_picker_t(value : Store[String], colors?, width? = 200.0)`
 
-Dropdown form: the trigger field (current swatch + hex + arrow) opens the preset palette (Popover-hosted); clicking a swatch writes `value` (`"#RRGGBB"`) and closes, the selected swatch gets a theme outline + white check, blur closes; the palette is customizable (15 colors by default).
+Dropdown form: the trigger field (current swatch + hex + arrow) opens the preset palette; clicking a swatch writes `value` (`"#RRGGBB"`) and closes, the selected swatch gets a theme outline + white check, blur closes; the palette is customizable (15 colors by default).
 
 ### Rating rate_t
 
@@ -245,7 +245,7 @@ Top form: tab header row (selected theme-colored text + 2px bottom indicator, da
 
 `hsplit(first, second, ratio? = 0.5, min_first? = 80.0, min_second? = 80.0)` (`vsplit` defaults its min values to 60)
 
-Draggable split layout (Qt QSplitter / GTK Paned counterpart): an 8px self-drawn handle with an always-visible divider line + dots (no need to hunt for it), grey fill on hover, theme color + white dots while dragging, mouse capture keeps events from being lost; ratio is the initial share, min clamps both panes.
+Draggable split layout: an 8px self-drawn handle with an always-visible divider line + dots (no need to hunt for it), grey fill on hover, theme color + white dots while dragging, mouse capture keeps events from being lost; ratio is the initial share, min clamps both panes.
 
 ## Data display
 
@@ -261,7 +261,7 @@ The former is a solid colored tag (custom color), the latter a light-fill tag wi
 
 ### Badge badge_count / badge_dot
 
-`badge_count(count)` is a red-background white-text chip (width adapts; the semantic red is read at draw time and follows the theme); `badge_dot(color? = "")` is an 8×8 dot.
+`badge_count(count)` is a red-background white-text chip (width adapts, color follows the theme); `badge_dot(color? = "")` is an 8×8 dot.
 
 ### Statistic statistic
 
@@ -291,11 +291,11 @@ The former is a solid colored tag (custom color), the latter a light-fill tag wi
 
 `code_view(lines, lang? = "moonbit", font_size? = 13.0, width? = 560.0, line_numbers? = false)`
 
-One AttributedText per token (whole-range coloring), measured and drawn manually — consistent behavior on all platforms (Windows ranged font/color is an upstream defect; this approach routes around it, see [adaptation.md](adaptation.md)). lang keyword sets: moonbit / js / ts / python / rust / c / go / bash / sql (case-insensitive); line_numbers=true draws a left gutter.
+Per-token highlighting with manual layout — consistent behavior on all platforms (including Windows). lang keyword sets: moonbit / js / ts / python / rust / c / go / bash / sql (case-insensitive); line_numbers=true draws a left gutter.
 
 ### Markdown rendering markdown_view
 
-`markdown_view(source, width? = 560.0)` — headings 1-6, paragraphs, **bold**, *italic*, `inline code`, link text, ordered/unordered lists, blockquotes (theme-colored bar), rules, fenced code blocks (language from the fence marker, backed by code_view); ranged fonts/colors via attributed-text range attributes, consistent across platforms, link/code colors follow the theme.
+`markdown_view(source, width? = 560.0)` — headings 1-6, paragraphs, **bold**, *italic*, `inline code`, link text, ordered/unordered lists, blockquotes (theme-colored bar), rules, fenced code blocks (language from the fence marker, backed by code_view); consistent rendering across platforms, link/code colors follow the theme.
 
 ### Table table_t
 
@@ -307,7 +307,7 @@ Header + zebra stripes + hover highlight + Store-driven (a set rebuilds all rows
 
 `table_v_t(columns, rows : Store[Array[TableRow]], width? = 560.0, height? = 360.0, row_height? = 32.0, selection? : Store[Array[Int]], on_row_click?)`
 
-The 10k+-row form of table_t: the whole surface is canvas-drawn with only visible rows painted, self-managed scrolling (wheel / drag scrollbar / keyboard), free of the native scroll container's content-height limit; cell rendering matches table_t (CellLines clamps to two lines within the row height), column/selection semantics are identical.
+The 10k+-row form of table_t: only visible rows are painted, self-managed scrolling (wheel / drag scrollbar / keyboard), free of the scroll container's content-height limit; cell rendering matches table_t (CellLines clamps to two lines within the row height), column/selection semantics are identical.
 
 ### Tree tree
 
@@ -348,7 +348,7 @@ Light fill of the type + 4px left color bar + same-family dark text, full width;
 
 `dialog_t(visible : Store[Bool], title, children : Array[Node], width? = 420.0, confirm_text? = "确定", cancel_text? = "取消", on_confirm?, on_cancel?, close_on_mask? = false)`
 
-In-app dialog: same-window mask (semi-transparent black, absolute relative to the mount container — mounted at the window root it covers the whole window) + centered panel (title bar with ✕ + body + right-aligned buttons). `visible` drives show/hide and one Node instance stays in the page tree; ✕ / cancel / confirm auto-close after the callback, empty text hides that button (both empty hides the whole row), close_on_mask=true also closes on mask clicks. Visually modal, not keyboard-modal.
+In-app dialog: same-window mask (semi-transparent black, absolute relative to the mount container — mounted at the window root it covers the whole window) + centered panel (title bar with ✕ + body + right-aligned buttons). `visible` drives show/hide; ✕ / cancel / confirm auto-close after the callback, empty text hides that button (both empty hides the whole row), close_on_mask=true also closes on mask clicks. Visually modal, not keyboard-modal.
 
 ### Toast toast_layer
 
@@ -368,11 +368,11 @@ Mount the layer node at the window root (absolute top strip, no layout space); t
 
 ### Popover popover_t
 
-`popover_t(trigger : Node, content : Node, width, height)` — clicking the trigger opens arbitrary Node content below it (Popover-hosted); click again to toggle closed.
+`popover_t(trigger : Node, content : Node, width, height)` — clicking the trigger opens arbitrary Node content below it; click again to toggle closed.
 
 ### Dropdown menu dropdown_menu
 
-`dropdown_menu(trigger : String, items, on_select : (Int) -> Unit, width? = 160.0)` — trigger text + dropdown arrow; clicking opens the item list (Popover-hosted): hover highlight, click calls back the index and closes; `"-"` in items draws a separator.
+`dropdown_menu(trigger : String, items, on_select : (Int) -> Unit, width? = 160.0)` — trigger text + dropdown arrow; clicking opens the item list: hover highlight, click calls back the index and closes; `"-"` in items draws a separator.
 
 ### Carousel carousel_t
 

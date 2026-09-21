@@ -1,6 +1,6 @@
 # 主题组件库速查
 
-组件库（`yue/components.mbt`，另含 `icons.mbt` / `overlays.mbt` / `splitter.mbt` 的主题化入口）在声明式层之上以纯 MoonBit 实现，Element Plus 风格、零平台代码。所有函数经 `@yue` 调用，返回 `Node` 直接进渲染树；一律 props 一步到位，没有经典 setter 写法（原生控件速查见 [components.md](components.md)）。响应式 `Store` / `Signal` 参数见 [declarative.md](declarative.md)。
+主题组件库速查：Element Plus 风格的成套界面组件（按钮 / 输入 / 选择 / 表单 / 导航 / 布局 / 数据展示 / 图标 / 反馈 / 浮层），全部经 `@yue` 调用、返回 `Node` 直接进界面树，具名参数均可选。响应式 `Store` / `Signal` 参数见 [declarative.md](declarative.md)；原生控件（Window / Label / Button / Entry 等）见 [components.md](components.md)。
 
 完整演示见 `examples/showcase`。
 
@@ -14,8 +14,8 @@
 |---|---|
 | `default_theme()` / `dark_theme()` | 内置浅色 / 暗色主题，返回 `Theme` |
 | `theme_current()` | 读当前主题快照 |
-| `theme_apply(t)` | 应用主题：已挂载组件即时重着色，Linux 端原生控件（输入框 / 多行 / 滚动条 / 窗口与弹层底）CSS 一并重建，无需重建界面 |
-| `on_theme_change(f)` | 订阅主题变更（组件挂载时注册，常驻界面重设定死色用；订阅随应用存活，不退订） |
+| `theme_apply(t)` | 应用主题：切换即时生效、无需重建界面（Linux 端原生控件样式一并重建） |
+| `on_theme_change(f)` | 订阅主题变更（组件挂载时注册，常驻界面重设定死色用） |
 | `system_prefers_dark()` | 读系统深浅偏好（当前仅 Linux 有实现） |
 | `on_system_theme_change(f)` | 系统偏好切换时回调（当前仅 Linux 有实现） |
 
@@ -47,7 +47,7 @@ let t = @yue.default_theme()
 
 `button_t(text, on_click?, variant? = Soft)`
 
-自绘按钮，hover 全程收敛在主题内，不交给原生样式。
+自绘按钮，hover 变化收敛在主题色板内。
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
@@ -80,7 +80,7 @@ hover 表现：Solid / Danger 加深，Soft 变实底白字，Text 浅灰底。
 
 `entry_t(text? = "", password? = false, height? = 30.0, on_input?)`
 
-统一字体与行高；文字色经主题通道跟随色板（GTK Entry `SetColor` 会整体染黑，故只统一字体，见 [adaptation.md](adaptation.md)）。
+统一字体与行高，文字色跟随主题；文字色不支持自定（平台限制，见 [adaptation.md](adaptation.md)）。
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
@@ -91,7 +91,7 @@ hover 表现：Solid / Danger 加深，Soft 变实底白字，Text 浅灰底。
 
 `input_t(text? = "", password? = false, margin? = 0.0, width? = 280.0, height? = 30.0, clearable? = false, on_input?, invalid? = Store::new(false))`
 
-外层自绘 1px 边框（聚焦变主题色）+ 白底，内部 Entry 经 `set_borderless` 去原生边框只负责文字，直角。
+外层自绘 1px 边框（聚焦变主题色）+ 白底，直角。
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
@@ -109,13 +109,13 @@ hover 表现：Solid / Danger 加深，Soft 变实底白字，Text 浅灰底。
 
 `textarea_t(text? = "", width? = 280.0, height? = 110.0, margin? = 0.0, on_input?, clearable? = false, invalid? = Store::new(false))`
 
-input_t 同套路：外层自绘 1px 边框（聚焦变主题色）+ 8px 内边距，内部 TextEdit 去原生边框；内容超出按平台自身滚动。clearable / invalid 语义同 input_t。
+input_t 同套路：外层自绘 1px 边框（聚焦变主题色）+ 8px 内边距；内容超出自行滚动。clearable / invalid 语义同 input_t。
 
 ### 复选框 checkbox_t
 
 `checkbox_t(title, checked? = false, disabled? = false, on_change?)`
 
-自绘直角勾选框（替代原生控件，GTK 原生 hover 高亮圈与直角主题冲突）：选中实心主题色 + 白勾，hover 边框变主题色，含禁用态。
+自绘直角勾选框（14×14）：选中实心主题色 + 白勾，hover 边框变主题色，含禁用态。
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
@@ -127,7 +127,7 @@ input_t 同套路：外层自绘 1px 边框（聚焦变主题色）+ 8px 内边�
 
 `radio_group(options, selected : Store[String], disabled? = false)`
 
-选中项实心方块 + 主题色文字，未选中空心方块，点击互斥（GTK 端原生 Radio 不共享组，故整行自绘）。
+选中项实心方块 + 主题色文字，未选中空心方块，点击互斥。
 
 ### 开关 switch_t
 
@@ -145,13 +145,13 @@ input_t 同套路：外层自绘 1px 边框（聚焦变主题色）+ 8px 内边�
 
 `select_t(options, value : Store[String], width? = 200.0, on_change?, clearable? = false)`
 
-全自绘：点击弹候选列表（Popover 承载），悬停高亮、当前选中主题色 ✓，点选回填并收起，失焦收起，三平台同形态。clearable=true 时悬停且有值，箭头左侧 ✕ 点击清空（value 置空串、`on_change("")`）。
+全自绘：点击弹候选列表，悬停高亮、当前选中主题色 ✓，点选回填并收起，失焦收起，三平台同形态。clearable=true 时悬停且有值，箭头左侧 ✕ 点击清空（value 置空串、`on_change("")`）。
 
 ### 日期选择器 date_picker_t
 
 `date_picker_t(value? : Store[DateYMD?], on_change?, width? = 200.0, placeholder? = "请选择日期", clearable? = false)`
 
-全自绘：输入框样式字段，点击弹出 `calendar_t` 月历面板（Popover 承载），点选回填并收起，失焦收起；clearable=true 时悬停且有值，箭头旁 ✕ 清空（不触发 on_change）。
+全自绘：输入框样式字段，点击弹出 `calendar_t` 月历面板，点选回填并收起，失焦收起；clearable=true 时悬停且有值，箭头旁 ✕ 清空（不触发 on_change）。
 
 ### 日期区间选择器 date_range_picker_t
 
@@ -181,7 +181,7 @@ input_t 同套路：外层自绘 1px 边框（聚焦变主题色）+ 8px 内边�
 
 `color_picker_t(value : Store[String], colors?, width? = 200.0)`
 
-下拉形态：触发字段（当前色块 + hex + 箭头）点击弹预设色板（Popover 承载），点击色块写入 `value`（`"#RRGGBB"`）并收起，选中色块主题色描边 + 白勾，失焦收起；色板可自定义（缺省 15 色）。
+下拉形态：触发字段（当前色块 + hex + 箭头）点击弹预设色板，点击色块写入 `value`（`"#RRGGBB"`）并收起，选中色块主题色描边 + 白勾，失焦收起；色板可自定义（缺省 15 色）。
 
 ### 评分 rate_t
 
@@ -245,7 +245,7 @@ hover 浅灰、选中主题浅蓝底 + 主题色文字 + 左侧 3px 强调条，
 
 `hsplit(first, second, ratio? = 0.5, min_first? = 80.0, min_second? = 80.0)`（`vsplit` 的 min 默认 60）
 
-可拖动分隔布局（Qt QSplitter / GTK Paned 对位）：8px 自绘把手常显分隔线 + 点纹（不靠 hover 就能找到），悬停浅灰底、拖动中主题色底白点，拖动经鼠标捕获不丢事件；ratio 为初始占比，min 钳制两栏下限。
+可拖动分隔布局：8px 自绘把手常显分隔线 + 点纹（不靠 hover 就能找到），悬停浅灰底、拖动中主题色底白点，拖动经鼠标捕获不丢事件；ratio 为初始占比，min 钳制两栏下限。
 
 ## 数据展示
 
@@ -261,7 +261,7 @@ hover 浅灰、选中主题浅蓝底 + 主题色文字 + 左侧 3px 强调条，
 
 ### 角标 badge_count / badge_dot
 
-`badge_count(count)` 红底白字数字小块（宽度自适应，语义红 draw 现取跟随主题）；`badge_dot(color? = "")` 8×8 色点。
+`badge_count(count)` 红底白字数字小块（宽度自适应，颜色跟随主题）；`badge_dot(color? = "")` 8×8 色点。
 
 ### 数值统计 statistic
 
@@ -291,11 +291,11 @@ hover 浅灰、选中主题浅蓝底 + 主题色文字 + 左侧 3px 强调条，
 
 `code_view(lines, lang? = "moonbit", font_size? = 13.0, width? = 560.0, line_numbers? = false)`
 
-逐 token 建 AttributedText（整段设色）+ 测宽后自绘排版，全平台行为一致（Windows 上区间字体 / 颜色是上游缺陷，此法绕开，见 [adaptation.md](adaptation.md)）。lang 关键字集：moonbit / js / ts / python / rust / c / go / bash / sql（大小写不敏感）；line_numbers=true 左侧行号槽。
+逐 token 高亮排版，全平台行为一致（含 Windows）。lang 关键字集：moonbit / js / ts / python / rust / c / go / bash / sql（大小写不敏感）；line_numbers=true 左侧行号槽。
 
 ### Markdown 展示 markdown_view
 
-`markdown_view(source, width? = 560.0)`——标题 1-6 / 段落 / **粗体** / *斜体* / `行内代码` / 链接文字 / 无序有序列表 / 引用（主题色竖条）/ 分隔线 / 围栏代码块（语言随 fence 标注，复用 code_view）；区间字体颜色经富文本范围属性，三平台一致，链接 / 代码色跟主题。
+`markdown_view(source, width? = 560.0)`——标题 1-6 / 段落 / **粗体** / *斜体* / `行内代码` / 链接文字 / 无序有序列表 / 引用（主题色竖条）/ 分隔线 / 围栏代码块（语言随 fence 标注，复用 code_view）；三平台显示一致，链接 / 代码色跟主题。
 
 ### 表格 table_t
 
@@ -307,7 +307,7 @@ hover 浅灰、选中主题浅蓝底 + 主题色文字 + 左侧 3px 强调条，
 
 `table_v_t(columns, rows : Store[Array[TableRow]], width? = 560.0, height? = 360.0, row_height? = 32.0, selection? : Store[Array[Int]], on_row_click?)`
 
-table_t 的万行级形态：整面 canvas 自绘、只画可见行，自管滚动（滚轮 / 拖拽滚动条 / 键盘），不受原生滚动容器内容高度上限约束；单元格画法同 table_t（CellLines 在行高内最多两行），列 / selection 语义一致。
+table_t 的万行级形态：只画可见行，自管滚动（滚轮 / 拖拽滚动条 / 键盘），不受滚动容器内容高度上限约束；单元格画法同 table_t（CellLines 在行高内最多两行），列 / selection 语义一致。
 
 ### 树形控件 tree
 
@@ -348,7 +348,7 @@ table_t 的万行级形态：整面 canvas 自绘、只画可见行，自管滚�
 
 `dialog_t(visible : Store[Bool], title, children : Array[Node], width? = 420.0, confirm_text? = "确定", cancel_text? = "取消", on_confirm?, on_cancel?, close_on_mask? = false)`
 
-应用内对话框：同窗遮罩（半透明黑，absolute 相对挂载容器——挂窗口根即盖全窗）+ 居中面板（标题栏 ✕ + 内容 + 右对齐按钮区）。visible 驱动弹 / 收，同一份 Node 常驻页面树；✕ / 取消 / 确定触发回调后自动收起，文案传空串隐藏该按钮（两个都空则整行不显示），close_on_mask=true 时点遮罩空白处也收起。视觉模态，非键盘强模态。
+应用内对话框：同窗遮罩（半透明黑，absolute 相对挂载容器——挂窗口根即盖全窗）+ 居中面板（标题栏 ✕ + 内容 + 右对齐按钮区）。visible 驱动弹 / 收；✕ / 取消 / 确定触发回调后自动收起，文案传空串隐藏该按钮（两个都空则整行不显示），close_on_mask=true 时点遮罩空白处也收起。视觉模态，非键盘强模态。
 
 ### 轻提示 toast_layer
 
@@ -368,11 +368,11 @@ table_t 的万行级形态：整面 canvas 自绘、只画可见行，自管滚�
 
 ### 气泡弹层 popover_t
 
-`popover_t(trigger : Node, content : Node, width, height)`——trigger 点击后在自身下方弹出任意 Node 内容（Popover 承载），再次点击切换收起。
+`popover_t(trigger : Node, content : Node, width, height)`——trigger 点击后在自身下方弹出任意 Node 内容，再次点击切换收起。
 
 ### 下拉菜单 dropdown_menu
 
-`dropdown_menu(trigger : String, items, on_select : (Int) -> Unit, width? = 160.0)`——触发文字 + 下拉箭头，点击弹菜单项列表（Popover 承载）：悬停高亮，点击回调序号并收起；items 中 `"-"` 画分隔线。
+`dropdown_menu(trigger : String, items, on_select : (Int) -> Unit, width? = 160.0)`——触发文字 + 下拉箭头，点击弹菜单项列表：悬停高亮，点击回调序号并收起；items 中 `"-"` 画分隔线。
 
 ### 轮播 carousel_t
 
