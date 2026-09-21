@@ -100,7 +100,7 @@ The showcase covers Basic / Icons / Form / Navigation / Data / Feedback / Code &
 | [components-ui.md](docs/components-ui.md) | Themed component library quick reference: per-API signatures and parameter tables, plus theme customization |
 | [declarative.md](docs/declarative.md) | Declarative `Node`/`mount` trees + `Store` reactive bindings |
 | [components.md](docs/components.md) | Widget API quick reference: classic setters and `X::make` props styles |
-| [layout.md](docs/layout.md) | Layout style keys (Yoga flexbox) |
+| [layout.md](docs/layout.md) | Layout style key quick reference: all keys + common-combination examples |
 | [adaptation.md](docs/adaptation.md) | Platform pitfalls, root causes and verification conclusions |
 | [tray.md](docs/tray.md) | Linux tray: SNI protocol stack design and backend fallback |
 | [relink.md](docs/relink.md) | Forcing a relink after native-layer changes |

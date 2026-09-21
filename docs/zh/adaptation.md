@@ -61,6 +61,11 @@ moonbit-libyue 在各平台适配过程中的实测经验与坑,全部来自真�
 - **mouse_enter/leave 回调里 set_background_color 改写运行期 CSS,会吞掉紧随的首次 press(2026-09-19 真机实测入档)**:backtop_t 曾在 hover 回调里 set_background_color 表达 hover 底色(GTK 端实现为 ApplyStyle 加 CSS provider)——真机现象:滚动到底后第一次点击「纹丝不动」,第二次点击才回顶;即首次 press 被事件窗口扰动吞掉。全库其余自绘件的 hover 都是 on_draw 现取色板(backtop 是最后一只漏网)。修复:hover 底色改 on_draw 表达(hover 态画深主色),enter/leave 仅置状态 + schedule_paint,零 CSS 改写。**规范:运行期(mouse 回调内)禁止 set_background_color,hover/按下等交互态一律 on_draw 表达;set_background_color 只允许出现在挂载期与主题订阅回调里。**另:「点两次才生效」类报障先分清「纹丝不动」(事件层,查 press 被吞)与「闪回又弹回」(设值被在途滚动事件拉回,用 set_timeout 短延时复设兜底)两种形态,修法不同。
 - **Container 子项的挂载序 = flex 排列序 = z 序,夹层件(把手/分隔)必须严格按排列位置挂入(2026-09-19 实测入档)**:Splitter 首版把 handle 先于两栏 attach(实现中途调整挂载点位置所致),排列序变成「把手、次栏、首栏」——把手被排到容器最左缘的 8px 窄条,视觉上「中间没有分隔条」,用户视角即「拖不动 + 找不到拖动区」;事件系统本身完好(点按/拖动逻辑都在,只是把手不在用户以为的位置)。修复:严格 pane_a → handle → pane_b 的挂载顺序,并把把手视觉改为常显(中央 1px 分隔线 + 双列点纹,不依赖 hover),hover 浅灰底、拖动主题色底白点。**教训:①flex 容器的 attach 顺序绝不能当「仅影响 z 序」来调整,它同时是排列序;②可交互的自绘夹层件必须常显视觉,不能靠 hover 才现形——用户找它的方式是「看」不是「碰」;③排查此类问题用探针示例 + xwd 截图看真实渲染布局最快,布局错乱一截图就现形(xdotool 合成拖动与 GTK motion 识别不兼容,拖动类交互以真机为准)。**
 
+### 布局几何(Yoga flexbox)
+
+- **16 项几何断言真实窗口实测 16/16 全过(2026-09-11,Ubuntu 24.04 + X11 + XFCE 4.18 实测入档)**:布局系统内置 16 项几何断言(flex 平分、gap 间距、百分比宽、justify/align 居中、min-width 托底、absolute 定位),真实窗口实测 **16/16 全过(failures=0)**,±1px 容差。叠加规律与手算一致:内容区 = 容器 − 2×padding;gap 不与 margin 叠加;百分比基准为父内容区宽。
+- **GUI 自动化经验(入档)**:坐标点击受 WM 框架偏移与窗口遮挡影响、不稳定;**键盘驱动(Tab 聚焦 + Space 激活)是触发控件的首选方式**;`xdotool key --window` 走 XSendEvent 合成事件会被 GTK 丢弃,必须用 XTEST(不带 --window)。
+
 ### MoonBit ↔ C ABI
 
 - **FuncRef+Callback 蹦床的形参个数必须与 C 函数指针原型逐位相等**(2026-09-11 实测入档)。约定:C 以 `callback(closure, args...)` 调用,MoonBit 蹦床为 `fn(f, args...)`,首参 `f` 收到的就是 closure。
