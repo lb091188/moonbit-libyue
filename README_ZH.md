@@ -64,11 +64,16 @@ Ubuntu 24.04(XFCE / GNOME / KDE) ✅ · Deepin 25 ✅ · Windows 10/11 ✅ · ma
 
 ## 开发贡献
 
-- 构建与测试:`moon check && moon test`(提交门禁:零错误零警告)
-- 新增控件:`shim/yue_mbt.cpp` 机械转换 → `shim/include/yue_mbt.h` 声明 → `yue/ffi.mbt` 加 extern → 新 `yue/*.mbt` 加类型与方法(FFI 规范见 `.agents/skills/moonbit-c-binding/`)
-- 实测踩坑一律回写 [docs/zh/adaptation.md](docs/zh/adaptation.md);发布二进制推 `bin-*` 标签,原生层变更推 `vendor-*` 标签
+欢迎参与：报平台兼容问题、补控件、补文档都算，尤其欢迎 macOS 真机测试（目前仅 CI 构建通过、无真机验证）。几条基本要求：
+
+- **提交门槛**：`moon check && moon test` 全仓零错误零警告
+- **经验入档**：实测踩坑连同修复写进 [adaptation.md](docs/zh/adaptation.md)，不留只在提交说明里
+- **小批提交**：一个内聚改动一批提交，提交信息简短
+
+新增控件、原生层发布等完整流程见 [AGENTS.md](AGENTS.md)。
 
 ## 参考
 
-- libyue 文档：<https://libyue.com/docs/latest/cpp/guides/getting_started.html>
-- Lua 绑定参考（架构对照）：github.com/yue/yue
+- [libyue 文档](https://libyue.com/docs/latest/cpp/guides/getting_started.html)
+
+- [MoonBit 文档](https://docs.moonbitlang.cn/)
