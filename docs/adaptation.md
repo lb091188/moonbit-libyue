@@ -81,6 +81,14 @@ The main AI document (repo root `AGENTS.md`, read by ZCode) pulls in this file v
 - **Two-layer root cause of SNI tray icon changes "not working" (real-machine verified on XFCE 2026-09-20)**: neither of the demo board's "switch to theme icon / switch back to image" buttons produced any visual change. (1) `set_icon_name` had already emitted the NewIcon signal, but the item still carried the program's built-in IconPixmap — the XFCE panel prioritizes **IconPixmap over IconName**, and after re-reading properties it kept painting the old pixmap; fix = clear the pixmap when setting icon_name (w=0/h=0/empty bytes) and conversely clear icon_name when setting pixmap, keeping the two mutually exclusive. (2) The SNI branch of `Tray::set_icon` was a no-op (no PNG decoding); fix = the shim gained `yue_mbt_image_read_argb32` (GdkPixbuf static frame -> the big-endian ARGB32 SNI requires, RGB padded with 0xFF alpha, row stride repacked); the MoonBit side pre-allocates `Bytes::make(w*h*4)` and passes it #borrow, and on success does set_pixmap + NewIcon — header/cpp/ffi all written in the same batch (to prevent a mangle-split recurrence). Verification: on the real machine, clicking "switch to theme icon" changed the tray to the system terminal icon, and "switch back to image icon" restored the icon.png bitmap.
 
 ---
+### Performance baseline (full MoonBit stack vs native C++; measured 2026-09-21)
+
+- **Compared**: examples/hello (`moon build --target native --release`) vs a functionally identical pure C++ libyue hello — both linked against the same vendored static library v0.15.6-mbt.12, with no shim on the C++ side (`-std=c++20 -O2 -DNDEBUG`, link flags per the prebuild.py Linux branch); the delta is the entire cost of "shim + MoonBit runtime".
+- **Methodology**: Ubuntu 24.04 XFCE (X11), same machine and session; warm starts (3 warmup rounds), 20 rounds each, medians; startup = exec to X window map (wmctrl polled by pid, ~10ms detection granularity); memory = steady-state Rss from smaps_rollup 3s after the window appears; size = final linked binary.
+- **Results**: startup 70ms vs 73ms (below detection granularity — a tie); steady-state memory 62.9MB vs 62.1MB (+0.8MB, +1.3%); binary 7.39MB vs 6.52MB (+0.87MB, +13%).
+- **Conclusion**: wrapper overhead — under 1MB of memory, startup on par, +0.9MB of binary; a MoonBit desktop app is effectively indistinguishable from native C++.
+- **Reproduction notes**: for the C++ side use headers from the same-version fork tree (nativeui) plus the prebuilt companion tree (base/build, adding `base/allocator/partition_allocator/src` as an include root); `-DNDEBUG` is required to disable DCHECK references, otherwise the link fails on `RefCountedBase::CalledOnValidSequence` (absent from the release library).
+
 ## Linux
 
 ### Distributions
