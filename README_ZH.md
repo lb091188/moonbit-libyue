@@ -59,6 +59,8 @@ let text = @yue.Signal::computed(fn() { "已点 \{clicks.get()} 次" })  // 依�
 
 Ubuntu 24.04(XFCE / GNOME / KDE) ✅ · Deepin 25 ✅ · Windows 10/11 ✅ · macOS 构建通过(CI,无真机)
 
+Windows 下,依赖本库构建的 exe 自动为 GUI 子系统,双击无控制台黑框;`moon run` 的输出经管道捕获,照常可见。
+
 ## 开发贡献
 
 欢迎参与：报平台兼容问题、补控件、补文档都算，尤其欢迎 macOS 真机测试（目前仅 CI 构建通过、无真机验证）。几条基本要求：

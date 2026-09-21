@@ -1,0 +1,144 @@
+# Windows GUI 子系统验证:三平台三件套构建后实测 exe 的 PE Subsystem,
+# 判定 yue 包 win_gui.c 的链接 pragma 路线是否让产物免挂控制台黑框。
+# 仅在 experiment/** 分支与手动触发时运行;结果自动 commit 回分支
+# (experiment/win_gui_result.md,[skip ci] 防循环),exe 与 verbose
+# 链接日志挂 artifact 供复核。机制与历史实验记录见 docs/zh/adaptation.md。
+name: experiment-win-gui
+
+on:
+  push:
+    branches:
+      - 'experiment/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 安装 moon 工具链 + python3 别名
+        shell: pwsh
+        run: |
+          iwr https://cli.moonbitlang.com/install/powershell.ps1 -useb | iex
+          echo "$env:USERPROFILE\.moon\bin" >> $env:GITHUB_PATH
+          $py = (Get-Command python).Source
+          Copy-Item $py "$env:USERPROFILE\.moon\bin\python3.exe"
+
+      # verbose 全量命令行落盘,供摘录 CStubLibrary 在链接命令中的真实位置
+      - name: 构建(MSVC 环境)
+        shell: cmd
+        run: |
+          for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath') do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
+          set YUE_MBT_SKIP_MANIFEST=1
+          python scripts\prepare.py
+          moon build --target native --release --strip --verbose 1> build_verbose.log 2>&1
+          echo BUILD_EXIT=%ERRORLEVEL%
+
+      - name: 读 PE 子系统并出判定
+        shell: python
+        run: |
+          import os, struct, sys
+          for stream in (sys.stdout, sys.stderr):
+              try:
+                  stream.reconfigure(encoding="utf-8", errors="replace")
+              except (AttributeError, OSError):
+                  pass
+          names = ["hello", "hello-themed", "showcase"]
+          rows = []
+          for name in names:
+              p = f"_build/native/release/build/examples/{name}/{name}.exe"
+              if not os.path.exists(p):
+                  rows.append((name, "MISSING(产物缺失,多半链接失败)"))
+                  continue
+              data = open(p, "rb").read()
+              pe = struct.unpack_from("<I", data, 0x3C)[0]
+              opt = pe + 4 + 20
+              magic = struct.unpack_from("<H", data, opt)[0]
+              assert magic in (0x10B, 0x20B), f"{p}: 非 PE32+ (magic={magic:#x})"
+              sub = struct.unpack_from("<H", data, opt + 68)[0]
+              label = {2: "GUI(2)", 3: "CONSOLE(3)"}.get(sub, f"未知({sub})")
+              rows.append((name, label))
+              print(f"{name}: {label}")
+          all_gui = all(label.startswith("GUI") for _, label in rows)
+          if all_gui:
+              print("判定:三 exe 全 GUI(2),yue 包 win_gui.c 路线生效")
+          else:
+              print("判定:存在非 GUI 产物,yue 包 win_gui.c 路线未完全生效")
+          lines = []
+          lines.append("# Windows GUI 子系统验证结果")
+          lines.append("")
+          lines.append(f"- run: {os.environ.get('GITHUB_SERVER_URL','')}/{os.environ.get('GITHUB_REPOSITORY','')}/actions/runs/{os.environ.get('GITHUB_RUN_ID','')}")
+          lines.append("")
+          lines.append("| 例子 | PE Subsystem |")
+          lines.append("|---|---|")
+          for name, label in rows:
+              lines.append(f"| {name} | {label} |")
+          lines.append("")
+          # verbose 日志摘录:链接命令行里 stub 库与 /subsystem:console 的真实位置
+          log = "build_verbose.log"
+          if os.path.exists(log):
+              text = open(log, encoding="utf-8", errors="replace").read()
+              hits = []
+              for needle in ("/subsystem:console", "win_gui", "/SUBSYSTEM", "/ENTRY"):
+                  start = 0
+                  while True:
+                      i = text.find(needle, start)
+                      if i < 0:
+                          break
+                      lo, hi = max(0, i - 400), min(len(text), i + 400)
+                      frag = text[lo:hi].replace("\r", " ").replace("\n", " ")
+                      if frag not in hits:
+                          hits.append(frag)
+                      start = i + 1
+                      if len(hits) >= 8:
+                          break
+                  if len(hits) >= 8:
+                      break
+              lines.append("## 链接命令行摘录(围绕 /subsystem 与 win_gui 各取窗口)")
+              lines.append("")
+              for h in hits:
+                  lines.append("```")
+                  lines.append(h)
+                  lines.append("```")
+          else:
+              lines.append("(build_verbose.log 不存在)")
+          os.makedirs("experiment", exist_ok=True)
+          open("experiment/win_gui_result.md", "w", encoding="utf-8").write("\n".join(lines) + "\n")
+          # 判定门槛:官方建议原味生效才算绿
+          sys.exit(0 if all_gui else 1)
+
+      - name: 收集 exe 与 verbose 日志
+        if: always()
+        shell: python
+        run: |
+          import os, shutil
+          stage = "probe-artifacts"
+          os.makedirs(stage, exist_ok=True)
+          for name in ["hello", "hello-themed", "showcase"]:
+              p = f"_build/native/release/build/examples/{name}/{name}.exe"
+              if os.path.exists(p):
+                  shutil.copy2(p, os.path.join(stage, f"{name}.exe"))
+          if os.path.exists("build_verbose.log"):
+              shutil.copy2("build_verbose.log", os.path.join(stage, "build_verbose.log"))
+          print(sorted(os.listdir(stage)))
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: win-gui-probe
+          path: probe-artifacts/
+          retention-days: 7
+
+      - name: 回填实测结果([skip ci] 防循环)
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add experiment/win_gui_result.md
+          git commit -m "【实验】Windows GUI pragma 实测结果自动回填 [skip ci]" || echo "无新结果可提交"
+          git push origin HEAD:"${{ github.ref_name }}"
