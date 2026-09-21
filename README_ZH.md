@@ -51,7 +51,7 @@ let text = @yue.Signal::computed(fn() { "已点 \{clicks.get()} 次" })  // 依�
 | [tutorial.md](docs/zh/tutorial.md) | 五分钟上手:从 `moon new` 到窗口跑起来,避开三个新手坑 |
 | [declarative.md](docs/zh/declarative.md) | 声明式 `Node`/`mount` 渲染树 + `Store` 响应式绑定 |
 | [layout.md](docs/zh/layout.md) | 布局样式键全集(Yoga flexbox) |
-| [components-ui.md](docs/zh/components-ui.md) | 主题组件库 API 一览 + 定制主题/深浅切换 |
+| [components-ui.md](docs/zh/components-ui.md) | 主题组件库速查:逐 API 签名 + 参数表,含定制主题/深浅切换 |
 | [components.md](docs/zh/components.md) | 控件 API 速查:经典 setter 与 `X::make` props 两种写法 |
 | [排错与专题](docs/zh/README.md) | 平台适配经验 · Linux 托盘 · 原生层重链(三篇独立文档) |
 

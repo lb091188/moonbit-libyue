@@ -126,7 +126,7 @@ moon run .
 @yue.theme_apply({ ..@yue.default_theme(), primary: "#1E4FA3" })
 ```
 
-改主色、圆角、暗色等定制项见 [components-ui.md](components-ui.md) 的「定制主题」；把 `label`/`button` 换成组件库主题件（`label_t`/`button_t`）也在该文档。
+改主色、圆角、暗色等定制项见 [components-ui.md](components-ui.md) 的「主题」节；把 `label`/`button` 换成组件库主题件（`label_t`/`button_t`）也在该文档。
 
 **想照着抄**——演示板就是素材库：
 

@@ -1,14 +1,37 @@
-# UI Component Library (`yue/components.mbt`)
+# Themed Component Library Quick Reference
 
-Element-Plus-style, theme-unified non-form components built in pure MoonBit on top of the declarative layer — zero platform code. Together with the themed controls (`label_t` / `button_t` / `entry_t`) they form the recommended way to build modern desktop app shells (sidebar navigation + top bar + scrolling content), as seen in `examples/showcase`.
+The component library (`yue/components.mbt`, plus the themed entry points in `icons.mbt` / `overlays.mbt` / `splitter.mbt`) is built in pure MoonBit on top of the declarative layer — Element-Plus style, zero platform code. Every function is called via `@yue` and returns a `Node` that goes straight into the render tree; they are all props-style one-shot calls, with no classic setter form (native control quick reference: [components.md](components.md)). Reactive `Store` / `Signal` parameters are covered in [declarative.md](declarative.md).
 
-**Theme**: all colors come from the `theme_*` palette — a deep, low-saturation scheme (not Element Plus defaults): blue `#2D68C4`, green `#2E9E5B`, orange `#D9822B`, red `#D64550`, plus greys for text/border/fill. Components render straight corners, use background colors for hover/active states, and center text vertically.
+Full demo: `examples/showcase`.
 
-### Customizing the theme / dark mode
+## Theme
 
-Call `theme_apply` at any time after `initialize()` (built-in palettes: `default_theme` light / `dark_theme` dark). Switching takes effect immediately without rebuilding the UI: self-drawn components repaint via theme subscriptions, colors fixed at mount (container backgrounds, label text colors) are re-applied internally, the Linux native-control CSS (entries/text views/scrollbars/window & popover backgrounds) is rebuilt, and every visible window gets a full repaint as a safety net. To follow the system dark mode: `system_prefers_dark()` reads the system preference and `on_system_theme_change(f)` fires when it changes (both currently implemented on Linux only) — pick the initial theme from the system preference and re-apply inside the callback. Focus rings and focused field borders use a neutral grey single stroke (not the theme color) to stay unobtrusive.
+All colors come from the theme palette — a deep, low-saturation scheme: blue `#2D68C4`, green `#2E9E5B`, orange `#D9822B`, red `#D64550`, plus greys for text / border / fill. Components render straight corners, use background colors for hover/active states, and center text vertically.
 
-**Colors are fully internalized — zero burden on consumers**: every component in the library (including the plain `label()`, which defaults to the theme's regular text color) follows the theme out of the box. Custom components hook in via three rules, with the platform pitfalls already encapsulated:
+### Switching and customization
+
+| API | Purpose |
+|---|---|
+| `default_theme()` / `dark_theme()` | built-in light / dark themes, return a `Theme` |
+| `theme_current()` | read the current theme snapshot |
+| `theme_apply(t)` | apply a theme: mounted components re-color immediately, and the Linux native-control CSS (entries / text views / scrollbars / window & popover backgrounds) is rebuilt — no UI rebuild needed |
+| `on_theme_change(f)` | subscribe to theme changes (registered at mount for re-applying colors fixed at mount; subscriptions live for the app's lifetime, no unsubscribe) |
+| `system_prefers_dark()` | read the system light/dark preference (currently implemented on Linux only) |
+| `on_system_theme_change(f)` | fires when the system preference changes (currently implemented on Linux only) |
+
+`Theme` fields: `primary` / `primary_light` / `primary_hover`; semantic colors `success` / `warning` / `danger` / `info` (each with a `_light` variant) plus `danger_hover`; text `text_primary` / `text_regular` / `text_secondary`; `border`; `fill_hover` / `fill_zebra`; backgrounds `bg_page` (page) / `bg_panel` (panel). Customizing means editing the palette and applying it wholesale:
+
+```moonbit
+@yue.initialize()
+let t = @yue.default_theme()
+@yue.theme_apply({ ..t, primary: "#1E4FA3", primary_light: "#E3EDFA" })
+```
+
+Following the system: pick the initial theme from `system_prefers_dark()`, and re-read and re-apply inside the `on_system_theme_change` callback. Focus rings and focused field borders use a neutral grey single stroke (not the theme color).
+
+### Hooking custom components into the theme
+
+Every component in the library (including the plain `label()`, which defaults to the theme's regular text color) follows the theme out of the box — zero color burden on consumers. Custom components follow three rules, with the platform pitfalls already encapsulated:
 
 | Case | How |
 |---|---|
@@ -18,89 +41,348 @@ Call `theme_apply` at any time after `initialize()` (built-in palettes: `default
 
 Fixed colors (brand swatches etc.) can be set directly and stay theme-independent.
 
-```moonbit
-@yue.initialize()
-let t = @yue.default_theme()
-@yue.theme_apply({ ..t, primary: "#1E4FA3", primary_light: "#E3EDFA" })
-```
+## Buttons and text
 
-## Themed controls
+### Themed button button_t
 
-| API | Variants / roles | Notes |
-|---|---|---|
-| `button_t(text, on_click?, variant?)` | `Solid` / `Soft` / `Text` / `Danger` | self-drawn, hover stays within the theme (Solid/Danger darken, Soft goes solid white, Text grey fill) |
-| `label_t(text, role?, style?, style_str?, handle?)` | `Title` / `Section` / `Body` / `Secondary` / `Accent` | font size+color by role, left-aligned, accepts layout styles and a handle callback |
-| `entry_t(text?, password?, on_input?)` | normal / password | font themed only (GTK Entry `SetColor` paints the whole input dark — see adaptation.md) |
-| `input_t(text?, password?, margin?, width?, height?, clearable?, on_input?, invalid?)` | bordered / password / clearable / invalid red border | outer self-drawn 1px border (focus turns primary), inner Entry stripped of native border & inner shadow via `set_borderless`; clearable=true shows ✕ on hover when non-empty, click to clear; on_input text-change callback; pass a Store[Bool] as invalid to turn the border danger red (light form validation) |
-| `checkbox_t(title, checked?, disabled?, on_change?)` | normal / disabled | self-drawn square check + white tick, border turns primary on hover |
-| `date_picker_t(value? : Store[DateYMD?], on_change?, width?, placeholder?, clearable?)` | date picker (EP style, fully self-drawn): input-style field; clicking opens the `calendar_t` month panel in a popover, ‹/› switch months, pick to fill and close, blur closes; clearable=true shows ✕ beside the arrow on hover when a value is set, click to clear (no on_change) |
-| `date_range_picker_t(value? : Store[DateRange], on_change?, width?, placeholder?, clearable?)` | date range (EP DateRange style, fully self-drawn): field shows "start ~ end"; the range calendar takes two clicks — first pick sets the start, second sets the end (swapped automatically if earlier) then closes and fires on_change(start, end); in-between days get a light primary fill, endpoints solid squares; clicking the field again starts a new range |
-| `time_range_picker_t(value? : Store[TimeRange], on_change?, width?, placeholder?, clearable?)` | time range: field shows "start : end" as HH:MM; popover holds start/end stepper rows (hour 0-23 / minute 0-59, backed by input_number), changes fire on_change immediately; both default to 00:00 |
-| `datetime_range_picker_t(value? : Store[DateTimeRange], on_change?, width?, placeholder?, clearable?)` | date-time range: popover = range calendar + separator + start/end time stepper rows + a "Done" button; once the date range is complete, any time change fires on_change(start date, start time, end date, end time); value type `DateTimeRange{ start : (DateYMD, TimeHM)?, end : (DateYMD, TimeHM)? }` |
-| `textarea_t(text?, width?, height?, margin?, on_input?, clearable?, invalid?)` | multi-line input: self-drawn border (focus turns theme primary) + 8px inset, inner TextEdit with native border removed; overflow scrolls per platform; clearable=true shows ✕ on hover when non-empty, click to clear (on_input receives ""); invalid adds the validation red border like input_t |
-| `divider(vertical?, spacing?)` | divider line: horizontal (default) or vertical, 1px theme border color, spacing on both sides |
-| `icon(kind, size?, color?)` | built-in vector icon: 136 kinds (arrows/file/editing/view/navigation/media/messaging/system/development/data/status, styled after Tabler/Lucide, `all_icons()` for the full list, `icon_name()` for the name), theme regular color by default, fixed color via color; `draw_icon(p, kind, cx, cy, s, color)` is the unified self-drawing entry |
-| `icon_button_t(kind, on_click?, size?, tip?)` | square icon button: hover grey fill + text brightening, Enter/Space activates; non-empty tip attaches a native tooltip; marginRight 6 for toolbar rows |
-| `slider_t(value : Store[Double], min?, max?, step?, width?, on_change?)` | self-drawn slider: light track + themed fill + square thumb, click/drag to set (step-quantized), external Store set also applies |
-| `tabs_t(pages : Array[(String, Node)], selected?)` | top tabs: active tab themed text + 2px bottom indicator, content switched via set_visible; `selected` is an index Store (internal 0 by default) |
-| `select_t(options, value : Store[String], width?, on_change?, clearable?)` | dropdown select (EP style, fully self-drawn): click to open the candidate list, hover highlight, ✓ on the current pick, click to fill and close; clearable=true shows ✕ beside the arrow on hover when a value is set, click to clear (value set to "", on_change("")); same behavior on all platforms |
-| `rate_t(value : Store[Int], max?, on_change?)` | star rating (self-drawn): filled theme color when on, outlined gray when off, hover preview, click sets stars |
-| `tooltip_t(content : Node, tip)` | wrap any node with the native tooltip; on Linux the tooltip color is pinned to dark background + white text (independent of the system theme), other platforms keep the system style |
-| `popover_t(trigger : Node, content : Node, width, height)` | popover bubble: clicking the trigger opens arbitrary Node content below it, click again to close |
-| `dropdown_menu(trigger, items, on_select, width?)` | dropdown menu: trigger field + item popover, hover highlight, click calls back the index; `"-"` in items draws a separator |
-| `carousel_t(pages : Array[Node], width?, height?, interval_ms?)` | carousel: panel sequence + side arrows + bottom dots, auto-advance every interval_ms ms (hover pauses, enabled when > 0), arrows/dots switch manually |
-| `color_picker_t(value : Store[String], colors?, width?)` | color picker (dropdown form): trigger field (current swatch + hex) opens the preset palette popover; theme outline + white check on current, click to fill; custom palette supported |
-| `calendar_t(on_pick?, value? : Store[DateYMD?])` | self-drawn month panel: ‹/› month nav + weekday row + 42-cell grid, adjacent-month days dimmed, "today" in theme primary, selected day as solid square; `DateYMD::format()` renders `YYYY-MM-DD` |
+`button_t(text, on_click?, variant? = Soft)`
+
+Self-drawn button; hover stays entirely within the theme, never handed to native styling.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| text | String | required | button text |
+| on_click | () -> Unit | no-op | click callback |
+| variant | ButtonVariant | `Soft` | `Solid` solid white text / `Soft` light fill / `Text` no fill / `Danger` danger color |
+
+Hover behavior: Solid / Danger darken, Soft goes solid white, Text gets a grey fill.
+
+### Themed label label_t
+
+`label_t(text, role? = Body, style?, style_str?, handle?)`
+
+Unified font size / color per text role, left-aligned; accepts layout styles and a handle callback.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| text | String | required | text |
+| role | TextRole | `Body` | `Title` / `Section` / `Body` / `Secondary` / `Accent` |
+| style / style_str | style key-value pairs | `[]` | see [layout.md](layout.md) |
+| handle | (Label) -> Unit | no-op | post-creation callback receiving the underlying Label |
+
+### Link link
+
+`link(text, on_click)` — theme-colored text, darkens on hover with an underline-colored bar, click callback.
+
+## Input
+
+### Themed single-line input entry_t
+
+`entry_t(text? = "", password? = false, height? = 30.0, on_input?)`
+
+Unified font and line height; the text color follows the palette through the theme channel (GTK Entry `SetColor` paints the whole input dark, so only the font is themed — see [adaptation.md](adaptation.md)).
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| password | Bool | false | password mode |
+| on_input | (String) -> Unit | no-op | content-change callback, receives the current text |
+
+### Bordered input input_t
+
+`input_t(text? = "", password? = false, margin? = 0.0, width? = 280.0, height? = 30.0, clearable? = false, on_input?, invalid? = Store::new(false))`
+
+Self-drawn 1px outer border (turns theme primary on focus) + white background, inner Entry stripped of the native border via `set_borderless`, straight corners.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| margin / width / height | Double | 0 / 280 / 30 | outer margin and size |
+| clearable | Bool | false | shows ✕ on the right on hover when non-empty; click clears |
+| invalid | Store[Bool] | false | when true the border turns danger red (light form validation), reacts to Store set |
+
+### Number input input_number
+
+`input_number(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, num_width? = 64.0)`
+
+-/+ buttons step the value, clamped to range; state lives in `Store[Double]`.
+
+### Multi-line input textarea_t
+
+`textarea_t(text? = "", width? = 280.0, height? = 110.0, margin? = 0.0, on_input?, clearable? = false, invalid? = Store::new(false))`
+
+Same pattern as input_t: self-drawn 1px border (turns theme primary on focus) + 8px inset, inner TextEdit with the native border removed; overflow scrolls per platform. clearable / invalid semantics match input_t.
+
+### Checkbox checkbox_t
+
+`checkbox_t(title, checked? = false, disabled? = false, on_change?)`
+
+Self-drawn square checkbox (replaces the native control, whose GTK hover ring clashes with the straight-corner theme): solid theme fill + white tick when checked, border turns theme primary on hover, disabled state included.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| checked | Bool | false | initial state |
+| disabled | Bool | false | disabled state |
+| on_change | (Bool) -> Unit | no-op | change callback, receives the new state |
+
+### Radio group radio_group
+
+`radio_group(options, selected : Store[String], disabled? = false)`
+
+Selected item shows a solid square + theme-colored text, unselected a hollow square; clicks are mutually exclusive (GTK native radios don't share a group, so the whole row is self-drawn).
+
+### Switch switch_t
+
+`switch_t(checked : Store[Bool], disabled? = false)` — track + knob: on = theme-blue track with the knob right, off = light-grey track with the knob left; state lives in `Store[Bool]`.
+
+### Slider slider_t
+
+`slider_t(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, width? = 0.0, on_change?)`
+
+Self-drawn: light-grey track + theme-colored fill + square thumb; click the track or drag the thumb, the value is step-quantized into `value` (external Store set works too); on_change fires on every change including during drags.
+
+## Selection
+
+### Dropdown select select_t
+
+`select_t(options, value : Store[String], width? = 200.0, on_change?, clearable? = false)`
+
+Fully self-drawn: click opens the candidate list (Popover-hosted), hover highlight, theme-colored ✓ on the current pick, click to fill and close, blur closes; same behavior on all platforms. With clearable=true, hovering a non-empty field shows ✕ beside the arrow; click clears the selection (value set to "", `on_change("")`).
+
+### Date picker date_picker_t
+
+`date_picker_t(value? : Store[DateYMD?], on_change?, width? = 200.0, placeholder? = "请选择日期", clearable? = false)`
+
+Fully self-drawn: input-style field; clicking opens the `calendar_t` month panel (Popover-hosted), pick to fill and close, blur closes; with clearable=true, hovering a set value shows ✕ beside the arrow to clear (no on_change).
+
+### Date range picker date_range_picker_t
+
+`date_range_picker_t(value? : Store[DateRange], on_change?, width? = 260.0, placeholder? = "请选择日期区间", clearable? = false)`
+
+The field shows "start ~ end"; clicking opens the range calendar — first pick sets the start, second sets the end (swapped automatically if earlier), then it closes and fires `on_change(start, end)`; in-between days get a light theme fill, endpoints solid squares; clicking the field again starts a new range. clearable clears both ends.
+
+### Time range picker time_range_picker_t
+
+`time_range_picker_t(value? : Store[TimeRange], on_change?, width? = 180.0, placeholder? = "请选择时间区间", clearable? = false)`
+
+The field shows "start : end" as HH:MM; clicking opens start/end stepper rows (hour 0-23 / minute 0-59, backed by `input_number`), every step fires `on_change(start, end)` immediately; both default to 00:00, and the popover closes on field blur.
+
+### Date-time range picker datetime_range_picker_t
+
+`datetime_range_picker_t(value? : Store[DateTimeRange], on_change?, width? = 340.0, placeholder? = "请选择日期时间区间", clearable? = false)`
+
+The field shows "start date start HH:MM ~ end date end HH:MM"; the popover is a range calendar + separator + start/end time stepper rows + a "Done" button; once the date range is complete, any time change fires `on_change(start date, start time, end date, end time)`. Value type `DateTimeRange{ start : (DateYMD, TimeHM)?, end : (DateYMD, TimeHM)? }`.
+
+### Calendar panel calendar_t
+
+`calendar_t(on_pick?, value? : Store[DateYMD?])`
+
+Fully self-drawn month panel: ‹/› month nav + weekday row + 42-cell grid, adjacent-month days dimmed, "today" in theme primary, the selected day a solid theme square; clicking a day of the current month fires on_pick and writes value. `DateYMD::format()` renders `YYYY-MM-DD`, `TimeHM::format()` renders `HH:MM`.
+
+### Color picker color_picker_t
+
+`color_picker_t(value : Store[String], colors?, width? = 200.0)`
+
+Dropdown form: the trigger field (current swatch + hex + arrow) opens the preset palette (Popover-hosted); clicking a swatch writes `value` (`"#RRGGBB"`) and closes, the selected swatch gets a theme outline + white check, blur closes; the palette is customizable (15 colors by default).
+
+### Rating rate_t
+
+`rate_t(value : Store[Int], max? = 5, on_change?)` — star sequence: filled theme color when on, outlined grey when off, hover preview, click writes `value` (0..max).
+
+## Forms
+
+### Form item form_item
+
+`form_item(label, control : Node, label_width? = 90.0, error? = Store::new(""))`
+
+Left label (grey, fixed width) + right control area, vertically centered; `error` is a validation message Store — when non-empty, danger-red text appears below the control row (row height is reserved, so appearing/disappearing errors cause no layout shift).
+
+### Form form
+
+`form(title, items : Array[Node])` — group title + a set of form items.
 
 ## Navigation
 
-| API | States covered |
-|---|---|
-| `side_menu(items, selected, width?)` | hover grey, selected light-blue + accent bar; syncs pages via `set_visible` |
-| `side_menu_sections(sections : Array[(String, Array[String])], selected, width?)` | grouped side menu: group captions (secondary small text, not clickable) + items (same rendering/selection as side_menu) |
-| `segmented(options, selected)` | selected white + primary text, hover grey |
-| `breadcrumb(items, selected)` | current dark, others clickable with hover accent |
-| `pagination(current : Store[Int], pages)` | current page solid primary, hover light-blue; ‹ › clamped |
-| `steps(items, current : Store[Int])` | done / active / todo three states with connector lines |
-| `hsplit(first, second, ratio?, min_first?, min_second?)` / `vsplit(...)` | draggable split layout (Qt QSplitter / GTK Paned counterpart): 8px self-drawn handle with an always-visible divider line + dots (no need to hunt for it), grey fill on hover, theme color + white dots while dragging, mouse capture keeps events outside the handle; ratio is the initial share, min clamps both panes |
+### Side menu side_menu
+
+`side_menu(items, selected : Store[String], width? = 180.0, icons? = [])`
+
+Hover light grey, selected theme-light-blue fill + theme-colored text + 3px left accent bar, 4px rounded corners. `icons` maps "item text → icon" (not drawn by default); `selected` is shared state — the main area subscribes to the same Store for `set_visible` page switching.
+
+### Grouped side menu side_menu_sections
+
+`side_menu_sections(sections : Array[(String, Array[String])], selected : Store[String], width? = 180.0, icons? = [], foldable? = true)`
+
+Group caption row (secondary small text + collapse arrow on the right) + group items (same rendering/selection as side_menu); with foldable=true the group can be collapsed/expanded (all expanded by default, Enter/Space works too).
+
+### Segmented control segmented
+
+`segmented(options, selected : Store[String])` — selected white fill + theme-colored text, hover grey, straight corners.
+
+### Breadcrumb breadcrumb
+
+`breadcrumb(items, selected : Store[String])` — current item dark and non-clickable, the rest grey and clickable, turning theme-colored on hover.
+
+### Pagination pagination
+
+`pagination(current : Store[Int], pages)` — ‹ page numbers ›, current page solid theme fill with white text, hover light blue, 28×28 straight corners; `current` starts at 1, clicks write straight to the source Store, ‹ › are clamped at the bounds.
+
+### Steps steps
+
+`steps(items, current : Store[Int])` — number squares (done light blue / current solid / todo grey) + text + connector lines.
+
+### Tabs tabs_t
+
+`tabs_t(pages : Array[(String, Node)], selected? : Store[Int])`
+
+Top form: tab header row (selected theme-colored text + 2px bottom indicator, darkens on hover) + content area switched via `set_visible`; `selected` is a page-index Store (internal 0 by default).
+
+## Layout and separation
+
+### Divider divider
+
+`divider(vertical? = false, spacing? = 10.0)` — horizontal (default, 1px tall, flex width) or vertical (1px wide, height follows the parent container); spacing is the margin on both sides. The color is read from the theme at mount, so it takes effect on UI rebuild.
+
+### Split panes hsplit / vsplit
+
+`hsplit(first, second, ratio? = 0.5, min_first? = 80.0, min_second? = 80.0)` (`vsplit` defaults its min values to 60)
+
+Draggable split layout (Qt QSplitter / GTK Paned counterpart): an 8px self-drawn handle with an always-visible divider line + dots (no need to hunt for it), grey fill on hover, theme color + white dots while dragging, mouse capture keeps events from being lost; ratio is the initial share, min clamps both panes.
 
 ## Data display
 
-| API | Notes |
+### Tag tag / tag_of_type
+
+`tag(text, color, height? = 24.0)` / `tag_of_type(text, t : SemanticType)`
+
+The former is a solid colored tag (custom color), the latter a light-fill tag with same-family dark text (`Primary` / `Success` / `Warning` / `Danger` / `Info`); straight corners, width adapts to the text.
+
+### Avatar avatar
+
+`avatar(letter, color, size? = 36.0)` — square solid fill with a white letter centered.
+
+### Badge badge_count / badge_dot
+
+`badge_count(count)` is a red-background white-text chip (width adapts; the semantic red is read at draw time and follows the theme); `badge_dot(color? = "")` is an 8×8 dot.
+
+### Statistic statistic
+
+`statistic(title, value : Store[String])` — large reactive number + grey title.
+
+### Linear progress progress_line
+
+`progress_line(value : Store[Double], height? = 8.0)` — light-grey track + theme-colored fill, value in 0..1, changes repaint automatically.
+
+### Descriptions descriptions
+
+`descriptions(pairs : Array[(String, String)])` — two-column grid with grey keys and dark values.
+
+### Timeline timeline
+
+`timeline(items : Array[(String, String, SemanticType)])` — color dot + vertical line on the left, title + description on the right; items are (title, description, semantic type), fixed 56px row height.
+
+### Collapse collapse
+
+`collapse(panels : Array[(String, Array[Node])])` — click the title row to toggle content visibility, panels collapse independently, only the first panel is expanded initially.
+
+### Card card
+
+`card(title, children : Array[Node], height? = 160.0)` — title bar (bold, bottom separator) + border; content starts below the title bar.
+
+### Code highlighting code_view
+
+`code_view(lines, lang? = "moonbit", font_size? = 13.0, width? = 560.0, line_numbers? = false)`
+
+One AttributedText per token (whole-range coloring), measured and drawn manually — consistent behavior on all platforms (Windows ranged font/color is an upstream defect; this approach routes around it, see [adaptation.md](adaptation.md)). lang keyword sets: moonbit / js / ts / python / rust / c / go / bash / sql (case-insensitive); line_numbers=true draws a left gutter.
+
+### Markdown rendering markdown_view
+
+`markdown_view(source, width? = 560.0)` — headings 1-6, paragraphs, **bold**, *italic*, `inline code`, link text, ordered/unordered lists, blockquotes (theme-colored bar), rules, fenced code blocks (language from the fence marker, backed by code_view); ranged fonts/colors via attributed-text range attributes, consistent across platforms, link/code colors follow the theme.
+
+### Table table_t
+
+`table_t(columns, rows : Store[Array[TableRow]], width? = 560.0, row_height? = 36.0, selection? : Store[Array[Int]], on_row_click?)`
+
+Header + zebra stripes + hover highlight + Store-driven (a set rebuilds all rows and clears the selection). Columns via `TableColumn::make(title, width, align?)` (width ≤ 0 = flexible columns sharing the remaining width). Cells are `TableCell`: `CellText` / `CellTag(text, semantic type)` / `CellColorBox(hex, name)` / `CellLines(multi-line, row auto-grows)`; `TableRow::make(string array)` builds plain rows. Without `selection` rows single-select on click; pass `selection` to enable a checkbox column (row click toggles, header select-all/clear, dash when partial, selected rows get a light-blue fill); the callback receives `(index, row)`.
+
+### Virtualized table table_v_t
+
+`table_v_t(columns, rows : Store[Array[TableRow]], width? = 560.0, height? = 360.0, row_height? = 32.0, selection? : Store[Array[Int]], on_row_click?)`
+
+The 10k+-row form of table_t: the whole surface is canvas-drawn with only visible rows painted, self-managed scrolling (wheel / drag scrollbar / keyboard), free of the native scroll container's content-height limit; cell rendering matches table_t (CellLines clamps to two lines within the row height), column/selection semantics are identical.
+
+### Tree tree
+
+`tree(root : Array[TreeNode])` — indented hierarchy + click to expand/collapse (arrow indicator when a node has children). Node type `TreeNode{ label : String, children : Array[TreeNode] }`.
+
+### Transfer transfer
+
+`transfer(left_items : Store[Array[String]], right_items : Store[Array[String]], width? = 160.0)` — two columns, click a row to select it (solid-square marker), the middle ›/‹ buttons move selected items between columns; data is driven by two Stores.
+
+## Icons
+
+136 built-in vector icons (arrows / file / editing / view / navigation / media / messaging / system / development / data / status, styled after Tabler / Lucide).
+
+| API | Purpose |
 |---|---|
-| `tag(text, color)` / `tag_of_type(text, t)` | auto width; five semantic types |
-| `avatar(letter, color, size?)` | square, white letter centered |
-| `badge_count(n)` / `badge_dot(color?)` | number chip / dot |
-| `statistic(title, value : Store[String])` | reactive big number |
-| `progress_line(value : Store[Double], height?)` | themed fill on a light track, reactive value |
-| `descriptions(pairs)` | key–value grid |
-| `timeline(items)` | colored node + connector, semantic colors |
-| `collapse(panels)` | click title to expand/collapse, independent panels |
-| `card(title, children, height?)` | header bar + separator + border |
-| `code_view(lines, lang?, font_size?, width?, line_numbers?)` | syntax highlighting; one `AttributedText` per token (whole-range coloring), measured and drawn manually — consistent on all platforms (Windows ranged font/color synced since v0.15.6-mbt.9); lang keyword sets: moonbit/js/ts/python/rust/c/go/bash/sql (case-insensitive), line_numbers=true draws a left gutter |
-| `markdown_view(source, width?)` | Markdown rendering: headings 1-6, paragraphs, **bold**, *italic*, `inline code`, link text, ordered/unordered lists, blockquotes (theme-colored bar), rules, fenced code blocks (language from the fence marker, backed by code_view); ranged fonts/colors via attributed-text range attributes, consistent across platforms, link/code colors follow the theme |
-| `table_t(columns, rows : Store[Array[TableRow]], width?, row_height?, selection?, on_row_click?)` | table: header + zebra stripes + hover highlight; columns via `TableColumn::make(title, width, align?)` (width ≤ 0 = flexible), full rebuild on Store set. Cells are `TableCell`: `CellText` / `CellTag(text, semantic type)` / `CellColorBox(hex, name)` / `CellLines(multi-line, row auto-grows)`; `TableRow::make(string array)` for plain rows. Without `selection` rows single-select on click; pass `selection : Store[Array[Int]]` for a checkbox column (row click toggles, header select-all/clear, dash when partial). Callback receives `(index, row)` |
-| `table_v_t(columns, rows : Store[Array[TableRow]], width?, height?, row_height?, selection?, on_row_click?)` | virtualized table (10k+ rows): whole surface canvas-drawn, only visible rows painted, self-managed scrolling (wheel / drag scrollbar / keyboard); same cell types and selection semantics as `table_t` (CellLines clamps to two lines per fixed row height) |
+| `icon(kind : IconKind, size? = 16.0, color? = "")` | icon node: theme regular color by default, fixed color via color |
+| `icon_button_t(kind, on_click?, size? = 28.0, tip? = "")` | square icon button: hover grey fill + text brightening, Enter/Space activates; non-empty tip attaches a native tooltip; marginRight 6 for toolbar rows |
+| `draw_icon(p : Painter, kind, cx, cy, s, color)` | unified self-drawing entry (center coordinates + edge length) |
+| `all_icons()` / `icon_name(kind)` | full list / name lookup |
 
 ## Feedback
 
-| API | States covered |
-|---|---|
-| `alert(text, t, height?)` | Success / Info / Warning / Danger banners |
-| `alert_closeable(text, t)` | with ✕ to dismiss |
-| `result(t, title, desc, children)` | big symbol + title + description + action area |
-| `empty(desc)` | placeholder block + caption |
-| `switch_t(checked : Store[Bool], disabled?)` | on / off / disabled |
-| `dialog_t(visible : Store[Bool], title, children, width?, confirm_text?, cancel_text?, on_confirm?, on_cancel?, close_on_mask?)` | in-app dialog: same-window mask (semi-transparent black, absolute relative to the mount container — mounted at the window root it covers the whole window) + centered panel (title bar with ✕ + body + right-aligned buttons); ✕/cancel/confirm auto-close after the callback; empty text hides the button; visually modal, not keyboard-modal |
-| `toast_layer(duration_ms?) -> (Node, (String, SemanticType) -> Unit)` | light toast: mount the layer node at the window root (absolute top strip, no layout space), the push function shows a semantic toast bar (panel bg + border + type icon), auto-removed after 2.6s by default, multiple bars stack top-down; call after the layer is mounted |
-| `context_menu_for(content, items : Array[(String, () -> Unit)])` | context menu: wrap any node with a native right-click menu, label "-" draws a separator; popup position converted to screen coordinates via bounds_in_screen, the menu is rebuilt on each right-click |
-| `radio_group(options, selected, disabled?)` | mutually exclusive selection |
+### Alert banners alert / alert_closeable
+
+`alert(text, t : SemanticType, height? = 40.0)` / `alert_closeable(text, t)`
+
+Light fill of the type + 4px left color bar + same-family dark text, full width; the latter adds a right-side close button that hides the whole banner.
+
+### Result result
+
+`result(t, title, desc, children : Array[Node])` — large colored symbol + title + description + custom button area.
+
+### Empty state empty
+
+`empty(desc)` — grey placeholder block + centered caption.
+
+### Dialog dialog_t
+
+`dialog_t(visible : Store[Bool], title, children : Array[Node], width? = 420.0, confirm_text? = "确定", cancel_text? = "取消", on_confirm?, on_cancel?, close_on_mask? = false)`
+
+In-app dialog: same-window mask (semi-transparent black, absolute relative to the mount container — mounted at the window root it covers the whole window) + centered panel (title bar with ✕ + body + right-aligned buttons). `visible` drives show/hide and one Node instance stays in the page tree; ✕ / cancel / confirm auto-close after the callback, empty text hides that button (both empty hides the whole row), close_on_mask=true also closes on mask clicks. Visually modal, not keyboard-modal.
+
+### Toast toast_layer
+
+`toast_layer(duration_ms? = 2600) -> (Node, (String, SemanticType) -> Unit)`
+
+Mount the layer node at the window root (absolute top strip, no layout space); the push function shows a semantic toast bar (panel background + border + type icon), auto-removed after 2.6s by default, multiple bars stack top-down; call it after the layer is mounted.
+
+### Context menu context_menu_for
+
+`context_menu_for(content : Node, items : Array[(String, () -> Unit)])` — wrap any node with a native right-click menu, label "-" draws a separator; the popup position is converted to screen coordinates via `bounds_in_screen`, and the menu is rebuilt on each right-click.
+
+## Overlays
+
+### Tooltip tooltip_t
+
+`tooltip_t(content : Node, tip)` — wrap any node with a native tooltip (system style, zero cost; use popover_t for a themed bubble). On Linux the tooltip color is pinned to a dark background with white text (independent of the system theme).
+
+### Popover popover_t
+
+`popover_t(trigger : Node, content : Node, width, height)` — clicking the trigger opens arbitrary Node content below it (Popover-hosted); click again to toggle closed.
+
+### Dropdown menu dropdown_menu
+
+`dropdown_menu(trigger : String, items, on_select : (Int) -> Unit, width? = 160.0)` — trigger text + dropdown arrow; clicking opens the item list (Popover-hosted): hover highlight, click calls back the index and closes; `"-"` in items draws a separator.
+
+### Carousel carousel_t
+
+`carousel_t(pages : Array[Node], width? = 360.0, height? = 180.0, interval_ms? = 3000)` — panel sequence + side arrows + bottom dots; with interval_ms > 0 it auto-advances every interval milliseconds (paused on hover), arrows/dots switch manually.
 
 ## Demo
 
-`moon run examples/showcase` — eleven-page showcase (Basic / Form / Events & Layout / Navigation / Data Display / Feedback + Native Widgets / Canvas & Rich Text + System Integration / Window & Web / Environment) covering the component library and all libyue capabilities:
+`moon run examples/showcase` — the full-capability demo board, one page per capability area, each page's source in its own file (`examples/showcase/pages_*.mbt`) — the best copy-paste material library; the page list is in the [documentation index](README.md) "Demo" section.
 
-![Basic](images/components-basic.png)
+![Basic components](images/components-basic.png)
 
 ![Navigation](images/components-nav.png)
 
@@ -108,7 +390,4 @@ let t = @yue.default_theme()
 
 ![Feedback](images/components-feedback.png)
 
-**Native & drawing**: the "Native Widgets" page (Entry/Slider/ProgressBar/Checkbox/Radio/ComboBox/Picker/DatePicker/TextEdit/GifPlayer/Popover) and "Canvas & Rich Text" page (container self-drawing + Painter primitives/blend modes/PNG, AttributedText range styling).
-**System capabilities**: the "System Integration" page (file dialogs / message boxes / system notifications / clipboard / timers) and "Window & Web" page (window APIs / global shortcuts / drag in & out / native context menu / embedded WebView + custom protocol) wrap libyue system pieces in the modern theme; the menu bar and system tray are attached at demo startup. Full-capability default-theme demos live in `examples/showcase`.
-
-State coordination across components goes through `Store` (subscribe / map / bind_label) or signals (`Signal`: computed with automatic dependency tracking, batch updates; pass a `sig.store()` view to component APIs taking a Store); see [docs/declarative.md](declarative.md). Chinese version: [docs/zh/components-ui.md](zh/components-ui.md).
+State coordination across components goes through `Store` (subscribe / map / bind_label) or signals (`Signal`: computed with automatic dependency tracking, batch updates; pass a `sig.store()` view to component APIs taking a Store); see [declarative.md](declarative.md). Chinese version: [docs/zh/components-ui.md](zh/components-ui.md).

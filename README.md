@@ -97,7 +97,7 @@ The showcase covers Basic / Icons / Form / Navigation / Data / Feedback / Code &
 
 | Doc | Content |
 |---|---|
-| [components-ui.md](docs/components-ui.md) | Themed component library API + theme customization |
+| [components-ui.md](docs/components-ui.md) | Themed component library quick reference: per-API signatures and parameter tables, plus theme customization |
 | [declarative.md](docs/declarative.md) | Declarative `Node`/`mount` trees + `Store` reactive bindings |
 | [components.md](docs/components.md) | Widget API quick reference: classic setters and `X::make` props styles |
 | [layout.md](docs/layout.md) | Layout style keys (Yoga flexbox) |
