@@ -75,6 +75,34 @@ jobs:
           && python scripts\prepare.py
           && moon build --target native --release --strip
 
+      # 去 Windows 黑框:moon 链接模板硬编码 /subsystem:console 且 link.exe
+      # 对重复 /SUBSYSTEM 先者优先,链接期无法覆盖——产物落地后把 PE 头
+      # OptionalHeader.Subsystem 由 CONSOLE(3) 改写为 GUI(2)(等价
+      # editbin /SUBSYSTEM:WINDOWS)。入口点已在链接期解析为
+      # mainCRTStartup,GUI 子系统下照常调用 main,无需改动。
+      - name: PE 子系统改 GUI(去黑框)
+        if: runner.os == 'Windows'
+        shell: python
+        run: |
+          import struct, sys
+          for stream in (sys.stdout, sys.stderr):
+              try:
+                  stream.reconfigure(encoding="utf-8", errors="replace")
+              except (AttributeError, OSError):
+                  pass
+          for name in ["hello", "hello-themed", "showcase"]:
+              p = f"_build/native/release/build/examples/{name}/{name}.exe"
+              data = bytearray(open(p, "rb").read())
+              pe = struct.unpack_from("<I", data, 0x3C)[0]
+              opt = pe + 4 + 20
+              assert struct.unpack_from("<H", data, opt)[0] in (0x10B, 0x20B)
+              off = opt + 68
+              cur = struct.unpack_from("<H", data, off)[0]
+              assert cur == 3, f"{p}: 预期 CONSOLE(3), 实为 {cur}"
+              struct.pack_into("<H", data, off, 2)
+              open(p, "wb").write(data)
+              print(f"{name}.exe: Subsystem CONSOLE(3) -> GUI(2)")
+
       - name: 构建
         if: runner.os != 'Windows'
         run: |
