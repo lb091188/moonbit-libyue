@@ -1,12 +1,9 @@
 import {
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/math",
+  "moonbitlang/core/env",
   "NoahLiu/moonbit-libyue/yue/traybus",
 }
-
-import {
-  "moonbitlang/core/env",
-} for "wbtest"
 
 options(
   "native-stub": ["win_gui.c"],
