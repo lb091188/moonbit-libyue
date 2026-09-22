@@ -42,6 +42,23 @@ int32_t yue_sysmon_set_priority(int32_t pid, int32_t nice) {
   (void)nice;
   return SYSMON_ERR_UNSUPPORTED;
 }
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t yue_sysmon_list_dir(moonbit_bytes_t path) {
+  (void)path;
+  return NULL;
+}
+MOONBIT_FFI_EXPORT
+int32_t yue_sysmon_statvfs(
+    moonbit_bytes_t path,
+    int64_t *out_total,
+    int64_t *out_free,
+    int64_t *out_avail) {
+  (void)path;
+  (void)out_total;
+  (void)out_free;
+  (void)out_avail;
+  return SYSMON_ERR_UNSUPPORTED;
+}
 
 #else
 
@@ -49,6 +66,7 @@ int32_t yue_sysmon_set_priority(int32_t pid, int32_t nice) {
 #include <errno.h>
 #include <signal.h>
 #include <sys/resource.h>
+#include <sys/statvfs.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -157,6 +175,71 @@ int32_t yue_sysmon_set_priority(int32_t pid, int32_t nice) {
     return 0;
   }
   return (int32_t)errno;
+}
+
+/* 列出目录条目名（跳过 . 与 ..），换行分隔；失败返回 NULL。 */
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t yue_sysmon_list_dir(moonbit_bytes_t path) {
+  DIR *d = opendir((const char *)path);
+  if (d == NULL) {
+    return NULL;
+  }
+  size_t cap = 4096;
+  size_t len = 0;
+  char *buf = (char *)malloc(cap);
+  if (buf == NULL) {
+    closedir(d);
+    return NULL;
+  }
+  struct dirent *e;
+  while ((e = readdir(d)) != NULL) {
+    const char *n = e->d_name;
+    if (n[0] == '.' && (n[1] == '\0' || (n[1] == '.' && n[2] == '\0'))) {
+      continue;
+    }
+    size_t nl = strlen(n);
+    while (len + nl + 1 > cap) {
+      size_t next = cap * 2;
+      char *grown = (char *)realloc(buf, next);
+      if (grown == NULL) {
+        free(buf);
+        closedir(d);
+        return NULL;
+      }
+      buf = grown;
+      cap = next;
+    }
+    memcpy(buf + len, n, nl);
+    len += nl;
+    buf[len++] = '\n';
+  }
+  closedir(d);
+  moonbit_bytes_t out = moonbit_make_bytes((int32_t)len, 0);
+  if (out == NULL) {
+    free(buf);
+    return NULL;
+  }
+  memcpy(out, buf, len);
+  free(buf);
+  return out;
+}
+
+/* statvfs 容量；成功写三个出参（字节）返回 0，失败返回 errno。
+   结构体跨 ABI 拆成扁平出参（f_blocks/f_bfree/f_bavail × f_frsize）。 */
+MOONBIT_FFI_EXPORT
+int32_t yue_sysmon_statvfs(
+    moonbit_bytes_t path,
+    int64_t *out_total,
+    int64_t *out_free,
+    int64_t *out_avail) {
+  struct statvfs st;
+  if (statvfs((const char *)path, &st) != 0) {
+    return (int32_t)errno;
+  }
+  *out_total = (int64_t)st.f_blocks * (int64_t)st.f_frsize;
+  *out_free = (int64_t)st.f_bfree * (int64_t)st.f_frsize;
+  *out_avail = (int64_t)st.f_bavail * (int64_t)st.f_frsize;
+  return 0;
 }
 
 #endif /* _WIN32 */

@@ -17,6 +17,15 @@ pub fn read_text_file(path : String) -> String? {
   }
 }
 
+///|
+/// 列目录条目名（跳过 . 与 ..，非空行）；失败或平台不支持返回 None。
+pub fn list_dir(path : String) -> Array[String]? {
+  match ffi_list_dir(@utf8.encode(path)) {
+    None => None
+    Some(bytes) => Some(nonempty_lines(@utf8.decode_lossy(bytes)))
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 解析原语（纯函数）
 // ---------------------------------------------------------------------------
@@ -69,6 +78,36 @@ pub fn parse_u64(s : StringView) -> Int64? {
   } else {
     None
   }
+}
+
+///|
+/// 解析有符号十进制整数（hwmon 温度等可为负的字段）。空串 / 格式非法
+/// 返回 None。
+pub fn parse_i64(s : StringView) -> Int64? {
+  let n = s.char_length()
+  let mut neg = false
+  let mut start = 0
+  if start < n && s.unsafe_get(0).to_int() == 45 {
+    neg = true
+    start = 1
+  }
+  match parse_u64(s.sub(start=start)) {
+    None => None
+    Some(v) => Some(if neg { -v } else { v })
+  }
+}
+
+///|
+/// 文本 → 非空行数组（各行去首尾空白，空行丢弃；目录枚举输出用）。
+pub fn nonempty_lines(text : String) -> Array[String] {
+  let out : Array[String] = []
+  for line in text.split("\n") {
+    let t = line.trim().to_owned()
+    if t != "" {
+      out.push(t)
+    }
+  }
+  out
 }
 
 ///|
