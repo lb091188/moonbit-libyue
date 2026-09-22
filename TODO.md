@@ -123,11 +123,11 @@
 - [ ] P1 防多开(单实例)
   - Linux:DBus claim 应用专属总线名,claim 失败即已有实例
   - Windows:命名互斥体,已存在标记即已有实例
-  - 验收:双开第二实例立即退出;XFCE / GNOME / KDE 与 Win10 / 11 真机
+  - 验收:双开第二实例先 wake_existing 唤起首实例再退出;XFCE / GNOME / KDE 与 Win10 / 11 真机
 - [ ] P2 二次启动唤起已有窗口
   - Linux:DBus——第二实例向应用总线名发消息,首实例回调并前置窗口
-  - Windows:查找窗口 + 置前;参数透传后置
-  - 验收:双开后首实例窗口置前
+  - Windows:消息窗口 WM_COPYDATA 透传命令行,标题查找置前为兜底
+  - 验收:双开后首实例窗口置前,并收到第二实例命令行参数
 - [ ] P3 开机自启动(查询 / 设置 / 取消)
   - Linux:XDG 自启动目录写 .desktop 文件(纯 MoonBit);坑:exe 绝对路径经 /proc/self/exe 需 readlink(应用侧 stub),路径含空格的 .desktop 转义
   - Windows:注册表当前用户 Run 键写值(通知 AUMID 已有写注册表先例)

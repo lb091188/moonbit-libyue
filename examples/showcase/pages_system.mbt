@@ -268,5 +268,16 @@ fn page_system(app : App) -> @yue.Node {
       ),
     )
   }
+  // 单实例:角色与唤起参数在 main 启动时采集,这里只展示
+  secs.push(
+    section(
+      "单实例与二次唤起",
+      "SingleInstance 统一 API:Linux 经 DBus 声称应用专属总线名,Windows 经命名互斥体;再启动一个本程序,新实例会唤醒本窗口后退出(最小化态恢复并置前)。",
+      [
+        @yue.bind_label(app.si_role, fn(s) { s }, style=[("marginBottom", 4.0)]),
+        @yue.bind_label(app.si_wake, fn(s) { s }),
+      ],
+    ),
+  )
   scroll_page(secs)
 }

@@ -12,6 +12,10 @@ fn is_linux() -> Bool {
 }
 
 ///|
+/// 窗口标题:单实例 Windows 兜底路径按标题查找首实例窗口,两个实例须一致
+const SHOWCASE_TITLE : String = "组件库演示板"
+
+///|
 /// 一段演示:标题 + 一句说明 + 演示区 + 分隔留白。
 /// 标题/说明走 label_t 文字角色(Section / Secondary)。
 fn section(
@@ -82,6 +86,9 @@ struct App {
   visits : @yue.Signal[String]
   ratio : @yue.Signal[Double]
   picked_lang : @yue.Signal[String]
+  // 单实例演示:本实例角色与最近一次收到的唤起参数(系统集成页展示)
+  si_role : @yue.Store[String]
+  si_wake : @yue.Store[String]
 }
 
 ///|
@@ -128,6 +135,8 @@ fn main {
       }
     }),
     picked_lang: @yue.Signal::new(""),
+    si_role: @yue.Store::new("(探测中)"),
+    si_wake: @yue.Store::new("(未收到唤起)"),
   }
   // 深浅主题:启动跟随系统,系统切换时实时联动;「切换深浅」按钮手动覆盖。
   // 主色(accent)非空时改走公式派生色板,深浅切换沿用当前主色
@@ -146,6 +155,34 @@ fn main {
   @yue.on_system_theme_change(fn() { app.dark_mode.set(@yue.system_prefers_dark()) })
   // 初始应用一次(subscribe 注册不回调):系统深浅 + 系统主色
   apply_theme()
+
+  // 单实例:首实例持有应用专属身份并监听唤起;第二实例唤醒首实例后直接
+  // 退出(不建窗口)。Windows 兜底路径按标题查找,故标题固定并登记
+  match @yue.SingleInstance::acquire("org.moonbitlibyue.Showcase") {
+    Ok(Some(si)) => {
+      app.si_role.set("首实例:已持有 org.moonbitlibyue.Showcase")
+      @yue.set_instance_window_title(SHOWCASE_TITLE)
+      si.on_activate(fn(args) {
+        app.si_wake.set("收到唤起:参数 \{args.length()} 个 [\{args.join(" ")}]")
+        app.toast_push("第二实例唤起了本窗口", @yue.Info)
+        match app.win_ref.val {
+          Some(w) => {
+            if w.is_minimized() {
+              w.restore()
+            }
+            w.activate()
+          }
+          None => ()
+        }
+      })
+    }
+    Ok(None) => {
+      // 已有实例且已向它发唤醒:本实例使命完成,不进消息循环
+      app.si_role.set("第二实例:已唤起首实例,本实例退出")
+      return
+    }
+    Err(e) => app.si_role.set("单实例不可用:\{e}(降级继续运行)")
+  }
 
   let window = @yue.mount_window(
     [
@@ -288,7 +325,7 @@ fn main {
         ),
       ]),
     ],
-    title="组件库演示板",
+    title=SHOWCASE_TITLE,
     size=Some((880.0, 720.0)),
     center=true,
     on_close=fn(_w) { @yue.quit() },
