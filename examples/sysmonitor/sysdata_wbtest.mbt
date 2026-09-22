@@ -33,6 +33,25 @@ test "parse_u64：正常 / 空 / 非数字 / 大数" {
 }
 
 ///|
+test "parse_i64：有符号解析(hwmon 负温度)" {
+  assert_eq(parse_i64("41850"), Some(41850))
+  assert_eq(parse_i64("-5000"), Some(-5000))
+  assert_eq(parse_i64("0"), Some(0))
+  assert_eq(parse_i64(""), None)
+  assert_eq(parse_i64("-"), None)
+  assert_eq(parse_i64("12a"), None)
+}
+
+///|
+test "nonempty_lines：目录枚举输出切分" {
+  let lines = nonempty_lines("hwmon0\nhwmon1\n\nhwmon2\n")
+  assert_eq(lines.length(), 3)
+  assert_eq(lines[0], "hwmon0")
+  assert_eq(lines[2], "hwmon2")
+  assert_eq(nonempty_lines("\n\n").length(), 0)
+}
+
+///|
 test "parse_double：整数 / 小数 / 负 / 前导点 / 非法" {
   assert_eq(parse_double("4500"), Some(4500.0))
   assert_eq(parse_double("4500.000"), Some(4500.0))

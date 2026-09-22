@@ -36,3 +36,18 @@ extern "c" fn ffi_clk_tck() -> Int = "yue_sysmon_clk_tck"
 ///|
 // 单调时钟秒（CLOCK_MONOTONIC）；平台不支持时恒 0。
 extern "c" fn ffi_monotonic() -> Double = "yue_sysmon_monotonic"
+
+///|
+// 列出目录条目名（跳过 . 与 ..），换行分隔；失败或平台不支持返回 None。
+#borrow(path)
+extern "c" fn ffi_list_dir(path : Bytes) -> Bytes? = "yue_sysmon_list_dir"
+
+///|
+// statvfs(path)：成功写 total/free/avail（字节）返回 0，失败返回 errno。
+#borrow(path, out_total, out_free, out_avail)
+extern "c" fn ffi_statvfs(
+  path : Bytes,
+  out_total : Ref[Int64],
+  out_free : Ref[Int64],
+  out_avail : Ref[Int64],
+) -> Int = "yue_sysmon_statvfs"

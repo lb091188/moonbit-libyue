@@ -64,14 +64,18 @@
   - /proc/[pid]/{stat,status,cmdline}:命令 / 状态(R,S,D,Z) / CPU%(差值采样) / MEM(rss)
   - ppid 构树备用
   - 验证:parse_proc_pid_stat / parse_cmdline / proc_cpu_pct / proc_children 纯函数测试(comm 含空格括号按最后 ')' 切、多线程钳制、ppid 构树);真实 /proc 全量采样测试通过;release 基准 580 进程 9.57ms/次,数据入 adaptation.md;RSS 取 stat 页数 × 页大小(与 VmRSS 等值)省第三次读取
-- [ ] S4 温度 — /sys/class/hwmon/hwmon*/(name + temp*_input/label,毫摄氏度换算)
-- [ ] S5 磁盘
+- [x] S4 温度 — /sys/class/hwmon/hwmon*/(name + temp*_input/label,毫摄氏度换算)
+  - 验证:parse_temp_input / temp_indices 纯函数测试(负温度、跳号编号、label 缺省回退);真机实测 coretemp 20 核 + Package、nvme 三传感器、acpitz、网卡温度全部合理
+- [x] S5 磁盘
   - /proc/diskstats:IO 速率
   - statvfs(应用 native-stub 提供):容量
-- [ ] S6 GPU
+  - 验证:parse_mounts / parse_diskstats / byte_rate / sector_rate 测试(伪文件系统过滤、分区行、df 口径 usage);真机实测根 LVM 487GB、/boot、/boot/efi、/data 1.9TB;mapper→dm-N→slaves 反查后并发写入实测写速率 61MB/s 正确跳动
+- [x] S6 GPU
   - sysfs 枚举显卡(/sys/bus/pci/devices 的 class=Display + vendor/device);温度走 hwmon
   - NVIDIA 利用率走 nvidia-smi 子进程(后置)
-- [ ] S7 网络 — /sys/class/net/*/statistics 的 rx/tx 速率
+  - 验证:is_display_class / vendor_name 映射测试;真机实测 NVIDIA 0x2488 枚举成功,该卡无 hwmon 温度按设计显示「—」
+- [x] S7 网络 — /sys/class/net/*/statistics 的 rx/tx 速率
+  - 验证:真机实测 lo + 6 块网卡枚举,累计字节与差值速率正常;二次采样速率有定义
 
 ### 应用自有 native-stub(examples/sysmonitor/stub/)
 
@@ -79,7 +83,8 @@
 
 - [x] F1 进程管理 — kill(pid, sig) / getpriority / setpriority;errno → Result 语义化
   - 验证:真实调用双侧走通——signal 0 探活自身 pid 返回 Ok、pid_max+1 kill 返回 ESRCH 语义化 Err、自身 nice 读/设(10 后还原);getpriority 的 nice=-1 歧义经 Ref 出参;Windows stub 同 ABI 占位运行期降级,CI 三平台不受影响
-- [ ] F2 statvfs(path) — 磁盘容量;C 侧拆结构体为扁平出参
+- [x] F2 statvfs(path) — 磁盘容量;C 侧拆结构体为扁平出参
+  - 验证:total/free/avail 三个 int64 出参跨 ABI;真机实测根/boot/efi/data 容量与 df 一致;f_bavail 口径(可用含保留块扣除)与 df Use% 对齐
 - [ ] F3 (后置)子进程执行 — spawn + 捕获 stdout 返回字符串(nvidia-smi 等)
 
 ### UI 与集成
