@@ -90,52 +90,64 @@
 - systemd 服务管理、连接级网络监控(只做网卡速率)
 - NVIDIA 之外 GPU 的专有利用率指标(温度走 hwmon 为准)
 
-## 系统集成扩容(Electron 对标)
+## 系统集成扩容(Electron 对标,Linux + Windows)
 
-桌面应用通用能力,属框架「系统集成」域(与托盘 / 通知同域),区别于 sysmonitor 的应用领域需求。落地路由三种:**纯 MoonBit** 零 C 层 / **DBus**(traybus 基建复用) / **shim**(新增 extern ABI);DBus 互操作一律真总线验证。
+桌面应用通用能力,属框架「系统集成」域(与托盘 / 通知同域),区别于 sysmonitor 的应用领域需求;macOS 暂缓。落地路由按平台:Linux = 纯 MoonBit / DBus(traybus 基建复用) / shim;Windows = 一律 shim(Win32 API)。语义归一在 MoonBit 层,使用方零平台感知。
 
 - [ ] P1 request_single_instance(name : String) -> Bool — 防多开
-  - 路由:DBus claim 总线名 org.app.<name>;claim 失败即已有实例
-  - 验收:双开第二实例返回 false;XFCE / GNOME / KDE 真机各一次
+  - Linux:DBus claim 总线名 org.app.<name>,claim 失败即已有实例
+  - Windows:CreateMutexW 命名互斥体,ERROR_ALREADY_EXISTS 即已有实例
+  - 验收:双开第二实例返回 false;XFCE / GNOME / KDE 与 Win10 / 11 真机
 - [ ] P2 on_second_instance(callback) — 二次启动唤起已有窗口
-  - 路由:DBus——第二实例向总线名发 method_call,首实例收信回调并前置窗口
-  - 验收:双开后首实例窗口置前;回调参数透传(后置)
+  - Linux:DBus——第二实例向总线名发 method_call,首实例回调并前置窗口
+  - Windows:FindWindow + SetForegroundWindow;参数透传走 WM_COPYDATA(后置)
+  - 验收:双开后首实例窗口置前
 - [ ] P3 get_autostart() -> Bool / set_autostart(enable : Bool)
-  - 路由:纯 MoonBit——读写 ~/.config/autostart/<app>.desktop(XDG 规范)
-  - 坑:Exec 需 exe 绝对路径,/proc/self/exe 是符号链接,readlink 需应用侧 stub;路径含空格的 .desktop 转义
-  - 验收:设置后重新登录拉起、取消后不拉起
+  - Linux:读写 ~/.config/autostart/<app>.desktop(XDG 规范,纯 MoonBit);坑:/proc/self/exe 是符号链接,readlink 需应用侧 stub,路径含空格的 .desktop 转义
+  - Windows:注册表 HKCU\Software\Microsoft\Windows\CurrentVersion\Run 写值(通知 AUMID 已有 HKCU 写入先例);exe 路径 GetModuleFileNameW
+  - 验收:设置后重新登录 / 重启拉起,取消后不拉起
 - [ ] P4 on_suspend / on_resume — 挂起与唤醒
-  - 路由:DBus logind——org.freedesktop.login1.Manager 的 PrepareForSleep(Boolean:true 将睡 / false 已醒)
-  - 验收:dbus-monitor 对照信号流;真机休眠 / 唤醒各触发一次
+  - Linux:DBus logind——org.freedesktop.login1.Manager 的 PrepareForSleep(Boolean)
+  - Windows:WM_POWERBROADCAST(PBT_APMSUSPEND / PBT_APMRESUMEAUTOMATIC,窗口过程 hook)
+  - 验收:dbus-monitor 对照;真机休眠 / 唤醒各触发一次
 - [ ] P5 on_lock_screen / on_unlock_screen — 锁屏与解锁
-  - 路由:DBus logind——Session 的 Lock / Unlock 信号
-  - 验收:真机锁屏 / 解锁触发;三桌面
+  - Linux:DBus logind——Session 的 Lock / Unlock 信号
+  - Windows:WTSRegisterSessionNotification(WM_WTSSESSION_CHANGE 的 WTS_SESSION_LOCK / UNLOCK)
+  - 验收:真机锁屏 / 解锁触发
 - [ ] P6 get_idle_time() -> Double — 用户空闲秒数
-  - 路由:shim ABI yue_mbt_get_idle_ms——X11 ScreenSaver 扩展 XScreenSaverQueryInfo;Wayland 后置
+  - Linux:shim ABI——X11 ScreenSaver 扩展 XScreenSaverQueryInfo;Wayland 后置
+  - Windows:shim ABI——GetLastInputInfo(结构更简单)
   - 注:active / idle 阈值判定由调用方比较,不设单独 API
-  - 验收:与 xset q 的 idle 值对照(±2s)
+  - 验收:与 xset q / 手表计时对照(±2s)
 - [ ] P7 open_url(url : String) — 默认浏览器打开
-  - 路由:shim 通用 spawn(xdg-open;Windows 走 ShellExecuteW)
-  - 验收:真机点链接开默认浏览器
+  - Linux:shim spawn xdg-open
+  - Windows:shim ShellExecuteW
+  - 验收:双平台真机开默认浏览器
 - [ ] P8 show_in_folder(path : String) — 文件管理器打开并选中
-  - 路由:DBus org.freedesktop.FileManager1 的 ShowItems(带选中);无服务时回退 xdg-open 目录
-  - 验收:打开文件管理器并选中文件;三桌面文件管理器差异记 adaptation.md
+  - Linux:DBus org.freedesktop.FileManager1 的 ShowItems;无服务时回退 xdg-open 目录
+  - Windows:explorer.exe /select,<path>(经 ShellExecuteW)
+  - 验收:双平台打开文件管理器并选中;差异记 adaptation.md
 - [ ] P9 set_keep_awake(enable : Bool) — 屏幕常亮
-  - 路由:DBus org.freedesktop.ScreenSaver 的 Inhibit / UnInhibit(Inhibit 返回 cookie,解除须带原值)
-  - 验收:启用后到达息屏时间不熄屏;禁用后恢复
+  - Linux:DBus org.freedesktop.ScreenSaver 的 Inhibit / UnInhibit(Inhibit 返回 cookie,解除须带原值)
+  - Windows:SetThreadExecutionState(启用 ES_CONTINUOUS | ES_DISPLAY_REQUIRED,解除还原 ES_CONTINUOUS)
+  - 验收:启用后到达息屏时间不熄屏,禁用恢复
 - [ ] P10 get_battery() -> BatteryInfo? — 电量(percent + charging;无电池返回 None)
-  - 路由:DBus UPower——devices/battery_BAT0 的 Percentage / State 属性
-  - 验收:与 upower -i 输出对照;台式机返回 None
+  - Linux:DBus UPower——devices/battery_BAT0 的 Percentage / State 属性
+  - Windows:GetSystemPowerStatus(ACLineStatus / BatteryLifePercent;BATTERY_FLAG_NO_BATTERY 判无电池)
+  - 验收:与 upower -i / 系统托盘电量对照;台式机返回 None
 - [ ] P11 on_power_source(callback : Bool) — 交流 / 电池切换
-  - 路由:DBus UPower 的 PropertiesChanged(OnBattery 属性)
+  - Linux:DBus UPower 的 PropertiesChanged(OnBattery 属性)
+  - Windows:WM_POWERBROADCAST + RegisterPowerSettingNotification(GUID_ACDC_POWER_SOURCE)
   - 验收:拔插电源真机触发
 - [ ] P12 is_online() -> Bool / on_connectivity_change(callback)
-  - 路由:DBus NetworkManager——State(NM_STATE_CONNECTED_GLOBAL = 70)/ StateChanged 信号
-  - 验收:断网 / 联网真机触发;与实际连通性对照
+  - Linux:DBus NetworkManager——State(NM_STATE_CONNECTED_GLOBAL = 70)/ StateChanged 信号
+  - Windows:IsNetworkAlive(sensapi,轮询);NLM COM 连接点监听后置
+  - 验收:断网 / 联网真机触发
 - [ ] P13 (后置)平台专属 — 任务栏进度(Windows ITaskbarList3)/ dock 徽标 / JumpList 最近文档
 - [ ] P14 测试与文档
-  - DBus 互操作真总线验证;XFCE / GNOME / KDE 三桌面真机复验
+  - Linux 三桌面 + Windows 10/11 真机复验;DBus 互操作真总线验证
   - components.md 中英文档;showcase「系统集成」页补演示(自启动开关 / 单实例 / 打开外部)
+- 批次策略:Linux DBus 套系先行(P1/P3-P5/P9-P11 复用 traybus),Windows 侧同 API 批量补 shim ABI + vendored 出包
 
 ## Markdown 能力升级(mizchi/markdown 编译器)
 
