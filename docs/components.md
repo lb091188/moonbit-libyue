@@ -273,8 +273,8 @@ let sep = @yue.Separator::make(Horizontal)   // or Vertical
 |---|---|---|---|
 | content | T : ViewLike | required | Content view |
 | content_size | (Double, Double)? | None | Content size; if omitted, the whole page scrolls following the content's natural height |
-| policy | (ScrollPolicy, ScrollPolicy)? | None | Scrollbar policy (horizontal, vertical): Always / Never / Automatic |
-| overlay | Bool | true | Overlay scrollbars (floating, no layout space) |
+| policy | (ScrollPolicy, ScrollPolicy)? | None | Native scrollbar policy (horizontal, vertical): Always / Never / Automatic; when passed explicitly the native scrollbar is kept |
+| overlay | Bool | true | Default: self-drawn floating slim thumb unified across the three platforms (see next section); false uses the platform's classic scrollbar |
 
 `Separator::make` parameters: `orientation : Orientation = Horizontal` (Horizontal / Vertical).
 
@@ -290,7 +290,9 @@ let sep = @yue.Separator::make(Horizontal)   // or Vertical
 
 ## Overlay Scrollbar (OverlayScroll)
 
-A declarative node that hides the platform scrollbar and overlays a self-drawn themed slim thumb on the content's right edge: appears on scroll / hover, fades out in two steps after about 1s of inactivity, draggable along the track (the native Windows scrollbar is the classic always-visible style that reserves layout space; this component unifies all three platforms on the floating form).
+The declarative `scroll()` default form (`overlay=true` with no explicit `policy`) is this component itself: it hides the platform scrollbar and overlays a self-drawn themed slim thumb on the content's right edge — appears on scroll / hover, fades out in two steps after about 1s of inactivity, draggable along the track (the native Windows scrollbar is the classic always-visible style that reserves layout space; this form unifies all three platforms). Pass `overlay=false` or an explicit `policy` to keep the platform scrollbar.
+
+Standalone use (equivalent to `scroll()` when the content is already a Node):
 
 ```moonbit
 @yue.overlay_scroll(

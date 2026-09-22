@@ -268,8 +268,8 @@ fn page_native(_app : App) -> @yue.Node {
       ],
     ),
     section(
-      "滚动区 Scroll",
-      "滚动条策略 Automatic/Always/Never 切换,验证悬浮条(空闲隐形)。",
+      "滚动区 Scroll(平台滚动条)",
+      "平台经典滚动条的 Automatic/Always/Never 策略切换(悬浮形态见基础组件页 OverlayScroll;其余页面默认悬浮细条)。",
       [
         @yue.scroll(
           @yue.vbox([
@@ -279,6 +279,7 @@ fn page_native(_app : App) -> @yue.Node {
             @yue.label_t("滚动区第四行", role=@yue.Body, style=[("padding", 8.0)]),
           ]),
           handle=fn(s) { nat_scroll.val = Some(s) },
+          overlay=false,
           style=[("height", 90.0), ("marginBottom", 8.0)],
         ),
         @yue.button("切换滚动条策略", on_click=fn() {
