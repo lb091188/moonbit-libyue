@@ -29,3 +29,17 @@ test "NLM 位掩码归一化" {
   inspect(nlm_normalize(0x440) is Online, content="true")
   inspect(nlm_normalize(0x62) is Online, content="true")
 }
+
+///|
+test "net_dispatch 去重与派发:仅变化派发,回调全部触达" {
+  // 全局态测试,末尾复位防跨测试污染
+  let seen : Array[String] = []
+  g_net_cbs.push(fn(s) { seen.push(s.to_string()) })
+  net_dispatch(Online) // 与 last(Offline)不同 → 派发
+  net_dispatch(Online) // 相同 → 去重
+  net_dispatch(Offline)
+  inspect(seen.join(" "), content="NetworkStatus::Online NetworkStatus::Offline")
+  inspect(g_net_last.val is Offline, content="true")
+  g_net_cbs.clear()
+  g_net_last.val = Offline
+}
