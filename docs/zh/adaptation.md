@@ -129,6 +129,8 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 头部 SIGNATURE 字段的 variant 签名是 "g"(u8 长度编码),按 "s" 编过不了真实总线。
 - SNI Menu 属性恒返回真实菜单对象路径,空菜单也不能回 `/`。
 - 单测自洽 ≠ 互操作通过:协议问题用 dbus-monitor 抓真总线定位,GNOME 面板侧异常看 journalctl。
+- 单实例 RequestName 必须带 flags=4(DO_NOT_QUEUE):默认 0 会排队,第二实例的防多开判定挂到首实例退出为止,语义全错。真总线实测(Ubuntu 24.04 XFCE):回复 3=他连接持有(已有实例→唤醒后退出);首实例 SIGKILL 后总线自动回收名字,新连接回复 1 即 claim 成为首实例;回复 4=本连接已持有(幂等)。完整链路(RequestName flags=4 → EXISTS → Wake('as') → RETURN)经 dbus-monitor 真总线抓包验证:Wake 到 RETURN 39µs;SIGKILL 首实例后第三实例可正常 claim。
+- 二次唤起的 Wake 分发必须插在 bus.mbt 的 Conn::handle kind==1 分支、先于 sni.mbt 的 handle_call:所有入站调用都汇进 handle_call,不拦截就落 UnknownMethod 兜底,首实例永远收不到。Wake 命名约定:接口 org.moonbitlibyue.Instance、对象路径 /org/moonbitlibyue/Instance、成员 Wake('as'=第二实例命令行,经 moonbitlang/core/env args() 透传,含 argv[0] 程序路径,使用方自行取舍)。
 
 - sysmonitor 实测(Ubuntu 24.04 XFCE X11,口径同篇首性能基准:启动中位、稳态 Rss、release 二进制):启动(exec → 窗口 map)5 轮 77/78/81/82/88ms,中位 81ms(hello 基线 70ms 是空载系统,本次系统载有 1042 进程);稳态进程页前台 1Hz 刷新 CPU 2-3%(采样 + 派生数据 + 千行表格重建 + 重绘合计约 25ms/秒),Rss 84.9MB → 100s 后 85.8MB 走平;二进制 7.72MB(hello 对照 7.03MB)。千行进程页验收达标:1053 进程全量采样 14.94ms/次(release,≈14µs/进程,每进程两次 /proc 读取),1Hz 下采样占空 1.5%。
 - 千行表格用 table_v_t 虚拟滚动(只画可见行):刷新走「数据层全量采样 → 过滤/排序派生 → rows Store set → 表格 load + schedule_paint」,不重建视图树;选择按 pid 重映射(排序每秒变化时选中不漂)。无 C++ 对照副本,「封装层 + 数据层」合计开销以上述数值直接归因,UI 绘制部分与 hello 基线同口径(持平量级)。
@@ -219,6 +221,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - Entry 无限递归案例:非 Linux 分支两函数互调栈溢出,MSVC C4717 早已告警——「逻辑必死」类警告应按错误对待。GUI「无窗口」用 `Get-Process <name> | Select MainWindowHandle` 判定;MoonBit println 管道下全缓冲,进程被杀即丢,插桩用 stderr。
 - mount_window 在 handle 回调执行后自动激活显示,消费方无需手动 activate。
 - 平台信息 / 区域 / 缩放 / 剪贴板 / 定时器 / 全局快捷键 / 全局鼠标轮询 / 画布(GDI+)实测正常。
+- 单实例消息窗口是仓内首例自有 WNDPROC/窗口类代码(此前 grep 0 命中):类名由 app_id 派生(moonbit_libyue_instance_<app_id 点换下划线>),必须建在运行 libyue 主循环的主线程;WM_COPYDATA 由 SendMessage 同步派发到 WNDPROC(不走消息队列),收端 MessageLoop::PostTask 抛回主循环再触发 MoonBit 回调,避免在对方进程的 SendMessage 栈里执行应用代码。互斥体用 Local\ 会话命名空间免提升;同进程对同名二次 CreateMutexW 会命中 ERROR_ALREADY_EXISTS,以 static 句柄守卫做幂等。【待真机验证】消息窗口在 libyue 主循环下的实际派发、SetForegroundWindow 在前台互斥下的置前成功率、旧构建混跑时标题查找兜底路径。
 
 ## macOS ❓ 未实测
 
