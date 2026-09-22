@@ -42,7 +42,7 @@
 ## 旗舰应用:examples/sysmonitor(Ubuntu 进程管理与硬件信息)
 
 - 定位:库的「表现力 + 性能」展示窗口,README 挂截图
-- 数据层纯 MoonBit 读 /proc、/sys;刷新走 set_timer;shim 只补极薄系统调用
+- 数据层纯 MoonBit 读 /proc、/sys;刷新走 set_timer;系统调用经应用自有 native-stub(不进 yue)
 
 ### 数据层(控制台输出对照 htop/free/sensors 先验证再上 UI)
 
