@@ -5272,6 +5272,13 @@ pub fn table_v_t(
       }
       let col_x : Array[Double] = []
       let col_w : Array[Double] = []
+      // 手动拖过宽度的列(含弹性列):此后退出弹性均分,按拖定的宽走,
+      // 窗口伸缩也不再摊薄——否则每次 on_draw 的 relayout_body 会把
+      // 弹性列重置回均分宽,拖动结果被当场抹掉(拖了没效果)
+      let manual : Array[Bool] = []
+      for _col in columns {
+        manual.push(false)
+      }
       let mut acc = col_x0
       for col in columns {
         let w = if col.width > 0.0 {
@@ -5294,18 +5301,27 @@ pub fn table_v_t(
 
       // 列几何随实际宽度重排:固定列保留(可能被拖宽改过的)宽度,弹性
       // 列分摊剩余宽度。拖列宽两列此消彼长守恒,与弹性列重排不冲突。
+      // 手动拖过的列(manual)视同固定列:计入 fixed_w、不参与均分,
+      // 否则每次绘制都把弹性列重置回均分宽、拖动结果被抹掉。
       fn relayout_body(bw : Double) -> Unit {
         body_w.val = bw - bar_w
         if flex_count > 0 {
           let mut fixed_w = col_x0
+          let mut flex_left = 0
           for j in 0..<col_w.length() {
-            if columns[j].width > 0.0 {
+            if columns[j].width > 0.0 || manual[j] {
               fixed_w = fixed_w + col_w[j]
+            } else {
+              flex_left = flex_left + 1
             }
           }
-          let fw = ((body_w.val - fixed_w) / flex_count.to_double()).max(0.0)
+          let fw = if flex_left > 0 {
+            ((body_w.val - fixed_w) / flex_left.to_double()).max(0.0)
+          } else {
+            0.0
+          }
           for j in 0..<col_w.length() {
-            if columns[j].width <= 0.0 {
+            if columns[j].width <= 0.0 && !manual[j] {
               col_w[j] = fw
             }
           }
@@ -5699,6 +5715,9 @@ pub fn table_v_t(
               resize_start_x.val = e.window_x
               resize_w0.val = col_w[jb]
               resize_w1.val = col_w[jb + 1]
+              // 拖过即转固定:退出弹性均分,后续绘制/窗口伸缩保留拖定宽
+              manual[jb] = true
+              manual[jb + 1] = true
               ViewLike::set_capture(cv)
               ViewLike::schedule_paint(cv)
               return true
