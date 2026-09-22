@@ -42,7 +42,7 @@ fn page_system(app : App) -> @yue.Node {
   let secs : Array[@yue.Node] = [
     section(
       "文件对话框",
-      "FileDialog 模态打开/保存,回显所选路径;配套 read/write_text_file 直读直写。",
+      "FileDialog 模态打开/保存,回显所选路径;API: read/write_text_file",
       [
         @yue.hbox([
           @yue.button_t("打开文件…", on_click=fn() {
@@ -82,7 +82,7 @@ fn page_system(app : App) -> @yue.Node {
     ),
     section(
       "消息框",
-      "原生 MessageBox(模态对话):标题/正文/按钮,响应 id 回传。",
+      "原生 MessageBox:标题/正文/按钮,响应 id 回传。",
       [
         @yue.hbox([
           @yue.button_t("询问框", on_click=fn() {
@@ -117,7 +117,7 @@ fn page_system(app : App) -> @yue.Node {
     ),
     section(
       "系统通知",
-      "提交系统通知中心;set_actions 带按钮,set_silent 静默。",
+      "提交系统通知中心;",
       [
         @yue.hbox([
           @yue.button_t("普通通知", on_click=fn() {
@@ -146,7 +146,7 @@ fn page_system(app : App) -> @yue.Node {
     ),
     section(
       "剪贴板",
-      "Clipboard 读写系统剪贴板文本;set_data 写富文本(Html);X11 下另有主选区(见下方)。",
+      "Clipboard 读写系统剪贴板文本;set_data 写富文本(Html);",
       [
         @yue.hbox([
           @yue.button_t("写入文本", on_click=fn() {
@@ -191,7 +191,7 @@ fn page_system(app : App) -> @yue.Node {
     ),
     section(
       "托盘状态",
-      "左键点击计数;Linux SNI 支持主题图标名,其他平台空操作。",
+      "左键点击计数;",
       [
         @yue.bind_label(app.tray_clicks, fn(n) { "托盘图标已被点击 \{n} 次" }),
         @yue.hbox(
@@ -230,7 +230,7 @@ fn page_system(app : App) -> @yue.Node {
     ),
     section(
       "关闭拦截",
-      "勾选后点窗口关闭被 set_should_close 拦下(演示期间请从菜单「文件→退出」或解除勾选退出)。",
+      "勾选后点窗口关闭被 set_should_close 拦下",
       [
         @yue.checkbox_t("开启关闭拦截", checked=false, on_change=fn(v) {
           app.close_veto.val = v
@@ -272,7 +272,7 @@ fn page_system(app : App) -> @yue.Node {
   secs.push(
     section(
       "单实例与二次唤起",
-      "SingleInstance 统一 API:Linux 经 DBus 声称应用专属总线名,Windows 经命名互斥体;再启动一个本程序,新实例会唤醒本窗口后退出(最小化态恢复并置前)。",
+      "再启动一个本程序,新实例会唤醒本窗口后退出。",
       [
         @yue.bind_label(app.si_role, fn(s) { s }, style=[("marginBottom", 4.0)]),
         @yue.bind_label(app.si_wake, fn(s) { s }),
@@ -304,7 +304,7 @@ fn page_system(app : App) -> @yue.Node {
   secs.push(
     section(
       "开机自启动",
-      "Autostart 统一 API:Linux 写 $XDG_CONFIG_HOME/autostart 的 .desktop(exe 路径取 /proc/self/exe),Windows 写 HKCU Run 键;macOS 暂缓。",
+      "",
       [
         @yue.hbox([
           @yue.switch_t(auto_on),
@@ -318,7 +318,7 @@ fn page_system(app : App) -> @yue.Node {
   secs.push(
     section(
       "打开外部",
-      "open_url / reveal_in_file_manager 统一入口:Linux xdg-open 与 FileManager1.ShowItems(不在线回退父目录),Windows ShellExecuteW 与 explorer /select。Ok 只表示已交给系统。",
+      "Ok 只表示已交给系统。",
       [
         @yue.hbox([
           @yue.button_t("打开 libyue.com", on_click=fn() {
@@ -399,7 +399,7 @@ fn page_system(app : App) -> @yue.Node {
   secs.push(
     section(
       "屏幕常亮与用户空闲",
-      "KeepAwake 抑制系统屏保 / 自动息屏(Linux 经抑制服务 Inhibit,Windows SetThreadExecutionState,Ok 只表示系统受理);idle_seconds 返回用户空闲秒数(Linux X11 XSS,Wayland 会话显式不支持,Windows 最后输入时间)。",
+      "KeepAwake 抑制系统屏保 / 自动息屏",
       [
         @yue.hbox([
           @yue.switch_t(ka_on),
@@ -424,14 +424,14 @@ fn page_system(app : App) -> @yue.Node {
   let unlock_n = Ref(0)
   let sleep_out : @yue.Store[String] = @yue.Store::new(
     if @yue.suspend_resume_supported() {
-      "休眠 0 次 / 唤醒 0 次(等待系统事件)"
+      "休眠 0 次 / 唤醒 0 次"
     } else {
       "当前环境无 logind,休眠事件不可用"
     },
   )
   let lock_out : @yue.Store[String] = @yue.Store::new(
     if @yue.session_lock_supported() {
-      "锁屏 0 次 / 解锁 0 次(等待系统事件)"
+      "锁屏 0 次 / 解锁 0 次"
     } else {
       "当前环境锁屏事件不可用"
     },
@@ -442,7 +442,7 @@ fn page_system(app : App) -> @yue.Node {
       @yue.Resuming => resume_n.val = resume_n.val + 1
     }
     sleep_out.set(
-      "休眠 \{suspend_n.val} 次 / 唤醒 \{resume_n.val} 次(等待系统事件)",
+      "休眠 \{suspend_n.val} 次 / 唤醒 \{resume_n.val} 次",
     )
   })
   match
@@ -452,7 +452,7 @@ fn page_system(app : App) -> @yue.Node {
         @yue.Unlocked => unlock_n.val = unlock_n.val + 1
       }
       lock_out.set(
-        "锁屏 \{lock_n.val} 次 / 解锁 \{unlock_n.val} 次(等待系统事件)",
+        "锁屏 \{lock_n.val} 次 / 解锁 \{unlock_n.val} 次",
       )
     }) {
     Ok(_) => ()
@@ -461,7 +461,7 @@ fn page_system(app : App) -> @yue.Node {
   secs.push(
     section(
       "休眠唤醒与锁屏解锁",
-      "on_suspend_resume / session_lock_watch 统一事件:Linux 走 logind(PrepareForSleep 与 Session Lock/Unlock,系统总线),Windows 走电源广播与 WTS 会话变更;锁屏工具不调 logind 的桌面收不到信号。",
+      "",
       [
         @yue.bind_label(sleep_out, fn(s) { s }, style=[("marginBottom", 4.0)]),
         @yue.bind_label(lock_out, fn(s) { s }),
@@ -484,7 +484,7 @@ fn page_system(app : App) -> @yue.Node {
           match @yue.power_source() {
             Ok(src) =>
               if src is @yue.Ac {
-                "无电池,电源:交流在线(台式机常态)"
+                "无电池,电源:交流在线"
               } else {
                 "无电池,电源:电池供电(异常:请反馈)"
               }
@@ -515,7 +515,7 @@ fn page_system(app : App) -> @yue.Node {
   secs.push(
     section(
       "电量与网络",
-      "battery_query 读电量(无电池返回 Ok(None));on_power_source_change / on_network_status_change 订阅交直流与网络变化(仅变化时派发,Linux 信号驱动 / Windows 轮询);门户劫持的网络按 Offline。",
+      "",
       [
         @yue.bind_label(power_out, fn(s) { s }, style=[("marginBottom", 4.0)]),
         @yue.bind_label(net_out, fn(s) { s }),

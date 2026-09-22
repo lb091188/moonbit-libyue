@@ -7,7 +7,7 @@ fn page_basic(app : App) -> @yue.Node {
   scroll_page([
     section(
       "主题色板(主色公式派生 + 系统主色)",
-      "选一个主色,整套色板(hover/浅底/语义色)按 HSL 公式即时派生,切换深浅沿用当前主色;「跟随系统」读系统主色调(Linux 取当前 GTK 主题的选中底色,GNOME 47+ 取强调色设置),读不到回落内置。",
+      "选一个主色,整套色板(hover/浅底/语义色)按 HSL 公式即时派生,切换深浅沿用当前主色;「跟随系统」读系统主色调,读不到回落内置。",
       [
         @yue.hbox(
           [
@@ -24,9 +24,9 @@ fn page_basic(app : App) -> @yue.Node {
         ),
         @yue.bind(app.accent.signal(), fn(s) {
           if s == "" {
-            "当前主色:内置默认(跟随深浅基准盘)"
+            "当前主色:内置默认"
           } else {
-            "当前主色:\{s}(公式派生)"
+            "当前主色:\{s}"
           }
         }, style=[("marginTop", 8.0)]),
       ],
@@ -54,11 +54,11 @@ fn page_basic(app : App) -> @yue.Node {
       "Label 文字与 Link 链接",
       "五级排版角色,字号颜色随角色;Link 主题色文字悬停下划线,最近点击信号回显。",
       [
-        @yue.label_t("标题文字(Title)", role=@yue.Title),
-        @yue.label_t("小节标题(Section)", role=@yue.Section),
-        @yue.label_t("正文文字(Body)", role=@yue.Body),
-        @yue.label_t("辅助文字(Secondary)", role=@yue.Secondary),
-        @yue.label_t("强调文字(Accent)", role=@yue.Accent),
+        @yue.label_t("标题文字(Title)", role=@yue.Title, style=[("marginTop", 8.0)]),
+        @yue.label_t("小节标题(Section)", role=@yue.Section, style=[("marginTop", 8.0)]),
+        @yue.label_t("正文文字(Body)", role=@yue.Body, style=[("marginTop", 8.0)]),
+        @yue.label_t("辅助文字(Secondary)", role=@yue.Secondary, style=[("marginTop", 8.0)]),
+        @yue.label_t("强调文字(Accent)", role=@yue.Accent, style=[("marginTop", 8.0)]),
         @yue.hbox(
           [
             @yue.link("打开文档", fn() { app.picked_lang.set("docs") }),
