@@ -3984,6 +3984,195 @@ extern "C" int32_t yue_mbt_win_reveal_file(const char *, int32_t *ok) {
 
 #endif  // 打开外部平台分支结束
 
+// ---------- 屏幕常亮与用户空闲 ----------
+
+#if defined(OS_LINUX)
+// XSS 运行期 dlopen:规避 libxss-dev 构建期依赖(运行库随桌面安装,直接
+// 链接反而引入新依赖)。XScreenSaverInfo 无头文件,按 X11 扩展标准布局
+// 本地镜像:{ Window window; int state; int kind; unsigned long
+// til_or_since; unsigned long idle; unsigned long eventMask; },64 位下
+// idle 在偏移 24;换工具链/平台时须与 scrnsaver.h 逐字段核对。
+struct XssInfoMirror {
+  unsigned long window;
+  int state;
+  int kind;
+  unsigned long til_or_since;
+  unsigned long idle;
+  unsigned long event_mask;
+};
+
+static void *g_xss_lib = nullptr;
+static void *g_x11_lib = nullptr;
+static void *(*g_x_open_display)(const char *) = nullptr;
+static int (*g_x_close_display)(void *) = nullptr;
+static unsigned long (*g_x_default_root_window)(void *) = nullptr;
+static void (*g_x_free)(void *) = nullptr;
+static void *(*g_xss_alloc_info)() = nullptr;
+static int (*g_xss_query_info)(void *, unsigned long, void *) = nullptr;
+static bool g_xss_load_tried = false;
+static bool g_xss_ready = false;
+static void *g_x_display = nullptr;  // GUI 单线程,静态缓存,失效重开
+
+static bool load_xss() {
+  if (g_xss_load_tried) {
+    return g_xss_ready;
+  }
+  g_xss_load_tried = true;
+  g_x11_lib = dlopen("libX11.so.6", RTLD_LAZY);
+  if (g_x11_lib == nullptr) {
+    g_x11_lib = dlopen("libX11.so", RTLD_LAZY);
+  }
+  g_xss_lib = dlopen("libXss.so.1", RTLD_LAZY);
+  if (g_xss_lib == nullptr) {
+    g_xss_lib = dlopen("libXss.so", RTLD_LAZY);
+  }
+  if (g_x11_lib == nullptr || g_xss_lib == nullptr) {
+    return false;
+  }
+  g_x_open_display =
+      reinterpret_cast<void *(*)(const char *)>(dlsym(g_x11_lib, "XOpenDisplay"));
+  g_x_close_display =
+      reinterpret_cast<int (*)(void *)>(dlsym(g_x11_lib, "XCloseDisplay"));
+  g_x_default_root_window = reinterpret_cast<unsigned long (*)(void *)>(
+      dlsym(g_x11_lib, "XDefaultRootWindow"));
+  g_x_free =
+      reinterpret_cast<void (*)(void *)>(dlsym(g_x11_lib, "XFree"));
+  g_xss_alloc_info =
+      reinterpret_cast<void *(*)()>(dlsym(g_xss_lib, "XScreenSaverAllocInfo"));
+  g_xss_query_info = reinterpret_cast<int (*)(void *, unsigned long, void *)>(
+      dlsym(g_xss_lib, "XScreenSaverQueryInfo"));
+  g_xss_ready = g_x_open_display != nullptr && g_x_close_display != nullptr &&
+                g_x_default_root_window != nullptr && g_x_free != nullptr &&
+                g_xss_alloc_info != nullptr && g_xss_query_info != nullptr;
+  return g_xss_ready;
+}
+
+static int xss_query_once() {
+  // 成功把 idle 毫秒写入返回值;失败返回 -1。调用方经 ok 区分语义。
+  void *info = g_xss_alloc_info();
+  if (info == nullptr) {
+    return -1;
+  }
+  int st = g_xss_query_info(g_x_display, g_x_default_root_window(g_x_display), info);
+  if (st == 0) {
+    g_x_free(info);
+    return -1;
+  }
+  unsigned long idle_ms = reinterpret_cast<XssInfoMirror *>(info)->idle;
+  g_x_free(info);
+  if (idle_ms > 0x7fffffffUL) {
+    return 0x7fffffff;
+  }
+  return static_cast<int32_t>(idle_ms);
+}
+
+extern "C" int32_t yue_mbt_idle_seconds_ms(int32_t *ok) {
+  *ok = 0;
+  // XWayland 下输入事件不进 X 服务端,idle 虚高:显式不支持而非给错数
+  if (std::getenv("WAYLAND_DISPLAY") != nullptr) {
+    return -1;
+  }
+  if (!load_xss()) {
+    return -1;
+  }
+  if (g_x_display == nullptr) {
+    g_x_display = g_x_open_display(nullptr);
+    if (g_x_display == nullptr) {
+      return -1;  // 无 X 会话(含 env -u DISPLAY)
+    }
+  }
+  int ms = xss_query_once();
+  if (ms < 0) {
+    // 显示句柄可能失效:重开一次再试
+    g_x_close_display(g_x_display);
+    g_x_display = g_x_open_display(nullptr);
+    if (g_x_display == nullptr) {
+      return -1;
+    }
+    ms = xss_query_once();
+    if (ms < 0) {
+      return -1;
+    }
+  }
+  *ok = 1;
+  return ms;
+}
+
+// Linux 常亮走 DBus 抑制服务(MoonBit 层),这两个 Win32 入口仅保证
+// 链接可解析;哨兵 -1000 = 平台不支持。
+extern "C" int32_t yue_mbt_win_keep_awake_enable(int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+extern "C" int32_t yue_mbt_win_keep_awake_restore(int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+#elif defined(OS_WIN)
+extern "C" int32_t yue_mbt_idle_seconds_ms(int32_t *ok) {
+  *ok = 0;
+  LASTINPUTINFO li = {};
+  li.cbSize = sizeof(li);
+  if (!::GetLastInputInfo(&li)) {
+    return -1;
+  }
+  ULONGLONG idle = ::GetTickCount64() - li.dwTime;
+  *ok = 1;
+  return idle > 0x7fffffffULL ? 0x7fffffff : static_cast<int32_t>(idle);
+}
+
+static UINT g_prev_exec_state = 0;
+static bool g_keep_awake_on = false;
+
+extern "C" int32_t yue_mbt_win_keep_awake_enable(int32_t *ok) {
+  *ok = 0;
+  // 返回值是调用前的执行状态(还原用);0 表示失败。须在主线程调用。
+  UINT prev = ::SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED);
+  if (prev == 0) {
+    return -1;
+  }
+  g_prev_exec_state = prev;
+  g_keep_awake_on = true;
+  *ok = 1;
+  return 0;
+}
+
+extern "C" int32_t yue_mbt_win_keep_awake_restore(int32_t *ok) {
+  *ok = 0;
+  if (!g_keep_awake_on) {
+    *ok = 1;  // 幂等:未持有视为已还原
+    return 0;
+  }
+  UINT prev = ::SetThreadExecutionState(ES_CONTINUOUS);
+  if (prev == 0) {
+    return -1;
+  }
+  g_keep_awake_on = false;
+  *ok = 1;
+  return 0;
+}
+
+#else  // macOS:暂缓
+
+extern "C" int32_t yue_mbt_idle_seconds_ms(int32_t *ok) {
+  *ok = 0;
+  return -1;
+}
+
+extern "C" int32_t yue_mbt_win_keep_awake_enable(int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+extern "C" int32_t yue_mbt_win_keep_awake_restore(int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+#endif  // 屏幕常亮平台分支结束
+
 void yue_mbt_notification_show(void *n) {
   if (auto *b = NotificationStore::get(n)) {
 #if defined(OS_WIN)

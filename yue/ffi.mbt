@@ -1857,6 +1857,24 @@ extern "c" fn ffi_open_url(url : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_open_ur
 #borrow(path, ok)
 extern "c" fn ffi_win_reveal_file(path : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_win_reveal_file"
 
+// ---------- 屏幕常亮与用户空闲（Linux XSS dlopen / Windows 输入时间与执行状态） ----------
+
+///|
+/// 用户空闲毫秒数（无 X 会话/Wayland/加载失败 ok=0）。
+#borrow(ok)
+extern "c" fn ffi_idle_seconds_ms(ok : Ref[Int]) -> Int = "yue_mbt_idle_seconds_ms"
+
+///|
+/// Windows:SetThreadExecutionState(ES_CONTINUOUS|ES_DISPLAY_REQUIRED),
+/// 必须在主线程调用。
+#borrow(ok)
+extern "c" fn ffi_win_keep_awake_enable(ok : Ref[Int]) -> Int = "yue_mbt_win_keep_awake_enable"
+
+///|
+/// Windows:还原线程执行状态(ES_CONTINUOUS)。
+#borrow(ok)
+extern "c" fn ffi_win_keep_awake_restore(ok : Ref[Int]) -> Int = "yue_mbt_win_keep_awake_restore"
+
 ///|
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，
 // FFI 边界上一律转成 C 侧期望的 UTF-8，转换成本留在库内。

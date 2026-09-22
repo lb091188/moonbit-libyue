@@ -135,6 +135,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 二次唤起的 Wake 分发必须插在 bus.mbt 的 Conn::handle kind==1 分支、先于 sni.mbt 的 handle_call:所有入站调用都汇进 handle_call,不拦截就落 UnknownMethod 兜底,首实例永远收不到。Wake 命名约定:接口 org.moonbitlibyue.Instance、对象路径 /org/moonbitlibyue/Instance、成员 Wake('as'=第二实例命令行,经 moonbitlang/core/env args() 透传,含 argv[0] 程序路径,使用方自行取舍)。
 - FileManager1(打开并选中文件)实测(XFCE):NameHasOwner 在线探测可用;ShowItems 线格式 "ass"(file URI 数组 + startup_id 空串);file URI 的百分号 hex 用大写(RFC 3986 大小写均可,大写为通行惯例),unreserved(A-Za-z0-9-._~)与 '/' 不编码,其余按 UTF-8 字节 %XX,单测锁定。服务不在线或调用失败的回退是 xdg-open 打开父目录——选中态丢失,属语义降级,使用文档须写明。
 - 外部打开类的 spawn 走 g_spawn_async(G_SPAWN_SEARCH_PATH + 输出重定向 DEV_NULL),glib 自动回收子进程无僵尸;不经 shell,argv 直传。xdg-open 对不存在路径/不可打开 URL 的行为因桌面而异,库层 Ok 只表示「已交给系统」,系统侧成败不回传。
+- 屏幕抑制(Inhibit/UnInhibit)服务名以 NameHasOwner 真实在线为准,不按环境名猜:候选表 [org.freedesktop.ScreenSaver, org.xfce.ScreenSaver],实测 Ubuntu 24.04 XFCE 仅 org.xfce.ScreenSaver 在线(xfce4-screensaver 持有),org.freedesktop.ScreenSaver 无人持有。两家接口同构:对象路径与接口名由服务名点换斜杠派生,Inhibit("ss" = 应用名 + 原因)-> u cookie,UnInhibit("u" = 原 cookie)须逐位一致(真总线抓包:Inhibit 得 cookie 1516211641,2 秒后 UnInhibit 带同值,空应答成功)。GNOME / KDE 的服务持有情况待真机补记。
 
 - sysmonitor 实测(Ubuntu 24.04 XFCE X11,口径同篇首性能基准:启动中位、稳态 Rss、release 二进制):启动(exec → 窗口 map)5 轮 77/78/81/82/88ms,中位 81ms(hello 基线 70ms 是空载系统,本次系统载有 1042 进程);稳态进程页前台 1Hz 刷新 CPU 2-3%(采样 + 派生数据 + 千行表格重建 + 重绘合计约 25ms/秒),Rss 84.9MB → 100s 后 85.8MB 走平;二进制 7.72MB(hello 对照 7.03MB)。千行进程页验收达标:1053 进程全量采样 14.94ms/次(release,≈14µs/进程,每进程两次 /proc 读取),1Hz 下采样占空 1.5%。
 - 千行表格用 table_v_t 虚拟滚动(只画可见行):刷新走「数据层全量采样 → 过滤/排序派生 → rows Store set → 表格 load + schedule_paint」,不重建视图树;选择按 pid 重映射(排序每秒变化时选中不漂)。无 C++ 对照副本,「封装层 + 数据层」合计开销以上述数值直接归因,UI 绘制部分与 hello 基线同口径(持平量级)。
@@ -162,6 +163,9 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 ### 显示协议
 
 - X11 ✅ 主链路;Wayland 未支持,验证 GUI 行为用 X11 会话(托盘 / 快捷键已按会话守卫)。
+- 用户空闲秒数走 X Screen Saver Extension(XSS)的 XScreenSaverQueryInfo,运行期 dlopen("libXss.so.1"/"libXss.so") 而非构建期链接:规避 libxss-dev 进分发链(预构建静态库随 mooncakes 分发,多一个动态依赖在消费端未必装);XScreenSaverInfo 结构极简,shim 里手写镜像结构体(idle 毫秒字段偏移 24),加载失败与无 X 同路径返回 Unsupported。
+- XWayland 会话输入事件不进 X 服务端,XSS idle 读数虚高(用户刚动过也可能读到小时级):显式探测 WAYLAND_DISPLAY 置位即返回 Unsupported,给错数不如不给;env -u DISPLAY(无 X 会话)同样 Unsupported,均不崩。数值对照实测(Ubuntu 24.04 XFCE X11):idle_seconds 与 xprintidle 同刻双读差 17ms(判据 ±2s),xdotool 模拟鼠标移动后 0.317s vs xprintidle 320ms。
+- 锁屏不算输入:XSS 的 idle 在锁屏期间持续增长(锁屏器不上报输入),「用户空闲」与「屏幕锁定」是正交维度,勿用 idle 阈值近似锁屏判定(锁屏事件走 logind,另批落地)。
 
 ### GTK 相关
 
