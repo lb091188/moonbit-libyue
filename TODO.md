@@ -47,7 +47,7 @@
 ### 数据层(控制台输出对照 htop/free/sensors 先验证再上 UI)
 
 - [ ] S0 文本读取入口
-  - yue 暴露通用 read_text_file(ffi_read_file 已有,补 pub 包装);数据层统一使用
+  - 应用 native-stub 提供 read_text_file(不进 yue:读文件非 GUI 框架职责);数据层统一使用
 - [ ] S1 CPU
   - /proc/stat:总体 + 各核两次采样差值算占用率
   - /proc/cpuinfo:型号 / 核数 / 频率
@@ -58,17 +58,19 @@
 - [ ] S4 温度 — /sys/class/hwmon/hwmon*/(name + temp*_input/label,毫摄氏度换算)
 - [ ] S5 磁盘
   - /proc/diskstats:IO 速率
-  - statvfs(shim 补):容量
+  - statvfs(应用 native-stub 提供):容量
 - [ ] S6 GPU
   - sysfs 枚举显卡(/sys/bus/pci/devices 的 class=Display + vendor/device);温度走 hwmon
   - NVIDIA 利用率走 nvidia-smi 子进程(后置)
 - [ ] S7 网络 — /sys/class/net/*/statistics 的 rx/tx 速率
 
-### shim 补充(固定流程:yue_mbt.cpp → yue_mbt.h → ffi.mbt → yue 模块)
+### 应用自有 native-stub(examples/sysmonitor/stub/,不进 yue 框架)
 
-- [ ] F1 进程管理 — kill(pid, sig) / getpriority / setpriority
-- [ ] F2 statvfs(path) — 磁盘容量
-- [ ] F3 (后置)子进程执行 — nvidia-smi 等外部工具调用
+监控应用的领域需求不是框架公共能力,经 moon.pkg 的 native-stub 编入应用包(yue 的 win_gui.c 即此机制先例);符号全在 libc 默认链接,零 shim/fork/vendored/链接参数改动。
+
+- [ ] F1 进程管理 — kill(pid, sig) / getpriority / setpriority;errno → Result 语义化
+- [ ] F2 statvfs(path) — 磁盘容量;C 侧拆结构体为扁平出参
+- [ ] F3 (后置)子进程执行 — spawn + 捕获 stdout 返回字符串(nvidia-smi 等)
 
 ### UI 与集成
 
