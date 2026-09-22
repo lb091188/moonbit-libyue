@@ -16,7 +16,7 @@ moon run examples/hello-themed  # minimal example of the themed component librar
 moon run examples/showcase      # full-capability demo board: 15 pages, three grouped sidebars, component library + system capabilities
 ```
 
-The showcase covers: Basic / Icons / Form / Navigation / Data Display / Feedback / Code & Docs / Events & Layout / Store comparison + Native widgets / Canvas & rich text + System Integration / Window / Browser / Environment & Platform, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). Each page's source is its own file (`examples/showcase/pages_*.mbt`) — the best copy-paste material library; screenshots of the component library:
+The showcase covers: Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store comparison + Native widgets / Canvas & rich text + System Integration / Window / Browser / Environment & Platform, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). Each page's source is its own file (`examples/showcase/pages_*.mbt`) — the best copy-paste material library; screenshots of the component library:
 
 ![Basic components](images/showcase-basic.png)
 
