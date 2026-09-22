@@ -60,7 +60,7 @@ Methodology: Ubuntu 24.04 XFCE (X11), same machine and session; the startup delt
 ### MoonBit ↔ C ABI
 
 - Trampolines must match the C function pointer prototype bit-for-bit, including arity: C calls `callback(closure, args...)` and the trampoline's first parameter receives the closure. Misalignment hides itself — row counts work, some callbacks fire; a callback is verified only once it has actually fired.
-- `extern "c"` must not return nullable types (segfault): report success/failure via a `Ref[Int]` out-parameter.
+- `extern "c"` returning nullable types: older toolchains segfault outright (report success/failure via a `Ref[Int]` out-parameter); on moon 0.1.20260904 + moonc v0.10.12, `-> Bytes?` works — a C-side NULL maps to None correctly, verified in both debug and release against real missing-file and directory (EISDIR) paths (sysmonitor's read_text_file). Other nullable types (handles etc.) are untested; the out-parameter pattern remains the fallback.
 - FFI pointer parameters need `#borrow` (compiler-enforced); widget parameters take the handle type `View`, never the MoonBit wrapper struct (otherwise handles are invalid at runtime and silently dropped).
 - Closures across the ABI: capture-free top-level function literals compile to real C function pointers; capturing closures use the "function pointer + closure pointer" two-parameter form.
 - Callback closures are kept alive process-wide by a registry and not reclaimed per window (negligible leak for single-window tools — settled).
@@ -123,6 +123,15 @@ Methodology: Ubuntu 24.04 XFCE (X11), same machine and session; the startup delt
 - The variant signature in the header SIGNATURE field is "g" (u8 length-encoded); encoding it as "s" passes unit tests but real buses reject it.
 - The SNI Menu property must always return the real menu object path — never `/`, even when empty.
 - Unit-test self-consistency ≠ interop: protocol issues are located with dbus-monitor on the real bus; GNOME panel-side exceptions show up in journalctl.
+
+### System monitor data layer (/proc, /sys — sysmonitor example)
+
+- /proc and /sys pseudo-files always report stat size 0 (fseek/ftell cannot learn the length): whole-file reads must loop with incremental `fread` and a doubling buffer (16MB cap); opening a directory succeeds but `fread` fails with EISDIR — detect via `ferror`. Implemented in the app's own native stub `examples/sysmonitor/stub/sysmon.c`; the MoonBit side goes through `read_text_file`.
+- An app-owned native stub may live in a subdirectory: `"native-stub": ["stub/sysmon.c"]` resolves relative to the moon.pkg directory; all symbols are within libc's default link set — zero shim / fork / vendored / link-flag changes. The test target links the stub automatically, so wbtests can read real /proc files.
+- /proc/stat column order is `user nice system idle iowait irq softirq steal guest guest_nice`: the 9th column (guest) is already folded into user/nice by the kernel — adding it double-counts. Usage = (Δtotal − Δidle − Δiowait) / Δtotal; iowait is not CPU-busy. When the sampling interval is shorter than one tick (USER_HZ, usually 10ms), Δtotal ≤ 0 and the result is 0; a zero first sample makes the first screen show the since-boot average.
+- /proc/cpuinfo model field differs by platform: x86 uses `model name`, ARM boards only have `Processor` / `Hardware` — three-level fallback; core count = number of `processor` lines (logical CPUs incl. hyperthreading, matches nproc).
+- /proc/meminfo units are always kB; `MemAvailable` only exists on kernels ≥ 3.14 — fall back to `MemFree`; used = total − available (includes reclaimable cache).
+- The `moon run` wrapper process does not forward signals to its child: smoke-testing exit behavior requires killing the built exe child process — killing only the wrapper PID leaves an orphan window.
 
 ### Display protocols
 

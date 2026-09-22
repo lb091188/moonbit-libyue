@@ -51,12 +51,15 @@
 
 ### 数据层
 
-- [ ] S0 文本读取入口
+- [x] S0 文本读取入口
   - 应用 native-stub 提供 read_text_file;数据层统一使用
-- [ ] S1 CPU
+  - 验证:examples/sysmonitor/stub/sysmon.c(子目录 native-stub,libc 默认链接零链接参数),/proc、/sys 尺寸为 0 走循环增量读;`-> Bytes?` 可空返回当前工具链实测可用(NULL→None,debug/release 双模式),已回写 adaptation.md
+- [x] S1 CPU
   - /proc/stat:总体 + 各核两次采样差值算占用率
   - /proc/cpuinfo:型号 / 核数 / 频率
-- [ ] S2 内存 — /proc/meminfo:总 / 已用 / 可用 / swap
+  - 验证:parse_proc_stat / cpu_usage / parse_cpuinfo 纯函数测试(列序含 guest 不重复计数、钳制、ARM 回退);真机 1Hz 采样冒烟(20 核各核占用实时刷新),截图亲验
+- [x] S2 内存 — /proc/meminfo:总 / 已用 / 可用 / swap
+  - 验证:parse_meminfo 测试(全字段 / MemAvailable 回退 MemFree / 缺 MemTotal 返回 None);真机读取 31.1GB 总量与 free 一致
 - [ ] S3 进程
   - /proc/[pid]/{stat,status,cmdline}:命令 / 状态(R,S,D,Z) / CPU%(差值采样) / MEM(rss)
   - ppid 构树备用
