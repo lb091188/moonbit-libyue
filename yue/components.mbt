@@ -4777,12 +4777,25 @@ pub fn table_t(
         )
         match content {
           CellText(text) => {
-            let l = Label::new(text)
-            ViewLike::set_font(l, fnt)
-            bind_fg(l, color_of)
-            l.set_align(col.align)
-            ViewLike::set_style(l, "flex", 1.0)
-            wrap.add_child(l)
+            // 自绘单行省略:Label 无 ellipsize 能力(fork 未暴露),
+            // 超宽长文本被平台排版换行穿透行高;draw 走 wrap=false +
+            // ellipsis=true 单行截断(与 table_v_t 单元格同模型),
+            // 拖列宽/行重建后按当前宽度重截,主题切换随重绘取新色
+            wrap.on_draw(fn(p) {
+              let b = ViewLike::get_bounds(wrap)
+              let at = AttributedText::new_with(
+                text,
+                {
+                  align: col.align,
+                  valign: Center,
+                  wrap: false,
+                  ellipsis: true,
+                  font: Some(fnt),
+                  color: Some(color_of()),
+                },
+              )
+              p.draw_attributed_text(at, 12.0, 0.0, b.width - 24.0, b.height)
+            })
           }
           CellTag(text, t) => {
             let probe = AttributedText::new(text, wrap=false)
