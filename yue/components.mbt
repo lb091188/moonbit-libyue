@@ -4594,11 +4594,11 @@ fn draw_sort_hint(p : Painter, cx : Double, cy : Double) -> Unit {
   p.line_to(cx, cy - 5.0)
   p.close_path()
   p.fill()
-  // 下三角(中心 cy+3)
+  // 下三角(中心 cy+3):底边在上、顶点朝下
   p.begin_path()
-  p.move_to(cx - 3.5, cy + 5.5)
-  p.line_to(cx + 3.5, cy + 5.5)
-  p.line_to(cx, cy + 1.0)
+  p.move_to(cx - 3.5, cy + 1.0)
+  p.line_to(cx + 3.5, cy + 1.0)
+  p.line_to(cx, cy + 5.5)
   p.close_path()
   p.fill()
 }
