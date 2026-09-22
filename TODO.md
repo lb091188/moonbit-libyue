@@ -1,23 +1,23 @@
-# 路线图:Chart 组件与系统监控旗舰应用
+# 路线图
 
 状态:`[x]` 完成 · `[~]` 部分(括号内是缺口) · `[ ]` 未开始;做完勾掉并注明验证方式。
 
-## 遗留(对照 libyue C++ 文档:5 指南 + 55 组件 + 59 结构体已收尾)
+## 遗留
 
-- [ ] [FAQ](https://libyue.com/docs/latest/cpp/guides/faq.html) — 迁移唯一未做指南
 - [~] 通知回调 — reply(OS_MAC)留平台目标
 - [~] 缓办:Display 全字段枚举、mac 专属(Accelerator 类/Tray 原生后端等)
 - [ ] 可关闭页签(chrome 式动态增删)— tabs_t API 形态重构(动态页数组 + Store 驱动),独立批次做
-- 平台:macOS 放弃(无设备);Windows 富文本/markdown 观感待真机复验(记录在 adaptation.md)
+- 平台:macOS 暂缓(无设备);Windows 富文本/markdown 观感待真机复验(记录在 adaptation.md)
 
 ## Chart 图表组件(主题组件库扩容,监控应用的需求内核)
 
-自绘路线(整面 canvas + Painter + Store 驱动,table_v_t/slider_t 同套路),进 components-ui 文档与 showcase「数据展示」页。
-
-- [ ] C1 折线/面积图核心 — line_chart_t:定长滚动窗口(max_points,超出丢最旧),折线 + 面积半透明填充,主题色 primary;Store 驱动推点自动重绘(仅画布,不重建视图树)
-- [ ] C2 多序列与坐标 — 多序列各配色;y 轴自适应(窗口 min/max + 留白)或手动范围;横向网格线 + 最新值右端标注
-- [ ] C3 高频更新实测 — set_timer 1~2Hz 推点:不闪烁、不整树重排;千点级窗口流畅(数据入 adaptation.md)
-- [ ] C4 演示与文档 — showcase「数据展示」页实时曲线(set_timer 模拟数据);components-ui 中英文档;真机视觉复验(用户执行)
+- [ ] C1 line_chart_t 折线/面积图 — 定长滚动窗口(max_points,超出丢最旧)、面积半透明填充可选、多序列(≤4,主题色系)、y 轴自适应(窗口 min/max + 留白)或手动范围、横向网格 + 最新值右端标注。验收:1000 点 × 4 序列 2Hz 推点单帧重绘 <5ms(仅画布重绘,不重建视图树)、10Hz 无闪烁、连续推点 10 分钟内存增量 <5MB
+- [ ] C2 bar_chart_t 柱状/条形图 — 纵向柱与横向条两形态、类目轴/数值轴、正负值基线、hover 高亮 + 行内数值标注(Painter 自绘,不走弹层)。验收:200 类目全量重绘 <3ms,hover 移动只重绘画布
+- [ ] C3 donut_chart_t 环形/饼图 — 占比扇区 + 中心汇总数值、图例、hover 扇区外扩。验收:50 扇区重绘 <3ms
+- [ ] C4 gauge_t 仪表盘 — 单值百分比环 + 中心大数字、阈值分段着色、数值插值平滑(非动画帧驱动)。验收:2Hz 更新无跳变
+- [ ] C5 scatter_t 散点图 — x/y 点列、最小二乘趋势线可选、框选缩放(后置)。验收:10000 点首绘 <30ms、缩放重绘 <10ms
+- [ ] C6 测试 — 数据窗口/坐标换算/刻度算法纯函数白盒测试;重绘耗时基准用例(release 计时);高频推点长跑内存平稳;数据入 adaptation.md
+- [ ] C7 演示与文档 — showcase「数据展示」页:各图型一屏 + set_timer 模拟数据的实时曲线;components-ui 中英文档(签名 + 参数表);真机视觉复验(用户执行)
 
 ## 旗舰应用:examples/sysmonitor(Ubuntu 进程管理与硬件信息)
 
