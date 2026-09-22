@@ -92,36 +92,49 @@
 
 ## 系统集成扩容(Electron 对标)
 
-桌面应用通用能力,属框架「系统集成」域(与托盘/通知同域),区别于 sysmonitor 的应用领域需求;DBus 系全部复用 traybus 基建,纯 MoonBit 扩容。
+桌面应用通用能力,属框架「系统集成」域(与托盘 / 通知同域),区别于 sysmonitor 的应用领域需求。落地路由三种:**纯 MoonBit** 零 C 层 / **DBus**(traybus 基建复用) / **shim**(新增 extern ABI);DBus 互操作一律真总线验证。
 
-- [ ] P1 单实例锁
-  - 功能:防多开;二次启动唤起已有窗口后退出
-  - 落地:DBus claim 总线名(traybus 基建复用)或文件锁
-  - 验收:双开第二实例自动退出并唤起首实例;XFCE / GNOME / KDE 真机各一次
-- [ ] P2 开机自启动
-  - 功能:查询 / 设置 / 取消自启动
-  - 落地:写 ~/.config/autostart/*.desktop(纯 MoonBit,零 C 层)
-  - 验收:设置后重新登录自动拉起,取消后不拉起
-- [ ] P3 电源与会话事件
-  - 功能:挂起 / 唤醒、锁屏 / 解锁事件回调
-  - 落地:logind DBus 信号(PrepareForSleep / Lock / Unlock)
-  - 验收:dbus-monitor 对照事件流;真机休眠唤醒、锁屏解锁各触发一次
-- [ ] P4 空闲查询
-  - 功能:get_idle_time(用户无输入秒数)+ 阈值状态
-  - 落地:X11 ScreenSaver 扩展(需 shim ABI);Wayland 后置
-  - 验收:空闲计时与 xset q 对照(±2s)
-- [ ] P5 打开外部
-  - 功能:默认浏览器开 URL / 文件管理器打开并定位文件
-  - 落地:shim 补通用 spawn(xdg-open;Windows 走 ShellExecute)
-  - 验收:真机点链接开默认浏览器、定位按钮打开文件管理器
-- [ ] P6 (中频)屏幕常亮 / 电量 / 网络在线
-  - 屏幕常亮:org.freedesktop.ScreenSaver 的 Inhibit(视频播放场景)
-  - 电量:UPower DBus(百分比 + 充电状态)
-  - 网络:NetworkManager State 信号
-- [ ] P7 (后置)平台专属
-  - 任务栏进度(Windows ITaskbarList3)、dock 徽标、JumpList 最近文档
-- [ ] P8 测试与文档
-  - DBus 互操作上真总线验证;XFCE / GNOME / KDE 三桌面真机复验
+- [ ] P1 request_single_instance(name : String) -> Bool — 防多开
+  - 路由:DBus claim 总线名 org.app.<name>;claim 失败即已有实例
+  - 验收:双开第二实例返回 false;XFCE / GNOME / KDE 真机各一次
+- [ ] P2 on_second_instance(callback) — 二次启动唤起已有窗口
+  - 路由:DBus——第二实例向总线名发 method_call,首实例收信回调并前置窗口
+  - 验收:双开后首实例窗口置前;回调参数透传(后置)
+- [ ] P3 get_autostart() -> Bool / set_autostart(enable : Bool)
+  - 路由:纯 MoonBit——读写 ~/.config/autostart/<app>.desktop(XDG 规范)
+  - 坑:Exec 需 exe 绝对路径,/proc/self/exe 是符号链接,readlink 需应用侧 stub;路径含空格的 .desktop 转义
+  - 验收:设置后重新登录拉起、取消后不拉起
+- [ ] P4 on_suspend / on_resume — 挂起与唤醒
+  - 路由:DBus logind——org.freedesktop.login1.Manager 的 PrepareForSleep(Boolean:true 将睡 / false 已醒)
+  - 验收:dbus-monitor 对照信号流;真机休眠 / 唤醒各触发一次
+- [ ] P5 on_lock_screen / on_unlock_screen — 锁屏与解锁
+  - 路由:DBus logind——Session 的 Lock / Unlock 信号
+  - 验收:真机锁屏 / 解锁触发;三桌面
+- [ ] P6 get_idle_time() -> Double — 用户空闲秒数
+  - 路由:shim ABI yue_mbt_get_idle_ms——X11 ScreenSaver 扩展 XScreenSaverQueryInfo;Wayland 后置
+  - 注:active / idle 阈值判定由调用方比较,不设单独 API
+  - 验收:与 xset q 的 idle 值对照(±2s)
+- [ ] P7 open_url(url : String) — 默认浏览器打开
+  - 路由:shim 通用 spawn(xdg-open;Windows 走 ShellExecuteW)
+  - 验收:真机点链接开默认浏览器
+- [ ] P8 show_in_folder(path : String) — 文件管理器打开并选中
+  - 路由:DBus org.freedesktop.FileManager1 的 ShowItems(带选中);无服务时回退 xdg-open 目录
+  - 验收:打开文件管理器并选中文件;三桌面文件管理器差异记 adaptation.md
+- [ ] P9 set_keep_awake(enable : Bool) — 屏幕常亮
+  - 路由:DBus org.freedesktop.ScreenSaver 的 Inhibit / UnInhibit(Inhibit 返回 cookie,解除须带原值)
+  - 验收:启用后到达息屏时间不熄屏;禁用后恢复
+- [ ] P10 get_battery() -> BatteryInfo? — 电量(percent + charging;无电池返回 None)
+  - 路由:DBus UPower——devices/battery_BAT0 的 Percentage / State 属性
+  - 验收:与 upower -i 输出对照;台式机返回 None
+- [ ] P11 on_power_source(callback : Bool) — 交流 / 电池切换
+  - 路由:DBus UPower 的 PropertiesChanged(OnBattery 属性)
+  - 验收:拔插电源真机触发
+- [ ] P12 is_online() -> Bool / on_connectivity_change(callback)
+  - 路由:DBus NetworkManager——State(NM_STATE_CONNECTED_GLOBAL = 70)/ StateChanged 信号
+  - 验收:断网 / 联网真机触发;与实际连通性对照
+- [ ] P13 (后置)平台专属 — 任务栏进度(Windows ITaskbarList3)/ dock 徽标 / JumpList 最近文档
+- [ ] P14 测试与文档
+  - DBus 互操作真总线验证;XFCE / GNOME / KDE 三桌面真机复验
   - components.md 中英文档;showcase「系统集成」页补演示(自启动开关 / 单实例 / 打开外部)
 
 ## Markdown 能力升级(mizchi/markdown 编译器)
