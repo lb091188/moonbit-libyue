@@ -8,12 +8,13 @@ Never touched MoonBit? Start from the [five-minute tutorial](tutorial.md) — le
 
 ## Demo
 
-Three examples, from shallow to deep:
+Four examples, from shallow to deep:
 
 ```sh
 moon run examples/hello         # minimal window with the original widgets
 moon run examples/hello-themed  # minimal example of the themed component library (theme_apply + button_t/input_t/label_t)
 moon run examples/showcase      # full-capability demo board: 15 pages, three grouped sidebars, component library + system capabilities
+moon run examples/sysmonitor    # flagship app: Ubuntu process manager & hardware monitor (1000-row process table + live curves)
 ```
 
 The showcase covers: Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store comparison + Native widgets / Canvas & rich text + System Integration / Window / Browser / Environment & Platform, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). Each page's source is its own file (`examples/showcase/pages_*.mbt`) — the best copy-paste material library; screenshots of the component library:
@@ -27,6 +28,18 @@ The showcase covers: Basic / Icons / Form / Navigation / Data Display / Charts /
 ![Code & docs](images/showcase-code.png)
 
 ![System integration](images/showcase-system.png)
+
+### sysmonitor: process manager & hardware monitor
+
+The library's flagship app for expressiveness + performance: the data layer reads /proc and /sys in pure MoonBit (two-sample CPU diff, memory, a 1000-row process list, hwmon temperatures, disk IO and capacity, PCI GPUs, NIC rates), with the only syscalls going through the app's own native stub. Five tabbed pages (Overview / Processes / Sensors / Disks / Network), one 1Hz timer driving all sampling; curves and value cards repaint the canvas only, never rebuilding the view tree; light/dark follows the system.
+
+Process page: a virtual table at the 1000-row scale with search filtering, six sortable columns, and selection-driven kill (SIGTERM, falling back to SIGKILL) / renice, with errno mapped to Chinese notices. Measured: full sampling of 1053 processes in 14.94ms/pass, steady-state 1Hz CPU 2-3% (figures in [adaptation.md](adaptation.md)).
+
+![Overview](images/sysmonitor-overview.png)
+
+![Processes](images/sysmonitor-process.png)
+
+![Dark theme](images/sysmonitor-dark.png)
 
 ## Routing
 

@@ -102,8 +102,11 @@
   - 磁盘:容量条 + IO 曲线
   - 网络:网卡 rx/tx 曲线
   - 验证:三页实现完成(moon check / moon test 全绿时点验证);单容器 on_draw 自绘行(迷你曲线 120 点窗口、容量条、rx/tx 叠加曲线),行数随数据增减不重建视图树;真机截图复验待库文件并行编辑(table_t 排序/列宽)修好后执行
-- [ ] U5 性能实测 — 千行进程页 1Hz/2Hz 刷新的帧率与内存占用,延续 vs C++ 基线口径入 adaptation.md
-- [ ] U6 文档发布 — README 中英挂旗舰示例与截图;踩坑回写 adaptation.md;mooncakes 发新版
+- [x] U5 性能实测 — 千行进程页 1Hz/2Hz 刷新的帧率与内存占用,延续 vs C++ 基线口径入 adaptation.md
+  - 验证:1053 进程全量采样 14.94ms/次(release);稳态进程页 1Hz CPU 2-3%、Rss 85.8MB 走平;启动中位 81ms、二进制 7.72MB,数据入 adaptation.md 中英两份;2Hz 档待应用可 rebuild 后补测(定时器改 500ms)
+- [~] U6 文档发布 — README 中英挂旗舰示例与截图;踩坑回写 adaptation.md;mooncakes 发新版
+  - 已完成:README 中英根文档 + docs/README 中英示例区挂 sysmonitor 旗舰条目与三张截图(概览/进程页/深色);U5 实测与全部坑位已入 adaptation.md 中英两份
+  - 缺口:传感器/磁盘/网络三页截图待用户真机复验后补;mooncakes 发新版(版本号 + 发布)待用户确认后执行
 
 ### 边界
 
