@@ -232,6 +232,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 ### 运行期差异
 
+- 滚动条形态:libyue 在 Windows 的滚动条是自绘经典样式(Scrollbar 类:轨道 + 箭头按钮 + 常驻占布局),`Scroll::SetOverlayScrollbar` 对 Windows 是空操作(头文件里 API 就被 `#if !defined(OS_WIN)` 排除)——GTK 的悬浮形态在 Windows 没有对应物。统一方案是 yue 层 `overlay_scroll` 组件:policy 置 Never 隐藏平台条,自绘 thumb 用 yoga absolute(right/top/bottom 静态样式)占满右缘全高,可见段在 on_draw 按 Ref 状态绘制——滚动更新只 schedule_paint 零 yoga 重排;浮现/渐隐用 clear_timeout 可取消的两级定时器(d9→73→隐藏),拖拽依赖按下后的隐式鼠标捕获(拖出仍收 move,见 splitter 条目的 WM_CAPTURECHANGED 适配),thumb 窄条上的滚轮经 on_wheel 手动转发给 Scroll。声明式 scroll 的 Windows 分支已有 on_scroll→0ms 定时器强制重摆原生 HWND 的兜底,组件内同款保留。
 - 系统强调色:`DwmGetColorizationColor` 取的是「窗口颜色化色」——强调色与系统基色的混合,默认配置下与设置页强调色有明显色偏(参照机 Win10 19045 实测返回黄绿 0xFFB7AC00,而设置页强调色为青 0xFF00B7C3);先读注册表 `HKCU\Software\Microsoft\Windows\DWM\AccentColor`(0xAABBGGRR,Win10 1803+ 写入),缺失 / 0 / 0xFFFFFFFF 才回退颜色化色,修复后探针实测 0xFF00B7C3 与设置页逐位一致。回退值的 alpha 位是「强度」非透明度,只取 RGB。
 - GetSystemPowerStatus 语义损失(电量查询):ACLineStatus 255(未知)按非在线;BatteryFlag 128(无电池)/ 255(未知)均按无电池;BatteryLifeTime 语义随交直流漂移且常为 -1,统一不给剩余时间(Linux UPower 侧 State 1/4/5 都归"接着电源",两平台口径对齐)。
 - `AttributedText` 区间字体 / 颜色:上游 Windows 只支持全文(区间 CHECK 崩,GDI+ 无富文本),fork mbt.9 自建分段布局器(run 存储 / 流式折行 / 测量绘制同源),MoonBit 层降级守卫已删,三平台语义一致。坑:`Gdiplus::Font::GetHeight` 重载是 `(const Graphics*)`,传引用编不过。

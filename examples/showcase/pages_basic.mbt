@@ -89,5 +89,30 @@ fn page_basic(app : App) -> @yue.Node {
         ),
       ],
     ),
+    section(
+      "OverlayScroll 悬浮滚动条",
+      "滚动/悬停右缘浮现主题色细条,停顿渐隐,可拖拽;平台原生滚动条隐藏(Windows 经典条常驻占位,悬浮形态由组件统一)。滚动或拖拽右缘体验。",
+      [
+        @yue.overlay_scroll(
+          @yue.vbox(
+            [
+              @yue.label_t("滚动内容区(悬浮滚动条演示)", role=@yue.Section),
+              @yue.label("第 1 行:滚动或拖动右缘细条"),
+              @yue.label("第 2 行:停顿约一秒细条渐隐"),
+              @yue.label("第 3 行:悬停细条保持显示"),
+              @yue.label("第 4 行:按住可拖拽"),
+              @yue.label("第 5 行"),
+              @yue.label("第 6 行"),
+              @yue.label("第 7 行"),
+              @yue.label("第 8 行"),
+              @yue.label("第 9 行"),
+              @yue.label("第 10 行:到底部了"),
+            ],
+            style=[("padding", 10.0)],
+          ),
+          style=[("height", 180.0)],
+        ),
+      ],
+    ),
   ])
 }
