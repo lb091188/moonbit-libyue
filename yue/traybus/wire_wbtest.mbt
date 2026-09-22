@@ -75,6 +75,65 @@ test "消息往返：空体信号" {
 }
 
 ///|
+test "消息往返：'d' 顶层双精度" {
+  match build_reply(1, 3, ":1.3", "d", [VDouble(-0.15625)]) {
+    Ok(bytes) =>
+      match parse_message(bytes[:]) {
+        Some(m) =>
+          match m.body[0] {
+            VDouble(v) => inspect(v.to_string(), content="-0.15625")
+            _ => inspect("类型不符", content="VDouble")
+          }
+        None => inspect("解析失败", content="应可解析")
+      }
+    Err(_) => inspect("构造失败", content="应可构造")
+  }
+}
+
+///|
+test "消息往返：a{sv} 内含 Percentage(d) 的 UPower GetAll 真实形状" {
+  let dict = VArray("{sv}", [
+    VStruct([VString("IsPresent"), VVariant(VBool(true))]),
+    VStruct([VString("Percentage"), VVariant(VDouble(87.5))]),
+    VStruct([VString("State"), VVariant(VU32(2))]),
+    VStruct([VString("TimeToEmpty"), VVariant(VI64(5400L))]),
+  ])
+  match build_reply(1, 9, ":1.9", "a{sv}", [dict]) {
+    Ok(bytes) =>
+      match parse_message(bytes[:]) {
+        Some(m) =>
+          match m.body[0] {
+            VArray(_, entries) => {
+              inspect(entries.length(), content="4")
+              match entries[1] {
+                VStruct([VString(name), VVariant(VDouble(v))]) => {
+                  inspect(name, content="Percentage")
+                  inspect(v.to_string(), content="87.5")
+                }
+                _ =>
+                  inspect(
+                    "结构不符",
+                    content="VStruct[VString, VVariant[VDouble]]",
+                  )
+              }
+              match entries[3] {
+                VStruct([VString(name), VVariant(VI64(t))]) => {
+                  inspect(name, content="TimeToEmpty")
+                  inspect(t.to_string(), content="5400")
+                }
+                _ =>
+                  inspect("结构不符", content="VStruct[VString, VVariant[VI64]]")
+              }
+            }
+            _ => inspect("不是数组", content="VArray")
+          }
+        None => inspect("解析失败", content="应可解析")
+      }
+    Err(_) => inspect("构造失败", content="应可构造")
+  }
+}
+
+///|
 test "消息往返：a{sv} 属性字典" {
   let dict = VArray("{sv}", [
     VStruct([VString("Id"), VVariant(VString("demo"))]),

@@ -136,6 +136,12 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - FileManager1(打开并选中文件)实测(XFCE):NameHasOwner 在线探测可用;ShowItems 线格式 "ass"(file URI 数组 + startup_id 空串);file URI 的百分号 hex 用大写(RFC 3986 大小写均可,大写为通行惯例),unreserved(A-Za-z0-9-._~)与 '/' 不编码,其余按 UTF-8 字节 %XX,单测锁定。服务不在线或调用失败的回退是 xdg-open 打开父目录——选中态丢失,属语义降级,使用文档须写明。
 - 外部打开类的 spawn 走 g_spawn_async(G_SPAWN_SEARCH_PATH + 输出重定向 DEV_NULL),glib 自动回收子进程无僵尸;不经 shell,argv 直传。xdg-open 对不存在路径/不可打开 URL 的行为因桌面而异,库层 Ok 只表示「已交给系统」,系统侧成败不回传。
 - 屏幕抑制(Inhibit/UnInhibit)服务名以 NameHasOwner 真实在线为准,不按环境名猜:候选表 [org.freedesktop.ScreenSaver, org.xfce.ScreenSaver],实测 Ubuntu 24.04 XFCE 仅 org.xfce.ScreenSaver 在线(xfce4-screensaver 持有),org.freedesktop.ScreenSaver 无人持有。两家接口同构:对象路径与接口名由服务名点换斜杠派生,Inhibit("ss" = 应用名 + 原因)-> u cookie,UnInhibit("u" = 原 cookie)须逐位一致(真总线抓包:Inhibit 得 cookie 1516211641,2 秒后 UnInhibit 带同值,空应答成功)。GNOME / KDE 的服务持有情况待真机补记。
+- 系统总线(Ubuntu 24.04 实测):socket 为 /run/dbus/system_bus_socket,未设 DBUS_SYSTEM_BUS_ADDRESS 时按此默认直连成功;地址显式设置时按逗号分隔取第一个 unix:path=,取不到(如 tcp: 地址)必须显式 Err 带原文——静默回退默认 socket 会连回真有 UPower 的总线,降级验收变假失败。系统总线 BecomeMonitor 被拒(dbus-monitor 与 busctl monitor 同),抓包不可用,验证走探针自身往返 + busctl call 对照应答形状。
+- 多总线连接并存(B5 基建):shim 的 fd 监视从进程级单槽(每次 watch 覆盖上一条)改为 fd→回调分发表 + unwatch;MoonBit 侧 fd→Conn 注册表按 fd 路由。双连接(会话 SNI + 系统 UPower)并存实测互不覆盖。glib source 回调返回 0 时 glib 自毁 source,shim 表项同步 erase(否则后续 unwatch 对已亡 id 再 g_source_remove 触发告警)。
+- wire 层 'd'(DOUBLE)与 't'(UINT64)必须成套支持:真总线 UPower GetAll 应答里 UpdateTime 是 't'、Percentage/Energy 是 'd',缺 't' 时 variant 未知签名走「返回空串但读位不动」的旧防御分支,后续元素整体错位、read_string 切片越界直接 abort(单测自洽测不出——自造的形状恰好没踩到)。防御已改两层:variant 未知签名把 pos 推到消息尾(解析化为垃圾值而非错位)、read_string/read_sig 加边界检查。新增类型是全链路八处联动:DVal/Sig/sig_align/parse_one_sig/sig_of/sig_char/encode/decode_in。
+- Double↔IEEE 754 位转换放 shim(moonbitlang/core 无 Double::to_bits/from_bits,实测确认):yue_mbt_sys_f64_to_bits/from_bits 纯位重解释(static_assert sizeof(double)==8),wire 层 'd' 借道 Int64 的 8 字节小端读写。注意:traybus 的 whitebox 测试目标一旦引用此类 extern,链接就吃 -lyue_mbt——而 link_configs 按「依赖该包的目标」传播,traybus 不依赖 yue(反向),prebuild.py 须为 NoahLiu/moonbit-libyue/yue/traybus 单列一份同值配置(静态库单成员引用 gtk 全套,不能给精简 flags)。
+- UPower 读数路径(实测 Ubuntu 24.04,台式机):DisplayDevice(/org/freedesktop/UPower/devices/DisplayDevice,接口 org.freedesktop.UPower.Device)聚合主电池,IsPresent=false → Ok(None);属性接口名注意区分——设备是 …UPower.Device、顶层是 …UPower,PropertiesChanged 的 arg0 过滤天然把设备级信号挡在顶层订阅外。OnBattery 在顶层对象,交直流事件订阅顶层 PropertiesChanged、回调内直解 changed 字典(信号分发在 drain 栈上,回调内 call_sync 会重入收包路径,严禁)。
+- 断线自愈(B5,未经真机断线演练):mark_dead 幂等(以 fd 注册表为准),经 shim 的 post_delayed_task(符号直 extern,绕开 traybus→yue 反向依赖)延迟 500ms 重连、最多 3 次;成功后重放 AddMatch 规则、迁移订阅表与托盘项并重新注册(断线期间 watcher 已按唯一名消失清掉旧注册)。纯 CLI 场景(主循环未跑)重连回调不触发,自然放弃。
 
 - sysmonitor 实测(Ubuntu 24.04 XFCE X11,口径同篇首性能基准:启动中位、稳态 Rss、release 二进制):启动(exec → 窗口 map)5 轮 77/78/81/82/88ms,中位 81ms(hello 基线 70ms 是空载系统,本次系统载有 1042 进程);稳态进程页前台 1Hz 刷新 CPU 2-3%(采样 + 派生数据 + 千行表格重建 + 重绘合计约 25ms/秒),Rss 84.9MB → 100s 后 85.8MB 走平;二进制 7.72MB(hello 对照 7.03MB)。千行进程页验收达标:1053 进程全量采样 14.94ms/次(release,≈14µs/进程,每进程两次 /proc 读取),1Hz 下采样占空 1.5%。
 - 千行表格用 table_v_t 虚拟滚动(只画可见行):刷新走「数据层全量采样 → 过滤/排序派生 → rows Store set → 表格 load + schedule_paint」,不重建视图树;选择按 pid 重映射(排序每秒变化时选中不漂)。无 C++ 对照副本,「封装层 + 数据层」合计开销以上述数值直接归因,UI 绘制部分与 hello 基线同口径(持平量级)。
@@ -211,6 +217,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 ### 运行期差异
 
+- GetSystemPowerStatus 语义损失(电量查询):ACLineStatus 255(未知)按非在线;BatteryFlag 128(无电池)/ 255(未知)均按无电池;BatteryLifeTime 语义随交直流漂移且常为 -1,统一不给剩余时间(Linux UPower 侧 State 1/4/5 都归"接着电源",两平台口径对齐)。
 - `AttributedText` 区间字体 / 颜色:上游 Windows 只支持全文(区间 CHECK 崩,GDI+ 无富文本),fork mbt.9 自建分段布局器(run 存储 / 流式折行 / 测量绘制同源),MoonBit 层降级守卫已删,三平台语义一致。坑:`Gdiplus::Font::GetHeight` 重载是 `(const Graphics*)`,传引用编不过。
 - `Color::Get(Border)` 触发 NOTREACHED 返回垃圾色:shim 对 Border 用 `GetSysColor(COLOR_WINDOWFRAME)`。
 - 自绘字体发虚:libyue GDI+ 画笔写死灰度抗锯齿,prepare.py 幂等补丁换 `TextRenderingHintClearTypeGridFit`。

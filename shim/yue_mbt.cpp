@@ -4173,6 +4173,44 @@ extern "C" int32_t yue_mbt_win_keep_awake_restore(int32_t *ok) {
 
 #endif  // 屏幕常亮平台分支结束
 
+// ---------- 电源状态（Windows GetSystemPowerStatus；Linux 走 DBus UPower） ----------
+#if defined(OS_WIN)
+
+extern "C" int32_t yue_mbt_win_power_status(
+    int32_t *ac_online, int32_t *percent, int32_t *charging,
+    int32_t *has_battery) {
+  SYSTEM_POWER_STATUS st;
+  if (!::GetSystemPowerStatus(&st)) {
+    *ac_online = 0;
+    *percent = -1;
+    *charging = 0;
+    *has_battery = 0;
+    return -1;
+  }
+  // BatteryFlag: 128 = 无电池, 255 = 未知 —— 都按无电池处理（台式机）
+  *has_battery =
+      (st.BatteryFlag != 255 && (st.BatteryFlag & 128) == 0) ? 1 : 0;
+  // ACLineStatus: 1 = 交流在线; 0 = 电池; 255 = 未知
+  *ac_online = st.ACLineStatus == 1 ? 1 : 0;
+  *charging = (st.BatteryFlag & 8) != 0 ? 1 : 0;
+  *percent = st.BatteryLifePercent == 255 ? -1 : st.BatteryLifePercent;
+  return 0;
+}
+
+#else  // Linux 电源查询走 DBus UPower（MoonBit 层），非 Windows 哨兵
+
+extern "C" int32_t yue_mbt_win_power_status(
+    int32_t *ac_online, int32_t *percent, int32_t *charging,
+    int32_t *has_battery) {
+  *ac_online = 0;
+  *percent = -1;
+  *charging = 0;
+  *has_battery = 0;
+  return -1000;
+}
+
+#endif  // 电源状态平台分支结束
+
 void yue_mbt_notification_show(void *n) {
   if (auto *b = NotificationStore::get(n)) {
 #if defined(OS_WIN)
@@ -4802,19 +4840,62 @@ extern "C" void yue_mbt_sys_close(int32_t fd) {
 }
 
 // GTK 主循环 fd 监视：回调是无捕获 MoonBit 顶层函数（与 on_click 同一跨
-// ABI 模式）。进程级只支持一条 SNI 连接，与 traybus 的全局连接约定一致。
-static int32_t (*g_mbt_fd_cb)(int32_t, int32_t) = nullptr;
+// ABI 模式）。fd → 回调分发表，支持多条总线连接并存（会话 + 系统）。
+struct FdWatchEntry {
+  int32_t (*cb)(int32_t, int32_t);
+  guint source_id;
+};
+static std::unordered_map<int32_t, FdWatchEntry> g_mbt_fd_watches;
 
 static gboolean mbt_fd_source_cb(gint fd, GIOCondition cond, gpointer) {
-  return g_mbt_fd_cb != nullptr ? g_mbt_fd_cb(fd, static_cast<int32_t>(cond))
-                                : TRUE;
+  auto it = g_mbt_fd_watches.find(fd);
+  if (it == g_mbt_fd_watches.end()) {
+    return FALSE; // 已注销：撤 source
+  }
+  // 回调返回 0 表示撤 source（glib 会自动销毁），表项同步清除
+  if (it->second.cb(fd, static_cast<int32_t>(cond)) == 0) {
+    g_mbt_fd_watches.erase(it);
+    return FALSE;
+  }
+  return TRUE;
 }
 
 extern "C" int32_t yue_mbt_sys_watch_fd(int32_t fd, int32_t events,
                              int32_t (*cb)(int32_t, int32_t)) {
-  g_mbt_fd_cb = cb;
-  return static_cast<int32_t>(g_unix_fd_add(
-      fd, static_cast<GIOCondition>(events), mbt_fd_source_cb, nullptr));
+  auto it = g_mbt_fd_watches.find(fd);
+  if (it != g_mbt_fd_watches.end()) {
+    g_source_remove(it->second.source_id);
+  }
+  FdWatchEntry e;
+  e.cb = cb;
+  e.source_id = g_unix_fd_add(
+      fd, static_cast<GIOCondition>(events), mbt_fd_source_cb, nullptr);
+  g_mbt_fd_watches[fd] = e;
+  return static_cast<int32_t>(e.source_id);
+}
+
+extern "C" void yue_mbt_sys_unwatch_fd(int32_t fd) {
+  auto it = g_mbt_fd_watches.find(fd);
+  if (it != g_mbt_fd_watches.end()) {
+    g_source_remove(it->second.source_id);
+    g_mbt_fd_watches.erase(it);
+  }
+}
+
+// Double ↔ IEEE 754 位模式：DBus 'd' 编解码用（纯位重解释）
+static_assert(sizeof(double) == 8, "DBus DOUBLE requires IEEE 754 binary64");
+
+extern "C" int64_t yue_mbt_sys_f64_to_bits(double v) {
+  uint64_t bits;
+  std::memcpy(&bits, &v, 8);
+  return static_cast<int64_t>(bits);
+}
+
+extern "C" double yue_mbt_sys_f64_from_bits(int64_t bits) {
+  double v;
+  uint64_t u = static_cast<uint64_t>(bits);
+  std::memcpy(&v, &u, 8);
+  return v;
 }
 
 // spawn 脱离子进程:glib 自动回收(无僵尸),SEARCH_PATH 按需找 xdg-open;
@@ -4865,6 +4946,12 @@ extern "C" int32_t yue_mbt_sys_watch_fd(int32_t, int32_t,
                                         int32_t (*)(int32_t, int32_t)) {
   return 0;
 }
+
+extern "C" void yue_mbt_sys_unwatch_fd(int32_t) {}
+
+extern "C" int64_t yue_mbt_sys_f64_to_bits(double) { return 0; }
+
+extern "C" double yue_mbt_sys_f64_from_bits(int64_t) { return 0.0; }
 
 extern "C" int32_t yue_mbt_sys_spawn_detached(const char *, const char *) {
   return -1;

@@ -15,6 +15,8 @@ priv enum DVal {
   VI32(Int)
   VU32(Int)
   VI64(Int64)
+  VU64(Int64) // UINT64 't':DBus 实践值(时间戳/计数)不超 2^63,Int64 承载
+  VDouble(Double)
   VString(String)
   VPath(String)
   VSig(String)
@@ -29,7 +31,7 @@ fn sig_align(s : Sig) -> Int {
     SigByte | SigSig | SigVariant => 1
     SigI16 | SigQ16 => 2
     SigBool | SigI32 | SigU32 | SigString | SigPath | SigArray(_) => 4
-    SigI64 => 8
+    SigI64 | SigU64 | SigDouble => 8
     SigStruct(_) => 8
     SigDict(_, _) => 8
   }
@@ -44,6 +46,8 @@ priv enum Sig {
   SigI32
   SigU32
   SigI64
+  SigU64
+  SigDouble
   SigString
   SigPath
   SigSig
@@ -87,6 +91,8 @@ fn parse_one_sig(p : SigParser) -> Result[Sig, String] {
     105 => Ok(SigI32) // i
     117 => Ok(SigU32) // u
     120 => Ok(SigI64) // x
+    116 => Ok(SigU64) // t
+    100 => Ok(SigDouble) // d
     115 => Ok(SigString) // s
     111 => Ok(SigPath) // o
     103 => Ok(SigSig) // g
@@ -161,6 +167,8 @@ fn sig_of(v : DVal) -> String {
     VI32(_) => "i"
     VU32(_) => "u"
     VI64(_) => "x"
+    VU64(_) => "t"
+    VDouble(_) => "d"
     VString(_) => "s"
     VPath(_) => "o"
     VSig(_) => "g"
@@ -309,6 +317,8 @@ fn encode(buf : Buf, s : Sig, v : DVal) -> Unit {
     (SigI32, VI32(n)) => buf.u32(n)
     (SigU32, VU32(n)) => buf.u32(n)
     (SigI64, VI64(n)) => buf.i64(n)
+    (SigU64, VU64(n)) => buf.i64(n) // 同 8 字节小端位模式
+    (SigDouble, VDouble(x)) => buf.i64(sys_f64_to_bits(x)) // 同 8 字节小端位模式
     (SigString, VString(s)) => buf.string(s)
     (SigPath, VPath(s)) => {
       buf.pad(4)
@@ -591,6 +601,11 @@ fn Rd::i64v(self : Rd) -> Int64 {
 ///|
 fn Rd::read_string(self : Rd) -> String {
   let len = self.u32v()
+  if len < 0 || self.pos + len > self.data.length() {
+    // 畸形长度:消耗掉余量并返回空串——解析出垃圾值,不越界崩溃
+    self.pos = self.data.length()
+    return ""
+  }
   let s = @utf8.decode_lossy(self.data[self.pos:self.pos + len])
   self.pos += len + 1 // 跳过 '\0'
   s
@@ -599,6 +614,10 @@ fn Rd::read_string(self : Rd) -> String {
 ///|
 fn Rd::read_sig(self : Rd) -> String {
   let len = self.u8v()
+  if self.pos + len > self.data.length() {
+    self.pos = self.data.length()
+    return ""
+  }
   let s = @utf8.decode_lossy(self.data[self.pos:self.pos + len])
   self.pos += len + 1
   s
@@ -636,6 +655,14 @@ fn decode_in(rd : Rd, s : Sig, base : Int) -> DVal {
     SigI64 => {
       rd.pad(8, base)
       VI64(rd.i64v())
+    }
+    SigU64 => {
+      rd.pad(8, base)
+      VU64(rd.i64v())
+    }
+    SigDouble => {
+      rd.pad(8, base)
+      VDouble(sys_f64_from_bits(rd.i64v()))
     }
     SigString => {
       rd.pad(4, base)
@@ -677,8 +704,12 @@ fn decode_in(rd : Rd, s : Sig, base : Int) -> DVal {
       let inner_sig = rd.read_sig()
       match parse_signature(inner_sig) {
         Ok([node]) => VVariant(decode_in(rd, node, base))
-        Ok(_) => VVariant(VString(""))
-        Err(_) => VVariant(VString(""))
+        // 签名未知/多元素:值边界无从判定,推到尾让本次体解析
+        // 化为垃圾值——比位置不动(后续整体错位越界)安全
+        _ => {
+          rd.pos = rd.data.length()
+          VVariant(VString(""))
+        }
       }
     }
   }
@@ -694,6 +725,8 @@ fn sig_char(s : Sig) -> String {
     SigI32 => "i"
     SigU32 => "u"
     SigI64 => "x"
+    SigU64 => "t"
+    SigDouble => "d"
     SigString => "s"
     SigPath => "o"
     SigSig => "g"

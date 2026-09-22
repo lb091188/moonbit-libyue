@@ -157,14 +157,14 @@
   - Linux:DBus 屏保服务的 Inhibit / UnInhibit( inhibit 返回的 cookie 解除时须带原值)
   - Windows:线程执行状态(启用显示必需标志,解除还原)
   - 验收:启用后到达息屏时间不熄屏,禁用恢复
-- [ ] P10 电量查询(百分比 + 充电状态;无电池返回空)
-  - Linux:DBus UPower——电池设备的 Percentage / State 属性
+- [x] P10 电量查询(百分比 + 充电状态;无电池返回空)
+  - Linux:DBus UPower——电池设备的 Percentage / State 属性(实测走 DisplayDevice 聚合设备,含 'd'/'t' 线型;台式机 IsPresent=false → Ok(None) 真总线验证)
   - Windows:系统电源状态(交流在线标志 + 剩余百分比;无电池标志判空)
-  - 验收:与 upower -i / 系统托盘电量对照;台式机返回空
+  - 验收:与 upower -i / 系统托盘电量对照;台式机返回空(台式机路径已验,笔记本读数对照待真机)
 - [ ] P11 交流 / 电池电源切换事件
-  - Linux:DBus UPower——OnBattery 属性变更信号
-  - Windows:电源设置注册通知(交直流源)
-  - 验收:拔插电源真机触发
+  - Linux:DBus UPower——OnBattery 属性变更信号(订阅经 B5 信号注册表,回调内直解 changed 字典不重查)
+  - Windows:电源设置注册通知(交直流源;事件接入随 B6 电源消息窗口)
+  - 验收:拔插电源真机触发(助手宿主机为台式机,无法本地触发)
 - [ ] P12 网络在线状态(查询 + 变化事件)
   - Linux:DBus NetworkManager——连接状态查询与变更信号
   - Windows:在线状态 API 轮询;监听式后置

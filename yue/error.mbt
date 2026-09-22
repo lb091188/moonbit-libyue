@@ -138,3 +138,22 @@ pub impl Show for KeepAwakeError with fn output(self, logger) {
 
 ///|
 pub extend KeepAwakeError with Show::{to_string, output}
+
+///|
+pub(all) enum PowerError {
+  /// 平台/服务不支持（macOS 暂缓、Linux 无 UPower 在线）
+  Unsupported
+  /// 查询失败（应答异常 / 系统调用失败）
+  QueryFailed(String)
+}
+
+///|
+pub impl Show for PowerError with fn output(self, logger) {
+  match self {
+    Unsupported => logger.write_string("PowerError::Unsupported")
+    QueryFailed(m) => logger.write_string("PowerError::QueryFailed(\{m})")
+  }
+}
+
+///|
+pub extend PowerError with Show::{to_string, output}
