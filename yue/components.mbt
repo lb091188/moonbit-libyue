@@ -4918,15 +4918,22 @@ pub fn table_t(
           false
         }
       })
-      // 表头点击:同列升降序,新列默认升序(使用方订阅 Store 排数据)
+      // 表头点击三态循环:新列默认升序 → 同列翻转 → 再击取消排序
+      // (column 置 -1,使用方订阅里恢复原始顺序);sort 缺省点击无效
       fn toggle_sort(j : Int) -> Unit {
         match sort {
-          Some(s) =>
-            if s.get().column == j {
-              s.set({ column: j, asc: !s.get().asc })
+          Some(s) => {
+            let cur = s.get()
+            if cur.column == j {
+              if cur.asc {
+                s.set({ column: j, asc: false })
+              } else {
+                s.set({ column: -1, asc: true })
+              }
             } else {
               s.set({ column: j, asc: true })
             }
+          }
           None => ()
         }
       }
@@ -5373,15 +5380,22 @@ pub fn table_v_t(
         }
       }
 
-      // 表头点击:同列升降序,新列默认升序(使用方订阅 Store 排数据)
+      // 表头点击三态循环:新列默认升序 → 同列翻转 → 再击取消排序
+      // (column 置 -1,使用方订阅里恢复原始顺序);sort 缺省点击无效
       fn toggle_sort(j : Int) -> Unit {
         match sort {
-          Some(s) =>
-            if s.get().column == j {
-              s.set({ column: j, asc: !s.get().asc })
+          Some(s) => {
+            let cur = s.get()
+            if cur.column == j {
+              if cur.asc {
+                s.set({ column: j, asc: false })
+              } else {
+                s.set({ column: -1, asc: true })
+              }
             } else {
               s.set({ column: j, asc: true })
             }
+          }
           None => ()
         }
       }
