@@ -800,6 +800,8 @@ int32_t yue_mbt_win_power_status(int32_t *ac_online, int32_t *percent,
    经 PostTask 抛回主循环）;失败 -1,非 Windows 哨兵 -1000 */
 int32_t yue_mbt_win_session_power_watch(void (*invoke)(void *, int32_t),
                                         void *closure);
+/* Windows:NLM GetConnectivity 位掩码;失败 -1,非 Windows 哨兵 -1000 */
+int32_t yue_mbt_win_connectivity(int32_t *ok);
 
 /* ---------- 探测示例(examples/probe) ---------- */
 
