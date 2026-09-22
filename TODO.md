@@ -60,9 +60,10 @@
   - 验证:parse_proc_stat / cpu_usage / parse_cpuinfo 纯函数测试(列序含 guest 不重复计数、钳制、ARM 回退);真机 1Hz 采样冒烟(20 核各核占用实时刷新),截图亲验
 - [x] S2 内存 — /proc/meminfo:总 / 已用 / 可用 / swap
   - 验证:parse_meminfo 测试(全字段 / MemAvailable 回退 MemFree / 缺 MemTotal 返回 None);真机读取 31.1GB 总量与 free 一致
-- [ ] S3 进程
+- [x] S3 进程
   - /proc/[pid]/{stat,status,cmdline}:命令 / 状态(R,S,D,Z) / CPU%(差值采样) / MEM(rss)
   - ppid 构树备用
+  - 验证:parse_proc_pid_stat / parse_cmdline / proc_cpu_pct / proc_children 纯函数测试(comm 含空格括号按最后 ')' 切、多线程钳制、ppid 构树);真实 /proc 全量采样测试通过;release 基准 580 进程 9.57ms/次,数据入 adaptation.md;RSS 取 stat 页数 × 页大小(与 VmRSS 等值)省第三次读取
 - [ ] S4 温度 — /sys/class/hwmon/hwmon*/(name + temp*_input/label,毫摄氏度换算)
 - [ ] S5 磁盘
   - /proc/diskstats:IO 速率
@@ -76,7 +77,8 @@
 
 监控应用的领域需求不是框架公共能力,经 moon.pkg 的 native-stub 编入应用包;符号全在 libc 默认链接,零 shim/fork/vendored/链接参数改动。
 
-- [ ] F1 进程管理 — kill(pid, sig) / getpriority / setpriority;errno → Result 语义化
+- [x] F1 进程管理 — kill(pid, sig) / getpriority / setpriority;errno → Result 语义化
+  - 验证:真实调用双侧走通——signal 0 探活自身 pid 返回 Ok、pid_max+1 kill 返回 ESRCH 语义化 Err、自身 nice 读/设(10 后还原);getpriority 的 nice=-1 歧义经 Ref 出参;Windows stub 同 ABI 占位运行期降级,CI 三平台不受影响
 - [ ] F2 statvfs(path) — 磁盘容量;C 侧拆结构体为扁平出参
 - [ ] F3 (后置)子进程执行 — spawn + 捕获 stdout 返回字符串(nvidia-smi 等)
 
