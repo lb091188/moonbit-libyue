@@ -33,7 +33,6 @@ jobs:
         shell: cmd
         run: |
           for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath') do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
-          set YUE_MBT_SKIP_MANIFEST=1
           python scripts\prepare.py
           moon build --target native --release --strip --verbose 1> build_verbose.log 2>&1
           echo BUILD_EXIT=%ERRORLEVEL%

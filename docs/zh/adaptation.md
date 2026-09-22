@@ -224,8 +224,10 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 ### manifest
 
-- exe 无清单时启动即报「无法定位于序数 345」(TaskDialogIndirect 仅以序数在 Common-Controls v6 导出):官方清单编译为 `yue_mbt_manifest.res` 经链接参数进每个 exe;测试驱动用 `YUE_MBT_SKIP_MANIFEST=1` 规避与 moon 自带 MANIFEST 的 CVT1100 冲突。
-- `YUE_MBT_SKIP_MANIFEST` 的取值变化不会让 moon 重套链接配置:未设变量跑过一次后,moon 缓存了含 manifest.res 的旧 flags,补设变量重跑仍 CVT1100;须 `moon clean`(或删 `_build` 下产物 exe)再生。
+- moon 的链接参数拼接行为(Windows 实测):按 main 包的依赖闭包把每个带 link_configs 的包的 flags 各拼一遍,并对 blackbox 测试目标把「被测包」的 flags 额外再拼一遍(被测包份 ×2)。`.lib` 重复列出无害,`manifest.res` 重复列出则同名 MANIFEST 资源进两次 → CVT1100 链接失败。早期「moon 新版给 exe 自带 MANIFEST 与我们的 res 冲突」的结论有误:mt 实测 moon 链的 exe 不含任何清单资源,冲突的「另一份」始终是重复传入的 res 自己(为 traybus 补 Windows 链接配置后,凡同时拼两份 flags 的目标即触发)。
+- 通道探索结论:`/MANIFEST:EMBED` `/MANIFESTINPUT:` 等链接选项放进 link_flags 会被 cl 当编译选项丢弃(D9002,`/link` 之前的链接选项不传递);`#pragma comment(linker,"/manifestdependency")` 依赖链接器开 /MANIFEST,moon 的链接不开(moon 链的 exe 旁也无外部 .manifest 文件);prebuild 的 stdin 只有环境变量快照与 module_root,无目标/包信息,无法按目标输出差异化配置。
+- 最终方案:manifest.res 不进默认 link_flags——开发 / 测试 / moon run 零配置。无清单的运行代价实测:showcase 启动存活、122 测试全过;「无清单启动即报序数 345(TaskDialogIndirect)」是历史版本的启动路径,当前代码未复现,但视觉样式会退化为经典外观。分发型构建设 `YUE_MBT_KEEP_MANIFEST=1`:res 随 yue 份传入,moon build 的 main 包对每份 flags 只拼一遍,恰好嵌入一份清单(Common-Controls v6 + supportedOS,mt 实读验证);全仓 `moon test` 勿设此开关(blackbox 被测包双拼必炸)。release-bin.yml 已按此配置。
+- 环境变量改变 link_flags 后 moon 偶发沿用旧配置不重链:设 / 去变量后行为不变时,`moon clean`(或删 `_build` 下产物 exe)兜底。
 
 ### 运行期差异
 

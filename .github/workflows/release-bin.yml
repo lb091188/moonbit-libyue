@@ -62,13 +62,15 @@ jobs:
           $py = (Get-Command python).Source
           Copy-Item $py "$env:USERPROFILE\.moon\bin\python3.exe"
 
-      # YUE_MBT_SKIP_MANIFEST=1:moon 自带 manifest 与 libyue 的同名冲突
-      # (CVT1100),CI 同款;发布包用 moon 的 manifest,行为不变
+      # YUE_MBT_KEEP_MANIFEST=1:发布 exe 嵌入应用清单(Common-Controls v6
+      # 与 supportedOS);moon build 的 main 包对每份 link_flags 只拼一遍,
+      # 恰好一份清单(全仓 moon test 不能设此开关,blackbox 测试目标会
+      # 双拼同份 flags 导致 CVT1100,见 docs/zh/adaptation.md)
       - name: 构建(MSVC 环境)
         if: runner.os == 'Windows'
         shell: cmd
         env:
-          YUE_MBT_SKIP_MANIFEST: '1'
+          YUE_MBT_KEEP_MANIFEST: '1'
         run: >-
           for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath')
           do call "%%i\VC\Auxiliary\Build\vcvars64.bat"

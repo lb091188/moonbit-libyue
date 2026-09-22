@@ -7,9 +7,9 @@
 #   → Linux 侧 xvfb 虚拟显示跑 hello 冒烟(GUI 事件循环存活即通过)
 #
 # 说明:
-# - Windows 构建步设 YUE_MBT_SKIP_MANIFEST=1:moon 新版给链接的 exe 自带
-#   MANIFEST 资源,与 libyue 所需的 manifest.res 同名冲突(CVT1100,实测);
-#   CI 跳过我们的 manifest 让 moon 的顶上。真机不设此变量,行为不变。
+# - Windows 默认不嵌应用清单(prebuild 按 moon 的链接参数拼接行为决定,
+#   详见 docs/zh/adaptation.md 的 manifest 小节);发布型构建由
+#   release-bin.yml 设 YUE_MBT_KEEP_MANIFEST=1 嵌入。
 # - 链接参数由 scripts/prebuild.py(moon 构建钩子)按当前系统生成并传播,
 #   workflow 不写任何链接配置;原生层产物缓存命中时 prepare.py 秒级返回。
 # - Windows / macOS 不做运行冒烟(headless 会话不可靠:无窗口会话/
@@ -107,12 +107,8 @@ jobs:
 
       # vcvars64 用 vswhere 定位(不依赖 VS 具体版本/ Edition 路径);
       # prepare.py 会自动从 NuGet 补 WebView2 头文件与 loader DLL。
-      # YUE_MBT_SKIP_MANIFEST:moon 新版 exe 自带 MANIFEST,与 libyue 的
-      # manifest.res 同名冲突(CVT1100);CI 跳过我们的 manifest 规避。
       - name: 构建原生层 + 检查/测试/构建(MSVC 环境)
         shell: cmd
-        env:
-          YUE_MBT_SKIP_MANIFEST: "1"
         run: >-
           for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath')
           do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
