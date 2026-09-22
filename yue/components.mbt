@@ -4941,7 +4941,11 @@ pub fn table_t(
 
       // 列宽回写:相邻两列此消彼长(总宽不变),表头 + 全部行单元格
       // 同步改样式后重排,并重算 col_x 供表头装饰定位;行本身不重建,
-      // 选择/hover 状态不丢
+      // 选择/hover 状态不丢。
+      // GTK 上 update_layout 只重排「调用节点及其父下的兄弟」:对根
+      // 调用子树不刷新(探针实测 bounds 不变),对单个叶子调用只影响
+      // 其所在行——被改样式的容器必须逐个调用(splitter 对唯一包装
+      // 容器调,等价于此处的逐容器)。
       fn apply_col_widths(j : Int) -> Unit {
         ViewLike::set_style(head_cs.val[j], "width", col_w[j])
         ViewLike::set_style(head_cs.val[j + 1], "width", col_w[j + 1])
@@ -4954,7 +4958,12 @@ pub fn table_t(
           col_x[k] = a
           a = a + col_w[k]
         }
-        ViewLike::update_layout(outer)
+        ViewLike::update_layout(head_cs.val[j])
+        ViewLike::update_layout(head_cs.val[j + 1])
+        for cells in row_cols.val {
+          ViewLike::update_layout(cells[j])
+          ViewLike::update_layout(cells[j + 1])
+        }
       }
 
       // 表头单元格:只放文字 Label(平台布局对齐,勿手动摆位)与事件;
@@ -5512,16 +5521,7 @@ pub fn table_v_t(
           }
           None => ()
         }
-        // 列边界线(常驻浅色,悬停/拖动变主题色):拖动位置一眼可辨
-        for j in 0..<(columns.length() - 1) {
-          let hot = resizing.val == j || boundary_hover.val == j
-          p.set_stroke_color(if hot { theme_primary() } else { theme_border() })
-          let ex = col_x[j] + col_w[j]
-          p.begin_path()
-          p.move_to(ex, 6.0)
-          p.line_to(ex, head_h + vis_h - 6.0)
-          p.stroke()
-        }
+        // 列标题与箭头(边界线在行之后画,避免被斑马纹盖住)
         for j in 0..<columns.length() {
           // 可排序列右侧留 14px 箭头区(标题右界同步内收,排序切换时
           // 标题不跳动;数据行无箭头保持原样)
@@ -5665,6 +5665,18 @@ pub fn table_v_t(
           let thumb_y = head_h + (vis_h - thumb_h) * t
           p.set_fill_color(theme_border())
           p.fill_rect(b.width - bar_w + 2.0, thumb_y, bar_w - 4.0, thumb_h)
+        }
+        // 列边界线(常驻浅色,悬停/拖动变主题色):拖动位置一眼可辨。
+        // 画在行之后——先前画在行之前,偶数行斑马纹 fill_rect 把线盖住,
+        // 体感上「列分割线时有时无」
+        for j in 0..<(columns.length() - 1) {
+          let hot = resizing.val == j || boundary_hover.val == j
+          p.set_stroke_color(if hot { theme_primary() } else { theme_border() })
+          let ex = col_x[j] + col_w[j]
+          p.begin_path()
+          p.move_to(ex, 6.0)
+          p.line_to(ex, head_h + vis_h - 6.0)
+          p.stroke()
         }
         // 列宽拖动中的边界高亮线(表头到底,主题色 1px)
         if resizing.val >= 0 {
