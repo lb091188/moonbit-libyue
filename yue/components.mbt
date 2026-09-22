@@ -4658,6 +4658,9 @@ pub fn table_t(
         style=[("width", width), ("padding", 1.0), ("marginBottom", 10.0)],
         style_str=[("flexDirection", "column")],
       )
+      // 面板底:斑马纹(fill_zebra)按「白面板上的浅灰」设计,透明挂在
+      // 页面灰底(bg_page,与 fill_zebra 几乎同色)上条纹不可见
+      bind_bg(outer, fn() { theme_bg_panel() })
       // 列几何(含复选框列偏移):初值=定义宽,弹性列均分剩余宽;
       // 拖动改写本数组并回写各处 cell 样式
       let body_w = width - 2.0 - (if sel is Some(_) { 36.0 } else { 0.0 })
@@ -5406,6 +5409,9 @@ pub fn table_v_t(
         [("width", width), ("height", height), ("marginBottom", 10.0)]
       }
       let cv = themed_container(style=size_style)
+      // 面板底:斑马纹按「白面板上的浅灰」设计,透明挂在页面灰底上
+      // 条纹不可见(与 table_t 同理)
+      bind_bg(cv, fn() { theme_bg_panel() })
 
       fn sel_has(i : Int) -> Bool {
         match sel {
