@@ -580,6 +580,126 @@ let right = @yue.Store::new(["丙"])
 @yue.transfer(left, right)
 ```
 
+## 图表
+
+图表族（EP Chart 对标）全部纯 MoonBit 自绘：数据经 `Store` 驱动，set 后只 schedule_paint 画布、不重建视图树；颜色在绘制时现取主题色板，`theme_apply` 切换深浅即跟随。序列色按主题四语义色循环（折线 ≤4 序列），环形图五色循环。
+
+### 折线 / 面积图 line_chart_t
+
+`line_chart_t(series : Store[Array[LineSeries]], width? = 560.0, height? = 260.0, area? = false, y_range?, show_last? = true)`
+
+定长滚动窗口多序列折线。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| series | Store[Array[LineSeries]] | 必填 | 多序列数据，推点见下 |
+| width / height | Double | 560 / 260 | 画布尺寸 |
+| area | Bool | false | 半透明面积填充 |
+| y_range | (Double, Double)? | None | 手动 y 值域；None 为自适应 |
+| show_last | Bool | true | 最新值右端标注 |
+`LineSeries::make(名称, max_points?)` 建序列（窗口容量默认 100，超出丢最旧）；推点用 `series_push(store, 序列序号, 值)`（或 `win_push(窗口, max_points, 值)` 换新窗口后整体 set）。y 轴自适应（窗口 min/max + 8% 留白）或经 `y_range = (下限, 上限)` 手动指定；横向网格 + 左侧刻度；`area = true` 半透明面积填充（值域含 0 填到零线，全正值填到绘制区底，全负值填到顶）；`show_last` 控制最新值右端标注。
+
+渲染策略：点数多于绘制区像素列数时按列抽稀（每列保留 min/max 极值）改矩形路径——面积模式每列填到锚线（填充顶边即折线），折线模式每列画 min..max 竖条；点数不多于列数时走真实折线 + 多边形面积。单帧成本与窗口大小脱钩（1000 点 × 4 序列实测约 3ms，见 adaptation.md）。
+
+```moonbit
+let series = @yue.Store::new([
+  @yue.LineSeries::make("CPU", max_points=120),
+  @yue.LineSeries::make("内存", max_points=120),
+])
+ignore(@yue.set_timer(500, fn() {
+  @yue.series_push(series, 0, cpu_usage())
+  @yue.series_push(series, 1, mem_usage())
+  true
+}))
+@yue.line_chart_t(series, width=380.0, height=220.0)
+@yue.line_chart_t(series, width=380.0, height=220.0, area=true)
+```
+
+### 柱状 / 条形图 bar_chart_t
+
+`bar_chart_t(data : Store[Array[BarItem]], width? = 560.0, height? = 280.0, horizontal? = false)`
+
+纵向柱
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| data | Store[Array[BarItem]] | 必填 | 类目数据（值可为负） |
+| width / height | Double | 560 / 280 | 画布尺寸 |
+| horizontal | Bool | false | 横向条形态 |
+（默认）与横向条（`horizontal = true`，适配长类目名）两形态。`BarItem::make(标签, 值)`，值可为负；以 0 为基线，正主题色、负红色。悬停高亮该类目并在行内标注数值（自绘，无弹层）；类目标签过密时自动抽稀截断。200 类目全量重绘实测约 0.4ms。
+
+```moonbit
+let bars = @yue.Store::new([
+  @yue.BarItem::make("1月", 12.0),
+  @yue.BarItem::make("2月", -8.0),
+])
+@yue.bar_chart_t(bars, width=380.0, height=220.0)
+@yue.bar_chart_t(bars, width=380.0, height=220.0, horizontal=true)
+```
+
+### 环形 / 饼图 donut_chart_t
+
+`donut_chart_t(data : Store[Array[DonutSlice]], width? = 480.0, height? = 240.0, thickness? = 34.0, center? = "")`
+
+占比扇区
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| data | Store[Array[DonutSlice]] | 必填 | 扇区数据（负值不计占比） |
+| width / height | Double | 480 / 240 | 画布尺寸 |
+| thickness | Double | 34 | 环厚（0 为实心饼） |
+| center | String | "" | 中心文案，空为汇总值 |
+（12 点方向起顺时针，五色循环，相邻扇区不同色）；中心汇总数值（默认总和，`center` 非空时改用该文案）；右侧图例（色块 + 标签 + 值与百分比）。悬停扇区外扩 4px，图例行同步高亮。`DonutSlice::make(标签, 值)`，负值不计入占比。50 扇区重绘实测约 2.9ms。
+
+```moonbit
+let slices = @yue.Store::new([
+  @yue.DonutSlice::make("直接访问", 335.0),
+  @yue.DonutSlice::make("搜索引擎", 510.0),
+])
+@yue.donut_chart_t(slices, width=420.0, height=220.0)
+```
+
+### 仪表盘 gauge_t
+
+`gauge_t(value : Store[Double], width? = 240.0, height? = 170.0, thresholds?)`
+
+单值百分比环
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| value | Store[Double] | 必填 | 0..1，超出钳制 |
+| width / height | Double | 240 / 170 | 画布尺寸 |
+| thresholds | Array[(Double, String)] | [] | 升序（阈值上限, 颜色）分段着色；空表用主题主色 |
+（135° 起扫 270°，开口朝下）+ 中心大数字。`value` 取 0..1（超出钳制）；`thresholds` 为升序的 `[(阈值上限, 颜色), ...]`，值弧按落入分段着色（空表用主题主色），如 `[(0.6, 绿), (0.85, 橙), (1.0, 红)]`。数值插值平滑：目标值变化后经 16ms 定时器每帧补 25% 差值逐步逼近（非动画帧驱动），2Hz 更新无跳变。
+
+```moonbit
+let usage = @yue.Store::new(0.0)
+@yue.gauge_t(usage, thresholds=[
+  (0.6, @yue.theme_current().success),
+  (0.85, @yue.theme_current().warning),
+  (1.0, @yue.theme_current().danger),
+])
+```
+
+### 散点图 scatter_t
+
+`scatter_t(points : Store[Array[(Double, Double)]>, width? = 560.0, height? = 320.0, trend? = false, dot? = 3.0)`
+
+x/y 点列
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| points | Store[Array[(Double, Double)]] | 必填 | (x, y) 点列 |
+| width / height | Double | 560 / 320 | 画布尺寸 |
+| trend | Bool | false | 最小二乘趋势线 |
+| dot | Double | 3 | 点边长（px） |
+（小方点），双轴自适应刻度 + 网格；`trend = true` 叠加最小二乘趋势线（红色）。10000 点首绘实测约 3ms。框选缩放后置，未做。
+
+```moonbit
+let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
+@yue.scatter_t(pts, trend=true)
+```
+
 ## 图标
 
 内置矢量图标 136 种（箭头 / 文件 / 编辑 / 视图 / 导航 / 媒体 / 通信 / 系统 / 开发 / 数据 / 状态，风格对齐 Tabler / Lucide）。
