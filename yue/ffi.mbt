@@ -1896,6 +1896,11 @@ extern "c" fn ffi_win_session_power_watch(
 ) -> Int = "yue_mbt_win_session_power_watch"
 
 ///|
+/// Windows:NLM GetConnectivity 位掩码;失败 -1,非 Windows 哨兵 -1000。
+#borrow(ok)
+extern "c" fn ffi_win_connectivity(ok : Ref[Int]) -> Int = "yue_mbt_win_connectivity"
+
+///|
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，
 // FFI 边界上一律转成 C 侧期望的 UTF-8，转换成本留在库内。
 fn utf8_bytes(text : String) -> Bytes {

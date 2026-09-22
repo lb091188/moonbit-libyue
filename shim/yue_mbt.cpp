@@ -4283,6 +4283,51 @@ extern "C" int32_t yue_mbt_win_session_power_watch(
 
 #endif  // 电源/会话事件平台分支结束
 
+// ---------- 网络在线状态（Windows NLM COM 查询；Linux 走 DBus NM） ----------
+#if defined(OS_WIN)
+#include <netlistmgr.h>
+
+static bool g_nlm_com_ready = false;
+static INetworkListManager *g_nlm = nullptr;
+
+extern "C" int32_t yue_mbt_win_connectivity(int32_t *ok) {
+  *ok = 0;
+  if (!g_nlm_com_ready) {
+    // 文件级 static 守卫：COM 只初始化一次；RPC_E_CHANGED_MODE 说明
+    // 线程已有别的并发模型（如 GUI 的 STA），沿用即可
+    HRESULT hr = ::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
+      return -1;
+    }
+    hr = ::CoCreateInstance(CLSID_NetworkListManager, nullptr, CLSCTX_ALL,
+                            IID_INetworkListManager,
+                            reinterpret_cast<LPVOID *>(&g_nlm));
+    g_nlm_com_ready = true;
+    if (FAILED(hr)) {
+      g_nlm = nullptr;
+      return -1;
+    }
+  }
+  if (g_nlm == nullptr) {
+    return -1;
+  }
+  NLM_CONNECTIVITY conn = NLM_CONNECTIVITY_DISCONNECTED;
+  if (FAILED(g_nlm->GetConnectivity(&conn))) {
+    return -1;
+  }
+  *ok = 1;
+  return static_cast<int32_t>(conn);
+}
+
+#else  // Linux 网络查询走 DBus NetworkManager（MoonBit 层），非 Windows 哨兵
+
+extern "C" int32_t yue_mbt_win_connectivity(int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+#endif  // 网络在线状态平台分支结束
+
 void yue_mbt_notification_show(void *n) {
   if (auto *b = NotificationStore::get(n)) {
 #if defined(OS_WIN)

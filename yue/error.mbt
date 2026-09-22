@@ -179,3 +179,22 @@ pub impl Show for SystemError with fn output(self, logger) {
 
 ///|
 pub extend SystemError with Show::{to_string, output}
+
+///|
+pub(all) enum NetworkError {
+  /// 平台/服务不支持（macOS 暂缓、Linux 无 NetworkManager 在线）
+  Unsupported
+  /// 查询失败（应答异常 / 系统调用失败）
+  QueryFailed(String)
+}
+
+///|
+pub impl Show for NetworkError with fn output(self, logger) {
+  match self {
+    Unsupported => logger.write_string("NetworkError::Unsupported")
+    QueryFailed(m) => logger.write_string("NetworkError::QueryFailed(\{m})")
+  }
+}
+
+///|
+pub extend NetworkError with Show::{to_string, output}

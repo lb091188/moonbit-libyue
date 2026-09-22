@@ -165,10 +165,10 @@
   - Linux:DBus UPower——OnBattery 属性变更信号(订阅经 B5 信号注册表,回调内直解 changed 字典不重查)
   - Windows:电源设置注册通知(交直流源;事件接入随 B6 电源消息窗口)
   - 验收:拔插电源真机触发(助手宿主机为台式机,无法本地触发)
-- [ ] P12 网络在线状态(查询 + 变化事件)
-  - Linux:DBus NetworkManager——连接状态查询与变更信号
-  - Windows:在线状态 API 轮询;监听式后置
-  - 验收:断网 / 联网真机触发
+- [x] P12 网络在线状态(查询 + 变化事件)
+  - Linux:DBus NetworkManager——连接状态查询与变更信号(State 70/50 × Connectivity 4/3 归一 Online;两条信号订阅,回调内只读缓存)
+  - Windows:在线状态 API 轮询(NLM COM,5s set_timer);监听式后置
+  - 验收:断网 / 联网真机触发(待用户);查询路径 busctl 对照一致,私有总线降级 Err(Unsupported) 已验
 - [ ] P13 (后置)平台专属 — 任务栏进度(Windows)/ dock 徽标 / 最近文档
 - [ ] P14 测试与文档
   - Linux 三桌面 + Windows 10/11 真机复验;DBus 互操作真总线验证
