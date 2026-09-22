@@ -553,6 +553,120 @@ let tray = match @yue.Tray::new("icon.png") {
 On Linux the pure MoonBit `yue/traybus` backend is recommended (the unified `Tray` API selects it automatically);
 see [docs/tray.md](tray.md) for details.
 
+## System Integration (single instance / autostart / power / session / network)
+
+System-level capabilities for desktop apps — unified entry points and a unified
+error style (`Err(Unsupported)` plus `xxx_supported()` probes first). Full
+demos live on the showcase "System" page.
+
+### Single Instance & Re-Activation
+
+```moonbit
+match @yue.SingleInstance::acquire("org.example.MyApp") {
+  Ok(Some(handle)) => {
+    // this process is the first instance — keep starting up
+    handle.on_activate(fn(args) {
+      // second instance launched: its command line arrives here;
+      // restore / raise the window
+    })
+  }
+  Ok(None) => return  // an instance exists and was woken — exit
+  Err(_) => ()        // single-instance unavailable; degrade or exit
+}
+```
+
+| API | Purpose |
+|---|---|
+| SingleInstance::acquire(app_id) -> Result[SingleInstance?, SingleInstanceError] | Try to become the first instance (app_id must be a valid DBus bus name: dot-separated segments, starting with a letter/underscore) |
+| handle.on_activate(cb : (Array[String]) -> Unit) | Register the re-activation callback (receives the second instance's command line, including argv[0]) |
+| set_instance_window_title(title) | Window title (Windows' raise fallback searches by title; renaming at runtime breaks the fallback) |
+
+Linux claims an app-specific name on the session bus; Windows uses a named
+mutex plus a message window.
+
+### Autostart
+
+```moonbit
+let auto = match @yue.Autostart::new("org.example.MyApp") {
+  Ok(a) => a
+  Err(_) => ...   // platform unsupported (macOS deferred)
+}
+auto.enable()     // after Ok: launched on next login / reboot
+auto.disable()    // cancel (idempotent)
+```
+
+| API | Purpose |
+|---|---|
+| Autostart::new(app_id) -> Result[Autostart, AutostartError] | Handle (app_id follows the single-instance constraint) |
+| Autostart::is_supported() | Whether the platform supports autostart |
+| handle.is_enabled() -> Result[Bool, AutostartError] | Query current state |
+| handle.enable() / disable() -> Result[Unit, AutostartError] | Set / cancel (both idempotent) |
+| handle.path() -> Result[String, AutostartError] | Autostart entry file path (Linux .desktop) |
+
+Linux writes a .desktop into `$XDG_CONFIG_HOME/autostart` (exe path resolved
+via `/proc/self/exe`); Windows writes the HKCU Run key.
+
+### Opening External Things
+
+| API | Purpose |
+|---|---|
+| open_url(url) -> Result[Unit, OpenUrlError] | Hand a URL to the default browser |
+| reveal_in_file_manager(path) -> Result[Unit, FileManagerError] | Open and select in the file manager (relative paths resolve against the working directory; on Linux without FileManager1 it falls back to opening the parent directory — selection lost) |
+
+`Ok` only means "handed to the system"; the platform-side outcome does not
+travel back (whether the browser truly opens is the desktop's call).
+
+### Keep-Awake & User Idle
+
+```moonbit
+match @yue.KeepAwake::enable("org.example.MyApp") {
+  Ok(k) => { /* display kept on */ ignore(k.release()) }  // release
+  Err(_) => ()
+}
+match @yue.idle_seconds() {
+  Ok(sec) => ...   // seconds since the last input (threshold is the caller's)
+  Err(_) => ()
+}
+```
+
+| API | Purpose |
+|---|---|
+| KeepAwake::is_supported() | Whether the inhibition service / system capability is available |
+| KeepAwake::enable(app_id) -> Result[KeepAwake, KeepAwakeError] | Request keep-awake (Ok means the system accepted only; actual dimming behavior is platform policy) |
+| handle.release() | Release (idempotent) |
+| keep_awake_active() | Whether keep-awake is currently held |
+| idle_supported() / idle_seconds() -> Result[Double, IdleError] | User idle seconds (Linux X11; Wayland sessions report Unsupported explicitly) |
+
+### Battery & Power Events
+
+| API | Purpose |
+|---|---|
+| battery_supported() / battery_query() -> Result[BatteryInfo?, PowerError] | Battery reading (percent / charging / seconds-to-full and seconds-to-empty; no battery gives Ok(None)) |
+| power_event_supported() / on_power_source_change(cb) | AC/battery switch events (PowerSource::Ac / OnBattery; Windows event wiring is deferred — probe supported() first) |
+| suspend_resume_supported() / on_suspend_resume(cb) | Suspend/resume events (SleepEvent::Suspending / Resuming; rapid suspend-resume cycles may deliver two Resuming events — no library-side debounce) |
+
+Battery goes through UPower (system bus) on Linux and GetSystemPowerStatus on
+Windows; suspend/resume goes through logind PrepareForSleep on Linux and power
+broadcasts on Windows.
+
+### Screen Lock
+
+| API | Purpose |
+|---|---|
+| session_lock_supported() | Whether available (desktops whose locker bypasses logind deliver no signal) |
+| session_lock_watch(cb) -> Result[Unit, SystemError] | Subscribe to lock/unlock (SessionLockEvent::Locked / Unlocked; failures are structured errors, never silent) |
+
+### Network Online Status
+
+| API | Purpose |
+|---|---|
+| network_supported() / network_status() -> Result[NetworkStatus, NetworkError] | Current online status (Online = internet-reachable; captive portals count as Offline) |
+| on_network_status_change(cb) | Change events (dispatched on change only; Linux signal-driven, Windows polls every 5 seconds) |
+
+Linux goes through NetworkManager (system bus). The first `network_status()`
+builds the bus cache synchronously with a worst-case 1.5s block — inside
+callbacks and timers use events or the cache instead of repeated queries.
+
 ## Popover
 
 ```moonbit
