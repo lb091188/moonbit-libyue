@@ -157,3 +157,25 @@ pub impl Show for PowerError with fn output(self, logger) {
 
 ///|
 pub extend PowerError with Show::{to_string, output}
+
+///|
+pub(all) enum SystemError {
+  /// 平台/服务不支持（macOS 暂缓、无 logind 的环境）
+  Unsupported
+  /// 操作失败（订阅失败 / 系统调用失败）带原文
+  Message(String)
+  /// 总线连接断开（自愈在后台进行，稍后可重试）
+  Disconnected
+}
+
+///|
+pub impl Show for SystemError with fn output(self, logger) {
+  match self {
+    Unsupported => logger.write_string("SystemError::Unsupported")
+    Message(m) => logger.write_string("SystemError::Message(\{m})")
+    Disconnected => logger.write_string("SystemError::Disconnected")
+  }
+}
+
+///|
+pub extend SystemError with Show::{to_string, output}

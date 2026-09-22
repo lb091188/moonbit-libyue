@@ -115,3 +115,97 @@ pub fn on_power_source_change(cb : (PowerSource) -> Unit) -> Unit {
     _ => ()
   }
 }
+
+///|
+/// 休眠/唤醒事件。
+pub enum SleepEvent {
+  /// 即将休眠(醒来前最后时机;耗时清理在此完成)
+  Suspending
+  /// 已唤醒
+  Resuming
+}
+
+///|
+pub impl Show for SleepEvent with fn output(self, logger) {
+  match self {
+    Suspending => logger.write_string("SleepEvent::Suspending")
+    Resuming => logger.write_string("SleepEvent::Resuming")
+  }
+}
+
+///|
+pub extend SleepEvent with Show::{to_string, output}
+
+///|
+/// 休眠/唤醒事件是否可用。Linux 看 logind 是否在线;Windows 恒可用
+/// (电源广播);macOS 暂缓。
+pub fn suspend_resume_supported() -> Bool {
+  match platform() {
+    "linux" => @traybus.logind_available()
+    "windows" => true
+    _ => false
+  }
+}
+
+///|
+/// Windows 事件分发表:C 侧单窗口单回调,休眠/锁屏共用,后注册不得
+/// 覆盖前者——MoonBit 侧全局单点登记、按 event 码派发。
+let g_win_sleep_cbs : Array[(SleepEvent) -> Unit] = []
+
+///|
+let g_win_lock_cbs : Array[(Int) -> Unit] = []
+
+///|
+let g_win_power_watched : Ref[Bool] = Ref(false)
+
+///|
+fn win_power_evt_dispatch(evt : Int) -> Unit {
+  match evt {
+    0 =>
+      for cb in g_win_sleep_cbs {
+        cb(Suspending)
+      }
+    1 =>
+      for cb in g_win_sleep_cbs {
+        cb(Resuming)
+      }
+    2 | 3 =>
+      for cb in g_win_lock_cbs {
+        cb(evt)
+      }
+    _ => ()
+  }
+}
+
+///|
+/// 幂等建 Windows 电源/会话事件窗口(顶层分发函数常驻,C 侧持有安全)。
+fn win_watch_once() -> Unit {
+  if g_win_power_watched.val {
+    return
+  }
+  g_win_power_watched.val = true
+  let _ = ffi_win_session_power_watch(
+    fn(f, evt) { f(evt) },
+    win_power_evt_dispatch,
+  )
+}
+
+///|
+/// 注册休眠/唤醒回调(可多次注册;不支持的平台静默忽略,先以
+/// suspend_resume_supported 判定)。快速挂起唤醒可能连收两条
+/// Resuming(库内不去抖)。
+pub fn on_suspend_resume(cb : (SleepEvent) -> Unit) -> Unit {
+  match platform() {
+    "linux" => {
+      let _ = @traybus.logind_on_sleep(fn(start) {
+        cb(if start { Suspending } else { Resuming })
+      })
+      ()
+    }
+    "windows" => {
+      g_win_sleep_cbs.push(cb)
+      win_watch_once()
+    }
+    _ => ()
+  }
+}

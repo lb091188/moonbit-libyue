@@ -132,14 +132,14 @@
   - Linux:XDG 自启动目录写 .desktop 文件(纯 MoonBit);坑:exe 绝对路径经 /proc/self/exe 需 readlink(应用侧 stub),路径含空格的 .desktop 转义
   - Windows:注册表当前用户 Run 键写值(通知 AUMID 已有写注册表先例)
   - 验收:设置后重新登录 / 重启拉起,取消后不拉起
-- [ ] P4 挂起与唤醒事件
+- [x] P4 挂起与唤醒事件
   - Linux:DBus logind——PrepareForSleep 信号(参数区分将睡 / 已醒)
   - Windows:电源广播消息(挂起 / 自动恢复两事件,窗口过程 hook)
-  - 验收:dbus-monitor 对照;真机休眠 / 唤醒各触发一次
-- [ ] P5 锁屏与解锁事件
+  - 验收:dbus-monitor 对照(系统总线 BecomeMonitor 被拒,以探针订阅往返+注册表分发单测代);真机休眠 / 唤醒各触发一次(待用户)
+- [x] P5 锁屏与解锁事件
   - Linux:DBus logind——Session 的 Lock / Unlock 信号
   - Windows:终端服务会话变更通知(锁定 / 解锁两事件)
-  - 验收:真机锁屏 / 解锁触发
+  - 验收:真机锁屏 / 解锁触发(待用户);无 logind 环境降级 Err(Unsupported) 已验
 - [ ] P6 获取用户空闲秒数
   - Linux:shim——X11 屏保扩展查询;Wayland 后置
   - Windows:shim——最后输入时间查询(结构更简单)
@@ -172,7 +172,7 @@
 - [ ] P13 (后置)平台专属 — 任务栏进度(Windows)/ dock 徽标 / 最近文档
 - [ ] P14 测试与文档
   - Linux 三桌面 + Windows 10/11 真机复验;DBus 互操作真总线验证
-  - components.md 中英文档;showcase「系统集成」页补演示(自启动开关 / 单实例 / 打开外部 / 屏幕常亮与空闲)
+  - components.md 中英文档;showcase「系统集成」页补演示(自启动开关 / 单实例 / 打开外部 / 屏幕常亮与空闲 / 休眠唤醒与锁屏)
 - 批次策略:Linux DBus 套系先行(P1/P3-P5/P9-P11 复用 traybus),Windows 侧同 API 批量补 shim ABI + vendored 出包
 
 ## Markdown 能力升级(mizchi/markdown 编译器)

@@ -4211,6 +4211,78 @@ extern "C" int32_t yue_mbt_win_power_status(
 
 #endif  // 电源状态平台分支结束
 
+// ---------- 休眠唤醒与锁屏解锁（电源/会话消息窗口，模式复用单实例） ----------
+//
+// 一个 message-only 窗口同时收 WM_POWERBROADCAST（PBT_APMSUSPEND/
+// RESUME，休眠/唤醒）与 WM_WTSSESSION_CHANGE（WTS_SESSION_LOCK/UNLOCK，
+// 锁屏/解锁）。WNDPROC 里不跑应用回调，MessageLoop::PostTask 抛回主循环
+// 再经蹦床上行（closure-first，event 码 0=将睡 1=已醒 2=锁屏 3=解锁）。
+#if defined(OS_WIN)
+
+static void (*g_power_evt_invoke)(void *, int32_t) = nullptr;
+static void *g_power_evt_closure = nullptr;
+static HWND g_power_evt_hwnd = nullptr;
+
+static LRESULT CALLBACK PowerEvtWndProc(HWND hwnd, UINT msg, WPARAM wp,
+                                        LPARAM lp) {
+  int32_t evt = -1;
+  if (msg == WM_POWERBROADCAST) {
+    if (wp == PBT_APMSUSPEND) {
+      evt = 0;
+    } else if (wp == PBT_APMRESUME || wp == PBT_APMRESUMEAUTOMATIC) {
+      evt = 1;
+    }
+  } else if (msg == WM_WTSSESSION_CHANGE) {
+    if (wp == WTS_SESSION_LOCK) {
+      evt = 2;
+    } else if (wp == WTS_SESSION_UNLOCK) {
+      evt = 3;
+    }
+  }
+  if (evt >= 0 && g_power_evt_invoke != nullptr) {
+    void (*invoke)(void *, int32_t) = g_power_evt_invoke;
+    void *closure = g_power_evt_closure;
+    nu::MessageLoop::PostTask(
+        [invoke, closure, evt]() { invoke(closure, evt); });
+    return TRUE;  // WM_POWERBROADCAST 返回 TRUE 表示已处理
+  }
+  return ::DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+extern "C" int32_t yue_mbt_win_session_power_watch(
+    void (*invoke)(void *, int32_t), void *closure) {
+  g_power_evt_invoke = invoke;
+  g_power_evt_closure = closure;
+  if (g_power_evt_hwnd == nullptr) {
+    WNDCLASSW wc = {};
+    wc.lpfnWndProc = PowerEvtWndProc;
+    wc.hInstance = ::GetModuleHandleW(nullptr);
+    wc.lpszClassName = L"moonbit_libyue_power_evt";
+    // 同进程重复注册同类名失败可忽略：WNDPROC 相同，窗口照常建
+    ::RegisterClassW(&wc);
+    g_power_evt_hwnd = ::CreateWindowExW(0, wc.lpszClassName, nullptr, 0, 0, 0,
+                                         0, 0, HWND_MESSAGE, nullptr,
+                                         wc.hInstance, nullptr);
+    if (g_power_evt_hwnd == nullptr) {
+      return -1;
+    }
+    // WTS 锁屏/解锁走会话变更通知（仅本会话）；注册失败只影响锁屏事件，
+    // 电源广播不受影响，不视为整体失败
+    ::WTSRegisterSessionNotification(g_power_evt_hwnd,
+                                     NOTIFY_FOR_THIS_SESSION);
+  }
+  return 0;
+}
+
+#else  // Linux 休眠/锁屏走 DBus logind（MoonBit 层），非 Windows 哨兵
+
+extern "C" int32_t yue_mbt_win_session_power_watch(
+    void (*)(void *, int32_t), void *) {
+  return -1000;
+}
+
+#endif  // 电源/会话事件平台分支结束
+
 void yue_mbt_notification_show(void *n) {
   if (auto *b = NotificationStore::get(n)) {
 #if defined(OS_WIN)

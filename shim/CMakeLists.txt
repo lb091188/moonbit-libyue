@@ -142,7 +142,7 @@ if(WIN32)
     setupapi.lib powrprof.lib ws2_32.lib dbghelp.lib shlwapi.lib version.lib
     winmm.lib wbemuuid.lib psapi.lib dwmapi.lib propsys.lib comctl32.lib
     gdiplus.lib urlmon.lib userenv.lib uxtheme.lib delayimp.lib
-    runtimeobject.lib ntdll.lib shcore.lib pdh.lib)
+    runtimeobject.lib ntdll.lib shcore.lib pdh.lib wtsapi32.lib)
   target_compile_options(yue_mbt PRIVATE /wd4005 /wd4101 /wd4244 /wd4267 /wd4996)
 
   # 浏览器优先 WebView2：需要发行包/预构建包自带的 SDK 头文件
