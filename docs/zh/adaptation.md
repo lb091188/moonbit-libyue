@@ -231,6 +231,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 ### 运行期差异
 
+- 系统强调色:`DwmGetColorizationColor` 取的是「窗口颜色化色」——强调色与系统基色的混合,默认配置下与设置页强调色有明显色偏(参照机 Win10 19045 实测返回黄绿 0xFFB7AC00,而设置页强调色为青 0xFF00B7C3);先读注册表 `HKCU\Software\Microsoft\Windows\DWM\AccentColor`(0xAABBGGRR,Win10 1803+ 写入),缺失 / 0 / 0xFFFFFFFF 才回退颜色化色,修复后探针实测 0xFF00B7C3 与设置页逐位一致。回退值的 alpha 位是「强度」非透明度,只取 RGB。
 - GetSystemPowerStatus 语义损失(电量查询):ACLineStatus 255(未知)按非在线;BatteryFlag 128(无电池)/ 255(未知)均按无电池;BatteryLifeTime 语义随交直流漂移且常为 -1,统一不给剩余时间(Linux UPower 侧 State 1/4/5 都归"接着电源",两平台口径对齐)。
 - `AttributedText` 区间字体 / 颜色:上游 Windows 只支持全文(区间 CHECK 崩,GDI+ 无富文本),fork mbt.9 自建分段布局器(run 存储 / 流式折行 / 测量绘制同源),MoonBit 层降级守卫已删,三平台语义一致。坑:`Gdiplus::Font::GetHeight` 重载是 `(const Graphics*)`,传引用编不过。
 - `Color::Get(Border)` 触发 NOTREACHED 返回垃圾色:shim 对 Border 用 `GetSysColor(COLOR_WINDOWFRAME)`。

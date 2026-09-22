@@ -83,8 +83,9 @@ pub fn system_prefers_dark() -> Bool {
 /// 系统主色调(强调色):ARGB hex(如 "#ff009688");系统无主色概念或
 /// 取不到时返回空串。仅主线程 GUI 初始化后可用。
 /// (Linux 三级递进:GNOME 47+ 的 accent-color 设置 → 当前 GTK 主题
-/// CSS 的 theme_selected_bg_color → 空;Windows 取 DWM 颜色化色;
-/// macOS 取 controlAccentColor。读取路径与实测值见 adaptation.md。)
+/// CSS 的 theme_selected_bg_color → 空;Windows 取注册表用户强调色
+/// (DWM\AccentColor),缺失回退 DWM 颜色化色;macOS 取 controlAccentColor。
+/// 读取路径与实测值见 adaptation.md。)
 pub fn system_accent() -> String {
   let v = ffi_system_accent()
   if v == 0 {
