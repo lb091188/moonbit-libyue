@@ -71,7 +71,7 @@ fn page_data(app : App) -> @yue.Node {
   table_sort.subscribe(fn(_st) { reorder_langs() })
   let table_picked = @yue.Signal::new("未选中")
   let table_sel : @yue.Store[Array[Int]] = @yue.Store::new([])
-  let rich_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new([
+  let rich_base : Array[@yue.TableRow] = [
     {
       cells: [
         @yue.CellText("MoonBit"),
@@ -96,7 +96,31 @@ fn page_data(app : App) -> @yue.Node {
         @yue.CellLines(["脚本", "AI 生态"]),
       ],
     },
-  ])
+  ]
+  let rich_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new(rich_base)
+  let rich_sort : @yue.Store[@yue.TableSort] = @yue.Store::new(
+    @yue.TableSort::{ column: -1, asc: true },
+  )
+  rich_sort.subscribe(fn(st) {
+    if st.column != 0 {
+      rich_rows.set(rich_base)
+      return
+    }
+    let rows = rich_base.copy()
+    rows.mut_view().sort_by(fn(a, b) {
+      let ka = match a.cells[0] {
+        @yue.CellText(t) => t
+        _ => ""
+      }
+      let kb = match b.cells[0] {
+        @yue.CellText(t) => t
+        _ => ""
+      }
+      let c = if ka < kb { -1 } else if ka > kb { 1 } else { 0 }
+      if st.asc { c } else { -c }
+    })
+    rich_rows.set(rows)
+  })
   let v_rows_data : Array[@yue.TableRow] = []
   for i in 0..<10000 {
     v_rows_data.push(
@@ -301,19 +325,20 @@ fn page_data(app : App) -> @yue.Node {
       ],
     ),
     section(
-      "Table 表格(多选)",
-      "复选框列:行点击勾选,表头全选/清空(部分选中画横条)。",
+      "Table 表格(多选 + 排序)",
+      "复选框列:行点击勾选,表头全选/清空(部分选中画横条);表头排序箭头(灰 ↕ 可排 / 主题色当前排序),「语言」列可点排序,拖动列边界调宽。",
       [
         @yue.table_t(
           [
             @yue.TableColumn::make("语言", 120.0),
-            @yue.TableColumn::make("类型", 100.0),
-            @yue.TableColumn::make("色板", 110.0),
-            @yue.TableColumn::make("特性", 0.0),
+            @yue.TableColumn::make("类型", 100.0, sortable=false),
+            @yue.TableColumn::make("色板", 110.0, sortable=false),
+            @yue.TableColumn::make("特性", 0.0, sortable=false),
           ],
           rich_rows,
           selection=table_sel,
           width=460.0,
+          sort=rich_sort,
         ),
         @yue.bind(table_sel.signal(), fn(s) { "已选 \{s.length()} 行" }),
       ],

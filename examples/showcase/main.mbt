@@ -69,6 +69,8 @@ struct App {
   close_veto : Ref[Bool]
   veto_info : @yue.Store[String]
   dark_mode : @yue.Store[Bool]
+  // 主题主色(hex):空串 = 内置基准盘,否则 theme_from_accent 公式派生
+  accent : @yue.Store[String]
   tray_clicks : @yue.Store[Int]
   dlg_basic : @yue.Store[Bool]
   dlg_form : @yue.Store[Bool]
@@ -108,6 +110,8 @@ fn main {
     close_veto: Ref(false),
     veto_info: @yue.Store::new("(未开启拦截)"),
     dark_mode: @yue.Store::new(@yue.system_prefers_dark()),
+    // 启动即跟随系统主色调(系统无主色概念时回落内置 primary)
+    accent: @yue.Store::new(@yue.system_accent()),
     tray_clicks: @yue.Store::new(0),
     dlg_basic: @yue.Store::new(false),
     dlg_form: @yue.Store::new(false),
@@ -125,15 +129,23 @@ fn main {
     }),
     picked_lang: @yue.Signal::new(""),
   }
-  // 深浅主题:启动跟随系统,系统切换时实时联动;「切换深浅」按钮手动覆盖
-  app.dark_mode.subscribe(fn(v) {
-    if v {
-      @yue.theme_apply(@yue.dark_theme())
+  // 深浅主题:启动跟随系统,系统切换时实时联动;「切换深浅」按钮手动覆盖。
+  // 主色(accent)非空时改走公式派生色板,深浅切换沿用当前主色
+  fn apply_theme() -> Unit {
+    let dark = app.dark_mode.get()
+    let accent = app.accent.get()
+    if accent == "" {
+      @yue.theme_apply(if dark { @yue.dark_theme() } else { @yue.default_theme() })
     } else {
-      @yue.theme_apply(@yue.default_theme())
+      @yue.theme_apply(@yue.theme_from_accent(accent, dark~))
     }
-  })
+  }
+
+  app.dark_mode.subscribe(fn(_v) { apply_theme() })
+  app.accent.subscribe(fn(_a) { apply_theme() })
   @yue.on_system_theme_change(fn() { app.dark_mode.set(@yue.system_prefers_dark()) })
+  // 初始应用一次(subscribe 注册不回调):系统深浅 + 系统主色
+  apply_theme()
 
   let window = @yue.mount_window(
     [

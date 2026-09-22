@@ -553,7 +553,7 @@ let ratio = @yue.Store::new(0.42)
 
 表头 + 斑马纹 + 悬停底色 + Store 驱动（set 后整表重建并清空选择）。列用 `TableColumn::make(标题, 宽, align?, sortable?)`（宽 ≤0 为弹性列均分剩余宽；`sortable=false` 的列不参与表头排序）。单元格 `TableCell`：`CellText` / `CellTag(文本, 语义类型)` / `CellColorBox(色值, 名)` / `CellLines(多行, 行自动撑高)`；`TableRow::make(字符串数组)` 建纯文本行。不传 `selection` 时行点击单选高亮；传 `selection` 启用复选框列（行点击勾选、表头全选 / 清空、部分选中画横条，选中行浅蓝底），回调收 `(行号, 行)`。
 
-表头排序与列宽：传 `sort`（`Store[TableSort]`，`TableSort{ column, asc }`，`column` 为列定义下标、<0 表示不排序）后，可排序列显示升降箭头，点击切换「新列默认升序 / 同列翻转升降」；数据排序由使用方订阅该 Store 自行完成后回写 `rows`。拖动表头列边界（右缘 4px）调整列宽，相邻两列此消彼长（最小 56px），行不重建、选择不丢。
+表头排序与列宽：传 `sort`（`Store[TableSort]`，`TableSort{ column, asc }`，`column` 为列定义下标、<0 表示不排序）后，可排序列表头右侧常驻灰色 ↕ 双三角提示可点排序；点击切换「新列默认升序 / 同列翻转升降」，当前排序列换主题色实心 ▲ / ▼（排序状态一眼可辨）；数据排序由使用方订阅该 Store 自行完成后回写 `rows`。表头列边界线常驻浅色，悬停 / 拖动变主题色——拖动位置一眼可辨；按住任一列左缘或右缘 4px 调整列宽（末列右缘不设把手），相邻两列此消彼长（最小 56px），拖动经鼠标捕获不丢事件，行不重建、选择不丢。
 
 ```moonbit
 let rows = @yue.Store::new([@yue.TableRow::make(["甲", "1"]), @yue.TableRow::make(["乙", "2"])])
@@ -570,7 +570,7 @@ sort.subscribe(fn(st) { /* 按 st.column / st.asc 重排后 rows.set(...) */ })
 
 `table_v_t(columns, rows : Store[Array[TableRow]], width? = 560.0, height? = 360.0, row_height? = 32.0, selection? : Store[Array[Int]], sort? : Store[TableSort], on_row_click?)`
 
-table_t 的万行级形态：只画可见行，自管滚动（滚轮 / 拖拽滚动条 / 键盘），不受滚动容器内容高度上限约束；单元格画法同 table_t（CellLines 在行高内最多两行），列 / selection / sort（表头排序箭头）/ 列宽拖动语义一致。
+table_t 的万行级形态：只画可见行，自管滚动（滚轮 / 拖拽滚动条 / 键盘），不受滚动容器内容高度上限约束；单元格画法同 table_t（CellLines 在行高内最多两行），列 / selection / sort（表头箭头：常驻灰 ↕ 提示、排序列主题色 ▲▼）/ 列宽拖动（左 / 右缘双向边界）语义一致。
 
 ```moonbit
 let rows = @yue.Store::new([@yue.TableRow::make(["1", "甲"]), @yue.TableRow::make(["2", "乙"])])
