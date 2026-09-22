@@ -4786,6 +4786,7 @@ pub fn table_v_t(
   row_height? : Double = 32.0,
   selection? : Store[Array[Int]],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) { },
+  on_header_click? : (Int) -> Unit = fn(_j) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -5119,6 +5120,17 @@ pub fn table_v_t(
             match sel {
               Some(_) => toggle_all()
               None => ()
+            }
+          } else {
+            // 列头点击（复选框区以外）：回传列号，使用方自接排序
+            let mut hit = -1
+            for j in 0..<columns.length() {
+              if e.view_x >= col_x[j] && e.view_x < col_x[j] + col_w[j] {
+                hit = j
+              }
+            }
+            if hit >= 0 {
+              on_header_click(hit)
             }
           }
           ViewLike::schedule_paint(cv)
