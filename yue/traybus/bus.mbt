@@ -483,6 +483,15 @@ fn Conn::handle(self : Conn, msg : Msg) -> Unit {
     return
   }
   if msg.kind == 1 {
-    self.handle_call(msg)
+    // 单实例对象的 Wake 调用先于 SNI 分发：今天入站调用一律进 handle_call，
+    // Wake 会落进 UnknownMethod 兜底，首实例永远收不到二次唤起。
+    // 先应答后触发——第二实例的 call_sync 有时限，回调里恢复/置前窗口
+    // 可能耗时，不能让对端干等。
+    if is_wake_call(msg) {
+      self.reply(msg, "", [])
+      fire_wake(msg)
+    } else {
+      self.handle_call(msg)
+    }
   }
 }

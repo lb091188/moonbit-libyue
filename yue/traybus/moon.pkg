@@ -7,9 +7,11 @@ options(
     "sys.mbt": [ "native" ],
     "wire.mbt": [ "native" ],
     "bus.mbt": [ "native" ],
+    "instance.mbt": [ "native" ],
     "sni.mbt": [ "native" ],
     "icon.mbt": [ "native" ],
     "detect.mbt": [ "native" ],
     "wire_wbtest.mbt": [ "native" ],
+    "instance_wbtest.mbt": [ "native" ],
   },
 )
