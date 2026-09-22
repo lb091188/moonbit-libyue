@@ -5107,6 +5107,16 @@ pub fn table_t(
         }
       }
 
+      // 鼠标离开整个表格(移去表头 / 表格外)时清悬停:兜底行级 leave
+      // 丢失导致的 hover 底色永久滞留
+      ViewLike::on_mouse_leave(outer, fn(_e) {
+        let prev = hover_i.val
+        if prev >= 0 {
+          hover_i.val = -1
+          refresh_row(prev)
+        }
+      })
+
       fn rebuild(data : Array[TableRow]) -> Unit {
         for v in row_cs.val {
           ignore(body.remove_child_view(ViewLike::view(v)))
@@ -5171,13 +5181,22 @@ pub fn table_t(
           }
           row_cols.val.push(cells)
           ViewLike::on_mouse_enter(row, fn(_e) {
+            // 旧行的 leave 可能迟到/丢失(快速移动、跨子控件边界事件
+            // 乱序),enter 里一并重绘旧行,滞留的 hover 底色即时清掉
+            let prev = hover_i.val
             hover_i.val = idx
+            if prev != idx {
+              refresh_row(prev)
+            }
             refresh_row(idx)
           })
           ViewLike::on_mouse_leave(row, fn(_e) {
-            let prev = hover_i.val
-            hover_i.val = -1
-            refresh_row(prev)
+            // 仅当当前悬停仍是本行才清:乱序 leave(到达晚于新行 enter)
+            // 不得清掉新行的 hover
+            if hover_i.val == idx {
+              hover_i.val = -1
+              refresh_row(idx)
+            }
           })
           View::set_cursor(row, hand())
           ViewLike::on_mouse_down(row, fn(e) {
