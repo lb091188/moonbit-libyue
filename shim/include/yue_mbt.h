@@ -649,6 +649,12 @@ void yue_mbt_view_set_tooltip(void *view, const char *text);
 int32_t yue_mbt_view_add_tooltip_for_rect(void *view, const char *text, double x, double y, double w, double h);
 void yue_mbt_view_remove_tooltip(void *view, int32_t id);
 bool yue_mbt_system_prefers_dark(void);
+/* 系统主色调(强调色)→ ARGB uint32;无主色概念/取不到返回 0 */
+uint32_t yue_mbt_system_accent(void);
+#if defined(__APPLE__)
+/* macOS 实现(ObjC++ 翻译单元 yue_accent_mac.mm),由 system_accent 转调 */
+uint32_t yue_mbt_system_accent_mac(void);
+#endif
 void yue_mbt_on_system_theme_change(void (*invoke)(void *), void *closure);
 void yue_mbt_repaint_all(void);
 void yue_mbt_view_set_focusable(void *view, int32_t focusable);

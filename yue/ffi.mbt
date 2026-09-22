@@ -2032,6 +2032,10 @@ extern "c" fn ffi_view_remove_tooltip(v : View, id : Int) -> Unit = "yue_mbt_vie
 extern "c" fn ffi_system_prefers_dark() -> Int = "yue_mbt_system_prefers_dark"
 
 ///|
+/// 系统主色调 ARGB(0 = 无主色概念/取不到),见 yue_mbt_system_accent。
+extern "c" fn ffi_system_accent() -> Int = "yue_mbt_system_accent"
+
+///|
 #borrow(invoke, callback)
 extern "c" fn ffi_on_system_theme_change(
   invoke : FuncRef[(() -> Unit) -> Unit],

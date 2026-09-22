@@ -264,6 +264,116 @@ pub fn dark_theme() -> Theme {
 }
 
 ///|
+/// 由单个主色调公式派生整套主题色板(EP 主题工作台的思路):
+///   - 主色:保持色相,仅按深浅模式钳制明度(浅 0.34..0.52 / 深
+///     0.55..0.72)与最低饱和度,保证白字/浅底上的可读性;
+///   - primary_hover = 主色明度 ∓8%(浅加深/深提亮);
+///   - primary_light = 主色向面板底混色(浅色混白 88%,深色混面板
+///     底),Soft 按钮/选中行底色即此;
+///   - 语义色(success/warning/danger/info)取固定色相轮
+///     (142/36/4/210),饱和度假借主色(≥0.4)、明度随深浅模式,
+///     浅底变体同理推出;
+///   - 中性色(文字/边框/悬停/斑马纹/背景)取内置深浅基准盘,
+///     不随主色偏移,保持排版稳定。
+/// accent 非法时回落内置基准主题。
+pub fn theme_from_accent(accent : String, dark? : Bool = false) -> Theme {
+  let base = if dark {
+    dark_theme()
+  } else {
+    default_theme()
+  }
+  let (r, g, b) = match parse_hex(accent) {
+    Some(rgb) => rgb
+    None => return base
+  }
+  let (h, s0, l0) = rgb_to_hsl(r, g, b)
+  // 主色:饱和度保底 0.45,明度按模式钳到可担纲强调色的区间
+  let ps = if s0 < 0.45 { 0.45 } else { s0 }
+  let pl = if dark {
+    if l0 > 0.72 {
+      0.72
+    } else if l0 < 0.55 {
+      0.55
+    } else {
+      l0
+    }
+  } else if l0 > 0.52 {
+    0.52
+  } else if l0 < 0.34 {
+    0.34
+  } else {
+    l0
+  }
+  let primary = from_hsl(h, ps, pl)
+  let primary_hover = if dark {
+    from_hsl(h, ps, pl + 0.08)
+  } else {
+    from_hsl(h, ps, pl - 0.09)
+  }
+  let primary_light = if dark {
+    mix_hex(primary, base.bg_panel, 0.30)
+  } else {
+    mix_hex(primary, "#FFFFFF", 0.88)
+  }
+  // 语义色:固定色相轮,饱和度假借主色、明度随模式
+  let ss = if ps * 0.8 < 0.4 { 0.4 } else { ps * 0.8 }
+  let sl = if dark { 0.62 } else { 0.38 }
+  let semantic = fn(hue : Double) -> String { from_hsl(hue, ss, sl) }
+  let success = semantic(142.0)
+  let warning = semantic(36.0)
+  let danger = semantic(4.0)
+  let info = semantic(210.0)
+  let light_of = fn(c : String) -> String {
+    if dark {
+      mix_hex(c, base.bg_panel, 0.30)
+    } else {
+      mix_hex(c, "#FFFFFF", 0.86)
+    }
+  }
+
+  {
+    primary,
+    primary_light,
+    primary_hover,
+    danger_hover: if dark { lighten_hex(danger, 0.08) } else { darken_hex(danger, 0.09) },
+    success,
+    success_light: light_of(success),
+    warning,
+    warning_light: light_of(warning),
+    danger,
+    danger_light: light_of(danger),
+    info,
+    info_light: light_of(info),
+    text_primary: base.text_primary,
+    text_regular: base.text_regular,
+    text_secondary: base.text_secondary,
+    border: base.border,
+    fill_hover: base.fill_hover,
+    fill_zebra: base.fill_zebra,
+    bg_page: base.bg_page,
+    bg_panel: base.bg_panel,
+  }
+}
+
+///|
+/// 跟随系统的整套主题:深浅取 [system_prefers_dark],主色取
+/// [system_accent](系统无主色概念时为空串,回落内置 primary)。
+/// 配合 on_system_theme_change 可在系统换主题时实时重算。
+pub fn theme_from_system() -> Theme {
+  let dark = system_prefers_dark()
+  let accent = system_accent()
+  if accent == "" {
+    if dark {
+      dark_theme()
+    } else {
+      default_theme()
+    }
+  } else {
+    theme_from_accent(accent, dark~)
+  }
+}
+
+///|
 /// 主题存储：单个可变快照 + 主题变更订阅（theme_apply 整体替换并通知，
 /// 已挂载组件借此即时重着色，暗/浅切换不需要重建界面）。
 priv struct ThemeBox {

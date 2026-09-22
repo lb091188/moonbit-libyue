@@ -6,7 +6,7 @@
 
 ## 主题
 
-全部颜色来自主题色板——深色低饱和配色：蓝 `#2D68C4`、绿 `#2E9E5B`、橙 `#D9822B`、红 `#D64550`，以及文字 / 边框 / 填充灰阶。组件一律直角，hover/active 用背景色表达，文字垂直居中。表单控件统一高度 32px（`control_height`），按钮 / 输入框 / 下拉 / 数字器 / 日期与颜色选择字段混排成行时基线对齐。
+全部颜色来自主题色板——深色低饱和配色：蓝 `#2D68C4`、绿 `#2E9E5B`、橙 `#D9822B`、红 `#D64550`，以及文字 / 边框 / 填充灰阶。组件一律直角，hover/active 用背景色表达，文字垂直居中。表单控件统一高度 32px（`control_height`），按钮 / 输入框 / 下拉 / 数字器 / 日期与颜色选择字段混排成行时基线对齐。表单控件统一高度 32px（`control_height`），按钮 / 输入框 / 下拉 / 数字器 / 日期与颜色选择字段混排成行时基线对齐。
 
 ### 切换与定制
 
@@ -18,6 +18,9 @@
 | `on_theme_change(f)` | 订阅主题变更（组件挂载时注册，常驻界面重设定死色用） |
 | `system_prefers_dark()` | 读系统深浅偏好（当前仅 Linux 有实现） |
 | `on_system_theme_change(f)` | 系统偏好切换时回调（当前仅 Linux 有实现） |
+| `system_accent()` | 读系统主色调（强调色）hex，无主色概念时为空串 |
+| `theme_from_accent(accent, dark?)` | 由单个主色按公式派生整套色板，返回 `Theme` |
+| `theme_from_system()` | 深浅 + 主色全部跟随系统，返回 `Theme` |
 
 `Theme` 字段：
 
@@ -39,13 +42,27 @@ let t = @yue.default_theme()
 @yue.theme_apply({ ..t, primary: "#1E4FA3", primary_light: "#E3EDFA" })
 ```
 
-跟随系统深浅：启动时按 `system_prefers_dark()` 选主题，`on_system_theme_change` 回调里重读并重新 `theme_apply`。焦点环与字段聚焦边框为中性灰单层描亮（不用主题色）。
+跟随系统：`theme_from_system()` 一次拿到「深浅 + 主色」全部跟随系统的主题（无主色概念的桌面回落内置 primary），`on_system_theme_change` 回调里重算并重新 `theme_apply` 即可实时跟随。焦点环与字段聚焦边框为中性灰单层描亮（不用主题色）。
 
 ```moonbit
-let dark = @yue.system_prefers_dark()
-@yue.theme_apply(if dark { @yue.dark_theme() } else { @yue.default_theme() })
+@yue.theme_apply(@yue.theme_from_system())
 @yue.on_system_theme_change(fn() {
-  @yue.theme_apply(if @yue.system_prefers_dark() { @yue.dark_theme() } else { @yue.default_theme() })
+  @yue.theme_apply(@yue.theme_from_system())
+})
+```
+
+### 主色公式派生与系统主色
+
+只有一个主色时不必手调整套色板：`theme_from_accent(accent, dark?)` 按 HSL 公式即时派生——主色保色相、按深浅模式钳制明度（浅 0.34..0.52 / 深 0.55..0.72）与最低饱和度保证可读；`primary_hover` 明度 ∓8%，`primary_light` 向面板底混色（Soft 按钮底即此）；语义色（success/warning/danger/info）取固定色相轮 142/36/4/210，饱和度假借主色、明度随深浅；中性色（文字 / 边框 / 填充 / 背景）取内置基准盘不随主色偏移。
+
+`system_accent()` 读系统主色调：Linux 三级递进（GNOME 47+ 强调色设置 → 当前 GTK 主题 CSS 的选中底色 → 空串），Windows 取 DWM 颜色化颜色，macOS 取 `controlAccentColor`；读取路径与实测值见 [adaptation.md](adaptation.md)。
+
+```moonbit
+// 点选主色即时换肤,深浅切换沿用当前主色
+let accent = @yue.Store::new("")
+@yue.theme_apply(@yue.theme_from_accent(accent.get(), dark=@yue.system_prefers_dark()))
+accent.subscribe(fn(a) {
+  @yue.theme_apply(@yue.theme_from_accent(a, dark=@yue.system_prefers_dark()))
 })
 ```
 
