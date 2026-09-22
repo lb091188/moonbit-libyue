@@ -2604,6 +2604,12 @@ pub fn input_t(
           let b = ViewLike::get_bounds(outer)
           if e.button == 1 && has_text.val && e.view_x >= b.width - 24.0 {
             entry.set_text("")
+            has_text.val = false
+            // SetText 不触发 on_text_change(fork 的 is-editing 守卫吞掉
+            // changed 信号,防编程式设置回环):清空后必须显式补一次回调,
+            // 否则使用方的过滤条件不更新(文本没了列表不变)
+            on_input("")
+            ViewLike::schedule_paint(outer)
             true
           } else {
             false
