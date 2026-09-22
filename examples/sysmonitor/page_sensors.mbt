@@ -148,24 +148,14 @@ fn page_sensors(app : App) -> @yue.Node {
 
   @yue.vbox(
     [
-      @yue.label_t("显卡（PCI 显示设备，温度走 hwmon）", role=@yue.Section, style=[
+      @yue.label_t("显卡", role=@yue.Section, style=[
         ("marginBottom", 6.0),
       ]),
-      @yue.label_t(
-        "NVIDIA 专有利用率指标（nvidia-smi 子进程）按计划后置；无 hwmon 温度的显卡显示「—」。",
-        role=@yue.Secondary,
-        style=[("marginBottom", 10.0)],
-      ),
       draw_rows(gpu_n, fn(p, w) { draw_gpu_rows(p, w, gpus.get()) }),
       @yue.separator(style=[("marginTop", 14.0), ("marginBottom", 10.0)]),
-      @yue.label_t("温度传感器（/sys/class/hwmon，毫摄氏度换算）", role=@yue.Section, style=[
+      @yue.label_t("温度传感器", role=@yue.Section, style=[
         ("marginBottom", 4.0),
       ]),
-      @yue.label_t(
-        "右列 120 点 2 分钟迷你曲线；<60℃ 常规、60-85℃ 警告、>85℃ 危险。",
-        role=@yue.Secondary,
-        style=[("marginBottom", 8.0)],
-      ),
       draw_rows(sensor_n, fn(p, w) { draw_sensor_rows(p, w, page.rows.get()) }),
     ],
     style=[("padding", 12.0)],

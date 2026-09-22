@@ -50,6 +50,8 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - libyue 的 Arc 无法表达逆时针弧:GTK 侧 `PainterGtk::Arc` 就是 `cairo_arc`,而 cairo 会把 `ea < sa` 规范化成「加 2π 的顺时针长弧」;Win 侧公开 API 也写死顺时针(底层 ArcPixel 有 anticlockwise 形参但没有暴露)。shim 里「ccw 用负角跨度表达」的换算因此两层都不生效——圆环内弧硬用 ccw 会把内孔包进长弧,填充出实心饼(真机截图实测:环形图/仪表盘中心不镂空,"总计"/百分比压在实心面上)。修复:内弧回程改折线近似(整圆 32 段,弦误差 <0.4px,三平台一致);纯描边场景(图标弧)直接交换起止角等价。fork 层若要把 `PainterGtk::Arc` 改成 `cairo_arc_negative` 才是根治,需走 vendor-* 出包,暂未做。
 - 图表验收基准(release,Ubuntu 24.04 XFCE X11,离屏 Canvas + initialize,真实全帧含文本):折线 1000 点 × 4 序列(陡锯齿对抗数据)3.08ms / 平滑数据 1.81ms;柱状 200 类目 0.38ms;环形 50 扇区 0.70ms;仪表盘 0.15ms;散点 10000 点 3.03ms。纯函数管线(值域/刻度/抽稀/坐标换算)折线 0.028ms。推点长跑:4800 次(10 分钟 @2Hz × 4 序列)共 2.89ms,窗口长度恒定 1000 不增长——活数据 4 × 1000 × 8B = 32KB 有界,内存增量来自 GC 回收的换窗垃圾,连续推点不积累。
 - 折线面积锚点:0 在值域内取零线,全正值取绘制区底,全负值取绘制区顶(跨零时一列上下两段矩形)。
+- `Painter::DrawText`(画布 draw_text)默认 `wrap=true`:定高行 / 窄盒里的长文本被平台排版换行,溢出行界。实测三类症状:进程表命令行(动辄上百字符)换行穿透行高压到下一行;图表 y 轴大数值直出("21414.7")竖排成多行互相叠压;折线多序列末端值标签接近时叠字。修复:shim 增 `yue_mbt_painter_draw_text_ex` 透出 TextAttributes 的 wrap/ellipsis(纯 ABI 翻译),MoonBit 侧 draw_text 加可选参数,表格单元格统一 `wrap=false + ellipsis=true` 单行省略(截断由平台排版完成,免逐格测宽);`fmt_axis` 在 |v| ≥ 1e4 起按 k/M/G 换挡(一位小数去尾零),标签保持 5 字符内不触发换行;末端标签改为收集后按 y 排位(最小间距 14px,越界整体压回)再绘制。
+- 图表 / 虚拟表格自适应(fill 开关):不设固定宽度,靠列容器默认 stretch 横向铺满,随窗口伸缩。表格 fill 模式下每次绘制按实际宽度重排列几何:固定列保留拖宽结果、弹性列分摊剩余宽度(拖宽两列此消彼长守恒,与弹性列重排不冲突);行内自适应固定坐标(w − 偏移)的自绘行容器本就跟随。
 
 ### 布局几何(Yoga flexbox)
 
@@ -144,6 +146,8 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - statvfs 容量取 f_bavail(可用,含保留块扣除)而非 f_bfree,与 df 的 Use% 口径一致;结构体跨 ABI 拆成 total/free/avail 三个 int64 出参。
 - /proc/mounts 的伪文件系统(proc/sysfs/cgroup2/devtmpfs/efivarfs 等约 20 种)statvfs 无容量意义,容量表按 fstype 黑名单跳过,只留 /dev/ 真实设备行;同一设备多挂载点(btrfs 子卷 / LVM 快照)按设备去重取首个。
 - 目录枚举(/sys/class/hwmon、/sys/class/net、/sys/bus/pci/devices、/sys/block/*/slaves)经 stub 的 opendir/readdir 通用化(换行分隔条目名),与 read_text_file 同为数据层唯一两类 IO 原语。
+- /dev/fuse 控制挂载(文件管理器拉起 gvfsd-fuse 后出现,挂载点 /tmp/fuse)statvfs 合法返回但 f_blocks=0:只按 fstype 黑名单过滤伪文件系统不够,须再按 total<=0 过滤,否则磁盘页出现 "0 MB / 0 MB" 噪音行(实测 S5 白盒断言 total>0 也因此挂)。
+- sysmonitor 界面文案纪律(整批界面打磨实测):界面文字只说「是什么 / 怎么用」,不写数据口径与实现路径(如 /proc 路径、两次差值、毫摄氏度换算、"nvidia-smi 后置"这类计划说明);速率 / 容量 / 坐标轴一律多级单位动态换挡(B→K→M→G),数值保持短,大号数值卡(24px)尤其忌换行溢出卡片。
 
 ### 显示协议
 

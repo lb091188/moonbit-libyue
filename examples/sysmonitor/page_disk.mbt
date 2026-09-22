@@ -76,15 +76,10 @@ fn page_disk(app : App) -> @yue.Node {
   app.disks.subscribe(push_io)
   @yue.vbox(
     [
-      @yue.label_t("根分区 IO 速率（/proc/diskstats 两次差值，B/s）", role=@yue.Section, style=[
-        ("marginBottom", 4.0),
+      @yue.label_t("根分区读写", role=@yue.Section, style=[
+        ("marginBottom", 6.0),
       ]),
-      @yue.label_t(
-        "LVM 卷经 /sys/block/dm-*/dm/name + slaves 反查归属物理盘；容量条 df 口径（已用 = 总 - 可用）。",
-        role=@yue.Secondary,
-        style=[("marginBottom", 8.0)],
-      ),
-      @yue.line_chart_t(io, width=1100.0, height=220.0),
+      @yue.line_chart_t(io, height=220.0, fill=true),
       @yue.separator(style=[("marginTop", 12.0), ("marginBottom", 10.0)]),
       draw_rows(disk_n, fn(p, w) { draw_disk_rows(p, w, disks.get()) }),
     ],

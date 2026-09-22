@@ -254,6 +254,10 @@ void yue_mbt_painter_rotate(void *painter, double angle);
 void yue_mbt_painter_draw_text(void *painter, const char *text, double x,
                                double y, double w, double h, int32_t align,
                                int32_t valign, const char *hex_color);
+void yue_mbt_painter_draw_text_ex(void *painter, const char *text, double x,
+                                  double y, double w, double h, int32_t align,
+                                  int32_t valign, const char *hex_color,
+                                  int32_t wrap, int32_t ellipsis);
 void yue_mbt_painter_draw_attributed_text(void *painter, void *attributed_text,
                                           double x, double y, double w,
                                           double h);

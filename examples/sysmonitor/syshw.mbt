@@ -261,6 +261,11 @@ pub fn DiskMonitor::tick(self : DiskMonitor) -> Array[DiskInfo]? {
       None => continue
       Some(t) => t
     }
+    // 零容量挂载（/dev/fuse 控制节点等伪文件系统）不进列表：没有
+    // 容量概念，显示出来只会是 0/0 噪音行
+    if total <= 0 {
+      continue
+    }
     let mut read_bps = 0.0
     let mut write_bps = 0.0
     match diskstats_name(m.device) {

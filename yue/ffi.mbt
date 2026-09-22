@@ -676,7 +676,7 @@ extern "c" fn ffi_painter_rotate(painter : Painter, angle : Double) -> Unit = "y
 
 ///|
 #borrow(painter, text, hex_color)
-extern "c" fn ffi_painter_draw_text(
+extern "c" fn ffi_painter_draw_text_ex(
   painter : Painter,
   text : Bytes,
   x : Double,
@@ -686,7 +686,9 @@ extern "c" fn ffi_painter_draw_text(
   align : Int,
   valign : Int,
   hex_color : Bytes,
-) -> Unit = "yue_mbt_painter_draw_text"
+  wrap : Int,
+  ellipsis : Int,
+) -> Unit = "yue_mbt_painter_draw_text_ex"
 
 ///|
 #borrow(painter, at)

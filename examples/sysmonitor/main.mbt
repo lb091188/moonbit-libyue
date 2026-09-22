@@ -8,34 +8,66 @@
 ///|
 /// kB 转人类可读（/proc/meminfo 单位为 kB）。
 fn fmt_kb(kb : Int64) -> String {
-  let gb = kb.to_double() / 1048576.0
-  if gb >= 1.0 {
-    "\{gb.to_int()}.\{(gb * 10.0).to_int() % 10} GB"
-  } else {
-    "\{(kb.to_double() / 1024.0).to_int()} MB"
-  }
+  fmt_bytes(kb * 1024)
 }
 
 ///|
-/// 字节数人类可读（磁盘 / 网络）。
+/// 字节数人类可读：多级单位动态换挡（B / KB / MB / GB），值超 10 后
+/// 只留整数档，小数值最多一位小数——保持字符串短，卡片与表格列内
+/// 不换行。
 fn fmt_bytes(b : Int64) -> String {
   let gb = b.to_double() / 1073741824.0
   if gb >= 1.0 {
-    "\{gb.to_int()}.\{(gb * 10.0).to_int() % 10} GB"
+    return "\{fmt_scale(gb)} GB"
+  }
+  let mb = b.to_double() / 1048576.0
+  if mb >= 1.0 {
+    return "\{fmt_scale(mb)} MB"
+  }
+  let kb = b.to_double() / 1024.0
+  if kb >= 1.0 {
+    return "\{fmt_scale(kb)} KB"
+  }
+  "\{b} B"
+}
+
+///|
+/// 速率人类可读：B/s → KB/s → MB/s → GB/s，与 fmt_bytes 同档规则。
+fn fmt_rate(bps : Double) -> String {
+  if bps >= 1073741824.0 {
+    "\{fmt_scale(bps / 1073741824.0)} GB/s"
+  } else if bps >= 1048576.0 {
+    "\{fmt_scale(bps / 1048576.0)} MB/s"
+  } else if bps >= 1024.0 {
+    "\{fmt_scale(bps / 1024.0)} KB/s"
   } else {
-    "\{(b.to_double() / 1048576.0).to_int()} MB"
+    "\{bps.to_int()} B/s"
   }
 }
 
 ///|
-/// 速率人类可读（B/s → KB/s → MB/s）。
-fn fmt_rate(bps : Double) -> String {
-  if bps >= 1048576.0 {
-    "\{(bps / 1048576.0).to_int()} MB/s"
+/// 速率紧凑格式（概览卡片用）：单位缩成单字母且不带 /s，箭头已表方向，
+/// 数值位尽量短。
+fn fmt_rate_c(bps : Double) -> String {
+  if bps >= 1073741824.0 {
+    "\{fmt_scale(bps / 1073741824.0)}G"
+  } else if bps >= 1048576.0 {
+    "\{fmt_scale(bps / 1048576.0)}M"
   } else if bps >= 1024.0 {
-    "\{(bps / 1024.0).to_int()} KB/s"
+    "\{fmt_scale(bps / 1024.0)}K"
   } else {
-    "\{bps.to_int()} B/s"
+    "\{bps.to_int()}B"
+  }
+}
+
+///|
+/// 缩放数值：≥10 或恰为整数时只出整数档，否则一位小数——保持字符串短。
+fn fmt_scale(v : Double) -> String {
+  let scaled = (v * 10.0).round().to_int()
+  if scaled % 10 == 0 {
+    "\{scaled / 10}"
+  } else {
+    "\{scaled / 10}.\{scaled % 10}"
   }
 }
 
@@ -126,7 +158,7 @@ fn sample_once(app : App) -> Unit {
       }
       match hottest {
         None => app.card_temp.set("—")
-        Some(t) => app.card_temp.set("\{t.celsius.to_int()}℃ · \{t.label}")
+        Some(t) => app.card_temp.set("\{t.celsius.to_int()}℃")
       }
     }
   }
@@ -167,9 +199,35 @@ fn sample_once(app : App) -> Unit {
           tx += n.tx_bps
         }
       }
-      app.card_net.set("↓\{fmt_rate(rx)} ↑\{fmt_rate(tx)}")
+      app.card_net.set("↓\{fmt_rate_c(rx)} ↑\{fmt_rate_c(tx)}")
     }
   }
+}
+
+///|
+/// 副标题里的 CPU 型号瘦身：去 "(R)" / "(TM)" 商标标记，缩短标题行。
+fn clean_model(s : String) -> String {
+  let chars : Array[Char] = []
+  for c in s {
+    chars.push(c)
+  }
+  let out = StringBuilder()
+  let mut i = 0
+  while i < chars.length() {
+    if chars[i] == '(' && i + 2 < chars.length() {
+      if chars[i + 1] == 'R' && chars[i + 2] == ')' {
+        i = i + 3
+        continue
+      }
+      if chars[i + 1] == 'T' && i + 3 < chars.length() && chars[i + 2] == 'M' && chars[i + 3] == ')' {
+        i = i + 4
+        continue
+      }
+    }
+    out.write_char(chars[i])
+    i = i + 1
+  }
+  out.to_string()
 }
 
 ///|
@@ -226,7 +284,7 @@ fn main {
       @yue.vbox(
         [
           @yue.label_t(
-            "sysmonitor · Ubuntu 进程管理与硬件信息查看 · \{info.model} · \{info.cores} 逻辑核",
+            "\{clean_model(info.model)} · \{info.cores} 逻辑核",
             role=@yue.Secondary,
             style=[
               ("paddingLeft", 14.0),

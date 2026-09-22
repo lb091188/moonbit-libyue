@@ -35,43 +35,51 @@ fn page_overview(app : App) -> @yue.Node {
           ("GPU", app.card_gpu),
         ]),
         @yue.separator(style=[("marginBottom", 10.0)]),
-        // 第一行曲线：CPU 总占用（0-100 固定轴）+ 各核占用柱状（0-100）
+        // 第一行曲线：CPU 总占用（0-100 固定轴）+ 各核占用柱状（0-100）。
+        // 图表外层 vbox flex=1、内层 fill 不设宽度，随窗口伸缩
         @yue.hbox(
           [
-            @yue.line_chart_t(
-              app.cpu_hist,
-              width=540.0,
-              height=230.0,
-              y_range=Some((0.0, 100.0)),
+            @yue.vbox(
+              [
+                @yue.line_chart_t(
+                  app.cpu_hist,
+                  height=230.0,
+                  y_range=Some((0.0, 100.0)),
+                  fill=true,
+                ),
+              ],
+              style=[("flex", 1.0)],
             ),
             @yue.label("  "),
-            @yue.bar_chart_t(
-              app.core_bars,
-              width=540.0,
-              height=230.0,
-              y_range=Some((0.0, 100.0)),
+            @yue.vbox(
+              [
+                @yue.bar_chart_t(
+                  app.core_bars,
+                  height=230.0,
+                  y_range=Some((0.0, 100.0)),
+                  fill=true,
+                ),
+              ],
+              style=[("flex", 1.0)],
             ),
           ],
           style_str=[("alignItems", "start")],
         ),
-        @yue.label_t(
-          "左：CPU 总占用 2 分钟滚动窗口（1Hz 采样，/proc/stat 两次差值）；右：各逻辑核当前占用（固定 0-100 轴）。",
-          role=@yue.Secondary,
-          style=[("marginTop", 4.0), ("marginBottom", 12.0)],
-        ),
+        @yue.separator(style=[("marginTop", 12.0), ("marginBottom", 12.0)]),
         // 第二行曲线：内存 + swap（自适应轴）
         @yue.hbox(
           [
-            @yue.line_chart_t(app.mem_hist, width=540.0, height=230.0),
+            @yue.vbox(
+              [@yue.line_chart_t(app.mem_hist, height=230.0, fill=true)],
+              style=[("flex", 1.0)],
+            ),
             @yue.label("  "),
-            @yue.line_chart_t(app.swap_hist, width=540.0, height=230.0),
+            @yue.vbox(
+              [@yue.line_chart_t(app.swap_hist, height=230.0, fill=true)],
+              style=[("flex", 1.0)],
+            ),
           ],
           style_str=[("alignItems", "start")],
-        ),
-        @yue.label_t(
-          "左：内存已用 GB（/proc/meminfo，已用 = 总 - 可用）；右：swap 已用 GB。窗口 120 点，超出丢最旧。",
-          role=@yue.Secondary,
-          style=[("marginTop", 4.0), ("marginBottom", 12.0)],
         ),
       ],
       style=[("padding", 14.0)],
