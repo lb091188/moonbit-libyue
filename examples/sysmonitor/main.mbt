@@ -92,8 +92,6 @@ struct App {
   card_disk : @yue.Store[String]
   card_disk_sub : @yue.Store[String]
   card_net : @yue.Store[String]
-  card_gpu : @yue.Store[String]
-  card_gpu_sub : @yue.Store[String]
   card_proc : @yue.Store[String]
   // 概览页：实时曲线（定长滚动窗口 120 点 = 2 分钟 @1Hz）
   cpu_hist : @yue.Store[Array[@yue.LineSeries]]
@@ -175,19 +173,7 @@ fn sample_once(app : App) -> Unit {
   }
   match gpu_list() {
     None => ()
-    Some(gpus) => {
-      app.gpus.set(gpus)
-      if gpus.length() > 0 {
-        let g = gpus[0]
-        app.card_gpu_sub.set("\{g.vendor} · \{g.device}")
-        app.card_gpu.set(match g.celsius {
-          None => "—"
-          Some(c) => "\{c.to_int()}℃"
-        })
-      } else {
-        app.card_gpu.set("—")
-      }
-    }
+    Some(gpus) => app.gpus.set(gpus)
   }
   match app.disk.tick() {
     None => ()
@@ -280,8 +266,6 @@ fn main {
     card_disk: @yue.Store::new("—"),
     card_disk_sub: @yue.Store::new("—"),
     card_net: @yue.Store::new("—"),
-    card_gpu: @yue.Store::new("—"),
-    card_gpu_sub: @yue.Store::new("—"),
     card_proc: @yue.Store::new("—"),
     cpu_hist: @yue.Store::new([@yue.LineSeries::make("CPU", max_points=120)]),
     core_bars: @yue.Store::new([]),
@@ -311,22 +295,12 @@ fn main {
   let window = @yue.mount_window(
     [
       @yue.vbox(
-        [
-          @yue.tabs_t(
-            [
-              ("概览", page_overview(app)),
-              ("进程", page_process(app)),
-              ("传感器", page_sensors(app)),
-              ("磁盘", page_disk(app)),
-              ("网络", page_net(app)),
-            ],
-          ),
-        ],
+        [app_shell(app)],
         style=[("flex", 1.0), ("padding", 6.0)],
       ),
     ],
     title="sysmonitor",
-    size=Some((1180.0, 840.0)),
+    size=Some((1240.0, 840.0)),
   )
   ignore(window)
   @yue.run()
