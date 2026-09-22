@@ -12,6 +12,8 @@ options(
     "filemanager.mbt": [ "native" ],
     "inhibit.mbt": [ "native" ],
     "upower.mbt": [ "native" ],
+    "logind.mbt": [ "native" ],
+    "logind_wbtest.mbt": [ "native" ],
     "upower_wbtest.mbt": [ "native" ],
     "icon.mbt": [ "native" ],
     "detect.mbt": [ "native" ],

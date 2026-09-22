@@ -48,7 +48,7 @@ WINDOWS_LINK_LIBS = [
     "shlwapi.lib", "version.lib", "winmm.lib", "wbemuuid.lib", "psapi.lib",
     "dwmapi.lib", "propsys.lib", "comctl32.lib", "gdiplus.lib", "urlmon.lib",
     "userenv.lib", "uxtheme.lib", "delayimp.lib", "runtimeobject.lib",
-    "ntdll.lib", "shcore.lib", "pdh.lib",
+    "ntdll.lib", "shcore.lib", "pdh.lib", "wtsapi32.lib",
 ]
 
 

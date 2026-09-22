@@ -1887,6 +1887,15 @@ extern "c" fn ffi_win_power_status(
 ) -> Int = "yue_mbt_win_power_status"
 
 ///|
+/// Windows:电源/会话事件窗口(event 码 0=将睡 1=已醒 2=锁屏 3=解锁);
+/// 失败 -1,非 Windows 哨兵 -1000。
+#borrow(invoke, closure)
+extern "c" fn ffi_win_session_power_watch(
+  invoke : FuncRef[((Int) -> Unit, Int) -> Unit],
+  closure : (Int) -> Unit,
+) -> Int = "yue_mbt_win_session_power_watch"
+
+///|
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，
 // FFI 边界上一律转成 C 侧期望的 UTF-8，转换成本留在库内。
 fn utf8_bytes(text : String) -> Bytes {

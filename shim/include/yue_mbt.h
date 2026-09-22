@@ -796,6 +796,10 @@ double yue_mbt_sys_f64_from_bits(int64_t bits);
    percent 未知 -1）;失败 -1,非 Windows 哨兵 -1000 */
 int32_t yue_mbt_win_power_status(int32_t *ac_online, int32_t *percent,
                                  int32_t *charging, int32_t *has_battery);
+/* Windows:电源/会话事件窗口（event 码 0=将睡 1=已醒 2=锁屏 3=解锁,
+   经 PostTask 抛回主循环）;失败 -1,非 Windows 哨兵 -1000 */
+int32_t yue_mbt_win_session_power_watch(void (*invoke)(void *, int32_t),
+                                        void *closure);
 
 /* ---------- 探测示例(examples/probe) ---------- */
 

@@ -402,5 +402,56 @@ fn page_system(app : App) -> @yue.Node {
       ],
     ),
   )
+  // 休眠唤醒与锁屏解锁:计数演示(真机休眠一次 / Win+L 锁屏一次即见)
+  let suspend_n = Ref(0)
+  let resume_n = Ref(0)
+  let lock_n = Ref(0)
+  let unlock_n = Ref(0)
+  let sleep_out : @yue.Store[String] = @yue.Store::new(
+    if @yue.suspend_resume_supported() {
+      "休眠 0 次 / 唤醒 0 次(等待系统事件)"
+    } else {
+      "当前环境无 logind,休眠事件不可用"
+    },
+  )
+  let lock_out : @yue.Store[String] = @yue.Store::new(
+    if @yue.session_lock_supported() {
+      "锁屏 0 次 / 解锁 0 次(等待系统事件)"
+    } else {
+      "当前环境锁屏事件不可用"
+    },
+  )
+  @yue.on_suspend_resume(fn(e) {
+    match e {
+      @yue.Suspending => suspend_n.val = suspend_n.val + 1
+      @yue.Resuming => resume_n.val = resume_n.val + 1
+    }
+    sleep_out.set(
+      "休眠 \{suspend_n.val} 次 / 唤醒 \{resume_n.val} 次(等待系统事件)",
+    )
+  })
+  match
+    @yue.session_lock_watch(fn(e) {
+      match e {
+        @yue.Locked => lock_n.val = lock_n.val + 1
+        @yue.Unlocked => unlock_n.val = unlock_n.val + 1
+      }
+      lock_out.set(
+        "锁屏 \{lock_n.val} 次 / 解锁 \{unlock_n.val} 次(等待系统事件)",
+      )
+    }) {
+    Ok(_) => ()
+    Err(e) => lock_out.set("锁屏订阅失败:\{e}")
+  }
+  secs.push(
+    section(
+      "休眠唤醒与锁屏解锁",
+      "on_suspend_resume / session_lock_watch 统一事件:Linux 走 logind(PrepareForSleep 与 Session Lock/Unlock,系统总线),Windows 走电源广播与 WTS 会话变更;锁屏工具不调 logind 的桌面收不到信号。",
+      [
+        @yue.bind_label(sleep_out, fn(s) { s }, style=[("marginBottom", 4.0)]),
+        @yue.bind_label(lock_out, fn(s) { s }),
+      ],
+    ),
+  )
   scroll_page(secs)
 }
