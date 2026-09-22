@@ -148,6 +148,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 目录枚举(/sys/class/hwmon、/sys/class/net、/sys/bus/pci/devices、/sys/block/*/slaves)经 stub 的 opendir/readdir 通用化(换行分隔条目名),与 read_text_file 同为数据层唯一两类 IO 原语。
 - /dev/fuse 控制挂载(文件管理器拉起 gvfsd-fuse 后出现,挂载点 /tmp/fuse)statvfs 合法返回但 f_blocks=0:只按 fstype 黑名单过滤伪文件系统不够,须再按 total<=0 过滤,否则磁盘页出现 "0 MB / 0 MB" 噪音行(实测 S5 白盒断言 total>0 也因此挂)。
 - sysmonitor 界面文案纪律(整批界面打磨实测):界面文字只说「是什么 / 怎么用」,不写数据口径与实现路径(如 /proc 路径、两次差值、毫摄氏度换算、"nvidia-smi 后置"这类计划说明);速率 / 容量 / 坐标轴一律多级单位动态换挡(B→K→M→G),数值保持短,大号数值卡(24px)尤其忌换行溢出卡片。
+- sysmonitor 概览页卡片范式对标 Mission Center(资源管理器式):图标 + 标题、规格副标题(CPU 型号 / 总容量 / 挂载点等硬件规格放卡片副标题,不在窗口顶层占副标题行)、当前值行(占用% · 温度、已用 / 总量 · swap 等组合)、卡内迷你曲线(序列末窗 + 末端圆点;值域固定 0-100 或峰值自适应,双序列同窗叠加如网络 rx/tx)。卡片 flex 均分、同排 stretch 等高,随窗口伸缩;单卡自包含,不看窗口其他部分也能读懂。
 
 ### 显示协议
 
