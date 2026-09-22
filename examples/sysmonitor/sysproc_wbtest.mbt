@@ -203,3 +203,136 @@ test "bench: ProcMonitor 全量采样耗时(release 计时)" {
     }
   }
 }
+
+///|
+/// 取单元格文本（非文本单元格给占位，测试断言用）。
+fn cell_text(c : @yue.TableCell) -> String {
+  match c {
+    CellText(t) => t
+    _ => "(non-text)"
+  }
+}
+
+///|
+/// 构造测试进程行（字段序同 ProcInfo）。
+fn mk_proc(
+  pid : Int,
+  ppid : Int,
+  name : String,
+  cmd : String,
+  state : String,
+  cpu : Double,
+  rss_kb : Int64,
+  nice : Int,
+  threads : Int,
+) -> ProcInfo {
+  {
+    pid,
+    ppid,
+    name,
+    cmd,
+    state,
+    nice,
+    threads,
+    rss_kb,
+    cpu_pct: cpu,
+  }
+}
+
+///|
+fn bench_procs() -> Array[ProcInfo] {
+  [
+    mk_proc(1, 0, "systemd", "/sbin/init", "S", 0.1, 20480, 0, 3),
+    mk_proc(420, 1, "Firefox", "/usr/lib/firefox/firefox", "S", 12.5, 1835008, 0, 87),
+    mk_proc(999, 420, "Web Content", "/usr/lib/firefox/firefox -contentproc", "R", 45.25, 2621440, 5, 12),
+    mk_proc(1234, 1, "code", "/usr/share/code/code --type=renderer", "S", 3.0, 524288, -2, 30),
+  ]
+}
+
+///|
+test "filter_procs：空 query 全收 / pid / 名称 / 命令行 / 大小写 / 无匹配" {
+  let procs = bench_procs()
+  // 空 query：全收且返回新数组
+  let all = filter_procs(procs, "  ")
+  assert_eq(all.length(), 4)
+  // pid 子串
+  assert_eq(filter_procs(procs, "42").length(), 1)
+  assert_eq(filter_procs(procs, "42")[0].pid, 420)
+  assert_eq(filter_procs(procs, "999").length(), 1)
+  // 名称（大小写不敏感）
+  assert_eq(filter_procs(procs, "firefox").length(), 2)
+  assert_eq(filter_procs(procs, "FIREFOX").length(), 2)
+  // 命令行
+  assert_eq(filter_procs(procs, "contentproc").length(), 1)
+  assert_eq(filter_procs(procs, "contentproc")[0].pid, 999)
+  // 无匹配
+  assert_eq(filter_procs(procs, "nonexistent-xyz").length(), 0)
+  // 入参不被修改
+  assert_eq(procs.length(), 4)
+}
+
+///|
+test "sort_procs：各列升降序 + 名称大小写不敏感 + 空数组" {
+  let procs = bench_procs()
+  // CPU 降序（默认监控视图）
+  let by_cpu = sort_procs(procs, ByCpu, false)
+  assert_eq(by_cpu[0].pid, 999)
+  assert_eq(by_cpu[3].pid, 1)
+  // CPU 升序
+  let by_cpu_asc = sort_procs(procs, ByCpu, true)
+  assert_eq(by_cpu_asc[0].pid, 1)
+  assert_eq(by_cpu_asc[3].pid, 999)
+  // PID 升序
+  let by_pid = sort_procs(procs, ByPid, true)
+  assert_eq(by_pid[0].pid, 1)
+  assert_eq(by_pid[3].pid, 1234)
+  // 名称（code < Firefox < systemd < Web Content，大小写不敏感）
+  let by_name = sort_procs(procs, ByName, true)
+  assert_eq(by_name[0].name, "code")
+  assert_eq(by_name[1].name, "Firefox")
+  assert_eq(by_name[2].name, "systemd")
+  assert_eq(by_name[3].name, "Web Content")
+  // 内存 / nice / 线程
+  let by_mem = sort_procs(procs, ByMem, false)
+  assert_eq(by_mem[0].pid, 999)
+  let by_nice = sort_procs(procs, ByNice, false)
+  assert_eq(by_nice[0].pid, 999)
+  let by_threads = sort_procs(procs, ByThreads, false)
+  assert_eq(by_threads[0].pid, 420)
+  // 空数组不炸
+  assert_eq(sort_procs([], ByCpu, false).length(), 0)
+  // 入参不被修改
+  assert_eq(procs[0].pid, 1)
+}
+
+///|
+test "proc_row：列内容与格式(CPU 一位小数 / 内存人类可读)" {
+  let p = mk_proc(999, 420, "Web Content", "/usr/lib/firefox", "R", 45.25, 2621440, 5, 12)
+  let row = proc_row(p)
+  assert_eq(row.cells.length(), 8)
+  assert_eq(cell_text(row.cells[0]), "999")
+  assert_eq(cell_text(row.cells[1]), "Web Content")
+  assert_eq(cell_text(row.cells[2]), "R")
+  assert_eq(cell_text(row.cells[3]), "45.3")
+  assert_eq(cell_text(row.cells[4]), "2.5 GB")
+  assert_eq(cell_text(row.cells[5]), "5")
+  assert_eq(cell_text(row.cells[6]), "12")
+  assert_eq(cell_text(row.cells[7]), "/usr/lib/firefox")
+  // 一位小数取整
+  let p2 = mk_proc(1, 0, "init", "/sbin/init", "S", 0.04, 1024, 0, 1)
+  assert_eq(cell_text(proc_row(p2).cells[3]), "0.0")
+  assert_eq(cell_text(proc_row(p2).cells[4]), "1 MB")
+}
+
+///|
+test "sort_of_col：列号映射(状态/命令行不参与)" {
+  assert_eq(sort_of_col(0).map(sort_id), Some(0))
+  assert_eq(sort_of_col(1).map(sort_id), Some(1))
+  assert_true(sort_of_col(2) is None)
+  assert_eq(sort_of_col(3).map(sort_id), Some(2))
+  assert_eq(sort_of_col(4).map(sort_id), Some(3))
+  assert_eq(sort_of_col(5).map(sort_id), Some(4))
+  assert_eq(sort_of_col(6).map(sort_id), Some(5))
+  assert_true(sort_of_col(7) is None)
+  assert_true(sort_of_col(-1) is None)
+}

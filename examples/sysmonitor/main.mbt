@@ -251,7 +251,7 @@ fn main {
           @yue.tabs_t(
             [
               ("概览", page_overview(app)),
-              ("进程", page_placeholder("进程管理")),
+              ("进程", page_process(app)),
               ("传感器", page_placeholder("传感器(温度 / GPU)")),
               ("磁盘", page_placeholder("磁盘")),
               ("网络", page_placeholder("网络")),
