@@ -57,6 +57,12 @@ n.set_title("Build finished")
 n.show()
 ```
 
+**📊 Flagship app — process manager & hardware monitor** (`examples/sysmonitor`): a pure-MoonBit data layer over /proc and /sys (CPU two-sample diff, memory, 1000-row process table, hwmon temperatures, disk IO + capacity, PCI GPUs, NIC rates) with one 1Hz timer driving five tabbed pages — 1053 processes fully sampled in 14.94ms:
+
+```moonbit
+moon run examples/sysmonitor
+```
+
 > 55 native widgets fully bound · 57 themed self-drawn components · wrapper overhead [startup on par with C++, memory +0.8MB](docs/adaptation.md) · three-platform CI · published on [mooncakes](https://mooncakes.io/)
 
 ## Quick start

@@ -57,6 +57,12 @@ n.set_title("构建完成")
 n.show()
 ```
 
+**📊 旗舰应用 — 进程管理与硬件信息查看**（`examples/sysmonitor`）：纯 MoonBit 数据层读 /proc、/sys（CPU 两次差值、内存、千行进程表、hwmon 温度、磁盘 IO 与容量、PCI 显卡、网卡速率），单一 1Hz 定时器驱动五页 tabs——1053 进程全量采样 14.94ms：
+
+```moonbit
+moon run examples/sysmonitor
+```
+
 > 55 个原生控件全量封装 · 57 个主题化自绘组件 · 封装开销[启动持平 C++、内存 +0.8MB](docs/zh/adaptation.md) · 三平台 CI · [mooncakes](https://mooncakes.io/) 已发布
 
 ## 快速开始

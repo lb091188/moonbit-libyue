@@ -8,12 +8,13 @@
 
 ## 演示
 
-三个示例，由浅入深：
+四个示例，由浅入深：
 
 ```sh
 moon run examples/hello         # 原版控件最小窗口
 moon run examples/hello-themed  # 主题组件库最小示例（theme_apply + button_t/input_t/label_t）
 moon run examples/showcase      # 全功能演示板：15 页三组侧栏，组件库 + 系统能力全集
+moon run examples/sysmonitor    # 旗舰应用：Ubuntu 进程管理与硬件信息查看（千行进程表 + 实时曲线）
 ```
 
 showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 / 反馈 / 代码与文档 / 事件与布局 / Store 对照 + 原生控件 / 画布与富文本 + 系统集成 / 窗口 / 浏览器 / 环境与平台；左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。每页源码独立成文件（`examples/showcase/pages_*.mbt`），是最好的复制粘贴素材库；组件库各组件的截图：
@@ -27,6 +28,18 @@ showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 /
 ![代码与文档](../images/showcase-code.png)
 
 ![系统集成](../images/showcase-system.png)
+
+### sysmonitor：进程管理与硬件信息查看
+
+库「表现力 + 性能」的旗舰应用：数据层纯 MoonBit 读 /proc、/sys（CPU 两次差值、内存、千行进程、hwmon 温度、磁盘 IO 与容量、PCI 显卡、网卡速率），唯一的系统调用经应用自有 native-stub；五页 tabs（概览 / 进程 / 传感器 / 磁盘 / 网络），1Hz 单定时器驱动全部采样，曲线与数值卡只重绘画布不重建视图树，主题深浅跟随系统。
+
+进程页：虚拟表格千行级，搜索过滤、六列排序、选中 kill（SIGTERM 失败转 SIGKILL）/ renice，errno 语义化为中文提示；实测 1053 进程全量采样 14.94ms/次、稳态 1Hz CPU 2-3%（数据见 [adaptation.md](adaptation.md)）。
+
+![概览](../images/sysmonitor-overview.png)
+
+![进程页](../images/sysmonitor-process.png)
+
+![深色主题](../images/sysmonitor-dark.png)
 
 ## 分流
 
