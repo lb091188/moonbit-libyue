@@ -132,6 +132,10 @@ Methodology: Ubuntu 24.04 XFCE (X11), same machine and session; the startup delt
 - /proc/cpuinfo model field differs by platform: x86 uses `model name`, ARM boards only have `Processor` / `Hardware` — three-level fallback; core count = number of `processor` lines (logical CPUs incl. hyperthreading, matches nproc).
 - /proc/meminfo units are always kB; `MemAvailable` only exists on kernels ≥ 3.14 — fall back to `MemFree`; used = total − available (includes reclaimable cache).
 - The `moon run` wrapper process does not forward signals to its child: smoke-testing exit behavior requires killing the built exe child process — killing only the wrapper PID leaves an orphan window.
+- Measured full-process sampling (release, Ubuntu 24.04): 580 processes × 2 file reads (stat + cmdline) = 9.57ms per pass, ~1% CPU at 1Hz refresh; RSS comes from stat's page count × page size (equal to status's VmRSS), saving a third read per process.
+- /proc/[pid]/stat comm can contain spaces and nested parentheses (process name "(foo (bar))") — split at the LAST ')' in the line; comm is truncated to 15 chars, so the full command line is read separately from cmdline (NUL-separated; empty falls back to [comm] for kernel threads).
+- getpriority's nice = -1 is a legal value and is ambiguous with the error return: report success/failure via a `Ref[Int]` out-parameter (kill / setpriority still use the errno return).
+- Windows has no /proc and no nice semantics: the stub keeps the same ABI at compile time and returns an "unsupported" sentinel (-1000) at runtime, which the MoonBit layer turns into a Chinese notice — the whole process page degrades cleanly; three-platform CI builds are unaffected (macOS takes the POSIX branch naturally).
 
 ### Display protocols
 
