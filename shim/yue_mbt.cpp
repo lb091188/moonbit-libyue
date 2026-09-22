@@ -5480,6 +5480,18 @@ uint32_t yue_mbt_system_accent(void) {
   }
   return 0;
 #elif defined(OS_WIN)
+  // 用户强调色优先:注册表 DWM\AccentColor(0xAABBGGRR)。DwmGetColor-
+  // izationColor 取的是「窗口颜色化色」——强调色与系统基色的混合,
+  // 默认配置下与设置页强调色有明显色偏,只作 AccentColor 缺失时的回退
+  DWORD accent = 0;
+  DWORD size = sizeof(accent);
+  if (::RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\DWM",
+                     L"AccentColor", RRF_RT_REG_DWORD, nullptr, &accent,
+                     &size) == ERROR_SUCCESS &&
+      accent != 0 && accent != 0xFFFFFFFF) {
+    return (0xFFu << 24) | ((accent & 0xFFu) << 16) |
+           (((accent >> 8) & 0xFFu) << 8) | ((accent >> 16) & 0xFFu);
+  }
   // DWM 颜色化颜色:alpha 位是「强度」非透明度,只取 RGB
   COLORREF c = 0;
   BOOL opaque = FALSE;
