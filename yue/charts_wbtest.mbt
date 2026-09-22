@@ -244,6 +244,49 @@ test "point_range：留白/退化/空" {
 }
 
 ///|
+test "bar_hit：纵向柱只看横坐标、横向条只看纵坐标（与绘制同源）" {
+  // 纵向柱（horizontal=false）：类目沿 x 分槽，命中只随横坐标变
+  let w = 320.0
+  let h = 240.0
+  let n = 8
+  let x0 = 46.0
+  let slot = (w - 12.0 - x0) / n.to_double()
+  for i in 0..<n {
+    let cx = x0 + slot * (i.to_double() + 0.5)
+    // 同一横坐标、不同纵坐标 → 同一类目（纵向图不看 y）
+    assert_eq(bar_hit(false, n, w, h, cx, 20.0), i)
+    assert_eq(bar_hit(false, n, w, h, cx, 120.0), i)
+    assert_eq(bar_hit(false, n, w, h, cx, 200.0), i)
+  }
+  // 横向移动跨槽：相邻槽命中相邻类目
+  assert_eq(bar_hit(false, n, w, h, x0 + slot * 0.5, 100.0), 0)
+  assert_eq(bar_hit(false, n, w, h, x0 + slot * 1.5, 100.0), 1)
+  assert_eq(bar_hit(false, n, w, h, x0 + slot * 7.5, 100.0), 7)
+  // 界外（左刻度区 / 右边距）→ -1
+  assert_eq(bar_hit(false, n, w, h, 10.0, 100.0), -1)
+  assert_eq(bar_hit(false, n, w, h, w - 5.0, 100.0), -1)
+  // 横向条（horizontal=true）：类目沿 y 排列，命中只随纵坐标变
+  let m = 5
+  let y0 = 12.0
+  let rslot = (h - 24.0 - y0) / m.to_double()
+  for i in 0..<m {
+    let cy = y0 + rslot * (i.to_double() + 0.5)
+    // 同一纵坐标、不同横坐标 → 同一类目（横向图不看 x）
+    assert_eq(bar_hit(true, m, w, h, 90.0, cy), i)
+    assert_eq(bar_hit(true, m, w, h, 200.0, cy), i)
+    assert_eq(bar_hit(true, m, w, h, 300.0, cy), i)
+  }
+  // 纵向移动跨行
+  assert_eq(bar_hit(true, m, w, h, 150.0, y0 + rslot * 0.5), 0)
+  assert_eq(bar_hit(true, m, w, h, 150.0, y0 + rslot * 4.5), 4)
+  // 界外（上 / 下边距）→ -1
+  assert_eq(bar_hit(true, m, w, h, 150.0, 5.0), -1)
+  assert_eq(bar_hit(true, m, w, h, 150.0, h - 10.0), -1)
+  // 退化
+  assert_eq(bar_hit(false, 0, w, h, 100.0, 100.0), -1)
+}
+
+///|
 test "band_color 阈值分段与 truncate_to" {
   let bands = [(0.6, "#00ff00"), (0.85, "#ffaa00"), (1.0, "#ff0000")]
   assert_eq(band_color(0.5, bands), "#00ff00")

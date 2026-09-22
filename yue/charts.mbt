@@ -309,6 +309,46 @@ pub fn bar_slot(
 }
 
 ///|
+/// 柱状图 hover 命中：返回鼠标 (px, py) 下的类目索引，界外 / 越界为 -1。
+/// 与 draw_bar_chart 两形态共用同一套几何——纵向柱沿 x 分槽（只看横
+/// 坐标），横向条沿 y 分行（只看纵坐标）；绘制与命中必须同源，否则高亮
+/// 与柱子错位。
+pub fn bar_hit(
+  horizontal : Bool,
+  n : Int,
+  w : Double,
+  h : Double,
+  px : Double,
+  py : Double,
+) -> Int {
+  if n <= 0 {
+    return -1
+  }
+  let idx = if horizontal {
+    let pad_t = 12.0
+    let pad_b = 24.0
+    if py < pad_t || py > h - pad_b {
+      return -1
+    }
+    let slot = (h - pad_t - pad_b) / n.to_double()
+    ((py - pad_t) / slot).to_int()
+  } else {
+    let pad_l = 46.0
+    let pad_r = 12.0
+    if px < pad_l || px > w - pad_r {
+      return -1
+    }
+    let slot = (w - pad_l - pad_r) / n.to_double()
+    ((px - pad_l) / slot).to_int()
+  }
+  if idx < 0 || idx >= n {
+    -1
+  } else {
+    idx
+  }
+}
+
+///|
 /// 环形图第 i 扇区的起止弧度（12 点方向起，顺时针；角度为画布语义，
 /// 0 指向右）。只累计正值；总和 <= 0 或 i 越界返回 None。
 pub fn sector_angles(values : Array[Double], i : Int) -> (Double, Double)? {
@@ -775,13 +815,13 @@ fn truncate_to(text : String, avail : Double) -> String {
 }
 
 ///|
-/// 柱状图绘制（vertical=true 纵向柱，false 横向条；hover 为高亮类目索引）。
+/// 柱状图绘制（horizontal=true 横向条，false 纵向柱；hover 为高亮类目索引）。
 fn draw_bar_chart(
   p : Painter,
   w : Double,
   h : Double,
   data : Array[BarItem],
-  vertical : Bool,
+  horizontal : Bool,
   hover : Int,
 ) -> Unit {
   let n = data.length()
@@ -794,7 +834,7 @@ fn draw_bar_chart(
   }
   let (lo, hi) = bar_range(values)
   let ticks = nice_ticks(lo, hi, count=4)
-  if vertical {
+  if !horizontal {
     let pad_l = 46.0
     let pad_r = 12.0
     let pad_t = 14.0
@@ -1316,38 +1356,12 @@ pub fn bar_chart_t(
         draw_bar_chart(p, b.width, b.height, data.get(), horizontal, hover.val)
       })
       data.subscribe(fn(_d) { ViewLike::schedule_paint(cv) })
-      // hover 命中与绘制同一套几何（bar_slot / 行槽），保证高亮与柱子对齐
+      // hover 命中与绘制同一套几何（bar_hit / draw_bar_chart 同源），
+      // 保证高亮与柱子对齐
       ViewLike::on_mouse_move(cv, fn(e) {
         let b = ViewLike::get_bounds(cv)
-        let items = data.get()
-        let n = items.length()
-        if n == 0 {
-          return
-        }
-        let new_hover = if horizontal {
-          let pad_t = 12.0
-          let pad_b = 24.0
-          if e.view_y < pad_t || e.view_y > b.height - pad_b {
-            -1
-          } else {
-            let slot = (b.height - pad_t - pad_b) / n.to_double()
-            ((e.view_y - pad_t) / slot).to_int()
-          }
-        } else {
-          let pad_l = 46.0
-          let pad_r = 12.0
-          if e.view_x < pad_l || e.view_x > b.width - pad_r {
-            -1
-          } else {
-            let slot = (b.width - pad_l - pad_r) / n.to_double()
-            ((e.view_x - pad_l) / slot).to_int()
-          }
-        }
-        let clamped = if new_hover < 0 || new_hover >= n {
-          -1
-        } else {
-          new_hover
-        }
+        let n = data.get().length()
+        let clamped = bar_hit(horizontal, n, b.width, b.height, e.view_x, e.view_y)
         if clamped != hover.val {
           hover.val = clamped
           ViewLike::schedule_paint(cv)
