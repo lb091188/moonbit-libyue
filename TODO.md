@@ -144,7 +144,7 @@
   - Linux:shim——X11 屏保扩展查询;Wayland 后置
   - Windows:shim——最后输入时间查询(结构更简单)
   - 边界:active / idle 阈值判定由调用方比较,不设单独接口
-  - 验收:与 xset q / 手表计时对照(±2s)
+  - 验收:与 xprintidle 数值对照(±2s);xset q 不含当前空闲读数,不能当基准
 - [ ] P7 默认浏览器打开 URL
   - Linux:shim spawn xdg-open
   - Windows:shim 系统打开命令
@@ -172,7 +172,7 @@
 - [ ] P13 (后置)平台专属 — 任务栏进度(Windows)/ dock 徽标 / 最近文档
 - [ ] P14 测试与文档
   - Linux 三桌面 + Windows 10/11 真机复验;DBus 互操作真总线验证
-  - components.md 中英文档;showcase「系统集成」页补演示(自启动开关 / 单实例 / 打开外部)
+  - components.md 中英文档;showcase「系统集成」页补演示(自启动开关 / 单实例 / 打开外部 / 屏幕常亮与空闲)
 - 批次策略:Linux DBus 套系先行(P1/P3-P5/P9-P11 复用 traybus),Windows 侧同 API 批量补 shim ABI + vendored 出包
 
 ## Markdown 能力升级(mizchi/markdown 编译器)

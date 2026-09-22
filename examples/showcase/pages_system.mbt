@@ -337,5 +337,70 @@ fn page_system(app : App) -> @yue.Node {
       ],
     ),
   )
+  // 屏幕常亮与用户空闲:开关直连真实抑制(句柄记下供 release);空闲
+  // 秒数即读即显,动一动输入设备再读,读数归零
+  let idle_out : @yue.Store[String] = @yue.Store::new(
+    if @yue.idle_supported() {
+      "(点按钮读取当前空闲秒数)"
+    } else {
+      "当前平台不支持空闲查询"
+    },
+  )
+  let ka : Ref[@yue.KeepAwake?] = Ref(None)
+  let ka_on : @yue.Store[Bool] = @yue.Store::new(@yue.keep_awake_active())
+  let ka_out : @yue.Store[String] = @yue.Store::new(
+    if @yue.KeepAwake::is_supported() { "(未开启)" } else { "当前环境无抑制服务在线" },
+  )
+  ka_on.subscribe(fn(on) {
+    if on {
+      match @yue.KeepAwake::enable("org.moonbitlibyue.Showcase") {
+        Ok(k) => {
+          ka.val = Some(k)
+          ka_out.set("已申请常亮:系统屏保 / 自动息屏被抑制")
+        }
+        Err(e) => {
+          ka_on.set(false)
+          ka_out.set("申请失败:\{e}")
+        }
+      }
+    } else {
+      match ka.val {
+        Some(k) =>
+          match k.release() {
+            Ok(_) => {
+              ka.val = None
+              ka_out.set("已解除常亮")
+            }
+            Err(e) => ka_out.set("解除失败:\{e}")
+          }
+        None => ka_out.set("(未开启)")
+      }
+    }
+  })
+  secs.push(
+    section(
+      "屏幕常亮与用户空闲",
+      "KeepAwake 抑制系统屏保 / 自动息屏(Linux 经抑制服务 Inhibit,Windows SetThreadExecutionState,Ok 只表示系统受理);idle_seconds 返回用户空闲秒数(Linux X11 XSS,Wayland 会话显式不支持,Windows 最后输入时间)。",
+      [
+        @yue.hbox([
+          @yue.switch_t(ka_on),
+          @yue.label_t("保持屏幕常亮", role=@yue.Secondary),
+        ]),
+        @yue.bind_label(ka_out, fn(s) { s }, style=[("marginTop", 8.0)]),
+        @yue.hbox(
+          [
+            @yue.button_t("读取空闲秒数", on_click=fn() {
+              match @yue.idle_seconds() {
+                Ok(s) => idle_out.set("当前空闲:\{s} 秒")
+                Err(e) => idle_out.set("不可用:\{e}")
+              }
+            }),
+          ],
+          style=[("marginTop", 8.0)],
+        ),
+        @yue.bind_label(idle_out, fn(s) { s }, style=[("marginTop", 8.0)]),
+      ],
+    ),
+  )
   scroll_page(secs)
 }

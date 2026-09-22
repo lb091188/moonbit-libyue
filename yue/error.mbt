@@ -103,3 +103,38 @@ pub impl Show for FileManagerError with fn output(self, logger) {
 
 ///|
 pub extend FileManagerError with Show::{to_string, output}
+
+///|
+pub(all) enum IdleError {
+  /// 平台/会话不支持（macOS 暂缓、Wayland 会话、无 X 服务端）
+  Unsupported
+}
+
+///|
+pub impl Show for IdleError with fn output(self, logger) {
+  match self {
+    Unsupported => logger.write_string("IdleError::Unsupported")
+  }
+}
+
+///|
+pub extend IdleError with Show::{to_string, output}
+
+///|
+pub(all) enum KeepAwakeError {
+  /// 平台不支持或抑制服务不在线（macOS 暂缓）
+  Unsupported
+  /// 系统调用失败
+  Failed
+}
+
+///|
+pub impl Show for KeepAwakeError with fn output(self, logger) {
+  match self {
+    Unsupported => logger.write_string("KeepAwakeError::Unsupported")
+    Failed => logger.write_string("KeepAwakeError::Failed")
+  }
+}
+
+///|
+pub extend KeepAwakeError with Show::{to_string, output}

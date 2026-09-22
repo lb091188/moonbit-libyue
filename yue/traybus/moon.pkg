@@ -10,6 +10,7 @@ options(
     "instance.mbt": [ "native" ],
     "sni.mbt": [ "native" ],
     "filemanager.mbt": [ "native" ],
+    "inhibit.mbt": [ "native" ],
     "icon.mbt": [ "native" ],
     "detect.mbt": [ "native" ],
     "wire_wbtest.mbt": [ "native" ],
