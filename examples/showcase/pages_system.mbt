@@ -279,5 +279,40 @@ fn page_system(app : App) -> @yue.Node {
       ],
     ),
   )
+  // 开机自启动:开关直连真实状态(Linux 写 XDG 自启动目录,Windows 写
+  // HKCU Run 键);冒烟验证后关掉即复位
+  let auto : @yue.Autostart = match @yue.Autostart::new("org.moonbitlibyue.Showcase") {
+    Ok(a) => a
+    Err(_) => abort("unreachable") // 固定 app_id 恒合法
+  }
+  let auto_on : @yue.Store[Bool] = @yue.Store::new(match auto.is_enabled() {
+    Ok(v) => v
+    Err(_) => false
+  })
+  let auto_out : @yue.Store[String] = @yue.Store::new("(开关即真实生效,重新登录后拉起)")
+  auto_on.subscribe(fn(on) {
+    let r = if on {
+      auto.enable()
+    } else {
+      auto.disable()
+    }
+    auto_out.set(match r {
+      Ok(_) => if on { "已启用:重启 / 重新登录后自动拉起" } else { "已关闭:自启动已移除" }
+      Err(e) => "操作失败:\{e}"
+    })
+  })
+  secs.push(
+    section(
+      "开机自启动",
+      "Autostart 统一 API:Linux 写 $XDG_CONFIG_HOME/autostart 的 .desktop(exe 路径取 /proc/self/exe),Windows 写 HKCU Run 键;macOS 暂缓。",
+      [
+        @yue.hbox([
+          @yue.switch_t(auto_on),
+          @yue.label_t("org.moonbitlibyue.Showcase", role=@yue.Secondary),
+        ]),
+        @yue.bind_label(auto_out, fn(s) { s }, style=[("marginTop", 8.0)]),
+      ],
+    ),
+  )
   scroll_page(secs)
 }

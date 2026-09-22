@@ -750,6 +750,21 @@ int32_t yue_mbt_win_instance_window_create(const char *class_name, void (*invoke
 /* 兜底：按标题查找顶层窗口并置前（最小化先恢复）；ok=1 找到 */
 int32_t yue_mbt_win_find_and_activate(const char *title, int32_t *ok);
 
+/* ---------- 开机自启动（.desktop 走 MoonBit 文件 API;注册表三件套非 Windows 为桩） ---------- */
+
+/* 本进程可执行文件绝对路径（Linux readlink /proc/self/exe;Windows GetModuleFileNameW） */
+void *yue_mbt_exe_path(int32_t *ok);
+/* 删除文件：目标本就不存在也记 ok=1（disable 幂等） */
+int32_t yue_mbt_remove_file(const char *path, int32_t *ok);
+/* 读环境变量：未设置 ok=0 */
+void *yue_mbt_getenv_bytes(const char *name, int32_t *ok);
+/* Windows:HKCU Run 键写值（exe 引号包裹）;非 Windows 返回 -1000 哨兵 */
+int32_t yue_mbt_autostart_set(const char *app_id, const char *exe, int32_t *ok);
+/* Windows:读 Run 键值（未设置 ok=0）;非 Windows ok=-1000 */
+void *yue_mbt_autostart_get(const char *app_id, int32_t *ok);
+/* Windows:删 Run 键值（值本就不在也记 ok=1）;非 Windows 返回 -1000 */
+int32_t yue_mbt_autostart_remove(const char *app_id, int32_t *ok);
+
 /* ---------- 探测示例(examples/probe) ---------- */
 
 void yue_mbt_probe_env(void *window);

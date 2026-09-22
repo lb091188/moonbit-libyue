@@ -92,6 +92,8 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 #### XFCE ✅
 
+- 自启动 .desktop 实测:Exec 经 /proc/self/exe readlink 取绝对路径(开发期指向 _build 构建产物,产物位置一变条目即失效——发布版固定安装路径才可靠,AppImage 指向挂载点同理);整文件 desktop-file-validate 零警告;启用位解析兼容系统侧 Hidden=true 与 X-GNOME-Autostart-enabled=false 两种禁用开关,disable 幂等(条目不存在视为成功)。
+
 - 右键菜单由面板自镜像 DBusMenu 渲染,不走 SNI ContextMenu 让应用自绘。
 - xfce4-panel 4.18 只发批量版 `EventGroup` / `AboutToShowGroup`,不发单条版:只实现单条版会被 UnknownMethod 静默拒绝,表现为菜单能弹、点击全部无效。
 - 桌面通知必须走 `Notification::Show()`;`NotificationCenter::AddNotification` 在 Linux 从不发 DBus Notify,静默失败。

@@ -1810,6 +1810,40 @@ extern "c" fn ffi_win_instance_window_create(
 #borrow(title, ok)
 extern "c" fn ffi_win_find_and_activate(title : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_win_find_and_activate"
 
+// ---------- 开机自启动（Linux:XDG .desktop;Windows:HKCU Run 键） ----------
+// 注册表三件套非 Windows 给桩（MoonBit 层按平台路由，桩值不会被消费）。
+
+///|
+/// 本进程可执行文件绝对路径（Linux readlink /proc/self/exe;Windows
+/// GetModuleFileNameW）。
+#borrow(ok)
+extern "c" fn ffi_exe_path(ok : Ref[Int]) -> Bytes = "yue_mbt_exe_path"
+
+///|
+/// 删除文件：目标本就不存在也记 ok=1（disable 幂等）。
+#borrow(path, ok)
+extern "c" fn ffi_remove_file(path : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_remove_file"
+
+///|
+/// 读环境变量（未设置 ok=0）。
+#borrow(name, ok)
+extern "c" fn ffi_getenv_bytes(name : Bytes, ok : Ref[Int]) -> Bytes = "yue_mbt_getenv_bytes"
+
+///|
+/// Windows:HKCU Run 键写值（exe 自动引号包裹）；非 Windows 返回 -1000 哨兵。
+#borrow(app_id, exe, ok)
+extern "c" fn ffi_autostart_set(app_id : Bytes, exe : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_autostart_set"
+
+///|
+/// Windows:读 Run 键值（未设置 ok=0）；非 Windows ok=-1000。
+#borrow(app_id, ok)
+extern "c" fn ffi_autostart_get(app_id : Bytes, ok : Ref[Int]) -> Bytes = "yue_mbt_autostart_get"
+
+///|
+/// Windows:删 Run 键值（值本就不在也记 ok=1）；非 Windows 返回 -1000。
+#borrow(app_id, ok)
+extern "c" fn ffi_autostart_remove(app_id : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_autostart_remove"
+
 ///|
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，
 // FFI 边界上一律转成 C 侧期望的 UTF-8，转换成本留在库内。

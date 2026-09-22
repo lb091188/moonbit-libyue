@@ -40,3 +40,28 @@ pub impl Show for SingleInstanceError with fn output(self, logger) {
 
 ///|
 pub extend SingleInstanceError with Show::{to_string, output}
+
+///|
+pub(all) enum AutostartError {
+  /// 平台不支持（macOS 暂缓）
+  Unsupported
+  /// app_id 不合法（与 SingleInstance 同规：DBus 知名名规则）
+  InvalidAppId
+  /// 取不到本进程可执行文件路径（/proc/self/exe 读取失败等）
+  NoExecutablePath
+  /// 文件或注册表读写失败，带原因
+  IoFailed(String)
+}
+
+///|
+pub impl Show for AutostartError with fn output(self, logger) {
+  match self {
+    Unsupported => logger.write_string("AutostartError::Unsupported")
+    InvalidAppId => logger.write_string("AutostartError::InvalidAppId")
+    NoExecutablePath => logger.write_string("AutostartError::NoExecutablePath")
+    IoFailed(reason) => logger.write_string("AutostartError::IoFailed(\{reason})")
+  }
+}
+
+///|
+pub extend AutostartError with Show::{to_string, output}
