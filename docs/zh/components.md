@@ -554,6 +554,114 @@ let tray = match @yue.Tray::new("icon.png") {
 Linux 推荐纯 MoonBit 的 `yue/traybus` 后端（`Tray` 统一 API 内部自动选择），
 方案见 [docs/tray.md](tray.md)。
 
+## 系统集成（单实例 / 自启动 / 电源 / 会话 / 网络）
+
+桌面应用的系统级能力,统一入口、统一错误风格(`Err(Unsupported)` 与
+`xxx_supported()` 先行判定)。完整演示见 showcase「系统集成」页。
+
+### 单实例与二次唤起
+
+```moonbit
+match @yue.SingleInstance::acquire("org.example.MyApp") {
+  Ok(Some(handle)) => {
+    // 本进程是首实例,继续启动
+    handle.on_activate(fn(args) {
+      // 第二实例启动时收到其命令行参数:恢复 / 置前窗口
+    })
+  }
+  Ok(None) => return  // 已有实例,唤醒已发,本进程退出
+  Err(_) => ()        // 单实例不可用,调用方决定降级或退出
+}
+```
+
+| API | 用途 |
+|---|---|
+| SingleInstance::acquire(app_id) -> Result[SingleInstance?, SingleInstanceError] | 尝试成为首实例（app_id 须为合法 DBus 总线名：点分层段、字母/下划线开头） |
+| handle.on_activate(cb : (Array[String]) -> Unit) | 注册第二实例唤起回调（透传其命令行，含 argv[0]） |
+| set_instance_window_title(title) | 设置窗口标题（Windows 置前兜底按标题查找；运行时改标题会破坏兜底） |
+
+Linux 经会话总线声称应用专属名,Windows 经命名互斥体 + 消息窗口。
+
+### 开机自启动
+
+```moonbit
+let auto = match @yue.Autostart::new("org.example.MyApp") {
+  Ok(a) => a
+  Err(_) => ...   // 平台不支持（macOS 暂缓）
+}
+auto.enable()     // Ok 后重新登录 / 重启即拉起
+auto.disable()    // 取消（幂等）
+```
+
+| API | 用途 |
+|---|---|
+| Autostart::new(app_id) -> Result[Autostart, AutostartError] | 句柄（app_id 同单实例约束） |
+| Autostart::is_supported() | 平台是否支持 |
+| handle.is_enabled() -> Result[Bool, AutostartError] | 查询当前状态 |
+| handle.enable() / disable() -> Result[Unit, AutostartError] | 设置 / 取消（均幂等） |
+| handle.path() -> Result[String, AutostartError] | 自启动项文件路径（Linux .desktop） |
+
+Linux 写 `$XDG_CONFIG_HOME/autostart` 的 .desktop（exe 路径取
+`/proc/self/exe`），Windows 写 HKCU Run 键。
+
+### 打开外部
+
+| API | 用途 |
+|---|---|
+| open_url(url) -> Result[Unit, OpenUrlError] | 交默认浏览器打开 |
+| reveal_in_file_manager(path) -> Result[Unit, FileManagerError] | 文件管理器中打开并选中（相对路径按工作目录解析；Linux FileManager1 不在线回退打开父目录,选中态丢失） |
+
+`Ok` 只表示已交给系统;系统侧成败不回传（浏览器是否真打开由桌面决定）。
+
+### 屏幕常亮与用户空闲
+
+```moonbit
+match @yue.KeepAwake::enable("org.example.MyApp") {
+  Ok(k) => { /* 保持常亮 */ ignore(k.release()) }  // 解除
+  Err(_) => ()
+}
+match @yue.idle_seconds() {
+  Ok(sec) => ...   // 自最后一次输入起的秒数（阈值判定由调用方比较）
+  Err(_) => ()
+}
+```
+
+| API | 用途 |
+|---|---|
+| KeepAwake::is_supported() | 抑制服务 / 系统能力是否可用 |
+| KeepAwake::enable(app_id) -> Result[KeepAwake, KeepAwakeError] | 申请常亮（Ok 只表示系统受理;是否真不熄屏由平台策略决定） |
+| handle.release() | 解除（幂等） |
+| keep_awake_active() | 当前是否持有常亮 |
+| idle_supported() / idle_seconds() -> Result[Double, IdleError] | 用户空闲秒数（Linux X11;Wayland 会话显式 Unsupported） |
+
+### 电量与电源事件
+
+| API | 用途 |
+|---|---|
+| battery_supported() / battery_query() -> Result[BatteryInfo?, PowerError] | 电量读数（百分比 / 充电中 / 距充满与放空秒数;无电池返回 Ok(None)） |
+| power_event_supported() / on_power_source_change(cb) | 交直流切换事件（PowerSource::Ac / OnBattery;Windows 事件接入后置,先判 supported） |
+| suspend_resume_supported() / on_suspend_resume(cb) | 休眠唤醒事件（SleepEvent::Suspending / Resuming;快速挂起唤醒可能连收两条 Resuming,库内不去抖） |
+
+Linux 电量走 UPower（系统总线）,Windows 走 GetSystemPowerStatus;
+休眠唤醒 Linux 走 logind PrepareForSleep,Windows 走电源广播。
+
+### 锁屏解锁
+
+| API | 用途 |
+|---|---|
+| session_lock_supported() | 是否可用（锁屏工具不调 logind 的桌面收不到信号） |
+| session_lock_watch(cb) -> Result[Unit, SystemError] | 订阅锁屏 / 解锁（SessionLockEvent::Locked / Unlocked;失败给结构化错误,不静默） |
+
+### 网络在线状态
+
+| API | 用途 |
+|---|---|
+| network_supported() / network_status() -> Result[NetworkStatus, NetworkError] | 当前在线状态（Online = 可达互联网;门户劫持按 Offline） |
+| on_network_status_change(cb) | 变化事件（仅变化时派发;Linux 信号驱动,Windows 5 秒轮询） |
+
+Linux 走 NetworkManager（系统总线）;首次 `network_status()` 同步建缓存,
+最坏阻塞 1.5 秒——回调与定时器内请用事件或缓存,勿反复查询。
+
 ## 气泡 Popover
 
 ```moonbit

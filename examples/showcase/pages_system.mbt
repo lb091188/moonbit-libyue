@@ -453,5 +453,49 @@ fn page_system(app : App) -> @yue.Node {
       ],
     ),
   )
+  // 电量与网络:查询即显 + 变化事件计数(真机拔插电源 / 断联网即见)
+  let power_out : @yue.Store[String] = @yue.Store::new(
+    if @yue.battery_supported() {
+      match @yue.battery_query() {
+        Ok(Some(b)) => {
+          let full = match b.charging_seconds {
+            Some(s) => "距充满 \{s} 秒"
+            None => "剩余时间未知"
+          }
+          "电量 \{b.percent}%,充电中:\{b.charging}(\{full})"
+        }
+        Ok(None) => "无电池(台式机常态)"
+        Err(e) => "查询失败:\{e}"
+      }
+    } else {
+      "当前环境无 UPower,电量不可用"
+    },
+  )
+  let net_out : @yue.Store[String] = @yue.Store::new(
+    if @yue.network_supported() {
+      match @yue.network_status() {
+        Ok(s) => "当前网络:\{s}"
+        Err(e) => "查询失败:\{e}"
+      }
+    } else {
+      "当前环境无 NetworkManager,网络状态不可用"
+    },
+  )
+  let net_n = Ref(0)
+  @yue.on_power_source_change(fn(src) { power_out.set("电源切换:\{src}") })
+  @yue.on_network_status_change(fn(s) {
+    net_n.val = net_n.val + 1
+    net_out.set("当前网络:\{s}(第 \{net_n.val} 次变化)")
+  })
+  secs.push(
+    section(
+      "电量与网络",
+      "battery_query 读电量(无电池返回 Ok(None));on_power_source_change / on_network_status_change 订阅交直流与网络变化(仅变化时派发,Linux 信号驱动 / Windows 轮询);门户劫持的网络按 Offline。",
+      [
+        @yue.bind_label(power_out, fn(s) { s }, style=[("marginBottom", 4.0)]),
+        @yue.bind_label(net_out, fn(s) { s }),
+      ],
+    ),
+  )
   scroll_page(secs)
 }

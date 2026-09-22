@@ -120,18 +120,18 @@
 
 桌面应用通用能力,属框架「系统集成」域(与托盘 / 通知同域),区别于 sysmonitor 的应用领域需求;macOS 暂缓。落地路由按平台:Linux = 纯 MoonBit / DBus(traybus 基建复用) / shim;Windows = 一律 shim(Win32 API)。语义归一在 MoonBit 层,使用方零平台感知。
 
-- [ ] P1 防多开(单实例)
+- [x] P1 防多开(单实例)
   - Linux:DBus claim 应用专属总线名,claim 失败即已有实例
   - Windows:命名互斥体,已存在标记即已有实例
-  - 验收:双开第二实例先 wake_existing 唤起首实例再退出;XFCE / GNOME / KDE 与 Win10 / 11 真机
-- [ ] P2 二次启动唤起已有窗口
+  - 验收:双开第二实例先 wake_existing 唤起首实例再退出;XFCE 真总线抓包验证(Wake→RETURN 39µs,SIGKILL 后三实例可再 claim);GNOME / KDE 与 Win10 / 11 真机待验
+- [x] P2 二次启动唤起已有窗口
   - Linux:DBus——第二实例向应用总线名发消息,首实例回调并前置窗口
   - Windows:消息窗口 WM_COPYDATA 透传命令行,标题查找置前为兜底
-  - 验收:双开后首实例窗口置前,并收到第二实例命令行参数
-- [ ] P3 开机自启动(查询 / 设置 / 取消)
+  - 验收:双开后首实例窗口置前,并收到第二实例命令行参数(真机待用户)
+- [x] P3 开机自启动(查询 / 设置 / 取消)
   - Linux:XDG 自启动目录写 .desktop 文件(纯 MoonBit);坑:exe 绝对路径经 /proc/self/exe 需 readlink(应用侧 stub),路径含空格的 .desktop 转义
   - Windows:注册表当前用户 Run 键写值(通知 AUMID 已有写注册表先例)
-  - 验收:设置后重新登录 / 重启拉起,取消后不拉起
+  - 验收:设置后重新登录 / 重启拉起,取消后不拉起(宿主机冒烟:.desktop 落盘 + desktop-file-validate 零警告;重启拉起待真机)
 - [x] P4 挂起与唤醒事件
   - Linux:DBus logind——PrepareForSleep 信号(参数区分将睡 / 已醒)
   - Windows:电源广播消息(挂起 / 自动恢复两事件,窗口过程 hook)
@@ -140,28 +140,28 @@
   - Linux:DBus logind——Session 的 Lock / Unlock 信号
   - Windows:终端服务会话变更通知(锁定 / 解锁两事件)
   - 验收:真机锁屏 / 解锁触发(待用户);无 logind 环境降级 Err(Unsupported) 已验
-- [ ] P6 获取用户空闲秒数
+- [x] P6 获取用户空闲秒数
   - Linux:shim——X11 屏保扩展查询;Wayland 后置
   - Windows:shim——最后输入时间查询(结构更简单)
   - 边界:active / idle 阈值判定由调用方比较,不设单独接口
-  - 验收:与 xprintidle 数值对照(±2s);xset q 不含当前空闲读数,不能当基准
-- [ ] P7 默认浏览器打开 URL
+  - 验收:与 xprintidle 数值对照(实测差 17ms);xset q 不含当前空闲读数,不能当基准
+- [x] P7 默认浏览器打开 URL
   - Linux:shim spawn xdg-open
   - Windows:shim 系统打开命令
-  - 验收:双平台真机开默认浏览器
-- [ ] P8 文件管理器打开并选中文件
+  - 验收:双平台真机开默认浏览器(Linux spawn 链路冒烟已过;视觉确认待真机)
+- [x] P8 文件管理器打开并选中文件
   - Linux:DBus 文件管理器统一接口的 ShowItems;无服务时回退 xdg-open 目录
   - Windows:explorer 定位选中参数
-  - 验收:双平台打开文件管理器并选中;差异记 adaptation.md
-- [ ] P9 屏幕常亮(设置 / 恢复)
+  - 验收:双平台打开文件管理器并选中;差异记 adaptation.md(FM1 在线探测与 file_uri 冒烟已过;视觉确认待真机)
+- [x] P9 屏幕常亮(设置 / 恢复)
   - Linux:DBus 屏保服务的 Inhibit / UnInhibit( inhibit 返回的 cookie 解除时须带原值)
   - Windows:线程执行状态(启用显示必需标志,解除还原)
-  - 验收:启用后到达息屏时间不熄屏,禁用恢复
+  - 验收:启用后到达息屏时间不熄屏,禁用恢复(Inhibit/UnInhibit cookie 真总线往返一致;息屏实测待真机)
 - [x] P10 电量查询(百分比 + 充电状态;无电池返回空)
   - Linux:DBus UPower——电池设备的 Percentage / State 属性(实测走 DisplayDevice 聚合设备,含 'd'/'t' 线型;台式机 IsPresent=false → Ok(None) 真总线验证)
   - Windows:系统电源状态(交流在线标志 + 剩余百分比;无电池标志判空)
   - 验收:与 upower -i / 系统托盘电量对照;台式机返回空(台式机路径已验,笔记本读数对照待真机)
-- [ ] P11 交流 / 电池电源切换事件
+- [x] P11 交流 / 电池电源切换事件
   - Linux:DBus UPower——OnBattery 属性变更信号(订阅经 B5 信号注册表,回调内直解 changed 字典不重查)
   - Windows:电源设置注册通知(交直流源;事件接入随 B6 电源消息窗口)
   - 验收:拔插电源真机触发(助手宿主机为台式机,无法本地触发)
@@ -170,9 +170,9 @@
   - Windows:在线状态 API 轮询(NLM COM,5s set_timer);监听式后置
   - 验收:断网 / 联网真机触发(待用户);查询路径 busctl 对照一致,私有总线降级 Err(Unsupported) 已验
 - [ ] P13 (后置)平台专属 — 任务栏进度(Windows)/ dock 徽标 / 最近文档
-- [ ] P14 测试与文档
-  - Linux 三桌面 + Windows 10/11 真机复验;DBus 互操作真总线验证
-  - components.md 中英文档;showcase「系统集成」页补演示(自启动开关 / 单实例 / 打开外部 / 屏幕常亮与空闲 / 休眠唤醒与锁屏)
+- [x] P14 测试与文档
+  - Linux 三桌面 + Windows 10/11 真机复验(待用户,复验清单见 docs/zh/plan-system-integration.md B8 节);DBus 互操作真总线验证(XFCE 主链路已随各批完成)
+  - components.md 中英文档;showcase「系统集成」页补演示(自启动开关 / 单实例 / 打开外部 / 屏幕常亮与空闲 / 休眠唤醒与锁屏 / 电量与网络)
 - 批次策略:Linux DBus 套系先行(P1/P3-P5/P9-P11 复用 traybus),Windows 侧同 API 批量补 shim ABI + vendored 出包
 
 ## Markdown 能力升级(mizchi/markdown 编译器)
