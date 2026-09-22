@@ -160,6 +160,7 @@ Methodology: Ubuntu 24.04 XFCE (X11), same machine and session; the startup delt
 - Drag-out data must use the `Data(std::vector<base::FilePath>)` constructor (the string constructor silently degrades to Text); relativize paths first (`g_filename_to_uri` rejects relative paths).
 - The drag preview hotspot is hardcoded to (0,0) upstream; the patch centers the image on the cursor (`patch_linux_drag_icon_hotspot`).
 - Whether a drop is accepted is decided by drag-motion (`handle_drag_update`); `handle_drag_enter` is only an entry notice. Register the Image data type too — dragging in from image viewers / browsers yields image content, not file paths.
+- libyue's `Entry::SetText` swallows `on_text_change`: the GTK side guards with an `is-editing` object-data flag that filters the `changed` signal during programmatic sets (loop prevention), so the visible text changes but consumers get no callback — `input_t`'s clear ✕ therefore "cleared the text but never refreshed the filtered list". Fix: the clear handler explicitly invokes `on_input("")` once. Any path that programmatically changes Entry / TextEdit text and then relies on the callback must invoke it manually.
 - Drag-out initiation: calling `gtk_drag_begin` synchronously desyncs GTK's drag state machine (nested gtk_main never exits, drag works once), so it must be deferred until the event queue drains, initiated with the press event, and the drag_context backfilled; drag-failed needs a defensive cleanup (fork mbt.12).
 
 ## Windows 10 / 11 ✅
