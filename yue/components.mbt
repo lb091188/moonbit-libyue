@@ -310,10 +310,13 @@ pub fn theme_from_accent(accent : String, dark? : Bool = false) -> Theme {
   } else {
     from_hsl(h, ps, pl - 0.09)
   }
+  // 浅底变体:浅色模式取 12% 主色混白(接近内置盘 #E8F0FB 的淡度),
+  // 深色模式取 30% 主色混面板底(内置盘 #1E3A5F 的淡度)。注意 mix_hex
+  // 的 t 是取「前者」的比例,别写反
   let primary_light = if dark {
     mix_hex(primary, base.bg_panel, 0.30)
   } else {
-    mix_hex(primary, "#FFFFFF", 0.88)
+    mix_hex(primary, "#FFFFFF", 0.12)
   }
   // 语义色:固定色相轮,饱和度假借主色、明度随模式
   let ss = if ps * 0.8 < 0.4 { 0.4 } else { ps * 0.8 }
@@ -325,9 +328,9 @@ pub fn theme_from_accent(accent : String, dark? : Bool = false) -> Theme {
   let info = semantic(210.0)
   let light_of = fn(c : String) -> String {
     if dark {
-      mix_hex(c, base.bg_panel, 0.30)
+      mix_hex(c, base.bg_panel, 0.28)
     } else {
-      mix_hex(c, "#FFFFFF", 0.86)
+      mix_hex(c, "#FFFFFF", 0.14)
     }
   }
 
@@ -4551,7 +4554,13 @@ fn table_draw_check(
 /// 排序箭头(表头):cx/cy 为中心,asc 升序尖端朝上;active=false 画
 /// 浅色(可排序列的 hover 提示,不表示当前排序)。8x7 矢量三角,
 /// 不依赖字体。
-fn draw_sort_arrow(
+///|
+/// 排序箭头(表头,实心三角):cx/cy 为中心,asc 升序尖端朝上;
+/// active=false 画灰色(未排序列的常驻 ↕ 提示,不表示当前方向)。
+/// 8x7 矢量三角,fill_rect 拼不出圆润边角时保留路径版——表头容器
+/// (单一绘制器)路径填充实测正常,小单元格容器反而不渲染(见
+/// adaptation.md),故表格表头装饰一律画在表头容器上。
+fn draw_sort_triangle(
   p : Painter,
   cx : Double,
   cy : Double,
@@ -4569,6 +4578,27 @@ fn draw_sort_arrow(
     p.line_to(cx + 4.0, cy - 2.0)
     p.line_to(cx, cy + 2.5)
   }
+  p.close_path()
+  p.fill()
+}
+
+///|
+/// 排序提示(表头,未排序列):上下双三角(↕),灰色,常驻显示——
+/// 用户看到就知道这列可点排序;排序列换实心主题色单向箭头。
+fn draw_sort_hint(p : Painter, cx : Double, cy : Double) -> Unit {
+  p.set_fill_color(theme_border())
+  // 上三角(中心 cy-3)
+  p.begin_path()
+  p.move_to(cx - 3.5, cy - 0.5)
+  p.line_to(cx + 3.5, cy - 0.5)
+  p.line_to(cx, cy - 5.0)
+  p.close_path()
+  p.fill()
+  // 下三角(中心 cy+3)
+  p.begin_path()
+  p.move_to(cx - 3.5, cy + 5.5)
+  p.line_to(cx + 3.5, cy + 5.5)
+  p.line_to(cx, cy + 1.0)
   p.close_path()
   p.fill()
 }
@@ -4649,6 +4679,41 @@ pub fn table_t(
       for col in columns {
         col_w.push(if col.width > 0.0 { col.width } else { flex_w })
       }
+      // 排序/列宽拖动态:表头单元格(见 head_cell)点击排序,列边界
+      // (单元格左/右缘 4px,两侧都认——对准可见边界按下,事件落左列
+      // 右缘或右列左缘都能起拖)按住拖列宽。sort 缺省不画箭头、点击
+      // 无效。表头装饰(箭头/边界线/高亮)统一画在 head 容器上:小
+      // 单元格容器的路径填充在 GTK 上不渲染(实测,见 adaptation.md),
+      // 表头容器单一绘制器正常,与 table_v_t 画布同模型。
+      let head_cs : Ref[Array[Container]] = Ref([])
+      let resizing = Ref(-1)
+      let resize_start_x = Ref(0.0)
+      let resize_w0 = Ref(0.0)
+      let resize_w1 = Ref(0.0)
+      // 悬停的列边界(左列号,-1 无):表头画高亮线 + 光标反馈用
+      let boundary_hover = Ref(-1)
+      // 列 x 偏移(含复选框列 36px):表头装饰定位用,与 col_w 同步
+      let col_x : Array[Double] = []
+      let mut acc_x = if sel is Some(_) { 36.0 } else { 0.0 }
+      for j in 0..<col_w.length() {
+        col_x.push(acc_x)
+        acc_x = acc_x + col_w[j]
+      }
+
+      fn sort_cur_col() -> Int {
+        match sort {
+          Some(s) => s.get().column
+          None => -1
+        }
+      }
+
+      fn sort_cur_asc() -> Bool {
+        match sort {
+          Some(s) => s.get().asc
+          None => true
+        }
+      }
+
       outer.on_draw(fn(p) {
         let b = ViewLike::get_bounds(outer)
         p.set_stroke_color(theme_border())
@@ -4787,6 +4852,31 @@ pub fn table_t(
         p.move_to(0.0, b.height - 0.5)
         p.line_to(b.width, b.height - 0.5)
         p.stroke()
+        // 列边界线(常驻浅色,悬停/拖动变主题色):拖动位置一眼可辨
+        for j in 0..<(columns.length() - 1) {
+          let hot = resizing.val == j || boundary_hover.val == j
+          p.set_stroke_color(if hot { theme_primary() } else { theme_border() })
+          let ex = col_x[j] + col_w[j]
+          p.begin_path()
+          p.move_to(ex, 6.0)
+          p.line_to(ex, b.height - 6.0)
+          p.stroke()
+        }
+        // 排序箭头:排序列实心主题色单向箭头;可排序列未排序时常驻
+        // 灰色 ↕ 提示(用户看得知可点);sort 缺省全不画
+        if sort is Some(_) {
+          for j in 0..<columns.length() {
+            if !columns[j].sortable {
+              continue
+            }
+            let cx = col_x[j] + col_w[j] - 11.0
+            if sort_cur_col() == j {
+              draw_sort_triangle(p, cx, head_h / 2.0, sort_cur_asc(), true)
+            } else {
+              draw_sort_hint(p, cx, head_h / 2.0)
+            }
+          }
+        }
       })
       // 表头复选框(仅 selection 启用时):全选 / 清空,部分选中画横条
       let head_cb = themed_container(style=[("width", 36.0), ("height", head_h)])
@@ -4828,29 +4918,6 @@ pub fn table_t(
           false
         }
       })
-      // 排序/列宽拖动态与helper:表头单元格(见 head_cell)点击排序、
-      // 右缘 4px 按住拖列宽。sort 缺省不画箭头、点击无效
-      let head_hover = Ref(-1)
-      let head_cs : Ref[Array[Container]] = Ref([])
-      let resizing = Ref(-1)
-      let resize_start_x = Ref(0.0)
-      let resize_w0 = Ref(0.0)
-      let resize_w1 = Ref(0.0)
-
-      fn sort_cur_col() -> Int {
-        match sort {
-          Some(s) => s.get().column
-          None => -1
-        }
-      }
-
-      fn sort_cur_asc() -> Bool {
-        match sort {
-          Some(s) => s.get().asc
-          None => true
-        }
-      }
-
       // 表头点击:同列升降序,新列默认升序(使用方订阅 Store 排数据)
       fn toggle_sort(j : Int) -> Unit {
         match sort {
@@ -4864,8 +4931,17 @@ pub fn table_t(
         }
       }
 
+      // 起拖:记录起点窗口坐标与相邻两列宽,捕获鼠标
+      fn begin_resize(j : Int, wx : Double) -> Unit {
+        resizing.val = j
+        resize_start_x.val = wx
+        resize_w0.val = col_w[j]
+        resize_w1.val = col_w[j + 1]
+      }
+
       // 列宽回写:相邻两列此消彼长(总宽不变),表头 + 全部行单元格
-      // 同步改样式后重排;行本身不重建,选择/hover 状态不丢
+      // 同步改样式后重排,并重算 col_x 供表头装饰定位;行本身不重建,
+      // 选择/hover 状态不丢
       fn apply_col_widths(j : Int) -> Unit {
         ViewLike::set_style(head_cs.val[j], "width", col_w[j])
         ViewLike::set_style(head_cs.val[j + 1], "width", col_w[j + 1])
@@ -4873,14 +4949,24 @@ pub fn table_t(
           ViewLike::set_style(cells[j], "width", col_w[j])
           ViewLike::set_style(cells[j + 1], "width", col_w[j + 1])
         }
+        let mut a = if sel is Some(_) { 36.0 } else { 0.0 }
+        for k in 0..<col_w.length() {
+          col_x[k] = a
+          a = a + col_w[k]
+        }
         ViewLike::update_layout(outer)
       }
 
-      // 表头单元格:文字走 Label(平台布局对齐,勿手动摆位)+ 排序箭头
-      // 画在本容器上(右缘内侧,可排序列留 22px 右内边距让位,标题不
-      // 被箭头挤动);右缘 4px 为列宽拖动把手(ResizeEW 光标反馈)
+      // 表头单元格:只放文字 Label(平台布局对齐,勿手动摆位)与事件;
+      // 箭头 / 边界线 / 高亮一律画在 head 容器(见 head.on_draw),
+      // 小单元格容器路径填充在 GTK 不渲染(实测,见 adaptation.md)。
+      // 排序点击与列宽拖动共用本容器:右缘 4px 拖 (j, j+1) 边界,
+      // 左缘 4px 拖 (j-1, j) 边界——对准可见边界按下,事件落左列
+      // 右缘或右列左缘都能起拖(此前只认右缘,对准边界按常落到下一
+      // 列左缘变成排序,拖不动)。
       fn head_cell(j : Int) -> Container {
         let col = columns[j]
+        // 可排序列右侧留 22px 箭头区(标题不跳动)
         let pad_r = if col.sortable { 22.0 } else { 12.0 }
         let cell = themed_container(
           style=[
@@ -4894,32 +4980,12 @@ pub fn table_t(
         l.set_align(col.align)
         ViewLike::set_style(l, "flex", 1.0)
         cell.add_child(l)
-        cell.on_draw(fn(p) {
-          let b = ViewLike::get_bounds(cell)
-          if sort is Some(_) && sort_cur_col() == j {
-            draw_sort_arrow(p, b.width - 11.0, head_h / 2.0, sort_cur_asc(), true)
-          } else if col.sortable && sort is Some(_) && head_hover.val == j {
-            draw_sort_arrow(p, b.width - 11.0, head_h / 2.0, true, false)
-          }
-        })
         let near_edge = Ref(false)
         View::set_cursor(cell, hand())
-        ViewLike::on_mouse_enter(cell, fn(_e) {
-          head_hover.val = j
-          ViewLike::schedule_paint(cell)
-        })
-        ViewLike::on_mouse_leave(cell, fn(_e) {
-          if head_hover.val == j {
-            head_hover.val = -1
-          }
-          if near_edge.val {
-            near_edge.val = false
-            View::set_cursor(cell, hand())
-          }
-          ViewLike::schedule_paint(cell)
-        })
+        // 悬停:靠近任一边界给 ResizeEW 光标 + 表头画高亮线
         ViewLike::on_mouse_move(cell, fn(e) {
-          if resizing.val == j {
+          if resizing.val >= 0 {
+            let jr = resizing.val
             let d = e.window_x - resize_start_x.val
             let total = resize_w0.val + resize_w1.val
             let mut w0 = resize_w0.val + d
@@ -4932,13 +4998,24 @@ pub fn table_t(
               w1 = min_col_width
               w0 = total - w1
             }
-            col_w[j] = w0
-            col_w[j + 1] = w1
-            apply_col_widths(j)
+            col_w[jr] = w0
+            col_w[jr + 1] = w1
+            apply_col_widths(jr)
           } else {
-            // 右缘把手光标反馈(末列无下一列,不给把手)
             let b = ViewLike::get_bounds(cell)
-            let near = j + 1 < columns.length() && e.view_x >= b.width - 4.0
+            // 右缘 → (j, j+1) 边界;左缘 → (j-1, j) 边界;末列右缘不设
+            let edge = if j + 1 < columns.length() && e.view_x >= b.width - 4.0 {
+              j
+            } else if j - 1 >= 0 && e.view_x <= 4.0 {
+              j - 1
+            } else {
+              -1
+            }
+            if edge != boundary_hover.val {
+              boundary_hover.val = edge
+              ViewLike::schedule_paint(head)
+            }
+            let near = edge >= 0
             if near != near_edge.val {
               near_edge.val = near
               View::set_cursor(cell, Cursor::new(if near { ResizeEW } else { Hand }))
@@ -4950,28 +5027,44 @@ pub fn table_t(
             return false
           }
           let b = ViewLike::get_bounds(cell)
-          if j + 1 < columns.length() && e.view_x >= b.width - 4.0 {
-            resizing.val = j
-            resize_start_x.val = e.window_x
-            resize_w0.val = col_w[j]
-            resize_w1.val = col_w[j + 1]
+          let edge = if j + 1 < columns.length() && e.view_x >= b.width - 4.0 {
+            j
+          } else if j - 1 >= 0 && e.view_x <= 4.0 {
+            j - 1
+          } else {
+            -1
+          }
+          if edge >= 0 {
+            begin_resize(edge, e.window_x)
             ViewLike::set_capture(cell)
             true
           } else {
             if col.sortable {
               toggle_sort(j)
-              ViewLike::schedule_paint(cell)
+              ViewLike::schedule_paint(head)
             }
             false
           }
         })
         ViewLike::on_mouse_up(cell, fn(_e) {
-          if resizing.val == j {
+          if resizing.val >= 0 {
             resizing.val = -1
             ViewLike::release_capture(cell)
+            ViewLike::schedule_paint(head)
             true
           } else {
             false
+          }
+        })
+        // 光标离开边界区:复位光标与高亮
+        ViewLike::on_mouse_leave(cell, fn(_e) {
+          if boundary_hover.val != -1 {
+            boundary_hover.val = -1
+            ViewLike::schedule_paint(head)
+          }
+          if near_edge.val {
+            near_edge.val = false
+            View::set_cursor(cell, hand())
           }
         })
         cell
@@ -5105,12 +5198,7 @@ pub fn table_t(
       }
       // 排序状态变化:表头箭头重绘(数据排序由使用方订阅 Store 完成)
       match sort {
-        Some(s) =>
-          s.subscribe(fn(_v) {
-            for c in head_cs.val {
-              ViewLike::schedule_paint(c)
-            }
-          })
+        Some(s) => s.subscribe(fn(_v) { ViewLike::schedule_paint(head) })
         None => ()
       }
       outer.add_child(head)
@@ -5151,9 +5239,11 @@ pub fn table_v_t(
       let offset = Ref(0.0)
       let dragging = Ref(false)
       // 排序/列宽拖动态:resizing 为边界左列号,-1 无;head_hover 为
-      // 悬停表头列号(-1 无);near_edge 光标是否已是 ResizeEW
+      // 悬停表头列号(-1 无);near_edge 光标是否已是 ResizeEW;
+      // boundary_hover 为悬停列边界(左列号,-1 无),表头画高亮线
       let head_hover = Ref(-1)
       let near_edge = Ref(false)
+      let boundary_hover = Ref(-1)
       let resizing = Ref(-1)
       let resize_start_x = Ref(0.0)
       let resize_w0 = Ref(0.0)
@@ -5406,6 +5496,16 @@ pub fn table_v_t(
           }
           None => ()
         }
+        // 列边界线(常驻浅色,悬停/拖动变主题色):拖动位置一眼可辨
+        for j in 0..<(columns.length() - 1) {
+          let hot = resizing.val == j || boundary_hover.val == j
+          p.set_stroke_color(if hot { theme_primary() } else { theme_border() })
+          let ex = col_x[j] + col_w[j]
+          p.begin_path()
+          p.move_to(ex, 6.0)
+          p.line_to(ex, head_h + vis_h - 6.0)
+          p.stroke()
+        }
         for j in 0..<columns.length() {
           // 可排序列右侧留 14px 箭头区(标题右界同步内收,排序切换时
           // 标题不跳动;数据行无箭头保持原样)
@@ -5420,17 +5520,13 @@ pub fn table_v_t(
             head_h,
             theme_text_secondary(),
           )
-          if sort is Some(_) {
+          // 排序箭头:排列表实心主题色单向;可排序列未排序时常驻灰色 ↕
+          if sort is Some(_) && columns[j].sortable {
+            let cx = col_x[j] + col_w[j] - 14.0
             if sort_cur_col() == j {
-              draw_sort_arrow(
-                p,
-                col_x[j] + col_w[j] - 14.0,
-                head_h / 2.0,
-                sort_cur_asc(),
-                true,
-              )
-            } else if columns[j].sortable && head_hover.val == j {
-              draw_sort_arrow(p, col_x[j] + col_w[j] - 14.0, head_h / 2.0, true, false)
+              draw_sort_triangle(p, cx, head_h / 2.0, sort_cur_asc(), true)
+            } else {
+              draw_sort_hint(p, cx, head_h / 2.0)
             }
           }
         }
@@ -5660,12 +5756,17 @@ pub fn table_v_t(
           ViewLike::schedule_paint(cv)
           return
         }
-        // 表头区:悬停列记录(可排序列画浅色箭头提示)+ 边界把手光标
+        // 表头区:悬停列记录 + 边界把手光标 + 边界高亮线
         if e.view_y < head_h && e.view_x >= col_x0 {
-          let near = boundary_at(e.view_x) >= 0
+          let bh = boundary_at(e.view_x)
+          let near = bh >= 0
           if near != near_edge.val {
             near_edge.val = near
             View::set_cursor(cv, Cursor::new(if near { ResizeEW } else { Hand }))
+          }
+          if bh != boundary_hover.val {
+            boundary_hover.val = bh
+            ViewLike::schedule_paint(cv)
           }
           let hc = col_at(e.view_x)
           if hc != head_hover.val {
@@ -5676,6 +5777,10 @@ pub fn table_v_t(
           if near_edge.val {
             near_edge.val = false
             View::set_cursor(cv, hand())
+          }
+          if boundary_hover.val != -1 {
+            boundary_hover.val = -1
+            ViewLike::schedule_paint(cv)
           }
           if head_hover.val != -1 {
             head_hover.val = -1
@@ -5715,6 +5820,10 @@ pub fn table_v_t(
         }
         if head_hover.val != -1 {
           head_hover.val = -1
+          ViewLike::schedule_paint(cv)
+        }
+        if boundary_hover.val != -1 {
+          boundary_hover.val = -1
           ViewLike::schedule_paint(cv)
         }
         if near_edge.val {

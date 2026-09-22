@@ -6,6 +6,32 @@
 fn page_basic(app : App) -> @yue.Node {
   scroll_page([
     section(
+      "主题色板(主色公式派生 + 系统主色)",
+      "选一个主色,整套色板(hover/浅底/语义色)按 HSL 公式即时派生,切换深浅沿用当前主色;「跟随系统」读系统主色调(Linux 取当前 GTK 主题的选中底色,GNOME 47+ 取强调色设置),读不到回落内置。",
+      [
+        @yue.hbox(
+          [
+            @yue.button_t("跟随系统", variant=@yue.Solid, on_click=fn() {
+              app.accent.set(@yue.system_accent())
+            }),
+            @yue.button_t("默认蓝", on_click=fn() { app.accent.set("") }),
+            @yue.button_t("青", on_click=fn() { app.accent.set("#009688") }),
+            @yue.button_t("绿", on_click=fn() { app.accent.set("#2E9E5B") }),
+            @yue.button_t("紫", on_click=fn() { app.accent.set("#9141AC") }),
+            @yue.button_t("红", on_click=fn() { app.accent.set("#D64550") }),
+          ],
+          style_str=[("alignItems", "center")],
+        ),
+        @yue.bind(app.accent.signal(), fn(s) {
+          if s == "" {
+            "当前主色:内置默认(跟随深浅基准盘)"
+          } else {
+            "当前主色:\{s}(公式派生)"
+          }
+        }, style=[("marginTop", 8.0)]),
+      ],
+    ),
+    section(
       "Button 按钮变体",
       "四变体;「主要操作」联动数据页访问量/进度条(信号)。",
       [

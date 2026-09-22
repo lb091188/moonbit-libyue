@@ -8,14 +8,9 @@ fn main {
     println("GUI 初始化失败")
     return
   }
-  // 启动跟随系统深浅,可换 default_theme() 固定浅色
-  @yue.theme_apply(
-    if @yue.system_prefers_dark() {
-      @yue.dark_theme()
-    } else {
-      @yue.default_theme()
-    },
-  )
+  // 启动跟随系统:深浅取 system_prefers_dark,主色取 system_accent
+  // (系统无主色概念时回落内置);可换 default_theme()/dark_theme() 固定内置盘
+  @yue.theme_apply(@yue.theme_from_system())
   let name : @yue.Store[String] = @yue.Store::new("MoonBit")
   let greet : @yue.Store[String] = @yue.Store::new("(点「问候」)")
   ignore(
