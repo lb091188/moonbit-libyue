@@ -45,7 +45,10 @@ pub fn Painter::bezier_curve_to(
 }
 
 ///|
-/// 圆弧。逆时针方向由库内换算为负角跨度（等价 canvas 语义）。
+/// 圆弧（顺时针，角度为画布语义：0 指向右，正值向下）。ccw 参数目前
+/// 两层后端都不可用：GTK 侧是 cairo_arc，ea < sa 会被规范化成「加 2π
+/// 的顺时针长弧」；Win 侧公开 API 写死顺时针。逆时针需求（环形内弧等）
+/// 用折线近似或交换起止角（仅描边时）表达，见图表圆环与图标弧。
 pub fn Painter::arc(
   self : Painter,
   x : Double,

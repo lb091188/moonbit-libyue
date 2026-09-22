@@ -246,7 +246,14 @@ fn icon_arc(
   ccw? : Bool = false,
 ) -> Unit {
   p.begin_path()
-  p.arc(x, y, r, a0, a1, ccw=ccw)
+  // 逆时针弧 libyue 两层后端都表达不了（GTK cairo_arc 会把 ea<sa 规范
+  // 化成顺时针长弧；Win 公开 API 写死顺时针）。描边方向不影响几何，
+  // 交换起止角即等价；填充场景（见图表圆环）须用折线近似。
+  if ccw {
+    p.arc(x, y, r, a1, a0)
+  } else {
+    p.arc(x, y, r, a0, a1)
+  }
   p.stroke()
 }
 

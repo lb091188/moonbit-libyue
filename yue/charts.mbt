@@ -1024,12 +1024,7 @@ fn draw_donut(
         }
         let ro = if hover == i { r_out + 4.0 } else { r_out }
         p.set_fill_color(donut_color(i))
-        p.begin_path()
-        p.arc(cx, cy, ro, a0, a1)
-        p.line_to(cx + r_in * @math.cos(a1), cy + r_in * @math.sin(a1))
-        p.arc(cx, cy, r_in, a1, a0, ccw=true)
-        p.close_path()
-        p.fill()
+        fill_ring(p, cx, cy, ro, r_in, a0, a1)
       }
     }
   }
@@ -1125,7 +1120,18 @@ fn band_color(frac : Double, thresholds : Array[(Double, String)]) -> String {
 }
 
 ///|
-/// 实心圆环段（外弧 a0→a1，内弧返回，填充）。
+/// 内弧折线段数：按扫角约每 11° 一段（整圆 32 段，弦误差 <0.4px），
+/// 至少 4 段。
+fn ring_steps(a0 : Double, a1 : Double) -> Int {
+  (((a1 - a0).abs() / (pi / 16.0)).ceil().to_int()).max(4)
+}
+
+///|
+/// 实心圆环段（外弧 a0→a1 走真 arc，内弧回程用折线近似后填充）。
+/// 内弧不能走 arc 的逆时针：libyue 的 Arc 在 GTK 侧是 cairo_arc，
+/// ea < sa 会被规范化成「加 2π 的顺时针长弧」，Win 侧公开 API 也写死
+/// 顺时针——逆时针弧跨平台无法表达，硬用会把环填成实心饼（内孔被
+/// 长弧包进去）。折线近似三平台行为一致，弦误差亚像素级。
 fn fill_ring(
   p : Painter,
   cx : Double,
@@ -1137,8 +1143,12 @@ fn fill_ring(
 ) -> Unit {
   p.begin_path()
   p.arc(cx, cy, r_out, a0, a1)
-  p.line_to(cx + r_in * @math.cos(a1), cy + r_in * @math.sin(a1))
-  p.arc(cx, cy, r_in, a1, a0, ccw=true)
+  let steps = ring_steps(a0, a1)
+  let last = steps + 1
+  for k in 0..<last {
+    let a = a1 - (a1 - a0) * k.to_double() / steps.to_double()
+    p.line_to(cx + r_in * @math.cos(a), cy + r_in * @math.sin(a))
+  }
   p.close_path()
   p.fill()
 }
