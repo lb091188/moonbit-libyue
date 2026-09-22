@@ -3661,7 +3661,159 @@ static void EnsureToastAumid() {
     ::RegCloseKey(handle);
   }
 }
-#endif
+#endif  // OS_WIN(toast AUMID)
+
+#if defined(OS_WIN)
+// ---------- 单实例：命名互斥体 + message-only 窗口 ----------
+//
+// 首实例持有一个 Local\ 命名空间互斥体（进程存活期不释放，static 句柄），
+// 并建一个 message-only 窗口（HWND_MESSAGE，自有 WNDPROC 与窗口类，类名由
+// app_id 派生）收第二实例的 WM_COPYDATA。WM_COPYDATA 由 SendMessage 同步
+// 派发到本线程 WNDPROC，此处不直接跑应用回调，而是 MessageLoop::PostTask
+// 抛回主循环再经蹦床上行——避免在对方进程的 SendMessage 栈里执行应用代码。
+
+static HANDLE g_instance_mutex = nullptr;
+
+// 每进程一个实例窗口：WNDPROC 经静态变量取蹦床（类名由 MoonBit 侧按
+// app_id 派生，同进程不会建第二个）
+static void (*g_instance_invoke)(void *, void *) = nullptr;
+static void *g_instance_closure = nullptr;
+
+static std::wstring InstanceWindowClassName(const char *app_id) {
+  std::wstring name = L"moonbit_libyue_instance_";
+  std::wstring wide = base::SysUTF8ToWide(app_id);
+  for (wchar_t &c : wide) {
+    if (c == L'.') {
+      c = L'_';
+    }
+  }
+  return name + wide;
+}
+
+static LRESULT CALLBACK InstanceWindowWndProc(HWND hwnd, UINT msg, WPARAM wp,
+                                              LPARAM lp) {
+  if (msg == WM_COPYDATA && g_instance_invoke != nullptr) {
+    auto *cds = reinterpret_cast<const COPYDATASTRUCT *>(lp);
+    const int32_t len = static_cast<int32_t>(cds->cbData);
+    void *bytes = moonbit_make_bytes(len > 0 ? len : 0, 0);
+    if (bytes != nullptr && len > 0 && cds->lpData != nullptr) {
+      std::memcpy(bytes, cds->lpData, static_cast<size_t>(len));
+    }
+    void (*invoke)(void *, void *) = g_instance_invoke;
+    void *closure = g_instance_closure;
+    nu::MessageLoop::PostTask([invoke, closure, bytes]() { invoke(closure, bytes); });
+    return TRUE;
+  }
+  return ::DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+extern "C" int32_t yue_mbt_win_named_mutex_create(const char *name,
+                                                  int32_t *ok) {
+  if (g_instance_mutex != nullptr) {
+    *ok = 1;  // 本进程已持有：同进程二次调用幂等
+    return 0;
+  }
+  std::wstring full = L"Local\\" + base::SysUTF8ToWide(name);
+  HANDLE h = ::CreateMutexW(nullptr, FALSE, full.c_str());
+  if (h == nullptr) {
+    *ok = 0;
+    return -1;
+  }
+  if (::GetLastError() == ERROR_ALREADY_EXISTS) {
+    ::CloseHandle(h);  // 不持有：立即归还，退出前不攥着别人的互斥体
+    *ok = 0;
+    return 0;
+  }
+  g_instance_mutex = h;
+  *ok = 1;
+  return 0;
+}
+
+extern "C" int32_t yue_mbt_win_instance_window_create(
+    const char *class_name, void (*invoke)(void *, void *), void *closure) {
+  std::wstring cls = InstanceWindowClassName(class_name);
+  WNDCLASSW wc = {};
+  wc.lpfnWndProc = InstanceWindowWndProc;
+  wc.hInstance = ::GetModuleHandleW(nullptr);
+  wc.lpszClassName = cls.c_str();
+  // 同类名重复注册（同进程二次 create）会失败，忽略即可：已注册类的
+  // WNDPROC 相同，窗口照常建
+  ::RegisterClassW(&wc);
+  g_instance_invoke = invoke;
+  g_instance_closure = closure;
+  HWND hwnd = ::CreateWindowExW(0, cls.c_str(), nullptr, 0, 0, 0, 0, 0,
+                                HWND_MESSAGE, nullptr, wc.hInstance, nullptr);
+  if (hwnd == nullptr) {
+    return -1;
+  }
+  return 0;
+}
+
+extern "C" int32_t yue_mbt_win_instance_window_send(const char *class_name,
+                                                    const char *args,
+                                                    int32_t *ok) {
+  std::wstring cls = InstanceWindowClassName(class_name);
+  HWND hwnd = ::FindWindowW(cls.c_str(), nullptr);
+  if (hwnd == nullptr) {
+    // message-only 窗口不一定进 FindWindow 的遍历，按 HWND_MESSAGE 父再找
+    hwnd = ::FindWindowExW(HWND_MESSAGE, nullptr, cls.c_str(), nullptr);
+  }
+  if (hwnd == nullptr) {
+    *ok = 0;
+    return 0;
+  }
+  std::string payload(args == nullptr ? "" : args);
+  COPYDATASTRUCT cds = {};
+  cds.dwData = 1;  // moonbit-libyue 单实例 Wake 载荷标识
+  cds.cbData = static_cast<DWORD>(payload.size());
+  cds.lpData = payload.empty()
+                   ? nullptr
+                   : static_cast<void *>(const_cast<char *>(payload.data()));
+  LRESULT r = ::SendMessageW(hwnd, WM_COPYDATA, 0,
+                             reinterpret_cast<LPARAM>(&cds));
+  *ok = (r != 0) ? 1 : 0;
+  return 0;
+}
+
+extern "C" int32_t yue_mbt_win_find_and_activate(const char *title,
+                                                 int32_t *ok) {
+  HWND hwnd = ::FindWindowW(nullptr, base::SysUTF8ToWide(title).c_str());
+  if (hwnd == nullptr) {
+    *ok = 0;
+    return 0;
+  }
+  if (::IsIconic(hwnd)) {
+    ::ShowWindow(hwnd, SW_RESTORE);
+  }
+  ::SetForegroundWindow(hwnd);
+  *ok = 1;
+  return 0;
+}
+
+#else  // 非 Windows：桩实现（Linux 走纯 MoonBit 路由，macOS 暂缓）
+
+extern "C" int32_t yue_mbt_win_named_mutex_create(const char *, int32_t *ok) {
+  *ok = 0;
+  return -1;
+}
+
+extern "C" int32_t yue_mbt_win_instance_window_send(const char *, const char *,
+                                                    int32_t *ok) {
+  *ok = 0;
+  return -1;
+}
+
+extern "C" int32_t yue_mbt_win_instance_window_create(
+    const char *, void (*)(void *, void *), void *) {
+  return -1;
+}
+
+extern "C" int32_t yue_mbt_win_find_and_activate(const char *, int32_t *ok) {
+  *ok = 0;
+  return -1;
+}
+
+#endif  // 单实例平台分支结束
 
 void yue_mbt_notification_show(void *n) {
   if (auto *b = NotificationStore::get(n)) {
