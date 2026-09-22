@@ -580,6 +580,126 @@ let right = @yue.Store::new(["C"])
 @yue.transfer(left, right)
 ```
 
+## Charts
+
+The whole chart family (EP Chart counterpart) is self-drawn in pure MoonBit: data flows through `Store`, a set only calls schedule_paint on the canvas — no view-tree rebuild; colors are read from the theme palette at draw time, so `theme_apply` light/dark switches follow immediately. Series colors cycle the four semantic theme colors (line charts ≤4 series), donut charts cycle five.
+
+### Line / area chart line_chart_t
+
+`line_chart_t(series : Store[Array[LineSeries]], width? = 560.0, height? = 260.0, area? = false, y_range?, show_last? = true)`
+
+Multi-series line chart over fixed-length rolling windows.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| series | Store[Array[LineSeries]] | required | multi-series data, see push helpers below |
+| width / height | Double | 560 / 260 | canvas size |
+| area | Bool | false | semi-transparent area fill |
+| y_range | (Double, Double)? | None | manual y range; None = auto |
+| show_last | Bool | true | right-edge latest-value label |
+ `LineSeries::make(name, max_points?)` creates a series (window capacity defaults to 100, oldest dropped on overflow); push points with `series_push(store, series index, value)` (or `win_push(window, max_points, value)` for a new window, then set it wholesale). The y-axis auto-ranges (window min/max + 8% padding) or is pinned via `y_range = (low, high)`; horizontal grid + left ticks; `area = true` adds semi-transparent area fill (to the zero line when 0 is in range, plot bottom for all-positive, plot top for all-negative); `show_last` toggles the right-edge latest-value label.
+
+Rendering strategy: when points outnumber pixel columns the chart decimates to columns (keeping each column's min/max extremes) and switches to rect paths — area mode fills one rect per column up to the anchor (the fill's top edge *is* the line), line mode draws a min..max vertical bar per column; when points are fewer than columns it uses a true polyline plus polygon area fill. Per-frame cost is decoupled from window size (1000 points × 4 series measured ~3ms, see adaptation.md).
+
+```moonbit
+let series = @yue.Store::new([
+  @yue.LineSeries::make("CPU", max_points=120),
+  @yue.LineSeries::make("Memory", max_points=120),
+])
+ignore(@yue.set_timer(500, fn() {
+  @yue.series_push(series, 0, cpu_usage())
+  @yue.series_push(series, 1, mem_usage())
+  true
+}))
+@yue.line_chart_t(series, width=380.0, height=220.0)
+@yue.line_chart_t(series, width=380.0, height=220.0, area=true)
+```
+
+### Bar chart bar_chart_t
+
+`bar_chart_t(data : Store[Array[BarItem]], width? = 560.0, height? = 280.0, horizontal? = false)`
+
+Vertical bars
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| data | Store[Array[BarItem]] | required | category data (values may be negative) |
+| width / height | Double | 560 / 280 | canvas size |
+| horizontal | Bool | false | horizontal bar form |
+ (default) and horizontal bars (`horizontal = true`, for long category names). `BarItem::make(label, value)` with possibly negative values; zero baseline, positive in theme color and negative in red. Hovering highlights the category and annotates its value inline (self-drawn, no popover); category labels thin out and truncate automatically when dense. Full redraw of 200 categories measured ~0.4ms.
+
+```moonbit
+let bars = @yue.Store::new([
+  @yue.BarItem::make("Jan", 12.0),
+  @yue.BarItem::make("Feb", -8.0),
+])
+@yue.bar_chart_t(bars, width=380.0, height=220.0)
+@yue.bar_chart_t(bars, width=380.0, height=220.0, horizontal=true)
+```
+
+### Donut / pie chart donut_chart_t
+
+`donut_chart_t(data : Store[Array[DonutSlice]], width? = 480.0, height? = 240.0, thickness? = 34.0, center? = "")`
+
+Proportional sectors
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| data | Store[Array[DonutSlice]] | required | sector data (negatives excluded) |
+| width / height | Double | 480 / 240 | canvas size |
+| thickness | Double | 34 | ring thickness (0 = solid pie) |
+| center | String | "" | center text; empty = total value |
+ (clockwise from 12 o'clock, five-color cycle, adjacent sectors differ); the center shows the total (pass `center` to override the text); a right-side legend (swatch + label + value and percentage). Hovering explodes a sector by 4px and highlights its legend row. `DonutSlice::make(label, value)`; negative values are excluded from proportions. Redraw of 50 sectors measured ~2.9ms.
+
+```moonbit
+let slices = @yue.Store::new([
+  @yue.DonutSlice::make("Direct", 335.0),
+  @yue.DonutSlice::make("Search", 510.0),
+])
+@yue.donut_chart_t(slices, width=420.0, height=220.0)
+```
+
+### Gauge gauge_t
+
+`gauge_t(value : Store[Double], width? = 240.0, height? = 170.0, thresholds?)`
+
+Single-value percentage ring
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| value | Store[Double] | required | 0..1, clamped |
+| width / height | Double | 240 / 170 | canvas size |
+| thresholds | Array[(Double, String)] | [] | ascending (upper bound, color) bands; empty = theme primary |
+ (270° sweep starting at 135°, opening downward) + big center number. `value` is 0..1 (clamped); `thresholds` is an ascending `[(upper bound, color), ...]` and the value arc takes the color of the band it falls into (empty table = theme primary), e.g. `[(0.6, green), (0.85, orange), (1.0, red)]`. Smooth interpolation: after a target change a 16ms timer closes 25% of the remaining gap per tick (not animation-frame driven), so 2Hz updates never jump.
+
+```moonbit
+let usage = @yue.Store::new(0.0)
+@yue.gauge_t(usage, thresholds=[
+  (0.6, @yue.theme_current().success),
+  (0.85, @yue.theme_current().warning),
+  (1.0, @yue.theme_current().danger),
+])
+```
+
+### Scatter chart scatter_t
+
+`scatter_t(points : Store[Array[(Double, Double)]>, width? = 560.0, height? = 320.0, trend? = false, dot? = 3.0)`
+
+x/y point series
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| points | Store[Array[(Double, Double)]] | required | (x, y) points |
+| width / height | Double | 560 / 320 | canvas size |
+| trend | Bool | false | least-squares trend line |
+| dot | Double | 3 | dot edge length (px) |
+ (small squares), dual adaptive axes + grid; `trend = true` overlays a least-squares trend line (red). First draw of 10000 points measured ~3ms. Box-select zoom is post-poned, not implemented.
+
+```moonbit
+let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
+@yue.scatter_t(pts, trend=true)
+```
+
 ## Icons
 
 136 built-in vector icons (arrows / file / editing / view / navigation / media / messaging / system / development / data / status, styled after Tabler / Lucide).

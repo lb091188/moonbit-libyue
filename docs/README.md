@@ -35,7 +35,7 @@ The showcase covers: Basic / Icons / Form / Navigation / Data Display / Feedback
 | [tutorial.md](tutorial.md) | Five-minute tutorial (for MoonBit newcomers): from `moon new` to a running window, avoiding the three newcomer pitfalls one by one; includes links to the official MoonBit tutorial & Tour |
 | [declarative.md](declarative.md) | Declarative UI: `Node`/`mount` render tree + `Store`/`Signal` reactive bindings (signals: computed with automatic dependency tracking + batch) |
 | [layout.md](layout.md) | Layout style key quick reference: all Yoga flexbox style keys (enum / numeric / edge / special) + common-combination examples |
-| [components-ui.md](components-ui.md) | Themed component library quick reference: Element-Plus-style themed components (buttons/input/selection/forms/navigation/layout/data display/icons/feedback/overlays), per-API signatures + parameter tables + examples |
+| [components-ui.md](components-ui.md) | Themed component library quick reference: Element-Plus-style themed components (buttons/input/selection/forms/navigation/layout/data display/charts/icons/feedback/overlays), per-API signatures + parameter tables + examples |
 | [components.md](components.md) | Widget API quick reference: both classic setter and `X::make` props styles, including upstream pitfalls |
 | [adaptation.md](adaptation.md) | Platform adaptation notes: field-tested pitfalls per platform, root causes, and verification conclusions (continuously updated) |
 | [tray.md](tray.md) | Linux tray solution: SNI protocol stack design, architecture, backend fallback, desktop compatibility |
