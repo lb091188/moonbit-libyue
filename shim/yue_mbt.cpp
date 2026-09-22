@@ -254,10 +254,29 @@ std::string FilePathValueToUTF8(const base::FilePath &path) {
 
 // ---------- 应用生命周期 ----------
 
+#if defined(OS_LINUX)
+/* WebKit(浏览器页)在 GBM EGL 不可用的机器上(NVIDIA 专有驱动缺
+ * libnvidia-egl-gbm、纯虚拟机无可用渲染节点等)创建 DRM 主设备失败会
+ * 直接 abort 整个进程("Could not create GBM EGL display"),showcase
+ * 首屏就挂 Browser,必炸。进程内无法可靠预判(GLVND 的探测结果与
+ * WebKit 实际选路不一致,实测本机探测"可用"而 WebKit 仍炸),故在
+ * WebKit 创建前统一走 DMABUF 关闭路径:该变量正是 WebKit 文档化的
+ * 软件回退开关,老版(2.40-2.44 DMABUF 渲染器崩溃)同样吃这一套;
+ * overwrite=0,用户显式设置优先。代价仅浏览器页网页内容少一层 GPU
+ * 加速,界面本体(cairo 自绘)不受影响。 */
+void GuardWebKitRendererForGlib(void) {
+  setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", 0);
+}
+#endif
+
 int32_t yue_mbt_app_init(void) {
   if (g_state != nullptr) {
     return 1;
   }
+#if defined(OS_LINUX)
+  // 必须先于任何 WebKitWebView 创建(showcase 等把 Browser 挂在首屏)
+  GuardWebKitRendererForGlib();
+#endif
   base::CommandLine::Init(0, nullptr);
   g_lifetime = new nu::Lifetime();
   g_state = new nu::State();
@@ -1551,6 +1570,23 @@ void yue_mbt_painter_draw_text(void *painter, const char *text, double x,
   nu::TextAttributes attributes(color);
   attributes.align = static_cast<nu::TextAlign>(align);
   attributes.valign = static_cast<nu::TextAlign>(valign);
+  static_cast<nu::Painter *>(painter)->DrawText(
+      text,
+      nu::RectF(static_cast<float>(x), static_cast<float>(y),
+                static_cast<float>(w), static_cast<float>(h)),
+      attributes);
+}
+
+void yue_mbt_painter_draw_text_ex(void *painter, const char *text, double x,
+                                  double y, double w, double h, int32_t align,
+                                  int32_t valign, const char *hex_color,
+                                  int32_t wrap, int32_t ellipsis) {
+  nu::Color color((std::string(hex_color)));
+  nu::TextAttributes attributes(color);
+  attributes.align = static_cast<nu::TextAlign>(align);
+  attributes.valign = static_cast<nu::TextAlign>(valign);
+  attributes.wrap = wrap != 0;
+  attributes.ellipsis = ellipsis != 0;
   static_cast<nu::Painter *>(painter)->DrawText(
       text,
       nu::RectF(static_cast<float>(x), static_cast<float>(y),
