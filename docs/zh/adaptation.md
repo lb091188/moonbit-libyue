@@ -43,6 +43,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 ### 自绘画布与图表渲染
 
+- 8 位 hex 颜色的 alpha 在**前**(`#AARRGGBB`,libyue `ParseHexColor` 源码级约定,与 CSS 的 `#RRGGBBAA` 相反;`yue/color.mbt` 的 `parse_hex` 亦然)。拼在尾部不会报错也不会改透明度——两位 hex 落到**蓝分量**,表现为颜色漂移。实例一:悬浮滚动条渐隐把 alpha 串从 "d9" 改 "73",实际蓝分量 0xd9→0x73、红绿不动,渐隐中的 thumb 变黄。实例二:图表面积填充 `color + "26"`,主题色 `#009688` 拼成 `#00968826` 按 AARRGGBB 解析 = alpha 0x00(全透明)+ RGB(150,136,38)——**面积填充从未显示过**。统一走 `with_alpha(hex, aa)`(拼头部)修复;凡 set_fill_color/set_stroke_color 需要透明度一律用它,禁手拼后缀。
 - 离屏 `Canvas::new + get_painter` 在未 `initialize()` 时可做全部几何绘制(fill / stroke / arc / clip 均正常,无 DISPLAY 的 CI 也能跑绘制基准);但文本路径(`draw_text` / `AttributedText::get_bounds_for`)直接段错误——GTK 文本栈要 initialize 起过才在。测试基准因此分两级:无显示跑「纯函数管线 + 几何调用镜像」,有 DISPLAY 才 `initialize` 后跑真实全帧(含文本标注),两级数值都记入 `charts_wbtest.mbt` 的输出。
 - painter 默认描边色下 `stroke()` 是空操作(不画任何东西):基准里忘记 `set_stroke_color` 会让描边成本显示为 ~0,虚假通过。所有描边基准必须显式设色后再测。
 - 软件光栅化(GTK/X11 无 GPU 路径)下路径描边每段约 1.8µs,近垂直段(斜率 >30)约 13µs/段;`fill_rect` 每约 1µs(轴对齐快路径),`draw_text` 每次约 0.11ms,`line_to` 本身约 12ns(纯建路径)。折线图 1000 点 × 4 序列若全走路径描边,单帧 45~60ms,远超 5ms 验收线。
