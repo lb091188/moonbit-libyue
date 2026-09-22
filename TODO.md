@@ -6,13 +6,11 @@
 
 - [~] 通知回调 — reply(OS_MAC)留平台目标
 - [~] 缓办 — Display 全字段枚举、mac 专属(Accelerator 类 / Tray 原生后端等)
-- [ ] 可关闭页签(chrome 式动态增删)
-  - tabs_t API 形态重构:动态页数组 + Store 驱动,独立批次
 - 平台
   - macOS 暂缓(无设备)
-  - Windows 富文本 / markdown 观感待真机复验(记录在 adaptation.md)
+  - Windows 富文本 / markdown 观感待真机复验
 
-## Chart 图表组件(主题组件库扩容,监控应用的需求内核)
+## Chart 图表组件
 
 - [ ] C1 line_chart_t 折线 / 面积图
   - 功能:定长滚动窗口(max_points,超出丢最旧);面积半透明填充可选;多序列 ≤4(主题色系)
@@ -39,15 +37,15 @@
   - components-ui 中英文档(签名 + 参数表)
   - 真机视觉复验(用户执行)
 
-## 旗舰应用:examples/sysmonitor(Ubuntu 进程管理与硬件信息)
+## Ubuntu 进程管理与硬件信息查看
 
 - 定位:库的「表现力 + 性能」展示窗口,README 挂截图
 - 数据层纯 MoonBit 读 /proc、/sys;刷新走 set_timer;系统调用经应用自有 native-stub(不进 yue)
 
-### 数据层(控制台输出对照 htop/free/sensors 先验证再上 UI)
+### 数据层
 
 - [ ] S0 文本读取入口
-  - 应用 native-stub 提供 read_text_file(不进 yue:读文件非 GUI 框架职责);数据层统一使用
+  - 应用 native-stub 提供 read_text_file;数据层统一使用
 - [ ] S1 CPU
   - /proc/stat:总体 + 各核两次采样差值算占用率
   - /proc/cpuinfo:型号 / 核数 / 频率
@@ -64,9 +62,9 @@
   - NVIDIA 利用率走 nvidia-smi 子进程(后置)
 - [ ] S7 网络 — /sys/class/net/*/statistics 的 rx/tx 速率
 
-### 应用自有 native-stub(examples/sysmonitor/stub/,不进 yue 框架)
+### 应用自有 native-stub(examples/sysmonitor/stub/)
 
-监控应用的领域需求不是框架公共能力,经 moon.pkg 的 native-stub 编入应用包(yue 的 win_gui.c 即此机制先例);符号全在 libc 默认链接,零 shim/fork/vendored/链接参数改动。
+监控应用的领域需求不是框架公共能力,经 moon.pkg 的 native-stub 编入应用包;符号全在 libc 默认链接,零 shim/fork/vendored/链接参数改动。
 
 - [ ] F1 进程管理 — kill(pid, sig) / getpriority / setpriority;errno → Result 语义化
 - [ ] F2 statvfs(path) — 磁盘容量;C 侧拆结构体为扁平出参
@@ -86,11 +84,45 @@
 - [ ] U5 性能实测 — 千行进程页 1Hz/2Hz 刷新的帧率与内存占用,延续 vs C++ 基线口径入 adaptation.md
 - [ ] U6 文档发布 — README 中英挂旗舰示例与截图;踩坑回写 adaptation.md;mooncakes 发新版
 
-### 边界(不做)
+### 边界
 
-- Windows / macOS 数据层(proc/sysfs 专属;UI 层天然跨平台,数据层留接口)
+- 仅测试 Ubuntu 24.04:GNOME、XFCE、KDE 桌面环境
 - systemd 服务管理、连接级网络监控(只做网卡速率)
 - NVIDIA 之外 GPU 的专有利用率指标(温度走 hwmon 为准)
+
+## 系统集成扩容(Electron 对标)
+
+桌面应用通用能力,属框架「系统集成」域(与托盘/通知同域),区别于 sysmonitor 的应用领域需求;DBus 系全部复用 traybus 基建,纯 MoonBit 扩容。
+
+- [ ] P1 单实例锁
+  - 功能:防多开;二次启动唤起已有窗口后退出
+  - 落地:DBus claim 总线名(traybus 基建复用)或文件锁
+  - 验收:双开第二实例自动退出并唤起首实例;XFCE / GNOME / KDE 真机各一次
+- [ ] P2 开机自启动
+  - 功能:查询 / 设置 / 取消自启动
+  - 落地:写 ~/.config/autostart/*.desktop(纯 MoonBit,零 C 层)
+  - 验收:设置后重新登录自动拉起,取消后不拉起
+- [ ] P3 电源与会话事件
+  - 功能:挂起 / 唤醒、锁屏 / 解锁事件回调
+  - 落地:logind DBus 信号(PrepareForSleep / Lock / Unlock)
+  - 验收:dbus-monitor 对照事件流;真机休眠唤醒、锁屏解锁各触发一次
+- [ ] P4 空闲查询
+  - 功能:get_idle_time(用户无输入秒数)+ 阈值状态
+  - 落地:X11 ScreenSaver 扩展(需 shim ABI);Wayland 后置
+  - 验收:空闲计时与 xset q 对照(±2s)
+- [ ] P5 打开外部
+  - 功能:默认浏览器开 URL / 文件管理器打开并定位文件
+  - 落地:shim 补通用 spawn(xdg-open;Windows 走 ShellExecute)
+  - 验收:真机点链接开默认浏览器、定位按钮打开文件管理器
+- [ ] P6 (中频)屏幕常亮 / 电量 / 网络在线
+  - 屏幕常亮:org.freedesktop.ScreenSaver 的 Inhibit(视频播放场景)
+  - 电量:UPower DBus(百分比 + 充电状态)
+  - 网络:NetworkManager State 信号
+- [ ] P7 (后置)平台专属
+  - 任务栏进度(Windows ITaskbarList3)、dock 徽标、JumpList 最近文档
+- [ ] P8 测试与文档
+  - DBus 互操作上真总线验证;XFCE / GNOME / KDE 三桌面真机复验
+  - components.md 中英文档;showcase「系统集成」页补演示(自启动开关 / 单实例 / 打开外部)
 
 ## Markdown 能力升级(mizchi/markdown 编译器)
 
