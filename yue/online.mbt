@@ -125,6 +125,9 @@ fn net_dispatch(status : NetworkStatus) -> Unit {
 /// network_supported 判定)。Linux 信号驱动(NM StateChanged 与
 /// PropertiesChanged,回调内只读缓存);Windows 定时轮询。
 pub fn on_network_status_change(cb : (NetworkStatus) -> Unit) -> Unit {
+  // 登记统一放分支外:派发统一走 net_dispatch 遍历 g_net_cbs,Linux
+  // 分支曾因只在 Windows 分支登记漏掉 push,信号全到而回调永不执行
+  g_net_cbs.push(cb)
   match platform() {
     "linux" => {
       let _ = @traybus.nm_on_change(fn(state, conn) {
@@ -138,7 +141,6 @@ pub fn on_network_status_change(cb : (NetworkStatus) -> Unit) -> Unit {
       ()
     }
     "windows" => {
-      g_net_cbs.push(cb)
       if !g_net_watched.val {
         g_net_watched.val = true
         match network_status() {

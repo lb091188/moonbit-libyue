@@ -76,3 +76,37 @@ test "NM StateChanged 信号按真实签名 Int32(i) 解码,u 兜底" {
     Err(_) => inspect("构造失败", content="应可构造")
   }
 }
+
+///|
+test "PropertiesChanged changed 字典提取 State/Connectivity(u32 variant)" {
+  let changed = VArray("{sv}", [
+    VStruct([VString("State"), VVariant(VU32(20))]),
+    VStruct([VString("Connectivity"), VVariant(VU32(1))]),
+    VStruct([VString("NetworkingEnabled"), VVariant(VBool(false))]),
+  ])
+  match
+    build_signal(
+      13,
+      "/org/freedesktop/NetworkManager",
+      "org.freedesktop.DBus.Properties",
+      "PropertiesChanged",
+      "sa{sv}as",
+      [
+        VString("org.freedesktop.NetworkManager"),
+        changed,
+        VArray("s", []),
+      ],
+    ) {
+    Ok(bytes) =>
+      match parse_message(bytes[:]) {
+        Some(m) => {
+          inspect(m.path, content="/org/freedesktop/NetworkManager")
+          inspect(changed_u32(m.body, "State") is Some(20), content="true")
+          inspect(changed_u32(m.body, "Connectivity") is Some(1), content="true")
+          inspect(changed_u32(m.body, "NetworkingEnabled") is None, content="true")
+        }
+        None => inspect("解析失败", content="应可解析")
+      }
+    Err(_) => inspect("构造失败", content="应可构造")
+  }
+}
