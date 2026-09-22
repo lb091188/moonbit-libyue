@@ -326,13 +326,13 @@ test "proc_row：列内容与格式(CPU 一位小数 / 内存人类可读)" {
 
 ///|
 test "sort_of_col：列号映射(状态/命令行不参与)" {
-  assert_eq(sort_of_col(0).map(sort_id), Some(0))
-  assert_eq(sort_of_col(1).map(sort_id), Some(1))
+  assert_true(sort_of_col(0) is Some(ByPid))
+  assert_true(sort_of_col(1) is Some(ByName))
   assert_true(sort_of_col(2) is None)
-  assert_eq(sort_of_col(3).map(sort_id), Some(2))
-  assert_eq(sort_of_col(4).map(sort_id), Some(3))
-  assert_eq(sort_of_col(5).map(sort_id), Some(4))
-  assert_eq(sort_of_col(6).map(sort_id), Some(5))
+  assert_true(sort_of_col(3) is Some(ByCpu))
+  assert_true(sort_of_col(4) is Some(ByMem))
+  assert_true(sort_of_col(5) is Some(ByNice))
+  assert_true(sort_of_col(6) is Some(ByThreads))
   assert_true(sort_of_col(7) is None)
   assert_true(sort_of_col(-1) is None)
 }

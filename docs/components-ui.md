@@ -6,7 +6,7 @@ Full demo: `examples/showcase`.
 
 ## Theme
 
-All colors come from the theme palette — a deep, low-saturation scheme: blue `#2D68C4`, green `#2E9E5B`, orange `#D9822B`, red `#D64550`, plus greys for text / border / fill. Components render straight corners, use background colors for hover/active states, and center text vertically.
+All colors come from the theme palette — a deep, low-saturation scheme: blue `#2D68C4`, green `#2E9E5B`, orange `#D9822B`, red `#D64550`, plus greys for text / border / fill. Components render straight corners, use background colors for hover/active states, and center text vertically. Form controls share a unified height of 32px (`control_height`), so buttons / inputs / selects / steppers / picker fields align on one row.
 
 ### Switching and customization
 
@@ -119,7 +119,7 @@ Unified font size / color per text role, left-aligned; accepts layout styles and
 
 ### Themed single-line input entry_t
 
-`entry_t(text? = "", password? = false, height? = 30.0, on_input?)`
+`entry_t(text? = "", password? = false, height? = 32.0, on_input?)`
 
 Unified font and line height; the text color follows the theme and cannot be customized (platform limitation, see [adaptation.md](adaptation.md)).
 
@@ -135,13 +135,13 @@ let name = @yue.Store::new("")
 
 ### Bordered input input_t
 
-`input_t(text? = "", password? = false, margin? = 0.0, width? = 280.0, height? = 30.0, clearable? = false, on_input?, invalid? = Store::new(false))`
+`input_t(text? = "", password? = false, margin? = 0.0, width? = 280.0, height? = 32.0, clearable? = false, on_input?, invalid? = Store::new(false))`
 
 Self-drawn 1px outer border (turns theme primary on focus) + white background, straight corners.
 
 | Param | Type | Default | Notes |
 |---|---|---|---|
-| margin / width / height | Double | 0 / 280 / 30 | outer margin and size |
+| margin / width / height | Double | 0 / 280 / 32 | outer margin and size |
 | clearable | Bool | false | shows ✕ on the right on hover when non-empty; click clears |
 | invalid | Store[Bool] | false | when true the border turns danger red (light form validation), reacts to Store set |
 
@@ -532,23 +532,28 @@ Per-token highlighting with manual layout — consistent behavior on all platfor
 
 ### Table table_t
 
-`table_t(columns, rows : Store[Array[TableRow]], width? = 560.0, row_height? = 36.0, selection? : Store[Array[Int]], on_row_click?)`
+`table_t(columns, rows : Store[Array[TableRow]], width? = 560.0, row_height? = 36.0, selection? : Store[Array[Int]], sort? : Store[TableSort], on_row_click?)`
 
-Header + zebra stripes + hover highlight + Store-driven (a set rebuilds all rows and clears the selection). Columns via `TableColumn::make(title, width, align?)` (width ≤ 0 = flexible columns sharing the remaining width). Cells are `TableCell`: `CellText` / `CellTag(text, semantic type)` / `CellColorBox(hex, name)` / `CellLines(multi-line, row auto-grows)`; `TableRow::make(string array)` builds plain rows. Without `selection` rows single-select on click; pass `selection` to enable a checkbox column (row click toggles, header select-all/clear, dash when partial, selected rows get a light-blue fill); the callback receives `(index, row)`.
+Header + zebra stripes + hover highlight + Store-driven (a set rebuilds all rows and clears the selection). Columns via `TableColumn::make(title, width, align?, sortable?)` (width ≤ 0 = flexible columns sharing the remaining width; `sortable=false` keeps a column out of header sorting). Cells are `TableCell`: `CellText` / `CellTag(text, semantic type)` / `CellColorBox(hex, name)` / `CellLines(multi-line, row auto-grows)`; `TableRow::make(string array)` builds plain rows. Without `selection` rows single-select on click; pass `selection` to enable a checkbox column (row click toggles, header select-all/clear, dash when partial, selected rows get a light-blue fill); the callback receives `(index, row)`.
+
+Header sorting and column resizing: pass `sort` (a `Store[TableSort]`; `TableSort{ column, asc }` where `column` is the column-definition index, < 0 = unsorted) and sortable columns get up/down arrows; clicking toggles "new column sorts ascending / same column flips direction"; actual data sorting is up to you — subscribe to the store, sort, and write back to `rows`. Drag a header column boundary (right 4px) to resize columns; the two neighbors trade width (minimum 56px) without rebuilding rows or losing selection.
 
 ```moonbit
 let rows = @yue.Store::new([@yue.TableRow::make(["A", "1"]), @yue.TableRow::make(["B", "2"])])
+let sort = @yue.Store::new(@yue.TableSort::{ column: -1, asc: true })
+sort.subscribe(fn(st) { /* re-sort by st.column / st.asc, then rows.set(...) */ })
 @yue.table_t(
   [@yue.TableColumn::make("Name", 120.0), @yue.TableColumn::make("Count", 80.0, align=@yue.Center)],
   rows,
+  sort=sort,
 )
 ```
 
 ### Virtualized table table_v_t
 
-`table_v_t(columns, rows : Store[Array[TableRow]], width? = 560.0, height? = 360.0, row_height? = 32.0, selection? : Store[Array[Int]], on_row_click?)`
+`table_v_t(columns, rows : Store[Array[TableRow]], width? = 560.0, height? = 360.0, row_height? = 32.0, selection? : Store[Array[Int]], sort? : Store[TableSort], on_row_click?)`
 
-The 10k+-row form of table_t: only visible rows are painted, self-managed scrolling (wheel / drag scrollbar / keyboard), free of the scroll container's content-height limit; cell rendering matches table_t (CellLines clamps to two lines within the row height), column/selection semantics are identical.
+The 10k+-row form of table_t: only visible rows are painted, self-managed scrolling (wheel / drag scrollbar / keyboard), free of the scroll container's content-height limit; cell rendering matches table_t (CellLines clamps to two lines within the row height), and column / selection / sort (header arrows) / column-resize semantics are identical.
 
 ```moonbit
 let rows = @yue.Store::new([@yue.TableRow::make(["1", "A"]), @yue.TableRow::make(["2", "B"])])

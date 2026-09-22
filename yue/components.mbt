@@ -82,6 +82,12 @@ fn theme_bg_panel() -> String { theme_box.t.bg_panel }
 fn theme_focus_accent() -> String { theme_text_secondary() }
 
 ///|
+/// 表单控件统一高度(按钮/输入框/下拉/数字器/日期选择字段等):
+/// 32px(EP 规格),混排成行时基线对齐。自定义控件与覆盖场景一律
+/// 引用本常量,不写死字面量;多行文本域等非单行控件不受此约束。
+pub let control_height : Double = 32.0
+
+///|
 /// 组件库自绘容器:Container::make + 主题切换时自动重绘
 /// (draw 回调现取 theme_* 色,重绘即跟随新主题)。
 fn themed_container(
@@ -2063,7 +2069,7 @@ pub fn button_t(
       let w = text_w + 32.0
       let v = themed_container(style=[
         ("width", w),
-        ("height", 32.0),
+        ("height", control_height),
         ("marginRight", 8.0),
       ])
       v.on_draw(fn(p) {
@@ -2196,7 +2202,7 @@ fn bind_entry_theme(e : Entry) -> Unit {
 pub fn entry_t(
   text? : String = "",
   password? : Bool = false,
-  height? : Double = 30.0,
+  height? : Double = control_height,
   on_input? : (String) -> Unit = fn(_s) {  },
 ) -> Node {
   {
@@ -2514,7 +2520,7 @@ pub fn input_t(
   password? : Bool = false,
   margin? : Double = 0.0,
   width? : Double = 280.0,
-  height? : Double = 30.0,
+  height? : Double = control_height,
   clearable? : Bool = false,
   on_input? : (String) -> Unit = fn(_s) {  },
   invalid? : Store[Bool] = Store::new(false),
@@ -2635,13 +2641,13 @@ pub fn input_number(
   {
     mount: fn(parent) {
       let row = themed_container(
-        style=[("height", 30.0)],
+        style=[("height", control_height)],
         style_str=[("flexDirection", "row"), ("alignItems", "center")],
       )
       let font = Font::new("Sans", 13.0)
       fn step_btn(dir : Double) -> Unit {
         let b = themed_container(
-          style=[("width", 28.0), ("height", 28.0)],
+          style=[("width", 28.0), ("height", control_height)],
           style_str=[("alignItems", "center")],
         )
         bind_bg(b, fn() { theme_info_light() })
@@ -2689,7 +2695,7 @@ pub fn input_number(
       step_btn(-1.0)
       // marginRight 0:EP InputNumber 的按钮与输入区紧贴
       let num = themed_container(
-        style=[("width", num_width), ("height", 28.0), ("marginRight", 0.0)],
+        style=[("width", num_width), ("height", control_height), ("marginRight", 0.0)],
         style_str=[("alignItems", "center")],
       )
       set_panel_bg(num)
@@ -3697,7 +3703,7 @@ fn build_picker_field(
   let hover = Ref(false)
   let focused = Ref(false)
   let field = themed_container(
-    style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
+    style=[("width", width), ("height", control_height), ("marginBottom", 10.0)],
     style_str=[("flexDirection", "row"), ("alignItems", "center")],
   )
   set_panel_bg(field)
@@ -4346,21 +4352,33 @@ pub fn datetime_range_picker_t(
 
 ///|
 /// 表格列定义(EP Table):标题 + 宽度(<=0 为弹性列,均分剩余宽)
-/// + 单元格文字对齐。
+/// + 单元格文字对齐 + 是否可排序(表头点击切换升降序)。
 pub(all) struct TableColumn {
   title : String
   width : Double
   align : TextAlign
+  sortable : Bool
 }
 
 ///|
-/// 创建列定义(align 默认左对齐)。
+/// 创建列定义(align 默认左对齐,sortable 默认可排序)。
 pub fn TableColumn::make(
   title : String,
   width : Double,
   align? : TextAlign = Start,
+  sortable? : Bool = true,
 ) -> TableColumn {
-  { title, width, align }
+  { title, width, align, sortable }
+}
+
+///|
+/// 表格排序状态(表头点击后写入):column 为参与排序的列号(列定义
+/// 下标,与复选框列无关),<0 表示不排序;asc 为升序。经 [table_t] /
+/// [table_v_t] 的 sort 参数传入——组件内切换状态并画箭头,使用方
+/// 订阅 Store 自行排序数据后回写 rows。
+pub(all) struct TableSort {
+  column : Int
+  asc : Bool
 }
 
 ///|
@@ -4420,6 +4438,36 @@ fn table_draw_check(
 }
 
 ///|
+/// 排序箭头(表头):cx/cy 为中心,asc 升序尖端朝上;active=false 画
+/// 浅色(可排序列的 hover 提示,不表示当前排序)。8x7 矢量三角,
+/// 不依赖字体。
+fn draw_sort_arrow(
+  p : Painter,
+  cx : Double,
+  cy : Double,
+  asc : Bool,
+  active : Bool,
+) -> Unit {
+  p.set_fill_color(if active { theme_primary() } else { theme_border() })
+  p.begin_path()
+  if asc {
+    p.move_to(cx - 4.0, cy + 2.0)
+    p.line_to(cx + 4.0, cy + 2.0)
+    p.line_to(cx, cy - 2.5)
+  } else {
+    p.move_to(cx - 4.0, cy - 2.0)
+    p.line_to(cx + 4.0, cy - 2.0)
+    p.line_to(cx, cy + 2.5)
+  }
+  p.close_path()
+  p.fill()
+}
+
+///|
+/// 表格最小列宽(拖动钳制下限):再窄标题/数值不可读。
+let min_col_width : Double = 56.0
+
+///|
 /// 行底色:选中 > 悬停 > 斑马纹(奇数行) > 透明。
 fn table_row_bg(i : Int, selected : Bool, hover : Bool) -> String {
   if selected {
@@ -4440,12 +4488,16 @@ fn table_row_bg(i : Int, selected : Bool, hover : Bool) -> String {
 /// 清空(部分选中画横条),选中行浅蓝底。单元格支持 CellText/CellTag/
 /// CellColorBox/CellLines(多行文本的行自动撑高)。主题色在重绘时读取
 /// 当前快照,theme_apply 即时生效。
+/// 表头:sort(Store[TableSort])提供后排序列显示升降箭头,点击可排序
+/// 列切换「新列升序 / 同列升降序」;列边界(表头右缘 4px)按住拖动
+/// 调整列宽,相邻两列此消彼长(最小 min_col_width)。
 pub fn table_t(
   columns : Array[TableColumn],
   rows : Store[Array[TableRow]],
   width? : Double = 560.0,
   row_height? : Double = 36.0,
   selection? : Store[Array[Int]],
+  sort? : Store[TableSort],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) { },
 ) -> Node {
   {
@@ -4457,6 +4509,8 @@ pub fn table_t(
       let selected_i = Ref(-1)
       let hover_i = Ref(-1)
       let row_cs : Ref[Array[Container]] = Ref([])
+      // 行内列单元格按 [行][列] 存(拖动列宽时逐行改样式,不重建树)
+      let row_cols : Ref[Array[Array[Container]]] = Ref([])
       let data_r : Ref[Array[TableRow]] = Ref([])
       let head_h = 40.0
       // 1px 内边距让外框描边落在 padding 环里,不被行/表头背景盖住
@@ -4464,6 +4518,27 @@ pub fn table_t(
         style=[("width", width), ("padding", 1.0), ("marginBottom", 10.0)],
         style_str=[("flexDirection", "column")],
       )
+      // 列几何(含复选框列偏移):初值=定义宽,弹性列均分剩余宽;
+      // 拖动改写本数组并回写各处 cell 样式
+      let body_w = width - 2.0 - (if sel is Some(_) { 36.0 } else { 0.0 })
+      let col_w : Array[Double] = []
+      let mut fixed = 0.0
+      let mut flex_count = 0
+      for col in columns {
+        if col.width > 0.0 {
+          fixed = fixed + col.width
+        } else {
+          flex_count = flex_count + 1
+        }
+      }
+      let flex_w = if flex_count > 0 {
+        ((body_w - fixed) / flex_count.to_double()).max(0.0)
+      } else {
+        0.0
+      }
+      for col in columns {
+        col_w.push(if col.width > 0.0 { col.width } else { flex_w })
+      }
       outer.on_draw(fn(p) {
         let b = ViewLike::get_bounds(outer)
         p.set_stroke_color(theme_border())
@@ -4505,18 +4580,19 @@ pub fn table_t(
         }
       }
 
-      // 单元格:定宽列给 width,弹性列给 flex,左右各留 12px 内边距
+      // 单元格:列宽一律读 col_w[j](弹性列的均分宽也在挂载时算入),
+      // 左右各留 12px 内边距;拖动列宽后重建行即按新宽,行不重建时
+      // 由 apply_col_widths 统一回写
       fn cell_view(
         content : TableCell,
-        col : TableColumn,
+        j : Int,
         fnt : Font,
         color_of : () -> String,
       ) -> Container {
-        let base : Array[(String, Double)] = if col.width > 0.0 {
-          [("width", col.width), ("paddingLeft", 12.0), ("paddingRight", 12.0)]
-        } else {
-          [("flex", 1.0), ("paddingLeft", 12.0), ("paddingRight", 12.0)]
-        }
+        let col = columns[j]
+        let base : Array[(String, Double)] = [
+          ("width", col_w[j]), ("paddingLeft", 12.0), ("paddingRight", 12.0),
+        ]
         let wrap = themed_container(
           style=base,
           style_str=[("flexDirection", "row"), ("alignItems", "center")],
@@ -4642,19 +4718,163 @@ pub fn table_t(
           false
         }
       })
+      // 排序/列宽拖动态与helper:表头单元格(见 head_cell)点击排序、
+      // 右缘 4px 按住拖列宽。sort 缺省不画箭头、点击无效
+      let head_hover = Ref(-1)
+      let head_cs : Ref[Array[Container]] = Ref([])
+      let resizing = Ref(-1)
+      let resize_start_x = Ref(0.0)
+      let resize_w0 = Ref(0.0)
+      let resize_w1 = Ref(0.0)
+
+      fn sort_cur_col() -> Int {
+        match sort {
+          Some(s) => s.get().column
+          None => -1
+        }
+      }
+
+      fn sort_cur_asc() -> Bool {
+        match sort {
+          Some(s) => s.get().asc
+          None => true
+        }
+      }
+
+      // 表头点击:同列升降序,新列默认升序(使用方订阅 Store 排数据)
+      fn toggle_sort(j : Int) -> Unit {
+        match sort {
+          Some(s) =>
+            if s.get().column == j {
+              s.set({ column: j, asc: !s.get().asc })
+            } else {
+              s.set({ column: j, asc: true })
+            }
+          None => ()
+        }
+      }
+
+      // 列宽回写:相邻两列此消彼长(总宽不变),表头 + 全部行单元格
+      // 同步改样式后重排;行本身不重建,选择/hover 状态不丢
+      fn apply_col_widths(j : Int) -> Unit {
+        ViewLike::set_style(head_cs.val[j], "width", col_w[j])
+        ViewLike::set_style(head_cs.val[j + 1], "width", col_w[j + 1])
+        for cells in row_cols.val {
+          ViewLike::set_style(cells[j], "width", col_w[j])
+          ViewLike::set_style(cells[j + 1], "width", col_w[j + 1])
+        }
+        ViewLike::update_layout(outer)
+      }
+
+      // 表头单元格:文字走 Label(平台布局对齐,勿手动摆位)+ 排序箭头
+      // 画在本容器上(右缘内侧,可排序列留 22px 右内边距让位,标题不
+      // 被箭头挤动);右缘 4px 为列宽拖动把手(ResizeEW 光标反馈)
+      fn head_cell(j : Int) -> Container {
+        let col = columns[j]
+        let pad_r = if col.sortable { 22.0 } else { 12.0 }
+        let cell = themed_container(
+          style=[
+            ("width", col_w[j]), ("paddingLeft", 12.0), ("paddingRight", pad_r),
+          ],
+          style_str=[("flexDirection", "row"), ("alignItems", "center")],
+        )
+        let l = Label::new(col.title)
+        ViewLike::set_font(l, head_font)
+        bind_fg(l, fn() { theme_text_secondary() })
+        l.set_align(col.align)
+        ViewLike::set_style(l, "flex", 1.0)
+        cell.add_child(l)
+        cell.on_draw(fn(p) {
+          let b = ViewLike::get_bounds(cell)
+          if sort is Some(_) && sort_cur_col() == j {
+            draw_sort_arrow(p, b.width - 11.0, head_h / 2.0, sort_cur_asc(), true)
+          } else if col.sortable && sort is Some(_) && head_hover.val == j {
+            draw_sort_arrow(p, b.width - 11.0, head_h / 2.0, true, false)
+          }
+        })
+        let near_edge = Ref(false)
+        View::set_cursor(cell, hand())
+        ViewLike::on_mouse_enter(cell, fn(_e) {
+          head_hover.val = j
+          ViewLike::schedule_paint(cell)
+        })
+        ViewLike::on_mouse_leave(cell, fn(_e) {
+          if head_hover.val == j {
+            head_hover.val = -1
+          }
+          if near_edge.val {
+            near_edge.val = false
+            View::set_cursor(cell, hand())
+          }
+          ViewLike::schedule_paint(cell)
+        })
+        ViewLike::on_mouse_move(cell, fn(e) {
+          if resizing.val == j {
+            let d = e.window_x - resize_start_x.val
+            let total = resize_w0.val + resize_w1.val
+            let mut w0 = resize_w0.val + d
+            let mut w1 = resize_w1.val - d
+            if w0 < min_col_width {
+              w0 = min_col_width
+              w1 = total - w0
+            }
+            if w1 < min_col_width {
+              w1 = min_col_width
+              w0 = total - w1
+            }
+            col_w[j] = w0
+            col_w[j + 1] = w1
+            apply_col_widths(j)
+          } else {
+            // 右缘把手光标反馈(末列无下一列,不给把手)
+            let b = ViewLike::get_bounds(cell)
+            let near = j + 1 < columns.length() && e.view_x >= b.width - 4.0
+            if near != near_edge.val {
+              near_edge.val = near
+              View::set_cursor(cell, Cursor::new(if near { ResizeEW } else { Hand }))
+            }
+          }
+        })
+        ViewLike::on_mouse_down(cell, fn(e) {
+          if e.button != 1 {
+            return false
+          }
+          let b = ViewLike::get_bounds(cell)
+          if j + 1 < columns.length() && e.view_x >= b.width - 4.0 {
+            resizing.val = j
+            resize_start_x.val = e.window_x
+            resize_w0.val = col_w[j]
+            resize_w1.val = col_w[j + 1]
+            ViewLike::set_capture(cell)
+            true
+          } else {
+            if col.sortable {
+              toggle_sort(j)
+              ViewLike::schedule_paint(cell)
+            }
+            false
+          }
+        })
+        ViewLike::on_mouse_up(cell, fn(_e) {
+          if resizing.val == j {
+            resizing.val = -1
+            ViewLike::release_capture(cell)
+            true
+          } else {
+            false
+          }
+        })
+        cell
+      }
+
       match sel {
         Some(_) => head.add_child(head_cb)
         None => ()
       }
-      for col in columns {
-        head.add_child(
-          cell_view(
-            CellText(col.title),
-            col,
-            head_font,
-            fn() { theme_text_secondary() },
-          ),
-        )
+      for j in 0..<columns.length() {
+        let hc = head_cell(j)
+        head_cs.val.push(hc)
+        head.add_child(hc)
       }
       let body = themed_container(style_str=[("flexDirection", "column")])
 
@@ -4670,6 +4890,7 @@ pub fn table_t(
           ignore(body.remove_child_view(ViewLike::view(v)))
         }
         row_cs.val = []
+        row_cols.val = []
         data_r.val = data
         selected_i.val = -1
         hover_i.val = -1
@@ -4713,18 +4934,20 @@ pub fn table_t(
             }
             None => ()
           }
+          let cells : Array[Container] = []
           for j in 0..<columns.length() {
             let content = if j < r.cells.length() {
               r.cells[j]
             } else {
               CellText("")
             }
-            row.add_child(
-              cell_view(content, columns[j], font, fn() {
-                theme_text_regular()
-              }),
-            )
+            let cv = cell_view(content, j, font, fn() {
+              theme_text_regular()
+            })
+            cells.push(cv)
+            row.add_child(cv)
           }
+          row_cols.val.push(cells)
           ViewLike::on_mouse_enter(row, fn(_e) {
             hover_i.val = idx
             refresh_row(idx)
@@ -4770,6 +4993,16 @@ pub fn table_t(
           })
         None => ()
       }
+      // 排序状态变化:表头箭头重绘(数据排序由使用方订阅 Store 完成)
+      match sort {
+        Some(s) =>
+          s.subscribe(fn(_v) {
+            for c in head_cs.val {
+              ViewLike::schedule_paint(c)
+            }
+          })
+        None => ()
+      }
       outer.add_child(head)
       outer.add_child(body)
       attach(parent, ViewLike::view(outer))
@@ -4784,6 +5017,9 @@ pub fn table_t(
 /// 滚动容器的内容高度上限约束(X11 子窗口高度 65535,万行内容放不进
 /// GtkViewport)。单元格画法与 table_t 一致(CellLines 在行高内最多画
 /// 两行);selection 语义同 table_t(复选框列 + 表头全选)。
+/// 表头:sort(Store[TableSort])提供后排序列显示升降箭头,点击可排序列
+/// 切换「新列升序 / 同列升降序」;列边界(表头,±3px 命中)按住拖动调整
+/// 列宽,相邻两列此消彼长(最小 min_col_width,末列边界不设把手)。
 pub fn table_v_t(
   columns : Array[TableColumn],
   rows : Store[Array[TableRow]],
@@ -4791,8 +5027,8 @@ pub fn table_v_t(
   height? : Double = 360.0,
   row_height? : Double = 32.0,
   selection? : Store[Array[Int]],
+  sort? : Store[TableSort],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) { },
-  on_header_click? : (Int) -> Unit = fn(_j) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -4803,11 +5039,21 @@ pub fn table_v_t(
       let hover_i = Ref(-1)
       let offset = Ref(0.0)
       let dragging = Ref(false)
+      // 排序/列宽拖动态:resizing 为边界左列号,-1 无;head_hover 为
+      // 悬停表头列号(-1 无);near_edge 光标是否已是 ResizeEW
+      let head_hover = Ref(-1)
+      let near_edge = Ref(false)
+      let resizing = Ref(-1)
+      let resize_start_x = Ref(0.0)
+      let resize_w0 = Ref(0.0)
+      let resize_w1 = Ref(0.0)
       let head_h = 40.0
       let bar_w = 10.0
       let body_w = width - bar_w
       let vis_h = height - head_h
-      // 列几何:固定宽直接用,弹性列均分剩余宽度
+      // 复选框列占 36px(selection 启用时),列几何整体右移
+      let col_x0 = if sel is Some(_) { 36.0 } else { 0.0 }
+      // 列几何:固定宽直接用,弹性列均分剩余宽度;col_x 含复选框列偏移
       let mut fixed = 0.0
       let mut flex_count = 0
       for col in columns {
@@ -4818,13 +5064,13 @@ pub fn table_v_t(
         }
       }
       let flex_w = if flex_count > 0 {
-        ((body_w - fixed) / flex_count.to_double()).max(0.0)
+        ((body_w - col_x0 - fixed) / flex_count.to_double()).max(0.0)
       } else {
         0.0
       }
       let col_x : Array[Double] = []
       let col_w : Array[Double] = []
-      let mut acc = 0.0
+      let mut acc = col_x0
       for col in columns {
         let w = if col.width > 0.0 {
           col.width
@@ -4835,6 +5081,63 @@ pub fn table_v_t(
         col_w.push(w)
         acc = acc + w
       }
+
+      fn relayout_cols() -> Unit {
+        let mut a = col_x0
+        for j in 0..<col_w.length() {
+          col_x[j] = a
+          a = a + col_w[j]
+        }
+      }
+
+      // 列边界命中:x(画布坐标)距某条数据列右边界 3px 内返回左列号
+      fn boundary_at(vx : Double) -> Int {
+        for j in 0..<(col_w.length() - 1) {
+          let edge = col_x[j] + col_w[j]
+          if vx >= edge - 3.0 && vx <= edge + 3.0 {
+            return j
+          }
+        }
+        -1
+      }
+
+      // 命中列号:数据列(不含复选框列),越界 -1
+      fn col_at(vx : Double) -> Int {
+        for j in 0..<col_w.length() {
+          if vx >= col_x[j] && vx < col_x[j] + col_w[j] {
+            return j
+          }
+        }
+        -1
+      }
+
+      fn sort_cur_col() -> Int {
+        match sort {
+          Some(s) => s.get().column
+          None => -1
+        }
+      }
+
+      fn sort_cur_asc() -> Bool {
+        match sort {
+          Some(s) => s.get().asc
+          None => true
+        }
+      }
+
+      // 表头点击:同列升降序,新列默认升序(使用方订阅 Store 排数据)
+      fn toggle_sort(j : Int) -> Unit {
+        match sort {
+          Some(s) =>
+            if s.get().column == j {
+              s.set({ column: j, asc: !s.get().asc })
+            } else {
+              s.set({ column: j, asc: true })
+            }
+          None => ()
+        }
+      }
+
       let cv = themed_container(
         style=[("width", width), ("height", height), ("marginBottom", 10.0)],
       )
@@ -4964,16 +5267,32 @@ pub fn table_v_t(
           None => ()
         }
         for j in 0..<columns.length() {
+          // 可排序列右侧留 14px 箭头区(标题右界同步内收,排序切换时
+          // 标题不跳动;数据行无箭头保持原样)
+          let w_eff = col_w[j] - (if columns[j].sortable { 14.0 } else { 0.0 })
           draw_align_text(
             p,
             columns[j].title,
             columns[j].align,
             col_x[j],
-            col_w[j],
+            w_eff,
             0.0,
             head_h,
             theme_text_secondary(),
           )
+          if sort is Some(_) {
+            if sort_cur_col() == j {
+              draw_sort_arrow(
+                p,
+                col_x[j] + col_w[j] - 14.0,
+                head_h / 2.0,
+                sort_cur_asc(),
+                true,
+              )
+            } else if columns[j].sortable && head_hover.val == j {
+              draw_sort_arrow(p, col_x[j] + col_w[j] - 14.0, head_h / 2.0, true, false)
+            }
+          }
         }
         // 可见行窗口(裁剪到表头以下,行滚动经过时不遮盖表头)
         p.save()
@@ -5090,6 +5409,15 @@ pub fn table_v_t(
           p.set_fill_color(theme_border())
           p.fill_rect(b.width - bar_w + 2.0, thumb_y, bar_w - 4.0, thumb_h)
         }
+        // 列宽拖动中的边界高亮线(表头到底,主题色 1px)
+        if resizing.val >= 0 {
+          let edge = col_x[resizing.val] + col_w[resizing.val]
+          p.set_stroke_color(theme_primary())
+          p.begin_path()
+          p.move_to(edge, head_h)
+          p.line_to(edge, b.height)
+          p.stroke()
+        }
         p.set_stroke_color(theme_border())
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
       })
@@ -5122,21 +5450,29 @@ pub fn table_v_t(
           return true
         }
         if e.view_y < head_h {
-          if e.view_x < 36.0 {
+          // 列边界把手(表头 ±3px):按住拖列宽,不与排序点击冲突
+          if e.view_x >= col_x0 {
+            let jb = boundary_at(e.view_x)
+            if jb >= 0 {
+              resizing.val = jb
+              resize_start_x.val = e.window_x
+              resize_w0.val = col_w[jb]
+              resize_w1.val = col_w[jb + 1]
+              ViewLike::set_capture(cv)
+              ViewLike::schedule_paint(cv)
+              return true
+            }
+          }
+          if e.view_x < col_x0 {
             match sel {
               Some(_) => toggle_all()
               None => ()
             }
           } else {
-            // 列头点击（复选框区以外）：回传列号，使用方自接排序
-            let mut hit = -1
-            for j in 0..<columns.length() {
-              if e.view_x >= col_x[j] && e.view_x < col_x[j] + col_w[j] {
-                hit = j
-              }
-            }
-            if hit >= 0 {
-              on_header_click(hit)
+            // 表头点击(把手外):可排序列切换升降序,组件内更新 sort
+            let j = col_at(e.view_x)
+            if j >= 0 && columns[j].sortable {
+              toggle_sort(j)
             }
           }
           ViewLike::schedule_paint(cv)
@@ -5158,6 +5494,49 @@ pub fn table_v_t(
           scroll_to_thumb(e.view_y)
           return
         }
+        if resizing.val >= 0 {
+          // 列宽拖动:相邻两列此消彼长,总宽不变,钳制最小宽
+          let j = resizing.val
+          let d = e.window_x - resize_start_x.val
+          let total = resize_w0.val + resize_w1.val
+          let mut w0 = resize_w0.val + d
+          let mut w1 = resize_w1.val - d
+          if w0 < min_col_width {
+            w0 = min_col_width
+            w1 = total - w0
+          }
+          if w1 < min_col_width {
+            w1 = min_col_width
+            w0 = total - w1
+          }
+          col_w[j] = w0
+          col_w[j + 1] = w1
+          relayout_cols()
+          ViewLike::schedule_paint(cv)
+          return
+        }
+        // 表头区:悬停列记录(可排序列画浅色箭头提示)+ 边界把手光标
+        if e.view_y < head_h && e.view_x >= col_x0 {
+          let near = boundary_at(e.view_x) >= 0
+          if near != near_edge.val {
+            near_edge.val = near
+            View::set_cursor(cv, Cursor::new(if near { ResizeEW } else { Hand }))
+          }
+          let hc = col_at(e.view_x)
+          if hc != head_hover.val {
+            head_hover.val = hc
+            ViewLike::schedule_paint(cv)
+          }
+        } else {
+          if near_edge.val {
+            near_edge.val = false
+            View::set_cursor(cv, hand())
+          }
+          if head_hover.val != -1 {
+            head_hover.val = -1
+            ViewLike::schedule_paint(cv)
+          }
+        }
         let n = data_r.val.length()
         let idx = ((e.view_y - head_h + offset.val) / row_height).to_int()
         let inside = e.view_x < body_w && e.view_y >= head_h
@@ -5176,6 +5555,10 @@ pub fn table_v_t(
           dragging.val = false
           ViewLike::release_capture(cv)
           true
+        } else if resizing.val >= 0 {
+          resizing.val = -1
+          ViewLike::release_capture(cv)
+          true
         } else {
           false
         }
@@ -5184,6 +5567,14 @@ pub fn table_v_t(
         if hover_i.val != -1 {
           hover_i.val = -1
           ViewLike::schedule_paint(cv)
+        }
+        if head_hover.val != -1 {
+          head_hover.val = -1
+          ViewLike::schedule_paint(cv)
+        }
+        if near_edge.val {
+          near_edge.val = false
+          View::set_cursor(cv, hand())
         }
       })
       ViewLike::on_wheel(cv, fn(delta) {
@@ -5229,6 +5620,11 @@ pub fn table_v_t(
       load(rows.get())
       rows.subscribe(load)
       match sel {
+        Some(s) => s.subscribe(fn(_v) { ViewLike::schedule_paint(cv) })
+        None => ()
+      }
+      // 排序状态变化:表头箭头重绘(数据排序由使用方订阅 Store 完成)
+      match sort {
         Some(s) => s.subscribe(fn(_v) { ViewLike::schedule_paint(cv) })
         None => ()
       }
@@ -5692,7 +6088,7 @@ pub fn select_t(
       let focused = Ref(false)
       let hover = Ref(false)
       let field = themed_container(
-        style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
+        style=[("width", width), ("height", control_height), ("marginBottom", 10.0)],
       )
       set_panel_bg(field)
       View::set_cursor(field, hand())
@@ -6022,7 +6418,7 @@ pub fn dropdown_menu(
       let fnt = Font::new("Sans", 13.0)
       let focused = Ref(false)
       let field = themed_container(
-        style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
+        style=[("width", width), ("height", control_height), ("marginBottom", 10.0)],
       )
       set_panel_bg(field)
       View::set_cursor(field, hand())
@@ -6349,7 +6745,7 @@ pub fn color_picker_t(
     mount: fn(parent) {
       let focused = Ref(false)
       let field = themed_container(
-        style=[("width", width), ("height", 30.0), ("marginBottom", 10.0)],
+        style=[("width", width), ("height", control_height), ("marginBottom", 10.0)],
       )
       set_panel_bg(field)
       View::set_cursor(field, hand())

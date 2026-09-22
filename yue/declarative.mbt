@@ -185,7 +185,7 @@ pub fn entry(
         ViewLike::set_font(e, Font::new("Sans", 13.0))
         match box_height {
           Some(h) => entry_vcenter(e, h, true)
-          None => entry_vcenter(e, 30.0, true)
+          None => entry_vcenter(e, control_height, true)
         }
         bind_entry_theme(e)
       }
