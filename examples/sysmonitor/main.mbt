@@ -84,20 +84,25 @@ struct App {
   proc : ProcMonitor
   disk : DiskMonitor
   net : NetMonitor
-  // 概览页：数值卡片
+  // 概览页：资源卡片(标题副标题存规格，值行存当前数值)
   card_cpu : @yue.Store[String]
+  card_cpu_sub : @yue.Store[String]
   card_mem : @yue.Store[String]
-  card_swap : @yue.Store[String]
-  card_proc : @yue.Store[String]
-  card_temp : @yue.Store[String]
+  card_mem_sub : @yue.Store[String]
   card_disk : @yue.Store[String]
+  card_disk_sub : @yue.Store[String]
   card_net : @yue.Store[String]
   card_gpu : @yue.Store[String]
+  card_gpu_sub : @yue.Store[String]
+  card_proc : @yue.Store[String]
   // 概览页：实时曲线（定长滚动窗口 120 点 = 2 分钟 @1Hz）
   cpu_hist : @yue.Store[Array[@yue.LineSeries]]
   core_bars : @yue.Store[Array[@yue.BarItem]]
   mem_hist : @yue.Store[Array[@yue.LineSeries]]
   swap_hist : @yue.Store[Array[@yue.LineSeries]]
+  disk_hist : @yue.Store[Array[@yue.LineSeries]]
+  net_hist : @yue.Store[Array[@yue.LineSeries]]
+  proc_hist : @yue.Store[Array[@yue.LineSeries]]
   // 其余页数据源（进程 / 传感器 / 磁盘 / 网络页订阅）
   procs : @yue.Store[Array[ProcInfo]]
   sensors : @yue.Store[Array[TempSensor]]
@@ -110,36 +115,18 @@ struct App {
 /// 一次全量采样：全部监视器 tick 后写入对应 Store。单个来源读取失败
 /// （平台不支持 / 瞬时竞态）只跳过该项，不影响其余卡片。
 fn sample_once(app : App) -> Unit {
+  // 处理器卡：占用 % · 最高温度（两个来源拼一行，任一缺失只显示有的）
+  let mut cpu_text = ""
   match app.cpu.tick() {
     None => ()
     Some((usage, per_core)) => {
-      app.card_cpu.set(pct(usage))
+      cpu_text = pct(usage)
       @yue.series_push(app.cpu_hist, 0, usage * 100.0)
       let bars : Array[@yue.BarItem] = []
       for i, u in per_core {
         bars.push(@yue.BarItem::make("\{i}", u * 100.0))
       }
       app.core_bars.set(bars)
-    }
-  }
-  match mem_info() {
-    None => ()
-    Some(mem) => {
-      let used_gb = mem.used_kb().to_double() / 1048576.0
-      let swap_gb = (mem.swap_total_kb - mem.swap_free_kb).to_double() / 1048576.0
-      app.card_mem.set("\{pct(mem.usage())} · \{fmt_kb(mem.used_kb())}")
-      app.card_swap.set(
-        "\{pct(mem.swap_usage())} · \{fmt_kb(mem.swap_total_kb - mem.swap_free_kb)}",
-      )
-      @yue.series_push(app.mem_hist, 0, used_gb)
-      @yue.series_push(app.swap_hist, 0, swap_gb)
-    }
-  }
-  match app.proc.tick() {
-    None => ()
-    Some(procs) => {
-      app.procs.set(procs)
-      app.card_proc.set("\{procs.length()}")
     }
   }
   match hwmon_sensors() {
@@ -157,9 +144,33 @@ fn sample_once(app : App) -> Unit {
         }
       }
       match hottest {
-        None => app.card_temp.set("—")
-        Some(t) => app.card_temp.set("\{t.celsius.to_int()}℃")
+        None => ()
+        Some(t) => cpu_text = "\{cpu_text} · \{t.celsius.to_int()}℃"
       }
+    }
+  }
+  if cpu_text != "" {
+    app.card_cpu.set(cpu_text)
+  }
+  match mem_info() {
+    None => ()
+    Some(mem) => {
+      let used_gb = mem.used_kb().to_double() / 1048576.0
+      let swap_gb = (mem.swap_total_kb - mem.swap_free_kb).to_double() / 1048576.0
+      app.card_mem.set(
+        "\{fmt_kb(mem.used_kb())} / \{fmt_kb(mem.total_kb)} · swap \{pct(mem.swap_usage())}",
+      )
+      app.card_mem_sub.set(fmt_kb(mem.total_kb))
+      @yue.series_push(app.mem_hist, 0, used_gb)
+      @yue.series_push(app.swap_hist, 0, swap_gb)
+    }
+  }
+  match app.proc.tick() {
+    None => ()
+    Some(procs) => {
+      app.procs.set(procs)
+      app.card_proc.set("\{procs.length()}")
+      @yue.series_push(app.proc_hist, 0, procs.length().to_double())
     }
   }
   match gpu_list() {
@@ -168,7 +179,11 @@ fn sample_once(app : App) -> Unit {
       app.gpus.set(gpus)
       if gpus.length() > 0 {
         let g = gpus[0]
-        app.card_gpu.set("\{g.vendor} \{g.device}")
+        app.card_gpu_sub.set("\{g.vendor} · \{g.device}")
+        app.card_gpu.set(match g.celsius {
+          None => "—"
+          Some(c) => "\{c.to_int()}℃"
+        })
       } else {
         app.card_gpu.set("—")
       }
@@ -181,8 +196,10 @@ fn sample_once(app : App) -> Unit {
       for d in disks {
         if d.mount == "/" {
           app.card_disk.set(
-            "\{pct(d.usage())} · \{fmt_bytes(d.total_bytes - d.avail_bytes)}",
+            "\{pct(d.usage())} · \{fmt_bytes(d.total_bytes - d.avail_bytes)} / \{fmt_bytes(d.total_bytes)}",
           )
+          app.card_disk_sub.set("\{d.mount} · \{d.fstype}")
+          @yue.series_push(app.disk_hist, 0, d.usage() * 100.0)
         }
       }
     }
@@ -200,6 +217,8 @@ fn sample_once(app : App) -> Unit {
         }
       }
       app.card_net.set("↓\{fmt_rate_c(rx)} ↑\{fmt_rate_c(tx)}")
+      @yue.series_push(app.net_hist, 0, rx)
+      @yue.series_push(app.net_hist, 1, tx)
     }
   }
 }
@@ -253,17 +272,27 @@ fn main {
     disk: DiskMonitor::new(),
     net: NetMonitor::new(),
     card_cpu: @yue.Store::new("—"),
+    card_cpu_sub: @yue.Store::new(
+      "\{clean_model(info.model)} · \{info.cores} 逻辑核",
+    ),
     card_mem: @yue.Store::new("—"),
-    card_swap: @yue.Store::new("—"),
-    card_proc: @yue.Store::new("—"),
-    card_temp: @yue.Store::new("—"),
+    card_mem_sub: @yue.Store::new("—"),
     card_disk: @yue.Store::new("—"),
+    card_disk_sub: @yue.Store::new("—"),
     card_net: @yue.Store::new("—"),
     card_gpu: @yue.Store::new("—"),
+    card_gpu_sub: @yue.Store::new("—"),
+    card_proc: @yue.Store::new("—"),
     cpu_hist: @yue.Store::new([@yue.LineSeries::make("CPU", max_points=120)]),
     core_bars: @yue.Store::new([]),
     mem_hist: @yue.Store::new([@yue.LineSeries::make("内存", max_points=120)]),
     swap_hist: @yue.Store::new([@yue.LineSeries::make("swap", max_points=120)]),
+    disk_hist: @yue.Store::new([@yue.LineSeries::make("已用", max_points=120)]),
+    net_hist: @yue.Store::new([
+      @yue.LineSeries::make("接收", max_points=120),
+      @yue.LineSeries::make("发送", max_points=120),
+    ]),
+    proc_hist: @yue.Store::new([@yue.LineSeries::make("进程", max_points=120)]),
     procs: @yue.Store::new([]),
     sensors: @yue.Store::new([]),
     gpus: @yue.Store::new([]),
@@ -283,15 +312,6 @@ fn main {
     [
       @yue.vbox(
         [
-          @yue.label_t(
-            "\{clean_model(info.model)} · \{info.cores} 逻辑核",
-            role=@yue.Secondary,
-            style=[
-              ("paddingLeft", 14.0),
-              ("paddingTop", 8.0),
-              ("paddingBottom", 4.0),
-            ],
-          ),
           @yue.tabs_t(
             [
               ("概览", page_overview(app)),
