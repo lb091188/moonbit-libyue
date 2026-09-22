@@ -3943,6 +3943,47 @@ extern "C" int32_t yue_mbt_autostart_remove(const char *, int32_t *ok) {
 
 #endif  // 自启动注册表平台分支结束
 
+// ---------- 打开外部（URL / 文件管理器选中;Linux 走 traybus spawn 不经过这里） ----------
+
+#if defined(OS_WIN)
+extern "C" int32_t yue_mbt_open_url(const char *url, int32_t *ok) {
+  *ok = 0;
+  // ShellExecuteW 返回值 > 32 为成功
+  HINSTANCE r = ::ShellExecuteW(nullptr, L"open", base::SysUTF8ToWide(url).c_str(),
+                                nullptr, nullptr, SW_SHOWNORMAL);
+  if (reinterpret_cast<intptr_t>(r) > 32) {
+    *ok = 1;
+    return 0;
+  }
+  return -1;
+}
+
+extern "C" int32_t yue_mbt_win_reveal_file(const char *path, int32_t *ok) {
+  *ok = 0;
+  std::wstring args = L"/select,\"" + base::SysUTF8ToWide(path) + L"\"";
+  HINSTANCE r = ::ShellExecuteW(nullptr, L"open", L"explorer.exe", args.c_str(),
+                                nullptr, SW_SHOWNORMAL);
+  if (reinterpret_cast<intptr_t>(r) > 32) {
+    *ok = 1;
+    return 0;
+  }
+  return -1;
+}
+
+#else  // 非 Windows:桩
+
+extern "C" int32_t yue_mbt_open_url(const char *, int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+extern "C" int32_t yue_mbt_win_reveal_file(const char *, int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+#endif  // 打开外部平台分支结束
+
 void yue_mbt_notification_show(void *n) {
   if (auto *b = NotificationStore::get(n)) {
 #if defined(OS_WIN)
@@ -4587,6 +4628,32 @@ extern "C" int32_t yue_mbt_sys_watch_fd(int32_t fd, int32_t events,
       fd, static_cast<GIOCondition>(events), mbt_fd_source_cb, nullptr));
 }
 
+// spawn 脱离子进程:glib 自动回收(无僵尸),SEARCH_PATH 按需找 xdg-open;
+// glib 可能改写 argv 内容,入参先拷进本地缓冲
+extern "C" int32_t yue_mbt_sys_spawn_detached(const char *file, const char *arg) {
+  std::string f = file == nullptr ? "xdg-open" : file;
+  std::string a = arg == nullptr ? "" : arg;
+  gchar *argv[] = {const_cast<gchar *>(f.c_str()),
+                   const_cast<gchar *>(a.c_str()), nullptr};
+  GError *err = nullptr;
+  gboolean r = g_spawn_async(
+      nullptr, argv, nullptr,
+      static_cast<GSpawnFlags>(G_SPAWN_SEARCH_PATH | G_SPAWN_STDOUT_TO_DEV_NULL |
+                               G_SPAWN_STDERR_TO_DEV_NULL),
+      nullptr, nullptr, nullptr, &err);
+  if (err != nullptr) {
+    g_error_free(err);
+  }
+  return r == TRUE ? 0 : -1;
+}
+
+extern "C" int32_t yue_mbt_sys_getcwd(char *buf, int32_t len) {
+  if (::getcwd(buf, static_cast<size_t>(len)) == nullptr) {
+    return -1;
+  }
+  return 0;
+}
+
 #else  // 非 Linux：桩实现，托盘回退 nativeui 后端
 
 extern "C" int32_t yue_mbt_sys_getuid(void) { return -1; }
@@ -4609,6 +4676,12 @@ extern "C" int32_t yue_mbt_sys_watch_fd(int32_t, int32_t,
                                         int32_t (*)(int32_t, int32_t)) {
   return 0;
 }
+
+extern "C" int32_t yue_mbt_sys_spawn_detached(const char *, const char *) {
+  return -1;
+}
+
+extern "C" int32_t yue_mbt_sys_getcwd(char *, int32_t) { return -1; }
 
 #endif  // sys_* 平台分支结束;以下为全平台通用函数
 

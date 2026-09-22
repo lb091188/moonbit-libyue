@@ -1844,6 +1844,19 @@ extern "c" fn ffi_autostart_get(app_id : Bytes, ok : Ref[Int]) -> Bytes = "yue_m
 #borrow(app_id, ok)
 extern "c" fn ffi_autostart_remove(app_id : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_autostart_remove"
 
+// ---------- 打开外部（URL / 文件管理器选中） ----------
+
+///|
+/// Windows:ShellExecuteW(open)交给默认处理程序;非 Windows 哨兵
+/// (Linux 走 traybus spawn xdg-open,macOS 暂缓)。
+#borrow(url, ok)
+extern "c" fn ffi_open_url(url : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_open_url"
+
+///|
+/// Windows:explorer /select 选中文件;非 Windows 哨兵。
+#borrow(path, ok)
+extern "c" fn ffi_win_reveal_file(path : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_win_reveal_file"
+
 ///|
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，
 // FFI 边界上一律转成 C 侧期望的 UTF-8，转换成本留在库内。

@@ -49,3 +49,36 @@ fn env_get(name : String) -> String? {
     Some(@utf8.decode_lossy(buf[0:n]))
   }
 }
+
+///|
+/// spawn 一个脱离的子进程(PATH 搜索,glib 自动回收子进程,无僵尸)。
+#borrow(file, arg)
+extern "c" fn sys_spawn_detached(file : Bytes, arg : Bytes) -> Int = "yue_mbt_sys_spawn_detached"
+
+///|
+/// spawn 失败给 Err(供 xdg-open 回退与打开 URL 共用)。
+pub fn spawn_detached(file : String, arg : String) -> Result[Unit, String] {
+  if sys_spawn_detached(utf8(file), utf8(arg)) == 0 {
+    Ok(())
+  } else {
+    Err("spawn 失败: \{file}")
+  }
+}
+
+///|
+#borrow(buf)
+extern "c" fn sys_getcwd(buf : Bytes, len : Int) -> Int = "yue_mbt_sys_getcwd"
+
+///|
+/// 当前工作目录(失败返回空串)。
+pub fn current_dir() -> String {
+  let buf = Bytes::make(4096, 0)
+  if sys_getcwd(buf, 4096) != 0 {
+    return ""
+  }
+  let mut n = 0
+  while n < 4096 && buf[n].to_int() != 0 {
+    n += 1
+  }
+  @utf8.decode_lossy(buf[0:n])
+}

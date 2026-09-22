@@ -765,6 +765,17 @@ void *yue_mbt_autostart_get(const char *app_id, int32_t *ok);
 /* Windows:删 Run 键值（值本就不在也记 ok=1）;非 Windows 返回 -1000 */
 int32_t yue_mbt_autostart_remove(const char *app_id, int32_t *ok);
 
+/* ---------- 打开外部（URL / 文件管理器选中;Linux URL 走 traybus spawn） ---------- */
+
+/* spawn 脱离子进程（PATH 搜索,glib 自动回收）;0 成功 -1 失败 */
+int32_t yue_mbt_sys_spawn_detached(const char *file, const char *arg);
+/* 当前工作目录写入 buf;0 成功 -1 失败 */
+int32_t yue_mbt_sys_getcwd(char *buf, int32_t len);
+/* Windows:ShellExecuteW open 交给默认处理程序;非 Windows 哨兵 -1000 */
+int32_t yue_mbt_open_url(const char *url, int32_t *ok);
+/* Windows:explorer /select 选中文件;非 Windows 哨兵 -1000 */
+int32_t yue_mbt_win_reveal_file(const char *path, int32_t *ok);
+
 /* ---------- 探测示例(examples/probe) ---------- */
 
 void yue_mbt_probe_env(void *window);
