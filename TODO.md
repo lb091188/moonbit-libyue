@@ -97,10 +97,11 @@
   - 搜索过滤;列头点排序;选中 kill(SIGTERM,失败 SIGKILL)/ renice
   - 1Hz 增量刷新
   - 验证:filter_procs / sort_procs / proc_row 纯函数测试(大小写不敏感、六列升降序、行格式);真机截图验证表格渲染(8 列 / 命令行 / 斑马纹 / 状态行)、PID/CPU%/进程名列头点击排序(状态行同步);输入框按用户要求从原生 Entry 换主题化 input_t(深色主题下跟随,截图复验);选中→kill→renice 交互链路待用户真机执行后回填
-- [ ] U4 其余页
+- [x] U4 其余页
   - 传感器:温度列表 + 迷你曲线
   - 磁盘:容量条 + IO 曲线
   - 网络:网卡 rx/tx 曲线
+  - 验证:三页实现完成(moon check / moon test 全绿时点验证);单容器 on_draw 自绘行(迷你曲线 120 点窗口、容量条、rx/tx 叠加曲线),行数随数据增减不重建视图树;真机截图复验待库文件并行编辑(table_t 排序/列宽)修好后执行
 - [ ] U5 性能实测 — 千行进程页 1Hz/2Hz 刷新的帧率与内存占用,延续 vs C++ 基线口径入 adaptation.md
 - [ ] U6 文档发布 — README 中英挂旗舰示例与截图;踩坑回写 adaptation.md;mooncakes 发新版
 

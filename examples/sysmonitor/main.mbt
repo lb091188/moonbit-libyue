@@ -173,20 +173,6 @@ fn sample_once(app : App) -> Unit {
 }
 
 ///|
-/// 占位页：数据已在采样，页面在后续批次填充。
-fn page_placeholder(title : String) -> @yue.Node {
-  @yue.vbox(
-    [
-      @yue.label_t("\{title}页", role=@yue.Section, style=[
-        ("marginBottom", 6.0),
-      ]),
-      @yue.label_t("数据层已在 1Hz 采样，本页界面在后续批次填充。", role=@yue.Secondary),
-    ],
-    style=[("padding", 14.0)],
-  )
-}
-
-///|
 fn main {
   if !@yue.initialize() {
     return
@@ -252,9 +238,9 @@ fn main {
             [
               ("概览", page_overview(app)),
               ("进程", page_process(app)),
-              ("传感器", page_placeholder("传感器(温度 / GPU)")),
-              ("磁盘", page_placeholder("磁盘")),
-              ("网络", page_placeholder("网络")),
+              ("传感器", page_sensors(app)),
+              ("磁盘", page_disk(app)),
+              ("网络", page_net(app)),
             ],
           ),
         ],
