@@ -617,7 +617,7 @@ ignore(@yue.set_timer(500, fn() {
 
 ### 柱状 / 条形图 bar_chart_t
 
-`bar_chart_t(data : Store[Array[BarItem]], width? = 560.0, height? = 280.0, horizontal? = false)`
+`bar_chart_t(data : Store[Array[BarItem]], width? = 560.0, height? = 280.0, horizontal? = false, y_range? = None)`
 
 纵向柱
 
@@ -626,6 +626,7 @@ ignore(@yue.set_timer(500, fn() {
 | data | Store[Array[BarItem]] | 必填 | 类目数据（值可为负） |
 | width / height | Double | 560 / 280 | 画布尺寸 |
 | horizontal | Bool | false | 横向条形态 |
+| y_range | (Double, Double)? | None | 手动值域；缺省按数据自适应（含 0 基线 + 6% 留白） |
 （默认）与横向条（`horizontal = true`，适配长类目名）两形态。`BarItem::make(标签, 值)`，值可为负；以 0 为基线，正主题色、负红色。悬停高亮该类目并在行内标注数值（自绘，无弹层）；类目标签过密时自动抽稀截断。200 类目全量重绘实测约 0.4ms。
 
 ```moonbit

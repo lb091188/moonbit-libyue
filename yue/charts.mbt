@@ -823,6 +823,7 @@ fn draw_bar_chart(
   data : Array[BarItem],
   horizontal : Bool,
   hover : Int,
+  y_range? : (Double, Double)? = None,
 ) -> Unit {
   let n = data.length()
   if n == 0 || w <= 0.0 || h <= 0.0 {
@@ -832,7 +833,10 @@ fn draw_bar_chart(
   for it in data {
     values.push(it.value)
   }
-  let (lo, hi) = bar_range(values)
+  let (lo, hi) = match y_range {
+    Some(r) => r
+    None => bar_range(values)
+  }
   let ticks = nice_ticks(lo, hi, count=4)
   if !horizontal {
     let pad_l = 46.0
@@ -1353,6 +1357,7 @@ pub fn bar_chart_t(
   width? : Double = 560.0,
   height? : Double = 280.0,
   horizontal? : Bool = false,
+  y_range? : (Double, Double)? = None,
 ) -> Node {
   {
     mount: fn(parent) {
@@ -1363,7 +1368,7 @@ pub fn bar_chart_t(
         let b = ViewLike::get_bounds(cv)
         p.set_stroke_color(theme_border())
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
-        draw_bar_chart(p, b.width, b.height, data.get(), horizontal, hover.val)
+        draw_bar_chart(p, b.width, b.height, data.get(), horizontal, hover.val, y_range~)
       })
       data.subscribe(fn(_d) { ViewLike::schedule_paint(cv) })
       // hover 命中与绘制同一套几何（bar_hit / draw_bar_chart 同源），

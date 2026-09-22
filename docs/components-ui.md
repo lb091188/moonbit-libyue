@@ -617,7 +617,7 @@ ignore(@yue.set_timer(500, fn() {
 
 ### Bar chart bar_chart_t
 
-`bar_chart_t(data : Store[Array[BarItem]], width? = 560.0, height? = 280.0, horizontal? = false)`
+`bar_chart_t(data : Store[Array[BarItem]], width? = 560.0, height? = 280.0, horizontal? = false, y_range? = None)`
 
 Vertical bars
 
