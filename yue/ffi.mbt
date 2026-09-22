@@ -1777,6 +1777,39 @@ extern "c" fn ffi_menu_item_is_enabled(item : MenuItem) -> Int = "yue_mbt_menu_i
 ///|
 extern "c" fn ffi_menu_item_click(item : MenuItem) -> Unit = "yue_mbt_menu_item_click"
 
+// ---------- 单实例（Windows:命名互斥体 + message-only 窗口） ----------
+// 非 Windows 平台由 shim 给桩（负值/0），MoonBit 侧据此结构化降级。
+
+///|
+/// 尝试创建/探测命名互斥体。ok=1 取得（首实例），ok=0 已存在（第二实例）。
+#borrow(name, ok)
+extern "c" fn ffi_win_named_mutex_create(name : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_win_named_mutex_create"
+
+///|
+/// 向首实例的 message-only 窗口发 Wake（WM_COPYDATA 透传命令行，'\n' 分隔）。
+/// ok=1 已送达，ok=0 窗口不在（新旧构建混跑 / 建窗失败）。
+#borrow(class_name, args, ok)
+extern "c" fn ffi_win_instance_window_send(
+  class_name : Bytes,
+  args : Bytes,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_win_instance_window_send"
+
+///|
+/// 首实例建 message-only 窗口：WM_COPYDATA 到达经 PostTask 抛回主循环，
+/// 再经蹦床调 callback(Bytes 命令行)。非零返回表示建窗失败（互斥体仍持有）。
+#borrow(class_name, invoke, callback)
+extern "c" fn ffi_win_instance_window_create(
+  class_name : Bytes,
+  invoke : FuncRef[((Bytes) -> Unit, Bytes) -> Unit],
+  callback : (Bytes) -> Unit,
+) -> Int = "yue_mbt_win_instance_window_create"
+
+///|
+/// 兜底路径：按标题查找顶层窗口并置前（最小化先恢复）。ok=1 找到。
+#borrow(title, ok)
+extern "c" fn ffi_win_find_and_activate(title : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_win_find_and_activate"
+
 ///|
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，
 // FFI 边界上一律转成 C 侧期望的 UTF-8，转换成本留在库内。
