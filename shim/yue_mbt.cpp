@@ -268,6 +268,17 @@ std::string FilePathValueToUTF8(const base::FilePath &path) {
 void GuardWebKitRendererForGlib(void) {
   setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", 0);
 }
+
+/* overlay 滚动条默认开:GTK 每次创建 ScrolledWindow 都实时读进程环境,
+ * 环境变量在 GtkSettings 里优先级高于 gsettings——发行版脚本/用户全局
+ * 导出 GTK_OVERLAY_SCROLLING=0 强制经典滚动条时,库的 overlay 默认语义
+ * 与 set_overlay_scrollbar(true) 都会被劫持。gtk_init 前 setenv 压回
+ * overlay=1(overwrite=1:库语义赢,调用方仍可对单个滚动区显式
+ * set_overlay_scrollbar(false) 关闭);后置的 gtk-overlay-scrolling
+ * GtkSettings 写入保留,作不走环境变量的路径的兜底。 */
+void GuardOverlayScrollingForGtk(void) {
+  setenv("GTK_OVERLAY_SCROLLING", "1", 1);
+}
 #endif
 
 int32_t yue_mbt_app_init(void) {
@@ -277,6 +288,8 @@ int32_t yue_mbt_app_init(void) {
 #if defined(OS_LINUX)
   // 必须先于任何 WebKitWebView 创建(showcase 等把 Browser 挂在首屏)
   GuardWebKitRendererForGlib();
+  // 必须先于 gtk_init:GtkSettings 初始化时读环境变量定 overlay 默认
+  GuardOverlayScrollingForGtk();
 #endif
   base::CommandLine::Init(0, nullptr);
   g_lifetime = new nu::Lifetime();
