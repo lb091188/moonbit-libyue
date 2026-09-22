@@ -1,0 +1,13 @@
+import {
+  "NoahLiu/moonbit-libyue/yue",
+  "moonbitlang/core/encoding/utf8",
+}
+
+pkgtype(kind: "executable")
+
+options(
+  "native-stub": ["stub/sysmon.c"],
+  targets: {
+    "sysffi.mbt": ["native"],
+  },
+)

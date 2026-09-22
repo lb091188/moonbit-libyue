@@ -60,7 +60,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 ### MoonBit ↔ C ABI
 
 - 蹦床与 C 函数指针原型逐位对齐,含参数个数:C 以 `(closure, args...)` 调用,蹦床首参收 closure。错位后行数正常、部分回调能跑,极具掩盖性;每个回调都真实触发过才算验证。
-- `extern "c"` 不得返回可空类型(段错误):成败经 `Ref[Int]` 出参报告。
+- `extern "c"` 返回可空类型:旧版工具链直接段错误(成败经 `Ref[Int]` 出参报告);moon 0.1.20260904 + moonc v0.10.12 实测 `-> Bytes?` 已可用——C 侧返回 NULL 正确映射 None,debug / release 双模式、真实缺失文件与目录(EISDIR)路径均验证(sysmonitor 的 read_text_file)。其余可空类型(句柄等)未复测,仍按出参模式兜底。
 - FFI 指针参数标 `#borrow`(编译器强制);控件参数写句柄类型 `View`,不写 MoonBit 包装 struct(否则运行时句柄全部无效且静默丢弃)。
 - 闭包跨 ABI:无捕获顶层函数字面量即 C 函数指针;带捕获走「函数指针 + 闭包指针」双参模式。
 - 回调闭包由注册表进程级保活,不随窗口回收(单窗口工具场景泄漏可忽略,已定案)。
@@ -123,6 +123,15 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 头部 SIGNATURE 字段的 variant 签名是 "g"(u8 长度编码),按 "s" 编过不了真实总线。
 - SNI Menu 属性恒返回真实菜单对象路径,空菜单也不能回 `/`。
 - 单测自洽 ≠ 互操作通过:协议问题用 dbus-monitor 抓真总线定位,GNOME 面板侧异常看 journalctl。
+
+### 系统监控数据层(/proc、/sys,sysmonitor 示例)
+
+- /proc、/sys 伪文件 stat 尺寸恒为 0(fseek/ftell 拿不到长度):整文件读取必须循环增量 `fread` + 倍增缓冲(上限 16MB);读目录时 `fopen` 成功但 `fread` 报 EISDIR,靠 `ferror` 判失败。实现在应用 native-stub `examples/sysmonitor/stub/sysmon.c`,MoonBit 侧统一走 `read_text_file`。
+- 应用自有 native-stub 可放子目录:`"native-stub": ["stub/sysmon.c"]` 相对 moon.pkg 所在目录解析;符号全在 libc 默认链接范围,零 shim / fork / vendored / 链接参数改动。测试目标自动链入该 stub,wbtest 可直接读真实 /proc 文件。
+- /proc/stat 列序 `user nice system idle iowait irq softirq steal guest guest_nice`:第 9 列 guest 已由内核计入 user/nice,再累加即重复计数;占用率 = (Δ总 − Δidle − Δiowait) / Δ总,iowait 不算 CPU 忙。采样间隔短于一个 tick(USER_HZ 通常 10ms)时 Δ总 ≤ 0,返回 0;首帧前样本取全零,首屏值为开机至今均值。
+- /proc/cpuinfo 型号字段平台分歧:x86 是 `model name`,ARM 开发板只有 `Processor` / `Hardware`,三级回退;核数取 `processor` 行数(逻辑 CPU 含超线程,与 nproc 一致)。
+- /proc/meminfo 单位恒为 kB;`MemAvailable` 内核 ≥3.14 才有,缺失回退 `MemFree`;已用口径 = 总 − 可用(含可回收缓存)。
+- `moon run` 包装进程不向子进程传播信号:冒烟验证退出行为要杀构建产物 exe 子进程,只杀包装 PID 会留下孤儿窗口。
 
 ### 显示协议
 
