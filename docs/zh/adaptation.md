@@ -196,12 +196,15 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 ## Windows 10 / 11 ✅
 
+首次本机全链路验证环境:Windows 10 19045 + VS BuildTools 2022(v17.14)+ SDK 10.0.26100,prepare.py 构建 → moon check / test / build → hello 启动冒烟全通过(此前 Windows 侧仅有 CI 验证,部分分支从未在真 Windows SDK 下编译过)。
+
 ### 工具链
 
 - 需 VS Build Tools(VCTools 工作负载 + ATL 组件,`base/win/atl_throw.h` 依赖),在 x64 Native Tools Command Prompt 或 vcvars64 环境执行 moon / cmake;安装器 quiet / passive 模式须提权,否则 Exit 5007。
 - 发行包资产名是 `libyue_{v}_win.zip` / `_mac.zip`(非 windows / darwin)。
 - 大小写敏感卷上编译报 C1083 找不到 `webview2.h`:SDK 只给 `WebView2.h`(大写 W),prepare.py 解压后补小写别名;同一卷上 `shutil.copyfile` 的 samefile 判定不可靠,复制前先删目标。
 - 平台专属代码的 include 与实现必须同批进平台分支:裸 `gtk/gtk.h`、或有使用守卫无定义守卫的函数,都会在另一平台编译端炸出 C1083 / C2065。
+- 电源/会话消息(B6)首个真机编译撞出三处 SDK 事实:`PBT_APMRESUME` 宏不存在(唤醒只有必发的 `PBT_APMRESUMEAUTOMATIC` 与其后仅在用户输入唤醒时追加的 `PBT_APMRESUMESUSPEND`,后者是前者子集、两个都认会一次唤醒两次回调);SDK 10.0.26100 已把 `PBT_*` 常量收编进 winuser.h,根本没有独立 `pbt.h`,显式 include 它反而 C1083;`WTSRegisterSessionNotification` / `NOTIFY_FOR_THIS_SESSION` 声明在 `wtsapi32.h`,而 `WTS_SESSION_LOCK` 等消息码在 winuser.h——只缺 include 时报函数未声明、消息码不报错,易误判成「头文件没问题」。
 - shim 平台差异:`dlfcn.h` 按 `__linux__` 守卫;MSVC 的 `M_PI` 需 `_USE_MATH_DEFINES`;`base::FilePath` 在 UNICODE 构建下是 `std::wstring`,统一经 `FromUTF8Unsafe / AsUTF8Unsafe` 进出;Windows 无 Popover、无 `SetOverlayScrollbar` / `Clipboard::Selection` / `Tray::SetTitle` 等,shim 降级空操作;`operator new/delete` 重定向 `malloc/free`(moon 运行时以 MOONBIT_ALLOCATOR=SYSTEM 编译);控件 HWND 须经 `dynamic_cast<nu::SubwinView*>(GetNative())->hwnd()` 取,`GetNative()` 本身不是 HWND。
 - 原生子控件滚动后 HWND 不随容器移动(悬浮遮挡):`View::Layout()` 强制重摆,scroll 封装已挂 on_scroll,回调经 0ms 定时器推迟到布局完成后执行;输入框内阴影是 `WS_EX_CLIENTEDGE`,borderless 须清 STATICEDGE / CLIENTEDGE / WS_BORDER 三者;DatePicker 不显式给宽只显示年份;字形小图标跨平台不一致,组件内一律 Painter 矢量自绘。
 
@@ -213,10 +216,12 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - CRT 必须与 moon 一致为静态 /MT:CMake 多配置生成器忽略 `CMAKE_BUILD_TYPE`,`cmake --build` 必须带 `--config Release`(prepare.py 已自动化),否则 LNK4098 + `__imp__*` 未解析。
 - exe 控制台黑框已由 yue 包内置 `win_gui.c` 链接 pragma 根治:pragma 存于 .obj 的 drectve 段,静态库归档成员须被引用才会被抽取——`initialize()` 引用 stub 符号 `yue_mbt_win_gui_marker` 保证生效,依赖方零配置;release-bin.yml 的 PE 头改写(Subsystem 3→2)为兜底。用户 link_flags 拼在 `/link` 之前,cl 直接丢弃 `/SUBSYSTEM` 类链接选项(D9002),追加参数路线不可行。GUI 子系统下 stdout 仅管道 / 重定向可见。
 - 换 `yue_mbt.lib` 后 `moon build` 报 no work to do:删 `_build` 下产物 exe 强制重链。
+- prebuild 的 link_configs Windows 分支曾漏为 `yue/traybus` 单列一份:traybus 不依赖 yue(反向),按「依赖该包的目标」传播拿不到链接配置,`moon test` 链 traybus 测试 exe 时 12 个 `yue_mbt_sys_*` 符号 LNK2019;Linux/macOS 分支本就单列,Windows 补齐后三平台一致。
 
 ### manifest
 
 - exe 无清单时启动即报「无法定位于序数 345」(TaskDialogIndirect 仅以序数在 Common-Controls v6 导出):官方清单编译为 `yue_mbt_manifest.res` 经链接参数进每个 exe;测试驱动用 `YUE_MBT_SKIP_MANIFEST=1` 规避与 moon 自带 MANIFEST 的 CVT1100 冲突。
+- `YUE_MBT_SKIP_MANIFEST` 的取值变化不会让 moon 重套链接配置:未设变量跑过一次后,moon 缓存了含 manifest.res 的旧 flags,补设变量重跑仍 CVT1100;须 `moon clean`(或删 `_build` 下产物 exe)再生。
 
 ### 运行期差异
 
@@ -239,6 +244,8 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - Entry 无限递归案例:非 Linux 分支两函数互调栈溢出,MSVC C4717 早已告警——「逻辑必死」类警告应按错误对待。GUI「无窗口」用 `Get-Process <name> | Select MainWindowHandle` 判定;MoonBit println 管道下全缓冲,进程被杀即丢,插桩用 stderr。
 - mount_window 在 handle 回调执行后自动激活显示,消费方无需手动 activate。
 - 平台信息 / 区域 / 缩放 / 剪贴板 / 定时器 / 全局快捷键 / 全局鼠标轮询 / 画布(GDI+)实测正常。
+- 离屏 Canvas 在 Windows 不能早于 initialize 创建:`Canvas::new` 一句即 0xc0000005 访问违例(最小复现不含任何绘制调用)。根因:Canvas / DoubleBuffer / Painter 构造依赖 `nu::State`——GDI+(`GdiplusHolder`)、默认字体、NativeTheme 都随 State 建立,而 State 由 initialize() 创建;曾试在 canvas_new 里裸 `GdiplusStartup` 兜底仍崩(State 还有别的空解引用),正解是 `g_state` 为空时先走与 initialize 相同的 `yue_mbt_app_init()`。对照 Linux:cairo image surface 无 State 依赖,离屏几何无需 initialize 可跑(仅文本路径要 GTK 栈,见「自绘画布与图表渲染」);Windows 连几何都起不来,shim 兜底后三平台「离屏 Canvas 随处可用」语义一致。charts_wbtest 的离屏几何基准据此在 Windows 通过(17/17)。
+- 平台无关函数误入平台分支的桩:wire 的 `'d'` 编解码走 `yue_mbt_sys_f64_to_bits/from_bits`(纯位重解释,memcpy 实现),实现却放在 OS_LINUX 分支、非 Linux 桩恒返回 0——Windows 上 3 个纯内存 wire 测试解码全 0 失败(wire 编解码测试不依赖总线,非 Linux 也跑)。移到平台分支外修复。判定法:桩清单逐个过「是否真平台专属」,纯计算 / 纯内存逻辑不进桩(与 macOS 小节「`#else` 兜底误吞 macOS」同族)。
 - 单实例消息窗口是仓内首例自有 WNDPROC/窗口类代码(此前 grep 0 命中):类名由 app_id 派生(moonbit_libyue_instance_<app_id 点换下划线>),必须建在运行 libyue 主循环的主线程;WM_COPYDATA 由 SendMessage 同步派发到 WNDPROC(不走消息队列),收端 MessageLoop::PostTask 抛回主循环再触发 MoonBit 回调,避免在对方进程的 SendMessage 栈里执行应用代码。互斥体用 Local\ 会话命名空间免提升;同进程对同名二次 CreateMutexW 会命中 ERROR_ALREADY_EXISTS,以 static 句柄守卫做幂等。【待真机验证】消息窗口在 libyue 主循环下的实际派发、SetForegroundWindow 在前台互斥下的置前成功率、旧构建混跑时标题查找兜底路径。
 
 ## macOS ❓ 未实测

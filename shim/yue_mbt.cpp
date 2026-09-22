@@ -23,6 +23,7 @@
 #include <richedit.h>
 #include <commctrl.h>
 #include <dwmapi.h> // system_accent 的 DwmGetColorizationColor
+#include <wtsapi32.h> // WTSRegisterSessionNotification 与 NOTIFY_FOR_*（WTS 消息码在 winuser.h，注册函数在此）
 #endif
 #include "yue_mbt.h"
 
@@ -1668,6 +1669,14 @@ void yue_mbt_painter_draw_canvas_from_rect(void *painter, void *canvas,
 // ---------- Canvas / AttributedText / Font / Image ----------
 
 void *yue_mbt_canvas_new(double width, double height) {
+#if defined(OS_WIN)
+  // Windows 的 Canvas/Painter 构造依赖 nu::State（GDI+、默认字体、主题
+  // 都随 State 建立），早于 initialize 创建会空指针访问违例；GTK/macOS
+  // 的离屏表面无此要求。这里兜底补一次与 initialize 相同的初始化
+  if (g_state == nullptr) {
+    yue_mbt_app_init();
+  }
+#endif
   return reinterpret_cast<void *>(CanvasStore::put(
       new nu::Canvas(nu::SizeF(static_cast<float>(width),
                                static_cast<float>(height)))));
@@ -4229,7 +4238,9 @@ static LRESULT CALLBACK PowerEvtWndProc(HWND hwnd, UINT msg, WPARAM wp,
   if (msg == WM_POWERBROADCAST) {
     if (wp == PBT_APMSUSPEND) {
       evt = 0;
-    } else if (wp == PBT_APMRESUME || wp == PBT_APMRESUMEAUTOMATIC) {
+    } else if (wp == PBT_APMRESUMEAUTOMATIC) {
+      // 唤醒只认 RESUMEAUTOMATIC：任何恢复必发；RESUMESUSPEND 仅在
+      // 用户输入唤醒时于其后追加，重复认会导致一次唤醒两次回调
       evt = 1;
     }
   } else if (msg == WM_WTSSESSION_CHANGE) {
@@ -4862,6 +4873,23 @@ extern "C" void yue_mbt_tray_on_click(void *tray, void (*invoke)(void *), void *
   }
 }
 
+// Double ↔ IEEE 754 位模式：DBus 'd' 编解码用（纯位重解释，平台无关，
+// wire 的纯内存编解码测试在非 Linux 平台也走这两个入口）
+static_assert(sizeof(double) == 8, "DBus DOUBLE requires IEEE 754 binary64");
+
+extern "C" int64_t yue_mbt_sys_f64_to_bits(double v) {
+  uint64_t bits;
+  std::memcpy(&bits, &v, 8);
+  return static_cast<int64_t>(bits);
+}
+
+extern "C" double yue_mbt_sys_f64_from_bits(int64_t bits) {
+  double v;
+  uint64_t u = static_cast<uint64_t>(bits);
+  std::memcpy(&v, &u, 8);
+  return v;
+}
+
 // ---------- 托盘：MoonBit 自实现后端的系统调用转发 ----------
 //
 // SNI（StatusNotifierItem）协议逻辑全部在 MoonBit 侧（yue/traybus 包），
@@ -4999,22 +5027,6 @@ extern "C" void yue_mbt_sys_unwatch_fd(int32_t fd) {
   }
 }
 
-// Double ↔ IEEE 754 位模式：DBus 'd' 编解码用（纯位重解释）
-static_assert(sizeof(double) == 8, "DBus DOUBLE requires IEEE 754 binary64");
-
-extern "C" int64_t yue_mbt_sys_f64_to_bits(double v) {
-  uint64_t bits;
-  std::memcpy(&bits, &v, 8);
-  return static_cast<int64_t>(bits);
-}
-
-extern "C" double yue_mbt_sys_f64_from_bits(int64_t bits) {
-  double v;
-  uint64_t u = static_cast<uint64_t>(bits);
-  std::memcpy(&v, &u, 8);
-  return v;
-}
-
 // spawn 脱离子进程:glib 自动回收(无僵尸),SEARCH_PATH 按需找 xdg-open;
 // glib 可能改写 argv 内容,入参先拷进本地缓冲
 extern "C" int32_t yue_mbt_sys_spawn_detached(const char *file, const char *arg) {
@@ -5065,10 +5077,6 @@ extern "C" int32_t yue_mbt_sys_watch_fd(int32_t, int32_t,
 }
 
 extern "C" void yue_mbt_sys_unwatch_fd(int32_t) {}
-
-extern "C" int64_t yue_mbt_sys_f64_to_bits(double) { return 0; }
-
-extern "C" double yue_mbt_sys_f64_from_bits(int64_t) { return 0.0; }
 
 extern "C" int32_t yue_mbt_sys_spawn_detached(const char *, const char *) {
   return -1;

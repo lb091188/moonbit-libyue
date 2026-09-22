@@ -259,14 +259,22 @@ def link_configs() -> dict:
         manifest = "" if os.environ.get("YUE_MBT_SKIP_MANIFEST") == "1" \
             else f"{build}/yue_mbt_manifest.res "
         prebuilt = _prebuilt("yue_prebuilt.lib")
-        return {"link_configs": [{
-            "package": "NoahLiu/moonbit-libyue/yue",
-            "link_flags": (
-                f"{manifest}{build}/yue_mbt.lib"
-                + (f" {prebuilt}" if prebuilt else "")
-                + " " + " ".join(WINDOWS_LINK_LIBS)
-            ),
-        }]}
+        win_flags = (
+            f"{manifest}{build}/yue_mbt.lib"
+            + (f" {prebuilt}" if prebuilt else "")
+            + " " + " ".join(WINDOWS_LINK_LIBS)
+        )
+        # traybus 须单列一份，缘由见下方 Linux/macOS 分支的注释
+        return {"link_configs": [
+            {
+                "package": "NoahLiu/moonbit-libyue/yue",
+                "link_flags": win_flags,
+            },
+            {
+                "package": "NoahLiu/moonbit-libyue/yue/traybus",
+                "link_flags": win_flags,
+            },
+        ]}
     if platform.system() == "Linux":
         arc = _prebuilt("libyue_prebuilt.a")
         core = f"-L{build} -lyue_mbt" + (f" {arc}" if arc else "")
