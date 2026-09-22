@@ -121,6 +121,17 @@ fn changed_u32(body : Array[DVal], key : String) -> Int? {
 }
 
 ///|
+/// StateChanged 信号体的新状态值。NM 规范里该信号参数是 Int32(i)
+/// （属性 State 才是 u32,信号与属性类型不同源）,按 i 解码为 VI32,
+/// u 兜底兼容个别实现差异;其余类型丢弃。
+fn statechanged_of(body : Array[DVal]) -> Int? {
+  match body.get(0) {
+    Some(VI32(v)) | Some(VU32(v)) => Some(v)
+    _ => None
+  }
+}
+
+///|
 /// 注册 (State, Connectivity) 变化回调。注册时同步查询一次建缓存
 /// (主线程、非 drain 栈,合法);此后信号驱动,回调内只读缓存。
 pub fn nm_on_change(cb : (Int, Int) -> Unit) -> Result[Unit, String] {
@@ -148,12 +159,12 @@ pub fn nm_on_change(cb : (Int, Int) -> Unit) -> Result[Unit, String] {
       "type='signal',sender='org.freedesktop.NetworkManager',interface='org.freedesktop.NetworkManager',member='StateChanged'",
       "org.freedesktop.NetworkManager.StateChanged",
       fn(m) {
-        match m.body.get(0) {
-          Some(VU32(v)) => {
+        match statechanged_of(m.body) {
+          Some(v) => {
             g_nm_state.val = v
             nm_notify()
           }
-          _ => ()
+          None => ()
         }
       },
     )
