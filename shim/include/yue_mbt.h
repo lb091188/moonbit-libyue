@@ -739,6 +739,17 @@ int32_t yue_mbt_view_is_dragging(void *view);
 
 void *yue_mbt_null_image();
 
+/* ---------- 单实例（Windows:命名互斥体 + message-only 窗口；非 Windows 为桩） ---------- */
+
+/* 命名互斥体探测/创建：ok=1 取得（首实例），ok=0 已存在（第二实例） */
+int32_t yue_mbt_win_named_mutex_create(const char *name, int32_t *ok);
+/* 向首实例 message-only 窗口发 Wake（WM_COPYDATA，'\n' 分隔命令行）；ok=1 已送达 */
+int32_t yue_mbt_win_instance_window_send(const char *class_name, const char *args, int32_t *ok);
+/* 首实例建 message-only 窗口：WM_COPYDATA 经 PostTask 抛回主循环再调 invoke(closure, bytes) */
+int32_t yue_mbt_win_instance_window_create(const char *class_name, void (*invoke)(void *, void *), void *closure);
+/* 兜底：按标题查找顶层窗口并置前（最小化先恢复）；ok=1 找到 */
+int32_t yue_mbt_win_find_and_activate(const char *title, int32_t *ok);
+
 /* ---------- 探测示例(examples/probe) ---------- */
 
 void yue_mbt_probe_env(void *window);
