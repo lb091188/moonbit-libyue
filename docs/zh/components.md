@@ -273,8 +273,8 @@ let sep = @yue.Separator::make(Horizontal)   // 或 Vertical
 |---|---|---|---|
 | content | T : ViewLike | 必填 | 内容视图 |
 | content_size | (Double, Double)? | None | 内容尺寸；不传则整页滚动跟随内容自然高度 |
-| policy | (ScrollPolicy, ScrollPolicy)? | None | 滚动条策略（水平, 垂直）：Always / Never / Automatic |
-| overlay | Bool | true | 覆盖式滚动条（悬浮不占位） |
+| policy | (ScrollPolicy, ScrollPolicy)? | None | 平台滚动条策略（水平, 垂直）：Always / Never / Automatic；显式传入时保留平台滚动条 |
+| overlay | Bool | true | 默认自绘悬浮细条（三平台统一，见下节）；false 用平台经典滚动条 |
 
 `Separator::make` 入参：`orientation : Orientation = Horizontal`（Horizontal / Vertical）。
 
@@ -290,7 +290,9 @@ let sep = @yue.Separator::make(Horizontal)   // 或 Vertical
 
 ## 悬浮滚动条 OverlayScroll
 
-声明式节点，隐藏平台滚动条，自绘主题色悬浮细条叠在内容右缘：滚动/悬停浮现，停顿约 1 秒两级渐隐，可沿轨道拖拽（Windows 平台原生滚动条为经典样式常驻占位，此组件统一三平台为悬浮形态）。
+声明式 `scroll()` 的默认形态（`overlay=true` 且未显式 `policy`）即为本节组件：隐藏平台滚动条，自绘主题色悬浮细条叠在内容右缘——滚动/悬停浮现，停顿约 1 秒两级渐隐，可沿轨道拖拽（Windows 平台原生滚动条为经典样式常驻占位，此形态统一三平台）。要平台滚动条时传 `overlay=false` 或显式 `policy`。
+
+独立使用（内容已是 Node 时与 `scroll()` 等价）：
 
 ```moonbit
 @yue.overlay_scroll(
