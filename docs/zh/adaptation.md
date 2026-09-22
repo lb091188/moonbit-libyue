@@ -164,6 +164,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 拖放能否接收由 drag-motion(`handle_drag_update`)决定,`handle_drag_enter` 只是进入通知;注册数据类型须补 Image(从图片查看器 / 浏览器拖入的是图片内容,不是文件路径)。
 - libyue 的 `Entry::SetText` 会吞掉 `on_text_change`:GTK 侧用 `is-editing` 对象数据守卫,编程式设置期间 `changed` 信号被过滤(防回环),程序化清空 / 置文本后可见文本变了但使用方拿不到回调——`input_t` 的清空 ✕ 曾因此「文本没了、筛选列表不刷新」。修复:清空处理里显式补调一次 `on_input("")`。凡编程式改 Entry / TextEdit 文本后又依赖回调的路径,都要手动补回调。
 - 拖出发起:同步调 `gtk_drag_begin` 会使 GTK 拖拽状态机不一致(嵌套 gtk_main 不退出、只能拖一次),须推迟到事件队列排空、以 press 事件发起并回填 drag_context;drag-failed 须防御性收尾(fork mbt.12)。
+- 系统主色调读取(GTK3 无强调色 API,`yue_mbt_system_accent` 三级递进):①GNOME 47+ 的 GSettings `org.gnome.desktop.interface`/`accent-color`——schema 存在但键不存在时(如 Ubuntu 24.04 的 gsettings-desktop-schemas)`g_settings_get_string` 直接 abort 而非返回空,必须先 `g_settings_schema_has_key` 探测(本机探针实测 abort);②当前主题 CSS 的 `@define-color theme_selected_bg_color`:GTK 各主题把主色统一表达为选中底色,按 `~/.themes` → `$XDG_DATA_HOME/themes` → `$XDG_DATA_DIRS/themes` → `/usr/share/themes` 找 `gtk-3.0/{gtk,gtk-contained,gtk-dark}.css`,深浅偏好决定先解析哪个(Orchis 系 gtk.css 是浅色主色、gtk-dark.css 是深色变体);③都取不到返回空。验证:探针程序(Ubuntu 24.04 + XFCE + Orchis-Teal-Light-Compact)返回 `#009688`,与主题 CSS 定义逐位一致;XFCE 无强调色设置,靠②命中主题主色。
 
 ## Windows 10 / 11 ✅
 

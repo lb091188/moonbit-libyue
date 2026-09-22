@@ -18,6 +18,9 @@ All colors come from the theme palette — a deep, low-saturation scheme: blue `
 | `on_theme_change(f)` | subscribe to theme changes (registered at mount for re-applying colors fixed at mount) |
 | `system_prefers_dark()` | read the system light/dark preference (currently implemented on Linux only) |
 | `on_system_theme_change(f)` | fires when the system preference changes (currently implemented on Linux only) |
+| `system_accent()` | read the system accent color as hex, empty string when the system has no accent |
+| `theme_from_accent(accent, dark?)` | derive a whole palette from one accent color via formula, returns a `Theme` |
+| `theme_from_system()` | follow the system for both light/dark and accent, returns a `Theme` |
 
 `Theme` fields:
 
@@ -39,13 +42,27 @@ let t = @yue.default_theme()
 @yue.theme_apply({ ..t, primary: "#1E4FA3", primary_light: "#E3EDFA" })
 ```
 
-Following the system: pick the initial theme from `system_prefers_dark()`, and re-read and re-apply inside the `on_system_theme_change` callback. Focus rings and focused field borders use a neutral grey single stroke (not the theme color).
+Following the system: `theme_from_system()` gives you a theme that follows the system for both light/dark and the accent color (falling back to the built-in primary on desktops without an accent); recompute and re-apply inside the `on_system_theme_change` callback to track live changes. Focus rings and focused field borders use a neutral grey single stroke (not the theme color).
 
 ```moonbit
-let dark = @yue.system_prefers_dark()
-@yue.theme_apply(if dark { @yue.dark_theme() } else { @yue.default_theme() })
+@yue.theme_apply(@yue.theme_from_system())
 @yue.on_system_theme_change(fn() {
-  @yue.theme_apply(if @yue.system_prefers_dark() { @yue.dark_theme() } else { @yue.default_theme() })
+  @yue.theme_apply(@yue.theme_from_system())
+})
+```
+
+### Formula-derived palettes and the system accent
+
+With a single accent color you don't have to hand-tune a whole palette: `theme_from_accent(accent, dark?)` derives one via HSL formulas — the accent keeps its hue while lightness is clamped per mode (0.34..0.52 light / 0.55..0.72 dark) with a saturation floor for readability; `primary_hover` shifts lightness by ∓8%, `primary_light` mixes toward the panel background (this is the Soft button fill); semantic colors (success/warning/danger/info) use a fixed hue wheel 142/36/4/210 borrowing the accent's saturation, with lightness following the mode; neutrals (text / border / fills / backgrounds) stay on the built-in base ramps and never shift with the accent.
+
+`system_accent()` reads the system accent color: on Linux a three-step fallback (GNOME 47+ accent-color setting → the selected-background color in the current GTK theme CSS → empty string), on Windows the DWM colorization color, on macOS `controlAccentColor`; see [adaptation.md](adaptation.md) for the read paths and measured values.
+
+```moonbit
+// click a preset to re-skin instantly; light/dark switching keeps the current accent
+let accent = @yue.Store::new("")
+@yue.theme_apply(@yue.theme_from_accent(accent.get(), dark=@yue.system_prefers_dark()))
+accent.subscribe(fn(a) {
+  @yue.theme_apply(@yue.theme_from_accent(a, dark=@yue.system_prefers_dark()))
 })
 ```
 

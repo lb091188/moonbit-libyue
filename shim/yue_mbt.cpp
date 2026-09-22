@@ -22,6 +22,7 @@
 #include <shellapi.h>
 #include <richedit.h>
 #include <commctrl.h>
+#include <dwmapi.h> // system_accent 的 DwmGetColorizationColor
 #endif
 #include "yue_mbt.h"
 
@@ -51,6 +52,7 @@
 #include "nativeui/nativeui.h"
 #if defined(OS_LINUX) // set_borderless 的 GtkCssProvider 注入(仅 Linux GTK)
 #include <gtk/gtk.h>
+#include <gio/gio.h> // system_accent 的 GSettings(GNOME accent-color)
 #include "nativeui/popover.h"
 #include "nativeui/gtk/nu_container.h"
 #endif
@@ -4476,6 +4478,218 @@ void yue_mbt_on_system_theme_change(void (*invoke)(void *), void *closure) {
     // 已有监听:仍回调一次,让后注册的 MoonBit 订阅者立即拿到当前状态
     invoke(closure);
   }
+#endif
+}
+
+/* ---------- 系统主色调(强调色) ---------- */
+
+#if defined(OS_LINUX)
+namespace {
+
+/* libadwaita(GNOME 47+)强调色色名 → 官方调色板 ARGB */
+struct AccentName {
+  const char *name;
+  uint32_t argb;
+};
+const AccentName kGnomeAccents[] = {
+    {"default", 0xFF3584E4u}, {"blue", 0xFF3584E4u},   {"teal", 0xFF2190A4u},
+    {"green", 0xFF3A944Au},   {"yellow", 0xFFC88800u}, {"orange", 0xFFE64613u},
+    {"red", 0xFFE62D42u},     {"pink", 0xFFD23799u},   {"purple", 0xFF9141ACu},
+    {"slate", 0xFF6F8396u},
+};
+
+/* 从 CSS 文本解析 theme_selected_bg_color 的值(#hex / rgb()/rgba())，
+ * 解不出返回 0。GTK 各主题把主色统一表达为选中底色(Adwaita/Yaru/
+ * Orchis 实测一致)。 */
+uint32_t ParseSelectedBg(const char *css) {
+  const char *k = strstr(css, "theme_selected_bg_color");
+  if (k == nullptr) {
+    return 0;
+  }
+  const char *p = k + strlen("theme_selected_bg_color");
+  while (*p == ' ' || *p == '\t' || *p == ':') {
+    p++;
+  }
+  int r = -1, g = -1, b = -1;
+  if (*p == '#') {
+    p++;
+    int digits[6] = {0, 0, 0, 0, 0, 0};
+    int n = 0;
+    while (n < 6) {
+      char c = *p;
+      int v = (c >= '0' && c <= '9')  ? c - '0'
+              : (c >= 'a' && c <= 'f') ? c - 'a' + 10
+              : (c >= 'A' && c <= 'F') ? c - 'A' + 10
+                                       : -1;
+      if (v < 0) {
+        break;
+      }
+      digits[n++] = v;
+      p++;
+    }
+    if (n == 6) {
+      r = digits[0] * 16 + digits[1];
+      g = digits[2] * 16 + digits[3];
+      b = digits[4] * 16 + digits[5];
+    } else if (n == 3) {
+      // #RGB 短式:每位重复一遍补足
+      r = digits[0] * 17;
+      g = digits[1] * 17;
+      b = digits[2] * 17;
+    }
+  } else if (strncmp(p, "rgb", 3) == 0) {
+    p += 3;
+    if (*p == 'a') {
+      p++;
+    }
+    if (*p == '(') {
+      p++;
+      int vals[3] = {0, 0, 0};
+      int n = 0;
+      int cur = 0;
+      bool neg = false;
+      bool in_num = false;
+      while (*p != '\0' && n < 3) {
+        char c = *p;
+        if (c >= '0' && c <= '9') {
+          cur = cur * 10 + (c - '0');
+          in_num = true;
+        } else {
+          if (in_num) {
+            vals[n++] = neg ? -cur : cur;
+            cur = 0;
+            neg = false;
+            in_num = false;
+          }
+          if (c == '-') {
+            neg = true;
+          } else if (c == ')') {
+            break;
+          }
+        }
+        p++;
+      }
+      if (in_num && n < 3) {
+        vals[n++] = neg ? -cur : cur;
+      }
+      r = vals[0];
+      g = vals[1];
+      b = vals[2];
+    }
+  }
+  if (r < 0 || g < 0 || b < 0) {
+    return 0;
+  }
+  return (0xFFu << 24) | ((r & 255) << 16) | ((g & 255) << 8) | (b & 255);
+}
+
+/* 在 GTK 主题目录搜索序里找当前主题的 CSS 并解析选中底色;dark 决定
+ * 先试 gtk-dark.css。目录序:~/.themes(旧约定)→ XDG_DATA_HOME →
+ * XDG_DATA_DIRS → /usr/share/themes(用户主题遮蔽系统主题)。 */
+uint32_t ThemeSelectedBg(const char *theme, bool dark) {
+  if (theme == nullptr || theme[0] == '\0') {
+    return 0;
+  }
+  const char *kLight[] = {"gtk.css", "gtk-contained.css", "gtk-dark.css",
+                          "gtk-contained-dark.css"};
+  const char *kDark[] = {"gtk-dark.css", "gtk.css", "gtk-contained-dark.css",
+                         "gtk-contained.css"};
+  const char **files = dark ? kDark : kLight;
+  gchar *dirs[64];
+  int nd = 0;
+  dirs[nd++] = g_build_filename(g_get_home_dir(), ".themes", theme, nullptr);
+  if (g_get_user_data_dir() != nullptr) {
+    dirs[nd++] = g_build_filename(g_get_user_data_dir(), "themes", theme, nullptr);
+  }
+  const gchar *const *sys_data = g_get_system_data_dirs();
+  for (int i = 0; sys_data != nullptr && sys_data[i] != nullptr && nd < 62; i++) {
+    dirs[nd++] = g_build_filename(sys_data[i], "themes", theme, nullptr);
+  }
+  dirs[nd++] = g_build_filename("/usr/share/themes", theme, nullptr);
+  uint32_t out = 0;
+  for (int d = 0; d < nd && out == 0; d++) {
+    for (int f = 0; f < 4 && out == 0; f++) {
+      gchar *path = g_build_filename(dirs[d], "gtk-3.0", files[f], nullptr);
+      gchar *text = nullptr;
+      if (g_file_get_contents(path, &text, nullptr, nullptr)) {
+        out = ParseSelectedBg(text);
+        g_free(text);
+      }
+      g_free(path);
+    }
+  }
+  for (int d = 0; d < nd; d++) {
+    g_free(dirs[d]);
+  }
+  return out;
+}
+
+}  // namespace
+#endif
+
+/* 系统主色调(强调色)→ ARGB;无主色概念/取不到返回 0。仅主线程 GUI
+ * 初始化后可用。三级来源(详见 docs/zh/adaptation.md):
+ * Linux(GTK3 无强调色 API):GNOME 47+ 的 accent-color 设置 → 当前
+ *   GTK 主题 CSS 的 theme_selected_bg_color(XFCE 等无主色桌面靠此);
+ * Windows:DWM 颜色化颜色(个性化-颜色-强调色);
+ * macOS:NSColor controlAccentColor(yue_accent_mac.mm,yue_mbt_system_accent_mac)。 */
+uint32_t yue_mbt_system_accent(void) {
+#if defined(OS_LINUX)
+  // 1) GNOME 47+ 强调色;schema 或键缺失时静默跳过(schema 在键不在时
+  //    g_settings_get_string 直接 abort,必须先 has_key 探测)
+  GSettingsSchemaSource *src = g_settings_schema_source_get_default();
+  GSettingsSchema *schema =
+      src == nullptr
+          ? nullptr
+          : g_settings_schema_source_lookup(src, "org.gnome.desktop.interface",
+                                            true);
+  if (schema != nullptr) {
+    if (g_settings_schema_has_key(schema, "accent-color")) {
+      GSettings *s = g_settings_new_full(schema, nullptr, nullptr);
+      if (s != nullptr) {
+        gchar *v = g_settings_get_string(s, "accent-color");
+        if (v != nullptr && v[0] != '\0') {
+          for (const AccentName &a : kGnomeAccents) {
+            if (g_ascii_strcasecmp(v, a.name) == 0) {
+              g_free(v);
+              g_object_unref(s);
+              g_settings_schema_unref(schema);
+              return a.argb;
+            }
+          }
+        }
+        g_free(v);
+        g_object_unref(s);
+      }
+    }
+    g_settings_schema_unref(schema);
+  }
+  // 2) 当前 GTK 主题 CSS 的选中底色
+  GtkSettings *settings = gtk_settings_get_default();
+  if (settings != nullptr) {
+    gchar *theme = nullptr;
+    g_object_get(settings, "gtk-theme-name", &theme, nullptr);
+    uint32_t c = ThemeSelectedBg(theme, yue_mbt_system_prefers_dark());
+    g_free(theme);
+    if (c != 0) {
+      return c;
+    }
+  }
+  return 0;
+#elif defined(OS_WIN)
+  // DWM 颜色化颜色:alpha 位是「强度」非透明度,只取 RGB
+  COLORREF c = 0;
+  BOOL opaque = FALSE;
+  if (SUCCEEDED(::DwmGetColorizationColor(&c, &opaque))) {
+    return (0xFFu << 24) | (GetRValue(c) << 16) | (GetGValue(c) << 8) |
+           GetBValue(c);
+  }
+  return 0;
+#elif defined(__APPLE__)
+  // 独立 ObjC++ 翻译单元实现(shim 主体纯 C++),见 yue_accent_mac.mm
+  return yue_mbt_system_accent_mac();
+#else
+  return 0;
 #endif
 }
 
