@@ -116,6 +116,8 @@
 
 ## 系统集成扩容(Electron 对标,Linux + Windows)
 
+实施计划:docs/zh/plan-system-integration.md
+
 桌面应用通用能力,属框架「系统集成」域(与托盘 / 通知同域),区别于 sysmonitor 的应用领域需求;macOS 暂缓。落地路由按平台:Linux = 纯 MoonBit / DBus(traybus 基建复用) / shim;Windows = 一律 shim(Win32 API)。语义归一在 MoonBit 层,使用方零平台感知。
 
 - [ ] P1 防多开(单实例)
