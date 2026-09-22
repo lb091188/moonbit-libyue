@@ -224,12 +224,38 @@ pub fn nice_ticks(lo : Double, hi : Double, count? : Int = 4) -> Array[Double] {
 }
 
 ///|
-/// 轴标签格式：最多两位小数、去尾零（整数不带小数点）；|v| >= 1.0e9 时
-/// 按整数值直出（轴标签不会到这种量级，仅兜底）。
+/// 带单位缩写的轴标签：值除以单位后最多一位小数、去尾零。
+fn fmt_axis_unit(v : Double, unit : Double, suffix : String) -> String {
+  let a = if v < 0.0 { -v } else { v }
+  let scaled = (a / unit * 10.0).round().to_int()
+  let ip = scaled / 10
+  let frac = scaled % 10
+  let body = if frac == 0 {
+    "\{ip}\{suffix}"
+  } else {
+    "\{ip}.\{frac}\{suffix}"
+  }
+  if v < 0.0 && scaled != 0 {
+    "-\{body}"
+  } else {
+    body
+  }
+}
+
+///|
+/// 轴标签格式：多级单位动态换挡（≥1e4 用 k、≥1e6 用 M、≥1e9 用 G），
+/// 数字保持短，不因标签过宽被排版换行竖排；以下维持最多两位小数、
+/// 去尾零。
 pub fn fmt_axis(v : Double) -> String {
   let a = if v < 0.0 { -v } else { v }
   if a >= 1.0e9 {
-    return v.to_int().to_string()
+    return fmt_axis_unit(v, 1.0e9, "G")
+  }
+  if a >= 1.0e6 {
+    return fmt_axis_unit(v, 1.0e6, "M")
+  }
+  if a >= 1.0e4 {
+    return fmt_axis_unit(v, 1.0e3, "k")
   }
   let scaled = (a * 100.0).round().to_int()
   let neg = v < 0.0 && scaled != 0
@@ -525,6 +551,7 @@ fn draw_hgrid(
       align=End,
       valign=Center,
       color=theme_text_secondary(),
+      wrap=false,
     )
   }
   p.set_stroke_color(theme_border())
@@ -565,6 +592,7 @@ fn draw_vgrid(
       align=Center,
       valign=Center,
       color=theme_text_secondary(),
+      wrap=false,
     )
   }
 }
@@ -758,11 +786,48 @@ fn draw_line_chart(
       }
       p.stroke()
     }
-    if show_last {
+  }
+  if show_last {
+    // 末端值标签：多序列末端值接近时直接逐个画会叠压，先按 y 排开、
+    // 推到最小间距之外并压回画布内，再统一绘制
+    let labels : Array[(Double, String, String)] = []
+    for si, s in series {
+      let n = s.points.length()
+      if n == 0 {
+        continue
+      }
       let v = s.points[n - 1]
-      let ly = map_y(v, lo, hi, y0, y1)
+      labels.push((map_y(v, lo, hi, y0, y1), fmt_axis(v), series_color(si)))
+    }
+    labels.mut_view().sort_by(fn(a, b) {
+      if a.0 < b.0 {
+        -1
+      } else if a.0 > b.0 {
+        1
+      } else {
+        0
+      }
+    })
+    let gap = 14.0
+    let top = y0 + 9.0
+    let bottom = y1 + 9.0
+    for i in 1..<labels.length() {
+      if labels[i].0 < labels[i - 1].0 + gap {
+        labels[i] = (labels[i - 1].0 + gap, labels[i].1, labels[i].2)
+      }
+    }
+    if labels.length() > 0 {
+      let off = (labels[labels.length() - 1].0 - bottom).max(0.0)
+      if off > 0.0 {
+        for i in 0..<labels.length() {
+          labels[i] = ((labels[i].0 - off).max(top), labels[i].1, labels[i].2)
+        }
+      }
+    }
+    for label in labels {
+      let (ly, text, color) = label
       p.draw_text(
-        fmt_axis(v),
+        text,
         x1 + 8.0,
         ly - 9.0,
         pad_r - 12.0,
@@ -770,6 +835,7 @@ fn draw_line_chart(
         align=Start,
         valign=Center,
         color~,
+        wrap=false,
       )
     }
   }
@@ -1313,7 +1379,8 @@ fn draw_scatter(
 /// 自适应（窗口 min/max + 留白）或经 y_range 手动指定；横向网格 + 左侧
 /// 刻度；面积半透明填充可选；最新值右端标注。数据经 Store 驱动：推点用
 /// [series_push]（或 [win_push] 换窗口后整体 set），只重绘画布不重建
-/// 视图树；主题切换现取色自动跟随。
+/// 视图树；主题切换现取色自动跟随。fill=true 不设固定宽度，横向铺满
+/// 父容器（跟随窗口伸缩）。
 pub fn line_chart_t(
   series : Store[Array[LineSeries]],
   width? : Double = 560.0,
@@ -1321,10 +1388,16 @@ pub fn line_chart_t(
   area? : Bool = false,
   y_range? : (Double, Double)? = None,
   show_last? : Bool = true,
+  fill? : Bool = false,
 ) -> Node {
   {
     mount: fn(parent) {
-      let cv = themed_container(style=[("width", width), ("height", height)])
+      let size_style = if fill {
+        [("height", height)]
+      } else {
+        [("width", width), ("height", height)]
+      }
+      let cv = themed_container(style=size_style)
       set_panel_bg(cv)
       cv.on_draw(fn(p) {
         let b = ViewLike::get_bounds(cv)
@@ -1351,18 +1424,25 @@ pub fn line_chart_t(
 /// 柱状/条形图（EP Bar）：纵向柱（默认）与横向条（horizontal=true）两
 /// 形态；以 0 为基线支持正负值（正主题色、负 danger 色）；hover 高亮 +
 /// 行内数值标注（自绘，不走弹层）；类目标签过密时自动抽稀截断。数据经
-/// Store 驱动，hover 移动只重绘画布。
+/// Store 驱动，hover 移动只重绘画布。fill=true 不设固定宽度，横向铺满
+/// 父容器（跟随窗口伸缩）。
 pub fn bar_chart_t(
   data : Store[Array[BarItem]],
   width? : Double = 560.0,
   height? : Double = 280.0,
   horizontal? : Bool = false,
   y_range? : (Double, Double)? = None,
+  fill? : Bool = false,
 ) -> Node {
   {
     mount: fn(parent) {
       let hover = Ref(-1)
-      let cv = themed_container(style=[("width", width), ("height", height)])
+      let size_style = if fill {
+        [("height", height)]
+      } else {
+        [("width", width), ("height", height)]
+      }
+      let cv = themed_container(style=size_style)
       set_panel_bg(cv)
       cv.on_draw(fn(p) {
         let b = ViewLike::get_bounds(cv)

@@ -159,7 +159,9 @@ fn align_id(a : TextAlign) -> Int {
 }
 
 ///|
-/// 在矩形内绘制文本（指定水平/垂直对齐与颜色）。
+/// 在矩形内绘制文本（指定水平/垂直对齐与颜色）。wrap=false 时不换行
+/// （定高行内的长文本默认会换行溢出行界，表格单元格 / 坐标轴标签等
+/// 单行场景应关掉；配 ellipsis=true 超宽截断加省略号，由平台排版完成）。
 pub fn Painter::draw_text(
   self : Painter,
   text : String,
@@ -170,8 +172,10 @@ pub fn Painter::draw_text(
   align? : TextAlign = Start,
   valign? : TextAlign = Start,
   color? : String = "#000",
+  wrap? : Bool = true,
+  ellipsis? : Bool = false,
 ) -> Unit {
-  ffi_painter_draw_text(
+  ffi_painter_draw_text_ex(
     self,
     utf8_bytes(text),
     x,
@@ -181,6 +185,8 @@ pub fn Painter::draw_text(
     align_id(align),
     align_id(valign),
     utf8_bytes(color),
+    if wrap { 1 } else { 0 },
+    if ellipsis { 1 } else { 0 },
   )
 }
 

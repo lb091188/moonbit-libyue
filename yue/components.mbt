@@ -5139,6 +5139,7 @@ pub fn table_v_t(
   selection? : Store[Array[Int]],
   sort? : Store[TableSort],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) { },
+  fill? : Bool = false,
 ) -> Node {
   {
     mount: fn(parent) {
@@ -5159,7 +5160,8 @@ pub fn table_v_t(
       let resize_w1 = Ref(0.0)
       let head_h = 40.0
       let bar_w = 10.0
-      let body_w = width - bar_w
+      // 表体宽随实际视口宽(fill 模式跟随窗口伸缩),绘制与命中共用
+      let body_w = Ref(width - bar_w)
       let vis_h = height - head_h
       // 复选框列占 36px(selection 启用时),列几何整体右移
       let col_x0 = if sel is Some(_) { 36.0 } else { 0.0 }
@@ -5174,7 +5176,7 @@ pub fn table_v_t(
         }
       }
       let flex_w = if flex_count > 0 {
-        ((body_w - col_x0 - fixed) / flex_count.to_double()).max(0.0)
+        ((body_w.val - col_x0 - fixed) / flex_count.to_double()).max(0.0)
       } else {
         0.0
       }
@@ -5198,6 +5200,27 @@ pub fn table_v_t(
           col_x[j] = a
           a = a + col_w[j]
         }
+      }
+
+      // 列几何随实际宽度重排:固定列保留(可能被拖宽改过的)宽度,弹性
+      // 列分摊剩余宽度。拖列宽两列此消彼长守恒,与弹性列重排不冲突。
+      fn relayout_body(bw : Double) -> Unit {
+        body_w.val = bw - bar_w
+        if flex_count > 0 {
+          let mut fixed_w = col_x0
+          for j in 0..<col_w.length() {
+            if columns[j].width > 0.0 {
+              fixed_w = fixed_w + col_w[j]
+            }
+          }
+          let fw = ((body_w.val - fixed_w) / flex_count.to_double()).max(0.0)
+          for j in 0..<col_w.length() {
+            if columns[j].width <= 0.0 {
+              col_w[j] = fw
+            }
+          }
+        }
+        relayout_cols()
       }
 
       // 列边界命中:x(画布坐标)距某条数据列右边界 3px 内返回左列号
@@ -5248,9 +5271,12 @@ pub fn table_v_t(
         }
       }
 
-      let cv = themed_container(
-        style=[("width", width), ("height", height), ("marginBottom", 10.0)],
-      )
+      let size_style = if fill {
+        [("height", height), ("marginBottom", 10.0)]
+      } else {
+        [("width", width), ("height", height), ("marginBottom", 10.0)]
+      }
+      let cv = themed_container(style=size_style)
 
       fn sel_has(i : Int) -> Bool {
         match sel {
@@ -5325,7 +5351,8 @@ pub fn table_v_t(
 
       // 文本按列对齐交给平台布局引擎(align 参数):Windows 的测宽与绘制
       // 格式不一致,手动按测量宽摆位会偏左(见 adaptation.md)。水平方向
-      // 两侧统一留 12px。
+      // 两侧统一留 12px。单行 + 超宽省略:默认换行会让长文本穿透定高
+      // 行界(命令行动辄上百字符),排版截断由平台完成,不逐格测宽。
       fn draw_align_text(
         p : Painter,
         text : String,
@@ -5348,11 +5375,14 @@ pub fn table_v_t(
           align=align,
           valign=Center,
           color=color,
+          wrap=false,
+          ellipsis=true,
         )
       }
 
       cv.on_draw(fn(p) {
         let b = ViewLike::get_bounds(cv)
+        relayout_body(b.width)
         let data = data_r.val
         let n = data.length()
         // 表头
@@ -5417,7 +5447,7 @@ pub fn table_v_t(
           let bg = table_row_bg(i, sel_has(i), hover_i.val == i)
           if bg != "" {
             p.set_fill_color(bg)
-            p.fill_rect(0.0, row_y, body_w, row_height)
+            p.fill_rect(0.0, row_y, body_w.val, row_height)
           }
           if sel is Some(_) {
             table_draw_check(
@@ -5465,6 +5495,7 @@ pub fn table_v_t(
                   20.0,
                   valign=Center,
                   color=type_color(t),
+                  wrap=false,
                 )
               }
               CellColorBox(hex, name) => {
@@ -5481,10 +5512,12 @@ pub fn table_v_t(
                   row_height,
                   valign=Center,
                   color=theme_text_regular(),
+                  wrap=false,
                 )
               }
               CellLines(lines) => {
-                // 行高内最多画两行,超出截断(虚拟滚动行高固定)
+                // 行高内最多画两行,超出截断(虚拟滚动行高固定);
+                // 单行不换行,超宽平台省略
                 let mut ly = row_y + (row_height - 28.0) / 2.0
                 let limit = row_y + row_height - 2.0
                 for ln in lines {
@@ -5498,6 +5531,8 @@ pub fn table_v_t(
                     w,
                     14.0,
                     color=theme_text_regular(),
+                    wrap=false,
+                    ellipsis=true,
                   )
                   ly = ly + 14.0
                 }
@@ -5553,7 +5588,7 @@ pub fn table_v_t(
           return false
         }
         let n = data_r.val.length()
-        if e.view_x >= body_w && max_offset() > 0.0 {
+        if e.view_x >= body_w.val && max_offset() > 0.0 {
           scroll_to_thumb(e.view_y)
           dragging.val = true
           ViewLike::set_capture(cv)
@@ -5649,7 +5684,7 @@ pub fn table_v_t(
         }
         let n = data_r.val.length()
         let idx = ((e.view_y - head_h + offset.val) / row_height).to_int()
-        let inside = e.view_x < body_w && e.view_y >= head_h
+        let inside = e.view_x < body_w.val && e.view_y >= head_h
         let new_hover = if inside && idx >= 0 && idx < n {
           idx
         } else {

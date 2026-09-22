@@ -135,20 +135,6 @@ fn sort_of_col(j : Int) -> ProcSort? {
   }
 }
 ///|
-/// 排序方向文案（工具栏 / 状态行显示）。
-fn sort_text(by : ProcSort, asc : Bool) -> String {
-  let name = match by {
-    ByPid => "PID"
-    ByName => "进程名"
-    ByCpu => "CPU%"
-    ByMem => "内存"
-    ByNice => "nice"
-    ByThreads => "线程"
-  }
-  "\{name} \{if asc { "↑" } else { "↓" }}"
-}
-
-///|
 /// 页面状态：派生表格数据 + 过滤 / 排序条件 + 操作消息。
 /// 排序条件走 @yue.TableSort Store（表头点击由 table_v_t 组件内切换，
 /// 本页订阅后重建数据），箭头显示与点击切换因此对组件透明。
@@ -199,12 +185,17 @@ fn ProcPage::rebuild(self : ProcPage, procs : Array[ProcInfo]) -> Unit {
     }
   }
   self.sel.set(new_sel)
-  let sort_desc = match sort_of_col(st.column) {
-    None => "未排序"
-    Some(by) => sort_text(by, st.asc)
+  let base = if pids.length() == procs.length() {
+    "\{pids.length()} 个进程"
+  } else {
+    "\{pids.length()}/\{procs.length()} 个进程"
   }
   self.status.set(
-    "共 \{pids.length()} 个进程（过滤自 \{procs.length()}）· 选中 \{new_sel.length()} · 排序 \{sort_desc}",
+    if new_sel.length() > 0 {
+      "\{base} · 选中 \{new_sel.length()}"
+    } else {
+      base
+    },
   )
 }
 
@@ -221,11 +212,11 @@ fn ProcPage::selected_pids(self : ProcPage) -> Array[Int] {
 }
 
 ///|
-/// 对选中进程发信号（SIGTERM / SIGKILL），逐个人态化报告。
+/// 对选中进程发信号（结束 / 强杀），逐个报告结果。
 fn ProcPage::signal_selected(self : ProcPage, sig : Int, label : String) -> Unit {
   let pids = self.selected_pids()
   if pids.length() == 0 {
-    self.msg.set("未选中进程（先点表格行选中）")
+    self.msg.set("先选中进程")
     return
   }
   let mut ok = 0
@@ -233,35 +224,35 @@ fn ProcPage::signal_selected(self : ProcPage, sig : Int, label : String) -> Unit
   for pid in pids {
     match kill_signal(pid, sig) {
       Ok(_) => ok += 1
-      Err(e) => fail = "\{fail} [\{pid}]\{e}"
+      Err(e) => fail = "\{fail},[\{pid}]\{e}"
     }
   }
   self.msg.set(
     if fail == "" {
-      "\{label}：已发送给 \{ok} 个进程"
+      "已\{label} \{ok} 个进程"
     } else {
-      "\{label}：\{ok} 个成功，失败:\{fail}"
+      "\{label}:\{ok} 个成功\{fail}"
     },
   )
 }
 
 ///|
-/// 对选中进程设 nice（-20..19），逐个人态化报告。
+/// 对选中进程设 nice（-20..19），逐个报告结果。
 fn ProcPage::renice_selected(self : ProcPage) -> Unit {
   let pids = self.selected_pids()
   if pids.length() == 0 {
-    self.msg.set("未选中进程（先点表格行选中）")
+    self.msg.set("先选中进程")
     return
   }
   let nice = match parse_i64(self.nice_text.trim()) {
     None => {
-      self.msg.set("nice 需为整数（-20..19）")
+      self.msg.set("nice 需为整数")
       return
     }
     Some(v) => v.to_int()
   }
   if nice < -20 || nice > 19 {
-    self.msg.set("nice 需在 -20..19（越大越谦让）")
+    self.msg.set("nice 需在 -20..19")
     return
   }
   let mut ok = 0
@@ -269,14 +260,14 @@ fn ProcPage::renice_selected(self : ProcPage) -> Unit {
   for pid in pids {
     match set_priority(pid, nice) {
       Ok(_) => ok += 1
-      Err(e) => fail = "\{fail} [\{pid}]\{e}"
+      Err(e) => fail = "\{fail},[\{pid}]\{e}"
     }
   }
   self.msg.set(
     if fail == "" {
-      "renice：\{ok} 个进程已设为 \{nice}"
+      "nice 已设为 \{nice}（\{ok} 个进程）"
     } else {
-      "renice：\{ok} 个成功，失败:\{fail}"
+      "nice:\{ok} 个成功\{fail}"
     },
   )
 }
@@ -286,7 +277,7 @@ fn page_process(app : App) -> @yue.Node {
   let page : ProcPage = {
     rows: @yue.Store::new([]),
     sel: @yue.Store::new([]),
-    msg: @yue.Store::new("选中行后可结束进程 / 调整 nice；数据 1Hz 增量刷新。"),
+    msg: @yue.Store::new("就绪"),
     status: @yue.Store::new("采样中…"),
     // 初始排序：CPU% 降序（列 3）
     sort: @yue.Store::new(@yue.TableSort::{ column: 3, asc: false }),
@@ -306,7 +297,7 @@ fn page_process(app : App) -> @yue.Node {
     @yue.TableColumn::make("状态", 56.0, align=@yue.Center, sortable=false),
     @yue.TableColumn::make("CPU%", 72.0, align=@yue.End),
     @yue.TableColumn::make("内存", 96.0, align=@yue.End),
-    @yue.TableColumn::make("nice", 56.0, align=@yue.End),
+    @yue.TableColumn::make("nice", 72.0, align=@yue.End),
     @yue.TableColumn::make("线程", 56.0, align=@yue.End),
     @yue.TableColumn::make("命令行", 0.0, sortable=false),
   ]
@@ -315,6 +306,7 @@ fn page_process(app : App) -> @yue.Node {
       // 工具栏：搜索 + 操作 + 消息
       @yue.hbox(
         [
+          @yue.label_t("搜索", role=@yue.Secondary),
           // 搜索框：主题化输入（自绘主题边框 + 主题底色 + 聚焦变色，
           // 悬停非空显示清空 ✕）——不用裸原生 Entry（Linux 下不跟主题）
           @yue.input_t(
@@ -326,11 +318,11 @@ fn page_process(app : App) -> @yue.Node {
               page.rebuild(app.procs.get())
             },
           ),
-          @yue.button_t("结束进程(SIGTERM)", variant=@yue.Soft, on_click=fn() {
-            page.signal_selected(SIGTERM, "SIGTERM")
+          @yue.button_t("结束进程", variant=@yue.Soft, on_click=fn() {
+            page.signal_selected(SIGTERM, "结束")
           }),
-          @yue.button_t("强杀(SIGKILL)", variant=@yue.Danger, on_click=fn() {
-            page.signal_selected(SIGKILL, "SIGKILL")
+          @yue.button_t("强制结束", variant=@yue.Danger, on_click=fn() {
+            page.signal_selected(SIGKILL, "强制结束")
           }),
           @yue.input_t(
             text=page.nice_text,
@@ -353,11 +345,11 @@ fn page_process(app : App) -> @yue.Node {
       @yue.table_v_t(
         columns,
         page.rows,
-        width=1140.0,
         height=520.0,
         row_height=30.0,
         selection=page.sel,
         sort=page.sort,
+        fill=true,
       ),
       @yue.label_t(
         page.status.get(),

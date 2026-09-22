@@ -153,15 +153,10 @@ fn page_net(app : App) -> @yue.Node {
   app.nets.subscribe(push_total)
   @yue.vbox(
     [
-      @yue.label_t("汇总收发速率（非 lo，/sys/class/net statistics 两次差值，B/s）", role=@yue.Section, style=[
-        ("marginBottom", 4.0),
+      @yue.label_t("收发速率（不含 lo）", role=@yue.Section, style=[
+        ("marginBottom", 6.0),
       ]),
-      @yue.label_t(
-        "每行右侧迷你曲线 rx（主题色）/ tx（警告色）同窗叠加，值域随窗口峰值自适应。",
-        role=@yue.Secondary,
-        style=[("marginBottom", 8.0)],
-      ),
-      @yue.line_chart_t(total, width=1100.0, height=220.0),
+      @yue.line_chart_t(total, height=220.0, fill=true),
       @yue.separator(style=[("marginTop", 12.0), ("marginBottom", 10.0)]),
       draw_rows(net_n, fn(p, w) { draw_net_rows(p, w, page.rows.get()) }),
     ],
