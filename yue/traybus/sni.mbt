@@ -119,24 +119,11 @@ fn Conn::next_item_path(self : Conn) -> String {
 ///|
 /// 向 watcher 注册指定路径的托盘项（含 watcher 存在性检查与重启跟踪）。
 fn Conn::register_item_path(self : Conn, path : String) -> Result[Unit, String] {
-  if !self.match_added {
-    // 跟踪 watcher 重启：换了 owner 就把所有项重新注册。
-    // AddMatch 是方法调用（此前误发成广播信号被总线忽略）。
-    self.call(
-      "org.freedesktop.DBus",
-      "/org/freedesktop/DBus",
-      "org.freedesktop.DBus",
-      "AddMatch",
-      "s",
-      [
-        VString(
-          "type='signal',sender='org.freedesktop.DBus',interface='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.kde.StatusNotifierWatcher'",
-        ),
-      ],
-      fn(_m) { () },
-    )
-    self.match_added = true
-  }
+  // 跟踪 watcher 重启：换了 owner 就把所有项重新注册。
+  // AddMatch 走 add_match（规则登记在案，断线自愈重连后重放）。
+  self.add_match(
+    "type='signal',sender='org.freedesktop.DBus',interface='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.kde.StatusNotifierWatcher'",
+  )
   match
     self.call_sync(
       "org.freedesktop.DBus",
@@ -176,7 +163,7 @@ pub fn Item::unregister(self : Item) -> Unit {
   match g_conn.val {
     Some(c) => {
       // fire-and-forget：watcher 不在时调用会失败，无需关心
-      c.call(
+      let _ = c.call(
         watcher_name,
         "/StatusNotifierWatcher",
         "org.kde.StatusNotifierWatcher",

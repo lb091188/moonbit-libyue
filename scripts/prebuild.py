@@ -299,10 +299,19 @@ def link_configs() -> dict:
             "-lbsm", "-Wl,-dead_strip",
             "-lobjc", "-lc++", "-lpthread",
         ]
-    return {"link_configs": [{
-        "package": "NoahLiu/moonbit-libyue/yue",
-        "link_flags": core + " " + " ".join(extra),
-    }]}
+    # traybus 的 whitebox 测试目标直接引用 wire.mbt 的 f64 位转换 extern，
+    # 而 link_configs 按「依赖该包的目标」传播——traybus 不依赖 yue（反向），
+    # 须单列一份；静态库单成员引用 gtk 全套，flags 与主份一致
+    return {"link_configs": [
+        {
+            "package": "NoahLiu/moonbit-libyue/yue",
+            "link_flags": core + " " + " ".join(extra),
+        },
+        {
+            "package": "NoahLiu/moonbit-libyue/yue/traybus",
+            "link_flags": core + " " + " ".join(extra),
+        },
+    ]}
 
 
 def check_package_version() -> None:

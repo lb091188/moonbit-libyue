@@ -11,6 +11,8 @@ options(
     "sni.mbt": [ "native" ],
     "filemanager.mbt": [ "native" ],
     "inhibit.mbt": [ "native" ],
+    "upower.mbt": [ "native" ],
+    "upower_wbtest.mbt": [ "native" ],
     "icon.mbt": [ "native" ],
     "detect.mbt": [ "native" ],
     "wire_wbtest.mbt": [ "native" ],

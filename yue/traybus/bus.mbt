@@ -1,9 +1,11 @@
-// 会话总线连接：地址解析、SASL EXTERNAL 握手、Hello、消息收发与分发。
-// 单进程一条连接（glib fd 监视经 shim 只支持一路），全部运行在主线程。
+// 会话/系统总线连接：地址解析、SASL EXTERNAL 握手、Hello、消息收发与
+// 分发。每条总线一条连接（会话 + 系统可并存），fd 监视按 fd 路由，
+// 全部运行在主线程。
 
 ///|
 priv struct Conn {
   fd : Int
+  bus : Int // 0 = 会话总线 1 = 系统总线（断线自愈按此重连）
   mut serial : Int
   mut name : String // 本端唯一名 :1.x
   mut alive : Bool
@@ -12,11 +14,23 @@ priv struct Conn {
   items : Map[String, Item] // 对象路径 → 托盘项
   menus : Map[String, Item] // 菜单对象路径 → 托盘项（DBusMenu）
   pending : Map[Int, (Msg) -> Unit] // 串号 → 应答处理
-  mut match_added : Bool
+  subs : Map[String, Array[(Msg) -> Unit]] // "接口.成员" → 信号回调
+  match_rules : Array[String] // AddMatch 规则（断线重连后重放）
 }
 
 ///|
 let g_conn : Ref[Conn?] = Ref(None)
+
+///|
+let g_sys_conn : Ref[Conn?] = Ref(None)
+
+///|
+/// fd → 连接注册表（glib fd 监视按 fd 路由到所属连接）。
+let g_conns : Ref[Map[Int, Conn]] = Ref((Map([]) : Map[Int, Conn]))
+
+///|
+/// 断线时暂存的旧连接（重连成功后迁移订阅与托盘项）。
+let g_saved : Map[Int, Conn] = (Map([]) : Map[Int, Conn])
 
 ///|
 /// SNI 后端是否可用：能连上会话总线即视为候选；
@@ -58,6 +72,25 @@ fn session_bus_path() -> String? {
 }
 
 ///|
+/// 解析系统总线地址：DBUS_SYSTEM_BUS_ADDRESS 显式设置了但不是受支持的
+/// unix:path 形态时给显式错误（不静默回退，便于诊断）；未设置用发行版
+/// 通行默认路径。
+fn system_bus_path() -> Result[String, String] {
+  match env_get("DBUS_SYSTEM_BUS_ADDRESS") {
+    Some(addr) => {
+      for part in addr.split(",") {
+        let t = part.to_owned()
+        if t.has_prefix("unix:path=") {
+          return Ok(t[10:].to_owned())
+        }
+      }
+      Err("DBUS_SYSTEM_BUS_ADDRESS 不是受支持的 unix:path 地址: \{addr}")
+    }
+    None => Ok("/run/dbus/system_bus_socket")
+  }
+}
+
+///|
 fn hex_char(v : Int) -> Char {
   if v < 10 {
     (48 + v).unsafe_to_char() // '0'
@@ -87,20 +120,120 @@ pub fn conn_unique_name() -> String {
 }
 
 ///|
-/// glib 主循环 fd 回调：无捕获顶层函数（跨 ABI 约定）。
+/// glib 主循环 fd 回调：无捕获顶层函数（跨 ABI 约定），按 fd 路由到
+/// 所属连接（会话/系统可并存）。
 fn on_bus_ready(fd : Int, cond : Int) -> Int {
-  ignore(fd)
-  match g_conn.val {
-    Some(c) => {
+  match g_conns.val.get(fd) {
+    Some(c) =>
       if (cond & 24) != 0 {
         // G_IO_ERR | G_IO_HUP：总线断开
-        c.alive = false
+        c.mark_dead()
+        0 // 撤 source
       } else {
         c.drain()
+        if c.alive {
+          1
+        } else {
+          // drain 内判死（EOF 等）：统一走自愈入口
+          c.mark_dead()
+          0
+        }
       }
-      1 // 保持 source
+    None => 0
+  }
+}
+
+///|
+/// 标记连接死亡。已挂入主循环的连接顺带注销监视、关闭 fd、调度自愈
+/// （幂等）；握手阶段（未入注册表）只置死——fd 清理是 connect_unix
+/// 错误分支的职责。
+fn Conn::mark_dead(self : Conn) -> Unit {
+  self.alive = false
+  if g_conns.val.contains(self.fd) {
+    let _ = g_conns.val.remove(self.fd)
+    sys_unwatch_fd(self.fd)
+    sys_close(self.fd)
+    g_saved.set(self.bus, self)
+    schedule_reconnect(self.bus)
+  }
+}
+
+///|
+/// 延迟重连：避开 fd 回调现场，投回主循环执行。
+fn schedule_reconnect(bus : Int) -> Unit {
+  if bus == 0 {
+    g_conn.val = None
+  }
+  if bus == 1 {
+    g_sys_conn.val = None
+  }
+  sys_post_delayed(500, fn(f) { f() }, fn() { try_reconnect(bus, 1) })
+}
+
+///|
+/// 自愈重连（最多 3 次）：成功后重放 AddMatch、迁移订阅与托盘项。
+fn try_reconnect(bus : Int, attempt : Int) -> Unit {
+  if attempt > 3 {
+    return
+  }
+  let nc = match bus {
+    0 =>
+      match connect_session() {
+        Ok(c) => {
+          g_conn.val = Some(c)
+          c
+        }
+        Err(_) =>
+          // 换回环里再试；主循环未运行时（纯 CLI 场景）回调不触发，自然放弃
+          {
+            sys_post_delayed(
+              1000,
+              fn(f) { f() },
+              fn() { try_reconnect(bus, attempt + 1) },
+            )
+            return
+          }
+      }
+    _ =>
+      match connect_system() {
+        Ok(c) => {
+          g_sys_conn.val = Some(c)
+          c
+        }
+        Err(_) => {
+          sys_post_delayed(
+            1000,
+            fn(f) { f() },
+            fn() { try_reconnect(bus, attempt + 1) },
+          )
+          return
+        }
+      }
+  }
+  match g_saved.get(bus) {
+    Some(old) => {
+      // 订阅表与 match 规则迁移到新连接
+      for k, arr in old.subs {
+        nc.subs.set(k, arr)
+      }
+      for rule in old.match_rules {
+        nc.add_match(rule)
+      }
+      if bus == 0 {
+        // 托盘项迁移并重新注册（断线期间 watcher 已按名字消失清掉旧注册）
+        for k, it in old.items {
+          nc.items.set(k, it)
+        }
+        for k, it in old.menus {
+          nc.menus.set(k, it)
+        }
+        for k, _ in nc.items {
+          let _ = nc.register_item_path(k)
+        }
+      }
+      let _ = g_saved.remove(bus)
     }
-    None => 1
+    None => ()
   }
 }
 
@@ -113,12 +246,45 @@ fn connect_session() -> Result[Conn, String] {
         "找不到会话总线地址（DBUS_SESSION_BUS_ADDRESS / XDG_RUNTIME_DIR 未设置）",
       )
   }
+  connect_unix(path, 0)
+}
+
+///|
+fn connect_system() -> Result[Conn, String] {
+  let path = match system_bus_path() {
+    Ok(p) => p
+    Err(e) => return Err(e)
+  }
+  connect_unix(path, 1)
+}
+
+///|
+/// 系统总线连接（电源/会话/网络监视共用；连接断开时调用方收到错误，
+/// 自愈在后台重连）。
+fn system_conn() -> Result[Conn, String] {
+  match g_sys_conn.val {
+    Some(c) => if c.alive { Ok(c) } else { Err("系统总线连接已断开") }
+    None =>
+      match connect_system() {
+        Ok(c) => {
+          g_sys_conn.val = Some(c)
+          Ok(c)
+        }
+        Err(e) => Err(e)
+      }
+  }
+}
+
+///|
+/// 连接一条总线（SASL EXTERNAL 握手 + Hello + 挂入主循环）。
+fn connect_unix(path : String, bus : Int) -> Result[Conn, String] {
   let fd = sys_unix_connect(utf8(path))
   if fd < 0 {
-    return Err("无法连接会话总线: \{path}")
+    return Err("无法连接总线 socket: \{path}")
   }
   let c : Conn = {
     fd,
+    bus,
     serial: 0,
     name: "",
     alive: true,
@@ -127,7 +293,8 @@ fn connect_session() -> Result[Conn, String] {
     items: (Map([]) : Map[String, Item]),
     menus: (Map([]) : Map[String, Item]),
     pending: (Map([]) : Map[Int, (Msg) -> Unit]),
-    match_added: false,
+    subs: (Map([]) : Map[String, Array[(Msg) -> Unit]]),
+    match_rules: [],
   }
   // SASL EXTERNAL：凭据是十六进制编码的 uid 字符串
   let uid = sys_getuid()
@@ -174,7 +341,9 @@ fn connect_session() -> Result[Conn, String] {
       return Err("Hello 失败: \{e}")
     }
   }
-  // 挂入 GTK 主循环：可读 + 错误 + 挂断
+  // 挂入 GTK 主循环：可读 + 错误 + 挂断；先入注册表再挂监视，
+  // 避免回调先到时查不到连接
+  g_conns.val.set(fd, c)
   let _ = sys_watch_fd(fd, 1 | 8 | 16, fn(fd, cond) { on_bus_ready(fd, cond) })
   Ok(c)
 }
@@ -242,7 +411,7 @@ fn Conn::next_serial(self : Conn) -> Int {
 }
 
 ///|
-/// 发出方法调用并登记应答处理。
+/// 发出方法调用并登记应答处理，返回串号（超时方据此摘除 pending）。
 fn Conn::call(
   self : Conn,
   dest : String,
@@ -252,7 +421,7 @@ fn Conn::call(
   sig : String,
   args : Array[DVal],
   cb : (Msg) -> Unit,
-) -> Unit {
+) -> Int {
   let s = self.next_serial()
   self.pending[s] = cb
   match build_call(s, dest, path, iface, action, sig, args) {
@@ -265,10 +434,12 @@ fn Conn::call(
       let _ = self.pending.remove(s)
     }
   }
+  s
 }
 
 ///|
-/// 同步调用：pump 总线直到应答或超时。
+/// 同步调用：pump 总线直到应答或超时。超时也摘除 pending——应答迟到
+/// 时串号已回收，不会误触发后续同串号调用的处理。
 fn Conn::call_sync(
   self : Conn,
   dest : String,
@@ -280,14 +451,53 @@ fn Conn::call_sync(
 ) -> Result[Msg, String] {
   let done = Ref(false)
   let resp : Ref[Msg?] = Ref(None)
-  self.call(dest, path, iface, action, sig, args, fn(m) {
+  let s = self.call(dest, path, iface, action, sig, args, fn(m) {
     resp.val = Some(m)
     done.val = true
   })
   let _ = self.pump_until(done, 1500)
+  if resp.val is None {
+    let _ = self.pending.remove(s)
+  }
   match resp.val {
     Some(m) => if m.kind == 3 { Err(m.error_name) } else { Ok(m) }
     None => Err("总线应答超时: \{iface}.\{action}")
+  }
+}
+
+///|
+/// 添加 match 规则（AddMatch 是方法调用，此前误发成广播信号被总线忽略
+/// 的教训见 sni.mbt）。规则登记在案，断线自愈重连后重放。
+fn Conn::add_match(self : Conn, rule : String) -> Unit {
+  if self.match_rules.contains(rule) {
+    return
+  }
+  self.match_rules.push(rule)
+  let _ = self.call(
+    "org.freedesktop.DBus",
+    "/org/freedesktop/DBus",
+    "org.freedesktop.DBus",
+    "AddMatch",
+    "s",
+    [VString(rule)],
+    fn(_m) { () },
+  )
+}
+
+///|
+/// 订阅信号：rule 为完整 match 规则串，key 为分发键 "接口.成员"
+/// （sender/argN 过滤由回调自查——UPower 的 PropertiesChanged 靠
+/// arg0 区分，回调里比对更直观）。同一 key 可多次订阅。
+fn Conn::subscribe(
+  self : Conn,
+  rule : String,
+  key : String,
+  cb : (Msg) -> Unit,
+) -> Unit {
+  self.add_match(rule)
+  match self.subs.get(key) {
+    Some(arr) => arr.push(cb)
+    None => self.subs.set(key, [cb])
   }
 }
 
@@ -352,7 +562,7 @@ fn Conn::pump_until(self : Conn, done : Ref[Bool], timeout_ms : Int) -> Bool {
     left -= slice
     if r > 0 {
       if (r & 24) != 0 {
-        self.alive = false
+        self.mark_dead()
         return false
       }
       self.drain()
@@ -376,12 +586,12 @@ fn Conn::drain(self : Conn) -> Unit {
         }
       }
     } else if n == 0 {
-      self.alive = false
+      self.mark_dead() // EOF：对端关闭
       return
     } else if n == -1 {
       return // 暂无数据
     } else {
-      self.alive = false
+      self.mark_dead()
       return
     }
   }
@@ -455,7 +665,7 @@ fn Conn::handle(self : Conn, msg : Msg) -> Unit {
     return
   }
   if msg.kind == 4 {
-    // 信号：watcher 重启后重注册
+    // 信号：watcher 重启后重注册（SNI 既有特判在前）
     if msg.action == "NameOwnerChanged" && msg.body.length() >= 3 {
       match dstr(msg.body[0]) {
         Some(watched) =>
@@ -478,7 +688,15 @@ fn Conn::handle(self : Conn, msg : Msg) -> Unit {
       }
     }
     if msg.action == "Disconnected" {
-      self.alive = false
+      self.mark_dead()
+      return
+    }
+    // 订阅注册表分发在后：按 "接口.成员" 查回调
+    if msg.iface != "" && msg.action != "" {
+      match self.subs.get("\{msg.iface}.\{msg.action}") {
+        Some(arr) => for cb in arr { cb(msg) }
+        None => ()
+      }
     }
     return
   }

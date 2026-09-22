@@ -1876,6 +1876,17 @@ extern "c" fn ffi_win_keep_awake_enable(ok : Ref[Int]) -> Int = "yue_mbt_win_kee
 extern "c" fn ffi_win_keep_awake_restore(ok : Ref[Int]) -> Int = "yue_mbt_win_keep_awake_restore"
 
 ///|
+/// Windows:GetSystemPowerStatus;出参 ac(0/1)/percent(-1 未知)/charging/
+/// has_battery;返回 0 成功、-1 失败、-1000 非 Windows。
+#borrow(ac, percent, charging, has_battery)
+extern "c" fn ffi_win_power_status(
+  ac : Ref[Int],
+  percent : Ref[Int],
+  charging : Ref[Int],
+  has_battery : Ref[Int],
+) -> Int = "yue_mbt_win_power_status"
+
+///|
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，
 // FFI 边界上一律转成 C 侧期望的 UTF-8，转换成本留在库内。
 fn utf8_bytes(text : String) -> Bytes {

@@ -776,6 +776,27 @@ int32_t yue_mbt_open_url(const char *url, int32_t *ok);
 /* Windows:explorer /select 选中文件;非 Windows 哨兵 -1000 */
 int32_t yue_mbt_win_reveal_file(const char *path, int32_t *ok);
 
+/* ---------- 屏幕常亮与用户空闲 ---------- */
+
+/* 用户空闲毫秒数（无 X 会话/Wayland/加载失败 ok=0） */
+int32_t yue_mbt_idle_seconds_ms(int32_t *ok);
+/* Windows:SetThreadExecutionState(ES_CONTINUOUS|ES_DISPLAY_REQUIRED);非 Windows 哨兵 -1000 */
+int32_t yue_mbt_win_keep_awake_enable(int32_t *ok);
+/* Windows:还原线程执行状态;非 Windows 哨兵 -1000 */
+int32_t yue_mbt_win_keep_awake_restore(int32_t *ok);
+
+/* ---------- 系统总线基建与电源 ---------- */
+
+/* 撤销 fd 监视（与 yue_mbt_sys_watch_fd 配对） */
+void yue_mbt_sys_unwatch_fd(int32_t fd);
+/* Double ↔ IEEE 754 位模式（DBus 'd' 编解码,纯位重解释） */
+int64_t yue_mbt_sys_f64_to_bits(double v);
+double yue_mbt_sys_f64_from_bits(int64_t bits);
+/* Windows:GetSystemPowerStatus（出参 ac_online/percent/charging/has_battery,
+   percent 未知 -1）;失败 -1,非 Windows 哨兵 -1000 */
+int32_t yue_mbt_win_power_status(int32_t *ac_online, int32_t *percent,
+                                 int32_t *charging, int32_t *has_battery);
+
 /* ---------- 探测示例(examples/probe) ---------- */
 
 void yue_mbt_probe_env(void *window);

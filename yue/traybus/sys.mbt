@@ -35,6 +35,28 @@ extern "c" fn sys_watch_fd(
 ) -> Int = "yue_mbt_sys_watch_fd"
 
 ///|
+/// 撤销 fd 监视（与 sys_watch_fd 配对）。
+extern "c" fn sys_unwatch_fd(fd : Int) -> Unit = "yue_mbt_sys_unwatch_fd"
+
+///|
+/// Double → IEEE 754 位模式（DBus 'd' 编码）。
+extern "c" fn sys_f64_to_bits(v : Double) -> Int64 = "yue_mbt_sys_f64_to_bits"
+
+///|
+/// IEEE 754 位模式 → Double（DBus 'd' 解码）。
+extern "c" fn sys_f64_from_bits(bits : Int64) -> Double = "yue_mbt_sys_f64_from_bits"
+
+///|
+/// 延迟任务（与 yue 的 post_delayed_task 同一 shim 入口）：断线自愈的
+/// 重连须避开 fd 回调现场，投回主循环延迟执行。
+#borrow(invoke, callback)
+extern "c" fn sys_post_delayed(
+  ms : Int,
+  invoke : FuncRef[(() -> Unit) -> Unit],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_post_delayed_task"
+
+///|
 #borrow(name, out)
 extern "c" fn sys_getenv(name : Bytes, out : Bytes, out_len : Int) -> Int = "yue_mbt_sys_getenv"
 
