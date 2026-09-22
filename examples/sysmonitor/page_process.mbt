@@ -5,7 +5,7 @@
 // 的 1Hz sample_once 写入的 app.procs。
 
 ///|
-/// 进程排序列（列头点击切换；状态与命令行列不参与排序）。
+/// 进程排序列（列头索引经 sort_of_col 映射；状态与命令行列不参与排序）。
 pub(all) enum ProcSort {
   ByPid
   ByName
@@ -13,19 +13,6 @@ pub(all) enum ProcSort {
   ByMem
   ByNice
   ByThreads
-}
-
-///|
-/// 排序列 → 稳定整数编号（枚举未派生 Eq，比较走编号）。
-fn sort_id(by : ProcSort) -> Int {
-  match by {
-    ByPid => 0
-    ByName => 1
-    ByCpu => 2
-    ByMem => 3
-    ByNice => 4
-    ByThreads => 5
-  }
 }
 
 ///|
@@ -147,7 +134,6 @@ fn sort_of_col(j : Int) -> ProcSort? {
     _ => None
   }
 }
-
 ///|
 /// 排序方向文案（工具栏 / 状态行显示）。
 fn sort_text(by : ProcSort, asc : Bool) -> String {
@@ -164,15 +150,16 @@ fn sort_text(by : ProcSort, asc : Bool) -> String {
 
 ///|
 /// 页面状态：派生表格数据 + 过滤 / 排序条件 + 操作消息。
+/// 排序条件走 @yue.TableSort Store（表头点击由 table_v_t 组件内切换，
+/// 本页订阅后重建数据），箭头显示与点击切换因此对组件透明。
 struct ProcPage {
   rows : @yue.Store[Array[@yue.TableRow]]
   sel : @yue.Store[Array[Int]]
   msg : @yue.Store[String]
   status : @yue.Store[String]
+  sort : @yue.Store[@yue.TableSort]
   mut pids : Array[Int]
   mut query : String
-  mut sort_by : ProcSort
-  mut sort_asc : Bool
   mut nice_text : String
 }
 
@@ -188,7 +175,11 @@ fn ProcPage::rebuild(self : ProcPage, procs : Array[ProcInfo]) -> Unit {
     }
   }
   let filtered = filter_procs(procs, self.query)
-  let sorted = sort_procs(filtered, self.sort_by, self.sort_asc)
+  let st = self.sort.get()
+  let sorted = match sort_of_col(st.column) {
+    None => filtered
+    Some(by) => sort_procs(filtered, by, st.asc)
+  }
   let rows : Array[@yue.TableRow] = []
   let pids : Array[Int] = []
   for p in sorted {
@@ -208,8 +199,12 @@ fn ProcPage::rebuild(self : ProcPage, procs : Array[ProcInfo]) -> Unit {
     }
   }
   self.sel.set(new_sel)
+  let sort_desc = match sort_of_col(st.column) {
+    None => "未排序"
+    Some(by) => sort_text(by, st.asc)
+  }
   self.status.set(
-    "共 \{pids.length()} 个进程（过滤自 \{procs.length()}）· 选中 \{new_sel.length()} · 排序 \{sort_text(self.sort_by, self.sort_asc)}",
+    "共 \{pids.length()} 个进程（过滤自 \{procs.length()}）· 选中 \{new_sel.length()} · 排序 \{sort_desc}",
   )
 }
 
@@ -293,25 +288,27 @@ fn page_process(app : App) -> @yue.Node {
     sel: @yue.Store::new([]),
     msg: @yue.Store::new("选中行后可结束进程 / 调整 nice；数据 1Hz 增量刷新。"),
     status: @yue.Store::new("采样中…"),
+    // 初始排序：CPU% 降序（列 3）
+    sort: @yue.Store::new(@yue.TableSort::{ column: 3, asc: false }),
     pids: [],
     query: "",
-    sort_by: ByCpu,
-    sort_asc: false,
     nice_text: "10",
   }
   // 初始数据 + 订阅 1Hz 刷新（增量：只重算派生数据，不重建视图树）
   page.rebuild(app.procs.get())
   app.procs.subscribe(fn(procs) { page.rebuild(procs) })
+  // 表头排序点击（table_v_t 组件内切换 Store）→ 重建数据
+  page.sort.subscribe(fn(_s) { page.rebuild(app.procs.get()) })
 
   let columns = [
     @yue.TableColumn::make("PID", 86.0, align=@yue.End),
     @yue.TableColumn::make("进程名", 150.0),
-    @yue.TableColumn::make("状态", 56.0, align=@yue.Center),
+    @yue.TableColumn::make("状态", 56.0, align=@yue.Center, sortable=false),
     @yue.TableColumn::make("CPU%", 72.0, align=@yue.End),
     @yue.TableColumn::make("内存", 96.0, align=@yue.End),
     @yue.TableColumn::make("nice", 56.0, align=@yue.End),
     @yue.TableColumn::make("线程", 56.0, align=@yue.End),
-    @yue.TableColumn::make("命令行", 0.0),
+    @yue.TableColumn::make("命令行", 0.0, sortable=false),
   ]
   @yue.vbox(
     [
@@ -323,7 +320,6 @@ fn page_process(app : App) -> @yue.Node {
           @yue.input_t(
             text=page.query,
             width=220.0,
-            height=28.0,
             clearable=true,
             on_input=fn(s) {
               page.query = s
@@ -339,7 +335,6 @@ fn page_process(app : App) -> @yue.Node {
           @yue.input_t(
             text=page.nice_text,
             width=72.0,
-            height=28.0,
             on_input=fn(s) { page.nice_text = s },
           ),
           @yue.button_t("设 nice", variant=@yue.Soft, on_click=fn() {
@@ -362,20 +357,7 @@ fn page_process(app : App) -> @yue.Node {
         height=520.0,
         row_height=30.0,
         selection=page.sel,
-        on_header_click=fn(j) {
-          match sort_of_col(j) {
-            None => ()
-            Some(by) => {
-              if sort_id(by) == sort_id(page.sort_by) {
-                page.sort_asc = !page.sort_asc
-              } else {
-                page.sort_by = by
-                page.sort_asc = false
-              }
-              page.rebuild(app.procs.get())
-            }
-          }
-        },
+        sort=page.sort,
       ),
       @yue.label_t(
         page.status.get(),

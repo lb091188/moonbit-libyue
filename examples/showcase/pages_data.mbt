@@ -3,13 +3,72 @@
 // 参数类型),选中回显等标量走信号。
 
 ///|
+/// 表格单元格的排序键(演示排序用:演示表格只有 CellText,其余取空串)。
+fn cell_key(v : @yue.TableCell) -> String {
+  match v {
+    @yue.CellText(s) => s
+    _ => ""
+  }
+}
+
+///|
+/// 演示用的无符号数字串比较(序号列):无前导零时「先比长度再比
+/// 字典序」即数值序,省得为例子引 parse 依赖。
+fn cmp_num_str(a : String, b : String) -> Int {
+  if a.length() != b.length() {
+    if a.length() < b.length() {
+      -1
+    } else {
+      1
+    }
+  } else if a < b {
+    -1
+  } else if a > b {
+    1
+  } else {
+    0
+  }
+}
+
+///|
 fn page_data(app : App) -> @yue.Node {
-  let table_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new([
+  // 语言表基础数据 + 排序显示数据(表头点击写 sort,订阅里重排)
+  let lang_base = [
     @yue.TableRow::make(["MoonBit", "2023", "多范式,云 + 端"]),
     @yue.TableRow::make(["Rust", "2015", "系统编程"]),
     @yue.TableRow::make(["Go", "2012", "云原生后端"]),
     @yue.TableRow::make(["TypeScript", "2012", "前端大规模工程"]),
-  ])
+  ]
+  let table_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new(lang_base)
+  let table_sort : @yue.Store[@yue.TableSort] = @yue.Store::new(
+    @yue.TableSort::{ column: -1, asc: true },
+  )
+  fn reorder_langs() -> Unit {
+    let st = table_sort.get()
+    if st.column < 0 || st.column >= lang_base[0].cells.length() {
+      table_rows.set(lang_base)
+      return
+    }
+    let rows = lang_base.copy()
+    rows.mut_view().sort_by(fn(a, b) {
+      let ka = cell_key(a.cells[st.column])
+      let kb = cell_key(b.cells[st.column])
+      let c = if ka < kb {
+        -1
+      } else if ka > kb {
+        1
+      } else {
+        0
+      }
+      if st.asc {
+        c
+      } else {
+        -c
+      }
+    })
+    table_rows.set(rows)
+  }
+  table_sort.subscribe(fn(_st) { reorder_langs() })
   let table_picked = @yue.Signal::new("未选中")
   let table_sel : @yue.Store[Array[Int]] = @yue.Store::new([])
   let rich_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new([
@@ -56,6 +115,36 @@ fn page_data(app : App) -> @yue.Node {
     )
   }
   let v_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new(v_rows_data)
+  // 虚拟表排序:序号列(0)按数值,其余按文本;表头点击写 Store,订阅里重排
+  let v_sort : @yue.Store[@yue.TableSort] = @yue.Store::new(
+    @yue.TableSort::{ column: -1, asc: true },
+  )
+  v_sort.subscribe(fn(st) {
+    if st.column < 0 || st.column >= 4 {
+      v_rows.set(v_rows_data)
+      return
+    }
+    let rows = v_rows_data.copy()
+    rows.mut_view().sort_by(fn(a, b) {
+      let ka = cell_key(a.cells[st.column])
+      let kb = cell_key(b.cells[st.column])
+      let c = if st.column == 0 {
+        cmp_num_str(ka, kb)
+      } else if ka < kb {
+        -1
+      } else if ka > kb {
+        1
+      } else {
+        0
+      }
+      if st.asc {
+        c
+      } else {
+        -c
+      }
+    })
+    v_rows.set(rows)
+  })
   let transfer_left : @yue.Store[Array[String]] = @yue.Store::new([
     "北京", "上海", "广州",
   ])
@@ -174,8 +263,8 @@ fn page_data(app : App) -> @yue.Node {
       ],
     ),
     section(
-      "Table 表格(单选)",
-      "表头 + 斑马纹 + 悬停底色,点击行单选;Store 驱动「添加一行」整表重建,选中行信号回显。",
+      "Table 表格(单选 + 排序 + 列宽拖动)",
+      "表头 + 斑马纹 + 悬停底色,点击行单选;点击表头排序(升降序箭头,新列默认升序),拖动列边界调整列宽;Store 驱动「添加一行」整表重建,选中行信号回显。",
       [
         @yue.table_t(
           [
@@ -185,6 +274,7 @@ fn page_data(app : App) -> @yue.Node {
           ],
           table_rows,
           width=440.0,
+          sort=table_sort,
           on_row_click=fn(i, r) {
             let name = match r.cells[0] {
               @yue.CellText(s) => s
@@ -196,12 +286,11 @@ fn page_data(app : App) -> @yue.Node {
         @yue.hbox(
           [
             @yue.button_t("添加一行", on_click=fn() {
-              let n = table_rows.get().length() + 1
-              let grown = table_rows.get().copy()
-              grown.push(
+              let n = lang_base.length() + 1
+              lang_base.push(
                 @yue.TableRow::make(["新语言 \{n}", "2026", "演示 Store 驱动"]),
               )
-              table_rows.set(grown)
+              reorder_langs()
             }),
             @yue.label("   "),
             @yue.bind(table_picked, fn(s) { s }),
@@ -257,8 +346,8 @@ fn page_data(app : App) -> @yue.Node {
       ],
     ),
     section(
-      "Table 虚拟滚动",
-      "整面自绘只画可见行,万行流畅;滚轮/拖右侧滚动条/键盘 ↑↓ PageUp PageDown 翻页。",
+      "Table 虚拟滚动(排序 + 列宽拖动)",
+      "整面自绘只画可见行,万行流畅;点击表头排序(序号列按数值),拖动列边界调整列宽;滚轮/拖右侧滚动条/键盘 ↑↓ PageUp PageDown 翻页。",
       [
         @yue.table_v_t(
           [
@@ -269,6 +358,7 @@ fn page_data(app : App) -> @yue.Node {
           ],
           v_rows,
           height=220.0,
+          sort=v_sort,
         ),
       ],
     ),
