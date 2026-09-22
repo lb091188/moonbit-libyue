@@ -4,6 +4,10 @@ import {
   "NoahLiu/moonbit-libyue/yue/traybus",
 }
 
+import {
+  "moonbitlang/core/env",
+} for "wbtest"
+
 options(
   "native-stub": ["win_gui.c"],
   targets: { "ffi.mbt": [ "native" ] },
