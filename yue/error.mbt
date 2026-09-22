@@ -65,3 +65,41 @@ pub impl Show for AutostartError with fn output(self, logger) {
 
 ///|
 pub extend AutostartError with Show::{to_string, output}
+
+///|
+pub(all) enum OpenUrlError {
+  /// 平台不支持（macOS 暂缓）
+  Unsupported
+  /// 交给系统的 spawn 失败
+  SpawnFailed
+}
+
+///|
+pub impl Show for OpenUrlError with fn output(self, logger) {
+  match self {
+    Unsupported => logger.write_string("OpenUrlError::Unsupported")
+    SpawnFailed => logger.write_string("OpenUrlError::SpawnFailed")
+  }
+}
+
+///|
+pub extend OpenUrlError with Show::{to_string, output}
+
+///|
+pub(all) enum FileManagerError {
+  /// 平台不支持（macOS 暂缓）
+  Unsupported
+  /// 回退 spawn 也失败
+  SpawnFailed
+}
+
+///|
+pub impl Show for FileManagerError with fn output(self, logger) {
+  match self {
+    Unsupported => logger.write_string("FileManagerError::Unsupported")
+    SpawnFailed => logger.write_string("FileManagerError::SpawnFailed")
+  }
+}
+
+///|
+pub extend FileManagerError with Show::{to_string, output}

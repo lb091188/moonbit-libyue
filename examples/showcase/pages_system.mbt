@@ -314,5 +314,28 @@ fn page_system(app : App) -> @yue.Node {
       ],
     ),
   )
+  // 打开外部:URL 交默认浏览器,文件管理器选中(README.md 相对工作目录解析)
+  secs.push(
+    section(
+      "打开外部",
+      "open_url / reveal_in_file_manager 统一入口:Linux xdg-open 与 FileManager1.ShowItems(不在线回退父目录),Windows ShellExecuteW 与 explorer /select。Ok 只表示已交给系统。",
+      [
+        @yue.hbox([
+          @yue.button_t("打开 libyue.com", on_click=fn() {
+            match @yue.open_url("https://libyue.com") {
+              Ok(_) => app.toast_push("已交给系统打开", @yue.Success)
+              Err(e) => app.toast_push("失败:\{e}", @yue.Danger)
+            }
+          }),
+          @yue.button_t("在文件管理器中显示 README.md", on_click=fn() {
+            match @yue.reveal_in_file_manager("README.md") {
+              Ok(_) => app.toast_push("已交给文件管理器", @yue.Success)
+              Err(e) => app.toast_push("失败:\{e}", @yue.Danger)
+            }
+          }),
+        ]),
+      ],
+    ),
+  )
   scroll_page(secs)
 }

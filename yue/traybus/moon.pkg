@@ -9,9 +9,11 @@ options(
     "bus.mbt": [ "native" ],
     "instance.mbt": [ "native" ],
     "sni.mbt": [ "native" ],
+    "filemanager.mbt": [ "native" ],
     "icon.mbt": [ "native" ],
     "detect.mbt": [ "native" ],
     "wire_wbtest.mbt": [ "native" ],
     "instance_wbtest.mbt": [ "native" ],
+    "filemanager_wbtest.mbt": [ "native" ],
   },
 )
