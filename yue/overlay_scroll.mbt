@@ -105,7 +105,7 @@ pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
     if !vis.val || thumb_len.val <= 0.0 {
       return
     }
-    p.set_fill_color(theme_border() + alpha.val)
+    p.set_fill_color(with_alpha(theme_border(), alpha.val))
     fill_round_rect(p, 0.0, gy.val, 6.0, thumb_len.val, 3.0)
   })
   ViewLike::on_mouse_enter(thumb, fn(_e) {

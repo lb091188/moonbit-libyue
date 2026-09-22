@@ -104,6 +104,26 @@ pub fn parse_hex(hex : String) -> (Int, Int, Int)? {
 }
 
 ///|
+/// 拼 alpha 色为 "#AARRGGBB":hex 传 "#RRGGBB"(容忍无 '#'),aa 传两
+/// 位十六进制不透明度。8 位 hex 的 alpha 在前(libyue Color 与上方
+/// parse_hex 同一约定,与 CSS 的 #RRGGBBAA 相反)——拼在尾部会落到
+/// 蓝分量,表现为颜色漂移而非透明度变化(渐隐变黄即此坑)。
+pub fn with_alpha(hex : String, aa : String) -> String {
+  let body = StringBuilder()
+  let mut skip_hash = true
+  for c in hex {
+    if skip_hash {
+      skip_hash = false
+      if c == '#' {
+        continue
+      }
+    }
+    body.write_char(c)
+  }
+  "#" + aa + body.to_string()
+}
+
+///|
 /// 钳制到 0..255。
 fn clamp8(v : Int) -> Int {
   if v < 0 {

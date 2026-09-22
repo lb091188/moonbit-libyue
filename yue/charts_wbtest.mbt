@@ -472,7 +472,7 @@ test "图表每帧几何调用耗时（离屏 Canvas, release 计时）" {
         459.0
       }
       let anchor = area_anchor(0.0, 100.0, 12.0, 242.0)
-      p.set_fill_color(color + "26")
+      p.set_fill_color(with_alpha(color, "26"))
       for col in cols {
         let (cx, ymin, ymax) = col
         if ymax < anchor - 0.01 {

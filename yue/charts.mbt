@@ -746,7 +746,7 @@ fn draw_line_chart(
       // 折线模式画 min..max 竖条（等效极值包络）。
       if area {
         let anchor = area_anchor(lo, hi, y0, y1)
-        p.set_fill_color(color + "26")
+        p.set_fill_color(with_alpha(color, "26"))
         for col in cols {
           let (cx, ymin, ymax) = col
           if ymax < anchor - 0.01 {
@@ -767,7 +767,7 @@ fn draw_line_chart(
       // 稀疏：真实折线 + 多边形面积（点数 <= 像素列，成本可忽略）
       let anchor = area_anchor(lo, hi, y0, y1)
       if area {
-        p.set_fill_color(color + "26")
+        p.set_fill_color(with_alpha(color, "26"))
         p.begin_path()
         p.move_to(cols[0].0, anchor)
         for col in cols {
