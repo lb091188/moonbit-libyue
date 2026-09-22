@@ -55,6 +55,7 @@ Methodology: Ubuntu 24.04 XFCE (X11), same machine and session; the startup delt
 
 - Built-in layout assertions pass 16/16 (±1px); composition rules: content area = container − 2×padding; gap does not stack with margin; percentages resolve against the parent content width.
 - Composite widgets (Tab / Scroll / Group) are measure-less leaf nodes in the yoga tree: their outer size must be given explicitly (e.g. `flex:1`) or they collapse (Tab freezes its minimum size at construction, driving the page area to zero).
+- tabs_t once hard-coded the outer width to 360px and gave content pages no flex: any Scroll / Table placed inside collapsed to zero (measured: the sysmonitor overview page rendered completely blank except the tab strip). Fix: outer drops the fixed width in favor of `flex:1` (stretch gets the width in a column parent; fills when the parent has a definite height) and content pages get `flex:1` too. When the parent has no definite height flex does not grow, so embedded usage (the showcase section) is unchanged.
 - GUI automation: prefer keyboard (Tab focus + Space activate); `xdotool key --window` sends XSendEvent events that GTK drops — use XTEST (no --window); coordinate clicks are unreliable due to WM decoration offsets.
 
 ### MoonBit ↔ C ABI

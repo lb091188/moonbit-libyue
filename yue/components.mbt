@@ -5497,8 +5497,11 @@ pub fn tabs_t(
         None => Store::new(0)
       }
       let fnt = Font::new("Sans", 13.0)
+      // 宽度随父容器拉伸(列容器默认 stretch),不写死:概览页要放
+      // 全宽图表;flex 让页区在父容器有确定高度时填充(Scroll 等无
+      // measure 的叶节点靠这个拿到确定高度,否则塌缩归零)
       let outer = themed_container(
-        style=[("width", 360.0), ("marginBottom", 10.0)],
+        style=[("flex", 1.0), ("marginBottom", 10.0)],
         style_str=[("flexDirection", "column")],
       )
       let head = themed_container(
@@ -5556,8 +5559,10 @@ pub fn tabs_t(
           ViewLike::schedule_paint(tab)
         })
         head.add_child(tab)
-        // 内容页:默认只显示当前页
+        // 内容页:默认只显示当前页;flex 让页区填充 outer 的确定高度
+        // (Scroll / Table 等无 measure 叶节点依赖父级确定高度)
         let page_c = themed_container(
+          style=[("flex", 1.0)],
           style_str=[("flexDirection", "column")],
         )
         ViewLike::set_visible(page_c, cur.val == idx)
