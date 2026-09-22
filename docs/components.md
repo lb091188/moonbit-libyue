@@ -285,6 +285,25 @@ let sep = @yue.Separator::make(Horizontal)   // or Vertical
 | Scroll::set_content_size(w, h) | Explicitly set content size |
 | Scroll::set_scroll_position(h, v) | Set scroll position |
 | Scroll::set_scrollbar_policy(h, v) / set_overlay_scrollbar(b) | Scrollbars |
+| Scroll::get_scroll_position_x/y() / get_max_scroll_position_x/y() | Read position and max scroll amount |
+| Scroll::on_scroll(fn() -> Bool) | Scroll position changed (wheel / drag / programmatic; return true to intercept) |
+
+## Overlay Scrollbar (OverlayScroll)
+
+A declarative node that hides the platform scrollbar and overlays a self-drawn themed slim thumb on the content's right edge: appears on scroll / hover, fades out in two steps after about 1s of inactivity, draggable along the track (the native Windows scrollbar is the classic always-visible style that reserves layout space; this component unifies all three platforms on the floating form).
+
+```moonbit
+@yue.overlay_scroll(
+  @yue.vbox([@yue.label("Line 1"), /* ... */]),
+  style=[("height", 180.0)],   // container style; height comes from outer layout or is explicit
+)
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| content | Node | required | Scroll content (declarative node) |
+| style / style_str | arrays | [] | Outer container styles |
+| handle | (Scroll) -> Unit | no-op | Access the inner Scroll for programmatic scrolling |
 
 ## Tab
 

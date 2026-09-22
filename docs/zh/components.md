@@ -285,6 +285,25 @@ let sep = @yue.Separator::make(Horizontal)   // 或 Vertical
 | Scroll::set_content_size(w, h) | 显式设内容尺寸 |
 | Scroll::set_scroll_position(h, v) | 设滚动位置 |
 | Scroll::set_scrollbar_policy(h, v) / set_overlay_scrollbar(b) | 滚动条 |
+| Scroll::get_scroll_position_x/y() / get_max_scroll_position_x/y() | 读位置与最大滚动量 |
+| Scroll::on_scroll(fn() -> Bool) | 滚动位置变化（滚轮/拖拽/程序滚动统一触发；返回 true 拦截默认处理） |
+
+## 悬浮滚动条 OverlayScroll
+
+声明式节点，隐藏平台滚动条，自绘主题色悬浮细条叠在内容右缘：滚动/悬停浮现，停顿约 1 秒两级渐隐，可沿轨道拖拽（Windows 平台原生滚动条为经典样式常驻占位，此组件统一三平台为悬浮形态）。
+
+```moonbit
+@yue.overlay_scroll(
+  @yue.vbox([@yue.label("第 1 行"), /* … */]),
+  style=[("height", 180.0)],   // 容器样式；高度由外层布局或显式给定
+)
+```
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| content | Node | 必填 | 滚动内容（声明式节点） |
+| style / style_str | 数组 | [] | 外层容器样式 |
+| handle | (Scroll) -> Unit | 空函数 | 拿内部 Scroll 做程序化滚动 |
 
 ## 页签 Tab
 
