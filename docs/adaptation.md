@@ -92,6 +92,8 @@ Methodology: Ubuntu 24.04 XFCE (X11), same machine and session; the startup delt
 
 #### XFCE ✅
 
+- Autostart .desktop findings: the Exec path comes from readlink on /proc/self/exe (during development it points into the _build output, so the entry breaks as soon as the artifact moves — only a fixed install path is reliable; AppImage likewise points at its mount point); the full file passes desktop-file-validate with zero warnings; the enabled check honors both system-side disable switches (Hidden=true and X-GNOME-Autostart-enabled=false), and disable is idempotent (a missing entry counts as success).
+
 - Context menus are rendered by the panel mirroring DBusMenu; the app is not asked to draw via SNI ContextMenu.
 - xfce4-panel 4.18 sends only the batch `EventGroup` / `AboutToShowGroup`, not the singular versions: implementing only the singular forms gets silently rejected by UnknownMethod — the menu opens but clicks do nothing.
 - Desktop notifications must go through `Notification::Show()`; `NotificationCenter::AddNotification` never issues the DBus Notify call on Linux and fails silently.

@@ -52,6 +52,7 @@ showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 /
 | [components.md](components.md) | 组件 API 速查:经典 setter 与 `X::make` props 两种写法,含上游坑 |
 | [adaptation.md](adaptation.md) | 平台适配经验:各平台实测坑、根因与验证结论(持续更新) |
 | [tray.md](tray.md) | Linux 托盘方案:SNI 协议栈设计、架构、后端降级、桌面兼容性 |
+| [autostart.md](autostart.md) | 开机自启动:Linux 写 XDG .desktop、Windows 写 HKCU Run 键,is_enabled / enable / disable 统一语义 |
 | [plan-system-integration.md](plan-system-integration.md) | 系统集成扩容总体实施计划:P1-P12 与收口项 P14 的批次划分、验收门、共享基建决策与风险(定稿) |
 | [relink.md](relink.md) | 原生层(shim/vendor)变更后强制重链:判别与处理 |
 

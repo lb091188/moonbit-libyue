@@ -52,6 +52,7 @@ Process page: a virtual table at the 1000-row scale with search filtering, six s
 | [components.md](components.md) | Widget API quick reference: both classic setter and `X::make` props styles, including upstream pitfalls |
 | [adaptation.md](adaptation.md) | Platform adaptation notes: field-tested pitfalls per platform, root causes, and verification conclusions (continuously updated) |
 | [tray.md](tray.md) | Linux tray solution: SNI protocol stack design, architecture, backend fallback, desktop compatibility |
+| [autostart.md](autostart.md) | Cross-platform autostart: XDG .desktop on Linux / HKCU Run key on Windows, unified is_enabled / enable / disable |
 | [relink.md](relink.md) | Forcing a relink after native layer (shim/vendor) changes: detection and handling |
 
 For the project overview and quick-start entry points, see the repository root [README.md](../README.md).

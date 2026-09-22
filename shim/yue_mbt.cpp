@@ -3815,6 +3815,134 @@ extern "C" int32_t yue_mbt_win_find_and_activate(const char *, int32_t *ok) {
 
 #endif  // 单实例平台分支结束
 
+// ---------- 开机自启动（.desktop 读写走 MoonBit 文件 API;Windows 注册表在这里） ----------
+
+extern "C" void *yue_mbt_getenv_bytes(const char *name, int32_t *ok) {
+  *ok = 0;
+  const char *v = std::getenv(name);
+  if (v == nullptr) {
+    return moonbit_make_bytes(0, 0);
+  }
+  *ok = 1;
+  return BytesFromString(std::string(v));
+}
+
+extern "C" void *yue_mbt_exe_path(int32_t *ok) {
+  *ok = 0;
+#if defined(OS_WIN)
+  wchar_t path[MAX_PATH] = L"";
+  UINT n = ::GetModuleFileNameW(nullptr, path, MAX_PATH);
+  if (n == 0 || n >= MAX_PATH) {
+    return moonbit_make_bytes(0, 0);
+  }
+  *ok = 1;
+  return BytesFromString(base::SysWideToUTF8(path));
+#elif defined(OS_LINUX)
+  char path[4096];
+  ssize_t n = ::readlink("/proc/self/exe", path, sizeof(path) - 1);
+  if (n <= 0) {
+    return moonbit_make_bytes(0, 0);
+  }
+  *ok = 1;
+  return BytesFromString(std::string(path, static_cast<size_t>(n)));
+#else
+  return moonbit_make_bytes(0, 0);  // macOS:暂缓
+#endif
+}
+
+extern "C" int32_t yue_mbt_remove_file(const char *path, int32_t *ok) {
+  *ok = 0;
+  std::FILE *probe = std::fopen(path, "r");
+  if (probe == nullptr) {
+    *ok = 1;  // 本就不存在:disable 幂等
+    return 0;
+  }
+  std::fclose(probe);
+  if (std::remove(path) == 0) {
+    *ok = 1;
+    return 0;
+  }
+  return -1;
+}
+
+#if defined(OS_WIN)
+extern "C" int32_t yue_mbt_autostart_set(const char *app_id, const char *exe,
+                                         int32_t *ok) {
+  *ok = 0;
+  HKEY handle = nullptr;
+  if (::RegCreateKeyExW(HKEY_CURRENT_USER,
+                        L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+                        0, nullptr, REG_OPTION_NON_VOLATILE, KEY_SET_VALUE,
+                        nullptr, &handle,
+                        nullptr) != ERROR_SUCCESS) {
+    return -1;
+  }
+  // 引号包裹:Run 键对含空格路径的标准写法
+  std::wstring value = L"\"" + base::SysUTF8ToWide(exe) + L"\"";
+  LSTATUS r = ::RegSetValueExW(
+      handle, base::SysUTF8ToWide(app_id).c_str(), 0, REG_SZ,
+      reinterpret_cast<const BYTE *>(value.data()),
+      static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t)));
+  ::RegCloseKey(handle);
+  if (r != ERROR_SUCCESS) {
+    return -1;
+  }
+  *ok = 1;
+  return 0;
+}
+
+extern "C" void *yue_mbt_autostart_get(const char *app_id, int32_t *ok) {
+  *ok = 0;
+  wchar_t buf[1024];
+  DWORD size = sizeof(buf);
+  LSTATUS r = ::RegGetValueW(
+      HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+      base::SysUTF8ToWide(app_id).c_str(), RRF_RT_REG_SZ, nullptr, buf, &size);
+  if (r != ERROR_SUCCESS) {
+    return moonbit_make_bytes(0, 0);  // 未设置(非错误)
+  }
+  *ok = 1;
+  return BytesFromString(base::SysWideToUTF8(buf));
+}
+
+extern "C" int32_t yue_mbt_autostart_remove(const char *app_id, int32_t *ok) {
+  *ok = 0;
+  HKEY handle = nullptr;
+  if (::RegOpenKeyExW(HKEY_CURRENT_USER,
+                      L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", 0,
+                      KEY_SET_VALUE, &handle) != ERROR_SUCCESS) {
+    *ok = 1;  // 键都不在:视为已移除(幂等)
+    return 0;
+  }
+  LSTATUS r = ::RegDeleteValueW(handle, base::SysUTF8ToWide(app_id).c_str());
+  ::RegCloseKey(handle);
+  if (r == ERROR_SUCCESS || r == ERROR_FILE_NOT_FOUND) {
+    *ok = 1;  // 幂等:不存在即达成
+    return 0;
+  }
+  return -1;
+}
+
+#else  // 非 Windows:桩(macOS 暂缓哨兵 -1000;Linux 走 MoonBit 文件路由不经过这里)
+
+extern "C" int32_t yue_mbt_autostart_set(const char *, const char *,
+                                         int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+extern "C" void *yue_mbt_autostart_get(const char *, int32_t *ok) {
+  *ok = -1000;
+  return moonbit_make_bytes(0, 0);
+}
+
+extern "C" int32_t yue_mbt_autostart_remove(const char *, int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+#endif  // 自启动注册表平台分支结束
+
 void yue_mbt_notification_show(void *n) {
   if (auto *b = NotificationStore::get(n)) {
 #if defined(OS_WIN)
