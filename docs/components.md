@@ -642,6 +642,7 @@ match @yue.idle_seconds() {
 | API | Purpose |
 |---|---|
 | battery_supported() / battery_query() -> Result[BatteryInfo?, PowerError] | Battery reading (percent / charging / seconds-to-full and seconds-to-empty; no battery gives Ok(None)) |
+| power_source() -> Result[PowerSource, PowerError] | Query the current power source (a desktop without battery is always AC) |
 | power_event_supported() / on_power_source_change(cb) | AC/battery switch events (PowerSource::Ac / OnBattery; Windows event wiring is deferred — probe supported() first) |
 | suspend_resume_supported() / on_suspend_resume(cb) | Suspend/resume events (SleepEvent::Suspending / Resuming; rapid suspend-resume cycles may deliver two Resuming events — no library-side debounce) |
 

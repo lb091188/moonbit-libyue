@@ -175,6 +175,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 用户空闲秒数走 X Screen Saver Extension(XSS)的 XScreenSaverQueryInfo,运行期 dlopen("libXss.so.1"/"libXss.so") 而非构建期链接:规避 libxss-dev 进分发链(预构建静态库随 mooncakes 分发,多一个动态依赖在消费端未必装);XScreenSaverInfo 结构极简,shim 里手写镜像结构体(idle 毫秒字段偏移 24),加载失败与无 X 同路径返回 Unsupported。
 - XWayland 会话输入事件不进 X 服务端,XSS idle 读数虚高(用户刚动过也可能读到小时级):显式探测 WAYLAND_DISPLAY 置位即返回 Unsupported,给错数不如不给;env -u DISPLAY(无 X 会话)同样 Unsupported,均不崩。数值对照实测(Ubuntu 24.04 XFCE X11):idle_seconds 与 xprintidle 同刻双读差 17ms(判据 ±2s),xdotool 模拟鼠标移动后 0.317s vs xprintidle 320ms。
 - 锁屏不算输入:XSS 的 idle 在锁屏期间持续增长(锁屏器不上报输入),「用户空闲」与「屏幕锁定」是正交维度,勿用 idle 阈值近似锁屏判定(锁屏事件走 logind,另批落地)。
+- 空闲读数的演示交互:点击本身是输入事件,会重置 XSS 空闲计数——「点按钮读当前空闲」的演示自相矛盾(读到的恒为 0.x 秒;命令行探针/xdotool 外部读数测不出此交互矛盾)。正确形态是开关开启后定时刷新(每秒读一次),开关关闭定时器下一拍自行停止(libyue 定时器无取消 id,回调查开关状态自杀)。
 
 ### GTK 相关
 

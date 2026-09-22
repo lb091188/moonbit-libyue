@@ -101,6 +101,34 @@ pub fn power_event_supported() -> Bool {
 }
 
 ///|
+/// 查询当前电源来源(台式机无电池,来源恒为交流在线)。
+pub fn power_source() -> Result[PowerSource, PowerError] {
+  match platform() {
+    "linux" => {
+      if !@traybus.upower_available() {
+        return Err(Unsupported)
+      }
+      match @traybus.upower_on_battery() {
+        Ok(on_batt) => Ok(if on_batt { OnBattery } else { Ac })
+        Err(e) => Err(QueryFailed(e))
+      }
+    }
+    "windows" => {
+      let ac = Ref(0)
+      let percent = Ref(0)
+      let charging = Ref(0)
+      let has = Ref(0)
+      let r = ffi_win_power_status(ac, percent, charging, has)
+      if r != 0 {
+        return Err(QueryFailed("GetSystemPowerStatus 失败"))
+      }
+      Ok(if ac.val == 1 { Ac } else { OnBattery })
+    }
+    _ => Err(Unsupported)
+  }
+}
+
+///|
 /// 注册交直流切换回调(可多次注册;不支持的平台静默忽略,先以
 /// power_event_supported 判定)。Linux 语义:UPower 顶层 OnBattery
 /// 属性变化即派发。

@@ -639,6 +639,7 @@ match @yue.idle_seconds() {
 | API | 用途 |
 |---|---|
 | battery_supported() / battery_query() -> Result[BatteryInfo?, PowerError] | 电量读数（百分比 / 充电中 / 距充满与放空秒数;无电池返回 Ok(None)） |
+| power_source() -> Result[PowerSource, PowerError] | 查询当前电源来源（台式机无电池,来源恒为交流在线） |
 | power_event_supported() / on_power_source_change(cb) | 交直流切换事件（PowerSource::Ac / OnBattery;Windows 事件接入后置,先判 supported） |
 | suspend_resume_supported() / on_suspend_resume(cb) | 休眠唤醒事件（SleepEvent::Suspending / Resuming;快速挂起唤醒可能连收两条 Resuming,库内不去抖） |
 

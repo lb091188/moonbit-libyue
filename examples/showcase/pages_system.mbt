@@ -338,14 +338,33 @@ fn page_system(app : App) -> @yue.Node {
     ),
   )
   // 屏幕常亮与用户空闲:开关直连真实抑制(句柄记下供 release);空闲
-  // 秒数即读即显,动一动输入设备再读,读数归零
+  // 秒数定时刷新——点击本身是输入会重置空闲,即读即显恒为 0,改为
+  // 开关开启后每秒读一次(开关关闭,定时器下一拍自行停止)
   let idle_out : @yue.Store[String] = @yue.Store::new(
     if @yue.idle_supported() {
-      "(点按钮读取当前空闲秒数)"
+      "(打开开关开始每秒刷新;不动输入看数值增长,动一下看归零)"
     } else {
       "当前平台不支持空闲查询"
     },
   )
+  let idle_running : @yue.Store[Bool] = @yue.Store::new(false)
+  idle_running.subscribe(fn(on) {
+    if on {
+      @yue.set_timer(1000, fn() {
+        if !idle_running.get() {
+          return false // 开关已关:停止刷新
+        }
+        match @yue.idle_seconds() {
+          Ok(s) => idle_out.set("当前空闲:\{s} 秒")
+          Err(e) => idle_out.set("不可用:\{e}")
+        }
+        true
+      })
+      ()
+    } else {
+      idle_out.set("(已停止刷新)")
+    }
+  })
   let ka : Ref[@yue.KeepAwake?] = Ref(None)
   let ka_on : @yue.Store[Bool] = @yue.Store::new(@yue.keep_awake_active())
   let ka_out : @yue.Store[String] = @yue.Store::new(
@@ -389,12 +408,8 @@ fn page_system(app : App) -> @yue.Node {
         @yue.bind_label(ka_out, fn(s) { s }, style=[("marginTop", 8.0)]),
         @yue.hbox(
           [
-            @yue.button_t("读取空闲秒数", on_click=fn() {
-              match @yue.idle_seconds() {
-                Ok(s) => idle_out.set("当前空闲:\{s} 秒")
-                Err(e) => idle_out.set("不可用:\{e}")
-              }
-            }),
+            @yue.switch_t(idle_running),
+            @yue.label_t("每秒刷新空闲秒数", role=@yue.Secondary),
           ],
           style=[("marginTop", 8.0)],
         ),
@@ -464,7 +479,17 @@ fn page_system(app : App) -> @yue.Node {
           }
           "电量 \{b.percent}%,充电中:\{b.charging}(\{full})"
         }
-        Ok(None) => "无电池(台式机常态)"
+        Ok(None) =>
+          // 台式机常态:无电池但电源来源可查(交流在线)
+          match @yue.power_source() {
+            Ok(src) =>
+              if src is @yue.Ac {
+                "无电池,电源:交流在线(台式机常态)"
+              } else {
+                "无电池,电源:电池供电(异常:请反馈)"
+              }
+            Err(_) => "无电池(电源状态未知)"
+          }
         Err(e) => "查询失败:\{e}"
       }
     } else {
