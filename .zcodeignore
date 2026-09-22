@@ -1,0 +1,53 @@
+# prepare.py 产物
+/vendor/
+/build/
+/.prepare/
+
+# moon 构建产物
+/_build/
+/target/
+*.core
+
+# WebView2 loader(prepare.py 复制到仓库根,运行期按工作目录搜索)
+/WebView2Loader.dll
+
+# Python 缓存(moon package 与 git 同样排除)
+__pycache__/
+
+# 本地文档(不发布、不入库)
+/9月黑客松.md
+
+# 发布包排除(文件已在版本库,gitignore 只影响未跟踪文件,git 照常跟踪)
+/AGENTS.md
+/TODO.md
+
+# ===== ↑ 以上同步自 .gitignore（「从 .gitignore 同步」只重写以上部分）=====
+.git/
+.hg/
+.svn/
+node_modules/
+bower_components/
+jspm_packages/
+site-packages/
+venv/
+coverage/
+htmlcov/
+lcov-report/
+cmakefiles/
+cmake-build-*/
+bazel-*/
+pods/
+deriveddata/
+storybook-static/
+playwright-report/
+test-results/
+allure-results/
+allure-report/
+cdk.out/
+*.egg-info/
+*.dist-info/
+eggs/
+pip-wheel-metadata/
+wheels/
+# ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
+# 自定义规则写在下方（本行提示可删除）
