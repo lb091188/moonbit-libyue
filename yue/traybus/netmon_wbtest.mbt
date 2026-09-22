@@ -27,3 +27,52 @@ test "NM Properties.Get \"v\"(u) 应答往返解析" {
     Err(_) => inspect("构造失败", content="应可构造")
   }
 }
+
+///|
+test "NM StateChanged 信号按真实签名 Int32(i) 解码,u 兜底" {
+  // NM 规范该信号参数是 i(属性 State 才是 u,信号与属性类型不同源);
+  // 旧实现只匹配 VU32,i 被静默丢弃,断网(State 70→20/10)后 UI 恒
+  // Online 即此因
+  let cases : Array[(String, DVal, String)] = [
+    ("i", VI32(20), "20"), ("i", VI32(70), "70"), ("u", VU32(10), "10"),
+  ]
+  for c in cases {
+    match
+      build_signal(
+        3,
+        "/org/freedesktop/NetworkManager",
+        "org.freedesktop.NetworkManager",
+        "StateChanged",
+        c.0,
+        [c.1],
+      ) {
+      Ok(bytes) =>
+        match parse_message(bytes[:]) {
+          Some(m) =>
+            match statechanged_of(m.body) {
+              Some(v) => inspect(v.to_string(), content=c.2)
+              None => inspect("未提取到", content="应可提取")
+            }
+          None => inspect("解析失败", content="应可解析")
+        }
+      Err(_) => inspect("构造失败", content="应可构造")
+    }
+  }
+  // 其余类型(bool)丢弃,不误触发缓存更新
+  match
+    build_signal(
+      4,
+      "/org/freedesktop/NetworkManager",
+      "org.freedesktop.NetworkManager",
+      "StateChanged",
+      "b",
+      [VBool(true)],
+    ) {
+    Ok(bytes) =>
+      match parse_message(bytes[:]) {
+        Some(m) => inspect(statechanged_of(m.body) is None, content="true")
+        None => inspect("解析失败", content="应可解析")
+      }
+    Err(_) => inspect("构造失败", content="应可构造")
+  }
+}
