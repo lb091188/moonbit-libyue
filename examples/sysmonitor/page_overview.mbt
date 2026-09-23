@@ -113,18 +113,12 @@ fn res_card(
             style=[("marginLeft", 6.0)],
             handle=fn(l) { @yue.View::set_cursor(l, hand_cur) },
           ),
-          // 弹性占位把值行推到标题行右端
-          @yue.vbox(
-            [],
-            style=[("flex", 1.0)],
-            handle=fn(h) { @yue.View::set_cursor(h, hand_cur) },
-          ),
-          // 值行：比标题小两档字号；固定宽度 + 右对齐——宽度不再随
-          // 文本回流，长数值只会占满不会换行
+          // 值行：吃掉标题行剩余宽度(flex:1),文本右对齐——空间全部
+          // 给数值,比标题小两档,固定右缘不随文本回流换行
           @yue.label_t(
             value.get(),
             role=@yue.Section,
-            style=[("width", 132.0)],
+            style=[("flex", 1.0)],
             handle=fn(l) {
               value.subscribe(fn(v) { l.set_text(v) })
               l.set_align(@yue.End)
