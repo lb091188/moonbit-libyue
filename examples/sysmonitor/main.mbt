@@ -84,13 +84,10 @@ struct App {
   proc : ProcMonitor
   disk : DiskMonitor
   net : NetMonitor
-  // 概览页：资源卡片(标题副标题存规格，值行存当前数值)
+  // 概览页：资源卡片值行（标题行右侧，紧凑格式防溢出）
   card_cpu : @yue.Store[String]
-  card_cpu_sub : @yue.Store[String]
   card_mem : @yue.Store[String]
-  card_mem_sub : @yue.Store[String]
   card_disk : @yue.Store[String]
-  card_disk_sub : @yue.Store[String]
   card_net : @yue.Store[String]
   card_proc : @yue.Store[String]
   // 概览页：实时曲线（定长滚动窗口 120 点 = 2 分钟 @1Hz）
@@ -100,8 +97,7 @@ struct App {
   swap_hist : @yue.Store[Array[@yue.LineSeries]]
   disk_hist : @yue.Store[Array[@yue.LineSeries]]
   net_hist : @yue.Store[Array[@yue.LineSeries]]
-  // GPU 卡与详情页：每块物理卡一套（数量取启动枚举结果，热插拔不重建）
-  card_gpu_subs : Array[@yue.Store[String]]
+  // GPU 详情页与卡值：每块物理卡一套（数量取启动枚举结果，热插拔不重建）
   card_gpu_vals : Array[@yue.Store[String]]
   gpu_busy_hists : Array[@yue.Store[Array[@yue.LineSeries]]]
   gpu_vram_hists : Array[@yue.Store[Array[@yue.LineSeries]]]
@@ -159,8 +155,9 @@ fn sample_once(app : App) -> Unit {
     Some(mem) => {
       let used_gb = mem.used_kb().to_double() / 1048576.0
       let swap_gb = (mem.swap_total_kb - mem.swap_free_kb).to_double() / 1048576.0
-      app.card_mem.set("\{fmt_kb(mem.used_kb())} / \{fmt_kb(mem.total_kb)}")
-      app.card_mem_sub.set(fmt_kb(mem.total_kb))
+      app.card_mem.set(
+        "\{fmt_rate_c(mem.used_kb().to_double() * 1024.0)} / \{fmt_rate_c(mem.total_kb.to_double() * 1024.0)}",
+      )
       @yue.series_push(app.mem_hist, 0, used_gb)
       @yue.series_push(app.swap_hist, 0, swap_gb)
     }
@@ -196,13 +193,7 @@ fn sample_once(app : App) -> Unit {
           (None, Some(c)) => "\{c.to_int()}℃"
           (None, None) => "—"
         }
-        let name = if g.model != "" {
-          g.model
-        } else {
-          g.device
-        }
         app.card_gpu_vals[i].set(val)
-        app.card_gpu_subs[i].set("\{g.vendor} · \{name}")
       }
     }
   }
@@ -213,9 +204,8 @@ fn sample_once(app : App) -> Unit {
       for d in disks {
         if d.mount == "/" {
           app.card_disk.set(
-            "\{pct(d.usage())} · \{fmt_bytes(d.total_bytes - d.avail_bytes)} / \{fmt_bytes(d.total_bytes)}",
+            "\{pct(d.usage())} · \{fmt_rate_c((d.total_bytes - d.avail_bytes).to_double())}",
           )
-          app.card_disk_sub.set("\{d.mount} · \{d.fstype}")
           @yue.series_push(app.disk_hist, 0, d.usage() * 100.0)
         }
       }
@@ -238,32 +228,6 @@ fn sample_once(app : App) -> Unit {
       @yue.series_push(app.net_hist, 1, tx)
     }
   }
-}
-
-///|
-/// 副标题里的 CPU 型号瘦身：去 "(R)" / "(TM)" 商标标记，缩短标题行。
-fn clean_model(s : String) -> String {
-  let chars : Array[Char] = []
-  for c in s {
-    chars.push(c)
-  }
-  let out = StringBuilder()
-  let mut i = 0
-  while i < chars.length() {
-    if chars[i] == '(' && i + 2 < chars.length() {
-      if chars[i + 1] == 'R' && chars[i + 2] == ')' {
-        i = i + 3
-        continue
-      }
-      if chars[i + 1] == 'T' && i + 3 < chars.length() && chars[i + 2] == 'M' && chars[i + 3] == ')' {
-        i = i + 4
-        continue
-      }
-    }
-    out.write_char(chars[i])
-    i = i + 1
-  }
-  out.to_string()
 }
 
 ///|
@@ -295,13 +259,8 @@ fn main {
     disk: DiskMonitor::new(),
     net: NetMonitor::new(),
     card_cpu: @yue.Store::new("—"),
-    card_cpu_sub: @yue.Store::new(
-      "\{clean_model(info.model)} · \{info.cores} 逻辑核",
-    ),
     card_mem: @yue.Store::new("—"),
-    card_mem_sub: @yue.Store::new("—"),
     card_disk: @yue.Store::new("—"),
-    card_disk_sub: @yue.Store::new("—"),
     card_net: @yue.Store::new("—"),
     card_proc: @yue.Store::new("—"),
     cpu_hist: @yue.Store::new([@yue.LineSeries::make("CPU", max_points=120)]),
@@ -313,7 +272,6 @@ fn main {
       @yue.LineSeries::make("接收", max_points=120),
       @yue.LineSeries::make("发送", max_points=120),
     ]),
-    card_gpu_subs: gpus0.map(fn(_g) { @yue.Store::new("—") }),
     card_gpu_vals: gpus0.map(fn(_g) { @yue.Store::new("—") }),
     gpu_busy_hists: gpus0.map(fn(_g) {
       @yue.Store::new([@yue.LineSeries::make("占用", max_points=120)])
