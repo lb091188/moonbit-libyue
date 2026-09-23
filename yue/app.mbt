@@ -4,13 +4,20 @@
 
 ///|
 /// 初始化 GUI 工具包。必须在创建任何 UI 对象之前调用一次。
+/// 初始化成功后框架默认应用整套系统主题（深浅 + 主色强调色）；应用层
+/// 显式 theme_apply 仍可覆盖，此后系统主题实时联动属 opt-in（见
+/// on_system_theme_change）。
 pub fn initialize() -> Bool {
   // 调用仅为让链接器抽取 win_gui.c 的归档成员(否则其中的 GUI 子系统
   // pragma 不会被处理);返回值恒 42,分支永不成立
   if ffi_win_gui_marker() < 0 {
     return false
   }
-  ffi_app_init()
+  let ok = ffi_app_init()
+  if ok {
+    theme_apply(theme_from_system())
+  }
+  ok
 }
 
 ///|

@@ -236,16 +236,9 @@ fn main {
     return
   }
   let info = cpu_info().unwrap_or({ model: "(未知)", mhz: 0.0, cores: 1 })
-  // 深浅主题：启动跟随系统，系统切换时实时联动
-  let dark_mode : @yue.Store[Bool] = @yue.Store::new(@yue.system_prefers_dark())
-  dark_mode.subscribe(fn(v) {
-    if v {
-      @yue.theme_apply(@yue.dark_theme())
-    } else {
-      @yue.theme_apply(@yue.default_theme())
-    }
-  })
-  @yue.on_system_theme_change(fn() { dark_mode.set(@yue.system_prefers_dark()) })
+  // 框架默认已随系统初始化整套主题(深浅 + 主色);这里只接管系统
+  // 切换主题时的实时联动
+  @yue.on_system_theme_change(fn() { @yue.theme_apply(@yue.theme_from_system()) })
 
   // GPU 数量取启动枚举结果，卡与曲线按块预建（热插拔不重建视图）
   let gpus0 : Array[GpuInfo] = match gpu_list() {
@@ -303,6 +296,7 @@ fn main {
     ],
     title="系统监视器",
     size=Some((1240.0, 840.0)),
+    on_close=fn(_w) { @yue.quit() },
   )
   ignore(window)
   @yue.run()

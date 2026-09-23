@@ -120,10 +120,10 @@ moon run .
 
 第一个应用跑起来之后，按目标选路径：
 
-**想做得好看**——一行换肤，深浅自动跟随系统：
+**想做得好看**——默认已整套跟随系统（深浅 + 主色），一行即可定制换肤（定制后不再随系统，联动见 `on_system_theme_change`）：
 
 ```moonbit
-@yue.theme_apply({ ..@yue.default_theme(), primary: "#1E4FA3" })
+@yue.theme_apply({ ..@yue.theme_from_system(), primary: "#1E4FA3" })
 ```
 
 改主色、圆角、暗色等定制项见 [components-ui.md](components-ui.md) 的「主题」节；把 `label`/`button` 换成组件库主题件（`label_t`/`button_t`）也在该文档。
