@@ -2,14 +2,16 @@
 // hover 态,子控件触发的事件同样改变组的样式。
 //
 // 机制:指针位置轮询(位置即真理),不依赖 enter/leave 的可达性——
-// GTK 的事件按最深命中的 GdkWindow 发,子容器/子控件(NUContainer、
-// 原生 Entry 等)的事件窗口会独占指针事件,祖先容器收不到 enter
-// (sysmonitor 卡片能收 enter 是因为子件是无窗口的 label;一旦子件
-// 是容器/原生控件就断流)。轮询 100ms 一拍,读全局指针坐标与组屏幕
-// 矩形比对(cursor_screen_x/y 与 get_bounds_in_screen 同坐标系,多屏
-// 拼接含负值一致);enter 事件仅作空白区命中时的即时加速,离场判定
-// 完全由轮询承担。Windows 下同一机制照常工作(跨平台一致,不依赖
-// 平台 hover 语义)。
+// GTK 的指针事件不冒泡,发给最深命中的 GdkWindow 就终结,子容器/
+// 原生控件(NUContainer、Entry 等)的事件窗口会独占指针事件,祖先
+// 容器收不到 enter(sysmonitor 卡片能收 enter 是因为子件是无窗口的
+// label;子件一旦是容器/原生控件就断流)。Windows 下同一机制工作
+// (跨平台一致,不依赖平台 hover 语义)。
+//
+// 开销:全部组共享一个全局定时器(100ms 一拍,无组时完全停止),
+// 每 tick 一次指针查询 + 每组一次屏幕矩形比对,均为微秒级 FFI;
+// 组静止(态不翻转)时不触发任何回调与重绘。enter 事件仅作组自身
+// 空白区命中时的即时加速。
 //
 // 背景高亮内置为 on_draw 自绘:GTK 下容器的可见背景必须自绘
 // (set_background_color 与 backgroundColor 样式对无 draw 的容器不
@@ -24,6 +26,45 @@ pub fn rect_contains(
   py : Double,
 ) -> Bool {
   px >= b.x && px <= b.x + b.width && py >= b.y && py <= b.y + b.height
+}
+
+///|
+/// 全局 hover 中心的注册项。
+priv struct HoverEntry {
+  host : Container
+  apply : (Bool) -> Unit
+}
+
+///|
+let g_hover_entries : Array[HoverEntry] = []
+
+///|
+/// 全局定时器句柄(set_timeout 链;无组时归零停转)。
+let g_hover_timer : Ref[Int] = Ref(0)
+
+///|
+fn hover_tick() -> Unit {
+  if g_hover_entries.is_empty() {
+    g_hover_timer.val = 0
+    return
+  }
+  // 每 tick 一次指针查询,各组只做矩形比对
+  let px = cursor_screen_x()
+  let py = cursor_screen_y()
+  for e in g_hover_entries {
+    (e.apply)(
+      rect_contains(ViewLike::get_bounds_in_screen(e.host), px, py),
+    )
+  }
+  g_hover_timer.val = set_timeout(100, fn() { hover_tick() })
+}
+
+///|
+fn hover_register(entry : HoverEntry) -> Unit {
+  g_hover_entries.push(entry)
+  if g_hover_timer.val == 0 {
+    hover_tick()
+  }
 }
 
 ///|
@@ -70,20 +111,8 @@ pub fn hover_group(
           }
         }
       })
-      fn pointer_in_group() -> Bool {
-        rect_contains(
-          ViewLike::get_bounds_in_screen(host),
-          cursor_screen_x(),
-          cursor_screen_y(),
-        )
-      }
-      // 常驻低频轮询:两次轻量 FFI 查询(指针坐标 + 屏幕矩形),
-      // 微秒级;每拍仅翻转时回调,静止无额外开销
-      set_timer(100, fn() {
-        set(pointer_in_group())
-        true
-      })
-      // enter 仅加速:host 自身空白区命中时立即置真(下一拍轮询确认)
+      hover_register({ host, apply: set })
+      // enter 仅加速:host 自身空白区命中时立即置真(下一拍全局确认)
       ViewLike::on_mouse_enter(host, fn(_e) {
         set(true)
       })
