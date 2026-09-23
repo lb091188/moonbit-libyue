@@ -33,10 +33,13 @@ fn view_index(v : ViewId) -> Int {
 ///|
 /// 卡内迷你曲线：序列窗口值 + 末端圆点。y_range 给固定值域；None 时
 /// 取窗口峰值自适应（floor 保底，防全零时除零 / 全平时看不出起伏）。
+/// hand 为卡片导航光标：GTK 光标按原生窗口生效，卡内每个子控件都要
+/// 各设一份（无原生窗口的控件上是安全空操作）。
 fn sparkline_box(
   hist : @yue.Store[Array[@yue.LineSeries]],
   y_range : (Double, Double)?,
   floor : Double,
+  hand : @yue.Cursor,
 ) -> @yue.Node {
   @yue.vbox(
     [],
@@ -72,6 +75,7 @@ fn sparkline_box(
       hist.subscribe(fn(_s) { c.schedule_paint() })
       // 主题切换后重绘（绘制时读 theme_current）
       @yue.on_theme_change(fn() { c.schedule_paint() })
+      @yue.View::set_cursor(c, hand)
     },
   )
 }
@@ -80,8 +84,9 @@ fn sparkline_box(
 /// 资源卡片（导航菜单项）：图标 + 标题 / 规格副标题 / 当前值 / 迷你
 /// 曲线（hist 为 None 时省略）。点击切到 target 视图；选中卡主题色
 /// 描边 + 浅底。不做 hover 高亮：卡内子控件会打断容器的
-/// enter/leave（GTK 按原生窗口边界派发），高亮会闪烁，悬停反馈只
-/// 留手型光标。
+/// enter/leave（GTK 按原生窗口边界派发），高亮会闪烁。悬停反馈只有
+/// 手型光标，且须逐子控件设置（光标同样按窗口生效，只设容器盖不住
+/// 有独立窗口的子控件）。
 fn res_card(
   icon : @yue.IconKind,
   title : String,
@@ -93,29 +98,42 @@ fn res_card(
   y_range? : (Double, Double)? = None,
   floor? : Double = 1.0,
 ) -> @yue.Node {
+  let hand_cur = @yue.Cursor::new(@yue.Hand)
   let spark = match hist {
     None => @yue.label("")
-    Some(h) => sparkline_box(h, y_range, floor)
+    Some(h) => sparkline_box(h, y_range, floor, hand_cur)
   }
   @yue.vbox(
     [
       @yue.hbox(
         [
           @yue.icon(icon, size=16.0),
-          @yue.label_t(title, role=@yue.Section, style=[("marginLeft", 6.0)]),
+          @yue.label_t(
+            title,
+            role=@yue.Section,
+            style=[("marginLeft", 6.0)],
+            handle=fn(l) { @yue.View::set_cursor(l, hand_cur) },
+          ),
         ],
         style_str=[("alignItems", "center")],
+        handle=fn(h) { @yue.View::set_cursor(h, hand_cur) },
       ),
       @yue.label_t(
         subtitle.get(),
         role=@yue.Secondary,
-        handle=fn(l) { subtitle.subscribe(fn(s) { l.set_text(s) }) },
+        handle=fn(l) {
+          subtitle.subscribe(fn(s) { l.set_text(s) })
+          @yue.View::set_cursor(l, hand_cur)
+        },
         style=[("marginTop", 2.0)],
       ),
       @yue.label_t(
         value.get(),
         role=@yue.Title,
-        handle=fn(l) { value.subscribe(fn(v) { l.set_text(v) }) },
+        handle=fn(l) {
+          value.subscribe(fn(v) { l.set_text(v) })
+          @yue.View::set_cursor(l, hand_cur)
+        },
         style=[("marginTop", 4.0)],
       ),
       spark,
@@ -134,7 +152,7 @@ fn res_card(
       // 主题切换 / 选中态变化都只重绘画布
       @yue.on_theme_change(fn() { c.schedule_paint() })
       view.subscribe(fn(_v) { c.schedule_paint() })
-      @yue.View::set_cursor(c, @yue.Cursor::new(@yue.Hand))
+      @yue.View::set_cursor(c, hand_cur)
       @yue.ViewLike::on_mouse_down(c, fn(e) {
         if e.button == 1 {
           view.set(target)
