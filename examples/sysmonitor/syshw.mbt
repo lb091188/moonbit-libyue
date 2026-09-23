@@ -183,6 +183,26 @@ pub fn parse_mounts(text : String) -> Array[MountInfo] {
 }
 
 ///|
+/// 系统自用挂载点黑名单：/boot、/snap 等用户用不到或无法使用的分区
+/// 不进容量列表（前缀按路径段匹配，避免 /bootstrap 之类误伤；
+/// /run/media 可移动介质是用户挂载，保留）。
+fn is_system_mount(mount : String) -> Bool {
+  fn hit(prefix : String) -> Bool {
+    mount == prefix || mount.has_prefix("\{prefix}/")
+  }
+  hit("/boot") ||
+  hit("/efi") ||
+  hit("/snap") ||
+  hit("/var") ||
+  hit("/opt") ||
+  hit("/srv") ||
+  hit("/tmp") ||
+  hit("/run/user") ||
+  hit("/run/initramfs") ||
+  mount == "/run"
+}
+
+///|
 /// 解析 /proc/diskstats：major minor name 之后取读扇区(5)与写扇区(9)。
 /// 行字段不足 14 个跳过；不过滤设备类型（loop/dm 等由调用方处置）。
 pub fn parse_diskstats(text : String) -> Array[DiskStat] {
@@ -253,6 +273,10 @@ pub fn DiskMonitor::tick(self : DiskMonitor) -> Array[DiskInfo]? {
   let out : Array[DiskInfo] = []
   let seen : Map[String, Bool] = Map([])
   for m in parse_mounts(mounts_text) {
+    // 系统自用挂载（/boot、/snap 等）直接跳过，省一次 statvfs
+    if is_system_mount(m.mount) {
+      continue
+    }
     if seen.contains(m.device) {
       continue
     }

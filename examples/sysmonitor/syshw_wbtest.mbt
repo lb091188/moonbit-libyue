@@ -190,3 +190,17 @@ test "S7 真实采样：网卡速率(Linux)" {
     }
   }
 }
+
+///|
+test "is_system_mount：/boot 等系统挂载排除,/run/media 与自定义挂载保留" {
+  assert_true(is_system_mount("/boot"))
+  assert_true(is_system_mount("/boot/efi"))
+  assert_true(is_system_mount("/snap/snapd/200"))
+  assert_true(is_system_mount("/var/lib/docker"))
+  assert_true(is_system_mount("/run/user/1000"))
+  assert_true(is_system_mount("/run"))
+  assert_false(is_system_mount("/"))
+  assert_false(is_system_mount("/bootstrap"))
+  assert_false(is_system_mount("/run/media/user/USB"))
+  assert_false(is_system_mount("/data"))
+}
