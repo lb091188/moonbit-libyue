@@ -357,12 +357,99 @@ fn slave_name(dm : String) -> String? {
 // ---------------------------------------------------------------------------
 
 ///|
-/// PCI 显卡枚举结果（vendor 已语义化；device 保留原始 id）。
+/// nvidia-smi 单卡采样结果（占位 / 显存单位换算成字节后存放）。
+struct NvmlSample {
+  busy : Double
+  vram_used : Double
+  vram_total : Double
+  celsius : Double
+  model : String
+}
+
+///|
+/// 总线地址归一化：取最后一段并去前导零，规避 nvidia-smi 的
+/// 00000000:01:00.0 与 sysfs 的 0000:01:00.0 前缀差异。
+fn norm_pci(s : String) -> String {
+  let parts = s.split(":").collect()
+  let tail = parts[parts.length() - 1].to_owned()
+  let sb = StringBuilder()
+  let mut lead = true
+  for c in tail {
+    if lead && c == '0' {
+      continue
+    }
+    lead = false
+    sb.write_char(c)
+  }
+  sb.to_string()
+}
+
+///|
+/// nvidia-smi 批量查询（stub 内 popen，进程内不加载 NVML），按归一化
+/// 总线地址建索引；查询失败（无 N 卡 / 未装驱动）返回 None。
+fn nvidia_smi_map() -> Map[String, NvmlSample]? {
+  let text = match ffi_nvidia_smi() {
+    None => return None
+    Some(bytes) => @utf8.decode_lossy(bytes)
+  }
+  let out : Map[String, NvmlSample] = Map([])
+  for line in nonempty_lines(text) {
+    let f = line.split(",").collect()
+    if f.length() < 6 {
+      continue
+    }
+    let busy = match parse_i64(f[1].trim()) {
+      Some(v) => v.to_double()
+      None => continue
+    }
+    let used = match parse_i64(f[2].trim()) {
+      Some(v) => v.to_double() * 1048576.0
+      None => continue
+    }
+    let total = match parse_i64(f[3].trim()) {
+      Some(v) => v.to_double() * 1048576.0
+      None => continue
+    }
+    let temp = match parse_i64(f[4].trim()) {
+      Some(v) => v.to_double()
+      None => continue
+    }
+    out.set(norm_pci(f[0].trim().to_owned()), {
+      busy,
+      vram_used: used,
+      vram_total: total,
+      celsius: temp,
+      model: f[5].trim().to_owned(),
+    })
+  }
+  Some(out)
+}
+
+///|
+/// 读整行为数值的 sysfs 节点（百分比 / 字节）；失败返回 None。
+fn read_u64_file(path : String) -> Double? {
+  match read_text_file(path) {
+    None => None
+    Some(t) =>
+      match parse_i64(t.trim()) {
+        None => None
+        Some(v) => Some(v.to_double())
+      }
+  }
+}
+
+///|
+/// PCI 显卡枚举结果（vendor 已语义化；model 为驱动报告名，空串回退
+/// device id；busy 0-100；vram_* 单位字节，仅独立显存显卡有值）。
 pub(all) struct GpuInfo {
   pci : String
   vendor : String
   device : String
+  model : String
   celsius : Double?
+  busy : Double?
+  vram_used : Double?
+  vram_total : Double?
 }
 
 ///|
@@ -386,14 +473,17 @@ pub fn vendor_name(id : String) -> String {
 }
 
 ///|
-/// 枚举 PCI 显示设备（/sys/bus/pci/devices class=0x03*），温度经该设备
-/// 的 hwmon 子目录（temp1_input）。目录不可读返回 None。
+/// 枚举 PCI 显示设备（/sys/bus/pci/devices class=0x03*）。占用 / 显存 /
+/// 温度先试 sysfs 通用节点（amdgpu / nouveau 的 gpu_busy_percent、
+/// mem_info_vram_*、hwmon），再 NVML 覆盖（NVIDIA 专有驱动仅有此路，
+/// 且附型号名）。目录不可读返回 None。
 pub fn gpu_list() -> Array[GpuInfo]? {
   let devs = match list_dir("/sys/bus/pci/devices") {
     None => return None
     Some(names) => names
   }
   let out : Array[GpuInfo] = []
+  let smi = nvidia_smi_map()
   for addr in devs {
     let base = "/sys/bus/pci/devices/\{addr}"
     let class = match read_text_file("\{base}/class") {
@@ -411,11 +501,34 @@ pub fn gpu_list() -> Array[GpuInfo]? {
       None => "(未知)".to_string()
       Some(t) => t.trim().to_owned()
     }
+    let mut busy : Double? = read_u64_file("\{base}/gpu_busy_percent")
+    let mut vram_used : Double? = read_u64_file("\{base}/mem_info_vram_used")
+    let mut vram_total : Double? = read_u64_file("\{base}/mem_info_vram_total")
+    let mut celsius : Double? = gpu_hwmon_temp(base)
+    let mut model = ""
+    match smi {
+      Some(m) =>
+        match m.get(norm_pci(addr)) {
+          Some(n) => {
+            busy = Some(n.busy)
+            vram_used = Some(n.vram_used)
+            vram_total = Some(n.vram_total)
+            celsius = Some(n.celsius)
+            model = n.model
+          }
+          None => ()
+        }
+      None => ()
+    }
     out.push({
       pci: addr,
       vendor: vendor_name(vendor),
       device,
-      celsius: gpu_hwmon_temp(base),
+      model,
+      celsius,
+      busy,
+      vram_used,
+      vram_total,
     })
   }
   Some(out)

@@ -59,6 +59,10 @@ int32_t yue_sysmon_statvfs(
   (void)out_avail;
   return SYSMON_ERR_UNSUPPORTED;
 }
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t yue_sysmon_nvidia_smi(void) {
+  return NULL;
+}
 
 #else
 
@@ -240,6 +244,66 @@ int32_t yue_sysmon_statvfs(
   *out_free = (int64_t)st.f_bfree * (int64_t)st.f_frsize;
   *out_avail = (int64_t)st.f_bavail * (int64_t)st.f_frsize;
   return 0;
+}
+
+/* ---- NVIDIA GPU 采样（popen nvidia-smi，进程内不加载 NVML）----
+   dlopen nvmlInit_v2 与宿主运行时存在偶发堆冲突（本机 RTX 3070 +
+   Ubuntu 24.04 实测 5/6 启动段错误，dlopen 不 init 则干净），改为每
+   次采样 popen 一次 nvidia-smi 批量查询全部卡（含 pci 总线地址可与
+   sysfs 枚举对位）。nvidia-smi 不存在（无 N 卡 / 未装驱动）返回 NULL。
+   成功输出每卡一行 CSV：pci_bus_id, util%, mem_used(MiB), mem_total
+   (MiB), temp(C), name（CSV, noheader, nounits）。 */
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t yue_sysmon_nvidia_smi(void) {
+  FILE *f = popen(
+      "nvidia-smi --query-gpu=pci.bus_id,utilization.gpu,memory.used,"
+      "memory.total,temperature.gpu,name --format=csv,noheader,nounits",
+      "r");
+  if (f == NULL) {
+    return NULL;
+  }
+  size_t cap = 4096;
+  size_t len = 0;
+  char *buf = (char *)malloc(cap);
+  if (buf == NULL) {
+    pclose(f);
+    return NULL;
+  }
+  for (;;) {
+    if (len == cap) {
+      if (cap >= 64 * 1024) {
+        break;
+      }
+      size_t next = cap * 2;
+      char *grown = (char *)realloc(buf, next);
+      if (grown == NULL) {
+        free(buf);
+        pclose(f);
+        return NULL;
+      }
+      buf = grown;
+      cap = next;
+    }
+    size_t n = fread(buf + len, 1, cap - len, f);
+    len += n;
+    if (n == 0) {
+      break;
+    }
+  }
+  int failed = ferror(f);
+  int status = pclose(f);
+  if (failed || status != 0) {
+    free(buf);
+    return NULL;
+  }
+  moonbit_bytes_t out = moonbit_make_bytes((int32_t)len, 0);
+  if (out == NULL) {
+    free(buf);
+    return NULL;
+  }
+  memcpy(out, buf, len);
+  free(buf);
+  return out;
 }
 
 #endif /* _WIN32 */

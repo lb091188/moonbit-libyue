@@ -51,3 +51,11 @@ extern "c" fn ffi_statvfs(
   out_free : Ref[Int64],
   out_avail : Ref[Int64],
 ) -> Int = "yue_sysmon_statvfs"
+
+///|
+// NVIDIA GPU 批量采样（popen nvidia-smi，进程内不加载 NVML——nvmlInit
+// 与宿主运行时存在偶发堆冲突，见 adaptation）。输出每卡一行 CSV：
+// pci 总线地址 / 占用 % / 显存已用与总量(MiB) / 温度 / 型号名。
+// nvidia-smi 不存在或查询失败返回 None。C 仅在调用期间读取返回值前
+// 的缓冲，结果经 Bytes 一次性带回。
+extern "c" fn ffi_nvidia_smi() -> Bytes? = "yue_sysmon_nvidia_smi"

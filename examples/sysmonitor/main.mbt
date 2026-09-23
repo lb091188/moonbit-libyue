@@ -100,7 +100,11 @@ struct App {
   swap_hist : @yue.Store[Array[@yue.LineSeries]]
   disk_hist : @yue.Store[Array[@yue.LineSeries]]
   net_hist : @yue.Store[Array[@yue.LineSeries]]
-  proc_hist : @yue.Store[Array[@yue.LineSeries]]
+  // GPU 卡与详情页：每块物理卡一套（数量取启动枚举结果，热插拔不重建）
+  card_gpu_subs : Array[@yue.Store[String]]
+  card_gpu_vals : Array[@yue.Store[String]]
+  gpu_busy_hists : Array[@yue.Store[Array[@yue.LineSeries]]]
+  gpu_vram_hists : Array[@yue.Store[Array[@yue.LineSeries]]]
   // 其余页数据源（进程 / 传感器 / 磁盘 / 网络页订阅）
   procs : @yue.Store[Array[ProcInfo]]
   sensors : @yue.Store[Array[TempSensor]]
@@ -155,9 +159,7 @@ fn sample_once(app : App) -> Unit {
     Some(mem) => {
       let used_gb = mem.used_kb().to_double() / 1048576.0
       let swap_gb = (mem.swap_total_kb - mem.swap_free_kb).to_double() / 1048576.0
-      app.card_mem.set(
-        "\{fmt_kb(mem.used_kb())} / \{fmt_kb(mem.total_kb)} · swap \{pct(mem.swap_usage())}",
-      )
+      app.card_mem.set("\{fmt_kb(mem.used_kb())} / \{fmt_kb(mem.total_kb)}")
       app.card_mem_sub.set(fmt_kb(mem.total_kb))
       @yue.series_push(app.mem_hist, 0, used_gb)
       @yue.series_push(app.swap_hist, 0, swap_gb)
@@ -168,12 +170,41 @@ fn sample_once(app : App) -> Unit {
     Some(procs) => {
       app.procs.set(procs)
       app.card_proc.set("\{procs.length()}")
-      @yue.series_push(app.proc_hist, 0, procs.length().to_double())
     }
   }
   match gpu_list() {
     None => ()
-    Some(gpus) => app.gpus.set(gpus)
+    Some(gpus) => {
+      app.gpus.set(gpus)
+      // 数量以启动枚举为准，超界（极端热插拔）只跳过，不重建视图
+      for i, g in gpus {
+        if i >= app.gpu_busy_hists.length() {
+          break
+        }
+        match g.busy {
+          Some(b) => @yue.series_push(app.gpu_busy_hists[i], 0, b)
+          None => ()
+        }
+        match g.vram_used {
+          Some(v) =>
+            @yue.series_push(app.gpu_vram_hists[i], 0, v / 1073741824.0)
+          None => ()
+        }
+        let val = match (g.busy, g.celsius) {
+          (Some(b), Some(c)) => "\{b.to_int()}% · \{c.to_int()}℃"
+          (Some(b), None) => "\{b.to_int()}%"
+          (None, Some(c)) => "\{c.to_int()}℃"
+          (None, None) => "—"
+        }
+        let name = if g.model != "" {
+          g.model
+        } else {
+          g.device
+        }
+        app.card_gpu_vals[i].set(val)
+        app.card_gpu_subs[i].set("\{g.vendor} · \{name}")
+      }
+    }
   }
   match app.disk.tick() {
     None => ()
@@ -252,6 +283,12 @@ fn main {
   })
   @yue.on_system_theme_change(fn() { dark_mode.set(@yue.system_prefers_dark()) })
 
+  // GPU 数量取启动枚举结果，卡与曲线按块预建（热插拔不重建视图）
+  let gpus0 : Array[GpuInfo] = match gpu_list() {
+    Some(g) => g
+    None => []
+  }
+
   let app : App = {
     cpu: CpuMonitor::new(),
     proc: ProcMonitor::new(info.cores),
@@ -276,7 +313,14 @@ fn main {
       @yue.LineSeries::make("接收", max_points=120),
       @yue.LineSeries::make("发送", max_points=120),
     ]),
-    proc_hist: @yue.Store::new([@yue.LineSeries::make("进程", max_points=120)]),
+    card_gpu_subs: gpus0.map(fn(_g) { @yue.Store::new("—") }),
+    card_gpu_vals: gpus0.map(fn(_g) { @yue.Store::new("—") }),
+    gpu_busy_hists: gpus0.map(fn(_g) {
+      @yue.Store::new([@yue.LineSeries::make("占用", max_points=120)])
+    }),
+    gpu_vram_hists: gpus0.map(fn(_g) {
+      @yue.Store::new([@yue.LineSeries::make("显存", max_points=120)])
+    }),
     procs: @yue.Store::new([]),
     sensors: @yue.Store::new([]),
     gpus: @yue.Store::new([]),
@@ -299,7 +343,7 @@ fn main {
         style=[("flex", 1.0), ("padding", 6.0)],
       ),
     ],
-    title="sysmonitor",
+    title="系统监视器",
     size=Some((1240.0, 840.0)),
   )
   ignore(window)
