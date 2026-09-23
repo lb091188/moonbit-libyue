@@ -81,16 +81,15 @@ fn sparkline_box(
 }
 
 ///|
-/// 资源卡片（导航菜单项）：图标 + 标题 / 规格副标题 / 当前值 / 迷你
-/// 曲线（hist 为 None 时省略）。点击切到 target 视图；选中卡主题色
-/// 描边 + 浅底。不做 hover 高亮：卡内子控件会打断容器的
-/// enter/leave（GTK 按原生窗口边界派发），高亮会闪烁。悬停反馈只有
-/// 手型光标，且须逐子控件设置（光标同样按窗口生效，只设容器盖不住
-/// 有独立窗口的子控件）。
+/// 资源卡片（导航菜单项）：标题行 = 图标 + 标题 + 右侧当前值（紧凑
+/// 格式），下方可选迷你曲线（hist 为 None 时省略，卡片只剩标题栏 +
+/// 内边距的高度）。点击切到 target 视图；选中卡主题色描边 + 浅底。
+/// 不做 hover 高亮：卡内子控件会打断容器的 enter/leave（GTK 按原生
+/// 窗口边界派发），高亮会闪烁。悬停反馈只有手型光标，且须逐子控件
+/// 设置（光标同样按窗口生效，只设容器盖不住有独立窗口的子控件）。
 fn res_card(
   icon : @yue.IconKind,
   title : String,
-  subtitle : @yue.Store[String],
   value : @yue.Store[String],
   hist : @yue.Store[Array[@yue.LineSeries]]?,
   view : @yue.Store[ViewId],
@@ -114,27 +113,23 @@ fn res_card(
             style=[("marginLeft", 6.0)],
             handle=fn(l) { @yue.View::set_cursor(l, hand_cur) },
           ),
+          // 弹性占位把值行推到标题行右端
+          @yue.vbox(
+            [],
+            style=[("flex", 1.0)],
+            handle=fn(h) { @yue.View::set_cursor(h, hand_cur) },
+          ),
+          @yue.label_t(
+            value.get(),
+            role=@yue.Title,
+            handle=fn(l) {
+              value.subscribe(fn(v) { l.set_text(v) })
+              @yue.View::set_cursor(l, hand_cur)
+            },
+          ),
         ],
         style_str=[("alignItems", "center")],
         handle=fn(h) { @yue.View::set_cursor(h, hand_cur) },
-      ),
-      @yue.label_t(
-        subtitle.get(),
-        role=@yue.Secondary,
-        handle=fn(l) {
-          subtitle.subscribe(fn(s) { l.set_text(s) })
-          @yue.View::set_cursor(l, hand_cur)
-        },
-        style=[("marginTop", 2.0)],
-      ),
-      @yue.label_t(
-        value.get(),
-        role=@yue.Title,
-        handle=fn(l) {
-          value.subscribe(fn(v) { l.set_text(v) })
-          @yue.View::set_cursor(l, hand_cur)
-        },
-        style=[("marginTop", 4.0)],
       ),
       spark,
     ],
@@ -169,31 +164,20 @@ fn res_card(
 /// 左栏：资源卡片导航（显单一列，超高滚动）。显卡按硬件实况出卡
 /// （核显 / 独显各一张，均指向传感器页）。
 fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
-  let blank = @yue.Store::new("")
   let cards : Array[@yue.Node] = [
     res_card(
       @yue.Cpu,
       "处理器",
-      app.card_cpu_sub,
       app.card_cpu,
       Some(app.cpu_hist),
       view,
       VCpu,
       y_range=Some((0.0, 100.0)),
     ),
-    res_card(
-      @yue.Database,
-      "内存",
-      app.card_mem_sub,
-      app.card_mem,
-      Some(app.mem_hist),
-      view,
-      VMem,
-    ),
+    res_card(@yue.Database, "内存", app.card_mem, Some(app.mem_hist), view, VMem),
     res_card(
       @yue.HardDrive,
       "磁盘",
-      app.card_disk_sub,
       app.card_disk,
       Some(app.disk_hist),
       view,
@@ -203,7 +187,6 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
     res_card(
       @yue.Wifi,
       "网络",
-      blank,
       app.card_net,
       Some(app.net_hist),
       view,
@@ -211,14 +194,13 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
       floor=1048576.0,
     ),
   ]
-  // 显卡卡：一块物理卡一张（副标题 = 厂商·型号，值 = 使用率·温度，
+  // 显卡卡：一块物理卡一张（值 = 使用率·温度，无曲线，紧凑高度；
   // Store 在 App 构建时按启动枚举预建，1Hz 采样更新文本）
-  for i in 0..<app.card_gpu_subs.length() {
+  for i in 0..<app.card_gpu_vals.length() {
     cards.push(
       res_card(
         @yue.Monitor,
         "显卡 \{i + 1}",
-        app.card_gpu_subs[i],
         app.card_gpu_vals[i],
         None,
         view,
@@ -227,7 +209,7 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
     )
   }
   cards.push(
-    res_card(@yue.TableRows, "进程", blank, app.card_proc, None, view, VProc),
+    res_card(@yue.TableRows, "进程", app.card_proc, None, view, VProc),
   )
   @yue.scroll(
     @yue.vbox(cards, style=[("padding", 10.0)]),

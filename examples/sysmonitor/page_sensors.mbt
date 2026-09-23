@@ -108,6 +108,16 @@ fn page_sensors(app : App) -> @yue.Node {
 
   // 每块物理卡两张图：使用率（0-100 固定轴）+ 显存（GB，自适应轴，
   // 采样值入序列时已换算 GiB）；温度在下方温度传感器行内有迷你曲线。
+  // 型号取启动枚举结果，拼进小节标题。
+  let gpus0 = app.gpus.get()
+  fn gpu_label(i : Int, what : String) -> String {
+    let model = if i < gpus0.length() && gpus0[i].model != "" {
+      "（\{gpus0[i].model}）"
+    } else {
+      ""
+    }
+    "显卡 \{i + 1}\{model} \{what}"
+  }
   let nodes : Array[@yue.Node] = []
   if app.gpu_busy_hists.length() == 0 {
     nodes.push(
@@ -118,7 +128,7 @@ fn page_sensors(app : App) -> @yue.Node {
   }
   for i in 0..<app.gpu_busy_hists.length() {
     nodes.push(
-      @yue.label_t("显卡 \{i + 1} 使用率（%）", role=@yue.Section, style=[
+      @yue.label_t(gpu_label(i, "使用率（%）"), role=@yue.Section, style=[
         ("marginBottom", 6.0),
       ]),
     )
@@ -131,7 +141,7 @@ fn page_sensors(app : App) -> @yue.Node {
       ),
     )
     nodes.push(
-      @yue.label_t("显卡 \{i + 1} 显存（GB）", role=@yue.Section, style=[
+      @yue.label_t(gpu_label(i, "显存（GB）"), role=@yue.Section, style=[
         ("marginTop", 14.0),
         ("marginBottom", 6.0),
       ]),
