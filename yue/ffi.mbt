@@ -2284,10 +2284,10 @@ extern "c" fn ffi_message_box_set_cancel_response(
 extern "c" fn ffi_message_box_run(box : MessageBox) -> Int = "yue_mbt_message_box_run"
 
 ///|
-#borrow(box, w)
+#borrow(box, window)
 extern "c" fn ffi_message_box_run_for_window(
   box : MessageBox,
-  w : Window,
+  window : View,
 ) -> Int = "yue_mbt_message_box_run_for_window"
 
 ///|
