@@ -69,6 +69,8 @@ moon run examples/sysmonitor
 
 Don't know MoonBit? The [five-minute tutorial](docs/tutorial.md) takes you from `moon new` to your first window.
 
+> **Upgrading to 0.5.0**: the `Browser` binding moved to a standalone package. Add `"NoahLiu/moonbit-libyue/yue/browser"` to your imports (`@yue.Browser` → `@browser.Browser`, API unchanged). Apps that don't import it are no longer linked against WebKit/WebView2.
+
 ## Documentation index
 
 | Document | Content |

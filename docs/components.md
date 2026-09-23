@@ -464,7 +464,8 @@ g.set_animating(true)
 ## Browser
 
 ```moonbit
-let b = @yue.Browser::make(url="https://example.com")   // or html="<h1>本地</h1>"
+// Browser lives in the standalone yue/browser package (moon.pkg import "NoahLiu/moonbit-libyue/yue/browser")
+let b = @browser.Browser::make(url="https://example.com")   // or html="<h1>本地</h1>"
 ```
 
 | Parameter | Type | Default | Description |
@@ -487,6 +488,8 @@ let b = @yue.Browser::make(url="https://example.com")   // or html="<h1>本地</
 | on_change_loading / on_update_title / on_update_command / on_commit_navigation / on_finish_navigation | Events |
 
 For customization options, use `Browser::new_with_options(BrowserOptions)`.
+
+> Since 0.5.0 Browser lives in the standalone package `NoahLiu/moonbit-libyue/yue/browser` (API unchanged; `@yue.Browser` becomes `@browser.Browser`); apps that don't import it no longer link WebKit/WebView2.
 
 ## Clipboard
 

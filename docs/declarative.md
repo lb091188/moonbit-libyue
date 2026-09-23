@@ -93,7 +93,7 @@ let win = @yue.mount_window(
 | `tab(pages, on_change, …)` | Tab | each page gets an automatic container |
 | `date_picker(epoch, on_change)` | DatePicker | |
 | `gif(image, scale)` | GifPlayer | |
-| `browser(url, html, …)` | Browser | one of the two |
+| `browser(url, html, …)` | Browser (in the `yue/browser` package, `@browser.browser(...)`) | one of the two |
 | `bind_label(store, f, …)` | Label | L3 reactive binding, see below |
 
 All nodes accept `style` / `style_str`; common nodes also have a **`handle`** parameter.
