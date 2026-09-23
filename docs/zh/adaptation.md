@@ -263,6 +263,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - Windows 切主题无全局重绘,残留旧像素成"重影":GTK 端 `theme_apply` 有 CSS 重建 + 逐窗口同步重绘兜底,Windows 端原本只通知订阅主题的自绘视图,漏订阅区域(以及被隐藏/移走的原生子窗口背后的区域)留旧像素,鼠标划过触发局部失效才消失。修复:shim `yue_mbt_repaint_all` 补 Windows 分支——`EnumWindows` 过滤本进程可见、无属主的顶层窗口,`RedrawWindow(RDW_INVALIDATE|RDW_ERASE|RDW_ALLCHILDREN)` 整体失效连带原生子窗口,只失效不同步绘制(WM_PAINT 交回消息循环);`theme_apply` 的 windows 分支调用它。验证:真机来回切深浅,头部/页面无残影。
 - 零高度自绘视图整段静默不渲染(table_t 文字列消失):`ViewImpl::Invalidate` 对空尺寸提前返回,childless 且无高度样式的 on_draw 容器被 yoga 测高为 0 后永不绘制——table_t 的 CellText 单元格正是这种容器(文字经 on_draw 自绘、无子节点),现象为整列文字不可见而表头/斑马纹/复选框正常;GTK 端裁剪行为不同故未暴露(同函数族此前已踩过「GTK 小单元格路径填充不渲染」的反向坑)。修复:`cell_view` 给 CellText 容器补 `minHeight=row_height`。教训:自绘 on_draw 容器必须有非零尺寸来源(显式高或子内容),「无子节点 + 自动高」在 Windows 等于不画;离屏 Canvas 像素探针可先排除绘制链本身(AttributedText 带色在 Windows 画布上逐位正常)。
 - GDI+ 混合模式仅 Normal/Copy 生效:`PainterWin::SetBlendMode` 只把 Copy 映射为 `CompositingModeSourceCopy`,其余全部落 `SourceOver`——GDI+ `Graphics` 只有这两种合成模式,Multiply/Screen/Difference/Xor 等静默无效。离屏像素探针实测:Multiply 交叉区 (128,128,255) 与 SourceOver 逐位一致(数学期望 #8028FF)。平台能力缺口,不修库(换 D2D 才有完整混合);showcase 画布演示在 Windows 回显「此平台仅 Normal 生效」,`docs` 中 `Image::write_to_file` 平台口径同步修正(Windows GDI+ 编码器 png/jpeg 可用、mac 发行包未编译恒失败)。
+- 原生 Tab 添加首页即回调 `on_selected_page_change`(内部初始选中,非用户切换):回调登记先于加页时,挂载期会空触发(declarative `tab()` 曾因此让切换计数演示凭空起跳);登记挪到加页循环之后即避开。
 
 ## macOS ❓ 未实测
 

@@ -480,12 +480,15 @@ pub fn tab(
     mount: fn(parent) {
       let t = Tab::new()
       apply_style(t, style~, style_str~)
-      t.on_selected_page_change(on_change)
       for (title, page) in pages {
         let holder = Container::new()
         ignore((page.mount)(ViewLike::view(holder)))
         t.add_page(title, holder)
       }
+      // 登记放在加页之后:原生添加首页会内部选中一次并回调,那不是
+      // 用户切换,先登记会让 on_change 在挂载期空触发(计数类演示
+      // 凭空起跳)
+      t.on_selected_page_change(on_change)
       handle(t)
       attach(parent, ViewLike::view(t))
       ViewLike::view(t)
