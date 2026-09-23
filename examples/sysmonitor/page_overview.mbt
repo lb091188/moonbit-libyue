@@ -79,7 +79,9 @@ fn sparkline_box(
 ///|
 /// 资源卡片（导航菜单项）：图标 + 标题 / 规格副标题 / 当前值 / 迷你
 /// 曲线（hist 为 None 时省略）。点击切到 target 视图；选中卡主题色
-/// 描边 + 浅底，悬停浅底提示。
+/// 描边 + 浅底。不做 hover 高亮：卡内子控件会打断容器的
+/// enter/leave（GTK 按原生窗口边界派发），高亮会闪烁，悬停反馈只
+/// 留手型光标。
 fn res_card(
   icon : @yue.IconKind,
   title : String,
@@ -120,18 +122,11 @@ fn res_card(
     ],
     style=[("padding", 12.0), ("marginBottom", 10.0)],
     handle=fn(c) {
-      let hover = Ref(false)
       c.on_draw(fn(p) {
         let b = @yue.ViewLike::get_bounds(c)
         let t = @yue.theme_current()
         let act = view_index(view.get()) == view_index(target)
-        p.set_fill_color(
-          if act || hover.val {
-            t.fill_hover
-          } else {
-            t.bg_panel
-          },
-        )
+        p.set_fill_color(if act { t.fill_hover } else { t.bg_panel })
         p.fill_rect(0.0, 0.0, b.width, b.height)
         p.set_stroke_color(if act { t.primary } else { t.border })
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
@@ -140,14 +135,6 @@ fn res_card(
       @yue.on_theme_change(fn() { c.schedule_paint() })
       view.subscribe(fn(_v) { c.schedule_paint() })
       @yue.View::set_cursor(c, @yue.Cursor::new(@yue.Hand))
-      @yue.ViewLike::on_mouse_enter(c, fn(_e) {
-        hover.val = true
-        c.schedule_paint()
-      })
-      @yue.ViewLike::on_mouse_leave(c, fn(_e) {
-        hover.val = false
-        c.schedule_paint()
-      })
       @yue.ViewLike::on_mouse_down(c, fn(e) {
         if e.button == 1 {
           view.set(target)
