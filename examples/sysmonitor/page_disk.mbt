@@ -1,5 +1,5 @@
-// 磁盘页（U4）：容量条 + IO 曲线。每个挂载点一行（挂载点 · 设备 ·
-// 文件系统 · 容量条 · 读写速率），上方根分区读写速率 2 分钟曲线。
+// 磁盘页（U4）：容量条 + IO 曲线。每个挂载点一行（挂载点 · 占用率 ·
+// 容量条 · 读写速率），上方根分区读写速率 2 分钟曲线。
 // 数据来自 main.mbt 的 1Hz sample_once；IO 曲线用 line_chart_t 的
 // 定长窗口（series_push）。行容器单容器 on_draw，只重绘画布。
 
@@ -15,7 +15,7 @@ fn draw_disk_rows(p : @yue.Painter, w : Double, disks : Array[DiskInfo]) -> Unit
     }
     let usage = d.usage()
     p.draw_text(
-      "\{d.mount} · \{d.device} · \{d.fstype} · \{(usage * 100.0).to_int()}%",
+      "\{d.mount} · \{(usage * 100.0).to_int()}%",
       12.0,
       y + 3.0,
       460.0,
