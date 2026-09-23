@@ -416,6 +416,17 @@ pub fn scroll(
       let holder = Container::new()
       ignore((content.mount)(ViewLike::view(holder)))
       s.set_content(holder)
+      // Windows 上滚动平移只更新 content 容器自身的绝对坐标,其子孙里的
+      // 原生子控件(Entry/TextEdit 等 HWND)不会跟随——滚轮/拖拽把内容画
+      // 走了,原生框仍停在旧屏幕位置,盖住视口外的区域。on_scroll 触发于
+      // Scroll 重摆 content 之前,须以 0ms 定时器延到滚动布局完成后的下一
+      // 个消息循环拍,再对 content 容器强制重摆子树
+      if platform() == "windows" {
+        s.on_scroll(fn() {
+          let _ = set_timeout(0, fn() { holder.update_child_bounds() })
+          false
+        })
+      }
       // flex:1 的 basis 默认 auto,按内容自然高度测量——内容挂载期
       // (holder 尚无父)的 0×0 yoga 计算会把测量缓存污染成 0,scroll
       // 视口高度塌陷(实测 356→0),原生子控件(Entry 等)的裁剪区随之

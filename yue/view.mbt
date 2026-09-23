@@ -154,6 +154,14 @@ pub fn[T : ViewLike] Container::add_child(self : Container, child : T) -> Unit {
 }
 
 ///|
+/// 强制按当前布局重摆子树绝对坐标。Windows 上 Scroll 的滚动平移只更新
+/// content 容器自身,其子孙里的原生子控件(Entry/TextEdit 等 HWND)不会
+/// 跟随,须在滚动布局完成后的 0ms 定时器里对本容器调用一次传导平移。
+pub fn Container::update_child_bounds(self : Container) -> Unit {
+  ffi_container_update_child_bounds(self.view)
+}
+
+///|
 /// 注册自绘回调。painter 仅回调期内有效。
 pub fn Container::on_draw(
   self : Container,

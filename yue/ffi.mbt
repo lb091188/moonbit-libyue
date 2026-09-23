@@ -135,6 +135,9 @@ extern "c" fn ffi_container_on_draw(
 ) -> Unit = "yue_mbt_container_on_draw"
 
 ///|
+extern "c" fn ffi_container_update_child_bounds(container : View) -> Unit = "yue_mbt_container_update_child_bounds"
+
+///|
 #borrow(text)
 extern "c" fn ffi_label_new(text : Bytes) -> View = "yue_mbt_label_new"
 

@@ -555,6 +555,15 @@ void yue_mbt_container_on_draw(void *container, void (*invoke)(void *, void *),
   }
 }
 
+// 滚动后强制把该容器的子树绝对坐标重摆一遍(Windows 上 Scroll 平移只
+// 更新 content 容器自身的 size_allocation_,其子孙的原生子控件 HWND 不
+// 会跟随,需在滚动完成后的 0ms 定时器里逐层调 UpdateChildBounds 传导)。
+void yue_mbt_container_update_child_bounds(void *container) {
+  if (auto *c = CastTo<nu::Container>(container)) {
+    c->UpdateChildBounds();
+  }
+}
+
 // ---------- Label ----------
 
 void *yue_mbt_label_new(const char *text) {
