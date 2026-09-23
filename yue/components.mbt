@@ -6264,6 +6264,7 @@ pub fn tabs_t(
       )
       outer.add_child(head)
       let contents : Array[Container] = []
+      let page_views : Array[View] = []
       let cur = Ref(sel.get())
       for i in 0..<pages.length() {
         let (title, node) = pages[i]
@@ -6314,27 +6315,37 @@ pub fn tabs_t(
           ViewLike::schedule_paint(tab)
         })
         head.add_child(tab)
-        // 内容页:默认只显示当前页;flex 让页区填充 outer 的确定高度
-        // (Scroll / Table 等无 measure 叶节点依赖父级确定高度)
+        // 内容页:flex 让页区填充 outer 的确定高度(Scroll / Table 等
+        // 无 measure 叶节点依赖父级确定高度)。basis 显式置 0(CSS 的
+        // flex:1 1 0 语义):yoga 的 flex 简写只设 grow、basis 为 auto,
+        // 页内容隐藏时 basis 塌 0,外层 auto 高的 scroll 内容测量跟着
+        // 塌,页容器被分配成压缩中间值卡死(Windows 实测 210→56);
+        // basis 恒定 0 + grow 1 则高度只由 flex 分配决定,不随内容显隐
+        // 波动
         let page_c = themed_container(
-          style=[("flex", 1.0)],
+          style=[("flex", 1.0), ("flexbasis", 0.0)],
           style_str=[("flexDirection", "column")],
         )
         ViewLike::set_visible(page_c, cur.val == idx)
-        ignore((node.mount)(ViewLike::view(page_c)))
+        let page_v = (node.mount)(ViewLike::view(page_c))
         outer.add_child(page_c)
         contents.push(page_c)
+        page_views.push(page_v)
       }
       sel.subscribe(fn(i) {
         cur.val = i
+        // 先显示新页再隐藏旧页:反序会让 yoga 在「新页未显示、旧页已
+        // 隐藏」的中间态把外层 flex 容器按 0 内容分配
+        ViewLike::set_visible(contents[i], true)
         for j in 0..<contents.length() {
-          ViewLike::set_visible(contents[j], j == i)
+          if j != i {
+            ViewLike::set_visible(contents[j], false)
+          }
         }
         ViewLike::schedule_paint(head)
-        // 显隐切换后强制根级重算:View::Layout 的传播在非 Container
-        // 父(Scroll)处中断,不补这一次恢复显示的页拿不到尺寸
-        // (Windows 实测页高塌缩,内容消失)
-        ViewLike::update_layout(outer)
+        refresh_layout(outer)
+        // 页内容视图(on_draw 宿主)显式重绘一次,确保切换后当帧画出
+        schedule_paint_view(page_views[i])
       })
       attach(parent, ViewLike::view(outer))
       ViewLike::view(outer)
