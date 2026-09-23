@@ -531,26 +531,6 @@ pub fn gif(
 }
 
 ///|
-/// 内嵌浏览器节点（html 与 url 二选一，都给时以 url 为准）。
-pub fn browser(
-  url? : String = "",
-  html? : String = "",
-  handle? : (Browser) -> Unit = fn(_b) {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
-) -> Node {
-  {
-    mount: fn(parent) {
-      let b = Browser::make(url~, html~)
-      apply_style(b, style~, style_str~)
-      handle(b)
-      attach(parent, ViewLike::view(b))
-      ViewLike::view(b)
-    },
-  }
-}
-
-///|
 /// 容器节点：需要自绘（on_draw）或要拿 Container 句柄时用；纯布局用
 /// vbox/hbox。
 pub fn container(
