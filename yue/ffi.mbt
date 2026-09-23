@@ -1014,6 +1014,7 @@ extern "c" fn ffi_view_on_drag_leave(
 ///|
 #borrow(view)
 extern "c" fn ffi_view_schedule_paint(view : View) -> Unit = "yue_mbt_view_schedule_paint"
+
 #borrow(view)
 extern "c" fn ffi_view_set_borderless(view : View, on : Int) -> Unit = "yue_mbt_view_set_borderless"
 
