@@ -471,19 +471,25 @@ fn page_system(app : App) -> @yue.Node {
       ],
     ),
   )
-  // 电量与网络:查询即显 + 变化事件计数(真机拔插电源 / 断联网即见)
-  let power_out : @yue.Store[String] = @yue.Store::new(
-    if @yue.battery_supported() {
-      match @yue.battery_query() {
-        Ok(Some(b)) => {
-          let full = match b.charging_seconds {
-            Some(s) => "距充满 \{s} 秒"
-            None => "剩余时间未知"
-          }
-          "电量 \{b.percent}%,充电中:\{b.charging}(\{full})"
+  // 电量与网络:定时轮询刷新(默认 30s,电量缓慢变化也可见)+ 变化事件计数
+  // (真机拔插电源 / 断联网即见)
+  let power_out : @yue.Store[String] = @yue.Store::new("")
+  let refresh_power : () -> Unit = fn() {
+    if !@yue.battery_supported() {
+      power_out.set("当前环境无 UPower,电量不可用")
+      return
+    }
+    match @yue.battery_query() {
+      Ok(Some(b)) => {
+        let full = match b.charging_seconds {
+          Some(s) => "距充满 \{s} 秒"
+          None => "剩余时间未知"
         }
-        Ok(None) =>
-          // 台式机常态:无电池但电源来源可查(交流在线)
+        power_out.set("电量 \{b.percent}%,充电中:\{b.charging}(\{full})")
+      }
+      Ok(None) =>
+        // 台式机常态:无电池但电源来源可查(交流在线)
+        power_out.set(
           match @yue.power_source() {
             Ok(src) =>
               if src is @yue.Ac {
@@ -492,12 +498,19 @@ fn page_system(app : App) -> @yue.Node {
                 "无电池,电源:电池供电(异常:请反馈)"
               }
             Err(_) => "无电池(电源状态未知)"
-          }
-        Err(e) => "查询失败:\{e}"
-      }
-    } else {
-      "当前环境无 UPower,电量不可用"
-    },
+          },
+        )
+      Err(e) => power_out.set("查询失败:\{e}")
+    }
+  }
+  refresh_power()
+  // 周期轮询:电量百分比/充电态随放充电缓慢变化,仅靠启动查询与电源
+  // 切换事件看不到(任务返回 true 持续轮询)
+  ignore(
+    @yue.set_timer(30000, fn() {
+      refresh_power()
+      true
+    }),
   )
   let net_out : @yue.Store[String] = @yue.Store::new(
     // Windows 查询走后台轮询缓存,启动后首个状态值由变化事件派发刷新
@@ -508,7 +521,9 @@ fn page_system(app : App) -> @yue.Node {
     },
   )
   let net_n = Ref(0)
-  @yue.on_power_source_change(fn(src) { power_out.set("电源切换:\{src}") })
+  // 电源切换事件即时刷新电量读数(替代原来只写"电源切换"的文案,
+  // 与 30s 轮询走同一查询口径)
+  @yue.on_power_source_change(fn(_src) { refresh_power() })
   @yue.on_network_status_change(fn(s) {
     net_n.val = net_n.val + 1
     net_out.set("当前网络:\{s}(第 \{net_n.val} 次变化)")
