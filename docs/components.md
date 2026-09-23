@@ -288,6 +288,32 @@ let sep = @yue.Separator::make(Horizontal)   // or Vertical
 | Scroll::get_scroll_position_x/y() / get_max_scroll_position_x/y() | Read position and max scroll amount |
 | Scroll::on_scroll(fn() -> Bool) | Scroll position changed (wheel / drag / programmatic; return true to intercept) |
 
+## Hover Group (HoverGroup)
+
+Hovering anywhere in the group — including all child widgets — puts the whole group into the hover state: events triggered on child widgets change the group's styling too.
+
+```moonbit
+@yue.hover_group(
+  @yue.vbox([ /* card content: title / buttons / inputs */ ], style=[("padding", 14.0)]),
+  radius=8.0,
+  on_change=fn(h, host) {
+    // the background highlight is built in; extra feedback like the cursor
+    // is applied to host in the callback
+    @yue.View::set_cursor(host, @yue.Cursor::new(if h { @yue.Hand } else { @yue.Default }))
+  },
+)
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| child | Node | required | Group content |
+| hover_bg / base_bg | String | theme fill_hover / empty (transparent) | Hover / idle background (self-drawn) |
+| radius | Double | 0 | Background corner radius |
+| on_change | (Bool, Container) -> Unit | no-op | Fired on hover-state flips only, receives the group container |
+| style / style_str | arrays | [] | Group container layout styles |
+
+The detection mechanism is pointer-position polling (100ms, comparing the global pointer coordinates against the group's screen rectangle) and does not rely on the container's enter/leave — under GTK, child containers' and native widgets' event windows monopolize pointer events, so the container layer never sees enter; the same mechanism works on Windows with cross-platform-identical behavior.
+
 ## Overlay Scrollbar (OverlayScroll)
 
 `scroll()` always uses the platform's native scrollbars (overlay style requested via `overlay=true`). This component is an **explicitly opted-in** self-drawn floating thumb: it hides the platform scrollbar and draws a themed slim bar over the content's right edge — appears on scroll / hover, fades out in two steps after about 1s of inactivity, draggable along the track, unified across all three platforms. It once served as `scroll()`'s default form and was demoted to a standalone component over stability concerns in complex scenes; not recommended for new code.

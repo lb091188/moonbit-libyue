@@ -288,6 +288,31 @@ let sep = @yue.Separator::make(Horizontal)   // 或 Vertical
 | Scroll::get_scroll_position_x/y() / get_max_scroll_position_x/y() | 读位置与最大滚动量 |
 | Scroll::on_scroll(fn() -> Bool) | 滚动位置变化（滚轮/拖拽/程序滚动统一触发；返回 true 拦截默认处理） |
 
+## Hover 组 HoverGroup
+
+组内任意位置(含全部子控件)悬停即整组进入 hover 态——子控件触发的事件同样改变组的样式。
+
+```moonbit
+@yue.hover_group(
+  @yue.vbox([ /* 卡片内容:标题 / 按钮 / 输入框等 */ ], style=[("padding", 14.0)]),
+  radius=8.0,
+  on_change=fn(h, host) {
+    // 底色高亮已内置;光标等额外反馈在回调里对 host 应用
+    @yue.View::set_cursor(host, @yue.Cursor::new(if h { @yue.Hand } else { @yue.Default }))
+  },
+)
+```
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| child | Node | 必填 | 组内容 |
+| hover_bg / base_bg | String | 主题 fill_hover / 空(透明) | 悬停 / 常态底色(自绘) |
+| radius | Double | 0 | 底色圆角 |
+| on_change | (Bool, Container) -> Unit | 空函数 | hover 态翻转时回调(仅变化时),携带组容器 |
+| style / style_str | 数组 | [] | 组容器布局样式 |
+
+判定机制是指针位置轮询(100ms,读全局指针坐标与组屏幕矩形比对),不依赖容器的 enter/leave——GTK 下子容器/原生控件的事件窗口会独占指针事件,容器层收不到 enter;Windows 下同一机制工作,行为跨平台一致。
+
 ## 悬浮滚动条 OverlayScroll
 
 `scroll()` 一律使用平台原生滚动条（悬浮样式经 `overlay=true` 请求）。本组件为**显式选用**的自绘悬浮细条：隐藏平台滚动条，自绘主题色细条叠在内容右缘——滚动/悬停浮现，停顿约 1 秒两级渐隐，可沿轨道拖拽，三平台形态统一。曾作为 `scroll()` 默认形态，因复杂场景下稳定性不足降级为独立组件，不建议新代码采用。

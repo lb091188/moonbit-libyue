@@ -114,5 +114,39 @@ fn page_basic(app : App) -> @yue.Node {
         ),
       ],
     ),
+    section(
+      "HoverGroup 悬停组",
+      "组内任意位置(含子控件)悬停即整组进入 hover 态:把指针移到卡片里的按钮或输入框上,整张卡片同样高亮且光标变手型——GTK 下子控件的事件窗口会独占指针事件,组件用指针位置轮询判定,不依赖 enter/leave,不闪烁。",
+      [
+        @yue.hover_group(
+          @yue.vbox(
+            [
+              @yue.label_t("组标题:悬停我,或下面的子控件", role=@yue.Section),
+              @yue.hbox(
+                [
+                  @yue.input_t(text="组内输入框", width=200.0),
+                  @yue.button_t("组内按钮"),
+                ],
+                style=[("marginTop", 10.0)],
+                style_str=[("alignItems", "center")],
+              ),
+              @yue.label_t(
+                "子控件触发的事件同样改变组的样式",
+                role=@yue.Secondary,
+                style=[("marginTop", 8.0)],
+              ),
+            ],
+            style=[("padding", 14.0)],
+          ),
+          radius=8.0,
+          on_change=fn(h, host) {
+            @yue.View::set_cursor(
+              host,
+              @yue.Cursor::new(if h { @yue.Hand } else { @yue.Default }),
+            )
+          },
+        ),
+      ],
+    ),
   ])
 }
