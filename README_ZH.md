@@ -16,10 +16,10 @@
 
 ## 核心特色
 
-**🎨 现代主题** —— 全部自绘、三平台视觉一致；`theme_apply` 一行换肤，深浅自动跟随系统：
+**🎨 现代主题** —— 全部自绘、三平台视觉一致；默认整套跟随系统（深浅 + 主色强调色），`theme_apply` 一行换肤（定制后不再随系统，联动见 `on_system_theme_change`）：
 
 ```moonbit
-@yue.theme_apply({ ..@yue.default_theme(), primary: "#1E4FA3" })
+@yue.theme_apply({ ..@yue.theme_from_system(), primary: "#1E4FA3" })
 ```
 
 **📝 声明式** —— 节点树描述界面，不手写 `new + set_xxx`：
