@@ -4343,12 +4343,82 @@ extern "C" int32_t yue_mbt_win_connectivity(int32_t *ok) {
   return static_cast<int32_t>(conn);
 }
 
+// 后台轮询线程：GetConnectivity 在部分环境（代理/虚拟网卡多/网管服务
+// 迟滞）单次可达秒级，在 UI 线程调用会整段冻结主消息循环。查询只在本
+// 线程发生，UI 线程经 yue_mbt_netwin_cached 读最近缓存。COM 对象与
+// CoInitialize 均属本 MTA 线程，跨线程共享接口指针的 apartment 问题
+// 因此不存在。
+static CRITICAL_SECTION g_net_cache_lock;
+static int32_t g_net_cache = -1;  // 最近一次 connectivity 位掩码；-1 无缓存
+static INIT_ONCE g_net_lock_once = INIT_ONCE_STATIC_INIT;
+
+static bool NetCacheLockInit(void) {
+  BOOL pending = FALSE;
+  if (!InitOnceBeginInitialize(&g_net_lock_once, 0, &pending, nullptr)) {
+    return false;
+  }
+  if (pending) {
+    InitializeCriticalSection(&g_net_cache_lock);
+    return InitOnceComplete(&g_net_lock_once, 0, nullptr) ? true : false;
+  }
+  return true;
+}
+
+static DWORD WINAPI NetPollThread(LPVOID arg) {
+  int32_t interval_ms = static_cast<int32_t>(reinterpret_cast<intptr_t>(arg));
+  for (;;) {
+    int32_t ok = 0;
+    int32_t v = yue_mbt_win_connectivity(&ok);
+    if (ok == 1 && NetCacheLockInit()) {
+      EnterCriticalSection(&g_net_cache_lock);
+      g_net_cache = v;
+      LeaveCriticalSection(&g_net_cache_lock);
+    }
+    Sleep(interval_ms > 0 ? static_cast<DWORD>(interval_ms) : 5000);
+  }
+}
+
+extern "C" int32_t yue_mbt_netwin_start(int32_t interval_ms) {
+  // 幂等：重复启动直接成功。线程常驻到进程结束（与 GUI 生命周期一致）。
+  static volatile LONG started = 0;
+  if (InterlockedCompareExchange(&started, 1, 0) != 0) {
+    return 1;
+  }
+  HANDLE h = ::CreateThread(nullptr, 0, NetPollThread,
+                            reinterpret_cast<LPVOID>(
+                                static_cast<intptr_t>(interval_ms)),
+                            0, nullptr);
+  if (h == nullptr) {
+    InterlockedExchange(&started, 0);
+    return 0;
+  }
+  ::CloseHandle(h);
+  return 1;
+}
+
+extern "C" int32_t yue_mbt_netwin_cached(void) {
+  if (!NetCacheLockInit()) {
+    return -1;
+  }
+  EnterCriticalSection(&g_net_cache_lock);
+  int32_t v = g_net_cache;
+  LeaveCriticalSection(&g_net_cache_lock);
+  return v;
+}
+
 #else  // Linux 网络查询走 DBus NetworkManager（MoonBit 层），非 Windows 哨兵
 
 extern "C" int32_t yue_mbt_win_connectivity(int32_t *ok) {
   *ok = 0;
   return -1000;
 }
+
+extern "C" int32_t yue_mbt_netwin_start(int32_t interval_ms) {
+  (void)interval_ms;
+  return 0;
+}
+
+extern "C" int32_t yue_mbt_netwin_cached(void) { return -1; }
 
 #endif  // 网络在线状态平台分支结束
 
