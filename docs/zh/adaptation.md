@@ -229,13 +229,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - CRT 必须与 moon 一致为静态 /MT:CMake 多配置生成器忽略 `CMAKE_BUILD_TYPE`,`cmake --build` 必须带 `--config Release`(prepare.py 已自动化),否则 LNK4098 + `__imp__*` 未解析。
 - exe 控制台黑框已由 yue 包内置 `win_gui.c` 链接 pragma 根治:pragma 存于 .obj 的 drectve 段,静态库归档成员须被引用才会被抽取——`initialize()` 引用 stub 符号 `yue_mbt_win_gui_marker` 保证生效,依赖方零配置;release-bin.yml 的 PE 头改写(Subsystem 3→2)为兜底。用户 link_flags 拼在 `/link` 之前,cl 直接丢弃 `/SUBSYSTEM` 类链接选项(D9002),追加参数路线不可行。GUI 子系统下 stdout 仅管道 / 重定向可见。
 - 换 `yue_mbt.lib` 后 `moon build` 报 no work to do:删 `_build` 下产物 exe 强制重链。
+- prepare.py 模式切换坑(prebuilt↔source):`cmake -D` 只在显式传时覆盖 CMakeCache,不传则沿用残留值——旧 build 目录按 prebuilt 配置过(YUE_MBT_PREBUILT=ON)后切源码模式,configure 沿用 ON 导致 GLOB 到的源码一个不编,`yue_mbt.lib` 里只有 shim 一个 obj,最终链接 360 个符号全库缺失。修复:两种模式都显式传 ON/OFF。判定法:`lib /list build\yue_mbt.lib` 数 obj,全量源码构建应有 27 个(Windows)。
 - prebuild 的 link_configs Windows 分支曾漏为 `yue/traybus` 单列一份:traybus 不依赖 yue(反向),按「依赖该包的目标」传播拿不到链接配置,`moon test` 链 traybus 测试 exe 时 12 个 `yue_mbt_sys_*` 符号 LNK2019;Linux/macOS 分支本就单列,Windows 补齐后三平台一致。
 
 ### manifest
 
 - moon 的链接参数拼接行为(Windows 实测):按 main 包的依赖闭包把每个带 link_configs 的包的 flags 各拼一遍,并对 blackbox 测试目标把「被测包」的 flags 额外再拼一遍(被测包份 ×2)。`.lib` 重复列出无害,`manifest.res` 重复列出则同名 MANIFEST 资源进两次 → CVT1100 链接失败。早期「moon 新版给 exe 自带 MANIFEST 与我们的 res 冲突」的结论有误:mt 实测 moon 链的 exe 不含任何清单资源,冲突的「另一份」始终是重复传入的 res 自己(为 traybus 补 Windows 链接配置后,凡同时拼两份 flags 的目标即触发)。
 - 通道探索结论:`/MANIFEST:EMBED` `/MANIFESTINPUT:` 等链接选项放进 link_flags 会被 cl 当编译选项丢弃(D9002,`/link` 之前的链接选项不传递);`#pragma comment(linker,"/manifestdependency")` 依赖链接器开 /MANIFEST,moon 的链接不开(moon 链的 exe 旁也无外部 .manifest 文件);prebuild 的 stdin 只有环境变量快照与 module_root,无目标/包信息,无法按目标输出差异化配置。
-- 最终方案:manifest.res 不进默认 link_flags——开发 / 测试 / moon run 零配置。无清单的运行代价实测:showcase 启动存活、122 测试全过;「无清单启动即报序数 345(TaskDialogIndirect)」是历史版本的启动路径,当前代码未复现,但视觉样式会退化为经典外观。分发型构建设 `YUE_MBT_KEEP_MANIFEST=1`:res 随 yue 份传入,moon build 的 main 包对每份 flags 只拼一遍,恰好嵌入一份清单(Common-Controls v6 + supportedOS,mt 实读验证);全仓 `moon test` 勿设此开关(blackbox 被测包双拼必炸)。release-bin.yml 已按此配置。
+- 最终方案:manifest.res 不进默认 link_flags——开发 / 测试 / moon run 零配置。无清单的运行代价不止视觉退化:真机 Win10 19045 实测消息框点击按钮进程即崩——`TaskDialogIndirect` 只有 comctl32 v6 才按序号 345 导出,无清单加载的是 v5.82,其导出表序号 345 指向无关函数,libyue 按序号取址拿到非空垃圾指针直接调用即 UB(python ctypes 探针证实解析出非空地址;MoonBit 探针复刻同用法三连跑全干净退出,UB 非确定性,单次不复现不能下结论)。fork 修复(mbt.13):MessageBox 解析序号前先读 comctl32 的 DllGetVersion,主版本 ≥6 才调用,否则安全降级为直接关闭(等效取消响应);OnClose 统一 PostTask 回 UI 线程(原空解析路径在后台线程直接回调也是跨线程隐患)。分发型构建设 `YUE_MBT_KEEP_MANIFEST=1`:res 随 yue 份传入,moon build 的 main 包对每份 flags 只拼一遍,恰好嵌入一份清单(Common-Controls v6 + supportedOS,mt 实读验证),v6 下有真 TaskDialog;全仓 `moon test` 勿设此开关(blackbox 被测包双拼必炸)。release-bin.yml 已按此配置。
 - 环境变量改变 link_flags 后 moon 偶发沿用旧配置不重链:设 / 去变量后行为不变时,`moon clean`(或删 `_build` 下产物 exe)兜底。
 
 ### 运行期差异
