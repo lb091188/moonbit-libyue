@@ -88,6 +88,20 @@ pub fn Window::get_content_size(self : Window) -> SizeF {
 /// 设置窗口内容视图。
 pub fn[T : ViewLike] Window::set_content(self : Window, content : T) -> Unit {
   ffi_window_set_content(self.view, content.view())
+  // content view 是 yoga 根,height 默认 auto——auto 容器没有「剩余
+  // 空间」可分,flex:1 子(Scroll 视口、flex 页区等)在 basis 为 0 时
+  // 高度塌陷(实测滚动视口 356→0,原生控件裁剪区恒空、HWND 永不摆
+  // 位)。yoga 根节点的 percent 无参照不生效,改用绝对值撑起根高,
+  // 并跟随窗口 resize 经 on_size_changed 更新(同值不标脏,无循环)
+  fn apply_height() -> Unit {
+    let sz = self.get_content_size()
+    ViewLike::set_style(content, "height", sz.height)
+  }
+
+  apply_height()
+  // set_style 只标脏,不立即重排;强制一次根级重算让 height 生效
+  refresh_layout(content)
+  ViewLike::on_size_changed(content, fn() { apply_height() })
 }
 
 ///|

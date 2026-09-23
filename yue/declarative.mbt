@@ -416,19 +416,21 @@ pub fn scroll(
       } else {
         s.set_overlay_scrollbar(false)
       }
-      // Windows 上原生子控件(Entry 等)的 HWND 不随容器滚动实时移动,
-      // 会浮在滚动内容之上遮挡其它组件;每次滚动后强制重摆一次布局。
+      // Windows 上原生子控件(Entry 等)的 HWND 由 ScrollImpl::Layout 的
+      // content 分配链同步摆位(SubwinView::SizeAllocate → SetWindowPos +
+      // SetWindowRgn 裁剪),原生链已覆盖;此前挂的 on_scroll 兜底在
+      // update_layout 改为根级遍历后反而引入分配中间态,移除
       let holder = Container::new()
       ignore((content.mount)(ViewLike::view(holder)))
       s.set_content(holder)
       apply_style(s, style~, style_str~)
+      // flex:1 的 basis 默认 auto,按内容自然高度测量——内容挂载期
+      // (holder 尚无父)的 0×0 yoga 计算会把测量缓存污染成 0,scroll
+      // 视口高度塌陷(实测 356→0),原生子控件(Entry 等)的裁剪区随之
+      // 恒空、HWND 永不摆位;显式 basis 0(CSS 的 flex:1 1 0 语义)让
+      // 高度只由 flex 分配决定,不随内容测量波动
+      ViewLike::set_style(s, "flexbasis", 0.0)
       attach(parent, ViewLike::view(s))
-      if platform() == "windows" {
-        s.on_scroll(fn() {
-          ViewLike::update_layout(holder)
-          false
-        })
-      }
       ViewLike::view(s)
     },
   }
