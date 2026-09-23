@@ -278,6 +278,8 @@ void yue_mbt_painter_draw_canvas_from_rect(void *painter, void *canvas,
 
 void *yue_mbt_canvas_new(double width, double height);
 void *yue_mbt_canvas_get_painter(void *canvas);
+/* 导出画布位图（format: "png"/"jpeg";Windows GDI+ 编码器,其余平台恒 0） */
+int32_t yue_mbt_canvas_write_to_file(void *canvas, const char *format, const char *path);
 void *yue_mbt_attributed_text_new(const char *text, int32_t align,
                                   int32_t valign, int32_t wrap, int32_t ellipsis);
 void yue_mbt_attributed_text_set_format(void *at, int32_t align,

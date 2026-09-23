@@ -69,10 +69,12 @@
 #include "nativeui/locale.h"
 #include "nativeui/screen.h"
 #if defined(OS_WIN)
+#include <vector>
 #include "nativeui/win/window_win.h" // WindowImpl::hwnd()（气泡替代窗口定位/置顶）
 #include "nativeui/win/subwin_view.h" // SubwinView::hwnd()（原生子控件 HWND 操作）
 #include "nativeui/win/view_win.h" // ViewImpl::wheel_hook（滚轮消费钩子）
 #include "nativeui/win/util/tray_host.h" // TrayHost::hwnd()（托盘幽灵图标防护）
+#include "nativeui/gfx/win/double_buffer.h" // Canvas 位图导出（GetGdiplusBitmap）
 #endif
 
 // 不包含 <moonbit.h>：它在 extern "C" 里声明的 memcpy 与 glibc 的
@@ -1708,6 +1710,63 @@ void *yue_mbt_canvas_get_painter(void *canvas) {
     return c->GetPainter();
   }
   return nullptr;
+}
+
+int32_t yue_mbt_canvas_write_to_file(void *canvas, const char *format,
+                                     const char *path) {
+#if !defined(OS_WIN)
+  // libyue 未暴露 Canvas 的跨平台导出 API;Windows 走 GDI+ 编码器,
+  // 其余平台降级恒失败(与 Image 写文件的 mac 降级策略一致)
+  (void)canvas;
+  (void)format;
+  (void)path;
+  return 0;
+#else
+  auto *c = CanvasStore::get(canvas);
+  if (c == nullptr) {
+    return 0;
+  }
+  std::wstring mime;
+  if (std::strcmp(format, "png") == 0) {
+    mime = L"image/png";
+  } else if (std::strcmp(format, "jpeg") == 0 || std::strcmp(format, "jpg") == 0) {
+    mime = L"image/jpeg";
+  } else {
+    return 0;
+  }
+  UINT enc_count = 0, enc_size = 0;
+  if (Gdiplus::GetImageEncodersSize(&enc_count, &enc_size) != Gdiplus::Ok ||
+      enc_size == 0) {
+    return 0;
+  }
+  std::vector<char> encs(enc_size);
+  if (Gdiplus::GetImageEncoders(enc_count, enc_size,
+                                reinterpret_cast<Gdiplus::ImageCodecInfo *>(
+                                    encs.data())) != Gdiplus::Ok) {
+    return 0;
+  }
+  CLSID clsid = {};
+  bool found = false;
+  for (UINT i = 0; i < enc_count; ++i) {
+    auto *info = reinterpret_cast<Gdiplus::ImageCodecInfo *>(encs.data()) + i;
+    if (mime == info->MimeType) {
+      clsid = info->Clsid;
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    return 0;
+  }
+  auto bmp = c->GetBitmap()->GetGdiplusBitmap();
+  if (bmp == nullptr) {
+    return 0;
+  }
+  return bmp->Save(FilePathFromUTF8(path).value().c_str(), &clsid,
+                   nullptr) == Gdiplus::Ok
+             ? 1
+             : 0;
+#endif
 }
 
 void *yue_mbt_attributed_text_new(const char *text, int32_t align, int32_t valign,

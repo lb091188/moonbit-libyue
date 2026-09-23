@@ -761,6 +761,14 @@ extern "c" fn ffi_canvas_new(width : Double, height : Double) -> Canvas = "yue_m
 extern "c" fn ffi_canvas_get_painter(canvas : Canvas) -> Painter = "yue_mbt_canvas_get_painter"
 
 ///|
+#borrow(canvas, format, path)
+extern "c" fn ffi_canvas_write_to_file(
+  canvas : Canvas,
+  format : Bytes,
+  path : Bytes,
+) -> Int = "yue_mbt_canvas_write_to_file"
+
+///|
 #borrow(text)
 extern "c" fn ffi_attributed_text_new(
   text : Bytes,
