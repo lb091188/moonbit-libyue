@@ -211,27 +211,23 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
       floor=1048576.0,
     ),
   ]
-  // 显卡卡：一块物理卡一张（数据取构建时枚举结果，GPU 热插拔不重建）
-  for i, g in app.gpus.get() {
-    let sub = @yue.Store::new("\{g.vendor} · \{g.device}")
-    let val = @yue.Store::new(match g.celsius {
-      None => "—"
-      Some(c) => "\{c.to_int()}℃"
-    })
+  // 显卡卡：一块物理卡一张（副标题 = 厂商·型号，值 = 使用率·温度，
+  // Store 在 App 构建时按启动枚举预建，1Hz 采样更新文本）
+  for i in 0..<app.card_gpu_subs.length() {
     cards.push(
-      res_card(@yue.Monitor, "显卡 \{i + 1}", sub, val, None, view, VGpu),
+      res_card(
+        @yue.Monitor,
+        "显卡 \{i + 1}",
+        app.card_gpu_subs[i],
+        app.card_gpu_vals[i],
+        None,
+        view,
+        VGpu,
+      ),
     )
   }
   cards.push(
-    res_card(
-      @yue.TableRows,
-      "进程",
-      blank,
-      app.card_proc,
-      Some(app.proc_hist),
-      view,
-      VProc,
-    ),
+    res_card(@yue.TableRows, "进程", blank, app.card_proc, None, view, VProc),
   )
   @yue.scroll(
     @yue.vbox(cards, style=[("padding", 10.0)]),

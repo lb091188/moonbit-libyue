@@ -166,6 +166,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - /proc/[pid]/stat 的 comm 可含空格与嵌套括号(进程名 "(foo (bar))"),只能按行内最后一个 ')' 切分;comm 截断到 15 字符,完整命令行另读 cmdline(NUL 分隔,空则内核线程回退 [comm])。
 - getpriority 的 nice = -1 是合法值,与出错返回值歧义:成败经 `Ref[Int]` 出参报告(kill / setpriority 仍用 errno 返回值)。
 - Windows 无 /proc 与 nice 语义:stub 编译期保留同一 ABI、运行期返回「不支持」哨兵(-1000),MoonBit 层语义化为中文提示,进程页整体降级;CI 三平台构建不受影响(macOS 走 POSIX 分支天然可用)。
+- NVIDIA 专有驱动的 GPU 占用 / 显存 / 温度不可走进程内 NVML:dlopen `libnvidia-ml.so.1` 后 `nvmlInit_v2` 与宿主运行时偶发堆冲突(本机 RTX 3070 + Ubuntu 24.04 实测启动段错误约 5/6,gdb 下不复现、时序敏感;仅 dlopen+dlsym 不 init 则干净),已改 popen `nvidia-smi` 批量查询(`--query-gpu=pci.bus_id,utilization.gpu,memory.used,memory.total,temperature.gpu,name --format=csv,noheader,nounits`,每卡一行),pci 总线地址按「取冒号后最后一段去前导零」与 sysfs 枚举对位(nvidia-smi 的 00000000:01:00.0 vs sysfs 的 0000:01:00.0);代价是每次采样一个子进程(实测几十毫秒,1Hz 可接受)。nvidia-smi 不存在(无 N 卡 / 未装驱动)时自然回退 sysfs 通用节点(amdgpu / nouveau 的 `gpu_busy_percent`、`mem_info_vram_*`),hwmon 温度两者通用;N 卡专有驱动无 hwmon,温度只能来自 nvidia-smi。
 - diskstats 同时含整盘与分区条目(nvme0n1 与 nvme0n1p1/p2/p3);LVM 挂载设备名(/dev/mapper/ubuntu--vg-ubuntu--lv)与 diskstats 名(dm-N)对不上,须经 `/sys/block/dm-*/dm/name` 反查 dm-N 再取 slaves 首项(实测 dm-0 → nvme0n1p3)才能把 IO 速率归属到挂载行。
 - hwmon 温度编号跳号(coretemp 只暴露部分核的 tempN_input),label 可缺(acpitz 无 label,回退 chip 名);毫摄氏度可为负(电池传感器);NVIDIA 独显普遍不暴露 hwmon 温度(实测 0x2488 无 temp),GPU 温度按 hwmon 口径显示「—」。
 - statvfs 容量取 f_bavail(可用,含保留块扣除)而非 f_bfree,与 df 的 Use% 口径一致;结构体跨 ABI 拆成 total/free/avail 三个 int64 出参。
