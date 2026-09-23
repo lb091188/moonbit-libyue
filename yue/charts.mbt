@@ -700,7 +700,7 @@ fn draw_line_chart(
     lo,
     hi,
     nice_ticks(lo, hi, count=4),
-    label_w=pad_l - 6.0,
+    label_w=pad_l - 12.0,
   )
   // 空窗提示
   let mut any = false
@@ -916,7 +916,7 @@ fn draw_bar_chart(
     if x1 <= x0 || y1 <= y0 {
       return
     }
-    draw_hgrid(p, x0, y0, x1, y1, lo, hi, ticks, label_w=pad_l - 6.0)
+    draw_hgrid(p, x0, y0, x1, y1, lo, hi, ticks, label_w=pad_l - 12.0)
     let yb = map_y(0.0, lo, hi, y0, y1)
     let slot = (x1 - x0) / n.to_double()
     // 类目标签抽稀：槽宽不足 26px 时每隔 step 个画一个
@@ -1317,7 +1317,7 @@ fn draw_scatter(
     ylo,
     yhi,
     nice_ticks(ylo, yhi, count=4),
-    label_w=pad_l - 6.0,
+    label_w=pad_l - 12.0,
   )
   draw_vgrid(p, x0, y0, x1, y1, xlo, xhi, nice_ticks(xlo, xhi, count=5))
   if points.length() == 0 {
