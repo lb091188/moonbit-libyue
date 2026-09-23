@@ -455,6 +455,11 @@ pub fn theme_apply(t : Theme) -> Unit {
     // 第一拍漏掉的子窗口
     post_task(fn() { ffi_repaint_all() })
     post_delayed_task(60, fn() { ffi_repaint_all() })
+  } else if platform() == "windows" {
+    // Windows 端切主题只有订阅主题的视图会重绘,其余区域残留旧像素
+    // (深浅切换后"重影",鼠标划过局部失效才消失);整体失效+擦除,
+    // 连带原生子窗口(输入框背景等)一并刷新
+    ffi_repaint_all()
   }
 }
 
