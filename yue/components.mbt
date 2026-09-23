@@ -6262,6 +6262,7 @@ pub fn tabs_t(
         style=[("height", 36.0)],
         style_str=[("flexDirection", "row")],
       )
+      outer.add_child(head)
       let contents : Array[Container] = []
       let cur = Ref(sel.get())
       for i in 0..<pages.length() {
@@ -6321,11 +6322,8 @@ pub fn tabs_t(
         )
         ViewLike::set_visible(page_c, cur.val == idx)
         ignore((node.mount)(ViewLike::view(page_c)))
+        outer.add_child(page_c)
         contents.push(page_c)
-      }
-      outer.add_child(head)
-      for c in contents {
-        outer.add_child(c)
       }
       sel.subscribe(fn(i) {
         cur.val = i
@@ -6333,6 +6331,10 @@ pub fn tabs_t(
           ViewLike::set_visible(contents[j], j == i)
         }
         ViewLike::schedule_paint(head)
+        // 显隐切换后强制根级重算:View::Layout 的传播在非 Container
+        // 父(Scroll)处中断,不补这一次恢复显示的页拿不到尺寸
+        // (Windows 实测页高塌缩,内容消失)
+        ViewLike::update_layout(outer)
       })
       attach(parent, ViewLike::view(outer))
       ViewLike::view(outer)

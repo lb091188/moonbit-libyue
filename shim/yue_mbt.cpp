@@ -530,8 +530,17 @@ void yue_mbt_view_set_borderless(void *view, int on) {
 void yue_mbt_view_layout(void *view) {
   if (auto *v = CastToView(view)) {
     // 强制重算布局并同步原生子控件位置(Windows 上滚动后
-    // 原生 EDIT HWND 不随容器滚动移动,需在 on_scroll 里补一次)
-    v->Layout();
+    // 原生 EDIT HWND 不随容器滚动移动,需在 on_scroll 里补一次)。
+    // 必须走到根:View::Layout 的传播在非 Container 父(Scroll)处
+    // 中断,子树内 display 切换(显隐页)后 yoga 根不重算,隐藏页
+    // 恢复显示时拿到 0 高尺寸(Windows 实测内容塌缩)。
+    auto* root = v;
+    while (root->GetParent() != nullptr)
+      root = root->GetParent();
+    if (root->IsContainer())
+      static_cast<nu::Container*>(root)->Layout();
+    else
+      root->Layout();
   }
 }
 
