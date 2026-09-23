@@ -166,8 +166,10 @@ def prepare_source(os_name: str) -> None:
 def cmake_build(prebuilt: bool) -> None:
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
-    if prebuilt:
-        configure.append("-DYUE_MBT_PREBUILT=ON")
+    # 两种模式都必须显式传:cmake -D 只在传了时覆盖,不传则沿用 CMakeCache
+    # 残留值——prebuilt→source 切换时 ON 残留会让源码模式只编 shim,库内仅
+    # 一个 yue_mbt.obj,链接期全库符号缺失。
+    configure.append(f"-DYUE_MBT_PREBUILT={'ON' if prebuilt else 'OFF'}")
     build = ["cmake", "--build", str(BUILD_DIR), "--parallel"]
     if system() == "Windows":
         # VS 多配置生成器忽略 CMAKE_BUILD_TYPE，必须显式 --config；
