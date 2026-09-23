@@ -5792,17 +5792,50 @@ double yue_mbt_scroll_get_position_y(void *scroll) {
 }
 
 double yue_mbt_scroll_get_max_position_x(void *scroll) {
+#if defined(OS_LINUX)
+  // fork 的 Linux ScrollImpl::GetMaximumScrollPosition 把另一轴的视口
+  // 尺寸当 page_size 用(实测 max_y = 内容高 − 视口宽,探针逐位命中),
+  // Linux 侧改从 GtkScrolledWindow 的 adjustment 直读真值。
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    if (auto *w = GTK_WIDGET(s->GetNative())) {
+      GtkAdjustment *adj = gtk_scrolled_window_get_hadjustment(
+          GTK_SCROLLED_WINDOW(w));
+      if (adj != nullptr) {
+        double m = gtk_adjustment_get_upper(adj) - gtk_adjustment_get_page_size(adj);
+        return m > 0.0 ? m : 0.0;
+      }
+    }
+    return 0.0;
+  }
+  return 0.0;
+#else
   if (auto *s = CastTo<nu::Scroll>(scroll)) {
     return std::get<0>(s->GetMaximumScrollPosition());
   }
   return 0.0;
+#endif
 }
 
 double yue_mbt_scroll_get_max_position_y(void *scroll) {
+#if defined(OS_LINUX)
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    if (auto *w = GTK_WIDGET(s->GetNative())) {
+      GtkAdjustment *adj = gtk_scrolled_window_get_vadjustment(
+          GTK_SCROLLED_WINDOW(w));
+      if (adj != nullptr) {
+        double m = gtk_adjustment_get_upper(adj) - gtk_adjustment_get_page_size(adj);
+        return m > 0.0 ? m : 0.0;
+      }
+    }
+    return 0.0;
+  }
+  return 0.0;
+#else
   if (auto *s = CastTo<nu::Scroll>(scroll)) {
     return std::get<1>(s->GetMaximumScrollPosition());
   }
   return 0.0;
+#endif
 }
 
 #if defined(OS_WIN)

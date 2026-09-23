@@ -384,11 +384,12 @@ pub fn group(
 /// 滚动容器节点：内容是任意 Node。Scroll 是 View 不是 Container,内容必须
 /// 走 SetContentView（AddChild 会被 shim 类型校验拒绝）,故先把内容挂进
 /// 一个容器再整块设为滚动内容。
-/// 滚动条形态:默认(overlay=true 且未显式 policy)为自绘悬浮细条,三平台
-/// 统一(Windows 平台条是经典样式常驻占位,无悬浮对应物);显式 policy 或
-/// overlay=false 保留平台滚动条。悬浮形态由 attach_overlay_thumb 实现,
-/// 本函数为它套一层 host 容器(thumb 的 absolute 定位以 host 为基准,
-/// style 参数相应挪给 host,Scroll 在其内撑满)。
+/// 滚动条形态:一律平台原生——overlay=true(默认)在支持的平台上请求
+/// 悬浮样式(Linux 由 app_init 的 GTK_OVERLAY_SCROLLING 环境保底;macOS
+/// 为 NSScroller overlay;Windows 无悬浮对应物,经典条常驻占位)。
+/// 自绘悬浮条(overlay_scroll 组件)曾作默认形态,实测在隐藏挂载后切换
+/// 显示、复杂自绘内容等场景下滚动范围测量不稳,降级为显式选用,不再
+/// 作为任何默认路径。
 pub fn scroll(
   content : Node,
   content_size? : (Double, Double)? = None,
@@ -400,7 +401,6 @@ pub fn scroll(
 ) -> Node {
   {
     mount: fn(parent) {
-      let use_thumb = overlay && !(policy is Some(_))
       let s = Scroll::new()
       handle(s)
       match content_size {
@@ -411,10 +411,9 @@ pub fn scroll(
         Some((h, v)) => s.set_scrollbar_policy(h, v)
         None => ()
       }
-      if overlay && !use_thumb {
+      if overlay {
         s.set_overlay_scrollbar(true)
-      }
-      if !overlay {
+      } else {
         s.set_overlay_scrollbar(false)
       }
       // Windows 上原生子控件(Entry 等)的 HWND 不随容器滚动实时移动,
@@ -422,30 +421,15 @@ pub fn scroll(
       let holder = Container::new()
       ignore((content.mount)(ViewLike::view(holder)))
       s.set_content(holder)
-      if use_thumb {
-        let host = Container::make(style~, style_str~)
-        attach(parent, ViewLike::view(host))
-        apply_style(s, style=[("flex", 1.0)], style_str=[])
-        attach(ViewLike::view(host), ViewLike::view(s))
-        if platform() == "windows" {
-          s.on_scroll(fn() {
-            ViewLike::update_layout(holder)
-            false
-          })
-        }
-        attach_overlay_thumb(ViewLike::view(host), s)
-        ViewLike::view(host)
-      } else {
-        apply_style(s, style~, style_str~)
-        attach(parent, ViewLike::view(s))
-        if platform() == "windows" {
-          s.on_scroll(fn() {
-            ViewLike::update_layout(holder)
-            false
-          })
-        }
-        ViewLike::view(s)
+      apply_style(s, style~, style_str~)
+      attach(parent, ViewLike::view(s))
+      if platform() == "windows" {
+        s.on_scroll(fn() {
+          ViewLike::update_layout(holder)
+          false
+        })
       }
+      ViewLike::view(s)
     },
   }
 }
