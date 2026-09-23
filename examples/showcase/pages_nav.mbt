@@ -112,8 +112,8 @@ fn page_nav(app : App) -> @yue.Node {
     ),
     section(
       "Breadcrumb 面包屑",
-      "层级随选中态联动:当前项深色,其余灰色可点、悬停变主题色。",
-      [@yue.breadcrumb(["MoonShell", "控制台", "基础组件"], app.selected)],
+      "层级随选中态联动:当前项深色,其余灰色可点、悬停变主题色。项名即页面名,点击直达(面包屑与侧边菜单共享同一导航状态,写不存在的页面名会把所有页隐藏)。",
+      [@yue.breadcrumb(["数据展示", "导航组件", "基础组件"], app.selected)],
     ),
     section(
       "Pagination 分页",

@@ -98,16 +98,27 @@ fn page_canvas(_app : App) -> @yue.Node {
           }),
           @yue.button_t("切换混合模式", on_click=fn() {
             canvas_blend.val = (canvas_blend.val + 1) % canvas_blends.length()
-            canvas_info.set(canvas_blend_names[canvas_blend.val])
+            // Windows 的 GDI+ 合成只有 SourceOver/SourceCopy 两种,
+            // 其余混合模式静默无效(见 adaptation.md),回显里如实提示
+            let note = if @yue.platform() == "windows" && canvas_blend.val != 0 {
+              "(此平台仅 Normal 生效)"
+            } else {
+              ""
+            }
+            canvas_info.set(canvas_blend_names[canvas_blend.val] + note)
             canvas_repaint()
           }),
           @yue.button_t("导出缩放图", variant=@yue.Solid, on_click=fn() {
             match canvas_img.val {
               Some(img) => {
                 let half = img.resize(img.get_width() / 2.0, img.get_height() / 2.0)
-                let ok = half.write_to_file("png", "/tmp/components_half.png")
+                let ok = half.write_to_file("png", "build/components_half.png")
                 canvas_info.set(
-                  if ok { "已导出 /tmp/components_half.png" } else { "导出失败" },
+                  if ok {
+                    "已导出 build/components_half.png"
+                  } else {
+                    "导出失败"
+                  },
                 )
               }
               None => canvas_info.set("无图片可导出")
@@ -119,7 +130,7 @@ fn page_canvas(_app : App) -> @yue.Node {
     ),
     section(
       "图像与混合模式",
-      "draw_image 叠 PNG(右下角)+ blend_mode(Normal/Multiply/Screen/Difference/Xor);导出缩略图到 /tmp。",
+      "draw_image 叠 PNG(右下角)+ blend_mode(Normal/Multiply/Screen/Difference/Xor);导出缩略图到运行目录 build/。Windows 的 GDI+ 合成仅支持 Normal/Copy,其余模式无效果(Linux/macOS 完整)。",
       [
         @yue.descriptions([
           ("Normal", "默认覆盖"),
