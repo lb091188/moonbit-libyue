@@ -4780,7 +4780,10 @@ pub fn table_t(
             // 自绘单行省略:Label 无 ellipsize 能力(fork 未暴露),
             // 超宽长文本被平台排版换行穿透行高;draw 走 wrap=false +
             // ellipsis=true 单行截断(与 table_v_t 单元格同模型),
-            // 拖列宽/行重建后按当前宽度重截,主题切换随重绘取新色
+            // 拖列宽/行重建后按当前宽度重截,主题切换随重绘取新色。
+            // wrap 无子节点、无高度样式,yoga 测高为 0——Windows 对
+            // 0 高视图直接跳过绘制(整列文字消失),必须给出行高下限
+            ViewLike::set_style(wrap, "minHeight", row_height)
             wrap.on_draw(fn(p) {
               let b = ViewLike::get_bounds(wrap)
               let at = AttributedText::new_with(
