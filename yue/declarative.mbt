@@ -384,12 +384,14 @@ pub fn group(
 /// 滚动容器节点：内容是任意 Node。Scroll 是 View 不是 Container,内容必须
 /// 走 SetContentView（AddChild 会被 shim 类型校验拒绝）,故先把内容挂进
 /// 一个容器再整块设为滚动内容。
-/// 滚动条形态:一律平台原生——overlay=true(默认)在支持的平台上请求
-/// 悬浮样式(Linux 由 app_init 的 GTK_OVERLAY_SCROLLING 环境保底;macOS
-/// 为 NSScroller overlay;Windows 无悬浮对应物,经典条常驻占位)。
-/// 自绘悬浮条(overlay_scroll 组件)曾作默认形态,实测在隐藏挂载后切换
-/// 显示、复杂自绘内容等场景下滚动范围测量不稳,降级为显式选用,不再
-/// 作为任何默认路径。
+/// 滚动条形态按平台分化(overlay=true 默认且未显式 policy 时):
+/// Windows 走悬浮细条形态——host 容器套原生 Scroll(平台条置 Never 完全
+/// 隐藏)+ 自绘主题色 thumb(absolute 占右缘,滚动浮现/停顿渐隐/悬停保持/
+/// 拖拽/滚轮转发;thumb 是普通自绘视图,Windows 上事件直接可达,无 GTK
+/// 子窗口独占指针事件的透传问题);其余平台走 set_overlay_scrollbar
+/// (GTK 原生悬浮形态,Linux 由 app_init 的 GTK_OVERLAY_SCROLLING 环境
+/// 保底,macOS 为 NSScroller overlay)。overlay=false 或显式 policy 仍走
+/// 平台原生条。
 pub fn scroll(
   content : Node,
   content_size? : (Double, Double)? = None,
@@ -411,27 +413,37 @@ pub fn scroll(
         Some((h, v)) => s.set_scrollbar_policy(h, v)
         None => ()
       }
-      if overlay {
-        s.set_overlay_scrollbar(true)
-      } else {
-        s.set_overlay_scrollbar(false)
-      }
-      // Windows 上原生子控件(Entry 等)的 HWND 由 ScrollImpl::Layout 的
-      // content 分配链同步摆位(SubwinView::SizeAllocate → SetWindowPos +
-      // SetWindowRgn 裁剪),原生链已覆盖;此前挂的 on_scroll 兜底在
-      // update_layout 改为根级遍历后反而引入分配中间态,移除
       let holder = Container::new()
       ignore((content.mount)(ViewLike::view(holder)))
       s.set_content(holder)
-      apply_style(s, style~, style_str~)
       // flex:1 的 basis 默认 auto,按内容自然高度测量——内容挂载期
       // (holder 尚无父)的 0×0 yoga 计算会把测量缓存污染成 0,scroll
       // 视口高度塌陷(实测 356→0),原生子控件(Entry 等)的裁剪区随之
       // 恒空、HWND 永不摆位;显式 basis 0(CSS 的 flex:1 1 0 语义)让
       // 高度只由 flex 分配决定,不随内容测量波动
       ViewLike::set_style(s, "flexbasis", 0.0)
-      attach(parent, ViewLike::view(s))
-      ViewLike::view(s)
+      if overlay && policy is None && platform() == "windows" {
+        // Windows 悬浮细条:style 挪给 host(thumb 的 absolute 定位以
+        // host 为基准,直接挂页面容器会被 padding/margin 带偏),Scroll
+        // 在内撑满,attach_overlay_thumb 置平台条 Never 并挂自绘 thumb
+        let host = themed_container(style~, style_str~)
+        attach(parent, ViewLike::view(host))
+        // Scroll 自身撑满 host:style 已挪给 host,这里补 flex(配 basis 0
+        // 即 CSS 的 flex:1 1 0——高度只由 flex 分配决定)
+        ViewLike::set_style(s, "flex", 1.0)
+        attach(ViewLike::view(host), ViewLike::view(s))
+        attach_overlay_thumb(ViewLike::view(host), s)
+        ViewLike::view(host)
+      } else {
+        if overlay {
+          s.set_overlay_scrollbar(true)
+        } else {
+          s.set_overlay_scrollbar(false)
+        }
+        apply_style(s, style~, style_str~)
+        attach(parent, ViewLike::view(s))
+        ViewLike::view(s)
+      }
     },
   }
 }
