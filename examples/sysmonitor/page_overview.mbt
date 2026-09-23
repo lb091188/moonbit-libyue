@@ -240,7 +240,9 @@ fn view_area(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
           style_str=[("flexDirection", "column")],
         )
         @yue.ViewLike::set_visible(pc, view_index(item.0) == view_index(view.get()))
-        ignore(node.mount_into(@yue.ViewLike::view(pc)))
+        // 页面内容整页滚动（showcase 同款），超窗不裁切
+        let sc = @yue.scroll(node, style=[("flex", 1.0)])
+        ignore(sc.mount_into(@yue.ViewLike::view(pc)))
         area.add_child(pc)
         boxes.push(pc)
       }
