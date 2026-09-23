@@ -119,11 +119,15 @@ fn res_card(
             style=[("flex", 1.0)],
             handle=fn(h) { @yue.View::set_cursor(h, hand_cur) },
           ),
+          // 值行：比标题小两档字号；固定宽度 + 右对齐——宽度不再随
+          // 文本回流，长数值只会占满不会换行
           @yue.label_t(
             value.get(),
-            role=@yue.Title,
+            role=@yue.Section,
+            style=[("width", 132.0)],
             handle=fn(l) {
               value.subscribe(fn(v) { l.set_text(v) })
+              l.set_align(@yue.End)
               @yue.View::set_cursor(l, hand_cur)
             },
           ),
