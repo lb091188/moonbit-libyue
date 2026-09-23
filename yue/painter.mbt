@@ -278,6 +278,17 @@ pub fn Canvas::get_painter(self : Canvas) -> Painter {
 }
 
 ///|
+/// 导出画布位图为图片文件（"png"/"jpeg"；Windows 走 GDI+ 编码器，
+/// 其余平台返回 false）。
+pub fn Canvas::write_to_file(
+  self : Canvas,
+  format : String,
+  path : String,
+) -> Bool {
+  ffi_canvas_write_to_file(self, utf8_bytes(format), utf8_bytes(path)) == 1
+}
+
+///|
 /// 创建富文本（可设字体/颜色/换行/省略，可查询布局包围盒）。
 pub fn AttributedText::new(
   text : String,
@@ -618,7 +629,8 @@ pub fn Image::resize(
 }
 
 ///|
-/// 导出为图片文件（Linux 支持 "png"）。
+/// 导出为图片文件（Windows/Linux 支持（"png" 等，Windows 走 GDI+ 编码器）；
+/// macOS 恒失败——发行包未编译进该实现，降级）。
 pub fn Image::write_to_file(
   self : Image,
   format : String,
