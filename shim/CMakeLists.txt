@@ -45,7 +45,7 @@ else()
   set(YUE_NO_ARC_SOURCES "")
 endif()
 
-add_library(yue_mbt STATIC ${YUE_SOURCES} yue_mbt.cpp)
+add_library(yue_mbt STATIC ${YUE_SOURCES} yue_mbt.cpp yue_mbt_browser.cpp)
 # macOS 系统主色调读 controlAccentColor 需 ObjC++ 翻译单元(shim 主体纯 C++)
 if(APPLE)
   target_sources(yue_mbt PRIVATE yue_accent_mac.mm)

@@ -1,0 +1,15 @@
+import {
+  "moonbitlang/core/encoding/utf8",
+  "NoahLiu/moonbit-libyue/yue",
+}
+
+options(
+  targets: {
+    "ffi.mbt": [ "native" ],
+    "browser.mbt": [ "native" ],
+    "types.mbt": [ "native" ],
+    "methods.mbt": [ "native" ],
+    "props.mbt": [ "native" ],
+    "declarative.mbt": [ "native" ],
+  },
+)

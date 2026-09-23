@@ -97,7 +97,7 @@ let win = @yue.mount_window(
 | `tab(pages, on_change, …)` | Tab | 每页自动包容器 |
 | `date_picker(epoch, on_change)` | DatePicker | |
 | `gif(image, scale)` | GifPlayer | |
-| `browser(url, html, …)` | Browser | 二选一 |
+| `browser(url, html, …)` | Browser(在 `yue/browser` 包,`@browser.browser(...)`) | 二选一 |
 | `bind_label(store, f, …)` | Label | L3 响应式绑定，见下 |
 
 所有节点都带 `style` / `style_str`；常用节点另有 **`handle`** 参数。

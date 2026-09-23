@@ -26,6 +26,7 @@
 #include <wtsapi32.h> // WTSRegisterSessionNotification 与 NOTIFY_FOR_*（WTS 消息码在 winuser.h，注册函数在此）
 #endif
 #include "yue_mbt.h"
+#include "yue_mbt_internal.h"
 
 #include <cmath>
 #include <cstdio>
@@ -49,7 +50,6 @@
 #include <unordered_map>
 
 #include "base/command_line.h"
-#include "base/json/json_writer.h"
 #include "nativeui/nativeui.h"
 #if defined(OS_LINUX) // set_borderless 的 GtkCssProvider 注入(仅 Linux GTK)
 #include <gtk/gtk.h>
@@ -76,11 +76,6 @@
 #include "nativeui/win/util/tray_host.h" // TrayHost::hwnd()（托盘幽灵图标防护）
 #include "nativeui/gfx/win/double_buffer.h" // Canvas 位图导出（GetGdiplusBitmap）
 #endif
-
-// 不包含 <moonbit.h>：它在 extern "C" 里声明的 memcpy 与 glibc 的
-// C++ noexcept 声明冲突。只声明用到的运行时入口，签名照抄
-// ~/.moon/include/moonbit.h。
-extern "C" void *moonbit_make_bytes(int32_t size, int value);
 
 // C++ 对象一律走系统堆（MoonBit 运行时可能接管进程分配器，普通 new 会被
 // GC 破坏）：Linux 用 __libc_malloc/__libc_free；Windows 下 moon 以
@@ -150,32 +145,7 @@ namespace {
 nu::Lifetime *g_lifetime = nullptr;
 nu::State *g_state = nullptr;
 
-int64_t g_next_handle = 1;
-
-// 句柄注册表：id → scoped_refptr。
-template <typename T>
-struct Store {
-  static std::unordered_map<int64_t, scoped_refptr<T>> &map() {
-    static std::unordered_map<int64_t, scoped_refptr<T>> m;
-    return m;
-  }
-  static int64_t put(T *obj) {
-    int64_t id = g_next_handle++;
-    map()[id] = scoped_refptr<T>(obj);
-    return id;
-  }
-  static int64_t put(const scoped_refptr<T> &obj) {
-    int64_t id = g_next_handle++;
-    map()[id] = obj;
-    return id;
-  }
-  static T *get(void *handle) {
-    auto it = map().find(reinterpret_cast<int64_t>(handle));
-    return it == map().end() ? nullptr : it->second.get();
-  }
-};
-
-using ViewStore = Store<nu::Responder>;
+using yue_mbt::Store;
 using MenuStore = Store<nu::Menu>;
 using ModelStore = Store<nu::TableModel>;
 using MenuBarStore = Store<nu::MenuBar>;
@@ -207,41 +177,10 @@ using PopoverStore = Store<nu::Window>;
 #endif
 using MessageBoxStore = Store<nu::MessageBox>;
 
-// CastTo：从注册表取对象，并用 GetClassName 校验运行时类型。
-// （View 自身无 kClassName，故模板仅用于具体控件类型。）
-template <typename T>
-T *CastTo(void *handle) {
-  auto *r = ViewStore::get(handle);
-  if (r == nullptr) {
-    std::fprintf(stderr, "yue_mbt: 句柄无效\n");
-    return nullptr;
-  }
-  if (std::strcmp(r->GetClassName(), T::kClassName) == 0) {
-    return static_cast<T *>(r);
-  }
-  std::fprintf(stderr, "yue_mbt: 类型不匹配，期望 %s，实际 %s\n", T::kClassName,
-               r->GetClassName());
-  return nullptr;
-}
-
-// 通用 View 检查：View 无 kClassName，类型正确性由 MoonBit 侧
-// ViewLike 约束保证。
-nu::View *CastToView(void *handle) {
-  auto *r = ViewStore::get(handle);
-  if (r == nullptr) {
-    return nullptr;
-  }
-  return static_cast<nu::View *>(r);
-}
-
-// MoonBit Bytes 内容拷贝
-void *BytesFromString(const std::string &s) {
-  void *bytes = moonbit_make_bytes(static_cast<int32_t>(s.size()), 0);
-  if (!s.empty()) {
-    std::memcpy(bytes, s.data(), s.size());
-  }
-  return bytes;
-}
+using yue_mbt::BytesFromString;
+using yue_mbt::CastTo;
+using yue_mbt::CastToView;
+using yue_mbt::ViewStore;
 
 // base::FilePath 在 Windows（UNICODE 构建）的 StringType 是 std::wstring；
 // ABI 边界统一 UTF-8，进出都经 libyue 的 FromUTF8Unsafe/AsUTF8Unsafe。
@@ -1065,209 +1004,6 @@ void yue_mbt_tab_on_selected_page_change(void *tab, void (*invoke)(void *),
   if (auto *t = CastTo<nu::Tab>(tab)) {
     t->on_selected_page_change.Connect(
         [invoke, closure](nu::Tab *) { invoke(closure); });
-  }
-}
-
-// ---------- Browser ----------
-
-/* GetCookiesForURL：回调收到扁平 UTF-8 文本，每行一条 Cookie，
- * 字段以 \x1f 分隔：name/value/domain/path/http_only/secure */
-void yue_mbt_browser_get_cookies_for_url(void *browser, const char *url,
-                                         void (*invoke)(void *, void *), void *closure) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->GetCookiesForURL(std::string(url),
-                        [invoke, closure](std::vector<nu::Cookie> cookies) {
-                          std::string flat;
-                          for (const auto &c : cookies) {
-                            flat += c.name;
-                            flat += '\x1f';
-                            flat += c.value;
-                            flat += '\x1f';
-                            flat += c.domain;
-                            flat += '\x1f';
-                            flat += c.path;
-                            flat += '\x1f';
-                            flat += c.http_only ? "1" : "0";
-                            flat += '\x1f';
-                            flat += c.secure ? "1" : "0";
-                            flat += '\n';
-                          }
-                          invoke(closure, BytesFromString(flat));
-                        });
-  }
-}
-
-void yue_mbt_browser_load_html(void *browser, const char *html, const char *base_url) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->LoadHTML(std::string(html), std::string(base_url));
-  }
-}
-
-void yue_mbt_browser_set_user_agent(void *browser, const char *agent) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->SetUserAgent(std::string(agent));
-  }
-}
-
-void yue_mbt_browser_execute_javascript(void *browser, const char *code) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->ExecuteJavaScript(std::string(code), nu::Browser::ExecutionCallback());
-  }
-}
-
-/* 自定义协议：MoonBit 回调返回 [ok:i32][mime_len:i32][mime][content] 编码,ok=0 表示拒绝 */
-void yue_mbt_browser_register_protocol(const char *scheme,
-                                       void *(*invoke)(void *, void *), void *closure) {
-  nu::Browser::RegisterProtocol(
-      std::string(scheme),
-      [invoke, closure](std::string url) -> nu::ProtocolJob * {
-        void *bytes = invoke(closure, BytesFromString(url));
-        auto *p = static_cast<const char *>(bytes);
-        int32_t ok = 0;
-        std::memcpy(&ok, p, 4);
-        if (ok == 0) {
-          return nullptr;
-        }
-        int32_t mime_len = 0;
-        std::memcpy(&mime_len, p + 4, 4);
-        std::string mime(p + 8, mime_len);
-        int32_t content_len = 0;
-        std::memcpy(&content_len, p + 8 + mime_len, 4);
-        std::string content(p + 8 + mime_len + 4, content_len);
-        return new nu::ProtocolStringJob(mime, content);
-      });
-}
-
-void yue_mbt_browser_unregister_protocol(const char *scheme) {
-  nu::Browser::UnregisterProtocol(std::string(scheme));
-}
-
-void *yue_mbt_browser_new_ex(int32_t devtools, int32_t context_menu,
-                             int32_t allow_file_access, int32_t hardware_acceleration) {
-  nu::Browser::Options options;
-  options.devtools = devtools != 0;
-  options.context_menu = context_menu != 0;
-#if defined(OS_MAC) || defined(OS_LINUX)
-  options.allow_file_access_from_files = allow_file_access != 0;
-#else
-  (void)allow_file_access;
-#endif
-#if defined(OS_LINUX)
-  options.hardware_acceleration = hardware_acceleration != 0;
-#else
-  (void)hardware_acceleration;
-#endif
-  return reinterpret_cast<void *>(ViewStore::put(new nu::Browser(options)));
-}
-
-void *yue_mbt_browser_new(void) {
-  nu::Browser::Options options;
-  options.context_menu = true;
-#if defined(WEBVIEW2_SUPPORT)
-  // Windows 优先 WebView2（loader/运行时缺失时 libyue 内部自动回退 IE）
-  options.webview2_support = true;
-#endif
-  return reinterpret_cast<void *>(ViewStore::put(new nu::Browser(options)));
-}
-
-void yue_mbt_browser_load_url(void *browser, const char *url) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->LoadURL(url);
-  }
-}
-
-void *yue_mbt_browser_get_url(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    return BytesFromString(b->GetURL());
-  }
-  return moonbit_make_bytes(0, 0);
-}
-
-void yue_mbt_browser_reload(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->Reload();
-  }
-}
-
-void yue_mbt_browser_go_back(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->GoBack();
-  }
-}
-
-void yue_mbt_browser_go_forward(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->GoForward();
-  }
-}
-
-int32_t yue_mbt_browser_can_go_back(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    return b->CanGoBack() ? 1 : 0;
-  }
-  return 0;
-}
-
-int32_t yue_mbt_browser_can_go_forward(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    return b->CanGoForward() ? 1 : 0;
-  }
-  return 0;
-}
-
-int32_t yue_mbt_browser_is_loading(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    return b->IsLoading() ? 1 : 0;
-  }
-  return 0;
-}
-
-void yue_mbt_browser_on_change_loading(void *browser, void (*invoke)(void *),
-                                       void *closure) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->on_change_loading.Connect(
-        [invoke, closure](nu::Browser *) { invoke(closure); });
-  }
-}
-
-void yue_mbt_browser_on_update_command(void *browser, void (*invoke)(void *),
-                                       void *closure) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->on_update_command.Connect(
-        [invoke, closure](nu::Browser *) { invoke(closure); });
-  }
-}
-
-void yue_mbt_browser_on_update_title(void *browser,
-                                     void (*invoke)(void *, void *),
-                                     void *closure) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->on_update_title.Connect([invoke, closure](nu::Browser *,
-                                                 const std::string &title) {
-      invoke(closure, BytesFromString(title));
-    });
-  }
-}
-
-void yue_mbt_browser_on_commit_navigation(void *browser,
-                                          void (*invoke)(void *, void *),
-                                          void *closure) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->on_commit_navigation.Connect([invoke, closure](nu::Browser *,
-                                                      const std::string &url) {
-      invoke(closure, BytesFromString(url));
-    });
-  }
-}
-
-void yue_mbt_browser_on_finish_navigation(void *browser,
-                                          void (*invoke)(void *, void *),
-                                          void *closure) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->on_finish_navigation.Connect([invoke, closure](nu::Browser *,
-                                                      const std::string &url) {
-      invoke(closure, BytesFromString(url));
-    });
   }
 }
 
@@ -6059,20 +5795,6 @@ int32_t yue_mbt_table_notify_value_change(void *table, int32_t column,
 #endif
 }
 
-/* Browser:标题与停止(回调版 JS 执行与 AddBinding 另批) */
-void *yue_mbt_browser_get_title(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    return BytesFromString(b->GetTitle());
-  }
-  return moonbit_make_bytes(0, 0);
-}
-
-void yue_mbt_browser_stop(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->Stop();
-  }
-}
-
 /* Screen:主显示器与光标 */
 static nu::Display g_screen_display;
 static bool g_screen_display_valid = false;
@@ -6306,47 +6028,6 @@ MBT_NOTIF_SIG(on_notification_action, on_notification_action)
 
 #undef MBT_NOTIF_SIG
 
-
-/* 方法级审计补齐二:Browser JS 回调/绑定与通用拖拽 */
-
-void yue_mbt_browser_execute_javascript_callback(
-    void *browser, const char *code,
-    void (*invoke)(void *, int32_t, void *), void *closure) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->ExecuteJavaScript(
-        code,
-        [invoke, closure](bool ok, base::Value value) {
-          std::string json;
-          base::JSONWriter::Write(base::ValueView(value), &json);
-          invoke(closure, ok ? 1 : 0, BytesFromString(json));
-        });
-  }
-}
-
-void yue_mbt_browser_add_raw_binding(void *browser, const char *name,
-                                     void (*invoke)(void *, void *),
-                                     void *closure) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->AddRawBinding(name, [invoke, closure](nu::Browser *, base::Value args) {
-      std::string json;
-      base::JSONWriter::Write(base::ValueView(args), &json);
-      invoke(closure, BytesFromString(json));
-    });
-  }
-}
-
-void yue_mbt_browser_remove_binding(void *browser, const char *name) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    b->RemoveBinding(name);
-  }
-}
-
-int32_t yue_mbt_browser_has_bindings(void *browser) {
-  if (auto *b = CastTo<nu::Browser>(browser)) {
-    return b->HasBindings() ? 1 : 0;
-  }
-  return 0;
-}
 
 int32_t yue_mbt_view_do_drag_data(void *view, const char *text,
                                   const char *file_paths, int32_t operations,
