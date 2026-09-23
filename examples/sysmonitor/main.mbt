@@ -87,15 +87,16 @@ struct App {
   // 概览页：资源卡片值行（标题行右侧，紧凑格式防溢出）
   card_cpu : @yue.Store[String]
   card_mem : @yue.Store[String]
-  card_disk : @yue.Store[String]
   card_net : @yue.Store[String]
   card_proc : @yue.Store[String]
+  // 磁盘卡：每个用户挂载一张（数量取启动枚举结果，热插拔不重建）
+  card_disk_vals : Array[@yue.Store[String]]
+  disk_hists : Array[@yue.Store[Array[@yue.LineSeries]]]
   // 概览页：实时曲线（定长滚动窗口 120 点 = 2 分钟 @1Hz）
   cpu_hist : @yue.Store[Array[@yue.LineSeries]]
   core_bars : @yue.Store[Array[@yue.BarItem]]
   mem_hist : @yue.Store[Array[@yue.LineSeries]]
   swap_hist : @yue.Store[Array[@yue.LineSeries]]
-  disk_hist : @yue.Store[Array[@yue.LineSeries]]
   net_hist : @yue.Store[Array[@yue.LineSeries]]
   // GPU 详情页与卡值：每块物理卡一套（数量取启动枚举结果，热插拔不重建）
   card_gpu_vals : Array[@yue.Store[String]]
@@ -201,13 +202,15 @@ fn sample_once(app : App) -> Unit {
     None => ()
     Some(disks) => {
       app.disks.set(disks)
-      for d in disks {
-        if d.mount == "/" {
-          app.card_disk.set(
-            "\{pct(d.usage())} · \{fmt_rate_c((d.total_bytes - d.avail_bytes).to_double())}",
-          )
-          @yue.series_push(app.disk_hist, 0, d.usage() * 100.0)
+      // 数量以启动枚举为准（根分区必在），热插拔只跳过不重建视图
+      for i, d in disks {
+        if i >= app.disk_hists.length() {
+          break
         }
+        app.card_disk_vals[i].set(
+          "\{pct(d.usage())} · \{fmt_rate_c((d.total_bytes - d.avail_bytes).to_double())}",
+        )
+        @yue.series_push(app.disk_hists[i], 0, d.usage() * 100.0)
       }
     }
   }
@@ -240,7 +243,12 @@ fn main {
   // 切换主题时的实时联动
   @yue.on_system_theme_change(fn() { @yue.theme_apply(@yue.theme_from_system()) })
 
-  // GPU 数量取启动枚举结果，卡与曲线按块预建（热插拔不重建视图）
+  // 磁盘与 GPU 数量取启动枚举结果，卡与曲线按块预建（热插拔不重建视图）
+  let disk_mon = DiskMonitor::new()
+  let disks0 : Array[DiskInfo] = match disk_mon.tick() {
+    Some(d) => d
+    None => []
+  }
   let gpus0 : Array[GpuInfo] = match gpu_list() {
     Some(g) => g
     None => []
@@ -249,18 +257,20 @@ fn main {
   let app : App = {
     cpu: CpuMonitor::new(),
     proc: ProcMonitor::new(info.cores),
-    disk: DiskMonitor::new(),
+    disk: disk_mon,
     net: NetMonitor::new(),
     card_cpu: @yue.Store::new("—"),
     card_mem: @yue.Store::new("—"),
-    card_disk: @yue.Store::new("—"),
     card_net: @yue.Store::new("—"),
     card_proc: @yue.Store::new("—"),
+    card_disk_vals: disks0.map(fn(_d) { @yue.Store::new("—") }),
+    disk_hists: disks0.map(fn(_d) {
+      @yue.Store::new([@yue.LineSeries::make("已用", max_points=120)])
+    }),
     cpu_hist: @yue.Store::new([@yue.LineSeries::make("CPU", max_points=120)]),
     core_bars: @yue.Store::new([]),
     mem_hist: @yue.Store::new([@yue.LineSeries::make("内存", max_points=120)]),
     swap_hist: @yue.Store::new([@yue.LineSeries::make("swap", max_points=120)]),
-    disk_hist: @yue.Store::new([@yue.LineSeries::make("已用", max_points=120)]),
     net_hist: @yue.Store::new([
       @yue.LineSeries::make("接收", max_points=120),
       @yue.LineSeries::make("发送", max_points=120),

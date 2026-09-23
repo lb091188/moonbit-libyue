@@ -174,15 +174,6 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
     ),
     res_card(@yue.Database, "内存", app.card_mem, Some(app.mem_hist), view, VMem),
     res_card(
-      @yue.HardDrive,
-      "磁盘",
-      app.card_disk,
-      Some(app.disk_hist),
-      view,
-      VDisk,
-      y_range=Some((0.0, 100.0)),
-    ),
-    res_card(
       @yue.Wifi,
       "网络",
       app.card_net,
@@ -192,6 +183,31 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
       floor=1048576.0,
     ),
   ]
+  // 磁盘卡：每个用户挂载一张（根分区标题「磁盘」，其余用挂载点做
+  // 标题），数量取启动枚举结果，1Hz 采样更新各自文本与曲线
+  for i in 0..<app.disk_hists.length() {
+    let mount = if i < app.disks.get().length() {
+      app.disks.get()[i].mount
+    } else {
+      ""
+    }
+    let title = if mount == "/" || app.disk_hists.length() == 1 {
+      "磁盘"
+    } else {
+      mount
+    }
+    cards.push(
+      res_card(
+        @yue.HardDrive,
+        title,
+        app.card_disk_vals[i],
+        Some(app.disk_hists[i]),
+        view,
+        VDisk,
+        y_range=Some((0.0, 100.0)),
+      ),
+    )
+  }
   // 显卡卡：一块物理卡一张（值 = 使用率·温度，无曲线，紧凑高度；
   // Store 在 App 构建时按启动枚举预建，1Hz 采样更新文本）
   for i in 0..<app.card_gpu_vals.length() {
