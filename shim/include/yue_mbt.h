@@ -802,6 +802,11 @@ int32_t yue_mbt_win_session_power_watch(void (*invoke)(void *, int32_t),
                                         void *closure);
 /* Windows:NLM GetConnectivity 位掩码;失败 -1,非 Windows 哨兵 -1000 */
 int32_t yue_mbt_win_connectivity(int32_t *ok);
+/* Windows:启动后台轮询线程(interval_ms),GetConnectivity 只在该线程
+   发生,结果写进程级缓存;重复调用幂等;失败 0,非 Windows 哨兵 0 */
+int32_t yue_mbt_netwin_start(int32_t interval_ms);
+/* Windows:读最近一次轮询缓存(位掩码);尚未轮询到 -1,非 Windows 哨兵 -1 */
+int32_t yue_mbt_netwin_cached(void);
 
 /* ---------- 探测示例(examples/probe) ---------- */
 

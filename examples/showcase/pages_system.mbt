@@ -497,11 +497,9 @@ fn page_system(app : App) -> @yue.Node {
     },
   )
   let net_out : @yue.Store[String] = @yue.Store::new(
+    // Windows 查询走后台轮询缓存,启动后首个状态值由变化事件派发刷新
     if @yue.network_supported() {
-      match @yue.network_status() {
-        Ok(s) => "当前网络:\{s}"
-        Err(e) => "查询失败:\{e}"
-      }
+      "当前网络:(探测中)"
     } else {
       "当前环境无 NetworkManager,网络状态不可用"
     },

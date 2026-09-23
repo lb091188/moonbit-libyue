@@ -1896,9 +1896,13 @@ extern "c" fn ffi_win_session_power_watch(
 ) -> Int = "yue_mbt_win_session_power_watch"
 
 ///|
-/// Windows:NLM GetConnectivity 位掩码;失败 -1,非 Windows 哨兵 -1000。
-#borrow(ok)
-extern "c" fn ffi_win_connectivity(ok : Ref[Int]) -> Int = "yue_mbt_win_connectivity"
+/// Windows:启动后台轮询线程(interval_ms),查询只在后台线程发生,
+/// UI 线程经 ffi_netwin_cached 读缓存;重复启动幂等;失败 0。
+extern "c" fn ffi_netwin_start(interval_ms : Int) -> Int = "yue_mbt_netwin_start"
+
+///|
+/// Windows:最近一次轮询缓存(位掩码);尚未轮询到 -1,非 Windows 哨兵 -1。
+extern "c" fn ffi_netwin_cached() -> Int = "yue_mbt_netwin_cached"
 
 ///|
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，

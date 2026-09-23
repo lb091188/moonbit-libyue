@@ -31,15 +31,15 @@ test "NLM 位掩码归一化" {
 }
 
 ///|
-test "net_dispatch 去重与派发:仅变化派发,回调全部触达" {
+test "net_dispatch 去重与派发:初值未知首个必派发,后续仅变化派发" {
   // 全局态测试,末尾复位防跨测试污染
   let seen : Array[String] = []
   g_net_cbs.push(fn(s) { seen.push(s.to_string()) })
-  net_dispatch(Online) // 与 last(Offline)不同 → 派发
+  net_dispatch(Online) // 初值未知(None) → 必派发
   net_dispatch(Online) // 相同 → 去重
   net_dispatch(Offline)
   inspect(seen.join(" "), content="NetworkStatus::Online NetworkStatus::Offline")
-  inspect(g_net_last.val is Offline, content="true")
+  inspect(g_net_last.val is Some(_), content="true")
   g_net_cbs.clear()
-  g_net_last.val = Offline
+  g_net_last.val = None
 }
