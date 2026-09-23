@@ -1639,14 +1639,9 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
       )
       let font = Font::new("Sans", 13.0)
       let n = items.length()
-      // 数字方块们,重绘时按 current 着色
-      let boxes : Array[Container] = []
+      // 单循环交错排布「连线 | 数字方块 | 文字」,文字紧随各自数字;
+      // 数字居中走 draw_text 的 align 参数(测宽手动摆位在 Windows 偏左)
       for i in 0..<n {
-        // 数字水平居中:GTK 端 align 无效,构造期测宽存闭包
-        let num_txt = (i + 1).to_string()
-        let num_probe = AttributedText::new(num_txt, wrap=false)
-        num_probe.set_font(Font::new("Sans", 12.0, weight=SemiBold))
-        let num_w = num_probe.get_bounds_for(10000.0, 1000.0).width
         if i > 0 {
           let line = themed_container(style=[
             ("flex", 1.0),
@@ -1667,6 +1662,7 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
           })
           row.add_child(line)
         }
+        let num_txt = (i + 1).to_string()
         let bx = themed_container(style=[
           ("width", 24.0),
           ("height", 24.0),
@@ -1692,10 +1688,11 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
           p.fill_rect(0.0, 0.0, b.width, b.height)
           p.draw_text(
             num_txt,
-            (b.width - num_w) / 2.0,
+            0.0,
             0.0,
             b.width,
             b.height,
+            align=Center,
             valign=Center,
             color=match st {
               0 => theme_primary()
@@ -1706,28 +1703,26 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
         })
         current.subscribe(fn(_v) { ViewLike::schedule_paint(bx) })
         row.add_child(bx)
-        boxes.push(bx)
-      }
-      for i in 0..<n {
+        // 文字色随「当前步」与主题双状态变化;set_color 后须同文 set_text
+        // 触发重排(否则重绘仍用旧色,见 adaptation.md)
         let l = Label::new(items[i])
         ViewLike::set_font(l, font)
-        let cur_ref = current
-        // 步骤文字色随「当前步」与主题双状态变化;set_color 后须同文
-        // set_text 触发重排(否则重绘仍用旧色,见 adaptation.md)
         fn apply_step_label() -> Unit {
-          ViewLike::set_color(l, 
-            if i <= cur_ref.get() {
+          ViewLike::set_color(
+            l,
+            if i <= current.get() {
               theme_text_primary()
             } else {
               theme_text_secondary()
             },
           )
           l.set_text(l.get_text())
+          ViewLike::schedule_paint(l)
         }
 
         apply_step_label()
         on_theme_change(apply_step_label)
-        cur_ref.subscribe(fn(_v) { apply_step_label() })
+        current.subscribe(fn(_v) { apply_step_label() })
         row.add_child(l)
       }
       attach(parent, ViewLike::view(row))
