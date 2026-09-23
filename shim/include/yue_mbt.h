@@ -71,6 +71,8 @@ void yue_mbt_container_add_child(void *container, void *child);
 void yue_mbt_container_on_draw(void *container,
                                void (*invoke)(void *closure, void *painter),
                                void *closure);
+/* 滚动后强制重摆该容器子树的绝对坐标(Windows 原生 HWND 跟随) */
+void yue_mbt_container_update_child_bounds(void *container);
 
 /* ---------- Label ---------- */
 
