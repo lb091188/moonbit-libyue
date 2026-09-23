@@ -254,7 +254,7 @@ pub fn MessageBox::run(self : MessageBox) -> Int {
 ///|
 /// 阻塞运行并模态于指定窗口。
 pub fn MessageBox::run_for_window(self : MessageBox, window : Window) -> Int {
-  ffi_message_box_run_for_window(self, window)
+  ffi_message_box_run_for_window(self, window.view())
 }
 
 ///|

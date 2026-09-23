@@ -107,6 +107,9 @@ fn page_system(app : App) -> @yue.Node {
                 let box = @yue.MessageBox::new(@yue.Warning)
                 box.set_title("警告")
                 box.set_text("此操作不可撤销!")
+                box.on_response(fn(code) {
+                  app.toast_push("消息框响应 id=\{code}", @yue.Info)
+                })
                 box.show_for_window(w)
               }
               None => ()
