@@ -83,6 +83,10 @@ extern "c" fn ffi_view_focus(view : View) -> Unit = "yue_mbt_view_focus"
 
 ///|
 #borrow(view)
+extern "c" fn ffi_view_refresh(view : View) -> Unit = "yue_mbt_view_refresh"
+
+///|
+#borrow(view)
 extern "c" fn ffi_view_set_enabled(view : View, enable : Int) -> Unit = "yue_mbt_view_set_enabled"
 
 ///|

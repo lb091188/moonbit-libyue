@@ -815,6 +815,7 @@ int32_t yue_mbt_netwin_cached(void);
 void yue_mbt_probe_env(void *window);
 void yue_mbt_probe_view(void *view, const char *label);
 void yue_mbt_probe_dark(void *view);
+void yue_mbt_view_refresh(void *view);
 
 #ifdef __cplusplus
 }

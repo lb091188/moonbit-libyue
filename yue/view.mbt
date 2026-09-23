@@ -209,6 +209,27 @@ impl ViewLike with fn update_layout(self) -> Unit {
   ffi_view_layout(self.view())
 }
 
+///|
+/// 布局重算 + 根级整窗重绘:显隐页(页签切换)后,子树的局部失效会被
+/// Scroll 视口裁成碎片、与恢复后的页区域不相交致整块不画
+/// (Windows 实测);布局稳定后对根做一次整窗重绘兜底。滚动等高频
+/// 场景仍用 update_layout(只重算不整窗重绘)。
+pub fn[T : ViewLike] refresh_layout(v : T) -> Unit {
+  ffi_view_refresh(v.view())
+}
+
+///|
+/// 对底层视图句柄直接请求重绘(声明式 Node 挂载返回的 View 用)。
+pub fn schedule_paint_view(v : View) -> Unit {
+  ffi_view_schedule_paint(v)
+}
+
+///|
+/// 对底层视图句柄直接设置显隐(声明式 Node 挂载返回的 View 用)。
+pub fn set_visible_view(v : View, visible : Bool) -> Unit {
+  ffi_view_set_visible(v, if visible { 1 } else { 0 })
+}
+
 
 ///|
 /// 设置视图字体（原生渲染，交互控件的文字样式首选此路）。

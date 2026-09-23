@@ -456,6 +456,17 @@ void yue_mbt_view_set_background_color(void *view, const char *hex) {
 void yue_mbt_view_set_visible(void *view, int visible) {
   if (auto *v = CastToView(view)) {
     v->SetVisible(visible != 0);
+    // 显隐切换的 Layout 传播在非 Container 父(Scroll)处中断,Container::
+    // Layout 的 dirty 自愈会用过期 yoga 结果把外层 flex 容器分配成
+    // 压缩中间值(实测页容器 210→56 卡死);这里补一次根级重算,用
+    // 最新 yoga 值覆盖自愈结果
+    auto* root = v;
+    while (root->GetParent() != nullptr)
+      root = root->GetParent();
+    if (root->IsContainer())
+      static_cast<nu::Container*>(root)->Layout();
+    else
+      root->Layout();
   }
 }
 
@@ -541,6 +552,22 @@ void yue_mbt_view_layout(void *view) {
       static_cast<nu::Container*>(root)->Layout();
     else
       root->Layout();
+  }
+}
+
+// 布局重算 + 根级整窗重绘:显隐页切换后,子树 Invalidate 会被 Scroll
+// 视口裁成碎片(实测只剩 24 高),页区域与失效区不相交致整块不画;
+// 布局稳定后对根 SchedulePaint,一次全窗重绘兜底。
+void yue_mbt_view_refresh(void *view) {
+  if (auto *v = CastToView(view)) {
+    auto* root = v;
+    while (root->GetParent() != nullptr)
+      root = root->GetParent();
+    if (root->IsContainer())
+      static_cast<nu::Container*>(root)->Layout();
+    else
+      root->Layout();
+    root->SchedulePaint();
   }
 }
 
