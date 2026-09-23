@@ -5670,6 +5670,29 @@ void yue_mbt_repaint_all(void) {
   g_list_free(toplevels);
   // 全部失效完成后再一次性同步绘制
   gdk_window_process_all_updates();
+#elif defined(OS_WIN)
+  // 主题切换后 Windows 原本没有全局重绘:只有订阅主题的自绘视图会重绘,
+  // 其余区域留旧像素(切深浅后残留"重影",鼠标划过触发局部失效才消失)。
+  // 枚举本进程可见顶层窗口整体失效+擦除,连带原生子窗口(输入框等)重绘;
+  // 只失效不同步绘制,WM_PAINT 交回消息循环
+  ::EnumWindows(
+      [](HWND hwnd, LPARAM) -> BOOL {
+        DWORD pid = 0;
+        ::GetWindowThreadProcessId(hwnd, &pid);
+        if (pid != ::GetCurrentProcessId()) {
+          return TRUE;
+        }
+        if (!::IsWindowVisible(hwnd)) {
+          return TRUE;
+        }
+        if (::GetWindow(hwnd, GW_OWNER) != nullptr) {
+          return TRUE;
+        }
+        ::RedrawWindow(hwnd, nullptr, nullptr,
+                       RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+        return TRUE;
+      },
+      0);
 #endif
 }
 
