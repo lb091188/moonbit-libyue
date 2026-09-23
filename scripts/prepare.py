@@ -163,6 +163,107 @@ def prepare_source(os_name: str) -> None:
         (BUILD_DIR / stale).unlink(missing_ok=True)
 
 
+def split_browser_out_of_jumbo() -> None:
+    """把浏览器实现从 nativeui jumbo 单元抽成独立编译单元（仅 Linux）。
+
+    发行包的 jumbo 把 browser.cc / browser_gtk.cc 与 PainterGtk/Font/
+    Image 等混编在同一成员，非浏览器程序只要链接该成员就得解析
+    webkit_* 符号。静态 weak stub 兜底在 moon 工具链下不成立：moon
+    默认 --as-needed 且按依赖拓扑序拼接各包 flags，浏览器程序的
+    stub 会先于真库绑定引用（ELF 静态绑定不可逆），实测浏览器页段
+    错误。抽段后 libyue_mbt.a 中浏览器独立成成员，静态库按需拉取
+    天然隔离，非浏览器程序链接期接触不到任何 webkit 符号。段按
+    「// ../../nativeui/...」注释头定位，找不到（未来 fork 拆分后）
+    即跳过，幂等。"""
+    base = VENDOR_DIR / "libyue/src/linux/nativeui"
+    targets = [
+        (base / "nativeui_jumbo_1.cc", "// ../../nativeui/browser.cc"),
+        (base / "nativeui_jumbo_2.cc",
+         "// ../../nativeui/gtk/browser_gtk.cc"),
+    ]
+    segments: list[list[str]] = []
+    for path, marker in targets:
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        except OSError:
+            return
+        start = next((i for i, l in enumerate(lines) if l.rstrip("\n") == marker), None)
+        if start is None:
+            print("[prepare] jumbo 中未找到浏览器段（可能已拆分），跳过抽段",
+                  file=sys.stderr)
+            return
+        end = next((i for i, l in enumerate(lines[start + 1:], start + 1)
+                    if l.startswith("// ../../")), len(lines))
+        segments.append(lines[start:end])
+        del lines[start:end]
+        path.write_text("".join(lines), encoding="utf-8")
+    (base / "nativeui_browser.cc").write_text(
+        "".join(segments[0]).rstrip("\n") + "\n\n" + "".join(segments[1]),
+        encoding="utf-8")
+    print("[prepare] 已把浏览器实现抽出为独立编译单元 nativeui_browser.cc",
+          file=sys.stderr)
+
+
+def decouple_menu_item_from_webkit() -> None:
+    """menu_item_gtk 的角色项(剪切/粘贴等)对聚焦 WebView 执行编辑命令,
+    与 webkit 有 2 个符号耦合(WEBKIT_IS_WEB_VIEW 宏展开引用
+    webkit_web_view_get_type + webkit_web_view_execute_editing_command),
+    jumbo 抽段后仍留在菜单成员里,非浏览器程序链接期就会碰到。改为
+    运行时探测:类型查 GType 注册表(WebKitWebView 仅在其库加载后注册,
+    非浏览器程序查不到即跳过),命令走 dlsym;浏览器程序两查全部命中,
+    行为不变。文本替换幂等:目标文本不存在(已打补丁/fork 已改)即跳过。
+    """
+    path = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_3.cc"
+    try:
+        s = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    anchor = "// Handling role item clicking.\nvoid OnRoleClick(GtkWidget*, MenuItem* item) {"
+    helpers = (
+        "// 浏览器可选化补丁:非浏览器程序不链 webkit,WebView 类型探测改走\n"
+        "// GType 注册表(WebKitWebView 类型仅在其库加载后注册),编辑命令运行时\n"
+        "// dlsym 探测,双场景行为不变。\n"
+        "#include <dlfcn.h>\n\n"
+        "static bool yue_is_web_view(GtkWidget* widget) {\n"
+        "  static GType type = g_type_from_name(\"WebKitWebView\");\n"
+        "  return type != 0 && G_TYPE_CHECK_INSTANCE_TYPE(widget, type);\n"
+        "}\n\n"
+        "static void yue_web_view_execute_editing_command(WebKitWebView* view,\n"
+        "                                                 const gchar* command) {\n"
+        "  using Fn = void (*)(WebKitWebView*, const gchar*);\n"
+        "  static Fn fn = reinterpret_cast<Fn>(\n"
+        "      dlsym(RTLD_DEFAULT, \"webkit_web_view_execute_editing_command\"));\n"
+        "  if (fn)\n"
+        "    fn(view, command);\n"
+        "}\n\n"
+    )
+    changed = False
+    if anchor in s and "yue_is_web_view" not in s:
+        s = s.replace(anchor, helpers + anchor, 1)
+        changed = True
+    old_call = (
+        "  if (WEBKIT_IS_WEB_VIEW(widget)) {\n"
+        "    webkit_web_view_execute_editing_command(\n"
+        "        WEBKIT_WEB_VIEW(widget),\n"
+        "        g_edit_map[static_cast<int>(item->GetRole())].webkit_command);\n"
+        "  } else {"
+    )
+    new_call = (
+        "  if (yue_is_web_view(widget)) {\n"
+        "    yue_web_view_execute_editing_command(\n"
+        "        reinterpret_cast<WebKitWebView*>(widget),\n"
+        "        g_edit_map[static_cast<int>(item->GetRole())].webkit_command);\n"
+        "  } else {"
+    )
+    if old_call in s:
+        s = s.replace(old_call, new_call, 1)
+        changed = True
+    if changed:
+        path.write_text(s, encoding="utf-8")
+        print("[prepare] menu_item_gtk 的 webkit 耦合已改为运行时探测",
+              file=sys.stderr)
+
+
 def cmake_build(prebuilt: bool) -> None:
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
@@ -198,6 +299,9 @@ def prepare(force_source: bool = False) -> None:
             asset = None
     if asset is None:
         prepare_source(os_name)
+        if os_name == "Linux":
+            split_browser_out_of_jumbo()
+            decouple_menu_item_from_webkit()
     copy_webview2_loader()
     cmake_build(prebuilt=asset is not None)
     print("prepare 完成")

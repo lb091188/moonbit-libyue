@@ -31,6 +31,15 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 新增 shim 函数:定义统一 `extern "C"`,声明同批进 `yue_mbt.h` 的 extern "C" 区,`nm` 确认符号无 `_Z` 前缀;GLib(`g_*`)是 Linux 专属,跨平台函数不得引用。
 - 新版 moon 弃用 trait 方法隐式提升:调用写显式静态形式 `ViewLike::method(obj)`;`impl Trait for X` 声明点须补 `pub extend X with Trait::{...}`(方法清单从 `moon check --no-render` 输出生成,勿手抄);黑盒测试内引用包内符号须限定 `@yue.xxx`。此类警告增量编译漏报,clean 全量才见全量。
 
+### 浏览器依赖按需化（0.5.0）
+
+- 机制：MoonBit 包边界即链接依赖边界。`Browser` 全部绑定迁入独立包 `yue/browser`（`@yue.Browser` → `@browser.Browser`，API 不变；`examples/showcase/moon.pkg` 是 import 样例），prebuild 的 link_configs 相应拆三份——Linux 的 webkit2gtk pkg-config 输出只进 `yue/browser` 条目，`yue`/`yue/traybus` 只带公共库；**主包严禁 import `yue/browser`**，否则依赖闭包让所有下游重新拿到 webkit flags。
+- shim 层同步拆分：27 个 `yue_mbt_browser_*` 全部移入 `shim/yue_mbt_browser.cpp`，`CastTo`/`Store`/`BytesFromString` 提到 `shim/include/yue_mbt_internal.h`（模板/inline 的函数内 static 按标准全程序唯一，多 TU 共享同一张句柄注册表——Browser 句柄必须能被通用 View 函数查到）。验收口径：`nm libyue_mbt.a` 中 browser 符号只出现在 browser 成员，`nm -C` 查 `U nu::Browser` 不命中主成员。
+- 大坑（全程实测，两条方案被证伪）：libyue 发行包的 jumbo 把 `browser.cc`/`browser_gtk.cc` 与 PainterGtk/Font/Image 混编同一成员，非浏览器程序链接它就得解析 webkit_* 符号；静态 stub 兜底不可行——moon 对链接命令默认加 `--as-needed` 且按依赖拓扑序（yue→traybus→browser）拼接各包 flags，浏览器程序的主包份 stub 先把 webkit 引用全部绑定（ELF 静态绑定不可逆），真库随 --as-needed 以「截至该库未被引用」被丢 DT_NEEDED，运行时浏览器页调到空 stub 即段错误；「weak 定义会被动态库强符号覆盖」也不成立，最小样例实测运行时绑定 weak（输出 -1 非 42）。符号改名手术（objcopy --redefine-syms 生成无浏览器引用版库 + y4b* stub，见 `scripts/make_webkit_stubs.py`）能精确服务非浏览器程序，但同一份 yue 条目 flags 无法按 main 是否 import browser 分叉，同样留有浏览器程序段错误的洞。**结论：库成员级隔离只能治本，任何静态 stub 都是坑。**
+- 治本（已落地，源码模式全场景闭环）：`prepare.py` 源码回退路径在解压后自动抽段——把 browser.cc/browser_gtk.cc 从 jumbo 抽成独立编译单元 `nativeui_browser.cc`（按 `// ../../nativeui/...` 段注释头定位，幂等）；`menu_item_gtk` 的角色项（剪切/粘贴）对 WebView 执行编辑命令的 2 个符号耦合改为运行时探测（类型查 `g_type_from_name("WebKitWebView")`、命令 `dlsym(RTLD_DEFAULT,...)`，非浏览器程序查不到即跳过，行为不变）。效果：`libyue_mbt.a` 中全部 58 个 webkit/soup/JS 系引用收敛到 browser 成员，静态库按需拉取天然隔离。使用 `LIBYUE_FORCE_SOURCE=1`（或无预构建资产的平台）即走此路径。
+- 平台状态：Linux 源码模式如上；Linux 预构建模式与 Windows（WebView2 无链接期符号，三条目 flags 一致即现状）行为不变——**fork 发行脚本侧的 jumbo 拆分（4a）完成并 `vendor-*` 重发后，预构建模式才获得同等按需化**，prepare 升版本后 stub 逻辑自然退役；macOS 暂不拆（本机无 Mach-O archive 工具链核验 `libyue_prebuilt(macos)` 的 WebKit 引用面，llvm-nm 读 universal archive 成员符号表不完整，拆错即 mac 全线断链且无真机兜底），Darwin 分支三条目 flags 保持与改造前一致。
+- 验证（Ubuntu 24.04 XFCE X11，源码模式）：sysmonitor（不 import browser）`ldd` 无 webkit/javascriptcore、`objdump -T` 动态符号表 webkit 计数 0（符号级清零，不只是无 DT_NEEDED）、启动存活；showcase `ldd` 有 `libwebkit2gtk-4.1`/`libjavascriptcoregtk-4.1`、首屏挂 Browser 不崩（WEBKIT_DISABLE_DMABUF_RENDERER 守护照旧生效）；`moon check` 零警告、`moon test` 131 全过。浏览器页交互（网页加载/JS 回传/binding）须真机确认。
+
 ### MoonBit cfg(platform=)
 
 - moonc 已实现 `#cfg(platform="windows"/"linux"/"macos")`,按 `-target` 三元组求值;但当前发布版 moon 只给 moonc 传无 OS 信息的 `native`,所有条件恒 false。`moon build -v` 的 moonc 命令行出现完整三元组即条件可用。

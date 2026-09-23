@@ -464,7 +464,8 @@ g.set_animating(true)
 ## 浏览器 Browser
 
 ```moonbit
-let b = @yue.Browser::make(url="https://example.com")   // 或 html="<h1>本地</h1>"
+// Browser 在独立包 yue/browser(moon.pkg import "NoahLiu/moonbit-libyue/yue/browser")
+let b = @browser.Browser::make(url="https://example.com")   // 或 html="<h1>本地</h1>"
 ```
 
 | 参数 | 类型 | 默认 | 说明 |
@@ -487,6 +488,8 @@ let b = @yue.Browser::make(url="https://example.com")   // 或 html="<h1>本地<
 | on_change_loading / on_update_title / on_update_command / on_commit_navigation / on_finish_navigation | 事件 |
 
 定制选项用 `Browser::new_with_options(BrowserOptions)`。
+
+> 0.5.0 起 Browser 迁入独立包 `NoahLiu/moonbit-libyue/yue/browser`(API 不变,`@yue.Browser` 改 `@browser.Browser`);未 import 该包的程序不再链接 WebKit/WebView2。
 
 ## 剪贴板 Clipboard
 
