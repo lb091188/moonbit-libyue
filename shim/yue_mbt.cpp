@@ -294,6 +294,14 @@ int32_t yue_mbt_app_init(void) {
   base::CommandLine::Init(0, nullptr);
   g_lifetime = new nu::Lifetime();
   g_state = new nu::State();
+#if defined(OS_WIN)
+  // UI 线程必须按 STA 建立 COM 套间(InitializeCOM 幂等):文件对话框
+  // (IFileDialog::Show)等公共组件要求 STA;若 UI 线程从未初始化 COM,
+  // CoCreateInstance 直接失败,若被应用后置调用抢先初始化成 MTA 则
+  // Show 永久挂死。此后线程上的 CoInitializeEx(MTA) 只会得到
+  // RPC_E_CHANGED_MODE,不影响本地 COM 对象使用。
+  g_state->InitializeCOM();
+#endif
   return 1;
 }
 
