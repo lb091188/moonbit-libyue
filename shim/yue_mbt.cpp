@@ -4557,6 +4557,27 @@ void yue_mbt_view_set_cursor(void *view, void *cursor) {
   }
 }
 
+// 光标透传:对视图自身及其全部子孙递归设置光标。GTK 端光标按原生
+// 窗口生效,只设父容器盖不住有独立窗口的子控件(Entry 等),父设子随
+// 必须递归到叶。
+static void SetCursorDeep(nu::View *v, nu::Cursor *cur) {
+  if (v == nullptr)
+    return;
+  v->SetCursor(scoped_refptr<nu::Cursor>(cur));
+  if (v->IsContainer()) {
+    auto *c = static_cast<nu::Container *>(v);
+    for (size_t i = 0; i < c->ChildCount(); ++i)
+      SetCursorDeep(c->ChildAt(i), cur);
+  }
+}
+
+void yue_mbt_view_set_cursor_deep(void *view, void *cursor) {
+  auto *v = CastToView(view);
+  auto *c = CursorStore::get(cursor);
+  if (v != nullptr && c != nullptr)
+    SetCursorDeep(v, c);
+}
+
 // ---------- 托盘 ----------
 
 #if defined(OS_LINUX)
