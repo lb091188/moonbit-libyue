@@ -628,6 +628,9 @@ int32_t yue_mbt_window_is_fullscreen(void *window);
  * 4=Text 5=NotAllowed 6=Help 7=Move 8=ResizeEW 9=ResizeNS 10=ResizeNESW 11=ResizeNWSE） */
 void *yue_mbt_cursor_new(int32_t type);
 void yue_mbt_view_set_cursor(void *view, void *cursor);
+/* 对视图自身及其全部子孙递归设置光标（父设子随：只设容器盖不住有
+ * 独立窗口的子控件，递归到叶才透传） */
+void yue_mbt_view_set_cursor_deep(void *view, void *cursor);
 
 /* ---------- 托盘 ---------- */
 
