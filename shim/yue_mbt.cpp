@@ -266,6 +266,132 @@ int32_t yue_mbt_platform(void) {
 
 // ---------- 窗口 ----------
 
+#if defined(OS_WIN)
+// live-resize 冻结:交互缩放期间(WindowImpl::OnSize 每帧全树
+// SizeAllocate + RedrawWindow(RDW_ALLCHILDREN),真机反馈卡顿严重)
+// 改为位图占位——WM_ENTERSIZEMOVE 抓客户区位图,期间 WM_SIZE 只记录
+// 最终尺寸、WM_PAINT 用 HALFTONE 平滑拉伸占位,WM_EXITSIZEMOVE 透传
+// 最后一次 WM_SIZE 触发一次真实布局(全树重摆 + 全窗重绘 + 根 height
+// 跟随的 on_size_changed 链自然恢复)。窗口移动(拖标题栏)同走
+// SIZEMOVE 但无 WM_SIZE,位图抓放无感。仅拦 WM_SIZE/WM_PAINT/这对
+// 进出消息,其余全部透传。
+namespace {
+
+struct LiveResize {
+  WNDPROC prev_proc = nullptr;
+  bool active = false;
+  bool pending = false;
+  WPARAM last_wp = 0;
+  int last_w = 0;
+  int last_h = 0;
+  HBITMAP bmp = nullptr;
+  int bmp_w = 0;
+  int bmp_h = 0;
+};
+
+std::unordered_map<HWND, LiveResize *> g_live_resizes;
+
+void LiveResizeReleaseBitmap(LiveResize *fz) {
+  if (fz->bmp != nullptr) {
+    ::DeleteObject(fz->bmp);
+    fz->bmp = nullptr;
+  }
+  fz->bmp_w = 0;
+  fz->bmp_h = 0;
+}
+
+LRESULT CALLBACK LiveResizeProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+  auto it = g_live_resizes.find(hwnd);
+  if (it == g_live_resizes.end())
+    return ::DefWindowProcW(hwnd, msg, wp, lp);
+  LiveResize *fz = it->second;
+  if (!fz->active && msg == WM_ENTERSIZEMOVE) {
+    RECT rc;
+    if (::GetClientRect(hwnd, &rc) && rc.right > 0 && rc.bottom > 0) {
+      HDC wdc = ::GetDC(hwnd);
+      fz->bmp = ::CreateCompatibleBitmap(wdc, rc.right, rc.bottom);
+      if (fz->bmp != nullptr) {
+        HDC mdc = ::CreateCompatibleDC(wdc);
+        HGDIOBJ old = ::SelectObject(mdc, fz->bmp);
+        ::BitBlt(mdc, 0, 0, rc.right, rc.bottom, wdc, 0, 0, SRCCOPY);
+        ::SelectObject(mdc, old);
+        ::DeleteDC(mdc);
+        fz->bmp_w = rc.right;
+        fz->bmp_h = rc.bottom;
+      }
+      ::ReleaseDC(hwnd, wdc);
+    }
+    fz->active = true;
+    fz->pending = false;
+    return ::CallWindowProc(fz->prev_proc, hwnd, msg, wp, lp);
+  }
+  if (fz->active) {
+    if (msg == WM_SIZE) {
+      // 冻结:只记录最终尺寸,不进 libyue 的全树重摆与全窗重绘
+      fz->last_wp = wp;
+      fz->last_w = LOWORD(lp);
+      fz->last_h = HIWORD(lp);
+      fz->pending = true;
+      return 0;
+    }
+    if (msg == WM_PAINT) {
+      PAINTSTRUCT ps;
+      HDC dc = ::BeginPaint(hwnd, &ps);
+      if (fz->bmp != nullptr && fz->bmp_w > 0 && fz->bmp_h > 0) {
+        HDC mdc = ::CreateCompatibleDC(dc);
+        HGDIOBJ old = ::SelectObject(mdc, fz->bmp);
+        ::SetStretchBltMode(dc, HALFTONE);
+        ::SetBrushOrgEx(dc, 0, 0, nullptr);
+        ::StretchBlt(dc, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom, mdc, 0,
+                     0, fz->bmp_w, fz->bmp_h, SRCCOPY);
+        ::SelectObject(mdc, old);
+        ::DeleteDC(mdc);
+      }
+      ::EndPaint(hwnd, &ps);
+      return 0;
+    }
+    if (msg == WM_EXITSIZEMOVE) {
+      fz->active = false;
+      LiveResizeReleaseBitmap(fz);
+      LRESULT r = ::CallWindowProc(fz->prev_proc, hwnd, msg, wp, lp);
+      if (fz->pending) {
+        fz->pending = false;
+        // 一次真实布局:OnSize 的 SizeAllocate(全树重摆)+ 全窗重绘
+        // + on_size_changed(根 height 跟随)
+        ::CallWindowProc(fz->prev_proc, hwnd, WM_SIZE, fz->last_wp,
+                         MAKELPARAM(fz->last_w, fz->last_h));
+      }
+      return r;
+    }
+  }
+  if (msg == WM_NCDESTROY) {
+    g_live_resizes.erase(it);
+    LiveResizeReleaseBitmap(fz);
+    LRESULT r = ::CallWindowProc(fz->prev_proc, hwnd, msg, wp, lp);
+    delete fz;
+    return r;
+  }
+  return ::CallWindowProc(fz->prev_proc, hwnd, msg, wp, lp);
+}
+
+void InstallLiveResize(nu::Window *w) {
+  HWND hwnd = w->GetNative()->hwnd();
+  if (hwnd == nullptr || g_live_resizes.count(hwnd) != 0)
+    return;
+  auto *fz = new LiveResize;
+  fz->prev_proc = reinterpret_cast<WNDPROC>(
+      ::SetWindowLongPtrW(hwnd, GWLP_WNDPROC,
+                          reinterpret_cast<LONG_PTR>(LiveResizeProc)));
+  if (fz->prev_proc == nullptr) {
+    delete fz;
+    return;
+  }
+  g_live_resizes[hwnd] = fz;
+}
+
+}  // namespace
+#endif
+
 void *yue_mbt_window_new_ex(int32_t frame, int32_t transparent, int32_t no_activate) {
   nu::Window::Options options;
   options.frame = frame != 0;
@@ -275,7 +401,11 @@ void *yue_mbt_window_new_ex(int32_t frame, int32_t transparent, int32_t no_activ
 #else
   (void)no_activate;
 #endif
-  return reinterpret_cast<void *>(ViewStore::put(new nu::Window(options)));
+  auto *win = new nu::Window(options);
+#if defined(OS_WIN)
+  InstallLiveResize(win);
+#endif
+  return reinterpret_cast<void *>(ViewStore::put(win));
 }
 
 void yue_mbt_window_set_title(void *window, const char *title) {
