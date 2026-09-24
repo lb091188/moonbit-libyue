@@ -264,6 +264,71 @@ def decouple_menu_item_from_webkit() -> None:
               file=sys.stderr)
 
 
+def backport_fork_main() -> None:
+    """把 fork main 领先当前发行版的补丁追打到解压后的源码上(幂等)。
+
+    发行包钉版本滞后于 fork main 时,已合入 main 的小修正在这里以文本
+    替换追打,避免为等一个补丁走一轮 tag/CI 出包;fork 发新版本后对应
+    条目自然失配跳过。每条补丁:目标文本(来自 fork 提交的旧侧)必须
+    精确命中一次,新文本(新侧)已存在则跳过。
+
+    现有补丁(对照 fork main):
+      ba479418  Container::UpdateChildBounds 递归下钻子容器——子容器尺寸
+                未变时 SetBounds 早退,SizeAllocate→Layout 级联断,其子树
+                整轮错过分配(set_visible 切页整块不再重绘,Windows 实测)
+    """
+    # 目标是 Windows 源码包的 nativeui jumbo(发行 zip 全为 jumbo 形态,
+    # CRLF 行尾),替换做 LF/CRLF 双形态兼容,保持文件原行尾。
+    patches = [
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_1.cc",
+            """  for (int i = 0; i < ChildCount(); ++i) {
+    View* child = ChildAt(i);
+    if (child->IsVisibleInHierarchy())
+      child->SetBounds(GetYGNodeBounds(child->node()));
+  }""",
+            """  for (int i = 0; i < ChildCount(); ++i) {
+    View* child = ChildAt(i);
+    if (child->IsVisibleInHierarchy()) {
+      child->SetBounds(GetYGNodeBounds(child->node()));
+      // Recurse unconditionally: a child container whose size did not
+      // change early-returns from SetBounds and never cascades
+      // SizeAllocate -> Layout, so its own subtree would miss this
+      // allocation round entirely (measured: pages toggled via set_visible
+      // stopped repainting as a whole block on Windows). The child bounds
+      // read here always come from the latest root-level layout, so the
+      // recursion only re-distributes fresh values and never invents
+      // constraints of its own. Do NOT recalculate per-container here:
+      // forcing YGNodeCalculateLayout with the container's own (possibly
+      // still-zero) bounds as the owner size pushes zeros into the whole
+      // subtree during early layout rounds (measured: freshly shown pages
+      // rendered completely blank on Windows).
+      if (child->IsContainer())
+        static_cast<Container*>(child)->UpdateChildBounds();
+    }
+  }""",
+        ),
+    ]
+    for path, old_lf, new_lf in patches:
+        try:
+            # newline="" 保留原行尾(zip 内 CRLF,写回不转 LF)
+            with open(path, "r", encoding="utf-8", newline="") as f:
+                content = f.read()
+        except OSError:
+            continue  # 平台不含该文件(非 win 源码包)
+        old_text = old_lf.replace("\n", "\r\n") if "\r\n" in content else old_lf
+        new_text = new_lf.replace("\n", "\r\n") if "\r\n" in content else new_lf
+        if new_text in content:
+            continue  # 已打过 / 新版本已含
+        if old_text not in content:
+            print(f"[prepare] 追补丁目标文本未命中(可能已更新),跳过: {path.name}",
+                  file=sys.stderr)
+            continue
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write(content.replace(old_text, new_text, 1))
+        print(f"[prepare] 已追打 fork main 补丁: {path.name}", file=sys.stderr)
+
+
 def cmake_build(prebuilt: bool) -> None:
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
@@ -299,6 +364,7 @@ def prepare(force_source: bool = False) -> None:
             asset = None
     if asset is None:
         prepare_source(os_name)
+        backport_fork_main()
         if os_name == "Linux":
             split_browser_out_of_jumbo()
             decouple_menu_item_from_webkit()
