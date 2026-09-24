@@ -6333,15 +6333,15 @@ pub fn tabs_t(
         page_views.push(page_v)
       }
       sel.subscribe(fn(i) {
-        cur.val = i
-        // 先显示新页再隐藏旧页:反序会让 yoga 在「新页未显示、旧页已
-        // 隐藏」的中间态把外层 flex 容器按 0 内容分配
-        ViewLike::set_visible(contents[i], true)
-        for j in 0..<contents.length() {
-          if j != i {
-            ViewLike::set_visible(contents[j], false)
-          }
+        let prev = cur.val
+        if i == prev {
+          return
         }
+        cur.val = i
+        // 只动新旧两页:先显示新页再隐藏旧页(反序会让 yoga 在「新页
+        // 未显示、旧页已隐藏」的中间态把外层 flex 容器按 0 内容分配)
+        ViewLike::set_visible(contents[i], true)
+        ViewLike::set_visible(contents[prev], false)
         ViewLike::schedule_paint(head)
         refresh_layout(outer)
         // 页内容视图(on_draw 宿主)显式重绘一次,确保切换后当帧画出
