@@ -1646,6 +1646,12 @@ extern "c" fn ffi_cursor_new(type_ : Int) -> Cursor = "yue_mbt_cursor_new"
 extern "c" fn ffi_view_set_cursor(view : View, cursor : Cursor) -> Unit = "yue_mbt_view_set_cursor"
 
 ///|
+/// 对视图自身及其全部子孙递归设置光标(光标组透传:GTK 光标按原生窗口
+/// 生效,只设容器盖不住有独立窗口的子控件)。
+#borrow(view, cursor)
+extern "c" fn ffi_view_set_cursor_deep(view : View, cursor : Cursor) -> Unit = "yue_mbt_view_set_cursor_deep"
+
+///|
 /// 托盘后端可用性探测。Linux 上等价于检查 AppIndicator 运行库能否加载。
 extern "c" fn ffi_tray_supported() -> Bool = "yue_mbt_tray_supported"
 
