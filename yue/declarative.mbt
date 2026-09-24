@@ -420,14 +420,11 @@ pub fn scroll(
       // 原生子控件(Entry/TextEdit 等 HWND)不会跟随——滚轮/拖拽把内容画
       // 走了,原生框仍停在旧屏幕位置,盖住视口外的区域。on_scroll 触发于
       // Scroll 重摆 content 之前,须以 0ms 定时器延到滚动布局完成后的下一
-      // 个消息循环拍,再对 content 容器强制重摆子树;重摆后对 content 区
-      // 域补一次失效重绘,清掉 HWND 移动留下的条状残影
+      // 个消息循环拍,再对 content 容器强制重摆子树(重摆后勿追加整区
+      // 失效重绘:每帧全内容区重绘会让闪烁与卡顿显著加剧,实测负优化)
       if platform() == "windows" {
         s.on_scroll(fn() {
-          let _ = set_timeout(0, fn() {
-            holder.update_child_bounds()
-            ViewLike::schedule_paint(holder)
-          })
+          let _ = set_timeout(0, fn() { holder.update_child_bounds() })
           false
         })
       }
