@@ -180,15 +180,8 @@ pub fn overlay_scroll(
       ignore((content.mount)(ViewLike::view(holder)))
       s.set_content(holder)
       attach_overlay_thumb(ViewLike::view(host), s)
-      // declarative scroll() 同款:Windows 上原生子控件 HWND 不随滚动平移,
-      // 0ms 定时器延到滚动布局完成后强制重摆 content 子树(勿追加整区失
-      // 效重绘,实测会加剧闪烁与卡顿)
-      if platform() == "windows" {
-        s.on_scroll(fn() {
-          let _ = set_timeout(0, fn() { holder.update_child_bounds() })
-          false
-        })
-      }
+      // Windows 上滚动平移由 ScrollImpl::Layout 内的 TranslateAllocation
+      // 同步传导(见 declarative scroll() 注释),无需 0ms 重摆兜底。
       ViewLike::view(host)
     },
   }
