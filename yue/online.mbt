@@ -22,6 +22,15 @@ pub impl Show for NetworkStatus with fn output(self, logger) {
 pub extend NetworkStatus with Show::{to_string, output}
 
 ///|
+/// 用户可读文案(UI 显示用;Show/to_string 是调试格式,wbtest 有断言)。
+pub fn NetworkStatus::label(self : NetworkStatus) -> String {
+  match self {
+    Online => "在线"
+    Offline => "离线"
+  }
+}
+
+///|
 /// NetworkManager 原始码归一:State 70/50(全球/站点级连接)且
 /// Connectivity 4/3(完全/受限)算 Online;门户劫持(2)按 Offline——
 /// 「在线」取「可达互联网」口径。

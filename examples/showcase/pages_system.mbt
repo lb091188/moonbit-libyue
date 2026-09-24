@@ -526,7 +526,7 @@ fn page_system(app : App) -> @yue.Node {
   @yue.on_power_source_change(fn(_src) { refresh_power() })
   @yue.on_network_status_change(fn(s) {
     net_n.val = net_n.val + 1
-    net_out.set("当前网络:\{s}(第 \{net_n.val} 次变化)")
+    net_out.set("当前网络:\{s.label()}(第 \{net_n.val} 次变化)")
   })
   secs.push(
     section(
