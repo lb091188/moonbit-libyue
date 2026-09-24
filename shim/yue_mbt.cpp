@@ -394,6 +394,11 @@ void yue_mbt_view_set_background_color(void *view, const char *hex) {
 
 void yue_mbt_view_set_visible(void *view, int visible) {
   if (auto *v = CastToView(view)) {
+    // 同值早退:目标与当前一致时直接返回——下面保护的是「真翻转」后
+    // 的根级重算,同值调用(多页订阅同一 Store 的 N-1 次重复触发)是
+    // 确定的无效功,每次都要上溯根级 Layout + 全子树重摆
+    if (v->IsVisible() == (visible != 0))
+      return;
     v->SetVisible(visible != 0);
     // 显隐切换的 Layout 传播在非 Container 父(Scroll)处中断,Container::
     // Layout 的 dirty 自愈会用过期 yoga 结果把外层 flex 容器分配成
