@@ -6784,6 +6784,12 @@ pub fn attach_tooltip(v : View, tip : String) -> Unit {
     tip_hide()
     0
   }
+  // 闭包传给 C 后必须有 GC root(keep_alive):无 root 的闭包会被
+  // MoonBit GC 回收/移动,C 侧持有悬空指针,事件触发即访问违例
+  // (Windows 真机 tooltip 闪退的根因,注册模式照 yue/events.mbt 事件表)
+  keep_alive(fn() { ignore(enter) })
+  keep_alive(fn() { ignore(leave) })
+  keep_alive(fn() { ignore(down) })
   ffi_view_on_mouse_enter(
     v,
     fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },

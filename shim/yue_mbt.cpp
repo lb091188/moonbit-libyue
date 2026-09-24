@@ -3171,6 +3171,27 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view) {
     }
   }
   if (!anchored) {
+    // 自绘视图无 HWND,GetBoundsInScreen 在 Windows 嵌套容器下偏移不可信
+    // (Win10 真机多次实测:巨幅偏移把弹层摆到屏幕外,或小偏移摆到屏幕
+    // 左上角——气泡弹了但用户看不见,即 tooltip「不显示」的另一半根
+    // 因)。ViewImpl::size_allocation 即相对顶层窗口客户区的绝对坐标
+    // (事件坐标换算 GetPosInView 同源),用顶层窗口 hwnd ClientToScreen
+    // 换成屏幕物理像素即为可靠锚点;拿不到窗口再回退 GetBoundsInScreen。
+    auto *impl = static_cast<nu::ViewImpl *>(v->GetNative());
+    nu::WindowImpl *w = impl->window();
+    if (w != nullptr && w->hwnd() != nullptr) {
+      nu::Rect alloc = impl->size_allocation();
+      POINT apt = {alloc.x(), alloc.y()};
+      if (::ClientToScreen(w->hwnd(), &apt)) {
+        anchor = nu::RectF(static_cast<float>(apt.x),
+                           static_cast<float>(apt.y),
+                           static_cast<float>(alloc.width()),
+                           static_cast<float>(alloc.height()));
+        anchored = true;
+      }
+    }
+  }
+  if (!anchored) {
     anchor = v->GetBoundsInScreen();
   }
   const nu::SizeF size = win->GetContentSize();
