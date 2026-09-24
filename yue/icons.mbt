@@ -1512,7 +1512,7 @@ pub fn icon_button_t(
         ViewLike::schedule_paint(v)
       })
       if tip != "" {
-        ffi_view_set_tooltip(ViewLike::view(v), utf8_bytes(tip))
+        attach_tooltip(ViewLike::view(v), tip)
       }
       attach(parent, ViewLike::view(v))
       ViewLike::view(v)
