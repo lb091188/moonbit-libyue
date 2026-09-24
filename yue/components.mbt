@@ -6669,13 +6669,114 @@ pub fn rate_t(
 }
 
 ///|
-/// 悬浮提示:给任意节点包原生 tooltip(系统样式,零成本;主题化气泡
-/// 请用 popover_t)。
+/// 自绘悬浮提示:悬停 500ms 延时在控件下方弹主题底色文字气泡
+/// (Popover 弹层),移开/按下即收。原生 View tooltip 在 Windows 环境
+/// (exe 无 comctl32 v6 清单)TTM_ADDTOOL 后区外/scroll 内/原生控件
+/// 三处对照全不弹(真机二分),统一走自绘,三平台一致;弹层不夺焦点。
+/// 参数是裸 View(挂 content 自身的视图,事件命中即触发),事件挂载
+/// 走包内 FFI(View 不实现 ViewLike)。
+pub fn attach_tooltip(v : View, tip : String) -> Unit {
+  let pop : Ref[Popover?] = Ref(None)
+  let timer : Ref[Int] = Ref(0)
+  fn close() -> Unit {
+    if timer.val != 0 {
+      clear_timeout(timer.val)
+      timer.val = 0
+    }
+    match pop.val {
+      Some(p) => {
+        pop.val = None
+        p.close()
+      }
+      None => ()
+    }
+  }
+  fn show() -> Unit {
+    let at = AttributedText::new(tip, wrap=false)
+    at.set_font(Font::new("Sans", 12.0))
+    let p = Popover::new()
+    bind_popover_bg(p)
+    p.set_accept_focus(false)
+    let host = themed_container(style=[("padding", 8.0)])
+    let label = Label::new(tip)
+    ViewLike::set_font(label, Font::new("Sans", 12.0))
+    bind_fg(label, fn() { theme_text_primary() })
+    host.add_child(label)
+    p.set_content(host)
+    p.set_content_size(at.get_bounds_for(10000.0, 100.0).width + 16.0, 30.0)
+    p.on_close(fn() { pop.val = None })
+    ffi_popover_show_relative_to(p, v)
+    pop.val = Some(p)
+  }
+  let enter : (
+    Int,
+    Double,
+    Double,
+    Double,
+    Double,
+    Double,
+    Double,
+    Int,
+    Int,
+  ) -> Unit = fn(_b, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
+    close()
+    timer.val = set_timeout(500, fn() {
+      timer.val = 0
+      show()
+    })
+  }
+  let leave : (
+    Int,
+    Double,
+    Double,
+    Double,
+    Double,
+    Double,
+    Double,
+    Int,
+    Int,
+  ) -> Unit = fn(_b, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
+    close()
+  }
+  let down : (
+    Int,
+    Double,
+    Double,
+    Double,
+    Double,
+    Double,
+    Double,
+    Int,
+    Int,
+  ) -> Int = fn(_b, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
+    close()
+    0
+  }
+  ffi_view_on_mouse_enter(
+    v,
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
+    enter,
+  )
+  ffi_view_on_mouse_leave(
+    v,
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
+    leave,
+  )
+  ffi_view_on_mouse_down(
+    v,
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
+    down,
+  )
+}
+
+///|
+/// 悬浮提示:给任意节点包自绘 tooltip(悬停延时气泡,见
+/// attach_tooltip;主题化任意内容弹层请用 popover_t)。
 pub fn tooltip_t(content : Node, tip : String) -> Node {
   {
     mount: fn(parent) {
       let v = (content.mount)(parent)
-      ffi_view_set_tooltip(v, utf8_bytes(tip))
+      attach_tooltip(v, tip)
       v
     },
   }
