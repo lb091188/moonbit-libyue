@@ -441,6 +441,10 @@ double yue_mbt_view_get_bounds_x(void *view);
 double yue_mbt_view_get_bounds_y(void *view);
 double yue_mbt_view_get_bounds_width(void *view);
 double yue_mbt_view_get_bounds_height(void *view);
+/* 沿父链上溯到顶层视图(根);锚点相对根的坐标(tooltip 自绘气泡挂根) */
+void *yue_mbt_view_root(void *view);
+double yue_mbt_view_origin_in_root_x(void *view, void *root);
+double yue_mbt_view_origin_in_root_y(void *view, void *root);
 double yue_mbt_view_get_bounds_in_screen_x(void *view);
 double yue_mbt_view_get_bounds_in_screen_y(void *view);
 double yue_mbt_view_get_bounds_in_screen_width(void *view);

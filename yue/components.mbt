@@ -6669,42 +6669,48 @@ pub fn rate_t(
 }
 
 ///|
-/// 自绘悬浮提示:悬停 500ms 延时在控件下方弹主题底色文字气泡
-/// (Popover 弹层),移开/按下即收。原生 View tooltip 在 Windows 环境
-/// (exe 无 comctl32 v6 清单)TTM_ADDTOOL 后区外/scroll 内/原生控件
-/// 三处对照全不弹(真机二分),统一走自绘,三平台一致;弹层不夺焦点。
-/// 事件挂 content 自身的视图(包内 FFI,View 不实现 ViewLike),挂
-/// 宿主容器会踩 hover_group 同款「子控件事件独占」洞。
-///
-/// 弹层是全局单例:Windows 的替代弹层是独立小窗且库内单例状态
-/// (活动弹层指针/8 秒自动关计时/点外鼠标钩子)都绑在「当前活动」
-/// 上,每次悬停新建实例会与之冲突(真机闪退);popover_t 的复用
-/// 同一实例模式是受测路径。文字更新走自绘重读全局 tip。
-let g_tip_pop : Ref[Popover?] = Ref(None)
-
-///|
-let g_tip_host : Ref[Container?] = Ref(None)
-
-///|
-let g_tip_text : Ref[String] = Ref("")
-
-///|
-let g_tip_timer : Ref[Int] = Ref(0)
-
-///|
-fn tip_hide() -> Unit {
-  if g_tip_timer.val != 0 {
-    clear_timeout(g_tip_timer.val)
-    g_tip_timer.val = 0
+/// 自绘悬浮提示:悬停 500ms 延时在控件下方显示主题底色文字气泡,
+/// 移开/按下即收。原生 View tooltip 在 Windows 环境(exe 无 comctl32
+/// v6 清单)区外/scroll 内/原生控件三处对照全不弹(真机二分);独立
+/// 弹层小窗(Popover 替代实现)有窗口创建/全局鼠标钩子/单例管理一串
+/// 平台坑且真机渲染卡顿,改为窗口内自绘覆盖层——气泡是挂在锚点所属
+/// 顶层根容器下的 absolute 定位自绘视图(挂载序在锚点之后,绘制在最
+/// 上),零新窗口零钩子,三平台一致。事件挂 content 自身的视图(包内
+/// FFI,View 不实现 ViewLike),挂宿主容器会踩 hover_group 同款「子
+/// 控件事件独占」洞。
+pub fn attach_tooltip(parent : View, v : View, tip : String) -> Unit {
+  // 气泡视图:文本固定,尺寸创建时测一次;先隐藏常驻,悬停才显示
+  let probe = AttributedText::new(tip, wrap=false)
+  probe.set_font(Font::new("Sans", 12.0))
+  let bw = probe.get_bounds_for(10000.0, 100.0).width + 20.0
+  let bh = 26.0
+  let bubble = themed_container(
+    style=[("width", bw), ("height", bh)],
+    style_str=[("position", "absolute"), ("left", "0"), ("top", "0")],
+  )
+  set_panel_bg(bubble)
+  bubble.on_draw(fn(p) {
+    let b = ViewLike::get_bounds(bubble)
+    p.set_stroke_color(theme_border())
+    p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
+    let at = AttributedText::new(tip, valign=Center, wrap=false)
+    at.set_font(Font::new("Sans", 12.0))
+    at.set_color(theme_text_primary())
+    p.draw_attributed_text(at, 10.0, 0.0, b.width - 20.0, b.height)
+  })
+  ViewLike::set_visible(bubble, false)
+  // 挂锚点所属顶层根容器:挂锚点直接父容器会被后绘的兄弟子树(如
+  // 图标网格的下一行)盖住
+  let root = ffi_view_root(parent)
+  attach(root, ViewLike::view(bubble))
+  let timer : Ref[Int] = Ref(0)
+  let hide = fn() -> Unit {
+    if timer.val != 0 {
+      clear_timeout(timer.val)
+      timer.val = 0
+    }
+    ViewLike::set_visible(bubble, false)
   }
-  match g_tip_pop.val {
-    Some(p) => p.close()
-    None => ()
-  }
-}
-
-///|
-pub fn attach_tooltip(v : View, tip : String) -> Unit {
   let enter : (
     Int,
     Double,
@@ -6716,45 +6722,32 @@ pub fn attach_tooltip(v : View, tip : String) -> Unit {
     Int,
     Int,
   ) -> Unit = fn(_b, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
-    tip_hide()
-    g_tip_timer.val = set_timeout(500, fn() {
-      g_tip_timer.val = 0
-      g_tip_text.val = tip
-      let p = match g_tip_pop.val {
-        Some(p) => p
-        None => {
-          let p = Popover::new()
-          bind_popover_bg(p)
-          p.set_accept_focus(false)
-          let host = themed_container(style=[("padding", 8.0)])
-          host.on_draw(fn(p) {
-            let b = ViewLike::get_bounds(host)
-            let at = AttributedText::new(g_tip_text.val, valign=Center, wrap=false)
-            at.set_font(Font::new("Sans", 12.0))
-            at.set_color(theme_text_primary())
-            p.draw_attributed_text(at, 0.0, 0.0, b.width, b.height)
-          })
-          p.set_content(host)
-          // 不注册 on_close 清单例引用:Windows 的 close 是隐藏并手动
-          // 补发 on_close,清了引用每次隐藏都会误重建实例
-          g_tip_pop.val = Some(p)
-          g_tip_host.val = Some(host)
-          p
-        }
+    hide()
+    timer.val = set_timeout(500, fn() {
+      timer.val = 0
+      // 锚点相对根的坐标(气泡同坐标空间):水平居中并 clamp 到根宽
+      // 内,下方放不下翻到锚点上方
+      let aw = ffi_view_get_bounds_width(v)
+      let ah = ffi_view_get_bounds_height(v)
+      let rx = ffi_view_origin_in_root_x(v, root)
+      let ry = ffi_view_origin_in_root_y(v, root)
+      let rw = ffi_view_get_bounds_width(root)
+      let rh = ffi_view_get_bounds_height(root)
+      let mut x = rx + (aw - bw) / 2.0
+      if x + bw > rw {
+        x = rw - bw
       }
-      match g_tip_host.val {
-        Some(host) => {
-          let at = AttributedText::new(tip, wrap=false)
-          at.set_font(Font::new("Sans", 12.0))
-          p.set_content_size(
-            at.get_bounds_for(10000.0, 100.0).width + 16.0,
-            30.0,
-          )
-          ViewLike::schedule_paint(host)
-        }
-        None => ()
+      if x < 0.0 {
+        x = 0.0
       }
-      ffi_popover_show_relative_to(p, v)
+      let mut y = ry + ah + 2.0
+      if y + bh > rh {
+        y = ry - bh - 2.0
+      }
+      ViewLike::set_style(bubble, "left", x)
+      ViewLike::set_style(bubble, "top", y)
+      ViewLike::set_visible(bubble, true)
+      ViewLike::schedule_paint(bubble)
     })
   }
   let leave : (
@@ -6768,7 +6761,7 @@ pub fn attach_tooltip(v : View, tip : String) -> Unit {
     Int,
     Int,
   ) -> Unit = fn(_b, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
-    tip_hide()
+    hide()
   }
   let down : (
     Int,
@@ -6781,7 +6774,7 @@ pub fn attach_tooltip(v : View, tip : String) -> Unit {
     Int,
     Int,
   ) -> Int = fn(_b, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
-    tip_hide()
+    hide()
     0
   }
   // 闭包传给 C 后必须有 GC root(keep_alive):无 root 的闭包会被
@@ -6814,7 +6807,7 @@ pub fn tooltip_t(content : Node, tip : String) -> Node {
   {
     mount: fn(parent) {
       let v = (content.mount)(parent)
-      attach_tooltip(v, tip)
+      attach_tooltip(parent, v, tip)
       v
     },
   }

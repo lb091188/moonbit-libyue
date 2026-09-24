@@ -74,14 +74,14 @@ fn page_basic(app : App) -> @yue.Node {
     ),
     section(
       "Divider 分隔线与 Tooltip 悬浮提示",
-      "水平(默认)/竖直 1px 主题边框色;tooltip_t 给任意节点包原生悬浮提示(系统样式,主题化气泡见反馈页 Popover)。",
+      "水平(默认)/竖直 1px 主题边框色;tooltip_t 给任意节点包悬浮提示(主题自绘气泡,悬停 500ms 弹出)。",
       [
         @yue.label_t("上方内容"),
         @yue.divider(spacing=6.0),
         @yue.label_t("下方内容"),
         @yue.hbox(
           [
-            @yue.tooltip_t(@yue.button_t("悬停看提示"), "原生 tooltip:系统样式"),
+            @yue.tooltip_t(@yue.button_t("悬停看提示"), "主题自绘气泡:悬停 500ms 弹出"),
             @yue.tooltip_t(@yue.button_t("再来一个", variant=@yue.Soft), "第二个提示"),
           ],
           style=[("marginTop", 10.0)],
