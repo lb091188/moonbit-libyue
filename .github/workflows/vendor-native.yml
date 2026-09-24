@@ -11,6 +11,7 @@ on:
   push:
     tags:
       - 'vendor-*'
+  workflow_dispatch:
 
 permissions:
   contents: write
