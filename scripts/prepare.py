@@ -33,20 +33,20 @@ CACHE_DIR = REPO_ROOT / ".prepare"
 
 # 固定版本：fork 的 v*-mbt* 标签，升级时同步更新 sha256。
 # 平台修复补丁已提交进 fork，发行包自带，无需本地打补丁。
-LIBYUE_VERSION = "v0.15.6-mbt.12"
+LIBYUE_VERSION = "v0.15.6-mbt.14"
 RELEASES = f"https://github.com/lb091188/yue/releases/download/{LIBYUE_VERSION}"
 # 发行包资产名与 platform.system() 不同名：mac 是 mac、Windows 是 win
 ASSET_OS = {"Linux": "linux", "Darwin": "mac", "Windows": "win"}
 
 SHA256 = {
     # 源码发行包（回退路径）
-    "source:linux": "9139239e67c0a9d3afd70d55163471178576882f029a7afd9510f9022089f34d",
-    "source:mac": "c872514222cf55a8d37ce51a6e3d0bdb4eaba4ac33d38056281c67ad871e2954",
-    "source:win": "3d3ddfc3c95619d08da5e499ac561730cce13a6df6fcb6306ecc5cc2ccf945ac",
+    "source:linux": "d888c6087c0ff9a7c75973b03659b34087161b94a705f77bb28068232b320c6a",
+    "source:mac": "40facc51ae0df0e91d79cf5de456df8e62de03db9c887dcf9d7c6e83c47a9211",
+    "source:win": "42dd0de3225f4a1a51ff4afc76d17479e501ed487631831acebfec9ad6bf847d",
     # 预构建静态库（优先路径）
-    "prebuilt:linux_x64": "aabd96d37d9c38e6317c69c5815d453abb3843f566a83ce066bc80eabbd4345a",
-    "prebuilt:mac_universal": "8881e18599aa5631a2d87ca37e511d54dd8f914a9435e9a817c7f5b101f236ad",
-    "prebuilt:win_x64": "015e5fb924251ec1e60fa1fbbebf5a180f3bcf1573c8605e860577e28eabaaff",
+    "prebuilt:linux_x64": "b57c0bc7b6e8a82f1bb37bccc9dd44c3dc92021fd1ca713bbf57e61822aabb0f",
+    "prebuilt:mac_universal": "1b9ba6b3c85b607e26ca60dcb9aa7201dd1c523bf6dc85648a9f9379e6e8fe11",
+    "prebuilt:win_x64": "d978472fdd64d1258b2202d11cf68404e7273bb91ddd52a435cf1610dcb1184c",
 }
 
 
@@ -163,7 +163,7 @@ def prepare_source(os_name: str) -> None:
         (BUILD_DIR / stale).unlink(missing_ok=True)
 
 
-def split_browser_out_of_jumbo() -> None:
+def split_browser_out_of_jumbo() -> bool:
     """把浏览器实现从 nativeui jumbo 单元抽成独立编译单元（仅 Linux）。
 
     发行包的 jumbo 把 browser.cc / browser_gtk.cc 与 PainterGtk/Font/
@@ -202,6 +202,7 @@ def split_browser_out_of_jumbo() -> None:
         encoding="utf-8")
     print("[prepare] 已把浏览器实现抽出为独立编译单元 nativeui_browser.cc",
           file=sys.stderr)
+    return True
 
 
 def decouple_menu_item_from_webkit() -> None:
@@ -264,7 +265,7 @@ def decouple_menu_item_from_webkit() -> None:
               file=sys.stderr)
 
 
-def cmake_build(prebuilt: bool) -> None:
+def cmake_build(prebuilt: bool, browser_split: bool = False) -> None:
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
     # 两种模式都必须显式传:cmake -D 只在传了时覆盖,不传则沿用 CMakeCache
@@ -281,7 +282,10 @@ def cmake_build(prebuilt: bool) -> None:
     print(" ".join(build))
     subprocess.run(build, check=True)
     stamp = BUILD_DIR / "prepare_stamp"
-    mode = "prebuilt" if prebuilt else "source"
+    # -split 后缀:浏览器已从 jumbo 抽成独立编译单元(仅 Linux 源码
+    # 模式)——prebuild 据此判断主包条目是否可免 webkit flags
+    mode = "prebuilt" if prebuilt else \
+        ("source-split" if browser_split else "source")
     stamp.write_text(f"{LIBYUE_VERSION} {mode}\n", encoding="utf-8")
 
 
@@ -297,13 +301,15 @@ def prepare(force_source: bool = False) -> None:
             print(f"[moonbit-libyue] 预构建资产不可用（{e}），回退源码构建",
                   file=sys.stderr)
             asset = None
+    browser_split = False
     if asset is None:
         prepare_source(os_name)
         if os_name == "Linux":
-            split_browser_out_of_jumbo()
-            decouple_menu_item_from_webkit()
+            browser_split = split_browser_out_of_jumbo()
+            if browser_split:
+                decouple_menu_item_from_webkit()
     copy_webview2_loader()
-    cmake_build(prebuilt=asset is not None)
+    cmake_build(prebuilt=asset is not None, browser_split=browser_split)
     print("prepare 完成")
 
 
