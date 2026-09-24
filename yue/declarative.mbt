@@ -431,8 +431,17 @@ pub fn scroll(
       // (holder 尚无父)的 0×0 yoga 计算会把测量缓存污染成 0,scroll
       // 视口高度塌陷(实测 356→0),原生子控件(Entry 等)的裁剪区随之
       // 恒空、HWND 永不摆位;显式 basis 0(CSS 的 flex:1 1 0 语义)让
-      // 高度只由 flex 分配决定,不随内容测量波动
-      ViewLike::set_style(s, "flexbasis", 0.0)
+      // 高度只由 flex 分配决定,不随内容测量波动。
+      // 但 basis 0 只该给参与 flex 分配的 scroll:flex-basis 非 auto 时
+      // yoga 走 flex 算法定主轴尺寸,style 的 width/height 不再参与——
+      // 靠 width 定尺寸的 scroll(sysmonitor 左栏 292 宽、无 flex)会被
+      // 塌成 0,整列消失(真机实测)。有 grow 才有分配,才需要 basis 0。
+      for kv in style {
+        if (kv.0 == "flex" || kv.0 == "flexgrow") && kv.1 > 0.0 {
+          ViewLike::set_style(s, "flexbasis", 0.0)
+          break
+        }
+      }
       if overlay && policy is None && platform() == "windows" {
         // Windows 悬浮细条:style 挪给 host(thumb 的 absolute 定位以
         // host 为基准,直接挂页面容器会被 padding/margin 带偏),Scroll
@@ -440,8 +449,10 @@ pub fn scroll(
         let host = themed_container(style~, style_str~)
         attach(parent, ViewLike::view(host))
         // Scroll 自身撑满 host:style 已挪给 host,这里补 flex(配 basis 0
-        // 即 CSS 的 flex:1 1 0——高度只由 flex 分配决定)
+        // 即 CSS 的 flex:1 1 0——高度只由 flex 分配决定;上面按 style 扫描
+        // 未必触发,host 场景固定补齐)
         ViewLike::set_style(s, "flex", 1.0)
+        ViewLike::set_style(s, "flexbasis", 0.0)
         attach(ViewLike::view(host), ViewLike::view(s))
         attach_overlay_thumb(ViewLike::view(host), s)
         ViewLike::view(host)

@@ -71,6 +71,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 复合控件(Tab / Scroll / Group)在 yoga 树里是无 measure 的叶节点,外框尺寸必须显式给出(如 `flex:1`),否则塌缩(Tab 构造时固化最小尺寸,页区域归零)。
 - tabs_t 曾把 outer 宽度写死 360px、内容页无 flex:放进页里的 Scroll / Table 因此塌缩归零(实测 sysmonitor 概览页整个空白,只有页签头)。修复:outer 去掉固定宽改 `flex:1`(列容器默认 stretch 拿宽度,父有确定高度时填充),内容页同样 `flex:1`。父容器无确定高度时 flex 不增长,内嵌场景(showcase 的分段演示)布局不变。
 - 运行时改样式(set_style)后调 `update_layout`,GTK 上对「根容器」调用子树完全不刷新(yoga 状态已改,bounds 纹丝不动),对单个节点调用也只重排「该节点及其父下的兄弟」——跨子树(如表格 body 的行)不受影响。探针同构四组对照实证(挂载后立即 / 500ms 后、update 根 / 叶子、width / flexbasis):唯一可靠形态是「被改样式的容器逐个调用」。table_t 拖列宽曾因对根调用而「手柄在动(bounds 走的 col_w)、列宽纹丝不动(样式没生效)」;splitter 恰好只有一个包装容器要改,对 outer 调用看似通用,实则同坑未爆。修复:apply_col_widths 对表头两个单元格 + 每行两个单元格逐个调用。
+- declarative scroll 的 flexbasis 0 不能无条件设(真机回归:sysmonitor 左栏整列消失):`0353d08` 为治「flex:1 的 basis auto 被内容挂载期 0×0 测量污染致视口塌陷」给 scroll 无条件 `set_style("flexbasis", 0)`,但 fork 已把 yoga 更新到严格 CSS 语义(`ffacab71`,gap 支持)——flex-basis 非 auto 时主轴尺寸走 flex 算法,**style 的 width/height 不再参与**,靠 width 定尺寸、无 flex 的 scroll(sysmonitor 左栏 292 宽)被塌成 0,右栏图表占满全窗。修复:basis 0 仅在 style 显式带 `flex`/`flexgrow` > 0 时设置(有 grow 才有分配才需要 basis 0),Windows host 分支自身补 flex 时固定同时补 basis。探针(get_bounds)验证修复后 7 张卡片 w=272/h=84 恢复。核对「发行包与 fork main 同步」的方法:`diff -rq fork/third_party/yoga vendor/src/linux/third_party/yoga`(mbt.12 完全一致);nativeui 是 jumbo 形态需按段注释头切出与原文件归一化对比(mbt.12 仅落后 fork main 一个提交:d193d336 的 GDK_SCROLL_MASK 滚轮修复)。
 - GUI 自动化:键盘驱动(Tab 聚焦 + Space 激活)首选;`xdotool key --window` 走 XSendEvent 会被 GTK 丢弃,必须 XTEST(不带 --window);坐标点击受 WM 装饰偏移影响不可靠。
 
 ### MoonBit ↔ C ABI
