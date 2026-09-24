@@ -284,6 +284,10 @@ def backport_fork_main() -> None:
                 TranslateAllocation(SubwinView 纯平移快路径只 SetWindowPos),
                 替代 0ms 定时器全子树 UpdateChildBounds(每拍 415 次调用/
                 21ms 且滞后一帧即蓝色残影,Windows 实测)
+      cf308737  滚动像素搬运——OnScroll/SetOrigin 用 ScrollWindowEx 视口
+                内 blit(子窗口随移)只失效暴露边带,替代全视口失效重绘
+                (内容重的页每帧全页重画,是滚动卡顿本体);视口外控件跳过
+                重复 ShowWindow(SW_HIDE)
     """
     # 目标是 Windows 源码包的 nativeui jumbo(发行 zip 全为 jumbo 形态,
     # CRLF 行尾),替换做 LF/CRLF 双形态兼容,保持文件原行尾。
@@ -472,10 +476,14 @@ void ContainerImpl::TranslateAllocation(const Vector2d& delta) {
   }
 
   if (clipped.IsEmpty()) {
-    shown_ = false;
-    ::ShowWindow(hwnd(), SW_HIDE);
+    if (shown_) {
+      shown_ = false;
+      ::ShowWindow(hwnd(), SW_HIDE);
+    }
     return;
   }
+  if (!shown_)
+    ::ShowWindow(hwnd(), SW_SHOWNOACTIVATE);
   shown_ = true;
 
   // Implement clipping by setting window region.
@@ -491,7 +499,6 @@ void ContainerImpl::TranslateAllocation(const Vector2d& delta) {
     SetWindowRgn(hwnd(), NULL, FALSE);
   }
 
-  ::ShowWindow(hwnd(), SW_SHOWNOACTIVATE);
   SetWindowPos(hwnd(), NULL,
                size_allocation.x(), size_allocation.y(),
                size_allocation.width(), size_allocation.height(),
@@ -553,6 +560,68 @@ void SubwinView::TranslateAllocation(const Vector2d& delta) {
 
   // Should emulate the transparent background.
   bool transprent_background_ = false;""",
+        ),
+        # cf308737:ScrollImpl::SetOrigin 像素搬运(jumbo_4)
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
+            """void ScrollImpl::SetOrigin(const Vector2d& origin) {
+  UpdateOrigin(origin);
+  Layout();
+  Invalidate();
+}""",
+            """void ScrollImpl::SetOrigin(const Vector2d& origin) {
+  const Vector2d old = origin_;
+  UpdateOrigin(origin);
+  ScrollPixels(origin_ - old);
+  Layout();
+}""",
+        ),
+        # cf308737:OnScroll 像素搬运 + ScrollPixels(jumbo_4)
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
+            """void ScrollImpl::OnScroll(int x, int y) {
+  if (UpdateOrigin(origin_ + Vector2d(x, y))) {
+    Layout();
+    Invalidate();
+  }
+}""",
+            """void ScrollImpl::OnScroll(int x, int y) {
+  const Vector2d old = origin_;
+  if (UpdateOrigin(origin_ + Vector2d(x, y))) {
+    ScrollPixels(origin_ - old);
+    Layout();
+  }
+}
+
+void ScrollImpl::ScrollPixels(const Vector2d& d) {
+  // Scroll by blitting the pixels that are already on screen (children
+  // included) and invalidating only the exposed band. A full-viewport
+  // invalidate repaints the whole page per scroll frame and janks badly
+  // on content-heavy pages (forms, component galleries) — especially so
+  // without WS_CLIPCHILDREN, where the parent also paints under every
+  // native child rect.
+  if (window() && !d.IsZero()) {
+    Rect vp = GetViewportRect() + size_allocation().OffsetFromOrigin();
+    RECT clip = {vp.x(), vp.y(), vp.right(), vp.bottom()};
+    ::ScrollWindowEx(window()->hwnd(), d.x(), d.y(), &clip, &clip,
+                     nullptr, nullptr, SW_SCROLLCHILDREN | SW_INVALIDATE);
+  } else {
+    Invalidate();
+  }
+}""",
+        ),
+        # cf308737:ScrollPixels 声明(scroll_win.h)
+        (
+            VENDOR_DIR / "libyue/include/nativeui/win/scroll_win.h",
+            """  void UpdateScrollbar();
+  bool UpdateOrigin(Vector2d new_origin);
+  Rect GetScrollbarRect(bool vertical) const;""",
+            """  void UpdateScrollbar();
+  bool UpdateOrigin(Vector2d new_origin);
+  Rect GetScrollbarRect(bool vertical) const;
+  // Blit the already-drawn viewport pixels by the scroll delta (children
+  // included) and invalidate only the exposed band.
+  void ScrollPixels(const Vector2d& d);""",
         ),
     ]
     for path, old_lf, new_lf in patches:
