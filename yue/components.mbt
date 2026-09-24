@@ -6673,41 +6673,38 @@ pub fn rate_t(
 /// (Popover 弹层),移开/按下即收。原生 View tooltip 在 Windows 环境
 /// (exe 无 comctl32 v6 清单)TTM_ADDTOOL 后区外/scroll 内/原生控件
 /// 三处对照全不弹(真机二分),统一走自绘,三平台一致;弹层不夺焦点。
-/// 参数是裸 View(挂 content 自身的视图,事件命中即触发),事件挂载
-/// 走包内 FFI(View 不实现 ViewLike)。
+/// 事件挂 content 自身的视图(包内 FFI,View 不实现 ViewLike),挂
+/// 宿主容器会踩 hover_group 同款「子控件事件独占」洞。
+///
+/// 弹层是全局单例:Windows 的替代弹层是独立小窗且库内单例状态
+/// (活动弹层指针/8 秒自动关计时/点外鼠标钩子)都绑在「当前活动」
+/// 上,每次悬停新建实例会与之冲突(真机闪退);popover_t 的复用
+/// 同一实例模式是受测路径。文字更新走自绘重读全局 tip。
+let g_tip_pop : Ref[Popover?] = Ref(None)
+
+///|
+let g_tip_host : Ref[Container?] = Ref(None)
+
+///|
+let g_tip_text : Ref[String] = Ref("")
+
+///|
+let g_tip_timer : Ref[Int] = Ref(0)
+
+///|
+fn tip_hide() -> Unit {
+  if g_tip_timer.val != 0 {
+    clear_timeout(g_tip_timer.val)
+    g_tip_timer.val = 0
+  }
+  match g_tip_pop.val {
+    Some(p) => p.close()
+    None => ()
+  }
+}
+
+///|
 pub fn attach_tooltip(v : View, tip : String) -> Unit {
-  let pop : Ref[Popover?] = Ref(None)
-  let timer : Ref[Int] = Ref(0)
-  fn close() -> Unit {
-    if timer.val != 0 {
-      clear_timeout(timer.val)
-      timer.val = 0
-    }
-    match pop.val {
-      Some(p) => {
-        pop.val = None
-        p.close()
-      }
-      None => ()
-    }
-  }
-  fn show() -> Unit {
-    let at = AttributedText::new(tip, wrap=false)
-    at.set_font(Font::new("Sans", 12.0))
-    let p = Popover::new()
-    bind_popover_bg(p)
-    p.set_accept_focus(false)
-    let host = themed_container(style=[("padding", 8.0)])
-    let label = Label::new(tip)
-    ViewLike::set_font(label, Font::new("Sans", 12.0))
-    bind_fg(label, fn() { theme_text_primary() })
-    host.add_child(label)
-    p.set_content(host)
-    p.set_content_size(at.get_bounds_for(10000.0, 100.0).width + 16.0, 30.0)
-    p.on_close(fn() { pop.val = None })
-    ffi_popover_show_relative_to(p, v)
-    pop.val = Some(p)
-  }
   let enter : (
     Int,
     Double,
@@ -6719,10 +6716,45 @@ pub fn attach_tooltip(v : View, tip : String) -> Unit {
     Int,
     Int,
   ) -> Unit = fn(_b, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
-    close()
-    timer.val = set_timeout(500, fn() {
-      timer.val = 0
-      show()
+    tip_hide()
+    g_tip_timer.val = set_timeout(500, fn() {
+      g_tip_timer.val = 0
+      g_tip_text.val = tip
+      let p = match g_tip_pop.val {
+        Some(p) => p
+        None => {
+          let p = Popover::new()
+          bind_popover_bg(p)
+          p.set_accept_focus(false)
+          let host = themed_container(style=[("padding", 8.0)])
+          host.on_draw(fn(p) {
+            let b = ViewLike::get_bounds(host)
+            let at = AttributedText::new(g_tip_text.val, valign=Center, wrap=false)
+            at.set_font(Font::new("Sans", 12.0))
+            at.set_color(theme_text_primary())
+            p.draw_attributed_text(at, 0.0, 0.0, b.width, b.height)
+          })
+          p.set_content(host)
+          // 不注册 on_close 清单例引用:Windows 的 close 是隐藏并手动
+          // 补发 on_close,清了引用每次隐藏都会误重建实例
+          g_tip_pop.val = Some(p)
+          g_tip_host.val = Some(host)
+          p
+        }
+      }
+      match g_tip_host.val {
+        Some(host) => {
+          let at = AttributedText::new(tip, wrap=false)
+          at.set_font(Font::new("Sans", 12.0))
+          p.set_content_size(
+            at.get_bounds_for(10000.0, 100.0).width + 16.0,
+            30.0,
+          )
+          ViewLike::schedule_paint(host)
+        }
+        None => ()
+      }
+      ffi_popover_show_relative_to(p, v)
     })
   }
   let leave : (
@@ -6736,7 +6768,7 @@ pub fn attach_tooltip(v : View, tip : String) -> Unit {
     Int,
     Int,
   ) -> Unit = fn(_b, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
-    close()
+    tip_hide()
   }
   let down : (
     Int,
@@ -6749,7 +6781,7 @@ pub fn attach_tooltip(v : View, tip : String) -> Unit {
     Int,
     Int,
   ) -> Int = fn(_b, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
-    close()
+    tip_hide()
     0
   }
   ffi_view_on_mouse_enter(
