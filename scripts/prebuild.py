@@ -131,7 +131,7 @@ def _stamp_stale() -> bool:
         return True
     # 只在环境显式强制源码模式而现有产物是预构建时重建；反向不重建，
     # 否则无预构建资产的平台（如 linux/arm64）会每次构建都重跑 prepare。
-    return os.environ.get("LIBYUE_FORCE_SOURCE") == "1" and mode != "source"
+    return os.environ.get("LIBYUE_FORCE_SOURCE") == "1" and not mode.startswith("source")
 
 
 def _shim_newer_than_lib() -> bool:
@@ -301,6 +301,24 @@ def link_configs() -> dict:
         arc = _prebuilt("libyue_prebuilt.a")
         core = f"-L{build} -lyue_mbt" + (f" {arc}" if arc else "")
         pc_common, pc_webkit = pkg_config_libs()
+        # 浏览器按需化按「库形态」分化:vendored 库恒为预构建(浏览器
+        # 混编 jumbo),build/ 预构建同;仅 prepare 源码模式抽段成功
+        # (stamp source-split)后浏览器才独立成成员——混编形态的主包
+        # 条目必须带 webkit,否则非浏览器程序链接期 undefined 断链
+        # (mbt.14 升版实测);抽段形态才可免。
+        if _native_dir() != BUILD_DIR:
+            browser_mixed = True
+        else:
+            stamp = _stamp()
+            if not stamp:
+                browser_mixed = True  # 无 stamp 无法判定,保守带 webkit
+            else:
+                mode = stamp.partition(" ")[2].strip()
+                browser_mixed = not mode.startswith("source") \
+                    or "split" not in mode
+        if browser_mixed:
+            pc_common = pc_webkit + pc_common
+            pc_webkit = []
         # -latomic：预构建库(官方 CMakeLists 清单也链 atomic)引用
         # __atomic_store，Ubuntu 22.04 工具链产物在最终链接必须显式给出
         sys_libs = ["-lpthread", "-ldl", "-lm", "-lstdc++", "-latomic"]
