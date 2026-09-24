@@ -280,6 +280,10 @@ def backport_fork_main() -> None:
       e373e60a  主窗口风格去 WS_CLIPCHILDREN——父表面在子窗口矩形处
                 从不绘制,HWND 重摆后旧位置陈旧像素不可达(切页/滚动横
                 线与残影,Windows 实测;DWM 合成下画到子窗口底下安全)
+      f4528cb8  滚动平移零 Layout 传导——ScrollImpl::Layout 对纯偏移走
+                TranslateAllocation(SubwinView 纯平移快路径只 SetWindowPos),
+                替代 0ms 定时器全子树 UpdateChildBounds(每拍 415 次调用/
+                21ms 且滞后一帧即蓝色残影,Windows 实测)
     """
     # 目标是 Windows 源码包的 nativeui jumbo(发行 zip 全为 jumbo 形态,
     # CRLF 行尾),替换做 LF/CRLF 双形态兼容,保持文件原行尾。
@@ -325,6 +329,230 @@ def backport_fork_main() -> None:
 // surfaces above the parent surface, so painting underneath children is
 // safe; the only cost is repainting areas covered by children.
 const DWORD Win32Window::kWindowDefaultStyle = WS_OVERLAPPEDWINDOW;""",
+        ),
+        # f4528cb8:ViewImpl::TranslateAllocation 基类实现(jumbo_4 的
+        # view_win.cc 段,插在 ViewImpl::Invalidate() 之后)
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
+            """void ViewImpl::Invalidate() {
+  Invalidate(size_allocation_);
+}""",
+            """void ViewImpl::Invalidate() {
+  Invalidate(size_allocation_);
+}
+
+void ViewImpl::TranslateAllocation(const Vector2d& delta) {
+  if (delta.IsZero())
+    return;
+  size_allocation_.Offset(delta);
+}""",
+        ),
+        # f4528cb8:ScrollImpl::Layout 的 content 分配改纯平移分流(jumbo_4)
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
+            """    if (content_alloc.height() < viewport_size.height())
+      content_alloc.set_height(viewport_size.height());
+    delegate_->GetContentView()->GetNative()->SizeAllocate(content_alloc);
+  }
+}""",
+            """    if (content_alloc.height() < viewport_size.height())
+      content_alloc.set_height(viewport_size.height());
+    // A pure scroll translation must not run the content container's full
+    // SizeAllocate cascade (Layout -> UpdateChildBounds recursion), which
+    // re-enters per child container and dominated scroll jank; shift the
+    // recorded allocations and the native HWNDs directly instead. Size
+    // changes (viewport growth, natural content size) still take the full
+    // path.
+    ViewImpl* content = delegate_->GetContentView()->GetNative();
+    const Rect old_alloc = content->size_allocation();
+    const Vector2d delta(content_alloc.x() - old_alloc.x(),
+                         content_alloc.y() - old_alloc.y());
+    if (!old_alloc.IsEmpty() &&
+        content_alloc.size() == old_alloc.size() &&
+        !delta.IsZero()) {
+      content->TranslateAllocation(delta);
+    } else {
+      content->SizeAllocate(content_alloc);
+    }
+  }
+}""",
+        ),
+        # f4528cb8:ContainerImpl::TranslateAllocation(jumbo_3 的
+        # container_win.cc 段)
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_3.cc",
+            """void ContainerImpl::SizeAllocate(const Rect& size_allocation) {
+  ViewImpl::SizeAllocate(size_allocation);
+  if (!size_allocation.size().IsEmpty())
+    adapter_->Layout();
+}""",
+            """void ContainerImpl::SizeAllocate(const Rect& size_allocation) {
+  ViewImpl::SizeAllocate(size_allocation);
+  if (!size_allocation.size().IsEmpty())
+    adapter_->Layout();
+}
+
+void ContainerImpl::TranslateAllocation(const Vector2d& delta) {
+  if (delta.IsZero())
+    return;
+  // Scroll translation: shift the recorded allocation and propagate to the
+  // subtree without any layout — running the full UpdateChildBounds cascade
+  // here is quadratic-to-exponential in tree depth (each child container's
+  // SetBounds re-enters Layout) and dominated scroll jank on form pages.
+  ViewImpl::TranslateAllocation(delta);
+  adapter_->ForEach([&delta](ViewImpl* child) {
+    child->TranslateAllocation(delta);
+    return true;
+  });
+}""",
+        ),
+        # f4528cb8:SubwinView::SizeAllocate 纯平移快路径(jumbo_3 的
+        # subwin_view.cc 段,整函数替换)
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_3.cc",
+            """void SubwinView::SizeAllocate(const Rect& size_allocation) {
+  ViewImpl::SizeAllocate(size_allocation);
+
+  // Manually hide the control if it is not visible, this is necessary because
+  // the control may be inside a Scroll.
+  Rect clipped = GetClippedRect();
+  if (clipped.IsEmpty()) {
+    ::ShowWindow(hwnd(), SW_HIDE);
+    return;
+  }
+
+  // Implement clipping by setting window region.
+  clipped.Offset(-size_allocation.x(), -size_allocation.y());
+  if (clipped.x() > 0 ||
+      clipped.y() > 0 ||
+      clipped.width() < size_allocation.width() ||
+      clipped.height() < size_allocation.height()) {
+    HRGN region = ::CreateRectRgn(clipped.x(), clipped.y(),
+                                  clipped.right(), clipped.bottom());
+    ::SetWindowRgn(hwnd(), region, FALSE);  // SetWindowRgn takes ownership
+  } else {
+    SetWindowRgn(hwnd(), NULL, FALSE);
+  }
+
+  ::ShowWindow(hwnd(), SW_SHOWNOACTIVATE);
+  SetWindowPos(hwnd(), NULL,
+               size_allocation.x(), size_allocation.y(),
+               size_allocation.width(), size_allocation.height(),
+               SWP_NOACTIVATE | SWP_NOZORDER);
+  RedrawWindow(hwnd(), NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN);
+}""",
+            """void SubwinView::SizeAllocate(const Rect& size_allocation) {
+  const Rect old_alloc = ViewImpl::size_allocation();
+  ViewImpl::SizeAllocate(size_allocation);
+
+  // Manually hide the control if it is not visible, this is necessary because
+  // the control may be inside a Scroll.
+  Rect clipped = GetClippedRect();
+  Rect rel(clipped);
+  rel.Offset(-size_allocation.x(), -size_allocation.y());
+
+  // Pure-translation fast path: when neither the size nor the clipped
+  // rect (relative to the view's origin) changed and the window is being
+  // shown either way, moving the window is enough — SetWindowPos carries
+  // the window surface to the new position, so no region/show/redraw
+  // work is needed. The full path otherwise runs per native control per
+  // scroll frame and dominates scroll jank (measured 20ms+ per resync
+  // on a form-heavy page).
+  bool pure_translation =
+      !old_alloc.IsEmpty() &&
+      size_allocation.size() == old_alloc.size() &&
+      !clipped.IsEmpty() && shown_ && rel == clip_rel_;
+  clip_rel_ = rel;
+  if (pure_translation) {
+    ::SetWindowPos(hwnd(), NULL,
+                   size_allocation.x(), size_allocation.y(),
+                   size_allocation.width(), size_allocation.height(),
+                   SWP_NOACTIVATE | SWP_NOZORDER);
+    return;
+  }
+
+  if (clipped.IsEmpty()) {
+    shown_ = false;
+    ::ShowWindow(hwnd(), SW_HIDE);
+    return;
+  }
+  shown_ = true;
+
+  // Implement clipping by setting window region.
+  clipped.Offset(-size_allocation.x(), -size_allocation.y());
+  if (clipped.x() > 0 ||
+      clipped.y() > 0 ||
+      clipped.width() < size_allocation.width() ||
+      clipped.height() < size_allocation.height()) {
+    HRGN region = ::CreateRectRgn(clipped.x(), clipped.y(),
+                                  clipped.right(), clipped.bottom());
+    ::SetWindowRgn(hwnd(), region, FALSE);  // SetWindowRgn takes ownership
+  } else {
+    SetWindowRgn(hwnd(), NULL, FALSE);
+  }
+
+  ::ShowWindow(hwnd(), SW_SHOWNOACTIVATE);
+  SetWindowPos(hwnd(), NULL,
+               size_allocation.x(), size_allocation.y(),
+               size_allocation.width(), size_allocation.height(),
+               SWP_NOACTIVATE | SWP_NOZORDER);
+  RedrawWindow(hwnd(), NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN);
+}
+
+void SubwinView::TranslateAllocation(const Vector2d& delta) {
+  if (delta.IsZero())
+    return;
+  // Reuse SizeAllocate: for a pure scroll translation it takes the fast
+  // path (a single SetWindowPos), and controls crossing the viewport
+  // edge correctly fall through to the region update.
+  SizeAllocate(Rect(size_allocation().origin() + delta,
+                    size_allocation().size()));
+}""",
+        ),
+        # f4528cb8:三个头的声明与成员(发行包 include 路径)
+        (
+            VENDOR_DIR / "libyue/include/nativeui/win/view_win.h",
+            """  // Change the bounds without invalidating.
+  void set_size_allocation(const Rect& bounds) { size_allocation_ = bounds; }
+  Rect size_allocation() const { return size_allocation_; }""",
+            """  // Change the bounds without invalidating.
+  void set_size_allocation(const Rect& bounds) { size_allocation_ = bounds; }
+  Rect size_allocation() const { return size_allocation_; }
+
+  // Shift this view's (and, for containers/subwin controls, its subtree's)
+  // allocation by |delta| without running any layout — the dedicated path
+  // for scroll translations, where nothing changes but the offset. Must
+  // not trigger yoga recalculation or the UpdateChildBounds cascade.
+  virtual void TranslateAllocation(const Vector2d& delta);""",
+        ),
+        (
+            VENDOR_DIR / "libyue/include/nativeui/win/container_win.h",
+            """  // ViewImpl:
+  void SizeAllocate(const Rect& size_allocation) override;""",
+            """  // ViewImpl:
+  void SizeAllocate(const Rect& size_allocation) override;
+  void TranslateAllocation(const Vector2d& delta) override;""",
+        ),
+        (
+            VENDOR_DIR / "libyue/include/nativeui/win/subwin_view.h",
+            """  void SizeAllocate(const Rect& size_allocation) override;""",
+            """  void SizeAllocate(const Rect& size_allocation) override;
+  void TranslateAllocation(const Vector2d& delta) override;""",
+        ),
+        (
+            VENDOR_DIR / "libyue/include/nativeui/win/subwin_view.h",
+            """  // Should emulate the transparent background.
+  bool transprent_background_ = false;""",
+            """  // The clipped rect relative to this view's origin, as of the last
+  // SizeAllocate — used by the pure-translation fast path to skip the
+  // region/show/redraw work when scrolling only moves the control.
+  Rect clip_rel_;
+
+  // Whether the window was left visible by the last SizeAllocate.
+  bool shown_ = false;
+
+  // Should emulate the transparent background.
+  bool transprent_background_ = false;""",
         ),
     ]
     for path, old_lf, new_lf in patches:
