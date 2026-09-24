@@ -964,6 +964,15 @@ extern "c" fn ffi_view_get_bounds_width(view : View) -> Double = "yue_mbt_view_g
 extern "c" fn ffi_view_get_bounds_height(view : View) -> Double = "yue_mbt_view_get_bounds_height"
 
 ///|
+extern "c" fn ffi_view_root(view : View) -> View = "yue_mbt_view_root"
+
+///|
+extern "c" fn ffi_view_origin_in_root_x(view : View, root : View) -> Double = "yue_mbt_view_origin_in_root_x"
+
+///|
+extern "c" fn ffi_view_origin_in_root_y(view : View, root : View) -> Double = "yue_mbt_view_origin_in_root_y"
+
+///|
 extern "c" fn ffi_view_get_bounds_in_screen_x(view : View) -> Double = "yue_mbt_view_get_bounds_in_screen_x"
 
 ///|

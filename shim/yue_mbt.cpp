@@ -2312,6 +2312,48 @@ double yue_mbt_view_get_bounds_height(void *view) {
   return 0;
 }
 
+// 沿父链上溯到顶层视图(根)。注册表按 refcount 重新持有,与原句柄
+// 并存安全(tooltip 自绘气泡挂根容器用)。
+void *yue_mbt_view_root(void *view) {
+  auto *v = CastToView(view);
+  if (v == nullptr) {
+    return nullptr;
+  }
+  while (v->GetParent() != nullptr) {
+    v = v->GetParent();
+  }
+  return reinterpret_cast<void *>(ViewStore::put(v));
+}
+
+// 锚点相对根的坐标:沿途累加各层相对父的 bounds(不含根自身偏移)。
+double yue_mbt_view_origin_in_root_x(void *view, void *root) {
+  auto *v = CastToView(view);
+  auto *r = CastToView(root);
+  if (v == nullptr || r == nullptr) {
+    return 0;
+  }
+  double x = 0;
+  while (v != nullptr && v != r) {
+    x += v->GetBounds().x();
+    v = v->GetParent();
+  }
+  return x;
+}
+
+double yue_mbt_view_origin_in_root_y(void *view, void *root) {
+  auto *v = CastToView(view);
+  auto *r = CastToView(root);
+  if (v == nullptr || r == nullptr) {
+    return 0;
+  }
+  double y = 0;
+  while (v != nullptr && v != r) {
+    y += v->GetBounds().y();
+    v = v->GetParent();
+  }
+  return y;
+}
+
 double yue_mbt_view_get_bounds_in_screen_x(void *view) {
   if (auto *v = CastToView(view)) {
     return v->GetBoundsInScreen().x();

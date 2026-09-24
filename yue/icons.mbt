@@ -1511,10 +1511,10 @@ pub fn icon_button_t(
         hover.val = false
         ViewLike::schedule_paint(v)
       })
-      if tip != "" {
-        attach_tooltip(ViewLike::view(v), tip)
-      }
       attach(parent, ViewLike::view(v))
+      if tip != "" {
+        attach_tooltip(parent, ViewLike::view(v), tip)
+      }
       ViewLike::view(v)
     },
   }
