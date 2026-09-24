@@ -181,10 +181,14 @@ pub fn overlay_scroll(
       s.set_content(holder)
       attach_overlay_thumb(ViewLike::view(host), s)
       // declarative scroll() 同款:Windows 上原生子控件 HWND 不随滚动平移,
-      // 0ms 定时器延到滚动布局完成后强制重摆 content 子树
+      // 0ms 定时器延到滚动布局完成后强制重摆 content 子树,并补一次失效
+      // 重绘清掉移动残影
       if platform() == "windows" {
         s.on_scroll(fn() {
-          let _ = set_timeout(0, fn() { holder.update_child_bounds() })
+          let _ = set_timeout(0, fn() {
+            holder.update_child_bounds()
+            ViewLike::schedule_paint(holder)
+          })
           false
         })
       }
