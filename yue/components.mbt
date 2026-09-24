@@ -1937,40 +1937,40 @@ pub fn result(
         ("height", 76.0),
         ("marginTop", 16.0),
       ])
-      let symbol = match t {
-        Success => "✓"
-        Danger => "✕"
-        _ => "!"
-      }
-      // 水平居中交给平台布局引擎(align=Center):Windows 的测宽带内边距,
-      // 手动按测量宽摆位必偏左(见 adaptation.md)
-      // GTK 端 DrawAttributedText 水平 align 未实现,align=Center 无效,
-      // mount 时测宽手动水平居中(库内惯例,见 adaptation)
-      let symbol_at = AttributedText::new(symbol, valign=Center, wrap=false)
-      symbol_at.set_font(Font::new("Sans", 38.0, weight=Bold))
-      symbol_at.set_color(type_color(t))
-      let symbol_w = symbol_at.get_bounds_for(10000.0, 100.0).width
 
       bind_bg(icon, fn() { type_light_color(t) })
-      // 符号色随主题:set_color 后同文重排(AT 属性变更不自动失效)
-      fn apply_symbol_color() -> Unit {
-        symbol_at.set_color(type_color(t))
-        symbol_at.set_text(symbol_at.get_text())
-        ViewLike::schedule_paint(icon)
-      }
-
-      apply_symbol_color()
-      on_theme_change(apply_symbol_color)
+      // 符号用 Painter 矢量路径自绘(✓/✕/!):不测宽、不摆位,三平台
+      // 一致(Windows 的 AttributedText 测宽含内边距,手动居中必偏左,
+      // 见 adaptation.md);主题切换重取色显式重绘
       icon.on_draw(fn(p) {
         let b = ViewLike::get_bounds(icon)
-        p.draw_attributed_text(
-          symbol_at,
-          (b.width - symbol_w) / 2.0,
-          0.0,
-          symbol_w,
-          b.height,
-        )
+        let cx = b.width / 2.0
+        let cy = b.height / 2.0
+        let s = 20.0
+        p.set_stroke_color(type_color(t))
+        p.begin_path()
+        match t {
+          Success => {
+            p.move_to(cx - s, cy + s * 0.1)
+            p.line_to(cx - s * 0.2, cy + s * 0.7)
+            p.line_to(cx + s, cy - s * 0.6)
+            p.stroke()
+          }
+          Danger => {
+            p.move_to(cx - s * 0.7, cy - s * 0.7)
+            p.line_to(cx + s * 0.7, cy + s * 0.7)
+            p.move_to(cx + s * 0.7, cy - s * 0.7)
+            p.line_to(cx - s * 0.7, cy + s * 0.7)
+            p.stroke()
+          }
+          _ => {
+            p.set_fill_color(type_color(t))
+            p.fill_rect(cx - s * 0.14, cy - s, s * 0.28, s * 1.25)
+            p.fill_rect(cx - s * 0.14, cy + s * 0.5, s * 0.28, s * 0.28)
+          }
+        }
       })
+      on_theme_change(fn() { ViewLike::schedule_paint(icon) })
       let big = themed_container(style=[("height", 30.0)], style_str=[
         ("alignItems", "center"),
       ])
