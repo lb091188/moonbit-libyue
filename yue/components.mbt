@@ -6316,14 +6316,17 @@ pub fn tabs_t(
         })
         head.add_child(tab)
         // 内容页:flex 让页区填充 outer 的确定高度(Scroll / Table 等
-        // 无 measure 叶节点依赖父级确定高度)。basis 显式置 0(CSS 的
-        // flex:1 1 0 语义):yoga 的 flex 简写只设 grow、basis 为 auto,
-        // 页内容隐藏时 basis 塌 0,外层 auto 高的 scroll 内容测量跟着
-        // 塌,页容器被分配成压缩中间值卡死(Windows 实测 210→56);
-        // basis 恒定 0 + grow 1 则高度只由 flex 分配决定,不随内容显隐
-        // 波动
+        // 无 measure 叶节点依赖父级确定高度)。basis 0 按平台分化:
+        // Windows 需要它治「切页中间态被 yoga 压缩」(basis 恒定 0 +
+        // grow 1,页区高度只由 flex 分配决定,不随内容显隐波动);
+        // GTK/macOS 全量重排无此病,且 basis 非 auto 时高度只来自
+        // flex 分配,父链无确定高度时整页塌陷,恢复内容测量撑高
         let page_c = themed_container(
-          style=[("flex", 1.0), ("flexbasis", 0.0)],
+          style=if platform() == "windows" {
+            [("flex", 1.0), ("flexbasis", 0.0)]
+          } else {
+            [("flex", 1.0)]
+          },
           style_str=[("flexDirection", "column")],
         )
         ViewLike::set_visible(page_c, cur.val == idx)
