@@ -140,9 +140,15 @@ pub fn on_network_status_change(cb : (NetworkStatus) -> Unit) -> Unit {
       let _ = @traybus.nm_on_change(fn(state, conn) {
         net_dispatch(nm_normalize(state, conn))
       })
-      // 注册时同步回填初值(缓存语义)
+      // 注册时同步回填初值:新订阅者立即拿到当前状态(否则文案停在
+      // 「探测中」直到网络真的变化);g_net_last 同步设为去重基准,
+      // 后续信号只派发变化。逐个 cb 回填而非走 net_dispatch——多注册
+      // 时后者会被去重吞掉第二个订阅者的初值
       match network_status() {
-        Ok(s) => g_net_last.val = Some(s)
+        Ok(s) => {
+          g_net_last.val = Some(s)
+          cb(s)
+        }
         Err(_) => ()
       }
       ()
