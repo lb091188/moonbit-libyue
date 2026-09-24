@@ -541,12 +541,6 @@ void yue_mbt_view_set_visible(void *view, int visible) {
       static_cast<nu::Container*>(root)->Layout();
     else
       root->Layout();
-#if defined(OS_WIN)
-    // HWND 重摆后旧位置留条状残影(真机反馈的切页横线):本路径低频
-    // (每次显隐翻转两次),对根补一次失效重绘清残影;滚动路径不挂——
-    // 高频全窗重绘风暴,9e4c99a 实测负优化
-    root->SchedulePaint();
-#endif
   }
 }
 
