@@ -524,14 +524,23 @@ void yue_mbt_view_set_background_color(void *view, const char *hex) {
 
 void yue_mbt_view_set_visible(void *view, int visible) {
   if (auto *v = CastToView(view)) {
-    // 同值早退:显隐值未翻转时什么都不做
+    // 同值早退:目标与当前一致时直接返回——下面保护的是「真翻转」后
+    // 的根级重算,同值调用(多页订阅同一 Store 的 N-1 次重复触发)是
+    // 确定的无效功,每次都要上溯根级 Layout + 全子树重摆
     if (v->IsVisible() == (visible != 0))
       return;
     v->SetVisible(visible != 0);
-    // 根级重算不在翻转时立即做:yue 层把它合并到本轮消息循环末尾
-    // (见 ViewLike::set_visible)——切页的「显新页+隐旧页」两次翻转
-    // 各自立即根级 Layout,第一次会按「两页同时 flex」的中间态分配
-    // 一轮随即作废的全子树重摆,原生控件多的页(表单页)尤其明显
+    // 显隐切换的 Layout 传播在非 Container 父(Scroll)处中断,Container::
+    // Layout 的 dirty 自愈会用过期 yoga 结果把外层 flex 容器分配成
+    // 压缩中间值(实测页容器 210→56 卡死);这里补一次根级重算,用
+    // 最新 yoga 值覆盖自愈结果
+    auto* root = v;
+    while (root->GetParent() != nullptr)
+      root = root->GetParent();
+    if (root->IsContainer())
+      static_cast<nu::Container*>(root)->Layout();
+    else
+      root->Layout();
   }
 }
 

@@ -213,39 +213,9 @@ impl ViewLike with fn set_background_color(self, hex) -> Unit {
 }
 
 ///|
-/// 根级重算的按拍合并:切页等场景连续多次显隐翻转(显新页+隐旧页),
-/// 每次翻转都立即根级 Layout 的话,第一次会按「新旧两页同时 flex」
-/// 的中间态分配一轮随即作废的全子树重摆。这里合并到本轮消息循环
-/// 末尾,全部翻转完成后按最终态一次重算。
-let g_relayout_pending : Ref[Bool] = Ref(false)
-
-///|
-let g_relayout_seed : Ref[View?] = Ref(None)
-
-///|
-fn schedule_root_relayout(v : View) -> Unit {
-  g_relayout_seed.val = Some(v)
-  if g_relayout_pending.val {
-    return
-  }
-  g_relayout_pending.val = true
-  ignore(
-    set_timeout(0, fn() {
-      g_relayout_pending.val = false
-      match g_relayout_seed.val {
-        Some(vv) => ffi_view_layout(vv)
-        None => ()
-      }
-    }),
-  )
-}
-
-///|
-/// 设置视图显隐（隐藏的视图不参与布局）。翻转后的根级重算合并到
-/// 本轮消息循环末尾执行（见 schedule_root_relayout）。
+/// 设置视图显隐（隐藏的视图不参与布局）。
 impl ViewLike with fn set_visible(self, visible : Bool) -> Unit {
   ffi_view_set_visible(self.view(), if visible { 1 } else { 0 })
-  schedule_root_relayout(self.view())
 }
 
 ///|
@@ -280,7 +250,6 @@ pub fn schedule_paint_view(v : View) -> Unit {
 /// 对底层视图句柄直接设置显隐(声明式 Node 挂载返回的 View 用)。
 pub fn set_visible_view(v : View, visible : Bool) -> Unit {
   ffi_view_set_visible(v, if visible { 1 } else { 0 })
-  schedule_root_relayout(v)
 }
 
 
