@@ -277,6 +277,9 @@ def backport_fork_main() -> None:
       ba479418  Container::UpdateChildBounds 递归下钻子容器——子容器尺寸
                 未变时 SetBounds 早退,SizeAllocate→Layout 级联断,其子树
                 整轮错过分配(set_visible 切页整块不再重绘,Windows 实测)
+      e373e60a  主窗口风格去 WS_CLIPCHILDREN——父表面在子窗口矩形处
+                从不绘制,HWND 重摆后旧位置陈旧像素不可达(切页/滚动横
+                线与残影,Windows 实测;DWM 合成下画到子窗口底下安全)
     """
     # 目标是 Windows 源码包的 nativeui jumbo(发行 zip 全为 jumbo 形态,
     # CRLF 行尾),替换做 LF/CRLF 双形态兼容,保持文件原行尾。
@@ -308,6 +311,20 @@ def backport_fork_main() -> None:
         static_cast<Container*>(child)->UpdateChildBounds();
     }
   }""",
+        ),
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
+            """const DWORD Win32Window::kWindowDefaultStyle =
+    WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN;""",
+            """// No WS_CLIPCHILDREN on the main window style: with it the parent surface
+// is never painted under child-window rects, so after native child HWNDs
+// move (layout resync, page switches, scroll), the stale pixels at their
+// old positions can never be repainted — the parent's paint DC is clipped
+// to the *current* child set and old/new rects interleave (unreachable
+// seams, measured as horizontal streaks on Win10). DWM composites child
+// surfaces above the parent surface, so painting underneath children is
+// safe; the only cost is repainting areas covered by children.
+const DWORD Win32Window::kWindowDefaultStyle = WS_OVERLAPPEDWINDOW;""",
         ),
     ]
     for path, old_lf, new_lf in patches:
