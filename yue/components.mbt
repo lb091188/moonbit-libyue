@@ -6670,7 +6670,7 @@ pub fn rate_t(
 
 ///|
 /// 自绘悬浮提示:悬停 500ms 延时在控件下方显示主题底色文字气泡,
-/// 移开/按下即收。原生 View tooltip 在 Windows 环境(exe 无 comctl32
+/// 移开/按下/滚动即收。原生 View tooltip 在 Windows 环境(exe 无 comctl32
 /// v6 清单)区外/scroll 内/原生控件三处对照全不弹(真机二分);独立
 /// 弹层小窗(Popover 替代实现)有窗口创建/全局鼠标钩子/单例管理一串
 /// 平台坑且真机渲染卡顿,改为窗口内自绘覆盖层——气泡是挂在锚点所属
@@ -6797,6 +6797,17 @@ pub fn attach_tooltip(parent : View, v : View, tip : String) -> Unit {
     v,
     fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
     down,
+  )
+  // 滚轮滚动时鼠标不动,不会产生 leave 事件——挂观察式滚轮旁路收气泡
+  // (回调后事件继续传播,页面滚动不受影响;消费式 on_wheel 会阻断滚动)
+  let wheel = fn(_delta : Double) -> Unit {
+    hide()
+  }
+  keep_alive(fn() { ignore(wheel) })
+  ffi_view_on_wheel_observe(
+    v,
+    fn(f, d) { f(d) },
+    wheel,
   )
 }
 
