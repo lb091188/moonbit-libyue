@@ -2612,6 +2612,29 @@ static gboolean ViewWheelTrampoline(GtkWidget *, GdkEventScroll *event,
   return TRUE;
 }
 
+// 观察式滚轮蹦床:回调后返回 FALSE,事件继续向父滚动区传播
+static gboolean ViewWheelTrampolineObserve(GtkWidget *, GdkEventScroll *event,
+                                           gpointer data) {
+  auto *cb = static_cast<WheelCb *>(data);
+  double delta = 0;
+  switch (event->direction) {
+    case GDK_SCROLL_UP:
+      delta = -1;
+      break;
+    case GDK_SCROLL_DOWN:
+      delta = 1;
+      break;
+    case GDK_SCROLL_SMOOTH:
+      delta = event->delta_y;
+      break;
+    default:
+      return FALSE;
+  }
+  if (delta != 0)
+    cb->invoke(cb->closure, delta);
+  return FALSE;
+}
+
 // NU_CONTAINER 系宏只能在 nu 命名空间内展开(内部用非限定类型函数)
 namespace nu {
 inline void container_add_scroll_mask(GtkWidget *w) {
@@ -2649,6 +2672,38 @@ void yue_mbt_view_on_wheel(void *view,
   (void)view;
   (void)invoke;
   (void)closure; // mac 滚轮接入待补(见 adaptation.md),先静默不挂
+#endif
+}
+
+// 观察式滚轮:回调收到 delta 后事件继续传播(Windows wheel_hook 返回
+// false / GTK 蹦床返回 FALSE),页面滚动不受影响。tooltip 收气泡等旁路
+// 场景专用;消费式 on_wheel 挂在滚动区内的控件上会阻断页面滚动。注意
+// Windows 的 wheel_hook 单槽:同一视图两种滚轮注册后写覆盖先写。
+void yue_mbt_view_on_wheel_observe(void *view,
+                                   void (*invoke)(void *, double),
+                                   void *closure) {
+#if defined(OS_LINUX)
+  if (auto *v = CastToView(view)) {
+    GtkWidget *w = v->GetNative();
+    nu::container_add_scroll_mask(w);
+    auto *cb = new WheelCb{invoke, closure};
+    g_signal_connect(w, "scroll-event",
+                     G_CALLBACK(ViewWheelTrampolineObserve), cb);
+  }
+#elif defined(OS_WIN)
+  if (auto *v = CastToView(view)) {
+    auto *impl = static_cast<nu::ViewImpl *>(v->GetNative());
+    auto *cb = new WheelCb{invoke, closure};
+    impl->wheel_hook = [cb](int raw) {
+      cb->invoke(cb->closure,
+                 -static_cast<double>(static_cast<int16_t>(raw)) / 120.0);
+      return false;
+    };
+  }
+#else
+  (void)view;
+  (void)invoke;
+  (void)closure;
 #endif
 }
 

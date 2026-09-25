@@ -33,20 +33,20 @@ CACHE_DIR = REPO_ROOT / ".prepare"
 
 # 固定版本：fork 的 v*-mbt* 标签，升级时同步更新 sha256。
 # 平台修复补丁已提交进 fork，发行包自带，无需本地打补丁。
-LIBYUE_VERSION = "v0.15.6-mbt.14"
+LIBYUE_VERSION = "v0.15.6-mbt.15"
 RELEASES = f"https://github.com/lb091188/yue/releases/download/{LIBYUE_VERSION}"
 # 发行包资产名与 platform.system() 不同名：mac 是 mac、Windows 是 win
 ASSET_OS = {"Linux": "linux", "Darwin": "mac", "Windows": "win"}
 
 SHA256 = {
     # 源码发行包（回退路径）
-    "source:linux": "d888c6087c0ff9a7c75973b03659b34087161b94a705f77bb28068232b320c6a",
-    "source:mac": "40facc51ae0df0e91d79cf5de456df8e62de03db9c887dcf9d7c6e83c47a9211",
-    "source:win": "42dd0de3225f4a1a51ff4afc76d17479e501ed487631831acebfec9ad6bf847d",
+    "source:linux": "bf11b0e5f45b16dbcb35469540b655c5c0b68b356fb9c3ef431290cbdcb993ec",
+    "source:mac": "0e007fd766a4c12f70243ba750ffbd52be3e2d91ffb68880dca19079fe322cdd",
+    "source:win": "86e9c5153af54237af340a2a991f8130815aeb1e47d0d493ee97e024c5b429fa",
     # 预构建静态库（优先路径）
-    "prebuilt:linux_x64": "b57c0bc7b6e8a82f1bb37bccc9dd44c3dc92021fd1ca713bbf57e61822aabb0f",
-    "prebuilt:mac_universal": "1b9ba6b3c85b607e26ca60dcb9aa7201dd1c523bf6dc85648a9f9379e6e8fe11",
-    "prebuilt:win_x64": "d978472fdd64d1258b2202d11cf68404e7273bb91ddd52a435cf1610dcb1184c",
+    "prebuilt:linux_x64": "daa520ba1bda55d66bcd2b130befc08fd334b6a73d47e496b1091ae7d8664a94",
+    "prebuilt:mac_universal": "58661cf795162f76dc6dc50d3f232ed4ae5eaa6d07bc7693d20101f437057214",
+    "prebuilt:win_x64": "e3988931b852cf1704cde11c0cfa5fc0cfc8c9f11fc12232f12cde136cb788b5",
 }
 
 
@@ -288,6 +288,14 @@ def backport_fork_main() -> None:
                 内 blit(子窗口随移)只失效暴露边带,替代全视口失效重绘
                 (内容重的页每帧全页重画,是滚动卡顿本体);视口外控件跳过
                 重复 ShowWindow(SW_HIDE)
+      (本批)    单行 Edit 放行滚轮——OnMouseWheelFromSelf 只在「事件在
+                控件内」时不转发,而单行 RichEdit 吞掉 WM_MOUSEWHEEL 既
+                不自滚也不冒泡,Entry 成了 Scroll 里的滚轮死区(表单页
+                大半是 Entry,真机表现为「滚不动只能猛拨」)
+      (本批)    连发滚轮撕裂——输入消息优先级高于 WM_PAINT,快拨连发
+                时后一个 blit 会读到前一个「已失效未重画」的暴露边带,
+                陈旧像素搬进视口中段逐拍复合(真机猛拨后大面错位);
+                ScrollPixels 后 UpdateWindow 同步补画暴露边带
     """
     # 目标是 Windows 源码包的 nativeui jumbo(发行 zip 全为 jumbo 形态,
     # CRLF 行尾),替换做 LF/CRLF 双形态兼容,保持文件原行尾。
@@ -622,6 +630,104 @@ void ScrollImpl::ScrollPixels(const Vector2d& d) {
   // Blit the already-drawn viewport pixels by the scroll delta (children
   // included) and invalidate only the exposed band.
   void ScrollPixels(const Vector2d& d);""",
+        ),
+        # 单行 Edit 放行滚轮:SubwinView 构造标记自滚意愿(jumbo_3)
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_3.cc",
+            """      proc_(SetWindowProc(hwnd(), &WndProc)) {
+  // Apply default font.
+  SetFont(font());
+}""",
+            """      proc_(SetWindowProc(hwnd(), &WndProc)) {
+  // Only multiline edit controls scroll their own content with the wheel;
+  // the ES_MULTILINE bit is meaningless for other subwin controls, so the
+  // plain bit test is enough.
+  wants_wheel_ = (window_style & ES_MULTILINE) != 0;
+  // Apply default font.
+  SetFont(font());
+}""",
+        ),
+        # 单行 Edit 放行滚轮:OnMouseWheelFromSelf 转发条件(jumbo_3)
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_3.cc",
+            """LRESULT SubwinView::OnMouseWheelFromSelf(
+    UINT message, WPARAM w_param, LPARAM l_param) {
+  if (window()) {
+    // Pass the event to window if not happened inside the control.
+    POINT p = { CR_GET_X_LPARAM(l_param), CR_GET_Y_LPARAM(l_param) };
+    ::ScreenToClient(window()->hwnd(), &p);
+    if (!size_allocation().Contains(Point(p))) {
+      ::SendMessage(window()->hwnd(), message, w_param, l_param);
+      return 0;
+    }
+  }
+  SetMsgHandled(false);
+  return 0;
+}""",
+            """LRESULT SubwinView::OnMouseWheelFromSelf(
+    UINT message, WPARAM w_param, LPARAM l_param) {
+  if (window()) {
+    // Pass the event to window if not happened inside the control, or when
+    // the control cannot scroll itself: the EDIT/RichEdit def-window-proc
+    // does nothing for single-line controls and never bubbles the wheel to
+    // the parent, so a single-line Entry inside a Scroll eats the event and
+    // the page stops scrolling under it (form pages are mostly Entries).
+    POINT p = { CR_GET_X_LPARAM(l_param), CR_GET_Y_LPARAM(l_param) };
+    ::ScreenToClient(window()->hwnd(), &p);
+    if (!size_allocation().Contains(Point(p)) || !wants_wheel_) {
+      ::SendMessage(window()->hwnd(), message, w_param, l_param);
+      return 0;
+    }
+  }
+  SetMsgHandled(false);
+  return 0;
+}""",
+        ),
+        # 单行 Edit 放行滚轮:subwin_view.h 的 setter 与成员
+        (
+            VENDOR_DIR / "libyue/include/nativeui/win/subwin_view.h",
+            """  // Change focus behavior.
+  void set_switch_focus_on_tab(bool s) { switch_focus_on_tab_ = s; }""",
+            """  // Change focus behavior.
+  void set_switch_focus_on_tab(bool s) { switch_focus_on_tab_ = s; }
+
+  // Mark that this control scrolls its own content with the wheel (multiline
+  // edits). Single-line subwin controls swallow WM_MOUSEWHEEL without
+  // scrolling anything and never bubble it, turning into wheel dead zones
+  // inside a Scroll.
+  void set_wants_mouse_wheel(bool w) { wants_wheel_ = w; }""",
+        ),
+        (
+            VENDOR_DIR / "libyue/include/nativeui/win/subwin_view.h",
+            """  // Should switch focus when TAB is pressed.
+  bool switch_focus_on_tab_ = true;""",
+            """  // Should switch focus when TAB is pressed.
+  bool switch_focus_on_tab_ = true;
+
+  // Whether the control scrolls its own content with the wheel.
+  bool wants_wheel_ = false;""",
+        ),
+        # 连发滚轮撕裂:ScrollPixels 后同步补画暴露边带(jumbo_4)
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
+            """    ::ScrollWindowEx(window()->hwnd(), d.x(), d.y(), &clip, &clip,
+                     nullptr, nullptr, SW_SCROLLCHILDREN | SW_INVALIDATE);
+  } else {
+    Invalidate();
+  }
+}""",
+            """    ::ScrollWindowEx(window()->hwnd(), d.x(), d.y(), &clip, &clip,
+                     nullptr, nullptr, SW_SCROLLCHILDREN | SW_INVALIDATE);
+    // Input messages outrank WM_PAINT, so a fast wheel flick queues several
+    // scrolls before any paint: each later blit would read the not yet
+    // repainted exposed band of the previous one and bake stale pixels into
+    // the viewport (real-machine tearing on hard flicks). Paint the exposed
+    // band synchronously so the surface is always fresh for the next blit.
+    ::UpdateWindow(window()->hwnd());
+  } else {
+    Invalidate();
+  }
+}""",
         ),
     ]
     for path, old_lf, new_lf in patches:

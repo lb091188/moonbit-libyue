@@ -1102,6 +1102,15 @@ extern "c" fn ffi_view_on_wheel(
   callback : (Double) -> Unit,
 ) -> Unit = "yue_mbt_view_on_wheel"
 
+///|
+/// 观察式滚轮(不消费事件,滚动继续冒泡):tooltip 收气泡等旁路场景。
+#borrow(view, invoke, callback)
+extern "c" fn ffi_view_on_wheel_observe(
+  view : View,
+  invoke : FuncRef[(((Double) -> Unit, Double) -> Unit)],
+  callback : (Double) -> Unit,
+) -> Unit = "yue_mbt_view_on_wheel_observe"
+
 
 ///|
 #borrow(view, invoke, callback)

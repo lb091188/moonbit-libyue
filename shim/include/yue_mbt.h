@@ -408,6 +408,10 @@ void yue_mbt_view_on_mouse_leave(void *view,
 void yue_mbt_view_on_wheel(void *view,
                            void (*invoke)(void *closure, double delta_y),
                            void *closure);
+/* 观察式滚轮：回调后事件继续传播（页面滚动不受影响），tooltip 等旁路场景用 */
+void yue_mbt_view_on_wheel_observe(void *view,
+                                   void (*invoke)(void *closure, double delta_y),
+                                   void *closure);
 /* 键盘事件：invoke(closure, key_code, modifiers, timestamp) 返回是否已处理 */
 void yue_mbt_view_on_key_down(void *view,
                               int32_t (*invoke)(void *closure, int32_t key_code, int32_t modifiers, int32_t timestamp),
