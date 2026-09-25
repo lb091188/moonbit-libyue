@@ -413,22 +413,21 @@ pub fn scroll(
         Some((h, v)) => s.set_scrollbar_policy(h, v)
         None => ()
       }
-      // 诊断开关(LIBYUE_SCROLL_FULL_INVALIDATE=1):每次滚动后对滚动区
-      // 整块失效,下一拍按最新坐标全量重绘——绕开像素搬运路径的对照模
-      // 式(慢但零 blit),真机二分「重影在搬运路径还是别处」用
-      if getenv_str("LIBYUE_SCROLL_FULL_INVALIDATE") is Some(_) {
-        s.on_scroll(fn() {
-          ViewLike::schedule_paint(s)
-          false
-        })
-      }
       let holder = Container::new()
       ignore((content.mount)(ViewLike::view(holder)))
       s.set_content(holder)
-      // Windows 上滚动平移由 ScrollImpl::Layout 内的 TranslateAllocation
-      // 同步传导给原生子控件 HWND(零 Layout);旧版曾在此挂 on_scroll
-      // 的 0ms 定时器全子树重摆,每拍 20ms+ 且滞后一帧(蓝色残影),
-      // 已由 fork 侧根治。
+      // Windows 上滚动平移只更新 content 容器自身的绝对坐标,其子孙里的
+      // 原生子控件(Entry/TextEdit 等 HWND)不会跟随——滚轮/拖拽把内容画
+      // 走了,原生框仍停在旧屏幕位置,盖住视口外的区域。on_scroll 触发于
+      // Scroll 重摆 content 之前,须以 0ms 定时器延到滚动布局完成后的下一
+      // 个消息循环拍,再对 content 容器强制重摆子树(fork 侧平移/blit 系
+      // 补丁真机多病已整串回滚,见 adaptation.md 回滚条目)
+      if platform() == "windows" {
+        s.on_scroll(fn() {
+          let _ = set_timeout(0, fn() { holder.update_child_bounds() })
+          false
+        })
+      }
       // flex:1 的 basis 默认 auto,按内容自然高度测量——内容挂载期
       // (holder 尚无父)的 0×0 yoga 计算会把测量缓存污染成 0,scroll
       // 视口高度塌陷(实测 356→0),原生子控件(Entry 等)的裁剪区随之

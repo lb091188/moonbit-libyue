@@ -33,20 +33,20 @@ CACHE_DIR = REPO_ROOT / ".prepare"
 
 # 固定版本：fork 的 v*-mbt* 标签，升级时同步更新 sha256。
 # 平台修复补丁已提交进 fork，发行包自带，无需本地打补丁。
-LIBYUE_VERSION = "v0.15.6-mbt.16"
+LIBYUE_VERSION = "v0.15.6-mbt.17"
 RELEASES = f"https://github.com/lb091188/yue/releases/download/{LIBYUE_VERSION}"
 # 发行包资产名与 platform.system() 不同名：mac 是 mac、Windows 是 win
 ASSET_OS = {"Linux": "linux", "Darwin": "mac", "Windows": "win"}
 
 SHA256 = {
     # 源码发行包（回退路径）
-    "source:linux": "42d7f6a99f372aed0d607f39452f643b37e81652d89a1e36b08198d20720cb53",
-    "source:mac": "e57e2b95efe92765fd484bfbf51f22b4281065adc2960f34607f546928198314",
-    "source:win": "efdbffa93631b8b4f654ee2415719cc5d483a6314d63717888c8a71012981429",
+    "source:linux": "3fd5588ac104779847de80a0f2c1df5e1c0f7ab828170915f8aa8991cf03684f",
+    "source:mac": "a382171dd8e2af54a602eedbd8efa270064ceb3ed07368deb4134177c4afe7ae",
+    "source:win": "84a8200fd95d5485f9e0798b7969c80c5e3c6bdb07c140f9ce3baa35279334ba",
     # 预构建静态库（优先路径）
-    "prebuilt:linux_x64": "b390fb9372b6883d452de1487895918d75b880be729f2fc34487483446c8f055",
-    "prebuilt:mac_universal": "7f6d03876944c635524033bf950f02c798afa5c014d2008f46ac587c8bcf0163",
-    "prebuilt:win_x64": "a53d0a9b4111de1a4c6d75c14b3857de70f7e6efcd5d6a53f4235ce87e865580",
+    "prebuilt:linux_x64": "241d813fe06123be7e62954769cdbb94032c53cc77dda5dcc248b665fd785641",
+    "prebuilt:mac_universal": "25cd45d2d7d70d42d2fcba6f198a1179d959e67ee5cc7e616832017fc9239c28",
+    "prebuilt:win_x64": "4e2e9ed7bec8327b1121b0e4d88bac253f1d1541daa352efb24b6de5124a97f4",
 }
 
 
@@ -277,26 +277,18 @@ def backport_fork_main() -> None:
       ba479418  Container::UpdateChildBounds 递归下钻子容器——子容器尺寸
                 未变时 SetBounds 早退,SizeAllocate→Layout 级联断,其子树
                 整轮错过分配(set_visible 切页整块不再重绘,Windows 实测)
-      e373e60a  主窗口风格去 WS_CLIPCHILDREN——父表面在子窗口矩形处
-                从不绘制,HWND 重摆后旧位置陈旧像素不可达(切页/滚动横
-                线与残影,Windows 实测;DWM 合成下画到子窗口底下安全)
-      f4528cb8  滚动平移零 Layout 传导——ScrollImpl::Layout 对纯偏移走
-                TranslateAllocation(SubwinView 纯平移快路径只 SetWindowPos),
-                替代 0ms 定时器全子树 UpdateChildBounds(每拍 415 次调用/
-                21ms 且滞后一帧即蓝色残影,Windows 实测)
-      cf308737  滚动像素搬运——OnScroll/SetOrigin 用 ScrollWindowEx 视口
-                内 blit(子窗口随移)只失效暴露边带,替代全视口失效重绘
-                (内容重的页每帧全页重画,是滚动卡顿本体);视口外控件跳过
-                重复 ShowWindow(SW_HIDE)
-      (本批)    单行 Edit 放行滚轮——OnMouseWheelFromSelf 只在「事件在
-                控件内」时不转发,而单行 RichEdit 吞掉 WM_MOUSEWHEEL 既
+      7f57e87f  单行 Edit 放行滚轮——OnMouseWheelFromSelf 只在「事件在
+                控件外」时转发,而单行 RichEdit 吞掉 WM_MOUSEWHEEL 既
                 不自滚也不冒泡,Entry 成了 Scroll 里的滚轮死区(表单页
                 大半是 Entry,真机表现为「滚不动只能猛拨」)
-      (本批)    连发滚轮撕裂与残影——输入消息优先级高于 WM_PAINT,快拨
-                连发时后一个 blit 读到前一个未重画的暴露边带(撕裂);
-                补画必须放在 Layout 之后——PaintViewportNow 在分配记录
-                移位前补画会按旧坐标把自绘控件烤进表面,后续 blit 把
-                烤好的旧影像带满整页(真机:输入框/按钮边线的叠影列)
+
+    历史:e373e60a(去 WS_CLIPCHILDREN)/f4528cb8(平移零 Layout)/
+    cf308737(ScrollWindowEx 像素搬运)/补画次序系补丁已在 fork
+    503366e4 整串回滚(真机多病未愈,用户拍板回滚,见 docs/zh/
+    adaptation.md 回滚条目)——**回滚后的发行包源码重新含有这些补丁
+    的旧侧文本,对应的回补丁条目必须保持删除**,否则会把已回滚的
+    补丁在源码包上重新打上。滚动跟随回到 MoonBit 层第一代 0ms 重摆
+    (declarative scroll()/overlay_scroll 的 update_child_bounds)。
     """
     # 目标是 Windows 源码包的 nativeui jumbo(发行 zip 全为 jumbo 形态,
     # CRLF 行尾),替换做 LF/CRLF 双形态兼容,保持文件原行尾。
@@ -328,309 +320,6 @@ def backport_fork_main() -> None:
         static_cast<Container*>(child)->UpdateChildBounds();
     }
   }""",
-        ),
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
-            """const DWORD Win32Window::kWindowDefaultStyle =
-    WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN;""",
-            """// No WS_CLIPCHILDREN on the main window style: with it the parent surface
-// is never painted under child-window rects, so after native child HWNDs
-// move (layout resync, page switches, scroll), the stale pixels at their
-// old positions can never be repainted — the parent's paint DC is clipped
-// to the *current* child set and old/new rects interleave (unreachable
-// seams, measured as horizontal streaks on Win10). DWM composites child
-// surfaces above the parent surface, so painting underneath children is
-// safe; the only cost is repainting areas covered by children.
-const DWORD Win32Window::kWindowDefaultStyle = WS_OVERLAPPEDWINDOW;""",
-        ),
-        # f4528cb8:ViewImpl::TranslateAllocation 基类实现(jumbo_4 的
-        # view_win.cc 段,插在 ViewImpl::Invalidate() 之后)
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
-            """void ViewImpl::Invalidate() {
-  Invalidate(size_allocation_);
-}""",
-            """void ViewImpl::Invalidate() {
-  Invalidate(size_allocation_);
-}
-
-void ViewImpl::TranslateAllocation(const Vector2d& delta) {
-  if (delta.IsZero())
-    return;
-  size_allocation_.Offset(delta);
-}""",
-        ),
-        # f4528cb8:ScrollImpl::Layout 的 content 分配改纯平移分流(jumbo_4)
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
-            """    if (content_alloc.height() < viewport_size.height())
-      content_alloc.set_height(viewport_size.height());
-    delegate_->GetContentView()->GetNative()->SizeAllocate(content_alloc);
-  }
-}""",
-            """    if (content_alloc.height() < viewport_size.height())
-      content_alloc.set_height(viewport_size.height());
-    // A pure scroll translation must not run the content container's full
-    // SizeAllocate cascade (Layout -> UpdateChildBounds recursion), which
-    // re-enters per child container and dominated scroll jank; shift the
-    // recorded allocations and the native HWNDs directly instead. Size
-    // changes (viewport growth, natural content size) still take the full
-    // path.
-    ViewImpl* content = delegate_->GetContentView()->GetNative();
-    const Rect old_alloc = content->size_allocation();
-    const Vector2d delta(content_alloc.x() - old_alloc.x(),
-                         content_alloc.y() - old_alloc.y());
-    if (!old_alloc.IsEmpty() &&
-        content_alloc.size() == old_alloc.size() &&
-        !delta.IsZero()) {
-      content->TranslateAllocation(delta);
-    } else {
-      content->SizeAllocate(content_alloc);
-    }
-  }
-}""",
-        ),
-        # f4528cb8:ContainerImpl::TranslateAllocation(jumbo_3 的
-        # container_win.cc 段)
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_3.cc",
-            """void ContainerImpl::SizeAllocate(const Rect& size_allocation) {
-  ViewImpl::SizeAllocate(size_allocation);
-  if (!size_allocation.size().IsEmpty())
-    adapter_->Layout();
-}""",
-            """void ContainerImpl::SizeAllocate(const Rect& size_allocation) {
-  ViewImpl::SizeAllocate(size_allocation);
-  if (!size_allocation.size().IsEmpty())
-    adapter_->Layout();
-}
-
-void ContainerImpl::TranslateAllocation(const Vector2d& delta) {
-  if (delta.IsZero())
-    return;
-  // Scroll translation: shift the recorded allocation and propagate to the
-  // subtree without any layout — running the full UpdateChildBounds cascade
-  // here is quadratic-to-exponential in tree depth (each child container's
-  // SetBounds re-enters Layout) and dominated scroll jank on form pages.
-  ViewImpl::TranslateAllocation(delta);
-  adapter_->ForEach([&delta](ViewImpl* child) {
-    child->TranslateAllocation(delta);
-    return true;
-  });
-}""",
-        ),
-        # f4528cb8:SubwinView::SizeAllocate 纯平移快路径(jumbo_3 的
-        # subwin_view.cc 段,整函数替换)
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_3.cc",
-            """void SubwinView::SizeAllocate(const Rect& size_allocation) {
-  ViewImpl::SizeAllocate(size_allocation);
-
-  // Manually hide the control if it is not visible, this is necessary because
-  // the control may be inside a Scroll.
-  Rect clipped = GetClippedRect();
-  if (clipped.IsEmpty()) {
-    ::ShowWindow(hwnd(), SW_HIDE);
-    return;
-  }
-
-  // Implement clipping by setting window region.
-  clipped.Offset(-size_allocation.x(), -size_allocation.y());
-  if (clipped.x() > 0 ||
-      clipped.y() > 0 ||
-      clipped.width() < size_allocation.width() ||
-      clipped.height() < size_allocation.height()) {
-    HRGN region = ::CreateRectRgn(clipped.x(), clipped.y(),
-                                  clipped.right(), clipped.bottom());
-    ::SetWindowRgn(hwnd(), region, FALSE);  // SetWindowRgn takes ownership
-  } else {
-    SetWindowRgn(hwnd(), NULL, FALSE);
-  }
-
-  ::ShowWindow(hwnd(), SW_SHOWNOACTIVATE);
-  SetWindowPos(hwnd(), NULL,
-               size_allocation.x(), size_allocation.y(),
-               size_allocation.width(), size_allocation.height(),
-               SWP_NOACTIVATE | SWP_NOZORDER);
-  RedrawWindow(hwnd(), NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN);
-}""",
-            """void SubwinView::SizeAllocate(const Rect& size_allocation) {
-  const Rect old_alloc = ViewImpl::size_allocation();
-  ViewImpl::SizeAllocate(size_allocation);
-
-  // Manually hide the control if it is not visible, this is necessary because
-  // the control may be inside a Scroll.
-  Rect clipped = GetClippedRect();
-  Rect rel(clipped);
-  rel.Offset(-size_allocation.x(), -size_allocation.y());
-
-  // Pure-translation fast path: when neither the size nor the clipped
-  // rect (relative to the view's origin) changed and the window is being
-  // shown either way, moving the window is enough — SetWindowPos carries
-  // the window surface to the new position, so no region/show/redraw
-  // work is needed. The full path otherwise runs per native control per
-  // scroll frame and dominates scroll jank (measured 20ms+ per resync
-  // on a form-heavy page).
-  bool pure_translation =
-      !old_alloc.IsEmpty() &&
-      size_allocation.size() == old_alloc.size() &&
-      !clipped.IsEmpty() && shown_ && rel == clip_rel_;
-  clip_rel_ = rel;
-  if (pure_translation) {
-    ::SetWindowPos(hwnd(), NULL,
-                   size_allocation.x(), size_allocation.y(),
-                   size_allocation.width(), size_allocation.height(),
-                   SWP_NOACTIVATE | SWP_NOZORDER);
-    return;
-  }
-
-  if (clipped.IsEmpty()) {
-    if (shown_) {
-      shown_ = false;
-      ::ShowWindow(hwnd(), SW_HIDE);
-    }
-    return;
-  }
-  if (!shown_)
-    ::ShowWindow(hwnd(), SW_SHOWNOACTIVATE);
-  shown_ = true;
-
-  // Implement clipping by setting window region.
-  clipped.Offset(-size_allocation.x(), -size_allocation.y());
-  if (clipped.x() > 0 ||
-      clipped.y() > 0 ||
-      clipped.width() < size_allocation.width() ||
-      clipped.height() < size_allocation.height()) {
-    HRGN region = ::CreateRectRgn(clipped.x(), clipped.y(),
-                                  clipped.right(), clipped.bottom());
-    ::SetWindowRgn(hwnd(), region, FALSE);  // SetWindowRgn takes ownership
-  } else {
-    SetWindowRgn(hwnd(), NULL, FALSE);
-  }
-
-  SetWindowPos(hwnd(), NULL,
-               size_allocation.x(), size_allocation.y(),
-               size_allocation.width(), size_allocation.height(),
-               SWP_NOACTIVATE | SWP_NOZORDER);
-  RedrawWindow(hwnd(), NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN);
-}
-
-void SubwinView::TranslateAllocation(const Vector2d& delta) {
-  if (delta.IsZero())
-    return;
-  // Reuse SizeAllocate: for a pure scroll translation it takes the fast
-  // path (a single SetWindowPos), and controls crossing the viewport
-  // edge correctly fall through to the region update.
-  SizeAllocate(Rect(size_allocation().origin() + delta,
-                    size_allocation().size()));
-}""",
-        ),
-        # f4528cb8:三个头的声明与成员(发行包 include 路径)
-        (
-            VENDOR_DIR / "libyue/include/nativeui/win/view_win.h",
-            """  // Change the bounds without invalidating.
-  void set_size_allocation(const Rect& bounds) { size_allocation_ = bounds; }
-  Rect size_allocation() const { return size_allocation_; }""",
-            """  // Change the bounds without invalidating.
-  void set_size_allocation(const Rect& bounds) { size_allocation_ = bounds; }
-  Rect size_allocation() const { return size_allocation_; }
-
-  // Shift this view's (and, for containers/subwin controls, its subtree's)
-  // allocation by |delta| without running any layout — the dedicated path
-  // for scroll translations, where nothing changes but the offset. Must
-  // not trigger yoga recalculation or the UpdateChildBounds cascade.
-  virtual void TranslateAllocation(const Vector2d& delta);""",
-        ),
-        (
-            VENDOR_DIR / "libyue/include/nativeui/win/container_win.h",
-            """  // ViewImpl:
-  void SizeAllocate(const Rect& size_allocation) override;""",
-            """  // ViewImpl:
-  void SizeAllocate(const Rect& size_allocation) override;
-  void TranslateAllocation(const Vector2d& delta) override;""",
-        ),
-        (
-            VENDOR_DIR / "libyue/include/nativeui/win/subwin_view.h",
-            """  void SizeAllocate(const Rect& size_allocation) override;""",
-            """  void SizeAllocate(const Rect& size_allocation) override;
-  void TranslateAllocation(const Vector2d& delta) override;""",
-        ),
-        (
-            VENDOR_DIR / "libyue/include/nativeui/win/subwin_view.h",
-            """  // Should emulate the transparent background.
-  bool transprent_background_ = false;""",
-            """  // The clipped rect relative to this view's origin, as of the last
-  // SizeAllocate — used by the pure-translation fast path to skip the
-  // region/show/redraw work when scrolling only moves the control.
-  Rect clip_rel_;
-
-  // Whether the window was left visible by the last SizeAllocate.
-  bool shown_ = false;
-
-  // Should emulate the transparent background.
-  bool transprent_background_ = false;""",
-        ),
-        # cf308737:ScrollImpl::SetOrigin 像素搬运(jumbo_4)
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
-            """void ScrollImpl::SetOrigin(const Vector2d& origin) {
-  UpdateOrigin(origin);
-  Layout();
-  Invalidate();
-}""",
-            """void ScrollImpl::SetOrigin(const Vector2d& origin) {
-  const Vector2d old = origin_;
-  UpdateOrigin(origin);
-  ScrollPixels(origin_ - old);
-  Layout();
-}""",
-        ),
-        # cf308737:OnScroll 像素搬运 + ScrollPixels(jumbo_4)
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
-            """void ScrollImpl::OnScroll(int x, int y) {
-  if (UpdateOrigin(origin_ + Vector2d(x, y))) {
-    Layout();
-    Invalidate();
-  }
-}""",
-            """void ScrollImpl::OnScroll(int x, int y) {
-  const Vector2d old = origin_;
-  if (UpdateOrigin(origin_ + Vector2d(x, y))) {
-    ScrollPixels(origin_ - old);
-    Layout();
-  }
-}
-
-void ScrollImpl::ScrollPixels(const Vector2d& d) {
-  // Scroll by blitting the pixels that are already on screen (children
-  // included) and invalidating only the exposed band. A full-viewport
-  // invalidate repaints the whole page per scroll frame and janks badly
-  // on content-heavy pages (forms, component galleries) — especially so
-  // without WS_CLIPCHILDREN, where the parent also paints under every
-  // native child rect.
-  if (window() && !d.IsZero()) {
-    Rect vp = GetViewportRect() + size_allocation().OffsetFromOrigin();
-    RECT clip = {vp.x(), vp.y(), vp.right(), vp.bottom()};
-    ::ScrollWindowEx(window()->hwnd(), d.x(), d.y(), &clip, &clip,
-                     nullptr, nullptr, SW_SCROLLCHILDREN | SW_INVALIDATE);
-  } else {
-    Invalidate();
-  }
-}""",
-        ),
-        # cf308737:ScrollPixels 声明(scroll_win.h)
-        (
-            VENDOR_DIR / "libyue/include/nativeui/win/scroll_win.h",
-            """  void UpdateScrollbar();
-  bool UpdateOrigin(Vector2d new_origin);
-  Rect GetScrollbarRect(bool vertical) const;""",
-            """  void UpdateScrollbar();
-  bool UpdateOrigin(Vector2d new_origin);
-  Rect GetScrollbarRect(bool vertical) const;
-  // Blit the already-drawn viewport pixels by the scroll delta (children
-  // included) and invalidate only the exposed band.
-  void ScrollPixels(const Vector2d& d);""",
         ),
         # 单行 Edit 放行滚轮:SubwinView 构造标记自滚意愿(jumbo_3)
         (
@@ -707,83 +396,6 @@ void ScrollImpl::ScrollPixels(const Vector2d& d) {
 
   // Whether the control scrolls its own content with the wheel.
   bool wants_wheel_ = false;""",
-        ),
-        # 补画次序:SetOrigin/OnScroll 在 Layout 之后同步补画(jumbo_4)
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
-            """void ScrollImpl::SetOrigin(const Vector2d& origin) {
-  const Vector2d old = origin_;
-  UpdateOrigin(origin);
-  ScrollPixels(origin_ - old);
-  Layout();
-}""",
-            """void ScrollImpl::SetOrigin(const Vector2d& origin) {
-  const Vector2d old = origin_;
-  UpdateOrigin(origin);
-  ScrollPixels(origin_ - old);
-  Layout();
-  PaintViewportNow();
-}""",
-        ),
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
-            """void ScrollImpl::OnScroll(int x, int y) {
-  const Vector2d old = origin_;
-  if (UpdateOrigin(origin_ + Vector2d(x, y))) {
-    ScrollPixels(origin_ - old);
-    Layout();
-  }
-}""",
-            """void ScrollImpl::OnScroll(int x, int y) {
-  const Vector2d old = origin_;
-  if (UpdateOrigin(origin_ + Vector2d(x, y))) {
-    ScrollPixels(origin_ - old);
-    Layout();
-    PaintViewportNow();
-  }
-}""",
-        ),
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
-            """    ::ScrollWindowEx(window()->hwnd(), d.x(), d.y(), &clip, &clip,
-                     nullptr, nullptr, SW_SCROLLCHILDREN | SW_INVALIDATE);
-  } else {
-    Invalidate();
-  }
-}""",
-            """    ::ScrollWindowEx(window()->hwnd(), d.x(), d.y(), &clip, &clip,
-                     nullptr, nullptr, SW_SCROLLCHILDREN | SW_INVALIDATE);
-  } else {
-    Invalidate();
-  }
-}
-
-void ScrollImpl::PaintViewportNow() {
-  // The band invalidated by the blit must be painted AFTER Layout(): the
-  // repaint walks children at their recorded allocations, so painting it
-  // before the allocations shift bakes self-drawn children into the surface
-  // at their pre-scroll positions, and later blits carry those baked images
-  // across the page (real-machine: trails of ghost input boxes and button
-  // edges persisting after scrolling stops). Painting synchronously here
-  // also keeps the surface fresh for the next blit — input messages outrank
-  // WM_PAINT, so a fast wheel flick would otherwise blit the not-yet-
-  // repainted band of the previous frame (tearing on hard flicks).
-  if (window())
-    ::UpdateWindow(window()->hwnd());
-}""",
-        ),
-        # 补画次序:PaintViewportNow 声明(scroll_win.h)
-        (
-            VENDOR_DIR / "libyue/include/nativeui/win/scroll_win.h",
-            """  // Blit the already-drawn viewport pixels by the scroll delta (children
-  // included) and invalidate only the exposed band.
-  void ScrollPixels(const Vector2d& d);""",
-            """  // Blit the already-drawn viewport pixels by the scroll delta (children
-  // included) and invalidate only the exposed band.
-  void ScrollPixels(const Vector2d& d);
-  // Synchronously paint the invalidated band — must run after Layout()
-  // shifted the allocations, see the definition for why.
-  void PaintViewportNow();""",
         ),
     ]
     for path, old_lf, new_lf in patches:
