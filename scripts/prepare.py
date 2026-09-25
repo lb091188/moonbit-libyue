@@ -33,20 +33,20 @@ CACHE_DIR = REPO_ROOT / ".prepare"
 
 # 固定版本：fork 的 v*-mbt* 标签，升级时同步更新 sha256。
 # 平台修复补丁已提交进 fork，发行包自带，无需本地打补丁。
-LIBYUE_VERSION = "v0.15.6-mbt.15"
+LIBYUE_VERSION = "v0.15.6-mbt.16"
 RELEASES = f"https://github.com/lb091188/yue/releases/download/{LIBYUE_VERSION}"
 # 发行包资产名与 platform.system() 不同名：mac 是 mac、Windows 是 win
 ASSET_OS = {"Linux": "linux", "Darwin": "mac", "Windows": "win"}
 
 SHA256 = {
     # 源码发行包（回退路径）
-    "source:linux": "bf11b0e5f45b16dbcb35469540b655c5c0b68b356fb9c3ef431290cbdcb993ec",
-    "source:mac": "0e007fd766a4c12f70243ba750ffbd52be3e2d91ffb68880dca19079fe322cdd",
-    "source:win": "86e9c5153af54237af340a2a991f8130815aeb1e47d0d493ee97e024c5b429fa",
+    "source:linux": "42d7f6a99f372aed0d607f39452f643b37e81652d89a1e36b08198d20720cb53",
+    "source:mac": "e57e2b95efe92765fd484bfbf51f22b4281065adc2960f34607f546928198314",
+    "source:win": "efdbffa93631b8b4f654ee2415719cc5d483a6314d63717888c8a71012981429",
     # 预构建静态库（优先路径）
-    "prebuilt:linux_x64": "daa520ba1bda55d66bcd2b130befc08fd334b6a73d47e496b1091ae7d8664a94",
-    "prebuilt:mac_universal": "58661cf795162f76dc6dc50d3f232ed4ae5eaa6d07bc7693d20101f437057214",
-    "prebuilt:win_x64": "e3988931b852cf1704cde11c0cfa5fc0cfc8c9f11fc12232f12cde136cb788b5",
+    "prebuilt:linux_x64": "b390fb9372b6883d452de1487895918d75b880be729f2fc34487483446c8f055",
+    "prebuilt:mac_universal": "7f6d03876944c635524033bf950f02c798afa5c014d2008f46ac587c8bcf0163",
+    "prebuilt:win_x64": "a53d0a9b4111de1a4c6d75c14b3857de70f7e6efcd5d6a53f4235ce87e865580",
 }
 
 
@@ -292,10 +292,11 @@ def backport_fork_main() -> None:
                 控件内」时不转发,而单行 RichEdit 吞掉 WM_MOUSEWHEEL 既
                 不自滚也不冒泡,Entry 成了 Scroll 里的滚轮死区(表单页
                 大半是 Entry,真机表现为「滚不动只能猛拨」)
-      (本批)    连发滚轮撕裂——输入消息优先级高于 WM_PAINT,快拨连发
-                时后一个 blit 会读到前一个「已失效未重画」的暴露边带,
-                陈旧像素搬进视口中段逐拍复合(真机猛拨后大面错位);
-                ScrollPixels 后 UpdateWindow 同步补画暴露边带
+      (本批)    连发滚轮撕裂与残影——输入消息优先级高于 WM_PAINT,快拨
+                连发时后一个 blit 读到前一个未重画的暴露边带(撕裂);
+                补画必须放在 Layout 之后——PaintViewportNow 在分配记录
+                移位前补画会按旧坐标把自绘控件烤进表面,后续 blit 把
+                烤好的旧影像带满整页(真机:输入框/按钮边线的叠影列)
     """
     # 目标是 Windows 源码包的 nativeui jumbo(发行 zip 全为 jumbo 形态,
     # CRLF 行尾),替换做 LF/CRLF 双形态兼容,保持文件原行尾。
@@ -707,7 +708,41 @@ void ScrollImpl::ScrollPixels(const Vector2d& d) {
   // Whether the control scrolls its own content with the wheel.
   bool wants_wheel_ = false;""",
         ),
-        # 连发滚轮撕裂:ScrollPixels 后同步补画暴露边带(jumbo_4)
+        # 补画次序:SetOrigin/OnScroll 在 Layout 之后同步补画(jumbo_4)
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
+            """void ScrollImpl::SetOrigin(const Vector2d& origin) {
+  const Vector2d old = origin_;
+  UpdateOrigin(origin);
+  ScrollPixels(origin_ - old);
+  Layout();
+}""",
+            """void ScrollImpl::SetOrigin(const Vector2d& origin) {
+  const Vector2d old = origin_;
+  UpdateOrigin(origin);
+  ScrollPixels(origin_ - old);
+  Layout();
+  PaintViewportNow();
+}""",
+        ),
+        (
+            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
+            """void ScrollImpl::OnScroll(int x, int y) {
+  const Vector2d old = origin_;
+  if (UpdateOrigin(origin_ + Vector2d(x, y))) {
+    ScrollPixels(origin_ - old);
+    Layout();
+  }
+}""",
+            """void ScrollImpl::OnScroll(int x, int y) {
+  const Vector2d old = origin_;
+  if (UpdateOrigin(origin_ + Vector2d(x, y))) {
+    ScrollPixels(origin_ - old);
+    Layout();
+    PaintViewportNow();
+  }
+}""",
+        ),
         (
             VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_4.cc",
             """    ::ScrollWindowEx(window()->hwnd(), d.x(), d.y(), &clip, &clip,
@@ -718,16 +753,37 @@ void ScrollImpl::ScrollPixels(const Vector2d& d) {
 }""",
             """    ::ScrollWindowEx(window()->hwnd(), d.x(), d.y(), &clip, &clip,
                      nullptr, nullptr, SW_SCROLLCHILDREN | SW_INVALIDATE);
-    // Input messages outrank WM_PAINT, so a fast wheel flick queues several
-    // scrolls before any paint: each later blit would read the not yet
-    // repainted exposed band of the previous one and bake stale pixels into
-    // the viewport (real-machine tearing on hard flicks). Paint the exposed
-    // band synchronously so the surface is always fresh for the next blit.
-    ::UpdateWindow(window()->hwnd());
   } else {
     Invalidate();
   }
+}
+
+void ScrollImpl::PaintViewportNow() {
+  // The band invalidated by the blit must be painted AFTER Layout(): the
+  // repaint walks children at their recorded allocations, so painting it
+  // before the allocations shift bakes self-drawn children into the surface
+  // at their pre-scroll positions, and later blits carry those baked images
+  // across the page (real-machine: trails of ghost input boxes and button
+  // edges persisting after scrolling stops). Painting synchronously here
+  // also keeps the surface fresh for the next blit — input messages outrank
+  // WM_PAINT, so a fast wheel flick would otherwise blit the not-yet-
+  // repainted band of the previous frame (tearing on hard flicks).
+  if (window())
+    ::UpdateWindow(window()->hwnd());
 }""",
+        ),
+        # 补画次序:PaintViewportNow 声明(scroll_win.h)
+        (
+            VENDOR_DIR / "libyue/include/nativeui/win/scroll_win.h",
+            """  // Blit the already-drawn viewport pixels by the scroll delta (children
+  // included) and invalidate only the exposed band.
+  void ScrollPixels(const Vector2d& d);""",
+            """  // Blit the already-drawn viewport pixels by the scroll delta (children
+  // included) and invalidate only the exposed band.
+  void ScrollPixels(const Vector2d& d);
+  // Synchronously paint the invalidated band — must run after Layout()
+  // shifted the allocations, see the definition for why.
+  void PaintViewportNow();""",
         ),
     ]
     for path, old_lf, new_lf in patches:
