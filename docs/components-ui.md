@@ -806,7 +806,7 @@ toast("Saved", @yue.Success)
 
 ### Tooltip tooltip_t
 
-`tooltip_t(content : Node, tip)` — wrap any node with a hover tooltip: after a 500ms hover a themed self-drawn bubble pops below the control (width adapts to the text, flips above when there is no room below) and dismisses on leave, press, or scroll; identical on all three platforms. Use popover_t for a themed bubble with arbitrary content.
+`tooltip_t(content : Node, tip)` — wrap any node with a native tooltip (system style, zero cost; use popover_t for a themed bubble). On Linux the tooltip color is pinned to a dark background with white text (independent of the system theme).
 
 ```moonbit
 @yue.tooltip_t(@yue.button_t("Delete"), "Delete this item")

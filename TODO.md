@@ -9,10 +9,6 @@
 - 平台
   - macOS 暂缓(无设备)
   - Windows 富文本 / markdown 观感待真机复验
-- [ ] 浏览器按需化的 fork 侧收尾(4a 治本,详见 docs/zh/adaptation.md「浏览器依赖按需化」)
-  - fork(lb091188/yue)发行脚本把 browser.cc / browser_gtk.cc 与 menu_item_gtk 的 webkit 耦合拆出 jumbo(补丁原型已在本仓库 prepare.py 源码路径实测:抽段 + GType/dlsym 运行时探测)
-  - 重发 vendor-* 三平台预构建库,prepare.py 升版本后,预构建模式(mooncakes 零编译路径)获得与源码模式同等的 webkit 按需化
-  - macOS 的 WebKit framework 拆分随该批次一并评估(需先在 mac 侧核验 libyue_prebuilt(macos) 的 WebKit 引用面)
 
 ## Chart 图表组件
 

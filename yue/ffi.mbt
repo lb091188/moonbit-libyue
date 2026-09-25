@@ -135,9 +135,6 @@ extern "c" fn ffi_container_on_draw(
 ) -> Unit = "yue_mbt_container_on_draw"
 
 ///|
-extern "c" fn ffi_container_update_child_bounds(container : View) -> Unit = "yue_mbt_container_update_child_bounds"
-
-///|
 #borrow(text)
 extern "c" fn ffi_label_new(text : Bytes) -> View = "yue_mbt_label_new"
 
@@ -340,6 +337,100 @@ extern "c" fn ffi_tab_on_selected_page_change(
   invoke : FuncRef[(() -> Unit) -> Unit],
   callback : () -> Unit,
 ) -> Unit = "yue_mbt_tab_on_selected_page_change"
+
+///|
+extern "c" fn ffi_browser_new_ex(
+  devtools : Int,
+  context_menu : Int,
+  allow_file_access : Int,
+  hardware_acceleration : Int,
+) -> View = "yue_mbt_browser_new_ex"
+
+///|
+#borrow(browser, url, invoke, callback)
+extern "c" fn ffi_browser_get_cookies_for_url(
+  browser : View,
+  url : Bytes,
+  invoke : FuncRef[((Bytes) -> Unit, Bytes) -> Unit],
+  callback : (Bytes) -> Unit,
+) -> Unit = "yue_mbt_browser_get_cookies_for_url"
+
+///|
+
+///|
+extern "c" fn ffi_browser_new() -> View = "yue_mbt_browser_new"
+
+///|
+#borrow(browser, url)
+extern "c" fn ffi_browser_load_url(browser : View, url : Bytes) -> Unit = "yue_mbt_browser_load_url"
+
+///|
+#borrow(browser)
+extern "c" fn ffi_browser_get_url(browser : View) -> Bytes = "yue_mbt_browser_get_url"
+
+///|
+#borrow(browser)
+extern "c" fn ffi_browser_reload(browser : View) -> Unit = "yue_mbt_browser_reload"
+
+///|
+#borrow(browser)
+extern "c" fn ffi_browser_go_back(browser : View) -> Unit = "yue_mbt_browser_go_back"
+
+///|
+#borrow(browser)
+extern "c" fn ffi_browser_go_forward(browser : View) -> Unit = "yue_mbt_browser_go_forward"
+
+///|
+#borrow(browser)
+extern "c" fn ffi_browser_can_go_back(browser : View) -> Int = "yue_mbt_browser_can_go_back"
+
+///|
+#borrow(browser)
+extern "c" fn ffi_browser_can_go_forward(browser : View) -> Int = "yue_mbt_browser_can_go_forward"
+
+///|
+#borrow(browser)
+extern "c" fn ffi_browser_is_loading(browser : View) -> Int = "yue_mbt_browser_is_loading"
+
+///|
+#borrow(browser, invoke, callback)
+extern "c" fn ffi_browser_on_change_loading(
+  browser : View,
+  invoke : FuncRef[(() -> Unit) -> Unit],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_browser_on_change_loading"
+
+///|
+#borrow(browser, invoke, callback)
+extern "c" fn ffi_browser_on_update_command(
+  browser : View,
+  invoke : FuncRef[(() -> Unit) -> Unit],
+  callback : () -> Unit,
+) -> Unit = "yue_mbt_browser_on_update_command"
+
+///|
+#borrow(browser, invoke, callback)
+extern "c" fn ffi_browser_on_update_title(
+  browser : View,
+  invoke : FuncRef[((Bytes) -> Unit, Bytes) -> Unit],
+  callback : (Bytes) -> Unit,
+) -> Unit = "yue_mbt_browser_on_update_title"
+
+///|
+#borrow(browser, invoke, callback)
+extern "c" fn ffi_browser_on_commit_navigation(
+  browser : View,
+  invoke : FuncRef[((Bytes) -> Unit, Bytes) -> Unit],
+  callback : (Bytes) -> Unit,
+) -> Unit = "yue_mbt_browser_on_commit_navigation"
+
+///|
+#borrow(browser, invoke, callback)
+extern "c" fn ffi_browser_on_finish_navigation(
+  browser : View,
+  invoke : FuncRef[((Bytes) -> Unit, Bytes) -> Unit],
+  callback : (Bytes) -> Unit,
+) -> Unit = "yue_mbt_browser_on_finish_navigation"
 
 ///|
 extern "c" fn ffi_menu_bar_new() -> MenuBar = "yue_mbt_menu_bar_new"
@@ -964,15 +1055,6 @@ extern "c" fn ffi_view_get_bounds_width(view : View) -> Double = "yue_mbt_view_g
 extern "c" fn ffi_view_get_bounds_height(view : View) -> Double = "yue_mbt_view_get_bounds_height"
 
 ///|
-extern "c" fn ffi_view_root(view : View) -> View = "yue_mbt_view_root"
-
-///|
-extern "c" fn ffi_view_origin_in_root_x(view : View, root : View) -> Double = "yue_mbt_view_origin_in_root_x"
-
-///|
-extern "c" fn ffi_view_origin_in_root_y(view : View, root : View) -> Double = "yue_mbt_view_origin_in_root_y"
-
-///|
 extern "c" fn ffi_view_get_bounds_in_screen_x(view : View) -> Double = "yue_mbt_view_get_bounds_in_screen_x"
 
 ///|
@@ -1101,15 +1183,6 @@ extern "c" fn ffi_view_on_wheel(
   invoke : FuncRef[(((Double) -> Unit, Double) -> Unit)],
   callback : (Double) -> Unit,
 ) -> Unit = "yue_mbt_view_on_wheel"
-
-///|
-/// 观察式滚轮(不消费事件,滚动继续冒泡):tooltip 收气泡等旁路场景。
-#borrow(view, invoke, callback)
-extern "c" fn ffi_view_on_wheel_observe(
-  view : View,
-  invoke : FuncRef[(((Double) -> Unit, Double) -> Unit)],
-  callback : (Double) -> Unit,
-) -> Unit = "yue_mbt_view_on_wheel_observe"
 
 
 ///|
@@ -1664,12 +1737,6 @@ extern "c" fn ffi_cursor_new(type_ : Int) -> Cursor = "yue_mbt_cursor_new"
 extern "c" fn ffi_view_set_cursor(view : View, cursor : Cursor) -> Unit = "yue_mbt_view_set_cursor"
 
 ///|
-/// 对视图自身及其全部子孙递归设置光标(光标组透传:GTK 光标按原生窗口
-/// 生效,只设容器盖不住有独立窗口的子控件)。
-#borrow(view, cursor)
-extern "c" fn ffi_view_set_cursor_deep(view : View, cursor : Cursor) -> Unit = "yue_mbt_view_set_cursor_deep"
-
-///|
 /// 托盘后端可用性探测。Linux 上等价于检查 AppIndicator 运行库能否加载。
 extern "c" fn ffi_tray_supported() -> Bool = "yue_mbt_tray_supported"
 
@@ -1957,6 +2024,25 @@ extern "c" fn ffi_menubar_item_at(menubar : MenuBar, index : Int) -> MenuItem = 
 extern "c" fn ffi_date_picker_new_ex(elements : Int, has_stepper : Int) -> View = "yue_mbt_date_picker_new_ex"
 
 ///|
+#borrow(browser, html, base_url)
+extern "c" fn ffi_browser_load_html(
+  browser : View,
+  html : Bytes,
+  base_url : Bytes,
+) -> Unit = "yue_mbt_browser_load_html"
+
+///|
+#borrow(browser, agent)
+extern "c" fn ffi_browser_set_user_agent(browser : View, agent : Bytes) -> Unit = "yue_mbt_browser_set_user_agent"
+
+///|
+#borrow(browser, code)
+extern "c" fn ffi_browser_execute_javascript(
+  browser : View,
+  code : Bytes,
+) -> Unit = "yue_mbt_browser_execute_javascript"
+
+///|
 extern "c" fn ffi_window_set_has_shadow(window : View, has : Int) -> Unit = "yue_mbt_window_set_has_shadow"
 
 ///|
@@ -1984,6 +2070,18 @@ extern "c" fn ffi_window_set_should_close(
   invoke : FuncRef[(() -> Int) -> Int],
   callback : () -> Int,
 ) -> Unit = "yue_mbt_window_set_should_close"
+
+///|
+#borrow(scheme, invoke, callback)
+extern "c" fn ffi_browser_register_protocol(
+  scheme : Bytes,
+  invoke : FuncRef[((Bytes) -> Bytes, Bytes) -> Bytes],
+  callback : (Bytes) -> Bytes,
+) -> Unit = "yue_mbt_browser_register_protocol"
+
+///|
+#borrow(scheme)
+extern "c" fn ffi_browser_unregister_protocol(scheme : Bytes) -> Unit = "yue_mbt_browser_unregister_protocol"
 
 // 方法级审计补齐(2026-09-16)
 
@@ -2248,6 +2346,14 @@ extern "c" fn ffi_table_notify_value_change(
 ) -> Int = "yue_mbt_table_notify_value_change"
 
 ///|
+#borrow(b)
+extern "c" fn ffi_browser_get_title(b : View) -> Bytes = "yue_mbt_browser_get_title"
+
+///|
+#borrow(b)
+extern "c" fn ffi_browser_stop(b : View) -> Unit = "yue_mbt_browser_stop"
+
+///|
 extern "c" fn ffi_screen_primary_scale_factor() -> Double = "yue_mbt_screen_primary_scale_factor"
 
 ///|
@@ -2395,7 +2501,33 @@ extern "c" fn ffi_notification_center_on_notification_action(
 ) -> Unit = "yue_mbt_notification_center_on_notification_action"
 
 ///|
-// 方法级审计补齐二:通用拖拽
+// 方法级审计补齐二:Browser JS 回调/绑定与通用拖拽
+
+///|
+#borrow(b, code, invoke, callback)
+extern "c" fn ffi_browser_execute_javascript_callback(
+  b : View,
+  code : Bytes,
+  invoke : FuncRef[((Int, Bytes) -> Unit, Int, Bytes) -> Unit],
+  callback : (Int, Bytes) -> Unit,
+) -> Unit = "yue_mbt_browser_execute_javascript_callback"
+
+///|
+#borrow(b, name, invoke, callback)
+extern "c" fn ffi_browser_add_raw_binding(
+  b : View,
+  name : Bytes,
+  invoke : FuncRef[((Bytes) -> Unit, Bytes) -> Unit],
+  callback : (Bytes) -> Unit,
+) -> Unit = "yue_mbt_browser_add_raw_binding"
+
+///|
+#borrow(b, name)
+extern "c" fn ffi_browser_remove_binding(b : View, name : Bytes) -> Unit = "yue_mbt_browser_remove_binding"
+
+///|
+#borrow(b)
+extern "c" fn ffi_browser_has_bindings(b : View) -> Int = "yue_mbt_browser_has_bindings"
 
 ///|
 #borrow(v, text, paths, image)

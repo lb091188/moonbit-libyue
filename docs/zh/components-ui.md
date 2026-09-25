@@ -807,7 +807,7 @@ toast("已保存", @yue.Success)
 
 ### 悬浮提示 tooltip_t
 
-`tooltip_t(content : Node, tip)`——给任意节点包悬浮提示：悬停 500ms 后在控件下方弹出主题底色自绘气泡（宽度随文本自适应，下方放不下自动翻到上方），移开、按下或滚动即收，三平台一致。主题化任意内容弹层请用 popover_t。
+`tooltip_t(content : Node, tip)`——给任意节点包原生 tooltip（系统样式，零成本；主题化气泡请用 popover_t）。Linux 端 tooltip 颜色已接管为恒深底白字（不随系统主题）。
 
 ```moonbit
 @yue.tooltip_t(@yue.button_t("删除"), "删除该项")

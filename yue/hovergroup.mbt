@@ -13,12 +13,6 @@
 // 组静止(态不翻转)时不触发任何回调与重绘。enter 事件仅作组自身
 // 空白区命中时的即时加速。
 //
-// cursor_group 与 hover_group 共用同一轮询拍:指针落在组 bounds 内
-// 时对组根+全部子孙递归设置光标(GTK 光标按原生窗口生效,只设容
-// 器盖不住有独立窗口的子控件,递归才透传),离开恢复默认光标——恢
-// 复的是默认而非各子视图原光标(库不提供读回,组内子件需保留自身
-// 光标时不要套组)。
-//
 // 背景高亮内置为 on_draw 自绘:GTK 下容器的可见背景必须自绘
 // (set_background_color 与 backgroundColor 样式对无 draw 的容器不
 // 可靠,主题 CSS 与子控件窗口都会压掉),悬停/常态底色在组件内直
@@ -42,18 +36,7 @@ priv struct HoverEntry {
 }
 
 ///|
-/// 全局光标组的注册项。
-priv struct CursorEntry {
-  host : Container
-  cursor : Cursor
-  active : Ref[Bool]
-}
-
-///|
 let g_hover_entries : Array[HoverEntry] = []
-
-///|
-let g_cursor_entries : Array[CursorEntry] = []
 
 ///|
 /// 全局定时器句柄(set_timeout 链;无组时归零停转)。
@@ -61,7 +44,7 @@ let g_hover_timer : Ref[Int] = Ref(0)
 
 ///|
 fn hover_tick() -> Unit {
-  if g_hover_entries.is_empty() && g_cursor_entries.is_empty() {
+  if g_hover_entries.is_empty() {
     g_hover_timer.val = 0
     return
   }
@@ -73,30 +56,12 @@ fn hover_tick() -> Unit {
       rect_contains(ViewLike::get_bounds_in_screen(e.host), px, py),
     )
   }
-  for e in g_cursor_entries {
-    let inside = rect_contains(ViewLike::get_bounds_in_screen(e.host), px, py)
-    if inside != e.active.val {
-      e.active.val = inside
-      ffi_view_set_cursor_deep(
-        ViewLike::view(e.host),
-        if inside { e.cursor } else { Cursor::new(Default) },
-      )
-    }
-  }
   g_hover_timer.val = set_timeout(100, fn() { hover_tick() })
 }
 
 ///|
 fn hover_register(entry : HoverEntry) -> Unit {
   g_hover_entries.push(entry)
-  if g_hover_timer.val == 0 {
-    hover_tick()
-  }
-}
-
-///|
-fn cursor_register(entry : CursorEntry) -> Unit {
-  g_cursor_entries.push(entry)
   if g_hover_timer.val == 0 {
     hover_tick()
   }
@@ -151,27 +116,6 @@ pub fn hover_group(
       ViewLike::on_mouse_enter(host, fn(_e) {
         set(true)
       })
-      ViewLike::view(host)
-    },
-  }
-}
-
-///|
-/// 光标组:指针落在组容器 bounds 内(含全部子控件,含有独立窗口的
-/// 原生子件)时保持指定光标(默认手型),离开恢复默认。与 hover_group
-/// 同机制(指针位置轮询);组根+子孙由 shim 递归设置,父设子随。
-pub fn cursor_group(
-  child : Node,
-  cursor? : Cursor = hand(),
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
-) -> Node {
-  {
-    mount: fn(parent) {
-      let host = themed_container(style~, style_str~)
-      attach(parent, ViewLike::view(host))
-      ignore((child.mount)(ViewLike::view(host)))
-      cursor_register({ host, cursor, active: Ref(false) })
       ViewLike::view(host)
     },
   }

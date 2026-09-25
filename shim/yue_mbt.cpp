@@ -26,7 +26,6 @@
 #include <wtsapi32.h> // WTSRegisterSessionNotification 与 NOTIFY_FOR_*（WTS 消息码在 winuser.h，注册函数在此）
 #endif
 #include "yue_mbt.h"
-#include "yue_mbt_internal.h"
 
 #include <cmath>
 #include <cstdio>
@@ -50,6 +49,7 @@
 #include <unordered_map>
 
 #include "base/command_line.h"
+#include "base/json/json_writer.h"
 #include "nativeui/nativeui.h"
 #if defined(OS_LINUX) // set_borderless 的 GtkCssProvider 注入(仅 Linux GTK)
 #include <gtk/gtk.h>
@@ -76,6 +76,11 @@
 #include "nativeui/win/util/tray_host.h" // TrayHost::hwnd()（托盘幽灵图标防护）
 #include "nativeui/gfx/win/double_buffer.h" // Canvas 位图导出（GetGdiplusBitmap）
 #endif
+
+// 不包含 <moonbit.h>：它在 extern "C" 里声明的 memcpy 与 glibc 的
+// C++ noexcept 声明冲突。只声明用到的运行时入口，签名照抄
+// ~/.moon/include/moonbit.h。
+extern "C" void *moonbit_make_bytes(int32_t size, int value);
 
 // C++ 对象一律走系统堆（MoonBit 运行时可能接管进程分配器，普通 new 会被
 // GC 破坏）：Linux 用 __libc_malloc/__libc_free；Windows 下 moon 以
@@ -145,7 +150,32 @@ namespace {
 nu::Lifetime *g_lifetime = nullptr;
 nu::State *g_state = nullptr;
 
-using yue_mbt::Store;
+int64_t g_next_handle = 1;
+
+// 句柄注册表：id → scoped_refptr。
+template <typename T>
+struct Store {
+  static std::unordered_map<int64_t, scoped_refptr<T>> &map() {
+    static std::unordered_map<int64_t, scoped_refptr<T>> m;
+    return m;
+  }
+  static int64_t put(T *obj) {
+    int64_t id = g_next_handle++;
+    map()[id] = scoped_refptr<T>(obj);
+    return id;
+  }
+  static int64_t put(const scoped_refptr<T> &obj) {
+    int64_t id = g_next_handle++;
+    map()[id] = obj;
+    return id;
+  }
+  static T *get(void *handle) {
+    auto it = map().find(reinterpret_cast<int64_t>(handle));
+    return it == map().end() ? nullptr : it->second.get();
+  }
+};
+
+using ViewStore = Store<nu::Responder>;
 using MenuStore = Store<nu::Menu>;
 using ModelStore = Store<nu::TableModel>;
 using MenuBarStore = Store<nu::MenuBar>;
@@ -177,10 +207,41 @@ using PopoverStore = Store<nu::Window>;
 #endif
 using MessageBoxStore = Store<nu::MessageBox>;
 
-using yue_mbt::BytesFromString;
-using yue_mbt::CastTo;
-using yue_mbt::CastToView;
-using yue_mbt::ViewStore;
+// CastTo：从注册表取对象，并用 GetClassName 校验运行时类型。
+// （View 自身无 kClassName，故模板仅用于具体控件类型。）
+template <typename T>
+T *CastTo(void *handle) {
+  auto *r = ViewStore::get(handle);
+  if (r == nullptr) {
+    std::fprintf(stderr, "yue_mbt: 句柄无效\n");
+    return nullptr;
+  }
+  if (std::strcmp(r->GetClassName(), T::kClassName) == 0) {
+    return static_cast<T *>(r);
+  }
+  std::fprintf(stderr, "yue_mbt: 类型不匹配，期望 %s，实际 %s\n", T::kClassName,
+               r->GetClassName());
+  return nullptr;
+}
+
+// 通用 View 检查：View 无 kClassName，类型正确性由 MoonBit 侧
+// ViewLike 约束保证。
+nu::View *CastToView(void *handle) {
+  auto *r = ViewStore::get(handle);
+  if (r == nullptr) {
+    return nullptr;
+  }
+  return static_cast<nu::View *>(r);
+}
+
+// MoonBit Bytes 内容拷贝
+void *BytesFromString(const std::string &s) {
+  void *bytes = moonbit_make_bytes(static_cast<int32_t>(s.size()), 0);
+  if (!s.empty()) {
+    std::memcpy(bytes, s.data(), s.size());
+  }
+  return bytes;
+}
 
 // base::FilePath 在 Windows（UNICODE 构建）的 StringType 是 std::wstring；
 // ABI 边界统一 UTF-8，进出都经 libyue 的 FromUTF8Unsafe/AsUTF8Unsafe。
@@ -266,132 +327,6 @@ int32_t yue_mbt_platform(void) {
 
 // ---------- 窗口 ----------
 
-#if defined(OS_WIN)
-// live-resize 冻结:交互缩放期间(WindowImpl::OnSize 每帧全树
-// SizeAllocate + RedrawWindow(RDW_ALLCHILDREN),真机反馈卡顿严重)
-// 改为位图占位——WM_ENTERSIZEMOVE 抓客户区位图,期间 WM_SIZE 只记录
-// 最终尺寸、WM_PAINT 用 HALFTONE 平滑拉伸占位,WM_EXITSIZEMOVE 透传
-// 最后一次 WM_SIZE 触发一次真实布局(全树重摆 + 全窗重绘 + 根 height
-// 跟随的 on_size_changed 链自然恢复)。窗口移动(拖标题栏)同走
-// SIZEMOVE 但无 WM_SIZE,位图抓放无感。仅拦 WM_SIZE/WM_PAINT/这对
-// 进出消息,其余全部透传。
-namespace {
-
-struct LiveResize {
-  WNDPROC prev_proc = nullptr;
-  bool active = false;
-  bool pending = false;
-  WPARAM last_wp = 0;
-  int last_w = 0;
-  int last_h = 0;
-  HBITMAP bmp = nullptr;
-  int bmp_w = 0;
-  int bmp_h = 0;
-};
-
-std::unordered_map<HWND, LiveResize *> g_live_resizes;
-
-void LiveResizeReleaseBitmap(LiveResize *fz) {
-  if (fz->bmp != nullptr) {
-    ::DeleteObject(fz->bmp);
-    fz->bmp = nullptr;
-  }
-  fz->bmp_w = 0;
-  fz->bmp_h = 0;
-}
-
-LRESULT CALLBACK LiveResizeProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
-  auto it = g_live_resizes.find(hwnd);
-  if (it == g_live_resizes.end())
-    return ::DefWindowProcW(hwnd, msg, wp, lp);
-  LiveResize *fz = it->second;
-  if (!fz->active && msg == WM_ENTERSIZEMOVE) {
-    RECT rc;
-    if (::GetClientRect(hwnd, &rc) && rc.right > 0 && rc.bottom > 0) {
-      HDC wdc = ::GetDC(hwnd);
-      fz->bmp = ::CreateCompatibleBitmap(wdc, rc.right, rc.bottom);
-      if (fz->bmp != nullptr) {
-        HDC mdc = ::CreateCompatibleDC(wdc);
-        HGDIOBJ old = ::SelectObject(mdc, fz->bmp);
-        ::BitBlt(mdc, 0, 0, rc.right, rc.bottom, wdc, 0, 0, SRCCOPY);
-        ::SelectObject(mdc, old);
-        ::DeleteDC(mdc);
-        fz->bmp_w = rc.right;
-        fz->bmp_h = rc.bottom;
-      }
-      ::ReleaseDC(hwnd, wdc);
-    }
-    fz->active = true;
-    fz->pending = false;
-    return ::CallWindowProc(fz->prev_proc, hwnd, msg, wp, lp);
-  }
-  if (fz->active) {
-    if (msg == WM_SIZE) {
-      // 冻结:只记录最终尺寸,不进 libyue 的全树重摆与全窗重绘
-      fz->last_wp = wp;
-      fz->last_w = LOWORD(lp);
-      fz->last_h = HIWORD(lp);
-      fz->pending = true;
-      return 0;
-    }
-    if (msg == WM_PAINT) {
-      PAINTSTRUCT ps;
-      HDC dc = ::BeginPaint(hwnd, &ps);
-      if (fz->bmp != nullptr && fz->bmp_w > 0 && fz->bmp_h > 0) {
-        HDC mdc = ::CreateCompatibleDC(dc);
-        HGDIOBJ old = ::SelectObject(mdc, fz->bmp);
-        ::SetStretchBltMode(dc, HALFTONE);
-        ::SetBrushOrgEx(dc, 0, 0, nullptr);
-        ::StretchBlt(dc, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom, mdc, 0,
-                     0, fz->bmp_w, fz->bmp_h, SRCCOPY);
-        ::SelectObject(mdc, old);
-        ::DeleteDC(mdc);
-      }
-      ::EndPaint(hwnd, &ps);
-      return 0;
-    }
-    if (msg == WM_EXITSIZEMOVE) {
-      fz->active = false;
-      LiveResizeReleaseBitmap(fz);
-      LRESULT r = ::CallWindowProc(fz->prev_proc, hwnd, msg, wp, lp);
-      if (fz->pending) {
-        fz->pending = false;
-        // 一次真实布局:OnSize 的 SizeAllocate(全树重摆)+ 全窗重绘
-        // + on_size_changed(根 height 跟随)
-        ::CallWindowProc(fz->prev_proc, hwnd, WM_SIZE, fz->last_wp,
-                         MAKELPARAM(fz->last_w, fz->last_h));
-      }
-      return r;
-    }
-  }
-  if (msg == WM_NCDESTROY) {
-    g_live_resizes.erase(it);
-    LiveResizeReleaseBitmap(fz);
-    LRESULT r = ::CallWindowProc(fz->prev_proc, hwnd, msg, wp, lp);
-    delete fz;
-    return r;
-  }
-  return ::CallWindowProc(fz->prev_proc, hwnd, msg, wp, lp);
-}
-
-void InstallLiveResize(nu::Window *w) {
-  HWND hwnd = w->GetNative()->hwnd();
-  if (hwnd == nullptr || g_live_resizes.count(hwnd) != 0)
-    return;
-  auto *fz = new LiveResize;
-  fz->prev_proc = reinterpret_cast<WNDPROC>(
-      ::SetWindowLongPtrW(hwnd, GWLP_WNDPROC,
-                          reinterpret_cast<LONG_PTR>(LiveResizeProc)));
-  if (fz->prev_proc == nullptr) {
-    delete fz;
-    return;
-  }
-  g_live_resizes[hwnd] = fz;
-}
-
-}  // namespace
-#endif
-
 void *yue_mbt_window_new_ex(int32_t frame, int32_t transparent, int32_t no_activate) {
   nu::Window::Options options;
   options.frame = frame != 0;
@@ -401,11 +336,7 @@ void *yue_mbt_window_new_ex(int32_t frame, int32_t transparent, int32_t no_activ
 #else
   (void)no_activate;
 #endif
-  auto *win = new nu::Window(options);
-#if defined(OS_WIN)
-  InstallLiveResize(win);
-#endif
-  return reinterpret_cast<void *>(ViewStore::put(win));
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Window(options)));
 }
 
 void yue_mbt_window_set_title(void *window, const char *title) {
@@ -524,11 +455,6 @@ void yue_mbt_view_set_background_color(void *view, const char *hex) {
 
 void yue_mbt_view_set_visible(void *view, int visible) {
   if (auto *v = CastToView(view)) {
-    // 同值早退:目标与当前一致时直接返回——下面保护的是「真翻转」后
-    // 的根级重算,同值调用(多页订阅同一 Store 的 N-1 次重复触发)是
-    // 确定的无效功,每次都要上溯根级 Layout + 全子树重摆
-    if (v->IsVisible() == (visible != 0))
-      return;
     v->SetVisible(visible != 0);
     // 显隐切换的 Layout 传播在非 Container 父(Scroll)处中断,Container::
     // Layout 的 dirty 自愈会用过期 yoga 结果把外层 flex 容器分配成
@@ -687,15 +613,6 @@ void yue_mbt_container_on_draw(void *container, void (*invoke)(void *, void *),
         [invoke, closure](nu::Container *, nu::Painter *painter, const nu::RectF &) {
           invoke(closure, painter);
         });
-  }
-}
-
-// 滚动后强制把该容器的子树绝对坐标重摆一遍(Windows 上根级重算等
-// 场景的兜底;滚动平移已由 ScrollImpl::Layout 内的 TranslateAllocation
-// 同步传导,不再依赖此入口)。
-void yue_mbt_container_update_child_bounds(void *container) {
-  if (auto *c = CastTo<nu::Container>(container)) {
-    c->UpdateChildBounds();
   }
 }
 
@@ -1148,6 +1065,209 @@ void yue_mbt_tab_on_selected_page_change(void *tab, void (*invoke)(void *),
   if (auto *t = CastTo<nu::Tab>(tab)) {
     t->on_selected_page_change.Connect(
         [invoke, closure](nu::Tab *) { invoke(closure); });
+  }
+}
+
+// ---------- Browser ----------
+
+/* GetCookiesForURL：回调收到扁平 UTF-8 文本，每行一条 Cookie，
+ * 字段以 \x1f 分隔：name/value/domain/path/http_only/secure */
+void yue_mbt_browser_get_cookies_for_url(void *browser, const char *url,
+                                         void (*invoke)(void *, void *), void *closure) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->GetCookiesForURL(std::string(url),
+                        [invoke, closure](std::vector<nu::Cookie> cookies) {
+                          std::string flat;
+                          for (const auto &c : cookies) {
+                            flat += c.name;
+                            flat += '\x1f';
+                            flat += c.value;
+                            flat += '\x1f';
+                            flat += c.domain;
+                            flat += '\x1f';
+                            flat += c.path;
+                            flat += '\x1f';
+                            flat += c.http_only ? "1" : "0";
+                            flat += '\x1f';
+                            flat += c.secure ? "1" : "0";
+                            flat += '\n';
+                          }
+                          invoke(closure, BytesFromString(flat));
+                        });
+  }
+}
+
+void yue_mbt_browser_load_html(void *browser, const char *html, const char *base_url) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->LoadHTML(std::string(html), std::string(base_url));
+  }
+}
+
+void yue_mbt_browser_set_user_agent(void *browser, const char *agent) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->SetUserAgent(std::string(agent));
+  }
+}
+
+void yue_mbt_browser_execute_javascript(void *browser, const char *code) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->ExecuteJavaScript(std::string(code), nu::Browser::ExecutionCallback());
+  }
+}
+
+/* 自定义协议：MoonBit 回调返回 [ok:i32][mime_len:i32][mime][content] 编码,ok=0 表示拒绝 */
+void yue_mbt_browser_register_protocol(const char *scheme,
+                                       void *(*invoke)(void *, void *), void *closure) {
+  nu::Browser::RegisterProtocol(
+      std::string(scheme),
+      [invoke, closure](std::string url) -> nu::ProtocolJob * {
+        void *bytes = invoke(closure, BytesFromString(url));
+        auto *p = static_cast<const char *>(bytes);
+        int32_t ok = 0;
+        std::memcpy(&ok, p, 4);
+        if (ok == 0) {
+          return nullptr;
+        }
+        int32_t mime_len = 0;
+        std::memcpy(&mime_len, p + 4, 4);
+        std::string mime(p + 8, mime_len);
+        int32_t content_len = 0;
+        std::memcpy(&content_len, p + 8 + mime_len, 4);
+        std::string content(p + 8 + mime_len + 4, content_len);
+        return new nu::ProtocolStringJob(mime, content);
+      });
+}
+
+void yue_mbt_browser_unregister_protocol(const char *scheme) {
+  nu::Browser::UnregisterProtocol(std::string(scheme));
+}
+
+void *yue_mbt_browser_new_ex(int32_t devtools, int32_t context_menu,
+                             int32_t allow_file_access, int32_t hardware_acceleration) {
+  nu::Browser::Options options;
+  options.devtools = devtools != 0;
+  options.context_menu = context_menu != 0;
+#if defined(OS_MAC) || defined(OS_LINUX)
+  options.allow_file_access_from_files = allow_file_access != 0;
+#else
+  (void)allow_file_access;
+#endif
+#if defined(OS_LINUX)
+  options.hardware_acceleration = hardware_acceleration != 0;
+#else
+  (void)hardware_acceleration;
+#endif
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Browser(options)));
+}
+
+void *yue_mbt_browser_new(void) {
+  nu::Browser::Options options;
+  options.context_menu = true;
+#if defined(WEBVIEW2_SUPPORT)
+  // Windows 优先 WebView2（loader/运行时缺失时 libyue 内部自动回退 IE）
+  options.webview2_support = true;
+#endif
+  return reinterpret_cast<void *>(ViewStore::put(new nu::Browser(options)));
+}
+
+void yue_mbt_browser_load_url(void *browser, const char *url) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->LoadURL(url);
+  }
+}
+
+void *yue_mbt_browser_get_url(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    return BytesFromString(b->GetURL());
+  }
+  return moonbit_make_bytes(0, 0);
+}
+
+void yue_mbt_browser_reload(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->Reload();
+  }
+}
+
+void yue_mbt_browser_go_back(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->GoBack();
+  }
+}
+
+void yue_mbt_browser_go_forward(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->GoForward();
+  }
+}
+
+int32_t yue_mbt_browser_can_go_back(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    return b->CanGoBack() ? 1 : 0;
+  }
+  return 0;
+}
+
+int32_t yue_mbt_browser_can_go_forward(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    return b->CanGoForward() ? 1 : 0;
+  }
+  return 0;
+}
+
+int32_t yue_mbt_browser_is_loading(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    return b->IsLoading() ? 1 : 0;
+  }
+  return 0;
+}
+
+void yue_mbt_browser_on_change_loading(void *browser, void (*invoke)(void *),
+                                       void *closure) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->on_change_loading.Connect(
+        [invoke, closure](nu::Browser *) { invoke(closure); });
+  }
+}
+
+void yue_mbt_browser_on_update_command(void *browser, void (*invoke)(void *),
+                                       void *closure) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->on_update_command.Connect(
+        [invoke, closure](nu::Browser *) { invoke(closure); });
+  }
+}
+
+void yue_mbt_browser_on_update_title(void *browser,
+                                     void (*invoke)(void *, void *),
+                                     void *closure) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->on_update_title.Connect([invoke, closure](nu::Browser *,
+                                                 const std::string &title) {
+      invoke(closure, BytesFromString(title));
+    });
+  }
+}
+
+void yue_mbt_browser_on_commit_navigation(void *browser,
+                                          void (*invoke)(void *, void *),
+                                          void *closure) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->on_commit_navigation.Connect([invoke, closure](nu::Browser *,
+                                                      const std::string &url) {
+      invoke(closure, BytesFromString(url));
+    });
+  }
+}
+
+void yue_mbt_browser_on_finish_navigation(void *browser,
+                                          void (*invoke)(void *, void *),
+                                          void *closure) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->on_finish_navigation.Connect([invoke, closure](nu::Browser *,
+                                                      const std::string &url) {
+      invoke(closure, BytesFromString(url));
+    });
   }
 }
 
@@ -2312,48 +2432,6 @@ double yue_mbt_view_get_bounds_height(void *view) {
   return 0;
 }
 
-// 沿父链上溯到顶层视图(根)。注册表按 refcount 重新持有,与原句柄
-// 并存安全(tooltip 自绘气泡挂根容器用)。
-void *yue_mbt_view_root(void *view) {
-  auto *v = CastToView(view);
-  if (v == nullptr) {
-    return nullptr;
-  }
-  while (v->GetParent() != nullptr) {
-    v = v->GetParent();
-  }
-  return reinterpret_cast<void *>(ViewStore::put(v));
-}
-
-// 锚点相对根的坐标:沿途累加各层相对父的 bounds(不含根自身偏移)。
-double yue_mbt_view_origin_in_root_x(void *view, void *root) {
-  auto *v = CastToView(view);
-  auto *r = CastToView(root);
-  if (v == nullptr || r == nullptr) {
-    return 0;
-  }
-  double x = 0;
-  while (v != nullptr && v != r) {
-    x += v->GetBounds().x();
-    v = v->GetParent();
-  }
-  return x;
-}
-
-double yue_mbt_view_origin_in_root_y(void *view, void *root) {
-  auto *v = CastToView(view);
-  auto *r = CastToView(root);
-  if (v == nullptr || r == nullptr) {
-    return 0;
-  }
-  double y = 0;
-  while (v != nullptr && v != r) {
-    y += v->GetBounds().y();
-    v = v->GetParent();
-  }
-  return y;
-}
-
 double yue_mbt_view_get_bounds_in_screen_x(void *view) {
   if (auto *v = CastToView(view)) {
     return v->GetBoundsInScreen().x();
@@ -2612,29 +2690,6 @@ static gboolean ViewWheelTrampoline(GtkWidget *, GdkEventScroll *event,
   return TRUE;
 }
 
-// 观察式滚轮蹦床:回调后返回 FALSE,事件继续向父滚动区传播
-static gboolean ViewWheelTrampolineObserve(GtkWidget *, GdkEventScroll *event,
-                                           gpointer data) {
-  auto *cb = static_cast<WheelCb *>(data);
-  double delta = 0;
-  switch (event->direction) {
-    case GDK_SCROLL_UP:
-      delta = -1;
-      break;
-    case GDK_SCROLL_DOWN:
-      delta = 1;
-      break;
-    case GDK_SCROLL_SMOOTH:
-      delta = event->delta_y;
-      break;
-    default:
-      return FALSE;
-  }
-  if (delta != 0)
-    cb->invoke(cb->closure, delta);
-  return FALSE;
-}
-
 // NU_CONTAINER 系宏只能在 nu 命名空间内展开(内部用非限定类型函数)
 namespace nu {
 inline void container_add_scroll_mask(GtkWidget *w) {
@@ -2672,38 +2727,6 @@ void yue_mbt_view_on_wheel(void *view,
   (void)view;
   (void)invoke;
   (void)closure; // mac 滚轮接入待补(见 adaptation.md),先静默不挂
-#endif
-}
-
-// 观察式滚轮:回调收到 delta 后事件继续传播(Windows wheel_hook 返回
-// false / GTK 蹦床返回 FALSE),页面滚动不受影响。tooltip 收气泡等旁路
-// 场景专用;消费式 on_wheel 挂在滚动区内的控件上会阻断页面滚动。注意
-// Windows 的 wheel_hook 单槽:同一视图两种滚轮注册后写覆盖先写。
-void yue_mbt_view_on_wheel_observe(void *view,
-                                   void (*invoke)(void *, double),
-                                   void *closure) {
-#if defined(OS_LINUX)
-  if (auto *v = CastToView(view)) {
-    GtkWidget *w = v->GetNative();
-    nu::container_add_scroll_mask(w);
-    auto *cb = new WheelCb{invoke, closure};
-    g_signal_connect(w, "scroll-event",
-                     G_CALLBACK(ViewWheelTrampolineObserve), cb);
-  }
-#elif defined(OS_WIN)
-  if (auto *v = CastToView(view)) {
-    auto *impl = static_cast<nu::ViewImpl *>(v->GetNative());
-    auto *cb = new WheelCb{invoke, closure};
-    impl->wheel_hook = [cb](int raw) {
-      cb->invoke(cb->closure,
-                 -static_cast<double>(static_cast<int16_t>(raw)) / 120.0);
-      return false;
-    };
-  }
-#else
-  (void)view;
-  (void)invoke;
-  (void)closure;
 #endif
 }
 
@@ -3265,27 +3288,6 @@ void yue_mbt_popover_show_relative_to(void *popover, void *view) {
                          static_cast<float>(r.right - r.left),
                          static_cast<float>(r.bottom - r.top));
       anchored = true;
-    }
-  }
-  if (!anchored) {
-    // 自绘视图无 HWND,GetBoundsInScreen 在 Windows 嵌套容器下偏移不可信
-    // (Win10 真机多次实测:巨幅偏移把弹层摆到屏幕外,或小偏移摆到屏幕
-    // 左上角——气泡弹了但用户看不见,即 tooltip「不显示」的另一半根
-    // 因)。ViewImpl::size_allocation 即相对顶层窗口客户区的绝对坐标
-    // (事件坐标换算 GetPosInView 同源),用顶层窗口 hwnd ClientToScreen
-    // 换成屏幕物理像素即为可靠锚点;拿不到窗口再回退 GetBoundsInScreen。
-    auto *impl = static_cast<nu::ViewImpl *>(v->GetNative());
-    nu::WindowImpl *w = impl->window();
-    if (w != nullptr && w->hwnd() != nullptr) {
-      nu::Rect alloc = impl->size_allocation();
-      POINT apt = {alloc.x(), alloc.y()};
-      if (::ClientToScreen(w->hwnd(), &apt)) {
-        anchor = nu::RectF(static_cast<float>(apt.x),
-                           static_cast<float>(apt.y),
-                           static_cast<float>(alloc.width()),
-                           static_cast<float>(alloc.height()));
-        anchored = true;
-      }
     }
   }
   if (!anchored) {
@@ -4819,27 +4821,6 @@ void yue_mbt_view_set_cursor(void *view, void *cursor) {
   }
 }
 
-// 光标透传:对视图自身及其全部子孙递归设置光标。GTK 端光标按原生
-// 窗口生效,只设父容器盖不住有独立窗口的子控件(Entry 等),父设子随
-// 必须递归到叶。
-static void SetCursorDeep(nu::View *v, nu::Cursor *cur) {
-  if (v == nullptr)
-    return;
-  v->SetCursor(scoped_refptr<nu::Cursor>(cur));
-  if (v->IsContainer()) {
-    auto *c = static_cast<nu::Container *>(v);
-    for (size_t i = 0; i < c->ChildCount(); ++i)
-      SetCursorDeep(c->ChildAt(i), cur);
-  }
-}
-
-void yue_mbt_view_set_cursor_deep(void *view, void *cursor) {
-  auto *v = CastToView(view);
-  auto *c = CursorStore::get(cursor);
-  if (v != nullptr && c != nullptr)
-    SetCursorDeep(v, c);
-}
-
 // ---------- 托盘 ----------
 
 #if defined(OS_LINUX)
@@ -6078,6 +6059,20 @@ int32_t yue_mbt_table_notify_value_change(void *table, int32_t column,
 #endif
 }
 
+/* Browser:标题与停止(回调版 JS 执行与 AddBinding 另批) */
+void *yue_mbt_browser_get_title(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    return BytesFromString(b->GetTitle());
+  }
+  return moonbit_make_bytes(0, 0);
+}
+
+void yue_mbt_browser_stop(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->Stop();
+  }
+}
+
 /* Screen:主显示器与光标 */
 static nu::Display g_screen_display;
 static bool g_screen_display_valid = false;
@@ -6311,6 +6306,47 @@ MBT_NOTIF_SIG(on_notification_action, on_notification_action)
 
 #undef MBT_NOTIF_SIG
 
+
+/* 方法级审计补齐二:Browser JS 回调/绑定与通用拖拽 */
+
+void yue_mbt_browser_execute_javascript_callback(
+    void *browser, const char *code,
+    void (*invoke)(void *, int32_t, void *), void *closure) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->ExecuteJavaScript(
+        code,
+        [invoke, closure](bool ok, base::Value value) {
+          std::string json;
+          base::JSONWriter::Write(base::ValueView(value), &json);
+          invoke(closure, ok ? 1 : 0, BytesFromString(json));
+        });
+  }
+}
+
+void yue_mbt_browser_add_raw_binding(void *browser, const char *name,
+                                     void (*invoke)(void *, void *),
+                                     void *closure) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->AddRawBinding(name, [invoke, closure](nu::Browser *, base::Value args) {
+      std::string json;
+      base::JSONWriter::Write(base::ValueView(args), &json);
+      invoke(closure, BytesFromString(json));
+    });
+  }
+}
+
+void yue_mbt_browser_remove_binding(void *browser, const char *name) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->RemoveBinding(name);
+  }
+}
+
+int32_t yue_mbt_browser_has_bindings(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    return b->HasBindings() ? 1 : 0;
+  }
+  return 0;
+}
 
 int32_t yue_mbt_view_do_drag_data(void *view, const char *text,
                                   const char *file_paths, int32_t operations,

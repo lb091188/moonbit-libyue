@@ -33,20 +33,20 @@ CACHE_DIR = REPO_ROOT / ".prepare"
 
 # 固定版本：fork 的 v*-mbt* 标签，升级时同步更新 sha256。
 # 平台修复补丁已提交进 fork，发行包自带，无需本地打补丁。
-LIBYUE_VERSION = "v0.15.6-mbt.17"
+LIBYUE_VERSION = "v0.15.6-mbt.12"
 RELEASES = f"https://github.com/lb091188/yue/releases/download/{LIBYUE_VERSION}"
 # 发行包资产名与 platform.system() 不同名：mac 是 mac、Windows 是 win
 ASSET_OS = {"Linux": "linux", "Darwin": "mac", "Windows": "win"}
 
 SHA256 = {
     # 源码发行包（回退路径）
-    "source:linux": "3fd5588ac104779847de80a0f2c1df5e1c0f7ab828170915f8aa8991cf03684f",
-    "source:mac": "a382171dd8e2af54a602eedbd8efa270064ceb3ed07368deb4134177c4afe7ae",
-    "source:win": "84a8200fd95d5485f9e0798b7969c80c5e3c6bdb07c140f9ce3baa35279334ba",
+    "source:linux": "9139239e67c0a9d3afd70d55163471178576882f029a7afd9510f9022089f34d",
+    "source:mac": "c872514222cf55a8d37ce51a6e3d0bdb4eaba4ac33d38056281c67ad871e2954",
+    "source:win": "3d3ddfc3c95619d08da5e499ac561730cce13a6df6fcb6306ecc5cc2ccf945ac",
     # 预构建静态库（优先路径）
-    "prebuilt:linux_x64": "241d813fe06123be7e62954769cdbb94032c53cc77dda5dcc248b665fd785641",
-    "prebuilt:mac_universal": "25cd45d2d7d70d42d2fcba6f198a1179d959e67ee5cc7e616832017fc9239c28",
-    "prebuilt:win_x64": "4e2e9ed7bec8327b1121b0e4d88bac253f1d1541daa352efb24b6de5124a97f4",
+    "prebuilt:linux_x64": "aabd96d37d9c38e6317c69c5815d453abb3843f566a83ce066bc80eabbd4345a",
+    "prebuilt:mac_universal": "8881e18599aa5631a2d87ca37e511d54dd8f914a9435e9a817c7f5b101f236ad",
+    "prebuilt:win_x64": "015e5fb924251ec1e60fa1fbbebf5a180f3bcf1573c8605e860577e28eabaaff",
 }
 
 
@@ -163,262 +163,7 @@ def prepare_source(os_name: str) -> None:
         (BUILD_DIR / stale).unlink(missing_ok=True)
 
 
-def split_browser_out_of_jumbo() -> bool:
-    """把浏览器实现从 nativeui jumbo 单元抽成独立编译单元（仅 Linux）。
-
-    发行包的 jumbo 把 browser.cc / browser_gtk.cc 与 PainterGtk/Font/
-    Image 等混编在同一成员，非浏览器程序只要链接该成员就得解析
-    webkit_* 符号。静态 weak stub 兜底在 moon 工具链下不成立：moon
-    默认 --as-needed 且按依赖拓扑序拼接各包 flags，浏览器程序的
-    stub 会先于真库绑定引用（ELF 静态绑定不可逆），实测浏览器页段
-    错误。抽段后 libyue_mbt.a 中浏览器独立成成员，静态库按需拉取
-    天然隔离，非浏览器程序链接期接触不到任何 webkit 符号。段按
-    「// ../../nativeui/...」注释头定位，找不到（未来 fork 拆分后）
-    即跳过，幂等。"""
-    base = VENDOR_DIR / "libyue/src/linux/nativeui"
-    targets = [
-        (base / "nativeui_jumbo_1.cc", "// ../../nativeui/browser.cc"),
-        (base / "nativeui_jumbo_2.cc",
-         "// ../../nativeui/gtk/browser_gtk.cc"),
-    ]
-    segments: list[list[str]] = []
-    for path, marker in targets:
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-        except OSError:
-            return
-        start = next((i for i, l in enumerate(lines) if l.rstrip("\n") == marker), None)
-        if start is None:
-            print("[prepare] jumbo 中未找到浏览器段（可能已拆分），跳过抽段",
-                  file=sys.stderr)
-            return
-        end = next((i for i, l in enumerate(lines[start + 1:], start + 1)
-                    if l.startswith("// ../../")), len(lines))
-        segments.append(lines[start:end])
-        del lines[start:end]
-        path.write_text("".join(lines), encoding="utf-8")
-    (base / "nativeui_browser.cc").write_text(
-        "".join(segments[0]).rstrip("\n") + "\n\n" + "".join(segments[1]),
-        encoding="utf-8")
-    print("[prepare] 已把浏览器实现抽出为独立编译单元 nativeui_browser.cc",
-          file=sys.stderr)
-    return True
-
-
-def decouple_menu_item_from_webkit() -> None:
-    """menu_item_gtk 的角色项(剪切/粘贴等)对聚焦 WebView 执行编辑命令,
-    与 webkit 有 2 个符号耦合(WEBKIT_IS_WEB_VIEW 宏展开引用
-    webkit_web_view_get_type + webkit_web_view_execute_editing_command),
-    jumbo 抽段后仍留在菜单成员里,非浏览器程序链接期就会碰到。改为
-    运行时探测:类型查 GType 注册表(WebKitWebView 仅在其库加载后注册,
-    非浏览器程序查不到即跳过),命令走 dlsym;浏览器程序两查全部命中,
-    行为不变。文本替换幂等:目标文本不存在(已打补丁/fork 已改)即跳过。
-    """
-    path = VENDOR_DIR / "libyue/src/linux/nativeui/nativeui_jumbo_3.cc"
-    try:
-        s = path.read_text(encoding="utf-8")
-    except OSError:
-        return
-    anchor = "// Handling role item clicking.\nvoid OnRoleClick(GtkWidget*, MenuItem* item) {"
-    helpers = (
-        "// 浏览器可选化补丁:非浏览器程序不链 webkit,WebView 类型探测改走\n"
-        "// GType 注册表(WebKitWebView 类型仅在其库加载后注册),编辑命令运行时\n"
-        "// dlsym 探测,双场景行为不变。\n"
-        "#include <dlfcn.h>\n\n"
-        "static bool yue_is_web_view(GtkWidget* widget) {\n"
-        "  static GType type = g_type_from_name(\"WebKitWebView\");\n"
-        "  return type != 0 && G_TYPE_CHECK_INSTANCE_TYPE(widget, type);\n"
-        "}\n\n"
-        "static void yue_web_view_execute_editing_command(WebKitWebView* view,\n"
-        "                                                 const gchar* command) {\n"
-        "  using Fn = void (*)(WebKitWebView*, const gchar*);\n"
-        "  static Fn fn = reinterpret_cast<Fn>(\n"
-        "      dlsym(RTLD_DEFAULT, \"webkit_web_view_execute_editing_command\"));\n"
-        "  if (fn)\n"
-        "    fn(view, command);\n"
-        "}\n\n"
-    )
-    changed = False
-    if anchor in s and "yue_is_web_view" not in s:
-        s = s.replace(anchor, helpers + anchor, 1)
-        changed = True
-    old_call = (
-        "  if (WEBKIT_IS_WEB_VIEW(widget)) {\n"
-        "    webkit_web_view_execute_editing_command(\n"
-        "        WEBKIT_WEB_VIEW(widget),\n"
-        "        g_edit_map[static_cast<int>(item->GetRole())].webkit_command);\n"
-        "  } else {"
-    )
-    new_call = (
-        "  if (yue_is_web_view(widget)) {\n"
-        "    yue_web_view_execute_editing_command(\n"
-        "        reinterpret_cast<WebKitWebView*>(widget),\n"
-        "        g_edit_map[static_cast<int>(item->GetRole())].webkit_command);\n"
-        "  } else {"
-    )
-    if old_call in s:
-        s = s.replace(old_call, new_call, 1)
-        changed = True
-    if changed:
-        path.write_text(s, encoding="utf-8")
-        print("[prepare] menu_item_gtk 的 webkit 耦合已改为运行时探测",
-              file=sys.stderr)
-
-
-def backport_fork_main() -> None:
-    """把 fork main 领先当前发行版的补丁追打到解压后的源码上(幂等)。
-
-    发行包钉版本滞后于 fork main 时,已合入 main 的小修正在这里以文本
-    替换追打,避免为等一个补丁走一轮 tag/CI 出包;fork 发新版本后对应
-    条目自然失配跳过。每条补丁:目标文本(来自 fork 提交的旧侧)必须
-    精确命中一次,新文本(新侧)已存在则跳过。
-
-    现有补丁(对照 fork main):
-      ba479418  Container::UpdateChildBounds 递归下钻子容器——子容器尺寸
-                未变时 SetBounds 早退,SizeAllocate→Layout 级联断,其子树
-                整轮错过分配(set_visible 切页整块不再重绘,Windows 实测)
-      7f57e87f  单行 Edit 放行滚轮——OnMouseWheelFromSelf 只在「事件在
-                控件外」时转发,而单行 RichEdit 吞掉 WM_MOUSEWHEEL 既
-                不自滚也不冒泡,Entry 成了 Scroll 里的滚轮死区(表单页
-                大半是 Entry,真机表现为「滚不动只能猛拨」)
-
-    历史:e373e60a(去 WS_CLIPCHILDREN)/f4528cb8(平移零 Layout)/
-    cf308737(ScrollWindowEx 像素搬运)/补画次序系补丁已在 fork
-    503366e4 整串回滚(真机多病未愈,用户拍板回滚,见 docs/zh/
-    adaptation.md 回滚条目)——**回滚后的发行包源码重新含有这些补丁
-    的旧侧文本,对应的回补丁条目必须保持删除**,否则会把已回滚的
-    补丁在源码包上重新打上。滚动跟随回到 MoonBit 层第一代 0ms 重摆
-    (declarative scroll()/overlay_scroll 的 update_child_bounds)。
-    """
-    # 目标是 Windows 源码包的 nativeui jumbo(发行 zip 全为 jumbo 形态,
-    # CRLF 行尾),替换做 LF/CRLF 双形态兼容,保持文件原行尾。
-    patches = [
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_1.cc",
-            """  for (int i = 0; i < ChildCount(); ++i) {
-    View* child = ChildAt(i);
-    if (child->IsVisibleInHierarchy())
-      child->SetBounds(GetYGNodeBounds(child->node()));
-  }""",
-            """  for (int i = 0; i < ChildCount(); ++i) {
-    View* child = ChildAt(i);
-    if (child->IsVisibleInHierarchy()) {
-      child->SetBounds(GetYGNodeBounds(child->node()));
-      // Recurse unconditionally: a child container whose size did not
-      // change early-returns from SetBounds and never cascades
-      // SizeAllocate -> Layout, so its own subtree would miss this
-      // allocation round entirely (measured: pages toggled via set_visible
-      // stopped repainting as a whole block on Windows). The child bounds
-      // read here always come from the latest root-level layout, so the
-      // recursion only re-distributes fresh values and never invents
-      // constraints of its own. Do NOT recalculate per-container here:
-      // forcing YGNodeCalculateLayout with the container's own (possibly
-      // still-zero) bounds as the owner size pushes zeros into the whole
-      // subtree during early layout rounds (measured: freshly shown pages
-      // rendered completely blank on Windows).
-      if (child->IsContainer())
-        static_cast<Container*>(child)->UpdateChildBounds();
-    }
-  }""",
-        ),
-        # 单行 Edit 放行滚轮:SubwinView 构造标记自滚意愿(jumbo_3)
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_3.cc",
-            """      proc_(SetWindowProc(hwnd(), &WndProc)) {
-  // Apply default font.
-  SetFont(font());
-}""",
-            """      proc_(SetWindowProc(hwnd(), &WndProc)) {
-  // Only multiline edit controls scroll their own content with the wheel;
-  // the ES_MULTILINE bit is meaningless for other subwin controls, so the
-  // plain bit test is enough.
-  wants_wheel_ = (window_style & ES_MULTILINE) != 0;
-  // Apply default font.
-  SetFont(font());
-}""",
-        ),
-        # 单行 Edit 放行滚轮:OnMouseWheelFromSelf 转发条件(jumbo_3)
-        (
-            VENDOR_DIR / "libyue/src/win/nativeui/nativeui_jumbo_3.cc",
-            """LRESULT SubwinView::OnMouseWheelFromSelf(
-    UINT message, WPARAM w_param, LPARAM l_param) {
-  if (window()) {
-    // Pass the event to window if not happened inside the control.
-    POINT p = { CR_GET_X_LPARAM(l_param), CR_GET_Y_LPARAM(l_param) };
-    ::ScreenToClient(window()->hwnd(), &p);
-    if (!size_allocation().Contains(Point(p))) {
-      ::SendMessage(window()->hwnd(), message, w_param, l_param);
-      return 0;
-    }
-  }
-  SetMsgHandled(false);
-  return 0;
-}""",
-            """LRESULT SubwinView::OnMouseWheelFromSelf(
-    UINT message, WPARAM w_param, LPARAM l_param) {
-  if (window()) {
-    // Pass the event to window if not happened inside the control, or when
-    // the control cannot scroll itself: the EDIT/RichEdit def-window-proc
-    // does nothing for single-line controls and never bubbles the wheel to
-    // the parent, so a single-line Entry inside a Scroll eats the event and
-    // the page stops scrolling under it (form pages are mostly Entries).
-    POINT p = { CR_GET_X_LPARAM(l_param), CR_GET_Y_LPARAM(l_param) };
-    ::ScreenToClient(window()->hwnd(), &p);
-    if (!size_allocation().Contains(Point(p)) || !wants_wheel_) {
-      ::SendMessage(window()->hwnd(), message, w_param, l_param);
-      return 0;
-    }
-  }
-  SetMsgHandled(false);
-  return 0;
-}""",
-        ),
-        # 单行 Edit 放行滚轮:subwin_view.h 的 setter 与成员
-        (
-            VENDOR_DIR / "libyue/include/nativeui/win/subwin_view.h",
-            """  // Change focus behavior.
-  void set_switch_focus_on_tab(bool s) { switch_focus_on_tab_ = s; }""",
-            """  // Change focus behavior.
-  void set_switch_focus_on_tab(bool s) { switch_focus_on_tab_ = s; }
-
-  // Mark that this control scrolls its own content with the wheel (multiline
-  // edits). Single-line subwin controls swallow WM_MOUSEWHEEL without
-  // scrolling anything and never bubble it, turning into wheel dead zones
-  // inside a Scroll.
-  void set_wants_mouse_wheel(bool w) { wants_wheel_ = w; }""",
-        ),
-        (
-            VENDOR_DIR / "libyue/include/nativeui/win/subwin_view.h",
-            """  // Should switch focus when TAB is pressed.
-  bool switch_focus_on_tab_ = true;""",
-            """  // Should switch focus when TAB is pressed.
-  bool switch_focus_on_tab_ = true;
-
-  // Whether the control scrolls its own content with the wheel.
-  bool wants_wheel_ = false;""",
-        ),
-    ]
-    for path, old_lf, new_lf in patches:
-        try:
-            # newline="" 保留原行尾(zip 内 CRLF,写回不转 LF)
-            with open(path, "r", encoding="utf-8", newline="") as f:
-                content = f.read()
-        except OSError:
-            continue  # 平台不含该文件(非 win 源码包)
-        old_text = old_lf.replace("\n", "\r\n") if "\r\n" in content else old_lf
-        new_text = new_lf.replace("\n", "\r\n") if "\r\n" in content else new_lf
-        if new_text in content:
-            continue  # 已打过 / 新版本已含
-        if old_text not in content:
-            print(f"[prepare] 追补丁目标文本未命中(可能已更新),跳过: {path.name}",
-                  file=sys.stderr)
-            continue
-        with open(path, "w", encoding="utf-8", newline="") as f:
-            f.write(content.replace(old_text, new_text, 1))
-        print(f"[prepare] 已追打 fork main 补丁: {path.name}", file=sys.stderr)
-
-
-def cmake_build(prebuilt: bool, browser_split: bool = False) -> None:
+def cmake_build(prebuilt: bool) -> None:
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
     # 两种模式都必须显式传:cmake -D 只在传了时覆盖,不传则沿用 CMakeCache
@@ -435,10 +180,7 @@ def cmake_build(prebuilt: bool, browser_split: bool = False) -> None:
     print(" ".join(build))
     subprocess.run(build, check=True)
     stamp = BUILD_DIR / "prepare_stamp"
-    # -split 后缀:浏览器已从 jumbo 抽成独立编译单元(仅 Linux 源码
-    # 模式)——prebuild 据此判断主包条目是否可免 webkit flags
-    mode = "prebuilt" if prebuilt else \
-        ("source-split" if browser_split else "source")
+    mode = "prebuilt" if prebuilt else "source"
     stamp.write_text(f"{LIBYUE_VERSION} {mode}\n", encoding="utf-8")
 
 
@@ -454,16 +196,10 @@ def prepare(force_source: bool = False) -> None:
             print(f"[moonbit-libyue] 预构建资产不可用（{e}），回退源码构建",
                   file=sys.stderr)
             asset = None
-    browser_split = False
     if asset is None:
         prepare_source(os_name)
-        backport_fork_main()
-        if os_name == "Linux":
-            browser_split = split_browser_out_of_jumbo()
-            if browser_split:
-                decouple_menu_item_from_webkit()
     copy_webview2_loader()
-    cmake_build(prebuilt=asset is not None, browser_split=browser_split)
+    cmake_build(prebuilt=asset is not None)
     print("prepare 完成")
 
 

@@ -22,15 +22,6 @@ pub impl Show for NetworkStatus with fn output(self, logger) {
 pub extend NetworkStatus with Show::{to_string, output}
 
 ///|
-/// 用户可读文案(UI 显示用;Show/to_string 是调试格式,wbtest 有断言)。
-pub fn NetworkStatus::label(self : NetworkStatus) -> String {
-  match self {
-    Online => "在线"
-    Offline => "离线"
-  }
-}
-
-///|
 /// NetworkManager 原始码归一:State 70/50(全球/站点级连接)且
 /// Connectivity 4/3(完全/受限)算 Online;门户劫持(2)按 Offline——
 /// 「在线」取「可达互联网」口径。
@@ -149,15 +140,9 @@ pub fn on_network_status_change(cb : (NetworkStatus) -> Unit) -> Unit {
       let _ = @traybus.nm_on_change(fn(state, conn) {
         net_dispatch(nm_normalize(state, conn))
       })
-      // 注册时同步回填初值:新订阅者立即拿到当前状态(否则文案停在
-      // 「探测中」直到网络真的变化);g_net_last 同步设为去重基准,
-      // 后续信号只派发变化。逐个 cb 回填而非走 net_dispatch——多注册
-      // 时后者会被去重吞掉第二个订阅者的初值
+      // 注册时同步回填初值(缓存语义)
       match network_status() {
-        Ok(s) => {
-          g_net_last.val = Some(s)
-          cb(s)
-        }
+        Ok(s) => g_net_last.val = Some(s)
         Err(_) => ()
       }
       ()
