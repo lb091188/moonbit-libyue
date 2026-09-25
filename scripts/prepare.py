@@ -33,20 +33,20 @@ CACHE_DIR = REPO_ROOT / ".prepare"
 
 # 固定版本：fork 的 v*-mbt* 标签，升级时同步更新 sha256。
 # 平台修复补丁已提交进 fork，发行包自带，无需本地打补丁。
-LIBYUE_VERSION = "v0.15.6-mbt.14"
+LIBYUE_VERSION = "v0.15.6-mbt.18"
 RELEASES = f"https://github.com/lb091188/yue/releases/download/{LIBYUE_VERSION}"
 # 发行包资产名与 platform.system() 不同名：mac 是 mac、Windows 是 win
 ASSET_OS = {"Linux": "linux", "Darwin": "mac", "Windows": "win"}
 
 SHA256 = {
     # 源码发行包（回退路径）
-    "source:linux": "d888c6087c0ff9a7c75973b03659b34087161b94a705f77bb28068232b320c6a",
-    "source:mac": "40facc51ae0df0e91d79cf5de456df8e62de03db9c887dcf9d7c6e83c47a9211",
-    "source:win": "42dd0de3225f4a1a51ff4afc76d17479e501ed487631831acebfec9ad6bf847d",
+    "source:linux": "09e3d53e6546b576411750aba5399fedeb4a221c7cd15a389401d16b2cb5e13a",
+    "source:mac": "ad08d933f8455906620f9e16d428e63a3e38cdd055d531d53016e532a9c3869c",
+    "source:win": "e5631f1ac51c1f46af3e8dc71ef5731d59c9cf138363f7a3da9c42dd537868c6",
     # 预构建静态库（优先路径）
-    "prebuilt:linux_x64": "b57c0bc7b6e8a82f1bb37bccc9dd44c3dc92021fd1ca713bbf57e61822aabb0f",
-    "prebuilt:mac_universal": "1b9ba6b3c85b607e26ca60dcb9aa7201dd1c523bf6dc85648a9f9379e6e8fe11",
-    "prebuilt:win_x64": "d978472fdd64d1258b2202d11cf68404e7273bb91ddd52a435cf1610dcb1184c",
+    "prebuilt:linux_x64": "bec9b42ec0b85f6a8934a9f74beb6bc0f2f993b3afaa52df6419c4591e42c0b7",
+    "prebuilt:mac_universal": "5c2a0b86c6e86f3a5c872d892361f336e0c3ac64c34f1f4d266ce857ac7b2a54",
+    "prebuilt:win_x64": "eb11552142f041536251af16ead47f5e49b59e0ce69648e55ffc79502c1c1485",
 }
 
 
