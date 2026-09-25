@@ -413,6 +413,15 @@ pub fn scroll(
         Some((h, v)) => s.set_scrollbar_policy(h, v)
         None => ()
       }
+      // 诊断开关(LIBYUE_SCROLL_FULL_INVALIDATE=1):每次滚动后对滚动区
+      // 整块失效,下一拍按最新坐标全量重绘——绕开像素搬运路径的对照模
+      // 式(慢但零 blit),真机二分「重影在搬运路径还是别处」用
+      if getenv_str("LIBYUE_SCROLL_FULL_INVALIDATE") is Some(_) {
+        s.on_scroll(fn() {
+          ViewLike::schedule_paint(s)
+          false
+        })
+      }
       let holder = Container::new()
       ignore((content.mount)(ViewLike::view(holder)))
       s.set_content(holder)
