@@ -71,8 +71,6 @@ void yue_mbt_container_add_child(void *container, void *child);
 void yue_mbt_container_on_draw(void *container,
                                void (*invoke)(void *closure, void *painter),
                                void *closure);
-/* 滚动后强制重摆该容器子树的绝对坐标(Windows 原生 HWND 跟随) */
-void yue_mbt_container_update_child_bounds(void *container);
 
 /* ---------- Label ---------- */
 
@@ -408,10 +406,6 @@ void yue_mbt_view_on_mouse_leave(void *view,
 void yue_mbt_view_on_wheel(void *view,
                            void (*invoke)(void *closure, double delta_y),
                            void *closure);
-/* 观察式滚轮：回调后事件继续传播（页面滚动不受影响），tooltip 等旁路场景用 */
-void yue_mbt_view_on_wheel_observe(void *view,
-                                   void (*invoke)(void *closure, double delta_y),
-                                   void *closure);
 /* 键盘事件：invoke(closure, key_code, modifiers, timestamp) 返回是否已处理 */
 void yue_mbt_view_on_key_down(void *view,
                               int32_t (*invoke)(void *closure, int32_t key_code, int32_t modifiers, int32_t timestamp),
@@ -445,10 +439,6 @@ double yue_mbt_view_get_bounds_x(void *view);
 double yue_mbt_view_get_bounds_y(void *view);
 double yue_mbt_view_get_bounds_width(void *view);
 double yue_mbt_view_get_bounds_height(void *view);
-/* 沿父链上溯到顶层视图(根);锚点相对根的坐标(tooltip 自绘气泡挂根) */
-void *yue_mbt_view_root(void *view);
-double yue_mbt_view_origin_in_root_x(void *view, void *root);
-double yue_mbt_view_origin_in_root_y(void *view, void *root);
 double yue_mbt_view_get_bounds_in_screen_x(void *view);
 double yue_mbt_view_get_bounds_in_screen_y(void *view);
 double yue_mbt_view_get_bounds_in_screen_width(void *view);
@@ -638,9 +628,6 @@ int32_t yue_mbt_window_is_fullscreen(void *window);
  * 4=Text 5=NotAllowed 6=Help 7=Move 8=ResizeEW 9=ResizeNS 10=ResizeNESW 11=ResizeNWSE） */
 void *yue_mbt_cursor_new(int32_t type);
 void yue_mbt_view_set_cursor(void *view, void *cursor);
-/* 对视图自身及其全部子孙递归设置光标（父设子随：只设容器盖不住有
- * 独立窗口的子控件，递归到叶才透传） */
-void yue_mbt_view_set_cursor_deep(void *view, void *cursor);
 
 /* ---------- 托盘 ---------- */
 

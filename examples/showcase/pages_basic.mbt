@@ -74,14 +74,14 @@ fn page_basic(app : App) -> @yue.Node {
     ),
     section(
       "Divider 分隔线与 Tooltip 悬浮提示",
-      "水平(默认)/竖直 1px 主题边框色;tooltip_t 给任意节点包悬浮提示(主题自绘气泡,悬停 500ms 弹出)。",
+      "水平(默认)/竖直 1px 主题边框色;tooltip_t 给任意节点包原生悬浮提示(系统样式,主题化气泡见反馈页 Popover)。",
       [
         @yue.label_t("上方内容"),
         @yue.divider(spacing=6.0),
         @yue.label_t("下方内容"),
         @yue.hbox(
           [
-            @yue.tooltip_t(@yue.button_t("悬停看提示"), "主题自绘气泡:悬停 500ms 弹出"),
+            @yue.tooltip_t(@yue.button_t("悬停看提示"), "原生 tooltip:系统样式"),
             @yue.tooltip_t(@yue.button_t("再来一个", variant=@yue.Soft), "第二个提示"),
           ],
           style=[("marginTop", 10.0)],
@@ -145,28 +145,6 @@ fn page_basic(app : App) -> @yue.Node {
               @yue.Cursor::new(if h { @yue.Hand } else { @yue.Default }),
             )
           },
-        ),
-      ],
-    ),
-    section(
-      "CursorGroup 光标组",
-      "父设子随:指针落在组内任意位置(含输入框、按钮等有独立窗口的子控件)都保持手型,移出恢复默认——与 hover_group 同机制的指针位置轮询,递归对组根+全部子孙设置。",
-      [
-        @yue.cursor_group(
-          @yue.vbox(
-            [
-              @yue.label_t("整组都是手型:移入试试,或移到子控件上", role=@yue.Section),
-              @yue.hbox(
-                [
-                  @yue.input_t(text="组内输入框", width=200.0),
-                  @yue.button_t("组内按钮"),
-                ],
-                style=[("marginTop", 10.0)],
-                style_str=[("alignItems", "center")],
-              ),
-            ],
-            style=[("padding", 14.0)],
-          ),
         ),
       ],
     ),

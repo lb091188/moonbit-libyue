@@ -131,7 +131,7 @@ def _stamp_stale() -> bool:
         return True
     # 只在环境显式强制源码模式而现有产物是预构建时重建；反向不重建，
     # 否则无预构建资产的平台（如 linux/arm64）会每次构建都重跑 prepare。
-    return os.environ.get("LIBYUE_FORCE_SOURCE") == "1" and not mode.startswith("source")
+    return os.environ.get("LIBYUE_FORCE_SOURCE") == "1" and mode != "source"
 
 
 def _shim_newer_than_lib() -> bool:
@@ -214,30 +214,26 @@ def ensure_native_artifacts() -> None:
     _copy_webview2_loader()
 
 
-def pkg_config_libs() -> tuple[list[str], list[str]]:
-    """Linux 链接期系统库（pkg-config 原样输出），分 (公共, webkit) 两组：
-    webkit 组只进 yue/browser 条目——MoonBit 包边界即链接依赖边界，
-    未 import yue/browser 的程序不拿 webkit flags，链接期也不引用其符号。
-    webkit 包名做 4.0/4.1 兼容。"""
-    common: list[str] = []
+def pkg_config_libs() -> list[str]:
+    """Linux 链接期系统库（pkg-config 原样输出）。webkit 包名做 4.0/4.1 兼容。"""
+    flags: list[str] = []
     for pkg in LINUX_PKG_CONFIG_LIBS:
         out = subprocess.run(["pkg-config", "--libs", pkg],
                              capture_output=True, text=True)
         if out.returncode != 0:
             raise SystemExit(f"缺少系统依赖：请安装 {pkg} 的开发包（pkg-config 找不到）")
-        common += out.stdout.split()
-    webkit: list[str] = []
+        flags += out.stdout.split()
     for pkg in LINUX_PKG_CONFIG_LIBS_ANY:
         out = subprocess.run(["pkg-config", "--libs", pkg],
                              capture_output=True, text=True)
         if out.returncode == 0:
-            webkit += out.stdout.split()
+            flags += out.stdout.split()
             break
     else:
         raise SystemExit("缺少系统依赖：webkit2gtk-4.0 或 4.1 的开发包至少装一个")
-    if "-lwebkit2gtk-4.1" in webkit and "-ljavascriptcoregtk-4.1" not in webkit:
-        webkit.append("-ljavascriptcoregtk-4.1")
-    return common, webkit
+    if "-lwebkit2gtk-4.1" in flags and "-ljavascriptcoregtk-4.1" not in flags:
+        flags.append("-ljavascriptcoregtk-4.1")
+    return flags
 
 
 def _prebuilt(name: str) -> str:
@@ -255,12 +251,6 @@ def link_configs() -> dict:
     -lstdc++ 之前；预构建模式下 libyue_prebuilt 必须排在 shim 之后，
     GNU ld 单遍扫描依赖先序）；Windows 的静态库与 manifest.res 以绝对
     路径作为链接输入，分隔符用正斜杠。实测细节见 docs/adaptation.md。
-
-    浏览器依赖按需化：webkit（Linux）/WebKit framework（macOS）只进
-    yue/browser 条目，与 MoonBit 包边界对应——主包严禁 import
-    yue/browser，否则依赖闭包会让所有下游重新拿到 webkit flags。
-    Windows 的 WebView2 loader 由 libyue 运行时动态加载，链接期无
-    webkit 专属输入，三份条目一致即现状行为。
     """
     build = str(_native_dir().resolve()).replace("\\", "/")
     if sys.platform == "win32":
@@ -292,44 +282,14 @@ def link_configs() -> dict:
                 "package": "NoahLiu/moonbit-libyue/yue/traybus",
                 "link_flags": libs,
             },
-            {
-                "package": "NoahLiu/moonbit-libyue/yue/browser",
-                "link_flags": libs,
-            },
         ]}
     if platform.system() == "Linux":
         arc = _prebuilt("libyue_prebuilt.a")
         core = f"-L{build} -lyue_mbt" + (f" {arc}" if arc else "")
-        pc_common, pc_webkit = pkg_config_libs()
-        # 浏览器按需化按「库形态」分化:vendored 库恒为预构建(浏览器
-        # 混编 jumbo),build/ 预构建同;仅 prepare 源码模式抽段成功
-        # (stamp source-split)后浏览器才独立成成员——混编形态的主包
-        # 条目必须带 webkit,否则非浏览器程序链接期 undefined 断链
-        # (mbt.14 升版实测);抽段形态才可免。
-        if _native_dir() != BUILD_DIR:
-            browser_mixed = True
-        else:
-            stamp = _stamp()
-            if not stamp:
-                browser_mixed = True  # 无 stamp 无法判定,保守带 webkit
-            else:
-                mode = stamp.partition(" ")[2].strip()
-                browser_mixed = not mode.startswith("source") \
-                    or "split" not in mode
-        if browser_mixed:
-            pc_common = pc_webkit + pc_common
-            pc_webkit = []
         # -latomic：预构建库(官方 CMakeLists 清单也链 atomic)引用
         # __atomic_store，Ubuntu 22.04 工具链产物在最终链接必须显式给出
-        sys_libs = ["-lpthread", "-ldl", "-lm", "-lstdc++", "-latomic"]
-        # webkit 只进 browser 条目（MoonBit 包边界 = 链接依赖边界）。
-        # 库层面的符号隔离由 prepare.py 源码模式的 jumbo 抽段完成：
-        # 浏览器实现独立成编译单元后，非浏览器程序链接期不接触任何
-        # webkit 符号，静态 stub 兜底反而有害——moon 默认 --as-needed
-        # 且按拓扑序拼 flags，stub 先于真库绑定引用，实测浏览器页段错误
-        # （全程记录见 make_webkit_stubs.py 与 docs/adaptation.md）。
-        common = [*pc_common, *sys_libs]
-        browser = [*pc_webkit, *pc_common, *sys_libs]
+        extra = pkg_config_libs() + ["-lpthread", "-ldl", "-lm", "-lstdc++",
+                                     "-latomic"]
     else:  # Darwin
         # macOS 双库结构（no-ARC 排其后）；源码模式第二库是 cmake 产出的
         # yue_mbt_noarc（-l 搜索），vendored/预构建模式第二库是随包的
@@ -337,13 +297,13 @@ def link_configs() -> dict:
         # 传播到 moon 的链接命令行，必须显式给出（与 Linux 侧 pkg-config
         # 补系统库同构）。
         arc = _prebuilt("libyue_prebuilt.a")
+        noarc = _prebuilt("libyue_noarc_prebuilt.a")
         core = f"-L{build} -lyue_mbt" + (f" {arc}" if arc else "")
         if (_native_dir() / "libyue_mbt_noarc.a").exists():
             core += " -lyue_mbt_noarc"
-        noarc = _prebuilt("libyue_noarc_prebuilt.a")
         if noarc:
             core += f" {noarc}"
-        sys_libs = [
+        extra = [
             "-framework", "AppKit",
             "-framework", "Carbon",
             "-framework", "IOKit",
@@ -355,27 +315,17 @@ def link_configs() -> dict:
             "-lbsm", "-Wl,-dead_strip",
             "-lobjc", "-lc++", "-lpthread",
         ]
-        # macOS 暂不拆 WebKit：本机无 Mach-O archive 工具链，无法核验
-        # libyue_prebuilt(macos) 的 WebKit 引用面（llvm-nm 读 universal
-        # archive 成员符号表不完整），拆错即 mac 全线断链且无真机兜底。
-        # 待 libyue fork 侧拆分浏览器编译单元（vendor 重发）时一并处理。
-        common = sys_libs
-        browser = sys_libs
     # traybus 的 whitebox 测试目标直接引用 wire.mbt 的 f64 位转换 extern，
     # 而 link_configs 按「依赖该包的目标」传播——traybus 不依赖 yue（反向），
     # 须单列一份；静态库单成员引用 gtk 全套，flags 与主份一致
     return {"link_configs": [
         {
             "package": "NoahLiu/moonbit-libyue/yue",
-            "link_flags": core + " " + " ".join(common),
+            "link_flags": core + " " + " ".join(extra),
         },
         {
             "package": "NoahLiu/moonbit-libyue/yue/traybus",
-            "link_flags": core + " " + " ".join(common),
-        },
-        {
-            "package": "NoahLiu/moonbit-libyue/yue/browser",
-            "link_flags": core + " " + " ".join(browser),
+            "link_flags": core + " " + " ".join(extra),
         },
     ]}
 

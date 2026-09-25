@@ -1937,40 +1937,40 @@ pub fn result(
         ("height", 76.0),
         ("marginTop", 16.0),
       ])
+      let symbol = match t {
+        Success => "✓"
+        Danger => "✕"
+        _ => "!"
+      }
+      // 水平居中交给平台布局引擎(align=Center):Windows 的测宽带内边距,
+      // 手动按测量宽摆位必偏左(见 adaptation.md)
+      // GTK 端 DrawAttributedText 水平 align 未实现,align=Center 无效,
+      // mount 时测宽手动水平居中(库内惯例,见 adaptation)
+      let symbol_at = AttributedText::new(symbol, valign=Center, wrap=false)
+      symbol_at.set_font(Font::new("Sans", 38.0, weight=Bold))
+      symbol_at.set_color(type_color(t))
+      let symbol_w = symbol_at.get_bounds_for(10000.0, 100.0).width
 
       bind_bg(icon, fn() { type_light_color(t) })
-      // 符号用 Painter 矢量路径自绘(✓/✕/!):不测宽、不摆位,三平台
-      // 一致(Windows 的 AttributedText 测宽含内边距,手动居中必偏左,
-      // 见 adaptation.md);主题切换重取色显式重绘
+      // 符号色随主题:set_color 后同文重排(AT 属性变更不自动失效)
+      fn apply_symbol_color() -> Unit {
+        symbol_at.set_color(type_color(t))
+        symbol_at.set_text(symbol_at.get_text())
+        ViewLike::schedule_paint(icon)
+      }
+
+      apply_symbol_color()
+      on_theme_change(apply_symbol_color)
       icon.on_draw(fn(p) {
         let b = ViewLike::get_bounds(icon)
-        let cx = b.width / 2.0
-        let cy = b.height / 2.0
-        let s = 20.0
-        p.set_stroke_color(type_color(t))
-        p.begin_path()
-        match t {
-          Success => {
-            p.move_to(cx - s, cy + s * 0.1)
-            p.line_to(cx - s * 0.2, cy + s * 0.7)
-            p.line_to(cx + s, cy - s * 0.6)
-            p.stroke()
-          }
-          Danger => {
-            p.move_to(cx - s * 0.7, cy - s * 0.7)
-            p.line_to(cx + s * 0.7, cy + s * 0.7)
-            p.move_to(cx + s * 0.7, cy - s * 0.7)
-            p.line_to(cx - s * 0.7, cy + s * 0.7)
-            p.stroke()
-          }
-          _ => {
-            p.set_fill_color(type_color(t))
-            p.fill_rect(cx - s * 0.14, cy - s, s * 0.28, s * 1.25)
-            p.fill_rect(cx - s * 0.14, cy + s * 0.5, s * 0.28, s * 0.28)
-          }
-        }
+        p.draw_attributed_text(
+          symbol_at,
+          (b.width - symbol_w) / 2.0,
+          0.0,
+          symbol_w,
+          b.height,
+        )
       })
-      on_theme_change(fn() { ViewLike::schedule_paint(icon) })
       let big = themed_container(style=[("height", 30.0)], style_str=[
         ("alignItems", "center"),
       ])
@@ -6316,17 +6316,14 @@ pub fn tabs_t(
         })
         head.add_child(tab)
         // 内容页:flex 让页区填充 outer 的确定高度(Scroll / Table 等
-        // 无 measure 叶节点依赖父级确定高度)。basis 0 按平台分化:
-        // Windows 需要它治「切页中间态被 yoga 压缩」(basis 恒定 0 +
-        // grow 1,页区高度只由 flex 分配决定,不随内容显隐波动);
-        // GTK/macOS 全量重排无此病,且 basis 非 auto 时高度只来自
-        // flex 分配,父链无确定高度时整页塌陷,恢复内容测量撑高
+        // 无 measure 叶节点依赖父级确定高度)。basis 显式置 0(CSS 的
+        // flex:1 1 0 语义):yoga 的 flex 简写只设 grow、basis 为 auto,
+        // 页内容隐藏时 basis 塌 0,外层 auto 高的 scroll 内容测量跟着
+        // 塌,页容器被分配成压缩中间值卡死(Windows 实测 210→56);
+        // basis 恒定 0 + grow 1 则高度只由 flex 分配决定,不随内容显隐
+        // 波动
         let page_c = themed_container(
-          style=if platform() == "windows" {
-            [("flex", 1.0), ("flexbasis", 0.0)]
-          } else {
-            [("flex", 1.0)]
-          },
+          style=[("flex", 1.0), ("flexbasis", 0.0)],
           style_str=[("flexDirection", "column")],
         )
         ViewLike::set_visible(page_c, cur.val == idx)
@@ -6336,15 +6333,15 @@ pub fn tabs_t(
         page_views.push(page_v)
       }
       sel.subscribe(fn(i) {
-        let prev = cur.val
-        if i == prev {
-          return
-        }
         cur.val = i
-        // 只动新旧两页:先显示新页再隐藏旧页(反序会让 yoga 在「新页
-        // 未显示、旧页已隐藏」的中间态把外层 flex 容器按 0 内容分配)
+        // 先显示新页再隐藏旧页:反序会让 yoga 在「新页未显示、旧页已
+        // 隐藏」的中间态把外层 flex 容器按 0 内容分配
         ViewLike::set_visible(contents[i], true)
-        ViewLike::set_visible(contents[prev], false)
+        for j in 0..<contents.length() {
+          if j != i {
+            ViewLike::set_visible(contents[j], false)
+          }
+        }
         ViewLike::schedule_paint(head)
         refresh_layout(outer)
         // 页内容视图(on_draw 宿主)显式重绘一次,确保切换后当帧画出
@@ -6669,156 +6666,13 @@ pub fn rate_t(
 }
 
 ///|
-/// 自绘悬浮提示:悬停 500ms 延时在控件下方显示主题底色文字气泡,
-/// 移开/按下/滚动即收。原生 View tooltip 在 Windows 环境(exe 无 comctl32
-/// v6 清单)区外/scroll 内/原生控件三处对照全不弹(真机二分);独立
-/// 弹层小窗(Popover 替代实现)有窗口创建/全局鼠标钩子/单例管理一串
-/// 平台坑且真机渲染卡顿,改为窗口内自绘覆盖层——气泡是挂在锚点所属
-/// 顶层根容器下的 absolute 定位自绘视图(挂载序在锚点之后,绘制在最
-/// 上),零新窗口零钩子,三平台一致。事件挂 content 自身的视图(包内
-/// FFI,View 不实现 ViewLike),挂宿主容器会踩 hover_group 同款「子
-/// 控件事件独占」洞。
-pub fn attach_tooltip(parent : View, v : View, tip : String) -> Unit {
-  // 气泡视图:文本固定,尺寸创建时测一次;先隐藏常驻,悬停才显示
-  let probe = AttributedText::new(tip, wrap=false)
-  probe.set_font(Font::new("Sans", 12.0))
-  let bw = probe.get_bounds_for(10000.0, 100.0).width + 20.0
-  let bh = 26.0
-  let bubble = themed_container(
-    style=[("width", bw), ("height", bh)],
-    style_str=[("position", "absolute"), ("left", "0"), ("top", "0")],
-  )
-  set_panel_bg(bubble)
-  bubble.on_draw(fn(p) {
-    let b = ViewLike::get_bounds(bubble)
-    p.set_stroke_color(theme_border())
-    p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
-    let at = AttributedText::new(tip, valign=Center, wrap=false)
-    at.set_font(Font::new("Sans", 12.0))
-    at.set_color(theme_text_primary())
-    p.draw_attributed_text(at, 10.0, 0.0, b.width - 20.0, b.height)
-  })
-  ViewLike::set_visible(bubble, false)
-  // 挂锚点所属顶层根容器:挂锚点直接父容器会被后绘的兄弟子树(如
-  // 图标网格的下一行)盖住
-  let root = ffi_view_root(parent)
-  attach(root, ViewLike::view(bubble))
-  let timer : Ref[Int] = Ref(0)
-  let hide = fn() -> Unit {
-    if timer.val != 0 {
-      clear_timeout(timer.val)
-      timer.val = 0
-    }
-    ViewLike::set_visible(bubble, false)
-  }
-  let enter : (
-    Int,
-    Double,
-    Double,
-    Double,
-    Double,
-    Double,
-    Double,
-    Int,
-    Int,
-  ) -> Unit = fn(_b, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
-    hide()
-    timer.val = set_timeout(500, fn() {
-      timer.val = 0
-      // 锚点相对根的坐标(气泡同坐标空间):水平居中并 clamp 到根宽
-      // 内,下方放不下翻到锚点上方
-      let aw = ffi_view_get_bounds_width(v)
-      let ah = ffi_view_get_bounds_height(v)
-      let rx = ffi_view_origin_in_root_x(v, root)
-      let ry = ffi_view_origin_in_root_y(v, root)
-      let rw = ffi_view_get_bounds_width(root)
-      let rh = ffi_view_get_bounds_height(root)
-      let mut x = rx + (aw - bw) / 2.0
-      if x + bw > rw {
-        x = rw - bw
-      }
-      if x < 0.0 {
-        x = 0.0
-      }
-      let mut y = ry + ah + 2.0
-      if y + bh > rh {
-        y = ry - bh - 2.0
-      }
-      ViewLike::set_style(bubble, "left", x)
-      ViewLike::set_style(bubble, "top", y)
-      ViewLike::set_visible(bubble, true)
-      ViewLike::schedule_paint(bubble)
-    })
-  }
-  let leave : (
-    Int,
-    Double,
-    Double,
-    Double,
-    Double,
-    Double,
-    Double,
-    Int,
-    Int,
-  ) -> Unit = fn(_b, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
-    hide()
-  }
-  let down : (
-    Int,
-    Double,
-    Double,
-    Double,
-    Double,
-    Double,
-    Double,
-    Int,
-    Int,
-  ) -> Int = fn(_b, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
-    hide()
-    0
-  }
-  // 闭包传给 C 后必须有 GC root(keep_alive):无 root 的闭包会被
-  // MoonBit GC 回收/移动,C 侧持有悬空指针,事件触发即访问违例
-  // (Windows 真机 tooltip 闪退的根因,注册模式照 yue/events.mbt 事件表)
-  keep_alive(fn() { ignore(enter) })
-  keep_alive(fn() { ignore(leave) })
-  keep_alive(fn() { ignore(down) })
-  ffi_view_on_mouse_enter(
-    v,
-    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
-    enter,
-  )
-  ffi_view_on_mouse_leave(
-    v,
-    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
-    leave,
-  )
-  ffi_view_on_mouse_down(
-    v,
-    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
-    down,
-  )
-  // 滚轮滚动时鼠标不动,不会产生 leave 事件——挂观察式滚轮旁路收气泡
-  // (回调后事件继续传播,页面滚动不受影响;消费式 on_wheel 会阻断滚动)
-  let wheel = fn(_delta : Double) -> Unit {
-    hide()
-  }
-  keep_alive(fn() { ignore(wheel) })
-  ffi_view_on_wheel_observe(
-    v,
-    fn(f, d) { f(d) },
-    wheel,
-  )
-}
-
-///|
-/// 悬浮提示:给任意节点包自绘 tooltip(悬停延时气泡,见
-/// attach_tooltip;主题化任意内容弹层请用 popover_t)。
+/// 悬浮提示:给任意节点包原生 tooltip(系统样式,零成本;主题化气泡
+/// 请用 popover_t)。
 pub fn tooltip_t(content : Node, tip : String) -> Node {
   {
     mount: fn(parent) {
       let v = (content.mount)(parent)
-      attach_tooltip(parent, v, tip)
+      ffi_view_set_tooltip(v, utf8_bytes(tip))
       v
     },
   }

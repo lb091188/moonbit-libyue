@@ -69,8 +69,6 @@ moon run examples/sysmonitor
 
 不会 MoonBit？[五分钟上手教程](docs/zh/tutorial.md) 从 `moon new` 带到第一个窗口。
 
-> **升级到 0.5.0**：`Browser` 绑定拆分为独立包,import 路径改为 `NoahLiu/moonbit-libyue/yue/browser`(`@yue.Browser` → `@browser.Browser`,API 不变)。未 import 该包的程序不再链接 WebKit/WebView2 依赖。
-
 ## 文档索引
 
 | 文档 | 内容 |

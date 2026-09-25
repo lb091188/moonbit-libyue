@@ -11,11 +11,9 @@ uint32_t yue_mbt_system_accent_mac(void) {
       return 0;
     }
     CGFloat r = 0, g = 0, b = 0, a = 0;
-    // AppleClang 17(macos-15 镜像更新后)把 getRed:green:blue:alpha:
-    // 的返回值解析成 void,`![...]` 一元取反直接编译错误(invalid
-    // argument type 'void');rgb 已确认非 nil 且转为 sRGB,取分量必然
-    // 成功,不再判断返回值——万一失败分量保持初值 0,与旧判空分支等价。
-    [rgb getRed:&r green:&g blue:&b alpha:&a];
+    if (![rgb getRed:&r green:&g blue:&b alpha:&a]) {
+      return 0;
+    }
     return (0xFFu << 24) | (static_cast<uint32_t>(r * 255.0 + 0.5) << 16) |
            (static_cast<uint32_t>(g * 255.0 + 0.5) << 8) |
            static_cast<uint32_t>(b * 255.0 + 0.5);

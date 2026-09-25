@@ -1,6 +1,5 @@
 import {
   "NoahLiu/moonbit-libyue/yue",
-  "NoahLiu/moonbit-libyue/yue/browser",
 }
 
 pkgtype(kind: "executable")

@@ -6,7 +6,7 @@
 ///|
 fn page_browser(_app : App) -> @yue.Node {
   let win = _app
-  let web_ref : Ref[@browser.Browser?] = Ref(None)
+  let web_ref : Ref[@yue.Browser?] = Ref(None)
   let nav_state : @yue.Store[String] = @yue.Store::new("(导航状态)")
   let nav_events : @yue.Store[String] = @yue.Store::new("(导航回调)")
   let bind_state : @yue.Store[String] = @yue.Store::new("(raw binding)")
@@ -14,7 +14,7 @@ fn page_browser(_app : App) -> @yue.Node {
   let cookie_state : @yue.Store[String] = @yue.Store::new("(Cookie)")
   let title_state : @yue.Store[String] = @yue.Store::new("(标题)")
   // 自定义协议(demo://;Windows 静默无效,页面自证跨平台差异)
-  @browser.Browser::register_protocol("demo", fn(_url) {
+  @yue.Browser::register_protocol("demo", fn(_url) {
     Some(
       (
         "text/html",
@@ -27,7 +27,7 @@ fn page_browser(_app : App) -> @yue.Node {
       "WebView 与加载",
       "load_url / demo:// 协议 / load_html 本地片段(内嵌 JS 按钮可调原生绑定)。",
       [
-        @browser.browser(handle=fn(x) {
+        @yue.browser(handle=fn(x) {
           web_ref.val = Some(x)
           x.load_html(
             "<html><body style='font-family:sans-serif;background:#fff;color:#222;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%'><h3>WebView 内嵌页 ✓</h3><button onclick=\"demoBinding('来自网页的调用')\">JS 调原生绑定</button><p id=r></p><script>function demoBinding(s){document.getElementById('r').textContent='已调用: '+s}</script></body></html>",
