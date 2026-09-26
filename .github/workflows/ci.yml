@@ -183,9 +183,22 @@ jobs:
           fi
           if [ $c2 -ne 0 ]; then
             echo "::error title=moon test 退出码 $c2::$(grep -aiE 'failed|FAILED|error|panicked|expect' /tmp/mt.out | tail -c 1800 | sed ':a;N;$!ba;s/\n/%0A/g')"
+            # ld 类错误本体在输出末尾,单条注解放不下——末尾 14KB 切片轰出
+            tail -c 14400 /tmp/mt.out > /tmp/mt.tail
+            n=$(( ($(wc -c </tmp/mt.tail) + 1799) / 1800 ))
+            k=0; while [ $k -lt $n ]; do
+              echo "::error title=moon test 尾段 $((k+1))/$n::$(dd if=/tmp/mt.tail bs=1800 skip=$k count=1 2>/dev/null | sed ':a;N;$!ba;s/\n/%0A/g')"
+              k=$((k+1))
+            done
           fi
           if [ $c3 -ne 0 ]; then
             echo "::error title=moon build 退出码 $c3::$(grep -aiE 'error|undefined|failed|ld: |warning: (ignoring|link)' /tmp/mb.out | tail -c 1800 | sed ':a;N;$!ba;s/\n/%0A/g')"
+            tail -c 14400 /tmp/mb.out > /tmp/mb.tail
+            n=$(( ($(wc -c </tmp/mb.tail) + 1799) / 1800 ))
+            k=0; while [ $k -lt $n ]; do
+              echo "::error title=moon build 尾段 $((k+1))/$n::$(dd if=/tmp/mb.tail bs=1800 skip=$k count=1 2>/dev/null | sed ':a;N;$!ba;s/\n/%0A/g')"
+              k=$((k+1))
+            done
           fi
           [ "$c1$c2$c3" = "000" ]
 
