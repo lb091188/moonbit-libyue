@@ -384,12 +384,12 @@ pub fn group(
 /// 滚动容器节点：内容是任意 Node。Scroll 是 View 不是 Container,内容必须
 /// 走 SetContentView（AddChild 会被 shim 类型校验拒绝）,故先把内容挂进
 /// 一个容器再整块设为滚动内容。
-/// 滚动条形态:一律平台原生——overlay=true(默认)在支持的平台上请求
-/// 悬浮样式(Linux 由 app_init 的 GTK_OVERLAY_SCROLLING 环境保底;macOS
-/// 为 NSScroller overlay;Windows 无悬浮对应物,经典条常驻占位)。
-/// 自绘悬浮条(overlay_scroll 组件)曾作默认形态,实测在隐藏挂载后切换
-/// 显示、复杂自绘内容等场景下滚动范围测量不稳,降级为显式选用,不再
-/// 作为任何默认路径。
+/// 滚动条形态按平台分化(overlay=true 默认且未显式 policy 时):Windows 走
+/// 悬浮细条形态——host 容器套原生 Scroll(平台条置 Never 完全隐藏)+ 自绘
+/// 主题色 thumb(absolute 占右缘,滚动浮现/停顿渐隐/悬停保持/拖拽/滚轮
+/// 转发);其余平台走 set_overlay_scrollbar(Linux 由 app_init 的
+/// GTK_OVERLAY_SCROLLING 环境保底,macOS 为 NSScroller overlay)。
+/// overlay=false 或显式 policy 仍走平台原生条。
 pub fn scroll(
   content : Node,
   content_size? : (Double, Double)? = None,
@@ -411,25 +411,41 @@ pub fn scroll(
         Some((h, v)) => s.set_scrollbar_policy(h, v)
         None => ()
       }
-      if overlay {
-        s.set_overlay_scrollbar(true)
-      } else {
-        s.set_overlay_scrollbar(false)
-      }
       // Windows 上原生子控件(Entry 等)的 HWND 不随容器滚动实时移动,
       // 会浮在滚动内容之上遮挡其它组件;每次滚动后强制重摆一次布局。
       let holder = Container::new()
       ignore((content.mount)(ViewLike::view(holder)))
       s.set_content(holder)
-      apply_style(s, style~, style_str~)
-      attach(parent, ViewLike::view(s))
+      let mounted : View = if overlay && policy is None && platform() == "windows" {
+        // Windows 悬浮细条:style 挪给 host(thumb 的 absolute 定位以
+        // host 为基准,直接挂页面容器会被 padding/margin 带偏),Scroll
+        // 在内撑满(flex 配 basis 0 即 CSS flex:1 1 0,高度只由 flex 分配
+        // 决定,防内容测量污染致视口塌陷),attach_overlay_thumb 置平台
+        // 条 Never 并挂自绘 thumb
+        let host = themed_container(style~, style_str~)
+        attach(parent, ViewLike::view(host))
+        ViewLike::set_style(s, "flex", 1.0)
+        ViewLike::set_style(s, "flexbasis", 0.0)
+        attach(ViewLike::view(host), ViewLike::view(s))
+        attach_overlay_thumb(ViewLike::view(host), s)
+        ViewLike::view(host)
+      } else {
+        if overlay {
+          s.set_overlay_scrollbar(true)
+        } else {
+          s.set_overlay_scrollbar(false)
+        }
+        apply_style(s, style~, style_str~)
+        attach(parent, ViewLike::view(s))
+        ViewLike::view(s)
+      }
       if platform() == "windows" {
         s.on_scroll(fn() {
           ViewLike::update_layout(holder)
           false
         })
       }
-      ViewLike::view(s)
+      mounted
     },
   }
 }
