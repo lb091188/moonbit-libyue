@@ -105,21 +105,17 @@ test "S4 真实采样：hwmon 传感器(Linux)" {
   match hwmon_sensors() {
     None => () // 非 Linux 宿主跳过
     Some(sensors) => {
-      assert_true(sensors.length() > 0)
+      // 虚机/容器宿主可能无 hwmon(CI runner 即如此),空列表跳过
+      if sensors.length() == 0 {
+        return
+      }
       for s in sensors {
         assert_true(s.chip.length() > 0)
         assert_true(s.label.length() > 0)
         // 合理温度区间(-50..200℃),防读到错误文件
         assert_true(s.celsius >= -50.0 && s.celsius <= 200.0)
       }
-      // 本机 coretemp 必有 Package 传感器
-      let mut has_package = false
-      for s in sensors {
-        if s.label.has_prefix("Package") {
-          has_package = true
-        }
-      }
-      assert_true(has_package)
+      // coretemp 的 Package 传感器仅物理真机必有,虚机会缺——不强制
     }
   }
 }

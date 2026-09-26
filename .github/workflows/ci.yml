@@ -58,21 +58,25 @@ jobs:
       - name: 构建原生层(钉版本下载 libyue + CMake 静态库)
         run: python3 scripts/prepare.py
 
-      # 三连拆开跑并捕获各退出码,失败时把输出尾巴塞进 error 注解
-      # (匿名 API 可读)——runner 环境差异导致的失败拿不到日志时定位用
+      # 三连拆开跑并捕获各退出码,失败命令各自把输出尾巴塞进 error
+      # 注解(匿名 API 可读)——runner 环境差异导致的失败拿不到日志时定位用
       - name: 静态检查 + 单元测试 + 全量构建
         run: |
           set +e
-          out=$(mktemp)
-          moon check >"$out" 2>&1; c1=$?
-          moon test >>"$out" 2>&1; c2=$?
-          moon build --target native >>"$out" 2>&1; c3=$?
+          moon check >/tmp/mc.out 2>&1; c1=$?
+          moon test >/tmp/mt.out 2>&1; c2=$?
+          moon build --target native >/tmp/mb.out 2>&1; c3=$?
           set -e
-          if [ "$c1$c2$c3" != "000" ]; then
-            tail=$(tail -c 2500 "$out" | sed ':a;N;$!ba;s/\n/%0A/g')
-            echo "::error title=moon 三连失败(check=$c1 test=$c2 build=$c3)::$tail"
-            exit 1
+          if [ $c1 -ne 0 ]; then
+            echo "::error title=moon check 退出码 $c1::$(tail -c 2000 /tmp/mc.out | sed ':a;N;$!ba;s/\n/%0A/g')"
           fi
+          if [ $c2 -ne 0 ]; then
+            echo "::error title=moon test 退出码 $c2::$(tail -c 2000 /tmp/mt.out | sed ':a;N;$!ba;s/\n/%0A/g')"
+          fi
+          if [ $c3 -ne 0 ]; then
+            echo "::error title=moon build 退出码 $c3::$(tail -c 2000 /tmp/mb.out | sed ':a;N;$!ba;s/\n/%0A/g')"
+          fi
+          [ "$c1$c2$c3" = "000" ]
 
       - name: GUI 冒烟(hello 在虚拟显示下存活 20 秒即通过)
         run: |
@@ -170,13 +174,17 @@ jobs:
       - name: 静态检查 + 单元测试 + 全量构建
         run: |
           set +e
-          out=$(mktemp)
-          moon check >"$out" 2>&1; c1=$?
-          moon test >>"$out" 2>&1; c2=$?
-          moon build --target native >>"$out" 2>&1; c3=$?
+          moon check >/tmp/mc.out 2>&1; c1=$?
+          moon test >/tmp/mt.out 2>&1; c2=$?
+          moon build --target native >/tmp/mb.out 2>&1; c3=$?
           set -e
-          if [ "$c1$c2$c3" != "000" ]; then
-            tail=$(tail -c 2500 "$out" | sed ':a;N;$!ba;s/\n/%0A/g')
-            echo "::error title=moon 三连失败(check=$c1 test=$c2 build=$c3)::$tail"
-            exit 1
+          if [ $c1 -ne 0 ]; then
+            echo "::error title=moon check 退出码 $c1::$(tail -c 2000 /tmp/mc.out | sed ':a;N;$!ba;s/\n/%0A/g')"
           fi
+          if [ $c2 -ne 0 ]; then
+            echo "::error title=moon test 退出码 $c2::$(tail -c 2000 /tmp/mt.out | sed ':a;N;$!ba;s/\n/%0A/g')"
+          fi
+          if [ $c3 -ne 0 ]; then
+            echo "::error title=moon build 退出码 $c3::$(tail -c 2000 /tmp/mb.out | sed ':a;N;$!ba;s/\n/%0A/g')"
+          fi
+          [ "$c1$c2$c3" = "000" ]
