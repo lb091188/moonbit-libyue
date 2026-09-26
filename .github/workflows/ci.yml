@@ -53,7 +53,7 @@ jobs:
             build
             vendor
             .prepare
-          key: native-linux-${{ hashFiles('scripts/prepare.py') }}
+          key: native-linux-${{ hashFiles('scripts/prepare.py', 'shim/**') }}
 
       - name: 构建原生层(钉版本下载 libyue + CMake 静态库)
         run: python3 scripts/prepare.py
@@ -117,7 +117,7 @@ jobs:
             build
             vendor
             .prepare
-          key: native-windows-${{ hashFiles('scripts/prepare.py') }}
+          key: native-windows-${{ hashFiles('scripts/prepare.py', 'shim/**') }}
 
       # vcvars64 用 vswhere 定位(不依赖 VS 具体版本/ Edition 路径);
       # prepare.py 会自动从 NuGet 补 WebView2 头文件与 loader DLL。
@@ -163,7 +163,7 @@ jobs:
             build
             vendor
             .prepare
-          key: native-macos-${{ hashFiles('scripts/prepare.py') }}
+          key: native-macos-${{ hashFiles('scripts/prepare.py', 'shim/**') }}
 
       # Xcode/CLT 与 CMake 为 Runner 自带;macOS 侧无 pkg-config 依赖
       # (prebuild 的 Darwin 分支直接给框架链接参数,不走 pkg-config)。
@@ -174,9 +174,15 @@ jobs:
       - name: 静态检查 + 单元测试 + 全量构建
         run: |
           set +e
+          # 诊断:build/ 与随包库成员清单(prepend 进 mb.out,失败时随尾段可见)
+          { echo "== build/ 产物 =="; ls -la build/*.a 2>/dev/null; \
+            echo "== build/libyue_mbt.a 成员 =="; ar t build/libyue_mbt.a 2>/dev/null; \
+            echo "== 随包 libyue_mbt.a 成员 =="; ar t lib/macos-universal/libyue_mbt.a 2>/dev/null; \
+          } >/tmp/probe.out 2>&1
+          cat /tmp/probe.out >/tmp/mb.out
           moon check >/tmp/mc.out 2>&1; c1=$?
           moon test >/tmp/mt.out 2>&1; c2=$?
-          moon build --target native >/tmp/mb.out 2>&1; c3=$?
+          moon build --target native >>/tmp/mb.out 2>&1; c3=$?
           set -e
           if [ $c1 -ne 0 ]; then
             echo "::error title=moon check 退出码 $c1::$(tail -c 2000 /tmp/mc.out | sed ':a;N;$!ba;s/\n/%0A/g')"
