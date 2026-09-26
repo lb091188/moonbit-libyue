@@ -82,6 +82,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 回调闭包由注册表进程级保活,不随窗口回收(单窗口工具场景泄漏可忽略,已定案)。
 - Toolbar / Vibrant 的 Linux 静态库无符号,链接必败,不暴露;Browser 空 Cookie 列表崩溃已在 fork mbt.7 修复。
 - 改 shim 签名必须 `.cpp` / `yue_mbt.h` / ffi.mbt 三处同批;漏同步或整段漏声明的断链形态都是 mangle 分裂(`_Z` 前缀符号对纯 C 名引用),nm 对比定位;出包前跑「.cpp 全量定义 × 头文件声明」对照扫描。
+- **独立翻译单元(如 `yue_accent_mac.mm`)不 include `yue_mbt.h` 时,函数定义必须显式 `extern "C"`**:缺了按 C++ mangling 导出(`__Z25yue_mbt_system_accent_macv`),`yue_mbt.cpp` 按头文件的 C 名引用即链接 undefined。此病三平台只有 macOS 暴露(Linux/Windows 不编 .mm),vendor/CI 的 prepare 阶段也不暴露(静态库不查 undefined),唯 macOS 真链接(moon test/build)必现;本机无 mac 时唯一防线是 CI。0.5.0 发布前实修一轮(符号经 vendor Actions 重出后 strings 复验为 `_yue_mbt_system_accent_mac`)。
 - XFCE 面板 IconPixmap 优先于 IconName:set_icon_name 与 set_pixmap 互斥,设一方须清空另一方。
 
 ## Linux
@@ -284,11 +285,13 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - GDI+ 混合模式仅 Normal/Copy 生效:`PainterWin::SetBlendMode` 只把 Copy 映射为 `CompositingModeSourceCopy`,其余全部落 `SourceOver`——GDI+ `Graphics` 只有这两种合成模式,Multiply/Screen/Difference/Xor 等静默无效。离屏像素探针实测:Multiply 交叉区 (128,128,255) 与 SourceOver 逐位一致(数学期望 #8028FF)。平台能力缺口,不修库(换 D2D 才有完整混合);showcase 画布演示在 Windows 回显「此平台仅 Normal 生效」,`docs` 中 `Image::write_to_file` 平台口径同步修正(Windows GDI+ 编码器 png/jpeg 可用、mac 发行包未编译恒失败)。
 - 原生 Tab 添加首页即回调 `on_selected_page_change`(内部初始选中,非用户切换):回调登记先于加页时,挂载期会空触发(declarative `tab()` 曾因此让切换计数演示凭空起跳);登记挪到加页循环之后即避开。
 
-## macOS ❓ 未实测
+## macOS(CI 构建链已验,GUI 待真机)
 
 - libyue v0.15.6 发行包含 ARC / no-ARC 双库:Darwin 链接参数 = 主库 + `-lyue_mbt_noarc`(no-ARC 符号被主库引用,须排其后)+ AppKit / Carbon / IOKit / Security / WebKit / OpenDirectory 框架 + `-lobjc -lc++ -lpthread -lbsm -Wl,-dead_strip`;prebuild Darwin 分支已按此预修。
 - CI(macos runner)承担构建 + 测试;headless 无 WindowServer,不做 GUI 冒烟。
 - shim 平台分支的 `#else` 兜底会误吞 macOS:borderless 须 `#elif defined(OS_WIN)`;CurrentDirForDrag 拆三支(mac 用 `getcwd`);`Window::SetSkipTaskbar` / `SetIcon` / `App::SetID` 在 mac 头文件无声明,调用补守卫空操作。
+- **AppleClang 17(macos-15 镜像更新后)把 `getRed:green:blue:alpha:` 返回值解析成 void**,`![...]` 一元取反编译错误;已判空且转 sRGB 后取分量必然成功,丢弃返回值写法对 BOOL/void 双解析都可编译(69136b7,曾被整树回退丢失又捡回——回退基线含带病文件时,后续修复会随回退消失,重推 vendor 前需对照该文件历史)。
+- **0.5.0 发布前的 CI 连红三根因(9-22 起,Linux/macOS 红、Windows 绿)**:① `yue_accent_mac.mm` 的 AppleClang 编译错误(见上)卡死 prepare;② extern "C" 缺失(见 ABI 小节)卡死链接;③ sysmonitor 的 S4 硬件采样测试断「coretemp 必有 Package 传感器」,虚机 runner 无此硬件即败——环境缺件(无传感器/无 DISPLAY)只跳过不硬断。另:CI 原生层缓存 key 必须含 shim 源码哈希(只含 prepare.py 时,shim 变更不换 key,恢复的 build/ 缓存里是旧 shim 库);无 Actions 日志权限时,把失败输出切片塞进 `::error` 注解(check-runs annotations API 匿名可读)是唯一取证通道。
 
 ## 维护约定
 
