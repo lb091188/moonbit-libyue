@@ -71,10 +71,10 @@ jobs:
             echo "::error title=moon check 退出码 $c1::$(tail -c 2000 /tmp/mc.out | sed ':a;N;$!ba;s/\n/%0A/g')"
           fi
           if [ $c2 -ne 0 ]; then
-            echo "::error title=moon test 退出码 $c2::$(tail -c 2000 /tmp/mt.out | sed ':a;N;$!ba;s/\n/%0A/g')"
+            echo "::error title=moon test 退出码 $c2::$(grep -aiE 'failed|FAILED|error|panicked|expect' /tmp/mt.out | tail -c 1800 | sed ':a;N;$!ba;s/\n/%0A/g')"
           fi
           if [ $c3 -ne 0 ]; then
-            echo "::error title=moon build 退出码 $c3::$(tail -c 2000 /tmp/mb.out | sed ':a;N;$!ba;s/\n/%0A/g')"
+            echo "::error title=moon build 退出码 $c3::$(grep -aiE 'error|undefined|failed|ld: |warning: (ignoring|link)' /tmp/mb.out | tail -c 1800 | sed ':a;N;$!ba;s/\n/%0A/g')"
           fi
           [ "$c1$c2$c3" = "000" ]
 
@@ -182,9 +182,9 @@ jobs:
             echo "::error title=moon check 退出码 $c1::$(tail -c 2000 /tmp/mc.out | sed ':a;N;$!ba;s/\n/%0A/g')"
           fi
           if [ $c2 -ne 0 ]; then
-            echo "::error title=moon test 退出码 $c2::$(tail -c 2000 /tmp/mt.out | sed ':a;N;$!ba;s/\n/%0A/g')"
+            echo "::error title=moon test 退出码 $c2::$(grep -aiE 'failed|FAILED|error|panicked|expect' /tmp/mt.out | tail -c 1800 | sed ':a;N;$!ba;s/\n/%0A/g')"
           fi
           if [ $c3 -ne 0 ]; then
-            echo "::error title=moon build 退出码 $c3::$(tail -c 2000 /tmp/mb.out | sed ':a;N;$!ba;s/\n/%0A/g')"
+            echo "::error title=moon build 退出码 $c3::$(grep -aiE 'error|undefined|failed|ld: |warning: (ignoring|link)' /tmp/mb.out | tail -c 1800 | sed ':a;N;$!ba;s/\n/%0A/g')"
           fi
           [ "$c1$c2$c3" = "000" ]
