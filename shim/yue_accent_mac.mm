@@ -1,9 +1,12 @@
 // macOS 系统主色调:NSColor.controlAccentColor → ARGB。
 // 独立 ObjC++ 翻译单元:shim 主体是纯 C++,ObjC 运行时调用只能在这里。
+// 定义必须显式 extern "C":本文件不 include yue_mbt.h,缺了则按 C++
+// mangling 导出,yue_mbt.cpp 按头文件的 C 名引用即链接 undefined
+// (macOS CI 实测符号 __Z25yue_mbt_system_accent_macv)。
 
 #import <Cocoa/Cocoa.h>
 
-uint32_t yue_mbt_system_accent_mac(void) {
+extern "C" uint32_t yue_mbt_system_accent_mac(void) {
   @autoreleasepool {
     NSColor *accent = [NSColor controlAccentColor];
     NSColor *rgb = [accent colorUsingColorSpace:[NSColorSpace sRGBColorSpace]];
