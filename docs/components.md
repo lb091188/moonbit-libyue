@@ -274,7 +274,7 @@ let sep = @yue.Separator::make(Horizontal)   // or Vertical
 | content | T : ViewLike | required | Content view |
 | content_size | (Double, Double)? | None | Content size; if omitted, the whole page scrolls following the content's natural height |
 | policy | (ScrollPolicy, ScrollPolicy)? | None | Native scrollbar policy (horizontal, vertical): Always / Never / Automatic; when passed explicitly the native scrollbar is kept |
-| overlay | Bool | true | Request the platform's overlay-style scrollbar (effective on Linux/macOS; Windows has no overlay equivalent and keeps classic bars) |
+| overlay | Bool | true | Scrollbar form: on Linux/macOS requests the platform's overlay style; on Windows the default form is a self-drawn floating thumb (overlay=false or an explicit policy keeps native classic bars) |
 
 `Separator::make` parameters: `orientation : Orientation = Horizontal` (Horizontal / Vertical).
 
@@ -316,7 +316,7 @@ The detection mechanism is pointer-position polling (100ms, comparing the global
 
 ## Overlay Scrollbar (OverlayScroll)
 
-`scroll()` always uses the platform's native scrollbars (overlay style requested via `overlay=true`). This component is an **explicitly opted-in** self-drawn floating thumb: it hides the platform scrollbar and draws a themed slim bar over the content's right edge — appears on scroll / hover, fades out in two steps after about 1s of inactivity, draggable along the track, unified across all three platforms. It once served as `scroll()`'s default form and was demoted to a standalone component over stability concerns in complex scenes; not recommended for new code.
+On Windows, `scroll()`'s default form (overlay=true with no explicit policy) already routes through this self-drawn floating thumb; this component is the **explicitly opted-in** entry point — use it when you want the same self-drawn floating thumb on Linux/macOS (instead of the platform overlay style), unified across all three platforms. Behavior: hides the platform scrollbar and draws a themed slim bar over the content's right edge — appears on scroll / hover, fades out in two steps after about 1s of inactivity, draggable along the track, wheel events on the slim bar forwarded to content scrolling.
 
 Standalone use (when the content is already a Node):
 
