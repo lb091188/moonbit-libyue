@@ -1,6 +1,6 @@
 name = "NoahLiu/moonbit-libyue"
 
-version = "0.5.0"
+version = "0.5.1"
 
 preferred_target = "native"
 
