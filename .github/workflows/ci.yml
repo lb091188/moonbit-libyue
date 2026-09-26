@@ -188,3 +188,14 @@ jobs:
             echo "::error title=moon build 退出码 $c3::$(grep -aiE 'error|undefined|failed|ld: |warning: (ignoring|link)' /tmp/mb.out | tail -c 1800 | sed ':a;N;$!ba;s/\n/%0A/g')"
           fi
           [ "$c1$c2$c3" = "000" ]
+
+      # 三连失败时上传完整输出(artifact 匿名可下载),注解截断时兜底
+      - name: 失败输出上传
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: moon-outputs-macos
+          path: |
+            /tmp/mc.out
+            /tmp/mt.out
+            /tmp/mb.out
