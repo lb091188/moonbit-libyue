@@ -2,10 +2,13 @@
 // 上下两栏)。桌面多栏界面的标配件(Qt QSplitter / GTK Paned 对位):
 // 8px 自绘把手常显点纹(不靠 hover 也能找到),悬停浅灰底、拖动中
 // 主题色 + 白点;拖动经 set_capture 捕获鼠标(拖出把手范围事件不丢),
-// window 坐标累计位移改写首栏 flexbasis(像素),release_capture 收势;
-// min_first/min_second 钳制两栏最小尺寸。挂载序即排列序与 z 序:
-// pane_a → 把手 → pane_b,把手必须挂在两栏之间。主题切换经
-// themed_container 自动重绘。
+// window 坐标位移改写首栏宽度,min_first/min_second 钳制两栏最小尺寸。
+// 挂载序即排列序与 z 序:pane_a → 把手 → pane_b,把手必须挂在两栏
+// 之间。主题切换经 themed_container 自动重绘。
+// 几何更新走 set_bounds 直写 + 首栏 width/height 样式双写:GTK 上
+// 运行期 SetStyleProperty 改布局属性后重排不落地(探针实测
+// width/flexbasis 全不生效,见 probe-splitter),直写 bounds 即时
+// 生效;样式值供窗口 resize 触发全链重排时按最后宽度接管。
 
 ///|
 /// 水平分隔:左右两栏,中间纵向把手左右拖动。
@@ -74,15 +77,31 @@ fn splitter_impl(
       ViewLike::set_style(pane_b, if horizontal { "minwidth" } else { "minheight" }, min_b)
       ignore((second.mount)(ViewLike::view(pane_b)))
       attach(ViewLike::view(outer), ViewLike::view(pane_b))
-      // 初始比例:初次布局完成后按实际尺寸换算像素写 flexbasis。百分比
-      // 字符串仅 GTK 端解析,Windows 端静默忽略(首栏被压到最小宽),
-      // 统一走像素跨平台一致;与拖动写像素同一形态
+      // 初始比例与拖动共用的几何直写:按首栏宽 x 摆三件(相对 outer),
+      // 同时把 x 写进首栏 width/height 样式——样式运行期不触发重排,
+      // 只在窗口 resize 全链重排时接管(保持最后宽度,次栏 flex 吃余)。
+      let layout_first = fn(x : Double) -> Unit {
+        let b = ViewLike::get_bounds(outer)
+        let span = if horizontal { b.width } else { b.height }
+        if horizontal {
+          set_view_bounds(pane_a, 0.0, 0.0, x, b.height)
+          set_view_bounds(handle, x, 0.0, handle_w, b.height)
+          set_view_bounds(pane_b, x + handle_w, 0.0, span - x - handle_w, b.height)
+          ViewLike::set_style(pane_a, "width", x)
+        } else {
+          set_view_bounds(pane_a, 0.0, 0.0, b.width, x)
+          set_view_bounds(handle, 0.0, x, b.width, handle_w)
+          set_view_bounds(pane_b, 0.0, x + handle_w, b.width, span - x - handle_w)
+          ViewLike::set_style(pane_a, "height", x)
+        }
+      }
+      // 初始比例:初次布局完成后按实际尺寸换算像素落位(百分比字符串
+      // 仅 GTK 端解析,Windows 端静默忽略,统一走像素跨平台一致)
       let apply_ratio = fn() -> Unit {
         let b = ViewLike::get_bounds(outer)
         let total = (if horizontal { b.width } else { b.height }) - handle_w
         if total > 0.0 {
-          ViewLike::set_style(pane_a, "flexbasis", total * ratio)
-          ViewLike::update_layout(outer)
+          layout_first(total * ratio)
         }
       }
       post_task(apply_ratio)
@@ -168,8 +187,7 @@ fn splitter_impl(
           } else {
             raw
           }
-          ViewLike::set_style(pane_a, "flexbasis", next)
-          ViewLike::update_layout(outer)
+          layout_first(next)
         }
       })
       ViewLike::on_mouse_up(handle, fn(_e) {
