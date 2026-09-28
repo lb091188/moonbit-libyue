@@ -838,11 +838,18 @@ pub fn segmented(options : Array[String], selected : Store[String]) -> Node {
       ),
     )
   }
-  hbox(items, style=[("padding", 2.0)], style_str=[("alignItems", "center")], handle=fn(
-    c,
-  ) {
-    bind_bg(c, fn() { theme_border() })
-  })
+  // 超宽自动换行(段多时一行放不下,如图标库 19 段)。要点:Yoga 的
+  // flexShrink 默认 0(区别于 CSS 的 1),不显式收缩则内部 hbox 拿到
+  // 内容全宽、wrap 永不触发;shrink 1 把宽度约束压进来才断行。
+  // rowGap 是换行行距。段少的页面不触发换行,外观不变。
+  hbox(
+    items,
+    style=[("padding", 2.0), ("rowGap", 4.0), ("flexShrink", 1.0)],
+    style_str=[("alignItems", "center"), ("flexWrap", "wrap")],
+    handle=fn(c) {
+      bind_bg(c, fn() { theme_border() })
+    },
+  )
 }
 
 ///|
