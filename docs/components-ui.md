@@ -729,7 +729,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 | API | Purpose |
 |---|---|
 | `icon(kind : IconKind, size? = 16.0, color? = "")` | icon node: theme regular color by default, fixed color via color |
-| `icon_button_t(kind, on_click?, size? = 28.0, tip? = "")` | square icon button: hover grey fill + text brightening, Enter/Space activates; non-empty tip attaches a native tooltip; marginRight 6 for toolbar rows |
+| `icon_button_t(kind, on_click?, size? = 28.0, tip? = "", style?, style_str?)` | Square icon button: hover light fill + brighter icon, triggered by click/Enter/Space; native tooltip when tip is non-empty; default marginRight 6 — caller style/style_str are appended last (can override defaults) |
 | `draw_icon(p : Painter, kind, cx, cy, s, color)` | unified self-drawing entry (center coordinates + edge length) |
 | `all_icons()` / `icon_name(kind)` | full list / name lookup |
 
