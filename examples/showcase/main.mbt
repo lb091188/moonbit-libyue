@@ -133,7 +133,7 @@ fn main {
                       (
                         "系统能力",
                         [
-                          "系统集成", "窗口", "浏览器", "环境与平台",
+                          "系统集成", "窗口", "浏览器",
                         ],
                       ),
                     ],
@@ -154,7 +154,6 @@ fn main {
                       ("系统集成", @yue.Gear),
                       ("窗口", @yue.Square),
                       ("浏览器", @yue.Globe),
-                      ("环境与平台", @yue.Cpu),
                     ],
                   ),
                 ],
@@ -201,25 +200,6 @@ fn main {
         ),
         @yue.vbox(
           [
-            @yue.hbox(
-              [
-                @yue.button_t("切换深浅", variant=@yue.Soft, on_click=fn() {
-                  app.dark_mode.update(fn(v) { !v })
-                }),
-                @yue.label("      "),
-                @yue.tag("MoonShell", "#2D68C4"),
-              ],
-              style=[("padding", 10.0)],
-              style_str=[("alignItems", "center")],
-              handle=fn(c) {
-                fn apply() -> Unit {
-                  c.set_background_color(@yue.theme_current().bg_panel)
-                }
-
-                apply()
-                @yue.on_theme_change(apply)
-              },
-            ),
             @ui.nav_page("基础组件", selected, @pages.page_basic(app)),
             @ui.nav_page("图标库", selected, @pages.page_icons(app)),
             @ui.nav_page("表单组件", selected, @pages.page_form(app)),
@@ -235,7 +215,6 @@ fn main {
             @ui.nav_page("浏览器", selected, @pages.page_browser(app)),
             @ui.nav_page("原生控件", selected, @pages.page_native(app)),
             @ui.nav_page("画布与富文本", selected, @pages.page_canvas(app)),
-            @ui.nav_page("环境与平台", selected, @pages.page_env(app)),
           ],
           style=[("flex", 1.0)],
           handle=fn(c) {
