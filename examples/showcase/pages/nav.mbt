@@ -5,7 +5,7 @@
 pub fn page_nav(app : @ui.App) -> @yue.Node {
   let page_no = @yue.Signal::new(2)
   let step = @yue.Signal::new(1)
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "侧栏",
       "Side Menu 侧边导航",

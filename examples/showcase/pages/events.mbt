@@ -43,7 +43,7 @@ pub fn page_events(_app : @ui.App) -> @yue.Node {
       None => ()
     }
   }
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "鼠标",
       "鼠标事件",

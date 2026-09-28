@@ -180,7 +180,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
     "北京", "上海", "广州",
   ])
   let transfer_right : @yue.Store[Array[String]] = @yue.Store::new(["深圳"])
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "标签头像",
       "Tag 标签与 Avatar 头像",

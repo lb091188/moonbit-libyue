@@ -13,7 +13,7 @@ pub fn page_store_demo(_app : @ui.App) -> @yue.Node {
   // 手动派生三:跨 Store 手动同步
   let merged : @yue.Store[String] = @yue.Store::new("")
   counter.subscribe(fn(n) { merged.set("计数 \{n},双倍 \{n * 2}") })
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "计数器",
       "手动计数器",

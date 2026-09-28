@@ -94,7 +94,7 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
     (0.85, @yue.theme_current().warning),
     (1.0, @yue.theme_current().danger),
   ]
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "折线",
       "Line 折线图(滚动窗口 + 实时推点)",
