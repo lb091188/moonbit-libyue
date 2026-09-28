@@ -589,8 +589,8 @@ pub fn draw_icon(
     }
     FolderOpen => {
       let u = s / 9.0
-      icon_polyline(p, [(cx - 9 * u, cy - 6 * u), (cx - 3 * u, cy - 6 * u), (cx - u, cy - 4 * u), (cx + 8 * u, cy - 4 * u), (cx + 8 * u, cy - 1 * u)])
-      icon_outline(p, [(cx - 8.5 * u, cy - 1 * u), (cx + 8.5 * u, cy - 1 * u), (cx + 6.5 * u, cy + 6 * u), (cx - 6.5 * u, cy + 6 * u)])
+      icon_polyline(p, [(cx - 8.5 * u, cy + 6 * u), (cx - 8.5 * u, cy - 5.5 * u), (cx - 3.5 * u, cy - 5.5 * u), (cx - 1.5 * u, cy - 3.5 * u), (cx + 5.5 * u, cy - 3.5 * u), (cx + 5.5 * u, cy - 1.5 * u)])
+      icon_outline(p, [(cx - 8.5 * u, cy + 6 * u), (cx - 5 * u, cy - 1.5 * u), (cx + 8.5 * u, cy - 1.5 * u), (cx + 5 * u, cy + 6 * u)])
     }
     FolderPlus => {
       let u = s / 9.0
@@ -622,15 +622,15 @@ pub fn draw_icon(
     // —— 编辑 ——
     Undo => {
       let u = s / 9.0
-      icon_polyline(p, [(cx - 3 * u, cy + 2 * u), (cx - 7 * u, cy - 2 * u), (cx - 3 * u, cy - 6 * u)])
-      icon_line(p, cx - 7 * u, cy - 2 * u, cx + 4 * u, cy - 2 * u)
-      icon_arc(p, cx + 4 * u, cy + 2 * u, 4 * u, -1.5708, 1.5708)
+      icon_polyline(p, [(cx - 4 * u, cy + 1.5 * u), (cx - 7.5 * u, cy - 2 * u), (cx - 4 * u, cy - 5.5 * u)])
+      icon_line(p, cx - 7.5 * u, cy - 2 * u, cx + 1 * u, cy - 2 * u)
+      icon_arc(p, cx + 1 * u, cy + 2 * u, 4 * u, 1.5708, 4.712389)
     }
     Redo => {
       let u = s / 9.0
-      icon_polyline(p, [(cx + 3 * u, cy + 2 * u), (cx + 7 * u, cy - 2 * u), (cx + 3 * u, cy - 6 * u)])
-      icon_line(p, cx + 7 * u, cy - 2 * u, cx - 4 * u, cy - 2 * u)
-      icon_arc(p, cx - 4 * u, cy + 2 * u, 4 * u, 1.5708, -1.5708, ccw=true)
+      icon_polyline(p, [(cx + 4 * u, cy + 1.5 * u), (cx + 7.5 * u, cy - 2 * u), (cx + 4 * u, cy - 5.5 * u)])
+      icon_line(p, cx + 7.5 * u, cy - 2 * u, cx - 1 * u, cy - 2 * u)
+      icon_arc(p, cx - 1 * u, cy + 2 * u, 4 * u, 4.712389, 1.5708, ccw=true)
     }
     Scissors => {
       let u = s / 9.0
@@ -712,19 +712,17 @@ pub fn draw_icon(
     }
     Unlink => {
       let u = s / 9.0
-      icon_outline(p, [(cx - 9 * u, cy - 3 * u), (cx - 5 * u, cy - 7 * u), (cx - 1 * u, cy - 3 * u), (cx - 5 * u, cy + 1 * u)])
-      icon_outline(p, [(cx + 1 * u, cy + 3 * u), (cx + 5 * u, cy - 1 * u), (cx + 9 * u, cy + 3 * u), (cx + 5 * u, cy + 7 * u)])
-      icon_line(p, cx - 3 * u, cy + 3 * u, cx - 1.5 * u, cy + 1.5 * u)
-      icon_line(p, cx + 1.5 * u, cy - 1.5 * u, cx + 3 * u, cy - 3 * u)
-      icon_line(p, cx - 8 * u, cy + 8 * u, cx - 6 * u, cy + 6 * u)
-      icon_line(p, cx + 6 * u, cy - 6 * u, cx + 8 * u, cy - 8 * u)
+      icon_line(p, cx - 1.8 * u, cy + 1.8 * u, cx + 1.8 * u, cy - 1.8 * u)
+      icon_polyline(p, [(cx - 7.5 * u, cy + 0.5 * u), (cx - 7.5 * u, cy + 7.5 * u), (cx - 0.5 * u, cy + 7.5 * u)])
+      icon_line(p, cx - 5.5 * u, cy + 5.5 * u, cx - 2.2 * u, cy + 2.2 * u)
+      icon_polyline(p, [(cx + 7.5 * u, cy - 0.5 * u), (cx + 7.5 * u, cy - 7.5 * u), (cx + 0.5 * u, cy - 7.5 * u)])
+      icon_line(p, cx + 5.5 * u, cy - 5.5 * u, cx + 2.2 * u, cy - 2.2 * u)
     }
     ExternalLink => {
       let u = s / 9.0
-      icon_outline(p, [(cx + 2 * u, cy - 7 * u), (cx - 7 * u, cy - 7 * u), (cx - 7 * u, cy + 7 * u), (cx + 7 * u, cy + 7 * u), (cx + 7 * u, cy - 2 * u)])
-      icon_polyline(p, [(cx + 2 * u, cy - 2 * u), (cx + 7 * u, cy - 7 * u)])
-      icon_line(p, cx + 3.5 * u, cy - 7 * u, cx + 7 * u, cy - 7 * u)
-      icon_line(p, cx + 7 * u, cy - 7 * u, cx + 7 * u, cy - 3.5 * u)
+      icon_polyline(p, [(cx + 2.5 * u, cy - 2.5 * u), (cx - 7 * u, cy - 2.5 * u), (cx - 7 * u, cy + 7.5 * u), (cx + 7 * u, cy + 7.5 * u), (cx + 7 * u, cy - 1.5 * u)])
+      icon_line(p, cx + 1 * u, cy - 1 * u, cx + 7.5 * u, cy - 7.5 * u)
+      icon_polyline(p, [(cx + 2.2 * u, cy - 7.5 * u), (cx + 7.5 * u, cy - 7.5 * u), (cx + 7.5 * u, cy - 2.2 * u)])
     }
     // —— 视图 ——
     ZoomIn => {
@@ -748,9 +746,10 @@ pub fn draw_icon(
     }
     EyeOff => {
       let u = s / 9.0
-      icon_polyline(p, [(cx - 6 * u, cy - 4 * u), (cx - 3 * u, cy - 5.5 * u), (cx, cy - 6 * u), (cx + 3 * u, cy - 5.5 * u), (cx + 6 * u, cy - 4 * u)])
-      icon_polyline(p, [(cx + 9.5 * u, cy), (cx + 6 * u, cy + 4 * u), (cx + 3 * u, cy + 5.5 * u), (cx, cy + 6 * u), (cx - 3 * u, cy + 5.5 * u), (cx - 6 * u, cy + 4 * u), (cx - 9.5 * u, cy)])
-      icon_line(p, cx - 8 * u, cy - 8 * u, cx + 8 * u, cy + 8 * u)
+      icon_arc(p, cx, cy + 3 * u, 7.62 * u, 3.55, 5.88)
+      icon_arc(p, cx, cy - 3 * u, 7.62 * u, 0.40, 2.74)
+      icon_circle(p, cx, cy, 2.6 * u)
+      icon_line(p, cx - 8.5 * u, cy - 8.5 * u, cx + 8.5 * u, cy + 8.5 * u)
     }
     Sun => {
       let u = s / 9.0
@@ -764,10 +763,8 @@ pub fn draw_icon(
     }
     Moon => {
       let u = s / 9.0
-      p.set_fill_color(color)
-      icon_polygon(p, [
-        (cx + 6 * u, cy - 7.5 * u), (cx + 1 * u, cy - 6.5 * u), (cx - 2.5 * u, cy - 3 * u), (cx - 3.5 * u, cy + 1.5 * u), (cx - 1.5 * u, cy + 5.5 * u), (cx + 2.5 * u, cy + 7.5 * u), (cx + 6 * u, cy + 7.5 * u), (cx + 1.5 * u, cy + 6.5 * u), (cx - 1.5 * u, cy + 3 * u), (cx - 2 * u, cy - 1 * u), (cx - 0.5 * u, cy - 5 * u), (cx + 2.5 * u, cy - 7.5 * u),
-      ])
+      icon_arc(p, cx, cy, 7.16 * u, 1.15, 5.24)
+      icon_arc(p, cx + 4 * u, cy, 6.58 * u, 1.72, 4.56)
     }
     Grid => {
       let u = s / 9.0
@@ -1113,15 +1110,25 @@ pub fn draw_icon(
     }
     CloudDownload => {
       let u = s / 9.0
-      icon_polyline(p, [(cx - 6 * u, cy - 3 * u), (cx - 7.5 * u, cy - 4.5 * u), (cx - 7.5 * u, cy - 7 * u), (cx - 6 * u, cy - 8.5 * u), (cx - 4.5 * u, cy - 9 * u), (cx - 3.5 * u, cy - 9.8 * u), (cx - 2 * u, cy - 10.5 * u), (cx - 0.5 * u, cy - 10.5 * u), (cx + 1 * u, cy - 9.5 * u), (cx + 2 * u, cy - 8 * u), (cx + 3.5 * u, cy - 7.5 * u), (cx + 4.5 * u, cy - 6 * u), (cx + 4.5 * u, cy - 4.5 * u), (cx + 3.5 * u, cy - 3 * u)])
-      icon_line(p, cx, cy - 2 * u, cx, cy + 7 * u)
-      icon_polyline(p, [(cx - 3.5 * u, cy + 3.5 * u), (cx, cy + 7 * u), (cx + 3.5 * u, cy + 3.5 * u)])
+      p.begin_path()
+      p.move_to(cx - 7 * u, cy - 0.5 * u)
+      p.arc(cx - 4.25 * u, cy - 0.5 * u, 2.75 * u, 3.141592653589793, ICON_TAU)
+      p.arc(cx + 2.25 * u, cy - 0.5 * u, 3.75 * u, 3.141592653589793, ICON_TAU)
+      p.close_path()
+      p.stroke()
+      icon_line(p, cx, cy + 1.5 * u, cx, cy + 7.5 * u)
+      icon_polyline(p, [(cx - 2.4 * u, cy + 5.1 * u), (cx, cy + 7.5 * u), (cx + 2.4 * u, cy + 5.1 * u)])
     }
     CloudUpload => {
       let u = s / 9.0
-      icon_polyline(p, [(cx - 6 * u, cy - 3 * u), (cx - 7.5 * u, cy - 4.5 * u), (cx - 7.5 * u, cy - 7 * u), (cx - 6 * u, cy - 8.5 * u), (cx - 4.5 * u, cy - 9 * u), (cx - 3.5 * u, cy - 9.8 * u), (cx - 2 * u, cy - 10.5 * u), (cx - 0.5 * u, cy - 10.5 * u), (cx + 1 * u, cy - 9.5 * u), (cx + 2 * u, cy - 8 * u), (cx + 3.5 * u, cy - 7.5 * u), (cx + 4.5 * u, cy - 6 * u), (cx + 4.5 * u, cy - 4.5 * u), (cx + 3.5 * u, cy - 3 * u)])
-      icon_line(p, cx, cy + 7 * u, cx, cy - 2 * u)
-      icon_polyline(p, [(cx - 3.5 * u, cy + 1.5 * u), (cx, cy - 2 * u), (cx + 3.5 * u, cy + 1.5 * u)])
+      p.begin_path()
+      p.move_to(cx - 7 * u, cy - 0.5 * u)
+      p.arc(cx - 4.25 * u, cy - 0.5 * u, 2.75 * u, 3.141592653589793, ICON_TAU)
+      p.arc(cx + 2.25 * u, cy - 0.5 * u, 3.75 * u, 3.141592653589793, ICON_TAU)
+      p.close_path()
+      p.stroke()
+      icon_line(p, cx, cy + 7.5 * u, cx, cy + 1.5 * u)
+      icon_polyline(p, [(cx - 2.4 * u, cy + 3.9 * u), (cx, cy + 1.5 * u), (cx + 2.4 * u, cy + 3.9 * u)])
     }
     Layers => {
       let u = s / 9.0
@@ -1214,11 +1221,10 @@ pub fn draw_icon(
     }
     ArrowUpDown => {
       let u = s / 9.0
-      icon_line(p, cx - 4.5 * u, cy, cx + 4.5 * u, cy)
-      icon_line(p, cx - 4.5 * u, cy + 3 * u, cx - 4.5 * u, cy - 6 * u)
-      icon_polyline(p, [(cx - 6.5 * u, cy - 4 * u), (cx - 4.5 * u, cy - 6 * u), (cx - 2.5 * u, cy - 4 * u)])
-      icon_line(p, cx + 4.5 * u, cy - 3 * u, cx + 4.5 * u, cy + 6 * u)
-      icon_polyline(p, [(cx + 2.5 * u, cy + 4 * u), (cx + 4.5 * u, cy + 6 * u), (cx + 6.5 * u, cy + 4 * u)])
+      icon_line(p, cx - 4.5 * u, cy + 8 * u, cx - 4.5 * u, cy - 8 * u)
+      icon_polyline(p, [(cx - 6.8 * u, cy - 5.4 * u), (cx - 4.5 * u, cy - 8 * u), (cx - 2.2 * u, cy - 5.4 * u)])
+      icon_line(p, cx + 4.5 * u, cy - 8 * u, cx + 4.5 * u, cy + 8 * u)
+      icon_polyline(p, [(cx + 2.2 * u, cy + 5.4 * u), (cx + 4.5 * u, cy + 8 * u), (cx + 6.8 * u, cy + 5.4 * u)])
     }
     AlignJustify => {
       let u = s / 9.0
@@ -1333,12 +1339,17 @@ pub fn draw_icon(
     }
     Users => {
       let u = s / 9.0
-      icon_circle(p, cx - 3 * u, cy - 4.5 * u, 3.2 * u)
+      // 前人:头 + 圆肩(竖直短边接半圆拱)
+      icon_circle(p, cx - 3.5 * u, cy - 3 * u, 3.2 * u)
       p.begin_path()
-      p.arc(cx - 3 * u, cy + 8 * u, 6 * u, 3.141592653589793, ICON_TAU)
+      p.move_to(cx - 8 * u, cy + 8.5 * u)
+      p.line_to(cx - 8 * u, cy + 6.5 * u)
+      p.arc(cx - 3.5 * u, cy + 6.5 * u, 4.5 * u, 3.141592653589793, ICON_TAU)
+      p.line_to(cx + 1 * u, cy + 8.5 * u)
       p.stroke()
-      icon_arc(p, cx + 4.5 * u, cy - 4.5 * u, 3 * u, -1.5708, 1.5708)
-      icon_arc(p, cx + 4.5 * u, cy + 8 * u, 6 * u, 3.141592653589793, 4.6)
+      // 后人:右露半张脸与肩头
+      icon_arc(p, cx + 5.5 * u, cy - 3 * u, 3.2 * u, -1.1, 1.1)
+      icon_arc(p, cx + 5.5 * u, cy + 6.5 * u, 4.5 * u, 3.34, 4.6)
     }
     Cloudy => {
       let u = s / 9.0
@@ -1914,9 +1925,10 @@ pub fn icon_name(kind : IconKind) -> String {
 }
 
 ///|
-/// 图标展示视图:固定尺寸,颜色默认主题常规文字色,传 color 固定色。
-/// size 为视图边长,图标内容约占 84%。
-pub fn icon(kind : IconKind, size? : Double = 16.0, color? : String = "") -> Node {
+/// 图标展示视图:颜色默认主题常规文字色,传 color 固定色。
+/// size 为视图边长(默认与 Body 正文字号一致,图文并排时基线协调),
+/// 图标内容约占 84%。
+pub fn icon(kind : IconKind, size? : Double = 13.0, color? : String = "") -> Node {
   {
     mount: fn(parent) {
       let v = themed_container(style=[("width", size), ("height", size)])
