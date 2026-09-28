@@ -69,32 +69,53 @@ pub fn page(secs : Array[Section]) -> @yue.Node {
 
 ///|
 /// 主区导航页:挂载后订阅导航状态做 set_visible 切换(侧栏菜单/
-/// segmented/面包屑共享同一导航 Store)。
+/// segmented/面包屑共享同一导航 Store)。页面内容惰性挂载:未选中过
+/// 的页只留空壳,首次选中才把 content 挂进占位——与段级惰性同机理,
+/// 15 页全量挂载(浏览器页含 WebKit 重控件)的启动开销不可行。
 pub fn nav_page(
   name : String,
   selected : @yue.Store[String],
   content : @yue.Node,
 ) -> @yue.Node {
-  @yue.vbox([content], style=[("flex", 1.0)], handle=fn(c) {
-    fn apply(s : String) -> Unit {
+  let mounted : Ref[Bool] = Ref(false)
+  @yue.vbox([], style=[("flex", 1.0)], handle=fn(c) {
+    fn ensure(s : String) -> Unit {
+      if !mounted.val && s == name {
+        mounted.val = true
+        let _ = content.mount_into(c.view)
+      }
       c.set_visible(s == name)
     }
 
-    apply(selected.get())
-    selected.subscribe(apply)
+    ensure(selected.get())
+    selected.subscribe(ensure)
   })
 }
 
 ///|
 /// 选中段的正文:标题 + 演示 + 说明 + 代码(带复制行),内容超高分段内
-/// 滚动;容器随页面 selected 切换显隐。
+/// 滚动;容器随页面 selected 切换显隐。演示内容惰性挂载:未选中过的
+/// 段只有标题/说明/代码骨架,首次选中才把 content 挂进占位容器——
+/// 全量挂载意味着启动即建 111 段全部控件(图标墙页 803 个图标控件),
+/// debug 构建秒级;挂过之后保形,显隐/滚动位置语义不变。
 fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
+  let mounted : Ref[Bool] = Ref(false)
+  let holder = @yue.vbox([], handle=fn(h) {
+    fn ensure(name : String) -> Unit {
+      if !mounted.val && name == s.name {
+        mounted.val = true
+        for c in s.content {
+          let _ = c.mount_into(h.view)
+        }
+      }
+    }
+    ensure(selected.get())
+    selected.subscribe(ensure)
+  })
   let inner : Array[@yue.Node] = [
     @yue.label_t(s.title, role=@yue.Section, style=[("marginBottom", 8.0)]),
+    holder,
   ]
-  for c in s.content {
-    inner.push(c)
-  }
   if s.desc != "" {
     inner.push(
       @yue.label_t(s.desc, role=@yue.Secondary, style=[("marginTop", 10.0)]),
@@ -106,7 +127,7 @@ fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
       @yue.code_view(s.code, lang="moonbit", line_numbers=true, width=1000.0),
     )
   }
-  // 本容器是显隐切换对象:grow/shrink 单写(同上,不写 flex 简写)
+  // 本容器是显隐切换对象:grow/shrink 单写(不写 flex 简写)
   @yue.vbox(
     [
       @yue.scroll(
