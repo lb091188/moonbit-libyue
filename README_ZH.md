@@ -69,6 +69,8 @@ moon run examples/sysmonitor
 
 不会 MoonBit？[五分钟上手教程](docs/zh/tutorial.md) 从 `moon new` 带到第一个窗口。
 
+前置要求:MoonBit native 工具链,`moonc` ≥ 0.10.14(`moon version --all` 可验证)。
+
 > **升级到 0.5.0**：`Browser` 绑定拆分为独立包,import 路径改为 `NoahLiu/moonbit-libyue/yue/browser`(`@yue.Browser` → `@browser.Browser`,API 不变)。未 import 该包的程序不再链接 WebKit/WebView2 依赖。
 
 ## 文档索引
@@ -97,6 +99,10 @@ Windows 下 exe 自动为 GUI 子系统,双击无控制台黑框。
 - **小批提交**：一个内聚改动一批提交，提交信息简短
 
 新增控件、原生层发布等完整流程见 [AGENTS.md](AGENTS.md)。
+
+## 许可证
+
+`moonbit-libyue` 以 [MIT](LICENSE) 发布。其封装的 [libyue](https://github.com/yue/libyue) 上游为 LGPL-2.1,并捆绑 Apache-2.0 / MIT / BSD-3-Clause 三方组件,完整许可文本随包分发于 [`vendor/libyue/LICENSE`](vendor/libyue/LICENSE)。本仓库用到的全部 libyue 补丁以独立提交维护于 fork [lb091188/yue](https://github.com/lb091188/yue),随包分发的预构建静态库由 GitHub Actions 从 fork 的 `vendor-*` 标签源码构建,对应源码始终可从仓库标签取回。
 
 ## 参考
 

@@ -69,6 +69,8 @@ moon run examples/sysmonitor
 
 Don't know MoonBit? The [five-minute tutorial](docs/tutorial.md) takes you from `moon new` to your first window.
 
+Prerequisite: the MoonBit native toolchain, `moonc` ≥ 0.10.14 (`moon version --all` to verify).
+
 > **Upgrading to 0.5.0**: the `Browser` binding moved to a standalone package. Add `"NoahLiu/moonbit-libyue/yue/browser"` to your imports (`@yue.Browser` → `@browser.Browser`, API unchanged). Apps that don't import it are no longer linked against WebKit/WebView2.
 
 ## Documentation index
@@ -97,6 +99,10 @@ Everyone is welcome: reporting platform-compatibility issues, adding widgets, im
 - **Small batches**: one cohesive change per commit, short commit messages
 
 The full process for adding widgets, native-layer releases, and more is in [AGENTS.md](AGENTS.md).
+
+## License
+
+`moonbit-libyue` is released under the [MIT License](LICENSE). It wraps [libyue](https://github.com/yue/libyue), whose upstream code is licensed LGPL-2.1 with bundled third-party components under Apache-2.0 / MIT / BSD-3-Clause — the complete notice ships in [`vendor/libyue/LICENSE`](vendor/libyue/LICENSE). All libyue patches used here are maintained as separate commits in the [lb091188/yue](https://github.com/lb091188/yue) fork, and the prebuilt static libraries distributed with the package are built from the fork's tagged sources by GitHub Actions (`vendor-*` tags), so the corresponding source stays retrievable from the repository.
 
 ## References
 
