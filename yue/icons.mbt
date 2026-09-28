@@ -624,7 +624,7 @@ pub fn draw_icon(
       let u = s / 9.0
       icon_polyline(p, [(cx - 4 * u, cy + 1.5 * u), (cx - 7.5 * u, cy - 2 * u), (cx - 4 * u, cy - 5.5 * u)])
       icon_line(p, cx - 7.5 * u, cy - 2 * u, cx + 1 * u, cy - 2 * u)
-      icon_arc(p, cx + 1 * u, cy + 2 * u, 4 * u, 1.5708, 4.712389)
+      icon_arc(p, cx + 1 * u, cy + 2 * u, 4 * u, -1.5708, 1.5708)
     }
     Redo => {
       let u = s / 9.0
