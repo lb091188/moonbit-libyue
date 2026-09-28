@@ -730,7 +730,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 | API | 用途 |
 |---|---|
 | `icon(kind : IconKind, size? = 16.0, color? = "")` | 图标节点：默认主题常规色，传 color 固定色 |
-| `icon_button_t(kind, on_click?, size? = 28.0, tip? = "")` | 方形图标按钮：hover 浅灰底 + 文字色提亮，Enter/Space 触发；tip 非空挂原生悬浮提示；marginRight 6 便于工具栏排列 |
+| `icon_button_t(kind, on_click?, size? = 28.0, tip? = "", style?, style_str?)` | 方形图标按钮：hover 浅灰底 + 文字色提亮，Enter/Space 触发；tip 非空挂原生悬浮提示；默认 marginRight 6,style/style_str 由调用方追加(后应用可覆盖默认) |
 | `draw_icon(p : Painter, kind, cx, cy, s, color)` | 统一自绘入口（中心坐标 + 边长） |
 | `all_icons()` / `icon_name(kind)` | 全清单 / 取名 |
 
