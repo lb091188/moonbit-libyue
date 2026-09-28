@@ -400,14 +400,10 @@ pub fn draw_icon(
     }
     Refresh => {
       p.set_stroke_color(color)
-      // 300° 圆弧,缺口朝右下,开口两端各一段回勾形成旋转感
       p.begin_path()
-      p.arc(cx, cy, s * 0.75, 0.5, 0.5 + ICON_TAU * 0.83)
+      p.arc(cx, cy, s * 0.72, -0.9, 4.5)
       p.stroke()
-      let a0 = 0.5
-      let tip_x = cx + s * 0.75 * @math.cos(a0)
-      let tip_y = cy + s * 0.75 * @math.sin(a0)
-      icon_polyline(p, [(tip_x - s * 0.3, tip_y - s * 0.18), (tip_x, tip_y), (tip_x - s * 0.05, tip_y - s * 0.35)])
+      icon_polyline(p, [(cx + s * 0.05, cy - s * 0.98), (cx + s * 0.68, cy - s * 0.56), (cx + s * 0.30, cy - s * 0.12)])
     }
     Trash => {
       p.set_stroke_color(color)
@@ -419,9 +415,9 @@ pub fn draw_icon(
     }
     Edit => {
       p.set_stroke_color(color)
-      icon_polyline(p, [(cx + s * 0.7, cy - s * 0.7), (cx - s * 0.55, cy + s * 0.55)])
-      icon_polyline(p, [(cx - s * 0.85, cy + s * 0.85), (cx - s * 0.3, cy + s * 0.3)])
-      icon_polyline(p, [(cx + s * 0.45, cy - s * 0.95), (cx + s * 0.95, cy - s * 0.45)])
+      icon_line(p, cx + s * 0.75, cy - s * 0.25, cx + s * 0.25, cy - s * 0.75)
+      icon_polyline(p, [(cx + s * 0.25, cy - s * 0.75), (cx - s * 0.55, cy + s * 0.05), (cx - s * 0.75, cy + s * 0.75), (cx - s * 0.05, cy + s * 0.55), (cx + s * 0.75, cy - s * 0.25)])
+      icon_line(p, cx - s * 0.55, cy + s * 0.05, cx - s * 0.05, cy + s * 0.55)
     }
     Save => {
       p.set_stroke_color(color)
@@ -496,11 +492,11 @@ pub fn draw_icon(
       p.set_stroke_color(color)
       p.begin_path()
       p.move_to(cx - s * 0.85, cy - s * 0.7)
-      p.line_to(cx + s * 0.85, cy - s * 0.7)
-      p.line_to(cx + s * 0.2, cy - s * 0.05)
-      p.line_to(cx + s * 0.2, cy + s * 0.7)
-      p.line_to(cx - s * 0.2, cy + s * 0.7)
-      p.line_to(cx - s * 0.2, cy - s * 0.05)
+      p.bezier_curve_to(cx - s * 0.4, cy - s * 0.15, cx - s * 0.15, cy + s * 0.05, cx - s * 0.15, cy + s * 0.3)
+      p.line_to(cx - s * 0.15, cy + s * 0.75)
+      p.line_to(cx + s * 0.15, cy + s * 0.75)
+      p.line_to(cx + s * 0.15, cy + s * 0.3)
+      p.bezier_curve_to(cx + s * 0.15, cy + s * 0.05, cx + s * 0.4, cy - s * 0.15, cx + s * 0.85, cy - s * 0.7)
       p.close_path()
       p.stroke()
     }
@@ -634,11 +630,10 @@ pub fn draw_icon(
     }
     Scissors => {
       let u = s / 9.0
-      icon_circle(p, cx - 6 * u, cy - 6 * u, 2.2 * u)
-      icon_circle(p, cx - 6 * u, cy + 6 * u, 2.2 * u)
-      icon_line(p, cx - 4.2 * u, cy - 4.7 * u, cx + 8 * u, cy + 8 * u)
-      icon_line(p, cx - 4.2 * u, cy + 4.7 * u, cx + 8 * u, cy - 8 * u)
-      icon_line(p, cx - 4.8 * u, cy - 2 * u, cx - 1 * u, cy + 0.5 * u)
+      icon_circle(p, cx - 6.5 * u, cy - 5.5 * u, 2.5 * u)
+      icon_circle(p, cx - 6.5 * u, cy + 5.5 * u, 2.5 * u)
+      icon_line(p, cx - 4.6 * u, cy - 4 * u, cx + 8 * u, cy + 6.5 * u)
+      icon_line(p, cx - 4.6 * u, cy + 4 * u, cx + 8 * u, cy - 6.5 * u)
     }
     Paste => {
       let u = s / 9.0
@@ -649,9 +644,9 @@ pub fn draw_icon(
     }
     Bold => {
       let u = s / 9.0
-      icon_outline(p, [(cx - 5 * u, cy - 7 * u), (cx + 1 * u, cy - 7 * u), (cx + 1 * u, cy), (cx - 5 * u, cy)])
-      icon_outline(p, [(cx - 5 * u, cy), (cx + 2.5 * u, cy), (cx + 2.5 * u, cy + 7 * u), (cx - 5 * u, cy + 7 * u)])
-      icon_line(p, cx - 5 * u, cy - 7 * u, cx - 5 * u, cy + 7 * u)
+      icon_line(p, cx - 5 * u, cy - 8 * u, cx - 5 * u, cy + 8 * u)
+      icon_arc(p, cx - 5 * u, cy - 4.5 * u, 4.5 * u, -1.5708, 1.5708)
+      icon_arc(p, cx - 5 * u, cy + 3.5 * u, 5.5 * u, -1.5708, 1.5708)
     }
     Italic => {
       let u = s / 9.0
@@ -694,15 +689,15 @@ pub fn draw_icon(
     }
     ListOl => {
       let u = s / 9.0
-      icon_line(p, cx - 8 * u, cy - 7 * u, cx - 5.5 * u, cy - 7 * u)
-      icon_line(p, cx - 5.5 * u, cy - 7 * u, cx - 5.5 * u, cy - 4.5 * u)
-      icon_line(p, cx - 8 * u, cy - 1 * u, cx - 8.5 * u, cy + 0.5 * u)
-      icon_line(p, cx - 8 * u, cy - 1 * u, cx - 6 * u, cy - 1 * u)
-      icon_line(p, cx - 6 * u, cy - 1 * u, cx - 6 * u, cy + 1.5 * u)
-      icon_line(p, cx - 8 * u, cy + 6 * u, cx - 5.5 * u, cy + 6 * u)
-      icon_line(p, cx - 3 * u, cy - 6 * u, cx + 8 * u, cy - 6 * u)
-      icon_line(p, cx - 3 * u, cy, cx + 8 * u, cy)
-      icon_line(p, cx - 3 * u, cy + 6 * u, cx + 8 * u, cy + 6 * u)
+      // 1
+      icon_polyline(p, [(cx - 7.5 * u, cy - 7.8 * u), (cx - 6.3 * u, cy - 8.5 * u), (cx - 6.3 * u, cy - 4.5 * u)])
+      // 2
+      icon_polyline(p, [(cx - 8.3 * u, cy - 1.3 * u), (cx - 6.3 * u, cy - 3.2 * u), (cx - 6.3 * u, cy - 0.5 * u), (cx - 8.3 * u, cy + 1.2 * u), (cx - 5.9 * u, cy + 1.2 * u)])
+      // 3
+      icon_polyline(p, [(cx - 8.3 * u, cy + 4.6 * u), (cx - 6.3 * u, cy + 3.8 * u), (cx - 6.3 * u, cy + 7.8 * u), (cx - 8.3 * u, cy + 7 * u)])
+      icon_line(p, cx - 2.5 * u, cy - 6.5 * u, cx + 8 * u, cy - 6.5 * u)
+      icon_line(p, cx - 2.5 * u, cy, cx + 8 * u, cy)
+      icon_line(p, cx - 2.5 * u, cy + 6.5 * u, cx + 8 * u, cy + 6.5 * u)
     }
     Link => {
       let u = s / 9.0
@@ -720,9 +715,9 @@ pub fn draw_icon(
     }
     ExternalLink => {
       let u = s / 9.0
-      icon_polyline(p, [(cx + 2.5 * u, cy - 2.5 * u), (cx - 7 * u, cy - 2.5 * u), (cx - 7 * u, cy + 7.5 * u), (cx + 7 * u, cy + 7.5 * u), (cx + 7 * u, cy - 1.5 * u)])
+      icon_polyline(p, [(cx + 2.5 * u, cy - 2.5 * u), (cx - 7 * u, cy - 2.5 * u), (cx - 7 * u, cy + 7.5 * u), (cx + 7 * u, cy + 7.5 * u), (cx + 7 * u, cy - 2 * u)])
       icon_line(p, cx + 1 * u, cy - 1 * u, cx + 7.5 * u, cy - 7.5 * u)
-      icon_polyline(p, [(cx + 2.2 * u, cy - 7.5 * u), (cx + 7.5 * u, cy - 7.5 * u), (cx + 7.5 * u, cy - 2.2 * u)])
+      icon_polyline(p, [(cx + 2.5 * u, cy - 7.5 * u), (cx + 7.5 * u, cy - 7.5 * u), (cx + 7.5 * u, cy - 2.5 * u)])
     }
     // —— 视图 ——
     ZoomIn => {
@@ -895,18 +890,61 @@ pub fn draw_icon(
     }
     Bell => {
       let u = s / 9.0
-      icon_outline(p, [(cx + 6 * u, cy + 4 * u), (cx - 6 * u, cy + 4 * u), (cx - 6 * u, cy - 2 * u), (cx - 4.5 * u, cy - 6.2 * u), (cx - 2 * u, cy - 7.8 * u), (cx, cy - 8 * u), (cx + 2 * u, cy - 7.8 * u), (cx + 4.5 * u, cy - 6.2 * u), (cx + 6 * u, cy - 2 * u), (cx + 6 * u, cy + 4 * u)])
+      p.begin_path()
+      p.move_to(cx + 6 * u, cy + 4 * u)
+      p.bezier_curve_to(cx + 6.5 * u, cy + 4 * u, cx + 6.5 * u, cy + 3.5 * u, cx + 6 * u, cy + 3 * u)
+      p.bezier_curve_to(cx + 5 * u, cy + 1.5 * u, cx + 5 * u, cy - 1 * u, cx + 5 * u, cy - 3 * u)
+      p.bezier_curve_to(cx + 5 * u, cy - 6.5 * u, cx + 2.8 * u, cy - 8 * u, cx, cy - 8 * u)
+      p.bezier_curve_to(cx - 2.8 * u, cy - 8 * u, cx - 5 * u, cy - 6.5 * u, cx - 5 * u, cy - 3 * u)
+      p.bezier_curve_to(cx - 5 * u, cy - 1 * u, cx - 5 * u, cy + 1.5 * u, cx - 6 * u, cy + 3 * u)
+      p.bezier_curve_to(cx - 6.5 * u, cy + 3.5 * u, cx - 6.5 * u, cy + 4 * u, cx - 6 * u, cy + 4 * u)
+      p.close_path()
+      p.stroke()
+      icon_dot(p, cx, cy - 9 * u, 0.7 * u)
+      icon_arc(p, cx, cy + 5.5 * u, 2.5 * u, 0.0, 3.141592653589793)
+      let u = s / 9.0
+      p.begin_path()
+      p.move_to(cx + 6 * u, cy + 4 * u)
+      p.bezier_curve_to(cx + 6.5 * u, cy + 4 * u, cx + 6.5 * u, cy + 3.5 * u, cx + 6 * u, cy + 3 * u)
+      p.bezier_curve_to(cx + 5 * u, cy + 1.5 * u, cx + 5 * u, cy - 1 * u, cx + 5 * u, cy - 3 * u)
+      p.bezier_curve_to(cx + 5 * u, cy - 6.5 * u, cx + 2.8 * u, cy - 8 * u, cx, cy - 8 * u)
+      p.bezier_curve_to(cx - 2.8 * u, cy - 8 * u, cx - 5 * u, cy - 6.5 * u, cx - 5 * u, cy - 3 * u)
+      p.bezier_curve_to(cx - 5 * u, cy - 1 * u, cx - 5 * u, cy + 1.5 * u, cx - 6 * u, cy + 3 * u)
+      p.bezier_curve_to(cx - 6.5 * u, cy + 3.5 * u, cx - 6.5 * u, cy + 4 * u, cx - 6 * u, cy + 4 * u)
+      p.close_path()
+      p.stroke()
+      icon_line(p, cx - 8 * u, cy - 8.5 * u, cx + 8 * u, cy + 8.5 * u)
       icon_line(p, cx - 2.5 * u, cy + 7 * u, cx + 2.5 * u, cy + 7 * u)
     }
     BellOff => {
       let u = s / 9.0
-      icon_outline(p, [(cx + 6 * u, cy + 4 * u), (cx - 6 * u, cy + 4 * u), (cx - 6 * u, cy - 2 * u), (cx - 4.5 * u, cy - 6.2 * u), (cx - 2 * u, cy - 7.8 * u), (cx, cy - 8 * u), (cx + 2 * u, cy - 7.8 * u), (cx + 4.5 * u, cy - 6.2 * u), (cx + 6 * u, cy - 2 * u), (cx + 6 * u, cy + 4 * u)])
+      p.begin_path()
+      p.move_to(cx + 6 * u, cy + 4 * u)
+      p.bezier_curve_to(cx + 6.5 * u, cy + 4 * u, cx + 6.5 * u, cy + 3.5 * u, cx + 6 * u, cy + 3 * u)
+      p.bezier_curve_to(cx + 5 * u, cy + 1.5 * u, cx + 5 * u, cy - 1 * u, cx + 5 * u, cy - 3 * u)
+      p.bezier_curve_to(cx + 5 * u, cy - 6.5 * u, cx + 2.8 * u, cy - 8 * u, cx, cy - 8 * u)
+      p.bezier_curve_to(cx - 2.8 * u, cy - 8 * u, cx - 5 * u, cy - 6.5 * u, cx - 5 * u, cy - 3 * u)
+      p.bezier_curve_to(cx - 5 * u, cy - 1 * u, cx - 5 * u, cy + 1.5 * u, cx - 6 * u, cy + 3 * u)
+      p.bezier_curve_to(cx - 6.5 * u, cy + 3.5 * u, cx - 6.5 * u, cy + 4 * u, cx - 6 * u, cy + 4 * u)
+      p.close_path()
+      p.stroke()
+      icon_line(p, cx - 8 * u, cy - 8.5 * u, cx + 8 * u, cy + 8.5 * u)
       icon_line(p, cx - 2.5 * u, cy + 7 * u, cx + 2.5 * u, cy + 7 * u)
-      icon_line(p, cx - 8 * u, cy - 8 * u, cx + 8 * u, cy + 8 * u)
     }
     Phone => {
       let u = s / 9.0
-      icon_outline(p, [(cx + 7.5 * u, cy + 4 * u), (cx + 7.5 * u, cy + 7 * u), (cx + 5 * u, cy + 8 * u), (cx - 1 * u, cy + 5.5 * u), (cx - 5.5 * u, cy + 1 * u), (cx - 8 * u, cy - 5 * u), (cx - 7 * u, cy - 7.5 * u), (cx - 4 * u, cy - 7.5 * u), (cx - 2.5 * u, cy - 3 * u), (cx - 4 * u, cy - 1.5 * u), (cx + 1.5 * u, cy + 4 * u), (cx + 3 * u, cy + 2.5 * u)])
+      p.begin_path()
+      p.move_to(cx + 7.5 * u, cy + 2 * u)
+      p.bezier_curve_to(cx + 7.8 * u, cy + 5.5 * u, cx + 6 * u, cy + 7.5 * u, cx + 4 * u, cy + 7.5 * u)
+      p.bezier_curve_to(cx + 1 * u, cy + 7.5 * u, cx - 3 * u, cy + 5 * u, cx - 6 * u, cy + 2 * u)
+      p.bezier_curve_to(cx - 8 * u, cy - 1 * u, cx - 7.5 * u, cy - 5 * u, cx - 7.5 * u, cy - 6 * u)
+      p.bezier_curve_to(cx - 7.5 * u, cy - 7.5 * u, cx - 6 * u, cy - 8 * u, cx - 4.5 * u, cy - 7.5 * u)
+      p.bezier_curve_to(cx - 3 * u, cy - 7 * u, cx - 2 * u, cy - 5 * u, cx - 2.5 * u, cy - 3.5 * u)
+      p.bezier_curve_to(cx - 2.8 * u, cy - 2.5 * u, cx - 3 * u, cy - 1.5 * u, cx - 2 * u, cy - 0.5 * u)
+      p.bezier_curve_to(cx - 0.5 * u, cy + 1.5 * u, cx + 1.5 * u, cy + 3 * u, cx + 3 * u, cy + 3.5 * u)
+      p.bezier_curve_to(cx + 4 * u, cy + 3.8 * u, cx + 5 * u, cy + 3 * u, cx + 6 * u, cy + 2.5 * u)
+      p.close_path()
+      p.stroke()
     }
     Rss => {
       let u = s / 9.0
@@ -917,12 +955,15 @@ pub fn draw_icon(
     }
     Globe => {
       let u = s / 9.0
-      icon_circle(p, cx, cy, 9 * u)
-      icon_line(p, cx - 9 * u, cy, cx + 9 * u, cy)
-      icon_polyline(p, [(cx - 3.5 * u, cy - 7 * u), (cx - 5 * u, cy - 3.5 * u), (cx - 5 * u, cy), (cx - 5 * u, cy + 3.5 * u), (cx - 3.5 * u, cy + 7 * u)])
-      icon_polyline(p, [(cx + 3.5 * u, cy - 7 * u), (cx + 5 * u, cy - 3.5 * u), (cx + 5 * u, cy), (cx + 5 * u, cy + 3.5 * u), (cx + 3.5 * u, cy + 7 * u)])
-      icon_polyline(p, [(cx - 7.5 * u, cy - 3.5 * u), (cx - 3.5 * u, cy - 4.8 * u), (cx, cy - 5 * u), (cx + 3.5 * u, cy - 4.8 * u), (cx + 7.5 * u, cy - 3.5 * u)])
-      icon_polyline(p, [(cx - 7.5 * u, cy + 3.5 * u), (cx - 3.5 * u, cy + 4.8 * u), (cx, cy + 5 * u), (cx + 3.5 * u, cy + 4.8 * u), (cx + 7.5 * u, cy + 3.5 * u)])
+      icon_circle(p, cx, cy, 8.5 * u)
+      icon_arc(p, cx, cy, 8.5 * u, 3.6652, 5.7596)
+      icon_arc(p, cx, cy, 8.5 * u, 0.5236, 2.6180)
+      icon_line(p, cx - 8.5 * u, cy, cx + 8.5 * u, cy)
+      p.begin_path()
+      p.arc(cx, cy, 4 * u, 0.0, ICON_TAU)
+      p.move_to(cx, cy - 8.5 * u)
+      p.bezier_curve_to(cx - 2.5 * u, cy - 5.5 * u, cx - 2.5 * u, cy + 5.5 * u, cx, cy + 8.5 * u)
+      p.stroke()
     }
     // —— 系统 ——
     Power => {
@@ -951,8 +992,10 @@ pub fn draw_icon(
     Unlock => {
       let u = s / 9.0
       icon_outline(p, [(cx - 7 * u, cy - 1 * u), (cx + 7 * u, cy - 1 * u), (cx + 7 * u, cy + 9 * u), (cx - 7 * u, cy + 9 * u)])
-      icon_arc(p, cx - 1 * u, cy - 1 * u, 4 * u, 3.6, 6.2832)
-      icon_line(p, cx + 2.2 * u, cy - 4.8 * u, cx + 5.5 * u, cy - 4.8 * u)
+      icon_arc(p, cx - 2.5 * u, cy - 1 * u, 4.5 * u, 3.141592653589793, ICON_TAU)
+      icon_line(p, cx + 2 * u, cy - 5.5 * u, cx + 2 * u, cy - 3 * u)
+      icon_line(p, cx + 2 * u, cy - 5.5 * u, cx + 5.5 * u, cy - 5.5 * u)
+      icon_line(p, cx + 5.5 * u, cy - 5.5 * u, cx + 5.5 * u, cy - 1 * u)
     }
     Key => {
       let u = s / 9.0
@@ -1106,29 +1149,34 @@ pub fn draw_icon(
     }
     Cloud => {
       let u = s / 9.0
-      icon_outline(p, [(cx - 6.5 * u, cy + 5 * u), (cx - 8 * u, cy + 3.5 * u), (cx - 8 * u, cy + 0.5 * u), (cx - 6.5 * u, cy - 1.5 * u), (cx - 4.5 * u, cy - 2.2 * u), (cx - 3 * u, cy - 1.5 * u), (cx - 2 * u, cy - 3.5 * u), (cx - 0.5 * u, cy - 4.5 * u), (cx + 1.5 * u, cy - 4.5 * u), (cx + 3.5 * u, cy - 3.5 * u), (cx + 4.5 * u, cy - 1.5 * u), (cx + 6 * u, cy - 1 * u), (cx + 7 * u, cy + 0.5 * u), (cx + 7 * u, cy + 2.5 * u), (cx + 5.5 * u, cy + 4.5 * u), (cx + 4 * u, cy + 5 * u)])
+      p.begin_path()
+      p.move_to(cx - 7.5 * u, cy + 4 * u)
+      p.arc(cx - 4.25 * u, cy + 4 * u, 3.25 * u, 3.141592653589793, ICON_TAU)
+      p.arc(cx + 1.75 * u, cy + 4 * u, 4.25 * u, 3.141592653589793, ICON_TAU)
+      p.close_path()
+      p.stroke()
     }
     CloudDownload => {
       let u = s / 9.0
       p.begin_path()
-      p.move_to(cx - 7 * u, cy - 0.5 * u)
-      p.arc(cx - 4.25 * u, cy - 0.5 * u, 2.75 * u, 3.141592653589793, ICON_TAU)
-      p.arc(cx + 2.25 * u, cy - 0.5 * u, 3.75 * u, 3.141592653589793, ICON_TAU)
+      p.move_to(cx - 7.5 * u, cy + 4 * u)
+      p.arc(cx - 4.25 * u, cy + 4 * u, 3.25 * u, 3.141592653589793, ICON_TAU)
+      p.arc(cx + 1.75 * u, cy + 4 * u, 4.25 * u, 3.141592653589793, ICON_TAU)
       p.close_path()
       p.stroke()
-      icon_line(p, cx, cy + 1.5 * u, cx, cy + 7.5 * u)
-      icon_polyline(p, [(cx - 2.4 * u, cy + 5.1 * u), (cx, cy + 7.5 * u), (cx + 2.4 * u, cy + 5.1 * u)])
+      icon_line(p, cx, cy + 6 * u, cx, cy + 11 * u)
+      icon_polyline(p, [(cx - 2.2 * u, cy + 9 * u), (cx, cy + 11 * u), (cx + 2.2 * u, cy + 9 * u)])
     }
     CloudUpload => {
       let u = s / 9.0
       p.begin_path()
-      p.move_to(cx - 7 * u, cy - 0.5 * u)
-      p.arc(cx - 4.25 * u, cy - 0.5 * u, 2.75 * u, 3.141592653589793, ICON_TAU)
-      p.arc(cx + 2.25 * u, cy - 0.5 * u, 3.75 * u, 3.141592653589793, ICON_TAU)
+      p.move_to(cx - 7.5 * u, cy + 4 * u)
+      p.arc(cx - 4.25 * u, cy + 4 * u, 3.25 * u, 3.141592653589793, ICON_TAU)
+      p.arc(cx + 1.75 * u, cy + 4 * u, 4.25 * u, 3.141592653589793, ICON_TAU)
       p.close_path()
       p.stroke()
-      icon_line(p, cx, cy + 7.5 * u, cx, cy + 1.5 * u)
-      icon_polyline(p, [(cx - 2.4 * u, cy + 3.9 * u), (cx, cy + 1.5 * u), (cx + 2.4 * u, cy + 3.9 * u)])
+      icon_line(p, cx, cy + 11 * u, cx, cy + 6 * u)
+      icon_polyline(p, [(cx - 2.2 * u, cy + 8 * u), (cx, cy + 6 * u), (cx + 2.2 * u, cy + 8 * u)])
     }
     Layers => {
       let u = s / 9.0
@@ -1259,13 +1307,13 @@ pub fn draw_icon(
     }
     RotateCw => {
       let u = s / 9.0
-      icon_arc(p, cx, cy, 6.5 * u, -1.5708, 4.6)
-      icon_polyline(p, [(cx + 2.6 * u, cy - 8.2 * u), (cx, cy - 6.5 * u), (cx + 2.6 * u, cy - 4.8 * u)])
+      icon_arc(p, cx, cy, 7 * u, -0.5236, -2.6180)
+      icon_polyline(p, [(cx + 0.6 * u, cy - 9.6 * u), (cx + 6.4 * u, cy - 4.2 * u), (cx + 0.8 * u, cy - 3.2 * u)])
     }
     RotateCcw => {
       let u = s / 9.0
-      icon_arc(p, cx, cy, 6.5 * u, -1.46, 4.712)
-      icon_polyline(p, [(cx - 2.6 * u, cy - 8.2 * u), (cx, cy - 6.5 * u), (cx - 2.6 * u, cy - 4.8 * u)])
+      icon_arc(p, cx, cy, 7 * u, -2.6180, -0.5236, ccw=true)
+      icon_polyline(p, [(cx - 0.6 * u, cy - 9.6 * u), (cx - 6.4 * u, cy - 4.2 * u), (cx - 0.8 * u, cy - 3.2 * u)])
     }
     Columns => {
       let u = s / 9.0
@@ -1301,11 +1349,21 @@ pub fn draw_icon(
     }
     BellRing => {
       let u = s / 9.0
-      let bx = cx - 1.5 * u
-      icon_outline(p, [(bx + 6 * u, cy + 4 * u), (bx - 6 * u, cy + 4 * u), (bx - 6 * u, cy - 2 * u), (bx - 4.5 * u, cy - 6.2 * u), (bx - 2 * u, cy - 7.8 * u), (bx, cy - 8 * u), (bx + 2 * u, cy - 7.8 * u), (bx + 4.5 * u, cy - 6.2 * u), (bx + 6 * u, cy - 2 * u), (bx + 6 * u, cy + 4 * u)])
+      let bx = cx - 2 * u
+      p.begin_path()
+      p.move_to(bx + 6 * u, cy + 4 * u)
+      p.bezier_curve_to(bx + 6.5 * u, cy + 4 * u, bx + 6.5 * u, cy + 3.5 * u, bx + 6 * u, cy + 3 * u)
+      p.bezier_curve_to(bx + 5 * u, cy + 1.5 * u, bx + 5 * u, cy - 1 * u, bx + 5 * u, cy - 3 * u)
+      p.bezier_curve_to(bx + 5 * u, cy - 6.5 * u, bx + 2.8 * u, cy - 8 * u, bx, cy - 8 * u)
+      p.bezier_curve_to(bx - 2.8 * u, cy - 8 * u, bx - 5 * u, cy - 6.5 * u, bx - 5 * u, cy - 3 * u)
+      p.bezier_curve_to(bx - 5 * u, cy - 1 * u, bx - 5 * u, cy + 1.5 * u, bx - 6 * u, cy + 3 * u)
+      p.bezier_curve_to(bx - 6.5 * u, cy + 3.5 * u, bx - 6.5 * u, cy + 4 * u, bx - 6 * u, cy + 4 * u)
+      p.close_path()
+      p.stroke()
       icon_line(p, bx - 2.5 * u, cy + 7 * u, bx + 2.5 * u, cy + 7 * u)
-      icon_arc(p, cx + 6.5 * u, cy - 2 * u, 2.2 * u, -1.2, 0.7)
-      icon_arc(p, cx + 7 * u, cy - 2.5 * u, 3 * u, -1.0, 0.4)
+      // 右侧声波:两段同心弧
+      icon_arc(p, bx + 6.5 * u, cy - 1 * u, 3 * u, -0.9, 0.9)
+      icon_arc(p, bx + 6.5 * u, cy - 1 * u, 5.5 * u, -0.7, 0.7)
     }
     Pin => {
       let u = s / 9.0
@@ -1347,9 +1405,9 @@ pub fn draw_icon(
       p.arc(cx - 3.5 * u, cy + 6.5 * u, 4.5 * u, 3.141592653589793, ICON_TAU)
       p.line_to(cx + 1 * u, cy + 8.5 * u)
       p.stroke()
-      // 后人:右露半张脸与肩头
-      icon_arc(p, cx + 6 * u, cy - 3 * u, 3.2 * u, -1.1, 1.1)
-      icon_arc(p, cx + 6 * u, cy + 6.5 * u, 4.5 * u, 3.0, 4.6)
+      // 后人:右露半张脸与肩头(弧心右移下探,与肩拱错开)
+      icon_arc(p, cx + 6.5 * u, cy - 3.5 * u, 2.8 * u, -1.2, 1.2)
+      icon_arc(p, cx + 6.5 * u, cy + 7.5 * u, 4.5 * u, 3.0, 4.7)
     }
     Cloudy => {
       let u = s / 9.0
@@ -1357,30 +1415,43 @@ pub fn draw_icon(
     }
     CloudSun => {
       let u = s / 9.0
-      icon_circle(p, cx - 3.5 * u, cy - 4 * u, 2.2 * u)
-      icon_line(p, cx - 3.5 * u, cy - 8.5 * u, cx - 3.5 * u, cy - 7.3 * u)
-      icon_line(p, cx - 8 * u, cy - 4 * u, cx - 6.8 * u, cy - 4 * u)
-      icon_line(p, cx - 6.7 * u, cy - 7.2 * u, cx - 5.9 * u, cy - 6.4 * u)
-      icon_line(p, cx - 0.3 * u, cy - 7.2 * u, cx - 1.1 * u, cy - 6.4 * u)
-      icon_outline(p, [(cx + 7 * u, cy + 4.5 * u), (cx - 4 * u, cy + 4.5 * u), (cx - 4 * u, cy + 1.5 * u), (cx - 2 * u, cy - 1 * u), (cx + 1.5 * u, cy - 1.8 * u), (cx + 4 * u, cy - 3.5 * u), (cx + 6 * u, cy - 1.5 * u), (cx + 7 * u, cy + 1 * u)])
+      p.begin_path()
+      p.move_to(cx - 7.5 * u, cy + 4 * u)
+      p.arc(cx - 4.25 * u, cy + 4 * u, 3.25 * u, 3.141592653589793, ICON_TAU)
+      p.arc(cx + 1.75 * u, cy + 4 * u, 4.25 * u, 3.141592653589793, ICON_TAU)
+      p.close_path()
+      p.stroke()
+      // 左上太阳:圆 + 三根光芒
+      icon_circle(p, cx - 3 * u, cy - 5.5 * u, 2.2 * u)
+      icon_line(p, cx - 3 * u, cy - 9.5 * u, cx - 3 * u, cy - 8.6 * u)
+      icon_line(p, cx - 7 * u, cy - 5.5 * u, cx - 6.1 * u, cy - 5.5 * u)
+      icon_line(p, cx - 6 * u, cy - 8.5 * u, cx - 5.4 * u, cy - 7.9 * u)
     }
     CloudRain => {
       let u = s / 9.0
-      icon_outline(p, [(cx - 6.5 * u, cy - 2 * u), (cx - 6.5 * u, cy - 4.5 * u), (cx - 4 * u, cy - 7 * u), (cx + 1 * u, cy - 7.5 * u), (cx + 4.5 * u, cy - 6 * u), (cx + 6.5 * u, cy - 3 * u), (cx + 6.5 * u, cy - 2 * u)])
-      icon_line(p, cx - 6.5 * u, cy - 2 * u, cx + 6.5 * u, cy - 2 * u)
-      icon_line(p, cx - 4 * u, cy + 1 * u, cx - 5.5 * u, cy + 5 * u)
-      icon_line(p, cx, cy + 1 * u, cx - 1.5 * u, cy + 5 * u)
-      icon_line(p, cx + 4 * u, cy + 1 * u, cx + 2.5 * u, cy + 5 * u)
+      p.begin_path()
+      p.move_to(cx - 7.5 * u, cy + 4 * u)
+      p.arc(cx - 4.25 * u, cy + 4 * u, 3.25 * u, 3.141592653589793, ICON_TAU)
+      p.arc(cx + 1.75 * u, cy + 4 * u, 4.25 * u, 3.141592653589793, ICON_TAU)
+      p.close_path()
+      p.stroke()
+      icon_line(p, cx - 4.5 * u, cy + 6.5 * u, cx - 5.5 * u, cy + 9.5 * u)
+      icon_line(p, cx + 0.5 * u, cy + 6.5 * u, cx - 0.5 * u, cy + 9.5 * u)
+      icon_line(p, cx + 5.5 * u, cy + 6.5 * u, cx + 4.5 * u, cy + 9.5 * u)
     }
     CloudSnow => {
       let u = s / 9.0
-      icon_outline(p, [(cx - 6.5 * u, cy - 2 * u), (cx - 6.5 * u, cy - 4.5 * u), (cx - 4 * u, cy - 7 * u), (cx + 1 * u, cy - 7.5 * u), (cx + 4.5 * u, cy - 6 * u), (cx + 6.5 * u, cy - 3 * u), (cx + 6.5 * u, cy - 2 * u)])
-      icon_line(p, cx - 6.5 * u, cy - 2 * u, cx + 6.5 * u, cy - 2 * u)
-      icon_dot(p, cx - 4.5 * u, cy + 2.5 * u, 0.8 * u)
-      icon_dot(p, cx, cy + 2.5 * u, 0.8 * u)
-      icon_dot(p, cx + 4.5 * u, cy + 2.5 * u, 0.8 * u)
-      icon_dot(p, cx - 2.2 * u, cy + 5 * u, 0.8 * u)
-      icon_dot(p, cx + 2.2 * u, cy + 5 * u, 0.8 * u)
+      p.begin_path()
+      p.move_to(cx - 7.5 * u, cy + 4 * u)
+      p.arc(cx - 4.25 * u, cy + 4 * u, 3.25 * u, 3.141592653589793, ICON_TAU)
+      p.arc(cx + 1.75 * u, cy + 4 * u, 4.25 * u, 3.141592653589793, ICON_TAU)
+      p.close_path()
+      p.stroke()
+      icon_dot(p, cx - 4.5 * u, cy + 6.5 * u, 0.8 * u)
+      icon_dot(p, cx, cy + 6.5 * u, 0.8 * u)
+      icon_dot(p, cx + 4.5 * u, cy + 6.5 * u, 0.8 * u)
+      icon_dot(p, cx - 2.2 * u, cy + 9 * u, 0.8 * u)
+      icon_dot(p, cx + 2.2 * u, cy + 9 * u, 0.8 * u)
     }
     Droplet => {
       let u = s / 9.0
@@ -1507,18 +1578,18 @@ pub fn draw_icon(
     }
     Lightbulb => {
       let u = s / 9.0
-      icon_outline(p, [(cx - 4.5 * u, cy - 2 * u), (cx - 4.5 * u, cy - 4.5 * u), (cx - 2 * u, cy - 7.5 * u), (cx + 2 * u, cy - 7.5 * u), (cx + 4.5 * u, cy - 4.5 * u), (cx + 4.5 * u, cy - 2 * u), (cx + 2.5 * u, cy + 1.5 * u), (cx - 2.5 * u, cy + 1.5 * u)])
-      icon_line(p, cx - 2 * u, cy + 1.5 * u, cx - 2 * u, cy + 3.5 * u)
-      icon_line(p, cx + 2 * u, cy + 1.5 * u, cx + 2 * u, cy + 3.5 * u)
-      icon_line(p, cx - 2 * u, cy + 3.5 * u, cx + 2 * u, cy + 3.5 * u)
-      icon_line(p, cx - 2.5 * u, cy + 6 * u, cx + 2.5 * u, cy + 6 * u)
-      icon_line(p, cx - 2 * u, cy + 8 * u, cx + 2 * u, cy + 8 * u)
+      icon_circle(p, cx, cy - 4 * u, 4.8 * u)
+      icon_polyline(p, [(cx - 3 * u, cy - 0.8 * u), (cx - 2 * u, cy + 2 * u), (cx + 2 * u, cy + 2 * u), (cx + 3 * u, cy - 0.8 * u)])
+      icon_line(p, cx - 2 * u, cy + 4 * u, cx + 2 * u, cy + 4 * u)
+      icon_line(p, cx - 2.5 * u, cy + 6.5 * u, cx + 2.5 * u, cy + 6.5 * u)
+      icon_line(p, cx - 2 * u, cy + 9 * u, cx + 2 * u, cy + 9 * u)
     }
     Wrench => {
       let u = s / 9.0
-      icon_arc(p, cx - 3 * u, cy - 3.5 * u, 4 * u, -2.4, 1.2)
-      icon_line(p, cx - 1.5 * u, cy + 0.2 * u, cx + 6.8 * u, cy + 6.8 * u)
-      icon_line(p, cx + 4.2 * u, cy + 8 * u, cx + 7.8 * u, cy + 4.4 * u)
+      icon_arc(p, cx - 4 * u, cy - 4 * u, 4.2 * u, 0.7854, 4.3197)
+      icon_line(p, cx - 1.2 * u, cy - 1.2 * u, cx + 6.5 * u, cy + 6.5 * u)
+      icon_line(p, cx + 4 * u, cy + 7.8 * u, cx + 7.8 * u, cy + 4 * u)
+      icon_line(p, cx + 4.9 * u, cy + 6.9 * u, cx + 6.9 * u, cy + 4.9 * u)
     }
     Compass => {
       let u = s / 9.0
