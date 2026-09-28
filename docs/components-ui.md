@@ -733,6 +733,18 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 | `draw_icon(p : Painter, kind, cx, cy, s, color)` | unified self-drawing entry (center coordinates + edge length) |
 | `all_icons()` / `icon_name(kind)` | full list / name lookup |
 
+Quick reference by group (full enum in `yue/icons.mbt` `IconKind`; live wall on the showcase icons page):
+
+| Group | Icons |
+|---|---|
+| Basic | ChevronLeft/Right/Up/Down, ArrowUp/Left/Right/Down, Plus, Minus, Close, Check, Search, Hamburger, Home, Gear, Refresh, Trash, Edit, Save, Star, User(s), Pin, Copy, Download, Upload, Play, Pause, Ellipsis, Grip |
+| Files & editing | Folder(Open/Plus), FileDoc/Code/Plus, Clipboard, Bookmark, Undo, Redo, Scissors, Paste, Bold, Italic, Underline, Type, Align*, ListUl/Ol, Link, Unlink, ExternalLink |
+| View & layout | ZoomIn/Out, Eye(EyeOff), Sun, Moon, Grid, Layout, Sidebar, Move, Expand, Shrink, RotateCw/Ccw, Columns, Rows |
+| Media & messaging | Square, CircleRecord, Volume(Off), Mic, Camera, Image, Music, Mail, Send, MessageCircle, Bell(BellOff/BellRing), Phone, Rss, Globe, Share |
+| System | Power, LogIn/Out, Lock/Unlock, Key, Shield, Database, Server, HardDrive, Monitor, Smartphone, Wifi(Off), Bluetooth, Cpu, Keyboard, Mouse, Battery(Charging), Signal |
+| Data & status | TrendingUp/Down, BarChart, PieChart, TableRows, Info, Warning, Error, Success, Help, Heart, Flag, Clock, Tag, CheckCircle, XCircle, InfoCircle, Loader |
+| Weather & misc | Cloud family (Cloudy/CloudSun/CloudRain/CloudSnow/Upload/Download), Droplet, Thermometer, Wind, ShoppingCart, CreditCard, Gift, Rocket, Trophy, Lightbulb, Wrench, Compass, MapPin, Navigation, Crown, Zap, Layers, Package |
+
 ```moonbit
 @yue.icon(@yue.Search, size=18.0)
 @yue.icon_button_t(@yue.Plus, on_click=fn() { add_row() }, tip="Add row")
