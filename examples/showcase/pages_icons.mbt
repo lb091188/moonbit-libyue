@@ -1,4 +1,4 @@
-// 图标库页:136 个内置矢量图标按十类分组展示,悬停看名称。
+// 图标库页:181 个内置矢量图标按分组展示,悬停看名称。
 // 网格为竖排 vbox 包行(每行 10 个)——外层容器必须 vbox,否则行组被
 // 水平排布、超宽截断(图标墙首版即此 bug)。
 
@@ -28,7 +28,7 @@ fn icon_grid(kinds : Array[@yue.IconKind], per_row : Int) -> @yue.Node {
 /// 图标页各分组共用的演示代码形态:icon 画矢量图标,悬停 tooltip 显名。
 fn icon_group_code(sample : Array[String]) -> Array[String] {
   let head : Array[String] = [
-    "// @yue.icon(图标, size, color):136 个内置矢量图标,颜色默认跟主题",
+    "// @yue.icon(图标, size, color):181 个内置矢量图标,颜色默认跟主题",
     "@yue.hbox([",
   ]
   for line in sample {
@@ -86,6 +86,10 @@ fn page_icons(_app : App) -> @yue.Node {
             @yue.Success,
             @yue.Ellipsis,
             @yue.Grip,
+            @yue.Pin,
+            @yue.UserPlus,
+            @yue.UserCheck,
+            @yue.Users,
           ],
           12,
         ),
@@ -140,6 +144,9 @@ fn page_icons(_app : App) -> @yue.Node {
             @yue.Link,
             @yue.Unlink,
             @yue.ExternalLink,
+            @yue.Type,
+            @yue.ArrowUpDown,
+            @yue.AlignJustify,
           ],
           12,
         ),
@@ -165,6 +172,13 @@ fn page_icons(_app : App) -> @yue.Node {
             @yue.Grid,
             @yue.Layout,
             @yue.Sidebar,
+            @yue.Move,
+            @yue.Expand,
+            @yue.Shrink,
+            @yue.RotateCw,
+            @yue.RotateCcw,
+            @yue.Columns,
+            @yue.Rows,
           ],
           12,
         ),
@@ -189,6 +203,9 @@ fn page_icons(_app : App) -> @yue.Node {
             @yue.SkipForward,
             @yue.CornerUpLeft,
             @yue.CornerUpRight,
+            @yue.Navigation,
+            @yue.MapPin,
+            @yue.Compass,
           ],
           12,
         ),
@@ -237,6 +254,8 @@ fn page_icons(_app : App) -> @yue.Node {
             @yue.Phone,
             @yue.Rss,
             @yue.Globe,
+            @yue.BellRing,
+            @yue.Share,
           ],
           12,
         ),
@@ -324,6 +343,10 @@ fn page_icons(_app : App) -> @yue.Node {
             @yue.Archive,
             @yue.Inbox,
             @yue.ThumbsUp,
+            @yue.CheckCircle,
+            @yue.XCircle,
+            @yue.InfoCircle,
+            @yue.Loader,
           ],
           12,
         ),
@@ -352,6 +375,76 @@ fn page_icons(_app : App) -> @yue.Node {
       code=icon_group_code([
         "  @yue.icon(@yue.TrendingUp, size=18.0),", "  @yue.icon(@yue.BarChart, size=18.0),",
         "  @yue.tooltip_t(@yue.icon(@yue.PieChart, size=18.0), @yue.icon_name(@yue.PieChart)),",
+      ]),
+    ),
+    section(
+      "天气",
+      "天气与环境",
+      "云雨雪/水滴/温度/风;Sun/Moon 在「视图」组。",
+      [
+        icon_grid(
+          [
+            @yue.Cloudy,
+            @yue.CloudSun,
+            @yue.CloudRain,
+            @yue.CloudSnow,
+            @yue.Droplet,
+            @yue.Thermometer,
+            @yue.Wind,
+          ],
+          12,
+        ),
+      ],
+      code=icon_group_code([
+        "  @yue.icon(@yue.Cloudy, size=18.0),", "  @yue.icon(@yue.Thermometer, size=18.0),",
+        "  @yue.tooltip_t(@yue.icon(@yue.Wind, size=18.0), @yue.icon_name(@yue.Wind)),",
+      ]),
+    ),
+    section(
+      "设备",
+      "设备与外设",
+      "键盘/鼠标/耳机/电池/信号。",
+      [
+        icon_grid(
+          [
+            @yue.Keyboard,
+            @yue.Mouse,
+            @yue.Headphones,
+            @yue.Battery,
+            @yue.BatteryCharging,
+            @yue.Signal,
+          ],
+          12,
+        ),
+      ],
+      code=icon_group_code([
+        "  @yue.icon(@yue.Keyboard, size=18.0),", "  @yue.icon(@yue.Battery, size=18.0),",
+        "  @yue.tooltip_t(@yue.icon(@yue.Signal, size=18.0), @yue.icon_name(@yue.Signal)),",
+      ]),
+    ),
+    section(
+      "商业",
+      "商业与物体",
+      "购物/支付/礼赠/百分比/火箭/奖杯/灯泡/扳手/皇冠。",
+      [
+        icon_grid(
+          [
+            @yue.ShoppingCart,
+            @yue.CreditCard,
+            @yue.Gift,
+            @yue.Percent,
+            @yue.Rocket,
+            @yue.Trophy,
+            @yue.Lightbulb,
+            @yue.Wrench,
+            @yue.Crown,
+          ],
+          12,
+        ),
+      ],
+      code=icon_group_code([
+        "  @yue.icon(@yue.ShoppingCart, size=18.0),", "  @yue.icon(@yue.Rocket, size=18.0),",
+        "  @yue.tooltip_t(@yue.icon(@yue.Crown, size=18.0), @yue.icon_name(@yue.Crown)),",
       ]),
     ),
   ])

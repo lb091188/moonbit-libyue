@@ -724,7 +724,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 
 ## Icons
 
-136 built-in vector icons (arrows / file / editing / view / navigation / media / messaging / system / development / data / status, styled after Tabler / Lucide).
+181 built-in vector icons (arrows / file / editing / view / layout / navigation / media / messaging / system / development / data / status / users / weather / devices / commerce, styled after Tabler / Lucide).
 
 | API | Purpose |
 |---|---|
