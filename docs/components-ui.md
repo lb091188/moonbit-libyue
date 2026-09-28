@@ -724,7 +724,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 
 ## Icons
 
-181 built-in vector icons (arrows / file / editing / view / layout / navigation / media / messaging / system / development / data / status / users / weather / devices / commerce, styled after Tabler / Lucide).
+181 built-in vector icons (arrows / file / editing / view / layout / navigation / media / messaging / system / development / data / status / users / weather / devices / commerce, styled after Tabler / Lucide), plus 81 `Yh*` icons generated from an iconfont package (MES form controls / typography / alignment & borders / window actions / menus & sorting / file types / cloud & devices / charts / status; fill-style, `Yh` prefix). Generated set is maintained by `scripts/gen_icons.py <iconfont-package-dir>`, which rewrites the `icons-gen` marker sections in `yue/icons.mbt` — do not hand-edit those sections.
 
 | API | Purpose |
 |---|---|
