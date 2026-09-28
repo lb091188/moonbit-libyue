@@ -164,7 +164,7 @@ fn res_card(
 fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
   let cards : Array[@yue.Node] = [
     res_card(
-      @yue.Cpu,
+      @yue.YhCpu,
       "处理器",
       app.card_cpu,
       Some(app.cpu_hist),
@@ -172,9 +172,9 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
       VCpu,
       y_range=Some((0.0, 100.0)),
     ),
-    res_card(@yue.Database, "内存", app.card_mem, Some(app.mem_hist), view, VMem),
+    res_card(@yue.YhDatabase, "内存", app.card_mem, Some(app.mem_hist), view, VMem),
     res_card(
-      @yue.Wifi,
+      @yue.YhWifi,
       "网络",
       app.card_net,
       Some(app.net_hist),
@@ -198,7 +198,7 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
     }
     cards.push(
       res_card(
-        @yue.HardDrive,
+        @yue.YhSever,
         title,
         app.card_disk_vals[i],
         Some(app.disk_hists[i]),
@@ -213,7 +213,7 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
   for i in 0..<app.card_gpu_vals.length() {
     cards.push(
       res_card(
-        @yue.Monitor,
+        @yue.YhMonitor,
         "显卡 \{i + 1}",
         app.card_gpu_vals[i],
         None,
@@ -223,7 +223,7 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
     )
   }
   cards.push(
-    res_card(@yue.TableRows, "进程", app.card_proc, None, view, VProc),
+    res_card(@yue.YhTable, "进程", app.card_proc, None, view, VProc),
   )
   @yue.scroll(
     @yue.vbox(cards, style=[("padding", 10.0)]),

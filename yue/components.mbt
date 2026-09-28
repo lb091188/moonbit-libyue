@@ -7311,9 +7311,9 @@ pub fn side_menu_sections(
             draw_icon(
               p,
               if open.val {
-                ChevronDown
+                YhCaretDownSmall
               } else {
-                ChevronRight
+                YhCaretRightSmall
               },
               b.width - 14.0,
               b.height / 2.0,
