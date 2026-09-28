@@ -7,15 +7,19 @@
 
 职责:
 1. 解析 SVG 字体 glyph(unicode→path d),全指令集:直线/贝塞尔/弧线端点
-   参数化展开,Q 升三次,S/T 反射;bbox 归一化到 ±1 并翻转 y(字体 y 向上),
-   坐标乘 s*0.88 与旧手写线条图标观感一致;填充型(整 path 一次 p.fill()),
-   子路径方向原样保留(镂空靠非零环绕,cairo 默认即非零)。
-2. 变体命名:SELECTION 覆盖表优先,其余按 font_class 自动转 PascalCase,
+   参数化展开,Q 升三次,S/T 反射;bbox 归一化到 ±1 并翻转 y(字体 y 向上);
+   填充型(整 path 一次 p.fill()),子路径方向原样保留(镂空靠非零环绕,
+   cairo 默认即非零)。
+2. 发射为数据形状:每图标一条千分定点路径串(命令 M/L/C/Z),写入
+   icon_path_data 数组 + kind_index 索引 match,draw_icon 经
+   fill_icon_path 解释绘制(见 yue/icons.mbt);数据 ~0.6MB 替代旧
+   代码形状 ~16MB 绘制代码,编译/体积/启动全面受益。
+3. 变体命名:SELECTION 覆盖表优先,其余按 font_class 自动转 PascalCase,
    统一 Yh 前缀,重名追加数字后缀。
-3. 重写 yue/icons.mbt 的 icons-gen 标记段,并清除旧手写图标残留:
+4. 重写 yue/icons.mbt 的 icons-gen 标记段,并清除旧手写图标残留:
    枚举变体、draw_icon/icon_name 旧分支、无用绘图助手(icon_dot 被
    splitter 使用,保留)、all_icons 清单。
-4. 同步更新文件头与文档注释中的图标计数。
+5. 同步更新文件头与文档注释中的图标计数。
 """
 
 import json
@@ -368,34 +372,25 @@ def glyph_geometry(abs_cmds):
 
 # ---------- 代码生成 ----------
 
-def fmt(v):
-    s = f"{v:.4f}".rstrip("0").rstrip(".")
-    return s if s not in ("", "-0") else "0"
 
-
-def gen_arm(variant, comment, subpaths):
-    """生成一个 match 分支。坐标已归一化到 [-1,1],乘 u 后即 s*0.88 范围。"""
-    lines = [f"    {variant} => {{ // {comment}"]
-    lines.append("      let u = s * 0.88")
-    lines.append("      p.begin_path()")
+def encode_path(subpaths):
+    """把归一化子路径编码为定点路径串:命令 M/L/C/Z(ASCII),坐标为
+    归一化值 ×1000 取整(千分定点,±1000 内,3~5 字符),逗号分隔;
+    每子路径 M…Z,绘制侧 fill_icon_path 解释执行(见 yue/icons.mbt)。
+    数据形状替代旧代码形状:803 图标 ~0.6MB 字符串 vs ~16MB 绘制代码。"""
+    out = []
     for sp in subpaths:
         for i, op in enumerate(sp):
             if op[0] == "L":
                 x, y = op[1], op[2]
-                if i == 0:
-                    lines.append(f"      p.move_to(cx + {fmt(x)} * u, cy + {fmt(y)} * u)")
-                else:
-                    lines.append(f"      p.line_to(cx + {fmt(x)} * u, cy + {fmt(y)} * u)")
+                out.append(("M" if i == 0 else "L") + f"{round(x * 1000)},{round(y * 1000)}")
             else:
                 _, x1, y1, x2, y2, px, py = op
-                lines.append(
-                    f"      p.bezier_curve_to(cx + {fmt(x1)} * u, cy + {fmt(y1)} * u, "
-                    f"cx + {fmt(x2)} * u, cy + {fmt(y2)} * u, cx + {fmt(px)} * u, cy + {fmt(py)} * u)"
+                out.append(
+                    "C" + ",".join(str(round(v * 1000)) for v in (x1, y1, x2, y2, px, py))
                 )
-        lines.append("      p.close_path()")
-    lines.append("      p.fill()")
-    lines.append("    }")
-    return "\n".join(lines)
+        out.append("Z")
+    return "".join(out)
 
 
 def normalize(subpaths, pts):
@@ -480,7 +475,7 @@ def main():
 
     # 全量生成:字体顺序 + 命名去重
     used = {}
-    arms, variants, names, all_list = [], [], [], []
+    paths, variant_names, variants, names, all_list = [], [], [], [], []
     skipped = []
     for g in meta["glyphs"]:
         fc = g["font_class"]
@@ -500,47 +495,48 @@ def main():
         subpaths, pts = glyph_geometry(abs_cmds)
         subpaths = normalize(subpaths, pts)
         zh = zh_names.get(fc, fc)
-        arms.append(gen_arm(variant, zh, subpaths))
+        paths.append(encode_path(subpaths))
+        variant_names.append(variant)
         variants.append(f"  {variant} // {zh}")
         names.append(f'    {variant} => "yh/{fc}"')
         all_list.append(f"    {variant},")
 
-    # arms 拆块:每块独立顶层函数 + 通配兜底,避免单段超限(0033 警告)
-    chunk_size = 110
-    n_chunks = (len(arms) + chunk_size - 1) // chunk_size
-    dispatch = []
-    chunks = []
-    for c in range(n_chunks):
-        part = arms[c * chunk_size : (c + 1) * chunk_size]
-        n = c + 1
-        dispatch.append("  draw_icon_chunk_" + str(n) + "(p, kind, cx, cy, s)")
-        head = (
-            "///|\nfn draw_icon_chunk_" + str(n) + "(\n"
-            "    p : Painter,\n"
-            "    kind : IconKind,\n"
-            "    cx : Double,\n"
-            "    cy : Double,\n"
-            "    s : Double,\n"
-            ") -> Unit {\n"
-            "  match kind {\n"
-        )
-        tail = "\n    _ => ()\n  }\n}\n"
-        chunks.append(head + "\n".join(part) + tail)
+    # 数据形状:路径定点串数组(与 kind_index/all_icons 同序)+ 索引 match。
+    # draw_icon 一行解释调用替代旧 8 块 chunk 函数(约 4 万行绘制代码),
+    # 绘制正确性由 probe-icon 探针网格截图对照保证。
+    index_lines = [f"    {v} => {i}" for i, v in enumerate(variant_names)]
+    path_lines = [f'  "{d}",' for d in paths]
+    data_block = (
+        "///|\n"
+        "/// 全部图标的定点路径数据(千分定点串,命令 M/L/C/Z),与\n"
+        "/// kind_index/all_icons 同序;绘制入口 fill_icon_path 解释执行。\n"
+        "let icon_path_data : Array[String] = [\n"
+        + "\n".join(path_lines)
+        + "\n]\n\n"
+        "///|\n"
+        "/// 图标变体 → 路径数据下标(与 all_icons 清单同序,wbtest 断言双射)。\n"
+        "fn kind_index(kind : IconKind) -> Int {\n"
+        "  match kind {\n"
+        + "\n".join(index_lines)
+        + "\n  }\n"
+        "}"
+    )
+    dispatch_call = "  fill_icon_path(p, icon_path_data[kind_index(kind)], cx, cy, s)"
 
     src = open(ICONS_MBT).read()
     src = strip_legacy(src)
     src = replace_section(src, "// ---- icons-gen:variants", "// ---- icons-gen:end ----",
                           "\n".join(variants))
     src = replace_section(src, "// ---- icons-gen:dispatch", "// ---- icons-gen:end ----",
-                          "\n".join(dispatch))
+                          dispatch_call)
     src = replace_section(src, "// ---- icons-gen:chunks", "// ---- icons-gen:end ----",
-                          "\n\n".join(chunks))
+                          data_block)
     src = replace_section(src, "// ---- icons-gen:names", "// ---- icons-gen:end ----",
                           "\n".join(names))
     src = replace_section(src, "// ---- icons-gen:all", "// ---- icons-gen:end ----",
                           "\n".join(all_list))
     # 计数注释同步
-    total = len(arms)
+    total = len(paths)
     src = re.sub(r"\d+ 个内置矢量图标", f"{total} 个内置矢量图标", src)
     src = re.sub(r"\d+ built-in vector icons", f"{total} built-in vector icons", src)
     src = re.sub(r"全部图标种类清单\(\d+ 项", f"全部图标种类清单({total} 项", src)

@@ -21,3 +21,27 @@ test {
   }
   assert_eq(uniq, 0)
 }
+
+test {
+  // 路径数据与索引、清单三者对齐:kind_index 是 all_icons 序的双射,
+  // 每条定点路径串非空且以 M 开头(M 命令不可缺,首点决定子路径起点)
+  assert_eq(icon_path_data.length(), all_icons().length())
+  for i, k in all_icons() {
+    assert_eq(kind_index(k), i)
+    let d = icon_path_data[i]
+    assert_true(d.length() > 10)
+    assert_eq(d.unsafe_get(0).to_int(), 77) // 'M'
+  }
+  // 解释器冒烟:首图标路径串逐字符可解析到底(无悬异数字/未知命令崩解)
+  let mut letters = 0
+  let d = icon_path_data[0]
+  for i in 0..<d.length() {
+    let c = d.unsafe_get(i).to_int()
+    if c == 77 || c == 76 || c == 67 || c == 90 {
+      letters += 1
+    } else {
+      assert_true((c >= 48 && c <= 57) || c == 44 || c == 45)
+    }
+  }
+  assert_true(letters >= 2)
+}

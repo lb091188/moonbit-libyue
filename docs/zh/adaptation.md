@@ -14,6 +14,8 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 口径:Ubuntu 24.04 XFCE(X11)同机同会话,启动差值小于检测粒度视为持平。C++ 侧 `-std=c++20 -O2 -DNDEBUG`;头文件用同版 fork 树(nativeui)+ 预构建配套树(base/build,并把 `base/allocator/partition_allocator/src` 补为 include 根);缺 `-DNDEBUG` 会缺 `RefCountedBase::CalledOnValidSequence` 符号,链接失败。
 
+图标数据的形状对比(803 个 iconfont 图标,debug 构建,2026-09-29):「代码形状」(每图标展开为 Painter 调用 match 分支)换「数据形状」(千分定点路径串 + `fill_icon_path` 解释绘制,`scripts/gen_icons.py` 发射)前后——`yue/icons.mbt` 51k 行/3.5MB → 4.3k 行/0.7MB;showcase.exe 23.7MB → 14.9MB(hello 同步 7.9 → 7.5MB);yue 包增量编译 6.8s → 0.78s;showcase 窗口 map 41ms → 7~9ms。绘制正确性以 probe-icon 全量网格截图对照旧形态(线条/填充/镂空一致);一帧可见图标 ≤ 百级 × 每图标几百字符解析,微秒级,无需缓存。教训:生成器发射「代码」还是发射「数据」差一个数量级——大量重复几何描述永远选数据形状 + 小解释器。
+
 ## 跨平台通用(构建链 / FFI)
 
 ### 构建与链接
