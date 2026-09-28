@@ -624,6 +624,15 @@ void yue_mbt_view_layout(void *view) {
   }
 }
 
+// 直接改写包围盒(相对父视图,像素):GTK 上运行期 SetStyleProperty
+// 改布局属性后重排不落地(探针实测 width/flexbasis 全不生效),需要
+// 运行期改几何的自绘布局件(splitter 拖动)由此直写 bounds。
+void yue_mbt_view_set_bounds(void *view, double x, double y, double w, double h) {
+  if (auto *v = CastToView(view)) {
+    v->SetBounds(nu::RectF(x, y, w, h));
+  }
+}
+
 // 布局重算 + 根级整窗重绘:显隐页切换后,子树 Invalidate 会被 Scroll
 // 视口裁成碎片(实测只剩 24 高),页区域与失效区不相交致整块不画;
 // 布局稳定后对根 SchedulePaint,一次全窗重绘兜底。

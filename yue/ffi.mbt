@@ -933,6 +933,16 @@ extern "c" fn ffi_view_set_borderless(view : View, on : Int) -> Unit = "yue_mbt_
 extern "c" fn ffi_view_layout(view : View) -> Unit = "yue_mbt_view_layout"
 
 ///|
+#borrow(view)
+extern "c" fn ffi_view_set_bounds(
+  view : View,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+) -> Unit = "yue_mbt_view_set_bounds"
+
+///|
 #borrow(view, font)
 extern "c" fn ffi_view_set_font(view : View, font : Font) -> Unit = "yue_mbt_view_set_font"
 

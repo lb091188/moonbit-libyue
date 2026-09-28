@@ -210,6 +210,13 @@ impl ViewLike with fn update_layout(self) -> Unit {
 }
 
 ///|
+/// 直接改写包围盒(相对父视图,像素):运行期几何由调用方自管时使用,
+/// 如 splitter 拖动(GTK 上运行期改布局样式重排不落地,探针实测)。
+pub fn[T : ViewLike] set_view_bounds(v : T, x : Double, y : Double, w : Double, h : Double) -> Unit {
+  ffi_view_set_bounds(v.view(), x, y, w, h)
+}
+
+///|
 /// 布局重算 + 根级整窗重绘:显隐页(页签切换)后,子树的局部失效会被
 /// Scroll 视口裁成碎片、与恢复后的页区域不相交致整块不画
 /// (Windows 实测);布局稳定后对根做一次整窗重绘兜底。滚动等高频
