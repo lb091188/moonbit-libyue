@@ -2,7 +2,7 @@
 // 事件回显是「事件 → 文本」直写,手动接线即最直白表达。
 
 ///|
-pub fn page_events(_app : @ui.App) -> @yue.Node {
+pub fn page_events(app : @ui.App) -> @yue.Node {
   let evt_mouse : @yue.Store[String] = @yue.Store::new(
     "(移入色块区操作)",
   )
@@ -172,6 +172,23 @@ pub fn page_events(_app : @ui.App) -> @yue.Node {
         "// View::set_cursor 切换悬停光标(c 为任意容器句柄)", "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Hand))",
         "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Text))", "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Crosshair))",
         "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.NotAllowed))", "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Default))",
+      ],
+    ),
+    @ui.section(
+      "键盘",
+      "键盘钩子",
+      "窗口级 on_key_down 全局生效(按任意键试试);describe 输出如 Ctrl+A。",
+      [
+        @yue.bind_label(app.key_info, fn(s) { "最后按键:\{s}" }, style=[
+          ("marginBottom", 8.0),
+        ]),
+      ],
+      code=[
+        "// 窗口级键盘钩子(窗口 handle 里注册,全局生效)",
+        "w.on_key_down(fn(e) {",
+        "  println(\"\\{e.describe()}(键码 \\{e.code})\")",
+        "  false   // 返回 true 吃掉事件",
+        "})",
       ],
     ),
     @ui.section(
