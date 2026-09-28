@@ -130,30 +130,25 @@ fn main {
                         "原生与自绘",
                         ["原生控件", "画布与富文本"],
                       ),
-                      (
-                        "系统能力",
-                        [
-                          "系统集成", "窗口", "浏览器",
-                        ],
-                      ),
+                      ("系统能力", ["系统集成", "窗口", "浏览器"]),
                     ],
                     selected,
                     icons=[
-                      ("基础组件", @yue.Grid),
-                      ("图标库", @yue.Star),
-                      ("表单组件", @yue.Edit),
-                      ("导航组件", @yue.Hamburger),
-                      ("数据展示", @yue.BarChart),
-                      ("图表", @yue.PieChart),
-                      ("反馈组件", @yue.MessageCircle),
-                      ("代码与文档", @yue.Code),
-                      ("事件与布局", @yue.Zap),
-                      ("Store 对照", @yue.Refresh),
-                      ("原生控件", @yue.Monitor),
-                      ("画布与富文本", @yue.Image),
-                      ("系统集成", @yue.Gear),
-                      ("窗口", @yue.Square),
-                      ("浏览器", @yue.Globe),
+                      ("基础组件", @yue.YhAppstore),
+                      ("图标库", @yue.YhStarFill),
+                      ("表单组件", @yue.YhEdit1),
+                      ("导航组件", @yue.YhMenu),
+                      ("数据展示", @yue.YhBarchart),
+                      ("图表", @yue.YhPieChart),
+                      ("反馈组件", @yue.YhChatRound),
+                      ("代码与文档", @yue.YhCode),
+                      ("事件与布局", @yue.YhThunderbolt),
+                      ("Store 对照", @yue.YhReload),
+                      ("原生控件", @yue.YhMonitor1),
+                      ("画布与富文本", @yue.YhImage1),
+                      ("系统集成", @yue.YhSetting1),
+                      ("窗口", @yue.YhFullscreen),
+                      ("浏览器", @yue.YhEarth),
                     ],
                   ),
                 ],
@@ -163,30 +158,31 @@ fn main {
             ),
             @yue.hbox(
               [
-                @yue.label_t(
-                  "V\{@yue.VERSION}",
-                  role=@yue.Secondary,
-                ),
+                @yue.label_t("V\{@yue.VERSION}", role=@yue.Secondary),
                 // 图标随状态切换:bind_node 订阅 dark_mode 信号,变化时
                 // 重挂整棵子树(低频切换的正解;高频场景用 bind 文本
                 // 绑定或 handle 命令式改属性)
                 @yue.bind_node(app.dark_mode.signal(), fn(dark) {
                   @yue.icon_button_t(
-                    if dark { @yue.Sun } else { @yue.Moon },
+                    if dark {
+                      @yue.YhSunny
+                    } else {
+                      @yue.YhMoon
+                    },
                     on_click=fn() { app.dark_mode.update(fn(v) { !v }) },
                     tip=if dark { "切换到浅色" } else { "切换到深色" },
-                    size=22.0,
+                    size=30.0,
+                    style=[("marginLeft", 20.0)],
                   )
                 }),
               ],
-                  style=[
-                    ("marginLeft",20.0),
-                    ("paddingLeft", 20.0),
-                    ("paddingTop", 6.0),
-                    ("paddingBottom", 10.0),
-                  ],
-
-            )
+              style=[
+                ("marginLeft", 20.0),
+                ("paddingLeft", 20.0),
+                ("paddingTop", 6.0),
+                ("paddingBottom", 10.0),
+              ],
+            ),
           ],
           style=[("width", 180.0)],
           handle=fn(c) {
@@ -214,7 +210,11 @@ fn main {
             @ui.nav_page("窗口", selected, @pages.page_window(app)),
             @ui.nav_page("浏览器", selected, @pages.page_browser(app)),
             @ui.nav_page("原生控件", selected, @pages.page_native(app)),
-            @ui.nav_page("画布与富文本", selected, @pages.page_canvas(app)),
+            @ui.nav_page(
+              "画布与富文本",
+              selected,
+              @pages.page_canvas(app),
+            ),
           ],
           style=[("flex", 1.0)],
           handle=fn(c) {
