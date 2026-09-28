@@ -725,7 +725,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 
 ## 图标
 
-内置矢量图标 181 种（箭头 / 文件 / 编辑 / 视图 / 布局 / 导航 / 媒体 / 通信 / 系统 / 开发 / 数据 / 状态 / 用户 / 天气 / 设备 / 商业，风格对齐 Tabler / Lucide），另有 81 种 `Yh*` 图标由 iconfont 包生成（MES 表单控件 / 文本排版 / 对齐与边框 / 窗口操作 / 菜单排序 / 文件类型 / 云与设备 / 图表 / 状态反馈，填充风格，`Yh` 前缀）。生成集由 `scripts/gen_icons.py <iconfont包目录>` 维护，重写 `yue/icons.mbt` 中 `icons-gen` 标记之间的段落，标记内勿手改。
+内置矢量图标 803 种，全部由 iconfont 包（元海公共库，MES 场景）经 `scripts/gen_icons.py <iconfont包目录>` 生成：SVG 字体轮廓（贝塞尔/弧线）翻译为 Painter 原语，bbox 归一化 + y 翻转，填充风格，统一 `Yh*` 前缀（如 `YhFilePdf`、`YhCaretRightSmall`）；`icon_name` 返回 `yh/<font_class>`。覆盖表单表格 / 编辑排版 / 方向翻页 / 布局视图 / 文件文档 / 云运维 / 设备 / 图表 / 通信 / 用户 / 安全 / 时间 / 状态 / 金融商业 / 系统工具 / 天气饮食 / 媒体出行 / 品牌平台等分组，showcase 图标页按组展示（该页由 `scripts/gen_showcase_icons.py` 生成）。换图标库 = 把新包目录传给 `scripts/gen_icons.py` 重跑，`icons-gen` 标记段落勿手改。
 
 | API | 用途 |
 |---|---|
@@ -747,7 +747,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 | 天气与其他 | Cloud(全家:Cloudy/CloudSun/CloudRain/CloudSnow/Upload/Download)、Droplet、Thermometer、Wind、ShoppingCart、CreditCard、Gift、Rocket、Trophy、Lightbulb、Wrench、Compass、MapPin、Navigation、Crown、Zap、Layers、Package |
 
 ```moonbit
-@yue.icon(@yue.Search, size=18.0)
+@yue.icon(@yue.YhSearch2, size=18.0)
 @yue.icon_button_t(@yue.Plus, on_click=fn() { add_row() }, tip="新增一行")
 
 // 自绘入口(在 on_draw 回调里):
@@ -764,7 +764,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 
 ```moonbit
 @yue.alert("保存成功", @yue.Success)
-@yue.alert_closeable("有新版本可用", @yue.Info)
+@yue.alert_closeable("有新版本可用", @yue.YhInfoCircleFill)
 ```
 
 ### 结果页 result
