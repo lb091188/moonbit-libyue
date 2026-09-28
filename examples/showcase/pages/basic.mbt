@@ -137,42 +137,6 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
       ],
     ),
     @ui.section(
-      "悬浮滚动",
-      "OverlayScroll 悬浮滚动条",
-      "滚动/悬停右缘浮现主题色细条,停顿渐隐,可拖拽;平台原生滚动条隐藏(Windows 经典条常驻占位,悬浮形态由组件统一)。滚动或拖拽右缘体验。",
-      [
-        @yue.overlay_scroll(
-          @yue.vbox(
-            [
-              @yue.label_t(
-                "滚动内容区(悬浮滚动条演示)",
-                role=@yue.Section,
-              ),
-              @yue.label("第 1 行:滚动或拖动右缘细条"),
-              @yue.label("第 2 行:停顿约一秒细条渐隐"),
-              @yue.label("第 3 行:悬停细条保持显示"),
-              @yue.label("第 4 行:按住可拖拽"),
-              @yue.label("第 5 行"),
-              @yue.label("第 6 行"),
-              @yue.label("第 7 行"),
-              @yue.label("第 8 行"),
-              @yue.label("第 9 行"),
-              @yue.label("第 10 行:到底部了"),
-            ],
-            style=[("padding", 10.0)],
-          ),
-          style=[("height", 180.0)],
-        ),
-      ],
-      code=[
-        "// 平台原生条隐藏,自绘主题色细条:滚动/悬停浮现,停顿渐隐",
-        "@yue.overlay_scroll(", "  @yue.vbox(", "    [", "      @yue.label(\"第 1 行\"),",
-        "      @yue.label(\"第 2 行\"),", "      // …更多内容", "    ],",
-        "    style=[(\"padding\", 10.0)],", "  ),", "  style=[(\"height\", 180.0)],",
-        ")",
-      ],
-    ),
-    @ui.section(
       "悬停组",
       "HoverGroup 悬停组",
       "组内任意位置(含子控件)悬停即整组进入 hover 态:把指针移到卡片里的按钮或输入框上,整张卡片同样高亮且光标变手型——GTK 下子控件的事件窗口会独占指针事件,组件用指针位置轮询判定,不依赖 enter/leave,不闪烁。",

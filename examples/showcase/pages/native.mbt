@@ -364,7 +364,7 @@ pub fn page_native(_app : @ui.App) -> @yue.Node {
     @ui.section(
       "滚动",
       "滚动区 Scroll(平台滚动条)",
-      "平台经典滚动条的 Automatic/Always/Never 策略切换(悬浮形态见基础组件页 OverlayScroll;其余页面默认悬浮细条)。",
+      "平台经典滚动条的 Automatic/Always/Never 策略切换(declarative scroll 默认悬浮细条,本段 overlay=false 保住平台条语义)。",
       [
         @yue.scroll(
           @yue.vbox([
