@@ -12,23 +12,6 @@
 const SHOWCASE_TITLE : String = "组件库演示板"
 
 ///|
-/// 主区页面:挂载后订阅导航状态做 set_visible 切换。
-fn page(
-  name : String,
-  selected : @yue.Store[String],
-  content : @yue.Node,
-) -> @yue.Node {
-  @yue.vbox([content], style=[("flex", 1.0)], handle=fn(c) {
-    fn apply(s : String) -> Unit {
-      c.set_visible(s == name)
-    }
-
-    apply(selected.get())
-    selected.subscribe(apply)
-  })
-}
-
-///|
 fn main {
   if !@yue.initialize() {
     return
@@ -220,22 +203,22 @@ fn main {
                 @yue.on_theme_change(apply)
               },
             ),
-            page("基础组件", selected, @pages.page_basic(app)),
-            page("图标库", selected, @pages.page_icons(app)),
-            page("表单组件", selected, @pages.page_form(app)),
-            page("事件与布局", selected, @pages.page_events(app)),
-            page("导航组件", selected, @pages.page_nav(app)),
-            page("数据展示", selected, @pages.page_data(app)),
-            page("图表", selected, @pages.page_charts(app)),
-            page("代码与文档", selected, @pages.page_code(app)),
-            page("反馈组件", selected, @pages.page_feedback(app)),
-            page("Store 对照", selected, @pages.page_store_demo(app)),
-            page("系统集成", selected, @pages.page_system(app)),
-            page("窗口", selected, @pages.page_window(app)),
-            page("浏览器", selected, @pages.page_browser(app)),
-            page("原生控件", selected, @pages.page_native(app)),
-            page("画布与富文本", selected, @pages.page_canvas(app)),
-            page("环境与平台", selected, @pages.page_env(app)),
+            @ui.page("基础组件", selected, @pages.page_basic(app)),
+            @ui.page("图标库", selected, @pages.page_icons(app)),
+            @ui.page("表单组件", selected, @pages.page_form(app)),
+            @ui.page("事件与布局", selected, @pages.page_events(app)),
+            @ui.page("导航组件", selected, @pages.page_nav(app)),
+            @ui.page("数据展示", selected, @pages.page_data(app)),
+            @ui.page("图表", selected, @pages.page_charts(app)),
+            @ui.page("代码与文档", selected, @pages.page_code(app)),
+            @ui.page("反馈组件", selected, @pages.page_feedback(app)),
+            @ui.page("Store 对照", selected, @pages.page_store_demo(app)),
+            @ui.page("系统集成", selected, @pages.page_system(app)),
+            @ui.page("窗口", selected, @pages.page_window(app)),
+            @ui.page("浏览器", selected, @pages.page_browser(app)),
+            @ui.page("原生控件", selected, @pages.page_native(app)),
+            @ui.page("画布与富文本", selected, @pages.page_canvas(app)),
+            @ui.page("环境与平台", selected, @pages.page_env(app)),
           ],
           style=[("flex", 1.0)],
           handle=fn(c) {

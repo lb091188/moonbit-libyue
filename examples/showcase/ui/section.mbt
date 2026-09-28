@@ -63,6 +63,24 @@ pub fn scroll_page(secs : Array[Section]) -> @yue.Node {
 }
 
 ///|
+/// 主区页面:挂载后订阅导航状态做 set_visible 切换(侧栏菜单/segmented/
+/// 面包屑共享同一导航 Store)。
+pub fn page(
+  name : String,
+  selected : @yue.Store[String],
+  content : @yue.Node,
+) -> @yue.Node {
+  @yue.vbox([content], style=[("flex", 1.0)], handle=fn(c) {
+    fn apply(s : String) -> Unit {
+      c.set_visible(s == name)
+    }
+
+    apply(selected.get())
+    selected.subscribe(apply)
+  })
+}
+
+///|
 /// 选中段的正文:标题 + 演示 + 说明 + 代码(带复制行);容器随页面
 /// selected 切换显隐。
 fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
