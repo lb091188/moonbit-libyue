@@ -16,12 +16,14 @@ fn is_linux() -> Bool {
 const SHOWCASE_TITLE : String = "组件库演示板"
 
 ///|
-/// 一段演示:标题 + 一句说明 + 演示区 + 分隔留白。
-/// 标题/说明走 label_t 文字角色(Section / Secondary)。
+/// 一段演示:标题 + 一句说明 + 演示区 + (可选)演示代码折叠块 + 分隔留白。
+/// 标题/说明走 label_t 文字角色(Section / Secondary);code 传入时在
+/// 演示区下方挂折叠代码块,内容是该章节最小自包含的演示代码(可复制)。
 fn section(
   title : String,
   desc : String,
   content : Array[@yue.Node],
+  code? : Array[String] = [],
 ) -> @yue.Node {
   let t = @yue.label_t(title, role=@yue.Section, style=[
     ("marginBottom", 4.0),
@@ -32,6 +34,9 @@ fn section(
   let nodes : Array[@yue.Node] = [t, d]
   for c in content {
     nodes.push(c)
+  }
+  if code.length() > 0 {
+    nodes.push(code_block(code))
   }
   nodes.push(@yue.separator(style=[("marginTop", 4.0), ("marginBottom", 20.0)]))
   @yue.vbox(nodes, style=[("marginBottom", 6.0)])

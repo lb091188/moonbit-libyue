@@ -68,6 +68,19 @@ fn page_window(_app : App) -> @yue.Node {
           }),
         ]),
       ],
+      code=[
+        "// w 为窗口句柄(挂载时经 handle 取得)",
+        "w.set_title(\"components · 标题已改\")",
+        "if w.is_maximized() {",
+        "  w.unmaximize()",
+        "} else {",
+        "  w.maximize()",
+        "}",
+        "w.set_fullscreen(!w.is_fullscreen())",
+        "w.set_always_on_top(true)",
+        "w.set_content_size(880.0, 720.0)",
+        "w.activate()",
+      ],
     ),
     section(
       "全局快捷键",
@@ -87,6 +100,13 @@ fn page_window(_app : App) -> @yue.Node {
             win.toast_push("全局快捷键已清空", @yue.Warning)
           }),
         ]),
+      ],
+      code=[
+        "// 应用外生效的系统快捷键",
+        "ignore(@yue.register_global_shortcut(\"Ctrl+Alt+C\", fn() {",
+        "  println(\"触发!\")",
+        "}))",
+        "@yue.unregister_all_global_shortcuts()",
       ],
     ),
     section(
@@ -128,6 +148,20 @@ fn page_window(_app : App) -> @yue.Node {
           },
         ),
       ],
+      code=[
+        "// c 为接收区容器句柄;注册类型后按序挂三个处理器",
+        "c.register_dragged_types([@yue.FilePaths, @yue.Text, @yue.Image])",
+        "c.handle_drag_enter(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })",
+        "// drag-update 不注册则一律拒绝(drop 永不发生)",
+        "c.handle_drag_update(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })",
+        "c.handle_drop(fn(info, _x, _y) {",
+        "  match info.get_data(@yue.FilePaths) {",
+        "    Some(@yue.Paths(paths)) => println(\"拖入 \\{paths.length()} 个文件\")",
+        "    _ => ()",
+        "  }",
+        "  true",
+        "})",
+      ],
     ),
     section(
       "拖出发起",
@@ -151,6 +185,17 @@ fn page_window(_app : App) -> @yue.Node {
             })
           },
         ),
+      ],
+      code=[
+        "// do_drag_file_paths 发起系统拖拽(第二个参数为拖动跟随图)",
+        "let img : @yue.Image? = match @yue.read_binary_file(\"icon.png\") {",
+        "  Some(bytes) => Some(@yue.Image::new_from_png(bytes))",
+        "  None => None",
+        "}",
+        "c.on_mouse_down(fn(_e) {",
+        "  ignore(c.do_drag_file_paths([\"icon.png\"], img))",
+        "  true",
+        "})",
       ],
     ),
   ])
