@@ -79,6 +79,22 @@ fn page_system(app : App) -> @yue.Node {
           }),
         ]),
       ],
+      code=[
+        "// 模态对话框:w 为父窗口句柄",
+        "let dlg = @yue.FileDialog::new_open()",
+        "dlg.set_filters(\"文本文件:txt,md|所有文件:*\")",
+        "if dlg.run_for_window(w) {",
+        "  println(\"已选 \\{dlg.get_result()}\")",
+        "} else {",
+        "  println(\"已取消\")",
+        "}",
+        "// 保存:预设文件名 + 写文件",
+        "let save = @yue.FileDialog::new_save()",
+        "save.set_filename(\"components.txt\")",
+        "if save.run_for_window(w) {",
+        "  ignore(@yue.write_text_file(save.get_result(), \"内容\\n\"))",
+        "}",
+      ],
     ),
     section(
       "消息框",
@@ -117,6 +133,16 @@ fn page_system(app : App) -> @yue.Node {
           }),
         ]),
       ],
+      code=[
+        "// 原生 MessageBox:标题/正文/按钮,响应 id 回传",
+        "let mb = @yue.MessageBox::new(@yue.Information)",
+        "mb.set_title(\"确认操作\")",
+        "mb.set_text(\"要执行该操作吗?\")",
+        "mb.add_button(\"确定\", 1)",
+        "mb.add_button(\"取消\", 2)",
+        "mb.on_response(fn(code) { println(\"响应 id=\\{code}\") })",
+        "mb.show_for_window(w)",
+      ],
     ),
     section(
       "系统通知",
@@ -146,6 +172,18 @@ fn page_system(app : App) -> @yue.Node {
           }),
         ]),
       ],
+      code=[
+        "// Notification::show() 走系统通知中心",
+        "let n = @yue.Notification::new()",
+        "n.set_title(\"components 演示\")",
+        "n.set_body(\"这是一条系统通知。\")",
+        "n.show()",
+        "// 带操作按钮:",
+        "n.set_actions([(\"查看\", \"view\"), (\"忽略\", \"ignore\")])",
+        "// 静默入中心(不发声不打扰):",
+        "n.set_silent(true)",
+        "@yue.NotificationCenter::add(n)",
+      ],
     ),
     section(
       "剪贴板",
@@ -172,6 +210,12 @@ fn page_system(app : App) -> @yue.Node {
           }),
         ]),
       ],
+      code=[
+        "@yue.Clipboard::get().set_text(\"剪贴板内容\")",
+        "let t = @yue.Clipboard::get().get_text()",
+        "// set_data 写富文本(Kind: Text/Html/FilePaths)",
+        "@yue.Clipboard::get().set_data(@yue.Html, \"<b>富文本</b>\")",
+      ],
     ),
     section(
       "定时器与延迟任务",
@@ -190,6 +234,15 @@ fn page_system(app : App) -> @yue.Node {
             })
           }),
         ]),
+      ],
+      code=[
+        "// set_timeout 单次;set_timer 周期(返回 false 停)",
+        "ignore(@yue.set_timeout(1500, fn() { println(\"延时任务\") }))",
+        "let n = Ref(0)",
+        "@yue.set_timer(700, fn() {",
+        "  n.val = n.val + 1",
+        "  n.val < 3   // 到 3 次后停止",
+        "})",
       ],
     ),
     section(
@@ -221,6 +274,21 @@ fn page_system(app : App) -> @yue.Node {
           style=[("marginTop", 8.0)],
         ),
       ],
+      code=[
+        "// tray 句柄经 App 共享;点击计数是普通 Store",
+        "match @yue.Tray::new(\"examples/showcase/icon.png\") {",
+        "  Ok(tray) => {",
+        "    tray.set_tooltip(\"演示托盘\", \"左键计数,右键菜单\")",
+        "    let menu = @yue.Menu::new()",
+        "    let _ = menu.add_label_item(\"退出\")",
+        "    tray.set_menu(menu)",
+        "    tray.on_click(fn() { println(\"点了托盘\") })",
+        "    // Linux 还可切系统主题图标:",
+        "    tray.set_icon_name(\"utilities-terminal\")",
+        "  }",
+        "  Err(_e) => ()",
+        "}",
+      ],
     ),
     section(
       "无边框透明窗口",
@@ -229,6 +297,21 @@ fn page_system(app : App) -> @yue.Node {
         @yue.button_t("打开悬浮心形窗口", variant=@yue.Solid, on_click=fn() {
           open_floating_heart()
         }),
+      ],
+      code=[
+        "// 无边框透明置顶小窗,整窗可拖动",
+        "let win = @yue.Window::new_with_options(frame=false, transparent=true)",
+        "win.set_always_on_top(true)",
+        "win.set_content_size(150.0, 130.0)",
+        "let content = @yue.Container::new()",
+        "content.set_mouse_down_can_move_window(true)   // 按住即拖",
+        "win.set_content(content)",
+        "content.on_draw(fn(p) {",
+        "  p.set_fill_color(\"#D46A6A\")",
+        "  // …画任意形状",
+        "})",
+        "win.center()",
+        "win.activate()",
       ],
     ),
     section(
@@ -242,6 +325,13 @@ fn page_system(app : App) -> @yue.Node {
           }
         }),
         @yue.bind_label(app.veto_info, fn(s) { s }, style=[("marginTop", 8.0)]),
+      ],
+      code=[
+        "// 窗口 handle 里注册;返回 false 拦下这次关闭",
+        "w.set_should_close(fn() {",
+        "  // 例:有未保存修改时拦下,提示保存",
+        "  false",
+        "})",
       ],
     ),
   ]
@@ -268,6 +358,17 @@ fn page_system(app : App) -> @yue.Node {
           ]),
           @yue.bind_label(sel_out, fn(s) { s }, style=[("marginTop", 8.0)]),
         ],
+        code=[
+        "// 主选区是 X11 概念:选中即写入、中键粘贴",
+        "@yue.Clipboard::from_type(@yue.Selection).set_data(",
+        "  @yue.Text,",
+        "  \"主选区内容\",",
+        ")",
+        "match @yue.Clipboard::from_type(@yue.Selection).get_data(@yue.Text) {",
+        "  Some(@yue.Text(t)) => println(t)",
+        "  _ => println(\"读回失败\")",
+        "}",
+        ],
       ),
     )
   }
@@ -279,6 +380,16 @@ fn page_system(app : App) -> @yue.Node {
       [
         @yue.bind_label(app.si_role, fn(s) { s }, style=[("marginBottom", 4.0)]),
         @yue.bind_label(app.si_wake, fn(s) { s }),
+      ],
+      code=[
+        "// 首实例持有身份并监听唤起;第二实例唤醒首实例后退出",
+        "match @yue.SingleInstance::acquire(\"org.app.Id\") {",
+        "  Ok(Some(si)) => si.on_activate(fn(args) {",
+        "    println(\"收到唤起:\\{args.length()} 个参数\")",
+        "  })",
+        "  Ok(None) => println(\"已有实例,本实例退出\")",
+        "  Err(e) => println(\"不可用:\\{e}(降级继续运行)\")",
+        "}",
       ],
     ),
   )
@@ -315,6 +426,17 @@ fn page_system(app : App) -> @yue.Node {
         ]),
         @yue.bind_label(auto_out, fn(s) { s }, style=[("marginTop", 8.0)]),
       ],
+      code=[
+        "// Linux 写 XDG 自启动目录,Windows 写 HKCU Run 键",
+        "match @yue.Autostart::new(\"org.app.Id\") {",
+        "  Ok(auto) => {",
+        "    ignore(auto.enable())     // 开机自动拉起",
+        "    println(auto.is_enabled())",
+        "    ignore(auto.disable())    // 移除",
+        "  }",
+        "  Err(e) => println(e)",
+        "}",
+      ],
     ),
   )
   // 打开外部:URL 交默认浏览器,文件管理器选中(README.md 相对工作目录解析)
@@ -337,6 +459,17 @@ fn page_system(app : App) -> @yue.Node {
             }
           }),
         ]),
+      ],
+      code=[
+        "// Ok 只表示已交给系统",
+        "match @yue.open_url(\"https://libyue.com\") {",
+        "  Ok(_) => println(\"已交给默认浏览器\")",
+        "  Err(e) => println(\"失败:\\{e}\")",
+        "}",
+        "match @yue.reveal_in_file_manager(\"README.md\") {",
+        "  Ok(_) => println(\"已交给文件管理器\")",
+        "  Err(e) => println(\"失败:\\{e}\")",
+        "}",
       ],
     ),
   )
@@ -418,6 +551,18 @@ fn page_system(app : App) -> @yue.Node {
         ),
         @yue.bind_label(idle_out, fn(s) { s }, style=[("marginTop", 8.0)]),
       ],
+      code=[
+        "// KeepAwake 抑制屏保/自动息屏;release 解除",
+        "match @yue.KeepAwake::enable(\"org.app.Id\") {",
+        "  Ok(k) => ignore(k.release())",
+        "  Err(e) => println(e)",
+        "}",
+        "// 用户空闲秒数(不动输入看数值增长)",
+        "match @yue.idle_seconds() {",
+        "  Ok(s) => println(\"空闲 \\{s} 秒\")",
+        "  Err(e) => println(e)",
+        "}",
+      ],
     ),
   )
   // 休眠唤醒与锁屏解锁:计数演示(真机休眠一次 / Win+L 锁屏一次即见)
@@ -468,6 +613,23 @@ fn page_system(app : App) -> @yue.Node {
       [
         @yue.bind_label(sleep_out, fn(s) { s }, style=[("marginBottom", 4.0)]),
         @yue.bind_label(lock_out, fn(s) { s }),
+      ],
+      code=[
+        "@yue.on_suspend_resume(fn(e) {",
+        "  match e {",
+        "    @yue.Suspending => println(\"休眠\")",
+        "    @yue.Resuming => println(\"唤醒\")",
+        "  }",
+        "})",
+        "match @yue.session_lock_watch(fn(e) {",
+        "  match e {",
+        "    @yue.Locked => println(\"锁屏\")",
+        "    @yue.Unlocked => println(\"解锁\")",
+        "  }",
+        "}) {",
+        "  Ok(_) => ()",
+        "  Err(e) => println(e)",
+        "}",
       ],
     ),
   )
@@ -535,6 +697,19 @@ fn page_system(app : App) -> @yue.Node {
       [
         @yue.bind_label(power_out, fn(s) { s }, style=[("marginBottom", 4.0)]),
         @yue.bind_label(net_out, fn(s) { s }),
+      ],
+      code=[
+        "// 台式机常态是 Ok(None):无电池,再查电源来源",
+        "match @yue.battery_query() {",
+        "  Ok(Some(b)) => println(\"电量 \\{b.percent}% 充电中:\\{b.charging}\")",
+        "  Ok(None) => println(@yue.power_source())",
+        "  Err(e) => println(e)",
+        "}",
+        "// 事件即时派发(拔插电源/断联网)",
+        "@yue.on_power_source_change(fn(_src) { println(\"电源切换\") })",
+        "@yue.on_network_status_change(fn(s) {",
+        "  println(\"网络:\\{s.label()}\")",
+        "})",
       ],
     ),
   )
