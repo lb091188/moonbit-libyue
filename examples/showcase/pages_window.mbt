@@ -60,8 +60,8 @@ fn page_window(_app : App) -> @yue.Node {
           @yue.button_t("还原尺寸", on_click=fn() {
             match win.win_ref.val {
               Some(w) => {
-                w.set_content_size(880.0, 720.0)
-                win.toast_push("已还原 880×720", @yue.Info)
+                w.set_content_size(1280.0, 720.0)
+                win.toast_push("已还原 1280×720", @yue.Info)
               }
               None => ()
             }
@@ -78,7 +78,7 @@ fn page_window(_app : App) -> @yue.Node {
         "}",
         "w.set_fullscreen(!w.is_fullscreen())",
         "w.set_always_on_top(true)",
-        "w.set_content_size(880.0, 720.0)",
+        "w.set_content_size(1280.0, 720.0)",
         "w.activate()",
       ],
     ),

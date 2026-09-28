@@ -16,9 +16,10 @@ fn is_linux() -> Bool {
 const SHOWCASE_TITLE : String = "组件库演示板"
 
 ///|
-/// 一段演示:标题 + 一句说明 + 演示区 + (可选)演示代码折叠块 + 分隔留白。
-/// 标题/说明走 label_t 文字角色(Section / Secondary);code 传入时在
-/// 演示区下方挂折叠代码块,内容是该章节最小自包含的演示代码(可复制)。
+/// 一段演示:标题 + 一句说明 + 内容区 + 分隔留白。
+/// 标题/说明走 label_t 文字角色(Section / Secondary);code 传入时
+/// 内容区改由 code_switcher 包住——segmented「演示 / 代码」一键切换,
+/// 复制按钮常驻,代码是该章节最小自包含的演示代码。
 fn section(
   title : String,
   desc : String,
@@ -32,11 +33,12 @@ fn section(
     ("marginBottom", 10.0),
   ])
   let nodes : Array[@yue.Node] = [t, d]
-  for c in content {
-    nodes.push(c)
-  }
   if code.length() > 0 {
-    nodes.push(code_block(code))
+    nodes.push(code_switcher(content, code))
+  } else {
+    for c in content {
+      nodes.push(c)
+    }
   }
   nodes.push(@yue.separator(style=[("marginTop", 4.0), ("marginBottom", 20.0)]))
   @yue.vbox(nodes, style=[("marginBottom", 6.0)])
@@ -113,6 +115,8 @@ fn main {
   }
   let selected : @yue.Store[String] = @yue.Store::new("基础组件")
   let (toast_node, toast_push) = @yue.toast_layer()
+  // 章节「复制」按钮的回显走同一 toast 层(见 code_block.mbt)
+  code_toast.val = Some(toast_push)
   let counter = @yue.Signal::new(0)
   let app : App = {
     selected,
@@ -331,11 +335,13 @@ fn main {
       ]),
     ],
     title=SHOWCASE_TITLE,
-    size=Some((880.0, 720.0)),
+    size=Some((1280.0, 720.0)),
     center=true,
     on_close=fn(_w) { @yue.quit() },
     handle=fn(w) {
       app.win_ref.val = Some(w)
+      // 演示板固定画布 1280×720,不提供拖角调整
+      w.set_resizable(false)
       // 菜单栏(原生 MenuBar):关于 + 退出 + 编辑角色项
       let bar = @yue.MenuBar::new()
       let file = bar.add_menu("文件")
