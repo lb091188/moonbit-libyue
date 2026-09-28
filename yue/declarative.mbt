@@ -48,9 +48,17 @@ fn container_node(
 ) -> Node {
   let sstr = style_str.copy()
   sstr.push(("flexDirection", direction))
+  // CSS 语义默认可收缩(shrink 1,先应用;调用方显式样式后应用可覆盖):
+  // Yoga 默认 shrink 0,子项超宽只会溢出截断,宽度约束传不进去,
+  // flexWrap 也永不触发(showcase segmented 19 段坑)。仅声明式层生效,
+  // 命令式 Container 与原生组件保持 yoga 原语义。
+  let sty : Array[(String, Double)] = [("flexshrink", 1.0)]
+  for kv in style {
+    sty.push(kv)
+  }
   {
     mount: fn(parent) {
-      let c = Container::make(style~, style_str=sstr)
+      let c = Container::make(style=sty, style_str=sstr)
       handle(c)
       attach(parent, ViewLike::view(c))
       for ch in children {
