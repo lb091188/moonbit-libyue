@@ -1,0 +1,5 @@
+import {
+  "NoahLiu/moonbit-libyue/yue",
+  "NoahLiu/moonbit-libyue/yue/browser",
+  "NoahLiu/moonbit-libyue/examples/showcase/ui",
+}

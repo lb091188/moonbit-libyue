@@ -2,12 +2,12 @@
 // 与导航状态都是页内私有,协议注册在页构建时执行一次。
 
 ///|
-fn page_window(_app : App) -> @yue.Node {
+pub fn page_window(_app : @ui.App) -> @yue.Node {
   let win = _app
   let ontop = Ref(false)
   // WebView 全能力演示迁至独立「浏览器」页(见 pages_browser.mbt)
-  scroll_page([
-    section(
+  @ui.scroll_page([
+    @ui.section(
       "窗口",
       "窗口 API",
       "运行期操作窗口:改标题 / 最大化 / 全屏 / 置顶 / 还原尺寸。",
@@ -79,7 +79,7 @@ fn page_window(_app : App) -> @yue.Node {
         "w.set_content_size(1280.0, 720.0)", "w.activate()",
       ],
     ),
-    section(
+    @ui.section(
       "快捷键",
       "全局快捷键",
       "应用外生效的系统快捷键(Ctrl+Alt+C)。",
@@ -107,7 +107,7 @@ fn page_window(_app : App) -> @yue.Node {
         "  println(\"触发!\")", "}))", "@yue.unregister_all_global_shortcuts()",
       ],
     ),
-    section(
+    @ui.section(
       "拖入",
       "拖放接收",
       "register_dragged_types 注册接收文件/文本,从文件管理器拖入下方色块。",
@@ -162,7 +162,7 @@ fn page_window(_app : App) -> @yue.Node {
         "    _ => ()", "  }", "  true", "})",
       ],
     ),
-    section(
+    @ui.section(
       "拖出",
       "拖出发起",
       "do_drag_file_paths 发起系统拖拽:按住下方色块拖到文件管理器即拖出 icon.png。",
@@ -173,7 +173,7 @@ fn page_window(_app : App) -> @yue.Node {
           handle=fn(c) {
             @yue.theme_bind_bg(c, fn() { @yue.theme_current().primary_light })
             let img : @yue.Image? = match
-              @yue.read_binary_file("examples/showcase/icon.png") {
+              @yue.read_binary_file("examples/showcase/assets/icon.png") {
               Some(bytes) => {
                 let i = @yue.Image::new_from_png(bytes)
                 if i.is_empty() {
@@ -185,7 +185,7 @@ fn page_window(_app : App) -> @yue.Node {
               None => None
             }
             c.on_mouse_down(fn(_e) {
-              ignore(c.do_drag_file_paths(["examples/showcase/icon.png"], img))
+              ignore(c.do_drag_file_paths(["examples/showcase/assets/icon.png"], img))
               true
             })
           },

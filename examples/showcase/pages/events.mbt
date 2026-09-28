@@ -2,7 +2,7 @@
 // 事件回显是「事件 → 文本」直写,手动接线即最直白表达。
 
 ///|
-fn page_events(_app : App) -> @yue.Node {
+pub fn page_events(_app : @ui.App) -> @yue.Node {
   let evt_mouse : @yue.Store[String] = @yue.Store::new(
     "(移入色块区操作)",
   )
@@ -43,8 +43,8 @@ fn page_events(_app : App) -> @yue.Node {
       None => ()
     }
   }
-  scroll_page([
-    section(
+  @ui.scroll_page([
+    @ui.section(
       "鼠标",
       "鼠标事件",
       "五鼠标事件 + 连击计数;事件带视图/屏幕坐标、按键、修饰键。",
@@ -88,7 +88,7 @@ fn page_events(_app : App) -> @yue.Node {
         "    c.on_mouse_up(fn(_e) { false })", "  },", ")", "@yue.bind_label(info, fn(s) { s })",
       ],
     ),
-    section(
+    @ui.section(
       "捕获",
       "鼠标捕获",
       "set_capture 后移动/抬升都送给该控件;捕获可被其他控件夺走(on_capture_lost)。",
@@ -122,7 +122,7 @@ fn page_events(_app : App) -> @yue.Node {
         "c.has_capture()        // 查询", "c.on_capture_lost(fn() { println(\"捕获被其他控件夺走\") })",
       ],
     ),
-    section(
+    @ui.section(
       "轮询",
       "全局鼠标轮询",
       "mouse_location + 修饰键查询,200ms 轮询。",
@@ -134,7 +134,7 @@ fn page_events(_app : App) -> @yue.Node {
         "  println(\"(\\{mx}, \\{my}) \\{shift} \\{ctrl} \\{alt}\")", "  true", "}))",
       ],
     ),
-    section(
+    @ui.section(
       "光标",
       "光标 Cursor",
       "View::set_cursor 切换悬停光标——把鼠标移到下方色块上再点按钮。",
@@ -174,7 +174,7 @@ fn page_events(_app : App) -> @yue.Node {
         "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.NotAllowed))", "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Default))",
       ],
     ),
-    section(
+    @ui.section(
       "布局",
       "嵌套布局",
       "固定宽 / 百分比 / flex 三种宽度模型(全集见 docs/zh/layout.md);6px Splitter 把手可拖动调整占比。",

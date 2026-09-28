@@ -4,7 +4,7 @@
 // 判断即可)。手动仪表盘经滑杆驱动,拖值即触发插值平滑。
 
 ///|
-fn page_charts(_app : App) -> @yue.Node {
+pub fn page_charts(_app : @ui.App) -> @yue.Node {
   // ---- 折线:3 序列定长窗口,500ms 推点(三角波模拟监控曲线),可暂停 ----
   let line_series : @yue.Store[Array[@yue.LineSeries]] = @yue.Store::new([
     @yue.LineSeries::make("CPU", max_points=120),
@@ -94,8 +94,8 @@ fn page_charts(_app : App) -> @yue.Node {
     (0.85, @yue.theme_current().warning),
     (1.0, @yue.theme_current().danger),
   ]
-  scroll_page([
-    section(
+  @ui.scroll_page([
+    @ui.section(
       "折线",
       "Line 折线图(滚动窗口 + 实时推点)",
       "定长滚动窗口(max_points=120,超出丢最旧),500ms 定时推点;多序列主题色循环,y 轴自适应 + 网格 + 最新值右端标注。左为折线形态,右为面积形态(半透明填充)。推点只重绘画布,不重建视图树。",
@@ -133,7 +133,7 @@ fn page_charts(_app : App) -> @yue.Node {
         "// area=true:面积形态(半透明填充)", "@yue.line_chart_t(series, width=320.0, height=240.0, area=true)",
       ],
     ),
-    section(
+    @ui.section(
       "柱状",
       "Bar 柱状图 / 条形图",
       "纵向柱(默认)以 0 为基线支持正负值(正主题色、负红色);横向条(horizontal)适配长类目名。悬停高亮 + 行内数值标注,移动只重绘画布。",
@@ -161,7 +161,7 @@ fn page_charts(_app : App) -> @yue.Node {
         "])", "@yue.bar_chart_t(top, width=320.0, height=240.0, horizontal=true)",
       ],
     ),
-    section(
+    @ui.section(
       "环形",
       "Donut 环形图",
       "占比扇区(12 点方向起顺时针,五色循环);中心汇总数值;右侧图例(标签 + 值 + 百分比)。悬停扇区外扩 4px,图例行同步高亮。",
@@ -172,7 +172,7 @@ fn page_charts(_app : App) -> @yue.Node {
         "])", "@yue.donut_chart_t(donut, width=440.0, height=240.0)", "// 12 点方向起顺时针,中心汇总 + 右侧图例(标签/值/百分比)",
       ],
     ),
-    section(
+    @ui.section(
       "仪表盘",
       "Gauge 仪表盘",
       "单值百分比环 + 中心大数字,阈值分段着色(≤60% 绿 / ≤85% 橙 / 红)。左:2Hz 三角波自动更新,经 16ms 定时器插值平滑(每帧补 25% 差值)无跳变;右:滑杆手动驱动,拖拽过程同样平滑。",
@@ -218,7 +218,7 @@ fn page_charts(_app : App) -> @yue.Node {
         "// 滑杆手动驱动,拖值即触发平滑过渡", "@yue.slider_t(gauge, min=0.0, max=1.0, step=0.01, width=160.0)",
       ],
     ),
-    section(
+    @ui.section(
       "散点",
       "Scatter 散点图",
       "2000 点 x/y 点列(小方点),双轴自适应刻度 + 网格;右侧叠加最小二乘趋势线。",

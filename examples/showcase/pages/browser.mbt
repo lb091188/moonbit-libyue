@@ -4,7 +4,7 @@
 // 一次(Windows WebView2 下自定义协议静默无效,段内说明)。
 
 ///|
-fn page_browser(_app : App) -> @yue.Node {
+pub fn page_browser(_app : @ui.App) -> @yue.Node {
   let win = _app
   let web_ref : Ref[@browser.Browser?] = Ref(None)
   let nav_state : @yue.Store[String] = @yue.Store::new("(导航状态)")
@@ -21,8 +21,8 @@ fn page_browser(_app : App) -> @yue.Node {
       ),
     )
   })
-  scroll_page([
-    section(
+  @ui.scroll_page([
+    @ui.section(
       "加载",
       "WebView 与加载",
       "load_url / demo:// 协议 / load_html 本地片段(内嵌 JS 按钮可调原生绑定)。",
@@ -95,7 +95,7 @@ fn page_browser(_app : App) -> @yue.Node {
         "})",
       ],
     ),
-    section(
+    @ui.section(
       "导航",
       "导航与能力查询",
       "四导航按钮 + can_go_back/can_go_forward/is_loading 能力查询。",
@@ -148,7 +148,7 @@ fn page_browser(_app : App) -> @yue.Node {
         "b.on_change_loading(fn() { () })", "b.on_update_command(fn() { () })", "b.on_update_title(fn(t) { println(t) })",
       ],
     ),
-    section(
+    @ui.section(
       "JS",
       "执行 JavaScript",
       "with_result 异步取回 JSON;无结果执行改页面。",
@@ -205,7 +205,7 @@ fn page_browser(_app : App) -> @yue.Node {
         "  }", "})",
       ],
     ),
-    section(
+    @ui.section(
       "绑定",
       "JS ↔ 原生绑定",
       "注册 demoBinding(网页按钮调用)/移除/has_bindings 查询。",
@@ -252,7 +252,7 @@ fn page_browser(_app : App) -> @yue.Node {
         "})", "b.remove_binding(\"demoBinding\")", "println(b.has_bindings())", "// 网页侧:<button onclick=\"demoBinding('来自网页')\">",
       ],
     ),
-    section(
+    @ui.section(
       "Cookie",
       "Cookie 查询",
       "异步查询 URL 的 Cookie(名称/值/域/路径/httpOnly/secure)。",
@@ -298,7 +298,7 @@ fn page_browser(_app : App) -> @yue.Node {
         "  }", "})",
       ],
     ),
-    section(
+    @ui.section(
       "选项",
       "创建选项与平台差异",
       "BrowserOptions 四选项与平台差异速览(自定义协议 Windows 静默无效等)。",

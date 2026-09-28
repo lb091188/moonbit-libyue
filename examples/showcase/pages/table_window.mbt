@@ -4,7 +4,7 @@
 
 ///|
 /// 表格模型：语言清单 + 勾选 + 可编辑星数。
-struct LangModel {
+priv struct LangModel {
   names : Array[String]
   stars : Array[Int]
   likes : Array[Bool]
@@ -54,7 +54,7 @@ let table_events : @yue.Store[String] = @yue.Store::new(
 )
 
 ///|
-fn open_table_window() -> Unit {
+pub fn open_table_window() -> Unit {
   let win = @yue.Window::new()
   win.set_title("表格演示")
   win.set_content_size(520.0, 380.0)

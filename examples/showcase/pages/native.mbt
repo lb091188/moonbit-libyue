@@ -3,7 +3,7 @@
 // 响应式形态对照见主题页与「Store 对照」页)。
 
 ///|
-fn page_native(_app : App) -> @yue.Node {
+pub fn page_native(_app : @ui.App) -> @yue.Node {
   let nat_clicks = Ref(0)
   let nat_clicks_lb : Ref[@yue.Label?] = Ref(None)
   let nat_echo_lb : Ref[@yue.Label?] = Ref(None)
@@ -26,8 +26,8 @@ fn page_native(_app : App) -> @yue.Node {
     has_stepper: true,
   })
   nat_date.set_date(946684800L)
-  scroll_page([
-    section(
+  @ui.scroll_page([
+    @ui.section(
       "按钮",
       "标签 / 按钮",
       "libyue 原生 Button/Label(系统主题外观),点击计数由命令式 set_text 回显。",
@@ -54,7 +54,7 @@ fn page_native(_app : App) -> @yue.Node {
         "    None => ()", "  }", "})", "@yue.label(\"已点 0 次\", handle=fn(l) { echo.val = Some(l) })",
       ],
     ),
-    section(
+    @ui.section(
       "输入",
       "文本输入(Entry / TextEdit)",
       "原生 Entry:on_input 实时回显、on_enter 回车、password 密码框;TextEdit 撤销重做/剪切复制粘贴/选区与插入。",
@@ -130,7 +130,7 @@ fn page_native(_app : App) -> @yue.Node {
         "})",
       ],
     ),
-    section(
+    @ui.section(
       "数值",
       "数值(Slider / ProgressBar)",
       "原生 Slider + ProgressBar(handle 命令式 set_value);按钮切换不确定态。",
@@ -167,7 +167,7 @@ fn page_native(_app : App) -> @yue.Node {
         "p.set_indeterminate(true)",
       ],
     ),
-    section(
+    @ui.section(
       "选择",
       "选择(Checkbox / Radio / ComboBox / Picker)",
       "checkbox 独立勾选;radio 同组自动互斥;ComboBox 可编辑(on_select/on_input);Picker 只读列表选择。",
@@ -261,7 +261,7 @@ fn page_native(_app : App) -> @yue.Node {
         "  handle=fn(c) { ignore(c) },", ")", "@yue.picker(items=[\"红\", \"绿\", \"蓝\"], on_change=fn() { () })",
       ],
     ),
-    section(
+    @ui.section(
       "日期",
       "日期时间选择",
       "原生 DatePicker(HourMinute 元素 + 步进器),epoch 秒读写。",
@@ -289,14 +289,14 @@ fn page_native(_app : App) -> @yue.Node {
         "@yue.node_of(dp)",
       ],
     ),
-    section(
+    @ui.section(
       "展示",
       "展示(GIF / Group / Tab)",
       "GifPlayer 播放 GIF;分组 Group 标题 + 内容;原生 Tab 切换页签。",
       [
         @yue.hbox([
           @yue.gif(
-            image=Some(@yue.Image::new_from_file("examples/showcase/dot.gif")),
+            image=Some(@yue.Image::new_from_file("examples/showcase/assets/dot.gif")),
             style=[("width", 120.0), ("height", 120.0)],
           ),
           @yue.group(
@@ -334,7 +334,7 @@ fn page_native(_app : App) -> @yue.Node {
         @yue.label("切换次数:0", handle=fn(l) { nat_tab_lb.val = Some(l) }),
       ],
       code=[
-        "// GifPlayer 播放 GIF;分组 Group 标题 + 内容", "@yue.gif(", "  image=Some(@yue.Image::new_from_file(\"examples/showcase/dot.gif\")),",
+        "// GifPlayer 播放 GIF;分组 Group 标题 + 内容", "@yue.gif(", "  image=Some(@yue.Image::new_from_file(\"examples/showcase/assets/dot.gif\")),",
         "  style=[(\"width\", 120.0), (\"height\", 120.0)],", ")", "@yue.group(\"分组:内嵌标签\", @yue.label(\"分组里的内容\"))",
         "// 原生 Tab 页签切换", "@yue.tab(", "  [", "    (\"文本\", @yue.label(\"第一个页签的内容\")),",
         "    (\"输入\", @yue.entry(text=\"页签里的输入框\")),", "  ],",
@@ -342,7 +342,7 @@ fn page_native(_app : App) -> @yue.Node {
         ")",
       ],
     ),
-    section(
+    @ui.section(
       "表格",
       "原生表格 Table",
       "TableModel 数据视图分离;列类型 Text/Checkbox/Edit;GTK 下放 Notebook 页签崩溃,故独立子窗口。",
@@ -361,7 +361,7 @@ fn page_native(_app : App) -> @yue.Node {
         "table.on_row_activate(fn(row) { println(\"行激活:\\{row}\") })",
       ],
     ),
-    section(
+    @ui.section(
       "滚动",
       "滚动区 Scroll(平台滚动条)",
       "平台经典滚动条的 Automatic/Always/Never 策略切换(悬浮形态见基础组件页 OverlayScroll;其余页面默认悬浮细条)。",

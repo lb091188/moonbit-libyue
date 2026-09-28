@@ -3,7 +3,7 @@
 // 忘接线界面就静默不刷新;信号版见「基础组件」等页。
 
 ///|
-fn page_store_demo(_app : App) -> @yue.Node {
+pub fn page_store_demo(_app : @ui.App) -> @yue.Node {
   let counter : @yue.Store[Int] = @yue.Store::new(0)
   // 手动派生一:动作回调里顺手 set(改 A 必须记得改 B)
   let doubled : @yue.Store[Int] = @yue.Store::new(0)
@@ -13,8 +13,8 @@ fn page_store_demo(_app : App) -> @yue.Node {
   // 手动派生三:跨 Store 手动同步
   let merged : @yue.Store[String] = @yue.Store::new("")
   counter.subscribe(fn(n) { merged.set("计数 \{n},双倍 \{n * 2}") })
-  scroll_page([
-    section(
+  @ui.scroll_page([
+    @ui.section(
       "计数器",
       "手动计数器",
       "Store::update 改源,bind_label 回显——「改值」与「刷新界面」已自动,但派生值全要手动接。",
@@ -39,7 +39,7 @@ fn page_store_demo(_app : App) -> @yue.Node {
         "})", "@yue.bind_label(counter, fn(n) { \"计数:\\{n}\" })",
       ],
     ),
-    section(
+    @ui.section(
       "手动接线",
       "手动派生:subscribe 回调里 set",
       "counter.subscribe(fn(n) { doubled.set(n * 2) })——派生关系散落在动作代码各处,链一长就是胶水瀑布。",
@@ -50,7 +50,7 @@ fn page_store_demo(_app : App) -> @yue.Node {
         "@yue.bind_label(doubled, fn(n) { \"双倍:\\{n}\" })",
       ],
     ),
-    section(
+    @ui.section(
       "map派生",
       "手动派生:Store::map",
       "一对一映射有现成糖(map 派生只读 Store),但两个以上源合成仍要 subscribe 手动同步。",
@@ -64,7 +64,7 @@ fn page_store_demo(_app : App) -> @yue.Node {
         "let merged = @yue.Store::new(\"\")", "counter.subscribe(fn(n) { merged.set(\"计数 \\{n}\") })",
       ],
     ),
-    section(
+    @ui.section(
       "信号对照",
       "与信号版对照",
       "信号写法:computed(fn() { counter.get() * 2 })——关系声明在定义处,多源合成/条件派生同一写法。",

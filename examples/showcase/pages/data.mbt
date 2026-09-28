@@ -31,7 +31,7 @@ fn cmp_num_str(a : String, b : String) -> Int {
 }
 
 ///|
-fn page_data(app : App) -> @yue.Node {
+pub fn page_data(app : @ui.App) -> @yue.Node {
   // 语言表基础数据 + 排序显示数据(表头点击写 sort,订阅里重排)
   let lang_base = [
     @yue.TableRow::make(["MoonBit", "2023", "多范式,云 + 端"]),
@@ -180,8 +180,8 @@ fn page_data(app : App) -> @yue.Node {
     "北京", "上海", "广州",
   ])
   let transfer_right : @yue.Store[Array[String]] = @yue.Store::new(["深圳"])
-  scroll_page([
-    section(
+  @ui.scroll_page([
+    @ui.section(
       "标签头像",
       "Tag 标签与 Avatar 头像",
       "五种语义 Tag(浅底深字)+ 自定义实底色,宽度自适应;Avatar 方形实底 + 白色字母,三种尺寸。",
@@ -216,7 +216,7 @@ fn page_data(app : App) -> @yue.Node {
         "@yue.avatar(\"X\", \"#D64550\", size=30.0)",
       ],
     ),
-    section(
+    @ui.section(
       "徽标",
       "Badge 徽标",
       "数字角标(红底白字,宽度自适应)与圆点两种形态。",
@@ -238,7 +238,7 @@ fn page_data(app : App) -> @yue.Node {
         "@yue.badge_count(128)", "@yue.badge_dot()",
       ],
     ),
-    section(
+    @ui.section(
       "统计进度",
       "Statistic 数值统计与 Progress 进度条",
       "大号数值经 computed 派生信号自动刷新;进度条主题色填充 + 浅灰轨道,随同一按钮联动。",
@@ -270,7 +270,7 @@ fn page_data(app : App) -> @yue.Node {
         "@yue.progress_line(ratio.store())", "@yue.bind(ratio, fn(v) { \"当前进度 \\{(v * 100.0).round()}%\" })",
       ],
     ),
-    section(
+    @ui.section(
       "卡片折叠",
       "Card 卡片与 Collapse 折叠面板",
       "标题栏 + 底部分隔线 + 边框;折叠面板点击标题展开/收起,各面板独立,初始第一个展开。",
@@ -306,7 +306,7 @@ fn page_data(app : App) -> @yue.Node {
         "  (\"支持哪些平台?\", [@yue.label_t(\"Linux / Windows\")]),", "])",
       ],
     ),
-    section(
+    @ui.section(
       "描述",
       "Descriptions 描述列表与 Timeline 时间线",
       "键灰值深的键值网格;左侧色点 + 竖线,节点颜色跟随语义类型,末项无连线。",
@@ -329,7 +329,7 @@ fn page_data(app : App) -> @yue.Node {
         "  (\"进行中\", \"2.0 规划:终端组件。\", @yue.Warning),", "])",
       ],
     ),
-    section(
+    @ui.section(
       "表格单选",
       "Table 表格(单选 + 排序 + 列宽拖动)",
       "表头 + 斑马纹 + 悬停底色,点击行单选;点击表头排序(升降序箭头,新列默认升序),拖动列边界调整列宽;Store 驱动「添加一行」整表重建,选中行信号回显。",
@@ -381,7 +381,7 @@ fn page_data(app : App) -> @yue.Node {
         ")",
       ],
     ),
-    section(
+    @ui.section(
       "表格多选",
       "Table 表格(多选 + 排序)",
       "复选框列:行点击勾选,表头全选/清空(部分选中画横条);表头排序箭头(灰 ↕ 可排 / 主题色当前排序),「语言」列可点排序,拖动列边界调宽。",
@@ -407,7 +407,7 @@ fn page_data(app : App) -> @yue.Node {
         "  ],", "  rows,", "  selection=sel,", "  width=460.0,", ")", "@yue.bind(sel.signal(), fn(s) { \"已选 \\{s.length()} 行\" })",
       ],
     ),
-    section(
+    @ui.section(
       "富单元格",
       "Table 表格(富单元格)",
       "单元格支持 Tag / 颜色块 / 多行文本(行自动撑高)。",
@@ -450,7 +450,7 @@ fn page_data(app : App) -> @yue.Node {
         "    ],", "  },", "])", "@yue.table_t(columns, rich, width=460.0)",
       ],
     ),
-    section(
+    @ui.section(
       "虚拟滚动",
       "Table 虚拟滚动(排序 + 列宽拖动)",
       "整面自绘只画可见行,万行流畅;点击表头排序(序号列按数值),拖动列边界调整列宽;滚轮/拖右侧滚动条/键盘 ↑↓ PageUp PageDown 翻页。",
@@ -475,7 +475,7 @@ fn page_data(app : App) -> @yue.Node {
         "  height=220.0,", ")",
       ],
     ),
-    section(
+    @ui.section(
       "树形",
       "Tree 树形控件",
       "缩进层级 + 点击展开/折叠(▸/▾)。",
@@ -504,7 +504,7 @@ fn page_data(app : App) -> @yue.Node {
         "    ],", "  },", "])",
       ],
     ),
-    section(
+    @ui.section(
       "穿梭轮播",
       "Transfer 穿梭框与 Carousel 轮播",
       "穿梭框:点击行选中,中间 ›/‹ 移对侧;轮播:箭头/圆点手动切,3 秒自动切换(悬停暂停)。",
@@ -541,7 +541,7 @@ fn page_data(app : App) -> @yue.Node {
         "  ],", "  width=320.0,", "  height=80.0,", ")",
       ],
     ),
-    section(
+    @ui.section(
       "空状态",
       "Empty 空状态",
       "占位图 + 说明文字。",
