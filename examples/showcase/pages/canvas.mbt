@@ -2,7 +2,7 @@
 // 命令式语义(Ref + schedule_paint),混合模式信息走 Store 手动回显。
 
 ///|
-fn page_canvas(_app : App) -> @yue.Node {
+pub fn page_canvas(_app : @ui.App) -> @yue.Node {
   let canvas_hue = Ref(0)
   let canvas_blend = Ref(0)
   let canvas_blends = [
@@ -17,7 +17,7 @@ fn page_canvas(_app : App) -> @yue.Node {
   let canvas_ref : Ref[@yue.Container?] = Ref(None)
   let canvas_rt : Ref[@yue.Container?] = Ref(None)
   let canvas_img : Ref[@yue.Image?] = Ref(
-    match @yue.read_binary_file("examples/showcase/icon.png") {
+    match @yue.read_binary_file("examples/showcase/assets/icon.png") {
       Some(bytes) => {
         let img = @yue.Image::new_from_png(bytes)
         if img.is_empty() {
@@ -78,8 +78,8 @@ fn page_canvas(_app : App) -> @yue.Node {
   rt.set_color_for("#E5534B", 8, 11)
   let rt_wrap = Ref(true)
   let rt_ellipsis = Ref(false)
-  scroll_page([
-    section(
+  @ui.scroll_page([
+    @ui.section(
       "自绘",
       "自绘原语(Painter)",
       "fill_rect / arc / stroke_rect / draw_text 等基础绘制;线条色 + 填充色 + 圆环 + 网格 + 文本同屏。",
@@ -143,7 +143,7 @@ fn page_canvas(_app : App) -> @yue.Node {
         "  style=[(\"height\", 300.0), (\"width\", 640.0)],", ")",
       ],
     ),
-    section(
+    @ui.section(
       "图像",
       "图像与混合模式",
       "draw_image 叠 PNG(右下角)+ blend_mode(Normal/Multiply/Screen/Difference/Xor);导出缩略图到运行目录 build/。Windows 的 GDI+ 合成仅支持 Normal/Copy,其余模式无效果(Linux/macOS 完整)。",
@@ -162,14 +162,14 @@ fn page_canvas(_app : App) -> @yue.Node {
         ),
       ],
       code=[
-        "// 读 PNG → draw_image 叠加;blend_mode 切混合", "match @yue.read_binary_file(\"examples/showcase/icon.png\") {",
+        "// 读 PNG → draw_image 叠加;blend_mode 切混合", "match @yue.read_binary_file(\"examples/showcase/assets/icon.png\") {",
         "  Some(bytes) => {", "    let img = @yue.Image::new_from_png(bytes)", "    p.set_blend_mode(@yue.Multiply)   // Multiply/Screen/Difference/Xor",
         "    p.draw_image(img, 10.0, 10.0, 80.0, 80.0)", "    p.set_blend_mode(@yue.Normal)",
         "  }", "  None => ()", "}", "// 导出缩放图到文件", "let half = img.resize(img.get_width() / 2.0, img.get_height() / 2.0)",
         "half.write_to_file(\"png\", \"build/half.png\")",
       ],
     ),
-    section(
+    @ui.section(
       "富文本",
       "富文本 AttributedText",
       "范围字体/颜色(0-6 号加粗、8-11 号红色);换行/省略号/改写。",

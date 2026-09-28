@@ -2,11 +2,11 @@
 // (side_menu/segmented/breadcrumb 共享),页内演示状态用信号。
 
 ///|
-fn page_nav(app : App) -> @yue.Node {
+pub fn page_nav(app : @ui.App) -> @yue.Node {
   let page_no = @yue.Signal::new(2)
   let step = @yue.Signal::new(1)
-  scroll_page([
-    section(
+  @ui.scroll_page([
+    @ui.section(
       "侧栏",
       "Side Menu 侧边导航",
       "窗口左侧即本组件;组标题可折叠收起,选中浅蓝底 + 主题色强调条。",
@@ -26,7 +26,7 @@ fn page_nav(app : App) -> @yue.Node {
         ")",
       ],
     ),
-    section(
+    @ui.section(
       "菜单",
       "菜单(主题化 ContextMenu / DropdownMenu)",
       "context_menu_for 包右键原生菜单(悬停高亮 + 点击);DropdownMenu 点字段弹候选(两套用途不同:前者右键显隐,后者顶部展开)。",
@@ -59,7 +59,7 @@ fn page_nav(app : App) -> @yue.Node {
         "  fn(i) { println(\"菜单项 \\{i}\") },", "  width=140.0,", ")",
       ],
     ),
-    section(
+    @ui.section(
       "原生菜单",
       "菜单(原生 Menu::popup_at)",
       "Menu::new + popup_at 弹原生右键菜单(系统主题外观),与上面主题化段对照。",
@@ -90,7 +90,7 @@ fn page_nav(app : App) -> @yue.Node {
         "  let (mx, my) = @yue.mouse_location()", "  menu.popup_at(mx, my)", "})",
       ],
     ),
-    section(
+    @ui.section(
       "菜单栏",
       "菜单栏(窗口顶部 MenuBar)",
       "窗口顶部原生菜单栏(文件/编辑/演示)由 main.mbt 挂载,此处仅示意结构:MenuItem 支持快捷键 + 角色项 + 分隔线,未注册项由系统自动省略。",
@@ -115,7 +115,7 @@ fn page_nav(app : App) -> @yue.Node {
         "w.set_menubar(bar)",
       ],
     ),
-    section(
+    @ui.section(
       "分段",
       "Segmented 分段控制器",
       "顶栏导航形态:选中白底 + 主题色文字,悬停灰底过渡;与左侧菜单共享状态(此处演示切换)。",
@@ -133,7 +133,7 @@ fn page_nav(app : App) -> @yue.Node {
         "  selected,   // 与侧边菜单共享同一导航 Store", ")",
       ],
     ),
-    section(
+    @ui.section(
       "页签",
       "Tabs 页签",
       "顶部页签形态:选中主题色文字 + 底部指示条,内容区切换。",
@@ -160,7 +160,7 @@ fn page_nav(app : App) -> @yue.Node {
         "])",
       ],
     ),
-    section(
+    @ui.section(
       "面包屑",
       "Breadcrumb 面包屑",
       "层级随选中态联动:当前项深色,其余灰色可点、悬停变主题色。项名即页面名,点击直达(面包屑与侧边菜单共享同一导航状态,写不存在的页面名会把所有页隐藏)。",
@@ -174,7 +174,7 @@ fn page_nav(app : App) -> @yue.Node {
         "// 层级随选中态联动:当前项深色,其余灰色可点", "@yue.breadcrumb([\"数据展示\", \"导航组件\", \"基础组件\"], selected)",
       ],
     ),
-    section(
+    @ui.section(
       "分页",
       "Pagination 分页",
       "当前页主题色实底白字,悬停浅蓝;点击页码切换。",
@@ -184,7 +184,7 @@ fn page_nav(app : App) -> @yue.Node {
         "@yue.pagination(page_no.store(), 5)",
       ],
     ),
-    section(
+    @ui.section(
       "步骤条",
       "Steps 步骤条",
       "完成/当前/待办三态:浅蓝、实底白字、灰;点按钮推进或回退。",

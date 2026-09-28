@@ -1,9 +1,9 @@
 // 代码与文档页:code_view 多语言高亮(行号)+ markdown_view 渲染。
 
 ///|
-fn page_code(_app : App) -> @yue.Node {
-  scroll_page([
-    section(
+pub fn page_code(_app : @ui.App) -> @yue.Node {
+  @ui.scroll_page([
+    @ui.section(
       "代码高亮",
       "Code View 代码高亮",
       "逐 token 测宽自绘,全平台一致;lang 关键字集(moonbit/js/ts/python/rust/c/go/bash/sql)+ 行号。",
@@ -45,7 +45,7 @@ fn page_code(_app : App) -> @yue.Node {
         "  line_numbers=true,", "  width=430.0,", ")",
       ],
     ),
-    section(
+    @ui.section(
       "Markdown",
       "Markdown 渲染",
       "标题/段落/粗斜体/行内代码/链接/列表/引用/分隔线/围栏代码块;区间字体颜色经富文本,三平台一致。",

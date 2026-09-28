@@ -2,7 +2,7 @@
 // 视图接入(组件写回即信号变化),展示端 bind 直连派生。
 
 ///|
-fn page_form(app : App) -> @yue.Node {
+pub fn page_form(app : @ui.App) -> @yue.Node {
   let qty = @yue.Signal::new(3.0)
   let qty2 = @yue.Signal::new(1.0)
   let slider_val = @yue.Signal::new(30.0)
@@ -27,8 +27,8 @@ fn page_form(app : App) -> @yue.Node {
     start: None,
     end: None,
   })
-  scroll_page([
-    section(
+  @ui.scroll_page([
+    @ui.section(
       "输入",
       "文本输入(Input / Textarea)",
       "自绘 1px 边框(聚焦变主题蓝)+ 白底;clearable 悬停非空时 ✕ 清空;多行内容超出按平台滚动。",
@@ -53,7 +53,7 @@ fn page_form(app : App) -> @yue.Node {
         "  width=300.0,", "  clearable=true,", ")",
       ],
     ),
-    section(
+    @ui.section(
       "数值",
       "数值输入(InputNumber / Slider / Rate)",
       "步进器 0..10 钳制;滑杆自绘轨道 + thumb(拖拽 step 5 量化);评分五角星 hover 预亮,值均响应式。",
@@ -75,7 +75,7 @@ fn page_form(app : App) -> @yue.Node {
         "let rate_val = @yue.Signal::new(3)", "@yue.rate_t(rate_val.store())",
       ],
     ),
-    section(
+    @ui.section(
       "选择",
       "选择器(Select / ColorPicker)",
       "下拉点字段弹候选(悬停高亮/选中 ✓),clearable ✕ 清空;取色器预设色板点击选色,hex 值响应式。",
@@ -102,7 +102,7 @@ fn page_form(app : App) -> @yue.Node {
         "@yue.bind(color, fn(c) { c })",
       ],
     ),
-    section(
+    @ui.section(
       "开关",
       "开关与勾选(Checkbox / Radio / Switch)",
       "勾选态存 Signal 勾选即回显;单选组整行悬停变色点击互斥(第二组禁用);开关开=主题蓝靠右,含禁用态。",
@@ -176,7 +176,7 @@ fn page_form(app : App) -> @yue.Node {
         "@yue.switch_t(wifi_on.store())", "@yue.switch_t(@yue.Signal::new(false).store(), disabled=true)",
       ],
     ),
-    section(
+    @ui.section(
       "日期",
       "日期与时间(DatePicker / 区间选择)",
       "全自绘月历(‹/› 切月)+ 内联 calendar_t;日期/时间/日期时间三区间选择器,选中值响应式。",
@@ -236,7 +236,7 @@ fn page_form(app : App) -> @yue.Node {
         "@yue.datetime_range_picker_t(value=dtr, width=340.0)",
       ],
     ),
-    section(
+    @ui.section(
       "表单",
       "Form 表单组合",
       "form_item 行布局(标签右对齐 + 控件区)+ form 分组标题。",

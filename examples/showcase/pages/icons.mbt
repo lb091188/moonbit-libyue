@@ -40,9 +40,9 @@ fn icon_group_code(sample : Array[String]) -> Array[String] {
 }
 
 ///|
-fn page_icons(_app : App) -> @yue.Node {
-  scroll_page([
-    section(
+pub fn page_icons(_app : @ui.App) -> @yue.Node {
+  @ui.scroll_page([
+    @ui.section(
       "基础",
       "基础",
       "方向/开关/状态等通用图标。",
@@ -99,7 +99,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.Star, size=18.0), @yue.icon_name(@yue.Star)),",
       ]),
     ),
-    section(
+    @ui.section(
       "文件",
       "文件与文档",
       "文件/文件夹/剪贴板/书签。",
@@ -122,7 +122,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.Book, size=18.0), @yue.icon_name(@yue.Book)),",
       ]),
     ),
-    section(
+    @ui.section(
       "编辑",
       "编辑",
       "撤销重做/剪切粘贴/排版/链接。",
@@ -156,7 +156,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.Scissors, size=18.0), @yue.icon_name(@yue.Scissors)),",
       ]),
     ),
-    section(
+    @ui.section(
       "视图",
       "视图",
       "缩放/可见性/明暗/布局。",
@@ -188,7 +188,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.Moon, size=18.0), @yue.icon_name(@yue.Moon)),",
       ]),
     ),
-    section(
+    @ui.section(
       "导航",
       "导航",
       "双向翻页/跳段/返回。",
@@ -215,7 +215,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.CornerUpLeft, size=18.0), @yue.icon_name(@yue.CornerUpLeft)),",
       ]),
     ),
-    section(
+    @ui.section(
       "媒体",
       "媒体",
       "录制/音量/麦克风/相机/图片/音符。",
@@ -239,7 +239,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.Mic, size=18.0), @yue.icon_name(@yue.Mic)),",
       ]),
     ),
-    section(
+    @ui.section(
       "通信",
       "通信",
       "邮件/发送/消息/提醒/电话/订阅/网络。",
@@ -265,7 +265,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.Send, size=18.0), @yue.icon_name(@yue.Send)),",
       ]),
     ),
-    section(
+    @ui.section(
       "系统",
       "系统",
       "电源/登录登出/锁钥/盾牌/存储/外设/网络/处理器。",
@@ -299,7 +299,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.Cpu, size=18.0), @yue.icon_name(@yue.Cpu)),",
       ]),
     ),
-    section(
+    @ui.section(
       "开发",
       "开发",
       "终端/代码/Git/打包/调试/实验/云/分层/闪电。",
@@ -328,7 +328,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.Bug, size=18.0), @yue.icon_name(@yue.Bug)),",
       ]),
     ),
-    section(
+    @ui.section(
       "语义",
       "语义与状态",
       "帮助/收藏/标记/时钟/标签/归档/收件/点赞。",
@@ -356,7 +356,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.Clock, size=18.0), @yue.icon_name(@yue.Clock)),",
       ]),
     ),
-    section(
+    @ui.section(
       "数据",
       "数据",
       "趋势/柱图/饼图/表格。",
@@ -377,7 +377,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.PieChart, size=18.0), @yue.icon_name(@yue.PieChart)),",
       ]),
     ),
-    section(
+    @ui.section(
       "天气",
       "天气与环境",
       "云雨雪/水滴/温度/风;Sun/Moon 在「视图」组。",
@@ -400,7 +400,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.Wind, size=18.0), @yue.icon_name(@yue.Wind)),",
       ]),
     ),
-    section(
+    @ui.section(
       "设备",
       "设备与外设",
       "键盘/鼠标/耳机/电池/信号。",
@@ -422,7 +422,7 @@ fn page_icons(_app : App) -> @yue.Node {
         "  @yue.tooltip_t(@yue.icon(@yue.Signal, size=18.0), @yue.icon_name(@yue.Signal)),",
       ]),
     ),
-    section(
+    @ui.section(
       "商业",
       "商业与物体",
       "购物/支付/礼赠/百分比/火箭/奖杯/灯泡/扳手/皇冠。",

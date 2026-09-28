@@ -3,9 +3,9 @@
 // 无手动 subscribe 接线。勾选类在表单组件页,右键菜单在导航组件页。
 
 ///|
-fn page_basic(app : App) -> @yue.Node {
-  scroll_page([
-    section(
+pub fn page_basic(app : @ui.App) -> @yue.Node {
+  @ui.scroll_page([
+    @ui.section(
       "主题",
       "主题色板(主色公式派生 + 系统主色)",
       "选一个主色,整套色板(hover/浅底/语义色)按 HSL 公式即时派生,切换深浅沿用当前主色;「跟随系统」读系统主色调,读不到回落内置。",
@@ -42,7 +42,7 @@ fn page_basic(app : App) -> @yue.Node {
         "// 跟随系统主色(读不到回落内置 primary)", "let sys = @yue.system_accent()",
       ],
     ),
-    section(
+    @ui.section(
       "按钮",
       "Button 按钮变体",
       "四变体;「主要操作」联动数据页访问量/进度条(信号)。",
@@ -68,7 +68,7 @@ fn page_basic(app : App) -> @yue.Node {
         "  @yue.button_t(\"危险操作\", variant=@yue.Danger),", "])",
       ],
     ),
-    section(
+    @ui.section(
       "文字链接",
       "Label 文字与 Link 链接",
       "五级排版角色,字号颜色随角色;Link 主题色文字悬停下划线,最近点击信号回显。",
@@ -107,7 +107,7 @@ fn page_basic(app : App) -> @yue.Node {
         "// Link:主题色文字,悬停下划线", "@yue.link(\"打开文档\", fn() { println(\"link clicked\") })",
       ],
     ),
-    section(
+    @ui.section(
       "分隔提示",
       "Divider 分隔线与 Tooltip 悬浮提示",
       "水平(默认)/竖直 1px 主题边框色;tooltip_t 给任意节点包原生悬浮提示(系统样式,主题化气泡见反馈页 Popover)。",
@@ -136,7 +136,7 @@ fn page_basic(app : App) -> @yue.Node {
         "@yue.tooltip_t(@yue.button_t(\"悬停看提示\"), \"原生 tooltip:系统样式\")",
       ],
     ),
-    section(
+    @ui.section(
       "悬浮滚动",
       "OverlayScroll 悬浮滚动条",
       "滚动/悬停右缘浮现主题色细条,停顿渐隐,可拖拽;平台原生滚动条隐藏(Windows 经典条常驻占位,悬浮形态由组件统一)。滚动或拖拽右缘体验。",
@@ -172,7 +172,7 @@ fn page_basic(app : App) -> @yue.Node {
         ")",
       ],
     ),
-    section(
+    @ui.section(
       "悬停组",
       "HoverGroup 悬停组",
       "组内任意位置(含子控件)悬停即整组进入 hover 态:把指针移到卡片里的按钮或输入框上,整张卡片同样高亮且光标变手型——GTK 下子控件的事件窗口会独占指针事件,组件用指针位置轮询判定,不依赖 enter/leave,不闪烁。",
@@ -218,7 +218,7 @@ fn page_basic(app : App) -> @yue.Node {
         "    )", "  },", ")",
       ],
     ),
-    section(
+    @ui.section(
       "光标组",
       "CursorGroup 光标组",
       "父设子随:指针落在组内任意位置(含输入框、按钮等有独立窗口的子控件)都保持手型,移出恢复默认——与 hover_group 同机制的指针位置轮询,递归对组根+全部子孙设置。",

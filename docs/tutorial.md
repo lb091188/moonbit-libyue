@@ -135,7 +135,7 @@ git clone https://github.com/lb091188/moonbit-libyue && cd moonbit-libyue
 moon run examples/showcase    # 15 pages: basic / form / navigation / data display / feedback / events & layout / native widgets / system integration...
 ```
 
-Pick a page from the left menu and write along on the right; each page's source is its own file (`examples/showcase/pages_*.mbt`) — copy and adapt. To start smaller: `moon run examples/hello` (original widgets) and `moon run examples/hello-themed` (themed).
+Pick a page from the left menu and write along on the right; each page's source is its own file (`examples/showcase/pages/*.mbt`) — copy and adapt. To start smaller: `moon run examples/hello` (original widgets) and `moon run examples/hello-themed` (themed).
 
 **Want to learn systematically** — three documents, three facets:
 

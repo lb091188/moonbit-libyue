@@ -35,12 +35,12 @@ fn open_floating_heart() -> Unit {
 }
 
 ///|
-fn page_system(app : App) -> @yue.Node {
+pub fn page_system(app : @ui.App) -> @yue.Node {
   let sel_out : @yue.Store[String] = @yue.Store::new("(主选区读回)")
   // 主选区是 X11 概念:Windows/macOS 上 from_type(Selection) 降级为公共
   // 剪贴板,整段只在 Linux 创建
-  let secs : Array[Section] = [
-    section(
+  let secs : Array[@ui.Section] = [
+    @ui.section(
       "文件",
       "文件对话框",
       "FileDialog 模态打开/保存,回显所选路径;API: read/write_text_file",
@@ -100,7 +100,7 @@ fn page_system(app : App) -> @yue.Node {
         "}",
       ],
     ),
-    section(
+    @ui.section(
       "消息框",
       "消息框",
       "原生 MessageBox:标题/正文/按钮,响应 id 回传。",
@@ -145,7 +145,7 @@ fn page_system(app : App) -> @yue.Node {
         "mb.show_for_window(w)",
       ],
     ),
-    section(
+    @ui.section(
       "通知",
       "系统通知",
       "提交系统通知中心;",
@@ -183,7 +183,7 @@ fn page_system(app : App) -> @yue.Node {
         "// 静默入中心(不发声不打扰):", "n.set_silent(true)", "@yue.NotificationCenter::add(n)",
       ],
     ),
-    section(
+    @ui.section(
       "剪贴板",
       "剪贴板",
       "Clipboard 读写系统剪贴板文本;set_data 写富文本(Html);",
@@ -224,7 +224,7 @@ fn page_system(app : App) -> @yue.Node {
         "// set_data 写富文本(Kind: Text/Html/FilePaths)", "@yue.Clipboard::get().set_data(@yue.Html, \"<b>富文本</b>\")",
       ],
     ),
-    section(
+    @ui.section(
       "定时器",
       "定时器与延迟任务",
       "set_timeout 单次 / set_timer 周期(返回 false 停)。",
@@ -253,7 +253,7 @@ fn page_system(app : App) -> @yue.Node {
         "})",
       ],
     ),
-    section(
+    @ui.section(
       "托盘",
       "托盘状态",
       "左键点击计数;",
@@ -278,7 +278,7 @@ fn page_system(app : App) -> @yue.Node {
             @yue.button_t("切回图片图标", on_click=fn() {
               match app.tray_ref.val {
                 Some(t) => {
-                  t.set_icon("examples/showcase/icon.png")
+                  t.set_icon("examples/showcase/assets/icon.png")
                   app.toast_push("已切回图片图标", @yue.Info)
                 }
                 None => ()
@@ -289,7 +289,7 @@ fn page_system(app : App) -> @yue.Node {
         ),
       ],
       code=[
-        "// tray 句柄经 App 共享;点击计数是普通 Store", "match @yue.Tray::new(\"examples/showcase/icon.png\") {",
+        "// tray 句柄经 App 共享;点击计数是普通 Store", "match @yue.Tray::new(\"examples/showcase/assets/icon.png\") {",
         "  Ok(tray) => {", "    tray.set_tooltip(\"演示托盘\", \"左键计数,右键菜单\")",
         "    let menu = @yue.Menu::new()", "    let _ = menu.add_label_item(\"退出\")",
         "    tray.set_menu(menu)", "    tray.on_click(fn() { println(\"点了托盘\") })",
@@ -297,7 +297,7 @@ fn page_system(app : App) -> @yue.Node {
         "  }", "  Err(_e) => ()", "}",
       ],
     ),
-    section(
+    @ui.section(
       "透明窗",
       "无边框透明窗口",
       "无边框透明置顶,整窗可拖动;无编程关闭 API,随应用退出。",
@@ -314,7 +314,7 @@ fn page_system(app : App) -> @yue.Node {
         "})", "win.center()", "win.activate()",
       ],
     ),
-    section(
+    @ui.section(
       "拦截",
       "关闭拦截",
       "勾选后点窗口关闭被 set_should_close 拦下",
@@ -333,9 +333,9 @@ fn page_system(app : App) -> @yue.Node {
       ],
     ),
   ]
-  if is_linux() {
+  if @ui.is_linux() {
     secs.push(
-      section(
+      @ui.section(
         "主选区",
         "主选区 Selection(仅 Linux)",
         "X11 选中即写入、中键粘贴;仅 Linux。",
@@ -368,7 +368,7 @@ fn page_system(app : App) -> @yue.Node {
   }
   // 单实例:角色与唤起参数在 main 启动时采集,这里只展示
   secs.push(
-    section(
+    @ui.section(
       "单实例",
       "单实例与二次唤起",
       "再启动一个本程序,新实例会唤醒本窗口后退出。",
@@ -415,7 +415,7 @@ fn page_system(app : App) -> @yue.Node {
     )
   })
   secs.push(
-    section(
+    @ui.section(
       "自启",
       "开机自启动",
       "",
@@ -436,7 +436,7 @@ fn page_system(app : App) -> @yue.Node {
   )
   // 打开外部:URL 交默认浏览器,文件管理器选中(README.md 相对工作目录解析)
   secs.push(
-    section(
+    @ui.section(
       "外部",
       "打开外部",
       "Ok 只表示已交给系统。",
@@ -528,7 +528,7 @@ fn page_system(app : App) -> @yue.Node {
     }
   })
   secs.push(
-    section(
+    @ui.section(
       "常亮空闲",
       "屏幕常亮与用户空闲",
       "KeepAwake 抑制系统屏保 / 自动息屏",
@@ -593,7 +593,7 @@ fn page_system(app : App) -> @yue.Node {
     Err(e) => lock_out.set("锁屏订阅失败:\{e}")
   }
   secs.push(
-    section(
+    @ui.section(
       "休眠锁屏",
       "休眠唤醒与锁屏解锁",
       "",
@@ -667,7 +667,7 @@ fn page_system(app : App) -> @yue.Node {
     net_out.set("当前网络:\{s.label()}(第 \{net_n.val} 次变化)")
   })
   secs.push(
-    section(
+    @ui.section(
       "电量网络",
       "电量与网络",
       "",
@@ -685,5 +685,5 @@ fn page_system(app : App) -> @yue.Node {
       ],
     ),
   )
-  scroll_page(secs)
+  @ui.scroll_page(secs)
 }

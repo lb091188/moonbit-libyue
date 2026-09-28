@@ -2,9 +2,9 @@
 // key_info 经 App 共享到这里显示。
 
 ///|
-fn page_env(app : App) -> @yue.Node {
-  scroll_page([
-    section(
+pub fn page_env(app : @ui.App) -> @yue.Node {
+  @ui.scroll_page([
+    @ui.section(
       "平台",
       "平台与屏幕",
       "运行环境查询 API(本次启动快照);主屏尺寸 / 缩放因子影响布局与自绘尺寸。",
@@ -36,7 +36,7 @@ fn page_env(app : App) -> @yue.Node {
         "println(@yue.App::get_name())", "println(@yue.Tray::is_supported())",
       ],
     ),
-    section(
+    @ui.section(
       "外观",
       "外观与能力",
       "主题切换深浅由系统偏好驱动;各子系统能力差异由 libyue 按平台自动降级。",
@@ -63,7 +63,7 @@ fn page_env(app : App) -> @yue.Node {
         "})", "// 系统主色(无主色概念时回落内置 primary)", "println(@yue.system_accent())",
       ],
     ),
-    section(
+    @ui.section(
       "键盘",
       "键盘钩子与平台差异",
       "窗口级 on_key_down 全局生效(按任意键试试);差异清单完整记录见 docs/zh/adaptation.md。",

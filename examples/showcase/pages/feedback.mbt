@@ -2,9 +2,9 @@
 // 反馈页的按钮只是触发方;Toast 推送函数经 App 传入。
 
 ///|
-fn page_feedback(app : App) -> @yue.Node {
-  scroll_page([
-    section(
+pub fn page_feedback(app : @ui.App) -> @yue.Node {
+  @ui.scroll_page([
+    @ui.section(
       "横幅",
       "Alert 提示横幅",
       "四种语义类型:左侧色条 + 类型浅底 + 同族深字,文字垂直居中。",
@@ -20,7 +20,7 @@ fn page_feedback(app : App) -> @yue.Node {
         "@yue.alert(\"错误提示:网络连接已断开。\", @yue.Danger)",
       ],
     ),
-    section(
+    @ui.section(
       "可关闭",
       "Alert 可关闭",
       "点击右侧 ✕ 关闭整条横幅。",
@@ -34,7 +34,7 @@ fn page_feedback(app : App) -> @yue.Node {
         "@yue.alert_closeable(\"可关闭横幅:点我右侧的 ✕ 试试。\", @yue.Warning)",
       ],
     ),
-    section(
+    @ui.section(
       "结果页",
       "Result 结果页",
       "大色块符号 + 标题 + 描述 + 操作区;四种语义类型。",
@@ -58,7 +58,7 @@ fn page_feedback(app : App) -> @yue.Node {
         ")",
       ],
     ),
-    section(
+    @ui.section(
       "气泡",
       "Popover 气泡弹层",
       "popover_t 给任意节点包点击弹层:内容为任意 Node,再次点击收起。",
@@ -76,7 +76,7 @@ fn page_feedback(app : App) -> @yue.Node {
         "  180.0,   // 宽", "  60.0,    // 高", ")",
       ],
     ),
-    section(
+    @ui.section(
       "轻提示",
       "Toast 轻提示",
       "操作反馈瞬态提示:推送后顶部居中出现,2.6 秒自动消失,多条堆叠;层挂在窗口根(absolute 顶部,不占布局)。",
@@ -103,7 +103,7 @@ fn page_feedback(app : App) -> @yue.Node {
         "toast_push(\"提交失败:网络不可达\", @yue.Danger)",
       ],
     ),
-    section(
+    @ui.section(
       "对话框",
       "Dialog 对话框",
       "同窗遮罩 + 居中面板;回调后自动收起,visible 由 Store 驱动。",
