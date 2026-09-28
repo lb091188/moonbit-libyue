@@ -5,6 +5,7 @@
 fn page_feedback(app : App) -> @yue.Node {
   scroll_page([
     section(
+      "横幅",
       "Alert 提示横幅",
       "四种语义类型:左侧色条 + 类型浅底 + 同族深字,文字垂直居中。",
       [
@@ -14,22 +15,27 @@ fn page_feedback(app : App) -> @yue.Node {
         @yue.alert("错误提示:网络连接已断开。", @yue.Danger),
       ],
       code=[
-        "// 左侧色条 + 类型浅底 + 同族深字",
-        "@yue.alert(\"成功提示:配置已保存。\", @yue.Success)",
-        "@yue.alert(\"信息提示:有新版本可用。\", @yue.Info)",
-        "@yue.alert(\"警告提示:磁盘剩余空间不足。\", @yue.Warning)",
+        "// 左侧色条 + 类型浅底 + 同族深字", "@yue.alert(\"成功提示:配置已保存。\", @yue.Success)",
+        "@yue.alert(\"信息提示:有新版本可用。\", @yue.Info)", "@yue.alert(\"警告提示:磁盘剩余空间不足。\", @yue.Warning)",
         "@yue.alert(\"错误提示:网络连接已断开。\", @yue.Danger)",
       ],
     ),
-    section("Alert 可关闭", "点击右侧 ✕ 关闭整条横幅。", [
-      @yue.alert_closeable(
-        "可关闭横幅:点我右侧的 ✕ 试试。",
-        @yue.Warning,
-      ),
-    ], code=[
-      "@yue.alert_closeable(\"可关闭横幅:点我右侧的 ✕ 试试。\", @yue.Warning)",
-    ]),
     section(
+      "可关闭",
+      "Alert 可关闭",
+      "点击右侧 ✕ 关闭整条横幅。",
+      [
+        @yue.alert_closeable(
+          "可关闭横幅:点我右侧的 ✕ 试试。",
+          @yue.Warning,
+        ),
+      ],
+      code=[
+        "@yue.alert_closeable(\"可关闭横幅:点我右侧的 ✕ 试试。\", @yue.Warning)",
+      ],
+    ),
+    section(
+      "结果页",
       "Result 结果页",
       "大色块符号 + 标题 + 描述 + 操作区;四种语义类型。",
       [
@@ -47,16 +53,13 @@ fn page_feedback(app : App) -> @yue.Node {
         ),
       ],
       code=[
-        "// 大色块符号 + 标题 + 描述 + 操作区",
-        "@yue.result(",
-        "  @yue.Success,",
-        "  \"操作成功\",",
-        "  \"配置已写入并生效。\",",
-        "  [@yue.button_t(\"返回首页\")],",
+        "// 大色块符号 + 标题 + 描述 + 操作区", "@yue.result(", "  @yue.Success,",
+        "  \"操作成功\",", "  \"配置已写入并生效。\",", "  [@yue.button_t(\"返回首页\")],",
         ")",
       ],
     ),
     section(
+      "气泡",
       "Popover 气泡弹层",
       "popover_t 给任意节点包点击弹层:内容为任意 Node,再次点击收起。",
       [
@@ -69,59 +72,63 @@ fn page_feedback(app : App) -> @yue.Node {
       ],
       code=[
         "// 给任意节点包点击弹层,内容为任意 Node,再次点击收起",
-        "@yue.popover_t(",
-        "  @yue.button_t(\"打开气泡\"),",
-        "  @yue.label_t(\"气泡内容:任意 Node。\", role=@yue.Body),",
-        "  180.0,   // 宽",
-        "  60.0,    // 高",
-        ")",
+        "@yue.popover_t(", "  @yue.button_t(\"打开气泡\"),", "  @yue.label_t(\"气泡内容:任意 Node。\", role=@yue.Body),",
+        "  180.0,   // 宽", "  60.0,    // 高", ")",
       ],
     ),
     section(
+      "轻提示",
       "Toast 轻提示",
       "操作反馈瞬态提示:推送后顶部居中出现,2.6 秒自动消失,多条堆叠;层挂在窗口根(absolute 顶部,不占布局)。",
       [
         @yue.hbox([
-          @yue.button_t("成功", on_click=fn() { app.toast_push("保存成功", @yue.Success) }),
-          @yue.button_t("警告", on_click=fn() { app.toast_push("连接超时,已重试", @yue.Warning) }),
-          @yue.button_t("错误", on_click=fn() { app.toast_push("提交失败:网络不可达", @yue.Danger) }),
-          @yue.button_t("普通", variant=@yue.Solid, on_click=fn() { app.toast_push("已加入下载队列", @yue.Info) }),
+          @yue.button_t("成功", on_click=fn() {
+            app.toast_push("保存成功", @yue.Success)
+          }),
+          @yue.button_t("警告", on_click=fn() {
+            app.toast_push("连接超时,已重试", @yue.Warning)
+          }),
+          @yue.button_t("错误", on_click=fn() {
+            app.toast_push("提交失败:网络不可达", @yue.Danger)
+          }),
+          @yue.button_t("普通", variant=@yue.Solid, on_click=fn() {
+            app.toast_push("已加入下载队列", @yue.Info)
+          }),
         ]),
       ],
       code=[
         "// 层挂在窗口根(absolute 顶部,不占布局);推送后 2.6 秒自动消失",
-        "let (toast_node, toast_push) = @yue.toast_layer()",
-        "// toast_node 加入 mount_window 根节点数组,任意位置推送:",
-        "toast_push(\"保存成功\", @yue.Success)",
-        "toast_push(\"连接超时,已重试\", @yue.Warning)",
+        "let (toast_node, toast_push) = @yue.toast_layer()", "// toast_node 加入 mount_window 根节点数组,任意位置推送:",
+        "toast_push(\"保存成功\", @yue.Success)", "toast_push(\"连接超时,已重试\", @yue.Warning)",
         "toast_push(\"提交失败:网络不可达\", @yue.Danger)",
       ],
     ),
     section(
+      "对话框",
       "Dialog 对话框",
       "同窗遮罩 + 居中面板;回调后自动收起,visible 由 Store 驱动。",
       [
         @yue.hbox([
-          @yue.button_t("基础对话框", on_click=fn() { app.dlg_basic.set(true) }),
-          @yue.button_t("表单对话框", variant=@yue.Solid, on_click=fn() { app.dlg_form.set(true) }),
-          @yue.bind(app.dlg_name.signal(), fn(n) { if n == "" { "尚未提交" } else { "提交了:\\{n}" } }),
+          @yue.button_t("基础对话框", on_click=fn() {
+            app.dlg_basic.set(true)
+          }),
+          @yue.button_t("表单对话框", variant=@yue.Solid, on_click=fn() {
+            app.dlg_form.set(true)
+          }),
+          @yue.bind(app.dlg_name.signal(), fn(n) {
+            if n == "" {
+              "尚未提交"
+            } else {
+              "提交了:\\{n}"
+            }
+          }),
         ]),
       ],
       code=[
-        "// visible 由 Store 驱动;回调后自动收起",
-        "let visible = @yue.Store::new(false)",
-        "let name = @yue.Store::new(\"\")",
-        "@yue.dialog_t(",
-        "  visible,",
-        "  \"新建连接\",",
-        "  [",
-        "    @yue.label_t(\"名称\", role=@yue.Body),",
-        "    @yue.input_t(text=\"\", width=320.0, on_input=fn(t) { name.set(t) }),",
-        "  ],",
-        "  width=380.0,",
-        ")",
-        "// 任意位置 set(true) 打开:",
-        "visible.set(true)",
+        "// visible 由 Store 驱动;回调后自动收起", "let visible = @yue.Store::new(false)",
+        "let name = @yue.Store::new(\"\")", "@yue.dialog_t(", "  visible,", "  \"新建连接\",",
+        "  [", "    @yue.label_t(\"名称\", role=@yue.Body),", "    @yue.input_t(text=\"\", width=320.0, on_input=fn(t) { name.set(t) }),",
+        "  ],", "  width=380.0,", ")", "// 任意位置 set(true) 打开:", "visible.set(true)",
       ],
     ),
   ])

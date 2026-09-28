@@ -81,10 +81,14 @@ fn page_charts(_app : App) -> @yue.Node {
     scatter_seed = (scatter_seed * 1103515245 + 12345) % 2147483647
     let x = scatter_seed.to_double() / 2147483647.0 * 100.0
     scatter_seed = (scatter_seed * 1103515245 + 12345) % 2147483647
-    let y = x * 0.6 + 20.0 + (scatter_seed.to_double() / 2147483647.0 - 0.5) * 40.0
+    let y = x * 0.6 +
+      20.0 +
+      (scatter_seed.to_double() / 2147483647.0 - 0.5) * 40.0
     scatter_data.push((x, y))
   }
-  let scatter_pts : @yue.Store[Array[(Double, Double)]] = @yue.Store::new(scatter_data)
+  let scatter_pts : @yue.Store[Array[(Double, Double)]] = @yue.Store::new(
+    scatter_data,
+  )
   let gauge_thresholds = [
     (0.6, @yue.theme_current().success),
     (0.85, @yue.theme_current().warning),
@@ -92,129 +96,146 @@ fn page_charts(_app : App) -> @yue.Node {
   ]
   scroll_page([
     section(
+      "折线",
       "Line 折线图(滚动窗口 + 实时推点)",
       "定长滚动窗口(max_points=120,超出丢最旧),500ms 定时推点;多序列主题色循环,y 轴自适应 + 网格 + 最新值右端标注。左为折线形态,右为面积形态(半透明填充)。推点只重绘画布,不重建视图树。",
       [
-        @yue.hbox([
-          @yue.line_chart_t(line_series, width=320.0, height=240.0),
-          @yue.label("  "),
-          @yue.line_chart_t(line_series, width=320.0, height=240.0, area=true),
-        ], style_str=[("alignItems", "start")]),
-        @yue.hbox([
-          @yue.checkbox_t("暂停推点", checked=line_running.get(), on_change=fn(v) {
-            line_running.set(v)
-          }),
-          @yue.label_t("窗口容量 120,推点频率 2Hz;暂停只断数据流,定时器不取消。", role=@yue.Secondary),
-        ], style=[("marginTop", 8.0)], style_str=[("alignItems", "center")]),
+        @yue.hbox(
+          [
+            @yue.line_chart_t(line_series, width=320.0, height=240.0),
+            @yue.label("  "),
+            @yue.line_chart_t(line_series, width=320.0, height=240.0, area=true),
+          ],
+          style_str=[("alignItems", "start")],
+        ),
+        @yue.hbox(
+          [
+            @yue.checkbox_t("暂停推点", checked=line_running.get(), on_change=fn(
+              v,
+            ) {
+              line_running.set(v)
+            }),
+            @yue.label_t(
+              "窗口容量 120,推点频率 2Hz;暂停只断数据流,定时器不取消。",
+              role=@yue.Secondary,
+            ),
+          ],
+          style=[("marginTop", 8.0)],
+          style_str=[("alignItems", "center")],
+        ),
       ],
       code=[
-        "// 定长滚动窗口(max_points=120,超出丢最旧)",
-        "let series = @yue.Store::new([",
-        "  @yue.LineSeries::make(\"CPU\", max_points=120),",
-        "  @yue.LineSeries::make(\"内存\", max_points=120),",
-        "])",
-        "// 周期推点:只重绘画布,不重建视图树",
-        "let t = Ref(0)",
-        "ignore(@yue.set_timer(500, fn() {",
-        "  t.val = t.val + 1",
-        "  @yue.series_push(series, 0, (t.val % 100).to_double())",
-        "  true   // 返回 false 停止周期",
-        "}))",
-        "@yue.line_chart_t(series, width=320.0, height=240.0)",
-        "// area=true:面积形态(半透明填充)",
-        "@yue.line_chart_t(series, width=320.0, height=240.0, area=true)",
+        "// 定长滚动窗口(max_points=120,超出丢最旧)", "let series = @yue.Store::new([",
+        "  @yue.LineSeries::make(\"CPU\", max_points=120),", "  @yue.LineSeries::make(\"内存\", max_points=120),",
+        "])", "// 周期推点:只重绘画布,不重建视图树", "let t = Ref(0)",
+        "ignore(@yue.set_timer(500, fn() {", "  t.val = t.val + 1", "  @yue.series_push(series, 0, (t.val % 100).to_double())",
+        "  true   // 返回 false 停止周期", "}))", "@yue.line_chart_t(series, width=320.0, height=240.0)",
+        "// area=true:面积形态(半透明填充)", "@yue.line_chart_t(series, width=320.0, height=240.0, area=true)",
       ],
     ),
     section(
+      "柱状",
       "Bar 柱状图 / 条形图",
       "纵向柱(默认)以 0 为基线支持正负值(正主题色、负红色);横向条(horizontal)适配长类目名。悬停高亮 + 行内数值标注,移动只重绘画布。",
       [
-        @yue.hbox([
-          @yue.bar_chart_t(bar_data, width=320.0, height=240.0),
-          @yue.label("  "),
-          @yue.bar_chart_t(bar_h_data, width=320.0, height=240.0, horizontal=true),
-        ], style_str=[("alignItems", "start")]),
+        @yue.hbox(
+          [
+            @yue.bar_chart_t(bar_data, width=320.0, height=240.0),
+            @yue.label("  "),
+            @yue.bar_chart_t(
+              bar_h_data,
+              width=320.0,
+              height=240.0,
+              horizontal=true,
+            ),
+          ],
+          style_str=[("alignItems", "start")],
+        ),
       ],
       code=[
-        "// 纵向柱以 0 为基线,正值主题色、负值红色",
-        "let bars = @yue.Store::new([",
-        "  @yue.BarItem::make(\"1月\", 12.0),",
-        "  @yue.BarItem::make(\"2月\", -8.0),",
-        "  @yue.BarItem::make(\"3月\", 25.0),",
-        "])",
-        "@yue.bar_chart_t(bars, width=320.0, height=240.0)",
-        "// horizontal=true:横向条形图,适配长类目名",
-        "let top = @yue.Store::new([",
-        "  @yue.BarItem::make(\"MoonBit\", 92.0),",
-        "  @yue.BarItem::make(\"Rust\", 78.0),",
-        "])",
-        "@yue.bar_chart_t(top, width=320.0, height=240.0, horizontal=true)",
+        "// 纵向柱以 0 为基线,正值主题色、负值红色", "let bars = @yue.Store::new([",
+        "  @yue.BarItem::make(\"1月\", 12.0),", "  @yue.BarItem::make(\"2月\", -8.0),",
+        "  @yue.BarItem::make(\"3月\", 25.0),", "])", "@yue.bar_chart_t(bars, width=320.0, height=240.0)",
+        "// horizontal=true:横向条形图,适配长类目名", "let top = @yue.Store::new([",
+        "  @yue.BarItem::make(\"MoonBit\", 92.0),", "  @yue.BarItem::make(\"Rust\", 78.0),",
+        "])", "@yue.bar_chart_t(top, width=320.0, height=240.0, horizontal=true)",
       ],
     ),
     section(
+      "环形",
       "Donut 环形图",
       "占比扇区(12 点方向起顺时针,五色循环);中心汇总数值;右侧图例(标签 + 值 + 百分比)。悬停扇区外扩 4px,图例行同步高亮。",
-      [
-        @yue.donut_chart_t(donut_data, width=440.0, height=240.0),
-      ],
+      [@yue.donut_chart_t(donut_data, width=440.0, height=240.0)],
       code=[
-        "let donut = @yue.Store::new([",
-        "  @yue.DonutSlice::make(\"直接访问\", 335.0),",
-        "  @yue.DonutSlice::make(\"搜索引擎\", 510.0),",
-        "  @yue.DonutSlice::make(\"社交媒体\", 234.0),",
-        "])",
-        "@yue.donut_chart_t(donut, width=440.0, height=240.0)",
-        "// 12 点方向起顺时针,中心汇总 + 右侧图例(标签/值/百分比)",
+        "let donut = @yue.Store::new([", "  @yue.DonutSlice::make(\"直接访问\", 335.0),",
+        "  @yue.DonutSlice::make(\"搜索引擎\", 510.0),", "  @yue.DonutSlice::make(\"社交媒体\", 234.0),",
+        "])", "@yue.donut_chart_t(donut, width=440.0, height=240.0)", "// 12 点方向起顺时针,中心汇总 + 右侧图例(标签/值/百分比)",
       ],
     ),
     section(
+      "仪表盘",
       "Gauge 仪表盘",
       "单值百分比环 + 中心大数字,阈值分段着色(≤60% 绿 / ≤85% 橙 / 红)。左:2Hz 三角波自动更新,经 16ms 定时器插值平滑(每帧补 25% 差值)无跳变;右:滑杆手动驱动,拖拽过程同样平滑。",
       [
-        @yue.hbox([
-          @yue.gauge_t(gauge_auto, width=240.0, height=180.0, thresholds=gauge_thresholds),
-          @yue.label("  "),
-          @yue.gauge_t(gauge_manual, width=240.0, height=180.0, thresholds=gauge_thresholds),
-          @yue.label("  "),
-          @yue.vbox([
-            @yue.label_t("手动值", role=@yue.Body),
-            @yue.slider_t(gauge_manual, min=0.0, max=1.0, step=0.01, width=160.0),
-          ], style_str=[("justifyContent", "center")]),
-        ], style_str=[("alignItems", "start")]),
+        @yue.hbox(
+          [
+            @yue.gauge_t(
+              gauge_auto,
+              width=240.0,
+              height=180.0,
+              thresholds=gauge_thresholds,
+            ),
+            @yue.label("  "),
+            @yue.gauge_t(
+              gauge_manual,
+              width=240.0,
+              height=180.0,
+              thresholds=gauge_thresholds,
+            ),
+            @yue.label("  "),
+            @yue.vbox(
+              [
+                @yue.label_t("手动值", role=@yue.Body),
+                @yue.slider_t(
+                  gauge_manual,
+                  min=0.0,
+                  max=1.0,
+                  step=0.01,
+                  width=160.0,
+                ),
+              ],
+              style_str=[("justifyContent", "center")],
+            ),
+          ],
+          style_str=[("alignItems", "start")],
+        ),
       ],
       code=[
         "// 阈值分段着色(值/边界色),中心大数字自动插值平滑",
-        "let gauge = @yue.Store::new(0.35)",
-        "let thresholds = [",
-        "  (0.6, @yue.theme_current().success),",
-        "  (0.85, @yue.theme_current().warning),",
-        "  (1.0, @yue.theme_current().danger),",
-        "]",
-        "@yue.gauge_t(gauge, width=240.0, height=180.0, thresholds=thresholds)",
-        "// 滑杆手动驱动,拖值即触发平滑过渡",
-        "@yue.slider_t(gauge, min=0.0, max=1.0, step=0.01, width=160.0)",
+        "let gauge = @yue.Store::new(0.35)", "let thresholds = [", "  (0.6, @yue.theme_current().success),",
+        "  (0.85, @yue.theme_current().warning),", "  (1.0, @yue.theme_current().danger),",
+        "]", "@yue.gauge_t(gauge, width=240.0, height=180.0, thresholds=thresholds)",
+        "// 滑杆手动驱动,拖值即触发平滑过渡", "@yue.slider_t(gauge, min=0.0, max=1.0, step=0.01, width=160.0)",
       ],
     ),
     section(
+      "散点",
       "Scatter 散点图",
       "2000 点 x/y 点列(小方点),双轴自适应刻度 + 网格;右侧叠加最小二乘趋势线。",
       [
-        @yue.hbox([
-          @yue.scatter_t(scatter_pts, width=320.0, height=260.0),
-          @yue.label("  "),
-          @yue.scatter_t(scatter_pts, width=320.0, height=260.0, trend=true),
-        ], style_str=[("alignItems", "start")]),
+        @yue.hbox(
+          [
+            @yue.scatter_t(scatter_pts, width=320.0, height=260.0),
+            @yue.label("  "),
+            @yue.scatter_t(scatter_pts, width=320.0, height=260.0, trend=true),
+          ],
+          style_str=[("alignItems", "start")],
+        ),
       ],
       code=[
-        "// x/y 点列,双轴自适应刻度 + 网格",
-        "let pts : @yue.Store[Array[(Double, Double)]] = @yue.Store::new([",
-        "  (12.0, 28.0),",
-        "  (44.0, 51.0),",
-        "  (70.0, 66.0),",
-        "])",
-        "@yue.scatter_t(pts, width=320.0, height=260.0)",
-        "// trend=true:叠加最小二乘趋势线",
-        "@yue.scatter_t(pts, width=320.0, height=260.0, trend=true)",
+        "// x/y 点列,双轴自适应刻度 + 网格", "let pts : @yue.Store[Array[(Double, Double)]] = @yue.Store::new([",
+        "  (12.0, 28.0),", "  (44.0, 51.0),", "  (70.0, 66.0),", "])", "@yue.scatter_t(pts, width=320.0, height=260.0)",
+        "// trend=true:叠加最小二乘趋势线", "@yue.scatter_t(pts, width=320.0, height=260.0, trend=true)",
       ],
     ),
   ])
