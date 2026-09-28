@@ -6252,10 +6252,14 @@ pub fn tabs_t(
       }
       let fnt = Font::new("Sans", 13.0)
       // 宽度随父容器拉伸(列容器默认 stretch),不写死:概览页要放
-      // 全宽图表;flex 让页区在父容器有确定高度时填充(Scroll 等无
-      // measure 的叶节点靠这个拿到确定高度,否则塌缩归零)
+      // 全宽图表;grow+shrink 让页区在父容器有确定高度时填充/压缩
+      // (Scroll 等无 measure 的叶节点靠这个拿到确定高度,否则塌缩归零)。
+      // 不写 flex 简写:简写派生 basis 0,在 auto 高父链的内容测量轮里
+      // 会被当成 0 高内容贡献,兄弟页显隐 dirty 祖先后整棵塌(native
+      // v0.15.6-mbt.19 只修被清零节点自身);grow/shrink 不参与内容
+      // 测量,basis 走 auto 语义,auto 父下按内容高
       let outer = themed_container(
-        style=[("flex", 1.0), ("marginBottom", 10.0)],
+        style=[("flexgrow", 1.0), ("flexshrink", 1.0), ("marginBottom", 10.0)],
         style_str=[("flexDirection", "column")],
       )
       let head = themed_container(
