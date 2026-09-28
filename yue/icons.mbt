@@ -1348,8 +1348,8 @@ pub fn draw_icon(
       p.line_to(cx + 1 * u, cy + 8.5 * u)
       p.stroke()
       // 后人:右露半张脸与肩头
-      icon_arc(p, cx + 5.5 * u, cy - 3 * u, 3.2 * u, -1.1, 1.1)
-      icon_arc(p, cx + 5.5 * u, cy + 6.5 * u, 4.5 * u, 3.34, 4.6)
+      icon_arc(p, cx + 6 * u, cy - 3 * u, 3.2 * u, -1.1, 1.1)
+      icon_arc(p, cx + 6 * u, cy + 6.5 * u, 4.5 * u, 3.0, 4.6)
     }
     Cloudy => {
       let u = s / 9.0
