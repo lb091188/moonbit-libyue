@@ -3,12 +3,16 @@
 
 ///|
 fn page_events(_app : App) -> @yue.Node {
-  let evt_mouse : @yue.Store[String] = @yue.Store::new("(移入色块区操作)")
+  let evt_mouse : @yue.Store[String] = @yue.Store::new(
+    "(移入色块区操作)",
+  )
   let evt_dbl : @yue.Store[String] = @yue.Store::new("(双击计数)")
   let evt_cap : @yue.Store[String] = @yue.Store::new("未捕获")
   let evt_area : Ref[@yue.Container?] = Ref(None)
   let evt_clicks = @yue.ClickTracker::new()
-  let evt_gmouse : @yue.Store[String] = @yue.Store::new("(全局鼠标,200ms 轮询)")
+  let evt_gmouse : @yue.Store[String] = @yue.Store::new(
+    "(全局鼠标,200ms 轮询)",
+  )
   ignore(
     @yue.set_timer(200, fn() {
       let (mx, my) = @yue.mouse_location()
@@ -22,7 +26,9 @@ fn page_events(_app : App) -> @yue.Node {
       if @yue.alt_pressed() {
         mods = mods + "Alt "
       }
-      evt_gmouse.set("全局鼠标 (\{mx.round()}, \{my.round()}) 修饰键 \{mods}")
+      evt_gmouse.set(
+        "全局鼠标 (\{mx.round()}, \{my.round()}) 修饰键 \{mods}",
+      )
       true
     }),
   )
@@ -39,6 +45,7 @@ fn page_events(_app : App) -> @yue.Node {
   }
   scroll_page([
     section(
+      "鼠标",
       "鼠标事件",
       "五鼠标事件 + 连击计数;事件带视图/屏幕坐标、按键、修饰键。",
       [
@@ -47,7 +54,9 @@ fn page_events(_app : App) -> @yue.Node {
           style=[("height", 88.0), ("marginBottom", 8.0)],
           handle=fn(c) {
             evt_area.val = Some(c)
-            c.on_mouse_enter(fn(e) { evt_mouse.set("enter (\{e.view_x}, \{e.view_y})") })
+            c.on_mouse_enter(fn(e) {
+              evt_mouse.set("enter (\{e.view_x}, \{e.view_y})")
+            })
             c.on_mouse_leave(fn(_e) { evt_mouse.set("leave") })
             c.on_mouse_move(fn(e) {
               evt_mouse.set("move (\{e.view_x}, \{e.view_y}) btn=\{e.button}")
@@ -71,22 +80,16 @@ fn page_events(_app : App) -> @yue.Node {
       ],
       code=[
         "// 事件带视图/屏幕坐标、按键、修饰键;ClickTracker 数连击",
-        "let info : @yue.Store[String] = @yue.Store::new(\"(移入操作)\")",
-        "@yue.vbox(",
-        "  [@yue.label_t(\"鼠标操作区\", role=@yue.Body)],",
-        "  style=[(\"height\", 88.0)],",
-        "  handle=fn(c) {",
-        "    c.on_mouse_enter(fn(e) { info.set(\"enter (\\{e.view_x}, \\{e.view_y})\") })",
-        "    c.on_mouse_leave(fn(_e) { info.set(\"leave\") })",
-        "    c.on_mouse_move(fn(e) { info.set(\"move btn=\\{e.button}\") })",
+        "let info : @yue.Store[String] = @yue.Store::new(\"(移入操作)\")", "@yue.vbox(",
+        "  [@yue.label_t(\"鼠标操作区\", role=@yue.Body)],", "  style=[(\"height\", 88.0)],",
+        "  handle=fn(c) {", "    c.on_mouse_enter(fn(e) { info.set(\"enter (\\{e.view_x}, \\{e.view_y})\") })",
+        "    c.on_mouse_leave(fn(_e) { info.set(\"leave\") })", "    c.on_mouse_move(fn(e) { info.set(\"move btn=\\{e.button}\") })",
         "    c.on_mouse_down(fn(e) { info.set(\"down btn=\\{e.button}\"); false })",
-        "    c.on_mouse_up(fn(_e) { false })",
-        "  },",
-        ")",
-        "@yue.bind_label(info, fn(s) { s })",
+        "    c.on_mouse_up(fn(_e) { false })", "  },", ")", "@yue.bind_label(info, fn(s) { s })",
       ],
     ),
     section(
+      "捕获",
       "鼠标捕获",
       "set_capture 后移动/抬升都送给该控件;捕获可被其他控件夺走(on_capture_lost)。",
       [
@@ -99,7 +102,13 @@ fn page_events(_app : App) -> @yue.Node {
                 } else {
                   c.set_capture()
                 }
-                evt_cap.set(if c.has_capture() { "已捕获" } else { "未捕获" })
+                evt_cap.set(
+                  if c.has_capture() {
+                    "已捕获"
+                  } else {
+                    "未捕获"
+                  },
+                )
               }
               None => ()
             }
@@ -109,29 +118,24 @@ fn page_events(_app : App) -> @yue.Node {
       ],
       code=[
         "// set_capture 后移动/抬升都送给该控件(c 为任意容器句柄)",
-        "c.set_capture()        // 开始捕获",
-        "c.release_capture()    // 结束捕获",
-        "c.has_capture()        // 查询",
-        "c.on_capture_lost(fn() { println(\"捕获被其他控件夺走\") })",
+        "c.set_capture()        // 开始捕获", "c.release_capture()    // 结束捕获",
+        "c.has_capture()        // 查询", "c.on_capture_lost(fn() { println(\"捕获被其他控件夺走\") })",
       ],
     ),
     section(
+      "轮询",
       "全局鼠标轮询",
       "mouse_location + 修饰键查询,200ms 轮询。",
       [@yue.bind_label(evt_gmouse, fn(s) { s })],
       code=[
-        "// mouse_location 返回屏幕坐标;修饰键三查询",
-        "ignore(@yue.set_timer(200, fn() {",
-        "  let (mx, my) = @yue.mouse_location()",
-        "  let shift = @yue.shift_pressed()",
-        "  let ctrl = @yue.control_pressed()",
-        "  let alt = @yue.alt_pressed()",
-        "  println(\"(\\{mx}, \\{my}) \\{shift} \\{ctrl} \\{alt}\")",
-        "  true",
-        "}))",
+        "// mouse_location 返回屏幕坐标;修饰键三查询", "ignore(@yue.set_timer(200, fn() {",
+        "  let (mx, my) = @yue.mouse_location()", "  let shift = @yue.shift_pressed()",
+        "  let ctrl = @yue.control_pressed()", "  let alt = @yue.alt_pressed()",
+        "  println(\"(\\{mx}, \\{my}) \\{shift} \\{ctrl} \\{alt}\")", "  true", "}))",
       ],
     ),
     section(
+      "光标",
       "光标 Cursor",
       "View::set_cursor 切换悬停光标——把鼠标移到下方色块上再点按钮。",
       [
@@ -144,24 +148,34 @@ fn page_events(_app : App) -> @yue.Node {
           },
         ),
         @yue.hbox([
-          @yue.button_t("手型", on_click=fn() { apply_cursor(@yue.Hand, "Hand") }),
-          @yue.button_t("文本", on_click=fn() { apply_cursor(@yue.Text, "Text") }),
-          @yue.button_t("十字", on_click=fn() { apply_cursor(@yue.Crosshair, "Crosshair") }),
-          @yue.button_t("禁止", on_click=fn() { apply_cursor(@yue.NotAllowed, "NotAllowed") }),
-          @yue.button_t("默认", on_click=fn() { apply_cursor(@yue.Default, "Default") }),
+          @yue.button_t("手型", on_click=fn() {
+            apply_cursor(@yue.Hand, "Hand")
+          }),
+          @yue.button_t("文本", on_click=fn() {
+            apply_cursor(@yue.Text, "Text")
+          }),
+          @yue.button_t("十字", on_click=fn() {
+            apply_cursor(@yue.Crosshair, "Crosshair")
+          }),
+          @yue.button_t("禁止", on_click=fn() {
+            apply_cursor(@yue.NotAllowed, "NotAllowed")
+          }),
+          @yue.button_t("默认", on_click=fn() {
+            apply_cursor(@yue.Default, "Default")
+          }),
         ]),
-        @yue.bind_label(cursor_now, fn(s) { "当前光标:\{s}" }, style=[("marginTop", 8.0)]),
+        @yue.bind_label(cursor_now, fn(s) { "当前光标:\{s}" }, style=[
+          ("marginTop", 8.0),
+        ]),
       ],
       code=[
-        "// View::set_cursor 切换悬停光标(c 为任意容器句柄)",
-        "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Hand))",
-        "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Text))",
-        "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Crosshair))",
-        "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.NotAllowed))",
-        "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Default))",
+        "// View::set_cursor 切换悬停光标(c 为任意容器句柄)", "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Hand))",
+        "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Text))", "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Crosshair))",
+        "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.NotAllowed))", "@yue.View::set_cursor(c, @yue.Cursor::new(@yue.Default))",
       ],
     ),
     section(
+      "布局",
       "嵌套布局",
       "固定宽 / 百分比 / flex 三种宽度模型(全集见 docs/zh/layout.md);6px Splitter 把手可拖动调整占比。",
       [
@@ -174,13 +188,27 @@ fn page_events(_app : App) -> @yue.Node {
                   children: [
                     {
                       label: "基础",
-                      children: [{ label: "图标", children: [] }, { label: "分隔", children: [] }],
+                      children: [
+                        { label: "图标", children: [], },
+                        { label: "分隔", children: [], },
+                      ],
                     },
-                    { label: "导航", children: [{ label: "分栏", children: [] }] },
+                    {
+                      label: "导航",
+                      children: [{ label: "分栏", children: [], }],
+                    },
                   ],
                 },
               ]),
-              @yue.vbox([@yue.label_t("右侧详情区:拖动中间把手调整占比", role=@yue.Body)], style=[("padding", 12.0)]),
+              @yue.vbox(
+                [
+                  @yue.label_t(
+                    "右侧详情区:拖动中间把手调整占比",
+                    role=@yue.Body,
+                  ),
+                ],
+                style=[("padding", 12.0)],
+              ),
               min_first=120.0,
             ),
           ],
@@ -200,27 +228,18 @@ fn page_events(_app : App) -> @yue.Node {
               style=[("height", 40.0), ("marginRight", 8.0)],
               style_str=[("width", "50%"), ("backgroundcolor", "#8A3A5F")],
             ),
-            @yue.label_t(
-              "flex 1",
-              role=@yue.Body,
-              style=[("height", 40.0)],
-              style_str=[("backgroundcolor", "#5F8A3A")],
-            ),
+            @yue.label_t("flex 1", role=@yue.Body, style=[("height", 40.0)], style_str=[
+              ("backgroundcolor", "#5F8A3A"),
+            ]),
           ],
           style=[("marginBottom", 8.0)],
         ),
       ],
       code=[
-        "// 固定宽 / 百分比 / flex 三种宽度模型",
-        "@yue.hbox([",
-        "  @yue.label_t(\"固定 80\", role=@yue.Body,",
-        "    style=[(\"width\", 80.0), (\"height\", 40.0)]),",
-        "  @yue.label_t(\"50%\", role=@yue.Body,",
-        "    style=[(\"height\", 40.0)], style_str=[(\"width\", \"50%\")]),",
-        "  @yue.label_t(\"flex 1\", role=@yue.Body,",
-        "    style=[(\"height\", 40.0), (\"flex\", 1.0)]),",
-        "])",
-        "// hsplit:拖动 6px 把手调整两栏占比",
+        "// 固定宽 / 百分比 / flex 三种宽度模型", "@yue.hbox([", "  @yue.label_t(\"固定 80\", role=@yue.Body,",
+        "    style=[(\"width\", 80.0), (\"height\", 40.0)]),", "  @yue.label_t(\"50%\", role=@yue.Body,",
+        "    style=[(\"height\", 40.0)], style_str=[(\"width\", \"50%\")]),", "  @yue.label_t(\"flex 1\", role=@yue.Body,",
+        "    style=[(\"height\", 40.0), (\"flex\", 1.0)]),", "])", "// hsplit:拖动 6px 把手调整两栏占比",
         "@yue.hsplit(tree_view, detail_view, min_first=120.0)",
       ],
     ),

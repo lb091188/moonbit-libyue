@@ -7,6 +7,7 @@ fn page_nav(app : App) -> @yue.Node {
   let step = @yue.Signal::new(1)
   scroll_page([
     section(
+      "侧栏",
       "Side Menu 侧边导航",
       "窗口左侧即本组件;组标题可折叠收起,选中浅蓝底 + 主题色强调条。",
       [
@@ -19,33 +20,29 @@ fn page_nav(app : App) -> @yue.Node {
       ],
       code=[
         "// 窗口左侧即本组件:组标题 + 菜单项,选中态自动管理",
-        "let selected = @yue.Store::new(\"基础组件\")",
-        "@yue.side_menu_sections(",
+        "let selected = @yue.Store::new(\"基础组件\")", "@yue.side_menu_sections(",
         "  [(\"组件\", [\"基础组件\", \"表单组件\"]), (\"系统能力\", [\"系统集成\"])],",
-        "  selected,",
-        "  icons=[(\"基础组件\", @yue.Grid), (\"系统集成\", @yue.Gear)],",
+        "  selected,", "  icons=[(\"基础组件\", @yue.Grid), (\"系统集成\", @yue.Gear)],",
         ")",
       ],
     ),
     section(
+      "菜单",
       "菜单(主题化 ContextMenu / DropdownMenu)",
       "context_menu_for 包右键原生菜单(悬停高亮 + 点击);DropdownMenu 点字段弹候选(两套用途不同:前者右键显隐,后者顶部展开)。",
       [
         @yue.hbox(
           [
-            @yue.context_menu_for(
-              @yue.tag("右键我", "#2D68C4"),
-              [
-                ("复制", fn() { app.picked_lang.set("已复制") }),
-                ("重命名", fn() { app.picked_lang.set("重命名") }),
-                ("-", fn() {  }),
-                ("删除", fn() { app.picked_lang.set("已删除") }),
-              ],
-            ),
+            @yue.context_menu_for(@yue.tag("右键我", "#2D68C4"), [
+              ("复制", fn() { app.picked_lang.set("已复制") }),
+              ("重命名", fn() { app.picked_lang.set("重命名") }),
+              ("-", fn() {  }),
+              ("删除", fn() { app.picked_lang.set("已删除") }),
+            ]),
             @yue.dropdown_menu(
-                  "操作",
-                  ["打开", "保存", "-", "复制链接", "删除"],
-                  fn(i) { app.picked_lang.set("菜单项 \{i}") },
+              "操作",
+              ["打开", "保存", "-", "复制链接", "删除"],
+              fn(i) { app.picked_lang.set("菜单项 \{i}") },
               width=140.0,
             ),
             @yue.bind(app.picked_lang, fn(s) { "最近操作:\{s}" }),
@@ -55,24 +52,15 @@ fn page_nav(app : App) -> @yue.Node {
       ],
       code=[
         "// context_menu_for:给任意节点包右键菜单(\"-\" 为分隔线)",
-        "@yue.context_menu_for(",
-        "  @yue.tag(\"右键我\", \"#2D68C4\"),",
-        "  [",
-        "    (\"复制\", fn() { println(\"复制\") }),",
-        "    (\"-\", fn() { () }),",
-        "    (\"删除\", fn() { println(\"删除\") }),",
-        "  ],",
-        ")",
-        "// dropdown_menu:点字段顶部弹候选",
-        "@yue.dropdown_menu(",
-        "  \"操作\",",
-        "  [\"打开\", \"保存\", \"-\", \"删除\"],",
-        "  fn(i) { println(\"菜单项 \\{i}\") },",
-        "  width=140.0,",
-        ")",
+        "@yue.context_menu_for(", "  @yue.tag(\"右键我\", \"#2D68C4\"),", "  [",
+        "    (\"复制\", fn() { println(\"复制\") }),", "    (\"-\", fn() { () }),",
+        "    (\"删除\", fn() { println(\"删除\") }),", "  ],", ")", "// dropdown_menu:点字段顶部弹候选",
+        "@yue.dropdown_menu(", "  \"操作\",", "  [\"打开\", \"保存\", \"-\", \"删除\"],",
+        "  fn(i) { println(\"菜单项 \\{i}\") },", "  width=140.0,", ")",
       ],
     ),
     section(
+      "原生菜单",
       "菜单(原生 Menu::popup_at)",
       "Menu::new + popup_at 弹原生右键菜单(系统主题外观),与上面主题化段对照。",
       [
@@ -96,57 +84,57 @@ fn page_nav(app : App) -> @yue.Node {
         ),
       ],
       code=[
-        "// Menu::popup_at 弹原生右键菜单(系统主题外观)",
-        "@yue.button_t(\"点我弹原生菜单\", on_click=fn() {",
-        "  let menu = @yue.Menu::new()",
-        "  let a = menu.add_label_item(\"第一项\")",
-        "  a.on_click(fn() { println(\"第一项\") })",
-        "  let _ = menu.add_separator()",
-        "  let (mx, my) = @yue.mouse_location()",
-        "  menu.popup_at(mx, my)",
-        "})",
+        "// Menu::popup_at 弹原生右键菜单(系统主题外观)", "@yue.button_t(\"点我弹原生菜单\", on_click=fn() {",
+        "  let menu = @yue.Menu::new()", "  let a = menu.add_label_item(\"第一项\")",
+        "  a.on_click(fn() { println(\"第一项\") })", "  let _ = menu.add_separator()",
+        "  let (mx, my) = @yue.mouse_location()", "  menu.popup_at(mx, my)", "})",
       ],
     ),
     section(
+      "菜单栏",
       "菜单栏(窗口顶部 MenuBar)",
       "窗口顶部原生菜单栏(文件/编辑/演示)由 main.mbt 挂载,此处仅示意结构:MenuItem 支持快捷键 + 角色项 + 分隔线,未注册项由系统自动省略。",
       [
         @yue.descriptions([
-          ("快捷键", "about.set_accelerator(\"CmdOrCtrl+I\") 注册系统级加速键"),
-          ("角色项", "edit.add_role_item(Copy/Cut/Paste/SelectAll) 取平台原生文案与图标"),
-          ("分隔线", "add_separator() 插入不可点分隔线;演示菜单可遍历 item_count/item_at"),
+          (
+            "快捷键", "about.set_accelerator(\"CmdOrCtrl+I\") 注册系统级加速键",
+          ),
+          (
+            "角色项", "edit.add_role_item(Copy/Cut/Paste/SelectAll) 取平台原生文案与图标",
+          ),
+          (
+            "分隔线", "add_separator() 插入不可点分隔线;演示菜单可遍历 item_count/item_at",
+          ),
         ]),
       ],
       code=[
-        "// 窗口 handle 里挂菜单栏(w 为 Window 句柄)",
-        "let bar = @yue.MenuBar::new()",
-        "let file = bar.add_menu(\"文件\")",
-        "let about = file.add_label_item(\"关于\")",
-        "about.set_accelerator(\"CmdOrCtrl+I\")   // 系统级加速键",
-        "let _ = file.add_separator()",
-        "let edit = bar.add_menu(\"编辑\")",
-        "let _ = edit.add_role_item(@yue.Copy)    // 平台原生文案与图标",
+        "// 窗口 handle 里挂菜单栏(w 为 Window 句柄)", "let bar = @yue.MenuBar::new()",
+        "let file = bar.add_menu(\"文件\")", "let about = file.add_label_item(\"关于\")",
+        "about.set_accelerator(\"CmdOrCtrl+I\")   // 系统级加速键", "let _ = file.add_separator()",
+        "let edit = bar.add_menu(\"编辑\")", "let _ = edit.add_role_item(@yue.Copy)    // 平台原生文案与图标",
         "w.set_menubar(bar)",
       ],
     ),
     section(
+      "分段",
       "Segmented 分段控制器",
       "顶栏导航形态:选中白底 + 主题色文字,悬停灰底过渡;与左侧菜单共享状态(此处演示切换)。",
       [
         @yue.segmented(
-          ["基础组件", "表单组件", "导航组件", "数据展示", "反馈组件"],
+          [
+            "基础组件", "表单组件", "导航组件", "数据展示", "反馈组件",
+          ],
           app.selected,
         ),
       ],
       code=[
         "// 顶栏导航形态:选中白底 + 主题色文字,悬停灰底过渡",
-        "@yue.segmented(",
-        "  [\"基础组件\", \"表单组件\", \"导航组件\"],",
-        "  selected,   // 与侧边菜单共享同一导航 Store",
-        ")",
+        "@yue.segmented(", "  [\"基础组件\", \"表单组件\", \"导航组件\"],",
+        "  selected,   // 与侧边菜单共享同一导航 Store", ")",
       ],
     ),
     section(
+      "页签",
       "Tabs 页签",
       "顶部页签形态:选中主题色文字 + 底部指示条,内容区切换。",
       [
@@ -167,32 +155,37 @@ fn page_nav(app : App) -> @yue.Node {
       ],
       code=[
         "// 顶部页签:选中主题色文字 + 底部指示条,内容区切换",
-        "@yue.tabs_t([",
-        "  (\"概览\", @yue.label_t(\"这里是概览页内容。\", role=@yue.Body)),",
+        "@yue.tabs_t([", "  (\"概览\", @yue.label_t(\"这里是概览页内容。\", role=@yue.Body)),",
         "  (\"日志\", @yue.label_t(\"这里是日志页内容。\", role=@yue.Body)),",
         "])",
       ],
     ),
     section(
+      "面包屑",
       "Breadcrumb 面包屑",
       "层级随选中态联动:当前项深色,其余灰色可点、悬停变主题色。项名即页面名,点击直达(面包屑与侧边菜单共享同一导航状态,写不存在的页面名会把所有页隐藏)。",
-      [@yue.breadcrumb(["数据展示", "导航组件", "基础组件"], app.selected)],
+      [
+        @yue.breadcrumb(
+          ["数据展示", "导航组件", "基础组件"],
+          app.selected,
+        ),
+      ],
       code=[
-        "// 层级随选中态联动:当前项深色,其余灰色可点",
-        "@yue.breadcrumb([\"数据展示\", \"导航组件\", \"基础组件\"], selected)",
+        "// 层级随选中态联动:当前项深色,其余灰色可点", "@yue.breadcrumb([\"数据展示\", \"导航组件\", \"基础组件\"], selected)",
       ],
     ),
     section(
+      "分页",
       "Pagination 分页",
       "当前页主题色实底白字,悬停浅蓝;点击页码切换。",
       [@yue.pagination(page_no.store(), 5)],
       code=[
-        "// 当前页主题色实底白字,点击页码切换;5 为总页数",
-        "let page_no = @yue.Signal::new(2)",
+        "// 当前页主题色实底白字,点击页码切换;5 为总页数", "let page_no = @yue.Signal::new(2)",
         "@yue.pagination(page_no.store(), 5)",
       ],
     ),
     section(
+      "步骤条",
       "Steps 步骤条",
       "完成/当前/待办三态:浅蓝、实底白字、灰;点按钮推进或回退。",
       [
@@ -210,20 +203,16 @@ fn page_nav(app : App) -> @yue.Node {
               })
             }),
             @yue.label(" "),
-            @yue.button_t(
-              "下一步",
-              variant=@yue.Solid,
-              on_click=fn() {
-                step.update(fn(n) {
-                  let m = n + 2
-                  if m > 2 {
-                    2
-                  } else {
-                    m
-                  }
-                })
-              },
-            ),
+            @yue.button_t("下一步", variant=@yue.Solid, on_click=fn() {
+              step.update(fn(n) {
+                let m = n + 2
+                if m > 2 {
+                  2
+                } else {
+                  m
+                }
+              })
+            }),
             @yue.label(" "),
             @yue.bind(step, fn(n) { "当前第 \{n + 1} 步" }),
           ],
@@ -231,12 +220,9 @@ fn page_nav(app : App) -> @yue.Node {
         ),
       ],
       code=[
-        "// 完成/当前/待办三态:浅蓝、实底白字、灰",
-        "let step = @yue.Signal::new(1)",
-        "@yue.steps([\"填写\", \"确认\", \"完成\"], step.store())",
-        "@yue.button_t(\"下一步\", variant=@yue.Solid, on_click=fn() {",
-        "  step.update(fn(n) { if n + 1 > 2 { 2 } else { n + 1 } })",
-        "})",
+        "// 完成/当前/待办三态:浅蓝、实底白字、灰", "let step = @yue.Signal::new(1)",
+        "@yue.steps([\"填写\", \"确认\", \"完成\"], step.store())", "@yue.button_t(\"下一步\", variant=@yue.Solid, on_click=fn() {",
+        "  step.update(fn(n) { if n + 1 > 2 { 2 } else { n + 1 } })", "})",
       ],
     ),
   ])

@@ -16,40 +16,45 @@ fn is_linux() -> Bool {
 const SHOWCASE_TITLE : String = "组件库演示板"
 
 ///|
-/// 一段演示:标题 + 一句说明 + 内容区 + 分隔留白。
-/// 标题/说明走 label_t 文字角色(Section / Secondary);code 传入时
-/// 内容区改由 code_switcher 包住——segmented「演示 / 代码」一键切换,
-/// 复制按钮常驻,代码是该章节最小自包含的演示代码。
+/// 声明一段演示:name 是段列表短名(页内唯一),title/desc/content/code
+/// 为该段正文四件套;实际节点由 scroll_page 统一装配。
 fn section(
+  name : String,
   title : String,
   desc : String,
   content : Array[@yue.Node],
   code? : Array[String] = [],
-) -> @yue.Node {
-  let t = @yue.label_t(title, role=@yue.Section, style=[
-    ("marginBottom", 4.0),
-  ])
-  let d = @yue.label_t(desc, role=@yue.Secondary, style=[
-    ("marginBottom", 10.0),
-  ])
-  let nodes : Array[@yue.Node] = [t, d]
-  if code.length() > 0 {
-    nodes.push(code_switcher(content, code))
-  } else {
-    for c in content {
-      nodes.push(c)
-    }
-  }
-  nodes.push(@yue.separator(style=[("marginTop", 4.0), ("marginBottom", 20.0)]))
-  @yue.vbox(nodes, style=[("marginBottom", 6.0)])
+) -> Section {
+  { name, title, desc, content, code, }
 }
 
 ///|
-/// 一页 = 整页滚动区包住全部分段。
-fn scroll_page(sections : Array[@yue.Node]) -> @yue.Node {
-  @yue.scroll(@yue.vbox(sections, style=[("padding", 14.0)]), style=[
-    ("flex", 1.0),
-  ])
+/// 一页 = 顶部 segmented 段列表(超宽自动换行)+ 滚动正文;选中某段
+/// 显示该段 标题/演示/说明/代码,其余段隐藏(不重建)。
+fn scroll_page(secs : Array[Section]) -> @yue.Node {
+  let selected : @yue.Store[String] = @yue.Store::new(secs[0].name)
+  let names : Array[String] = []
+  for s in secs {
+    names.push(s.name)
+  }
+  let strip = @yue.hbox(
+    [@yue.segmented(names, selected)],
+    style=[("paddingLeft", 14.0), ("paddingRight", 14.0), ("paddingTop", 10.0)],
+    style_str=[("flexWrap", "wrap"), ("alignItems", "center")],
+  )
+  let bodies : Array[@yue.Node] = []
+  for s in secs {
+    bodies.push(section_body(s, selected))
+  }
+  @yue.vbox(
+    [
+      strip,
+      @yue.scroll(@yue.vbox(bodies, style=[("padding", 14.0)]), style=[
+        ("flex", 1.0),
+      ]),
+    ],
+    style=[("flex", 1.0)],
+  )
 }
 
 ///|
@@ -100,11 +105,7 @@ struct App {
 
 ///|
 /// 推送一条轻提示(转发 toast 函数字段;函数值字段不能直接点调用)。
-fn App::toast_push(
-  self : App,
-  text : String,
-  t : @yue.SemanticType,
-) -> Unit {
+fn App::toast_push(self : App, text : String, t : @yue.SemanticType) -> Unit {
   (self.toast)(text, t)
 }
 
@@ -153,7 +154,13 @@ fn main {
     let dark = app.dark_mode.get()
     let accent = app.accent.get()
     if accent == "" {
-      @yue.theme_apply(if dark { @yue.dark_theme() } else { @yue.default_theme() })
+      @yue.theme_apply(
+        if dark {
+          @yue.dark_theme()
+        } else {
+          @yue.default_theme()
+        },
+      )
     } else {
       @yue.theme_apply(@yue.theme_from_accent(accent, dark~))
     }
@@ -161,7 +168,9 @@ fn main {
 
   app.dark_mode.subscribe(fn(_v) { apply_theme() })
   app.accent.subscribe(fn(_a) { apply_theme() })
-  @yue.on_system_theme_change(fn() { app.dark_mode.set(@yue.system_prefers_dark()) })
+  @yue.on_system_theme_change(fn() {
+    app.dark_mode.set(@yue.system_prefers_dark())
+  })
   // 初始应用一次(subscribe 注册不回调):系统深浅 + 系统主色
   apply_theme()
 
@@ -172,7 +181,9 @@ fn main {
       app.si_role.set("首实例:已持有 org.moonbitlibyue.Showcase")
       @yue.set_instance_window_title(SHOWCASE_TITLE)
       si.on_activate(fn(args) {
-        app.si_wake.set("收到唤起:参数 \{args.length()} 个 [\{args.join(" ")}]")
+        app.si_wake.set(
+          "收到唤起:参数 \{args.length()} 个 [\{args.join(" ")}]",
+        )
         app.toast_push("第二实例唤起了本窗口", @yue.Info)
         match app.win_ref.val {
           Some(w) => {
@@ -208,12 +219,21 @@ fn main {
                       (
                         "组件",
                         [
-                          "基础组件", "图标库", "表单组件", "导航组件", "数据展示",
-                          "图表", "反馈组件", "代码与文档", "事件与布局", "Store 对照",
+                          "基础组件", "图标库", "表单组件", "导航组件",
+                          "数据展示", "图表", "反馈组件", "代码与文档",
+                          "事件与布局", "Store 对照",
                         ],
                       ),
-                      ("原生与自绘", ["原生控件", "画布与富文本"]),
-                      ("系统能力", ["系统集成", "窗口", "浏览器", "环境与平台"]),
+                      (
+                        "原生与自绘",
+                        ["原生控件", "画布与富文本"],
+                      ),
+                      (
+                        "系统能力",
+                        [
+                          "系统集成", "窗口", "浏览器", "环境与平台",
+                        ],
+                      ),
                     ],
                     selected,
                     icons=[
@@ -243,7 +263,11 @@ fn main {
             @yue.label_t(
               "moonbit-libyue \{@yue.VERSION}",
               role=@yue.Secondary,
-              style=[("paddingLeft", 20.0), ("paddingTop", 6.0), ("paddingBottom", 10.0)],
+              style=[
+                ("paddingLeft", 20.0),
+                ("paddingTop", 6.0),
+                ("paddingBottom", 10.0),
+              ],
             ),
           ],
           style=[("width", 180.0)],
@@ -260,11 +284,9 @@ fn main {
           [
             @yue.hbox(
               [
-                @yue.button_t(
-                  "切换深浅",
-                  variant=@yue.Soft,
-                  on_click=fn() { app.dark_mode.update(fn(v) { !v }) },
-                ),
+                @yue.button_t("切换深浅", variant=@yue.Soft, on_click=fn() {
+                  app.dark_mode.update(fn(v) { !v })
+                }),
                 @yue.label("      "),
                 @yue.tag("MoonShell", "#2D68C4"),
               ],
@@ -313,8 +335,14 @@ fn main {
           app.dlg_basic,
           "删除确认",
           [
-            @yue.alert_closeable("此操作不可撤销,请确认。", @yue.Warning),
-            @yue.label_t("确定要删除「示例项目」吗?", role=@yue.Body),
+            @yue.alert_closeable(
+              "此操作不可撤销,请确认。",
+              @yue.Warning,
+            ),
+            @yue.label_t(
+              "确定要删除「示例项目」吗?",
+              role=@yue.Body,
+            ),
           ],
           confirm_text="删除",
           cancel_text="取消",
@@ -326,7 +354,9 @@ fn main {
           "新建连接",
           [
             @yue.label_t("名称", role=@yue.Body),
-            @yue.input_t(text="例如:开发库", width=320.0, on_input=fn(t) { app.dlg_name.set(t) }),
+            @yue.input_t(text="例如:开发库", width=320.0, on_input=fn(t) {
+              app.dlg_name.set(t)
+            }),
             @yue.label_t("地址", role=@yue.Body),
             @yue.input_t(text="host:port", width=320.0),
           ],
@@ -385,7 +415,9 @@ fn main {
       // 关闭拦截:系统集成页勾选后,点窗口关闭被 set_should_close 拦下
       w.set_should_close(fn() {
         if app.close_veto.val {
-          app.veto_info.set("关闭请求被 set_should_close 拦截(回「系统集成」页解除)")
+          app.veto_info.set(
+            "关闭请求被 set_should_close 拦截(回「系统集成」页解除)",
+          )
           return false
         }
         true
@@ -396,7 +428,9 @@ fn main {
           Ok(tray) => {
             app.tray_ref.val = Some(tray)
             tray.set_title("components")
-            tray.set_tooltip("moonbit-libyue 组件库演示板", "左键计数,右键菜单")
+            tray.set_tooltip(
+              "moonbit-libyue 组件库演示板", "左键计数,右键菜单",
+            )
             let menu = @yue.Menu::new()
             let show_item = menu.add_label_item("显示主窗口")
             show_item.on_click(fn() { w.activate() })

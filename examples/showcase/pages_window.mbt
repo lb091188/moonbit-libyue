@@ -8,6 +8,7 @@ fn page_window(_app : App) -> @yue.Node {
   // WebView 全能力演示迁至独立「浏览器」页(见 pages_browser.mbt)
   scroll_page([
     section(
+      "窗口",
       "窗口 API",
       "运行期操作窗口:改标题 / 最大化 / 全屏 / 置顶 / 还原尺寸。",
       [
@@ -23,7 +24,7 @@ fn page_window(_app : App) -> @yue.Node {
           }),
           @yue.button_t("最大化/还原", on_click=fn() {
             match win.win_ref.val {
-              Some(w) => {
+              Some(w) =>
                 if w.is_maximized() {
                   w.unmaximize()
                   win.toast_push("已还原", @yue.Info)
@@ -31,7 +32,6 @@ fn page_window(_app : App) -> @yue.Node {
                   w.maximize()
                   win.toast_push("已最大化", @yue.Info)
                 }
-              }
               None => ()
             }
           }),
@@ -50,7 +50,11 @@ fn page_window(_app : App) -> @yue.Node {
                 ontop.val = !ontop.val
                 w.set_always_on_top(ontop.val)
                 win.toast_push(
-                  if ontop.val { "已置顶" } else { "已取消置顶" },
+                  if ontop.val {
+                    "已置顶"
+                  } else {
+                    "已取消置顶"
+                  },
                   @yue.Info,
                 )
               }
@@ -69,20 +73,14 @@ fn page_window(_app : App) -> @yue.Node {
         ]),
       ],
       code=[
-        "// w 为窗口句柄(挂载时经 handle 取得)",
-        "w.set_title(\"components · 标题已改\")",
-        "if w.is_maximized() {",
-        "  w.unmaximize()",
-        "} else {",
-        "  w.maximize()",
-        "}",
-        "w.set_fullscreen(!w.is_fullscreen())",
-        "w.set_always_on_top(true)",
-        "w.set_content_size(1280.0, 720.0)",
-        "w.activate()",
+        "// w 为窗口句柄(挂载时经 handle 取得)", "w.set_title(\"components · 标题已改\")",
+        "if w.is_maximized() {", "  w.unmaximize()", "} else {", "  w.maximize()",
+        "}", "w.set_fullscreen(!w.is_fullscreen())", "w.set_always_on_top(true)",
+        "w.set_content_size(1280.0, 720.0)", "w.activate()",
       ],
     ),
     section(
+      "快捷键",
       "全局快捷键",
       "应用外生效的系统快捷键(Ctrl+Alt+C)。",
       [
@@ -93,7 +91,10 @@ fn page_window(_app : App) -> @yue.Node {
                 win.toast_push("全局快捷键触发!", @yue.Success)
               }),
             )
-            win.toast_push("已注册,切到别的窗口按 Ctrl+Alt+C 试试", @yue.Info)
+            win.toast_push(
+              "已注册,切到别的窗口按 Ctrl+Alt+C 试试",
+              @yue.Info,
+            )
           }),
           @yue.button_t("注销全部", on_click=fn() {
             @yue.unregister_all_global_shortcuts()
@@ -102,20 +103,20 @@ fn page_window(_app : App) -> @yue.Node {
         ]),
       ],
       code=[
-        "// 应用外生效的系统快捷键",
-        "ignore(@yue.register_global_shortcut(\"Ctrl+Alt+C\", fn() {",
-        "  println(\"触发!\")",
-        "}))",
-        "@yue.unregister_all_global_shortcuts()",
+        "// 应用外生效的系统快捷键", "ignore(@yue.register_global_shortcut(\"Ctrl+Alt+C\", fn() {",
+        "  println(\"触发!\")", "}))", "@yue.unregister_all_global_shortcuts()",
       ],
     ),
     section(
+      "拖入",
       "拖放接收",
       "register_dragged_types 注册接收文件/文本,从文件管理器拖入下方色块。",
       [
         @yue.vbox(
           [
-            @yue.label_t("把文件拖进来", role=@yue.Body, handle=fn(_l) {  }),
+            @yue.label_t("把文件拖进来", role=@yue.Body, handle=fn(_l) {
+
+            }),
           ],
           style=[("height", 70.0), ("width", 420.0), ("padding", 10.0)],
           handle=fn(c) {
@@ -127,7 +128,8 @@ fn page_window(_app : App) -> @yue.Node {
             c.handle_drag_update(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })
             c.handle_drop(fn(info, _x, _y) {
               match info.get_data(@yue.Image) {
-                Some(@yue.Img(_)) => win.toast_push("拖入图片", @yue.Success)
+                Some(@yue.Img(_)) =>
+                  win.toast_push("拖入图片", @yue.Success)
                 _ =>
                   match info.get_data(@yue.FilePaths) {
                     Some(@yue.Paths(paths)) => {
@@ -138,7 +140,10 @@ fn page_window(_app : App) -> @yue.Node {
                         }
                         sb.write_string(p)
                       }
-                      win.toast_push("拖入 \{paths.length()} 个文件", @yue.Success)
+                      win.toast_push(
+                        "拖入 \{paths.length()} 个文件",
+                        @yue.Success,
+                      )
                     }
                     _ => win.toast_push("拖入文本", @yue.Info)
                   }
@@ -150,20 +155,15 @@ fn page_window(_app : App) -> @yue.Node {
       ],
       code=[
         "// c 为接收区容器句柄;注册类型后按序挂三个处理器",
-        "c.register_dragged_types([@yue.FilePaths, @yue.Text, @yue.Image])",
-        "c.handle_drag_enter(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })",
-        "// drag-update 不注册则一律拒绝(drop 永不发生)",
-        "c.handle_drag_update(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })",
-        "c.handle_drop(fn(info, _x, _y) {",
-        "  match info.get_data(@yue.FilePaths) {",
+        "c.register_dragged_types([@yue.FilePaths, @yue.Text, @yue.Image])", "c.handle_drag_enter(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })",
+        "// drag-update 不注册则一律拒绝(drop 永不发生)", "c.handle_drag_update(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })",
+        "c.handle_drop(fn(info, _x, _y) {", "  match info.get_data(@yue.FilePaths) {",
         "    Some(@yue.Paths(paths)) => println(\"拖入 \\{paths.length()} 个文件\")",
-        "    _ => ()",
-        "  }",
-        "  true",
-        "})",
+        "    _ => ()", "  }", "  true", "})",
       ],
     ),
     section(
+      "拖出",
       "拖出发起",
       "do_drag_file_paths 发起系统拖拽:按住下方色块拖到文件管理器即拖出 icon.png。",
       [
@@ -172,10 +172,15 @@ fn page_window(_app : App) -> @yue.Node {
           style=[("height", 60.0), ("width", 200.0), ("padding", 10.0)],
           handle=fn(c) {
             @yue.theme_bind_bg(c, fn() { @yue.theme_current().primary_light })
-            let img : @yue.Image? = match @yue.read_binary_file("examples/showcase/icon.png") {
+            let img : @yue.Image? = match
+              @yue.read_binary_file("examples/showcase/icon.png") {
               Some(bytes) => {
                 let i = @yue.Image::new_from_png(bytes)
-                if i.is_empty() { None } else { Some(i) }
+                if i.is_empty() {
+                  None
+                } else {
+                  Some(i)
+                }
               }
               None => None
             }
@@ -188,14 +193,9 @@ fn page_window(_app : App) -> @yue.Node {
       ],
       code=[
         "// do_drag_file_paths 发起系统拖拽(第二个参数为拖动跟随图)",
-        "let img : @yue.Image? = match @yue.read_binary_file(\"icon.png\") {",
-        "  Some(bytes) => Some(@yue.Image::new_from_png(bytes))",
-        "  None => None",
-        "}",
-        "c.on_mouse_down(fn(_e) {",
-        "  ignore(c.do_drag_file_paths([\"icon.png\"], img))",
-        "  true",
-        "})",
+        "let img : @yue.Image? = match @yue.read_binary_file(\"icon.png\") {", "  Some(bytes) => Some(@yue.Image::new_from_png(bytes))",
+        "  None => None", "}", "c.on_mouse_down(fn(_e) {", "  ignore(c.do_drag_file_paths([\"icon.png\"], img))",
+        "  true", "})",
       ],
     ),
   ])

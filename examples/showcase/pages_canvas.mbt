@@ -80,6 +80,7 @@ fn page_canvas(_app : App) -> @yue.Node {
   let rt_ellipsis = Ref(false)
   scroll_page([
     section(
+      "自绘",
       "自绘原语(Painter)",
       "fill_rect / arc / stroke_rect / draw_text 等基础绘制;线条色 + 填充色 + 圆环 + 网格 + 文本同屏。",
       [
@@ -111,7 +112,10 @@ fn page_canvas(_app : App) -> @yue.Node {
           @yue.button_t("导出缩放图", variant=@yue.Solid, on_click=fn() {
             match canvas_img.val {
               Some(img) => {
-                let half = img.resize(img.get_width() / 2.0, img.get_height() / 2.0)
+                let half = img.resize(
+                  img.get_width() / 2.0,
+                  img.get_height() / 2.0,
+                )
                 let ok = half.write_to_file("png", "build/components_half.png")
                 canvas_info.set(
                   if ok {
@@ -125,27 +129,22 @@ fn page_canvas(_app : App) -> @yue.Node {
             }
           }),
         ]),
-        @yue.bind_label(canvas_info, fn(s) { "混合模式:\{s}" }, style=[("marginTop", 8.0)]),
+        @yue.bind_label(canvas_info, fn(s) { "混合模式:\{s}" }, style=[
+          ("marginTop", 8.0),
+        ]),
       ],
       code=[
         "// container on_draw 里拿 Painter 自绘;改状态后 schedule_paint",
-        "@yue.container(",
-        "  on_draw=fn(p) {",
-        "    p.set_fill_color(\"#4B8BE8\")",
-        "    p.fill_rect(10.0, 10.0, 80.0, 60.0)",
-        "    p.arc(200.0, 40.0, 30.0, 0.0, 6.28318)",
-        "    p.fill()",
-        "    p.set_stroke_color(\"#4A5060\")",
-        "    p.stroke_rect(10.0, 90.0, 592.0, 1.0)",
-        "    p.draw_text(\"自绘文本\", 24.0, 110.0, 592.0, 30.0,",
-        "      align=@yue.TextAlign::Center)",
-        "  },",
-        "  handle=fn(c) { c.on_size_changed(fn() { c.schedule_paint() }) },",
-        "  style=[(\"height\", 300.0), (\"width\", 640.0)],",
-        ")",
+        "@yue.container(", "  on_draw=fn(p) {", "    p.set_fill_color(\"#4B8BE8\")",
+        "    p.fill_rect(10.0, 10.0, 80.0, 60.0)", "    p.arc(200.0, 40.0, 30.0, 0.0, 6.28318)",
+        "    p.fill()", "    p.set_stroke_color(\"#4A5060\")", "    p.stroke_rect(10.0, 90.0, 592.0, 1.0)",
+        "    p.draw_text(\"自绘文本\", 24.0, 110.0, 592.0, 30.0,", "      align=@yue.TextAlign::Center)",
+        "  },", "  handle=fn(c) { c.on_size_changed(fn() { c.schedule_paint() }) },",
+        "  style=[(\"height\", 300.0), (\"width\", 640.0)],", ")",
       ],
     ),
     section(
+      "图像",
       "图像与混合模式",
       "draw_image 叠 PNG(右下角)+ blend_mode(Normal/Multiply/Screen/Difference/Xor);导出缩略图到运行目录 build/。Windows 的 GDI+ 合成仅支持 Normal/Copy,其余模式无效果(Linux/macOS 完整)。",
       [
@@ -163,22 +162,15 @@ fn page_canvas(_app : App) -> @yue.Node {
         ),
       ],
       code=[
-        "// 读 PNG → draw_image 叠加;blend_mode 切混合",
-        "match @yue.read_binary_file(\"examples/showcase/icon.png\") {",
-        "  Some(bytes) => {",
-        "    let img = @yue.Image::new_from_png(bytes)",
-        "    p.set_blend_mode(@yue.Multiply)   // Multiply/Screen/Difference/Xor",
-        "    p.draw_image(img, 10.0, 10.0, 80.0, 80.0)",
-        "    p.set_blend_mode(@yue.Normal)",
-        "  }",
-        "  None => ()",
-        "}",
-        "// 导出缩放图到文件",
-        "let half = img.resize(img.get_width() / 2.0, img.get_height() / 2.0)",
+        "// 读 PNG → draw_image 叠加;blend_mode 切混合", "match @yue.read_binary_file(\"examples/showcase/icon.png\") {",
+        "  Some(bytes) => {", "    let img = @yue.Image::new_from_png(bytes)", "    p.set_blend_mode(@yue.Multiply)   // Multiply/Screen/Difference/Xor",
+        "    p.draw_image(img, 10.0, 10.0, 80.0, 80.0)", "    p.set_blend_mode(@yue.Normal)",
+        "  }", "  None => ()", "}", "// 导出缩放图到文件", "let half = img.resize(img.get_width() / 2.0, img.get_height() / 2.0)",
         "half.write_to_file(\"png\", \"build/half.png\")",
       ],
     ),
     section(
+      "富文本",
       "富文本 AttributedText",
       "范围字体/颜色(0-6 号加粗、8-11 号红色);换行/省略号/改写。",
       [
@@ -188,7 +180,13 @@ fn page_canvas(_app : App) -> @yue.Node {
               Some(c) => {
                 let size = c.get_bounds()
                 painter.fill_rect(0.0, 0.0, size.width, size.height)
-                painter.draw_attributed_text(rt, 10.0, 20.0, size.width - 20.0, 100.0)
+                painter.draw_attributed_text(
+                  rt,
+                  10.0,
+                  20.0,
+                  size.width - 20.0,
+                  100.0,
+                )
               }
               None => ()
             }
@@ -242,23 +240,12 @@ fn page_canvas(_app : App) -> @yue.Node {
         ),
       ],
       code=[
-        "// 范围字体/颜色:_for 后缀按字符下标区间应用",
-        "let rt = @yue.AttributedText::new_with(",
-        "  \"MoonBit 富文本:这段文字有范围着色与粗体。\",",
-        "  @yue.TextAttributes::new(),",
-        ")",
-        "rt.set_font(@yue.Font::new(\"Sans\", 20.0, weight=@yue.Bold))",
-        "rt.set_font_for(@yue.Font::new(\"Sans\", 24.0, weight=@yue.Black), 0, 6)",
-        "rt.set_color(\"#356AA0\")",
-        "rt.set_color_for(\"#E5534B\", 8, 11)",
-        "// 换行/省略号经 set_format",
-        "rt.set_format({",
-        "  align: @yue.Start,",
-        "  valign: @yue.Start,",
-        "  wrap: true,",
-        "  ellipsis: false,",
-        "})",
-        "painter.draw_attributed_text(rt, 10.0, 20.0, 600.0, 100.0)",
+        "// 范围字体/颜色:_for 后缀按字符下标区间应用", "let rt = @yue.AttributedText::new_with(",
+        "  \"MoonBit 富文本:这段文字有范围着色与粗体。\",", "  @yue.TextAttributes::new(),",
+        ")", "rt.set_font(@yue.Font::new(\"Sans\", 20.0, weight=@yue.Bold))", "rt.set_font_for(@yue.Font::new(\"Sans\", 24.0, weight=@yue.Black), 0, 6)",
+        "rt.set_color(\"#356AA0\")", "rt.set_color_for(\"#E5534B\", 8, 11)", "// 换行/省略号经 set_format",
+        "rt.set_format({", "  align: @yue.Start,", "  valign: @yue.Start,", "  wrap: true,",
+        "  ellipsis: false,", "})", "painter.draw_attributed_text(rt, 10.0, 20.0, 600.0, 100.0)",
       ],
     ),
   ])
