@@ -154,6 +154,58 @@ pub(all) enum IconKind {
   BarChart
   PieChart
   TableRows
+  // —— 编辑补充 ——
+  Type
+  ArrowUpDown
+  AlignJustify
+  // —— 视图/布局补充 ——
+  Move
+  Expand
+  Shrink
+  RotateCw
+  RotateCcw
+  Columns
+  Rows
+  // —— 状态/反馈补充 ——
+  CheckCircle
+  XCircle
+  InfoCircle
+  Loader
+  BellRing
+  Pin
+  Share
+  // —— 用户 ——
+  UserPlus
+  UserCheck
+  Users
+  // —— 天气 ——
+  Cloudy
+  CloudSun
+  CloudRain
+  CloudSnow
+  Droplet
+  Thermometer
+  Wind
+  // —— 设备 ——
+  Keyboard
+  Mouse
+  Headphones
+  Battery
+  BatteryCharging
+  Signal
+  // —— 商业/物体 ——
+  ShoppingCart
+  CreditCard
+  Gift
+  Percent
+  Rocket
+  Trophy
+  Lightbulb
+  Wrench
+  Compass
+  MapPin
+  Navigation
+  Crown
 } derive(Eq, Debug)
 
 ///|
@@ -1155,11 +1207,337 @@ pub fn draw_icon(
       icon_line(p, cx - 8 * u, cy - 2.5 * u, cx + 8 * u, cy - 2.5 * u)
       icon_line(p, cx - 8 * u, cy + 3 * u, cx + 8 * u, cy + 3 * u)
     }
+    Type => {
+      let u = s / 9.0
+      icon_line(p, cx - 7 * u, cy - 6 * u, cx + 7 * u, cy - 6 * u)
+      icon_line(p, cx, cy - 6 * u, cx, cy + 7 * u)
+    }
+    ArrowUpDown => {
+      let u = s / 9.0
+      icon_line(p, cx - 4.5 * u, cy, cx + 4.5 * u, cy)
+      icon_line(p, cx - 4.5 * u, cy + 3 * u, cx - 4.5 * u, cy - 6 * u)
+      icon_polyline(p, [(cx - 6.5 * u, cy - 4 * u), (cx - 4.5 * u, cy - 6 * u), (cx - 2.5 * u, cy - 4 * u)])
+      icon_line(p, cx + 4.5 * u, cy - 3 * u, cx + 4.5 * u, cy + 6 * u)
+      icon_polyline(p, [(cx + 2.5 * u, cy + 4 * u), (cx + 4.5 * u, cy + 6 * u), (cx + 6.5 * u, cy + 4 * u)])
+    }
+    AlignJustify => {
+      let u = s / 9.0
+      icon_line(p, cx - 7 * u, cy - 6 * u, cx + 7 * u, cy - 6 * u)
+      icon_line(p, cx - 7 * u, cy - 2 * u, cx + 7 * u, cy - 2 * u)
+      icon_line(p, cx - 7 * u, cy + 2 * u, cx + 7 * u, cy + 2 * u)
+      icon_line(p, cx - 7 * u, cy + 6 * u, cx + 7 * u, cy + 6 * u)
+    }
+    Move => {
+      let u = s / 9.0
+      icon_dot(p, cx, cy, 1.2 * u)
+      icon_line(p, cx, cy - 8 * u, cx, cy + 8 * u)
+      icon_line(p, cx - 8 * u, cy, cx + 8 * u, cy)
+      icon_polyline(p, [(cx - 2 * u, cy - 6 * u), (cx, cy - 8 * u), (cx + 2 * u, cy - 6 * u)])
+      icon_polyline(p, [(cx - 2 * u, cy + 6 * u), (cx, cy + 8 * u), (cx + 2 * u, cy + 6 * u)])
+      icon_polyline(p, [(cx - 6 * u, cy - 2 * u), (cx - 8 * u, cy), (cx - 6 * u, cy + 2 * u)])
+      icon_polyline(p, [(cx + 6 * u, cy - 2 * u), (cx + 8 * u, cy), (cx + 6 * u, cy + 2 * u)])
+    }
+    Expand => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 7 * u, cy - 3 * u), (cx - 7 * u, cy - 7 * u), (cx - 3 * u, cy - 7 * u)])
+      icon_polyline(p, [(cx + 3 * u, cy - 7 * u), (cx + 7 * u, cy - 7 * u), (cx + 7 * u, cy - 3 * u)])
+      icon_polyline(p, [(cx + 7 * u, cy + 3 * u), (cx + 7 * u, cy + 7 * u), (cx + 3 * u, cy + 7 * u)])
+      icon_polyline(p, [(cx - 3 * u, cy + 7 * u), (cx - 7 * u, cy + 7 * u), (cx - 7 * u, cy + 3 * u)])
+    }
+    Shrink => {
+      let u = s / 9.0
+      icon_line(p, cx - 3 * u, cy - 3 * u, cx - 7.5 * u, cy - 7.5 * u)
+      icon_polyline(p, [(cx - 4.2 * u, cy - 7.5 * u), (cx - 7.5 * u, cy - 7.5 * u), (cx - 7.5 * u, cy - 4.2 * u)])
+      icon_line(p, cx + 3 * u, cy + 3 * u, cx + 7.5 * u, cy + 7.5 * u)
+      icon_polyline(p, [(cx + 4.2 * u, cy + 7.5 * u), (cx + 7.5 * u, cy + 7.5 * u), (cx + 7.5 * u, cy + 4.2 * u)])
+    }
+    RotateCw => {
+      let u = s / 9.0
+      icon_arc(p, cx, cy, 6.5 * u, -1.5708, 4.6)
+      icon_polyline(p, [(cx + 2.6 * u, cy - 8.2 * u), (cx, cy - 6.5 * u), (cx + 2.6 * u, cy - 4.8 * u)])
+    }
+    RotateCcw => {
+      let u = s / 9.0
+      icon_arc(p, cx, cy, 6.5 * u, -1.46, 4.712)
+      icon_polyline(p, [(cx - 2.6 * u, cy - 8.2 * u), (cx, cy - 6.5 * u), (cx - 2.6 * u, cy - 4.8 * u)])
+    }
+    Columns => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 7 * u, cy - 7 * u), (cx + 7 * u, cy - 7 * u), (cx + 7 * u, cy + 7 * u), (cx - 7 * u, cy + 7 * u)])
+      icon_line(p, cx, cy - 7 * u, cx, cy + 7 * u)
+    }
+    Rows => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 7 * u, cy - 7 * u), (cx + 7 * u, cy - 7 * u), (cx + 7 * u, cy + 7 * u), (cx - 7 * u, cy + 7 * u)])
+      icon_line(p, cx - 7 * u, cy, cx + 7 * u, cy)
+    }
+    CheckCircle => {
+      let u = s / 9.0
+      icon_circle(p, cx, cy, 8 * u)
+      icon_polyline(p, [(cx - 3.6 * u, cy + 0.2 * u), (cx - 1 * u, cy + 2.8 * u), (cx + 4 * u, cy - 2.8 * u)])
+    }
+    XCircle => {
+      let u = s / 9.0
+      icon_circle(p, cx, cy, 8 * u)
+      icon_line(p, cx - 3.2 * u, cy - 3.2 * u, cx + 3.2 * u, cy + 3.2 * u)
+      icon_line(p, cx + 3.2 * u, cy - 3.2 * u, cx - 3.2 * u, cy + 3.2 * u)
+    }
+    InfoCircle => {
+      let u = s / 9.0
+      icon_circle(p, cx, cy, 8 * u)
+      icon_dot(p, cx, cy - 3.5 * u, 0.9 * u)
+      icon_line(p, cx, cy - 0.5 * u, cx, cy + 4 * u)
+    }
+    Loader => {
+      let u = s / 9.0
+      icon_arc(p, cx, cy, 7 * u, -1.5708, 3.14)
+      icon_dot(p, cx, cy, 1.3 * u)
+    }
+    BellRing => {
+      let u = s / 9.0
+      let bx = cx - 1.5 * u
+      icon_outline(p, [(bx + 6 * u, cy + 4 * u), (bx - 6 * u, cy + 4 * u), (bx - 6 * u, cy - 2 * u), (bx - 4.5 * u, cy - 6.2 * u), (bx - 2 * u, cy - 7.8 * u), (bx, cy - 8 * u), (bx + 2 * u, cy - 7.8 * u), (bx + 4.5 * u, cy - 6.2 * u), (bx + 6 * u, cy - 2 * u), (bx + 6 * u, cy + 4 * u)])
+      icon_line(p, bx - 2.5 * u, cy + 7 * u, bx + 2.5 * u, cy + 7 * u)
+      icon_arc(p, cx + 6.5 * u, cy - 2 * u, 2.2 * u, -1.2, 0.7)
+      icon_arc(p, cx + 7 * u, cy - 2.5 * u, 3 * u, -1.0, 0.4)
+    }
+    Pin => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 3 * u, cy - 8 * u), (cx + 3 * u, cy - 8 * u), (cx + 2.5 * u, cy - 3 * u), (cx + 4.5 * u, cy - 1 * u), (cx + 4.5 * u, cy + 0.5 * u), (cx - 4.5 * u, cy + 0.5 * u), (cx - 4.5 * u, cy - 1 * u), (cx - 2.5 * u, cy - 3 * u)])
+      icon_line(p, cx, cy + 0.5 * u, cx, cy + 8 * u)
+    }
+    Share => {
+      let u = s / 9.0
+      icon_circle(p, cx + 5 * u, cy - 6 * u, 2.4 * u)
+      icon_circle(p, cx + 5 * u, cy + 6 * u, 2.4 * u)
+      icon_circle(p, cx - 5 * u, cy, 2.4 * u)
+      icon_line(p, cx - 2.8 * u, cy - 1.3 * u, cx + 2.9 * u, cy - 4.8 * u)
+      icon_line(p, cx - 2.8 * u, cy + 1.3 * u, cx + 2.9 * u, cy + 4.8 * u)
+    }
+    UserPlus => {
+      let u = s / 9.0
+      icon_circle(p, cx - 2 * u, cy - 4 * u, 3.2 * u)
+      p.begin_path()
+      p.arc(cx - 2 * u, cy + 7.5 * u, 6 * u, 3.141592653589793, ICON_TAU)
+      p.stroke()
+      icon_line(p, cx + 4.5 * u, cy - 1 * u, cx + 4.5 * u, cy + 5 * u)
+      icon_line(p, cx + 1.5 * u, cy + 2 * u, cx + 7.5 * u, cy + 2 * u)
+    }
+    UserCheck => {
+      let u = s / 9.0
+      icon_circle(p, cx - 2 * u, cy - 4 * u, 3.2 * u)
+      p.begin_path()
+      p.arc(cx - 2 * u, cy + 7.5 * u, 6 * u, 3.141592653589793, ICON_TAU)
+      p.stroke()
+      icon_polyline(p, [(cx + 2.6 * u, cy + 2 * u), (cx + 4.1 * u, cy + 3.8 * u), (cx + 7.5 * u, cy - 0.5 * u)])
+    }
+    Users => {
+      let u = s / 9.0
+      icon_circle(p, cx - 3 * u, cy - 4.5 * u, 3.2 * u)
+      p.begin_path()
+      p.arc(cx - 3 * u, cy + 8 * u, 6 * u, 3.141592653589793, ICON_TAU)
+      p.stroke()
+      icon_arc(p, cx + 4.5 * u, cy - 4.5 * u, 3 * u, -1.5708, 1.5708)
+      icon_arc(p, cx + 4.5 * u, cy + 8 * u, 6 * u, 3.141592653589793, 4.6)
+    }
+    Cloudy => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 7 * u, cy + 3 * u), (cx - 7 * u, cy - 1 * u), (cx - 5 * u, cy - 4.5 * u), (cx - 1.5 * u, cy - 5.5 * u), (cx + 1 * u, cy - 7.5 * u), (cx + 4 * u, cy - 7 * u), (cx + 6 * u, cy - 4.5 * u), (cx + 7 * u, cy - 1 * u), (cx + 7 * u, cy + 3 * u)])
+    }
+    CloudSun => {
+      let u = s / 9.0
+      icon_circle(p, cx - 3.5 * u, cy - 4 * u, 2.2 * u)
+      icon_line(p, cx - 3.5 * u, cy - 8.5 * u, cx - 3.5 * u, cy - 7.3 * u)
+      icon_line(p, cx - 8 * u, cy - 4 * u, cx - 6.8 * u, cy - 4 * u)
+      icon_line(p, cx - 6.7 * u, cy - 7.2 * u, cx - 5.9 * u, cy - 6.4 * u)
+      icon_line(p, cx - 0.3 * u, cy - 7.2 * u, cx - 1.1 * u, cy - 6.4 * u)
+      icon_outline(p, [(cx + 7 * u, cy + 4.5 * u), (cx - 4 * u, cy + 4.5 * u), (cx - 4 * u, cy + 1.5 * u), (cx - 2 * u, cy - 1 * u), (cx + 1.5 * u, cy - 1.8 * u), (cx + 4 * u, cy - 3.5 * u), (cx + 6 * u, cy - 1.5 * u), (cx + 7 * u, cy + 1 * u)])
+    }
+    CloudRain => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 6.5 * u, cy - 2 * u), (cx - 6.5 * u, cy - 4.5 * u), (cx - 4 * u, cy - 7 * u), (cx + 1 * u, cy - 7.5 * u), (cx + 4.5 * u, cy - 6 * u), (cx + 6.5 * u, cy - 3 * u), (cx + 6.5 * u, cy - 2 * u)])
+      icon_line(p, cx - 6.5 * u, cy - 2 * u, cx + 6.5 * u, cy - 2 * u)
+      icon_line(p, cx - 4 * u, cy + 1 * u, cx - 5.5 * u, cy + 5 * u)
+      icon_line(p, cx, cy + 1 * u, cx - 1.5 * u, cy + 5 * u)
+      icon_line(p, cx + 4 * u, cy + 1 * u, cx + 2.5 * u, cy + 5 * u)
+    }
+    CloudSnow => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 6.5 * u, cy - 2 * u), (cx - 6.5 * u, cy - 4.5 * u), (cx - 4 * u, cy - 7 * u), (cx + 1 * u, cy - 7.5 * u), (cx + 4.5 * u, cy - 6 * u), (cx + 6.5 * u, cy - 3 * u), (cx + 6.5 * u, cy - 2 * u)])
+      icon_line(p, cx - 6.5 * u, cy - 2 * u, cx + 6.5 * u, cy - 2 * u)
+      icon_dot(p, cx - 4.5 * u, cy + 2.5 * u, 0.8 * u)
+      icon_dot(p, cx, cy + 2.5 * u, 0.8 * u)
+      icon_dot(p, cx + 4.5 * u, cy + 2.5 * u, 0.8 * u)
+      icon_dot(p, cx - 2.2 * u, cy + 5 * u, 0.8 * u)
+      icon_dot(p, cx + 2.2 * u, cy + 5 * u, 0.8 * u)
+    }
+    Droplet => {
+      let u = s / 9.0
+      p.begin_path()
+      p.move_to(cx, cy - 8 * u)
+      p.bezier_curve_to(cx, cy - 8 * u, cx + 6 * u, cy - 1 * u, cx + 6 * u, cy + 2 * u)
+      p.arc(cx, cy + 2 * u, 6 * u, 0.0, 3.141592653589793)
+      p.bezier_curve_to(cx - 6 * u, cy - 1 * u, cx, cy - 8 * u, cx, cy - 8 * u)
+      p.close_path()
+      p.stroke()
+    }
+    Thermometer => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 2 * u, cy - 8 * u), (cx + 2 * u, cy - 8 * u), (cx + 2 * u, cy + 1 * u), (cx + 3.5 * u, cy + 2.5 * u), (cx + 3.5 * u, cy + 5 * u), (cx + 1.8 * u, cy + 7.2 * u), (cx - 1.8 * u, cy + 7.2 * u), (cx - 3.5 * u, cy + 5 * u), (cx - 3.5 * u, cy + 2.5 * u), (cx - 2 * u, cy + 1 * u)])
+      icon_line(p, cx, cy - 6 * u, cx, cy + 2 * u)
+      icon_dot(p, cx, cy + 4 * u, 2.2 * u)
+    }
+    Wind => {
+      let u = s / 9.0
+      icon_line(p, cx - 7 * u, cy - 4 * u, cx + 4 * u, cy - 4 * u)
+      icon_arc(p, cx + 4 * u, cy - 5.5 * u, 1.5 * u, 1.5708, 4.712)
+      icon_line(p, cx - 7 * u, cy + 0.5 * u, cx + 1 * u, cy + 0.5 * u)
+      icon_arc(p, cx + 1 * u, cy - 1 * u, 1.5 * u, 1.5708, 4.712)
+      icon_line(p, cx - 4 * u, cy + 5 * u, cx + 5 * u, cy + 5 * u)
+      icon_arc(p, cx + 5 * u, cy + 3.5 * u, 1.5 * u, 1.5708, 4.712)
+    }
+    Keyboard => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 5 * u), (cx + 8 * u, cy - 5 * u), (cx + 8 * u, cy + 5 * u), (cx - 8 * u, cy + 5 * u)])
+      icon_dot(p, cx - 6 * u, cy - 2.2 * u, 0.6 * u)
+      icon_dot(p, cx - 3 * u, cy - 2.2 * u, 0.6 * u)
+      icon_dot(p, cx, cy - 2.2 * u, 0.6 * u)
+      icon_dot(p, cx + 3 * u, cy - 2.2 * u, 0.6 * u)
+      icon_dot(p, cx + 6 * u, cy - 2.2 * u, 0.6 * u)
+      icon_dot(p, cx - 6 * u, cy + 0.6 * u, 0.6 * u)
+      icon_dot(p, cx - 3 * u, cy + 0.6 * u, 0.6 * u)
+      icon_dot(p, cx, cy + 0.6 * u, 0.6 * u)
+      icon_dot(p, cx + 3 * u, cy + 0.6 * u, 0.6 * u)
+      icon_dot(p, cx + 6 * u, cy + 0.6 * u, 0.6 * u)
+      icon_line(p, cx - 4 * u, cy + 3.4 * u, cx + 4 * u, cy + 3.4 * u)
+    }
+    Mouse => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 4 * u, cy - 6.5 * u), (cx + 4 * u, cy - 6.5 * u), (cx + 4 * u, cy + 2 * u), (cx + 2 * u, cy + 7 * u), (cx - 2 * u, cy + 7 * u), (cx - 4 * u, cy + 2 * u)])
+      icon_line(p, cx, cy - 6.5 * u, cx, cy - 2 * u)
+      icon_line(p, cx - 4 * u, cy - 2 * u, cx + 4 * u, cy - 2 * u)
+    }
+    Headphones => {
+      let u = s / 9.0
+      icon_arc(p, cx, cy + 2.5 * u, 6.5 * u, 3.141592653589793, ICON_TAU)
+      icon_outline(p, [(cx - 7.8 * u, cy + 2.5 * u), (cx - 6.2 * u, cy + 2.5 * u), (cx - 6.2 * u, cy + 7 * u), (cx - 7.8 * u, cy + 7 * u)])
+      icon_outline(p, [(cx + 6.2 * u, cy + 2.5 * u), (cx + 7.8 * u, cy + 2.5 * u), (cx + 7.8 * u, cy + 7 * u), (cx + 6.2 * u, cy + 7 * u)])
+    }
+    Battery => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 4 * u), (cx + 6.5 * u, cy - 4 * u), (cx + 6.5 * u, cy + 4 * u), (cx - 8 * u, cy + 4 * u)])
+      icon_line(p, cx + 6.5 * u, cy - 1.5 * u, cx + 8.5 * u, cy - 1.5 * u)
+      icon_line(p, cx + 8.5 * u, cy - 1.5 * u, cx + 8.5 * u, cy + 1.5 * u)
+      icon_line(p, cx + 8.5 * u, cy + 1.5 * u, cx + 6.5 * u, cy + 1.5 * u)
+      icon_line(p, cx - 6 * u, cy - 1.8 * u, cx - 6 * u, cy + 1.8 * u)
+      icon_line(p, cx - 2.5 * u, cy - 1.8 * u, cx - 2.5 * u, cy + 1.8 * u)
+      icon_line(p, cx + 1 * u, cy - 1.8 * u, cx + 1 * u, cy + 1.8 * u)
+    }
+    BatteryCharging => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 4 * u), (cx + 6.5 * u, cy - 4 * u), (cx + 6.5 * u, cy + 4 * u), (cx - 8 * u, cy + 4 * u)])
+      icon_line(p, cx + 6.5 * u, cy - 1.5 * u, cx + 8.5 * u, cy - 1.5 * u)
+      icon_line(p, cx + 8.5 * u, cy - 1.5 * u, cx + 8.5 * u, cy + 1.5 * u)
+      icon_line(p, cx + 8.5 * u, cy + 1.5 * u, cx + 6.5 * u, cy + 1.5 * u)
+      icon_polygon(p, [(cx + 1.5 * u, cy - 5 * u), (cx - 3.5 * u, cy + 0.5 * u), (cx - 0.3 * u, cy + 0.5 * u), (cx - 1.5 * u, cy + 5 * u), (cx + 3.8 * u, cy - 0.8 * u), (cx + 0.6 * u, cy - 0.8 * u)])
+    }
+    Signal => {
+      let u = s / 9.0
+      icon_line(p, cx - 6.5 * u, cy + 6 * u, cx - 6.5 * u, cy + 3 * u)
+      icon_line(p, cx - 2.2 * u, cy + 6 * u, cx - 2.2 * u, cy)
+      icon_line(p, cx + 2.2 * u, cy + 6 * u, cx + 2.2 * u, cy - 3 * u)
+      icon_line(p, cx + 6.5 * u, cy + 6 * u, cx + 6.5 * u, cy - 6 * u)
+    }
+    ShoppingCart => {
+      let u = s / 9.0
+      icon_polyline(p, [(cx - 8 * u, cy - 7 * u), (cx - 6 * u, cy - 7 * u), (cx - 4 * u, cy - 2 * u), (cx + 6.5 * u, cy - 2 * u), (cx + 5 * u, cy + 2.5 * u), (cx - 4.5 * u, cy + 2.5 * u)])
+      icon_circle(p, cx - 3 * u, cy + 6.5 * u, 1.8 * u)
+      icon_circle(p, cx + 3.5 * u, cy + 6.5 * u, 1.8 * u)
+    }
+    CreditCard => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 8 * u, cy - 5.5 * u), (cx + 8 * u, cy - 5.5 * u), (cx + 8 * u, cy + 5.5 * u), (cx - 8 * u, cy + 5.5 * u)])
+      icon_line(p, cx - 8 * u, cy - 1.5 * u, cx + 8 * u, cy - 1.5 * u)
+      icon_line(p, cx - 5.5 * u, cy + 3 * u, cx - 1 * u, cy + 3 * u)
+    }
+    Gift => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 6.5 * u, cy - 2 * u), (cx + 6.5 * u, cy - 2 * u), (cx + 6.5 * u, cy + 7 * u), (cx - 6.5 * u, cy + 7 * u)])
+      icon_line(p, cx - 7.5 * u, cy - 5 * u, cx + 7.5 * u, cy - 5 * u)
+      icon_line(p, cx - 7.5 * u, cy - 5 * u, cx - 7.5 * u, cy - 2 * u)
+      icon_line(p, cx + 7.5 * u, cy - 5 * u, cx + 7.5 * u, cy - 2 * u)
+      icon_line(p, cx - 6.5 * u, cy - 5 * u, cx + 6.5 * u, cy - 5 * u)
+      icon_line(p, cx, cy - 5 * u, cx, cy + 7 * u)
+      icon_arc(p, cx - 2.8 * u, cy - 6.5 * u, 2 * u, 0.0, 3.141592653589793)
+      icon_arc(p, cx + 2.8 * u, cy - 6.5 * u, 2 * u, 0.0, 3.141592653589793)
+    }
+    Percent => {
+      let u = s / 9.0
+      icon_line(p, cx - 5.5 * u, cy + 5.5 * u, cx + 5.5 * u, cy - 5.5 * u)
+      icon_circle(p, cx - 5 * u, cy - 5 * u, 2.5 * u)
+      icon_circle(p, cx + 5 * u, cy + 5 * u, 2.5 * u)
+    }
+    Rocket => {
+      let u = s / 9.0
+      icon_outline(p, [(cx, cy - 8.5 * u), (cx + 3 * u, cy - 4 * u), (cx + 3 * u, cy + 2 * u), (cx - 3 * u, cy + 2 * u), (cx - 3 * u, cy - 4 * u)])
+      icon_circle(p, cx, cy - 3 * u, 1.6 * u)
+      icon_polyline(p, [(cx - 3 * u, cy - 1 * u), (cx - 6 * u, cy + 2.5 * u), (cx - 3 * u, cy + 3.5 * u)])
+      icon_polyline(p, [(cx + 3 * u, cy - 1 * u), (cx + 6 * u, cy + 2.5 * u), (cx + 3 * u, cy + 3.5 * u)])
+      icon_polyline(p, [(cx - 1.5 * u, cy + 4.5 * u), (cx, cy + 8 * u), (cx + 1.5 * u, cy + 4.5 * u)])
+    }
+    Trophy => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 5 * u, cy - 7.5 * u), (cx + 5 * u, cy - 7.5 * u), (cx + 4 * u, cy - 0.5 * u), (cx + 1.5 * u, cy + 2 * u), (cx - 1.5 * u, cy + 2 * u), (cx - 4 * u, cy - 0.5 * u)])
+      icon_arc(p, cx - 6.5 * u, cy - 5 * u, 2 * u, 1.5708, 4.712)
+      icon_arc(p, cx + 6.5 * u, cy - 5 * u, 2 * u, -1.5708, 1.5708)
+      icon_line(p, cx, cy + 2 * u, cx, cy + 4.5 * u)
+      icon_line(p, cx - 3 * u, cy + 4.5 * u, cx + 3 * u, cy + 4.5 * u)
+      icon_line(p, cx - 3.5 * u, cy + 7.5 * u, cx + 3.5 * u, cy + 7.5 * u)
+    }
+    Lightbulb => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 4.5 * u, cy - 2 * u), (cx - 4.5 * u, cy - 4.5 * u), (cx - 2 * u, cy - 7.5 * u), (cx + 2 * u, cy - 7.5 * u), (cx + 4.5 * u, cy - 4.5 * u), (cx + 4.5 * u, cy - 2 * u), (cx + 2.5 * u, cy + 1.5 * u), (cx - 2.5 * u, cy + 1.5 * u)])
+      icon_line(p, cx - 2 * u, cy + 1.5 * u, cx - 2 * u, cy + 3.5 * u)
+      icon_line(p, cx + 2 * u, cy + 1.5 * u, cx + 2 * u, cy + 3.5 * u)
+      icon_line(p, cx - 2 * u, cy + 3.5 * u, cx + 2 * u, cy + 3.5 * u)
+      icon_line(p, cx - 2.5 * u, cy + 6 * u, cx + 2.5 * u, cy + 6 * u)
+      icon_line(p, cx - 2 * u, cy + 8 * u, cx + 2 * u, cy + 8 * u)
+    }
+    Wrench => {
+      let u = s / 9.0
+      icon_arc(p, cx - 3 * u, cy - 3.5 * u, 4 * u, -2.4, 1.2)
+      icon_line(p, cx - 1.5 * u, cy + 0.2 * u, cx + 6.8 * u, cy + 6.8 * u)
+      icon_line(p, cx + 4.2 * u, cy + 8 * u, cx + 7.8 * u, cy + 4.4 * u)
+    }
+    Compass => {
+      let u = s / 9.0
+      icon_circle(p, cx, cy, 8 * u)
+      icon_outline(p, [(cx + 5 * u, cy - 5 * u), (cx - 2.2 * u, cy + 2.2 * u), (cx - 5 * u, cy + 5 * u), (cx + 2.2 * u, cy - 2.2 * u)])
+    }
+    MapPin => {
+      let u = s / 9.0
+      p.begin_path()
+      p.move_to(cx, cy + 8 * u)
+      p.bezier_curve_to(cx - 0.5 * u, cy + 5 * u, cx - 6 * u, cy + 1 * u, cx - 6 * u, cy - 2.5 * u)
+      p.arc(cx, cy - 2.5 * u, 6 * u, 3.141592653589793, ICON_TAU)
+      p.bezier_curve_to(cx + 6 * u, cy + 1 * u, cx + 0.5 * u, cy + 5 * u, cx, cy + 8 * u)
+      p.close_path()
+      p.stroke()
+      icon_circle(p, cx, cy - 2.5 * u, 2.3 * u)
+    }
+    Navigation => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 6.5 * u, cy - 6.5 * u), (cx + 7.5 * u, cy - 0.5 * u), (cx + 0.5 * u, cy + 0.8 * u), (cx - 2 * u, cy + 7 * u)])
+    }
+    Crown => {
+      let u = s / 9.0
+      icon_outline(p, [(cx - 7.5 * u, cy + 6 * u), (cx - 7.5 * u, cy - 5 * u), (cx - 3 * u, cy - 0.5 * u), (cx, cy - 7 * u), (cx + 3 * u, cy - 0.5 * u), (cx + 7.5 * u, cy - 5 * u), (cx + 7.5 * u, cy + 6 * u)])
+    }
   }
 }
 
 ///|
-/// 全部图标种类清单(137 项,图标墙/选取器素材)。
+/// 全部图标种类清单(181 项,图标墙/选取器素材)。
 pub fn all_icons() -> Array[IconKind] {
   [
     ChevronLeft,
@@ -1298,6 +1676,51 @@ pub fn all_icons() -> Array[IconKind] {
     BarChart,
     PieChart,
     TableRows,
+    Type,
+    ArrowUpDown,
+    AlignJustify,
+    Move,
+    Expand,
+    Shrink,
+    RotateCw,
+    RotateCcw,
+    Columns,
+    Rows,
+    CheckCircle,
+    XCircle,
+    InfoCircle,
+    Loader,
+    BellRing,
+    Pin,
+    Share,
+    UserPlus,
+    UserCheck,
+    Users,
+    Cloudy,
+    CloudSun,
+    CloudRain,
+    CloudSnow,
+    Droplet,
+    Thermometer,
+    Wind,
+    Keyboard,
+    Mouse,
+    Headphones,
+    Battery,
+    BatteryCharging,
+    Signal,
+    ShoppingCart,
+    CreditCard,
+    Gift,
+    Percent,
+    Rocket,
+    Trophy,
+    Lightbulb,
+    Wrench,
+    Compass,
+    MapPin,
+    Navigation,
+    Crown,
   ]
 }
 
@@ -1442,6 +1865,51 @@ pub fn icon_name(kind : IconKind) -> String {
     BarChart => "BarChart"
     PieChart => "PieChart"
     TableRows => "TableRows"
+    Type => "Type"
+    ArrowUpDown => "ArrowUpDown"
+    AlignJustify => "AlignJustify"
+    Move => "Move"
+    Expand => "Expand"
+    Shrink => "Shrink"
+    RotateCw => "RotateCw"
+    RotateCcw => "RotateCcw"
+    Columns => "Columns"
+    Rows => "Rows"
+    CheckCircle => "CheckCircle"
+    XCircle => "XCircle"
+    InfoCircle => "InfoCircle"
+    Loader => "Loader"
+    BellRing => "BellRing"
+    Pin => "Pin"
+    Share => "Share"
+    UserPlus => "UserPlus"
+    UserCheck => "UserCheck"
+    Users => "Users"
+    Cloudy => "Cloudy"
+    CloudSun => "CloudSun"
+    CloudRain => "CloudRain"
+    CloudSnow => "CloudSnow"
+    Droplet => "Droplet"
+    Thermometer => "Thermometer"
+    Wind => "Wind"
+    Keyboard => "Keyboard"
+    Mouse => "Mouse"
+    Headphones => "Headphones"
+    Battery => "Battery"
+    BatteryCharging => "BatteryCharging"
+    Signal => "Signal"
+    ShoppingCart => "ShoppingCart"
+    CreditCard => "CreditCard"
+    Gift => "Gift"
+    Percent => "Percent"
+    Rocket => "Rocket"
+    Trophy => "Trophy"
+    Lightbulb => "Lightbulb"
+    Wrench => "Wrench"
+    Compass => "Compass"
+    MapPin => "MapPin"
+    Navigation => "Navigation"
+    Crown => "Crown"
   }
 }
 
