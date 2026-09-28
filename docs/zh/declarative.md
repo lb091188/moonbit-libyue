@@ -198,6 +198,20 @@ win.set_content(@yue.mount([
 点击按钮 → `count` 变化 → `bind_label` 的文本自动变为「已点 1 次」。
 不用 Store 的地方照旧用 `handle` + setter，两者共存。
 
+状态变化时要换的不只是文本而是任意节点，用 `bind_node`：信号变化时重挂整棵
+子树，适合低频切换——典型如深浅主题的太阳/月亮图标按钮：
+
+```moonbit
+@yue.bind_node(dark.signal(), fn(dark) {
+  @yue.icon_button_t(
+    if dark { @yue.Sun } else { @yue.Moon },
+    on_click=fn() { dark.update(fn(v) { !v }) },
+  )
+})
+```
+
+高频更新请改用 `bind`（文本）或经 `handle` 命令式改属性。
+
 API 一览：
 
 | 函数 | 说明 |
@@ -208,6 +222,8 @@ API 一览：
 | `subscribe(f)` | 订阅；**注册时不回调**，初始值请直接 `get` |
 | `map(f)` | 派生 Store，源变化时自动跟随（可链式） |
 | `bind_label(store, f, …)` | 声明树里绑定文本，`f` 把状态映射为字符串 |
+| `bind(sig, f, …)` | bind_label 的信号版；接受源信号或 computed 派生信号 |
+| `bind_node(sig, f)` | 声明树里绑定任意节点：信号变化时把子树重挂为 `f(新值)`，适合低频切换（如随状态换太阳/月亮图标按钮）；Store 传 `store.signal()` 接入 |
 
 ### Signal：自动依赖收集的派生
 
