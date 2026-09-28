@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
-"""iconfont SVG 字体 → MoonBit 图标代码生成器。
+"""iconfont SVG 字体 → MoonBit 图标代码生成器(全量替换手写图标集)。
 
 用法:
   python3 scripts/gen_icons.py <iconfont 包目录>
 包目录需含 iconfont.json(元数据)与 iconfont.svg(SVG 字体)。
 
-从 SELECTION 挑选图标,把字体轮廓坐标归一化后翻译成 Painter 调用,
-替换 yue/icons.mbt 中三处 icons-gen 标记之间的内容。
-生成的都是填充型图标(整 path 一次 p.fill()),非零环绕规则由
-cairo/Win 后端默认支持,子路径方向原样保留(镂空依赖反向环绕)。
+职责:
+1. 解析 SVG 字体 glyph(unicode→path d),全指令集:直线/贝塞尔/弧线端点
+   参数化展开,Q 升三次,S/T 反射;bbox 归一化到 ±1 并翻转 y(字体 y 向上),
+   坐标乘 s*0.88 与旧手写线条图标观感一致;填充型(整 path 一次 p.fill()),
+   子路径方向原样保留(镂空靠非零环绕,cairo 默认即非零)。
+2. 变体命名:SELECTION 覆盖表优先,其余按 font_class 自动转 PascalCase,
+   统一 Yh 前缀,重名追加数字后缀。
+3. 重写 yue/icons.mbt 的 icons-gen 标记段,并清除旧手写图标残留:
+   枚举变体、draw_icon/icon_name 旧分支、无用绘图助手(icon_dot 被
+   splitter 使用,保留)、all_icons 清单。
+4. 同步更新文件头与文档注释中的图标计数。
 """
 
 import json
@@ -19,7 +26,7 @@ import sys
 REPO = __file__.rsplit("/scripts/", 1)[0]
 ICONS_MBT = REPO + "/yue/icons.mbt"
 
-# 选型清单: font_class -> MoonBit 变体名(桌面 GUI 场景,品牌/食物/体育等不收)
+# 命名覆盖表:font_class -> MoonBit 变体名(与自动 PascalCase 不一致或需稳定的)
 SELECTION = {
     # —— MES 表单控件 ——
     "tree-structure": "YhTreeStructure",
@@ -115,11 +122,9 @@ SELECTION = {
 }
 
 NUM = re.compile(r"[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?")
-# 归一化半径:图标内容约占 s 的 88%(与手写线条图标观感一致)
-FIT = 0.88
 
 
-# ---------- SVG path 解析:输出 [(cmd, [numbers...])] 绝对化 ----------
+# ---------- SVG path 解析 ----------
 
 def tokenize_path(d):
     for m in re.finditer(r"([MmLlHhVvCcSsQqTtAaZz])|(" + NUM.pattern + r")", d):
@@ -127,6 +132,18 @@ def tokenize_path(d):
             yield m.group(1), None
         else:
             yield None, float(m.group(2))
+
+
+def flush(cmd, nums):
+    """按指令参数个数切分重复组。"""
+    size = {
+        "M": 2, "m": 2, "L": 2, "l": 2, "H": 1, "h": 1, "V": 1, "v": 1,
+        "C": 6, "c": 6, "S": 4, "s": 4, "Q": 4, "q": 4, "T": 2, "t": 2,
+        "A": 7, "a": 7, "Z": 0, "z": 0,
+    }[cmd]
+    if size == 0:
+        return [(cmd, [])]
+    return [(cmd, nums[i : i + size]) for i in range(0, len(nums), size)]
 
 
 def parse_path(d):
@@ -144,11 +161,9 @@ def parse_path(d):
             nums.append(n)
     if cmd:
         out.extend(flush(cmd, nums))
-    # 相对转绝对
     abs_cmds = []
     x = y = 0.0
     start = (0.0, 0.0)
-    i = 0
     for cmd, args in out:
         rel = cmd.islower()
         C = cmd.upper()
@@ -158,13 +173,13 @@ def parse_path(d):
             while j < len(args):
                 px, py = args[j], args[j + 1]
                 if first:
-                    px += x if rel else 0
-                    py += y if rel else 0
+                    if rel:
+                        px += x
+                        py += y
                     first = False
                     start = (px, py)
                     abs_cmds.append(("M", [px, py]))
                 else:
-                    # M 后续坐标按 L 处理(SVG 规范)
                     if rel:
                         px += x
                         py += y
@@ -204,7 +219,6 @@ def parse_path(d):
                 if C == "C":
                     abs_cmds.append(("C", a))
                 else:
-                    # S: 反射上一控制点
                     prev = abs_cmds[-1] if abs_cmds else None
                     if prev and prev[0] == "C":
                         x0, y0 = x, y
@@ -216,14 +230,15 @@ def parse_path(d):
                 x, y = a[-2], a[-1]
             continue
         if C in ("Q", "T"):
-            for j in range(0, len(args), 4 if C == "Q" else 2):
-                if C == "Q":
+            if C == "Q":
+                for j in range(0, len(args), 4):
                     a = args[j : j + 4]
                     if rel:
                         a[0] += x; a[1] += y; a[2] += x; a[3] += y
                     abs_cmds.append(("Q", a))
                     x, y = a[2], a[3]
-                else:
+            else:
+                for j in range(0, len(args), 2):
                     px, py = args[j], args[j + 1]
                     if rel:
                         px += x; py += y
@@ -251,18 +266,6 @@ def parse_path(d):
             continue
         raise ValueError("unknown cmd " + cmd)
     return abs_cmds
-
-
-def flush(cmd, nums):
-    """按指令参数个数切分重复组。"""
-    size = {
-        "M": 2, "m": 2, "L": 2, "l": 2, "H": 1, "h": 1, "V": 1, "v": 1,
-        "C": 6, "c": 6, "S": 4, "s": 4, "Q": 4, "q": 4, "T": 2, "t": 2,
-        "A": 7, "a": 7, "Z": 0, "z": 0,
-    }[cmd]
-    if size == 0:
-        return [(cmd, [])]
-    return [(cmd, nums[i : i + size]) for i in range(0, len(nums), size)]
 
 
 # ---------- 弧展开(端点参数 → 采样点) ----------
@@ -314,12 +317,10 @@ def arc_points(x1, y1, rx, ry, phi_deg, laf, sf, x2, y2):
     return pts
 
 
-# ---------- 几何收集:得到多边形子路径(所有曲线采样/转换后仍按原语保留) ----------
+# ---------- 几何收集 ----------
 
 def glyph_geometry(abs_cmds):
-    """返回 (subpaths, all_points)。
-    subpaths: 每条为 ops 列表, op = ('L', x, y) | ('C', x1,y1,x2,y2,x,y)。
-    弧展开为折线,二次贝塞尔升为三次。"""
+    """返回 (subpaths, all_points);弧展开为折线,二次贝塞尔升为三次。"""
     subpaths = []
     cur = []
     x = y = 0.0
@@ -342,7 +343,6 @@ def glyph_geometry(abs_cmds):
             x, y = px, py
         elif cmd == "Q":
             qx, qy, px, py = a
-            # 升为三次:c1 = p0 + 2/3(q-p0), c2 = p2 + 2/3(q-p2)
             c1x = x + 2.0 / 3.0 * (qx - x)
             c1y = y + 2.0 / 3.0 * (qy - y)
             c2x = px + 2.0 / 3.0 * (qx - px)
@@ -373,7 +373,7 @@ def fmt(v):
     return s if s not in ("", "-0") else "0"
 
 
-def gen_arm(variant, comment, subpaths, cx_expr="cx", cy_expr="cy"):
+def gen_arm(variant, comment, subpaths):
     """生成一个 match 分支。坐标已归一化到 [-1,1],乘 u 后即 s*0.88 范围。"""
     lines = [f"    {variant} => {{ // {comment}"]
     lines.append("      let u = s * 0.88")
@@ -383,15 +383,14 @@ def gen_arm(variant, comment, subpaths, cx_expr="cx", cy_expr="cy"):
             if op[0] == "L":
                 x, y = op[1], op[2]
                 if i == 0:
-                    lines.append(f"      p.move_to({cx_expr} + {fmt(x)} * u, {cy_expr} + {fmt(y)} * u)")
+                    lines.append(f"      p.move_to(cx + {fmt(x)} * u, cy + {fmt(y)} * u)")
                 else:
-                    lines.append(f"      p.line_to({cx_expr} + {fmt(x)} * u, {cy_expr} + {fmt(y)} * u)")
+                    lines.append(f"      p.line_to(cx + {fmt(x)} * u, cy + {fmt(y)} * u)")
             else:
                 _, x1, y1, x2, y2, px, py = op
                 lines.append(
-                    f"      p.bezier_curve_to({cx_expr} + {fmt(x1)} * u, {cy_expr} + {fmt(y1)} * u, "
-                    f"{cx_expr} + {fmt(x2)} * u, {cy_expr} + {fmt(y2)} * u, "
-                    f"{cx_expr} + {fmt(px)} * u, {cy_expr} + {fmt(py)} * u)"
+                    f"      p.bezier_curve_to(cx + {fmt(x1)} * u, cy + {fmt(y1)} * u, "
+                    f"cx + {fmt(x2)} * u, cy + {fmt(y2)} * u, cx + {fmt(px)} * u, cy + {fmt(py)} * u)"
                 )
         lines.append("      p.close_path()")
     lines.append("      p.fill()")
@@ -423,11 +422,41 @@ def normalize(subpaths, pts):
     return out
 
 
+def pascal(fc):
+    parts = [p for p in fc.split("-") if p]
+    return "".join(p[:1].upper() + p[1:] for p in parts)
+
+
 def replace_section(src, begin_marker, end_marker, content):
     pat = re.compile(r"(" + re.escape(begin_marker) + r").*?(" + re.escape(end_marker) + r")", re.S)
     if not pat.search(src):
         raise SystemExit("marker not found: " + begin_marker)
-    return pat.sub(lambda m: m.group(1) + "\n" + content + "\n  " + m.group(2), src, count=1)
+    return pat.sub(lambda m: m.group(1) + "\n" + content + "\n" + m.group(2), src, count=1)
+
+
+def strip_legacy(src):
+    """删除旧手写图标:枚举变体、两个 match 旧分支、无用助手、all_icons 清单。"""
+    # 1. 枚举旧变体
+    src = re.sub(
+        r"(pub\(all\) enum IconKind \{\n).*?(\n  // ---- icons-gen:variants)",
+        r"\1\2", src, count=1, flags=re.S)
+    # 2. draw_icon 旧分支(match kind { 到 arms 标记)
+    src = re.sub(
+        r"(  match kind \{\n).*?(\n    // ---- icons-gen:arms)",
+        r"\1\2", src, count=1, flags=re.S)
+    # 3. icon_name 旧分支
+    src = re.sub(
+        r"(pub fn icon_name\(kind : IconKind\) -> String \{\n.*?  match kind \{\n).*?(\n    // ---- icons-gen:names)",
+        r"\1\2", src, count=1, flags=re.S)
+    # 4. 无用绘图助手(icon_dot 被 splitter 使用,保留)
+    for name in ("icon_circle", "icon_polyline", "icon_polygon", "icon_outline", "icon_line", "icon_arc"):
+        src = re.sub(r"\nfn " + name + r"\(.*?\n\}\n", "\n", src, count=1, flags=re.S)
+    # 5. all_icons 清单换成标记段
+    src = re.sub(
+        r"(pub fn all_icons\(\) -> Array\[IconKind\] \{\n  \[\n).*?(\n  \]\n\})",
+        r"\1    // ---- icons-gen:all (scripts/gen_icons.py 维护,勿手改) ----\n    // ---- icons-gen:end ----\2",
+        src, count=1, flags=re.S)
+    return src
 
 
 def main():
@@ -439,31 +468,34 @@ def main():
     # unicode codepoint -> path d
     by_cp = {}
     for gm in re.finditer(r'<glyph\s+[^>]*unicode="([^"]*)"[^>]*d="([^"]*)"', svg):
-        tag = gm.group(0)
-        d = gm.group(2)
-        uni = gm.group(1)
-        mcp = re.search(r"&#x([0-9a-fA-F]+);|&#(\d+);", uni)
+        mcp = re.search(r"&#x([0-9a-fA-F]+);|&#(\d+);", gm.group(1))
         if not mcp:
             continue
         cp = int(mcp.group(1), 16) if mcp.group(1) else int(mcp.group(2))
-        by_cp[cp] = d
-    # unicode 属性可能不带实体(直接字符)
+        by_cp[cp] = gm.group(2)
     for gm in re.finditer(r'<glyph\s+[^>]*?unicode="([^"<&][^"]*)"[^>]*?d="([^"]*)"', svg):
         ch = gm.group(1)
         if len(ch) == 1:
             by_cp.setdefault(ord(ch), gm.group(2))
 
-    class_to_cp = {}
-    for g in meta["glyphs"]:
-        class_to_cp[g["font_class"]] = int(g["unicode_decimal"])
-
-    arms, variants, names = [], [], []
+    # 全量生成:字体顺序 + 命名去重
+    used = {}
+    arms, variants, names, all_list = [], [], [], []
     skipped = []
-    for fc, variant in SELECTION.items():
-        if fc not in class_to_cp or class_to_cp[fc] not in by_cp:
+    for g in meta["glyphs"]:
+        fc = g["font_class"]
+        cp = int(g["unicode_decimal"])
+        if cp not in by_cp:
             skipped.append(fc)
             continue
-        d = by_cp[class_to_cp[fc]]
+        base = SELECTION.get(fc) or ("Yh" + pascal(fc))
+        variant = base
+        n = 2
+        while variant in used:
+            variant = f"{base}{n}"
+            n += 1
+        used[variant] = fc
+        d = by_cp[cp]
         abs_cmds = parse_path(d)
         subpaths, pts = glyph_geometry(abs_cmds)
         subpaths = normalize(subpaths, pts)
@@ -471,19 +503,50 @@ def main():
         arms.append(gen_arm(variant, zh, subpaths))
         variants.append(f"  {variant} // {zh}")
         names.append(f'    {variant} => "yh/{fc}"')
+        all_list.append(f"    {variant},")
 
-    gen_block = "\n".join(arms)
-    var_block = "\n".join(variants)
-    name_block = "\n".join(names)
+    # arms 拆块:每块独立顶层函数 + 通配兜底,避免单段超限(0033 警告)
+    chunk_size = 110
+    n_chunks = (len(arms) + chunk_size - 1) // chunk_size
+    dispatch = []
+    chunks = []
+    for c in range(n_chunks):
+        part = arms[c * chunk_size : (c + 1) * chunk_size]
+        n = c + 1
+        dispatch.append("  draw_icon_chunk_" + str(n) + "(p, kind, cx, cy, s)")
+        head = (
+            "///|\nfn draw_icon_chunk_" + str(n) + "(\n"
+            "    p : Painter,\n"
+            "    kind : IconKind,\n"
+            "    cx : Double,\n"
+            "    cy : Double,\n"
+            "    s : Double,\n"
+            ") -> Unit {\n"
+            "  match kind {\n"
+        )
+        tail = "\n    _ => ()\n  }\n}\n"
+        chunks.append(head + "\n".join(part) + tail)
 
     src = open(ICONS_MBT).read()
-    src = replace_section(src, "// ---- icons-gen:variants", "// ---- icons-gen:end ----", var_block)
-    src = replace_section(src, "    // ---- icons-gen:arms", "    // ---- icons-gen:end ----", gen_block)
-    src = replace_section(src, "    // ---- icons-gen:names", "    // ---- icons-gen:end ----", name_block)
+    src = strip_legacy(src)
+    src = replace_section(src, "// ---- icons-gen:variants", "// ---- icons-gen:end ----",
+                          "\n".join(variants))
+    src = replace_section(src, "// ---- icons-gen:dispatch", "// ---- icons-gen:end ----",
+                          "\n".join(dispatch))
+    src = replace_section(src, "// ---- icons-gen:chunks", "// ---- icons-gen:end ----",
+                          "\n\n".join(chunks))
+    src = replace_section(src, "// ---- icons-gen:names", "// ---- icons-gen:end ----",
+                          "\n".join(names))
+    src = replace_section(src, "// ---- icons-gen:all", "// ---- icons-gen:end ----",
+                          "\n".join(all_list))
+    # 计数注释同步
+    total = len(arms)
+    src = re.sub(r"\d+ 个内置矢量图标", f"{total} 个内置矢量图标", src)
+    src = re.sub(r"\d+ built-in vector icons", f"{total} built-in vector icons", src)
+    src = re.sub(r"全部图标种类清单\(\d+ 项", f"全部图标种类清单({total} 项", src)
     open(ICONS_MBT, "w").write(src)
 
-    n = len(arms)
-    print(f"生成 {n} 个图标")
+    print(f"生成 {total} 个图标")
     if skipped:
         print("跳过(字体中未找到):", ", ".join(skipped))
 
