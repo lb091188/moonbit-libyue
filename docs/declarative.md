@@ -165,6 +165,19 @@ win.set_content(@yue.mount([
 Clicking the button → `count` changes → the `bind_label` text automatically becomes "Clicked 1 times".
 Where you don't use a Store, keep using `handle` + setter as before; both coexist.
 
+To swap an arbitrary node (not just text) on state change, use `bind_node`: it remounts the whole subtree when the signal changes, which suits low-frequency switches such as a sun/moon theme toggle:
+
+```moonbit
+@yue.bind_node(dark.signal(), fn(dark) {
+  @yue.icon_button_t(
+    if dark { @yue.Sun } else { @yue.Moon },
+    on_click=fn() { dark.update(fn(v) { !v }) },
+  )
+})
+```
+
+For high-frequency updates prefer `bind` (text) or imperative setters via `handle`.
+
 API overview:
 
 | Function | Description |
@@ -175,6 +188,8 @@ API overview:
 | `subscribe(f)` | subscribe; **no callback at registration time**, read the initial value via `get` directly |
 | `map(f)` | derive a Store that follows the source automatically on change (chainable) |
 | `bind_label(store, f, …)` | bind text inside a declarative tree; `f` maps the state to a string |
+| `bind(sig, f, …)` | Signal version of bind_label; accepts source or computed signals |
+| `bind_node(sig, f)` | bind an arbitrary node: remounts the subtree as `f(value)` whenever the signal changes — for low-frequency switches such as a state-dependent icon button (pass `store.signal()` for a Store) |
 
 ### Signal: derived values with automatic dependency tracking
 

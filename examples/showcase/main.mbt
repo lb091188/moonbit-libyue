@@ -162,15 +162,32 @@ fn main {
               ),
               style=[("flex", 1.0), ("width", 180.0)],
             ),
-            @yue.label_t(
-              "moonbit-libyue \{@yue.VERSION}",
-              role=@yue.Secondary,
-              style=[
-                ("paddingLeft", 20.0),
-                ("paddingTop", 6.0),
-                ("paddingBottom", 10.0),
+            @yue.hbox(
+              [
+                @yue.label_t(
+                  "V\{@yue.VERSION}",
+                  role=@yue.Secondary,
+                ),
+                // 图标随状态切换:bind_node 订阅 dark_mode 信号,变化时
+                // 重挂整棵子树(低频切换的正解;高频场景用 bind 文本
+                // 绑定或 handle 命令式改属性)
+                @yue.bind_node(app.dark_mode.signal(), fn(dark) {
+                  @yue.icon_button_t(
+                    if dark { @yue.Sun } else { @yue.Moon },
+                    on_click=fn() { app.dark_mode.update(fn(v) { !v }) },
+                    tip=if dark { "切换到浅色" } else { "切换到深色" },
+                    size=22.0,
+                  )
+                }),
               ],
-            ),
+                  style=[
+                    ("marginLeft",20.0),
+                    ("paddingLeft", 20.0),
+                    ("paddingTop", 6.0),
+                    ("paddingBottom", 10.0),
+                  ],
+
+            )
           ],
           style=[("width", 180.0)],
           handle=fn(c) {

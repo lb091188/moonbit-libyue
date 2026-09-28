@@ -227,3 +227,30 @@ pub fn[A] bind(
 ) -> Node {
   bind_label({ sig, }, f, style~, style_str~)
 }
+
+///|
+/// 声明式节点绑定:信号变化时把容器内容重挂为 f(新值) 的节点。
+/// 每次变化重建整棵子树,适合低频切换(如随状态换图标/换整块视图);
+/// 高频更新请改用 bind 文本绑定或经 handle 命令式改属性。Store 传
+/// store.signal() 接入。
+pub fn[T] bind_node(sig : Signal[T], f : (T) -> Node) -> Node {
+  {
+    mount: fn(parent) {
+      let c = Container::new()
+      let current : Ref[View?] = Ref(None)
+      fn rebuild(v : T) -> Unit {
+        match current.val {
+          Some(old) => ignore(Container::remove_child_view(c, old))
+          None => ()
+        }
+        let node = f(v)
+        current.val = Some((node.mount)(ViewLike::view(c)))
+      }
+
+      rebuild(sig.get())
+      sig.subscribe(fn(v) { rebuild(v) })
+      attach(parent, ViewLike::view(c))
+      ViewLike::view(c)
+    },
+  }
+}
