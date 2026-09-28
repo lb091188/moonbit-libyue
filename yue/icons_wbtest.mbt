@@ -1,15 +1,15 @@
 // 图标系统白盒测试:全变体清单规模与代表性种类(覆盖各分类)。
 
 test {
-  assert_eq(all_icons().length(), 181)
-  assert_true(all_icons().contains(Search))
-  assert_true(all_icons().contains(Grip))
-  assert_true(all_icons().contains(FileCode))
-  assert_true(all_icons().contains(Terminal))
-  assert_true(all_icons().contains(GitBranch))
-  assert_true(all_icons().contains(Mail))
-  assert_true(all_icons().contains(Database))
-  assert_true(all_icons().contains(PieChart))
+  assert_eq(all_icons().length(), 803)
+  assert_true(all_icons().contains(YhSearch2))
+  assert_true(all_icons().contains(YhDrag))
+  assert_true(all_icons().contains(YhCode))
+  assert_true(all_icons().contains(YhCode))
+  assert_true(all_icons().contains(YhBranches))
+  assert_true(all_icons().contains(YhMail1))
+  assert_true(all_icons().contains(YhDatabase))
+  assert_true(all_icons().contains(YhPieChart))
   // 清单无重复
   let mut uniq = 0
   for i, a in all_icons() {
