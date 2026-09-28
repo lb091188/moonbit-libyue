@@ -3,7 +3,7 @@
 
 ///|
 pub fn page_env(app : @ui.App) -> @yue.Node {
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "平台",
       "平台与屏幕",

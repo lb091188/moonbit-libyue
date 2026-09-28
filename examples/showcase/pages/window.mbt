@@ -6,7 +6,7 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
   let win = _app
   let ontop = Ref(false)
   // WebView 全能力演示迁至独立「浏览器」页(见 pages_browser.mbt)
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "窗口",
       "窗口 API",

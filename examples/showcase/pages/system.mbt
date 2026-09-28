@@ -685,5 +685,5 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       ],
     ),
   )
-  @ui.scroll_page(secs)
+  @ui.page(secs)
 }

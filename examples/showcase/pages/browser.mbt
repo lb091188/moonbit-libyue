@@ -21,7 +21,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
       ),
     )
   })
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "加载",
       "WebView 与加载",

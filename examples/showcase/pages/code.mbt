@@ -2,7 +2,7 @@
 
 ///|
 pub fn page_code(_app : @ui.App) -> @yue.Node {
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "代码高亮",
       "Code View 代码高亮",

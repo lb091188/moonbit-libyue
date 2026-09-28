@@ -78,7 +78,7 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
   rt.set_color_for("#E5534B", 8, 11)
   let rt_wrap = Ref(true)
   let rt_ellipsis = Ref(false)
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "自绘",
       "自绘原语(Painter)",

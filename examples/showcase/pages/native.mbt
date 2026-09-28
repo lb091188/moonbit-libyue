@@ -26,7 +26,7 @@ pub fn page_native(_app : @ui.App) -> @yue.Node {
     has_stepper: true,
   })
   nat_date.set_date(946684800L)
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "按钮",
       "标签 / 按钮",

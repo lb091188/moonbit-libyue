@@ -41,7 +41,7 @@ fn icon_group_code(sample : Array[String]) -> Array[String] {
 
 ///|
 pub fn page_icons(_app : @ui.App) -> @yue.Node {
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "基础",
       "基础",

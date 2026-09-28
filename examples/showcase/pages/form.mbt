@@ -27,7 +27,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
     start: None,
     end: None,
   })
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "输入",
       "文本输入(Input / Textarea)",

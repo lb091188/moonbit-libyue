@@ -4,7 +4,7 @@
 
 ///|
 pub fn page_basic(app : @ui.App) -> @yue.Node {
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "主题",
       "主题色板(主色公式派生 + 系统主色)",

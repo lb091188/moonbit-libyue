@@ -3,7 +3,7 @@
 
 ///|
 pub fn page_feedback(app : @ui.App) -> @yue.Node {
-  @ui.scroll_page([
+  @ui.page([
     @ui.section(
       "横幅",
       "Alert 提示横幅",

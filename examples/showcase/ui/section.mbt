@@ -1,7 +1,8 @@
-// 共享层:页面「段」装配。scroll_page 用 segmented 列出各段短名
-// (如 主题|按钮|文字|…),正文区显示选中段的 标题/演示/说明/代码 四件
-// 同屏;切段只切容器可见性,不重建视图树。代码区顶行常驻「复制」,
-// 点击写入剪贴板并经全局 toast 回显(钩子由 main 注入)。
+// 共享层:页面「段」装配。page 用 segmented 列出各段短名(如
+// 主题|按钮|文字|…);每段正文自带滚动区(切段各自保留滚动位置,
+// 页级不再整体滚动),选中段填满剩余高度。切段只切容器可见性,
+// 不重建视图树。代码区顶行常驻「复制」,点击写入剪贴板并经全局
+// toast 回显(钩子由 main 注入)。
 
 ///|
 /// 全局 toast 推送钩子:main 创建 toast_layer 后注入,复制回显用。
@@ -34,9 +35,9 @@ pub fn section(
 }
 
 ///|
-/// 一页 = 顶部 segmented 段列表(超宽自动换行)+ 滚动正文;选中某段
-/// 显示该段 标题/演示/说明/代码,其余段隐藏(不重建)。
-pub fn scroll_page(secs : Array[Section]) -> @yue.Node {
+/// 一页 = 顶部 segmented 段列表(超宽自动换行)+ 段正文栈;选中段
+/// 填满剩余高度并自带滚动,其余段隐藏(不重建,滚动位置各自保留)。
+pub fn page(secs : Array[Section]) -> @yue.Node {
   let selected : @yue.Store[String] = @yue.Store::new(secs[0].name)
   let names : Array[String] = []
   for s in secs {
@@ -54,18 +55,22 @@ pub fn scroll_page(secs : Array[Section]) -> @yue.Node {
   @yue.vbox(
     [
       strip,
-      @yue.scroll(@yue.vbox(bodies, style=[("padding", 14.0)]), style=[
-        ("flex", 1.0),
-      ]),
+      // 段是显隐切换对象:按两栖容器规则用 grow/shrink 单写,不写
+      // flex 简写(简写派生 basis 0 的坑见 docs/zh/adaptation.md)
+      @yue.vbox(
+        bodies,
+        style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
+        style_str=[("flexDirection", "column")],
+      ),
     ],
     style=[("flex", 1.0)],
   )
 }
 
 ///|
-/// 主区页面:挂载后订阅导航状态做 set_visible 切换(侧栏菜单/segmented/
-/// 面包屑共享同一导航 Store)。
-pub fn page(
+/// 主区导航页:挂载后订阅导航状态做 set_visible 切换(侧栏菜单/
+/// segmented/面包屑共享同一导航 Store)。
+pub fn nav_page(
   name : String,
   selected : @yue.Store[String],
   content : @yue.Node,
@@ -81,8 +86,8 @@ pub fn page(
 }
 
 ///|
-/// 选中段的正文:标题 + 演示 + 说明 + 代码(带复制行);容器随页面
-/// selected 切换显隐。
+/// 选中段的正文:标题 + 演示 + 说明 + 代码(带复制行),内容超高分段内
+/// 滚动;容器随页面 selected 切换显隐。
 fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
   let inner : Array[@yue.Node] = [
     @yue.label_t(s.title, role=@yue.Section, style=[("marginBottom", 8.0)]),
@@ -101,14 +106,24 @@ fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
       @yue.code_view(s.code, lang="moonbit", line_numbers=true, width=1000.0),
     )
   }
-  @yue.vbox([@yue.vbox(inner)], style=[("marginBottom", 6.0)], handle=fn(c) {
-    fn apply(name : String) -> Unit {
-      c.set_visible(name == s.name)
-    }
+  // 本容器是显隐切换对象:grow/shrink 单写(同上,不写 flex 简写)
+  @yue.vbox(
+    [
+      @yue.scroll(
+        @yue.vbox(inner, style=[("padding", 14.0)]),
+        style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
+      ),
+    ],
+    style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
+    handle=fn(c) {
+      fn apply(name : String) -> Unit {
+        c.set_visible(name == s.name)
+      }
 
-    apply(selected.get())
-    selected.subscribe(apply)
-  })
+      apply(selected.get())
+      selected.subscribe(apply)
+    },
+  )
 }
 
 ///|
