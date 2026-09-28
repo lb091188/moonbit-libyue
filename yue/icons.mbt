@@ -1405,9 +1405,13 @@ pub fn draw_icon(
       p.arc(cx - 3.5 * u, cy + 6.5 * u, 4.5 * u, 3.141592653589793, ICON_TAU)
       p.line_to(cx + 1 * u, cy + 8.5 * u)
       p.stroke()
-      // 后人:右露半张脸与肩头(弧心右移下探,与肩拱错开)
-      icon_arc(p, cx + 6.5 * u, cy - 3.5 * u, 2.8 * u, -1.2, 1.2)
-      icon_arc(p, cx + 6.5 * u, cy + 7.5 * u, 4.5 * u, 3.0, 4.7)
+      // 后人:右露大半张脸(右向弧) + 肩头(右缘竖线接四分之一肩弧,弧端朝上指向头部)
+      icon_arc(p, cx + 4.5 * u, cy - 3.5 * u, 3 * u, -1.3, 1.3)
+      p.begin_path()
+      p.move_to(cx + 8.3 * u, cy + 8.5 * u)
+      p.line_to(cx + 8.3 * u, cy + 6.8 * u)
+      p.arc(cx + 8.3 * u, cy + 3.4 * u, 3.4 * u, 1.5707963267948966, 3.141592653589793)
+      p.stroke()
     }
     Cloudy => {
       let u = s / 9.0
