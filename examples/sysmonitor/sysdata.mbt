@@ -40,7 +40,7 @@ pub fn split_fields(s : StringView) -> Array[StringView] {
   for i, c in s.iter2() {
     if is_ws(c) {
       if start >= 0 {
-        out.push(s.sub(start=start, end=i))
+        out.push(s.exact_view(start=start, end=i))
         start = -1
       }
     } else if start < 0 {
@@ -48,7 +48,7 @@ pub fn split_fields(s : StringView) -> Array[StringView] {
     }
   }
   if start >= 0 {
-    out.push(s.sub(start=start))
+    out.push(s.exact_view(start=start))
   }
   out
 }
@@ -91,7 +91,7 @@ pub fn parse_i64(s : StringView) -> Int64? {
     neg = true
     start = 1
   }
-  match parse_u64(s.sub(start=start)) {
+  match parse_u64(s.exact_view(start=start)) {
     None => None
     Some(v) => Some(if neg { -v } else { v })
   }
@@ -208,7 +208,7 @@ pub fn parse_proc_stat(text : String) -> (CpuTimes, Array[CpuTimes])? {
       continue
     }
     let tag = f[0]
-    if tag.char_length() >= 3 && tag.sub(start=0, end=3).equal_to_string("cpu") {
+    if tag.char_length() >= 3 && tag.exact_view(start=0, end=3).equal_to_string("cpu") {
       let t = cpu_line_times(f)
       if tag.char_length() == 3 {
         total = Some(t)
