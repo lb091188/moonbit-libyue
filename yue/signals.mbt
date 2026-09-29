@@ -276,3 +276,33 @@ pub fn[T] bind_node(sig : Signal[T], f : (T) -> Node) -> Node {
     },
   }
 }
+
+///|
+/// 两态切换:预建 a/b 两棵节点,信号值选显隐(不销毁不重建 view)。
+/// bind_node 的 Windows 安全替代——重挂的 remove+add 在 Windows 上
+/// 会令鼠标命中测试错乱(见 bind_node 警示),显隐走 display:none
+/// (fork 补丁维护路径)无此患;代价是两棵子树常驻(低频切换场景可
+/// 忽略)。典型如随深浅换太阳/月亮图标按钮:
+///
+/// ```moonbit
+/// @yue.swap_node(dark.signal(),
+///   @yue.icon_button_t(@yue.YhMoon, on_click=..., tip="切换到深色"),
+///   @yue.icon_button_t(@yue.YhSunny, on_click=..., tip="切换到浅色"))
+/// ```
+pub fn swap_node(sig : Signal[Bool], a : Node, b : Node) -> Node {
+  {
+    mount: fn(parent) {
+      let va = (a.mount)(parent)
+      let vb = (b.mount)(parent)
+      fn apply(v : Bool) -> Unit {
+        set_visible_view(va, !v)
+        set_visible_view(vb, v)
+      }
+
+      apply(sig.get())
+      sig.subscribe(apply)
+      ignore(parent)
+      va
+    },
+  }
+}

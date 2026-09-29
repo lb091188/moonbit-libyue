@@ -166,15 +166,17 @@ win.set_content(@yue.mount([
 Clicking the button → `count` changes → the `bind_label` text automatically becomes "Clicked 1 times".
 Where you don't use a Store, keep using `handle` + setter as before; both coexist.
 
-To swap an arbitrary node (not just text) on state change, use `bind_node`: it remounts the whole subtree when the signal changes, which suits low-frequency switches such as a sun/moon theme toggle:
+To swap an arbitrary node (not just text) on state change, use `bind_node`: it remounts the whole subtree when the signal changes, which suits low-frequency switches. ⚠ **Windows limitation (upstream libyue bug, see adaptation.md)**: remounting a subtree that contains the clicked control itself from inside a click handler corrupts subsequent mouse hit-testing (every click gets mis-routed, irreversibly) — for such cases use `swap_node`, which pre-builds both nodes and toggles visibility (no destroy/recreate; the display:none path):
 
 ```moonbit
-@yue.bind_node(dark.signal(), fn(dark) {
-  @yue.icon_button_t(
-    if dark { @yue.Sun } else { @yue.Moon },
-    on_click=fn() { dark.update(fn(v) { !v }) },
-  )
+// swapping whole blocks (not on the clicked control's own chain): bind_node
+@yue.bind_node(mode.signal(), fn(m) {
+  if m { @yue.input_t(text="Edit mode") } else { @yue.label_t("Read-only") }
 })
+// icon toggles driven by their own clicks: swap_node on Windows
+@yue.swap_node(dark.signal(),
+  @yue.icon_button_t(@yue.YhMoon, on_click=..., tip="Switch to dark"),
+  @yue.icon_button_t(@yue.YhSunny, on_click=..., tip="Switch to light"))
 ```
 
 For high-frequency updates prefer `bind` (text) or imperative setters via `handle`.
@@ -190,7 +192,8 @@ API overview:
 | `map(f)` | derive a Store that follows the source automatically on change (chainable) |
 | `bind_label(store, f, …)` | bind text inside a declarative tree; `f` maps the state to a string |
 | `bind(sig, f, …)` | Signal version of bind_label; accepts source or computed signals |
-| `bind_node(sig, f)` | bind an arbitrary node: remounts the subtree as `f(value)` whenever the signal changes — for low-frequency switches such as a state-dependent icon button (pass `store.signal()` for a Store) |
+| `bind_node(sig, f)` | bind an arbitrary node: remounts the subtree as `f(value)` whenever the signal changes — for low-frequency switches; **on Windows, do not use in click chains that remount the clicked control itself** (see the warning above; pass `store.signal()` for a Store) |
+| `swap_node(sig, a, b)` | two-state swap: pre-build both nodes and toggle visibility by the signal — no destroy/recreate, the Windows-safe alternative to `bind_node` at the cost of keeping both subtrees alive |
 
 ### Signal: derived values with automatic dependency tracking
 
