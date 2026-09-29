@@ -1,14 +1,14 @@
-// Windows「点击劫持」二分探针:定位深浅切换后全窗点击失效的根因要素。
+// Windows「点击劫持」诊断探针 v3:自动记录事件到状态栏,真机跑一轮
+// 把状态栏文本抄回来即可定位失效层级。
 //
-// 操作步骤(★每测一行前必须关掉探针重开★——失效一旦发生不可逆,
-//   不重启会让后续所有行的数据都被污染):
-//   1. 开探针,点行 1(对照)若干次——数字应正常自增;
-//   2. 重开探针,点行 2 → 回点行 1,还自增吗?
-//   3. 重开探针,点行 2b → 回点行 1?
-//   4. 重开探针,点行 3 → 回点行 1?
-//   5. 重开探针,点行 4 → 回点行 1?
-// 行 2 现已与行 2b 同语义(库内修复:Windows 上 bind_node 重挂推迟一拍),
-// 两者都应不再失效;若仍失效把现象与行号发回。
+// 操作(★每测一行前关掉重开;关不掉按 Esc 退出★):
+//   1. 开探针,点行1 若干次;
+//   2. 重开,点行2,再点行1 一次,再点窗口空白处一次;
+//   3. 重开,点行3,再点行1 一次,再点空白处一次;
+// 每次点击后看「事件流」最后几行:
+//   - 出现 [根 (x,y)] = 窗口层活着,只是子控件路由断;
+//   - 什么都没有 = 整个窗口鼠标消息死了;
+//   - 点行1 却出现 [行2] = 点击被劫持给了行2 的回调。
 
 fn main {
   if !@yue.initialize() {
@@ -16,83 +16,109 @@ fn main {
     return
   }
   let n : @yue.Signal[Int] = @yue.Signal::new(0)
-  let n2 : @yue.Signal[Int] = @yue.Signal::new(0)
   let dark : @yue.Store[Bool] = @yue.Store::new(false)
+  // 事件流:最近 4 条,新事件顶在最前
+  let log : @yue.Store[String] = @yue.Store::new("(等待点击)")
 
-  let probe : @yue.Store[String] = @yue.Store::new("(未操作)")
-
-  fn say(s : String) -> Unit {
-    probe.set(s)
+  fn say(tag : String, detail : String) -> Unit {
+    log.update(fn(old) {
+      let parts : Array[String] = []
+      parts.push("[\{tag} \{detail}]")
+      let mut cnt = 0
+      for line in old.split("|") {
+        let line = line.to_owned()
+        if line != "(等待点击)" && cnt < 3 {
+          parts.push(line)
+          cnt = cnt + 1
+        }
+      }
+      parts.join("|")
+    })
   }
 
+  let body : Array[@yue.Node] = [
+    @yue.label_t("点击劫持诊断探针 v3(Esc 退出)", role=@yue.Title),
+    @yue.label_t("每测一行前重开探针;点击后看下方事件流", role=@yue.Secondary),
+    @yue.button_t(
+      "行1 对照 \{n.get()}",
+      on_click=fn() {
+        n.update(fn(v) { v + 1 })
+        say("行1", "自增")
+      },
+      variant=@yue.Solid,
+    ),
+    @yue.bind_node(n, fn(v) {
+      @yue.button_t(
+        "行2 bind_node 重挂 \{v}",
+        on_click=fn() {
+          n.update(fn(x) { x + 1 })
+          say("行2", "重挂触发")
+        },
+      )
+    }),
+    @yue.button_t(
+      "行3 切主题",
+      on_click=fn() {
+        dark.update(fn(v) { !v })
+        @yue.theme_apply(
+          if dark.get() { @yue.dark_theme() } else { @yue.default_theme() },
+        )
+        say("行3", "主题切换")
+      },
+      variant=@yue.Danger,
+    ),
+    @yue.hbox(
+      [
+        @yue.label_t("行4:"),
+        @yue.bind_node(dark.signal(), fn(d) {
+          @yue.icon_button_t(
+            if d { @yue.YhSunny } else { @yue.YhMoon },
+            on_click=fn() {
+              dark.update(fn(v) { !v })
+              @yue.theme_apply(
+                if !d { @yue.dark_theme() } else { @yue.default_theme() },
+              )
+              say("行4", "图标按钮触发")
+            },
+            tip="showcase 同款",
+          )
+        }),
+      ],
+      style=[("alignItems", "center")],
+    ),
+    @yue.separator(),
+    @yue.label_t("事件流(新在前):", role=@yue.Secondary),
+    @yue.bind_label(log, fn(s) { s }),
+  ]
   ignore(
     @yue.mount_window(
-    [
-      @yue.label_t("点击劫持二分探针", role=@yue.Title),
-      @yue.label_t("每点一行后,回到「行1 对照」多点几下,看数字是否还在自增", role=@yue.Secondary),
-      @yue.bind_label(probe, fn(s) { "状态: \{s}" }),
-      @yue.separator(),
-      // 行 1 对照:普通自绘按钮,无重挂无主题
-      @yue.button_t(
-        "行1 对照:自增 \{n.get()}",
-        on_click=fn() {
-          n.update(fn(v) { v + 1 })
-          say("行1 正常自增")
-        },
-        variant=@yue.Solid,
-      ),
-      // 行 2:bind_node 运行期重挂(点击回调内 remove+add),不切主题
-      @yue.bind_node(n, fn(v) {
-        @yue.button_t(
-          "行2 bind_node 重挂 \{v}(点我,再试行1)",
-          on_click=fn() {
-            n.update(fn(x) { x + 1 })
-            say("行2 重挂已触发")
+      [
+        // 根容器:记录窗口层收到的每次点击坐标(判断整窗是否还活着)
+        @yue.vbox(
+          body,
+          style=[("padding", 16.0), ("flexgrow", 1.0)],
+          handle=fn(root) {
+            root.on_mouse_down(fn(e) {
+              say("根", "(\{e.view_x}, \{e.view_y})")
+              false
+            })
           },
-        )
-      }),
-      // 行 2b:bind_node 重挂但信号更新推迟一拍(重挂脱离点击回调栈)
-      @yue.bind_node(n2, fn(v) {
-        @yue.button_t(
-          "行2b 延迟重挂 \{v}(点我,再试行1)",
-          on_click=fn() {
-            @yue.post_task(fn() { n2.update(fn(x) { x + 1 }) })
-            say("行2b 延迟重挂已排队")
-          },
-        )
-      }),
-      // 行 3:切主题(不用 bind_node),普通按钮
-      @yue.button_t(
-        "行3 切主题(点我,再试行1)",
-        on_click=fn() {
-          dark.update(fn(v) { !v })
-          @yue.theme_apply(if dark.get() { @yue.dark_theme() } else { @yue.default_theme() })
-          say("行3 主题已切换")
-        },
-        variant=@yue.Danger,
-      ),
-      // 行 4:icon_button_t + tip + bind_node 重挂 + 切主题(showcase 同款)
-      @yue.hbox(
-        [
-          @yue.label_t("行4:"),
-          @yue.bind_node(dark.signal(), fn(d) {
-            @yue.icon_button_t(
-              if d { @yue.YhSunny } else { @yue.YhMoon },
-              on_click=fn() {
-                dark.update(fn(v) { !v })
-                @yue.theme_apply(if !d { @yue.dark_theme() } else { @yue.default_theme() })
-                say("行4 图标按钮已触发")
-              },
-              tip="showcase 同款",
-            )
-          }),
-        ],
-        style=[("alignItems", "center")],
-      ),
-    ],
-      title="点击劫持二分探针",
-      size=Some((560.0, 420.0)),
+        ),
+      ],
+      title="点击劫持诊断 v3",
+      size=Some((600.0, 560.0)),
       center=true,
+      handle=fn(w) {
+        // Esc 退出:鼠标死后键盘焦点仍可用,保底关闭通道
+        w.on_key_down(fn(e) {
+          if e.code == @yue.VKEY_ESCAPE {
+            @yue.quit()
+            true
+          } else {
+            false
+          }
+        })
+      },
     ),
   )
   @yue.run()
