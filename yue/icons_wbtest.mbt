@@ -2,14 +2,14 @@
 
 test {
   assert_eq(all_icons().length(), 803)
-  assert_true(all_icons().contains(YhSearch2))
-  assert_true(all_icons().contains(YhDrag))
-  assert_true(all_icons().contains(YhCode))
-  assert_true(all_icons().contains(YhCode))
-  assert_true(all_icons().contains(YhBranches))
-  assert_true(all_icons().contains(YhMail1))
-  assert_true(all_icons().contains(YhDatabase))
-  assert_true(all_icons().contains(YhPieChart))
+  assert_true(all_icons().contains(Search2))
+  assert_true(all_icons().contains(Drag))
+  assert_true(all_icons().contains(Code))
+  assert_true(all_icons().contains(Code))
+  assert_true(all_icons().contains(Branches))
+  assert_true(all_icons().contains(Mail1))
+  assert_true(all_icons().contains(Database))
+  assert_true(all_icons().contains(PieChart))
   // 清单无重复
   let mut uniq = 0
   for i, a in all_icons() {

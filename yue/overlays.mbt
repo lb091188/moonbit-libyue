@@ -63,7 +63,7 @@ pub fn dialog_t(
       attach(ViewLike::view(head), label_t(title, role=Section).mount_into(ViewLike::view(head)))
       let spacer = themed_container(style=[("flex", 1.0)])
       head.add_child(spacer)
-      let close_btn = icon_button_t(YhClose2, on_click=fn() {
+      let close_btn = icon_button_t(Close2, on_click=fn() {
         on_cancel()
         close()
       }, tip="关闭")
@@ -168,11 +168,11 @@ pub fn toast_layer(
           p.set_stroke_color(theme_border())
           p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
           let kind : IconKind = match t {
-            Info => IconKind::YhInfoCircleFill
-            Success => IconKind::YhCheckCircleFill
-            Warning => IconKind::YhWarningCircleFill
-            Danger => IconKind::YhCloseCircleFill
-            Primary => IconKind::YhInfoCircleFill
+            Info => IconKind::InfoCircleFill
+            Success => IconKind::CheckCircleFill
+            Warning => IconKind::WarningCircleFill
+            Danger => IconKind::CloseCircleFill
+            Primary => IconKind::InfoCircleFill
           }
           draw_icon(p, kind, 18.0, b.height / 2.0, 7.0, type_color(t))
           let at = AttributedText::new(text, valign=Center, wrap=false)

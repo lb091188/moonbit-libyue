@@ -12,809 +12,809 @@
 pub(all) enum IconKind {
 
   // ---- icons-gen:variants
-  YhTreeStructure // 树形图
-  YhHide // 隐藏
-  YhClickButton // 点击按钮
-  YhStaticText // 静态文字
-  YhSwitch // switch
-  YhTextField // 单行输入框
-  YhTextarea // 多行输入框
-  YhNumberField // 数字输入框
-  YhSelectField // 下拉多选
-  YhTreeTable // 树形表格
-  YhEditTable // 可编辑表格
-  YhTable // 表格
-  YhTab // 标签页
-  YhScript // script
-  YhShangduiqi // 上对齐
-  YhYouduiqi // 右对齐
-  YhZuoduiqi // 左对齐
-  YhWeibiaoti545 // 撤销
-  YhDingceng // 顶层
-  YhDiceng // 底层
-  YhShangyiyiceng // 上移一层
-  YhXiaduiqi // 下对齐
-  YhXiayiyiceng // 下移一层
-  YhDaxiaoxiangdeng // 大小相等
-  YhTuceng // 图层
-  YhChatBar // 图表_柱状图
-  YhFunction // function
-  YhDuiqi // 对齐
-  YhParams // 参数
-  YhTucengzhizuoyuweihu // 图层制作与维护
-  YhKuaibuju // 块布局
-  YhShuxiangfenbu // 竖向分布
-  YhHengxiangfenbu1 // 横向分布
-  YhChicunbiaozhu_ // 自定义尺寸
-  YhZuoyoujuzhong // 左右居中
-  YhShangxiajuzhong // 上下居中
-  YhDengkuan // 09等宽
-  YhDenggao // 10等高
-  YhQueryFilter // 条件查询
-  YhZhushujushenqingShujufenxi02 // 主数据申请-数据分析-02
-  YhSuofangdaodengbi // 缩放到等比
-  YhHuifu // 恢复
-  YhMenu1 // menu
-  YhMicrophone // microphone
-  YhMinus1 // minus
-  YhMessage1 // message
-  YhMapLocation // map-location
-  YhMessageSolid // message-solid
-  YhMic // mic
-  YhMilkTea // milk-tea
-  YhMedal // medal
-  YhMedal2 // medal-1
-  YhMobile1 // mobile
-  YhMobilePhone // mobile-phone
-  YhMoney // money
-  YhMore1 // more
-  YhNoSmoking // no-smoking
-  YhMoreOutline // more-outline
-  YhNotebook // notebook-2
-  YhSHome // s-home
-  YhNews // news
-  YhNotebook1 // notebook-1
-  YhSOpen // s-open
-  YhSMarketing // s-marketing
-  YhMouse // mouse
-  YhSManagement // s-management
-  YhSOperation // s-operation
-  YhOfficeBuilding // office-building
-  YhSwitchOpen // open
-  YhShip // ship
-  YhSell // sell
-  YhSearch2 // search
-  YhService // service
-  YhScissors // scissors
-  YhOrange // orange
-  YhPhoneOutline // phone-outline
-  YhPicture // picture
-  YhReceiving // receiving
-  YhPictureOutlineRound // picture-outline-round
-  YhPictureOutline // picture-outline
-  YhPieChart // pie-chart
-  YhSData // s-data
-  YhRefrigerator // refrigerator
-  YhSCooperation // s-cooperation
-  YhSCheck // s-check
-  YhSFlag // s-flag
-  YhSCustom // s-custom
-  YhSFinance // s-finance
-  YhRemoveOutline // remove-outline
-  YhSComment // s-comment
-  YhRemove // remove
-  YhSchool // school
-  YhSShop // s-shop
-  YhSTicket // s-ticket
-  YhSortUp // sort-up
-  YhSort // sort
-  YhTakeawayBox // takeaway-box
-  YhStopwatch // stopwatch
-  YhThumb // thumb
-  YhTickets // tickets
-  YhTruck // truck
-  YhUser1 // user
-  YhUserSolid // user-solid
-  YhVideoCameraSolid // video-camera-solid
-  YhVideoPlay // video-play
-  YhVideoCamera // video-camera
-  YhRight1 // right
-  YhVideoPause // video-pause
-  YhStarOff // star-off
-  YhTrophy1 // trophy
-  YhWallet1 // wallet
-  YhWatch // watch
-  YhWindPower // wind-power
-  YhView // view
-  YhWatermelon // watermelon
-  YhShare2 // share
-  YhSetUp // set-up
-  YhZoomIn // zoom-in
-  YhWaterCup // water-cup
-  YhWarning // warning
-  YhWatch2 // watch-1
-  YhSetting1 // setting
-  YhZoomOut // zoom-out
-  YhPear // pear
-  YhPaperclip // paperclip
-  YhPlatformEleme // platform-eleme
-  YhSClaim // s-claim
-  YhSGoods // s-goods
-  YhSGrid // s-grid
-  YhSHelp // s-help
-  YhShoppingCart // shopping-cart-2
-  YhSmoking // smoking
-  YhSoccer // soccer
-  YhSPromotion // s-promotion
-  YhSortDown // sort-down
-  YhSRelease // s-release
-  YhSOpportunity // s-opportunity
-  YhSOrder // s-order
-  YhSTools // s-tools
-  YhSoldOut // sold-out
-  YhSPlatform // s-platform
-  YhSuitcase // suitcase
-  YhSuitcase2 // suitcase-1
-  YhSugar // sugar
-  YhSunset // sunset
-  YhSunrise // sunrise-1
-  YhTopLeft // top-left
-  YhSwitchButton // switch-button
-  YhToiletPaper // toilet-paper
-  YhTableLamp // table-lamp
-  YhTableware // tableware
-  YhTopRight // top-right
-  YhTop // top
-  YhTurnOff // turn-off
-  YhMonitor1 // monitor
-  YhUnlock1 // unlock
-  YhPostcard // postcard
-  YhUmbrella // umbrella
-  YhMoon // moon
-  YhAddLocation // add-location
-  YhPresent // present
-  YhAim // aim
-  YhPosition // position
-  YhBack // back
-  YhPriceTag // price-tag
-  YhArrowLeft // arrow-left
-  YhPotatoStrips // potato-strips
-  YhAttract // attract
-  YhArrowRight // arrow-right
-  YhSunny // sunny
-  YhArrowUp // arrow-up
-  YhMoonNight // moon-night
-  YhAlarmClock // alarm-clock
-  YhReading // reading
-  YhArrowDown // arrow-down
-  YhRank // rank
-  YhApple1 // apple
-  YhBottomRight // bottom-right
-  YhUpload2 // upload
-  YhBox // box
-  YhTimer // timer
-  YhBrush // brush
-  YhGuide // guide
-  YhBankCard // bank-card
-  YhTrophy12 // trophy-1
-  YhBottomLeft // bottom-left
-  YhBicycle // bicycle
-  YhBaseball // baseball
-  YhBasketball // basketball
-  YhBurger // burger
-  YhBottom // bottom
-  YhCScaleToOriginal // c-scale-to-original
-  YhChatDotRound // chat-dot-round
-  YhChatRound // chat-round
-  YhChatDotSquare // chat-dot-square
-  YhChatSquare // chat-square
-  YhCircleClose // circle-close
-  YhChicken // chicken
-  YhCloseNotification // close-notification
-  YhClose2 // close
-  YhCherry // cherry
-  YhCoffeeCup // coffee-cup
-  YhCloudy // cloudy
-  YhCollectionTag // collection-tag
-  YhColdDrink // cold-drink
-  YhCollection // collection
-  YhCoordinate // coordinate
-  YhConnection // connection
-  YhCrop // crop
-  YhCpu // cpu
-  YhCopyDocument // copy-document
-  YhDCaret // d-caret
-  YhDArrowRight // d-arrow-right
-  YhDataBoard // data-board
-  YhDataAnalysis // data-analysis
-  YhDataLine // data-line
-  YhDArrowLeft // d-arrow-left
-  YhDeleteSolid // delete-solid
-  YhDeleteLocation // delete-location
-  YhDiscount // discount
-  YhDate // date
-  YhDessert // dessert
-  YhDish // dish
-  YhDelete2 // delete
-  YhDocumentCopy // document-copy
-  YhDocument // document
-  YhDiscover // discover
-  YhDocumentAdd // document-add
-  YhDocumentChecked // document-checked
-  YhDocumentDelete // document-delete
-  YhDocumentRemove // document-remove
-  YhDish2 // dish-1
-  YhDownload1 // download
-  YhCoin // coin
-  YhFemale // female
-  YhFilm // film
-  YhError1 // error
-  YhEleme // eleme
-  YhCoffee // coffee
-  YhFolderRemove // folder-remove
-  YhFolderChecked // folder-checked
-  YhFolderAdd1 // folder-add
-  YhFolderDelete // folder-delete
-  YhFootball // football
-  YhFinished // finished
-  YhForkSpoon // fork-spoon
-  YhFirstAidKit // first-aid-kit
-  YhGobletFull // goblet-full
-  YhFood // food
-  YhFullscreen // full-screen
-  YhGobletSquareFull // goblet-square-full
-  YhGoblet // goblet
-  YhGoods // goods
-  YhHeadset // headset
-  YhHouse // house
-  YhIceCreamRound // ice-cream-round
-  YhHotWater // hot-water
-  YhHeavyRain // heavy-rain
-  YhIceDrink // ice-drink
-  YhIceCream // ice-cream
-  YhKey1 // key
-  YhIceCreamSquare // ice-cream-square
-  YhKnifeFork // knife-fork
-  YhIceTea // ice-tea
-  YhInfo // info
-  YhGrape // grape
-  YhLightRain // light-rain
-  YhLock1 // lock
-  YhLocationOutline // location-outline
-  YhLightning // lightning
-  YhMagicStick // magic-stick
-  YhLink1 // link
-  YhLollipop // lollipop
-  YhLoadingStep // loading
-  YhRest // rest
-  YhBellFill // bell-fill
-  YhUsb // USB
-  YhFilterFill // filter-fill
-  YhSkin // skin
-  YhFireFill // fire-fill
-  YhHome // home
-  YhFunnelplotFill // funnel plot-fill
-  YhBank // bank
-  YhGiftFill // gift-fill
-  YhFilter1 // filter
-  YhHourglassFill // hourglass-fill
-  YhFunnelplot // funnel plot
-  YhHomeFill // home-fill
-  YhLike // like
-  YhTrophyFill // trophy-fill
-  YhUnlike // unlike
-  YhLocationFill // location-fill
-  YhUnlock // unlock
-  YhCloudFill // cloud-fill
-  YhLock // lock
-  YhCustomerserviceFill // customerservice-fill
-  YhCustomerservice // customerservice
-  YhExperimentFill // experiment-fill
-  YhFlag // flag
-  YhEyeFill // eye-fill
-  YhMoneycollect // money collect
-  YhLikeFill // like-fill
-  YhMedicinebox // medicinebox
-  YhLockFill // lock-fill
-  YhShop // shop
-  YhUnlikeFill // unlike-fill
-  YhShopping // shopping
-  YhStarFill // star-fill
-  YhFolder // folder
-  YhUnlockFill // unlock-fill
-  YhFolderOpen // folder-open
-  YhAlertFill // alert-fill
-  YhApiFill // api-fill
-  YhDeploymentunit // deployment unit
-  YhHighlightFill // highlight-fill
-  YhAccountbook // account book
-  YhPhoneFill // phone-fill
-  YhContacts // contacts
-  YhEditFill // edit-fill
-  YhCarryout // carry out
-  YhPushpinFill // pushpin-fill
-  YhCalendarCheck // calendar-check
-  YhThunderboltFill // thunderbolt-fill
-  YhCalendar1 // calendar
-  YhTagFill // tag-fill
-  YhScan // scan
-  YhWrenchFill // wrench-fill
-  YhSelect // select
-  YhTagsFill // tags-fill
-  YhBoxplot // box plot
-  YhBankFill // bank-fill
-  YhBuild // build
-  YhCameraFill // camera-fill
-  YhSliders // sliders
-  YhErrorFill // error-fill
-  YhLaptop // laptop
-  YhCrownFill // crown-fill
-  YhBarcode1 // barcode
-  YhMailFill // mail-fill
-  YhCamera // camera
-  YhCarFill // car-fill
-  YhCluster // cluster
-  YhPrinterFill // printer-fill
-  YhGateway // gateway
-  YhShopFill // shop-fill
-  YhCar // car
-  YhSettingFill // setting-fill
-  YhPrinter // printer
-  YhUSBFill // USB-fill
-  YhRead // read
-  YhGoldenFill // golden-fill
-  YhCloudServer // cloud-server
-  YhBuildFill // build-fill
-  YhCloudUpload // cloud-upload
-  YhBoxplotFill // box plot-fill
-  YhCloud // cloud
-  YhSlidersFill // sliders-fill
-  YhCloudDownload // cloud-download
-  YhAlibaba // alibaba
-  YhCloudSync // cloud-sync
-  YhAlibabacloud // alibabacloud
-  YhVideo // video
-  YhAntdesign // ant design
-  YhNotification // notification
-  YhAntCloud // ant-cloud
-  YhSound // sound
-  YhBehance // behance
-  YhRadarChart // radar chart
-  YhGoogleplus // google plus
-  YhQrcode // qrcode
-  YhMedium // medium
-  YhFund // fund
-  YhGoogle // google
-  YhImage1 // image
-  YhIE // IE
-  YhMail1 // mail
-  YhAmazon // amazon
-  YhSlack // slack
-  YhIdcard // id card
-  YhAlipay // alipay
-  YhCreditcard // credit card
-  YhTaobao // taobao
-  YhHeart // heart
-  YhZhihu // zhihu
-  YhBlock // block
-  YhHTML // HTML5
-  YhError // error
-  YhLinkedin // linkedin
-  YhStar // star
-  YhYahoo // yahoo
-  YhGold // gold
-  YhFacebook // facebook
-  YhHeatmap // heat map
-  YhSkype // skype
-  YhWifi // wifi
-  YhCodeSandbox // CodeSandbox
-  YhPaperclip2 // attachment
-  YhChrome // chrome
-  YhEdit1 // edit
-  YhAliwangwang // aliwangwang
-  YhKey // key
-  YhApple // apple
-  YhApi // api
-  YhAndroid // android
-  YhDisconnect // disconnect
-  YhSketch // sketch
-  YhHighlight // highlight
-  YhGitlab // Gitlab
-  YhMonitor // monitor
-  YhDribbble // dribbble
-  YhLink // link
-  YhInstagram // instagram
-  YhMan // man
-  YhReddit // reddit
-  YhPercentage // percentage
-  YhWindows // windows
-  YhPushpin // pushpin
-  YhYuque // yuque
-  YhPhone // phone
-  YhYoutube // Youtube
-  YhShake // shake
-  YhGitlabFill // Gitlab-fill
-  YhTag // tag
-  YhDropbox // dropbox
-  YhWrench // wrench
-  YhDingtalk // dingtalk
-  YhWoman // woman
-  YhAndroidFill // android-fill
-  YhTags // tags
-  YhAppleFill // apple-fill
-  YhScissor // scissor
-  YhHTMLFill // HTML5-fill
-  YhMr // mr
-  YhWindowsFill // windows-fill
-  YhShare1 // share
-  YhQQ // QQ
-  YhBranches // branches
-  YhTwitter // twitter
-  YhFork // fork
-  YhSkypeFill // skype-fill
-  YhShrink // shrink
-  YhWeibo // weibo
-  YhArrawsalt // arrawsalt
-  YhYuqueFill // yuque-fill
-  YhVerticalright // vertical right
-  YhYoutubeFill // Youtube-fill
-  YhVerticalleft // vertical left
-  YhYahooFill // yahoo-fill
-  YhWechat // wechat
-  YhChromeFill // chrome-fill
-  YhAliwangwangFill // aliwangwang-fill
-  YhFullscreenExit // fullscreen-exit
-  YhGithubFill // github-fill
-  YhMediumCircleFill // medium-circle-fill
-  YhColumnHeight // colum-height
-  YhVAlignBottom // vertical-align-botto
-  YhVAlignMiddle // vertical-align-middl
-  YhToTop // totop
-  YhVAlignTop // vertical-align-top
-  YhDownload // download
-  YhSortDesc // sort-descending
-  YhSortAsc // sort-ascending
-  YhFall // fall
-  YhSwap // swap
-  YhStock // stock
-  YhRise // rise
-  YhIndent // indent
-  YhOutdent // outdent
-  YhMenu // menu
-  YhUnorderedlist // unordered list
-  YhOrderedlist // ordered list
-  YhAlignRight // align-right
-  YhAlignCenter // align-center
-  YhAlignLeft // align-left
-  YhPicCenter // pic-center
-  YhPicRight // pic-right
-  YhPicLeft // pic-left
-  YhBold // bold
-  YhFontColor // font-colors
-  YhCheckCircle // check-circle
-  YhExclaimination // exclaimination
-  YhCI // CI
-  YhFontSize // font-size
-  YhDollar // Dollar
-  YhInfomation // infomation
-  YhCompass // compass
-  YhLineHeight // line-height
-  YhStrikethrough // strikethrough
-  YhFrown // frown
-  YhUnderline // underline
-  YhInfoCircle // info-circle
-  YhNumber // number
-  YhLeftCircle // left-circle
-  YhItalic // italic
-  YhLoading // loading
-  YhDownCircle // down-circle
-  YhCode // code
-  YhEURO // EURO
-  YhColumnWidth // column-width
-  YhCopyright // copyright
-  YhMinusCircle // minus-circle
-  YhMeh // meh
-  YhDash // dash
-  YhPlusCircle // plus-circle
-  YhPlayCircle // play-circle
-  YhEnter1 // enter
-  YhQuestionCircle // question-circle
-  YhLine // line
-  YhPound // Pound
-  YhMinus // minus
-  YhRightCircle // right-circle
-  YhQuestion // question
-  YhSmile // smile
-  YhPlus // plus
-  YhTrademark // trademark
-  YhSmallDash // small-dash
-  YhPause // pause
-  YhEarth // earth
-  YhBgColors // bg-colors
-  YhYUAN // YUAN
-  YhCrown // crown
-  YhUpCircle // up-circle
-  YhDrag // drag
-  YhWarningCircle // warning-circle
-  YhSync // sync
-  YhGift // gift
-  YhTransaction // transaction
-  YhStop // stop
-  YhUndo // undo
-  YhFire // fire
-  YhRedo // redo
-  YhThunderbolt // thunderbolt
-  YhReload // reload
-  YhCheckCircleFill // check-circle-fill
-  YhReloadtime // reload time
-  YhLeftCircleFill // left-circle-fill
-  YhMessage // message
-  YhDownCircleFill // down-circle-fill
-  YhDashboard // dashboard
-  YhMinusCircleFill // minus-circle-fill
-  YhIssuesclose // issues close
-  YhCloseCircleFill // close-circle-fill
-  YhPoweroff // poweroff
-  YhInfoCircleFill // info-circle-fill
-  YhLogout // logout
-  YhUpCircleFill // up-circle-fill
-  YhLogin // login
-  YhRightCircleFill // right-circle-fill
-  YhPiechart // pie chart
-  YhPlusCircleFill // plus-circle-fill
-  YhQuestionCircleFill // question-circle-fill
-  YhEye // eye
-  YhEUROCircleFill // EURO-circle-fill
-  YhFrownFill // frown-fill
-  YhCopyrightCircleFil // copyright-circle-fil
-  YhExport // export
-  YhCICircleFill // CI-circle-fill
-  YhSave1 // save
-  YhCompassFill // compass-fill
-  YhImport // Import
-  YhDollarCircleFill // Dollar-circle-fill
-  YhAppstore // app store
-  YhPoweroffCircleFill // poweroff-circle-fill
-  YhMehFill // meh-fill
-  YhPlayCircleFill // play-circle-fill
-  YhLayout // layout
-  YhPoundCircleFill // Pound-circle-fill
-  YhSmileFill // smile-fill
-  YhStopFill // stop-fill
-  YhControl // control
-  YhWarningCircleFill // warning-circle-fill
-  YhCodelibrary // code library
-  YhDetail // detail
-  YhTrademarkCircleFil // trademark-circle-fil
-  YhYUANCircleFill // YUAN-circle-fill
-  YhHeartFill // heart-fill
-  YhPiechartCircleFil // pie chart-circle-fil
-  YhProject // project
-  YhDashboardFill // dashboard-fill
-  YhWallet // wallet
-  YhMessageFill // message-fill
-  YhCalculator // calculator
-  YhInteration // interation
-  YhBorder // border
-  YhCodelibraryFill // code library-fill
-  YhBorderOuter // border-outer
-  YhBorderTop // border-top
-  YhBorderBottom // border-bottom
-  YhBorderLeft // border-left
-  YhBorderRight // border-right
-  YhBorderInner // border-inner
-  YhAccountbookFill // account book-fill
-  YhBorderVertical // border-verticle
-  YhCarryoutFill // carry out-fill
-  YhBorderHorizontal // border-horizontal
-  YhCalendarFill // calendar-fill
-  YhRadiusBottomleft // radius-bottomleft
-  YhCalculatorFill // calculator-fill
-  YhRadiusBottomright // radius-bottomright
-  YhInterationFill // interation-fill
-  YhRadiusUpleft // radius-upleft
-  YhProjectFill // project-fill
-  YhRadiusUpright // radius-upright
-  YhDetailFill // detail-fill
-  YhRadiusSetting // radius-setting
-  YhSaveFill // save-fill
-  YhAdduser // add user
-  YhWalletFill // wallet-fill
-  YhDeleteteam // delete team
-  YhControlFill // control-fill
-  YhDeleteuser // delete user
-  YhLayoutFill // layout-fill
-  YhAddteam // addteam
-  YhAppstoreFill // app store-fill
-  YhUser // user
-  YhMobileFill // mobile-fill
-  YhTeam // team
-  YhTabletFill // tablet-fill
-  YhAreaChart // area chart
-  YhBookFill // book-fill
-  YhLineChart // line chart
-  YhRedenvelopeFill // red envelope-fill
-  YhBarchart // bar chart
-  YhSafetycertificateF // safety certificate-f
-  YhPointmap // point map
-  YhPropertysafetyFill // property safety-fill
-  YhContainer // container
-  YhDatabase // database
-  YhSecurityscanFill // security scan-fill
-  YhSever // sever
-  YhFileExclamationFil // file-exclamation-fil
-  YhMobile // mobile
-  YhFileAddFill // file-add-fill
-  YhTablet // tablet
-  YhFileExcelFill // file-excel-fill
-  YhRedenvelope // red envelope
-  YhFileMarkdownFill // file-markdown-fill
-  YhBook // book
-  YhFileTextFill // file-text-fill
-  YhFiledone // file done
-  YhFilePptFill // file-ppt-fill
-  YhReconciliation // reconciliation
-  YhFileUnknownFill // file-unknown-fill
-  YhFileException // file -exception
-  YhFileWordFill // file-word-fill
-  YhFilesync // file sync
-  YhFileZipFill // file-zip-fill
-  YhFileSearch // file search
-  YhFilePdfFill // file-pdf-fill
-  YhSolution // solution
-  YhFileImageFill // file-image-fill
-  YhFileprotect // file protect
-  YhDiffFill // diff-fill
-  YhFileAdd // file-add
-  YhFileCopyFill // file-copy-fill
-  YhFileExcel // file-excel
-  YhSnippetsFill // snippets-fill
-  YhFileExclamation // file-exclamation
-  YhBatchfoldingFill // batch folding-fill
-  YhFilePdf // file-pdf
-  YhReconciliationFill // reconciliation-fill
-  YhFileImage // file-image
-  YhFileMarkdown // file-markdown
-  YhFolderFill // folder-fill
-  YhFileUnknown // file-unknown
-  YhFolderOpenFill // folder-open-fill
-  YhFilePpt // file-ppt
-  YhDatabaseFill // database-fill
-  YhFileWord // file-word
-  YhContainerFill // container-fill
-  YhFile1 // file
-  YhSeverFill // sever-fill
-  YhFileZip // file-zip
-  YhCalendarCheckFill // calendar-check-fill
-  YhFileText // file-text
-  YhImageFill // image-fill
-  YhFileCopy // file-copy
-  YhIdcardFill // id card-fill
-  YhSnippets // snippets
-  YhCreditcardFill // credit card-fill
-  YhAudit // audit
-  YhFundFill // fund-fill
-  YhDiff // diff
-  YhReadFill // read-fill
-  YhBatchfolding // Batch folding
-  YhContactsFill // contacts-fill
-  YhSecurityscan // security scan
-  YhPropertysafety // property safety
-  YhNotificationFill // notification-fill
-  YhSafetycertificate // safety certificate
-  YhFlagFill // flag-fill
-  YhMoneycollectFill // money collect-fill
-  YhAlert // alert
-  YhMedicineboxFill // medicine box-fill
-  YhRestFill // rest-fill
-  YhHourglass // hourglass
-  YhShoppingFill // shopping-fill
-  YhBulb // bulb
-  YhSkinFill // skin-fill
-  YhExperiment // experiment
-  YhVideoFill // video-fill
-  YhBell // bell
-  YhSoundFill // sound-fill
-  YhTrophy // trophy
-  YhBulbFill // bulb-fill
-  YhFuwuActive // 服务
-  YhShouyeShouye // 首页-首页
-  YhCangkuxinxi // 仓库信息
-  YhSaomiao // 239扫描
-  YhIconset0254 // 条码
-  YhZhongsuanrenwuliebiao // 重算任务列表
-  YhXiangxiazhanhang // 向下占行
-  YhQita // 其他
-  YhXiajia // 下架
-  YhFeiji // plane
-  YhTixing // 提醒
-  YhShaixuan_o // 筛选_o
-  YhSiji // 司机
-  YhLianxiwomen // 联系我们
-  YhGuanyuwomen // 关于我们
-  YhWode // 我的
-  YhTruckFull // 货车
-  YhXiayibu // xiayibu
-  YhVideo2 // video
-  YhImage // images
-  YhFile // file-fill
-  YhXinhao // 信号
-  YhGengduo // 更多
-  YhXuhao // 3序号
-  YhZhiye // 职业
-  YhWeixian // 危险
-  YhApptubiao // 没有
-  YhJingdiananli_wujiaoxing_shoucanghou // 经典案例_五角星_收藏后
-  YhJingdiananli_kongwujiaoxing_shoucang // 经典案例_空五角星_收藏
-  YhCaigou // 采购
-  YhNaviconQtrkd // 其他入库单
-  YhCustomWorker // 审批模型-工人
-  YhRuku // 入库
-  YhYichang // 异常
-  YhShougongpeidui // 12、手工配对
-  YhLunkuohua113 // -补货
-  YhJiebang // 解绑
-  YhGoodsppeinventory // 资产盘点 goods/ppe/inventory
-  YhWeixiujilu // 维修记录
-  YhTaizhangguanli // 1台账管理
-  YhWeixiu // 维修
-  YhBaoxiu // 报修
-  YhDaijiedan // 待接单
-  YhShebeidianjian // 设备点检
-  YhShebeidianjiantongji // 设备点检统计
-  YhBaoyanggongdan // 保养工单
-  YhBaoyangjihua // 保养计划
-  YhChart // chart
-  YhChartBar // chart-bar
-  YhFilter // filter
-  YhFilterClear // filter-clear
-  YhShare // share
-  YhBooks // books
-  YhCart // cart
-  YhClear // clear
-  YhMenuFold // menu-fold
-  YhLockOff // lock-off
-  YhRotation // rotation
-  YhLayers // layers
-  YhLockOn // lock-on
-  YhRootList // root-list
-  YhAControlplatform // control.platform
-  YhChartBubble // chart-bubble
-  YhCaretUpSmall // caret-up-small
-  YhEnter // enter
-  YhRollfront // rollfront
-  YhJump // jump
-  YhRollback // rollback
-  YhCaretRightSmall // caret-right-small
-  YhMirror // mirror
-  YhTime // time
-  YhUserAvatar // user-avatar
-  YhUsergroupClear // usergroup-clear
-  YhMinusRectangle // minus-rectangle
-  YhFormatHorizontalAlignTop // format-horizontal-align-top
-  YhMove1 // move
-  YhBulletpoint // bulletpoint
-  YhBarcode // barcode
-  YhLogoWecom // logo-wecom
-  YhMenuUnfold // menu-unfold
-  YhTools // tools
-  YhCaretLeftSmall // caret-left-small
-  YhRound // round
-  YhCaretDownSmall // caret-down-small
-  YhCheck // check
-  YhAPrecisemonitor // precise.monitor
-  YhGenderFemale // gender-female
-  YhAOrderAdjustmentcolumn // order-adjustment.column
-  YhQueue // queue
-  YhPrint // print
-  YhEllipsis // ellipsis
-  YhTimeFilled // time-filled
-  YhSlash // slash
-  YhHelpCircleFilled // help-circle-filled
-  YhMenuApplication // menu-application
-  YhPin // pin
-  YhUserTalk // user-talk
-  YhMore // more
+  TreeStructure // 树形图
+  Hide // 隐藏
+  ClickButton // 点击按钮
+  StaticText // 静态文字
+  Switch // switch
+  TextField // 单行输入框
+  Textarea // 多行输入框
+  NumberField // 数字输入框
+  SelectField // 下拉多选
+  TreeTable // 树形表格
+  EditTable // 可编辑表格
+  TableIcon // 表格
+  TabIcon // 标签页
+  Script // script
+  Shangduiqi // 上对齐
+  Youduiqi // 右对齐
+  Zuoduiqi // 左对齐
+  Weibiaoti545 // 撤销
+  Dingceng // 顶层
+  Diceng // 底层
+  Shangyiyiceng // 上移一层
+  Xiaduiqi // 下对齐
+  Xiayiyiceng // 下移一层
+  Daxiaoxiangdeng // 大小相等
+  Tuceng // 图层
+  ChatBar // 图表_柱状图
+  Function // function
+  Duiqi // 对齐
+  Params // 参数
+  Tucengzhizuoyuweihu // 图层制作与维护
+  Kuaibuju // 块布局
+  Shuxiangfenbu // 竖向分布
+  Hengxiangfenbu1 // 横向分布
+  Chicunbiaozhu_ // 自定义尺寸
+  Zuoyoujuzhong // 左右居中
+  Shangxiajuzhong // 上下居中
+  Dengkuan // 09等宽
+  Denggao // 10等高
+  QueryFilter // 条件查询
+  ZhushujushenqingShujufenxi02 // 主数据申请-数据分析-02
+  Suofangdaodengbi // 缩放到等比
+  Huifu // 恢复
+  Menu1 // menu
+  Microphone // microphone
+  Minus1 // minus
+  Message1 // message
+  MapLocation // map-location
+  MessageSolid // message-solid
+  Mic // mic
+  MilkTea // milk-tea
+  Medal // medal
+  Medal2 // medal-1
+  Mobile1 // mobile
+  MobilePhone // mobile-phone
+  Money // money
+  More1 // more
+  NoSmoking // no-smoking
+  MoreOutline // more-outline
+  Notebook // notebook-2
+  SHome // s-home
+  News // news
+  Notebook1 // notebook-1
+  SOpen // s-open
+  SMarketing // s-marketing
+  Mouse // mouse
+  SManagement // s-management
+  SOperation // s-operation
+  OfficeBuilding // office-building
+  SwitchOpen // open
+  Ship // ship
+  Sell // sell
+  Search2 // search
+  Service // service
+  Scissors // scissors
+  Orange // orange
+  PhoneOutline // phone-outline
+  Picture // picture
+  Receiving // receiving
+  PictureOutlineRound // picture-outline-round
+  PictureOutline // picture-outline
+  PieChart // pie-chart
+  SData // s-data
+  Refrigerator // refrigerator
+  SCooperation // s-cooperation
+  SCheck // s-check
+  SFlag // s-flag
+  SCustom // s-custom
+  SFinance // s-finance
+  RemoveOutline // remove-outline
+  SComment // s-comment
+  Remove // remove
+  School // school
+  SShop // s-shop
+  STicket // s-ticket
+  SortUp // sort-up
+  Sort // sort
+  TakeawayBox // takeaway-box
+  Stopwatch // stopwatch
+  Thumb // thumb
+  Tickets // tickets
+  Truck // truck
+  User1 // user
+  UserSolid // user-solid
+  VideoCameraSolid // video-camera-solid
+  VideoPlay // video-play
+  VideoCamera // video-camera
+  Right1 // right
+  VideoPause // video-pause
+  StarOff // star-off
+  Trophy1 // trophy
+  Wallet1 // wallet
+  Watch // watch
+  WindPower // wind-power
+  ViewIcon // view
+  Watermelon // watermelon
+  Share2 // share
+  SetUp // set-up
+  ZoomIn // zoom-in
+  WaterCup // water-cup
+  Warning // warning
+  Watch2 // watch-1
+  Setting1 // setting
+  ZoomOut // zoom-out
+  Pear // pear
+  Paperclip // paperclip
+  PlatformEleme // platform-eleme
+  SClaim // s-claim
+  SGoods // s-goods
+  SGrid // s-grid
+  SHelp // s-help
+  ShoppingCart // shopping-cart-2
+  Smoking // smoking
+  Soccer // soccer
+  SPromotion // s-promotion
+  SortDown // sort-down
+  SRelease // s-release
+  SOpportunity // s-opportunity
+  SOrder // s-order
+  STools // s-tools
+  SoldOut // sold-out
+  SPlatform // s-platform
+  Suitcase // suitcase
+  Suitcase2 // suitcase-1
+  Sugar // sugar
+  Sunset // sunset
+  Sunrise // sunrise-1
+  TopLeft // top-left
+  SwitchButton // switch-button
+  ToiletPaper // toilet-paper
+  TableLamp // table-lamp
+  Tableware // tableware
+  TopRight // top-right
+  Top // top
+  TurnOff // turn-off
+  Monitor1 // monitor
+  Unlock1 // unlock
+  Postcard // postcard
+  Umbrella // umbrella
+  Moon // moon
+  AddLocation // add-location
+  Present // present
+  Aim // aim
+  Position // position
+  Back // back
+  PriceTag // price-tag
+  ArrowLeft // arrow-left
+  PotatoStrips // potato-strips
+  Attract // attract
+  ArrowRight // arrow-right
+  Sunny // sunny
+  ArrowUp // arrow-up
+  MoonNight // moon-night
+  AlarmClock // alarm-clock
+  Reading // reading
+  ArrowDown // arrow-down
+  Rank // rank
+  Apple1 // apple
+  BottomRight // bottom-right
+  Upload2 // upload
+  Box // box
+  Timer // timer
+  Brush // brush
+  Guide // guide
+  BankCard // bank-card
+  Trophy12 // trophy-1
+  BottomLeft // bottom-left
+  Bicycle // bicycle
+  Baseball // baseball
+  Basketball // basketball
+  Burger // burger
+  Bottom // bottom
+  CScaleToOriginal // c-scale-to-original
+  ChatDotRound // chat-dot-round
+  ChatRound // chat-round
+  ChatDotSquare // chat-dot-square
+  ChatSquare // chat-square
+  CircleClose // circle-close
+  Chicken // chicken
+  CloseNotification // close-notification
+  Close2 // close
+  Cherry // cherry
+  CoffeeCup // coffee-cup
+  Cloudy // cloudy
+  CollectionTag // collection-tag
+  ColdDrink // cold-drink
+  Collection // collection
+  Coordinate // coordinate
+  Connection // connection
+  Crop // crop
+  Cpu // cpu
+  CopyDocument // copy-document
+  DCaret // d-caret
+  DArrowRight // d-arrow-right
+  DataBoard // data-board
+  DataAnalysis // data-analysis
+  DataLine // data-line
+  DArrowLeft // d-arrow-left
+  DeleteSolid // delete-solid
+  DeleteLocation // delete-location
+  Discount // discount
+  Date // date
+  Dessert // dessert
+  Dish // dish
+  Delete2 // delete
+  DocumentCopy // document-copy
+  Document // document
+  Discover // discover
+  DocumentAdd // document-add
+  DocumentChecked // document-checked
+  DocumentDelete // document-delete
+  DocumentRemove // document-remove
+  Dish2 // dish-1
+  Download1 // download
+  Coin // coin
+  Female // female
+  Film // film
+  Error1 // error
+  Eleme // eleme
+  Coffee // coffee
+  FolderRemove // folder-remove
+  FolderChecked // folder-checked
+  FolderAdd1 // folder-add
+  FolderDelete // folder-delete
+  Football // football
+  Finished // finished
+  ForkSpoon // fork-spoon
+  FirstAidKit // first-aid-kit
+  GobletFull // goblet-full
+  Food // food
+  Fullscreen // full-screen
+  GobletSquareFull // goblet-square-full
+  Goblet // goblet
+  Goods // goods
+  Headset // headset
+  House // house
+  IceCreamRound // ice-cream-round
+  HotWater // hot-water
+  HeavyRain // heavy-rain
+  IceDrink // ice-drink
+  IceCream // ice-cream
+  Key1 // key
+  IceCreamSquare // ice-cream-square
+  KnifeFork // knife-fork
+  IceTea // ice-tea
+  Info // info
+  Grape // grape
+  LightRain // light-rain
+  Lock1 // lock
+  LocationOutline // location-outline
+  Lightning // lightning
+  MagicStick // magic-stick
+  Link1 // link
+  Lollipop // lollipop
+  LoadingStep // loading
+  Rest // rest
+  BellFill // bell-fill
+  Usb // USB
+  FilterFill // filter-fill
+  Skin // skin
+  FireFill // fire-fill
+  Home // home
+  FunnelplotFill // funnel plot-fill
+  Bank // bank
+  GiftFill // gift-fill
+  Filter1 // filter
+  HourglassFill // hourglass-fill
+  Funnelplot // funnel plot
+  HomeFill // home-fill
+  Like // like
+  TrophyFill // trophy-fill
+  Unlike // unlike
+  LocationFill // location-fill
+  Unlock // unlock
+  CloudFill // cloud-fill
+  Lock // lock
+  CustomerserviceFill // customerservice-fill
+  Customerservice // customerservice
+  ExperimentFill // experiment-fill
+  Flag // flag
+  EyeFill // eye-fill
+  Moneycollect // money collect
+  LikeFill // like-fill
+  Medicinebox // medicinebox
+  LockFill // lock-fill
+  Shop // shop
+  UnlikeFill // unlike-fill
+  Shopping // shopping
+  StarFill // star-fill
+  Folder // folder
+  UnlockFill // unlock-fill
+  FolderOpen // folder-open
+  AlertFill // alert-fill
+  ApiFill // api-fill
+  Deploymentunit // deployment unit
+  HighlightFill // highlight-fill
+  Accountbook // account book
+  PhoneFill // phone-fill
+  Contacts // contacts
+  EditFill // edit-fill
+  Carryout // carry out
+  PushpinFill // pushpin-fill
+  CalendarCheck // calendar-check
+  ThunderboltFill // thunderbolt-fill
+  Calendar1 // calendar
+  TagFill // tag-fill
+  Scan // scan
+  WrenchFill // wrench-fill
+  Select // select
+  TagsFill // tags-fill
+  Boxplot // box plot
+  BankFill // bank-fill
+  Build // build
+  CameraFill // camera-fill
+  Sliders // sliders
+  ErrorFill // error-fill
+  Laptop // laptop
+  CrownFill // crown-fill
+  Barcode1 // barcode
+  MailFill // mail-fill
+  Camera // camera
+  CarFill // car-fill
+  Cluster // cluster
+  PrinterFill // printer-fill
+  Gateway // gateway
+  ShopFill // shop-fill
+  Car // car
+  SettingFill // setting-fill
+  Printer // printer
+  USBFill // USB-fill
+  Read // read
+  GoldenFill // golden-fill
+  CloudServer // cloud-server
+  BuildFill // build-fill
+  CloudUpload // cloud-upload
+  BoxplotFill // box plot-fill
+  Cloud // cloud
+  SlidersFill // sliders-fill
+  CloudDownload // cloud-download
+  Alibaba // alibaba
+  CloudSync // cloud-sync
+  Alibabacloud // alibabacloud
+  Video // video
+  Antdesign // ant design
+  NotificationIcon // notification
+  AntCloud // ant-cloud
+  Sound // sound
+  Behance // behance
+  RadarChart // radar chart
+  Googleplus // google plus
+  Qrcode // qrcode
+  Medium // medium
+  Fund // fund
+  Google // google
+  Image1 // image
+  IE // IE
+  Mail1 // mail
+  Amazon // amazon
+  Slack // slack
+  Idcard // id card
+  Alipay // alipay
+  Creditcard // credit card
+  Taobao // taobao
+  Heart // heart
+  Zhihu // zhihu
+  Block // block
+  HTML // HTML5
+  Error // error
+  Linkedin // linkedin
+  Star // star
+  Yahoo // yahoo
+  Gold // gold
+  Facebook // facebook
+  Heatmap // heat map
+  Skype // skype
+  Wifi // wifi
+  CodeSandbox // CodeSandbox
+  Paperclip2 // attachment
+  Chrome // chrome
+  Edit1 // edit
+  Aliwangwang // aliwangwang
+  Key // key
+  Apple // apple
+  Api // api
+  Android // android
+  Disconnect // disconnect
+  Sketch // sketch
+  Highlight // highlight
+  Gitlab // Gitlab
+  Monitor // monitor
+  Dribbble // dribbble
+  Link // link
+  Instagram // instagram
+  Man // man
+  Reddit // reddit
+  Percentage // percentage
+  Windows // windows
+  Pushpin // pushpin
+  Yuque // yuque
+  Phone // phone
+  Youtube // Youtube
+  Shake // shake
+  GitlabFill // Gitlab-fill
+  Tag // tag
+  Dropbox // dropbox
+  Wrench // wrench
+  Dingtalk // dingtalk
+  Woman // woman
+  AndroidFill // android-fill
+  Tags // tags
+  AppleFill // apple-fill
+  Scissor // scissor
+  HTMLFill // HTML5-fill
+  Mr // mr
+  WindowsFill // windows-fill
+  Share1 // share
+  QQ // QQ
+  Branches // branches
+  Twitter // twitter
+  Fork // fork
+  SkypeFill // skype-fill
+  Shrink // shrink
+  Weibo // weibo
+  Arrawsalt // arrawsalt
+  YuqueFill // yuque-fill
+  Verticalright // vertical right
+  YoutubeFill // Youtube-fill
+  Verticalleft // vertical left
+  YahooFill // yahoo-fill
+  Wechat // wechat
+  ChromeFill // chrome-fill
+  AliwangwangFill // aliwangwang-fill
+  FullscreenExit // fullscreen-exit
+  GithubFill // github-fill
+  MediumCircleFill // medium-circle-fill
+  ColumnHeight // colum-height
+  VAlignBottom // vertical-align-botto
+  VAlignMiddle // vertical-align-middl
+  ToTop // totop
+  VAlignTop // vertical-align-top
+  Download // download
+  SortDesc // sort-descending
+  SortAsc // sort-ascending
+  Fall // fall
+  Swap // swap
+  Stock // stock
+  Rise // rise
+  Indent // indent
+  Outdent // outdent
+  MenuIcon // menu
+  Unorderedlist // unordered list
+  Orderedlist // ordered list
+  AlignRight // align-right
+  AlignCenter // align-center
+  AlignLeft // align-left
+  PicCenter // pic-center
+  PicRight // pic-right
+  PicLeft // pic-left
+  Bold // bold
+  FontColor // font-colors
+  CheckCircle // check-circle
+  Exclaimination // exclaimination
+  CI // CI
+  FontSize // font-size
+  Dollar // Dollar
+  Infomation // infomation
+  Compass // compass
+  LineHeight // line-height
+  Strikethrough // strikethrough
+  Frown // frown
+  Underline // underline
+  InfoCircle // info-circle
+  Number // number
+  LeftCircle // left-circle
+  Italic // italic
+  Loading // loading
+  DownCircle // down-circle
+  Code // code
+  EURO // EURO
+  ColumnWidth // column-width
+  Copyright // copyright
+  MinusCircle // minus-circle
+  Meh // meh
+  Dash // dash
+  PlusCircle // plus-circle
+  PlayCircle // play-circle
+  Enter1 // enter
+  QuestionCircle // question-circle
+  Line // line
+  Pound // Pound
+  Minus // minus
+  RightCircle // right-circle
+  Question // question
+  Smile // smile
+  Plus // plus
+  Trademark // trademark
+  SmallDash // small-dash
+  Pause // pause
+  Earth // earth
+  BgColors // bg-colors
+  YUAN // YUAN
+  Crown // crown
+  UpCircle // up-circle
+  Drag // drag
+  WarningCircle // warning-circle
+  Sync // sync
+  Gift // gift
+  Transaction // transaction
+  Stop // stop
+  Undo // undo
+  Fire // fire
+  Redo // redo
+  Thunderbolt // thunderbolt
+  Reload // reload
+  CheckCircleFill // check-circle-fill
+  Reloadtime // reload time
+  LeftCircleFill // left-circle-fill
+  Message // message
+  DownCircleFill // down-circle-fill
+  Dashboard // dashboard
+  MinusCircleFill // minus-circle-fill
+  Issuesclose // issues close
+  CloseCircleFill // close-circle-fill
+  Poweroff // poweroff
+  InfoCircleFill // info-circle-fill
+  Logout // logout
+  UpCircleFill // up-circle-fill
+  Login // login
+  RightCircleFill // right-circle-fill
+  Piechart // pie chart
+  PlusCircleFill // plus-circle-fill
+  QuestionCircleFill // question-circle-fill
+  Eye // eye
+  EUROCircleFill // EURO-circle-fill
+  FrownFill // frown-fill
+  CopyrightCircleFil // copyright-circle-fil
+  Export // export
+  CICircleFill // CI-circle-fill
+  Save1 // save
+  CompassFill // compass-fill
+  Import // Import
+  DollarCircleFill // Dollar-circle-fill
+  Appstore // app store
+  PoweroffCircleFill // poweroff-circle-fill
+  MehFill // meh-fill
+  PlayCircleFill // play-circle-fill
+  Layout // layout
+  PoundCircleFill // Pound-circle-fill
+  SmileFill // smile-fill
+  StopFill // stop-fill
+  Control // control
+  WarningCircleFill // warning-circle-fill
+  Codelibrary // code library
+  Detail // detail
+  TrademarkCircleFil // trademark-circle-fil
+  YUANCircleFill // YUAN-circle-fill
+  HeartFill // heart-fill
+  PiechartCircleFil // pie chart-circle-fil
+  Project // project
+  DashboardFill // dashboard-fill
+  Wallet // wallet
+  MessageFill // message-fill
+  Calculator // calculator
+  Interation // interation
+  Border // border
+  CodelibraryFill // code library-fill
+  BorderOuter // border-outer
+  BorderTop // border-top
+  BorderBottom // border-bottom
+  BorderLeft // border-left
+  BorderRight // border-right
+  BorderInner // border-inner
+  AccountbookFill // account book-fill
+  BorderVertical // border-verticle
+  CarryoutFill // carry out-fill
+  BorderHorizontal // border-horizontal
+  CalendarFill // calendar-fill
+  RadiusBottomleft // radius-bottomleft
+  CalculatorFill // calculator-fill
+  RadiusBottomright // radius-bottomright
+  InterationFill // interation-fill
+  RadiusUpleft // radius-upleft
+  ProjectFill // project-fill
+  RadiusUpright // radius-upright
+  DetailFill // detail-fill
+  RadiusSetting // radius-setting
+  SaveFill // save-fill
+  Adduser // add user
+  WalletFill // wallet-fill
+  Deleteteam // delete team
+  ControlFill // control-fill
+  Deleteuser // delete user
+  LayoutFill // layout-fill
+  Addteam // addteam
+  AppstoreFill // app store-fill
+  User // user
+  MobileFill // mobile-fill
+  Team // team
+  TabletFill // tablet-fill
+  AreaChart // area chart
+  BookFill // book-fill
+  LineChart // line chart
+  RedenvelopeFill // red envelope-fill
+  Barchart // bar chart
+  SafetycertificateF // safety certificate-f
+  Pointmap // point map
+  PropertysafetyFill // property safety-fill
+  ContainerIcon // container
+  Database // database
+  SecurityscanFill // security scan-fill
+  Sever // sever
+  FileExclamationFil // file-exclamation-fil
+  Mobile // mobile
+  FileAddFill // file-add-fill
+  Tablet // tablet
+  FileExcelFill // file-excel-fill
+  Redenvelope // red envelope
+  FileMarkdownFill // file-markdown-fill
+  Book // book
+  FileTextFill // file-text-fill
+  Filedone // file done
+  FilePptFill // file-ppt-fill
+  Reconciliation // reconciliation
+  FileUnknownFill // file-unknown-fill
+  FileException // file -exception
+  FileWordFill // file-word-fill
+  Filesync // file sync
+  FileZipFill // file-zip-fill
+  FileSearch // file search
+  FilePdfFill // file-pdf-fill
+  Solution // solution
+  FileImageFill // file-image-fill
+  Fileprotect // file protect
+  DiffFill // diff-fill
+  FileAdd // file-add
+  FileCopyFill // file-copy-fill
+  FileExcel // file-excel
+  SnippetsFill // snippets-fill
+  FileExclamation // file-exclamation
+  BatchfoldingFill // batch folding-fill
+  FilePdf // file-pdf
+  ReconciliationFill // reconciliation-fill
+  FileImage // file-image
+  FileMarkdown // file-markdown
+  FolderFill // folder-fill
+  FileUnknown // file-unknown
+  FolderOpenFill // folder-open-fill
+  FilePpt // file-ppt
+  DatabaseFill // database-fill
+  FileWord // file-word
+  ContainerFill // container-fill
+  File1 // file
+  SeverFill // sever-fill
+  FileZip // file-zip
+  CalendarCheckFill // calendar-check-fill
+  FileText // file-text
+  ImageFill // image-fill
+  FileCopy // file-copy
+  IdcardFill // id card-fill
+  Snippets // snippets
+  CreditcardFill // credit card-fill
+  Audit // audit
+  FundFill // fund-fill
+  Diff // diff
+  ReadFill // read-fill
+  Batchfolding // Batch folding
+  ContactsFill // contacts-fill
+  Securityscan // security scan
+  Propertysafety // property safety
+  NotificationFill // notification-fill
+  Safetycertificate // safety certificate
+  FlagFill // flag-fill
+  MoneycollectFill // money collect-fill
+  Alert // alert
+  MedicineboxFill // medicine box-fill
+  RestFill // rest-fill
+  Hourglass // hourglass
+  ShoppingFill // shopping-fill
+  Bulb // bulb
+  SkinFill // skin-fill
+  Experiment // experiment
+  VideoFill // video-fill
+  Bell // bell
+  SoundFill // sound-fill
+  Trophy // trophy
+  BulbFill // bulb-fill
+  FuwuActive // 服务
+  ShouyeShouye // 首页-首页
+  Cangkuxinxi // 仓库信息
+  Saomiao // 239扫描
+  Iconset0254 // 条码
+  Zhongsuanrenwuliebiao // 重算任务列表
+  Xiangxiazhanhang // 向下占行
+  Qita // 其他
+  Xiajia // 下架
+  Feiji // plane
+  Tixing // 提醒
+  Shaixuan_o // 筛选_o
+  Siji // 司机
+  Lianxiwomen // 联系我们
+  Guanyuwomen // 关于我们
+  Wode // 我的
+  TruckFull // 货车
+  Xiayibu // xiayibu
+  Video2 // video
+  ImageIcon // images
+  File // file-fill
+  Xinhao // 信号
+  Gengduo // 更多
+  Xuhao // 3序号
+  Zhiye // 职业
+  Weixian // 危险
+  Apptubiao // 没有
+  Jingdiananli_wujiaoxing_shoucanghou // 经典案例_五角星_收藏后
+  Jingdiananli_kongwujiaoxing_shoucang // 经典案例_空五角星_收藏
+  Caigou // 采购
+  NaviconQtrkd // 其他入库单
+  CustomWorker // 审批模型-工人
+  Ruku // 入库
+  Yichang // 异常
+  Shougongpeidui // 12、手工配对
+  Lunkuohua113 // -补货
+  Jiebang // 解绑
+  Goodsppeinventory // 资产盘点 goods/ppe/inventory
+  Weixiujilu // 维修记录
+  Taizhangguanli // 1台账管理
+  Weixiu // 维修
+  Baoxiu // 报修
+  Daijiedan // 待接单
+  Shebeidianjian // 设备点检
+  Shebeidianjiantongji // 设备点检统计
+  Baoyanggongdan // 保养工单
+  Baoyangjihua // 保养计划
+  Chart // chart
+  ChartBar // chart-bar
+  Filter // filter
+  FilterClear // filter-clear
+  Share // share
+  Books // books
+  Cart // cart
+  Clear // clear
+  MenuFold // menu-fold
+  LockOff // lock-off
+  Rotation // rotation
+  Layers // layers
+  LockOn // lock-on
+  RootList // root-list
+  AControlplatform // control.platform
+  ChartBubble // chart-bubble
+  CaretUpSmall // caret-up-small
+  Enter // enter
+  Rollfront // rollfront
+  Jump // jump
+  Rollback // rollback
+  CaretRightSmall // caret-right-small
+  Mirror // mirror
+  Time // time
+  UserAvatar // user-avatar
+  UsergroupClear // usergroup-clear
+  MinusRectangle // minus-rectangle
+  FormatHorizontalAlignTop // format-horizontal-align-top
+  Move1 // move
+  Bulletpoint // bulletpoint
+  Barcode // barcode
+  LogoWecom // logo-wecom
+  MenuUnfold // menu-unfold
+  Tools // tools
+  CaretLeftSmall // caret-left-small
+  Round // round
+  CaretDownSmall // caret-down-small
+  Check // check
+  APrecisemonitor // precise.monitor
+  GenderFemale // gender-female
+  AOrderAdjustmentcolumn // order-adjustment.column
+  Queue // queue
+  Print // print
+  Ellipsis // ellipsis
+  TimeFilled // time-filled
+  Slash // slash
+  HelpCircleFilled // help-circle-filled
+  MenuApplication // menu-application
+  Pin // pin
+  UserTalk // user-talk
+  More // more
 // ---- icons-gen:end ----
 } derive(Eq, Debug)
 
@@ -1769,809 +1769,809 @@ let icon_path_data : Array[String] = [
 /// 图标变体 → 路径数据下标(与 all_icons 清单同序,wbtest 断言双射)。
 fn kind_index(kind : IconKind) -> Int {
   match kind {
-    YhTreeStructure => 0
-    YhHide => 1
-    YhClickButton => 2
-    YhStaticText => 3
-    YhSwitch => 4
-    YhTextField => 5
-    YhTextarea => 6
-    YhNumberField => 7
-    YhSelectField => 8
-    YhTreeTable => 9
-    YhEditTable => 10
-    YhTable => 11
-    YhTab => 12
-    YhScript => 13
-    YhShangduiqi => 14
-    YhYouduiqi => 15
-    YhZuoduiqi => 16
-    YhWeibiaoti545 => 17
-    YhDingceng => 18
-    YhDiceng => 19
-    YhShangyiyiceng => 20
-    YhXiaduiqi => 21
-    YhXiayiyiceng => 22
-    YhDaxiaoxiangdeng => 23
-    YhTuceng => 24
-    YhChatBar => 25
-    YhFunction => 26
-    YhDuiqi => 27
-    YhParams => 28
-    YhTucengzhizuoyuweihu => 29
-    YhKuaibuju => 30
-    YhShuxiangfenbu => 31
-    YhHengxiangfenbu1 => 32
-    YhChicunbiaozhu_ => 33
-    YhZuoyoujuzhong => 34
-    YhShangxiajuzhong => 35
-    YhDengkuan => 36
-    YhDenggao => 37
-    YhQueryFilter => 38
-    YhZhushujushenqingShujufenxi02 => 39
-    YhSuofangdaodengbi => 40
-    YhHuifu => 41
-    YhMenu1 => 42
-    YhMicrophone => 43
-    YhMinus1 => 44
-    YhMessage1 => 45
-    YhMapLocation => 46
-    YhMessageSolid => 47
-    YhMic => 48
-    YhMilkTea => 49
-    YhMedal => 50
-    YhMedal2 => 51
-    YhMobile1 => 52
-    YhMobilePhone => 53
-    YhMoney => 54
-    YhMore1 => 55
-    YhNoSmoking => 56
-    YhMoreOutline => 57
-    YhNotebook => 58
-    YhSHome => 59
-    YhNews => 60
-    YhNotebook1 => 61
-    YhSOpen => 62
-    YhSMarketing => 63
-    YhMouse => 64
-    YhSManagement => 65
-    YhSOperation => 66
-    YhOfficeBuilding => 67
-    YhSwitchOpen => 68
-    YhShip => 69
-    YhSell => 70
-    YhSearch2 => 71
-    YhService => 72
-    YhScissors => 73
-    YhOrange => 74
-    YhPhoneOutline => 75
-    YhPicture => 76
-    YhReceiving => 77
-    YhPictureOutlineRound => 78
-    YhPictureOutline => 79
-    YhPieChart => 80
-    YhSData => 81
-    YhRefrigerator => 82
-    YhSCooperation => 83
-    YhSCheck => 84
-    YhSFlag => 85
-    YhSCustom => 86
-    YhSFinance => 87
-    YhRemoveOutline => 88
-    YhSComment => 89
-    YhRemove => 90
-    YhSchool => 91
-    YhSShop => 92
-    YhSTicket => 93
-    YhSortUp => 94
-    YhSort => 95
-    YhTakeawayBox => 96
-    YhStopwatch => 97
-    YhThumb => 98
-    YhTickets => 99
-    YhTruck => 100
-    YhUser1 => 101
-    YhUserSolid => 102
-    YhVideoCameraSolid => 103
-    YhVideoPlay => 104
-    YhVideoCamera => 105
-    YhRight1 => 106
-    YhVideoPause => 107
-    YhStarOff => 108
-    YhTrophy1 => 109
-    YhWallet1 => 110
-    YhWatch => 111
-    YhWindPower => 112
-    YhView => 113
-    YhWatermelon => 114
-    YhShare2 => 115
-    YhSetUp => 116
-    YhZoomIn => 117
-    YhWaterCup => 118
-    YhWarning => 119
-    YhWatch2 => 120
-    YhSetting1 => 121
-    YhZoomOut => 122
-    YhPear => 123
-    YhPaperclip => 124
-    YhPlatformEleme => 125
-    YhSClaim => 126
-    YhSGoods => 127
-    YhSGrid => 128
-    YhSHelp => 129
-    YhShoppingCart => 130
-    YhSmoking => 131
-    YhSoccer => 132
-    YhSPromotion => 133
-    YhSortDown => 134
-    YhSRelease => 135
-    YhSOpportunity => 136
-    YhSOrder => 137
-    YhSTools => 138
-    YhSoldOut => 139
-    YhSPlatform => 140
-    YhSuitcase => 141
-    YhSuitcase2 => 142
-    YhSugar => 143
-    YhSunset => 144
-    YhSunrise => 145
-    YhTopLeft => 146
-    YhSwitchButton => 147
-    YhToiletPaper => 148
-    YhTableLamp => 149
-    YhTableware => 150
-    YhTopRight => 151
-    YhTop => 152
-    YhTurnOff => 153
-    YhMonitor1 => 154
-    YhUnlock1 => 155
-    YhPostcard => 156
-    YhUmbrella => 157
-    YhMoon => 158
-    YhAddLocation => 159
-    YhPresent => 160
-    YhAim => 161
-    YhPosition => 162
-    YhBack => 163
-    YhPriceTag => 164
-    YhArrowLeft => 165
-    YhPotatoStrips => 166
-    YhAttract => 167
-    YhArrowRight => 168
-    YhSunny => 169
-    YhArrowUp => 170
-    YhMoonNight => 171
-    YhAlarmClock => 172
-    YhReading => 173
-    YhArrowDown => 174
-    YhRank => 175
-    YhApple1 => 176
-    YhBottomRight => 177
-    YhUpload2 => 178
-    YhBox => 179
-    YhTimer => 180
-    YhBrush => 181
-    YhGuide => 182
-    YhBankCard => 183
-    YhTrophy12 => 184
-    YhBottomLeft => 185
-    YhBicycle => 186
-    YhBaseball => 187
-    YhBasketball => 188
-    YhBurger => 189
-    YhBottom => 190
-    YhCScaleToOriginal => 191
-    YhChatDotRound => 192
-    YhChatRound => 193
-    YhChatDotSquare => 194
-    YhChatSquare => 195
-    YhCircleClose => 196
-    YhChicken => 197
-    YhCloseNotification => 198
-    YhClose2 => 199
-    YhCherry => 200
-    YhCoffeeCup => 201
-    YhCloudy => 202
-    YhCollectionTag => 203
-    YhColdDrink => 204
-    YhCollection => 205
-    YhCoordinate => 206
-    YhConnection => 207
-    YhCrop => 208
-    YhCpu => 209
-    YhCopyDocument => 210
-    YhDCaret => 211
-    YhDArrowRight => 212
-    YhDataBoard => 213
-    YhDataAnalysis => 214
-    YhDataLine => 215
-    YhDArrowLeft => 216
-    YhDeleteSolid => 217
-    YhDeleteLocation => 218
-    YhDiscount => 219
-    YhDate => 220
-    YhDessert => 221
-    YhDish => 222
-    YhDelete2 => 223
-    YhDocumentCopy => 224
-    YhDocument => 225
-    YhDiscover => 226
-    YhDocumentAdd => 227
-    YhDocumentChecked => 228
-    YhDocumentDelete => 229
-    YhDocumentRemove => 230
-    YhDish2 => 231
-    YhDownload1 => 232
-    YhCoin => 233
-    YhFemale => 234
-    YhFilm => 235
-    YhError1 => 236
-    YhEleme => 237
-    YhCoffee => 238
-    YhFolderRemove => 239
-    YhFolderChecked => 240
-    YhFolderAdd1 => 241
-    YhFolderDelete => 242
-    YhFootball => 243
-    YhFinished => 244
-    YhForkSpoon => 245
-    YhFirstAidKit => 246
-    YhGobletFull => 247
-    YhFood => 248
-    YhFullscreen => 249
-    YhGobletSquareFull => 250
-    YhGoblet => 251
-    YhGoods => 252
-    YhHeadset => 253
-    YhHouse => 254
-    YhIceCreamRound => 255
-    YhHotWater => 256
-    YhHeavyRain => 257
-    YhIceDrink => 258
-    YhIceCream => 259
-    YhKey1 => 260
-    YhIceCreamSquare => 261
-    YhKnifeFork => 262
-    YhIceTea => 263
-    YhInfo => 264
-    YhGrape => 265
-    YhLightRain => 266
-    YhLock1 => 267
-    YhLocationOutline => 268
-    YhLightning => 269
-    YhMagicStick => 270
-    YhLink1 => 271
-    YhLollipop => 272
-    YhLoadingStep => 273
-    YhRest => 274
-    YhBellFill => 275
-    YhUsb => 276
-    YhFilterFill => 277
-    YhSkin => 278
-    YhFireFill => 279
-    YhHome => 280
-    YhFunnelplotFill => 281
-    YhBank => 282
-    YhGiftFill => 283
-    YhFilter1 => 284
-    YhHourglassFill => 285
-    YhFunnelplot => 286
-    YhHomeFill => 287
-    YhLike => 288
-    YhTrophyFill => 289
-    YhUnlike => 290
-    YhLocationFill => 291
-    YhUnlock => 292
-    YhCloudFill => 293
-    YhLock => 294
-    YhCustomerserviceFill => 295
-    YhCustomerservice => 296
-    YhExperimentFill => 297
-    YhFlag => 298
-    YhEyeFill => 299
-    YhMoneycollect => 300
-    YhLikeFill => 301
-    YhMedicinebox => 302
-    YhLockFill => 303
-    YhShop => 304
-    YhUnlikeFill => 305
-    YhShopping => 306
-    YhStarFill => 307
-    YhFolder => 308
-    YhUnlockFill => 309
-    YhFolderOpen => 310
-    YhAlertFill => 311
-    YhApiFill => 312
-    YhDeploymentunit => 313
-    YhHighlightFill => 314
-    YhAccountbook => 315
-    YhPhoneFill => 316
-    YhContacts => 317
-    YhEditFill => 318
-    YhCarryout => 319
-    YhPushpinFill => 320
-    YhCalendarCheck => 321
-    YhThunderboltFill => 322
-    YhCalendar1 => 323
-    YhTagFill => 324
-    YhScan => 325
-    YhWrenchFill => 326
-    YhSelect => 327
-    YhTagsFill => 328
-    YhBoxplot => 329
-    YhBankFill => 330
-    YhBuild => 331
-    YhCameraFill => 332
-    YhSliders => 333
-    YhErrorFill => 334
-    YhLaptop => 335
-    YhCrownFill => 336
-    YhBarcode1 => 337
-    YhMailFill => 338
-    YhCamera => 339
-    YhCarFill => 340
-    YhCluster => 341
-    YhPrinterFill => 342
-    YhGateway => 343
-    YhShopFill => 344
-    YhCar => 345
-    YhSettingFill => 346
-    YhPrinter => 347
-    YhUSBFill => 348
-    YhRead => 349
-    YhGoldenFill => 350
-    YhCloudServer => 351
-    YhBuildFill => 352
-    YhCloudUpload => 353
-    YhBoxplotFill => 354
-    YhCloud => 355
-    YhSlidersFill => 356
-    YhCloudDownload => 357
-    YhAlibaba => 358
-    YhCloudSync => 359
-    YhAlibabacloud => 360
-    YhVideo => 361
-    YhAntdesign => 362
-    YhNotification => 363
-    YhAntCloud => 364
-    YhSound => 365
-    YhBehance => 366
-    YhRadarChart => 367
-    YhGoogleplus => 368
-    YhQrcode => 369
-    YhMedium => 370
-    YhFund => 371
-    YhGoogle => 372
-    YhImage1 => 373
-    YhIE => 374
-    YhMail1 => 375
-    YhAmazon => 376
-    YhSlack => 377
-    YhIdcard => 378
-    YhAlipay => 379
-    YhCreditcard => 380
-    YhTaobao => 381
-    YhHeart => 382
-    YhZhihu => 383
-    YhBlock => 384
-    YhHTML => 385
-    YhError => 386
-    YhLinkedin => 387
-    YhStar => 388
-    YhYahoo => 389
-    YhGold => 390
-    YhFacebook => 391
-    YhHeatmap => 392
-    YhSkype => 393
-    YhWifi => 394
-    YhCodeSandbox => 395
-    YhPaperclip2 => 396
-    YhChrome => 397
-    YhEdit1 => 398
-    YhAliwangwang => 399
-    YhKey => 400
-    YhApple => 401
-    YhApi => 402
-    YhAndroid => 403
-    YhDisconnect => 404
-    YhSketch => 405
-    YhHighlight => 406
-    YhGitlab => 407
-    YhMonitor => 408
-    YhDribbble => 409
-    YhLink => 410
-    YhInstagram => 411
-    YhMan => 412
-    YhReddit => 413
-    YhPercentage => 414
-    YhWindows => 415
-    YhPushpin => 416
-    YhYuque => 417
-    YhPhone => 418
-    YhYoutube => 419
-    YhShake => 420
-    YhGitlabFill => 421
-    YhTag => 422
-    YhDropbox => 423
-    YhWrench => 424
-    YhDingtalk => 425
-    YhWoman => 426
-    YhAndroidFill => 427
-    YhTags => 428
-    YhAppleFill => 429
-    YhScissor => 430
-    YhHTMLFill => 431
-    YhMr => 432
-    YhWindowsFill => 433
-    YhShare1 => 434
-    YhQQ => 435
-    YhBranches => 436
-    YhTwitter => 437
-    YhFork => 438
-    YhSkypeFill => 439
-    YhShrink => 440
-    YhWeibo => 441
-    YhArrawsalt => 442
-    YhYuqueFill => 443
-    YhVerticalright => 444
-    YhYoutubeFill => 445
-    YhVerticalleft => 446
-    YhYahooFill => 447
-    YhWechat => 448
-    YhChromeFill => 449
-    YhAliwangwangFill => 450
-    YhFullscreenExit => 451
-    YhGithubFill => 452
-    YhMediumCircleFill => 453
-    YhColumnHeight => 454
-    YhVAlignBottom => 455
-    YhVAlignMiddle => 456
-    YhToTop => 457
-    YhVAlignTop => 458
-    YhDownload => 459
-    YhSortDesc => 460
-    YhSortAsc => 461
-    YhFall => 462
-    YhSwap => 463
-    YhStock => 464
-    YhRise => 465
-    YhIndent => 466
-    YhOutdent => 467
-    YhMenu => 468
-    YhUnorderedlist => 469
-    YhOrderedlist => 470
-    YhAlignRight => 471
-    YhAlignCenter => 472
-    YhAlignLeft => 473
-    YhPicCenter => 474
-    YhPicRight => 475
-    YhPicLeft => 476
-    YhBold => 477
-    YhFontColor => 478
-    YhCheckCircle => 479
-    YhExclaimination => 480
-    YhCI => 481
-    YhFontSize => 482
-    YhDollar => 483
-    YhInfomation => 484
-    YhCompass => 485
-    YhLineHeight => 486
-    YhStrikethrough => 487
-    YhFrown => 488
-    YhUnderline => 489
-    YhInfoCircle => 490
-    YhNumber => 491
-    YhLeftCircle => 492
-    YhItalic => 493
-    YhLoading => 494
-    YhDownCircle => 495
-    YhCode => 496
-    YhEURO => 497
-    YhColumnWidth => 498
-    YhCopyright => 499
-    YhMinusCircle => 500
-    YhMeh => 501
-    YhDash => 502
-    YhPlusCircle => 503
-    YhPlayCircle => 504
-    YhEnter1 => 505
-    YhQuestionCircle => 506
-    YhLine => 507
-    YhPound => 508
-    YhMinus => 509
-    YhRightCircle => 510
-    YhQuestion => 511
-    YhSmile => 512
-    YhPlus => 513
-    YhTrademark => 514
-    YhSmallDash => 515
-    YhPause => 516
-    YhEarth => 517
-    YhBgColors => 518
-    YhYUAN => 519
-    YhCrown => 520
-    YhUpCircle => 521
-    YhDrag => 522
-    YhWarningCircle => 523
-    YhSync => 524
-    YhGift => 525
-    YhTransaction => 526
-    YhStop => 527
-    YhUndo => 528
-    YhFire => 529
-    YhRedo => 530
-    YhThunderbolt => 531
-    YhReload => 532
-    YhCheckCircleFill => 533
-    YhReloadtime => 534
-    YhLeftCircleFill => 535
-    YhMessage => 536
-    YhDownCircleFill => 537
-    YhDashboard => 538
-    YhMinusCircleFill => 539
-    YhIssuesclose => 540
-    YhCloseCircleFill => 541
-    YhPoweroff => 542
-    YhInfoCircleFill => 543
-    YhLogout => 544
-    YhUpCircleFill => 545
-    YhLogin => 546
-    YhRightCircleFill => 547
-    YhPiechart => 548
-    YhPlusCircleFill => 549
-    YhQuestionCircleFill => 550
-    YhEye => 551
-    YhEUROCircleFill => 552
-    YhFrownFill => 553
-    YhCopyrightCircleFil => 554
-    YhExport => 555
-    YhCICircleFill => 556
-    YhSave1 => 557
-    YhCompassFill => 558
-    YhImport => 559
-    YhDollarCircleFill => 560
-    YhAppstore => 561
-    YhPoweroffCircleFill => 562
-    YhMehFill => 563
-    YhPlayCircleFill => 564
-    YhLayout => 565
-    YhPoundCircleFill => 566
-    YhSmileFill => 567
-    YhStopFill => 568
-    YhControl => 569
-    YhWarningCircleFill => 570
-    YhCodelibrary => 571
-    YhDetail => 572
-    YhTrademarkCircleFil => 573
-    YhYUANCircleFill => 574
-    YhHeartFill => 575
-    YhPiechartCircleFil => 576
-    YhProject => 577
-    YhDashboardFill => 578
-    YhWallet => 579
-    YhMessageFill => 580
-    YhCalculator => 581
-    YhInteration => 582
-    YhBorder => 583
-    YhCodelibraryFill => 584
-    YhBorderOuter => 585
-    YhBorderTop => 586
-    YhBorderBottom => 587
-    YhBorderLeft => 588
-    YhBorderRight => 589
-    YhBorderInner => 590
-    YhAccountbookFill => 591
-    YhBorderVertical => 592
-    YhCarryoutFill => 593
-    YhBorderHorizontal => 594
-    YhCalendarFill => 595
-    YhRadiusBottomleft => 596
-    YhCalculatorFill => 597
-    YhRadiusBottomright => 598
-    YhInterationFill => 599
-    YhRadiusUpleft => 600
-    YhProjectFill => 601
-    YhRadiusUpright => 602
-    YhDetailFill => 603
-    YhRadiusSetting => 604
-    YhSaveFill => 605
-    YhAdduser => 606
-    YhWalletFill => 607
-    YhDeleteteam => 608
-    YhControlFill => 609
-    YhDeleteuser => 610
-    YhLayoutFill => 611
-    YhAddteam => 612
-    YhAppstoreFill => 613
-    YhUser => 614
-    YhMobileFill => 615
-    YhTeam => 616
-    YhTabletFill => 617
-    YhAreaChart => 618
-    YhBookFill => 619
-    YhLineChart => 620
-    YhRedenvelopeFill => 621
-    YhBarchart => 622
-    YhSafetycertificateF => 623
-    YhPointmap => 624
-    YhPropertysafetyFill => 625
-    YhContainer => 626
-    YhDatabase => 627
-    YhSecurityscanFill => 628
-    YhSever => 629
-    YhFileExclamationFil => 630
-    YhMobile => 631
-    YhFileAddFill => 632
-    YhTablet => 633
-    YhFileExcelFill => 634
-    YhRedenvelope => 635
-    YhFileMarkdownFill => 636
-    YhBook => 637
-    YhFileTextFill => 638
-    YhFiledone => 639
-    YhFilePptFill => 640
-    YhReconciliation => 641
-    YhFileUnknownFill => 642
-    YhFileException => 643
-    YhFileWordFill => 644
-    YhFilesync => 645
-    YhFileZipFill => 646
-    YhFileSearch => 647
-    YhFilePdfFill => 648
-    YhSolution => 649
-    YhFileImageFill => 650
-    YhFileprotect => 651
-    YhDiffFill => 652
-    YhFileAdd => 653
-    YhFileCopyFill => 654
-    YhFileExcel => 655
-    YhSnippetsFill => 656
-    YhFileExclamation => 657
-    YhBatchfoldingFill => 658
-    YhFilePdf => 659
-    YhReconciliationFill => 660
-    YhFileImage => 661
-    YhFileMarkdown => 662
-    YhFolderFill => 663
-    YhFileUnknown => 664
-    YhFolderOpenFill => 665
-    YhFilePpt => 666
-    YhDatabaseFill => 667
-    YhFileWord => 668
-    YhContainerFill => 669
-    YhFile1 => 670
-    YhSeverFill => 671
-    YhFileZip => 672
-    YhCalendarCheckFill => 673
-    YhFileText => 674
-    YhImageFill => 675
-    YhFileCopy => 676
-    YhIdcardFill => 677
-    YhSnippets => 678
-    YhCreditcardFill => 679
-    YhAudit => 680
-    YhFundFill => 681
-    YhDiff => 682
-    YhReadFill => 683
-    YhBatchfolding => 684
-    YhContactsFill => 685
-    YhSecurityscan => 686
-    YhPropertysafety => 687
-    YhNotificationFill => 688
-    YhSafetycertificate => 689
-    YhFlagFill => 690
-    YhMoneycollectFill => 691
-    YhAlert => 692
-    YhMedicineboxFill => 693
-    YhRestFill => 694
-    YhHourglass => 695
-    YhShoppingFill => 696
-    YhBulb => 697
-    YhSkinFill => 698
-    YhExperiment => 699
-    YhVideoFill => 700
-    YhBell => 701
-    YhSoundFill => 702
-    YhTrophy => 703
-    YhBulbFill => 704
-    YhFuwuActive => 705
-    YhShouyeShouye => 706
-    YhCangkuxinxi => 707
-    YhSaomiao => 708
-    YhIconset0254 => 709
-    YhZhongsuanrenwuliebiao => 710
-    YhXiangxiazhanhang => 711
-    YhQita => 712
-    YhXiajia => 713
-    YhFeiji => 714
-    YhTixing => 715
-    YhShaixuan_o => 716
-    YhSiji => 717
-    YhLianxiwomen => 718
-    YhGuanyuwomen => 719
-    YhWode => 720
-    YhTruckFull => 721
-    YhXiayibu => 722
-    YhVideo2 => 723
-    YhImage => 724
-    YhFile => 725
-    YhXinhao => 726
-    YhGengduo => 727
-    YhXuhao => 728
-    YhZhiye => 729
-    YhWeixian => 730
-    YhApptubiao => 731
-    YhJingdiananli_wujiaoxing_shoucanghou => 732
-    YhJingdiananli_kongwujiaoxing_shoucang => 733
-    YhCaigou => 734
-    YhNaviconQtrkd => 735
-    YhCustomWorker => 736
-    YhRuku => 737
-    YhYichang => 738
-    YhShougongpeidui => 739
-    YhLunkuohua113 => 740
-    YhJiebang => 741
-    YhGoodsppeinventory => 742
-    YhWeixiujilu => 743
-    YhTaizhangguanli => 744
-    YhWeixiu => 745
-    YhBaoxiu => 746
-    YhDaijiedan => 747
-    YhShebeidianjian => 748
-    YhShebeidianjiantongji => 749
-    YhBaoyanggongdan => 750
-    YhBaoyangjihua => 751
-    YhChart => 752
-    YhChartBar => 753
-    YhFilter => 754
-    YhFilterClear => 755
-    YhShare => 756
-    YhBooks => 757
-    YhCart => 758
-    YhClear => 759
-    YhMenuFold => 760
-    YhLockOff => 761
-    YhRotation => 762
-    YhLayers => 763
-    YhLockOn => 764
-    YhRootList => 765
-    YhAControlplatform => 766
-    YhChartBubble => 767
-    YhCaretUpSmall => 768
-    YhEnter => 769
-    YhRollfront => 770
-    YhJump => 771
-    YhRollback => 772
-    YhCaretRightSmall => 773
-    YhMirror => 774
-    YhTime => 775
-    YhUserAvatar => 776
-    YhUsergroupClear => 777
-    YhMinusRectangle => 778
-    YhFormatHorizontalAlignTop => 779
-    YhMove1 => 780
-    YhBulletpoint => 781
-    YhBarcode => 782
-    YhLogoWecom => 783
-    YhMenuUnfold => 784
-    YhTools => 785
-    YhCaretLeftSmall => 786
-    YhRound => 787
-    YhCaretDownSmall => 788
-    YhCheck => 789
-    YhAPrecisemonitor => 790
-    YhGenderFemale => 791
-    YhAOrderAdjustmentcolumn => 792
-    YhQueue => 793
-    YhPrint => 794
-    YhEllipsis => 795
-    YhTimeFilled => 796
-    YhSlash => 797
-    YhHelpCircleFilled => 798
-    YhMenuApplication => 799
-    YhPin => 800
-    YhUserTalk => 801
-    YhMore => 802
+    TreeStructure => 0
+    Hide => 1
+    ClickButton => 2
+    StaticText => 3
+    Switch => 4
+    TextField => 5
+    Textarea => 6
+    NumberField => 7
+    SelectField => 8
+    TreeTable => 9
+    EditTable => 10
+    TableIcon => 11
+    TabIcon => 12
+    Script => 13
+    Shangduiqi => 14
+    Youduiqi => 15
+    Zuoduiqi => 16
+    Weibiaoti545 => 17
+    Dingceng => 18
+    Diceng => 19
+    Shangyiyiceng => 20
+    Xiaduiqi => 21
+    Xiayiyiceng => 22
+    Daxiaoxiangdeng => 23
+    Tuceng => 24
+    ChatBar => 25
+    Function => 26
+    Duiqi => 27
+    Params => 28
+    Tucengzhizuoyuweihu => 29
+    Kuaibuju => 30
+    Shuxiangfenbu => 31
+    Hengxiangfenbu1 => 32
+    Chicunbiaozhu_ => 33
+    Zuoyoujuzhong => 34
+    Shangxiajuzhong => 35
+    Dengkuan => 36
+    Denggao => 37
+    QueryFilter => 38
+    ZhushujushenqingShujufenxi02 => 39
+    Suofangdaodengbi => 40
+    Huifu => 41
+    Menu1 => 42
+    Microphone => 43
+    Minus1 => 44
+    Message1 => 45
+    MapLocation => 46
+    MessageSolid => 47
+    Mic => 48
+    MilkTea => 49
+    Medal => 50
+    Medal2 => 51
+    Mobile1 => 52
+    MobilePhone => 53
+    Money => 54
+    More1 => 55
+    NoSmoking => 56
+    MoreOutline => 57
+    Notebook => 58
+    SHome => 59
+    News => 60
+    Notebook1 => 61
+    SOpen => 62
+    SMarketing => 63
+    Mouse => 64
+    SManagement => 65
+    SOperation => 66
+    OfficeBuilding => 67
+    SwitchOpen => 68
+    Ship => 69
+    Sell => 70
+    Search2 => 71
+    Service => 72
+    Scissors => 73
+    Orange => 74
+    PhoneOutline => 75
+    Picture => 76
+    Receiving => 77
+    PictureOutlineRound => 78
+    PictureOutline => 79
+    PieChart => 80
+    SData => 81
+    Refrigerator => 82
+    SCooperation => 83
+    SCheck => 84
+    SFlag => 85
+    SCustom => 86
+    SFinance => 87
+    RemoveOutline => 88
+    SComment => 89
+    Remove => 90
+    School => 91
+    SShop => 92
+    STicket => 93
+    SortUp => 94
+    Sort => 95
+    TakeawayBox => 96
+    Stopwatch => 97
+    Thumb => 98
+    Tickets => 99
+    Truck => 100
+    User1 => 101
+    UserSolid => 102
+    VideoCameraSolid => 103
+    VideoPlay => 104
+    VideoCamera => 105
+    Right1 => 106
+    VideoPause => 107
+    StarOff => 108
+    Trophy1 => 109
+    Wallet1 => 110
+    Watch => 111
+    WindPower => 112
+    ViewIcon => 113
+    Watermelon => 114
+    Share2 => 115
+    SetUp => 116
+    ZoomIn => 117
+    WaterCup => 118
+    Warning => 119
+    Watch2 => 120
+    Setting1 => 121
+    ZoomOut => 122
+    Pear => 123
+    Paperclip => 124
+    PlatformEleme => 125
+    SClaim => 126
+    SGoods => 127
+    SGrid => 128
+    SHelp => 129
+    ShoppingCart => 130
+    Smoking => 131
+    Soccer => 132
+    SPromotion => 133
+    SortDown => 134
+    SRelease => 135
+    SOpportunity => 136
+    SOrder => 137
+    STools => 138
+    SoldOut => 139
+    SPlatform => 140
+    Suitcase => 141
+    Suitcase2 => 142
+    Sugar => 143
+    Sunset => 144
+    Sunrise => 145
+    TopLeft => 146
+    SwitchButton => 147
+    ToiletPaper => 148
+    TableLamp => 149
+    Tableware => 150
+    TopRight => 151
+    Top => 152
+    TurnOff => 153
+    Monitor1 => 154
+    Unlock1 => 155
+    Postcard => 156
+    Umbrella => 157
+    Moon => 158
+    AddLocation => 159
+    Present => 160
+    Aim => 161
+    Position => 162
+    Back => 163
+    PriceTag => 164
+    ArrowLeft => 165
+    PotatoStrips => 166
+    Attract => 167
+    ArrowRight => 168
+    Sunny => 169
+    ArrowUp => 170
+    MoonNight => 171
+    AlarmClock => 172
+    Reading => 173
+    ArrowDown => 174
+    Rank => 175
+    Apple1 => 176
+    BottomRight => 177
+    Upload2 => 178
+    Box => 179
+    Timer => 180
+    Brush => 181
+    Guide => 182
+    BankCard => 183
+    Trophy12 => 184
+    BottomLeft => 185
+    Bicycle => 186
+    Baseball => 187
+    Basketball => 188
+    Burger => 189
+    Bottom => 190
+    CScaleToOriginal => 191
+    ChatDotRound => 192
+    ChatRound => 193
+    ChatDotSquare => 194
+    ChatSquare => 195
+    CircleClose => 196
+    Chicken => 197
+    CloseNotification => 198
+    Close2 => 199
+    Cherry => 200
+    CoffeeCup => 201
+    Cloudy => 202
+    CollectionTag => 203
+    ColdDrink => 204
+    Collection => 205
+    Coordinate => 206
+    Connection => 207
+    Crop => 208
+    Cpu => 209
+    CopyDocument => 210
+    DCaret => 211
+    DArrowRight => 212
+    DataBoard => 213
+    DataAnalysis => 214
+    DataLine => 215
+    DArrowLeft => 216
+    DeleteSolid => 217
+    DeleteLocation => 218
+    Discount => 219
+    Date => 220
+    Dessert => 221
+    Dish => 222
+    Delete2 => 223
+    DocumentCopy => 224
+    Document => 225
+    Discover => 226
+    DocumentAdd => 227
+    DocumentChecked => 228
+    DocumentDelete => 229
+    DocumentRemove => 230
+    Dish2 => 231
+    Download1 => 232
+    Coin => 233
+    Female => 234
+    Film => 235
+    Error1 => 236
+    Eleme => 237
+    Coffee => 238
+    FolderRemove => 239
+    FolderChecked => 240
+    FolderAdd1 => 241
+    FolderDelete => 242
+    Football => 243
+    Finished => 244
+    ForkSpoon => 245
+    FirstAidKit => 246
+    GobletFull => 247
+    Food => 248
+    Fullscreen => 249
+    GobletSquareFull => 250
+    Goblet => 251
+    Goods => 252
+    Headset => 253
+    House => 254
+    IceCreamRound => 255
+    HotWater => 256
+    HeavyRain => 257
+    IceDrink => 258
+    IceCream => 259
+    Key1 => 260
+    IceCreamSquare => 261
+    KnifeFork => 262
+    IceTea => 263
+    Info => 264
+    Grape => 265
+    LightRain => 266
+    Lock1 => 267
+    LocationOutline => 268
+    Lightning => 269
+    MagicStick => 270
+    Link1 => 271
+    Lollipop => 272
+    LoadingStep => 273
+    Rest => 274
+    BellFill => 275
+    Usb => 276
+    FilterFill => 277
+    Skin => 278
+    FireFill => 279
+    Home => 280
+    FunnelplotFill => 281
+    Bank => 282
+    GiftFill => 283
+    Filter1 => 284
+    HourglassFill => 285
+    Funnelplot => 286
+    HomeFill => 287
+    Like => 288
+    TrophyFill => 289
+    Unlike => 290
+    LocationFill => 291
+    Unlock => 292
+    CloudFill => 293
+    Lock => 294
+    CustomerserviceFill => 295
+    Customerservice => 296
+    ExperimentFill => 297
+    Flag => 298
+    EyeFill => 299
+    Moneycollect => 300
+    LikeFill => 301
+    Medicinebox => 302
+    LockFill => 303
+    Shop => 304
+    UnlikeFill => 305
+    Shopping => 306
+    StarFill => 307
+    Folder => 308
+    UnlockFill => 309
+    FolderOpen => 310
+    AlertFill => 311
+    ApiFill => 312
+    Deploymentunit => 313
+    HighlightFill => 314
+    Accountbook => 315
+    PhoneFill => 316
+    Contacts => 317
+    EditFill => 318
+    Carryout => 319
+    PushpinFill => 320
+    CalendarCheck => 321
+    ThunderboltFill => 322
+    Calendar1 => 323
+    TagFill => 324
+    Scan => 325
+    WrenchFill => 326
+    Select => 327
+    TagsFill => 328
+    Boxplot => 329
+    BankFill => 330
+    Build => 331
+    CameraFill => 332
+    Sliders => 333
+    ErrorFill => 334
+    Laptop => 335
+    CrownFill => 336
+    Barcode1 => 337
+    MailFill => 338
+    Camera => 339
+    CarFill => 340
+    Cluster => 341
+    PrinterFill => 342
+    Gateway => 343
+    ShopFill => 344
+    Car => 345
+    SettingFill => 346
+    Printer => 347
+    USBFill => 348
+    Read => 349
+    GoldenFill => 350
+    CloudServer => 351
+    BuildFill => 352
+    CloudUpload => 353
+    BoxplotFill => 354
+    Cloud => 355
+    SlidersFill => 356
+    CloudDownload => 357
+    Alibaba => 358
+    CloudSync => 359
+    Alibabacloud => 360
+    Video => 361
+    Antdesign => 362
+    NotificationIcon => 363
+    AntCloud => 364
+    Sound => 365
+    Behance => 366
+    RadarChart => 367
+    Googleplus => 368
+    Qrcode => 369
+    Medium => 370
+    Fund => 371
+    Google => 372
+    Image1 => 373
+    IE => 374
+    Mail1 => 375
+    Amazon => 376
+    Slack => 377
+    Idcard => 378
+    Alipay => 379
+    Creditcard => 380
+    Taobao => 381
+    Heart => 382
+    Zhihu => 383
+    Block => 384
+    HTML => 385
+    Error => 386
+    Linkedin => 387
+    Star => 388
+    Yahoo => 389
+    Gold => 390
+    Facebook => 391
+    Heatmap => 392
+    Skype => 393
+    Wifi => 394
+    CodeSandbox => 395
+    Paperclip2 => 396
+    Chrome => 397
+    Edit1 => 398
+    Aliwangwang => 399
+    Key => 400
+    Apple => 401
+    Api => 402
+    Android => 403
+    Disconnect => 404
+    Sketch => 405
+    Highlight => 406
+    Gitlab => 407
+    Monitor => 408
+    Dribbble => 409
+    Link => 410
+    Instagram => 411
+    Man => 412
+    Reddit => 413
+    Percentage => 414
+    Windows => 415
+    Pushpin => 416
+    Yuque => 417
+    Phone => 418
+    Youtube => 419
+    Shake => 420
+    GitlabFill => 421
+    Tag => 422
+    Dropbox => 423
+    Wrench => 424
+    Dingtalk => 425
+    Woman => 426
+    AndroidFill => 427
+    Tags => 428
+    AppleFill => 429
+    Scissor => 430
+    HTMLFill => 431
+    Mr => 432
+    WindowsFill => 433
+    Share1 => 434
+    QQ => 435
+    Branches => 436
+    Twitter => 437
+    Fork => 438
+    SkypeFill => 439
+    Shrink => 440
+    Weibo => 441
+    Arrawsalt => 442
+    YuqueFill => 443
+    Verticalright => 444
+    YoutubeFill => 445
+    Verticalleft => 446
+    YahooFill => 447
+    Wechat => 448
+    ChromeFill => 449
+    AliwangwangFill => 450
+    FullscreenExit => 451
+    GithubFill => 452
+    MediumCircleFill => 453
+    ColumnHeight => 454
+    VAlignBottom => 455
+    VAlignMiddle => 456
+    ToTop => 457
+    VAlignTop => 458
+    Download => 459
+    SortDesc => 460
+    SortAsc => 461
+    Fall => 462
+    Swap => 463
+    Stock => 464
+    Rise => 465
+    Indent => 466
+    Outdent => 467
+    MenuIcon => 468
+    Unorderedlist => 469
+    Orderedlist => 470
+    AlignRight => 471
+    AlignCenter => 472
+    AlignLeft => 473
+    PicCenter => 474
+    PicRight => 475
+    PicLeft => 476
+    Bold => 477
+    FontColor => 478
+    CheckCircle => 479
+    Exclaimination => 480
+    CI => 481
+    FontSize => 482
+    Dollar => 483
+    Infomation => 484
+    Compass => 485
+    LineHeight => 486
+    Strikethrough => 487
+    Frown => 488
+    Underline => 489
+    InfoCircle => 490
+    Number => 491
+    LeftCircle => 492
+    Italic => 493
+    Loading => 494
+    DownCircle => 495
+    Code => 496
+    EURO => 497
+    ColumnWidth => 498
+    Copyright => 499
+    MinusCircle => 500
+    Meh => 501
+    Dash => 502
+    PlusCircle => 503
+    PlayCircle => 504
+    Enter1 => 505
+    QuestionCircle => 506
+    Line => 507
+    Pound => 508
+    Minus => 509
+    RightCircle => 510
+    Question => 511
+    Smile => 512
+    Plus => 513
+    Trademark => 514
+    SmallDash => 515
+    Pause => 516
+    Earth => 517
+    BgColors => 518
+    YUAN => 519
+    Crown => 520
+    UpCircle => 521
+    Drag => 522
+    WarningCircle => 523
+    Sync => 524
+    Gift => 525
+    Transaction => 526
+    Stop => 527
+    Undo => 528
+    Fire => 529
+    Redo => 530
+    Thunderbolt => 531
+    Reload => 532
+    CheckCircleFill => 533
+    Reloadtime => 534
+    LeftCircleFill => 535
+    Message => 536
+    DownCircleFill => 537
+    Dashboard => 538
+    MinusCircleFill => 539
+    Issuesclose => 540
+    CloseCircleFill => 541
+    Poweroff => 542
+    InfoCircleFill => 543
+    Logout => 544
+    UpCircleFill => 545
+    Login => 546
+    RightCircleFill => 547
+    Piechart => 548
+    PlusCircleFill => 549
+    QuestionCircleFill => 550
+    Eye => 551
+    EUROCircleFill => 552
+    FrownFill => 553
+    CopyrightCircleFil => 554
+    Export => 555
+    CICircleFill => 556
+    Save1 => 557
+    CompassFill => 558
+    Import => 559
+    DollarCircleFill => 560
+    Appstore => 561
+    PoweroffCircleFill => 562
+    MehFill => 563
+    PlayCircleFill => 564
+    Layout => 565
+    PoundCircleFill => 566
+    SmileFill => 567
+    StopFill => 568
+    Control => 569
+    WarningCircleFill => 570
+    Codelibrary => 571
+    Detail => 572
+    TrademarkCircleFil => 573
+    YUANCircleFill => 574
+    HeartFill => 575
+    PiechartCircleFil => 576
+    Project => 577
+    DashboardFill => 578
+    Wallet => 579
+    MessageFill => 580
+    Calculator => 581
+    Interation => 582
+    Border => 583
+    CodelibraryFill => 584
+    BorderOuter => 585
+    BorderTop => 586
+    BorderBottom => 587
+    BorderLeft => 588
+    BorderRight => 589
+    BorderInner => 590
+    AccountbookFill => 591
+    BorderVertical => 592
+    CarryoutFill => 593
+    BorderHorizontal => 594
+    CalendarFill => 595
+    RadiusBottomleft => 596
+    CalculatorFill => 597
+    RadiusBottomright => 598
+    InterationFill => 599
+    RadiusUpleft => 600
+    ProjectFill => 601
+    RadiusUpright => 602
+    DetailFill => 603
+    RadiusSetting => 604
+    SaveFill => 605
+    Adduser => 606
+    WalletFill => 607
+    Deleteteam => 608
+    ControlFill => 609
+    Deleteuser => 610
+    LayoutFill => 611
+    Addteam => 612
+    AppstoreFill => 613
+    User => 614
+    MobileFill => 615
+    Team => 616
+    TabletFill => 617
+    AreaChart => 618
+    BookFill => 619
+    LineChart => 620
+    RedenvelopeFill => 621
+    Barchart => 622
+    SafetycertificateF => 623
+    Pointmap => 624
+    PropertysafetyFill => 625
+    ContainerIcon => 626
+    Database => 627
+    SecurityscanFill => 628
+    Sever => 629
+    FileExclamationFil => 630
+    Mobile => 631
+    FileAddFill => 632
+    Tablet => 633
+    FileExcelFill => 634
+    Redenvelope => 635
+    FileMarkdownFill => 636
+    Book => 637
+    FileTextFill => 638
+    Filedone => 639
+    FilePptFill => 640
+    Reconciliation => 641
+    FileUnknownFill => 642
+    FileException => 643
+    FileWordFill => 644
+    Filesync => 645
+    FileZipFill => 646
+    FileSearch => 647
+    FilePdfFill => 648
+    Solution => 649
+    FileImageFill => 650
+    Fileprotect => 651
+    DiffFill => 652
+    FileAdd => 653
+    FileCopyFill => 654
+    FileExcel => 655
+    SnippetsFill => 656
+    FileExclamation => 657
+    BatchfoldingFill => 658
+    FilePdf => 659
+    ReconciliationFill => 660
+    FileImage => 661
+    FileMarkdown => 662
+    FolderFill => 663
+    FileUnknown => 664
+    FolderOpenFill => 665
+    FilePpt => 666
+    DatabaseFill => 667
+    FileWord => 668
+    ContainerFill => 669
+    File1 => 670
+    SeverFill => 671
+    FileZip => 672
+    CalendarCheckFill => 673
+    FileText => 674
+    ImageFill => 675
+    FileCopy => 676
+    IdcardFill => 677
+    Snippets => 678
+    CreditcardFill => 679
+    Audit => 680
+    FundFill => 681
+    Diff => 682
+    ReadFill => 683
+    Batchfolding => 684
+    ContactsFill => 685
+    Securityscan => 686
+    Propertysafety => 687
+    NotificationFill => 688
+    Safetycertificate => 689
+    FlagFill => 690
+    MoneycollectFill => 691
+    Alert => 692
+    MedicineboxFill => 693
+    RestFill => 694
+    Hourglass => 695
+    ShoppingFill => 696
+    Bulb => 697
+    SkinFill => 698
+    Experiment => 699
+    VideoFill => 700
+    Bell => 701
+    SoundFill => 702
+    Trophy => 703
+    BulbFill => 704
+    FuwuActive => 705
+    ShouyeShouye => 706
+    Cangkuxinxi => 707
+    Saomiao => 708
+    Iconset0254 => 709
+    Zhongsuanrenwuliebiao => 710
+    Xiangxiazhanhang => 711
+    Qita => 712
+    Xiajia => 713
+    Feiji => 714
+    Tixing => 715
+    Shaixuan_o => 716
+    Siji => 717
+    Lianxiwomen => 718
+    Guanyuwomen => 719
+    Wode => 720
+    TruckFull => 721
+    Xiayibu => 722
+    Video2 => 723
+    ImageIcon => 724
+    File => 725
+    Xinhao => 726
+    Gengduo => 727
+    Xuhao => 728
+    Zhiye => 729
+    Weixian => 730
+    Apptubiao => 731
+    Jingdiananli_wujiaoxing_shoucanghou => 732
+    Jingdiananli_kongwujiaoxing_shoucang => 733
+    Caigou => 734
+    NaviconQtrkd => 735
+    CustomWorker => 736
+    Ruku => 737
+    Yichang => 738
+    Shougongpeidui => 739
+    Lunkuohua113 => 740
+    Jiebang => 741
+    Goodsppeinventory => 742
+    Weixiujilu => 743
+    Taizhangguanli => 744
+    Weixiu => 745
+    Baoxiu => 746
+    Daijiedan => 747
+    Shebeidianjian => 748
+    Shebeidianjiantongji => 749
+    Baoyanggongdan => 750
+    Baoyangjihua => 751
+    Chart => 752
+    ChartBar => 753
+    Filter => 754
+    FilterClear => 755
+    Share => 756
+    Books => 757
+    Cart => 758
+    Clear => 759
+    MenuFold => 760
+    LockOff => 761
+    Rotation => 762
+    Layers => 763
+    LockOn => 764
+    RootList => 765
+    AControlplatform => 766
+    ChartBubble => 767
+    CaretUpSmall => 768
+    Enter => 769
+    Rollfront => 770
+    Jump => 771
+    Rollback => 772
+    CaretRightSmall => 773
+    Mirror => 774
+    Time => 775
+    UserAvatar => 776
+    UsergroupClear => 777
+    MinusRectangle => 778
+    FormatHorizontalAlignTop => 779
+    Move1 => 780
+    Bulletpoint => 781
+    Barcode => 782
+    LogoWecom => 783
+    MenuUnfold => 784
+    Tools => 785
+    CaretLeftSmall => 786
+    Round => 787
+    CaretDownSmall => 788
+    Check => 789
+    APrecisemonitor => 790
+    GenderFemale => 791
+    AOrderAdjustmentcolumn => 792
+    Queue => 793
+    Print => 794
+    Ellipsis => 795
+    TimeFilled => 796
+    Slash => 797
+    HelpCircleFilled => 798
+    MenuApplication => 799
+    Pin => 800
+    UserTalk => 801
+    More => 802
   }
 }
 // ---- icons-gen:end ----
@@ -2581,809 +2581,809 @@ fn kind_index(kind : IconKind) -> Int {
 pub fn all_icons() -> Array[IconKind] {
   [
     // ---- icons-gen:all
-    YhTreeStructure,
-    YhHide,
-    YhClickButton,
-    YhStaticText,
-    YhSwitch,
-    YhTextField,
-    YhTextarea,
-    YhNumberField,
-    YhSelectField,
-    YhTreeTable,
-    YhEditTable,
-    YhTable,
-    YhTab,
-    YhScript,
-    YhShangduiqi,
-    YhYouduiqi,
-    YhZuoduiqi,
-    YhWeibiaoti545,
-    YhDingceng,
-    YhDiceng,
-    YhShangyiyiceng,
-    YhXiaduiqi,
-    YhXiayiyiceng,
-    YhDaxiaoxiangdeng,
-    YhTuceng,
-    YhChatBar,
-    YhFunction,
-    YhDuiqi,
-    YhParams,
-    YhTucengzhizuoyuweihu,
-    YhKuaibuju,
-    YhShuxiangfenbu,
-    YhHengxiangfenbu1,
-    YhChicunbiaozhu_,
-    YhZuoyoujuzhong,
-    YhShangxiajuzhong,
-    YhDengkuan,
-    YhDenggao,
-    YhQueryFilter,
-    YhZhushujushenqingShujufenxi02,
-    YhSuofangdaodengbi,
-    YhHuifu,
-    YhMenu1,
-    YhMicrophone,
-    YhMinus1,
-    YhMessage1,
-    YhMapLocation,
-    YhMessageSolid,
-    YhMic,
-    YhMilkTea,
-    YhMedal,
-    YhMedal2,
-    YhMobile1,
-    YhMobilePhone,
-    YhMoney,
-    YhMore1,
-    YhNoSmoking,
-    YhMoreOutline,
-    YhNotebook,
-    YhSHome,
-    YhNews,
-    YhNotebook1,
-    YhSOpen,
-    YhSMarketing,
-    YhMouse,
-    YhSManagement,
-    YhSOperation,
-    YhOfficeBuilding,
-    YhSwitchOpen,
-    YhShip,
-    YhSell,
-    YhSearch2,
-    YhService,
-    YhScissors,
-    YhOrange,
-    YhPhoneOutline,
-    YhPicture,
-    YhReceiving,
-    YhPictureOutlineRound,
-    YhPictureOutline,
-    YhPieChart,
-    YhSData,
-    YhRefrigerator,
-    YhSCooperation,
-    YhSCheck,
-    YhSFlag,
-    YhSCustom,
-    YhSFinance,
-    YhRemoveOutline,
-    YhSComment,
-    YhRemove,
-    YhSchool,
-    YhSShop,
-    YhSTicket,
-    YhSortUp,
-    YhSort,
-    YhTakeawayBox,
-    YhStopwatch,
-    YhThumb,
-    YhTickets,
-    YhTruck,
-    YhUser1,
-    YhUserSolid,
-    YhVideoCameraSolid,
-    YhVideoPlay,
-    YhVideoCamera,
-    YhRight1,
-    YhVideoPause,
-    YhStarOff,
-    YhTrophy1,
-    YhWallet1,
-    YhWatch,
-    YhWindPower,
-    YhView,
-    YhWatermelon,
-    YhShare2,
-    YhSetUp,
-    YhZoomIn,
-    YhWaterCup,
-    YhWarning,
-    YhWatch2,
-    YhSetting1,
-    YhZoomOut,
-    YhPear,
-    YhPaperclip,
-    YhPlatformEleme,
-    YhSClaim,
-    YhSGoods,
-    YhSGrid,
-    YhSHelp,
-    YhShoppingCart,
-    YhSmoking,
-    YhSoccer,
-    YhSPromotion,
-    YhSortDown,
-    YhSRelease,
-    YhSOpportunity,
-    YhSOrder,
-    YhSTools,
-    YhSoldOut,
-    YhSPlatform,
-    YhSuitcase,
-    YhSuitcase2,
-    YhSugar,
-    YhSunset,
-    YhSunrise,
-    YhTopLeft,
-    YhSwitchButton,
-    YhToiletPaper,
-    YhTableLamp,
-    YhTableware,
-    YhTopRight,
-    YhTop,
-    YhTurnOff,
-    YhMonitor1,
-    YhUnlock1,
-    YhPostcard,
-    YhUmbrella,
-    YhMoon,
-    YhAddLocation,
-    YhPresent,
-    YhAim,
-    YhPosition,
-    YhBack,
-    YhPriceTag,
-    YhArrowLeft,
-    YhPotatoStrips,
-    YhAttract,
-    YhArrowRight,
-    YhSunny,
-    YhArrowUp,
-    YhMoonNight,
-    YhAlarmClock,
-    YhReading,
-    YhArrowDown,
-    YhRank,
-    YhApple1,
-    YhBottomRight,
-    YhUpload2,
-    YhBox,
-    YhTimer,
-    YhBrush,
-    YhGuide,
-    YhBankCard,
-    YhTrophy12,
-    YhBottomLeft,
-    YhBicycle,
-    YhBaseball,
-    YhBasketball,
-    YhBurger,
-    YhBottom,
-    YhCScaleToOriginal,
-    YhChatDotRound,
-    YhChatRound,
-    YhChatDotSquare,
-    YhChatSquare,
-    YhCircleClose,
-    YhChicken,
-    YhCloseNotification,
-    YhClose2,
-    YhCherry,
-    YhCoffeeCup,
-    YhCloudy,
-    YhCollectionTag,
-    YhColdDrink,
-    YhCollection,
-    YhCoordinate,
-    YhConnection,
-    YhCrop,
-    YhCpu,
-    YhCopyDocument,
-    YhDCaret,
-    YhDArrowRight,
-    YhDataBoard,
-    YhDataAnalysis,
-    YhDataLine,
-    YhDArrowLeft,
-    YhDeleteSolid,
-    YhDeleteLocation,
-    YhDiscount,
-    YhDate,
-    YhDessert,
-    YhDish,
-    YhDelete2,
-    YhDocumentCopy,
-    YhDocument,
-    YhDiscover,
-    YhDocumentAdd,
-    YhDocumentChecked,
-    YhDocumentDelete,
-    YhDocumentRemove,
-    YhDish2,
-    YhDownload1,
-    YhCoin,
-    YhFemale,
-    YhFilm,
-    YhError1,
-    YhEleme,
-    YhCoffee,
-    YhFolderRemove,
-    YhFolderChecked,
-    YhFolderAdd1,
-    YhFolderDelete,
-    YhFootball,
-    YhFinished,
-    YhForkSpoon,
-    YhFirstAidKit,
-    YhGobletFull,
-    YhFood,
-    YhFullscreen,
-    YhGobletSquareFull,
-    YhGoblet,
-    YhGoods,
-    YhHeadset,
-    YhHouse,
-    YhIceCreamRound,
-    YhHotWater,
-    YhHeavyRain,
-    YhIceDrink,
-    YhIceCream,
-    YhKey1,
-    YhIceCreamSquare,
-    YhKnifeFork,
-    YhIceTea,
-    YhInfo,
-    YhGrape,
-    YhLightRain,
-    YhLock1,
-    YhLocationOutline,
-    YhLightning,
-    YhMagicStick,
-    YhLink1,
-    YhLollipop,
-    YhLoadingStep,
-    YhRest,
-    YhBellFill,
-    YhUsb,
-    YhFilterFill,
-    YhSkin,
-    YhFireFill,
-    YhHome,
-    YhFunnelplotFill,
-    YhBank,
-    YhGiftFill,
-    YhFilter1,
-    YhHourglassFill,
-    YhFunnelplot,
-    YhHomeFill,
-    YhLike,
-    YhTrophyFill,
-    YhUnlike,
-    YhLocationFill,
-    YhUnlock,
-    YhCloudFill,
-    YhLock,
-    YhCustomerserviceFill,
-    YhCustomerservice,
-    YhExperimentFill,
-    YhFlag,
-    YhEyeFill,
-    YhMoneycollect,
-    YhLikeFill,
-    YhMedicinebox,
-    YhLockFill,
-    YhShop,
-    YhUnlikeFill,
-    YhShopping,
-    YhStarFill,
-    YhFolder,
-    YhUnlockFill,
-    YhFolderOpen,
-    YhAlertFill,
-    YhApiFill,
-    YhDeploymentunit,
-    YhHighlightFill,
-    YhAccountbook,
-    YhPhoneFill,
-    YhContacts,
-    YhEditFill,
-    YhCarryout,
-    YhPushpinFill,
-    YhCalendarCheck,
-    YhThunderboltFill,
-    YhCalendar1,
-    YhTagFill,
-    YhScan,
-    YhWrenchFill,
-    YhSelect,
-    YhTagsFill,
-    YhBoxplot,
-    YhBankFill,
-    YhBuild,
-    YhCameraFill,
-    YhSliders,
-    YhErrorFill,
-    YhLaptop,
-    YhCrownFill,
-    YhBarcode1,
-    YhMailFill,
-    YhCamera,
-    YhCarFill,
-    YhCluster,
-    YhPrinterFill,
-    YhGateway,
-    YhShopFill,
-    YhCar,
-    YhSettingFill,
-    YhPrinter,
-    YhUSBFill,
-    YhRead,
-    YhGoldenFill,
-    YhCloudServer,
-    YhBuildFill,
-    YhCloudUpload,
-    YhBoxplotFill,
-    YhCloud,
-    YhSlidersFill,
-    YhCloudDownload,
-    YhAlibaba,
-    YhCloudSync,
-    YhAlibabacloud,
-    YhVideo,
-    YhAntdesign,
-    YhNotification,
-    YhAntCloud,
-    YhSound,
-    YhBehance,
-    YhRadarChart,
-    YhGoogleplus,
-    YhQrcode,
-    YhMedium,
-    YhFund,
-    YhGoogle,
-    YhImage1,
-    YhIE,
-    YhMail1,
-    YhAmazon,
-    YhSlack,
-    YhIdcard,
-    YhAlipay,
-    YhCreditcard,
-    YhTaobao,
-    YhHeart,
-    YhZhihu,
-    YhBlock,
-    YhHTML,
-    YhError,
-    YhLinkedin,
-    YhStar,
-    YhYahoo,
-    YhGold,
-    YhFacebook,
-    YhHeatmap,
-    YhSkype,
-    YhWifi,
-    YhCodeSandbox,
-    YhPaperclip2,
-    YhChrome,
-    YhEdit1,
-    YhAliwangwang,
-    YhKey,
-    YhApple,
-    YhApi,
-    YhAndroid,
-    YhDisconnect,
-    YhSketch,
-    YhHighlight,
-    YhGitlab,
-    YhMonitor,
-    YhDribbble,
-    YhLink,
-    YhInstagram,
-    YhMan,
-    YhReddit,
-    YhPercentage,
-    YhWindows,
-    YhPushpin,
-    YhYuque,
-    YhPhone,
-    YhYoutube,
-    YhShake,
-    YhGitlabFill,
-    YhTag,
-    YhDropbox,
-    YhWrench,
-    YhDingtalk,
-    YhWoman,
-    YhAndroidFill,
-    YhTags,
-    YhAppleFill,
-    YhScissor,
-    YhHTMLFill,
-    YhMr,
-    YhWindowsFill,
-    YhShare1,
-    YhQQ,
-    YhBranches,
-    YhTwitter,
-    YhFork,
-    YhSkypeFill,
-    YhShrink,
-    YhWeibo,
-    YhArrawsalt,
-    YhYuqueFill,
-    YhVerticalright,
-    YhYoutubeFill,
-    YhVerticalleft,
-    YhYahooFill,
-    YhWechat,
-    YhChromeFill,
-    YhAliwangwangFill,
-    YhFullscreenExit,
-    YhGithubFill,
-    YhMediumCircleFill,
-    YhColumnHeight,
-    YhVAlignBottom,
-    YhVAlignMiddle,
-    YhToTop,
-    YhVAlignTop,
-    YhDownload,
-    YhSortDesc,
-    YhSortAsc,
-    YhFall,
-    YhSwap,
-    YhStock,
-    YhRise,
-    YhIndent,
-    YhOutdent,
-    YhMenu,
-    YhUnorderedlist,
-    YhOrderedlist,
-    YhAlignRight,
-    YhAlignCenter,
-    YhAlignLeft,
-    YhPicCenter,
-    YhPicRight,
-    YhPicLeft,
-    YhBold,
-    YhFontColor,
-    YhCheckCircle,
-    YhExclaimination,
-    YhCI,
-    YhFontSize,
-    YhDollar,
-    YhInfomation,
-    YhCompass,
-    YhLineHeight,
-    YhStrikethrough,
-    YhFrown,
-    YhUnderline,
-    YhInfoCircle,
-    YhNumber,
-    YhLeftCircle,
-    YhItalic,
-    YhLoading,
-    YhDownCircle,
-    YhCode,
-    YhEURO,
-    YhColumnWidth,
-    YhCopyright,
-    YhMinusCircle,
-    YhMeh,
-    YhDash,
-    YhPlusCircle,
-    YhPlayCircle,
-    YhEnter1,
-    YhQuestionCircle,
-    YhLine,
-    YhPound,
-    YhMinus,
-    YhRightCircle,
-    YhQuestion,
-    YhSmile,
-    YhPlus,
-    YhTrademark,
-    YhSmallDash,
-    YhPause,
-    YhEarth,
-    YhBgColors,
-    YhYUAN,
-    YhCrown,
-    YhUpCircle,
-    YhDrag,
-    YhWarningCircle,
-    YhSync,
-    YhGift,
-    YhTransaction,
-    YhStop,
-    YhUndo,
-    YhFire,
-    YhRedo,
-    YhThunderbolt,
-    YhReload,
-    YhCheckCircleFill,
-    YhReloadtime,
-    YhLeftCircleFill,
-    YhMessage,
-    YhDownCircleFill,
-    YhDashboard,
-    YhMinusCircleFill,
-    YhIssuesclose,
-    YhCloseCircleFill,
-    YhPoweroff,
-    YhInfoCircleFill,
-    YhLogout,
-    YhUpCircleFill,
-    YhLogin,
-    YhRightCircleFill,
-    YhPiechart,
-    YhPlusCircleFill,
-    YhQuestionCircleFill,
-    YhEye,
-    YhEUROCircleFill,
-    YhFrownFill,
-    YhCopyrightCircleFil,
-    YhExport,
-    YhCICircleFill,
-    YhSave1,
-    YhCompassFill,
-    YhImport,
-    YhDollarCircleFill,
-    YhAppstore,
-    YhPoweroffCircleFill,
-    YhMehFill,
-    YhPlayCircleFill,
-    YhLayout,
-    YhPoundCircleFill,
-    YhSmileFill,
-    YhStopFill,
-    YhControl,
-    YhWarningCircleFill,
-    YhCodelibrary,
-    YhDetail,
-    YhTrademarkCircleFil,
-    YhYUANCircleFill,
-    YhHeartFill,
-    YhPiechartCircleFil,
-    YhProject,
-    YhDashboardFill,
-    YhWallet,
-    YhMessageFill,
-    YhCalculator,
-    YhInteration,
-    YhBorder,
-    YhCodelibraryFill,
-    YhBorderOuter,
-    YhBorderTop,
-    YhBorderBottom,
-    YhBorderLeft,
-    YhBorderRight,
-    YhBorderInner,
-    YhAccountbookFill,
-    YhBorderVertical,
-    YhCarryoutFill,
-    YhBorderHorizontal,
-    YhCalendarFill,
-    YhRadiusBottomleft,
-    YhCalculatorFill,
-    YhRadiusBottomright,
-    YhInterationFill,
-    YhRadiusUpleft,
-    YhProjectFill,
-    YhRadiusUpright,
-    YhDetailFill,
-    YhRadiusSetting,
-    YhSaveFill,
-    YhAdduser,
-    YhWalletFill,
-    YhDeleteteam,
-    YhControlFill,
-    YhDeleteuser,
-    YhLayoutFill,
-    YhAddteam,
-    YhAppstoreFill,
-    YhUser,
-    YhMobileFill,
-    YhTeam,
-    YhTabletFill,
-    YhAreaChart,
-    YhBookFill,
-    YhLineChart,
-    YhRedenvelopeFill,
-    YhBarchart,
-    YhSafetycertificateF,
-    YhPointmap,
-    YhPropertysafetyFill,
-    YhContainer,
-    YhDatabase,
-    YhSecurityscanFill,
-    YhSever,
-    YhFileExclamationFil,
-    YhMobile,
-    YhFileAddFill,
-    YhTablet,
-    YhFileExcelFill,
-    YhRedenvelope,
-    YhFileMarkdownFill,
-    YhBook,
-    YhFileTextFill,
-    YhFiledone,
-    YhFilePptFill,
-    YhReconciliation,
-    YhFileUnknownFill,
-    YhFileException,
-    YhFileWordFill,
-    YhFilesync,
-    YhFileZipFill,
-    YhFileSearch,
-    YhFilePdfFill,
-    YhSolution,
-    YhFileImageFill,
-    YhFileprotect,
-    YhDiffFill,
-    YhFileAdd,
-    YhFileCopyFill,
-    YhFileExcel,
-    YhSnippetsFill,
-    YhFileExclamation,
-    YhBatchfoldingFill,
-    YhFilePdf,
-    YhReconciliationFill,
-    YhFileImage,
-    YhFileMarkdown,
-    YhFolderFill,
-    YhFileUnknown,
-    YhFolderOpenFill,
-    YhFilePpt,
-    YhDatabaseFill,
-    YhFileWord,
-    YhContainerFill,
-    YhFile1,
-    YhSeverFill,
-    YhFileZip,
-    YhCalendarCheckFill,
-    YhFileText,
-    YhImageFill,
-    YhFileCopy,
-    YhIdcardFill,
-    YhSnippets,
-    YhCreditcardFill,
-    YhAudit,
-    YhFundFill,
-    YhDiff,
-    YhReadFill,
-    YhBatchfolding,
-    YhContactsFill,
-    YhSecurityscan,
-    YhPropertysafety,
-    YhNotificationFill,
-    YhSafetycertificate,
-    YhFlagFill,
-    YhMoneycollectFill,
-    YhAlert,
-    YhMedicineboxFill,
-    YhRestFill,
-    YhHourglass,
-    YhShoppingFill,
-    YhBulb,
-    YhSkinFill,
-    YhExperiment,
-    YhVideoFill,
-    YhBell,
-    YhSoundFill,
-    YhTrophy,
-    YhBulbFill,
-    YhFuwuActive,
-    YhShouyeShouye,
-    YhCangkuxinxi,
-    YhSaomiao,
-    YhIconset0254,
-    YhZhongsuanrenwuliebiao,
-    YhXiangxiazhanhang,
-    YhQita,
-    YhXiajia,
-    YhFeiji,
-    YhTixing,
-    YhShaixuan_o,
-    YhSiji,
-    YhLianxiwomen,
-    YhGuanyuwomen,
-    YhWode,
-    YhTruckFull,
-    YhXiayibu,
-    YhVideo2,
-    YhImage,
-    YhFile,
-    YhXinhao,
-    YhGengduo,
-    YhXuhao,
-    YhZhiye,
-    YhWeixian,
-    YhApptubiao,
-    YhJingdiananli_wujiaoxing_shoucanghou,
-    YhJingdiananli_kongwujiaoxing_shoucang,
-    YhCaigou,
-    YhNaviconQtrkd,
-    YhCustomWorker,
-    YhRuku,
-    YhYichang,
-    YhShougongpeidui,
-    YhLunkuohua113,
-    YhJiebang,
-    YhGoodsppeinventory,
-    YhWeixiujilu,
-    YhTaizhangguanli,
-    YhWeixiu,
-    YhBaoxiu,
-    YhDaijiedan,
-    YhShebeidianjian,
-    YhShebeidianjiantongji,
-    YhBaoyanggongdan,
-    YhBaoyangjihua,
-    YhChart,
-    YhChartBar,
-    YhFilter,
-    YhFilterClear,
-    YhShare,
-    YhBooks,
-    YhCart,
-    YhClear,
-    YhMenuFold,
-    YhLockOff,
-    YhRotation,
-    YhLayers,
-    YhLockOn,
-    YhRootList,
-    YhAControlplatform,
-    YhChartBubble,
-    YhCaretUpSmall,
-    YhEnter,
-    YhRollfront,
-    YhJump,
-    YhRollback,
-    YhCaretRightSmall,
-    YhMirror,
-    YhTime,
-    YhUserAvatar,
-    YhUsergroupClear,
-    YhMinusRectangle,
-    YhFormatHorizontalAlignTop,
-    YhMove1,
-    YhBulletpoint,
-    YhBarcode,
-    YhLogoWecom,
-    YhMenuUnfold,
-    YhTools,
-    YhCaretLeftSmall,
-    YhRound,
-    YhCaretDownSmall,
-    YhCheck,
-    YhAPrecisemonitor,
-    YhGenderFemale,
-    YhAOrderAdjustmentcolumn,
-    YhQueue,
-    YhPrint,
-    YhEllipsis,
-    YhTimeFilled,
-    YhSlash,
-    YhHelpCircleFilled,
-    YhMenuApplication,
-    YhPin,
-    YhUserTalk,
-    YhMore,
+    TreeStructure,
+    Hide,
+    ClickButton,
+    StaticText,
+    Switch,
+    TextField,
+    Textarea,
+    NumberField,
+    SelectField,
+    TreeTable,
+    EditTable,
+    TableIcon,
+    TabIcon,
+    Script,
+    Shangduiqi,
+    Youduiqi,
+    Zuoduiqi,
+    Weibiaoti545,
+    Dingceng,
+    Diceng,
+    Shangyiyiceng,
+    Xiaduiqi,
+    Xiayiyiceng,
+    Daxiaoxiangdeng,
+    Tuceng,
+    ChatBar,
+    Function,
+    Duiqi,
+    Params,
+    Tucengzhizuoyuweihu,
+    Kuaibuju,
+    Shuxiangfenbu,
+    Hengxiangfenbu1,
+    Chicunbiaozhu_,
+    Zuoyoujuzhong,
+    Shangxiajuzhong,
+    Dengkuan,
+    Denggao,
+    QueryFilter,
+    ZhushujushenqingShujufenxi02,
+    Suofangdaodengbi,
+    Huifu,
+    Menu1,
+    Microphone,
+    Minus1,
+    Message1,
+    MapLocation,
+    MessageSolid,
+    Mic,
+    MilkTea,
+    Medal,
+    Medal2,
+    Mobile1,
+    MobilePhone,
+    Money,
+    More1,
+    NoSmoking,
+    MoreOutline,
+    Notebook,
+    SHome,
+    News,
+    Notebook1,
+    SOpen,
+    SMarketing,
+    Mouse,
+    SManagement,
+    SOperation,
+    OfficeBuilding,
+    SwitchOpen,
+    Ship,
+    Sell,
+    Search2,
+    Service,
+    Scissors,
+    Orange,
+    PhoneOutline,
+    Picture,
+    Receiving,
+    PictureOutlineRound,
+    PictureOutline,
+    PieChart,
+    SData,
+    Refrigerator,
+    SCooperation,
+    SCheck,
+    SFlag,
+    SCustom,
+    SFinance,
+    RemoveOutline,
+    SComment,
+    Remove,
+    School,
+    SShop,
+    STicket,
+    SortUp,
+    Sort,
+    TakeawayBox,
+    Stopwatch,
+    Thumb,
+    Tickets,
+    Truck,
+    User1,
+    UserSolid,
+    VideoCameraSolid,
+    VideoPlay,
+    VideoCamera,
+    Right1,
+    VideoPause,
+    StarOff,
+    Trophy1,
+    Wallet1,
+    Watch,
+    WindPower,
+    ViewIcon,
+    Watermelon,
+    Share2,
+    SetUp,
+    ZoomIn,
+    WaterCup,
+    Warning,
+    Watch2,
+    Setting1,
+    ZoomOut,
+    Pear,
+    Paperclip,
+    PlatformEleme,
+    SClaim,
+    SGoods,
+    SGrid,
+    SHelp,
+    ShoppingCart,
+    Smoking,
+    Soccer,
+    SPromotion,
+    SortDown,
+    SRelease,
+    SOpportunity,
+    SOrder,
+    STools,
+    SoldOut,
+    SPlatform,
+    Suitcase,
+    Suitcase2,
+    Sugar,
+    Sunset,
+    Sunrise,
+    TopLeft,
+    SwitchButton,
+    ToiletPaper,
+    TableLamp,
+    Tableware,
+    TopRight,
+    Top,
+    TurnOff,
+    Monitor1,
+    Unlock1,
+    Postcard,
+    Umbrella,
+    Moon,
+    AddLocation,
+    Present,
+    Aim,
+    Position,
+    Back,
+    PriceTag,
+    ArrowLeft,
+    PotatoStrips,
+    Attract,
+    ArrowRight,
+    Sunny,
+    ArrowUp,
+    MoonNight,
+    AlarmClock,
+    Reading,
+    ArrowDown,
+    Rank,
+    Apple1,
+    BottomRight,
+    Upload2,
+    Box,
+    Timer,
+    Brush,
+    Guide,
+    BankCard,
+    Trophy12,
+    BottomLeft,
+    Bicycle,
+    Baseball,
+    Basketball,
+    Burger,
+    Bottom,
+    CScaleToOriginal,
+    ChatDotRound,
+    ChatRound,
+    ChatDotSquare,
+    ChatSquare,
+    CircleClose,
+    Chicken,
+    CloseNotification,
+    Close2,
+    Cherry,
+    CoffeeCup,
+    Cloudy,
+    CollectionTag,
+    ColdDrink,
+    Collection,
+    Coordinate,
+    Connection,
+    Crop,
+    Cpu,
+    CopyDocument,
+    DCaret,
+    DArrowRight,
+    DataBoard,
+    DataAnalysis,
+    DataLine,
+    DArrowLeft,
+    DeleteSolid,
+    DeleteLocation,
+    Discount,
+    Date,
+    Dessert,
+    Dish,
+    Delete2,
+    DocumentCopy,
+    Document,
+    Discover,
+    DocumentAdd,
+    DocumentChecked,
+    DocumentDelete,
+    DocumentRemove,
+    Dish2,
+    Download1,
+    Coin,
+    Female,
+    Film,
+    Error1,
+    Eleme,
+    Coffee,
+    FolderRemove,
+    FolderChecked,
+    FolderAdd1,
+    FolderDelete,
+    Football,
+    Finished,
+    ForkSpoon,
+    FirstAidKit,
+    GobletFull,
+    Food,
+    Fullscreen,
+    GobletSquareFull,
+    Goblet,
+    Goods,
+    Headset,
+    House,
+    IceCreamRound,
+    HotWater,
+    HeavyRain,
+    IceDrink,
+    IceCream,
+    Key1,
+    IceCreamSquare,
+    KnifeFork,
+    IceTea,
+    Info,
+    Grape,
+    LightRain,
+    Lock1,
+    LocationOutline,
+    Lightning,
+    MagicStick,
+    Link1,
+    Lollipop,
+    LoadingStep,
+    Rest,
+    BellFill,
+    Usb,
+    FilterFill,
+    Skin,
+    FireFill,
+    Home,
+    FunnelplotFill,
+    Bank,
+    GiftFill,
+    Filter1,
+    HourglassFill,
+    Funnelplot,
+    HomeFill,
+    Like,
+    TrophyFill,
+    Unlike,
+    LocationFill,
+    Unlock,
+    CloudFill,
+    Lock,
+    CustomerserviceFill,
+    Customerservice,
+    ExperimentFill,
+    Flag,
+    EyeFill,
+    Moneycollect,
+    LikeFill,
+    Medicinebox,
+    LockFill,
+    Shop,
+    UnlikeFill,
+    Shopping,
+    StarFill,
+    Folder,
+    UnlockFill,
+    FolderOpen,
+    AlertFill,
+    ApiFill,
+    Deploymentunit,
+    HighlightFill,
+    Accountbook,
+    PhoneFill,
+    Contacts,
+    EditFill,
+    Carryout,
+    PushpinFill,
+    CalendarCheck,
+    ThunderboltFill,
+    Calendar1,
+    TagFill,
+    Scan,
+    WrenchFill,
+    Select,
+    TagsFill,
+    Boxplot,
+    BankFill,
+    Build,
+    CameraFill,
+    Sliders,
+    ErrorFill,
+    Laptop,
+    CrownFill,
+    Barcode1,
+    MailFill,
+    Camera,
+    CarFill,
+    Cluster,
+    PrinterFill,
+    Gateway,
+    ShopFill,
+    Car,
+    SettingFill,
+    Printer,
+    USBFill,
+    Read,
+    GoldenFill,
+    CloudServer,
+    BuildFill,
+    CloudUpload,
+    BoxplotFill,
+    Cloud,
+    SlidersFill,
+    CloudDownload,
+    Alibaba,
+    CloudSync,
+    Alibabacloud,
+    Video,
+    Antdesign,
+    NotificationIcon,
+    AntCloud,
+    Sound,
+    Behance,
+    RadarChart,
+    Googleplus,
+    Qrcode,
+    Medium,
+    Fund,
+    Google,
+    Image1,
+    IE,
+    Mail1,
+    Amazon,
+    Slack,
+    Idcard,
+    Alipay,
+    Creditcard,
+    Taobao,
+    Heart,
+    Zhihu,
+    Block,
+    HTML,
+    Error,
+    Linkedin,
+    Star,
+    Yahoo,
+    Gold,
+    Facebook,
+    Heatmap,
+    Skype,
+    Wifi,
+    CodeSandbox,
+    Paperclip2,
+    Chrome,
+    Edit1,
+    Aliwangwang,
+    Key,
+    Apple,
+    Api,
+    Android,
+    Disconnect,
+    Sketch,
+    Highlight,
+    Gitlab,
+    Monitor,
+    Dribbble,
+    Link,
+    Instagram,
+    Man,
+    Reddit,
+    Percentage,
+    Windows,
+    Pushpin,
+    Yuque,
+    Phone,
+    Youtube,
+    Shake,
+    GitlabFill,
+    Tag,
+    Dropbox,
+    Wrench,
+    Dingtalk,
+    Woman,
+    AndroidFill,
+    Tags,
+    AppleFill,
+    Scissor,
+    HTMLFill,
+    Mr,
+    WindowsFill,
+    Share1,
+    QQ,
+    Branches,
+    Twitter,
+    Fork,
+    SkypeFill,
+    Shrink,
+    Weibo,
+    Arrawsalt,
+    YuqueFill,
+    Verticalright,
+    YoutubeFill,
+    Verticalleft,
+    YahooFill,
+    Wechat,
+    ChromeFill,
+    AliwangwangFill,
+    FullscreenExit,
+    GithubFill,
+    MediumCircleFill,
+    ColumnHeight,
+    VAlignBottom,
+    VAlignMiddle,
+    ToTop,
+    VAlignTop,
+    Download,
+    SortDesc,
+    SortAsc,
+    Fall,
+    Swap,
+    Stock,
+    Rise,
+    Indent,
+    Outdent,
+    MenuIcon,
+    Unorderedlist,
+    Orderedlist,
+    AlignRight,
+    AlignCenter,
+    AlignLeft,
+    PicCenter,
+    PicRight,
+    PicLeft,
+    Bold,
+    FontColor,
+    CheckCircle,
+    Exclaimination,
+    CI,
+    FontSize,
+    Dollar,
+    Infomation,
+    Compass,
+    LineHeight,
+    Strikethrough,
+    Frown,
+    Underline,
+    InfoCircle,
+    Number,
+    LeftCircle,
+    Italic,
+    Loading,
+    DownCircle,
+    Code,
+    EURO,
+    ColumnWidth,
+    Copyright,
+    MinusCircle,
+    Meh,
+    Dash,
+    PlusCircle,
+    PlayCircle,
+    Enter1,
+    QuestionCircle,
+    Line,
+    Pound,
+    Minus,
+    RightCircle,
+    Question,
+    Smile,
+    Plus,
+    Trademark,
+    SmallDash,
+    Pause,
+    Earth,
+    BgColors,
+    YUAN,
+    Crown,
+    UpCircle,
+    Drag,
+    WarningCircle,
+    Sync,
+    Gift,
+    Transaction,
+    Stop,
+    Undo,
+    Fire,
+    Redo,
+    Thunderbolt,
+    Reload,
+    CheckCircleFill,
+    Reloadtime,
+    LeftCircleFill,
+    Message,
+    DownCircleFill,
+    Dashboard,
+    MinusCircleFill,
+    Issuesclose,
+    CloseCircleFill,
+    Poweroff,
+    InfoCircleFill,
+    Logout,
+    UpCircleFill,
+    Login,
+    RightCircleFill,
+    Piechart,
+    PlusCircleFill,
+    QuestionCircleFill,
+    Eye,
+    EUROCircleFill,
+    FrownFill,
+    CopyrightCircleFil,
+    Export,
+    CICircleFill,
+    Save1,
+    CompassFill,
+    Import,
+    DollarCircleFill,
+    Appstore,
+    PoweroffCircleFill,
+    MehFill,
+    PlayCircleFill,
+    Layout,
+    PoundCircleFill,
+    SmileFill,
+    StopFill,
+    Control,
+    WarningCircleFill,
+    Codelibrary,
+    Detail,
+    TrademarkCircleFil,
+    YUANCircleFill,
+    HeartFill,
+    PiechartCircleFil,
+    Project,
+    DashboardFill,
+    Wallet,
+    MessageFill,
+    Calculator,
+    Interation,
+    Border,
+    CodelibraryFill,
+    BorderOuter,
+    BorderTop,
+    BorderBottom,
+    BorderLeft,
+    BorderRight,
+    BorderInner,
+    AccountbookFill,
+    BorderVertical,
+    CarryoutFill,
+    BorderHorizontal,
+    CalendarFill,
+    RadiusBottomleft,
+    CalculatorFill,
+    RadiusBottomright,
+    InterationFill,
+    RadiusUpleft,
+    ProjectFill,
+    RadiusUpright,
+    DetailFill,
+    RadiusSetting,
+    SaveFill,
+    Adduser,
+    WalletFill,
+    Deleteteam,
+    ControlFill,
+    Deleteuser,
+    LayoutFill,
+    Addteam,
+    AppstoreFill,
+    User,
+    MobileFill,
+    Team,
+    TabletFill,
+    AreaChart,
+    BookFill,
+    LineChart,
+    RedenvelopeFill,
+    Barchart,
+    SafetycertificateF,
+    Pointmap,
+    PropertysafetyFill,
+    ContainerIcon,
+    Database,
+    SecurityscanFill,
+    Sever,
+    FileExclamationFil,
+    Mobile,
+    FileAddFill,
+    Tablet,
+    FileExcelFill,
+    Redenvelope,
+    FileMarkdownFill,
+    Book,
+    FileTextFill,
+    Filedone,
+    FilePptFill,
+    Reconciliation,
+    FileUnknownFill,
+    FileException,
+    FileWordFill,
+    Filesync,
+    FileZipFill,
+    FileSearch,
+    FilePdfFill,
+    Solution,
+    FileImageFill,
+    Fileprotect,
+    DiffFill,
+    FileAdd,
+    FileCopyFill,
+    FileExcel,
+    SnippetsFill,
+    FileExclamation,
+    BatchfoldingFill,
+    FilePdf,
+    ReconciliationFill,
+    FileImage,
+    FileMarkdown,
+    FolderFill,
+    FileUnknown,
+    FolderOpenFill,
+    FilePpt,
+    DatabaseFill,
+    FileWord,
+    ContainerFill,
+    File1,
+    SeverFill,
+    FileZip,
+    CalendarCheckFill,
+    FileText,
+    ImageFill,
+    FileCopy,
+    IdcardFill,
+    Snippets,
+    CreditcardFill,
+    Audit,
+    FundFill,
+    Diff,
+    ReadFill,
+    Batchfolding,
+    ContactsFill,
+    Securityscan,
+    Propertysafety,
+    NotificationFill,
+    Safetycertificate,
+    FlagFill,
+    MoneycollectFill,
+    Alert,
+    MedicineboxFill,
+    RestFill,
+    Hourglass,
+    ShoppingFill,
+    Bulb,
+    SkinFill,
+    Experiment,
+    VideoFill,
+    Bell,
+    SoundFill,
+    Trophy,
+    BulbFill,
+    FuwuActive,
+    ShouyeShouye,
+    Cangkuxinxi,
+    Saomiao,
+    Iconset0254,
+    Zhongsuanrenwuliebiao,
+    Xiangxiazhanhang,
+    Qita,
+    Xiajia,
+    Feiji,
+    Tixing,
+    Shaixuan_o,
+    Siji,
+    Lianxiwomen,
+    Guanyuwomen,
+    Wode,
+    TruckFull,
+    Xiayibu,
+    Video2,
+    ImageIcon,
+    File,
+    Xinhao,
+    Gengduo,
+    Xuhao,
+    Zhiye,
+    Weixian,
+    Apptubiao,
+    Jingdiananli_wujiaoxing_shoucanghou,
+    Jingdiananli_kongwujiaoxing_shoucang,
+    Caigou,
+    NaviconQtrkd,
+    CustomWorker,
+    Ruku,
+    Yichang,
+    Shougongpeidui,
+    Lunkuohua113,
+    Jiebang,
+    Goodsppeinventory,
+    Weixiujilu,
+    Taizhangguanli,
+    Weixiu,
+    Baoxiu,
+    Daijiedan,
+    Shebeidianjian,
+    Shebeidianjiantongji,
+    Baoyanggongdan,
+    Baoyangjihua,
+    Chart,
+    ChartBar,
+    Filter,
+    FilterClear,
+    Share,
+    Books,
+    Cart,
+    Clear,
+    MenuFold,
+    LockOff,
+    Rotation,
+    Layers,
+    LockOn,
+    RootList,
+    AControlplatform,
+    ChartBubble,
+    CaretUpSmall,
+    Enter,
+    Rollfront,
+    Jump,
+    Rollback,
+    CaretRightSmall,
+    Mirror,
+    Time,
+    UserAvatar,
+    UsergroupClear,
+    MinusRectangle,
+    FormatHorizontalAlignTop,
+    Move1,
+    Bulletpoint,
+    Barcode,
+    LogoWecom,
+    MenuUnfold,
+    Tools,
+    CaretLeftSmall,
+    Round,
+    CaretDownSmall,
+    Check,
+    APrecisemonitor,
+    GenderFemale,
+    AOrderAdjustmentcolumn,
+    Queue,
+    Print,
+    Ellipsis,
+    TimeFilled,
+    Slash,
+    HelpCircleFilled,
+    MenuApplication,
+    Pin,
+    UserTalk,
+    More,
 // ---- icons-gen:end ----
   ]
 }
@@ -3395,809 +3395,809 @@ pub fn icon_name(kind : IconKind) -> String {
   match kind {
 
     // ---- icons-gen:names
-    YhTreeStructure => "yh/tree-structure"
-    YhHide => "yh/hide"
-    YhClickButton => "yh/click-button"
-    YhStaticText => "yh/static-text"
-    YhSwitch => "yh/switch"
-    YhTextField => "yh/text-field"
-    YhTextarea => "yh/textarea-field"
-    YhNumberField => "yh/number-field"
-    YhSelectField => "yh/select-field"
-    YhTreeTable => "yh/tree-table"
-    YhEditTable => "yh/edit-table"
-    YhTable => "yh/table"
-    YhTab => "yh/tab"
-    YhScript => "yh/script"
-    YhShangduiqi => "yh/shangduiqi"
-    YhYouduiqi => "yh/youduiqi"
-    YhZuoduiqi => "yh/zuoduiqi"
-    YhWeibiaoti545 => "yh/weibiaoti545"
-    YhDingceng => "yh/dingceng"
-    YhDiceng => "yh/diceng"
-    YhShangyiyiceng => "yh/shangyiyiceng"
-    YhXiaduiqi => "yh/xiaduiqi"
-    YhXiayiyiceng => "yh/xiayiyiceng"
-    YhDaxiaoxiangdeng => "yh/daxiaoxiangdeng"
-    YhTuceng => "yh/tuceng"
-    YhChatBar => "yh/chat-bar"
-    YhFunction => "yh/yunhang"
-    YhDuiqi => "yh/duiqi-"
-    YhParams => "yh/canshu"
-    YhTucengzhizuoyuweihu => "yh/tucengzhizuoyuweihu"
-    YhKuaibuju => "yh/kuaibuju"
-    YhShuxiangfenbu => "yh/shuxiangfenbu"
-    YhHengxiangfenbu1 => "yh/hengxiangfenbu1"
-    YhChicunbiaozhu_ => "yh/chicunbiaozhu_"
-    YhZuoyoujuzhong => "yh/zuoyoujuzhong"
-    YhShangxiajuzhong => "yh/shangxiajuzhong"
-    YhDengkuan => "yh/dengkuan"
-    YhDenggao => "yh/denggao"
-    YhQueryFilter => "yh/tiaojianchaxun"
-    YhZhushujushenqingShujufenxi02 => "yh/zhushujushenqing-shujufenxi-02"
-    YhSuofangdaodengbi => "yh/suofangdaodengbi"
-    YhHuifu => "yh/huifu"
-    YhMenu1 => "yh/menu1"
-    YhMicrophone => "yh/microphone"
-    YhMinus1 => "yh/minus1"
-    YhMessage1 => "yh/message1"
-    YhMapLocation => "yh/map-location"
-    YhMessageSolid => "yh/message-solid"
-    YhMic => "yh/mic"
-    YhMilkTea => "yh/milk-tea"
-    YhMedal => "yh/medal"
-    YhMedal2 => "yh/medal-"
-    YhMobile1 => "yh/mobile1"
-    YhMobilePhone => "yh/mobile-phone"
-    YhMoney => "yh/money"
-    YhMore1 => "yh/more1"
-    YhNoSmoking => "yh/no-smoking"
-    YhMoreOutline => "yh/more-outline"
-    YhNotebook => "yh/notebook-"
-    YhSHome => "yh/s-home"
-    YhNews => "yh/news"
-    YhNotebook1 => "yh/notebook-1"
-    YhSOpen => "yh/s-open"
-    YhSMarketing => "yh/s-marketing"
-    YhMouse => "yh/mouse"
-    YhSManagement => "yh/s-management"
-    YhSOperation => "yh/s-operation"
-    YhOfficeBuilding => "yh/office-building"
-    YhSwitchOpen => "yh/switch-open"
-    YhShip => "yh/ship"
-    YhSell => "yh/sell"
-    YhSearch2 => "yh/search2"
-    YhService => "yh/service"
-    YhScissors => "yh/scissors"
-    YhOrange => "yh/orange"
-    YhPhoneOutline => "yh/phone-outline"
-    YhPicture => "yh/picture"
-    YhReceiving => "yh/receiving"
-    YhPictureOutlineRound => "yh/picture-outline-round"
-    YhPictureOutline => "yh/picture-outline"
-    YhPieChart => "yh/pie-chart"
-    YhSData => "yh/s-data"
-    YhRefrigerator => "yh/refrigerator"
-    YhSCooperation => "yh/s-cooperation"
-    YhSCheck => "yh/s-check"
-    YhSFlag => "yh/s-flag"
-    YhSCustom => "yh/s-custom"
-    YhSFinance => "yh/s-finance"
-    YhRemoveOutline => "yh/remove-outline"
-    YhSComment => "yh/s-comment"
-    YhRemove => "yh/remove"
-    YhSchool => "yh/school"
-    YhSShop => "yh/s-shop"
-    YhSTicket => "yh/s-ticket"
-    YhSortUp => "yh/sort-up"
-    YhSort => "yh/sort"
-    YhTakeawayBox => "yh/takeaway-box"
-    YhStopwatch => "yh/stopwatch"
-    YhThumb => "yh/thumb"
-    YhTickets => "yh/tickets"
-    YhTruck => "yh/truck"
-    YhUser1 => "yh/user1"
-    YhUserSolid => "yh/user-solid"
-    YhVideoCameraSolid => "yh/video-camera-solid"
-    YhVideoPlay => "yh/video-play"
-    YhVideoCamera => "yh/video-camera"
-    YhRight1 => "yh/right1"
-    YhVideoPause => "yh/video-pause"
-    YhStarOff => "yh/star-off"
-    YhTrophy1 => "yh/trophy1"
-    YhWallet1 => "yh/wallet1"
-    YhWatch => "yh/watch"
-    YhWindPower => "yh/wind-power"
-    YhView => "yh/view"
-    YhWatermelon => "yh/watermelon"
-    YhShare2 => "yh/share2"
-    YhSetUp => "yh/set-up"
-    YhZoomIn => "yh/zoom-in"
-    YhWaterCup => "yh/water-cup"
-    YhWarning => "yh/warning"
-    YhWatch2 => "yh/watch-"
-    YhSetting1 => "yh/setting1"
-    YhZoomOut => "yh/zoom-out"
-    YhPear => "yh/pear"
-    YhPaperclip => "yh/paperclip"
-    YhPlatformEleme => "yh/platform-eleme"
-    YhSClaim => "yh/s-claim"
-    YhSGoods => "yh/s-goods"
-    YhSGrid => "yh/s-grid"
-    YhSHelp => "yh/s-help"
-    YhShoppingCart => "yh/shopping-cart-"
-    YhSmoking => "yh/smoking"
-    YhSoccer => "yh/soccer"
-    YhSPromotion => "yh/s-promotion"
-    YhSortDown => "yh/sort-down"
-    YhSRelease => "yh/s-release"
-    YhSOpportunity => "yh/s-opportunity"
-    YhSOrder => "yh/s-order"
-    YhSTools => "yh/s-tools"
-    YhSoldOut => "yh/sold-out"
-    YhSPlatform => "yh/s-platform"
-    YhSuitcase => "yh/suitcase"
-    YhSuitcase2 => "yh/suitcase-"
-    YhSugar => "yh/sugar"
-    YhSunset => "yh/sunset"
-    YhSunrise => "yh/sunrise-"
-    YhTopLeft => "yh/top-left"
-    YhSwitchButton => "yh/switch-button"
-    YhToiletPaper => "yh/toilet-paper"
-    YhTableLamp => "yh/table-lamp"
-    YhTableware => "yh/tableware"
-    YhTopRight => "yh/top-right"
-    YhTop => "yh/top"
-    YhTurnOff => "yh/turn-off"
-    YhMonitor1 => "yh/monitor1"
-    YhUnlock1 => "yh/unlock1"
-    YhPostcard => "yh/postcard"
-    YhUmbrella => "yh/umbrella"
-    YhMoon => "yh/moon"
-    YhAddLocation => "yh/add-location"
-    YhPresent => "yh/present"
-    YhAim => "yh/aim"
-    YhPosition => "yh/position"
-    YhBack => "yh/back"
-    YhPriceTag => "yh/price-tag"
-    YhArrowLeft => "yh/arrow-left"
-    YhPotatoStrips => "yh/potato-strips"
-    YhAttract => "yh/attract"
-    YhArrowRight => "yh/arrow-right"
-    YhSunny => "yh/sunny"
-    YhArrowUp => "yh/arrow-up"
-    YhMoonNight => "yh/moon-night"
-    YhAlarmClock => "yh/alarm-clock"
-    YhReading => "yh/reading"
-    YhArrowDown => "yh/arrow-down"
-    YhRank => "yh/rank"
-    YhApple1 => "yh/apple1"
-    YhBottomRight => "yh/bottom-right"
-    YhUpload2 => "yh/upload2"
-    YhBox => "yh/box"
-    YhTimer => "yh/timer"
-    YhBrush => "yh/brush"
-    YhGuide => "yh/guide"
-    YhBankCard => "yh/bank-card"
-    YhTrophy12 => "yh/trophy-1"
-    YhBottomLeft => "yh/bottom-left"
-    YhBicycle => "yh/bicycle"
-    YhBaseball => "yh/baseball"
-    YhBasketball => "yh/basketball"
-    YhBurger => "yh/burger"
-    YhBottom => "yh/bottom"
-    YhCScaleToOriginal => "yh/c-scale-to-original"
-    YhChatDotRound => "yh/chat-dot-round"
-    YhChatRound => "yh/chat-round"
-    YhChatDotSquare => "yh/chat-dot-square"
-    YhChatSquare => "yh/chat-square"
-    YhCircleClose => "yh/circle-close"
-    YhChicken => "yh/chicken"
-    YhCloseNotification => "yh/close-notification"
-    YhClose2 => "yh/close2"
-    YhCherry => "yh/cherry"
-    YhCoffeeCup => "yh/coffee-cup"
-    YhCloudy => "yh/cloudy"
-    YhCollectionTag => "yh/collection-tag"
-    YhColdDrink => "yh/cold-drink"
-    YhCollection => "yh/collection"
-    YhCoordinate => "yh/coordinate"
-    YhConnection => "yh/connection"
-    YhCrop => "yh/crop"
-    YhCpu => "yh/cpu"
-    YhCopyDocument => "yh/copy-document"
-    YhDCaret => "yh/d-caret"
-    YhDArrowRight => "yh/d-arrow-right"
-    YhDataBoard => "yh/data-board"
-    YhDataAnalysis => "yh/data-analysis"
-    YhDataLine => "yh/data-line"
-    YhDArrowLeft => "yh/d-arrow-left"
-    YhDeleteSolid => "yh/delete-solid"
-    YhDeleteLocation => "yh/delete-location"
-    YhDiscount => "yh/discount"
-    YhDate => "yh/date"
-    YhDessert => "yh/dessert"
-    YhDish => "yh/dish"
-    YhDelete2 => "yh/delete2"
-    YhDocumentCopy => "yh/document-copy"
-    YhDocument => "yh/document"
-    YhDiscover => "yh/discover"
-    YhDocumentAdd => "yh/document-add"
-    YhDocumentChecked => "yh/document-checked"
-    YhDocumentDelete => "yh/document-delete"
-    YhDocumentRemove => "yh/document-remove"
-    YhDish2 => "yh/dish-"
-    YhDownload1 => "yh/download1"
-    YhCoin => "yh/coin"
-    YhFemale => "yh/female"
-    YhFilm => "yh/film"
-    YhError1 => "yh/error1"
-    YhEleme => "yh/eleme"
-    YhCoffee => "yh/coffee"
-    YhFolderRemove => "yh/folder-remove"
-    YhFolderChecked => "yh/folder-checked"
-    YhFolderAdd1 => "yh/folder-add1"
-    YhFolderDelete => "yh/folder-delete"
-    YhFootball => "yh/football"
-    YhFinished => "yh/finished"
-    YhForkSpoon => "yh/fork-spoon"
-    YhFirstAidKit => "yh/first-aid-kit"
-    YhGobletFull => "yh/goblet-full"
-    YhFood => "yh/food"
-    YhFullscreen => "yh/full-screen"
-    YhGobletSquareFull => "yh/goblet-square-full"
-    YhGoblet => "yh/goblet"
-    YhGoods => "yh/goods"
-    YhHeadset => "yh/headset"
-    YhHouse => "yh/house"
-    YhIceCreamRound => "yh/ice-cream-round"
-    YhHotWater => "yh/hot-water"
-    YhHeavyRain => "yh/heavy-rain"
-    YhIceDrink => "yh/ice-drink"
-    YhIceCream => "yh/ice-cream"
-    YhKey1 => "yh/key1"
-    YhIceCreamSquare => "yh/ice-cream-square"
-    YhKnifeFork => "yh/knife-fork"
-    YhIceTea => "yh/ice-tea"
-    YhInfo => "yh/info"
-    YhGrape => "yh/grape"
-    YhLightRain => "yh/light-rain"
-    YhLock1 => "yh/lock1"
-    YhLocationOutline => "yh/location-outline"
-    YhLightning => "yh/lightning"
-    YhMagicStick => "yh/magic-stick"
-    YhLink1 => "yh/link1"
-    YhLollipop => "yh/lollipop"
-    YhLoadingStep => "yh/loading-step"
-    YhRest => "yh/rest"
-    YhBellFill => "yh/bell-fill"
-    YhUsb => "yh/USB"
-    YhFilterFill => "yh/filter-fill"
-    YhSkin => "yh/skin"
-    YhFireFill => "yh/fire-fill"
-    YhHome => "yh/home"
-    YhFunnelplotFill => "yh/funnelplot-fill"
-    YhBank => "yh/bank"
-    YhGiftFill => "yh/gift-fill"
-    YhFilter1 => "yh/filter1"
-    YhHourglassFill => "yh/hourglass-fill"
-    YhFunnelplot => "yh/funnelplot"
-    YhHomeFill => "yh/home-fill"
-    YhLike => "yh/like"
-    YhTrophyFill => "yh/trophy-fill"
-    YhUnlike => "yh/unlike"
-    YhLocationFill => "yh/location-fill"
-    YhUnlock => "yh/unlock"
-    YhCloudFill => "yh/cloud-fill"
-    YhLock => "yh/lock"
-    YhCustomerserviceFill => "yh/customerservice-fill"
-    YhCustomerservice => "yh/customerservice"
-    YhExperimentFill => "yh/experiment-fill"
-    YhFlag => "yh/flag"
-    YhEyeFill => "yh/eye-fill"
-    YhMoneycollect => "yh/moneycollect"
-    YhLikeFill => "yh/like-fill"
-    YhMedicinebox => "yh/medicinebox"
-    YhLockFill => "yh/lock-fill"
-    YhShop => "yh/shop"
-    YhUnlikeFill => "yh/unlike-fill"
-    YhShopping => "yh/shopping"
-    YhStarFill => "yh/star-fill"
-    YhFolder => "yh/folder"
-    YhUnlockFill => "yh/unlock-fill"
-    YhFolderOpen => "yh/folder-open"
-    YhAlertFill => "yh/alert-fill"
-    YhApiFill => "yh/api-fill"
-    YhDeploymentunit => "yh/deploymentunit"
-    YhHighlightFill => "yh/highlight-fill"
-    YhAccountbook => "yh/accountbook"
-    YhPhoneFill => "yh/phone-fill"
-    YhContacts => "yh/contacts"
-    YhEditFill => "yh/edit-fill"
-    YhCarryout => "yh/carryout"
-    YhPushpinFill => "yh/pushpin-fill"
-    YhCalendarCheck => "yh/calendar-check"
-    YhThunderboltFill => "yh/thunderbolt-fill"
-    YhCalendar1 => "yh/calendar1"
-    YhTagFill => "yh/tag-fill"
-    YhScan => "yh/scan1"
-    YhWrenchFill => "yh/wrench-fill"
-    YhSelect => "yh/select"
-    YhTagsFill => "yh/tags-fill"
-    YhBoxplot => "yh/boxplot"
-    YhBankFill => "yh/bank-fill"
-    YhBuild => "yh/build"
-    YhCameraFill => "yh/camera-fill"
-    YhSliders => "yh/sliders"
-    YhErrorFill => "yh/error-fill"
-    YhLaptop => "yh/laptop"
-    YhCrownFill => "yh/crown-fill"
-    YhBarcode1 => "yh/barcode1"
-    YhMailFill => "yh/mail-fill"
-    YhCamera => "yh/camera"
-    YhCarFill => "yh/car-fill"
-    YhCluster => "yh/cluster"
-    YhPrinterFill => "yh/printer-fill"
-    YhGateway => "yh/gateway"
-    YhShopFill => "yh/shop-fill"
-    YhCar => "yh/car"
-    YhSettingFill => "yh/setting-fill"
-    YhPrinter => "yh/printer"
-    YhUSBFill => "yh/USB-fill"
-    YhRead => "yh/read"
-    YhGoldenFill => "yh/golden-fill"
-    YhCloudServer => "yh/cloud-server"
-    YhBuildFill => "yh/build-fill"
-    YhCloudUpload => "yh/cloud-upload"
-    YhBoxplotFill => "yh/boxplot-fill"
-    YhCloud => "yh/cloud"
-    YhSlidersFill => "yh/sliders-fill"
-    YhCloudDownload => "yh/cloud-download"
-    YhAlibaba => "yh/alibaba"
-    YhCloudSync => "yh/cloud-sync"
-    YhAlibabacloud => "yh/alibabacloud"
-    YhVideo => "yh/video1"
-    YhAntdesign => "yh/antdesign"
-    YhNotification => "yh/notification"
-    YhAntCloud => "yh/ant-cloud"
-    YhSound => "yh/sound"
-    YhBehance => "yh/behance"
-    YhRadarChart => "yh/radarchart"
-    YhGoogleplus => "yh/googleplus"
-    YhQrcode => "yh/qrcode"
-    YhMedium => "yh/medium"
-    YhFund => "yh/fund"
-    YhGoogle => "yh/google"
-    YhImage1 => "yh/image1"
-    YhIE => "yh/IE"
-    YhMail1 => "yh/mail1"
-    YhAmazon => "yh/amazon"
-    YhSlack => "yh/slack"
-    YhIdcard => "yh/idcard"
-    YhAlipay => "yh/alipay"
-    YhCreditcard => "yh/creditcard"
-    YhTaobao => "yh/taobao"
-    YhHeart => "yh/heart"
-    YhZhihu => "yh/zhihu"
-    YhBlock => "yh/block"
-    YhHTML => "yh/HTML"
-    YhError => "yh/error"
-    YhLinkedin => "yh/linkedin"
-    YhStar => "yh/star"
-    YhYahoo => "yh/yahoo"
-    YhGold => "yh/gold"
-    YhFacebook => "yh/facebook"
-    YhHeatmap => "yh/heatmap"
-    YhSkype => "yh/skype"
-    YhWifi => "yh/wifi"
-    YhCodeSandbox => "yh/CodeSandbox"
-    YhPaperclip2 => "yh/attachment"
-    YhChrome => "yh/chrome"
-    YhEdit1 => "yh/edit1"
-    YhAliwangwang => "yh/aliwangwang"
-    YhKey => "yh/key"
-    YhApple => "yh/apple"
-    YhApi => "yh/api"
-    YhAndroid => "yh/android"
-    YhDisconnect => "yh/disconnect"
-    YhSketch => "yh/sketch"
-    YhHighlight => "yh/highlight"
-    YhGitlab => "yh/Gitlab"
-    YhMonitor => "yh/monitor"
-    YhDribbble => "yh/dribbble"
-    YhLink => "yh/link"
-    YhInstagram => "yh/instagram"
-    YhMan => "yh/man"
-    YhReddit => "yh/reddit"
-    YhPercentage => "yh/percentage"
-    YhWindows => "yh/windows"
-    YhPushpin => "yh/pushpin"
-    YhYuque => "yh/yuque"
-    YhPhone => "yh/phone"
-    YhYoutube => "yh/Youtube"
-    YhShake => "yh/shake"
-    YhGitlabFill => "yh/Gitlab-fill"
-    YhTag => "yh/tag"
-    YhDropbox => "yh/dropbox"
-    YhWrench => "yh/wrench"
-    YhDingtalk => "yh/dingtalk"
-    YhWoman => "yh/woman"
-    YhAndroidFill => "yh/android-fill"
-    YhTags => "yh/tags"
-    YhAppleFill => "yh/apple-fill"
-    YhScissor => "yh/scissor"
-    YhHTMLFill => "yh/HTML-fill"
-    YhMr => "yh/mr"
-    YhWindowsFill => "yh/windows-fill"
-    YhShare1 => "yh/share1"
-    YhQQ => "yh/QQ"
-    YhBranches => "yh/branches"
-    YhTwitter => "yh/twitter"
-    YhFork => "yh/fork"
-    YhSkypeFill => "yh/skype-fill"
-    YhShrink => "yh/shrink"
-    YhWeibo => "yh/weibo"
-    YhArrawsalt => "yh/arrawsalt"
-    YhYuqueFill => "yh/yuque-fill"
-    YhVerticalright => "yh/verticalright"
-    YhYoutubeFill => "yh/Youtube-fill"
-    YhVerticalleft => "yh/verticalleft"
-    YhYahooFill => "yh/yahoo-fill"
-    YhWechat => "yh/wechat"
-    YhChromeFill => "yh/chrome-fill"
-    YhAliwangwangFill => "yh/aliwangwang-fill"
-    YhFullscreenExit => "yh/fullscreen-exit"
-    YhGithubFill => "yh/github-fill"
-    YhMediumCircleFill => "yh/medium-circle-fill"
-    YhColumnHeight => "yh/colum-height"
-    YhVAlignBottom => "yh/vertical-align-botto"
-    YhVAlignMiddle => "yh/vertical-align-middl"
-    YhToTop => "yh/totop"
-    YhVAlignTop => "yh/vertical-align-top"
-    YhDownload => "yh/download"
-    YhSortDesc => "yh/sort-descending"
-    YhSortAsc => "yh/sort-ascending"
-    YhFall => "yh/fall"
-    YhSwap => "yh/swap"
-    YhStock => "yh/stock"
-    YhRise => "yh/rise"
-    YhIndent => "yh/indent"
-    YhOutdent => "yh/outdent"
-    YhMenu => "yh/menu"
-    YhUnorderedlist => "yh/unorderedlist"
-    YhOrderedlist => "yh/orderedlist"
-    YhAlignRight => "yh/align-right"
-    YhAlignCenter => "yh/align-center"
-    YhAlignLeft => "yh/align-left"
-    YhPicCenter => "yh/pic-center"
-    YhPicRight => "yh/pic-right"
-    YhPicLeft => "yh/pic-left"
-    YhBold => "yh/bold"
-    YhFontColor => "yh/font-colors"
-    YhCheckCircle => "yh/check-circle"
-    YhExclaimination => "yh/exclaimination"
-    YhCI => "yh/CI"
-    YhFontSize => "yh/font-size"
-    YhDollar => "yh/Dollar"
-    YhInfomation => "yh/infomation"
-    YhCompass => "yh/compass"
-    YhLineHeight => "yh/line-height"
-    YhStrikethrough => "yh/strikethrough"
-    YhFrown => "yh/frown"
-    YhUnderline => "yh/underline"
-    YhInfoCircle => "yh/info-circle"
-    YhNumber => "yh/number"
-    YhLeftCircle => "yh/left-circle"
-    YhItalic => "yh/italic"
-    YhLoading => "yh/loading"
-    YhDownCircle => "yh/down-circle"
-    YhCode => "yh/code"
-    YhEURO => "yh/EURO"
-    YhColumnWidth => "yh/column-width"
-    YhCopyright => "yh/copyright"
-    YhMinusCircle => "yh/minus-circle"
-    YhMeh => "yh/meh"
-    YhDash => "yh/dash"
-    YhPlusCircle => "yh/plus-circle"
-    YhPlayCircle => "yh/play-circle"
-    YhEnter1 => "yh/enter1"
-    YhQuestionCircle => "yh/question-circle"
-    YhLine => "yh/line"
-    YhPound => "yh/Pound"
-    YhMinus => "yh/minus"
-    YhRightCircle => "yh/right-circle"
-    YhQuestion => "yh/question"
-    YhSmile => "yh/smile"
-    YhPlus => "yh/plus"
-    YhTrademark => "yh/trademark"
-    YhSmallDash => "yh/small-dash"
-    YhPause => "yh/pause"
-    YhEarth => "yh/earth"
-    YhBgColors => "yh/bg-colors"
-    YhYUAN => "yh/YUAN"
-    YhCrown => "yh/crown"
-    YhUpCircle => "yh/up-circle"
-    YhDrag => "yh/drag"
-    YhWarningCircle => "yh/warning-circle"
-    YhSync => "yh/sync"
-    YhGift => "yh/gift"
-    YhTransaction => "yh/transaction"
-    YhStop => "yh/stop"
-    YhUndo => "yh/undo"
-    YhFire => "yh/fire"
-    YhRedo => "yh/redo"
-    YhThunderbolt => "yh/thunderbolt"
-    YhReload => "yh/reload"
-    YhCheckCircleFill => "yh/check-circle-fill"
-    YhReloadtime => "yh/reloadtime"
-    YhLeftCircleFill => "yh/left-circle-fill"
-    YhMessage => "yh/message"
-    YhDownCircleFill => "yh/down-circle-fill"
-    YhDashboard => "yh/dashboard1"
-    YhMinusCircleFill => "yh/minus-circle-fill"
-    YhIssuesclose => "yh/issuesclose"
-    YhCloseCircleFill => "yh/close-circle-fill"
-    YhPoweroff => "yh/poweroff"
-    YhInfoCircleFill => "yh/info-circle-fill"
-    YhLogout => "yh/logout"
-    YhUpCircleFill => "yh/up-circle-fill"
-    YhLogin => "yh/login"
-    YhRightCircleFill => "yh/right-circle-fill"
-    YhPiechart => "yh/piechart"
-    YhPlusCircleFill => "yh/plus-circle-fill"
-    YhQuestionCircleFill => "yh/question-circle-fill"
-    YhEye => "yh/eye"
-    YhEUROCircleFill => "yh/EURO-circle-fill"
-    YhFrownFill => "yh/frown-fill"
-    YhCopyrightCircleFil => "yh/copyright-circle-fil"
-    YhExport => "yh/export"
-    YhCICircleFill => "yh/CI-circle-fill"
-    YhSave1 => "yh/save1"
-    YhCompassFill => "yh/compass-fill"
-    YhImport => "yh/Import"
-    YhDollarCircleFill => "yh/Dollar-circle-fill"
-    YhAppstore => "yh/appstore"
-    YhPoweroffCircleFill => "yh/poweroff-circle-fill"
-    YhMehFill => "yh/meh-fill"
-    YhPlayCircleFill => "yh/play-circle-fill"
-    YhLayout => "yh/layout"
-    YhPoundCircleFill => "yh/Pound-circle-fill"
-    YhSmileFill => "yh/smile-fill"
-    YhStopFill => "yh/stop-fill"
-    YhControl => "yh/control"
-    YhWarningCircleFill => "yh/warning-circle-fill"
-    YhCodelibrary => "yh/codelibrary"
-    YhDetail => "yh/detail"
-    YhTrademarkCircleFil => "yh/trademark-circle-fil"
-    YhYUANCircleFill => "yh/YUAN-circle-fill"
-    YhHeartFill => "yh/heart-fill"
-    YhPiechartCircleFil => "yh/piechart-circle-fil"
-    YhProject => "yh/project"
-    YhDashboardFill => "yh/dashboard-fill"
-    YhWallet => "yh/wallet"
-    YhMessageFill => "yh/message-fill"
-    YhCalculator => "yh/calculator"
-    YhInteration => "yh/interation"
-    YhBorder => "yh/border"
-    YhCodelibraryFill => "yh/codelibrary-fill"
-    YhBorderOuter => "yh/border-outer"
-    YhBorderTop => "yh/border-top"
-    YhBorderBottom => "yh/border-bottom"
-    YhBorderLeft => "yh/border-left"
-    YhBorderRight => "yh/border-right"
-    YhBorderInner => "yh/border-inner"
-    YhAccountbookFill => "yh/accountbook-fill"
-    YhBorderVertical => "yh/border-verticle"
-    YhCarryoutFill => "yh/carryout-fill"
-    YhBorderHorizontal => "yh/border-horizontal"
-    YhCalendarFill => "yh/calendar-fill"
-    YhRadiusBottomleft => "yh/radius-bottomleft"
-    YhCalculatorFill => "yh/calculator-fill"
-    YhRadiusBottomright => "yh/radius-bottomright"
-    YhInterationFill => "yh/interation-fill"
-    YhRadiusUpleft => "yh/radius-upleft"
-    YhProjectFill => "yh/project-fill"
-    YhRadiusUpright => "yh/radius-upright"
-    YhDetailFill => "yh/detail-fill"
-    YhRadiusSetting => "yh/radius-setting"
-    YhSaveFill => "yh/save-fill"
-    YhAdduser => "yh/adduser"
-    YhWalletFill => "yh/wallet-fill"
-    YhDeleteteam => "yh/deleteteam"
-    YhControlFill => "yh/control-fill"
-    YhDeleteuser => "yh/deleteuser"
-    YhLayoutFill => "yh/layout-fill"
-    YhAddteam => "yh/addteam"
-    YhAppstoreFill => "yh/appstore-fill"
-    YhUser => "yh/user"
-    YhMobileFill => "yh/mobile-fill"
-    YhTeam => "yh/team"
-    YhTabletFill => "yh/tablet-fill"
-    YhAreaChart => "yh/areachart"
-    YhBookFill => "yh/book-fill"
-    YhLineChart => "yh/linechart"
-    YhRedenvelopeFill => "yh/redenvelope-fill"
-    YhBarchart => "yh/barchart"
-    YhSafetycertificateF => "yh/safetycertificate-f"
-    YhPointmap => "yh/pointmap"
-    YhPropertysafetyFill => "yh/propertysafety-fill"
-    YhContainer => "yh/container"
-    YhDatabase => "yh/database"
-    YhSecurityscanFill => "yh/securityscan-fill"
-    YhSever => "yh/sever"
-    YhFileExclamationFil => "yh/file-exclamation-fil"
-    YhMobile => "yh/mobile"
-    YhFileAddFill => "yh/file-add-fill"
-    YhTablet => "yh/tablet"
-    YhFileExcelFill => "yh/file-excel-fill"
-    YhRedenvelope => "yh/redenvelope"
-    YhFileMarkdownFill => "yh/file-markdown-fill"
-    YhBook => "yh/book"
-    YhFileTextFill => "yh/file-text-fill"
-    YhFiledone => "yh/filedone"
-    YhFilePptFill => "yh/file-ppt-fill"
-    YhReconciliation => "yh/reconciliation"
-    YhFileUnknownFill => "yh/file-unknown-fill"
-    YhFileException => "yh/file-exception"
-    YhFileWordFill => "yh/file-word-fill"
-    YhFilesync => "yh/filesync"
-    YhFileZipFill => "yh/file-zip-fill"
-    YhFileSearch => "yh/filesearch"
-    YhFilePdfFill => "yh/file-pdf-fill"
-    YhSolution => "yh/solution"
-    YhFileImageFill => "yh/file-image-fill"
-    YhFileprotect => "yh/fileprotect"
-    YhDiffFill => "yh/diff-fill"
-    YhFileAdd => "yh/file-add"
-    YhFileCopyFill => "yh/file-copy-fill"
-    YhFileExcel => "yh/file-excel"
-    YhSnippetsFill => "yh/snippets-fill"
-    YhFileExclamation => "yh/file-exclamation"
-    YhBatchfoldingFill => "yh/batchfolding-fill"
-    YhFilePdf => "yh/file-pdf"
-    YhReconciliationFill => "yh/reconciliation-fill"
-    YhFileImage => "yh/file-image"
-    YhFileMarkdown => "yh/file-markdown"
-    YhFolderFill => "yh/folder-fill"
-    YhFileUnknown => "yh/file-unknown"
-    YhFolderOpenFill => "yh/folder-open-fill"
-    YhFilePpt => "yh/file-ppt"
-    YhDatabaseFill => "yh/database-fill"
-    YhFileWord => "yh/file-word"
-    YhContainerFill => "yh/container-fill"
-    YhFile1 => "yh/file1"
-    YhSeverFill => "yh/sever-fill"
-    YhFileZip => "yh/file-zip"
-    YhCalendarCheckFill => "yh/calendar-check-fill"
-    YhFileText => "yh/file-text"
-    YhImageFill => "yh/image-fill"
-    YhFileCopy => "yh/file-copy"
-    YhIdcardFill => "yh/idcard-fill"
-    YhSnippets => "yh/snippets"
-    YhCreditcardFill => "yh/creditcard-fill"
-    YhAudit => "yh/audit"
-    YhFundFill => "yh/fund-fill"
-    YhDiff => "yh/diff"
-    YhReadFill => "yh/read-fill"
-    YhBatchfolding => "yh/Batchfolding"
-    YhContactsFill => "yh/contacts-fill"
-    YhSecurityscan => "yh/securityscan"
-    YhPropertysafety => "yh/propertysafety"
-    YhNotificationFill => "yh/notification-fill"
-    YhSafetycertificate => "yh/safetycertificate"
-    YhFlagFill => "yh/flag-fill"
-    YhMoneycollectFill => "yh/moneycollect-fill"
-    YhAlert => "yh/alert"
-    YhMedicineboxFill => "yh/medicinebox-fill"
-    YhRestFill => "yh/rest-fill"
-    YhHourglass => "yh/hourglass"
-    YhShoppingFill => "yh/shopping-fill"
-    YhBulb => "yh/bulb"
-    YhSkinFill => "yh/skin-fill"
-    YhExperiment => "yh/experiment"
-    YhVideoFill => "yh/video-fill"
-    YhBell => "yh/bell"
-    YhSoundFill => "yh/sound-fill"
-    YhTrophy => "yh/trophy"
-    YhBulbFill => "yh/bulb-fill"
-    YhFuwuActive => "yh/fuwu-active"
-    YhShouyeShouye => "yh/shouye-shouye"
-    YhCangkuxinxi => "yh/cangkuxinxi"
-    YhSaomiao => "yh/saomiao"
-    YhIconset0254 => "yh/iconset0254"
-    YhZhongsuanrenwuliebiao => "yh/zhongsuanrenwuliebiao"
-    YhXiangxiazhanhang => "yh/xiangxiazhanhang"
-    YhQita => "yh/qita"
-    YhXiajia => "yh/xiajia"
-    YhFeiji => "yh/feiji"
-    YhTixing => "yh/tixing"
-    YhShaixuan_o => "yh/shaixuan_o"
-    YhSiji => "yh/siji"
-    YhLianxiwomen => "yh/lianxiwomen"
-    YhGuanyuwomen => "yh/guanyuwomen"
-    YhWode => "yh/wode"
-    YhTruckFull => "yh/truck-full"
-    YhXiayibu => "yh/xiayibu"
-    YhVideo2 => "yh/video"
-    YhImage => "yh/image"
-    YhFile => "yh/file"
-    YhXinhao => "yh/xinhao"
-    YhGengduo => "yh/gengduo"
-    YhXuhao => "yh/xuhao"
-    YhZhiye => "yh/zhiye"
-    YhWeixian => "yh/weixian"
-    YhApptubiao => "yh/apptubiao-"
-    YhJingdiananli_wujiaoxing_shoucanghou => "yh/jingdiananli_wujiaoxing_shoucanghou"
-    YhJingdiananli_kongwujiaoxing_shoucang => "yh/jingdiananli_kongwujiaoxing_shoucang"
-    YhCaigou => "yh/caigou"
-    YhNaviconQtrkd => "yh/navicon-qtrkd"
-    YhCustomWorker => "yh/custom-worker"
-    YhRuku => "yh/ruku"
-    YhYichang => "yh/yichang"
-    YhShougongpeidui => "yh/shougongpeidui"
-    YhLunkuohua113 => "yh/lunkuohua-113"
-    YhJiebang => "yh/jiebang"
-    YhGoodsppeinventory => "yh/goodsppeinventory"
-    YhWeixiujilu => "yh/weixiujilu"
-    YhTaizhangguanli => "yh/taizhangguanli"
-    YhWeixiu => "yh/weixiu"
-    YhBaoxiu => "yh/baoxiu"
-    YhDaijiedan => "yh/daijiedan"
-    YhShebeidianjian => "yh/shebeidianjian"
-    YhShebeidianjiantongji => "yh/shebeidianjiantongji"
-    YhBaoyanggongdan => "yh/baoyanggongdan"
-    YhBaoyangjihua => "yh/baoyangjihua"
-    YhChart => "yh/chart"
-    YhChartBar => "yh/chart-bar"
-    YhFilter => "yh/filter"
-    YhFilterClear => "yh/filter-clear"
-    YhShare => "yh/share"
-    YhBooks => "yh/books"
-    YhCart => "yh/cart"
-    YhClear => "yh/clear"
-    YhMenuFold => "yh/menu-fold"
-    YhLockOff => "yh/lock-off"
-    YhRotation => "yh/rotation"
-    YhLayers => "yh/layers"
-    YhLockOn => "yh/lock-on"
-    YhRootList => "yh/root-list"
-    YhAControlplatform => "yh/a-controlplatform"
-    YhChartBubble => "yh/chart-bubble"
-    YhCaretUpSmall => "yh/caret-up-small"
-    YhEnter => "yh/enter"
-    YhRollfront => "yh/rollfront"
-    YhJump => "yh/jump"
-    YhRollback => "yh/rollback"
-    YhCaretRightSmall => "yh/caret-right-small"
-    YhMirror => "yh/mirror"
-    YhTime => "yh/time"
-    YhUserAvatar => "yh/user-avatar"
-    YhUsergroupClear => "yh/usergroup-clear"
-    YhMinusRectangle => "yh/minus-rectangle"
-    YhFormatHorizontalAlignTop => "yh/format-horizontal-align-top"
-    YhMove1 => "yh/move1"
-    YhBulletpoint => "yh/bulletpoint"
-    YhBarcode => "yh/barcode"
-    YhLogoWecom => "yh/logo-wecom"
-    YhMenuUnfold => "yh/menu-unfold"
-    YhTools => "yh/tools"
-    YhCaretLeftSmall => "yh/caret-left-small"
-    YhRound => "yh/round"
-    YhCaretDownSmall => "yh/caret-down-small"
-    YhCheck => "yh/check"
-    YhAPrecisemonitor => "yh/a-precisemonitor"
-    YhGenderFemale => "yh/gender-female"
-    YhAOrderAdjustmentcolumn => "yh/a-order-adjustmentcolumn"
-    YhQueue => "yh/queue"
-    YhPrint => "yh/print"
-    YhEllipsis => "yh/ellipsis"
-    YhTimeFilled => "yh/time-filled"
-    YhSlash => "yh/slash"
-    YhHelpCircleFilled => "yh/help-circle-filled"
-    YhMenuApplication => "yh/menu-application"
-    YhPin => "yh/pin"
-    YhUserTalk => "yh/user-talk"
-    YhMore => "yh/more"
+    TreeStructure => "tree-structure"
+    Hide => "hide"
+    ClickButton => "click-button"
+    StaticText => "static-text"
+    Switch => "switch"
+    TextField => "text-field"
+    Textarea => "textarea-field"
+    NumberField => "number-field"
+    SelectField => "select-field"
+    TreeTable => "tree-table"
+    EditTable => "edit-table"
+    TableIcon => "table"
+    TabIcon => "tab"
+    Script => "script"
+    Shangduiqi => "shangduiqi"
+    Youduiqi => "youduiqi"
+    Zuoduiqi => "zuoduiqi"
+    Weibiaoti545 => "weibiaoti545"
+    Dingceng => "dingceng"
+    Diceng => "diceng"
+    Shangyiyiceng => "shangyiyiceng"
+    Xiaduiqi => "xiaduiqi"
+    Xiayiyiceng => "xiayiyiceng"
+    Daxiaoxiangdeng => "daxiaoxiangdeng"
+    Tuceng => "tuceng"
+    ChatBar => "chat-bar"
+    Function => "yunhang"
+    Duiqi => "duiqi-"
+    Params => "canshu"
+    Tucengzhizuoyuweihu => "tucengzhizuoyuweihu"
+    Kuaibuju => "kuaibuju"
+    Shuxiangfenbu => "shuxiangfenbu"
+    Hengxiangfenbu1 => "hengxiangfenbu1"
+    Chicunbiaozhu_ => "chicunbiaozhu_"
+    Zuoyoujuzhong => "zuoyoujuzhong"
+    Shangxiajuzhong => "shangxiajuzhong"
+    Dengkuan => "dengkuan"
+    Denggao => "denggao"
+    QueryFilter => "tiaojianchaxun"
+    ZhushujushenqingShujufenxi02 => "zhushujushenqing-shujufenxi-02"
+    Suofangdaodengbi => "suofangdaodengbi"
+    Huifu => "huifu"
+    Menu1 => "menu1"
+    Microphone => "microphone"
+    Minus1 => "minus1"
+    Message1 => "message1"
+    MapLocation => "map-location"
+    MessageSolid => "message-solid"
+    Mic => "mic"
+    MilkTea => "milk-tea"
+    Medal => "medal"
+    Medal2 => "medal-"
+    Mobile1 => "mobile1"
+    MobilePhone => "mobile-phone"
+    Money => "money"
+    More1 => "more1"
+    NoSmoking => "no-smoking"
+    MoreOutline => "more-outline"
+    Notebook => "notebook-"
+    SHome => "s-home"
+    News => "news"
+    Notebook1 => "notebook-1"
+    SOpen => "s-open"
+    SMarketing => "s-marketing"
+    Mouse => "mouse"
+    SManagement => "s-management"
+    SOperation => "s-operation"
+    OfficeBuilding => "office-building"
+    SwitchOpen => "switch-open"
+    Ship => "ship"
+    Sell => "sell"
+    Search2 => "search2"
+    Service => "service"
+    Scissors => "scissors"
+    Orange => "orange"
+    PhoneOutline => "phone-outline"
+    Picture => "picture"
+    Receiving => "receiving"
+    PictureOutlineRound => "picture-outline-round"
+    PictureOutline => "picture-outline"
+    PieChart => "pie-chart"
+    SData => "s-data"
+    Refrigerator => "refrigerator"
+    SCooperation => "s-cooperation"
+    SCheck => "s-check"
+    SFlag => "s-flag"
+    SCustom => "s-custom"
+    SFinance => "s-finance"
+    RemoveOutline => "remove-outline"
+    SComment => "s-comment"
+    Remove => "remove"
+    School => "school"
+    SShop => "s-shop"
+    STicket => "s-ticket"
+    SortUp => "sort-up"
+    Sort => "sort"
+    TakeawayBox => "takeaway-box"
+    Stopwatch => "stopwatch"
+    Thumb => "thumb"
+    Tickets => "tickets"
+    Truck => "truck"
+    User1 => "user1"
+    UserSolid => "user-solid"
+    VideoCameraSolid => "video-camera-solid"
+    VideoPlay => "video-play"
+    VideoCamera => "video-camera"
+    Right1 => "right1"
+    VideoPause => "video-pause"
+    StarOff => "star-off"
+    Trophy1 => "trophy1"
+    Wallet1 => "wallet1"
+    Watch => "watch"
+    WindPower => "wind-power"
+    ViewIcon => "view"
+    Watermelon => "watermelon"
+    Share2 => "share2"
+    SetUp => "set-up"
+    ZoomIn => "zoom-in"
+    WaterCup => "water-cup"
+    Warning => "warning"
+    Watch2 => "watch-"
+    Setting1 => "setting1"
+    ZoomOut => "zoom-out"
+    Pear => "pear"
+    Paperclip => "paperclip"
+    PlatformEleme => "platform-eleme"
+    SClaim => "s-claim"
+    SGoods => "s-goods"
+    SGrid => "s-grid"
+    SHelp => "s-help"
+    ShoppingCart => "shopping-cart-"
+    Smoking => "smoking"
+    Soccer => "soccer"
+    SPromotion => "s-promotion"
+    SortDown => "sort-down"
+    SRelease => "s-release"
+    SOpportunity => "s-opportunity"
+    SOrder => "s-order"
+    STools => "s-tools"
+    SoldOut => "sold-out"
+    SPlatform => "s-platform"
+    Suitcase => "suitcase"
+    Suitcase2 => "suitcase-"
+    Sugar => "sugar"
+    Sunset => "sunset"
+    Sunrise => "sunrise-"
+    TopLeft => "top-left"
+    SwitchButton => "switch-button"
+    ToiletPaper => "toilet-paper"
+    TableLamp => "table-lamp"
+    Tableware => "tableware"
+    TopRight => "top-right"
+    Top => "top"
+    TurnOff => "turn-off"
+    Monitor1 => "monitor1"
+    Unlock1 => "unlock1"
+    Postcard => "postcard"
+    Umbrella => "umbrella"
+    Moon => "moon"
+    AddLocation => "add-location"
+    Present => "present"
+    Aim => "aim"
+    Position => "position"
+    Back => "back"
+    PriceTag => "price-tag"
+    ArrowLeft => "arrow-left"
+    PotatoStrips => "potato-strips"
+    Attract => "attract"
+    ArrowRight => "arrow-right"
+    Sunny => "sunny"
+    ArrowUp => "arrow-up"
+    MoonNight => "moon-night"
+    AlarmClock => "alarm-clock"
+    Reading => "reading"
+    ArrowDown => "arrow-down"
+    Rank => "rank"
+    Apple1 => "apple1"
+    BottomRight => "bottom-right"
+    Upload2 => "upload2"
+    Box => "box"
+    Timer => "timer"
+    Brush => "brush"
+    Guide => "guide"
+    BankCard => "bank-card"
+    Trophy12 => "trophy-1"
+    BottomLeft => "bottom-left"
+    Bicycle => "bicycle"
+    Baseball => "baseball"
+    Basketball => "basketball"
+    Burger => "burger"
+    Bottom => "bottom"
+    CScaleToOriginal => "c-scale-to-original"
+    ChatDotRound => "chat-dot-round"
+    ChatRound => "chat-round"
+    ChatDotSquare => "chat-dot-square"
+    ChatSquare => "chat-square"
+    CircleClose => "circle-close"
+    Chicken => "chicken"
+    CloseNotification => "close-notification"
+    Close2 => "close2"
+    Cherry => "cherry"
+    CoffeeCup => "coffee-cup"
+    Cloudy => "cloudy"
+    CollectionTag => "collection-tag"
+    ColdDrink => "cold-drink"
+    Collection => "collection"
+    Coordinate => "coordinate"
+    Connection => "connection"
+    Crop => "crop"
+    Cpu => "cpu"
+    CopyDocument => "copy-document"
+    DCaret => "d-caret"
+    DArrowRight => "d-arrow-right"
+    DataBoard => "data-board"
+    DataAnalysis => "data-analysis"
+    DataLine => "data-line"
+    DArrowLeft => "d-arrow-left"
+    DeleteSolid => "delete-solid"
+    DeleteLocation => "delete-location"
+    Discount => "discount"
+    Date => "date"
+    Dessert => "dessert"
+    Dish => "dish"
+    Delete2 => "delete2"
+    DocumentCopy => "document-copy"
+    Document => "document"
+    Discover => "discover"
+    DocumentAdd => "document-add"
+    DocumentChecked => "document-checked"
+    DocumentDelete => "document-delete"
+    DocumentRemove => "document-remove"
+    Dish2 => "dish-"
+    Download1 => "download1"
+    Coin => "coin"
+    Female => "female"
+    Film => "film"
+    Error1 => "error1"
+    Eleme => "eleme"
+    Coffee => "coffee"
+    FolderRemove => "folder-remove"
+    FolderChecked => "folder-checked"
+    FolderAdd1 => "folder-add1"
+    FolderDelete => "folder-delete"
+    Football => "football"
+    Finished => "finished"
+    ForkSpoon => "fork-spoon"
+    FirstAidKit => "first-aid-kit"
+    GobletFull => "goblet-full"
+    Food => "food"
+    Fullscreen => "full-screen"
+    GobletSquareFull => "goblet-square-full"
+    Goblet => "goblet"
+    Goods => "goods"
+    Headset => "headset"
+    House => "house"
+    IceCreamRound => "ice-cream-round"
+    HotWater => "hot-water"
+    HeavyRain => "heavy-rain"
+    IceDrink => "ice-drink"
+    IceCream => "ice-cream"
+    Key1 => "key1"
+    IceCreamSquare => "ice-cream-square"
+    KnifeFork => "knife-fork"
+    IceTea => "ice-tea"
+    Info => "info"
+    Grape => "grape"
+    LightRain => "light-rain"
+    Lock1 => "lock1"
+    LocationOutline => "location-outline"
+    Lightning => "lightning"
+    MagicStick => "magic-stick"
+    Link1 => "link1"
+    Lollipop => "lollipop"
+    LoadingStep => "loading-step"
+    Rest => "rest"
+    BellFill => "bell-fill"
+    Usb => "USB"
+    FilterFill => "filter-fill"
+    Skin => "skin"
+    FireFill => "fire-fill"
+    Home => "home"
+    FunnelplotFill => "funnelplot-fill"
+    Bank => "bank"
+    GiftFill => "gift-fill"
+    Filter1 => "filter1"
+    HourglassFill => "hourglass-fill"
+    Funnelplot => "funnelplot"
+    HomeFill => "home-fill"
+    Like => "like"
+    TrophyFill => "trophy-fill"
+    Unlike => "unlike"
+    LocationFill => "location-fill"
+    Unlock => "unlock"
+    CloudFill => "cloud-fill"
+    Lock => "lock"
+    CustomerserviceFill => "customerservice-fill"
+    Customerservice => "customerservice"
+    ExperimentFill => "experiment-fill"
+    Flag => "flag"
+    EyeFill => "eye-fill"
+    Moneycollect => "moneycollect"
+    LikeFill => "like-fill"
+    Medicinebox => "medicinebox"
+    LockFill => "lock-fill"
+    Shop => "shop"
+    UnlikeFill => "unlike-fill"
+    Shopping => "shopping"
+    StarFill => "star-fill"
+    Folder => "folder"
+    UnlockFill => "unlock-fill"
+    FolderOpen => "folder-open"
+    AlertFill => "alert-fill"
+    ApiFill => "api-fill"
+    Deploymentunit => "deploymentunit"
+    HighlightFill => "highlight-fill"
+    Accountbook => "accountbook"
+    PhoneFill => "phone-fill"
+    Contacts => "contacts"
+    EditFill => "edit-fill"
+    Carryout => "carryout"
+    PushpinFill => "pushpin-fill"
+    CalendarCheck => "calendar-check"
+    ThunderboltFill => "thunderbolt-fill"
+    Calendar1 => "calendar1"
+    TagFill => "tag-fill"
+    Scan => "scan1"
+    WrenchFill => "wrench-fill"
+    Select => "select"
+    TagsFill => "tags-fill"
+    Boxplot => "boxplot"
+    BankFill => "bank-fill"
+    Build => "build"
+    CameraFill => "camera-fill"
+    Sliders => "sliders"
+    ErrorFill => "error-fill"
+    Laptop => "laptop"
+    CrownFill => "crown-fill"
+    Barcode1 => "barcode1"
+    MailFill => "mail-fill"
+    Camera => "camera"
+    CarFill => "car-fill"
+    Cluster => "cluster"
+    PrinterFill => "printer-fill"
+    Gateway => "gateway"
+    ShopFill => "shop-fill"
+    Car => "car"
+    SettingFill => "setting-fill"
+    Printer => "printer"
+    USBFill => "USB-fill"
+    Read => "read"
+    GoldenFill => "golden-fill"
+    CloudServer => "cloud-server"
+    BuildFill => "build-fill"
+    CloudUpload => "cloud-upload"
+    BoxplotFill => "boxplot-fill"
+    Cloud => "cloud"
+    SlidersFill => "sliders-fill"
+    CloudDownload => "cloud-download"
+    Alibaba => "alibaba"
+    CloudSync => "cloud-sync"
+    Alibabacloud => "alibabacloud"
+    Video => "video1"
+    Antdesign => "antdesign"
+    NotificationIcon => "notification"
+    AntCloud => "ant-cloud"
+    Sound => "sound"
+    Behance => "behance"
+    RadarChart => "radarchart"
+    Googleplus => "googleplus"
+    Qrcode => "qrcode"
+    Medium => "medium"
+    Fund => "fund"
+    Google => "google"
+    Image1 => "image1"
+    IE => "IE"
+    Mail1 => "mail1"
+    Amazon => "amazon"
+    Slack => "slack"
+    Idcard => "idcard"
+    Alipay => "alipay"
+    Creditcard => "creditcard"
+    Taobao => "taobao"
+    Heart => "heart"
+    Zhihu => "zhihu"
+    Block => "block"
+    HTML => "HTML"
+    Error => "error"
+    Linkedin => "linkedin"
+    Star => "star"
+    Yahoo => "yahoo"
+    Gold => "gold"
+    Facebook => "facebook"
+    Heatmap => "heatmap"
+    Skype => "skype"
+    Wifi => "wifi"
+    CodeSandbox => "CodeSandbox"
+    Paperclip2 => "attachment"
+    Chrome => "chrome"
+    Edit1 => "edit1"
+    Aliwangwang => "aliwangwang"
+    Key => "key"
+    Apple => "apple"
+    Api => "api"
+    Android => "android"
+    Disconnect => "disconnect"
+    Sketch => "sketch"
+    Highlight => "highlight"
+    Gitlab => "Gitlab"
+    Monitor => "monitor"
+    Dribbble => "dribbble"
+    Link => "link"
+    Instagram => "instagram"
+    Man => "man"
+    Reddit => "reddit"
+    Percentage => "percentage"
+    Windows => "windows"
+    Pushpin => "pushpin"
+    Yuque => "yuque"
+    Phone => "phone"
+    Youtube => "Youtube"
+    Shake => "shake"
+    GitlabFill => "Gitlab-fill"
+    Tag => "tag"
+    Dropbox => "dropbox"
+    Wrench => "wrench"
+    Dingtalk => "dingtalk"
+    Woman => "woman"
+    AndroidFill => "android-fill"
+    Tags => "tags"
+    AppleFill => "apple-fill"
+    Scissor => "scissor"
+    HTMLFill => "HTML-fill"
+    Mr => "mr"
+    WindowsFill => "windows-fill"
+    Share1 => "share1"
+    QQ => "QQ"
+    Branches => "branches"
+    Twitter => "twitter"
+    Fork => "fork"
+    SkypeFill => "skype-fill"
+    Shrink => "shrink"
+    Weibo => "weibo"
+    Arrawsalt => "arrawsalt"
+    YuqueFill => "yuque-fill"
+    Verticalright => "verticalright"
+    YoutubeFill => "Youtube-fill"
+    Verticalleft => "verticalleft"
+    YahooFill => "yahoo-fill"
+    Wechat => "wechat"
+    ChromeFill => "chrome-fill"
+    AliwangwangFill => "aliwangwang-fill"
+    FullscreenExit => "fullscreen-exit"
+    GithubFill => "github-fill"
+    MediumCircleFill => "medium-circle-fill"
+    ColumnHeight => "colum-height"
+    VAlignBottom => "vertical-align-botto"
+    VAlignMiddle => "vertical-align-middl"
+    ToTop => "totop"
+    VAlignTop => "vertical-align-top"
+    Download => "download"
+    SortDesc => "sort-descending"
+    SortAsc => "sort-ascending"
+    Fall => "fall"
+    Swap => "swap"
+    Stock => "stock"
+    Rise => "rise"
+    Indent => "indent"
+    Outdent => "outdent"
+    MenuIcon => "menu"
+    Unorderedlist => "unorderedlist"
+    Orderedlist => "orderedlist"
+    AlignRight => "align-right"
+    AlignCenter => "align-center"
+    AlignLeft => "align-left"
+    PicCenter => "pic-center"
+    PicRight => "pic-right"
+    PicLeft => "pic-left"
+    Bold => "bold"
+    FontColor => "font-colors"
+    CheckCircle => "check-circle"
+    Exclaimination => "exclaimination"
+    CI => "CI"
+    FontSize => "font-size"
+    Dollar => "Dollar"
+    Infomation => "infomation"
+    Compass => "compass"
+    LineHeight => "line-height"
+    Strikethrough => "strikethrough"
+    Frown => "frown"
+    Underline => "underline"
+    InfoCircle => "info-circle"
+    Number => "number"
+    LeftCircle => "left-circle"
+    Italic => "italic"
+    Loading => "loading"
+    DownCircle => "down-circle"
+    Code => "code"
+    EURO => "EURO"
+    ColumnWidth => "column-width"
+    Copyright => "copyright"
+    MinusCircle => "minus-circle"
+    Meh => "meh"
+    Dash => "dash"
+    PlusCircle => "plus-circle"
+    PlayCircle => "play-circle"
+    Enter1 => "enter1"
+    QuestionCircle => "question-circle"
+    Line => "line"
+    Pound => "Pound"
+    Minus => "minus"
+    RightCircle => "right-circle"
+    Question => "question"
+    Smile => "smile"
+    Plus => "plus"
+    Trademark => "trademark"
+    SmallDash => "small-dash"
+    Pause => "pause"
+    Earth => "earth"
+    BgColors => "bg-colors"
+    YUAN => "YUAN"
+    Crown => "crown"
+    UpCircle => "up-circle"
+    Drag => "drag"
+    WarningCircle => "warning-circle"
+    Sync => "sync"
+    Gift => "gift"
+    Transaction => "transaction"
+    Stop => "stop"
+    Undo => "undo"
+    Fire => "fire"
+    Redo => "redo"
+    Thunderbolt => "thunderbolt"
+    Reload => "reload"
+    CheckCircleFill => "check-circle-fill"
+    Reloadtime => "reloadtime"
+    LeftCircleFill => "left-circle-fill"
+    Message => "message"
+    DownCircleFill => "down-circle-fill"
+    Dashboard => "dashboard1"
+    MinusCircleFill => "minus-circle-fill"
+    Issuesclose => "issuesclose"
+    CloseCircleFill => "close-circle-fill"
+    Poweroff => "poweroff"
+    InfoCircleFill => "info-circle-fill"
+    Logout => "logout"
+    UpCircleFill => "up-circle-fill"
+    Login => "login"
+    RightCircleFill => "right-circle-fill"
+    Piechart => "piechart"
+    PlusCircleFill => "plus-circle-fill"
+    QuestionCircleFill => "question-circle-fill"
+    Eye => "eye"
+    EUROCircleFill => "EURO-circle-fill"
+    FrownFill => "frown-fill"
+    CopyrightCircleFil => "copyright-circle-fil"
+    Export => "export"
+    CICircleFill => "CI-circle-fill"
+    Save1 => "save1"
+    CompassFill => "compass-fill"
+    Import => "Import"
+    DollarCircleFill => "Dollar-circle-fill"
+    Appstore => "appstore"
+    PoweroffCircleFill => "poweroff-circle-fill"
+    MehFill => "meh-fill"
+    PlayCircleFill => "play-circle-fill"
+    Layout => "layout"
+    PoundCircleFill => "Pound-circle-fill"
+    SmileFill => "smile-fill"
+    StopFill => "stop-fill"
+    Control => "control"
+    WarningCircleFill => "warning-circle-fill"
+    Codelibrary => "codelibrary"
+    Detail => "detail"
+    TrademarkCircleFil => "trademark-circle-fil"
+    YUANCircleFill => "YUAN-circle-fill"
+    HeartFill => "heart-fill"
+    PiechartCircleFil => "piechart-circle-fil"
+    Project => "project"
+    DashboardFill => "dashboard-fill"
+    Wallet => "wallet"
+    MessageFill => "message-fill"
+    Calculator => "calculator"
+    Interation => "interation"
+    Border => "border"
+    CodelibraryFill => "codelibrary-fill"
+    BorderOuter => "border-outer"
+    BorderTop => "border-top"
+    BorderBottom => "border-bottom"
+    BorderLeft => "border-left"
+    BorderRight => "border-right"
+    BorderInner => "border-inner"
+    AccountbookFill => "accountbook-fill"
+    BorderVertical => "border-verticle"
+    CarryoutFill => "carryout-fill"
+    BorderHorizontal => "border-horizontal"
+    CalendarFill => "calendar-fill"
+    RadiusBottomleft => "radius-bottomleft"
+    CalculatorFill => "calculator-fill"
+    RadiusBottomright => "radius-bottomright"
+    InterationFill => "interation-fill"
+    RadiusUpleft => "radius-upleft"
+    ProjectFill => "project-fill"
+    RadiusUpright => "radius-upright"
+    DetailFill => "detail-fill"
+    RadiusSetting => "radius-setting"
+    SaveFill => "save-fill"
+    Adduser => "adduser"
+    WalletFill => "wallet-fill"
+    Deleteteam => "deleteteam"
+    ControlFill => "control-fill"
+    Deleteuser => "deleteuser"
+    LayoutFill => "layout-fill"
+    Addteam => "addteam"
+    AppstoreFill => "appstore-fill"
+    User => "user"
+    MobileFill => "mobile-fill"
+    Team => "team"
+    TabletFill => "tablet-fill"
+    AreaChart => "areachart"
+    BookFill => "book-fill"
+    LineChart => "linechart"
+    RedenvelopeFill => "redenvelope-fill"
+    Barchart => "barchart"
+    SafetycertificateF => "safetycertificate-f"
+    Pointmap => "pointmap"
+    PropertysafetyFill => "propertysafety-fill"
+    ContainerIcon => "container"
+    Database => "database"
+    SecurityscanFill => "securityscan-fill"
+    Sever => "sever"
+    FileExclamationFil => "file-exclamation-fil"
+    Mobile => "mobile"
+    FileAddFill => "file-add-fill"
+    Tablet => "tablet"
+    FileExcelFill => "file-excel-fill"
+    Redenvelope => "redenvelope"
+    FileMarkdownFill => "file-markdown-fill"
+    Book => "book"
+    FileTextFill => "file-text-fill"
+    Filedone => "filedone"
+    FilePptFill => "file-ppt-fill"
+    Reconciliation => "reconciliation"
+    FileUnknownFill => "file-unknown-fill"
+    FileException => "file-exception"
+    FileWordFill => "file-word-fill"
+    Filesync => "filesync"
+    FileZipFill => "file-zip-fill"
+    FileSearch => "filesearch"
+    FilePdfFill => "file-pdf-fill"
+    Solution => "solution"
+    FileImageFill => "file-image-fill"
+    Fileprotect => "fileprotect"
+    DiffFill => "diff-fill"
+    FileAdd => "file-add"
+    FileCopyFill => "file-copy-fill"
+    FileExcel => "file-excel"
+    SnippetsFill => "snippets-fill"
+    FileExclamation => "file-exclamation"
+    BatchfoldingFill => "batchfolding-fill"
+    FilePdf => "file-pdf"
+    ReconciliationFill => "reconciliation-fill"
+    FileImage => "file-image"
+    FileMarkdown => "file-markdown"
+    FolderFill => "folder-fill"
+    FileUnknown => "file-unknown"
+    FolderOpenFill => "folder-open-fill"
+    FilePpt => "file-ppt"
+    DatabaseFill => "database-fill"
+    FileWord => "file-word"
+    ContainerFill => "container-fill"
+    File1 => "file1"
+    SeverFill => "sever-fill"
+    FileZip => "file-zip"
+    CalendarCheckFill => "calendar-check-fill"
+    FileText => "file-text"
+    ImageFill => "image-fill"
+    FileCopy => "file-copy"
+    IdcardFill => "idcard-fill"
+    Snippets => "snippets"
+    CreditcardFill => "creditcard-fill"
+    Audit => "audit"
+    FundFill => "fund-fill"
+    Diff => "diff"
+    ReadFill => "read-fill"
+    Batchfolding => "Batchfolding"
+    ContactsFill => "contacts-fill"
+    Securityscan => "securityscan"
+    Propertysafety => "propertysafety"
+    NotificationFill => "notification-fill"
+    Safetycertificate => "safetycertificate"
+    FlagFill => "flag-fill"
+    MoneycollectFill => "moneycollect-fill"
+    Alert => "alert"
+    MedicineboxFill => "medicinebox-fill"
+    RestFill => "rest-fill"
+    Hourglass => "hourglass"
+    ShoppingFill => "shopping-fill"
+    Bulb => "bulb"
+    SkinFill => "skin-fill"
+    Experiment => "experiment"
+    VideoFill => "video-fill"
+    Bell => "bell"
+    SoundFill => "sound-fill"
+    Trophy => "trophy"
+    BulbFill => "bulb-fill"
+    FuwuActive => "fuwu-active"
+    ShouyeShouye => "shouye-shouye"
+    Cangkuxinxi => "cangkuxinxi"
+    Saomiao => "saomiao"
+    Iconset0254 => "iconset0254"
+    Zhongsuanrenwuliebiao => "zhongsuanrenwuliebiao"
+    Xiangxiazhanhang => "xiangxiazhanhang"
+    Qita => "qita"
+    Xiajia => "xiajia"
+    Feiji => "feiji"
+    Tixing => "tixing"
+    Shaixuan_o => "shaixuan_o"
+    Siji => "siji"
+    Lianxiwomen => "lianxiwomen"
+    Guanyuwomen => "guanyuwomen"
+    Wode => "wode"
+    TruckFull => "truck-full"
+    Xiayibu => "xiayibu"
+    Video2 => "video"
+    ImageIcon => "image"
+    File => "file"
+    Xinhao => "xinhao"
+    Gengduo => "gengduo"
+    Xuhao => "xuhao"
+    Zhiye => "zhiye"
+    Weixian => "weixian"
+    Apptubiao => "apptubiao-"
+    Jingdiananli_wujiaoxing_shoucanghou => "jingdiananli_wujiaoxing_shoucanghou"
+    Jingdiananli_kongwujiaoxing_shoucang => "jingdiananli_kongwujiaoxing_shoucang"
+    Caigou => "caigou"
+    NaviconQtrkd => "navicon-qtrkd"
+    CustomWorker => "custom-worker"
+    Ruku => "ruku"
+    Yichang => "yichang"
+    Shougongpeidui => "shougongpeidui"
+    Lunkuohua113 => "lunkuohua-113"
+    Jiebang => "jiebang"
+    Goodsppeinventory => "goodsppeinventory"
+    Weixiujilu => "weixiujilu"
+    Taizhangguanli => "taizhangguanli"
+    Weixiu => "weixiu"
+    Baoxiu => "baoxiu"
+    Daijiedan => "daijiedan"
+    Shebeidianjian => "shebeidianjian"
+    Shebeidianjiantongji => "shebeidianjiantongji"
+    Baoyanggongdan => "baoyanggongdan"
+    Baoyangjihua => "baoyangjihua"
+    Chart => "chart"
+    ChartBar => "chart-bar"
+    Filter => "filter"
+    FilterClear => "filter-clear"
+    Share => "share"
+    Books => "books"
+    Cart => "cart"
+    Clear => "clear"
+    MenuFold => "menu-fold"
+    LockOff => "lock-off"
+    Rotation => "rotation"
+    Layers => "layers"
+    LockOn => "lock-on"
+    RootList => "root-list"
+    AControlplatform => "a-controlplatform"
+    ChartBubble => "chart-bubble"
+    CaretUpSmall => "caret-up-small"
+    Enter => "enter"
+    Rollfront => "rollfront"
+    Jump => "jump"
+    Rollback => "rollback"
+    CaretRightSmall => "caret-right-small"
+    Mirror => "mirror"
+    Time => "time"
+    UserAvatar => "user-avatar"
+    UsergroupClear => "usergroup-clear"
+    MinusRectangle => "minus-rectangle"
+    FormatHorizontalAlignTop => "format-horizontal-align-top"
+    Move1 => "move1"
+    Bulletpoint => "bulletpoint"
+    Barcode => "barcode"
+    LogoWecom => "logo-wecom"
+    MenuUnfold => "menu-unfold"
+    Tools => "tools"
+    CaretLeftSmall => "caret-left-small"
+    Round => "round"
+    CaretDownSmall => "caret-down-small"
+    Check => "check"
+    APrecisemonitor => "a-precisemonitor"
+    GenderFemale => "gender-female"
+    AOrderAdjustmentcolumn => "a-order-adjustmentcolumn"
+    Queue => "queue"
+    Print => "print"
+    Ellipsis => "ellipsis"
+    TimeFilled => "time-filled"
+    Slash => "slash"
+    HelpCircleFilled => "help-circle-filled"
+    MenuApplication => "menu-application"
+    Pin => "pin"
+    UserTalk => "user-talk"
+    More => "more"
 // ---- icons-gen:end ----
   }
 }

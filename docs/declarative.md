@@ -175,8 +175,8 @@ To swap an arbitrary node (not just text) on state change, use `bind_node`: it r
 })
 // icon toggles driven by their own clicks: swap_node on Windows
 @yue.swap_node(dark.signal(),
-  @yue.icon_button_t(@yue.YhMoon, on_click=..., tip="Switch to dark"),
-  @yue.icon_button_t(@yue.YhSunny, on_click=..., tip="Switch to light"))
+  @yue.icon_button_t(@yue.Moon, on_click=..., tip="Switch to dark"),
+  @yue.icon_button_t(@yue.Sunny, on_click=..., tip="Switch to light"))
 ```
 
 For high-frequency updates prefer `bind` (text) or imperative setters via `handle`.
