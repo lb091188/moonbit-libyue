@@ -1,7 +1,0 @@
-import {
-  "NoahLiu/moonbit-libyue/yue",
-}
-
-options(
-  "is-main": true,
-)

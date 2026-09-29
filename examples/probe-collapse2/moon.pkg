@@ -1,5 +1,0 @@
-import {
-  "NoahLiu/moonbit-libyue/yue",
-}
-
-pkgtype(kind: "executable")
