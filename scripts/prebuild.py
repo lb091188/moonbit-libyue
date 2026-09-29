@@ -82,25 +82,34 @@ def _git(args: list[str]) -> str | None:
 def _sources_newer(vendored: Path) -> bool:
     """shim 源码比 vendored 库新 → 开发者在改 shim，回退 build/ 流程。
 
-    git 仓库下按提交时间比较：克隆/检出按路径序写盘，lib/ 恒早于 shim/，
-    mtime 比较在每次拉取后都会误判回退；shim 有未提交改动视为更新。
-    vendored 目录未入库或非 git 环境回退 mtime 比较。"""
+    git 仓库下按提交时间比较；shim 有未提交改动视为更新。判定不了
+    （浅克隆查不到 lib/ 历史、非 git 环境、mtime 并行检出竞态）一律
+    保守返回 True：回退 build/ 宁可重编，也不误链缺新符号的 vendored
+    旧库（CI 曾因浅克隆+大文件后写完的 mtime 竞态误判,链接 undefined）。
+    """
     rel = vendored.relative_to(MODULE_ROOT).as_posix()
     if _git(["status", "--porcelain", "--", "shim"]) == "":
         t_shim = _git(["log", "-1", "--format=%ct", "--", "shim"])
         t_lib = _git(["log", "-1", "--format=%ct", "--", rel])
         if t_shim is not None and t_lib is not None and t_lib.strip():
-            return int(t_shim.strip() or 0) > int(t_lib.strip())
-    lib_mtime = (vendored / _shim_lib_name()).stat().st_mtime
-    for pattern in ("*.cpp", "*.h", "include/*.h"):
-        for src in (MODULE_ROOT / "shim").glob(pattern):
-            if src.stat().st_mtime > lib_mtime:
-                return True
-    return False
+            ts, tl = int(t_shim.strip() or 0), int(t_lib.strip() or 0)
+            if ts != tl:
+                return ts > tl
+            # 浅克隆(actions/checkout 默认 fetch-depth=1)下 pathspec 限定的
+            # log 退化为 HEAD 时间,两值恒等不可信——保守回退 build/
+            return True
+        return True
 
 
 def _native_dir() -> Path:
-    """原生库目录：vendored lib/<平台>/ 优先，否则 build/。"""
+    """原生库目录：build/ 有 prepare 产物时优先，否则 vendored lib/<平台>/。
+
+    build/ 存在 stamp+库说明 prepare 已跑过(开发/CI 链路),产物按当前
+    shim 全新编译,恒不旧于 vendored——vendored 只服务无 build/ 的
+    mooncakes 分发用户。此前 vendored 优先且判定依赖 git 历史/mtime,
+    CI 浅克隆下误走旧 vendored 库导致新 shim 符号链接 undefined。"""
+    if (BUILD_DIR / _shim_lib_name()).exists() and _stamp():
+        return BUILD_DIR
     plat = _platform_dir()
     if plat is not None:
         vendored = VENDOR_LIB_DIR / plat
