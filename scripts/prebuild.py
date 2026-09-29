@@ -273,19 +273,27 @@ def link_configs() -> dict:
     """
     build = str(_native_dir().resolve()).replace("\\", "/")
     if sys.platform == "win32":
-            # manifest.res 默认不传，仅 YUE_MBT_KEEP_MANIFEST=1 时随 yue 份
-            # 传入（用于分发型 moon build：main 包对每个包的 link_flags 只
-            # 拼一遍，恰好嵌入一份清单）。默认不传的原因：moon 按依赖闭包
-            # 逐包拼 link_flags，且对 blackbox 测试目标把「被测包」的份拼
-            # 两遍（yue/traybus 的 blackbox 实测），.res 重复列出会让同名
-            # MANIFEST 资源进两次（CVT1100）——moon test 无法与清单共存。
-            # 无清单的运行代价实测仅剩视觉样式退化（经典外观），开发与
-            # 测试链路零配置；分发 exe 由 KEEP 开关或 release 流程保障。
-            # /MANIFESTINPUT 等 link 选项路线不通：cl 把 /link 之前的链接
-            # 选项当编译选项丢弃（D9002）。
+        # 库与 manifest 一律用相对模块根路径：moon 链接子进程 cwd 为
+        # 模块根，相对路径即可解析；绝对路径在用户目录含引号/空格时会被
+        # 链接命令行 quoting 剥字符并黏成单参数（LNK1104，用户名
+        # noah'liu 实测：两个库路径变成一个输入、撇号被删）。
+        # Linux/macOS 走参数数组不经命令行拼接，无此问题，仍用绝对路径。
+        build = "build"
+        # manifest.res 默认不传，仅 YUE_MBT_KEEP_MANIFEST=1 时随 yue 份
+        # 传入（用于分发型 moon build：main 包对每个包的 link_flags 只
+        # 拼一遍，恰好嵌入一份清单）。默认不传的原因：moon 按依赖闭包
+        # 逐包拼 link_flags，且对 blackbox 测试目标把「被测包」的份拼
+        # 两遍（yue/traybus 的 blackbox 实测），.res 重复列出会让同名
+        # MANIFEST 资源进两次（CVT1100）——moon test 无法与清单共存。
+        # 无清单的运行代价实测仅剩视觉样式退化（经典外观），开发与
+        # 测试链路零配置；分发 exe 由 KEEP 开关或 release 流程保障。
+        # /MANIFESTINPUT 等 link 选项路线不通：cl 把 /link 之前的链接
+        # 选项当编译选项丢弃（D9002）。
         manifest = f"{build}/yue_mbt_manifest.res " \
             if os.environ.get("YUE_MBT_KEEP_MANIFEST") == "1" else ""
         prebuilt = _prebuilt("yue_prebuilt.lib")
+        if prebuilt:
+            prebuilt = str(Path(prebuilt).relative_to(MODULE_ROOT)).replace("\\", "/")
         libs = (
             f"{build}/yue_mbt.lib"
             + (f" {prebuilt}" if prebuilt else "")
