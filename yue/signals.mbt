@@ -244,6 +244,15 @@ pub fn[T] bind_node(sig : Signal[T], f : (T) -> Node) -> Node {
         }
         let node = f(v)
         current.val = Some((node.mount)(ViewLike::view(c)))
+        // Windows:运行期 remove+add 后 yoga 根不重算(native 只修被清零
+        // 节点自身,见 view.mbt 的 refresh_layout 注释),新挂子树 bounds
+        // 停在脏值,鼠标 hit-test 恒命中它——点击窗口任意处都误触重挂
+        // 前的控件(真机实测:深浅切换按钮重挂后,全窗点击都变成切换
+        // 明暗,键盘焦点路径不受影响)。重挂后整窗布局重算+重绘兜底,
+        // 与 tabs 切页同款;Linux 的 GTK 布局自动覆盖新子树,无需此步
+        if platform() == "windows" {
+          refresh_layout(c)
+        }
       }
 
       rebuild(sig.get())
