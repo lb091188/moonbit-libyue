@@ -162,7 +162,9 @@ pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
 ///|
 /// 悬浮滚动条容器:content 为滚动内容(声明式节点),挂载后自带悬浮
 /// thumb。style 应用于外层容器(须给定尺寸或由外层布局决定);handle
-/// 可拿到内部 Scroll 做程序化滚动。
+/// 可拿到内部 Scroll 做程序化滚动。内容在挂载之后才挂进 content(惰性
+/// 挂载)或明显长高时,经 handle 调 Scroll::refresh_content_size 刷新
+/// 滚动范围。
 pub fn overlay_scroll(
   content : Node,
   style? : Array[(String, Double)] = [],

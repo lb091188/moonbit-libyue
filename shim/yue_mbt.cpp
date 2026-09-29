@@ -5708,6 +5708,39 @@ int32_t yue_mbt_container_child_count(void *container) {
   return 0;
 }
 
+/* Container:自然尺寸(即时跑 yoga 内容测量,探测用) */
+double yue_mbt_container_get_preferred_height(void *container) {
+  if (auto *c = CastTo<nu::Container>(container)) {
+    return c->GetPreferredSize().height();
+  }
+  return -1.0;
+}
+
+/* Scroll:按当前内容重算滚动范围 */
+void yue_mbt_scroll_refresh_content_size(void *scroll) {
+#if defined(OS_LINUX)
+  // GTK viewport 的滚动范围全靠内容视图的 size request 支撑(nu_container
+  // 的 GTK preferred 恒报 0,不走 GTK 布局系统);而 fork 的
+  // PlatformSetContentView 只在 set_content 时刻对内容自然高做一次性快照,
+  // 且重挂时读到旧快照值即跳过重算——内容后挂(惰性挂载)后滚动范围
+  // 永远停在骨架高度。此处在运行期按当前内容重写(宽度请求保持现值,
+  // 水平行为与常驻路径一致)。Windows 的 ScrollImpl::Layout 每轮重查内容
+  // 自然尺寸、macOS 由 documentView frame 决定范围,均无快照问题,空操作。
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    nu::View *content = s->GetContentView();
+    if (content == nullptr || !content->IsContainer()) {
+      return;
+    }
+    GtkWidget *w = GTK_WIDGET(content->GetNative());
+    gint cur_w;
+    gtk_widget_get_size_request(w, &cur_w, nullptr);
+    double h = static_cast<nu::Container *>(content)->GetPreferredSize().height();
+    gtk_widget_set_size_request(w, cur_w,
+                                h > 0.0 ? static_cast<gint>(h) : -1);
+  }
+#endif
+}
+
 /* Scroll:位置与滚动信号 */
 double yue_mbt_scroll_get_position_x(void *scroll) {
   if (auto *s = CastTo<nu::Scroll>(scroll)) {

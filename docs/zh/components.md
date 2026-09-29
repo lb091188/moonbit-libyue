@@ -283,6 +283,7 @@ let sep = @yue.Separator::make(Horizontal)   // 或 Vertical
 | Group::set_title(t) | 改标题 |
 | Scroll::set_content(v) | 换内容 |
 | Scroll::set_content_size(w, h) | 显式设内容尺寸 |
+| Scroll::refresh_content_size() | 按当前内容重算滚动范围(内容在 set_content 之后才挂入或明显长高时调用) |
 | Scroll::set_scroll_position(h, v) | 设滚动位置 |
 | Scroll::set_scrollbar_policy(h, v) / set_overlay_scrollbar(b) | 滚动条 |
 | Scroll::get_scroll_position_x/y() / get_max_scroll_position_x/y() | 读位置与最大滚动量 |

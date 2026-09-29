@@ -100,12 +100,19 @@ pub fn nav_page(
 /// debug 构建秒级;挂过之后保形,显隐/滚动位置语义不变。
 fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
   let mounted : Ref[Bool] = Ref(false)
+  // 惰性挂载完成后按当前内容重算滚动范围(Linux GTK 的滚动范围取
+  // set_content 时刻快照,不刷新会停在骨架高度滚不动)
+  let scroll_ref : Ref[@yue.Scroll?] = Ref(None)
   let holder = @yue.vbox([], handle=fn(h) {
     fn ensure(name : String) -> Unit {
       if !mounted.val && name == s.name {
         mounted.val = true
         for c in s.content {
           let _ = c.mount_into(h.view)
+        }
+        match scroll_ref.val {
+          Some(sc) => sc.refresh_content_size()
+          None => ()
         }
       }
     }
@@ -133,6 +140,7 @@ fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
       @yue.scroll(
         @yue.vbox(inner, style=[("padding", 14.0)]),
         style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
+        handle=fn(sc) { scroll_ref.val = Some(sc) },
       ),
     ],
     style=[("flexgrow", 1.0), ("flexshrink", 1.0)],

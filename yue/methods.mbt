@@ -177,6 +177,20 @@ pub fn Container::child_count(self : Container) -> Int {
 }
 
 ///|
+/// 内容自然高度(即时按内容测量,不受当前分配影响)。
+pub fn Container::get_preferred_height(self : Container) -> Double {
+  ffi_container_get_preferred_height(self.view)
+}
+
+///|
+/// 按当前内容重算滚动范围:滚动内容在 set_content 之后才挂入(惰性挂载)
+/// 或尺寸变化时调用,Linux(GTK)下滚动范围来自 set_content 时刻的
+/// 内容自然高快照,不刷新会停在骨架高度滚不动。
+pub fn Scroll::refresh_content_size(self : Scroll) -> Unit {
+  ffi_scroll_refresh_content_size(ViewLike::view(self))
+}
+
+///|
 /// 当前滚动位置 X。
 pub fn Scroll::get_scroll_position_x(self : Scroll) -> Double {
   ffi_scroll_get_position_x(ViewLike::view(self))

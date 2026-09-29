@@ -92,7 +92,7 @@ let win = @yue.mount_window(
 | `picker(items, selected, on_change, …)` | Picker | |
 | `combo(items, selected, on_select, on_input, …)` | ComboBox | |
 | `group(title, content, …)` | Group | content 是单个 Node |
-| `scroll(content, content_size, policy, …)` | Scroll | content 是单个 Node |
+| `scroll(content, content_size, policy, …)` | Scroll | content 是单个 Node;内容后挂/后长高时经 handle 调 `Scroll::refresh_content_size` 刷新范围 |
 | `separator(orientation)` | Separator | |
 | `tab(pages, on_change, …)` | Tab | 每页自动包容器 |
 | `date_picker(epoch, on_change)` | DatePicker | |
