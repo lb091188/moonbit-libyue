@@ -27,21 +27,18 @@ pub fn dialog_t(
       }
       // 遮罩:absolute 全覆盖 + 居中排布;固定半透明黑(EP 遮罩语义)
       let overlay = themed_container(
-        style_str=[
-          ("position", "absolute"),
+        style=[("position", "absolute"),
           ("top", "0"),
           ("bottom", "0"),
           ("left", "0"),
           ("right", "0"),
           ("justifyContent", "center"),
-          ("alignItems", "center"),
-        ],
+          ("alignItems", "center"),],
       )
       ViewLike::set_background_color(overlay, "#00000059")
       // 面板:主题面板底 + 1px 边框(on_draw 描)
       let panel = themed_container(
-        style=[("width", width)],
-        style_str=[("flexDirection", "column"), ("maxHeight", "80%")],
+        style=[("width", width), ("flexDirection", "column"), ("maxHeight", "80%")],
       )
       set_panel_bg(panel)
       panel.on_draw(fn(p) {
@@ -53,8 +50,7 @@ pub fn dialog_t(
       ViewLike::on_mouse_down(panel, fn(_e) { true })
       // 标题栏:标题 + 弹性空档 + ✕
       let head = themed_container(
-        style=[("height", 44.0), ("paddingLeft", 16.0), ("paddingRight", 10.0), ("marginTop", 4.0)],
-        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+        style=[("height", 44.0), ("paddingLeft", 16.0), ("paddingRight", 10.0), ("marginTop", 4.0), ("flexDirection", "row"), ("alignItems", "center")],
       )
       attach(ViewLike::view(head), label_t(title, role=Section).mount_into(ViewLike::view(head)))
       let spacer = themed_container(style=[("flex", 1.0)])
@@ -67,8 +63,7 @@ pub fn dialog_t(
       panel.add_child(head)
       // 内容区:统一 16px 内边距
       let body = themed_container(
-        style=[("padding", 16.0)],
-        style_str=[("flexDirection", "column")],
+        style=[("padding", 16.0), ("flexDirection", "column")],
       )
       for ch in children {
         ignore((ch.mount)(ViewLike::view(body)))
@@ -77,8 +72,7 @@ pub fn dialog_t(
       // 底部按钮区:右对齐;两个文案都空则不显示
       if confirm_text != "" || cancel_text != "" {
         let foot = themed_container(
-          style=[("paddingRight", 16.0), ("paddingBottom", 14.0)],
-          style_str=[("flexDirection", "row"), ("justifyContent", "flex-end")],
+          style=[("paddingRight", 16.0), ("paddingBottom", 14.0), ("flexDirection", "row"), ("justifyContent", "flex-end")],
         )
         if cancel_text != "" {
           attach(
@@ -131,15 +125,13 @@ pub fn toast_layer(
   let layer = {
     mount: fn(parent) {
       let c = themed_container(
-        style=[("paddingTop", 8.0)],
-        style_str=[
-          ("position", "absolute"),
+        style=[("paddingTop", 8.0),
+        ("position", "absolute"),
           ("top", "0"),
           ("left", "0"),
           ("right", "0"),
           ("flexDirection", "column"),
-          ("alignItems", "center"),
-        ],
+          ("alignItems", "center"),],
       )
       host.val = Some(c)
       attach(parent, ViewLike::view(c))
@@ -205,7 +197,7 @@ pub fn context_menu_for(
 ) -> Node {
   {
     mount: fn(parent) {
-      let wrap = themed_container(style_str=[("flexDirection", "column")])
+      let wrap = themed_container(style=[("flexDirection", "column")])
       ignore((content.mount)(ViewLike::view(wrap)))
       ViewLike::on_mouse_down(wrap, fn(e) {
         if e.button == 2 {

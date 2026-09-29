@@ -126,7 +126,7 @@ fn res_card(
             },
           ),
         ],
-        style_str=[("alignItems", "center")],
+        style=[("alignItems", "center")],
         handle=fn(h) { @yue.View::set_cursor(h, hand_cur) },
       ),
       spark,
@@ -245,15 +245,13 @@ fn view_area(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
   ]
   @yue.vbox(
     [],
-    style=[("flex", 1.0)],
-    style_str=[("flexDirection", "column")],
+    style=[("flex", 1.0), ("flexDirection", "column")],
     handle=fn(area) {
       let boxes : Array[@yue.Container] = []
       for item in items {
         let (_, node) = item
         let pc = @yue.Container::make(
-          style=[("flex", 1.0)],
-          style_str=[("flexDirection", "column")],
+          style=[("flex", 1.0), ("flexDirection", "column")],
         )
         @yue.ViewLike::set_visible(pc, view_index(item.0) == view_index(view.get()))
         // 页面内容整页滚动（showcase 同款），超窗不裁切

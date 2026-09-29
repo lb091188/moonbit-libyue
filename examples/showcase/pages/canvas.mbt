@@ -230,8 +230,7 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
             canvas_rt.val = Some(c)
             c.on_size_changed(fn() { c.schedule_paint() })
           },
-          style=[("height", 120.0), ("marginBottom", 8.0), ("width", 640.0)],
-          style_str=[("backgroundcolor", "#F4F4F0")],
+          style=[("height", 120.0), ("marginBottom", 8.0), ("width", 640.0), ("backgroundcolor", "#F4F4F0")],
         ),
         @yue.hbox([
           @yue.button_t("换行开关", on_click=fn() {

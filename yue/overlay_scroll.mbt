@@ -20,12 +20,11 @@
 pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
   s.set_scrollbar_policy(Never, Never) // 隐藏平台滚动条,thumb 全权替代
   // ---- 悬浮 thumb:右缘窄条,占满轨道高度,可见段由绘制决定 ----
-  let thumb = themed_container(style=[("width", 6.0)], style_str=[
-    ("position", "absolute"),
+  let thumb = themed_container(style=[("width", 6.0),
+        ("position", "absolute"),
     ("right", "0px"),
     ("top", "0px"),
-    ("bottom", "0px"),
-  ])
+    ("bottom", "0px"),])
   attach(host, ViewLike::view(thumb))
   // 状态(gy/thumb_len 绘制用;alpha 两级 d9≈85% 常态 / 73≈45% 渐隐中)
   let vis = Ref(false)
@@ -167,13 +166,12 @@ pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
 /// 滚动范围。
 pub fn overlay_scroll(
   content : Node,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   handle? : (Scroll) -> Unit = fn(_s) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let host = themed_container(style~, style_str~)
+      let host = themed_container(style~)
       attach(parent, ViewLike::view(host))
       let s = Scroll::new()
       handle(s)

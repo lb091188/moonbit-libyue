@@ -15,14 +15,6 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
   let radio_disabled = @yue.Signal::new("选项一")
   let wifi_on = @yue.Signal::new(true)
   let locked = @yue.Signal::new(false)
-  let dr : @yue.Store[@yue.DateRange] = @yue.Store::new({
-    start: None,
-    end: None,
-  })
-  let tr : @yue.Store[@yue.TimeRange] = @yue.Store::new({
-    start: None,
-    end: None,
-  })
   let dtr : @yue.Store[@yue.DateTimeRange] = @yue.Store::new({
     start: None,
     end: None,
@@ -34,9 +26,8 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
       "自绘 1px 边框(聚焦变中性灰)+ 白底;clearable 悬停非空时 ✕ 清空;多行内容超出按平台滚动。",
       [
         @yue.vbox([
-          @yue.input_t(text="输入点什么…", margin=10.0),
-          @yue.input_t(text="密码框", password=true),
-          @yue.input_t(text="悬停出现 ✕,点击清空", clearable=true),
+          @yue.input_t(text="输入点什么…", clearable=true),
+          @yue.input_t(text="密码框", password=true, margin=10.0, clearable=true),
           @yue.textarea_t(
             text="多行文本输入演示。\n第二行内容。",
             height=90.0,
@@ -119,7 +110,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
             @yue.color_picker_t(picked_color.store()),
             @yue.bind(picked_color, fn(c) { c }),
           ],
-          style_str=[("alignItems", "center")],
+          style=[("alignItems", "center")],
         ),
       ],
       code=[
@@ -203,8 +194,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
             @yue.switch_t(locked.store(), disabled=true),
             @yue.label_t("禁用", role=@yue.Body),
           ],
-          style=[("marginTop", 10.0)],
-          style_str=[("alignItems", "center")],
+          style=[("marginTop", 10.0), ("alignItems", "center")],
         ),
       ],
       code=[
@@ -246,26 +236,10 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
               }
             }),
           ],
-          style_str=[("alignItems", "center")],
+          style=[("alignItems", "center")],
         ),
         @yue.calendar_t(),
         @yue.vbox([
-          @yue.date_range_picker_t(value=dr),
-          @yue.bind_label(dr, fn(r) {
-            match (r.start, r.end) {
-              (Some(s), Some(e)) => "日期区间:\{s.format()} ~ \{e.format()}"
-              (Some(s), None) =>
-                "日期区间:\{s.format()} ~ (再点终点日)"
-              _ => "日期区间:未选择"
-            }
-          }),
-          @yue.time_range_picker_t(value=tr),
-          @yue.bind_label(tr, fn(r) {
-            match (r.start, r.end) {
-              (Some(s), Some(e)) => "时间区间:\{s.format()} ~ \{e.format()}"
-              _ => "时间区间:未选择"
-            }
-          }),
           @yue.datetime_range_picker_t(value=dtr, width=340.0),
           @yue.bind_label(dtr, fn(r) {
             match (r.start, r.end) {

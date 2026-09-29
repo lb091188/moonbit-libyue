@@ -7,13 +7,12 @@ pub fn browser(
   url? : String = "",
   html? : String = "",
   handle? : (Browser) -> Unit = fn(_b) {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &@yue.StyVal)] = [],
 ) -> @yue.Node {
   {
     mount: fn(parent) {
       let b = Browser::make(url~, html~)
-      let node = @yue.node_of(b, style~, style_str~)
+      let node = @yue.node_of(b, style~)
       handle(b)
       node.mount_into(parent)
     },

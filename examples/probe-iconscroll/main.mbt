@@ -143,8 +143,7 @@ fn main {
             shell_r=sec_long_shell_r,
           ),
         ],
-        style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
-        style_str=[("flexDirection", "column")],
+        style=[("flexgrow", 1.0), ("flexshrink", 1.0), ("flexDirection", "column")],
         handle=fn(c) { secs_box_r.val = Some(c) },
       ),
     ],
@@ -173,8 +172,7 @@ fn main {
         style=[("flex", 1.0)],
       ),
     ],
-    style=[("flex", 1.0)],
-    style_str=[("alignItems", "stretch")],
+    style=[("flex", 1.0), ("alignItems", "stretch")],
   )
 
   fn h(r : Ref[@yue.Container?]) -> Double {

@@ -52,7 +52,7 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
             ),
             @yue.bind(app.picked_lang, fn(s) { "最近操作:\{s}" }),
           ],
-          style_str=[("alignItems", "center")],
+          style=[("alignItems", "center")],
         ),
       ],
       code=[
@@ -92,7 +92,7 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
             }),
             @yue.bind(app.picked_lang, fn(s) { s }),
           ],
-          style_str=[("alignItems", "center")],
+          style=[("alignItems", "center")],
         ),
       ],
       code=[

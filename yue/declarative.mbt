@@ -26,10 +26,9 @@ pub fn Node::mount_into(self : Node, parent : View) -> View {
 /// 把已有视图包装成节点（可顺带应用样式）——命令式与声明式混用的桥。
 pub fn[T : ViewLike] node_of(
   v : T,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
-  apply_style(v, style~, style_str~)
+  apply_style(v, style~)
   {
     mount: fn(parent) {
       attach(parent, v.view())
@@ -42,18 +41,17 @@ pub fn[T : ViewLike] node_of(
 fn container_node(
   direction : String,
   children : Array[Node],
-  style : Array[(String, Double)],
-  style_str : Array[(String, String)],
+  style : Array[(String, &StyVal)],
   handle~ : (Container) -> Unit,
 ) -> Node {
-  let sstr = style_str.copy()
-  sstr.push(("flexDirection", direction))
+  let s = style.copy()
+  s.push(("flexDirection", direction))
   // shrink 维持 yoga 默认 0:实测默认 1 会挤压全库固定宽自绘控件
   // (图标墙图标、输入框等,回归面过大已回退)。需要收缩/折行的
   // 容器(如 segmented 超宽换行)显式 style 给 1。
   {
     mount: fn(parent) {
-      let c = Container::make(style~, style_str=sstr)
+      let c = Container::make(style=s)
       handle(c)
       attach(parent, ViewLike::view(c))
       for ch in children {
@@ -68,22 +66,20 @@ fn container_node(
 /// 垂直布局容器（flexDirection=column，libyue 默认即 column）。
 pub fn vbox(
   children : Array[Node],
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
-  container_node("column", children, style, style_str, handle~)
+  container_node("column", children, style, handle~)
 }
 
 ///|
 /// 水平布局容器（flexDirection=row）。
 pub fn hbox(
   children : Array[Node],
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
-  container_node("row", children, style, style_str, handle~)
+  container_node("row", children, style, handle~)
 }
 
 ///|
@@ -94,13 +90,12 @@ pub fn hbox(
 /// 便于后续命令式补充。
 pub fn label(
   text : String,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   handle? : (Label) -> Unit = fn(_l) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let l = Label::make(text, style~, style_str~)
+      let l = Label::make(text, style~)
       bind_fg(l, fn() { theme_text_regular() })
       handle(l)
       attach(parent, ViewLike::view(l))
@@ -114,13 +109,12 @@ pub fn label(
 pub fn button(
   title : String,
   on_click? : () -> Unit = fn() {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   handle? : (Button) -> Unit = fn(_b) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let b = Button::make(title, on_click~, style~, style_str~)
+      let b = Button::make(title, on_click~, style~)
       handle(b)
       attach(parent, ViewLike::view(b))
       ViewLike::view(b)
@@ -134,8 +128,7 @@ pub fn checkbox(
   title : String,
   checked? : Bool = false,
   on_change? : (Bool) -> Unit = fn(_v) {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   handle? : (Button) -> Unit = fn(_b) {  },
 ) -> Node {
   {
@@ -145,7 +138,6 @@ pub fn checkbox(
         button_type=Checkbox,
         checked~,
         style~,
-        style_str~,
       )
       b.on_click(fn() { on_change(b.is_checked()) })
       handle(b)
@@ -161,19 +153,18 @@ pub fn checkbox(
 pub fn entry(
   text? : String = "",
   password? : Bool = false,
-  on_enter? : (String) -> Unit = fn(_s) {  },
-  on_input? : (String) -> Unit = fn(_s) {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
-  handle? : (Entry) -> Unit = fn(_e) {  },
+  on_enter? : (String) -> Unit = fn(_s) { },
+  on_input? : (String) -> Unit = fn(_s) { },
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Entry) -> Unit = fn(_e) { },
 ) -> Node {
   {
     mount: fn(parent) {
-      // Windows 上 height 不直接落到原生控件(文字贴顶),拆成
-      // 「行高控件 + 均分边距」由 entry_vcenter 垂直居中
-      let (make_style, box_height) = if platform() == "windows" {
-        let (h, rest) = take_style_height(style)
-        (rest, h)
+      // Windows 上 height 不直接落到原生控件(文字贴顶),拆出包进
+      // 外壳容器(值原样应用,百分比也支持),挂载后一帧读外壳实际
+      // 高做 entry_vcenter 垂直居中
+      let (make_style, height_kv) = if platform() == "windows" {
+        take_style_height(style)
       } else {
         (style, None)
       }
@@ -181,41 +172,56 @@ pub fn entry(
         text~,
         entry_type=if password { Password } else { Normal },
         style=make_style,
-        style_str~,
       )
-      if platform() == "windows" {
+      let target : View = if platform() == "windows" {
         // 与 entry_t 一致的字体,保证行高测量与控件实际字体吻合
         ViewLike::set_font(e, Font::new("Sans", 13.0))
-        match box_height {
-          Some(h) => entry_vcenter(e, h, true)
-          None => entry_vcenter(e, control_height, true)
+        match height_kv {
+          Some(kv) => {
+            let shell = themed_container(style=[kv])
+            ViewLike::set_style(e, "flex", 1.0)
+            attach(ViewLike::view(shell), ViewLike::view(e))
+            post_task(fn() {
+              let b = ViewLike::get_bounds(shell)
+              entry_vcenter(e, b.height, true)
+            })
+            bind_entry_theme(e)
+            ViewLike::view(shell)
+          }
+          None => {
+            entry_vcenter(e, control_height, true)
+            bind_entry_theme(e)
+            ViewLike::view(e)
+          }
         }
-        bind_entry_theme(e)
+      } else {
+        ViewLike::view(e)
       }
       e.on_activate(fn() { on_enter(e.get_text()) })
       e.on_text_change(fn() { on_input(e.get_text()) })
       handle(e)
-      attach(parent, ViewLike::view(e))
-      ViewLike::view(e)
+      attach(parent, target)
+      target
     },
   }
 }
 
 ///|
-/// 从数值样式表取出 height(重复出现以最后一个为准),返回剩余样式。
+/// 从样式表拆出 height 键（重复出现以最后一个为准，按键拆不解析值），
+/// 返回剩余样式与被拆出的键值对。
 fn take_style_height(
-  style : Array[(String, Double)],
-) -> (Double?, Array[(String, Double)]) {
-  let mut h : Double? = None
-  let rest : Array[(String, Double)] = []
+  style : Array[(String, &StyVal)],
+) -> (Array[(String, &StyVal)], (String, &StyVal)?) {
+  let mut kv : (String, &StyVal)? = None
+  let rest : Array[(String, &StyVal)] = []
   for pair in style {
     if pair.0 == "height" {
-      h = Some(pair.1)
+      kv = Some(pair)
     } else {
       rest.push(pair)
     }
   }
-  (h, rest)
+  (rest, kv)
 }
 
 ///|
@@ -223,13 +229,12 @@ fn take_style_height(
 pub fn text_edit(
   text? : String = "",
   on_input? : (String) -> Unit = fn(_s) {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   handle? : (TextEdit) -> Unit = fn(_t) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let t = TextEdit::make(text~, style~, style_str~)
+      let t = TextEdit::make(text~, style~)
       t.on_text_change(fn() { on_input(t.get_text()) })
       handle(t)
       attach(parent, ViewLike::view(t))
@@ -244,8 +249,7 @@ pub fn radio(
   title : String,
   checked? : Bool = false,
   on_change? : (Bool) -> Unit = fn(_v) {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   handle? : (Button) -> Unit = fn(_b) {  },
 ) -> Node {
   {
@@ -255,7 +259,6 @@ pub fn radio(
         button_type=Radio,
         checked~,
         style~,
-        style_str~,
       )
       b.on_click(fn() { on_change(b.is_checked()) })
       handle(b)
@@ -272,13 +275,12 @@ pub fn slider(
   range? : (Double, Double)? = None,
   step? : Double? = None,
   on_change? : (Double) -> Unit = fn(_v) {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   handle? : (Slider) -> Unit = fn(_s) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let s = Slider::make(value~, range~, step~, style~, style_str~)
+      let s = Slider::make(value~, range~, step~, style~)
       s.on_value_change(fn() { on_change(s.get_value()) })
       handle(s)
       attach(parent, ViewLike::view(s))
@@ -292,13 +294,12 @@ pub fn slider(
 pub fn progress(
   value? : Double = 0.0,
   indeterminate? : Bool = false,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   handle? : (ProgressBar) -> Unit = fn(_p) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let p = ProgressBar::make(value~, indeterminate~, style~, style_str~)
+      let p = ProgressBar::make(value~, indeterminate~, style~)
       handle(p)
       attach(parent, ViewLike::view(p))
       ViewLike::view(p)
@@ -312,8 +313,7 @@ pub fn picker(
   items? : Array[String] = [],
   selected? : Int = 0,
   on_change? : () -> Unit = fn() {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   handle? : (Picker) -> Unit = fn(_p) {  },
 ) -> Node {
   {
@@ -323,7 +323,7 @@ pub fn picker(
         selected~,
         on_selection_change=on_change,
         style~,
-        style_str~,
+        
       )
       handle(p)
       attach(parent, ViewLike::view(p))
@@ -339,8 +339,7 @@ pub fn combo(
   selected? : Int = 0,
   on_select? : () -> Unit = fn() {  },
   on_input? : () -> Unit = fn() {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   handle? : (ComboBox) -> Unit = fn(_c) {  },
 ) -> Node {
   {
@@ -351,7 +350,7 @@ pub fn combo(
         on_selection_change=on_select,
         on_text_change=on_input,
         style~,
-        style_str~,
+        
       )
       handle(c)
       attach(parent, ViewLike::view(c))
@@ -367,13 +366,12 @@ pub fn combo(
 pub fn group(
   title : String,
   content : Node,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
       let g = Group::new(title)
-      apply_style(g, style~, style_str~)
+      apply_style(g, style~)
       attach(parent, ViewLike::view(g))
       let holder = Container::new()
       ignore((content.mount)(ViewLike::view(holder)))
@@ -400,8 +398,7 @@ pub fn scroll(
   content_size? : (Double, Double)? = None,
   policy? : (ScrollPolicy, ScrollPolicy)? = None,
   overlay? : Bool = true,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   handle? : (Scroll) -> Unit = fn(_s) {  },
 ) -> Node {
   {
@@ -427,7 +424,7 @@ pub fn scroll(
         // 在内撑满(flex 配 basis 0 即 CSS flex:1 1 0,高度只由 flex 分配
         // 决定,防内容测量污染致视口塌陷),attach_overlay_thumb 置平台
         // 条 Never 并挂自绘 thumb
-        let host = themed_container(style~, style_str~)
+        let host = themed_container(style~)
         attach(parent, ViewLike::view(host))
         ViewLike::set_style(s, "flex", 1.0)
         ViewLike::set_style(s, "flexbasis", 0.0)
@@ -440,7 +437,7 @@ pub fn scroll(
         } else {
           s.set_overlay_scrollbar(false)
         }
-        apply_style(s, style~, style_str~)
+        apply_style(s, style~)
         attach(parent, ViewLike::view(s))
         ViewLike::view(s)
       }
@@ -459,13 +456,12 @@ pub fn scroll(
 /// 分隔线节点。
 pub fn separator(
   orientation? : Orientation = Horizontal,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
       let s = Separator::new(orientation)
-      apply_style(s, style~, style_str~)
+      apply_style(s, style~)
       attach(parent, ViewLike::view(s))
       ViewLike::view(s)
     },
@@ -478,13 +474,12 @@ pub fn tab(
   pages : Array[(String, Node)],
   on_change? : () -> Unit = fn() {  },
   handle? : (Tab) -> Unit = fn(_t) {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
       let t = Tab::new()
-      apply_style(t, style~, style_str~)
+      apply_style(t, style~)
       for (title, page) in pages {
         let holder = Container::new()
         ignore((page.mount)(ViewLike::view(holder)))
@@ -506,13 +501,12 @@ pub fn tab(
 pub fn date_picker(
   epoch? : Int64? = None,
   on_change? : () -> Unit = fn() {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
       let d = DatePicker::make(epoch~, on_date_change=on_change)
-      apply_style(d, style~, style_str~)
+      apply_style(d, style~)
       attach(parent, ViewLike::view(d))
       ViewLike::view(d)
     },
@@ -524,13 +518,12 @@ pub fn date_picker(
 pub fn gif(
   image? : Image? = None,
   scale? : ImageScale = Down,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
       let g = GifPlayer::make(image~, scale~)
-      apply_style(g, style~, style_str~)
+      apply_style(g, style~)
       attach(parent, ViewLike::view(g))
       ViewLike::view(g)
     },
@@ -543,12 +536,11 @@ pub fn gif(
 pub fn container(
   on_draw? : (Painter) -> Unit = fn(_p) {  },
   handle? : (Container) -> Unit = fn(_c) {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
-      let c = Container::make(style~, style_str~)
+      let c = Container::make(style~)
       c.on_draw(on_draw)
       handle(c)
       attach(parent, ViewLike::view(c))
@@ -562,10 +554,9 @@ pub fn container(
 /// （直接传给 Window::set_content 或作为更外层的孩子）。
 pub fn mount(
   children : Array[Node],
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Container {
-  let root = Container::make(style~, style_str~)
+  let root = Container::make(style~)
   for ch in children {
     ignore((ch.mount)(ViewLike::view(root)))
   }

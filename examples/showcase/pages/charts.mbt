@@ -106,7 +106,7 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
             @yue.label("  "),
             @yue.line_chart_t(line_series, width=320.0, height=240.0, area=true),
           ],
-          style_str=[("alignItems", "start")],
+          style=[("alignItems", "start")],
         ),
         @yue.hbox(
           [
@@ -120,8 +120,7 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
               role=@yue.Secondary,
             ),
           ],
-          style=[("marginTop", 8.0)],
-          style_str=[("alignItems", "center")],
+          style=[("marginTop", 8.0), ("alignItems", "center")],
         ),
       ],
       code=[
@@ -162,7 +161,7 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
               horizontal=true,
             ),
           ],
-          style_str=[("alignItems", "start")],
+          style=[("alignItems", "start")],
         ),
       ],
       code=[
@@ -234,10 +233,10 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
                   width=160.0,
                 ),
               ],
-              style_str=[("justifyContent", "center")],
+              style=[("justifyContent", "center")],
             ),
           ],
-          style_str=[("alignItems", "start")],
+          style=[("alignItems", "start")],
         ),
       ],
       code=[
@@ -268,7 +267,7 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
             @yue.label("  "),
             @yue.scatter_t(scatter_pts, width=320.0, height=260.0, trend=true),
           ],
-          style_str=[("alignItems", "start")],
+          style=[("alignItems", "start")],
         ),
       ],
       code=[

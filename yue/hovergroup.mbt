@@ -114,12 +114,11 @@ pub fn hover_group(
   base_bg? : String = "",
   radius? : Double = 0.0,
   on_change? : (Bool, Container) -> Unit = fn(_b, _c) {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
-      let host = themed_container(style~, style_str~)
+      let host = themed_container(style~)
       attach(parent, ViewLike::view(host))
       ignore((child.mount)(ViewLike::view(host)))
       let hover = Ref(false)
@@ -163,12 +162,11 @@ pub fn hover_group(
 pub fn cursor_group(
   child : Node,
   cursor? : Cursor = hand(),
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
-      let host = themed_container(style~, style_str~)
+      let host = themed_container(style~)
       attach(parent, ViewLike::view(host))
       ignore((child.mount)(ViewLike::view(host)))
       cursor_register({ host, cursor, active: Ref(false) })

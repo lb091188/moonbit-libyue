@@ -91,10 +91,9 @@ pub let control_height : Double = 32.0
 /// 组件库自绘容器:Container::make + 主题切换时自动重绘
 /// (draw 回调现取 theme_* 色,重绘即跟随新主题)。
 fn themed_container(
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Container {
-  let c = Container::make(style~, style_str~)
+  let c = Container::make(style~)
   on_theme_change(fn() { ViewLike::schedule_paint(c) })
   c
 }
@@ -636,7 +635,7 @@ fn fill_round_rect(
 /// 画 3px 强调条(与文字同色);rounded 时背景画 4px 圆角。
 fn stateful_item(
   text : String,
-  style : Array[(String, Double)],
+  style : Array[(String, &StyVal)],
   selected : Store[String],
   bg_of : (Bool, Bool) -> String,
   fg_of : (Bool, Bool) -> String,
@@ -844,8 +843,7 @@ pub fn segmented(options : Array[String], selected : Store[String]) -> Node {
   // rowGap 是换行行距。段少的页面不触发换行,外观不变。
   hbox(
     items,
-    style=[("padding", 2.0), ("rowGap", 4.0), ("flexShrink", 1.0)],
-    style_str=[("alignItems", "center"), ("flexWrap", "wrap")],
+    style=[("padding", 2.0), ("rowGap", 4.0), ("flexShrink", 1.0), ("alignItems", "center"), ("flexWrap", "wrap")],
     handle=fn(c) {
       bind_bg(c, fn() { theme_border() })
     },
@@ -997,7 +995,7 @@ pub fn breadcrumb(items : Array[String], selected : Store[String]) -> Node {
     )
     i = i + 1
   }
-  hbox(nodes, style_str=[("alignItems", "center")])
+  hbox(nodes, style=[("alignItems", "center")])
 }
 
 ///|
@@ -1053,10 +1051,9 @@ pub fn alert(text : String, t : SemanticType, height? : Double = 40.0) -> Node {
 pub fn pagination(current : Store[Int], pages : Int) -> Node {
   {
     mount: fn(parent) {
-      let row = themed_container(style=[("height", 30.0)], style_str=[
+      let row = themed_container(style=[("height", 30.0),
         ("flexDirection", "row"),
-        ("alignItems", "center"),
-      ])
+        ("alignItems", "center"),])
       fn add_btn(label : String, target : Int, is_page : Bool) -> Unit {
         let hover = Ref(false)
         let focused = Ref(false)
@@ -1187,9 +1184,7 @@ pub fn card(
       })
       outer.add_child(title)
       // 内容区
-      let body = themed_container(style=[("padding", 14.0)], style_str=[
-        ("flexDirection", "column"),
-      ])
+      let body = themed_container(style=[("padding", 14.0), ("flexDirection", "column"),])
       for ch in children {
         ignore((ch.mount)(ViewLike::view(body)))
       }
@@ -1583,8 +1578,7 @@ pub fn alert_closeable(text : String, t : SemanticType) -> Node {
   {
     mount: fn(parent) {
       let v = themed_container(
-        style=[("height", 40.0), ("marginBottom", 10.0)],
-        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+        style=[("height", 40.0), ("marginBottom", 10.0), ("flexDirection", "row"), ("alignItems", "center")],
       )
       bind_bg(v, fn() { type_light_color(t) })
       let label = Label::new("  " + text)
@@ -1641,8 +1635,7 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
   {
     mount: fn(parent) {
       let row = themed_container(
-        style=[("height", 40.0), ("marginBottom", 12.0)],
-        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+        style=[("height", 40.0), ("marginBottom", 12.0), ("flexDirection", "row"), ("alignItems", "center")],
       )
       let font = Font::new("Sans", 13.0)
       let n = items.length()
@@ -1744,16 +1737,13 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
 pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("marginBottom", 12.0)], style_str=[
-        ("flexDirection", "column"),
-      ])
+      let outer = themed_container(style=[("marginBottom", 12.0), ("flexDirection", "column"),])
       let mut first = true
       for entry in panels {
         let open = Ref(first)
         first = false
         let head = themed_container(
-          style=[("height", 34.0), ("paddingLeft", 12.0)],
-          style_str=[("flexDirection", "row"), ("alignItems", "center")],
+          style=[("height", 34.0), ("paddingLeft", 12.0), ("flexDirection", "row"), ("alignItems", "center")],
         )
         bind_bg(head, fn() { theme_info_light() })
         let head_focused = Ref(false)
@@ -1793,9 +1783,7 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
         on_theme_change(apply_title_color)
         head.add_child(arrow)
         head.add_child(title)
-        let body = themed_container(style=[("padding", 10.0)], style_str=[
-          ("flexDirection", "column"),
-        ])
+        let body = themed_container(style=[("padding", 10.0), ("flexDirection", "column"),])
         set_panel_bg(body)
         for ch in entry.1 {
           ignore((ch.mount)(ViewLike::view(body)))
@@ -1821,9 +1809,7 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
           }
         })
         bind_focus(head, fn() { ViewLike::schedule_paint(head) }, head_focused, toggle)
-        let panel = themed_container(style=[("marginBottom", 6.0)], style_str=[
-          ("flexDirection", "column"),
-        ])
+        let panel = themed_container(style=[("marginBottom", 6.0), ("flexDirection", "column"),])
         panel.add_child(head)
         panel.add_child(body)
         outer.add_child(panel)
@@ -1839,16 +1825,12 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
 pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("marginBottom", 12.0)], style_str=[
-        ("flexDirection", "column"),
-      ])
+      let outer = themed_container(style=[("marginBottom", 12.0), ("flexDirection", "column"),])
       let n = items.length()
       let mut i = 0
       for entry in items {
         let is_last = i == n - 1
-        let row = themed_container(style=[("height", 56.0)], style_str=[
-          ("flexDirection", "row"),
-        ])
+        let row = themed_container(style=[("height", 56.0), ("flexDirection", "row"),])
         let node_col = themed_container(style=[("width", 20.0), ("height", 56.0)])
         let is_first = i == 0
         node_col.on_draw(fn(p) {
@@ -1865,8 +1847,7 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
           p.fill_rect(5.0, b.height / 2.0 - 5.0, 10.0, 10.0)
         })
         let text_col = themed_container(
-          style=[("paddingLeft", 8.0), ("flex", 1.0)],
-          style_str=[("flexDirection", "column")],
+          style=[("paddingLeft", 8.0), ("flex", 1.0), ("flexDirection", "column")],
         )
         let title = Label::new(entry.0)
         fn apply_title_color() -> Unit {
@@ -1898,14 +1879,11 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
 pub fn descriptions(pairs : Array[(String, String)]) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("marginBottom", 12.0)], style_str=[
-        ("flexDirection", "column"),
-      ])
+      let outer = themed_container(style=[("marginBottom", 12.0), ("flexDirection", "column"),])
       for kv in pairs {
-        let row = themed_container(style=[("height", 26.0)], style_str=[
-          ("flexDirection", "row"),
-          ("alignItems", "center"),
-        ])
+        let row = themed_container(style=[("height", 26.0),
+        ("flexDirection", "row"),
+          ("alignItems", "center"),])
         let k = Label::new(kv.0)
         bind_fg(k, fn() { theme_text_secondary() })
         k.set_align(Start)
@@ -1936,8 +1914,7 @@ pub fn result(
     mount: fn(parent) {
       // 图标(76+16) + 标题 30 + 描述 24 + 按钮区(8+按钮高约 32)+ 底部留白
       let outer = themed_container(
-        style=[("height", 208.0), ("marginBottom", 12.0)],
-        style_str=[("flexDirection", "column"), ("alignItems", "center")],
+        style=[("height", 208.0), ("marginBottom", 12.0), ("flexDirection", "column"), ("alignItems", "center")],
       )
       let icon = themed_container(style=[
         ("width", 76.0),
@@ -1978,23 +1955,18 @@ pub fn result(
         }
       })
       on_theme_change(fn() { ViewLike::schedule_paint(icon) })
-      let big = themed_container(style=[("height", 30.0)], style_str=[
-        ("alignItems", "center"),
-      ])
+      let big = themed_container(style=[("height", 30.0), ("alignItems", "center"),])
       let t1 = Label::new(title)
       ViewLike::set_font(t1, Font::new("Sans", 18.0, weight=SemiBold))
       bind_fg(t1, fn() { theme_text_primary() })
       big.add_child(t1)
-      let sub = themed_container(style=[("height", 24.0)], style_str=[
-        ("alignItems", "center"),
-      ])
+      let sub = themed_container(style=[("height", 24.0), ("alignItems", "center"),])
       let t2 = Label::new(desc)
       bind_fg(t2, fn() { theme_text_secondary() })
       sub.add_child(t2)
-      let btns = themed_container(style=[("marginTop", 8.0)], style_str=[
+      let btns = themed_container(style=[("marginTop", 8.0),
         ("flexDirection", "row"),
-        ("alignItems", "center"),
-      ])
+        ("alignItems", "center"),])
       for ch in children {
         ignore((ch.mount)(ViewLike::view(btns)))
       }
@@ -2014,8 +1986,7 @@ pub fn empty(desc : String) -> Node {
   {
     mount: fn(parent) {
       let outer = themed_container(
-        style=[("height", 140.0), ("marginBottom", 12.0)],
-        style_str=[("flexDirection", "column"), ("alignItems", "center")],
+        style=[("height", 140.0), ("marginBottom", 12.0), ("flexDirection", "column"), ("alignItems", "center")],
       )
       let box = themed_container(style=[
         ("width", 96.0),
@@ -2037,9 +2008,7 @@ pub fn empty(desc : String) -> Node {
         p.fill_rect(cx - 34.0, 22.0, 68.0, 14.0)
         p.stroke_rect(cx - 34.0, 22.0, 68.0, 14.0)
       })
-      let cap = themed_container(style=[("height", 26.0), ("marginTop", 6.0)], style_str=[
-        ("alignItems", "center"),
-      ])
+      let cap = themed_container(style=[("height", 26.0), ("marginTop", 6.0), ("alignItems", "center"),])
       let l = Label::new(desc)
       bind_fg(l, fn() { theme_text_secondary() })
       cap.add_child(l)
@@ -2056,9 +2025,7 @@ pub fn empty(desc : String) -> Node {
 pub fn statistic(title : String, value : Store[String]) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("marginRight", 24.0)], style_str=[
-        ("flexDirection", "column"),
-      ])
+      let outer = themed_container(style=[("marginRight", 24.0), ("flexDirection", "column"),])
       let num = Label::new(value.get())
       ViewLike::set_font(num, Font::new("Sans", 24.0, weight=SemiBold))
       bind_fg(num, fn() { theme_text_primary() })
@@ -2139,8 +2106,7 @@ fn role_color(role : TextRole) -> String {
 pub fn label_t(
   text : String,
   role? : TextRole = Body,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   handle? : (Label) -> Unit = fn(_l) {  },
 ) -> Node {
   {
@@ -2157,7 +2123,7 @@ pub fn label_t(
       apply_color()
       on_theme_change(apply_color)
       l.set_align(Start)
-      apply_style(l, style~, style_str~)
+      apply_style(l, style~)
       handle(l)
       attach(parent, ViewLike::view(l))
       ViewLike::view(l)
@@ -2460,9 +2426,7 @@ pub fn radio_group(
 ) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("marginBottom", 10.0)], style_str=[
-        ("flexDirection", "column"),
-      ])
+      let outer = themed_container(style=[("marginBottom", 10.0), ("flexDirection", "column"),])
       let font = Font::new("Sans", 13.0)
       let rows : Array[Container] = []
       let mut idx = 0
@@ -2767,14 +2731,12 @@ pub fn input_number(
   {
     mount: fn(parent) {
       let row = themed_container(
-        style=[("height", control_height)],
-        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+        style=[("height", control_height), ("flexDirection", "row"), ("alignItems", "center")],
       )
       let font = Font::new("Sans", 13.0)
       fn step_btn(dir : Double) -> Unit {
         let b = themed_container(
-          style=[("width", 28.0), ("height", control_height)],
-          style_str=[("alignItems", "center")],
+          style=[("width", 28.0), ("height", control_height), ("alignItems", "center")],
         )
         bind_bg(b, fn() { theme_info_light() })
         let hover = Ref(false)
@@ -2821,8 +2783,7 @@ pub fn input_number(
       step_btn(-1.0)
       // marginRight 0:EP InputNumber 的按钮与输入区紧贴
       let num = themed_container(
-        style=[("width", num_width), ("height", control_height), ("marginRight", 0.0)],
-        style_str=[("alignItems", "center")],
+        style=[("width", num_width), ("height", control_height), ("marginRight", 0.0), ("alignItems", "center")],
       )
       set_panel_bg(num)
       let t = AttributedText::new(
@@ -2862,10 +2823,9 @@ pub fn form_item(
 ) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style_str=[("flexDirection", "column")])
+      let outer = themed_container(style=[("flexDirection", "column")])
       let row = themed_container(
-        style=[("marginBottom", 2.0)],
-        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+        style=[("marginBottom", 2.0), ("flexDirection", "row"), ("alignItems", "center")],
       )
       let k = Label::new(label)
       ViewLike::set_font(k, Font::new("Sans", 13.0))
@@ -2913,8 +2873,7 @@ pub fn link(text : String, on_click : () -> Unit) -> Node {
     mount: fn(parent) {
       let hover = Ref(false)
       let row = themed_container(
-        style=[("paddingRight", 6.0)],
-        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+        style=[("paddingRight", 6.0), ("flexDirection", "row"), ("alignItems", "center")],
       )
       let l = Label::new(text)
       ViewLike::set_font(l, Font::new("Sans", 13.0))
@@ -2970,8 +2929,7 @@ pub fn tree(root : Array[TreeNode]) -> Node {
   {
     mount: fn(parent) {
       let outer = themed_container(
-        style=[("marginBottom", 10.0), ("paddingTop", 2.0)],
-        style_str=[("flexDirection", "column")],
+        style=[("marginBottom", 10.0), ("paddingTop", 2.0), ("flexDirection", "column")],
       )
       let font = Font::new("Sans", 13.0)
       // 实心小三角箭头(矢量自绘,不依赖字体字形,避免 Windows 端字符发虚)
@@ -2997,8 +2955,7 @@ pub fn tree(root : Array[TreeNode]) -> Node {
           let open = Ref(false)
           let indent = level.to_double() * 18.0
           let row = themed_container(
-            style=[("height", 32.0), ("marginLeft", indent)],
-            style_str=[("flexDirection", "row"), ("alignItems", "center")],
+            style=[("height", 32.0), ("marginLeft", indent), ("flexDirection", "row"), ("alignItems", "center")],
           )
           let arrow = themed_container(
             style=[("width", 10.0), ("height", 10.0), ("marginRight", 3.0)],
@@ -3014,7 +2971,7 @@ pub fn tree(root : Array[TreeNode]) -> Node {
           row.add_child(arrow)
           row.add_child(label)
           let kids = themed_container(
-            style_str=[("flexDirection", "column")],
+            style=[("flexDirection", "column")],
           )
           ViewLike::set_visible(kids, false)
           if has_children {
@@ -3054,20 +3011,17 @@ pub fn transfer(
   {
     mount: fn(parent) {
       let row = themed_container(
-        style=[("marginBottom", 10.0)],
-        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+        style=[("marginBottom", 10.0), ("flexDirection", "row"), ("alignItems", "center")],
       )
       let font = Font::new("Sans", 13.0)
       // 选中集合(按值),用 Ref 可变数组
       let left_sel : Ref[Array[String]] = Ref([])
       let right_sel : Ref[Array[String]] = Ref([])
       let left_box = themed_container(
-        style=[("width", width)],
-        style_str=[("flexDirection", "column")],
+        style=[("width", width), ("flexDirection", "column")],
       )
       let right_box = themed_container(
-        style=[("width", width)],
-        style_str=[("flexDirection", "column")],
+        style=[("width", width), ("flexDirection", "column")],
       )
       fn contains(arr : Array[String], s : String) -> Bool {
         for x in arr {
@@ -3109,8 +3063,7 @@ pub fn transfer(
         for it in items.get() {
           let it_ref = it
           let row = themed_container(
-            style=[("height", 26.0), ("paddingLeft", 8.0)],
-            style_str=[("flexDirection", "row"), ("alignItems", "center")],
+            style=[("height", 26.0), ("paddingLeft", 8.0), ("flexDirection", "row"), ("alignItems", "center")],
           )
           let mark = themed_container(
             style=[("width", 10.0), ("height", 10.0), ("marginRight", 6.0)],
@@ -3179,8 +3132,7 @@ pub fn transfer(
       right_items.subscribe(fn(_v) { render_all() })
       fn mid_btn(to_right : Bool) -> Unit {
         let b = themed_container(
-          style=[("width", 32.0), ("height", 28.0), ("marginRight", 8.0)],
-          style_str=[("alignItems", "center")],
+          style=[("width", 32.0), ("height", 28.0), ("marginRight", 8.0), ("alignItems", "center")],
         )
         bind_bg(b, fn() { theme_info_light() })
         b.on_draw(fn(p) {
@@ -3380,14 +3332,11 @@ fn build_calendar(
   // 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然高度
   // (高 = 上下 padding 16 + 头 32+4 + 星期行 26 + 6 行 x 30)
   let panel = themed_container(
-    style=[
-      // yoga 的 width 是 border-box 语义(含 padding),须加 16;
+    style=[// yoga 的 width 是 border-box 语义(含 padding),须加 16;
       // 只给内容宽 252 会把最后一列(周六)裁掉 16px
       ("width", cell_w * 7.0 + 16.0),
       ("height", 16.0 + 32.0 + 4.0 + 26.0 + 6.0 * cell_h),
-      ("padding", 8.0),
-    ],
-    style_str=[("flexDirection", "column")],
+      ("padding", 8.0), ("flexDirection", "column")],
   )
   set_panel_bg(panel)
   panel.on_draw(fn(p) {
@@ -3410,8 +3359,7 @@ fn build_calendar(
 
   let head_h = 32.0
   let head = themed_container(
-    style=[("height", head_h), ("marginBottom", 4.0)],
-    style_str=[("flexDirection", "row"), ("alignItems", "center")],
+    style=[("height", head_h), ("marginBottom", 4.0), ("flexDirection", "row"), ("alignItems", "center")],
   )
   let title_text = Ref("")
   let title = themed_container(
@@ -3493,8 +3441,7 @@ fn build_calendar(
   head.add_child(nav_btn("›", fn() { nav(1) }))
   let week_h = 26.0
   let wk = themed_container(
-    style=[("height", week_h)],
-    style_str=[("flexDirection", "row")],
+    style=[("height", week_h), ("flexDirection", "row")],
   )
   for name in ["日", "一", "二", "三", "四", "五", "六"] {
     let wref = name
@@ -3505,7 +3452,7 @@ fn build_calendar(
     })
     wk.add_child(c)
   }
-  let grid = themed_container(style_str=[("flexDirection", "column")])
+  let grid = themed_container(style=[("flexDirection", "column")])
   // 42 格一次性创建、永不增删:实测弹层窗口 map 过之后再加进来的行
   // 不会被绘制(同面板一次创建的标题/星期行始终正常,增删过的格子
   // 消失且导航重建也不恢复)——rebuild 只改每格数据+重绘
@@ -3514,7 +3461,7 @@ fn build_calendar(
   let cell_inm : Ref[Array[Ref[Bool]]] = Ref([])
   {
     for _row in 0..<6 {
-      let r = themed_container(style_str=[("flexDirection", "row")])
+      let r = themed_container(style=[("flexDirection", "row")])
       for _col in 0..<7 {
         let dref : Ref[DateYMD] = Ref({ y: 0, m: 1, d: 1 })
         let inm : Ref[Bool] = Ref(false)
@@ -3829,8 +3776,7 @@ fn build_picker_field(
   let hover = Ref(false)
   let focused = Ref(false)
   let field = themed_container(
-    style=[("width", width), ("height", control_height), ("marginBottom", 10.0)],
-    style_str=[("flexDirection", "row"), ("alignItems", "center")],
+    style=[("width", width), ("height", control_height), ("marginBottom", 10.0), ("flexDirection", "row"), ("alignItems", "center")],
   )
   set_panel_bg(field)
   View::set_cursor(field, hand())
@@ -3989,8 +3935,7 @@ fn build_time_row(
       label_t(":", role=Body),
       input_number(ms, min=0.0, max=59.0, step=1.0, num_width=40.0),
     ],
-    style=[("marginBottom", 6.0)],
-    style_str=[("alignItems", "center")],
+    style=[("marginBottom", 6.0), ("alignItems", "center")],
   )
   fn sync(t : TimeHM) -> Unit {
     mute.val = true
@@ -4014,14 +3959,11 @@ fn build_time_panel(
   let (row1, sync1) = build_time_row("起", start_hm, mute, on_change)
   let (row2, sync2) = build_time_row("止", end_hm, mute, on_change)
   let panel = themed_container(
-    style=[
-      // 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然
+    style=[// 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然
       // 高度,漏显式高度会把两行压塌(高 = 上下 padding 16 + 两行 x 36)
       ("padding", 8.0),
       ("width", 268.0),
-      ("height", 16.0 + 2.0 * 36.0),
-    ],
-    style_str=[("flexDirection", "column")],
+      ("height", 16.0 + 2.0 * 36.0), ("flexDirection", "column")],
   )
   set_panel_bg(panel)
   let _ = row1.mount_into(panel.view())
@@ -4411,8 +4353,7 @@ pub fn datetime_range_picker_t(
               // 显式总宽高:PopoverRootView 按 content_size 硬分配,漏显式
               // 高度会把时间面板/完成行压塌
               let body = themed_container(
-                style=[("width", 268.0), ("height", 258.0 + 1.0 + 88.0 + 32.0)],
-                style_str=[("flexDirection", "column")],
+                style=[("width", 268.0), ("height", 258.0 + 1.0 + 88.0 + 32.0), ("flexDirection", "column")],
               )
               body.add_child(cal)
               let sep = themed_container(style=[("height", 1.0)])
@@ -4424,8 +4365,7 @@ pub fn datetime_range_picker_t(
               body.add_child(sep)
               body.add_child(tpanel)
               let done_row = themed_container(
-                style=[("height", 32.0), ("padding", 6.0)],
-                style_str=[("flexDirection", "row"), ("alignItems", "center"), ("justifyContent", "flex-end")],
+                style=[("height", 32.0), ("padding", 6.0), ("flexDirection", "row"), ("alignItems", "center"), ("justifyContent", "flex-end")],
               )
               let _ = button_t("完成", variant=Solid, on_click=fn() {
                 p.close()
@@ -4668,8 +4608,7 @@ pub fn table_t(
       let head_h = 40.0
       // 1px 内边距让外框描边落在 padding 环里,不被行/表头背景盖住
       let outer = themed_container(
-        style=[("width", width), ("padding", 1.0), ("marginBottom", 10.0)],
-        style_str=[("flexDirection", "column")],
+        style=[("width", width), ("padding", 1.0), ("marginBottom", 10.0), ("flexDirection", "column")],
       )
       // 面板底:斑马纹(fill_zebra)按「白面板上的浅灰」设计,透明挂在
       // 页面灰底(bg_page,与 fill_zebra 几乎同色)上条纹不可见
@@ -4781,13 +4720,12 @@ pub fn table_t(
         color_of : () -> String,
       ) -> Container {
         let col = columns[j]
-        let base : Array[(String, Double)] = [
+        let base : Array[(String, &StyVal)] = [
           ("width", col_w[j]), ("paddingLeft", 12.0), ("paddingRight", 12.0),
         ]
-        let wrap = themed_container(
-          style=base,
-          style_str=[("flexDirection", "row"), ("alignItems", "center")],
-        )
+        base.push(("flexDirection", "row"))
+        base.push(("alignItems", "center"))
+        let wrap = themed_container(style=base)
         match content {
           CellText(text) => {
             // 自绘单行省略:Label 无 ellipsize 能力(fork 未暴露),
@@ -4854,8 +4792,7 @@ pub fn table_t(
           }
           CellLines(lines) => {
             let stack = themed_container(
-              style=[("paddingTop", 6.0), ("paddingBottom", 6.0)],
-              style_str=[("flexDirection", "column")],
+              style=[("paddingTop", 6.0), ("paddingBottom", 6.0), ("flexDirection", "column")],
             )
             for ln in lines {
               let l = Label::new(ln)
@@ -4872,8 +4809,7 @@ pub fn table_t(
 
       // 表头:主题斑马色打底 + 底边分隔线,次级色加粗文字
       let head = themed_container(
-        style=[("height", head_h)],
-        style_str=[("flexDirection", "row"), ("alignItems", "center")],
+        style=[("height", head_h), ("flexDirection", "row"), ("alignItems", "center")],
       )
       head.on_draw(fn(p) {
         let b = ViewLike::get_bounds(head)
@@ -5017,10 +4953,7 @@ pub fn table_t(
         // 可排序列右侧留 22px 箭头区(标题不跳动)
         let pad_r = if col.sortable { 22.0 } else { 12.0 }
         let cell = themed_container(
-          style=[
-            ("width", col_w[j]), ("paddingLeft", 12.0), ("paddingRight", pad_r),
-          ],
-          style_str=[("flexDirection", "row"), ("alignItems", "center")],
+          style=[("width", col_w[j]), ("paddingLeft", 12.0), ("paddingRight", pad_r), ("flexDirection", "row"), ("alignItems", "center")],
         )
         let l = Label::new(col.title)
         ViewLike::set_font(l, head_font)
@@ -5127,7 +5060,7 @@ pub fn table_t(
         head_cs.val.push(hc)
         head.add_child(hc)
       }
-      let body = themed_container(style_str=[("flexDirection", "column")])
+      let body = themed_container(style=[("flexDirection", "column")])
 
       fn refresh_row(i : Int) -> Unit {
         let cs = row_cs.val
@@ -5164,8 +5097,7 @@ pub fn table_t(
           let idx = i
           // minHeight:普通行 = row_height,含多行文本时自动撑高
           let row = themed_container(
-            style=[("minHeight", row_height)],
-            style_str=[("flexDirection", "row"), ("alignItems", "center")],
+            style=[("minHeight", row_height), ("flexDirection", "row"), ("alignItems", "center")],
           )
           row.on_draw(fn(p) {
             let bg = table_row_bg(idx, sel_has(idx), hover_i.val == idx)
@@ -5178,8 +5110,7 @@ pub fn table_t(
           match sel {
             Some(_) => {
               let cb = themed_container(
-                style=[("width", 36.0)],
-                style_str=[("alignSelf", "stretch")],
+                style=[("width", 36.0), ("alignSelf", "stretch")],
               )
               cb.on_draw(fn(p) {
                 let b = ViewLike::get_bounds(cb)
@@ -5451,7 +5382,7 @@ pub fn table_v_t(
         }
       }
 
-      let size_style = if fill {
+      let size_style : Array[(String, &StyVal)] = if fill {
         [("height", height), ("marginBottom", 10.0)]
       } else {
         [("width", width), ("height", height), ("marginBottom", 10.0)]
@@ -5993,7 +5924,7 @@ pub fn table_v_t(
 pub fn divider(vertical? : Bool = false, spacing? : Double = 10.0) -> Node {
   {
     mount: fn(parent) {
-      let style : Array[(String, Double)] = if vertical {
+      let style : Array[(String, &StyVal)] = if vertical {
         [("width", 1.0), ("marginLeft", spacing), ("marginRight", spacing)]
       } else {
         [("height", 1.0), ("marginTop", spacing), ("marginBottom", spacing)]
@@ -6135,7 +6066,7 @@ pub fn slider_t(
       // width<=0(缺省)flex 自适应父容器宽;显式正宽则定宽。
       // 自适应分支用 grow/shrink 单写:column 父(auto 高链)下简写
       // 派生 basis 0 会盖掉 height 塌成 0 高
-      let size_style : Array[(String, Double)] = if width > 0.0 {
+      let size_style : Array[(String, &StyVal)] = if width > 0.0 {
         [("width", width)]
       } else {
         [("flexgrow", 1.0), ("flexshrink", 1.0)]
@@ -6277,12 +6208,10 @@ pub fn tabs_t(
       // v0.15.6-mbt.19 只修被清零节点自身);grow/shrink 不参与内容
       // 测量,basis 走 auto 语义,auto 父下按内容高
       let outer = themed_container(
-        style=[("flexgrow", 1.0), ("flexshrink", 1.0), ("marginBottom", 10.0)],
-        style_str=[("flexDirection", "column")],
+        style=[("flexgrow", 1.0), ("flexshrink", 1.0), ("marginBottom", 10.0), ("flexDirection", "column")],
       )
       let head = themed_container(
-        style=[("height", 36.0)],
-        style_str=[("flexDirection", "row")],
+        style=[("height", 36.0), ("flexDirection", "row")],
       )
       outer.add_child(head)
       let contents : Array[Container] = []
@@ -6347,11 +6276,10 @@ pub fn tabs_t(
         // 轮才恢复(实测);单写与 outer 同款两栖语义
         let page_c = themed_container(
           style=if platform() == "windows" {
-            [("flex", 1.0), ("flexbasis", 0.0)]
+            [("flex", 1.0), ("flexbasis", 0.0), ("flexDirection", "column")]
           } else {
-            [("flexgrow", 1.0), ("flexshrink", 1.0)]
+            [("flexgrow", 1.0), ("flexshrink", 1.0), ("flexDirection", "column")]
           },
-          style_str=[("flexDirection", "column")],
         )
         ViewLike::set_visible(page_c, cur.val == idx)
         let page_v = (node.mount)(ViewLike::view(page_c))
@@ -6389,8 +6317,7 @@ fn select_row(
   on_pick : () -> Unit,
 ) -> Container {
   let row = themed_container(
-    style=[("height", 28.0), ("paddingLeft", 8.0)],
-    style_str=[("flexDirection", "row"), ("alignItems", "center")],
+    style=[("height", 28.0), ("paddingLeft", 8.0), ("flexDirection", "row"), ("alignItems", "center")],
   )
   let hover = Ref(false)
   row.on_draw(fn(p) {
@@ -6559,12 +6486,9 @@ pub fn select_t(
                 rows_h = 300.0
               }
               let list = themed_container(
-                style=[
-                  ("width", width),
+                style=[("width", width),
                   ("height", rows_h),
-                  ("padding", 4.0),
-                ],
-                style_str=[("flexDirection", "column")],
+                  ("padding", 4.0), ("flexDirection", "column")],
               )
               set_panel_bg(list)
               for opt in options {
@@ -6856,12 +6780,9 @@ pub fn dropdown_menu(
               // 根容器宽高创建期给定(事后 set_style 会被弹层时序吞掉),
               // 高度 = 项数 x 28 + padding 8,与 content_size 一致
               let list = themed_container(
-                style=[
-                  ("width", width),
+                style=[("width", width),
                   ("height", items.length().to_double() * 28.0 + 8.0),
-                  ("padding", 4.0),
-                ],
-                style_str=[("flexDirection", "column")],
+                  ("padding", 4.0), ("flexDirection", "column")],
               )
               set_panel_bg(list)
               for i in 0..<items.length() {
@@ -6882,8 +6803,7 @@ pub fn dropdown_menu(
                 }
                 let hover = Ref(false)
                 let row = themed_container(
-                  style=[("height", 28.0), ("paddingLeft", 8.0)],
-                  style_str=[("flexDirection", "row"), ("alignItems", "center")],
+                  style=[("height", 28.0), ("paddingLeft", 8.0), ("flexDirection", "row"), ("alignItems", "center")],
                 )
                 row.on_draw(fn(p2) {
                   let b = ViewLike::get_bounds(row)
@@ -6963,12 +6883,10 @@ pub fn carousel_t(
       let dots : Array[Container] = []
       let panels : Array[Container] = []
       let outer = themed_container(
-        style=[("width", width), ("height", height + 24.0), ("marginBottom", 10.0)],
-        style_str=[("flexDirection", "column")],
+        style=[("width", width), ("height", height + 24.0), ("marginBottom", 10.0), ("flexDirection", "column")],
       )
       let stage = themed_container(
-        style=[("width", width), ("height", height)],
-        style_str=[("flexDirection", "column")],
+        style=[("width", width), ("height", height), ("flexDirection", "column")],
       )
       // 切页:越界回绕
       fn do_switch(i : Int) -> Unit {
@@ -6995,8 +6913,7 @@ pub fn carousel_t(
         // 舞台(两侧箭头各占 24px),盖住右侧切换箭头的事件窗口。
         // grow/shrink 单写:column 舞台 auto 高链下简写派生 basis 0 塌陷
         let pc = themed_container(
-          style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
-          style_str=[("flexDirection", "column"), ("alignSelf", "stretch")],
+          style=[("flexgrow", 1.0), ("flexshrink", 1.0), ("flexDirection", "column"), ("alignSelf", "stretch")],
         )
         ViewLike::set_visible(pc, i == 0)
         ignore((pages[i].mount)(ViewLike::view(pc)))
@@ -7076,12 +6993,12 @@ pub fn carousel_t(
       }
 
       // 布局:舞台行 = 左箭头 + 舞台 + 右箭头;下行为指示点
-      let stage_row = themed_container(style_str=[("flexDirection", "row")])
+      let stage_row = themed_container(style=[("flexDirection", "row")])
       stage_row.add_child(arrow(false))
       ViewLike::set_style(stage, "flex", 1.0)
       stage_row.add_child(stage)
       stage_row.add_child(arrow(true))
-      let dots_row = themed_container(style_str=[("flexDirection", "row")])
+      let dots_row = themed_container(style=[("flexDirection", "row")])
       for d in dots {
         dots_row.add_child(d)
       }
@@ -7201,12 +7118,9 @@ pub fn color_picker_t(
               let grid_w0 = per_row.to_double() * (swatch + gap) + 16.0
               let grid_h0 = 16.0 + rows_n0.to_double() * (swatch + gap)
               let grid = themed_container(
-                style=[
-                  ("width", grid_w0),
+                style=[("width", grid_w0),
                   ("height", grid_h0),
-                  ("padding", 8.0),
-                ],
-                style_str=[("flexDirection", "column")],
+                  ("padding", 8.0), ("flexDirection", "column")],
               )
               set_panel_bg(grid)
               let rows : Array[(Container, Array[Container])] = []
@@ -7214,8 +7128,7 @@ pub fn color_picker_t(
                 if i % per_row == 0 {
                   rows.push((
                     themed_container(
-                      style=[("height", swatch + gap)],
-                      style_str=[("flexDirection", "row")],
+                      style=[("height", swatch + gap), ("flexDirection", "row")],
                     ),
                     [],
                   ))
@@ -7305,9 +7218,7 @@ pub fn side_menu_sections(
 ) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("width", width), ("padding", 6.0)], style_str=[
-        ("flexDirection", "column"),
-      ])
+      let outer = themed_container(style=[("width", width), ("padding", 6.0), ("flexDirection", "column"),])
       set_panel_bg(outer)
       let gfont = Font::new("Sans", 12.0)
       for (group, items) in sections {
@@ -7347,7 +7258,7 @@ pub fn side_menu_sections(
           }
         })
         // 组内项容器 + 项(收起即整容器隐藏,不占布局)
-        let body = themed_container(style_str=[("flexDirection", "column")])
+        let body = themed_container(style=[("flexDirection", "column")])
         for it in items {
           let mut kind : IconKind? = None
           for kv in icons {
