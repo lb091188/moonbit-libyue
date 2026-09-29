@@ -103,7 +103,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
             @yue.select_t(
               ["杭州", "北京", "上海", "深圳", "广州"],
               app.picked_lang.store(),
-              width=170.0,
+              style=[("width", 170.0)],
               clearable=true,
             ),
             @yue.color_picker_t(picked_color.store()),
@@ -224,7 +224,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
           [
             @yue.date_picker_t(
               value=dp_val.store(),
-              width=170.0,
+              style=[("width", 170.0)],
               clearable=true,
             ),
             @yue.label_t("选中:", role=@yue.Body),
@@ -239,7 +239,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
         ),
         @yue.calendar_t(),
         @yue.vbox([
-          @yue.datetime_range_picker_t(value=dtr, width=340.0),
+          @yue.datetime_range_picker_t(value=dtr),
           @yue.bind_label(dtr, fn(r) {
             match (r.start, r.end) {
               (Some((sd, st)), Some((ed, et))) =>

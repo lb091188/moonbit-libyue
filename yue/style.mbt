@@ -23,3 +23,12 @@ pub impl StyVal for Double with fn apply_to(self, v, name) -> Unit {
 pub impl StyVal for String with fn apply_to(self, v, name) -> Unit {
   ffi_view_set_style_prop_str(v, utf8_bytes(name), utf8_bytes(self))
 }
+
+///|
+/// 对裸视图句柄应用样式表（View 未实现 ViewLike，包装型组件
+/// 把样式落到被包装节点 mount 出的根视图时用）。
+fn apply_style_view(v : View, style : Array[(String, &StyVal)]) -> Unit {
+  for (k, val) in style {
+    val.apply_to(v, k)
+  }
+}
