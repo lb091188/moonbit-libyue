@@ -204,15 +204,20 @@ win.set_content(@yue.mount([
 不用 Store 的地方照旧用 `handle` + setter，两者共存。
 
 状态变化时要换的不只是文本而是任意节点，用 `bind_node`：信号变化时重挂整棵
-子树，适合低频切换——典型如深浅主题的太阳/月亮图标按钮：
+子树，适合低频切换。⚠ **Windows 限制（libyue 层根因待修，见 adaptation.md）**：
+点击回调链路里重挂**包含被点控件自身的子树**会让后续鼠标命中测试错乱
+（全窗点击被误路由、不可逆）——此类场景改「双预建 + `handle` 里订阅
+`set_visible` 显隐切换」（不销毁不重建 view，走 display:none 安全路径）：
 
 ```moonbit
-@yue.bind_node(dark.signal(), fn(dark) {
-  @yue.icon_button_t(
-    if dark { @yue.Sun } else { @yue.Moon },
-    on_click=fn() { dark.update(fn(v) { !v }) },
-  )
+// 随状态换表单区块(非点击链路自身):bind_node 适用
+@yue.bind_node(mode.signal(), fn(m) {
+  if m { @yue.input_t(text="编辑模式") } else { @yue.label_t("只读模式") }
 })
+// 换图标按钮这类「点击自身触发重挂」的形态:Windows 用 swap_node
+@yue.swap_node(dark.signal(),
+  @yue.icon_button_t(@yue.YhMoon, on_click=..., tip="切换到深色"),
+  @yue.icon_button_t(@yue.YhSunny, on_click=..., tip="切换到浅色"))
 ```
 
 高频更新请改用 `bind`（文本）或经 `handle` 命令式改属性。
@@ -228,7 +233,8 @@ API 一览：
 | `map(f)` | 派生 Store，源变化时自动跟随（可链式） |
 | `bind_label(store, f, …)` | 声明树里绑定文本，`f` 把状态映射为字符串 |
 | `bind(sig, f, …)` | bind_label 的信号版；接受源信号或 computed 派生信号 |
-| `bind_node(sig, f)` | 声明树里绑定任意节点：信号变化时把子树重挂为 `f(新值)`，适合低频切换（如随状态换太阳/月亮图标按钮）；Store 传 `store.signal()` 接入 |
+| `bind_node(sig, f)` | 声明树里绑定任意节点：信号变化时把子树重挂为 `f(新值)`，适合低频切换；**Windows 上点击链路会重挂自身的场景禁用**（见上方警示）；Store 传 `store.signal()` 接入 |
+| `swap_node(sig, a, b)` | 两态切换：预建 a/b 两棵节点、信号值选显隐，不销毁不重建——bind_node 的 Windows 安全替代，代价是两棵子树常驻 |
 
 ### Signal：自动依赖收集的派生
 

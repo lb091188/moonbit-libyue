@@ -9,6 +9,11 @@
 - 平台
   - macOS 暂缓(无设备)
   - Windows 富文本 / markdown 观感待真机复验
+- [ ] **libyue fork 根修:Windows 运行期 remove+add 子树后鼠标 hit-test 错乱**(bind_node 病根,详见 docs/zh/adaptation.md「bind_node 运行期重挂后 Windows 鼠标 hit-test 错乱」)
+  - 现象:点击回调链里 remove_child+add 新子树后,新子树的 size_allocation_(ViewImpl 布局分配矩形)异常,FindChildFromPoint 恒命中它——全窗点击被误路由给重挂过的控件、不可逆、连标题栏都关不掉;推迟重挂躲不开,Linux 无恙
+  - 复现工具:examples/probe-click(行2 bind_node(button_t) 必现,事件流自动记录)
+  - 排查方向:RemoveChildView 后被移除 view 的 size_allocation_ 残留、新挂 view 首轮 Layout 前的初始值;补丁方向:remove 时清零或 FindChildFromPoint 对未布局 view 防御
+  - 修好随 vendor-* 重出包后:解除 bind_node 的 Windows 警示与 swap_node 的「安全替代」定位(两 API 并存,swap_node 仍有零重建的低开销价值)
 - [ ] 浏览器按需化的 fork 侧收尾(4a 治本,详见 docs/zh/adaptation.md「浏览器依赖按需化」)
   - fork(lb091188/yue)发行脚本把 browser.cc / browser_gtk.cc 与 menu_item_gtk 的 webkit 耦合拆出 jumbo(补丁原型已在本仓库 prepare.py 源码路径实测:抽段 + GType/dlsym 运行时探测)
   - 重发 vendor-* 三平台预构建库,prepare.py 升版本后,预构建模式(mooncakes 零编译路径)获得与源码模式同等的 webkit 按需化

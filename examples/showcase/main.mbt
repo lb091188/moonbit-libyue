@@ -159,36 +159,25 @@ fn main {
             @yue.hbox(
               [
                 @yue.label_t("V\{@yue.VERSION}", role=@yue.Secondary),
-                // 图标随状态切换:双预建按钮显隐切换(set_visible)。不用
-                // bind_node 重挂——Windows 上点击回调触发的 remove+add
-                // 会令 hit-test 异常(点击任意处都被路由给重挂过的控件,
-                // 真机探针实证且推迟重挂也躲不开),显隐走 display:none
-                // 是 fork 补丁专门维护的路径,安全
-                @yue.icon_button_t(
-                  @yue.YhMoon,
-                  on_click=fn() { app.dark_mode.update(fn(v) { !v }) },
-                  tip="切换到深色",
-                  size=30.0,
-                  style=[("marginLeft", 20.0)],
-                  handle=fn(c) {
-                    app.dark_mode.subscribe(fn(d) {
-                      c.set_visible(!d)
-                    })
-                    c.set_visible(!app.dark_mode.get())
-                  },
-                ),
-                @yue.icon_button_t(
-                  @yue.YhSunny,
-                  on_click=fn() { app.dark_mode.update(fn(v) { !v }) },
-                  tip="切换到浅色",
-                  size=30.0,
-                  style=[("marginLeft", 20.0)],
-                  handle=fn(c) {
-                    app.dark_mode.subscribe(fn(d) {
-                      c.set_visible(d)
-                    })
-                    c.set_visible(app.dark_mode.get())
-                  },
+                // 图标随状态切换:swap_node 双预建显隐(bind_node 的
+                // Windows 安全替代——重挂的 remove+add 会令 hit-test
+                // 错乱,真机实证;显隐走 display:none 安全路径)
+                @yue.swap_node(
+                  app.dark_mode.signal(),
+                  @yue.icon_button_t(
+                    @yue.YhMoon,
+                    on_click=fn() { app.dark_mode.update(fn(v) { !v }) },
+                    tip="切换到深色",
+                    size=30.0,
+                    style=[("marginLeft", 20.0)],
+                  ),
+                  @yue.icon_button_t(
+                    @yue.YhSunny,
+                    on_click=fn() { app.dark_mode.update(fn(v) { !v }) },
+                    tip="切换到浅色",
+                    size=30.0,
+                    style=[("marginLeft", 20.0)],
+                  ),
                 ),
               ],
               style=[
