@@ -544,7 +544,7 @@ let ratio = @yue.Store::new(0.42)
 
 `code_view(lines, lang? = "moonbit", font_size? = 13.0, line_numbers? = false, style?, handle?)`
 
-Per-token highlighting with manual layout — consistent behavior on all platforms (including Windows). lang keyword sets: moonbit / js / ts / python / rust / c / go / bash / sql (case-insensitive); line_numbers=true draws a left gutter.
+Per-token highlighting with manual layout — consistent behavior on all platforms (including Windows). Color classes: keywords purple / types and capitalized constructors yellow / calls followed by `(` blue / numbers orange / strings green / line comments gray; punctuation and operators tokenize separately (`items.push(`, `0..<` each color correctly). lang keyword sets: moonbit / js / ts / python / rust / c / go / bash / sql (case-insensitive); line_numbers=true draws a left gutter.
 
 ```moonbit
 @yue.code_view(

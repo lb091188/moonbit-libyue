@@ -52,3 +52,39 @@ test {
   assert_eq(t2.h, 0)
   assert_eq(t2.m, 0)
 }
+
+test {
+  // 代码高亮分词:关键字/类型/函数调用/数字/字符串/注释与断词规则
+  fn color_of(line : String, word : String, lang : String) -> String {
+    let mut found = ""
+    for t in tokenize_lang(line, lang) {
+      if t.text == word {
+        found = t.color
+      }
+    }
+    found
+  }
+  // 关键字(含补全的 in/loop/typealias 等)紫、大写开头类型黄
+  assert_eq(color_of("for row in rows", "for", "moonbit"), "#C678DD")
+  assert_eq(color_of("for row in rows", "in", "moonbit"), "#C678DD")
+  assert_eq(color_of("loop { break }", "loop", "moonbit"), "#C678DD")
+  assert_eq(color_of("typealias T = Int", "typealias", "moonbit"), "#C678DD")
+  assert_eq(color_of("typealias T = Int", "T", "moonbit"), "#E5C07B")
+  assert_eq(color_of("let n : Array[Int] = []", "Array", "moonbit"), "#E5C07B")
+  // @ 限定名:最后段小写为调用蓝、大写为类型黄
+  assert_eq(color_of("@yue.tooltip_t(x, y)", "@yue.tooltip_t", "moonbit"), "#61AFEF")
+  assert_eq(color_of("@yue.IconKind", "@yue.IconKind", "moonbit"), "#E5C07B")
+  // 词后紧跟 '(' 为函数调用;无括号的限定名保持普通色
+  assert_eq(color_of("items.push(v)", "items.push", "moonbit"), "#61AFEF")
+  assert_eq(color_of("let v = items.copy", "items.copy", "moonbit"), "#ABB2BF")
+  // 区间:前导数字独立着橙,..< 归运算符
+  assert_eq(color_of("for i in 0..<n", "0", "moonbit"), "#D19A66")
+  assert_eq(color_of("for i in 0..<n", "..<", "moonbit"), "#ABB2BF")
+  // 字符串绿、行注释灰(按语言前缀)
+  assert_eq(color_of("let s = \"abc\"", "\"abc\"", "moonbit"), "#98C379")
+  assert_eq(color_of("// note", "// note", "moonbit"), "#5C6370")
+  assert_eq(color_of("# python", "# python", "python"), "#5C6370")
+  // tokenize_moonbit 收敛为 moonbit 特化;其余语言关键字表不回归
+  assert_eq(tokenize_moonbit("in")[0].color, "#C678DD")
+  assert_eq(color_of("fn main() {}", "fn", "rust"), "#C678DD")
+}
