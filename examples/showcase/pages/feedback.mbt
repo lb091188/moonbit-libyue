@@ -43,18 +43,20 @@ pub fn page_feedback(app : @ui.App) -> @yue.Node {
       "Result 结果页",
       "大色块符号 + 标题 + 描述 + 操作区;四种语义类型。",
       [
-        @yue.result(
-          @yue.Success,
-          "操作成功",
-          "配置已写入并生效。",
-          [@yue.button_t("返回首页")],
-        ),
-        @yue.result(
-          @yue.Danger,
-          "操作失败",
-          "网络异常,请稍后重试。",
-          [@yue.button_t("重新加载", variant=@yue.Soft)],
-        ),
+        @yue.hbox([
+          @yue.result(
+            @yue.Success,
+            "操作成功",
+            "配置已写入并生效。",
+            [@yue.button_t("返回首页")],
+          ),
+          @yue.result(
+            @yue.Danger,
+            "操作失败",
+            "网络异常,请稍后重试。",
+            [@yue.button_t("重新加载", variant=@yue.Soft)],
+          ),
+          ])
       ],
       code=[
         "// result(语义类型, 标题, 描述, 操作区节点数组):大色块图标随类型画符号",

@@ -257,18 +257,19 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
             @yue.statistic("访问量", app.visits.store()),
             @yue.statistic("任务数", @yue.Store::new("36")),
           ],
-          style=[("alignItems", "center")],
+          style=[("alignItems", "center"),("marginBottom",10.0)],
         ),
         @yue.button_t(
           "刷新访问量",
           on_click=fn() { app.counter.update(fn(n) { n + 1 }) },
           variant=@yue.Solid,
+          style=[("marginBottom",10.0)]
         ),
         @yue.progress_line(app.ratio.store()),
         @yue.bind(
           app.ratio,
           fn(v) { "当前进度 \{((v * 100.0)).round()}%" },
-          style=[("marginTop", 6.0)],
+          style=[("marginTop", 10.0)],
         ),
       ],
       code=[
@@ -300,7 +301,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
               "卡片内容:组件库全部用 theme_* 主题色着色。",
             ),
           ],
-          style=[("height", 110.0)],
+          style=[("height", 110.0),("marginBottom",10.0)],
         ),
         @yue.collapse([
           (

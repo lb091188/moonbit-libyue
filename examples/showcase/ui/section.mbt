@@ -118,14 +118,14 @@ fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
     selected.subscribe(ensure)
   })
   let inner : Array[@yue.Node] = [
-    @yue.label_t(s.title, role=@yue.Section, style=[("marginBottom", 8.0)]),
-    holder,
+    @yue.label_t(s.title, role=@yue.Section, style=[("marginBottom", 10.0)]),
   ]
   if s.desc != "" {
     inner.push(
-      @yue.label_t(s.desc, role=@yue.Secondary, style=[("marginTop", 10.0)]),
+      @yue.label_t(s.desc, role=@yue.Secondary, style=[("marginTop", 10.0),("marginBottom", 10.0)]),
     )
   }
+  inner.push(holder)
   if s.code.length() > 0 {
     inner.push(code_copy_row(s.code))
     inner.push(
@@ -172,6 +172,6 @@ fn code_copy_row(lines : Array[String]) -> @yue.Node {
         },
       ),
     ],
-    style=[("marginTop", 12.0), ("marginBottom", 4.0), ("alignItems", "center")],
+    style=[("marginTop", 10.0), ("marginBottom", 4.0), ("alignItems", "center")],
   )
 }

@@ -38,7 +38,7 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.context_menu_for(@yue.tag("右键我", "#2D68C4"), [
+            @yue.context_menu_for(@yue.tag("右键我", "#2D68C4",style=[("width",140.0),("height",32.0)]), [
               ("复制", fn() { app.picked_lang.set("已复制") }),
               ("重命名", fn() { app.picked_lang.set("重命名") }),
               ("-", fn() {  }),
@@ -48,7 +48,7 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
               "操作",
               ["打开", "保存", "-", "复制链接", "删除"],
               fn(i) { app.picked_lang.set("菜单项 \{i}") },
-              style=[("width", 140.0)],
+              style=[("width", 140.0),("marginBottom",0.0), ("marginRight", 10.0)],
             ),
             @yue.bind(app.picked_lang, fn(s) { "最近操作:\{s}" }),
           ],
