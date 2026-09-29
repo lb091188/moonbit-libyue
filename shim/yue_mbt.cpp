@@ -607,8 +607,8 @@ void yue_mbt_view_set_borderless(void *view, int on) {
 #endif
 }
 
-// 走到根做一次 Layout(yoga 全树重算并同步原生子控件位置),再从起点
-// 向上逐层强制 UpdateChildBounds 下发子边界。
+// 走到根做一次 Layout(yoga 全树重算并同步原生子控件位置),再沿
+// root→起点方向逐层强制 UpdateChildBounds 下发子边界。
 // 必须走到根:View::Layout 的传播在非 Container 父(Scroll)处中断,
 // 子树内 display 切换(显隐页)后 yoga 根不重算,隐藏页恢复显示时拿到
 // 0 高尺寸(Windows 实测内容塌缩)。
@@ -619,6 +619,9 @@ void yue_mbt_view_set_borderless(void *view, int on) {
 // 表现为长文本截断、且滞后到下一次真实 resize 才恢复(Linux 探针
 // 实测 bounds 滞后一轮)。libyue 的 Container::Layout 非根分支有等价
 // 自愈,但其向上传播同样会被非 Container 父截断,故此处显式逐层。
+// 必须外→内顺序:Scroll 的内容容器是独立 yoga 根(不挂大树),其
+// UpdateChildBounds 才触发局部树重算;内层若先下发拿到的是重算前的
+// 旧值,新测宽仍到不了目标(Scroll 场景探针实测,内→外序滞后一轮)。
 static void layout_root_down(nu::View* v) {
   auto* root = v;
   while (root->GetParent() != nullptr)
@@ -627,9 +630,13 @@ static void layout_root_down(nu::View* v) {
     static_cast<nu::Container*>(root)->Layout();
   else
     root->Layout();
-  for (auto* p = v; p != nullptr && p != root; p = p->GetParent()) {
-    if (p->IsContainer())
-      static_cast<nu::Container*>(p)->UpdateChildBounds();
+  nu::View* path[128];
+  int n = 0;
+  for (auto* p = v; p != nullptr && p != root && n < 128; p = p->GetParent())
+    path[n++] = p;
+  for (int i = n - 1; i >= 0; i--) {
+    if (path[i]->IsContainer())
+      static_cast<nu::Container*>(path[i])->UpdateChildBounds();
   }
 }
 
