@@ -252,11 +252,11 @@ fn main {
           "新建连接",
           [
             @yue.label_t("名称", role=@yue.Body),
-            @yue.input_t(text="例如:开发库", width=320.0, on_input=fn(t) {
+            @yue.input_t(text="例如:开发库", style=[("width", 320.0)], on_input=fn(t) {
               app.dlg_name.set(t)
             }),
             @yue.label_t("地址", role=@yue.Body),
-            @yue.input_t(text="host:port", width=320.0),
+            @yue.input_t(text="host:port", style=[("width", 320.0)]),
           ],
           width=380.0,
         ),

@@ -15,7 +15,7 @@ pub fn page_code(_app : @ui.App) -> @yue.Node {
           ],
           lang="moonbit",
           line_numbers=true,
-          width=430.0,
+          style=[("width", 430.0)],
         ),
         @yue.code_view(
           [
@@ -25,7 +25,7 @@ pub fn page_code(_app : @ui.App) -> @yue.Node {
           ],
           lang="rust",
           line_numbers=true,
-          width=430.0,
+          style=[("width", 430.0)],
         ),
         @yue.code_view(
           [
@@ -34,7 +34,7 @@ pub fn page_code(_app : @ui.App) -> @yue.Node {
           ],
           lang="python",
           line_numbers=true,
-          width=430.0,
+          style=[("width", 430.0)],
         ),
       ],
       code=[

@@ -174,27 +174,21 @@ pub fn entry(
         style=make_style,
       )
       let target : View = if platform() == "windows" {
-        // 与 entry_t 一致的字体,保证行高测量与控件实际字体吻合
+        // 与 entry_t 一致:字体先设(行高测量吻合),控件收窄到行高,
+        // height 键值原样包进外壳容器 justifyContent=center 垂直居中
         ViewLike::set_font(e, Font::new("Sans", 13.0))
-        match height_kv {
-          Some(kv) => {
-            let shell = themed_container(style=[kv])
-            ViewLike::set_style(e, "flex", 1.0)
-            attach(ViewLike::view(shell), ViewLike::view(e))
-            post_task(fn() {
-              let b = ViewLike::get_bounds(shell)
-              entry_vcenter(e, b.height, true)
-            })
-            bind_entry_theme(e)
-            ViewLike::view(shell)
-          }
-          None => {
-            entry_vcenter(e, control_height, true)
-            bind_entry_theme(e)
-            ViewLike::view(e)
-          }
+        ViewLike::set_style(e, "height", entry_ctrl_height(true))
+        let shell_style : Array[(String, &StyVal)] = match height_kv {
+          Some(kv) => [kv]
+          None => [("height", control_height)]
         }
+        shell_style.push(("justifyContent", "center"))
+        let shell = themed_container(style=shell_style)
+        attach(ViewLike::view(shell), ViewLike::view(e))
+        bind_entry_theme(e)
+        ViewLike::view(shell)
       } else {
+        bind_entry_theme(e)
         ViewLike::view(e)
       }
       e.on_activate(fn() { on_enter(e.get_text()) })

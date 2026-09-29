@@ -853,30 +853,39 @@ pub fn segmented(options : Array[String], selected : Store[String]) -> Node {
 ///|
 /// 标签(对应 EP Tag 的浅色变体):类型浅底 + 同族深字,直角,
 /// 宽度按文本自适应,文字垂直居中。
-pub fn tag_of_type(text : String, t : SemanticType) -> Node {
+pub fn tag_of_type(
+  text : String,
+  t : SemanticType,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
       let font = Font::new("Sans", 12.0)
       let probe = AttributedText::new(text, wrap=false)
       probe.set_font(font)
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
-      let w = text_w + 16.0
-      let h = 24.0
-      let c = themed_container(style=[
-        ("width", w),
-        ("height", h),
+      let base : Array[(String, &StyVal)] = [
+        ("width", text_w + 16.0),
+        ("height", 24.0),
         ("marginRight", 8.0),
-      ])
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let c = themed_container(style=base)
+      handle(c)
       c.on_draw(fn(p) {
+        let b = ViewLike::get_bounds(c)
         p.set_fill_color(type_light_color(t))
-        p.fill_rect(0.0, 0.0, w, h)
+        p.fill_rect(0.0, 0.0, b.width, b.height)
         // 水平手动居中(GTK 端 DrawAttributedText 不实现水平 align)
         p.draw_text(
           text,
-          (w - text_w) / 2.0,
+          (b.width - text_w) / 2.0,
           0.0,
-          w,
-          h,
+          b.width,
+          b.height,
           valign=Center,
           color=type_color(t),
         )
@@ -889,28 +898,38 @@ pub fn tag_of_type(text : String, t : SemanticType) -> Node {
 
 ///|
 /// 兼容旧用法的彩色实底标签(自定颜色)。
-pub fn tag(text : String, color : String, height? : Double = 24.0) -> Node {
+pub fn tag(
+  text : String,
+  color : String,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
       let font = Font::new("Sans", 12.0)
       let probe = AttributedText::new(text, wrap=false)
       probe.set_font(font)
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
-      let w = text_w + 16.0
-      let c = themed_container(style=[
-        ("width", w),
-        ("height", height),
+      let base : Array[(String, &StyVal)] = [
+        ("width", text_w + 16.0),
+        ("height", 24.0),
         ("marginRight", 8.0),
-      ])
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let c = themed_container(style=base)
+      handle(c)
       c.on_draw(fn(p) {
+        let b = ViewLike::get_bounds(c)
         p.set_fill_color(color)
-        p.fill_rect(0.0, 0.0, w, height)
+        p.fill_rect(0.0, 0.0, b.width, b.height)
         p.draw_text(
           text,
-          (w - text_w) / 2.0,
+          (b.width - text_w) / 2.0,
           0.0,
-          w,
-          height,
+          b.width,
+          b.height,
           valign=Center,
           color="#FFFFFF",
         )
@@ -924,7 +943,11 @@ pub fn tag(text : String, color : String, height? : Double = 24.0) -> Node {
 ///|
 /// 数字角标(对应 EP Badge 的数字形态):红底白字小块,宽度自适应。
 /// 语义红 draw 现取跟随主题(不复用 tag——其 color 参数为固定色语义)。
-pub fn badge_count(count : Int) -> Node {
+pub fn badge_count(
+  count : Int,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   let text = count.to_string()
   {
     mount: fn(parent) {
@@ -932,22 +955,26 @@ pub fn badge_count(count : Int) -> Node {
       let probe = AttributedText::new(text, wrap=false)
       probe.set_font(font)
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
-      let w = text_w + 14.0
-      let h = 18.0
-      let c = themed_container(style=[
-        ("width", w),
-        ("height", h),
+      let base : Array[(String, &StyVal)] = [
+        ("width", text_w + 14.0),
+        ("height", 18.0),
         ("marginRight", 8.0),
-      ])
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let c = themed_container(style=base)
+      handle(c)
       c.on_draw(fn(p) {
+        let b = ViewLike::get_bounds(c)
         p.set_fill_color(theme_danger())
-        p.fill_rect(0.0, 0.0, w, h)
+        p.fill_rect(0.0, 0.0, b.width, b.height)
         p.draw_text(
           text,
-          (w - text_w) / 2.0,
+          (b.width - text_w) / 2.0,
           0.0,
-          w,
-          h,
+          b.width,
+          b.height,
           valign=Center,
           color="#FFFFFF",
         )
@@ -1015,10 +1042,20 @@ fn crumb_fg_static(_act : Bool, _hov : Bool) -> String {
 ///|
 /// 提示横幅(对应 EP Alert):类型浅底 + 左侧 4px 色条 + 同族深字,
 /// 全宽,文字垂直居中。
-pub fn alert(text : String, t : SemanticType, height? : Double = 40.0) -> Node {
+pub fn alert(
+  text : String,
+  t : SemanticType,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let v = themed_container(style=[("height", height), ("marginBottom", 10.0)])
+      let base : Array[(String, &StyVal)] = [("height", 40.0), ("marginBottom", 10.0)]
+      for kv in style {
+        base.push(kv)
+      }
+      let v = themed_container(style=base)
+      handle(v)
       v.on_draw(fn(p) {
         let b = ViewLike::get_bounds(v)
         let w = b.width
@@ -1147,12 +1184,18 @@ pub fn pagination(current : Store[Int], pages : Int) -> Node {
 pub fn card(
   title : String,
   children : Array[Node],
-  height? : Double = 160.0,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
       let head_h = 40.0
-      let outer = themed_container(style=[("height", height)])
+      let base : Array[(String, &StyVal)] = [("height", 160.0)]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       outer.on_draw(fn(p) {
         let b = ViewLike::get_bounds(outer)
         let w = b.width
@@ -1455,8 +1498,9 @@ pub fn code_view(
   lines : Array[String],
   lang? : String = "moonbit",
   font_size? : Double = 13.0,
-  width? : Double = 560.0,
   line_numbers? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -1506,9 +1550,16 @@ pub fn code_view(
         laid.push((segs, x))
       }
       let content_w = max_line_w + num_off + 32.0
-      let view_w = if width > content_w { width } else { content_w }
       let view_h = line_h * laid.length().to_double() + 28.0
-      let c = themed_container(style=[("width", view_w), ("height", view_h)])
+      let base : Array[(String, &StyVal)] = [
+        ("width", content_w),
+        ("height", view_h),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let c = themed_container(style=base)
+      handle(c)
       ViewLike::set_background_color(c, "#282C34")
       c.on_draw(fn(p) {
         let mut y = 14.0
@@ -1528,14 +1579,25 @@ pub fn code_view(
 
 ///|
 /// 头像:方形实底 + 白字居中(EP Avatar 的 square 形态)。
-pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
+pub fn avatar(
+  letter : String,
+  color : String,
+  size? : Double = 36.0,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let c = themed_container(style=[
+      let base : Array[(String, &StyVal)] = [
         ("width", size),
         ("height", size),
         ("marginRight", 8.0),
-      ])
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let c = themed_container(style=base)
+      handle(c)
       ViewLike::set_background_color(c, color)
       // 字母水平居中:GTK 端 align 无效,mount 时测宽手动摆位
       let letter_probe = AttributedText::new(letter, wrap=false)
@@ -1561,25 +1623,49 @@ pub fn avatar(letter : String, color : String, size? : Double = 36.0) -> Node {
 
 ///|
 /// 圆点徽标(EP Badge 的 dot 形态):8×8 色点。
-pub fn badge_dot(color? : String = "") -> Node {
+pub fn badge_dot(
+  color? : String = "",
+  style? : Array[(String, &StyVal)] = [],
+) -> Node {
+  let base : Array[(String, &StyVal)] = [
+    ("width", 8.0),
+    ("height", 8.0),
+    ("marginRight", 6.0),
+  ]
+  for kv in style {
+    base.push(kv)
+  }
   container(
     on_draw=fn(p) {
       // 空串=默认语义红,draw 现取跟随主题;显式传色则恒定
       p.set_fill_color(if color == "" { theme_danger() } else { color })
       p.fill_rect(0.0, 0.0, 10000.0, 10000.0)
     },
-    style=[("width", 8.0), ("height", 8.0), ("marginRight", 6.0)],
+    style=base,
   )
 }
 
 ///|
 /// 可关闭横幅:alert + 右侧关闭钮(点击整条隐藏)。
-pub fn alert_closeable(text : String, t : SemanticType) -> Node {
+pub fn alert_closeable(
+  text : String,
+  t : SemanticType,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let v = themed_container(
-        style=[("height", 40.0), ("marginBottom", 10.0), ("flexDirection", "row"), ("alignItems", "center")],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("height", 40.0),
+        ("marginBottom", 10.0),
+        ("flexDirection", "row"),
+        ("alignItems", "center"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let v = themed_container(style=base)
+      handle(v)
       bind_bg(v, fn() { type_light_color(t) })
       let label = Label::new("  " + text)
       bind_fg(label, fn() { type_color(t) })
@@ -1909,13 +1995,23 @@ pub fn result(
   title : String,
   desc : String,
   children : Array[Node],
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
       // 图标(76+16) + 标题 30 + 描述 24 + 按钮区(8+按钮高约 32)+ 底部留白
-      let outer = themed_container(
-        style=[("height", 208.0), ("marginBottom", 12.0), ("flexDirection", "column"), ("alignItems", "center")],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("height", 208.0),
+        ("marginBottom", 12.0),
+        ("flexDirection", "column"),
+        ("alignItems", "center"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       let icon = themed_container(style=[
         ("width", 76.0),
         ("height", 76.0),
@@ -1982,12 +2078,24 @@ pub fn result(
 
 ///|
 /// 空状态(EP Empty):灰块占位 + 居中说明。
-pub fn empty(desc : String) -> Node {
+pub fn empty(
+  desc : String,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(
-        style=[("height", 140.0), ("marginBottom", 12.0), ("flexDirection", "column"), ("alignItems", "center")],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("height", 140.0),
+        ("marginBottom", 12.0),
+        ("flexDirection", "column"),
+        ("alignItems", "center"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       let box = themed_container(style=[
         ("width", 96.0),
         ("height", 88.0),
@@ -2022,10 +2130,20 @@ pub fn empty(desc : String) -> Node {
 
 ///|
 /// 数值统计(EP Statistic):大号数值(响应式)+ 灰色标题。
-pub fn statistic(title : String, value : Store[String]) -> Node {
+pub fn statistic(
+  title : String,
+  value : Store[String],
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("marginRight", 24.0), ("flexDirection", "column"),])
+      let base : Array[(String, &StyVal)] = [("marginRight", 24.0), ("flexDirection", "column")]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       let num = Label::new(value.get())
       ViewLike::set_font(num, Font::new("Sans", 24.0, weight=SemiBold))
       bind_fg(num, fn() { theme_text_primary() })
@@ -2043,16 +2161,25 @@ pub fn statistic(title : String, value : Store[String]) -> Node {
 ///|
 /// 线性进度条(EP Progress):背景浅灰轨道 + 主题色填充,
 /// value 为 Store(0..1),变化自动重绘。
-pub fn progress_line(value : Store[Double], height? : Double = 8.0) -> Node {
+pub fn progress_line(
+  value : Store[Double],
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
       // grow/shrink 单写不写 flex 简写:column 父(auto 高链)下简写
       // 派生 basis 0 首轮解析成 0 即塌(height 被盖),惰性挂载时序必现
-      let v = themed_container(style=[
+      let base : Array[(String, &StyVal)] = [
         ("flexgrow", 1.0),
         ("flexshrink", 1.0),
-        ("height", height),
-      ])
+        ("height", 8.0),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let v = themed_container(style=base)
+      handle(v)
       bind_bg(v, fn() { theme_info_light() })
       v.on_draw(fn(p) {
         let b = ViewLike::get_bounds(v)
@@ -2149,6 +2276,8 @@ pub fn button_t(
   text : String,
   on_click? : () -> Unit = fn() {  },
   variant? : ButtonVariant = Soft,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -2158,12 +2287,16 @@ pub fn button_t(
       let probe = AttributedText::new(text, wrap=false)
       probe.set_font(font)
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
-      let w = text_w + 32.0
-      let v = themed_container(style=[
-        ("width", w),
+      let base : Array[(String, &StyVal)] = [
+        ("width", text_w + 32.0),
         ("height", control_height),
         ("marginRight", 8.0),
-      ])
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let v = themed_container(style=base)
+      handle(v)
       v.on_draw(fn(p) {
         let b = ViewLike::get_bounds(v)
         let bg = match variant {
@@ -2255,22 +2388,13 @@ pub fn button_t(
 
 ///|
 /// Windows 原生单行输入文字贴顶(Win32 EDIT 自客户区顶部绘制,无垂直
-/// 居中样式):按字体行高把原生控件收窄到「行高(带原生边框时 +1px×2)」,
-/// 剩余高度均分为上下 margin,视觉垂直居中;其余平台原生居中,不动。
-fn entry_vcenter(e : Entry, box_height : Double, bordered : Bool) -> Unit {
-  if platform() != "windows" {
-    return
-  }
+/// 居中样式):控件高度收窄到「行高(带原生边框时 +1px×2)」,文字即
+/// 在控件内天然居中;外层容器用 justifyContent=center 让控件垂直居中
+/// (布局语义,适配任意高度值)。返回收窄后的控件高度。
+fn entry_ctrl_height(bordered : Bool) -> Double {
   let probe = AttributedText::new("Ag", wrap=false)
   probe.set_font(Font::new("Sans", 13.0))
-  let line = probe.get_bounds_for(10000.0, 1000.0).height
-  let ctrl = line + (if bordered { 2.0 } else { 0.0 })
-  ViewLike::set_style(e, "height", ctrl)
-  let rest = (box_height - ctrl) / 2.0
-  if rest > 0.0 {
-    ViewLike::set_style(e, "marginTop", rest)
-    ViewLike::set_style(e, "marginBottom", rest)
-  }
+  probe.get_bounds_for(10000.0, 1000.0).height + (if bordered { 2.0 } else { 0.0 })
 }
 
 ///|
@@ -2291,11 +2415,14 @@ fn bind_entry_theme(e : Entry) -> Unit {
 
 ///|
 /// 主题化单行输入:统一字体与行高;文字色经主题通道跟随色板。
+/// 样式作用于 Entry 本体;Windows 文字贴顶,改为外包居中容器
+/// (Entry 收窄到行高,容器 justifyContent=center),样式落容器。
 pub fn entry_t(
   text? : String = "",
   password? : Bool = false,
-  height? : Double = control_height,
   on_input? : (String) -> Unit = fn(_s) {  },
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Entry) -> Unit = fn(_e) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -2304,18 +2431,28 @@ pub fn entry_t(
         false => Entry::make(text~, entry_type=Normal)
       }
       ViewLike::set_font(e, Font::new("Sans", 13.0))
-      // Linux 端 Entry 尺寸已归一化(min-height:0),裸 Entry 自然高只剩
-      // 文字行高,补显式高度维持输入框观感;Windows 文字贴顶,按行高
-      // 收窄控件 + 均分边距实现垂直居中
-      if platform() == "linux" {
-        ViewLike::set_style(e, "height", height)
+      let base : Array[(String, &StyVal)] = [("height", control_height)]
+      for kv in style {
+        base.push(kv)
+      }
+      let target : View = if platform() == "windows" {
+        // Linux 端 Entry 尺寸已归一化(min-height:0),补显式高度维持观感;
+        // Windows 收窄控件到行高 + 外包居中容器(布局语义,适配任意高度)
+        ViewLike::set_style(e, "height", entry_ctrl_height(true))
+        let shell_style = base.copy()
+        shell_style.push(("justifyContent", "center"))
+        let shell = themed_container(style=shell_style)
+        attach(ViewLike::view(shell), ViewLike::view(e))
+        ViewLike::view(shell)
       } else {
-        entry_vcenter(e, height, true)
+        apply_style(e, style=base)
+        ViewLike::view(e)
       }
       bind_entry_theme(e)
       e.on_text_change(fn() { on_input(e.get_text()) })
-      attach(parent, ViewLike::view(e))
-      ViewLike::view(e)
+      handle(e)
+      attach(parent, target)
+      target
     },
   }
 }
@@ -2329,6 +2466,8 @@ pub fn checkbox_t(
   checked? : Bool = false,
   disabled? : Bool = false,
   on_change? : (Bool) -> Unit = fn(_v) {  },
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -2338,12 +2477,16 @@ pub fn checkbox_t(
       let font = Font::new("Sans", 13.0)
       let probe = AttributedText::new(title, wrap=false)
       probe.set_font(font)
-      let w = probe.get_bounds_for(10000.0, 100.0).width + 30.0
-      let v = themed_container(style=[
-        ("width", w),
+      let base : Array[(String, &StyVal)] = [
+        ("width", probe.get_bounds_for(10000.0, 100.0).width + 30.0),
         ("height", 24.0),
         ("marginBottom", 6.0),
-      ])
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let v = themed_container(style=base)
+      handle(v)
       let activate = fn() -> Unit {
         state.val = !state.val
         on_change(state.val)
@@ -2375,12 +2518,13 @@ pub fn checkbox_t(
             p.stroke()
           }
         }
+        let b = ViewLike::get_bounds(v)
         let at = AttributedText::new(title, valign=Center, wrap=false)
         at.set_font(font)
         at.set_color(if disabled { theme_border() } else { theme_text_regular() })
-        p.draw_attributed_text(at, 25.0, 0.0, w, 24.0)
+        p.draw_attributed_text(at, 25.0, 0.0, b.width, b.height)
         if focused.val {
-          draw_focus_ring(p, w, 24.0)
+          draw_focus_ring(p, b.width, b.height)
         }
       })
       let repaint = fn() -> Unit {
@@ -2423,10 +2567,17 @@ pub fn radio_group(
   options : Array[String],
   selected : Store[String],
   disabled? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("marginBottom", 10.0), ("flexDirection", "column"),])
+      let base : Array[(String, &StyVal)] = [("marginBottom", 10.0), ("flexDirection", "column")]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       let font = Font::new("Sans", 13.0)
       let rows : Array[Container] = []
       let mut idx = 0
@@ -2557,10 +2708,20 @@ pub fn radio_group(
 ///|
 /// 开关(EP Switch 的直角形态):轨道 + 滑块,开=主题蓝轨道滑块靠右,
 /// 关=浅灰轨道滑块靠左;点击切换,状态存于 Store[Bool]。
-pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
+pub fn switch_t(
+  checked : Store[Bool],
+  disabled? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let v = themed_container(style=[("width", 40.0), ("height", 18.0)])
+      let base : Array[(String, &StyVal)] = [("width", 40.0), ("height", 18.0)]
+      for kv in style {
+        base.push(kv)
+      }
+      let v = themed_container(style=base)
+      handle(v)
       let focused = Ref(false)
       let activate = fn() -> Unit {
         checked.set(!checked.get())
@@ -2608,29 +2769,27 @@ pub fn switch_t(checked : Store[Bool], disabled? : Bool = false) -> Node {
 pub fn input_t(
   text? : String = "",
   password? : Bool = false,
-  margin? : Double = 0.0,
-  width? : Double = 280.0,
-  height? : Double = control_height,
   clearable? : Bool = false,
   on_input? : (String) -> Unit = fn(_s) {  },
   invalid? : Store[Bool] = Store::new(false),
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
       let hover = Ref(false)
       let has_text = Ref(text != "")
-      let outer = themed_container(
-        style=[
-          ("width", width),
-          ("height", height),
-          ("marginTop", margin),
-          ("marginBottom", margin),
-        ],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("width", 280.0),
+        ("height", control_height),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       set_panel_bg(outer)
-      // 清空带宽 24(✕ 中心在带中央),不显示时也留白,避免 ✕ 被 Entry 盖住
-      let clear_x = width - 12.0
       outer.on_draw(fn(p) {
         let b = ViewLike::get_bounds(outer)
         p.set_stroke_color(
@@ -2644,7 +2803,7 @@ pub fn input_t(
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         if clearable && hover.val && has_text.val {
-          draw_clear_x(p, clear_x, b.height / 2.0)
+          draw_clear_x(p, b.width - 12.0, b.height / 2.0)
         }
       })
       invalid.subscribe(fn(_v) { ViewLike::schedule_paint(outer) })
@@ -2654,14 +2813,15 @@ pub fn input_t(
       }
       ViewLike::set_borderless(entry, true)
       set_panel_bg(entry)
-      ViewLike::set_style(entry, "flex", 1.0)
       ViewLike::set_style(entry, "marginLeft", 10.0)
       ViewLike::set_style(entry, "marginRight", if clearable { 26.0 } else { 10.0 })
       if platform() == "windows" {
-        // 文字贴顶:按行高收窄控件并垂直居中(外框线 1px×2 从可用高扣)
-        entry_vcenter(entry, height - 2.0, false)
+        // 文字贴顶:控件收窄到行高,外层 justifyContent=center 垂直居中
+        ViewLike::set_style(entry, "height", entry_ctrl_height(false))
+        ViewLike::set_style_str(outer, "justifyContent", "center")
       } else {
-        // 原生子窗口绘制在自绘之上:上下留 2 让出边框线
+        // 高度撑满 + 原生子窗口绘制在自绘之上:上下留 2 让出边框线
+        ViewLike::set_style(entry, "flex", 1.0)
         ViewLike::set_style(entry, "marginTop", 2.0)
         ViewLike::set_style(entry, "marginBottom", 2.0)
       }
@@ -2726,13 +2886,21 @@ pub fn input_number(
   min? : Double = 0.0,
   max? : Double = 100.0,
   step? : Double = 1.0,
-  num_width? : Double = 64.0,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
-      let row = themed_container(
-        style=[("height", control_height), ("flexDirection", "row"), ("alignItems", "center")],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("height", control_height),
+        ("flexDirection", "row"),
+        ("alignItems", "center"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let row = themed_container(style=base)
+      handle(row)
       let font = Font::new("Sans", 13.0)
       fn step_btn(dir : Double) -> Unit {
         let b = themed_container(
@@ -2783,7 +2951,7 @@ pub fn input_number(
       step_btn(-1.0)
       // marginRight 0:EP InputNumber 的按钮与输入区紧贴
       let num = themed_container(
-        style=[("width", num_width), ("height", control_height), ("marginRight", 0.0), ("alignItems", "center")],
+        style=[("width", 64.0), ("height", control_height), ("marginRight", 0.0), ("alignItems", "center")],
       )
       set_panel_bg(num)
       let t = AttributedText::new(
@@ -2868,13 +3036,25 @@ pub fn form(title : String, items : Array[Node]) -> Node {
 
 ///|
 /// 链接文字:主题色,悬停加深并显示下划线色条,点击回调。
-pub fn link(text : String, on_click : () -> Unit) -> Node {
+pub fn link(
+  text : String,
+  on_click : () -> Unit,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
       let hover = Ref(false)
-      let row = themed_container(
-        style=[("paddingRight", 6.0), ("flexDirection", "row"), ("alignItems", "center")],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("paddingRight", 6.0),
+        ("flexDirection", "row"),
+        ("alignItems", "center"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let row = themed_container(style=base)
+      handle(row)
       let l = Label::new(text)
       ViewLike::set_font(l, Font::new("Sans", 13.0))
       fn apply_color() -> Unit {
@@ -3931,9 +4111,9 @@ fn build_time_row(
   let row = hbox(
     [
       label_t(label, role=Body, style=[("width", 28.0), ("marginRight", 6.0)]),
-      input_number(hs, min=0.0, max=23.0, step=1.0, num_width=40.0),
+      input_number(hs, min=0.0, max=23.0, step=1.0, style=[("width", 40.0)]),
       label_t(":", role=Body),
-      input_number(ms, min=0.0, max=59.0, step=1.0, num_width=40.0),
+      input_number(ms, min=0.0, max=59.0, step=1.0, style=[("width", 40.0)]),
     ],
     style=[("marginBottom", 6.0), ("alignItems", "center")],
   )
@@ -5921,21 +6101,29 @@ pub fn table_v_t(
 ///|
 /// 分隔线(EP Divider):水平(默认,height 1px,宽 flex)或竖直(宽 1px,
 /// 高随父容器);spacing 为两侧留白。底色挂载时读主题(重建界面生效)。
-pub fn divider(vertical? : Bool = false, spacing? : Double = 10.0) -> Node {
+pub fn divider(
+  vertical? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let style : Array[(String, &StyVal)] = if vertical {
-        [("width", 1.0), ("marginLeft", spacing), ("marginRight", spacing)]
+      let base : Array[(String, &StyVal)] = if vertical {
+        [("width", 1.0), ("marginLeft", 10.0), ("marginRight", 10.0)]
       } else {
-        [("height", 1.0), ("marginTop", spacing), ("marginBottom", spacing)]
+        [("height", 1.0), ("marginTop", 10.0), ("marginBottom", 10.0)]
       }
       if !vertical {
         // 水平分隔线在 column 父(auto 高链)下:grow/shrink 单写,
         // flex 简写派生 basis 0 会盖掉 height 1 塌成 0 高
-        style.push(("flexgrow", 1.0))
-        style.push(("flexshrink", 1.0))
+        base.push(("flexgrow", 1.0))
+        base.push(("flexshrink", 1.0))
       }
-      let c = themed_container(style=style)
+      for kv in style {
+        base.push(kv)
+      }
+      let c = themed_container(style=base)
+      handle(c)
       bind_bg(c, fn() { theme_border() })
       attach(parent, ViewLike::view(c))
       ViewLike::view(c)
@@ -5951,30 +6139,28 @@ pub fn divider(vertical? : Bool = false, spacing? : Double = 10.0) -> Node {
 /// 点击清空文本(on_input 收到空串)。
 pub fn textarea_t(
   text? : String = "",
-  width? : Double = 280.0,
-  height? : Double = 110.0,
-  margin? : Double = 0.0,
   on_input? : (String) -> Unit = fn(_s) {  },
   clearable? : Bool = false,
   invalid? : Store[Bool] = Store::new(false),
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
       let hover = Ref(false)
       let has_text = Ref(text != "")
-      let outer = themed_container(
-        style=[
-          ("width", width),
-          ("height", height),
-          ("padding", 10.0),
-          ("marginTop", margin),
-          ("marginBottom", margin),
-        ],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("width", 280.0),
+        ("height", 110.0),
+        ("padding", 10.0),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       set_panel_bg(outer)
-      // 清空带在 padding 区右侧(TextEdit 恒定让出,防 ✕ 被原生子窗口盖住)
-      let clear_x = width - 20.0
       outer.on_draw(fn(p) {
         let b = ViewLike::get_bounds(outer)
         p.set_stroke_color(
@@ -5988,7 +6174,7 @@ pub fn textarea_t(
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         if clearable && hover.val && has_text.val {
-          draw_clear_x(p, clear_x, b.height / 2.0)
+          draw_clear_x(p, b.width - 20.0, b.height / 2.0)
         }
       })
       invalid.subscribe(fn(_v) { ViewLike::schedule_paint(outer) })
@@ -6053,8 +6239,9 @@ pub fn slider_t(
   min? : Double = 0.0,
   max? : Double = 100.0,
   step? : Double = 1.0,
-  width? : Double = 0.0,
   on_change? : (Double) -> Unit = fn(_v) {  },
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -6063,17 +6250,20 @@ pub fn slider_t(
       let thumb = 12.0
       let dragging = Ref(false)
       let hover = Ref(false)
-      // width<=0(缺省)flex 自适应父容器宽;显式正宽则定宽。
-      // 自适应分支用 grow/shrink 单写:column 父(auto 高链)下简写
-      // 派生 basis 0 会盖掉 height 塌成 0 高
-      let size_style : Array[(String, &StyVal)] = if width > 0.0 {
-        [("width", width)]
-      } else {
-        [("flexgrow", 1.0), ("flexshrink", 1.0)]
+      // 默认横向自适应父容器宽:grow/shrink 单写(column 父 auto 高链下
+      // 简写派生 basis 0 会盖掉 height 塌成 0 高);定宽由调用方
+      // style=[("flexgrow", 0.0), ("width", w)] 覆盖
+      let base : Array[(String, &StyVal)] = [
+        ("flexgrow", 1.0),
+        ("flexshrink", 1.0),
+        ("height", h),
+        ("marginBottom", 10.0),
+      ]
+      for kv in style {
+        base.push(kv)
       }
-      size_style.push(("height", h))
-      size_style.push(("marginBottom", 10.0))
-      let v = themed_container(style=size_style)
+      let v = themed_container(style=base)
+      handle(v)
       fn clamp01(x : Double) -> Double {
         if x < 0.0 {
           0.0
