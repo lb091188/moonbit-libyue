@@ -457,13 +457,11 @@ pub fn theme_apply(t : Theme) -> Unit {
   } else if platform() == "windows" {
     // Windows 端切主题只有订阅主题的视图会重绘,其余区域残留旧像素
     // (深浅切换后"重影",鼠标划过局部失效才消失);整体失效+擦除,
-    // 连带原生子窗口(输入框背景等)一并刷新。
-    // 与 Linux 同款推迟一拍:输入事件回调栈内同步 EnumWindows+
-    // RedrawWindow(RDW_ALLCHILDREN) 扰动窗口消息状态,真机实测
-    // 点击一次后全窗鼠标失效且不可逆(连标题栏关闭都无响应);
-    // 脱离触发上下文再整体重绘
-    post_task(fn() { ffi_repaint_all() })
-    post_delayed_task(60, fn() { ffi_repaint_all() })
+    // 连带原生子窗口(输入框背景等)一并刷新。保持同步:曾试与 Linux
+    // 同款推迟一拍,黑盒测试进程退出时延迟任务对已销毁窗口重绘直接
+    // 崩(exit -1,Windows CI 实证);点击劫持真凶是 bind_node 重挂的
+    // remove+add(探针定案),与重绘时机无关,勿再动此处
+    ffi_repaint_all()
   }
 }
 
