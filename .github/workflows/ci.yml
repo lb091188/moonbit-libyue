@@ -57,7 +57,27 @@ jobs:
           key: native-linux-${{ hashFiles('scripts/prepare.py', 'shim/**') }}
 
       - name: 构建原生层(钉版本下载 libyue + CMake 静态库)
-        run: python3 scripts/prepare.py
+        run: |
+          python3 scripts/prepare.py
+          # 诊断:链接回归排查——shim 库必须含近期新增符号,缺失即打印
+          # 编译器/库成员详情后失败(注解匿名可读)
+          if ! nm build/libyue_mbt.a | grep -q yue_mbt_view_set_bounds; then
+            {
+              echo "== 工具链 =="
+              g++ --version | head -1
+              cmake --version | head -1
+              echo "== libyue_mbt.a 成员 =="
+              ar t build/libyue_mbt.a
+              echo "== 符号表规模 =="
+              nm build/libyue_mbt.a | grep -c " T "
+              echo "== yue_mbt.o 内 set_bounds =="
+              nm build/CMakeFiles/yue_mbt.dir/yue_mbt.cpp.o 2>/dev/null | grep set_bounds || echo "对象文件中无此符号"
+              echo "== CMakeCache 编译器 =="
+              grep -E "CMAKE_CXX_COMPILER:|CMAKE_CXX_FLAGS" build/CMakeCache.txt
+            } > /tmp/diag.out 2>&1
+            echo "::error title=shim 缺符号::$(tail -c 1800 /tmp/diag.out | sed ':a;N;$!ba;s/\n/%0A/g')"
+            exit 1
+          fi
 
       # 三连拆开跑并捕获各退出码,失败命令各自把输出尾巴塞进 error
       # 注解(匿名 API 可读)——runner 环境差异导致的失败拿不到日志时定位用
