@@ -21,8 +21,11 @@ fn main {
   }
   let sig : @yue.Signal[String] = @yue.Signal::new(SHORT)
   let phase : @yue.Store[String] = @yue.Store::new("短")
-  // 复刻行:与 bind_label 同内核,但可拿到 Label 引用做测量
+  // 复刻行:bind_label 完整复刻(Label::make + wrap=false 富文本替换 +
+  // set_text),可拿到 Label 引用做测量
   let probe : @yue.Label = @yue.Label::make(SHORT)
+  let at = @yue.AttributedText::new(SHORT, valign=@yue.Center, wrap=false)
+  probe.set_attributed_text(at)
   let win_ref : Ref[@yue.Window?] = Ref(None)
   let n : Ref[Int] = Ref(0)
   @yue.set_timer(2500, fn() {
@@ -63,32 +66,41 @@ fn main {
   ignore(
     @yue.mount_window(
       [
-        @yue.hbox(
-          [
-            @yue.label_t("bind:", role=@yue.Body),
-            @yue.bind(sig, fn(v) { v }),
-            @yue.label_t("  ←[\{phase.get()}]", role=@yue.Secondary),
-          ],
-          style=[("alignItems", "center"), ("marginBottom", 14.0)],
-        ),
-        @yue.hbox(
-          [
-            @yue.label_t("复刻行:", role=@yue.Body),
-            @yue.node_of(probe),
-            @yue.label_t("  (stdout 打 bounds)", role=@yue.Secondary),
-          ],
-          style=[("alignItems", "center")],
-        ),
-        @yue.hbox(
-          [
-            @yue.label_t("静态对照:", role=@yue.Body),
-            @yue.label_t(LONG, role=@yue.Body),
-          ],
-          style=[("alignItems", "center")],
+        // 复刻 showcase 段内滚动架构:bind/复刻行都在 Scroll 内
+        @yue.scroll(
+          @yue.vbox(
+            [
+              @yue.hbox(
+                [
+                  @yue.label_t("bind:", role=@yue.Body),
+                  @yue.bind(sig, fn(v) { v }),
+                  @yue.label_t("  ←[\{phase.get()}]", role=@yue.Secondary),
+                ],
+                style=[("alignItems", "center"), ("marginBottom", 14.0)],
+              ),
+              @yue.hbox(
+                [
+                  @yue.label_t("复刻行:", role=@yue.Body),
+                  @yue.node_of(probe),
+                  @yue.label_t("  (stdout 打 bounds)", role=@yue.Secondary),
+                ],
+                style=[("alignItems", "center"), ("marginBottom", 14.0)],
+              ),
+              @yue.hbox(
+                [
+                  @yue.label_t("静态对照:", role=@yue.Body),
+                  @yue.label_t(LONG, role=@yue.Body),
+                ],
+                style=[("alignItems", "center")],
+              ),
+            ],
+            style=[("padding", 8.0)],
+          ),
+          style=[("flexgrow", 1.0)],
         ),
       ],
       title="probe-bind",
-      size=Some((620.0, 160.0)),
+      size=Some((620.0, 220.0)),
       center=true,
       handle=fn(w) {
         win_ref.val = Some(w)
