@@ -222,10 +222,9 @@ pub fn[T] Signal::store(self : Signal[T]) -> Store[T] {
 pub fn[A] bind(
   sig : Signal[A],
   f : (A) -> String,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
-  bind_label({ sig, }, f, style~, style_str~)
+  bind_label({ sig, }, f, style~)
 }
 
 ///|

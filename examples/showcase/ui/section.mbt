@@ -45,8 +45,7 @@ pub fn page(secs : Array[Section]) -> @yue.Node {
   }
   let strip = @yue.hbox(
     [@yue.segmented(names, selected)],
-    style=[("paddingLeft", 14.0), ("paddingRight", 14.0), ("paddingTop", 10.0)],
-    style_str=[("flexWrap", "wrap"), ("alignItems", "center")],
+    style=[("paddingLeft", 14.0), ("paddingRight", 14.0), ("paddingTop", 10.0), ("flexWrap", "wrap"), ("alignItems", "center")],
   )
   let bodies : Array[@yue.Node] = []
   for s in secs {
@@ -59,8 +58,7 @@ pub fn page(secs : Array[Section]) -> @yue.Node {
       // flex 简写(简写派生 basis 0 的坑见 docs/zh/adaptation.md)
       @yue.vbox(
         bodies,
-        style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
-        style_str=[("flexDirection", "column")],
+        style=[("flexgrow", 1.0), ("flexshrink", 1.0), ("flexDirection", "column")],
       ),
     ],
     style=[("flex", 1.0)],
@@ -174,7 +172,6 @@ fn code_copy_row(lines : Array[String]) -> @yue.Node {
         },
       ),
     ],
-    style=[("marginTop", 12.0), ("marginBottom", 4.0)],
-    style_str=[("alignItems", "center")],
+    style=[("marginTop", 12.0), ("marginBottom", 4.0), ("alignItems", "center")],
   )
 }

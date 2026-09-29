@@ -53,14 +53,11 @@ fn splitter_impl(
       let start_basis = Ref(0.0)
       let handle_w = 8.0
       let outer = themed_container(
-        style=[("flex", 1.0)],
-        style_str=[
-          ("flexDirection", if horizontal { "row" } else { "column" }),
-        ],
+        style=[("flex", 1.0), ("flexDirection", if horizontal { "row" } else { "column" }),],
       )
       // 首栏包装容器:尺寸/布局打在包装上,内容 mount 其内(View 句柄
       // 不实现 ViewLike,不能直接设样式)
-      let pane_a = themed_container(style_str=[("flexDirection", "column")])
+      let pane_a = themed_container(style=[("flexDirection", "column")])
       ViewLike::set_style(pane_a, if horizontal { "minwidth" } else { "minheight" }, min_a)
       ignore((first.mount)(ViewLike::view(pane_a)))
       attach(ViewLike::view(outer), ViewLike::view(pane_a))
@@ -72,7 +69,7 @@ fn splitter_impl(
         },
       ])
       attach(ViewLike::view(outer), ViewLike::view(handle))
-      let pane_b = themed_container(style_str=[("flexDirection", "column")])
+      let pane_b = themed_container(style=[("flexDirection", "column")])
       ViewLike::set_style(pane_b, "flex", 1.0)
       ViewLike::set_style(pane_b, if horizontal { "minwidth" } else { "minheight" }, min_b)
       ignore((second.mount)(ViewLike::view(pane_b)))

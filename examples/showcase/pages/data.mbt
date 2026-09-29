@@ -196,7 +196,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
             @yue.tag("自定义实底", "#2D68C4"),
             @yue.tag("v1.0", "#2E9E5B"),
           ],
-          style_str=[("alignItems", "center")],
+          style=[("alignItems", "center")],
         ),
         @yue.hbox(
           [
@@ -205,8 +205,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
             @yue.avatar("X", "#D64550", size=30.0),
             @yue.avatar("L", "#D9822B", size=26.0),
           ],
-          style=[("marginTop", 10.0)],
-          style_str=[("alignItems", "center")],
+          style=[("marginTop", 10.0), ("alignItems", "center")],
         ),
       ],
       code=[
@@ -236,7 +235,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
             @yue.badge_dot(),
             @yue.label_t("在线", role=@yue.Body),
           ],
-          style_str=[("alignItems", "center")],
+          style=[("alignItems", "center")],
         ),
       ],
       code=[
@@ -258,7 +257,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
             @yue.statistic("访问量", app.visits.store()),
             @yue.statistic("任务数", @yue.Store::new("36")),
           ],
-          style_str=[("alignItems", "center")],
+          style=[("alignItems", "center")],
         ),
         @yue.button_t(
           "刷新访问量",
@@ -398,8 +397,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
             @yue.label("   "),
             @yue.bind(table_picked, fn(s) { s }),
           ],
-          style=[("marginTop", 8.0)],
-          style_str=[("alignItems", "center")],
+          style=[("marginTop", 8.0), ("alignItems", "center")],
         ),
       ],
       code=[
@@ -497,7 +495,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
               style=[("marginLeft", 12.0)],
             ),
           ],
-          style_str=[("alignItems", "start")],
+          style=[("alignItems", "start")],
         ),
       ],
       code=[

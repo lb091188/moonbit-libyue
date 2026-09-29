@@ -1392,7 +1392,7 @@ pub fn line_chart_t(
 ) -> Node {
   {
     mount: fn(parent) {
-      let size_style = if fill {
+      let size_style : Array[(String, &StyVal)] = if fill {
         [("height", height)]
       } else {
         [("width", width), ("height", height)]
@@ -1437,7 +1437,7 @@ pub fn bar_chart_t(
   {
     mount: fn(parent) {
       let hover = Ref(-1)
-      let size_style = if fill {
+      let size_style : Array[(String, &StyVal)] = if fill {
         [("height", height)]
       } else {
         [("width", width), ("height", height)]

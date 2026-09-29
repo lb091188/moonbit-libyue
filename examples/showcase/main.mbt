@@ -108,7 +108,7 @@ fn main {
 
   let window = @yue.mount_window(
     [
-      @yue.hbox(style=[("flex", 1.0)], style_str=[("alignItems", "stretch")], [
+      @yue.hbox(style=[("flex", 1.0), ("alignItems", "stretch")], [
         // 侧栏:菜单(可滚动,窗口矮时滚到底部项) + 底部钉住包版本号
         // (与 moon.mod 同步,scripts/prebuild.py 构建期校验)
         @yue.vbox(

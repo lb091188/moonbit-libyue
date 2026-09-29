@@ -21,7 +21,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
             @yue.button_t("紫", on_click=fn() { app.accent.set("#9141AC") }),
             @yue.button_t("红", on_click=fn() { app.accent.set("#D64550") }),
           ],
-          style_str=[("alignItems", "center")],
+          style=[("alignItems", "center")],
         ),
         @yue.bind(
           app.accent.signal(),
@@ -64,7 +64,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
             @yue.button_t("文字按钮", variant=@yue.Text),
             @yue.button_t("危险操作", variant=@yue.Danger),
           ],
-          style_str=[("alignItems", "center")],
+          style=[("alignItems", "center")],
         ),
       ],
       code=[
@@ -108,8 +108,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
             @yue.label_t("最近点击:", role=@yue.Body),
             @yue.bind(app.picked_lang, fn(s) { s }),
           ],
-          style=[("marginTop", 8.0)],
-          style_str=[("alignItems", "center")],
+          style=[("marginTop", 8.0), ("alignItems", "center")],
         ),
       ],
       code=[
@@ -145,8 +144,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
               "第二个提示",
             ),
           ],
-          style=[("marginTop", 10.0)],
-          style_str=[("alignItems", "center")],
+          style=[("marginTop", 10.0), ("alignItems", "center")],
         ),
       ],
       code=[
@@ -176,8 +174,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
                   @yue.input_t(text="组内输入框", width=200.0),
                   @yue.button_t("组内按钮"),
                 ],
-                style=[("marginTop", 10.0)],
-                style_str=[("alignItems", "center")],
+                style=[("marginTop", 10.0), ("alignItems", "center")],
               ),
               @yue.label_t(
                 "子控件触发的事件同样改变组的样式",
@@ -239,8 +236,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
                   @yue.input_t(text="组内输入框", width=200.0),
                   @yue.button_t("组内按钮"),
                 ],
-                style=[("marginTop", 10.0)],
-                style_str=[("alignItems", "center")],
+                style=[("marginTop", 10.0), ("alignItems", "center")],
               ),
             ],
             style=[("padding", 14.0)],

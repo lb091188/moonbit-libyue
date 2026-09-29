@@ -30,7 +30,7 @@ pub fn page_store_demo(_app : @ui.App) -> @yue.Node {
               ("marginLeft", 10.0),
             ]),
           ],
-          style_str=[("alignItems", "center")],
+          style=[("alignItems", "center")],
         ),
       ],
       code=[

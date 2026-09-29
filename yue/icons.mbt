@@ -4223,21 +4223,20 @@ pub fn icon(kind : IconKind, size? : Double = 13.0, color? : String = "") -> Nod
 ///|
 /// 图标按钮:方形自绘,hover 浅灰底 + 文字色提亮,点击/Enter/Space 触发
 /// on_click;tip 非空时挂原生悬浮提示。默认 marginRight 6 便于工具栏
-/// 横向排列;style/style_str 由调用方追加(后应用,可覆盖默认值,
+/// 横向排列;style 由调用方追加(后应用,可覆盖默认值,
 /// 如去掉右边距 ["marginRight", 0.0] 或加外边距)。
 pub fn icon_button_t(
   kind : IconKind,
   on_click? : () -> Unit = fn() {  },
   size? : Double = 28.0,
   tip? : String = "",
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
       let hover = Ref(false)
       let focused = Ref(false)
-      let base : Array[(String, Double)] = [
+      let base : Array[(String, &StyVal)] = [
         ("width", size),
         ("height", size),
         ("marginRight", 6.0),
@@ -4245,7 +4244,7 @@ pub fn icon_button_t(
       for kv in style {
         base.push(kv)
       }
-      let v = themed_container(style=base, style_str~)
+      let v = themed_container(style=base)
       v.on_draw(fn(p) {
         let b = ViewLike::get_bounds(v)
         if hover.val {

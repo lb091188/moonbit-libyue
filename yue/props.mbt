@@ -3,18 +3,15 @@
 // 语义与对应 setter 完全一致；未涉及的属性仍用 setter 补充。
 
 ///|
-/// 统一应用样式表：style 为数值型键值对（如 padding/marginBottom），
-/// style_str 为字符串型键值对（如 flexDirection="row"）。
+/// 统一应用样式表：单个数组混装数值与字符串值（如 padding/marginBottom
+/// 为 Double，flexDirection="row"/width="50%" 为 String），按值类型
+/// 派发到对应底层通道。
 pub fn[V : ViewLike] apply_style(
   v : V,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Unit {
-  for (k, n) in style {
-    v.set_style(k, n)
-  }
-  for (k, s) in style_str {
-    v.set_style_str(k, s)
+  for (k, val) in style {
+    val.apply_to(v.view(), k)
   }
 }
 
@@ -44,11 +41,10 @@ pub fn Window::make(
 ///|
 /// 创建容器并应用样式。
 pub fn Container::make(
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Container {
   let c = Container::new()
-  apply_style(c, style~, style_str~)
+  apply_style(c, style~)
   c
 }
 
@@ -56,11 +52,10 @@ pub fn Container::make(
 /// 创建标签并应用样式。
 pub fn Label::make(
   text : String,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Label {
   let l = Label::new(text)
-  apply_style(l, style~, style_str~)
+  apply_style(l, style~)
   l
 }
 
@@ -71,15 +66,14 @@ pub fn Button::make(
   button_type? : ButtonType = Normal,
   on_click? : () -> Unit = fn() {  },
   checked? : Bool = false,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Button {
   let b = Button::new_of(button_type, title)
   b.on_click(on_click)
   if checked {
     b.set_checked(true)
   }
-  apply_style(b, style~, style_str~)
+  apply_style(b, style~)
   b
 }
 
@@ -90,8 +84,7 @@ pub fn Entry::make(
   entry_type? : EntryType = Normal,
   on_activate? : () -> Unit = fn() {  },
   on_text_change? : () -> Unit = fn() {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
   width_chars? : Int = -1,
 ) -> Entry {
   let e = if width_chars == -1 {
@@ -104,7 +97,7 @@ pub fn Entry::make(
   }
   e.on_activate(on_activate)
   e.on_text_change(on_text_change)
-  apply_style(e, style~, style_str~)
+  apply_style(e, style~)
   e
 }
 
@@ -113,15 +106,14 @@ pub fn Entry::make(
 pub fn TextEdit::make(
   text? : String = "",
   on_text_change? : () -> Unit = fn() {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> TextEdit {
   let t = TextEdit::new()
   if text != "" {
     t.set_text(text)
   }
   t.on_text_change(on_text_change)
-  apply_style(t, style~, style_str~)
+  apply_style(t, style~)
   t
 }
 
@@ -132,8 +124,7 @@ pub fn Slider::make(
   range? : (Double, Double)? = None,
   step? : Double? = None,
   on_value_change? : () -> Unit = fn() {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Slider {
   let s = Slider::new()
   match range {
@@ -146,7 +137,7 @@ pub fn Slider::make(
   }
   s.set_value(value)
   s.on_value_change(on_value_change)
-  apply_style(s, style~, style_str~)
+  apply_style(s, style~)
   s
 }
 
@@ -155,15 +146,14 @@ pub fn Slider::make(
 pub fn ProgressBar::make(
   value? : Double = 0.0,
   indeterminate? : Bool = false,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> ProgressBar {
   let p = ProgressBar::new()
   p.set_value(value)
   if indeterminate {
     p.set_indeterminate(true)
   }
-  apply_style(p, style~, style_str~)
+  apply_style(p, style~)
   p
 }
 
@@ -173,8 +163,7 @@ pub fn Picker::make(
   items? : Array[String] = [],
   selected? : Int = 0,
   on_selection_change? : () -> Unit = fn() {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Picker {
   let p = Picker::new()
   for it in items {
@@ -184,7 +173,7 @@ pub fn Picker::make(
     p.select_item_at(selected)
   }
   p.on_selection_change(on_selection_change)
-  apply_style(p, style~, style_str~)
+  apply_style(p, style~)
   p
 }
 
@@ -195,8 +184,7 @@ pub fn ComboBox::make(
   selected? : Int = 0,
   on_selection_change? : () -> Unit = fn() {  },
   on_text_change? : () -> Unit = fn() {  },
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> ComboBox {
   let c = ComboBox::new()
   for it in items {
@@ -207,7 +195,7 @@ pub fn ComboBox::make(
   }
   c.on_selection_change(on_selection_change)
   c.on_text_change(on_text_change)
-  apply_style(c, style~, style_str~)
+  apply_style(c, style~)
   c
 }
 
@@ -216,12 +204,11 @@ pub fn ComboBox::make(
 pub fn[T : ViewLike] Group::make(
   title : String,
   content : T,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Group {
   let g = Group::new(title)
   g.set_content(content)
-  apply_style(g, style~, style_str~)
+  apply_style(g, style~)
   g
 }
 

@@ -64,13 +64,12 @@ pub fn[T] Store::signal(self : Store[T]) -> Signal[T] {
 pub fn[A] bind_label(
   store : Store[A],
   f : (A) -> String,
-  style? : Array[(String, Double)] = [],
-  style_str? : Array[(String, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
       let init = f(store.get())
-      let l = Label::make(init, style~, style_str~)
+      let l = Label::make(init, style~)
       let at = AttributedText::new(init, valign=Center, wrap=false)
       at.set_font(Font::new("Sans", 13.0))
       fn apply_color() -> Unit {

@@ -333,8 +333,7 @@ fn page_process(app : App) -> @yue.Node {
             page.renice_selected()
           }),
         ],
-        style=[("marginBottom", 8.0)],
-        style_str=[("alignItems", "center")],
+        style=[("marginBottom", 8.0), ("alignItems", "center")],
       ),
       @yue.label_t(
         page.msg.get(),
