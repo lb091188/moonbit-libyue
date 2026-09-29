@@ -272,8 +272,6 @@ def main():
     out.append("/// 图标页各分组共用的演示代码形态:icon 画矢量图标,悬停 tooltip 显名。")
     out.append("fn icon_group_code(sample : Array[String]) -> Array[String] {")
     out.append("  let head : Array[String] = [")
-    out.append("    \"// @yue.icon(图标, size, color):%d 个内置矢量图标(iconfont 生成),颜色默认跟主题\"," % total)
-    out.append("    \"// hbox(子项, style):children 横向排列(flexDirection=row);gap 为相邻子项间距\",")
     out.append("    \"@yue.hbox([\",")
     out.append("  ]")
     out.append("  for line in sample {")
@@ -304,18 +302,8 @@ def main():
         out.append("      ],")
         code_lines = []
         if samples:
-            notes = [
-                "  // size:视图边长像素,默认 13(与正文字号协调),图形内容约占边长 84%,本行放大到 18",
-                "  // color:hex 色串(#RRGGBB 等)固定颜色;省略则取主题常规文字色,深浅主题自适应",
-            ]
-            code_lines.append("        \"// @yue.icon(图标, size, color):第一参数 IconKind(803 选一);size/color 命名可选参数\",")
-            for i, s in enumerate(samples[:3]):
+            for s in samples[:3]:
                 code_lines.append("        \"  @yue.icon(@yue.%s, size=18.0),\"," % s)
-                if i < len(notes):
-                    code_lines.append("        \"%s\"," % notes[i])
-            code_lines.append(
-                "        \"  // tooltip_t(内容, 文案):包原生悬浮提示;icon_name(图标) 返回图标名 %s\","
-                % fc_of[samples[0]])
             code_lines.append(
                 "        \"  @yue.tooltip_t(@yue.icon(@yue.%s, size=18.0), @yue.icon_name(@yue.%s)),\","
                 % (samples[0], samples[0]))
