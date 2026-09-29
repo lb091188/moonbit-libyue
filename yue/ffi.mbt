@@ -2128,6 +2128,14 @@ extern "c" fn ffi_container_remove_child_view(c : View, v : View) -> Int = "yue_
 #borrow(c)
 extern "c" fn ffi_container_child_count(c : View) -> Int = "yue_mbt_container_child_count"
 
+///|
+#borrow(c)
+extern "c" fn ffi_container_get_preferred_height(c : View) -> Double = "yue_mbt_container_get_preferred_height"
+
+///|
+#borrow(scroll)
+extern "c" fn ffi_scroll_refresh_content_size(scroll : View) -> Unit = "yue_mbt_scroll_refresh_content_size"
+
 extern "c" fn ffi_scroll_get_position_x(s : View) -> Double = "yue_mbt_scroll_get_position_x"
 
 ///|

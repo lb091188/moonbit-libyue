@@ -675,6 +675,8 @@ void yue_mbt_view_on_focus_out(void *view, int32_t (*invoke)(void *), void *clos
 void yue_mbt_container_add_child_view_at(void *container, void *view, int32_t index);
 int32_t yue_mbt_container_remove_child_view(void *container, void *view);
 int32_t yue_mbt_container_child_count(void *container);
+double yue_mbt_container_get_preferred_height(void *container);
+void yue_mbt_scroll_refresh_content_size(void *scroll);
 double yue_mbt_scroll_get_position_x(void *scroll);
 double yue_mbt_scroll_get_position_y(void *scroll);
 double yue_mbt_scroll_get_max_position_x(void *scroll);

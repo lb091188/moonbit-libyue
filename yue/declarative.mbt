@@ -393,6 +393,8 @@ pub fn group(
 /// 转发);其余平台走 set_overlay_scrollbar(Linux 由 app_init 的
 /// GTK_OVERLAY_SCROLLING 环境保底,macOS 为 NSScroller overlay)。
 /// overlay=false 或显式 policy 仍走平台原生条。
+/// 内容在挂载之后才挂进 content(惰性挂载)或明显长高时,经 handle 拿
+/// Scroll 调 refresh_content_size 刷新滚动范围。
 pub fn scroll(
   content : Node,
   content_size? : (Double, Double)? = None,
