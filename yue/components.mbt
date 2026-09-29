@@ -2079,7 +2079,13 @@ pub fn statistic(title : String, value : Store[String]) -> Node {
 pub fn progress_line(value : Store[Double], height? : Double = 8.0) -> Node {
   {
     mount: fn(parent) {
-      let v = themed_container(style=[("flex", 1.0), ("height", height)])
+      // grow/shrink 单写不写 flex 简写:column 父(auto 高链)下简写
+      // 派生 basis 0 首轮解析成 0 即塌(height 被盖),惰性挂载时序必现
+      let v = themed_container(style=[
+        ("flexgrow", 1.0),
+        ("flexshrink", 1.0),
+        ("height", height),
+      ])
       bind_bg(v, fn() { theme_info_light() })
       v.on_draw(fn(p) {
         let b = ViewLike::get_bounds(v)
@@ -5993,7 +5999,10 @@ pub fn divider(vertical? : Bool = false, spacing? : Double = 10.0) -> Node {
         [("height", 1.0), ("marginTop", spacing), ("marginBottom", spacing)]
       }
       if !vertical {
-        style.push(("flex", 1.0))
+        // 水平分隔线在 column 父(auto 高链)下:grow/shrink 单写,
+        // flex 简写派生 basis 0 会盖掉 height 1 塌成 0 高
+        style.push(("flexgrow", 1.0))
+        style.push(("flexshrink", 1.0))
       }
       let c = themed_container(style=style)
       bind_bg(c, fn() { theme_border() })
@@ -6123,11 +6132,13 @@ pub fn slider_t(
       let thumb = 12.0
       let dragging = Ref(false)
       let hover = Ref(false)
-      // width<=0(缺省)flex 自适应父容器宽;显式正宽则定宽
+      // width<=0(缺省)flex 自适应父容器宽;显式正宽则定宽。
+      // 自适应分支用 grow/shrink 单写:column 父(auto 高链)下简写
+      // 派生 basis 0 会盖掉 height 塌成 0 高
       let size_style : Array[(String, Double)] = if width > 0.0 {
         [("width", width)]
       } else {
-        [("flex", 1.0)]
+        [("flexgrow", 1.0), ("flexshrink", 1.0)]
       }
       size_style.push(("height", h))
       size_style.push(("marginBottom", 10.0))
@@ -6980,10 +6991,11 @@ pub fn carousel_t(
 
       // 面板与指示点先建好,切换只动 set_visible
       for i in 0..<n {
-        // 面板填满舞台(flex 拉高 + stretch 拉宽):固定宽会横向溢出
-        // 舞台(两侧箭头各占 24px),盖住右侧切换箭头的事件窗口
+        // 面板填满舞台(grow 拉高 + stretch 拉宽):固定宽会横向溢出
+        // 舞台(两侧箭头各占 24px),盖住右侧切换箭头的事件窗口。
+        // grow/shrink 单写:column 舞台 auto 高链下简写派生 basis 0 塌陷
         let pc = themed_container(
-          style=[("flex", 1.0)],
+          style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
           style_str=[("flexDirection", "column"), ("alignSelf", "stretch")],
         )
         ViewLike::set_visible(pc, i == 0)
