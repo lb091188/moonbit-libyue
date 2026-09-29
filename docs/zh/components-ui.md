@@ -78,6 +78,21 @@ accent.subscribe(fn(a) {
 
 固定色（品牌色块等）直接设即可，不受主题影响。
 
+### 统一 style 通道
+
+主题组件库全部组件的最外层容器都带 `style?`（样式键值对，数值与字符串混装，键表见 [layout.md](layout.md)）与 `handle?`（挂载时收到最外层容器句柄）参数。组件默认尺寸 / 边距 / 方向已进默认样式表，调用方 `style` 键后应用、可覆盖默认值：
+
+```moonbit
+// 覆盖宽度与外边距(默认值其余保持)
+@yue.input_t(text="姓名", style=[("width", 160.0), ("marginBottom", 4.0)])
+// slider 默认横向自适应;定宽需同时取消 grow
+@yue.slider_t(v, style=[("flexgrow", 0.0), ("width", 240.0)])
+```
+
+布局定制唯一入口是 `style`——组件签名不再保留 margin / width / height / spacing 之类布局命名参数。仍以命名参数保留的是语义 / 结构参数：`avatar` / `icon` 的 `size`（图形内容尺寸）、`table_t` 的 `width`（列宽均分基准）与 `row_height`、`popover_t` 的 `width` / `height`（原生弹层窗口尺寸，不走布局）、`transfer` 的 `width`（栏宽）、`hsplit` / `vsplit` 的 `ratio`（拖动几何）、各数据/交互参数（min/max/step/placeholder/clearable/foldable 等）。
+
+`style` 为挂载期一次性应用；颜色定制优先走主题色板，经 `style` 设的颜色可能与主题切换（`theme_apply`）的取色语义冲突。
+
 ```moonbit
 let l = @yue.Label::make("标题")
 @yue.theme_bind_fg(l, fn() { @yue.theme_current().text_regular })
@@ -108,7 +123,7 @@ hover 表现：Solid / Danger 加深，Soft 变实底白字，Text 浅灰底。
 
 ### 主题标签 label_t
 
-`label_t(text, role? = Body, style?, style_str?, handle?)`
+`label_t(text, role? = Body, style?, handle?)`
 
 文字角色统一字号 / 颜色，左对齐；可叠加布局样式与句柄回调。
 
@@ -116,7 +131,7 @@ hover 表现：Solid / Danger 加深，Soft 变实底白字，Text 浅灰底。
 |---|---|---|---|
 | text | String | 必填 | 文本 |
 | role | TextRole | `Body` | `Title` / `Section` / `Body` / `Secondary` / `Accent` |
-| style / style_str | 样式键值对 | `[]` | 见 [layout.md](layout.md) |
+| style | 样式键值对（数值+字符串混装） | `[]` | 见 [layout.md](layout.md) |
 | handle | (Label) -> Unit | 空操作 | 创建后回调，拿到底层 Label 自行处理 |
 
 ```moonbit
@@ -136,7 +151,7 @@ hover 表现：Solid / Danger 加深，Soft 变实底白字，Text 浅灰底。
 
 ### 主题单行输入 entry_t
 
-`entry_t(text? = "", password? = false, height? = 32.0, on_input?)`
+`entry_t(text? = "", password? = false, on_input?, style?, handle?)`
 
 统一字体与行高，文字色跟随主题；文字色不支持自定（平台限制，见 [adaptation.md](adaptation.md)）。
 
@@ -152,7 +167,7 @@ let name = @yue.Store::new("")
 
 ### 边框输入框 input_t
 
-`input_t(text? = "", password? = false, margin? = 0.0, width? = 280.0, height? = 32.0, clearable? = false, on_input?, invalid? = Store::new(false))`
+`input_t(text? = "", password? = false, clearable? = false, on_input?, invalid? = Store::new(false), style?, handle?)`
 
 外层自绘 1px 边框（聚焦变主题色）+ 白底，直角。
 
@@ -169,7 +184,7 @@ let valid = @yue.Store::new(false)
 
 ### 数字输入器 input_number
 
-`input_number(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, num_width? = 64.0)`
+`input_number(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, style?, handle?)`
 
 -/+ 按钮步进，范围钳制，状态存 `Store[Double]`。
 
@@ -180,7 +195,7 @@ let count = @yue.Store::new(1.0)
 
 ### 多行输入 textarea_t
 
-`textarea_t(text? = "", width? = 280.0, height? = 110.0, margin? = 0.0, on_input?, clearable? = false, invalid? = Store::new(false))`
+`textarea_t(text? = "", on_input?, clearable? = false, invalid? = Store::new(false), style?, handle?)`
 
 input_t 同套路：外层自绘 1px 边框（聚焦变主题色）+ 8px 内边距；内容超出自行滚动。clearable / invalid 语义同 input_t。
 
@@ -226,7 +241,7 @@ let enabled = @yue.Store::new(true)
 
 ### 滑杆 slider_t
 
-`slider_t(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, width? = 0.0, on_change?)`
+`slider_t(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, on_change?, style?, handle?)`
 
 自绘：浅灰轨道 + 主题色填充段 + 方形 thumb，点击轨道 / 拖拽 thumb 调值，值按 step 量化后写入 `value`（外部 set 同样生效）；on_change 含拖拽过程。
 
@@ -239,7 +254,7 @@ let volume = @yue.Store::new(0.5)
 
 ### 下拉选择 select_t
 
-`select_t(options, value : Store[String], width? = 200.0, on_change?, clearable? = false)`
+`select_t(options, value : Store[String], on_change?, clearable? = false, style?)`
 
 全自绘：点击弹候选列表，悬停高亮、当前选中主题色 ✓，点选回填并收起，失焦收起，三平台同形态。clearable=true 时悬停且有值，箭头左侧 ✕ 点击清空（value 置空串、`on_change("")`）。
 
@@ -250,7 +265,7 @@ let color = @yue.Store::new("红")
 
 ### 日期选择器 date_picker_t
 
-`date_picker_t(value? : Store[DateYMD?], on_change?, width? = 200.0, placeholder? = "请选择日期", clearable? = false)`
+`date_picker_t(value? : Store[DateYMD?], on_change?, placeholder? = "请选择日期", clearable? = false, style?)`
 
 全自绘：输入框样式字段，点击弹出 `calendar_t` 月历面板，点选回填并收起，失焦收起；clearable=true 时悬停且有值，箭头旁 ✕ 清空（不触发 on_change）。
 
@@ -261,7 +276,7 @@ let day : @yue.Store[@yue.DateYMD?] = @yue.Store::new(None)
 
 ### 日期区间选择器 date_range_picker_t
 
-`date_range_picker_t(value? : Store[DateRange], on_change?, width? = 260.0, placeholder? = "请选择日期区间", clearable? = false)`
+`date_range_picker_t(value? : Store[DateRange], on_change?, placeholder? = "请选择日期区间", clearable? = false, style?)`
 
 字段显示「起 ~ 止」，点击弹区间日历：第一次点选起点，第二次点选终点（终点早于起点自动对调）后收起并回调 `on_change(起, 止)`；中间日期浅主题色底，端点实心方块；再点字段重新开始新区间。clearable 清空两端。
 
@@ -272,7 +287,7 @@ let range : @yue.Store[@yue.DateRange] = @yue.Store::new({ start: None, end: Non
 
 ### 时间区间选择器 time_range_picker_t
 
-`time_range_picker_t(value? : Store[TimeRange], on_change?, width? = 180.0, placeholder? = "请选择时间区间", clearable? = false)`
+`time_range_picker_t(value? : Store[TimeRange], on_change?, placeholder? = "请选择时间区间", clearable? = false, style?)`
 
 字段显示「起 : 止」时 : 分，点击弹起 / 止两行步进编辑器（时 0-23 / 分 0-59，`input_number` 承载），步进即改即回调 `on_change(起, 止)`；起止默认 00:00，弹层随字段失焦收起。
 
@@ -283,7 +298,7 @@ let tr : @yue.Store[@yue.TimeRange] = @yue.Store::new({ start: None, end: None }
 
 ### 日期时间区间选择器 datetime_range_picker_t
 
-`datetime_range_picker_t(value? : Store[DateTimeRange], on_change?, width? = 340.0, placeholder? = "请选择日期时间区间", clearable? = false)`
+`datetime_range_picker_t(value? : Store[DateTimeRange], on_change?, placeholder? = "请选择日期时间区间", clearable? = false, style?)`
 
 字段显示「起日期 起:分 ~ 止日期 止:分」，弹层 = 区间日历 + 分隔线 + 起 / 止两行时间步进 + 「完成」按钮；日期两段式选完或时间步进后区间完整即回调 `on_change(起日期, 起时间, 止日期, 止时间)`。值类型 `DateTimeRange{ start : (DateYMD, TimeHM)?, end : (DateYMD, TimeHM)? }`。
 
@@ -304,7 +319,7 @@ let dtr : @yue.Store[@yue.DateTimeRange] = @yue.Store::new({ start: None, end: N
 
 ### 取色器 color_picker_t
 
-`color_picker_t(value : Store[String], colors?, width? = 200.0)`
+`color_picker_t(value : Store[String], colors?, style?)`
 
 下拉形态：触发字段（当前色块 + hex + 箭头）点击弹预设色板，点击色块写入 `value`（`"#RRGGBB"`）并收起，选中色块主题色描边 + 白勾，失焦收起；色板可自定义（缺省 15 色）。
 
@@ -350,7 +365,7 @@ let err = @yue.Store::new("")
 
 ### 侧边菜单 side_menu
 
-`side_menu(items, selected : Store[String], width? = 180.0, icons? = [])`
+`side_menu(items, selected : Store[String], icons? = [], style?)`
 
 hover 浅灰、选中主题浅蓝底 + 主题色文字 + 左侧 3px 强调条，4px 圆角。`icons` 给「项文本 → 图标」（缺省不画）；`selected` 为共享状态，主区页面订阅同一 Store 做 `set_visible` 联动。
 
@@ -361,7 +376,7 @@ let page = @yue.Store::new("首页")
 
 ### 分组侧边菜单 side_menu_sections
 
-`side_menu_sections(sections : Array[(String, Array[String])], selected : Store[String], width? = 180.0, icons? = [], foldable? = true)`
+`side_menu_sections(sections : Array[(String, Array[String])], selected : Store[String], icons? = [], foldable? = true, style?, handle?)`
 
 组标题行（次要色小字 + 右侧折叠箭头）+ 组内项（画法 / 联动同 side_menu）；foldable=true 时可点收起 / 展开组内项（默认全展开，键盘 Enter/Space 同效）。
 
@@ -420,7 +435,7 @@ let step = @yue.Store::new(1)
 
 ### 分隔线 divider
 
-`divider(vertical? = false, spacing? = 10.0)`——水平（默认，高 1px 宽 flex）或竖直（宽 1px 高随父容器），spacing 为两侧留白。底色挂载时读主题，重建界面生效。
+`divider(vertical? = false, style?, handle?)`——水平（默认，高 1px 宽 flex）或竖直（宽 1px 高随父容器），两侧留白默认 10px、经 style 覆盖。底色挂载时读主题，重建界面生效。
 
 ```moonbit
 @yue.divider(spacing=16.0)
@@ -442,7 +457,7 @@ let step = @yue.Store::new(1)
 
 ### 标签 tag / tag_of_type
 
-`tag(text, color, height? = 24.0)` / `tag_of_type(text, t : SemanticType)`
+`tag(text, color, style?, handle?)` / `tag_of_type(text, t : SemanticType, style?, handle?)`
 
 前者彩色实底（自定颜色），后者类型浅底 + 同族深字（`Primary` / `Success` / `Warning` / `Danger` / `Info`）；直角，宽度按文本自适应。
 
@@ -479,7 +494,7 @@ let visits = @yue.Store::new("1,024")
 
 ### 线性进度条 progress_line
 
-`progress_line(value : Store[Double], height? = 8.0)`——背景浅灰轨道 + 主题色填充，value 取值 0..1，变化自动重绘。
+`progress_line(value : Store[Double], style?, handle?)`——背景浅灰轨道 + 主题色填充（条高默认 8、经 style 覆盖），value 取值 0..1，变化自动重绘。
 
 ```moonbit
 let ratio = @yue.Store::new(0.42)
@@ -519,7 +534,7 @@ let ratio = @yue.Store::new(0.42)
 
 ### 卡片 card
 
-`card(title, children : Array[Node], height? = 160.0)`——标题栏（加粗、底部分隔线）+ 边框，内容区从标题栏下方开始。
+`card(title, children : Array[Node], style?, handle?)`——标题栏（加粗、底部分隔线）+ 边框（卡高默认 160、经 style 覆盖），内容区从标题栏下方开始。
 
 ```moonbit
 @yue.card("概要", [@yue.statistic("任务数", done)], height=120.0)
@@ -527,7 +542,7 @@ let ratio = @yue.Store::new(0.42)
 
 ### 代码高亮 code_view
 
-`code_view(lines, lang? = "moonbit", font_size? = 13.0, width? = 560.0, line_numbers? = false)`
+`code_view(lines, lang? = "moonbit", font_size? = 13.0, line_numbers? = false, style?, handle?)`
 
 逐 token 高亮排版，全平台行为一致（含 Windows）。lang 关键字集：moonbit / js / ts / python / rust / c / go / bash / sql（大小写不敏感）；line_numbers=true 左侧行号槽。
 
@@ -541,7 +556,7 @@ let ratio = @yue.Store::new(0.42)
 
 ### Markdown 展示 markdown_view
 
-`markdown_view(source, width? = 560.0)`——标题 1-6 / 段落 / **粗体** / *斜体* / `行内代码` / 链接文字 / 无序有序列表 / 引用（主题色竖条）/ 分隔线 / 围栏代码块（语言随 fence 标注，复用 code_view）；三平台显示一致，链接 / 代码色跟主题。
+`markdown_view(source, style?)`——标题 1-6 / 段落 / **粗体** / *斜体* / `行内代码` / 链接文字 / 无序有序列表 / 引用（主题色竖条）/ 分隔线 / 围栏代码块（语言随 fence 标注，复用 code_view）；三平台显示一致，链接 / 代码色跟主题。
 
 ```moonbit
 @yue.markdown_view("# 标题\n\n正文 **粗体** 与 `行内代码`。")
@@ -549,7 +564,7 @@ let ratio = @yue.Store::new(0.42)
 
 ### 表格 table_t
 
-`table_t(columns, rows : Store[Array[TableRow]], width? = 560.0, row_height? = 36.0, selection? : Store[Array[Int]], sort? : Store[TableSort], on_row_click?)`
+`table_t(columns, rows : Store[Array[TableRow]], width? = 560.0, row_height? = 36.0, selection? : Store[Array[Int]], sort? : Store[TableSort], on_row_click?, style?, handle?)`
 
 表头 + 斑马纹 + 悬停底色 + Store 驱动（set 后整表重建并清空选择）。列用 `TableColumn::make(标题, 宽, align?, sortable?)`（宽 ≤0 为弹性列均分剩余宽；`sortable=false` 的列不参与表头排序）。单元格 `TableCell`：`CellText`（超宽单行省略号截断，拖列宽后按新宽度重截）/ `CellTag(文本, 语义类型)` / `CellColorBox(色值, 名)` / `CellLines(多行, 行自动撑高)`；`TableRow::make(字符串数组)` 建纯文本行。不传 `selection` 时行点击单选高亮；传 `selection` 启用复选框列（行点击勾选、表头全选 / 清空、部分选中画横条，选中行浅蓝底），回调收 `(行号, 行)`。
 
@@ -568,7 +583,7 @@ sort.subscribe(fn(st) { /* 按 st.column / st.asc 重排后 rows.set(...) */ })
 
 ### 虚拟滚动表格 table_v_t
 
-`table_v_t(columns, rows : Store[Array[TableRow]], width? = 560.0, height? = 360.0, row_height? = 32.0, selection? : Store[Array[Int]], sort? : Store[TableSort], on_row_click?)`
+`table_v_t(columns, rows : Store[Array[TableRow]], width? = 560.0, height? = 360.0, row_height? = 32.0, selection? : Store[Array[Int]], sort? : Store[TableSort], on_row_click?, fill? = false, style?, handle?)`
 
 table_t 的万行级形态：只画可见行，自管滚动（滚轮 / 拖拽滚动条 / 键盘），不受滚动容器内容高度上限约束；单元格画法同 table_t（CellLines 在行高内最多两行），列 / selection / sort（表头箭头：常驻灰 ↕ 提示、排序列主题色 ▲▼）/ 列宽拖动（左 / 右缘双向边界）语义一致。
 
@@ -608,7 +623,7 @@ let right = @yue.Store::new(["丙"])
 
 ### 折线 / 面积图 line_chart_t
 
-`line_chart_t(series : Store[Array[LineSeries]], width? = 560.0, height? = 260.0, area? = false, y_range?, show_last? = true)`
+`line_chart_t(series : Store[Array[LineSeries]], area? = false, y_range?, show_last? = true, fill? = false, style?, handle?)`
 
 定长滚动窗口多序列折线。
 
@@ -639,7 +654,7 @@ ignore(@yue.set_timer(500, fn() {
 
 ### 柱状 / 条形图 bar_chart_t
 
-`bar_chart_t(data : Store[Array[BarItem]], width? = 560.0, height? = 280.0, horizontal? = false, y_range? = None)`
+`bar_chart_t(data : Store[Array[BarItem]], horizontal? = false, y_range? = None, fill? = false, style?, handle?)`
 
 纵向柱
 
@@ -662,7 +677,7 @@ let bars = @yue.Store::new([
 
 ### 环形 / 饼图 donut_chart_t
 
-`donut_chart_t(data : Store[Array[DonutSlice]], width? = 480.0, height? = 240.0, thickness? = 34.0, center? = "")`
+`donut_chart_t(data : Store[Array[DonutSlice]], thickness? = 34.0, center? = "", style?, handle?)`
 
 占比扇区
 
@@ -684,7 +699,7 @@ let slices = @yue.Store::new([
 
 ### 仪表盘 gauge_t
 
-`gauge_t(value : Store[Double], width? = 240.0, height? = 170.0, thresholds?)`
+`gauge_t(value : Store[Double], thresholds?, style?, handle?)`
 
 单值百分比环
 
@@ -706,7 +721,7 @@ let usage = @yue.Store::new(0.0)
 
 ### 散点图 scatter_t
 
-`scatter_t(points : Store[Array[(Double, Double)]>, width? = 560.0, height? = 320.0, trend? = false, dot? = 3.0)`
+`scatter_t(points : Store[Array[(Double, Double)]>, trend? = false, dot? = 3.0, style?, handle?)`
 
 x/y 点列
 
@@ -730,7 +745,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 | API | 用途 |
 |---|---|
 | `icon(kind : IconKind, size? = 16.0, color? = "")` | 图标节点：默认主题常规色，传 color 固定色 |
-| `icon_button_t(kind, on_click?, size? = 28.0, tip? = "", style?, style_str?)` | 方形图标按钮：hover 浅灰底 + 文字色提亮，Enter/Space 触发；tip 非空挂原生悬浮提示；默认 marginRight 6,style/style_str 由调用方追加(后应用可覆盖默认) |
+| `icon_button_t(kind, on_click?, size? = 28.0, tip? = "", style?, handle?)` | 方形图标按钮：hover 浅灰底 + 文字色提亮，Enter/Space 触发；tip 非空挂原生悬浮提示；默认 marginRight 6,style 由调用方追加(后应用可覆盖默认) |
 | `draw_icon(p : Painter, kind, cx, cy, s, color)` | 统一自绘入口（中心坐标 + 边长） |
 | `all_icons()` / `icon_name(kind)` | 全清单 / 取名 |
 
@@ -835,7 +850,7 @@ toast("已保存", @yue.Success)
 
 ### 下拉菜单 dropdown_menu
 
-`dropdown_menu(trigger : String, items, on_select : (Int) -> Unit, width? = 160.0)`——触发文字 + 下拉箭头，点击弹菜单项列表：悬停高亮，点击回调序号并收起；items 中 `"-"` 画分隔线。
+`dropdown_menu(trigger : String, items, on_select : (Int) -> Unit, style?)`——触发文字 + 下拉箭头，点击弹菜单项列表：悬停高亮，点击回调序号并收起；items 中 `"-"` 画分隔线。
 
 ```moonbit
 @yue.dropdown_menu("操作", ["编辑", "-", "删除"], fn(i) { handle(i) })

@@ -5,7 +5,7 @@
 通用约定：
 
 - 除单独说明外，所有 `make` 均有可选参数
-  `style : Array[(String, Double)]` 与 `style_str : Array[(String, String)]`
+  `style : Array[(String, &StyVal)]` —— 单个数组混装数值（Double）与字符串值
   （创建即应用的样式键值对），下表不再重复列出。
 - `on_*` 为回调注册方法。
 
@@ -62,8 +62,8 @@ let col = @yue.Container::make(style=[("padding", 12.0)])
 col.add_child(child)
 ```
 
-入参只有 `style` / `style_str`（见文首）。默认 `flexDirection=column`、
-`alignItems=stretch`，水平排列 `set_style_str("flexDirection", "row")`；
+入参只有 `style`（见文首）。默认 `flexDirection=column`、
+`alignItems=stretch`，水平排列在 `style` 里传 `("flexDirection", "row")`；
 键的解析规则见 [docs/layout.md](layout.md)。
 
 | 方法 | 用途 |
@@ -74,7 +74,7 @@ col.add_child(child)
 ## 标签 Label
 
 ```moonbit
-let l = @yue.Label::make("文本", style_str=[("color", "#356AA0")])
+let l = @yue.Label::make("文本", style=[("color", "#356AA0")])
 l.set_text("新文本")
 ```
 
@@ -310,7 +310,7 @@ let sep = @yue.Separator::make(Horizontal)   // 或 Vertical
 | hover_bg / base_bg | String | 主题 fill_hover / 空(透明) | 悬停 / 常态底色(自绘) |
 | radius | Double | 0 | 底色圆角 |
 | on_change | (Bool, Container) -> Unit | 空函数 | hover 态翻转时回调(仅变化时),携带组容器 |
-| style / style_str | 数组 | [] | 组容器布局样式 |
+| style | 数组 | [] | 组容器布局样式 |
 
 判定机制是指针位置轮询(100ms,读全局指针坐标与组屏幕矩形比对),不依赖容器的 enter/leave——GTK 下子容器/原生控件的事件窗口会独占指针事件,容器层收不到 enter;Windows 下同一机制工作,行为跨平台一致。
 
@@ -330,7 +330,7 @@ Windows 上 `scroll()` 的默认形态（overlay=true 且未显式 policy）即�
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | content | Node | 必填 | 滚动内容（声明式节点） |
-| style / style_str | 数组 | [] | 外层容器样式 |
+| style | 数组 | [] | 外层容器样式 |
 | handle | (Scroll) -> Unit | 空函数 | 拿内部 Scroll 做程序化滚动 |
 
 ## 页签 Tab
@@ -750,7 +750,7 @@ pop.show_relative_to(anchor_view)
 | on_key_down / up | 键盘 |
 | on_size_changed | 尺寸变化 |
 | set_capture() / release_capture() / has_capture() | 鼠标捕获 |
-| set_style(k, v) / set_style_str(k, v) | 布局样式 |
+| set_style(k, v) / set_style_str(k, v) | 布局样式（运行期底层原语） |
 | 拖拽注册与拖放回调 | 拖放（接收方必须注册 handle_drag_update 返回允许的操作位，缺省一律拒绝；发起方 do_drag_file_paths / do_drag_data_full 须在 on_mouse_down 回调内调用才生效；演示见 components「窗口」页） |
 
 事件载荷字段：

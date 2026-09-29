@@ -394,8 +394,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
               )
               reorder_langs()
             }),
-            @yue.label("   "),
-            @yue.bind(table_picked, fn(s) { s }),
+            @yue.bind(table_picked, fn(s) { s }, style=[("marginLeft", 12.0)]),
           ],
           style=[("marginTop", 8.0), ("alignItems", "center")],
         ),
@@ -596,7 +595,6 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       [
         @yue.hbox([
           @yue.transfer(transfer_left, transfer_right),
-          @yue.label("   "),
           @yue.carousel_t(
             [
               @yue.label_t(
@@ -612,7 +610,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
                 role=@yue.Body,
               ),
             ],
-            width=320.0,
+            style=[("width", 320.0), ("marginLeft", 20.0)],
             height=80.0,
           ),
         ]),
@@ -631,8 +629,8 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
         "    @yue.label_t(\"第一屏:任意 Node。\", role=@yue.Body),",
         "    @yue.label_t(\"第二屏:自动轮播 3s 一切。\", role=@yue.Body),",
         "  ],",
-        "  width=320.0,",
-        "  height=80.0,",
+        "  // 尺寸经 style 覆盖(布局唯一入口)",
+        "  style=[(\"width\", 320.0), (\"height\", 80.0)],",
         "  // interval_ms=3000:自动轮播间隔毫秒,传 0 关闭自动",
         ")",
       ],

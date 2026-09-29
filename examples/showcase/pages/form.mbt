@@ -80,7 +80,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
         "// step 默认 1.0,num_width 中间数值区宽默认 64;本例钳到 0..10",
         "@yue.input_number(qty.store(), min=0.0, max=10.0, step=1.0)",
         "// bind(信号, fn):挂载即建 Label 显示 f(当前值),之后信号一变",
-        "// 文本自动刷新;可选 style/style_str 叠加布局样式",
+        "// 文本自动刷新;可选 style 叠加布局样式",
         "@yue.bind(qty, fn(v) { \"当前数量:\\{v.round()}\" })",
         "// slider_t 自绘滑杆:点击轨道/拖拽 thumb 调值,按 step 量化写入;",
         "// 首参 Store[Double],min/max/step 默认 0..100 步 1,on_change 随",

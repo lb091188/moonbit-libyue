@@ -5,7 +5,7 @@ For the usage overview (two styles), see [README.md](README.md); all types are r
 General conventions:
 
 - Unless stated otherwise, every `make` accepts the optional parameters
-  `style : Array[(String, Double)]` and `style_str : Array[(String, String)]`
+  `style : Array[(String, &StyVal)]` — one array mixing numeric (`Double`) and string values
   (style key-value pairs applied at creation); these are not repeated in the tables below.
 - `on_*` methods register callbacks.
 
@@ -62,8 +62,8 @@ let col = @yue.Container::make(style=[("padding", 12.0)])
 col.add_child(child)
 ```
 
-Parameters are only `style` / `style_str` (see the top of this document). Defaults are `flexDirection=column`,
-`alignItems=stretch`; for horizontal layout use `set_style_str("flexDirection", "row")`;
+Parameters are only `style` (see the top of this document). Defaults are `flexDirection=column`,
+`alignItems=stretch`; for horizontal layout pass `("flexDirection", "row")` in `style`;
 see [docs/layout.md](layout.md) for key parsing rules.
 
 | Method | Purpose |
@@ -74,7 +74,7 @@ see [docs/layout.md](layout.md) for key parsing rules.
 ## Label
 
 ```moonbit
-let l = @yue.Label::make("文本", style_str=[("color", "#356AA0")])
+let l = @yue.Label::make("文本", style=[("color", "#356AA0")])
 l.set_text("新文本")
 ```
 
@@ -310,7 +310,7 @@ Hovering anywhere in the group — including all child widgets — puts the whol
 | hover_bg / base_bg | String | theme fill_hover / empty (transparent) | Hover / idle background (self-drawn) |
 | radius | Double | 0 | Background corner radius |
 | on_change | (Bool, Container) -> Unit | no-op | Fired on hover-state flips only, receives the group container |
-| style / style_str | arrays | [] | Group container layout styles |
+| style | array | [] | Group container layout styles |
 
 The detection mechanism is pointer-position polling (100ms, comparing the global pointer coordinates against the group's screen rectangle) and does not rely on the container's enter/leave — under GTK, child containers' and native widgets' event windows monopolize pointer events, so the container layer never sees enter; the same mechanism works on Windows with cross-platform-identical behavior.
 
@@ -330,7 +330,7 @@ Standalone use (when the content is already a Node):
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | content | Node | required | Scroll content (declarative node) |
-| style / style_str | arrays | [] | Outer container styles |
+| style | array | [] | Outer container styles |
 | handle | (Scroll) -> Unit | no-op | Access the inner Scroll for programmatic scrolling |
 
 ## Tab
@@ -755,7 +755,7 @@ All widgets (`ViewLike`) support:
 | on_key_down / up | Keyboard |
 | on_size_changed | Size changes |
 | set_capture() / release_capture() / has_capture() | Mouse capture |
-| set_style(k, v) / set_style_str(k, v) | Layout styles |
+| set_style(k, v) / set_style_str(k, v) | Layout styles (runtime primitives) |
 | Drag registration and drop callbacks | Drag and drop (receivers must also register handle_drag_update returning allowed operations; without it every drag is rejected; demo in the components example, "Windows & Web" page) |
 
 Event payload fields:

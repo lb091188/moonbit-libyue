@@ -89,7 +89,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
       ],
       code=[
         "// 声明式挂 WebView:url?/html? 二选一(都给时以 url 为准,默认空串则初始空白)",
-        "// handle? 在 mount 时收到 Browser 句柄(此时才实例化),style/style_str 为数值/字符串样式",
+        "// handle? 在 mount 时收到 Browser 句柄(此时才实例化),style 为混型样式表",
         "@browser.browser(handle=fn(b) {",
         "// 加载 HTML 片段:第一参数为 HTML 字符串,可选 base_url 默认 \"about:blank\"(相对资源基准)",
         "  b.load_html(\"<h3>WebView 内嵌页</h3>\")",

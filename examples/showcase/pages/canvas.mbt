@@ -158,7 +158,7 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
         "  },",
         "  // handle 拿 Container 句柄;on_size_changed 在首次布局/窗口缩放时回调",
         "  handle=fn(c) { c.on_size_changed(fn() { c.schedule_paint() }) },",
-        "  // style:数值样式对(属性名, 值);style_str:字符串样式对(如背景色)",
+        "  // style:混型样式对(属性名, 值)——数值即像素,字符串收枚举/百分比/颜色",
         "  style=[(\"height\", 300.0), (\"width\", 640.0)],",
         ")",
       ],
