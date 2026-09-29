@@ -5,6 +5,8 @@
 //   1. 开探针,点行1 若干次;
 //   2. 重开,点行2,再点行1 一次,再点窗口空白处一次;
 //   3. 重开,点行3,再点行1 一次,再点空白处一次;
+//   4. 重开,点行5-A(变隐藏、B 出现),再点 B,再点行1——验证显隐切换
+//      (不 remove/add)是否安全,这是 showcase 明暗按钮的规避方案;
 // 每次点击后看「事件流」最后几行:
 //   - 出现 [根 (x,y)] = 窗口层活着,只是子控件路由断;
 //   - 什么都没有 = 整个窗口鼠标消息死了;
@@ -36,6 +38,7 @@ fn main {
     })
   }
 
+  let toggle : @yue.Store[Bool] = @yue.Store::new(true)
   let body : Array[@yue.Node] = [
     @yue.label_t("点击劫持诊断探针 v3(Esc 退出)", role=@yue.Title),
     @yue.label_t("每测一行前重开探针;点击后看下方事件流", role=@yue.Secondary),
@@ -85,6 +88,38 @@ fn main {
         }),
       ],
       style=[("alignItems", "center")],
+    ),
+    // 行5:规避方案验证——双预建按钮显隐切换(不 remove/add)
+    @yue.hbox(
+      [
+        @yue.label_t("行5 显隐切换:"),
+        @yue.button_t(
+          "行5-A(显示时)",
+          on_click=fn() {
+            toggle.update(fn(v) { !v })
+            say("行5A", "显隐触发")
+          },
+          handle=fn(c) {
+            toggle.subscribe(fn(v) { c.set_visible(v) })
+          },
+        ),
+        @yue.button_t(
+          "行5-B(隐藏时)",
+          on_click=fn() {
+            toggle.update(fn(v) { !v })
+            say("行5B", "显隐触发")
+          },
+          handle=fn(c) {
+            toggle.subscribe(fn(v) { c.set_visible(!v) })
+            c.set_visible(false)
+          },
+        ),
+      ],
+      style=[("alignItems", "center")],
+      handle=fn(row) {
+        // 用 toggle 信号演示:点 A 隐 A 显 B,点 B 隐 B 显 A
+        ignore(row)
+      },
     ),
     @yue.separator(),
     @yue.label_t("事件流(新在前):", role=@yue.Secondary),

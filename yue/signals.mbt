@@ -232,6 +232,10 @@ pub fn[A] bind(
 /// 每次变化重建整棵子树,适合低频切换(如随状态换图标/换整块视图);
 /// 高频更新请改用 bind 文本绑定或经 handle 命令式改属性。Store 传
 /// store.signal() 接入。
+/// ⚠ Windows:重挂的 remove+add 真机实证会令后续鼠标 hit-test 异常
+/// (全窗点击被路由给重挂过的控件,推迟重挂也躲不开,见
+/// adaptation.md),点击链路会重挂自身的场景请改「预建 + set_visible
+/// 显隐切换」规避;libyue 层根修前此限制不解除。
 pub fn[T] bind_node(sig : Signal[T], f : (T) -> Node) -> Node {
   {
     mount: fn(parent) {
