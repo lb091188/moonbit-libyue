@@ -1,6 +1,6 @@
 # 布局样式键速查
 
-libyue 的布局引擎是 Yoga flexbox。本文是全部可用样式键的速查：键名解析规则、四类键（枚举 / 数值 / 边缘 / 特殊）的取值表、常用组合示例——照此设置即可，不用查 yoga 文档。样式经 `style` / `style_str` 创建即应用，也可运行期用 `set_style` / `set_style_str` 修改；容器与原生控件 API 见 [components.md](components.md)，声明式树里的样式键用法见 [declarative.md](declarative.md)。
+libyue 的布局引擎是 Yoga flexbox。本文是全部可用样式键的速查：键名解析规则、四类键（枚举 / 数值 / 边缘 / 特殊）的取值表、常用组合示例——照此设置即可，不用查 yoga 文档。样式经单个 `style` 数组创建即应用（数值 Double 与字符串值混装，按值类型派发），也可运行期用底层原语 `set_style` / `set_style_str` 修改；容器与原生控件 API 见 [components.md](components.md)，声明式树里的样式键用法见 [declarative.md](declarative.md)。
 
 ## 通用约定
 
@@ -9,7 +9,7 @@ libyue 的布局引擎是 Yoga flexbox。本文是全部可用样式键的速查
 | API | 用途 |
 |---|---|
 | `set_style(name, Double)` | 数值型样式（像素） |
-| `set_style_str(name, String)` | 枚举 / 百分比 / auto 型 |
+| `set_style_str(name, String)` | 枚举 / 百分比 / auto 型（底层原语） |
 | `get_bounds() -> (x, y, w, h)` | 读相对父节点的计算几何 |
 | `get_computed_layout() -> String` | yoga 布局树文本转储（调试） |
 | `on_size_changed(callback)` | 尺寸变化时机 |
@@ -28,7 +28,7 @@ libyue 的布局引擎是 Yoga flexbox。本文是全部可用样式键的速查
 
 ## 枚举键
 
-`set_style_str` 设置，值为字符串：
+值为字符串（直接写进 `style` 数组；`set_style_str` 是运行期底层原语）：
 
 | 键 | 合法值 | 说明 |
 |---|---|---|
@@ -45,7 +45,7 @@ libyue 的布局引擎是 Yoga flexbox。本文是全部可用样式键的速查
 
 ```moonbit
 let toolbar = @yue.Container::make(
-  style_str=[("flexDirection", "row"), ("justifyContent", "space-between")])
+  style=[("flexDirection", "row"), ("justifyContent", "space-between")])
 toolbar.set_style_str("alignItems", "center")   // 运行期改键同样生效
 ```
 
@@ -67,10 +67,10 @@ toolbar.set_style_str("alignItems", "center")   // 运行期改键同样生效
 ```moonbit
 let page = @yue.Container::make(
   style=[("gap", 12.0), ("padding", 16.0)],
-  style_str=[("flexDirection", "row")])
+  style=[("flexDirection", "row")])
 let side = @yue.Container::make(style=[("width", 220.0)])
 let main = @yue.Container::make(style=[("flex", 1.0)])
-let half = @yue.Container::make(style_str=[("width", "50%")])   // 百分比走 style_str
+let half = @yue.Container::make(style=[("width", "50%")])   // 字符串值即百分比
 ```
 
 ## 边缘键
@@ -98,7 +98,7 @@ View 直收、不走 yoga：
 经典两栏（侧栏定宽 + 主区弹性）：
 
 ```moonbit
-let root = @yue.Container::make(style_str=[("flexDirection", "row")])
+let root = @yue.Container::make(style=[("flexDirection", "row")])
 root.add_child(@yue.Container::make(style=[("width", 220.0)]))   // 侧栏定宽
 root.add_child(@yue.Container::make(style=[("flex", 1.0)]))      // 主区吃剩余空间
 ```
@@ -107,14 +107,14 @@ root.add_child(@yue.Container::make(style=[("flex", 1.0)]))      // 主区吃剩
 
 ```moonbit
 let center_box = @yue.Container::make(
-  style_str=[("justifyContent", "center"), ("alignItems", "center")])
+  style=[("justifyContent", "center"), ("alignItems", "center")])
 ```
 
 绝对定位浮层（相对挂载容器，配 `dialog_t` / 自定义遮罩用）：
 
 ```moonbit
 let overlay = @yue.Container::make(
-  style_str=[("position", "absolute"), ("top", "0"), ("left", "0")],
+  style=[("position", "absolute"), ("top", "0"), ("left", "0")],
   style=[("width", 120.0), ("height", 80.0)])
 ```
 

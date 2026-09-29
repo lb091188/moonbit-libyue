@@ -27,14 +27,14 @@ entry.on_activate(fn() { check(entry.get_text()) })
 `entry_type` / `on_activate()`（回调不带参），L2 `entry` 节点则是
 `password` / `on_enter(String)`（回调携带文本，见下节）。
 
-`style`（数值型样式键值对）与 `style_str`（字符串型）几乎在每个构造器上都有：
+单个 `style` 数组（数值 Double 与字符串值混装）几乎在每个构造器上都有：
 
 ```moonbit
 @yue.Label::make("标题", style=[("marginBottom", 10.0)],
-                 style_str=[("color", "#356AA0")])
+                 ("color", "#356AA0")])
 ```
 
-已有控件想批量应用样式，用自由函数 `apply_style(view, style=..., style_str=...)`。
+已有控件想批量应用样式，用自由函数 `apply_style(view, style=...)`。
 
 ## L2：Node 树与 mount
 
@@ -44,7 +44,7 @@ entry.on_activate(fn() { check(entry.get_text()) })
 ```moonbit
 fn page(state : State) -> @yue.Container {
   @yue.mount([
-    @yue.label("设置", style_str=[("color", "#356AA0")]),
+    @yue.label("设置", style=[("color", "#356AA0")]),
     @yue.entry(text="昵称", on_enter=fn(s) { state.save(s) }),
     @yue.hbox([
       @yue.button("保存", on_click=fn() { state.flush() }),
@@ -100,7 +100,7 @@ let win = @yue.mount_window(
 | `browser(url, html, …)` | Browser(在 `yue/browser` 包,`@browser.browser(...)`) | 二选一 |
 | `bind_label(store, f, …)` | Label | L3 响应式绑定，见下 |
 
-所有节点都带 `style` / `style_str`；常用节点另有 **`handle`** 参数。
+所有节点都带 `style`；常用节点另有 **`handle`** 参数。
 
 ### handle：拿回控件句柄
 
@@ -147,7 +147,7 @@ fn tagged(label_text : String, body : Node) -> Node {
 5. **现代化布局**：纯 vbox/hbox/scroll 弹性盒可排出「深色侧边栏 + 顶栏 +
    滚动卡片」外壳；要点是**根节点必须 `style=[("flex", 1.0)]` 才撑满窗口**，
    侧栏定宽（width）不放 flex，主区 flex=1；根容器加
-   `style_str=[("alignItems", "stretch")]` 让子列占满高度。
+   `style=[("alignItems", "stretch")]` 让子列占满高度。
 6. **容器收缩语义**:`vbox`/`hbox` 默认**不收缩**(yoga 原语义
    `flexShrink 0`),子项超宽时溢出截断;需要收缩或折行的容器显式给
    `style=[("flexshrink", 1.0)]`(如 segmented 超宽换行,wrap 的宽度

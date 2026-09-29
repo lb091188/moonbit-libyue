@@ -93,6 +93,13 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **独立翻译单元(如 `yue_accent_mac.mm`)不 include `yue_mbt.h` 时,函数定义必须显式 `extern "C"`**:缺了按 C++ mangling 导出(`__Z25yue_mbt_system_accent_macv`),`yue_mbt.cpp` 按头文件的 C 名引用即链接 undefined。此病三平台只有 macOS 暴露(Linux/Windows 不编 .mm),vendor/CI 的 prepare 阶段也不暴露(静态库不查 undefined),唯 macOS 真链接(moon test/build)必现;本机无 mac 时唯一防线是 CI。0.5.0 发布前实修一轮(符号经 vendor Actions 重出后 strings 复验为 `_yue_mbt_system_accent_mac`)。
 - XFCE 面板 IconPixmap 优先于 IconName:set_icon_name 与 set_pixmap 互斥,设一方须清空另一方。
 
+### 统一 style 值模型(StyVal trait)与 MoonBit trait object 限制(0.5.2)
+
+- 统一 style 值模型:`StyVal` 开放 trait(`yue/style.mbt`)给 builtin `Double`/`String` 实现 `apply_to(Self, View, String)`,混型数组 `Array[(String, &StyVal)]` 单参数收像素与字符串值,内部派发 `ffi_view_set_style_prop_float/_str` 两条 C 通道(C ABI 无重载,拆分消化在 yue 内)。期望类型已知时数组字面量自动装箱(tuple 内亦传播),存量纯数值调用点零改动迁移。
+- **trait object 对 builtin 类型的 impl 判定限制**(moonc v0.10.12 实测,/tmp 探针):①一个 impl 块只能写一个方法,`impl T for X with fn a.. fn b..` 换行连排与同行连写都不存在;②impl 块必须一次写全 trait 全部方法——trait 两方法而某类型只 impl 其一时,报 "does not implement trait, although an impl is defined: method X is missing",且 `&Trait` 引用直接报 "trait not found";③「声明 `= _` + 包级默认 impl + 类型分块覆盖」对 builtin 类型不生效(对 struct 类型是官方文档形态,见 moonbit-docs trait 示例的 J),覆盖块写全两方法也判定失败;④结论:给 builtin 类型实现自有 trait,每类型一个 impl 块写全全部方法(core 的 Show/Hash 同此形态);因此 StyVal 只能单方法,「从 trait object 取回数值」(as_num 通道)不可行。
+- 布局参数收编后 Windows 单行输入垂直居中不再读数值:改纯布局方案——Entry 控件收窄到行高(`entry_ctrl_height`,文字在控件内天然居中),外壳 `justifyContent=center` 垂直居中,任意高度值(含百分比)自动适配;原 entry_vcenter 的「收窄+均分 margin」路径已删。
+- select_t/dropdown_menu 弹层宽度在点击时 `get_bounds(field)` 现取(用户 style 覆盖字段宽后弹层自动跟随);弹层根容器宽高仍须创建期给定(事后 set_style 会被弹层分配时序吞掉,见 GTK 节)。
+
 ## Linux
 
 ### 发行版

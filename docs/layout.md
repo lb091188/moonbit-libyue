@@ -1,6 +1,6 @@
 # Layout Style Key Quick Reference
 
-libyue's layout engine is Yoga flexbox. This document is a quick reference for all usable style keys: name-resolution rules, value tables for the four key categories (enum / numeric / edge / special), and common-combination examples — set styles according to this table without consulting yoga docs. Styles are applied at creation via `style` / `style_str` and can be changed at runtime with `set_style` / `set_style_str`; container and native control APIs are in [components.md](components.md), and style keys inside the declarative tree are covered in [declarative.md](declarative.md).
+libyue's layout engine is Yoga flexbox. This document is a quick reference for all usable style keys: name-resolution rules, value tables for the four key categories (enum / numeric / edge / special), and common-combination examples — set styles according to this table without consulting yoga docs. Styles are applied at creation via a single `style` array that mixes numeric (Double) and string values, and can be changed at runtime with the lower-level `set_style` / `set_style_str` primitives; container and native control APIs are in [components.md](components.md), and style keys inside the declarative tree are covered in [declarative.md](declarative.md).
 
 ## Conventions
 
@@ -9,7 +9,7 @@ Entry points (any `ViewLike`):
 | API | Purpose |
 |---|---|
 | `set_style(name, Double)` | numeric styles (pixels) |
-| `set_style_str(name, String)` | enum / percentage / auto values |
+| `set_style_str(name, String)` | enum / percentage / auto values (lower-level primitive) |
 | `get_bounds() -> (x, y, w, h)` | computed geometry relative to the parent node |
 | `get_computed_layout() -> String` | text dump of the yoga layout tree (debugging) |
 | `on_size_changed(callback)` | size-change timing |
@@ -28,7 +28,7 @@ Entry points (any `ViewLike`):
 
 ## Enum Keys
 
-Set with `set_style_str`; values are strings:
+Values are strings (put them straight into the `style` array; `set_style_str` is the runtime primitive):
 
 | Key | Legal values | Description |
 |---|---|---|
@@ -45,7 +45,7 @@ Set with `set_style_str`; values are strings:
 
 ```moonbit
 let toolbar = @yue.Container::make(
-  style_str=[("flexDirection", "row"), ("justifyContent", "space-between")])
+  style=[("flexDirection", "row"), ("justifyContent", "space-between")])
 toolbar.set_style_str("alignItems", "center")   // runtime key changes work too
 ```
 
@@ -66,11 +66,10 @@ Set with `set_style`; values are `Double` pixels, with `"50%"` for percentages a
 
 ```moonbit
 let page = @yue.Container::make(
-  style=[("gap", 12.0), ("padding", 16.0)],
-  style_str=[("flexDirection", "row")])
+  style=[("gap", 12.0), ("padding", 16.0), ("flexDirection", "row")])
 let side = @yue.Container::make(style=[("width", 220.0)])
 let main = @yue.Container::make(style=[("flex", 1.0)])
-let half = @yue.Container::make(style_str=[("width", "50%")])   // percentages go through style_str
+let half = @yue.Container::make(style=[("width", "50%")])   // string value = percentage
 ```
 
 ## Edge Keys
@@ -98,7 +97,7 @@ Received directly by View, not routed through yoga:
 Classic two panes (fixed sidebar + flexible main area):
 
 ```moonbit
-let root = @yue.Container::make(style_str=[("flexDirection", "row")])
+let root = @yue.Container::make(style=[("flexDirection", "row")])
 root.add_child(@yue.Container::make(style=[("width", 220.0)]))   // fixed-width sidebar
 root.add_child(@yue.Container::make(style=[("flex", 1.0)]))      // main area takes the rest
 ```
@@ -107,15 +106,15 @@ Centering on both axes:
 
 ```moonbit
 let center_box = @yue.Container::make(
-  style_str=[("justifyContent", "center"), ("alignItems", "center")])
+  style=[("justifyContent", "center"), ("alignItems", "center")])
 ```
 
 Absolutely positioned overlay (relative to the mount container, for `dialog_t` / custom masks):
 
 ```moonbit
 let overlay = @yue.Container::make(
-  style_str=[("position", "absolute"), ("top", "0"), ("left", "0")],
-  style=[("width", 120.0), ("height", 80.0)])
+  style=[("position", "absolute"), ("top", "0"), ("left", "0"),
+    ("width", 120.0), ("height", 80.0)])
 ```
 
 Flex distribution with a min/max floor (doesn't collapse on narrow screens):

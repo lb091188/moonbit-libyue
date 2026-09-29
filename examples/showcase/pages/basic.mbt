@@ -68,7 +68,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "// hbox(children 子节点数组, style~/style_str~ 默认空, handle~ 拿 Container):水平排列",
+        "// hbox(children 子节点数组, style~ 默认空, handle~ 拿 Container):水平排列",
         "@yue.hbox([",
         "// button_t(文字, on_click~ 点击回调默认空操作, variant~ 变体默认 Soft)",
         "// 四变体:Solid 主题色实底白字 / Soft 浅底主题色字 / Text 透明底主题色字 /",
@@ -112,7 +112,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "// label_t(文字, role~ 排版角色默认 Body, style~/style_str~, handle~ 拿 Label)",
+        "// label_t(文字, role~ 排版角色默认 Body, style~, handle~ 拿 Label)",
         "// 五级角色字号颜色各异,主题切换自动跟随:",
         "// Title 18 半粗 / Section 14 半粗 / Body 13 常规 / Secondary 12 辅助灰 /",
         "// Accent 13 半粗主题色",
@@ -195,11 +195,11 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
       ],
       code=[
         "// hover_group(child 组内容, hover_bg~ 悬停底色, base_bg~ 常态底色,",
-        "// radius~ 圆角默认 0, on_change~ 翻转回调, style~/style_str~):底色默认取",
+        "// radius~ 圆角默认 0, on_change~ 翻转回调, style~):底色默认取",
         "// 主题 fill_hover / 透明;指针位置轮询,不依赖 enter/leave——组内任意",
         "// 位置(含子控件)悬停即整组进入 hover 态",
         "@yue.hover_group(",
-        "  // vbox(children 子节点数组, style~/style_str~ 默认空, handle~ 拿 Container):垂直布局",
+        "  // vbox(children 子节点数组, style~ 默认空, handle~ 拿 Container):垂直布局",
         "  @yue.vbox(",
         "    [",
         "      @yue.label_t(\"组标题\", role=@yue.Section),",
@@ -244,7 +244,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "// cursor_group(child 组内容, cursor~ 组内光标默认手型, style~/style_str~):",
+        "// cursor_group(child 组内容, cursor~ 组内光标默认手型, style~):",
         "// 指针落在组内任意位置(含有独立窗口的子控件)都保持该光标,移出恢复默认",
         "// (非各子件原光标);组根+全部子孙递归设置(父设子随),机制同 hover_group",
         "@yue.cursor_group(",

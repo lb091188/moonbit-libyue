@@ -78,6 +78,21 @@ Every component in the library (including the plain `label()`, which defaults to
 
 Fixed colors (brand swatches etc.) can be set directly and stay theme-independent.
 
+### Unified style channel
+
+Every themed component exposes `style?` (style key-value pairs, numeric and string mixed; key table in [layout.md](layout.md)) and `handle?` (receives the outermost container on mount) on its outermost container. Component defaults (size / margin / direction) live in a default style table; caller `style` keys are applied last and can override them:
+
+```moonbit
+// Override width and margins (other defaults preserved)
+@yue.input_t(text="Name", style=[("width", 160.0), ("marginBottom", 4.0)])
+// slider fills the parent width by default; fix width by also clearing grow
+@yue.slider_t(v, style=[("flexgrow", 0.0), ("width", 240.0)])
+```
+
+`style` is the single entry for layout customization — component signatures no longer carry layout named parameters such as margin / width / height / spacing. Named parameters that remain are semantic/structural: `size` on `avatar` / `icon` (drawn content size), `width` on `table_t` (column-distribution basis) and `row_height`, `width` / `height` on `popover_t` (native popup window size, not layout), `width` on `transfer` (column width), `ratio` on `hsplit` / `vsplit` (drag geometry), plus data/interaction parameters (min/max/step/placeholder/clearable/foldable etc.).
+
+`style` is applied once at mount; prefer the theme palette for colors — colors set via `style` may conflict with theme switching (`theme_apply`).
+
 ```moonbit
 let l = @yue.Label::make("Title")
 @yue.theme_bind_fg(l, fn() { @yue.theme_current().text_regular })
@@ -108,7 +123,7 @@ Hover behavior: Solid / Danger darken, Soft goes solid white, Text gets a grey f
 
 ### Themed label label_t
 
-`label_t(text, role? = Body, style?, style_str?, handle?)`
+`label_t(text, role? = Body, style?, handle?)`
 
 Unified font size / color per text role, left-aligned; accepts layout styles and a handle callback.
 
@@ -116,7 +131,7 @@ Unified font size / color per text role, left-aligned; accepts layout styles and
 |---|---|---|---|
 | text | String | required | text |
 | role | TextRole | `Body` | `Title` / `Section` / `Body` / `Secondary` / `Accent` |
-| style / style_str | style key-value pairs | `[]` | see [layout.md](layout.md) |
+| style | style key-value pairs (numeric + string mixed) | `[]` | see [layout.md](layout.md) |
 | handle | (Label) -> Unit | no-op | post-creation callback receiving the underlying Label |
 
 ```moonbit
@@ -136,7 +151,7 @@ Unified font size / color per text role, left-aligned; accepts layout styles and
 
 ### Themed single-line input entry_t
 
-`entry_t(text? = "", password? = false, height? = 32.0, on_input?)`
+`entry_t(text? = "", password? = false, on_input?, style?, handle?)`
 
 Unified font and line height; the text color follows the theme and cannot be customized (platform limitation, see [adaptation.md](adaptation.md)).
 
@@ -152,7 +167,7 @@ let name = @yue.Store::new("")
 
 ### Bordered input input_t
 
-`input_t(text? = "", password? = false, margin? = 0.0, width? = 280.0, height? = 32.0, clearable? = false, on_input?, invalid? = Store::new(false))`
+`input_t(text? = "", password? = false, clearable? = false, on_input?, invalid? = Store::new(false), style?, handle?)`
 
 Self-drawn 1px outer border (turns theme primary on focus) + white background, straight corners.
 
@@ -169,7 +184,7 @@ let valid = @yue.Store::new(false)
 
 ### Number input input_number
 
-`input_number(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, num_width? = 64.0)`
+`input_number(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, style?, handle?)`
 
 -/+ buttons step the value, clamped to range; state lives in `Store[Double]`.
 
@@ -180,7 +195,7 @@ let count = @yue.Store::new(1.0)
 
 ### Multi-line input textarea_t
 
-`textarea_t(text? = "", width? = 280.0, height? = 110.0, margin? = 0.0, on_input?, clearable? = false, invalid? = Store::new(false))`
+`textarea_t(text? = "", on_input?, clearable? = false, invalid? = Store::new(false), style?, handle?)`
 
 Same pattern as input_t: self-drawn 1px border (turns theme primary on focus) + 8px inset; overflow scrolls per platform. clearable / invalid semantics match input_t.
 
@@ -226,7 +241,7 @@ let enabled = @yue.Store::new(true)
 
 ### Slider slider_t
 
-`slider_t(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, width? = 0.0, on_change?)`
+`slider_t(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, on_change?, style?, handle?)`
 
 Self-drawn: light-grey track + theme-colored fill + square thumb; click the track or drag the thumb, the value is step-quantized into `value` (external Store set works too); on_change fires on every change including during drags.
 
@@ -239,7 +254,7 @@ let volume = @yue.Store::new(0.5)
 
 ### Dropdown select select_t
 
-`select_t(options, value : Store[String], width? = 200.0, on_change?, clearable? = false)`
+`select_t(options, value : Store[String], on_change?, clearable? = false, style?)`
 
 Fully self-drawn: click opens the candidate list, hover highlight, theme-colored ✓ on the current pick, click to fill and close, blur closes; same behavior on all platforms. With clearable=true, hovering a non-empty field shows ✕ beside the arrow; click clears the selection (value set to "", `on_change("")`).
 
@@ -250,7 +265,7 @@ let color = @yue.Store::new("Red")
 
 ### Date picker date_picker_t
 
-`date_picker_t(value? : Store[DateYMD?], on_change?, width? = 200.0, placeholder? = "请选择日期", clearable? = false)`
+`date_picker_t(value? : Store[DateYMD?], on_change?, placeholder? = "请选择日期", clearable? = false, style?)`
 
 Fully self-drawn: input-style field; clicking opens the `calendar_t` month panel, pick to fill and close, blur closes; with clearable=true, hovering a set value shows ✕ beside the arrow to clear (no on_change).
 
@@ -261,7 +276,7 @@ let day : @yue.Store[@yue.DateYMD?] = @yue.Store::new(None)
 
 ### Date range picker date_range_picker_t
 
-`date_range_picker_t(value? : Store[DateRange], on_change?, width? = 260.0, placeholder? = "请选择日期区间", clearable? = false)`
+`date_range_picker_t(value? : Store[DateRange], on_change?, placeholder? = "请选择日期区间", clearable? = false, style?)`
 
 The field shows "start ~ end"; clicking opens the range calendar — first pick sets the start, second sets the end (swapped automatically if earlier), then it closes and fires `on_change(start, end)`; in-between days get a light theme fill, endpoints solid squares; clicking the field again starts a new range. clearable clears both ends.
 
@@ -272,7 +287,7 @@ let range : @yue.Store[@yue.DateRange] = @yue.Store::new({ start: None, end: Non
 
 ### Time range picker time_range_picker_t
 
-`time_range_picker_t(value? : Store[TimeRange], on_change?, width? = 180.0, placeholder? = "请选择时间区间", clearable? = false)`
+`time_range_picker_t(value? : Store[TimeRange], on_change?, placeholder? = "请选择时间区间", clearable? = false, style?)`
 
 The field shows "start : end" as HH:MM; clicking opens start/end stepper rows (hour 0-23 / minute 0-59, backed by `input_number`), every step fires `on_change(start, end)` immediately; both default to 00:00, and the popover closes on field blur.
 
@@ -283,7 +298,7 @@ let tr : @yue.Store[@yue.TimeRange] = @yue.Store::new({ start: None, end: None }
 
 ### Date-time range picker datetime_range_picker_t
 
-`datetime_range_picker_t(value? : Store[DateTimeRange], on_change?, width? = 340.0, placeholder? = "请选择日期时间区间", clearable? = false)`
+`datetime_range_picker_t(value? : Store[DateTimeRange], on_change?, placeholder? = "请选择日期时间区间", clearable? = false, style?)`
 
 The field shows "start date start HH:MM ~ end date end HH:MM"; the popover is a range calendar + separator + start/end time stepper rows + a "Done" button; once the date range is complete, any time change fires `on_change(start date, start time, end date, end time)`. Value type `DateTimeRange{ start : (DateYMD, TimeHM)?, end : (DateYMD, TimeHM)? }`.
 
@@ -304,7 +319,7 @@ Fully self-drawn month panel: ‹/› month nav + weekday row + 42-cell grid, ad
 
 ### Color picker color_picker_t
 
-`color_picker_t(value : Store[String], colors?, width? = 200.0)`
+`color_picker_t(value : Store[String], colors?, style?)`
 
 Dropdown form: the trigger field (current swatch + hex + arrow) opens the preset palette; clicking a swatch writes `value` (`"#RRGGBB"`) and closes, the selected swatch gets a theme outline + white check, blur closes; the palette is customizable (15 colors by default).
 
@@ -350,7 +365,7 @@ let err = @yue.Store::new("")
 
 ### Side menu side_menu
 
-`side_menu(items, selected : Store[String], width? = 180.0, icons? = [])`
+`side_menu(items, selected : Store[String], icons? = [], style?)`
 
 Hover light grey, selected theme-light-blue fill + theme-colored text + 3px left accent bar, 4px rounded corners. `icons` maps "item text → icon" (not drawn by default); `selected` is shared state — the main area subscribes to the same Store for `set_visible` page switching.
 
@@ -361,7 +376,7 @@ let page = @yue.Store::new("Home")
 
 ### Grouped side menu side_menu_sections
 
-`side_menu_sections(sections : Array[(String, Array[String])], selected : Store[String], width? = 180.0, icons? = [], foldable? = true)`
+`side_menu_sections(sections : Array[(String, Array[String])], selected : Store[String], icons? = [], foldable? = true, style?, handle?)`
 
 Group caption row (secondary small text + collapse arrow on the right) + group items (same rendering/selection as side_menu); with foldable=true the group can be collapsed/expanded (all expanded by default, Enter/Space works too).
 
@@ -420,7 +435,7 @@ Top form: tab header row (selected theme-colored text + 2px bottom indicator, da
 
 ### Divider divider
 
-`divider(vertical? = false, spacing? = 10.0)` — horizontal (default, 1px tall, flex width) or vertical (1px wide, height follows the parent container); spacing is the margin on both sides. The color is read from the theme at mount, so it takes effect on UI rebuild.
+`divider(vertical? = false, style?, handle?)` — horizontal (default, 1px tall, flex width) or vertical (1px wide, height follows the parent container); side margins default to 10px, override via style. The color is read from the theme at mount, so it takes effect on UI rebuild.
 
 ```moonbit
 @yue.divider(spacing=16.0)
@@ -442,7 +457,7 @@ Draggable split layout: an 8px self-drawn handle with an always-visible divider 
 
 ### Tag tag / tag_of_type
 
-`tag(text, color, height? = 24.0)` / `tag_of_type(text, t : SemanticType)`
+`tag(text, color, style?, handle?)` / `tag_of_type(text, t : SemanticType, style?, handle?)`
 
 The former is a solid colored tag (custom color), the latter a light-fill tag with same-family dark text (`Primary` / `Success` / `Warning` / `Danger` / `Info`); straight corners, width adapts to the text.
 
@@ -479,7 +494,7 @@ let visits = @yue.Store::new("1,024")
 
 ### Linear progress progress_line
 
-`progress_line(value : Store[Double], height? = 8.0)` — light-grey track + theme-colored fill, value in 0..1, changes repaint automatically.
+`progress_line(value : Store[Double], style?, handle?)` — light-grey track + theme-colored fill (bar height defaults to 8, override via style), value in 0..1, changes repaint automatically.
 
 ```moonbit
 let ratio = @yue.Store::new(0.42)
@@ -519,7 +534,7 @@ let ratio = @yue.Store::new(0.42)
 
 ### Card card
 
-`card(title, children : Array[Node], height? = 160.0)` — title bar (bold, bottom separator) + border; content starts below the title bar.
+`card(title, children : Array[Node], style?, handle?)` — title bar (bold, bottom separator) + border (card height defaults to 160, override via style); content starts below the title bar.
 
 ```moonbit
 @yue.card("Summary", [@yue.statistic("Tasks", done)], height=120.0)
@@ -527,7 +542,7 @@ let ratio = @yue.Store::new(0.42)
 
 ### Code highlighting code_view
 
-`code_view(lines, lang? = "moonbit", font_size? = 13.0, width? = 560.0, line_numbers? = false)`
+`code_view(lines, lang? = "moonbit", font_size? = 13.0, line_numbers? = false, style?, handle?)`
 
 Per-token highlighting with manual layout — consistent behavior on all platforms (including Windows). lang keyword sets: moonbit / js / ts / python / rust / c / go / bash / sql (case-insensitive); line_numbers=true draws a left gutter.
 
@@ -541,7 +556,7 @@ Per-token highlighting with manual layout — consistent behavior on all platfor
 
 ### Markdown rendering markdown_view
 
-`markdown_view(source, width? = 560.0)` — headings 1-6, paragraphs, **bold**, *italic*, `inline code`, link text, ordered/unordered lists, blockquotes (theme-colored bar), rules, fenced code blocks (language from the fence marker, backed by code_view); consistent rendering across platforms, link/code colors follow the theme.
+`markdown_view(source, style?)` — headings 1-6, paragraphs, **bold**, *italic*, `inline code`, link text, ordered/unordered lists, blockquotes (theme-colored bar), rules, fenced code blocks (language from the fence marker, backed by code_view); consistent rendering across platforms, link/code colors follow the theme.
 
 ```moonbit
 @yue.markdown_view("# Heading\n\nBody **bold** and `inline code`.")
@@ -549,7 +564,7 @@ Per-token highlighting with manual layout — consistent behavior on all platfor
 
 ### Table table_t
 
-`table_t(columns, rows : Store[Array[TableRow]], width? = 560.0, row_height? = 36.0, selection? : Store[Array[Int]], sort? : Store[TableSort], on_row_click?)`
+`table_t(columns, rows : Store[Array[TableRow]], width? = 560.0, row_height? = 36.0, selection? : Store[Array[Int]], sort? : Store[TableSort], on_row_click?, style?, handle?)`
 
 Header + zebra stripes + hover highlight + Store-driven (a set rebuilds all rows and clears the selection). Columns via `TableColumn::make(title, width, align?, sortable?)` (width ≤ 0 = flexible columns sharing the remaining width; `sortable=false` keeps a column out of header sorting). Cells are `TableCell`: `CellText` (single-line ellipsis when overflowing; re-truncated at the new width after column resize) / `CellTag(text, semantic type)` / `CellColorBox(hex, name)` / `CellLines(multi-line, row auto-grows)`; `TableRow::make(string array)` builds plain rows. Without `selection` rows single-select on click; pass `selection` to enable a checkbox column (row click toggles, header select-all/clear, dash when partial, selected rows get a light-blue fill); the callback receives `(index, row)`.
 
@@ -568,7 +583,7 @@ sort.subscribe(fn(st) { /* re-sort by st.column / st.asc, then rows.set(...) */ 
 
 ### Virtualized table table_v_t
 
-`table_v_t(columns, rows : Store[Array[TableRow]], width? = 560.0, height? = 360.0, row_height? = 32.0, selection? : Store[Array[Int]], sort? : Store[TableSort], on_row_click?)`
+`table_v_t(columns, rows : Store[Array[TableRow]], width? = 560.0, height? = 360.0, row_height? = 32.0, selection? : Store[Array[Int]], sort? : Store[TableSort], on_row_click?, fill? = false, style?, handle?)`
 
 The 10k+-row form of table_t: only visible rows are painted, self-managed scrolling (wheel / drag scrollbar / keyboard), free of the scroll container's content-height limit; cell rendering matches table_t (CellLines clamps to two lines within the row height), and column / selection / sort (header arrows) / column-resize semantics are identical.
 
@@ -608,7 +623,7 @@ The whole chart family (EP Chart counterpart) is self-drawn in pure MoonBit: dat
 
 ### Line / area chart line_chart_t
 
-`line_chart_t(series : Store[Array[LineSeries]], width? = 560.0, height? = 260.0, area? = false, y_range?, show_last? = true)`
+`line_chart_t(series : Store[Array[LineSeries]], area? = false, y_range?, show_last? = true, fill? = false, style?, handle?)`
 
 Multi-series line chart over fixed-length rolling windows.
 
@@ -639,7 +654,7 @@ ignore(@yue.set_timer(500, fn() {
 
 ### Bar chart bar_chart_t
 
-`bar_chart_t(data : Store[Array[BarItem]], width? = 560.0, height? = 280.0, horizontal? = false, y_range? = None)`
+`bar_chart_t(data : Store[Array[BarItem]], horizontal? = false, y_range? = None, fill? = false, style?, handle?)`
 
 Vertical bars
 
@@ -661,7 +676,7 @@ let bars = @yue.Store::new([
 
 ### Donut / pie chart donut_chart_t
 
-`donut_chart_t(data : Store[Array[DonutSlice]], width? = 480.0, height? = 240.0, thickness? = 34.0, center? = "")`
+`donut_chart_t(data : Store[Array[DonutSlice]], thickness? = 34.0, center? = "", style?, handle?)`
 
 Proportional sectors
 
@@ -683,7 +698,7 @@ let slices = @yue.Store::new([
 
 ### Gauge gauge_t
 
-`gauge_t(value : Store[Double], width? = 240.0, height? = 170.0, thresholds?)`
+`gauge_t(value : Store[Double], thresholds?, style?, handle?)`
 
 Single-value percentage ring
 
@@ -705,7 +720,7 @@ let usage = @yue.Store::new(0.0)
 
 ### Scatter chart scatter_t
 
-`scatter_t(points : Store[Array[(Double, Double)]>, width? = 560.0, height? = 320.0, trend? = false, dot? = 3.0)`
+`scatter_t(points : Store[Array[(Double, Double)]>, trend? = false, dot? = 3.0, style?, handle?)`
 
 x/y point series
 
@@ -729,7 +744,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 | API | Purpose |
 |---|---|
 | `icon(kind : IconKind, size? = 16.0, color? = "")` | icon node: theme regular color by default, fixed color via color |
-| `icon_button_t(kind, on_click?, size? = 28.0, tip? = "", style?, style_str?)` | Square icon button: hover light fill + brighter icon, triggered by click/Enter/Space; native tooltip when tip is non-empty; default marginRight 6 — caller style/style_str are appended last (can override defaults) |
+| `icon_button_t(kind, on_click?, size? = 28.0, tip? = "", style?, handle?)` | Square icon button: hover light fill + brighter icon, triggered by click/Enter/Space; native tooltip when tip is non-empty; default marginRight 6 — caller style is appended last (can override defaults) |
 | `draw_icon(p : Painter, kind, cx, cy, s, color)` | unified self-drawing entry (center coordinates + edge length) |
 | `all_icons()` / `icon_name(kind)` | full list / name lookup |
 
@@ -834,7 +849,7 @@ toast("Saved", @yue.Success)
 
 ### Dropdown menu dropdown_menu
 
-`dropdown_menu(trigger : String, items, on_select : (Int) -> Unit, width? = 160.0)` — trigger text + dropdown arrow; clicking opens the item list: hover highlight, click calls back the index and closes; `"-"` in items draws a separator.
+`dropdown_menu(trigger : String, items, on_select : (Int) -> Unit, style?)` — trigger text + dropdown arrow; clicking opens the item list: hover highlight, click calls back the index and closes; `"-"` in items draws a separator.
 
 ```moonbit
 @yue.dropdown_menu("Actions", ["Edit", "-", "Delete"], fn(i) { handle(i) })

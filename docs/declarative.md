@@ -27,14 +27,14 @@ Note that L1 constructors and their same-named L2 nodes differ in callback param
 `entry_type` / `on_activate()` (callback without arguments), while the L2 `entry` node takes
 `password` / `on_enter(String)` (callback receives the text, see the next section).
 
-`style` (numeric style key-value pairs) and `style_str` (string-typed) are available on almost every constructor:
+A single `style` array mixing numeric (`Double`) and string values is available on almost every constructor:
 
 ```moonbit
 @yue.Label::make("Title", style=[("marginBottom", 10.0)],
-                 style_str=[("color", "#356AA0")])
+                 ("color", "#356AA0")])
 ```
 
-To batch-apply styles to an existing widget, use the free function `apply_style(view, style=..., style_str=...)`.
+To batch-apply styles to an existing widget, use the free function `apply_style(view, style=...)`.
 
 ## L2: the Node tree and mount
 
@@ -43,7 +43,7 @@ A `Node` represents "a UI fragment not yet mounted". Constructing nodes only bui
 ```moonbit
 fn page(state : State) -> @yue.Container {
   @yue.mount([
-    @yue.label("Settings", style_str=[("color", "#356AA0")]),
+    @yue.label("Settings", style=[("color", "#356AA0")]),
     @yue.entry(text="Nickname", on_enter=fn(s) { state.save(s) }),
     @yue.hbox([
       @yue.button("Save", on_click=fn() { state.flush() }),
@@ -96,7 +96,7 @@ let win = @yue.mount_window(
 | `browser(url, html, …)` | Browser (in the `yue/browser` package, `@browser.browser(...)`) | one of the two |
 | `bind_label(store, f, …)` | Label | L3 reactive binding, see below |
 
-All nodes accept `style` / `style_str`; common nodes also have a **`handle`** parameter.
+All nodes accept `style`; common nodes also have a **`handle`** parameter.
 
 ### handle: getting the widget handle back
 
@@ -132,7 +132,7 @@ fn tagged(label_text : String, body : Node) -> Node {
 2. **Drawn components**: `container(on_draw=...)` + Painter draws badges etc. with zero image assets.
 3. **Stateful components**: the component holds a private `Store`, refreshed automatically via `bind_label`; each instance has independent state (e.g. `counter_widget`). Cross-component coordination uses a shared Store + `map` derivation (the sidebar highlight works this way).
 4. **Extending built-in nodes**: `vbox`/`hbox` accept `handle` (returns the Container handle at mount time, for background colors etc.). Note: the `parent : View` received by a `Node`'s `mount` only has `attach` available **inside the `yue` package** — outside the package you cannot write a Node literal that mounts a container into the parent directly; extend the library instead, or wrap existing views with `node_of`.
-5. **Modern layouts**: plain vbox/hbox/scroll flex boxes can produce a "dark sidebar + header bar + scrolling cards" shell; the key points are that **the root node needs `style=[("flex", 1.0)]` to fill the window**, the fixed-width sidebar sets `width` without flex, the main area takes `flex=1`, and the root container uses `style_str=[("alignItems", "stretch")]` so child columns fill the height.
+5. **Modern layouts**: plain vbox/hbox/scroll flex boxes can produce a "dark sidebar + header bar + scrolling cards" shell; the key points are that **the root node needs `style=[("flex", 1.0)]` to fill the window**, the fixed-width sidebar sets `width` without flex, the main area takes `flex=1`, and the root container uses `style=[("alignItems", "stretch")]` so child columns fill the height.
 6. **Shrink semantics**: `vbox`/`hbox` do **not** shrink by default (yoga semantics, `flexShrink 0`); overflowing children are clipped. Containers that need to shrink or wrap give it explicitly via `style=[("flexshrink", 1.0)]` (e.g. segmented multi-row wrapping — the width constraint required by wrap is propagated through it). Trade-off measured in practice: defaulting to 1 squeezes fixed-size drawn widgets (icons, inputs) across the board, so the default stays 0 and is opted into explicitly.
 
 ### Component library (yue/components.mbt)
