@@ -18,8 +18,10 @@ pub fn hsplit(
   ratio? : Double = 0.5,
   min_first? : Double = 80.0,
   min_second? : Double = 80.0,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
-  splitter_impl(true, first, second, ratio, min_first, min_second)
+  splitter_impl(true, first, second, ratio, min_first, min_second, style, handle~)
 }
 
 ///|
@@ -30,8 +32,10 @@ pub fn vsplit(
   ratio? : Double = 0.5,
   min_first? : Double = 60.0,
   min_second? : Double = 60.0,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
-  splitter_impl(false, first, second, ratio, min_first, min_second)
+  splitter_impl(false, first, second, ratio, min_first, min_second, style, handle~)
 }
 
 ///|
@@ -42,6 +46,8 @@ fn splitter_impl(
   ratio : Double,
   min_a : Double,
   min_b : Double,
+  style : Array[(String, &StyVal)],
+  handle~ : (Container) -> Unit,
 ) -> Node {
   {
     mount: fn(parent) {
@@ -52,9 +58,16 @@ fn splitter_impl(
       let start_pos = Ref(0.0)
       let start_basis = Ref(0.0)
       let handle_w = 8.0
-      let outer = themed_container(
-        style=[("flex", 1.0), ("flexDirection", if horizontal { "row" } else { "column" }),],
-      )
+      // 默认 flex 1 占满父容器方向空间,调用方 style 可覆盖
+      let base : Array[(String, &StyVal)] = [
+        ("flex", 1.0),
+        ("flexDirection", if horizontal { "row" } else { "column" }),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       // 首栏包装容器:尺寸/布局打在包装上,内容 mount 其内(View 句柄
       // 不实现 ViewLike,不能直接设样式)
       let pane_a = themed_container(style=[("flexDirection", "column")])
