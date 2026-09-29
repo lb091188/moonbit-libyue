@@ -98,18 +98,18 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
       "选择器(Select / ColorPicker)",
       "下拉点字段弹候选(悬停高亮/选中 ✓),clearable ✕ 清空;取色器预设色板点击选色,hex 值响应式。",
       [
-        @yue.hbox(
+        @yue.vbox(
           [
             @yue.select_t(
               ["杭州", "北京", "上海", "深圳", "广州"],
               app.picked_lang.store(),
-              style=[("width", 170.0)],
+              style=[("width", 170.0),("marginBottom",10.0)],
               clearable=true,
             ),
             @yue.color_picker_t(picked_color.store()),
             @yue.bind(picked_color, fn(c) { c }),
           ],
-          style=[("alignItems", "center")],
+          style=[("alignItems", "flex-start")],
         ),
       ],
       code=[
@@ -220,24 +220,27 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
       "日期与时间(DatePicker / 区间选择)",
       "全自绘月历(‹/› 切月)+ 内联 calendar_t;日期/时间/日期时间三区间选择器,选中值响应式。",
       [
-        @yue.hbox(
+        @yue.vbox(
           [
             @yue.date_picker_t(
               value=dp_val.store(),
               style=[("width", 170.0)],
               clearable=true,
             ),
-            @yue.label_t("选中:", role=@yue.Body),
-            @yue.bind(dp_val, fn(d) {
-              match d {
-                Some(v) => v.format()
-                None => "未选"
-              }
-            }),
+            @yue.hbox([
+              @yue.label_t("选中:", role=@yue.Body),
+              @yue.bind(dp_val, fn(d) {
+                match d {
+                  Some(v) => v.format()
+                  None => "未选"
+                }
+              })
+            ])
+            
           ],
-          style=[("alignItems", "center")],
+          style=[("alignItems", "flex-start"),("marginBottom",10.0)],
         ),
-        @yue.calendar_t(),
+        @yue.calendar_t(style=[("marginBottom",10.0)]),
         @yue.vbox([
           @yue.datetime_range_picker_t(value=dtr),
           @yue.bind_label(dtr, fn(r) {

@@ -61,6 +61,8 @@ pub fn[T] Store::signal(self : Store[T]) -> Signal[T] {
 /// 压成两行;这里替换为 wrap=false 的富文本(之后的 set_text 仍在
 /// 同一富文本上改写,单行测宽持续生效),并显式钉主题常规文字色
 /// (富文本路径不走系统文字色)。
+/// 标签宽度跟随文本:set_text 后强制重排一次,变长/变短即时生效
+/// (不补则停在挂载时的宽度,长文本截断,详见 adaptation.md)。
 pub fn[A] bind_label(
   store : Store[A],
   f : (A) -> String,
@@ -81,7 +83,12 @@ pub fn[A] bind_label(
       apply_color()
       on_theme_change(apply_color)
       l.set_attributed_text(at)
-      store.subscribe(fn(v) { l.set_text(f(v)) })
+      // set_text 只标脏 yoga + 按旧尺寸重绘,不触发布局下发(标签宽度
+      // 不会跟随文本变化,变长即截断),须补一次强制重排
+      store.subscribe(fn(v) {
+        l.set_text(f(v))
+        ViewLike::update_layout(l)
+      })
       attach(parent, ViewLike::view(l))
       ViewLike::view(l)
     },

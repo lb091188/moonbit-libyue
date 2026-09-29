@@ -2233,7 +2233,11 @@ pub fn statistic(
       bind_fg(num, fn() { theme_text_primary() })
       let cap = Label::new(title)
       bind_fg(cap, fn() { theme_text_secondary() })
-      value.subscribe(fn(v) { num.set_text(v) })
+      // set_text 只标脏不重排,变长截断,须补强制重排
+      value.subscribe(fn(v) {
+        num.set_text(v)
+        ViewLike::update_layout(num)
+      })
       outer.add_child(num)
       outer.add_child(cap)
       attach(parent, ViewLike::view(outer))
@@ -3103,10 +3107,10 @@ pub fn form_item(
       ViewLike::set_style(err, "marginLeft", label_width + 12.0)
       outer.add_child(err)
       error.subscribe(fn(msg) {
-        // set_text 新文本本身触发 GTK 重排,重排取 bind_fg 已设的 danger
-        // 颜色属性;红字色固定由 bind_fg 管,此处 set_color 反而错(参数
-        // 是颜色不是文本)
+        // 红字色固定由 bind_fg 管,set_color 反而错(参数是颜色不是
+        // 文本);set_text 只标脏不重排,须补强制重排否则变长截断
         err.set_text(msg)
+        ViewLike::update_layout(err)
       })
       let spacer = themed_container(style=[("height", 8.0)])
       outer.add_child(spacer)
