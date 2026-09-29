@@ -265,7 +265,42 @@ def decouple_menu_item_from_webkit() -> None:
               file=sys.stderr)
 
 
+def _stale_cmake_cache() -> bool:
+    """build/ 里的 CMake 缓存记录的是旧路径（仓库整体移动/拷贝过）？
+
+    CMakeCache.txt 记了配置期的绝对目录（CMAKE_CACHEFILE_DIR /
+    CMAKE_HOME_DIRECTORY），仓库挪位后 cmake 拒绝复用且直接报错
+    ("current CMakeCache.txt directory is different than...")。
+    检测到不一致返回 True，调用方清缓存重新配置。"""
+    cache = BUILD_DIR / "CMakeCache.txt"
+    if not cache.exists():
+        return False
+    try:
+        text = cache.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+
+    def norm(p: str) -> str:
+        return p.replace("\\", "/").rstrip("/").lower()
+
+    want = {norm(str(BUILD_DIR)), norm(str(REPO_ROOT / "shim"))}
+    for key in ("CMAKE_CACHEFILE_DIR:INTERNAL=", "CMAKE_HOME_DIRECTORY:INTERNAL="):
+        for line in text.splitlines():
+            if line.startswith(key):
+                val = norm(line[len(key):].strip())
+                if val and val not in want:
+                    return True
+                break
+    return False
+
+
 def cmake_build(prebuilt: bool, browser_split: bool = False) -> None:
+    # 仓库移动/拷贝后 build/ 的 CMakeCache 是旧路径,cmake 拒绝配置
+    # 并报错——先清掉缓存再全新配置(顺带重编 shim)
+    if _stale_cmake_cache():
+        print("[prepare] CMake 缓存路径过期（仓库曾移动），清空 build/ 重新配置",
+              file=sys.stderr)
+        shutil.rmtree(BUILD_DIR, ignore_errors=True)
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
     # 两种模式都必须显式传:cmake -D 只在传了时覆盖,不传则沿用 CMakeCache
