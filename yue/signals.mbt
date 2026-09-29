@@ -256,7 +256,17 @@ pub fn[T] bind_node(sig : Signal[T], f : (T) -> Node) -> Node {
       }
 
       rebuild(sig.get())
-      sig.subscribe(fn(v) { rebuild(v) })
+      // Windows:信号更新触发的重挂整体推迟一拍——在点击回调栈内
+      // remove+add 正被事件分发的控件(被点按钮自身在 bind_node 子树内
+      // 的场景),Windows 的事件分发状态会永久错乱,真机探针实测点一次
+      // 后全窗点击失效且不可逆;脱离触发上下文后重挂无害(点击子树外
+      // 按钮触发别的 bind_node 重挂,同栈内执行也正常,同为探针实证)。
+      // Linux 的 GTK 布局同步安全,保持即时重挂
+      if platform() == "windows" {
+        sig.subscribe(fn(v) { post_task(fn() { rebuild(v) }) })
+      } else {
+        sig.subscribe(fn(v) { rebuild(v) })
+      }
       attach(parent, ViewLike::view(c))
       ViewLike::view(c)
     },
