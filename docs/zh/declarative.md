@@ -148,11 +148,11 @@ fn tagged(label_text : String, body : Node) -> Node {
    滚动卡片」外壳；要点是**根节点必须 `style=[("flex", 1.0)]` 才撑满窗口**，
    侧栏定宽（width）不放 flex，主区 flex=1；根容器加
    `style_str=[("alignItems", "stretch")]` 让子列占满高度。
-6. **容器默认值**：`vbox`/`hbox` 默认 `flexShrink 1`（CSS 语义，可收缩）：
-   子项超宽时收缩而不是溢出截断，`flexWrap` 的宽度约束也因此能传导
-   （segmented 超宽折行依赖此默认）。要固定宽不收缩，显式
-   `style=[("flexshrink", 0.0)]` 覆盖；命令式 `Container` 不带此默认
-   （保持 yoga 原语义，原生组件不受影响）。
+6. **容器收缩语义**:`vbox`/`hbox` 默认**不收缩**(yoga 原语义
+   `flexShrink 0`),子项超宽时溢出截断;需要收缩或折行的容器显式给
+   `style=[("flexshrink", 1.0)]`(如 segmented 超宽换行,wrap 的宽度
+   约束也靠它传导)。实测权衡:默认 1 会挤压图标、输入框等固定宽
+   自绘控件,回归面过大,故维持 0、显式放开。
 
 ### 组件库（yue/components.mbt）
 
