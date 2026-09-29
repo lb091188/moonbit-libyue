@@ -27,7 +27,7 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
         "@yue.side_menu_sections(",
         "  [(\"组件\", [\"基础组件\", \"表单组件\"]), (\"系统能力\", [\"系统集成\"])],",
         "  selected,",
-        "  icons=[(\"基础组件\", @yue.YhAppstore), (\"系统集成\", @yue.YhSetting1)],",
+        "  icons=[(\"基础组件\", @yue.Appstore), (\"系统集成\", @yue.Setting1)],",
         ")",
       ],
     ),

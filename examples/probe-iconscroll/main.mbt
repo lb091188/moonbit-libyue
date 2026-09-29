@@ -109,7 +109,7 @@ fn main {
   for _r in 0..<21 {
     let items : Array[@yue.Node] = []
     for _c in 0..<5 {
-      items.push(@yue.icon(@yue.YhStar, size=50.0))
+      items.push(@yue.icon(@yue.Star, size=50.0))
     }
     wall_rows.push(@yue.hbox(items, style=[("gap", 10.0)]))
   }
@@ -130,7 +130,7 @@ fn main {
       ),
       @yue.vbox(
         [
-          mk_sec("短", @yue.icon(@yue.YhStar, size=50.0), sec_sel),
+          mk_sec("短", @yue.icon(@yue.Star, size=50.0), sec_sel),
           mk_sec(
             "长",
             long_wall,

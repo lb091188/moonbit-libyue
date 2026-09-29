@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""重写 examples/showcase/pages/icons.mbt:按主题组铺全量 Yh 图标墙。
+"""重写 examples/showcase/pages/icons.mbt:按主题组铺全量图标墙。
 
 用法: python3 scripts/gen_showcase_icons.py
 读取 yue/icons.mbt 的生成标记区(变体+中文名),按 GROUPS 分组输出,
@@ -212,9 +212,9 @@ CODE_SAMPLES = {
 def load_icons():
     src = open(ICONS_MBT).read()
     zh = {}
-    for v, c in re.findall(r'^  (Yh\w+) // (.+)$', src, re.M):
+    for v, c in re.findall(r'^  (\w+) // (.+)$', src, re.M):
         zh[v] = c
-    fc_of = dict(re.findall(r'^    (Yh\w+) => "yh/(.+)"$', src, re.M))
+    fc_of = dict(re.findall(r'^    (\w+) => "(.+)"$', src, re.M))
     return fc_of, zh
 
 
@@ -241,9 +241,9 @@ def main():
 
     total = sum(len(s[2]) for s in sections)
     out = []
-    out.append("// 图标库页:全量 %d 个 Yh* 矢量图标(iconfont 生成)按分组展示,悬停看名称。" % total)
+    out.append("// 图标库页:全量 %d 个矢量图标(iconfont 生成)按分组展示,悬停看名称。" % total)
     out.append("// 本页由 scripts/gen_showcase_icons.py 生成,勿手改;分组定义见该脚本 GROUPS。")
-    out.append("// 网格为竖排 vbox 包行(每行 12 个)——外层容器必须 vbox,否则行组被")
+    out.append("// 网格为竖排 vbox 包行(每行 24 个)——外层容器必须 vbox,否则行组被")
     out.append("// 水平排布、超宽截断(图标墙首版即此 bug)。")
     out.append("")
     out.append("///|")
@@ -257,7 +257,7 @@ def main():
     out.append("      if idx < kinds.length() {")
     out.append("        items.push(")
     out.append("          @yue.tooltip_t(")
-    out.append("            @yue.icon(kinds[idx], size=50.0),")
+    out.append("            @yue.icon(kinds[idx], size=30.0),")
     out.append("            @yue.icon_name(kinds[idx]),")
     out.append("          ),")
     out.append("        )")
@@ -299,7 +299,7 @@ def main():
             chunk = kinds[i : i + 3]
             out.append("            " + " ".join("@yue." + k + "," for k in chunk))
         out.append("          ],")
-        out.append("          12,")
+        out.append("          24,")
         out.append("        ),")
         out.append("      ],")
         code_lines = []
@@ -314,7 +314,7 @@ def main():
                 if i < len(notes):
                     code_lines.append("        \"%s\"," % notes[i])
             code_lines.append(
-                "        \"  // tooltip_t(内容, 文案):包原生悬浮提示;icon_name(图标) 返回图标名 yh/%s\","
+                "        \"  // tooltip_t(内容, 文案):包原生悬浮提示;icon_name(图标) 返回图标名 %s\","
                 % fc_of[samples[0]])
             code_lines.append(
                 "        \"  @yue.tooltip_t(@yue.icon(@yue.%s, size=18.0), @yue.icon_name(@yue.%s)),\","

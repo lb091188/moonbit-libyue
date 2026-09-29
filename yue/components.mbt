@@ -3123,11 +3123,11 @@ pub fn form(
   items : Array[Node],
   style? : Array[(String, &StyVal)] = [],
 ) -> Node {
-  let nodes : Array[Node] = [label_t(title, role=Section)]
+  let nodes : Array[Node] = [label_t(title, role=Section, style=[("marginBottom", 10.0)])]
   for it in items {
     nodes.push(it)
   }
-  let base : Array[(String, &StyVal)] = [("marginBottom", 14.0)]
+  let base : Array[(String, &StyVal)] = [("marginBottom", 10.0)]
   for kv in style {
     base.push(kv)
   }
@@ -7650,9 +7650,9 @@ pub fn side_menu_sections(
             draw_icon(
               p,
               if open.val {
-                YhCaretDownSmall
+                CaretDownSmall
               } else {
-                YhCaretRightSmall
+                CaretRightSmall
               },
               b.width - 14.0,
               b.height / 2.0,

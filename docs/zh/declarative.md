@@ -216,8 +216,8 @@ win.set_content(@yue.mount([
 })
 // 换图标按钮这类「点击自身触发重挂」的形态:Windows 用 swap_node
 @yue.swap_node(dark.signal(),
-  @yue.icon_button_t(@yue.YhMoon, on_click=..., tip="切换到深色"),
-  @yue.icon_button_t(@yue.YhSunny, on_click=..., tip="切换到浅色"))
+  @yue.icon_button_t(@yue.Moon, on_click=..., tip="切换到深色"),
+  @yue.icon_button_t(@yue.Sunny, on_click=..., tip="切换到浅色"))
 ```
 
 高频更新请改用 `bind`（文本）或经 `handle` 命令式改属性。

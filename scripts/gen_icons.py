@@ -14,8 +14,8 @@
    icon_path_data 数组 + kind_index 索引 match,draw_icon 经
    fill_icon_path 解释绘制(见 yue/icons.mbt);数据 ~0.6MB 替代旧
    代码形状 ~16MB 绘制代码,编译/体积/启动全面受益。
-3. 变体命名:SELECTION 覆盖表优先,其余按 font_class 自动转 PascalCase,
-   统一 Yh 前缀,重名追加数字后缀。
+3. 变体命名:SELECTION 覆盖表优先,其余按 font_class 自动转 PascalCase;
+   与 yue 包顶层名相撞的追加 Icon 后缀,重名追加数字后缀。
 4. 重写 yue/icons.mbt 的 icons-gen 标记段,并清除旧手写图标残留:
    枚举变体、draw_icon/icon_name 旧分支、无用绘图助手(icon_dot 被
    splitter 使用,保留)、all_icons 清单。
@@ -33,96 +33,96 @@ ICONS_MBT = REPO + "/yue/icons.mbt"
 # 命名覆盖表:font_class -> MoonBit 变体名(与自动 PascalCase 不一致或需稳定的)
 SELECTION = {
     # —— MES 表单控件 ——
-    "tree-structure": "YhTreeStructure",
-    "tree-table": "YhTreeTable",
-    "table": "YhTable",
-    "tab": "YhTab",
-    "text-field": "YhTextField",
-    "textarea-field": "YhTextarea",
-    "number-field": "YhNumberField",
-    "select-field": "YhSelectField",
-    "edit-table": "YhEditTable",
-    "script": "YhScript",
-    "yunhang": "YhFunction",
-    "canshu": "YhParams",
-    "tiaojianchaxun": "YhQueryFilter",
+    "tree-structure": "TreeStructure",
+    "tree-table": "TreeTable",
+    "table": "TableIcon",
+    "tab": "TabIcon",
+    "text-field": "TextField",
+    "textarea-field": "Textarea",
+    "number-field": "NumberField",
+    "select-field": "SelectField",
+    "edit-table": "EditTable",
+    "script": "Script",
+    "yunhang": "Function",
+    "canshu": "Params",
+    "tiaojianchaxun": "QueryFilter",
     # —— 文本排版 ——
-    "font-size": "YhFontSize",
-    "font-colors": "YhFontColor",
-    "line-height": "YhLineHeight",
-    "strikethrough": "YhStrikethrough",
-    "indent": "YhIndent",
-    "outdent": "YhOutdent",
+    "font-size": "FontSize",
+    "font-colors": "FontColor",
+    "line-height": "LineHeight",
+    "strikethrough": "Strikethrough",
+    "indent": "Indent",
+    "outdent": "Outdent",
     # —— 对齐/布局 ——
-    "colum-height": "YhColumnHeight",
-    "column-width": "YhColumnWidth",
-    "vertical-align-botto": "YhVAlignBottom",
-    "vertical-align-middl": "YhVAlignMiddle",
-    "vertical-align-top": "YhVAlignTop",
-    "border-outer": "YhBorderOuter",
-    "border-top": "YhBorderTop",
-    "border-bottom": "YhBorderBottom",
-    "border-left": "YhBorderLeft",
-    "border-right": "YhBorderRight",
-    "border-inner": "YhBorderInner",
-    "border-verticle": "YhBorderVertical",
-    "border-horizontal": "YhBorderHorizontal",
-    "appstore": "YhAppstore",
-    "full-screen": "YhFullscreen",
+    "colum-height": "ColumnHeight",
+    "column-width": "ColumnWidth",
+    "vertical-align-botto": "VAlignBottom",
+    "vertical-align-middl": "VAlignMiddle",
+    "vertical-align-top": "VAlignTop",
+    "border-outer": "BorderOuter",
+    "border-top": "BorderTop",
+    "border-bottom": "BorderBottom",
+    "border-left": "BorderLeft",
+    "border-right": "BorderRight",
+    "border-inner": "BorderInner",
+    "border-verticle": "BorderVertical",
+    "border-horizontal": "BorderHorizontal",
+    "appstore": "Appstore",
+    "full-screen": "Fullscreen",
     # —— 窗口/流程操作 ——
-    "fullscreen-exit": "YhFullscreenExit",
-    "totop": "YhToTop",
-    "swap": "YhSwap",
-    "rollback": "YhRollback",
-    "enter": "YhEnter",
-    "drag": "YhDrag",
+    "fullscreen-exit": "FullscreenExit",
+    "totop": "ToTop",
+    "swap": "Swap",
+    "rollback": "Rollback",
+    "enter": "Enter",
+    "drag": "Drag",
     # —— 菜单/排序 ——
-    "menu-fold": "YhMenuFold",
-    "menu-unfold": "YhMenuUnfold",
-    "sort-descending": "YhSortDesc",
-    "sort-ascending": "YhSortAsc",
+    "menu-fold": "MenuFold",
+    "menu-unfold": "MenuUnfold",
+    "sort-descending": "SortDesc",
+    "sort-ascending": "SortAsc",
     # —— 文件族 ——
-    "file": "YhFile",
-    "file-pdf": "YhFilePdf",
-    "file-word": "YhFileWord",
-    "file-excel": "YhFileExcel",
-    "file-ppt": "YhFilePpt",
-    "file-zip": "YhFileZip",
-    "file-markdown": "YhFileMarkdown",
-    "filesearch": "YhFileSearch",
-    "snippets": "YhSnippets",
+    "file": "File",
+    "file-pdf": "FilePdf",
+    "file-word": "FileWord",
+    "file-excel": "FileExcel",
+    "file-ppt": "FilePpt",
+    "file-zip": "FileZip",
+    "file-markdown": "FileMarkdown",
+    "filesearch": "FileSearch",
+    "snippets": "Snippets",
     # —— 云/设备 ——
-    "cloud-server": "YhCloudServer",
-    "cloud-sync": "YhCloudSync",
-    "api": "YhApi",
-    "gateway": "YhGateway",
-    "qrcode": "YhQrcode",
-    "barcode": "YhBarcode",
-    "scan1": "YhScan",
-    "laptop": "YhLaptop",
-    "tablet": "YhTablet",
-    "USB": "YhUsb",
-    "video1": "YhVideo",
+    "cloud-server": "CloudServer",
+    "cloud-sync": "CloudSync",
+    "api": "Api",
+    "gateway": "Gateway",
+    "qrcode": "Qrcode",
+    "barcode": "Barcode",
+    "scan1": "Scan",
+    "laptop": "Laptop",
+    "tablet": "Tablet",
+    "USB": "Usb",
+    "video1": "Video",
     # —— 图表 ——
-    "areachart": "YhAreaChart",
-    "linechart": "YhLineChart",
-    "radarchart": "YhRadarChart",
-    "boxplot": "YhBoxplot",
-    "dashboard1": "YhDashboard",
+    "areachart": "AreaChart",
+    "linechart": "LineChart",
+    "radarchart": "RadarChart",
+    "boxplot": "Boxplot",
+    "dashboard1": "Dashboard",
     # —— 用户 ——
-    "idcard": "YhIdcard",
-    "contacts": "YhContacts",
+    "idcard": "Idcard",
+    "contacts": "Contacts",
     # —— 状态/交互 ——
-    "stop": "YhStop",
-    "export": "YhExport",
-    "Import": "YhImport",
-    "smile": "YhSmile",
-    "frown": "YhFrown",
-    "attachment": "YhPaperclip",
-    "crop": "YhCrop",
-    "magic-stick": "YhMagicStick",
-    "wallet": "YhWallet",
-    "books": "YhBooks",
+    "stop": "Stop",
+    "export": "Export",
+    "Import": "Import",
+    "smile": "Smile",
+    "frown": "Frown",
+    "attachment": "Paperclip",
+    "crop": "Crop",
+    "magic-stick": "MagicStick",
+    "wallet": "Wallet",
+    "books": "Books",
 }
 
 NUM = re.compile(r"[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?")
@@ -422,6 +422,23 @@ def pascal(fc):
     return "".join(p[:1].upper() + p[1:] for p in parts)
 
 
+def yue_top_level_names():
+    """yue 包全部顶层名(struct/enum/fn/let,含非 pub):图标变体名
+    与之相撞会导致 MoonBit 解析歧义,生成时须规避(追加 Icon 后缀)。"""
+    import glob
+
+    names = set()
+    for f in glob.glob(REPO + "/yue/*.mbt"):
+        src = open(f).read()
+        for pat in (
+            r"^(?:pub\(all\)|pub\s+)?(?:struct|enum|type|abstract)\s+(\w+)",
+            r"^(?:pub\(all\)|pub\s+)?fn\s+(\w+)",
+            r"^(?:pub\(all\)|pub\s+)?let\s+(\w+)",
+        ):
+            names |= set(re.findall(pat, src, re.M))
+    return names
+
+
 def replace_section(src, begin_marker, end_marker, content):
     pat = re.compile(r"(" + re.escape(begin_marker) + r").*?(" + re.escape(end_marker) + r")", re.S)
     if not pat.search(src):
@@ -474,6 +491,7 @@ def main():
             by_cp.setdefault(ord(ch), gm.group(2))
 
     # 全量生成:字体顺序 + 命名去重
+    reserved = yue_top_level_names()
     used = {}
     paths, variant_names, variants, names, all_list = [], [], [], [], []
     skipped = []
@@ -483,7 +501,9 @@ def main():
         if cp not in by_cp:
             skipped.append(fc)
             continue
-        base = SELECTION.get(fc) or ("Yh" + pascal(fc))
+        base = SELECTION.get(fc) or pascal(fc)
+        if base in reserved:
+            base += "Icon"
         variant = base
         n = 2
         while variant in used:
@@ -498,7 +518,7 @@ def main():
         paths.append(encode_path(subpaths))
         variant_names.append(variant)
         variants.append(f"  {variant} // {zh}")
-        names.append(f'    {variant} => "yh/{fc}"')
+        names.append(f'    {variant} => "{fc}"')
         all_list.append(f"    {variant},")
 
     # 数据形状:路径定点串数组(与 kind_index/all_icons 同序)+ 索引 match。

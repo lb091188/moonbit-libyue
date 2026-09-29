@@ -286,8 +286,8 @@ pub fn[T] bind_node(sig : Signal[T], f : (T) -> Node) -> Node {
 ///
 /// ```moonbit
 /// @yue.swap_node(dark.signal(),
-///   @yue.icon_button_t(@yue.YhMoon, on_click=..., tip="切换到深色"),
-///   @yue.icon_button_t(@yue.YhSunny, on_click=..., tip="切换到浅色"))
+///   @yue.icon_button_t(@yue.Moon, on_click=..., tip="切换到深色"),
+///   @yue.icon_button_t(@yue.Sunny, on_click=..., tip="切换到浅色"))
 /// ```
 pub fn swap_node(sig : Signal[Bool], a : Node, b : Node) -> Node {
   {

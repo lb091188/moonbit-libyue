@@ -75,7 +75,7 @@ fn main {
         @yue.label_t("行4:"),
         @yue.bind_node(dark.signal(), fn(d) {
           @yue.icon_button_t(
-            if d { @yue.YhSunny } else { @yue.YhMoon },
+            if d { @yue.Sunny } else { @yue.Moon },
             on_click=fn() {
               dark.update(fn(v) { !v })
               @yue.theme_apply(
