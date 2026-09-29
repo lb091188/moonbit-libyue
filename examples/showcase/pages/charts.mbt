@@ -102,9 +102,9 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.line_chart_t(line_series, width=320.0, height=240.0),
+            @yue.line_chart_t(line_series, style=[("width", 320.0), ("height", 240.0)]),
             @yue.label("  "),
-            @yue.line_chart_t(line_series, width=320.0, height=240.0, area=true),
+            @yue.line_chart_t(line_series, style=[("width", 320.0), ("height", 240.0)], area=true),
           ],
           style=[("alignItems", "start")],
         ),
@@ -152,12 +152,11 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.bar_chart_t(bar_data, width=320.0, height=240.0),
+            @yue.bar_chart_t(bar_data, style=[("width", 320.0), ("height", 240.0)]),
             @yue.label("  "),
             @yue.bar_chart_t(
               bar_h_data,
-              width=320.0,
-              height=240.0,
+              style=[("width", 320.0), ("height", 240.0)],
               horizontal=true,
             ),
           ],
@@ -186,7 +185,7 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       "环形",
       "Donut 环形图",
       "占比扇区(12 点方向起顺时针,五色循环);中心汇总数值;右侧图例(标签 + 值 + 百分比)。悬停扇区外扩 4px,图例行同步高亮。",
-      [@yue.donut_chart_t(donut_data, width=440.0, height=240.0)],
+      [@yue.donut_chart_t(donut_data, style=[("width", 440.0), ("height", 240.0)])],
       code=[
         "// 占比数据 Store:set 后画布重绘",
         "let donut = @yue.Store::new([",
@@ -210,16 +209,14 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
           [
             @yue.gauge_t(
               gauge_auto,
-              width=240.0,
-              height=180.0,
               thresholds=gauge_thresholds,
+              style=[("width", 240.0), ("height", 180.0)],
             ),
             @yue.label("  "),
             @yue.gauge_t(
               gauge_manual,
-              width=240.0,
-              height=180.0,
               thresholds=gauge_thresholds,
+              style=[("width", 240.0), ("height", 180.0)],
             ),
             @yue.label("  "),
             @yue.vbox(
@@ -263,9 +260,9 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.scatter_t(scatter_pts, width=320.0, height=260.0),
+            @yue.scatter_t(scatter_pts, style=[("width", 320.0), ("height", 260.0)]),
             @yue.label("  "),
-            @yue.scatter_t(scatter_pts, width=320.0, height=260.0, trend=true),
+            @yue.scatter_t(scatter_pts, style=[("width", 320.0), ("height", 260.0)], trend=true),
           ],
           style=[("alignItems", "start")],
         ),

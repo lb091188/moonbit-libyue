@@ -306,7 +306,10 @@ fn md_rich_label(spans : Array[MDSpan], size : Double, color : String) -> Node {
 ///|
 /// Markdown 展示视图:块级 + 行内语法渲染,代码块复用 code_view
 /// (语言随 fence 标注,如 ```rust)。
-pub fn markdown_view(source : String, width? : Double = 560.0) -> Node {
+pub fn markdown_view(
+  source : String,
+  style? : Array[(String, &StyVal)] = [],
+) -> Node {
   let lines : Array[String] = []
   let cur = Ref(StringBuilder())
   for ch in source {
@@ -349,7 +352,7 @@ pub fn markdown_view(source : String, width? : Double = 560.0) -> Node {
       CodeBlock(code_lines, lang) =>
         nodes.push(
           vbox(
-            [code_view(code_lines, lang=lang, style=[("width", width)])],
+            [code_view(code_lines, lang=lang)],
             style=[("marginBottom", 10.0)],
           ),
         )
@@ -385,5 +388,9 @@ pub fn markdown_view(source : String, width? : Double = 560.0) -> Node {
         nodes.push(separator(style=[("marginTop", 6.0), ("marginBottom", 10.0)]))
     }
   }
-  vbox(nodes, style=[("width", width)])
+  let base : Array[(String, &StyVal)] = [("width", 560.0)]
+  for kv in style {
+    base.push(kv)
+  }
+  vbox(nodes, style=base)
 }

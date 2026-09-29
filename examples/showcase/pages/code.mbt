@@ -79,7 +79,7 @@ pub fn page_code(_app : @ui.App) -> @yue.Node {
           "```\n" +
           "\n" +
           "段落文本收尾。",
-          width=480.0,
+          style=[("width", 480.0)],
         ),
       ],
       code=[

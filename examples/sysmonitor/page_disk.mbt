@@ -79,7 +79,7 @@ fn page_disk(app : App) -> @yue.Node {
       @yue.label_t("根分区读写", role=@yue.Section, style=[
         ("marginBottom", 6.0),
       ]),
-      @yue.line_chart_t(io, height=220.0, fill=true),
+      @yue.line_chart_t(io, fill=true, style=[("height", 220.0)]),
       @yue.separator(style=[("marginTop", 12.0), ("marginBottom", 10.0)]),
       draw_rows(disk_n, fn(p, w) { draw_disk_rows(p, w, disks.get()) }),
     ],

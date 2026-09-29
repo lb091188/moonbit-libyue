@@ -4206,10 +4206,21 @@ pub fn icon_name(kind : IconKind) -> String {
 /// 图标展示视图:颜色默认主题常规文字色,传 color 固定色。
 /// size 为视图边长(默认与 Body 正文字号一致,图文并排时基线协调),
 /// 图标内容约占 84%。
-pub fn icon(kind : IconKind, size? : Double = 13.0, color? : String = "") -> Node {
+pub fn icon(
+  kind : IconKind,
+  size? : Double = 13.0,
+  color? : String = "",
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let v = themed_container(style=[("width", size), ("height", size)])
+      let base : Array[(String, &StyVal)] = [("width", size), ("height", size)]
+      for kv in style {
+        base.push(kv)
+      }
+      let v = themed_container(style=base)
+      handle(v)
       v.on_draw(fn(p) {
         let c = if color != "" { color } else { theme_text_regular() }
         draw_icon(p, kind, size / 2.0, size / 2.0, size * 0.42, c)
@@ -4231,6 +4242,7 @@ pub fn icon_button_t(
   size? : Double = 28.0,
   tip? : String = "",
   style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -4245,6 +4257,7 @@ pub fn icon_button_t(
         base.push(kv)
       }
       let v = themed_container(style=base)
+      handle(v)
       v.on_draw(fn(p) {
         let b = ViewLike::get_bounds(v)
         if hover.val {

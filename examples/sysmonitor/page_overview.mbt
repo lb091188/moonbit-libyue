@@ -280,7 +280,7 @@ fn page_cpu_detail(app : App) -> @yue.Node {
       ]),
       @yue.line_chart_t(
         app.cpu_hist,
-        height=250.0,
+        style=[("height", 250.0)],
         y_range=Some((0.0, 100.0)),
         fill=true,
       ),
@@ -290,7 +290,7 @@ fn page_cpu_detail(app : App) -> @yue.Node {
       ]),
       @yue.bar_chart_t(
         app.core_bars,
-        height=250.0,
+        style=[("height", 250.0)],
         y_range=Some((0.0, 100.0)),
         fill=true,
       ),
@@ -307,12 +307,12 @@ fn page_mem_detail(app : App) -> @yue.Node {
       @yue.label_t("内存（GB）", role=@yue.Section, style=[
         ("marginBottom", 6.0),
       ]),
-      @yue.line_chart_t(app.mem_hist, height=250.0, fill=true),
+      @yue.line_chart_t(app.mem_hist, fill=true, style=[("height", 250.0)]),
       @yue.label_t("swap（GB）", role=@yue.Section, style=[
         ("marginTop", 14.0),
         ("marginBottom", 6.0),
       ]),
-      @yue.line_chart_t(app.swap_hist, height=250.0, fill=true),
+      @yue.line_chart_t(app.swap_hist, fill=true, style=[("height", 250.0)]),
     ],
     style=[("padding", 12.0)],
   )
