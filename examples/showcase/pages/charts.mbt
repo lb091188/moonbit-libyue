@@ -230,7 +230,7 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
                   min=0.0,
                   max=1.0,
                   step=0.01,
-                  width=160.0,
+                  style=[("flexgrow", 0.0), ("width", 160.0)],
                 ),
               ],
               style=[("justifyContent", "center")],

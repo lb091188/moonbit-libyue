@@ -349,7 +349,7 @@ pub fn markdown_view(source : String, width? : Double = 560.0) -> Node {
       CodeBlock(code_lines, lang) =>
         nodes.push(
           vbox(
-            [code_view(code_lines, lang=lang, width=width)],
+            [code_view(code_lines, lang=lang, style=[("width", width)])],
             style=[("marginBottom", 10.0)],
           ),
         )

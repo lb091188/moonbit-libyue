@@ -311,7 +311,7 @@ fn page_process(app : App) -> @yue.Node {
           // 悬停非空显示清空 ✕）——不用裸原生 Entry（Linux 下不跟主题）
           @yue.input_t(
             text=page.query,
-            width=220.0,
+            style=[("width", 220.0)],
             clearable=true,
             on_input=fn(s) {
               page.query = s
@@ -326,7 +326,7 @@ fn page_process(app : App) -> @yue.Node {
           }),
           @yue.input_t(
             text=page.nice_text,
-            width=72.0,
+            style=[("width", 72.0)],
             on_input=fn(s) { page.nice_text = s },
           ),
           @yue.button_t("设 nice", variant=@yue.Soft, on_click=fn() {

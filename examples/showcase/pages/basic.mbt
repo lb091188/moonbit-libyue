@@ -131,7 +131,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
       "水平(默认)/竖直 1px 主题边框色;tooltip_t 给任意节点包原生悬浮提示(系统样式,主题化气泡见反馈页 Popover)。",
       [
         @yue.label_t("上方内容"),
-        @yue.divider(spacing=6.0),
+        @yue.divider(style=[("marginTop", 6.0), ("marginBottom", 6.0)]),
         @yue.label_t("下方内容"),
         @yue.hbox(
           [
@@ -171,7 +171,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
               ),
               @yue.hbox(
                 [
-                  @yue.input_t(text="组内输入框", width=200.0),
+                  @yue.input_t(text="组内输入框", style=[("width", 200.0)]),
                   @yue.button_t("组内按钮"),
                 ],
                 style=[("marginTop", 10.0), ("alignItems", "center")],
@@ -233,7 +233,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
               ),
               @yue.hbox(
                 [
-                  @yue.input_t(text="组内输入框", width=200.0),
+                  @yue.input_t(text="组内输入框", style=[("width", 200.0)]),
                   @yue.button_t("组内按钮"),
                 ],
                 style=[("marginTop", 10.0), ("alignItems", "center")],

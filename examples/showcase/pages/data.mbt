@@ -300,7 +300,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
               "卡片内容:组件库全部用 theme_* 主题色着色。",
             ),
           ],
-          height=110.0,
+          style=[("height", 110.0)],
         ),
         @yue.collapse([
           (

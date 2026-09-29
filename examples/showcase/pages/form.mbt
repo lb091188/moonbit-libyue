@@ -27,11 +27,10 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
       [
         @yue.vbox([
           @yue.input_t(text="输入点什么…", clearable=true),
-          @yue.input_t(text="密码框", password=true, margin=10.0, clearable=true),
+          @yue.input_t(text="密码框", password=true, clearable=true, style=[("marginTop", 10.0), ("marginBottom", 10.0)]),
           @yue.textarea_t(
             text="多行文本输入演示。\n第二行内容。",
-            height=90.0,
-            width=300.0,
+            style=[("height", 90.0), ("width", 300.0)],
             clearable=true,
           ),
         ]),
@@ -288,8 +287,8 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
       "form_item 行布局(标签右对齐 + 控件区)+ form 分组标题。",
       [
         @yue.form("用户设置", [
-          @yue.form_item("用户名", @yue.input_t(text="moonbit", width=200.0)),
-          @yue.form_item("城市", @yue.input_t(text="杭州", width=200.0)),
+          @yue.form_item("用户名", @yue.input_t(text="moonbit", style=[("width", 200.0)])),
+          @yue.form_item("城市", @yue.input_t(text="杭州", style=[("width", 200.0)])),
           @yue.form_item(
             "数量",
             @yue.input_number(qty2.store(), min=1.0, max=9.0),

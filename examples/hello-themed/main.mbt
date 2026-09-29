@@ -22,7 +22,7 @@ fn main {
           @yue.label_t("输入名字点问候,按钮/输入框/文字全是主题化形态。", role=@yue.Secondary),
           @yue.input_t(
             text=name.get(),
-            width=240.0,
+            style=[("width", 240.0)],
             on_input=fn(t) { name.set(t) },
           ),
           @yue.button_t(

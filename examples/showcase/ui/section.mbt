@@ -129,7 +129,7 @@ fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
   if s.code.length() > 0 {
     inner.push(code_copy_row(s.code))
     inner.push(
-      @yue.code_view(s.code, lang="moonbit", line_numbers=true, width=1000.0),
+      @yue.code_view(s.code, lang="moonbit", line_numbers=true, style=[("width", 1000.0)]),
     )
   }
   // 本容器是显隐切换对象:grow/shrink 单写(不写 flex 简写)
