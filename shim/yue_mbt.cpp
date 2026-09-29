@@ -607,20 +607,37 @@ void yue_mbt_view_set_borderless(void *view, int on) {
 #endif
 }
 
+// 走到根做一次 Layout(yoga 全树重算并同步原生子控件位置),再从起点
+// 向上逐层强制 UpdateChildBounds 下发子边界。
+// 必须走到根:View::Layout 的传播在非 Container 父(Scroll)处中断,
+// 子树内 display 切换(显隐页)后 yoga 根不重算,隐藏页恢复显示时拿到
+// 0 高尺寸(Windows 实测内容塌缩)。
+// 必须逐层补下发:根只对直接子 SetBounds,深层子靠各中间容器自己的
+// UpdateChildBounds(GTK 上由其 size_allocate 触发);而 GTK 对相同
+// allocation 的 size_allocate 短路,自身尺寸未变的中间容器因此不下发,
+// 其子树内 measure 已变的内容(如 Label set_text 变长)停在旧宽度——
+// 表现为长文本截断、且滞后到下一次真实 resize 才恢复(Linux 探针
+// 实测 bounds 滞后一轮)。libyue 的 Container::Layout 非根分支有等价
+// 自愈,但其向上传播同样会被非 Container 父截断,故此处显式逐层。
+static void layout_root_down(nu::View* v) {
+  auto* root = v;
+  while (root->GetParent() != nullptr)
+    root = root->GetParent();
+  if (root->IsContainer())
+    static_cast<nu::Container*>(root)->Layout();
+  else
+    root->Layout();
+  for (auto* p = v; p != nullptr && p != root; p = p->GetParent()) {
+    if (p->IsContainer())
+      static_cast<nu::Container*>(p)->UpdateChildBounds();
+  }
+}
+
 void yue_mbt_view_layout(void *view) {
   if (auto *v = CastToView(view)) {
-    // 强制重算布局并同步原生子控件位置(Windows 上滚动后
-    // 原生 EDIT HWND 不随容器滚动移动,需在 on_scroll 里补一次)。
-    // 必须走到根:View::Layout 的传播在非 Container 父(Scroll)处
-    // 中断,子树内 display 切换(显隐页)后 yoga 根不重算,隐藏页
-    // 恢复显示时拿到 0 高尺寸(Windows 实测内容塌缩)。
-    auto* root = v;
-    while (root->GetParent() != nullptr)
-      root = root->GetParent();
-    if (root->IsContainer())
-      static_cast<nu::Container*>(root)->Layout();
-    else
-      root->Layout();
+    // Windows 上滚动后原生 EDIT HWND 不随容器滚动移动,需在
+    // on_scroll 里补一次。
+    layout_root_down(v);
   }
 }
 
@@ -638,13 +655,10 @@ void yue_mbt_view_set_bounds(void *view, double x, double y, double w, double h)
 // 布局稳定后对根 SchedulePaint,一次全窗重绘兜底。
 void yue_mbt_view_refresh(void *view) {
   if (auto *v = CastToView(view)) {
+    layout_root_down(v);
     auto* root = v;
     while (root->GetParent() != nullptr)
       root = root->GetParent();
-    if (root->IsContainer())
-      static_cast<nu::Container*>(root)->Layout();
-    else
-      root->Layout();
     root->SchedulePaint();
   }
 }
