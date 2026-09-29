@@ -544,7 +544,7 @@ let ratio = @yue.Store::new(0.42)
 
 `code_view(lines, lang? = "moonbit", font_size? = 13.0, line_numbers? = false, style?, handle?)`
 
-逐 token 高亮排版，全平台行为一致（含 Windows）。lang 关键字集：moonbit / js / ts / python / rust / c / go / bash / sql（大小写不敏感）；line_numbers=true 左侧行号槽。
+逐 token 高亮排版，全平台行为一致（含 Windows）。着色分类：关键字紫 / 类型与大写开头构造器黄 / 后随 `(` 的调用蓝 / 数字橙 / 字符串绿 / 行注释灰；标点与运算符独立断词（`items.push(`、`0..<` 各自正确着色）。lang 关键字集：moonbit / js / ts / python / rust / c / go / bash / sql（大小写不敏感）；line_numbers=true 左侧行号槽。
 
 ```moonbit
 @yue.code_view(

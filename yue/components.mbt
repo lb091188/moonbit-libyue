@@ -1290,7 +1290,8 @@ pub(all) struct Token {
 }
 
 ///|
-/// MoonBit 风格的极简着色器:关键字 / 数字 / 字符串 / 注释 / 普通文本。
+/// MoonBit 风格着色器:关键字 / 类型(大写开头) / 函数调用(后随 '(')/
+/// 数字 / 字符串 / 注释 / 标点与普通文本,One Dark 调色板。
 /// 仅供演示;消费方可换成任意词法分析结果后直接用 code_view。
 ///|
 /// ASCII 小写(关键字大小写不敏感比较用)。
@@ -1365,17 +1366,26 @@ fn lang_keywords(lang : String) -> (Array[String], String) {
         "foreign", "references", "alter", "drop", "index", "view",
       ], "--")
     _ =>
-      ([
-        "fn", "let", "mut", "if", "else", "for", "while", "match", "return",
-        "struct", "impl", "pub", "enum", "trait", "type", "true", "false",
-        "using", "import", "test", "const", "view",
-      ], "//")
+      // MoonBit 全量关键字(moonc 内置词表对齐):声明/可见性/属性/控制流/
+      // 模式与所有权/异步/字面量
+      (
+        [
+          "fn", "let", "mut", "const", "struct", "enum", "trait", "impl",
+          "type", "typealias", "derive", "pub", "priv", "open", "override",
+          "readonly", "extern", "native", "test", "async", "await",
+          "if", "else", "for", "in", "while", "loop", "match", "when",
+          "where", "return", "break", "continue", "as", "is", "move",
+          "root", "unsafe", "object", "true", "false",
+        ],
+        "//",
+      )
   }
 }
 
 ///|
-/// 通用语言分词:字符串("…"/'…')、行注释(按语言)、关键字(大小写
-/// 不敏感)、数字与默认文本。tokenize_moonbit 即本函数的 moonbit 特化。
+/// 通用语言分词:字符串("…"/'…')、行注释(按语言)、()[]{},;: 标点独立、
+/// 运算符连续成词,其余连续非空白为一个词;词再经 classify_word 分为
+/// 关键字/类型/函数调用/数字/普通文本。tokenize_moonbit 即 moonbit 特化。
 pub fn tokenize_lang(line : String, lang : String) -> Array[Token] {
   let (keywords, comment_prefix) = lang_keywords(lang)
   let out : Array[Token] = []
@@ -1385,36 +1395,39 @@ pub fn tokenize_lang(line : String, lang : String) -> Array[Token] {
   }
   let n = cs.length()
   let buf = Ref(StringBuilder())
-  let in_string = Ref(false)
-  let quote : Ref[Char] = Ref('"')
-  fn flush() -> Unit {
+  // 0 未开始,1 词(标识符/限定名/数字),2 运算符串
+  let kind = Ref(0)
+  // 词着色需要 lookahead:词后紧跟 '(' 视为函数调用
+  fn flush(next : Char) -> Unit {
     let s = buf.val.to_string()
     buf.val = StringBuilder()
+    let is_word = kind.val == 1
+    kind.val = 0
     if s.length() > 0 {
-      if in_string.val {
-        out.push({ text: s, color: "#98C379", })
-      } else {
-        out.push(classify_token(s, keywords))
-      }
+      out.push(classify_word(s, keywords, is_word && next == '('))
     }
   }
 
   let mut i = 0
   while i < n {
     let ch = cs[i]
-    if in_string.val {
-      buf.val.write_char(ch)
-      if ch == quote.val {
-        flush()
-        in_string.val = false
+    let c = ch.to_int()
+    if ch == '"' || ch == '\'' {
+      // 字符串字面量:开引号起到闭引号整段
+      flush(ch)
+      let s = StringBuilder()
+      s.write_char(ch)
+      i = i + 1
+      while i < n {
+        s.write_char(cs[i])
+        if cs[i] == ch {
+          break
+        }
+        i = i + 1
       }
-    } else if ch == '"' || ch == '\'' {
-      flush()
-      in_string.val = true
-      quote.val = ch
-      buf.val.write_char(ch)
+      out.push({ text: s.to_string(), color: "#98C379", })
     } else if ch == '/' && i + 1 < n && cs[i + 1] == '/' && comment_prefix == "//" {
-      flush()
+      flush('/')
       let comment = StringBuilder()
       while i < n {
         comment.write_char(cs[i])
@@ -1423,7 +1436,7 @@ pub fn tokenize_lang(line : String, lang : String) -> Array[Token] {
       out.push({ text: comment.to_string(), color: "#5C6370", })
       break
     } else if ch == '#' && comment_prefix == "#" {
-      flush()
+      flush('#')
       let comment = StringBuilder()
       while i < n {
         comment.write_char(cs[i])
@@ -1432,7 +1445,7 @@ pub fn tokenize_lang(line : String, lang : String) -> Array[Token] {
       out.push({ text: comment.to_string(), color: "#5C6370", })
       break
     } else if ch == '-' && i + 1 < n && cs[i + 1] == '-' && comment_prefix == "--" {
-      flush()
+      flush('-')
       let comment = StringBuilder()
       while i < n {
         comment.write_char(cs[i])
@@ -1440,91 +1453,96 @@ pub fn tokenize_lang(line : String, lang : String) -> Array[Token] {
       }
       out.push({ text: comment.to_string(), color: "#5C6370", })
       break
-    } else if ch == ' ' {
-      flush()
+    } else if c == 32 {
+      flush(ch)
       out.push({ text: " ", color: "#ABB2BF", })
     } else {
-      buf.val.write_char(ch)
+      let ident = (c >= 65 && c <= 90) || (c >= 97 && c <= 122) ||
+        (c >= 48 && c <= 57) || c == 95 || c == 64 || c == 36 || c > 127
+      // '.' 在词内续词(小数/限定名),但后随 '.'(区间符 ..)时断开,
+      // 让前导数字独立着色;不在词内时归运算符
+      let dot_in_word = ch == '.' && kind.val == 1 &&
+        !(i + 1 < n && cs[i + 1] == '.')
+      if (ident || dot_in_word) && kind.val != 2 {
+        buf.val.write_char(ch)
+        kind.val = 1
+      } else if is_op_char(ch) && kind.val != 1 {
+        buf.val.write_char(ch)
+        kind.val = 2
+      } else {
+        // 词与运算符串互切:先冲刷再按新词性开串;()[]{},;: 标点单字符
+        flush(ch)
+        if !ident && !dot_in_word && !is_op_char(ch) {
+          out.push({ text: char_to_string(ch), color: "#ABB2BF", })
+        } else if ident || dot_in_word {
+          buf.val.write_char(ch)
+          kind.val = 1
+        } else {
+          buf.val.write_char(ch)
+          kind.val = 2
+        }
+      }
     }
     i = i + 1
   }
-  flush()
+  flush(' ')
   out
+}
+
+///|
+/// 运算符字符(连续出现时并成一个词,如 ->、<=、..<、&&、@ 无关的 '.')。
+fn is_op_char(ch : Char) -> Bool {
+  match ch {
+    '+' | '-' | '*' | '/' | '%' | '<' | '>' | '=' | '!' | '&' | '|' |
+    '?' | '^' | '~' | '#' | '\\' | '`' | '.'
+      => true
+    _ => false
+  }
+}
+
+///|
+fn char_to_string(ch : Char) -> String {
+  let b = StringBuilder()
+  b.write_char(ch)
+  b.to_string()
 }
 
 ///|
 pub fn tokenize_moonbit(line : String) -> Array[Token] {
-  let keywords = [
-    "fn", "let", "mut", "if", "else", "for", "while", "match", "return", "struct",
-    "impl", "pub", "enum", "trait", "true", "false",
-  ]
-  let out : Array[Token] = []
-  let cs : Array[Char] = []
-  for ch in line {
-    cs.push(ch)
-  }
-  let n = cs.length()
-  let buf = Ref(StringBuilder())
-  let in_string = Ref(false)
-  fn flush() -> Unit {
-    let s = buf.val.to_string()
-    buf.val = StringBuilder()
-    if s.length() > 0 {
-      if in_string.val {
-        out.push({ text: s, color: "#98C379", })
-      } else {
-        out.push(classify_token(s, keywords))
-      }
-    }
-  }
-
-  let mut i = 0
-  while i < n {
-    let ch = cs[i]
-    if in_string.val {
-      buf.val.write_char(ch)
-      if ch == '"' {
-        flush()
-        in_string.val = false
-      }
-    } else if ch == '"' {
-      flush()
-      in_string.val = true
-      buf.val.write_char(ch)
-    } else if ch == '/' && i + 1 < n && cs[i + 1] == '/' {
-      flush()
-      // 余下整行是注释
-      let comment = StringBuilder()
-      while i < n {
-        comment.write_char(cs[i])
-        i = i + 1
-      }
-      out.push({ text: comment.to_string(), color: "#5C6370", })
-      break
-    } else if ch == ' ' {
-      flush()
-      out.push({ text: " ", color: "#ABB2BF", })
-    } else {
-      buf.val.write_char(ch)
-    }
-    i = i + 1
-  }
-  flush()
-  out
+  tokenize_lang(line, "moonbit")
 }
 
 ///|
-fn classify_token(word : String, keywords : Array[String]) -> Token {
+/// 词分类着色:关键字(大小写不敏感)紫;纯数字橙;@ 限定名按最后一段、
+/// 裸标识符按首字符,大写开头视为类型/构造器黄;后随 '(' 的小写标识符
+/// 视为函数调用蓝;其余灰。
+fn classify_word(word : String, keywords : Array[String], is_call : Bool) -> Token {
   let lowered = ascii_lower(word)
   for k in keywords {
     if ascii_lower(k) == lowered {
       return { text: word, color: "#C678DD", }
     }
   }
+  // 着色主体:@ 限定名取最后 '.' 段,裸词取整词
+  let mut head = word
+  if word.unsafe_get(0).to_int() == 64 {
+    let segs : Array[StringView] = word.split(".").collect()
+    let last = segs[segs.length() - 1]
+    if last.length() > 0 {
+      head = last.to_owned()
+    }
+  }
+  let c0 = head.unsafe_get(0).to_int()
+  if c0 >= 65 && c0 <= 90 {
+    return { text: word, color: "#E5C07B", }
+  }
   let is_num = word.length() > 0
   for i in 0..<word.length() {
     let c = word.unsafe_get(i).to_int()
     if !((c >= 48 && c <= 57) || c == 46) {
+      if is_call && !(c0 >= 48 && c0 <= 57) {
+        return { text: word, color: "#61AFEF", }
+      }
       return { text: word, color: "#ABB2BF", }
     }
   }
