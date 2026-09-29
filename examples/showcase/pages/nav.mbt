@@ -48,7 +48,7 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
               "操作",
               ["打开", "保存", "-", "复制链接", "删除"],
               fn(i) { app.picked_lang.set("菜单项 \{i}") },
-              width=140.0,
+              style=[("width", 140.0)],
             ),
             @yue.bind(app.picked_lang, fn(s) { "最近操作:\{s}" }),
           ],

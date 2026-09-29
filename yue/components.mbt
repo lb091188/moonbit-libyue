@@ -768,9 +768,16 @@ fn side_menu_fg(act : Bool, _hov : Bool) -> String {
 pub fn side_menu(
   items : Array[String],
   selected : Store[String],
-  width? : Double = 180.0,
   icons? : Array[(String, IconKind)] = [],
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
+  let width = 180.0
+  let base : Array[(String, &StyVal)] = [("width", width), ("padding", 6.0)]
+  for kv in style {
+    base.push(kv)
+  }
+  // 用户覆盖 width 时项宽随 180 基准失准,故默认样式照旧、覆盖由
+  // style 直接改外层;项宽跟随需要调用方自行对齐(内部项 168 固定)
   let nodes : Array[Node] = []
   for it in items {
     let mut kind : IconKind? = None
@@ -795,7 +802,7 @@ pub fn side_menu(
       ),
     )
   }
-  vbox(nodes, style=[("width", width), ("padding", 6.0)], handle=fn(c) {
+  vbox(nodes, style=base, handle=fn(c) {
     set_panel_bg(c)
   })
 }
@@ -823,7 +830,11 @@ fn segmented_fg(act : Bool, _hov : Bool) -> String {
 ///|
 /// 分段控制器 / 顶栏导航(对应 EP Segmented):选中白底 + 主题色文字,
 /// hover 灰底,直角,文字垂直居中。
-pub fn segmented(options : Array[String], selected : Store[String]) -> Node {
+pub fn segmented(
+  options : Array[String],
+  selected : Store[String],
+  style? : Array[(String, &StyVal)] = [],
+) -> Node {
   let items : Array[Node] = []
   for opt in options {
     items.push(
@@ -841,9 +852,19 @@ pub fn segmented(options : Array[String], selected : Store[String]) -> Node {
   // flexShrink 默认 0(区别于 CSS 的 1),不显式收缩则内部 hbox 拿到
   // 内容全宽、wrap 永不触发;shrink 1 把宽度约束压进来才断行。
   // rowGap 是换行行距。段少的页面不触发换行,外观不变。
+  let base : Array[(String, &StyVal)] = [
+    ("padding", 2.0),
+    ("rowGap", 4.0),
+    ("flexShrink", 1.0),
+    ("alignItems", "center"),
+    ("flexWrap", "wrap"),
+  ]
+  for kv in style {
+    base.push(kv)
+  }
   hbox(
     items,
-    style=[("padding", 2.0), ("rowGap", 4.0), ("flexShrink", 1.0), ("alignItems", "center"), ("flexWrap", "wrap")],
+    style=base,
     handle=fn(c) {
       bind_bg(c, fn() { theme_border() })
     },
@@ -993,7 +1014,11 @@ fn crumb_bg(_act : Bool, _hov : Bool) -> String {
 ///|
 /// 面包屑(对应 EP Breadcrumb):层级随选中态联动——当前项深色不可点,
 /// 其余灰色可点、hover 变主题色。
-pub fn breadcrumb(items : Array[String], selected : Store[String]) -> Node {
+pub fn breadcrumb(
+  items : Array[String],
+  selected : Store[String],
+  style? : Array[(String, &StyVal)] = [],
+) -> Node {
   let nodes : Array[Node] = []
   let mut i = 0
   for it in items {
@@ -1022,7 +1047,11 @@ pub fn breadcrumb(items : Array[String], selected : Store[String]) -> Node {
     )
     i = i + 1
   }
-  hbox(nodes, style=[("alignItems", "center")])
+  let base : Array[(String, &StyVal)] = [("alignItems", "center")]
+  for kv in style {
+    base.push(kv)
+  }
+  hbox(nodes, style=base)
 }
 
 ///|
@@ -1085,12 +1114,24 @@ pub fn alert(
 /// 分页(EP Pagination):‹ 页码 ›,当前页主题色实底白字,
 /// 悬停浅蓝,28×28 直角,文字垂直居中。current 为共享状态(从 1 开始),
 /// 点击直接写源 Store,全部按钮同步高亮。
-pub fn pagination(current : Store[Int], pages : Int) -> Node {
+pub fn pagination(
+  current : Store[Int],
+  pages : Int,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let row = themed_container(style=[("height", 30.0),
+      let base : Array[(String, &StyVal)] = [
+        ("height", 30.0),
         ("flexDirection", "row"),
-        ("alignItems", "center"),])
+        ("alignItems", "center"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let row = themed_container(style=base)
+      handle(row)
       fn add_btn(label : String, target : Int, is_page : Bool) -> Unit {
         let hover = Ref(false)
         let focused = Ref(false)
@@ -1717,12 +1758,25 @@ pub fn alert_closeable(
 
 ///|
 /// 步骤条(EP Steps):数字方块(完成浅蓝/当前实底/待办灰)+ 文字 + 连线。
-pub fn steps(items : Array[String], current : Store[Int]) -> Node {
+pub fn steps(
+  items : Array[String],
+  current : Store[Int],
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let row = themed_container(
-        style=[("height", 40.0), ("marginBottom", 12.0), ("flexDirection", "row"), ("alignItems", "center")],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("height", 40.0),
+        ("marginBottom", 12.0),
+        ("flexDirection", "row"),
+        ("alignItems", "center"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let row = themed_container(style=base)
+      handle(row)
       let font = Font::new("Sans", 13.0)
       let n = items.length()
       // 单循环交错排布「连线 | 数字方块 | 文字」,文字紧随各自数字;
@@ -1820,10 +1874,19 @@ pub fn steps(items : Array[String], current : Store[Int]) -> Node {
 ///|
 /// 折叠面板(EP Collapse):点击标题行切换内容显隐,各面板独立开合,
 /// 初始仅第一面板展开。
-pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
+pub fn collapse(
+  panels : Array[(String, Array[Node])],
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("marginBottom", 12.0), ("flexDirection", "column"),])
+      let base : Array[(String, &StyVal)] = [("marginBottom", 12.0), ("flexDirection", "column")]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       let mut first = true
       for entry in panels {
         let open = Ref(first)
@@ -1908,10 +1971,19 @@ pub fn collapse(panels : Array[(String, Array[Node])]) -> Node {
 
 ///|
 /// 时间线(EP Timeline):左列色点+竖线,右列标题+描述。item 高固定 56。
-pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
+pub fn timeline(
+  items : Array[(String, String, SemanticType)],
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("marginBottom", 12.0), ("flexDirection", "column"),])
+      let base : Array[(String, &StyVal)] = [("marginBottom", 12.0), ("flexDirection", "column")]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       let n = items.length()
       let mut i = 0
       for entry in items {
@@ -1962,10 +2034,19 @@ pub fn timeline(items : Array[(String, String, SemanticType)]) -> Node {
 
 ///|
 /// 描述列表(EP Descriptions):键灰值深的两列网格。
-pub fn descriptions(pairs : Array[(String, String)]) -> Node {
+pub fn descriptions(
+  pairs : Array[(String, String)],
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("marginBottom", 12.0), ("flexDirection", "column"),])
+      let base : Array[(String, &StyVal)] = [("marginBottom", 12.0), ("flexDirection", "column")]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       for kv in pairs {
         let row = themed_container(style=[("height", 26.0),
         ("flexDirection", "row"),
@@ -2988,10 +3069,17 @@ pub fn form_item(
   control : Node,
   label_width? : Double = 90.0,
   error? : Store[String] = Store::new(""),
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("flexDirection", "column")])
+      let base : Array[(String, &StyVal)] = [("flexDirection", "column")]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       let row = themed_container(
         style=[("marginBottom", 2.0), ("flexDirection", "row"), ("alignItems", "center")],
       )
@@ -3026,12 +3114,20 @@ pub fn form_item(
 
 ///|
 /// 表单:分组标题 + 一组表单项。
-pub fn form(title : String, items : Array[Node]) -> Node {
+pub fn form(
+  title : String,
+  items : Array[Node],
+  style? : Array[(String, &StyVal)] = [],
+) -> Node {
   let nodes : Array[Node] = [label_t(title, role=Section)]
   for it in items {
     nodes.push(it)
   }
-  vbox(nodes, style=[("marginBottom", 14.0)])
+  let base : Array[(String, &StyVal)] = [("marginBottom", 14.0)]
+  for kv in style {
+    base.push(kv)
+  }
+  vbox(nodes, style=base)
 }
 
 ///|
@@ -3105,12 +3201,23 @@ pub(all) struct TreeNode {
 
 ///|
 /// 树形控件(EP Tree):缩进层级 + 点击展开/折叠(有子节点时箭头指示)。
-pub fn tree(root : Array[TreeNode]) -> Node {
+pub fn tree(
+  root : Array[TreeNode],
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
+) -> Node {
   {
     mount: fn(parent) {
-      let outer = themed_container(
-        style=[("marginBottom", 10.0), ("paddingTop", 2.0), ("flexDirection", "column")],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("marginBottom", 10.0),
+        ("paddingTop", 2.0),
+        ("flexDirection", "column"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       let font = Font::new("Sans", 13.0)
       // 实心小三角箭头(矢量自绘,不依赖字体字形,避免 Windows 端字符发虚)
       fn draw_caret(p : Painter, open : Bool) -> Unit {
@@ -3187,12 +3294,21 @@ pub fn transfer(
   left_items : Store[Array[String]],
   right_items : Store[Array[String]],
   width? : Double = 160.0,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
-      let row = themed_container(
-        style=[("marginBottom", 10.0), ("flexDirection", "row"), ("alignItems", "center")],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("marginBottom", 10.0),
+        ("flexDirection", "row"),
+        ("alignItems", "center"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let row = themed_container(style=base)
+      handle(row)
       let font = Font::new("Sans", 13.0)
       // 选中集合(按值),用 Ref 可变数组
       let left_sel : Ref[Array[String]] = Ref([])
@@ -3786,6 +3902,8 @@ fn build_calendar(
 pub fn calendar_t(
   on_pick? : (DateYMD) -> Unit = fn(_d) {  },
   value? : Store[DateYMD?],
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -3807,6 +3925,8 @@ pub fn calendar_t(
         }
         on_pick(d)
       })
+      apply_style(panel, style~)
+      handle(panel)
       match value {
         Some(s) => s.subscribe(fn(_v) { refresh() })
         None => ()
@@ -3826,9 +3946,9 @@ pub fn calendar_t(
 pub fn date_picker_t(
   value? : Store[DateYMD?],
   on_change? : (DateYMD) -> Unit = fn(_d) {  },
-  width? : Double = 200.0,
   placeholder? : String = "请选择日期",
   clearable? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
@@ -3848,14 +3968,14 @@ pub fn date_picker_t(
       // 弹层与面板:首开时创建,面板重建函数挂入 grid_refresh 供外部同步
       let pop : Ref[Popover?] = Ref(None)
       let grid_refresh : Ref[() -> Unit] = Ref(fn() {  })
-      let field = build_picker_field(width, text, has_val, clearable, on_focus_changed=fn(f) {
+      let field = build_picker_field(200.0, text, has_val, clearable, on_focus_changed=fn(f) {
         if !f {
           match pop.val {
             Some(p) => p.close()
             None => ()
           }
         }
-      })
+      }, extra_style=style)
       fn apply_date(d : DateYMD) -> Unit {
         sel.val = Some(d)
         text.val = d.format()
@@ -3951,13 +4071,22 @@ fn build_picker_field(
   has_val : Ref[Bool],
   clearable : Bool,
   on_focus_changed? : (Bool) -> Unit = fn(_f) {  },
+  extra_style? : Array[(String, &StyVal)] = [],
 ) -> Container {
   let fnt = Font::new("Sans", 13.0)
   let hover = Ref(false)
   let focused = Ref(false)
-  let field = themed_container(
-    style=[("width", width), ("height", control_height), ("marginBottom", 10.0), ("flexDirection", "row"), ("alignItems", "center")],
-  )
+  let style : Array[(String, &StyVal)] = [
+    ("width", width),
+    ("height", control_height),
+    ("marginBottom", 10.0),
+    ("flexDirection", "row"),
+    ("alignItems", "center"),
+  ]
+  for kv in extra_style {
+    style.push(kv)
+  }
+  let field = themed_container(style=style)
   set_panel_bg(field)
   View::set_cursor(field, hand())
   field.on_draw(fn(p) {
@@ -4164,9 +4293,9 @@ fn build_time_panel(
 pub fn date_range_picker_t(
   value? : Store[DateRange],
   on_change? : (DateYMD, DateYMD) -> Unit = fn(_s, _e) {  },
-  width? : Double = 260.0,
   placeholder? : String = "请选择日期区间",
   clearable? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
@@ -4183,14 +4312,14 @@ pub fn date_range_picker_t(
       let text = Ref("")
       let has_val = Ref(false)
       let grid_refresh : Ref[() -> Unit] = Ref(fn() {  })
-      let field = build_picker_field(width, text, has_val, clearable, on_focus_changed=fn(f) {
+      let field = build_picker_field(260.0, text, has_val, clearable, on_focus_changed=fn(f) {
         if !f {
           match pop.val {
             Some(p) => p.close()
             None => ()
           }
         }
-      })
+      }, extra_style=style)
       fn refresh_text() -> Unit {
         match (start.val, end.val) {
           (Some(s), Some(e)) => {
@@ -4285,9 +4414,9 @@ pub fn date_range_picker_t(
 pub fn time_range_picker_t(
   value? : Store[TimeRange],
   on_change? : (TimeHM, TimeHM) -> Unit = fn(_s, _e) {  },
-  width? : Double = 180.0,
   placeholder? : String = "请选择时间区间",
   clearable? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
@@ -4297,14 +4426,14 @@ pub fn time_range_picker_t(
       let touched = Ref(false) // 弹层内动过步进才视为有值
       let text = Ref("")
       let has_val = Ref(false)
-      let field = build_picker_field(width, text, has_val, clearable, on_focus_changed=fn(f) {
+      let field = build_picker_field(180.0, text, has_val, clearable, on_focus_changed=fn(f) {
         if !f {
           match pop.val {
             Some(p) => p.close()
             None => ()
           }
         }
-      })
+      }, extra_style=style)
       fn refresh_text() -> Unit {
         if has_val.val {
           text.val = "\{start.val.format()} ~ \{end.val.format()}"
@@ -4401,9 +4530,9 @@ pub fn time_range_picker_t(
 pub fn datetime_range_picker_t(
   value? : Store[DateTimeRange],
   on_change? : (DateYMD, TimeHM, DateYMD, TimeHM) -> Unit = fn(_sd, _st, _ed, _et) {  },
-  width? : Double = 340.0,
   placeholder? : String = "请选择日期时间区间",
   clearable? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
@@ -4445,14 +4574,14 @@ pub fn datetime_range_picker_t(
       let has_val = Ref(false)
       let time_sync : Ref[(TimeHM, TimeHM) -> Unit] = Ref(fn(_st, _et) {  })
       let grid_refresh_d : Ref[() -> Unit] = Ref(fn() {  })
-      let field = build_picker_field(width, text, has_val, clearable, on_focus_changed=fn(f) {
+      let field = build_picker_field(340.0, text, has_val, clearable, on_focus_changed=fn(f) {
         if !f {
           match pop.val {
             Some(p) => p.close()
             None => ()
           }
         }
-      })
+      }, extra_style=style)
       fn refresh_text() -> Unit {
         match (start_d.val, end_d.val) {
           (Some(sd), Some(ed)) => {
@@ -4772,6 +4901,8 @@ pub fn table_t(
   selection? : Store[Array[Int]],
   sort? : Store[TableSort],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) { },
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -4787,9 +4918,17 @@ pub fn table_t(
       let data_r : Ref[Array[TableRow]] = Ref([])
       let head_h = 40.0
       // 1px 内边距让外框描边落在 padding 环里,不被行/表头背景盖住
-      let outer = themed_container(
-        style=[("width", width), ("padding", 1.0), ("marginBottom", 10.0), ("flexDirection", "column")],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("width", width),
+        ("padding", 1.0),
+        ("marginBottom", 10.0),
+        ("flexDirection", "column"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       // 面板底:斑马纹(fill_zebra)按「白面板上的浅灰」设计,透明挂在
       // 页面灰底(bg_page,与 fill_zebra 几乎同色)上条纹不可见
       bind_bg(outer, fn() { theme_bg_panel() })
@@ -5406,6 +5545,8 @@ pub fn table_v_t(
   sort? : Store[TableSort],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) { },
   fill? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -5567,7 +5708,11 @@ pub fn table_v_t(
       } else {
         [("width", width), ("height", height), ("marginBottom", 10.0)]
       }
+      for kv in style {
+        size_style.push(kv)
+      }
       let cv = themed_container(style=size_style)
+      handle(cv)
       // 面板底:斑马纹按「白面板上的浅灰」设计,透明挂在页面灰底上
       // 条纹不可见(与 table_t 同理)
       bind_bg(cv, fn() { theme_bg_panel() })
@@ -6382,6 +6527,8 @@ pub fn slider_t(
 pub fn tabs_t(
   pages : Array[(String, Node)],
   selected? : Store[Int],
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -6397,9 +6544,17 @@ pub fn tabs_t(
       // 会被当成 0 高内容贡献,兄弟页显隐 dirty 祖先后整棵塌(native
       // v0.15.6-mbt.19 只修被清零节点自身);grow/shrink 不参与内容
       // 测量,basis 走 auto 语义,auto 父下按内容高
-      let outer = themed_container(
-        style=[("flexgrow", 1.0), ("flexshrink", 1.0), ("marginBottom", 10.0), ("flexDirection", "column")],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("flexgrow", 1.0),
+        ("flexshrink", 1.0),
+        ("marginBottom", 10.0),
+        ("flexDirection", "column"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       let head = themed_container(
         style=[("height", 36.0), ("flexDirection", "row")],
       )
@@ -6576,17 +6731,23 @@ fn select_row(
 pub fn select_t(
   options : Array[String],
   value : Store[String],
-  width? : Double = 200.0,
   on_change? : (String) -> Unit = fn(_s) {  },
   clearable? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
       let hover = Ref(false)
-      let field = themed_container(
-        style=[("width", width), ("height", control_height), ("marginBottom", 10.0)],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("width", 200.0),
+        ("height", control_height),
+        ("marginBottom", 10.0),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let field = themed_container(style=base)
       set_panel_bg(field)
       View::set_cursor(field, hand())
       fn apply(text : String) -> Unit {
@@ -6675,8 +6836,10 @@ pub fn select_t(
               if rows_h > 300.0 {
                 rows_h = 300.0
               }
+              // 弹层宽随字段实际宽(用户 style 覆盖宽度后自动跟随)
+              let pop_w = ViewLike::get_bounds(field).width
               let list = themed_container(
-                style=[("width", width),
+                style=[("width", pop_w),
                   ("height", rows_h),
                   ("padding", 4.0), ("flexDirection", "column")],
               )
@@ -6686,7 +6849,7 @@ pub fn select_t(
                 list.add_child(select_row(o, value, fn() { pick(o) }))
               }
               p.set_content(list)
-              p.set_content_size(width, rows_h)
+              p.set_content_size(pop_w, rows_h)
               pop.val = Some(p)
             }
           }
@@ -6734,19 +6897,24 @@ pub fn rate_t(
   value : Store[Int],
   max? : Int = 5,
   on_change? : (Int) -> Unit = fn(_v) {  },
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
       let size = 22.0
       let gap = 4.0
       let hover = Ref(0) // 0 = 无预览,否则预亮到第 N 颗
-      let v = themed_container(
-        style=[
-          ("width", size * max.to_double() + gap * (max - 1).to_double()),
-          ("height", size),
-          ("marginBottom", 10.0),
-        ],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("width", size * max.to_double() + gap * (max - 1).to_double()),
+        ("height", size),
+        ("marginBottom", 10.0),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let v = themed_container(style=base)
+      handle(v)
       fn star_at(x : Double) -> Int {
         let idx = ((x + gap / 2.0) / (size + gap)).to_int() + 1
         if idx < 1 {
@@ -6809,10 +6977,17 @@ pub fn rate_t(
 ///|
 /// 悬浮提示:给任意节点包原生 tooltip(系统样式,零成本;主题化气泡
 /// 请用 popover_t)。
-pub fn tooltip_t(content : Node, tip : String) -> Node {
+pub fn tooltip_t(
+  content : Node,
+  tip : String,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (View) -> Unit = fn(_v) { },
+) -> Node {
   {
     mount: fn(parent) {
       let v = (content.mount)(parent)
+      apply_style_view(v, style)
+      handle(v)
       ffi_view_set_tooltip(v, utf8_bytes(tip))
       v
     },
@@ -6827,6 +7002,8 @@ pub fn popover_t(
   content : Node,
   width : Double,
   height : Double,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -6861,9 +7038,15 @@ pub fn popover_t(
           None => {
             let p = Popover::new()
             bind_popover_bg(p)
-            let holder = themed_container(
-              style=[("width", width), ("height", height)],
-            )
+            let holder_style : Array[(String, &StyVal)] = [
+              ("width", width),
+              ("height", height),
+            ]
+            for kv in style {
+              holder_style.push(kv)
+            }
+            let holder = themed_container(style=holder_style)
+            handle(holder)
             ignore((content.mount)(ViewLike::view(holder)))
             p.set_content(holder)
             p.set_content_size(width, height)
@@ -6905,15 +7088,21 @@ pub fn dropdown_menu(
   trigger : String,
   items : Array[String],
   on_select : (Int) -> Unit,
-  width? : Double = 160.0,
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
       let fnt = Font::new("Sans", 13.0)
       let focused = Ref(false)
-      let field = themed_container(
-        style=[("width", width), ("height", control_height), ("marginBottom", 10.0)],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("width", 160.0),
+        ("height", control_height),
+        ("marginBottom", 10.0),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let field = themed_container(style=base)
       set_panel_bg(field)
       View::set_cursor(field, hand())
       field.on_draw(fn(p) {
@@ -6969,8 +7158,9 @@ pub fn dropdown_menu(
               bind_popover_bg(p)
               // 根容器宽高创建期给定(事后 set_style 会被弹层时序吞掉),
               // 高度 = 项数 x 28 + padding 8,与 content_size 一致
+              let pop_w = ViewLike::get_bounds(field).width
               let list = themed_container(
-                style=[("width", width),
+                style=[("width", pop_w),
                   ("height", items.length().to_double() * 28.0 + 8.0),
                   ("padding", 4.0), ("flexDirection", "column")],
               )
@@ -7034,7 +7224,7 @@ pub fn dropdown_menu(
               }
               p.set_content(list)
               p.set_content_size(
-                width,
+                pop_w,
                 items.length().to_double() * 28.0 + 8.0,
               )
               pop.val = Some(p)
@@ -7064,6 +7254,8 @@ pub fn carousel_t(
   width? : Double = 360.0,
   height? : Double = 180.0,
   interval_ms? : Int = 3000,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -7072,9 +7264,17 @@ pub fn carousel_t(
       let paused = Ref(false)
       let dots : Array[Container] = []
       let panels : Array[Container] = []
-      let outer = themed_container(
-        style=[("width", width), ("height", height + 24.0), ("marginBottom", 10.0), ("flexDirection", "column")],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("width", width),
+        ("height", height + 24.0),
+        ("marginBottom", 10.0),
+        ("flexDirection", "column"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let outer = themed_container(style=base)
+      handle(outer)
       let stage = themed_container(
         style=[("width", width), ("height", height), ("flexDirection", "column")],
       )
@@ -7227,14 +7427,20 @@ pub fn color_picker_t(
     "#1E4FA3", "#3F6E9E", "#7A9E4E", "#B86E2B", "#9AA0A6",
     "#E8EAED", "#BDC1C6", "#4E5560", "#2A2F36", "#F5F7FA",
   ],
-  width? : Double = 200.0,
+  style? : Array[(String, &StyVal)] = [],
 ) -> Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
-      let field = themed_container(
-        style=[("width", width), ("height", control_height), ("marginBottom", 10.0)],
-      )
+      let base : Array[(String, &StyVal)] = [
+        ("width", 200.0),
+        ("height", control_height),
+        ("marginBottom", 10.0),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let field = themed_container(style=base)
       set_panel_bg(field)
       View::set_cursor(field, hand())
       field.on_draw(fn(p) {
@@ -7402,13 +7608,20 @@ pub fn color_picker_t(
 pub fn side_menu_sections(
   sections : Array[(String, Array[String])],
   selected : Store[String],
-  width? : Double = 180.0,
   icons? : Array[(String, IconKind)] = [],
   foldable? : Bool = true,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
+  let width = 180.0
+  let base : Array[(String, &StyVal)] = [("width", width), ("padding", 6.0), ("flexDirection", "column")]
+  for kv in style {
+    base.push(kv)
+  }
   {
     mount: fn(parent) {
-      let outer = themed_container(style=[("width", width), ("padding", 6.0), ("flexDirection", "column"),])
+      let outer = themed_container(style=base)
+      handle(outer)
       set_panel_bg(outer)
       let gfont = Font::new("Sans", 12.0)
       for (group, items) in sections {
