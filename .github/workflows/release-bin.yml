@@ -13,6 +13,12 @@
 # - macOS: Apple Silicon(arm64)原生
 name: release-bin
 
+env:
+  # 钉 nightly 版本:CI 曾因滚动 nightly 的链接回归整排红(符号 undefined),
+  # 本版本经 Linux 全量验证(132 测+build+冒烟);升级时先本机过一遍再改这里
+  MOONBIT_INSTALL_VERSION: "0.1.20260920"
+
+
 on:
   push:
     tags:
