@@ -258,7 +258,7 @@ fn main {
             @yue.label_t("地址", role=@yue.Body),
             @yue.input_t(text="host:port", style=[("width", 320.0)]),
           ],
-          width=380.0,
+          style=[("width", 380.0)],
         ),
       ]),
     ],

@@ -13,12 +13,13 @@ pub fn dialog_t(
   visible : Store[Bool],
   title : String,
   children : Array[Node],
-  width? : Double = 420.0,
   confirm_text? : String = "确定",
   cancel_text? : String = "取消",
   on_confirm? : () -> Unit = fn() {  },
   on_cancel? : () -> Unit = fn() {  },
   close_on_mask? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -36,10 +37,17 @@ pub fn dialog_t(
           ("alignItems", "center"),],
       )
       ViewLike::set_background_color(overlay, "#00000059")
-      // 面板:主题面板底 + 1px 边框(on_draw 描)
-      let panel = themed_container(
-        style=[("width", width), ("flexDirection", "column"), ("maxHeight", "80%")],
-      )
+      // 面板:主题面板底 + 1px 边框(on_draw 描);style 落面板
+      let base : Array[(String, &StyVal)] = [
+        ("width", 420.0),
+        ("flexDirection", "column"),
+        ("maxHeight", "80%"),
+      ]
+      for kv in style {
+        base.push(kv)
+      }
+      let panel = themed_container(style=base)
+      handle(panel)
       set_panel_bg(panel)
       panel.on_draw(fn(p) {
         let b = ViewLike::get_bounds(panel)
@@ -194,10 +202,17 @@ pub fn toast_layer(
 pub fn context_menu_for(
   content : Node,
   items : Array[(String, () -> Unit)],
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
-      let wrap = themed_container(style=[("flexDirection", "column")])
+      let base : Array[(String, &StyVal)] = [("flexDirection", "column")]
+      for kv in style {
+        base.push(kv)
+      }
+      let wrap = themed_container(style=base)
+      handle(wrap)
       ignore((content.mount)(ViewLike::view(wrap)))
       ViewLike::on_mouse_down(wrap, fn(e) {
         if e.button == 2 {

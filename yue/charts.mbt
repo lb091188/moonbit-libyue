@@ -1383,21 +1383,25 @@ fn draw_scatter(
 /// 父容器（跟随窗口伸缩）。
 pub fn line_chart_t(
   series : Store[Array[LineSeries]],
-  width? : Double = 560.0,
-  height? : Double = 260.0,
   area? : Bool = false,
   y_range? : (Double, Double)? = None,
   show_last? : Bool = true,
   fill? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
       let size_style : Array[(String, &StyVal)] = if fill {
-        [("height", height)]
+        [("height", 260.0)]
       } else {
-        [("width", width), ("height", height)]
+        [("width", 560.0), ("height", 260.0)]
+      }
+      for kv in style {
+        size_style.push(kv)
       }
       let cv = themed_container(style=size_style)
+      handle(cv)
       set_panel_bg(cv)
       cv.on_draw(fn(p) {
         let b = ViewLike::get_bounds(cv)
@@ -1428,21 +1432,25 @@ pub fn line_chart_t(
 /// 父容器（跟随窗口伸缩）。
 pub fn bar_chart_t(
   data : Store[Array[BarItem]],
-  width? : Double = 560.0,
-  height? : Double = 280.0,
   horizontal? : Bool = false,
   y_range? : (Double, Double)? = None,
   fill? : Bool = false,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
       let hover = Ref(-1)
       let size_style : Array[(String, &StyVal)] = if fill {
-        [("height", height)]
+        [("height", 280.0)]
       } else {
-        [("width", width), ("height", height)]
+        [("width", 560.0), ("height", 280.0)]
+      }
+      for kv in style {
+        size_style.push(kv)
       }
       let cv = themed_container(style=size_style)
+      handle(cv)
       set_panel_bg(cv)
       cv.on_draw(fn(p) {
         let b = ViewLike::get_bounds(cv)
@@ -1480,15 +1488,20 @@ pub fn bar_chart_t(
 /// + 百分比）；hover 扇区外扩 4px 且图例行高亮。数据经 Store 驱动。
 pub fn donut_chart_t(
   data : Store[Array[DonutSlice]],
-  width? : Double = 480.0,
-  height? : Double = 240.0,
   thickness? : Double = 34.0,
   center? : String = "",
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
       let hover = Ref(-1)
-      let cv = themed_container(style=[("width", width), ("height", height)])
+      let base : Array[(String, &StyVal)] = [("width", 480.0), ("height", 240.0)]
+      for kv in style {
+        base.push(kv)
+      }
+      let cv = themed_container(style=base)
+      handle(cv)
       set_panel_bg(cv)
       cv.on_draw(fn(p) {
         let b = ViewLike::get_bounds(cv)
@@ -1551,15 +1564,20 @@ pub fn donut_chart_t(
 /// （超出钳制），Store 驱动。
 pub fn gauge_t(
   value : Store[Double],
-  width? : Double = 240.0,
-  height? : Double = 170.0,
   thresholds? : Array[(Double, String)] = [],
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
       let disp = Ref(value.get().max(0.0).min(1.0))
       let running = Ref(false)
-      let cv = themed_container(style=[("width", width), ("height", height)])
+      let base : Array[(String, &StyVal)] = [("width", 240.0), ("height", 170.0)]
+      for kv in style {
+        base.push(kv)
+      }
+      let cv = themed_container(style=base)
+      handle(cv)
       set_panel_bg(cv)
       cv.on_draw(fn(p) {
         let b = ViewLike::get_bounds(cv)
@@ -1604,14 +1622,19 @@ pub fn gauge_t(
 /// 后置，未做。数据经 Store 驱动。
 pub fn scatter_t(
   points : Store[Array[(Double, Double)]],
-  width? : Double = 560.0,
-  height? : Double = 320.0,
   trend? : Bool = false,
   dot? : Double = 3.0,
+  style? : Array[(String, &StyVal)] = [],
+  handle? : (Container) -> Unit = fn(_c) { },
 ) -> Node {
   {
     mount: fn(parent) {
-      let cv = themed_container(style=[("width", width), ("height", height)])
+      let base : Array[(String, &StyVal)] = [("width", 560.0), ("height", 320.0)]
+      for kv in style {
+        base.push(kv)
+      }
+      let cv = themed_container(style=base)
+      handle(cv)
       set_panel_bg(cv)
       cv.on_draw(fn(p) {
         let b = ViewLike::get_bounds(cv)

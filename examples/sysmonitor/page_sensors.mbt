@@ -135,7 +135,7 @@ fn page_sensors(app : App) -> @yue.Node {
     nodes.push(
       @yue.line_chart_t(
         app.gpu_busy_hists[i],
-        height=220.0,
+        style=[("height", 220.0)],
         y_range=Some((0.0, 100.0)),
         fill=true,
       ),
@@ -146,7 +146,7 @@ fn page_sensors(app : App) -> @yue.Node {
         ("marginBottom", 6.0),
       ]),
     )
-    nodes.push(@yue.line_chart_t(app.gpu_vram_hists[i], height=220.0, fill=true))
+    nodes.push(@yue.line_chart_t(app.gpu_vram_hists[i], fill=true, style=[("height", 220.0)]))
   }
   nodes.push(@yue.separator(style=[("marginTop", 14.0), ("marginBottom", 10.0)]))
   nodes.push(

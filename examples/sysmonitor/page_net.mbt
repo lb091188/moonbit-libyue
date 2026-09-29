@@ -156,7 +156,7 @@ fn page_net(app : App) -> @yue.Node {
       @yue.label_t("收发速率（不含 lo）", role=@yue.Section, style=[
         ("marginBottom", 6.0),
       ]),
-      @yue.line_chart_t(total, height=220.0, fill=true),
+      @yue.line_chart_t(total, fill=true, style=[("height", 220.0)]),
       @yue.separator(style=[("marginTop", 12.0), ("marginBottom", 10.0)]),
       draw_rows(net_n, fn(p, w) { draw_net_rows(p, w, page.rows.get()) }),
     ],
