@@ -184,7 +184,7 @@ let valid = @yue.Store::new(false)
 
 ### Number input input_number
 
-`input_number(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, style?, handle?)`
+`input_number(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, num_width? = 64.0, style?, handle?)`
 
 -/+ buttons step the value, clamped to range; state lives in `Store[Double]`.
 

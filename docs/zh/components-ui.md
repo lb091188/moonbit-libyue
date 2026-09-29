@@ -184,7 +184,7 @@ let valid = @yue.Store::new(false)
 
 ### 数字输入器 input_number
 
-`input_number(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, style?, handle?)`
+`input_number(value : Store[Double], min? = 0.0, max? = 100.0, step? = 1.0, num_width? = 64.0, style?, handle?)`
 
 -/+ 按钮步进，范围钳制，状态存 `Store[Double]`。
 
