@@ -294,13 +294,29 @@ def _stale_cmake_cache() -> bool:
     return False
 
 
+def _clear_cmake_cache() -> None:
+    """清 CMake 配置缓存与中间产物，保留 build/ 下已就位资产。
+
+    只删 CMakeCache.txt / CMakeFiles/ / cmake_install.cmake——这三个是
+    cmake 记录配置期绝对路径与对象产物的地方，删后即全新配置。
+    **不能整目录 rmtree**：prepare_prebuilt 先解出的 yue_prebuilt.lib 与
+    stamp 同在 build/，曾因整删导致预构建库丢失、链接期 nu 符号全
+    undefined（LNK2019×361，仓库移动场景实测）。"""
+    for name in ("CMakeCache.txt", "CMakeFiles", "cmake_install.cmake"):
+        target = BUILD_DIR / name
+        if target.is_dir():
+            shutil.rmtree(target, ignore_errors=True)
+        elif target.exists():
+            target.unlink()
+
+
 def cmake_build(prebuilt: bool, browser_split: bool = False) -> None:
     # 仓库移动/拷贝后 build/ 的 CMakeCache 是旧路径,cmake 拒绝配置
-    # 并报错——先清掉缓存再全新配置(顺带重编 shim)
+    # 并报错——先清缓存再全新配置(顺带重编 shim)
     if _stale_cmake_cache():
-        print("[prepare] CMake 缓存路径过期（仓库曾移动），清空 build/ 重新配置",
+        print("[prepare] CMake 缓存路径过期（仓库曾移动），清缓存重新配置",
               file=sys.stderr)
-        shutil.rmtree(BUILD_DIR, ignore_errors=True)
+        _clear_cmake_cache()
     configure = ["cmake", "-S", str(REPO_ROOT / "shim"), "-B", str(BUILD_DIR),
                  "-DCMAKE_BUILD_TYPE=Release"]
     # 两种模式都必须显式传:cmake -D 只在传了时覆盖,不传则沿用 CMakeCache
