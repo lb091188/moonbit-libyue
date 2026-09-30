@@ -8,11 +8,9 @@ English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/maste
 
 ![Component showcase](docs/images/showcase-basic.png)
 
-<p align="center">
-  <img src="docs/images/showcase-anim-linux.webp" width="49.5%" alt="Live demo on Linux (XFCE)">
-  <img src="docs/images/showcase-anim-windows.webp" width="49.5%" alt="Live demo on Windows">
-</p>
-<p align="center"><sub>Left: Linux (XFCE) · Right: Windows — the same MoonBit codebase</sub></p>
+![Live demo on Linux (XFCE)](docs/images/showcase-anim-linux.webp) ![Live demo on Windows](docs/images/showcase-anim-windows.webp)
+
+*Left: Linux (XFCE) · Right: Windows — one MoonBit codebase*
 
 ## Core highlights
 
