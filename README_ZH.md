@@ -9,10 +9,10 @@
 ![组件库演示板](docs/images/showcase-basic.png)
 
 <p align="center">
-  <img src="docs/images/showcase-data.png" width="32%" alt="数据展示">
-  <img src="docs/images/showcase-form.png" width="32%" alt="表单组件">
-  <img src="docs/images/showcase-system.png" width="32%" alt="系统集成">
+  <img src="docs/images/showcase-anim-linux.webp" width="49.5%" alt="Linux(XFCE)实机演示动图">
+  <img src="docs/images/showcase-anim-windows.webp" width="49.5%" alt="Windows 实机演示动图">
 </p>
+<p align="center"><sub>左:Linux(XFCE) · 右:Windows —— 同一套 MoonBit 代码</sub></p>
 
 ## 核心特色
 
@@ -70,6 +70,14 @@ moon run examples/sysmonitor
 不会 MoonBit？[五分钟上手教程](docs/zh/tutorial.md) 从 `moon new` 带到第一个窗口。
 
 前置要求:MoonBit native 工具链,`moonc` ≥ 0.10.14(`moon version --all` 可验证)。
+
+**不想装工具链?直接下预编译演示包**——解压即跑(内含 `hello` / `hello-themed` / `showcase` 三件):
+
+| 平台 | 下载 |
+|---|---|
+| Windows 10/11 x64 | [`bin-windows-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-windows-x64.zip) |
+| Linux x64(需 GTK3,Ubuntu 自带) | [`bin-linux-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-linux-x64.zip) |
+| macOS(Apple Silicon) | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
 
 > **升级到 0.5.0**：`Browser` 绑定拆分为独立包,import 路径改为 `NoahLiu/moonbit-libyue/yue/browser`(`@yue.Browser` → `@browser.Browser`,API 不变)。未 import 该包的程序不再链接 WebKit/WebView2 依赖。
 
