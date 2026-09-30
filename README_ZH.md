@@ -8,11 +8,9 @@
 
 ![组件库演示板](docs/images/showcase-basic.png)
 
-<p align="center">
-  <img src="docs/images/showcase-anim-linux.webp" width="49.5%" alt="Linux(XFCE)实机演示动图">
-  <img src="docs/images/showcase-anim-windows.webp" width="49.5%" alt="Windows 实机演示动图">
-</p>
-<p align="center"><sub>左:Linux(XFCE) · 右:Windows —— 同一套 MoonBit 代码</sub></p>
+![Linux(XFCE)实机演示](docs/images/showcase-anim-linux.webp) ![Windows 实机演示](docs/images/showcase-anim-windows.webp)
+
+*左:Linux(XFCE) · 右:Windows —— 同一套 MoonBit 代码*
 
 ## 核心特色
 
