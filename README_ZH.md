@@ -2,7 +2,7 @@
 
 > 感谢 [赵成(zcbenz)](https://github.com/zcbenz) 和他的 [Yue](https://github.com/yue/yue) 框架，以及 [MoonBit](https://github.com/moonbitlang)。很凑巧，这两个编程工具都有 “月”，现在我也很喜欢它们。 [关于我和 `libyue`](docs/zh/aboutlibyue.md)
 
-[MoonBit](https://github.com/moonbitlang) 生态的**原生跨平台桌面 GUI 库**——对 [libyue](https://libyue.com/docs/latest/cpp/)(C++) 全量封装,一套 MoonBit 代码跑 Windows / macOS / Linux 原生窗口,`moon add` 后零配置直接运行。
+[MoonBit](https://github.com/moonbitlang) 生态的**原生跨平台桌面 GUI 库**——对 [libyue](https://libyue.com/docs/latest/cpp/)(C++) 全量封装,一套 MoonBit 代码跑 Windows ✅ / Linux ✅ / macOS 🟡 原生窗口,`moon add` 后零配置直接运行。
 
 简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
 
@@ -77,7 +77,7 @@ moon run examples/sysmonitor
 |---|---|
 | Windows 10/11 x64 | [`bin-windows-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-windows-x64.zip) |
 | Linux x64(需 GTK3,Ubuntu 自带) | [`bin-linux-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-linux-x64.zip) |
-| macOS(Apple Silicon) | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
+| macOS(Apple Silicon) 🟡 未真机验证 | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
 
 > **升级到 0.5.0**：`Browser` 绑定拆分为独立包,import 路径改为 `NoahLiu/moonbit-libyue/yue/browser`(`@yue.Browser` → `@browser.Browser`,API 不变)。未 import 该包的程序不再链接 WebKit/WebView2 依赖。
 
@@ -94,7 +94,7 @@ moon run examples/sysmonitor
 
 ## 平台支持
 
-Ubuntu 24.04(XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 构建通过(CI,无真机)
+Ubuntu 24.04(XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🟡 构建通过(CI,无真机)
 
 Windows 下 exe 自动为 GUI 子系统,双击无控制台黑框。
 
