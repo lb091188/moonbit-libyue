@@ -32,6 +32,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - MSVC 按 cp936 误读无 BOM UTF-8 源码,中文注释会造出假预处理错误(报错行没有那个指令):CMake 对 MSVC 加 `/utf-8`。
 - 新增 shim 函数:定义统一 `extern "C"`,声明同批进 `yue_mbt.h` 的 extern "C" 区,`nm` 确认符号无 `_Z` 前缀;GLib(`g_*`)是 Linux 专属,跨平台函数不得引用。
 - 新版 moon 弃用 trait 方法隐式提升:调用写显式静态形式 `ViewLike::method(obj)`;`impl Trait for X` 声明点须补 `pub extend X with Trait::{...}`(方法清单从 `moon check --no-render` 输出生成,勿手抄);黑盒测试内引用包内符号须限定 `@yue.xxx`。此类警告增量编译漏报,clean 全量才见全量。
+- 工具链三件套(moon/moonc/core)必须配套同版本(0.5.3 发布实测):非交互终端跑 `moon upgrade` 半途报 `IO error: not a terminal` 时只换了二进制、`~/.moon/lib/core` 未动,落得 moonc 0.10.14 + core 0.10.12 混搭——core 无 `StringView::exact_view`(sysdata 报 4 处 no method),且升号改 moon.mod 触发的全量重查才暴露,之前的增量 `moon check`/`moon test` 全绿是假绿;nightly 版本号当日即滚动下架(CLI 服务器对指名历史版本一律 403),`MOONBIT_INSTALL_VERSION` 钉版本不可行,唯一修复路径是无参重跑 `install/unix.sh` 装 latest 全家桶(二进制与 core 同批换)对齐 CI;验证:`moon version --all` 与 `~/.moon/lib/core/moon.mod` 的版本一致后升号触发全量重查,133 测全绿。
 
 ### 浏览器依赖按需化（0.5.0）
 
