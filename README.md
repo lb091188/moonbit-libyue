@@ -9,10 +9,10 @@ English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/maste
 ![Component showcase](docs/images/showcase-basic.png)
 
 <p align="center">
-  <img src="docs/images/showcase-data.png" width="32%" alt="Data display">
-  <img src="docs/images/showcase-form.png" width="32%" alt="Form components">
-  <img src="docs/images/showcase-system.png" width="32%" alt="System integration">
+  <img src="docs/images/showcase-anim-linux.webp" width="49.5%" alt="Live demo on Linux (XFCE)">
+  <img src="docs/images/showcase-anim-windows.webp" width="49.5%" alt="Live demo on Windows">
 </p>
+<p align="center"><sub>Left: Linux (XFCE) · Right: Windows — the same MoonBit codebase</sub></p>
 
 ## Core highlights
 
@@ -70,6 +70,14 @@ moon run examples/sysmonitor
 Don't know MoonBit? The [five-minute tutorial](docs/tutorial.md) takes you from `moon new` to your first window.
 
 Prerequisite: the MoonBit native toolchain, `moonc` ≥ 0.10.14 (`moon version --all` to verify).
+
+**No toolchain? Grab a prebuilt demo bundle** — unzip and run (`hello` / `hello-themed` / `showcase` included):
+
+| Platform | Package |
+|---|---|
+| Windows 10/11 x64 | [`bin-windows-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-windows-x64.zip) |
+| Linux x64 (GTK3, on Ubuntu by default) | [`bin-linux-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-linux-x64.zip) |
+| macOS (Apple Silicon) | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
 
 > **Upgrading to 0.5.0**: the `Browser` binding moved to a standalone package. Add `"NoahLiu/moonbit-libyue/yue/browser"` to your imports (`@yue.Browser` → `@browser.Browser`, API unchanged). Apps that don't import it are no longer linked against WebKit/WebView2.
 
