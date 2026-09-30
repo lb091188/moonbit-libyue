@@ -14,7 +14,7 @@
 
 ## 核心特色
 
-**🎨 现代主题** —— 全部自绘、三平台视觉一致；默认整套跟随系统（深浅 + 主色强调色），`theme_apply` 一行换肤（定制后不再随系统，联动见 `on_system_theme_change`）：
+**🎨 现代主题** —— 跨平台视觉一致；默认整套跟随系统主色强调色、明暗模式，`theme_apply` 一行换肤（定制后不再随系统，联动见 `on_system_theme_change`）：
 
 ```moonbit
 @yue.theme_apply({ ..@yue.theme_from_system(), primary: "#1E4FA3" })

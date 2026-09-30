@@ -14,7 +14,7 @@ English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/maste
 
 ## Core highlights
 
-**🎨 Modern theme** — everything self-drawn, visually consistent across the three platforms; follows the system theme (light/dark + accent color) by default, and `theme_apply` reskins in one line (explicit theming opts out of system tracking, see `on_system_theme_change`):
+**🎨 Modern theme** — visually consistent across platforms; follows the system accent color and light/dark mode by default, and `theme_apply` reskins in one line (explicit theming opts out of system tracking, see `on_system_theme_change`):
 
 ```moonbit
 @yue.theme_apply({ ..@yue.theme_from_system(), primary: "#1E4FA3" })
