@@ -14,13 +14,13 @@ English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/maste
 
 ## Core highlights
 
-**🎨 Modern theme** — visually consistent across platforms; follows the system accent color and light/dark mode by default, and `theme_apply` reskins in one line (explicit theming opts out of system tracking, see `on_system_theme_change`):
+**🎨 Modern theme** — visually consistent across platforms; follows the system accent color and light/dark mode by default, and `theme_apply` reskins in one line:
 
 ```moonbit
 @yue.theme_apply({ ..@yue.theme_from_system(), primary: "#1E4FA3" })
 ```
 
-**📝 Declarative** — describe the UI as a node tree, no hand-written `new + set_xxx`:
+**📝 Declarative** — describe the UI as a node tree:
 
 ```moonbit
 let window = @yue.mount_window(
@@ -32,7 +32,7 @@ let window = @yue.mount_window(
 )
 ```
 
-**⚡ Signal reactivity** — keep state in `Signal` / `Store`; bound spots refresh automatically, with no "update the text on click" glue:
+**⚡ Signal reactivity** — keep state in `Signal` / `Store`; bound spots refresh automatically:
 
 ```moonbit
 let clicks = @yue.Signal::new(0)
@@ -55,7 +55,9 @@ n.set_title("Build finished")
 n.show()
 ```
 
-**📊 Flagship app — process manager & hardware monitor** (`examples/sysmonitor`): a pure-MoonBit data layer over /proc and /sys (CPU two-sample diff, memory, 1000-row process table, hwmon temperatures, disk IO + capacity, PCI GPUs, NIC rates) with one 1Hz timer driving five tabbed pages — 1053 processes fully sampled in 14.94ms:
+**📊 Flagship app — Linux process manager & hardware monitor**:
+
+![Processes](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/sys.png)
 
 ```moonbit
 moon run examples/sysmonitor
@@ -69,7 +71,7 @@ Don't know MoonBit? The [five-minute tutorial](docs/tutorial.md) takes you from 
 
 Prerequisite: the MoonBit native toolchain, `moonc` ≥ 0.10.14 (`moon version --all` to verify).
 
-**No toolchain? Grab a prebuilt demo bundle** — unzip and run (`hello` / `hello-themed` / `showcase` included):
+**Prebuilt demos** — unzip and run:
 
 | Platform | Package |
 |---|---|

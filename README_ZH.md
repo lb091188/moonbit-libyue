@@ -14,13 +14,13 @@
 
 ## 核心特色
 
-**🎨 现代主题** —— 跨平台视觉一致；默认整套跟随系统主色强调色、明暗模式，`theme_apply` 一行换肤（定制后不再随系统，联动见 `on_system_theme_change`）：
+**🎨 现代主题** —— 跨平台视觉一致；默认整套跟随系统主色强调色、明暗模式，`theme_apply` 一行换肤：
 
 ```moonbit
 @yue.theme_apply({ ..@yue.theme_from_system(), primary: "#1E4FA3" })
 ```
 
-**📝 声明式** —— 节点树描述界面，不手写 `new + set_xxx`：
+**📝 声明式** —— 节点树描述界面：
 
 ```moonbit
 let window = @yue.mount_window(
@@ -32,7 +32,7 @@ let window = @yue.mount_window(
 )
 ```
 
-**⚡ 信号响应式** —— 状态放 `Signal` / `Store`，绑定处自动刷新，不写「点击后改文本」的胶水：
+**⚡ 信号响应式** —— 状态放 `Signal` / `Store`，绑定处自动刷新：
 
 ```moonbit
 let clicks = @yue.Signal::new(0)
@@ -55,7 +55,9 @@ n.set_title("构建完成")
 n.show()
 ```
 
-**📊 旗舰应用 — 进程管理与硬件信息查看**（`examples/sysmonitor`）：纯 MoonBit 数据层读 /proc、/sys（CPU 两次差值、内存、千行进程表、hwmon 温度、磁盘 IO 与容量、PCI 显卡、网卡速率），单一 1Hz 定时器驱动五页 tabs——1053 进程全量采样 14.94ms：
+**📊 旗舰应用 — Linux 进程管理与硬件信息查看**：
+
+![进程](./docs/images/sys.png)
 
 ```moonbit
 moon run examples/sysmonitor
@@ -69,7 +71,7 @@ moon run examples/sysmonitor
 
 前置要求:MoonBit native 工具链,`moonc` ≥ 0.10.14(`moon version --all` 可验证)。
 
-**不想装工具链?直接下预编译演示包**——解压即跑(内含 `hello` / `hello-themed` / `showcase` 三件):
+**预演示包**——解压即跑
 
 | 平台 | 下载 |
 |---|---|
