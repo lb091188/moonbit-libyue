@@ -6,7 +6,7 @@ A **native cross-platform desktop GUI library** for the [MoonBit](https://github
 
 English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)
 
-![Component showcase](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-basic.png)
+![Component showcase](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-main.png)
 
 ![Live demo on Linux (XFCE)](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-anim-linux.webp) ![Live demo on Windows](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-anim-windows.webp)
 
