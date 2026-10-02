@@ -749,6 +749,17 @@ void yue_mbt_label_set_text(void *label, const char *text) {
   }
 }
 
+/* Label 文本可选择(可选中复制):Linux 走 GtkLabel selectable;
+ * Windows static 控件无原生文本选择通道,no-op;macOS 未真机
+ * 铺开,暂 no-op(能力差异由 MoonBit 层语义化文档标注)。 */
+void yue_mbt_label_set_selectable(void *label, int32_t selectable) {
+#if defined(OS_LINUX)
+  if (auto *l = CastTo<nu::Label>(label)) {
+    gtk_label_set_selectable(GTK_LABEL(l->GetNative()), selectable != 0);
+  }
+#endif
+}
+
 // ---------- TextEdit ----------
 
 void *yue_mbt_text_edit_new(void) {

@@ -65,6 +65,8 @@ void yue_mbt_view_set_bounds(void *view, double x, double y, double w, double h)
 void yue_mbt_view_set_font(void *view, void *font);
 void yue_mbt_view_set_color(void *view, const char *hex);
 void yue_mbt_label_set_align(void *label, int32_t align);
+/* Label 文本可选择(仅 Linux 生效;Windows/macOS 暂 no-op) */
+void yue_mbt_label_set_selectable(void *label, int32_t selectable);
 
 /* ---------- Container ---------- */
 
