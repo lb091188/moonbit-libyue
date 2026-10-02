@@ -251,6 +251,35 @@ void yue_mbt_run(void) {
 }
 
 void yue_mbt_quit(void) {
+  // 主动 quit 的进程,窗口与控件要活到 exit 静态析构期才销毁;销毁瞬间
+  // GTK 会同步派发 focus-out 等事件,经 on_focus_out 蹦床重入已处于析构
+  // 中的句柄注册表与 MoonBit 运行时,偶发段错误(复现与根因链见
+  // experiment/exit_crash/patch_notes.md)。消息循环尚健全时统一断开全部
+  // 视图的应用层信号,让 exit 期的信号 Emit 空转。on_close 不断:quit 常
+  // 在其回调链内被调,Emit 已持 slots 拷贝,不断亦安全。
+  for (auto &kv : yue_mbt::ViewStore::map()) {
+    auto *r = kv.second.get();
+    // Responder 级信号(View/Window 共有基类成员)
+    r->on_mouse_down.DisconnectAll();
+    r->on_mouse_up.DisconnectAll();
+    r->on_mouse_move.DisconnectAll();
+    r->on_mouse_enter.DisconnectAll();
+    r->on_mouse_leave.DisconnectAll();
+    r->on_key_down.DisconnectAll();
+    r->on_key_up.DisconnectAll();
+    r->on_capture_lost.DisconnectAll();
+    if (std::strcmp(r->GetClassName(), nu::Window::kClassName) == 0) {
+      auto *w = static_cast<nu::Window *>(r);
+      w->on_focus.DisconnectAll();
+      w->on_blur.DisconnectAll();
+    } else {
+      auto *v = static_cast<nu::View *>(r);
+      v->on_focus_in.DisconnectAll();
+      v->on_focus_out.DisconnectAll();
+      v->on_size_changed.DisconnectAll();
+      v->on_drag_leave.DisconnectAll();
+    }
+  }
   nu::MessageLoop::Quit();
 }
 
