@@ -1,0 +1,8 @@
+pkgtype(kind: "executable")
+
+import {
+  "moonbitlang/async",
+  "NoahLiu/moonbit-libyue/yue",
+}
+
+supported_targets = "+native"

@@ -1,0 +1,12 @@
+pkgtype(kind: "executable")
+
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/external_loop_integration",
+}
+
+options(
+  "native-stub": [ "fake_gui_loop.c" ],
+)
+
+supported_targets = "+native"
