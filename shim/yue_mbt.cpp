@@ -545,6 +545,21 @@ void yue_mbt_view_schedule_paint(void *view) {
   }
 }
 
+/* View 原生句柄(平台控件指针,uintptr 承载):供渲染集成层
+ * (如 WebGPU surface)取平台窗口资源。Linux=GtkWidget*、
+ * macOS=NSView*;Windows 的 NativeView 为内部 ViewImpl*(HWND
+ * 需经内部类转换,平台铺开时补),暂返回 0。 */
+uint64_t yue_mbt_view_get_native_handle(void *view) {
+  if (auto *v = CastToView(view)) {
+#if defined(OS_WIN)
+    return 0;
+#else
+    return reinterpret_cast<uint64_t>(v->GetNative());
+#endif
+  }
+  return 0;
+}
+
 void yue_mbt_view_set_borderless(void *view, int on) {
 #if defined(OS_LINUX)
   if (auto *v = CastToView(view)) {

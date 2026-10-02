@@ -232,6 +232,13 @@ pub fn schedule_paint_view(v : View) -> Unit {
 }
 
 ///|
+/// View 原生句柄(uintptr 承载):Linux=GtkWidget*、macOS=NSView*、
+/// Windows 暂为 0。供渲染集成层(如 WebGPU surface)取平台窗口资源。
+pub fn native_handle_view(v : View) -> UInt64 {
+  ffi_view_get_native_handle(v)
+}
+
+///|
 /// 对底层视图句柄直接设置显隐(声明式 Node 挂载返回的 View 用)。
 pub fn set_visible_view(v : View, visible : Bool) -> Unit {
   ffi_view_set_visible(v, if visible { 1 } else { 0 })
