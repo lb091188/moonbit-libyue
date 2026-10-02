@@ -56,6 +56,9 @@ void yue_mbt_view_set_style_prop_str(void *view, const char *name, const char *v
 void yue_mbt_view_set_background_color(void *view, const char *hex);
 void yue_mbt_view_set_visible(void *view, int visible);
 void yue_mbt_view_schedule_paint(void *view);
+/* View 原生句柄(uintptr 承载):Linux=GtkWidget*、macOS=NSView*,
+ * Windows 暂返回 0;供渲染集成层(如 WebGPU surface)取平台资源 */
+uint64_t yue_mbt_view_get_native_handle(void *view);
 void yue_mbt_view_set_borderless(void *view, int on);
 void yue_mbt_view_layout(void *view);
 void yue_mbt_view_set_bounds(void *view, double x, double y, double w, double h);
