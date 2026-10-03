@@ -2,9 +2,6 @@
 #borrow(w)
 extern "c" fn ffi_gtk_label_get_selectable(w : UInt64) -> Int = "gtk_label_get_selectable"
 
-#borrow(fmt, w)
-extern "c" fn ffi_printf_s(fmt : Bytes, w : UInt64) -> Int = "printf"
-
 fn main {
   if !@yue.initialize() {
     println("init 失败")
@@ -21,14 +18,9 @@ fn main {
   window.on_close(fn(_w) { @yue.quit() })
   window.set_content_size(400.0, 300.0)
   window.activate()
-  // set_selectable 读回(期望 1)+ 控件真实类名
+  // set_selectable 读回(期望 1;类名已查明为 NULabel 自绘控件)
   let h = @yue.native_handle_view(label.view)
-  let _ = ffi_printf_s("label_widget_name=%s\n".to_bytes(), h)
   println("selectable_readback=\{ffi_gtk_label_get_selectable(h)}")
-  let hh = @yue.native_handle_view(host.view)
-  let _ = ffi_printf_s("host_widget_name=%s\n".to_bytes(), hh)
-  let wgt = @yue.native_handle_view(window.view)
-  let _ = ffi_printf_s("window_widget_name=%s\n".to_bytes(), wgt)
   // 事件计数
   let down = Ref(0)
   let mv = Ref(0)
