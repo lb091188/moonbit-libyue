@@ -146,10 +146,6 @@ extern "c" fn ffi_label_get_text(l : View) -> Bytes = "yue_mbt_label_get_text"
 extern "c" fn ffi_label_set_text(label : View, text : Bytes) -> Unit = "yue_mbt_label_set_text"
 
 ///|
-#borrow(label)
-extern "c" fn ffi_label_set_selectable(label : View, selectable : Int) -> Unit = "yue_mbt_label_set_selectable"
-
-///|
 extern "c" fn ffi_text_edit_new() -> View = "yue_mbt_text_edit_new"
 
 ///|
