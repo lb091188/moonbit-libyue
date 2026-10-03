@@ -2655,9 +2655,22 @@ void yue_mbt_view_on_wheel(void *view,
                            void (*invoke)(void *, double),
                            void *closure) {
 #if defined(OS_LINUX)
-  if (auto *v = CastToView(view)) {
-    GtkWidget *w = v->GetNative();
-    // NUContainer 系用事件窗口收事件,补 GDK_SCROLL_MASK 才有滚轮
+  // Window 与 View 是 Responder 的兄弟类,不能用 CastToView 错位强转取
+  // GetNative(指针错位曾致 g_signal_connect 收到垃圾实例报 CRITICAL,
+  // 信号从未真正挂上);按类名分派取各自的原生 widget
+  if (auto *r = ViewStore::get(view)) {
+    GtkWidget *w = nullptr;
+    if (std::strcmp(r->GetClassName(), nu::Window::kClassName) == 0) {
+      w = GTK_WIDGET(static_cast<nu::Window *>(r)->GetNative());
+    } else if (auto *v = dynamic_cast<nu::View *>(r)) {
+      w = GTK_WIDGET(v->GetNative());
+    }
+    if (w == nullptr) {
+      return;
+    }
+    // GtkWidget/GtkWindow 默认无滚轮 mask,须显式选;NUContainer 系的
+    // 事件窗口另走 container_add_scroll_mask,同加无碍
+    gtk_widget_add_events(w, GDK_SCROLL_MASK | GDK_SMOOTH_SCROLL_MASK);
     nu::container_add_scroll_mask(w);
     auto *cb = new WheelCb{invoke, closure};
     g_signal_connect(w, "scroll-event", G_CALLBACK(ViewWheelTrampoline), cb);
