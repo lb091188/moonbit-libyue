@@ -289,13 +289,6 @@ pub fn Label::set_text(self : Label, text : String) -> Unit {
 }
 
 ///|
-/// 设置标签文本可选中复制。平台支持:Linux 生效(GtkLabel
-/// selectable);Windows/macOS 暂为 no-op(原生控件无此通道或未铺开)。
-pub fn Label::set_selectable(self : Label, selectable : Bool) -> Unit {
-  ffi_label_set_selectable(self.view, if selectable { 1 } else { 0 })
-}
-
-///|
 /// 读取标签当前文本。
 pub fn Label::get_text(self : Label) -> String {
   from_utf8_bytes(ffi_label_get_text(self.view))
