@@ -589,6 +589,26 @@ uint64_t yue_mbt_view_get_native_handle(void *view) {
   return 0;
 }
 
+/* 顶层窗口的平台句柄(渲染集成层建整窗 surface 用):
+ * Windows:Container 等自绘视图无 HWND(container_win.h:17 ViewImpl,
+ * GDI+ 画在父窗口上),顶层窗口 HWND 在 WindowImpl : public Win32Window
+ * (window_win.h:23)的基类里——经 CastTo<nu::Window> 分派取
+ * GetNative()->hwnd()(与 shim 内 MouseEventScreenPoint 等既有用法一致);
+ * Linux/macOS:与 view_get_native_handle 同值(GtkWidget* 或 NSView*),
+ * 直接委托。传 View 句柄进来会被类名校验拒绝并记日志,返回 0。 */
+uint64_t yue_mbt_window_get_hwnd(void *window) {
+#if defined(OS_WIN)
+  if (auto *w = CastTo<nu::Window>(window)) {
+    if (auto *native = w->GetNative()) {
+      return reinterpret_cast<uint64_t>(native->hwnd());
+    }
+  }
+  return 0;
+#else
+  return yue_mbt_view_get_native_handle(window);
+#endif
+}
+
 void yue_mbt_view_set_borderless(void *view, int on) {
 #if defined(OS_LINUX)
   if (auto *v = CastToView(view)) {

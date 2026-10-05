@@ -233,9 +233,18 @@ pub fn schedule_paint_view(v : View) -> Unit {
 
 ///|
 /// View 原生句柄(uintptr 承载):Linux=GtkWidget*、macOS=NSView*、
-/// Windows 暂为 0。供渲染集成层(如 WebGPU surface)取平台窗口资源。
+/// Windows 暂为 0(自绘控件无 HWND 属预期)。供渲染集成层(如 WebGPU
+/// surface)取平台窗口资源。
 pub fn native_handle_view(v : View) -> UInt64 {
   ffi_view_get_native_handle(v)
+}
+
+///|
+/// 顶层窗口平台句柄:Windows=HWND(Container 等自绘视图没有 HWND,
+/// 整窗渲染/单 surface 全自绘架构取顶层窗口句柄即此处);
+/// Linux/macOS 与 native_handle_view 同值(GtkWidget*/NSView*)。
+pub fn native_handle_window(w : Window) -> UInt64 {
+  ffi_window_get_hwnd(w.view)
 }
 
 ///|

@@ -929,6 +929,10 @@ extern "c" fn ffi_view_schedule_paint(view : View) -> Unit = "yue_mbt_view_sched
 #borrow(view)
 extern "c" fn ffi_view_get_native_handle(view : View) -> UInt64 = "yue_mbt_view_get_native_handle"
 
+///| 顶层窗口平台句柄(Windows=HWND,Linux/macOS 与 view_get_native_handle 同值)
+#borrow(window)
+extern "c" fn ffi_window_get_hwnd(window : View) -> UInt64 = "yue_mbt_window_get_hwnd"
+
 #borrow(view)
 extern "c" fn ffi_view_set_borderless(view : View, on : Int) -> Unit = "yue_mbt_view_set_borderless"
 

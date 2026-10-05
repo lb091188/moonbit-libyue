@@ -59,6 +59,10 @@ void yue_mbt_view_schedule_paint(void *view);
 /* View 原生句柄(uintptr 承载):Linux=GtkWidget*、macOS=NSView*,
  * Windows 暂返回 0;供渲染集成层(如 WebGPU surface)取平台资源 */
 uint64_t yue_mbt_view_get_native_handle(void *view);
+/* 顶层窗口平台句柄:Windows=HWND(WindowImpl:Win32Window 基类;
+ * 自绘 Container 无 HWND 属预期),Linux/macOS 与 view_get_native_handle
+ * 同值——整窗渲染(单 surface 全自绘)取此处 */
+uint64_t yue_mbt_window_get_hwnd(void *window);
 void yue_mbt_view_set_borderless(void *view, int on);
 void yue_mbt_view_layout(void *view);
 void yue_mbt_view_set_bounds(void *view, double x, double y, double w, double h);
