@@ -79,6 +79,30 @@ pub fn clear_timeout(id : Int) -> Unit {
 }
 
 ///|
+/// 外部事件循环单步迭代（供外部执行器集成，如 moonbitlang/async 的
+/// ExternalEventLoop）：迭代主循环一轮——至多等待 timeout_ms 毫秒
+/// （-1 无限等，0 不等待），派发本轮事件后返回。返回 1=处理了事件或被
+/// 跨线程唤醒，0=超时且无事件，负数=失败。
+pub fn loop_poll(timeout_ms : Int) -> Int {
+  ffi_loop_poll(timeout_ms)
+}
+
+///|
+/// 跨线程唤醒阻塞中的 loop_poll（如 async 的 waiter 线程调用）。唤醒必须
+/// 走此路径而非 post_task：后者经平台定时器投递，有毫秒级延迟，喂不醒
+/// 等在主循环上的外部执行器。
+pub fn loop_wakeup() -> Unit {
+  ffi_loop_wakeup()
+}
+
+///|
+/// 外部循环退出清理：外部执行器主流程返回后调用一次（与 loop_poll 配对
+/// 使用；仅外部循环模式需要，run() 驱动的常规路径不要调用）。
+pub fn loop_terminate() -> Unit {
+  ffi_loop_terminate()
+}
+
+///|
 /// 系统是否偏好深色(Linux 读 GtkSettings 的深色开关与主题名;其余
 /// 平台当前恒 false,联动接入待补)。适合 initialize 后决定初始主题:
 /// `theme_apply(if system_prefers_dark() { dark_theme() } else { default_theme() })`。

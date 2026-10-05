@@ -1895,6 +1895,19 @@ extern "c" fn ffi_set_timer(
 extern "c" fn ffi_clear_timeout(id : Int) -> Unit = "yue_mbt_clear_timeout"
 
 ///|
+// 外部事件循环三接口（moonbitlang/async ExternalEventLoop 投影）：单步迭代、
+// 跨线程唤醒、退出清理。唤醒只准由 async waiter 线程经纯 C 路径调用，MoonBit
+// 侧拿到的是原始原语；集成方式（YueLoop trait 实现与 install）属批次 3 的
+// yue/async 子包，此处只暴露 C ABI。契约见 docs/zh/async-research.md §7。
+extern "c" fn ffi_loop_poll(timeout_ms : Int) -> Int = "yue_mbt_loop_poll"
+
+///|
+extern "c" fn ffi_loop_wakeup() -> Unit = "yue_mbt_loop_wakeup"
+
+///|
+extern "c" fn ffi_loop_terminate() -> Unit = "yue_mbt_loop_terminate"
+
+///|
 #borrow(data)
 extern "c" fn ffi_image_new_from_data(
   data : Bytes,

@@ -541,6 +541,16 @@ uint32_t yue_mbt_set_timeout(int32_t ms, void (*invoke)(void *), void *closure);
 void yue_mbt_set_timer(int32_t ms, int32_t (*invoke)(void *), void *closure);
 void yue_mbt_clear_timeout(uint32_t id);
 
+// ---------- 外部事件循环（moonbitlang/async ExternalEventLoop 投影） ----------
+// libyue MessageLoop 不暴露单步迭代，此处按平台补齐：poll 单步迭代主循环，
+// wakeup 跨线程唤醒阻塞中的 poll，terminate 退出清理。wakeup 由 async 的
+// waiter 专属线程调用，实现必须纯 C、线程安全，严禁触碰 MoonBit 堆（漏唤醒
+// 即死锁）。契约与选型依据见 docs/zh/async-research.md §7 批次 2。
+// timeout_ms：-1 无限等，0 不等待，>0 至多等待毫秒数；返回 >=0 正常，<0 失败。
+int32_t yue_mbt_loop_poll(int32_t timeout_ms);
+void yue_mbt_loop_wakeup(void);
+void yue_mbt_loop_terminate(void);
+
 /* ---------- 消息框（句柄独立；type 0=None 1=Information 2=Warning 3=Error） ---------- */
 
 void *yue_mbt_message_box_new(int32_t type);

@@ -254,6 +254,8 @@ poll 每轮固定 busy 200ms(模拟 GUI 事件处理慢),观察 `sleep(100*i)`:
 4. 遵循 FFI 规范:`shim/yue_mbt.cpp` 机械转换 + `shim/include/yue_mbt.h` 声明 + `yue/ffi.mbt` extern 三段式;无新链接参数(GLib/CF/User32 均已在链接面);
 5. `run()` **保持不变**(非 async 用户不受影响);不提供「手动 pump async」的接口(公共 API 不存在,勿造)。
 
+**落地状态(2026-10-05)**:三接口已实现并合入主链路——`shim/yue_mbt.cpp` 的 `yue_mbt_loop_poll/_wakeup/_terminate`(三平台按上表),`yue/app.mbt` 的 `loop_poll/loop_wakeup/loop_terminate` 薄封装(只暴露 GUI 侧原语,trait 实现留给批次 3 的独立 async 模块,主模块不引入 async 依赖),白盒冒烟 `yue/loop_wbtest.mbt`。Windows 真机验证(moon 0.1.20260904 + MSVC 19.44):shim 增量重编通过、`moon test yue` 67/67、唤醒后 `loop_poll(0)` 返回 1(唤醒消息确被取走);Linux/macOS 待 CI 与真机。实现细节与验证记录回写 `docs/zh/adaptation.md`「外部事件循环」小节。**新发现版本矩阵约束**:async 0.22.4 需 moon ≥ 0.1.20260920(在 0.1.20260904 下其内部源码 `eprintln` 编译失败),0.21.2 可用——批次 3 版本区间据此收窄。
+
 ### 批次 3:`yue/async` 子包 —— 形态校准
 
 - **内容**:`YueLoop`(实现 `ExternalEventLoop`,三方法直通 shim 三接口)+ `install()`(GUI 初始化 + `@async.set_external_event_loop`,**必须在 `async fn main` 开头、任何实际 async 代码之前调用**——官方 abort 红线)+ 桥接糖(官方建议的 GUI 事件 → `CondVar`/`Queue` 封装,如 `on_click_async`)+ 退出惯例(如「全部窗口关闭 → task group 返回」的 helper)。

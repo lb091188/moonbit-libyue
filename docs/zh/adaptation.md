@@ -111,6 +111,16 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 布局参数收编后 Windows 单行输入垂直居中不再读数值:改纯布局方案——Entry 控件收窄到行高(`entry_ctrl_height`,文字在控件内天然居中),外壳 `justifyContent=center` 垂直居中,任意高度值(含百分比)自动适配;原 entry_vcenter 的「收窄+均分 margin」路径已删。
 - select_t/dropdown_menu 弹层宽度在点击时 `get_bounds(field)` 现取(用户 style 覆盖字段宽后弹层自动跟随);弹层根容器宽高仍须创建期给定(事后 set_style 会被弹层分配时序吞掉,见 GTK 节)。
 
+### 外部事件循环(moonbitlang/async ExternalEventLoop 投影)
+
+- **背景与接口**:`moonbitlang/async` 0.21.0+ 提供官方 GUI 集成通道(`@async.set_external_event_loop` + `ExternalEventLoop` trait 三方法);libyue `MessageLoop` 只暴露 Run/Quit/PostTask,无单步迭代,三方法对应的平台原语由 shim 补齐:`yue_mbt_loop_poll(timeout_ms)` / `yue_mbt_loop_wakeup()` / `yue_mbt_loop_terminate()`(shim/yue_mbt.cpp,MoonBit 侧 `yue/app.mbt` 的 `loop_poll/loop_wakeup/loop_terminate` 薄封装)。设计依据与四组机制实验见 `docs/zh/async-research.md`、`experiment/async_coexist/`。
+- **Linux(GTK 主链路)**:默认 GMainContext 四步(prepare → query → g_poll → check → dispatch)。**必须 clamp**:`g_main_context_query` 会用内部源最近到期时间覆盖传入 timeout(无源时置 -1 无限等),不按外部上限截断即违反 `poll(timeout)` 契约——实验实测 poll(100) 等成 251ms、无源轮次挂死(glib_step 原型复现)。wakeup 用 `g_main_context_wakeup`(纯 C、任意线程)。
+- **Windows**:`MsgWaitForMultipleObjectsEx(QS_ALLINPUT, MWMO_INPUTAVAILABLE)` 等待 + `PeekMessageW/TranslateMessage/DispatchMessageW` 取空本轮积压。wakeup 用 `PostMessageW` 投到自建 message-only 窗口(惰性建于主线程首轮 poll;唤醒早于首轮 poll 时退回 `PostThreadMessageW`)。**严禁复用 `post_task` 做唤醒**:其底层 `SetTimeout(USER_TIMER_MINIMUM)` 有 ≥10ms 延迟,喂不醒等在主循环上的执行器。
+- **macOS**:纯 C 驱动不经 ObjC——`CFRunLoopRunInMode(kCFRunLoopDefaultMode, seconds, false)` 单步 + 版本 0 空 source 作跨线程唤醒通道(`CFRunLoopSourceSignal` 线程安全,source 建在主线程 poll 内)。
+- **红线(全部来自官方契约 + 实测)**:①wakeup 运行在 async 的 waiter 专属线程,只准纯 C 线程安全操作,禁碰任何 MoonBit 对象/引用计数(漏唤醒即死锁);②poll 内 GUI 回调必须薄,重活 `spawn_bg` 丢回 async 世界(poll 内 busy 200ms 实测 async 定时器漂移最高 7 倍);③`run()` 常规路径不变,三接口仅服务于 async 外部循环模式。
+- **验证状态(本批,2026-10-05)**:Windows 真机(moon 0.1.20260904 + MSVC 19.44)shim 增量重编通过;`moon test yue` 67/67(含新白盒冒烟 `yue/loop_wbtest.mbt`:三接口返回合法、不阻塞);唤醒后 `loop_poll(0)` 实测返回 1(唤醒消息确被单步迭代取走)。Linux 四步语义已由 glib_step 实验在 Ubuntu 24.04 验证过原型,本批落地的 shim 版待 Linux CI;macOS CF 路径未真机验证,待用户真机。
+- **版本矩阵(新发现)**:`moonbitlang/async@0.22.4` 在 moon 0.1.20260904 上**自身源码编译失败**(内部 `event_loop.mbt` 引用 `eprintln`,该工具链 core 未提供),需 moon ≥ 0.1.20260920 左右;本机工具链下可用 `0.21.2`(external_loop_integration 自 0.21.0 引入)。批次 3 的版本区间声明要据此收窄(`>= 0.21.0, < 0.23` 且需实测最小 moon 版本)。
+
 ## Linux
 
 ### 发行版

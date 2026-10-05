@@ -76,6 +76,10 @@
 #include "nativeui/win/util/tray_host.h" // TrayHost::hwnd()（托盘幽灵图标防护）
 #include "nativeui/gfx/win/double_buffer.h" // Canvas 位图导出（GetGdiplusBitmap）
 #endif
+#if defined(OS_MAC)
+// 外部事件循环单步迭代与跨线程唤醒（纯 C 驱动主 run loop，不经 ObjC）
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
 // C++ 对象一律走系统堆（MoonBit 运行时可能接管进程分配器，普通 new 会被
 // GC 破坏）：Linux 用 __libc_malloc/__libc_free；Windows 下 moon 以
@@ -3602,6 +3606,167 @@ void yue_mbt_set_timer(int32_t ms, int32_t (*invoke)(void *), void *closure) {
 void yue_mbt_clear_timeout(uint32_t id) {
   nu::MessageLoop::ClearTimeout(id);
 }
+
+// ---------- 外部事件循环（moonbitlang/async ExternalEventLoop 投影）----------
+//
+// moonbitlang/async 的 @async.set_external_event_loop 需要外部循环提供
+// 单步迭代、跨线程唤醒与退出清理（trait ExternalEventLoop 三方法）。libyue
+// MessageLoop 只暴露 Run/Quit/PostTask，单步原语按平台在此补齐：run() 的
+// 常规路径不受影响，这三个函数仅服务于 async 外部循环模式（async 当家、
+// GUI 循环作 poll 回调挂入，见 docs/zh/async-research.md §7）。
+// 红线：wakeup 运行在 async 的 waiter 专属线程，只准纯 C 线程安全操作，
+// 严禁触碰任何 MoonBit 对象/引用计数（漏唤醒会死锁）。
+
+#if defined(OS_WIN)
+
+namespace {
+
+// 唤醒专用 message-only 窗口（HWND_MESSAGE）：wakeup 只投递一条 WM_APP+1，
+// poll 的 PeekMessage 循环取走即完成使命，无应用逻辑。严禁复用
+// MessageLoop::PostTask 做唤醒——其底层 SetTimeout 有 ≥10ms 延迟。窗口必须
+// 建在主线程，故惰性建于首次 poll；唤醒早于首轮 poll 时退回
+// PostThreadMessage（同样能唤醒 MsgWaitForMultipleObjectsEx）。
+constexpr UINT kLoopWakeupMsg = WM_APP + 1;
+HWND g_loop_wakeup_hwnd = nullptr;
+DWORD g_loop_main_tid = 0;
+
+LRESULT CALLBACK LoopWakeupWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+  return ::DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+void LoopWakeupEnsureWindow() {
+  if (g_loop_wakeup_hwnd != nullptr) {
+    return;
+  }
+  static const wchar_t kClassName[] = L"moonbit_libyue_loop_wakeup";
+  WNDCLASSW wc = {};
+  wc.lpfnWndProc = LoopWakeupWndProc;
+  wc.hInstance = ::GetModuleHandleW(nullptr);
+  wc.lpszClassName = kClassName;
+  // 同类名重复注册失败可忽略：已注册类的 WNDPROC 相同，窗口照常建
+  ::RegisterClassW(&wc);
+  g_loop_main_tid = ::GetCurrentThreadId();
+  g_loop_wakeup_hwnd = ::CreateWindowExW(0, kClassName, nullptr, 0, 0, 0, 0, 0,
+                                         HWND_MESSAGE, nullptr, wc.hInstance,
+                                         nullptr);
+}
+
+}  // namespace
+
+int32_t yue_mbt_loop_poll(int32_t timeout_ms) {
+  LoopWakeupEnsureWindow();
+  DWORD to = (timeout_ms < 0) ? INFINITE : static_cast<DWORD>(timeout_ms);
+  DWORD r = ::MsgWaitForMultipleObjectsEx(0, nullptr, to, QS_ALLINPUT,
+                                          MWMO_INPUTAVAILABLE);
+  if (r == WAIT_FAILED) {
+    return -1;
+  }
+  // 一轮迭代：取空本线程当前积压的全部消息（常规 GUI 消息与唤醒消息）
+  MSG msg;
+  while (::PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+    ::TranslateMessage(&msg);
+    ::DispatchMessageW(&msg);
+  }
+  return (r == WAIT_TIMEOUT) ? 0 : 1;
+}
+
+void yue_mbt_loop_wakeup(void) {
+  if (g_loop_wakeup_hwnd != nullptr) {
+    ::PostMessageW(g_loop_wakeup_hwnd, kLoopWakeupMsg, 0, 0);
+  } else if (g_loop_main_tid != 0) {
+    ::PostThreadMessageW(g_loop_main_tid, kLoopWakeupMsg, 0, 0);
+  }
+}
+
+void yue_mbt_loop_terminate(void) {
+  if (g_loop_wakeup_hwnd != nullptr) {
+    ::DestroyWindow(g_loop_wakeup_hwnd);
+    g_loop_wakeup_hwnd = nullptr;
+  }
+}
+
+#elif defined(OS_LINUX)
+
+int32_t yue_mbt_loop_poll(int32_t timeout_ms) {
+  // GTK 默认主上下文单步迭代：prepare → query → g_poll → check → dispatch。
+  // 必须 clamp：g_main_context_query 会用内部源最近到期时间覆盖 wait（无源
+  // 时置 -1 无限等），不按外部上限截断即违反 poll(timeout) 契约——实测
+  // poll(100) 等成 251ms、无源轮次挂死（experiment/async_coexist/glib_step）。
+  GMainContext *ctx = g_main_context_default();
+  gint max_priority = 0;
+  GPollFD fds[64];
+  if (!g_main_context_acquire(ctx)) {
+    return -1;
+  }
+  gboolean some_ready = g_main_context_prepare(ctx, &max_priority);
+  if (!some_ready) {
+    gint wait = timeout_ms;
+    gint n = g_main_context_query(ctx, max_priority, &wait, fds, 64);
+    if (timeout_ms >= 0 && (wait < 0 || wait > timeout_ms)) {
+      wait = timeout_ms;
+    }
+    g_poll(fds, n, wait);
+    some_ready = g_main_context_check(ctx, max_priority, fds, n);
+  }
+  if (some_ready) {
+    g_main_context_dispatch(ctx);
+  }
+  g_main_context_release(ctx);
+  return some_ready ? 1 : 0;
+}
+
+void yue_mbt_loop_wakeup(void) {
+  g_main_context_wakeup(g_main_context_default());
+}
+
+void yue_mbt_loop_terminate(void) {
+  // 默认上下文随进程回收，无需清理
+}
+
+#elif defined(OS_MAC)
+
+namespace {
+
+// 版本 0 空回调 source：仅作跨线程唤醒通道（signal 线程安全）。source 建在
+// 主线程的 poll 内并挂入默认模式，wakeup 从任意线程 signal + 唤醒主循环。
+CFRunLoopSourceRef g_loop_wakeup_source = nullptr;
+
+}  // namespace
+
+int32_t yue_mbt_loop_poll(int32_t timeout_ms) {
+  if (g_loop_wakeup_source == nullptr) {
+    CFRunLoopSourceContext context = {};
+    context.version = 0;
+    g_loop_wakeup_source =
+        CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &context);
+    if (g_loop_wakeup_source == nullptr) {
+      return -1;
+    }
+    CFRunLoopAddSource(CFRunLoopGetMain(), g_loop_wakeup_source,
+                       kCFRunLoopDefaultMode);
+  }
+  CFTimeInterval seconds = (timeout_ms < 0) ? 1e30 : timeout_ms / 1000.0;
+  SInt32 r = CFRunLoopRunInMode(kCFRunLoopDefaultMode, seconds, false);
+  return (r == kCFRunLoopRunTimedOut) ? 0 : 1;
+}
+
+void yue_mbt_loop_wakeup(void) {
+  if (g_loop_wakeup_source != nullptr) {
+    CFRunLoopSourceSignal(g_loop_wakeup_source);
+    CFRunLoopWakeUp(CFRunLoopGetMain());
+  }
+}
+
+void yue_mbt_loop_terminate(void) {
+  if (g_loop_wakeup_source != nullptr) {
+    CFRunLoopRemoveSource(CFRunLoopGetMain(), g_loop_wakeup_source,
+                          kCFRunLoopDefaultMode);
+    CFRelease(g_loop_wakeup_source);
+    g_loop_wakeup_source = nullptr;
+  }
+}
+
+#endif
 
 // ---------- 消息框 ----------
 
