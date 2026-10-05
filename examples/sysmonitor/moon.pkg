@@ -1,3 +1,5 @@
+// Linux 专属示例(/proc 系统监视器):Windows 仅保 stub ABI,勿在 Windows
+// 纳入全树 moon test 回归(口径见 docs/zh/adaptation.md「系统监控数据层」)。
 import {
   "NoahLiu/moonbit-libyue/yue",
   "moonbitlang/core/encoding/utf8",
