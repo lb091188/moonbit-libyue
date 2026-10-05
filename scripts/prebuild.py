@@ -273,12 +273,19 @@ def link_configs() -> dict:
     """
     build = str(_native_dir().resolve()).replace("\\", "/")
     if sys.platform == "win32":
-        # 库与 manifest 一律用相对模块根路径：moon 链接子进程 cwd 为
-        # 模块根，相对路径即可解析；绝对路径在用户目录含引号/空格时会被
-        # 链接命令行 quoting 剥字符并黏成单参数（LNK1104，用户名
-        # noah'liu 实测：两个库路径变成一个输入、撇号被删）。
-        # Linux/macOS 走参数数组不经命令行拼接，无此问题，仍用绝对路径。
-        build = "build"
+        # 库与 manifest 的链接输入路径:跨模块消费(mooncakes 用户把本包
+        # 作为依赖)时 moon 链接子进程 cwd=消费方模块根,相对路径 build/
+        # 解析不到 → LNK1104(Windows 侧 three-mbt 消费实测,2026-10-05);
+        # 库内自用 cwd=模块根,相对/绝对皆可。绝对路径在用户目录含引号/
+        # 空格时会被链接命令行 quoting 剥字符并黏成单参数(LNK1104,用户名
+        # noah'liu 实测:两个库路径变成一个输入、撇号被删)——路径干净
+        # (无引号/空格)时用绝对路径,否则退回相对路径,两场景自动兼顾。
+        # Linux/macOS 走参数数组不经命令行拼接,无此问题,仍用绝对路径。
+        native_abs = str(_native_dir().resolve())
+        if any(c in native_abs for c in "' "):
+            build = "build"
+        else:
+            build = native_abs.replace("\\", "/")
         # manifest.res 默认不传，仅 YUE_MBT_KEEP_MANIFEST=1 时随 yue 份
         # 传入（用于分发型 moon build：main 包对每个包的 link_flags 只
         # 拼一遍，恰好嵌入一份清单）。默认不传的原因：moon 按依赖闭包
@@ -293,7 +300,11 @@ def link_configs() -> dict:
             if os.environ.get("YUE_MBT_KEEP_MANIFEST") == "1" else ""
         prebuilt = _prebuilt("yue_prebuilt.lib")
         if prebuilt:
-            prebuilt = str(Path(prebuilt).relative_to(MODULE_ROOT)).replace("\\", "/")
+            prebuilt_abs = str(Path(prebuilt).resolve())
+            if any(c in prebuilt_abs for c in "' "):
+                prebuilt = str(Path(prebuilt).relative_to(MODULE_ROOT)).replace("\\", "/")
+            else:
+                prebuilt = prebuilt_abs.replace("\\", "/")
         libs = (
             f"{build}/yue_mbt.lib"
             + (f" {prebuilt}" if prebuilt else "")
