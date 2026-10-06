@@ -3,6 +3,8 @@ import {
   "moonbitlang/core/math",
   "moonbitlang/core/env",
   "NoahLiu/moonbit-libyue/yue/traybus",
+  "chensuiyi/subproc",
+  "prowk/moonsqlitefile",
 }
 
 options(
