@@ -738,6 +738,171 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 @yue.scatter_t(pts, trend=true)
 ```
 
+以下六个扩展图表与上述同渲染模型（Store 驱动、只重绘画布、主题切换跟随），完整演示见 `examples/systemprobe`。
+
+### 雷达图 radar_chart_t
+
+`radar_chart_t(indicators : Store[Array[RadarIndicator]], series : Store[Array[RadarSeries]], rings? = 4, show_legend? = true, fill? = false, style?, handle?)`
+
+多维数据对比：N 边形同心网格 + 轴线 + 维度标签，每系列一个半透明填充多边形并描边（多系列叠加）。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| indicators | Store[Array[RadarIndicator]] | 必填 | 维度定义，`RadarIndicator::make(名称, 最大值)`，量程 0..max |
+| series | Store[Array[RadarSeries]] | 必填 | `RadarSeries::make(名称, 各维取值)`，与 indicators 同序 |
+| width / height | Double | 460 / 340 | 画布尺寸 |
+| rings | Int | 4 | 同心网格层数 |
+| show_legend | Bool | true | 右侧图例列（色块 + 系列名） |
+
+系列色按主题四语义色循环；维度取值超出量程钳制、缺失按 0（折到中心），量程 max ≤ 0 的维度恒为 0；维度数 < 3 时画「暂无数据」占位。顶点 0 在 12 点方向、顺时针均布。
+
+```moonbit
+let ind : @yue.Store[Array[@yue.RadarIndicator]] = @yue.Store::new([
+  @yue.RadarIndicator::make("渲染", 100.0),
+  @yue.RadarIndicator::make("IO", 100.0),
+  @yue.RadarIndicator::make("内存", 100.0),
+])
+let ser : @yue.Store[Array[@yue.RadarSeries]] = @yue.Store::new([
+  @yue.RadarSeries::make("本方案", [88.0, 72.0, 80.0]),
+  @yue.RadarSeries::make("对照", [70.0, 90.0, 65.0]),
+])
+@yue.radar_chart_t(ind, ser, rings=5, style=[("width", 420.0), ("height", 320.0)])
+```
+
+### 热力图 heatmap_t
+
+`heatmap_t(data : Store[HeatGrid], low_color? = "", high_color? = "", gap? = 2.0, show_values? = false, fill? = false, style?, handle?)`
+
+二维数值矩阵逐格着色：低值取色带起点、高值取终点，线性映射。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| data | Store[HeatGrid] | 必填 | `HeatGrid::make(列标签, 行标签, 行×列矩阵)`（外层行、内层列） |
+| width / height | Double | 480 / 300 | 画布尺寸 |
+| low_color / high_color | String | 跟随主题 | 色带起止色（"#RRGGBB"），空串 = 主题浅主色 → 主色 |
+| gap | Double | 2 | 格间距（px） |
+| show_values | Bool | false | 格内居中标注数值（格子宽 ≥30 且高 ≥14 才画） |
+
+量程自动取矩阵实际 min/max（两端必被数据命中，不加留白）；全部同值时整表取色带中点色。行标签居左、列标签居底，过密自动抽稀截断；空矩阵画「暂无数据」。
+
+```moonbit
+let heat : @yue.Store[@yue.HeatGrid] = @yue.Store::new(
+  @yue.HeatGrid::make(
+    ["周一", "周二", "周三"],
+    ["上午", "下午"],
+    [[3.0, 5.0, 7.0], [6.0, 8.0, 9.0]],
+  ),
+)
+@yue.heatmap_t(heat, show_values=true, style=[("width", 420.0), ("height", 280.0)])
+@yue.heatmap_t(heat, low_color="#E3EDFA", high_color="#1E4FA3", gap=1.0)
+```
+
+### K 线图 candlestick_t
+
+`candlestick_t(candles : Store[Array[Candle]], y_range? = None, up_color? = "", down_color? = "", fill? = false, style?, handle?)`
+
+蜡烛图：影线（high-low 竖线）+ 实体（open-close 矩形），x 等距排布。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| candles | Store[Array[Candle]] | 必填 | `Candle::make(open, high, low, close)` |
+| width / height | Double | 560 / 280 | 画布尺寸 |
+| y_range | (Double, Double)? | 自适应 | 手动值域；缺省取全体 low/high + 8% 留白 |
+| up_color / down_color | String | 主题色 | 涨 / 跌颜色（"#RRGGBB"），空串回主题 danger / success |
+
+涨跌判定 close ≥ open 记涨（平盘归涨）；默认涨红跌绿（中国习惯配色）；平盘实体高度钳 1px 保持可见。横向网格 + 左侧刻度。
+
+```moonbit
+let candles : @yue.Store[Array[@yue.Candle]] = @yue.Store::new([
+  @yue.Candle::make(100.0, 108.0, 98.0, 105.0),
+  @yue.Candle::make(105.0, 107.0, 99.0, 101.0),
+  @yue.Candle::make(101.0, 110.0, 100.0, 108.0),
+])
+@yue.candlestick_t(candles, style=[("width", 420.0), ("height", 260.0)])
+@yue.candlestick_t(candles, y_range=Some((90.0, 115.0)))
+```
+
+### 漏斗图 funnel_t
+
+`funnel_t(data : Store[Array[BarItem]], alignment? = FunnelCenter, pct_of_total? = false, fill? = false, style?, handle?)`
+
+转化漏斗：按 value 降序分层，每层一个梯形（宽度 ∝ value），同系列色自顶向下渐浅。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| data | Store[Array[BarItem]] | 必填 | 复用柱状图 `BarItem::make(标签, 值)`，内部按 value 降序稳定排 |
+| width / height | Double | 560 / 280 | 画布尺寸 |
+| alignment | FunnelAlign | `FunnelCenter` | 层水平对齐：居中 / `FunnelLeft` 左缘对齐 |
+| pct_of_total | Bool | false | 占比口径：false 相对首层（最大层，转化率口径），true 相对全部正值总和 |
+
+画布足够宽（扣除右侧标注列后 ≥100px）时逐层标注 标签 + 数值 (百分比)，过窄时省略标注只画梯形；值 ≤ 0 的层宽钳 0。
+
+```moonbit
+let funnel : @yue.Store[Array[@yue.BarItem]] = @yue.Store::new([
+  @yue.BarItem::make("浏览", 1000.0),
+  @yue.BarItem::make("加购", 420.0),
+  @yue.BarItem::make("下单", 260.0),
+  @yue.BarItem::make("支付", 190.0),
+])
+@yue.funnel_t(funnel, style=[("width", 420.0), ("height", 260.0)])
+@yue.funnel_t(funnel, alignment=@yue.FunnelLeft, pct_of_total=true)
+```
+
+### 箱线图 boxplot_t
+
+`boxplot_t(groups : Store[Array[(String, Array[Double])]], y_range? = None, fill? = false, style?, handle?)`
+
+多组并列箱线图：每组自动算五数概括，绘箱体 + 中位线 + 须线端帽 + 离群点。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| groups | Store[Array[(String, Array[Double])]] | 必填 | (组标签, 样本值数组)，每组独立概括 |
+| width / height | Double | 560 / 280 | 画布尺寸 |
+| y_range | (Double, Double)? | 自适应 | 手动值域；缺省取全部样本 min/max（含离群点）+ 8% 留白 |
+
+五数概括按 1.5×IQR 规则：箱体 Q1-Q3（组序走四语义色循环，半透明填充 + 描边）、中位线 3px、须端取围栏内最远样本（端帽宽 60% 箱宽）、围栏外样本画 danger 色离群点圆点。组标签居中贴底轴，过密自动抽稀截断；空组只画标签。`boxp_summary(values) -> BoxSummary`（min/q1/median/q3/max/whisker_lo/whisker_hi/outliers）可脱离组件单独取概括值。
+
+```moonbit
+let boxp : @yue.Store[Array[(String, Array[Double])]] = @yue.Store::new([
+  ("渲染", [12.0, 14.0, 15.0, 16.0, 18.0, 21.0, 25.0, 30.0]),
+  ("IO", [5.0, 6.0, 6.5, 7.0, 8.0, 9.0, 12.0]),
+])
+@yue.boxplot_t(boxp, style=[("width", 420.0), ("height", 260.0)])
+// 单独取概括值: @yue.boxp_summary([1.0, 2.0, 3.0, 8.0]).median
+```
+
+### 桑基图 sankey_t
+
+`sankey_t(data : Store[SankeyData], show_labels? = true, fill? = false, style?, handle?)`
+
+节点-链路流量图（静态分层布局，非力导向）：无入边节点进第 0 列、沿链路拓扑右移分层，列内按流量比例定高、纵向居中。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| data | Store[SankeyData] | 必填 | `SankeyData::make(节点, 链路)`，见下 |
+| width / height | Double | 560 / 320 | 画布尺寸 |
+| show_labels | Bool | true | 节点名标签（第 0 列标在矩形左侧、其余列右侧） |
+
+`SankeyNode::make(名称)` 建节点；`SankeyLink::make(源下标, 目标下标, 流量)` 建链路（流量 > 0 才计入布局，节点高度与色带宽度同量纲）。节点矩形高 ∝ 流量，链路画源右缘到目标左缘的半透明贝塞尔色带（宽 ∝ 流量，同一节点多条链路纵向依序排布不重叠）；节点与链路色按源节点下标走四语义色循环。
+
+```moonbit
+let sankey : @yue.Store[@yue.SankeyData] = @yue.Store::new(
+  @yue.SankeyData::make(
+    [
+      @yue.SankeyNode::make("浏览"),
+      @yue.SankeyNode::make("加购"),
+      @yue.SankeyNode::make("支付"),
+    ],
+    [
+      @yue.SankeyLink::make(0, 1, 420.0),
+      @yue.SankeyLink::make(1, 2, 190.0),
+      @yue.SankeyLink::make(0, 2, 160.0),
+    ],
+  ),
+)
+@yue.sankey_t(sankey, style=[("width", 420.0), ("height", 300.0)])
+```
+
 ## 图标
 
 内置矢量图标 803 种，全部由 iconfont 包（元海公共库，MES 场景）经 `scripts/gen_icons.py <iconfont包目录>` 生成：SVG 字体轮廓（贝塞尔/弧线）翻译为 Painter 原语，bbox 归一化 + y 翻转，填充风格，变体名取 `font_class` 的 PascalCase（如 `FilePdf`、`CaretRightSmall`），与控件类型重名的加 `Icon` 后缀（如 `MenuIcon`、`TableIcon`）；`icon_name` 返回 `<font_class>`。覆盖表单表格 / 编辑排版 / 方向翻页 / 布局视图 / 文件文档 / 云运维 / 设备 / 图表 / 通信 / 用户 / 安全 / 时间 / 状态 / 金融商业 / 系统工具 / 天气饮食 / 媒体出行 / 品牌平台等分组，showcase 图标页按组展示（该页由 `scripts/gen_showcase_icons.py` 生成）。换图标库 = 把新包目录传给 `scripts/gen_icons.py` 重跑，`icons-gen` 标记段落勿手改。
