@@ -10,6 +10,9 @@
 *.core
 *.generated.mbti
 
+# mooncakes 依赖缓存(moon install 下载,勿入库)
+/.mooncakes/
+
 # WebView2 loader(prepare.py 复制到仓库根,运行期按工作目录搜索)
 /WebView2Loader.dll
 
