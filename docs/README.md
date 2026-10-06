@@ -15,6 +15,7 @@ moon run examples/hello         # minimal window with the original widgets
 moon run examples/hello-themed  # minimal example of the themed component library (theme_apply + button_t/input_t/label_t)
 moon run examples/showcase      # full-capability demo board: 15 pages, three grouped sidebars, component library + system capabilities
 moon run examples/sysmonitor    # flagship app: Ubuntu process manager & hardware monitor (1000-row process table + live curves)
+moon run examples/systemprobe   # system capabilities + extended charts demo (volume/brightness/browser & VS Code history/app lookup + radar/heatmap/candlestick/funnel/boxplot/sankey)
 ```
 
 The showcase covers: Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store comparison + Native widgets / Canvas & rich text + System Integration / Window / Browser, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). Each page's source is its own file (`examples/showcase/pages/*.mbt`) — the best copy-paste material library; screenshots of the component library:
@@ -48,11 +49,12 @@ Process page: a virtual table at the 1000-row scale with search filtering, six s
 | [tutorial.md](tutorial.md) | Five-minute tutorial (for MoonBit newcomers): from `moon new` to a running window, avoiding the three newcomer pitfalls one by one; includes links to the official MoonBit tutorial & Tour |
 | [declarative.md](declarative.md) | Declarative UI: `Node`/`mount` render tree + `Store`/`Signal` reactive bindings (signals: computed with automatic dependency tracking + batch) |
 | [layout.md](layout.md) | Layout style key quick reference: all Yoga flexbox style keys (enum / numeric / edge / special) + common-combination examples |
-| [components-ui.md](components-ui.md) | Themed component library quick reference: Element-Plus-style themed components (buttons/input/selection/forms/navigation/layout/data display/charts/icons/feedback/overlays), per-API signatures + parameter tables + examples |
+| [components-ui.md](components-ui.md) | Themed component library quick reference: Element-Plus-style themed components (buttons/input/selection/forms/navigation/layout/data display/charts/icons/feedback/overlays), per-API signatures + parameter tables + examples; charts cover line/bar/donut/gauge/scatter plus extended charts (radar/heatmap/candlestick/funnel/boxplot/sankey) |
 | [components.md](components.md) | Widget API quick reference: both classic setter and `X::make` props styles, including upstream pitfalls |
 | [adaptation.md](adaptation.md) | Platform adaptation notes: field-tested pitfalls per platform, root causes, and verification conclusions (continuously updated) |
 | [tray.md](tray.md) | Linux tray solution: SNI protocol stack design, architecture, backend fallback, desktop compatibility |
 | [autostart.md](autostart.md) | Cross-platform autostart: XDG .desktop on Linux / HKCU Run key on Windows, unified is_enabled / enable / disable |
+| [zh/system-capabilities.md](zh/system-capabilities.md) (Chinese) | System capabilities: screen brightness / keyboard backlight / system volume (wpctl first, pactl fallback) / installed-app lookup / VS Code local history & recent workspaces / browser history & downloads, unified Result semantics |
 | [relink.md](relink.md) | Forcing a relink after native layer (shim/vendor) changes: detection and handling |
 
 For the project overview and quick-start entry points, see the repository root [README.md](../README.md).
