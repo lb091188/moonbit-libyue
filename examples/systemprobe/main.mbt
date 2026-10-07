@@ -869,7 +869,12 @@ fn main {
   ] + cmd_preview_buttons(cmd_report)
   ignore(
     @yue.mount_window(
-      [@yue.scroll(@yue.vbox(inner, style=[("padding", 20.0), ("gap", 14.0)]))],
+      [
+        @yue.scroll(
+          @yue.vbox(inner, style=[("padding", 20.0), ("gap", 14.0)]),
+          style=[("flex", 1.0)],
+        ),
+      ],
       title="systemprobe",
       size=Some((960.0, 740.0)),
       center=true,
