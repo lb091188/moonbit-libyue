@@ -116,6 +116,28 @@ fn sysprobe_collect() -> String {
       Err(_) => buf.write_string("\{name} -> 未找到\n")
     }
   }
+  buf.write_string("\n== 默认应用查询(只读) ==\n")
+  if @yue.da_supported() {
+    match @yue.da_file_type("/etc/hostname") {
+      Ok(mime) => {
+        buf.write_string("/etc/hostname 类型: \{mime}\n")
+        match @yue.da_default_for(mime) {
+          Ok(d) => buf.write_string("默认应用: \{d}\n")
+          Err(@yue.DefaultAppError::NoDefault(_)) => buf.write_string("默认应用: 未登记\n")
+          Err(e) => buf.write_string("默认应用查询失败: \{e}\n")
+        }
+        let htmls = @yue.da_associations_for("text/html")
+        if htmls.is_empty() {
+          buf.write_string("text/html 关联: 无\n")
+        } else {
+          buf.write_string("text/html 关联: \{htmls.join(", ")}\n")
+        }
+      }
+      Err(e) => buf.write_string("文件类型查询失败: \{e}\n")
+    }
+  } else {
+    buf.write_string("xdg-mime 不可用,跳过\n")
+  }
   // ---- 第二批新模块:只读查询真调,失败只映出错误文本 ----
   buf.write_string("\n== 媒体播放(MPRIS,只读) ==\n")
   match @yue.media_players() {

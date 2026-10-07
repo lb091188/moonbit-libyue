@@ -135,6 +135,37 @@ match @yue.appfind_executable("code") {
 }
 ```
 
+## 默认应用查询
+
+查询文件类型与 MIME 类型的默认应用、枚举某类型的全部关联应用，以及设置默认应用。查询走 `xdg-mime`（PATH 探测），关联枚举直读三层 `mimeapps.list`（XDG mimeapps 规范：用户配置 `~/.config/mimeapps.list` 优先、`~/.local/share/applications/mimeapps.list` 次之、`/usr/share/applications/mimeapps.list` 兜底）。仅 Linux。
+
+| 函数 | 说明 |
+|---|---|
+| `da_supported() -> Bool` | `xdg-mime` 是否在 PATH |
+| `da_file_type(path) -> Result[String, DefaultAppError]` | 推断文件 MIME 类型（`xdg-mime query filetype`） |
+| `da_default_for(mime) -> Result[String, DefaultAppError]` | 查默认应用（`.desktop` 名）；命令不可用或无结果时回退解析 mimeapps.list 的 `[Default Applications]` 段（同名多行按规范后写覆盖，取最后一个） |
+| `da_associations_for(mime) -> Array[String]` | 某类型的全部关联 `.desktop` 名（去重；`[Default Applications]` 与 `[Added Associations]` 两段合并） |
+| `da_set_default(mime, desktop_id) -> Result[Unit, DefaultAppError]` | 把 `mime=desktop_id` 写入用户 `~/.config/mimeapps.list` 的 `[Default Applications]` 段：已有该 MIME 行则替换、否则段内追加、段不存在则新建；desktop_id 必须以 `.desktop` 结尾 |
+
+错误类型：`Unsupported`（无 xdg-mime）、`QueryFailed`（命令失败）、`NoDefault`（该类型无登记）、`IoFailed`（读写失败）。
+
+```moonbit
+// 文件类型与默认应用
+match @yue.da_file_type("/home/me/report.pdf") {
+  Ok(mime) => {
+    println("类型：\{mime}")
+    match @yue.da_default_for(mime) {
+      Ok(desktop) => println("默认应用：\{desktop}")
+      Err(_) => println("没有默认应用")
+    }
+  }
+  Err(e) => println("查询失败：\{e}")
+}
+// 枚举关联应用、设置默认（set 是改变系统状态的操作，由用户显式触发）
+let apps = @yue.da_associations_for("text/html")
+@yue.da_set_default("text/html", "firefox.desktop")
+```
+
 ## VS Code 本地历史与最近工作区
 
 读取本机 VS Code 用户数据：某文件的本地历史快照列表（`User/History`）与最近打开的工作区 / 文件夹。三平台路径均已实现（Linux / macOS / Windows 各按其用户数据目录定位）。
