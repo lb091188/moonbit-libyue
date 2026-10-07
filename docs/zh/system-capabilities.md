@@ -362,8 +362,29 @@ fn source(i : Int) -> Bytes? {
   let px = FixedArray::make(320 * 240 * 4, (i * 7 % 255).to_byte())
   Some(Bytes::from_array(px))
 }
-let view = @yue.video_view_t(width=320, height=240, frame_count=120, source, fps=30)
+let view = @yue.video_view_t(320, 240, 120, source, fps=30)
 ```
+
+### ffmpeg 路线（AVI/MP4/MKV/WebM 等容器）
+
+`yue/vidsrc_ffmpeg.mbt` 以 ffmpeg CLI 为解码后端：ffprobe CSV 读元信息，ffmpeg 解码为单个 raw RGBA 文件整读进内存，帧源按帧号偏移切片。容器与编码随 ffmpeg 解码器覆盖（AVI/MP4/MKV/WebM/H.264/VP9/AV1…）。
+
+| 函数 | 说明 |
+|---|---|
+| `vidf_supported() -> Bool` | ffmpeg 可用（进程内缓存，首次真探 `ffmpeg -version`） |
+| `vidf_probe(path) -> Result[VideoMeta, String]` | ffprobe 元信息（宽/高/fps/时长/有无音轨） |
+| `vidf_extract(path, fps?=8.0, width?=0, height?=0, max_frames?=240)` | 提取帧集 `VideoFrames`（参数钳制内存占用：缺省约 240 帧） |
+| `VideoFrames::frame(idx)` / `vidf_source(frames)` | 按帧号取 RGBA / 直接得到 `VideoFrameSource` 喂 `video_view_t` |
+| `vidf_extract_audio(path, out_wav)` | 提取音轨为 WAV（16bit 44.1kHz 立体声），交 `AudioEngine` 播放（音画各自从 0 起播的近似同步） |
+
+```moonbit
+let frames = @yue.vidf_extract("demo.avi", fps=12.0, width=480)?
+let view = @yue.video_view_t(frames.width, frames.height, frames.frame_count,
+  @yue.vidf_source(frames), fps=12, looping=true)
+// 音轨：@yue.vidf_extract_audio("demo.avi", "/tmp/a.wav") 后 AudioEngine::load("/tmp/a.wav")
+```
+
+帧数据整读进内存，长视频用 fps/width/height/max_frames 降采样钳制；音画同步为近似（各自从 0 起播），精确同步需时钟对齐，后续批次再做。
 
 ## 显示器配置
 
