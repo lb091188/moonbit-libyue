@@ -5,7 +5,7 @@ import {
   "moonbitlang/core/env",
   "NoahLiu/moonbit-libyue/yue/traybus",
   "chensuiyi/subproc",
-  "NoahLiu/moonbit-libyue/third_party/moonsqlitefile",
+  "prowk/moonsqlitefile",
   "CorvusCinereus/miniaudio",
 }
 
