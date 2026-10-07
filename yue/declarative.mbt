@@ -375,6 +375,8 @@ pub fn group(
 /// overlay=false 或显式 policy 仍走平台原生条。
 /// 内容在挂载之后才挂进 content(惰性挂载)或明显长高时,经 handle 拿
 /// Scroll 调 refresh_content_size 刷新滚动范围。
+/// 布局提示：Scroll 视口高度来自弹性分配,作为窗口根或需占满父容器时
+/// 要自带 style flex(如 [("flex", 1.0)]),否则视口塌陷为 0(空白)。
 pub fn scroll(
   content : Node,
   content_size? : (Double, Double)? = None,
@@ -561,7 +563,9 @@ pub fn mount_window(
   handle? : (Window) -> Unit = fn(_w) {  },
 ) -> Window {
   let win = Window::make(title~, size~, on_close~, center~)
-  win.set_content(mount(children))
+  // 根容器默认撑满窗口：scroll 等依赖弹性高度的子节点若不加自己的
+  // flex,视口会塌陷为 0(空白窗口),因此根默认 flex=1,子节点按需再给
+  win.set_content(mount(children, style=[("flex", 1.0)]))
   handle(win)
   win.activate()
   win

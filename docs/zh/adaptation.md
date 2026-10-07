@@ -400,6 +400,20 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **AppleClang 17(macos-15 镜像更新后)把 `getRed:green:blue:alpha:` 返回值解析成 void**,`![...]` 一元取反编译错误;已判空且转 sRGB 后取分量必然成功,丢弃返回值写法对 BOOL/void 双解析都可编译(69136b7,曾被整树回退丢失又捡回——回退基线含带病文件时,后续修复会随回退消失,重推 vendor 前需对照该文件历史)。
 - **0.5.0 发布前的 CI 连红三根因(9-22 起,Linux/macOS 红、Windows 绿)**:① `yue_accent_mac.mm` 的 AppleClang 编译错误(见上)卡死 prepare;② extern "C" 缺失(见 ABI 小节)卡死链接;③ sysmonitor 的 S4 硬件采样测试断「coretemp 必有 Package 传感器」,虚机 runner 无此硬件即败——环境缺件(无传感器/无 DISPLAY)只跳过不硬断。另:CI 原生层缓存 key 必须含 shim 源码哈希(只含 prepare.py 时,shim 变更不换 key,恢复的 build/ 缓存里是旧 shim 库);无 Actions 日志权限时,把失败输出切片塞进 `::error` 注解(check-runs annotations API 匿名可读)是唯一取证通道。
 
+### 声明式根容器高度塌陷(mount_window 默认 flex)
+
+- 环境:Ubuntu 24.04 + X11 + XFCE,systemprobe 示例。现象:`mount_window([scroll(vbox(...))])` 打开是空白窗口(纯底色,无内容,进程正常)。
+- 根因:mount_window 的根容器无任何样式,窗口内容区不弹性分配;Scroll 视口高度来自 flex 分配,无高度约束时塌陷为 0。showcase 未踩坑是因为外层恰好有 `hbox(style=[("flex", 1.0), ("alignItems", "stretch")])` 包裹。
+- 修复:mount_window 的根容器默认 `style=[("flex", 1.0)]`(窗口根语义即撑满窗口,默认化安全;`mount()` 面向任意父容器的子树,不默认化以免改坏既有布局);scroll 的文档注释补弹性高度警示;systemprobe 的 scroll 同时显式给 `("flex", 1.0)`(双保险,滚动子节点按需自给 flex 的用法不变)。
+- 验证:xdotool + import 截图窗口区域像素方差,修复前纯底色、修复后完整渲染(标题/按钮/雷达图可见);showcase/hello 无回归。
+
+### toolchain 代差(v0.10.12 vs 生态新包)与 moonsqlitefile vendor 收编
+
+- 环境:本机 toolchain 2026-10-07 晚间实测为 moonc v0.10.12+1634b282e(core 0.10.12,无 `Bytes/String::exact_view`、无 `eprintln`);当天早些时候同机为 v0.10.14(有)。CI 统一 `install.sh` 装最新,两端并存。
+- 现象:clean 后 moonsqlitefile(0.7/0.8 全线)与 moonbit-community/sqlite3(经 moonbitlang/async 的 `eprintln`)在 v0.10.12 编不过;examples/sysmonitor 自身的 `String::exact_view` 同炸——此前"编译通过"是 `_build` 旧缓存假象,toolchain 切换后 clean 暴露。
+- 决策:不引 C、不升用户全局 toolchain,把 moonsqlitefile v0.8.0 源码(9k 行,Apache-2.0)收编为进程内子包 `third_party/moonsqlitefile/`,唯一 patch:`record.mbt` 的 `payload.exact_view(start,end)` → 字节切片 `payload[start:end]`(切片语法在 v0.10.12 与最新 toolchain 均可用,上游修复可 diff 最小化同步);sysmonitor 的 4 处 `exact_view` 同步改切片。`@utf8/@utf16 decode(BytesView)` 与 `@debug`/`@buffer` 按本机 core 显式 import。
+- 验证:moon check 零警告(含 vendor 包)、moon test 575 全绿(净增 6:PNG 编码器字节级自校验)、moon build 全仓通过;clean 后全量重建复核。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。
