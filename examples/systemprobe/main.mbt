@@ -518,6 +518,55 @@ fn cmd_preview_buttons(report : Ref[@yue.Label?]) -> Array[@yue.Node] {
 }
 
 ///|
+///|
+/// 载入视频演示:lavfi 生成 2 秒 160x120@5 测试视频(AVI 容器)→ 提取
+/// 8fps 帧集(约 16 帧)→ 更新帧源。同步执行约 1-2 秒,由点击后
+/// set_timeout 触发,期间状态标签先行提示。
+fn vidf_load_demo(
+  frames_ref : Ref[@yue.VideoFrames?],
+  status : Ref[@yue.Label?],
+) -> Unit {
+  let avi = "/tmp/yue-probe-demo.avi"
+  match @yue.pr_run(
+    "ffmpeg",
+    ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=160x120:rate=5", "-pix_fmt", "yuv420p", avi],
+    timeout_ms=30000,
+  ) {
+    Ok(o) =>
+      if o.exit_code != 0 {
+        match status.val {
+          Some(l) => l.set_text("测试视频生成失败(退出码 \{o.exit_code})")
+          None => ()
+        }
+        return
+      }
+    Err(e) => {
+      match status.val {
+        Some(l) => l.set_text("ffmpeg 启动失败: \{e}")
+        None => ()
+      }
+      return
+    }
+  }
+  match @yue.vidf_extract(avi, fps=8.0, width=160, height=120) {
+    Ok(frames) => {
+      frames_ref.val = Some(frames)
+      match status.val {
+        Some(l) =>
+          l.set_text(
+            "已载入 \{frames.width}x\{frames.height} × \{frames.frame_count} 帧(@8fps,循环播放)",
+          )
+        None => ()
+      }
+    }
+    Err(e) =>
+      match status.val {
+        Some(l) => l.set_text("提取失败: \{e}")
+        None => ()
+      }
+  }
+}
+
 fn main {
   if !@yue.initialize() {
     println("GUI 初始化失败")
@@ -744,6 +793,10 @@ fn main {
   ])
   // 特效散点:涟漪动画句柄外置,关窗时停止定时器
   let eff_anim = @yue.EffAnim::make()
+  // 视频(ffmpeg 路线):点击「载入演示视频」后 lavfi 生成测试视频并
+  // 提取帧集,帧源从 Ref 取;载入前 video_view_t 显示占位底色。
+  let vid_frames : Ref[@yue.VideoFrames?] = Ref(None)
+  let vid_status : Ref[@yue.Label?] = Ref(None)
   let eff_points : @yue.Store[Array[@yue.EffPoint]] = @yue.Store::new([
     @yue.EffPoint::make(18.0, 72.0, size=20.0),
     @yue.EffPoint::make(32.0, 58.0, size=14.0),
@@ -852,6 +905,46 @@ fn main {
     @yue.line_chart_it(it_line, fill=true),
     @yue.bar_chart_it(it_bar, fill=true),
     @yue.donut_chart_it(it_donut, center="合计 100", fill=true),
+    @yue.label_t(
+      "视频播放(ffmpeg 解码路线)",
+      role=@yue.Section,
+      style=[("marginTop", 16.0)],
+    ),
+    @yue.label_t(
+      "ffmpeg/ffprobe 可用时,点击载入:lavfi 生成 2 秒测试视频(AVI 容器),ffprobe 读元信息,ffmpeg 解码为 RGBA 帧集,video_view_t 按帧号经 PNG 内存编码→Image→draw_image 渲染。",
+      role=@yue.Secondary,
+    ),
+    @yue.button_t(
+      if @yue.vidf_supported() { "载入演示视频" } else { "ffmpeg 不可用" },
+      variant=@yue.Solid,
+      on_click=fn() {
+        match vid_status.val {
+          Some(l) => l.set_text("载入中:生成测试视频并解码…")
+          None => ()
+        }
+        // 生成+解码约 1-2 秒,延后一拍让状态文本先渲染
+        let _ = @yue.set_timeout(50, fn() { vidf_load_demo(vid_frames, vid_status) })
+      },
+    ),
+    @yue.label_t(
+      "(视频加载状态显示在此)",
+      role=@yue.Body,
+      handle=fn(l) { vid_status.val = Some(l) },
+    ),
+    @yue.video_view_t(
+      160,
+      120,
+      16,
+      fn(i) {
+        match vid_frames.val {
+          Some(frames) => frames.frame(i)
+          None => None
+        }
+      },
+      fps=8,
+      looping=true,
+      fill=true,
+    ),
     @yue.label_t(
       "设置类命令预览(只展示将执行的命令文本,不真实执行)",
       role=@yue.Section,

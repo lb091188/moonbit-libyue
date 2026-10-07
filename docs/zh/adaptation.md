@@ -400,6 +400,14 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **AppleClang 17(macos-15 镜像更新后)把 `getRed:green:blue:alpha:` 返回值解析成 void**,`![...]` 一元取反编译错误;已判空且转 sRGB 后取分量必然成功,丢弃返回值写法对 BOOL/void 双解析都可编译(69136b7,曾被整树回退丢失又捡回——回退基线含带病文件时,后续修复会随回退消失,重推 vendor 前需对照该文件历史)。
 - **0.5.0 发布前的 CI 连红三根因(9-22 起,Linux/macOS 红、Windows 绿)**:① `yue_accent_mac.mm` 的 AppleClang 编译错误(见上)卡死 prepare;② extern "C" 缺失(见 ABI 小节)卡死链接;③ sysmonitor 的 S4 硬件采样测试断「coretemp 必有 Package 传感器」,虚机 runner 无此硬件即败——环境缺件(无传感器/无 DISPLAY)只跳过不硬断。另:CI 原生层缓存 key 必须含 shim 源码哈希(只含 prepare.py 时,shim 变更不换 key,恢复的 build/ 缓存里是旧 shim 库);无 Actions 日志权限时,把失败输出切片塞进 `::error` 注解(check-runs annotations API 匿名可读)是唯一取证通道。
 
+### ffmpeg CLI 视频解码路线(帧集整读 + 偏移切片)
+
+- 环境:Ubuntu 24.04,ffmpeg 6.1.1 + ffprobe(apt)。决策:mooncakes 无 ffmpeg 绑定(ABI 面 +100 不收),视频解码走 ffmpeg CLI:`vidf_probe` 用 ffprobe CSV(`-show_entries stream=... -of csv=p=0`),`vidf_extract` 用 `-f rawvideo -pix_fmt rgba` 解码为单个连续帧文件(rawvideo muxer 顺序写帧,无需 image2 序列),`read_binary_file` 整读进内存后按帧号偏移切片——帧数据不落 stdout(pr_run 的 stdout 捕获是文本语义,二进制会坏),直接 ffmpeg 写文件绕开。
+- 内存钳制:帧集大小 = 帧数×宽×高×4,默认 fps=8/max_frames=240;480p 12fps 60 秒会到 ~630MB,长视频必须降采样,文档已写明。
+- ffprobe CSV 解析坑:r_frame_rate 是分数("30000/1001"),format duration 是纯小数行("2.000000")且无标签前缀——用「video,/audio, 前缀分流 + 其余纯数字行当时长」解析;分隔符逗号,字段无引号(探测输出字段不含逗号,不处理转义)。
+- 真机全链路验证:lavfi `testsrc` 生成 2 秒 160x120@5 AVI(容器验证用 AVI 对齐需求方场景)→ probe 宽高帧率对 → 提取 8fps 得 9 帧 → 帧源切片首帧 76800 字节;systemprobe 演示板点「载入演示视频」实渲染 testsrc 彩条画面(xdotool 截图确认),状态栏显示「已载入 160x120 × 16 帧(@8fps,循环播放)」。
+- 音画同步:音轨提取 WAV 交 AudioEngine 各自从 0 起播,属近似同步;精确同步需播放时钟对齐,留后续批次。
+
 ### 声明式根容器高度塌陷(mount_window 默认 flex)
 
 - 环境:Ubuntu 24.04 + X11 + XFCE,systemprobe 示例。现象:`mount_window([scroll(vbox(...))])` 打开是空白窗口(纯底色,无内容,进程正常)。
