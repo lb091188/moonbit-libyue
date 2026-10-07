@@ -79,10 +79,14 @@ pub fn hwmon_sensors() -> Array[TempSensor]? {
         None => chip
         Some(t) => {
           let l = t.trim().to_owned()
-          if l == "" { chip } else { l }
+          if l == "" {
+            chip
+          } else {
+            l
+          }
         }
       }
-      out.push({ chip, label, celsius })
+      out.push({ chip, label, celsius, })
     }
   }
   Some(out)
@@ -128,7 +132,9 @@ pub fn DiskInfo::usage(self : DiskInfo) -> Double {
     0.0
   } else {
     ((self.total_bytes - self.avail_bytes).to_double() /
-    self.total_bytes.to_double()).max(0.0).min(1.0)
+    self.total_bytes.to_double())
+    .max(0.0)
+    .min(1.0)
   }
 }
 
@@ -152,12 +158,29 @@ pub fn sector_rate(prev : Int64, cur : Int64, wall_s : Double) -> Double {
 /// 内核伪文件系统集合（statvfs 无容量意义，容量表跳过）。
 fn is_pseudo_fs(fstype : String) -> Bool {
   match fstype {
-    "proc" | "sysfs" | "cgroup" | "cgroup2" | "devpts" | "mqueue" |
-    "hugetlbfs" | "securityfs" | "pstore" | "bpf" | "configfs" | "debugfs" |
-    "tracefs" | "fusectl" | "binfmt_misc" | "autofs" | "rpc_pipefs" |
-    "selinuxfs" | "efivarfs" | "nsfs" | "ramfs" | "fuse.gvfsd-fuse" |
-    "fusectl2" =>
-      true
+    "proc"
+    | "sysfs"
+    | "cgroup"
+    | "cgroup2"
+    | "devpts"
+    | "mqueue"
+    | "hugetlbfs"
+    | "securityfs"
+    | "pstore"
+    | "bpf"
+    | "configfs"
+    | "debugfs"
+    | "tracefs"
+    | "fusectl"
+    | "binfmt_misc"
+    | "autofs"
+    | "rpc_pipefs"
+    | "selinuxfs"
+    | "efivarfs"
+    | "nsfs"
+    | "ramfs"
+    | "fuse.gvfsd-fuse"
+    | "fusectl2" => true
     _ => false
   }
 }
@@ -177,7 +200,7 @@ pub fn parse_mounts(text : String) -> Array[MountInfo] {
     if !device.has_prefix("/dev/") || is_pseudo_fs(fstype) {
       continue
     }
-    out.push({ device, mount: f[1].to_owned(), fstype })
+    out.push({ device, mount: f[1].to_owned(), fstype, })
   }
   out
 }
@@ -245,7 +268,7 @@ pub(all) struct DiskMonitor {
 
 ///|
 pub fn DiskMonitor::new() -> DiskMonitor {
-  { prev: Map([]), prev_wall: 0.0 }
+  { prev: Map([]), prev_wall: 0.0, }
 }
 
 ///|
@@ -265,11 +288,7 @@ pub fn DiskMonitor::tick(self : DiskMonitor) -> Array[DiskInfo]? {
     Some(t) => t
   }
   let wall = ffi_monotonic()
-  let wall_dt = if self.prev_wall > 0.0 {
-    wall - self.prev_wall
-  } else {
-    0.0
-  }
+  let wall_dt = if self.prev_wall > 0.0 { wall - self.prev_wall } else { 0.0 }
   let out : Array[DiskInfo] = []
   let seen : Map[String, Bool] = Map([])
   for m in parse_mounts(mounts_text) {
@@ -351,10 +370,7 @@ fn dm_name_for_mapper(mapper : String) -> String? {
     }
     match read_text_file("/sys/block/\{entry}/dm/name") {
       None => ()
-      Some(t) =>
-        if t.trim().to_owned() == mapper {
-          return Some(entry)
-        }
+      Some(t) => if t.trim().to_owned() == mapper { return Some(entry) }
     }
   }
   None
@@ -603,7 +619,7 @@ pub(all) struct NetMonitor {
 
 ///|
 pub fn NetMonitor::new() -> NetMonitor {
-  { prev: Map([]), prev_wall: 0.0 }
+  { prev: Map([]), prev_wall: 0.0, }
 }
 
 ///|
@@ -614,19 +630,17 @@ pub fn NetMonitor::tick(self : NetMonitor) -> Array[NetInfo]? {
     Some(names) => names
   }
   let wall = ffi_monotonic()
-  let wall_dt = if self.prev_wall > 0.0 {
-    wall - self.prev_wall
-  } else {
-    0.0
-  }
+  let wall_dt = if self.prev_wall > 0.0 { wall - self.prev_wall } else { 0.0 }
   let out : Array[NetInfo] = []
   let cur : Map[String, (Int64, Int64)] = Map([])
   for name in names {
-    let rx = match read_text_file("/sys/class/net/\{name}/statistics/rx_bytes") {
+    let rx = match
+      read_text_file("/sys/class/net/\{name}/statistics/rx_bytes") {
       None => continue
       Some(t) => parse_u64(t.trim()).unwrap_or(0)
     }
-    let tx = match read_text_file("/sys/class/net/\{name}/statistics/tx_bytes") {
+    let tx = match
+      read_text_file("/sys/class/net/\{name}/statistics/tx_bytes") {
       None => continue
       Some(t) => parse_u64(t.trim()).unwrap_or(0)
     }
@@ -639,7 +653,7 @@ pub fn NetMonitor::tick(self : NetMonitor) -> Array[NetInfo]? {
         tx_bps = byte_rate(p.1, tx, wall_dt)
       }
     }
-    out.push({ name, rx_bytes: rx, tx_bytes: tx, rx_bps, tx_bps })
+    out.push({ name, rx_bytes: rx, tx_bytes: tx, rx_bps, tx_bps, })
     cur.set(name, (rx, tx))
   }
   self.prev = cur

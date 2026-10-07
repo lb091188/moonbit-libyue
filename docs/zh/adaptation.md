@@ -69,6 +69,9 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 图表 / 虚拟表格自适应(fill 开关):不设固定宽度,靠列容器默认 stretch 横向铺满,随窗口伸缩。表格 fill 模式下每次绘制按实际宽度重排列几何:固定列保留拖宽结果、弹性列分摊剩余宽度(拖宽两列此消彼长守恒,与弹性列重排不冲突);行内自适应固定坐标(w − 偏移)的自绘行容器本就跟随。
 - 表格表头自绘装饰必须画在表头容器(head)的 `on_draw`,不能画在单元格容器(head_cell)上:GTK 上 libyue Painter 的路径填充(`begin_path` + `fill`)在单个表头单元格(约一列宽 × 32px、内有 Label 子 widget)里完全不渲染——代码跑了、无报错、就是不出像素;同一段代码画在整行表头容器或表格大画布容器上正常。`fill_rect` 与路径描边(`stroke`)在所有尺寸容器都正常,症状极易误判成「坐标算错」。复现方式:同窗口并排画 fill_rect / 路径填充 / 路径描边三块即可定位。修复:table_t / table_v_t 的排序箭头、列边界线、悬停高亮统一收敛到 head 容器单一 `on_draw`,head_cell 只留交互。根因待 fork 层深究(疑似与小容器 GTK draw 区域 / 裁剪有关)。
 - 表头列边界的鼠标事件落点:列边界竖线右侧像素归属下一单元格,对准可见边界按下会落进下一格左缘(触发排序而非拖动)。修复:拖动热区认双向边界(右缘 4px → 边界 (j, j+1),左缘 4px → 边界 (j-1, j)),末列右缘不设把手。
+- Painter 无 dash API:markLine 等虚线一律自绘段模拟(ci_dash_line,6px 实 4px 空),三平台观感一致,不依赖平台 dash 支持。
+- 图表 hover 浮层自绘而不复用基础件(选型依据):Popover 是点击触发、相对视图定位、独立裸窗口,hover 跟随会闪;原生 tooltip 是单行系统样式,不满足多行 + 主题化。故浮层画在图表容器自身 on_draw 内(图表之后绘制即在最上层,无 z-order 问题),位置经 ci_tooltip_pos 钳制在画布内不出界;mouse 可达性经 bar_chart_t/donut_chart_t 同款路径验证。
+- 地图与飞线的投影方案(geo_map_t,选型与实现口径):**等距圆柱投影(equirectangular)**——lon [-180,180] 线性映射到绘制区横向、lat [-90,90] 线性映射到纵向(上北下南),输入先钳制经纬度再算,输出不越过绘制区(geo_project)。没有选墨卡托 / Lambert:墨卡托的 85° 截断与纬度间距放大对中国纬度带不利、纬度外推会发散,Lambert 的双标准纬线又要为每个数据集挑参数,等距圆柱的全部几何都能被单测定点断言(北美 / 中国 / 全球三种典型数据集均可验证)。投影矩形 = 区域环与飞线端点的**合并包围盒**按自身长宽比居中缩进(geo_fit_rect,保形不变形),不用固定矩形:局部地图才不缩成一角,飞线两端落区域外也完整可见;退化轴(同经 / 同纬)给 1° 最小跨度,w/h 非正退化为 0 尺寸。质心用 shoelace 有向面积(|A| 为轴)加面积加权环内点平均(geo_ring_centroid / geo_region_centroid):环可能是 MultiPolygon 拼接的多环,取有向面积绝对值最大的环为主环,凹形(如山东半岛 / 辽宁)比 bbox 中心或首点都稳;angle-free 实现避免椭圆积分近似在细长环上跑偏。区域填充色用主题主色按**区域名 FNV-1a 哈希**做 ±0.06 明度微调(geo_name_hash,哈希取模 13 / 12 归一),同名同色、换主题或缩放不变——不用表格序号:序号随数据顺序变,深浅对比会闪。飞线弧线在**投影后的画布坐标**上算控制点(geo_flight_ctrl 取起终中点 + 方向法向偏移 bend × 起终距),弧的视觉凸量才均匀;直接在经纬度上算控制点,高纬弧会因经度权重而畸变(1° 经度在高纬比低纬短)。贝塞尔采样 geo_flight_points 默认 48 段,首点 from 末点 to(含端点保证箭头方向正确)。地图数据不内置:geojson_parse 复用 vscode_history 的手写 JSON 解析器(vsc_json,纯 MoonBit),只收 FeatureCollection / Feature / 裸 Polygon / MultiPolygon,几何不合规(缺 coordinates、环点数 < 3、坐标含非数值)给 GeoError::BadGeometry;geometry 为 null 的 Feature 合法跳过。
 
 ### 布局几何(Yoga flexbox)
 
@@ -111,6 +114,12 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **vendored 库级联误链(浅克隆)——CI 整排红的根因**(实测闭环):prebuild 的 `_native_dir()` 级联「lib/<平台>/ vendored 优先、build/ 回退」,其新鲜度判定 `_sources_newer` 依赖 git pathspec 提交时间;**actions/checkout 默认 fetch-depth=1 浅克隆下 pathspec 限定的 log 退化成 HEAD 时间,t_shim==t_lib 恒等 → 判定 shim 不比库新 → 恒走 vendored**,而 `ensure_native_lib` 对 vendored 就位直接零编译返回——shim 领先 vendored 出包的新符号(如 view_set_bounds/scroll_refresh_content_size)在 CI 链接全部 undefined,本机完整 clone 走 git 时间比较用 build/ 故不复现。修复:`_native_dir()` 改「**build/ 有 prepare 产物(stamp+库)即最高优先**」(开发/CI 链路的产物按当前 shim 全新编译,恒不旧于 vendored;vendored 只服务无 build/ 的 mooncakes 分发用户),`_sources_newer` 浅克隆恒等/mtime 竞态一律保守回退 build/。教训:**vendored 与 shim 的领先关系是常态**,级联判定宁可重编不可误链旧库。
 - 布局参数收编后 Windows 单行输入垂直居中不再读数值:改纯布局方案——Entry 控件收窄到行高(`entry_ctrl_height`,文字在控件内天然居中),外壳 `justifyContent=center` 垂直居中,任意高度值(含百分比)自动适配;原 entry_vcenter 的「收窄+均分 margin」路径已删。
 - select_t/dropdown_menu 弹层宽度在点击时 `get_bounds(field)` 现取(用户 style 覆盖字段宽后弹层自动跟随);弹层根容器宽高仍须创建期给定(事后 set_style 会被弹层分配时序吞掉,见 GTK 节)。
+
+### 目录枚举与进程内环境变量(shim 的 POSIX / Win32 分支)
+
+- 目录枚举(`yue_mbt_list_dir`,服务 fsx_list_dir;shim 由 prebuild.py 托管编译):POSIX 走 `opendir`/`readdir`(跳过 `.` 与 `..`),Windows 走 `FindFirstFileW`。**不能用 FindFirstFileA**——A 版是 ANSI 代码页,非 ASCII 路径(中文用户目录)全乱码;路径用 `base::SysUTF8ToWide` 转宽字符、拼 `L"\\*"` 模式,子项经 `SysWideToUTF8` 回转。返回扁平 UTF-8 文本、子项名以 '\n' 分行(与本包多字符串返回惯例一致:browser cookie / clipboard get_data 同编码);**子项名本身含 '\n' 的极端文件名会被拆开**,扁平文本编码的已知边界,文档须写明。`ok` 出参区分「空文本是失败」与「空目录」(空目录 ok=1 空文本,合法成功态)。
+- 进程内环境变量(`yue_mbt_setenv` / `yue_mbt_unsetenv`,服务 fsx/envx):POSIX 直接 `setenv`/`unsetenv`;Windows 用 `_putenv_s`,它**恒覆盖**——`overwrite=0` 分支须先 `std::getenv` 探测再决定,否则「已是既有值则保持原值」语义会被静默改掉。删环境变量在 Windows 是 `_putenv_s(name, "")`(卸下该变量,不是置为空串),与 POSIX `unsetenv` 语义对齐;本就不存在也记 ok=1(幂等)。作用范围都是**当前进程**(之后 spawn 的子进程可见),不触碰系统持久配置、不影响父进程。
+- fsx 把这两类薄原语收进一个模块(appfind / browser_history / envx 共用):要点是「只列条目名、不读内容」,修 appfind 的「大体积可执行文件全量读入仅判存在」取舍——之前 appfind 用 read_binary_file 判存在,现在走 fsx_list_dir 查目录条目。
 
 ## Linux
 
@@ -187,6 +196,10 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - NetworkManager 在线状态(B7):State 与 Connectivity 都是顶层属性,Properties.Get 的应答体是单 "v"(内为 u32),与 GetAll 的 a{sv} 不同形状。变化信号两条都订——老式 StateChanged(i) 直带新值,新式 PropertiesChanged(a{sv}) 的 changed 里可能带任一属性;订阅回调在 drain 栈上,只更新缓存与归并通知,严禁 call_sync 重查(首次缓存建在注册动作里,主线程非 drain 栈合法,最坏阻塞 1.5s)。归一口径:State 70/50 且 Connectivity 4/3 为 Online,门户劫持(Connectivity=2)按 Offline(「在线」= 可达互联网)。实测 Ubuntu 24.04:State=70/Connectivity=4 → Online,与 busctl 逐位一致;私有总线降级 Err(NetworkError::Unsupported)。Windows NLM GetConnectivity 位掩码:含 IPV4_INTERNET(0x40)/IPV6_INTERNET(0x400)为 Online,轮询 5s(监听式后置);netlistmgr.h 无需额外链接库。
 - NM StateChanged 信号参数是 Int32(i) 不是 u32(真机踩坑修正):D-Bus 规范里属性 State 是 u、信号 StateChanged 的 state 参数是 i,两者类型不同源;wire 层 i 解码为 VI32,旧实现只匹配 VU32 被静默丢弃——信号照发、回调不触发,面板断开连接/关「启用网络」(State 70→20/10)后 UI 恒显示初始 Online(单测自洽测不出:自造信号体恰好写成 u)。修复:statechanged_of 对 VI32/VU32 双匹配,bool 等其余类型照旧丢弃;Properties.Get 与 PropertiesChanged 里的 State 仍是 u,不动。分发链路本身用无害属性写实测存活(NM 1.46 WwanEnabled 开关,无 WWAN 硬件机器零网络影响,PropertiesChanged 实时到达);信号触发后的 UI 翻转由真机断网/恢复验证。
 - 网络回调登记必须平台分支外统一(真机两级观测定位):on_network_status_change 的派发统一走 net_dispatch 遍历 g_net_cbs,但登记 g_net_cbs.push(cb) 原本只在 Windows 分支——Linux 信号全数到达、缓存逐值更新(State 70→10→20→40→60→70 与 nmcli monitor 逐条一致)而回调零执行,UI 恒显初值;两级探针(traybus nm_on_change 层 + online 派发层)一对比即锁定。修复:push 提到平台分支外,两平台统一登记。同类事件注册(on_suspend_resume/on_power_source_change)是回调闭包直接内嵌、不经全局数组,无此问题;net_dispatch 的去重以注册时回填的 network_status() 为基线,注册后首条同态信号不派发属预期。
+- 通用 D-Bus 调用层(yue/traybus/dbus.mbt,横切地基,媒体/磁盘/蓝牙/传感器/时区五模块共用):在 wire.mbt 的线协议与 bus.mbt 的进程级双连接之上加薄薄一层「任意服务的方法调用 + 属性读写」,六个公开入口 gdbus_call_session / gdbus_call_system / gdbus_get_property_session / gdbus_get_property_system / gdbus_set_property_session / gdbus_set_property_system(连接取进程级单例,没有则现连;同步调用 1.5 秒超时,与总线既有约定一致,应答超时给 gdbus.timeout)。**a{sv} 支持是这层的立项理由**:MPRIS 的 Metadata、udisks 的 GetAll 属性字典都是 a{sv},只支持基本类型的话每个模块都要各自解一遍字典,重复且易错。值模型 GDBusValue 覆盖 GVArray(元素签名, 元素表) / GVDict(a{sv},Map 按插入序序列化) / GVVariant(保持包裹) / GVStruct 四种容器:编码侧 GVArray 的元素签名由调用方给全("s"/"{sv}"/"(ii)" 等完整类型),套 GVStruct 时逐字段拼签名后整体过 parse_signature 预检**不带超时代价**(坏签名在本地就报 gdbus.encode,不用等 1.5s 总线超时);解码侧 `VArray("{sv}")` 折成 GVDict 并拆掉 variant 包裹(终端数据是取值,类别细分无后续编码影响),Byte/16 位整数并入 GVInt32、'g' 签名并入 GVString。参数树递归禁 GVNone(类型签名无从推导),入口先过 gdbus_args_ok 全树扫描。属性读路径的返回值已拆变体包裹(Properties.Get 的应答体恒为单 "v",解开直取内层),写路径的 value 传裸值、variant 包裹在本层完成。错误模型 GDBusError{ name, message }:name 取 D-Bus 错误名原样(UnknownMethod / ServiceUnknown 等),本地错误用 gdbus.io(连不上/已断开)/ gdbus.timeout / gdbus.encode 前缀,调用方按 name 前缀即可分流「服务不在线」与「应答超时」。
+- udisks2(org.freedesktop.UDisks2,系统总线)接口要点:对象枚举走 `/org/freedesktop/UDisks2/Manager` 的 GetBlocks 返回 a{oa{sv}}(设备路径 → 该 block 对象的全部属性字典),每块再按需 Properties.GetAll 补 Filesystem 接口;**挂载点属性(MountPoints)的类型是 aay(字节数组数组)**,不是 as——按字符串数组解析会直接把全部条目变成空串,挂载态永远读不出来,须逐字节数组按 UTF-8 解码。挂载/卸载走 Filesystem 接口的 Mount(options : a{sv})/Unmount(options : a{sv}),第一参 options 可传空 GVDict;应答带挂载点字符串(多挂载点设备可能多个)。udisks2 不在线时 lsblk --json 只做枚举回退(char-typed 字段需 ansi 剔除)。
+- bluez(org.bluez,系统总线)接口要点:对象枚举用 ObjectManager.GetManagedObjects,应答形状 a{oa{sa{sv}}}(路径 → 接口名 → 该接口的属性字典),按接口名 filter 出 Adapter1 / Device1 两摊;Adapter1 的 Powered / Discovering 与 Device1 的 Name / Alias / Paired / Connected / Trusted 都从字典里取。开扫描用 Adapter1.StartDiscovery(空参),配对用 Device1.Pair(空参),连接用 Device1.Connect——三者都是空参方法,应答为空。**无蓝牙适配器是合法状态**:org.bluez 不在线或枚举不到 Adapter1,bt_supported() 给 false、查询类 API 给 Unsupported,不当异常处理。
+- iio-sensor-proxy(net.hadess.SensorProxy,系统总线)接口要点:属性 HasAccelerometer / HasAmbientLight / LightLevel / AccelerometerOrientation 全在同一对象 `/net/hadess/SensorProxy` 的单一接口上(与 udisks / bluez 的多接口多对象不同)。**取值前必须 ClaimLight/ReleaseLight(或 ClaimAccelerometer/ReleaseAccelerometer)**:传感器不点灯时读数停在旧值,取完必须释放,否则别人(如自动亮度)读不到新值。AccelerometerOrientation 的类型是**字符串**(不是枚举整数),取值如 "normal"/"left-up"/"bottom-down"。
 - Windows NLM GetConnectivity 在 UI 线程调用可秒级冻结并连带原生布局断言崩溃(实测 Win10 19045 宿主机,网络环境差时必现):showcase 启动 3.7~4.7s 稳定 abort(0xC0000409 = fast-fail),崩前 stderr 打出 yoga 顶层断言「availableHeight is indefinite so heightMeasureMode must be YGMeasureModeUndefined」;崩率随网络环境 0%~100% 漂移(网络健康时查询毫秒级,与提交时冒烟存活一致,极易误判为代码回归)。定位路径:同一 exe 二分页面(仅系统集成页消失即 0 崩)→ 只禁网络初值查询+回调注册即 10/10 稳 → 预热/延迟查询均无效(查询存在即冻结,与时机无关)。根因:GetConnectivity 慢路径单次可达秒级,注册时的同步初值查询冻结 UI 线程数秒,返回瞬间 yoga 在积压布局上走 ScrollView 内容测量的 GetPreferred* 路径(该路径以 NaN 高度调 YGNodeCalculateLayout,对 height 样式已定义的容器是 fatal)。修复:shim 新增 yue_mbt_netwin_start/netwin_cached——后台 MTA 线程独占 COM 与轮询(interval 默认 5s),结果写进程级缓存,UI 线程只读缓存(network_status 缓存未就绪返回 QueryFailed,on_network_status_change 不再同步回填初值,g_net_last 改 None=未知态、首值必派发)。跨线程 COM 的 apartment 问题因接口指针创建与使用都在同一线程自然消解。验证:moon check 零警告、128 测全过、showcase 冒烟 12/12 存活(修复前同环境 7/10 崩)。
 
 - sysmonitor 实测(Ubuntu 24.04 XFCE X11,口径同篇首性能基准:启动中位、稳态 Rss、release 二进制):启动(exec → 窗口 map)5 轮 77/78/81/82/88ms,中位 81ms(hello 基线 70ms 是空载系统,本次系统载有 1042 进程);稳态进程页前台 1Hz 刷新 CPU 2-3%(采样 + 派生数据 + 千行表格重建 + 重绘合计约 25ms/秒),Rss 84.9MB → 100s 后 85.8MB 走平;二进制 7.72MB(hello 对照 7.03MB)。千行进程页验收达标:1053 进程全量采样 14.94ms/次(release,≈14µs/进程,每进程两次 /proc 读取),1Hz 下采样占空 1.5%。
@@ -212,6 +225,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - /dev/fuse 控制挂载(文件管理器拉起 gvfsd-fuse 后出现,挂载点 /tmp/fuse)statvfs 合法返回但 f_blocks=0:只按 fstype 黑名单过滤伪文件系统不够,须再按 total<=0 过滤,否则磁盘页出现 "0 MB / 0 MB" 噪音行(实测 S5 白盒断言 total>0 也因此挂)。
 - sysmonitor 界面文案纪律(整批界面打磨实测):界面文字只说「是什么 / 怎么用」,不写数据口径与实现路径(如 /proc 路径、两次差值、毫摄氏度换算、"nvidia-smi 后置"这类计划说明);速率 / 容量 / 坐标轴一律多级单位动态换挡(B→K→M→G),数值保持短,大号数值卡(24px)尤其忌换行溢出卡片。
 - sysmonitor 概览页卡片范式对标 Mission Center(资源管理器式):图标 + 标题、规格副标题(CPU 型号 / 总容量 / 挂载点等硬件规格放卡片副标题,不在窗口顶层占副标题行)、当前值行(占用% · 温度、已用 / 总量 · swap 等组合)、卡内迷你曲线(序列末窗 + 末端圆点;值域固定 0-100 或峰值自适应,双序列同窗叠加如网络 rx/tx)。卡片 flex 均分、同排 stretch 等高,随窗口伸缩;单卡自包含,不看窗口其他部分也能读懂。
+- xrandr 输出格式随版本变化(显示器枚举实测):1.5.2 起把刷新率标记('*' 当前 / '+' 首选 / 'i' 隔行)中的 '+' 打成独立 token 且位于被标记刷新率之后(`59.95 +  75.00`,经 xrandr --verbose 证实 59.95 为该 +preferred 模式),旧版直接附着在刷新率尾部(`59.95+`)。mon_fold_marker_tokens 把独立标记 token 回贴到前一 token 尾部统一为附着形态后再解析。
 
 ### 系统能力数据层(音量 / 亮度 / 浏览器历史 / VS Code 历史 / 应用查找)
 
@@ -223,6 +237,37 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 亮度:设置走 logind 的 SetBrightness(系统总线 session/auto 对象,@traybus 层),枚举与当前值走 /sys/class/backlight sysfs 只读——logind 不在线时 set 报 Unsupported 而 devices/get 仍可用;键盘背光在 leds 子系统(设备名形如 `inputN::kbd_backlight`)。sysfs 值文本解析容忍首尾空白与尾换行。
 - 应用查找(appfind):desktop entries 无目录枚举原语,`appfind_installed_with` 由调用方注入列举函数,默认便捷入口因恒空已裁撤(名不副实);`appfind_executable` 命中判定为整文件可读(read_binary_file),大体积可执行文件全量读入仅判存在是已知取舍(修需新增原生 stat 原语,暂不动 shim)。
 - 浏览器历史 / VS Code 历史的真机验证入口:examples/systemprobe 示例(图表 + 系统能力一板),`moon run examples/systemprobe` 点「读取系统能力」按钮逐项呈现五模块真实结果。
+
+#### 影音与桌面控制命令路线(pr_run 统一封装,含 MPRIS 总线回退)
+
+本批命令行类模块全部经 `yue/procrun.mbt` 的 `pr_run`(spawn → 限时回收 → 临时文件捕获 stdout/stderr),不自行 spawn;环境固定 C locale,退出码 0 归一 Ok、非零归一 Err 带 stderr,调用方不再自行判码。**命令缺失的语义**:Unix 下 shell 以退出码 127 呈现,由各模块自己的 `*_supported()` 探测归一为 Unsupported(pp_profiles / prt_default / nl_supported / win_list 各自探测自身命令),调用方按错误值分类,不用文本猜。命令路线与降级链:
+
+| 能力 | 首选路线 | 降级路线 | 探测方式(只读无副作用) |
+|---|---|---|---|
+| 夜间色温 nightlight | `redshift -P -O <K>`(2500K..6500K,一次性设) | `xrandr --output <输出> --gamma R:G:B`(红 0.85..1.00 微提、蓝 1.00..2.20 衰减,绿恒 1.00) | `redshift -V` 退出 0;否则 `xrandr --query` 可用(无已连接输出 → Unsupported,无头环境) |
+| 显示器配置 monitor | `xrandr --query` 全量解析(刷新率厘赫兹整数) | 无(不可用即 Unsupported) | 同上,一条 `--query` 只读探测 |
+| 壁纸 wallpaper | XFCE `xfconf-query -c xfce4-desktop -p /backdrop/.../last-image`(读 / 写) | GNOME `gsettings get/set org.gnome.desktop.background picture-uri`;KDE `qdbus6/qdbus org.kde.plasmashell evaluateScript`(未真机验证) | DE 识别复用 @traybus.detect_desktop(XDG_CURRENT_DESKTOP),未知 DE → UnknownDesktop 带原文 |
+| 窗口管理 windowctl | `wmctrl -l` 列表 / `-i -a <id>` / `-ic <id>` | 无(非 Linux 或 wmctrl 缺失 → Unsupported) | 命令缺失以 127 呈现 → Unsupported |
+| 剪贴板监听 clipboard_watch | `xclip -selection clipboard -o`(只读轮询) | 无 | 同上,读失败(未装 / 选区无文本)静默跳过该拍 |
+| 电源计划 powerprofile | `powerprofilesctl list / get / set` | 无 | 命令缺失 → PpUnsupported;list 输出保留后端序(推荐序在前时即推荐序) |
+| 打印机 printer | `lpstat -p / -d / -o <打印机>` + `lp [-d 打印机] -n 份数 文件` | 无 | lpstat 缺失(未装 CUPS)→ PrtUnsupported |
+| 磁盘卷 disk | udisks2 D-Bus(系统总线) | `lsblk --json`(仅枚举,挂载卸载不可用) | NameHasOwner 或 Manager 调用可达 |
+
+MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置路线。接口要点:播放器实例经会话总线 `org.freedesktop.DBus.ListNames` 应答里过滤 `org.mpris.MediaPlayer2.` 前缀(含 playerctld 代理实例,一并收),对象路径恒 `/org/mpris/MediaPlayer2`,接口 `org.mpris.MediaPlayer2.Player`;播放控制 Play/Pause/PlayPause/Next/Previous/Stop 全为空参方法(应答空),状态读 `org.freedesktop.DBus.Properties.PlaybackStatus` + Metadata 字符串字段 title/artist/album。**总线调用失败才回退 playerctl**(`playerctl --version` 退出 0 判定可用),回退路径用 `-p <player>` 指定实例、读取用 `metadata --format <US>title<US>artist<US>album<US>`(US 分隔符界定,标题含分隔符的场景按首段切分,已知取舍)。探测口径:media_supported 以 ListNames 通为准,总线不可达才看 playerctl。播放控制属设置类,不在探测里触发。
+
+#### Firefox places.sqlite(纯读取,非 WAL 合并)
+
+- places.sqlite 常处 WAL 模式:最新浏览记录还在 places.sqlite-wal / -shm 里,主库文件是旧快照。当前实现只把主库文件字节交给 moonsqlitefile 的 `open_database`,**尚未 WAL 合并,checkpoint 进主库的最新记录读不到**——这是已知边界,文档须写明「读数是读入时刻的主库快照」。补法(未做):moonsqlitefile 另有 `open_wal_database` 可接,需同时把 -wal 文件交给同一 Database。
+- 表与列:`moz_places` 是唯一需要的表,取列 `url`(TEXT,主键为 id 但行解析不依赖)、`title`(TEXT,可为 NULL)、`last_visit_date`(INTEGER,**Unix 纪元微秒**——与 Chrome 的 1601 微秒不同源,ffx_time_to_unix_us 换算毫秒 = us/1000)、`hidden`(INTEGER,非 0 的是书签/收藏条目须滤除,口径同 Chrome)。
+- 行解析按列序取值但**类型不做假设**:url 可能是 Blob(SQLite 动态类型,title/url 理论上都可能是 BLOB 存储),BhValue 各分支都要有兜底(ffx_parse_places_row 对非文本值返回 None 跳过该行)。
+- profile 定位:`~/.mozilla/firefox/profiles.ini` 取 `Path=` 目录名(分节 [Install*]/[Profile*] 都可能有 Path,全部收),缺失时回退固定候选名(default / default-release / default-esr / default-nightly / dev-edition-default)——**随机前缀命名的 profile 目录(如 `a1b2c3d4.default-release`)只有 profiles.ini 收得到**,本包无目录枚举原语时这是硬边界(fsx_list_dir 落地后可扫目录补齐)。
+- 条目类型复用 browser_history 的 `HistoryItem`(字段结构与 Chrome 历史完全一致),排序 / 截断 / 取列也复用 bh_sort_history / bh_take / bh_value_text / bh_value_int,不重造一套。
+- 多 profile 聚合口径与 Chrome 侧一致:同一 url 在不同 profile 各出现一次,不去重(去重反而掩盖「多账号分别在两个 profile」的事实)。
+
+### 系统信息(si_machine / memory / uptime)与系统级安全边界
+
+- /sys/class/dmi/id/product_serial 多数发行版仅 root 可读,读不到给 `Err` 带路径,不用空串糊弄;/proc/meminfo 单位恒 kB,MemAvailable 内核 ≥3.14 才有,缺失回退 MemFree;uptime 是浮点秒直接返回。
+- 传感器(iio-sensor-proxy)取值前必须 ClaimLight/ReleaseLight,不点灯的读数停在旧值;AccelerometerOrientation 的类型是字符串而非枚举整数。
 
 ### 显示协议
 
@@ -342,3 +387,4 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。
 2. 中英两份(本文与 docs/adaptation.md)同批同步。
+3. 影音与桌面控制批次的落点:`影音与桌面控制命令路线`(Linux 系统能力数据层下)、`系统信息与系统级安全边界`、`目录枚举与进程内环境变量`(跨平台通用下)、`通用 D-Bus 调用层`(DBus 线路协议下)、`地图与飞线的投影方案`(自绘画布与图表渲染下);浏览器侧结论进 `Firefox places.sqlite` 小节。

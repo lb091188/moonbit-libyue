@@ -65,7 +65,15 @@ fn draw_net_rows(p : @yue.Painter, w : Double, rows : Array[NetRow]) -> Unit {
       p.set_fill_color(t.fill_zebra)
       p.fill_rect(0.0, y, w, row_h())
     }
-    p.draw_text(n.name, 12.0, y, 130.0, row_h(), valign=Center, color=t.text_regular)
+    p.draw_text(
+      n.name,
+      12.0,
+      y,
+      130.0,
+      row_h(),
+      valign=Center,
+      color=t.text_regular,
+    )
     p.draw_text(
       "累计 ↓\{fmt_bytes(n.rx_bytes)} ↑\{fmt_bytes(n.tx_bytes)}",
       148.0,
@@ -126,7 +134,7 @@ fn draw_net_rows(p : @yue.Painter, w : Double, rows : Array[NetRow]) -> Unit {
 
 ///|
 fn page_net(app : App) -> @yue.Node {
-  let page : NetPage = { rows: @yue.Store::new([]), hist: Map([]) }
+  let page : NetPage = { rows: @yue.Store::new([]), hist: Map([]), }
   page.rebuild(app.nets.get())
   app.nets.subscribe(fn(nets) { page.rebuild(nets) })
   let net_n : @yue.Store[Int] = @yue.Store::new(page.rows.get().length())

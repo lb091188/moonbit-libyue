@@ -124,7 +124,7 @@ test "S4 真实采样：hwmon 传感器(Linux)" {
 test "S6 真实采样：PCI 显示设备枚举(Linux)" {
   match gpu_list() {
     None => () // 非 Linux 宿主跳过
-    Some(gpus) => {
+    Some(gpus) =>
       // 虚拟机可能无显示设备；有条目则字段须完整
       for g in gpus {
         assert_true(g.pci.length() > 0)
@@ -135,7 +135,6 @@ test "S6 真实采样：PCI 显示设备枚举(Linux)" {
           Some(c) => assert_true(c >= -50.0 && c <= 200.0)
         }
       }
-    }
   }
 }
 
