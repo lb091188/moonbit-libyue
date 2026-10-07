@@ -1,8 +1,13 @@
-// 系统音量（默认输出设备）：经 @subproc 调命令行工具读取与设置。
-// wpctl 优先（PipeWire/WirePlumber），不可用时回退 pactl（pipewire-pulse
-// / PulseAudio），两者都不可用即不支持。子进程环境强制 C locale，
-// 输出语言固定可解析。输出解析与命令构造均为纯函数，
-// volume_wbtest.mbt 白盒覆盖。
+// 系统音量（默认输出设备）：经 procrun 的 pr_run 调命令行工具读取与
+// 设置。wpctl 优先（PipeWire/WirePlumber），不可用时回退 pactl（
+// pipewire-pulse / PulseAudio），两者都不可用即不支持。子进程环境由
+// procrun 固定 C locale，输出语言固定可解析。输出解析与命令构造均为
+// 纯函数，volume_wbtest.mbt 白盒覆盖。
+//
+// 文件内含两组 API：vol_ 前缀的第一批能力（默认 sink 的读/设音量/
+// 增减/静音），以及 volx_ 前缀的增强能力（设备枚举、默认设备切换、
+// 逐应用播放流音量）。volx_ 组依赖 pactl（wpctl 无等价的设备枚举与
+// 逐流接口），单独探测门控，不影响 vol_ 组行为。
 
 ///|
 /// 音量快照：默认 sink 名（wpctl 为显示名、pactl 为节点名，取不到为
@@ -307,7 +312,7 @@ fn vol_parse_wpctl_status_sink(status : String) -> String? {
   let mut in_sinks = false
   for line in vol_split_lines(status) {
     match vol_first_char(line) {
-      Some(c) => {
+      Some(c) =>
         if !vol_is_ws(c) {
           // 顶格段落标题切换段落
           if line.has_prefix("Audio") {
@@ -326,7 +331,6 @@ fn vol_parse_wpctl_status_sink(status : String) -> String? {
             return vol_sink_name_from_star_line(line)
           }
         }
-      }
       None => ()
     }
   }
@@ -342,19 +346,15 @@ fn vol_parse_pactl_percent(out : String) -> Int? {
   for tok in vol_split_ws(out) {
     match vol_strip_suffix(tok, '%') {
       None => ()
-      Some(numtxt) => {
+      Some(numtxt) =>
         match vol_parse_uint(numtxt) {
           None => ()
-          Some(v) => {
+          Some(v) =>
             match best {
               None => best = Some(v)
-              Some(b) => if v > b {
-                best = Some(v)
-              }
+              Some(b) => if v > b { best = Some(v) }
             }
-          }
         }
-      }
     }
   }
   best
@@ -434,96 +434,27 @@ fn vol_mute_args(b : VolBackend, mute : Bool) -> Array[String] {
 }
 
 // ---------------------------------------------------------------------------
-// 子进程执行封装（@subproc：spawn → 限时回收 → 读临时文件输出）
+// 子进程执行封装（复用 procrun 的 [pr_run]：spawn → 限时回收 → 读临时
+// 文件输出；非零退出还原为 (退出码, stdout) 供后端探测按退出码分流）
 // ---------------------------------------------------------------------------
 
 ///|
-/// 临时文件名自增序号（与进程 pid 联合保证并发内唯一）。
-let vol_tmp_counter : Ref[Int] = Ref(0)
-
-///|
-/// 临时输出文件路径（$TMPDIR 下，缺省 /tmp）。
-fn vol_tmp_path(tag : String) -> String {
-  vol_tmp_counter.val = vol_tmp_counter.val + 1
-  let dir = match @env.get_env_var("TMPDIR") {
-    Some(d) => if d != "" { d } else { "/tmp" }
-    None => "/tmp"
-  }
-  "\{dir}/yue-vol-\{@subproc.get_pid()}-\{vol_tmp_counter.val}.\{tag}"
-}
-
-///|
-/// 传给音量工具的子进程环境（NUL 分隔的 "K=V" blob）：PATH（命令名
-/// 解析）、XDG_RUNTIME_DIR（PipeWire/Pulse 套接字定位）、HOME，并固定
-/// C locale 使输出语言恒定可解析。
-fn vol_env_blob() -> Bytes {
-  let buf = StringBuilder()
-  for name in ["PATH", "XDG_RUNTIME_DIR", "HOME"] {
-    match @env.get_env_var(name) {
-      Some(v) => {
-        buf.write_string(name)
-        buf.write_char('=')
-        buf.write_string(v)
-        buf.write_char('\u{0}')
-      }
-      None => ()
-    }
-  }
-  buf.write_string("LC_ALL=C")
-  buf.write_char('\u{0}')
-  buf.write_char('\u{0}')
-  @utf8.encode(buf.to_string())
-}
-
-///|
-/// 运行命令并捕获标准输出：spawn（stdout/stderr 重定向到临时文件）→
-/// 限时回收 → 读回输出文本。返回 (退出码, stdout)；spawn 失败 / 超时 /
-/// 被信号终止为 Err，退出码非 0 属正常返回由调用方判断。
+/// 运行命令并捕获标准输出：底层走 [pr_run]，把非零退出还原为
+/// (退出码, stdout) 正常返回——wpctl/pactl 在服务不在线时以非零退出
+/// 呈现属正常分支，由调用方按退出码分流；其余错误映射为 VolumeError。
 fn vol_run_capture(
   prog : String,
   args : Array[String],
   timeout_ms? : Int = 4000,
 ) -> Result[(Int, String), VolumeError] {
-  let out_path = vol_tmp_path("out")
-  let err_path = vol_tmp_path("err")
-  // 多参数以 NUL 分隔拼入 script（spawn 的参数协议）
-  let script = StringBuilder()
-  let mut first = true
-  for a in args {
-    if !first {
-      script.write_char('\u{0}')
-    }
-    script.write_string(a)
-    first = false
+  match pr_run(prog, args, timeout_ms~) {
+    Ok(o) => Ok((o.exit_code, o.stdout))
+    Err(NonZeroExit(code, _)) => Ok((code, ""))
+    Err(Timeout(m)) => Err(CommandFailed(m))
+    Err(SpawnFailed(m)) => Err(CommandFailed(m))
+    Err(Signaled(sig)) => Err(CommandFailed("\{prog}: 被信号 \{sig} 终止"))
+    Err(Unsupported) => Err(CommandFailed("\{prog}: 子进程执行不可用"))
   }
-  let ans : Result[(Int, String), VolumeError] = try {
-    let pid = @subproc.spawn({
-      bun_path: prog,
-      script: script.to_string(),
-      cwd: "/",
-      out_log: out_path,
-      err_log: err_path,
-      env_blob: vol_env_blob(),
-    })
-    match @subproc.wait_child_timeout(pid, timeout_ms) {
-      None => Err(CommandFailed("\{prog}: 超时（\{timeout_ms}ms）"))
-      Some((_, @subproc.Signaled(sig))) => Err(CommandFailed("\{prog}: 被信号 \{sig} 终止"))
-      Some((_, @subproc.Exited(code))) => {
-        let text = match read_text_file(out_path) {
-          Some(t) => t
-          None => ""
-        }
-        Ok((code, text))
-      }
-    }
-  } catch {
-    e => Err(CommandFailed("\{prog}: \{e.to_string()}"))
-  }
-  // 清理临时文件（无论成败）
-  let ok = Ref(0)
-  let _ = ffi_remove_file(utf8_bytes(out_path), ok)
-  let _ = ffi_remove_file(utf8_bytes(err_path), ok)
-  ans
 }
 
 ///|
@@ -577,15 +508,14 @@ fn vol_get_wpctl() -> Result[VolumeInfo, VolumeError] {
         None => Err(ParseFailed("wpctl get-volume: \{vol_trim(out)}"))
         Some((volume, muted)) => {
           let sink = match vol_run_capture("wpctl", ["status"]) {
-            Ok((0, st)) => {
+            Ok((0, st)) =>
               match vol_parse_wpctl_status_sink(st) {
                 Some(name) => name
                 None => ""
               }
-            }
             _ => ""
           }
-          Ok({ sink, volume, muted })
+          Ok({ sink, volume, muted, })
         }
       }
     }
@@ -599,7 +529,8 @@ fn vol_get_pactl() -> Result[VolumeInfo, VolumeError] {
     Ok((0, o)) => vol_trim(o)
     _ => ""
   }
-  let volume = match vol_run_capture("pactl", ["get-sink-volume", "@DEFAULT_SINK@"]) {
+  let volume = match
+    vol_run_capture("pactl", ["get-sink-volume", "@DEFAULT_SINK@"]) {
     Err(e) => return Err(e)
     Ok((code, out)) => {
       if code != 0 {
@@ -607,11 +538,13 @@ fn vol_get_pactl() -> Result[VolumeInfo, VolumeError] {
       }
       match vol_parse_pactl_percent(out) {
         Some(v) => v
-        None => return Err(ParseFailed("pactl get-sink-volume: \{vol_trim(out)}"))
+        None =>
+          return Err(ParseFailed("pactl get-sink-volume: \{vol_trim(out)}"))
       }
     }
   }
-  let muted = match vol_run_capture("pactl", ["get-sink-mute", "@DEFAULT_SINK@"]) {
+  let muted = match
+    vol_run_capture("pactl", ["get-sink-mute", "@DEFAULT_SINK@"]) {
     Err(e) => return Err(e)
     Ok((code, out)) => {
       if code != 0 {
@@ -623,15 +556,12 @@ fn vol_get_pactl() -> Result[VolumeInfo, VolumeError] {
       }
     }
   }
-  Ok({ sink, volume, muted })
+  Ok({ sink, volume, muted, })
 }
 
 ///|
 /// 执行后端命令并按退出码归一结果（0 为成功）。
-fn vol_apply(
-  prog : String,
-  args : Array[String],
-) -> Result[Unit, VolumeError] {
+fn vol_apply(prog : String, args : Array[String]) -> Result[Unit, VolumeError] {
   match vol_run_capture(prog, args) {
     Err(e) => Err(e)
     Ok((0, _)) => Ok(())
@@ -665,4 +595,573 @@ pub fn vol_set_mute(mute : Bool) -> Result[Unit, VolumeError] {
     None => Err(Unsupported)
     Some(b) => vol_apply(vol_prog(b), vol_mute_args(b, mute))
   }
+}
+
+// ---------------------------------------------------------------------------
+// 增强能力：设备枚举 / 默认设备切换 / 逐应用播放流音量（volx_ 前缀）
+// wpctl 不暴露设备枚举与逐流接口，本组固定走 pactl；可用性由
+// [volx_pactl_ready] 单独探测，不依赖也不影响 [vol_backend] 的选择。
+// ---------------------------------------------------------------------------
+
+///|
+/// 音量输出设备：name 为 pactl 节点名（[volx_set_default] 即用它），
+/// description 为人类可读名称（`pactl list sinks` 的 Description，
+/// 取不到为空串），is_default 标注枚举时是否为默认输出设备。
+pub(all) struct AudioDevice {
+  name : String
+  description : String
+  is_default : Bool
+}
+
+///|
+pub impl Show for AudioDevice with fn output(self, logger) {
+  logger.write_string("AudioDevice { name: ")
+  logger.write_string(self.name)
+  logger.write_string(", description: ")
+  logger.write_string(self.description)
+  logger.write_string(", is_default: ")
+  logger.write_string(self.is_default.to_string())
+  logger.write_string(" }")
+}
+
+///|
+pub extend AudioDevice with Show::{to_string, output}
+
+///|
+/// 单个应用的播放流（sink-input）：index 为流序号，[volx_set_app_volume]
+/// 与 [volx_set_app_mute] 以它定位；app_name 取 application.name 属性
+/// （缺省回落 node.name，再缺省 "unknown"）；volume 为该流音量百分比
+/// 0-100（各声道不一致取最响）；muted 为该流是否静音。
+pub(all) struct AppStream {
+  index : Int
+  app_name : String
+  volume : Int
+  muted : Bool
+}
+
+///|
+pub impl Show for AppStream with fn output(self, logger) {
+  logger.write_string("AppStream { index: ")
+  logger.write_string(self.index.to_string())
+  logger.write_string(", app_name: ")
+  logger.write_string(self.app_name)
+  logger.write_string(", volume: ")
+  logger.write_string(self.volume.to_string())
+  logger.write_string(", muted: ")
+  logger.write_string(self.muted.to_string())
+  logger.write_string(" }")
+}
+
+///|
+pub extend AppStream with Show::{to_string, output}
+
+// ---------------------------------------------------------------------------
+// 纯函数层：pactl 列表输出解析 / 命令构造（白盒测试覆盖）
+// ---------------------------------------------------------------------------
+
+///|
+/// 文本是否以指定字符串开头（逐字符比较，键长按字符数计）。
+fn volx_starts_with(s : String, key : String) -> Bool {
+  let ks : Array[Char] = []
+  for ch in key {
+    ks.push(ch)
+  }
+  let ss : Array[Char] = []
+  for ch in s {
+    ss.push(ch)
+  }
+  if ss.length() < ks.length() {
+    return false
+  }
+  for i in 0..<ks.length() {
+    if ss[i] != ks[i] {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// 取 "字段名: 值" 行中字段名（key 含结尾冒号，如 "Volume:"）之后的值
+/// （行文本先 trim，缩进符同样可判；该行不是此字段为 None）。key 自身
+/// 必须以 ':' 结尾，否则一律不中——防 "Volume" 误中 "Volume:" 行。
+fn volx_field(line : String, key : String) -> String? {
+  let keys : Array[Char] = []
+  for ch in key {
+    keys.push(ch)
+  }
+  if keys.length() == 0 || keys[keys.length() - 1] != ':' {
+    return None
+  }
+  let l = vol_trim(line)
+  if !volx_starts_with(l, key) {
+    return None
+  }
+  let chars : Array[Char] = []
+  for ch in l {
+    chars.push(ch)
+  }
+  let buf = StringBuilder()
+  let mut i = keys.length()
+  while i < chars.length() {
+    buf.write_char(chars[i])
+    i = i + 1
+  }
+  Some(vol_trim(buf.to_string()))
+}
+
+///|
+/// 去掉属性值外层包裹的成对引号（`"pacat"` → pacat；无引号原样返回）。
+fn volx_unquote(s : String) -> String {
+  let chars : Array[Char] = []
+  for ch in s {
+    chars.push(ch)
+  }
+  let n = chars.length()
+  if n >= 2 && chars[0] == '"' && chars[n - 1] == '"' {
+    let buf = StringBuilder()
+    let mut i = 1
+    while i < n - 1 {
+      buf.write_char(chars[i])
+      i = i + 1
+    }
+    buf.to_string()
+  } else {
+    s
+  }
+}
+
+///|
+/// 拆 "key = \"value\"" 属性行为 (key, value)（value 去首尾空白与包裹
+/// 引号；行内无 '=' 为 None）。仅用于属性段，Mute:/Volume: 等冒号字段
+/// 不含 '='，不会命中。
+fn volx_kv(line : String) -> (String, String)? {
+  let chars : Array[Char] = []
+  for ch in line {
+    chars.push(ch)
+  }
+  for i in 0..<chars.length() {
+    if chars[i] == '=' {
+      let kb = StringBuilder()
+      let mut j = 0
+      while j < i {
+        kb.write_char(chars[j])
+        j = j + 1
+      }
+      let vb = StringBuilder()
+      let mut k = i + 1
+      while k < chars.length() {
+        vb.write_char(chars[k])
+        k = k + 1
+      }
+      return Some(
+        (vol_trim(kb.to_string()), volx_unquote(vol_trim(vb.to_string()))),
+      )
+    }
+  }
+  None
+}
+
+///|
+/// 取小节标题行里的对象序号（"Sink Input #386" → 386）：认最后一个
+/// '#' 之后的十进制数字，标题用什么语言不关心（C locale 下即 Sink /
+/// Sink Input 标题）。
+fn volx_block_index(line : String) -> Int? {
+  let chars : Array[Char] = []
+  for ch in line {
+    chars.push(ch)
+  }
+  let n = chars.length()
+  let mut at = -1
+  for i in 0..<n {
+    if chars[i] == '#' {
+      at = i
+    }
+  }
+  if at < 0 {
+    return None
+  }
+  let buf = StringBuilder()
+  let mut i = at + 1
+  while i < n {
+    buf.write_char(chars[i])
+    i = i + 1
+  }
+  vol_parse_uint(vol_trim(buf.to_string()))
+}
+
+///|
+/// 是否小节标题行：顶格（首字符非空白）且带对象序号。pactl 的块标题
+/// （"Sink #49" / "Sink Input #386"）顶格输出，字段行与属性行均缩进，
+/// 据此分块可避开属性值里的 '#'（如 "subdevice #0"）。
+fn volx_is_block_head(line : String) -> Bool {
+  match vol_first_char(line) {
+    Some(c) => !vol_is_ws(c) && volx_block_index(line) is Some(_)
+    None => false
+  }
+}
+
+///|
+/// 按小节标题切分列表输出，返回 [(标题行, 小节正文)]（标题已 trim）；
+/// 标题行之前的文本被忽略。
+fn volx_split_blocks(out : String) -> Array[(String, String)] {
+  let blocks : Array[(String, String)] = []
+  let mut head : String? = None
+  let mut body = StringBuilder()
+  for line in vol_split_lines(out) {
+    if volx_is_block_head(line) {
+      match head {
+        Some(h) => blocks.push((h, body.to_string()))
+        None => ()
+      }
+      head = Some(vol_trim(line))
+      body = StringBuilder()
+    } else {
+      match head {
+        Some(_) => {
+          body.write_string(line)
+          body.write_char('\n')
+        }
+        None => ()
+      }
+    }
+  }
+  match head {
+    Some(h) => blocks.push((h, body.to_string()))
+    None => ()
+  }
+  blocks
+}
+
+///|
+/// yes/no 文本 → 布尔（仅认 C locale 的 yes/no，本地化文案为 None）。
+fn volx_yes_no(v : String) -> Bool? {
+  if v == "yes" {
+    Some(true)
+  } else if v == "no" {
+    Some(false)
+  } else {
+    None
+  }
+}
+
+///|
+/// 解析 `pactl list short sinks` 输出：每行
+/// "INDEX\tNAME\tDRIVER\tSAMPLE_SPEC\tSTATE"（Tab 分隔），取 name 构成
+/// 设备；index 只用于确认该行是数据行。description 与 is_default 留空，
+/// 由 [volx_devices] 另行补全。行首不是十进制序号即跳过。
+fn volx_parse_short_sinks(out : String) -> Array[AudioDevice] {
+  let devs : Array[AudioDevice] = []
+  for line in vol_split_lines(out) {
+    let toks = vol_split_ws(line)
+    if toks.length() >= 2 {
+      match vol_parse_uint(toks[0]) {
+        Some(_) =>
+          devs.push({ name: toks[1], description: "", is_default: false, })
+        None => ()
+      }
+    }
+  }
+  devs
+}
+
+///|
+/// 解析 `pactl list sinks` 输出里的 Name / Description 字段对：每个
+/// 小节的 Name 行在 Description 行之前，配成一对即消费（防止属性段的
+/// device.description 等被误配）；没等到 Description 的 Name 不入列。
+fn volx_parse_sink_pairs(out : String) -> Array[(String, String)] {
+  let pairs : Array[(String, String)] = []
+  let mut name : String? = None
+  for line in vol_split_lines(out) {
+    let l = vol_trim(line)
+    match volx_field(l, "Name:") {
+      Some(v) => name = Some(v)
+      None => ()
+    }
+    match name {
+      None => ()
+      Some(n) =>
+        match volx_field(l, "Description:") {
+          Some(v) => {
+            pairs.push((n, v))
+            name = None
+          }
+          None => ()
+        }
+    }
+  }
+  pairs
+}
+
+///|
+/// 在 (name, description) 对里按 name 查描述（取首个非空命中，查不到
+/// 为空串）。
+fn volx_lookup(pairs : Array[(String, String)], name : String) -> String {
+  for p in pairs {
+    if p.0 == name && p.1 != "" {
+      return p.1
+    }
+  }
+  ""
+}
+
+///|
+/// 用 `pactl list sinks` 解析出的字段对补全设备描述（按 name 精确
+/// 匹配；匹配不到留空，其余字段原样保留）。
+fn volx_merge_descriptions(
+  devs : Array[AudioDevice],
+  sinks : String,
+) -> Array[AudioDevice] {
+  let pairs = volx_parse_sink_pairs(sinks)
+  let out : Array[AudioDevice] = []
+  for d in devs {
+    out.push({
+      name: d.name,
+      description: volx_lookup(pairs, d.name),
+      is_default: d.is_default,
+    })
+  }
+  out
+}
+
+///|
+/// 取小节正文里 "Volume:" 行的百分比（复用 [vol_parse_pactl_percent]，
+/// 各声道取最大；无该行或解析失败为 None）。样例（C locale）：
+/// "Volume: front-left: 0 /   0% / -inf dB,   front-right: 0 /   0% / -inf dB"。
+fn volx_block_volume(body : String) -> Int? {
+  for line in vol_split_lines(body) {
+    if volx_field(line, "Volume:") is Some(_) {
+      return vol_parse_pactl_percent(line)
+    }
+  }
+  None
+}
+
+///|
+/// 取小节正文里 "Mute:" 行的布尔值（C locale 认 yes/no，本地化文案
+/// 为 None）。
+fn volx_block_mute(body : String) -> Bool? {
+  for line in vol_split_lines(body) {
+    match volx_field(line, "Mute:") {
+      Some(v) =>
+        match volx_yes_no(v) {
+          Some(m) => return Some(m)
+          None => ()
+        }
+      None => ()
+    }
+  }
+  None
+}
+
+///|
+/// 取小节正文里属性段 "key = \"value\"" 行中 key 的值（相同 key 多处
+/// 出现取首个；找不到为 None）。样例：application.name = "pacat"。
+fn volx_block_prop(body : String, key : String) -> String? {
+  for line in vol_split_lines(body) {
+    match volx_kv(vol_trim(line)) {
+      Some((k, v)) => if k == key { return Some(v) }
+      None => ()
+    }
+  }
+  None
+}
+
+///|
+/// 解析 `pactl list sink-inputs` 输出为逐应用播放流列表：小节标题
+/// "Sink Input #386" 给 index，正文取 Mute:/Volume: 与应用属性。
+/// volume 解析不到记 0、muted 解析不到记 false；app_name 取
+/// application.name，缺省回落 node.name，再缺省 "unknown"。
+fn volx_parse_sink_inputs(out : String) -> Array[AppStream] {
+  let streams : Array[AppStream] = []
+  for blk in volx_split_blocks(out) {
+    match volx_block_index(blk.0) {
+      None => ()
+      Some(index) => {
+        let vol = match volx_block_volume(blk.1) {
+          Some(v) => v
+          None => 0
+        }
+        let muted = match volx_block_mute(blk.1) {
+          Some(m) => m
+          None => false
+        }
+        let app = match volx_block_prop(blk.1, "application.name") {
+          Some(n) => n
+          None =>
+            match volx_block_prop(blk.1, "node.name") {
+              Some(n) => n
+              None => "unknown"
+            }
+        }
+        streams.push({ index, app_name: app, volume: vol, muted, })
+      }
+    }
+  }
+  streams
+}
+
+// ---------------------------------------------------------------------------
+// 命令构造（pactl 专线：设备与逐流操作只有一套语法）
+// ---------------------------------------------------------------------------
+
+///|
+/// 切换默认输出设备的参数表（pactl set-default-sink <name>）。
+fn volx_set_default_args(name : String) -> Array[String] {
+  ["set-default-sink", name]
+}
+
+///|
+/// 设单个播放流音量的参数表（入参钳 0..100 后转 "N%"）。
+fn volx_set_app_volume_args(index : Int, percent : Int) -> Array[String] {
+  ["set-sink-input-volume", index.to_string(), "\{vol_clamp_percent(percent)}%"]
+}
+
+///|
+/// 设单个播放流静音的参数表（1 静音、0 取消）。
+fn volx_set_app_mute_args(index : Int, mute : Bool) -> Array[String] {
+  let flag = if mute { "1" } else { "0" }
+  ["set-sink-input-mute", index.to_string(), flag]
+}
+
+// ---------------------------------------------------------------------------
+// pactl 执行封装（可用性探测 / 只读查询 / 写操作）
+// ---------------------------------------------------------------------------
+
+///|
+/// pactl 是否可用（命令存在且 pipewire-pulse / PulseAudio 服务在线）：
+/// 只读跑 `pactl info`，退出码 0 即可用。volx_ 组接口先过这道门。
+fn volx_pactl_ready() -> Bool {
+  match vol_run_capture("pactl", ["info"]) {
+    Ok((0, _)) => true
+    _ => false
+  }
+}
+
+///|
+/// 跑 pactl 命令并取 stdout（调用方需先过 [volx_pactl_ready] 门）：
+/// 退出码 0 成功，非零为 CommandFailed，spawn 失败 / 超时 / 被信号
+/// 终止按 [VolumeError] 映射。
+fn volx_capture(args : Array[String]) -> Result[String, VolumeError] {
+  match vol_run_capture("pactl", args) {
+    Err(e) => Err(e)
+    Ok((0, out)) => Ok(out)
+    Ok((code, _)) => Err(CommandFailed("pactl \{args[0]}: 退出码 \{code}"))
+  }
+}
+
+///|
+/// 执行写操作 pactl 命令（忽略 stdout，退出码 0 为 Ok）。
+fn volx_apply(args : Array[String]) -> Result[Unit, VolumeError] {
+  match volx_capture(args) {
+    Ok(_) => Ok(())
+    Err(e) => Err(e)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 公开 API（volx_ 组：设备枚举 / 默认设备切换 / 逐应用播放流）
+// ---------------------------------------------------------------------------
+
+///|
+/// 枚举音量输出设备：`pactl list short sinks` 取名、`pactl list sinks`
+/// 补人类可读描述、`pactl get-default-sink` 标默认设备。无 pactl 或
+/// 服务不在线为 Unsupported；空列表 = 服务在线但无输出设备。描述与
+/// 默认标记是次要信息，取不到时分别留空 / 不标，不影响 name。
+pub fn volx_devices() -> Result[Array[AudioDevice], VolumeError] {
+  if !volx_pactl_ready() {
+    return Err(Unsupported)
+  }
+  match volx_capture(["list", "short", "sinks"]) {
+    Err(e) => Err(e)
+    Ok(list) => {
+      let base = volx_parse_short_sinks(list)
+      let named = match volx_capture(["list", "sinks"]) {
+        Ok(sinks) => volx_merge_descriptions(base, sinks)
+        Err(_) => base
+      }
+      match volx_capture(["get-default-sink"]) {
+        Ok(cur) => {
+          let def = vol_trim(cur)
+          let out : Array[AudioDevice] = []
+          for d in named {
+            out.push({
+              name: d.name,
+              description: d.description,
+              is_default: d.name == def,
+            })
+          }
+          Ok(out)
+        }
+        Err(_) => Ok(named)
+      }
+    }
+  }
+}
+
+///|
+/// 切换默认输出设备（pactl set-default-sink <name>，name 取
+/// [volx_devices] 枚举出的 AudioDevice.name）。设备名为空为
+/// CommandFailed；无 pactl 或服务不在线为 Unsupported。
+pub fn volx_set_default(name : String) -> Result[Unit, VolumeError] {
+  if !volx_pactl_ready() {
+    return Err(Unsupported)
+  }
+  if name == "" {
+    return Err(CommandFailed("pactl set-default-sink: 设备名为空"))
+  }
+  volx_apply(volx_set_default_args(name))
+}
+
+///|
+/// 枚举逐应用播放流（`pactl list sink-inputs`）：index 供
+/// [volx_set_app_volume] / [volx_set_app_mute] 定位，app_name 取
+/// application.name 属性。无播放流返回空列表；无 pactl 或服务不在线为
+/// Unsupported。
+pub fn volx_app_streams() -> Result[Array[AppStream], VolumeError] {
+  if !volx_pactl_ready() {
+    return Err(Unsupported)
+  }
+  match volx_capture(["list", "sink-inputs"]) {
+    Err(e) => Err(e)
+    Ok(out) => Ok(volx_parse_sink_inputs(out))
+  }
+}
+
+///|
+/// 设单个应用播放流的音量（0-100，出界钳制；pactl set-sink-input-volume
+/// <index> <N%>）。index 取 [volx_app_streams] 枚举出的
+/// AppStream.index，负序号为 CommandFailed；无 pactl 或服务不在线为
+/// Unsupported。
+pub fn volx_set_app_volume(
+  index : Int,
+  percent : Int,
+) -> Result[Unit, VolumeError] {
+  if !volx_pactl_ready() {
+    return Err(Unsupported)
+  }
+  if index < 0 {
+    return Err(
+      CommandFailed(
+        "pactl set-sink-input-volume: 流序号非法（\{index}）",
+      ),
+    )
+  }
+  volx_apply(volx_set_app_volume_args(index, percent))
+}
+
+///|
+/// 设 / 取消单个应用播放流的静音（pactl set-sink-input-mute <index>
+/// <1|0>）。index 语义同 [volx_set_app_volume]，负序号为
+/// CommandFailed；无 pactl 或服务不在线为 Unsupported。
+pub fn volx_set_app_mute(index : Int, mute : Bool) -> Result[Unit, VolumeError] {
+  if !volx_pactl_ready() {
+    return Err(Unsupported)
+  }
+  if index < 0 {
+    return Err(
+      CommandFailed("pactl set-sink-input-mute: 流序号非法（\{index}）"),
+    )
+  }
+  volx_apply(volx_set_app_mute_args(index, mute))
 }
