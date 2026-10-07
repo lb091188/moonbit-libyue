@@ -256,6 +256,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置路线。接口要点:播放器实例经会话总线 `org.freedesktop.DBus.ListNames` 应答里过滤 `org.mpris.MediaPlayer2.` 前缀(含 playerctld 代理实例,一并收),对象路径恒 `/org/mpris/MediaPlayer2`,接口 `org.mpris.MediaPlayer2.Player`;播放控制 Play/Pause/PlayPause/Next/Previous/Stop 全为空参方法(应答空),状态读 `org.freedesktop.DBus.Properties.PlaybackStatus` + Metadata 字符串字段 title/artist/album。**总线调用失败才回退 playerctl**(`playerctl --version` 退出 0 判定可用),回退路径用 `-p <player>` 指定实例、读取用 `metadata --format <US>title<US>artist<US>album<US>`(US 分隔符界定,标题含分隔符的场景按首段切分,已知取舍)。探测口径:media_supported 以 ListNames 通为准,总线不可达才看 playerctl。播放控制属设置类,不在探测里触发。
 
+#### 媒体状态监视(MPRIS 轮询增量)与通知进度(正文字符条)
+
+- 环境:Ubuntu 24.04 + XFCE + PipeWire(pipewire-pulse)。MPRIS 的 org.freedesktop.DBus.PropertiesChanged 信号可订阅,但订阅需要常驻读循环,与本库「同步请求-回复 socket 事务 + set_timer」的调用模型不兼容(通用 D-Bus 层 gdbus_call 是同步往返,无异步读线程)。故 media_watch_status 走轮询增量:默认 1000ms 读一次 PlaybackStatus + Metadata,播放态 / 标题 / 艺术家 / 专辑任一变化即 on_change;首轮只建基线不触发;查询失败(总线错误 / playerctld 掉线)的轮次静默跳过不影响后续。
+- 目标解析:player 参数为空时每轮重试解析首个播放器实例(media_players 失败即跳过本轮),实例出现后锁定;播放中切换播放器不会自动跟随,使用文档已写明。
+- 停止语义:set_timer 无取消句柄(只能让回调返回 false),句柄持 Ref[Bool],media_watch_stop 置 false 后下一帧注销,不可恢复——复用 charts_effectscatter 的 EffAnim 同一模式。已知取舍:on_change 回调抛异常会中断该定时器(无 try/catch 保护是 MoonBit unused_try 检查的取舍),文档已注明。
+- 真机冒烟:本机无 MPRIS 播放器,watch 启动后立即 stop,on_change 触发 0 次且全程无异常(media_wbtest.mbt 冒烟用例,12/12 通过)。
+- 通知进度:freedesktop 通知协议无进度字段(Windows / macOS 原生进度呈现也各自为政),跨平台一致做法是正文内字符条 + 百分比。notification_progress_text 把 percent 钳到 [0,100],NaN 经 percent!=percent 检测按 0 处理,width<=0 只给百分比,格数四舍五入(+0.5 后 to_int);Notification::set_progress 正文=原文字 + 换行 + 进度行。
+
 #### Firefox places.sqlite(纯读取,非 WAL 合并)
 
 - places.sqlite 常处 WAL 模式:最新浏览记录还在 places.sqlite-wal / -shm 里,主库文件是旧快照。当前实现只把主库文件字节交给 moonsqlitefile 的 `open_database`,**尚未 WAL 合并,checkpoint 进主库的最新记录读不到**——这是已知边界,文档须写明「读数是读入时刻的主库快照」。补法(未做):moonsqlitefile 另有 `open_wal_database` 可接,需同时把 -wal 文件交给同一 Database。

@@ -609,3 +609,99 @@ pub fn media_previous(player : String) -> Result[Unit, MediaError] {
 pub fn media_stop(player : String) -> Result[Unit, MediaError] {
   media_control(player, MediaCmdStop)
 }
+
+// ---------------------------------------------------------------------------
+// 媒体状态监视（轮询 PlaybackStatus 与元数据的增量变化）
+// ---------------------------------------------------------------------------
+
+///|
+/// 媒体状态监视句柄：句柄持定时器开关，停止后下一帧轮询回调返回 false
+/// 即注销定时器。同一句柄可多处持有，任意一处 stop 即全局停。
+pub(all) struct MediaWatcher {
+  running : Ref[Bool]
+}
+
+///|
+/// 建监视句柄（默认运行中；传给 media_watch_status 后即开始轮询）。
+pub fn MediaWatcher::make() -> MediaWatcher {
+  { running: Ref(true), }
+}
+
+///|
+/// 句柄当前是否在监视（定时器存活）。
+pub fn MediaWatcher::is_running(self : MediaWatcher) -> Bool {
+  self.running.val
+}
+
+///|
+/// 停止监视（下一帧轮询回调返回 false 即注销定时器）。停止不可恢复，
+/// 恢复请用新句柄重新调用 media_watch_status。
+pub fn media_watch_stop(w : MediaWatcher) -> Unit {
+  w.running.val = false
+}
+
+///|
+/// 两份状态快照是否有变化（播放态、标题、艺术家、专辑任一不同即变化）。
+pub fn media_status_changed(old : MediaStatus, new : MediaStatus) -> Bool {
+  old.playback.to_string() != new.playback.to_string() ||
+  old.title != new.title ||
+  old.artist != new.artist ||
+  old.album != new.album
+}
+
+///|
+/// 解析监视目标（player 非空即用；为空取当前首个 MPRIS 实例总线名）。
+fn media_watch_resolve(player : String) -> String? {
+  if player != "" {
+    Some(player)
+  } else {
+    match media_players() {
+      Ok(players) => if players.is_empty() { None } else { Some(players[0].name) }
+      Err(_) => None
+    }
+  }
+}
+
+///|
+/// 轮询监视某播放器（空 player 监视首个实例；interval_ms 轮询间隔，
+/// 默认 1000ms）。播放态 / 标题 / 艺术家 / 专辑任一变化时触发
+/// on_change（首次轮询不触发，只建立基线）。播放器未出现前每轮重试
+/// 解析目标，出现后锁定。目标解析或查询失败的轮次静默跳过，不影响
+/// 后续轮询。不需要监视时 media_watch_stop 停止句柄。
+pub fn media_watch_status(
+  player? : String = "",
+  interval_ms? : Int = 1000,
+  on_change : (MediaStatus) -> Unit,
+) -> MediaWatcher {
+  let w = MediaWatcher::make()
+  let mut target : String? = None
+  let mut last : MediaStatus? = None
+  set_timer(interval_ms, fn() {
+    if !w.running.val {
+      false
+    } else {
+      if target is None {
+        target = media_watch_resolve(player)
+      }
+      match target {
+        None => ()
+        Some(name) =>
+          match media_status(name) {
+            Err(_) => ()
+            Ok(st) => {
+              let changed = match last {
+                None => false
+                Some(prev) => media_status_changed(prev, st)
+              }
+              last = Some(st)
+              if changed {
+                on_change(st)
+              }
+            }
+          }
+      }
+      true
+    }
+  })
+  w
+}
