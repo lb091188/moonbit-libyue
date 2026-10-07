@@ -17,6 +17,7 @@ repository = "https://github.com/lb091188/moonbit-libyue"
 import {
   "prowk/moonsqlitefile@0.8.0",
   "chensuiyi/subproc@0.3.0",
+  "CorvusCinereus/miniaudio@0.4.0",
 }
 
 options(

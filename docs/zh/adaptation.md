@@ -256,6 +256,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置路线。接口要点:播放器实例经会话总线 `org.freedesktop.DBus.ListNames` 应答里过滤 `org.mpris.MediaPlayer2.` 前缀(含 playerctld 代理实例,一并收),对象路径恒 `/org/mpris/MediaPlayer2`,接口 `org.mpris.MediaPlayer2.Player`;播放控制 Play/Pause/PlayPause/Next/Previous/Stop 全为空参方法(应答空),状态读 `org.freedesktop.DBus.Properties.PlaybackStatus` + Metadata 字符串字段 title/artist/album。**总线调用失败才回退 playerctl**(`playerctl --version` 退出 0 判定可用),回退路径用 `-p <player>` 指定实例、读取用 `metadata --format <US>title<US>artist<US>album<US>`(US 分隔符界定,标题含分隔符的场景按首段切分,已知取舍)。探测口径:media_supported 以 ListNames 通为准,总线不可达才看 playerctl。播放控制属设置类,不在探测里触发。
 
+#### 音频与视频(FRAME → draw_image 渲染路线)
+
+- 音频:集成 `CorvusCinereus/miniaudio@0.4.0`(miniaudio 的 MoonBit 封装,产物体积小、ABI 面=引擎+剪辑两组)。链接验证:同样本 prebuild.py 托管体系,moon add 后 moon build 全仓通过,与 subproc/moonsqlitefile 的 native stub 共存无冲突;该包自身 moonbuild 无 supported_targets 声明(第三方包的告警,非本项目问题)。headless 真机冒烟(本机 XFCE + PipeWire):引擎可建、`/usr/share/sounds/alsa/Front_Center.wav` 可加载、volume 读写在 0.5 附近成立;播放/停止属设置类未在测试执行。
+- 视频画面渲染路线:**libyue 的 Image 没有裸像素构造入口**(查证 vendor/libyue/include/nativeui/gfx/image.h:构造只有 Image(NativeImage, scale_factor) / Image(FilePath) / Image(Buffer, scale_factor),其中 Buffer 只吃 PNG/JPEG 编码),Canvas/Painter 也无像素写接口。故视频帧走「帧源回调 → pngr_encode_rgba 内存 PNG 编码 → Image::new_from_png 解码 → draw_image 铺满」。PNG 编码为纯 MoonBit(签名/IHDR/IDAT/IEND + CRC32 + Adler32 + zlib stored 块,CR 表与累计全程 Int64 运算——MoonBit Int 的 >> 是算术右移,反射表需要逻辑右移,Int64 非负值的 >> 即 32 位逻辑右移)。
+- **PTREF**:headless 测试环境(moon test)里 Image::new_from_png / new_from_file 一律返回空图——无 GUI 上下文(GTK 未初始化)时 libyue 解码恒失败,实测本机真实 PNG(`/usr/share/icons/hicolor/48x48/apps/*.png`)同样 is_empty=true。因此 PNG 编码器的 wbtest 全部为字节级自校验(魔数/IHDR 字段/IDAT stored 块数/总长自洽/adler 尾部),Image 真机解码验证改由 systemprobe 示例承担。
+- 视频组件与解码器解耦:VideoFrameSource 回调(帧号→RGBA)注入,moonav1(纯 MoonBit AV1 解码器,mooncakes)作为下一批帧源实现接入;H.264 需 ffmpeg,暂无 MoonBit 绑定,留待需要。
+- 帧推进用 @yue.set_timer(无取消句柄,句柄持 Ref 开关,停止后回调返回 false 注销,复用 charts_effectscatter 的 EffAnim 模式);set_progress/媒体轮询同款模式。
+
 #### 媒体状态监视(MPRIS 轮询增量)与通知进度(正文字符条)
 
 - 环境:Ubuntu 24.04 + XFCE + PipeWire(pipewire-pulse)。MPRIS 的 org.freedesktop.DBus.PropertiesChanged 信号可订阅,但订阅需要常驻读循环,与本库「同步请求-回复 socket 事务 + set_timer」的调用模型不兼容(通用 D-Bus 层 gdbus_call 是同步往返,无异步读线程)。故 media_watch_status 走轮询增量:默认 1000ms 读一次 PlaybackStatus + Metadata,播放态 / 标题 / 艺术家 / 专辑任一变化即 on_change;首轮只建基线不触发;查询失败(总线错误 / playerctld 掉线)的轮次静默跳过不影响后续。
