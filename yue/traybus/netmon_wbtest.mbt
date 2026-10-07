@@ -34,7 +34,9 @@ test "NM StateChanged 信号按真实签名 Int32(i) 解码,u 兜底" {
   // 旧实现只匹配 VU32,i 被静默丢弃,断网(State 70→20/10)后 UI 恒
   // Online 即此因
   let cases : Array[(String, DVal, String)] = [
-    ("i", VI32(20), "20"), ("i", VI32(70), "70"), ("u", VU32(10), "10"),
+    ("i", VI32(20), "20"),
+    ("i", VI32(70), "70"),
+    ("u", VU32(10), "10"),
   ]
   for c in cases {
     match
@@ -91,19 +93,21 @@ test "PropertiesChanged changed 字典提取 State/Connectivity(u32 variant)" {
       "org.freedesktop.DBus.Properties",
       "PropertiesChanged",
       "sa{sv}as",
-      [
-        VString("org.freedesktop.NetworkManager"),
-        changed,
-        VArray("s", []),
-      ],
+      [VString("org.freedesktop.NetworkManager"), changed, VArray("s", [])],
     ) {
     Ok(bytes) =>
       match parse_message(bytes[:]) {
         Some(m) => {
           inspect(m.path, content="/org/freedesktop/NetworkManager")
           inspect(changed_u32(m.body, "State") is Some(20), content="true")
-          inspect(changed_u32(m.body, "Connectivity") is Some(1), content="true")
-          inspect(changed_u32(m.body, "NetworkingEnabled") is None, content="true")
+          inspect(
+            changed_u32(m.body, "Connectivity") is Some(1),
+            content="true",
+          )
+          inspect(
+            changed_u32(m.body, "NetworkingEnabled") is None,
+            content="true",
+          )
         }
         None => inspect("解析失败", content="应可解析")
       }

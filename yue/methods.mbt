@@ -219,7 +219,11 @@ pub fn Scroll::get_max_scroll_position_y(self : Scroll) -> Double {
 pub fn Scroll::on_scroll(self : Scroll, callback : () -> Bool) -> Unit {
   let wrapped : () -> Int = fn() { if callback() { 1 } else { 0 } }
   keep_alive(fn() { ignore(wrapped) })
-  ffi_scroll_on_scroll(ViewLike::view(self), fn(f : () -> Int) -> Int { f() }, wrapped)
+  ffi_scroll_on_scroll(
+    ViewLike::view(self),
+    fn(f : () -> Int) -> Int { f() },
+    wrapped,
+  )
 }
 
 ///|
@@ -299,7 +303,14 @@ pub fn Clipboard::on_change(self : Clipboard, callback : () -> Unit) -> Unit {
 ///|
 /// 启用多选(Linux/Windows)。
 pub fn Table::enable_multiple_selection(self : Table, enable : Bool) -> Unit {
-  ffi_table_enable_multiple_selection(ViewLike::view(self), if enable { 1 } else { 0 })
+  ffi_table_enable_multiple_selection(
+    ViewLike::view(self),
+    if enable {
+      1
+    } else {
+      0
+    },
+  )
 }
 
 ///|
@@ -487,7 +498,14 @@ pub fn get_app_id() -> String {
 ///|
 /// 设置 GIF 动画开关。
 pub fn GifPlayer::set_animating(self : GifPlayer, animating : Bool) -> Unit {
-  ffi_gif_player_set_animating(ViewLike::view(self), if animating { 1 } else { 0 })
+  ffi_gif_player_set_animating(
+    ViewLike::view(self),
+    if animating {
+      1
+    } else {
+      0
+    },
+  )
 }
 
 ///|

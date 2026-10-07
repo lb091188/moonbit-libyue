@@ -26,11 +26,7 @@
 
 ///|
 /// 点是否在矩形内(含边界)。
-pub fn rect_contains(
-  b : RectF,
-  px : Double,
-  py : Double,
-) -> Bool {
+pub fn rect_contains(b : RectF, px : Double, py : Double) -> Bool {
   px >= b.x && px <= b.x + b.width && py >= b.y && py <= b.y + b.height
 }
 
@@ -69,9 +65,7 @@ fn hover_tick() -> Unit {
   let px = cursor_screen_x()
   let py = cursor_screen_y()
   for e in g_hover_entries {
-    (e.apply)(
-      rect_contains(ViewLike::get_bounds_in_screen(e.host), px, py),
-    )
+    (e.apply)(rect_contains(ViewLike::get_bounds_in_screen(e.host), px, py))
   }
   for e in g_cursor_entries {
     let inside = rect_contains(ViewLike::get_bounds_in_screen(e.host), px, py)
@@ -79,7 +73,11 @@ fn hover_tick() -> Unit {
       e.active.val = inside
       ffi_view_set_cursor_deep(
         ViewLike::view(e.host),
-        if inside { e.cursor } else { Cursor::new(Default) },
+        if inside {
+          e.cursor
+        } else {
+          Cursor::new(Default)
+        },
       )
     }
   }
@@ -131,7 +129,11 @@ pub fn hover_group(
       }
       host.on_draw(fn(p) {
         let bg = if hover.val {
-          if hover_bg != "" { hover_bg } else { theme_fill_hover() }
+          if hover_bg != "" {
+            hover_bg
+          } else {
+            theme_fill_hover()
+          }
         } else {
           base_bg
         }
@@ -145,11 +147,9 @@ pub fn hover_group(
           }
         }
       })
-      hover_register({ host, apply: set })
+      hover_register({ host, apply: set, })
       // enter 仅加速:host 自身空白区命中时立即置真(下一拍全局确认)
-      ViewLike::on_mouse_enter(host, fn(_e) {
-        set(true)
-      })
+      ViewLike::on_mouse_enter(host, fn(_e) { set(true) })
       ViewLike::view(host)
     },
   }
@@ -169,7 +169,7 @@ pub fn cursor_group(
       let host = themed_container(style~)
       attach(parent, ViewLike::view(host))
       ignore((child.mount)(ViewLike::view(host)))
-      cursor_register({ host, cursor, active: Ref(false) })
+      cursor_register({ host, cursor, active: Ref(false), })
       ViewLike::view(host)
     },
   }

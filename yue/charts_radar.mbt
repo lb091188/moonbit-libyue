@@ -41,10 +41,7 @@ pub(all) struct RadarSeries {
 
 ///|
 /// 建雷达图系列。
-pub fn RadarSeries::make(
-  name : String,
-  values : Array[Double],
-) -> RadarSeries {
+pub fn RadarSeries::make(name : String, values : Array[Double]) -> RadarSeries {
   { name, values, }
 }
 
@@ -98,11 +95,7 @@ pub fn radar_norm(v : Double, max : Double) -> Double {
 
 ///|
 /// 值 → 半径：归一分数 × 满半径（0..r_max）。
-pub fn radar_map_radius(
-  v : Double,
-  max : Double,
-  r_max : Double,
-) -> Double {
+pub fn radar_map_radius(v : Double, max : Double, r_max : Double) -> Double {
   radar_norm(v, max) * r_max
 }
 
@@ -200,13 +193,19 @@ fn radar_draw_chart(
     at.set_font(Font::new("Sans", 13.0))
     at.set_color(theme_text_secondary())
     let tw = at.get_bounds_for(400.0, 40.0).width
-    p.draw_attributed_text(at, w / 2.0 - tw / 2.0, h / 2.0 - 10.0, tw + 4.0, 20.0)
+    p.draw_attributed_text(
+      at,
+      w / 2.0 - tw / 2.0,
+      h / 2.0 - 10.0,
+      tw + 4.0,
+      20.0,
+    )
     return
   }
   let layers = if rings < 1 { 1 } else { rings }
   // 网格：layers 层同心 N 边形
   p.set_stroke_color(theme_border())
-  for k in 1..=layers {
+  for k in 1..<=layers {
     radar_stroke_polygon(
       p,
       radar_polygon(cx, cy, r_max * k.to_double() / layers.to_double(), n),
@@ -304,7 +303,7 @@ pub fn radar_chart_t(
   show_legend? : Bool = true,
   fill? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {

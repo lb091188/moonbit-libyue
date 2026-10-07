@@ -160,11 +160,7 @@ pub fn rgb_to_hsl(r : Int, g : Int, b : Int) -> (Double, Double, Double) {
     (0.0, 0.0, l)
   } else {
     let d = mx - mn
-    let s = if l > 0.5 {
-      d / (2.0 - mx - mn)
-    } else {
-      d / (mx + mn)
-    }
+    let s = if l > 0.5 { d / (2.0 - mx - mn) } else { d / (mx + mn) }
     let h6 = if mx == rf {
       (gf - bf) / d + (if gf < bf { 6.0 } else { 0.0 })
     } else if mx == gf {
@@ -179,26 +175,14 @@ pub fn rgb_to_hsl(r : Int, g : Int, b : Int) -> (Double, Double, Double) {
 ///|
 /// HSL(h 0..360,s 0..1,l 0..1)→ RGB(0..255)。
 pub fn hsl_to_rgb(h : Double, s : Double, l : Double) -> (Int, Int, Int) {
-  let ss = if s < 0.0 {
-    0.0
-  } else if s > 1.0 {
-    1.0
-  } else {
-    s
-  }
-  let ll = if l < 0.0 {
-    0.0
-  } else if l > 1.0 {
-    1.0
-  } else {
-    l
-  }
+  let ss = if s < 0.0 { 0.0 } else if s > 1.0 { 1.0 } else { s }
+  let ll = if l < 0.0 { 0.0 } else if l > 1.0 { 1.0 } else { l }
   let mut hh = h % 360.0
   if hh < 0.0 {
     hh = hh + 360.0
   }
   let c = (1.0 - (2.0 * ll - 1.0).abs()) * ss
-  let x = c * (1.0 - ((hh / 60.0) % 2.0 - 1.0).abs())
+  let x = c * (1.0 - (hh / 60.0 % 2.0 - 1.0).abs())
   let m = ll - c / 2.0
   let (r1, g1, b1) = if hh < 60.0 {
     (c, x, 0.0)
@@ -231,19 +215,19 @@ pub fn from_hsl(h : Double, s : Double, l : Double) -> String {
 /// 两色线性混色:t 为取 a 的比例(0..1),其余取 b;任一输入非法时
 /// 原样返回 a。
 pub fn mix_hex(a : String, b : String, t : Double) -> String {
-  let tt = if t < 0.0 {
-    0.0
-  } else if t > 1.0 {
-    1.0
-  } else {
-    t
-  }
+  let tt = if t < 0.0 { 0.0 } else if t > 1.0 { 1.0 } else { t }
   match (parse_hex(a), parse_hex(b)) {
     (Some((r1, g1, b1)), Some((r2, g2, b2))) =>
       hex6(
-        clamp8(((r1.to_double() * tt + r2.to_double() * (1.0 - tt)).round()).to_int()),
-        clamp8(((g1.to_double() * tt + g2.to_double() * (1.0 - tt)).round()).to_int()),
-        clamp8(((b1.to_double() * tt + b2.to_double() * (1.0 - tt)).round()).to_int()),
+        clamp8(
+          (r1.to_double() * tt + r2.to_double() * (1.0 - tt)).round().to_int(),
+        ),
+        clamp8(
+          (g1.to_double() * tt + g2.to_double() * (1.0 - tt)).round().to_int(),
+        ),
+        clamp8(
+          (b1.to_double() * tt + b2.to_double() * (1.0 - tt)).round().to_int(),
+        ),
       )
     _ => a
   }

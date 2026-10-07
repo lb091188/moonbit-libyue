@@ -80,7 +80,9 @@ pub fn valid_app_id(app_id : String) -> Bool {
         return false
       }
       if elem_start {
-        let head_ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+        let head_ok = (c >= 'a' && c <= 'z') ||
+          (c >= 'A' && c <= 'Z') ||
+          c == '_'
         if !head_ok {
           return false // 元素不能以数字或 '-' 开头
         }
@@ -96,12 +98,7 @@ pub fn valid_app_id(app_id : String) -> Bool {
 /// 取进程级会话连接（没有则现连）。
 fn bus_conn() -> Result[Conn, String] {
   match g_conn.val {
-    Some(c) =>
-      if c.alive {
-        Ok(c)
-      } else {
-        Err("会话总线连接已断开")
-      }
+    Some(c) => if c.alive { Ok(c) } else { Err("会话总线连接已断开") }
     None =>
       match connect_session() {
         Ok(c) => {
@@ -148,7 +145,10 @@ pub fn claim_name(app_id : String) -> Result[NameClaim, String] {
 
 ///|
 /// 第二实例：向首实例发 Wake('as' 命令行参数)。Ok 表示首实例已应答。
-pub fn wake_existing(app_id : String, args : Array[String]) -> Result[Unit, String] {
+pub fn wake_existing(
+  app_id : String,
+  args : Array[String],
+) -> Result[Unit, String] {
   if !valid_app_id(app_id) {
     return Err("非法 app_id: \{app_id}")
   }

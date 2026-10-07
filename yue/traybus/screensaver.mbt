@@ -5,8 +5,7 @@
 
 ///|
 let saver_candidates : Array[String] = [
-  "org.xfce.ScreenSaver",
-  "org.freedesktop.ScreenSaver",
+  "org.xfce.ScreenSaver", "org.freedesktop.ScreenSaver",
 ]
 
 ///|
@@ -34,7 +33,8 @@ fn probe_saver_service() -> Bool {
     Err(_) => false
     Ok(c) => {
       for name in saver_candidates {
-        match c.call_sync(
+        match
+          c.call_sync(
             "org.freedesktop.DBus",
             "/org/freedesktop/DBus",
             "org.freedesktop.DBus",

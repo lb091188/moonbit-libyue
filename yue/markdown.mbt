@@ -26,7 +26,7 @@ fn md_parse_inline(text : String) -> Array[MDSpan] {
   let italic = Ref(false)
   let code = Ref(false)
   let link_text = Ref(false) // [ ] 内部(链接文字段)
-  let link_url = Ref(false)  // ( ) 内部(链接地址,不渲染)
+  let link_url = Ref(false) // ( ) 内部(链接地址,不渲染)
   let cs : Array[Char] = []
   for ch in text {
     cs.push(ch)
@@ -114,8 +114,8 @@ priv enum MDBlock {
   Heading(String, Int) // 文本,级别 1-6
   Para(String)
   CodeBlock(Array[String], String) // 行,语言
-  Quote(Array[String])             // 行
-  ListItem(String, String)         // 标记(•/数字),文本
+  Quote(Array[String]) // 行
+  ListItem(String, String) // 标记(•/数字),文本
   Rule
 }
 
@@ -159,7 +159,7 @@ fn md_parse_blocks(source : Array[String]) -> Array[MDBlock] {
       flush_para()
       flush_quote()
       in_code.val = true
-      code_lang.val = (t[3:]).to_owned()
+      code_lang.val = t[3:].to_owned()
       continue
     }
     if t.has_prefix("#") {
@@ -174,7 +174,7 @@ fn md_parse_blocks(source : Array[String]) -> Array[MDBlock] {
       if level > 0 && t.length() > level && t.unsafe_get(level) == ' ' {
         flush_para()
         flush_quote()
-        blocks.push(Heading((t[level + 1:]).to_owned(), level))
+        blocks.push(Heading(t[level + 1:].to_owned(), level))
         continue
       }
     }
@@ -186,14 +186,14 @@ fn md_parse_blocks(source : Array[String]) -> Array[MDBlock] {
     }
     if t.has_prefix("> ") || t == ">" {
       flush_para()
-      let body = if t == ">" { "" } else { (t[2:]).to_owned() }
+      let body = if t == ">" { "" } else { t[2:].to_owned() }
       quote.push(body)
       continue
     }
     if t.has_prefix("- ") || t.has_prefix("* ") || t.has_prefix("+ ") {
       flush_para()
       flush_quote()
-      blocks.push(ListItem("•", (t[2:]).to_owned()))
+      blocks.push(ListItem("•", t[2:].to_owned()))
       continue
     }
     // 有序列表:数字. 或 数字)
@@ -215,7 +215,7 @@ fn md_parse_blocks(source : Array[String]) -> Array[MDBlock] {
     if is_ordered {
       flush_para()
       flush_quote()
-      blocks.push(ListItem((t[:oi + 1]).to_owned(), (t[oi + 2:]).to_owned()))
+      blocks.push(ListItem(t[:oi + 1].to_owned(), t[oi + 2:].to_owned()))
       continue
     }
     if t == "" {
@@ -336,25 +336,21 @@ pub fn markdown_view(
         }
         let spans = md_parse_inline(text)
         nodes.push(
-          vbox(
-            [md_rich_label(spans, size, "#FFFFFF")],
-            style=[("marginTop", if level <= 2 { 10.0 } else { 6.0 }), ("marginBottom", 4.0)],
-          ),
+          vbox([md_rich_label(spans, size, "#FFFFFF")], style=[
+            ("marginTop", if level <= 2 { 10.0 } else { 6.0 }),
+            ("marginBottom", 4.0),
+          ]),
         )
       }
       Para(text) =>
         nodes.push(
-          vbox(
-            [md_rich_label(md_parse_inline(text), 13.0, "#FFFFFF")],
-            style=[("marginBottom", 8.0)],
-          ),
+          vbox([md_rich_label(md_parse_inline(text), 13.0, "#FFFFFF")], style=[
+            ("marginBottom", 8.0),
+          ]),
         )
       CodeBlock(code_lines, lang) =>
         nodes.push(
-          vbox(
-            [code_view(code_lines, lang=lang)],
-            style=[("marginBottom", 10.0)],
-          ),
+          vbox([code_view(code_lines, lang~)], style=[("marginBottom", 10.0)]),
         )
       Quote(qlines) => {
         let paras : Array[Node] = []
@@ -369,7 +365,10 @@ pub fn markdown_view(
         })
         nodes.push(
           hbox(
-            [node_of(bar, style=[("height", 24.0)]), vbox(paras, style=[("marginLeft", 10.0)])],
+            [
+              node_of(bar, style=[("height", 24.0)]),
+              vbox(paras, style=[("marginLeft", 10.0)]),
+            ],
             style=[("marginBottom", 10.0)],
           ),
         )
@@ -385,7 +384,9 @@ pub fn markdown_view(
           ),
         )
       Rule =>
-        nodes.push(separator(style=[("marginTop", 6.0), ("marginBottom", 10.0)]))
+        nodes.push(
+          separator(style=[("marginTop", 6.0), ("marginBottom", 10.0)]),
+        )
     }
   }
   let base : Array[(String, &StyVal)] = [("width", 560.0)]

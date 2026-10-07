@@ -41,17 +41,14 @@ test "订阅表按 服务名.ActiveChanged 分发" {
     match_rules: [],
   }
   let got = Ref("")
-  c.subs.set(
-    "org.xfce.ScreenSaver.ActiveChanged",
-    [
-      fn(m : Msg) {
-        match m.body.get(0) {
-          Some(VBool(active)) => got.val = if active { "锁" } else { "解" }
-          _ => ()
-        }
-      },
-    ],
-  )
+  c.subs.set("org.xfce.ScreenSaver.ActiveChanged", [
+    fn(m : Msg) {
+      match m.body.get(0) {
+        Some(VBool(active)) => got.val = if active { "锁" } else { "解" }
+        _ => ()
+      }
+    },
+  ])
   match
     build_signal(
       32,

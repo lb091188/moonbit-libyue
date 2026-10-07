@@ -24,7 +24,10 @@ test "GetAll a{sv} 应答解析:IsPresent/Percentage(d)/State" {
             content="true",
           )
           inspect(props.get("State") is Some(VU32(1)), content="true")
-          inspect(props.get("UpdateTime") is Some(VU64(1789346811L)), content="true")
+          inspect(
+            props.get("UpdateTime") is Some(VU64(1789346811L)),
+            content="true",
+          )
           inspect(props.get("NoSuch") is None, content="true")
         }
         None => inspect("解析失败", content="应可解析")
@@ -102,11 +105,7 @@ test "PropertiesChanged 无 OnBattery / 缺字典 → None" {
     ) {
     Ok(bytes) =>
       match parse_message(bytes[:]) {
-        Some(m) =>
-          inspect(
-            changed_on_battery(m.body) is None,
-            content="true",
-          )
+        Some(m) => inspect(changed_on_battery(m.body) is None, content="true")
         None => inspect("解析失败", content="应可解析")
       }
     Err(_) => inspect("构造失败", content="应可构造")

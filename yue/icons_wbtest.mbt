@@ -1,5 +1,6 @@
 // 图标系统白盒测试:全变体清单规模与代表性种类(覆盖各分类)。
 
+///|
 test {
   assert_eq(all_icons().length(), 803)
   assert_true(all_icons().contains(Search2))
@@ -22,6 +23,7 @@ test {
   assert_eq(uniq, 0)
 }
 
+///|
 test {
   // 路径数据与索引、清单三者对齐:kind_index 是 all_icons 序的双射,
   // 每条定点路径串非空且以 M 开头(M 命令不可缺,首点决定子路径起点)

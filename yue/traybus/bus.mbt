@@ -84,7 +84,9 @@ fn system_bus_path() -> Result[String, String] {
           return Ok(t[10:].to_owned())
         }
       }
-      Err("DBUS_SYSTEM_BUS_ADDRESS 不是受支持的 unix:path 地址: \{addr}")
+      Err(
+        "DBUS_SYSTEM_BUS_ADDRESS 不是受支持的 unix:path 地址: \{addr}",
+      )
     }
     None => Ok("/run/dbus/system_bus_socket")
   }
@@ -183,16 +185,13 @@ fn try_reconnect(bus : Int, attempt : Int) -> Unit {
           g_conn.val = Some(c)
           c
         }
-        Err(_) =>
-          // 换回环里再试；主循环未运行时（纯 CLI 场景）回调不触发，自然放弃
-          {
-            sys_post_delayed(
-              1000,
-              fn(f) { f() },
-              fn() { try_reconnect(bus, attempt + 1) },
-            )
-            return
-          }
+        // 换回环里再试；主循环未运行时（纯 CLI 场景）回调不触发，自然放弃
+        Err(_) => {
+          sys_post_delayed(1000, fn(f) { f() }, fn() {
+            try_reconnect(bus, attempt + 1)
+          })
+          return
+        }
       }
     _ =>
       match connect_system() {
@@ -201,11 +200,9 @@ fn try_reconnect(bus : Int, attempt : Int) -> Unit {
           c
         }
         Err(_) => {
-          sys_post_delayed(
-            1000,
-            fn(f) { f() },
-            fn() { try_reconnect(bus, attempt + 1) },
-          )
+          sys_post_delayed(1000, fn(f) { f() }, fn() {
+            try_reconnect(bus, attempt + 1)
+          })
           return
         }
       }
@@ -694,7 +691,10 @@ fn Conn::handle(self : Conn, msg : Msg) -> Unit {
     // 订阅注册表分发在后：按 "接口.成员" 查回调
     if msg.iface != "" && msg.action != "" {
       match self.subs.get("\{msg.iface}.\{msg.action}") {
-        Some(arr) => for cb in arr { cb(msg) }
+        Some(arr) =>
+          for cb in arr {
+            cb(msg)
+          }
         None => ()
       }
     }

@@ -79,7 +79,10 @@ pub fn sankey_columns(n_nodes : Int, links : Array[SankeyLink]) -> Array[Int] {
       if l.source == l.target || !(l.value > 0.0) {
         continue
       }
-      if l.source < 0 || l.source >= n_nodes || l.target < 0 || l.target >= n_nodes {
+      if l.source < 0 ||
+        l.source >= n_nodes ||
+        l.target < 0 ||
+        l.target >= n_nodes {
         continue
       }
       let want = cols[l.source] + 1
@@ -96,7 +99,10 @@ pub fn sankey_columns(n_nodes : Int, links : Array[SankeyLink]) -> Array[Int] {
 ///|
 /// 节点流量（矩形高度的量纲）：每节点取 max(入边和, 出边和)，只计
 /// 正值链路；下标越界的链路忽略。返回长度 n_nodes 的流量表。
-pub fn sankey_node_flow(n_nodes : Int, links : Array[SankeyLink]) -> Array[Double] {
+pub fn sankey_node_flow(
+  n_nodes : Int,
+  links : Array[SankeyLink],
+) -> Array[Double] {
   let in_tot = Array::make(n_nodes, 0.0)
   let out_tot = Array::make(n_nodes, 0.0)
   for l in links {
@@ -172,7 +178,7 @@ pub fn sankey_layout(
   let boxes : Array[SankeyNodeBox] = []
   let bands : Array[SankeyLinkBand] = []
   if n_nodes <= 0 {
-    return { boxes, bands, cols }
+    return { boxes, bands, cols, }
   }
   // 列号 → 节点集合（按节点下标序，稳定）
   let n_cols = {
@@ -224,7 +230,7 @@ pub fn sankey_layout(
     }
     for i in by_col[c] {
       let hh = (flow[i] * scale).max(min_h)
-      boxes.push({ node: i, col: c, x: cx, y: cy, w: node_w, h: hh })
+      boxes.push({ node: i, col: c, x: cx, y: cy, w: node_w, h: hh, })
       cy = cy + hh + gap
     }
   }
@@ -240,7 +246,10 @@ pub fn sankey_layout(
     if l.source == l.target {
       continue
     }
-    if l.source < 0 || l.source >= n_nodes || l.target < 0 || l.target >= n_nodes {
+    if l.source < 0 ||
+      l.source >= n_nodes ||
+      l.target < 0 ||
+      l.target >= n_nodes {
       continue
     }
     if !(l.value > 0.0) {
@@ -261,7 +270,7 @@ pub fn sankey_layout(
     out_off[l.source] = out_off[l.source] + lh
     in_off[l.target] = in_off[l.target] + lh
   }
-  { boxes, bands, cols }
+  { boxes, bands, cols, }
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +325,9 @@ fn sankey_draw(
   let lay = sankey_layout(data.nodes.length(), data.links, x0, x1, y0, y1)
   // 色带：上边 (x0, sy0) → (x1, ty0)，下边回程，控制点取中点横坐标
   for band in lay.bands {
-    p.set_fill_color(with_alpha(series_color(data.links[band.link].source), "3d"))
+    p.set_fill_color(
+      with_alpha(series_color(data.links[band.link].source), "3d"),
+    )
     let mx = (band.x0 + band.x1) / 2.0
     p.begin_path()
     p.move_to(band.x0, band.sy0)
@@ -337,7 +348,11 @@ fn sankey_draw(
       if name != "" {
         p.draw_text(
           name,
-          if first_col { b.x - avail - 4.0 } else { b.x + b.w + 6.0 },
+          if first_col {
+            b.x - avail - 4.0
+          } else {
+            b.x + b.w + 6.0
+          },
           b.y + b.h / 2.0 - 9.0,
           avail,
           18.0,
@@ -368,7 +383,7 @@ pub fn sankey_t(
   show_labels? : Bool = true,
   fill? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {

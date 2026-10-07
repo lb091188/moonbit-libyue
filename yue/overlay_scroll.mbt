@@ -20,11 +20,13 @@
 pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
   s.set_scrollbar_policy(Never, Never) // 隐藏平台滚动条,thumb 全权替代
   // ---- 悬浮 thumb:右缘窄条,占满轨道高度,可见段由绘制决定 ----
-  let thumb = themed_container(style=[("width", 6.0),
-        ("position", "absolute"),
+  let thumb = themed_container(style=[
+    ("width", 6.0),
+    ("position", "absolute"),
     ("right", "0px"),
     ("top", "0px"),
-    ("bottom", "0px"),])
+    ("bottom", "0px"),
+  ])
   attach(host, ViewLike::view(thumb))
   // 状态(gy/thumb_len 绘制用;alpha 两级 d9≈85% 常态 / 73≈45% 渐隐中)
   let vis = Ref(false)
@@ -79,11 +81,7 @@ pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
     let full = track * track / (track + m)
     let len = if full < 40.0 { 40.0 } else { full }
     let pos = s.get_scroll_position_y()
-    let y = if track - len > 0.0 {
-      pos / m * (track - len)
-    } else {
-      0.0
-    }
+    let y = if track - len > 0.0 { pos / m * (track - len) } else { 0.0 }
     thumb_len.val = len
     gy.val = y
     if !vis.val {

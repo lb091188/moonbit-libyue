@@ -17,17 +17,11 @@ test "file_uri:空格与中文按 UTF-8 字节编码" {
 
 ///|
 test "file_uri:保留字符 %XX" {
-  inspect(
-    file_uri("/a/b&c?d=e%f"),
-    content="file:///a/b%26c%3Fd%3De%25f",
-  )
+  inspect(file_uri("/a/b&c?d=e%f"), content="file:///a/b%26c%3Fd%3De%25f")
   inspect(file_uri("/a+b=c"), content="file:///a%2Bb%3Dc")
 }
 
 ///|
 test "file_uri:unreserved 不编码" {
-  inspect(
-    file_uri("/a-Z_9.~x/file.name"),
-    content="file:///a-Z_9.~x/file.name",
-  )
+  inspect(file_uri("/a-Z_9.~x/file.name"), content="file:///a-Z_9.~x/file.name")
 }

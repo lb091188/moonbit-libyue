@@ -18,68 +18,109 @@
 ///|
 /// 主题色板。经 [theme_apply] 定制（initialize 之后、mount 之前调用最佳）；
 /// 组件每次绘制/挂载经 getter 读取当前值。
-///|
-fn theme_primary() -> String { theme_box.t.primary }
 
 ///|
-fn theme_primary_light() -> String { theme_box.t.primary_light }
+fn theme_primary() -> String {
+  theme_box.t.primary
+}
 
 ///|
-fn theme_primary_hover() -> String { theme_box.t.primary_hover }
+fn theme_primary_light() -> String {
+  theme_box.t.primary_light
+}
 
 ///|
-fn theme_danger_hover() -> String { theme_box.t.danger_hover }
+fn theme_primary_hover() -> String {
+  theme_box.t.primary_hover
+}
 
 ///|
-fn theme_success() -> String { theme_box.t.success }
+fn theme_danger_hover() -> String {
+  theme_box.t.danger_hover
+}
 
 ///|
-fn theme_success_light() -> String { theme_box.t.success_light }
+fn theme_success() -> String {
+  theme_box.t.success
+}
 
 ///|
-fn theme_warning() -> String { theme_box.t.warning }
+fn theme_success_light() -> String {
+  theme_box.t.success_light
+}
 
 ///|
-fn theme_warning_light() -> String { theme_box.t.warning_light }
+fn theme_warning() -> String {
+  theme_box.t.warning
+}
 
 ///|
-fn theme_danger() -> String { theme_box.t.danger }
+fn theme_warning_light() -> String {
+  theme_box.t.warning_light
+}
 
 ///|
-fn theme_danger_light() -> String { theme_box.t.danger_light }
+fn theme_danger() -> String {
+  theme_box.t.danger
+}
 
 ///|
-fn theme_info() -> String { theme_box.t.info }
+fn theme_danger_light() -> String {
+  theme_box.t.danger_light
+}
 
 ///|
-fn theme_info_light() -> String { theme_box.t.info_light }
+fn theme_info() -> String {
+  theme_box.t.info
+}
 
 ///|
-fn theme_text_primary() -> String { theme_box.t.text_primary }
+fn theme_info_light() -> String {
+  theme_box.t.info_light
+}
 
 ///|
-fn theme_text_regular() -> String { theme_box.t.text_regular }
+fn theme_text_primary() -> String {
+  theme_box.t.text_primary
+}
 
 ///|
-fn theme_text_secondary() -> String { theme_box.t.text_secondary }
+fn theme_text_regular() -> String {
+  theme_box.t.text_regular
+}
 
 ///|
-fn theme_border() -> String { theme_box.t.border }
+fn theme_text_secondary() -> String {
+  theme_box.t.text_secondary
+}
 
 ///|
-fn theme_fill_hover() -> String { theme_box.t.fill_hover }
+fn theme_border() -> String {
+  theme_box.t.border
+}
 
 ///|
-fn theme_fill_zebra() -> String { theme_box.t.fill_zebra }
+fn theme_fill_hover() -> String {
+  theme_box.t.fill_hover
+}
 
 ///|
-fn theme_bg_panel() -> String { theme_box.t.bg_panel }
+fn theme_fill_zebra() -> String {
+  theme_box.t.fill_zebra
+}
+
+///|
+fn theme_bg_panel() -> String {
+  theme_box.t.bg_panel
+}
 
 ///|
 /// 焦点/激活反馈色:中性灰(取 text_secondary),不用主题色——
 /// 主题蓝只用于主要按钮/选中态等强调语义,active 反馈不喧宾夺主。
 /// 焦点环与字段聚焦边框共用。
-fn theme_focus_accent() -> String { theme_text_secondary() }
+fn theme_focus_accent() -> String {
+  theme_text_secondary()
+}
 
 ///|
 /// 表单控件统一高度(按钮/输入框/下拉/数字器/日期选择字段等):
@@ -90,9 +131,7 @@ pub let control_height : Double = 32.0
 ///|
 /// 组件库自绘容器:Container::make + 主题切换时自动重绘
 /// (draw 回调现取 theme_* 色,重绘即跟随新主题)。
-fn themed_container(
-  style? : Array[(String, &StyVal)] = [],
-) -> Container {
+fn themed_container(style? : Array[(String, &StyVal)] = []) -> Container {
   let c = Container::make(style~)
   on_theme_change(fn() { ViewLike::schedule_paint(c) })
   c
@@ -176,7 +215,7 @@ fn hand() -> Cursor {
 ///|
 /// 主题色板快照。用结构体更新语法做局部定制：
 ///
-/// ```moonbit
+/// ```moonbit nocheck
 /// @yue.theme_apply(
 ///   @yue.Theme::{ primary: "#1E4FA3", primary_light: "#E3EDFA", ..@yue.default_theme() },
 /// )
@@ -276,11 +315,7 @@ pub fn dark_theme() -> Theme {
 ///     不随主色偏移,保持排版稳定。
 /// accent 非法时回落内置基准主题。
 pub fn theme_from_accent(accent : String, dark? : Bool = false) -> Theme {
-  let base = if dark {
-    dark_theme()
-  } else {
-    default_theme()
-  }
+  let base = if dark { dark_theme() } else { default_theme() }
   let (r, g, b) = match parse_hex(accent) {
     Some(rgb) => rgb
     None => return base
@@ -337,7 +372,11 @@ pub fn theme_from_accent(accent : String, dark? : Bool = false) -> Theme {
     primary,
     primary_light,
     primary_hover,
-    danger_hover: if dark { lighten_hex(danger, 0.08) } else { darken_hex(danger, 0.09) },
+    danger_hover: if dark {
+      lighten_hex(danger, 0.08)
+    } else {
+      darken_hex(danger, 0.09)
+    },
     success,
     success_light: light_of(success),
     warning,
@@ -384,7 +423,7 @@ priv struct ThemeBox {
 }
 
 ///|
-let theme_box : ThemeBox = { t: default_theme(), subs: [] }
+let theme_box : ThemeBox = { t: default_theme(), subs: [], }
 
 ///|
 /// 读取当前主题快照。
@@ -408,22 +447,46 @@ pub fn on_theme_change(f : () -> Unit) -> Unit {
 fn apply_native_theme_css(t : Theme) -> Unit {
   let buf = StringBuilder()
   buf.write_string("label { color: \{t.text_primary}; }")
-  buf.write_string("entry { color: \{t.text_primary}; caret-color: \{t.text_primary}; background-color: \{t.bg_panel}; background-image: none; outline-width: 0px; }")
-  buf.write_string("entry:not(.yue-borderless) { border: 1px solid \{t.border}; }")
+  buf.write_string(
+    "entry { color: \{t.text_primary}; caret-color: \{t.text_primary}; background-color: \{t.bg_panel}; background-image: none; outline-width: 0px; }",
+  )
+  buf.write_string(
+    "entry:not(.yue-borderless) { border: 1px solid \{t.border}; }",
+  )
   buf.write_string("entry undershoot { background: none; }")
-  buf.write_string("entry selection { background-color: \{t.primary_light}; color: \{t.text_primary}; }")
+  buf.write_string(
+    "entry selection { background-color: \{t.primary_light}; color: \{t.text_primary}; }",
+  )
   buf.write_string("entry placeholder { color: \{t.text_secondary}; }")
-  buf.write_string("textview { background-color: \{t.bg_panel}; color: \{t.text_primary}; }")
-  buf.write_string("textview text { background-color: \{t.bg_panel}; color: \{t.text_primary}; }")
-  buf.write_string("textview text selection { background-color: \{t.primary_light}; color: \{t.text_primary}; }")
+  buf.write_string(
+    "textview { background-color: \{t.bg_panel}; color: \{t.text_primary}; }",
+  )
+  buf.write_string(
+    "textview text { background-color: \{t.bg_panel}; color: \{t.text_primary}; }",
+  )
+  buf.write_string(
+    "textview text selection { background-color: \{t.primary_light}; color: \{t.text_primary}; }",
+  )
   buf.write_string("scrollbar { background-color: transparent; }")
-  buf.write_string("scrollbar.overlay-indicator:not(.dragging):not(.hovering) { background-color: transparent; }")
-  buf.write_string("scrollbar.overlay-indicator:not(.dragging):not(.hovering) slider { min-width: 4px; min-height: 4px; margin: 3px; border-radius: 4px; background-color: \{t.border}; }")
-  buf.write_string("scrollbar.overlay-indicator.dragging, scrollbar.overlay-indicator.hovering { background-color: \{t.primary_light}; }")
-  buf.write_string("scrollbar.overlay-indicator.dragging slider, scrollbar.overlay-indicator.hovering slider { background-color: \{t.primary}; border-radius: 8px; }")
-  buf.write_string("scrollbar slider:hover { background-color: \{t.primary}; border-radius: 8px; }")
+  buf.write_string(
+    "scrollbar.overlay-indicator:not(.dragging):not(.hovering) { background-color: transparent; }",
+  )
+  buf.write_string(
+    "scrollbar.overlay-indicator:not(.dragging):not(.hovering) slider { min-width: 4px; min-height: 4px; margin: 3px; border-radius: 4px; background-color: \{t.border}; }",
+  )
+  buf.write_string(
+    "scrollbar.overlay-indicator.dragging, scrollbar.overlay-indicator.hovering { background-color: \{t.primary_light}; }",
+  )
+  buf.write_string(
+    "scrollbar.overlay-indicator.dragging slider, scrollbar.overlay-indicator.hovering slider { background-color: \{t.primary}; border-radius: 8px; }",
+  )
+  buf.write_string(
+    "scrollbar slider:hover { background-color: \{t.primary}; border-radius: 8px; }",
+  )
   buf.write_string("window { background-color: \{t.bg_page}; }")
-  buf.write_string("scrolledwindow junction { background-color: \{t.bg_page}; }")
+  buf.write_string(
+    "scrolledwindow junction { background-color: \{t.bg_page}; }",
+  )
   // 原生 tooltip 恒深底白字(EP 语义,不随色板):系统主题的 tooltip
   // 底/字色来自两处配置,深色系统主题下常见深底深字不可读
   buf.write_string(
@@ -500,7 +563,12 @@ fn type_light_color(t : SemanticType) -> String {
 ///|
 /// 焦点环:单层 1px 淡主色描边(默认 40% 透明,不喧宾夺主;
 /// 需在深色实底上使用时可传实底友好的颜色,如白色)。
-fn draw_focus_ring(p : Painter, w : Double, h : Double, color? : String = theme_focus_accent()) -> Unit {
+fn draw_focus_ring(
+  p : Painter,
+  w : Double,
+  h : Double,
+  color? : String = theme_focus_accent(),
+) -> Unit {
   p.set_stroke_color(color)
   p.stroke_rect(0.5, 0.5, w - 1.0, h - 1.0)
 }
@@ -529,8 +597,15 @@ fn draw_clear_x(
 /// 跨平台不一致,库内一律矢量;GTK 端 align=Center 无效,顺带解决
 /// 字形居中问题)。中心 (cx,cy),s 为半径。
 
-///| + 号(步进按钮)
-fn draw_glyph_plus(p : Painter, cx : Double, cy : Double, s : Double, color : String) -> Unit {
+///|
+/// + 号(步进按钮)
+fn draw_glyph_plus(
+  p : Painter,
+  cx : Double,
+  cy : Double,
+  s : Double,
+  color : String,
+) -> Unit {
   p.set_stroke_color(color)
   p.begin_path()
   p.move_to(cx - s, cy)
@@ -540,8 +615,15 @@ fn draw_glyph_plus(p : Painter, cx : Double, cy : Double, s : Double, color : St
   p.stroke()
 }
 
-///| − 号(步进按钮)
-fn draw_glyph_minus(p : Painter, cx : Double, cy : Double, s : Double, color : String) -> Unit {
+///|
+/// − 号(步进按钮)
+fn draw_glyph_minus(
+  p : Painter,
+  cx : Double,
+  cy : Double,
+  s : Double,
+  color : String,
+) -> Unit {
   p.set_stroke_color(color)
   p.begin_path()
   p.move_to(cx - s, cy)
@@ -549,8 +631,15 @@ fn draw_glyph_minus(p : Painter, cx : Double, cy : Double, s : Double, color : S
   p.stroke()
 }
 
-///| ‹ 朝左三角(实心)
-fn draw_glyph_left(p : Painter, cx : Double, cy : Double, s : Double, color : String) -> Unit {
+///|
+/// ‹ 朝左三角(实心)
+fn draw_glyph_left(
+  p : Painter,
+  cx : Double,
+  cy : Double,
+  s : Double,
+  color : String,
+) -> Unit {
   p.set_fill_color(color)
   p.begin_path()
   p.move_to(cx + s / 2.0, cy - s)
@@ -560,8 +649,15 @@ fn draw_glyph_left(p : Painter, cx : Double, cy : Double, s : Double, color : St
   p.fill()
 }
 
-///| › 朝右三角(实心)
-fn draw_glyph_right(p : Painter, cx : Double, cy : Double, s : Double, color : String) -> Unit {
+///|
+/// › 朝右三角(实心)
+fn draw_glyph_right(
+  p : Painter,
+  cx : Double,
+  cy : Double,
+  s : Double,
+  color : String,
+) -> Unit {
   p.set_fill_color(color)
   p.begin_path()
   p.move_to(cx - s / 2.0, cy - s)
@@ -620,7 +716,14 @@ fn fill_round_rect(
   p.line_to(x + w - r, y)
   p.bezier_curve_to(x + w - r + k * r, y, x + w, y + r - k * r, x + w, y + r)
   p.line_to(x + w, y + h - r)
-  p.bezier_curve_to(x + w, y + h - r + k * r, x + w - r + k * r, y + h, x + w - r, y + h)
+  p.bezier_curve_to(
+    x + w,
+    y + h - r + k * r,
+    x + w - r + k * r,
+    y + h,
+    x + w - r,
+    y + h,
+  )
   p.line_to(x + r, y + h)
   p.bezier_curve_to(x + r - k * r, y + h, x, y + h - r + k * r, x, y + h - r)
   p.line_to(x, y + r)
@@ -693,15 +796,17 @@ fn stateful_item(
         // 图标在 pad_x 起(16px),文字右移;无图标按 align_start/居中排
         let text_x = match icon {
           Some(k) => {
-            draw_icon(p, k, pad_x + 8.0, h / 2.0, 16.0 * 0.42, fg_of(act, hover.val))
+            draw_icon(
+              p,
+              k,
+              pad_x + 8.0,
+              h / 2.0,
+              16.0 * 0.42,
+              fg_of(act, hover.val),
+            )
             pad_x + 24.0
           }
-          None =>
-            if align_start {
-              pad_x
-            } else {
-              (w - text_w) / 2.0
-            }
+          None => if align_start { pad_x } else { (w - text_w) / 2.0 }
         }
         // 文字:AttributedText 支持指定字号,垂直居中交给 valign=Center;
         // 水平位置手动计算(见函数注释)
@@ -805,9 +910,7 @@ pub fn side_menu(
       ),
     )
   }
-  vbox(nodes, style=base, handle=fn(c) {
-    set_panel_bg(c)
-  })
+  vbox(nodes, style=base, handle=fn(c) { set_panel_bg(c) })
 }
 
 ///|
@@ -865,13 +968,7 @@ pub fn segmented(
   for kv in style {
     base.push(kv)
   }
-  hbox(
-    items,
-    style=base,
-    handle=fn(c) {
-      bind_bg(c, fn() { theme_border() })
-    },
-  )
+  hbox(items, style=base, handle=fn(c) { bind_bg(c, fn() { theme_border() }) })
 }
 
 ///|
@@ -881,7 +978,7 @@ pub fn tag_of_type(
   text : String,
   t : SemanticType,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -926,7 +1023,7 @@ pub fn tag(
   text : String,
   color : String,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -970,7 +1067,7 @@ pub fn tag(
 pub fn badge_count(
   count : Int,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   let text = count.to_string()
   {
@@ -1078,11 +1175,14 @@ pub fn alert(
   text : String,
   t : SemanticType,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [("height", 40.0), ("marginBottom", 10.0)]
+      let base : Array[(String, &StyVal)] = [
+        ("height", 40.0),
+        ("marginBottom", 10.0),
+      ]
       for kv in style {
         base.push(kv)
       }
@@ -1121,7 +1221,7 @@ pub fn pagination(
   current : Store[Int],
   pages : Int,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -1229,7 +1329,7 @@ pub fn card(
   title : String,
   children : Array[Node],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -1271,7 +1371,10 @@ pub fn card(
       })
       outer.add_child(title)
       // 内容区
-      let body = themed_container(style=[("padding", 14.0), ("flexDirection", "column"),])
+      let body = themed_container(style=[
+        ("padding", 14.0),
+        ("flexDirection", "column"),
+      ])
       for ch in children {
         ignore((ch.mount)(ViewLike::view(body)))
       }
@@ -1293,6 +1396,7 @@ pub(all) struct Token {
 /// MoonBit 风格着色器:关键字 / 类型(大写开头) / 函数调用(后随 '(')/
 /// 数字 / 字符串 / 注释 / 标点与普通文本,One Dark 调色板。
 /// 仅供演示;消费方可换成任意词法分析结果后直接用 code_view。
+
 ///|
 /// ASCII 小写(关键字大小写不敏感比较用)。
 fn ascii_lower(s : String) -> String {
@@ -1313,69 +1417,86 @@ fn ascii_lower(s : String) -> String {
 fn lang_keywords(lang : String) -> (Array[String], String) {
   match lang {
     "js" | "ts" =>
-      ([
-        "function", "const", "let", "var", "if", "else", "return", "class",
-        "extends", "import", "export", "new", "typeof", "await", "async",
-        "for", "while", "switch", "case", "break", "default", "try", "catch",
-        "throw", "this", "super", "null", "undefined", "true", "false",
-        "static", "get", "set", "of", "in", "yield", "delete", "void",
-      ], "//")
+      (
+        [
+          "function", "const", "let", "var", "if", "else", "return", "class", "extends",
+          "import", "export", "new", "typeof", "await", "async", "for", "while",
+          "switch", "case", "break", "default", "try", "catch", "throw", "this",
+          "super", "null", "undefined", "true", "false", "static", "get", "set",
+          "of", "in", "yield", "delete", "void",
+        ],
+        "//",
+      )
     "python" =>
-      ([
-        "def", "class", "import", "from", "if", "elif", "else", "for",
-        "while", "in", "not", "and", "or", "lambda", "return", "None",
-        "True", "False", "self", "pass", "with", "as", "try", "except",
-        "finally", "raise", "yield", "global", "del", "assert", "break",
-        "continue", "is",
-      ], "#")
+      (
+        [
+          "def", "class", "import", "from", "if", "elif", "else", "for", "while",
+          "in", "not", "and", "or", "lambda", "return", "None", "True", "False",
+          "self", "pass", "with", "as", "try", "except", "finally", "raise", "yield",
+          "global", "del", "assert", "break", "continue", "is",
+        ],
+        "#",
+      )
     "rust" =>
-      ([
-        "fn", "let", "mut", "pub", "struct", "enum", "impl", "trait", "use",
-        "mod", "match", "if", "else", "loop", "while", "for", "in", "return",
-        "Some", "None", "Ok", "Err", "self", "crate", "move", "ref", "where",
-        "async", "await", "dyn", "as", "break", "const", "continue",
-        "static", "type", "unsafe", "true", "false",
-      ], "//")
+      (
+        [
+          "fn", "let", "mut", "pub", "struct", "enum", "impl", "trait", "use", "mod",
+          "match", "if", "else", "loop", "while", "for", "in", "return", "Some",
+          "None", "Ok", "Err", "self", "crate", "move", "ref", "where", "async",
+          "await", "dyn", "as", "break", "const", "continue", "static", "type", "unsafe",
+          "true", "false",
+        ],
+        "//",
+      )
     "c" =>
-      ([
-        "include", "define", "typedef", "struct", "union", "enum", "static",
-        "const", "int", "void", "char", "float", "double", "return", "if",
-        "else", "for", "while", "switch", "case", "break", "default",
-        "sizeof", "long", "short", "unsigned", "signed", "extern", "goto",
-        "do",
-      ], "//")
+      (
+        [
+          "include", "define", "typedef", "struct", "union", "enum", "static", "const",
+          "int", "void", "char", "float", "double", "return", "if", "else", "for",
+          "while", "switch", "case", "break", "default", "sizeof", "long", "short",
+          "unsigned", "signed", "extern", "goto", "do",
+        ],
+        "//",
+      )
     "go" =>
-      ([
-        "func", "package", "import", "var", "const", "type", "struct",
-        "interface", "map", "chan", "go", "defer", "if", "else", "for",
-        "range", "return", "nil", "break", "continue", "switch", "case",
-        "default", "select", "fallthrough",
-      ], "//")
+      (
+        [
+          "func", "package", "import", "var", "const", "type", "struct", "interface",
+          "map", "chan", "go", "defer", "if", "else", "for", "range", "return", "nil",
+          "break", "continue", "switch", "case", "default", "select", "fallthrough",
+        ],
+        "//",
+      )
     "bash" =>
-      ([
-        "echo", "if", "then", "else", "fi", "for", "do", "done", "while",
-        "case", "esac", "function", "local", "export", "return", "exit",
-        "read", "shift", "in",
-      ], "#")
+      (
+        [
+          "echo", "if", "then", "else", "fi", "for", "do", "done", "while", "case",
+          "esac", "function", "local", "export", "return", "exit", "read", "shift",
+          "in",
+        ],
+        "#",
+      )
     "sql" =>
-      ([
-        "select", "from", "where", "insert", "into", "values", "update",
-        "set", "delete", "create", "table", "join", "left", "right", "inner",
-        "outer", "on", "group", "order", "by", "limit", "as", "and", "or",
-        "not", "null", "distinct", "count", "sum", "avg", "primary", "key",
-        "foreign", "references", "alter", "drop", "index", "view",
-      ], "--")
+      (
+        [
+          "select", "from", "where", "insert", "into", "values", "update", "set",
+          "delete", "create", "table", "join", "left", "right", "inner", "outer",
+          "on", "group", "order", "by", "limit", "as", "and", "or", "not", "null",
+          "distinct", "count", "sum", "avg", "primary", "key", "foreign", "references",
+          "alter", "drop", "index", "view",
+        ],
+        "--",
+      )
     _ =>
       // MoonBit 全量关键字(moonc 内置词表对齐):声明/可见性/属性/控制流/
       // 模式与所有权/异步/字面量
       (
         [
-          "fn", "let", "mut", "const", "struct", "enum", "trait", "impl",
-          "type", "typealias", "derive", "pub", "priv", "open", "override",
-          "readonly", "extern", "native", "test", "async", "await",
-          "if", "else", "for", "in", "while", "loop", "match", "when",
-          "where", "return", "break", "continue", "as", "is", "move",
-          "root", "unsafe", "object", "true", "false",
+          "fn", "let", "mut", "const", "struct", "enum", "trait", "impl", "type",
+          "typealias", "derive", "pub", "priv", "open", "override", "readonly", "extern",
+          "native", "test", "async", "await", "if", "else", "for", "in", "while",
+          "loop", "match", "when", "where", "return", "break", "continue", "as",
+          "is", "move", "root", "unsafe", "object", "true", "false",
         ],
         "//",
       )
@@ -1426,7 +1547,10 @@ pub fn tokenize_lang(line : String, lang : String) -> Array[Token] {
         i = i + 1
       }
       out.push({ text: s.to_string(), color: "#98C379", })
-    } else if ch == '/' && i + 1 < n && cs[i + 1] == '/' && comment_prefix == "//" {
+    } else if ch == '/' &&
+      i + 1 < n &&
+      cs[i + 1] == '/' &&
+      comment_prefix == "//" {
       flush('/')
       let comment = StringBuilder()
       while i < n {
@@ -1444,7 +1568,10 @@ pub fn tokenize_lang(line : String, lang : String) -> Array[Token] {
       }
       out.push({ text: comment.to_string(), color: "#5C6370", })
       break
-    } else if ch == '-' && i + 1 < n && cs[i + 1] == '-' && comment_prefix == "--" {
+    } else if ch == '-' &&
+      i + 1 < n &&
+      cs[i + 1] == '-' &&
+      comment_prefix == "--" {
       flush('-')
       let comment = StringBuilder()
       while i < n {
@@ -1457,11 +1584,17 @@ pub fn tokenize_lang(line : String, lang : String) -> Array[Token] {
       flush(ch)
       out.push({ text: " ", color: "#ABB2BF", })
     } else {
-      let ident = (c >= 65 && c <= 90) || (c >= 97 && c <= 122) ||
-        (c >= 48 && c <= 57) || c == 95 || c == 64 || c == 36 || c > 127
+      let ident = (c >= 65 && c <= 90) ||
+        (c >= 97 && c <= 122) ||
+        (c >= 48 && c <= 57) ||
+        c == 95 ||
+        c == 64 ||
+        c == 36 ||
+        c > 127
       // '.' 在词内续词(小数/限定名),但后随 '.'(区间符 ..)时断开,
       // 让前导数字独立着色;不在词内时归运算符
-      let dot_in_word = ch == '.' && kind.val == 1 &&
+      let dot_in_word = ch == '.' &&
+        kind.val == 1 &&
         !(i + 1 < n && cs[i + 1] == '.')
       if (ident || dot_in_word) && kind.val != 2 {
         buf.val.write_char(ch)
@@ -1493,9 +1626,24 @@ pub fn tokenize_lang(line : String, lang : String) -> Array[Token] {
 /// 运算符字符(连续出现时并成一个词,如 ->、<=、..<、&&、@ 无关的 '.')。
 fn is_op_char(ch : Char) -> Bool {
   match ch {
-    '+' | '-' | '*' | '/' | '%' | '<' | '>' | '=' | '!' | '&' | '|' |
-    '?' | '^' | '~' | '#' | '\\' | '`' | '.'
-      => true
+    '+'
+    | '-'
+    | '*'
+    | '/'
+    | '%'
+    | '<'
+    | '>'
+    | '='
+    | '!'
+    | '&'
+    | '|'
+    | '?'
+    | '^'
+    | '~'
+    | '#'
+    | '\\'
+    | '`'
+    | '.' => true
     _ => false
   }
 }
@@ -1516,7 +1664,11 @@ pub fn tokenize_moonbit(line : String) -> Array[Token] {
 /// 词分类着色:关键字(大小写不敏感)紫;纯数字橙;@ 限定名按最后一段、
 /// 裸标识符按首字符,大写开头视为类型/构造器黄;后随 '(' 的小写标识符
 /// 视为函数调用蓝;其余灰。
-fn classify_word(word : String, keywords : Array[String], is_call : Bool) -> Token {
+fn classify_word(
+  word : String,
+  keywords : Array[String],
+  is_call : Bool,
+) -> Token {
   let lowered = ascii_lower(word)
   for k in keywords {
     if ascii_lower(k) == lowered {
@@ -1562,7 +1714,7 @@ pub fn code_view(
   font_size? : Double = 13.0,
   line_numbers? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -1646,7 +1798,7 @@ pub fn avatar(
   color : String,
   size? : Double = 36.0,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -1713,7 +1865,7 @@ pub fn alert_closeable(
   text : String,
   t : SemanticType,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -1738,9 +1890,7 @@ pub fn alert_closeable(
       let close = themed_container(style=[("width", 32.0), ("height", 40.0)])
       let hover = Ref(false)
       let close_focused = Ref(false)
-      let close_it = fn() -> Unit {
-        ViewLike::set_visible(v, false)
-      }
+      let close_it = fn() -> Unit { ViewLike::set_visible(v, false) }
 
       close.on_draw(fn(p) {
         let b = ViewLike::get_bounds(close)
@@ -1760,7 +1910,12 @@ pub fn alert_closeable(
           false
         }
       })
-      bind_focus(close, fn() { ViewLike::schedule_paint(close) }, close_focused, close_it)
+      bind_focus(
+        close,
+        fn() { ViewLike::schedule_paint(close) },
+        close_focused,
+        close_it,
+      )
       ViewLike::on_mouse_enter(close, fn(_e) {
         hover.val = true
         ViewLike::schedule_paint(close)
@@ -1783,7 +1938,7 @@ pub fn steps(
   items : Array[String],
   current : Store[Int],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -1898,11 +2053,14 @@ pub fn steps(
 pub fn collapse(
   panels : Array[(String, Array[Node])],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [("marginBottom", 12.0), ("flexDirection", "column")]
+      let base : Array[(String, &StyVal)] = [
+        ("marginBottom", 12.0),
+        ("flexDirection", "column"),
+      ]
       for kv in style {
         base.push(kv)
       }
@@ -1912,9 +2070,12 @@ pub fn collapse(
       for entry in panels {
         let open = Ref(first)
         first = false
-        let head = themed_container(
-          style=[("height", 34.0), ("paddingLeft", 12.0), ("flexDirection", "row"), ("alignItems", "center")],
-        )
+        let head = themed_container(style=[
+          ("height", 34.0),
+          ("paddingLeft", 12.0),
+          ("flexDirection", "row"),
+          ("alignItems", "center"),
+        ])
         bind_bg(head, fn() { theme_info_light() })
         let head_focused = Ref(false)
         head.on_draw(fn(p) {
@@ -1924,9 +2085,11 @@ pub fn collapse(
           }
         })
         // 自绘折叠指示(V 形折线,不依赖字体字形)
-        let arrow = themed_container(
-          style=[("width", 12.0), ("height", 12.0), ("marginRight", 5.0)],
-        )
+        let arrow = themed_container(style=[
+          ("width", 12.0),
+          ("height", 12.0),
+          ("marginRight", 5.0),
+        ])
         arrow.on_draw(fn(p) {
           p.set_stroke_color(theme_primary())
           for off in [0.0, 0.6] {
@@ -1953,7 +2116,10 @@ pub fn collapse(
         on_theme_change(apply_title_color)
         head.add_child(arrow)
         head.add_child(title)
-        let body = themed_container(style=[("padding", 10.0), ("flexDirection", "column"),])
+        let body = themed_container(style=[
+          ("padding", 10.0),
+          ("flexDirection", "column"),
+        ])
         set_panel_bg(body)
         for ch in entry.1 {
           ignore((ch.mount)(ViewLike::view(body)))
@@ -1978,8 +2144,16 @@ pub fn collapse(
             false
           }
         })
-        bind_focus(head, fn() { ViewLike::schedule_paint(head) }, head_focused, toggle)
-        let panel = themed_container(style=[("marginBottom", 6.0), ("flexDirection", "column"),])
+        bind_focus(
+          head,
+          fn() { ViewLike::schedule_paint(head) },
+          head_focused,
+          toggle,
+        )
+        let panel = themed_container(style=[
+          ("marginBottom", 6.0),
+          ("flexDirection", "column"),
+        ])
         panel.add_child(head)
         panel.add_child(body)
         outer.add_child(panel)
@@ -1995,11 +2169,14 @@ pub fn collapse(
 pub fn timeline(
   items : Array[(String, String, SemanticType)],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [("marginBottom", 12.0), ("flexDirection", "column")]
+      let base : Array[(String, &StyVal)] = [
+        ("marginBottom", 12.0),
+        ("flexDirection", "column"),
+      ]
       for kv in style {
         base.push(kv)
       }
@@ -2009,8 +2186,14 @@ pub fn timeline(
       let mut i = 0
       for entry in items {
         let is_last = i == n - 1
-        let row = themed_container(style=[("height", 56.0), ("flexDirection", "row"),])
-        let node_col = themed_container(style=[("width", 20.0), ("height", 56.0)])
+        let row = themed_container(style=[
+          ("height", 56.0),
+          ("flexDirection", "row"),
+        ])
+        let node_col = themed_container(style=[
+          ("width", 20.0),
+          ("height", 56.0),
+        ])
         let is_first = i == 0
         node_col.on_draw(fn(p) {
           // 竖线:首行从点心起、末行到点心止,中间整行贯通(节点色块居中)
@@ -2025,9 +2208,11 @@ pub fn timeline(
           p.set_fill_color(type_color(entry.2))
           p.fill_rect(5.0, b.height / 2.0 - 5.0, 10.0, 10.0)
         })
-        let text_col = themed_container(
-          style=[("paddingLeft", 8.0), ("flex", 1.0), ("flexDirection", "column")],
-        )
+        let text_col = themed_container(style=[
+          ("paddingLeft", 8.0),
+          ("flex", 1.0),
+          ("flexDirection", "column"),
+        ])
         let title = Label::new(entry.0)
         fn apply_title_color() -> Unit {
           ViewLike::set_color(title, theme_text_primary())
@@ -2058,20 +2243,25 @@ pub fn timeline(
 pub fn descriptions(
   pairs : Array[(String, String)],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [("marginBottom", 12.0), ("flexDirection", "column")]
+      let base : Array[(String, &StyVal)] = [
+        ("marginBottom", 12.0),
+        ("flexDirection", "column"),
+      ]
       for kv in style {
         base.push(kv)
       }
       let outer = themed_container(style=base)
       handle(outer)
       for kv in pairs {
-        let row = themed_container(style=[("height", 26.0),
-        ("flexDirection", "row"),
-          ("alignItems", "center"),])
+        let row = themed_container(style=[
+          ("height", 26.0),
+          ("flexDirection", "row"),
+          ("alignItems", "center"),
+        ])
         let k = Label::new(kv.0)
         bind_fg(k, fn() { theme_text_secondary() })
         k.set_align(Start)
@@ -2098,7 +2288,7 @@ pub fn result(
   desc : String,
   children : Array[Node],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -2153,18 +2343,26 @@ pub fn result(
         }
       })
       on_theme_change(fn() { ViewLike::schedule_paint(icon) })
-      let big = themed_container(style=[("height", 30.0), ("alignItems", "center"),])
+      let big = themed_container(style=[
+        ("height", 30.0),
+        ("alignItems", "center"),
+      ])
       let t1 = Label::new(title)
       ViewLike::set_font(t1, Font::new("Sans", 18.0, weight=SemiBold))
       bind_fg(t1, fn() { theme_text_primary() })
       big.add_child(t1)
-      let sub = themed_container(style=[("height", 24.0), ("alignItems", "center"),])
+      let sub = themed_container(style=[
+        ("height", 24.0),
+        ("alignItems", "center"),
+      ])
       let t2 = Label::new(desc)
       bind_fg(t2, fn() { theme_text_secondary() })
       sub.add_child(t2)
-      let btns = themed_container(style=[("marginTop", 8.0),
+      let btns = themed_container(style=[
+        ("marginTop", 8.0),
         ("flexDirection", "row"),
-        ("alignItems", "center"),])
+        ("alignItems", "center"),
+      ])
       for ch in children {
         ignore((ch.mount)(ViewLike::view(btns)))
       }
@@ -2183,7 +2381,7 @@ pub fn result(
 pub fn empty(
   desc : String,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -2218,7 +2416,11 @@ pub fn empty(
         p.fill_rect(cx - 34.0, 22.0, 68.0, 14.0)
         p.stroke_rect(cx - 34.0, 22.0, 68.0, 14.0)
       })
-      let cap = themed_container(style=[("height", 26.0), ("marginTop", 6.0), ("alignItems", "center"),])
+      let cap = themed_container(style=[
+        ("height", 26.0),
+        ("marginTop", 6.0),
+        ("alignItems", "center"),
+      ])
       let l = Label::new(desc)
       bind_fg(l, fn() { theme_text_secondary() })
       cap.add_child(l)
@@ -2236,11 +2438,14 @@ pub fn statistic(
   title : String,
   value : Store[String],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [("marginRight", 24.0), ("flexDirection", "column")]
+      let base : Array[(String, &StyVal)] = [
+        ("marginRight", 24.0),
+        ("flexDirection", "column"),
+      ]
       for kv in style {
         base.push(kv)
       }
@@ -2270,7 +2475,7 @@ pub fn statistic(
 pub fn progress_line(
   value : Store[Double],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -2383,7 +2588,7 @@ pub fn button_t(
   on_click? : () -> Unit = fn() {  },
   variant? : ButtonVariant = Soft,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -2418,12 +2623,7 @@ pub fn button_t(
             } else {
               theme_primary_light()
             }
-          Text =>
-            if hover.val {
-              theme_fill_hover()
-            } else {
-              ""
-            }
+          Text => if hover.val { theme_fill_hover() } else { "" }
           Danger =>
             if hover.val {
               theme_danger_hover()
@@ -2500,7 +2700,8 @@ pub fn button_t(
 fn entry_ctrl_height(bordered : Bool) -> Double {
   let probe = AttributedText::new("Ag", wrap=false)
   probe.set_font(Font::new("Sans", 13.0))
-  probe.get_bounds_for(10000.0, 1000.0).height + (if bordered { 2.0 } else { 0.0 })
+  probe.get_bounds_for(10000.0, 1000.0).height +
+  (if bordered { 2.0 } else { 0.0 })
 }
 
 ///|
@@ -2573,7 +2774,7 @@ pub fn checkbox_t(
   disabled? : Bool = false,
   on_change? : (Bool) -> Unit = fn(_v) {  },
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -2612,7 +2813,13 @@ pub fn checkbox_t(
         )
         p.stroke_rect(3.5, by + 0.5, 13.0, 13.0)
         if state.val {
-          p.set_fill_color(if disabled { theme_border() } else { theme_primary() })
+          p.set_fill_color(
+            if disabled {
+              theme_border()
+            } else {
+              theme_primary()
+            },
+          )
           p.fill_rect(5.0, by + 2.0, 10.0, 10.0)
           // 白勾:折线两段,描两遍(错位 0.5px)近似 2px 线宽,不依赖字体
           p.set_stroke_color("#FFFFFF")
@@ -2627,7 +2834,13 @@ pub fn checkbox_t(
         let b = ViewLike::get_bounds(v)
         let at = AttributedText::new(title, valign=Center, wrap=false)
         at.set_font(font)
-        at.set_color(if disabled { theme_border() } else { theme_text_regular() })
+        at.set_color(
+          if disabled {
+            theme_border()
+          } else {
+            theme_text_regular()
+          },
+        )
         p.draw_attributed_text(at, 25.0, 0.0, b.width, b.height)
         if focused.val {
           draw_focus_ring(p, b.width, b.height)
@@ -2674,11 +2887,14 @@ pub fn radio_group(
   selected : Store[String],
   disabled? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [("marginBottom", 10.0), ("flexDirection", "column")]
+      let base : Array[(String, &StyVal)] = [
+        ("marginBottom", 10.0),
+        ("flexDirection", "column"),
+      ]
       for kv in style {
         base.push(kv)
       }
@@ -2695,9 +2911,7 @@ pub fn radio_group(
         let hover = Ref(false)
         let focused = Ref(false)
         let row = themed_container(style=[("width", w), ("height", 28.0)])
-        let activate = fn() -> Unit {
-          selected.set(opt)
-        }
+        let activate = fn() -> Unit { selected.set(opt) }
 
         row.on_draw(fn(p) {
           let act = selected.get() == opt
@@ -2818,7 +3032,7 @@ pub fn switch_t(
   checked : Store[Bool],
   disabled? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -2829,9 +3043,7 @@ pub fn switch_t(
       let v = themed_container(style=base)
       handle(v)
       let focused = Ref(false)
-      let activate = fn() -> Unit {
-        checked.set(!checked.get())
-      }
+      let activate = fn() -> Unit { checked.set(!checked.get()) }
 
       let slider_w = 14.0
       v.on_draw(fn(p) {
@@ -2840,7 +3052,13 @@ pub fn switch_t(
         p.set_fill_color(if on { theme_primary() } else { theme_border() })
         p.fill_rect(0.0, 0.0, b.width, b.height)
         let sx = if on { b.width - slider_w - 2.0 } else { 2.0 }
-        p.set_fill_color(if disabled { theme_info_light() } else { theme_bg_panel() })
+        p.set_fill_color(
+          if disabled {
+            theme_info_light()
+          } else {
+            theme_bg_panel()
+          },
+        )
         p.fill_rect(sx, 2.0, slider_w, b.height - 4.0)
         if focused.val {
           draw_focus_ring(p, b.width, b.height)
@@ -2866,7 +3084,6 @@ pub fn switch_t(
   }
 }
 
-
 ///|
 /// 边框输入框:外层自绘 1px 边框(聚焦变主题色)+ 白底,
 /// 内部 Entry 去 native 边框只负责文字;margin 控制外边距,直角。
@@ -2879,7 +3096,7 @@ pub fn input_t(
   on_input? : (String) -> Unit = fn(_s) {  },
   invalid? : Store[Bool] = Store::new(false),
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -2920,7 +3137,15 @@ pub fn input_t(
       ViewLike::set_borderless(entry, true)
       set_panel_bg(entry)
       ViewLike::set_style(entry, "marginLeft", 10.0)
-      ViewLike::set_style(entry, "marginRight", if clearable { 26.0 } else { 10.0 })
+      ViewLike::set_style(
+        entry,
+        "marginRight",
+        if clearable {
+          26.0
+        } else {
+          10.0
+        },
+      )
       if platform() == "windows" {
         // 文字贴顶:控件收窄到行高,外层 justifyContent=center 垂直居中
         ViewLike::set_style(entry, "height", entry_ctrl_height(false))
@@ -2994,7 +3219,7 @@ pub fn input_number(
   step? : Double = 1.0,
   num_width? : Double = 64.0,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -3010,20 +3235,40 @@ pub fn input_number(
       handle(row)
       let font = Font::new("Sans", 13.0)
       fn step_btn(dir : Double) -> Unit {
-        let b = themed_container(
-          style=[("width", 28.0), ("height", control_height), ("alignItems", "center")],
-        )
+        let b = themed_container(style=[
+          ("width", 28.0),
+          ("height", control_height),
+          ("alignItems", "center"),
+        ])
         bind_bg(b, fn() { theme_info_light() })
         let hover = Ref(false)
         b.on_draw(fn(p) {
           let bd = ViewLike::get_bounds(b)
-          p.set_fill_color(if hover.val { theme_primary_light() } else { theme_info_light() })
+          p.set_fill_color(
+            if hover.val {
+              theme_primary_light()
+            } else {
+              theme_info_light()
+            },
+          )
           p.fill_rect(0.0, 0.0, bd.width, bd.height)
           // +/− 矢量自绘(字形图标跨平台发虚,GTK align 亦无效)
           if dir > 0.0 {
-            draw_glyph_plus(p, bd.width / 2.0, bd.height / 2.0, 4.0, theme_text_regular())
+            draw_glyph_plus(
+              p,
+              bd.width / 2.0,
+              bd.height / 2.0,
+              4.0,
+              theme_text_regular(),
+            )
           } else {
-            draw_glyph_minus(p, bd.width / 2.0, bd.height / 2.0, 4.0, theme_text_regular())
+            draw_glyph_minus(
+              p,
+              bd.width / 2.0,
+              bd.height / 2.0,
+              4.0,
+              theme_text_regular(),
+            )
           }
         })
         View::set_cursor(b, hand())
@@ -3057,9 +3302,12 @@ pub fn input_number(
 
       step_btn(-1.0)
       // marginRight 0:EP InputNumber 的按钮与输入区紧贴
-      let num = themed_container(
-        style=[("width", num_width), ("height", control_height), ("marginRight", 0.0), ("alignItems", "center")],
-      )
+      let num = themed_container(style=[
+        ("width", num_width),
+        ("height", control_height),
+        ("marginRight", 0.0),
+        ("alignItems", "center"),
+      ])
       set_panel_bg(num)
       let t = AttributedText::new(
         value.get().to_string(),
@@ -3096,7 +3344,7 @@ pub fn form_item(
   label_width? : Double = 90.0,
   error? : Store[String] = Store::new(""),
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -3106,14 +3354,19 @@ pub fn form_item(
       }
       let outer = themed_container(style=base)
       handle(outer)
-      let row = themed_container(
-        style=[("marginBottom", 2.0), ("flexDirection", "row"), ("alignItems", "center")],
-      )
+      let row = themed_container(style=[
+        ("marginBottom", 2.0),
+        ("flexDirection", "row"),
+        ("alignItems", "center"),
+      ])
       let k = Label::new(label)
       ViewLike::set_font(k, Font::new("Sans", 13.0))
       bind_fg(k, fn() { theme_text_secondary() })
       k.set_align(End)
-      let kwrap = themed_container(style=[("width", label_width), ("marginRight", 12.0)])
+      let kwrap = themed_container(style=[
+        ("width", label_width),
+        ("marginRight", 12.0),
+      ])
       kwrap.add_child(k)
       row.add_child(kwrap)
       ignore((control.mount)(ViewLike::view(row)))
@@ -3145,7 +3398,9 @@ pub fn form(
   items : Array[Node],
   style? : Array[(String, &StyVal)] = [],
 ) -> Node {
-  let nodes : Array[Node] = [label_t(title, role=Section, style=[("marginBottom", 10.0)])]
+  let nodes : Array[Node] = [
+    label_t(title, role=Section, style=[("marginBottom", 10.0)]),
+  ]
   for it in items {
     nodes.push(it)
   }
@@ -3162,7 +3417,7 @@ pub fn link(
   text : String,
   on_click : () -> Unit,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -3230,7 +3485,7 @@ pub(all) struct TreeNode {
 pub fn tree(
   root : Array[TreeNode],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -3267,25 +3522,24 @@ pub fn tree(
           let has_children = nd.children.length() > 0
           let open = Ref(false)
           let indent = level.to_double() * 18.0
-          let row = themed_container(
-            style=[("height", 32.0), ("marginLeft", indent), ("flexDirection", "row"), ("alignItems", "center")],
-          )
-          let arrow = themed_container(
-            style=[("width", 10.0), ("height", 10.0), ("marginRight", 3.0)],
-          )
-          arrow.on_draw(fn(p) {
-            if has_children {
-              draw_caret(p, open.val)
-            }
-          })
+          let row = themed_container(style=[
+            ("height", 32.0),
+            ("marginLeft", indent),
+            ("flexDirection", "row"),
+            ("alignItems", "center"),
+          ])
+          let arrow = themed_container(style=[
+            ("width", 10.0),
+            ("height", 10.0),
+            ("marginRight", 3.0),
+          ])
+          arrow.on_draw(fn(p) { if has_children { draw_caret(p, open.val) } })
           let label = Label::new(" " + nd.label)
           ViewLike::set_font(label, font)
           bind_fg(label, fn() { theme_text_primary() })
           row.add_child(arrow)
           row.add_child(label)
-          let kids = themed_container(
-            style=[("flexDirection", "column")],
-          )
+          let kids = themed_container(style=[("flexDirection", "column")])
           ViewLike::set_visible(kids, false)
           if has_children {
             build(nd.children, level + 1, kids)
@@ -3321,7 +3575,7 @@ pub fn transfer(
   right_items : Store[Array[String]],
   width? : Double = 160.0,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -3339,12 +3593,14 @@ pub fn transfer(
       // 选中集合(按值),用 Ref 可变数组
       let left_sel : Ref[Array[String]] = Ref([])
       let right_sel : Ref[Array[String]] = Ref([])
-      let left_box = themed_container(
-        style=[("width", width), ("flexDirection", "column")],
-      )
-      let right_box = themed_container(
-        style=[("width", width), ("flexDirection", "column")],
-      )
+      let left_box = themed_container(style=[
+        ("width", width),
+        ("flexDirection", "column"),
+      ])
+      let right_box = themed_container(style=[
+        ("width", width),
+        ("flexDirection", "column"),
+      ])
       fn contains(arr : Array[String], s : String) -> Bool {
         for x in arr {
           if x == s {
@@ -3384,15 +3640,26 @@ pub fn transfer(
       ) -> Unit {
         for it in items.get() {
           let it_ref = it
-          let row = themed_container(
-            style=[("height", 26.0), ("paddingLeft", 8.0), ("flexDirection", "row"), ("alignItems", "center")],
-          )
-          let mark = themed_container(
-            style=[("width", 10.0), ("height", 10.0), ("marginRight", 6.0)],
-          )
+          let row = themed_container(style=[
+            ("height", 26.0),
+            ("paddingLeft", 8.0),
+            ("flexDirection", "row"),
+            ("alignItems", "center"),
+          ])
+          let mark = themed_container(style=[
+            ("width", 10.0),
+            ("height", 10.0),
+            ("marginRight", 6.0),
+          ])
           mark.on_draw(fn(p) {
             let is_sel = contains(sel.val, it_ref)
-            p.set_stroke_color(if is_sel { theme_primary() } else { theme_border() })
+            p.set_stroke_color(
+              if is_sel {
+                theme_primary()
+              } else {
+                theme_border()
+              },
+            )
             p.stroke_rect(0.5, 0.5, 9.0, 9.0)
             if is_sel {
               p.set_fill_color(theme_primary())
@@ -3426,7 +3693,11 @@ pub fn transfer(
         }
       }
 
-      fn move_items(from : Store[Array[String]], to : Store[Array[String]], sel : Ref[Array[String]]) -> Unit {
+      fn move_items(
+        from : Store[Array[String]],
+        to : Store[Array[String]],
+        sel : Ref[Array[String]],
+      ) -> Unit {
         let moving = sel.val
         let remain : Array[String] = []
         for x in from.get() {
@@ -3453,17 +3724,32 @@ pub fn transfer(
       left_items.subscribe(fn(_v) { render_all() })
       right_items.subscribe(fn(_v) { render_all() })
       fn mid_btn(to_right : Bool) -> Unit {
-        let b = themed_container(
-          style=[("width", 32.0), ("height", 28.0), ("marginRight", 8.0), ("alignItems", "center")],
-        )
+        let b = themed_container(style=[
+          ("width", 32.0),
+          ("height", 28.0),
+          ("marginRight", 8.0),
+          ("alignItems", "center"),
+        ])
         bind_bg(b, fn() { theme_info_light() })
         b.on_draw(fn(p) {
           let bd = ViewLike::get_bounds(b)
           // ‹/› 矢量三角(字形图标跨平台发虚,GTK align 亦无效)
           if to_right {
-            draw_glyph_right(p, bd.width / 2.0, bd.height / 2.0, 4.0, theme_text_regular())
+            draw_glyph_right(
+              p,
+              bd.width / 2.0,
+              bd.height / 2.0,
+              4.0,
+              theme_text_regular(),
+            )
           } else {
-            draw_glyph_left(p, bd.width / 2.0, bd.height / 2.0, 4.0, theme_text_regular())
+            draw_glyph_left(
+              p,
+              bd.width / 2.0,
+              bd.height / 2.0,
+              4.0,
+              theme_text_regular(),
+            )
           }
         })
         View::set_cursor(b, hand())
@@ -3544,7 +3830,7 @@ fn local_date() -> DateYMD {
   let v = ffi_local_date()
   {
     y: (v / 10000).to_int(),
-    m: ((v % 10000) / 100).to_int(),
+    m: (v % 10000 / 100).to_int(),
     d: (v % 100).to_int(),
   }
 }
@@ -3605,7 +3891,7 @@ pub fn TimeHM::format(self : TimeHM) -> String {
 fn time_clamp(h : Int, m : Int) -> TimeHM {
   let hc = if h < 0 { 0 } else if h > 23 { 23 } else { h }
   let mc = if m < 0 { 0 } else if m > 59 { 59 } else { m }
-  { h: hc, m: mc }
+  { h: hc, m: mc, }
 }
 
 ///|
@@ -3653,13 +3939,13 @@ fn build_calendar(
   let cell_h = 30.0
   // 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然高度
   // (高 = 上下 padding 16 + 头 32+4 + 星期行 26 + 6 行 x 30)
-  let panel = themed_container(
-    style=[// yoga 的 width 是 border-box 语义(含 padding),须加 16;
-      // 只给内容宽 252 会把最后一列(周六)裁掉 16px
-      ("width", cell_w * 7.0 + 16.0),
-      ("height", 16.0 + 32.0 + 4.0 + 26.0 + 6.0 * cell_h),
-      ("padding", 8.0), ("flexDirection", "column")],
-  )
+  let panel = themed_container(style=[ // yoga 的 width 是 border-box 语义(含 padding),须加 16;
+    // 只给内容宽 252 会把最后一列(周六)裁掉 16px
+    ("width", cell_w * 7.0 + 16.0),
+    ("height", 16.0 + 32.0 + 4.0 + 26.0 + 6.0 * cell_h),
+    ("padding", 8.0),
+    ("flexDirection", "column"),
+  ])
   set_panel_bg(panel)
   panel.on_draw(fn(p) {
     let b = ViewLike::get_bounds(panel)
@@ -3676,17 +3962,18 @@ fn build_calendar(
     h : Double,
     color : String,
   ) -> Unit {
-    p.draw_text(text, 0.0, y, cell_w, h, align=Center, valign=Center, color=color)
+    p.draw_text(text, 0.0, y, cell_w, h, align=Center, valign=Center, color~)
   }
 
   let head_h = 32.0
-  let head = themed_container(
-    style=[("height", head_h), ("marginBottom", 4.0), ("flexDirection", "row"), ("alignItems", "center")],
-  )
+  let head = themed_container(style=[
+    ("height", head_h),
+    ("marginBottom", 4.0),
+    ("flexDirection", "row"),
+    ("alignItems", "center"),
+  ])
   let title_text = Ref("")
-  let title = themed_container(
-    style=[("flex", 1.0), ("height", head_h)],
-  )
+  let title = themed_container(style=[("flex", 1.0), ("height", head_h)])
   // 月标题水平居中:GTK 端 align 无效,绘制时测宽手动摆位
   title.on_draw(fn(p) {
     let b = ViewLike::get_bounds(title)
@@ -3715,9 +4002,21 @@ fn build_calendar(
       }
       // ‹/› 矢量三角(字形图标跨平台发虚,GTK align 亦无效)
       if to_left {
-        draw_glyph_left(p, bb.width / 2.0, bb.height / 2.0, 4.0, theme_text_regular())
+        draw_glyph_left(
+          p,
+          bb.width / 2.0,
+          bb.height / 2.0,
+          4.0,
+          theme_text_regular(),
+        )
       } else {
-        draw_glyph_right(p, bb.width / 2.0, bb.height / 2.0, 4.0, theme_text_regular())
+        draw_glyph_right(
+          p,
+          bb.width / 2.0,
+          bb.height / 2.0,
+          4.0,
+          theme_text_regular(),
+        )
       }
     })
     ViewLike::on_mouse_enter(b, fn(_e) {
@@ -3762,9 +4061,7 @@ fn build_calendar(
   head.add_child(title)
   head.add_child(nav_btn("›", fn() { nav(1) }))
   let week_h = 26.0
-  let wk = themed_container(
-    style=[("height", week_h), ("flexDirection", "row")],
-  )
+  let wk = themed_container(style=[("height", week_h), ("flexDirection", "row")])
   for name in ["日", "一", "二", "三", "四", "五", "六"] {
     let wref = name
     let c = themed_container(style=[("width", cell_w), ("height", week_h)])
@@ -3781,86 +4078,84 @@ fn build_calendar(
   let cells : Ref[Array[Container]] = Ref([])
   let cell_date : Ref[Array[Ref[DateYMD]]] = Ref([])
   let cell_inm : Ref[Array[Ref[Bool]]] = Ref([])
-  {
-    for _row in 0..<6 {
-      let r = themed_container(style=[("flexDirection", "row")])
-      for _col in 0..<7 {
-        let dref : Ref[DateYMD] = Ref({ y: 0, m: 1, d: 1 })
-        let inm : Ref[Bool] = Ref(false)
-        let hover = Ref(false)
-        let c = themed_container(style=[("width", cell_w), ("height", cell_h)])
-        c.on_draw(fn(p) {
-          let b = ViewLike::get_bounds(c)
-          let d = dref.val
-          let in_m = inm.val
-          let st = state_of(d)
-          let solid = match st {
-            Selected | RangeEdge => true
-            Plain | InRange => false
-          }
-          if hover.val && !solid {
-            p.set_fill_color(theme_fill_hover())
+  for _row in 0..<6 {
+    let r = themed_container(style=[("flexDirection", "row")])
+    for _col in 0..<7 {
+      let dref : Ref[DateYMD] = Ref({ y: 0, m: 1, d: 1, })
+      let inm : Ref[Bool] = Ref(false)
+      let hover = Ref(false)
+      let c = themed_container(style=[("width", cell_w), ("height", cell_h)])
+      c.on_draw(fn(p) {
+        let b = ViewLike::get_bounds(c)
+        let d = dref.val
+        let in_m = inm.val
+        let st = state_of(d)
+        let solid = match st {
+          Selected | RangeEdge => true
+          Plain | InRange => false
+        }
+        if hover.val && !solid {
+          p.set_fill_color(theme_fill_hover())
+          p.fill_rect(0.0, 0.0, b.width, b.height)
+        }
+        match st {
+          InRange => {
+            p.set_fill_color(theme_primary_light())
             p.fill_rect(0.0, 0.0, b.width, b.height)
           }
-          match st {
-            InRange => {
-              p.set_fill_color(theme_primary_light())
-              p.fill_rect(0.0, 0.0, b.width, b.height)
-            }
-            Plain | Selected | RangeEdge => ()
-          }
-          if solid {
-            p.set_fill_color(theme_primary())
-            p.fill_rect(
-              (b.width - 28.0) / 2.0,
-              (b.height - 28.0) / 2.0,
-              28.0,
-              28.0,
-            )
-            draw_center(p, d.d.to_string(), 0.0, b.height, "#FFFFFF")
+          Plain | Selected | RangeEdge => ()
+        }
+        if solid {
+          p.set_fill_color(theme_primary())
+          p.fill_rect(
+            (b.width - 28.0) / 2.0,
+            (b.height - 28.0) / 2.0,
+            28.0,
+            28.0,
+          )
+          draw_center(p, d.d.to_string(), 0.0, b.height, "#FFFFFF")
+        } else {
+          let color = if !in_m {
+            theme_text_secondary()
+          } else if today.y == d.y && today.m == d.m && today.d == d.d {
+            theme_primary()
+          } else if st is InRange {
+            theme_primary()
           } else {
-            let color = if !in_m {
-              theme_text_secondary()
-            } else if today.y == d.y && today.m == d.m && today.d == d.d {
-              theme_primary()
-            } else if st is InRange {
-              theme_primary()
-            } else {
-              theme_text_primary()
-            }
-            draw_center(p, d.d.to_string(), 0.0, b.height, color)
+            theme_text_primary()
           }
-        })
-        View::set_cursor(c, hand())
-        // release 才选中:弹层内点项一律 release 防穿透;
-        // calendar_t 内联面板同语义无副作用(松开选中,标准按钮感)。
-        // 跨月格不可选(inm 校验在回调内,格子稳定不随月重建)
-        ViewLike::on_mouse_up(c, fn(e) {
-          if e.button == 1 && inm.val {
-            on_cell(dref.val)
-            for cc in cells.val {
-              ViewLike::schedule_paint(cc)
-            }
-            true
-          } else {
-            false
+          draw_center(p, d.d.to_string(), 0.0, b.height, color)
+        }
+      })
+      View::set_cursor(c, hand())
+      // release 才选中:弹层内点项一律 release 防穿透;
+      // calendar_t 内联面板同语义无副作用(松开选中,标准按钮感)。
+      // 跨月格不可选(inm 校验在回调内,格子稳定不随月重建)
+      ViewLike::on_mouse_up(c, fn(e) {
+        if e.button == 1 && inm.val {
+          on_cell(dref.val)
+          for cc in cells.val {
+            ViewLike::schedule_paint(cc)
           }
-        })
-        ViewLike::on_mouse_enter(c, fn(_e) {
-          hover.val = true
-          ViewLike::schedule_paint(c)
-        })
-        ViewLike::on_mouse_leave(c, fn(_e) {
-          hover.val = false
-          ViewLike::schedule_paint(c)
-        })
-        r.add_child(c)
-        cells.val.push(c)
-        cell_date.val.push(dref)
-        cell_inm.val.push(inm)
-      }
-      grid.add_child(r)
+          true
+        } else {
+          false
+        }
+      })
+      ViewLike::on_mouse_enter(c, fn(_e) {
+        hover.val = true
+        ViewLike::schedule_paint(c)
+      })
+      ViewLike::on_mouse_leave(c, fn(_e) {
+        hover.val = false
+        ViewLike::schedule_paint(c)
+      })
+      r.add_child(c)
+      cells.val.push(c)
+      cell_date.val.push(dref)
+      cell_inm.val.push(inm)
     }
+    grid.add_child(r)
   }
 
   fn rebuild_grid() -> Unit {
@@ -3871,8 +4166,16 @@ fn build_calendar(
     let first_wd = date_weekday(y, m, 1)
     let dim = date_days_in_month(y, m)
     let dim_prev = date_days_in_month(
-      if m == 1 { y - 1 } else { y },
-      if m == 1 { 12 } else { m - 1 },
+      if m == 1 {
+        y - 1
+      } else {
+        y
+      },
+      if m == 1 {
+        12
+      } else {
+        m - 1
+      },
     )
     for idx in 0..<42 {
       let in_month = idx >= first_wd && idx < first_wd + dim
@@ -3907,7 +4210,7 @@ fn build_calendar(
       } else {
         m + 1
       }
-      cell_date.val[idx].val = { y: dy, m: dm, d: dd }
+      cell_date.val[idx].val = { y: dy, m: dm, d: dd, }
       cell_inm.val[idx].val = in_month
       ViewLike::schedule_paint(cells.val[idx])
     }
@@ -3929,28 +4232,34 @@ pub fn calendar_t(
   on_pick? : (DateYMD) -> Unit = fn(_d) {  },
   value? : Store[DateYMD?],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
       let today = local_date()
-      let sel : Ref[DateYMD?] = Ref(match value {
-        Some(s) => s.get()
-        None => None
-      })
-      let (panel, refresh) = build_calendar(today, fn(d) {
-        match sel.val {
-          Some(s) => if date_eq(s, d) { Selected } else { Plain }
-          None => Plain
-        }
-      }, fn(d) {
-        sel.val = Some(d)
+      let sel : Ref[DateYMD?] = Ref(
         match value {
-          Some(s) => s.set(Some(d))
-          None => ()
-        }
-        on_pick(d)
-      })
+          Some(s) => s.get()
+          None => None
+        },
+      )
+      let (panel, refresh) = build_calendar(
+        today,
+        fn(d) {
+          match sel.val {
+            Some(s) => if date_eq(s, d) { Selected } else { Plain }
+            None => Plain
+          }
+        },
+        fn(d) {
+          sel.val = Some(d)
+          match value {
+            Some(s) => s.set(Some(d))
+            None => ()
+          }
+          on_pick(d)
+        },
+      )
       apply_style(panel, style~)
       handle(panel)
       match value {
@@ -3979,29 +4288,42 @@ pub fn date_picker_t(
   {
     mount: fn(parent) {
       let today = local_date()
-      let sel : Ref[DateYMD?] = Ref(match value {
-        Some(s) => s.get()
-        None => None
-      })
-      let text = Ref(match sel.val {
-        Some(d) => d.format()
-        None => placeholder
-      })
-      let has_val = Ref(match sel.val {
-        Some(_) => true
-        None => false
-      })
+      let sel : Ref[DateYMD?] = Ref(
+        match value {
+          Some(s) => s.get()
+          None => None
+        },
+      )
+      let text = Ref(
+        match sel.val {
+          Some(d) => d.format()
+          None => placeholder
+        },
+      )
+      let has_val = Ref(
+        match sel.val {
+          Some(_) => true
+          None => false
+        },
+      )
       // 弹层与面板:首开时创建,面板重建函数挂入 grid_refresh 供外部同步
       let pop : Ref[Popover?] = Ref(None)
       let grid_refresh : Ref[() -> Unit] = Ref(fn() {  })
-      let field = build_picker_field(200.0, text, has_val, clearable, on_focus_changed=fn(f) {
-        if !f {
-          match pop.val {
-            Some(p) => p.close()
-            None => ()
+      let field = build_picker_field(
+        200.0,
+        text,
+        has_val,
+        clearable,
+        on_focus_changed=fn(f) {
+          if !f {
+            match pop.val {
+              Some(p) => p.close()
+              None => ()
+            }
           }
-        }
-      }, extra_style=style)
+        },
+        extra_style=style,
+      )
       fn apply_date(d : DateYMD) -> Unit {
         sel.val = Some(d)
         text.val = d.format()
@@ -4034,15 +4356,19 @@ pub fn date_picker_t(
             None => {
               let p = Popover::new()
               bind_popover_bg(p)
-              let (panel, refresh) = build_calendar(today, fn(d) {
-                match sel.val {
-                  Some(s) => if date_eq(s, d) { Selected } else { Plain }
-                  None => Plain
-                }
-              }, fn(d) {
-                apply_date(d)
-                p.close()
-              })
+              let (panel, refresh) = build_calendar(
+                today,
+                fn(d) {
+                  match sel.val {
+                    Some(s) => if date_eq(s, d) { Selected } else { Plain }
+                    None => Plain
+                  }
+                },
+                fn(d) {
+                  apply_date(d)
+                  p.close()
+                },
+              )
               ignore(refresh)
               grid_refresh.val = refresh
               p.set_content(panel)
@@ -4075,7 +4401,7 @@ pub fn date_picker_t(
               }
             }
             ViewLike::schedule_paint(field)
-            ((grid_refresh.val))()
+            (grid_refresh.val)()
           })
         None => ()
       }
@@ -4112,13 +4438,17 @@ fn build_picker_field(
   for kv in extra_style {
     style.push(kv)
   }
-  let field = themed_container(style=style)
+  let field = themed_container(style~)
   set_panel_bg(field)
   View::set_cursor(field, hand())
   field.on_draw(fn(p) {
     let b = ViewLike::get_bounds(field)
     p.set_stroke_color(
-      if focused.val { theme_focus_accent() } else { theme_border() },
+      if focused.val {
+        theme_focus_accent()
+      } else {
+        theme_border()
+      },
     )
     p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
     let probe = AttributedText::new(text.val, wrap=false)
@@ -4195,7 +4525,7 @@ fn range_state_of(
 ) -> (DateYMD) -> CalCell {
   fn state_of(d : DateYMD) -> CalCell {
     match (start.val, end.val) {
-      (Some(s), Some(e)) => {
+      (Some(s), Some(e)) =>
         if date_eq(d, s) || date_eq(d, e) {
           RangeEdge
         } else if date_in_range(d, s, e) {
@@ -4203,7 +4533,6 @@ fn range_state_of(
         } else {
           Plain
         }
-      }
       (Some(s), None) => if date_eq(d, s) { RangeEdge } else { Plain }
       (None, None) | (None, Some(_)) => Plain
     }
@@ -4293,13 +4622,13 @@ fn build_time_panel(
   let mute = Ref(false)
   let (row1, sync1) = build_time_row("起", start_hm, mute, on_change)
   let (row2, sync2) = build_time_row("止", end_hm, mute, on_change)
-  let panel = themed_container(
-    style=[// 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然
-      // 高度,漏显式高度会把两行压塌(高 = 上下 padding 16 + 两行 x 36)
-      ("padding", 8.0),
-      ("width", 268.0),
-      ("height", 16.0 + 2.0 * 36.0), ("flexDirection", "column")],
-  )
+  let panel = themed_container(style=[ // 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然
+    // 高度,漏显式高度会把两行压塌(高 = 上下 padding 16 + 两行 x 36)
+    ("padding", 8.0),
+    ("width", 268.0),
+    ("height", 16.0 + 2.0 * 36.0),
+    ("flexDirection", "column"),
+  ])
   set_panel_bg(panel)
   let _ = row1.mount_into(panel.view())
   let _ = row2.mount_into(panel.view())
@@ -4327,25 +4656,36 @@ pub fn date_range_picker_t(
     mount: fn(parent) {
       let today = local_date()
       let pop : Ref[Popover?] = Ref(None)
-      let start : Ref[DateYMD?] = Ref(match value {
-        Some(v) => v.get().start
-        None => None
-      })
-      let end : Ref[DateYMD?] = Ref(match value {
-        Some(v) => v.get().end
-        None => None
-      })
+      let start : Ref[DateYMD?] = Ref(
+        match value {
+          Some(v) => v.get().start
+          None => None
+        },
+      )
+      let end : Ref[DateYMD?] = Ref(
+        match value {
+          Some(v) => v.get().end
+          None => None
+        },
+      )
       let text = Ref("")
       let has_val = Ref(false)
       let grid_refresh : Ref[() -> Unit] = Ref(fn() {  })
-      let field = build_picker_field(260.0, text, has_val, clearable, on_focus_changed=fn(f) {
-        if !f {
-          match pop.val {
-            Some(p) => p.close()
-            None => ()
+      let field = build_picker_field(
+        260.0,
+        text,
+        has_val,
+        clearable,
+        on_focus_changed=fn(f) {
+          if !f {
+            match pop.val {
+              Some(p) => p.close()
+              None => ()
+            }
           }
-        }
-      }, extra_style=style)
+        },
+        extra_style=style,
+      )
       fn refresh_text() -> Unit {
         match (start.val, end.val) {
           (Some(s), Some(e)) => {
@@ -4366,7 +4706,7 @@ pub fn date_range_picker_t(
 
       fn write_value(s : DateYMD?, e : DateYMD?) -> Unit {
         match value {
-          Some(v) => v.set({ start: s, end: e })
+          Some(v) => v.set({ start: s, end: e, })
           None => ()
         }
       }
@@ -4390,15 +4730,19 @@ pub fn date_range_picker_t(
             None => {
               let p = Popover::new()
               bind_popover_bg(p)
-              let (panel, refresh) = build_calendar(today, range_state_of(start, end), fn(d) {
-                range_cell_click(start, end, d, fn(a, b) {
+              let (panel, refresh) = build_calendar(
+                today,
+                range_state_of(start, end),
+                fn(d) {
+                  range_cell_click(start, end, d, fn(a, b) {
+                    refresh_text()
+                    write_value(Some(a), Some(b))
+                    on_change(a, b)
+                    p.close()
+                  })
                   refresh_text()
-                  write_value(Some(a), Some(b))
-                  on_change(a, b)
-                  p.close()
-                })
-                refresh_text()
-              })
+                },
+              )
               grid_refresh.val = refresh
               refresh()
               p.set_content(panel)
@@ -4421,7 +4765,7 @@ pub fn date_range_picker_t(
             start.val = r.start
             end.val = r.end
             refresh_text()
-            ((grid_refresh.val))()
+            (grid_refresh.val)()
           })
         None => ()
       }
@@ -4452,14 +4796,21 @@ pub fn time_range_picker_t(
       let touched = Ref(false) // 弹层内动过步进才视为有值
       let text = Ref("")
       let has_val = Ref(false)
-      let field = build_picker_field(180.0, text, has_val, clearable, on_focus_changed=fn(f) {
-        if !f {
-          match pop.val {
-            Some(p) => p.close()
-            None => ()
+      let field = build_picker_field(
+        180.0,
+        text,
+        has_val,
+        clearable,
+        on_focus_changed=fn(f) {
+          if !f {
+            match pop.val {
+              Some(p) => p.close()
+              None => ()
+            }
           }
-        }
-      }, extra_style=style)
+        },
+        extra_style=style,
+      )
       fn refresh_text() -> Unit {
         if has_val.val {
           text.val = "\{start.val.format()} ~ \{end.val.format()}"
@@ -4471,7 +4822,7 @@ pub fn time_range_picker_t(
 
       fn write_value(s : TimeHM, e : TimeHM) -> Unit {
         match value {
-          Some(v) => v.set({ start: Some(s), end: Some(e) })
+          Some(v) => v.set({ start: Some(s), end: Some(e), })
           None => ()
         }
       }
@@ -4483,7 +4834,7 @@ pub fn time_range_picker_t(
             touched.val = false
             has_val.val = false
             match value {
-              Some(v) => v.set({ start: None, end: None })
+              Some(v) => v.set({ start: None, end: None, })
               None => ()
             }
             refresh_text()
@@ -4555,7 +4906,14 @@ pub fn time_range_picker_t(
 /// (起日期, 起时间, 止日期, 止时间);「完成」按钮或字段失焦收起。
 pub fn datetime_range_picker_t(
   value? : Store[DateTimeRange],
-  on_change? : (DateYMD, TimeHM, DateYMD, TimeHM) -> Unit = fn(_sd, _st, _ed, _et) {  },
+  on_change? : (DateYMD, TimeHM, DateYMD, TimeHM) -> Unit = fn(
+    _sd,
+    _st,
+    _ed,
+    _et,
+  ) {
+
+  },
   placeholder? : String = "请选择日期时间区间",
   clearable? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
@@ -4564,50 +4922,65 @@ pub fn datetime_range_picker_t(
     mount: fn(parent) {
       let today = local_date()
       let pop : Ref[Popover?] = Ref(None)
-      let start_d : Ref[DateYMD?] = Ref(match value {
-        Some(v) =>
-          match v.get().start {
-            Some((d, _t)) => Some(d)
-            None => None
-          }
-        None => None
-      })
-      let end_d : Ref[DateYMD?] = Ref(match value {
-        Some(v) =>
-          match v.get().end {
-            Some((d, _t)) => Some(d)
-            None => None
-          }
-        None => None
-      })
-      let start_t = Ref(match value {
-        Some(v) =>
-          match v.get().start {
-            Some((_d, t)) => t
-            None => time_clamp(0, 0)
-          }
-        None => time_clamp(0, 0)
-      })
-      let end_t = Ref(match value {
-        Some(v) =>
-          match v.get().end {
-            Some((_d, t)) => t
-            None => time_clamp(0, 0)
-          }
-        None => time_clamp(0, 0)
-      })
+      let start_d : Ref[DateYMD?] = Ref(
+        match value {
+          Some(v) =>
+            match v.get().start {
+              Some((d, _t)) => Some(d)
+              None => None
+            }
+          None => None
+        },
+      )
+      let end_d : Ref[DateYMD?] = Ref(
+        match value {
+          Some(v) =>
+            match v.get().end {
+              Some((d, _t)) => Some(d)
+              None => None
+            }
+          None => None
+        },
+      )
+      let start_t = Ref(
+        match value {
+          Some(v) =>
+            match v.get().start {
+              Some((_d, t)) => t
+              None => time_clamp(0, 0)
+            }
+          None => time_clamp(0, 0)
+        },
+      )
+      let end_t = Ref(
+        match value {
+          Some(v) =>
+            match v.get().end {
+              Some((_d, t)) => t
+              None => time_clamp(0, 0)
+            }
+          None => time_clamp(0, 0)
+        },
+      )
       let text = Ref("")
       let has_val = Ref(false)
       let time_sync : Ref[(TimeHM, TimeHM) -> Unit] = Ref(fn(_st, _et) {  })
       let grid_refresh_d : Ref[() -> Unit] = Ref(fn() {  })
-      let field = build_picker_field(340.0, text, has_val, clearable, on_focus_changed=fn(f) {
-        if !f {
-          match pop.val {
-            Some(p) => p.close()
-            None => ()
+      let field = build_picker_field(
+        340.0,
+        text,
+        has_val,
+        clearable,
+        on_focus_changed=fn(f) {
+          if !f {
+            match pop.val {
+              Some(p) => p.close()
+              None => ()
+            }
           }
-        }
-      }, extra_style=style)
+        },
+        extra_style=style,
+      )
       fn refresh_text() -> Unit {
         match (start_d.val, end_d.val) {
           (Some(sd), Some(ed)) => {
@@ -4637,7 +5010,7 @@ pub fn datetime_range_picker_t(
               Some(d) => Some((d, end_t.val))
               None => None
             }
-            v.set({ start: s, end: e })
+            v.set({ start: s, end: e, })
           }
           None => ()
         }
@@ -4673,12 +5046,14 @@ pub fn datetime_range_picker_t(
             None => {
               let p = Popover::new()
               bind_popover_bg(p)
-              let (cal, refresh) = build_calendar(today, range_state_of(start_d, end_d), fn(d) {
-                range_cell_click(start_d, end_d, d, fn(_a, _b) {
-                  emit()
-                })
-                refresh_text()
-              })
+              let (cal, refresh) = build_calendar(
+                today,
+                range_state_of(start_d, end_d),
+                fn(d) {
+                  range_cell_click(start_d, end_d, d, fn(_a, _b) { emit() })
+                  refresh_text()
+                },
+              )
               let (tpanel, sync, _mute) = build_time_panel(start_t, end_t, fn() {
                 emit()
                 refresh_text()
@@ -4687,9 +5062,11 @@ pub fn datetime_range_picker_t(
               grid_refresh_d.val = refresh
               // 显式总宽高:PopoverRootView 按 content_size 硬分配,漏显式
               // 高度会把时间面板/完成行压塌
-              let body = themed_container(
-                style=[("width", 268.0), ("height", 258.0 + 1.0 + 88.0 + 32.0), ("flexDirection", "column")],
-              )
+              let body = themed_container(style=[
+                ("width", 268.0),
+                ("height", 258.0 + 1.0 + 88.0 + 32.0),
+                ("flexDirection", "column"),
+              ])
               body.add_child(cal)
               let sep = themed_container(style=[("height", 1.0)])
               sep.on_draw(fn(p2) {
@@ -4699,9 +5076,13 @@ pub fn datetime_range_picker_t(
               })
               body.add_child(sep)
               body.add_child(tpanel)
-              let done_row = themed_container(
-                style=[("height", 32.0), ("padding", 6.0), ("flexDirection", "row"), ("alignItems", "center"), ("justifyContent", "flex-end")],
-              )
+              let done_row = themed_container(style=[
+                ("height", 32.0),
+                ("padding", 6.0),
+                ("flexDirection", "row"),
+                ("alignItems", "center"),
+                ("justifyContent", "flex-end"),
+              ])
               let _ = button_t("完成", variant=Solid, on_click=fn() {
                 p.close()
               }).mount_into(done_row.view())
@@ -4740,7 +5121,7 @@ pub fn datetime_range_picker_t(
             }
             (time_sync.val)(start_t.val, end_t.val)
             refresh_text()
-            ((grid_refresh_d.val))()
+            (grid_refresh_d.val)()
           })
         None => ()
       }
@@ -4769,7 +5150,7 @@ pub fn TableColumn::make(
   align? : TextAlign = Start,
   sortable? : Bool = true,
 ) -> TableColumn {
-  { title, width, align, sortable }
+  { title, width, align, sortable, }
 }
 
 ///|
@@ -4804,7 +5185,7 @@ pub fn TableRow::make(cells : Array[String]) -> TableRow {
   for c in cells {
     out.push(CellText(c))
   }
-  { cells: out }
+  { cells: out, }
 }
 
 ///|
@@ -4818,7 +5199,11 @@ fn table_draw_check(
   partial : Bool,
 ) -> Unit {
   p.set_stroke_color(
-    if checked || partial { theme_primary() } else { theme_border() },
+    if checked || partial {
+      theme_primary()
+    } else {
+      theme_border()
+    },
   )
   p.stroke_rect(x + 0.5, y + 0.5, 13.0, 13.0)
   if checked {
@@ -4842,6 +5227,7 @@ fn table_draw_check(
 /// 排序箭头(表头):cx/cy 为中心,asc 升序尖端朝上;active=false 画
 /// 浅色(可排序列的 hover 提示,不表示当前排序)。8x7 矢量三角,
 /// 不依赖字体。
+
 ///|
 /// 排序箭头(表头,实心三角):cx/cy 为中心,asc 升序尖端朝上;
 /// active=false 画灰色(未排序列的常驻 ↕ 提示,不表示当前方向)。
@@ -4926,9 +5312,9 @@ pub fn table_t(
   row_height? : Double = 36.0,
   selection? : Store[Array[Int]],
   sort? : Store[TableSort],
-  on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) { },
+  on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) {  },
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -5066,7 +5452,9 @@ pub fn table_t(
       ) -> Container {
         let col = columns[j]
         let base : Array[(String, &StyVal)] = [
-          ("width", col_w[j]), ("paddingLeft", 12.0), ("paddingRight", 12.0),
+          ("width", col_w[j]),
+          ("paddingLeft", 12.0),
+          ("paddingRight", 12.0),
         ]
         base.push(("flexDirection", "row"))
         base.push(("alignItems", "center"))
@@ -5082,17 +5470,14 @@ pub fn table_t(
             ViewLike::set_style(wrap, "minHeight", row_height)
             wrap.on_draw(fn(p) {
               let b = ViewLike::get_bounds(wrap)
-              let at = AttributedText::new_with(
-                text,
-                {
-                  align: col.align,
-                  valign: Center,
-                  wrap: false,
-                  ellipsis: true,
-                  font: Some(fnt),
-                  color: Some(color_of()),
-                },
-              )
+              let at = AttributedText::new_with(text, {
+                align: col.align,
+                valign: Center,
+                wrap: false,
+                ellipsis: true,
+                font: Some(fnt),
+                color: Some(color_of()),
+              })
               p.draw_attributed_text(at, 12.0, 0.0, b.width - 24.0, b.height)
             })
           }
@@ -5136,9 +5521,11 @@ pub fn table_t(
             wrap.add_child(l)
           }
           CellLines(lines) => {
-            let stack = themed_container(
-              style=[("paddingTop", 6.0), ("paddingBottom", 6.0), ("flexDirection", "column")],
-            )
+            let stack = themed_container(style=[
+              ("paddingTop", 6.0),
+              ("paddingBottom", 6.0),
+              ("flexDirection", "column"),
+            ])
             for ln in lines {
               let l = Label::new(ln)
               ViewLike::set_font(l, small_font)
@@ -5153,9 +5540,11 @@ pub fn table_t(
       }
 
       // 表头:主题斑马色打底 + 底边分隔线,次级色加粗文字
-      let head = themed_container(
-        style=[("height", head_h), ("flexDirection", "row"), ("alignItems", "center")],
-      )
+      let head = themed_container(style=[
+        ("height", head_h),
+        ("flexDirection", "row"),
+        ("alignItems", "center"),
+      ])
       head.on_draw(fn(p) {
         let b = ViewLike::get_bounds(head)
         p.set_fill_color(theme_fill_zebra())
@@ -5239,12 +5628,12 @@ pub fn table_t(
             let cur = s.get()
             if cur.column == j {
               if cur.asc {
-                s.set({ column: j, asc: false })
+                s.set({ column: j, asc: false, })
               } else {
-                s.set({ column: -1, asc: true })
+                s.set({ column: -1, asc: true, })
               }
             } else {
-              s.set({ column: j, asc: true })
+              s.set({ column: j, asc: true, })
             }
           }
           None => ()
@@ -5297,9 +5686,13 @@ pub fn table_t(
         let col = columns[j]
         // 可排序列右侧留 22px 箭头区(标题不跳动)
         let pad_r = if col.sortable { 22.0 } else { 12.0 }
-        let cell = themed_container(
-          style=[("width", col_w[j]), ("paddingLeft", 12.0), ("paddingRight", pad_r), ("flexDirection", "row"), ("alignItems", "center")],
-        )
+        let cell = themed_container(style=[
+          ("width", col_w[j]),
+          ("paddingLeft", 12.0),
+          ("paddingRight", pad_r),
+          ("flexDirection", "row"),
+          ("alignItems", "center"),
+        ])
         let l = Label::new(col.title)
         ViewLike::set_font(l, head_font)
         bind_fg(l, fn() { theme_text_secondary() })
@@ -5344,7 +5737,10 @@ pub fn table_t(
             let near = edge >= 0
             if near != near_edge.val {
               near_edge.val = near
-              View::set_cursor(cell, Cursor::new(if near { ResizeEW } else { Hand }))
+              View::set_cursor(
+                cell,
+                Cursor::new(if near { ResizeEW } else { Hand }),
+              )
             }
           }
         })
@@ -5441,9 +5837,11 @@ pub fn table_t(
           let r = data[i]
           let idx = i
           // minHeight:普通行 = row_height,含多行文本时自动撑高
-          let row = themed_container(
-            style=[("minHeight", row_height), ("flexDirection", "row"), ("alignItems", "center")],
-          )
+          let row = themed_container(style=[
+            ("minHeight", row_height),
+            ("flexDirection", "row"),
+            ("alignItems", "center"),
+          ])
           row.on_draw(fn(p) {
             let bg = table_row_bg(idx, sel_has(idx), hover_i.val == idx)
             if bg != "" {
@@ -5454,9 +5852,10 @@ pub fn table_t(
           })
           match sel {
             Some(_) => {
-              let cb = themed_container(
-                style=[("width", 36.0), ("alignSelf", "stretch")],
-              )
+              let cb = themed_container(style=[
+                ("width", 36.0),
+                ("alignSelf", "stretch"),
+              ])
               cb.on_draw(fn(p) {
                 let b = ViewLike::get_bounds(cb)
                 table_draw_check(
@@ -5478,9 +5877,7 @@ pub fn table_t(
             } else {
               CellText("")
             }
-            let cv = cell_view(content, j, font, fn() {
-              theme_text_regular()
-            })
+            let cv = cell_view(content, j, font, fn() { theme_text_regular() })
             cells.push(cv)
             row.add_child(cv)
           }
@@ -5569,10 +5966,10 @@ pub fn table_v_t(
   row_height? : Double = 32.0,
   selection? : Store[Array[Int]],
   sort? : Store[TableSort],
-  on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) { },
+  on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) {  },
   fill? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -5626,11 +6023,7 @@ pub fn table_v_t(
       }
       let mut acc = col_x0
       for col in columns {
-        let w = if col.width > 0.0 {
-          col.width
-        } else {
-          flex_w
-        }
+        let w = if col.width > 0.0 { col.width } else { flex_w }
         col_x.push(acc)
         col_w.push(w)
         acc = acc + w
@@ -5717,12 +6110,12 @@ pub fn table_v_t(
             let cur = s.get()
             if cur.column == j {
               if cur.asc {
-                s.set({ column: j, asc: false })
+                s.set({ column: j, asc: false, })
               } else {
-                s.set({ column: -1, asc: true })
+                s.set({ column: -1, asc: true, })
               }
             } else {
-              s.set({ column: j, asc: true })
+              s.set({ column: j, asc: true, })
             }
           }
           None => ()
@@ -5837,9 +6230,9 @@ pub fn table_v_t(
           y,
           w - 24.0,
           h,
-          align=align,
+          align~,
           valign=Center,
-          color=color,
+          color~,
           wrap=false,
           ellipsis=true,
         )
@@ -6143,7 +6536,10 @@ pub fn table_v_t(
           let near = bh >= 0
           if near != near_edge.val {
             near_edge.val = near
-            View::set_cursor(cv, Cursor::new(if near { ResizeEW } else { Hand }))
+            View::set_cursor(
+              cv,
+              Cursor::new(if near { ResizeEW } else { Hand }),
+            )
           }
           if bh != boundary_hover.val {
             boundary_hover.val = bh
@@ -6171,11 +6567,7 @@ pub fn table_v_t(
         let n = data_r.val.length()
         let idx = ((e.view_y - head_h + offset.val) / row_height).to_int()
         let inside = e.view_x < body_w.val && e.view_y >= head_h
-        let new_hover = if inside && idx >= 0 && idx < n {
-          idx
-        } else {
-          -1
-        }
+        let new_hover = if inside && idx >= 0 && idx < n { idx } else { -1 }
         if new_hover != hover_i.val {
           hover_i.val = new_hover
           ViewLike::schedule_paint(cv)
@@ -6275,7 +6667,7 @@ pub fn table_v_t(
 pub fn divider(
   vertical? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -6314,7 +6706,7 @@ pub fn textarea_t(
   clearable? : Bool = false,
   invalid? : Store[Bool] = Store::new(false),
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -6412,7 +6804,7 @@ pub fn slider_t(
   step? : Double = 1.0,
   on_change? : (Double) -> Unit = fn(_v) {  },
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -6554,7 +6946,7 @@ pub fn tabs_t(
   pages : Array[(String, Node)],
   selected? : Store[Int],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -6581,9 +6973,10 @@ pub fn tabs_t(
       }
       let outer = themed_container(style=base)
       handle(outer)
-      let head = themed_container(
-        style=[("height", 36.0), ("flexDirection", "row")],
-      )
+      let head = themed_container(style=[
+        ("height", 36.0),
+        ("flexDirection", "row"),
+      ])
       outer.add_child(head)
       let contents : Array[Container] = []
       let page_views : Array[View] = []
@@ -6595,9 +6988,11 @@ pub fn tabs_t(
         let probe = AttributedText::new(title, wrap=false)
         probe.set_font(fnt)
         let tw = probe.get_bounds_for(10000.0, 100.0).width
-        let tab = themed_container(
-          style=[("width", tw + 28.0), ("height", 36.0), ("marginRight", 8.0)],
-        )
+        let tab = themed_container(style=[
+          ("width", tw + 28.0),
+          ("height", 36.0),
+          ("marginRight", 8.0),
+        ])
         let hover = Ref(false)
         tab.on_draw(fn(p) {
           let b = ViewLike::get_bounds(tab)
@@ -6649,7 +7044,11 @@ pub fn tabs_t(
           style=if platform() == "windows" {
             [("flex", 1.0), ("flexbasis", 0.0), ("flexDirection", "column")]
           } else {
-            [("flexgrow", 1.0), ("flexshrink", 1.0), ("flexDirection", "column")]
+            [
+              ("flexgrow", 1.0),
+              ("flexshrink", 1.0),
+              ("flexDirection", "column"),
+            ]
           },
         )
         ViewLike::set_visible(page_c, cur.val == idx)
@@ -6687,9 +7086,12 @@ fn select_row(
   value : Store[String],
   on_pick : () -> Unit,
 ) -> Container {
-  let row = themed_container(
-    style=[("height", 28.0), ("paddingLeft", 8.0), ("flexDirection", "row"), ("alignItems", "center")],
-  )
+  let row = themed_container(style=[
+    ("height", 28.0),
+    ("paddingLeft", 8.0),
+    ("flexDirection", "row"),
+    ("alignItems", "center"),
+  ])
   let hover = Ref(false)
   row.on_draw(fn(p) {
     let b = ViewLike::get_bounds(row)
@@ -6708,11 +7110,7 @@ fn select_row(
       b.width - 26.0,
       b.height,
       valign=Center,
-      color=if act {
-        theme_primary()
-      } else {
-        theme_text_regular()
-      },
+      color=if act { theme_primary() } else { theme_text_regular() },
     )
     if act {
       // 选中项右侧 ✓(矢量小勾,不依赖字体)
@@ -6784,7 +7182,11 @@ pub fn select_t(
       field.on_draw(fn(p) {
         let b = ViewLike::get_bounds(field)
         p.set_stroke_color(
-          if focused.val { theme_focus_accent() } else { theme_border() },
+          if focused.val {
+            theme_focus_accent()
+          } else {
+            theme_border()
+          },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         p.draw_text(
@@ -6845,7 +7247,10 @@ pub fn select_t(
           ViewLike::focus(field)
           // 清空带(箭头左侧)优先:清空选择,不弹列表
           let b = ViewLike::get_bounds(field)
-          if clearable && value.get() != "" && e.view_x >= b.width - 40.0 && e.view_x <= b.width - 20.0 {
+          if clearable &&
+            value.get() != "" &&
+            e.view_x >= b.width - 40.0 &&
+            e.view_x <= b.width - 20.0 {
             value.set("")
             on_change("")
             return true
@@ -6864,11 +7269,12 @@ pub fn select_t(
               }
               // 弹层宽随字段实际宽(用户 style 覆盖宽度后自动跟随)
               let pop_w = ViewLike::get_bounds(field).width
-              let list = themed_container(
-                style=[("width", pop_w),
-                  ("height", rows_h),
-                  ("padding", 4.0), ("flexDirection", "column")],
-              )
+              let list = themed_container(style=[
+                ("width", pop_w),
+                ("height", rows_h),
+                ("padding", 4.0),
+                ("flexDirection", "column"),
+              ])
               set_panel_bg(list)
               for opt in options {
                 let o = opt
@@ -6924,7 +7330,7 @@ pub fn rate_t(
   max? : Int = 5,
   on_change? : (Int) -> Unit = fn(_v) {  },
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -6953,10 +7359,14 @@ pub fn rate_t(
       }
 
       v.on_draw(fn(p) {
-        for i in 1..=max {
+        for i in 1..<=max {
           let cx = (i - 1).to_double() * (size + gap) + size / 2.0
           let cy = size / 2.0
-          let lit = if hover.val > 0 { i <= hover.val } else { i <= value.get() }
+          let lit = if hover.val > 0 {
+            i <= hover.val
+          } else {
+            i <= value.get()
+          }
           if lit {
             p.set_fill_color(theme_primary())
             star_path(p, cx, cy, size / 2.0 - 1.0)
@@ -7007,7 +7417,7 @@ pub fn tooltip_t(
   content : Node,
   tip : String,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (View) -> Unit = fn(_v) { },
+  handle? : (View) -> Unit = fn(_v) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -7029,7 +7439,7 @@ pub fn popover_t(
   width : Double,
   height : Double,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -7046,17 +7456,7 @@ pub fn popover_t(
         Double,
         Int,
         Int,
-      ) -> Int = fn(
-        button,
-        _vx,
-        _vy,
-        _wx,
-        _wy,
-        _sx,
-        _sy,
-        _m,
-        _t,
-      ) {
+      ) -> Int = fn(button, _vx, _vy, _wx, _wy, _sx, _sy, _m, _t) {
         if button != 1 {
           return 0
         }
@@ -7138,7 +7538,11 @@ pub fn dropdown_menu(
           p.fill_rect(0.0, 0.0, b.width, b.height)
         }
         p.set_stroke_color(
-          if focused.val { theme_focus_accent() } else { theme_border() },
+          if focused.val {
+            theme_focus_accent()
+          } else {
+            theme_border()
+          },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         p.draw_text(
@@ -7185,11 +7589,12 @@ pub fn dropdown_menu(
               // 根容器宽高创建期给定(事后 set_style 会被弹层时序吞掉),
               // 高度 = 项数 x 28 + padding 8,与 content_size 一致
               let pop_w = ViewLike::get_bounds(field).width
-              let list = themed_container(
-                style=[("width", pop_w),
-                  ("height", items.length().to_double() * 28.0 + 8.0),
-                  ("padding", 4.0), ("flexDirection", "column")],
-              )
+              let list = themed_container(style=[
+                ("width", pop_w),
+                ("height", items.length().to_double() * 28.0 + 8.0),
+                ("padding", 4.0),
+                ("flexDirection", "column"),
+              ])
               set_panel_bg(list)
               for i in 0..<items.length() {
                 let it = items[i]
@@ -7208,9 +7613,12 @@ pub fn dropdown_menu(
                   continue
                 }
                 let hover = Ref(false)
-                let row = themed_container(
-                  style=[("height", 28.0), ("paddingLeft", 8.0), ("flexDirection", "row"), ("alignItems", "center")],
-                )
+                let row = themed_container(style=[
+                  ("height", 28.0),
+                  ("paddingLeft", 8.0),
+                  ("flexDirection", "row"),
+                  ("alignItems", "center"),
+                ])
                 row.on_draw(fn(p2) {
                   let b = ViewLike::get_bounds(row)
                   if hover.val {
@@ -7249,10 +7657,7 @@ pub fn dropdown_menu(
                 list.add_child(row)
               }
               p.set_content(list)
-              p.set_content_size(
-                pop_w,
-                items.length().to_double() * 28.0 + 8.0,
-              )
+              p.set_content_size(pop_w, items.length().to_double() * 28.0 + 8.0)
               pop.val = Some(p)
             }
           }
@@ -7281,7 +7686,7 @@ pub fn carousel_t(
   height? : Double = 180.0,
   interval_ms? : Int = 3000,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -7301,18 +7706,14 @@ pub fn carousel_t(
       }
       let outer = themed_container(style=base)
       handle(outer)
-      let stage = themed_container(
-        style=[("width", width), ("height", height), ("flexDirection", "column")],
-      )
+      let stage = themed_container(style=[
+        ("width", width),
+        ("height", height),
+        ("flexDirection", "column"),
+      ])
       // 切页:越界回绕
       fn do_switch(i : Int) -> Unit {
-        let idx = if i < 0 {
-          n - 1
-        } else if i >= n {
-          0
-        } else {
-          i
-        }
+        let idx = if i < 0 { n - 1 } else if i >= n { 0 } else { i }
         let prev = cur.val
         cur.val = idx
         if prev != idx {
@@ -7328,26 +7729,31 @@ pub fn carousel_t(
         // 面板填满舞台(grow 拉高 + stretch 拉宽):固定宽会横向溢出
         // 舞台(两侧箭头各占 24px),盖住右侧切换箭头的事件窗口。
         // grow/shrink 单写:column 舞台 auto 高链下简写派生 basis 0 塌陷
-        let pc = themed_container(
-          style=[("flexgrow", 1.0), ("flexshrink", 1.0), ("flexDirection", "column"), ("alignSelf", "stretch")],
-        )
+        let pc = themed_container(style=[
+          ("flexgrow", 1.0),
+          ("flexshrink", 1.0),
+          ("flexDirection", "column"),
+          ("alignSelf", "stretch"),
+        ])
         ViewLike::set_visible(pc, i == 0)
         ignore((pages[i].mount)(ViewLike::view(pc)))
         stage.add_child(pc)
         panels.push(pc)
-        let dot = themed_container(
-          style=[
-            ("width", 8.0),
-            ("height", 8.0),
-            ("marginLeft", 4.0),
-            ("marginRight", 4.0),
-            ("marginTop", 8.0),
-          ],
-        )
+        let dot = themed_container(style=[
+          ("width", 8.0),
+          ("height", 8.0),
+          ("marginLeft", 4.0),
+          ("marginRight", 4.0),
+          ("marginTop", 8.0),
+        ])
         let di = i
         dot.on_draw(fn(p) {
           p.set_fill_color(
-            if cur.val == di { theme_primary() } else { theme_border() },
+            if cur.val == di {
+              theme_primary()
+            } else {
+              theme_border()
+            },
           )
           p.fill_rect(0.0, 0.0, 8.0, 8.0)
         })
@@ -7426,12 +7832,14 @@ pub fn carousel_t(
       if interval_ms > 0 && n > 1 {
         let tick : Ref[() -> Unit] = Ref(fn() {  })
         tick.val = fn() {
-          ignore(set_timeout(interval_ms, fn() {
-            if !paused.val {
-              do_switch(cur.val + 1)
-            }
-            (tick.val)()
-          }))
+          ignore(
+            set_timeout(interval_ms, fn() {
+              if !paused.val {
+                do_switch(cur.val + 1)
+              }
+              (tick.val)()
+            }),
+          )
         }
         (tick.val)()
       }
@@ -7441,7 +7849,6 @@ pub fn carousel_t(
   }
 }
 
-
 ///|
 /// 取色器(EP ColorPicker,下拉形态):触发字段(当前色块 + hex + 箭头)
 /// 点击弹出预设色板(Popover 承载):点击色块写入 value("#RRGGBB")并
@@ -7449,9 +7856,9 @@ pub fn carousel_t(
 pub fn color_picker_t(
   value : Store[String],
   colors? : Array[String] = [
-    "#2D68C4", "#2E9E5B", "#D9822B", "#D64550", "#6B7480",
-    "#1E4FA3", "#3F6E9E", "#7A9E4E", "#B86E2B", "#9AA0A6",
-    "#E8EAED", "#BDC1C6", "#4E5560", "#2A2F36", "#F5F7FA",
+    "#2D68C4", "#2E9E5B", "#D9822B", "#D64550", "#6B7480", "#1E4FA3", "#3F6E9E",
+    "#7A9E4E", "#B86E2B", "#9AA0A6", "#E8EAED", "#BDC1C6", "#4E5560", "#2A2F36",
+    "#F5F7FA",
   ],
   style? : Array[(String, &StyVal)] = [],
 ) -> Node {
@@ -7472,7 +7879,11 @@ pub fn color_picker_t(
       field.on_draw(fn(p) {
         let b = ViewLike::get_bounds(field)
         p.set_stroke_color(
-          if focused.val { theme_focus_accent() } else { theme_border() },
+          if focused.val {
+            theme_focus_accent()
+          } else {
+            theme_border()
+          },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         // 当前色块
@@ -7539,31 +7950,33 @@ pub fn color_picker_t(
               let rows_n0 = (colors.length() + per_row - 1) / per_row
               let grid_w0 = per_row.to_double() * (swatch + gap) + 16.0
               let grid_h0 = 16.0 + rows_n0.to_double() * (swatch + gap)
-              let grid = themed_container(
-                style=[("width", grid_w0),
-                  ("height", grid_h0),
-                  ("padding", 8.0), ("flexDirection", "column")],
-              )
+              let grid = themed_container(style=[
+                ("width", grid_w0),
+                ("height", grid_h0),
+                ("padding", 8.0),
+                ("flexDirection", "column"),
+              ])
               set_panel_bg(grid)
               let rows : Array[(Container, Array[Container])] = []
               for i in 0..<colors.length() {
                 if i % per_row == 0 {
-                  rows.push((
-                    themed_container(
-                      style=[("height", swatch + gap), ("flexDirection", "row")],
+                  rows.push(
+                    (
+                      themed_container(style=[
+                        ("height", swatch + gap),
+                        ("flexDirection", "row"),
+                      ]),
+                      [],
                     ),
-                    [],
-                  ))
+                  )
                 }
                 let (row, cells) = rows[rows.length() - 1]
                 let c = colors[i]
-                let cell = themed_container(
-                  style=[
-                    ("width", swatch),
-                    ("height", swatch),
-                    ("marginRight", gap),
-                  ],
-                )
+                let cell = themed_container(style=[
+                  ("width", swatch),
+                  ("height", swatch),
+                  ("marginRight", gap),
+                ])
                 View::set_cursor(cell, hand())
                 cell.on_draw(fn(p2) {
                   p2.set_fill_color(c)
@@ -7637,10 +8050,14 @@ pub fn side_menu_sections(
   icons? : Array[(String, IconKind)] = [],
   foldable? : Bool = true,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   let width = 180.0
-  let base : Array[(String, &StyVal)] = [("width", width), ("padding", 6.0), ("flexDirection", "column")]
+  let base : Array[(String, &StyVal)] = [
+    ("width", width),
+    ("padding", 6.0),
+    ("flexDirection", "column"),
+  ]
   for kv in style {
     base.push(kv)
   }
@@ -7653,9 +8070,10 @@ pub fn side_menu_sections(
       for (group, items) in sections {
         let open = Ref(true)
         // 组标题行:自绘(组名 + 右侧折叠箭头),不挂子件保证 hover 全区域
-        let head = themed_container(
-          style=[("height", 30.0), ("width", width - 12.0)],
-        )
+        let head = themed_container(style=[
+          ("height", 30.0),
+          ("width", width - 12.0),
+        ])
         let head_hover = Ref(false)
         let head_focused = Ref(false)
         head.on_draw(fn(p) {
@@ -7740,7 +8158,12 @@ pub fn side_menu_sections(
               false
             }
           })
-          bind_focus(head, fn() { ViewLike::schedule_paint(head) }, head_focused, toggle)
+          bind_focus(
+            head,
+            fn() { ViewLike::schedule_paint(head) },
+            head_focused,
+            toggle,
+          )
         }
         outer.add_child(head)
         outer.add_child(body)

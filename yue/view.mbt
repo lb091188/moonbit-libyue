@@ -212,7 +212,13 @@ impl ViewLike with fn update_layout(self) -> Unit {
 ///|
 /// 直接改写包围盒(相对父视图,像素):运行期几何由调用方自管时使用,
 /// 如 splitter 拖动(GTK 上运行期改布局样式重排不落地,探针实测)。
-pub fn[T : ViewLike] set_view_bounds(v : T, x : Double, y : Double, w : Double, h : Double) -> Unit {
+pub fn[T : ViewLike] set_view_bounds(
+  v : T,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+) -> Unit {
   ffi_view_set_bounds(v.view(), x, y, w, h)
 }
 
@@ -243,7 +249,6 @@ pub fn native_handle_view(v : View) -> UInt64 {
 pub fn set_visible_view(v : View, visible : Bool) -> Unit {
   ffi_view_set_visible(v, if visible { 1 } else { 0 })
 }
-
 
 ///|
 /// 设置视图字体（原生渲染，交互控件的文字样式首选此路）。
@@ -571,5 +576,3 @@ pub fn Window::set_should_close(self : Window, callback : () -> Bool) -> Unit {
   keep_alive(fn() { ignore(wrapped) })
   ffi_window_set_should_close(self.view, fn(f) { f() }, wrapped)
 }
-
-

@@ -119,8 +119,5 @@ test "HeatGrid::make：标签与矩阵原样入表" {
   // 量程 + 插值组合：整表 min→low、max→high
   let (lo, hi) = heat_range(g.values)
   assert_eq(heat_color(g.values[0][0], lo, hi, "#ffffff", "#0000ff"), "#ffffff")
-  assert_eq(
-    heat_color(g.values[1][2], lo, hi, "#ffffff", "#0000ff"),
-    "#0000ff",
-  )
+  assert_eq(heat_color(g.values[1][2], lo, hi, "#ffffff", "#0000ff"), "#0000ff")
 }

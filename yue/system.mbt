@@ -28,9 +28,7 @@ pub fn open_url(url : String) -> Result[Unit, OpenUrlError] {
 ///|
 /// 在文件管理器中打开并选中路径(相对路径按工作目录解析)。Linux 的
 /// FileManager1 不在线或调用失败时,回退打开父目录(选中态丢失)。
-pub fn reveal_in_file_manager(
-  path : String,
-) -> Result[Unit, FileManagerError] {
+pub fn reveal_in_file_manager(path : String) -> Result[Unit, FileManagerError] {
   match platform() {
     "linux" => {
       let abs = if path.has_prefix("/") {

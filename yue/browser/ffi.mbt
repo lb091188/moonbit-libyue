@@ -4,11 +4,14 @@
 
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，
 // FFI 边界上一律转成 C 侧期望的 UTF-8，转换成本留在库内。
+///|
 fn utf8_bytes(text : String) -> Bytes {
   @utf8.encode(text)
 }
 
 // UTF-8 Bytes -> String：C 侧返回字符串时的统一入口。
+
+///|
 fn from_utf8_bytes(bytes : Bytes) -> String {
   @utf8.decode_lossy(bytes)
 }
@@ -133,7 +136,10 @@ extern "c" fn ffi_browser_load_html(
 
 ///|
 #borrow(browser, agent)
-extern "c" fn ffi_browser_set_user_agent(browser : @yue.View, agent : Bytes) -> Unit = "yue_mbt_browser_set_user_agent"
+extern "c" fn ffi_browser_set_user_agent(
+  browser : @yue.View,
+  agent : Bytes,
+) -> Unit = "yue_mbt_browser_set_user_agent"
 
 ///|
 #borrow(browser, code)
@@ -182,7 +188,10 @@ extern "c" fn ffi_browser_add_raw_binding(
 
 ///|
 #borrow(browser, name)
-extern "c" fn ffi_browser_remove_binding(browser : @yue.View, name : Bytes) -> Unit = "yue_mbt_browser_remove_binding"
+extern "c" fn ffi_browser_remove_binding(
+  browser : @yue.View,
+  name : Bytes,
+) -> Unit = "yue_mbt_browser_remove_binding"
 
 ///|
 #borrow(browser)

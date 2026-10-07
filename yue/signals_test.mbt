@@ -51,7 +51,13 @@ test "computed:条件分支只依赖实际读到的信号" {
   let flag = @yue.Signal::new(true)
   let x = @yue.Signal::new(1)
   let y = @yue.Signal::new(100)
-  let c = @yue.Signal::computed(fn() { if flag.get() { x.get() } else { y.get() } })
+  let c = @yue.Signal::computed(fn() {
+    if flag.get() {
+      x.get()
+    } else {
+      y.get()
+    }
+  })
   inspect(c.get(), content="1")
   y.set(200)
   inspect(c.get(), content="1") // y 不是当前依赖

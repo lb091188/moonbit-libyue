@@ -28,20 +28,20 @@ fn sankey_band_of(lay : SankeyLayout, link : Int) -> SankeyLinkBand? {
 test "sankey_columns：无入边进第 0 列、沿拓扑右移" {
   // 线性链 0→1→2：层级 0,1,2
   debug_inspect(
-    sankey_columns(3, [SankeyLink::make(0, 1, 10.0), SankeyLink::make(1, 2, 6.0)]),
+    sankey_columns(3, [
+      SankeyLink::make(0, 1, 10.0),
+      SankeyLink::make(1, 2, 6.0),
+    ]),
     content="[0, 1, 2]",
   )
   // 菱形 0→{1,2}→3：1/2 同列，3 收齐后进列 2
   debug_inspect(
-    sankey_columns(
-      4,
-      [
-        SankeyLink::make(0, 1, 6.0),
-        SankeyLink::make(0, 2, 4.0),
-        SankeyLink::make(1, 3, 5.0),
-        SankeyLink::make(2, 3, 1.0),
-      ],
-    ),
+    sankey_columns(4, [
+      SankeyLink::make(0, 1, 6.0),
+      SankeyLink::make(0, 2, 4.0),
+      SankeyLink::make(1, 3, 5.0),
+      SankeyLink::make(2, 3, 1.0),
+    ]),
     content="[0, 1, 1, 2]",
   )
   // 跨级链 0→2 与经停链并存：列号取入边源列最大值 +1（0→1→2 已把 2
@@ -146,7 +146,8 @@ test "sankey_layout：线性链的列 x / 节点高度 / 链路端缘" {
   // 链路 0：源右缘 14 → 目标左缘 43，两端都占满节点高
   let a0 = match sankey_band_of(lay, 0) {
     Some(b) => b
-    None => { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0 }
+    None =>
+      { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0, }
   }
   assert_true((a0.x0 - 14.0).abs() < 1.0e-9)
   assert_true((a0.x1 - 43.0).abs() < 1.0e-9)
@@ -157,7 +158,8 @@ test "sankey_layout：线性链的列 x / 节点高度 / 链路端缘" {
   // 链路 1：高 6×10=60，源端自 b1 顶起，目标端自 b2 顶（20）起
   let a1 = match sankey_band_of(lay, 1) {
     Some(b) => b
-    None => { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0 }
+    None =>
+      { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0, }
   }
   assert_true((a1.x0 - 57.0).abs() < 1.0e-9)
   assert_true((a1.x1 - 86.0).abs() < 1.0e-9)
@@ -202,19 +204,23 @@ test "sankey_layout：菱形多出/入边的偏移消费与贴合" {
   // 同源两带沿节点纵向依序消费（无缝衔接）
   let a0 = match sankey_band_of(lay, 0) {
     Some(b) => b
-    None => { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0 }
+    None =>
+      { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0, }
   }
   let a1 = match sankey_band_of(lay, 1) {
     Some(b) => b
-    None => { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0 }
+    None =>
+      { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0, }
   }
   let a2 = match sankey_band_of(lay, 2) {
     Some(b) => b
-    None => { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0 }
+    None =>
+      { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0, }
   }
   let a3 = match sankey_band_of(lay, 3) {
     Some(b) => b
-    None => { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0 }
+    None =>
+      { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0, }
   }
   assert_true((a1.sy0 - a0.sy1).abs() < 1.0e-6) // 源端偏移衔接在 55.2
   assert_true((a0.sy0 - b0.y).abs() < 1.0e-6) // 自节点顶起
@@ -298,7 +304,8 @@ test "sankey_layout：自定义 node_w / gap / min_h 生效" {
   assert_true((b1.x - 40.0).abs() < 1.0e-9) // span = 50-10 = 40
   let a0 = match sankey_band_of(lay, 0) {
     Some(b) => b
-    None => { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0 }
+    None =>
+      { link: -1, x0: 0.0, x1: 0.0, sy0: 0.0, sy1: 0.0, ty0: 0.0, ty1: 0.0, }
   }
   assert_true((a0.x0 - 10.0).abs() < 1.0e-9)
   assert_true((a0.x1 - 40.0).abs() < 1.0e-9)

@@ -36,7 +36,7 @@ priv struct VscJsonParser {
 ///|
 /// 解析 JSON 文本：语法完整且无尾随内容返回值，否则 None。
 fn vsc_json_parse(text : String) -> VscJson? {
-  let p : VscJsonParser = { text, pos: 0 }
+  let p : VscJsonParser = { text, pos: 0, }
   p.skip_ws()
   let v = match p.value() {
     Some(v) => v
@@ -83,7 +83,8 @@ fn VscJsonParser::value(self : VscJsonParser) -> VscJson? {
     116 => self.parse_literal("true", VscJBool) // 't'
     102 => self.parse_literal("false", VscJBool) // 'f'
     110 => self.parse_literal("null", VscJNull) // 'n'
-    c => if c == 45 || (c >= 48 && c <= 57) {
+    c =>
+      if c == 45 || (c >= 48 && c <= 57) {
         self.parse_number() // '-' 数字
       } else {
         None
@@ -101,7 +102,8 @@ fn VscJsonParser::parse_literal(
   let n = word.length()
   let mut i = 0
   while i < n {
-    if self.pos + i >= self.text.length() || self.text.unsafe_get(self.pos + i).to_int() != word.unsafe_get(i).to_int() {
+    if self.pos + i >= self.text.length() ||
+      self.text.unsafe_get(self.pos + i).to_int() != word.unsafe_get(i).to_int() {
       return None
     }
     i += 1
@@ -219,7 +221,7 @@ fn VscJsonParser::parse_string_v(self : VscJsonParser) -> VscJson? {
           sb.write_char(ch.unsafe_to_char())
           self.pos += 1
         }
-        None => {
+        None =>
           if e == 117 {
             // 'u'：先消费 u 再读 4 位十六进制；高代理再看一个 \uXXXX 合并
             self.pos += 1
@@ -227,27 +229,30 @@ fn VscJsonParser::parse_string_v(self : VscJsonParser) -> VscJson? {
               Some(v) => v
               None => return None
             }
-            let cp = if h1 >= 0xD800 && h1 <= 0xDBFF && self.pos + 1 < n && self.text.unsafe_get(self.pos).to_int() == 92 && self.text.unsafe_get(self.pos + 1).to_int() == 117 {
-                self.pos += 2
-                let h2 = match self.hex4() {
-                  Some(v) => v
-                  None => return None
-                }
-                if h2 >= 0xDC00 && h2 <= 0xDFFF {
-                  0x10000 + ((h1 - 0xD800) << 10) + (h2 - 0xDC00)
-                } else {
-                  0xFFFD
-                }
-              } else if h1 >= 0xD800 && h1 <= 0xDFFF {
-                0xFFFD
-              } else {
-                h1
+            let cp = if h1 >= 0xD800 &&
+              h1 <= 0xDBFF &&
+              self.pos + 1 < n &&
+              self.text.unsafe_get(self.pos).to_int() == 92 &&
+              self.text.unsafe_get(self.pos + 1).to_int() == 117 {
+              self.pos += 2
+              let h2 = match self.hex4() {
+                Some(v) => v
+                None => return None
               }
+              if h2 >= 0xDC00 && h2 <= 0xDFFF {
+                0x10000 + ((h1 - 0xD800) << 10) + (h2 - 0xDC00)
+              } else {
+                0xFFFD
+              }
+            } else if h1 >= 0xD800 && h1 <= 0xDFFF {
+              0xFFFD
+            } else {
+              h1
+            }
             sb.write_char(cp.unsafe_to_char())
           } else {
             return None
           }
-        }
       }
     } else {
       let (cp, step) = vsc_codepoint_at(self.text, self.pos)
@@ -296,7 +301,12 @@ fn VscJsonParser::parse_number(self : VscJsonParser) -> VscJson? {
   let n = self.text.length()
   while self.pos < n {
     let c = self.text.unsafe_get(self.pos).to_int()
-    if (c >= 48 && c <= 57) || c == 45 || c == 43 || c == 46 || c == 101 || c == 69 {
+    if (c >= 48 && c <= 57) ||
+      c == 45 ||
+      c == 43 ||
+      c == 46 ||
+      c == 101 ||
+      c == 69 {
       chars.push(c)
       self.pos += 1
     } else {
@@ -414,12 +424,12 @@ fn vsc_json_str(v : VscJson?) -> String? {
   match v {
     Some(VscJStr(s)) => Some(s)
     Some(
-      VscJNull |
-      VscJBool |
-      VscJInt(_) |
-      VscJFloat(_) |
-      VscJArr(_) |
-      VscJObj(_),
+      VscJNull
+      | VscJBool
+      | VscJInt(_)
+      | VscJFloat(_)
+      | VscJArr(_)
+      | VscJObj(_)
     ) => None
     None => None
   }
@@ -501,15 +511,26 @@ fn vsc_utf8_decode(bytes : Array[Int], out : Array[Int]) -> Unit {
     } else if b >= 0xC2 && b <= 0xDF && i + 1 < n && vsc_is_cont(bytes[i + 1]) {
       out.push(((b & 0x1F) << 6) | (bytes[i + 1] & 0x3F))
       i += 2
-    } else if b >= 0xE0 && b <= 0xEF && i + 2 < n && vsc_is_cont(bytes[i + 1]) && vsc_is_cont(bytes[i + 2]) {
-      let cp = ((b & 0x0F) << 12) | ((bytes[i + 1] & 0x3F) << 6) | (bytes[i + 2] & 0x3F)
+    } else if b >= 0xE0 &&
+      b <= 0xEF &&
+      i + 2 < n &&
+      vsc_is_cont(bytes[i + 1]) &&
+      vsc_is_cont(bytes[i + 2]) {
+      let cp = ((b & 0x0F) << 12) |
+        ((bytes[i + 1] & 0x3F) << 6) |
+        (bytes[i + 2] & 0x3F)
       if cp >= 0xD800 && cp <= 0xDFFF {
         out.push(0xFFFD)
       } else {
         out.push(cp)
       }
       i += 3
-    } else if b >= 0xF0 && b <= 0xF4 && i + 3 < n && vsc_is_cont(bytes[i + 1]) && vsc_is_cont(bytes[i + 2]) && vsc_is_cont(bytes[i + 3]) {
+    } else if b >= 0xF0 &&
+      b <= 0xF4 &&
+      i + 3 < n &&
+      vsc_is_cont(bytes[i + 1]) &&
+      vsc_is_cont(bytes[i + 2]) &&
+      vsc_is_cont(bytes[i + 3]) {
       let cp = ((b & 0x07) << 18) |
         ((bytes[i + 1] & 0x3F) << 12) |
         ((bytes[i + 2] & 0x3F) << 6) |
@@ -599,9 +620,13 @@ fn vsc_uri_percent_decode(s : String, start : Int, end : Int) -> String {
   let mut i = start
   while i < end {
     let c = s.unsafe_get(i).to_int()
-    let is_pct = c == 37 && i + 2 < end && vsc_hex_val(s.unsafe_get(i + 1).to_int()) is Some(_) && vsc_hex_val(s.unsafe_get(i + 2).to_int()) is Some(_)
+    let is_pct = c == 37 &&
+      i + 2 < end &&
+      vsc_hex_val(s.unsafe_get(i + 1).to_int()) is Some(_) &&
+      vsc_hex_val(s.unsafe_get(i + 2).to_int()) is Some(_)
     if is_pct {
-      let b = vsc_hex_val(s.unsafe_get(i + 1).to_int()).unwrap() * 16 + vsc_hex_val(s.unsafe_get(i + 2).to_int()).unwrap()
+      let b = vsc_hex_val(s.unsafe_get(i + 1).to_int()).unwrap() * 16 +
+        vsc_hex_val(s.unsafe_get(i + 2).to_int()).unwrap()
       pending.push(b)
       i += 3
     } else {
@@ -789,7 +814,7 @@ fn vsc_history_folder(uri : String) -> String {
   let mut i = 0
   while i < n {
     let v = h * 31L + uri.unsafe_get(i).to_int().to_int64()
-    let u = ((v % 4294967296L) + 4294967296L) % 4294967296L
+    let u = (v % 4294967296L + 4294967296L) % 4294967296L
     h = if u >= 2147483648L { u - 4294967296L } else { u }
     i += 1
   }
@@ -844,8 +869,10 @@ pub impl Show for VscodeError with fn output(self, logger) {
   match self {
     Unsupported => logger.write_string("VscodeError::Unsupported")
     StorageUnavailable => logger.write_string("VscodeError::StorageUnavailable")
-    StorageCorrupted(m) => logger.write_string("VscodeError::StorageCorrupted(\{m})")
-    HistoryCorrupted(m) => logger.write_string("VscodeError::HistoryCorrupted(\{m})")
+    StorageCorrupted(m) =>
+      logger.write_string("VscodeError::StorageCorrupted(\{m})")
+    HistoryCorrupted(m) =>
+      logger.write_string("VscodeError::HistoryCorrupted(\{m})")
   }
 }
 
@@ -957,15 +984,21 @@ pub fn vsc_local_history(
   for e in entries {
     let id = match vsc_json_str(vsc_json_get(e, "id")) {
       Some(s) => s
-      None => return Err(HistoryCorrupted("快照条目缺少 id: " + entries_path))
+      None =>
+        return Err(HistoryCorrupted("快照条目缺少 id: " + entries_path))
     }
     let ts = match vsc_json_int64(vsc_json_get(e, "timestamp")) {
       Some(i) => i
-      None => return Err(HistoryCorrupted("快照条目缺少 timestamp: " + entries_path))
+      None =>
+        return Err(
+          HistoryCorrupted("快照条目缺少 timestamp: " + entries_path),
+        )
     }
-    out.push({ path: hist_dir + "/" + id, timestamp: ts })
+    out.push({ path: hist_dir + "/" + id, timestamp: ts, })
   }
-  out.mut_view().sort_by(fn(a, b) {
+  out
+  .mut_view()
+  .sort_by(fn(a, b) {
     if a.timestamp > b.timestamp {
       -1
     } else if a.timestamp < b.timestamp {
@@ -994,14 +1027,13 @@ fn vsc_recent_paths_of(root : VscJson) -> Array[String] {
         None => ()
       }
       match vsc_json_get(state, "openedWindows") {
-        Some(VscJArr(ws)) => {
+        Some(VscJArr(ws)) =>
           for w in ws {
             match vsc_window_path(w) {
               Some(p) => out.push(p)
               None => ()
             }
           }
-        }
         _ => ()
       }
     }

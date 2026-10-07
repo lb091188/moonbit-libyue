@@ -230,11 +230,7 @@ fn fmt_axis_unit(v : Double, unit : Double, suffix : String) -> String {
   let scaled = (a / unit * 10.0).round().to_int()
   let ip = scaled / 10
   let frac = scaled % 10
-  let body = if frac == 0 {
-    "\{ip}\{suffix}"
-  } else {
-    "\{ip}.\{frac}\{suffix}"
-  }
+  let body = if frac == 0 { "\{ip}\{suffix}" } else { "\{ip}.\{frac}\{suffix}" }
   if v < 0.0 && scaled != 0 {
     "-\{body}"
   } else {
@@ -799,15 +795,9 @@ fn draw_line_chart(
       let v = s.points[n - 1]
       labels.push((map_y(v, lo, hi, y0, y1), fmt_axis(v), series_color(si)))
     }
-    labels.mut_view().sort_by(fn(a, b) {
-      if a.0 < b.0 {
-        -1
-      } else if a.0 > b.0 {
-        1
-      } else {
-        0
-      }
-    })
+    labels
+    .mut_view()
+    .sort_by(fn(a, b) { if a.0 < b.0 { -1 } else if a.0 > b.0 { 1 } else { 0 } })
     let gap = 14.0
     let top = y0 + 9.0
     let bottom = y1 + 9.0
@@ -1193,7 +1183,7 @@ fn band_color(frac : Double, thresholds : Array[(Double, String)]) -> String {
 /// 内弧折线段数：按扫角约每 11° 一段（整圆 32 段，弦误差 <0.4px），
 /// 至少 4 段。
 fn ring_steps(a0 : Double, a1 : Double) -> Int {
-  (((a1 - a0).abs() / (pi / 16.0)).ceil().to_int()).max(4)
+  ((a1 - a0).abs() / (pi / 16.0)).ceil().to_int().max(4)
 }
 
 ///|
@@ -1388,7 +1378,7 @@ pub fn line_chart_t(
   show_last? : Bool = true,
   fill? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -1436,7 +1426,7 @@ pub fn bar_chart_t(
   y_range? : (Double, Double)? = None,
   fill? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -1456,7 +1446,15 @@ pub fn bar_chart_t(
         let b = ViewLike::get_bounds(cv)
         p.set_stroke_color(theme_border())
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
-        draw_bar_chart(p, b.width, b.height, data.get(), horizontal, hover.val, y_range~)
+        draw_bar_chart(
+          p,
+          b.width,
+          b.height,
+          data.get(),
+          horizontal,
+          hover.val,
+          y_range~,
+        )
       })
       data.subscribe(fn(_d) { ViewLike::schedule_paint(cv) })
       // hover 命中与绘制同一套几何（bar_hit / draw_bar_chart 同源），
@@ -1464,7 +1462,14 @@ pub fn bar_chart_t(
       ViewLike::on_mouse_move(cv, fn(e) {
         let b = ViewLike::get_bounds(cv)
         let n = data.get().length()
-        let clamped = bar_hit(horizontal, n, b.width, b.height, e.view_x, e.view_y)
+        let clamped = bar_hit(
+          horizontal,
+          n,
+          b.width,
+          b.height,
+          e.view_x,
+          e.view_y,
+        )
         if clamped != hover.val {
           hover.val = clamped
           ViewLike::schedule_paint(cv)
@@ -1491,12 +1496,15 @@ pub fn donut_chart_t(
   thickness? : Double = 34.0,
   center? : String = "",
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
       let hover = Ref(-1)
-      let base : Array[(String, &StyVal)] = [("width", 480.0), ("height", 240.0)]
+      let base : Array[(String, &StyVal)] = [
+        ("width", 480.0),
+        ("height", 240.0),
+      ]
       for kv in style {
         base.push(kv)
       }
@@ -1566,13 +1574,16 @@ pub fn gauge_t(
   value : Store[Double],
   thresholds? : Array[(Double, String)] = [],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
       let disp = Ref(value.get().max(0.0).min(1.0))
       let running = Ref(false)
-      let base : Array[(String, &StyVal)] = [("width", 240.0), ("height", 170.0)]
+      let base : Array[(String, &StyVal)] = [
+        ("width", 240.0),
+        ("height", 170.0),
+      ]
       for kv in style {
         base.push(kv)
       }
@@ -1625,11 +1636,14 @@ pub fn scatter_t(
   trend? : Bool = false,
   dot? : Double = 3.0,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [("width", 560.0), ("height", 320.0)]
+      let base : Array[(String, &StyVal)] = [
+        ("width", 560.0),
+        ("height", 320.0),
+      ]
       for kv in style {
         base.push(kv)
       }

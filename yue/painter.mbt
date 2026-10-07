@@ -185,8 +185,16 @@ pub fn Painter::draw_text(
     align_id(align),
     align_id(valign),
     utf8_bytes(color),
-    if wrap { 1 } else { 0 },
-    if ellipsis { 1 } else { 0 },
+    if wrap {
+      1
+    } else {
+      0
+    },
+    if ellipsis {
+      1
+    } else {
+      0
+    },
   )
 }
 
@@ -420,6 +428,7 @@ pub fn AttributedText::set_font(self : AttributedText, font : Font) -> Unit {
 ///|
 // 区间字体/颜色:GDI+ 无富文本,fork v0.15.6-mbt.9 起 Windows 由 shim
 // 侧分段布局绘制,三平台语义一致,不再降级。
+
 ///|
 /// 对 [start, end) 字符区间设字体。
 pub fn AttributedText::set_font_for(

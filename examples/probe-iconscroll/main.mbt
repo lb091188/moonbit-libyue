@@ -7,17 +7,18 @@
 // 惰性挂载完成后调 Scroll::refresh_content_size 重写。本探针验证修复版
 // 装配下切段、二轮显隐、切页回来后 max_y 恒为内容高−视口。
 
-///| 复刻 section_body 段装配(含修复:挂载后 refresh)
+///|
+/// 复刻 section_body 段装配(含修复:挂载后 refresh)
 fn mk_sec(
-    name : String,
-    content : @yue.Node,
-    sec_sel : @yue.Store[String],
-    grab_scroll? : Bool = false,
-    grab_holder? : Bool = false,
-    grab_shell? : Bool = false,
-    scroll_r? : Ref[@yue.Scroll?] = Ref(None),
-    holder_r? : Ref[@yue.Container?] = Ref(None),
-    shell_r? : Ref[@yue.Container?] = Ref(None),
+  name : String,
+  content : @yue.Node,
+  sec_sel : @yue.Store[String],
+  grab_scroll? : Bool = false,
+  grab_holder? : Bool = false,
+  grab_shell? : Bool = false,
+  scroll_r? : Ref[@yue.Scroll?] = Ref(None),
+  holder_r? : Ref[@yue.Container?] = Ref(None),
+  shell_r? : Ref[@yue.Container?] = Ref(None),
 ) -> @yue.Node {
   let mounted = Ref(false)
   let scroll_ref : Ref[@yue.Scroll?] = Ref(None)
@@ -41,7 +42,9 @@ fn mk_sec(
   let inner : Array[@yue.Node] = [
     @yue.label_t("段:\{name}", role=@yue.Section, style=[("marginBottom", 8.0)]),
     holder,
-    @yue.label_t("说明文字占位", role=@yue.Secondary, style=[("marginTop", 10.0)]),
+    @yue.label_t("说明文字占位", role=@yue.Secondary, style=[
+      ("marginTop", 10.0),
+    ]),
   ]
   @yue.vbox(
     [
@@ -70,11 +73,12 @@ fn mk_sec(
   )
 }
 
-///| 复刻 nav_page(flex 简写 + 显隐切换 + 首选挂载)
+///|
+/// 复刻 nav_page(flex 简写 + 显隐切换 + 首选挂载)
 fn mk_nav(
-    name : String,
-    page_sel : @yue.Store[String],
-    content : @yue.Node,
+  name : String,
+  page_sel : @yue.Store[String],
+  content : @yue.Node,
 ) -> @yue.Node {
   let mounted = Ref(false)
   @yue.vbox([], style=[("flex", 1.0)], handle=fn(c) {
@@ -90,6 +94,7 @@ fn mk_nav(
   })
 }
 
+///|
 fn main {
   if !@yue.initialize() {
     println("GUI 初始化失败")
@@ -118,16 +123,18 @@ fn main {
   let base_lines : Array[@yue.Node] = []
   for i in 0..<40 {
     base_lines.push(
-      @yue.label_t("基础页文本行 \{i}", role=@yue.Secondary, style=[("height", 28.0)]),
+      @yue.label_t("基础页文本行 \{i}", role=@yue.Secondary, style=[
+        ("height", 28.0),
+      ]),
     )
   }
 
   let icon_page = @yue.vbox(
     [
-      @yue.hbox(
-        [@yue.label_t("图标库")],
-        style=[("paddingLeft", 14.0), ("paddingTop", 10.0)],
-      ),
+      @yue.hbox([@yue.label_t("图标库")], style=[
+        ("paddingLeft", 14.0),
+        ("paddingTop", 10.0),
+      ]),
       @yue.vbox(
         [
           mk_sec("短", @yue.icon(@yue.Star, size=50.0), sec_sel),
@@ -138,12 +145,16 @@ fn main {
             grab_scroll=true,
             grab_holder=true,
             grab_shell=true,
-            scroll_r=scroll_r,
-            holder_r=holder_r,
+            scroll_r~,
+            holder_r~,
             shell_r=sec_long_shell_r,
           ),
         ],
-        style=[("flexgrow", 1.0), ("flexshrink", 1.0), ("flexDirection", "column")],
+        style=[
+          ("flexgrow", 1.0),
+          ("flexshrink", 1.0),
+          ("flexDirection", "column"),
+        ],
         handle=fn(c) { secs_box_r.val = Some(c) },
       ),
     ],

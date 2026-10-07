@@ -60,6 +60,7 @@ pub fn show_items(
 ///|
 /// 绝对路径 → file:// URI:UTF-8 字节逐个百分号编码,保留 RFC 3986
 /// unreserved(A-Za-z0-9-._~)与 '/',其余(空格/中文/&?=% 等)按字节 %XX。
+
 ///|
 /// URI 百分号 hex 用大写(RFC 3986 大小写均可,大写是通行惯例)。
 fn uri_hex(v : Int) -> Char {

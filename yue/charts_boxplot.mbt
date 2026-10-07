@@ -49,13 +49,7 @@ pub fn boxp_quantile(sorted : Array[Double], q : Double) -> Double {
   if n == 1 {
     return sorted[0]
   }
-  let qq = if q < 0.0 {
-    0.0
-  } else if q > 1.0 {
-    1.0
-  } else {
-    q
-  }
+  let qq = if q < 0.0 { 0.0 } else if q > 1.0 { 1.0 } else { q }
   let pos = qq * (n - 1).to_double()
   if pos <= 0.0 {
     return sorted[0]
@@ -73,15 +67,9 @@ pub fn boxp_quantile(sorted : Array[Double], q : Double) -> Double {
 /// 离群点（升序）；空数组给全零概括（离群点空表）。
 pub fn boxp_summary(values : Array[Double]) -> BoxSummary {
   let sorted = values.copy()
-  sorted.mut_view().sort_by(fn(a, b) {
-    if a < b {
-      -1
-    } else if a > b {
-      1
-    } else {
-      0
-    }
-  })
+  sorted
+  .mut_view()
+  .sort_by(fn(a, b) { if a < b { -1 } else if a > b { 1 } else { 0 } })
   let n = sorted.length()
   if n == 0 {
     return {
@@ -135,9 +123,7 @@ pub fn boxp_summary(values : Array[Double]) -> BoxSummary {
 /// 箱线图 y 轴自适应范围：全部组样本的 min/max + 8% 留白（离群点计入，
 /// 圆点不裁剪）；空数据给 (0, 1)；等值退化以值为中心撑开（|值|<10 时
 /// 至少 ±1）。
-pub fn boxp_range(
-  groups : Array[(String, Array[Double])],
-) -> (Double, Double) {
+pub fn boxp_range(groups : Array[(String, Array[Double])]) -> (Double, Double) {
   let mut lo = 0.0
   let mut hi = 0.0
   let mut any = false
@@ -243,11 +229,7 @@ fn draw_boxplot(
   }
   let slot = (x1 - x0) / n.to_double()
   // 组标签抽稀：槽宽不足 26px 时每隔 step 个画一个
-  let step = if slot >= 26.0 {
-    1
-  } else {
-    (26.0 / slot).ceil().to_int().max(1)
-  }
+  let step = if slot >= 26.0 { 1 } else { (26.0 / slot).ceil().to_int().max(1) }
   for i, g in groups {
     let (label, values) = g
     if i % step == 0 {
@@ -329,7 +311,7 @@ pub fn boxplot_t(
   y_range? : (Double, Double)? = None,
   fill? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {

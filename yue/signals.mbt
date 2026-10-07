@@ -212,7 +212,7 @@ pub fn[A, B] Signal::map(self : Signal[A], f : (A) -> B) -> Signal[B] {
 /// 视图转换:以 Store 形态使用同一信号(共享值与订阅)。组件 API 的
 /// Store 参数传 computed 信号时为只读语义,组件不应回写。
 pub fn[T] Signal::store(self : Signal[T]) -> Store[T] {
-  { sig: self }
+  { sig: self, }
 }
 
 ///|
@@ -284,7 +284,7 @@ pub fn[T] bind_node(sig : Signal[T], f : (T) -> Node) -> Node {
 /// (fork 补丁维护路径)无此患;代价是两棵子树常驻(低频切换场景可
 /// 忽略)。典型如随深浅换太阳/月亮图标按钮:
 ///
-/// ```moonbit
+/// ```moonbit nocheck
 /// @yue.swap_node(dark.signal(),
 ///   @yue.icon_button_t(@yue.Moon, on_click=..., tip="切换到深色"),
 ///   @yue.icon_button_t(@yue.Sunny, on_click=..., tip="切换到浅色"))

@@ -1,7 +1,9 @@
 // 输入链路与 set_selectable 自动诊断:事件计数 + GTK 属性读回。
+///|
 #borrow(w)
 extern "c" fn ffi_gtk_label_get_selectable(w : UInt64) -> Int = "gtk_label_get_selectable"
 
+///|
 fn main {
   if !@yue.initialize() {
     println("init 失败")
@@ -47,7 +49,9 @@ fn main {
   })
   // 6 秒后自动退出,汇总
   @yue.set_timer(6000, fn() {
-    println("SUMMARY down=\{down.val} move=\{mv.val} up=\{up.val} wheel=\{wheel.val}")
+    println(
+      "SUMMARY down=\{down.val} move=\{mv.val} up=\{up.val} wheel=\{wheel.val}",
+    )
     @yue.quit()
     false
   })
