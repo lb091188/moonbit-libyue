@@ -24,5 +24,7 @@ options(
     "wire_wbtest.mbt": [ "native" ],
     "instance_wbtest.mbt": [ "native" ],
     "filemanager_wbtest.mbt": [ "native" ],
+    "dbus.mbt": [ "native" ],
+    "dbus_wbtest.mbt": [ "native" ],
   },
 )
