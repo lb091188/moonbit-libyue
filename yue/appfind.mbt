@@ -1,7 +1,8 @@
 // 应用查找：已装应用清单（desktop entries 扫描）与应用二进制查找
-// （which 语义的固定目录版）。文件读取复用 read_text_file /
-// read_binary_file；目录探测按"存在才扫、读不到静默跳过"，
-// 不存在的目录不报错。
+// （which 语义的固定目录版）。desktop 文件读取复用 read_text_file；
+// 目录枚举与存在性判断走 fsx_list_dir（只列条目名，不读文件内容），
+// 按"存在才扫、读不到静默跳过"处理，全部扫描目录都不存在时报
+// NoScanDir。
 
 ///|
 /// 已装应用条目（来自 .desktop 的 [Desktop Entry] 段）。
@@ -26,6 +27,8 @@ pub(all) enum AppFindError {
   Unsupported
   /// 未找到该名称的可执行文件，带查找名
   NotFound(String)
+  /// 扫描目录全都不存在（系统与用户 applications 目录皆缺失）
+  NoScanDir
 }
 
 ///|
@@ -33,6 +36,7 @@ pub impl Show for AppFindError with fn output(self, logger) {
   match self {
     Unsupported => logger.write_string("AppFindError::Unsupported")
     NotFound(name) => logger.write_string("AppFindError::NotFound(\{name})")
+    NoScanDir => logger.write_string("AppFindError::NoScanDir")
   }
 }
 
@@ -147,11 +151,27 @@ pub fn appfind_desktop_to_entry(content : String, id : String) -> AppEntry? {
   Some({
     id,
     name,
-    locale_name: if locale != "" { locale } else { name },
+    locale_name: if locale != "" {
+      locale
+    } else {
+      name
+    },
     exec: appfind_kv_get(pairs, "Exec"),
     icon: appfind_kv_get(pairs, "Icon"),
     categories: appfind_split_semi(appfind_kv_get(pairs, "Categories")),
   })
+}
+
+///|
+/// 目录条目名里是否有该名字（存在性判断的纯逻辑：只比条目名，不看文件
+/// 内容，也不校验执行权限）。
+fn appfind_names_hit(names : Array[String], name : String) -> Bool {
+  for n in names {
+    if n == name {
+      return true
+    }
+  }
+  false
 }
 
 ///|
@@ -181,7 +201,9 @@ fn appfind_str_cmp(a : String, b : String) -> Int {
 ///|
 /// 按 desktop id 去重合并：layers 按低→高优先级顺序传入，同 id 后者覆盖
 /// 前者（用户目录覆盖系统目录）；结果按 name 码点字典序排序（同名按 id）。
-pub fn appfind_merge_entries(layers : Array[Array[AppEntry]]) -> Array[AppEntry] {
+pub fn appfind_merge_entries(
+  layers : Array[Array[AppEntry]],
+) -> Array[AppEntry] {
   let acc : Array[AppEntry] = []
   for layer in layers {
     for e in layer {
@@ -201,7 +223,9 @@ pub fn appfind_merge_entries(layers : Array[Array[AppEntry]]) -> Array[AppEntry]
       }
     }
   }
-  acc.mut_view().sort_by(fn(a, b) {
+  acc
+  .mut_view()
+  .sort_by(fn(a, b) {
     let by_name = appfind_str_cmp(a.name, b.name)
     if by_name != 0 {
       by_name
@@ -237,8 +261,7 @@ pub fn appfind_scan_dirs(
   home : String?,
 ) -> Array[String] {
   let dirs : Array[String] = [
-    "/usr/share/applications",
-    "/usr/local/share/applications",
+    "/usr/share/applications", "/usr/local/share/applications",
   ]
   match appfind_user_apps_dir(xdg_data_home, home) {
     Some(d) => {
@@ -268,7 +291,7 @@ pub fn appfind_bin_dirs(home : String?) -> Array[String] {
 }
 
 // ---------------------------------------------------------------------------
-// 扫描与查找（读盘走 read_text_file / read_binary_file）
+// 扫描与查找（desktop 读盘走 read_text_file，存在性判断走 fsx_list_dir）
 // ---------------------------------------------------------------------------
 
 ///|
@@ -291,52 +314,101 @@ fn appfind_basename(path : String) -> String {
 }
 
 ///|
-/// 扫描收集：dirs 低→高优先级；list_dir 收目录路径、返回该目录下文件名
-/// 数组；非 .desktop 与名为 ".desktop" 的条目过滤，单个文件读不到或解析
+/// 单个 applications 目录的一层条目：names 为该目录下的文件名数组，
+/// 非 .desktop 与名为 ".desktop" 的条目过滤，单个文件读不到或解析
 /// 后被过滤均静默跳过。
+fn appfind_dir_layer(dir : String, names : Array[String]) -> Array[AppEntry] {
+  let layer : Array[AppEntry] = []
+  for fname in names {
+    let base = appfind_basename(fname)
+    if !base.has_suffix(".desktop") || base == ".desktop" {
+      continue
+    }
+    let id = base[:base.length() - 8].to_owned()
+    match read_text_file(dir + "/" + base) {
+      Some(content) =>
+        match appfind_desktop_to_entry(content, id) {
+          Some(e) => layer.push(e)
+          None => ()
+        }
+      None => ()
+    }
+  }
+  layer
+}
+
+///|
+/// 扫描收集：dirs 低→高优先级；list_dir 收目录路径、返回该目录下文件名
+/// 数组。
 fn appfind_collect(
   dirs : Array[String],
   list_dir : (String) -> Array[String],
 ) -> Array[AppEntry] {
   let layers : Array[Array[AppEntry]] = []
   for dir in dirs {
-    let layer : Array[AppEntry] = []
-    for fname in list_dir(dir) {
-      let base = appfind_basename(fname)
-      if !base.has_suffix(".desktop") || base == ".desktop" {
-        continue
-      }
-      let id = base[:base.length() - 8].to_owned()
-      match read_text_file(dir + "/" + base) {
-        Some(content) =>
-          match appfind_desktop_to_entry(content, id) {
-            Some(e) => layer.push(e)
-            None => ()
-          }
-        None => ()
-      }
-    }
-    layers.push(layer)
+    layers.push(appfind_dir_layer(dir, list_dir(dir)))
   }
   appfind_merge_entries(layers)
 }
 
 ///|
-/// 已装应用清单：扫描 /usr/share/applications、/usr/local/share/applications、
-/// ~/.local/share/applications 三个目录的 .desktop，按 desktop id 去重
-/// （用户目录覆盖系统目录），结果按 name 排序；目录不存在跳过不报错。
-/// 本包未提供目录枚举原语，调用方须注入 list_dir（收目录路径、返回该
-/// 目录下文件名数组，.desktop 之外的条目会被过滤）；非 Linux 给
+/// 已装应用清单公共实现：dirs 低→高优先级；list_dir 收目录路径、返回
+/// 该目录下文件名数组的语义化结果，打不开的目录静默跳过；全部目录都
+/// 打不开时报 NoScanDir。
+fn appfind_installed_impl(
+  dirs : Array[String],
+  list_dir : (String) -> Result[Array[String], FsError],
+) -> Result[Array[AppEntry], AppFindError] {
+  let layers : Array[Array[AppEntry]] = []
+  let mut scanned = false
+  for dir in dirs {
+    match list_dir(dir) {
+      Ok(names) => {
+        scanned = true
+        layers.push(appfind_dir_layer(dir, names))
+      }
+      Err(_) => () // 存在才扫，读不到的目录静默跳过
+    }
+  }
+  if !scanned {
+    return Err(NoScanDir)
+  }
+  Ok(appfind_merge_entries(layers))
+}
+
+///|
+/// 已装应用清单：真实扫描 /usr/share/applications、
+/// /usr/local/share/applications、~/.local/share/applications（XDG
+/// 数据目录约定）下的 .desktop，按 desktop id 去重（用户目录覆盖系统
+/// 目录），结果按 name 排序；不存在的目录跳过，全部扫描目录都不存在
+/// 时报 NoScanDir；非 Linux 给 [Unsupported]。
+pub fn appfind_installed() -> Result[Array[AppEntry], AppFindError] {
+  match platform() {
+    "linux" =>
+      appfind_installed_impl(
+        appfind_scan_dirs(getenv_str("XDG_DATA_HOME"), getenv_str("HOME")),
+        fn(path) { fsx_list_dir(path) },
+      )
+    _ => Err(Unsupported)
+  }
+}
+
+///|
+/// 已装应用清单（注入版）：与 [appfind_installed] 同流程，目录枚举由
+/// 调用方注入（收目录路径、返回该目录下文件名数组，.desktop 之外的
+/// 条目会被过滤），供无 fsx 层的调用方与测试使用；非 Linux 给
 /// [Unsupported]。
 pub fn appfind_installed_with(
   list_dir : (String) -> Array[String],
 ) -> Result[Array[AppEntry], AppFindError] {
   match platform() {
     "linux" =>
-      Ok(appfind_collect(
-        appfind_scan_dirs(getenv_str("XDG_DATA_HOME"), getenv_str("HOME")),
-        list_dir,
-      ))
+      Ok(
+        appfind_collect(
+          appfind_scan_dirs(getenv_str("XDG_DATA_HOME"), getenv_str("HOME")),
+          list_dir,
+        ),
+      )
     _ => Err(Unsupported)
   }
 }
@@ -344,9 +416,9 @@ pub fn appfind_installed_with(
 ///|
 /// 应用二进制查找（which 语义的固定目录版）：在 ~/.local/bin、
 /// /usr/local/bin、/usr/bin、/bin、/usr/sbin、/sbin 中按序找名为 name 的
-/// 文件，返回首个命中的完整路径；找不到给 NotFound。name 为空或含路径
-/// 分隔符直接 NotFound。命中判定为文件可打开读取（本包不校验执行
-/// 权限位）。
+/// 条目，返回首个命中的完整路径；找不到给 NotFound。name 为空或含路径
+/// 分隔符直接 NotFound。命中判定为目录枚举里有该名字的条目（不读文件
+/// 内容；本包不校验执行权限位）。
 pub fn appfind_executable(name : String) -> Result[String, AppFindError] {
   match platform() {
     "linux" => {
@@ -354,9 +426,12 @@ pub fn appfind_executable(name : String) -> Result[String, AppFindError] {
         return Err(NotFound(name))
       }
       for dir in appfind_bin_dirs(getenv_str("HOME")) {
-        let p = dir + "/" + name
-        if read_binary_file(p) is Some(_) {
-          return Ok(p)
+        match fsx_list_dir(dir) {
+          Ok(names) =>
+            if appfind_names_hit(names, name) {
+              return Ok(dir + "/" + name)
+            }
+          Err(_) => () // 目录打不开（不存在/非目录/无权限）：当无此目录
         }
       }
       Err(NotFound(name))

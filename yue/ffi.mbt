@@ -277,7 +277,11 @@ extern "c" fn ffi_entry_set_position(entry : View, index : Int) -> Unit = "yue_m
 
 ///|
 #borrow(entry, fg, bg)
-extern "c" fn ffi_entry_set_colors(entry : View, fg : Bytes, bg : Bytes) -> Unit = "yue_mbt_entry_set_colors"
+extern "c" fn ffi_entry_set_colors(
+  entry : View,
+  fg : Bytes,
+  bg : Bytes,
+) -> Unit = "yue_mbt_entry_set_colors"
 
 ///|
 #borrow(css)
@@ -925,10 +929,12 @@ extern "c" fn ffi_view_on_drag_leave(
 #borrow(view)
 extern "c" fn ffi_view_schedule_paint(view : View) -> Unit = "yue_mbt_view_schedule_paint"
 
-///| View 原生句柄(uintptr 承载,Linux=GtkWidget*、macOS=NSView*、Windows 暂为 0)
+///|
+/// View 原生句柄(uintptr 承载,Linux=GtkWidget*、macOS=NSView*、Windows 暂为 0)
 #borrow(view)
 extern "c" fn ffi_view_get_native_handle(view : View) -> UInt64 = "yue_mbt_view_get_native_handle"
 
+///|
 #borrow(view)
 extern "c" fn ffi_view_set_borderless(view : View, on : Int) -> Unit = "yue_mbt_view_set_borderless"
 
@@ -1100,10 +1106,9 @@ extern "c" fn ffi_view_on_mouse_leave(
 #borrow(view, invoke, callback)
 extern "c" fn ffi_view_on_wheel(
   view : View,
-  invoke : FuncRef[(((Double) -> Unit, Double) -> Unit)],
+  invoke : FuncRef[((Double) -> Unit, Double) -> Unit],
   callback : (Double) -> Unit,
 ) -> Unit = "yue_mbt_view_on_wheel"
-
 
 ///|
 #borrow(view, invoke, callback)
@@ -1771,7 +1776,11 @@ extern "c" fn ffi_getenv_bytes(name : Bytes, ok : Ref[Int]) -> Bytes = "yue_mbt_
 ///|
 /// Windows:HKCU Run 键写值（exe 自动引号包裹）；非 Windows 返回 -1000 哨兵。
 #borrow(app_id, exe, ok)
-extern "c" fn ffi_autostart_set(app_id : Bytes, exe : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_autostart_set"
+extern "c" fn ffi_autostart_set(
+  app_id : Bytes,
+  exe : Bytes,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_autostart_set"
 
 ///|
 /// Windows:读 Run 键值（未设置 ok=0）；非 Windows ok=-1000。
@@ -1782,6 +1791,29 @@ extern "c" fn ffi_autostart_get(app_id : Bytes, ok : Ref[Int]) -> Bytes = "yue_m
 /// Windows:删 Run 键值（值本就不在也记 ok=1）；非 Windows 返回 -1000。
 #borrow(app_id, ok)
 extern "c" fn ffi_autostart_remove(app_id : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_autostart_remove"
+
+// ---------- 环境变量与目录枚举（fsx） ----------
+
+///|
+/// 目录枚举：子项名扁平 UTF-8 文本（'\n' 分行，不含 . ..，不做递归）；
+/// 打不开（不存在/非目录/无权限）ok=0。
+#borrow(path, ok)
+extern "c" fn ffi_list_dir(path : Bytes, ok : Ref[Int]) -> Bytes = "yue_mbt_list_dir"
+
+///|
+/// 写环境变量（overwrite=0 且已存在时保持原值；仅作用当前进程环境）。
+#borrow(name, value, ok)
+extern "c" fn ffi_set_env(
+  name : Bytes,
+  value : Bytes,
+  overwrite : Int,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_setenv"
+
+///|
+/// 删环境变量（本就不存在也记 ok=1，幂等）。
+#borrow(name, ok)
+extern "c" fn ffi_unset_env(name : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_unsetenv"
 
 // ---------- 打开外部（URL / 文件管理器选中） ----------
 
@@ -2140,6 +2172,7 @@ extern "c" fn ffi_container_get_preferred_height(c : View) -> Double = "yue_mbt_
 #borrow(scroll)
 extern "c" fn ffi_scroll_refresh_content_size(scroll : View) -> Unit = "yue_mbt_scroll_refresh_content_size"
 
+///|
 extern "c" fn ffi_scroll_get_position_x(s : View) -> Double = "yue_mbt_scroll_get_position_x"
 
 ///|
