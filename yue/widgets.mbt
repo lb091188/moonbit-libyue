@@ -608,3 +608,48 @@ pub fn DatePicker::new_with(options : DatePickerOptions) -> DatePicker {
     ),
   }
 }
+
+///|
+/// 通知进度文本：字符进度条 + 百分比（percent 钳到 [0,100]，非数值
+/// 按 0 处理；width<=0 时只给百分比）。通知规范本身没有进度字段，各
+/// 桌面落地不一，正文内呈现是跨平台一致的做法。
+pub fn notification_progress_text(percent : Double, width? : Int = 10) -> String {
+  let p = if percent != percent {
+    0.0
+  } else if percent < 0.0 {
+    0.0
+  } else if percent > 100.0 {
+    100.0
+  } else {
+    percent
+  }
+  if width <= 0 {
+    return "\{p.to_int()}%"
+  }
+  let filled = ((p / 100.0) * width.to_double() + 0.5).to_int()
+  let n = if filled < 0 {
+    0
+  } else if filled > width {
+    width
+  } else {
+    filled
+  }
+  let bar = StringBuilder()
+  for i = 0; i < width; i = i + 1 {
+    bar.write_char(if i < n { '\u{2588}' } else { '\u{2591}' })
+  }
+  "\{bar.to_string()} \{p.to_int()}%"
+}
+
+///|
+/// 设置通知正文与进度行：正文首行原样，第二行跟进度条 + 百分比
+/// （notification_progress_text；规范无进度 hint 的跨平台一致呈现，
+/// 详见 docs/zh/system-capabilities.md 通知小节）。
+pub fn Notification::set_progress(
+  self : Notification,
+  body : String,
+  percent : Double,
+  width? : Int = 10,
+) -> Unit {
+  self.set_body("\{body}\n\{notification_progress_text(percent, width=width)}")
+}

@@ -199,3 +199,68 @@ test "media 错误路径：不存在的播放器给错误而非 Ok" {
     Err(e) => println("players err: \{e}")
   }
 }
+
+///|
+test "media_status_changed：状态快照变化判定" {
+  let base = MediaStatus::{
+    player: "org.mpris.MediaPlayer2.vlc",
+    playback: MediaPlaying,
+    title: "A",
+    artist: "B",
+    album: "C",
+  }
+  // 完全相同的快照无变化
+  inspect(media_status_changed(base, base), content="false")
+  // 播放态变化
+  inspect(
+    media_status_changed(
+      base,
+      MediaStatus::{ ..base, playback: MediaPaused },
+    ),
+    content="true",
+  )
+  // 标题变化
+  inspect(
+    media_status_changed(base, MediaStatus::{ ..base, title: "X" }),
+    content="true",
+  )
+  // 艺术家变化
+  inspect(
+    media_status_changed(base, MediaStatus::{ ..base, artist: "Y" }),
+    content="true",
+  )
+  // 专辑变化
+  inspect(
+    media_status_changed(base, MediaStatus::{ ..base, album: "Z" }),
+    content="true",
+  )
+  // player 字段本身不参与变化判定（目标锁定后不会变）
+  inspect(
+    media_status_changed(base, MediaStatus::{ ..base, player: "other" }),
+    content="false",
+  )
+}
+
+///|
+test "MediaWatcher：建/运行中/停止 语义" {
+  let w = MediaWatcher::make()
+  inspect(w.is_running(), content="true")
+  media_watch_stop(w)
+  inspect(w.is_running(), content="false")
+}
+
+///|
+test "media 真机冒烟：监视启动后立停不崩（无播放器环境跳过触发）" {
+  if platform() != "linux" {
+    println("media watch: skip (非 Linux)")
+    return
+  }
+  // 无播放器机器上目标解析失败，轮询静默跳过、on_change 不触发；
+  // 有播放器机器上首轮建基线也不触发。启动后立即停止验证句柄与
+  // 定时器注销路径不抛异常。
+  let mut fired = 0
+  let w = media_watch_status(interval_ms=100, fn(_s : MediaStatus) { fired = fired + 1 })
+  media_watch_stop(w)
+  inspect(w.is_running(), content="false")
+  println("media watch 冒烟完成（触发次数 \{fired}）")
+}

@@ -1,6 +1,6 @@
 # 系统能力（音量 / 亮度 / 应用查找 / 应用历史 / 影音与桌面控制）
 
-系统能力族 API：屏幕亮度、键盘背光、系统音量（含输出设备与逐应用音量）、媒体播放控制、夜间色温、壁纸、显示器配置、系统窗口管理、剪贴板监听、子进程执行、磁盘卷、电源与登录会话、电源计划、系统信息、时区与本地语言、蓝牙、传感器、打印机、环境变量、目录枚举、最近文件、浏览器书签与 Firefox 历史。全部只读或经系统服务授权写入，统一返回 `Result`，不支持的环境给对应错误值而不是崩溃；`*_supported()` 每次调用真实探测当前环境。
+系统能力族 API：屏幕亮度、键盘背光、系统音量（含输出设备与逐应用音量）、媒体播放控制、夜间色温、壁纸、显示器配置、系统窗口管理、剪贴板监听、子进程执行、磁盘卷、电源与登录会话、电源计划、系统信息、时区与本地语言、蓝牙、传感器、打印机、环境变量、目录枚举、最近文件、浏览器书签与 Firefox 历史、媒体状态监视与通知进度文本。全部只读或经系统服务授权写入，统一返回 `Result`，不支持的环境给对应错误值而不是崩溃；`*_supported()` 每次调用真实探测当前环境。
 
 完整演示见 `moon run examples/systemprobe`——点「读取系统能力」逐项呈现本机真实结果，不支持的能力显示对应错误文本。各能力在不同发行版 / 桌面环境的实测结论与原理（logind 路径、wpctl/pactl 差异、SQLite 库直读等）见 [adaptation.md](adaptation.md)。
 
@@ -253,6 +253,43 @@ match @yue.media_players() {
   Err(@yue.MediaError::NoPlayer) => println("无播放器")
   Err(e) => println("不可用：\{e}")
 }
+```
+
+### 媒体状态监视
+
+MPRIS 不提供统一的信号回调通路（总线可订阅 `PropertiesChanged`，但需要常驻读循环，与库的同步调用模型不兼容），状态监视采用轮询增量：按间隔读状态，播放态 / 标题 / 艺术家 / 专辑任一变化即触发 `on_change`；首轮只建立基线不触发；目标播放器（空 player 取首个实例）出现前每轮重试解析，出现后锁定；查询失败的轮次静默跳过。
+
+| 函数 | 说明 |
+|---|---|
+| `MediaWatcher::make() -> MediaWatcher` | 建监视句柄（默认运行中） |
+| `media_watch_status(player?, interval_ms? = 1000, on_change) -> MediaWatcher` | 启动轮询监视；player 为空监视首个 MPRIS 实例；on_change 得 `MediaStatus` |
+| `media_watch_stop(w)` | 停止监视（下一帧注销定时器；不可恢复，重新监视请用新句柄） |
+| `MediaWatcher::is_running() -> Bool` | 句柄是否在监视 |
+
+`on_change` 回调抛异常会中断该定时器（先保证自身不抛）；组件销毁前调用 `media_watch_stop` 显式停止。
+
+```moonbit
+let w = @yue.media_watch_status(interval_ms=1000, fn(s : @yue.MediaStatus) {
+  println("现在播放：\{s.title} - \{s.artist}")
+})
+// 不再关心时
+@yue.media_watch_stop(w)
+```
+
+### 通知进度
+
+桌面通知规范本身没有进度字段（freedesktop 通知协议无 progress，Windows / macOS 的原生进度呈现也各自为政），跨平台一致的做法是在正文内渲染字符进度条 + 百分比。
+
+| 函数 | 说明 |
+|---|---|
+| `notification_progress_text(percent : Double, width? : Int = 10) -> String` | 进度文本：字符条 + 百分比（percent 钳到 [0,100]，NaN 按 0，width<=0 只给百分比） |
+| `Notification::set_progress(body : String, percent : Double, width? : Int = 10) -> Unit` | 设通知正文：首行原文 + 第二行进度 |
+
+```moonbit
+let n = @yue.Notification::new()
+n.set_title("导出中")
+n.set_progress("正在导出 3/8 个文件", 37.5, width=4)
+n.show()
 ```
 
 ## 夜间色温
