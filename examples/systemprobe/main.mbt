@@ -519,17 +519,24 @@ fn cmd_preview_buttons(report : Ref[@yue.Label?]) -> Array[@yue.Node] {
 
 ///|
 ///|
-/// 载入视频演示:lavfi 生成 2 秒 160x120@5 测试视频(AVI 容器)→ 提取
-/// 8fps 帧集(约 16 帧)→ 更新帧源。同步执行约 1-2 秒,由点击后
-/// set_timeout 触发,期间状态标签先行提示。
-fn vidf_load_demo(
-  frames_ref : Ref[@yue.VideoFrames?],
+/// 载入视频演示:lavfi 生成 2 秒 160x120@5 测试视频(AVI 容器 + 正弦
+/// 音轨)→ VideoPlayer::make(probe + 帧集提取 + 音轨提取,同步耗时) →
+/// video_player_t 挂载进 holder。播放/暂停/进度/音量/循环全部可交互。
+fn vidf_load_player(
+  holder : Ref[@yue.Container?],
   status : Ref[@yue.Label?],
+  out_player : Ref[@yue.VideoPlayer?],
 ) -> Unit {
   let avi = "/tmp/yue-probe-demo.avi"
   match @yue.pr_run(
     "ffmpeg",
-    ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=160x120:rate=5", "-pix_fmt", "yuv420p", avi],
+    [
+      "-v", "error", "-y",
+      "-f", "lavfi", "-i", "testsrc=duration=2:size=160x120:rate=5",
+      "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+      "-pix_fmt", "yuv420p",
+      avi,
+    ],
     timeout_ms=30000,
   ) {
     Ok(o) =>
@@ -548,20 +555,27 @@ fn vidf_load_demo(
       return
     }
   }
-  match @yue.vidf_extract(avi, fps=8.0, width=160, height=120) {
-    Ok(frames) => {
-      frames_ref.val = Some(frames)
-      match status.val {
-        Some(l) =>
-          l.set_text(
-            "已载入 \{frames.width}x\{frames.height} × \{frames.frame_count} 帧(@8fps,循环播放)",
-          )
+  match @yue.VideoPlayer::make(avi, fps=8, width=160, height=120) {
+    Ok(player) => {
+      out_player.val = Some(player)
+      let node = @yue.video_player_t(player)
+      match holder.val {
+        Some(c) => {
+          let _view = (node.mount)(@yue.ViewLike::view(c))
+          match status.val {
+            Some(l) =>
+              l.set_text(
+                "已载入 \{player.frames.width}x\{player.frames.height} × \{player.frames.frame_count} 帧 · 时长 \{player.duration()}s(播放/暂停/进度/音量/循环均可交互)",
+              )
+            None => ()
+          }
+        }
         None => ()
       }
     }
     Err(e) =>
       match status.val {
-        Some(l) => l.set_text("提取失败: \{e}")
+        Some(l) => l.set_text("播放器构建失败: \{e}")
         None => ()
       }
   }
@@ -793,10 +807,11 @@ fn main {
   ])
   // 特效散点:涟漪动画句柄外置,关窗时停止定时器
   let eff_anim = @yue.EffAnim::make()
-  // 视频(ffmpeg 路线):点击「载入演示视频」后 lavfi 生成测试视频并
-  // 提取帧集,帧源从 Ref 取;载入前 video_view_t 显示占位底色。
-  let vid_frames : Ref[@yue.VideoFrames?] = Ref(None)
+  // 视频播放器(ffmpeg 路线):点击「载入演示视频」后生成测试视频并
+  // 构建 VideoPlayer,挂载进 vid_holder 容器(控制条可交互)。
+  let vid_holder : Ref[@yue.Container?] = Ref(None)
   let vid_status : Ref[@yue.Label?] = Ref(None)
+  let vid_player : Ref[@yue.VideoPlayer?] = Ref(None)
   let eff_points : @yue.Store[Array[@yue.EffPoint]] = @yue.Store::new([
     @yue.EffPoint::make(18.0, 72.0, size=20.0),
     @yue.EffPoint::make(32.0, 58.0, size=14.0),
@@ -906,12 +921,12 @@ fn main {
     @yue.bar_chart_it(it_bar, fill=true),
     @yue.donut_chart_it(it_donut, center="合计 100", fill=true),
     @yue.label_t(
-      "视频播放(ffmpeg 解码路线)",
+      "视频播放(ffmpeg 解码路线,浏览器级播放器)",
       role=@yue.Section,
       style=[("marginTop", 16.0)],
     ),
     @yue.label_t(
-      "ffmpeg/ffprobe 可用时,点击载入:lavfi 生成 2 秒测试视频(AVI 容器),ffprobe 读元信息,ffmpeg 解码为 RGBA 帧集,video_view_t 按帧号经 PNG 内存编码→Image→draw_image 渲染。",
+      "点击载入:lavfi 生成 2 秒测试视频(AVI 容器,含正弦音轨),VideoPlayer 内部完成 ffprobe 元信息、视频帧集提取与音轨 WAV 提取,挂载后即浏览器 <video> 级体验:播放/暂停、拖进度(松手 seek)、音量、循环。",
       role=@yue.Secondary,
     ),
     @yue.button_t(
@@ -919,32 +934,19 @@ fn main {
       variant=@yue.Solid,
       on_click=fn() {
         match vid_status.val {
-          Some(l) => l.set_text("载入中:生成测试视频并解码…")
+          Some(l) => l.set_text("载入中:生成测试视频并解码(约 1-2 秒)…")
           None => ()
         }
-        // 生成+解码约 1-2 秒,延后一拍让状态文本先渲染
-        let _ = @yue.set_timeout(50, fn() { vidf_load_demo(vid_frames, vid_status) })
+        // 生成+解码同步耗时,延后一拍让状态文本先渲染
+        let _ = @yue.set_timeout(50, fn() { vidf_load_player(vid_holder, vid_status, vid_player) })
       },
     ),
     @yue.label_t(
-      "(视频加载状态显示在此)",
+      "(播放器加载状态显示在此)",
       role=@yue.Body,
       handle=fn(l) { vid_status.val = Some(l) },
     ),
-    @yue.video_view_t(
-      160,
-      120,
-      16,
-      fn(i) {
-        match vid_frames.val {
-          Some(frames) => frames.frame(i)
-          None => None
-        }
-      },
-      fps=8,
-      looping=true,
-      fill=true,
-    ),
+    @yue.container(handle=fn(c) { vid_holder.val = Some(c) }),
     @yue.label_t(
       "设置类命令预览(只展示将执行的命令文本,不真实执行)",
       role=@yue.Section,
@@ -973,9 +975,16 @@ fn main {
       center=true,
       on_close=fn(_w) {
         @yue.eff_stop(eff_anim)
+        match vid_player.val {
+          Some(p) => p.free()
+          None => ()
+        }
         @yue.quit()
       },
     ),
   )
+  // 启动即自动载入演示视频播放器（make 同步耗时 1-2 秒；也可点上方
+  // 「载入演示视频」按钮重新载入）
+  let _ = @yue.set_timeout(300, fn() { vidf_load_player(vid_holder, vid_status, vid_player) })
   @yue.run()
 }

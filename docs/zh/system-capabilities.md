@@ -386,6 +386,24 @@ let view = @yue.video_view_t(frames.width, frames.height, frames.frame_count,
 
 帧数据整读进内存，长视频用 fps/width/height/max_frames 降采样钳制；音画同步为近似（各自从 0 起播），精确同步需时钟对齐，后续批次再做。
 
+### 播放器组件（对标浏览器 <video>）
+
+`VideoPlayer`（`yue/video_player.mbt`）把上面的管线封成浏览器级播放器：`VideoPlayer::make(path, fps?, width?, height?)` 一次完成 probe + 帧集提取 + 音轨 WAV 提取（同步耗时，宜放 `set_timeout`），`video_player_t(player)` 挂载后即得完整控件：
+
+- **播放控制**：`play()` / `pause()` / `stop()` / `seek(t_s)`（播放中 seek 从新位置续播）/ `is_playing()` / `current()` / `duration()`
+- **控件**：播放/暂停按钮、可拖进度条（松手防抖 180ms 后 seek）、时间文本（m:ss / m:ss）、音量滑条、循环开关
+- **音画同步**：音频与帧推进同为 play 起点、50ms 步进（数十毫秒级误差；精确同步需音频光标回读，见 adaptation.md）
+- **时长兜底**：ffprobe 拿不到 format duration（如 lavfi 写的 AVI 输出 N/A）时用帧集时长 = 帧数 ÷ 抽取帧率
+- **音轨**：`vidf_extract_audio` 提取 WAV 交 `AudioEngine` 播放；无音轨文件自动静音播放
+- seek 实现为 ffmpeg 切段播放（`-ss t -c copy`），拖拽防抖避免连续切段；音画从 seek 点重新对齐
+
+```moonbit
+let player = @yue.VideoPlayer::make("demo.avi", fps=12)?
+let view = @yue.video_player_t(player)
+```
+
+systemprobe 启动即自动载入演示播放器（lavfi 生成 2 秒 AVI：testsrc 视频 + sine 音轨），播放/暂停/拖进度/音量/循环全部可交互；真机截图已确认控制条与帧画面渲染。
+
 ## 显示器配置
 
 解析 `xrandr --query` 输出，给出每个输出的名称 / 连接状态 / 当前分辨率 × 刷新率 / 位置 / 物理尺寸 / 支持的模式列表。刷新率以厘赫兹整数表示（×100，如 5995 = 59.95Hz），避免浮点解析与比较。

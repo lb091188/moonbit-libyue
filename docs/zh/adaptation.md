@@ -415,12 +415,20 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 修复:mount_window 的根容器默认 `style=[("flex", 1.0)]`(窗口根语义即撑满窗口,默认化安全;`mount()` 面向任意父容器的子树,不默认化以免改坏既有布局);scroll 的文档注释补弹性高度警示;systemprobe 的 scroll 同时显式给 `("flex", 1.0)`(双保险,滚动子节点按需自给 flex 的用法不变)。
 - 验证:xdotool + import 截图窗口区域像素方差,修复前纯底色、修复后完整渲染(标题/按钮/雷达图可见);showcase/hello 无回归。
 
-### toolchain 代差(v0.10.12 vs 生态新包)与 moonsqlitefile vendor 收编
+### toolchain 版本升级(弃 fork 路线)
 
-- 环境:本机 toolchain 2026-10-07 晚间实测为 moonc v0.10.12+1634b282e(core 0.10.12,无 `Bytes/String::exact_view`、无 `eprintln`);当天早些时候同机为 v0.10.14(有)。CI 统一 `install.sh` 装最新,两端并存。
-- 现象:clean 后 moonsqlitefile(0.7/0.8 全线)与 moonbit-community/sqlite3(经 moonbitlang/async 的 `eprintln`)在 v0.10.12 编不过;examples/sysmonitor 自身的 `String::exact_view` 同炸——此前"编译通过"是 `_build` 旧缓存假象,toolchain 切换后 clean 暴露。
-- 决策:不引 C、不升用户全局 toolchain,把 moonsqlitefile v0.8.0 源码(9k 行,Apache-2.0)收编为进程内子包 `third_party/moonsqlitefile/`,唯一 patch:`record.mbt` 的 `payload.exact_view(start,end)` → 字节切片 `payload[start:end]`(切片语法在 v0.10.12 与最新 toolchain 均可用,上游修复可 diff 最小化同步);sysmonitor 的 4 处 `exact_view` 同步改切片。`@utf8/@utf16 decode(BytesView)` 与 `@debug`/`@buffer` 按本机 core 显式 import。
-- 验证:moon check 零警告(含 vendor 包)、moon test 575 全绿(净增 6:PNG 编码器字节级自校验)、moon build 全仓通过;clean 后全量重建复核。
+- 环境:本机 toolchain 曾被切到 moonc v0.10.12+1634b282e(core 0.10.12),而 moonsqlitefile 0.7/0.8 全线、moonbitlang/async 均要求 v0.10.14 的 API(`Bytes::exact_view`、`eprintln`);CI 无版本锁定(install.sh 装最新),两端漂移导致本机 clean 后全仓编译失败,而 `_build` 旧缓存掩盖了这一点。
+- 决策演变:一度把 moonsqlitefile 0.8.0 vendored 进 `third_party/`(patch exact_view 为字节切片)应急;确认正解是**升级 toolchain 而非 fork 规避**(fork 生态包是长期维护债,只为应急),遂执行官方 install.sh 升级 moon 至 v0.10.14,撤销 third_party fork、恢复 prowk/moonsqlitefile@0.8.0 官方依赖,sysmonitor 的 4 处 String::exact_view 恢复正版写法。
+- 结论:版本代差一律升级 toolchain 解决(与 CI 对齐),不 fork 生态包;third_party/ 仅保留确无替代的 vendored。
+- 验证:moon clean 后全量重建 check 零警告、moon test 575 全绿、moon build 通过。
+
+### 视频播放器(浏览器级:seek 切段 + 音画同源时钟)
+
+- 组件:VideoPlayer + video_player_t(播放/暂停/进度拖拽/音量/循环/时间文本)。音画同步口径:音频(AudioEngine)与帧推进(set_timer 50ms)同为 play 起点、按播放位置走帧集随机访问,误差数十毫秒级。
+- seek 实现:ffmpeg `-ss t -c copy` 切段播放,拖拽防抖 180ms 避免连续切段卡顿。评估过 fork miniaudio 补 seek(上游封装未导出 cursor/seek),否决:音频与视频共用 ffmpeg 技术栈、零 fork 更稳;精确音画同步需读音频光标,留后续。
+- 时长兜底:ffprobe 对 lavfi 写的 AVI 返回 format duration=N/A(CSV 行「N/A」非数字,解析时跳过),此时时长 = 帧集帧数 ÷ 抽取帧率;有 format duration 时以其为准(含容器 padding,2.0s 源实测 2.2s)。
+- 音轨提取失败(无音轨/编码不支持)时自动静音播放,不阻断视频路径。
+- systemprobe 演示改为启动即自动载入(make 同步 1-2 秒,set_timeout 300ms 后执行;按钮保留重新载入)。X11 验证注意:xdotool 合成点击被 XFCE「click-to-focus」策略拦截(motion 事件可达、button 事件需窗口先 focus 而死锁),渲染验证走启动自动载入 + xdotool 截图;播放/暂停/seek 状态机由 wbtest 覆盖。真机截图已确认控制条与 testsrc 帧画面渲染。
 
 ## 维护约定
 
