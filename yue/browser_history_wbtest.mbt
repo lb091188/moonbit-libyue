@@ -98,9 +98,30 @@ test "bh_sort_history：时间降序/并列按 url" {
 ///|
 test "bh_sort_downloads：开始时间降序/并列按路径" {
   let items = [
-    { target_path: "/tmp/b", received_bytes: 1L, total_bytes: 1L, start_time: 50L, end_time: 60L, state: 1L },
-    { target_path: "/tmp/a", received_bytes: 2L, total_bytes: 2L, start_time: 90L, end_time: 95L, state: 1L },
-    { target_path: "/tmp/c", received_bytes: 3L, total_bytes: 3L, start_time: 50L, end_time: 70L, state: 1L },
+    {
+      target_path: "/tmp/b",
+      received_bytes: 1L,
+      total_bytes: 1L,
+      start_time: 50L,
+      end_time: 60L,
+      state: 1L,
+    },
+    {
+      target_path: "/tmp/a",
+      received_bytes: 2L,
+      total_bytes: 2L,
+      start_time: 90L,
+      end_time: 95L,
+      state: 1L,
+    },
+    {
+      target_path: "/tmp/c",
+      received_bytes: 3L,
+      total_bytes: 3L,
+      start_time: 50L,
+      end_time: 70L,
+      state: 1L,
+    },
   ]
   let sorted = bh_sort_downloads(items)
   assert_eq(sorted[0].target_path, "/tmp/a")
@@ -133,10 +154,10 @@ test "bh_parse_history_row：正常/隐藏过滤/列数不足" {
   // hidden=1（重定向等）不收
   assert_true(bh_parse_history_row(mk(1L)) is None)
   // 列数不足
-  assert_true(bh_parse_history_row([
-      @moonsqlitefile.Null,
-      @moonsqlitefile.Text("u"),
-    ]) is None)
+  assert_true(
+    bh_parse_history_row([@moonsqlitefile.Null, @moonsqlitefile.Text("u")])
+    is None,
+  )
 }
 
 ///|
@@ -168,10 +189,10 @@ test "bh_parse_download_row：正常/列数不足" {
     None => fail("正常行应解析成功")
   }
   // 列数不足（downloads 需至少 12 列）
-  assert_true(bh_parse_download_row([
-      @moonsqlitefile.Null,
-      @moonsqlitefile.Text("guid"),
-    ]) is None)
+  assert_true(
+    bh_parse_download_row([@moonsqlitefile.Null, @moonsqlitefile.Text("guid")])
+    is None,
+  )
 }
 
 ///|

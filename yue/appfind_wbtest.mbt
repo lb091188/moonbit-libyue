@@ -43,44 +43,37 @@ test "appfind 条目抽取：Type/NoDisplay/缺 Name 过滤与 zh_CN 回退" {
     None => inspect(false, content="true")
   }
   // 无 zh_CN：locale_name 回退 Name
-  match appfind_desktop_to_entry(
-      "[Desktop Entry]\nName=Plain\nExec=p\n",
-      "plain",
-    ) {
+  match
+    appfind_desktop_to_entry("[Desktop Entry]\nName=Plain\nExec=p\n", "plain") {
     Some(v) => inspect(v.locale_name, content="Plain")
     None => inspect(false, content="true")
   }
   // NoDisplay=true：过滤
   inspect(
     appfind_desktop_to_entry(
-      "[Desktop Entry]\nName=Hide\nNoDisplay=true\n",
-      "hide",
+      "[Desktop Entry]\nName=Hide\nNoDisplay=true\n", "hide",
     )
-      is None,
+    is None,
     content="true",
   )
   // Type=Link：过滤；缺 Type 行视为 Application
   inspect(
     appfind_desktop_to_entry("[Desktop Entry]\nType=Link\nName=L\n", "l")
-      is None,
+    is None,
     content="true",
   )
   inspect(
-    appfind_desktop_to_entry("[Desktop Entry]\nName=T\n", "t")
-      is Some(_),
+    appfind_desktop_to_entry("[Desktop Entry]\nName=T\n", "t") is Some(_),
     content="true",
   )
   // 缺 Name：过滤
   inspect(
-    appfind_desktop_to_entry("[Desktop Entry]\nExec=only-exec\n", "x")
-      is None,
+    appfind_desktop_to_entry("[Desktop Entry]\nExec=only-exec\n", "x") is None,
     content="true",
   )
   // categories 全空/分号尾巴：空数组
-  match appfind_desktop_to_entry(
-      "[Desktop Entry]\nName=C\nCategories=;; ;\n",
-      "c",
-    ) {
+  match
+    appfind_desktop_to_entry("[Desktop Entry]\nName=C\nCategories=;; ;\n", "c") {
     Some(v) => debug_inspect(v.categories, content="[]")
     None => inspect(false, content="true")
   }
@@ -90,12 +83,40 @@ test "appfind 条目抽取：Type/NoDisplay/缺 Name 过滤与 zh_CN 回退" {
 ///|
 test "appfind 去重合并：用户覆盖系统 + 按 name 排序" {
   let sys : Array[AppEntry] = [
-    { id: "b.app", name: "Beta", locale_name: "Beta", exec: "beta", icon: "", categories: [], },
-    { id: "a.app", name: "Alpha", locale_name: "Alpha", exec: "alpha", icon: "", categories: [], },
-    { id: "dup.app", name: "Old", locale_name: "Old", exec: "old", icon: "", categories: [], },
+    {
+      id: "b.app",
+      name: "Beta",
+      locale_name: "Beta",
+      exec: "beta",
+      icon: "",
+      categories: [],
+    },
+    {
+      id: "a.app",
+      name: "Alpha",
+      locale_name: "Alpha",
+      exec: "alpha",
+      icon: "",
+      categories: [],
+    },
+    {
+      id: "dup.app",
+      name: "Old",
+      locale_name: "Old",
+      exec: "old",
+      icon: "",
+      categories: [],
+    },
   ]
   let user : Array[AppEntry] = [
-    { id: "dup.app", name: "New", locale_name: "新", exec: "new", icon: "", categories: [], },
+    {
+      id: "dup.app",
+      name: "New",
+      locale_name: "新",
+      exec: "new",
+      icon: "",
+      categories: [],
+    },
   ]
   let out = appfind_merge_entries([sys, user])
   inspect(out.length(), content="3")
@@ -114,19 +135,19 @@ test "appfind 目录拼装：用户目录三态 + 扫描序 + bin 查找序" {
   // XDG_DATA_HOME 设且非空：优先
   inspect(
     appfind_user_apps_dir(Some("/xdg"), Some("/home/u"))
-      is Some("/xdg/applications"),
+    is Some("/xdg/applications"),
     content="true",
   )
   // 空串：回退 HOME
   inspect(
     appfind_user_apps_dir(Some(""), Some("/home/u"))
-      is Some("/home/u/.local/share/applications"),
+    is Some("/home/u/.local/share/applications"),
     content="true",
   )
   // 未设：回退 HOME
   inspect(
     appfind_user_apps_dir(None, Some("/home/u"))
-      is Some("/home/u/.local/share/applications"),
+    is Some("/home/u/.local/share/applications"),
     content="true",
   )
   // 都没有：None
@@ -165,17 +186,13 @@ test "appfind 目录拼装：用户目录三态 + 扫描序 + bin 查找序" {
 test "appfind_collect：真实读盘 + 非 .desktop 过滤 + 路径只留文件名" {
   let path = "/tmp/appfind_wbtest_sample.desktop"
   let written = write_text_file(
-    path,
-    "[Desktop Entry]\nType=Application\nName=Sample\nName[zh_CN]=示例\nExec=/opt/sample %U\nIcon=sample\nCategories=Development;\n",
+    path, "[Desktop Entry]\nType=Application\nName=Sample\nName[zh_CN]=示例\nExec=/opt/sample %U\nIcon=sample\nCategories=Development;\n",
   )
   inspect(written, content="true")
   let out = appfind_collect(["/tmp"], fn(dir) {
     if dir == "/tmp" {
       [
-        "appfind_wbtest_sample.desktop",
-        "not_desktop.txt",
-        ".desktop",
-        "/tmp/appfind_wbtest_sample.desktop",
+        "appfind_wbtest_sample.desktop", "not_desktop.txt", ".desktop", "/tmp/appfind_wbtest_sample.desktop",
       ]
     } else {
       []
@@ -217,6 +234,56 @@ test "appfind_collect：目录读不到静默跳过（空清单不报错）" {
 test "appfind_installed_with：注入枚举" {
   // 注入空枚举：Ok 空清单
   inspect(appfind_installed_with(fn(_dir) { [] }) is Ok(_), content="true")
+}
+
+///|
+test "appfind_installed_impl：目录全打不开 Err(NoScanDir)，部分存在只扫存在的" {
+  // 全部目录都打不开：NoScanDir（不再伪装空清单）
+  match
+    appfind_installed_impl(
+      ["/nonexistent-appfind-zz-1", "/nonexistent-appfind-zz-2"],
+      fn(dir) { Err(OpenFailed(dir)) },
+    ) {
+    Err(NoScanDir) => inspect(true, content="true")
+    _ => inspect(false, content="true")
+  }
+  // 部分目录打不开：跳过，存在的照扫
+  let path = "/tmp/appfind_wbtest_real.desktop"
+  ignore(
+    write_text_file(
+      path, "[Desktop Entry]\nType=Application\nName=RealScan\nExec=real %U\n",
+    ),
+  )
+  match
+    appfind_installed_impl(["/nonexistent-appfind-zz-1", "/tmp"], fn(dir) {
+      if dir == "/tmp" {
+        Ok(["appfind_wbtest_real.desktop"])
+      } else {
+        Err(OpenFailed(dir))
+      }
+    }) {
+    Ok(entries) => {
+      inspect(entries.length(), content="1")
+      inspect(entries[0].id, content="appfind_wbtest_real")
+      inspect(entries[0].name, content="RealScan")
+    }
+    Err(e) => {
+      inspect(e.to_string(), content="<应成功>")
+      inspect(false, content="true")
+    }
+  }
+  ignore(ffi_remove_file(utf8_bytes(path), Ref(0)))
+}
+
+///|
+test "appfind_installed：真实扫描（本链路宿主机 /usr/share/applications 必有）" {
+  match appfind_installed() {
+    Ok(entries) => inspect(entries.length() > 0, content="true")
+    Err(e) => {
+      inspect(e.to_string(), content="<应成功>")
+      inspect(false, content="true")
+    }
+  }
 }
 
 ///|

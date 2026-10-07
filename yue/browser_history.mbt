@@ -1,9 +1,11 @@
 // 浏览器历史读取（只读）：Chrome / Chromium / Edge / Brave 的 History
 // SQLite 库读取，直接解析磁盘文件（moonsqlitefile，纯 MoonBit 无 FFI），
-// 不复制、不修改原库。文件读取复用 read_binary_file；profile 探测按
-// "存在才收、读不到静默跳过"，探测读入的库字节直接作打开输入（同一
-// 库不读第二遍）。本包未提供目录枚举原语，profile 目录按
-// 固定候选名探测（Default 与 Profile 1..N）。
+// 不复制、不修改原库。profile 存在性探测走目录枚举（fsx_list_dir 查
+// History 条目，不读库文件内容），取数路径才把命中的库整读一遍——
+// 列 profile 不再为判存在把数十 MB 的库读进来。探测按"存在才收、
+// 读不到静默跳过"（目录枚举无类型信息，profile 目录里名为 History
+// 的条目即算命中）。本包未提供目录枚举之外的 profile 发现手段，
+// profile 目录按固定候选名探测（Default 与 Profile 1..N）。
 //   - bh_browsers  列出有 History 库的浏览器 profile
 //   - bh_history   浏览历史（urls 表，时间降序）
 //   - bh_downloads 下载记录（downloads 表，开始时间降序）
@@ -152,7 +154,9 @@ fn[T] bh_take(items : Array[T], limit : Int) -> Array[T] {
 /// 浏览历史排序：最近访问时间降序，并列按 url 升序（返回新数组）。
 pub fn bh_sort_history(items : Array[HistoryItem]) -> Array[HistoryItem] {
   let out = items.copy()
-  out.mut_view().sort_by(fn(a, b) {
+  out
+  .mut_view()
+  .sort_by(fn(a, b) {
     if a.last_visit_time > b.last_visit_time {
       -1
     } else if a.last_visit_time < b.last_visit_time {
@@ -172,7 +176,9 @@ pub fn bh_sort_history(items : Array[HistoryItem]) -> Array[HistoryItem] {
 /// 下载记录排序：开始时间降序，并列按 target_path 升序（返回新数组）。
 pub fn bh_sort_downloads(items : Array[DownloadItem]) -> Array[DownloadItem] {
   let out = items.copy()
-  out.mut_view().sort_by(fn(a, b) {
+  out
+  .mut_view()
+  .sort_by(fn(a, b) {
     if a.start_time > b.start_time {
       -1
     } else if a.start_time < b.start_time {
@@ -258,12 +264,12 @@ fn bh_sqlite_error_text(e : @moonsqlitefile.SqliteError) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// 探测与读取（读盘走 read_binary_file，只读不开写）
+// 探测与读取（探测走目录枚举，取数读盘走 read_binary_file，只读不开写）
 // ---------------------------------------------------------------------------
 
 ///|
-/// profile 目录候选名：Default 与 Profile 1..24（本包无目录枚举原语，
-/// 按固定候选名探测；自定义目录名的 profile 收不到）。
+/// profile 目录候选名：Default 与 Profile 1..24（本包无 profile 目录
+/// 枚举手段，按固定候选名探测；自定义目录名的 profile 收不到）。
 let bh_profile_probe_max : Int = 24
 
 ///|
@@ -278,10 +284,7 @@ pub fn bh_profile_candidates() -> Array[String] {
 
 ///|
 /// 浏览器配置根：XDG_CONFIG_HOME（设且非空）优先，回退 $HOME/.config。
-pub fn bh_config_root(
-  xdg_config_home : String?,
-  home : String?,
-) -> String? {
+pub fn bh_config_root(xdg_config_home : String?, home : String?) -> String? {
   match xdg_config_home {
     Some(d) if d != "" => Some(d)
     _ =>
@@ -303,98 +306,130 @@ let bh_browser_defs : Array[(String, String, String)] = [
 ]
 
 ///|
+/// 目录条目名里是否含 History（存在性判断的纯逻辑：只比条目名，不看
+/// 文件内容）。
+fn bh_names_hit_history(names : Array[String]) -> Bool {
+  for n in names {
+    if n == "History" {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// 探测配置根下所有含 History 库的 profile：浏览器定义 × profile 候选名
+/// 逐一目录枚举，命中（目录里有名为 History 的条目）即收，不读库文件
+/// 内容；返回按浏览器定义顺序（Chrome → Chromium → Edge → Brave）、同
+/// 浏览器内按 profile 候选顺序（Default 在前）排列。
+fn bh_probe_profiles(root : String) -> Array[BrowserProfile] {
+  let out : Array[BrowserProfile] = []
+  for def in bh_browser_defs {
+    let (id, dir, subdir) = def
+    let base = if subdir != "" {
+      root + "/" + dir + "/" + subdir
+    } else {
+      root + "/" + dir
+    }
+    for profile in bh_profile_candidates() {
+      let dir_path = base + "/" + profile
+      match fsx_list_dir(dir_path) {
+        Ok(names) =>
+          if bh_names_hit_history(names) {
+            out.push({
+              browser: id,
+              profile,
+              history_path: dir_path + "/History",
+            })
+          }
+        Err(_) => () // 目录打不开（不存在/非目录/无权限）：当无此 profile
+      }
+    }
+  }
+  out
+}
+
+///|
 /// 当前平台是否支持浏览器历史读取（本文件仅实现 Linux 路径探测）。
 pub fn bh_supported() -> Bool {
   platform() == "linux"
 }
 
 ///|
-/// 列出有可读 History 库的浏览器 profile：在配置根下按浏览器定义 ×
-/// profile 候选名逐一探测 <目录>/<profile>/History；无可读库给
+/// 列出有 History 库的浏览器 profile：按浏览器定义 × profile 候选名
+/// 探测（目录枚举查 History 条目，不读库内容）；无可命中 profile 给
 /// [BhNoBrowser]，非 Linux 给 [BhUnsupported]。
 pub fn bh_browsers() -> Result[Array[BrowserProfile], BrowserHistoryError] {
-  match bh_browsers_loaded() {
-    Ok(pairs) => Ok(pairs.map(fn(pair) { pair.0 }))
+  match bh_root_or_err() {
     Err(e) => Err(e)
+    Ok(root) => {
+      let out = bh_probe_profiles(root)
+      if out.is_empty() {
+        Err(BhNoBrowser)
+      } else {
+        Ok(out)
+      }
+    }
   }
 }
 
 ///|
-/// bh_browsers 的内部版：探测命中的库连同整文件字节一并带回——探测
-/// 读入的字节直接作后续打开的输入，同一个库不读第二遍（History 库
-/// 常达数十 MB）。
-fn bh_browsers_loaded(
-) -> Result[Array[(BrowserProfile, Bytes)], BrowserHistoryError] {
+/// 配置根定位（探测与取数的公共前置）：非 Linux 给 [BhUnsupported]，
+/// XDG_CONFIG_HOME / HOME 都定位不到给 [BhNoConfigDir]。
+fn bh_root_or_err() -> Result[String, BrowserHistoryError] {
   if platform() != "linux" {
     return Err(BhUnsupported)
   }
-  let root = match bh_config_root(
-    getenv_str("XDG_CONFIG_HOME"),
-    getenv_str("HOME"),
-  ) {
-    Some(r) => r
-    None => return Err(BhNoConfigDir)
+  match bh_config_root(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME")) {
+    Some(r) => Ok(r)
+    None => Err(BhNoConfigDir)
   }
-  let out : Array[(BrowserProfile, Bytes)] = []
-  for def in bh_browser_defs {
-    let (id, dir, subdir) = def
-    for profile in bh_profile_candidates() {
-      let base = if subdir != "" {
-        root + "/" + dir + "/" + subdir
-      } else {
-        root + "/" + dir
-      }
-      let path = base + "/" + profile + "/History"
-      match read_binary_file(path) {
-        Some(bytes) => out.push(({ browser: id, profile, history_path: path, }, bytes))
-        None => ()
-      }
-    }
-  }
-  if out.is_empty() {
-    return Err(BhNoBrowser)
-  }
-  Ok(out)
 }
 
 ///|
 /// 用已读入的库字节打开（只读，交给 moonsqlitefile）。
 fn bh_open_db(bytes : Bytes) -> Result[@moonsqlitefile.Database, String] {
-  try {
-    Ok(@moonsqlitefile.open_database(bytes))
-  } catch {
+  Ok(@moonsqlitefile.open_database(bytes)) catch {
     e => Err(bh_sqlite_error_text(e))
   }
 }
 
 ///|
-/// 跨 profile 聚合：探测（读库一遍）后 read_one 逐 profile 处理，单
-/// profile 失败跳过并记首个原因；全部失败给 [BhIoFailed]，一个都没有
-/// 可读 profile 时给 [BhNoBrowser]。
+/// 跨 profile 聚合：探测（目录枚举，不读库内容）后逐 profile 把库整读
+/// 一遍交给 read_one，单 profile 读失败或解析失败跳过并记首个原因；
+/// 全部失败给 [BhIoFailed]，一个可命中 profile 都没有时给
+/// [BhNoBrowser]。
 fn[T] bh_merge_profiles(
   read_one : (BrowserProfile, Bytes) -> Result[Array[T], String],
 ) -> Result[Array[T], BrowserHistoryError] {
-  let profiles = match bh_browsers_loaded() {
-    Ok(ps) => ps
+  let root = match bh_root_or_err() {
+    Ok(r) => r
     Err(e) => return Err(e)
+  }
+  let profiles = bh_probe_profiles(root)
+  if profiles.is_empty() {
+    return Err(BhNoBrowser)
   }
   let out : Array[T] = []
   let mut first_error = ""
   let mut ok_count = 0
-  for pair in profiles {
-    let (p, bytes) = pair
-    match read_one(p, bytes) {
-      Ok(items) => {
-        ok_count = ok_count + 1
-        for item in items {
-          out.push(item)
+  for p in profiles {
+    let reason = match read_binary_file(p.history_path) {
+      Some(bytes) =>
+        match read_one(p, bytes) {
+          Ok(items) => {
+            ok_count = ok_count + 1
+            for item in items {
+              out.push(item)
+            }
+            ""
+          }
+          Err(reason) => reason
         }
-      }
-      Err(reason) => {
-        if first_error == "" {
-          first_error = p.browser + "/" + p.profile + ": " + reason
-        }
-      }
+      None => "读取失败（库文件不可读）"
+    }
+    if reason != "" && first_error == "" {
+      first_error = p.browser + "/" + p.profile + ": " + reason
     }
   }
   if ok_count == 0 && first_error != "" {
@@ -405,9 +440,7 @@ fn[T] bh_merge_profiles(
 
 ///|
 /// 单 profile 的 urls 表全量读取（含列数不足行的静默跳过）。
-fn bh_history_of_profile(
-  bytes : Bytes,
-) -> Result[Array[HistoryItem], String] {
+fn bh_history_of_profile(bytes : Bytes) -> Result[Array[HistoryItem], String] {
   let db = match bh_open_db(bytes) {
     Ok(d) => d
     Err(reason) => return Err(reason)

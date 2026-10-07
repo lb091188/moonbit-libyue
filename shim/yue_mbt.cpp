@@ -43,6 +43,7 @@
 #endif
 #if !defined(_WIN32)
 #include <unistd.h> // CurrentDirForDrag 的 getcwd(macOS 分支)
+#include <dirent.h> // list_dir 的 opendir/readdir(Linux 与 macOS 同为 POSIX)
 #endif
 #include <fstream>
 #include <new>
@@ -3952,6 +3953,97 @@ extern "C" int32_t yue_mbt_remove_file(const char *path, int32_t *ok) {
     return 0;
   }
   return -1;
+}
+
+// ---------- 环境变量与目录枚举（fsx:纯探测/薄翻译,无业务逻辑） ----------
+
+/* 目录枚举:子项名扁平 UTF-8 文本(按 '\n' 分行,不含 . ..,不做递归)。
+ * 打不开(不存在/非目录/无权限)ok=0 返回空文本。Windows 走
+ * FindFirstFileW(宽字符版,FindFirstFileA 是 ANSI 代码页,非 ASCII
+ * 路径会乱码);其余平台 opendir/readdir。 */
+extern "C" void *yue_mbt_list_dir(const char *path, int32_t *ok) {
+  *ok = 0;
+  if (path == nullptr) {
+    return moonbit_make_bytes(0, 0);
+  }
+  std::string out;
+#if defined(_WIN32)
+  std::wstring pattern = base::SysUTF8ToWide(path) + L"\\*";
+  WIN32_FIND_DATAW data;
+  HANDLE find = ::FindFirstFileW(pattern.c_str(), &data);
+  if (find == INVALID_HANDLE_VALUE) {
+    return moonbit_make_bytes(0, 0);
+  }
+  do {
+    if (std::wcscmp(data.cFileName, L".") == 0 ||
+        std::wcscmp(data.cFileName, L"..") == 0) {
+      continue;
+    }
+    out += base::SysWideToUTF8(data.cFileName);
+    out += '\n';
+  } while (::FindNextFileW(find, &data));
+  ::FindClose(find);
+#else
+  ::DIR *dir = ::opendir(path);
+  if (dir == nullptr) {
+    return moonbit_make_bytes(0, 0);
+  }
+  while (::dirent *ent = ::readdir(dir)) {
+    const char *name = ent->d_name;
+    if (name[0] == '.' &&
+        (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'))) {
+      continue;
+    }
+    out += name;
+    out += '\n';
+  }
+  ::closedir(dir);
+#endif
+  *ok = 1;
+  return BytesFromString(out);
+}
+
+/* 写环境变量:overwrite=0 且已存在时保持原值;仅作用当前进程环境。
+ * Windows 的 _putenv_s 恒覆盖,overwrite=0 分支先探测再决定。 */
+extern "C" int32_t yue_mbt_setenv(const char *name, const char *value,
+                                  int32_t overwrite, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  if (overwrite == 0 && std::getenv(name) != nullptr) {
+    *ok = 1;
+    return 0;
+  }
+  if (::_putenv_s(name, value) == 0) {
+    *ok = 1;
+    return 0;
+  }
+  return -1;
+#else
+  if (::setenv(name, value, overwrite) == 0) {
+    *ok = 1;
+    return 0;
+  }
+  return -1;
+#endif
+}
+
+/* 删环境变量:本就不存在也记 ok=1(幂等)。Windows 经 _putenv_s(name,"")
+ * 删除(MSDN 语义)。 */
+extern "C" int32_t yue_mbt_unsetenv(const char *name, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  if (::_putenv_s(name, "") == 0) {
+    *ok = 1;
+    return 0;
+  }
+  return -1;
+#else
+  if (::unsetenv(name) == 0) {
+    *ok = 1;
+    return 0;
+  }
+  return -1;
+#endif
 }
 
 #if defined(OS_WIN)

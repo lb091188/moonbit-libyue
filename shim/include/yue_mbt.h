@@ -798,6 +798,18 @@ int32_t yue_mbt_win_keep_awake_enable(int32_t *ok);
 /* Windows:还原线程执行状态;非 Windows 哨兵 -1000 */
 int32_t yue_mbt_win_keep_awake_restore(int32_t *ok);
 
+/* ---------- 环境变量与目录枚举（fsx;纯探测/薄翻译,无业务逻辑） ---------- */
+
+/* 目录枚举：子项名扁平 UTF-8 文本（'\n' 分行,不含 . ..,不做递归）;
+ * 打不开（不存在/非目录/无权限）ok=0 */
+void *yue_mbt_list_dir(const char *path, int32_t *ok);
+/* 写环境变量：overwrite=0 且已存在时保持原值;仅作用当前进程环境;
+ * 0 成功 -1 失败 */
+int32_t yue_mbt_setenv(const char *name, const char *value, int32_t overwrite,
+                       int32_t *ok);
+/* 删环境变量：本就不存在也记 ok=1（幂等）;0 成功 -1 失败 */
+int32_t yue_mbt_unsetenv(const char *name, int32_t *ok);
+
 /* ---------- 系统总线基建与电源 ---------- */
 
 /* 撤销 fd 监视（与 yue_mbt_sys_watch_fd 配对） */
