@@ -12,7 +12,8 @@ pub fn logind_available() -> Bool {
   match system_conn() {
     Err(_) => false
     Ok(c) =>
-      match c.call_sync(
+      match
+        c.call_sync(
           "org.freedesktop.DBus",
           "/org/freedesktop/DBus",
           "org.freedesktop.DBus",

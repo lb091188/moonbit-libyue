@@ -17,7 +17,9 @@ pub(all) enum FunnelAlign {
 /// 入参不变。
 pub fn funnel_sort(items : Array[BarItem]) -> Array[BarItem] {
   let out = items.copy()
-  out.mut_view().sort_by(fn(a, b) {
+  out
+  .mut_view()
+  .sort_by(fn(a, b) {
     if a.value > b.value {
       -1
     } else if a.value < b.value {
@@ -170,7 +172,9 @@ fn funnel_draw(
     p.fill()
     if has_label {
       let label_avail = (label_w - 76.0).max(20.0)
-      let pct = funnel_pct(values[i], values, of_total=pct_of_total).round().to_int()
+      let pct = funnel_pct(values[i], values, of_total=pct_of_total)
+        .round()
+        .to_int()
       p.draw_text(
         truncate_to(items[i].label, label_avail),
         pad_l + full + 16.0,
@@ -210,7 +214,7 @@ pub fn funnel_t(
   pct_of_total? : Bool = false,
   fill? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {

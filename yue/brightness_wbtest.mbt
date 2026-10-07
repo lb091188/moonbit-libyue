@@ -82,11 +82,26 @@ test "bright_check_dev:子系统/设备名/max 校验" {
     current: 0,
   }
   assert_true(bright_check_dev(mixed, "backlight") is Err(InvalidParam(_)))
-  let slash : BrightnessDevice = { subsystem: "leds", name: "a/b", max: 10, current: 0, }
+  let slash : BrightnessDevice = {
+    subsystem: "leds",
+    name: "a/b",
+    max: 10,
+    current: 0,
+  }
   assert_true(bright_check_dev(slash, "leds") is Err(InvalidParam(_)))
-  let empty_name : BrightnessDevice = { subsystem: "leds", name: "", max: 10, current: 0, }
+  let empty_name : BrightnessDevice = {
+    subsystem: "leds",
+    name: "",
+    max: 10,
+    current: 0,
+  }
   assert_true(bright_check_dev(empty_name, "leds") is Err(InvalidParam(_)))
-  let no_max : BrightnessDevice = { subsystem: "leds", name: "x", max: 0, current: 0, }
+  let no_max : BrightnessDevice = {
+    subsystem: "leds",
+    name: "x",
+    max: 0,
+    current: 0,
+  }
   assert_true(bright_check_dev(no_max, "leds") is Err(InvalidParam(_)))
 }
 
@@ -141,7 +156,10 @@ test "Show 输出:错误枚举与设备" {
   let e3 : BrightnessError = BusFailed("总线应答超时")
   assert_eq(e3.to_string(), "BrightnessError::BusFailed(总线应答超时)")
   let e4 : BrightnessError = InvalidParam("百分比越界: 150")
-  assert_eq(e4.to_string(), "BrightnessError::InvalidParam(百分比越界: 150)")
+  assert_eq(
+    e4.to_string(),
+    "BrightnessError::InvalidParam(百分比越界: 150)",
+  )
   let d : BrightnessDevice = {
     subsystem: "backlight",
     name: "b0",

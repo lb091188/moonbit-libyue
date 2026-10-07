@@ -15,7 +15,8 @@ pub fn nm_available() -> Bool {
   match system_conn() {
     Err(_) => false
     Ok(c) =>
-      match c.call_sync(
+      match
+        c.call_sync(
           "org.freedesktop.DBus",
           "/org/freedesktop/DBus",
           "org.freedesktop.DBus",
@@ -50,14 +51,10 @@ fn nm_get_u32(prop : String) -> Result[Int, String] {
     Err(e) => return Err(e)
   }
   match
-    c.call_sync(
-      NM,
-      NM_PATH,
-      "org.freedesktop.DBus.Properties",
-      "Get",
-      "ss",
-      [VString(NM), VString(prop)],
-    ) {
+    c.call_sync(NM, NM_PATH, "org.freedesktop.DBus.Properties", "Get", "ss", [
+      VString(NM),
+      VString(prop),
+    ]) {
     Ok(m) =>
       match vu32_of(m) {
         Some(v) => Ok(v)

@@ -14,18 +14,26 @@ test "vsc_json_parse：entries.json 实测样例" {
       assert_eq(vsc_json_get(root, "version") |> vsc_json_int64, Some(1L))
       assert_eq(
         vsc_json_get(root, "resource") |> vsc_json_str,
-        Some("file:///home/lkyh/code/EMS-CP/web/src/view/ems/components/pointSelect.vue"),
+        Some(
+          "file:///home/lkyh/code/EMS-CP/web/src/view/ems/components/pointSelect.vue",
+        ),
       )
       match vsc_json_get(root, "entries") {
         Some(VscJArr(entries)) => {
           assert_eq(entries.length(), 3)
-          assert_eq(vsc_json_get(entries[0], "id") |> vsc_json_str, Some("mzv0.vue"))
+          assert_eq(
+            vsc_json_get(entries[0], "id") |> vsc_json_str,
+            Some("mzv0.vue"),
+          )
           assert_eq(
             vsc_json_get(entries[1], "timestamp") |> vsc_json_int64,
             Some(1780042445877L),
           )
           // 末条无 source 字段也能解析
-          assert_eq(vsc_json_get(entries[2], "id") |> vsc_json_str, Some("wmV7.vue"))
+          assert_eq(
+            vsc_json_get(entries[2], "id") |> vsc_json_str,
+            Some("wmV7.vue"),
+          )
           assert_eq(
             vsc_json_get(entries[2], "timestamp") |> vsc_json_int64,
             Some(1780305446898L),
@@ -75,13 +83,18 @@ test "vsc_json_parse：storage.json windowsState 实测样例" {
 test "vsc_json_parse：字符串转义" {
   let sample = "{\"s\":\"a\\nb\\\"q\\\"\\u4e2d\\\\z\\ud83d\\ude00!/\"}"
   match vsc_json_parse(sample) {
-    Some(root) => assert_eq(vsc_json_get(root, "s") |> vsc_json_str, Some("a\nb\"q\"中\\z😀!/"))
+    Some(root) =>
+      assert_eq(
+        vsc_json_get(root, "s") |> vsc_json_str,
+        Some("a\nb\"q\"中\\z😀!/"),
+      )
     None => assert_true(false)
   }
   // 原样 UTF-8 字符直通
   let sample2 = "{\"s\":\"中文😀\"}"
   match vsc_json_parse(sample2) {
-    Some(root) => assert_eq(vsc_json_get(root, "s") |> vsc_json_str, Some("中文😀"))
+    Some(root) =>
+      assert_eq(vsc_json_get(root, "s") |> vsc_json_str, Some("中文😀"))
     None => assert_true(false)
   }
 }
@@ -90,14 +103,16 @@ test "vsc_json_parse：字符串转义" {
 /// 数字：整数（负数/Int64 大值）、浮点、指数；畸形 JSON 一律 None。
 test "vsc_json_parse：数字与容错" {
   match vsc_json_parse("{\"n\":-7}") {
-    Some(root) => assert_eq(vsc_json_get(root, "n") |> vsc_json_int64, Some(-7L))
+    Some(root) =>
+      assert_eq(vsc_json_get(root, "n") |> vsc_json_int64, Some(-7L))
     None => assert_true(false)
   }
   match vsc_json_parse("{\"n\":9223372036854775807}") {
-    Some(root) => assert_eq(
-      vsc_json_get(root, "n") |> vsc_json_int64,
-      Some(9223372036854775807L),
-    )
+    Some(root) =>
+      assert_eq(
+        vsc_json_get(root, "n") |> vsc_json_int64,
+        Some(9223372036854775807L),
+      )
     None => assert_true(false)
   }
   match vsc_json_parse("{\"f\":12.5}") {
@@ -143,7 +158,10 @@ test "vsc_uri_encode_path：保留集与转义" {
     vsc_uri_encode_path("/tmp/a-b_c.d~e(f)g+h;j,k'm"),
     "/tmp/a-b_c.d~e%28f%29g%2Bh%3Bj%2Ck%27m",
   )
-  assert_eq(vsc_uri_encode_path("/plain/path-1.2_v~.txt"), "/plain/path-1.2_v~.txt")
+  assert_eq(
+    vsc_uri_encode_path("/plain/path-1.2_v~.txt"),
+    "/plain/path-1.2_v~.txt",
+  )
   // 回环：编码 → 解码还原
   let enc = vsc_uri_encode_path("/home/u/a b/中文.vue")
   assert_eq(
@@ -159,7 +177,10 @@ test "vsc_uri_to_path：形态与解码" {
     vsc_uri_to_path("file:///home/lkyh/ownCode/steel-front"),
     Some("/home/lkyh/ownCode/steel-front"),
   )
-  assert_eq(vsc_uri_to_path("file:///home/lkyh/my%20proj"), Some("/home/lkyh/my proj"))
+  assert_eq(
+    vsc_uri_to_path("file:///home/lkyh/my%20proj"),
+    Some("/home/lkyh/my proj"),
+  )
   assert_true(vsc_uri_to_path("https://example.com/y") is None)
   assert_eq(
     vsc_uri_to_path("vscode-userdata:/home/x/.config/Code/User/settings.json"),
@@ -175,11 +196,15 @@ test "vsc_resource_uri：普通文件与 User 内配置" {
     "file:///home/x/prj/a%20b.vue",
   )
   assert_eq(
-    vsc_resource_uri("/home/x/.config/Code", "/home/x/.config/Code/User/settings.json"),
+    vsc_resource_uri(
+      "/home/x/.config/Code", "/home/x/.config/Code/User/settings.json",
+    ),
     "vscode-userdata:/home/x/.config/Code/User/settings.json",
   )
   assert_eq(
-    vsc_resource_uri("/home/x/.config/Code", "/home/x/.config/Code/User/中文目录/xx.json"),
+    vsc_resource_uri(
+      "/home/x/.config/Code", "/home/x/.config/Code/User/中文目录/xx.json",
+    ),
     "vscode-userdata:/home/x/.config/Code/User/%E4%B8%AD%E6%96%87%E7%9B%AE%E5%BD%95/xx.json",
   )
 }
@@ -189,15 +214,21 @@ test "vsc_resource_uri：普通文件与 User 内配置" {
 /// 有符号十六进制格式。
 test "vsc_history_folder：真实目录名复算" {
   assert_eq(
-    vsc_history_folder("file:///home/lkyh/code/EMS-CP/web/src/view/ems/components/pointSelect.vue"),
+    vsc_history_folder(
+      "file:///home/lkyh/code/EMS-CP/web/src/view/ems/components/pointSelect.vue",
+    ),
     "100bdcaa",
   )
   assert_eq(
-    vsc_history_folder("file:///home/lkyh/code/BASE/forntEnd/web-new/src/view/eam/api/datasourceApi.js"),
+    vsc_history_folder(
+      "file:///home/lkyh/code/BASE/forntEnd/web-new/src/view/eam/api/datasourceApi.js",
+    ),
     "-10b5e510",
   )
   assert_eq(
-    vsc_history_folder("vscode-userdata:/home/lkyh/.config/Code/User/settings.json"),
+    vsc_history_folder(
+      "vscode-userdata:/home/lkyh/.config/Code/User/settings.json",
+    ),
     "4180635d",
   )
   // 有符号十六进制：无补零、负号、边界值
@@ -212,9 +243,9 @@ test "vsc_history_folder：真实目录名复算" {
 ///|
 /// 时间戳换算：毫秒 → 秒去尾。
 test "VscHistoryEntry::timestamp_seconds：毫秒转秒" {
-  let e : VscHistoryEntry = { path: "/x/abc.vue", timestamp: 1780041766190L }
+  let e : VscHistoryEntry = { path: "/x/abc.vue", timestamp: 1780041766190L, }
   assert_eq(e.timestamp_seconds(), 1780041766L)
-  let e2 : VscHistoryEntry = { path: "/x/abc.vue", timestamp: 999L }
+  let e2 : VscHistoryEntry = { path: "/x/abc.vue", timestamp: 999L, }
   assert_eq(e2.timestamp_seconds(), 0L)
 }
 
@@ -230,7 +261,10 @@ test "vsc_local_history / vsc_recent：真实环境端到端（无 VS Code 数�
     Ok(list) => println("vscode: recent=\{list.length()}")
     Err(_) => assert_true(false)
   }
-  match vsc_local_history("/home/lkyh/code/EMS-CP/web/src/view/ems/components/pointSelect.vue") {
+  match
+    vsc_local_history(
+      "/home/lkyh/code/EMS-CP/web/src/view/ems/components/pointSelect.vue",
+    ) {
     Ok(entries) => {
       println("vscode: history entries=\{entries.length()}")
       if entries.length() > 0 {

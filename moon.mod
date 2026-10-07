@@ -14,11 +14,12 @@ license = "MIT"
 
 repository = "https://github.com/lb091188/moonbit-libyue"
 
-options(
-  homepage: "https://github.com/lb091188/moonbit-libyue",
-  "--moonbit-unstable-prebuild": "scripts/prebuild.py",
-)
 import {
   "prowk/moonsqlitefile@0.8.0",
   "chensuiyi/subproc@0.3.0",
 }
+
+options(
+  homepage: "https://github.com/lb091188/moonbit-libyue",
+  "--moonbit-unstable-prebuild": "scripts/prebuild.py",
+)

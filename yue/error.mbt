@@ -34,7 +34,8 @@ pub impl Show for SingleInstanceError with fn output(self, logger) {
   match self {
     Unsupported => logger.write_string("SingleInstanceError::Unsupported")
     InvalidAppId => logger.write_string("SingleInstanceError::InvalidAppId")
-    BackendUnavailable => logger.write_string("SingleInstanceError::BackendUnavailable")
+    BackendUnavailable =>
+      logger.write_string("SingleInstanceError::BackendUnavailable")
   }
 }
 
@@ -59,7 +60,8 @@ pub impl Show for AutostartError with fn output(self, logger) {
     Unsupported => logger.write_string("AutostartError::Unsupported")
     InvalidAppId => logger.write_string("AutostartError::InvalidAppId")
     NoExecutablePath => logger.write_string("AutostartError::NoExecutablePath")
-    IoFailed(reason) => logger.write_string("AutostartError::IoFailed(\{reason})")
+    IoFailed(reason) =>
+      logger.write_string("AutostartError::IoFailed(\{reason})")
   }
 }
 

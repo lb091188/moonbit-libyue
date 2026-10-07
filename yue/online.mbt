@@ -162,7 +162,7 @@ pub fn on_network_status_change(cb : (NetworkStatus) -> Unit) -> Unit {
       }
       ()
     }
-    "windows" => {
+    "windows" =>
       if !g_net_watched.val {
         g_net_watched.val = true
         // 初值不做同步回填:GetConnectivity 可能秒级阻塞,注册发生在
@@ -179,7 +179,6 @@ pub fn on_network_status_change(cb : (NetworkStatus) -> Unit) -> Unit {
         })
         ()
       }
-    }
     _ => ()
   }
 }

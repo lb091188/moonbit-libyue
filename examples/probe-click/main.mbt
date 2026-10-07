@@ -12,6 +12,7 @@
 //   - 什么都没有 = 整个窗口鼠标消息死了;
 //   - 点行1 却出现 [行2] = 点击被劫持给了行2 的回调。
 
+///|
 fn main {
   if !@yue.initialize() {
     println("GUI 初始化失败")
@@ -41,7 +42,10 @@ fn main {
   let toggle : @yue.Store[Bool] = @yue.Store::new(true)
   let body : Array[@yue.Node] = [
     @yue.label_t("点击劫持诊断探针 v3(Esc 退出)", role=@yue.Title),
-    @yue.label_t("每测一行前重开探针;点击后看下方事件流", role=@yue.Secondary),
+    @yue.label_t(
+      "每测一行前重开探针;点击后看下方事件流",
+      role=@yue.Secondary,
+    ),
     @yue.button_t(
       "行1 对照 \{n.get()}",
       on_click=fn() {
@@ -51,20 +55,21 @@ fn main {
       variant=@yue.Solid,
     ),
     @yue.bind_node(n, fn(v) {
-      @yue.button_t(
-        "行2 bind_node 重挂 \{v}",
-        on_click=fn() {
-          n.update(fn(x) { x + 1 })
-          say("行2", "重挂触发")
-        },
-      )
+      @yue.button_t("行2 bind_node 重挂 \{v}", on_click=fn() {
+        n.update(fn(x) { x + 1 })
+        say("行2", "重挂触发")
+      })
     }),
     @yue.button_t(
       "行3 切主题",
       on_click=fn() {
         dark.update(fn(v) { !v })
         @yue.theme_apply(
-          if dark.get() { @yue.dark_theme() } else { @yue.default_theme() },
+          if dark.get() {
+            @yue.dark_theme()
+          } else {
+            @yue.default_theme()
+          },
         )
         say("行3", "主题切换")
       },
@@ -75,11 +80,19 @@ fn main {
         @yue.label_t("行4:"),
         @yue.bind_node(dark.signal(), fn(d) {
           @yue.icon_button_t(
-            if d { @yue.Sunny } else { @yue.Moon },
+            if d {
+              @yue.Sunny
+            } else {
+              @yue.Moon
+            },
             on_click=fn() {
               dark.update(fn(v) { !v })
               @yue.theme_apply(
-                if !d { @yue.dark_theme() } else { @yue.default_theme() },
+                if !d {
+                  @yue.dark_theme()
+                } else {
+                  @yue.default_theme()
+                },
               )
               say("行4", "图标按钮触发")
             },
@@ -99,9 +112,7 @@ fn main {
             toggle.update(fn(v) { !v })
             say("行5A", "显隐触发")
           },
-          handle=fn(c) {
-            toggle.subscribe(fn(v) { c.set_visible(v) })
-          },
+          handle=fn(c) { toggle.subscribe(fn(v) { c.set_visible(v) }) },
         ),
         @yue.button_t(
           "行5-B(隐藏时)",
@@ -129,16 +140,14 @@ fn main {
     @yue.mount_window(
       [
         // 根容器:记录窗口层收到的每次点击坐标(判断整窗是否还活着)
-        @yue.vbox(
-          body,
-          style=[("padding", 16.0), ("flexgrow", 1.0)],
-          handle=fn(root) {
-            root.on_mouse_down(fn(e) {
-              say("根", "(\{e.view_x}, \{e.view_y})")
-              false
-            })
-          },
-        ),
+        @yue.vbox(body, style=[("padding", 16.0), ("flexgrow", 1.0)], handle=fn(
+          root,
+        ) {
+          root.on_mouse_down(fn(e) {
+            say("根", "(\{e.view_x}, \{e.view_y})")
+            false
+          })
+        }),
       ],
       title="点击劫持诊断 v3",
       size=Some((600.0, 560.0)),

@@ -10,10 +10,13 @@
 // 验证:每次轮换后打印复刻行 bounds,宽度应与当前文本长度即时同步
 // (长≈243 / 短=25),不再滞后一轮。
 
+///|
 const SHORT : String = "未选"
 
+///|
 const LONG : String = "2026-09-29 12:34:56 选中了一条很长的内容"
 
+///|
 fn main {
   if !@yue.initialize() {
     println("GUI 初始化失败")
@@ -37,9 +40,7 @@ fn main {
     probe.set_text(if to_long { LONG } else { SHORT })
     probe.update_layout()
     let b = probe.get_bounds()
-    println(
-      "[轮换#\{n.val + 1}] set_text 后 bounds=\{b.width}x\{b.height}",
-    )
+    println("[轮换#\{n.val + 1}] set_text 后 bounds=\{b.width}x\{b.height}")
     // 诊断:真改尺寸交替抖动(620/700),必然触发 GTK 整链 size_allocate
     match win_ref.val {
       Some(w) => {

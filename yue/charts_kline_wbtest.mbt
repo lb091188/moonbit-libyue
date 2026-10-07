@@ -72,15 +72,7 @@ test "kline_body_rect：实体矩形（涨跌同跨/平盘钳 1）" {
   // 涨：open=40→y=60，close=60→y=40：顶 40，高 20；单根实体宽 70，x=15
   let up = Candle::make(40.0, 80.0, 20.0, 60.0)
   let (x, y, w, h) = kline_body_rect(
-    0,
-    1,
-    up,
-    0.0,
-    100.0,
-    0.0,
-    100.0,
-    0.0,
-    100.0,
+    0, 1, up, 0.0, 100.0, 0.0, 100.0, 0.0, 100.0,
   )
   assert_eq(x, 15.0)
   assert_eq(y, 40.0)
@@ -89,44 +81,20 @@ test "kline_body_rect：实体矩形（涨跌同跨/平盘钳 1）" {
   // 跌：open=60→y=40，close=40→y=60：矩形同跨 open..close，顶 40 高 20
   let dn = Candle::make(60.0, 80.0, 20.0, 40.0)
   let (_x2, y2, _w2, h2) = kline_body_rect(
-    0,
-    1,
-    dn,
-    0.0,
-    100.0,
-    0.0,
-    100.0,
-    0.0,
-    100.0,
+    0, 1, dn, 0.0, 100.0, 0.0, 100.0, 0.0, 100.0,
   )
   assert_eq(y2, 40.0)
   assert_eq(h2, 20.0)
   // 平盘：高度钳到 >=1 保持可见
   let flat = Candle::make(50.0, 70.0, 30.0, 50.0)
   let (_x3, _y3, _w3, h3) = kline_body_rect(
-    0,
-    1,
-    flat,
-    0.0,
-    100.0,
-    0.0,
-    100.0,
-    0.0,
-    100.0,
+    0, 1, flat, 0.0, 100.0, 0.0, 100.0, 0.0, 100.0,
   )
   assert_true(h3 >= 1.0)
   // 非归一化几何：值域 0..200 映射画布 10..110（每 2 值 1px）
   let c4 = Candle::make(80.0, 180.0, 20.0, 120.0)
   let (_x4, y4, _w4, h4) = kline_body_rect(
-    0,
-    1,
-    c4,
-    0.0,
-    200.0,
-    0.0,
-    100.0,
-    10.0,
-    110.0,
+    0, 1, c4, 0.0, 200.0, 0.0, 100.0, 10.0, 110.0,
   )
   assert_true((y4 - 50.0).abs() < 1.0e-9) // close=120 → y=110-60=50
   assert_true((h4 - 20.0).abs() < 1.0e-9) // open=80 → y=70
@@ -137,15 +105,7 @@ test "kline_wick_span：影线过实体中心，high 上 low 下" {
   // 与 kline_slot 同源：n=2 时中心 25
   let c = Candle::make(40.0, 80.0, 20.0, 60.0)
   let (cx, yh, yl) = kline_wick_span(
-    0,
-    2,
-    c,
-    0.0,
-    100.0,
-    0.0,
-    100.0,
-    0.0,
-    100.0,
+    0, 2, c, 0.0, 100.0, 0.0, 100.0, 0.0, 100.0,
   )
   assert_eq(cx, 25.0)
   assert_eq(yh, 20.0) // high=80 → y=20（上端）
@@ -153,15 +113,7 @@ test "kline_wick_span：影线过实体中心，high 上 low 下" {
   assert_true(yh < yl)
   // 值域退化：两端都取画布中点
   let (_cx1, yh1, yl1) = kline_wick_span(
-    0,
-    2,
-    c,
-    5.0,
-    5.0,
-    0.0,
-    100.0,
-    10.0,
-    90.0,
+    0, 2, c, 5.0, 5.0, 0.0, 100.0, 10.0, 90.0,
   )
   assert_eq(yh1, 50.0)
   assert_eq(yl1, 50.0)

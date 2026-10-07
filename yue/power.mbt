@@ -33,16 +33,22 @@ pub fn battery_query() -> Result[BatteryInfo?, PowerError] {
       match @traybus.upower_battery() {
         Ok(None) => Ok(None)
         Ok(Some((percent, charging, t_full, t_empty))) =>
-          Ok(Some({
-            percent,
-            charging,
-            charging_seconds: if t_full > 0L { Some(t_full.to_int()) } else { None },
-            discharging_seconds: if t_empty > 0L {
-              Some(t_empty.to_int())
-            } else {
-              None
-            },
-          }))
+          Ok(
+            Some({
+              percent,
+              charging,
+              charging_seconds: if t_full > 0L {
+                Some(t_full.to_int())
+              } else {
+                None
+              },
+              discharging_seconds: if t_empty > 0L {
+                Some(t_empty.to_int())
+              } else {
+                None
+              },
+            }),
+          )
         Err(e) => Err(QueryFailed(e))
       }
     }
@@ -58,14 +64,20 @@ pub fn battery_query() -> Result[BatteryInfo?, PowerError] {
       if has.val != 1 {
         return Ok(None)
       }
-      Ok(Some({
-        percent: if percent.val < 0 { 0 } else { percent.val },
-        charging: charging.val == 1,
-        // GetSystemPowerStatus 不给剩余时间(BatteryLifeTime 按"秒"但
-        // 交流在线时语义是放空时间,且常为 -1),统一不给数
-        charging_seconds: None,
-        discharging_seconds: None,
-      }))
+      Ok(
+        Some({
+          percent: if percent.val < 0 {
+            0
+          } else {
+            percent.val
+          },
+          charging: charging.val == 1,
+          // GetSystemPowerStatus 不给剩余时间(BatteryLifeTime 按"秒"但
+          // 交流在线时语义是放空时间,且常为 -1),统一不给数
+          charging_seconds: None,
+          discharging_seconds: None,
+        }),
+      )
     }
     _ => Err(Unsupported)
   }

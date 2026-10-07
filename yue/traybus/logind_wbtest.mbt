@@ -40,17 +40,15 @@ test "PrepareForSleep(b) 信号往返与注册表分发" {
           inspect(m.body[0] is VBool(true), content="true")
           let c = fake_conn()
           let got = Ref("")
-          c.subs.set(
-            "org.freedesktop.login1.Manager.PrepareForSleep",
-            [
-              fn(m2 : Msg) {
-                match m2.body.get(0) {
-                  Some(VBool(start)) => got.val = if start { "睡" } else { "醒" }
-                  _ => ()
-                }
-              },
-            ],
-          )
+          c.subs.set("org.freedesktop.login1.Manager.PrepareForSleep", [
+            fn(m2 : Msg) {
+              match m2.body.get(0) {
+                Some(VBool(start)) =>
+                  got.val = if start { "睡" } else { "醒" }
+                _ => ()
+              }
+            },
+          ])
           c.handle(m)
           inspect(got.val, content="睡")
         }
@@ -64,14 +62,12 @@ test "PrepareForSleep(b) 信号往返与注册表分发" {
 test "Session Lock/Unlock 空体信号按成员分发" {
   let c = fake_conn()
   let got = Ref("")
-  c.subs.set(
-    "org.freedesktop.login1.Session.Lock",
-    [fn(_m : Msg) { got.val = "锁" }],
-  )
-  c.subs.set(
-    "org.freedesktop.login1.Session.Unlock",
-    [fn(_m : Msg) { got.val = "解" }],
-  )
+  c.subs.set("org.freedesktop.login1.Session.Lock", [
+    fn(_m : Msg) { got.val = "锁" },
+  ])
+  c.subs.set("org.freedesktop.login1.Session.Unlock", [
+    fn(_m : Msg) { got.val = "解" },
+  ])
   match
     build_signal(
       22,

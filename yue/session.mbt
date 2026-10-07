@@ -70,9 +70,8 @@ pub fn session_lock_watch(
         }
       }
       if @traybus.screensaver_available() {
-        match @traybus.screensaver_on_active(fn(active) {
-          lock_transition(active)
-        }) {
+        match
+          @traybus.screensaver_on_active(fn(active) { lock_transition(active) }) {
           Ok(_) => registered.val = true
           Err(e) => return Err(Message(e))
         }
@@ -85,7 +84,9 @@ pub fn session_lock_watch(
     }
     "windows" => {
       // evt 码 2=锁屏 3=解锁(电源窗口分发,与休眠共用单点登记)
-      g_win_lock_cbs.push(fn(evt) { cb(if evt == 2 { Locked } else { Unlocked }) })
+      g_win_lock_cbs.push(fn(evt) {
+        cb(if evt == 2 { Locked } else { Unlocked })
+      })
       win_watch_once()
       Ok(())
     }

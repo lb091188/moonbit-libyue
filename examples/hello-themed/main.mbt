@@ -15,30 +15,31 @@ fn main {
   let greet : @yue.Store[String] = @yue.Store::new("(点「问候」)")
   ignore(
     @yue.mount_window(
-    [
-      @yue.vbox(
-        [
-          @yue.label_t("Hello, 主题组件库!", role=@yue.Title),
-          @yue.label_t("输入名字点问候,按钮/输入框/文字全是主题化形态。", role=@yue.Secondary),
-          @yue.input_t(
-            text=name.get(),
-            style=[("width", 240.0)],
-            on_input=fn(t) { name.set(t) },
-          ),
-          @yue.button_t(
-            "问候",
-            variant=@yue.Solid,
-            on_click=fn() { greet.set("你好,\{name.get()}!") },
-          ),
-          @yue.bind_label(greet, fn(s) { s }),
-        ],
-        style=[("padding", 24.0), ("gap", 12.0)],
-      ),
-    ],
-    title="hello-themed",
-    size=Some((360.0, 260.0)),
-    center=true,
-    on_close=fn(_w) { @yue.quit() },
+      [
+        @yue.vbox(
+          [
+            @yue.label_t("Hello, 主题组件库!", role=@yue.Title),
+            @yue.label_t(
+              "输入名字点问候,按钮/输入框/文字全是主题化形态。",
+              role=@yue.Secondary,
+            ),
+            @yue.input_t(text=name.get(), style=[("width", 240.0)], on_input=fn(
+              t,
+            ) {
+              name.set(t)
+            }),
+            @yue.button_t("问候", variant=@yue.Solid, on_click=fn() {
+              greet.set("你好,\{name.get()}!")
+            }),
+            @yue.bind_label(greet, fn(s) { s }),
+          ],
+          style=[("padding", 24.0), ("gap", 12.0)],
+        ),
+      ],
+      title="hello-themed",
+      size=Some((360.0, 260.0)),
+      center=true,
+      on_close=fn(_w) { @yue.quit() },
     ),
   )
   @yue.run()

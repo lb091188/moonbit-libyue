@@ -6,8 +6,7 @@
 ///|
 /// 抑制服务候选表:标准名在前,桌面实测名在后(随真机实测扩充)。
 let inhibit_candidates : Array[String] = [
-  "org.freedesktop.ScreenSaver",
-  "org.xfce.ScreenSaver",
+  "org.freedesktop.ScreenSaver", "org.xfce.ScreenSaver",
 ]
 
 ///|
@@ -51,12 +50,14 @@ pub fn inhibit_active() -> Bool {
   g_inhibit_cookie.val is Some(_)
 }
 
+///|
 fn probe_inhibit_service() -> Bool {
   match bus_conn() {
     Err(_) => false
     Ok(c) => {
       for name in inhibit_candidates {
-        match c.call_sync(
+        match
+          c.call_sync(
             "org.freedesktop.DBus",
             "/org/freedesktop/DBus",
             "org.freedesktop.DBus",
@@ -99,14 +100,11 @@ pub fn inhibit(app_name : String, reason : String) -> Result[Int, String] {
   match bus_conn() {
     Err(e) => Err(e)
     Ok(c) =>
-      match c.call_sync(
-          service,
-          inhibit_path(service),
-          service,
-          "Inhibit",
-          "ss",
-          [VString(app_name), VString(reason)],
-        ) {
+      match
+        c.call_sync(service, inhibit_path(service), service, "Inhibit", "ss", [
+          VString(app_name),
+          VString(reason),
+        ]) {
         Ok(m) =>
           match m.body.get(0) {
             Some(VU32(cookie)) => {
@@ -134,14 +132,10 @@ pub fn unInhibit() -> Result[Unit, String] {
   match bus_conn() {
     Err(e) => Err(e)
     Ok(c) =>
-      match c.call_sync(
-          service,
-          inhibit_path(service),
-          service,
-          "UnInhibit",
-          "u",
-          [VU32(cookie)],
-        ) {
+      match
+        c.call_sync(service, inhibit_path(service), service, "UnInhibit", "u", [
+          VU32(cookie),
+        ]) {
         Ok(_) => {
           g_inhibit_cookie.val = None
           Ok(())

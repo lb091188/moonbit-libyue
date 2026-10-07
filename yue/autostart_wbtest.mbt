@@ -20,12 +20,14 @@ test "Exec 转义" {
 test "自启动目录三态拼装" {
   // XDG_CONFIG_HOME 设且非空：优先
   inspect(
-    autostart_dir_of(Some("/custom/cfg"), Some("/home/u")) is Some("/custom/cfg/autostart"),
+    autostart_dir_of(Some("/custom/cfg"), Some("/home/u"))
+    is Some("/custom/cfg/autostart"),
     content="true",
   )
   // 空串：回退 HOME
   inspect(
-    autostart_dir_of(Some(""), Some("/home/u")) is Some("/home/u/.config/autostart"),
+    autostart_dir_of(Some(""), Some("/home/u"))
+    is Some("/home/u/.config/autostart"),
     content="true",
   )
   // 未设：回退 HOME
@@ -63,7 +65,9 @@ test ".desktop 启用位解析" {
   )
   // 两开关位缺省（外来 .desktop）：视为启用
   inspect(
-    desktop_entry_enabled("[Desktop Entry]\nType=Application\nExec=\"/opt/x\"\n"),
+    desktop_entry_enabled(
+      "[Desktop Entry]\nType=Application\nExec=\"/opt/x\"\n",
+    ),
     content="true",
   )
 }

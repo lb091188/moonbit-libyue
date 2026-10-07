@@ -19,9 +19,18 @@ pub fn hsplit(
   min_first? : Double = 80.0,
   min_second? : Double = 80.0,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
-  splitter_impl(true, first, second, ratio, min_first, min_second, style, handle~)
+  splitter_impl(
+    true,
+    first,
+    second,
+    ratio,
+    min_first,
+    min_second,
+    style,
+    handle~,
+  )
 }
 
 ///|
@@ -33,9 +42,18 @@ pub fn vsplit(
   min_first? : Double = 60.0,
   min_second? : Double = 60.0,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
-  splitter_impl(false, first, second, ratio, min_first, min_second, style, handle~)
+  splitter_impl(
+    false,
+    first,
+    second,
+    ratio,
+    min_first,
+    min_second,
+    style,
+    handle~,
+  )
 }
 
 ///|
@@ -71,7 +89,15 @@ fn splitter_impl(
       // 首栏包装容器:尺寸/布局打在包装上,内容 mount 其内(View 句柄
       // 不实现 ViewLike,不能直接设样式)
       let pane_a = themed_container(style=[("flexDirection", "column")])
-      ViewLike::set_style(pane_a, if horizontal { "minwidth" } else { "minheight" }, min_a)
+      ViewLike::set_style(
+        pane_a,
+        if horizontal {
+          "minwidth"
+        } else {
+          "minheight"
+        },
+        min_a,
+      )
       ignore((first.mount)(ViewLike::view(pane_a)))
       attach(ViewLike::view(outer), ViewLike::view(pane_a))
       let handle = themed_container(style=[
@@ -84,7 +110,15 @@ fn splitter_impl(
       attach(ViewLike::view(outer), ViewLike::view(handle))
       let pane_b = themed_container(style=[("flexDirection", "column")])
       ViewLike::set_style(pane_b, "flex", 1.0)
-      ViewLike::set_style(pane_b, if horizontal { "minwidth" } else { "minheight" }, min_b)
+      ViewLike::set_style(
+        pane_b,
+        if horizontal {
+          "minwidth"
+        } else {
+          "minheight"
+        },
+        min_b,
+      )
       ignore((second.mount)(ViewLike::view(pane_b)))
       attach(ViewLike::view(outer), ViewLike::view(pane_b))
       // 初始比例与拖动共用的几何直写:按首栏宽 x 摆三件(相对 outer),
@@ -96,12 +130,24 @@ fn splitter_impl(
         if horizontal {
           set_view_bounds(pane_a, 0.0, 0.0, x, b.height)
           set_view_bounds(handle, x, 0.0, handle_w, b.height)
-          set_view_bounds(pane_b, x + handle_w, 0.0, span - x - handle_w, b.height)
+          set_view_bounds(
+            pane_b,
+            x + handle_w,
+            0.0,
+            span - x - handle_w,
+            b.height,
+          )
           ViewLike::set_style(pane_a, "width", x)
         } else {
           set_view_bounds(pane_a, 0.0, 0.0, b.width, x)
           set_view_bounds(handle, 0.0, x, b.width, handle_w)
-          set_view_bounds(pane_b, 0.0, x + handle_w, b.width, span - x - handle_w)
+          set_view_bounds(
+            pane_b,
+            0.0,
+            x + handle_w,
+            b.width,
+            span - x - handle_w,
+          )
           ViewLike::set_style(pane_a, "height", x)
         }
       }
@@ -115,7 +161,10 @@ fn splitter_impl(
         }
       }
       post_task(apply_ratio)
-      View::set_cursor(handle, Cursor::new(if horizontal { ResizeEW } else { ResizeNS }))
+      View::set_cursor(
+        handle,
+        Cursor::new(if horizontal { ResizeEW } else { ResizeNS }),
+      )
       // 常显视觉:中间 1px 分隔线 + 双列点纹(border 色),不靠 hover;
       // hover 浅灰底、拖动主题色底白点(把手状态一眼可辨)
       handle.on_draw(fn(p) {
@@ -184,19 +233,9 @@ fn splitter_impl(
           let span = if horizontal { total_b.width } else { total_b.height }
           let total = span - handle_w
           let lo = min_a
-          let hi = if total - min_b < min_a {
-            min_a
-          } else {
-            total - min_b
-          }
+          let hi = if total - min_b < min_a { min_a } else { total - min_b }
           let raw = start_basis.val + (cur - start_pos.val)
-          let next = if raw < lo {
-            lo
-          } else if raw > hi {
-            hi
-          } else {
-            raw
-          }
+          let next = if raw < lo { lo } else if raw > hi { hi } else { raw }
           layout_first(next)
         }
       })

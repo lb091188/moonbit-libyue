@@ -10,10 +10,7 @@
 
 ///|
 /// 自启动目录：XDG_CONFIG_HOME（设且非空）优先，回退 $HOME/.config。
-pub fn autostart_dir_of(
-  xdg_config_home : String?,
-  home : String?,
-) -> String? {
+pub fn autostart_dir_of(xdg_config_home : String?, home : String?) -> String? {
   match xdg_config_home {
     Some(d) if d != "" => Some(d + "/autostart")
     _ =>
@@ -105,7 +102,10 @@ pub fn Autostart::path(self : Autostart) -> Result[String, AutostartError] {
   match platform() {
     "linux" => self.linux_file()
     "windows" =>
-      Ok("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\" + self.app_id)
+      Ok(
+        "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\" +
+        self.app_id,
+      )
     _ => Err(Unsupported)
   }
 }
@@ -155,7 +155,9 @@ pub fn Autostart::enable(self : Autostart) -> Result[Unit, AutostartError] {
         Err(e) => return Err(e)
       }
       if !write_text_file(file, desktop_entry_content(exe, self.app_id)) {
-        return Err(IoFailed("写入失败: " + file + " (目录不存在或无权限)"))
+        return Err(
+          IoFailed("写入失败: " + file + " (目录不存在或无权限)"),
+        )
       }
       Ok(())
     }
@@ -209,10 +211,15 @@ pub fn Autostart::disable(self : Autostart) -> Result[Unit, AutostartError] {
 ///|
 /// Linux 侧 .desktop 完整路径（目录解析失败给结构化错误）。
 fn Autostart::linux_file(self : Autostart) -> Result[String, AutostartError] {
-  let dir = match autostart_dir_of(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME")) {
+  let dir = match
+    autostart_dir_of(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME")) {
     Some(d) => d
     None =>
-      return Err(IoFailed("无法定位自启动目录(XDG_CONFIG_HOME / HOME 均未设置)"))
+      return Err(
+        IoFailed(
+          "无法定位自启动目录(XDG_CONFIG_HOME / HOME 均未设置)",
+        ),
+      )
   }
   Ok(dir + "/" + self.app_id + ".desktop")
 }

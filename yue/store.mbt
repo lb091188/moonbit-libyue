@@ -13,7 +13,7 @@ pub struct Store[T] {
 
 ///|
 pub fn[T] Store::new(value : T) -> Store[T] {
-  { sig: Signal::new(value) }
+  { sig: Signal::new(value), }
 }
 
 ///|

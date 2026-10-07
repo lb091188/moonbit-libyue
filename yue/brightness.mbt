@@ -59,7 +59,8 @@ pub impl Show for BrightnessError with fn output(self, logger) {
     Unsupported => logger.write_string("BrightnessError::Unsupported")
     BusFailed(m) => logger.write_string("BrightnessError::BusFailed(\{m})")
     DeviceNotFound => logger.write_string("BrightnessError::DeviceNotFound")
-    InvalidParam(m) => logger.write_string("BrightnessError::InvalidParam(\{m})")
+    InvalidParam(m) =>
+      logger.write_string("BrightnessError::InvalidParam(\{m})")
   }
 }
 
@@ -130,13 +131,7 @@ fn bright_value_of(percent : Int, max : Int) -> Int {
 /// 百分比步进:cur 加 delta 后钳 0-100(cur 界外先钳,delta 先钳
 /// ±101,极端值不回绕)。
 fn bright_step(cur : Int, delta : Int) -> Int {
-  let d = if delta > 101 {
-    101
-  } else if delta < -101 {
-    -101
-  } else {
-    delta
-  }
+  let d = if delta > 101 { 101 } else if delta < -101 { -101 } else { delta }
   bright_clamp_percent(bright_clamp_percent(cur) + d)
 }
 
@@ -146,7 +141,11 @@ fn bright_step(cur : Int, delta : Int) -> Int {
 
 ///|
 /// 设备 sysfs 属性路径:/sys/class/<subsystem>/<name>/<attr>。
-fn bright_sysfs_attr(subsystem : String, name : String, attr : String) -> String {
+fn bright_sysfs_attr(
+  subsystem : String,
+  name : String,
+  attr : String,
+) -> String {
   "/sys/class/" + subsystem + "/" + name + "/" + attr
 }
 
@@ -167,12 +166,11 @@ fn bright_read_sysfs_int(
 /// 屏幕背光设备名探测表(探测序即推荐序:原生驱动在前,通用/ACPI
 /// 兼容层在后)。
 let bright_backlight_names : Array[String] = [
-  "intel_backlight", "amdgpu_bl0", "amdgpu_bl1", "amdgpu_bl2", "radeon_bl0",
-  "radeon_bl1", "nouveau_bl0", "nvidia_wmi_ec_backlight", "nv_backlight",
-  "apple_backlight", "dell_uart_backlight", "thinkpad_screen", "asus-nb-wmi",
-  "toshiba", "panasonic", "sony", "fujitsu-lbs", "acer-wmi", "hp-wmi",
-  "pwm_backlight", "pwm-backlight", "acpi_video0", "acpi_video1", "acpi_video2",
-  "acpi_video3", "acpi_video4",
+  "intel_backlight", "amdgpu_bl0", "amdgpu_bl1", "amdgpu_bl2", "radeon_bl0", "radeon_bl1",
+  "nouveau_bl0", "nvidia_wmi_ec_backlight", "nv_backlight", "apple_backlight", "dell_uart_backlight",
+  "thinkpad_screen", "asus-nb-wmi", "toshiba", "panasonic", "sony", "fujitsu-lbs",
+  "acer-wmi", "hp-wmi", "pwm_backlight", "pwm-backlight", "acpi_video0", "acpi_video1",
+  "acpi_video2", "acpi_video3", "acpi_video4",
 ]
 
 ///|
@@ -180,9 +178,8 @@ let bright_backlight_names : Array[String] = [
 /// "::kbd_backlight" 扫描(HID 键盘背光的 input 序号因机而异)。
 fn bright_kbd_names() -> Array[String] {
   let names : Array[String] = [
-    "tpacpi::kbd_backlight", "dell::kbd_backlight", "asus::kbd_backlight",
-    "lenovo::kbd_backlight", "platform::kbd_backlight",
-    "chromeos::kbd_backlight", "system76_acpi::kbd_backlight",
+    "tpacpi::kbd_backlight", "dell::kbd_backlight", "asus::kbd_backlight", "lenovo::kbd_backlight",
+    "platform::kbd_backlight", "chromeos::kbd_backlight", "system76_acpi::kbd_backlight",
   ]
   for i in 0..<16 {
     names.push("input\{i}::kbd_backlight")
@@ -202,7 +199,8 @@ fn bright_probe_devices(
     match bright_read_sysfs_int(subsystem, name, "max_brightness") {
       Some(max) =>
         if max > 0 {
-          let current = match bright_read_sysfs_int(subsystem, name, "brightness") {
+          let current = match
+            bright_read_sysfs_int(subsystem, name, "brightness") {
             Some(v) => v
             None => 0
           }
@@ -225,7 +223,9 @@ fn bright_check_dev(
     return Err(InvalidParam("子系统非法: \{dev.subsystem}"))
   }
   if dev.subsystem != expected {
-    return Err(InvalidParam("子系统不符: \{dev.subsystem}(期望 \{expected})"))
+    return Err(
+      InvalidParam("子系统不符: \{dev.subsystem}(期望 \{expected})"),
+    )
   }
   if dev.name == "" {
     return Err(InvalidParam("设备名为空"))
@@ -303,7 +303,10 @@ pub fn kbd_brightness_supported() -> Bool {
 ///|
 /// 枚举键盘背光设备(探测 /sys/class/leds 下的 *::kbd_backlight 常见
 /// 名;空列表 = 无键盘背光)。
-pub fn kbd_brightness_devices() -> Result[Array[BrightnessDevice], BrightnessError] {
+pub fn kbd_brightness_devices() -> Result[
+  Array[BrightnessDevice],
+  BrightnessError,
+] {
   match platform() {
     "linux" => Ok(bright_probe_devices("leds", bright_kbd_names()))
     _ => Err(Unsupported)
@@ -312,7 +315,9 @@ pub fn kbd_brightness_devices() -> Result[Array[BrightnessDevice], BrightnessErr
 
 ///|
 /// 键盘背光当前百分比(0-100,实时读 sysfs)。
-pub fn kbd_brightness_get(dev : BrightnessDevice) -> Result[Int, BrightnessError] {
+pub fn kbd_brightness_get(
+  dev : BrightnessDevice,
+) -> Result[Int, BrightnessError] {
   bright_get_impl(dev, "leds")
 }
 

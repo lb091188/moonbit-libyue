@@ -15,7 +15,8 @@ pub fn upower_available() -> Bool {
   match system_conn() {
     Err(_) => false
     Ok(c) =>
-      match c.call_sync(
+      match
+        c.call_sync(
           "org.freedesktop.DBus",
           "/org/freedesktop/DBus",
           "org.freedesktop.DBus",
@@ -79,8 +80,7 @@ pub fn upower_battery() -> Result[(Int, Bool, Int64, Int64)?, String] {
     Ok(c) => c
     Err(e) => return Err(e)
   }
-  match
-    upower_get_all(c, UPOWER_DEVICE_PATH, "org.freedesktop.UPower.Device") {
+  match upower_get_all(c, UPOWER_DEVICE_PATH, "org.freedesktop.UPower.Device") {
     Err(e) => Err(e)
     Ok(props) =>
       match props.get("IsPresent") {

@@ -95,16 +95,14 @@ test "funnel_pct：相对首层/相对总和/基数与负值退化" {
 test "funnel_layer_color：同系列自顶向下渐浅" {
   // 首层与主题主色同色（hex 经 HSL 往返会小写化，按 RGB 分量比较）
   match (parse_hex(funnel_layer_color(0, 4)), parse_hex(theme_primary())) {
-    (Some((r1, g1, b1)), Some((r2, g2, b2))) => {
+    (Some((r1, g1, b1)), Some((r2, g2, b2))) =>
       assert_eq((r1, g1, b1), (r2, g2, b2))
-    }
     _ => assert_true(false)
   }
   // 单层即原色
   match (parse_hex(funnel_layer_color(0, 1)), parse_hex(theme_primary())) {
-    (Some((r1, g1, b1)), Some((r2, g2, b2))) => {
+    (Some((r1, g1, b1)), Some((r2, g2, b2))) =>
       assert_eq((r1, g1, b1), (r2, g2, b2))
-    }
     _ => assert_true(false)
   }
   // 末层为提亮色（明度高于基色）

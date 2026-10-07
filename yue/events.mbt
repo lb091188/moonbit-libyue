@@ -616,7 +616,9 @@ impl ViewLike with fn on_mouse_down(self, callback : (MouseEvent) -> Bool) -> Un
     mods,
     ts,
   ) {
-    if callback(mouse_event(MouseDown, button, vx, vy, wx, wy, sx, sy, mods, ts)) {
+    if callback(
+        mouse_event(MouseDown, button, vx, vy, wx, wy, sx, sy, mods, ts),
+      ) {
       1
     } else {
       0
@@ -625,7 +627,9 @@ impl ViewLike with fn on_mouse_down(self, callback : (MouseEvent) -> Bool) -> Un
   keep_alive(fn() { ignore(wrapped) })
   ffi_view_on_mouse_down(
     self.view(),
-    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) {
+      f(b, vx, vy, wx, wy, sx, sy, m, t)
+    },
     wrapped,
   )
 }
@@ -653,7 +657,9 @@ impl ViewLike with fn on_mouse_up(self, callback : (MouseEvent) -> Bool) -> Unit
   keep_alive(fn() { ignore(wrapped) })
   ffi_view_on_mouse_up(
     self.view(),
-    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) {
+      f(b, vx, vy, wx, wy, sx, sy, m, t)
+    },
     wrapped,
   )
 }
@@ -677,7 +683,9 @@ impl ViewLike with fn on_mouse_move(self, callback : (MouseEvent) -> Unit) -> Un
   keep_alive(fn() { ignore(wrapped) })
   ffi_view_on_mouse_move(
     self.view(),
-    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) {
+      f(b, vx, vy, wx, wy, sx, sy, m, t)
+    },
     wrapped,
   )
 }
@@ -701,7 +709,9 @@ impl ViewLike with fn on_mouse_enter(self, callback : (MouseEvent) -> Unit) -> U
   keep_alive(fn() { ignore(wrapped) })
   ffi_view_on_mouse_enter(
     self.view(),
-    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) {
+      f(b, vx, vy, wx, wy, sx, sy, m, t)
+    },
     wrapped,
   )
 }
@@ -725,7 +735,9 @@ impl ViewLike with fn on_mouse_leave(self, callback : (MouseEvent) -> Unit) -> U
   keep_alive(fn() { ignore(wrapped) })
   ffi_view_on_mouse_leave(
     self.view(),
-    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) { f(b, vx, vy, wx, wy, sx, sy, m, t) },
+    fn(f, b, vx, vy, wx, wy, sx, sy, m, t) {
+      f(b, vx, vy, wx, wy, sx, sy, m, t)
+    },
     wrapped,
   )
 }

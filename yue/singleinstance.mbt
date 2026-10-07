@@ -34,7 +34,7 @@ pub fn SingleInstance::acquire(
     "linux" =>
       match @traybus.claim_name(app_id) {
         Ok(@traybus.PrimaryOwner) | Ok(@traybus.AlreadyOwner) =>
-          Ok(Some({ app_id, activate: None }))
+          Ok(Some({ app_id, activate: None, }))
         Ok(@traybus.AlreadyExists) => {
           let _ = @traybus.wake_existing(app_id, command_line())
           Ok(None)
@@ -71,9 +71,12 @@ pub fn SingleInstance::on_activate(
 
 ///|
 /// Windows 首实例：建 message-only 窗口收 WM_COPYDATA。
-fn acquire_windows(app_id : String) -> Result[SingleInstance?, SingleInstanceError] {
+fn acquire_windows(
+  app_id : String,
+) -> Result[SingleInstance?, SingleInstanceError] {
   let ok = Ref(0)
-  if ffi_win_named_mutex_create(utf8_bytes(instance_mutex_name(app_id)), ok) != 0 {
+  if ffi_win_named_mutex_create(utf8_bytes(instance_mutex_name(app_id)), ok) !=
+    0 {
     return Err(BackendUnavailable)
   }
   if ok.val == 0 {
@@ -83,7 +86,7 @@ fn acquire_windows(app_id : String) -> Result[SingleInstance?, SingleInstanceErr
     wake_windows(app_id)
     return Ok(None)
   }
-  let handle : SingleInstance = { app_id, activate: None }
+  let handle : SingleInstance = { app_id, activate: None, }
   // WM_COPYDATA 负载是 \n 连接的命令行(wake_windows 同款拼法),收端
   // 拆回数组;空负载不当成一次空参数唤起
   let wrapped : (Bytes) -> Unit = fn(b) {
@@ -123,7 +126,10 @@ fn wake_windows(app_id : String) -> Unit {
 
 ///|
 /// 读出唤起回调（两条平台路线的汇点）。
-fn SingleInstance::fire_activate(self : SingleInstance, args : Array[String]) -> Unit {
+fn SingleInstance::fire_activate(
+  self : SingleInstance,
+  args : Array[String],
+) -> Unit {
   match self.activate {
     Some(cb) => cb(args)
     None => ()

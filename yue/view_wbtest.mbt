@@ -16,4 +16,3 @@ test "native_handle_view:有显示环境时返回非 0 原生句柄" {
   let h = native_handle_view(label.view)
   inspect(h > 0, content="true")
 }
-

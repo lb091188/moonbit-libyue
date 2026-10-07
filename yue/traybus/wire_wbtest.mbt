@@ -122,7 +122,10 @@ test "消息往返：a{sv} 内含 Percentage(d) 的 UPower GetAll 真实形状" 
                   inspect(t.to_string(), content="5400")
                 }
                 _ =>
-                  inspect("结构不符", content="VStruct[VString, VVariant[VI64]]")
+                  inspect(
+                    "结构不符",
+                    content="VStruct[VString, VVariant[VI64]]",
+                  )
               }
             }
             _ => inspect("不是数组", content="VArray")

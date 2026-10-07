@@ -40,9 +40,7 @@ pub fn Window::make(
 
 ///|
 /// 创建容器并应用样式。
-pub fn Container::make(
-  style? : Array[(String, &StyVal)] = [],
-) -> Container {
+pub fn Container::make(style? : Array[(String, &StyVal)] = []) -> Container {
   let c = Container::new()
   apply_style(c, style~)
   c

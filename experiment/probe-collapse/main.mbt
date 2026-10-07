@@ -6,11 +6,12 @@
 // 定时采样 get_bounds:挂载 1.2s 测初始 → 先显新页后隐旧页(与 tabs_t
 // 同序)→ 再 1.2s 复测 → 反向切回 → 复测 → 退出。
 
+///|
 fn mk_page(name : String, explicit_basis : Bool) -> @yue.Container {
   let page = @yue.Container::new()
   page.set_style("flex", 1.0)
   if explicit_basis {
-    page.set_style("flexbasis", 0.0)  // tabs_t page_c 同款:显式 basis 0
+    page.set_style("flexbasis", 0.0) // tabs_t page_c 同款:显式 basis 0
   }
   page.set_style_str("flexDirection", "column")
   let body = @yue.Container::new()
@@ -22,18 +23,28 @@ fn mk_page(name : String, explicit_basis : Bool) -> @yue.Container {
   page
 }
 
-fn dump3(tag : String, outer : @yue.Container, head : @yue.Container,
-        content : @yue.Container, p0 : @yue.Container, p1 : @yue.Container,
-        p2 : @yue.Container) -> Unit {
+///|
+fn dump3(
+  tag : String,
+  outer : @yue.Container,
+  head : @yue.Container,
+  content : @yue.Container,
+  p0 : @yue.Container,
+  p1 : @yue.Container,
+  p2 : @yue.Container,
+) -> Unit {
   let o = outer.get_bounds()
   let h = head.get_bounds()
   let c = content.get_bounds()
   let b0 = p0.get_bounds()
   let b1 = p1.get_bounds()
   let b2 = p2.get_bounds()
-  println("[\{tag}] outer=\{o.height} head=\{h.height} content=\{c.height} p0=\{b0.height} p1=\{b1.height} p2=\{b2.height}")
+  println(
+    "[\{tag}] outer=\{o.height} head=\{h.height} content=\{c.height} p0=\{b0.height} p1=\{b1.height} p2=\{b2.height}",
+  )
 }
 
+///|
 fn main {
   if !@yue.initialize() {
     println("GUI 初始化失败")

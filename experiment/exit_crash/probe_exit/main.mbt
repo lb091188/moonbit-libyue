@@ -2,6 +2,7 @@
 // set_focusable(true) + on_focus_out→repaint 链),启动 700ms 后程序内
 // focus() 到其中一个,再由外部 wmctrl -ic 发关闭请求,复刻
 // 「焦点在 button_t 上时窗口关闭」的时序,观察进程退出码。
+///|
 fn main {
   if !@yue.initialize() {
     println("GUI 初始化失败")
@@ -13,28 +14,20 @@ fn main {
   for i in 0..<8 {
     let idx = i
     btns.push(
-      @yue.button_t(
-        "按钮\{idx}",
-        handle=fn(c) {
-          if idx == 3 {
-            target.val = c
-          }
-        },
-      ),
+      @yue.button_t("按钮\{idx}", handle=fn(c) {
+        if idx == 3 {
+          target.val = c
+        }
+      }),
     )
   }
   ignore(
     @yue.mount_window(
-    [
-      @yue.vbox(
-        [..btns],
-        style=[("padding", 24.0), ("gap", 6.0)],
-      ),
-    ],
-    title="exit-crash-probe",
-    size=Some((260.0, 420.0)),
-    center=true,
-    on_close=fn(_w) { @yue.quit() },
+      [@yue.vbox([..btns], style=[("padding", 24.0), ("gap", 6.0)])],
+      title="exit-crash-probe",
+      size=Some((260.0, 420.0)),
+      center=true,
+      on_close=fn(_w) { @yue.quit() },
     ),
   )
   // 700ms 后把 GTK 焦点交给 3 号 button_t(自绘可聚焦容器)

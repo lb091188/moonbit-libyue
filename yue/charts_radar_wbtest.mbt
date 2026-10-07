@@ -10,9 +10,13 @@ test "radar_axis_angle：顶点 0 在 12 点方向、顺时针均布" {
   assert_true((radar_axis_angle(2, 4) - pi / 2.0).abs() < 1.0e-12)
   assert_true((radar_axis_angle(3, 4) - pi).abs() < 1.0e-12)
   // 3 边形：上 → 右下 120° → 左下 240°
-  assert_true((radar_axis_angle(1, 3) - (-pi / 2.0 + tau / 3.0)).abs() < 1.0e-12)
+  assert_true(
+    (radar_axis_angle(1, 3) - (-pi / 2.0 + tau / 3.0)).abs() < 1.0e-12,
+  )
   // 顶点角跨整圈回归 2π（同余）
-  assert_true((radar_axis_angle(4, 4) - radar_axis_angle(0, 4) - tau).abs() < 1.0e-12)
+  assert_true(
+    (radar_axis_angle(4, 4) - radar_axis_angle(0, 4) - tau).abs() < 1.0e-12,
+  )
   // 退化：n <= 0 一律 12 点方向
   assert_true((radar_axis_angle(0, 0) - -pi / 2.0).abs() < 1.0e-12)
   assert_true((radar_axis_angle(3, -2) - -pi / 2.0).abs() < 1.0e-12)

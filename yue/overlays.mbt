@@ -19,23 +19,21 @@ pub fn dialog_t(
   on_cancel? : () -> Unit = fn() {  },
   close_on_mask? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
-      let close = fn() -> Unit {
-        visible.set(false)
-      }
+      let close = fn() -> Unit { visible.set(false) }
       // 遮罩:absolute 全覆盖 + 居中排布;固定半透明黑(EP 遮罩语义)
-      let overlay = themed_container(
-        style=[("position", "absolute"),
-          ("top", "0"),
-          ("bottom", "0"),
-          ("left", "0"),
-          ("right", "0"),
-          ("justifyContent", "center"),
-          ("alignItems", "center"),],
-      )
+      let overlay = themed_container(style=[
+        ("position", "absolute"),
+        ("top", "0"),
+        ("bottom", "0"),
+        ("left", "0"),
+        ("right", "0"),
+        ("justifyContent", "center"),
+        ("alignItems", "center"),
+      ])
       ViewLike::set_background_color(overlay, "#00000059")
       // 面板:主题面板底 + 1px 边框(on_draw 描);style 落面板
       let base : Array[(String, &StyVal)] = [
@@ -57,31 +55,47 @@ pub fn dialog_t(
       // 面板消费鼠标,避免点击内容冒泡到遮罩触发 close_on_mask
       ViewLike::on_mouse_down(panel, fn(_e) { true })
       // 标题栏:标题 + 弹性空档 + ✕
-      let head = themed_container(
-        style=[("height", 44.0), ("paddingLeft", 16.0), ("paddingRight", 10.0), ("marginTop", 4.0), ("flexDirection", "row"), ("alignItems", "center")],
+      let head = themed_container(style=[
+        ("height", 44.0),
+        ("paddingLeft", 16.0),
+        ("paddingRight", 10.0),
+        ("marginTop", 4.0),
+        ("flexDirection", "row"),
+        ("alignItems", "center"),
+      ])
+      attach(
+        ViewLike::view(head),
+        label_t(title, role=Section).mount_into(ViewLike::view(head)),
       )
-      attach(ViewLike::view(head), label_t(title, role=Section).mount_into(ViewLike::view(head)))
       let spacer = themed_container(style=[("flex", 1.0)])
       head.add_child(spacer)
-      let close_btn = icon_button_t(Close2, on_click=fn() {
-        on_cancel()
-        close()
-      }, tip="关闭")
+      let close_btn = icon_button_t(
+        Close2,
+        on_click=fn() {
+          on_cancel()
+          close()
+        },
+        tip="关闭",
+      )
       attach(ViewLike::view(head), close_btn.mount_into(ViewLike::view(head)))
       panel.add_child(head)
       // 内容区:统一 16px 内边距
-      let body = themed_container(
-        style=[("padding", 16.0), ("flexDirection", "column")],
-      )
+      let body = themed_container(style=[
+        ("padding", 16.0),
+        ("flexDirection", "column"),
+      ])
       for ch in children {
         ignore((ch.mount)(ViewLike::view(body)))
       }
       panel.add_child(body)
       // 底部按钮区:右对齐;两个文案都空则不显示
       if confirm_text != "" || cancel_text != "" {
-        let foot = themed_container(
-          style=[("paddingRight", 16.0), ("paddingBottom", 14.0), ("flexDirection", "row"), ("justifyContent", "flex-end")],
-        )
+        let foot = themed_container(style=[
+          ("paddingRight", 16.0),
+          ("paddingBottom", 14.0),
+          ("flexDirection", "row"),
+          ("justifyContent", "flex-end"),
+        ])
         if cancel_text != "" {
           attach(
             ViewLike::view(foot),
@@ -132,15 +146,15 @@ pub fn toast_layer(
   let host : Ref[Container?] = Ref(None)
   let layer = {
     mount: fn(parent) {
-      let c = themed_container(
-        style=[("paddingTop", 8.0),
+      let c = themed_container(style=[
+        ("paddingTop", 8.0),
         ("position", "absolute"),
-          ("top", "0"),
-          ("left", "0"),
-          ("right", "0"),
-          ("flexDirection", "column"),
-          ("alignItems", "center"),],
-      )
+        ("top", "0"),
+        ("left", "0"),
+        ("right", "0"),
+        ("flexDirection", "column"),
+        ("alignItems", "center"),
+      ])
       host.val = Some(c)
       attach(parent, ViewLike::view(c))
       ViewLike::view(c)
@@ -155,13 +169,11 @@ pub fn toast_layer(
         probe.set_font(fnt)
         let text_w = probe.get_bounds_for(10000.0, 100.0).width
         let w = text_w + 62.0
-        let bar = themed_container(
-          style=[
-            ("width", w),
-            ("height", 34.0),
-            ("marginBottom", 8.0),
-          ],
-        )
+        let bar = themed_container(style=[
+          ("width", w),
+          ("height", 34.0),
+          ("marginBottom", 8.0),
+        ])
         set_panel_bg(bar)
         bar.on_draw(fn(p) {
           let b = ViewLike::get_bounds(bar)
@@ -203,7 +215,7 @@ pub fn context_menu_for(
   content : Node,
   items : Array[(String, () -> Unit)],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {

@@ -67,7 +67,7 @@ fn container_node(
 pub fn vbox(
   children : Array[Node],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   container_node("column", children, style, handle~)
 }
@@ -77,7 +77,7 @@ pub fn vbox(
 pub fn hbox(
   children : Array[Node],
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   container_node("row", children, style, handle~)
 }
@@ -133,12 +133,7 @@ pub fn checkbox(
 ) -> Node {
   {
     mount: fn(parent) {
-      let b = Button::make(
-        title,
-        button_type=Checkbox,
-        checked~,
-        style~,
-      )
+      let b = Button::make(title, button_type=Checkbox, checked~, style~)
       b.on_click(fn() { on_change(b.is_checked()) })
       handle(b)
       attach(parent, ViewLike::view(b))
@@ -153,10 +148,10 @@ pub fn checkbox(
 pub fn entry(
   text? : String = "",
   password? : Bool = false,
-  on_enter? : (String) -> Unit = fn(_s) { },
-  on_input? : (String) -> Unit = fn(_s) { },
+  on_enter? : (String) -> Unit = fn(_s) {  },
+  on_input? : (String) -> Unit = fn(_s) {  },
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Entry) -> Unit = fn(_e) { },
+  handle? : (Entry) -> Unit = fn(_e) {  },
 ) -> Node {
   {
     mount: fn(parent) {
@@ -248,12 +243,7 @@ pub fn radio(
 ) -> Node {
   {
     mount: fn(parent) {
-      let b = Button::make(
-        title,
-        button_type=Radio,
-        checked~,
-        style~,
-      )
+      let b = Button::make(title, button_type=Radio, checked~, style~)
       b.on_click(fn() { on_change(b.is_checked()) })
       handle(b)
       attach(parent, ViewLike::view(b))
@@ -317,7 +307,6 @@ pub fn picker(
         selected~,
         on_selection_change=on_change,
         style~,
-        
       )
       handle(p)
       attach(parent, ViewLike::view(p))
@@ -344,7 +333,6 @@ pub fn combo(
         on_selection_change=on_select,
         on_text_change=on_input,
         style~,
-        
       )
       handle(c)
       attach(parent, ViewLike::view(c))
@@ -412,7 +400,9 @@ pub fn scroll(
       let holder = Container::new()
       ignore((content.mount)(ViewLike::view(holder)))
       s.set_content(holder)
-      let mounted : View = if overlay && policy is None && platform() == "windows" {
+      let mounted : View = if overlay &&
+        policy is None &&
+        platform() == "windows" {
         // Windows 悬浮细条:style 挪给 host(thumb 的 absolute 定位以
         // host 为基准,直接挂页面容器会被 padding/margin 带偏),Scroll
         // 在内撑满(flex 配 basis 0 即 CSS flex:1 1 0,高度只由 flex 分配

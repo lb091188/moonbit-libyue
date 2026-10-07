@@ -85,13 +85,7 @@ pub fn kline_slot(
   if n <= 0 {
     return ((left + right) / 2.0, (right - left).max(1.0))
   }
-  let r = if ratio < 0.0 {
-    0.0
-  } else if ratio > 1.0 {
-    1.0
-  } else {
-    ratio
-  }
+  let r = if ratio < 0.0 { 0.0 } else if ratio > 1.0 { 1.0 } else { ratio }
   let slot = (right - left) / n.to_double()
   let w = (slot * r).max(1.0)
   let cx = left + slot * (i.to_double() + 0.5)
@@ -206,17 +200,7 @@ fn kline_draw(
     let c = candles[i]
     let color = if kline_is_up(c) { up_c } else { down_c }
     // 影线：high..low 竖线（先画，实体压其上）
-    let (cx, wy_high, wy_low) = kline_wick_span(
-      i,
-      n,
-      c,
-      lo,
-      hi,
-      x0,
-      x1,
-      y0,
-      y1,
-    )
+    let (cx, wy_high, wy_low) = kline_wick_span(i, n, c, lo, hi, x0, x1, y0, y1)
     p.set_stroke_color(color)
     p.begin_path()
     p.move_to(cx, wy_high)
@@ -243,7 +227,7 @@ pub fn candlestick_t(
   down_color? : String = "",
   fill? : Bool = false,
   style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) { },
+  handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
   {
     mount: fn(parent) {
