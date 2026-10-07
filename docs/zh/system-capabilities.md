@@ -1,6 +1,6 @@
 # 系统能力（音量 / 亮度 / 应用查找 / 应用历史 / 影音与桌面控制）
 
-系统能力族 API：屏幕亮度、键盘背光、系统音量（含输出设备与逐应用音量）、媒体播放控制、夜间色温、壁纸、显示器配置、系统窗口管理、剪贴板监听、子进程执行、磁盘卷、电源与登录会话、电源计划、系统信息、时区与本地语言、蓝牙、传感器、打印机、环境变量、目录枚举、最近文件、浏览器书签与 Firefox 历史、媒体状态监视与通知进度文本。全部只读或经系统服务授权写入，统一返回 `Result`，不支持的环境给对应错误值而不是崩溃；`*_supported()` 每次调用真实探测当前环境。
+系统能力族 API：屏幕亮度、键盘背光、系统音量（含输出设备与逐应用音量）、媒体播放控制、夜间色温、壁纸、显示器配置、系统窗口管理、剪贴板监听、子进程执行、磁盘卷、电源与登录会话、电源计划、系统信息、时区与本地语言、蓝牙、传感器、打印机、环境变量、目录枚举、最近文件、浏览器书签与 Firefox 历史、媒体状态监视与通知进度文本、音频播放、视频帧渲染。全部只读或经系统服务授权写入，统一返回 `Result`，不支持的环境给对应错误值而不是崩溃；`*_supported()` 每次调用真实探测当前环境。
 
 完整演示见 `moon run examples/systemprobe`——点「读取系统能力」逐项呈现本机真实结果，不支持的能力显示对应错误文本。各能力在不同发行版 / 桌面环境的实测结论与原理（logind 路径、wpctl/pactl 差异、SQLite 库直读等）见 [adaptation.md](adaptation.md)。
 
@@ -326,6 +326,43 @@ match @yue.wp_get() {
   Err(e) => println("读不到：\{e}")
 }
 let _ = @yue.wp_set("/home/me/Pictures/wall.png")
+```
+
+## 音频播放（miniaudio）
+
+引擎 + 剪辑两级 API：`AudioEngine::new()` 创建引擎（无输出设备的服务容器/纯 SSH 环境给 `Err(DeviceFailed)`），`AudioEngine::load(path, looping?=false, decoded?=false)` 加载音频（miniaudio 解码，支持 WAV/MP3/FLAC/OGG），得到 `AudioClip` 后 `play() / stop() / is_playing() / set_volume / get_volume / free()`。`decoded=true` 全解码进内存（短音效低延迟），默认流式加载（长音频）。音量钳制在 [0,1]。
+
+```moonbit
+let engine = @yue.AudioEngine::new()?
+let clip = engine.load("/path/sound.wav")?
+clip.set_volume(0.8)
+clip.play()
+// 播放中：clip.is_playing() 为 true；停止：clip.stop()
+clip.free()
+engine.free()
+```
+
+播放/停止属设置类，只在调用方显式调用时执行；库内测试只覆盖加载与音量读写。真机效果听感验证走 systemprobe。
+
+## 视频播放（帧源 → draw_image）
+
+视频帧渲染走「帧源回调产出 RGBA 字节 → `pngr_encode_rgba` 内存编码为 PNG → `Image::new_from_png` 解码 → `Painter::draw_image` 铺满」：libyue 的 Image 没有裸像素构造入口（只有 Buffer/FilePath/NativeImage 三种构造），PNG 内存编码是纯 MoonBit 的中转通道（stored 压缩，合法 zlib 流，小分辨率够用）。解码器与本组件解耦——任何帧源（未来的 moonav1 / 平台解码器）按帧号提供 RGBA 即可接入。
+
+| 函数 | 说明 |
+|---|---|
+| `video_view_t(width, height, frame_count, source, fps?=30, looping?=false, handle?, fill?, style?, on_ready?)` | 视频视图；帧缺失/解码失败画主题底色占位，不中断播放 |
+| `vid_pause(handle)` / `vid_resume(handle)` / `vid_stop(handle)` | 暂停/恢复/停止（stop 后定时器下一帧注销，不可恢复；组件卸载前应显式停） |
+| `VidHandle::make()` / `is_running()` / `is_paused()` | 播放句柄 |
+| `vid_frame_image(source, idx, w, h)` | 单体帧 → Image（长度校验+编码+解码，失败 None） |
+| `pngr_encode_rgba(data, w, h)` | RGBA → PNG（Result；尺寸/长度不符 Err） |
+
+```moonbit
+// 帧源：按帧号产出 RGBA（此处 320x240 每帧变色示意）
+fn source(i : Int) -> Bytes? {
+  let px = FixedArray::make(320 * 240 * 4, (i * 7 % 255).to_byte())
+  Some(Bytes::from_array(px))
+}
+let view = @yue.video_view_t(width=320, height=240, frame_count=120, source, fps=30)
 ```
 
 ## 显示器配置
