@@ -15,8 +15,7 @@ pub fn page_feedback(app : @ui.App) -> @yue.Node {
         @yue.alert("错误提示:网络连接已断开。", @yue.Danger),
       ],
       code=[
-        "@yue.alert(\"成功提示:配置已保存。\", @yue.Success)",
-        "@yue.alert(\"信息提示:有新版本可用。\", @yue.Info)",
+        "@yue.alert(\"成功提示:配置已保存。\", @yue.Success)", "@yue.alert(\"信息提示:有新版本可用。\", @yue.Info)",
         "@yue.alert(\"警告提示:磁盘剩余空间不足。\", @yue.Warning)",
         "@yue.alert(\"错误提示:网络连接已断开。\", @yue.Danger)",
       ],
@@ -53,15 +52,11 @@ pub fn page_feedback(app : @ui.App) -> @yue.Node {
             "网络异常,请稍后重试。",
             [@yue.button_t("重新加载", variant=@yue.Soft)],
           ),
-          ])
+        ]),
       ],
       code=[
-        "@yue.result(",
-        "  @yue.Success,",
-        "  \"操作成功\",",
-        "  \"配置已写入并生效。\",",
-        "  [@yue.button_t(\"返回首页\")],",
-        ")",
+        "@yue.result(", "  @yue.Success,", "  \"操作成功\",", "  \"配置已写入并生效。\",",
+        "  [@yue.button_t(\"返回首页\")],", ")",
       ],
     ),
     @ui.section(
@@ -77,12 +72,8 @@ pub fn page_feedback(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "@yue.popover_t(",
-        "  @yue.button_t(\"打开气泡\"),",
-        "  @yue.label_t(\"气泡内容:任意 Node。\", role=@yue.Body),",
-        "  180.0,",
-        "  60.0,",
-        ")",
+        "@yue.popover_t(", "  @yue.button_t(\"打开气泡\"),", "  @yue.label_t(\"气泡内容:任意 Node。\", role=@yue.Body),",
+        "  180.0,", "  60.0,", ")",
       ],
     ),
     @ui.section(
@@ -106,10 +97,8 @@ pub fn page_feedback(app : @ui.App) -> @yue.Node {
         ]),
       ],
       code=[
-        "let (toast_node, toast_push) = @yue.toast_layer()",
-        "// toast_node 加入 mount_window 根节点数组,之后任意位置推送:",
-        "toast_push(\"保存成功\", @yue.Success)",
-        "toast_push(\"连接超时,已重试\", @yue.Warning)",
+        "let (toast_node, toast_push) = @yue.toast_layer()", "// toast_node 加入 mount_window 根节点数组,之后任意位置推送:",
+        "toast_push(\"保存成功\", @yue.Success)", "toast_push(\"连接超时,已重试\", @yue.Warning)",
       ],
     ),
     @ui.section(
@@ -134,18 +123,10 @@ pub fn page_feedback(app : @ui.App) -> @yue.Node {
         ]),
       ],
       code=[
-        "let visible = @yue.Store::new(false)",
-        "let name = @yue.Store::new(\"\")",
-        "@yue.dialog_t(",
-        "  visible,",
-        "  \"新建连接\",",
-        "  [",
-        "    @yue.label_t(\"名称\", role=@yue.Body),",
+        "let visible = @yue.Store::new(false)", "let name = @yue.Store::new(\"\")",
+        "@yue.dialog_t(", "  visible,", "  \"新建连接\",", "  [", "    @yue.label_t(\"名称\", role=@yue.Body),",
         "    @yue.input_t(text=\"\", style=[(\"width\", 320.0)], on_input=fn(t) { name.set(t) }),",
-        "  ],",
-        "  style=[(\"width\", 380.0)],",
-        ")",
-        "visible.set(true)",
+        "  ],", "  style=[(\"width\", 380.0)],", ")", "visible.set(true)",
       ],
     ),
   ])

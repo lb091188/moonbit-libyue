@@ -6,8 +6,6 @@ import {
 pkgtype(kind: "executable")
 
 options(
-  "native-stub": ["stub/sysmon.c"],
-  targets: {
-    "sysffi.mbt": ["native"],
-  },
+  "native-stub": [ "stub/sysmon.c" ],
+  targets: { "sysffi.mbt": [ "native" ] },
 )

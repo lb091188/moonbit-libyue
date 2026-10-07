@@ -176,7 +176,10 @@ test "parse_meminfo：全字段 / MemAvailable 回退 / 缺 MemTotal / 派生量
   assert_eq(mem.swap_total_kb, 8388604)
   assert_eq(mem.swap_free_kb, 8000000)
   assert_eq(mem.used_kb(), 32665012 - 20532740)
-  assert_true((mem.usage() - (32665012 - 20532740).to_double() / 32665012.0).abs() < 1.0e-12)
+  assert_true(
+    (mem.usage() - (32665012 - 20532740).to_double() / 32665012.0).abs() <
+    1.0e-12,
+  )
   assert_true((mem.swap_usage() - 388604.0 / 8388604.0).abs() < 1.0e-12)
   // 老内核无 MemAvailable：回退 MemFree
   let old = parse_meminfo("MemTotal: 1000 kB\nMemFree: 200 kB\n").unwrap()

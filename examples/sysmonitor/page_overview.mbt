@@ -41,43 +41,45 @@ fn sparkline_box(
   floor : Double,
   hand : @yue.Cursor,
 ) -> @yue.Node {
-  @yue.vbox(
-    [],
-    style=[("height", 34.0), ("marginTop", 8.0)],
-    handle=fn(c) {
-      c.on_draw(fn(p) {
-        let b = @yue.ViewLike::get_bounds(c)
-        let t = @yue.theme_current()
-        let (lo, hi) = match y_range {
-          Some((a, bb)) => (a, bb)
-          None => {
-            let mut peak = floor
-            for s in hist.get() {
-              for v in s.points {
-                if v > peak {
-                  peak = v
-                }
+  @yue.vbox([], style=[("height", 34.0), ("marginTop", 8.0)], handle=fn(c) {
+    c.on_draw(fn(p) {
+      let b = @yue.ViewLike::get_bounds(c)
+      let t = @yue.theme_current()
+      let (lo, hi) = match y_range {
+        Some((a, bb)) => (a, bb)
+        None => {
+          let mut peak = floor
+          for s in hist.get() {
+            for v in s.points {
+              if v > peak {
+                peak = v
               }
             }
-            (0.0, peak)
           }
+          (0.0, peak)
         }
-        // 多序列同窗叠加（网络卡 rx 主题色 / tx 警告色）
-        for si, s in hist.get() {
-          let color = if si == 0 {
-            t.primary
-          } else {
-            t.warning
-          }
-          draw_sparkline(p, 0.0, 2.0, b.width, b.height - 4.0, s.points, lo, hi, color)
-        }
-      })
-      hist.subscribe(fn(_s) { c.schedule_paint() })
-      // 主题切换后重绘（绘制时读 theme_current）
-      @yue.on_theme_change(fn() { c.schedule_paint() })
-      @yue.View::set_cursor(c, hand)
-    },
-  )
+      }
+      // 多序列同窗叠加（网络卡 rx 主题色 / tx 警告色）
+      for si, s in hist.get() {
+        let color = if si == 0 { t.primary } else { t.warning }
+        draw_sparkline(
+          p,
+          0.0,
+          2.0,
+          b.width,
+          b.height - 4.0,
+          s.points,
+          lo,
+          hi,
+          color,
+        )
+      }
+    })
+    hist.subscribe(fn(_s) { c.schedule_paint() })
+    // 主题切换后重绘（绘制时读 theme_current）
+    @yue.on_theme_change(fn() { c.schedule_paint() })
+    @yue.View::set_cursor(c, hand)
+  })
 }
 
 ///|
@@ -107,24 +109,20 @@ fn res_card(
       @yue.hbox(
         [
           @yue.icon(icon, size=16.0),
-          @yue.label_t(
-            title,
-            role=@yue.Section,
-            style=[("marginLeft", 6.0)],
-            handle=fn(l) { @yue.View::set_cursor(l, hand_cur) },
-          ),
+          @yue.label_t(title, role=@yue.Section, style=[("marginLeft", 6.0)], handle=fn(
+            l,
+          ) {
+            @yue.View::set_cursor(l, hand_cur)
+          }),
           // 值行：吃掉标题行剩余宽度(flex:1),文本右对齐——空间全部
           // 给数值,比标题小两档,固定右缘不随文本回流换行
-          @yue.label_t(
-            value.get(),
-            role=@yue.Section,
-            style=[("flex", 1.0)],
-            handle=fn(l) {
-              value.subscribe(fn(v) { l.set_text(v) })
-              l.set_align(@yue.End)
-              @yue.View::set_cursor(l, hand_cur)
-            },
-          ),
+          @yue.label_t(value.get(), role=@yue.Section, style=[("flex", 1.0)], handle=fn(
+            l,
+          ) {
+            value.subscribe(fn(v) { l.set_text(v) })
+            l.set_align(@yue.End)
+            @yue.View::set_cursor(l, hand_cur)
+          }),
         ],
         style=[("alignItems", "center")],
         handle=fn(h) { @yue.View::set_cursor(h, hand_cur) },
@@ -172,7 +170,14 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
       VCpu,
       y_range=Some((0.0, 100.0)),
     ),
-    res_card(@yue.Database, "内存", app.card_mem, Some(app.mem_hist), view, VMem),
+    res_card(
+      @yue.Database,
+      "内存",
+      app.card_mem,
+      Some(app.mem_hist),
+      view,
+      VMem,
+    ),
     res_card(
       @yue.Wifi,
       "网络",
@@ -225,10 +230,9 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
   cards.push(
     res_card(@yue.TableIcon, "进程", app.card_proc, None, view, VProc),
   )
-  @yue.scroll(
-    @yue.vbox(cards, style=[("padding", 10.0)]),
-    style=[("width", 292.0)],
-  )
+  @yue.scroll(@yue.vbox(cards, style=[("padding", 10.0)]), style=[
+    ("width", 292.0),
+  ])
 }
 
 ///|
@@ -243,30 +247,35 @@ fn view_area(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
     (VGpu, page_sensors(app)),
     (VProc, page_process(app)),
   ]
-  @yue.vbox(
-    [],
-    style=[("flex", 1.0), ("flexDirection", "column")],
-    handle=fn(area) {
-      let boxes : Array[@yue.Container] = []
-      for item in items {
-        let (_, node) = item
-        let pc = @yue.Container::make(
-          style=[("flex", 1.0), ("flexDirection", "column")],
+  @yue.vbox([], style=[("flex", 1.0), ("flexDirection", "column")], handle=fn(
+    area,
+  ) {
+    let boxes : Array[@yue.Container] = []
+    for item in items {
+      let (_, node) = item
+      let pc = @yue.Container::make(style=[
+        ("flex", 1.0),
+        ("flexDirection", "column"),
+      ])
+      @yue.ViewLike::set_visible(
+        pc,
+        view_index(item.0) == view_index(view.get()),
+      )
+      // 页面内容整页滚动（showcase 同款），超窗不裁切
+      let sc = @yue.scroll(node, style=[("flex", 1.0)])
+      ignore(sc.mount_into(@yue.ViewLike::view(pc)))
+      area.add_child(pc)
+      boxes.push(pc)
+    }
+    view.subscribe(fn(cur) {
+      for j in 0..<boxes.length() {
+        @yue.ViewLike::set_visible(
+          boxes[j],
+          view_index(items[j].0) == view_index(cur),
         )
-        @yue.ViewLike::set_visible(pc, view_index(item.0) == view_index(view.get()))
-        // 页面内容整页滚动（showcase 同款），超窗不裁切
-        let sc = @yue.scroll(node, style=[("flex", 1.0)])
-        ignore(sc.mount_into(@yue.ViewLike::view(pc)))
-        area.add_child(pc)
-        boxes.push(pc)
       }
-      view.subscribe(fn(cur) {
-        for j in 0..<boxes.length() {
-          @yue.ViewLike::set_visible(boxes[j], view_index(items[j].0) == view_index(cur))
-        }
-      })
-    },
-  )
+    })
+  })
 }
 
 ///|
@@ -322,8 +331,5 @@ fn page_mem_detail(app : App) -> @yue.Node {
 /// 双栏应用壳：左栏卡片导航 + 右栏详情页。
 fn app_shell(app : App) -> @yue.Node {
   let view : @yue.Store[ViewId] = @yue.Store::new(VCpu)
-  @yue.hbox(
-    [left_pane(app, view), view_area(app, view)],
-    style=[("flex", 1.0)],
-  )
+  @yue.hbox([left_pane(app, view), view_area(app, view)], style=[("flex", 1.0)])
 }

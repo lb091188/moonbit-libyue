@@ -40,7 +40,7 @@ pub fn split_fields(s : StringView) -> Array[StringView] {
   for i, c in s.iter2() {
     if is_ws(c) {
       if start >= 0 {
-        out.push(s.exact_view(start=start, end=i))
+        out.push(s.exact_view(start~, end=i))
         start = -1
       }
     } else if start < 0 {
@@ -48,7 +48,7 @@ pub fn split_fields(s : StringView) -> Array[StringView] {
     }
   }
   if start >= 0 {
-    out.push(s.exact_view(start=start))
+    out.push(s.exact_view(start~))
   }
   out
 }
@@ -91,7 +91,7 @@ pub fn parse_i64(s : StringView) -> Int64? {
     neg = true
     start = 1
   }
-  match parse_u64(s.exact_view(start=start)) {
+  match parse_u64(s.exact_view(start~)) {
     None => None
     Some(v) => Some(if neg { -v } else { v })
   }
@@ -175,7 +175,12 @@ pub(all) struct CpuTimes {
 ///|
 /// 总时间片（guest 已由内核计入 user/nice，不重复累加）。
 pub fn CpuTimes::total(self : CpuTimes) -> Int64 {
-  self.user + self.nice + self.system + self.idle + self.iowait + self.irq +
+  self.user +
+  self.nice +
+  self.system +
+  self.idle +
+  self.iowait +
+  self.irq +
   self.softirq +
   self.steal
 }
@@ -208,7 +213,8 @@ pub fn parse_proc_stat(text : String) -> (CpuTimes, Array[CpuTimes])? {
       continue
     }
     let tag = f[0]
-    if tag.char_length() >= 3 && tag.exact_view(start=0, end=3).equal_to_string("cpu") {
+    if tag.char_length() >= 3 &&
+      tag.exact_view(start=0, end=3).equal_to_string("cpu") {
       let t = cpu_line_times(f)
       if tag.char_length() == 3 {
         total = Some(t)
@@ -291,7 +297,7 @@ pub fn parse_cpuinfo(text : String) -> CpuInfo? {
   if cores == 0 {
     None
   } else {
-    Some({ model, mhz, cores })
+    Some({ model, mhz, cores, })
   }
 }
 
@@ -332,13 +338,16 @@ pub fn MemInfo::swap_usage(self : MemInfo) -> Double {
     0.0
   } else {
     ((self.swap_total_kb - self.swap_free_kb).to_double() /
-    self.swap_total_kb.to_double()).max(0.0).min(1.0)
+    self.swap_total_kb.to_double())
+    .max(0.0)
+    .min(1.0)
   }
 }
 
 ///|
 /// 解析 /proc/meminfo。缺 MemTotal 行返回 None。
-pub fn parse_meminfo(text : String) -> MemInfo? {  let mut total : Int64? = None
+pub fn parse_meminfo(text : String) -> MemInfo? {
+  let mut total : Int64? = None
   let mut free : Int64? = None
   let mut avail : Int64? = None
   let mut swap_total : Int64? = None
@@ -409,7 +418,7 @@ pub(all) struct CpuMonitor {
 
 ///|
 pub fn CpuMonitor::new() -> CpuMonitor {
-  { prev: zero_times(), prev_cores: [], cores: 0 }
+  { prev: zero_times(), prev_cores: [], cores: 0, }
 }
 
 ///|

@@ -136,10 +136,7 @@ fn sample_once(app : App) -> Unit {
       for s in sensors {
         match hottest {
           None => hottest = Some(s)
-          Some(t) =>
-            if s.celsius > t.celsius {
-              hottest = Some(s)
-            }
+          Some(t) => if s.celsius > t.celsius { hottest = Some(s) }
         }
       }
       match hottest {
@@ -155,7 +152,8 @@ fn sample_once(app : App) -> Unit {
     None => ()
     Some(mem) => {
       let used_gb = mem.used_kb().to_double() / 1048576.0
-      let swap_gb = (mem.swap_total_kb - mem.swap_free_kb).to_double() / 1048576.0
+      let swap_gb = (mem.swap_total_kb - mem.swap_free_kb).to_double() /
+        1048576.0
       app.card_mem.set(
         "\{fmt_rate_c(mem.used_kb().to_double() * 1024.0)} / \{fmt_rate_c(mem.total_kb.to_double() * 1024.0)}",
       )
@@ -238,10 +236,12 @@ fn main {
   if !@yue.initialize() {
     return
   }
-  let info = cpu_info().unwrap_or({ model: "(未知)", mhz: 0.0, cores: 1 })
+  let info = cpu_info().unwrap_or({ model: "(未知)", mhz: 0.0, cores: 1, })
   // 框架默认已随系统初始化整套主题(深浅 + 主色);这里只接管系统
   // 切换主题时的实时联动
-  @yue.on_system_theme_change(fn() { @yue.theme_apply(@yue.theme_from_system()) })
+  @yue.on_system_theme_change(fn() {
+    @yue.theme_apply(@yue.theme_from_system())
+  })
 
   // 磁盘与 GPU 数量取启动枚举结果，卡与曲线按块预建（热插拔不重建视图）
   let disk_mon = DiskMonitor::new()
@@ -298,12 +298,7 @@ fn main {
   )
 
   let window = @yue.mount_window(
-    [
-      @yue.vbox(
-        [app_shell(app)],
-        style=[("flex", 1.0), ("padding", 6.0)],
-      ),
-    ],
+    [@yue.vbox([app_shell(app)], style=[("flex", 1.0), ("padding", 6.0)])],
     title="系统监视器",
     size=Some((1240.0, 840.0)),
     on_close=fn(_w) { @yue.quit() },

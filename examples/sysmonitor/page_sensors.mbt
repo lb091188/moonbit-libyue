@@ -93,14 +93,14 @@ fn SensorPage::rebuild(self : SensorPage, sensors : Array[TempSensor]) -> Unit {
     let prev = self.hist.get(key).unwrap_or([])
     let h = @yue.win_push(prev, 120, s.celsius)
     self.hist.set(key, h)
-    out.push({ chip: s.chip, label: s.label, celsius: s.celsius, hist: h })
+    out.push({ chip: s.chip, label: s.label, celsius: s.celsius, hist: h, })
   }
   self.rows.set(out)
 }
 
 ///|
 fn page_sensors(app : App) -> @yue.Node {
-  let page : SensorPage = { rows: @yue.Store::new([]), hist: Map([]) }
+  let page : SensorPage = { rows: @yue.Store::new([]), hist: Map([]), }
   page.rebuild(app.sensors.get())
   app.sensors.subscribe(fn(sensors) { page.rebuild(sensors) })
   let sensor_n : @yue.Store[Int] = @yue.Store::new(page.rows.get().length())
@@ -146,13 +146,23 @@ fn page_sensors(app : App) -> @yue.Node {
         ("marginBottom", 6.0),
       ]),
     )
-    nodes.push(@yue.line_chart_t(app.gpu_vram_hists[i], fill=true, style=[("height", 220.0)]))
+    nodes.push(
+      @yue.line_chart_t(app.gpu_vram_hists[i], fill=true, style=[
+        ("height", 220.0),
+      ]),
+    )
   }
-  nodes.push(@yue.separator(style=[("marginTop", 14.0), ("marginBottom", 10.0)]))
   nodes.push(
-    @yue.label_t("温度传感器", role=@yue.Section, style=[("marginBottom", 4.0)]),
+    @yue.separator(style=[("marginTop", 14.0), ("marginBottom", 10.0)]),
   )
-  nodes.push(draw_rows(sensor_n, fn(p, w) { draw_sensor_rows(p, w, page.rows.get()) }))
+  nodes.push(
+    @yue.label_t("温度传感器", role=@yue.Section, style=[
+      ("marginBottom", 4.0),
+    ]),
+  )
+  nodes.push(
+    draw_rows(sensor_n, fn(p, w) { draw_sensor_rows(p, w, page.rows.get()) }),
+  )
 
   @yue.vbox(nodes, style=[("padding", 12.0)])
 }

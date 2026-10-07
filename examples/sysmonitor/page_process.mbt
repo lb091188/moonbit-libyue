@@ -68,16 +68,12 @@ pub fn sort_procs(
 
   if by is ByName {
     // 名称列按字符串比较（大小写不敏感）
-    out.mut_view().sort_by(fn(a, b) {
+    out
+    .mut_view()
+    .sort_by(fn(a, b) {
       let ka = a.name.to_lower()
       let kb = b.name.to_lower()
-      let c = if ka < kb {
-        -1
-      } else if ka > kb {
-        1
-      } else {
-        0
-      }
+      let c = if ka < kb { -1 } else if ka > kb { 1 } else { 0 }
       if asc {
         c
       } else {
@@ -85,16 +81,12 @@ pub fn sort_procs(
       }
     })
   } else {
-    out.mut_view().sort_by(fn(a, b) {
+    out
+    .mut_view()
+    .sort_by(fn(a, b) {
       let ka = key_of(a, by)
       let kb = key_of(b, by)
-      let c = if ka < kb {
-        -1
-      } else if ka > kb {
-        1
-      } else {
-        0
-      }
+      let c = if ka < kb { -1 } else if ka > kb { 1 } else { 0 }
       if asc {
         c
       } else {
@@ -134,6 +126,7 @@ fn sort_of_col(j : Int) -> ProcSort? {
     _ => None
   }
 }
+
 ///|
 /// 页面状态：派生表格数据 + 过滤 / 排序条件 + 操作消息。
 /// 排序条件走 @yue.TableSort Store（表头点击由 table_v_t 组件内切换，
@@ -213,7 +206,11 @@ fn ProcPage::selected_pids(self : ProcPage) -> Array[Int] {
 
 ///|
 /// 对选中进程发信号（结束 / 强杀），逐个报告结果。
-fn ProcPage::signal_selected(self : ProcPage, sig : Int, label : String) -> Unit {
+fn ProcPage::signal_selected(
+  self : ProcPage,
+  sig : Int,
+  label : String,
+) -> Unit {
   let pids = self.selected_pids()
   if pids.length() == 0 {
     self.msg.set("先选中进程")
@@ -280,7 +277,7 @@ fn page_process(app : App) -> @yue.Node {
     msg: @yue.Store::new("就绪"),
     status: @yue.Store::new("采样中…"),
     // 初始排序：CPU% 降序（列 3）
-    sort: @yue.Store::new(@yue.TableSort::{ column: 3, asc: false }),
+    sort: @yue.Store::new(@yue.TableSort::{ column: 3, asc: false, }),
     pids: [],
     query: "",
     nice_text: "10",
@@ -324,11 +321,11 @@ fn page_process(app : App) -> @yue.Node {
           @yue.button_t("强制结束", variant=@yue.Danger, on_click=fn() {
             page.signal_selected(SIGKILL, "强制结束")
           }),
-          @yue.input_t(
-            text=page.nice_text,
-            style=[("width", 72.0)],
-            on_input=fn(s) { page.nice_text = s },
-          ),
+          @yue.input_t(text=page.nice_text, style=[("width", 72.0)], on_input=fn(
+            s,
+          ) {
+            page.nice_text = s
+          }),
           @yue.button_t("设 nice", variant=@yue.Soft, on_click=fn() {
             page.renice_selected()
           }),

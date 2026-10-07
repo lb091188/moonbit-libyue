@@ -185,11 +185,7 @@ pub fn ProcMonitor::tick(self : ProcMonitor) -> Array[ProcInfo]? {
     }
   }
   let wall = ffi_monotonic()
-  let wall_dt = if self.prev_wall > 0.0 {
-    wall - self.prev_wall
-  } else {
-    0.0
-  }
+  let wall_dt = if self.prev_wall > 0.0 { wall - self.prev_wall } else { 0.0 }
   let out : Array[ProcInfo] = []
   let cur : Map[Int, Int64] = Map([])
   for pid in pids {
@@ -216,7 +212,11 @@ pub fn ProcMonitor::tick(self : ProcMonitor) -> Array[ProcInfo]? {
       pid: st.pid,
       ppid: st.ppid,
       name: st.comm,
-      cmd: if cmdline == "" { "[\{st.comm}]" } else { cmdline },
+      cmd: if cmdline == "" {
+        "[\{st.comm}]"
+      } else {
+        cmdline
+      },
       state: st.state,
       nice: st.nice,
       threads: st.threads,

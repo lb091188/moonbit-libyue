@@ -33,12 +33,20 @@ test "parse_proc_pid_stat：真实格式 / comm 含空格括号 / 字段不足" 
   assert_true(parse_proc_pid_stat("1234 cat R 1\n") is None)
   assert_true(parse_proc_pid_stat("1234 (cat R 1 2\n") is None)
   // pid 非法
-  assert_true(parse_proc_pid_stat("abc (cat) R 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22\n") is None)
+  assert_true(
+    parse_proc_pid_stat(
+      "abc (cat) R 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22\n",
+    )
+    is None,
+  )
 }
 
 ///|
 test "parse_cmdline：NUL 分隔转空格 / 去尾随 / 空串" {
-  assert_eq(parse_cmdline("cat\u{0}/proc/self/stat\u{0}"), "cat /proc/self/stat")
+  assert_eq(
+    parse_cmdline("cat\u{0}/proc/self/stat\u{0}"),
+    "cat /proc/self/stat",
+  )
   assert_eq(parse_cmdline("sleep\u{0}100\u{0}"), "sleep 100")
   assert_eq(parse_cmdline(""), "")
   assert_eq(parse_cmdline("\u{0}"), "")
@@ -226,26 +234,24 @@ fn mk_proc(
   nice : Int,
   threads : Int,
 ) -> ProcInfo {
-  {
-    pid,
-    ppid,
-    name,
-    cmd,
-    state,
-    nice,
-    threads,
-    rss_kb,
-    cpu_pct: cpu,
-  }
+  { pid, ppid, name, cmd, state, nice, threads, rss_kb, cpu_pct: cpu, }
 }
 
 ///|
 fn bench_procs() -> Array[ProcInfo] {
   [
     mk_proc(1, 0, "systemd", "/sbin/init", "S", 0.1, 20480, 0, 3),
-    mk_proc(420, 1, "Firefox", "/usr/lib/firefox/firefox", "S", 12.5, 1835008, 0, 87),
-    mk_proc(999, 420, "Web Content", "/usr/lib/firefox/firefox -contentproc", "R", 45.25, 2621440, 5, 12),
-    mk_proc(1234, 1, "code", "/usr/share/code/code --type=renderer", "S", 3.0, 524288, -2, 30),
+    mk_proc(
+      420, 1, "Firefox", "/usr/lib/firefox/firefox", "S", 12.5, 1835008, 0, 87,
+    ),
+    mk_proc(
+      999, 420, "Web Content", "/usr/lib/firefox/firefox -contentproc", "R", 45.25,
+      2621440, 5, 12,
+    ),
+    mk_proc(
+      1234, 1, "code", "/usr/share/code/code --type=renderer", "S", 3.0, 524288,
+      -2, 30,
+    ),
   ]
 }
 
@@ -307,7 +313,9 @@ test "sort_procs：各列升降序 + 名称大小写不敏感 + 空数组" {
 
 ///|
 test "proc_row：列内容与格式(CPU 一位小数 / 内存人类可读)" {
-  let p = mk_proc(999, 420, "Web Content", "/usr/lib/firefox", "R", 45.25, 2621440, 5, 12)
+  let p = mk_proc(
+    999, 420, "Web Content", "/usr/lib/firefox", "R", 45.25, 2621440, 5, 12,
+  )
   let row = proc_row(p)
   assert_eq(row.cells.length(), 8)
   assert_eq(cell_text(row.cells[0]), "999")

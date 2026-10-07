@@ -73,16 +73,9 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
         ]),
       ],
       code=[
-        "w.set_title(\"components · 标题已改\")",
-        "if w.is_maximized() {",
-        "  w.unmaximize()",
-        "} else {",
-        "  w.maximize()",
-        "}",
-        "w.set_fullscreen(!w.is_fullscreen())",
-        "w.set_always_on_top(true)",
-        "w.set_content_size(1280.0, 720.0)",
-        "w.activate()",
+        "w.set_title(\"components · 标题已改\")", "if w.is_maximized() {", "  w.unmaximize()",
+        "} else {", "  w.maximize()", "}", "w.set_fullscreen(!w.is_fullscreen())",
+        "w.set_always_on_top(true)", "w.set_content_size(1280.0, 720.0)", "w.activate()",
       ],
     ),
     @ui.section(
@@ -109,10 +102,8 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
         ]),
       ],
       code=[
-        "ignore(@yue.register_global_shortcut(\"Ctrl+Alt+C\", fn() {",
-        "  println(\"触发!\")",
-        "}))",
-        "@yue.unregister_all_global_shortcuts()",
+        "ignore(@yue.register_global_shortcut(\"Ctrl+Alt+C\", fn() {", "  println(\"触发!\")",
+        "}))", "@yue.unregister_all_global_shortcuts()",
       ],
     ),
     @ui.section(
@@ -162,16 +153,10 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "c.register_dragged_types([@yue.FilePaths, @yue.Text, @yue.Image])",
-        "c.handle_drag_enter(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })",
-        "c.handle_drag_update(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })",
-        "c.handle_drop(fn(info, _x, _y) {",
-        "  match info.get_data(@yue.FilePaths) {",
-        "    Some(@yue.Paths(paths)) => println(\"拖入 \\{paths.length()} 个文件\")",
-        "    _ => ()",
-        "  }",
-        "  true",
-        "})",
+        "c.register_dragged_types([@yue.FilePaths, @yue.Text, @yue.Image])", "c.handle_drag_enter(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })",
+        "c.handle_drag_update(fn(_info, _x, _y) { @yue.DRAG_OPERATION_COPY })", "c.handle_drop(fn(info, _x, _y) {",
+        "  match info.get_data(@yue.FilePaths) {", "    Some(@yue.Paths(paths)) => println(\"拖入 \\{paths.length()} 个文件\")",
+        "    _ => ()", "  }", "  true", "})",
       ],
     ),
     @ui.section(
@@ -197,21 +182,18 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
               None => None
             }
             c.on_mouse_down(fn(_e) {
-              ignore(c.do_drag_file_paths(["examples/showcase/assets/icon.png"], img))
+              ignore(
+                c.do_drag_file_paths(["examples/showcase/assets/icon.png"], img),
+              )
               true
             })
           },
         ),
       ],
       code=[
-        "let img : @yue.Image? = match @yue.read_binary_file(\"icon.png\") {",
-        "  Some(bytes) => Some(@yue.Image::new_from_png(bytes))",
-        "  None => None",
-        "}",
-        "c.on_mouse_down(fn(_e) {",
-        "  ignore(c.do_drag_file_paths([\"icon.png\"], img))",
-        "  true",
-        "})",
+        "let img : @yue.Image? = match @yue.read_binary_file(\"icon.png\") {", "  Some(bytes) => Some(@yue.Image::new_from_png(bytes))",
+        "  None => None", "}", "c.on_mouse_down(fn(_e) {", "  ignore(c.do_drag_file_paths([\"icon.png\"], img))",
+        "  true", "})",
       ],
     ),
   ])

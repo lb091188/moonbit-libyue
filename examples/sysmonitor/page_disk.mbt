@@ -5,7 +5,11 @@
 
 ///|
 /// 磁盘行自绘：名称行 + 容量条 + 速率行（全部手绘，行数随挂载增减）。
-fn draw_disk_rows(p : @yue.Painter, w : Double, disks : Array[DiskInfo]) -> Unit {
+fn draw_disk_rows(
+  p : @yue.Painter,
+  w : Double,
+  disks : Array[DiskInfo],
+) -> Unit {
   let t = @yue.theme_current()
   for i, d in disks {
     let y = i.to_double() * row_h()

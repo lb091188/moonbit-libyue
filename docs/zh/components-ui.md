@@ -738,7 +738,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 @yue.scatter_t(pts, trend=true)
 ```
 
-以下六个扩展图表与上述同渲染模型（Store 驱动、只重绘画布、主题切换跟随），完整演示见 `examples/systemprobe`。
+以下六个扩展图表与上述同渲染模型（Store 驱动、只重绘画布、主题切换跟随），完整演示见 `examples/systemprobe`。其后九个层级 / 地理 / 力导向 / 时间流图表与图表交互层为后续批次，同样纯 MoonBit 自绘、Store 驱动。
 
 ### 雷达图 radar_chart_t
 
@@ -901,6 +901,394 @@ let sankey : @yue.Store[@yue.SankeyData] = @yue.Store::new(
   ),
 )
 @yue.sankey_t(sankey, style=[("width", 420.0), ("height", 300.0)])
+```
+
+以下九个图表与交互层同样纯 MoonBit 自绘、数据经 Store 驱动、set 后只 schedule_paint 画布不重建视图树，主题切换现取色自动跟随；除注明外都能经 `style` 覆盖画布尺寸、经 `fill=true` 横向铺满父容器。
+
+### 树图 tree_chart_t
+
+`tree_chart_t(root : Store[TreeItem], orientation? = "horizontal", fill? = false, style?, handle?)`
+
+层级树：叶节点沿横铺方向均分槽位、父节点取子节点中点、深度方向分层定位；连线为直角肘线。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| root | Store[TreeItem] | 必填 | 树根节点（children 是可变子列表，直接 push 增删后 set 即重绘） |
+| orientation | String | "horizontal" | "horizontal" 横向（根居左、叶居右）；"vertical" 纵向（根居顶、叶居底） |
+| fill | Bool | false | 不设固定宽度，横向铺满父容器 |
+| width / height | Double | 560 / 320 | 画布尺寸（fill=false 时） |
+
+`TreeItem::make(名称, value? = None)` 建节点：value 为圆点大小量纲（None 或全树无 value 时圆点等大），children 建后可再 push。节点圆点半径 ∝ value（相对子树最大值），深度方向取主题主色渐变着色，每个节点带名称标签。配套纯函数：`tree_depth`（子树高度）、`tree_leaf_count`（叶子数）、`tree_max_value`（峰值）、`tree_vertical(orientation)`（是否纵形态）。
+
+```moonbit
+let root = @yue.TreeItem::make("仓库")
+let src = @yue.TreeItem::make("src", value=80.0)
+src.children.push(@yue.TreeItem::make("main.mbt", value=40.0))
+root.children.push(src)
+root.children.push(@yue.TreeItem::make("README.md", value=10.0))
+let tree = @yue.Store::new(root)
+@yue.tree_chart_t(tree, style=[("width", 420.0), ("height", 260.0)])
+@yue.tree_chart_t(tree, orientation="vertical") // 纵向形态
+```
+
+### 矩形树图 tm_chart_t
+
+`tm_chart_t(items : Store[Array[TmItem]], levels? = 2, gap? = 4.0, fill? = false, style?, handle?)`
+
+层级数据按面积 ∝ value 正交切分（squarified 宽高比优化）。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| items | Store[Array[TmItem]] | 必填 | 顶层项（每项 children 递归展开） |
+| levels | Int | 2 | 展开层数：1=只排顶层；>1 把父矩形让给子项递归布局 |
+| gap | Double | 4 | 兄弟格间隙（px） |
+| fill | Bool | false | 不设固定宽度，横向铺满父容器 |
+| width / height | Double | 560 / 360 | 画布尺寸（fill=false 时） |
+
+`TmItem::make(名称, value? = 0.0, children? = [])` 建节点；计值口径 `tm_value_of`——自身 value > 0 取自身值，否则子项递归合计，全零退化为 0（不参与布局）。兄弟格沿主题主色的 HSL 明度轴均摊着色（同色系、相邻可辨），父格浅底 + 名称带；格内标签 `tm_label_lines` 给名称 + 数值两行（格高 ≥30 才两行，16..30 只名称，以下不显示，按可用宽截断）。hover 命中最深可见格（提亮 + 描边），命中表每次 on_draw 重建、与绘制同一 layout。
+
+```moonbit
+let tm = @yue.Store::new([
+  @yue.TmItem::make(
+    "华东",
+    children=[
+      @yue.TmItem::make("上海", value=320.0),
+      @yue.TmItem::make("江苏", value=260.0),
+    ],
+  ),
+  @yue.TmItem::make("华南", children=[@yue.TmItem::make("广东", value=300.0)]),
+])
+@yue.tm_chart_t(tm, levels=2, gap=3.0, style=[("width", 420.0), ("height", 260.0)])
+```
+
+### 旭日图 sun_chart_t
+
+`sun_chart_t(data : Store[SunItem], inner? = 0.0, show_labels? = true, center_text? = None, fill? = false, style?, handle?)`
+
+树形数据逐级同心环：父段角度区间由子项按聚合值占比瓜分。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| data | Store[SunItem] | 必填 | 树根节点 |
+| inner | Double | 0 | 中心孔半径（px）；≤ 0 时取外半径 22% |
+| show_labels | Bool | true | 段内名称标签（按可容纳空间判定，放不下不画） |
+| center_text | String? | None | 中心文案：None=聚合总值 + 「总计」；`Some("")` 隐藏；`Some(t)` 自定义 |
+| fill | Bool | false | 不设固定宽度，横向铺满父容器 |
+| width / height | Double | 440 / 380 | 画布尺寸（fill=false 时） |
+
+`SunItem::make(名称, value? = None, children? = [])`：value 缺省时按 children 聚合值之和填好。聚合口径 `sun_total`——显式值 > 0 优先，否则子项递归合计，负值不计入，无子项为 0。同支系顶层段取主题五语义色循环、逐层提亮；段间按角度内缩留缝（不依赖描边线宽）。
+
+```moonbit
+let sun = @yue.Store::new(
+  @yue.SunItem::make(
+    "全部",
+    children=[
+      @yue.SunItem::make("直接", value=335.0),
+      @yue.SunItem::make("搜索", children=[
+        @yue.SunItem::make("百度", value=120.0),
+        @yue.SunItem::make("必应", value=80.0),
+      ]),
+    ],
+  ),
+)
+@yue.sun_chart_t(sun, style=[("width", 380.0), ("height", 320.0)])
+@yue.sun_chart_t(sun, inner=40.0, center_text=Some("总计访问"))
+```
+
+### 地图与飞线 geo_map_t
+
+`geo_map_t(regions : Store[Array[GeoRegion]], flights? = [], show_labels? = true, fill? = false, style?, handle?)`
+
+GeoJSON 区域按等距圆柱投影绘制（填充 + 描边 + 质心区域名标签），飞线为起终经纬度间的二次贝塞尔弧线。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| regions | Store[Array[GeoRegion]] | 必填 | 区域表（环列表，每环 `(lon, lat)` 点对） |
+| flights | Array[GeoFlight] | [] | 飞线（不经 Store，重画需整体重挂或改 regions 触发） |
+| show_labels | Bool | true | 区域名标签（画在质心，按可用宽截断，放得下才画） |
+| fill | Bool | false | 不设固定宽度，横向铺满父容器 |
+| width / height | Double | 560 / 360 | 画布尺寸（fill=false 时） |
+
+地图数据集不内置：文本解析走 `geojson_parse(text) -> Result[Array[GeoRegion], GeoError]`（支持 FeatureCollection / Feature / 裸 Polygon / MultiPolygon，几何不合规给 `GeoError::BadGeometry`），或自行构造 `GeoRegion::make(名称?, 环列表)`。投影矩形 = 区域环与飞线端点的合并包围盒按自身长宽比居中缩进（不变形），无数据时画「暂无数据」。区域填充以主题主色为底、按区域名哈希 ±0.06 微调明度（同名同色、换主题不变）；飞线分段渐变虚线 + 起终点圆点 + 末端箭头，静态表现无动画，hover 未做。配套纯函数：`geo_project`（等距圆柱投影）、`geo_bbox` / `geo_bbox_points`、`geo_fit_rect`、`geo_shoelace`（环有向面积）、`geo_ring_centroid` / `geo_region_centroid`、`geo_flight_points`（弧线采样）、`geo_quad_bezier`。
+
+```moonbit
+let geojson = @yue.read_text_file("china.geojson") // 自有文本读取即可
+let regions = match geojson {
+  Some(text) => @yue.geojson_parse(text) catch { _ => [] }
+  None => []
+}
+@yue.geo_map_t(
+  @yue.Store::new(regions),
+  flights=[
+    @yue.GeoFlight::make((121.47, 31.23), (114.06, 22.54)),
+  ],
+  style=[("width", 420.0), ("height", 300.0)],
+)
+```
+
+### 力导向关系图 gph_chart_t
+
+`gph_chart_t(data : Store[GraphData], iterations? = 300, show_labels? = true, fill? = false, style?, handle?)`
+
+节点-边图经力模拟收敛后静态绘制：节点对库仑斥力 + 边胡克弹簧（劲度 ∝ weight）+ 质心向心，阻尼步进。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| data | Store[GraphData] | 必填 | `GraphData::make(节点表, 边表)`，边按下标引用节点 |
+| iterations | Int | 300 | 力模拟步数 |
+| show_labels | Bool | true | 节点名标签（防重叠推挤后的位置） |
+| fill | Bool | false | 不设固定宽度，横向铺满父容器 |
+| width / height | Double | 560 / 320 | 画布尺寸（fill=false 时） |
+
+`GraphNode::make(名称, value? = 1.0)`（value 定节点圆面积，不参与力模拟）、`GraphEdge::make(源下标, 目标下标, weight? = 1.0)`（两端下标越界、自环、weight ≤ 0 的边不参与模拟也不画）。边画半透明平行四边形色带（宽 ∝ weight），节点圆按主题四语义色循环；模拟无随机源（圆周均匀布点起步），同输入必同输出。布局按当前画布尺寸在首次绘制时收敛一次并缓存，数据 set 或画布尺寸变化才重算。
+
+```moonbit
+let g = @yue.GraphData::make(
+  [
+    @yue.GraphNode::make("核心", value=10.0),
+    @yue.GraphNode::make("网关", value=5.0),
+    @yue.GraphNode::make("终端", value=3.0),
+  ],
+  [@yue.GraphEdge::make(0, 1, 8.0), @yue.GraphEdge::make(1, 2, 4.0)],
+)
+@yue.gph_chart_t(@yue.Store::new(g), iterations=200, style=[("width", 420.0), ("height", 300.0)])
+```
+
+### 平行坐标图 par_chart_t
+
+`par_chart_t(axes : Store[Array[ParAxis]], rows : Store[Array[Array[Double]]], highlight? = -1, fill? = false, style?, handle?)`
+
+N 条竖轴等距横排、每轴独立量程归一，每行数据一条折线穿越各轴。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| axes | Store[Array[ParAxis]] | 必填 | `ParAxis::make(名称, min? = None, max? = None)`；只给一端时另一端仍由数据推断 |
+| rows | Store[Array[Array[Double]]] | 必填 | 数据行，每行一条折线（行短于列数的位按缺失处理） |
+| highlight | Int | -1 | 高亮行索引（≥0 时该行不透明重描 + 各轴顶点圆点） |
+| fill | Bool | false | 不设固定宽度，横向铺满父容器 |
+| width / height | Double | 640 / 320 | 画布尺寸（fill=false 时） |
+
+每轴顶部轴名、轴侧 min/max 量程标签、轴身刻度小横线；折线取系列色 alpha 混合（多行叠显密度），高亮行用不透明本色。`par_axis_range` 单轴量程推断（不加留白，等值退化以值为中心撑开）、`par_norm` 归一、`par_row_vertices` 行顶点可供自绘复用。
+
+```moonbit
+let axes = @yue.Store::new([
+  @yue.ParAxis::make("渲染", 0.0, 100.0),
+  @yue.ParAxis::make("IO", 0.0, 100.0),
+  @yue.ParAxis::make("内存", 0.0, 100.0),
+])
+let rows = @yue.Store::new([[88.0, 72.0, 80.0], [70.0, 90.0, 65.0]])
+@yue.par_chart_t(axes, rows, highlight=0, style=[("width", 480.0), ("height", 260.0)])
+```
+
+### 主题河流图 trv_chart_t
+
+`trv_chart_t(names : Store[Array[String]], values : Store[Array[Array[Double]]], baseline? = TrvZero, tension? = 1.0, show_legend? = true, fill? = false, style?, handle?)`
+
+等间隔时间轴上把多序列堆叠成河流，每层上下缘走平滑曲线。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| names | Store[Array[String]] | 必填 | 序列名，与 values 同序（names[i] ↔ values[i]） |
+| values | Store[Array[Array[Double]]] | 必填 | 各序列值时序（按时间索引等距对齐，负值按 0，短序列缺失位按 0） |
+| baseline | TrvBaseline | `TrvZero` | `TrvZero` 底部堆叠（自 0 起逐层累加）；`TrvSym` 围绕水平中轴对称（经典 wiggle 中枢） |
+| tension | Double | 1.0 | 平滑张力：1 = 标准 Catmull-Rom；0 = 退化为折线 |
+| show_legend | Bool | true | 右侧图例（色块 + 层名 + 序列总量） |
+| fill | Bool | false | 不设固定宽度，横向铺满父容器 |
+| width / height | Double | 560 / 320 | 画布尺寸（fill=false 时） |
+
+层色取主题四语义色循环；时间轴长度 = 全体序列最长长度（`trv_axis_len`）。配套纯函数：`trv_row_at` / `trv_total_at`（取值与列总计）、`trv_stack_offsets`（堆叠偏移）、`trv_range`（值域）、`trv_layer_band`（层带像素盒）、`trv_series_total`。
+
+```moonbit
+let names = @yue.Store::new(["搜索", "直接"])
+let values = @yue.Store::new([[120.0, 132.0, 101.0], [220.0, 182.0, 191.0]])
+@yue.trv_chart_t(names, values, baseline=@yue.TrvSym, fill=false)
+```
+
+### 涟漪散点图 eff_chart_t
+
+`eff_chart_t(points : Store[Array[EffPoint]], period_ms? = 3000, rings? = 3, x_range?, y_range?, anim? = EffAnim::make(), fill? = false, style?, handle?)`
+
+散点 + 涟漪动画：每点周期性扩散 N 圈同心圆（半径随相位增大、描边 alpha 衰减），`set_timer` 驱动相位 Store 推进后 schedule_paint 重绘。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| points | Store[Array[EffPoint]] | 必填 | `EffPoint::make(x, y, size? = 12.0)`，size 为点直径（逻辑 px，绘层钳 2..48） |
+| period_ms | Int | 3000 | 一轮涟漪周期（帧步长 = 周期 ÷ 60，兜底最小 16ms） |
+| rings | Int | 3 | 每点同时扩散的圈数（≤0 退化为静态散点） |
+| x_range / y_range | (Double, Double)? | None | 手动值域；None 为自适应 |
+| anim | EffAnim | 自建 | 动画句柄：`eff_stop(anim)` 停定时器，未传则本次挂载自建（无法从外部停止） |
+| fill | Bool | false | 不设固定宽度，横向铺满父容器 |
+| width / height | Double | 560 / 320 | 画布尺寸（fill=false 时） |
+
+**停止纪律**：本库视图没有销毁回调（`yue/view.mbt` 无 dispose 钩子），组件被卸载后定时器仍会存活、持续 schedule_paint 已卸载视图，故调用方须在卸载前显式 `eff_stop(anim)`；停止不可恢复，需要恢复请用新句柄重新挂载。配套纯函数：`eff_point_radius`（直径钳制取半径）、`eff_ring_progress` / `eff_ring_radius` / `eff_ring_alpha`（单圈进度 → 半径 / alpha）、`eff_phase_advance`、`eff_tick_ms`、`eff_xy`（点数对表）。
+
+```moonbit
+let pts = @yue.Store::new([
+  @yue.EffPoint::make(120.0, 12.0, size=14.0),
+  @yue.EffPoint::make(320.0, 26.0, size=20.0),
+])
+let anim = @yue.EffAnim::make()
+@yue.eff_chart_t(pts, period_ms=2500, rings=3, anim=anim)
+// ……页面卸载前
+@yue.eff_stop(anim)
+```
+
+### 象形柱图 pb_chart_t
+
+`pb_chart_t(data : Store[Array[BarItem]], symbol? = PbRect, mode? = PbRepeat, unit? = 10.0, horizontal? = false, show_values? = false, y_range? = None, fill? = false, style?, handle?)`
+
+以符号沿基线重复平铺或整体拉伸表达数值；坐标语义对齐 `bar_chart_t`（0 基线、正负值、槽位、网格刻度、类目标签抽稀截断同源）。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| data | Store[Array[BarItem]] | 必填 | 复用柱状图 `BarItem::make(标签, 值)` |
+| symbol | PbSymbol | `PbRect` | `PbRect` / `PbCircle` / `PbTriangle`（顶点朝杆轴值端）/ `PbCustom` 自绘回调 |
+| mode | PbMode | `PbRepeat` | `PbRepeat` 沿杆轴重复平铺（个数 = ceil 绝对值/unit）；`PbStretch` 整体拉伸铺满基线到值端 |
+| unit | Double | 10 | 每个符号代表的数值单位（≤0 时每根柱一个符号） |
+| horizontal | Bool | false | 横向条形态 |
+| show_values | Bool | false | 逐根标注数值（贴杆端外侧） |
+| y_range | (Double, Double)? | None | 手动值域；None 为自适应 |
+| fill | Bool | false | 不设固定宽度，横向铺满父容器 |
+| width / height | Double | 560 / 280 | 画布尺寸（fill=false 时） |
+
+正数取主题主色向上 / 向右，负数取 danger 色向下 / 向左。单杆符号个数钳 64 上限；符号像素尺寸按「单位 × 杆长 / \|值\|」换算并钳在柱槽宽内。自定义符号：`PbCustom((Painter, x, y, w, h, color) -> Unit)` 在给定盒内自绘（颜色自行 set_fill_color）。
+
+```moonbit
+let pb = @yue.Store::new([
+  @yue.BarItem::make("Q1", 32.0),
+  @yue.BarItem::make("Q2", 48.0),
+])
+@yue.pb_chart_t(pb, symbol=@yue.PbCircle, mode=@yue.PbRepeat, unit=10.0, show_values=true)
+@yue.pb_chart_t(pb, symbol=@yue.PbTriangle, mode=@yue.PbStretch, horizontal=true)
+```
+
+## 图表交互层
+
+横切层（`charts_tooltip.mbt` 的浮层与命中 + `charts_interactive.mbt` 的图例/缩放/标注/色带/导出 + `charts_it.mbt` 的三个交互变体）：给任意自绘图表加 hover 浮层、可点击图例、DataZoom 缩放平移、阈值线与高亮域、色带映射与导出。与其余图表同一渲染模型，几何知识留在调用方（绘制与命中同源），交互层只管事件接线与浮层落位。
+
+### hover 浮层与命中 ci_tooltip
+
+`ci_tooltip(draw, hit, plot? = ..., zoom? = None, pan? = false, zoom_map? = None, style? = [("width", 560.0), ("height", 280.0)], handle?)`
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| draw | (Painter, Double, Double) -> Unit | 必填 | 图表内容绘制（不含边框与浮层） |
+| hit | (x, y, 宽, 高) -> (标题, 行)? | 必填 | 命中 → `Some((标题, [(色标色, 行文本), ...]))`；None 隐藏浮层 |
+| plot | (Double, Double) -> CiPlot | 全画布 | 绘制区矩形（缩放锚点 / 命中换算基准，须与绘制几何一致） |
+| zoom | CiZoom? | None | 非 None 时绑滚轮缩放；`zoom_map` 默认沿 x 轴取 plot 分数，横向条等类目轴在 y 的场景覆盖之 |
+| pan | Bool | false | 左键拖拽平移窗口（按下 `set_capture`、抬起 `release_capture`） |
+| style | Array[(String, &StyVal)] | 560×280 | 画布尺寸样式 |
+
+浮层画在图表容器自身 on_draw 内（图表之后绘制即在最上层，无 z-order 问题），恒深底浅字、不随主题变换；定位经 `ci_tooltip_pos` 钳在画布内，右溢时翻到锚点对侧。鼠标移入即刻显隐变化或拖拽时才 schedule_paint，静态移动不重绘。状态结构 `CiTip`（`CiTip::new()` / `ci_tip_show(tip, 标题, 行, px, py)` / `ci_tip_hide(tip)` / `ci_tip_draw(p, tip, w, h)` / `ci_tip_size(标题, 行)`）也可直接用于自绘图表。命中纯函数：`CiPlot::make(x0, y0, x1, y1)`（`width` / `frac` / `contains`）、`ci_nearest_idx(px, n, x0, x1)`（均布点列最近序号，绘制区外 -1）、`ci_sector_at(px, py, cx, cy, r_in, r_out, values)`（扇形命中，12 点方向起顺时针，与 `sector_angles` 同构造）。
+
+```moonbit
+let zoom = @yue.ci_zoom_make()
+@yue.ci_tooltip(
+  draw=fn(p, w, h) { // 按 zoom 窗切片后自绘
+    let (i0, i1) = @yue.ci_zoom_visible(zoom, pts.length())
+    my_draw(p, w, h, @yue.ci_slice_range(pts, i0, i1))
+  },
+  hit=fn(px, _py, _w, _h) {
+    match @yue.ci_nearest_idx(px, pts.length(), 46.0, 500.0) {
+      i if i >= 0 => Some(("第 \{i + 1} 点", [("", "\{pts[i].y}")]))
+      _ => None
+    }
+  },
+  zoom=Some(zoom),
+  pan=true,
+  style=[("width", 420.0), ("height", 240.0)],
+)
+```
+
+（`draw` / `hit` 两个必填回调也可只写位置参数：`@yue.ci_tooltip(自绘回调, 命中回调, zoom=Some(zoom))`。）
+
+### 可点击图例 ci_legend + 显隐位工具
+
+`ci_legend(items~ : Store[Array[(String, String)]], visible~ : Store[Array[Bool]], on_toggle? = (Int) -> Unit, style?)`
+
+系列色块 + 名称单行排布，hover 浅底，点击切换对应系列显隐并回调 `on_toggle`（调用方重绘图表）；`visible` 不必预先对齐长度，绘制 / 点击时按 `ci_fit_len` 补齐到 items 长度（缺省 true=可见），数据整体更换只 set items。起点超出容器宽的项不绘制（与命中 `ci_legend_hit` 的 width 门槛同源）。显隐辅助：`ci_fit_len(flags, n)`、`ci_toggle_flag(flags, i)`、`ci_filter_visible(arr, flags)` 与 `ci_filter_visible_at(arr, flags, base)`（返回 `(可见项, 各项原序号)`——显隐后颜色 / 索引仍按原始数据定位，不串色）、`ci_slice_range(arr, i0, i1)`（闭区间切片，越界自动收窄）。
+
+```moonbit
+let items = @yue.Store::new([("CPU", @yue.theme_current().primary), ("内存", @yue.theme_current().info)])
+let visible = @yue.Store::new([true, true])
+@yue.ci_legend(items~, visible~, on_toggle=fn(_i) { my_repaint() })
+```
+
+### DataZoom 状态窗口 ci_zoom
+
+| 函数 | 说明 |
+|---|---|
+| `ci_zoom_make(start? = 0.0, end? = 100.0) -> CiZoom` | 建窗口（起止百分比 0..100，默认全窗） |
+| `ci_zoom_span(z) -> Double` | 当前窗跨度 |
+| `ci_zoom_reset(z)` | 复位全窗 |
+| `ci_zoom_set(z, start, end, min_span? = 5.0)` | 设窗（起止先归一，跨度不足 min_span 以中点为心撑开再贴边） |
+| `ci_zoom_wheel(z, anchor, delta, min_span? = 5.0, step? = 0.2)` | 滚轮缩放：anchor 为鼠标在类目轴上的百分比，上滚放大（触边界贴边，锚点滑动） |
+| `ci_zoom_pan(z, dx)` | 拖拽平移（跨度不变，贴 0/100 边界停住） |
+| `ci_zoom_visible(z, n) -> (Int, Int)` | 窗 → 可见序号闭区间 `[i0, i1]`（i0 下取整、i1 上取整−1，窗口内点不漏；n ≤ 0 给 (0, −1)） |
+
+窗口数学是独立可测的纯函数（`ci_zoom_normalize` 互换保序、钳 0..100、跨度下限 1%），状态本身不依赖视图；数据切片由绘制方调用方按 `ci_zoom_visible` + `ci_slice_range` 取出后重绘。
+
+### 阈值线与高亮域 ci_mark_line / ci_mark_area
+
+在任意 `on_draw` 回调内对绘制区 `(x0,y0)-(x1,y1)` 调用：
+
+| 函数 | 说明 |
+|---|---|
+| `ci_mark_line(p, horizontal, value, lo, hi, x0, y0, x1, y1, label? = "", color? = theme_danger(), dashed? = true)` | 横（y=value）/ 纵（x=value）阈值线 + 端标签；value 超出值域 `[lo, hi]` 不画，标签钳在绘制区内 |
+| `ci_mark_area(p, horizontal, from, to, lo, hi, x0, y0, x1, y1, label? = "", color? = theme_warning(), alpha? = "26")` | from..to 值带半透明填充 + 带内端标签；from/to 自动交换，带与值域无交集不画、部分相交按交集裁剪 |
+
+```moonbit
+cv.on_draw(fn(p) {
+  @yue.ci_mark_area(p, true, 0.0, 60.0, 0.0, 100.0, 46.0, 12.0, 540.0, 240.0, label="安全区")
+  @yue.ci_mark_line(p, true, 80.0, 0.0, 100.0, 46.0, 12.0, 540.0, 240.0, label="告警线")
+})
+```
+
+### 色带映射 ci_visual_map
+
+| 函数 | 说明 |
+|---|---|
+| `ci_visual_map_make(min, max, low, high) -> CiVisualMap` | 两色带（min/max 无序自动互换，low→high 线性混） |
+| `ci_visual_map3_make(min, mid, max, low, midc, high) -> CiVisualMap` | 三色带（mid 缺省或以端点身份落入时取 min/max 中点） |
+| `ci_visual_map_frac(v, lo, hi) -> Double` | value → 归一分数 0..1（量程退化给 0，两端外钳制） |
+| `CiVisualMap::color(self, v) -> String` | value → 颜色（两色带线性 mix；三色带两段各线性 mix，中点为 midc） |
+
+非法色串的回退语义同 `mix_hex`（原样返回高端色）。
+
+```moonbit
+let vm = @yue.ci_visual_map3_make(0.0, 50.0, 100.0, "#E3EDFA", "#409EFF", "#1E4FA3")
+let fill_color = vm.color(73.0)
+```
+
+### 导出 ci_save / ci_save_chart
+
+| 函数 | 说明 |
+|---|---|
+| `ci_save(canvas : Canvas, path, format? = "png") -> Result[Unit, CiSaveError]` | 离屏画布落盘：格式非法（仅 png/jpeg/jpg）先行拒绝、不触盘；写失败带格式与路径 |
+| `ci_save_chart(draw, w, h, path, format? = "png") -> Result[Unit, CiSaveError]` | 把与挂载时同一支 draw 画到离屏画布后导出（视图像素无 shim API，只能重渲染） |
+
+非 Windows 平台 libyue 未暴露 Canvas 跨平台导出 API（shim 恒失败），错误信息带平台提示；跨平台导出走打包 / 截图工具，不由本层解决。错误 `CiSaveError`：`UnsupportedFormat(String)` / `WriteFailed(String)`。
+
+### 交互变体 line_chart_it / bar_chart_it / donut_chart_it
+
+三个现成「交互版」：数据 / 参数语义同原图表，改挂在 `ci_tooltip` 交互画布上，布局 = vbox(图例行 + 画布)，总高比原图多图例行（30px）。
+
+| 组件 | 新增交互 | DataZoom |
+|---|---|---|
+| `line_chart_it(series, area? = false, y_range?, show_last? = true, zoom? = true, fill? = false, style?, handle?)` | hover 最近点：浮层「第 N 点」+ 各可见序列值，并画竖直准线 + 序列落点（4×4 色点）；图例点击显隐序列 | 支持（窗按最长序列定标，短序列同窗截取；y 轴随可见窗自适应） |
+| `bar_chart_it(data, horizontal? = false, y_range? = None, zoom? = true, fill? = false, style?, handle?)` | hover 类目：浮层显类目标签 + 值（柱体高亮由绘制层 hover 参数承担）；图例点击显隐类目 | 支持（窗按类目索引定标，横向条的窗沿 y 轴经 zoom_map 换算；y 值域按全量类目计算，缩放 / 显隐切换时轴不动） |
+| `donut_chart_it(data, thickness? = 34.0, center? = "", fill? = false, style?, handle?)` | hover 扇区：浮层显标签 + 值（占比按当前可见扇区重算），扇区外扩 4px；图例点击显隐扇区 | 无（环形图无 x 轴） |
+
+图例色板随主题重建（`on_theme_change`），Store 订阅与主题回调均在挂载期注册——构造而未挂载的 Node 无残留。
+
+```moonbit
+let series = @yue.Store::new([
+  @yue.LineSeries::make("CPU", max_points=120),
+  @yue.LineSeries::make("内存", max_points=120),
+])
+@yue.line_chart_it(series, area=true, zoom=true)
+@yue.bar_chart_it(bars, horizontal=true)
+@yue.donut_chart_it(slices)
 ```
 
 ## 图标
