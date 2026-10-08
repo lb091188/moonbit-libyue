@@ -1,0 +1,11 @@
+import {
+  "moonbitlang/core/encoding/utf8" @utf8,
+}
+
+supported_targets = "native"
+
+options(
+    "native-stub": [
+        "ffmpeg_stub.c"
+    ]
+)
