@@ -459,14 +459,15 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 根因(两层叠加):①slider_t 的 on_change 对**程序性 Store.set 同样触发**(订阅无来源区分)——播放中 50ms 时钟每 tick 刷新进度条都排一个 180ms seek 防抖定时器(seek 风暴,每 ~230ms 一次冗余 seek);②换载时 vid_mount_player 先 make 新(含新设备)、free 旧,而旧组件的最后一个防抖定时器仍在飞,180ms 后触发对已 free 的 demuxer 调 vf_seek_s——use-after-free。触发窗口=「最后一次程序刷新排定的定时器恰落在 free 之后」,演示视频播放中换载必然命中。「卡死」是同源另一个面:FileDialog 回调里同步跑 make(大文件双 Demuxer find_stream_info + 设备握手,数秒)冻结 GTK 主循环,观感即死机。
 - 修复(三层):①组件 refresh 用 syncing 抑制标志包住 pos_store.set(程序性刷新不再触发 on_change/不再排 seek 定时器);②user_seeking 标志——用户拖动+防抖期间 refresh 跳过进度条(顺带修了拖到一半被弹回播放位置);③防抖闭包与两播放器全部公开 mutating 方法(play/pause/stop/seek/set_volume/set_looping)开头补 closed 守卫(free 后一律 no-op,残留闭包不触碰 FFI);④音频页 FileDialog 选完先 set_text「载入中」+ set_timeout(50) 延后 make(对话框先关、UI 先渲染,同步耗时不再叠加模态循环)。
 - 验证:复现程序(修复前 100% 段错误)修复后连跑 3 轮×20 秒全存活;575 测全绿;systemprobe 冒烟存活。真机视觉/交互验证由用户执行。
-- 顺带记档(GUI 复现方法论):yue 应用必须先 `@yue.initialize()` 再创建任何控件/窗口(mount_window 内的 Window::make 也依赖它),复现程序漏掉会在 `nu::View::View()` 处段错误或 `Gtk-ERROR: Can't create a GtkStyleContext without a display connection`,极易误判为音视频问题;`pgrep -f` 匹配 moon run 会命中 moon 父进程造成「进程存活」假象,验证存活要核对真实 exe 进程名或用 `moon run` 的退出码语义。
+- GUI 免点击复现方法论(本轮关键手法):xdotool 合成点击被 XFCE click-to-focus 拦截(见前文),「用户点了才崩」类问题用 **set_timeout 编排用户时序**复现——按用户真实操作序列排定时器(0.3s autostart 演示视频 → 4s 播放中换载本地大文件 → 12s 二次换载),零交互稳定命中崩溃窗口;配合 `import -window root` 差分截图确认画面在更新。gdb 抓栈用 `gdb -batch -ex "set environment DISPLAY :0.0" -ex "handle SIGSEGV stop nopass" -ex run -ex bt` 直跑 `_build/.../xxx.exe`(gdb 环境可能丢 DISPLAY,gdb 内显式 set;moon run 是包装进程,gdb 要直指 exe)。
+- 排查弯路两则:①yue 应用必须先 `@yue.initialize()` 再创建任何控件/窗口(mount_window 内的 Window::make 也依赖它),复现程序漏掉会在 `nu::View::View()` 段错误或 `Gtk-ERROR: Can't create a GtkStyleContext without a display connection`——极易误判为音视频问题;②`pgrep -f` 匹配 `moon run` 会命中 moon 父进程造成「进程存活」假象,验证存活要核对真实 exe 进程名或退出码语义;gdb 调试前 `touch` 源文件强制重编,防旧产物误导。
 
 ### 视频播放器(FFI 双 Demuxer:视频帧 + 音轨 PCM 直出)
 
 - 组件:VideoPlayer + video_player_t(播放/暂停/进度拖拽/音量/循环/时间文本)。2026-10 音频并入后:音轨是同文件的第二个独立 Demuxer(读游标与视频互不干扰),vp_tick 每 tick 解一帧视频 + 补音频队列到高水位;音画从 play/seek 点各自起播,误差数十毫秒级(精确同步需音频光标回读,留后续)。
 - seek 实现:avformat_seek_file 时间戳级(视频/音频 Demuxer 各自 seek + 解码器 flush + swr 重 init),拖拽防抖 180ms;不再走 ffmpeg CLI 切段(音轨 CLI 提取/切段残留 audio_extract.mbt 已删,媒体链路零 CLI)。
 - 音轨失败(无音轨/解码器不可用/无设备)时自动静音播放,不阻断视频路径。
-- 换源顺序必须是「旧播放器 stop → free(closed 置位,旧刷新定时器停摆)→ 旧根视图 `remove_child_view` → 挂新节点」,乱序会留残音/残定时器。systemprobe 视频页首次挂载 set_timeout 300ms 自动载入(make 同步耗时);音频页换 AudioPlayer 后:载入即播放、控制条 audio_player_t 挂 holder、200ms 轮询 is_playing 状态标签、演示素材改 MP3(lavfi + libmp3lame)。
+- 换源顺序必须是「旧播放器 stop → free(closed 置位,旧刷新定时器停摆)→ 旧根视图 `remove_child_view` → 挂新节点」,乱序会留残音/残定时器;但顺序正确也不够——free 旧后其组件的在飞定时器(seek 防抖等)仍会触发,组件侧必须自防御(closed 守卫),详见「播放器组件换载崩溃与 seek 防抖风暴」节。systemprobe 视频页首次挂载 set_timeout 300ms 自动载入(make 同步耗时);音频页换 AudioPlayer 后:载入即播放、控制条 audio_player_t 挂 holder、200ms 轮询 is_playing 状态标签、演示素材改 MP3(lavfi + libmp3lame)。
 
 ## 维护约定
 
