@@ -1,4 +1,4 @@
-// 音频播放页(miniaudio 引擎:WAV/MP3/FLAC/OGG 等)。两条载入路径:
+// 音频播放页(miniaudio 引擎,可解码 WAV/MP3/FLAC)。两条载入路径:
 // ① 演示音频:lavfi 生成 3 秒 440Hz 正弦 WAV;② 本地文件:FileDialog
 // 选盘上音频。引擎懒创建,换载先释放旧剪辑;状态标签 200ms 轮询
 // is_playing(自然播完自动回落「已停止」),文本变化后刷新滚动范围。
@@ -36,7 +36,8 @@ fn aud_poll_status(
 
 ///|
 /// 载入音频文件:引擎懒创建(无输出设备时报错文本);换载先释放旧
-/// 剪辑;成功后立即播放并更新路径标签。
+/// 剪辑;成功后立即播放并更新路径标签。可解码格式为 miniaudio 内置
+/// 解码器集合(WAV/MP3/FLAC),其余格式给出带格式提示的错误文本。
 fn aud_load(
   app : @ui.ProbeApp,
   path : String,
@@ -81,7 +82,10 @@ fn aud_load(
     }
     Err(e) =>
       match status.val {
-        Some(l) => l.set_text("音频加载失败: \{e}")
+        Some(l) =>
+          l.set_text(
+            "音频加载失败: \{e}\n可解码格式为 WAV/MP3/FLAC(miniaudio 内置解码器,OGG/m4a/aac 等不支持,可先用 ffmpeg 转码)",
+          )
         None => ()
       }
   }
@@ -96,7 +100,7 @@ pub fn page_audio(app : @ui.ProbeApp) -> @yue.Node {
   let vol : @yue.Store[Double] = @yue.Store::new(80.0)
   @ui.page_shell(
     "音频播放",
-    "miniaudio 后端,支持 WAV/MP3/FLAC/OGG 等;引擎懒创建,本机无输出设备时显示错误文本。 AudioClip 一次 load 对应一个可播放实例:播放/停止互斥,停止后可再播放,重复 play 无副作用。",
+    "miniaudio 后端,可解码 WAV/MP3/FLAC(miniaudio 内置解码器集合,OGG/m4a/aac 等无内置解码);引擎懒创建,本机无输出设备时显示错误文本。 AudioClip 一次 load 对应一个可播放实例:播放/停止互斥,停止后可再播放,重复 play 无副作用。",
     fn(refresh) {
       [
         @yue.hbox(
@@ -144,9 +148,7 @@ pub fn page_audio(app : @ui.ProbeApp) -> @yue.Node {
                   Some(w) => {
                     let dlg = @yue.FileDialog::new_open()
                     dlg.set_title("选择音频文件")
-                    dlg.set_filters(
-                      "音频文件:wav,mp3,flac,ogg,m4a,aac,opus,wma,aiff|所有文件:*",
-                    )
+                  dlg.set_filters("音频文件:wav,mp3,flac|所有文件:*")
                     if dlg.run_for_window(w) {
                       let path = dlg.get_result()
                       app.toast_push("已选 \{path}", @yue.Success)

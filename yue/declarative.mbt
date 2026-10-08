@@ -6,7 +6,7 @@
 ///|
 /// 把子视图挂到父视图（父须为容器：Container/Group/Scroll/Tab 均可，
 /// 错型由 shim 侧 dynamic_cast 校验拒绝）。
-fn attach(parent : View, child : View) -> Unit {
+pub fn attach(parent : View, child : View) -> Unit {
   ffi_container_add_child(parent, child)
 }
 

@@ -1,4 +1,5 @@
 import {
   "NoahLiu/moonbit-libyue/yue",
+  "NoahLiu/yue-video/src" @yuevideo,
   "NoahLiu/moonbit-libyue/examples/systemprobe/ui",
 }

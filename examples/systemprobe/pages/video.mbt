@@ -17,7 +17,7 @@ fn vid_mount_player(
   width : Int,
   height : Int,
 ) -> Unit {
-  match @yue.VideoPlayer::make(path, fps=fps, width=width, height=height) {
+  match @yuevideo.VideoPlayer::make(path, fps=fps, width=width, height=height) {
     Ok(player) => {
       // 换源:旧播放器先停再释放,其视图从 holder 移除
       match app.vid_player.val {
@@ -28,7 +28,9 @@ fn vid_mount_player(
         None => ()
       }
       app.vid_player.val = Some(player)
-      let node = @yue.video_player_t(player)
+      // 载入即自动播放(浏览器 autoplay 同款语义;控制条仍可暂停)
+      player.play()
+      let node = @yuevideo.video_player_t(player)
       match holder.val {
         Some(c) => {
           match vid_view.val {
@@ -43,7 +45,7 @@ fn vid_mount_player(
           match status.val {
             Some(l) =>
               l.set_text(
-                "已载入 \{path}\n\{player.frames.width}x\{player.frames.height} × \{player.frames.frame_count} 帧 · 时长 \{player.duration()}s(播放/暂停/进度/音量/循环均可交互)",
+                "已载入 \{path}\n\{player.frame_width()}x\{player.frame_height()} · 时长 \{player.duration()}s(FFI 流式解码,播放/暂停/进度/音量/循环均可交互)",
               )
             None => ()
           }
@@ -117,13 +119,13 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
   let auto_started : Ref[Bool] = Ref(false)
   @ui.page_shell(
     "视频播放",
-    "ffmpeg 解码路线的浏览器级播放器:画面按播放位置逐帧渲染,控制条含播放/暂停、拖进度(松手防抖 seek)、时间、音量、循环。本地文件解码参数:12fps、宽 480 按源比例、最多 1200 帧(约前 100 秒),更长视频画面止于帧集上限、音轨完整。",
+    "FFI 流式解码的浏览器级播放器:播放时钟按帧率逐帧解码并重绘(不预提取、不限时长),控制条含播放/暂停、拖进度(时间戳级 seek,松手防抖)、时间、音量、循环。本地文件播放帧率 12fps、宽 480 按源比例。",
     fn(refresh) {
       [
         @yue.hbox(
           [
             @yue.button_t(
-              if @yue.vidf_supported() { "载入演示视频" } else { "ffmpeg 不可用" },
+              if @yuevideo.audiof_supported() { "载入演示视频" } else { "ffmpeg 不可用" },
               variant=@yue.Solid,
               on_click=fn() {
                 match status.val {
@@ -187,7 +189,7 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
             let _ = @yue.set_timeout(
               300,
               fn() {
-                if @yue.vidf_supported() {
+                if @yuevideo.audiof_supported() {
                   match status.val {
                     Some(l) => l.set_text("载入中:生成测试视频并解码(约 1-2 秒)…")
                     None => ()

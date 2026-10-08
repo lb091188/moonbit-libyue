@@ -10,7 +10,7 @@ pub(all) struct ProbeApp {
   win_ref : Ref[@yue.Window?]
   toast : (String, @yue.SemanticType) -> Unit
   eff_anim : @yue.EffAnim
-  vid_player : Ref[@yue.VideoPlayer?]
+  vid_player : Ref[@yuevideo.VideoPlayer?]
   aud_engine : Ref[@yue.AudioEngine?]
   aud_clip : Ref[@yue.AudioClip?]
 }
