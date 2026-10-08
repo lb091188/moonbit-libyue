@@ -2,6 +2,50 @@
 
 状态:`[x]` 完成 · `[~]` 部分(括号内是缺口) · `[ ]` 未开始;做完勾掉并注明验证方式。
 
+## 全仓排查修复清单(2026-10)
+
+六路排查(TODO 时效 / markdown 能力 / sysmonitor 跨平台 / 代码与文档一致性 / yue 核心质量 / 示例与模块质量)去重汇总,用户点名优先域置顶,其后按严重度排列;MD1-MD3 即「Markdown 能力升级」M1 的落地拆分。
+
+- [ ] MD1 引入 mizchi/markdown 0.8.3 并 native 实证——独立探针示例 parse / render_html / serialize 三调用 native 跑通,根 moon.mod 钉 @0.8.3,5 个传递依赖对 mooncakes 发布链的隔离方案定案
+- [ ] MD2 markdown_view 解析切换 mdast——旧自写解析器删除不留双轨,样式区间端点统一码点→UTF-16 换算(含 emoji 文本样式不错位),moon test 全绿
+- [ ] MD3 GFM 渲染面补齐——表格 / 任务列表 / 脚注 / 删除线 / 图片 / 可点击链接可渲染,showcase「代码与文档」页演示与复制串同源并补新语法,components-ui 中英能力清单同步
+- [ ] SYS1 sysmonitor Windows 数据层——stub/sysmon.c Windows 分支以 Win32 补齐 CPU / 内存 / 磁盘 / 网络 / 进程 / GPU 七路数据源(GetSystemTimes、GlobalMemoryStatusEx、PDH、DXGI、EnumProcesses 等,子进程原语 CREATE_NO_WINDOW),解析纯函数单测全绿
+- [ ] SYS2 sysmonitor Windows 语义归一——kill / 优先级 / 错误码翻译为统一语义形态,温度等不可用来源按卡显示「—」,UI 文案平台化,TODO 边界节同步
+- [ ] SYS3 sysmonitor macOS 数据层——stub 补 macOS 分支(proc_listpids 进程枚举、sysctl CPU/内存、getfsstat+statvfs 磁盘、getifaddrs 网络、system_profiler -json GPU 子进程),IO 速率与温度按边界显示「—」
+- [ ] SYS4 Linux GPU 利用率补全(Intel 集显 / AMD)——DRM fdinfo 聚合采样免 root 得全卡利用率(AMD 保留 sysfs gpu_busy_percent 优先、fdinfo 兜底),「常规显卡数据无需超管、debugfs 细分不支持、polkit 暂不集成」边界入 adaptation.md
+- [ ] SYS5 GPU 型号名解析——AMD / Intel 显卡经 pci.ids 显示商业型号(查不到回退现 id 显示),解析纯函数单测全绿
+- [ ] DOC1 英文 components-ui.md 补齐——第二批九图表与图表交互层整章翻译入英文档,Scroll::refresh_content_size 等三处英文滞后点同步,与 docs/README.md 索引描述对齐
+- [ ] DOC2 文档签名错误与过时描述批量修复——7 处 width/height 示例改 style 传参、declarative 中英括号错配示例、theme_* 过时描述、「四个示例」计数、aboutlibyue / plan-system-integration 索引缺项、README 组件数量口径、adaptation scroll() 过时陈述、system-capabilities Result 括号笔误全部修正
+- [ ] CORE1 browser 自定义协议拒绝编码修复——reject 载荷首字节改 0、C 端对 ok==1 短载荷防御拒绝,handler 返回 None 路径补测试,拒绝不再触发原生堆越界读
+- [ ] EX1 VideoPlayer 重播状态机修复——播完后再点播放从头重播、stop 后重播有声,循环 / stop-play / 音量钳制 wbtest 补齐,systemprobe 视频页文案更新为流式解码事实
+- [ ] EX2 sysmonitor 进程数据正确性——nice 字段改 parse_i64 负值正确显示,新出现 pid 当拍 CPU% 置 0 不再钉满格,负值回归用例入 wbtest
+- [ ] CORE2 yue 核心健壮性批次——SNI 菜单路径随项派生且注销 / 注册失败对称清理,总线重连先检查按需重建连接防 fd 泄漏,Store 增 remove 与主题订阅可退订,carousel / video_view 挂载定时器获得回收通道
+
+## 2026 年 10 月月度目标与 Q4 季度目标
+
+10 月(月度):完成现在规划的三大能力域收尾——系统接口、音频、视频渲染;Q4(季度):月度目标全部达成后,macOS 真机验证测试收尾 + 发布闭环。
+
+音视频主体已落地(modules/yue-media + modules/ffmpeg-mbt 两子模块,2026-10-08~09 修复链实测):FFI 流式解码全链路、AudioPlayer / VideoPlayer、悬浮控制条与全屏、墙钟同轴时钟;O2 / O3 为其收尾项。
+
+- [ ] O1 系统接口收尾(月度)
+  - P14 真机复验清单闭环:GNOME / KDE 桌面侧重跑 P1-P12 验收项;Windows 10/11 真机(双开唤起 / 自启动拉起 / 休眠唤醒 / 锁屏解锁 / 拔插电源 / 断联网);清单见 docs/zh/plan-system-integration.md B8 节
+  - 视余量:媒体控制补 Windows 路径(SMTC,对齐 media.mbt 的 MPRIS 语义)
+  - 验证:各真机项按 P1-P12 验收列逐条回填
+- [ ] O2 音频收尾(月度)
+  - 精确音画同步:音频光标回读(现为 play 起点同源时钟,误差数十毫秒级,记档见 adaptation.md「视频播放器」节)
+  - 验证:VideoPlayer 拖动进度后音画偏差实测入档
+- [ ] O3 视频渲染收尾(月度)
+  - 真实片源实测:mp4 已随修复链实际播放,mkv 等常见容器与长视频未系统实测;复核 ffmpeg-mbt 流式逐帧解码下长视频内存平稳性(原 CLI 帧集钳制已随路线删除)
+  - moonav1(mooncakes 纯 MoonBit AV1 解码)帧源接入评估
+  - 验证:真机播放实测片源截图入档
+- [ ] O4 macOS 真机验证测试(季度,前置:获得 mac 真机)
+  - 基础冒烟:hello / hello-themed / showcase / systemprobe 全量启动与视觉确认
+  - 遗留清单逐项:reply(OS_MAC) 通知回调、Display 全字段枚举、Accelerator 类 / Tray 原生后端、mac canvas 滚轮事件、WebKit framework 拆分评估(浏览器按需化 fork 侧收尾)
+  - 验证:mac 真机逐项执行,结论回填 TODO.md 与 adaptation.md
+- [ ] O5 发布闭环(季度)
+  - mooncakes 发 0.5.11:携带 yue-media / ffmpeg-mbt 依赖与悬浮控制条修复链(0.5.10 已于 2026-10-04 前后发布)
+  - README 截图补齐(sysmonitor 传感器 / 磁盘 / 网络三页)
+
 ## 遗留
 
 - [~] 通知回调 — reply(OS_MAC)留平台目标
@@ -115,13 +159,13 @@
   - 验证:1053 进程全量采样 14.94ms/次(release);稳态进程页 1Hz CPU 2-3%、Rss 85.8MB 走平;启动中位 81ms、二进制 7.72MB,数据入 adaptation.md 中英两份;2Hz 档待应用可 rebuild 后补测(定时器改 500ms)
 - [~] U6 文档发布 — README 中英挂旗舰示例与截图;踩坑回写 adaptation.md;mooncakes 发新版
   - 已完成:README 中英根文档 + docs/README 中英示例区挂 sysmonitor 旗舰条目与三张截图(概览/进程页/深色);U5 实测与全部坑位已入 adaptation.md 中英两份
-  - 缺口:传感器/磁盘/网络三页截图待用户真机复验后补;mooncakes 发新版(版本号 + 发布)待用户确认后执行
+  - 缺口:传感器/磁盘/网络三页截图待用户真机复验后补;mooncakes 发 0.5.11(0.5.10 已发布,现缺口为其后的 yue-media 依赖与控制条修复链增量)
 
 ### 边界
 
-- 仅测试 Ubuntu 24.04:GNOME、XFCE、KDE 桌面环境
+- Linux 仅测试 Ubuntu 24.04:GNOME、XFCE、KDE 桌面环境;Windows / macOS 窗口可编译启动(CI 三平台在跑),sysmonitor 数据层未实现、页面无数据(补齐方案见「全仓排查修复清单」SYS1 / SYS2 / SYS3)
 - systemd 服务管理、连接级网络监控(只做网卡速率)
-- NVIDIA 之外 GPU 的专有利用率指标(温度走 hwmon 为准)
+- GPU 受限项:Intel 集显温度无 sysfs / hwmon 节点(i915 hwmon 仅 dGfx)、macOS 温度走私有键、Windows 非 NVIDIA 温度需厂商 SDK;AMD gpu_busy_percent 为标准 sysfs 属性、Intel 利用率有 DRM fdinfo 标准接口,均免 root(补全见 SYS4 / SYS5)
 
 ## 系统集成扩容(Electron 对标,Linux + Windows)
 
@@ -195,7 +239,7 @@
   - parse_incremental 增量解析 + 源码 Span 光标→块定位
   - 原生 TextEdit 行内编辑(IME 免费)+ 块结构状态机(回车拆块 / 续列表 / Tab 嵌套)
   - 前置:TextEdit 格式化 ABI(fork/shim;GTK tag / RichEdit CHARFORMAT2)
-- 边界:span 为 UTF-16 索引,与 FFI 层 utf8_bytes 换算需谨慎;0.x 版本 API 有变动风险
+- 边界:mdast Span 为 Unicode 码点索引,yue AttributedText 区间为 UTF-16 code unit(MoonBit String 内部同为 UTF-16),换算方向码点→UTF-16,FFI 字符串统一 utf8_bytes 由 C 侧消化;0.x 版本 API 有变动风险
 
 ## 已知边界(详见 docs/zh/adaptation.md)
 
