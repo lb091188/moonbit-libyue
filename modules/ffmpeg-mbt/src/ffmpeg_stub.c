@@ -24,6 +24,7 @@ typedef struct VfDec {
     int vstream;
     int width;
     int height;
+    double last_pts; // 最近一次 vf_decode_next 成功帧的 pts（秒）；-1=未知
 } VfDec;
 
 /* 音频解码器：swr 统一重采样输出 s16 交错 */
@@ -133,6 +134,7 @@ VfDec *vf_open_video_decoder(VfFmt *f, int32_t out_w, int32_t out_h) {
     d->sws = NULL;
     d->width = 0;
     d->height = 0;
+    d->last_pts = -1.0;
     d->codec = avcodec_alloc_context3(codec);
     if (avcodec_parameters_to_context(d->codec, st->codecpar) < 0) {
         avcodec_free_context(&d->codec);
@@ -163,6 +165,7 @@ VfDec *vf_open_video_decoder(VfFmt *f, int32_t out_w, int32_t out_h) {
         d->sws = NULL;
         d->width = 0;
         d->height = 0;
+        d->last_pts = -1.0;
         return d;
     }
     return d;
@@ -231,9 +234,39 @@ int32_t vf_decode_next(VfDec *d, uint8_t *out, int32_t out_len) {
         int dst_linesize[4] = { d->width * 4, 0, 0, 0 };
         sws_scale(d->sws, (const uint8_t *const *)d->frame->data, d->frame->linesize,
                   0, d->frame->height, dst, dst_linesize);
+        // 帧时间戳（秒）：best_effort 优先（容错丢 pts 的包），流时间基换算
+        int64_t ts = d->frame->best_effort_timestamp;
+        if (ts == AV_NOPTS_VALUE) {
+            ts = d->frame->pts;
+        }
+        AVStream *st = d->fmt->streams[d->vstream];
+        d->last_pts = ts == AV_NOPTS_VALUE
+                          ? -1.0
+                          : (double)ts * av_q2d(st->time_base);
         av_frame_unref(d->frame);
         return 1;
     }
+}
+
+/* 最近一次 vf_decode_next 成功帧的 pts（秒）；未解/未知 -1 */
+double vf_frame_pts_s(VfDec *d) {
+    return d ? d->last_pts : -1.0;
+}
+
+/* 视频流帧率（avg_frame_rate 优先，r_frame_rate 回退；未知 0） */
+double vf_stream_fps(VfFmt *f) {
+    if (!f || f->vstream < 0) {
+        return 0.0;
+    }
+    AVStream *st = f->fmt->streams[f->vstream];
+    AVRational r = st->avg_frame_rate;
+    if (r.num <= 0 || r.den <= 0) {
+        r = st->r_frame_rate;
+    }
+    if (r.num <= 0 || r.den <= 0) {
+        return 0.0;
+    }
+    return av_q2d(r);
 }
 
 /* 跳转到指定秒（视频流时间基）；0 成功 / -1 失败 */
@@ -247,6 +280,7 @@ int32_t vf_seek_s(VfDec *d, double t_s) {
         return -1;
     }
     avcodec_flush_buffers(d->codec);
+    d->last_pts = -1.0; // 旧位置的 pts 不得误导下一帧的时间轴判断
     return 0;
 }
 

@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "moonbit.h"
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
@@ -227,4 +228,11 @@ void mbt_adev_close(MaPlayer *p) {
     ma_mutex_uninit(&p->mutex);
     mbt_adev_clear(p);
     free(p);
+}
+
+/* 单调墙钟（ms，CLOCK_MONOTONIC）：视频播放时钟的推进基准 */
+int64_t mbt_now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }

@@ -1,9 +1,9 @@
 // 视频播放器（FFI 流式后端）：NoahLiu/ffmpeg-mbt 进程内
-// 解码——视频 Demuxer 顺序逐帧取 RGBA，播放时钟按 fps 定时推进（每
-// tick 解一帧并重绘画面容器），seek 为时间戳级（avformat_seek_file）。
-// 音轨为第二个独立 Demuxer（同文件各开一个容器上下文，读游标互不
-// 干扰），解出 s16 PCM 直推输出设备队列——音画从 play/seek 点各自
-// 起播，误差数十毫秒级。
+// 解码——播放时钟为墙钟 + 帧时间戳（与容器时长同一时间轴）：每 tick
+// 按单调时钟算出目标时刻，解码推进到该时刻的帧（跳帧追时钟）并重绘
+// 画面容器；seek 为时间戳级（avformat_seek_file）。音轨为第二个独立
+// Demuxer（同文件各开一个容器上下文，读游标互不干扰），解出 s16 PCM
+// 直推输出设备队列——音画从 play/seek 点各自按真实速率起播。
 
 ///|
 /// 播放状态。
@@ -16,11 +16,7 @@ pub(all) enum VpState {
 ///|
 /// 播放位置（秒）→ 帧索引（钳非负）。
 pub fn vp_frame_idx(t_s : Double, fps : Int) -> Int {
-  let f = if fps < 1 {
-    1.0
-  } else {
-    fps.to_double()
-  }
+  let f = if fps < 1 { 1.0 } else { fps.to_double() }
   let idx = (t_s * f).to_int()
   if idx < 0 {
     0
@@ -60,11 +56,7 @@ pub fn vp_pct(t : Double, duration_s : Double) -> Double {
 ///|
 /// 时间文本（m:ss；负值按 0）。
 pub fn vp_fmt_time(t : Double) -> String {
-  let total = if t <= 0.0 {
-    0.0
-  } else {
-    t
-  }
+  let total = if t <= 0.0 { 0.0 } else { t }
   let m = (total / 60.0).to_int()
   let s = (total - m.to_double() * 60.0).to_int()
   "\{m}:\{if s < 10 { "0" } else { "" }}\{s}"
@@ -72,13 +64,14 @@ pub fn vp_fmt_time(t : Double) -> String {
 
 ///|
 /// 视频播放器：make 打开视频 Demuxer；含音轨时另开音频 Demuxer 与
-/// 输出设备（FFI 全链路，无 CLI）。无音轨时静音播放；FFI 库不可用
-/// 时 make 直接 Err。
+/// 输出设备（FFI 全链路，无 CLI）。播放时钟为墙钟 + 帧时间戳，与
+/// duration 同轴。无音轨时静音播放；FFI 库不可用时 make 直接 Err。
 pub(all) struct VideoPlayer {
   demuxer : @ffmbt.Demuxer
   audio : Ref[@ffmbt.Demuxer?]
   dev : Ref[MbtAdev?]
   fps : Int
+  fps_real : Double
   duration_s : Double
   width : Int
   height : Int
@@ -87,6 +80,8 @@ pub(all) struct VideoPlayer {
   state : Ref[VpState]
   closed : Ref[Bool]
   pos : Ref[Double]
+  wall0 : Ref[Int64]
+  base_pts : Ref[Double]
   frame : Ref[Bytes?]
   frame_no : Ref[Int]
 }
@@ -161,12 +156,15 @@ pub fn VideoPlayer::set_looping(self : VideoPlayer, on : Bool) -> Unit {
 }
 
 ///|
-/// 开始播放（idle/paused 从当前位置续播；首个 tick 解出首帧）。
+/// 开始播放（idle/paused 从当前位置续播；首个 tick 解出首帧）。时钟
+/// 基准取当前位置 + 当前墙钟，恢复播放不跳秒。
 pub fn VideoPlayer::play(self : VideoPlayer) -> Unit {
   if self.closed.val || self.state.val is VpPlaying {
     return
   }
   self.state.val = VpPlaying
+  self.base_pts.val = self.pos.val
+  self.wall0.val = mbt_now_ms()
   match self.dev.val {
     Some(d) => {
       let _ = mbt_adev_start(d)
@@ -203,6 +201,8 @@ pub fn VideoPlayer::stop(self : VideoPlayer) -> Unit {
   }
   self.state.val = VpIdle
   self.pos.val = 0.0
+  self.base_pts.val = 0.0
+  self.wall0.val = mbt_now_ms()
   self.frame.val = None
   self.frame_no.val = 0
   self.vp_audio_flush()
@@ -217,6 +217,8 @@ pub fn VideoPlayer::seek(self : VideoPlayer, t : Double) -> Unit {
   }
   let target = vp_clamp_t(t, self.duration_s)
   self.pos.val = target
+  self.base_pts.val = target
+  self.wall0.val = mbt_now_ms()
   self.frame.val = None
   self.frame_no.val = vp_frame_idx(target, self.fps)
   ignore(self.demuxer.seek(target))
@@ -255,45 +257,92 @@ pub fn VideoPlayer::free(self : VideoPlayer) -> Unit {
 // ---------------------------------------------------------------------------
 
 ///|
-/// 推进一步播放（组件定时器每 tick 调用；播放中解下一帧并推进位置、
-/// 补音频队列，流结束时循环或停）。
+/// 推进一步播放（组件定时器每 tick 调用）：按墙钟算目标时刻（基准
+/// 位置 + 起播以来真实流逝），解码推进到目标时刻的帧——高帧率视频
+/// 跳帧追时钟、低帧率视频画面跨 tick 保持，速率恒为 1 倍速，位置与
+/// duration 同轴。流无时间戳时回退每 tick 一帧、按流帧率步进。追帧
+/// 每 tick 上限 8 帧（seek 后关键帧距离长也不卡 UI 一整拍）。
 fn VideoPlayer::vp_tick(self : VideoPlayer) -> Unit {
   if self.closed.val || !(self.state.val is VpPlaying) {
     return
   }
-  match self.demuxer.decode_rgba() {
-    Some(rgba) => {
-      self.frame.val = Some(rgba)
-      self.frame_no.val = self.frame_no.val + 1
-      self.pos.val = self.frame_no.val.to_double() / self.fps.to_double()
+  let now = mbt_now_ms()
+  let target = self.base_pts.val + (now - self.wall0.val).to_double() / 1000.0
+  let mut eof = false
+  let mut pts_seen = false
+  for i = 0; i < 8; i = i + 1 {
+    match self.demuxer.decode_rgba() {
+      Some(rgba) => {
+        self.frame.val = Some(rgba)
+        self.frame_no.val = self.frame_no.val + 1
+        let pts = self.demuxer.last_frame_pts()
+        if pts < 0.0 {
+          break // 无时间戳流：回退每 tick 一帧
+        }
+        pts_seen = true
+        if pts >= target {
+          break
+        }
+      }
+      None => {
+        eof = true
+        break
+      }
     }
-    None => {
-      if self.looping.val {
-        let _ = self.demuxer.seek(0.0)
-        self.frame_no.val = 0
-        self.pos.val = 0.0
-        self.vp_audio_flush()
-        match self.audio.val {
-          Some(a) => {
-            ignore(a.seek(0.0))
-            self.vp_fill_audio()
-          }
-          None => ()
+  }
+  // 位置：pts 路径=墙钟目标（与 duration 同轴，钳到时长）；回退
+  // 路径=已解帧数 / 流帧率（流帧率未知用 make 参数 fps）
+  if pts_seen {
+    self.pos.val = vp_clamp_t(target, self.duration_s)
+  } else {
+    let f = if self.fps_real > 0.0 {
+      self.fps_real
+    } else {
+      self.fps.to_double()
+    }
+    self.pos.val = vp_clamp_t(
+      self.frame_no.val.to_double() / f,
+      self.duration_s,
+    )
+  }
+  if eof {
+    if self.looping.val {
+      self.vp_restart(now)
+    } else {
+      // 播完：位置钉在时长（进度满格；容器无时长头则保持回退值）
+      if self.duration_s > 0.0 {
+        self.pos.val = self.duration_s
+      }
+      self.state.val = VpIdle
+      self.vp_audio_flush()
+      match self.dev.val {
+        Some(d) => {
+          let _ = mbt_adev_pause(d)
+          ()
         }
-      } else {
-        self.state.val = VpIdle
-        self.vp_audio_flush()
-        match self.dev.val {
-          Some(d) => {
-            let _ = mbt_adev_pause(d)
-            ()
-          }
-          None => ()
-        }
+        None => ()
       }
     }
   }
   self.vp_fill_audio()
+}
+
+///|
+/// 回到起点续播（循环模式 EOF 时；时钟基准归零）。
+fn VideoPlayer::vp_restart(self : VideoPlayer, now : Int64) -> Unit {
+  let _ = self.demuxer.seek(0.0)
+  self.frame_no.val = 0
+  self.pos.val = 0.0
+  self.base_pts.val = 0.0
+  self.wall0.val = now
+  self.vp_audio_flush()
+  match self.audio.val {
+    Some(a) => {
+      ignore(a.seek(0.0))
+      self.vp_fill_audio()
+    }
+    None => ()
+  }
 }
 
 ///|
@@ -325,9 +374,9 @@ fn VideoPlayer::vp_audio_flush(self : VideoPlayer) -> Unit {
 
 ///|
 /// 打开视频文件为播放器（FFI 全链路：视频 Demuxer + 音轨独立
-/// Demuxer + 输出设备；同步耗时，调用方宜放 set_timeout）。fps 为
-/// 播放帧率（默认 12，控制帧时钟步进）；width/height 为输出画面
-/// 尺寸（0 = 源尺寸）。
+/// Demuxer + 输出设备；同步耗时，调用方宜放 set_timeout）。播放时钟
+/// 为墙钟 + 帧时间戳，fps 仅作无时间戳流的回退帧率。width/height 为
+/// 输出画面尺寸（0 = 源尺寸）。
 pub fn VideoPlayer::make(
   path : String,
   fps? : Int = 12,
@@ -348,6 +397,7 @@ pub fn VideoPlayer::make(
     }
   }
   let duration = demuxer.duration_s()
+  let fps_real = demuxer.video_fps()
   let w = demuxer.out_width()
   let h = demuxer.out_height()
   if w <= 0 || h <= 0 {
@@ -366,7 +416,7 @@ pub fn VideoPlayer::make(
             let ch = ad.audio_channels()
             let rate = ad.audio_rate()
             if ch > 0 && rate > 0 {
-              let boxed : AdevBox = { h: mbt_adev_open(ch, rate) }
+              let boxed : AdevBox = { h: mbt_adev_open(ch, rate), }
               dev.val = Some(boxed.h)
               audio.val = Some(ad)
             } else {
@@ -374,7 +424,7 @@ pub fn VideoPlayer::make(
             }
           }
           Err(_) => ad.close()
-      }
+        }
       Err(_) => ()
     }
   }
@@ -383,6 +433,7 @@ pub fn VideoPlayer::make(
     audio,
     dev,
     fps,
+    fps_real,
     duration_s: duration,
     width: w,
     height: h,
@@ -391,7 +442,12 @@ pub fn VideoPlayer::make(
     state: Ref(VpIdle),
     closed: Ref(false),
     pos: Ref(0.0),
+    wall0: Ref(0L),
+    base_pts: Ref(0.0),
     frame: Ref(None),
     frame_no: Ref(0),
   })
 }
+
+///|
+extern "c" fn mbt_now_ms() -> Int64 = "mbt_now_ms"

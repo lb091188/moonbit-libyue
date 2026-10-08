@@ -70,14 +70,18 @@ test "ffmpeg FFI 音频解码：四格式 PCM 直出" {
       Err(e) => fail("\{path} seek 失败：\{e}")
     }
     d.close()
-    println("ffmpeg 音频解码冒烟 \{path}：\{chunks} 段共 \{frames} 帧")
+    println(
+      "ffmpeg 音频解码冒烟 \{path}：\{chunks} 段共 \{frames} 帧",
+    )
   }
 }
 
 ///|
 /// 视频解码冒烟：testdata 内置 1 秒 96x64 lavfi 测试视频（testsrc，
 /// 无外部素材依赖），打开 → 显式开视频解码器 → 逐帧 RGBA → seek。
-test "ffmpeg FFI 视频解码：RGBA 逐帧 + seek" {
+/// 帧时间戳（pts）与流帧率随帧校验：pts 非负单调、末帧贴近容器
+/// 时长（与 duration 同轴的证据）、seek 后重置。
+test "ffmpeg FFI 视频解码：RGBA 逐帧 + pts/帧率 + seek" {
   let d = match Demuxer::open("src/testdata/testsrc_1s.avi") {
     Ok(d) => d
     Err(e) => fail("testsrc_1s.avi 打开失败：\{e}")
@@ -87,17 +91,29 @@ test "ffmpeg FFI 视频解码：RGBA 逐帧 + seek" {
     Ok(_) => ()
     Err(e) => fail("开视频解码器失败：\{e}")
   }
+  // 流帧率：素材为 12fps
+  let fps = d.video_fps()
+  if fps < 11.0 || fps > 13.0 {
+    fail("流帧率异常：\{fps}（期望 ≈12）")
+  }
   let w = d.out_width()
   let h = d.out_height()
   inspect(w > 0, content="true")
   inspect(h > 0, content="true")
   let fb = w * h * 4
   let mut frames = 0
+  let mut last_pts = -1.0
+  let mut pts_monotonic = true
   while true {
     match d.decode_rgba() {
       Some(b) => {
         inspect(b.length(), content="\{fb}")
         frames = frames + 1
+        let pts = d.last_frame_pts()
+        if pts < 0.0 || (last_pts >= 0.0 && pts <= last_pts) {
+          pts_monotonic = false
+        }
+        last_pts = pts
         if frames > 100 {
           fail("解码未收敛（EOF 未达）")
         }
@@ -106,14 +122,26 @@ test "ffmpeg FFI 视频解码：RGBA 逐帧 + seek" {
     }
   }
   inspect(frames > 0, content="true")
+  inspect(pts_monotonic, content="true")
+  // 末帧 pts 贴近容器时长（1 秒素材末帧 11/12 ≈ 0.917）
+  if last_pts < 0.8 || last_pts > 1.0 {
+    fail("末帧 pts 异常：\{last_pts}（期望 ≈0.92）")
+  }
   match d.seek(0.1) {
-    Ok(_) =>
+    Ok(_) => {
+      // seek 后旧 pts 重置，不再指向 seek 前位置
+      if d.last_frame_pts() != -1.0 {
+        fail("seek 后 last_frame_pts 应重置为 -1")
+      }
       match d.decode_rgba() {
         Some(_) => ()
         None => fail("seek 后应能解出帧")
       }
+    }
     Err(e) => fail("seek 失败：\{e}")
   }
   d.close()
-  println("ffmpeg 视频解码冒烟：\{w}x\{h} 共 \{frames} 帧 + seek 验证")
+  println(
+    "ffmpeg 视频解码冒烟 \{w}x\{h} 共 \{frames} 帧（fps=\{fps}，末帧 pts=\{last_pts}）",
+  )
 }

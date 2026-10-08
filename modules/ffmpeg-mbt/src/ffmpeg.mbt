@@ -10,6 +10,7 @@ pub fn ffmpeg_supported() -> Bool {
   ok
 }
 
+///|
 let supported_cache : Ref[Int] = Ref(-1)
 
 ///|
@@ -80,7 +81,7 @@ pub fn Demuxer::open(path : String) -> Result[Demuxer, VfError] {
   // FFI 返回的裸指针不能裸绑定（MoonBit GC 会把裸 extern 值当 GC 对象
   // drop 导致 mi_free 段错误），必须立即装进 struct 字段（extern 类型
   // 字段不归 GC 管理）
-  let fmt : VfFmtBox = { h: vf_open(@utf8.encode(path)) }
+  let fmt : VfFmtBox = { h: vf_open(@utf8.encode(path)), }
   if vf_ok(fmt.h) != 1 {
     vf_close(fmt.h)
     return Err(OpenFailed(path))
@@ -89,7 +90,7 @@ pub fn Demuxer::open(path : String) -> Result[Demuxer, VfError] {
     vf_close(fmt.h)
     return Err(NoMediaStream)
   }
-  Ok({ fmt: fmt.h, dec: vf_no_decoder(), adec: vf_no_audio_decoder() })
+  Ok({ fmt: fmt.h, dec: vf_no_decoder(), adec: vf_no_audio_decoder(), })
 }
 
 ///|
@@ -123,6 +124,19 @@ pub fn Demuxer::duration_s(self : Demuxer) -> Double {
 }
 
 ///|
+/// 视频流帧率（avg_frame_rate，未知 0）。
+pub fn Demuxer::video_fps(self : Demuxer) -> Double {
+  vf_stream_fps(self.fmt)
+}
+
+///|
+/// 最近一次 decode_rgba 成功帧的 pts（秒，与 duration 同轴；未解或
+/// 流无时间戳 -1）。seek 后重置为 -1。
+pub fn Demuxer::last_frame_pts(self : Demuxer) -> Double {
+  vf_frame_pts_s(self.dec)
+}
+
+///|
 /// 打开视频解码器（RGBA 输出）。width/height 为输出帧目标尺寸
 /// （0 = 源尺寸）。已开时幂等。
 pub fn Demuxer::open_video_decoder(
@@ -137,7 +151,7 @@ pub fn Demuxer::open_video_decoder(
     return Err(DecodeFailed("无视频流"))
   }
   // FFI 裸指针立即装 struct 字段（同 open 的 GC 隔离约定）
-  let dec : VfDecBox = { h: vf_open_video_decoder(self.fmt, width, height) }
+  let dec : VfDecBox = { h: vf_open_video_decoder(self.fmt, width, height), }
   if vf_dec_width(dec.h) <= 0 {
     vf_close_decoder(dec.h)
     return Err(DecodeFailed("视频解码器初始化失败"))
@@ -155,7 +169,7 @@ pub fn Demuxer::open_audio_decoder(self : Demuxer) -> Result[Unit, VfError] {
   if !self.has_audio() {
     return Err(DecodeFailed("无音频流"))
   }
-  let adec : VfADecBox = { h: vf_open_audio_decoder(self.fmt) }
+  let adec : VfADecBox = { h: vf_open_audio_decoder(self.fmt), }
   if vf_adec_channels(adec.h) <= 0 {
     vf_close_audio_decoder(adec.h)
     return Err(DecodeFailed("音频解码器初始化失败"))
@@ -298,7 +312,19 @@ extern "c" fn vf_duration_s(f : VfFmt) -> Double = "vf_duration_s"
 
 ///|
 #borrow(f)
-extern "c" fn vf_open_video_decoder(f : VfFmt, out_w : Int, out_h : Int) -> VfDec = "vf_open_video_decoder"
+extern "c" fn vf_stream_fps(f : VfFmt) -> Double = "vf_stream_fps"
+
+///|
+#borrow(d)
+extern "c" fn vf_frame_pts_s(d : VfDec) -> Double = "vf_frame_pts_s"
+
+///|
+#borrow(f)
+extern "c" fn vf_open_video_decoder(
+  f : VfFmt,
+  out_w : Int,
+  out_h : Int,
+) -> VfDec = "vf_open_video_decoder"
 
 ///|
 #borrow(d)

@@ -17,7 +17,7 @@ fn vid_mount_player(
   width : Int,
   height : Int,
 ) -> Unit {
-  match @yuemedia.VideoPlayer::make(path, fps=fps, width=width, height=height) {
+  match @yuemedia.VideoPlayer::make(path, fps~, width~, height~) {
     Ok(player) => {
       // 换源:旧播放器先停再释放,其视图从 holder 移除
       match app.vid_player.val {
@@ -73,21 +73,21 @@ fn vid_load_demo(
   refresh : () -> Unit,
 ) -> Unit {
   let avi = "/tmp/yue-probe-demo.avi"
-  match @yue.pr_run(
-    "ffmpeg",
-    [
-      "-v", "error", "-y",
-      "-f", "lavfi", "-i", "testsrc=duration=2:size=160x120:rate=5",
-      "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
-      "-pix_fmt", "yuv420p",
-      avi,
-    ],
-    timeout_ms=30000,
-  ) {
+  match
+    @yue.pr_run(
+      "ffmpeg",
+      [
+        "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=160x120:rate=5",
+        "-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-pix_fmt", "yuv420p",
+        avi,
+      ],
+      timeout_ms=30000,
+    ) {
     Ok(o) =>
       if o.exit_code != 0 {
         match status.val {
-          Some(l) => l.set_text("测试视频生成失败(退出码 \{o.exit_code})")
+          Some(l) =>
+            l.set_text("测试视频生成失败(退出码 \{o.exit_code})")
           None => ()
         }
         refresh()
@@ -102,9 +102,7 @@ fn vid_load_demo(
       return
     }
   }
-  vid_mount_player(
-    app, holder, status, vid_view, refresh, avi, 8, 160, 120,
-  )
+  vid_mount_player(app, holder, status, vid_view, refresh, avi, 5, 160, 120)
 }
 
 ///|
@@ -119,85 +117,85 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
   let auto_started : Ref[Bool] = Ref(false)
   @ui.page_shell(
     "视频播放",
-    "FFI 流式解码的浏览器级播放器:播放时钟按帧率逐帧解码并重绘(不预提取、不限时长),控制条含播放/暂停、拖进度(时间戳级 seek,松手防抖)、时间、音量、循环。本地文件播放帧率 12fps、宽 480 按源比例。",
+    "FFI 流式解码的浏览器级播放器:播放时钟为墙钟+帧时间戳(与时长同轴、1 倍速,高帧率视频跳帧追时钟),控制条含播放/暂停、拖进度(时间戳级 seek,松手防抖)、时间、音量、循环。本地文件宽 480 按源比例。",
     fn(refresh) {
       [
         @yue.hbox(
           [
             @yue.button_t(
-              if @ffmbt.ffmpeg_supported() { "载入演示视频" } else { "ffmpeg 不可用" },
+              if @ffmbt.ffmpeg_supported() {
+                "载入演示视频"
+              } else {
+                "ffmpeg 不可用"
+              },
               variant=@yue.Solid,
               on_click=fn() {
                 match status.val {
-                  Some(l) => l.set_text("载入中:生成测试视频并解码(约 1-2 秒)…")
+                  Some(l) =>
+                    l.set_text(
+                      "载入中:生成测试视频并解码(约 1-2 秒)…",
+                    )
                   None => ()
                 }
                 // 生成+解码同步耗时,延后一拍让状态文本先渲染
-                let _ = @yue.set_timeout(
-                  50,
-                  fn() { vid_load_demo(app, holder, status, vid_view, refresh) },
-                )
+                let _ = @yue.set_timeout(50, fn() {
+                  vid_load_demo(app, holder, status, vid_view, refresh)
+                })
               },
             ),
-            @yue.button_t(
-              "选择本地视频…",
-              on_click=fn() {
-                match app.win_ref.val {
-                  Some(w) => {
-                    let dlg = @yue.FileDialog::new_open()
-                    dlg.set_title("选择视频文件")
-                    dlg.set_filters(
-                      "视频文件:mp4,mkv,mov,avi,webm,flv,ts,wmv,m4v,mpg,mpeg|所有文件:*",
-                    )
-                    if dlg.run_for_window(w) {
-                      let path = dlg.get_result()
-                      app.toast_push("已选 \{path}", @yue.Success)
-                      match status.val {
-                        Some(l) =>
-                          l.set_text(
-                            "载入中:\{path}(probe + 解码同步耗时,视文件大小数秒)…",
-                          )
-                        None => ()
-                      }
-                      let _ = @yue.set_timeout(
-                        50,
-                        fn() {
-                          vid_mount_player(
-                            app, holder, status, vid_view, refresh, path, 12, 480, 0,
-                          )
-                        },
-                      )
+            @yue.button_t("选择本地视频…", on_click=fn() {
+              match app.win_ref.val {
+                Some(w) => {
+                  let dlg = @yue.FileDialog::new_open()
+                  dlg.set_title("选择视频文件")
+                  dlg.set_filters(
+                    "视频文件:mp4,mkv,mov,avi,webm,flv,ts,wmv,m4v,mpg,mpeg|所有文件:*",
+                  )
+                  if dlg.run_for_window(w) {
+                    let path = dlg.get_result()
+                    app.toast_push("已选 \{path}", @yue.Success)
+                    match status.val {
+                      Some(l) =>
+                        l.set_text(
+                          "载入中:\{path}(probe + 解码同步耗时,视文件大小数秒)…",
+                        )
+                      None => ()
                     }
+                    let _ = @yue.set_timeout(50, fn() {
+                      vid_mount_player(
+                        app, holder, status, vid_view, refresh, path, 12, 480, 0,
+                      )
+                    })
                   }
-                  None => ()
                 }
-              },
-            ),
+                None => ()
+              }
+            }),
           ],
           style=[("gap", 8.0), ("alignItems", "center")],
         ),
-        @yue.label_t(
-          "(播放器加载状态显示在此)",
-          role=@yue.Body,
-          handle=fn(l) { status.val = Some(l) },
-        ),
+        @yue.label_t("(播放器加载状态显示在此)", role=@yue.Body, handle=fn(
+          l,
+        ) {
+          status.val = Some(l)
+        }),
         @yue.container(handle=fn(c) {
           holder.val = Some(c)
           if !auto_started.val {
             auto_started.val = true
             // make 同步耗时 1-2 秒,延后一拍让页面先渲染
-            let _ = @yue.set_timeout(
-              300,
-              fn() {
-                if @ffmbt.ffmpeg_supported() {
-                  match status.val {
-                    Some(l) => l.set_text("载入中:生成测试视频并解码(约 1-2 秒)…")
-                    None => ()
-                  }
-                  vid_load_demo(app, holder, status, vid_view, refresh)
+            let _ = @yue.set_timeout(300, fn() {
+              if @ffmbt.ffmpeg_supported() {
+                match status.val {
+                  Some(l) =>
+                    l.set_text(
+                      "载入中:生成测试视频并解码(约 1-2 秒)…",
+                    )
+                  None => ()
                 }
-              },
-            )
+                vid_load_demo(app, holder, status, vid_view, refresh)
+              }
+            })
           }
         }),
       ]

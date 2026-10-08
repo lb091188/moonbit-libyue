@@ -462,9 +462,16 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - GUI 免点击复现方法论(本轮关键手法):xdotool 合成点击被 XFCE click-to-focus 拦截(见前文),「用户点了才崩」类问题用 **set_timeout 编排用户时序**复现——按用户真实操作序列排定时器(0.3s autostart 演示视频 → 4s 播放中换载本地大文件 → 12s 二次换载),零交互稳定命中崩溃窗口;配合 `import -window root` 差分截图确认画面在更新。gdb 抓栈用 `gdb -batch -ex "set environment DISPLAY :0.0" -ex "handle SIGSEGV stop nopass" -ex run -ex bt` 直跑 `_build/.../xxx.exe`(gdb 环境可能丢 DISPLAY,gdb 内显式 set;moon run 是包装进程,gdb 要直指 exe)。
 - 排查弯路两则:①yue 应用必须先 `@yue.initialize()` 再创建任何控件/窗口(mount_window 内的 Window::make 也依赖它),复现程序漏掉会在 `nu::View::View()` 段错误或 `Gtk-ERROR: Can't create a GtkStyleContext without a display connection`——极易误判为音视频问题;②`pgrep -f` 匹配 `moon run` 会命中 moon 父进程造成「进程存活」假象,验证存活要核对真实 exe 进程名或退出码语义;gdb 调试前 `touch` 源文件强制重编,防旧产物误导。
 
+### 视频播放时钟与时长不同轴(帧计数 / 硬编码 fps,2026-10 真机)
+
+- 现象(用户真机):「视频的时长对不上」——时间文本与进度条和真实视频时长脱节:帧率高于 12 的视频进度早早爆表(30fps 视频播完位置=2.5×时长)、低于 12 的走不满格;且画面播放速率随真实帧率漂移(解码固定 20fps,30fps 视频画面 0.67 倍速拖慢),音轨设备实时直出,音画偏差随播放发散。
+- 根因:`vp_tick` 的播放时钟 = `frame_no / fps`,fps 是 make 参数(演示视频传 8、本地文件传 12,全是调用方硬编码),而 duration 是容器头真实秒数——**两条时间轴不同尺度**,pos 与 duration 相除无意义。演示视频自己都是歪的:生成 `rate=5` 却传 `fps=8`,2 秒视频播完 pos 停在 1.25s(进度只到 62%)。内置测试素材恰好 12fps、测试恰好传 12,单测全绿完全掩盖问题——**时钟类回归必须故意传错 fps 参数断言时间轴不受影响**。
+- 修复(墙钟 + 帧时间戳,与 duration 同轴):ffmpeg-mbt 透出帧级信息——`vf_decode_next` 成功时记录帧 pts(`best_effort_timestamp` 优先,流时间基换算成秒,`vf_frame_pts_s` 读出;seek 后重置 -1)与流真实帧率 `vf_stream_fps`(avg_frame_rate 优先 r_frame_rate 回退);yue-media 增单调墙钟 `mbt_now_ms`(audio_stub.c,CLOCK_MONOTONIC)。VideoPlayer 时钟重写:play/seek 记基准(位置 + 墙钟),每 tick `target = 基准 + 真实流逝`,解帧推进到 target 时刻的帧(高帧率视频跳帧追时钟、低帧率画面跨 tick 保持,追帧上限 8 帧/tick——seek 落点离关键帧远也不卡 UI 一整拍),`pos = clamp(target, duration)`——恒 1 倍速,EOF 位置钉在时长(进度满格)。fps 参数降级为**无 pts 流的回退帧率**(优先用流真实帧率)。附带收益:音频设备按采样率实时消费、视频按墙钟推进,两条速率天然同尺度,音画偏差从「随帧率倍率发散」降为常数级。
+- 验证:回归测试故意传错 fps=5(素材实为 12fps)断言位置仍按时间戳走(墙钟回拨 500ms → pos=0.5;回拨超时长 → EOF 钉 duration=1.0 转停);ffmpeg 侧 pts 非负单调、末帧贴近容器时长、seek 重置 -1。576 测全绿;systemprobe 冒烟存活。真机交互(进度/时间显示)由用户复验。
+
 ### 视频播放器(FFI 双 Demuxer:视频帧 + 音轨 PCM 直出)
 
-- 组件:VideoPlayer + video_player_t(播放/暂停/进度拖拽/音量/循环/时间文本)。2026-10 音频并入后:音轨是同文件的第二个独立 Demuxer(读游标与视频互不干扰),vp_tick 每 tick 解一帧视频 + 补音频队列到高水位;音画从 play/seek 点各自起播,误差数十毫秒级(精确同步需音频光标回读,留后续)。
+- 组件:VideoPlayer + video_player_t(播放/暂停/进度拖拽/音量/循环/时间文本)。2026-10 音频并入后:音轨是同文件的第二个独立 Demuxer(读游标与视频互不干扰),vp_tick 按墙钟目标解帧 + 补音频队列到高水位(时钟语义见「视频播放时钟与时长不同轴」节);音画从 play/seek 点各自起播,误差数十毫秒级(精确同步需音频光标回读,留后续)。
 - seek 实现:avformat_seek_file 时间戳级(视频/音频 Demuxer 各自 seek + 解码器 flush + swr 重 init),拖拽防抖 180ms;不再走 ffmpeg CLI 切段(音轨 CLI 提取/切段残留 audio_extract.mbt 已删,媒体链路零 CLI)。
 - 音轨失败(无音轨/解码器不可用/无设备)时自动静音播放,不阻断视频路径。
 - 换源顺序必须是「旧播放器 stop → free(closed 置位,旧刷新定时器停摆)→ 旧根视图 `remove_child_view` → 挂新节点」,乱序会留残音/残定时器;但顺序正确也不够——free 旧后其组件的在飞定时器(seek 防抖等)仍会触发,组件侧必须自防御(closed 守卫),详见「播放器组件换载崩溃与 seek 防抖风暴」节。systemprobe 视频页首次挂载 set_timeout 300ms 自动载入(make 同步耗时);音频页换 AudioPlayer 后:载入即播放、控制条 audio_player_t 挂 holder、200ms 轮询 is_playing 状态标签、演示素材改 MP3(lavfi + libmp3lame)。
