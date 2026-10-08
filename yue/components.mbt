@@ -2544,6 +2544,7 @@ fn role_color(role : TextRole) -> String {
 pub fn label_t(
   text : String,
   role? : TextRole = Body,
+  color? : String = "",
   style? : Array[(String, &StyVal)] = [],
   handle? : (Label) -> Unit = fn(_l) {  },
 ) -> Node {
@@ -2552,7 +2553,15 @@ pub fn label_t(
       let l = Label::new(text)
       ViewLike::set_font(l, role_font(role))
       fn apply_color() -> Unit {
-        ViewLike::set_color(l, role_color(role))
+        // 固定色(如深色遮盖层上的白字)不随主题切换
+        ViewLike::set_color(
+          l,
+          if color == "" {
+            role_color(role)
+          } else {
+            color
+          },
+        )
         // 同文重写一次:set_color 改的 Pango 前景属性在部分控件上不被
         // 下次绘制拾取,重排强制生效
         l.set_text(l.get_text())
@@ -2772,6 +2781,7 @@ pub fn checkbox_t(
   title : String,
   checked? : Bool = false,
   disabled? : Bool = false,
+  color? : String = "",
   on_change? : (Bool) -> Unit = fn(_v) {  },
   style? : Array[(String, &StyVal)] = [],
   handle? : (Container) -> Unit = fn(_c) {  },
@@ -2837,6 +2847,8 @@ pub fn checkbox_t(
         at.set_color(
           if disabled {
             theme_border()
+          } else if color != "" {
+            color
           } else {
             theme_text_regular()
           },
@@ -6797,12 +6809,16 @@ pub fn textarea_t(
 /// 滑杆(EP Slider,自绘):浅灰轨道 + 主题色填充段 + 方形 thumb,支持
 /// 点击轨道/拖拽 thumb 调值,值按 step 量化后写入 value(Store[Double]),
 /// 外部 set 同样生效。on_change 在值变化时回调(含拖拽过程)。
+/// bar_color/track_color 自定义填充/轨道色(空=主题色,深色遮盖层上的
+/// 白色滑杆用)。
 pub fn slider_t(
   value : Store[Double],
   min? : Double = 0.0,
   max? : Double = 100.0,
   step? : Double = 1.0,
   on_change? : (Double) -> Unit = fn(_v) {  },
+  bar_color? : String = "",
+  track_color? : String = "",
   style? : Array[(String, &StyVal)] = [],
   handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
@@ -6873,19 +6889,35 @@ pub fn slider_t(
         let ty = (h - track_h) / 2.0
         // 轨道底用 border 灰:白底上的浅斑马纹几乎不可见,
         // 轨道必须整条可见才能读出滑杆长度
-        p.set_fill_color(theme_border())
+        p.set_fill_color(
+          if track_color == "" {
+            theme_border()
+          } else {
+            track_color
+          },
+        )
         p.fill_rect(0.0, ty, w, track_h)
-        p.set_fill_color(theme_primary())
+        p.set_fill_color(
+          if bar_color == "" {
+            theme_primary()
+          } else {
+            bar_color
+          },
+        )
         p.fill_rect(0.0, ty, ratio * (w - thumb) + thumb / 2.0, track_h)
         // thumb:主题色实心方块,hover/拖拽加深
         let tx = ratio * (w - thumb)
-        p.set_fill_color(
-          if hover.val || dragging.val {
-            theme_primary_hover()
-          } else {
-            theme_primary()
-          },
-        )
+        if bar_color == "" {
+          p.set_fill_color(
+            if hover.val || dragging.val {
+              theme_primary_hover()
+            } else {
+              theme_primary()
+            },
+          )
+        } else {
+          p.set_fill_color(bar_color)
+        }
         p.fill_rect(tx, (h - thumb) / 2.0, thumb, thumb)
       })
       View::set_cursor(v, hand())
