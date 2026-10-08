@@ -1,0 +1,4 @@
+import {
+  "NoahLiu/moonbit-libyue/yue",
+  "NoahLiu/moonbit-libyue/examples/systemprobe/ui",
+}
