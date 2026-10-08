@@ -1,4 +1,4 @@
-name = "NoahLiu/ffmpeg"
+name = "NoahLiu/ffmpeg-mbt"
 version = "0.1.0"
 preferred_target = "native"
 

@@ -1,1 +1,1 @@
-members = ["", "modules/ffmpeg", "modules/yue-video"]
+members = ["", "modules/ffmpeg-mbt", "modules/yue-media"]

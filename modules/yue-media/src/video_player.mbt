@@ -1,8 +1,9 @@
-// 视频播放器（FFI 流式后端）：NoahLiu/ffmpeg 进程内
-// 解码——Demuxer 顺序逐帧取 RGBA，播放时钟按 fps 定时推进（每 tick 解
-// 一帧并重绘画面容器），seek 为时间戳级（avformat_seek_file）。音轨
-// 提取仍走一条 ffmpeg CLI 命令（FFI 音频解码绑定留后续）；音画从
-// seek/play 点各自起播，误差数十毫秒级。
+// 视频播放器（FFI 流式后端）：NoahLiu/ffmpeg-mbt 进程内
+// 解码——视频 Demuxer 顺序逐帧取 RGBA，播放时钟按 fps 定时推进（每
+// tick 解一帧并重绘画面容器），seek 为时间戳级（avformat_seek_file）。
+// 音轨为第二个独立 Demuxer（同文件各开一个容器上下文，读游标互不
+// 干扰），解出 s16 PCM 直推输出设备队列——音画从 play/seek 点各自
+// 起播，误差数十毫秒级。
 
 ///|
 /// 播放状态。
@@ -70,11 +71,13 @@ pub fn vp_fmt_time(t : Double) -> String {
 }
 
 ///|
-/// 视频播放器：make 打开 FFI Demuxer 并提取音轨 WAV（同步耗时，宜放
-/// set_timeout）。无音轨（提取失败/无 ffmpeg CLI）时静音播放；FFI 库
-/// 不可用时 make 直接 Err。
+/// 视频播放器：make 打开视频 Demuxer；含音轨时另开音频 Demuxer 与
+/// 输出设备（FFI 全链路，无 CLI）。无音轨时静音播放；FFI 库不可用
+/// 时 make 直接 Err。
 pub(all) struct VideoPlayer {
-  demuxer : @ffmpeg.Demuxer
+  demuxer : @ffmbt.Demuxer
+  audio : Ref[@ffmbt.Demuxer?]
+  dev : Ref[MbtAdev?]
   fps : Int
   duration_s : Double
   width : Int
@@ -82,13 +85,16 @@ pub(all) struct VideoPlayer {
   volume : Ref[Double]
   looping : Ref[Bool]
   state : Ref[VpState]
+  closed : Ref[Bool]
   pos : Ref[Double]
   frame : Ref[Bytes?]
   frame_no : Ref[Int]
-  engine : Ref[@yue.AudioEngine?]
-  clip : Ref[@yue.AudioClip?]
-  audio_src : String
-  audio_seg : String
+}
+
+///|
+/// 是否已释放（释放后组件时钟应停摆，不再触碰 FFI 句柄）。
+pub fn VideoPlayer::is_closed(self : VideoPlayer) -> Bool {
+  self.closed.val
 }
 
 ///|
@@ -104,9 +110,10 @@ pub fn VideoPlayer::current(self : VideoPlayer) -> Double {
 }
 
 ///|
-/// 总时长（秒；容器头无时长元数据时 0，进度条按已知部分走）。
+/// 总时长（秒；make 时缓存，容器头无时长元数据时 0，进度条按已知
+/// 部分走）。
 pub fn VideoPlayer::duration(self : VideoPlayer) -> Double {
-  self.demuxer.duration_s()
+  self.duration_s
 }
 
 ///|
@@ -122,6 +129,12 @@ pub fn VideoPlayer::frame_height(self : VideoPlayer) -> Int {
 }
 
 ///|
+/// 是否含音轨。
+pub fn VideoPlayer::has_audio(self : VideoPlayer) -> Bool {
+  self.audio.val is Some(_)
+}
+
+///|
 /// 当前已解码帧（RGBA 字节；未开始时 None）。
 pub fn VideoPlayer::current_frame(self : VideoPlayer) -> Bytes? {
   self.frame.val
@@ -130,10 +143,10 @@ pub fn VideoPlayer::current_frame(self : VideoPlayer) -> Bytes? {
 ///|
 /// 设置音量（0..1；钳制）。
 pub fn VideoPlayer::set_volume(self : VideoPlayer, v : Double) -> Unit {
-  let vol = @yue.audio_clamp_volume(v)
+  let vol = media_clamp_volume(v)
   self.volume.val = vol
-  match self.clip.val {
-    Some(c) => c.set_volume(vol)
+  match self.dev.val {
+    Some(d) => mbt_adev_set_volume(d, Float::from_double(vol))
     None => ()
   }
 }
@@ -151,15 +164,28 @@ pub fn VideoPlayer::play(self : VideoPlayer) -> Unit {
     return
   }
   self.state.val = VpPlaying
-  self.vp_seg_audio()
+  match self.dev.val {
+    Some(d) => {
+      let _ = mbt_adev_start(d)
+      ()
+    }
+    None => ()
+  }
+  self.vp_fill_audio()
 }
 
 ///|
-/// 暂停（停音频；帧时钟停；位置保留）。
+/// 暂停（停帧时钟与音频设备；位置保留）。
 pub fn VideoPlayer::pause(self : VideoPlayer) -> Unit {
   if self.state.val is VpPlaying {
     self.state.val = VpPaused
-    self.vp_audio_stop()
+    match self.dev.val {
+      Some(d) => {
+        let _ = mbt_adev_pause(d)
+        ()
+      }
+      None => ()
+    }
   }
 }
 
@@ -170,7 +196,7 @@ pub fn VideoPlayer::stop(self : VideoPlayer) -> Unit {
   self.pos.val = 0.0
   self.frame.val = None
   self.frame_no.val = 0
-  self.vp_audio_stop()
+  self.vp_audio_flush()
   let _ = self.demuxer.seek(0.0)
 }
 
@@ -182,35 +208,45 @@ pub fn VideoPlayer::seek(self : VideoPlayer, t : Double) -> Unit {
   self.frame.val = None
   self.frame_no.val = vp_frame_idx(target, self.fps)
   ignore(self.demuxer.seek(target))
+  self.vp_audio_flush()
+  match self.audio.val {
+    Some(a) => ignore(a.seek(target))
+    None => ()
+  }
   if self.state.val is VpPlaying {
-    self.vp_seg_audio()
+    self.vp_fill_audio()
   }
 }
 
 ///|
-/// 释放（停音频、释放引擎与剪辑、关闭 Demuxer；之后不可再用）。
+/// 释放（停设备、关双 Demuxer；之后不可再用，组件时钟凭 is_closed
+/// 停摆）。
 pub fn VideoPlayer::free(self : VideoPlayer) -> Unit {
-  self.vp_audio_stop()
-  match self.clip.val {
-    Some(c) => c.free()
+  if self.closed.val {
+    return
+  }
+  self.closed.val = true
+  self.state.val = VpIdle
+  match self.dev.val {
+    Some(d) => mbt_adev_close(d)
     None => ()
   }
-  match self.engine.val {
-    Some(e) => e.free()
+  match self.audio.val {
+    Some(a) => a.close()
     None => ()
   }
   self.demuxer.close()
 }
 
 // ---------------------------------------------------------------------------
-// 内部：帧时钟与音频切段
+// 内部：帧时钟与音频直出
 // ---------------------------------------------------------------------------
 
 ///|
-/// 推进一步播放（组件定时器每 tick 调用；播放中解下一帧并推进位置，
-/// 流结束时循环或停）。返回是否仍应继续调度。
+/// 推进一步播放（组件定时器每 tick 调用；播放中解下一帧并推进位置、
+/// 补音频队列，流结束时循环或停）。
 fn VideoPlayer::vp_tick(self : VideoPlayer) -> Unit {
-  if !(self.state.val is VpPlaying) {
+  if self.closed.val || !(self.state.val is VpPlaying) {
     return
   }
   match self.demuxer.decode_rgba() {
@@ -218,81 +254,68 @@ fn VideoPlayer::vp_tick(self : VideoPlayer) -> Unit {
       self.frame.val = Some(rgba)
       self.frame_no.val = self.frame_no.val + 1
       self.pos.val = self.frame_no.val.to_double() / self.fps.to_double()
-      if self.duration_s <= 0.0 {
-        // 容器无时长元数据：按已解帧数外推，进度条可用
-        ignore(self)
-      }
     }
     None => {
       if self.looping.val {
         let _ = self.demuxer.seek(0.0)
         self.frame_no.val = 0
         self.pos.val = 0.0
-        self.vp_seg_audio()
+        self.vp_audio_flush()
+        match self.audio.val {
+          Some(a) => {
+            ignore(a.seek(0.0))
+            self.vp_fill_audio()
+          }
+          None => ()
+        }
       } else {
         self.state.val = VpIdle
-        self.vp_audio_stop()
-      }
-    }
-  }
-}
-
-///|
-/// 从当前位置切一段音频播放（play/seek/循环 的公共路径）；无音轨或
-/// 切段失败时静默（纯视频播放）。
-fn VideoPlayer::vp_seg_audio(self : VideoPlayer) -> Unit {
-  match self.engine.val {
-    None => ()
-    Some(engine) =>
-      match self.audio_src {
-        "" => ()
-        src => {
-          self.vp_audio_stop()
-          let seek = self.pos.val
-          let args = if seek <= 0.05 {
-            ["-v", "error", "-y", "-i", src, "-c", "copy", self.audio_seg]
-          } else {
-            [
-              "-v", "error", "-y", "-ss", @yue.fmt_axis(seek), "-i", src, "-c",
-              "copy", self.audio_seg,
-            ]
+        self.vp_audio_flush()
+        match self.dev.val {
+          Some(d) => {
+            let _ = mbt_adev_pause(d)
+            ()
           }
-          let seg_ok = match @yue.pr_run("ffmpeg", args, timeout_ms=30000) {
-            Ok(o) => o.exit_code == 0
-            Err(_) => false
-          }
-          if seg_ok {
-            match engine.load(self.audio_seg, looping=self.looping.val) {
-              Ok(clip) => {
-                self.clip.val = Some(clip)
-                clip.set_volume(self.volume.val)
-                clip.play()
-              }
-              Err(_) => ()
-            }
-          }
+          None => ()
         }
       }
+    }
+  }
+  self.vp_fill_audio()
+}
+
+///|
+/// 补音频队列到高水位（有音轨时）。
+fn VideoPlayer::vp_fill_audio(self : VideoPlayer) -> Unit {
+  match (self.audio.val, self.dev.val) {
+    (Some(a), Some(d)) =>
+      while mbt_adev_queued_bytes(d) < ap_high_water.to_int64() {
+        match a.decode_pcm() {
+          Some(pcm) => {
+            let _ = mbt_adev_push(d, pcm, pcm.length())
+            ()
+          }
+          None => break
+        }
+      }
+    (_, _) => ()
   }
 }
 
 ///|
-/// 停当前音频段。
-fn VideoPlayer::vp_audio_stop(self : VideoPlayer) -> Unit {
-  match self.clip.val {
-    Some(c) => {
-      c.stop()
-      c.free()
-      self.clip.val = None
-    }
+/// 清音频待播队列（stop/seek 用）。
+fn VideoPlayer::vp_audio_flush(self : VideoPlayer) -> Unit {
+  match self.dev.val {
+    Some(d) => mbt_adev_clear(d)
     None => ()
   }
 }
 
 ///|
-/// 打开视频文件为播放器（FFI Demuxer + 音轨 WAV 提取，同步耗时；调用
-/// 方宜放 set_timeout）。fps 为播放帧率（默认 12，控制帧时钟步进）；
-/// width/height 为输出画面尺寸（0 = 源尺寸）。
+/// 打开视频文件为播放器（FFI 全链路：视频 Demuxer + 音轨独立
+/// Demuxer + 输出设备；同步耗时，调用方宜放 set_timeout）。fps 为
+/// 播放帧率（默认 12，控制帧时钟步进）；width/height 为输出画面
+/// 尺寸（0 = 源尺寸）。
 pub fn VideoPlayer::make(
   path : String,
   fps? : Int = 12,
@@ -301,7 +324,7 @@ pub fn VideoPlayer::make(
   volume? : Double = 0.8,
   looping? : Bool = false,
 ) -> Result[VideoPlayer, String] {
-  let demuxer = match @ffmpeg.Demuxer::open(path) {
+  let demuxer = match @ffmbt.Demuxer::open(path) {
     Ok(d) => d
     Err(e) => return Err("FFI 打开失败：\{e}")
   }
@@ -319,36 +342,44 @@ pub fn VideoPlayer::make(
     demuxer.close()
     return Err("无效画面尺寸 \{w}x\{h}")
   }
-  // 音轨：提取失败（无音轨/无 ffmpeg CLI）时静音播放
-  let audio_src = "/tmp/yue-vp.wav"
-  let audio_seg = "/tmp/yue-vp-seg.wav"
-  let audio_ok = match audiof_extract_wav(path, audio_src) {
-    Ok(_) => true
-    Err(_) => false
-  }
-  let engine = if audio_ok {
-    match @yue.AudioEngine::new() {
-      Ok(e) => Some(e)
-      Err(_) => None
+  // 音轨：同文件再开一个独立容器上下文（读游标与视频互不干扰）；
+  // 无音轨或解码器不可用时静音播放
+  let audio : Ref[@ffmbt.Demuxer?] = Ref(None)
+  let dev : Ref[MbtAdev?] = Ref(None)
+  if demuxer.has_audio() {
+    match @ffmbt.Demuxer::open(path) {
+      Ok(ad) =>
+        match ad.open_audio_decoder() {
+          Ok(_) => {
+            let ch = ad.audio_channels()
+            let rate = ad.audio_rate()
+            if ch > 0 && rate > 0 {
+              let boxed : AdevBox = { h: mbt_adev_open(ch, rate) }
+              dev.val = Some(boxed.h)
+              audio.val = Some(ad)
+            } else {
+              ad.close()
+            }
+          }
+          Err(_) => ad.close()
+      }
+      Err(_) => ()
     }
-  } else {
-    None
   }
   Ok({
     demuxer,
+    audio,
+    dev,
     fps,
     duration_s: duration,
     width: w,
     height: h,
-    volume: Ref(@yue.audio_clamp_volume(volume)),
+    volume: Ref(media_clamp_volume(volume)),
     looping: Ref(looping),
     state: Ref(VpIdle),
+    closed: Ref(false),
     pos: Ref(0.0),
     frame: Ref(None),
     frame_no: Ref(0),
-    engine: Ref(engine),
-    clip: Ref(None),
-    audio_src: if audio_ok { audio_src } else { "" },
-    audio_seg,
   })
 }

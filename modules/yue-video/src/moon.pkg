@@ -1,4 +1,0 @@
-import {
-  "NoahLiu/moonbit-libyue/yue" @yue,
-  "NoahLiu/ffmpeg/src" @ffmpeg,
-}

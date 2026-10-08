@@ -17,7 +17,7 @@ fn vid_mount_player(
   width : Int,
   height : Int,
 ) -> Unit {
-  match @yuevideo.VideoPlayer::make(path, fps=fps, width=width, height=height) {
+  match @yuemedia.VideoPlayer::make(path, fps=fps, width=width, height=height) {
     Ok(player) => {
       // 换源:旧播放器先停再释放,其视图从 holder 移除
       match app.vid_player.val {
@@ -30,7 +30,7 @@ fn vid_mount_player(
       app.vid_player.val = Some(player)
       // 载入即自动播放(浏览器 autoplay 同款语义;控制条仍可暂停)
       player.play()
-      let node = @yuevideo.video_player_t(player)
+      let node = @yuemedia.video_player_t(player)
       match holder.val {
         Some(c) => {
           match vid_view.val {
@@ -125,7 +125,7 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
         @yue.hbox(
           [
             @yue.button_t(
-              if @yuevideo.audiof_supported() { "载入演示视频" } else { "ffmpeg 不可用" },
+              if @ffmbt.ffmpeg_supported() { "载入演示视频" } else { "ffmpeg 不可用" },
               variant=@yue.Solid,
               on_click=fn() {
                 match status.val {
@@ -189,7 +189,7 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
             let _ = @yue.set_timeout(
               300,
               fn() {
-                if @yuevideo.audiof_supported() {
+                if @ffmbt.ffmpeg_supported() {
                   match status.val {
                     Some(l) => l.set_text("载入中:生成测试视频并解码(约 1-2 秒)…")
                     None => ()

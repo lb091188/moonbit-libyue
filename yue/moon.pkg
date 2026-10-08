@@ -6,7 +6,6 @@ import {
   "NoahLiu/moonbit-libyue/yue/traybus",
   "chensuiyi/subproc",
   "prowk/moonsqlitefile",
-  "CorvusCinereus/miniaudio",
 }
 
 options(

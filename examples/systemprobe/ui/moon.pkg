@@ -1,4 +1,6 @@
 import {
   "NoahLiu/moonbit-libyue/yue",
-  "NoahLiu/yue-video/src" @yuevideo,
+  "NoahLiu/yue-media/src" @yuemedia,
 }
+
+supported_targets = "native"
