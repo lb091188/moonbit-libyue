@@ -2,7 +2,8 @@
 """NoahLiu/ffmpeg 的链接预构建脚本（--moonbit-unstable-prebuild）。
 
 动态链系统 ffmpeg 库：构建期用 pkg-config 探测 libavformat/libavcodec/
-libswscale/libavutil，输出 link_configs 传播给所有依赖本包的 main 包。
+libswscale/libswresample/libavutil，输出 link_configs 传播给所有依赖本包
+的 main 包。
 约束：stdout 只能是 JSON；进度信息走 stderr。
 
 依赖：系统的 ffmpeg 开发包（Ubuntu: libavcodec-dev 等；运行期只需对应
@@ -17,7 +18,7 @@ import shutil
 import subprocess
 import sys
 
-LIBS = ["libavformat", "libavcodec", "libswscale", "libavutil"]
+LIBS = ["libavformat", "libavcodec", "libswscale", "libswresample", "libavutil"]
 
 
 def main() -> int:
