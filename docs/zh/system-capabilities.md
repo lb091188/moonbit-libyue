@@ -328,23 +328,35 @@ match @yue.wp_get() {
 let _ = @yue.wp_set("/home/me/Pictures/wall.png")
 ```
 
-## 音频播放（miniaudio）
+## 音频/视频播放（yue-media 可选层）
 
-引擎 + 剪辑两级 API：`AudioEngine::new()` 创建引擎（无输出设备的服务容器/纯 SSH 环境给 `Err(DeviceFailed)`），`AudioEngine::load(path, looping?=false, decoded?=false)` 加载音频（miniaudio 解码，支持 WAV/MP3/FLAC/OGG），得到 `AudioClip` 后 `play() / stop() / is_playing() / set_volume / get_volume / free()`。`decoded=true` 全解码进内存（短音效低延迟），默认流式加载（长音频）。音量钳制在 [0,1]。
+媒体播放不在 yue 核心包里（不引入 ffmpeg 依赖的人零成本），在可选模块 `NoahLiu/yue-media`（依赖 `NoahLiu/ffmpeg-mbt` 的 FFI 绑定）：
 
 ```moonbit
-let engine = @yue.AudioEngine::new()?
-let clip = engine.load("/path/sound.wav")?
-clip.set_volume(0.8)
-clip.play()
-// 播放中：clip.is_playing() 为 true；停止：clip.stop()
-clip.free()
-engine.free()
+// moon.mod import: "NoahLiu/yue-media@0.1.0"
+// moon.pkg import: "NoahLiu/yue-media/src" @yuemedia
 ```
 
-播放/停止属设置类，只在调用方显式调用时执行；库内测试只覆盖加载与音量读写。真机效果听感验证走 systemprobe。
+解码走 ffmpeg FFI（进程内动态链，格式随系统 ffmpeg：MP3/OGG/M4A/AAC/FLAC/WAV…），输出设备由内嵌 miniaudio 设备层直出（s16 PCM 队列，零重采样）。无输出设备环境（CI/headless）自动静音降级，状态机照常。
 
-## 视频播放（帧源 → draw_image）
+### AudioPlayer（对标浏览器 <audio>）
+
+```moonbit
+let player = @yuemedia.AudioPlayer::make("/path/song.mp3")?
+player.play()
+let view = @yuemedia.audio_player_t(player)  // 播放/暂停/进度/时间/音量/循环控制条
+```
+
+| API | 说明 |
+|---|---|
+| `AudioPlayer::make(path, volume?=0.8, looping?=false)` | 打开音频文件（ffmpeg 全格式）+ 输出设备 |
+| `play() / pause() / stop() / seek(t_s)` | 播放控制（seek 清队列重定位，播放中从新位置续播） |
+| `pump()` | 推进一步（补 PCM 队列/播完转态）——组件 50ms 时钟自动调，独立使用时自行定时调 |
+| `is_playing() / current() / duration() / has_audio 对应 is_muted()` | 状态/位置（按设备已消费字节换算）/时长/静音降级查询 |
+| `set_volume(0..1) / get_volume / set_looping` | 音量与循环 |
+| `free()` | 释放（之后组件时钟自动停摆） |
+
+### 视频帧源视图（yue 核心，零依赖）
 
 视频帧渲染走「帧源回调产出 RGBA 字节 → `pngr_encode_rgba` 内存编码为 PNG → `Image::new_from_png` 解码 → `Painter::draw_image` 铺满」：libyue 的 Image 没有裸像素构造入口（只有 Buffer/FilePath/NativeImage 三种构造），PNG 内存编码是纯 MoonBit 的中转通道（stored 压缩，合法 zlib 流，小分辨率够用）。解码器与本组件解耦——任何帧源（未来的 moonav1 / 平台解码器）按帧号提供 RGBA 即可接入。
 
@@ -365,44 +377,27 @@ fn source(i : Int) -> Bytes? {
 let view = @yue.video_view_t(320, 240, 120, source, fps=30)
 ```
 
-### ffmpeg 路线（AVI/MP4/MKV/WebM 等容器）
+### VideoPlayer（对标浏览器 <video>）
 
-`yue/vidsrc_ffmpeg.mbt` 以 ffmpeg CLI 为解码后端：ffprobe CSV 读元信息，ffmpeg 解码为单个 raw RGBA 文件整读进内存，帧源按帧号偏移切片。容器与编码随 ffmpeg 解码器覆盖（AVI/MP4/MKV/WebM/H.264/VP9/AV1…）。
+FFI 全链路：视频流逐帧 RGBA（时间戳级 seek），音轨是同文件的第二个独立解码器（读游标互不干扰）解出 PCM 直推输出设备——无 CLI 子进程。无音轨/无输出设备自动静音。
 
-| 函数 | 说明 |
+```moonbit
+let player = @yuemedia.VideoPlayer::make("demo.mp4", fps=12, width=480)?
+player.play()
+let view = @yuemedia.video_player_t(player)
+```
+
+| API | 说明 |
 |---|---|
-| `vidf_supported() -> Bool` | ffmpeg 可用（进程内缓存，首次真探 `ffmpeg -version`） |
-| `vidf_probe(path) -> Result[VideoMeta, String]` | ffprobe 元信息（宽/高/fps/时长/有无音轨） |
-| `vidf_extract(path, fps?=8.0, width?=0, height?=0, max_frames?=240)` | 提取帧集 `VideoFrames`（参数钳制内存占用：缺省约 240 帧） |
-| `VideoFrames::frame(idx)` / `vidf_source(frames)` | 按帧号取 RGBA / 直接得到 `VideoFrameSource` 喂 `video_view_t` |
-| `vidf_extract_audio(path, out_wav)` | 提取音轨为 WAV（16bit 44.1kHz 立体声），交 `AudioEngine` 播放（音画各自从 0 起播的近似同步） |
+| `VideoPlayer::make(path, fps?=12, width?=0, height?=0, volume?=0.8, looping?=false)` | 打开视频（含音轨双解码器；同步耗时，宜放 `set_timeout`） |
+| `play() / pause() / stop() / seek(t_s)` | 播放控制（seek 双流各自重定位续播） |
+| `is_playing() / current() / duration() / has_audio()` | 状态/位置/时长/音轨查询 |
+| `current_frame() / frame_width() / frame_height()` | 当前帧 RGBA（自渲染场景） |
+| `set_volume / set_looping / free()` | 音量/循环/释放 |
 
-```moonbit
-let frames = @yue.vidf_extract("demo.avi", fps=12.0, width=480)?
-let view = @yue.video_view_t(frames.width, frames.height, frames.frame_count,
-  @yue.vidf_source(frames), fps=12, looping=true)
-// 音轨：@yue.vidf_extract_audio("demo.avi", "/tmp/a.wav") 后 AudioEngine::load("/tmp/a.wav")
-```
+控制条组件（video_player_t / audio_player_t 同风格）：播放/暂停按钮、可拖进度条（松手防抖 180ms 后 seek）、时间文本（m:ss / m:ss）、音量滑条、循环开关；50ms 时钟自动 pump + 刷新，`free()` 后时钟自动停摆。
 
-帧数据整读进内存，长视频用 fps/width/height/max_frames 降采样钳制；音画同步为近似（各自从 0 起播），精确同步需时钟对齐，后续批次再做。
-
-### 播放器组件（对标浏览器 <video>）
-
-`VideoPlayer`（`yue/video_player.mbt`）把上面的管线封成浏览器级播放器：`VideoPlayer::make(path, fps?, width?, height?)` 一次完成 probe + 帧集提取 + 音轨 WAV 提取（同步耗时，宜放 `set_timeout`），`video_player_t(player)` 挂载后即得完整控件：
-
-- **播放控制**：`play()` / `pause()` / `stop()` / `seek(t_s)`（播放中 seek 从新位置续播）/ `is_playing()` / `current()` / `duration()`
-- **控件**：播放/暂停按钮、可拖进度条（松手防抖 180ms 后 seek）、时间文本（m:ss / m:ss）、音量滑条、循环开关
-- **音画同步**：音频与帧推进同为 play 起点、50ms 步进（数十毫秒级误差；精确同步需音频光标回读，见 adaptation.md）
-- **时长兜底**：ffprobe 拿不到 format duration（如 lavfi 写的 AVI 输出 N/A）时用帧集时长 = 帧数 ÷ 抽取帧率
-- **音轨**：`vidf_extract_audio` 提取 WAV 交 `AudioEngine` 播放；无音轨文件自动静音播放
-- seek 实现为 ffmpeg 切段播放（`-ss t -c copy`），拖拽防抖避免连续切段；音画从 seek 点重新对齐
-
-```moonbit
-let player = @yue.VideoPlayer::make("demo.avi", fps=12)?
-let view = @yue.video_player_t(player)
-```
-
-systemprobe 启动即自动载入演示播放器（lavfi 生成 2 秒 AVI：testsrc 视频 + sine 音轨），播放/暂停/拖进度/音量/循环全部可交互；真机截图已确认控制条与帧画面渲染。
+systemprobe 启动即自动载入演示播放器，播放/暂停/拖进度/音量/循环全部可交互。
 
 ## 显示器配置
 

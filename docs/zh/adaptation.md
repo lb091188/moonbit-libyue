@@ -408,10 +408,10 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 真机全链路验证:lavfi `testsrc` 生成 2 秒 160x120@5 AVI(容器验证用 AVI 对齐需求方场景)→ probe 宽高帧率对 → 提取 8fps 得 9 帧 → 帧源切片首帧 76800 字节;systemprobe 演示板点「载入演示视频」实渲染 testsrc 彩条画面(xdotool 截图确认),状态栏显示「已载入 160x120 × 16 帧(@8fps,循环播放)」。
 - 音画同步:音轨提取 WAV 交 AudioEngine 各自从 0 起播,属近似同步;精确同步需播放时钟对齐,留后续批次。
 
-### 视频三层拆分(yue 零 ffmpeg / yue-video 可选层 / ffmpeg FFI)
+### 媒体三层拆分(yue 零 ffmpeg / yue-media 可选层 / ffmpeg-mbt FFI)
 
-- 背景:VideoPlayer 曾直接放 yue 且引 ffmpeg FFI——moon 依赖是 **module 级**的,yue 只要 import 了 ffmpeg,所有 GUI 库用户构建都会跑 ffmpeg prebuild(没装 dev 包即失败),不用视频的人被传染依赖。
-- 三层:①yue 核心(零 ffmpeg,删 CLI 视频路线 vidsrc_ffmpeg.mbt 全部;AudioEngine/miniaudio 自包含无系统库依赖,保留);②modules/ffmpeg(FFI 绑定,零 yue);③modules/yue-video(VideoPlayer FFI 流式后端 + video_player_t 组件 + 音轨提取单命令,依赖前两者)——要视频播放器的人才 import 这层。workspace 成员互相引用:被引 module 在主 moon.mod import 列表带版本号,moon 就近解析 workspace 成员(不去 registry)。
+- 背景:VideoPlayer 曾直接放 yue 且引 ffmpeg FFI——moon 依赖是 **module 级**的,yue 只要 import 了 ffmpeg,所有 GUI 库用户构建都会跑 ffmpeg prebuild(没装 dev 包即失败),不用视频的人被传染依赖。音频曾走 `CorvusCinereus/miniaudio`(MoonBit 依赖),2026-10 用户定案「音频也交给 ffmpeg」后连音频一并统一:yue 核心删 AudioEngine/audio.mbt,音视频都在可选层。
+- 三层:①yue 核心(零 ffmpeg 零 miniaudio 依赖,纯 GUI);②modules/ffmpeg-mbt(FFI 绑定,零 yue,moon 名称 `NoahLiu/ffmpeg-mbt`——用户定名,ffmpeg 训练语料污染太重不敢占 ffmpeg 裸名);③modules/yue-media(VideoPlayer/AudioPlayer + 播放器组件,依赖前两者)——要媒体播放的人 import 这层,别 import 这层就零额外依赖。workspace 成员互相引用:被引 module 在主 moon.mod import 列表带版本号,moon 就近解析 workspace 成员(不去 registry);**workspace 内改名**(ffmpeg→ffmpeg-mbt)三处同步:moon.work members、主/依赖方 moon.mod import、prebuild.py 的 link_configs package 字段(写死包名,漏改报 "Link config package name ... does not start with module name")。
 - **「视频只有第一帧」根因**:旧版播放时钟只推进位置 Ref,画面容器的 schedule_paint 无人调用——GTK 不重绘,永远停首帧。修复:组件 50ms 时钟里 vp_tick()(FFI 逐帧解码)+ ViewLike::schedule_paint(cv) 成对出现。
 - FFI 流式语义:播放时钟按 fps 每 tick 解一帧(decode_rgba 顺序流),seek 为时间戳级(Demuxer::seek → avformat_seek_file + 解码器 flush);容器无时长元数据(lavfi AVI 的 N/A)时 duration 为 0,进度条按 0 处理(帧照常播)。
 - 跨包组件基建:yue 的 attach/themed_container/set_panel_bg/theme_border/theme_bg_panel 原为包私有,yue-video 组件层需要,最小 pub 化这 5 个(组件扩展 API)。
@@ -432,23 +432,33 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 结论:版本代差一律升级 toolchain 解决(与 CI 对齐),不 fork 生态包;third_party/ 仅保留确无替代的 vendored。
 - 验证:moon clean 后全量重建 check 零警告、moon test 575 全绿、moon build 通过。
 
-### ffmpeg 动态链 FFI(workspace 子模块 modules/ffmpeg)
+### ffmpeg 动态链 FFI(workspace 子模块 modules/ffmpeg-mbt)
 
-- 形态:moon.work workspace 成员 `modules/ffmpeg`(module `NoahLiu/ffmpeg`),与主 module 并列、互不依赖(yue 不 import 它,避免给 GUI 库强加系统库依赖;按需直接使用)。动态链零 vendored:编译期 pkg-config 探测 libav*,运行期加载系统 .so。
+- 形态:moon.work workspace 成员 `modules/ffmpeg-mbt`(module `NoahLiu/ffmpeg-mbt`),与主 module 并列(yue 不 import 它,避免给 GUI 库强加系统库依赖;主 module 因 examples 直接用 @ffmbt 而声明,GUI 库用户不传染)。动态链零 vendored:编译期 pkg-config 探测 libav*(含音频的 libswresample),运行期加载系统 .so。
 - **链接传播**:库包 moon.pkg 的 link 段不会传播给最终链接(AGENTS 规则 2 的老坑)——照主仓库架构给子模块挂自己的 `prebuild.py`(moon.mod options --moonbit-unstable-prebuild),输出 `{"link_configs":[{"package":"NoahLiu/ffmpeg/src","link_flags":"-lavformat ..."}]}` 自动传播给依赖方 main 包;link 段从 moon.pkg 移除。测试方式:在 module 目录内 `moon test src`(workspace 根的全量 test 会连带 examples,他人未完成代码会干扰)。
 - **FFI 三个坑(真机 gdb 定位)**:① extern 类型声明必须 `#external`(缺它时 GC 把 FFI 返回裸指针当 GC 堆对象,drop 走 mi_free 段错误——崩栈 moonbit_drop_object→mi_free);② C 侧句柄失败不返回 NULL,统一哑句柄+vf_ok 探测(NULL↔Option 转换语义不确定);③ MoonBit 侧中间裸值立即装 struct 字段再传(miniaudio 的持有模式)。FFI 指针参数按新 toolchain 要求逐个 `#borrow` 注解。
-- 真机验证:系统 mp4 真文件打开(stream 宽高/时长)→逐帧 RGBA 解码(帧尺寸恰 w*h*4)→seek 0.1s 后继续解码,3/3 测试过;错误路径(不存在文件 OpenFailed)与版本探测自包含。stub 单独 gcc 编链验证(pkg-config cflags/libs)。
-- 运行库版本:Ubuntu 24.04 = libavcodec60(avformat 60.16);CI 与本机一致需 apt 装 dev 包(见 modules/ffmpeg/README)。
+- Demuxer 形态(2026-10 音频并入后):open 只开容器探测流(vstream/astream),视频/音频解码器**显式按需打开**(open_video_decoder RGBA/sws、open_audio_decoder s16 交错/swr)——纯音频文件不再因无视频流被拒(旧版 NoVideoStream 直接 Err 的坑)。同一 Demuxer 实例上视频/音频解码器**共享 AVFormatContext 读游标会互吃 packet**,视频带音轨的场景必须双 Demuxer(同文件各 open 一个,VideoPlayer 即此形态)。
+- 音频解码坑:①vf_decode_pcm 的 EOF 冲刷——av_read_frame 返回 AVERROR_EOF 后还要 `avcodec_send_packet(NULL)` + 继续 receive_frame 取解码器残留帧(AAC 尾部 ≈1 帧样本),否则尾部丢帧(实测 m4a 45056 帧 vs wav 44100 帧的差即编码器延迟);②seek 后 swr 要重 init 丢弃旧位置重采样缓存,否则残音。
+- 测试素材内置:src/testdata/ 进仓(mp3/ogg/m4a/wav 各 1 秒正弦 + testsrc AVI + 带音轨 av_1s.mp4,ffmpeg lavfi 生成,共 <120KB),摆脱「本机 trae 素材路径」依赖,CI 可复现。**moon test 的 cwd 是各 module 目录**(workspace 全量 test 时 ffmpeg-mbt 包里 `src/testdata/...` 过、yue-media 包里同串失败),跨模块引用素材用 `../ffmpeg-mbt/src/testdata/...`。
+- 真机验证:四格式音频 PCM 直出(累计帧数 ±10% 断言 + seek 后续解)+视频 RGBA 逐帧/seek,全部内置素材,CI 可跑;错误路径(不存在文件 OpenFailed)与版本探测自包含。
+- 运行库版本:Ubuntu 24.04 = libavcodec60(avformat 60.16);CI 与本机一致需 apt 装 dev 包(见 modules/ffmpeg-mbt/README)。
 
-### 视频播放器(浏览器级:seek 切段 + 音画同源时钟)
+### 音频 ffmpeg 全链路(miniaudio 降级为内嵌设备层)
 
-- 组件:VideoPlayer + video_player_t(播放/暂停/进度拖拽/音量/循环/时间文本)。音画同步口径:音频(AudioEngine)与帧推进(set_timer 50ms)同为 play 起点、按播放位置走帧集随机访问,误差数十毫秒级。
-- seek 实现:ffmpeg `-ss t -c copy` 切段播放,拖拽防抖 180ms 避免连续切段卡顿。评估过 fork miniaudio 补 seek(上游封装未导出 cursor/seek),否决:音频与视频共用 ffmpeg 技术栈、零 fork 更稳;精确音画同步需读音频光标,留后续。
-- 时长兜底:ffprobe 对 lavfi 写的 AVI 返回 format duration=N/A(CSV 行「N/A」非数字,解析时跳过),此时时长 = 帧集帧数 ÷ 抽取帧率;有 format duration 时以其为准(含容器 padding,2.0s 源实测 2.2s)。
-- 音轨提取失败(无音轨/编码不支持)时自动静音播放,不阻断视频路径。
-- systemprobe 演示改为启动即自动载入(make 同步 1-2 秒,set_timeout 300ms 后执行;按钮保留重新载入)。X11 验证注意:xdotool 合成点击被 XFCE「click-to-focus」策略拦截(motion 事件可达、button 事件需窗口先 focus 而死锁),渲染验证走启动自动载入 + xdotool 截图;播放/暂停/seek 状态机由 wbtest 覆盖。真机截图已确认控制条与 testsrc 帧画面渲染。
-- **AudioEngine 可解码格式 = miniaudio 内置解码器集合,仅 WAV/MP3/FLAC**(2026-10 探针实证):生成 mp3/flac/m4a/ogg 各一份测试文件,经临时 wbtest 逐个 load——mp3/flac/演示 wav OK,m4a 与 ogg 均 `音频加载失败:Invalid file`。根因:miniaudio 的 Vorbis 解码依赖外部 stb_vorbis(本绑定未集成),m4a/aac/opus/wma/aiff 无内置解码器。坑的形态是「文案与过滤器宣称超集」:文件对话框过滤器列了 m4a/aac/ogg 等、页面文案写「WAV/MP3/FLAC/OGG 等」,用户选了就撞 Invalid file(演示 wav 路径本身无问题,ffmpeg lavfi sine 生成正常)。修复:过滤器只留 `wav,mp3,flac`(另开「所有文件」),页面文案与 yue/audio.mbt 头注释写明集合边界,加载失败文案附「可先用 ffmpeg 转码」提示;不做静默自动转码(演示板应呈现 AudioEngine 真实能力,且同步转码大文件卡 UI)。
-- 本地文件与换源(systemprobe 多页化批次):FileDialog 选盘上视频(过滤器 mp4/mkv/mov/avi/webm 等),`VideoPlayer::make` 走 12fps、宽 480 按源比例——帧集上限 1200 帧约对应前 100 秒,更长视频音轨完整、画面止于帧集上限(页面文案注明)。换源顺序必须是「旧播放器 stop(位置归零、旧刷新定时器随之休眠)→ free → 旧根视图 `remove_child_view` → 挂新节点」,乱序会留残音/残定时器。启动自动载入改为视频页首次挂载时触发(nav_page 惰性挂载,holder handle 里 set_timeout 300ms);音频页新增 AudioEngine 懒创建 + FileDialog 本地选择 + 200ms 轮询 is_playing 状态标签(自然播完自动回落「已停止」)。
+- 起因:用户真机载 MP3 报 `音频加载失败: Invalid file`(浏览器可播)。独立 C 程序直链同一份 miniaudio 0.11.25 实测:libmp3lame 标准 MP3、系统 MP3 全部解码 OK——miniaudio 上游没有坏,是 `CorvusCinereus/miniaudio` MoonBit 封装的错误语义脏(load_sound 复用 engine->result 传错误码,加载失败后引擎 result 被污染,后续所有 load 永远报 Invalid file)且解码器集合仅 WAV/MP3/FLAC(OGG 需 stb_vorbis、m4a/aac 无内置)。用户定案:音频也交给 ffmpeg(全格式、与视频同栈、音画同源)。
+- 架构:**ffmpeg 管解码,miniaudio 只管输出设备**。miniaudio.h(0.11.25 上游单头)vendored 进 `modules/yue-media/src/`,与 audio_stub.c 一起作为 native-stub 编译——miniaudio 从「MoonBit 依赖(mooncakes)」降级为「播放器的内部实现细节」,不再出现在任何 moon.mod import 里,不引入 yue-media 的人零感知。
+- 设备层设计(audio_stub.c):ma_device(playback,s16,声道/采样率与 ffmpeg 解码输出一致零重采样)+ 互斥锁保护的 PCM chunk 链表;MoonBit 层 pump(50ms)把 decode_pcm 的字节 push 进队列(高水位 40KB≈0.3s),设备回调线程从队列取数混出、音量在回调内逐样本钳制乘。位置 = 设备累计消费字节(played_bytes)- seek 时记录的基准;自然播完 = demuxer EOF && 队列空。seek = 清队列 + 双 Demuxer 重定位 + 重填。
+- **无输出设备降级**:headless/CI 环境 ma_device_init 失败时返回哑设备句柄(has_device=0),push 静默丢弃、状态机照常(pump 按 tick×25ms 近似推进位置)——AudioPlayer 冒烟在无设备环境也能全断言跑通,不为环境写跳过分支。
+- AudioPlayer/VideoPlayer 共用这套设备层;组件(audio_player_t/video_player_t)50ms 时钟 pump+refresh,free 后凭 closed 标志停摆。
+- 踩坑:① C 侧 data_callback 里消费 chunk 后 queued_bytes 统计口径要统一 recount(半播块/整块消费混写递减会漏);② ma_device_init 是三参 (context,cfg,device),漏 context 编译错;③ MoonBit `guard` 是保留字(循环哨兵变量名撞上,Parse error);④ 自定义 Node 的 mount 闭包返回 View 不是 Node(结尾 `(row.mount)(parent)`);⑤ 换载 free 旧播放器后旧组件 50ms 时钟还在 pump 已释放的 FFI 句柄(悬垂)——free() 置 closed、时钟查 is_closed 返回 false 停摆,同理 VideoPlayer::duration 改用 make 时缓存的字段(free 后旧时钟的 refresh 曾会调 demuxer.duration_s() 解引用已释放的 fmt)。
+- 真机验证:AudioPlayer 冒烟 1 秒 MP3 从 play 到自然播完 17 tick(真实设备消费队列,非降级路径)+seek/循环重播/错误路径;VideoPlayer 双路(视频帧+音轨 PCM 队列)与无音轨静音路径;全仓 575 测全绿;systemprobe 冒烟进程存活。
+
+### 视频播放器(FFI 双 Demuxer:视频帧 + 音轨 PCM 直出)
+
+- 组件:VideoPlayer + video_player_t(播放/暂停/进度拖拽/音量/循环/时间文本)。2026-10 音频并入后:音轨是同文件的第二个独立 Demuxer(读游标与视频互不干扰),vp_tick 每 tick 解一帧视频 + 补音频队列到高水位;音画从 play/seek 点各自起播,误差数十毫秒级(精确同步需音频光标回读,留后续)。
+- seek 实现:avformat_seek_file 时间戳级(视频/音频 Demuxer 各自 seek + 解码器 flush + swr 重 init),拖拽防抖 180ms;不再走 ffmpeg CLI 切段(音轨 CLI 提取/切段残留 audio_extract.mbt 已删,媒体链路零 CLI)。
+- 音轨失败(无音轨/解码器不可用/无设备)时自动静音播放,不阻断视频路径。
+- 换源顺序必须是「旧播放器 stop → free(closed 置位,旧刷新定时器停摆)→ 旧根视图 `remove_child_view` → 挂新节点」,乱序会留残音/残定时器。systemprobe 视频页首次挂载 set_timeout 300ms 自动载入(make 同步耗时);音频页换 AudioPlayer 后:载入即播放、控制条 audio_player_t 挂 holder、200ms 轮询 is_playing 状态标签、演示素材改 MP3(lavfi + libmp3lame)。
 
 ## 维护约定
 
