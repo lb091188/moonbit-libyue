@@ -91,6 +91,10 @@ Methodology: Ubuntu 24.04 XFCE (X11), same machine and session; the startup delt
 - **A standalone translation unit (e.g. `yue_accent_mac.mm`) that does not include `yue_mbt.h` must mark its function definitions `extern "C"` explicitly**: without it they export C++-mangled (`__Z25yue_mbt_system_accent_macv`) while `yue_mbt.cpp` references the plain-C name from the header — link-time undefined. Only macOS exposes this (Linux/Windows never compile the .mm), and neither does the vendor/CI prepare stage (a static archive never checks undefined) — only a real macOS link (moon test/build) hits it; with no local mac, CI is the only defense line. Actually fixed ahead of the 0.5.0 release (symbol re-verified via strings on the re-vendored archive as `_yue_mbt_system_accent_mac`).
 - The XFCE panel prioritizes IconPixmap over IconName: set_icon_name and set_pixmap are mutually exclusive — setting one must clear the other.
 
+### Audio decoding capability boundary (miniaudio)
+
+- AudioEngine's decodable formats are exactly miniaudio's built-in decoder set — **WAV / MP3 / FLAC only** (probe-verified 2026-10: generated mp3/flac/m4a/ogg samples and loaded each via a throwaway wbtest; mp3/flac/wav load fine, m4a and ogg both fail with `LoadFailed: Invalid file`). Root cause: miniaudio's Vorbis decoding needs an external stb_vorbis (this binding doesn't integrate one), and m4a/aac/opus/wma/aiff have no built-in decoder at all. The trap takes the form of "docs and filters claiming a superset": a file-dialog filter listing m4a/aac/ogg plus copy saying "WAV/MP3/FLAC/OGG etc." invites users straight into Invalid file (the ffmpeg-generated demo wav itself loads fine). Fix: filter only `wav,mp3,flac` (plus an "All files" entry), state the set boundary in the page copy and the yue/audio.mbt header comment, and append a "convert with ffmpeg first" hint to the load-failure message; no silent auto-transcoding (a demo board should show AudioEngine's real capability, and synchronous transcoding of large files would block the UI).
+
 ## Linux
 
 ### Distributions
