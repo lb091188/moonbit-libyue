@@ -52,6 +52,7 @@ pub(all) struct AudioPlayer {
   eof : Ref[Bool]
   closed : Ref[Bool]
   played_base : Ref[Int64]
+  pos_base : Ref[Double]
   muted_ticks : Ref[Int]
 }
 
@@ -68,14 +69,15 @@ pub fn AudioPlayer::is_playing(self : AudioPlayer) -> Bool {
 }
 
 ///|
-/// 播放位置（秒；按设备已消费字节换算，静音降级按 tick 近似）。
+/// 播放位置（秒，媒体时间轴）：seek 基准位置 + 自基准以来设备已消费
+/// 秒数；静音降级按 tick 近似累加。
 pub fn AudioPlayer::current(self : AudioPlayer) -> Double {
   match self.dev.val {
     Some(d) =>
       if mbt_adev_has_device(d) == 1 {
         let consumed = mbt_adev_played_bytes(d) - self.played_base.val
         let frames = consumed.to_double() / (self.channels * 2).to_double()
-        let t = frames / self.rate.to_double()
+        let t = self.pos_base.val + frames / self.rate.to_double()
         if t < 0.0 {
           0.0
         } else if self.duration_s > 0.0 && t > self.duration_s {
@@ -85,7 +87,7 @@ pub fn AudioPlayer::current(self : AudioPlayer) -> Double {
         }
       } else {
         // 哑设备：每 tick 解一帧（一帧 ≈ 25ms）近似推进
-        self.muted_ticks.val.to_double() * 0.025
+        self.pos_base.val + self.muted_ticks.val.to_double() * 0.025
       }
     None => 0.0
   }
@@ -192,7 +194,8 @@ pub fn AudioPlayer::stop(self : AudioPlayer) -> Unit {
 }
 
 ///|
-/// 跳转（秒；清队列重定位，播放中从新位置续播）。
+/// 跳转（秒；清队列重定位，播放中从新位置续播）。位置基准取 target
+/// （消费字节从零重新累计），current() 落在新位置而非从 0 重新涨。
 pub fn AudioPlayer::seek(self : AudioPlayer, t : Double) -> Unit {
   if self.closed.val {
     return
@@ -206,6 +209,7 @@ pub fn AudioPlayer::seek(self : AudioPlayer, t : Double) -> Unit {
     None => ()
   }
   ignore(self.demuxer.seek(target))
+  self.pos_base.val = target
   self.eof.val = false
   self.muted_ticks.val = 0
   if self.state.val is ApPlaying {
@@ -252,13 +256,13 @@ pub fn AudioPlayer::pump(self : AudioPlayer) -> Unit {
           }
         }
       } else {
-        // 哑设备：解一段丢一段，按 tick×25ms 近似推进，到时长转态
+        // 哑设备：解一段丢一段，按基准位置+tick×25ms 近似推进，到时长转态
         match self.demuxer.decode_pcm() {
           Some(_) => ()
           None => self.eof.val = true
         }
         self.muted_ticks.val = self.muted_ticks.val + 1
-        let played = self.muted_ticks.val.to_double() * 0.025
+        let played = self.current()
         if self.eof.val || played >= self.duration_s {
           if self.looping.val {
             self.ap_restart()
@@ -293,7 +297,7 @@ fn AudioPlayer::ap_fill(self : AudioPlayer) -> Unit {
 }
 
 ///|
-/// 回到起点（清队列 + seek 0 + 重填）。
+/// 回到起点（清队列 + seek 0 + 重填；位置基准归零）。
 fn AudioPlayer::ap_restart(self : AudioPlayer) -> Unit {
   match self.dev.val {
     Some(d) => {
@@ -303,6 +307,7 @@ fn AudioPlayer::ap_restart(self : AudioPlayer) -> Unit {
     None => ()
   }
   ignore(self.demuxer.seek(0.0))
+  self.pos_base.val = 0.0
   self.eof.val = false
   self.muted_ticks.val = 0
   self.state.val = ApPlaying
@@ -320,6 +325,7 @@ fn AudioPlayer::ap_reset_pos(self : AudioPlayer) -> Unit {
     None => ()
   }
   ignore(self.demuxer.seek(0.0))
+  self.pos_base.val = 0.0
   self.eof.val = false
   self.muted_ticks.val = 0
 }
@@ -348,7 +354,7 @@ pub fn AudioPlayer::make(
     demuxer.close()
     return Err("无效音频参数 ch=\{ch} rate=\{rate}")
   }
-  let dev : AdevBox = { h: mbt_adev_open(ch, rate) }
+  let dev : AdevBox = { h: mbt_adev_open(ch, rate), }
   Ok({
     demuxer,
     dev: Ref(Some(dev.h)),
@@ -361,6 +367,7 @@ pub fn AudioPlayer::make(
     eof: Ref(false),
     closed: Ref(false),
     played_base: Ref(0L),
+    pos_base: Ref(0.0),
     muted_ticks: Ref(0),
   })
 }
@@ -390,11 +397,7 @@ extern "c" fn mbt_adev_pause(p : MbtAdev) -> Int = "mbt_adev_pause"
 
 ///|
 #borrow(p, data)
-extern "c" fn mbt_adev_push(
-  p : MbtAdev,
-  data : Bytes,
-  len : Int,
-) -> Int = "mbt_adev_push"
+extern "c" fn mbt_adev_push(p : MbtAdev, data : Bytes, len : Int) -> Int = "mbt_adev_push"
 
 ///|
 #borrow(p)
