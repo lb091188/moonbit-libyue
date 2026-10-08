@@ -1,5 +1,6 @@
 // ---------------------------------------------------------------------------
-// 视频播放器组件：画面（黑底 letterbox）+ 悬浮控制条（悬停显隐）+ 全屏
+// 视频播放器组件：画面（黑底 + 等比/原始两模式）+ 悬浮控制条（移动
+// 唤醒显隐）+ 全屏（独立窗口自绘画面）
 // ---------------------------------------------------------------------------
 
 ///|
@@ -22,12 +23,45 @@ fn vpc_frame_image(bytes : Bytes, width : Int, height : Int) -> @yue.Image? {
 }
 
 ///|
-/// 视频播放器组件（对标浏览器 <video> 的控件级体验）：画面黑底、帧按
-/// 宽高比 letterbox 居中绘制；控制条悬浮于画面底部（position absolute
-/// 半透明黑），指针进入画面显示、播放中移开 800ms 后自动隐藏（暂停/
-/// 未播常显）。全屏为独立全屏窗口承载画面容器（re-parent，播放器 FFI
-/// 与时钟不动）：双击画面或控制条按钮进入，Esc / 按钮 / 窗口关闭退出。
-/// 50ms 时钟驱动帧推进 + schedule_paint + 控制条刷新。
+/// 显示模式:等比缩放(letterbox 适配容器)/ 原始尺寸(1:1 像素居中,
+/// 超出容器裁剪)。
+pub(all) enum VpFitMode {
+  VpFitContain
+  VpFitOriginal
+}
+
+///|
+/// 在 (b_w × b_h) 区域按显示模式画视频帧(等比:缩放至完整可见居中;
+/// 原始:源像素尺寸居中)。
+fn vpc_draw_video(
+  p : @yue.Painter,
+  b_w : Double,
+  b_h : Double,
+  img : @yue.Image,
+  vw : Double,
+  vh : Double,
+  fit : VpFitMode,
+) -> Unit {
+  if vw <= 0.0 || vh <= 0.0 || b_w <= 0.0 || b_h <= 0.0 {
+    return
+  }
+  let (dw, dh) = match fit {
+    VpFitContain => {
+      let s = if b_w / vw < b_h / vh { b_w / vw } else { b_h / vh }
+      (vw * s, vh * s)
+    }
+    VpFitOriginal => (vw, vh)
+  }
+  p.draw_image(img, (b_w - dw) / 2.0, (b_h - dh) / 2.0, dw, dh)
+}
+
+///|
+/// 视频播放器组件（对标浏览器 <video> 的控件级体验）：画面黑底,帧按
+/// 显示模式绘制(等比 letterbox / 原始 1:1,控制条按钮切换);控制条悬浮
+/// 画面底部(半透明黑、白色控件),鼠标进入或移动即显示,静止 1 秒或移出
+/// 后隐藏(与播放状态无关;拖动进度期间顺延)。全屏为独立全屏窗口自绘
+/// 画面(画面绘制与事件挂到全屏根容器,几何来自窗口布局):双击画面或
+/// 按钮进入,Esc / 按钮 / 窗口关闭退出。50ms 时钟驱动帧推进与刷新。
 pub fn video_player_t(
   player : VideoPlayer,
   style? : Array[(String, &@yue.StyVal)] = [],
@@ -48,14 +82,17 @@ pub fn video_player_t(
       let syncing : Ref[Bool] = Ref(false)
       // 用户拖动/防抖期间锁住进度条,refresh 不得覆盖用户拖到的位置
       let user_seeking : Ref[Bool] = Ref(false)
-      // 悬停显隐:指针在画面/控制条内保持显示;移开延时隐藏(拖动中不藏)
+      // 悬浮控制条显隐:进入/移动即显示并排静止计时;静止 1s 或移出
+      // (250ms 短延时防指针滑经控制条时画面 leave 先到而闪烁)后隐藏,
+      // 与播放状态无关;拖动进度期间顺延
       let pointer_in : Ref[Bool] = Ref(false)
       let hide_timer : Ref[Int] = Ref(-1)
-      // 全屏状态:画面容器 re-parent 进独立全屏窗口,退出时归还组件
+      // 显示模式与全屏状态
+      let fit_mode : Ref[VpFitMode] = Ref(VpFitContain)
       let fs_active : Ref[Bool] = Ref(false)
       let fs_win : Ref[@yue.Window?] = Ref(None)
       let fs_root : Ref[@yue.Container?] = Ref(None)
-      // ---- 画面容器（黑底 letterbox）----
+      // 画面容器(创建于事件装配前,绘制与事件函数都引用它)
       let view_style : Array[(String, &@yue.StyVal)] = [
         ("width", 480.0),
         ("height", 300.0),
@@ -64,46 +101,42 @@ pub fn video_player_t(
         view_style.push(kv)
       }
       let cv = @yue.themed_container(style=view_style)
-      cv.on_draw(fn(p) {
-        let b = @yue.ViewLike::get_bounds(cv)
+      // 画面绘制:黑底 + 帧按显示模式(画面容器与全屏根容器共用)
+      fn vpc_paint_frame(host : @yue.Container, p : @yue.Painter) -> Unit {
+        let b = @yue.ViewLike::get_bounds(host)
         p.set_fill_color("#000000")
         p.fill_rect(0.0, 0.0, b.width, b.height)
         match player.current_frame() {
           Some(rgba) => {
-            let vw = player.frame_width().to_double()
-            let vh = player.frame_height().to_double()
-            if vw > 0.0 && vh > 0.0 && b.width > 0.0 && b.height > 0.0 {
-              match
-                vpc_frame_image(
-                  rgba,
-                  player.frame_width(),
-                  player.frame_height(),
-                ) {
-                Some(img) => {
-                  // letterbox:等比缩放居中,四周留黑
-                  let s = if b.width / vw < b.height / vh {
-                    b.width / vw
-                  } else {
-                    b.height / vh
-                  }
-                  let dw = vw * s
-                  let dh = vh * s
-                  p.draw_image(
-                    img,
-                    (b.width - dw) / 2.0,
-                    (b.height - dh) / 2.0,
-                    dw,
-                    dh,
-                  )
-                }
-                None => ()
-              }
+            let vw = player.frame_width()
+            let vh = player.frame_height()
+            match vpc_frame_image(rgba, vw, vh) {
+              Some(img) =>
+                vpc_draw_video(
+                  p,
+                  b.width,
+                  b.height,
+                  img,
+                  vw.to_double(),
+                  vh.to_double(),
+                  fit_mode.val,
+                )
+              None => ()
             }
           }
           None => ()
         }
-      })
-      // ---- 控制条（悬浮画面底部,半透明黑）----
+      }
+      // 当前画面宿主重绘(全屏时画面画在全屏根容器上)
+      fn vpc_repaint() -> Unit {
+        match fs_root.val {
+          Some(root) => @yue.ViewLike::schedule_paint(root)
+          None => ()
+        }
+        @yue.ViewLike::schedule_paint(cv)
+      }
+      cv.on_draw(fn(p) { vpc_paint_frame(cv, p) })
+      // ---- 控制条(悬浮画面底部,半透明黑 + 白色控件) ----
       let ctrl_bar = @yue.themed_container(style=[
         ("position", "absolute"),
         ("bottom", "0"),
@@ -120,10 +153,7 @@ pub fn video_player_t(
         p.set_fill_color("#00000080")
         p.fill_rect(0.0, 0.0, b.width, b.height)
       })
-      // 悬浮控制条显隐(画面与控制条共用:指针移到控制条时 GTK 会先给
-      // 画面发 leave,控制条自身 enter/move 兜底):进入或移动即显示并排
-      // 静止计时;静止 1s 或移出(250ms 短延时,防滑经控制条时闪烁)后,
-      // 播放中隐藏;拖动进度期间顺延;暂停/未播由 refresh 常显
+      // 显隐调度
       fn ctrl_schedule_hide(ms : Int) -> Unit {
         if hide_timer.val >= 0 {
           @yue.clear_timeout(hide_timer.val)
@@ -133,12 +163,11 @@ pub fn video_player_t(
           if player.is_closed() {
             return
           }
-          if player.is_playing() {
-            if user_seeking.val {
-              ctrl_schedule_hide(1000)
-            } else {
-              @yue.ViewLike::set_visible(ctrl_bar, false)
-            }
+          // 静止超时或移出:隐藏(与播放状态无关);拖动进度期间顺延
+          if user_seeking.val {
+            ctrl_schedule_hide(1000)
+          } else {
+            @yue.ViewLike::set_visible(ctrl_bar, false)
           }
         })
       }
@@ -219,12 +248,49 @@ pub fn video_player_t(
       ) {
         player.set_looping(on)
       })
-      // 全屏按钮（自绘:随全屏态切 Fullscreen/FullscreenExit 图标）
+      // 显示模式切换按钮(自绘:当前模式文字,点击等比/原始循环)
+      let fit_hover : Ref[Bool] = Ref(false)
+      let fit_btn = @yue.themed_container(style=[
+        ("width", 40.0),
+        ("height", 24.0),
+        ("marginLeft", 4.0),
+      ])
+      fn fit_label() -> String {
+        if fit_mode.val is VpFitContain {
+          "等比"
+        } else {
+          "原始"
+        }
+      }
+      fit_btn.on_draw(fn(p) {
+        let b = @yue.ViewLike::get_bounds(fit_btn)
+        if fit_hover.val {
+          p.set_fill_color("#ffffff26")
+          p.fill_rect(0.0, 0.0, b.width, b.height)
+        }
+        let at = @yue.AttributedText::new(
+          fit_label(),
+          valign=@yue.Center,
+          wrap=false,
+        )
+        at.set_font(@yue.Font::new("Sans", 12.0))
+        at.set_color("#ffffffd9")
+        p.draw_attributed_text(at, 0.0, 0.0, b.width, b.height)
+      })
+      @yue.ViewLike::on_mouse_enter(fit_btn, fn(_e) {
+        fit_hover.val = true
+        @yue.ViewLike::schedule_paint(fit_btn)
+      })
+      @yue.ViewLike::on_mouse_leave(fit_btn, fn(_e) {
+        fit_hover.val = false
+        @yue.ViewLike::schedule_paint(fit_btn)
+      })
+      // 全屏按钮(自绘:随全屏态切 Fullscreen/FullscreenExit 图标)
       let fs_hover : Ref[Bool] = Ref(false)
       let fs_btn = @yue.themed_container(style=[
         ("width", 28.0),
         ("height", 28.0),
-        ("marginLeft", 4.0),
+        ("marginLeft", 2.0),
       ])
       fs_btn.on_draw(fn(p) {
         let b = @yue.ViewLike::get_bounds(fs_btn)
@@ -254,11 +320,39 @@ pub fn video_player_t(
         fs_hover.val = false
         @yue.ViewLike::schedule_paint(fs_btn)
       })
-      // ---- 组件根（box 只装画面;控制条悬浮在画面内）----
+      // ---- 组件根(box 只装画面;控制条悬浮在画面内) ----
       let box = @yue.themed_container(style=[("flexDirection", "column")])
       box.add_child(cv)
-      // ---- 全屏（画面容器 re-parent 进/出独立全屏窗口）----
-      // 归还画面并收窗口（fs_active 防重入;不触碰播放器 FFI）
+      // ---- 画面宿主事件(Esc/双击/悬停显隐;画面容器与全屏根容器
+      // 各挂一份,处理函数共用;ClickTracker 共享,鼠标只落一处) ----
+      let dbl = @yue.ClickTracker::new()
+      // 全屏动作经 Ref 间接绑定(事件装配先于 fs_exit/fs_toggle 定义,
+      // 局部函数无前向引用)
+      let fs_do_exit : Ref[() -> Unit] = Ref(fn() { () })
+      let fs_do_toggle : Ref[() -> Unit] = Ref(fn() { () })
+      fn vpc_wire_host(host : @yue.Container) -> Unit {
+        @yue.ViewLike::on_key_down(host, fn(e) {
+          if fs_active.val && e.code == @yue.VKEY_ESCAPE {
+            (fs_do_exit.val)()
+            true
+          } else {
+            false
+          }
+        })
+        @yue.ViewLike::on_mouse_down(host, fn(e) {
+          if e.button == 1 && dbl.feed(e) >= 2 {
+            (fs_do_toggle.val)()
+            true
+          } else {
+            false
+          }
+        })
+        @yue.ViewLike::on_mouse_enter(host, fn(_e) { ctrl_wake() })
+        @yue.ViewLike::on_mouse_move(host, fn(_e) { ctrl_wake() })
+        @yue.ViewLike::on_mouse_leave(host, fn(_e) { ctrl_leave() })
+      }
+      // ---- 全屏:独立全屏窗口自绘画面 ----
+      // 控制条归还画面容器并收窗口(fs_active 防重入;不触碰播放器 FFI)
       fn fs_exit_quiet() -> Unit {
         if !fs_active.val {
           return
@@ -270,9 +364,9 @@ pub fn video_player_t(
             fs_root.val = None
             let _ = @yue.Container::remove_child_view(
               root,
-              @yue.ViewLike::view(cv),
+              @yue.ViewLike::view(ctrl_bar),
             )
-            box.add_child(cv)
+            cv.add_child(ctrl_bar)
             w.close()
             @yue.ViewLike::schedule_paint(cv)
           }
@@ -290,38 +384,27 @@ pub fn video_player_t(
           return
         }
         fs_active.val = true
-        // 根容器纯黑底承载画面（无 flex 约束,画面几何由 set_view_bounds
-        // 直写——GTK 运行期改布局样式不落地,几何直写是 splitter 定案）
+        // 全屏根容器:几何来自窗口布局(flex:1 即整屏),画面绘制/事件/
+        // 控制条都挂这里——不 re-parent 画面、不直写几何(set_view_bounds
+        // 直写会被后续布局事件冲掉,画面停在旧尺寸的根因)
         let root = @yue.themed_container(style=[("flex", 1.0)])
-        root.on_draw(fn(p) {
-          let b = @yue.ViewLike::get_bounds(root)
-          p.set_fill_color("#000000")
-          p.fill_rect(0.0, 0.0, b.width, b.height)
-        })
-        // WM 关闭(Alt+F4 等)兜底:归还画面再收窗口
+        root.on_draw(fn(p) { vpc_paint_frame(root, p) })
+        // WM 关闭(Alt+F4 等)兜底:归还控制条再收窗口
         let win = @yue.Window::make(on_close=fn(_w) { fs_exit_quiet() })
         win.set_fullscreen(true)
         fs_win.val = Some(win)
         fs_root.val = Some(root)
-        let _ = @yue.Container::remove_child_view(box, @yue.ViewLike::view(cv))
-        root.add_child(cv)
+        vpc_wire_host(root)
+        let _ = @yue.Container::remove_child_view(
+          cv,
+          @yue.ViewLike::view(ctrl_bar),
+        )
+        root.add_child(ctrl_bar)
         win.set_content(root)
         win.activate()
+        @yue.ViewLike::set_focusable(root, true)
+        @yue.ViewLike::focus(root)
         ctrl_wake()
-        // 全屏切换是异步窗口状态请求,延后一拍取屏幕尺寸直写画面几何;
-        // 退出后回 box 由原 width/height 样式重排恢复
-        let _ = @yue.set_timeout(150, fn() {
-          if fs_active.val {
-            match fs_win.val {
-              Some(w) => {
-                let sz = w.get_content_size()
-                @yue.set_view_bounds(cv, 0.0, 0.0, sz.width, sz.height)
-                @yue.ViewLike::schedule_paint(cv)
-              }
-              None => ()
-            }
-          }
-        })
         on_event("fullscreen")
       }
       fn fs_toggle() -> Unit {
@@ -331,9 +414,32 @@ pub fn video_player_t(
           fs_enter()
         }
       }
+      fs_do_exit.val = fn() { fs_exit() }
+      fs_do_toggle.val = fn() { fs_toggle() }
       let _ = @yue.ViewLike::on_mouse_down(fs_btn, fn(e) {
         if e.button == 1 {
           fs_toggle()
+          true
+        } else {
+          false
+        }
+      })
+      let _ = @yue.ViewLike::on_mouse_down(fit_btn, fn(e) {
+        if e.button == 1 {
+          fit_mode.val = if fit_mode.val is VpFitContain {
+            VpFitOriginal
+          } else {
+            VpFitContain
+          }
+          vpc_repaint()
+          @yue.ViewLike::schedule_paint(fit_btn)
+          on_event(
+            if fit_mode.val is VpFitContain {
+              "fit-contain"
+            } else {
+              "fit-original"
+            },
+          )
           true
         } else {
           false
@@ -345,34 +451,14 @@ pub fn video_player_t(
       ignore((time_lbl.mount)(@yue.ViewLike::view(ctrl_bar)))
       ignore((vol.mount)(@yue.ViewLike::view(ctrl_bar)))
       ignore((loop_cb.mount)(@yue.ViewLike::view(ctrl_bar)))
+      ctrl_bar.add_child(fit_btn)
       ctrl_bar.add_child(fs_btn)
       cv.add_child(ctrl_bar)
-      // ---- 画面事件:Esc 退出 / 双击切换 / 悬停显隐 ----
-      @yue.ViewLike::set_focusable(cv, true)
-      @yue.ViewLike::on_key_down(cv, fn(e) {
-        if fs_active.val && e.code == @yue.VKEY_ESCAPE {
-          fs_exit()
-          true
-        } else {
-          false
-        }
-      })
-      let dbl = @yue.ClickTracker::new()
-      @yue.ViewLike::on_mouse_down(cv, fn(e) {
-        if e.button == 1 && dbl.feed(e) >= 2 {
-          fs_toggle()
-          true
-        } else {
-          false
-        }
-      })
-      @yue.ViewLike::on_mouse_enter(cv, fn(_e) { ctrl_wake() })
-      @yue.ViewLike::on_mouse_move(cv, fn(_e) { ctrl_wake() })
-      @yue.ViewLike::on_mouse_leave(cv, fn(_e) { ctrl_leave() })
+      vpc_wire_host(cv)
       @yue.ViewLike::on_mouse_enter(ctrl_bar, fn(_e) { ctrl_wake() })
       @yue.ViewLike::on_mouse_move(ctrl_bar, fn(_e) { ctrl_wake() })
       @yue.ViewLike::on_mouse_leave(ctrl_bar, fn(_e) { ctrl_leave() })
-      // ---- 刷新（时间/按钮文本/进度/暂停常显控制条）----
+      // ---- 刷新(时间/按钮文本/进度) ----
       let refresh = fn() {
         // 用户拖动中不动进度条(否则拖到一半被弹回播放位置)
         if !user_seeking.val {
@@ -398,26 +484,27 @@ pub fn video_player_t(
             )
           None => ()
         }
-        // 暂停/未播常显;播放中且指针在外则维持隐藏态
-        if !player.is_playing() && !pointer_in.val {
-          @yue.ViewLike::set_visible(ctrl_bar, true)
-        }
       }
-      // ---- 50ms 时钟：帧推进 + 重绘 + 状态刷新（「只有第一帧」的修复
-      // 核心：每 tick vp_tick 解下一帧后必须 schedule_paint 画面容器） ----
+      // ---- 50ms 时钟：帧推进 + 重绘 + 状态刷新 ----
       let _ = @yue.set_timer(50, fn() {
         if player.is_closed() {
-          // 全屏中换载/释放:收掉全屏窗口归还画面(不触碰已释放的 FFI)
+          // 全屏中换载/释放:收掉全屏窗口归还控制条(不触碰 FFI)
           fs_exit_quiet()
           return false
         }
         if player.is_playing() {
           player.vp_tick()
+          match fs_root.val {
+            Some(root) => @yue.ViewLike::schedule_paint(root)
+            None => ()
+          }
           @yue.ViewLike::schedule_paint(cv)
         }
         refresh()
         true
       })
+      // 初始:控制条可见,静止 1s 后自动隐藏
+      ctrl_schedule_hide(1000)
       @yue.attach(parent, @yue.ViewLike::view(box))
       @yue.ViewLike::view(box)
     },
