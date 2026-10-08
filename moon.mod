@@ -19,6 +19,7 @@ import {
   "prowk/moonsqlitefile@0.8.0",
   "NoahLiu/yue-media@0.1.0",
   "NoahLiu/ffmpeg-mbt@0.1.0",
+  "mizchi/markdown@0.8.3",
 }
 
 options(
