@@ -148,6 +148,19 @@ VfDec *vf_open_video_decoder(VfFmt *f, int32_t out_w, int32_t out_h) {
     }
     d->width = out_w > 0 ? out_w : d->codec->width;
     d->height = out_h > 0 ? out_h : d->codec->height;
+    // 单边指定时另一边按源宽高比补齐(ffmpeg -1 语义):否则 480 宽+
+    // 源高会把 16:9 视频解码成竖长拉伸帧,后续 letterbox 无从校正
+    if (out_w > 0 && out_h <= 0 && d->codec->width > 0) {
+        d->height = (int)((double)d->codec->height * out_w / d->codec->width + 0.5);
+    } else if (out_h > 0 && out_w <= 0 && d->codec->height > 0) {
+        d->width = (int)((double)d->codec->width * out_h / d->codec->height + 0.5);
+    }
+    if (d->width < 1) {
+        d->width = 1;
+    }
+    if (d->height < 1) {
+        d->height = 1;
+    }
     d->frame = av_frame_alloc();
     d->pkt = av_packet_alloc();
     d->sws = sws_getContext(

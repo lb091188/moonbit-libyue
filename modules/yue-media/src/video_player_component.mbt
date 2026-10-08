@@ -150,7 +150,7 @@ pub fn video_player_t(
       ])
       ctrl_bar.on_draw(fn(p) {
         let b = @yue.ViewLike::get_bounds(ctrl_bar)
-        p.set_fill_color("#00000080")
+        p.set_fill_color("#80000000")
         p.fill_rect(0.0, 0.0, b.width, b.height)
       })
       // 显隐调度
@@ -201,7 +201,7 @@ pub fn video_player_t(
       let time_lbl = @yue.label_t(
         "0:00 / 0:00",
         role=@yue.Body,
-        color="#ffffffe6",
+        color="#e6ffffff",
         handle=fn(l) { time_label.val = Some(l) },
       )
       let progress = @yue.slider_t(
@@ -210,7 +210,7 @@ pub fn video_player_t(
         max=100.0,
         step=0.5,
         bar_color="#ffffff",
-        track_color="#ffffff3d",
+        track_color="#3dffffff",
         on_change=fn(v) {
           // 程序性刷新(refresh 的 Store.set)不触发 seek
           if syncing.val {
@@ -240,10 +240,10 @@ pub fn video_player_t(
         max=100.0,
         step=1.0,
         bar_color="#ffffff",
-        track_color="#ffffff3d",
+        track_color="#3dffffff",
         on_change=fn(v) { player.set_volume(v / 100.0) },
       )
-      let loop_cb = @yue.checkbox_t("循环", color="#ffffffe6", on_change=fn(
+      let loop_cb = @yue.checkbox_t("循环", color="#e6ffffff", on_change=fn(
         on,
       ) {
         player.set_looping(on)
@@ -265,7 +265,7 @@ pub fn video_player_t(
       fit_btn.on_draw(fn(p) {
         let b = @yue.ViewLike::get_bounds(fit_btn)
         if fit_hover.val {
-          p.set_fill_color("#ffffff26")
+          p.set_fill_color("#26ffffff")
           p.fill_rect(0.0, 0.0, b.width, b.height)
         }
         let at = @yue.AttributedText::new(
@@ -274,7 +274,7 @@ pub fn video_player_t(
           wrap=false,
         )
         at.set_font(@yue.Font::new("Sans", 12.0))
-        at.set_color("#ffffffd9")
+        at.set_color("#d9ffffff")
         p.draw_attributed_text(at, 0.0, 0.0, b.width, b.height)
       })
       @yue.ViewLike::on_mouse_enter(fit_btn, fn(_e) {
@@ -295,7 +295,7 @@ pub fn video_player_t(
       fs_btn.on_draw(fn(p) {
         let b = @yue.ViewLike::get_bounds(fs_btn)
         if fs_hover.val {
-          p.set_fill_color("#ffffff26")
+          p.set_fill_color("#26ffffff")
           p.fill_rect(0.0, 0.0, b.width, b.height)
         }
         let kind : @yue.IconKind = if fs_active.val {
@@ -309,7 +309,7 @@ pub fn video_player_t(
           b.width / 2.0,
           b.height / 2.0,
           15.0,
-          "#ffffffd9",
+          "#d9ffffff",
         )
       })
       @yue.ViewLike::on_mouse_enter(fs_btn, fn(_e) {
