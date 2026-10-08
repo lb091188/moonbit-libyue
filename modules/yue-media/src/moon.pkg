@@ -1,0 +1,12 @@
+import {
+  "NoahLiu/moonbit-libyue/yue" @yue,
+  "NoahLiu/ffmpeg-mbt/src" @ffmbt,
+}
+
+supported_targets = "native"
+
+options(
+  "native-stub": [
+    "audio_stub.c"
+  ]
+)

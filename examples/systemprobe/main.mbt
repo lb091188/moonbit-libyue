@@ -21,8 +21,7 @@ fn main {
     // 特效散点涟漪动画句柄:关窗时停止定时器
     eff_anim: @yue.EffAnim::make(),
     vid_player: Ref(None),
-    aud_engine: Ref(None),
-    aud_clip: Ref(None),
+    aud_ap: Ref(None),
   }
   ignore(
     @yue.mount_window(
@@ -123,13 +122,8 @@ fn main {
       center=true,
       on_close=fn(_w) {
         @yue.eff_stop(app.eff_anim)
-        // 音频先释放剪辑再释放引擎
-        match app.aud_clip.val {
-          Some(c) => c.free()
-          None => ()
-        }
-        match app.aud_engine.val {
-          Some(e) => e.free()
+        match app.aud_ap.val {
+          Some(a) => a.free()
           None => ()
         }
         match app.vid_player.val {

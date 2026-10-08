@@ -43,7 +43,7 @@ def main() -> int:
             {
                 "link_configs": [
                     {
-                        "package": "NoahLiu/ffmpeg/src",
+                        "package": "NoahLiu/ffmpeg-mbt/src",
                         "link_flags": " ".join(flags),
                     }
                 ]

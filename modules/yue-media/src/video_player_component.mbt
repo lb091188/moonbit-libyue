@@ -149,6 +149,9 @@ pub fn video_player_t(
       // ---- 50ms 时钟：帧推进 + 重绘 + 状态刷新（「只有第一帧」的修复
       // 核心：每 tick vp_tick 解下一帧后必须 schedule_paint 画面容器） ----
       let _ = @yue.set_timer(50, fn() {
+        if player.is_closed() {
+          return false
+        }
         if player.is_playing() {
           player.vp_tick()
           @yue.ViewLike::schedule_paint(cv)
