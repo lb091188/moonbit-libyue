@@ -453,6 +453,14 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 踩坑:① C 侧 data_callback 里消费 chunk 后 queued_bytes 统计口径要统一 recount(半播块/整块消费混写递减会漏);② ma_device_init 是三参 (context,cfg,device),漏 context 编译错;③ MoonBit `guard` 是保留字(循环哨兵变量名撞上,Parse error);④ 自定义 Node 的 mount 闭包返回 View 不是 Node(结尾 `(row.mount)(parent)`);⑤ 换载 free 旧播放器后旧组件 50ms 时钟还在 pump 已释放的 FFI 句柄(悬垂)——free() 置 closed、时钟查 is_closed 返回 false 停摆,同理 VideoPlayer::duration 改用 make 时缓存的字段(free 后旧时钟的 refresh 曾会调 demuxer.duration_s() 解引用已释放的 fmt)。
 - 真机验证:AudioPlayer 冒烟 1 秒 MP3 从 play 到自然播完 17 tick(真实设备消费队列,非降级路径)+seek/循环重播/错误路径;VideoPlayer 双路(视频帧+音轨 PCM 队列)与无音轨静音路径;全仓 575 测全绿;systemprobe 冒烟进程存活。
 
+### 播放器组件换载崩溃与 seek 防抖风暴(2026-10 真机)
+
+- 现象(用户真机):视频页「选择本地视频」后崩溃(段错误)、音频页「选择本地音频」后卡死。本机复现(GUI 复现程序模拟用户时序:演示视频播放中换载真实 960x720 大 mp4):稳定段错误,gdb 栈定格 `vf_seek_s → d->fmt->streams[...]` 悬垂。
+- 根因(两层叠加):①slider_t 的 on_change 对**程序性 Store.set 同样触发**(订阅无来源区分)——播放中 50ms 时钟每 tick 刷新进度条都排一个 180ms seek 防抖定时器(seek 风暴,每 ~230ms 一次冗余 seek);②换载时 vid_mount_player 先 make 新(含新设备)、free 旧,而旧组件的最后一个防抖定时器仍在飞,180ms 后触发对已 free 的 demuxer 调 vf_seek_s——use-after-free。触发窗口=「最后一次程序刷新排定的定时器恰落在 free 之后」,演示视频播放中换载必然命中。「卡死」是同源另一个面:FileDialog 回调里同步跑 make(大文件双 Demuxer find_stream_info + 设备握手,数秒)冻结 GTK 主循环,观感即死机。
+- 修复(三层):①组件 refresh 用 syncing 抑制标志包住 pos_store.set(程序性刷新不再触发 on_change/不再排 seek 定时器);②user_seeking 标志——用户拖动+防抖期间 refresh 跳过进度条(顺带修了拖到一半被弹回播放位置);③防抖闭包与两播放器全部公开 mutating 方法(play/pause/stop/seek/set_volume/set_looping)开头补 closed 守卫(free 后一律 no-op,残留闭包不触碰 FFI);④音频页 FileDialog 选完先 set_text「载入中」+ set_timeout(50) 延后 make(对话框先关、UI 先渲染,同步耗时不再叠加模态循环)。
+- 验证:复现程序(修复前 100% 段错误)修复后连跑 3 轮×20 秒全存活;575 测全绿;systemprobe 冒烟存活。真机视觉/交互验证由用户执行。
+- 顺带记档(GUI 复现方法论):yue 应用必须先 `@yue.initialize()` 再创建任何控件/窗口(mount_window 内的 Window::make 也依赖它),复现程序漏掉会在 `nu::View::View()` 处段错误或 `Gtk-ERROR: Can't create a GtkStyleContext without a display connection`,极易误判为音视频问题;`pgrep -f` 匹配 moon run 会命中 moon 父进程造成「进程存活」假象,验证存活要核对真实 exe 进程名或用 `moon run` 的退出码语义。
+
 ### 视频播放器(FFI 双 Demuxer:视频帧 + 音轨 PCM 直出)
 
 - 组件:VideoPlayer + video_player_t(播放/暂停/进度拖拽/音量/循环/时间文本)。2026-10 音频并入后:音轨是同文件的第二个独立 Demuxer(读游标与视频互不干扰),vp_tick 每 tick 解一帧视频 + 补音频队列到高水位;音画从 play/seek 点各自起播,误差数十毫秒级(精确同步需音频光标回读,留后续)。

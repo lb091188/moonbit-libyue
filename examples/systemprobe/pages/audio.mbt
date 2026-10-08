@@ -152,7 +152,19 @@ pub fn page_audio(app : @ui.ProbeApp) -> @yue.Node {
                     if dlg.run_for_window(w) {
                       let path = dlg.get_result()
                       app.toast_push("已选 \{path}", @yue.Success)
-                      aud_load(app, holder, ctrl_view, path, path_lbl, status, refresh)
+                      // 大文件探测/设备握手同步耗时,延后一拍让对话框先
+                      // 关、状态先渲染(UI 不冻结)
+                      match status.val {
+                        Some(l) => l.set_text("载入中:\{path}…")
+                        None => ()
+                      }
+                      refresh()
+                      let _ = @yue.set_timeout(
+                        50,
+                        fn() {
+                          aud_load(app, holder, ctrl_view, path, path_lbl, status, refresh)
+                        },
+                      )
                     }
                   }
                   None => ()

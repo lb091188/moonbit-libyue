@@ -121,6 +121,9 @@ pub fn AudioPlayer::is_muted(self : AudioPlayer) -> Bool {
 ///|
 /// 设置音量（0..1；钳制）。
 pub fn AudioPlayer::set_volume(self : AudioPlayer, v : Double) -> Unit {
+  if self.closed.val {
+    return
+  }
   let vol = media_clamp_volume(v)
   self.volume.val = vol
   match self.dev.val {
@@ -144,7 +147,7 @@ pub fn AudioPlayer::set_looping(self : AudioPlayer, on : Bool) -> Unit {
 ///|
 /// 开始播放（idle/paused/ended 从当前位置续播；ended 重头）。
 pub fn AudioPlayer::play(self : AudioPlayer) -> Unit {
-  if self.state.val is ApPlaying {
+  if self.closed.val || self.state.val is ApPlaying {
     return
   }
   if self.state.val is ApEnded {
@@ -163,6 +166,9 @@ pub fn AudioPlayer::play(self : AudioPlayer) -> Unit {
 ///|
 /// 暂停（设备停取，位置保留）。
 pub fn AudioPlayer::pause(self : AudioPlayer) -> Unit {
+  if self.closed.val {
+    return
+  }
   if self.state.val is ApPlaying {
     self.state.val = ApPaused
     match self.dev.val {
@@ -178,6 +184,9 @@ pub fn AudioPlayer::pause(self : AudioPlayer) -> Unit {
 ///|
 /// 停止（回起点；下次 play 从头播）。
 pub fn AudioPlayer::stop(self : AudioPlayer) -> Unit {
+  if self.closed.val {
+    return
+  }
   self.state.val = ApIdle
   self.ap_reset_pos()
 }
@@ -185,6 +194,9 @@ pub fn AudioPlayer::stop(self : AudioPlayer) -> Unit {
 ///|
 /// 跳转（秒；清队列重定位，播放中从新位置续播）。
 pub fn AudioPlayer::seek(self : AudioPlayer, t : Double) -> Unit {
+  if self.closed.val {
+    return
+  }
   let target = vp_clamp_t(t, self.duration_s)
   match self.dev.val {
     Some(d) => {
