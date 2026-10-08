@@ -422,6 +422,14 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 结论:版本代差一律升级 toolchain 解决(与 CI 对齐),不 fork 生态包;third_party/ 仅保留确无替代的 vendored。
 - 验证:moon clean 后全量重建 check 零警告、moon test 575 全绿、moon build 通过。
 
+### ffmpeg 动态链 FFI(workspace 子模块 modules/ffmpeg)
+
+- 形态:moon.work workspace 成员 `modules/ffmpeg`(module `NoahLiu/ffmpeg`),与主 module 并列、互不依赖(yue 不 import 它,避免给 GUI 库强加系统库依赖;按需直接使用)。动态链零 vendored:编译期 pkg-config 探测 libav*,运行期加载系统 .so。
+- **链接传播**:库包 moon.pkg 的 link 段不会传播给最终链接(AGENTS 规则 2 的老坑)——照主仓库架构给子模块挂自己的 `prebuild.py`(moon.mod options --moonbit-unstable-prebuild),输出 `{"link_configs":[{"package":"NoahLiu/ffmpeg/src","link_flags":"-lavformat ..."}]}` 自动传播给依赖方 main 包;link 段从 moon.pkg 移除。测试方式:在 module 目录内 `moon test src`(workspace 根的全量 test 会连带 examples,他人未完成代码会干扰)。
+- **FFI 三个坑(真机 gdb 定位)**:① extern 类型声明必须 `#external`(缺它时 GC 把 FFI 返回裸指针当 GC 堆对象,drop 走 mi_free 段错误——崩栈 moonbit_drop_object→mi_free);② C 侧句柄失败不返回 NULL,统一哑句柄+vf_ok 探测(NULL↔Option 转换语义不确定);③ MoonBit 侧中间裸值立即装 struct 字段再传(miniaudio 的持有模式)。FFI 指针参数按新 toolchain 要求逐个 `#borrow` 注解。
+- 真机验证:系统 mp4 真文件打开(stream 宽高/时长)→逐帧 RGBA 解码(帧尺寸恰 w*h*4)→seek 0.1s 后继续解码,3/3 测试过;错误路径(不存在文件 OpenFailed)与版本探测自包含。stub 单独 gcc 编链验证(pkg-config cflags/libs)。
+- 运行库版本:Ubuntu 24.04 = libavcodec60(avformat 60.16);CI 与本机一致需 apt 装 dev 包(见 modules/ffmpeg/README)。
+
 ### 视频播放器(浏览器级:seek 切段 + 音画同源时钟)
 
 - 组件:VideoPlayer + video_player_t(播放/暂停/进度拖拽/音量/循环/时间文本)。音画同步口径:音频(AudioEngine)与帧推进(set_timer 50ms)同为 play 起点、按播放位置走帧集随机访问,误差数十毫秒级。
