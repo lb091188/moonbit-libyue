@@ -1,7 +1,4 @@
 import {
   "NoahLiu/moonbit-libyue/yue",
   "NoahLiu/moonbit-libyue/examples/systemprobe/ui",
-  "NoahLiu/moonbit-libyue/examples/systemprobe/pages",
 }
-
-pkgtype(kind: "executable")
