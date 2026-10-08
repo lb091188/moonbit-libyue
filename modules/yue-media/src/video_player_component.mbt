@@ -120,34 +120,36 @@ pub fn video_player_t(
         p.set_fill_color("#00000080")
         p.fill_rect(0.0, 0.0, b.width, b.height)
       })
-      // 悬停显隐调度（画面与控制条共用:指针移到控制条时 GTK 会先给
-      // 画面发 leave,控制条自身 enter 兜底）
-      fn ctrl_show() -> Unit {
-        pointer_in.val = true
-        if hide_timer.val >= 0 {
-          @yue.clear_timeout(hide_timer.val)
-          hide_timer.val = -1
-        }
-        @yue.ViewLike::set_visible(ctrl_bar, true)
-      }
-      fn ctrl_schedule_hide() -> Unit {
+      // 悬浮控制条显隐(画面与控制条共用:指针移到控制条时 GTK 会先给
+      // 画面发 leave,控制条自身 enter/move 兜底):进入或移动即显示并排
+      // 静止计时;静止 1s 或移出(250ms 短延时,防滑经控制条时闪烁)后,
+      // 播放中隐藏;拖动进度期间顺延;暂停/未播由 refresh 常显
+      fn ctrl_schedule_hide(ms : Int) -> Unit {
         if hide_timer.val >= 0 {
           @yue.clear_timeout(hide_timer.val)
         }
-        hide_timer.val = @yue.set_timeout(800, fn() {
+        hide_timer.val = @yue.set_timeout(ms, fn() {
           hide_timer.val = -1
           if player.is_closed() {
             return
           }
-          // 播放中且指针已离开才隐藏;拖动进度期间顺延再查
-          if !pointer_in.val && player.is_playing() {
+          if player.is_playing() {
             if user_seeking.val {
-              ctrl_schedule_hide()
+              ctrl_schedule_hide(1000)
             } else {
               @yue.ViewLike::set_visible(ctrl_bar, false)
             }
           }
         })
+      }
+      fn ctrl_wake() -> Unit {
+        pointer_in.val = true
+        @yue.ViewLike::set_visible(ctrl_bar, true)
+        ctrl_schedule_hide(1000)
+      }
+      fn ctrl_leave() -> Unit {
+        pointer_in.val = false
+        ctrl_schedule_hide(250)
       }
       // ---- 控制条控件 ----
       let play_btn_node : @yue.Node = {
@@ -167,39 +169,54 @@ pub fn video_player_t(
           @yue.ViewLike::view(b)
         },
       }
-      let time_lbl = @yue.label_t("0:00 / 0:00", role=@yue.Body, handle=fn(l) {
-        time_label.val = Some(l)
-      })
-      let progress = @yue.slider_t(pos_store, min=0.0, max=100.0, step=0.5, on_change=fn(
-        v,
-      ) {
-        // 程序性刷新(refresh 的 Store.set)不触发 seek
-        if syncing.val {
-          return
-        }
-        user_seeking.val = true
-        if seek_defer.val >= 0 {
-          @yue.clear_timeout(seek_defer.val)
-        }
-        let dur = player.duration()
-        let target = if dur <= 0.0 { 0.0 } else { v / 100.0 * dur }
-        seek_defer.val = @yue.set_timeout(180, fn() {
-          seek_defer.val = -1
-          user_seeking.val = false
-          // 换载/释放后的残留定时器:不得触碰已 free 的 FFI 句柄
-          if player.is_closed() {
+      let time_lbl = @yue.label_t(
+        "0:00 / 0:00",
+        role=@yue.Body,
+        color="#ffffffe6",
+        handle=fn(l) { time_label.val = Some(l) },
+      )
+      let progress = @yue.slider_t(
+        pos_store,
+        min=0.0,
+        max=100.0,
+        step=0.5,
+        bar_color="#ffffff",
+        track_color="#ffffff3d",
+        on_change=fn(v) {
+          // 程序性刷新(refresh 的 Store.set)不触发 seek
+          if syncing.val {
             return
           }
-          player.seek(target)
-          on_event("seek")
-        })
-      })
-      let vol = @yue.slider_t(vol_store, min=0.0, max=100.0, step=1.0, on_change=fn(
-        v,
+          user_seeking.val = true
+          if seek_defer.val >= 0 {
+            @yue.clear_timeout(seek_defer.val)
+          }
+          let dur = player.duration()
+          let target = if dur <= 0.0 { 0.0 } else { v / 100.0 * dur }
+          seek_defer.val = @yue.set_timeout(180, fn() {
+            seek_defer.val = -1
+            user_seeking.val = false
+            // 换载/释放后的残留定时器:不得触碰已 free 的 FFI 句柄
+            if player.is_closed() {
+              return
+            }
+            player.seek(target)
+            on_event("seek")
+          })
+        },
+      )
+      let vol = @yue.slider_t(
+        vol_store,
+        min=0.0,
+        max=100.0,
+        step=1.0,
+        bar_color="#ffffff",
+        track_color="#ffffff3d",
+        on_change=fn(v) { player.set_volume(v / 100.0) },
+      )
+      let loop_cb = @yue.checkbox_t("循环", color="#ffffffe6", on_change=fn(
+        on,
       ) {
-        player.set_volume(v / 100.0)
-      })
-      let loop_cb = @yue.checkbox_t("循环", on_change=fn(on) {
         player.set_looping(on)
       })
       // 全屏按钮（自绘:随全屏态切 Fullscreen/FullscreenExit 图标）
@@ -290,7 +307,7 @@ pub fn video_player_t(
         root.add_child(cv)
         win.set_content(root)
         win.activate()
-        ctrl_show()
+        ctrl_wake()
         // 全屏切换是异步窗口状态请求,延后一拍取屏幕尺寸直写画面几何;
         // 退出后回 box 由原 width/height 样式重排恢复
         let _ = @yue.set_timeout(150, fn() {
@@ -349,16 +366,12 @@ pub fn video_player_t(
           false
         }
       })
-      @yue.ViewLike::on_mouse_enter(cv, fn(_e) { ctrl_show() })
-      @yue.ViewLike::on_mouse_leave(cv, fn(_e) {
-        pointer_in.val = false
-        ctrl_schedule_hide()
-      })
-      @yue.ViewLike::on_mouse_enter(ctrl_bar, fn(_e) { ctrl_show() })
-      @yue.ViewLike::on_mouse_leave(ctrl_bar, fn(_e) {
-        pointer_in.val = false
-        ctrl_schedule_hide()
-      })
+      @yue.ViewLike::on_mouse_enter(cv, fn(_e) { ctrl_wake() })
+      @yue.ViewLike::on_mouse_move(cv, fn(_e) { ctrl_wake() })
+      @yue.ViewLike::on_mouse_leave(cv, fn(_e) { ctrl_leave() })
+      @yue.ViewLike::on_mouse_enter(ctrl_bar, fn(_e) { ctrl_wake() })
+      @yue.ViewLike::on_mouse_move(ctrl_bar, fn(_e) { ctrl_wake() })
+      @yue.ViewLike::on_mouse_leave(ctrl_bar, fn(_e) { ctrl_leave() })
       // ---- 刷新（时间/按钮文本/进度/暂停常显控制条）----
       let refresh = fn() {
         // 用户拖动中不动进度条(否则拖到一半被弹回播放位置)
