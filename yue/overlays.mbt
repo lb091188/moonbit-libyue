@@ -34,7 +34,7 @@ pub fn dialog_t(
         ("justifyContent", "center"),
         ("alignItems", "center"),
       ])
-      ViewLike::set_background_color(overlay, "#00000059")
+      ViewLike::set_background_color(overlay, "#59000000")
       // 面板:主题面板底 + 1px 边框(on_draw 描);style 落面板
       let base : Array[(String, &StyVal)] = [
         ("width", 420.0),
