@@ -142,6 +142,7 @@ pub fn video_player_t(
         ("bottom", "0"),
         ("left", "0"),
         ("right", "0"),
+        ("height", 40.0),
         ("flexDirection", "row"),
         ("alignItems", "center"),
         ("gap", 8.0),
@@ -183,16 +184,20 @@ pub fn video_player_t(
       // ---- 控制条控件 ----
       let play_btn_node : @yue.Node = {
         mount: fn(parent) {
-          let b = @yue.Button::new("播放")
-          b.on_click(fn() {
-            if player.is_playing() {
-              player.pause()
-              on_event("pause")
-            } else {
-              player.play()
-              on_event("play")
-            }
-          })
+          // 高 28 与等比/全屏自绘按钮统一(内建高度偏大,行内不齐)
+          let b = @yue.Button::make(
+            "播放",
+            on_click=fn() {
+              if player.is_playing() {
+                player.pause()
+                on_event("pause")
+              } else {
+                player.play()
+                on_event("play")
+              }
+            },
+            style=[("height", 28.0)],
+          )
           play_btn.val = Some(b)
           @yue.attach(parent, @yue.ViewLike::view(b))
           @yue.ViewLike::view(b)
@@ -211,6 +216,8 @@ pub fn video_player_t(
         step=0.5,
         bar_color="#ffffff",
         track_color="#3dffffff",
+        // 内建 marginBottom 10 会把滑杆顶离行中线,归 0 交给 alignItems 居中
+        style=[("marginBottom", 0.0)],
         on_change=fn(v) {
           // 程序性刷新(refresh 的 Store.set)不触发 seek
           if syncing.val {
@@ -241,19 +248,20 @@ pub fn video_player_t(
         step=1.0,
         bar_color="#ffffff",
         track_color="#3dffffff",
+        style=[("marginBottom", 0.0)],
         on_change=fn(v) { player.set_volume(v / 100.0) },
       )
-      let loop_cb = @yue.checkbox_t("循环", color="#e6ffffff", on_change=fn(
-        on,
-      ) {
-        player.set_looping(on)
-      })
+      let loop_cb = @yue.checkbox_t(
+        "循环",
+        color="#e6ffffff",
+        style=[("marginBottom", 0.0)],
+        on_change=fn(on) { player.set_looping(on) },
+      )
       // 显示模式切换按钮(自绘:当前模式文字,点击等比/原始循环)
       let fit_hover : Ref[Bool] = Ref(false)
       let fit_btn = @yue.themed_container(style=[
-        ("width", 40.0),
-        ("height", 24.0),
-        ("marginLeft", 4.0),
+        ("width", 44.0),
+        ("height", 28.0),
       ])
       fn fit_label() -> String {
         if fit_mode.val is VpFitContain {
@@ -275,7 +283,8 @@ pub fn video_player_t(
         )
         at.set_font(@yue.Font::new("Sans", 12.0))
         at.set_color("#d9ffffff")
-        p.draw_attributed_text(at, 0.0, 0.0, b.width, b.height)
+        let tw = at.get_bounds_for(10000.0, 100.0).width
+        p.draw_attributed_text(at, (b.width - tw) / 2.0, 0.0, b.width, b.height)
       })
       @yue.ViewLike::on_mouse_enter(fit_btn, fn(_e) {
         fit_hover.val = true
@@ -290,7 +299,6 @@ pub fn video_player_t(
       let fs_btn = @yue.themed_container(style=[
         ("width", 28.0),
         ("height", 28.0),
-        ("marginLeft", 2.0),
       ])
       fs_btn.on_draw(fn(p) {
         let b = @yue.ViewLike::get_bounds(fs_btn)
