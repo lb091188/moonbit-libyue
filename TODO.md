@@ -9,17 +9,17 @@
 - [ ] MD1 引入 mizchi/markdown 0.8.3 并 native 实证——独立探针示例 parse / render_html / serialize 三调用 native 跑通,根 moon.mod 钉 @0.8.3,5 个传递依赖对 mooncakes 发布链的隔离方案定案
 - [ ] MD2 markdown_view 解析切换 mdast——旧自写解析器删除不留双轨,样式区间端点统一码点→UTF-16 换算(含 emoji 文本样式不错位),moon test 全绿
 - [ ] MD3 GFM 渲染面补齐——表格 / 任务列表 / 脚注 / 删除线 / 图片 / 可点击链接可渲染,showcase「代码与文档」页演示与复制串同源并补新语法,components-ui 中英能力清单同步
-- [ ] SYS1 sysmonitor Windows 数据层——stub/sysmon.c Windows 分支以 Win32 补齐 CPU / 内存 / 磁盘 / 网络 / 进程 / GPU 七路数据源(GetSystemTimes、GlobalMemoryStatusEx、PDH、DXGI、EnumProcesses 等,子进程原语 CREATE_NO_WINDOW),解析纯函数单测全绿
-- [ ] SYS2 sysmonitor Windows 语义归一——kill / 优先级 / 错误码翻译为统一语义形态,温度等不可用来源按卡显示「—」,UI 文案平台化,TODO 边界节同步
-- [ ] SYS3 sysmonitor macOS 数据层——stub 补 macOS 分支(proc_listpids 进程枚举、sysctl CPU/内存、getfsstat+statvfs 磁盘、getifaddrs 网络、system_profiler -json GPU 子进程),IO 速率与温度按边界显示「—」
-- [ ] SYS4 Linux GPU 利用率补全(Intel 集显 / AMD)——DRM fdinfo 聚合采样免 root 得全卡利用率(AMD 保留 sysfs gpu_busy_percent 优先、fdinfo 兜底),「常规显卡数据无需超管、debugfs 细分不支持、polkit 暂不集成」边界入 adaptation.md
+- [ ] SYS1 sysmonitor Windows 数据层——stub/sysmon.c Windows 分支以 Win32 补齐 CPU / 内存 / 磁盘 / 网络 / 进程 / GPU / 温度七路数据源(GetSystemTimes、GlobalMemoryStatusEx、PDH、DXGI、EnumProcesses 等,子进程原语 CREATE_NO_WINDOW),解析纯函数单测全绿,真机五页出数据(真机验证项列清单由用户执行)
+- [ ] SYS2 sysmonitor Windows 语义归一——kill / 优先级 / 错误码翻译为统一语义形态且错误码翻译表单测全绿,温度等不可用来源按卡显示「—」,UI 文案平台化,TODO 边界节同步(实际终止 / 提权行为真机验证项列清单由用户执行)
+- [ ] SYS3 sysmonitor macOS 数据层——stub 补 macOS 分支(proc_listpids 进程枚举、sysctl CPU/内存、getfsstat+statvfs 磁盘、getifaddrs 网络、system_profiler -json GPU 子进程),IO 速率与温度按边界显示「—」,解析纯函数单测全绿(真机验证项列清单由用户执行)
+- [ ] SYS4 Linux GPU 利用率补全(Intel 集显 / AMD)——DRM fdinfo 聚合采样免 root 得全卡利用率(AMD 保留 sysfs gpu_busy_percent 优先、fdinfo 兜底),「常规显卡数据无需超管、debugfs 细分不支持、polkit 暂不集成」边界入 adaptation.md,解析纯函数单测全绿
 - [ ] SYS5 GPU 型号名解析——AMD / Intel 显卡经 pci.ids 显示商业型号(查不到回退现 id 显示),解析纯函数单测全绿
 - [ ] DOC1 英文 components-ui.md 补齐——第二批九图表与图表交互层整章翻译入英文档,Scroll::refresh_content_size 等三处英文滞后点同步,与 docs/README.md 索引描述对齐
-- [ ] DOC2 文档签名错误与过时描述批量修复——7 处 width/height 示例改 style 传参、declarative 中英括号错配示例、theme_* 过时描述、「四个示例」计数、aboutlibyue / plan-system-integration 索引缺项、README 组件数量口径、adaptation scroll() 过时陈述、system-capabilities Result 括号笔误全部修正
+- [ ] DOC2 文档签名错误与过时描述批量修复——7 处 width/height 示例改 style 传参、declarative card 签名行删 height?、declarative 中英括号错配示例、theme_* 过时描述、「四个示例」计数、aboutlibyue / plan-system-integration 索引缺项、README 组件数量口径、adaptation scroll() 过时陈述、system-capabilities Result 括号笔误全部修正
 - [ ] CORE1 browser 自定义协议拒绝编码修复——reject 载荷首字节改 0、C 端对 ok==1 短载荷防御拒绝,handler 返回 None 路径补测试,拒绝不再触发原生堆越界读
-- [ ] EX1 VideoPlayer 重播状态机修复——播完后再点播放从头重播、stop 后重播有声,循环 / stop-play / 音量钳制 wbtest 补齐,systemprobe 视频页文案更新为流式解码事实
+- [ ] EX1 VideoPlayer 重播状态机修复——播完后再点播放从头重播、stop 后重播有声,循环 / stop→play / 播完→play / 音量钳制 wbtest 补齐,systemprobe 视频页文案更新为流式解码事实
 - [ ] EX2 sysmonitor 进程数据正确性——nice 字段改 parse_i64 负值正确显示,新出现 pid 当拍 CPU% 置 0 不再钉满格,负值回归用例入 wbtest
-- [ ] CORE2 yue 核心健壮性批次——SNI 菜单路径随项派生且注销 / 注册失败对称清理,总线重连先检查按需重建连接防 fd 泄漏,Store 增 remove 与主题订阅可退订,carousel / video_view 挂载定时器获得回收通道
+- [ ] CORE2 yue 核心健壮性批次——SNI 菜单路径随项派生且注销 / 注册失败对称清理,总线重连先检查按需重建连接防 fd 泄漏,Store 增 remove 与主题订阅可退订,carousel / video_view 挂载定时器获得回收通道,moon test 全绿,SNI 多项场景真实总线复验
 
 ## 2026 年 10 月月度目标与 Q4 季度目标
 
@@ -154,7 +154,7 @@
   - 传感器:温度列表 + 迷你曲线
   - 磁盘:容量条 + IO 曲线
   - 网络:网卡 rx/tx 曲线
-  - 验证:三页实现完成(moon check / moon test 全绿时点验证);单容器 on_draw 自绘行(迷你曲线 120 点窗口、容量条、rx/tx 叠加曲线),行数随数据增减不重建视图树;真机截图复验待库文件并行编辑(table_t 排序/列宽)修好后执行
+  - 验证:三页实现完成(moon check / moon test 全绿时点验证);单容器 on_draw 自绘行(迷你曲线 120 点窗口、容量条、rx/tx 叠加曲线),行数随数据增减不重建视图树;真机截图复验待用户执行(原前置 table_t / table_v_t 拖列宽已分别修复,复验本身仍待做)
 - [x] U5 性能实测 — 千行进程页 1Hz/2Hz 刷新的帧率与内存占用,延续 vs C++ 基线口径入 adaptation.md
   - 验证:1053 进程全量采样 14.94ms/次(release);稳态进程页 1Hz CPU 2-3%、Rss 85.8MB 走平;启动中位 81ms、二进制 7.72MB,数据入 adaptation.md 中英两份;2Hz 档待应用可 rebuild 后补测(定时器改 500ms)
 - [~] U6 文档发布 — README 中英挂旗舰示例与截图;踩坑回写 adaptation.md;mooncakes 发新版
