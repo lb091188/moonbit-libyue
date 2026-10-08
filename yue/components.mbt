@@ -95,7 +95,7 @@ fn theme_text_secondary() -> String {
 }
 
 ///|
-fn theme_border() -> String {
+pub fn theme_border() -> String {
   theme_box.t.border
 }
 
@@ -110,7 +110,7 @@ fn theme_fill_zebra() -> String {
 }
 
 ///|
-fn theme_bg_panel() -> String {
+pub fn theme_bg_panel() -> String {
   theme_box.t.bg_panel
 }
 
@@ -131,7 +131,7 @@ pub let control_height : Double = 32.0
 ///|
 /// 组件库自绘容器:Container::make + 主题切换时自动重绘
 /// (draw 回调现取 theme_* 色,重绘即跟随新主题)。
-fn themed_container(style? : Array[(String, &StyVal)] = []) -> Container {
+pub fn themed_container(style? : Array[(String, &StyVal)] = []) -> Container {
   let c = Container::make(style~)
   on_theme_change(fn() { ViewLike::schedule_paint(c) })
   c
@@ -140,7 +140,7 @@ fn themed_container(style? : Array[(String, &StyVal)] = []) -> Container {
 ///|
 /// 面板底色(挂载即设 + 主题切换重设):set_background_color 定死的
 /// 底色不经 draw,须订阅重设。
-fn[T : ViewLike] set_panel_bg(v : T) -> Unit {
+pub fn[T : ViewLike] set_panel_bg(v : T) -> Unit {
   fn apply() -> Unit {
     v.set_background_color(theme_bg_panel())
   }

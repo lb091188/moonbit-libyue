@@ -1,3 +1,4 @@
 import {
   "NoahLiu/moonbit-libyue/yue",
+  "NoahLiu/yue-video/src" @yuevideo,
 }

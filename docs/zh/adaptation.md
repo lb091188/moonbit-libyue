@@ -408,6 +408,16 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 真机全链路验证:lavfi `testsrc` 生成 2 秒 160x120@5 AVI(容器验证用 AVI 对齐需求方场景)→ probe 宽高帧率对 → 提取 8fps 得 9 帧 → 帧源切片首帧 76800 字节;systemprobe 演示板点「载入演示视频」实渲染 testsrc 彩条画面(xdotool 截图确认),状态栏显示「已载入 160x120 × 16 帧(@8fps,循环播放)」。
 - 音画同步:音轨提取 WAV 交 AudioEngine 各自从 0 起播,属近似同步;精确同步需播放时钟对齐,留后续批次。
 
+### 视频三层拆分(yue 零 ffmpeg / yue-video 可选层 / ffmpeg FFI)
+
+- 背景:VideoPlayer 曾直接放 yue 且引 ffmpeg FFI——moon 依赖是 **module 级**的,yue 只要 import 了 ffmpeg,所有 GUI 库用户构建都会跑 ffmpeg prebuild(没装 dev 包即失败),不用视频的人被传染依赖。
+- 三层:①yue 核心(零 ffmpeg,删 CLI 视频路线 vidsrc_ffmpeg.mbt 全部;AudioEngine/miniaudio 自包含无系统库依赖,保留);②modules/ffmpeg(FFI 绑定,零 yue);③modules/yue-video(VideoPlayer FFI 流式后端 + video_player_t 组件 + 音轨提取单命令,依赖前两者)——要视频播放器的人才 import 这层。workspace 成员互相引用:被引 module 在主 moon.mod import 列表带版本号,moon 就近解析 workspace 成员(不去 registry)。
+- **「视频只有第一帧」根因**:旧版播放时钟只推进位置 Ref,画面容器的 schedule_paint 无人调用——GTK 不重绘,永远停首帧。修复:组件 50ms 时钟里 vp_tick()(FFI 逐帧解码)+ ViewLike::schedule_paint(cv) 成对出现。
+- FFI 流式语义:播放时钟按 fps 每 tick 解一帧(decode_rgba 顺序流),seek 为时间戳级(Demuxer::seek → avformat_seek_file + 解码器 flush);容器无时长元数据(lavfi AVI 的 N/A)时 duration 为 0,进度条按 0 处理(帧照常播)。
+- 跨包组件基建:yue 的 attach/themed_container/set_panel_bg/theme_border/theme_bg_panel 原为包私有,yue-video 组件层需要,最小 pub 化这 5 个(组件扩展 API)。
+- yue 侧接口对齐:VideoPlayer 迁至 yue-video 后 vpc_frame_image(RGBA→PNG→Image)替代 vid_frame_image 直调;音频切段/提取保留 CLI 单命令(audiof_extract_wav/audiof_supported),FFI 音频 PCM 直出留后续。
+- 真机验证:X11 合成点击(xdotool mousedown/up)持续被 XFCE click-to-focus 拦截(motion 事件可达、button 不可达),播放中视觉验证留真机;逻辑层 wbtest 全断言(make→play→vp_tick 帧推进→seek 清帧重解→pause/stop→free)。演示板视频页载入即 autoplay。
+
 ### 声明式根容器高度塌陷(mount_window 默认 flex)
 
 - 环境:Ubuntu 24.04 + X11 + XFCE,systemprobe 示例。现象:`mount_window([scroll(vbox(...))])` 打开是空白窗口(纯底色,无内容,进程正常)。
@@ -437,6 +447,7 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 时长兜底:ffprobe 对 lavfi 写的 AVI 返回 format duration=N/A(CSV 行「N/A」非数字,解析时跳过),此时时长 = 帧集帧数 ÷ 抽取帧率;有 format duration 时以其为准(含容器 padding,2.0s 源实测 2.2s)。
 - 音轨提取失败(无音轨/编码不支持)时自动静音播放,不阻断视频路径。
 - systemprobe 演示改为启动即自动载入(make 同步 1-2 秒,set_timeout 300ms 后执行;按钮保留重新载入)。X11 验证注意:xdotool 合成点击被 XFCE「click-to-focus」策略拦截(motion 事件可达、button 事件需窗口先 focus 而死锁),渲染验证走启动自动载入 + xdotool 截图;播放/暂停/seek 状态机由 wbtest 覆盖。真机截图已确认控制条与 testsrc 帧画面渲染。
+- **AudioEngine 可解码格式 = miniaudio 内置解码器集合,仅 WAV/MP3/FLAC**(2026-10 探针实证):生成 mp3/flac/m4a/ogg 各一份测试文件,经临时 wbtest 逐个 load——mp3/flac/演示 wav OK,m4a 与 ogg 均 `音频加载失败:Invalid file`。根因:miniaudio 的 Vorbis 解码依赖外部 stb_vorbis(本绑定未集成),m4a/aac/opus/wma/aiff 无内置解码器。坑的形态是「文案与过滤器宣称超集」:文件对话框过滤器列了 m4a/aac/ogg 等、页面文案写「WAV/MP3/FLAC/OGG 等」,用户选了就撞 Invalid file(演示 wav 路径本身无问题,ffmpeg lavfi sine 生成正常)。修复:过滤器只留 `wav,mp3,flac`(另开「所有文件」),页面文案与 yue/audio.mbt 头注释写明集合边界,加载失败文案附「可先用 ffmpeg 转码」提示;不做静默自动转码(演示板应呈现 AudioEngine 真实能力,且同步转码大文件卡 UI)。
 - 本地文件与换源(systemprobe 多页化批次):FileDialog 选盘上视频(过滤器 mp4/mkv/mov/avi/webm 等),`VideoPlayer::make` 走 12fps、宽 480 按源比例——帧集上限 1200 帧约对应前 100 秒,更长视频音轨完整、画面止于帧集上限(页面文案注明)。换源顺序必须是「旧播放器 stop(位置归零、旧刷新定时器随之休眠)→ free → 旧根视图 `remove_child_view` → 挂新节点」,乱序会留残音/残定时器。启动自动载入改为视频页首次挂载时触发(nav_page 惰性挂载,holder handle 里 set_timeout 300ms);音频页新增 AudioEngine 懒创建 + FileDialog 本地选择 + 200ms 轮询 is_playing 状态标签(自然播完自动回落「已停止」)。
 
 ## 维护约定

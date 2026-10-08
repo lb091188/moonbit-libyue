@@ -1,5 +1,5 @@
-// 音频播放（miniaudio 后端：WAV / MP3 / FLAC / OGG 等 miniaudio 支持的
-// 格式）。封装层级：引擎 → 剪辑（load → play/pause/stop/volume）→ 释放；
+// 音频播放（miniaudio 后端：可解码 WAV / MP3 / FLAC,即 miniaudio 内置
+// 解码器集合;OGG 需外部 stb_vorbis、m4a/aac 等无内置解码,均不支持）。封装层级：引擎 → 剪辑（load → play/pause/stop/volume）→ 释放；
 // 失败统一 Result + AudioError，不崩进程。详见 system-capabilities.md。
 
 ///|
