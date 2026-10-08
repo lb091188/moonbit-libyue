@@ -32,9 +32,12 @@ test "VideoPlayer 真机冒烟：FFI 双路状态机" {
     None => ()
     Some(_) => fail("未播不应有帧")
   }
-  // play + 手动 tick（组件里由定时器驱动）解出帧；音轨队列同 tick 补
+  // play + 手动 tick（组件里由定时器驱动）解出帧；音轨队列同 tick 补。
+  // tick 前回拨墙钟 100ms：play 与 tick 同毫秒时目标时刻为 0、位置停
+  // 在起点属正常语义，回拨让位置断言确定为 ≈0.1（同下方时钟同轴测）
   player.play()
   inspect(player.is_playing(), content="true")
+  player.wall0.val = player.wall0.val - 100L
   player.vp_tick()
   match player.current_frame() {
     Some(b) =>
@@ -45,7 +48,9 @@ test "VideoPlayer 真机冒烟：FFI 双路状态机" {
     None => fail("tick 后应有帧")
   }
   let t1 = player.current()
-  inspect(t1 > 0.0, content="true")
+  if t1 < 0.09 || t1 > 0.15 {
+    fail("首 tick 位置应 ≈0.1s：\{t1}")
+  }
   // seek 到 0.5s：帧清空，下一 tick 重新解出
   player.seek(0.5)
   match player.current_frame() {
