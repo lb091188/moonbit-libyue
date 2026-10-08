@@ -6,7 +6,7 @@
 
 六路排查(TODO 时效 / markdown 能力 / sysmonitor 跨平台 / 代码与文档一致性 / yue 核心质量 / 示例与模块质量)去重汇总,用户点名优先域置顶,其后按严重度排列;MD1-MD3 即「Markdown 能力升级」M1 的落地拆分。
 
-- [ ] MD1 引入 mizchi/markdown 0.8.3 并 native 实证——独立探针示例 parse / render_html / serialize 三调用 native 跑通,根 moon.mod 钉 @0.8.3,5 个传递依赖对 mooncakes 发布链的隔离方案定案
+- [x] MD1 引入 mizchi/markdown 0.8.3 并 native 实证——独立探针示例 parse / render_html / serialize 三调用 native 跑通,根 moon.mod 钉 @0.8.3,5 个传递依赖对 mooncakes 发布链的隔离方案定案。验证:`moon run examples/probe-markdown --target native` 输出 PROBE-OK;闭包实测与「接受传递、不拆独立模块」定案见 adaptation.md「构建与链接」节 MD1 条
 - [ ] MD2 markdown_view 解析切换 mdast——旧自写解析器删除不留双轨,样式区间端点统一码点→UTF-16 换算(含 emoji 文本样式不错位),moon test 全绿
 - [ ] MD3 GFM 渲染面补齐——表格 / 任务列表 / 脚注 / 删除线 / 图片 / 可点击链接可渲染,showcase「代码与文档」页演示与复制串同源并补新语法,components-ui 中英能力清单同步
 - [ ] SYS1 sysmonitor Windows 数据层——stub/sysmon.c Windows 分支以 Win32 补齐 CPU / 内存 / 磁盘 / 网络 / 进程 / GPU / 温度七路数据源(GetSystemTimes、GlobalMemoryStatusEx、PDH、DXGI、EnumProcesses 等,子进程原语 CREATE_NO_WINDOW),解析纯函数单测全绿,真机五页出数据(真机验证项列清单由用户执行)
