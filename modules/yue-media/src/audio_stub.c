@@ -106,15 +106,16 @@ MaPlayer *mbt_adev_open(int32_t channels, int32_t sample_rate) {
     cfg.dataCallback = mbt_adev_data_callback;
     cfg.pUserData = p;
     // 无输出设备（CI/headless）时 ma_device_init 失败——返回哑设备
-    // （started=0，push 静默丢弃），MoonBit 层照常推进状态机
+    // （started=-1，push 静默丢弃），MoonBit 层照常推进状态机
     if (ma_device_init(NULL, &cfg, &p->device) != MA_SUCCESS) {
         p->started = -1; // 标记无设备
     }
     return p;
 }
 
+/* 有真实输出设备（init 成功；停止/播放中都算，started: -1=init 失败哑设备） */
 int32_t mbt_adev_has_device(MaPlayer *p) {
-    return p && p->started == 0 ? 1 : 0;
+    return p && p->started >= 0 ? 1 : 0;
 }
 
 int32_t mbt_adev_start(MaPlayer *p) {
