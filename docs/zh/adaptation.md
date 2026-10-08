@@ -469,6 +469,14 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 修复(墙钟 + 帧时间戳,与 duration 同轴):ffmpeg-mbt 透出帧级信息——`vf_decode_next` 成功时记录帧 pts(`best_effort_timestamp` 优先,流时间基换算成秒,`vf_frame_pts_s` 读出;seek 后重置 -1)与流真实帧率 `vf_stream_fps`(avg_frame_rate 优先 r_frame_rate 回退);yue-media 增单调墙钟 `mbt_now_ms`(audio_stub.c,CLOCK_MONOTONIC)。VideoPlayer 时钟重写:play/seek 记基准(位置 + 墙钟),每 tick `target = 基准 + 真实流逝`,解帧推进到 target 时刻的帧(高帧率视频跳帧追时钟、低帧率画面跨 tick 保持,追帧上限 8 帧/tick——seek 落点离关键帧远也不卡 UI 一整拍),`pos = clamp(target, duration)`——恒 1 倍速,EOF 位置钉在时长(进度满格)。fps 参数降级为**无 pts 流的回退帧率**(优先用流真实帧率)。附带收益:音频设备按采样率实时消费、视频按墙钟推进,两条速率天然同尺度,音画偏差从「随帧率倍率发散」降为常数级。
 - 验证:回归测试故意传错 fps=5(素材实为 12fps)断言位置仍按时间戳走(墙钟回拨 500ms → pos=0.5;回拨超时长 → EOF 钉 duration=1.0 转停);ffmpeg 侧 pts 非负单调、末帧贴近容器时长、seek 重置 -1。576 测全绿;systemprobe 冒烟存活。真机交互(进度/时间显示)由用户复验。
 
+### 音频进度条「拖不动」(seek 后 current 从零重涨,2026-10 真机)
+
+- 现象(用户真机):音频页进度条拖到一半松手,进度条立即被拉回开头——观感即「拖不动」。视频页进度条正常(两侧组件层 syncing/user_seeking 同构,差异在播放器层)。
+- 根因:AudioPlayer 的 `current()` = 自 played_base 以来设备已消费秒数,**语义是"消费量"而非"媒体时间轴位置"**。seek 只重置了 played_base(消费基准),pos 语义仍从 0 重新累计——seek(0.3) 后 current 从 ~0 开始涨,组件 refresh 每 50ms 把进度条 set 回 vp_pct(current≈0)=开头。VideoPlayer 的 seek 直接 pos=target,所以视频侧无此问题。组件层的 user_seeking 拖动锁只保护「拖动+180ms 防抖期间」,防抖定时器触发 seek 后锁即释放,下一拍 refresh 就把条弹回。
+- 修复:AudioPlayer 加位置基准 `pos_base`(seek 时=target,stop/循环重启归零),`current() = pos_base + 自基准以来消费秒数`(哑设备分支同样加 pos_base,pump 哑设备 EOF 判断改用 current())——回到媒体时间轴语义,与 duration/进度条同轴。
+- 验证:回归断言 seek(0.3) 后 current ≥0.29、pump 一拍不回落(真设备=0.3+消费、哑设备=0.3+0.025 两分支覆盖);576 测全绿;systemprobe 冒烟存活。真机拖动手感由用户复验。
+- 教训:**「位置」字段的语义必须在 seek/play/pause 全生命周期自洽**——消费计数型时钟(设备字节/帧计数)换算位置时,seek 必须携带位置基准,否则进度 UI 会被拉回。与上一条视频时钟 bug 同族:都是播放时钟与媒体时间轴脱节,一个差在速率,一个差在原点。
+
 ### 视频播放器(FFI 双 Demuxer:视频帧 + 音轨 PCM 直出)
 
 - 组件:VideoPlayer + video_player_t(播放/暂停/进度拖拽/音量/循环/时间文本)。2026-10 音频并入后:音轨是同文件的第二个独立 Demuxer(读游标与视频互不干扰),vp_tick 按墙钟目标解帧 + 补音频队列到高水位(时钟语义见「视频播放时钟与时长不同轴」节);音画从 play/seek 点各自起播,误差数十毫秒级(精确同步需音频光标回读,留后续)。

@@ -19,9 +19,19 @@ test "AudioPlayer 冒烟：播放/pump/seek/循环" {
     p.pump()
     ticks = ticks + 1
     if ticks == 5 {
-      // 中途 seek：清队列重定位后仍能继续
+      // 中途 seek：清队列重定位后仍能继续；位置必须落在 seek 点——
+      // 修复前 current 自 0 重新累计，进度条被拉回开头（「拖不动」根因）
       p.seek(0.3)
       inspect(p.is_playing(), content="true")
+      if p.current() < 0.29 {
+        fail("seek(0.3) 后位置应 ≥0.29，实为 \{p.current()}")
+      }
+    }
+    if ticks == 6 {
+      // pump 一拍后位置仍从 seek 点推进（真设备=0.3+消费，哑设备=0.3+0.025）
+      if p.current() < 0.29 {
+        fail("seek 后 pump 位置不应回落，实为 \{p.current()}")
+      }
     }
     if ticks == 10 {
       p.pause()
@@ -46,7 +56,9 @@ test "AudioPlayer 冒烟：播放/pump/seek/循环" {
   inspect(p.is_playing(), content="false")
   inspect(p.current() < 0.05, content="true")
   p.free()
-  println("AudioPlayer 冒烟完成（pump \{ticks} tick 播完 1 秒素材，循环重播验证 OK）")
+  println(
+    "AudioPlayer 冒烟完成（pump \{ticks} tick 播完 1 秒素材，循环重播验证 OK）",
+  )
 }
 
 ///|
