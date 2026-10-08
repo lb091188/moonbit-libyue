@@ -301,13 +301,20 @@ pub fn VideoPlayer::make(
   volume? : Double = 0.8,
   looping? : Bool = false,
 ) -> Result[VideoPlayer, String] {
-  let demuxer = match @ffmpeg.Demuxer::open(path, width~, height~) {
+  let demuxer = match @ffmpeg.Demuxer::open(path) {
     Ok(d) => d
     Err(e) => return Err("FFI 打开失败：\{e}")
   }
+  match demuxer.open_video_decoder(width~, height~) {
+    Ok(_) => ()
+    Err(e) => {
+      demuxer.close()
+      return Err("视频解码器打开失败：\{e}")
+    }
+  }
   let duration = demuxer.duration_s()
-  let w = demuxer.width
-  let h = demuxer.height
+  let w = demuxer.out_width()
+  let h = demuxer.out_height()
   if w <= 0 || h <= 0 {
     demuxer.close()
     return Err("无效画面尺寸 \{w}x\{h}")
