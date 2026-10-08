@@ -37,7 +37,11 @@ test "VideoPlayer 真机冒烟：FFI 双路状态机" {
   inspect(player.is_playing(), content="true")
   player.vp_tick()
   match player.current_frame() {
-    Some(b) => inspect(b.length(), content="\{player.frame_width() * player.frame_height() * 4}")
+    Some(b) =>
+      inspect(
+        b.length(),
+        content="\{player.frame_width() * player.frame_height() * 4}",
+      )
     None => fail("tick 后应有帧")
   }
   let t1 = player.current()
@@ -62,7 +66,9 @@ test "VideoPlayer 真机冒烟：FFI 双路状态机" {
   player.set_looping(true)
   player.free()
   inspect(player.is_closed(), content="true")
-  println("VideoPlayer FFI 双路冒烟完成（视频帧 + 音轨 PCM 队列）")
+  println(
+    "VideoPlayer FFI 双路冒烟完成（视频帧 + 音轨 PCM 队列）",
+  )
 }
 
 ///|
@@ -83,5 +89,38 @@ test "VideoPlayer 无音轨：静音播放路径" {
     None => fail("tick 后应有帧")
   }
   player.stop()
+  player.free()
+}
+
+///|
+/// 时钟同轴回归：素材实为 12fps，故意传错回退 fps=5——播放位置仍须
+/// 按帧时间戳推进（与 duration 同轴），且 EOF 后位置钉在时长（进度
+/// 满格）。白盒回拨墙钟基准模拟时间流逝。
+test "VideoPlayer 时钟同轴：回退 fps 不影响时间轴" {
+  let path = "../ffmpeg-mbt/src/testdata/av_1s.mp4"
+  let player = match VideoPlayer::make(path, fps=5) {
+    Ok(p) => p
+    Err(e) => fail("make 失败：\{e}")
+  }
+  let dur = player.duration()
+  if dur < 0.9 || dur > 1.1 {
+    fail("时长异常：\{dur}（期望 ≈1）")
+  }
+  player.play()
+  player.vp_tick()
+  // 回拨 500ms → 目标 0.5s：帧解到 pts>=0.5，位置=0.5
+  player.wall0.val = player.wall0.val - 500L
+  player.vp_tick()
+  let mid = player.current()
+  if mid < 0.45 || mid > 0.55 {
+    fail("半程位置异常：\{mid}（期望 0.5）")
+  }
+  // 回拨 2s → 目标超时长：解完全部帧 EOF，位置钉在时长、转停
+  player.wall0.val = player.wall0.val - 2000L
+  player.vp_tick()
+  if player.current() != dur {
+    fail("EOF 位置应钉在时长：\{player.current()} != \{dur}")
+  }
+  inspect(player.is_playing(), content="false")
   player.free()
 }
