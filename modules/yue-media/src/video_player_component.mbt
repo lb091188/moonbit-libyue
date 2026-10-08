@@ -39,6 +39,12 @@ pub fn video_player_t(
       let time_label : Ref[@yue.Label?] = Ref(None)
       let play_btn : Ref[@yue.Button?] = Ref(None)
       let seek_defer : Ref[Int] = Ref(-1)
+      // 程序刷新抑制:slider 的 on_change 对 Store.set(程序性刷新)同样
+      // 触发——不抑制则播放中每 tick 都排一个冗余 seek 防抖,且换载
+      // free 后残留定时器会 seek 已释放的 demuxer(悬垂崩溃根因)
+      let syncing : Ref[Bool] = Ref(false)
+      // 用户拖动/防抖期间锁住进度条,refresh 不得覆盖用户拖到的位置
+      let user_seeking : Ref[Bool] = Ref(false)
       // ---- 画面容器 ----
       let view_style : Array[(String, &@yue.StyVal)] = [
         ("width", 480.0),
@@ -97,6 +103,11 @@ pub fn video_player_t(
         max=100.0,
         step=0.5,
         on_change=fn(v) {
+          // 程序性刷新(refresh 的 Store.set)不触发 seek
+          if syncing.val {
+            return
+          }
+          user_seeking.val = true
           if seek_defer.val >= 0 {
             @yue.clear_timeout(seek_defer.val)
           }
@@ -109,8 +120,13 @@ pub fn video_player_t(
           seek_defer.val = @yue.set_timeout(
             180,
             fn() {
-              player.seek(target)
               seek_defer.val = -1
+              user_seeking.val = false
+              // 换载/释放后的残留定时器:不得触碰已 free 的 FFI 句柄
+              if player.is_closed() {
+                return
+              }
+              player.seek(target)
               on_event("seek")
             },
           )
@@ -129,11 +145,16 @@ pub fn video_player_t(
       )
       // ---- 刷新（时间/按钮文本/进度）----
       let refresh = fn() {
-        pos_store.set(if player.duration() > 0.0 {
-          vp_pct(player.current(), player.duration()) * 100.0
-        } else {
-          0.0
-        })
+        // 用户拖动中不动进度条(否则拖到一半被弹回播放位置)
+        if !user_seeking.val {
+          syncing.val = true
+          pos_store.set(if player.duration() > 0.0 {
+            vp_pct(player.current(), player.duration()) * 100.0
+          } else {
+            0.0
+          })
+          syncing.val = false
+        }
         match play_btn.val {
           Some(b) => b.set_title(if player.is_playing() { "暂停" } else { "播放" })
           None => ()

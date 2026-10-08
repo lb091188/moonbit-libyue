@@ -143,6 +143,9 @@ pub fn VideoPlayer::current_frame(self : VideoPlayer) -> Bytes? {
 ///|
 /// 设置音量（0..1；钳制）。
 pub fn VideoPlayer::set_volume(self : VideoPlayer, v : Double) -> Unit {
+  if self.closed.val {
+    return
+  }
   let vol = media_clamp_volume(v)
   self.volume.val = vol
   match self.dev.val {
@@ -160,7 +163,7 @@ pub fn VideoPlayer::set_looping(self : VideoPlayer, on : Bool) -> Unit {
 ///|
 /// 开始播放（idle/paused 从当前位置续播；首个 tick 解出首帧）。
 pub fn VideoPlayer::play(self : VideoPlayer) -> Unit {
-  if self.state.val is VpPlaying {
+  if self.closed.val || self.state.val is VpPlaying {
     return
   }
   self.state.val = VpPlaying
@@ -177,6 +180,9 @@ pub fn VideoPlayer::play(self : VideoPlayer) -> Unit {
 ///|
 /// 暂停（停帧时钟与音频设备；位置保留）。
 pub fn VideoPlayer::pause(self : VideoPlayer) -> Unit {
+  if self.closed.val {
+    return
+  }
   if self.state.val is VpPlaying {
     self.state.val = VpPaused
     match self.dev.val {
@@ -192,6 +198,9 @@ pub fn VideoPlayer::pause(self : VideoPlayer) -> Unit {
 ///|
 /// 停止（停音频、seek 回 0、清当前帧、状态回 idle）。
 pub fn VideoPlayer::stop(self : VideoPlayer) -> Unit {
+  if self.closed.val {
+    return
+  }
   self.state.val = VpIdle
   self.pos.val = 0.0
   self.frame.val = None
@@ -203,6 +212,9 @@ pub fn VideoPlayer::stop(self : VideoPlayer) -> Unit {
 ///|
 /// 跳转（秒；FFI 时间戳级；播放中从新位置续播，首帧由下一 tick 解出）。
 pub fn VideoPlayer::seek(self : VideoPlayer, t : Double) -> Unit {
+  if self.closed.val {
+    return
+  }
   let target = vp_clamp_t(t, self.duration_s)
   self.pos.val = target
   self.frame.val = None
