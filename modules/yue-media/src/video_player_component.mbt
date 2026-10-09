@@ -203,13 +203,13 @@ pub fn video_player_t(
           @yue.ViewLike::view(b)
         },
       }
-      let time_lbl = @yue.label_t(
+      let time_lbl = @components.label_t(
         "0:00 / 0:00",
-        role=@yue.Body,
+        role=@components.Body,
         color="#e6ffffff",
         handle=fn(l) { time_label.val = Some(l) },
       )
-      let progress = @yue.slider_t(
+      let progress = @components.slider_t(
         pos_store,
         min=0.0,
         max=100.0,
@@ -241,7 +241,7 @@ pub fn video_player_t(
           })
         },
       )
-      let vol = @yue.slider_t(
+      let vol = @components.slider_t(
         vol_store,
         min=0.0,
         max=100.0,
@@ -251,7 +251,7 @@ pub fn video_player_t(
         style=[("marginBottom", 0.0)],
         on_change=fn(v) { player.set_volume(v / 100.0) },
       )
-      let loop_cb = @yue.checkbox_t(
+      let loop_cb = @components.checkbox_t(
         "循环",
         color="#e6ffffff",
         style=[("marginBottom", 0.0)],

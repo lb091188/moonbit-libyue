@@ -20,16 +20,19 @@ pub fn page_shell(
     }
   }
   let head : Array[@yue.Node] = [
-    @yue.label_t(title, role=@yue.Section),
+    @components.label_t(title, role=@components.Section),
   ]
   if desc != "" {
-    head.push(@yue.label_t(desc, role=@yue.Secondary))
+    head.push(@components.label_t(desc, role=@components.Secondary))
   }
-  let node = @yue.vbox(
+  let node = @declarative.vbox(
     [
-      @yue.vbox(head, style=[("padding", 14.0), ("gap", 8.0)]),
-      @yue.scroll(
-        @yue.vbox(body(refresh), style=[("padding", 14.0), ("gap", 14.0)]),
+      @declarative.vbox(head, style=[("padding", 14.0), ("gap", 8.0)]),
+      @declarative.scroll(
+        @declarative.vbox(body(refresh), style=[
+          ("padding", 14.0),
+          ("gap", 14.0),
+        ]),
         style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
         handle=fn(sc) { scroll_ref.val = Some(sc) },
       ),
@@ -66,7 +69,7 @@ pub fn nav_page(
   content : @yue.Node,
 ) -> @yue.Node {
   let mounted : Ref[Bool] = Ref(false)
-  @yue.vbox([], style=[("flex", 1.0)], handle=fn(c) {
+  @declarative.vbox([], style=[("flex", 1.0)], handle=fn(c) {
     fn ensure(s : String) -> Unit {
       if !mounted.val && s == name {
         mounted.val = true

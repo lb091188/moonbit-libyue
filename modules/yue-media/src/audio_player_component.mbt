@@ -15,7 +15,9 @@ pub fn audio_player_t(
   {
     mount: fn(parent) {
       let pos_store : @yue.Store[Double] = @yue.Store::new(0.0)
-      let vol_store : @yue.Store[Double] = @yue.Store::new(player.get_volume() * 100.0)
+      let vol_store : @yue.Store[Double] = @yue.Store::new(
+        player.get_volume() * 100.0,
+      )
       let time_label : Ref[@yue.Label?] = Ref(None)
       let play_btn : Ref[@yue.Button?] = Ref(None)
       let seek_defer : Ref[Int] = Ref(-1)
@@ -41,12 +43,12 @@ pub fn audio_player_t(
           @yue.ViewLike::view(b)
         },
       }
-      let time_lbl = @yue.label_t(
-        "0:00 / 0:00",
-        role=@yue.Body,
-        handle=fn(l) { time_label.val = Some(l) },
-      )
-      let progress = @yue.slider_t(
+      let time_lbl = @components.label_t("0:00 / 0:00", role=@components.Body, handle=fn(
+        l,
+      ) {
+        time_label.val = Some(l)
+      })
+      let progress = @components.slider_t(
         pos_store,
         min=0.0,
         max=100.0,
@@ -61,51 +63,44 @@ pub fn audio_player_t(
             @yue.clear_timeout(seek_defer.val)
           }
           let dur = player.duration()
-          let target = if dur <= 0.0 {
-            0.0
-          } else {
-            v / 100.0 * dur
-          }
-          seek_defer.val = @yue.set_timeout(
-            180,
-            fn() {
-              seek_defer.val = -1
-              user_seeking.val = false
-              // 换载/释放后的残留定时器:不得触碰已 free 的 FFI 句柄
-              if player.is_closed() {
-                return
-              }
-              player.seek(target)
-              on_event("seek")
-            },
-          )
+          let target = if dur <= 0.0 { 0.0 } else { v / 100.0 * dur }
+          seek_defer.val = @yue.set_timeout(180, fn() {
+            seek_defer.val = -1
+            user_seeking.val = false
+            // 换载/释放后的残留定时器:不得触碰已 free 的 FFI 句柄
+            if player.is_closed() {
+              return
+            }
+            player.seek(target)
+            on_event("seek")
+          })
         },
       )
-      let vol = @yue.slider_t(
-        vol_store,
-        min=0.0,
-        max=100.0,
-        step=1.0,
-        on_change=fn(v) { player.set_volume(v / 100.0) },
-      )
-      let loop_cb = @yue.checkbox_t(
-        "循环",
-        on_change=fn(on) { player.set_looping(on) },
-      )
+      let vol = @components.slider_t(vol_store, min=0.0, max=100.0, step=1.0, on_change=fn(
+        v,
+      ) {
+        player.set_volume(v / 100.0)
+      })
+      let loop_cb = @components.checkbox_t("循环", on_change=fn(on) {
+        player.set_looping(on)
+      })
       // ---- 刷新（时间/按钮文本/进度）----
       let refresh = fn() {
         // 用户拖动中不动进度条(否则拖到一半被弹回播放位置)
         if !user_seeking.val {
           syncing.val = true
-          pos_store.set(if player.duration() > 0.0 {
-            vp_pct(player.current(), player.duration()) * 100.0
-          } else {
-            0.0
-          })
+          pos_store.set(
+            if player.duration() > 0.0 {
+              vp_pct(player.current(), player.duration()) * 100.0
+            } else {
+              0.0
+            },
+          )
           syncing.val = false
         }
         match play_btn.val {
-          Some(b) => b.set_title(if player.is_playing() { "暂停" } else { "播放" })
+          Some(b) =>
+            b.set_title(if player.is_playing() { "暂停" } else { "播放" })
           None => ()
         }
         match time_label.val {
@@ -133,18 +128,15 @@ pub fn audio_player_t(
       for kv in style {
         row_style.push(kv)
       }
-      let row = @yue.hbox(
-        style=row_style,
-        [
-          play_btn_node,
-          @yue.label_t("进度", role=@yue.Secondary),
-          progress,
-          time_lbl,
-          @yue.label_t("音量", role=@yue.Secondary),
-          vol,
-          loop_cb,
-        ],
-      )
+      let row = @declarative.hbox(style=row_style, [
+        play_btn_node,
+        @components.label_t("进度", role=@components.Secondary),
+        progress,
+        time_lbl,
+        @components.label_t("音量", role=@components.Secondary),
+        vol,
+        loop_cb,
+      ])
       (row.mount)(parent)
     },
   }

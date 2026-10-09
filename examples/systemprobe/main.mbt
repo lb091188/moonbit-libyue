@@ -24,25 +24,19 @@ fn main {
     aud_ap: Ref(None),
   }
   ignore(
-    @yue.mount_window(
+    @declarative.mount_window(
       [
-        @yue.hbox(style=[("flex", 1.0), ("alignItems", "stretch")], [
+        @declarative.hbox(style=[("flex", 1.0), ("alignItems", "stretch")], [
           // 侧栏:菜单 + 演示说明
-          @yue.vbox(
+          @declarative.vbox(
             [
-              @yue.scroll(
-                @yue.vbox(
+              @declarative.scroll(
+                @declarative.vbox(
                   [
                     @components.side_menu_sections(
                       [
-                        (
-                          "能力",
-                          ["系统能力", "命令预览"],
-                        ),
-                        (
-                          "媒体",
-                          ["视频播放", "音频播放"],
-                        ),
+                        ("能力", ["系统能力", "命令预览"]),
+                        ("媒体", ["视频播放", "音频播放"]),
                         (
                           "图表",
                           ["扩展图表", "新图表", "交互图表"],
@@ -85,15 +79,31 @@ fn main {
               ignore(@yue.on_theme_change(apply))
             },
           ),
-          @yue.vbox(
+          @declarative.vbox(
             [
-              @ui.nav_page("系统能力", app.selected, @pages.page_sysinfo(app)),
+              @ui.nav_page(
+                "系统能力",
+                app.selected,
+                @pages.page_sysinfo(app),
+              ),
               @ui.nav_page("视频播放", app.selected, @pages.page_video(app)),
               @ui.nav_page("音频播放", app.selected, @pages.page_audio(app)),
-              @ui.nav_page("命令预览", app.selected, @pages.page_cmdpreview(app)),
-              @ui.nav_page( "扩展图表", app.selected, @pages.page_charts1(app), ),
-              @ui.nav_page( "新图表", app.selected, @pages.page_charts2(app), ),
-              @ui.nav_page("交互图表", app.selected, @pages.page_charts_it(app)),
+              @ui.nav_page(
+                "命令预览",
+                app.selected,
+                @pages.page_cmdpreview(app),
+              ),
+              @ui.nav_page(
+                "扩展图表",
+                app.selected,
+                @pages.page_charts1(app),
+              ),
+              @ui.nav_page("新图表", app.selected, @pages.page_charts2(app)),
+              @ui.nav_page(
+                "交互图表",
+                app.selected,
+                @pages.page_charts_it(app),
+              ),
             ],
             style=[("flex", 1.0)],
             handle=fn(c) {
