@@ -76,7 +76,7 @@ fn vid_load_demo(
 ) -> Unit {
   let avi = "/tmp/yue-probe-demo.avi"
   match
-    @yue.pr_run(
+    @system.pr_run(
       "ffmpeg",
       [
         "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=160x120:rate=5",
@@ -89,7 +89,11 @@ fn vid_load_demo(
       if o.exit_code != 0 {
         match status.val {
           Some(l) =>
-            @ui.report_set(l, "测试视频生成失败(退出码 \{o.exit_code})", refresh)
+            @ui.report_set(
+              l,
+              "测试视频生成失败(退出码 \{o.exit_code})",
+              refresh,
+            )
           None => ()
         }
         return
@@ -120,19 +124,22 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
     "FFI 流式解码的浏览器级播放器:播放时钟为墙钟+帧时间戳(与时长同轴、1 倍速,高帧率视频跳帧追时钟);控制条悬浮于画面底部(移动/进入即显示,静止 1s 或移出 250ms 后隐藏),双击画面或右下按钮进全屏(Esc/按钮退出),画面黑底等比 letterbox;含播放/暂停、拖进度(松手防抖)、时间、音量、循环。本地文件宽 480 按源比例。",
     fn(refresh) {
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
-            @yue.button_t(
+            @components.button_t(
               if @ffmbt.ffmpeg_supported() {
                 "载入演示视频"
               } else {
                 "ffmpeg 不可用"
               },
-              variant=@yue.Solid,
+              variant=@components.Solid,
               on_click=fn() {
                 match status.val {
                   Some(l) =>
-                    @ui.report_set(l, "载入中:生成测试视频并解码(约 1-2 秒)…", refresh)
+                    @ui.report_set(
+                      l, "载入中:生成测试视频并解码(约 1-2 秒)…",
+                      refresh,
+                    )
                   None => ()
                 }
                 // 生成+解码同步耗时,延后一拍让状态文本先渲染
@@ -141,7 +148,7 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
                 })
               },
             ),
-            @yue.button_t("选择本地视频…", on_click=fn() {
+            @components.button_t("选择本地视频…", on_click=fn() {
               match app.win_ref.val {
                 Some(w) => {
                   let dlg = @yue.FileDialog::new_open()
@@ -151,7 +158,7 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
                   )
                   if dlg.run_for_window(w) {
                     let path = dlg.get_result()
-                    app.toast_push("已选 \{path}", @yue.Success)
+                    app.toast_push("已选 \{path}", @components.Success)
                     match status.val {
                       Some(l) =>
                         @ui.report_set(
@@ -174,12 +181,12 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
           ],
           style=[("gap", 8.0), ("alignItems", "center")],
         ),
-        @yue.label_t("(播放器加载状态显示在此)", role=@yue.Body, handle=fn(
-          l,
-        ) {
-          status.val = Some(l)
-        }),
-        @yue.container(handle=fn(c) {
+        @components.label_t(
+          "(播放器加载状态显示在此)",
+          role=@components.Body,
+          handle=fn(l) { status.val = Some(l) },
+        ),
+        @declarative.container(handle=fn(c) {
           holder.val = Some(c)
           if !auto_started.val {
             auto_started.val = true
@@ -188,7 +195,10 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
               if @ffmbt.ffmpeg_supported() {
                 match status.val {
                   Some(l) =>
-                    @ui.report_set(l, "载入中:生成测试视频并解码(约 1-2 秒)…", refresh)
+                    @ui.report_set(
+                      l, "载入中:生成测试视频并解码(约 1-2 秒)…",
+                      refresh,
+                    )
                   None => ()
                 }
                 vid_load_demo(app, holder, status, vid_view, refresh)
