@@ -13,6 +13,11 @@
 // amdgpu 兜底：/proc/<pid>/fdinfo 的 drm-engine-* 按 drm-client-id
 // 归并、差值 / 墙钟折算全卡利用率，免 root）；前样本差值状态在
 // GpuMonitor。
+// GPU 型号名（SYS5，Linux）：nvidia-smi 命中优先；否则 pci.ids
+// （/usr/share/hwdata 或 /usr/share/misc，免 root 纯文本）按
+// vendor:device 查商业型号名（AMD / Intel 的型号名不在任何 sysfs
+// 节点中），查不到回退 device id 原文；pci.ids 文本与解析结果在
+// GpuMonitor 常驻（静态硬件信息，首拍查一次）。
 
 // ---------------------------------------------------------------------------
 // S4 温度
@@ -595,6 +600,182 @@ pub fn vendor_name(id : String) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// S6 GPU：pci.ids 商业型号名解析（SYS5）
+// ---------------------------------------------------------------------------
+
+///|
+/// pci.ids 候选路径：发行版安装位置有差异——hwdata 包装
+/// /usr/share/hwdata/pci.ids（不少发行版里它是指向 misc 的符号链接），
+/// pciutils 包装 /usr/share/misc/pci.ids。两路都不可达（未装数据库 /
+/// Flatpak 沙箱 / 非 Linux）时由 [gpu_model_name] 兜底回退 device id
+/// 显示。
+pub fn pci_ids_paths() -> Array[String] {
+  ["/usr/share/hwdata/pci.ids", "/usr/share/misc/pci.ids"]
+}
+
+///|
+/// 读 pci.ids 全文（候选路径依次尝试；整文件约 1.4MB，native-stub 单文件
+/// 读取上限 16MB）。都读不到返回 None（未装 hwdata / pciutils、Flatpak
+/// 沙箱、非 Linux）。
+fn read_pci_ids() -> String? {
+  for path in pci_ids_paths() {
+    match read_text_file(path) {
+      Some(text) => return Some(text)
+      None => ()
+    }
+  }
+  None
+}
+
+///|
+/// PCI id 归一化：去 0x / 0X 前缀、转小写、左侧补零到 4 位十六进制
+/// （sysfs 的 vendor / device 节点形如 0x10de，pci.ids 形如 10de；
+/// 位数不足左补零对齐；空串保持空串——补成 "0000" 会变成假有效 id）。
+pub fn norm_pci_id(id : String) -> String {
+  let mut s = id.trim().to_owned()
+  if s.has_prefix("0x") || s.has_prefix("0X") {
+    s = s[2:].to_owned()
+  }
+  s = s.to_lower()
+  if s.is_empty() {
+    return ""
+  }
+  let pad = 4 - s.char_length()
+  if pad <= 0 {
+    s
+  } else {
+    String::make(pad, '0') + s
+  }
+}
+
+///|
+/// 是否为 4 位十六进制串（pci.ids 的 vendor / device id 形态；归一化后
+/// 用于判 id 是否可用——sysfs 读取失败时是 "(未知)" 之类占位串）。
+pub fn is_hex4(s : String) -> Bool {
+  if s.char_length() != 4 {
+    return false
+  }
+  for c in s {
+    let n = c.to_int()
+    if !((n >= 48 && n <= 57) || (n >= 97 && n <= 102)) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// pci.ids 行内容（调用方已去缩进）切出 id 与名称：id 为首个空白分隔
+/// 字段，名称为其后去首尾空白的部分（名称内部空格保留，如 "Navi 33
+/// [Radeon RX 7700S/7600]"）；无名称时返回空串。按 UTF-16 码元索引
+/// （与 [StringView::exact_view] 同基准；结构性字符全是 ASCII，代理对
+/// 只可能出现在名称里，整体切片不受影响）。
+fn pci_ids_id_name(content : StringView) -> (StringView, String) {
+  let n = content.length()
+  let mut id_end = -1
+  let mut name_start = -1
+  let mut i = 0
+  while i < n {
+    let c = content.unsafe_get(i).to_int()
+    let ws = c == 32 || c == 9 || c == 10 || c == 13
+    if id_end < 0 {
+      if ws {
+        id_end = i
+      }
+    } else if name_start < 0 && !ws {
+      name_start = i
+    }
+    i += 1
+  }
+  let id = if id_end < 0 {
+    content
+  } else {
+    content.exact_view(end=id_end)
+  }
+  let name = if name_start < 0 {
+    ""
+  } else {
+    content.exact_view(start=name_start).to_owned().trim().to_owned()
+  }
+  (id, name)
+}
+
+///|
+/// 在 pci.ids 全文里按 vendor:device 查商业型号名（sysfs 只有数字 id，
+/// 商业型号名不在任何 /sys 节点中，免 root 纯文本数据库是唯一来源）。
+/// 缩进层级：无缩进行是 vendor（4 位 id + 两空格 + 厂商名），单 Tab 行是
+/// 该 vendor 的 device，双 Tab 行是 subsystem（跳过），'#' 起是注释；
+/// class 节（"C xx" 起）与 vendor 行同形，id 非四位十六进制自然不匹配。
+/// vendor 节唯一且按 id 有序，找到目标 vendor 后只扫其 device 行，遇到
+/// 下一个无缩进行（下一 vendor / class 节）即出节、提前返回 None。id
+/// 非法（归一化后非 4 位十六进制）直接 None。device 行有条目但无名称
+/// （真实数据库不出现）不当命中，继续扫、最终按查不到回退 id 显示。
+pub fn pci_ids_device_name(
+  text : String,
+  vendor : String,
+  device : String,
+) -> String? {
+  let want_v = norm_pci_id(vendor)
+  let want_d = norm_pci_id(device)
+  if !is_hex4(want_v) || !is_hex4(want_d) {
+    return None
+  }
+  let mut in_vendor = false
+  for line in text.split("\n") {
+    if line.is_empty() || line.has_prefix("#") {
+      continue
+    }
+    if line.has_prefix("\t\t") {
+      continue // subsystem 行
+    }
+    if line.has_prefix("\t") {
+      if !in_vendor {
+        continue
+      }
+      let (id, name) = pci_ids_id_name(line[1:])
+      if id.equal_to_string(want_d) && name != "" {
+        return Some(name)
+      }
+    } else {
+      if in_vendor {
+        return None // 已出目标 vendor 节（下一 vendor / class 节）
+      }
+      let (id, _) = pci_ids_id_name(line)
+      if id.equal_to_string(want_v) {
+        in_vendor = true
+      }
+    }
+  }
+  None
+}
+
+///|
+/// 显卡型号名：nvidia-smi 命中时用其型号（比 pci.ids 更具体）；否则按
+/// vendor:device 查 pci.ids 商业型号名（AMD / Intel 等免 smi 的卡）；
+/// 查不到（pci.ids 无该条目 / 数据库不可达）回退 device id 原文（UI
+/// 显示「0x7480」，至少可区分多卡）；id 本身不可用（sysfs 读取失败，
+/// 占位 "(未知)"）时留空，UI 不显示型号位。
+fn gpu_model_name(
+  smi_model : String,
+  vendor : String,
+  device : String,
+  ids : String,
+) -> String {
+  if smi_model != "" {
+    return smi_model
+  }
+  match pci_ids_device_name(ids, vendor, device) {
+    Some(name) => name
+    None =>
+      if is_hex4(norm_pci_id(device)) {
+        device
+      } else {
+        ""
+      }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // S6 GPU：DRM fdinfo 聚合采样（SYS4）
 // ---------------------------------------------------------------------------
 
@@ -763,17 +944,58 @@ struct GpuRow {
 
 ///|
 /// GPU 采样器：PCI 显示控制器枚举 + 占用来源优先级 + fdinfo 前样本差值
-/// 状态。占用来源：nvidia-smi（N 卡专有驱动）> sysfs gpu_busy_percent
-/// （amdgpu，免 root）> DRM fdinfo 聚合（i915 / xe / amdgpu 兜底，免
-/// root）。显存 / 温度走 sysfs 与 nvidia-smi（原有口径不变）。
+/// 状态 + pci.ids 型号名缓存。占用来源：nvidia-smi（N 卡专有驱动）>
+/// sysfs gpu_busy_percent（amdgpu，免 root）> DRM fdinfo 聚合（i915 /
+/// xe / amdgpu 兜底，免 root）。显存 / 温度走 sysfs 与 nvidia-smi
+/// （原有口径不变）；型号名见 [GpuMonitor::gpu_model]。
 pub(all) struct GpuMonitor {
   mut prev : Map[String, Int64]
   mut prev_wall : Double
+  mut pci_ids : String?
+  mut pci_ids_tried : Bool
+  mut models : Map[String, String]
 }
 
 ///|
 pub fn GpuMonitor::new() -> GpuMonitor {
-  { prev: Map([]), prev_wall: 0.0, }
+  {
+    prev: Map([]),
+    prev_wall: 0.0,
+    pci_ids: None,
+    pci_ids_tried: false,
+    models: Map([]),
+  }
+}
+
+///|
+/// pci.ids 全文：首次用到时读入并常驻（约 1.4MB，一拍只读一次）；两路
+/// 候选路径都读不到记空串，不再每拍重试。
+fn GpuMonitor::pci_ids_text(self : GpuMonitor) -> String {
+  if !self.pci_ids_tried {
+    self.pci_ids = read_pci_ids()
+    self.pci_ids_tried = true
+  }
+  self.pci_ids.unwrap_or("")
+}
+
+///|
+/// 行的型号名：nvidia-smi 命中优先（其型号名比 pci.ids 更具体）；否则
+/// 按 vendor:device 查 pci.ids 商业型号名，查不到回退 device id 原文。
+/// 解析结果按 PCI 地址常驻——vendor:device 是静态硬件信息，首拍查一次
+/// 即可，之后每拍零成本（pci.ids 全文扫描约 38k 行，不值得每拍重扫）；
+/// pci.ids 不可达时常驻的是回退值，重启后重试。
+fn GpuMonitor::gpu_model(self : GpuMonitor, r : GpuRow) -> String {
+  if r.model != "" {
+    return r.model
+  }
+  match self.models.get(r.addr) {
+    Some(m) => m
+    None => {
+      let m = gpu_model_name(r.model, r.vendor, r.device, self.pci_ids_text())
+      self.models.set(r.addr, m)
+      m
+    }
+  }
 }
 
 ///|
@@ -932,7 +1154,7 @@ pub fn GpuMonitor::tick(self : GpuMonitor) -> Array[GpuInfo]? {
       pci: r.addr,
       vendor: vendor_name(r.vendor),
       device: r.device,
-      model: r.model,
+      model: self.gpu_model(r),
       celsius: r.celsius,
       busy: gpu_row_busy(r, usage),
       vram_used: r.vram_used,
