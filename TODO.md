@@ -8,7 +8,7 @@
 
 - [x] MD1 引入 mizchi/markdown 0.8.3 并 native 实证——独立探针示例 parse / render_html / serialize 三调用 native 跑通,根 moon.mod 钉 @0.8.3,5 个传递依赖对 mooncakes 发布链的隔离方案定案。验证:`moon run examples/probe-markdown --target native` 输出 PROBE-OK;闭包实测与「接受传递、不拆独立模块」定案见 adaptation.md「构建与链接」节 MD1 条
 - [x] MD2 markdown_view 解析切换 mdast——旧自写解析器删除不留双轨,样式区间端点统一码点→UTF-16 换算(含 emoji 文本样式不错位),moon test 全绿。验证:`moon check` 零警告 + `moon test` 595 全绿(markdown_wbtest 19 条:换算/展平/区间 emoji 断言 [4,6)/info/切行 + setext/~~~/info 串/缩进代码/嵌套列表五项前后对比);mdast 实测语义回写 adaptation.md「声明式层与自绘组件」节 MD2 条
-- [ ] MD3 GFM 渲染面补齐——表格 / 任务列表 / 脚注 / 删除线 / 图片 / 可点击链接可渲染,showcase「代码与文档」页演示与复制串同源并补新语法,components-ui 中英能力清单同步
+- [x] MD3 GFM 渲染面补齐——表格 / 任务列表 / 脚注 / 删除线 / 图片 / 可点击链接可渲染,showcase「代码与文档」页演示与复制串同源并补新语法,components-ui 中英能力清单同步。验证:`moon check` 零警告 + `moon test` 600 全绿(markdown_wbtest 24 条,新增删除线/携址链接/引用式链接/脚注编号上标/图片路径/表格单元格断言);真机视觉与点击项由用户在 showcase「代码与文档」页 Markdown 段验证(删除线横线/链接点击与悬浮/表格/图片/任务勾选/脚注),跨层契约与上游核实结论回写 adaptation.md「声明式层与自绘组件」节 MD3 条
 - [ ] SYS1 sysmonitor Windows 数据层——stub/sysmon.c Windows 分支以 Win32 补齐 CPU / 内存 / 磁盘 / 网络 / 进程 / GPU / 温度七路数据源(GetSystemTimes、GlobalMemoryStatusEx、PDH、DXGI、EnumProcesses 等,子进程原语 CREATE_NO_WINDOW),解析纯函数单测全绿,真机五页出数据(真机验证项列清单由用户执行)
 - [ ] SYS2 sysmonitor Windows 语义归一——kill / 优先级 / 错误码翻译为统一语义形态且错误码翻译表单测全绿,温度等不可用来源按卡显示「—」,UI 文案平台化,TODO 边界节同步(实际终止 / 提权行为真机验证项列清单由用户执行)
 - [ ] SYS3 sysmonitor macOS 数据层——stub 补 macOS 分支(proc_listpids 进程枚举、sysctl CPU/内存、getfsstat+statvfs 磁盘、getifaddrs 网络、system_profiler -json GPU 子进程),IO 速率与温度按边界显示「—」,解析纯函数单测全绿(真机验证项列清单由用户执行)
