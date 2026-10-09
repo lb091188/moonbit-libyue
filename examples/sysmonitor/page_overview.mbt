@@ -109,14 +109,14 @@ fn res_card(
       @yue.hbox(
         [
           @yue.icon(icon, size=16.0),
-          @yue.label_t(title, role=@yue.Section, style=[("marginLeft", 6.0)], handle=fn(
+          @components.label_t(title, role=@components.Section, style=[("marginLeft", 6.0)], handle=fn(
             l,
           ) {
             @yue.View::set_cursor(l, hand_cur)
           }),
           // 值行：吃掉标题行剩余宽度(flex:1),文本右对齐——空间全部
           // 给数值,比标题小两档,固定右缘不随文本回流换行
-          @yue.label_t(value.get(), role=@yue.Section, style=[("flex", 1.0)], handle=fn(
+          @components.label_t(value.get(), role=@components.Section, style=[("flex", 1.0)], handle=fn(
             l,
           ) {
             value.subscribe(fn(v) { l.set_text(v) })
@@ -284,7 +284,7 @@ fn view_area(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
 fn page_cpu_detail(app : App) -> @yue.Node {
   @yue.vbox(
     [
-      @yue.label_t("总占用（%）", role=@yue.Section, style=[
+      @components.label_t("总占用（%）", role=@components.Section, style=[
         ("marginBottom", 6.0),
       ]),
       @yue.line_chart_t(
@@ -293,7 +293,7 @@ fn page_cpu_detail(app : App) -> @yue.Node {
         y_range=Some((0.0, 100.0)),
         fill=true,
       ),
-      @yue.label_t("各逻辑核（%）", role=@yue.Section, style=[
+      @components.label_t("各逻辑核（%）", role=@components.Section, style=[
         ("marginTop", 14.0),
         ("marginBottom", 6.0),
       ]),
@@ -313,11 +313,11 @@ fn page_cpu_detail(app : App) -> @yue.Node {
 fn page_mem_detail(app : App) -> @yue.Node {
   @yue.vbox(
     [
-      @yue.label_t("内存（GB）", role=@yue.Section, style=[
+      @components.label_t("内存（GB）", role=@components.Section, style=[
         ("marginBottom", 6.0),
       ]),
       @yue.line_chart_t(app.mem_hist, fill=true, style=[("height", 250.0)]),
-      @yue.label_t("swap（GB）", role=@yue.Section, style=[
+      @components.label_t("swap（GB）", role=@components.Section, style=[
         ("marginTop", 14.0),
         ("marginBottom", 6.0),
       ]),

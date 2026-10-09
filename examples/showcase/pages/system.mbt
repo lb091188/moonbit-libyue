@@ -52,21 +52,21 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "FileDialog 模态打开/保存,回显所选路径;API: read/write_text_file",
       [
         @yue.hbox([
-          @yue.button_t("打开文件…", on_click=fn() {
+          @components.button_t("打开文件…", on_click=fn() {
             match app.win_ref.val {
               Some(w) => {
                 let dlg = @yue.FileDialog::new_open()
                 dlg.set_filters("文本文件:txt,md|所有文件:*")
                 if dlg.run_for_window(w) {
-                  app.toast_push("已选 \{dlg.get_result()}", @yue.Success)
+                  app.toast_push("已选 \{dlg.get_result()}", @components.Success)
                 } else {
-                  app.toast_push("已取消", @yue.Info)
+                  app.toast_push("已取消", @components.Info)
                 }
               }
               None => ()
             }
           }),
-          @yue.button_t("保存文件…", on_click=fn() {
+          @components.button_t("保存文件…", on_click=fn() {
             match app.win_ref.val {
               Some(w) => {
                 let dlg = @yue.FileDialog::new_save()
@@ -83,13 +83,13 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
                       "保存失败"
                     },
                     if ok {
-                      @yue.Success
+                      @components.Success
                     } else {
-                      @yue.Danger
+                      @components.Danger
                     },
                   )
                 } else {
-                  app.toast_push("已取消", @yue.Info)
+                  app.toast_push("已取消", @components.Info)
                 }
               }
               None => ()
@@ -111,7 +111,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "原生 MessageBox:标题/正文/按钮,响应 id 回传。",
       [
         @yue.hbox([
-          @yue.button_t("询问框", on_click=fn() {
+          @components.button_t("询问框", on_click=fn() {
             match app.win_ref.val {
               Some(w) => {
                 let box = @yue.MessageBox::new(@yue.Information)
@@ -120,21 +120,21 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
                 box.add_button("确定", 1)
                 box.add_button("取消", 2)
                 box.on_response(fn(code) {
-                  app.toast_push("消息框响应 id=\{code}", @yue.Info)
+                  app.toast_push("消息框响应 id=\{code}", @components.Info)
                 })
                 box.show_for_window(w)
               }
               None => ()
             }
           }),
-          @yue.button_t("警告框", on_click=fn() {
+          @components.button_t("警告框", on_click=fn() {
             match app.win_ref.val {
               Some(w) => {
                 let box = @yue.MessageBox::new(@yue.Warning)
                 box.set_title("警告")
                 box.set_text("此操作不可撤销!")
                 box.on_response(fn(code) {
-                  app.toast_push("消息框响应 id=\{code}", @yue.Info)
+                  app.toast_push("消息框响应 id=\{code}", @components.Info)
                 })
                 box.show_for_window(w)
               }
@@ -156,23 +156,23 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "提交系统通知中心:普通通知、带操作按钮、静默入中心三种形态。",
       [
         @yue.hbox([
-          @yue.button_t("普通通知", on_click=fn() {
+          @components.button_t("普通通知", on_click=fn() {
             let n = @yue.Notification::new()
             n.set_title("components 演示")
             n.set_body(
               "这是一条系统通知,点击后已提交通知中心。",
             )
             n.show()
-            app.toast_push("通知已提交", @yue.Success)
+            app.toast_push("通知已提交", @components.Success)
           }),
-          @yue.button_t("带按钮", on_click=fn() {
+          @components.button_t("带按钮", on_click=fn() {
             let n = @yue.Notification::new()
             n.set_title("带操作按钮的通知")
             n.set_body("点通知上的按钮试试(查看 / 忽略)")
             n.set_actions([("查看", "view"), ("忽略", "ignore")])
             n.show()
           }),
-          @yue.button_t("静默通知", variant=@yue.Soft, on_click=fn() {
+          @components.button_t("静默通知", variant=@components.Soft, on_click=fn() {
             let n = @yue.Notification::new()
             n.set_title("静默通知")
             n.set_body("set_silent(true):不发声不打扰")
@@ -193,13 +193,13 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "Clipboard 读写系统剪贴板文本;set_data 写富文本(Html)。",
       [
         @yue.hbox([
-          @yue.button_t("写入文本", on_click=fn() {
+          @components.button_t("写入文本", on_click=fn() {
             @yue.Clipboard::get().set_text(
               "来自 components 的剪贴板内容",
             )
-            app.toast_push("已写入剪贴板", @yue.Success)
+            app.toast_push("已写入剪贴板", @components.Success)
           }),
-          @yue.button_t("读回显示", variant=@yue.Solid, on_click=fn() {
+          @components.button_t("读回显示", variant=@components.Solid, on_click=fn() {
             let t = @yue.Clipboard::get().get_text()
             app.toast_push(
               if t == "" {
@@ -208,18 +208,18 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
                 "读到: \{t}"
               },
               if t == "" {
-                @yue.Warning
+                @components.Warning
               } else {
-                @yue.Info
+                @components.Info
               },
             )
           }),
-          @yue.button_t("写 HTML 富文本", on_click=fn() {
+          @components.button_t("写 HTML 富文本", on_click=fn() {
             @yue.Clipboard::get().set_data(
               @yue.Html,
               "<b>components 富文本剪贴板</b>",
             )
-            app.toast_push("已写入 Html 富文本", @yue.Success)
+            app.toast_push("已写入 Html 富文本", @components.Success)
           }),
         ]),
       ],
@@ -234,18 +234,18 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "set_timeout 单次 / set_timer 周期(返回 false 停)。",
       [
         @yue.hbox([
-          @yue.button_t("1.5 秒后提示", on_click=fn() {
+          @components.button_t("1.5 秒后提示", on_click=fn() {
             ignore(
               @yue.set_timeout(1500, fn() {
-                app.toast_push("延时任务触发", @yue.Success)
+                app.toast_push("延时任务触发", @components.Success)
               }),
             )
           }),
-          @yue.button_t("周期计数到 3", variant=@yue.Solid, on_click=fn() {
+          @components.button_t("周期计数到 3", variant=@components.Solid, on_click=fn() {
             let n = Ref(0)
             @yue.set_timer(700, fn() {
               n.val = n.val + 1
-              app.toast_push("第 \{n.val} 次周期回调", @yue.Info)
+              app.toast_push("第 \{n.val} 次周期回调", @components.Info)
               n.val < 3
             })
           }),
@@ -266,30 +266,30 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
         }),
         @yue.hbox(
           [
-            @yue.button_t("切主题图标(Linux)", on_click=fn() {
+            @components.button_t("切主题图标(Linux)", on_click=fn() {
               match app.tray_ref.val {
                 Some(t) => {
                   t.set_icon_name("utilities-terminal")
                   app.toast_push(
                     "托盘图标已切为系统主题图标",
-                    @yue.Success,
+                    @components.Success,
                   )
                 }
-                None => app.toast_push("托盘不可用", @yue.Warning)
+                None => app.toast_push("托盘不可用", @components.Warning)
               }
             }),
-            @yue.button_t("切换月相图标", on_click=fn() {
+            @components.button_t("切换月相图标", on_click=fn() {
               match app.tray_ref.val {
                 Some(t) => {
                   let (phase_name, phase_path) = moon_phases[moon_idx.val]
                   t.set_icon(phase_path)
                   app.toast_push(
                     "托盘图标已切换:\{phase_name}(PNG)",
-                    @yue.Info,
+                    @components.Info,
                   )
                   moon_idx.val = (moon_idx.val + 1) % moon_phases.length()
                 }
-                None => app.toast_push("托盘不可用", @yue.Warning)
+                None => app.toast_push("托盘不可用", @components.Warning)
               }
             }),
           ],
@@ -311,7 +311,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "无边框透明窗口",
       "无边框透明置顶,整窗可拖动;无编程关闭 API,随应用退出。",
       [
-        @yue.button_t("打开悬浮心形窗口", variant=@yue.Solid, on_click=fn() {
+        @components.button_t("打开悬浮心形窗口", variant=@components.Solid, on_click=fn() {
           open_floating_heart()
         }),
       ],
@@ -328,7 +328,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "关闭拦截",
       "勾选后点窗口关闭被 set_should_close 拦下",
       [
-        @yue.checkbox_t("开启关闭拦截", checked=false, on_change=fn(v) {
+        @components.checkbox_t("开启关闭拦截", checked=false, on_change=fn(v) {
           app.close_veto.val = v
           if !v {
             app.veto_info.set("(未开启拦截)")
@@ -393,8 +393,8 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "开关直连真实自启动状态,重新登录后生效。",
       [
         @yue.hbox([
-          @yue.switch_t(auto_on),
-          @yue.label_t("org.moonbitlibyue.Showcase", role=@yue.Secondary),
+          @components.switch_t(auto_on),
+          @components.label_t("org.moonbitlibyue.Showcase", role=@components.Secondary),
         ]),
         @yue.bind_label(auto_out, fn(s) { s }, style=[("marginTop", 8.0)]),
       ],
@@ -413,16 +413,16 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "Ok 只表示已交给系统。",
       [
         @yue.hbox([
-          @yue.button_t("打开 libyue.com", on_click=fn() {
+          @components.button_t("打开 libyue.com", on_click=fn() {
             match @yue.open_url("https://libyue.com") {
-              Ok(_) => app.toast_push("已交给系统打开", @yue.Success)
-              Err(e) => app.toast_push("失败:\{e}", @yue.Danger)
+              Ok(_) => app.toast_push("已交给系统打开", @components.Success)
+              Err(e) => app.toast_push("失败:\{e}", @components.Danger)
             }
           }),
-          @yue.button_t("在文件管理器中显示 README.md", on_click=fn() {
+          @components.button_t("在文件管理器中显示 README.md", on_click=fn() {
             match @yue.reveal_in_file_manager("README.md") {
-              Ok(_) => app.toast_push("已交给文件管理器", @yue.Success)
-              Err(e) => app.toast_push("失败:\{e}", @yue.Danger)
+              Ok(_) => app.toast_push("已交给文件管理器", @components.Success)
+              Err(e) => app.toast_push("失败:\{e}", @components.Danger)
             }
           }),
         ]),
@@ -505,14 +505,14 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "KeepAwake 抑制系统屏保 / 自动息屏",
       [
         @yue.hbox([
-          @yue.switch_t(ka_on),
-          @yue.label_t("保持屏幕常亮", role=@yue.Secondary),
+          @components.switch_t(ka_on),
+          @components.label_t("保持屏幕常亮", role=@components.Secondary),
         ]),
         @yue.bind_label(ka_out, fn(s) { s }, style=[("marginTop", 8.0)]),
         @yue.hbox(
           [
-            @yue.switch_t(idle_running),
-            @yue.label_t("每秒刷新空闲秒数", role=@yue.Secondary),
+            @components.switch_t(idle_running),
+            @components.label_t("每秒刷新空闲秒数", role=@components.Secondary),
           ],
           style=[("marginTop", 8.0)],
         ),

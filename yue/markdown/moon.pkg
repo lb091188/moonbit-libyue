@@ -1,4 +1,5 @@
 import {
   "NoahLiu/moonbit-libyue/yue",
+  "NoahLiu/moonbit-libyue/yue/components",
   "mizchi/markdown" @mdast,
 }

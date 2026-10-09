@@ -525,18 +525,18 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@yue.Nod
       FencedCode(info~, code~, ..) =>
         nodes.push(
           @yue.vbox(
-            [@yue.code_view(md_split_code_lines(code), lang=md_info_lang(info))],
+            [@components.code_view(md_split_code_lines(code), lang=md_info_lang(info))],
             style=[("marginBottom", 10.0)],
           ),
         )
       IndentedCode(code~, ..) =>
         nodes.push(
-          @yue.vbox([@yue.code_view(md_split_code_lines(code))], style=[("marginBottom", 10.0)]),
+          @yue.vbox([@components.code_view(md_split_code_lines(code))], style=[("marginBottom", 10.0)]),
         )
       MathBlock(value~, ..) =>
         nodes.push(
           @yue.vbox(
-            [@yue.code_view(md_split_code_lines(value), lang="math")],
+            [@components.code_view(md_split_code_lines(value), lang="math")],
             style=[("marginBottom", 10.0)],
           ),
         )
@@ -558,7 +558,7 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@yue.Nod
               nodes.push(
                 @yue.hbox(
                   [
-                    @yue.checkbox_t("", checked=ck, style=[("width", 24.0)]),
+                    @components.checkbox_t("", checked=ck, style=[("width", 24.0)]),
                     @yue.vbox(md_item_content(item.children, ctx)),
                   ],
                   style=[("marginBottom", 4.0), ("marginLeft", 8.0)],

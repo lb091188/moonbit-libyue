@@ -91,7 +91,7 @@ pub fn page_code(_app : @ui.App) -> @yue.Node {
       "CodeView 代码高亮",
       "逐 token 测宽自绘,全平台一致;lang 关键字集(moonbit/js/ts/python/rust/c/go/bash/sql)+ 行号。",
       [
-        @yue.code_view(
+        @components.code_view(
           [
             "// MoonBit · 关键字/字符串/数字/注释", "fn main {", "  let msg = \"hello 组件库\"",
             "  println(msg + \"!\" )  // 2026", "}",
@@ -100,7 +100,7 @@ pub fn page_code(_app : @ui.App) -> @yue.Node {
           line_numbers=true,
           style=[("width", 430.0)],
         ),
-        @yue.code_view(
+        @components.code_view(
           [
             "use gtk::prelude::*;", "", "fn main() {", "    let app = gtk::Application::new()",
             "        .expect(\"init failed\");", "    app.connect_activate(|_| {}); // 回调",
@@ -110,7 +110,7 @@ pub fn page_code(_app : @ui.App) -> @yue.Node {
           line_numbers=true,
           style=[("width", 430.0)],
         ),
-        @yue.code_view(
+        @components.code_view(
           [
             "# Python · 注释与关键字", "def greet(name: str) -> str:", "    return f'Hello, {name}!'",
             "", "print(greet('MoonBit'))",
@@ -121,7 +121,7 @@ pub fn page_code(_app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "@yue.code_view(", "  [", "    \"// MoonBit · 关键字/字符串/数字/注释\",",
+        "@components.code_view(", "  [", "    \"// MoonBit · 关键字/字符串/数字/注释\",",
         "    \"fn main {\",", "    \"  let msg = \\\"hello 组件库\\\"\",", "    \"  println(msg)\",",
         "    \"}\",", "  ],", "  lang=\"moonbit\",", "  line_numbers=true,", "  style=[(\"width\", 430.0)],",
         ")",

@@ -10,7 +10,7 @@ fn main {
   @yue.theme_apply(@yue.theme_from_system())
   let btns : Array[@yue.Node] = []
   for i in 0..<8 {
-    btns.push(@yue.button_t("按钮\{i}"))
+    btns.push(@components.button_t("按钮\{i}"))
   }
   ignore(
     @yue.mount_window(

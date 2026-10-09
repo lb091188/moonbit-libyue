@@ -13,38 +13,38 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
       "运行期操作窗口:改标题 / 最大化 / 全屏 / 置顶 / 还原尺寸。",
       [
         @yue.hbox([
-          @yue.button_t("改标题", on_click=fn() {
+          @components.button_t("改标题", on_click=fn() {
             match win.win_ref.val {
               Some(w) => {
                 w.set_title("components · 标题已改")
-                win.toast_push("窗口标题已更新", @yue.Success)
+                win.toast_push("窗口标题已更新", @components.Success)
               }
               None => ()
             }
           }),
-          @yue.button_t("最大化/还原", on_click=fn() {
+          @components.button_t("最大化/还原", on_click=fn() {
             match win.win_ref.val {
               Some(w) =>
                 if w.is_maximized() {
                   w.unmaximize()
-                  win.toast_push("已还原", @yue.Info)
+                  win.toast_push("已还原", @components.Info)
                 } else {
                   w.maximize()
-                  win.toast_push("已最大化", @yue.Info)
+                  win.toast_push("已最大化", @components.Info)
                 }
               None => ()
             }
           }),
-          @yue.button_t("全屏切换", on_click=fn() {
+          @components.button_t("全屏切换", on_click=fn() {
             match win.win_ref.val {
               Some(w) => {
                 w.set_fullscreen(!w.is_fullscreen())
-                win.toast_push("全屏状态已切换", @yue.Info)
+                win.toast_push("全屏状态已切换", @components.Info)
               }
               None => ()
             }
           }),
-          @yue.button_t("置顶切换", variant=@yue.Solid, on_click=fn() {
+          @components.button_t("置顶切换", variant=@components.Solid, on_click=fn() {
             match win.win_ref.val {
               Some(w) => {
                 ontop.val = !ontop.val
@@ -55,17 +55,17 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
                   } else {
                     "已取消置顶"
                   },
-                  @yue.Info,
+                  @components.Info,
                 )
               }
               None => ()
             }
           }),
-          @yue.button_t("还原尺寸", on_click=fn() {
+          @components.button_t("还原尺寸", on_click=fn() {
             match win.win_ref.val {
               Some(w) => {
                 w.set_content_size(1280.0, 720.0)
-                win.toast_push("已还原 1280×720", @yue.Info)
+                win.toast_push("已还原 1280×720", @components.Info)
               }
               None => ()
             }
@@ -84,20 +84,20 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
       "应用外生效的系统快捷键(Ctrl+Alt+C)。",
       [
         @yue.hbox([
-          @yue.button_t("注册 Ctrl+Alt+C", on_click=fn() {
+          @components.button_t("注册 Ctrl+Alt+C", on_click=fn() {
             ignore(
               @yue.register_global_shortcut("Ctrl+Alt+C", fn() {
-                win.toast_push("全局快捷键触发!", @yue.Success)
+                win.toast_push("全局快捷键触发!", @components.Success)
               }),
             )
             win.toast_push(
               "已注册,切到别的窗口按 Ctrl+Alt+C 试试",
-              @yue.Info,
+              @components.Info,
             )
           }),
-          @yue.button_t("注销全部", on_click=fn() {
+          @components.button_t("注销全部", on_click=fn() {
             @yue.unregister_all_global_shortcuts()
-            win.toast_push("全局快捷键已清空", @yue.Warning)
+            win.toast_push("全局快捷键已清空", @components.Warning)
           }),
         ]),
       ],
@@ -113,7 +113,7 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
       [
         @yue.vbox(
           [
-            @yue.label_t("把文件拖进来", role=@yue.Body, handle=fn(_l) {
+            @components.label_t("把文件拖进来", role=@components.Body, handle=fn(_l) {
 
             }),
           ],
@@ -128,7 +128,7 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
             c.handle_drop(fn(info, _x, _y) {
               match info.get_data(@yue.Image) {
                 Some(@yue.Img(_)) =>
-                  win.toast_push("拖入图片", @yue.Success)
+                  win.toast_push("拖入图片", @components.Success)
                 _ =>
                   match info.get_data(@yue.FilePaths) {
                     Some(@yue.Paths(paths)) => {
@@ -141,10 +141,10 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
                       }
                       win.toast_push(
                         "拖入 \{paths.length()} 个文件",
-                        @yue.Success,
+                        @components.Success,
                       )
                     }
-                    _ => win.toast_push("拖入文本", @yue.Info)
+                    _ => win.toast_push("拖入文本", @components.Info)
                   }
               }
               true
@@ -165,7 +165,7 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
       "do_drag_file_paths 发起系统拖拽:按住下方色块拖到文件管理器即拖出 icon.png。",
       [
         @yue.vbox(
-          [@yue.label_t("按住我拖出去", role=@yue.Body)],
+          [@components.label_t("按住我拖出去", role=@components.Body)],
           style=[("height", 60.0), ("width", 200.0), ("padding", 10.0)],
           handle=fn(c) {
             @yue.theme_bind_bg(c, fn() { @yue.theme_current().primary_light })

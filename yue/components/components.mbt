@@ -16,12 +16,6 @@
 // 变化经 schedule_paint 触发重绘。组件间状态协调统一走 Store，无平台代码。
 
 ///|
-/// 可点击自绘控件统一手型光标。
-pub fn hand() -> Cursor {
-  Cursor::new(Hand)
-}
-
-///|
 /// 语义类型（EP Tag/Alert 的 type）。
 pub(all) enum SemanticType {
   Primary
@@ -34,47 +28,38 @@ pub(all) enum SemanticType {
 ///|
 fn type_color(t : SemanticType) -> String {
   match t {
-    Primary => theme_primary()
-    Success => theme_success()
-    Warning => theme_warning()
-    Danger => theme_danger()
-    Info => theme_info()
+    Primary => @yue.theme_primary()
+    Success => @yue.theme_success()
+    Warning => @yue.theme_warning()
+    Danger => @yue.theme_danger()
+    Info => @yue.theme_info()
   }
 }
 
 ///|
 fn type_light_color(t : SemanticType) -> String {
   match t {
-    Primary => theme_primary_light()
-    Success => theme_success_light()
-    Warning => theme_warning_light()
-    Danger => theme_danger_light()
-    Info => theme_info_light()
+    Primary => @yue.theme_primary_light()
+    Success => @yue.theme_success_light()
+    Warning => @yue.theme_warning_light()
+    Danger => @yue.theme_danger_light()
+    Info => @yue.theme_info_light()
   }
 }
 
 ///|
 /// 焦点环:单层 1px 淡主色描边(默认 40% 透明,不喧宾夺主;
 /// 需在深色实底上使用时可传实底友好的颜色,如白色)。
-fn draw_focus_ring(
-  p : Painter,
-  w : Double,
-  h : Double,
-  color? : String = theme_focus_accent(),
-) -> Unit {
-  p.set_stroke_color(color)
-  p.stroke_rect(0.5, 0.5, w - 1.0, h - 1.0)
-}
 
 ///|
 /// 清空按钮 ✕(矢量自绘,不依赖字体字形):中心 (cx,cy),半径 r。
 /// 供 clearable 形态的字段在「有值且悬停」时画在右侧清空带内。
 fn draw_clear_x(
-  p : Painter,
+  p : @yue.Painter,
   cx : Double,
   cy : Double,
   r? : Double = 4.0,
-  color? : String = theme_text_secondary(),
+  color? : String = @yue.theme_text_secondary(),
 ) -> Unit {
   p.set_stroke_color(color)
   p.begin_path()
@@ -93,7 +78,7 @@ fn draw_clear_x(
 ///|
 /// + 号(步进按钮)
 fn draw_glyph_plus(
-  p : Painter,
+  p : @yue.Painter,
   cx : Double,
   cy : Double,
   s : Double,
@@ -111,7 +96,7 @@ fn draw_glyph_plus(
 ///|
 /// − 号(步进按钮)
 fn draw_glyph_minus(
-  p : Painter,
+  p : @yue.Painter,
   cx : Double,
   cy : Double,
   s : Double,
@@ -127,7 +112,7 @@ fn draw_glyph_minus(
 ///|
 /// ‹ 朝左三角(实心)
 fn draw_glyph_left(
-  p : Painter,
+  p : @yue.Painter,
   cx : Double,
   cy : Double,
   s : Double,
@@ -145,7 +130,7 @@ fn draw_glyph_left(
 ///|
 /// › 朝右三角(实心)
 fn draw_glyph_right(
-  p : Painter,
+  p : @yue.Painter,
   cx : Double,
   cy : Double,
   s : Double,
@@ -164,66 +149,10 @@ fn draw_glyph_right(
 /// 自绘交互项的焦点接线:可聚焦(Tab 链由 GTK 按挂载顺序遍历)、
 /// 聚焦变化时重绘、Enter/Space 触发激活。点击聚焦由各组件在
 /// on_mouse_down 里调 focus()。
-fn bind_focus(
-  v : Container,
-  repaint : () -> Unit,
-  focused : Ref[Bool],
-  on_activate : () -> Unit,
-) -> Unit {
-  ViewLike::set_focusable(v, true)
-  ViewLike::on_focus_in(v, fn() {
-    focused.val = true
-    repaint()
-    false
-  })
-  ViewLike::on_focus_out(v, fn() {
-    focused.val = false
-    repaint()
-    false
-  })
-  ViewLike::on_key_down(v, fn(e) {
-    if e.code == VKEY_RETURN || e.code == VKEY_SPACE {
-      on_activate()
-      true
-    } else {
-      false
-    }
-  })
-}
 
 ///|
 /// 圆角矩形填充(bezier 控制点按圆率 0.5522 近似四角)。r 自动钳到
 /// w/2、h/2 以内,窄条也不会画出负半径。
-fn fill_round_rect(
-  p : Painter,
-  x : Double,
-  y : Double,
-  w : Double,
-  h : Double,
-  r : Double,
-) -> Unit {
-  let r = if r > w / 2.0 { w / 2.0 } else if r > h / 2.0 { h / 2.0 } else { r }
-  let k = 0.5522847498
-  p.begin_path()
-  p.move_to(x + r, y)
-  p.line_to(x + w - r, y)
-  p.bezier_curve_to(x + w - r + k * r, y, x + w, y + r - k * r, x + w, y + r)
-  p.line_to(x + w, y + h - r)
-  p.bezier_curve_to(
-    x + w,
-    y + h - r + k * r,
-    x + w - r + k * r,
-    y + h,
-    x + w - r,
-    y + h,
-  )
-  p.line_to(x + r, y + h)
-  p.bezier_curve_to(x + r - k * r, y + h, x, y + h - r + k * r, x, y + h - r)
-  p.line_to(x, y + r)
-  p.bezier_curve_to(x, y + r - k * r, x + r - k * r, y, x + r, y)
-  p.close_path()
-  p.fill()
-}
 
 ///|
 /// 自绘交互项通用挂载器:背景色表达 hover/active,文字垂直居中。
@@ -234,24 +163,24 @@ fn fill_round_rect(
 /// 画 3px 强调条(与文字同色);rounded 时背景画 4px 圆角。
 fn stateful_item(
   text : String,
-  style : Array[(String, &StyVal)],
-  selected : Store[String],
+  style : Array[(String, &@yue.StyVal)],
+  selected : @yue.Store[String],
   bg_of : (Bool, Bool) -> String,
   fg_of : (Bool, Bool) -> String,
   pad_x? : Double = 0.0,
   align_start? : Bool = false,
   font_size? : Double = 13.0,
-  icon? : IconKind? = None,
+  icon? : @yue.IconKind? = None,
   accent? : Bool = false,
   rounded? : Bool = false,
-) -> Node {
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let hover = Ref(false)
       let focused = Ref(false)
       // 自绘文字不占布局空间:无显式 width 时按文本测宽自动定宽
-      let font = Font::new("Sans", font_size)
-      let probe = AttributedText::new(text, wrap=false)
+      let font = @yue.Font::new("Sans", font_size)
+      let probe = @yue.AttributedText::new(text, wrap=false)
       probe.set_font(font)
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
       let mut has_w = false
@@ -267,9 +196,9 @@ fn stateful_item(
         copy.push(("width", text_w + pad_x * 2.0))
         copy
       }
-      let v = themed_container(style=style2)
-      fn draw_item(p : Painter) -> Unit {
-        let b = ViewLike::get_bounds(v)
+      let v = @yue.themed_container(style=style2)
+      fn draw_item(p : @yue.Painter) -> Unit {
+        let b = @yue.ViewLike::get_bounds(v)
         let w = b.width
         let h = b.height
         let act = selected.get() == text
@@ -277,7 +206,7 @@ fn stateful_item(
         if bg != "" {
           p.set_fill_color(bg)
           if rounded {
-            fill_round_rect(p, 0.0, 0.0, w, h, 4.0)
+            @yue.fill_round_rect(p, 0.0, 0.0, w, h, 4.0)
           } else {
             p.fill_rect(0.0, 0.0, w, h)
           }
@@ -289,7 +218,7 @@ fn stateful_item(
         // 图标在 pad_x 起(16px),文字右移;无图标按 align_start/居中排
         let text_x = match icon {
           Some(k) => {
-            draw_icon(
+            @yue.draw_icon(
               p,
               k,
               pad_x + 8.0,
@@ -303,40 +232,40 @@ fn stateful_item(
         }
         // 文字:AttributedText 支持指定字号,垂直居中交给 valign=Center;
         // 水平位置手动计算(见函数注释)
-        let at = AttributedText::new(text, valign=Center, wrap=false)
+        let at = @yue.AttributedText::new(text, valign=@yue.Center, wrap=false)
         at.set_font(font)
         at.set_color(fg_of(act, hover.val))
         p.draw_attributed_text(at, text_x, 0.0, w, h)
         if focused.val {
-          draw_focus_ring(p, w, h)
+          @yue.draw_focus_ring(p, w, h)
         }
       }
 
       v.on_draw(draw_item)
-      View::set_cursor(v, hand())
-      ViewLike::on_mouse_down(v, fn(e) {
+      @yue.View::set_cursor(v, @yue.hand())
+      @yue.ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 {
-          ViewLike::focus(v)
+          @yue.ViewLike::focus(v)
           selected.set(text)
           true
         } else {
           false
         }
       })
-      ViewLike::on_mouse_enter(v, fn(_e) {
+      @yue.ViewLike::on_mouse_enter(v, fn(_e) {
         hover.val = true
-        ViewLike::schedule_paint(v)
+        @yue.ViewLike::schedule_paint(v)
       })
-      ViewLike::on_mouse_leave(v, fn(_e) {
+      @yue.ViewLike::on_mouse_leave(v, fn(_e) {
         hover.val = false
-        ViewLike::schedule_paint(v)
+        @yue.ViewLike::schedule_paint(v)
       })
-      bind_focus(v, fn() { ViewLike::schedule_paint(v) }, focused, fn() {
+      @yue.bind_focus(v, fn() { @yue.ViewLike::schedule_paint(v) }, focused, fn() {
         selected.set(text)
       })
-      selected.subscribe(fn(_s) { ViewLike::schedule_paint(v) })
-      attach(parent, ViewLike::view(v))
-      ViewLike::view(v)
+      selected.subscribe(fn(_s) { @yue.ViewLike::schedule_paint(v) })
+      @yue.attach(parent, @yue.ViewLike::view(v))
+      @yue.ViewLike::view(v)
     },
   }
 }
@@ -344,9 +273,9 @@ fn stateful_item(
 ///|
 fn side_menu_bg(act : Bool, hov : Bool) -> String {
   if act {
-    theme_primary_light()
+    @yue.theme_primary_light()
   } else if hov {
-    theme_fill_hover()
+    @yue.theme_fill_hover()
   } else {
     ""
   }
@@ -355,9 +284,9 @@ fn side_menu_bg(act : Bool, hov : Bool) -> String {
 ///|
 fn side_menu_fg(act : Bool, _hov : Bool) -> String {
   if act {
-    theme_primary()
+    @yue.theme_primary()
   } else {
-    theme_text_primary()
+    @yue.theme_text_primary()
   }
 }
 
@@ -368,20 +297,23 @@ fn side_menu_fg(act : Bool, _hov : Bool) -> String {
 /// 做 set_visible 联动。
 pub fn side_menu(
   items : Array[String],
-  selected : Store[String],
-  icons? : Array[(String, IconKind)] = [],
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  selected : @yue.Store[String],
+  icons? : Array[(String, @yue.IconKind)] = [],
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   let width = 180.0
-  let base : Array[(String, &StyVal)] = [("width", width), ("padding", 6.0)]
+  let base : Array[(String, &@yue.StyVal)] = [
+    ("width", width),
+    ("padding", 6.0),
+  ]
   for kv in style {
     base.push(kv)
   }
   // 用户覆盖 width 时项宽随 180 基准失准,故默认样式照旧、覆盖由
   // style 直接改外层;项宽跟随需要调用方自行对齐(内部项 168 固定)
-  let nodes : Array[Node] = []
+  let nodes : Array[@yue.Node] = []
   for it in items {
-    let mut kind : IconKind? = None
+    let mut kind : @yue.IconKind? = None
     for kv in icons {
       if kv.0 == it {
         kind = Some(kv.1)
@@ -403,15 +335,15 @@ pub fn side_menu(
       ),
     )
   }
-  vbox(nodes, style=base, handle=fn(c) { set_panel_bg(c) })
+  @yue.vbox(nodes, style=base, handle=fn(c) { @yue.set_panel_bg(c) })
 }
 
 ///|
 fn segmented_bg(act : Bool, hov : Bool) -> String {
   if act {
-    theme_bg_panel()
+    @yue.theme_bg_panel()
   } else if hov {
-    theme_border()
+    @yue.theme_border()
   } else {
     ""
   }
@@ -420,9 +352,9 @@ fn segmented_bg(act : Bool, hov : Bool) -> String {
 ///|
 fn segmented_fg(act : Bool, _hov : Bool) -> String {
   if act {
-    theme_primary()
+    @yue.theme_primary()
   } else {
-    theme_text_regular()
+    @yue.theme_text_regular()
   }
 }
 
@@ -431,10 +363,10 @@ fn segmented_fg(act : Bool, _hov : Bool) -> String {
 /// hover 灰底,直角,文字垂直居中。
 pub fn segmented(
   options : Array[String],
-  selected : Store[String],
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
-  let items : Array[Node] = []
+  selected : @yue.Store[String],
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
+  let items : Array[@yue.Node] = []
   for opt in options {
     items.push(
       stateful_item(
@@ -451,7 +383,7 @@ pub fn segmented(
   // flexShrink 默认 0(区别于 CSS 的 1),不显式收缩则内部 hbox 拿到
   // 内容全宽、wrap 永不触发;shrink 1 把宽度约束压进来才断行。
   // rowGap 是换行行距。段少的页面不触发换行,外观不变。
-  let base : Array[(String, &StyVal)] = [
+  let base : Array[(String, &@yue.StyVal)] = [
     ("padding", 2.0),
     ("rowGap", 4.0),
     ("flexShrink", 1.0),
@@ -461,7 +393,9 @@ pub fn segmented(
   for kv in style {
     base.push(kv)
   }
-  hbox(items, style=base, handle=fn(c) { bind_bg(c, fn() { theme_border() }) })
+  @yue.hbox(items, style=base, handle=fn(c) {
+    @yue.bind_bg(c, fn() { @yue.theme_border() })
+  })
 }
 
 ///|
@@ -470,16 +404,16 @@ pub fn segmented(
 pub fn tag_of_type(
   text : String,
   t : SemanticType,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let font = Font::new("Sans", 12.0)
-      let probe = AttributedText::new(text, wrap=false)
+      let font = @yue.Font::new("Sans", 12.0)
+      let probe = @yue.AttributedText::new(text, wrap=false)
       probe.set_font(font)
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", text_w + 16.0),
         ("height", 24.0),
         ("marginRight", 8.0),
@@ -487,10 +421,10 @@ pub fn tag_of_type(
       for kv in style {
         base.push(kv)
       }
-      let c = themed_container(style=base)
+      let c = @yue.themed_container(style=base)
       handle(c)
       c.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(c)
+        let b = @yue.ViewLike::get_bounds(c)
         p.set_fill_color(type_light_color(t))
         p.fill_rect(0.0, 0.0, b.width, b.height)
         // 水平手动居中(GTK 端 DrawAttributedText 不实现水平 align)
@@ -500,12 +434,12 @@ pub fn tag_of_type(
           0.0,
           b.width,
           b.height,
-          valign=Center,
+          valign=@yue.Center,
           color=type_color(t),
         )
       })
-      attach(parent, ViewLike::view(c))
-      ViewLike::view(c)
+      @yue.attach(parent, @yue.ViewLike::view(c))
+      @yue.ViewLike::view(c)
     },
   }
 }
@@ -515,16 +449,16 @@ pub fn tag_of_type(
 pub fn tag(
   text : String,
   color : String,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let font = Font::new("Sans", 12.0)
-      let probe = AttributedText::new(text, wrap=false)
+      let font = @yue.Font::new("Sans", 12.0)
+      let probe = @yue.AttributedText::new(text, wrap=false)
       probe.set_font(font)
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", text_w + 16.0),
         ("height", 24.0),
         ("marginRight", 8.0),
@@ -532,10 +466,10 @@ pub fn tag(
       for kv in style {
         base.push(kv)
       }
-      let c = themed_container(style=base)
+      let c = @yue.themed_container(style=base)
       handle(c)
       c.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(c)
+        let b = @yue.ViewLike::get_bounds(c)
         p.set_fill_color(color)
         p.fill_rect(0.0, 0.0, b.width, b.height)
         p.draw_text(
@@ -544,12 +478,12 @@ pub fn tag(
           0.0,
           b.width,
           b.height,
-          valign=Center,
+          valign=@yue.Center,
           color="#FFFFFF",
         )
       })
-      attach(parent, ViewLike::view(c))
-      ViewLike::view(c)
+      @yue.attach(parent, @yue.ViewLike::view(c))
+      @yue.ViewLike::view(c)
     },
   }
 }
@@ -559,17 +493,17 @@ pub fn tag(
 /// 语义红 draw 现取跟随主题(不复用 tag——其 color 参数为固定色语义)。
 pub fn badge_count(
   count : Int,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   let text = count.to_string()
   {
     mount: fn(parent) {
-      let font = Font::new("Sans", 12.0)
-      let probe = AttributedText::new(text, wrap=false)
+      let font = @yue.Font::new("Sans", 12.0)
+      let probe = @yue.AttributedText::new(text, wrap=false)
       probe.set_font(font)
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", text_w + 14.0),
         ("height", 18.0),
         ("marginRight", 8.0),
@@ -577,11 +511,11 @@ pub fn badge_count(
       for kv in style {
         base.push(kv)
       }
-      let c = themed_container(style=base)
+      let c = @yue.themed_container(style=base)
       handle(c)
       c.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(c)
-        p.set_fill_color(theme_danger())
+        let b = @yue.ViewLike::get_bounds(c)
+        p.set_fill_color(@yue.theme_danger())
         p.fill_rect(0.0, 0.0, b.width, b.height)
         p.draw_text(
           text,
@@ -589,12 +523,12 @@ pub fn badge_count(
           0.0,
           b.width,
           b.height,
-          valign=Center,
+          valign=@yue.Center,
           color="#FFFFFF",
         )
       })
-      attach(parent, ViewLike::view(c))
-      ViewLike::view(c)
+      @yue.attach(parent, @yue.ViewLike::view(c))
+      @yue.ViewLike::view(c)
     },
   }
 }
@@ -609,10 +543,10 @@ fn crumb_bg(_act : Bool, _hov : Bool) -> String {
 /// 其余灰色可点、hover 变主题色。
 pub fn breadcrumb(
   items : Array[String],
-  selected : Store[String],
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
-  let nodes : Array[Node] = []
+  selected : @yue.Store[String],
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
+  let nodes : Array[@yue.Node] = []
   let mut i = 0
   for it in items {
     if i > 0 {
@@ -620,7 +554,7 @@ pub fn breadcrumb(
         stateful_item(
           "/",
           [("height", 24.0), ("marginRight", 4.0)],
-          Store::new(""),
+          @yue.Store::new(""),
           crumb_bg,
           crumb_fg_static,
           font_size=13.0,
@@ -640,25 +574,25 @@ pub fn breadcrumb(
     )
     i = i + 1
   }
-  let base : Array[(String, &StyVal)] = [("alignItems", "center")]
+  let base : Array[(String, &@yue.StyVal)] = [("alignItems", "center")]
   for kv in style {
     base.push(kv)
   }
-  hbox(nodes, style=base)
+  @yue.hbox(nodes, style=base)
 }
 
 ///|
 fn crumb_fg(_act : Bool, hov : Bool) -> String {
   if hov {
-    theme_primary()
+    @yue.theme_primary()
   } else {
-    theme_text_secondary()
+    @yue.theme_text_secondary()
   }
 }
 
 ///|
 fn crumb_fg_static(_act : Bool, _hov : Bool) -> String {
-  theme_text_secondary()
+  @yue.theme_text_secondary()
 }
 
 ///|
@@ -667,22 +601,22 @@ fn crumb_fg_static(_act : Bool, _hov : Bool) -> String {
 pub fn alert(
   text : String,
   t : SemanticType,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("height", 40.0),
         ("marginBottom", 10.0),
       ]
       for kv in style {
         base.push(kv)
       }
-      let v = themed_container(style=base)
+      let v = @yue.themed_container(style=base)
       handle(v)
       v.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(v)
+        let b = @yue.ViewLike::get_bounds(v)
         let w = b.width
         let h = b.height
         p.set_fill_color(type_light_color(t))
@@ -695,13 +629,13 @@ pub fn alert(
           0.0,
           w,
           h,
-          align=Start,
-          valign=Center,
+          align=@yue.Start,
+          valign=@yue.Center,
           color=type_color(t),
         )
       })
-      attach(parent, ViewLike::view(v))
-      ViewLike::view(v)
+      @yue.attach(parent, @yue.ViewLike::view(v))
+      @yue.ViewLike::view(v)
     },
   }
 }
@@ -711,14 +645,14 @@ pub fn alert(
 /// 悬停浅蓝,28×28 直角,文字垂直居中。current 为共享状态(从 1 开始),
 /// 点击直接写源 Store,全部按钮同步高亮。
 pub fn pagination(
-  current : Store[Int],
+  current : @yue.Store[Int],
   pages : Int,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("height", 30.0),
         ("flexDirection", "row"),
         ("alignItems", "center"),
@@ -726,14 +660,14 @@ pub fn pagination(
       for kv in style {
         base.push(kv)
       }
-      let row = themed_container(style=base)
+      let row = @yue.themed_container(style=base)
       handle(row)
       fn add_btn(label : String, target : Int, is_page : Bool) -> Unit {
         let hover = Ref(false)
         let focused = Ref(false)
-        let probe = AttributedText::new(label, wrap=false)
+        let probe = @yue.AttributedText::new(label, wrap=false)
         let label_w = probe.get_bounds_for(10000.0, 100.0).width
-        let b = themed_container(style=[
+        let b = @yue.themed_container(style=[
           ("width", 28.0),
           ("height", 28.0),
           ("marginRight", 4.0),
@@ -756,14 +690,14 @@ pub fn pagination(
         }
 
         b.on_draw(fn(p) {
-          let bd = ViewLike::get_bounds(b)
+          let bd = @yue.ViewLike::get_bounds(b)
           let cur = current.get()
           let act = is_page && cur == target
           if act {
-            p.set_fill_color(theme_primary())
+            p.set_fill_color(@yue.theme_primary())
             p.fill_rect(0.0, 0.0, bd.width, bd.height)
           } else if hover.val {
-            p.set_fill_color(theme_primary_light())
+            p.set_fill_color(@yue.theme_primary_light())
             p.fill_rect(0.0, 0.0, bd.width, bd.height)
           }
           p.draw_text(
@@ -772,33 +706,38 @@ pub fn pagination(
             0.0,
             bd.width,
             bd.height,
-            valign=Center,
-            color=if act { "#FFFFFF" } else { theme_text_regular() },
+            valign=@yue.Center,
+            color=if act { "#FFFFFF" } else { @yue.theme_text_regular() },
           )
           if focused.val {
-            draw_focus_ring(p, bd.width, bd.height, color="#FFFFFF")
+            @yue.draw_focus_ring(p, bd.width, bd.height, color="#FFFFFF")
           }
         })
-        View::set_cursor(b, hand())
-        ViewLike::on_mouse_down(b, fn(e) {
+        @yue.View::set_cursor(b, @yue.hand())
+        @yue.ViewLike::on_mouse_down(b, fn(e) {
           if e.button == 1 {
-            ViewLike::focus(b)
+            @yue.ViewLike::focus(b)
             activate()
             true
           } else {
             false
           }
         })
-        bind_focus(b, fn() { ViewLike::schedule_paint(b) }, focused, activate)
-        ViewLike::on_mouse_enter(b, fn(_e) {
+        @yue.bind_focus(
+          b,
+          fn() { @yue.ViewLike::schedule_paint(b) },
+          focused,
+          activate,
+        )
+        @yue.ViewLike::on_mouse_enter(b, fn(_e) {
           hover.val = true
-          ViewLike::schedule_paint(b)
+          @yue.ViewLike::schedule_paint(b)
         })
-        ViewLike::on_mouse_leave(b, fn(_e) {
+        @yue.ViewLike::on_mouse_leave(b, fn(_e) {
           hover.val = false
-          ViewLike::schedule_paint(b)
+          @yue.ViewLike::schedule_paint(b)
         })
-        current.subscribe(fn(_v) { ViewLike::schedule_paint(b) })
+        current.subscribe(fn(_v) { @yue.ViewLike::schedule_paint(b) })
         row.add_child(b)
       }
 
@@ -809,8 +748,8 @@ pub fn pagination(
         i = i + 1
       }
       add_btn("›", 1, false)
-      attach(parent, ViewLike::view(row))
-      ViewLike::view(row)
+      @yue.attach(parent, @yue.ViewLike::view(row))
+      @yue.ViewLike::view(row)
     },
   }
 }
@@ -820,60 +759,64 @@ pub fn pagination(
 /// 内容区从标题栏下方开始。children 经内层容器挂载,自动留出标题高度。
 pub fn card(
   title : String,
-  children : Array[Node],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  children : Array[@yue.Node],
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let head_h = 40.0
-      let base : Array[(String, &StyVal)] = [("height", 160.0)]
+      let base : Array[(String, &@yue.StyVal)] = [("height", 160.0)]
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
       outer.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(outer)
+        let b = @yue.ViewLike::get_bounds(outer)
         let w = b.width
         let h = b.height
         // 边框
-        p.set_stroke_color(theme_border())
+        p.set_stroke_color(@yue.theme_border())
         p.stroke_rect(0.0, 0.0, w, h)
         // 标题栏底部分隔线
-        p.set_fill_color(theme_border())
+        p.set_fill_color(@yue.theme_border())
         p.fill_rect(0.0, head_h, w, 1.0)
       })
       // 标题(加粗,垂直居中,左内边距 16;文字为自绘,padding 样式
       // 只影响子项排列,起点须在 draw 坐标里给)
-      let title_at = AttributedText::new(title, valign=Center, wrap=false)
-      title_at.set_font(Font::new("Sans", 14.0, weight=Bold))
-      title_at.set_color(theme_text_primary())
-      let title = themed_container(style=[("height", head_h)])
+      let title_at = @yue.AttributedText::new(
+        title,
+        valign=@yue.Center,
+        wrap=false,
+      )
+      title_at.set_font(@yue.Font::new("Sans", 14.0, weight=@yue.Bold))
+      title_at.set_color(@yue.theme_text_primary())
+      let title = @yue.themed_container(style=[("height", head_h)])
       fn apply_title_color() -> Unit {
-        title_at.set_color(theme_text_primary())
+        title_at.set_color(@yue.theme_text_primary())
         title_at.set_text(title_at.get_text())
-        ViewLike::schedule_paint(title)
+        @yue.ViewLike::schedule_paint(title)
       }
 
       apply_title_color()
-      ignore(on_theme_change(apply_title_color))
+      ignore(@yue.on_theme_change(apply_title_color))
       title.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(title)
+        let b = @yue.ViewLike::get_bounds(title)
         p.draw_attributed_text(title_at, 16.0, 0.0, b.width - 16.0, head_h)
       })
       outer.add_child(title)
       // 内容区
-      let body = themed_container(style=[
+      let body = @yue.themed_container(style=[
         ("padding", 14.0),
         ("flexDirection", "column"),
       ])
       for ch in children {
-        ignore((ch.mount)(ViewLike::view(body)))
+        ignore((ch.mount)(@yue.ViewLike::view(body)))
       }
       outer.add_child(body)
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -1206,14 +1149,14 @@ pub fn code_view(
   lang? : String = "moonbit",
   font_size? : Double = 13.0,
   line_numbers? : Bool = false,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let font = Font::new("Monospace", font_size)
-      fn make_at(text : String, color : String) -> AttributedText {
-        let at = AttributedText::new(text, wrap=false)
+      let font = @yue.Font::new("Monospace", font_size)
+      fn make_at(text : String, color : String) -> @yue.AttributedText {
+        let at = @yue.AttributedText::new(text, wrap=false)
         at.set_font(font)
         at.set_color(color)
         at
@@ -1231,10 +1174,10 @@ pub fn code_view(
       } else {
         0.0
       }
-      let laid : Array[(Array[(AttributedText, Double)], Double)] = []
+      let laid : Array[(Array[(@yue.AttributedText, Double)], Double)] = []
       let mut max_line_w = 0.0
       for idx, line in lines {
-        let segs : Array[(AttributedText, Double)] = []
+        let segs : Array[(@yue.AttributedText, Double)] = []
         let mut x = num_off
         if line_numbers {
           let num_txt = (idx + 1).to_string()
@@ -1258,16 +1201,16 @@ pub fn code_view(
       }
       let content_w = max_line_w + num_off + 32.0
       let view_h = line_h * laid.length().to_double() + 28.0
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", content_w),
         ("height", view_h),
       ]
       for kv in style {
         base.push(kv)
       }
-      let c = themed_container(style=base)
+      let c = @yue.themed_container(style=base)
       handle(c)
-      ViewLike::set_background_color(c, "#282C34")
+      @yue.ViewLike::set_background_color(c, "#282C34")
       c.on_draw(fn(p) {
         let mut y = 14.0
         for entry in laid {
@@ -1278,8 +1221,8 @@ pub fn code_view(
           y = y + line_h
         }
       })
-      attach(parent, ViewLike::view(c))
-      ViewLike::view(c)
+      @yue.attach(parent, @yue.ViewLike::view(c))
+      @yue.ViewLike::view(c)
     },
   }
 }
@@ -1290,12 +1233,12 @@ pub fn avatar(
   letter : String,
   color : String,
   size? : Double = 36.0,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", size),
         ("height", size),
         ("marginRight", 8.0),
@@ -1303,27 +1246,27 @@ pub fn avatar(
       for kv in style {
         base.push(kv)
       }
-      let c = themed_container(style=base)
+      let c = @yue.themed_container(style=base)
       handle(c)
-      ViewLike::set_background_color(c, color)
+      @yue.ViewLike::set_background_color(c, color)
       // 字母水平居中:GTK 端 align 无效,mount 时测宽手动摆位
-      let letter_probe = AttributedText::new(letter, wrap=false)
-      letter_probe.set_font(Font::new("Sans", size / 2.2))
+      let letter_probe = @yue.AttributedText::new(letter, wrap=false)
+      letter_probe.set_font(@yue.Font::new("Sans", size / 2.2))
       let letter_w = letter_probe.get_bounds_for(10000.0, 1000.0).width
       c.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(c)
+        let b = @yue.ViewLike::get_bounds(c)
         p.draw_text(
           letter,
           (b.width - letter_w) / 2.0,
           0.0,
           b.width,
           b.height,
-          valign=Center,
+          valign=@yue.Center,
           color="#FFFFFF",
         )
       })
-      attach(parent, ViewLike::view(c))
-      ViewLike::view(c)
+      @yue.attach(parent, @yue.ViewLike::view(c))
+      @yue.ViewLike::view(c)
     },
   }
 }
@@ -1332,9 +1275,9 @@ pub fn avatar(
 /// 圆点徽标(EP Badge 的 dot 形态):8×8 色点。
 pub fn badge_dot(
   color? : String = "",
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
-  let base : Array[(String, &StyVal)] = [
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
+  let base : Array[(String, &@yue.StyVal)] = [
     ("width", 8.0),
     ("height", 8.0),
     ("marginRight", 6.0),
@@ -1342,10 +1285,10 @@ pub fn badge_dot(
   for kv in style {
     base.push(kv)
   }
-  container(
+  @yue.container(
     on_draw=fn(p) {
       // 空串=默认语义红,draw 现取跟随主题;显式传色则恒定
-      p.set_fill_color(if color == "" { theme_danger() } else { color })
+      p.set_fill_color(if color == "" { @yue.theme_danger() } else { color })
       p.fill_rect(0.0, 0.0, 10000.0, 10000.0)
     },
     style=base,
@@ -1357,12 +1300,12 @@ pub fn badge_dot(
 pub fn alert_closeable(
   text : String,
   t : SemanticType,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("height", 40.0),
         ("marginBottom", 10.0),
         ("flexDirection", "row"),
@@ -1371,56 +1314,63 @@ pub fn alert_closeable(
       for kv in style {
         base.push(kv)
       }
-      let v = themed_container(style=base)
+      let v = @yue.themed_container(style=base)
       handle(v)
-      bind_bg(v, fn() { type_light_color(t) })
-      let label = Label::new("  " + text)
-      bind_fg(label, fn() { type_color(t) })
+      @yue.bind_bg(v, fn() { type_light_color(t) })
+      let label = @yue.Label::new("  " + text)
+      @yue.bind_fg(label, fn() { type_color(t) })
       v.add_child(label)
       // 弹性空白把关闭钮推到右端
-      let spacer = themed_container(style=[("flex", 1.0), ("height", 1.0)])
+      let spacer = @yue.themed_container(style=[("flex", 1.0), ("height", 1.0)])
       v.add_child(spacer)
-      let close = themed_container(style=[("width", 32.0), ("height", 40.0)])
+      let close = @yue.themed_container(style=[
+        ("width", 32.0),
+        ("height", 40.0),
+      ])
       let hover = Ref(false)
       let close_focused = Ref(false)
-      let close_it = fn() -> Unit { ViewLike::set_visible(v, false) }
+      let close_it = fn() -> Unit { @yue.ViewLike::set_visible(v, false) }
 
       close.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(close)
-        let c = if hover.val { type_color(t) } else { theme_text_secondary() }
+        let b = @yue.ViewLike::get_bounds(close)
+        let c = if hover.val {
+          type_color(t)
+        } else {
+          @yue.theme_text_secondary()
+        }
         draw_clear_x(p, b.width / 2.0, b.height / 2.0, color=c)
         if close_focused.val {
-          draw_focus_ring(p, b.width, b.height)
+          @yue.draw_focus_ring(p, b.width, b.height)
         }
       })
-      View::set_cursor(close, hand())
-      ViewLike::on_mouse_down(close, fn(e) {
+      @yue.View::set_cursor(close, @yue.hand())
+      @yue.ViewLike::on_mouse_down(close, fn(e) {
         if e.button == 1 {
-          ViewLike::focus(close)
+          @yue.ViewLike::focus(close)
           close_it()
           true
         } else {
           false
         }
       })
-      bind_focus(
+      @yue.bind_focus(
         close,
-        fn() { ViewLike::schedule_paint(close) },
+        fn() { @yue.ViewLike::schedule_paint(close) },
         close_focused,
         close_it,
       )
-      ViewLike::on_mouse_enter(close, fn(_e) {
+      @yue.ViewLike::on_mouse_enter(close, fn(_e) {
         hover.val = true
-        ViewLike::schedule_paint(close)
+        @yue.ViewLike::schedule_paint(close)
       })
-      ViewLike::on_mouse_leave(close, fn(_e) {
+      @yue.ViewLike::on_mouse_leave(close, fn(_e) {
         hover.val = false
-        ViewLike::schedule_paint(close)
+        @yue.ViewLike::schedule_paint(close)
       })
       v.add_child(close)
       // 让关闭钮靠右:中间垫一个弹性空白
-      attach(parent, ViewLike::view(v))
-      ViewLike::view(v)
+      @yue.attach(parent, @yue.ViewLike::view(v))
+      @yue.ViewLike::view(v)
     },
   }
 }
@@ -1429,13 +1379,13 @@ pub fn alert_closeable(
 /// 步骤条(EP Steps):数字方块(完成浅蓝/当前实底/待办灰)+ 文字 + 连线。
 pub fn steps(
   items : Array[String],
-  current : Store[Int],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  current : @yue.Store[Int],
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("height", 40.0),
         ("marginBottom", 12.0),
         ("flexDirection", "row"),
@@ -1444,27 +1394,27 @@ pub fn steps(
       for kv in style {
         base.push(kv)
       }
-      let row = themed_container(style=base)
+      let row = @yue.themed_container(style=base)
       handle(row)
-      let font = Font::new("Sans", 13.0)
+      let font = @yue.Font::new("Sans", 13.0)
       let n = items.length()
       // 单循环交错排布「连线 | 数字方块 | 文字」,文字紧随各自数字;
       // 数字居中走 draw_text 的 align 参数(测宽手动摆位在 Windows 偏左)
       for i in 0..<n {
         if i > 0 {
-          let line = themed_container(style=[
+          let line = @yue.themed_container(style=[
             ("flex", 1.0),
             ("height", 2.0),
             ("marginRight", 6.0),
           ])
           let idx = i
           line.on_draw(fn(p) {
-            let b = ViewLike::get_bounds(line)
+            let b = @yue.ViewLike::get_bounds(line)
             p.set_fill_color(
               if current.get() >= idx {
-                theme_primary()
+                @yue.theme_primary()
               } else {
-                theme_border()
+                @yue.theme_border()
               },
             )
             p.fill_rect(0.0, 0.0, b.width, b.height)
@@ -1472,13 +1422,13 @@ pub fn steps(
           row.add_child(line)
         }
         let num_txt = (i + 1).to_string()
-        let bx = themed_container(style=[
+        let bx = @yue.themed_container(style=[
           ("width", 24.0),
           ("height", 24.0),
           ("marginRight", 6.0),
         ])
         bx.on_draw(fn(p) {
-          let b = ViewLike::get_bounds(bx)
+          let b = @yue.ViewLike::get_bounds(bx)
           let cur = current.get()
           let st = if i < cur {
             0 // done
@@ -1489,9 +1439,9 @@ pub fn steps(
           }
           p.set_fill_color(
             match st {
-              0 => theme_primary_light()
-              1 => theme_primary()
-              _ => theme_info_light()
+              0 => @yue.theme_primary_light()
+              1 => @yue.theme_primary()
+              _ => @yue.theme_info_light()
             },
           )
           p.fill_rect(0.0, 0.0, b.width, b.height)
@@ -1501,41 +1451,41 @@ pub fn steps(
             0.0,
             b.width,
             b.height,
-            align=Center,
-            valign=Center,
+            align=@yue.Center,
+            valign=@yue.Center,
             color=match st {
-              0 => theme_primary()
+              0 => @yue.theme_primary()
               1 => "#FFFFFF"
-              _ => theme_text_secondary()
+              _ => @yue.theme_text_secondary()
             },
           )
         })
-        current.subscribe(fn(_v) { ViewLike::schedule_paint(bx) })
+        current.subscribe(fn(_v) { @yue.ViewLike::schedule_paint(bx) })
         row.add_child(bx)
         // 文字色随「当前步」与主题双状态变化;set_color 后须同文 set_text
         // 触发重排(否则重绘仍用旧色,见 adaptation.md)
-        let l = Label::new(items[i])
-        ViewLike::set_font(l, font)
+        let l = @yue.Label::new(items[i])
+        @yue.ViewLike::set_font(l, font)
         fn apply_step_label() -> Unit {
-          ViewLike::set_color(
+          @yue.ViewLike::set_color(
             l,
             if i <= current.get() {
-              theme_text_primary()
+              @yue.theme_text_primary()
             } else {
-              theme_text_secondary()
+              @yue.theme_text_secondary()
             },
           )
           l.set_text(l.get_text())
-          ViewLike::schedule_paint(l)
+          @yue.ViewLike::schedule_paint(l)
         }
 
         apply_step_label()
-        ignore(on_theme_change(apply_step_label))
+        ignore(@yue.on_theme_change(apply_step_label))
         current.subscribe(fn(_v) { apply_step_label() })
         row.add_child(l)
       }
-      attach(parent, ViewLike::view(row))
-      ViewLike::view(row)
+      @yue.attach(parent, @yue.ViewLike::view(row))
+      @yue.ViewLike::view(row)
     },
   }
 }
@@ -1544,47 +1494,47 @@ pub fn steps(
 /// 折叠面板(EP Collapse):点击标题行切换内容显隐,各面板独立开合,
 /// 初始仅第一面板展开。
 pub fn collapse(
-  panels : Array[(String, Array[Node])],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  panels : Array[(String, Array[@yue.Node])],
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("marginBottom", 12.0),
         ("flexDirection", "column"),
       ]
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
       let mut first = true
       for entry in panels {
         let open = Ref(first)
         first = false
-        let head = themed_container(style=[
+        let head = @yue.themed_container(style=[
           ("height", 34.0),
           ("paddingLeft", 12.0),
           ("flexDirection", "row"),
           ("alignItems", "center"),
         ])
-        bind_bg(head, fn() { theme_info_light() })
+        @yue.bind_bg(head, fn() { @yue.theme_info_light() })
         let head_focused = Ref(false)
         head.on_draw(fn(p) {
           if head_focused.val {
-            let b = ViewLike::get_bounds(head)
-            draw_focus_ring(p, b.width, b.height)
+            let b = @yue.ViewLike::get_bounds(head)
+            @yue.draw_focus_ring(p, b.width, b.height)
           }
         })
         // 自绘折叠指示(V 形折线,不依赖字体字形)
-        let arrow = themed_container(style=[
+        let arrow = @yue.themed_container(style=[
           ("width", 12.0),
           ("height", 12.0),
           ("marginRight", 5.0),
         ])
         arrow.on_draw(fn(p) {
-          p.set_stroke_color(theme_primary())
+          p.set_stroke_color(@yue.theme_primary())
           for off in [0.0, 0.6] {
             p.begin_path()
             if open.val {
@@ -1599,27 +1549,27 @@ pub fn collapse(
             p.stroke()
           }
         })
-        let title = Label::new(entry.0)
+        let title = @yue.Label::new(entry.0)
         fn apply_title_color() -> Unit {
-          ViewLike::set_color(title, theme_text_primary())
+          @yue.ViewLike::set_color(title, @yue.theme_text_primary())
           title.set_text(title.get_text())
         }
 
         apply_title_color()
-        ignore(on_theme_change(apply_title_color))
+        ignore(@yue.on_theme_change(apply_title_color))
         head.add_child(arrow)
         head.add_child(title)
-        let body = themed_container(style=[
+        let body = @yue.themed_container(style=[
           ("padding", 10.0),
           ("flexDirection", "column"),
         ])
-        set_panel_bg(body)
+        @yue.set_panel_bg(body)
         for ch in entry.1 {
-          ignore((ch.mount)(ViewLike::view(body)))
+          ignore((ch.mount)(@yue.ViewLike::view(body)))
         }
         let apply = fn() -> Unit {
-          ViewLike::set_visible(body, open.val)
-          ViewLike::schedule_paint(arrow)
+          @yue.ViewLike::set_visible(body, open.val)
+          @yue.ViewLike::schedule_paint(arrow)
         }
         let toggle = fn() -> Unit {
           open.val = !open.val
@@ -1627,23 +1577,23 @@ pub fn collapse(
         }
 
         apply()
-        View::set_cursor(head, hand())
-        ViewLike::on_mouse_down(head, fn(e) {
+        @yue.View::set_cursor(head, @yue.hand())
+        @yue.ViewLike::on_mouse_down(head, fn(e) {
           if e.button == 1 {
-            ViewLike::focus(head)
+            @yue.ViewLike::focus(head)
             toggle()
             true
           } else {
             false
           }
         })
-        bind_focus(
+        @yue.bind_focus(
           head,
-          fn() { ViewLike::schedule_paint(head) },
+          fn() { @yue.ViewLike::schedule_paint(head) },
           head_focused,
           toggle,
         )
-        let panel = themed_container(style=[
+        let panel = @yue.themed_container(style=[
           ("marginBottom", 6.0),
           ("flexDirection", "column"),
         ])
@@ -1651,8 +1601,8 @@ pub fn collapse(
         panel.add_child(body)
         outer.add_child(panel)
       }
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -1661,63 +1611,63 @@ pub fn collapse(
 /// 时间线(EP Timeline):左列色点+竖线,右列标题+描述。item 高固定 56。
 pub fn timeline(
   items : Array[(String, String, SemanticType)],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("marginBottom", 12.0),
         ("flexDirection", "column"),
       ]
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
       let n = items.length()
       let mut i = 0
       for entry in items {
         let is_last = i == n - 1
-        let row = themed_container(style=[
+        let row = @yue.themed_container(style=[
           ("height", 56.0),
           ("flexDirection", "row"),
         ])
-        let node_col = themed_container(style=[
+        let node_col = @yue.themed_container(style=[
           ("width", 20.0),
           ("height", 56.0),
         ])
         let is_first = i == 0
         node_col.on_draw(fn(p) {
           // 竖线:首行从点心起、末行到点心止,中间整行贯通(节点色块居中)
-          let b = ViewLike::get_bounds(node_col)
+          let b = @yue.ViewLike::get_bounds(node_col)
           let cy = b.height / 2.0
           let top = if is_first { cy } else { 0.0 }
           let bottom = if is_last { cy } else { b.height }
           if bottom > top {
-            p.set_fill_color(theme_border())
+            p.set_fill_color(@yue.theme_border())
             p.fill_rect(9.0, top, 2.0, bottom - top)
           }
           p.set_fill_color(type_color(entry.2))
           p.fill_rect(5.0, b.height / 2.0 - 5.0, 10.0, 10.0)
         })
-        let text_col = themed_container(style=[
+        let text_col = @yue.themed_container(style=[
           ("paddingLeft", 8.0),
           ("flex", 1.0),
           ("flexDirection", "column"),
         ])
-        let title = Label::new(entry.0)
+        let title = @yue.Label::new(entry.0)
         fn apply_title_color() -> Unit {
-          ViewLike::set_color(title, theme_text_primary())
+          @yue.ViewLike::set_color(title, @yue.theme_text_primary())
           title.set_text(title.get_text())
         }
 
         apply_title_color()
-        ignore(on_theme_change(apply_title_color))
-        title.set_align(Start)
-        let desc = Label::new(entry.1)
-        bind_fg(desc, fn() { theme_text_secondary() })
-        desc.set_align(Start)
+        ignore(@yue.on_theme_change(apply_title_color))
+        title.set_align(@yue.Start)
+        let desc = @yue.Label::new(entry.1)
+        @yue.bind_fg(desc, fn() { @yue.theme_text_secondary() })
+        desc.set_align(@yue.Start)
         text_col.add_child(title)
         text_col.add_child(desc)
         row.add_child(node_col)
@@ -1725,8 +1675,8 @@ pub fn timeline(
         outer.add_child(row)
         i = i + 1
       }
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -1735,40 +1685,40 @@ pub fn timeline(
 /// 描述列表(EP Descriptions):键灰值深的两列网格。
 pub fn descriptions(
   pairs : Array[(String, String)],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("marginBottom", 12.0),
         ("flexDirection", "column"),
       ]
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
       for kv in pairs {
-        let row = themed_container(style=[
+        let row = @yue.themed_container(style=[
           ("height", 26.0),
           ("flexDirection", "row"),
           ("alignItems", "center"),
         ])
-        let k = Label::new(kv.0)
-        bind_fg(k, fn() { theme_text_secondary() })
-        k.set_align(Start)
-        let v = Label::new(kv.1)
-        bind_fg(v, fn() { theme_text_primary() })
-        v.set_align(Start)
-        let key_wrap = themed_container(style=[("width", 110.0)])
+        let k = @yue.Label::new(kv.0)
+        @yue.bind_fg(k, fn() { @yue.theme_text_secondary() })
+        k.set_align(@yue.Start)
+        let v = @yue.Label::new(kv.1)
+        @yue.bind_fg(v, fn() { @yue.theme_text_primary() })
+        v.set_align(@yue.Start)
+        let key_wrap = @yue.themed_container(style=[("width", 110.0)])
         key_wrap.add_child(k)
         row.add_child(key_wrap)
         row.add_child(v)
         outer.add_child(row)
       }
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -1779,14 +1729,14 @@ pub fn result(
   t : SemanticType,
   title : String,
   desc : String,
-  children : Array[Node],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  children : Array[@yue.Node],
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       // 图标(76+16) + 标题 30 + 描述 24 + 按钮区(8+按钮高约 32)+ 底部留白
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("height", 208.0),
         ("marginBottom", 12.0),
         ("flexDirection", "column"),
@@ -1795,20 +1745,20 @@ pub fn result(
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
-      let icon = themed_container(style=[
+      let icon = @yue.themed_container(style=[
         ("width", 76.0),
         ("height", 76.0),
         ("marginTop", 16.0),
       ])
 
-      bind_bg(icon, fn() { type_light_color(t) })
+      @yue.bind_bg(icon, fn() { type_light_color(t) })
       // 符号用 Painter 矢量路径自绘(✓/✕/!):不测宽、不摆位,三平台
       // 一致(Windows 的 AttributedText 测宽含内边距,手动居中必偏左,
       // 见 adaptation.md);主题切换重取色显式重绘
       icon.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(icon)
+        let b = @yue.ViewLike::get_bounds(icon)
         let cx = b.width / 2.0
         let cy = b.height / 2.0
         let s = 20.0
@@ -1835,36 +1785,39 @@ pub fn result(
           }
         }
       })
-      ignore(on_theme_change(fn() { ViewLike::schedule_paint(icon) }))
-      let big = themed_container(style=[
+      ignore(@yue.on_theme_change(fn() { @yue.ViewLike::schedule_paint(icon) }))
+      let big = @yue.themed_container(style=[
         ("height", 30.0),
         ("alignItems", "center"),
       ])
-      let t1 = Label::new(title)
-      ViewLike::set_font(t1, Font::new("Sans", 18.0, weight=SemiBold))
-      bind_fg(t1, fn() { theme_text_primary() })
+      let t1 = @yue.Label::new(title)
+      @yue.ViewLike::set_font(
+        t1,
+        @yue.Font::new("Sans", 18.0, weight=@yue.SemiBold),
+      )
+      @yue.bind_fg(t1, fn() { @yue.theme_text_primary() })
       big.add_child(t1)
-      let sub = themed_container(style=[
+      let sub = @yue.themed_container(style=[
         ("height", 24.0),
         ("alignItems", "center"),
       ])
-      let t2 = Label::new(desc)
-      bind_fg(t2, fn() { theme_text_secondary() })
+      let t2 = @yue.Label::new(desc)
+      @yue.bind_fg(t2, fn() { @yue.theme_text_secondary() })
       sub.add_child(t2)
-      let btns = themed_container(style=[
+      let btns = @yue.themed_container(style=[
         ("marginTop", 8.0),
         ("flexDirection", "row"),
         ("alignItems", "center"),
       ])
       for ch in children {
-        ignore((ch.mount)(ViewLike::view(btns)))
+        ignore((ch.mount)(@yue.ViewLike::view(btns)))
       }
       outer.add_child(icon)
       outer.add_child(big)
       outer.add_child(sub)
       outer.add_child(btns)
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -1873,12 +1826,12 @@ pub fn result(
 /// 空状态(EP Empty):灰块占位 + 居中说明。
 pub fn empty(
   desc : String,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("height", 140.0),
         ("marginBottom", 12.0),
         ("flexDirection", "column"),
@@ -1887,9 +1840,9 @@ pub fn empty(
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
-      let box = themed_container(style=[
+      let box = @yue.themed_container(style=[
         ("width", 96.0),
         ("height", 88.0),
         ("marginTop", 12.0),
@@ -1900,27 +1853,27 @@ pub fn empty(
         // 图案画到负坐标被裁且无重绘时机("偶尔不显示"根因)
         let cx = 48.0
         // 盒体
-        p.set_fill_color(theme_fill_hover())
+        p.set_fill_color(@yue.theme_fill_hover())
         p.fill_rect(cx - 26.0, 36.0, 52.0, 34.0)
-        p.set_stroke_color(theme_border())
+        p.set_stroke_color(@yue.theme_border())
         p.stroke_rect(cx - 26.0, 36.0, 52.0, 34.0)
         // 盖(比体宽,略上叠)
-        p.set_fill_color(theme_info_light())
+        p.set_fill_color(@yue.theme_info_light())
         p.fill_rect(cx - 34.0, 22.0, 68.0, 14.0)
         p.stroke_rect(cx - 34.0, 22.0, 68.0, 14.0)
       })
-      let cap = themed_container(style=[
+      let cap = @yue.themed_container(style=[
         ("height", 26.0),
         ("marginTop", 6.0),
         ("alignItems", "center"),
       ])
-      let l = Label::new(desc)
-      bind_fg(l, fn() { theme_text_secondary() })
+      let l = @yue.Label::new(desc)
+      @yue.bind_fg(l, fn() { @yue.theme_text_secondary() })
       cap.add_child(l)
       outer.add_child(box)
       outer.add_child(cap)
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -1929,35 +1882,38 @@ pub fn empty(
 /// 数值统计(EP Statistic):大号数值(响应式)+ 灰色标题。
 pub fn statistic(
   title : String,
-  value : Store[String],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  value : @yue.Store[String],
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("marginRight", 24.0),
         ("flexDirection", "column"),
       ]
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
-      let num = Label::new(value.get())
-      ViewLike::set_font(num, Font::new("Sans", 24.0, weight=SemiBold))
-      bind_fg(num, fn() { theme_text_primary() })
-      let cap = Label::new(title)
-      bind_fg(cap, fn() { theme_text_secondary() })
+      let num = @yue.Label::new(value.get())
+      @yue.ViewLike::set_font(
+        num,
+        @yue.Font::new("Sans", 24.0, weight=@yue.SemiBold),
+      )
+      @yue.bind_fg(num, fn() { @yue.theme_text_primary() })
+      let cap = @yue.Label::new(title)
+      @yue.bind_fg(cap, fn() { @yue.theme_text_secondary() })
       // set_text 只标脏不重排,变长截断,须补强制重排
       value.subscribe(fn(v) {
         num.set_text(v)
-        ViewLike::update_layout(num)
+        @yue.ViewLike::update_layout(num)
       })
       outer.add_child(num)
       outer.add_child(cap)
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -1966,15 +1922,15 @@ pub fn statistic(
 /// 线性进度条(EP Progress):背景浅灰轨道 + 主题色填充,
 /// value 为 Store(0..1),变化自动重绘。
 pub fn progress_line(
-  value : Store[Double],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  value : @yue.Store[Double],
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       // grow/shrink 单写不写 flex 简写:column 父(auto 高链)下简写
       // 派生 basis 0 首轮解析成 0 即塌(height 被盖),惰性挂载时序必现
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("flexgrow", 1.0),
         ("flexshrink", 1.0),
         ("height", 8.0),
@@ -1982,20 +1938,20 @@ pub fn progress_line(
       for kv in style {
         base.push(kv)
       }
-      let v = themed_container(style=base)
+      let v = @yue.themed_container(style=base)
       handle(v)
-      bind_bg(v, fn() { theme_info_light() })
+      @yue.bind_bg(v, fn() { @yue.theme_info_light() })
       v.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(v)
+        let b = @yue.ViewLike::get_bounds(v)
         let frac = value.get()
         if frac > 0.0 {
-          p.set_fill_color(theme_primary())
+          p.set_fill_color(@yue.theme_primary())
           p.fill_rect(0.0, 0.0, b.width * frac, b.height)
         }
       })
-      value.subscribe(fn(_x) { ViewLike::schedule_paint(v) })
-      attach(parent, ViewLike::view(v))
-      ViewLike::view(v)
+      value.subscribe(fn(_x) { @yue.ViewLike::schedule_paint(v) })
+      @yue.attach(parent, @yue.ViewLike::view(v))
+      @yue.ViewLike::view(v)
     },
   }
 }
@@ -2011,24 +1967,40 @@ pub(all) enum TextRole {
 }
 
 ///|
-fn role_font(role : TextRole) -> Font {
+fn role_font(role : TextRole) -> @yue.Font {
   match role {
-    Title => Font::new("Sans", 18.0, weight=SemiBold)
-    Section => Font::new("Sans", 14.0, weight=SemiBold)
-    Body => Font::new("Sans", 13.0)
-    Secondary => Font::new("Sans", 12.0)
-    Accent => Font::new("Sans", 13.0, weight=SemiBold)
+    Title => @yue.Font::new("Sans", 18.0, weight=@yue.SemiBold)
+    Section => @yue.Font::new("Sans", 14.0, weight=@yue.SemiBold)
+    Body => @yue.Font::new("Sans", 13.0)
+    Secondary => @yue.Font::new("Sans", 12.0)
+    Accent => @yue.Font::new("Sans", 13.0, weight=@yue.SemiBold)
   }
+}
+
+///|
+/// 量一段文本在指定宽度下的自然渲染高(同 role 字体,含换行折行;
+/// width 传 0 或不传时按不换行量)。供运行期长高的标签显式设定
+/// 高度:GTK 标签的自然高交给 yoga 重测会得到错误值(pango 对
+/// 未定义高度按一行量、对视口确定高度按裁断量),显式高度可绕开,
+/// 定案见 adaptation.md「报告标签自然高」条。
+pub fn measure_text_height(
+  text : String,
+  role? : TextRole = Body,
+  width? : Double = 0.0,
+) -> Double {
+  let probe = @yue.AttributedText::new(text, wrap=width > 0.0)
+  probe.set_font(role_font(role))
+  probe.get_bounds_for(if width > 0.0 { width } else { 100000.0 }, 100000.0).height
 }
 
 ///|
 fn role_color(role : TextRole) -> String {
   match role {
-    Title => theme_text_primary()
-    Section => theme_text_primary()
-    Body => theme_text_regular()
-    Secondary => theme_text_secondary()
-    Accent => theme_primary()
+    Title => @yue.theme_text_primary()
+    Section => @yue.theme_text_primary()
+    Body => @yue.theme_text_regular()
+    Secondary => @yue.theme_text_secondary()
+    Accent => @yue.theme_primary()
   }
 }
 
@@ -2038,16 +2010,16 @@ pub fn label_t(
   text : String,
   role? : TextRole = Body,
   color? : String = "",
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Label) -> Unit = fn(_l) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Label) -> Unit = fn(_l) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let l = Label::new(text)
-      ViewLike::set_font(l, role_font(role))
+      let l = @yue.Label::new(text)
+      @yue.ViewLike::set_font(l, role_font(role))
       fn apply_color() -> Unit {
         // 固定色(如深色遮盖层上的白字)不随主题切换
-        ViewLike::set_color(
+        @yue.ViewLike::set_color(
           l,
           if color == "" {
             role_color(role)
@@ -2061,12 +2033,12 @@ pub fn label_t(
       }
 
       apply_color()
-      ignore(on_theme_change(apply_color))
-      l.set_align(Start)
-      apply_style(l, style~)
+      ignore(@yue.on_theme_change(apply_color))
+      l.set_align(@yue.Start)
+      @yue.apply_style(l, style~)
       handle(l)
-      attach(parent, ViewLike::view(l))
-      ViewLike::view(l)
+      @yue.attach(parent, @yue.ViewLike::view(l))
+      @yue.ViewLike::view(l)
     },
   }
 }
@@ -2082,72 +2054,102 @@ pub(all) enum ButtonVariant {
 }
 
 ///|
+/// 按钮配色求解:color / background_color 传非空为显式覆盖(所有状态
+/// 一致,hover 不再变色);未传按 variant + hover 走预设
+/// (background_color 为 "" 即无底,Text 常态)。
+fn button_colors(
+  variant : ButtonVariant,
+  hover : Bool,
+  color : String,
+  background_color : String,
+) -> (String, String) {
+  let fg_eff = if color != "" {
+    color
+  } else {
+    match variant {
+      Solid => "#FFFFFF"
+      Soft => if hover { "#FFFFFF" } else { @yue.theme_primary() }
+      Text => @yue.theme_primary()
+      Danger => "#FFFFFF"
+    }
+  }
+  let bg_eff = if background_color != "" {
+    background_color
+  } else {
+    match variant {
+      Solid =>
+        if hover {
+          @yue.theme_primary_hover()
+        } else {
+          @yue.theme_primary()
+        }
+      Soft =>
+        if hover {
+          @yue.theme_primary()
+        } else {
+          @yue.theme_primary_light()
+        }
+      Text => if hover { @yue.theme_fill_hover() } else { "" }
+      Danger =>
+        if hover {
+          @yue.theme_danger_hover()
+        } else {
+          @yue.theme_danger()
+        }
+    }
+  }
+  (fg_eff, bg_eff)
+}
+
+///|
 /// 主题化按钮(自绘,hover 全程收敛在主题内,不交给原生样式):
 /// Solid hover 加深 / Soft hover 变实底白字 / Text hover 浅灰底 /
-/// Danger hover 加深。
+/// Danger hover 加深。color / background_color 传非空即覆盖文字色 /
+/// 底色(所有状态生效,hover 不再变色);不传则按 variant 预设。
 pub fn button_t(
   text : String,
   on_click? : () -> Unit = fn() {  },
   variant? : ButtonVariant = Soft,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  color? : String = "",
+  background_color? : String = "",
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let hover = Ref(false)
       let focused = Ref(false)
-      let font = Font::new("Sans", 13.0)
-      let probe = AttributedText::new(text, wrap=false)
+      let font = @yue.Font::new("Sans", 13.0)
+      let probe = @yue.AttributedText::new(text, wrap=false)
       probe.set_font(font)
       let text_w = probe.get_bounds_for(10000.0, 100.0).width
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", text_w + 32.0),
-        ("height", control_height),
+        ("height", @yue.control_height),
         ("marginRight", 8.0),
       ]
       for kv in style {
         base.push(kv)
       }
-      let v = themed_container(style=base)
+      let v = @yue.themed_container(style=base)
       handle(v)
       v.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(v)
-        let bg = match variant {
-          Solid =>
-            if hover.val {
-              theme_primary_hover()
-            } else {
-              theme_primary()
-            }
-          Soft =>
-            if hover.val {
-              theme_primary()
-            } else {
-              theme_primary_light()
-            }
-          Text => if hover.val { theme_fill_hover() } else { "" }
-          Danger =>
-            if hover.val {
-              theme_danger_hover()
-            } else {
-              theme_danger()
-            }
-        }
-        let fg = match variant {
-          Solid => "#FFFFFF"
-          Soft => if hover.val { "#FFFFFF" } else { theme_primary() }
-          Text => theme_primary()
-          Danger => "#FFFFFF"
-        }
-        if bg != "" {
-          p.set_fill_color(bg)
+        let b = @yue.ViewLike::get_bounds(v)
+        let (fg_c, bg_c) = button_colors(
+          variant,
+          hover.val,
+          color,
+          background_color,
+        )
+        if bg_c != "" {
+          p.set_fill_color(bg_c)
           p.fill_rect(0.0, 0.0, b.width, b.height)
         }
         // GTK 端 DrawAttributedText 只实现 valign,水平 align 无效——
         // 用 mount 时测的文本宽手动水平居中。
-        let at = AttributedText::new(text, valign=Center, wrap=false)
+        let at = @yue.AttributedText::new(text, valign=@yue.Center, wrap=false)
         at.set_font(font)
-        at.set_color(fg)
+        at.set_color(fg_c)
         p.draw_attributed_text(
           at,
           (b.width - text_w) / 2.0,
@@ -2157,39 +2159,44 @@ pub fn button_t(
         )
         // 实底变体上主题色环不可见,焦点环用白色
         if focused.val {
-          draw_focus_ring(
+          @yue.draw_focus_ring(
             p,
             b.width,
             b.height,
             color=match variant {
               Solid => "#FFFFFF"
               Danger => "#FFFFFF"
-              _ => theme_primary()
+              _ => @yue.theme_primary()
             },
           )
         }
       })
-      View::set_cursor(v, hand())
-      ViewLike::on_mouse_down(v, fn(e) {
+      @yue.View::set_cursor(v, @yue.hand())
+      @yue.ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 {
-          ViewLike::focus(v)
+          @yue.ViewLike::focus(v)
           on_click()
           true
         } else {
           false
         }
       })
-      bind_focus(v, fn() { ViewLike::schedule_paint(v) }, focused, on_click)
-      ViewLike::on_mouse_enter(v, fn(_e) {
+      @yue.bind_focus(
+        v,
+        fn() { @yue.ViewLike::schedule_paint(v) },
+        focused,
+        on_click,
+      )
+      @yue.ViewLike::on_mouse_enter(v, fn(_e) {
         hover.val = true
-        ViewLike::schedule_paint(v)
+        @yue.ViewLike::schedule_paint(v)
       })
-      ViewLike::on_mouse_leave(v, fn(_e) {
+      @yue.ViewLike::on_mouse_leave(v, fn(_e) {
         hover.val = false
-        ViewLike::schedule_paint(v)
+        @yue.ViewLike::schedule_paint(v)
       })
-      attach(parent, ViewLike::view(v))
-      ViewLike::view(v)
+      @yue.attach(parent, @yue.ViewLike::view(v))
+      @yue.ViewLike::view(v)
     },
   }
 }
@@ -2199,28 +2206,11 @@ pub fn button_t(
 /// 居中样式):控件高度收窄到「行高(带原生边框时 +1px×2)」,文字即
 /// 在控件内天然居中;外层容器用 justifyContent=center 让控件垂直居中
 /// (布局语义,适配任意高度值)。返回收窄后的控件高度。
-fn entry_ctrl_height(bordered : Bool) -> Double {
-  let probe = AttributedText::new("Ag", wrap=false)
-  probe.set_font(Font::new("Sans", 13.0))
-  probe.get_bounds_for(10000.0, 1000.0).height +
-  (if bordered { 2.0 } else { 0.0 })
-}
 
 ///|
 /// 输入框文字色跟随主题:Linux 由全局接管 CSS 负责,不逐控件设;其余
 /// 平台显式设当前主题前景/背景并订阅主题切换重设(Windows 原生
 /// RichEdit 恒黑字不随主题,是此函数存在的原因)。
-fn bind_entry_theme(e : Entry) -> Unit {
-  if platform() == "linux" {
-    return
-  }
-  fn apply() -> Unit {
-    e.set_colors(fg=theme_text_regular(), bg=theme_bg_panel())
-  }
-
-  apply()
-  ignore(on_theme_change(apply))
-}
 
 ///|
 /// 主题化单行输入:统一字体与行高;文字色经主题通道跟随色板。
@@ -2230,37 +2220,39 @@ pub fn entry_t(
   text? : String = "",
   password? : Bool = false,
   on_input? : (String) -> Unit = fn(_s) {  },
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Entry) -> Unit = fn(_e) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Entry) -> Unit = fn(_e) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let e = match password {
-        true => Entry::make(text~, entry_type=Password)
-        false => Entry::make(text~, entry_type=Normal)
+        true => @yue.Entry::make(text~, entry_type=@yue.Password)
+        false => @yue.Entry::make(text~, entry_type=@yue.Normal)
       }
-      ViewLike::set_font(e, Font::new("Sans", 13.0))
-      let base : Array[(String, &StyVal)] = [("height", control_height)]
+      @yue.ViewLike::set_font(e, @yue.Font::new("Sans", 13.0))
+      let base : Array[(String, &@yue.StyVal)] = [
+        ("height", @yue.control_height),
+      ]
       for kv in style {
         base.push(kv)
       }
-      let target : View = if platform() == "windows" {
+      let target : @yue.View = if @yue.platform() == "windows" {
         // Linux 端 Entry 尺寸已归一化(min-height:0),补显式高度维持观感;
         // Windows 收窄控件到行高 + 外包居中容器(布局语义,适配任意高度)
-        ViewLike::set_style(e, "height", entry_ctrl_height(true))
+        @yue.ViewLike::set_style(e, "height", @yue.entry_ctrl_height(true))
         let shell_style = base.copy()
         shell_style.push(("justifyContent", "center"))
-        let shell = themed_container(style=shell_style)
-        attach(ViewLike::view(shell), ViewLike::view(e))
-        ViewLike::view(shell)
+        let shell = @yue.themed_container(style=shell_style)
+        @yue.attach(@yue.ViewLike::view(shell), @yue.ViewLike::view(e))
+        @yue.ViewLike::view(shell)
       } else {
-        apply_style(e, style=base)
-        ViewLike::view(e)
+        @yue.apply_style(e, style=base)
+        @yue.ViewLike::view(e)
       }
-      bind_entry_theme(e)
+      @yue.bind_entry_theme(e)
       e.on_text_change(fn() { on_input(e.get_text()) })
       handle(e)
-      attach(parent, target)
+      @yue.attach(parent, target)
       target
     },
   }
@@ -2276,18 +2268,18 @@ pub fn checkbox_t(
   disabled? : Bool = false,
   color? : String = "",
   on_change? : (Bool) -> Unit = fn(_v) {  },
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let state = Ref(checked)
       let hover = Ref(false)
       let focused = Ref(false)
-      let font = Font::new("Sans", 13.0)
-      let probe = AttributedText::new(title, wrap=false)
+      let font = @yue.Font::new("Sans", 13.0)
+      let probe = @yue.AttributedText::new(title, wrap=false)
       probe.set_font(font)
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", probe.get_bounds_for(10000.0, 100.0).width + 30.0),
         ("height", 24.0),
         ("marginBottom", 6.0),
@@ -2295,32 +2287,32 @@ pub fn checkbox_t(
       for kv in style {
         base.push(kv)
       }
-      let v = themed_container(style=base)
+      let v = @yue.themed_container(style=base)
       handle(v)
       let activate = fn() -> Unit {
         state.val = !state.val
         on_change(state.val)
-        ViewLike::schedule_paint(v)
+        @yue.ViewLike::schedule_paint(v)
       }
 
       v.on_draw(fn(p) {
         let by = 5.0
         p.set_stroke_color(
           if disabled {
-            theme_border()
+            @yue.theme_border()
           } else if state.val || hover.val {
-            theme_primary()
+            @yue.theme_primary()
           } else {
-            theme_border()
+            @yue.theme_border()
           },
         )
         p.stroke_rect(3.5, by + 0.5, 13.0, 13.0)
         if state.val {
           p.set_fill_color(
             if disabled {
-              theme_border()
+              @yue.theme_border()
             } else {
-              theme_primary()
+              @yue.theme_primary()
             },
           )
           p.fill_rect(5.0, by + 2.0, 10.0, 10.0)
@@ -2334,51 +2326,51 @@ pub fn checkbox_t(
             p.stroke()
           }
         }
-        let b = ViewLike::get_bounds(v)
-        let at = AttributedText::new(title, valign=Center, wrap=false)
+        let b = @yue.ViewLike::get_bounds(v)
+        let at = @yue.AttributedText::new(title, valign=@yue.Center, wrap=false)
         at.set_font(font)
         at.set_color(
           if disabled {
-            theme_border()
+            @yue.theme_border()
           } else if color != "" {
             color
           } else {
-            theme_text_regular()
+            @yue.theme_text_regular()
           },
         )
         p.draw_attributed_text(at, 25.0, 0.0, b.width, b.height)
         if focused.val {
-          draw_focus_ring(p, b.width, b.height)
+          @yue.draw_focus_ring(p, b.width, b.height)
         }
       })
       let repaint = fn() -> Unit {
         if !disabled {
-          ViewLike::schedule_paint(v)
+          @yue.ViewLike::schedule_paint(v)
         }
       }
-      View::set_cursor(v, hand())
-      ViewLike::on_mouse_down(v, fn(e) {
+      @yue.View::set_cursor(v, @yue.hand())
+      @yue.ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 && !disabled {
-          ViewLike::focus(v)
+          @yue.ViewLike::focus(v)
           activate()
           true
         } else {
           false
         }
       })
-      ViewLike::on_mouse_enter(v, fn(_e) {
+      @yue.ViewLike::on_mouse_enter(v, fn(_e) {
         hover.val = true
         repaint()
       })
-      ViewLike::on_mouse_leave(v, fn(_e) {
+      @yue.ViewLike::on_mouse_leave(v, fn(_e) {
         hover.val = false
         repaint()
       })
       if !disabled {
-        bind_focus(v, repaint, focused, activate)
+        @yue.bind_focus(v, repaint, focused, activate)
       }
-      attach(parent, ViewLike::view(v))
-      ViewLike::view(v)
+      @yue.attach(parent, @yue.ViewLike::view(v))
+      @yue.ViewLike::view(v)
     },
   }
 }
@@ -2389,127 +2381,127 @@ pub fn checkbox_t(
 /// 无法互斥,故自绘指示器。
 pub fn radio_group(
   options : Array[String],
-  selected : Store[String],
+  selected : @yue.Store[String],
   disabled? : Bool = false,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("marginBottom", 10.0),
         ("flexDirection", "column"),
       ]
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
-      let font = Font::new("Sans", 13.0)
-      let rows : Array[Container] = []
+      let font = @yue.Font::new("Sans", 13.0)
+      let rows : Array[@yue.Container] = []
       let mut idx = 0
       for opt in options {
         let i = idx
-        let probe = AttributedText::new(opt, wrap=false)
+        let probe = @yue.AttributedText::new(opt, wrap=false)
         probe.set_font(font)
         let w = probe.get_bounds_for(10000.0, 100.0).width + 30.0
         let hover = Ref(false)
         let focused = Ref(false)
-        let row = themed_container(style=[("width", w), ("height", 28.0)])
+        let row = @yue.themed_container(style=[("width", w), ("height", 28.0)])
         let activate = fn() -> Unit { selected.set(opt) }
 
         row.on_draw(fn(p) {
           let act = selected.get() == opt
           p.set_stroke_color(
             if disabled {
-              theme_border()
+              @yue.theme_border()
             } else if act || hover.val {
-              theme_primary()
+              @yue.theme_primary()
             } else {
-              theme_border()
+              @yue.theme_border()
             },
           )
           p.stroke_rect(3.5, 7.5, 13.0, 13.0)
           if act {
             p.set_fill_color(
               if disabled {
-                theme_border()
+                @yue.theme_border()
               } else {
-                theme_primary()
+                @yue.theme_primary()
               },
             )
             p.fill_rect(7.0, 11.0, 6.0, 6.0)
           }
-          let at = AttributedText::new(opt, valign=Center, wrap=false)
+          let at = @yue.AttributedText::new(opt, valign=@yue.Center, wrap=false)
           at.set_font(font)
           at.set_color(
             if disabled {
-              theme_border()
+              @yue.theme_border()
             } else if act {
-              theme_text_primary()
+              @yue.theme_text_primary()
             } else if hover.val {
-              theme_primary()
+              @yue.theme_primary()
             } else {
-              theme_text_regular()
+              @yue.theme_text_regular()
             },
           )
           p.draw_attributed_text(at, 25.0, 0.0, w, 28.0)
           if focused.val {
-            draw_focus_ring(p, w, 28.0)
+            @yue.draw_focus_ring(p, w, 28.0)
           }
         })
         let repaint = fn() -> Unit {
           if !disabled {
-            ViewLike::schedule_paint(row)
+            @yue.ViewLike::schedule_paint(row)
           }
         }
-        View::set_cursor(row, hand())
-        ViewLike::on_mouse_down(row, fn(e) {
+        @yue.View::set_cursor(row, @yue.hand())
+        @yue.ViewLike::on_mouse_down(row, fn(e) {
           if e.button == 1 && !disabled {
-            ViewLike::focus(row)
+            @yue.ViewLike::focus(row)
             activate()
             true
           } else {
             false
           }
         })
-        ViewLike::on_mouse_enter(row, fn(_e) {
+        @yue.ViewLike::on_mouse_enter(row, fn(_e) {
           hover.val = true
           repaint()
         })
-        ViewLike::on_mouse_leave(row, fn(_e) {
+        @yue.ViewLike::on_mouse_leave(row, fn(_e) {
           hover.val = false
           repaint()
         })
         if !disabled {
-          ViewLike::set_focusable(row, true)
-          ViewLike::on_focus_in(row, fn() {
+          @yue.ViewLike::set_focusable(row, true)
+          @yue.ViewLike::on_focus_in(row, fn() {
             focused.val = true
             repaint()
             false
           })
-          ViewLike::on_focus_out(row, fn() {
+          @yue.ViewLike::on_focus_out(row, fn() {
             focused.val = false
             repaint()
             false
           })
           // Enter/Space 选中;方向键在组内移动选中并跟随焦点
-          ViewLike::on_key_down(row, fn(e) {
-            if e.code == VKEY_RETURN || e.code == VKEY_SPACE {
+          @yue.ViewLike::on_key_down(row, fn(e) {
+            if e.code == @yue.VKEY_RETURN || e.code == @yue.VKEY_SPACE {
               activate()
               true
-            } else if e.code == VKEY_DOWN || e.code == VKEY_RIGHT {
+            } else if e.code == @yue.VKEY_DOWN || e.code == @yue.VKEY_RIGHT {
               if i + 1 < options.length() {
                 selected.set(options[i + 1])
-                ViewLike::focus(rows[i + 1])
+                @yue.ViewLike::focus(rows[i + 1])
                 true
               } else {
                 false
               }
-            } else if e.code == VKEY_UP || e.code == VKEY_LEFT {
+            } else if e.code == @yue.VKEY_UP || e.code == @yue.VKEY_LEFT {
               if i > 0 {
                 selected.set(options[i - 1])
-                ViewLike::focus(rows[i - 1])
+                @yue.ViewLike::focus(rows[i - 1])
                 true
               } else {
                 false
@@ -2524,8 +2516,8 @@ pub fn radio_group(
         outer.add_child(row)
         idx = idx + 1
       }
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -2534,57 +2526,71 @@ pub fn radio_group(
 /// 开关(EP Switch 的直角形态):轨道 + 滑块,开=主题蓝轨道滑块靠右,
 /// 关=浅灰轨道滑块靠左;点击切换,状态存于 Store[Bool]。
 pub fn switch_t(
-  checked : Store[Bool],
+  checked : @yue.Store[Bool],
   disabled? : Bool = false,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [("width", 40.0), ("height", 18.0)]
+      let base : Array[(String, &@yue.StyVal)] = [
+        ("width", 40.0),
+        ("height", 18.0),
+      ]
       for kv in style {
         base.push(kv)
       }
-      let v = themed_container(style=base)
+      let v = @yue.themed_container(style=base)
       handle(v)
       let focused = Ref(false)
       let activate = fn() -> Unit { checked.set(!checked.get()) }
 
       let slider_w = 14.0
       v.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(v)
+        let b = @yue.ViewLike::get_bounds(v)
         let on = checked.get()
-        p.set_fill_color(if on { theme_primary() } else { theme_border() })
+        p.set_fill_color(
+          if on {
+            @yue.theme_primary()
+          } else {
+            @yue.theme_border()
+          },
+        )
         p.fill_rect(0.0, 0.0, b.width, b.height)
         let sx = if on { b.width - slider_w - 2.0 } else { 2.0 }
         p.set_fill_color(
           if disabled {
-            theme_info_light()
+            @yue.theme_info_light()
           } else {
-            theme_bg_panel()
+            @yue.theme_bg_panel()
           },
         )
         p.fill_rect(sx, 2.0, slider_w, b.height - 4.0)
         if focused.val {
-          draw_focus_ring(p, b.width, b.height)
+          @yue.draw_focus_ring(p, b.width, b.height)
         }
       })
-      View::set_cursor(v, hand())
-      ViewLike::on_mouse_down(v, fn(e) {
+      @yue.View::set_cursor(v, @yue.hand())
+      @yue.ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 && !disabled {
-          ViewLike::focus(v)
+          @yue.ViewLike::focus(v)
           activate()
           true
         } else {
           false
         }
       })
-      checked.subscribe(fn(_v) { ViewLike::schedule_paint(v) })
+      checked.subscribe(fn(_v) { @yue.ViewLike::schedule_paint(v) })
       if !disabled {
-        bind_focus(v, fn() { ViewLike::schedule_paint(v) }, focused, activate)
+        @yue.bind_focus(
+          v,
+          fn() { @yue.ViewLike::schedule_paint(v) },
+          focused,
+          activate,
+        )
       }
-      attach(parent, ViewLike::view(v))
-      ViewLike::view(v)
+      @yue.attach(parent, @yue.ViewLike::view(v))
+      @yue.ViewLike::view(v)
     },
   }
 }
@@ -2599,34 +2605,34 @@ pub fn input_t(
   password? : Bool = false,
   clearable? : Bool = false,
   on_input? : (String) -> Unit = fn(_s) {  },
-  invalid? : Store[Bool] = Store::new(false),
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  invalid? : @yue.Store[Bool] = @yue.Store::new(false),
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
       let hover = Ref(false)
       let has_text = Ref(text != "")
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", 280.0),
-        ("height", control_height),
+        ("height", @yue.control_height),
       ]
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
-      set_panel_bg(outer)
+      @yue.set_panel_bg(outer)
       outer.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(outer)
+        let b = @yue.ViewLike::get_bounds(outer)
         p.set_stroke_color(
           if invalid.get() {
-            theme_danger()
+            @yue.theme_danger()
           } else if focused.val {
-            theme_focus_accent()
+            @yue.theme_focus_accent()
           } else {
-            theme_border()
+            @yue.theme_border()
           },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
@@ -2634,15 +2640,15 @@ pub fn input_t(
           draw_clear_x(p, b.width - 12.0, b.height / 2.0)
         }
       })
-      invalid.subscribe(fn(_v) { ViewLike::schedule_paint(outer) })
+      invalid.subscribe(fn(_v) { @yue.ViewLike::schedule_paint(outer) })
       let entry = match password {
-        true => Entry::make(text~, entry_type=Password)
-        false => Entry::make(text~, entry_type=Normal)
+        true => @yue.Entry::make(text~, entry_type=@yue.Password)
+        false => @yue.Entry::make(text~, entry_type=@yue.Normal)
       }
-      ViewLike::set_borderless(entry, true)
-      set_panel_bg(entry)
-      ViewLike::set_style(entry, "marginLeft", 10.0)
-      ViewLike::set_style(
+      @yue.ViewLike::set_borderless(entry, true)
+      @yue.set_panel_bg(entry)
+      @yue.ViewLike::set_style(entry, "marginLeft", 10.0)
+      @yue.ViewLike::set_style(
         entry,
         "marginRight",
         if clearable {
@@ -2651,25 +2657,25 @@ pub fn input_t(
           10.0
         },
       )
-      if platform() == "windows" {
+      if @yue.platform() == "windows" {
         // 文字贴顶:控件收窄到行高,外层 justifyContent=center 垂直居中
-        ViewLike::set_style(entry, "height", entry_ctrl_height(false))
-        ViewLike::set_style_str(outer, "justifyContent", "center")
+        @yue.ViewLike::set_style(entry, "height", @yue.entry_ctrl_height(false))
+        @yue.ViewLike::set_style_str(outer, "justifyContent", "center")
       } else {
         // 高度撑满 + 原生子窗口绘制在自绘之上:上下留 2 让出边框线
-        ViewLike::set_style(entry, "flex", 1.0)
-        ViewLike::set_style(entry, "marginTop", 2.0)
-        ViewLike::set_style(entry, "marginBottom", 2.0)
+        @yue.ViewLike::set_style(entry, "flex", 1.0)
+        @yue.ViewLike::set_style(entry, "marginTop", 2.0)
+        @yue.ViewLike::set_style(entry, "marginBottom", 2.0)
       }
-      bind_entry_theme(entry)
-      ViewLike::on_focus_in(entry, fn() {
+      @yue.bind_entry_theme(entry)
+      @yue.ViewLike::on_focus_in(entry, fn() {
         focused.val = true
-        ViewLike::schedule_paint(outer)
+        @yue.ViewLike::schedule_paint(outer)
         false
       })
-      ViewLike::on_focus_out(entry, fn() {
+      @yue.ViewLike::on_focus_out(entry, fn() {
         focused.val = false
-        ViewLike::schedule_paint(outer)
+        @yue.ViewLike::schedule_paint(outer)
         // 光标归 0:文本滚回首端,溢出裁切固定发生在右缘,左侧不再出现
         // 随光标位置变化的余量
         entry.set_position(0)
@@ -2679,21 +2685,21 @@ pub fn input_t(
         let cur = entry.get_text()
         has_text.val = cur != ""
         on_input(cur)
-        ViewLike::schedule_paint(outer)
+        @yue.ViewLike::schedule_paint(outer)
       })
       if clearable {
-        ViewLike::on_mouse_enter(outer, fn(_e) {
+        @yue.ViewLike::on_mouse_enter(outer, fn(_e) {
           hover.val = true
-          ViewLike::schedule_paint(outer)
+          @yue.ViewLike::schedule_paint(outer)
         })
-        ViewLike::on_mouse_leave(outer, fn(_e) {
+        @yue.ViewLike::on_mouse_leave(outer, fn(_e) {
           hover.val = false
-          ViewLike::schedule_paint(outer)
+          @yue.ViewLike::schedule_paint(outer)
         })
         // 清空带不与 Entry 重叠(其事件窗口只覆盖原生子窗口之外的区域),
         // 点击落在带上即清空
-        ViewLike::on_mouse_up(outer, fn(e) {
-          let b = ViewLike::get_bounds(outer)
+        @yue.ViewLike::on_mouse_up(outer, fn(e) {
+          let b = @yue.ViewLike::get_bounds(outer)
           if e.button == 1 && has_text.val && e.view_x >= b.width - 24.0 {
             entry.set_text("")
             has_text.val = false
@@ -2701,7 +2707,7 @@ pub fn input_t(
             // changed 信号,防编程式设置回环):清空后必须显式补一次回调,
             // 否则使用方的过滤条件不更新(文本没了列表不变)
             on_input("")
-            ViewLike::schedule_paint(outer)
+            @yue.ViewLike::schedule_paint(outer)
             true
           } else {
             false
@@ -2709,8 +2715,8 @@ pub fn input_t(
         })
       }
       outer.add_child(entry)
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -2718,42 +2724,42 @@ pub fn input_t(
 ///|
 /// 数字输入器(EP InputNumber):-/+ 按钮步进,范围钳制,状态存 Store[Double]。
 pub fn input_number(
-  value : Store[Double],
+  value : @yue.Store[Double],
   min? : Double = 0.0,
   max? : Double = 100.0,
   step? : Double = 1.0,
   num_width? : Double = 64.0,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
-        ("height", control_height),
+      let base : Array[(String, &@yue.StyVal)] = [
+        ("height", @yue.control_height),
         ("flexDirection", "row"),
         ("alignItems", "center"),
       ]
       for kv in style {
         base.push(kv)
       }
-      let row = themed_container(style=base)
+      let row = @yue.themed_container(style=base)
       handle(row)
-      let font = Font::new("Sans", 13.0)
+      let font = @yue.Font::new("Sans", 13.0)
       fn step_btn(dir : Double) -> Unit {
-        let b = themed_container(style=[
+        let b = @yue.themed_container(style=[
           ("width", 28.0),
-          ("height", control_height),
+          ("height", @yue.control_height),
           ("alignItems", "center"),
         ])
-        bind_bg(b, fn() { theme_info_light() })
+        @yue.bind_bg(b, fn() { @yue.theme_info_light() })
         let hover = Ref(false)
         b.on_draw(fn(p) {
-          let bd = ViewLike::get_bounds(b)
+          let bd = @yue.ViewLike::get_bounds(b)
           p.set_fill_color(
             if hover.val {
-              theme_primary_light()
+              @yue.theme_primary_light()
             } else {
-              theme_info_light()
+              @yue.theme_info_light()
             },
           )
           p.fill_rect(0.0, 0.0, bd.width, bd.height)
@@ -2764,7 +2770,7 @@ pub fn input_number(
               bd.width / 2.0,
               bd.height / 2.0,
               4.0,
-              theme_text_regular(),
+              @yue.theme_text_regular(),
             )
           } else {
             draw_glyph_minus(
@@ -2772,12 +2778,12 @@ pub fn input_number(
               bd.width / 2.0,
               bd.height / 2.0,
               4.0,
-              theme_text_regular(),
+              @yue.theme_text_regular(),
             )
           }
         })
-        View::set_cursor(b, hand())
-        ViewLike::on_mouse_down(b, fn(e) {
+        @yue.View::set_cursor(b, @yue.hand())
+        @yue.ViewLike::on_mouse_down(b, fn(e) {
           if e.button == 1 {
             value.update(fn(n) {
               let m = n + dir * step
@@ -2794,47 +2800,47 @@ pub fn input_number(
             false
           }
         })
-        ViewLike::on_mouse_enter(b, fn(_e) {
+        @yue.ViewLike::on_mouse_enter(b, fn(_e) {
           hover.val = true
-          ViewLike::schedule_paint(b)
+          @yue.ViewLike::schedule_paint(b)
         })
-        ViewLike::on_mouse_leave(b, fn(_e) {
+        @yue.ViewLike::on_mouse_leave(b, fn(_e) {
           hover.val = false
-          ViewLike::schedule_paint(b)
+          @yue.ViewLike::schedule_paint(b)
         })
         row.add_child(b)
       }
 
       step_btn(-1.0)
       // marginRight 0:EP InputNumber 的按钮与输入区紧贴
-      let num = themed_container(style=[
+      let num = @yue.themed_container(style=[
         ("width", num_width),
-        ("height", control_height),
+        ("height", @yue.control_height),
         ("marginRight", 0.0),
         ("alignItems", "center"),
       ])
-      set_panel_bg(num)
-      let t = AttributedText::new(
+      @yue.set_panel_bg(num)
+      let t = @yue.AttributedText::new(
         value.get().to_string(),
-        valign=Center,
+        valign=@yue.Center,
         wrap=false,
       )
       t.set_font(font)
-      t.set_color(theme_text_primary())
+      t.set_color(@yue.theme_text_primary())
       num.on_draw(fn(p) {
         // GTK 端 DrawAttributedText 不实现水平 align,手动测宽居中
-        let b = ViewLike::get_bounds(num)
+        let b = @yue.ViewLike::get_bounds(num)
         let tw = t.get_bounds_for(10000.0, 100.0).width
         p.draw_attributed_text(t, (b.width - tw) / 2.0, 0.0, b.width, b.height)
       })
       value.subscribe(fn(v) {
         t.set_text(v.to_string())
-        ViewLike::schedule_paint(num)
+        @yue.ViewLike::schedule_paint(num)
       })
       row.add_child(num)
       step_btn(1.0)
-      attach(parent, ViewLike::view(row))
-      ViewLike::view(row)
+      @yue.attach(parent, @yue.ViewLike::view(row))
+      @yue.ViewLike::view(row)
     },
   }
 }
@@ -2845,53 +2851,53 @@ pub fn input_number(
 /// 错误出现/消失不引起布局跳动。
 pub fn form_item(
   label : String,
-  control : Node,
+  control : @yue.Node,
   label_width? : Double = 90.0,
-  error? : Store[String] = Store::new(""),
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  error? : @yue.Store[String] = @yue.Store::new(""),
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [("flexDirection", "column")]
+      let base : Array[(String, &@yue.StyVal)] = [("flexDirection", "column")]
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
-      let row = themed_container(style=[
+      let row = @yue.themed_container(style=[
         ("marginBottom", 2.0),
         ("flexDirection", "row"),
         ("alignItems", "center"),
       ])
-      let k = Label::new(label)
-      ViewLike::set_font(k, Font::new("Sans", 13.0))
-      bind_fg(k, fn() { theme_text_secondary() })
-      k.set_align(End)
-      let kwrap = themed_container(style=[
+      let k = @yue.Label::new(label)
+      @yue.ViewLike::set_font(k, @yue.Font::new("Sans", 13.0))
+      @yue.bind_fg(k, fn() { @yue.theme_text_secondary() })
+      k.set_align(@yue.End)
+      let kwrap = @yue.themed_container(style=[
         ("width", label_width),
         ("marginRight", 12.0),
       ])
       kwrap.add_child(k)
       row.add_child(kwrap)
-      ignore((control.mount)(ViewLike::view(row)))
+      ignore((control.mount)(@yue.ViewLike::view(row)))
       outer.add_child(row)
-      let err = Label::new(error.get())
-      ViewLike::set_font(err, Font::new("Sans", 12.0))
-      bind_fg(err, fn() { theme_danger() })
-      ViewLike::set_style(err, "height", 18.0)
-      ViewLike::set_style(err, "marginLeft", label_width + 12.0)
+      let err = @yue.Label::new(error.get())
+      @yue.ViewLike::set_font(err, @yue.Font::new("Sans", 12.0))
+      @yue.bind_fg(err, fn() { @yue.theme_danger() })
+      @yue.ViewLike::set_style(err, "height", 18.0)
+      @yue.ViewLike::set_style(err, "marginLeft", label_width + 12.0)
       outer.add_child(err)
       error.subscribe(fn(msg) {
         // 红字色固定由 bind_fg 管,set_color 反而错(参数是颜色不是
         // 文本);set_text 只标脏不重排,须补强制重排否则变长截断
         err.set_text(msg)
-        ViewLike::update_layout(err)
+        @yue.ViewLike::update_layout(err)
       })
-      let spacer = themed_container(style=[("height", 8.0)])
+      let spacer = @yue.themed_container(style=[("height", 8.0)])
       outer.add_child(spacer)
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -2900,20 +2906,20 @@ pub fn form_item(
 /// 表单:分组标题 + 一组表单项。
 pub fn form(
   title : String,
-  items : Array[Node],
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
-  let nodes : Array[Node] = [
+  items : Array[@yue.Node],
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
+  let nodes : Array[@yue.Node] = [
     label_t(title, role=Section, style=[("marginBottom", 10.0)]),
   ]
   for it in items {
     nodes.push(it)
   }
-  let base : Array[(String, &StyVal)] = [("marginBottom", 10.0)]
+  let base : Array[(String, &@yue.StyVal)] = [("marginBottom", 10.0)]
   for kv in style {
     base.push(kv)
   }
-  vbox(nodes, style=base)
+  @yue.vbox(nodes, style=base)
 }
 
 ///|
@@ -2921,13 +2927,13 @@ pub fn form(
 pub fn link(
   text : String,
   on_click : () -> Unit,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let hover = Ref(false)
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("paddingRight", 6.0),
         ("flexDirection", "row"),
         ("alignItems", "center"),
@@ -2935,36 +2941,36 @@ pub fn link(
       for kv in style {
         base.push(kv)
       }
-      let row = themed_container(style=base)
+      let row = @yue.themed_container(style=base)
       handle(row)
-      let l = Label::new(text)
-      ViewLike::set_font(l, Font::new("Sans", 13.0))
+      let l = @yue.Label::new(text)
+      @yue.ViewLike::set_font(l, @yue.Font::new("Sans", 13.0))
       fn apply_color() -> Unit {
-        ViewLike::set_color(l, theme_primary())
+        @yue.ViewLike::set_color(l, @yue.theme_primary())
         l.set_text(l.get_text())
       }
 
       apply_color()
-      ignore(on_theme_change(apply_color))
+      ignore(@yue.on_theme_change(apply_color))
       row.add_child(l)
-      let underline = themed_container(style=[("height", 1.0)])
-      bind_bg(underline, fn() { theme_primary() })
+      let underline = @yue.themed_container(style=[("height", 1.0)])
+      @yue.bind_bg(underline, fn() { @yue.theme_primary() })
       row.add_child(underline)
       fn apply() -> Unit {
-        ViewLike::set_visible(underline, hover.val)
+        @yue.ViewLike::set_visible(underline, hover.val)
       }
 
       apply()
-      ViewLike::on_mouse_enter(row, fn(_e) {
+      @yue.ViewLike::on_mouse_enter(row, fn(_e) {
         hover.val = true
         apply()
       })
-      ViewLike::on_mouse_leave(row, fn(_e) {
+      @yue.ViewLike::on_mouse_leave(row, fn(_e) {
         hover.val = false
         apply()
       })
-      View::set_cursor(row, hand())
-      ViewLike::on_mouse_down(row, fn(e) {
+      @yue.View::set_cursor(row, @yue.hand())
+      @yue.ViewLike::on_mouse_down(row, fn(e) {
         if e.button == 1 {
           on_click()
           true
@@ -2972,8 +2978,8 @@ pub fn link(
           false
         }
       })
-      attach(parent, ViewLike::view(row))
-      ViewLike::view(row)
+      @yue.attach(parent, @yue.ViewLike::view(row))
+      @yue.ViewLike::view(row)
     },
   }
 }
@@ -2989,12 +2995,12 @@ pub(all) struct TreeNode {
 /// 树形控件(EP Tree):缩进层级 + 点击展开/折叠(有子节点时箭头指示)。
 pub fn tree(
   root : Array[TreeNode],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("marginBottom", 10.0),
         ("paddingTop", 2.0),
         ("flexDirection", "column"),
@@ -3002,12 +3008,12 @@ pub fn tree(
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
-      let font = Font::new("Sans", 13.0)
+      let font = @yue.Font::new("Sans", 13.0)
       // 实心小三角箭头(矢量自绘,不依赖字体字形,避免 Windows 端字符发虚)
-      fn draw_caret(p : Painter, open : Bool) -> Unit {
-        p.set_fill_color(theme_text_secondary())
+      fn draw_caret(p : @yue.Painter, open : Bool) -> Unit {
+        p.set_fill_color(@yue.theme_text_secondary())
         p.begin_path()
         if open {
           p.move_to(2.0, 3.5)
@@ -3022,39 +3028,43 @@ pub fn tree(
         p.fill()
       }
 
-      fn build(nodes : Array[TreeNode], level : Int, into : Container) -> Unit {
+      fn build(
+        nodes : Array[TreeNode],
+        level : Int,
+        into : @yue.Container,
+      ) -> Unit {
         for nd in nodes {
           let has_children = nd.children.length() > 0
           let open = Ref(false)
           let indent = level.to_double() * 18.0
-          let row = themed_container(style=[
+          let row = @yue.themed_container(style=[
             ("height", 32.0),
             ("marginLeft", indent),
             ("flexDirection", "row"),
             ("alignItems", "center"),
           ])
-          let arrow = themed_container(style=[
+          let arrow = @yue.themed_container(style=[
             ("width", 10.0),
             ("height", 10.0),
             ("marginRight", 3.0),
           ])
           arrow.on_draw(fn(p) { if has_children { draw_caret(p, open.val) } })
-          let label = Label::new(" " + nd.label)
-          ViewLike::set_font(label, font)
-          bind_fg(label, fn() { theme_text_primary() })
+          let label = @yue.Label::new(" " + nd.label)
+          @yue.ViewLike::set_font(label, font)
+          @yue.bind_fg(label, fn() { @yue.theme_text_primary() })
           row.add_child(arrow)
           row.add_child(label)
-          let kids = themed_container(style=[("flexDirection", "column")])
-          ViewLike::set_visible(kids, false)
+          let kids = @yue.themed_container(style=[("flexDirection", "column")])
+          @yue.ViewLike::set_visible(kids, false)
           if has_children {
             build(nd.children, level + 1, kids)
           }
-          View::set_cursor(row, hand())
-          ViewLike::on_mouse_down(row, fn(e) {
+          @yue.View::set_cursor(row, @yue.hand())
+          @yue.ViewLike::on_mouse_down(row, fn(e) {
             if e.button == 1 && has_children {
               open.val = !open.val
-              ViewLike::schedule_paint(arrow)
-              ViewLike::set_visible(kids, open.val)
+              @yue.ViewLike::schedule_paint(arrow)
+              @yue.ViewLike::set_visible(kids, open.val)
               true
             } else {
               false
@@ -3066,8 +3076,8 @@ pub fn tree(
       }
 
       build(root, 0, outer)
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -3076,15 +3086,15 @@ pub fn tree(
 /// 穿梭框(EP Transfer):左右两列,点击行选中(实心方块标记),
 /// 中间 ›/‹ 按钮把选中项在两列间移动。数据经双 Store 驱动。
 pub fn transfer(
-  left_items : Store[Array[String]],
-  right_items : Store[Array[String]],
+  left_items : @yue.Store[Array[String]],
+  right_items : @yue.Store[Array[String]],
   width? : Double = 160.0,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("marginBottom", 10.0),
         ("flexDirection", "row"),
         ("alignItems", "center"),
@@ -3092,17 +3102,17 @@ pub fn transfer(
       for kv in style {
         base.push(kv)
       }
-      let row = themed_container(style=base)
+      let row = @yue.themed_container(style=base)
       handle(row)
-      let font = Font::new("Sans", 13.0)
+      let font = @yue.Font::new("Sans", 13.0)
       // 选中集合(按值),用 Ref 可变数组
       let left_sel : Ref[Array[String]] = Ref([])
       let right_sel : Ref[Array[String]] = Ref([])
-      let left_box = themed_container(style=[
+      let left_box = @yue.themed_container(style=[
         ("width", width),
         ("flexDirection", "column"),
       ])
-      let right_box = themed_container(style=[
+      let right_box = @yue.themed_container(style=[
         ("width", width),
         ("flexDirection", "column"),
       ])
@@ -3128,12 +3138,15 @@ pub fn transfer(
         out
       }
 
-      let left_rows : Ref[Array[View]] = Ref([])
-      let right_rows : Ref[Array[View]] = Ref([])
+      let left_rows : Ref[Array[@yue.View]] = Ref([])
+      let right_rows : Ref[Array[@yue.View]] = Ref([])
       // 行级订阅的本代退订闭包:每次重建(移动项/改数据)前整袋退订,
       // 旧行随 remove_child_view 一起退场,死订阅不随移动次数累积
       let gen : Ref[Array[() -> Unit]] = Ref([])
-      fn clear_list(box : Container, rows : Ref[Array[View]]) -> Unit {
+      fn clear_list(
+        box : @yue.Container,
+        rows : Ref[Array[@yue.View]],
+      ) -> Unit {
         for v in rows.val {
           ignore(box.remove_child_view(v))
         }
@@ -3141,20 +3154,20 @@ pub fn transfer(
       }
 
       fn build_list(
-        box : Container,
-        items : Store[Array[String]],
+        box : @yue.Container,
+        items : @yue.Store[Array[String]],
         sel : Ref[Array[String]],
-        rows : Ref[Array[View]],
+        rows : Ref[Array[@yue.View]],
       ) -> Unit {
         for it in items.get() {
           let it_ref = it
-          let row = themed_container(style=[
+          let row = @yue.themed_container(style=[
             ("height", 26.0),
             ("paddingLeft", 8.0),
             ("flexDirection", "row"),
             ("alignItems", "center"),
           ])
-          let mark = themed_container(style=[
+          let mark = @yue.themed_container(style=[
             ("width", 10.0),
             ("height", 10.0),
             ("marginRight", 6.0),
@@ -3163,25 +3176,25 @@ pub fn transfer(
             let is_sel = contains(sel.val, it_ref)
             p.set_stroke_color(
               if is_sel {
-                theme_primary()
+                @yue.theme_primary()
               } else {
-                theme_border()
+                @yue.theme_border()
               },
             )
             p.stroke_rect(0.5, 0.5, 9.0, 9.0)
             if is_sel {
-              p.set_fill_color(theme_primary())
+              p.set_fill_color(@yue.theme_primary())
               p.fill_rect(3.0, 3.0, 4.0, 4.0)
             }
           })
-          let l = Label::new(it_ref)
-          ViewLike::set_font(l, font)
-          bind_fg(l, fn() { theme_text_regular() })
+          let l = @yue.Label::new(it_ref)
+          @yue.ViewLike::set_font(l, font)
+          @yue.bind_fg(l, fn() { @yue.theme_text_regular() })
           row.add_child(mark)
           row.add_child(l)
           let mark_ref = mark
-          View::set_cursor(row, hand())
-          ViewLike::on_mouse_down(row, fn(e) {
+          @yue.View::set_cursor(row, @yue.hand())
+          @yue.ViewLike::on_mouse_down(row, fn(e) {
             if e.button == 1 {
               if contains(sel.val, it_ref) {
                 sel.val = remove_one(sel.val, it_ref)
@@ -3190,20 +3203,20 @@ pub fn transfer(
                 grown.push(it_ref)
                 sel.val = grown
               }
-              ViewLike::schedule_paint(mark_ref)
+              @yue.ViewLike::schedule_paint(mark_ref)
               true
             } else {
               false
             }
           })
           box.add_child(row)
-          rows.val.push(ViewLike::view(row))
+          rows.val.push(@yue.ViewLike::view(row))
         }
       }
 
       fn move_items(
-        from : Store[Array[String]],
-        to : Store[Array[String]],
+        from : @yue.Store[Array[String]],
+        to : @yue.Store[Array[String]],
         sel : Ref[Array[String]],
       ) -> Unit {
         let moving = sel.val
@@ -3223,27 +3236,27 @@ pub fn transfer(
       }
 
       fn render_all() -> Unit {
-        sub_bag_discard(gen.val)
+        @yue.sub_bag_discard(gen.val)
         clear_list(left_box, left_rows)
         clear_list(right_box, right_rows)
-        sub_bag_begin()
+        @yue.sub_bag_begin()
         build_list(left_box, left_items, left_sel, left_rows)
         build_list(right_box, right_items, right_sel, right_rows)
-        gen.val = sub_bag_end()
+        gen.val = @yue.sub_bag_end()
       }
 
       left_items.subscribe(fn(_v) { render_all() })
       right_items.subscribe(fn(_v) { render_all() })
       fn mid_btn(to_right : Bool) -> Unit {
-        let b = themed_container(style=[
+        let b = @yue.themed_container(style=[
           ("width", 32.0),
           ("height", 28.0),
           ("marginRight", 8.0),
           ("alignItems", "center"),
         ])
-        bind_bg(b, fn() { theme_info_light() })
+        @yue.bind_bg(b, fn() { @yue.theme_info_light() })
         b.on_draw(fn(p) {
-          let bd = ViewLike::get_bounds(b)
+          let bd = @yue.ViewLike::get_bounds(b)
           // ‹/› 矢量三角(字形图标跨平台发虚,GTK align 亦无效)
           if to_right {
             draw_glyph_right(
@@ -3251,7 +3264,7 @@ pub fn transfer(
               bd.width / 2.0,
               bd.height / 2.0,
               4.0,
-              theme_text_regular(),
+              @yue.theme_text_regular(),
             )
           } else {
             draw_glyph_left(
@@ -3259,12 +3272,12 @@ pub fn transfer(
               bd.width / 2.0,
               bd.height / 2.0,
               4.0,
-              theme_text_regular(),
+              @yue.theme_text_regular(),
             )
           }
         })
-        View::set_cursor(b, hand())
-        ViewLike::on_mouse_down(b, fn(e) {
+        @yue.View::set_cursor(b, @yue.hand())
+        @yue.ViewLike::on_mouse_down(b, fn(e) {
           if e.button == 1 {
             if to_right {
               move_items(left_items, right_items, left_sel)
@@ -3284,8 +3297,8 @@ pub fn transfer(
       mid_btn(false)
       row.add_child(right_box)
       render_all()
-      attach(parent, ViewLike::view(row))
-      ViewLike::view(row)
+      @yue.attach(parent, @yue.ViewLike::view(row))
+      @yue.ViewLike::view(row)
     },
   }
 }
@@ -3338,7 +3351,7 @@ pub fn DateYMD::format(self : DateYMD) -> String {
 ///|
 /// 本地时区的今天(日历"今天"高亮用)。
 fn local_date() -> DateYMD {
-  let v = ffi_local_date()
+  let v = @yue.ffi_local_date()
   {
     y: (v / 10000).to_int(),
     m: (v % 10000 / 100).to_int(),
@@ -3445,51 +3458,60 @@ fn build_calendar(
   today : DateYMD,
   state_of : (DateYMD) -> CalCell,
   on_cell : (DateYMD) -> Unit,
-) -> (Container, () -> Unit) {
+) -> (@yue.Container, () -> Unit) {
   let cell_w = 36.0
   let cell_h = 30.0
   // 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然高度
   // (高 = 上下 padding 16 + 头 32+4 + 星期行 26 + 6 行 x 30)
-  let panel = themed_container(style=[ // yoga 的 width 是 border-box 语义(含 padding),须加 16;
+  let panel = @yue.themed_container(style=[ // yoga 的 width 是 border-box 语义(含 padding),须加 16;
     // 只给内容宽 252 会把最后一列(周六)裁掉 16px
     ("width", cell_w * 7.0 + 16.0),
     ("height", 16.0 + 32.0 + 4.0 + 26.0 + 6.0 * cell_h),
     ("padding", 8.0),
     ("flexDirection", "column"),
   ])
-  set_panel_bg(panel)
+  @yue.set_panel_bg(panel)
   panel.on_draw(fn(p) {
-    let b = ViewLike::get_bounds(panel)
-    p.set_stroke_color(theme_border())
+    let b = @yue.ViewLike::get_bounds(panel)
+    p.set_stroke_color(@yue.theme_border())
     p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
   })
   let view_y = Ref(today.y)
   let view_m = Ref(today.m)
   // 文本水平居中走 draw_text 的 align 参数(平台布局引擎居中)
   fn draw_center(
-    p : Painter,
+    p : @yue.Painter,
     text : String,
     y : Double,
     h : Double,
     color : String,
   ) -> Unit {
-    p.draw_text(text, 0.0, y, cell_w, h, align=Center, valign=Center, color~)
+    p.draw_text(
+      text,
+      0.0,
+      y,
+      cell_w,
+      h,
+      align=@yue.Center,
+      valign=@yue.Center,
+      color~,
+    )
   }
 
   let head_h = 32.0
-  let head = themed_container(style=[
+  let head = @yue.themed_container(style=[
     ("height", head_h),
     ("marginBottom", 4.0),
     ("flexDirection", "row"),
     ("alignItems", "center"),
   ])
   let title_text = Ref("")
-  let title = themed_container(style=[("flex", 1.0), ("height", head_h)])
+  let title = @yue.themed_container(style=[("flex", 1.0), ("height", head_h)])
   // 月标题水平居中:GTK 端 align 无效,绘制时测宽手动摆位
   title.on_draw(fn(p) {
-    let b = ViewLike::get_bounds(title)
-    let probe = AttributedText::new(title_text.val, wrap=false)
-    probe.set_font(Font::new("Sans", 14.0, weight=SemiBold))
+    let b = @yue.ViewLike::get_bounds(title)
+    let probe = @yue.AttributedText::new(title_text.val, wrap=false)
+    probe.set_font(@yue.Font::new("Sans", 14.0, weight=@yue.SemiBold))
     let tw = probe.get_bounds_for(10000.0, 1000.0).width
     p.draw_text(
       title_text.val,
@@ -3497,18 +3519,18 @@ fn build_calendar(
       0.0,
       b.width,
       b.height,
-      valign=Center,
-      color=theme_text_primary(),
+      valign=@yue.Center,
+      color=@yue.theme_text_primary(),
     )
   })
-  fn nav_btn(glyph : String, on_click : () -> Unit) -> Container {
+  fn nav_btn(glyph : String, on_click : () -> Unit) -> @yue.Container {
     let hover = Ref(false)
-    let b = themed_container(style=[("width", 28.0), ("height", head_h)])
+    let b = @yue.themed_container(style=[("width", 28.0), ("height", head_h)])
     let to_left = glyph == "‹"
     b.on_draw(fn(p) {
-      let bb = ViewLike::get_bounds(b)
+      let bb = @yue.ViewLike::get_bounds(b)
       if hover.val {
-        p.set_fill_color(theme_fill_hover())
+        p.set_fill_color(@yue.theme_fill_hover())
         p.fill_rect(0.0, 0.0, bb.width, bb.height)
       }
       // ‹/› 矢量三角(字形图标跨平台发虚,GTK align 亦无效)
@@ -3518,7 +3540,7 @@ fn build_calendar(
           bb.width / 2.0,
           bb.height / 2.0,
           4.0,
-          theme_text_regular(),
+          @yue.theme_text_regular(),
         )
       } else {
         draw_glyph_right(
@@ -3526,20 +3548,20 @@ fn build_calendar(
           bb.width / 2.0,
           bb.height / 2.0,
           4.0,
-          theme_text_regular(),
+          @yue.theme_text_regular(),
         )
       }
     })
-    ViewLike::on_mouse_enter(b, fn(_e) {
+    @yue.ViewLike::on_mouse_enter(b, fn(_e) {
       hover.val = true
-      ViewLike::schedule_paint(b)
+      @yue.ViewLike::schedule_paint(b)
     })
-    ViewLike::on_mouse_leave(b, fn(_e) {
+    @yue.ViewLike::on_mouse_leave(b, fn(_e) {
       hover.val = false
-      ViewLike::schedule_paint(b)
+      @yue.ViewLike::schedule_paint(b)
     })
-    View::set_cursor(b, hand())
-    ViewLike::on_mouse_down(b, fn(e) {
+    @yue.View::set_cursor(b, @yue.hand())
+    @yue.ViewLike::on_mouse_down(b, fn(e) {
       if e.button == 1 {
         on_click()
         true
@@ -3572,32 +3594,38 @@ fn build_calendar(
   head.add_child(title)
   head.add_child(nav_btn("›", fn() { nav(1) }))
   let week_h = 26.0
-  let wk = themed_container(style=[("height", week_h), ("flexDirection", "row")])
+  let wk = @yue.themed_container(style=[
+    ("height", week_h),
+    ("flexDirection", "row"),
+  ])
   for name in ["日", "一", "二", "三", "四", "五", "六"] {
     let wref = name
-    let c = themed_container(style=[("width", cell_w), ("height", week_h)])
+    let c = @yue.themed_container(style=[("width", cell_w), ("height", week_h)])
     c.on_draw(fn(p) {
-      let b = ViewLike::get_bounds(c)
-      draw_center(p, wref, 0.0, b.height, theme_text_secondary())
+      let b = @yue.ViewLike::get_bounds(c)
+      draw_center(p, wref, 0.0, b.height, @yue.theme_text_secondary())
     })
     wk.add_child(c)
   }
-  let grid = themed_container(style=[("flexDirection", "column")])
+  let grid = @yue.themed_container(style=[("flexDirection", "column")])
   // 42 格一次性创建、永不增删:实测弹层窗口 map 过之后再加进来的行
   // 不会被绘制(同面板一次创建的标题/星期行始终正常,增删过的格子
   // 消失且导航重建也不恢复)——rebuild 只改每格数据+重绘
-  let cells : Ref[Array[Container]] = Ref([])
+  let cells : Ref[Array[@yue.Container]] = Ref([])
   let cell_date : Ref[Array[Ref[DateYMD]]] = Ref([])
   let cell_inm : Ref[Array[Ref[Bool]]] = Ref([])
   for _row in 0..<6 {
-    let r = themed_container(style=[("flexDirection", "row")])
+    let r = @yue.themed_container(style=[("flexDirection", "row")])
     for _col in 0..<7 {
       let dref : Ref[DateYMD] = Ref({ y: 0, m: 1, d: 1, })
       let inm : Ref[Bool] = Ref(false)
       let hover = Ref(false)
-      let c = themed_container(style=[("width", cell_w), ("height", cell_h)])
+      let c = @yue.themed_container(style=[
+        ("width", cell_w),
+        ("height", cell_h),
+      ])
       c.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(c)
+        let b = @yue.ViewLike::get_bounds(c)
         let d = dref.val
         let in_m = inm.val
         let st = state_of(d)
@@ -3606,18 +3634,18 @@ fn build_calendar(
           Plain | InRange => false
         }
         if hover.val && !solid {
-          p.set_fill_color(theme_fill_hover())
+          p.set_fill_color(@yue.theme_fill_hover())
           p.fill_rect(0.0, 0.0, b.width, b.height)
         }
         match st {
           InRange => {
-            p.set_fill_color(theme_primary_light())
+            p.set_fill_color(@yue.theme_primary_light())
             p.fill_rect(0.0, 0.0, b.width, b.height)
           }
           Plain | Selected | RangeEdge => ()
         }
         if solid {
-          p.set_fill_color(theme_primary())
+          p.set_fill_color(@yue.theme_primary())
           p.fill_rect(
             (b.width - 28.0) / 2.0,
             (b.height - 28.0) / 2.0,
@@ -3627,39 +3655,39 @@ fn build_calendar(
           draw_center(p, d.d.to_string(), 0.0, b.height, "#FFFFFF")
         } else {
           let color = if !in_m {
-            theme_text_secondary()
+            @yue.theme_text_secondary()
           } else if today.y == d.y && today.m == d.m && today.d == d.d {
-            theme_primary()
+            @yue.theme_primary()
           } else if st is InRange {
-            theme_primary()
+            @yue.theme_primary()
           } else {
-            theme_text_primary()
+            @yue.theme_text_primary()
           }
           draw_center(p, d.d.to_string(), 0.0, b.height, color)
         }
       })
-      View::set_cursor(c, hand())
+      @yue.View::set_cursor(c, @yue.hand())
       // release 才选中:弹层内点项一律 release 防穿透;
       // calendar_t 内联面板同语义无副作用(松开选中,标准按钮感)。
       // 跨月格不可选(inm 校验在回调内,格子稳定不随月重建)
-      ViewLike::on_mouse_up(c, fn(e) {
+      @yue.ViewLike::on_mouse_up(c, fn(e) {
         if e.button == 1 && inm.val {
           on_cell(dref.val)
           for cc in cells.val {
-            ViewLike::schedule_paint(cc)
+            @yue.ViewLike::schedule_paint(cc)
           }
           true
         } else {
           false
         }
       })
-      ViewLike::on_mouse_enter(c, fn(_e) {
+      @yue.ViewLike::on_mouse_enter(c, fn(_e) {
         hover.val = true
-        ViewLike::schedule_paint(c)
+        @yue.ViewLike::schedule_paint(c)
       })
-      ViewLike::on_mouse_leave(c, fn(_e) {
+      @yue.ViewLike::on_mouse_leave(c, fn(_e) {
         hover.val = false
-        ViewLike::schedule_paint(c)
+        @yue.ViewLike::schedule_paint(c)
       })
       r.add_child(c)
       cells.val.push(c)
@@ -3673,7 +3701,7 @@ fn build_calendar(
     let y = view_y.val
     let m = view_m.val
     title_text.val = "\{y} 年 \{m} 月"
-    ViewLike::schedule_paint(title)
+    @yue.ViewLike::schedule_paint(title)
     let first_wd = date_weekday(y, m, 1)
     let dim = date_days_in_month(y, m)
     let dim_prev = date_days_in_month(
@@ -3723,7 +3751,7 @@ fn build_calendar(
       }
       cell_date.val[idx].val = { y: dy, m: dm, d: dd, }
       cell_inm.val[idx].val = in_month
-      ViewLike::schedule_paint(cells.val[idx])
+      @yue.ViewLike::schedule_paint(cells.val[idx])
     }
   }
 
@@ -3741,10 +3769,10 @@ fn build_calendar(
 /// 点击当月日期回调 on_pick 并写入 value。
 pub fn calendar_t(
   on_pick? : (DateYMD) -> Unit = fn(_d) {  },
-  value? : Store[DateYMD?],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  value? : @yue.Store[DateYMD?],
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let today = local_date()
@@ -3771,14 +3799,14 @@ pub fn calendar_t(
           on_pick(d)
         },
       )
-      apply_style(panel, style~)
+      @yue.apply_style(panel, style~)
       handle(panel)
       match value {
         Some(s) => s.subscribe(fn(_v) { refresh() })
         None => ()
       }
-      attach(parent, ViewLike::view(panel))
-      ViewLike::view(panel)
+      @yue.attach(parent, @yue.ViewLike::view(panel))
+      @yue.ViewLike::view(panel)
     },
   }
 }
@@ -3790,12 +3818,12 @@ pub fn calendar_t(
 /// clearable=true 时字段悬停且有值,箭头左侧显示 ✕,点击清空
 /// (value 置 None;on_change 签名不带空值,清空不触发回调)。
 pub fn date_picker_t(
-  value? : Store[DateYMD?],
+  value? : @yue.Store[DateYMD?],
   on_change? : (DateYMD) -> Unit = fn(_d) {  },
   placeholder? : String = "请选择日期",
   clearable? : Bool = false,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let today = local_date()
@@ -3818,7 +3846,7 @@ pub fn date_picker_t(
         },
       )
       // 弹层与面板:首开时创建,面板重建函数挂入 grid_refresh 供外部同步
-      let pop : Ref[Popover?] = Ref(None)
+      let pop : Ref[@yue.Popover?] = Ref(None)
       let grid_refresh : Ref[() -> Unit] = Ref(fn() {  })
       let field = build_picker_field(
         200.0,
@@ -3839,7 +3867,7 @@ pub fn date_picker_t(
         sel.val = Some(d)
         text.val = d.format()
         has_val.val = true
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
         match value {
           Some(s) => s.set(Some(d))
           None => ()
@@ -3847,9 +3875,9 @@ pub fn date_picker_t(
         on_change(d)
       }
 
-      ViewLike::on_mouse_up(field, fn(e) {
+      @yue.ViewLike::on_mouse_up(field, fn(e) {
         if e.button == 1 {
-          ViewLike::focus(field)
+          @yue.ViewLike::focus(field)
           // 清空带(箭头左侧)优先:清空日期,不弹日历
           if picker_clear_hit(field, e, clearable, has_val.val) {
             sel.val = None
@@ -3859,14 +3887,14 @@ pub fn date_picker_t(
               Some(s) => s.set(None)
               None => ()
             }
-            ViewLike::schedule_paint(field)
+            @yue.ViewLike::schedule_paint(field)
             return true
           }
           match pop.val {
             Some(_) => ()
             None => {
-              let p = Popover::new()
-              bind_popover_bg(p)
+              let p = @yue.Popover::new()
+              @yue.bind_popover_bg(p)
               let (panel, refresh) = build_calendar(
                 today,
                 fn(d) {
@@ -3911,13 +3939,13 @@ pub fn date_picker_t(
                 has_val.val = false
               }
             }
-            ViewLike::schedule_paint(field)
+            @yue.ViewLike::schedule_paint(field)
             (grid_refresh.val)()
           })
         None => ()
       }
-      attach(parent, ViewLike::view(field))
-      ViewLike::view(field)
+      @yue.attach(parent, @yue.ViewLike::view(field))
+      @yue.ViewLike::view(field)
     },
   }
 }
@@ -3934,14 +3962,14 @@ fn build_picker_field(
   has_val : Ref[Bool],
   clearable : Bool,
   on_focus_changed? : (Bool) -> Unit = fn(_f) {  },
-  extra_style? : Array[(String, &StyVal)] = [],
-) -> Container {
-  let fnt = Font::new("Sans", 13.0)
+  extra_style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Container {
+  let fnt = @yue.Font::new("Sans", 13.0)
   let hover = Ref(false)
   let focused = Ref(false)
-  let style : Array[(String, &StyVal)] = [
+  let style : Array[(String, &@yue.StyVal)] = [
     ("width", width),
-    ("height", control_height),
+    ("height", @yue.control_height),
     ("marginBottom", 10.0),
     ("flexDirection", "row"),
     ("alignItems", "center"),
@@ -3949,20 +3977,20 @@ fn build_picker_field(
   for kv in extra_style {
     style.push(kv)
   }
-  let field = themed_container(style~)
-  set_panel_bg(field)
-  View::set_cursor(field, hand())
+  let field = @yue.themed_container(style~)
+  @yue.set_panel_bg(field)
+  @yue.View::set_cursor(field, @yue.hand())
   field.on_draw(fn(p) {
-    let b = ViewLike::get_bounds(field)
+    let b = @yue.ViewLike::get_bounds(field)
     p.set_stroke_color(
       if focused.val {
-        theme_focus_accent()
+        @yue.theme_focus_accent()
       } else {
-        theme_border()
+        @yue.theme_border()
       },
     )
     p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
-    let probe = AttributedText::new(text.val, wrap=false)
+    let probe = @yue.AttributedText::new(text.val, wrap=false)
     probe.set_font(fnt)
     p.draw_text(
       text.val,
@@ -3970,15 +3998,15 @@ fn build_picker_field(
       0.0,
       b.width - 30.0,
       b.height,
-      valign=Center,
+      valign=@yue.Center,
       color=if has_val.val {
-        theme_text_primary()
+        @yue.theme_text_primary()
       } else {
-        theme_text_secondary()
+        @yue.theme_text_secondary()
       },
     )
     // 右侧下拉小箭头(矢量自绘,不依赖字体字形)
-    p.set_fill_color(theme_text_secondary())
+    p.set_fill_color(@yue.theme_text_secondary())
     p.begin_path()
     p.move_to(b.width - 20.0, b.height / 2.0 - 2.0)
     p.line_to(b.width - 12.0, b.height / 2.0 - 2.0)
@@ -3989,26 +4017,26 @@ fn build_picker_field(
       draw_clear_x(p, b.width - 30.0, b.height / 2.0)
     }
   })
-  ViewLike::set_focusable(field, true)
-  ViewLike::on_focus_in(field, fn() {
+  @yue.ViewLike::set_focusable(field, true)
+  @yue.ViewLike::on_focus_in(field, fn() {
     focused.val = true
-    ViewLike::schedule_paint(field)
+    @yue.ViewLike::schedule_paint(field)
     on_focus_changed(true)
     false
   })
-  ViewLike::on_focus_out(field, fn() {
+  @yue.ViewLike::on_focus_out(field, fn() {
     focused.val = false
-    ViewLike::schedule_paint(field)
+    @yue.ViewLike::schedule_paint(field)
     on_focus_changed(false)
     false
   })
-  ViewLike::on_mouse_enter(field, fn(_e) {
+  @yue.ViewLike::on_mouse_enter(field, fn(_e) {
     hover.val = true
-    ViewLike::schedule_paint(field)
+    @yue.ViewLike::schedule_paint(field)
   })
-  ViewLike::on_mouse_leave(field, fn(_e) {
+  @yue.ViewLike::on_mouse_leave(field, fn(_e) {
     hover.val = false
-    ViewLike::schedule_paint(field)
+    @yue.ViewLike::schedule_paint(field)
   })
   field
 }
@@ -4016,15 +4044,15 @@ fn build_picker_field(
 ///|
 /// 点击是否落在字段清空带(下拉箭头左侧的 ✕ 区域)。
 fn picker_clear_hit(
-  field : Container,
-  e : MouseEvent,
+  field : @yue.Container,
+  e : @yue.MouseEvent,
   clearable : Bool,
   has_val : Bool,
 ) -> Bool {
   if !(clearable && has_val) {
     return false
   }
-  let b = ViewLike::get_bounds(field)
+  let b = @yue.ViewLike::get_bounds(field)
   e.view_x >= b.width - 40.0 && e.view_x <= b.width - 20.0
 }
 
@@ -4088,9 +4116,9 @@ fn build_time_row(
   hm : Ref[TimeHM],
   mute : Ref[Bool],
   on_change : () -> Unit,
-) -> (Node, (TimeHM) -> Unit) {
-  let hs : Store[Double] = Store::new(hm.val.h.to_double())
-  let ms : Store[Double] = Store::new(hm.val.m.to_double())
+) -> (@yue.Node, (TimeHM) -> Unit) {
+  let hs : @yue.Store[Double] = @yue.Store::new(hm.val.h.to_double())
+  let ms : @yue.Store[Double] = @yue.Store::new(hm.val.m.to_double())
   hs.subscribe(fn(v) {
     hm.val = time_clamp(v.round().to_int(), hm.val.m)
     if !mute.val {
@@ -4103,7 +4131,7 @@ fn build_time_row(
       on_change()
     }
   })
-  let row = hbox(
+  let row = @yue.hbox(
     [
       label_t(label, role=Body, style=[("width", 28.0), ("marginRight", 6.0)]),
       input_number(hs, min=0.0, max=23.0, step=1.0, num_width=40.0),
@@ -4129,18 +4157,18 @@ fn build_time_panel(
   start_hm : Ref[TimeHM],
   end_hm : Ref[TimeHM],
   on_change : () -> Unit,
-) -> (Container, (TimeHM, TimeHM) -> Unit, Ref[Bool]) {
+) -> (@yue.Container, (TimeHM, TimeHM) -> Unit, Ref[Bool]) {
   let mute = Ref(false)
   let (row1, sync1) = build_time_row("起", start_hm, mute, on_change)
   let (row2, sync2) = build_time_row("止", end_hm, mute, on_change)
-  let panel = themed_container(style=[ // 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然
+  let panel = @yue.themed_container(style=[ // 显式总高:PopoverRootView 按 content_size 硬分配,不读内容自然
     // 高度,漏显式高度会把两行压塌(高 = 上下 padding 16 + 两行 x 36)
     ("padding", 8.0),
     ("width", 268.0),
     ("height", 16.0 + 2.0 * 36.0),
     ("flexDirection", "column"),
   ])
-  set_panel_bg(panel)
+  @yue.set_panel_bg(panel)
   let _ = row1.mount_into(panel.view())
   let _ = row2.mount_into(panel.view())
   fn sync(s : TimeHM, e : TimeHM) -> Unit {
@@ -4157,16 +4185,16 @@ fn build_time_panel(
 /// 对调)后收起,回调 on_change(起, 止);再点字段重新开始新区间。
 /// clearable=true 清空两端(value 置全空,on_change 不因清空触发)。
 pub fn date_range_picker_t(
-  value? : Store[DateRange],
+  value? : @yue.Store[DateRange],
   on_change? : (DateYMD, DateYMD) -> Unit = fn(_s, _e) {  },
   placeholder? : String = "请选择日期区间",
   clearable? : Bool = false,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let today = local_date()
-      let pop : Ref[Popover?] = Ref(None)
+      let pop : Ref[@yue.Popover?] = Ref(None)
       let start : Ref[DateYMD?] = Ref(
         match value {
           Some(v) => v.get().start
@@ -4212,7 +4240,7 @@ pub fn date_range_picker_t(
             has_val.val = false
           }
         }
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
       }
 
       fn write_value(s : DateYMD?, e : DateYMD?) -> Unit {
@@ -4222,9 +4250,9 @@ pub fn date_range_picker_t(
         }
       }
 
-      ViewLike::on_mouse_up(field, fn(e) {
+      @yue.ViewLike::on_mouse_up(field, fn(e) {
         if e.button == 1 {
-          ViewLike::focus(field)
+          @yue.ViewLike::focus(field)
           if picker_clear_hit(field, e, clearable, has_val.val) {
             start.val = None
             end.val = None
@@ -4239,8 +4267,8 @@ pub fn date_range_picker_t(
           match pop.val {
             Some(_) => ()
             None => {
-              let p = Popover::new()
-              bind_popover_bg(p)
+              let p = @yue.Popover::new()
+              @yue.bind_popover_bg(p)
               let (panel, refresh) = build_calendar(
                 today,
                 range_state_of(start, end),
@@ -4281,8 +4309,8 @@ pub fn date_range_picker_t(
         None => ()
       }
       refresh_text()
-      attach(parent, ViewLike::view(field))
-      ViewLike::view(field)
+      @yue.attach(parent, @yue.ViewLike::view(field))
+      @yue.ViewLike::view(field)
     },
   }
 }
@@ -4293,15 +4321,15 @@ pub fn date_range_picker_t(
 /// 即回调 on_change;起止默认 00:00,弹层随字段失焦收起。clearable
 /// 清空两端(重开弹层后步进即重新写入)。
 pub fn time_range_picker_t(
-  value? : Store[TimeRange],
+  value? : @yue.Store[TimeRange],
   on_change? : (TimeHM, TimeHM) -> Unit = fn(_s, _e) {  },
   placeholder? : String = "请选择时间区间",
   clearable? : Bool = false,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let pop : Ref[Popover?] = Ref(None)
+      let pop : Ref[@yue.Popover?] = Ref(None)
       let start = Ref(time_clamp(0, 0))
       let end = Ref(time_clamp(0, 0))
       let touched = Ref(false) // 弹层内动过步进才视为有值
@@ -4328,7 +4356,7 @@ pub fn time_range_picker_t(
         } else {
           text.val = placeholder
         }
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
       }
 
       fn write_value(s : TimeHM, e : TimeHM) -> Unit {
@@ -4338,9 +4366,9 @@ pub fn time_range_picker_t(
         }
       }
 
-      ViewLike::on_mouse_up(field, fn(e) {
+      @yue.ViewLike::on_mouse_up(field, fn(e) {
         if e.button == 1 {
-          ViewLike::focus(field)
+          @yue.ViewLike::focus(field)
           if picker_clear_hit(field, e, clearable, has_val.val) {
             touched.val = false
             has_val.val = false
@@ -4358,8 +4386,8 @@ pub fn time_range_picker_t(
           match pop.val {
             Some(_) => ()
             None => {
-              let p = Popover::new()
-              bind_popover_bg(p)
+              let p = @yue.Popover::new()
+              @yue.bind_popover_bg(p)
               let (panel, _sync, _mute) = build_time_panel(start, end, fn() {
                 if !touched.val {
                   touched.val = true
@@ -4404,8 +4432,8 @@ pub fn time_range_picker_t(
         None => ()
       }
       refresh_text()
-      attach(parent, ViewLike::view(field))
-      ViewLike::view(field)
+      @yue.attach(parent, @yue.ViewLike::view(field))
+      @yue.ViewLike::view(field)
     },
   }
 }
@@ -4416,7 +4444,7 @@ pub fn time_range_picker_t(
 /// 时间步进;日期两段式选完或时间步进后,区间完整即回调 on_change
 /// (起日期, 起时间, 止日期, 止时间);「完成」按钮或字段失焦收起。
 pub fn datetime_range_picker_t(
-  value? : Store[DateTimeRange],
+  value? : @yue.Store[DateTimeRange],
   on_change? : (DateYMD, TimeHM, DateYMD, TimeHM) -> Unit = fn(
     _sd,
     _st,
@@ -4427,12 +4455,12 @@ pub fn datetime_range_picker_t(
   },
   placeholder? : String = "请选择日期时间区间",
   clearable? : Bool = false,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let today = local_date()
-      let pop : Ref[Popover?] = Ref(None)
+      let pop : Ref[@yue.Popover?] = Ref(None)
       let start_d : Ref[DateYMD?] = Ref(
         match value {
           Some(v) =>
@@ -4507,7 +4535,7 @@ pub fn datetime_range_picker_t(
             has_val.val = false
           }
         }
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
       }
 
       fn write_value() -> Unit {
@@ -4538,9 +4566,9 @@ pub fn datetime_range_picker_t(
         }
       }
 
-      ViewLike::on_mouse_up(field, fn(e) {
+      @yue.ViewLike::on_mouse_up(field, fn(e) {
         if e.button == 1 {
-          ViewLike::focus(field)
+          @yue.ViewLike::focus(field)
           if picker_clear_hit(field, e, clearable, has_val.val) {
             start_d.val = None
             end_d.val = None
@@ -4555,8 +4583,8 @@ pub fn datetime_range_picker_t(
           match pop.val {
             Some(_) => ()
             None => {
-              let p = Popover::new()
-              bind_popover_bg(p)
+              let p = @yue.Popover::new()
+              @yue.bind_popover_bg(p)
               let (cal, refresh) = build_calendar(
                 today,
                 range_state_of(start_d, end_d),
@@ -4573,21 +4601,21 @@ pub fn datetime_range_picker_t(
               grid_refresh_d.val = refresh
               // 显式总宽高:PopoverRootView 按 content_size 硬分配,漏显式
               // 高度会把时间面板/完成行压塌
-              let body = themed_container(style=[
+              let body = @yue.themed_container(style=[
                 ("width", 268.0),
                 ("height", 258.0 + 1.0 + 88.0 + 32.0),
                 ("flexDirection", "column"),
               ])
               body.add_child(cal)
-              let sep = themed_container(style=[("height", 1.0)])
+              let sep = @yue.themed_container(style=[("height", 1.0)])
               sep.on_draw(fn(p2) {
-                let b2 = ViewLike::get_bounds(sep)
-                p2.set_stroke_color(theme_border())
+                let b2 = @yue.ViewLike::get_bounds(sep)
+                p2.set_stroke_color(@yue.theme_border())
                 p2.stroke_rect(0.5, 0.5, b2.width - 1.0, 0.0)
               })
               body.add_child(sep)
               body.add_child(tpanel)
-              let done_row = themed_container(style=[
+              let done_row = @yue.themed_container(style=[
                 ("height", 32.0),
                 ("padding", 6.0),
                 ("flexDirection", "row"),
@@ -4637,8 +4665,8 @@ pub fn datetime_range_picker_t(
         None => ()
       }
       refresh_text()
-      attach(parent, ViewLike::view(field))
-      ViewLike::view(field)
+      @yue.attach(parent, @yue.ViewLike::view(field))
+      @yue.ViewLike::view(field)
     },
   }
 }
@@ -4649,7 +4677,7 @@ pub fn datetime_range_picker_t(
 pub(all) struct TableColumn {
   title : String
   width : Double
-  align : TextAlign
+  align : @yue.TextAlign
   sortable : Bool
 }
 
@@ -4658,7 +4686,7 @@ pub(all) struct TableColumn {
 pub fn TableColumn::make(
   title : String,
   width : Double,
-  align? : TextAlign = Start,
+  align? : @yue.TextAlign = @yue.Start,
   sortable? : Bool = true,
 ) -> TableColumn {
   { title, width, align, sortable, }
@@ -4703,7 +4731,7 @@ pub fn TableRow::make(cells : Array[String]) -> TableRow {
 /// 表格复选框画法(同 checkbox_t):直角方框,选中实心主题色 + 白勾,
 /// 部分选中画横条;(x, y) 为 14x14 方框左上角。
 fn table_draw_check(
-  p : Painter,
+  p : @yue.Painter,
   x : Double,
   y : Double,
   checked : Bool,
@@ -4711,14 +4739,14 @@ fn table_draw_check(
 ) -> Unit {
   p.set_stroke_color(
     if checked || partial {
-      theme_primary()
+      @yue.theme_primary()
     } else {
-      theme_border()
+      @yue.theme_border()
     },
   )
   p.stroke_rect(x + 0.5, y + 0.5, 13.0, 13.0)
   if checked {
-    p.set_fill_color(theme_primary())
+    p.set_fill_color(@yue.theme_primary())
     p.fill_rect(x + 2.0, y + 2.0, 10.0, 10.0)
     p.set_stroke_color("#FFFFFF")
     for off in [0.0, 0.5] {
@@ -4729,7 +4757,7 @@ fn table_draw_check(
       p.stroke()
     }
   } else if partial {
-    p.set_fill_color(theme_primary())
+    p.set_fill_color(@yue.theme_primary())
     p.fill_rect(x + 4.0, y + 6.0, 6.0, 2.0)
   }
 }
@@ -4746,13 +4774,19 @@ fn table_draw_check(
 /// (单一绘制器)路径填充实测正常,小单元格容器反而不渲染(见
 /// adaptation.md),故表格表头装饰一律画在表头容器上。
 fn draw_sort_triangle(
-  p : Painter,
+  p : @yue.Painter,
   cx : Double,
   cy : Double,
   asc : Bool,
   active : Bool,
 ) -> Unit {
-  p.set_fill_color(if active { theme_primary() } else { theme_border() })
+  p.set_fill_color(
+    if active {
+      @yue.theme_primary()
+    } else {
+      @yue.theme_border()
+    },
+  )
   p.begin_path()
   if asc {
     p.move_to(cx - 4.0, cy + 2.0)
@@ -4770,8 +4804,8 @@ fn draw_sort_triangle(
 ///|
 /// 排序提示(表头,未排序列):上下双三角(↕),灰色,常驻显示——
 /// 用户看到就知道这列可点排序;排序列换实心主题色单向箭头。
-fn draw_sort_hint(p : Painter, cx : Double, cy : Double) -> Unit {
-  p.set_fill_color(theme_border())
+fn draw_sort_hint(p : @yue.Painter, cx : Double, cy : Double) -> Unit {
+  p.set_fill_color(@yue.theme_border())
   // 上三角(中心 cy-3)
   p.begin_path()
   p.move_to(cx - 3.5, cy - 0.5)
@@ -4796,11 +4830,11 @@ let min_col_width : Double = 56.0
 /// 行底色:选中 > 悬停 > 斑马纹(奇数行) > 透明。
 fn table_row_bg(i : Int, selected : Bool, hover : Bool) -> String {
   if selected {
-    theme_primary_light()
+    @yue.theme_primary_light()
   } else if hover {
-    theme_fill_hover()
+    @yue.theme_fill_hover()
   } else if i % 2 == 1 {
-    theme_fill_zebra()
+    @yue.theme_fill_zebra()
   } else {
     ""
   }
@@ -4818,32 +4852,32 @@ fn table_row_bg(i : Int, selected : Bool, hover : Bool) -> String {
 /// 调整列宽,相邻两列此消彼长(最小 min_col_width)。
 pub fn table_t(
   columns : Array[TableColumn],
-  rows : Store[Array[TableRow]],
+  rows : @yue.Store[Array[TableRow]],
   width? : Double = 560.0,
   row_height? : Double = 36.0,
-  selection? : Store[Array[Int]],
-  sort? : Store[TableSort],
+  selection? : @yue.Store[Array[Int]],
+  sort? : @yue.Store[TableSort],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) {  },
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let font = Font::new("Sans", 13.0)
-      let small_font = Font::new("Sans", 12.0)
-      let head_font = Font::new("Sans", 13.0, weight=SemiBold)
+      let font = @yue.Font::new("Sans", 13.0)
+      let small_font = @yue.Font::new("Sans", 12.0)
+      let head_font = @yue.Font::new("Sans", 13.0, weight=@yue.SemiBold)
       let sel = selection
       let selected_i = Ref(-1)
       let hover_i = Ref(-1)
-      let row_cs : Ref[Array[Container]] = Ref([])
+      let row_cs : Ref[Array[@yue.Container]] = Ref([])
       // 行级订阅的本代退订闭包(rebuild 前整袋退订,见 rebuild)
       let gen : Ref[Array[() -> Unit]] = Ref([])
       // 行内列单元格按 [行][列] 存(拖动列宽时逐行改样式,不重建树)
-      let row_cols : Ref[Array[Array[Container]]] = Ref([])
+      let row_cols : Ref[Array[Array[@yue.Container]]] = Ref([])
       let data_r : Ref[Array[TableRow]] = Ref([])
       let head_h = 40.0
       // 1px 内边距让外框描边落在 padding 环里,不被行/表头背景盖住
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", width),
         ("padding", 1.0),
         ("marginBottom", 10.0),
@@ -4852,11 +4886,11 @@ pub fn table_t(
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
       // 面板底:斑马纹(fill_zebra)按「白面板上的浅灰」设计,透明挂在
       // 页面灰底(bg_page,与 fill_zebra 几乎同色)上条纹不可见
-      bind_bg(outer, fn() { theme_bg_panel() })
+      @yue.bind_bg(outer, fn() { @yue.theme_bg_panel() })
       // 列几何(含复选框列偏移):初值=定义宽,弹性列均分剩余宽;
       // 拖动改写本数组并回写各处 cell 样式
       let body_w = width - 2.0 - (if sel is Some(_) { 36.0 } else { 0.0 })
@@ -4884,7 +4918,7 @@ pub fn table_t(
       // 无效。表头装饰(箭头/边界线/高亮)统一画在 head 容器上:小
       // 单元格容器的路径填充在 GTK 上不渲染(实测,见 adaptation.md),
       // 表头容器单一绘制器正常,与 table_v_t 画布同模型。
-      let head_cs : Ref[Array[Container]] = Ref([])
+      let head_cs : Ref[Array[@yue.Container]] = Ref([])
       let resizing = Ref(-1)
       let resize_start_x = Ref(0.0)
       let resize_w0 = Ref(0.0)
@@ -4914,8 +4948,8 @@ pub fn table_t(
       }
 
       outer.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(outer)
-        p.set_stroke_color(theme_border())
+        let b = @yue.ViewLike::get_bounds(outer)
+        p.set_stroke_color(@yue.theme_border())
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
       })
 
@@ -4960,18 +4994,18 @@ pub fn table_t(
       fn cell_view(
         content : TableCell,
         j : Int,
-        fnt : Font,
+        fnt : @yue.Font,
         color_of : () -> String,
-      ) -> Container {
+      ) -> @yue.Container {
         let col = columns[j]
-        let base : Array[(String, &StyVal)] = [
+        let base : Array[(String, &@yue.StyVal)] = [
           ("width", col_w[j]),
           ("paddingLeft", 12.0),
           ("paddingRight", 12.0),
         ]
         base.push(("flexDirection", "row"))
         base.push(("alignItems", "center"))
-        let wrap = themed_container(style=base)
+        let wrap = @yue.themed_container(style=base)
         match content {
           CellText(text) => {
             // 自绘单行省略:Label 无 ellipsize 能力(fork 未暴露),
@@ -4980,12 +5014,12 @@ pub fn table_t(
             // 拖列宽/行重建后按当前宽度重截,主题切换随重绘取新色。
             // wrap 无子节点、无高度样式,yoga 测高为 0——Windows 对
             // 0 高视图直接跳过绘制(整列文字消失),必须给出行高下限
-            ViewLike::set_style(wrap, "minHeight", row_height)
+            @yue.ViewLike::set_style(wrap, "minHeight", row_height)
             wrap.on_draw(fn(p) {
-              let b = ViewLike::get_bounds(wrap)
-              let at = AttributedText::new_with(text, {
+              let b = @yue.ViewLike::get_bounds(wrap)
+              let at = @yue.AttributedText::new_with(text, {
                 align: col.align,
-                valign: Center,
+                valign: @yue.Center,
                 wrap: false,
                 ellipsis: true,
                 font: Some(fnt),
@@ -4995,11 +5029,14 @@ pub fn table_t(
             })
           }
           CellTag(text, t) => {
-            let probe = AttributedText::new(text, wrap=false)
+            let probe = @yue.AttributedText::new(text, wrap=false)
             probe.set_font(small_font)
             let text_w = probe.get_bounds_for(10000.0, 100.0).width
             let w = text_w + 14.0
-            let tg = themed_container(style=[("width", w), ("height", 20.0)])
+            let tg = @yue.themed_container(style=[
+              ("width", w),
+              ("height", 20.0),
+            ])
             tg.on_draw(fn(p) {
               p.set_fill_color(type_light_color(t))
               p.fill_rect(0.0, 0.0, w, 20.0)
@@ -5009,43 +5046,46 @@ pub fn table_t(
                 0.0,
                 w,
                 20.0,
-                align=Center,
-                valign=Center,
+                align=@yue.Center,
+                valign=@yue.Center,
                 color=type_color(t),
               )
             })
             wrap.add_child(tg)
           }
           CellColorBox(hex, name) => {
-            let sw = themed_container(style=[("width", 14.0), ("height", 14.0)])
+            let sw = @yue.themed_container(style=[
+              ("width", 14.0),
+              ("height", 14.0),
+            ])
             sw.on_draw(fn(p) {
               p.set_fill_color(hex)
               p.fill_rect(0.0, 0.0, 14.0, 14.0)
-              p.set_stroke_color(theme_border())
+              p.set_stroke_color(@yue.theme_border())
               p.stroke_rect(0.5, 0.5, 13.0, 13.0)
             })
             wrap.add_child(sw)
-            let l = Label::new(name)
-            ViewLike::set_font(l, small_font)
-            bind_fg(l, color_of)
+            let l = @yue.Label::new(name)
+            @yue.ViewLike::set_font(l, small_font)
+            @yue.bind_fg(l, color_of)
             l.set_align(col.align)
-            ViewLike::set_style(l, "flex", 1.0)
-            ViewLike::set_style(l, "marginLeft", 6.0)
+            @yue.ViewLike::set_style(l, "flex", 1.0)
+            @yue.ViewLike::set_style(l, "marginLeft", 6.0)
             wrap.add_child(l)
           }
           CellLines(lines) => {
-            let stack = themed_container(style=[
+            let stack = @yue.themed_container(style=[
               ("paddingTop", 6.0),
               ("paddingBottom", 6.0),
               ("flexDirection", "column"),
             ])
             for ln in lines {
-              let l = Label::new(ln)
-              ViewLike::set_font(l, small_font)
-              bind_fg(l, fn() { theme_text_regular() })
+              let l = @yue.Label::new(ln)
+              @yue.ViewLike::set_font(l, small_font)
+              @yue.bind_fg(l, fn() { @yue.theme_text_regular() })
               stack.add_child(l)
             }
-            ViewLike::set_style(stack, "flex", 1.0)
+            @yue.ViewLike::set_style(stack, "flex", 1.0)
             wrap.add_child(stack)
           }
         }
@@ -5053,16 +5093,16 @@ pub fn table_t(
       }
 
       // 表头:主题斑马色打底 + 底边分隔线,次级色加粗文字
-      let head = themed_container(style=[
+      let head = @yue.themed_container(style=[
         ("height", head_h),
         ("flexDirection", "row"),
         ("alignItems", "center"),
       ])
       head.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(head)
-        p.set_fill_color(theme_fill_zebra())
+        let b = @yue.ViewLike::get_bounds(head)
+        p.set_fill_color(@yue.theme_fill_zebra())
         p.fill_rect(0.0, 0.0, b.width, b.height)
-        p.set_stroke_color(theme_border())
+        p.set_stroke_color(@yue.theme_border())
         p.begin_path()
         p.move_to(0.0, b.height - 0.5)
         p.line_to(b.width, b.height - 0.5)
@@ -5070,7 +5110,13 @@ pub fn table_t(
         // 列边界线(常驻浅色,悬停/拖动变主题色):拖动位置一眼可辨
         for j in 0..<(columns.length() - 1) {
           let hot = resizing.val == j || boundary_hover.val == j
-          p.set_stroke_color(if hot { theme_primary() } else { theme_border() })
+          p.set_stroke_color(
+            if hot {
+              @yue.theme_primary()
+            } else {
+              @yue.theme_border()
+            },
+          )
           let ex = col_x[j] + col_w[j]
           p.begin_path()
           p.move_to(ex, 6.0)
@@ -5094,9 +5140,12 @@ pub fn table_t(
         }
       })
       // 表头复选框(仅 selection 启用时):全选 / 清空,部分选中画横条
-      let head_cb = themed_container(style=[("width", 36.0), ("height", head_h)])
+      let head_cb = @yue.themed_container(style=[
+        ("width", 36.0),
+        ("height", head_h),
+      ])
       head_cb.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(head_cb)
+        let b = @yue.ViewLike::get_bounds(head_cb)
         let n = data_r.val.length()
         let k = match sel {
           Some(s) => s.get().length()
@@ -5110,8 +5159,8 @@ pub fn table_t(
           k > 0 && k < n,
         )
       })
-      View::set_cursor(head_cb, hand())
-      ViewLike::on_mouse_down(head_cb, fn(e) {
+      @yue.View::set_cursor(head_cb, @yue.hand())
+      @yue.ViewLike::on_mouse_down(head_cb, fn(e) {
         if e.button == 1 {
           match sel {
             Some(s) => {
@@ -5169,22 +5218,22 @@ pub fn table_t(
       // 其所在行——被改样式的容器必须逐个调用(splitter 对唯一包装
       // 容器调,等价于此处的逐容器)。
       fn apply_col_widths(j : Int) -> Unit {
-        ViewLike::set_style(head_cs.val[j], "width", col_w[j])
-        ViewLike::set_style(head_cs.val[j + 1], "width", col_w[j + 1])
+        @yue.ViewLike::set_style(head_cs.val[j], "width", col_w[j])
+        @yue.ViewLike::set_style(head_cs.val[j + 1], "width", col_w[j + 1])
         for cells in row_cols.val {
-          ViewLike::set_style(cells[j], "width", col_w[j])
-          ViewLike::set_style(cells[j + 1], "width", col_w[j + 1])
+          @yue.ViewLike::set_style(cells[j], "width", col_w[j])
+          @yue.ViewLike::set_style(cells[j + 1], "width", col_w[j + 1])
         }
         let mut a = if sel is Some(_) { 36.0 } else { 0.0 }
         for k in 0..<col_w.length() {
           col_x[k] = a
           a = a + col_w[k]
         }
-        ViewLike::update_layout(head_cs.val[j])
-        ViewLike::update_layout(head_cs.val[j + 1])
+        @yue.ViewLike::update_layout(head_cs.val[j])
+        @yue.ViewLike::update_layout(head_cs.val[j + 1])
         for cells in row_cols.val {
-          ViewLike::update_layout(cells[j])
-          ViewLike::update_layout(cells[j + 1])
+          @yue.ViewLike::update_layout(cells[j])
+          @yue.ViewLike::update_layout(cells[j + 1])
         }
       }
 
@@ -5195,27 +5244,27 @@ pub fn table_t(
       // 左缘 4px 拖 (j-1, j) 边界——对准可见边界按下,事件落左列
       // 右缘或右列左缘都能起拖(此前只认右缘,对准边界按常落到下一
       // 列左缘变成排序,拖不动)。
-      fn head_cell(j : Int) -> Container {
+      fn head_cell(j : Int) -> @yue.Container {
         let col = columns[j]
         // 可排序列右侧留 22px 箭头区(标题不跳动)
         let pad_r = if col.sortable { 22.0 } else { 12.0 }
-        let cell = themed_container(style=[
+        let cell = @yue.themed_container(style=[
           ("width", col_w[j]),
           ("paddingLeft", 12.0),
           ("paddingRight", pad_r),
           ("flexDirection", "row"),
           ("alignItems", "center"),
         ])
-        let l = Label::new(col.title)
-        ViewLike::set_font(l, head_font)
-        bind_fg(l, fn() { theme_text_secondary() })
+        let l = @yue.Label::new(col.title)
+        @yue.ViewLike::set_font(l, head_font)
+        @yue.bind_fg(l, fn() { @yue.theme_text_secondary() })
         l.set_align(col.align)
-        ViewLike::set_style(l, "flex", 1.0)
+        @yue.ViewLike::set_style(l, "flex", 1.0)
         cell.add_child(l)
         let near_edge = Ref(false)
-        View::set_cursor(cell, hand())
+        @yue.View::set_cursor(cell, @yue.hand())
         // 悬停:靠近任一边界给 ResizeEW 光标 + 表头画高亮线
-        ViewLike::on_mouse_move(cell, fn(e) {
+        @yue.ViewLike::on_mouse_move(cell, fn(e) {
           if resizing.val >= 0 {
             let jr = resizing.val
             let d = e.window_x - resize_start_x.val
@@ -5234,7 +5283,7 @@ pub fn table_t(
             col_w[jr + 1] = w1
             apply_col_widths(jr)
           } else {
-            let b = ViewLike::get_bounds(cell)
+            let b = @yue.ViewLike::get_bounds(cell)
             // 右缘 → (j, j+1) 边界;左缘 → (j-1, j) 边界;末列右缘不设
             let edge = if j + 1 < columns.length() && e.view_x >= b.width - 4.0 {
               j
@@ -5245,23 +5294,23 @@ pub fn table_t(
             }
             if edge != boundary_hover.val {
               boundary_hover.val = edge
-              ViewLike::schedule_paint(head)
+              @yue.ViewLike::schedule_paint(head)
             }
             let near = edge >= 0
             if near != near_edge.val {
               near_edge.val = near
-              View::set_cursor(
+              @yue.View::set_cursor(
                 cell,
-                Cursor::new(if near { ResizeEW } else { Hand }),
+                @yue.Cursor::new(if near { @yue.ResizeEW } else { @yue.Hand }),
               )
             }
           }
         })
-        ViewLike::on_mouse_down(cell, fn(e) {
+        @yue.ViewLike::on_mouse_down(cell, fn(e) {
           if e.button != 1 {
             return false
           }
-          let b = ViewLike::get_bounds(cell)
+          let b = @yue.ViewLike::get_bounds(cell)
           let edge = if j + 1 < columns.length() && e.view_x >= b.width - 4.0 {
             j
           } else if j - 1 >= 0 && e.view_x <= 4.0 {
@@ -5271,35 +5320,35 @@ pub fn table_t(
           }
           if edge >= 0 {
             begin_resize(edge, e.window_x)
-            ViewLike::set_capture(cell)
+            @yue.ViewLike::set_capture(cell)
             true
           } else {
             if col.sortable {
               toggle_sort(j)
-              ViewLike::schedule_paint(head)
+              @yue.ViewLike::schedule_paint(head)
             }
             false
           }
         })
-        ViewLike::on_mouse_up(cell, fn(_e) {
+        @yue.ViewLike::on_mouse_up(cell, fn(_e) {
           if resizing.val >= 0 {
             resizing.val = -1
-            ViewLike::release_capture(cell)
-            ViewLike::schedule_paint(head)
+            @yue.ViewLike::release_capture(cell)
+            @yue.ViewLike::schedule_paint(head)
             true
           } else {
             false
           }
         })
         // 光标离开边界区:复位光标与高亮
-        ViewLike::on_mouse_leave(cell, fn(_e) {
+        @yue.ViewLike::on_mouse_leave(cell, fn(_e) {
           if boundary_hover.val != -1 {
             boundary_hover.val = -1
-            ViewLike::schedule_paint(head)
+            @yue.ViewLike::schedule_paint(head)
           }
           if near_edge.val {
             near_edge.val = false
-            View::set_cursor(cell, hand())
+            @yue.View::set_cursor(cell, @yue.hand())
           }
         })
         cell
@@ -5314,18 +5363,18 @@ pub fn table_t(
         head_cs.val.push(hc)
         head.add_child(hc)
       }
-      let body = themed_container(style=[("flexDirection", "column")])
+      let body = @yue.themed_container(style=[("flexDirection", "column")])
 
       fn refresh_row(i : Int) -> Unit {
         let cs = row_cs.val
         if i >= 0 && i < cs.length() {
-          ViewLike::schedule_paint(cs[i])
+          @yue.ViewLike::schedule_paint(cs[i])
         }
       }
 
       // 鼠标离开整个表格(移去表头 / 表格外)时清悬停:兜底行级 leave
       // 丢失导致的 hover 底色永久滞留
-      ViewLike::on_mouse_leave(outer, fn(_e) {
+      @yue.ViewLike::on_mouse_leave(outer, fn(_e) {
         let prev = hover_i.val
         if prev >= 0 {
           hover_i.val = -1
@@ -5336,9 +5385,9 @@ pub fn table_t(
       fn rebuild(data : Array[TableRow]) -> Unit {
         // 旧代订阅整袋退订:行与单元格挂载时登记的主题订阅随旧行视图
         // 一起退场,不随每次数据刷新累积死订阅
-        sub_bag_discard(gen.val)
+        @yue.sub_bag_discard(gen.val)
         for v in row_cs.val {
-          ignore(body.remove_child_view(ViewLike::view(v)))
+          ignore(body.remove_child_view(@yue.ViewLike::view(v)))
         }
         row_cs.val = []
         row_cols.val = []
@@ -5349,12 +5398,12 @@ pub fn table_t(
           Some(s) => s.set([])
           None => ()
         }
-        sub_bag_begin()
+        @yue.sub_bag_begin()
         for i in 0..<data.length() {
           let r = data[i]
           let idx = i
           // minHeight:普通行 = row_height,含多行文本时自动撑高
-          let row = themed_container(style=[
+          let row = @yue.themed_container(style=[
             ("minHeight", row_height),
             ("flexDirection", "row"),
             ("alignItems", "center"),
@@ -5362,19 +5411,19 @@ pub fn table_t(
           row.on_draw(fn(p) {
             let bg = table_row_bg(idx, sel_has(idx), hover_i.val == idx)
             if bg != "" {
-              let b = ViewLike::get_bounds(row)
+              let b = @yue.ViewLike::get_bounds(row)
               p.set_fill_color(bg)
               p.fill_rect(0.0, 0.0, b.width, b.height)
             }
           })
           match sel {
             Some(_) => {
-              let cb = themed_container(style=[
+              let cb = @yue.themed_container(style=[
                 ("width", 36.0),
                 ("alignSelf", "stretch"),
               ])
               cb.on_draw(fn(p) {
-                let b = ViewLike::get_bounds(cb)
+                let b = @yue.ViewLike::get_bounds(cb)
                 table_draw_check(
                   p,
                   11.0,
@@ -5387,19 +5436,21 @@ pub fn table_t(
             }
             None => ()
           }
-          let cells : Array[Container] = []
+          let cells : Array[@yue.Container] = []
           for j in 0..<columns.length() {
             let content = if j < r.cells.length() {
               r.cells[j]
             } else {
               CellText("")
             }
-            let cv = cell_view(content, j, font, fn() { theme_text_regular() })
+            let cv = cell_view(content, j, font, fn() {
+              @yue.theme_text_regular()
+            })
             cells.push(cv)
             row.add_child(cv)
           }
           row_cols.val.push(cells)
-          ViewLike::on_mouse_enter(row, fn(_e) {
+          @yue.ViewLike::on_mouse_enter(row, fn(_e) {
             // 旧行的 leave 可能迟到/丢失(快速移动、跨子控件边界事件
             // 乱序),enter 里一并重绘旧行,滞留的 hover 底色即时清掉
             let prev = hover_i.val
@@ -5409,7 +5460,7 @@ pub fn table_t(
             }
             refresh_row(idx)
           })
-          ViewLike::on_mouse_leave(row, fn(_e) {
+          @yue.ViewLike::on_mouse_leave(row, fn(_e) {
             // 仅当当前悬停仍是本行才清:乱序 leave(到达晚于新行 enter)
             // 不得清掉新行的 hover
             if hover_i.val == idx {
@@ -5417,8 +5468,8 @@ pub fn table_t(
               refresh_row(idx)
             }
           })
-          View::set_cursor(row, hand())
-          ViewLike::on_mouse_down(row, fn(e) {
+          @yue.View::set_cursor(row, @yue.hand())
+          @yue.ViewLike::on_mouse_down(row, fn(e) {
             if e.button == 1 {
               match sel {
                 Some(_) => toggle_sel(idx)
@@ -5438,8 +5489,8 @@ pub fn table_t(
           body.add_child(row)
           row_cs.val.push(row)
         }
-        gen.val = sub_bag_end()
-        ViewLike::schedule_paint(head_cb)
+        gen.val = @yue.sub_bag_end()
+        @yue.ViewLike::schedule_paint(head_cb)
       }
 
       rebuild(rows.get())
@@ -5448,21 +5499,21 @@ pub fn table_t(
         Some(s) =>
           s.subscribe(fn(_v) {
             for c in row_cs.val {
-              ViewLike::schedule_paint(c)
+              @yue.ViewLike::schedule_paint(c)
             }
-            ViewLike::schedule_paint(head_cb)
+            @yue.ViewLike::schedule_paint(head_cb)
           })
         None => ()
       }
       // 排序状态变化:表头箭头重绘(数据排序由使用方订阅 Store 完成)
       match sort {
-        Some(s) => s.subscribe(fn(_v) { ViewLike::schedule_paint(head) })
+        Some(s) => s.subscribe(fn(_v) { @yue.ViewLike::schedule_paint(head) })
         None => ()
       }
       outer.add_child(head)
       outer.add_child(body)
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -5478,20 +5529,20 @@ pub fn table_t(
 /// 列宽,相邻两列此消彼长(最小 min_col_width,末列边界不设把手)。
 pub fn table_v_t(
   columns : Array[TableColumn],
-  rows : Store[Array[TableRow]],
+  rows : @yue.Store[Array[TableRow]],
   width? : Double = 560.0,
   height? : Double = 360.0,
   row_height? : Double = 32.0,
-  selection? : Store[Array[Int]],
-  sort? : Store[TableSort],
+  selection? : @yue.Store[Array[Int]],
+  sort? : @yue.Store[TableSort],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i, _r) {  },
   fill? : Bool = false,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let small_font = Font::new("Sans", 12.0)
+      let small_font = @yue.Font::new("Sans", 12.0)
       let sel = selection
       let data_r : Ref[Array[TableRow]] = Ref([])
       let selected_i = Ref(-1)
@@ -5640,7 +5691,7 @@ pub fn table_v_t(
         }
       }
 
-      let size_style : Array[(String, &StyVal)] = if fill {
+      let size_style : Array[(String, &@yue.StyVal)] = if fill {
         [("height", height), ("marginBottom", 10.0)]
       } else {
         [("width", width), ("height", height), ("marginBottom", 10.0)]
@@ -5648,11 +5699,11 @@ pub fn table_v_t(
       for kv in style {
         size_style.push(kv)
       }
-      let cv = themed_container(style=size_style)
+      let cv = @yue.themed_container(style=size_style)
       handle(cv)
       // 面板底:斑马纹按「白面板上的浅灰」设计,透明挂在页面灰底上
       // 条纹不可见(与 table_t 同理)
-      bind_bg(cv, fn() { theme_bg_panel() })
+      @yue.bind_bg(cv, fn() { @yue.theme_bg_panel() })
 
       fn sel_has(i : Int) -> Bool {
         match sel {
@@ -5730,9 +5781,9 @@ pub fn table_v_t(
       // 两侧统一留 12px。单行 + 超宽省略:默认换行会让长文本穿透定高
       // 行界(命令行动辄上百字符),排版截断由平台完成,不逐格测宽。
       fn draw_align_text(
-        p : Painter,
+        p : @yue.Painter,
         text : String,
-        align : TextAlign,
+        align : @yue.TextAlign,
         x : Double,
         w : Double,
         y : Double,
@@ -5749,7 +5800,7 @@ pub fn table_v_t(
           w - 24.0,
           h,
           align~,
-          valign=Center,
+          valign=@yue.Center,
           color~,
           wrap=false,
           ellipsis=true,
@@ -5757,14 +5808,14 @@ pub fn table_v_t(
       }
 
       cv.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(cv)
+        let b = @yue.ViewLike::get_bounds(cv)
         relayout_body(b.width)
         let data = data_r.val
         let n = data.length()
         // 表头
-        p.set_fill_color(theme_fill_zebra())
+        p.set_fill_color(@yue.theme_fill_zebra())
         p.fill_rect(0.0, 0.0, b.width, head_h)
-        p.set_stroke_color(theme_border())
+        p.set_stroke_color(@yue.theme_border())
         p.begin_path()
         p.move_to(0.0, head_h - 0.5)
         p.line_to(b.width, head_h - 0.5)
@@ -5795,7 +5846,7 @@ pub fn table_v_t(
             w_eff,
             0.0,
             head_h,
-            theme_text_secondary(),
+            @yue.theme_text_secondary(),
           )
           // 排序箭头:排列表实心主题色单向;可排序列未排序时常驻灰色 ↕
           if sort is Some(_) && columns[j].sortable {
@@ -5850,10 +5901,10 @@ pub fn table_v_t(
                   w,
                   row_y,
                   row_height,
-                  theme_text_regular(),
+                  @yue.theme_text_regular(),
                 )
               CellTag(text, t) => {
-                let probe = AttributedText::new(text, wrap=false)
+                let probe = @yue.AttributedText::new(text, wrap=false)
                 probe.set_font(small_font)
                 let tw = probe.get_bounds_for(10000.0, 100.0).width
                 let tag_w = tw + 14.0
@@ -5866,7 +5917,7 @@ pub fn table_v_t(
                   ty,
                   tag_w,
                   20.0,
-                  valign=Center,
+                  valign=@yue.Center,
                   color=type_color(t),
                   wrap=false,
                 )
@@ -5875,7 +5926,7 @@ pub fn table_v_t(
                 let sy = row_y + (row_height - 14.0) / 2.0
                 p.set_fill_color(hex)
                 p.fill_rect(x + 12.0, sy, 14.0, 14.0)
-                p.set_stroke_color(theme_border())
+                p.set_stroke_color(@yue.theme_border())
                 p.stroke_rect(x + 12.5, sy + 0.5, 13.0, 13.0)
                 p.draw_text(
                   name,
@@ -5883,8 +5934,8 @@ pub fn table_v_t(
                   row_y,
                   w - 32.0,
                   row_height,
-                  valign=Center,
-                  color=theme_text_regular(),
+                  valign=@yue.Center,
+                  color=@yue.theme_text_regular(),
                   wrap=false,
                 )
               }
@@ -5903,7 +5954,7 @@ pub fn table_v_t(
                     ly,
                     w,
                     14.0,
-                    color=theme_text_regular(),
+                    color=@yue.theme_text_regular(),
                     wrap=false,
                     ellipsis=true,
                   )
@@ -5924,7 +5975,7 @@ pub fn table_v_t(
             0.0
           }
           let thumb_y = head_h + (vis_h - thumb_h) * t
-          p.set_fill_color(theme_border())
+          p.set_fill_color(@yue.theme_border())
           p.fill_rect(b.width - bar_w + 2.0, thumb_y, bar_w - 4.0, thumb_h)
         }
         // 列边界线(常驻浅色,悬停/拖动变主题色):拖动位置一眼可辨。
@@ -5932,7 +5983,13 @@ pub fn table_v_t(
         // 体感上「列分割线时有时无」
         for j in 0..<(columns.length() - 1) {
           let hot = resizing.val == j || boundary_hover.val == j
-          p.set_stroke_color(if hot { theme_primary() } else { theme_border() })
+          p.set_stroke_color(
+            if hot {
+              @yue.theme_primary()
+            } else {
+              @yue.theme_border()
+            },
+          )
           let ex = col_x[j] + col_w[j]
           p.begin_path()
           p.move_to(ex, 6.0)
@@ -5942,13 +5999,13 @@ pub fn table_v_t(
         // 列宽拖动中的边界高亮线(表头到底,主题色 1px)
         if resizing.val >= 0 {
           let edge = col_x[resizing.val] + col_w[resizing.val]
-          p.set_stroke_color(theme_primary())
+          p.set_stroke_color(@yue.theme_primary())
           p.begin_path()
           p.move_to(edge, head_h)
           p.line_to(edge, b.height)
           p.stroke()
         }
-        p.set_stroke_color(theme_border())
+        p.set_stroke_color(@yue.theme_border())
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
       })
 
@@ -5964,11 +6021,11 @@ pub fn table_v_t(
           .max(0.0)
           .min(1.0)
         offset.val = t * max_offset()
-        ViewLike::schedule_paint(cv)
+        @yue.ViewLike::schedule_paint(cv)
       }
 
-      View::set_cursor(cv, hand())
-      ViewLike::on_mouse_down(cv, fn(e) {
+      @yue.View::set_cursor(cv, @yue.hand())
+      @yue.ViewLike::on_mouse_down(cv, fn(e) {
         if e.button != 1 {
           return false
         }
@@ -5976,7 +6033,7 @@ pub fn table_v_t(
         if e.view_x >= body_w.val && max_offset() > 0.0 {
           scroll_to_thumb(e.view_y)
           dragging.val = true
-          ViewLike::set_capture(cv)
+          @yue.ViewLike::set_capture(cv)
           return true
         }
         if e.view_y < head_h {
@@ -5991,8 +6048,8 @@ pub fn table_v_t(
               // 拖过即转固定:退出弹性均分,后续绘制/窗口伸缩保留拖定宽
               manual[jb] = true
               manual[jb + 1] = true
-              ViewLike::set_capture(cv)
-              ViewLike::schedule_paint(cv)
+              @yue.ViewLike::set_capture(cv)
+              @yue.ViewLike::schedule_paint(cv)
               return true
             }
           }
@@ -6008,7 +6065,7 @@ pub fn table_v_t(
               toggle_sort(j)
             }
           }
-          ViewLike::schedule_paint(cv)
+          @yue.ViewLike::schedule_paint(cv)
           return true
         }
         let idx = ((e.view_y - head_h + offset.val) / row_height).to_int()
@@ -6019,10 +6076,10 @@ pub fn table_v_t(
           }
           on_row_click(idx, data_r.val[idx])
         }
-        ViewLike::schedule_paint(cv)
+        @yue.ViewLike::schedule_paint(cv)
         true
       })
-      ViewLike::on_mouse_move(cv, fn(e) {
+      @yue.ViewLike::on_mouse_move(cv, fn(e) {
         if dragging.val {
           scroll_to_thumb(e.view_y)
           return
@@ -6045,7 +6102,7 @@ pub fn table_v_t(
           col_w[j] = w0
           col_w[j + 1] = w1
           relayout_cols()
-          ViewLike::schedule_paint(cv)
+          @yue.ViewLike::schedule_paint(cv)
           return
         }
         // 表头区:悬停列记录 + 边界把手光标 + 边界高亮线
@@ -6054,32 +6111,32 @@ pub fn table_v_t(
           let near = bh >= 0
           if near != near_edge.val {
             near_edge.val = near
-            View::set_cursor(
+            @yue.View::set_cursor(
               cv,
-              Cursor::new(if near { ResizeEW } else { Hand }),
+              @yue.Cursor::new(if near { @yue.ResizeEW } else { @yue.Hand }),
             )
           }
           if bh != boundary_hover.val {
             boundary_hover.val = bh
-            ViewLike::schedule_paint(cv)
+            @yue.ViewLike::schedule_paint(cv)
           }
           let hc = col_at(e.view_x)
           if hc != head_hover.val {
             head_hover.val = hc
-            ViewLike::schedule_paint(cv)
+            @yue.ViewLike::schedule_paint(cv)
           }
         } else {
           if near_edge.val {
             near_edge.val = false
-            View::set_cursor(cv, hand())
+            @yue.View::set_cursor(cv, @yue.hand())
           }
           if boundary_hover.val != -1 {
             boundary_hover.val = -1
-            ViewLike::schedule_paint(cv)
+            @yue.ViewLike::schedule_paint(cv)
           }
           if head_hover.val != -1 {
             head_hover.val = -1
-            ViewLike::schedule_paint(cv)
+            @yue.ViewLike::schedule_paint(cv)
           }
         }
         let n = data_r.val.length()
@@ -6088,65 +6145,65 @@ pub fn table_v_t(
         let new_hover = if inside && idx >= 0 && idx < n { idx } else { -1 }
         if new_hover != hover_i.val {
           hover_i.val = new_hover
-          ViewLike::schedule_paint(cv)
+          @yue.ViewLike::schedule_paint(cv)
         }
       })
-      ViewLike::on_mouse_up(cv, fn(_e) {
+      @yue.ViewLike::on_mouse_up(cv, fn(_e) {
         if dragging.val {
           dragging.val = false
-          ViewLike::release_capture(cv)
+          @yue.ViewLike::release_capture(cv)
           true
         } else if resizing.val >= 0 {
           resizing.val = -1
-          ViewLike::release_capture(cv)
+          @yue.ViewLike::release_capture(cv)
           true
         } else {
           false
         }
       })
-      ViewLike::on_mouse_leave(cv, fn(_e) {
+      @yue.ViewLike::on_mouse_leave(cv, fn(_e) {
         if hover_i.val != -1 {
           hover_i.val = -1
-          ViewLike::schedule_paint(cv)
+          @yue.ViewLike::schedule_paint(cv)
         }
         if head_hover.val != -1 {
           head_hover.val = -1
-          ViewLike::schedule_paint(cv)
+          @yue.ViewLike::schedule_paint(cv)
         }
         if boundary_hover.val != -1 {
           boundary_hover.val = -1
-          ViewLike::schedule_paint(cv)
+          @yue.ViewLike::schedule_paint(cv)
         }
         if near_edge.val {
           near_edge.val = false
-          View::set_cursor(cv, hand())
+          @yue.View::set_cursor(cv, @yue.hand())
         }
       })
-      ViewLike::on_wheel(cv, fn(delta) {
+      @yue.ViewLike::on_wheel(cv, fn(delta) {
         offset.val = offset.val + delta * 60.0
         clamp_offset()
-        ViewLike::schedule_paint(cv)
+        @yue.ViewLike::schedule_paint(cv)
       })
-      ViewLike::set_focusable(cv, true)
-      ViewLike::on_key_down(cv, fn(e) {
+      @yue.ViewLike::set_focusable(cv, true)
+      @yue.ViewLike::on_key_down(cv, fn(e) {
         let page = (vis_h - row_height).max(row_height)
-        if e.code == VKEY_DOWN {
+        if e.code == @yue.VKEY_DOWN {
           offset.val = offset.val + row_height
-        } else if e.code == VKEY_UP {
+        } else if e.code == @yue.VKEY_UP {
           offset.val = offset.val - row_height
-        } else if e.code == VKEY_NEXT {
+        } else if e.code == @yue.VKEY_NEXT {
           offset.val = offset.val + page
-        } else if e.code == VKEY_PRIOR {
+        } else if e.code == @yue.VKEY_PRIOR {
           offset.val = offset.val - page
-        } else if e.code == VKEY_END {
+        } else if e.code == @yue.VKEY_END {
           offset.val = max_offset()
-        } else if e.code == VKEY_HOME {
+        } else if e.code == @yue.VKEY_HOME {
           offset.val = 0.0
         } else {
           return false
         }
         clamp_offset()
-        ViewLike::schedule_paint(cv)
+        @yue.ViewLike::schedule_paint(cv)
         true
       })
 
@@ -6159,22 +6216,22 @@ pub fn table_v_t(
           Some(s) => s.set([])
           None => ()
         }
-        ViewLike::schedule_paint(cv)
+        @yue.ViewLike::schedule_paint(cv)
       }
 
       load(rows.get())
       rows.subscribe(load)
       match sel {
-        Some(s) => s.subscribe(fn(_v) { ViewLike::schedule_paint(cv) })
+        Some(s) => s.subscribe(fn(_v) { @yue.ViewLike::schedule_paint(cv) })
         None => ()
       }
       // 排序状态变化:表头箭头重绘(数据排序由使用方订阅 Store 完成)
       match sort {
-        Some(s) => s.subscribe(fn(_v) { ViewLike::schedule_paint(cv) })
+        Some(s) => s.subscribe(fn(_v) { @yue.ViewLike::schedule_paint(cv) })
         None => ()
       }
-      attach(parent, ViewLike::view(cv))
-      ViewLike::view(cv)
+      @yue.attach(parent, @yue.ViewLike::view(cv))
+      @yue.ViewLike::view(cv)
     },
   }
 }
@@ -6184,12 +6241,12 @@ pub fn table_v_t(
 /// 高随父容器);spacing 为两侧留白。底色挂载时读主题(重建界面生效)。
 pub fn divider(
   vertical? : Bool = false,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = if vertical {
+      let base : Array[(String, &@yue.StyVal)] = if vertical {
         [("width", 1.0), ("marginLeft", 10.0), ("marginRight", 10.0)]
       } else {
         [("height", 1.0), ("marginTop", 10.0), ("marginBottom", 10.0)]
@@ -6203,11 +6260,11 @@ pub fn divider(
       for kv in style {
         base.push(kv)
       }
-      let c = themed_container(style=base)
+      let c = @yue.themed_container(style=base)
       handle(c)
-      bind_bg(c, fn() { theme_border() })
-      attach(parent, ViewLike::view(c))
-      ViewLike::view(c)
+      @yue.bind_bg(c, fn() { @yue.theme_border() })
+      @yue.attach(parent, @yue.ViewLike::view(c))
+      @yue.ViewLike::view(c)
     },
   }
 }
@@ -6222,16 +6279,16 @@ pub fn textarea_t(
   text? : String = "",
   on_input? : (String) -> Unit = fn(_s) {  },
   clearable? : Bool = false,
-  invalid? : Store[Bool] = Store::new(false),
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  invalid? : @yue.Store[Bool] = @yue.Store::new(false),
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
       let hover = Ref(false)
       let has_text = Ref(text != "")
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", 280.0),
         ("height", 110.0),
         ("padding", 10.0),
@@ -6239,18 +6296,18 @@ pub fn textarea_t(
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
-      set_panel_bg(outer)
+      @yue.set_panel_bg(outer)
       outer.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(outer)
+        let b = @yue.ViewLike::get_bounds(outer)
         p.set_stroke_color(
           if invalid.get() {
-            theme_danger()
+            @yue.theme_danger()
           } else if focused.val {
-            theme_focus_accent()
+            @yue.theme_focus_accent()
           } else {
-            theme_border()
+            @yue.theme_border()
           },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
@@ -6258,44 +6315,44 @@ pub fn textarea_t(
           draw_clear_x(p, b.width - 20.0, b.height / 2.0)
         }
       })
-      invalid.subscribe(fn(_v) { ViewLike::schedule_paint(outer) })
-      let edit = TextEdit::new()
+      invalid.subscribe(fn(_v) { @yue.ViewLike::schedule_paint(outer) })
+      let edit = @yue.TextEdit::new()
       edit.set_text(text)
-      ViewLike::set_font(edit, Font::new("Sans", 13.0))
-      ViewLike::set_borderless(edit, true)
-      set_panel_bg(edit)
-      ViewLike::set_style(edit, "flex", 1.0)
+      @yue.ViewLike::set_font(edit, @yue.Font::new("Sans", 13.0))
+      @yue.ViewLike::set_borderless(edit, true)
+      @yue.set_panel_bg(edit)
+      @yue.ViewLike::set_style(edit, "flex", 1.0)
       if clearable {
-        ViewLike::set_style(edit, "marginRight", 24.0)
+        @yue.ViewLike::set_style(edit, "marginRight", 24.0)
       }
       edit.on_text_change(fn() {
         if clearable {
           has_text.val = edit.get_text() != ""
-          ViewLike::schedule_paint(outer)
+          @yue.ViewLike::schedule_paint(outer)
         }
         on_input(edit.get_text())
       })
-      ViewLike::on_focus_in(edit, fn() {
+      @yue.ViewLike::on_focus_in(edit, fn() {
         focused.val = true
-        ViewLike::schedule_paint(outer)
+        @yue.ViewLike::schedule_paint(outer)
         false
       })
-      ViewLike::on_focus_out(edit, fn() {
+      @yue.ViewLike::on_focus_out(edit, fn() {
         focused.val = false
-        ViewLike::schedule_paint(outer)
+        @yue.ViewLike::schedule_paint(outer)
         false
       })
       if clearable {
-        ViewLike::on_mouse_enter(outer, fn(_e) {
+        @yue.ViewLike::on_mouse_enter(outer, fn(_e) {
           hover.val = true
-          ViewLike::schedule_paint(outer)
+          @yue.ViewLike::schedule_paint(outer)
         })
-        ViewLike::on_mouse_leave(outer, fn(_e) {
+        @yue.ViewLike::on_mouse_leave(outer, fn(_e) {
           hover.val = false
-          ViewLike::schedule_paint(outer)
+          @yue.ViewLike::schedule_paint(outer)
         })
-        ViewLike::on_mouse_up(outer, fn(e) {
-          let b = ViewLike::get_bounds(outer)
+        @yue.ViewLike::on_mouse_up(outer, fn(e) {
+          let b = @yue.ViewLike::get_bounds(outer)
           if e.button == 1 && has_text.val && e.view_x >= b.width - 32.0 {
             edit.set_text("")
             true
@@ -6305,8 +6362,8 @@ pub fn textarea_t(
         })
       }
       outer.add_child(edit)
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -6318,16 +6375,16 @@ pub fn textarea_t(
 /// bar_color/track_color 自定义填充/轨道色(空=主题色,深色遮盖层上的
 /// 白色滑杆用)。
 pub fn slider_t(
-  value : Store[Double],
+  value : @yue.Store[Double],
   min? : Double = 0.0,
   max? : Double = 100.0,
   step? : Double = 1.0,
   on_change? : (Double) -> Unit = fn(_v) {  },
   bar_color? : String = "",
   track_color? : String = "",
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let h = 24.0
@@ -6338,7 +6395,7 @@ pub fn slider_t(
       // 默认横向自适应父容器宽:grow/shrink 单写(column 父 auto 高链下
       // 简写派生 basis 0 会盖掉 height 塌成 0 高);定宽由调用方
       // style=[("flexgrow", 0.0), ("width", w)] 覆盖
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("flexgrow", 1.0),
         ("flexshrink", 1.0),
         ("height", h),
@@ -6347,7 +6404,7 @@ pub fn slider_t(
       for kv in style {
         base.push(kv)
       }
-      let v = themed_container(style=base)
+      let v = @yue.themed_container(style=base)
       handle(v)
       fn clamp01(x : Double) -> Double {
         if x < 0.0 {
@@ -6383,13 +6440,13 @@ pub fn slider_t(
       }
 
       fn set_from_x(x : Double) -> Unit {
-        let w = ViewLike::get_bounds(v).width
+        let w = @yue.ViewLike::get_bounds(v).width
         let r = clamp01((x - thumb / 2.0) / (w - thumb))
         value.set(quantize(min + r * (max - min)))
       }
 
       v.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(v)
+        let b = @yue.ViewLike::get_bounds(v)
         let w = b.width
         let ratio = ratio_of(value.get())
         let ty = (h - track_h) / 2.0
@@ -6397,7 +6454,7 @@ pub fn slider_t(
         // 轨道必须整条可见才能读出滑杆长度
         p.set_fill_color(
           if track_color == "" {
-            theme_border()
+            @yue.theme_border()
           } else {
             track_color
           },
@@ -6405,7 +6462,7 @@ pub fn slider_t(
         p.fill_rect(0.0, ty, w, track_h)
         p.set_fill_color(
           if bar_color == "" {
-            theme_primary()
+            @yue.theme_primary()
           } else {
             bar_color
           },
@@ -6416,9 +6473,9 @@ pub fn slider_t(
         if bar_color == "" {
           p.set_fill_color(
             if hover.val || dragging.val {
-              theme_primary_hover()
+              @yue.theme_primary_hover()
             } else {
-              theme_primary()
+              @yue.theme_primary()
             },
           )
         } else {
@@ -6426,52 +6483,52 @@ pub fn slider_t(
         }
         p.fill_rect(tx, (h - thumb) / 2.0, thumb, thumb)
       })
-      View::set_cursor(v, hand())
-      ViewLike::on_mouse_down(v, fn(e) {
+      @yue.View::set_cursor(v, @yue.hand())
+      @yue.ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 {
           dragging.val = true
-          ViewLike::set_capture(v)
+          @yue.ViewLike::set_capture(v)
           set_from_x(e.view_x)
           true
         } else {
           false
         }
       })
-      ViewLike::on_mouse_move(v, fn(e) {
+      @yue.ViewLike::on_mouse_move(v, fn(e) {
         if dragging.val {
           set_from_x(e.view_x)
         }
       })
-      ViewLike::on_mouse_up(v, fn(_e) {
+      @yue.ViewLike::on_mouse_up(v, fn(_e) {
         if dragging.val {
           dragging.val = false
-          ViewLike::release_capture(v)
+          @yue.ViewLike::release_capture(v)
           true
         } else {
           false
         }
       })
-      ViewLike::on_mouse_enter(v, fn(_e) {
+      @yue.ViewLike::on_mouse_enter(v, fn(_e) {
         hover.val = true
-        ViewLike::schedule_paint(v)
+        @yue.ViewLike::schedule_paint(v)
       })
-      ViewLike::on_mouse_leave(v, fn(_e) {
+      @yue.ViewLike::on_mouse_leave(v, fn(_e) {
         hover.val = false
-        ViewLike::schedule_paint(v)
+        @yue.ViewLike::schedule_paint(v)
       })
-      ViewLike::on_focus_out(v, fn() {
+      @yue.ViewLike::on_focus_out(v, fn() {
         if dragging.val {
           dragging.val = false
-          ViewLike::release_capture(v)
+          @yue.ViewLike::release_capture(v)
         }
         false
       })
       value.subscribe(fn(new_v) {
         on_change(new_v)
-        ViewLike::schedule_paint(v)
+        @yue.ViewLike::schedule_paint(v)
       })
-      attach(parent, ViewLike::view(v))
-      ViewLike::view(v)
+      @yue.attach(parent, @yue.ViewLike::view(v))
+      @yue.ViewLike::view(v)
     },
   }
 }
@@ -6481,18 +6538,18 @@ pub fn slider_t(
 /// 悬停变深)+ 内容区经 set_visible 切换。selected 为页序号 Store,默认
 /// 内部建 0。
 pub fn tabs_t(
-  pages : Array[(String, Node)],
-  selected? : Store[Int],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  pages : Array[(String, @yue.Node)],
+  selected? : @yue.Store[Int],
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let sel = match selected {
         Some(s) => s
-        None => Store::new(0)
+        None => @yue.Store::new(0)
       }
-      let fnt = Font::new("Sans", 13.0)
+      let fnt = @yue.Font::new("Sans", 13.0)
       // 宽度随父容器拉伸(列容器默认 stretch),不写死:概览页要放
       // 全宽图表;grow+shrink 让页区在父容器有确定高度时填充/压缩
       // (Scroll 等无 measure 的叶节点靠这个拿到确定高度,否则塌缩归零)。
@@ -6500,7 +6557,7 @@ pub fn tabs_t(
       // 会被当成 0 高内容贡献,兄弟页显隐 dirty 祖先后整棵塌(native
       // v0.15.6-mbt.19 只修被清零节点自身);grow/shrink 不参与内容
       // 测量,basis 走 auto 语义,auto 父下按内容高
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("flexgrow", 1.0),
         ("flexshrink", 1.0),
         ("marginBottom", 10.0),
@@ -6509,51 +6566,55 @@ pub fn tabs_t(
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
-      let head = themed_container(style=[
+      let head = @yue.themed_container(style=[
         ("height", 36.0),
         ("flexDirection", "row"),
       ])
       outer.add_child(head)
-      let contents : Array[Container] = []
-      let page_views : Array[View] = []
+      let contents : Array[@yue.Container] = []
+      let page_views : Array[@yue.View] = []
       let cur = Ref(sel.get())
       for i in 0..<pages.length() {
         let (title, node) = pages[i]
         let idx = i
         // 页签头:宽度自适应(测字宽 + 两侧 14px)
-        let probe = AttributedText::new(title, wrap=false)
+        let probe = @yue.AttributedText::new(title, wrap=false)
         probe.set_font(fnt)
         let tw = probe.get_bounds_for(10000.0, 100.0).width
-        let tab = themed_container(style=[
+        let tab = @yue.themed_container(style=[
           ("width", tw + 28.0),
           ("height", 36.0),
           ("marginRight", 8.0),
         ])
         let hover = Ref(false)
         tab.on_draw(fn(p) {
-          let b = ViewLike::get_bounds(tab)
+          let b = @yue.ViewLike::get_bounds(tab)
           let act = cur.val == idx
-          let at = AttributedText::new(title, valign=Center, wrap=false)
+          let at = @yue.AttributedText::new(
+            title,
+            valign=@yue.Center,
+            wrap=false,
+          )
           at.set_font(fnt)
           at.set_color(
             if act {
-              theme_primary()
+              @yue.theme_primary()
             } else if hover.val {
-              theme_text_regular()
+              @yue.theme_text_regular()
             } else {
-              theme_text_secondary()
+              @yue.theme_text_secondary()
             },
           )
           p.draw_attributed_text(at, 14.0, 0.0, b.width - 14.0, 36.0)
           if act {
-            p.set_fill_color(theme_primary())
+            p.set_fill_color(@yue.theme_primary())
             p.fill_rect(0.0, 34.0, b.width, 2.0)
           }
         })
-        View::set_cursor(tab, hand())
-        ViewLike::on_mouse_down(tab, fn(e) {
+        @yue.View::set_cursor(tab, @yue.hand())
+        @yue.ViewLike::on_mouse_down(tab, fn(e) {
           if e.button == 1 {
             sel.set(idx)
             true
@@ -6561,13 +6622,13 @@ pub fn tabs_t(
             false
           }
         })
-        ViewLike::on_mouse_enter(tab, fn(_e) {
+        @yue.ViewLike::on_mouse_enter(tab, fn(_e) {
           hover.val = true
-          ViewLike::schedule_paint(tab)
+          @yue.ViewLike::schedule_paint(tab)
         })
-        ViewLike::on_mouse_leave(tab, fn(_e) {
+        @yue.ViewLike::on_mouse_leave(tab, fn(_e) {
           hover.val = false
-          ViewLike::schedule_paint(tab)
+          @yue.ViewLike::schedule_paint(tab)
         })
         head.add_child(tab)
         // 内容页:flex 让页区填充 outer 的确定高度(Scroll / Table 等
@@ -6578,8 +6639,8 @@ pub fn tabs_t(
         // 页惰性挂载),派生 basis 0 首轮即解析成 0 并进缓存,且初始
         // 可见页从未隐藏、不落 mbt.19 重显保护——初始页 0 高,切换一
         // 轮才恢复(实测);单写与 outer 同款两栖语义
-        let page_c = themed_container(
-          style=if platform() == "windows" {
+        let page_c = @yue.themed_container(
+          style=if @yue.platform() == "windows" {
             [("flex", 1.0), ("flexbasis", 0.0), ("flexDirection", "column")]
           } else {
             [
@@ -6589,8 +6650,8 @@ pub fn tabs_t(
             ]
           },
         )
-        ViewLike::set_visible(page_c, cur.val == idx)
-        let page_v = (node.mount)(ViewLike::view(page_c))
+        @yue.ViewLike::set_visible(page_c, cur.val == idx)
+        let page_v = (node.mount)(@yue.ViewLike::view(page_c))
         outer.add_child(page_c)
         contents.push(page_c)
         page_views.push(page_v)
@@ -6599,19 +6660,19 @@ pub fn tabs_t(
         cur.val = i
         // 先显示新页再隐藏旧页:反序会让 yoga 在「新页未显示、旧页已
         // 隐藏」的中间态把外层 flex 容器按 0 内容分配
-        ViewLike::set_visible(contents[i], true)
+        @yue.ViewLike::set_visible(contents[i], true)
         for j in 0..<contents.length() {
           if j != i {
-            ViewLike::set_visible(contents[j], false)
+            @yue.ViewLike::set_visible(contents[j], false)
           }
         }
-        ViewLike::schedule_paint(head)
-        refresh_layout(outer)
+        @yue.ViewLike::schedule_paint(head)
+        @yue.refresh_layout(outer)
         // 页内容视图(on_draw 宿主)显式重绘一次,确保切换后当帧画出
-        schedule_paint_view(page_views[i])
+        @yue.schedule_paint_view(page_views[i])
       })
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -6621,10 +6682,10 @@ pub fn tabs_t(
 /// 右侧 ✓,hover/键盘高亮灰底。mark 为键盘高亮标记(非鼠标路径)。
 fn select_row(
   opt : String,
-  value : Store[String],
+  value : @yue.Store[String],
   on_pick : () -> Unit,
-) -> Container {
-  let row = themed_container(style=[
+) -> @yue.Container {
+  let row = @yue.themed_container(style=[
     ("height", 28.0),
     ("paddingLeft", 8.0),
     ("flexDirection", "row"),
@@ -6632,13 +6693,13 @@ fn select_row(
   ])
   let hover = Ref(false)
   row.on_draw(fn(p) {
-    let b = ViewLike::get_bounds(row)
+    let b = @yue.ViewLike::get_bounds(row)
     let act = value.get() == opt
     if act {
-      p.set_fill_color(theme_primary_light())
+      p.set_fill_color(@yue.theme_primary_light())
       p.fill_rect(0.0, 0.0, b.width, b.height)
     } else if hover.val {
-      p.set_fill_color(theme_fill_hover())
+      p.set_fill_color(@yue.theme_fill_hover())
       p.fill_rect(0.0, 0.0, b.width, b.height)
     }
     p.draw_text(
@@ -6647,12 +6708,12 @@ fn select_row(
       0.0,
       b.width - 26.0,
       b.height,
-      valign=Center,
-      color=if act { theme_primary() } else { theme_text_regular() },
+      valign=@yue.Center,
+      color=if act { @yue.theme_primary() } else { @yue.theme_text_regular() },
     )
     if act {
       // 选中项右侧 ✓(矢量小勾,不依赖字体)
-      p.set_stroke_color(theme_primary())
+      p.set_stroke_color(@yue.theme_primary())
       p.begin_path()
       p.move_to(b.width - 18.0, b.height / 2.0)
       p.line_to(b.width - 14.0, b.height / 2.0 + 4.0)
@@ -6660,18 +6721,18 @@ fn select_row(
       p.stroke()
     }
   })
-  ViewLike::on_mouse_enter(row, fn(_e) {
+  @yue.ViewLike::on_mouse_enter(row, fn(_e) {
     hover.val = true
-    ViewLike::schedule_paint(row)
+    @yue.ViewLike::schedule_paint(row)
   })
-  ViewLike::on_mouse_leave(row, fn(_e) {
+  @yue.ViewLike::on_mouse_leave(row, fn(_e) {
     hover.val = false
-    ViewLike::schedule_paint(row)
+    @yue.ViewLike::schedule_paint(row)
   })
-  View::set_cursor(row, hand())
+  @yue.View::set_cursor(row, @yue.hand())
   // release 才选中:press 时刻 pick+关层会解除弹层指针抓取,悬着的
   // release 穿透到弹层下方控件;release 由弹层抓取派发给行,无待决事件
-  ViewLike::on_mouse_up(row, fn(e) {
+  @yue.ViewLike::on_mouse_up(row, fn(e) {
     if e.button == 1 {
       on_pick()
       true
@@ -6692,38 +6753,38 @@ fn select_row(
 /// 真机两轮验证均折在 X11 弹层焦点语义上,已移除,见 adaptation.md。)
 pub fn select_t(
   options : Array[String],
-  value : Store[String],
+  value : @yue.Store[String],
   on_change? : (String) -> Unit = fn(_s) {  },
   clearable? : Bool = false,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
       let hover = Ref(false)
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", 200.0),
-        ("height", control_height),
+        ("height", @yue.control_height),
         ("marginBottom", 10.0),
       ]
       for kv in style {
         base.push(kv)
       }
-      let field = themed_container(style=base)
-      set_panel_bg(field)
-      View::set_cursor(field, hand())
+      let field = @yue.themed_container(style=base)
+      @yue.set_panel_bg(field)
+      @yue.View::set_cursor(field, @yue.hand())
       fn apply(text : String) -> Unit {
         ignore(text)
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
       }
 
       field.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(field)
+        let b = @yue.ViewLike::get_bounds(field)
         p.set_stroke_color(
           if focused.val {
-            theme_focus_accent()
+            @yue.theme_focus_accent()
           } else {
-            theme_border()
+            @yue.theme_border()
           },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
@@ -6733,10 +6794,10 @@ pub fn select_t(
           0.0,
           b.width - 30.0,
           b.height,
-          valign=Center,
-          color=theme_text_primary(),
+          valign=@yue.Center,
+          color=@yue.theme_text_primary(),
         )
-        p.set_fill_color(theme_text_secondary())
+        p.set_fill_color(@yue.theme_text_secondary())
         p.begin_path()
         p.move_to(b.width - 20.0, b.height / 2.0 - 2.0)
         p.line_to(b.width - 12.0, b.height / 2.0 - 2.0)
@@ -6747,7 +6808,7 @@ pub fn select_t(
           draw_clear_x(p, b.width - 30.0, b.height / 2.0)
         }
       })
-      let pop : Ref[Popover?] = Ref(None)
+      let pop : Ref[@yue.Popover?] = Ref(None)
       fn pick(opt : String) -> Unit {
         value.set(opt)
         on_change(opt)
@@ -6757,34 +6818,34 @@ pub fn select_t(
         }
       }
 
-      ViewLike::set_focusable(field, true)
-      ViewLike::on_focus_in(field, fn() {
+      @yue.ViewLike::set_focusable(field, true)
+      @yue.ViewLike::on_focus_in(field, fn() {
         focused.val = true
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
         false
       })
-      ViewLike::on_focus_out(field, fn() {
+      @yue.ViewLike::on_focus_out(field, fn() {
         focused.val = false
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
         match pop.val {
           Some(p) => p.close()
           None => ()
         }
         false
       })
-      ViewLike::on_mouse_enter(field, fn(_e) {
+      @yue.ViewLike::on_mouse_enter(field, fn(_e) {
         hover.val = true
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
       })
-      ViewLike::on_mouse_leave(field, fn(_e) {
+      @yue.ViewLike::on_mouse_leave(field, fn(_e) {
         hover.val = false
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
       })
-      ViewLike::on_mouse_up(field, fn(e) {
+      @yue.ViewLike::on_mouse_up(field, fn(e) {
         if e.button == 1 {
-          ViewLike::focus(field)
+          @yue.ViewLike::focus(field)
           // 清空带(箭头左侧)优先:清空选择,不弹列表
-          let b = ViewLike::get_bounds(field)
+          let b = @yue.ViewLike::get_bounds(field)
           if clearable &&
             value.get() != "" &&
             e.view_x >= b.width - 40.0 &&
@@ -6796,8 +6857,8 @@ pub fn select_t(
           match pop.val {
             Some(_) => ()
             None => {
-              let p = Popover::new()
-              bind_popover_bg(p)
+              let p = @yue.Popover::new()
+              @yue.bind_popover_bg(p)
               // 高度 = 项数 x 28 + padding 8,上限 300;根容器宽高必须
               // 创建期给定(事后 set_style 会被弹层分配时序吞掉),
               // 公式与 content_size 一致
@@ -6806,14 +6867,14 @@ pub fn select_t(
                 rows_h = 300.0
               }
               // 弹层宽随字段实际宽(用户 style 覆盖宽度后自动跟随)
-              let pop_w = ViewLike::get_bounds(field).width
-              let list = themed_container(style=[
+              let pop_w = @yue.ViewLike::get_bounds(field).width
+              let list = @yue.themed_container(style=[
                 ("width", pop_w),
                 ("height", rows_h),
                 ("padding", 4.0),
                 ("flexDirection", "column"),
               ])
-              set_panel_bg(list)
+              @yue.set_panel_bg(list)
               for opt in options {
                 let o = opt
                 list.add_child(select_row(o, value, fn() { pick(o) }))
@@ -6833,8 +6894,8 @@ pub fn select_t(
         }
       })
       value.subscribe(fn(v) { apply(v) })
-      attach(parent, ViewLike::view(field))
-      ViewLike::view(field)
+      @yue.attach(parent, @yue.ViewLike::view(field))
+      @yue.ViewLike::view(field)
     },
   }
 }
@@ -6842,7 +6903,12 @@ pub fn select_t(
 ///|
 /// 五角星路径(矢量自绘,不依赖字体字形):cx/cy 星心,R 外半径,
 /// 内半径取 0.382R(正五角星比例)。
-fn star_path(p : Painter, cx : Double, cy : Double, r_out : Double) -> Unit {
+fn star_path(
+  p : @yue.Painter,
+  cx : Double,
+  cy : Double,
+  r_out : Double,
+) -> Unit {
   let r_in = r_out * 0.382
   p.begin_path()
   for k in 0..<10 {
@@ -6864,18 +6930,18 @@ fn star_path(p : Painter, cx : Double, cy : Double, r_out : Double) -> Unit {
 /// 评分(EP Rate,自绘):五角星序列,选中实心主题色、未选中描边灰,
 /// 悬停预亮(实心),点击写入 value(Store[Int],0..max)。
 pub fn rate_t(
-  value : Store[Int],
+  value : @yue.Store[Int],
   max? : Int = 5,
   on_change? : (Int) -> Unit = fn(_v) {  },
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let size = 22.0
       let gap = 4.0
       let hover = Ref(0) // 0 = 无预览,否则预亮到第 N 颗
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", size * max.to_double() + gap * (max - 1).to_double()),
         ("height", size),
         ("marginBottom", 10.0),
@@ -6883,7 +6949,7 @@ pub fn rate_t(
       for kv in style {
         base.push(kv)
       }
-      let v = themed_container(style=base)
+      let v = @yue.themed_container(style=base)
       handle(v)
       fn star_at(x : Double) -> Int {
         let idx = ((x + gap / 2.0) / (size + gap)).to_int() + 1
@@ -6906,31 +6972,31 @@ pub fn rate_t(
             i <= value.get()
           }
           if lit {
-            p.set_fill_color(theme_primary())
+            p.set_fill_color(@yue.theme_primary())
             star_path(p, cx, cy, size / 2.0 - 1.0)
             p.fill()
           } else {
-            p.set_stroke_color(theme_border())
+            p.set_stroke_color(@yue.theme_border())
             star_path(p, cx, cy, size / 2.0 - 1.0)
             p.stroke()
           }
         }
       })
-      ViewLike::on_mouse_move(v, fn(e) {
+      @yue.ViewLike::on_mouse_move(v, fn(e) {
         let h = star_at(e.view_x)
         if h != hover.val {
           hover.val = h
-          ViewLike::schedule_paint(v)
+          @yue.ViewLike::schedule_paint(v)
         }
       })
-      ViewLike::on_mouse_leave(v, fn(_e) {
+      @yue.ViewLike::on_mouse_leave(v, fn(_e) {
         if hover.val != 0 {
           hover.val = 0
-          ViewLike::schedule_paint(v)
+          @yue.ViewLike::schedule_paint(v)
         }
       })
-      View::set_cursor(v, hand())
-      ViewLike::on_mouse_down(v, fn(e) {
+      @yue.View::set_cursor(v, @yue.hand())
+      @yue.ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 {
           value.set(star_at(e.view_x))
           true
@@ -6940,10 +7006,10 @@ pub fn rate_t(
       })
       value.subscribe(fn(new_v) {
         on_change(new_v)
-        ViewLike::schedule_paint(v)
+        @yue.ViewLike::schedule_paint(v)
       })
-      attach(parent, ViewLike::view(v))
-      ViewLike::view(v)
+      @yue.attach(parent, @yue.ViewLike::view(v))
+      @yue.ViewLike::view(v)
     },
   }
 }
@@ -6952,17 +7018,17 @@ pub fn rate_t(
 /// 悬浮提示:给任意节点包原生 tooltip(系统样式,零成本;主题化气泡
 /// 请用 popover_t)。
 pub fn tooltip_t(
-  content : Node,
+  content : @yue.Node,
   tip : String,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (View) -> Unit = fn(_v) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.View) -> Unit = fn(_v) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let v = (content.mount)(parent)
-      apply_style_view(v, style)
+      @yue.apply_style_view(v, style)
       handle(v)
-      ffi_view_set_tooltip(v, utf8_bytes(tip))
+      @yue.ffi_view_set_tooltip(v, @yue.utf8_bytes(tip))
       v
     },
   }
@@ -6972,17 +7038,17 @@ pub fn tooltip_t(
 /// 气泡弹层(EP Popover):trigger 点击后在自身下方弹出任意内容
 /// (Node,Popover 承载,内容先挂进临时容器),再次点击切换收起。
 pub fn popover_t(
-  trigger : Node,
-  content : Node,
+  trigger : @yue.Node,
+  content : @yue.Node,
   width : Double,
   height : Double,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let tv = (trigger.mount)(parent)
-      let pop : Ref[Popover?] = Ref(None)
+      let pop : Ref[@yue.Popover?] = Ref(None)
       let open = Ref(false)
       let wrapped : (
         Int,
@@ -7000,40 +7066,40 @@ pub fn popover_t(
         }
         match pop.val {
           None => {
-            let p = Popover::new()
-            bind_popover_bg(p)
-            let holder_style : Array[(String, &StyVal)] = [
+            let p = @yue.Popover::new()
+            @yue.bind_popover_bg(p)
+            let holder_style : Array[(String, &@yue.StyVal)] = [
               ("width", width),
               ("height", height),
             ]
             for kv in style {
               holder_style.push(kv)
             }
-            let holder = themed_container(style=holder_style)
+            let holder = @yue.themed_container(style=holder_style)
             handle(holder)
-            ignore((content.mount)(ViewLike::view(holder)))
+            ignore((content.mount)(@yue.ViewLike::view(holder)))
             p.set_content(holder)
             p.set_content_size(width, height)
             // 点外关闭(Linux 系统行为)/显式关闭都同步状态,
             // 否则下次点击误走 close 分支,弹层再也打不开
             p.on_close(fn() { open.val = false })
             pop.val = Some(p)
-            ffi_popover_show_relative_to(p, tv)
+            @yue.ffi_popover_show_relative_to(p, tv)
             open.val = true
           }
           Some(p) =>
             if open.val {
               p.close()
             } else {
-              ffi_popover_show_relative_to(p, tv)
+              @yue.ffi_popover_show_relative_to(p, tv)
               open.val = true
             }
         }
         1
       }
-      ffi_view_set_cursor(tv, hand())
-      keep_alive(fn() { ignore(wrapped) })
-      ffi_view_on_mouse_up(
+      @yue.ffi_view_set_cursor(tv, @yue.hand())
+      @yue.keep_alive(fn() { ignore(wrapped) })
+      @yue.ffi_view_on_mouse_up(
         tv,
         fn(f, b, vx, vy, wx, wy, sx, sy, m, t) {
           f(b, vx, vy, wx, wy, sx, sy, m, t)
@@ -7052,34 +7118,34 @@ pub fn dropdown_menu(
   trigger : String,
   items : Array[String],
   on_select : (Int) -> Unit,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let fnt = Font::new("Sans", 13.0)
+      let fnt = @yue.Font::new("Sans", 13.0)
       let focused = Ref(false)
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", 160.0),
-        ("height", control_height),
+        ("height", @yue.control_height),
         ("marginBottom", 10.0),
       ]
       for kv in style {
         base.push(kv)
       }
-      let field = themed_container(style=base)
-      set_panel_bg(field)
-      View::set_cursor(field, hand())
+      let field = @yue.themed_container(style=base)
+      @yue.set_panel_bg(field)
+      @yue.View::set_cursor(field, @yue.hand())
       field.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(field)
+        let b = @yue.ViewLike::get_bounds(field)
         if focused.val {
-          p.set_fill_color(theme_fill_hover())
+          p.set_fill_color(@yue.theme_fill_hover())
           p.fill_rect(0.0, 0.0, b.width, b.height)
         }
         p.set_stroke_color(
           if focused.val {
-            theme_focus_accent()
+            @yue.theme_focus_accent()
           } else {
-            theme_border()
+            @yue.theme_border()
           },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
@@ -7089,10 +7155,10 @@ pub fn dropdown_menu(
           0.0,
           b.width - 30.0,
           b.height,
-          valign=Center,
-          color=theme_text_primary(),
+          valign=@yue.Center,
+          color=@yue.theme_text_primary(),
         )
-        p.set_fill_color(theme_text_secondary())
+        p.set_fill_color(@yue.theme_text_secondary())
         p.begin_path()
         p.move_to(b.width - 20.0, b.height / 2.0 - 2.0)
         p.line_to(b.width - 12.0, b.height / 2.0 - 2.0)
@@ -7100,48 +7166,48 @@ pub fn dropdown_menu(
         p.close_path()
         p.fill()
       })
-      let pop : Ref[Popover?] = Ref(None)
-      ViewLike::set_focusable(field, true)
-      ViewLike::on_focus_in(field, fn() {
+      let pop : Ref[@yue.Popover?] = Ref(None)
+      @yue.ViewLike::set_focusable(field, true)
+      @yue.ViewLike::on_focus_in(field, fn() {
         focused.val = true
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
         false
       })
-      ViewLike::on_focus_out(field, fn() {
+      @yue.ViewLike::on_focus_out(field, fn() {
         focused.val = false
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
         match pop.val {
           Some(p) => p.close()
           None => ()
         }
         false
       })
-      ViewLike::on_mouse_up(field, fn(e) {
+      @yue.ViewLike::on_mouse_up(field, fn(e) {
         if e.button == 1 {
-          ViewLike::focus(field)
+          @yue.ViewLike::focus(field)
           match pop.val {
             Some(_) => ()
             None => {
-              let p = Popover::new()
-              bind_popover_bg(p)
+              let p = @yue.Popover::new()
+              @yue.bind_popover_bg(p)
               // 根容器宽高创建期给定(事后 set_style 会被弹层时序吞掉),
               // 高度 = 项数 x 28 + padding 8,与 content_size 一致
-              let pop_w = ViewLike::get_bounds(field).width
-              let list = themed_container(style=[
+              let pop_w = @yue.ViewLike::get_bounds(field).width
+              let list = @yue.themed_container(style=[
                 ("width", pop_w),
                 ("height", items.length().to_double() * 28.0 + 8.0),
                 ("padding", 4.0),
                 ("flexDirection", "column"),
               ])
-              set_panel_bg(list)
+              @yue.set_panel_bg(list)
               for i in 0..<items.length() {
                 let it = items[i]
                 let idx = i
                 if it == "-" {
-                  let sep = themed_container(style=[("height", 9.0)])
+                  let sep = @yue.themed_container(style=[("height", 9.0)])
                   sep.on_draw(fn(p2) {
-                    let b = ViewLike::get_bounds(sep)
-                    p2.set_stroke_color(theme_border())
+                    let b = @yue.ViewLike::get_bounds(sep)
+                    p2.set_stroke_color(@yue.theme_border())
                     p2.begin_path()
                     p2.move_to(8.0, 4.5)
                     p2.line_to(b.width - 8.0, 4.5)
@@ -7151,36 +7217,40 @@ pub fn dropdown_menu(
                   continue
                 }
                 let hover = Ref(false)
-                let row = themed_container(style=[
+                let row = @yue.themed_container(style=[
                   ("height", 28.0),
                   ("paddingLeft", 8.0),
                   ("flexDirection", "row"),
                   ("alignItems", "center"),
                 ])
                 row.on_draw(fn(p2) {
-                  let b = ViewLike::get_bounds(row)
+                  let b = @yue.ViewLike::get_bounds(row)
                   if hover.val {
-                    p2.set_fill_color(theme_fill_hover())
+                    p2.set_fill_color(@yue.theme_fill_hover())
                     p2.fill_rect(0.0, 0.0, b.width, b.height)
                   }
-                  let at = AttributedText::new(it, valign=Center, wrap=false)
+                  let at = @yue.AttributedText::new(
+                    it,
+                    valign=@yue.Center,
+                    wrap=false,
+                  )
                   at.set_font(fnt)
-                  at.set_color(theme_text_regular())
+                  at.set_color(@yue.theme_text_regular())
                   p2.draw_attributed_text(at, 8.0, 0.0, b.width - 16.0, 28.0)
                 })
-                ViewLike::on_mouse_enter(row, fn(_e) {
+                @yue.ViewLike::on_mouse_enter(row, fn(_e) {
                   hover.val = true
-                  ViewLike::schedule_paint(row)
+                  @yue.ViewLike::schedule_paint(row)
                 })
-                ViewLike::on_mouse_leave(row, fn(_e) {
+                @yue.ViewLike::on_mouse_leave(row, fn(_e) {
                   hover.val = false
-                  ViewLike::schedule_paint(row)
+                  @yue.ViewLike::schedule_paint(row)
                 })
-                View::set_cursor(row, hand())
+                @yue.View::set_cursor(row, @yue.hand())
                 // release 才选中+关层:防 press 关层后悬着的 release
                 // 穿透到弹层下方控件(弹层点项一律 release,见
                 // adaptation.md)
-                ViewLike::on_mouse_up(row, fn(e2) {
+                @yue.ViewLike::on_mouse_up(row, fn(e2) {
                   if e2.button == 1 {
                     on_select(idx)
                     match pop.val {
@@ -7208,8 +7278,8 @@ pub fn dropdown_menu(
           false
         }
       })
-      attach(parent, ViewLike::view(field))
-      ViewLike::view(field)
+      @yue.attach(parent, @yue.ViewLike::view(field))
+      @yue.ViewLike::view(field)
     },
   }
 }
@@ -7242,7 +7312,7 @@ pub fn carousel_stop(handle : CarouselHandle) -> Unit {
   handle.running.val = false
   let id = handle.timer.val
   if id != 0 {
-    clear_timeout(id)
+    @yue.clear_timeout(id)
     handle.timer.val = 0
   }
 }
@@ -7254,22 +7324,22 @@ pub fn carousel_stop(handle : CarouselHandle) -> Unit {
 /// 自动轮播是自排的超时链,回收经 [carousel_stop](rotation):卸载
 /// 轮播前必须先 stop,否则链继续对已移除的视图空转。
 pub fn carousel_t(
-  pages : Array[Node],
+  pages : Array[@yue.Node],
   width? : Double = 360.0,
   height? : Double = 180.0,
   interval_ms? : Int = 3000,
   rotation? : CarouselHandle = CarouselHandle::make(),
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let n = pages.length()
       let cur = Ref(0)
       let paused = Ref(false)
-      let dots : Array[Container] = []
-      let panels : Array[Container] = []
-      let base : Array[(String, &StyVal)] = [
+      let dots : Array[@yue.Container] = []
+      let panels : Array[@yue.Container] = []
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", width),
         ("height", height + 24.0),
         ("marginBottom", 10.0),
@@ -7278,9 +7348,9 @@ pub fn carousel_t(
       for kv in style {
         base.push(kv)
       }
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
-      let stage = themed_container(style=[
+      let stage = @yue.themed_container(style=[
         ("width", width),
         ("height", height),
         ("flexDirection", "column"),
@@ -7291,10 +7361,10 @@ pub fn carousel_t(
         let prev = cur.val
         cur.val = idx
         if prev != idx {
-          ViewLike::set_visible(panels[prev], false)
-          ViewLike::schedule_paint(dots[prev])
-          ViewLike::set_visible(panels[idx], true)
-          ViewLike::schedule_paint(dots[idx])
+          @yue.ViewLike::set_visible(panels[prev], false)
+          @yue.ViewLike::schedule_paint(dots[prev])
+          @yue.ViewLike::set_visible(panels[idx], true)
+          @yue.ViewLike::schedule_paint(dots[idx])
         }
       }
 
@@ -7303,17 +7373,17 @@ pub fn carousel_t(
         // 面板填满舞台(grow 拉高 + stretch 拉宽):固定宽会横向溢出
         // 舞台(两侧箭头各占 24px),盖住右侧切换箭头的事件窗口。
         // grow/shrink 单写:column 舞台 auto 高链下简写派生 basis 0 塌陷
-        let pc = themed_container(style=[
+        let pc = @yue.themed_container(style=[
           ("flexgrow", 1.0),
           ("flexshrink", 1.0),
           ("flexDirection", "column"),
           ("alignSelf", "stretch"),
         ])
-        ViewLike::set_visible(pc, i == 0)
-        ignore((pages[i].mount)(ViewLike::view(pc)))
+        @yue.ViewLike::set_visible(pc, i == 0)
+        ignore((pages[i].mount)(@yue.ViewLike::view(pc)))
         stage.add_child(pc)
         panels.push(pc)
-        let dot = themed_container(style=[
+        let dot = @yue.themed_container(style=[
           ("width", 8.0),
           ("height", 8.0),
           ("marginLeft", 4.0),
@@ -7324,15 +7394,15 @@ pub fn carousel_t(
         dot.on_draw(fn(p) {
           p.set_fill_color(
             if cur.val == di {
-              theme_primary()
+              @yue.theme_primary()
             } else {
-              theme_border()
+              @yue.theme_border()
             },
           )
           p.fill_rect(0.0, 0.0, 8.0, 8.0)
         })
-        View::set_cursor(dot, hand())
-        ViewLike::on_mouse_down(dot, fn(e) {
+        @yue.View::set_cursor(dot, @yue.hand())
+        @yue.ViewLike::on_mouse_down(dot, fn(e) {
           if e.button == 1 {
             do_switch(di)
             true
@@ -7343,18 +7413,21 @@ pub fn carousel_t(
         dots.push(dot)
       }
       // 左右箭头(矢量三角,悬浮在舞台两侧的窄热区)
-      fn arrow(right : Bool) -> Container {
-        let a = themed_container(style=[("width", 24.0), ("height", height)])
+      fn arrow(right : Bool) -> @yue.Container {
+        let a = @yue.themed_container(style=[
+          ("width", 24.0),
+          ("height", height),
+        ])
         let hover = Ref(false)
         a.on_draw(fn(p) {
           if hover.val {
-            let b = ViewLike::get_bounds(a)
-            p.set_fill_color(theme_fill_hover())
+            let b = @yue.ViewLike::get_bounds(a)
+            p.set_fill_color(@yue.theme_fill_hover())
             p.fill_rect(0.0, 0.0, b.width, b.height)
           }
           let cx = 12.0
           let cy = height / 2.0
-          p.set_fill_color(theme_text_regular())
+          p.set_fill_color(@yue.theme_text_regular())
           p.begin_path()
           if right {
             p.move_to(cx - 4.0, cy - 5.0)
@@ -7368,16 +7441,16 @@ pub fn carousel_t(
           p.close_path()
           p.fill()
         })
-        ViewLike::on_mouse_enter(a, fn(_e) {
+        @yue.ViewLike::on_mouse_enter(a, fn(_e) {
           hover.val = true
-          ViewLike::schedule_paint(a)
+          @yue.ViewLike::schedule_paint(a)
         })
-        ViewLike::on_mouse_leave(a, fn(_e) {
+        @yue.ViewLike::on_mouse_leave(a, fn(_e) {
           hover.val = false
-          ViewLike::schedule_paint(a)
+          @yue.ViewLike::schedule_paint(a)
         })
-        View::set_cursor(a, hand())
-        ViewLike::on_mouse_down(a, fn(e) {
+        @yue.View::set_cursor(a, @yue.hand())
+        @yue.ViewLike::on_mouse_down(a, fn(e) {
           if e.button == 1 {
             do_switch(if right { cur.val + 1 } else { cur.val - 1 })
             true
@@ -7389,26 +7462,26 @@ pub fn carousel_t(
       }
 
       // 布局:舞台行 = 左箭头 + 舞台 + 右箭头;下行为指示点
-      let stage_row = themed_container(style=[("flexDirection", "row")])
+      let stage_row = @yue.themed_container(style=[("flexDirection", "row")])
       stage_row.add_child(arrow(false))
-      ViewLike::set_style(stage, "flex", 1.0)
+      @yue.ViewLike::set_style(stage, "flex", 1.0)
       stage_row.add_child(stage)
       stage_row.add_child(arrow(true))
-      let dots_row = themed_container(style=[("flexDirection", "row")])
+      let dots_row = @yue.themed_container(style=[("flexDirection", "row")])
       for d in dots {
         dots_row.add_child(d)
       }
       outer.add_child(stage_row)
       outer.add_child(dots_row)
       // 悬停暂停自动轮播;set_timeout 一次性,回调里自排下一个
-      ViewLike::on_mouse_enter(outer, fn(_e) { paused.val = true })
-      ViewLike::on_mouse_leave(outer, fn(_e) { paused.val = false })
+      @yue.ViewLike::on_mouse_enter(outer, fn(_e) { paused.val = true })
+      @yue.ViewLike::on_mouse_leave(outer, fn(_e) { paused.val = false })
       if interval_ms > 0 && n > 1 {
         let tick : Ref[() -> Unit] = Ref(fn() {  })
         tick.val = fn() {
           // 超时 id 记进句柄:carousel_stop 取消待触发那次,running
           // 兜底终止自排链(回调已进队时不至于再多转一圈)
-          rotation.timer.val = set_timeout(interval_ms, fn() {
+          rotation.timer.val = @yue.set_timeout(interval_ms, fn() {
             if rotation.running.val {
               if !paused.val {
                 do_switch(cur.val + 1)
@@ -7419,8 +7492,8 @@ pub fn carousel_t(
         }
         (tick.val)()
       }
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }
@@ -7430,42 +7503,42 @@ pub fn carousel_t(
 /// 点击弹出预设色板(Popover 承载):点击色块写入 value("#RRGGBB")并
 /// 收起;选中色块主题色描边 + 白勾。失焦收起。
 pub fn color_picker_t(
-  value : Store[String],
+  value : @yue.Store[String],
   colors? : Array[String] = [
     "#2D68C4", "#2E9E5B", "#D9822B", "#D64550", "#6B7480", "#1E4FA3", "#3F6E9E",
     "#7A9E4E", "#B86E2B", "#9AA0A6", "#E8EAED", "#BDC1C6", "#4E5560", "#2A2F36",
     "#F5F7FA",
   ],
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let focused = Ref(false)
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", 200.0),
-        ("height", control_height),
+        ("height", @yue.control_height),
         ("marginBottom", 10.0),
       ]
       for kv in style {
         base.push(kv)
       }
-      let field = themed_container(style=base)
-      set_panel_bg(field)
-      View::set_cursor(field, hand())
+      let field = @yue.themed_container(style=base)
+      @yue.set_panel_bg(field)
+      @yue.View::set_cursor(field, @yue.hand())
       field.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(field)
+        let b = @yue.ViewLike::get_bounds(field)
         p.set_stroke_color(
           if focused.val {
-            theme_focus_accent()
+            @yue.theme_focus_accent()
           } else {
-            theme_border()
+            @yue.theme_border()
           },
         )
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
         // 当前色块
         p.set_fill_color(value.get())
         p.fill_rect(10.0, 8.0, 14.0, 14.0)
-        p.set_stroke_color(theme_border())
+        p.set_stroke_color(@yue.theme_border())
         p.stroke_rect(10.5, 8.5, 13.0, 13.0)
         p.draw_text(
           value.get(),
@@ -7473,10 +7546,10 @@ pub fn color_picker_t(
           0.0,
           b.width - 52.0,
           b.height,
-          valign=Center,
-          color=theme_text_primary(),
+          valign=@yue.Center,
+          color=@yue.theme_text_primary(),
         )
-        p.set_fill_color(theme_text_secondary())
+        p.set_fill_color(@yue.theme_text_secondary())
         p.begin_path()
         p.move_to(b.width - 20.0, b.height / 2.0 - 2.0)
         p.line_to(b.width - 12.0, b.height / 2.0 - 2.0)
@@ -7484,7 +7557,7 @@ pub fn color_picker_t(
         p.close_path()
         p.fill()
       })
-      let pop : Ref[Popover?] = Ref(None)
+      let pop : Ref[@yue.Popover?] = Ref(None)
       fn pick(c : String) -> Unit {
         value.set(c)
         match pop.val {
@@ -7493,29 +7566,29 @@ pub fn color_picker_t(
         }
       }
 
-      ViewLike::set_focusable(field, true)
-      ViewLike::on_focus_in(field, fn() {
+      @yue.ViewLike::set_focusable(field, true)
+      @yue.ViewLike::on_focus_in(field, fn() {
         focused.val = true
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
         false
       })
-      ViewLike::on_focus_out(field, fn() {
+      @yue.ViewLike::on_focus_out(field, fn() {
         focused.val = false
-        ViewLike::schedule_paint(field)
+        @yue.ViewLike::schedule_paint(field)
         match pop.val {
           Some(p) => p.close()
           None => ()
         }
         false
       })
-      ViewLike::on_mouse_up(field, fn(e) {
+      @yue.ViewLike::on_mouse_up(field, fn(e) {
         if e.button == 1 {
-          ViewLike::focus(field)
+          @yue.ViewLike::focus(field)
           match pop.val {
             Some(_) => ()
             None => {
-              let p = Popover::new()
-              bind_popover_bg(p)
+              let p = @yue.Popover::new()
+              @yue.bind_popover_bg(p)
               // 色板网格:5 列布局,选中描边 + 白勾
               let swatch = 26.0
               let gap = 6.0
@@ -7526,19 +7599,19 @@ pub fn color_picker_t(
               let rows_n0 = (colors.length() + per_row - 1) / per_row
               let grid_w0 = per_row.to_double() * (swatch + gap) + 16.0
               let grid_h0 = 16.0 + rows_n0.to_double() * (swatch + gap)
-              let grid = themed_container(style=[
+              let grid = @yue.themed_container(style=[
                 ("width", grid_w0),
                 ("height", grid_h0),
                 ("padding", 8.0),
                 ("flexDirection", "column"),
               ])
-              set_panel_bg(grid)
-              let rows : Array[(Container, Array[Container])] = []
+              @yue.set_panel_bg(grid)
+              let rows : Array[(@yue.Container, Array[@yue.Container])] = []
               for i in 0..<colors.length() {
                 if i % per_row == 0 {
                   rows.push(
                     (
-                      themed_container(style=[
+                      @yue.themed_container(style=[
                         ("height", swatch + gap),
                         ("flexDirection", "row"),
                       ]),
@@ -7548,19 +7621,19 @@ pub fn color_picker_t(
                 }
                 let (row, cells) = rows[rows.length() - 1]
                 let c = colors[i]
-                let cell = themed_container(style=[
+                let cell = @yue.themed_container(style=[
                   ("width", swatch),
                   ("height", swatch),
                   ("marginRight", gap),
                 ])
-                View::set_cursor(cell, hand())
+                @yue.View::set_cursor(cell, @yue.hand())
                 cell.on_draw(fn(p2) {
                   p2.set_fill_color(c)
                   p2.fill_rect(0.0, 0.0, swatch, swatch)
-                  p2.set_stroke_color(theme_border())
+                  p2.set_stroke_color(@yue.theme_border())
                   p2.stroke_rect(0.5, 0.5, swatch - 1.0, swatch - 1.0)
                   if value.get() == c {
-                    p2.set_stroke_color(theme_primary())
+                    p2.set_stroke_color(@yue.theme_primary())
                     p2.stroke_rect(1.5, 1.5, swatch - 3.0, swatch - 3.0)
                     p2.set_stroke_color("#FFFFFF")
                     p2.begin_path()
@@ -7571,7 +7644,7 @@ pub fn color_picker_t(
                   }
                 })
                 // release 才选中:弹层点项一律 release,防穿透
-                ViewLike::on_mouse_up(cell, fn(e2) {
+                @yue.ViewLike::on_mouse_up(cell, fn(e2) {
                   if e2.button == 1 {
                     pick(c)
                     true
@@ -7588,10 +7661,10 @@ pub fn color_picker_t(
               value.subscribe(fn(_v) {
                 for (_r, cells) in rows {
                   for cell in cells {
-                    ViewLike::schedule_paint(cell)
+                    @yue.ViewLike::schedule_paint(cell)
                   }
                 }
-                ViewLike::schedule_paint(field)
+                @yue.ViewLike::schedule_paint(field)
               })
               // 高度 = padding 16 + 行数 x 32(色块 26 + 间距 6);
               // content_size 与创建期根容器尺寸公式一致
@@ -7609,8 +7682,8 @@ pub fn color_picker_t(
           false
         }
       })
-      attach(parent, ViewLike::view(field))
-      ViewLike::view(field)
+      @yue.attach(parent, @yue.ViewLike::view(field))
+      @yue.ViewLike::view(field)
     },
   }
 }
@@ -7622,14 +7695,14 @@ pub fn color_picker_t(
 /// 圆角,选中/悬停联动 selected)。icons 给「项文本 → 图标」。
 pub fn side_menu_sections(
   sections : Array[(String, Array[String])],
-  selected : Store[String],
-  icons? : Array[(String, IconKind)] = [],
+  selected : @yue.Store[String],
+  icons? : Array[(String, @yue.IconKind)] = [],
   foldable? : Bool = true,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   let width = 180.0
-  let base : Array[(String, &StyVal)] = [
+  let base : Array[(String, &@yue.StyVal)] = [
     ("width", width),
     ("padding", 6.0),
     ("flexDirection", "column"),
@@ -7639,31 +7712,35 @@ pub fn side_menu_sections(
   }
   {
     mount: fn(parent) {
-      let outer = themed_container(style=base)
+      let outer = @yue.themed_container(style=base)
       handle(outer)
-      set_panel_bg(outer)
-      let gfont = Font::new("Sans", 12.0)
+      @yue.set_panel_bg(outer)
+      let gfont = @yue.Font::new("Sans", 12.0)
       for (group, items) in sections {
         let open = Ref(true)
         // 组标题行:自绘(组名 + 右侧折叠箭头),不挂子件保证 hover 全区域
-        let head = themed_container(style=[
+        let head = @yue.themed_container(style=[
           ("height", 30.0),
           ("width", width - 12.0),
         ])
         let head_hover = Ref(false)
         let head_focused = Ref(false)
         head.on_draw(fn(p) {
-          let b = ViewLike::get_bounds(head)
+          let b = @yue.ViewLike::get_bounds(head)
           if foldable && head_hover.val {
-            p.set_fill_color(theme_fill_hover())
-            fill_round_rect(p, 0.0, 0.0, b.width, b.height, 4.0)
+            p.set_fill_color(@yue.theme_fill_hover())
+            @yue.fill_round_rect(p, 0.0, 0.0, b.width, b.height, 4.0)
           }
-          let at = AttributedText::new(group, valign=Center, wrap=false)
+          let at = @yue.AttributedText::new(
+            group,
+            valign=@yue.Center,
+            wrap=false,
+          )
           at.set_font(gfont)
-          at.set_color(theme_text_secondary())
+          at.set_color(@yue.theme_text_secondary())
           p.draw_attributed_text(at, 14.0, 0.0, b.width, b.height)
           if foldable {
-            draw_icon(
+            @yue.draw_icon(
               p,
               if open.val {
                 CaretDownSmall
@@ -7673,17 +7750,17 @@ pub fn side_menu_sections(
               b.width - 14.0,
               b.height / 2.0,
               5.0,
-              theme_text_secondary(),
+              @yue.theme_text_secondary(),
             )
           }
           if head_focused.val {
-            draw_focus_ring(p, b.width, b.height)
+            @yue.draw_focus_ring(p, b.width, b.height)
           }
         })
         // 组内项容器 + 项(收起即整容器隐藏,不占布局)
-        let body = themed_container(style=[("flexDirection", "column")])
+        let body = @yue.themed_container(style=[("flexDirection", "column")])
         for it in items {
-          let mut kind : IconKind? = None
+          let mut kind : @yue.IconKind? = None
           for kv in icons {
             if kv.0 == it {
               kind = Some(kv.1)
@@ -7702,11 +7779,11 @@ pub fn side_menu_sections(
             accent=true,
             rounded=true,
           )
-          ignore((item.mount)(ViewLike::view(body)))
+          ignore((item.mount)(@yue.ViewLike::view(body)))
         }
         fn apply_fold() -> Unit {
-          ViewLike::set_visible(body, open.val)
-          ViewLike::schedule_paint(head)
+          @yue.ViewLike::set_visible(body, open.val)
+          @yue.ViewLike::schedule_paint(head)
         }
 
         if foldable {
@@ -7716,27 +7793,27 @@ pub fn side_menu_sections(
           }
 
           apply_fold()
-          View::set_cursor(head, hand())
-          ViewLike::on_mouse_enter(head, fn(_e) {
+          @yue.View::set_cursor(head, @yue.hand())
+          @yue.ViewLike::on_mouse_enter(head, fn(_e) {
             head_hover.val = true
-            ViewLike::schedule_paint(head)
+            @yue.ViewLike::schedule_paint(head)
           })
-          ViewLike::on_mouse_leave(head, fn(_e) {
+          @yue.ViewLike::on_mouse_leave(head, fn(_e) {
             head_hover.val = false
-            ViewLike::schedule_paint(head)
+            @yue.ViewLike::schedule_paint(head)
           })
-          ViewLike::on_mouse_down(head, fn(e) {
+          @yue.ViewLike::on_mouse_down(head, fn(e) {
             if e.button == 1 {
-              ViewLike::focus(head)
+              @yue.ViewLike::focus(head)
               toggle()
               true
             } else {
               false
             }
           })
-          bind_focus(
+          @yue.bind_focus(
             head,
-            fn() { ViewLike::schedule_paint(head) },
+            fn() { @yue.ViewLike::schedule_paint(head) },
             head_focused,
             toggle,
           )
@@ -7744,8 +7821,8 @@ pub fn side_menu_sections(
         outer.add_child(head)
         outer.add_child(body)
       }
-      attach(parent, ViewLike::view(outer))
-      ViewLike::view(outer)
+      @yue.attach(parent, @yue.ViewLike::view(outer))
+      @yue.ViewLike::view(outer)
     },
   }
 }

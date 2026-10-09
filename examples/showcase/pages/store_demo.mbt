@@ -21,7 +21,7 @@ pub fn page_store_demo(_app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.button_t("计数 +1", variant=@yue.Solid, on_click=fn() {
+            @components.button_t("计数 +1", variant=@components.Solid, on_click=fn() {
               counter.update(fn(n) { n + 1 })
               // ↑ 动作本体;若 doubled 不靠 subscribe,这里就得再写
               //   doubled.set(counter.get() * 2)——信号版无此负担
@@ -34,7 +34,7 @@ pub fn page_store_demo(_app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "let counter = @yue.Store::new(0)", "@yue.button_t(\"计数 +1\", variant=@yue.Solid, on_click=fn() {",
+        "let counter = @yue.Store::new(0)", "@components.button_t(\"计数 +1\", variant=@components.Solid, on_click=fn() {",
         "  counter.update(fn(n) { n + 1 })", "})", "@yue.bind_label(counter, fn(n) { \"计数:\\{n}\" })",
       ],
     ),
@@ -66,7 +66,7 @@ pub fn page_store_demo(_app : @ui.App) -> @yue.Node {
       "与信号版对照",
       "信号写法:computed(fn() { counter.get() * 2 })——关系声明在定义处,多源合成/条件派生同一写法。",
       [
-        @yue.descriptions([
+        @components.descriptions([
           (
             "手动(本页)", "动作里 set / subscribe 里 set / map 一对一",
           ),

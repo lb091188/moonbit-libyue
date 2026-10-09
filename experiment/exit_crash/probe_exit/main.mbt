@@ -14,7 +14,7 @@ fn main {
   for i in 0..<8 {
     let idx = i
     btns.push(
-      @yue.button_t("按钮\{idx}", handle=fn(c) {
+      @components.button_t("按钮\{idx}", handle=fn(c) {
         if idx == 3 {
           target.val = c
         }

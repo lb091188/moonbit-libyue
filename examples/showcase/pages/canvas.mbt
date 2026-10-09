@@ -61,7 +61,7 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
           style=[("height", 300.0), ("marginBottom", 8.0), ("width", 640.0)],
         ),
         @yue.hbox([
-          @yue.button_t("旋转色相", on_click=fn() {
+          @components.button_t("旋转色相", on_click=fn() {
             canvas_hue.val = (canvas_hue.val + 1) % 3
             canvas_repaint()
           }),
@@ -110,7 +110,7 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
           ],
         ),
         @yue.hbox([
-          @yue.button_t("换行开关", on_click=fn() {
+          @components.button_t("换行开关", on_click=fn() {
             rt_wrap.val = !rt_wrap.val
             rt.set_format({
               align: @yue.Start,
@@ -123,7 +123,7 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
               None => ()
             }
           }),
-          @yue.button_t("省略号开关", on_click=fn() {
+          @components.button_t("省略号开关", on_click=fn() {
             rt_ellipsis.val = !rt_ellipsis.val
             rt.set_format({
               align: @yue.Start,
@@ -136,7 +136,7 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
               None => ()
             }
           }),
-          @yue.button_t("改写文本", variant=@yue.Solid, on_click=fn() {
+          @components.button_t("改写文本", variant=@components.Solid, on_click=fn() {
             rt.set_text("文本已替换 ✓(属性保留)")
             match canvas_rt.val {
               Some(c) => c.schedule_paint()
@@ -144,9 +144,9 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
             }
           }),
         ]),
-        @yue.label_t(
+        @components.label_t(
           "系统语义色 Text=\{@yue.system_color(@yue.Text)} WindowBackground=\{@yue.system_color(@yue.WindowBackground)} Border=\{@yue.system_color(@yue.Border)}",
-          role=@yue.Secondary,
+          role=@components.Secondary,
           style=[("marginTop", 8.0)],
         ),
       ],

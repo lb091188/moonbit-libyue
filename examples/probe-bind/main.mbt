@@ -73,24 +73,24 @@ fn main {
             [
               @yue.hbox(
                 [
-                  @yue.label_t("bind:", role=@yue.Body),
+                  @components.label_t("bind:", role=@components.Body),
                   @yue.bind(sig, fn(v) { v }),
-                  @yue.label_t("  ←[\{phase.get()}]", role=@yue.Secondary),
+                  @components.label_t("  ←[\{phase.get()}]", role=@components.Secondary),
                 ],
                 style=[("alignItems", "center"), ("marginBottom", 14.0)],
               ),
               @yue.hbox(
                 [
-                  @yue.label_t("复刻行:", role=@yue.Body),
+                  @components.label_t("复刻行:", role=@components.Body),
                   @yue.node_of(probe),
-                  @yue.label_t("  (stdout 打 bounds)", role=@yue.Secondary),
+                  @components.label_t("  (stdout 打 bounds)", role=@components.Secondary),
                 ],
                 style=[("alignItems", "center"), ("marginBottom", 14.0)],
               ),
               @yue.hbox(
                 [
-                  @yue.label_t("静态对照:", role=@yue.Body),
-                  @yue.label_t(LONG, role=@yue.Body),
+                  @components.label_t("静态对照:", role=@components.Body),
+                  @components.label_t(LONG, role=@components.Body),
                 ],
                 style=[("alignItems", "center")],
               ),

@@ -40,9 +40,9 @@ fn mk_sec(
     }
   })
   let inner : Array[@yue.Node] = [
-    @yue.label_t("段:\{name}", role=@yue.Section, style=[("marginBottom", 8.0)]),
+    @components.label_t("段:\{name}", role=@components.Section, style=[("marginBottom", 8.0)]),
     holder,
-    @yue.label_t("说明文字占位", role=@yue.Secondary, style=[
+    @components.label_t("说明文字占位", role=@components.Secondary, style=[
       ("marginTop", 10.0),
     ]),
   ]
@@ -123,7 +123,7 @@ fn main {
   let base_lines : Array[@yue.Node] = []
   for i in 0..<40 {
     base_lines.push(
-      @yue.label_t("基础页文本行 \{i}", role=@yue.Secondary, style=[
+      @components.label_t("基础页文本行 \{i}", role=@components.Secondary, style=[
         ("height", 28.0),
       ]),
     )
@@ -131,7 +131,7 @@ fn main {
 
   let icon_page = @yue.vbox(
     [
-      @yue.hbox([@yue.label_t("图标库")], style=[
+      @yue.hbox([@components.label_t("图标库")], style=[
         ("paddingLeft", 14.0),
         ("paddingTop", 10.0),
       ]),
