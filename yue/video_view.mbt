@@ -45,7 +45,12 @@ pub fn vid_rgba_len(width : Int, height : Int) -> Int {
 /// 帧字节 → Image（长度不符 / 编码失败 / 解码失败给 None；调用方画
 /// 占位背景）。headless 无 GUI 上下文时 Image 解码恒空图，此时 Image
 /// 句柄仍非空——调用方按 is_empty 判定是否可用。
-pub fn vid_frame_image(source : VideoFrameSource, idx : Int, width : Int, height : Int) -> Image? {
+pub fn vid_frame_image(
+  source : VideoFrameSource,
+  idx : Int,
+  width : Int,
+  height : Int,
+) -> Image? {
   match source(idx) {
     Some(bytes) =>
       if bytes.length() == vid_rgba_len(width, height) {

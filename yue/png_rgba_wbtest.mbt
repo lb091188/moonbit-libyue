@@ -26,10 +26,28 @@ test "pngr_encode_rgba：1x1 容器结构自校验" {
   inspect(png[0].to_int() == 0x89 && png[1].to_int() == 0x50, content="true")
   inspect(png[2].to_int() == 0x4E && png[3].to_int() == 0x47, content="true")
   // IHDR：length=13、type、width=1 BE、height=1 BE、bitdepth 8、colortype 6
-  inspect(png[8].to_int() == 0 && png[9].to_int() == 0 && png[10].to_int() == 0 && png[11].to_int() == 13, content="true")
+  inspect(
+    png[8].to_int() == 0 &&
+    png[9].to_int() == 0 &&
+    png[10].to_int() == 0 &&
+    png[11].to_int() == 13,
+    content="true",
+  )
   inspect(png[12] == b"I"[0] && png[13] == b"H"[0], content="true")
-  inspect(png[16].to_int() == 0 && png[17].to_int() == 0 && png[18].to_int() == 0 && png[19].to_int() == 1, content="true")
-  inspect(png[20].to_int() == 0 && png[21].to_int() == 0 && png[22].to_int() == 0 && png[23].to_int() == 1, content="true")
+  inspect(
+    png[16].to_int() == 0 &&
+    png[17].to_int() == 0 &&
+    png[18].to_int() == 0 &&
+    png[19].to_int() == 1,
+    content="true",
+  )
+  inspect(
+    png[20].to_int() == 0 &&
+    png[21].to_int() == 0 &&
+    png[22].to_int() == 0 &&
+    png[23].to_int() == 1,
+    content="true",
+  )
   inspect(png[24].to_int() == 8, content="true")
   inspect(png[25].to_int() == 6, content="true")
   // IDAT：zlib 头 0x78 0x01（stored 压缩），3 字节 BFINAL+LEN+NLEN 头
@@ -38,7 +56,10 @@ test "pngr_encode_rgba：1x1 容器结构自校验" {
   let idat_len = 2 + 5 + raw_len + 4 // zlib 头 + 存块头 + raw + adler
   inspect(png.length(), content="\{8 + 25 + 12 + idat_len + 12}")
   let iend_off = 8 + 25 + 12 + idat_len
-  inspect(png[iend_off + 4] == b"I"[0] && png[iend_off + 5] == b"E"[0], content="true")
+  inspect(
+    png[iend_off + 4] == b"I"[0] && png[iend_off + 5] == b"E"[0],
+    content="true",
+  )
   // IDAT 尾部 = adler32(scanlines) BE；scanlines = 00 FF FF FF FF
   let sl = FixedArray::make(5, b'\x00')
   sl[1] = b'\xF0'
@@ -49,7 +70,7 @@ test "pngr_encode_rgba：1x1 容器结构自校验" {
   let idat_tail = 8 + 25 + 8 + idat_len - 4 // IDAT data 尾部 - 4
   inspect(
     ((adler >> 24) & 255).to_byte() == png[idat_tail] &&
-      ((adler >> 16) & 255).to_byte() == png[idat_tail + 1],
+    ((adler >> 16) & 255).to_byte() == png[idat_tail + 1],
     content="true",
   )
 }

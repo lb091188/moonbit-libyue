@@ -613,7 +613,10 @@ pub fn DatePicker::new_with(options : DatePickerOptions) -> DatePicker {
 /// 通知进度文本：字符进度条 + 百分比（percent 钳到 [0,100]，非数值
 /// 按 0 处理；width<=0 时只给百分比）。通知规范本身没有进度字段，各
 /// 桌面落地不一，正文内呈现是跨平台一致的做法。
-pub fn notification_progress_text(percent : Double, width? : Int = 10) -> String {
+pub fn notification_progress_text(
+  percent : Double,
+  width? : Int = 10,
+) -> String {
   let p = if percent != percent {
     0.0
   } else if percent < 0.0 {
@@ -626,14 +629,8 @@ pub fn notification_progress_text(percent : Double, width? : Int = 10) -> String
   if width <= 0 {
     return "\{p.to_int()}%"
   }
-  let filled = ((p / 100.0) * width.to_double() + 0.5).to_int()
-  let n = if filled < 0 {
-    0
-  } else if filled > width {
-    width
-  } else {
-    filled
-  }
+  let filled = (p / 100.0 * width.to_double() + 0.5).to_int()
+  let n = if filled < 0 { 0 } else if filled > width { width } else { filled }
   let bar = StringBuilder()
   for i = 0; i < width; i = i + 1 {
     bar.write_char(if i < n { '\u{2588}' } else { '\u{2591}' })

@@ -27,11 +27,7 @@ fn pngr_crc_table() -> Array[Int64] {
   for i = 0; i < 256; i = i + 1 {
     let mut c : Int64 = i.to_int64()
     for _k = 0; _k < 8; _k = _k + 1 {
-      c = if (c & 1L) == 1L {
-        poly ^ (c >> 1)
-      } else {
-        c >> 1
-      }
+      c = if (c & 1L) == 1L { poly ^ (c >> 1) } else { c >> 1 }
     }
     table.push(c)
   }
@@ -44,7 +40,7 @@ fn pngr_crc32(data : Bytes) -> Int {
   let table = pngr_crc_table()
   let mut c : Int64 = 4294967295L
   for i = 0; i < data.length(); i = i + 1 {
-    c = table[((c.to_int()) ^ data[i].to_int()) & 0xFF] ^ (c >> 8)
+    c = table[(c.to_int() ^ data[i].to_int()) & 0xFF] ^ (c >> 8)
   }
   (c ^ 4294967295L).to_int()
 }
@@ -117,7 +113,12 @@ fn pngr_zlib_stored(raw : Bytes) -> Bytes {
 
 ///|
 /// 把一个 chunk（length + type + data + crc）追加到 out，返回写游标。
-fn pngr_push_chunk(out : FixedArray[Byte], off : Int, ctype : String, data : Bytes) -> Int {
+fn pngr_push_chunk(
+  out : FixedArray[Byte],
+  off : Int,
+  ctype : String,
+  data : Bytes,
+) -> Int {
   let type_bytes = utf8_bytes(ctype)
   let mut o = off
   for i = 0; i < 4; i = i + 1 {
@@ -150,7 +151,11 @@ fn pngr_push_chunk(out : FixedArray[Byte], off : Int, ctype : String, data : Byt
 /// 把 RGBA 位图编码为 PNG 字节流（8 bit、color type 6、无隔行、stored
 /// 压缩）。data 为 width*height*4 字节的行主序 RGBA；尺寸或数据长度
 /// 不符给 Err。
-pub fn pngr_encode_rgba(data : Bytes, width : Int, height : Int) -> Result[Bytes, String] {
+pub fn pngr_encode_rgba(
+  data : Bytes,
+  width : Int,
+  height : Int,
+) -> Result[Bytes, String] {
   if width <= 0 || height <= 0 {
     return Err("width/height 必须为正")
   }
