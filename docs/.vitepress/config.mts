@@ -2,6 +2,25 @@ import { defineConfig } from 'vitepress'
 
 const gh = 'https://github.com/lb091188/moonbit-libyue'
 
+// 落地页语言自动选择:首次访问根路径时,浏览器语言为中文则跳转 /zh/,
+// 其余语言留在默认英文;用户手动切换过语言(localStorage 有记录)后不再跳转。
+const langDetect = `(function () {
+  try {
+    if (localStorage.getItem('docs-lang')) return
+    if (location.pathname !== '/' && location.pathname !== '/index.html') return
+    var langs = navigator.languages && navigator.languages.length
+      ? navigator.languages
+      : [navigator.language || '']
+    for (var i = 0; i < langs.length; i++) {
+      if (String(langs[i]).toLowerCase().indexOf('zh') === 0) {
+        localStorage.setItem('docs-lang', 'zh')
+        location.replace('zh/')
+        return
+      }
+    }
+  } catch (e) {}
+})()`
+
 // Minimal TextMate grammar so ```moonbit blocks get keyword/string/number
 // highlighting instead of falling back to plain text.
 const moonbitGrammar = {
@@ -48,6 +67,9 @@ export default defineConfig({
   description: 'libyue 的 MoonBit 封装:统一跨平台桌面 GUI API',
   cleanUrls: true,
   lastUpdated: true,
+  head: [
+    ['script', {}, langDetect],
+  ],
   markdown: {
     languages: [moonbitGrammar],
   },
