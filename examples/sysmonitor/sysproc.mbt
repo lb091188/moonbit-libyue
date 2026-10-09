@@ -2,10 +2,16 @@
 // S3：/proc/[pid]/{stat,cmdline} 纯函数解析 + 差值采样器（CPU% = 两次
 // 采样 utime+stime 增量 / 墙钟增量）；RSS 取 stat 的页数 × 页大小，与
 // status 的 VmRSS 等值，省掉每进程第三次读取。
+// 平台复用：Windows / macOS 由 stub 把 pid 枚举、stat、cmdline 虚拟成
+// 同构 /proc 文本（Windows = EnumProcesses 快照 + GetProcessTimes；
+// macOS = proc_listpids + proc_pidinfo + proc_pidpath），本文件零平台
+// 分支。
 // F1：kill / getpriority / setpriority 经应用 native-stub，errno 语义化
 // 为 Result；Windows 侧 stub 把 kill 映射 TerminateProcess 一档、优先级
 // 映射 IDLE/NORMAL/HIGH/REALTIME 四档，Win32 错误码先译成 errno 编号
-// （errno_text 与 Result 形态零改动，SYS2 语义归一）。
+// （errno_text 与 Result 形态零改动，SYS2 语义归一）；macOS 与 Linux
+// 同走 POSIX 共享实现（kill / nice 连续值语义一致，UI 两按钮与 nice
+// 口径原样适用）。
 
 ///|
 /// /proc/[pid]/stat 解析结果（时间为 tick，见 ProcMonitor 的 clk_tck）。

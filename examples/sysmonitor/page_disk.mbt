@@ -4,6 +4,16 @@
 // 定长窗口（series_push）。行容器单容器 on_draw，只重绘画布。
 
 ///|
+/// 速率或「—」：来源不可用时（macOS 无磁盘 IO 来源 / 挂载无 IO 归属 /
+/// 首帧无前样本）速率字段为 None，显示「—」而不是虚构的 0 B/s。
+fn fmt_rate_opt(bps : Double?) -> String {
+  match bps {
+    None => "—"
+    Some(v) => fmt_rate(v)
+  }
+}
+
+///|
 /// 磁盘行自绘：名称行 + 容量条 + 速率行（全部手绘，行数随挂载增减）。
 fn draw_disk_rows(
   p : @yue.Painter,
@@ -28,7 +38,7 @@ fn draw_disk_rows(
       color=t.text_regular,
     )
     p.draw_text(
-      "读 \{fmt_rate(d.read_bps)} · 写 \{fmt_rate(d.write_bps)} · 可用 \{fmt_bytes(d.avail_bytes)} / \{fmt_bytes(d.total_bytes)}",
+      "读 \{fmt_rate_opt(d.read_bps)} · 写 \{fmt_rate_opt(d.write_bps)} · 可用 \{fmt_bytes(d.avail_bytes)} / \{fmt_bytes(d.total_bytes)}",
       w - 330.0,
       y + 3.0,
       318.0,
@@ -67,11 +77,19 @@ fn page_disk(app : App) -> @yue.Node {
     @yue.LineSeries::make("读", max_points=120),
     @yue.LineSeries::make("写", max_points=120),
   ])
+  // 根分区 IO 曲线（读 / 写两序列，120 点窗口）；速率来源不可用时
+  // （macOS 无 IO 数据）不推点，曲线保持空态而不是画一条假的 0 线
   let push_io = fn(ds : Array[DiskInfo]) -> Unit {
     for d in ds {
       if d.mount == "/" {
-        @yue.series_push(io, 0, d.read_bps)
-        @yue.series_push(io, 1, d.write_bps)
+        match d.read_bps {
+          Some(v) => @yue.series_push(io, 0, v)
+          None => ()
+        }
+        match d.write_bps {
+          Some(v) => @yue.series_push(io, 1, v)
+          None => ()
+        }
       }
     }
   }

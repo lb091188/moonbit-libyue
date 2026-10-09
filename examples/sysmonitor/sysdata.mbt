@@ -1,6 +1,9 @@
 // 监控数据层（S0-S2）：纯 MoonBit 读 /proc 文本并解析为结构化数据。
 // 唯一的系统调用是文件读取（S0，经应用 native-stub，见 sysffi.mbt）；
 // 字段切分、数值解析、差值占用率全部为纯函数，白盒测试直接喂字面量。
+// 平台路由：stub 把 Windows / macOS 的数据源虚拟成同构的 /proc、/sys
+// 文本（Linux 路径即跨层契约），CPU / 内存 / 进程 / 网络采样器零平台
+// 分支；GPU 与磁盘 IO 的 macOS 特例在 syshw.mbt 按 on_macos() 分流。
 // 后续批次在此文件续写 S3 进程 / S4-S7 硬件（sysproc.mbt / syshw.mbt）。
 
 // ---------------------------------------------------------------------------
@@ -24,6 +27,14 @@ pub fn list_dir(path : String) -> Array[String]? {
     None => None
     Some(bytes) => Some(nonempty_lines(@utf8.decode_lossy(bytes)))
   }
+}
+
+///|
+/// 当前平台是否为 macOS。数据层入口按平台路由：CPU / 内存 / 进程 / 网络
+/// 走 stub 虚拟 /proc、/sys 无需分流；GPU（system_profiler JSON 解析）与
+/// 磁盘 IO 速率（无来源）在 syshw.mbt 按此开关走 macOS 特例。
+pub fn on_macos() -> Bool {
+  @yue.platform() == "macos"
 }
 
 // ---------------------------------------------------------------------------

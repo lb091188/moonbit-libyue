@@ -83,8 +83,8 @@ test "DiskInfo::usage：df 口径(总-可用)" {
     total_bytes: 1000,
     free_bytes: 100,
     avail_bytes: 300,
-    read_bps: 0.0,
-    write_bps: 0.0,
+    read_bps: Some(0.0),
+    write_bps: Some(0.0),
   }
   assert_eq(d.usage(), 0.7)
   let empty : DiskInfo = {
@@ -94,10 +94,48 @@ test "DiskInfo::usage：df 口径(总-可用)" {
     total_bytes: 0,
     free_bytes: 0,
     avail_bytes: 0,
-    read_bps: 0.0,
-    write_bps: 0.0,
+    read_bps: None,
+    write_bps: None,
   }
   assert_eq(empty.usage(), 0.0)
+}
+
+///|
+test "unescape_mount：内核八进制转义还原 / 无反斜杠原样 / 非法序列保留" {
+  assert_eq(unescape_mount("/Volumes/My\\040Drive"), "/Volumes/My Drive")
+  assert_eq(unescape_mount("/dev/disk1s1s1"), "/dev/disk1s1s1")
+  assert_eq(unescape_mount("/"), "/")
+  assert_eq(unescape_mount(""), "")
+  assert_eq(unescape_mount("/Volumes/a\\134b"), "/Volumes/a\\b")
+  assert_eq(unescape_mount("/Volumes/a\\040b\\040c"), "/Volumes/a b c")
+  // 非八进制数字的 \xNN 与孤立反斜杠原样保留
+  assert_eq(unescape_mount("/Volumes/a\\099b"), "/Volumes/a\\099b")
+  assert_eq(unescape_mount("/Volumes/a\\04"), "/Volumes/a\\04")
+  assert_eq(unescape_mount("/Volumes/a\\b"), "/Volumes/a\\b")
+  // 中文卷名（非 ASCII）原样透过
+  assert_eq(unescape_mount("/Volumes/移动硬盘"), "/Volumes/移动硬盘")
+}
+
+///|
+test "parse_mounts：macOS getfsstat 形态(apfs 卷 / 转义空格 / BSD 伪文件系统)" {
+  // stub 对 getfsstat 输出按 /proc/mounts 同构转写：设备 \t 挂载点 \t 类型
+  let text = "/dev/disk1s1s1\t/\tapfs\trw 0 0\n/dev/disk1s5\t/System/Volumes/Data\tapfs\trw 0 0\n/dev/disk2s1\t/Volumes/My\\040Drive\thfs\trw 0 0\ndevfs\t/dev\tdevfs\trw 0 0\nmap\\040auto_home\t/System/Volumes/Data/home\tautofs\tautomounted\n"
+  let mounts = parse_mounts(text)
+  // devfs / autofs 伪文件系统被跳过；autofs 行设备名也无 /dev/ 前缀
+  assert_eq(mounts.length(), 3)
+  assert_eq(mounts[0].device, "/dev/disk1s1s1")
+  assert_eq(mounts[0].mount, "/")
+  assert_eq(mounts[0].fstype, "apfs")
+  assert_eq(mounts[1].mount, "/System/Volumes/Data")
+  // 含空格卷名经 \040 转义后还原（statvfs 才能对上位）
+  assert_eq(mounts[2].mount, "/Volumes/My Drive")
+  assert_eq(mounts[2].device, "/dev/disk2s1")
+  assert_eq(mounts[2].fstype, "hfs")
+  // Linux 原有形态不受影响（回归）
+  let linux = "sysfs /sys sysfs rw 0 0\n/dev/nvme0n1p3 / ext4 rw,relatime 0 0\n"
+  let lm = parse_mounts(linux)
+  assert_eq(lm.length(), 1)
+  assert_eq(lm[0].mount, "/")
 }
 
 ///|
@@ -121,11 +159,12 @@ test "S4 真实采样：hwmon 传感器(Linux)" {
 }
 
 ///|
-test "S6 真实采样：PCI 显示设备枚举(Linux)" {
+test "S6 真实采样：GPU 枚举(Linux sysfs / macOS system_profiler)" {
   match gpu_list() {
-    None => () // 非 Linux 宿主跳过
+    None => () // 枚举失败宿主跳过
     Some(gpus) =>
-      // 虚拟机可能无显示设备；有条目则字段须完整
+      // 虚拟机可能无显示设备；有条目则字段须完整（macOS 路径为
+      // system_profiler 解析结果，pci / device / vendor 同样非空）
       for g in gpus {
         assert_true(g.pci.length() > 0)
         assert_true(g.device.length() > 0)
@@ -139,10 +178,10 @@ test "S6 真实采样：PCI 显示设备枚举(Linux)" {
 }
 
 ///|
-test "S5 真实采样：磁盘容量 + IO(Linux)" {
+test "S5 真实采样：磁盘容量 + IO(Linux / macOS)" {
   let mon = DiskMonitor::new()
   match mon.tick() {
-    None => () // 非 Linux 宿主跳过
+    None => () // 无挂载表宿主跳过
     Some(disks) => {
       assert_true(disks.length() > 0)
       let mut has_root = false
@@ -150,7 +189,16 @@ test "S5 真实采样：磁盘容量 + IO(Linux)" {
         assert_true(d.total_bytes > 0)
         assert_true(d.avail_bytes >= 0 && d.avail_bytes <= d.total_bytes)
         assert_true(d.usage() >= 0.0 && d.usage() <= 1.0)
-        assert_true(d.read_bps >= 0.0 && d.write_bps >= 0.0)
+        // 速率：来源可用时有定义且非负；macOS 无 IO 来源为 None
+        // （UI 显示「—」），两种形态都合法
+        match d.read_bps {
+          None => ()
+          Some(v) => assert_true(v >= 0.0)
+        }
+        match d.write_bps {
+          None => ()
+          Some(v) => assert_true(v >= 0.0)
+        }
         if d.mount == "/" {
           has_root = true
         }
@@ -198,4 +246,94 @@ test "is_system_mount：/boot 等系统挂载排除,/run/media 与自定义挂�
   assert_false(is_system_mount("/bootstrap"))
   assert_false(is_system_mount("/run/media/user/USB"))
   assert_false(is_system_mount("/data"))
+  // macOS 系统宗卷：/private（swap 后备）与 /System/Volumes 下非数据卷
+  assert_true(is_system_mount("/private"))
+  assert_true(is_system_mount("/private/var/vm"))
+  assert_true(is_system_mount("/System/Volumes/Preboot"))
+  assert_true(is_system_mount("/System/Volumes/Update"))
+  assert_true(is_system_mount("/System/Volumes/VM"))
+  assert_true(is_system_mount("/System/Volumes/Hardware"))
+  assert_true(is_system_mount("/System/Volumes/iSCPreboot"))
+  // 用户数据卷与用户挂载保留（macOS 的 "Macintosh HD" 是 /System/Volumes/Data）
+  assert_false(is_system_mount("/System/Volumes/Data"))
+  assert_false(is_system_mount("/Volumes/My Drive"))
+  assert_false(is_system_mount("/System"))
+}
+
+///|
+test "parse_vram：system_profiler 显存文本转字节" {
+  assert_eq(parse_vram("16 GB"), Some(16L * 1024 * 1024 * 1024))
+  assert_eq(parse_vram("1536 MB"), Some(1536L * 1024 * 1024))
+  assert_eq(parse_vram("1.5 GB"), Some(1610612736L))
+  assert_eq(parse_vram("128 MB"), Some(128L * 1024 * 1024))
+  assert_eq(parse_vram("8 KB"), Some(8192L))
+  assert_eq(parse_vram("512"), Some(512L)) // 无单位按字节
+  assert_eq(parse_vram(""), None)
+  assert_eq(parse_vram("abc"), None)
+  assert_eq(parse_vram("16 XB"), None) // 未知单位
+}
+
+///|
+test "json_string_value：键值提取 / 嵌套键 / 数字值 / 转义" {
+  let obj = "{\"sppci_model\" : \"Apple M1 Pro\", \"sppci_cores\" : 16, \"spdisplays_vram\" : \"16 GB\"}"
+  assert_eq(json_string_value(obj, "sppci_model"), Some("Apple M1 Pro"))
+  assert_eq(json_string_value(obj, "spdisplays_vram"), Some("16 GB"))
+  // 数字值不是字符串 → None
+  assert_eq(json_string_value(obj, "sppci_cores"), None)
+  // 键缺失
+  assert_eq(json_string_value(obj, "nope"), None)
+  // 值内含转义引号
+  assert_eq(
+    json_string_value("{\"k\" : \"a\\\"b\"}", "k"),
+    Some("a\"b"),
+  )
+  // 键名是其它键值的前缀也不能误配（带引号整键匹配）
+  assert_eq(json_string_value("{\"ab\" : \"1\", \"a\" : \"2\"}", "a"), Some("2"))
+}
+
+///|
+test "json_items_objects：_items 顶层对象切分 / 嵌套 / 字符串内括号" {
+  let json = "{\"_items\" : [ {\"a\" : \"1\"}, {\"b\" : {\"c\" : \"{\"}}, {\"d\" : \"}\"} ], \"_other\" : 1}"
+  let objs = json_items_objects(json)
+  assert_eq(objs.length(), 3)
+  assert_eq(json_string_value(objs[0], "a"), Some("1"))
+  assert_eq(json_string_value(objs[1], "c"), Some("{"))
+  assert_eq(json_string_value(objs[2], "d"), Some("}"))
+  // 无 _items / 空数组 / 非 JSON
+  assert_eq(json_items_objects("{\"x\" : 1}").length(), 0)
+  assert_eq(json_items_objects("").length(), 0)
+  assert_eq(json_items_objects("{\"_items\" : []}").length(), 0)
+}
+
+///|
+test "parse_system_profiler_gpu：Apple Silicon 单卡 / Intel 双卡 / 宽容口径" {
+  // Apple Silicon（system_profiler -json 实测形态：sppci_model 芯片名，
+  // spdisplays_vram 显存，无 spdisplays_vendor）
+  let m1 = "{\"_items\" : [{\"_name\" : \"Apple M1 Pro\", \"sppci_model\" : \"Apple M1 Pro\", \"spdisplays_vram\" : \"16 GB\", \"spdisplays_vendor\" : \"sppci_vendor_apple\"}], \"_detailLevel\" : 0}"
+  let g1 = parse_system_profiler_gpu(m1)
+  assert_eq(g1.length(), 1)
+  assert_eq(g1[0].model, "Apple M1 Pro")
+  assert_eq(g1[0].vendor, "Apple")
+  assert_eq(g1[0].vram_total, Some(16.0 * 1024 * 1024 * 1024))
+  // 利用率与温度无来源 → None（UI 按位显示「—」）
+  assert_eq(g1[0].busy, None)
+  assert_eq(g1[0].celsius, None)
+  assert_eq(g1[0].vram_used, None)
+  assert_true(g1[0].pci.length() > 0)
+  assert_true(g1[0].device.length() > 0)
+  // Intel 集显 + AMD 独显双卡：厂商按型号名嗅探
+  let dual = "{\"_items\" : [{\"sppci_model\" : \"Intel UHD Graphics 630\"}, {\"sppci_model\" : \"AMD Radeon Pro 5500M\", \"spdisplays_vram\" : \"8 GB\"}]}"
+  let g2 = parse_system_profiler_gpu(dual)
+  assert_eq(g2.length(), 2)
+  assert_eq(g2[0].vendor, "Intel")
+  assert_eq(g2[0].model, "Intel UHD Graphics 630")
+  assert_eq(g2[0].vram_total, None) // 集显无显存字段 → None
+  assert_eq(g2[1].vendor, "AMD")
+  assert_eq(g2[1].vram_total, Some(8.0 * 1024 * 1024 * 1024))
+  // 宽容口径：键缺失 / _items 为空 / 型号缺失回退 _name
+  assert_eq(parse_system_profiler_gpu("{\"_items\" : []}").length(), 0)
+  assert_eq(parse_system_profiler_gpu("{}").length(), 0)
+  let noname = parse_system_profiler_gpu("{\"_items\" : [{\"_name\" : \"Fallback GPU\"}]}")
+  assert_eq(noname.length(), 1)
+  assert_eq(noname[0].model, "Fallback GPU")
 }
