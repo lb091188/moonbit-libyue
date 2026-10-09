@@ -61,6 +61,7 @@ moon add NoahLiu/moonbit-libyue
   ```
   import {
     "NoahLiu/moonbit-libyue/yue",
+    "NoahLiu/moonbit-libyue/yue/declarative",
   }
 
   options(
@@ -68,7 +69,7 @@ moon add NoahLiu/moonbit-libyue
   )
   ```
 
-  `import` 让代码里能用 `@yue.*` 访问组件库;`is-main` 声明本包是可执行入口。
+  `import` 让代码能访问库:`@yue.*` 是核心包(窗口、原生控件、绘制、`Signal`/`Store`),`@declarative.*` 是声明式层(`mount`/`mount_window` 与各节点构造器),它住在 `yue/declarative` 子包。`is-main` 声明本包是可执行入口。
 
 ## 3. 第一个窗口
 
@@ -80,12 +81,12 @@ fn main {
     return
   }
   let clicks = @yue.Signal::new(0)
-  let _ = @yue.mount_window(
+  let _ = @declarative.mount_window(
     [
-      @yue.label("Hello, MoonBit + libyue!", style=[("margin", 20.0)]),
-      @yue.button("点我", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
-      @yue.bind(clicks, fn(n) { "已点 \{n} 次" }),
-      @yue.button("退出", on_click=fn() { @yue.quit() }),
+      @declarative.label("Hello, MoonBit + libyue!", style=[("margin", 20.0)]),
+      @declarative.button("点我", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
+      @declarative.bind(clicks, fn(n) { "已点 \{n} 次" }),
+      @declarative.button("退出", on_click=fn() { @yue.quit() }),
     ],
     title="教程示例",
     size=Some((360.0, 220.0)),

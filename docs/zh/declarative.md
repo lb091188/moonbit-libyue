@@ -42,12 +42,12 @@ entry.on_activate(fn() { check(entry.get_text()) })
 
 ```moonbit
 fn page(state : State) -> @yue.Container {
-  @yue.mount([
-    @yue.label("设置", style=[("color", "#356AA0")]),
-    @yue.entry(text="昵称", on_enter=fn(s) { state.save(s) }),
-    @yue.hbox([
-      @yue.button("保存", on_click=fn() { state.flush() }),
-      @yue.button("取消"),
+  @declarative.mount([
+    @declarative.label("设置", style=[("color", "#356AA0")]),
+    @declarative.entry(text="昵称", on_enter=fn(s) { state.save(s) }),
+    @declarative.hbox([
+      @declarative.button("保存", on_click=fn() { state.flush() }),
+      @declarative.button("取消"),
     ]),
   ])
 }
@@ -62,10 +62,10 @@ win.set_content(page(state))   // mount 返回根 Container，直接喂给窗口
 `activate`；要抢在显示前调整窗口（无边框/透明等），写进 `handle`：
 
 ```moonbit
-let win = @yue.mount_window(
+let win = @declarative.mount_window(
   [
-    @yue.label("你好"),
-    @yue.button("退出", on_click=fn() { @yue.quit() }),
+    @declarative.label("你好"),
+    @declarative.button("退出", on_click=fn() { @yue.quit() }),
   ],
   title="Demo",
   size=Some((960.0, 640.0)),
@@ -108,7 +108,7 @@ let win = @yue.mount_window(
 
 ```moonbit
 let bar : Ref[@yue.ProgressBar?] = Ref(None)
-@yue.progress(handle=fn(p) { bar.val = Some(p) })
+@declarative.progress(handle=fn(p) { bar.val = Some(p) })
 // 之后任意时刻：bar.val 里的 p.set_value(0.5)
 ```
 
@@ -117,7 +117,7 @@ let bar : Ref[@yue.ProgressBar?] = Ref(None)
 任何已有的 ViewLike 控件都能包成节点，嵌进声明树：
 
 ```moonbit
-@yue.node_of(my_legacy_view, style=[("marginBottom", 8.0)])
+@declarative.node_of(my_legacy_view, style=[("marginBottom", 8.0)])
 ```
 
 ### 自定义节点
@@ -127,7 +127,7 @@ let bar : Ref[@yue.ProgressBar?] = Ref(None)
 
 ```moonbit
 fn tagged(label_text : String, body : Node) -> Node {
-  @yue.vbox([@yue.label(label_text), body])
+  @declarative.vbox([@declarative.label(label_text), body])
 }
 ```
 
@@ -193,9 +193,9 @@ fn tagged(label_text : String, body : Node) -> Node {
 ```moonbit
 let count : @yue.Store[Int] = @yue.Store::new(0)
 
-win.set_content(@yue.mount([
-  @yue.bind_label(count, fn(n) { "已点 \{n} 次" }),
-  @yue.button("点我", on_click=fn() { count.update(fn(n) { n + 1 }) }),
+win.set_content(@declarative.mount([
+  @declarative.bind_label(count, fn(n) { "已点 \{n} 次" }),
+  @declarative.button("点我", on_click=fn() { count.update(fn(n) { n + 1 }) }),
 ]))
 ```
 
@@ -211,12 +211,12 @@ win.set_content(@yue.mount([
 ```moonbit
 // 随状态换表单区块(非点击链路自身):bind_node 适用
 @yue.bind_node(mode.signal(), fn(m) {
-  if m { @yue.input_t(text="编辑模式") } else { @yue.label_t("只读模式") }
+  if m { @components.input_t(text="编辑模式") } else { @components.label_t("只读模式") }
 })
 // 换图标按钮这类「点击自身触发重挂」的形态:Windows 用 swap_node
 @yue.swap_node(dark.signal(),
-  @yue.icon_button_t(@yue.Moon, on_click=..., tip="切换到深色"),
-  @yue.icon_button_t(@yue.Sunny, on_click=..., tip="切换到浅色"))
+  @icons.icon_button_t(@icons.Moon, on_click=..., tip="切换到深色"),
+  @icons.icon_button_t(@icons.Sunny, on_click=..., tip="切换到浅色"))
 ```
 
 高频更新请改用 `bind`（文本）或经 `handle` 命令式改属性。
@@ -248,8 +248,8 @@ API 一览：
 let count = @yue.Signal::new(0)
 let doubled = @yue.Signal::computed(fn() { count.get() * 2 })
 
-@yue.bind(doubled, fn(n) { "双倍:\{n}" })   // 信号版文本绑定
-@yue.button("点我", on_click=fn() { count.update(fn(n) { n + 1 }) })
+@declarative.bind(doubled, fn(n) { "双倍:\{n}" })   // 信号版文本绑定
+@declarative.button("点我", on_click=fn() { count.update(fn(n) { n + 1 }) })
 ```
 
 同一事件回调里多次 `set` 会触发多轮通知，需要合并时用 `batch` 包裹：

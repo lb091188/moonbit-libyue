@@ -19,9 +19,9 @@
 `BrightnessDevice{ subsystem, name, max, current }`：subsystem 为 `"backlight"`（屏幕）、name 为 sysfs 设备名、max 为量程上限、current 为枚举时快照（实时值用 `brightness_get`）。设备名不在探测表时可手工构造 `BrightnessDevice` 访问。错误 `BrightnessError`：`Unsupported`（非 Linux 或系统服务不在线）/ `BusFailed(String)` / `DeviceNotFound` / `InvalidParam(String)`。
 
 ```moonbit
-match @yue.brightness_devices() {
+match @system.brightness_devices() {
   Ok(devs) if devs.length() > 0 =>
-    match @yue.brightness_set_percent(devs[0], 50) {
+    match @system.brightness_set_percent(devs[0], 50) {
       Ok(_) => println("已设为半亮")
       Err(e) => println("失败：\{e}")
     }
@@ -43,10 +43,10 @@ match @yue.brightness_devices() {
 | `kbd_brightness_step_percent(dev, delta) -> Result[Unit, BrightnessError]` | 按百分比步进 |
 
 ```moonbit
-match @yue.kbd_brightness_devices() {
+match @system.kbd_brightness_devices() {
   Ok(devs) if devs.length() > 0 => {
-    let _ = @yue.kbd_brightness_set_percent(devs[0], 80)
-    let _ = @yue.kbd_brightness_step_percent(devs[0], -10) // 步进减 10%
+    let _ = @system.kbd_brightness_set_percent(devs[0], 80)
+    let _ = @system.kbd_brightness_step_percent(devs[0], -10) // 步进减 10%
   }
   _ => println("无键盘背光")
 }
@@ -67,16 +67,16 @@ match @yue.kbd_brightness_devices() {
 错误 `VolumeError`：`Unsupported`（无可用音量工具）/ `CommandFailed(String)`（执行失败、超时等）/ `ParseFailed(String)`（输出解析失败，带原文）。
 
 ```moonbit
-match @yue.vol_get() {
+match @system.vol_get() {
   Ok(v) =>
     println(
       "sink=\{v.sink} 音量=\{v.volume}% 静音=\{if v.muted { "是" } else { "否" }}",
     )
   Err(e) => println("不可用：\{e}")
 }
-let _ = @yue.vol_set(42)
-let _ = @yue.vol_add(-5)
-let _ = @yue.vol_set_mute(false)
+let _ = @system.vol_set(42)
+let _ = @system.vol_add(-5)
+let _ = @system.vol_set_mute(false)
 ```
 
 ### 音量增强（输出设备与逐应用音量 volx_）
@@ -94,13 +94,13 @@ let _ = @yue.vol_set_mute(false)
 `AudioDevice{ name, description, is_default }`（name 为 pactl 节点名，是 `volx_set_default` 的入参；description 为人类可读名）；`AppStream{ index, app_name, volume, muted }`（app_name 取 `application.name` 属性，缺省回落 `node.name`，再缺省 `"unknown"`；volume 为 0-100，各声道不一致取最响）。错误沿用 `VolumeError`。
 
 ```moonbit
-match @yue.volx_devices() {
+match @system.volx_devices() {
   Ok(devs) => for d in devs {
       println("\{d.description}（\{d.name}）\{if d.is_default { " ←默认" } else { "" }}")
     }
   Err(e) => println("不可用：\{e}")
 }
-match @yue.volx_app_streams() {
+match @system.volx_app_streams() {
   Ok(streams) => for s in streams {
       println("\{s.app_name}  音量=\{s.volume}%")
     }
@@ -121,16 +121,16 @@ match @yue.volx_app_streams() {
 
 ```moonbit
 // 已装清单:注入目录列举函数(如自有的 readdir 封装)
-match @yue.appfind_installed_with(fn(dir) { my_list_dir(dir) }) {
+match @system.appfind_installed_with(fn(dir) { my_list_dir(dir) }) {
   Ok(apps) => for a in apps {
       println("\{a.locale_name}  \{a.exec}")
     }
   Err(e) => println("不可用：\{e}")
 }
 // 二进制查找
-match @yue.appfind_executable("code") {
+match @system.appfind_executable("code") {
   Ok(path) => println("code 位于 \{path}")
-  Err(@yue.AppFindError::NotFound(_)) => println("未安装")
+  Err(@system.AppFindError::NotFound(_)) => println("未安装")
   Err(_) => println("平台不支持")
 }
 ```
@@ -151,10 +151,10 @@ match @yue.appfind_executable("code") {
 
 ```moonbit
 // 文件类型与默认应用
-match @yue.da_file_type("/home/me/report.pdf") {
+match @system.da_file_type("/home/me/report.pdf") {
   Ok(mime) => {
     println("类型：\{mime}")
-    match @yue.da_default_for(mime) {
+    match @system.da_default_for(mime) {
       Ok(desktop) => println("默认应用：\{desktop}")
       Err(_) => println("没有默认应用")
     }
@@ -162,8 +162,8 @@ match @yue.da_file_type("/home/me/report.pdf") {
   Err(e) => println("查询失败：\{e}")
 }
 // 枚举关联应用、设置默认（set 是改变系统状态的操作，由用户显式触发）
-let apps = @yue.da_associations_for("text/html")
-@yue.da_set_default("text/html", "firefox.desktop")
+let apps = @system.da_associations_for("text/html")
+@system.da_set_default("text/html", "firefox.desktop")
 ```
 
 ## VS Code 本地历史与最近工作区
@@ -179,13 +179,13 @@ let apps = @yue.da_associations_for("text/html")
 `VscHistoryEntry{ path, timestamp }`：path 为快照文件绝对路径（内容即该时刻文件全文），timestamp 为 Unix 毫秒，`timestamp_seconds()` 换算秒。错误 `VscodeError`：`Unsupported`（无法定位用户数据目录）/ `StorageUnavailable`（VS Code 从未在本机运行过）/ `StorageCorrupted(String)` / `HistoryCorrupted(String)`。
 
 ```moonbit
-match @yue.vsc_local_history("/home/me/proj/src/main.mbt") {
+match @system.vsc_local_history("/home/me/proj/src/main.mbt") {
   Ok(snaps) => for s in snaps {
       println("\{s.timestamp_seconds()}  \{s.path}")
     }
   Err(e) => println("不可用：\{e}")
 }
-match @yue.vsc_recent() {
+match @system.vsc_recent() {
   Ok(paths) => if paths.length() > 0 {
       println("最近工作区：\{paths[0]}")
     }
@@ -209,20 +209,20 @@ match @yue.vsc_recent() {
 `BrowserProfile{ browser, profile, history_path }`：browser 为 google-chrome / chromium / microsoft-edge / brave，profile 为目录名（Default 或 Profile N）。`HistoryItem{ url, title, visit_count, last_visit_time }`（时间为 Unix 毫秒，未知为 0）；`DownloadItem{ target_path, received_bytes, total_bytes, start_time, end_time, state }`。错误 `BrowserHistoryError`：`BhUnsupported` / `BhNoConfigDir` / `BhNoBrowser` / `BhIoFailed(String)`（单 profile 读失败跳过，全部失败才报错）。
 
 ```moonbit
-match @yue.bh_history(limit=6) {
+match @system.bh_history(limit=6) {
   Ok(items) => for it in items {
       let title = if it.title == "" { "(无标题)" } else { it.title }
       println("[\{it.visit_count}次] \{title}\n  \{it.url}")
     }
   Err(e) => println("不可用：\{e}")
 }
-match @yue.bh_downloads(limit=3) {
+match @system.bh_downloads(limit=3) {
   Ok(ds) => for d in ds {
-      println("\{d.target_path}  \{@yue.bh_download_state_name(d.state)}")
+      println("\{d.target_path}  \{@system.bh_download_state_name(d.state)}")
     }
   Err(_) => ()
 }
-let _ = @yue.bh_search("moonbit", limit=10)
+let _ = @system.bh_search("moonbit", limit=10)
 ```
 
 ## 媒体控制（MPRIS）
@@ -241,16 +241,16 @@ let _ = @yue.bh_search("moonbit", limit=10)
 播放控制属设置类操作，只在调用方显式调用时执行，探测与查询路径不会触发。
 
 ```moonbit
-match @yue.media_players() {
+match @system.media_players() {
   Ok(players) if players.length() > 0 => {
     let p = players[0].name
-    match @yue.media_status(p) {
+    match @system.media_status(p) {
       Ok(s) => println("\{s.title} - \{s.artist}（\{s.playback}）")
       Err(e) => println("读状态失败：\{e}")
     }
-    let _ = @yue.media_play_pause(p)
+    let _ = @system.media_play_pause(p)
   }
-  Err(@yue.MediaError::NoPlayer) => println("无播放器")
+  Err(@system.MediaError::NoPlayer) => println("无播放器")
   Err(e) => println("不可用：\{e}")
 }
 ```
@@ -269,11 +269,11 @@ MPRIS 不提供统一的信号回调通路（总线可订阅 `PropertiesChanged`
 `on_change` 回调抛异常会中断该定时器（先保证自身不抛）；组件销毁前调用 `media_watch_stop` 显式停止。
 
 ```moonbit
-let w = @yue.media_watch_status(interval_ms=1000, fn(s : @yue.MediaStatus) {
+let w = @system.media_watch_status(interval_ms=1000, fn(s : @system.MediaStatus) {
   println("现在播放：\{s.title} - \{s.artist}")
 })
 // 不再关心时
-@yue.media_watch_stop(w)
+@system.media_watch_stop(w)
 ```
 
 ### 通知进度
@@ -305,8 +305,8 @@ n.show()
 错误 `NightlightError`：`Unsupported`（非 Linux，或 redshift 与 xrandr 均不可用、xrandr 无已连接输出）/ `CommandFailed(String)`。xrandr 路径的输出从当前主输出取，无主输出取首个已连接输出。
 
 ```moonbit
-let _ = @yue.nl_set_temperature(30) // 偏暖
-let _ = @yue.nl_reset()
+let _ = @system.nl_set_temperature(30) // 偏暖
+let _ = @system.nl_reset()
 ```
 
 ## 壁纸
@@ -321,11 +321,11 @@ let _ = @yue.nl_reset()
 错误 `WallpaperError`：`Unsupported`（非 Linux、子进程不可用、KDE 的 qdbus 不在）/ `UnknownDesktop(String)`（非 XFCE/GNOME/KDE，带 `XDG_CURRENT_DESKTOP` 原文）/ `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)`。XFCE 写入时属性不存在会创建。
 
 ```moonbit
-match @yue.wp_get() {
+match @system.wp_get() {
   Ok(p) => println("当前壁纸：\{p}")
   Err(e) => println("读不到：\{e}")
 }
-let _ = @yue.wp_set("/home/me/Pictures/wall.png")
+let _ = @system.wp_set("/home/me/Pictures/wall.png")
 ```
 
 ## 音频/视频播放（yue-media 可选层）
@@ -411,7 +411,7 @@ systemprobe 启动即自动载入演示播放器，播放/暂停/拖进度/音�
 `MonitorInfo{ name, connected, primary, width, height, refresh_centi, pos_x, pos_y, mm_width, mm_height, modes }`；`MonitorMode{ width, height, refresh_centi, preferred, current }`；`CurrentOutput{ name, width, height, refresh_centi, pos_x, pos_y }`。错误 `MonitorError`：`Unsupported`（非 Linux 或 xrandr 不可用）/ `CommandFailed(String)` / `ParseFailed(String)`（无任何输出条目）。
 
 ```moonbit
-match @yue.mon_current() {
+match @system.mon_current() {
   Ok(outs) => for o in outs {
       println("\{o.name}  \{o.width}x\{o.height}@\{o.refresh_centi / 100}Hz")
     }
@@ -435,12 +435,12 @@ match @yue.mon_current() {
 激活与关闭会改变真实窗口状态（设置类）：接口完整实现，应用层只在用户操作时调用。
 
 ```moonbit
-match @yue.win_list() {
+match @system.win_list() {
   Ok(wins) => for w in wins { println("\{w.id}  \{w.title}") }
   Err(e) => println("不可用：\{e}")
 }
-let _ = @yue.win_activate("ZCode")   // 按标题
-let _ = @yue.win_close("ZCode")
+let _ = @system.win_activate("ZCode")   // 按标题
+let _ = @system.win_close("ZCode")
 ```
 
 ## 剪贴板监听
@@ -456,11 +456,11 @@ let _ = @yue.win_close("ZCode")
 错误 `ClipboardError`：`Unsupported`（非 Linux 或 xclip 不存在）/ `CommandFailed(String)`。读失败静默跳过该拍，不触发回调。轮询挂在 libyue 定时器上，需在 GUI 消息循环运行后才实际派发。
 
 ```moonbit
-let w = @yue.cbw_start_watch(interval_ms=500, fn(text) {
+let w = @system.cbw_start_watch(interval_ms=500, fn(text) {
   println("剪贴板新内容：\{text}")
 })
 // ……需要时
-@yue.cbw_stop(w)
+@system.cbw_stop(w)
 ```
 
 ## 磁盘卷管理
@@ -477,10 +477,10 @@ let w = @yue.cbw_start_watch(interval_ms=500, fn(text) {
 `DskVolume{ device, label, mountpoint, size_bytes, removable, path }`：device 为块设备文件（`/dev/sda1`）、label 为卷标（无卷标空串）、mountpoint 为已挂载路径（未挂载 None）、size_bytes 为字节、removable 指示可移动介质、path 为 udisks2 对象路径（lsblk 路线取不到为空串，供挂载卸载内部定位）。错误 `DiskError`：`Unsupported` / `BusFailed(String)` / `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)` / `NotMounted(String)` / `AlreadyMounted(String)`。
 
 ```moonbit
-match @yue.dsk_volumes() {
+match @system.dsk_volumes() {
   Ok(vols) =>
     for v in vols if v.removable && v.mountpoint is None {
-      match @yue.dsk_mount(v) {
+      match @system.dsk_mount(v) {
         Ok(_) => println("已挂载 \{v.device}")
         Err(e) => println("挂载失败：\{e}")
       }
@@ -505,13 +505,13 @@ match @yue.dsk_volumes() {
 `SessionInfo{ id, uid, user, seat, path }`：seat 本地为 "seat0"，远程 / 无 seat 的会话为空串。错误 `PwrcError`：`Unsupported`（非 Linux 或 logind 不在线 / 总线不可达）/ `NotAllowed(String)`（Can* 返回 no/na、polkit 授权被拒）/ `BusFailed(String)`。
 
 ```moonbit
-if @yue.pwrc_supported() {
-  match @yue.pwrc_can_power_off() {
+if @system.pwrc_supported() {
+  match @system.pwrc_can_power_off() {
     Ok(true) => {
-      let _ = @yue.pwrc_power_off() // 真机执行：弹 polkit 授权并关机
+      let _ = @system.pwrc_power_off() // 真机执行：弹 polkit 授权并关机
     }
     _ => {
-      let _ = @yue.pwrc_logout_self()
+      let _ = @system.pwrc_logout_self()
     }
   }
 }
@@ -531,9 +531,9 @@ if @yue.pwrc_supported() {
 `PowerProfile`：`PPerformance`（性能）/ `PBalanced`（均衡）/ `PPowerSaver`（省电）。错误 `PowerProfileError`：`PpUnsupported` / `PpCommandFailed(String)` / `PpParseFailed(String)`。
 
 ```moonbit
-match @yue.pp_profiles() {
-  Ok(profiles) if profiles.contains(@yue.PBalanced) => {
-    let _ = @yue.pp_set(@yue.PBalanced)
+match @system.pp_profiles() {
+  Ok(profiles) if profiles.contains(@system.PBalanced) => {
+    let _ = @system.pp_set(@system.PBalanced)
   }
   _ => ()
 }
@@ -553,9 +553,9 @@ match @yue.pp_profiles() {
 错误 `SysInfoError`：`SiUnsupported`（非 Linux）/ `SiReadFailed(String)`（带路径）/ `SiParseFailed(String)`。
 
 ```moonbit
-let os = @yue.si_os() // Ok({ pretty_name: "Ubuntu 24.04.5 LTS", id: "ubuntu", .. })
-let mem = @yue.si_memory()
-let up = @yue.si_uptime() // Ok(84088.08)
+let os = @system.si_os() // Ok({ pretty_name: "Ubuntu 24.04.5 LTS", id: "ubuntu", .. })
+let mem = @system.si_memory()
+let up = @system.si_uptime() // Ok(84088.08)
 ```
 
 ## 时区与本地语言
@@ -572,9 +572,9 @@ let up = @yue.si_uptime() // Ok(84088.08)
 错误 `LocaleError`：`LcUnsupported` / `LcBusFailed(String)` / `LcCommandFailed(String)` / `LcParseFailed(String)` / `LcInvalidTimezone(String)`（空串 / 含空白 / 以 '/' 开头 / 含 '..'）。
 
 ```moonbit
-let tz = @yue.lc_timezone()
-let ntp = @yue.lc_ntp()
-let _ = @yue.lc_set_timezone("Asia/Tokyo") // 需要认证
+let tz = @system.lc_timezone()
+let ntp = @system.lc_ntp()
+let _ = @system.lc_set_timezone("Asia/Tokyo") // 需要认证
 ```
 
 ## 蓝牙
@@ -593,16 +593,16 @@ let _ = @yue.lc_set_timezone("Asia/Tokyo") // 需要认证
 `BtAdapter{ path, address, name, powered, discovering }`；`BtDevice{ path, address, name, paired, connected, trusted }`（name 取 Name 属性，空则回退 Alias，仍空回退 MAC）。错误 `BtError`：`Unsupported`（无适配器或服务不在线）/ `BusFailed(String)`。
 
 ```moonbit
-if @yue.bt_supported() {
-  match @yue.bt_adapter_info() {
+if @system.bt_supported() {
+  match @system.bt_adapter_info() {
     Ok(a) if !a.powered => {
-      let _ = @yue.bt_set_powered(true)
+      let _ = @system.bt_set_powered(true)
     }
     _ => ()
   }
-  let _ = @yue.bt_start_discovery()
-  match @yue.bt_devices() {
-    Ok(devs) => for d in devs if !d.paired { let _ = @yue.bt_pair(d) }
+  let _ = @system.bt_start_discovery()
+  match @system.bt_devices() {
+    Ok(devs) => for d in devs if !d.paired { let _ = @system.bt_pair(d) }
     Err(_) => ()
   }
 }
@@ -622,8 +622,8 @@ if @yue.bt_supported() {
 错误 `SensorError`：`Unsupported`（无服务 / 无对应传感器，含运行中传感器被拔出 / 服务退出）/ `BusFailed(String)`。
 
 ```moonbit
-if @yue.sns_supported() && @yue.sns_has_ambient_light() {
-  match @yue.sns_ambient_light() {
+if @system.sns_supported() && @system.sns_has_ambient_light() {
+  match @system.sns_ambient_light() {
     Ok(lux) => println("环境光：\{lux} lx")
     Err(e) => println("读不到：\{e}")
   }
@@ -645,9 +645,9 @@ if @yue.sns_supported() && @yue.sns_has_ambient_light() {
 `PrinterStatus`：`Idle` / `Printing` / `Paused`（暂停接新任务）/ `Disabled`；`prt_status_available(status)` 判是否可用接任务。`PrinterInfo{ name, status }`；`PrinterJob{ name, id }`（name 为 "目标名-编号" 形态，如 `Gprinter-GP-9034T-12`）。错误 `PrinterError`：`PrtUnsupported` / `PrtCommandFailed(String)` / `PrtParseFailed(String)` / `PrtInvalidParam(String)`（打印机名 / 文件路径为空、份数 < 1）。
 
 ```moonbit
-match @yue.prt_default() {
+match @system.prt_default() {
   Ok(name) => {
-    let _ = @yue.prt_print(printer=name, path="/tmp/doc.pdf")
+    let _ = @system.prt_print(printer=name, path="/tmp/doc.pdf")
   }
   Err(e) => println("无默认打印机：\{e}")
 }
@@ -692,7 +692,7 @@ match @yue.fsx_list_dir("/usr/share/applications") {
 `RecentItem{ uri, path, mime, added, modified, app_count }`：path 为 href 去 `file://` 前缀并百分号解码后的本地路径（非 file:// 方案给空串）、mime 为 MIME 类型（该 bookmark 无此节点给 None）、added / modified 为 Unix 毫秒（缺失或非法为 0）、app_count 为记录过该文件的应用个数。错误 `RecentError`：`RfUnsupported` / `RfNoDataDir` / `RfNoFile`（从未记录过）/ `RfParseFailed(String)`。解码与换算纯函数：`rf_xml_unescape` / `rf_percent_decode` / `rf_uri_to_path` / `rf_iso_to_unix_ms` / `rf_sort_recent`。
 
 ```moonbit
-match @yue.rf_recent(limit=8) {
+match @system.rf_recent(limit=8) {
   Ok(items) => for it in items { println("\{it.path}  (\{it.modified})") }
   Err(e) => println("读不到：\{e}")
 }
@@ -711,9 +711,9 @@ match @yue.rf_recent(limit=8) {
 `BookmarkProfile{ browser, profile, bookmarks_path }`；`BookmarkNode{ name, url?, children, added, root }`（added 为 Unix 毫秒、root 标注所属根 bookmark_bar / other / synced）——返回虚拟根树（名称 "<浏览器>/<profile>"，children 为三根合并），`BookmarkNode::is_folder()` / `is_url()` 分类，`bm_flatten(node)` 给先序扁平 url 书签列表。错误 `BookmarkError`：`BmUnsupported` / `BmNoConfigDir` / `BmNoBrowser` / `BmIoFailed(String)`。
 
 ```moonbit
-match @yue.bm_bookmarks("google-chrome") {
+match @system.bm_bookmarks("google-chrome") {
   Ok(root) =>
-    for n in @yue.bm_flatten(root) {
+    for n in @system.bm_flatten(root) {
       println("\{n.name}  →  \{n.url}")
     }
   Err(e) => println("读不到：\{e}")
@@ -733,7 +733,7 @@ match @yue.bm_bookmarks("google-chrome") {
 `FirefoxProfile{ profile, places_path }`（profile 为 profiles.ini 的 `Path=` 目录名，绝对路径取末段）。hidden 条目（书签等）已滤除；单 profile 读失败跳过、全部失败给 `FfxIoFailed`。错误 `FirefoxHistoryError`：`FfxUnsupported` / `FfxNoProfile`（未安装或从未启动 Firefox）/ `FfxIoFailed(String)`。profiles.ini 缺失时回退固定候选名（default / default-release / default-esr / default-nightly / dev-edition-default），随机前缀命名的 profile 目录收不到。
 
 ```moonbit
-match @yue.ffx_history(limit=10) {
+match @system.ffx_history(limit=10) {
   Ok(items) => for it in items { println("\{it.title}  \{it.url}") }
   Err(e) => println("读不到：\{e}")
 }
@@ -753,9 +753,9 @@ match @yue.ffx_history(limit=10) {
 命令缺失与「存在但失败」是两种语义：前者在该模块自身通常归一为 `*Supported == false` 或 `Unsupported`（如 `PpUnsupported`、`PrtUnsupported`），后者是 `CommandFailed`——调用方按错误值分类处理即可。
 
 ```moonbit
-match @yue.pr_run("wpctl", ["get-volume", "@DEFAULT_SINK@"]) {
+match @system.pr_run("wpctl", ["get-volume", "@DEFAULT_SINK@"]) {
   Ok(out) => println(out.stdout)
-  Err(@yue.ProcError::NonZeroExit(_, err)) => println("失败：\{err}")
+  Err(@system.ProcError::NonZeroExit(_, err)) => println("失败：\{err}")
   Err(e) => println(e)
 }
 ```

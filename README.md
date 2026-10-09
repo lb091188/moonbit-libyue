@@ -23,10 +23,10 @@ English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/maste
 **📝 Declarative** — describe the UI as a node tree:
 
 ```moonbit
-let window = @yue.mount_window(
+let window = @declarative.mount_window(
   [
-    @yue.label("Hello, MoonBit + libyue!", style=[("margin", 20.0)]),
-    @yue.button("Quit", on_click=fn() { @yue.quit() }),
+    @declarative.label("Hello, MoonBit + libyue!", style=[("margin", 20.0)]),
+    @declarative.button("Quit", on_click=fn() { @yue.quit() }),
   ],
   title="Hello", size=Some((420.0, 160.0)), center=true, on_close=fn(_w) { @yue.quit() },
 )
@@ -38,8 +38,8 @@ let window = @yue.mount_window(
 let clicks = @yue.Signal::new(0)
 let text = @yue.Signal::computed(fn() { "Clicked \{clicks.get()} times" })  // dependencies auto-collected
 
-@yue.button("Click me", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
-@yue.bind(text, fn(s) { s }),
+@declarative.button("Click me", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
+@declarative.bind(text, fn(s) { s }),
 ```
 
 **🖥 Desktop-grade system integration** — system tray · notifications · global shortcuts · clipboard · native menu bar · file dialogs · drag & drop · multiple monitors:
@@ -79,7 +79,9 @@ Prerequisite: the MoonBit native toolchain, `moonc` ≥ 0.10.14 (`moon version -
 | Linux x64 (GTK3, on Ubuntu by default) | [`bin-linux-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-linux-x64.zip) |
 | macOS (Apple Silicon) 🟡 no real-machine test | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
 
-> **Upgrading to 0.5.0**: the `Browser` binding moved to a standalone package. Add `"NoahLiu/moonbit-libyue/yue/browser"` to your imports (`@yue.Browser` → `@browser.Browser`, API unchanged). Apps that don't import it are no longer linked against WebKit/WebView2.
+> **Since 0.5.11** the library is split into sub-packages — import only what you use (unused packages are not compiled into your binary). Core (native widgets, painting, `Store`/`Signal`, theme, tray) stays at `NoahLiu/moonbit-libyue/yue` (`@yue`); the declarative layer is `.../yue/declarative` (`@declarative`), themed components `.../yue/components` (`@components`), charts `.../yue/charts`, icons `.../yue/icons`, markdown `.../yue/markdown`, OS capabilities `.../yue/system`. Full table in [docs/README.md](docs/README.md#packages).
+
+> **Upgrading to 0.5.0**: the `Browser` binding moved to a standalone package. Add `"NoahLiu/moonbit-libyue/yue/browser"` to your imports (`@browser.Browser` → `@browser.Browser`, API unchanged). Apps that don't import it are no longer linked against WebKit/WebView2.
 
 ## Documentation index
 
