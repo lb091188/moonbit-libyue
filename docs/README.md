@@ -6,6 +6,23 @@ This directory holds the usage documentation for moonbit-libyue. The component A
 
 Never touched MoonBit? Start from the [five-minute tutorial](tutorial.md) — learning MoonBit, installing dependencies, and building your first desktop app.
 
+## Packages
+
+Since 0.5.11 the module is split into sub-packages — `moon add NoahLiu/moonbit-libyue` gets you all of them, but you only compile and link what you import (MoonBit builds the import closure; an unused package costs nothing in your binary):
+
+| Import in `moon.pkg` | Alias | Contents |
+|---|---|---|
+| `NoahLiu/moonbit-libyue/yue` | `@yue` | Core: FFI, native widgets (Window / View / Label / Button / Entry / Table / Tab / Menu / dialog…), Painter, events, `Store`/`Signal`, theme, tray, file/env helpers |
+| `.../yue/declarative` | `@declarative` | Declarative layer: `Node`/`mount` render tree, node constructors, `bind_label`/`bind`, hover group, overlay scroll |
+| `.../yue/components` | `@components` | Themed component library: buttons / inputs / selection / forms / navigation / layout / data display / feedback / overlays |
+| `.../yue/charts` | `@charts` | 20+ chart types plus the cross-cutting interactive layer |
+| `.../yue/icons` | `@icons` | Vector icon system (`draw_icon` and the icon views/buttons) |
+| `.../yue/markdown` | `@markdown` | `markdown_view` rendering (this package pulls in the mizchi/markdown dependency) |
+| `.../yue/system` | `@system` | OS capabilities: autostart, single instance, power & sessions, volume, brightness, media keys, wallpaper, Bluetooth, printers, disk volumes, browser history… (pulls in subproc / sqlite) |
+| `.../yue/browser` | `@browser` | Webview widget — import only if you need it (it is the only package that links WebKit/WebView2) |
+
+The tutorial imports core + declarative; the themed component library and everything above it is opt-in.
+
 ## Demo
 
 Five examples, from shallow to deep:
@@ -48,14 +65,14 @@ Process page: a virtual table at the 1000-row scale with search filtering, six s
 |---|---|
 | [tutorial.md](tutorial.md) | Five-minute tutorial (for MoonBit newcomers): from `moon new` to a running window, avoiding the three newcomer pitfalls one by one; includes links to the official MoonBit tutorial & Tour |
 | [aboutlibyue.md](aboutlibyue.md) | About me and `libyue`: how the author met this library and how the binding came to be |
-| [declarative.md](declarative.md) | Declarative UI: `Node`/`mount` render tree + `Store`/`Signal` reactive bindings (signals: computed with automatic dependency tracking + batch) |
+| [declarative.md](declarative.md) | Declarative UI (package `@declarative`): `Node`/`mount` render tree + `Store`/`Signal` reactive bindings (signals: computed with automatic dependency tracking + batch) |
 | [layout.md](layout.md) | Layout style key quick reference: all Yoga flexbox style keys (enum / numeric / edge / special) + common-combination examples |
-| [components-ui.md](components-ui.md) | Themed component library quick reference: Element-Plus-style themed components (buttons/input/selection/forms/navigation/layout/data display/charts/icons/feedback/overlays), per-API signatures + parameter tables + examples; charts cover line/bar/donut/gauge/scatter plus extended charts (radar/heatmap/candlestick/funnel/boxplot/sankey) and a second batch of hierarchy/geo/force/stream charts (tree/treemap/sunburst/geo map + flights/force graph/parallel coordinates/theme river/ripple scatter/pictorial bar) with a cross-cutting interactive layer (hover tooltip + hit testing, clickable legend, DataZoom pan/zoom, markLine/markArea, VisualMap, export) |
+| [components-ui.md](components-ui.md) | Themed component library quick reference (package `@components`): Element-Plus-style themed components (buttons/input/selection/forms/navigation/layout/data display/charts/icons/feedback/overlays), per-API signatures + parameter tables + examples; charts cover line/bar/donut/gauge/scatter plus extended charts (radar/heatmap/candlestick/funnel/boxplot/sankey) and a second batch of hierarchy/geo/force/stream charts (tree/treemap/sunburst/geo map + flights/force graph/parallel coordinates/theme river/ripple scatter/pictorial bar) with a cross-cutting interactive layer (hover tooltip + hit testing, clickable legend, DataZoom pan/zoom, markLine/markArea, VisualMap, export) |
 | [components.md](components.md) | Widget API quick reference: both classic setter and `X::make` props styles, including upstream pitfalls |
 | [adaptation.md](adaptation.md) | Platform adaptation notes: field-tested pitfalls per platform, root causes, and verification conclusions (continuously updated) |
 | [tray.md](tray.md) | Linux tray solution: SNI protocol stack design, architecture, backend fallback, desktop compatibility |
 | [autostart.md](autostart.md) | Cross-platform autostart: XDG .desktop on Linux / HKCU Run key on Windows, unified is_enabled / enable / disable |
-| [zh/system-capabilities.md](zh/system-capabilities.md) (Chinese) | System capabilities: screen brightness / keyboard backlight / system volume (wpctl first, pactl fallback; output devices + per-app streams) / media playback control (MPRIS, playerctl fallback) / night color temperature / wallpaper / monitor configuration / window management / clipboard watching / disk volumes (udisks2 first, lsblk fallback) / power & sessions / power profiles / system info / timezone & language / Bluetooth / sensors / printers / process env & directory listing / recent files / browser bookmarks & Firefox history / installed-app lookup / VS Code local history & recent workspaces / browser history & downloads, unified Result semantics; includes the shared subprocess (procrun) and generic D-Bus (traybus) layers |
+| [zh/system-capabilities.md](zh/system-capabilities.md) (Chinese) | System capabilities (package `@system`, Chinese only): screen brightness / keyboard backlight / system volume (wpctl first, pactl fallback; output devices + per-app streams) / media playback control (MPRIS, playerctl fallback) / night color temperature / wallpaper / monitor configuration / window management / clipboard watching / disk volumes (udisks2 first, lsblk fallback) / power & sessions / power profiles / system info / timezone & language / Bluetooth / sensors / printers / process env & directory listing / recent files / browser bookmarks & Firefox history / installed-app lookup / VS Code local history & recent workspaces / browser history & downloads, unified Result semantics; includes the shared subprocess (procrun) and generic D-Bus (traybus) layers |
 | [zh/plan-system-integration.md](zh/plan-system-integration.md) (Chinese) | System-integration expansion master plan: the batch breakdown of P1-P12 plus the closing item P14, acceptance gates, shared-infrastructure decisions and risks (finalized) |
 | [relink.md](relink.md) | Forcing a relink after native layer (shim/vendor) changes: detection and handling |
 

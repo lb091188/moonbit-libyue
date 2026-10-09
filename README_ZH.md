@@ -23,10 +23,10 @@
 **📝 声明式** —— 节点树描述界面：
 
 ```moonbit
-let window = @yue.mount_window(
+let window = @declarative.mount_window(
   [
-    @yue.label("Hello, MoonBit + libyue!", style=[("margin", 20.0)]),
-    @yue.button("退出", on_click=fn() { @yue.quit() }),
+    @declarative.label("Hello, MoonBit + libyue!", style=[("margin", 20.0)]),
+    @declarative.button("退出", on_click=fn() { @yue.quit() }),
   ],
   title="Hello", size=Some((420.0, 160.0)), center=true, on_close=fn(_w) { @yue.quit() },
 )
@@ -38,8 +38,8 @@ let window = @yue.mount_window(
 let clicks = @yue.Signal::new(0)
 let text = @yue.Signal::computed(fn() { "已点 \{clicks.get()} 次" })  // 依赖自动收集
 
-@yue.button("点我", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
-@yue.bind(text, fn(s) { s }),
+@declarative.button("点我", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
+@declarative.bind(text, fn(s) { s }),
 ```
 
 **🖥 桌面级系统能力** —— 系统托盘 · 通知 · 全局快捷键 · 剪贴板 · 原生菜单栏 · 文件对话框 · 拖放 · 多显示器：
@@ -79,7 +79,9 @@ moon run examples/sysmonitor
 | Linux x64(需 GTK3,Ubuntu 自带) | [`bin-linux-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-linux-x64.zip) |
 | macOS(Apple Silicon) 🟡 未真机验证 | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
 
-> **升级到 0.5.0**：`Browser` 绑定拆分为独立包,import 路径改为 `NoahLiu/moonbit-libyue/yue/browser`(`@yue.Browser` → `@browser.Browser`,API 不变)。未 import 该包的程序不再链接 WebKit/WebView2 依赖。
+> **0.5.11 起**库拆成多个子包——按需 import,用不到的包不进二进制。核心(原生控件、绘制、`Store`/`Signal`、主题、托盘)仍是 `NoahLiu/moonbit-libyue/yue`(`@yue`);声明式层 `.../yue/declarative`(`@declarative`)、主题组件 `.../yue/components`(`@components`)、图表 `.../yue/charts`、图标 `.../yue/icons`、markdown `.../yue/markdown`、系统能力 `.../yue/system`。完整表见 [docs/zh/README.md](docs/zh/README.md#包结构)。
+
+> **升级到 0.5.0**：`Browser` 绑定拆分为独立包,import 路径改为 `NoahLiu/moonbit-libyue/yue/browser`(`@browser.Browser` → `@browser.Browser`,API 不变)。未 import 该包的程序不再链接 WebKit/WebView2 依赖。
 
 ## 文档索引
 

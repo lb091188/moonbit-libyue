@@ -294,8 +294,8 @@ let sep = @yue.Separator::make(Horizontal)   // or Vertical
 Hovering anywhere in the group — including all child widgets — puts the whole group into the hover state: events triggered on child widgets change the group's styling too.
 
 ```moonbit
-@yue.hover_group(
-  @yue.vbox([ /* card content: title / buttons / inputs */ ], style=[("padding", 14.0)]),
+@declarative.hover_group(
+  @declarative.vbox([ /* card content: title / buttons / inputs */ ], style=[("padding", 14.0)]),
   radius=8.0,
   on_change=fn(h, host) {
     // the background highlight is built in; extra feedback like the cursor
@@ -322,8 +322,8 @@ On Windows, `scroll()`'s default form (overlay=true with no explicit policy) alr
 Standalone use (when the content is already a Node):
 
 ```moonbit
-@yue.overlay_scroll(
-  @yue.vbox([@yue.label("Line 1"), /* ... */]),
+@declarative.overlay_scroll(
+  @declarative.vbox([@declarative.label("Line 1"), /* ... */]),
   style=[("height", 180.0)],   // container style; height comes from outer layout or is explicit
 )
 ```
@@ -490,7 +490,7 @@ let b = @browser.Browser::make(url="https://example.com")   // or html="<h1>本�
 
 For customization options, use `Browser::new_with_options(BrowserOptions)`.
 
-> Since 0.5.0 Browser lives in the standalone package `NoahLiu/moonbit-libyue/yue/browser` (API unchanged; `@yue.Browser` becomes `@browser.Browser`); apps that don't import it no longer link WebKit/WebView2.
+> Since 0.5.0 Browser lives in the standalone package `NoahLiu/moonbit-libyue/yue/browser` (API unchanged; `@browser.Browser` becomes `@browser.Browser`); apps that don't import it no longer link WebKit/WebView2.
 
 ## Clipboard
 
@@ -612,7 +612,7 @@ demos live on the showcase "System" page.
 ### Single Instance & Re-Activation
 
 ```moonbit
-match @yue.SingleInstance::acquire("org.example.MyApp") {
+match @system.SingleInstance::acquire("org.example.MyApp") {
   Ok(Some(handle)) => {
     // this process is the first instance — keep starting up
     handle.on_activate(fn(args) {
@@ -637,7 +637,7 @@ mutex plus a message window.
 ### Autostart
 
 ```moonbit
-let auto = match @yue.Autostart::new("org.example.MyApp") {
+let auto = match @system.Autostart::new("org.example.MyApp") {
   Ok(a) => a
   Err(_) => ...   // platform unsupported (macOS deferred)
 }
@@ -669,11 +669,11 @@ travel back (whether the browser truly opens is the desktop's call).
 ### Keep-Awake & User Idle
 
 ```moonbit
-match @yue.KeepAwake::enable("org.example.MyApp") {
+match @system.KeepAwake::enable("org.example.MyApp") {
   Ok(k) => { /* display kept on */ ignore(k.release()) }  // release
   Err(_) => ()
 }
-match @yue.idle_seconds() {
+match @system.idle_seconds() {
   Ok(sec) => ...   // seconds since the last input (threshold is the caller's)
   Err(_) => ()
 }

@@ -1,6 +1,6 @@
 # 主题组件库速查
 
-主题组件库速查：Element Plus 风格的成套界面组件（按钮 / 输入 / 选择 / 表单 / 导航 / 布局 / 数据展示 / 图标 / 反馈 / 浮层），全部经 `@yue` 调用、返回 `Node` 直接进界面树。签名中带 `?` 的可选参数必须具名传值（如 `date_picker_t(value=day)`），不带 `?` 的位置参数按序传。响应式 `Store` / `Signal` 参数见 [declarative.md](declarative.md)；原生控件（Window / Label / Button / Entry 等）见 [components.md](components.md)。
+主题组件库速查：Element Plus 风格的成套界面组件（按钮 / 输入 / 选择 / 表单 / 导航 / 布局 / 数据展示 / 图标 / 反馈 / 浮层），全部经 `@components` 调用(moon.pkg 的 import 加 `"NoahLiu/moonbit-libyue/yue/components"`;`Node` 类型与 `mount` 来自 `@declarative`,即还要 import `"NoahLiu/moonbit-libyue/yue/declarative"`)、返回 `Node` 直接进界面树。签名中带 `?` 的可选参数必须具名传值（如 `date_picker_t(value=day)`），不带 `?` 的位置参数按序传。响应式 `Store` / `Signal` 参数见 [declarative.md](declarative.md)；原生控件（Window / Label / Button / Entry 等）见 [components.md](components.md)。
 
 完整演示见 `examples/showcase`。
 
@@ -84,9 +84,9 @@ accent.subscribe(fn(a) {
 
 ```moonbit
 // 覆盖宽度与外边距(默认值其余保持)
-@yue.input_t(text="姓名", style=[("width", 160.0), ("marginBottom", 4.0)])
+@components.input_t(text="姓名", style=[("width", 160.0), ("marginBottom", 4.0)])
 // slider 默认横向自适应;定宽需同时取消 grow
-@yue.slider_t(v, style=[("flexgrow", 0.0), ("width", 240.0)])
+@components.slider_t(v, style=[("flexgrow", 0.0), ("width", 240.0)])
 ```
 
 布局定制唯一入口是 `style`——组件签名不再保留 margin / width / height / spacing 之类布局命名参数。仍以命名参数保留的是语义 / 结构参数：`avatar` / `icon` 的 `size`（图形内容尺寸）、`table_t` 的 `width`（列宽均分基准）与 `row_height`、`popover_t` 的 `width` / `height`（原生弹层窗口尺寸，不走布局）、`transfer` 的 `width`（栏宽）、`hsplit` / `vsplit` 的 `ratio`（拖动几何）、各数据/交互参数（min/max/step/placeholder/clearable/foldable 等）。
@@ -119,9 +119,9 @@ let panel = @yue.Container::make()
 hover 表现：Solid / Danger 加深，Soft 变实底白字，Text 浅灰底；传了 color / background_color 后以传入色为准，hover 不再变色。
 
 ```moonbit
-@yue.button_t("确定", on_click=fn() { submit() })
-@yue.button_t("删除", variant=@yue.Danger)
-@yue.button_t("自定义", color="#ffd700", background_color="#1a1a2e")
+@components.button_t("确定", on_click=fn() { submit() })
+@components.button_t("删除", variant=@components.Danger)
+@components.button_t("自定义", color="#ffd700", background_color="#1a1a2e")
 ```
 
 ### 主题标签 label_t
@@ -138,8 +138,8 @@ hover 表现：Solid / Danger 加深，Soft 变实底白字，Text 浅灰底；�
 | handle | (Label) -> Unit | 空操作 | 创建后回调，拿到底层 Label 自行处理 |
 
 ```moonbit
-@yue.label_t("设置", role=@yue.Title)
-@yue.label_t("当前用户:admin", role=@yue.Secondary)
+@components.label_t("设置", role=@components.Title)
+@components.label_t("当前用户:admin", role=@components.Secondary)
 ```
 
 ### 链接 link
@@ -147,7 +147,7 @@ hover 表现：Solid / Danger 加深，Soft 变实底白字，Text 浅灰底；�
 `link(text, on_click)`——主题色文字，悬停加深并显示下划线色条，点击回调。
 
 ```moonbit
-@yue.link("查看详情", fn() { open_detail() })
+@components.link("查看详情", fn() { open_detail() })
 ```
 
 ## 输入
@@ -165,7 +165,7 @@ hover 表现：Solid / Danger 加深，Soft 变实底白字，Text 浅灰底；�
 
 ```moonbit
 let name = @yue.Store::new("")
-@yue.entry_t(text="预填", on_input=fn(s) { name.set(s) })
+@components.entry_t(text="预填", on_input=fn(s) { name.set(s) })
 ```
 
 ### 边框输入框 input_t
@@ -182,7 +182,7 @@ let name = @yue.Store::new("")
 
 ```moonbit
 let valid = @yue.Store::new(false)
-@yue.input_t(text="admin", clearable=true, invalid=valid, on_input=fn(s) { check(s) })
+@components.input_t(text="admin", clearable=true, invalid=valid, on_input=fn(s) { check(s) })
 ```
 
 ### 数字输入器 input_number
@@ -193,7 +193,7 @@ let valid = @yue.Store::new(false)
 
 ```moonbit
 let count = @yue.Store::new(1.0)
-@yue.input_number(count, min=1.0, max=10.0)
+@components.input_number(count, min=1.0, max=10.0)
 ```
 
 ### 多行输入 textarea_t
@@ -203,7 +203,7 @@ let count = @yue.Store::new(1.0)
 input_t 同套路：外层自绘 1px 边框（聚焦变主题色）+ 8px 内边距；内容超出自行滚动。clearable / invalid 语义同 input_t。
 
 ```moonbit
-@yue.textarea_t(text="第一行\n第二行", style=[("width", 320.0), ("height", 120.0)])
+@components.textarea_t(text="第一行\n第二行", style=[("width", 320.0), ("height", 120.0)])
 ```
 
 ### 复选框 checkbox_t
@@ -219,7 +219,7 @@ input_t 同套路：外层自绘 1px 边框（聚焦变主题色）+ 8px 内边�
 | on_change | (Bool) -> Unit | 空操作 | 勾选变化回调，收新状态 |
 
 ```moonbit
-@yue.checkbox_t("记住我", checked=true, on_change=fn(v) { remember(v) })
+@components.checkbox_t("记住我", checked=true, on_change=fn(v) { remember(v) })
 ```
 
 ### 单选组 radio_group
@@ -230,7 +230,7 @@ input_t 同套路：外层自绘 1px 边框（聚焦变主题色）+ 8px 内边�
 
 ```moonbit
 let choice = @yue.Store::new("甲")
-@yue.radio_group(["甲", "乙", "丙"], choice)
+@components.radio_group(["甲", "乙", "丙"], choice)
 ```
 
 ### 开关 switch_t
@@ -239,7 +239,7 @@ let choice = @yue.Store::new("甲")
 
 ```moonbit
 let enabled = @yue.Store::new(true)
-@yue.switch_t(enabled)
+@components.switch_t(enabled)
 ```
 
 ### 滑杆 slider_t
@@ -250,7 +250,7 @@ let enabled = @yue.Store::new(true)
 
 ```moonbit
 let volume = @yue.Store::new(0.5)
-@yue.slider_t(volume, max=1.0, step=0.1, on_change=fn(v) { set_volume(v) })
+@components.slider_t(volume, max=1.0, step=0.1, on_change=fn(v) { set_volume(v) })
 ```
 
 ## 选择
@@ -263,7 +263,7 @@ let volume = @yue.Store::new(0.5)
 
 ```moonbit
 let color = @yue.Store::new("红")
-@yue.select_t(["红", "绿", "蓝"], color, clearable=true, on_change=fn(s) { recolor(s) })
+@components.select_t(["红", "绿", "蓝"], color, clearable=true, on_change=fn(s) { recolor(s) })
 ```
 
 ### 日期选择器 date_picker_t
@@ -273,8 +273,8 @@ let color = @yue.Store::new("红")
 全自绘：输入框样式字段，点击弹出 `calendar_t` 月历面板，点选回填并收起，失焦收起；clearable=true 时悬停且有值，箭头旁 ✕ 清空（不触发 on_change）。
 
 ```moonbit
-let day : @yue.Store[@yue.DateYMD?] = @yue.Store::new(None)
-@yue.date_picker_t(value=day, on_change=fn(d) { picked(d) })
+let day : @yue.Store[@components.DateYMD?] = @yue.Store::new(None)
+@components.date_picker_t(value=day, on_change=fn(d) { picked(d) })
 ```
 
 ### 日期区间选择器 date_range_picker_t
@@ -284,8 +284,8 @@ let day : @yue.Store[@yue.DateYMD?] = @yue.Store::new(None)
 字段显示「起 ~ 止」，点击弹区间日历：第一次点选起点，第二次点选终点（终点早于起点自动对调）后收起并回调 `on_change(起, 止)`；中间日期浅主题色底，端点实心方块；再点字段重新开始新区间。clearable 清空两端。
 
 ```moonbit
-let range : @yue.Store[@yue.DateRange] = @yue.Store::new({ start: None, end: None })
-@yue.date_range_picker_t(value=range, on_change=fn(s, e) { show(s, e) })
+let range : @yue.Store[@components.DateRange] = @yue.Store::new({ start: None, end: None })
+@components.date_range_picker_t(value=range, on_change=fn(s, e) { show(s, e) })
 ```
 
 ### 时间区间选择器 time_range_picker_t
@@ -295,8 +295,8 @@ let range : @yue.Store[@yue.DateRange] = @yue.Store::new({ start: None, end: Non
 字段显示「起 : 止」时 : 分，点击弹起 / 止两行步进编辑器（时 0-23 / 分 0-59，`input_number` 承载），步进即改即回调 `on_change(起, 止)`；起止默认 00:00，弹层随字段失焦收起。
 
 ```moonbit
-let tr : @yue.Store[@yue.TimeRange] = @yue.Store::new({ start: None, end: None })
-@yue.time_range_picker_t(value=tr, on_change=fn(s, e) { show(s, e) })
+let tr : @yue.Store[@components.TimeRange] = @yue.Store::new({ start: None, end: None })
+@components.time_range_picker_t(value=tr, on_change=fn(s, e) { show(s, e) })
 ```
 
 ### 日期时间区间选择器 datetime_range_picker_t
@@ -306,8 +306,8 @@ let tr : @yue.Store[@yue.TimeRange] = @yue.Store::new({ start: None, end: None }
 字段显示「起日期 起:分 ~ 止日期 止:分」，弹层 = 区间日历 + 分隔线 + 起 / 止两行时间步进 + 「完成」按钮；日期两段式选完或时间步进后区间完整即回调 `on_change(起日期, 起时间, 止日期, 止时间)`。值类型 `DateTimeRange{ start : (DateYMD, TimeHM)?, end : (DateYMD, TimeHM)? }`。
 
 ```moonbit
-let dtr : @yue.Store[@yue.DateTimeRange] = @yue.Store::new({ start: None, end: None })
-@yue.datetime_range_picker_t(value=dtr, on_change=fn(sd, st, ed, et) { show(sd, st, ed, et) })
+let dtr : @yue.Store[@components.DateTimeRange] = @yue.Store::new({ start: None, end: None })
+@components.datetime_range_picker_t(value=dtr, on_change=fn(sd, st, ed, et) { show(sd, st, ed, et) })
 ```
 
 ### 日历面板 calendar_t
@@ -317,7 +317,7 @@ let dtr : @yue.Store[@yue.DateTimeRange] = @yue.Store::new({ start: None, end: N
 全自绘月历面板：‹/› 切月 + 星期行 + 42 格月网格，跨月日期灰显，「今天」主题色，选中日期实心主题色方块；点击当月日期回调 on_pick 并写入 value。`DateYMD::format()` 出 `YYYY-MM-DD`，`TimeHM::format()` 出 `HH:MM`。
 
 ```moonbit
-@yue.calendar_t(on_pick=fn(d) { picked(d) })
+@components.calendar_t(on_pick=fn(d) { picked(d) })
 ```
 
 ### 取色器 color_picker_t
@@ -328,7 +328,7 @@ let dtr : @yue.Store[@yue.DateTimeRange] = @yue.Store::new({ start: None, end: N
 
 ```moonbit
 let hex = @yue.Store::new("#2D68C4")
-@yue.color_picker_t(hex)
+@components.color_picker_t(hex)
 ```
 
 ### 评分 rate_t
@@ -337,7 +337,7 @@ let hex = @yue.Store::new("#2D68C4")
 
 ```moonbit
 let stars = @yue.Store::new(4)
-@yue.rate_t(stars)
+@components.rate_t(stars)
 ```
 
 ## 表单
@@ -350,7 +350,7 @@ let stars = @yue.Store::new(4)
 
 ```moonbit
 let err = @yue.Store::new("")
-@yue.form_item("用户名", @yue.input_t(text="admin"), error=err)
+@components.form_item("用户名", @components.input_t(text="admin"), error=err)
 ```
 
 ### 表单 form
@@ -358,9 +358,9 @@ let err = @yue.Store::new("")
 `form(title, items : Array[Node])`——分组标题 + 一组表单项。
 
 ```moonbit
-@yue.form("账号设置", [
-  @yue.form_item("用户名", @yue.input_t()),
-  @yue.form_item("密码", @yue.input_t(password=true)),
+@components.form("账号设置", [
+  @components.form_item("用户名", @components.input_t()),
+  @components.form_item("密码", @components.input_t(password=true)),
 ])
 ```
 
@@ -374,7 +374,7 @@ hover 浅灰、选中主题浅蓝底 + 主题色文字 + 左侧 3px 强调条，
 
 ```moonbit
 let page = @yue.Store::new("首页")
-@yue.side_menu(["首页", "设置", "关于"], page)
+@components.side_menu(["首页", "设置", "关于"], page)
 ```
 
 ### 分组侧边菜单 side_menu_sections
@@ -385,7 +385,7 @@ let page = @yue.Store::new("首页")
 
 ```moonbit
 let page = @yue.Store::new("按钮")
-@yue.side_menu_sections([("组件", ["按钮", "输入"]), ("系统", ["关于"])], page)
+@components.side_menu_sections([("组件", ["按钮", "输入"]), ("系统", ["关于"])], page)
 ```
 
 ### 分段控制器 segmented
@@ -394,7 +394,7 @@ let page = @yue.Store::new("按钮")
 
 ```moonbit
 let view = @yue.Store::new("列表")
-@yue.segmented(["列表", "网格"], view)
+@components.segmented(["列表", "网格"], view)
 ```
 
 ### 面包屑 breadcrumb
@@ -403,7 +403,7 @@ let view = @yue.Store::new("列表")
 
 ```moonbit
 let cur = @yue.Store::new("网络")
-@yue.breadcrumb(["首页", "设置", "网络"], cur)
+@components.breadcrumb(["首页", "设置", "网络"], cur)
 ```
 
 ### 分页 pagination
@@ -412,7 +412,7 @@ let cur = @yue.Store::new("网络")
 
 ```moonbit
 let page_no = @yue.Store::new(1)
-@yue.pagination(page_no, 10)
+@components.pagination(page_no, 10)
 ```
 
 ### 步骤条 steps
@@ -421,7 +421,7 @@ let page_no = @yue.Store::new(1)
 
 ```moonbit
 let step = @yue.Store::new(1)
-@yue.steps(["填写信息", "验证", "完成"], step)
+@components.steps(["填写信息", "验证", "完成"], step)
 ```
 
 ### 页签 tabs_t
@@ -431,7 +431,7 @@ let step = @yue.Store::new(1)
 顶部形态：页签头行（选中主题色文字 + 底部 2px 指示条，悬停变深）+ 内容区经 `set_visible` 切换；`selected` 为页序号 Store，缺省内部建 0。
 
 ```moonbit
-@yue.tabs_t([("概览", overview_view), ("日志", log_view)])
+@components.tabs_t([("概览", overview_view), ("日志", log_view)])
 ```
 
 ## 布局与分隔
@@ -441,8 +441,8 @@ let step = @yue.Store::new(1)
 `divider(vertical? = false, style?, handle?)`——水平（默认，高 1px 宽 flex）或竖直（宽 1px 高随父容器），两侧留白默认 10px、经 style 覆盖。底色挂载时读主题，重建界面生效。
 
 ```moonbit
-@yue.divider(style=[("marginTop", 16.0), ("marginBottom", 16.0)])
-@yue.divider(vertical=true)
+@components.divider(style=[("marginTop", 16.0), ("marginBottom", 16.0)])
+@components.divider(vertical=true)
 ```
 
 ### 可分栏 hsplit / vsplit
@@ -465,8 +465,8 @@ let step = @yue.Store::new(1)
 前者彩色实底（自定颜色），后者类型浅底 + 同族深字（`Primary` / `Success` / `Warning` / `Danger` / `Info`）；直角，宽度按文本自适应。
 
 ```moonbit
-@yue.tag("v1.2", "#2D68C4")
-@yue.tag_of_type("运行中", @yue.Success)
+@components.tag("v1.2", "#2D68C4")
+@components.tag_of_type("运行中", @components.Success)
 ```
 
 ### 头像 avatar
@@ -474,7 +474,7 @@ let step = @yue.Store::new(1)
 `avatar(letter, color, size? = 36.0)`——方形实底 + 白字居中。
 
 ```moonbit
-@yue.avatar("Y", "#2D68C4", size=40.0)
+@components.avatar("Y", "#2D68C4", size=40.0)
 ```
 
 ### 角标 badge_count / badge_dot
@@ -482,8 +482,8 @@ let step = @yue.Store::new(1)
 `badge_count(count)` 红底白字数字小块（宽度自适应，颜色跟随主题）；`badge_dot(color? = "")` 8×8 色点。
 
 ```moonbit
-@yue.badge_count(3)
-@yue.badge_dot(color="#2E9E5B")
+@components.badge_count(3)
+@components.badge_dot(color="#2E9E5B")
 ```
 
 ### 数值统计 statistic
@@ -492,7 +492,7 @@ let step = @yue.Store::new(1)
 
 ```moonbit
 let visits = @yue.Store::new("1,024")
-@yue.statistic("今日访问", visits)
+@components.statistic("今日访问", visits)
 ```
 
 ### 线性进度条 progress_line
@@ -501,7 +501,7 @@ let visits = @yue.Store::new("1,024")
 
 ```moonbit
 let ratio = @yue.Store::new(0.42)
-@yue.progress_line(ratio, style=[("height", 6.0)])
+@components.progress_line(ratio, style=[("height", 6.0)])
 ```
 
 ### 描述列表 descriptions
@@ -509,7 +509,7 @@ let ratio = @yue.Store::new(0.42)
 `descriptions(pairs : Array[(String, String)])`——键灰值深的两列网格。
 
 ```moonbit
-@yue.descriptions([("名称", "libyue"), ("版本", "0.15.6"), ("平台", "Linux")])
+@components.descriptions([("名称", "libyue"), ("版本", "0.15.6"), ("平台", "Linux")])
 ```
 
 ### 时间线 timeline
@@ -517,10 +517,10 @@ let ratio = @yue.Store::new(0.42)
 `timeline(items : Array[(String, String, SemanticType)])`——左列色点 + 竖线，右列标题 + 描述；item 为（标题, 描述, 语义类型），行高固定 56。
 
 ```moonbit
-@yue.timeline([
-  ("构建", "编译通过", @yue.Success),
-  ("测试", "45/45 通过", @yue.Success),
-  ("发布", "等待审核", @yue.Warning),
+@components.timeline([
+  ("构建", "编译通过", @components.Success),
+  ("测试", "45/45 通过", @components.Success),
+  ("发布", "等待审核", @components.Warning),
 ])
 ```
 
@@ -529,9 +529,9 @@ let ratio = @yue.Store::new(0.42)
 `collapse(panels : Array[(String, Array[Node])])`——点击标题行切换内容显隐，各面板独立开合，初始仅第一面板展开。
 
 ```moonbit
-@yue.collapse([
-  ("常规", [@yue.label_t("基础设置项", role=@yue.Body)]),
-  ("高级", [@yue.label_t("调试选项", role=@yue.Body)]),
+@components.collapse([
+  ("常规", [@components.label_t("基础设置项", role=@components.Body)]),
+  ("高级", [@components.label_t("调试选项", role=@components.Body)]),
 ])
 ```
 
@@ -540,7 +540,7 @@ let ratio = @yue.Store::new(0.42)
 `card(title, children : Array[Node], style?, handle?)`——标题栏（加粗、底部分隔线）+ 边框（卡高默认 160、经 style 覆盖），内容区从标题栏下方开始。
 
 ```moonbit
-@yue.card("概要", [@yue.statistic("任务数", done)], style=[("height", 120.0)])
+@components.card("概要", [@components.statistic("任务数", done)], style=[("height", 120.0)])
 ```
 
 ### 代码高亮 code_view
@@ -550,7 +550,7 @@ let ratio = @yue.Store::new(0.42)
 逐 token 高亮排版，全平台行为一致（含 Windows）。着色分类：关键字紫 / 类型与大写开头构造器黄 / 后随 `(` 的调用蓝 / 数字橙 / 字符串绿 / 行注释灰；标点与运算符独立断词（`items.push(`、`0..<` 各自正确着色）。lang 关键字集：moonbit / js / ts / python / rust / c / go / bash / sql（大小写不敏感）；line_numbers=true 左侧行号槽。
 
 ```moonbit
-@yue.code_view(
+@components.code_view(
   ["fn main() {", "  println(\"hello\")", "}"],
   lang="moonbit",
   line_numbers=true,
@@ -562,7 +562,7 @@ let ratio = @yue.Store::new(0.42)
 `markdown_view(source, style?)`——标题 1-6（ATX/Setext）/ 段落 / **粗体** / *斜体* / ~~删除线~~（区间自画横线）/ `行内代码` / [链接](url)（点击经默认浏览器打开，悬浮手型光标 + 地址提示；引用式链接取文档级链接定义）/ 自动链接 / 无序有序列表（带 start）/ 任务列表（真复选框，点击可勾选）/ 引用（主题色竖条）/ GFM 提示块 / 分隔线 / 围栏与缩进代码块（语言随 fence 标注，复用 code_view）/ 表格（等分列宽网格，单元格富文本，列对齐随 `:---` `:---:` `---:` 标注）/ 定义列表 / 脚注（正文上标引用按出现顺序编号，文末分隔线后渲染被引用的定义）/ 块级图片（本地路径或 `file://` 加载显示，等比缩放、宽度上限 560；加载失败或网络地址降级 alt 文本，行内图片降级 alt）；emoji 等非 BMP 字符后样式区间按 UTF-16 计量不错位；行内 HTML 与 HTML 块默认不渲染；三平台显示一致，链接 / 代码色跟主题。
 
 ```moonbit
-@yue.markdown_view("# 标题\n\n正文 **粗体**、~~删除线~~ 与 [链接](https://libyue.com)。\n\n- [x] 任务项\n\n| 列甲 | 列乙 |\n|:--|--:|\n| 1 | 2 |\n\n脚注引用[^1]。\n\n[^1]: 脚注定义。")
+@markdown.markdown_view("# 标题\n\n正文 **粗体**、~~删除线~~ 与 [链接](https://libyue.com)。\n\n- [x] 任务项\n\n| 列甲 | 列乙 |\n|:--|--:|\n| 1 | 2 |\n\n脚注引用[^1]。\n\n[^1]: 脚注定义。")
 ```
 
 ### 表格 table_t
@@ -574,11 +574,11 @@ let ratio = @yue.Store::new(0.42)
 表头排序与列宽：传 `sort`（`Store[TableSort]`，`TableSort{ column, asc }`，`column` 为列定义下标、<0 表示不排序）后，可排序列表头右侧常驻灰色 ↕ 双三角提示可点排序；点击三态循环「新列默认升序 → 同列翻转降序 → 再击取消排序」，当前排序列换主题色实心 ▲ / ▼（排序状态一眼可辨），取消后 `column` 置 -1、使用方订阅里恢复原始顺序；数据排序由使用方订阅该 Store 自行完成后回写 `rows`。表头列边界线常驻浅色，悬停 / 拖动变主题色——拖动位置一眼可辨；按住任一列左缘或右缘 4px 调整列宽（末列右缘不设把手），相邻两列此消彼长（最小 56px），拖动经鼠标捕获不丢事件，行不重建、选择不丢。
 
 ```moonbit
-let rows = @yue.Store::new([@yue.TableRow::make(["甲", "1"]), @yue.TableRow::make(["乙", "2"])])
-let sort = @yue.Store::new(@yue.TableSort::{ column: -1, asc: true })
+let rows = @yue.Store::new([@components.TableRow::make(["甲", "1"]), @components.TableRow::make(["乙", "2"])])
+let sort = @yue.Store::new(@components.TableSort::{ column: -1, asc: true })
 sort.subscribe(fn(st) { /* 按 st.column / st.asc 重排后 rows.set(...) */ })
-@yue.table_t(
-  [@yue.TableColumn::make("名称", 120.0), @yue.TableColumn::make("数量", 80.0, align=@yue.Center)],
+@components.table_t(
+  [@components.TableColumn::make("名称", 120.0), @components.TableColumn::make("数量", 80.0, align=@yue.Center)],
   rows,
   sort=sort,
 )
@@ -591,9 +591,9 @@ sort.subscribe(fn(st) { /* 按 st.column / st.asc 重排后 rows.set(...) */ })
 table_t 的万行级形态：只画可见行，自管滚动（滚轮 / 拖拽滚动条 / 键盘），不受滚动容器内容高度上限约束；单元格画法同 table_t（CellLines 在行高内最多两行），列 / selection / sort（表头箭头：常驻灰 ↕ 提示、排序列主题色 ▲▼）/ 列宽拖动（左 / 右缘双向边界）语义一致。
 
 ```moonbit
-let rows = @yue.Store::new([@yue.TableRow::make(["1", "甲"]), @yue.TableRow::make(["2", "乙"])])
-@yue.table_v_t(
-  [@yue.TableColumn::make("序号", 90.0), @yue.TableColumn::make("名称", 160.0)],
+let rows = @yue.Store::new([@components.TableRow::make(["1", "甲"]), @components.TableRow::make(["2", "乙"])])
+@components.table_v_t(
+  [@components.TableColumn::make("序号", 90.0), @components.TableColumn::make("名称", 160.0)],
   rows,
   height=480.0,
 )
@@ -604,7 +604,7 @@ let rows = @yue.Store::new([@yue.TableRow::make(["1", "甲"]), @yue.TableRow::ma
 `tree(root : Array[TreeNode])`——缩进层级 + 点击展开 / 折叠（有子节点时箭头指示）。节点 `TreeNode{ label : String, children : Array[TreeNode] }`。
 
 ```moonbit
-@yue.tree([
+@components.tree([
   { label: "src", children: [{ label: "main.mbt", children: [] }] },
   { label: "README.md", children: [] },
 ])
@@ -617,7 +617,7 @@ let rows = @yue.Store::new([@yue.TableRow::make(["1", "甲"]), @yue.TableRow::ma
 ```moonbit
 let left = @yue.Store::new(["甲", "乙"])
 let right = @yue.Store::new(["丙"])
-@yue.transfer(left, right)
+@components.transfer(left, right)
 ```
 
 ## 图表
@@ -1318,11 +1318,11 @@ let series = @yue.Store::new([
 | 天气与其他 | Cloud(全家:Cloudy/CloudSun/CloudRain/CloudSnow/Upload/Download)、Droplet、Thermometer、Wind、ShoppingCart、CreditCard、Gift、Rocket、Trophy、Lightbulb、Wrench、Compass、MapPin、Navigation、Crown、Zap、Layers、Package |
 
 ```moonbit
-@yue.icon(@yue.Search2, size=18.0)
-@yue.icon_button_t(@yue.Plus, on_click=fn() { add_row() }, tip="新增一行")
+@icons.icon(@icons.Search2, size=18.0)
+@icons.icon_button_t(@icons.Plus, on_click=fn() { add_row() }, tip="新增一行")
 
 // 自绘入口(在 on_draw 回调里):
-@yue.draw_icon(p, @yue.Star, 24.0, 24.0, 16.0, "#D9822B")
+@icons.draw_icon(p, @icons.Star, 24.0, 24.0, 16.0, "#D9822B")
 ```
 
 ## 反馈
@@ -1334,8 +1334,8 @@ let series = @yue.Store::new([
 类型浅底 + 左侧 4px 色条 + 同族深字，全宽；后者右侧带关闭钮，点击整条隐藏。
 
 ```moonbit
-@yue.alert("保存成功", @yue.Success)
-@yue.alert_closeable("有新版本可用", @yue.InfoCircleFill)
+@components.alert("保存成功", @components.Success)
+@components.alert_closeable("有新版本可用", @icons.InfoCircleFill)
 ```
 
 ### 结果页 result
@@ -1343,7 +1343,7 @@ let series = @yue.Store::new([
 `result(t, title, desc, children : Array[Node])`——大色块符号 + 标题 + 描述 + 自定义按钮区。
 
 ```moonbit
-@yue.result(@yue.Success, "提交完成", "结果将于 1 个工作日内反馈", [@yue.button_t("好的")])
+@components.result(@components.Success, "提交完成", "结果将于 1 个工作日内反馈", [@components.button_t("好的")])
 ```
 
 ### 空状态 empty
@@ -1351,7 +1351,7 @@ let series = @yue.Store::new([
 `empty(desc)`——灰块占位 + 居中说明。
 
 ```moonbit
-@yue.empty("暂无数据")
+@components.empty("暂无数据")
 ```
 
 ### 对话框 dialog_t
@@ -1362,7 +1362,7 @@ let series = @yue.Store::new([
 
 ```moonbit
 let show = @yue.Store::new(false)
-@yue.dialog_t(show, "删除确认", [@yue.label_t("删除后不可恢复，确定吗？")],
+@components.dialog_t(show, "删除确认", [@components.label_t("删除后不可恢复，确定吗？")],
   confirm_text="删除", on_confirm=fn() { remove() }, close_on_mask=true)
 ```
 
@@ -1373,9 +1373,9 @@ let show = @yue.Store::new(false)
 层节点挂窗口根（absolute 顶部，不占布局），推送函数弹语义提示条（面板底 + 边框 + 类型图标），默认 2.6s 自动移除，多条自上而下堆叠；须在层 mount 后调用。
 
 ```moonbit
-let (layer, toast) = @yue.toast_layer()
+let (layer, toast) = @components.toast_layer()
 // 把 layer 挂到窗口根之后:
-toast("已保存", @yue.Success)
+toast("已保存", @components.Success)
 ```
 
 ### 右键菜单 context_menu_for
@@ -1383,7 +1383,7 @@ toast("已保存", @yue.Success)
 `context_menu_for(content : Node, items : Array[(String, () -> Unit)])`——给任意节点包原生右键菜单，文案 "-" 画分隔线；弹出位置经 `bounds_in_screen` 换算屏幕坐标，每次右键现建菜单。
 
 ```moonbit
-@yue.context_menu_for(row_view, [("复制", fn() { copy() }), ("-", fn() {}), ("删除", fn() { remove() })])
+@components.context_menu_for(row_view, [("复制", fn() { copy() }), ("-", fn() {}), ("删除", fn() { remove() })])
 ```
 
 ## 浮层
@@ -1393,7 +1393,7 @@ toast("已保存", @yue.Success)
 `tooltip_t(content : Node, tip)`——给任意节点包原生 tooltip（系统样式，零成本；主题化气泡请用 popover_t）。Linux 端 tooltip 颜色已接管为恒深底白字（不随系统主题）。
 
 ```moonbit
-@yue.tooltip_t(@yue.button_t("删除"), "删除该项")
+@components.tooltip_t(@components.button_t("删除"), "删除该项")
 ```
 
 ### 气泡弹层 popover_t
@@ -1401,7 +1401,7 @@ toast("已保存", @yue.Success)
 `popover_t(trigger : Node, content : Node, width, height)`——trigger 点击后在自身下方弹出任意 Node 内容，再次点击切换收起。
 
 ```moonbit
-@yue.popover_t(@yue.button_t("更多"), filter_panel, 240.0, 160.0)
+@components.popover_t(@components.button_t("更多"), filter_panel, 240.0, 160.0)
 ```
 
 ### 下拉菜单 dropdown_menu
@@ -1409,7 +1409,7 @@ toast("已保存", @yue.Success)
 `dropdown_menu(trigger : String, items, on_select : (Int) -> Unit, style?)`——触发文字 + 下拉箭头，点击弹菜单项列表：悬停高亮，点击回调序号并收起；items 中 `"-"` 画分隔线。
 
 ```moonbit
-@yue.dropdown_menu("操作", ["编辑", "-", "删除"], fn(i) { handle(i) })
+@components.dropdown_menu("操作", ["编辑", "-", "删除"], fn(i) { handle(i) })
 ```
 
 ### 轮播 carousel_t
@@ -1417,7 +1417,7 @@ toast("已保存", @yue.Success)
 `carousel_t(pages : Array[Node], width? = 360.0, height? = 180.0, interval_ms? = 3000, rotation?, style?, handle?)`——面板序列 + 左右箭头 + 底部指示点；interval_ms > 0 时每 interval 毫秒自动切换（悬停暂停），点击箭头 / 指示点手动切换。
 
 ```moonbit
-@yue.carousel_t([banner1, banner2], interval_ms=4000)
+@components.carousel_t([banner1, banner2], interval_ms=4000)
 ```
 
 自动轮播是自排的超时链，**卸载轮播前必须 `carousel_stop(rotation)`**（不 stop 则链继续对已移除的视图空转）：`rotation` 传自建句柄 `CarouselHandle::make()`（`is_running()` 查状态）；不传则组件自建、外部拿不到句柄，仅适合随应用常驻的轮播。

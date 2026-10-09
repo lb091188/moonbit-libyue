@@ -1,6 +1,6 @@
 # Themed Component Library Quick Reference
 
-Themed component library quick reference: a full set of Element-Plus-style UI components (buttons / input / selection / forms / navigation / layout / data display / icons / feedback / overlays). Every function is called via `@yue` and returns a `Node` that goes straight into the UI tree. Optional parameters (marked `?` in the signatures below) must be passed by name, e.g. `date_picker_t(value=day)`; parameters without `?` are positional. Reactive `Store` / `Signal` parameters are covered in [declarative.md](declarative.md); native controls (Window / Label / Button / Entry, etc.) are in [components.md](components.md).
+Themed component library quick reference: a full set of Element-Plus-style UI components (buttons / input / selection / forms / navigation / layout / data display / icons / feedback / overlays). Every function is called via `@components` (add `"NoahLiu/moonbit-libyue/yue/components"` to your `moon.pkg` imports; the `Node` type and `mount` come from `@declarative`, i.e. also import `"NoahLiu/moonbit-libyue/yue/declarative"`) and returns a `Node` that goes straight into the UI tree. Optional parameters (marked `?` in the signatures below) must be passed by name, e.g. `date_picker_t(value=day)`; parameters without `?` are positional. Reactive `Store` / `Signal` parameters are covered in [declarative.md](declarative.md); native controls (Window / Label / Button / Entry, etc.) are in [components.md](components.md).
 
 Full demo: `examples/showcase`.
 
@@ -84,9 +84,9 @@ Every themed component exposes `style?` (style key-value pairs, numeric and stri
 
 ```moonbit
 // Override width and margins (other defaults preserved)
-@yue.input_t(text="Name", style=[("width", 160.0), ("marginBottom", 4.0)])
+@components.input_t(text="Name", style=[("width", 160.0), ("marginBottom", 4.0)])
 // slider fills the parent width by default; fix width by also clearing grow
-@yue.slider_t(v, style=[("flexgrow", 0.0), ("width", 240.0)])
+@components.slider_t(v, style=[("flexgrow", 0.0), ("width", 240.0)])
 ```
 
 `style` is the single entry for layout customization — component signatures no longer carry layout named parameters such as margin / width / height / spacing. Named parameters that remain are semantic/structural: `size` on `avatar` / `icon` (drawn content size), `width` on `table_t` (column-distribution basis) and `row_height`, `width` / `height` on `popover_t` (native popup window size, not layout), `width` on `transfer` (column width), `ratio` on `hsplit` / `vsplit` (drag geometry), plus data/interaction parameters (min/max/step/placeholder/clearable/foldable etc.).
@@ -119,9 +119,9 @@ Self-drawn button; hover changes stay within the theme palette.
 Hover behavior: Solid / Danger darken, Soft goes solid white, Text gets a grey fill; once color / background_color are passed, the given colors win and hover no longer recolors.
 
 ```moonbit
-@yue.button_t("OK", on_click=fn() { submit() })
-@yue.button_t("Delete", variant=@yue.Danger)
-@yue.button_t("Custom", color="#ffd700", background_color="#1a1a2e")
+@components.button_t("OK", on_click=fn() { submit() })
+@components.button_t("Delete", variant=@components.Danger)
+@components.button_t("Custom", color="#ffd700", background_color="#1a1a2e")
 ```
 
 ### Themed label label_t
@@ -138,8 +138,8 @@ Unified font size / color per text role, left-aligned; accepts layout styles and
 | handle | (Label) -> Unit | no-op | post-creation callback receiving the underlying Label |
 
 ```moonbit
-@yue.label_t("Settings", role=@yue.Title)
-@yue.label_t("Current user: admin", role=@yue.Secondary)
+@components.label_t("Settings", role=@components.Title)
+@components.label_t("Current user: admin", role=@components.Secondary)
 ```
 
 ### Link link
@@ -147,7 +147,7 @@ Unified font size / color per text role, left-aligned; accepts layout styles and
 `link(text, on_click)` — theme-colored text, darkens on hover with an underline-colored bar, click callback.
 
 ```moonbit
-@yue.link("View details", fn() { open_detail() })
+@components.link("View details", fn() { open_detail() })
 ```
 
 ## Input
@@ -165,7 +165,7 @@ Unified font and line height; the text color follows the theme and cannot be cus
 
 ```moonbit
 let name = @yue.Store::new("")
-@yue.entry_t(text="prefill", on_input=fn(s) { name.set(s) })
+@components.entry_t(text="prefill", on_input=fn(s) { name.set(s) })
 ```
 
 ### Bordered input input_t
@@ -182,7 +182,7 @@ Self-drawn 1px outer border (turns theme primary on focus) + white background, s
 
 ```moonbit
 let valid = @yue.Store::new(false)
-@yue.input_t(text="admin", clearable=true, invalid=valid, on_input=fn(s) { check(s) })
+@components.input_t(text="admin", clearable=true, invalid=valid, on_input=fn(s) { check(s) })
 ```
 
 ### Number input input_number
@@ -193,7 +193,7 @@ let valid = @yue.Store::new(false)
 
 ```moonbit
 let count = @yue.Store::new(1.0)
-@yue.input_number(count, min=1.0, max=10.0)
+@components.input_number(count, min=1.0, max=10.0)
 ```
 
 ### Multi-line input textarea_t
@@ -203,7 +203,7 @@ let count = @yue.Store::new(1.0)
 Same pattern as input_t: self-drawn 1px border (turns theme primary on focus) + 8px inset; overflow scrolls per platform. clearable / invalid semantics match input_t.
 
 ```moonbit
-@yue.textarea_t(text="line one\nline two", style=[("width", 320.0), ("height", 120.0)])
+@components.textarea_t(text="line one\nline two", style=[("width", 320.0), ("height", 120.0)])
 ```
 
 ### Checkbox checkbox_t
@@ -219,7 +219,7 @@ Self-drawn square checkbox (14×14): solid theme fill + white tick when checked,
 | on_change | (Bool) -> Unit | no-op | change callback, receives the new state |
 
 ```moonbit
-@yue.checkbox_t("Remember me", checked=true, on_change=fn(v) { remember(v) })
+@components.checkbox_t("Remember me", checked=true, on_change=fn(v) { remember(v) })
 ```
 
 ### Radio group radio_group
@@ -230,7 +230,7 @@ Selected item shows a solid square + theme-colored text, unselected a hollow squ
 
 ```moonbit
 let choice = @yue.Store::new("A")
-@yue.radio_group(["A", "B", "C"], choice)
+@components.radio_group(["A", "B", "C"], choice)
 ```
 
 ### Switch switch_t
@@ -239,7 +239,7 @@ let choice = @yue.Store::new("A")
 
 ```moonbit
 let enabled = @yue.Store::new(true)
-@yue.switch_t(enabled)
+@components.switch_t(enabled)
 ```
 
 ### Slider slider_t
@@ -250,7 +250,7 @@ Self-drawn: light-grey track + theme-colored fill + square thumb; click the trac
 
 ```moonbit
 let volume = @yue.Store::new(0.5)
-@yue.slider_t(volume, max=1.0, step=0.1, on_change=fn(v) { set_volume(v) })
+@components.slider_t(volume, max=1.0, step=0.1, on_change=fn(v) { set_volume(v) })
 ```
 
 ## Selection
@@ -263,7 +263,7 @@ Fully self-drawn: click opens the candidate list, hover highlight, theme-colored
 
 ```moonbit
 let color = @yue.Store::new("Red")
-@yue.select_t(["Red", "Green", "Blue"], color, clearable=true, on_change=fn(s) { recolor(s) })
+@components.select_t(["Red", "Green", "Blue"], color, clearable=true, on_change=fn(s) { recolor(s) })
 ```
 
 ### Date picker date_picker_t
@@ -273,8 +273,8 @@ let color = @yue.Store::new("Red")
 Fully self-drawn: input-style field; clicking opens the `calendar_t` month panel, pick to fill and close, blur closes; with clearable=true, hovering a set value shows ✕ beside the arrow to clear (no on_change).
 
 ```moonbit
-let day : @yue.Store[@yue.DateYMD?] = @yue.Store::new(None)
-@yue.date_picker_t(value=day, on_change=fn(d) { picked(d) })
+let day : @yue.Store[@components.DateYMD?] = @yue.Store::new(None)
+@components.date_picker_t(value=day, on_change=fn(d) { picked(d) })
 ```
 
 ### Date range picker date_range_picker_t
@@ -284,8 +284,8 @@ let day : @yue.Store[@yue.DateYMD?] = @yue.Store::new(None)
 The field shows "start ~ end"; clicking opens the range calendar — first pick sets the start, second sets the end (swapped automatically if earlier), then it closes and fires `on_change(start, end)`; in-between days get a light theme fill, endpoints solid squares; clicking the field again starts a new range. clearable clears both ends.
 
 ```moonbit
-let range : @yue.Store[@yue.DateRange] = @yue.Store::new({ start: None, end: None })
-@yue.date_range_picker_t(value=range, on_change=fn(s, e) { show(s, e) })
+let range : @yue.Store[@components.DateRange] = @yue.Store::new({ start: None, end: None })
+@components.date_range_picker_t(value=range, on_change=fn(s, e) { show(s, e) })
 ```
 
 ### Time range picker time_range_picker_t
@@ -295,8 +295,8 @@ let range : @yue.Store[@yue.DateRange] = @yue.Store::new({ start: None, end: Non
 The field shows "start : end" as HH:MM; clicking opens start/end stepper rows (hour 0-23 / minute 0-59, backed by `input_number`), every step fires `on_change(start, end)` immediately; both default to 00:00, and the popover closes on field blur.
 
 ```moonbit
-let tr : @yue.Store[@yue.TimeRange] = @yue.Store::new({ start: None, end: None })
-@yue.time_range_picker_t(value=tr, on_change=fn(s, e) { show(s, e) })
+let tr : @yue.Store[@components.TimeRange] = @yue.Store::new({ start: None, end: None })
+@components.time_range_picker_t(value=tr, on_change=fn(s, e) { show(s, e) })
 ```
 
 ### Date-time range picker datetime_range_picker_t
@@ -306,8 +306,8 @@ let tr : @yue.Store[@yue.TimeRange] = @yue.Store::new({ start: None, end: None }
 The field shows "start date start HH:MM ~ end date end HH:MM"; the popover is a range calendar + separator + start/end time stepper rows + a "Done" button; once the date range is complete, any time change fires `on_change(start date, start time, end date, end time)`. Value type `DateTimeRange{ start : (DateYMD, TimeHM)?, end : (DateYMD, TimeHM)? }`.
 
 ```moonbit
-let dtr : @yue.Store[@yue.DateTimeRange] = @yue.Store::new({ start: None, end: None })
-@yue.datetime_range_picker_t(value=dtr, on_change=fn(sd, st, ed, et) { show(sd, st, ed, et) })
+let dtr : @yue.Store[@components.DateTimeRange] = @yue.Store::new({ start: None, end: None })
+@components.datetime_range_picker_t(value=dtr, on_change=fn(sd, st, ed, et) { show(sd, st, ed, et) })
 ```
 
 ### Calendar panel calendar_t
@@ -317,7 +317,7 @@ let dtr : @yue.Store[@yue.DateTimeRange] = @yue.Store::new({ start: None, end: N
 Fully self-drawn month panel: ‹/› month nav + weekday row + 42-cell grid, adjacent-month days dimmed, "today" in theme primary, the selected day a solid theme square; clicking a day of the current month fires on_pick and writes value. `DateYMD::format()` renders `YYYY-MM-DD`, `TimeHM::format()` renders `HH:MM`.
 
 ```moonbit
-@yue.calendar_t(on_pick=fn(d) { picked(d) })
+@components.calendar_t(on_pick=fn(d) { picked(d) })
 ```
 
 ### Color picker color_picker_t
@@ -328,7 +328,7 @@ Dropdown form: the trigger field (current swatch + hex + arrow) opens the preset
 
 ```moonbit
 let hex = @yue.Store::new("#2D68C4")
-@yue.color_picker_t(hex)
+@components.color_picker_t(hex)
 ```
 
 ### Rating rate_t
@@ -337,7 +337,7 @@ let hex = @yue.Store::new("#2D68C4")
 
 ```moonbit
 let stars = @yue.Store::new(4)
-@yue.rate_t(stars)
+@components.rate_t(stars)
 ```
 
 ## Forms
@@ -350,7 +350,7 @@ Left label (grey, fixed width) + right control area, vertically centered; `error
 
 ```moonbit
 let err = @yue.Store::new("")
-@yue.form_item("Username", @yue.input_t(text="admin"), error=err)
+@components.form_item("Username", @components.input_t(text="admin"), error=err)
 ```
 
 ### Form form
@@ -358,9 +358,9 @@ let err = @yue.Store::new("")
 `form(title, items : Array[Node])` — group title + a set of form items.
 
 ```moonbit
-@yue.form("Account", [
-  @yue.form_item("Username", @yue.input_t()),
-  @yue.form_item("Password", @yue.input_t(password=true)),
+@components.form("Account", [
+  @components.form_item("Username", @components.input_t()),
+  @components.form_item("Password", @components.input_t(password=true)),
 ])
 ```
 
@@ -374,7 +374,7 @@ Hover light grey, selected theme-light-blue fill + theme-colored text + 3px left
 
 ```moonbit
 let page = @yue.Store::new("Home")
-@yue.side_menu(["Home", "Settings", "About"], page)
+@components.side_menu(["Home", "Settings", "About"], page)
 ```
 
 ### Grouped side menu side_menu_sections
@@ -385,7 +385,7 @@ Group caption row (secondary small text + collapse arrow on the right) + group i
 
 ```moonbit
 let page = @yue.Store::new("Buttons")
-@yue.side_menu_sections([("Components", ["Buttons", "Input"]), ("System", ["About"])], page)
+@components.side_menu_sections([("Components", ["Buttons", "Input"]), ("System", ["About"])], page)
 ```
 
 ### Segmented control segmented
@@ -394,7 +394,7 @@ let page = @yue.Store::new("Buttons")
 
 ```moonbit
 let view = @yue.Store::new("List")
-@yue.segmented(["List", "Grid"], view)
+@components.segmented(["List", "Grid"], view)
 ```
 
 ### Breadcrumb breadcrumb
@@ -403,7 +403,7 @@ let view = @yue.Store::new("List")
 
 ```moonbit
 let cur = @yue.Store::new("Network")
-@yue.breadcrumb(["Home", "Settings", "Network"], cur)
+@components.breadcrumb(["Home", "Settings", "Network"], cur)
 ```
 
 ### Pagination pagination
@@ -412,7 +412,7 @@ let cur = @yue.Store::new("Network")
 
 ```moonbit
 let page_no = @yue.Store::new(1)
-@yue.pagination(page_no, 10)
+@components.pagination(page_no, 10)
 ```
 
 ### Steps steps
@@ -421,7 +421,7 @@ let page_no = @yue.Store::new(1)
 
 ```moonbit
 let step = @yue.Store::new(1)
-@yue.steps(["Fill in", "Verify", "Done"], step)
+@components.steps(["Fill in", "Verify", "Done"], step)
 ```
 
 ### Tabs tabs_t
@@ -431,7 +431,7 @@ let step = @yue.Store::new(1)
 Top form: tab header row (selected theme-colored text + 2px bottom indicator, darkens on hover) + content area switched via `set_visible`; `selected` is a page-index Store (internal 0 by default).
 
 ```moonbit
-@yue.tabs_t([("Overview", overview_view), ("Log", log_view)])
+@components.tabs_t([("Overview", overview_view), ("Log", log_view)])
 ```
 
 ## Layout and separation
@@ -441,8 +441,8 @@ Top form: tab header row (selected theme-colored text + 2px bottom indicator, da
 `divider(vertical? = false, style?, handle?)` — horizontal (default, 1px tall, flex width) or vertical (1px wide, height follows the parent container); side margins default to 10px, override via style. The color is read from the theme at mount, so it takes effect on UI rebuild.
 
 ```moonbit
-@yue.divider(style=[("marginTop", 16.0), ("marginBottom", 16.0)])
-@yue.divider(vertical=true)
+@components.divider(style=[("marginTop", 16.0), ("marginBottom", 16.0)])
+@components.divider(vertical=true)
 ```
 
 ### Split panes hsplit / vsplit
@@ -465,8 +465,8 @@ Draggable split layout: an 8px self-drawn handle with an always-visible divider 
 The former is a solid colored tag (custom color), the latter a light-fill tag with same-family dark text (`Primary` / `Success` / `Warning` / `Danger` / `Info`); straight corners, width adapts to the text.
 
 ```moonbit
-@yue.tag("v1.2", "#2D68C4")
-@yue.tag_of_type("Running", @yue.Success)
+@components.tag("v1.2", "#2D68C4")
+@components.tag_of_type("Running", @components.Success)
 ```
 
 ### Avatar avatar
@@ -474,7 +474,7 @@ The former is a solid colored tag (custom color), the latter a light-fill tag wi
 `avatar(letter, color, size? = 36.0)` — square solid fill with a white letter centered.
 
 ```moonbit
-@yue.avatar("Y", "#2D68C4", size=40.0)
+@components.avatar("Y", "#2D68C4", size=40.0)
 ```
 
 ### Badge badge_count / badge_dot
@@ -482,8 +482,8 @@ The former is a solid colored tag (custom color), the latter a light-fill tag wi
 `badge_count(count)` is a red-background white-text chip (width adapts, color follows the theme); `badge_dot(color? = "")` is an 8×8 dot.
 
 ```moonbit
-@yue.badge_count(3)
-@yue.badge_dot(color="#2E9E5B")
+@components.badge_count(3)
+@components.badge_dot(color="#2E9E5B")
 ```
 
 ### Statistic statistic
@@ -492,7 +492,7 @@ The former is a solid colored tag (custom color), the latter a light-fill tag wi
 
 ```moonbit
 let visits = @yue.Store::new("1,024")
-@yue.statistic("Visits today", visits)
+@components.statistic("Visits today", visits)
 ```
 
 ### Linear progress progress_line
@@ -501,7 +501,7 @@ let visits = @yue.Store::new("1,024")
 
 ```moonbit
 let ratio = @yue.Store::new(0.42)
-@yue.progress_line(ratio, style=[("height", 6.0)])
+@components.progress_line(ratio, style=[("height", 6.0)])
 ```
 
 ### Descriptions descriptions
@@ -509,7 +509,7 @@ let ratio = @yue.Store::new(0.42)
 `descriptions(pairs : Array[(String, String)])` — two-column grid with grey keys and dark values.
 
 ```moonbit
-@yue.descriptions([("Name", "libyue"), ("Version", "0.15.6"), ("Platform", "Linux")])
+@components.descriptions([("Name", "libyue"), ("Version", "0.15.6"), ("Platform", "Linux")])
 ```
 
 ### Timeline timeline
@@ -517,10 +517,10 @@ let ratio = @yue.Store::new(0.42)
 `timeline(items : Array[(String, String, SemanticType)])` — color dot + vertical line on the left, title + description on the right; items are (title, description, semantic type), fixed 56px row height.
 
 ```moonbit
-@yue.timeline([
-  ("Build", "compiled", @yue.Success),
-  ("Test", "45/45 passed", @yue.Success),
-  ("Release", "awaiting review", @yue.Warning),
+@components.timeline([
+  ("Build", "compiled", @components.Success),
+  ("Test", "45/45 passed", @components.Success),
+  ("Release", "awaiting review", @components.Warning),
 ])
 ```
 
@@ -529,9 +529,9 @@ let ratio = @yue.Store::new(0.42)
 `collapse(panels : Array[(String, Array[Node])])` — click the title row to toggle content visibility, panels collapse independently, only the first panel is expanded initially.
 
 ```moonbit
-@yue.collapse([
-  ("General", [@yue.label_t("Basic options", role=@yue.Body)]),
-  ("Advanced", [@yue.label_t("Debug options", role=@yue.Body)]),
+@components.collapse([
+  ("General", [@components.label_t("Basic options", role=@components.Body)]),
+  ("Advanced", [@components.label_t("Debug options", role=@components.Body)]),
 ])
 ```
 
@@ -540,7 +540,7 @@ let ratio = @yue.Store::new(0.42)
 `card(title, children : Array[Node], style?, handle?)` — title bar (bold, bottom separator) + border (card height defaults to 160, override via style); content starts below the title bar.
 
 ```moonbit
-@yue.card("Summary", [@yue.statistic("Tasks", done)], style=[("height", 120.0)])
+@components.card("Summary", [@components.statistic("Tasks", done)], style=[("height", 120.0)])
 ```
 
 ### Code highlighting code_view
@@ -550,7 +550,7 @@ let ratio = @yue.Store::new(0.42)
 Per-token highlighting with manual layout — consistent behavior on all platforms (including Windows). Color classes: keywords purple / types and capitalized constructors yellow / calls followed by `(` blue / numbers orange / strings green / line comments gray; punctuation and operators tokenize separately (`items.push(`, `0..<` each color correctly). lang keyword sets: moonbit / js / ts / python / rust / c / go / bash / sql (case-insensitive); line_numbers=true draws a left gutter.
 
 ```moonbit
-@yue.code_view(
+@components.code_view(
   ["fn main() {", "  println(\"hello\")", "}"],
   lang="moonbit",
   line_numbers=true,
@@ -562,7 +562,7 @@ Per-token highlighting with manual layout — consistent behavior on all platfor
 `markdown_view(source, style?)` — headings 1-6 (ATX/Setext), paragraphs, **bold**, *italic*, ~~strikethrough~~ (line drawn per range), `inline code`, [links](url) (click opens the default browser, hand cursor and address tooltip on hover; reference-style links resolve from the document link definitions), autolinks, ordered/unordered lists (with start), task lists (real checkboxes, click to toggle), blockquotes (theme-colored bar), GFM alerts, rules, fenced and indented code blocks (language from the fence marker, backed by code_view), tables (equal-width column grid, rich-text cells, column alignment from `:---` `:---:` `---:`), definition lists, footnotes (superscript references numbered in order of appearance, referenced definitions rendered after a rule at the end), block images (loaded from local paths or `file://`, scaled proportionally up to 560 wide; on load failure or network URLs falls back to the alt text, inline images fall back to alt); style ranges stay aligned after non-BMP characters (emoji) via UTF-16 indexing; inline HTML and HTML blocks are not rendered; consistent rendering across platforms, link/code colors follow the theme.
 
 ```moonbit
-@yue.markdown_view("# Heading\n\nBody **bold**, ~~struck~~ and a [link](https://libyue.com).\n\n- [x] Task item\n\n| Col A | Col B |\n|:--|--:|\n| 1 | 2 |\n\nA footnote[^1].\n\n[^1]: Footnote body.")
+@markdown.markdown_view("# Heading\n\nBody **bold**, ~~struck~~ and a [link](https://libyue.com).\n\n- [x] Task item\n\n| Col A | Col B |\n|:--|--:|\n| 1 | 2 |\n\nA footnote[^1].\n\n[^1]: Footnote body.")
 ```
 
 ### Table table_t
@@ -574,11 +574,11 @@ Header + zebra stripes + hover highlight + Store-driven (a set rebuilds all rows
 Header sorting and column resizing: pass `sort` (a `Store[TableSort]`; `TableSort{ column, asc }` where `column` is the column-definition index, < 0 = unsorted) and sortable columns keep a grey ↕ double-triangle hint at the right of the header so users can tell the column is clickable; clicking runs a three-state cycle "new column ascending → same column descending → click again to clear" (column set back to -1, subscribers restore the original order), and the actively sorted column switches to a solid theme-colored ▲ / ▼ so the sort state is obvious at a glance; actual data sorting is up to you — subscribe to the store, sort, and write back to `rows`. Header column boundaries stay visible as light lines and turn theme-colored on hover / while dragging; press within 4px of either edge of a column (no handle on the last column's right edge) to resize, with the two neighbors trading width (minimum 56px), mouse capture keeping the drag alive, and no row rebuild or selection loss.
 
 ```moonbit
-let rows = @yue.Store::new([@yue.TableRow::make(["A", "1"]), @yue.TableRow::make(["B", "2"])])
-let sort = @yue.Store::new(@yue.TableSort::{ column: -1, asc: true })
+let rows = @yue.Store::new([@components.TableRow::make(["A", "1"]), @components.TableRow::make(["B", "2"])])
+let sort = @yue.Store::new(@components.TableSort::{ column: -1, asc: true })
 sort.subscribe(fn(st) { /* re-sort by st.column / st.asc, then rows.set(...) */ })
-@yue.table_t(
-  [@yue.TableColumn::make("Name", 120.0), @yue.TableColumn::make("Count", 80.0, align=@yue.Center)],
+@components.table_t(
+  [@components.TableColumn::make("Name", 120.0), @components.TableColumn::make("Count", 80.0, align=@yue.Center)],
   rows,
   sort=sort,
 )
@@ -591,9 +591,9 @@ sort.subscribe(fn(st) { /* re-sort by st.column / st.asc, then rows.set(...) */ 
 The 10k+-row form of table_t: only visible rows are painted, self-managed scrolling (wheel / drag scrollbar / keyboard), free of the scroll container's content-height limit; cell rendering matches table_t (CellLines clamps to two lines within the row height), and column / selection / sort (header arrows) / column-resize semantics are identical.
 
 ```moonbit
-let rows = @yue.Store::new([@yue.TableRow::make(["1", "A"]), @yue.TableRow::make(["2", "B"])])
-@yue.table_v_t(
-  [@yue.TableColumn::make("No.", 90.0), @yue.TableColumn::make("Name", 160.0)],
+let rows = @yue.Store::new([@components.TableRow::make(["1", "A"]), @components.TableRow::make(["2", "B"])])
+@components.table_v_t(
+  [@components.TableColumn::make("No.", 90.0), @components.TableColumn::make("Name", 160.0)],
   rows,
   height=480.0,
 )
@@ -604,7 +604,7 @@ let rows = @yue.Store::new([@yue.TableRow::make(["1", "A"]), @yue.TableRow::make
 `tree(root : Array[TreeNode])` — indented hierarchy + click to expand/collapse (arrow indicator when a node has children). Node type `TreeNode{ label : String, children : Array[TreeNode] }`.
 
 ```moonbit
-@yue.tree([
+@components.tree([
   { label: "src", children: [{ label: "main.mbt", children: [] }] },
   { label: "README.md", children: [] },
 ])
@@ -617,7 +617,7 @@ let rows = @yue.Store::new([@yue.TableRow::make(["1", "A"]), @yue.TableRow::make
 ```moonbit
 let left = @yue.Store::new(["A", "B"])
 let right = @yue.Store::new(["C"])
-@yue.transfer(left, right)
+@components.transfer(left, right)
 ```
 
 ## Charts
@@ -1152,11 +1152,11 @@ Quick reference by group (full enum in `yue/icons/icons.mbt` `IconKind`; live wa
 | Weather & misc | Cloud family (Cloudy/CloudSun/CloudRain/CloudSnow/Upload/Download), Droplet, Thermometer, Wind, ShoppingCart, CreditCard, Gift, Rocket, Trophy, Lightbulb, Wrench, Compass, MapPin, Navigation, Crown, Zap, Layers, Package |
 
 ```moonbit
-@yue.icon(@yue.Search2, size=18.0)
-@yue.icon_button_t(@yue.Plus, on_click=fn() { add_row() }, tip="Add row")
+@icons.icon(@icons.Search2, size=18.0)
+@icons.icon_button_t(@icons.Plus, on_click=fn() { add_row() }, tip="Add row")
 
 // self-drawing entry (inside an on_draw callback):
-@yue.draw_icon(p, @yue.Star, 24.0, 24.0, 16.0, "#D9822B")
+@icons.draw_icon(p, @icons.Star, 24.0, 24.0, 16.0, "#D9822B")
 ```
 
 ## Feedback
@@ -1168,8 +1168,8 @@ Quick reference by group (full enum in `yue/icons/icons.mbt` `IconKind`; live wa
 Light fill of the type + 4px left color bar + same-family dark text, full width; the latter adds a right-side close button that hides the whole banner.
 
 ```moonbit
-@yue.alert("Saved", @yue.Success)
-@yue.alert_closeable("A new version is available", @yue.InfoCircleFill)
+@components.alert("Saved", @components.Success)
+@components.alert_closeable("A new version is available", @icons.InfoCircleFill)
 ```
 
 ### Result result
@@ -1177,7 +1177,7 @@ Light fill of the type + 4px left color bar + same-family dark text, full width;
 `result(t, title, desc, children : Array[Node])` — large colored symbol + title + description + custom button area.
 
 ```moonbit
-@yue.result(@yue.Success, "Submitted", "Results arrive within one business day", [@yue.button_t("OK")])
+@components.result(@components.Success, "Submitted", "Results arrive within one business day", [@components.button_t("OK")])
 ```
 
 ### Empty state empty
@@ -1185,7 +1185,7 @@ Light fill of the type + 4px left color bar + same-family dark text, full width;
 `empty(desc)` — grey placeholder block + centered caption.
 
 ```moonbit
-@yue.empty("No data")
+@components.empty("No data")
 ```
 
 ### Dialog dialog_t
@@ -1196,7 +1196,7 @@ In-app dialog: same-window mask (semi-transparent black, absolute relative to th
 
 ```moonbit
 let show = @yue.Store::new(false)
-@yue.dialog_t(show, "Confirm delete", [@yue.label_t("This cannot be undone. Sure?")],
+@components.dialog_t(show, "Confirm delete", [@components.label_t("This cannot be undone. Sure?")],
   confirm_text="Delete", on_confirm=fn() { remove() }, close_on_mask=true)
 ```
 
@@ -1207,9 +1207,9 @@ let show = @yue.Store::new(false)
 Mount the layer node at the window root (absolute top strip, no layout space); the push function shows a semantic toast bar (panel background + border + type icon), auto-removed after 2.6s by default, multiple bars stack top-down; call it after the layer is mounted.
 
 ```moonbit
-let (layer, toast) = @yue.toast_layer()
+let (layer, toast) = @components.toast_layer()
 // after mounting layer at the window root:
-toast("Saved", @yue.Success)
+toast("Saved", @components.Success)
 ```
 
 ### Context menu context_menu_for
@@ -1217,7 +1217,7 @@ toast("Saved", @yue.Success)
 `context_menu_for(content : Node, items : Array[(String, () -> Unit)])` — wrap any node with a native right-click menu, label "-" draws a separator; the popup position is converted to screen coordinates via `bounds_in_screen`, and the menu is rebuilt on each right-click.
 
 ```moonbit
-@yue.context_menu_for(row_view, [("Copy", fn() { copy() }), ("-", fn() {}), ("Delete", fn() { remove() })])
+@components.context_menu_for(row_view, [("Copy", fn() { copy() }), ("-", fn() {}), ("Delete", fn() { remove() })])
 ```
 
 ## Overlays
@@ -1227,7 +1227,7 @@ toast("Saved", @yue.Success)
 `tooltip_t(content : Node, tip)` — wrap any node with a native tooltip (system style, zero cost; use popover_t for a themed bubble). On Linux the tooltip color is pinned to a dark background with white text (independent of the system theme).
 
 ```moonbit
-@yue.tooltip_t(@yue.button_t("Delete"), "Delete this item")
+@components.tooltip_t(@components.button_t("Delete"), "Delete this item")
 ```
 
 ### Popover popover_t
@@ -1235,7 +1235,7 @@ toast("Saved", @yue.Success)
 `popover_t(trigger : Node, content : Node, width, height)` — clicking the trigger opens arbitrary Node content below it; click again to toggle closed.
 
 ```moonbit
-@yue.popover_t(@yue.button_t("More"), filter_panel, 240.0, 160.0)
+@components.popover_t(@components.button_t("More"), filter_panel, 240.0, 160.0)
 ```
 
 ### Dropdown menu dropdown_menu
@@ -1243,7 +1243,7 @@ toast("Saved", @yue.Success)
 `dropdown_menu(trigger : String, items, on_select : (Int) -> Unit, style?)` — trigger text + dropdown arrow; clicking opens the item list: hover highlight, click calls back the index and closes; `"-"` in items draws a separator.
 
 ```moonbit
-@yue.dropdown_menu("Actions", ["Edit", "-", "Delete"], fn(i) { handle(i) })
+@components.dropdown_menu("Actions", ["Edit", "-", "Delete"], fn(i) { handle(i) })
 ```
 
 ### Carousel carousel_t
@@ -1251,7 +1251,7 @@ toast("Saved", @yue.Success)
 `carousel_t(pages : Array[Node], width? = 360.0, height? = 180.0, interval_ms? = 3000, rotation?, style?, handle?)` — panel sequence + side arrows + bottom dots; with interval_ms > 0 it auto-advances every interval milliseconds (paused on hover), arrows/dots switch manually.
 
 ```moonbit
-@yue.carousel_t([banner1, banner2], interval_ms=4000)
+@components.carousel_t([banner1, banner2], interval_ms=4000)
 ```
 
 Auto-advance is a self-scheduling timeout chain: **call `carousel_stop(rotation)` before unmounting the carousel** (otherwise the chain keeps ticking against the removed views). Pass a handle you built with `CarouselHandle::make()` as `rotation` (`is_running()` reads the state); without it the component builds its own handle that callers cannot reach, which only fits carousels living for the whole app.

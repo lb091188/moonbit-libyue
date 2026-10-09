@@ -294,8 +294,8 @@ let sep = @yue.Separator::make(Horizontal)   // 或 Vertical
 组内任意位置(含全部子控件)悬停即整组进入 hover 态——子控件触发的事件同样改变组的样式。
 
 ```moonbit
-@yue.hover_group(
-  @yue.vbox([ /* 卡片内容:标题 / 按钮 / 输入框等 */ ], style=[("padding", 14.0)]),
+@declarative.hover_group(
+  @declarative.vbox([ /* 卡片内容:标题 / 按钮 / 输入框等 */ ], style=[("padding", 14.0)]),
   radius=8.0,
   on_change=fn(h, host) {
     // 底色高亮已内置;光标等额外反馈在回调里对 host 应用
@@ -321,8 +321,8 @@ Windows 上 `scroll()` 的默认形态（overlay=true 且未显式 policy）即�
 独立使用（内容已是 Node 时）：
 
 ```moonbit
-@yue.overlay_scroll(
-  @yue.vbox([@yue.label("第 1 行"), /* … */]),
+@declarative.overlay_scroll(
+  @declarative.vbox([@declarative.label("第 1 行"), /* … */]),
   style=[("height", 180.0)],   // 容器样式；高度由外层布局或显式给定
 )
 ```
@@ -490,7 +490,7 @@ let b = @browser.Browser::make(url="https://example.com")   // 或 html="<h1>本
 
 定制选项用 `Browser::new_with_options(BrowserOptions)`。
 
-> 0.5.0 起 Browser 迁入独立包 `NoahLiu/moonbit-libyue/yue/browser`(API 不变,`@yue.Browser` 改 `@browser.Browser`);未 import 该包的程序不再链接 WebKit/WebView2。
+> 0.5.0 起 Browser 迁入独立包 `NoahLiu/moonbit-libyue/yue/browser`(API 不变,`@browser.Browser` 改 `@browser.Browser`);未 import 该包的程序不再链接 WebKit/WebView2。
 
 ## 剪贴板 Clipboard
 
@@ -611,7 +611,7 @@ Linux 推荐纯 MoonBit 的 `yue/traybus` 后端（`Tray` 统一 API 内部自�
 ### 单实例与二次唤起
 
 ```moonbit
-match @yue.SingleInstance::acquire("org.example.MyApp") {
+match @system.SingleInstance::acquire("org.example.MyApp") {
   Ok(Some(handle)) => {
     // 本进程是首实例,继续启动
     handle.on_activate(fn(args) {
@@ -634,7 +634,7 @@ Linux 经会话总线声称应用专属名,Windows 经命名互斥体 + 消息�
 ### 开机自启动
 
 ```moonbit
-let auto = match @yue.Autostart::new("org.example.MyApp") {
+let auto = match @system.Autostart::new("org.example.MyApp") {
   Ok(a) => a
   Err(_) => ...   // 平台不支持（macOS 暂缓）
 }
@@ -665,11 +665,11 @@ Linux 写 `$XDG_CONFIG_HOME/autostart` 的 .desktop（exe 路径取
 ### 屏幕常亮与用户空闲
 
 ```moonbit
-match @yue.KeepAwake::enable("org.example.MyApp") {
+match @system.KeepAwake::enable("org.example.MyApp") {
   Ok(k) => { /* 保持常亮 */ ignore(k.release()) }  // 解除
   Err(_) => ()
 }
-match @yue.idle_seconds() {
+match @system.idle_seconds() {
   Ok(sec) => ...   // 自最后一次输入起的秒数（阈值判定由调用方比较）
   Err(_) => ()
 }

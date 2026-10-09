@@ -1,6 +1,6 @@
 # 开机自启动（Autostart）
 
-`@yue.Autostart` 提供跨平台的开机自启动查询 / 设置 / 取消，语义归一在 MoonBit 层，使用方零平台感知。
+`@system.Autostart` 提供跨平台的开机自启动查询 / 设置 / 取消，语义归一在 MoonBit 层，使用方零平台感知。
 
 ## 平台路由
 
@@ -24,7 +24,7 @@
 ## 用法
 
 ```moonbit
-match @yue.Autostart::new("com.example.app") {
+match @system.Autostart::new("com.example.app") {
   Ok(a) =>
     match a.enable() {
       Ok(_) => println("已启用，重新登录后拉起")

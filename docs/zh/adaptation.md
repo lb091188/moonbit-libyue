@@ -40,7 +40,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 ### 浏览器依赖按需化（0.5.0）
 
 
-- 机制：MoonBit 包边界即链接依赖边界。`Browser` 全部绑定迁入独立包 `yue/browser`（`@yue.Browser` → `@browser.Browser`，API 不变；`examples/showcase/moon.pkg` 是 import 样例），prebuild 的 link_configs 相应拆三份——Linux 的 webkit2gtk pkg-config 输出只进 `yue/browser` 条目，`yue`/`yue/traybus` 只带公共库；**主包严禁 import `yue/browser`**，否则依赖闭包让所有下游重新拿到 webkit flags。
+- 机制：MoonBit 包边界即链接依赖边界。`Browser` 全部绑定迁入独立包 `yue/browser`（`@browser.Browser` → `@browser.Browser`，API 不变；`examples/showcase/moon.pkg` 是 import 样例），prebuild 的 link_configs 相应拆三份——Linux 的 webkit2gtk pkg-config 输出只进 `yue/browser` 条目，`yue`/`yue/traybus` 只带公共库；**主包严禁 import `yue/browser`**，否则依赖闭包让所有下游重新拿到 webkit flags。
 - shim 层同步拆分：27 个 `yue_mbt_browser_*` 全部移入 `shim/yue_mbt_browser.cpp`，`CastTo`/`Store`/`BytesFromString` 提到 `shim/include/yue_mbt_internal.h`（模板/inline 的函数内 static 按标准全程序唯一，多 TU 共享同一张句柄注册表——Browser 句柄必须能被通用 View 函数查到）。验收口径：`nm libyue_mbt.a` 中 browser 符号只出现在 browser 成员，`nm -C` 查 `U nu::Browser` 不命中主成员。
 - 大坑（全程实测，两条方案被证伪）：libyue 发行包的 jumbo 把 `browser.cc`/`browser_gtk.cc` 与 PainterGtk/Font/Image 混编同一成员，非浏览器程序链接它就得解析 webkit_* 符号；静态 stub 兜底不可行——moon 对链接命令默认加 `--as-needed` 且按依赖拓扑序（yue→traybus→browser）拼接各包 flags，浏览器程序的主包份 stub 先把 webkit 引用全部绑定（ELF 静态绑定不可逆），真库随 --as-needed 以「截至该库未被引用」被丢 DT_NEEDED，运行时浏览器页调到空 stub 即段错误；「weak 定义会被动态库强符号覆盖」也不成立，最小样例实测运行时绑定 weak（输出 -1 非 42）。符号改名手术（objcopy --redefine-syms 生成无浏览器引用版库 + y4b* stub，见 `scripts/make_webkit_stubs.py`）能精确服务非浏览器程序，但同一份 yue 条目 flags 无法按 main 是否 import browser 分叉，同样留有浏览器程序段错误的洞。**结论：库成员级隔离只能治本，任何静态 stub 都是坑。**
 - 治本（已落地，源码模式全场景闭环）：`prepare.py` 源码回退路径在解压后自动抽段——把 browser.cc/browser_gtk.cc 从 jumbo 抽成独立编译单元 `nativeui_browser.cc`（按 `// ../../nativeui/...` 段注释头定位，幂等）；`menu_item_gtk` 的角色项（剪切/粘贴）对 WebView 执行编辑命令的 2 个符号耦合改为运行时探测（类型查 `g_type_from_name("WebKitWebView")`、命令 `dlsym(RTLD_DEFAULT,...)`，非浏览器程序查不到即跳过，行为不变）。效果：`libyue_mbt.a` 中全部 58 个 webkit/soup/JS 系引用收敛到 browser 成员，静态库按需拉取天然隔离。使用 `LIBYUE_FORCE_SOURCE=1`（或无预构建资产的平台）即走此路径。
@@ -127,6 +127,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 目录枚举(`yue_mbt_list_dir`,服务 fsx_list_dir;shim 由 prebuild.py 托管编译):POSIX 走 `opendir`/`readdir`(跳过 `.` 与 `..`),Windows 走 `FindFirstFileW`。**不能用 FindFirstFileA**——A 版是 ANSI 代码页,非 ASCII 路径(中文用户目录)全乱码;路径用 `base::SysUTF8ToWide` 转宽字符、拼 `L"\\*"` 模式,子项经 `SysWideToUTF8` 回转。返回扁平 UTF-8 文本、子项名以 '\n' 分行(与本包多字符串返回惯例一致:browser cookie / clipboard get_data 同编码);**子项名本身含 '\n' 的极端文件名会被拆开**,扁平文本编码的已知边界,文档须写明。`ok` 出参区分「空文本是失败」与「空目录」(空目录 ok=1 空文本,合法成功态)。
 - 进程内环境变量(`yue_mbt_setenv` / `yue_mbt_unsetenv`,服务 fsx/envx):POSIX 直接 `setenv`/`unsetenv`;Windows 用 `_putenv_s`,它**恒覆盖**——`overwrite=0` 分支须先 `std::getenv` 探测再决定,否则「已是既有值则保持原值」语义会被静默改掉。删环境变量在 Windows 是 `_putenv_s(name, "")`(卸下该变量,不是置为空串),与 POSIX `unsetenv` 语义对齐;本就不存在也记 ok=1(幂等)。作用范围都是**当前进程**(之后 spawn 的子进程可见),不触碰系统持久配置、不影响父进程。
 - fsx 把这两类薄原语收进一个模块(appfind / browser_history / envx 共用):要点是「只列条目名、不读内容」,修 appfind 的「大体积可执行文件全量读入仅判存在」取舍——之前 appfind 用 read_binary_file 判存在,现在走 fsx_list_dir 查目录条目。
+
+### 按包拆分:yue 单包 → 核心 + 六个子包(0.5.11)
+
+- 环境:moon 0.1.20260920 / moonc v0.10.14,模块 NoahLiu/moonbit-libyue;原生层预构建库就绪。
+- 现象:拆包前 yue 单包容纳约 6 万行——FFI、原生控件、主题组件库、20+ 图表、markdown、声明式层、30 个系统能力文件混在一个包。MoonBit 按包编译、包内无树摇,webview 方案或只用核心的消费者也被迫把整套工具箱编进二进制。
+- 根因(机制):MoonBit 跨包引用必须 `@别名.` 限定——实证两条:官方 moonbitlang/async 的 src/fs 子包用 `@async.xxx` 引用根包;本仓 yue/media.mbt 用 `@traybus.xxx` 引用 traybus 包。拆包因此=每子包独立 moon.pkg + 包内全部核心引用加 `@yue.` 限定(codemod 词边界替换,须跳过 `.字段`/`::方法`/字符串字面量)+ 外部依赖声明随包下沉(mizchi/markdown → yue/markdown,subproc 与 moonsqlitefile → yue/system)。链接参数无需改 prebuild:link_configs 按依赖闭包逐包拼 flags,新包只 import 核心即自动拿到 `-lyue_mbt`;webkit 仍只进 yue/browser 条目,按需化不被破坏。
+- 修复(批次顺序即循环依赖规避):①markdown 先搬——它调 components 的 code_view,晚搬则核心→components→核心成环;②components——前置手术是把 `hand()` 光标助手从 components.mbt 提入核心并 pub(charts_interactive 跨包引用它,charts 后搬),主题块约 17 个私有 getter 及 bind_fg/bind_entry_theme/entry_ctrl_height 被 20+ 文件跨包引用,按需 pub 化;③icons;④charts(charts_wbtest.mbt 自带 extern "C",moon.pkg 须 targets 声明 native-only);⑤declarative——前置手术两步:Node 协议(struct Node + attach)从 declarative.mbt 抽留核心 yue/node.mbt(否则 components/icons/markdown/charts 四包对 Node 的无前缀引用全要改),signals.mbt 末尾的 `bind()`(内部调 bind_label)随 bind_label 迁入 declarative 包;⑥system——打开外部 `open_url`(system.mbt)与托盘 tray.mbt 留核心(markdown 的链接点击依赖 open_url,procrun 随系统层走);⑦版本收口 0.5.11:moon.mod、yue/version.mbt、modules/yue-media 钉版三处同步(prebuild 构建期校验一致,不一致 moon build 直接失败)。
+- 验证方式与教训:每批 moon check 零警告 + moon test 全量 + moon build examples/showcase 与 sysmonitor;独立验收员只读审 git diff(符号逐位等价、moon.pkg 卫生、无夹带)。**教训:门控漏了 systemprobe**——批处理提交后,已推送的树 systemprobe 构建 15 处断链(导入适配留在工作区未随批提交),hello/hello-themed 不受影响故双示例门控无感;用 `git stash` 在已提交态实测才发现。拆包类改动的门控必须覆盖全部示例,提交范围须以 git status 逐批核对(并行工作流的未提交文件极易被整文件提交扫入)。
 
 ## Linux
 

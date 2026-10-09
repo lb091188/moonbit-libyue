@@ -41,12 +41,12 @@ A `Node` represents "a UI fragment not yet mounted". Constructing nodes only bui
 
 ```moonbit
 fn page(state : State) -> @yue.Container {
-  @yue.mount([
-    @yue.label("Settings", style=[("color", "#356AA0")]),
-    @yue.entry(text="Nickname", on_enter=fn(s) { state.save(s) }),
-    @yue.hbox([
-      @yue.button("Save", on_click=fn() { state.flush() }),
-      @yue.button("Cancel"),
+  @declarative.mount([
+    @declarative.label("Settings", style=[("color", "#356AA0")]),
+    @declarative.entry(text="Nickname", on_enter=fn(s) { state.save(s) }),
+    @declarative.hbox([
+      @declarative.button("Save", on_click=fn() { state.flush() }),
+      @declarative.button("Cancel"),
     ]),
   ])
 }
@@ -58,10 +58,10 @@ win.set_content(page(state))   // mount returns the root Container; feed it stra
 A `Window` has no parent view, so instead of being a Node it serves as the mount entry point: it creates the window, mounts the subtree as its content, and returns the window handle; non-view assets such as menu bars and tray icons are attached via `handle`. The window is activated and shown right after `handle` returns — feed the result straight into `run`, no manual `activate` needed; adjustments that must happen before the window shows go inside `handle`:
 
 ```moonbit
-let win = @yue.mount_window(
+let win = @declarative.mount_window(
   [
-    @yue.label("Hello"),
-    @yue.button("Quit", on_click=fn() { @yue.quit() }),
+    @declarative.label("Hello"),
+    @declarative.button("Quit", on_click=fn() { @yue.quit() }),
   ],
   title="Demo",
   size=Some((960.0, 640.0)),
@@ -103,7 +103,7 @@ In a declarative tree, widgets only exist once mounted. If you want to imperativ
 
 ```moonbit
 let bar : Ref[@yue.ProgressBar?] = Ref(None)
-@yue.progress(handle=fn(p) { bar.val = Some(p) })
+@declarative.progress(handle=fn(p) { bar.val = Some(p) })
 // any time later: p.set_value(0.5) on the value in bar.val
 ```
 
@@ -112,7 +112,7 @@ let bar : Ref[@yue.ProgressBar?] = Ref(None)
 Any existing ViewLike widget can be wrapped as a node and embedded in a declarative tree:
 
 ```moonbit
-@yue.node_of(my_legacy_view, style=[("marginBottom", 8.0)])
+@declarative.node_of(my_legacy_view, style=[("marginBottom", 8.0)])
 ```
 
 ### Custom nodes
@@ -121,7 +121,7 @@ Any existing ViewLike widget can be wrapped as a node and embedded in a declarat
 
 ```moonbit
 fn tagged(label_text : String, body : Node) -> Node {
-  @yue.vbox([@yue.label(label_text), body])
+  @declarative.vbox([@declarative.label(label_text), body])
 }
 ```
 
@@ -156,9 +156,9 @@ A `Store[T]` is a subscribable value: `set` notifies all subscribers, `map` deri
 ```moonbit
 let count : @yue.Store[Int] = @yue.Store::new(0)
 
-win.set_content(@yue.mount([
-  @yue.bind_label(count, fn(n) { "Clicked \{n} times" }),
-  @yue.button("Click me", on_click=fn() { count.update(fn(n) { n + 1 }) }),
+win.set_content(@declarative.mount([
+  @declarative.bind_label(count, fn(n) { "Clicked \{n} times" }),
+  @declarative.button("Click me", on_click=fn() { count.update(fn(n) { n + 1 }) }),
 ]))
 ```
 
@@ -170,12 +170,12 @@ To swap an arbitrary node (not just text) on state change, use `bind_node`: it r
 ```moonbit
 // swapping whole blocks (not on the clicked control's own chain): bind_node
 @yue.bind_node(mode.signal(), fn(m) {
-  if m { @yue.input_t(text="Edit mode") } else { @yue.label_t("Read-only") }
+  if m { @components.input_t(text="Edit mode") } else { @components.label_t("Read-only") }
 })
 // icon toggles driven by their own clicks: swap_node on Windows
 @yue.swap_node(dark.signal(),
-  @yue.icon_button_t(@yue.Moon, on_click=..., tip="Switch to dark"),
-  @yue.icon_button_t(@yue.Sunny, on_click=..., tip="Switch to light"))
+  @icons.icon_button_t(@icons.Moon, on_click=..., tip="Switch to dark"),
+  @icons.icon_button_t(@icons.Sunny, on_click=..., tip="Switch to light"))
 ```
 
 For high-frequency updates prefer `bind` (text) or imperative setters via `handle`.
@@ -202,8 +202,8 @@ API overview:
 let count = @yue.Signal::new(0)
 let doubled = @yue.Signal::computed(fn() { count.get() * 2 })
 
-@yue.bind(doubled, fn(n) { "Doubled: \{n}" })   // text binding, signal edition
-@yue.button("Click me", on_click=fn() { count.update(fn(n) { n + 1 }) })
+@declarative.bind(doubled, fn(n) { "Doubled: \{n}" })   // text binding, signal edition
+@declarative.button("Click me", on_click=fn() { count.update(fn(n) { n + 1 }) })
 ```
 
 Multiple `set` calls inside the same event callback trigger one notification round each; wrap them in `batch` to merge:
