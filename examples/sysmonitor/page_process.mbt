@@ -234,8 +234,9 @@ fn ProcPage::signal_selected(
 }
 
 ///|
-/// 对选中进程设 nice（-20..19），逐个报告结果。
-fn ProcPage::renice_selected(self : ProcPage) -> Unit {
+/// 对选中进程设 nice（-20..19），逐个报告结果。Windows 侧 set 后回读
+/// 档位代表值（离散档钳制后的实际值），Linux 直接报告输入值。
+fn ProcPage::renice_selected(self : ProcPage, platform : String) -> Unit {
   let pids = self.selected_pids()
   if pids.length() == 0 {
     self.msg.set("先选中进程")
@@ -254,27 +255,37 @@ fn ProcPage::renice_selected(self : ProcPage) -> Unit {
   }
   let mut ok = 0
   let mut fail = ""
+  let mut effective = nice
   for pid in pids {
     match set_priority(pid, nice) {
-      Ok(_) => ok += 1
+      Ok(_) => {
+        ok += 1
+        if platform == "windows" {
+          // 离散档:回读钳制后的档位代表值再报告
+          match get_priority(pid) {
+            Ok(v) => effective = v
+            Err(_) => ()
+          }
+        }
+      }
       Err(e) => fail = "\{fail},[\{pid}]\{e}"
     }
   }
-  self.msg.set(
-    if fail == "" {
-      "nice 已设为 \{nice}（\{ok} 个进程）"
-    } else {
-      "nice:\{ok} 个成功\{fail}"
-    },
-  )
+  self.msg.set(priority_result(platform, effective, ok, fail))
 }
 
 ///|
 fn page_process(app : App) -> @yue.Node {
+  // 平台化文案：Windows kill 一律 TerminateProcess 一档、优先级四档
+  // 离散钳制；Linux 维持 SIGTERM/SIGKILL 两档与连续 nice
+  let platform : String = if on_windows() { "windows" } else { "linux" }
+  let (end_label, force_label) = kill_button_labels(platform)
+  let (prio_btn, prio_hint) = priority_ui(platform)
   let page : ProcPage = {
     rows: @yue.Store::new([]),
     sel: @yue.Store::new([]),
-    msg: @yue.Store::new("就绪"),
+    // 初始消息即优先级口径说明（首次操作后被结果覆盖）
+    msg: @yue.Store::new(prio_hint),
     status: @yue.Store::new("采样中…"),
     // 初始排序：CPU% 降序（列 3）
     sort: @yue.Store::new(@yue.TableSort::{ column: 3, asc: false, }),
@@ -288,13 +299,62 @@ fn page_process(app : App) -> @yue.Node {
   // 表头排序点击（table_v_t 组件内切换 Store）→ 重建数据
   page.sort.subscribe(fn(_s) { page.rebuild(app.procs.get()) })
 
+  let tools : Array[@yue.Node] = [
+    @yue.label_t("搜索", role=@yue.Secondary),
+    // 搜索框：主题化输入（自绘主题边框 + 主题底色 + 聚焦变色，
+    // 悬停非空显示清空 ✕）——不用裸原生 Entry（Linux 下不跟主题）
+    @yue.input_t(
+      text=page.query,
+      style=[("width", 220.0)],
+      clearable=true,
+      on_input=fn(s) {
+        page.query = s
+        page.rebuild(app.procs.get())
+      },
+    ),
+  ]
+  match force_label {
+    None =>
+      // Windows：一律立即终止，单按钮
+      tools.push(
+        @yue.button_t(end_label, variant=@yue.Danger, on_click=fn() {
+          page.signal_selected(SIGKILL, "强制结束")
+        }),
+      )
+    Some(fl) => {
+      // Linux：温和结束（SIGTERM）+ 强制结束（SIGKILL 兜底）两档
+      tools.push(
+        @yue.button_t(end_label, variant=@yue.Soft, on_click=fn() {
+          page.signal_selected(SIGTERM, "结束")
+        }),
+      )
+      tools.push(
+        @yue.button_t(fl, variant=@yue.Danger, on_click=fn() {
+          page.signal_selected(SIGKILL, "强制结束")
+        }),
+      )
+    }
+  }
+  tools.push(
+    @yue.input_t(text=page.nice_text, style=[("width", 72.0)], on_input=fn(
+      s,
+    ) {
+      page.nice_text = s
+    }),
+  )
+  tools.push(
+    @yue.button_t(prio_btn, variant=@yue.Soft, on_click=fn() {
+      page.renice_selected(platform)
+    }),
+  )
+
   let columns = [
     @yue.TableColumn::make("PID", 86.0, align=@yue.End),
     @yue.TableColumn::make("进程名", 150.0),
     @yue.TableColumn::make("状态", 56.0, align=@yue.Center, sortable=false),
     @yue.TableColumn::make("CPU%", 72.0, align=@yue.End),
     @yue.TableColumn::make("内存", 96.0, align=@yue.End),
-    @yue.TableColumn::make("nice", 72.0, align=@yue.End),
+    @yue.TableColumn::make(priority_col_header(platform), 72.0, align=@yue.End),
     @yue.TableColumn::make("线程", 56.0, align=@yue.End),
     @yue.TableColumn::make("命令行", 0.0, sortable=false),
   ]
@@ -302,34 +362,7 @@ fn page_process(app : App) -> @yue.Node {
     [
       // 工具栏：搜索 + 操作 + 消息
       @yue.hbox(
-        [
-          @yue.label_t("搜索", role=@yue.Secondary),
-          // 搜索框：主题化输入（自绘主题边框 + 主题底色 + 聚焦变色，
-          // 悬停非空显示清空 ✕）——不用裸原生 Entry（Linux 下不跟主题）
-          @yue.input_t(
-            text=page.query,
-            style=[("width", 220.0)],
-            clearable=true,
-            on_input=fn(s) {
-              page.query = s
-              page.rebuild(app.procs.get())
-            },
-          ),
-          @yue.button_t("结束进程", variant=@yue.Soft, on_click=fn() {
-            page.signal_selected(SIGTERM, "结束")
-          }),
-          @yue.button_t("强制结束", variant=@yue.Danger, on_click=fn() {
-            page.signal_selected(SIGKILL, "强制结束")
-          }),
-          @yue.input_t(text=page.nice_text, style=[("width", 72.0)], on_input=fn(
-            s,
-          ) {
-            page.nice_text = s
-          }),
-          @yue.button_t("设 nice", variant=@yue.Soft, on_click=fn() {
-            page.renice_selected()
-          }),
-        ],
+        tools,
         style=[("marginBottom", 8.0), ("alignItems", "center")],
       ),
       @yue.label_t(

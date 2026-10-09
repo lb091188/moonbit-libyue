@@ -5,6 +5,9 @@
    POSIX；Windows 无 /proc、/sys，Win32 数据源（GetSystemTimes、
    GlobalMemoryStatusEx、PDH、DXGI、GetIfTable2、EnumProcesses 等）在
    读取入口虚拟出与 Linux 同构的文本，MoonBit 数据层与解析纯函数零改动；
+   进程管理语义归一（SYS2）：Windows 侧 kill 映射 TerminateProcess 一档、
+   优先级映射 IDLE/NORMAL/HIGH/REALTIME 四档，Win32 错误码先译成 errno
+   编号再返回（errno_text 与 Result 形态在 MoonBit 层零改动）；
    非默认链接的系统库（pdh / dxgi / iphlpapi / psapi / ntdll）一律运行期
    LoadLibrary 取函数指针，不新增任何链接参数。 */
 
@@ -24,7 +27,6 @@
 #include <wchar.h>
 
 #define SYSMON_MAX_FILE_BYTES (16 * 1024 * 1024)
-#define SYSMON_ERR_UNSUPPORTED (-1000)
 
 /* 通用 fopen 读取（三平台共用实现，定义在文件末尾）。 */
 static moonbit_bytes_t sysmon_read_file_generic(moonbit_bytes_t path);
@@ -504,13 +506,13 @@ static moonbit_bytes_t sysmon_read_diskstats(void) {
         int found = 0;
         for (DWORD j = 0; j < aw.count; j++) {
           if (wcscmp(ar.items[i].szName, aw.items[j].szName) == 0) {
-            written = aw.items[j].RawValue.FirstValue.largeValue;
+            written = aw.items[j].RawValue.FirstValue;
             found = 1;
             break;
           }
         }
         if (found) {
-          LONGLONG read_sectors = ar.items[i].RawValue.FirstValue.largeValue;
+          LONGLONG read_sectors = ar.items[i].RawValue.FirstValue;
           if (!sysmon_buf_putf(&b,
                                "8 0 %s 0 0 %lld 0 0 0 %lld 0 0 0 0 0\n", name,
                                read_sectors / 512, written / 512)) {
@@ -676,6 +678,83 @@ static moonbit_bytes_t sysmon_read_netif_bytes(const char *path) {
   return NULL;
 }
 
+/* ---------------- 进程管理语义归一(SYS2) ----------------
+   Windows 侧 kill 映射 TerminateProcess 一档、优先级映射
+   IDLE/NORMAL/HIGH/REALTIME 四档;Win32 错误码先译成 errno 编号再
+   返回,MoonBit 层 errno_text 与 Result 形态零改动。 */
+
+/* Win32 错误码 → 同语义 Linux errno 编号;未列出的归 EIO 兜底。 */
+static int32_t sysmon_winerr_to_errno(DWORD err) {
+  switch (err) {
+  case ERROR_ACCESS_DENIED:
+    return 1; /* EPERM */
+  case ERROR_FILE_NOT_FOUND:
+  case ERROR_PATH_NOT_FOUND:
+    return 2; /* ENOENT */
+  case ERROR_NOT_ENOUGH_MEMORY:
+  case ERROR_OUTOFMEMORY:
+    return 12; /* ENOMEM */
+  case ERROR_SHARING_VIOLATION:
+    return 13; /* EACCES */
+  case ERROR_PRIVILEGE_NOT_HELD:
+    return 13; /* EACCES:需提权(如 REALTIME 档) */
+  case ERROR_INVALID_HANDLE:
+    return 9; /* EBADF */
+  case ERROR_ALREADY_EXISTS:
+    return 17; /* EEXIST */
+  case ERROR_BROKEN_PIPE:
+    return 32; /* EPIPE */
+  case ERROR_INVALID_PARAMETER:
+    return 22; /* EINVAL */
+  default:
+    return 5; /* EIO 兜底 */
+  }
+}
+
+/* Windows 优先级类 → nice 档位代表值(离散档;BELOW/ABOVE_NORMAL 钳到
+   邻档;代表值回设时落回同类或设计邻档)。 */
+static int32_t sysmon_class_to_nice(DWORD cls) {
+  switch (cls) {
+  case IDLE_PRIORITY_CLASS:
+    return 19;
+  case BELOW_NORMAL_PRIORITY_CLASS:
+    return 10;
+  case ABOVE_NORMAL_PRIORITY_CLASS:
+    return -10;
+  case HIGH_PRIORITY_CLASS:
+    return -13;
+  case REALTIME_PRIORITY_CLASS:
+    return -20;
+  default:
+    return 0; /* NORMAL 及未知类 */
+  }
+}
+
+/* nice → 四档优先级类(就近钳制:10..19 IDLE / -9..9 NORMAL /
+   -16..-10 HIGH / -20..-17 REALTIME)。 */
+static DWORD sysmon_nice_to_class(int32_t nice) {
+  if (nice >= 10) {
+    return IDLE_PRIORITY_CLASS;
+  }
+  if (nice <= -17) {
+    return REALTIME_PRIORITY_CLASS;
+  }
+  if (nice <= -10) {
+    return HIGH_PRIORITY_CLASS;
+  }
+  return NORMAL_PRIORITY_CLASS;
+}
+
+/* OpenProcess 失败统一入口:进程已退出时 Windows 恒报
+   ERROR_INVALID_PARAMETER,kill/优先级语义归一为 ESRCH(3)。 */
+static int32_t sysmon_openproc_err(void) {
+  DWORD err = GetLastError();
+  if (err == ERROR_INVALID_PARAMETER) {
+    return 3; /* ESRCH:进程不存在或已退出 */
+  }
+  return sysmon_winerr_to_errno(err);
+}
+
 /* ---------------- 进程：枚举 / 快照 / 虚拟 stat 与 cmdline ---------------- */
 
 typedef DWORD(WINAPI * K32EnumProcessesFn)(DWORD *, DWORD, DWORD *);
@@ -800,6 +879,9 @@ static moonbit_bytes_t sysmon_read_pid_stat(DWORD pid) {
     return NULL;
   }
   unsigned long long utime = 0, stime = 0, start_ticks = 0, rss_pages = 0;
+  /* nice 取优先级类的档位代表值(离散档,SYS2 语义归一);系统进程
+     OpenProcess 被拒时保持 0(=NORMAL 档) */
+  int32_t nice_val = 0;
   HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
   if (h != NULL) {
     FILETIME ct, et, kt, ut;
@@ -846,6 +928,10 @@ static moonbit_bytes_t sysmon_read_pid_stat(DWORD pid) {
         rss_pages = (unsigned long long)mc.WorkingSetSize / 4096ULL;
       }
     }
+    DWORD cls = GetPriorityClass(h);
+    if (cls != 0) {
+      nice_val = sysmon_class_to_nice(cls);
+    }
     CloseHandle(h);
   }
   char *name = sysmon_wide_to_utf8(e->exe);
@@ -853,15 +939,15 @@ static moonbit_bytes_t sysmon_read_pid_stat(DWORD pid) {
     return NULL;
   }
   SysmonBuf b = {0};
-  /* 22 个状态后置字段：state ppid pgrp session tty tpgid flags minflt
+  /* 22 个状态后置字段:state ppid pgrp session tty tpgid flags minflt
      cminflt majflt cmajflt utime stime cutime cstime priority nice
-     threads itreal starttime vsize rss（nice 恒 0：Windows 优先级类不
-     映射 Linux nice 语义，显示 0 即 NORMAL） */
+     threads itreal starttime vsize rss;nice 为优先级类反查的档位代表
+     值(OpenProcess 被拒的系统进程保持 0) */
   int ok = sysmon_buf_putf(
       &b,
-      "%lu (%s) S %lu 0 0 0 0 0 0 0 0 0 %llu %llu 0 0 0 0 %lu 0 %llu 0 %llu 0\n",
+      "%lu (%s) S %lu 0 0 0 0 0 0 0 0 0 %llu %llu 0 0 0 %d %lu 0 %llu 0 %llu 0\n",
       (unsigned long)pid, name, (unsigned long)e->ppid, utime, stime,
-      (unsigned long)e->threads, start_ticks, rss_pages);
+      nice_val, (unsigned long)e->threads, start_ticks, rss_pages);
   free(name);
   if (!ok) {
     free(b.p);
@@ -1598,28 +1684,67 @@ moonbit_bytes_t yue_sysmon_read_text_file(moonbit_bytes_t path) {
   return sysmon_read_file_generic(path);
 }
 
-/* ---------------- 保持占位（SYS2 范围：kill / 优先级语义归一） -------- */
+/* ---------------- 进程管理:kill / 优先级(SYS2 语义归一) ---------------- */
 
+/* kill:首版一律 TerminateProcess 强杀一档(SIGTERM / SIGKILL 同映射,
+   温和结束 WM_CLOSE 方案后置)。发起后退出异步,短等让返回时进程确
+   已退出(等不到仍算发起成功)。 */
 MOONBIT_FFI_EXPORT
 int32_t yue_sysmon_kill(int32_t pid, int32_t sig) {
-  (void)pid;
-  (void)sig;
-  return SYSMON_ERR_UNSUPPORTED;
+  (void)sig; /* 首版无温和档,两信号同走强杀 */
+  HANDLE h = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, FALSE, (DWORD)pid);
+  if (h == NULL) {
+    return sysmon_openproc_err();
+  }
+  if (!TerminateProcess(h, 1)) {
+    int32_t rc = sysmon_winerr_to_errno(GetLastError());
+    CloseHandle(h);
+    return rc;
+  }
+  WaitForSingleObject(h, 3000);
+  CloseHandle(h);
+  return 0;
 }
 
+/* 取优先级(读 nice 档位代表值);成功写 *out_nice 返回 0,失败返回
+   errno(已退出进程归一 ESRCH)。 */
 MOONBIT_FFI_EXPORT
 int32_t yue_sysmon_get_priority(int32_t pid, int32_t *out_nice) {
-  (void)pid;
-  (void)out_nice;
-  return SYSMON_ERR_UNSUPPORTED;
+  HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, (DWORD)pid);
+  if (h == NULL) {
+    return sysmon_openproc_err();
+  }
+  DWORD cls = GetPriorityClass(h);
+  int32_t rc = 0;
+  if (cls == 0) {
+    rc = sysmon_winerr_to_errno(GetLastError());
+  } else {
+    *out_nice = sysmon_class_to_nice(cls);
+  }
+  CloseHandle(h);
+  return rc;
 }
 
+/* 设优先级:nice 就近钳制到 IDLE/NORMAL/HIGH/REALTIME 四档
+   (REALTIME 需管理员提权,不足时报 EACCES)。 */
 MOONBIT_FFI_EXPORT
 int32_t yue_sysmon_set_priority(int32_t pid, int32_t nice) {
-  (void)pid;
-  (void)nice;
-  return SYSMON_ERR_UNSUPPORTED;
+  if (nice < -20 || nice > 19) {
+    return 22; /* EINVAL 越界双保险(MoonBit 层已预钳) */
+  }
+  HANDLE h = OpenProcess(PROCESS_SET_INFORMATION, FALSE, (DWORD)pid);
+  if (h == NULL) {
+    return sysmon_openproc_err();
+  }
+  int ok = SetPriorityClass(h, sysmon_nice_to_class(nice));
+  int32_t rc = ok ? 0 : sysmon_winerr_to_errno(GetLastError());
+  CloseHandle(h);
+  return rc;
 }
+
+/* 平台探测(编译期定):UI 文案按平台收敛。 */
+MOONBIT_FFI_EXPORT
+int32_t yue_sysmon_is_windows(void) { return 1; }
 
 MOONBIT_FFI_EXPORT
 int32_t yue_sysmon_page_size(void) { return 4096; }
@@ -1642,6 +1767,10 @@ int32_t yue_sysmon_page_size(void) {
   long v = sysconf(_SC_PAGE_SIZE);
   return v > 0 ? (int32_t)v : 4096;
 }
+
+/* 平台探测(编译期定):UI 文案按平台收敛。 */
+MOONBIT_FFI_EXPORT
+int32_t yue_sysmon_is_windows(void) { return 0; }
 
 MOONBIT_FFI_EXPORT
 int32_t yue_sysmon_clk_tck(void) {

@@ -1,6 +1,7 @@
 // sysmonitor FFI 层：extern "c" 声明（仅 native 目标编译）。
 // 安全封装与纯函数解析在 sysdata.mbt / sysproc.mbt / syshw.mbt。
-// Windows 侧 stub 为同 ABI 占位（返回「不支持」哨兵），封装层统一语义化。
+// Windows 侧 stub 同 ABI 真实实现（kill 映射 TerminateProcess、优先级
+// 四档离散映射，Win32 错误码译成 errno 编号，SYS2 语义归一）。
 
 ///|
 // 读整个文本文件；失败返回 None（C 侧 NULL 映射）。#borrow：C 仅在
@@ -25,6 +26,10 @@ extern "c" fn ffi_get_priority(pid : Int, out : Ref[Int]) -> Int = "yue_sysmon_g
 ///|
 // setpriority(PRIO_PROCESS, pid, nice)；成功返回 0，失败返回 errno。
 extern "c" fn ffi_set_priority(pid : Int, nice : Int) -> Int = "yue_sysmon_set_priority"
+
+///|
+// 平台探测(stub 编译期定):非 0 为 Windows(kill / 优先级语义归一开关)。
+extern "c" fn ffi_is_windows() -> Int = "yue_sysmon_is_windows"
 
 ///|
 extern "c" fn ffi_page_size() -> Int = "yue_sysmon_page_size"
