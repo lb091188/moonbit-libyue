@@ -530,6 +530,8 @@ pub fn theme_apply(t : Theme) -> Unit {
     ffi_repaint_all()
   }
 }
+
+///|
 pub fn entry_ctrl_height(bordered : Bool) -> Double {
   let probe = AttributedText::new("Ag", wrap=false)
   probe.set_font(Font::new("Sans", 13.0))
@@ -537,6 +539,7 @@ pub fn entry_ctrl_height(bordered : Bool) -> Double {
   (if bordered { 2.0 } else { 0.0 })
 }
 
+///|
 pub fn bind_entry_theme(e : Entry) -> Unit {
   if platform() == "linux" {
     return

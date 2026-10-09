@@ -686,6 +686,8 @@ pub fn ImageSlot::set(self : ImageSlot, img : Image?) -> Unit {
 pub fn ImageSlot::get(self : ImageSlot) -> Image? {
   self.value
 }
+
+///|
 pub fn draw_focus_ring(
   p : Painter,
   w : Double,
@@ -696,6 +698,7 @@ pub fn draw_focus_ring(
   p.stroke_rect(0.5, 0.5, w - 1.0, h - 1.0)
 }
 
+///|
 pub fn fill_round_rect(
   p : Painter,
   x : Double,
