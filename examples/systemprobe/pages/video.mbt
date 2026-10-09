@@ -44,8 +44,10 @@ fn vid_mount_player(
           vid_view.val = Some(view)
           match status.val {
             Some(l) =>
-              l.set_text(
+              @ui.report_set(
+                l,
                 "已载入 \{path}\n\{player.frame_width()}x\{player.frame_height()} · 时长 \{player.duration()}s(FFI 流式解码,播放/暂停/进度/音量/循环均可交互)",
+                refresh,
               )
             None => ()
           }
@@ -55,7 +57,7 @@ fn vid_mount_player(
     }
     Err(e) =>
       match status.val {
-        Some(l) => l.set_text("播放器构建失败: \{e}")
+        Some(l) => @ui.report_set(l, "播放器构建失败: \{e}", refresh)
         None => ()
       }
   }
@@ -87,18 +89,16 @@ fn vid_load_demo(
       if o.exit_code != 0 {
         match status.val {
           Some(l) =>
-            l.set_text("测试视频生成失败(退出码 \{o.exit_code})")
+            @ui.report_set(l, "测试视频生成失败(退出码 \{o.exit_code})", refresh)
           None => ()
         }
-        refresh()
         return
       }
     Err(e) => {
       match status.val {
-        Some(l) => l.set_text("ffmpeg 启动失败: \{e}")
+        Some(l) => @ui.report_set(l, "ffmpeg 启动失败: \{e}", refresh)
         None => ()
       }
-      refresh()
       return
     }
   }
@@ -132,9 +132,7 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
               on_click=fn() {
                 match status.val {
                   Some(l) =>
-                    l.set_text(
-                      "载入中:生成测试视频并解码(约 1-2 秒)…",
-                    )
+                    @ui.report_set(l, "载入中:生成测试视频并解码(约 1-2 秒)…", refresh)
                   None => ()
                 }
                 // 生成+解码同步耗时,延后一拍让状态文本先渲染
@@ -156,8 +154,10 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
                     app.toast_push("已选 \{path}", @yue.Success)
                     match status.val {
                       Some(l) =>
-                        l.set_text(
+                        @ui.report_set(
+                          l,
                           "载入中:\{path}(probe + 解码同步耗时,视文件大小数秒)…",
+                          refresh,
                         )
                       None => ()
                     }
@@ -188,9 +188,7 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
               if @ffmbt.ffmpeg_supported() {
                 match status.val {
                   Some(l) =>
-                    l.set_text(
-                      "载入中:生成测试视频并解码(约 1-2 秒)…",
-                    )
+                    @ui.report_set(l, "载入中:生成测试视频并解码(约 1-2 秒)…", refresh)
                   None => ()
                 }
                 vid_load_demo(app, holder, status, vid_view, refresh)

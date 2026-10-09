@@ -52,11 +52,7 @@ pub fn page_cmdpreview(_app : @ui.ProbeApp) -> @yue.Node {
             variant=@yue.Solid,
             on_click=fn() {
               match cmd_report.val {
-                Some(l) => {
-                  l.set_text(cmd)
-                  // 命令文本写入后刷新滚动范围(挂载后才长高的内容)
-                  refresh()
-                }
+                Some(l) => @ui.report_set(l, cmd, refresh)
                 None => ()
               }
             },

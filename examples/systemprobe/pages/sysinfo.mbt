@@ -464,10 +464,7 @@ pub fn page_sysinfo(app : @ui.ProbeApp) -> @yue.Node {
           variant=@yue.Solid,
           on_click=fn() {
             match report.val {
-              Some(l) => {
-                l.set_text(sysprobe_collect())
-                refresh()
-              }
+              Some(l) => @ui.report_set(l, sysprobe_collect(), refresh)
               None => ()
             }
           },
