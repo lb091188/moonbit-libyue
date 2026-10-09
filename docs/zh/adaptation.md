@@ -56,6 +56,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。
 - flex 容器的挂载序同时是排列序与 z 序:夹层件(把手 / 分隔线)必须严格按排列位置挂入,且视觉常显——用户靠「看」找它,不靠 hover。
+- **markdown_view 样式区间计量与 mdast 实测语义(MD2,2026-10)**:旧自写解析器(md_parse_inline / md_parse_blocks)已删,`yue/markdown.mbt` 改吃 mizchi/markdown(mdast)。①**富文本区间端点必须按渲染文本逐段累计 UTF-16 code unit(`md_utf16_len`),不能按码点数累计,也不能直接用 mdast Span 定位**——MoonBit `for ch in str` 按码点迭代而 `str.length()` 是 UTF-16 code unit 数(实测 "a👍b" 迭代 3 次、length 4),AttributedText 区间是 UTF-16 语义,emoji(非 BMP,1 码点 = 2 code unit)之后的样式按码点累计会整体前移;Span 定位则根本不可行:渲染文本 ≠ 源文(标记剥离、软换行空格化、链接地址丢弃),区间只能对渲染后文本计量。展平用显式栈携带样式集递归展平行内嵌套树(`md_flatten_inline`),相邻同样式段合并减区间数;渲染与测试共用同一计量 `md_span_ranges`(wbtest 断言 emoji 后粗体区间为 [4,6) 而非码点错位的 [3,5))。②mizchi/markdown 0.8.3 解析语义三则:`FencedCode.code` 尾带 `\n`(切行须丢末尾空行);`parse_code_block_info` 只认 `lang:file {meta}` 格式,**不认空格分隔 info 串**("rust title=x" 整串进 lang),语言须自取首词;段落间空白行会产出 `BlankLines` 块,AST 遍历不能按「块下标=文档序直觉」取块(测试曾因此踩 children[2] 实为空行块)。渲染面决策:HtmlBlock / 脚注默认不渲染,表格行式降级(单元格两空格分隔 + 表头加粗),任务列表吃 `ListItem.checked`(☑/☐),Blockquote 子块整体递归进竖条,有序列表带 `start`。验证:`moon check` 零警告 + `moon test` 595 全绿(19 条新 wbtest 覆盖换算 / 展平 / 区间 / info / 切行,及 CommonMark 偏差五项前后对比:setext 标题 / ~~~ 围栏 / info 串 / 缩进代码块 / 嵌套列表)。
 
 ### 自绘画布与图表渲染
 
