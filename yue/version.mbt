@@ -2,4 +2,4 @@
 // 在构建期校验两者,不一致即报错退出。
 
 ///|
-pub const VERSION : String = "0.5.10"
+pub const VERSION : String = "0.5.11"
