@@ -192,7 +192,9 @@ test "VideoPlayer 播完后再 play：回起点重播" {
   // 播完（非循环）：位置钉时长、离开播放态
   inspect(player.is_playing(), content="false")
   if player.current() != player.duration() {
-    fail("EOF 位置应钉在时长：\{player.current()} != \{player.duration()}")
+    fail(
+      "EOF 位置应钉在时长：\{player.current()} != \{player.duration()}",
+    )
   }
   // 再 play：回起点重播
   player.play()

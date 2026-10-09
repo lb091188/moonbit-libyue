@@ -83,7 +83,9 @@ test "AudioPlayer 冒烟：播放/pump/seek/循环" {
   inspect(p.is_playing(), content="false")
   inspect(p.current() < 0.05, content="true")
   p.free()
-  println("AudioPlayer 冒烟完成（pump \{ticks} 拍播完 1 秒素材，循环重播验证 OK）")
+  println(
+    "AudioPlayer 冒烟完成（pump \{ticks} 拍播完 1 秒素材，循环重播验证 OK）",
+  )
 }
 
 ///|
