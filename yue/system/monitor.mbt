@@ -643,7 +643,7 @@ fn mon_current_from(infos : Array[MonitorInfo]) -> Array[CurrentOutput] {
 /// 枚举全部输出（含未连接）：名称 / 连接状态 / 当前分辨率×刷新率 /
 /// 位置 / 物理尺寸 / 支持的模式列表。
 pub fn mon_list() -> Result[Array[MonitorInfo], MonitorError] {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return Err(Unsupported)
   }
   match pr_run("xrandr", ["--query"], timeout_ms=5000) {

@@ -350,7 +350,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
         @declarative.bind_label(app.si_wake, fn(s) { s }),
       ],
       code=[
-        "match @yue.SingleInstance::acquire(\"org.app.Id\") {", "  Ok(Some(si)) => si.on_activate(fn(args) {",
+        "match @system.SingleInstance::acquire(\"org.app.Id\") {", "  Ok(Some(si)) => si.on_activate(fn(args) {",
         "    println(\"收到唤起:\\{args.length()} 个参数\")", "  })", "  Ok(None) => println(\"已有实例,本实例退出\")",
         "  Err(e) => println(\"不可用:\\{e}(降级继续运行)\")", "}",
       ],
@@ -358,8 +358,8 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
   )
   // 开机自启动:开关直连真实状态(Linux 写 XDG 自启动目录,Windows 写
   // HKCU Run 键);冒烟验证后关掉即复位
-  let auto : @yue.Autostart = match
-    @yue.Autostart::new("org.moonbitlibyue.Showcase") {
+  let auto : @system.Autostart = match
+    @system.Autostart::new("org.moonbitlibyue.Showcase") {
     Ok(a) => a
     Err(_) => abort("unreachable") // 固定 app_id 恒合法
   }
@@ -399,7 +399,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
         @declarative.bind_label(auto_out, fn(s) { s }, style=[("marginTop", 8.0)]),
       ],
       code=[
-        "match @yue.Autostart::new(\"org.app.Id\") {", "  Ok(auto) => {", "    ignore(auto.enable())",
+        "match @system.Autostart::new(\"org.app.Id\") {", "  Ok(auto) => {", "    ignore(auto.enable())",
         "    println(auto.is_enabled())", "    ignore(auto.disable())", "  }", "  Err(e) => println(e)",
         "}",
       ],
@@ -439,7 +439,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
   // 秒数定时刷新——点击本身是输入会重置空闲,即读即显恒为 0,改为
   // 开关开启后每秒读一次(开关关闭,定时器下一拍自行停止)
   let idle_out : @yue.Store[String] = @yue.Store::new(
-    if @yue.idle_supported() {
+    if @system.idle_supported() {
       "(打开开关开始每秒刷新;不动输入看数值增长,动一下看归零)"
     } else {
       "当前平台不支持空闲查询"
@@ -452,7 +452,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
         if !idle_running.get() {
           return false // 开关已关:停止刷新
         }
-        match @yue.idle_seconds() {
+        match @system.idle_seconds() {
           Ok(s) => idle_out.set("当前空闲:\{s} 秒")
           Err(e) => idle_out.set("不可用:\{e}")
         }
@@ -463,10 +463,10 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       idle_out.set("(已停止刷新)")
     }
   })
-  let ka : Ref[@yue.KeepAwake?] = Ref(None)
-  let ka_on : @yue.Store[Bool] = @yue.Store::new(@yue.keep_awake_active())
+  let ka : Ref[@system.KeepAwake?] = Ref(None)
+  let ka_on : @yue.Store[Bool] = @yue.Store::new(@system.keep_awake_active())
   let ka_out : @yue.Store[String] = @yue.Store::new(
-    if @yue.KeepAwake::is_supported() {
+    if @system.KeepAwake::is_supported() {
       "(未开启)"
     } else {
       "当前环境无抑制服务在线"
@@ -474,7 +474,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
   )
   ka_on.subscribe(fn(on) {
     if on {
-      match @yue.KeepAwake::enable("org.moonbitlibyue.Showcase") {
+      match @system.KeepAwake::enable("org.moonbitlibyue.Showcase") {
         Ok(k) => {
           ka.val = Some(k)
           ka_out.set("已申请常亮:系统屏保 / 自动息屏被抑制")
@@ -519,8 +519,8 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
         @declarative.bind_label(idle_out, fn(s) { s }, style=[("marginTop", 8.0)]),
       ],
       code=[
-        "match @yue.KeepAwake::enable(\"org.app.Id\") {", "  Ok(k) => ignore(k.release())",
-        "  Err(e) => println(e)", "}", "match @yue.idle_seconds() {", "  Ok(s) => println(\"空闲 \\{s} 秒\")",
+        "match @system.KeepAwake::enable(\"org.app.Id\") {", "  Ok(k) => ignore(k.release())",
+        "  Err(e) => println(e)", "}", "match @system.idle_seconds() {", "  Ok(s) => println(\"空闲 \\{s} 秒\")",
         "  Err(e) => println(e)", "}",
       ],
     ),
@@ -531,31 +531,31 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
   let lock_n = Ref(0)
   let unlock_n = Ref(0)
   let sleep_out : @yue.Store[String] = @yue.Store::new(
-    if @yue.suspend_resume_supported() {
+    if @system.suspend_resume_supported() {
       "休眠 0 次 / 唤醒 0 次"
     } else {
       "当前环境无 logind,休眠事件不可用"
     },
   )
   let lock_out : @yue.Store[String] = @yue.Store::new(
-    if @yue.session_lock_supported() {
+    if @system.session_lock_supported() {
       "锁屏 0 次 / 解锁 0 次"
     } else {
       "当前环境锁屏事件不可用"
     },
   )
-  @yue.on_suspend_resume(fn(e) {
+  @system.on_suspend_resume(fn(e) {
     match e {
-      @yue.Suspending => suspend_n.val = suspend_n.val + 1
-      @yue.Resuming => resume_n.val = resume_n.val + 1
+      @system.Suspending => suspend_n.val = suspend_n.val + 1
+      @system.Resuming => resume_n.val = resume_n.val + 1
     }
     sleep_out.set("休眠 \{suspend_n.val} 次 / 唤醒 \{resume_n.val} 次")
   })
   match
-    @yue.session_lock_watch(fn(e) {
+    @system.session_lock_watch(fn(e) {
       match e {
-        @yue.Locked => lock_n.val = lock_n.val + 1
-        @yue.Unlocked => unlock_n.val = unlock_n.val + 1
+        @system.Locked => lock_n.val = lock_n.val + 1
+        @system.Unlocked => unlock_n.val = unlock_n.val + 1
       }
       lock_out.set("锁屏 \{lock_n.val} 次 / 解锁 \{unlock_n.val} 次")
     }) {
@@ -572,9 +572,9 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
         @declarative.bind_label(lock_out, fn(s) { s }),
       ],
       code=[
-        "@yue.on_suspend_resume(fn(e) {", "  match e {", "    @yue.Suspending => println(\"休眠\")",
-        "    @yue.Resuming => println(\"唤醒\")", "  }", "})", "match @yue.session_lock_watch(fn(e) {",
-        "  match e {", "    @yue.Locked => println(\"锁屏\")", "    @yue.Unlocked => println(\"解锁\")",
+        "@system.on_suspend_resume(fn(e) {", "  match e {", "    @system.Suspending => println(\"休眠\")",
+        "    @system.Resuming => println(\"唤醒\")", "  }", "})", "match @system.session_lock_watch(fn(e) {",
+        "  match e {", "    @system.Locked => println(\"锁屏\")", "    @system.Unlocked => println(\"解锁\")",
         "  }", "}) {", "  Ok(_) => ()", "  Err(e) => println(e)", "}",
       ],
     ),
@@ -583,11 +583,11 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
   // (真机拔插电源 / 断联网即见)
   let power_out : @yue.Store[String] = @yue.Store::new("")
   let refresh_power : () -> Unit = fn() {
-    if !@yue.battery_supported() {
+    if !@system.battery_supported() {
       power_out.set("当前环境无 UPower,电量不可用")
       return
     }
-    match @yue.battery_query() {
+    match @system.battery_query() {
       Ok(Some(b)) => {
         let full = match b.charging_seconds {
           Some(s) => "距充满 \{s} 秒"
@@ -598,9 +598,9 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       Ok(None) =>
         // 台式机常态:无电池但电源来源可查(交流在线)
         power_out.set(
-          match @yue.power_source() {
+          match @system.power_source() {
             Ok(src) =>
-              if src is @yue.Ac {
+              if src is @system.Ac {
                 "无电池,电源:交流在线"
               } else {
                 "无电池,电源:电池供电(异常:请反馈)"
@@ -622,7 +622,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
   )
   let net_out : @yue.Store[String] = @yue.Store::new(
     // Windows 查询走后台轮询缓存,启动后首个状态值由变化事件派发刷新
-    if @yue.network_supported() {
+    if @system.network_supported() {
       "当前网络:(探测中)"
     } else {
       "当前环境无 NetworkManager,网络状态不可用"
@@ -631,8 +631,8 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
   let net_n = Ref(0)
   // 电源切换事件即时刷新电量读数(替代原来只写"电源切换"的文案,
   // 与 30s 轮询走同一查询口径)
-  @yue.on_power_source_change(fn(_src) { refresh_power() })
-  @yue.on_network_status_change(fn(s) {
+  @system.on_power_source_change(fn(_src) { refresh_power() })
+  @system.on_network_status_change(fn(s) {
     net_n.val = net_n.val + 1
     net_out.set("当前网络:\{s.label()}(第 \{net_n.val} 次变化)")
   })
@@ -646,9 +646,9 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
         @declarative.bind_label(net_out, fn(s) { s }),
       ],
       code=[
-        "match @yue.battery_query() {", "  Ok(Some(b)) => println(\"电量 \\{b.percent}% 充电中:\\{b.charging}\")",
-        "  Ok(None) => println(@yue.power_source())", "  Err(e) => println(e)", "}",
-        "@yue.on_power_source_change(fn(_src) { println(\"电源切换\") })", "@yue.on_network_status_change(fn(s) {",
+        "match @system.battery_query() {", "  Ok(Some(b)) => println(\"电量 \\{b.percent}% 充电中:\\{b.charging}\")",
+        "  Ok(None) => println(@system.power_source())", "  Err(e) => println(e)", "}",
+        "@system.on_power_source_change(fn(_src) { println(\"电源切换\") })", "@system.on_network_status_change(fn(s) {",
         "  println(\"网络:\\{s.label()}\")", "})",
       ],
     ),

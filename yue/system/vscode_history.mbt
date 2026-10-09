@@ -5,478 +5,13 @@
 // read_text_file。
 //
 // 典型用法：
-//   let snaps = @yue.vsc_local_history("/path/to/file.ext")
+//   let snaps = @system.vsc_local_history("/path/to/file.ext")
 //   //  Ok([{ path: "…/History/<hash>/XXXX.ext", timestamp: 毫秒 }, …]) 倒序
-//   let recent = @yue.vsc_recent() // Ok(["/path/to/workspace", …])
-
-// ---------------------------------------------------------------------------
-// 纯函数层：JSON 解析（entries.json / storage.json 形态，白盒测试覆盖）
-// ---------------------------------------------------------------------------
-
-///|
-/// 最小 JSON 值（解析 entries.json / storage.json 用；整数保持 Int64 精度，
-/// 时间戳毫秒值超 Int32 表示范围）。
-pub(all) enum VscJson {
-  VscJNull
-  VscJBool
-  VscJInt(Int64)
-  VscJFloat(Double)
-  VscJStr(String)
-  VscJArr(Array[VscJson])
-  VscJObj(Array[(String, VscJson)])
-}
-
-///|
-/// 递归下降解析器状态（text + 游标）。
-priv struct VscJsonParser {
-  text : String
-  mut pos : Int
-}
-
-///|
-/// 解析 JSON 文本：语法完整且无尾随内容返回值，否则 None。
-pub fn vsc_json_parse(text : String) -> VscJson? {
-  let p : VscJsonParser = { text, pos: 0, }
-  p.skip_ws()
-  let v = match p.value() {
-    Some(v) => v
-    None => return None
-  }
-  p.skip_ws()
-  if p.pos == text.length() {
-    Some(v)
-  } else {
-    None
-  }
-}
-
-///|
-/// 跳过空白（空格/制表/换行/回车）。
-fn VscJsonParser::skip_ws(self : VscJsonParser) -> Unit {
-  let n = self.text.length()
-  while self.pos < n {
-    let c = self.text.unsafe_get(self.pos).to_int()
-    if c == 32 || c == 9 || c == 10 || c == 13 {
-      self.pos += 1
-    } else {
-      break
-    }
-  }
-}
-
-///|
-/// 当前码元；越界返回 -1。
-fn VscJsonParser::peek(self : VscJsonParser) -> Int {
-  if self.pos < self.text.length() {
-    self.text.unsafe_get(self.pos).to_int()
-  } else {
-    -1
-  }
-}
-
-///|
-fn VscJsonParser::value(self : VscJsonParser) -> VscJson? {
-  match self.peek() {
-    123 => self.parse_object() // '{'
-    91 => self.parse_array() // '['
-    34 => self.parse_string_v() // '"'
-    116 => self.parse_literal("true", VscJBool) // 't'
-    102 => self.parse_literal("false", VscJBool) // 'f'
-    110 => self.parse_literal("null", VscJNull) // 'n'
-    c =>
-      if c == 45 || (c >= 48 && c <= 57) {
-        self.parse_number() // '-' 数字
-      } else {
-        None
-      }
-  }
-}
-
-///|
-/// 匹配字面量 true/false/null（从当前位起逐码元比对）。
-fn VscJsonParser::parse_literal(
-  self : VscJsonParser,
-  word : String,
-  out : VscJson,
-) -> VscJson? {
-  let n = word.length()
-  let mut i = 0
-  while i < n {
-    if self.pos + i >= self.text.length() ||
-      self.text.unsafe_get(self.pos + i).to_int() != word.unsafe_get(i).to_int() {
-      return None
-    }
-    i += 1
-  }
-  self.pos += n
-  Some(out)
-}
-
-///|
-fn VscJsonParser::parse_object(self : VscJsonParser) -> VscJson? {
-  self.pos += 1 // '{'
-  self.skip_ws()
-  let pairs : Array[(String, VscJson)] = []
-  if self.peek() == 125 {
-    // '}'
-    self.pos += 1
-    return Some(VscJObj(pairs))
-  }
-  let mut closed = false
-  while !closed {
-    self.skip_ws()
-    if self.peek() != 34 {
-      return None
-    }
-    let key = match self.parse_string_v() {
-      Some(VscJStr(s)) => s
-      _ => return None
-    }
-    self.skip_ws()
-    if self.peek() != 58 {
-      // ':'
-      return None
-    }
-    self.pos += 1
-    self.skip_ws()
-    let v = match self.value() {
-      Some(v) => v
-      None => return None
-    }
-    pairs.push((key, v))
-    self.skip_ws()
-    match self.peek() {
-      44 => self.pos += 1 // ',' 继续下一对
-      125 => {
-        self.pos += 1 // '}' 结束
-        closed = true
-      }
-      _ => return None
-    }
-  }
-  Some(VscJObj(pairs))
-}
-
-///|
-fn VscJsonParser::parse_array(self : VscJsonParser) -> VscJson? {
-  self.pos += 1 // '['
-  self.skip_ws()
-  let items : Array[VscJson] = []
-  if self.peek() == 93 {
-    // ']'
-    self.pos += 1
-    return Some(VscJArr(items))
-  }
-  let mut closed = false
-  while !closed {
-    self.skip_ws()
-    let v = match self.value() {
-      Some(v) => v
-      None => return None
-    }
-    items.push(v)
-    self.skip_ws()
-    match self.peek() {
-      44 => self.pos += 1 // ','
-      93 => {
-        self.pos += 1 // ']'
-        closed = true
-      }
-      _ => return None
-    }
-  }
-  Some(VscJArr(items))
-}
-
-///|
-/// 字符串值（含 \" \\ \/ \b \f \n \r \t \uXXXX 转义与代理对合并）。
-fn VscJsonParser::parse_string_v(self : VscJsonParser) -> VscJson? {
-  self.pos += 1 // '"'
-  let sb = StringBuilder()
-  let n = self.text.length()
-  while self.pos < n {
-    let c = self.text.unsafe_get(self.pos).to_int()
-    if c == 34 {
-      // '"'
-      self.pos += 1
-      return Some(VscJStr(sb.to_string()))
-    }
-    if c == 92 {
-      // '\'
-      self.pos += 1
-      let e = self.peek()
-      let simple : Int? = match e {
-        34 => Some(34)
-        92 => Some(92)
-        47 => Some(47) // '/'
-        98 => Some(8) // 'b'
-        102 => Some(12) // 'f'
-        110 => Some(10) // 'n'
-        114 => Some(13) // 'r'
-        116 => Some(9) // 't'
-        _ => None
-      }
-      match simple {
-        Some(ch) => {
-          sb.write_char(ch.unsafe_to_char())
-          self.pos += 1
-        }
-        None =>
-          if e == 117 {
-            // 'u'：先消费 u 再读 4 位十六进制；高代理再看一个 \uXXXX 合并
-            self.pos += 1
-            let h1 = match self.hex4() {
-              Some(v) => v
-              None => return None
-            }
-            let cp = if h1 >= 0xD800 &&
-              h1 <= 0xDBFF &&
-              self.pos + 1 < n &&
-              self.text.unsafe_get(self.pos).to_int() == 92 &&
-              self.text.unsafe_get(self.pos + 1).to_int() == 117 {
-              self.pos += 2
-              let h2 = match self.hex4() {
-                Some(v) => v
-                None => return None
-              }
-              if h2 >= 0xDC00 && h2 <= 0xDFFF {
-                0x10000 + ((h1 - 0xD800) << 10) + (h2 - 0xDC00)
-              } else {
-                0xFFFD
-              }
-            } else if h1 >= 0xD800 && h1 <= 0xDFFF {
-              0xFFFD
-            } else {
-              h1
-            }
-            sb.write_char(cp.unsafe_to_char())
-          } else {
-            return None
-          }
-      }
-    } else {
-      let (cp, step) = vsc_codepoint_at(self.text, self.pos)
-      sb.write_char(cp.unsafe_to_char())
-      self.pos += step
-    }
-  }
-  None // 未闭合
-}
-
-///|
-/// 从当前位置读 4 位十六进制（\uXXXX 的 XXXX 部分）。
-fn VscJsonParser::hex4(self : VscJsonParser) -> Int? {
-  let mut v = 0
-  let mut i = 0
-  while i < 4 {
-    let d = match vsc_hex_val(self.peek()) {
-      Some(d) => d
-      None => return None
-    }
-    v = v * 16 + d
-    self.pos += 1
-    i += 1
-  }
-  Some(v)
-}
-
-///|
-/// 单个十六进制码元 → 数值（大小写均可）。
-fn vsc_hex_val(c : Int) -> Int? {
-  if c >= 48 && c <= 57 {
-    Some(c - 48)
-  } else if c >= 97 && c <= 102 {
-    Some(c - 87)
-  } else if c >= 65 && c <= 70 {
-    Some(c - 55)
-  } else {
-    None
-  }
-}
-
-///|
-/// 数值：纯整数走 Int64（溢出与含小数/指数走 Double 近似）。
-fn VscJsonParser::parse_number(self : VscJsonParser) -> VscJson? {
-  let chars : Array[Int] = []
-  let n = self.text.length()
-  while self.pos < n {
-    let c = self.text.unsafe_get(self.pos).to_int()
-    if (c >= 48 && c <= 57) ||
-      c == 45 ||
-      c == 43 ||
-      c == 46 ||
-      c == 101 ||
-      c == 69 {
-      chars.push(c)
-      self.pos += 1
-    } else {
-      break
-    }
-  }
-  if chars.length() == 0 {
-    return None
-  }
-  Some(vsc_number_value(chars))
-}
-
-///|
-/// 数值词元（码元列表）→ VscJson。
-fn vsc_number_value(chars : Array[Int]) -> VscJson {
-  let mut is_float = false
-  for c in chars {
-    if c == 46 || c == 101 || c == 69 {
-      // '.' 'e' 'E'
-      is_float = true
-      break
-    }
-  }
-  if !is_float {
-    let mut v : Int64 = 0L
-    let mut neg = false
-    let mut idx = 0
-    if chars[0] == 45 {
-      neg = true
-      idx = 1
-    }
-    let mut overflow = false
-    while idx < chars.length() {
-      if v > 922337203685477580L {
-        overflow = true
-        break
-      }
-      v = v * 10L + (chars[idx] - 48).to_int64()
-      idx += 1
-    }
-    if !overflow {
-      return VscJInt(if neg { -v } else { v })
-    }
-  }
-  // Double 近似（尾数逐位累加 + 10 的幂）
-  let mut mant = 0.0
-  let mut neg = false
-  let mut frac_cnt = 0
-  let mut exp = 0
-  let mut i = 0
-  if chars[0] == 45 {
-    neg = true
-    i = 1
-  }
-  let mut in_frac = false
-  let mut in_exp = false
-  let mut exp_neg = false
-  while i < chars.length() {
-    let c = chars[i]
-    if c >= 48 && c <= 57 {
-      if in_exp {
-        exp = exp * 10 + (c - 48)
-      } else {
-        mant = mant * 10.0 + (c - 48).to_double()
-        if in_frac {
-          frac_cnt += 1
-        }
-      }
-    } else if c == 46 {
-      in_frac = true
-    } else if c == 101 || c == 69 {
-      in_exp = true
-      if i + 1 < chars.length() && (chars[i + 1] == 45 || chars[i + 1] == 43) {
-        exp_neg = chars[i + 1] == 45
-        i += 1
-      }
-    }
-    i += 1
-  }
-  if exp_neg {
-    exp = -exp
-  }
-  let mut out = mant
-  let mut shift = exp - frac_cnt
-  while shift > 0 {
-    out = out * 10.0
-    shift -= 1
-  }
-  while shift < 0 {
-    out = out / 10.0
-    shift += 1
-  }
-  VscJFloat(if neg { -out } else { out })
-}
-
-///|
-/// 对象按键取首个匹配（键不存在或值非对象返回 None）。
-pub fn vsc_json_get(v : VscJson, key : String) -> VscJson? {
-  match v {
-    VscJObj(pairs) => {
-      for pair in pairs {
-        if pair.0 == key {
-          return Some(pair.1)
-        }
-      }
-      None
-    }
-    _ => None
-  }
-}
-
-///|
-/// 字符串值；缺失或非字符串返回 None。
-pub fn vsc_json_str(v : VscJson?) -> String? {
-  match v {
-    Some(VscJStr(s)) => Some(s)
-    Some(
-      VscJNull
-      | VscJBool
-      | VscJInt(_)
-      | VscJFloat(_)
-      | VscJArr(_)
-      | VscJObj(_)
-    ) => None
-    None => None
-  }
-}
-
-///|
-/// 整数值；缺失、非整数返回 None；整值浮点（如 123.0）兜底转 Int64。
-fn vsc_json_int64(v : VscJson?) -> Int64? {
-  match v {
-    Some(VscJInt(i)) => Some(i)
-    Some(VscJFloat(f)) => vsc_float_to_int64(f)
-    Some(VscJNull | VscJBool | VscJStr(_) | VscJArr(_) | VscJObj(_)) => None
-    None => None
-  }
-}
-
-///|
-/// 整值浮点 → Int64；带小数部分或超出 2^53 精确表示范围返回 None。
-fn vsc_float_to_int64(f : Double) -> Int64? {
-  let t = f.trunc()
-  if t == f && t.abs() <= 9007199254740992.0 {
-    Some(t.to_int64())
-  } else {
-    None
-  }
-}
+//   let recent = @system.vsc_recent() // Ok(["/path/to/workspace", …])
 
 // ---------------------------------------------------------------------------
 // 纯函数层：URI 编码/解码与码点（UTF-16 ↔ Unicode 码点 ↔ UTF-8）
 // ---------------------------------------------------------------------------
-
-///|
-/// 取 i 处码点：代理对合并为一个码点，返回 (码点, 消耗码元数)；
-/// 孤立代理替换为 U+FFFD。
-fn vsc_codepoint_at(s : String, i : Int) -> (Int, Int) {
-  let c = s.unsafe_get(i).to_int()
-  if c >= 0xD800 && c <= 0xDBFF && i + 1 < s.length() {
-    let lo = s.unsafe_get(i + 1).to_int()
-    if lo >= 0xDC00 && lo <= 0xDFFF {
-      return (0x10000 + ((c - 0xD800) << 10) + (lo - 0xDC00), 2)
-    }
-  }
-  if c >= 0xD800 && c <= 0xDFFF {
-    return (0xFFFD, 1)
-  }
-  (c, 1)
-}
 
 ///|
 /// 码点 → UTF-8 字节（追加进 out）。
@@ -599,7 +134,7 @@ fn vsc_uri_encode_path(path : String) -> String {
       sb.write_string(vsc_byte_hex(c))
       i += 1
     } else {
-      let (cp, step) = vsc_codepoint_at(path, i)
+      let (cp, step) = @yue.vsc_codepoint_at(path, i)
       let bytes : Array[Int] = []
       vsc_utf8_encode(cp, bytes)
       for b in bytes {
@@ -622,16 +157,16 @@ fn vsc_uri_percent_decode(s : String, start : Int, end : Int) -> String {
     let c = s.unsafe_get(i).to_int()
     let is_pct = c == 37 &&
       i + 2 < end &&
-      vsc_hex_val(s.unsafe_get(i + 1).to_int()) is Some(_) &&
-      vsc_hex_val(s.unsafe_get(i + 2).to_int()) is Some(_)
+      @yue.vsc_hex_val(s.unsafe_get(i + 1).to_int()) is Some(_) &&
+      @yue.vsc_hex_val(s.unsafe_get(i + 2).to_int()) is Some(_)
     if is_pct {
-      let b = vsc_hex_val(s.unsafe_get(i + 1).to_int()).unwrap() * 16 +
-        vsc_hex_val(s.unsafe_get(i + 2).to_int()).unwrap()
+      let b = @yue.vsc_hex_val(s.unsafe_get(i + 1).to_int()).unwrap() * 16 +
+        @yue.vsc_hex_val(s.unsafe_get(i + 2).to_int()).unwrap()
       pending.push(b)
       i += 3
     } else {
       vsc_flush_pending(sb, pending)
-      let (cp, step) = vsc_codepoint_at(s, i)
+      let (cp, step) = @yue.vsc_codepoint_at(s, i)
       sb.write_char(cp.unsafe_to_char())
       i += step
     }
@@ -669,7 +204,7 @@ fn vsc_resource_uri(user_dir : String, file_path : String) -> String {
     return "vscode-userdata:" + vsc_uri_encode_path(file_path)
   }
   let mut p = file_path
-  if platform() == "windows" {
+  if @yue.platform() == "windows" {
     p = vsc_win_uri_path(p)
   }
   if p.has_prefix("//") {
@@ -721,7 +256,7 @@ fn vsc_uri_encode_path_from(path : String, start : Int) -> String {
       sb.write_string(vsc_byte_hex(c))
       i += 1
     } else {
-      let (cp, step) = vsc_codepoint_at(path, i)
+      let (cp, step) = @yue.vsc_codepoint_at(path, i)
       let bytes : Array[Int] = []
       vsc_utf8_encode(cp, bytes)
       for b in bytes {
@@ -778,7 +313,7 @@ fn vsc_uri_to_path(uri : String) -> String? {
     }
     let path = vsc_uri_percent_decode(uri, i, n)
     let mut full = if authority != "" { "//" + authority + path } else { path }
-    if platform() == "windows" &&
+    if @yue.platform() == "windows" &&
       full.has_prefix("/") &&
       full.length() >= 3 &&
       full.unsafe_get(2).to_int() == 58 {
@@ -897,7 +432,7 @@ pub fn VscHistoryEntry::timestamp_seconds(self : VscHistoryEntry) -> Int64 {
 /// VS Code 用户数据目录：Linux 为 $XDG_CONFIG_HOME/Code（缺省 $HOME/.config/Code），
 /// macOS 为 $HOME/Library/Application Support/Code，Windows 为 %APPDATA%\Code。
 fn vsc_user_data_dir() -> String? {
-  match platform() {
+  match @yue.platform() {
     "linux" =>
       match getenv_str("XDG_CONFIG_HOME") {
         Some(d) if d != "" => Some(d + "/Code")
@@ -924,10 +459,10 @@ fn vsc_user_data_dir() -> String? {
 ///|
 /// windowsState 里单个窗口对象 → 工作区/文件夹路径（folder 或
 /// workspaceUri，URI 转本地路径）。
-fn vsc_window_path(w : VscJson) -> String? {
-  let uri : String? = match vsc_json_str(vsc_json_get(w, "folder")) {
+fn vsc_window_path(w : @yue.VscJson) -> String? {
+  let uri : String? = match @yue.vsc_json_str(@yue.vsc_json_get(w, "folder")) {
     Some(s) => Some(s)
-    None => vsc_json_str(vsc_json_get(w, "workspaceUri"))
+    None => @yue.vsc_json_str(@yue.vsc_json_get(w, "workspaceUri"))
   }
   match uri {
     Some(u) => vsc_uri_to_path(u)
@@ -940,7 +475,7 @@ fn vsc_window_path(w : VscJson) -> String? {
 /// storage.json 可读）。
 pub fn vsc_supported() -> Bool {
   match vsc_user_data_dir() {
-    Some(d) => read_text_file(d + "/User/globalStorage/storage.json") is Some(_)
+    Some(d) => @yue.read_text_file(d + "/User/globalStorage/storage.json") is Some(_)
     None => false
   }
 }
@@ -967,27 +502,27 @@ pub fn vsc_local_history(
   let folder = vsc_history_folder(vsc_resource_uri(dir, path))
   let hist_dir = dir + "/User/History/" + folder
   let entries_path = hist_dir + "/entries.json"
-  let content = match read_text_file(entries_path) {
+  let content = match @yue.read_text_file(entries_path) {
     Some(c) => c
     // 无该文件的历史目录 = 无本地历史
     None => return Ok([])
   }
-  let root = match vsc_json_parse(content) {
+  let root = match @yue.vsc_json_parse(content) {
     Some(j) => j
     None => return Err(HistoryCorrupted("JSON 解析失败: " + entries_path))
   }
-  let entries = match vsc_json_get(root, "entries") {
-    Some(VscJArr(a)) => a
+  let entries = match @yue.vsc_json_get(root, "entries") {
+    Some(@yue.VscJArr(a)) => a
     _ => return Err(HistoryCorrupted("缺少 entries 数组: " + entries_path))
   }
   let out : Array[VscHistoryEntry] = []
   for e in entries {
-    let id = match vsc_json_str(vsc_json_get(e, "id")) {
+    let id = match @yue.vsc_json_str(@yue.vsc_json_get(e, "id")) {
       Some(s) => s
       None =>
         return Err(HistoryCorrupted("快照条目缺少 id: " + entries_path))
     }
-    let ts = match vsc_json_int64(vsc_json_get(e, "timestamp")) {
+    let ts = match @yue.vsc_json_int64(@yue.vsc_json_get(e, "timestamp")) {
       Some(i) => i
       None =>
         return Err(
@@ -1014,11 +549,11 @@ pub fn vsc_local_history(
 /// storage.json 根对象 → 最近路径列表：windowsState.lastActiveWindow
 /// 在最前，openedWindows 依次追加（folder 与 workspaceUri 两种形态均
 /// 收）；无 windowsState 给空数组。
-fn vsc_recent_paths_of(root : VscJson) -> Array[String] {
+fn vsc_recent_paths_of(root : @yue.VscJson) -> Array[String] {
   let out : Array[String] = []
-  match vsc_json_get(root, "windowsState") {
+  match @yue.vsc_json_get(root, "windowsState") {
     Some(state) => {
-      match vsc_json_get(state, "lastActiveWindow") {
+      match @yue.vsc_json_get(state, "lastActiveWindow") {
         Some(w) =>
           match vsc_window_path(w) {
             Some(p) => out.push(p)
@@ -1026,8 +561,8 @@ fn vsc_recent_paths_of(root : VscJson) -> Array[String] {
           }
         None => ()
       }
-      match vsc_json_get(state, "openedWindows") {
-        Some(VscJArr(ws)) =>
+      match @yue.vsc_json_get(state, "openedWindows") {
+        Some(@yue.VscJArr(ws)) =>
           for w in ws {
             match vsc_window_path(w) {
               Some(p) => out.push(p)
@@ -1052,13 +587,14 @@ pub fn vsc_recent() -> Result[Array[String], VscodeError] {
     None => return Err(Unsupported)
   }
   let storage_path = dir + "/User/globalStorage/storage.json"
-  let content = match read_text_file(storage_path) {
+  let content = match @yue.read_text_file(storage_path) {
     Some(c) => c
     None => return Err(StorageUnavailable)
   }
-  let root = match vsc_json_parse(content) {
+  let root = match @yue.vsc_json_parse(content) {
     Some(j) => j
     None => return Err(StorageCorrupted("JSON 解析失败: " + storage_path))
   }
   Ok(vsc_recent_paths_of(root))
 }
+

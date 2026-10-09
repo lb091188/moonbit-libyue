@@ -156,7 +156,7 @@ fn bright_read_sysfs_int(
   name : String,
   attr : String,
 ) -> Int? {
-  match read_text_file(bright_sysfs_attr(subsystem, name, attr)) {
+  match @yue.read_text_file(bright_sysfs_attr(subsystem, name, attr)) {
     Some(text) => bright_parse_sysfs(text)
     None => None
   }
@@ -247,7 +247,7 @@ fn bright_check_dev(
 /// 屏幕亮度调节是否可用:Linux 看 logind 在线(设置走其 SetBrightness;
 // devices/get 只读 sysfs 不依赖它)。每次调用真实探测。
 pub fn brightness_supported() -> Bool {
-  match platform() {
+  match @yue.platform() {
     "linux" => @traybus.logind_available()
     _ => false
   }
@@ -258,7 +258,7 @@ pub fn brightness_supported() -> Bool {
 /// 空列表 = 无背光设备或设备名不在探测表,后者可手工构造
 /// BrightnessDevice 访问)。
 pub fn brightness_devices() -> Result[Array[BrightnessDevice], BrightnessError] {
-  match platform() {
+  match @yue.platform() {
     "linux" => Ok(bright_probe_devices("backlight", bright_backlight_names))
     _ => Err(Unsupported)
   }
@@ -294,7 +294,7 @@ pub fn brightness_step_percent(
 /// 键盘背光是否可用:Linux 看 logind 在线;有无键盘背光设备以
 /// kbd_brightness_devices 的空列表判。每次调用真实探测。
 pub fn kbd_brightness_supported() -> Bool {
-  match platform() {
+  match @yue.platform() {
     "linux" => @traybus.logind_available()
     _ => false
   }
@@ -307,7 +307,7 @@ pub fn kbd_brightness_devices() -> Result[
   Array[BrightnessDevice],
   BrightnessError,
 ] {
-  match platform() {
+  match @yue.platform() {
     "linux" => Ok(bright_probe_devices("leds", bright_kbd_names()))
     _ => Err(Unsupported)
   }
@@ -351,7 +351,7 @@ fn bright_get_impl(
   dev : BrightnessDevice,
   expected : String,
 ) -> Result[Int, BrightnessError] {
-  match platform() {
+  match @yue.platform() {
     "linux" => {
       match bright_check_dev(dev, expected) {
         Err(e) => return Err(e)
@@ -373,7 +373,7 @@ fn bright_set_impl(
   expected : String,
   percent : Int,
 ) -> Result[Unit, BrightnessError] {
-  match platform() {
+  match @yue.platform() {
     "linux" => {
       if !@traybus.logind_available() {
         return Err(Unsupported)
@@ -407,7 +407,7 @@ fn bright_step_impl(
   expected : String,
   delta : Int,
 ) -> Result[Unit, BrightnessError] {
-  match platform() {
+  match @yue.platform() {
     "linux" => {
       if !@traybus.logind_available() {
         return Err(Unsupported)

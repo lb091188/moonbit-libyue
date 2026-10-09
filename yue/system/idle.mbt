@@ -6,7 +6,7 @@
 /// 当前平台是否提供空闲查询(macOS 暂缓)。Wayland 会话在 idle_seconds
 /// 里给结构化 Unsupported。
 pub fn idle_supported() -> Bool {
-  match platform() {
+  match @yue.platform() {
     "linux" | "windows" => true
     _ => false
   }
@@ -15,12 +15,12 @@ pub fn idle_supported() -> Bool {
 ///|
 /// 用户空闲秒数(自最后一次输入起)。XWayland 会话输入不进 X 服务端,
 /// 读数虚高,显式 Err(Unsupported) 而非给错数。
-pub fn idle_seconds() -> Result[Double, IdleError] {
+pub fn idle_seconds() -> Result[Double, @yue.IdleError] {
   let ok = Ref(0)
-  let ms = ffi_idle_seconds_ms(ok)
+  let ms = @yue.ffi_idle_seconds_ms(ok)
   if ok.val == 1 {
     Ok(ms.to_double() / 1000.0)
   } else {
-    Err(Unsupported)
+    Err(@yue.Unsupported)
   }
 }

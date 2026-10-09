@@ -7,38 +7,38 @@
 /// entries.json 解析：本机实测样例（含无 source 字段的条目）。
 test "vsc_json_parse：entries.json 实测样例" {
   let sample = "{\"version\":1,\"resource\":\"file:///home/lkyh/code/EMS-CP/web/src/view/ems/components/pointSelect.vue\",\"entries\":[{\"id\":\"mzv0.vue\",\"source\":\"searchReplace.source\",\"timestamp\":1780041766190},{\"id\":\"cnqS.vue\",\"source\":\"searchReplace.source\",\"timestamp\":1780042445877},{\"id\":\"wmV7.vue\",\"timestamp\":1780305446898}]}"
-  let j = vsc_json_parse(sample)
+  let j = @yue.vsc_json_parse(sample)
   assert_true(j is Some(_))
   match j {
     Some(root) => {
-      assert_eq(vsc_json_get(root, "version") |> vsc_json_int64, Some(1L))
+      assert_eq(@yue.vsc_json_get(root, "version") |> @yue.vsc_json_int64, Some(1L))
       assert_eq(
-        vsc_json_get(root, "resource") |> vsc_json_str,
+        @yue.vsc_json_get(root, "resource") |> @yue.vsc_json_str,
         Some(
           "file:///home/lkyh/code/EMS-CP/web/src/view/ems/components/pointSelect.vue",
         ),
       )
-      match vsc_json_get(root, "entries") {
-        Some(VscJArr(entries)) => {
+      match @yue.vsc_json_get(root, "entries") {
+        Some(@yue.VscJArr(entries)) => {
           assert_eq(entries.length(), 3)
           assert_eq(
-            vsc_json_get(entries[0], "id") |> vsc_json_str,
+            @yue.vsc_json_get(entries[0], "id") |> @yue.vsc_json_str,
             Some("mzv0.vue"),
           )
           assert_eq(
-            vsc_json_get(entries[1], "timestamp") |> vsc_json_int64,
+            @yue.vsc_json_get(entries[1], "timestamp") |> @yue.vsc_json_int64,
             Some(1780042445877L),
           )
           // 末条无 source 字段也能解析
           assert_eq(
-            vsc_json_get(entries[2], "id") |> vsc_json_str,
+            @yue.vsc_json_get(entries[2], "id") |> @yue.vsc_json_str,
             Some("wmV7.vue"),
           )
           assert_eq(
-            vsc_json_get(entries[2], "timestamp") |> vsc_json_int64,
+            @yue.vsc_json_get(entries[2], "timestamp") |> @yue.vsc_json_int64,
             Some(1780305446898L),
           )
-          assert_true(vsc_json_get(entries[2], "source") is None)
+          assert_true(@yue.vsc_json_get(entries[2], "source") is None)
         }
         _ => assert_true(false)
       }
@@ -52,7 +52,7 @@ test "vsc_json_parse：entries.json 实测样例" {
 /// openedWindows 合成样例。
 test "vsc_json_parse：storage.json windowsState 实测样例" {
   let sample = "{\"windowsState\":{\"lastActiveWindow\":{\"folder\":\"file:///home/lkyh/ownCode/steel-front\",\"backupPath\":\"/home/lkyh/.config/Code/Backups/575b8b90282ed2604fc34b0719168ea4\",\"uiState\":{\"mode\":0,\"x\":635,\"y\":76,\"width\":1200,\"height\":800}},\"openedWindows\":[]}}"
-  match vsc_json_parse(sample) {
+  match @yue.vsc_json_parse(sample) {
     Some(root) => {
       let recent = vsc_recent_paths_of(root)
       assert_eq(recent.length(), 1)
@@ -62,7 +62,7 @@ test "vsc_json_parse：storage.json windowsState 实测样例" {
   }
   // openedWindows 含 folder（带空格）与 workspaceUri 两种形态
   let sample2 = "{\"windowsState\":{\"openedWindows\":[{\"folder\":\"file:///home/lkyh/my%20proj\"},{\"workspaceUri\":\"file:///home/lkyh/ownCode/demo.code-workspace\"}]}}"
-  match vsc_json_parse(sample2) {
+  match @yue.vsc_json_parse(sample2) {
     Some(root) => {
       let recent = vsc_recent_paths_of(root)
       assert_eq(recent.length(), 2)
@@ -72,7 +72,7 @@ test "vsc_json_parse：storage.json windowsState 实测样例" {
     None => assert_true(false)
   }
   // 无 windowsState（全新安装）→ 空
-  match vsc_json_parse("{\"theme\":\"dark\"}") {
+  match @yue.vsc_json_parse("{\"theme\":\"dark\"}") {
     Some(root) => assert_eq(vsc_recent_paths_of(root).length(), 0)
     None => assert_true(false)
   }
@@ -82,19 +82,19 @@ test "vsc_json_parse：storage.json windowsState 实测样例" {
 /// 字符串转义：\" \\ \/ \b \f \n \r \t \uXXXX 与代理对合并。
 test "vsc_json_parse：字符串转义" {
   let sample = "{\"s\":\"a\\nb\\\"q\\\"\\u4e2d\\\\z\\ud83d\\ude00!/\"}"
-  match vsc_json_parse(sample) {
+  match @yue.vsc_json_parse(sample) {
     Some(root) =>
       assert_eq(
-        vsc_json_get(root, "s") |> vsc_json_str,
+        @yue.vsc_json_get(root, "s") |> @yue.vsc_json_str,
         Some("a\nb\"q\"中\\z😀!/"),
       )
     None => assert_true(false)
   }
   // 原样 UTF-8 字符直通
   let sample2 = "{\"s\":\"中文😀\"}"
-  match vsc_json_parse(sample2) {
+  match @yue.vsc_json_parse(sample2) {
     Some(root) =>
-      assert_eq(vsc_json_get(root, "s") |> vsc_json_str, Some("中文😀"))
+      assert_eq(@yue.vsc_json_get(root, "s") |> @yue.vsc_json_str, Some("中文😀"))
     None => assert_true(false)
   }
 }
@@ -102,49 +102,49 @@ test "vsc_json_parse：字符串转义" {
 ///|
 /// 数字：整数（负数/Int64 大值）、浮点、指数；畸形 JSON 一律 None。
 test "vsc_json_parse：数字与容错" {
-  match vsc_json_parse("{\"n\":-7}") {
+  match @yue.vsc_json_parse("{\"n\":-7}") {
     Some(root) =>
-      assert_eq(vsc_json_get(root, "n") |> vsc_json_int64, Some(-7L))
+      assert_eq(@yue.vsc_json_get(root, "n") |> @yue.vsc_json_int64, Some(-7L))
     None => assert_true(false)
   }
-  match vsc_json_parse("{\"n\":9223372036854775807}") {
+  match @yue.vsc_json_parse("{\"n\":9223372036854775807}") {
     Some(root) =>
       assert_eq(
-        vsc_json_get(root, "n") |> vsc_json_int64,
+        @yue.vsc_json_get(root, "n") |> @yue.vsc_json_int64,
         Some(9223372036854775807L),
       )
     None => assert_true(false)
   }
-  match vsc_json_parse("{\"f\":12.5}") {
+  match @yue.vsc_json_parse("{\"f\":12.5}") {
     Some(root) =>
-      match vsc_json_get(root, "f") {
-        Some(VscJFloat(f)) => assert_true((f - 12.5).abs() < 1.0e-9)
+      match @yue.vsc_json_get(root, "f") {
+        Some(@yue.VscJFloat(f)) => assert_true((f - 12.5).abs() < 1.0e-9)
         _ => assert_true(false)
       }
     None => assert_true(false)
   }
-  match vsc_json_parse("{\"f\":1e3}") {
+  match @yue.vsc_json_parse("{\"f\":1e3}") {
     Some(root) =>
-      match vsc_json_get(root, "f") {
-        Some(VscJFloat(f)) => assert_true((f - 1000.0).abs() < 1.0e-6)
+      match @yue.vsc_json_get(root, "f") {
+        Some(@yue.VscJFloat(f)) => assert_true((f - 1000.0).abs() < 1.0e-6)
         _ => assert_true(false)
       }
     None => assert_true(false)
   }
   // 整值浮点兜底转 Int64；带小数返回 None
-  assert_eq(vsc_json_int64(Some(VscJFloat(1.0))), Some(1L))
-  assert_true(vsc_json_int64(Some(VscJFloat(1.5))) is None)
+  assert_eq(@yue.vsc_json_int64(Some(@yue.VscJFloat(1.0))), Some(1L))
+  assert_true(@yue.vsc_json_int64(Some(@yue.VscJFloat(1.5))) is None)
   // 字面量 true / null
-  assert_true(vsc_json_parse("true") is Some(VscJBool))
-  assert_true(vsc_json_parse("null") is Some(VscJNull))
+  assert_true(@yue.vsc_json_parse("true") is Some(@yue.VscJBool))
+  assert_true(@yue.vsc_json_parse("null") is Some(@yue.VscJNull))
   // 畸形：未闭合/截断字面量/尾逗号/缺值/尾随内容/空文本
-  assert_true(vsc_json_parse("{") is None)
-  assert_true(vsc_json_parse("tru") is None)
-  assert_true(vsc_json_parse("[1,]") is None)
-  assert_true(vsc_json_parse("{\"a\":}") is None)
-  assert_true(vsc_json_parse("1 2") is None)
-  assert_true(vsc_json_parse("") is None)
-  assert_true(vsc_json_parse("\"unterminated") is None)
+  assert_true(@yue.vsc_json_parse("{") is None)
+  assert_true(@yue.vsc_json_parse("tru") is None)
+  assert_true(@yue.vsc_json_parse("[1,]") is None)
+  assert_true(@yue.vsc_json_parse("{\"a\":}") is None)
+  assert_true(@yue.vsc_json_parse("1 2") is None)
+  assert_true(@yue.vsc_json_parse("") is None)
+  assert_true(@yue.vsc_json_parse("\"unterminated") is None)
 }
 
 ///|

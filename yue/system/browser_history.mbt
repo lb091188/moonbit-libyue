@@ -333,7 +333,7 @@ fn bh_probe_profiles(root : String) -> Array[BrowserProfile] {
     }
     for profile in bh_profile_candidates() {
       let dir_path = base + "/" + profile
-      match fsx_list_dir(dir_path) {
+      match @yue.fsx_list_dir(dir_path) {
         Ok(names) =>
           if bh_names_hit_history(names) {
             out.push({
@@ -352,7 +352,7 @@ fn bh_probe_profiles(root : String) -> Array[BrowserProfile] {
 ///|
 /// 当前平台是否支持浏览器历史读取（本文件仅实现 Linux 路径探测）。
 pub fn bh_supported() -> Bool {
-  platform() == "linux"
+  @yue.platform() == "linux"
 }
 
 ///|
@@ -377,7 +377,7 @@ pub fn bh_browsers() -> Result[Array[BrowserProfile], BrowserHistoryError] {
 /// 配置根定位（探测与取数的公共前置）：非 Linux 给 [BhUnsupported]，
 /// XDG_CONFIG_HOME / HOME 都定位不到给 [BhNoConfigDir]。
 fn bh_root_or_err() -> Result[String, BrowserHistoryError] {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return Err(BhUnsupported)
   }
   match bh_config_root(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME")) {
@@ -414,7 +414,7 @@ fn[T] bh_merge_profiles(
   let mut first_error = ""
   let mut ok_count = 0
   for p in profiles {
-    let reason = match read_binary_file(p.history_path) {
+    let reason = match @yue.read_binary_file(p.history_path) {
       Some(bytes) =>
         match read_one(p, bytes) {
           Ok(items) => {

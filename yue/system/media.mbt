@@ -497,7 +497,7 @@ fn media_status_playerctl(player : String) -> Result[MediaStatus, MediaError] {
 /// 媒体控制是否可用：Linux 且会话总线可列名（ListNames 成功），或
 /// playerctl 可用（命令回退路径）。每次调用真实探测。
 pub fn media_supported() -> Bool {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return false
   }
   match
@@ -520,7 +520,7 @@ pub fn media_supported() -> Bool {
 /// [Unsupported]；总线不可用给 [BusFailed]；实例一个都没有给
 /// [NoPlayer]（无播放器 ≠ 不可用，可稍后再试）。
 pub fn media_players() -> Result[Array[MediaPlayerInfo], MediaError] {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return Err(Unsupported)
   }
   match media_players_dbus() {
@@ -534,7 +534,7 @@ pub fn media_players() -> Result[Array[MediaPlayerInfo], MediaError] {
 /// 失败且 playerctl 可用时回退 playerctl 只读查询；两种路径都失败给
 /// 对应错误（总线错误名或 playerctl 退出原因）。
 pub fn media_status(player : String) -> Result[MediaStatus, MediaError] {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return Err(Unsupported)
   }
   match media_status_dbus(player) {
@@ -553,7 +553,7 @@ pub fn media_status(player : String) -> Result[MediaStatus, MediaError] {
 /// 且 playerctl 可用时回退 playerctl 子命令。属设置类操作，只在调用
 /// 方显式调用时执行，探测与查询路径不会触发。
 fn media_control(player : String, c : MediaCmd) -> Result[Unit, MediaError] {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return Err(Unsupported)
   }
   match
@@ -676,7 +676,7 @@ pub fn media_watch_status(
   let w = MediaWatcher::make()
   let mut target : String? = None
   let mut last : MediaStatus? = None
-  set_timer(interval_ms, fn() {
+  @yue.set_timer(interval_ms, fn() {
     if !w.running.val {
       false
     } else {

@@ -1,5 +1,5 @@
 // 浏览器书签读取（只读）：Chrome / Chromium / Edge / Brave 的 Bookmarks
-// JSON 文件解析。JSON 解析复用同包 vscode_history.mbt 的 vsc_json 系列
+// JSON 文件解析。JSON 解析复用核心包的 vsc_json 系列（@yue.vsc_json_parse 等）
 // （纯 MoonBit，整数字段保持 Int64 精度——Chrome 的 date_added 等以
 // 数值字符串存储，微秒值经 bh_chrome_time_to_unix_ms 换算为 Unix
 // 毫秒）；文件读取走 read_text_file，不复制、不修改原文件。roots 下
@@ -122,10 +122,10 @@ pub fn bm_digits_to_int64(s : String) -> Int64 {
 ///|
 /// 书签 JSON 的整数字段取值：整数直取；数值字符串逐位解析（Chrome 的
 /// date_added 等以字符串存数值）；缺失或非数值给 0。
-fn bm_json_int(v : VscJson?) -> Int64 {
+fn bm_json_int(v : @yue.VscJson?) -> Int64 {
   match v {
-    Some(VscJInt(i)) => i
-    Some(VscJStr(s)) => bm_digits_to_int64(s)
+    Some(@yue.VscJInt(i)) => i
+    Some(@yue.VscJStr(s)) => bm_digits_to_int64(s)
     _ => 0L
   }
 }
@@ -134,22 +134,22 @@ fn bm_json_int(v : VscJson?) -> Int64 {
 /// 单个书签节点（folder 或 url）→ [BookmarkNode]：type 既非 folder
 /// 也非 url、或 url 节点缺 url 字段时给 None（不收）；folder 的
 /// children 中无法解析的节点静默跳过。
-fn bm_parse_node(v : VscJson, root : String) -> BookmarkNode? {
-  let name = match vsc_json_str(vsc_json_get(v, "name")) {
+fn bm_parse_node(v : @yue.VscJson, root : String) -> BookmarkNode? {
+  let name = match @yue.vsc_json_str(@yue.vsc_json_get(v, "name")) {
     Some(s) => s
     None => ""
   }
-  let kind = match vsc_json_str(vsc_json_get(v, "type")) {
+  let kind = match @yue.vsc_json_str(@yue.vsc_json_get(v, "type")) {
     Some(s) => s
     None => ""
   }
   let added = bh_chrome_time_to_unix_ms(
-    bm_json_int(vsc_json_get(v, "date_added")),
+    bm_json_int(@yue.vsc_json_get(v, "date_added")),
   )
   if kind == "folder" {
     let children : Array[BookmarkNode] = []
-    match vsc_json_get(v, "children") {
-      Some(VscJArr(arr)) =>
+    match @yue.vsc_json_get(v, "children") {
+      Some(@yue.VscJArr(arr)) =>
         for c in arr {
           match bm_parse_node(c, root) {
             Some(child) => children.push(child)
@@ -160,7 +160,7 @@ fn bm_parse_node(v : VscJson, root : String) -> BookmarkNode? {
     }
     Some({ name, url: None, children, added, root, })
   } else if kind == "url" {
-    match vsc_json_str(vsc_json_get(v, "url")) {
+    match @yue.vsc_json_str(@yue.vsc_json_get(v, "url")) {
       Some(url) => Some({ name, url: Some(url), children: [], added, root, })
       None => None
     }
@@ -171,7 +171,7 @@ fn bm_parse_node(v : VscJson, root : String) -> BookmarkNode? {
 
 ///|
 /// roots 下单个根（可为缺失）→ 根节点；缺失给 None。
-fn bm_parse_root(v : VscJson?, root : String) -> BookmarkNode? {
+fn bm_parse_root(v : @yue.VscJson?, root : String) -> BookmarkNode? {
   match v {
     Some(j) => bm_parse_node(j, root)
     None => None
@@ -187,17 +187,17 @@ pub fn bm_parse_bookmarks(
   text : String,
   label : String,
 ) -> Result[BookmarkNode, String] {
-  let parsed = match vsc_json_parse(text) {
+  let parsed = match @yue.vsc_json_parse(text) {
     Some(j) => j
     None => return Err("JSON 解析失败")
   }
-  let roots = match vsc_json_get(parsed, "roots") {
-    Some(r) if r is VscJObj(_) => r
+  let roots = match @yue.vsc_json_get(parsed, "roots") {
+    Some(r) if r is @yue.VscJObj(_) => r
     _ => return Err("缺少 roots 对象")
   }
   let children : Array[BookmarkNode] = []
   for key in bm_root_keys {
-    match bm_parse_root(vsc_json_get(roots, key), key) {
+    match bm_parse_root(@yue.vsc_json_get(roots, key), key) {
       Some(node) => children.push(node)
       None => ()
     }
@@ -264,7 +264,7 @@ pub fn bm_bookmarks_path(
 ///|
 /// 当前平台是否支持浏览器书签读取（本文件仅实现 Linux 路径探测）。
 pub fn bm_supported() -> Bool {
-  platform() == "linux"
+  @yue.platform() == "linux"
 }
 
 ///|
@@ -273,7 +273,7 @@ pub fn bm_supported() -> Bool {
 /// 逐一探测；无可读文件给 [BmNoBrowser]，非 Linux 给 [BmUnsupported]，
 /// 配置目录定位失败给 [BmNoConfigDir]。
 pub fn bm_browsers() -> Result[Array[BookmarkProfile], BookmarkError] {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return Err(BmUnsupported)
   }
   let root = match
@@ -286,7 +286,7 @@ pub fn bm_browsers() -> Result[Array[BookmarkProfile], BookmarkError] {
     let (id, dir, subdir) = def
     for profile in bh_profile_candidates() {
       let path = bm_bookmarks_path(root, dir, subdir, profile)
-      if read_text_file(path) is Some(_) {
+      if @yue.read_text_file(path) is Some(_) {
         out.push({ browser: id, profile, bookmarks_path: path, })
       }
     }
@@ -304,7 +304,7 @@ pub fn bm_browsers() -> Result[Array[BookmarkProfile], BookmarkError] {
 /// 返回虚拟根树（名称 "<浏览器>/<profile>"，children 为三根），解析
 /// 失败给 [BmIoFailed]，该书签文件不存在给 [BmNoBrowser]。
 pub fn bm_bookmarks(browser : String) -> Result[BookmarkNode, BookmarkError] {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return Err(BmUnsupported)
   }
   let root = match
@@ -319,7 +319,7 @@ pub fn bm_bookmarks(browser : String) -> Result[BookmarkNode, BookmarkError] {
     }
     for profile in bh_profile_candidates() {
       let path = bm_bookmarks_path(root, dir, subdir, profile)
-      match read_text_file(path) {
+      match @yue.read_text_file(path) {
         Some(text) => {
           let label = id + "/" + profile
           match bm_parse_bookmarks(text, label) {

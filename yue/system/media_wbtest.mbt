@@ -159,7 +159,7 @@ test "media_mpris_method / media_playerctl_subcmd：命令名映射" {
 
 ///|
 test "media 真机只读冒烟：players 与 status（无总线或无播放器跳过）" {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     println("media: skip (非 Linux)")
     return
   }
@@ -182,7 +182,7 @@ test "media 真机只读冒烟：players 与 status（无总线或无播放器�
 
 ///|
 test "media 错误路径：不存在的播放器给错误而非 Ok" {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     println("media: skip (非 Linux)")
     return
   }
@@ -251,7 +251,7 @@ test "MediaWatcher：建/运行中/停止 语义" {
 
 ///|
 test "media 真机冒烟：监视启动后立停不崩（无播放器环境跳过触发）" {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     println("media watch: skip (非 Linux)")
     return
   }

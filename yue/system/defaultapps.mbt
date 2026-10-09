@@ -277,7 +277,7 @@ pub fn da_default_for(mime : String) -> Result[String, DefaultAppError] {
   // 回退:mimeapps.list(同名多行按规范后写覆盖,取最后一个候选)
   let mut candidate : String? = None
   for file in da_mimeapps_files() {
-    match read_text_file(file) {
+    match @yue.read_text_file(file) {
       Some(content) => {
         let sections = da_parse_mimeapps(content)
         for v in da_section_values(sections, "Default Applications", mime) {
@@ -303,7 +303,7 @@ pub fn da_default_for(mime : String) -> Result[String, DefaultAppError] {
 pub fn da_associations_for(mime : String) -> Array[String] {
   let texts : Array[String] = []
   for file in da_mimeapps_files() {
-    match read_text_file(file) {
+    match @yue.read_text_file(file) {
       Some(content) =>
         if content != "" {
           texts.push(content)
@@ -331,12 +331,12 @@ pub fn da_set_default(mime : String, desktop_id : String) -> Result[Unit, Defaul
         None => return Err(IoFailed("缺少 HOME/XDG_CONFIG_HOME,无法定位 mimeapps.list"))
       }
   }
-  let existing = match read_text_file(file) {
+  let existing = match @yue.read_text_file(file) {
     Some(c) => c
     None => ""
   }
   let merged = da_merge_default_line(existing, mime, desktop_id)
-  if !write_text_file(file, merged) {
+  if !@yue.write_text_file(file, merged) {
     Err(IoFailed("写入失败: \{file}"))
   } else {
     Ok(())

@@ -25,19 +25,19 @@ test "bm_digits_to_int64：普通/符号/截断/非数值" {
 
 ///|
 test "bm_json_int：整数/数值字符串/缺失与非数值" {
-  assert_eq(bm_json_int(Some(VscJInt(42L))), 42L)
+  assert_eq(bm_json_int(Some(@yue.VscJInt(42L))), 42L)
   // Chrome 的 date_added 以数值字符串存储
-  assert_eq(bm_json_int(Some(VscJStr("13341227029000000"))), 13341227029000000L)
-  assert_eq(bm_json_int(Some(VscJStr("bad"))), 0L)
-  assert_eq(bm_json_int(Some(VscJStr(""))), 0L)
-  assert_eq(bm_json_int(Some(VscJNull)), 0L)
+  assert_eq(bm_json_int(Some(@yue.VscJStr("13341227029000000"))), 13341227029000000L)
+  assert_eq(bm_json_int(Some(@yue.VscJStr("bad"))), 0L)
+  assert_eq(bm_json_int(Some(@yue.VscJStr(""))), 0L)
+  assert_eq(bm_json_int(Some(@yue.VscJNull)), 0L)
   assert_eq(bm_json_int(None), 0L)
 }
 
 ///|
 test "bm_parse_node：folder/url/未知类型/缺 url 字段" {
   // folder：children 里合法 url 收、未知类型与缺 url 字段的节点跳过
-  let folder = vsc_json_parse(
+  let folder = @yue.vsc_json_parse(
     "{\"type\":\"folder\",\"name\":\"目录\",\"date_added\":\"13341227029000000\",\"children\":[{\"type\":\"url\",\"name\":\"甲\",\"url\":\"https://a.example/\",\"date_added\":\"1\"},{\"type\":\"url\",\"name\":\"坏节点\",\"date_added\":\"1\"},{\"type\":\"other\",\"name\":\"x\"}]}",
   )
   match folder {
@@ -57,7 +57,7 @@ test "bm_parse_node：folder/url/未知类型/缺 url 字段" {
     None => fail("样例 JSON 应解析成功")
   }
   // url 节点：children 为空数组
-  let url = vsc_json_parse(
+  let url = @yue.vsc_json_parse(
     "{\"type\":\"url\",\"name\":\"乙\",\"url\":\"https://b.example/\",\"date_added\":\"13341227029000000\"}",
   )
   match url {
@@ -74,18 +74,18 @@ test "bm_parse_node：folder/url/未知类型/缺 url 字段" {
     None => fail("样例 JSON 应解析成功")
   }
   // 未知 type 不收
-  let bad = vsc_json_parse("{\"type\":\"weird\",\"name\":\"x\"}")
+  let bad = @yue.vsc_json_parse("{\"type\":\"weird\",\"name\":\"x\"}")
   match bad {
     Some(b) => assert_true(bm_parse_node(b, "other") is None)
     None => fail("样例 JSON 应解析成功")
   }
   // 缺 type 不收；缺 name 名字给空串
-  let no_type = vsc_json_parse("{\"name\":\"x\"}")
+  let no_type = @yue.vsc_json_parse("{\"name\":\"x\"}")
   match no_type {
     Some(n) => assert_true(bm_parse_node(n, "other") is None)
     None => fail("样例 JSON 应解析成功")
   }
-  let no_name = vsc_json_parse(
+  let no_name = @yue.vsc_json_parse(
     "{\"type\":\"url\",\"url\":\"https://c.example/\"}",
   )
   match no_name {
@@ -97,7 +97,7 @@ test "bm_parse_node：folder/url/未知类型/缺 url 字段" {
     None => fail("样例 JSON 应解析成功")
   }
   // date_added 缺失给 0
-  let no_time = vsc_json_parse(
+  let no_time = @yue.vsc_json_parse(
     "{\"type\":\"url\",\"name\":\"丙\",\"url\":\"https://d.example/\"}",
   )
   match no_time {
@@ -281,7 +281,7 @@ test "bm_bookmarks_path：子目录拼装" {
 
 ///|
 test "bm_supported：与平台一致的探测口径" {
-  assert_eq(bm_supported(), platform() == "linux")
+  assert_eq(bm_supported(), @yue.platform() == "linux")
 }
 
 ///|

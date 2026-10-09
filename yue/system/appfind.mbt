@@ -325,7 +325,7 @@ fn appfind_dir_layer(dir : String, names : Array[String]) -> Array[AppEntry] {
       continue
     }
     let id = base[:base.length() - 8].to_owned()
-    match read_text_file(dir + "/" + base) {
+    match @yue.read_text_file(dir + "/" + base) {
       Some(content) =>
         match appfind_desktop_to_entry(content, id) {
           Some(e) => layer.push(e)
@@ -357,7 +357,7 @@ fn appfind_collect(
 /// 打不开时报 NoScanDir。
 fn appfind_installed_impl(
   dirs : Array[String],
-  list_dir : (String) -> Result[Array[String], FsError],
+  list_dir : (String) -> Result[Array[String], @yue.FsError],
 ) -> Result[Array[AppEntry], AppFindError] {
   let layers : Array[Array[AppEntry]] = []
   let mut scanned = false
@@ -383,11 +383,11 @@ fn appfind_installed_impl(
 /// 目录），结果按 name 排序；不存在的目录跳过，全部扫描目录都不存在
 /// 时报 NoScanDir；非 Linux 给 [Unsupported]。
 pub fn appfind_installed() -> Result[Array[AppEntry], AppFindError] {
-  match platform() {
+  match @yue.platform() {
     "linux" =>
       appfind_installed_impl(
         appfind_scan_dirs(getenv_str("XDG_DATA_HOME"), getenv_str("HOME")),
-        fn(path) { fsx_list_dir(path) },
+        fn(path) { @yue.fsx_list_dir(path) },
       )
     _ => Err(Unsupported)
   }
@@ -401,7 +401,7 @@ pub fn appfind_installed() -> Result[Array[AppEntry], AppFindError] {
 pub fn appfind_installed_with(
   list_dir : (String) -> Array[String],
 ) -> Result[Array[AppEntry], AppFindError] {
-  match platform() {
+  match @yue.platform() {
     "linux" =>
       Ok(
         appfind_collect(
@@ -420,13 +420,13 @@ pub fn appfind_installed_with(
 /// 分隔符直接 NotFound。命中判定为目录枚举里有该名字的条目（不读文件
 /// 内容；本包不校验执行权限位）。
 pub fn appfind_executable(name : String) -> Result[String, AppFindError] {
-  match platform() {
+  match @yue.platform() {
     "linux" => {
       if name == "" || name.contains("/") {
         return Err(NotFound(name))
       }
       for dir in appfind_bin_dirs(getenv_str("HOME")) {
-        match fsx_list_dir(dir) {
+        match @yue.fsx_list_dir(dir) {
           Ok(names) =>
             if appfind_names_hit(names, name) {
               return Ok(dir + "/" + name)

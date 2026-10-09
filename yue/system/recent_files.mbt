@@ -923,7 +923,7 @@ pub fn rf_data_dir(xdg_data_home : String?, home : String?) -> String? {
 ///|
 /// 本机 recently-used.xbel 路径（非 Linux 给 None）。
 fn rf_recent_file() -> String? {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return None
   }
   match rf_data_dir(getenv_str("XDG_DATA_HOME"), getenv_str("HOME")) {
@@ -935,14 +935,14 @@ fn rf_recent_file() -> String? {
 ///|
 /// 读取并解析 recently-used.xbel（每次调用真实读盘）。
 fn rf_load_entries() -> Result[Array[RfEntry], RecentError] {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return Err(RfUnsupported)
   }
   let path = match rf_recent_file() {
     Some(p) => p
     None => return Err(RfNoDataDir)
   }
-  match read_text_file(path) {
+  match @yue.read_text_file(path) {
     None => Err(RfNoFile)
     Some(text) =>
       match rf_parse_xbel(text) {
@@ -957,7 +957,7 @@ fn rf_load_entries() -> Result[Array[RfEntry], RecentError] {
 /// 每次调用真实探测，高频场景请调用方自行缓存结果。
 pub fn rf_supported() -> Bool {
   match rf_recent_file() {
-    Some(p) => read_text_file(p) is Some(_)
+    Some(p) => @yue.read_text_file(p) is Some(_)
     None => false
   }
 }

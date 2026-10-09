@@ -322,7 +322,7 @@ fn lc_ntp_cmd() -> Result[Bool, LocaleError] {
 /// 应答超时）自动回退 `timedatectl show`；两条路都不可用 →
 /// LcUnsupported。
 pub fn lc_timezone() -> Result[String, LocaleError] {
-  match platform() {
+  match @yue.platform() {
     "linux" =>
       match lc_dbus_string_prop("Timezone") {
         Ok(tz) => Ok(tz)
@@ -337,7 +337,7 @@ pub fn lc_timezone() -> Result[String, LocaleError] {
 /// NTP 时间同步是否开启：优先 timedate1 的 NTP 属性；总线调用失败自动
 /// 回退 `timedatectl show`；两条路都不可用 → LcUnsupported。
 pub fn lc_ntp() -> Result[Bool, LocaleError] {
-  match platform() {
+  match @yue.platform() {
     "linux" =>
       match lc_dbus_bool_prop("NTP") {
         Ok(on) => Ok(on)
@@ -353,7 +353,7 @@ pub fn lc_ntp() -> Result[Bool, LocaleError] {
 /// Timezone 属性（系统总线，需要认证，调用方自行走授权流程；有副作用，
 /// 仅实现不执行）。标识非法先给 LcInvalidTimezone，不发起总线调用。
 pub fn lc_set_timezone(tz : String) -> Result[Unit, LocaleError] {
-  match platform() {
+  match @yue.platform() {
     "linux" => {
       if !lc_valid_timezone(tz) {
         return Err(LcInvalidTimezone(tz))

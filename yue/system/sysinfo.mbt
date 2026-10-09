@@ -450,7 +450,7 @@ fn si_dmi_path(name : String) -> String {
 /// 读 DMI 文本属性：成功去首尾空白返回非空内容；读不到或内容为空
 /// （属性不存在 / 权限不足 / 空文件）为 None。
 fn si_read_dmi(name : String) -> String? {
-  match read_text_file(si_dmi_path(name)) {
+  match @yue.read_text_file(si_dmi_path(name)) {
     None => None
     Some(text) => {
       let t = si_trim(text)
@@ -471,9 +471,9 @@ fn si_read_dmi(name : String) -> String? {
 /// 发行版标识（/etc/os-release 的 PRETTY_NAME / ID / VERSION_ID；文件
 /// 读不到 → SiReadFailed，格式不符 → SiParseFailed）。
 pub fn si_os() -> Result[OsInfo, SysInfoError] {
-  match platform() {
+  match @yue.platform() {
     "linux" =>
-      match read_text_file("/etc/os-release") {
+      match @yue.read_text_file("/etc/os-release") {
         None => Err(SiReadFailed("/etc/os-release"))
         Some(text) =>
           match si_parse_os_release(text) {
@@ -490,7 +490,7 @@ pub fn si_os() -> Result[OsInfo, SysInfoError] {
 /// product_serial）。任一项读不到（权限不足或非 x86/ACPI 平台）给
 /// Err(SiReadFailed(路径))，不用空串糊弄。
 pub fn si_machine() -> Result[MachineInfo, SysInfoError] {
-  match platform() {
+  match @yue.platform() {
     "linux" => {
       let vendor = match si_read_dmi("sys_vendor") {
         Some(v) => v
@@ -514,9 +514,9 @@ pub fn si_machine() -> Result[MachineInfo, SysInfoError] {
 /// 物理内存快照（/proc/meminfo 的 MemTotal / MemAvailable，单位 kB；
 /// 文件读不到 → SiReadFailed，关键行缺失 → SiParseFailed）。
 pub fn si_memory() -> Result[MemoryInfo, SysInfoError] {
-  match platform() {
+  match @yue.platform() {
     "linux" =>
-      match read_text_file("/proc/meminfo") {
+      match @yue.read_text_file("/proc/meminfo") {
         None => Err(SiReadFailed("/proc/meminfo"))
         Some(text) =>
           match si_parse_meminfo(text) {
@@ -533,9 +533,9 @@ pub fn si_memory() -> Result[MemoryInfo, SysInfoError] {
 /// 开机时长（/proc/uptime 首列，单位秒；文件读不到 → SiReadFailed，
 /// 格式不符 → SiParseFailed）。
 pub fn si_uptime() -> Result[Double, SysInfoError] {
-  match platform() {
+  match @yue.platform() {
     "linux" =>
-      match read_text_file("/proc/uptime") {
+      match @yue.read_text_file("/proc/uptime") {
         None => Err(SiReadFailed("/proc/uptime"))
         Some(text) =>
           match si_parse_uptime(text) {

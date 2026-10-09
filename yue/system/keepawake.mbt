@@ -21,7 +21,7 @@ let g_keep_awake_held : Ref[Bool] = Ref(false)
 /// 屏幕常亮是否可用:macOS 暂缓;Linux 看抑制服务是否真实在线(以
 /// NameHasOwner 为准,GNOME/KDE 未装屏保服务时不可用);Windows 恒可用。
 pub fn KeepAwake::is_supported() -> Bool {
-  match platform() {
+  match @yue.platform() {
     "linux" => @traybus.inhibit_available()
     "windows" => true
     _ => false
@@ -31,57 +31,57 @@ pub fn KeepAwake::is_supported() -> Bool {
 ///|
 /// 启用屏幕常亮。app_id 用于抑制服务的身份标识(同一 app_id 可重复
 /// enable,覆盖语义由服务端决定)。
-pub fn KeepAwake::enable(app_id : String) -> Result[KeepAwake, KeepAwakeError] {
-  match platform() {
+pub fn KeepAwake::enable(app_id : String) -> Result[KeepAwake, @yue.KeepAwakeError] {
+  match @yue.platform() {
     "linux" => {
       if !@traybus.inhibit_available() {
-        return Err(Unsupported)
+        return Err(@yue.Unsupported)
       }
       match @traybus.inhibit(app_id, "keep display on") {
         Ok(_) => {
           g_keep_awake_held.val = true
           Ok({ app_id, })
         }
-        Err(_) => Err(Failed)
+        Err(_) => Err(@yue.Failed)
       }
     }
     "windows" => {
       let ok = Ref(0)
-      let _ = ffi_win_keep_awake_enable(ok)
+      let _ = @yue.ffi_win_keep_awake_enable(ok)
       if ok.val == 1 {
         g_keep_awake_held.val = true
         Ok({ app_id, })
       } else {
-        Err(Failed)
+        Err(@yue.Failed)
       }
     }
-    _ => Err(Unsupported)
+    _ => Err(@yue.Unsupported)
   }
 }
 
 ///|
 /// 解除常亮。幂等:未持有也是成功。抑制状态(服务+cookie)全局持有,
 /// release 不读句柄字段。
-pub fn KeepAwake::release(_self : KeepAwake) -> Result[Unit, KeepAwakeError] {
-  match platform() {
+pub fn KeepAwake::release(_self : KeepAwake) -> Result[Unit, @yue.KeepAwakeError] {
+  match @yue.platform() {
     "linux" =>
       match @traybus.unInhibit() {
         Ok(_) => {
           g_keep_awake_held.val = false
           Ok(())
         }
-        Err(_) => Err(Failed)
+        Err(_) => Err(@yue.Failed)
       }
     "windows" => {
       let ok = Ref(0)
-      let _ = ffi_win_keep_awake_restore(ok)
+      let _ = @yue.ffi_win_keep_awake_restore(ok)
       if ok.val == 1 {
         g_keep_awake_held.val = false
         Ok(())
       } else {
-        Err(Failed)
+        Err(@yue.Failed)
       }
     }
-    _ => Err(Unsupported)
+    _ => Err(@yue.Unsupported)
   }
 }

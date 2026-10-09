@@ -4,7 +4,7 @@
 // 语义归一在本层，使用方零平台感知；macOS 暂缓给结构化 Unsupported。
 //
 // 典型用法：
-//   match @yue.SingleInstance::acquire("com.example.app") {
+//   match @system.SingleInstance::acquire("com.example.app") {
 //     Ok(Some(si)) => { si.on_activate(fn(args) { ... }); /* 继续启动 */ }
 //     Ok(None) => { /* 已有实例且已唤醒，退出 */ }
 //     Err(e) => { /* 单实例不可用，自行决定继续启动还是退出 */ }
@@ -26,11 +26,11 @@ pub struct SingleInstance {
 ///   调用方自行决定继续启动（降级）还是退出。
 pub fn SingleInstance::acquire(
   app_id : String,
-) -> Result[SingleInstance?, SingleInstanceError] {
+) -> Result[SingleInstance?, @yue.SingleInstanceError] {
   if !@traybus.valid_app_id(app_id) {
-    return Err(InvalidAppId)
+    return Err(@yue.InvalidAppId)
   }
-  match platform() {
+  match @yue.platform() {
     "linux" =>
       match @traybus.claim_name(app_id) {
         Ok(@traybus.PrimaryOwner) | Ok(@traybus.AlreadyOwner) =>
@@ -41,10 +41,10 @@ pub fn SingleInstance::acquire(
         }
         // DO_NOT_QUEUE 下不会出现；防御性按「让出」处理
         Ok(@traybus.InQueue) => Ok(None)
-        Err(_) => Err(BackendUnavailable)
+        Err(_) => Err(@yue.BackendUnavailable)
       }
     "windows" => acquire_windows(app_id)
-    _ => Err(Unsupported)
+    _ => Err(@yue.Unsupported)
   }
 }
 
@@ -57,7 +57,7 @@ pub fn SingleInstance::on_activate(
   self.activate = Some(cb)
   // Linux 经 traybus 的 Wake 分发触发；Windows 的 callback 在 acquire 时
   // 已挂到消息窗口蹦床，两条路都归集到 self.activate 一处读出
-  match platform() {
+  match @yue.platform() {
     "linux" =>
       @traybus.on_wake(fn(args) {
         match self.activate {
@@ -73,11 +73,11 @@ pub fn SingleInstance::on_activate(
 /// Windows 首实例：建 message-only 窗口收 WM_COPYDATA。
 fn acquire_windows(
   app_id : String,
-) -> Result[SingleInstance?, SingleInstanceError] {
+) -> Result[SingleInstance?, @yue.SingleInstanceError] {
   let ok = Ref(0)
-  if ffi_win_named_mutex_create(utf8_bytes(instance_mutex_name(app_id)), ok) !=
+  if @yue.ffi_win_named_mutex_create(@yue.utf8_bytes(instance_mutex_name(app_id)), ok) !=
     0 {
-    return Err(BackendUnavailable)
+    return Err(@yue.BackendUnavailable)
   }
   if ok.val == 0 {
     // 已有实例：主路径送命令行到首实例消息窗口（首实例在回调内自置前），
@@ -90,7 +90,7 @@ fn acquire_windows(
   // WM_COPYDATA 负载是 \n 连接的命令行(wake_windows 同款拼法),收端
   // 拆回数组;空负载不当成一次空参数唤起
   let wrapped : (Bytes) -> Unit = fn(b) {
-    let text = from_utf8_bytes(b)
+    let text = @yue.from_utf8_bytes(b)
     let args = if text == "" {
       []
     } else {
@@ -98,11 +98,11 @@ fn acquire_windows(
     }
     handle.fire_activate(args)
   }
-  keep_alive_bytes(wrapped)
+  @yue.keep_alive_bytes(wrapped)
   // 建窗失败不改变首实例身份（互斥体已持有），只是唤起收不到；
   // 兜底查找置前仍然可用，此处降级继续
-  let _ = ffi_win_instance_window_create(
-    utf8_bytes(instance_class_name(app_id)),
+  let _ = @yue.ffi_win_instance_window_create(
+    @yue.utf8_bytes(instance_class_name(app_id)),
     fn(f : (Bytes) -> Unit, b : Bytes) -> Unit { f(b) },
     wrapped,
   )
@@ -113,14 +113,14 @@ fn acquire_windows(
 /// Windows 二次启动：向首实例消息窗口发 Wake，失败按标题兜底置前。
 fn wake_windows(app_id : String) -> Unit {
   let sent = Ref(0)
-  let rc = ffi_win_instance_window_send(
-    utf8_bytes(instance_class_name(app_id)),
-    utf8_bytes(command_line().join("\n")),
+  let rc = @yue.ffi_win_instance_window_send(
+    @yue.utf8_bytes(instance_class_name(app_id)),
+    @yue.utf8_bytes(command_line().join("\n")),
     sent,
   )
   if rc != 0 || sent.val == 0 {
     let found = Ref(0)
-    let _ = ffi_win_find_and_activate(utf8_bytes(g_window_title.val), found)
+    let _ = @yue.ffi_win_find_and_activate(@yue.utf8_bytes(g_window_title.val), found)
   }
 }
 
