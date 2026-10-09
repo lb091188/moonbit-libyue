@@ -170,7 +170,7 @@ fn stateful_item(
   pad_x? : Double = 0.0,
   align_start? : Bool = false,
   font_size? : Double = 13.0,
-  icon? : @yue.IconKind? = None,
+  icon? : @icons.IconKind? = None,
   accent? : Bool = false,
   rounded? : Bool = false,
 ) -> @yue.Node {
@@ -218,7 +218,7 @@ fn stateful_item(
         // 图标在 pad_x 起(16px),文字右移;无图标按 align_start/居中排
         let text_x = match icon {
           Some(k) => {
-            @yue.draw_icon(
+            @icons.draw_icon(
               p,
               k,
               pad_x + 8.0,
@@ -298,7 +298,7 @@ fn side_menu_fg(act : Bool, _hov : Bool) -> String {
 pub fn side_menu(
   items : Array[String],
   selected : @yue.Store[String],
-  icons? : Array[(String, @yue.IconKind)] = [],
+  icons? : Array[(String, @icons.IconKind)] = [],
   style? : Array[(String, &@yue.StyVal)] = [],
 ) -> @yue.Node {
   let width = 180.0
@@ -313,7 +313,7 @@ pub fn side_menu(
   // style 直接改外层;项宽跟随需要调用方自行对齐(内部项 168 固定)
   let nodes : Array[@yue.Node] = []
   for it in items {
-    let mut kind : @yue.IconKind? = None
+    let mut kind : @icons.IconKind? = None
     for kv in icons {
       if kv.0 == it {
         kind = Some(kv.1)
@@ -7696,7 +7696,7 @@ pub fn color_picker_t(
 pub fn side_menu_sections(
   sections : Array[(String, Array[String])],
   selected : @yue.Store[String],
-  icons? : Array[(String, @yue.IconKind)] = [],
+  icons? : Array[(String, @icons.IconKind)] = [],
   foldable? : Bool = true,
   style? : Array[(String, &@yue.StyVal)] = [],
   handle? : (@yue.Container) -> Unit = fn(_c) {  },
@@ -7740,7 +7740,7 @@ pub fn side_menu_sections(
           at.set_color(@yue.theme_text_secondary())
           p.draw_attributed_text(at, 14.0, 0.0, b.width, b.height)
           if foldable {
-            @yue.draw_icon(
+            @icons.draw_icon(
               p,
               if open.val {
                 CaretDownSmall
@@ -7760,7 +7760,7 @@ pub fn side_menu_sections(
         // 组内项容器 + 项(收起即整容器隐藏,不占布局)
         let body = @yue.themed_container(style=[("flexDirection", "column")])
         for it in items {
-          let mut kind : @yue.IconKind? = None
+          let mut kind : @icons.IconKind? = None
           for kv in icons {
             if kv.0 == it {
               kind = Some(kv.1)

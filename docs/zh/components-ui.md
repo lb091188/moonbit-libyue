@@ -1302,7 +1302,7 @@ let series = @yue.Store::new([
 | `draw_icon(p : Painter, kind, cx, cy, s, color)` | 统一自绘入口（中心坐标 + 边长） |
 | `all_icons()` / `icon_name(kind)` | 全清单 / 取名 |
 
-常用图标按组速查(全部枚举见 `yue/icons.mbt` 的 `IconKind` 与 showcase 图标库页):
+常用图标按组速查(全部枚举见 `yue/icons/icons.mbt` 的 `IconKind` 与 showcase 图标库页):
 
 | 组 | 图标 |
 |---|---|

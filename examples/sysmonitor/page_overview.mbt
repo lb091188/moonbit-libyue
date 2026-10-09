@@ -90,7 +90,7 @@ fn sparkline_box(
 /// 窗口边界派发），高亮会闪烁。悬停反馈只有手型光标，且须逐子控件
 /// 设置（光标同样按窗口生效，只设容器盖不住有独立窗口的子控件）。
 fn res_card(
-  icon : @yue.IconKind,
+  icon : @icons.IconKind,
   title : String,
   value : @yue.Store[String],
   hist : @yue.Store[Array[@yue.LineSeries]]?,
@@ -108,7 +108,7 @@ fn res_card(
     [
       @yue.hbox(
         [
-          @yue.icon(icon, size=16.0),
+          @icons.icon(icon, size=16.0),
           @components.label_t(title, role=@components.Section, style=[("marginLeft", 6.0)], handle=fn(
             l,
           ) {
@@ -162,7 +162,7 @@ fn res_card(
 fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
   let cards : Array[@yue.Node] = [
     res_card(
-      @yue.Cpu,
+      @icons.Cpu,
       "处理器",
       app.card_cpu,
       Some(app.cpu_hist),
@@ -171,7 +171,7 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
       y_range=Some((0.0, 100.0)),
     ),
     res_card(
-      @yue.Database,
+      @icons.Database,
       "内存",
       app.card_mem,
       Some(app.mem_hist),
@@ -179,7 +179,7 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
       VMem,
     ),
     res_card(
-      @yue.Wifi,
+      @icons.Wifi,
       "网络",
       app.card_net,
       Some(app.net_hist),
@@ -203,7 +203,7 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
     }
     cards.push(
       res_card(
-        @yue.Sever,
+        @icons.Sever,
         title,
         app.card_disk_vals[i],
         Some(app.disk_hists[i]),
@@ -218,7 +218,7 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
   for i in 0..<app.card_gpu_vals.length() {
     cards.push(
       res_card(
-        @yue.Monitor,
+        @icons.Monitor,
         "显卡 \{i + 1}",
         app.card_gpu_vals[i],
         None,
@@ -228,7 +228,7 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
     )
   }
   cards.push(
-    res_card(@yue.TableIcon, "进程", app.card_proc, None, view, VProc),
+    res_card(@icons.TableIcon, "进程", app.card_proc, None, view, VProc),
   )
   @yue.scroll(@yue.vbox(cards, style=[("padding", 10.0)]), style=[
     ("width", 292.0),

@@ -825,18 +825,6 @@ pub extend IconKind with Eq::{equal, not_equal}
 pub extend IconKind with Debug::{to_repr}
 
 ///|
-/// 整圆弧度(2π,圆/点绘制用)
-const ICON_TAU : Double = 6.283185307179586
-
-///|
-/// 实心圆点(圆心 x,y,半径 r)。
-fn icon_dot(p : Painter, x : Double, y : Double, r : Double) -> Unit {
-  p.begin_path()
-  p.arc(x, y, r, 0.0, ICON_TAU)
-  p.fill()
-}
-
-///|
 /// 折线快捷画法:points 依次连线并描边。
 
 ///|
@@ -892,7 +880,7 @@ fn path_num(d : String, i : Int) -> (Double, Int) {
 /// 坐标换算 v × s × 0.88 / 1000 + 中心(0.88 为图标安全边距,同生成器;
 /// 单命令即读即调,数值解析全程微秒级,无需缓存)。
 fn fill_icon_path(
-  p : Painter,
+  p : @yue.Painter,
   d : String,
   cx : Double,
   cy : Double,
@@ -952,7 +940,7 @@ fn fill_icon_path(
 /// 线条图标以 color 为描边色,实心图标(Star/Play/圆点)以 color 为填充色;
 /// 混合型(圆底 + 内符)内符沿用 color。
 pub fn draw_icon(
-  p : Painter,
+  p : @yue.Painter,
   kind : IconKind,
   cx : Double,
   cy : Double,
@@ -4216,23 +4204,23 @@ pub fn icon(
   kind : IconKind,
   size? : Double = 13.0,
   color? : String = "",
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [("width", size), ("height", size)]
+      let base : Array[(String, &@yue.StyVal)] = [("width", size), ("height", size)]
       for kv in style {
         base.push(kv)
       }
-      let v = themed_container(style=base)
+      let v = @yue.themed_container(style=base)
       handle(v)
       v.on_draw(fn(p) {
-        let c = if color != "" { color } else { theme_text_regular() }
+        let c = if color != "" { color } else { @yue.theme_text_regular() }
         draw_icon(p, kind, size / 2.0, size / 2.0, size * 0.42, c)
       })
-      attach(parent, ViewLike::view(v))
-      ViewLike::view(v)
+      @yue.attach(parent, @yue.ViewLike::view(v))
+      @yue.ViewLike::view(v)
     },
   }
 }
@@ -4247,14 +4235,14 @@ pub fn icon_button_t(
   on_click? : () -> Unit = fn() {  },
   size? : Double = 28.0,
   tip? : String = "",
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let hover = Ref(false)
       let focused = Ref(false)
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", size),
         ("height", size),
         ("marginRight", 6.0),
@@ -4262,48 +4250,48 @@ pub fn icon_button_t(
       for kv in style {
         base.push(kv)
       }
-      let v = themed_container(style=base)
+      let v = @yue.themed_container(style=base)
       handle(v)
       v.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(v)
+        let b = @yue.ViewLike::get_bounds(v)
         if hover.val {
-          p.set_fill_color(theme_fill_hover())
+          p.set_fill_color(@yue.theme_fill_hover())
           p.fill_rect(0.0, 0.0, b.width, b.height)
         }
         let c = if hover.val {
-          theme_text_primary()
+          @yue.theme_text_primary()
         } else {
-          theme_text_regular()
+          @yue.theme_text_regular()
         }
         draw_icon(p, kind, b.width / 2.0, b.height / 2.0, size * 0.26, c)
         if focused.val {
-          draw_focus_ring(p, b.width, b.height)
+          @yue.draw_focus_ring(p, b.width, b.height)
         }
       })
-      View::set_cursor(v, hand())
-      ViewLike::on_mouse_down(v, fn(e) {
+      @yue.View::set_cursor(v, @yue.hand())
+      @yue.ViewLike::on_mouse_down(v, fn(e) {
         if e.button == 1 {
-          ViewLike::focus(v)
+          @yue.ViewLike::focus(v)
           on_click()
           true
         } else {
           false
         }
       })
-      bind_focus(v, fn() { ViewLike::schedule_paint(v) }, focused, on_click)
-      ViewLike::on_mouse_enter(v, fn(_e) {
+      @yue.bind_focus(v, fn() { @yue.ViewLike::schedule_paint(v) }, focused, on_click)
+      @yue.ViewLike::on_mouse_enter(v, fn(_e) {
         hover.val = true
-        ViewLike::schedule_paint(v)
+        @yue.ViewLike::schedule_paint(v)
       })
-      ViewLike::on_mouse_leave(v, fn(_e) {
+      @yue.ViewLike::on_mouse_leave(v, fn(_e) {
         hover.val = false
-        ViewLike::schedule_paint(v)
+        @yue.ViewLike::schedule_paint(v)
       })
       if tip != "" {
-        ffi_view_set_tooltip(ViewLike::view(v), utf8_bytes(tip))
+        @yue.ffi_view_set_tooltip(@yue.ViewLike::view(v), @yue.utf8_bytes(tip))
       }
-      attach(parent, ViewLike::view(v))
-      ViewLike::view(v)
+      @yue.attach(parent, @yue.ViewLike::view(v))
+      @yue.ViewLike::view(v)
     },
   }
 }

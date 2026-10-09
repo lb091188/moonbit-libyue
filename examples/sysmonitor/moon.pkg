@@ -1,6 +1,7 @@
 import {
   "NoahLiu/moonbit-libyue/yue",
   "NoahLiu/moonbit-libyue/yue/components",
+  "NoahLiu/moonbit-libyue/yue/icons",
   "moonbitlang/core/encoding/utf8",
 }
 

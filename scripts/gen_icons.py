@@ -12,11 +12,11 @@
    cairo 默认即非零)。
 2. 发射为数据形状:每图标一条千分定点路径串(命令 M/L/C/Z),写入
    icon_path_data 数组 + kind_index 索引 match,draw_icon 经
-   fill_icon_path 解释绘制(见 yue/icons.mbt);数据 ~0.6MB 替代旧
+   fill_icon_path 解释绘制(见 yue/icons/icons.mbt);数据 ~0.6MB 替代旧
    代码形状 ~16MB 绘制代码,编译/体积/启动全面受益。
 3. 变体命名:SELECTION 覆盖表优先,其余按 font_class 自动转 PascalCase;
    与 yue 包顶层名相撞的追加 Icon 后缀,重名追加数字后缀。
-4. 重写 yue/icons.mbt 的 icons-gen 标记段,并清除旧手写图标残留:
+4. 重写 yue/icons/icons.mbt 的 icons-gen 标记段,并清除旧手写图标残留:
    枚举变体、draw_icon/icon_name 旧分支、无用绘图助手(icon_dot 被
    splitter 使用,保留)、all_icons 清单。
 5. 同步更新文件头与文档注释中的图标计数。
@@ -28,7 +28,7 @@ import re
 import sys
 
 REPO = __file__.rsplit("/scripts/", 1)[0]
-ICONS_MBT = REPO + "/yue/icons.mbt"
+ICONS_MBT = REPO + "/yue/icons/icons.mbt"
 
 # 命名覆盖表:font_class -> MoonBit 变体名(与自动 PascalCase 不一致或需稳定的)
 SELECTION = {
@@ -376,7 +376,7 @@ def glyph_geometry(abs_cmds):
 def encode_path(subpaths):
     """把归一化子路径编码为定点路径串:命令 M/L/C/Z(ASCII),坐标为
     归一化值 ×1000 取整(千分定点,±1000 内,3~5 字符),逗号分隔;
-    每子路径 M…Z,绘制侧 fill_icon_path 解释执行(见 yue/icons.mbt)。
+    每子路径 M…Z,绘制侧 fill_icon_path 解释执行(见 yue/icons/icons.mbt)。
     数据形状替代旧代码形状:803 图标 ~0.6MB 字符串 vs ~16MB 绘制代码。"""
     out = []
     for sp in subpaths:
@@ -428,7 +428,7 @@ def yue_top_level_names():
     import glob
 
     names = set()
-    for f in glob.glob(REPO + "/yue/*.mbt"):
+    for f in glob.glob(REPO + "/yue/*.mbt") + glob.glob(REPO + "/yue/icons/*.mbt"):
         src = open(f).read()
         for pat in (
             r"^(?:pub\(all\)|pub\s+)?(?:struct|enum|type|abstract)\s+(\w+)",
