@@ -543,6 +543,14 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 验证:576 测全绿;探针数值证明(帧 480x270 + 条背景 50% 黑实证);systemprobe 冒烟存活。真机最终观感由用户复验。
 - 教训:**库约定色值序是 ARGB(AARRGGBB),写 8 位 HEX 时 alpha 在前**;半透明色务必上真机/探针采样验证——全透明与半透明在深色底上肉眼难分。解码器输出尺寸改写(缩放)必须保持宽高比,单边指定即隐含「按比例补齐」预期。
 
+### 对话框遮罩纯黑(背景色 alpha 被 GTK 钳为不透明,2026-10 用户真机反馈+本机实证)
+
+- 现象(用户真机):dialog_t 遮罩变成纯黑、盖住底下内容——预期 35% 半透明黑(`#59000000`)。
+- 根因:遮罩色走 `ViewLike::set_background_color` → shim 裸传 `nu::Color(std::string)` → GTK 后端 `View::SetBackgroundColor` 以 `Color::ToString()` 拼 CSS。libyue(上游与 fork 同)的 `ToString()` 产出 `rgba(r, g, b, a)` 且 **a 是 0-255 整数**,而 GTK CSS 的 rgba alpha 只接受 0..1,超界钳为 1.0——本机 `gdk_rgba_parse` 实测:`rgba(0,0,0,89)`→alpha=1.000、`rgba(0,0,0,128)`→1.000、`rgba(0,0,0,0.35)`→0.350。故任何带 alpha 的 8 位 hex 走背景色路径在 Linux 一律渲染为不透明。`6af827c` 只修对字节序,其「#80000000 50% 黑」探针结论取自 Painter 填充路径,在背景色路径上不成立(深色底上不透明黑与半透明黑肉眼难分,误判来源)。
+- 修复:遮罩改 on_draw + Painter `set_fill_color("#59000000")` + `fill_rect`(控制条同款 Cairo 路径,alpha 正常;与 hover_group「可见背景必须自绘」既有结论一致);absolute 容器补显式 `height:"100%"`;删 `set_background_color` 调用;`set_background_color` 文档注释更正为「#AARRGGBB,alpha 不保证生效,半透明底走 Painter」。全仓扫描:带 alpha 的 8 位 hex 走背景色路径仅此一处,`with_alpha` 全走 Painter 无碍。
+- 验证:探针示例(白底 + dialog_t 常驻可见)真机截图,遮罩区域三处像素采样均 `srgb(166,166,166)` = `#a6a6a6`,与 `#59000000` 叠 `#ffffff` 理论值(255×(1−0x59/255)=166)逐位一致;`moon check` 零警告 + `moon test` 657 全绿。
+- 教训:**半透明底一律 on_draw + Painter 填充,不走 set_background_color**(libyue 的 Color→CSS rgba 把 0-255 alpha 钳成不透明);探针结论必须标明渲染路径——Painter 填充与背景色 CSS 两条路径同一色值行为不同。
+
 ### 音频播放无声、仅拖动进度时响一下(has_device 状态判定写反,2026-10 真机)
 
 - 现象(用户真机):音频播放全程无声,只有拖动进度条的瞬间响一下(约 0.4 秒)又静默。视频页音轨正常。
