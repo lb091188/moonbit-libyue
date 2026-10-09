@@ -90,6 +90,17 @@ inline void *BytesFromString(const std::string &s) {
   return bytes;
 }
 
+// MoonBit Bytes 的字节长度：数据指针前 8 字节为 moonbit_object 头
+// （rc:4 + meta:4），BLOCK_KIND_VAL_ARRAY 的 meta 即长度。布局照
+// ~/.moon/include/moonbit.h 的 Moonbit_array_length，不引入 moonbit.h
+// （其 extern "C" memcpy 声明与 glibc 冲突，见文件头注释）。用于按载荷
+// 长度预验后再解码，避免按越界读到的垃圾长度构造 string。
+inline int32_t BytesLength(const void *bytes) {
+  uint32_t meta = 0;
+  std::memcpy(&meta, static_cast<const char *>(bytes) - 4, 4);
+  return static_cast<int32_t>(meta);
+}
+
 }  // namespace yue_mbt
 
 #endif  // YUE_MBT_INTERNAL_H
