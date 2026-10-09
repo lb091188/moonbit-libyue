@@ -8,6 +8,11 @@
 // 内存 / 进程同样虚拟 /proc；磁盘 IO 与温度无来源（IOKit / SMC 列远期），
 // 速率字段为 None、UI 显示「—」；GPU 走 system_profiler -json 子进程，
 // JSON 解析是本文件的纯函数（parse_system_profiler_gpu）。
+// GPU 占用来源（SYS4，Linux）：nvidia-smi（N 卡）> sysfs
+// gpu_busy_percent（amdgpu，免 root）> DRM fdinfo 聚合（i915 / xe /
+// amdgpu 兜底：/proc/<pid>/fdinfo 的 drm-engine-* 按 drm-client-id
+// 归并、差值 / 墙钟折算全卡利用率，免 root）；前样本差值状态在
+// GpuMonitor。
 
 // ---------------------------------------------------------------------------
 // S4 温度
@@ -589,14 +594,274 @@ pub fn vendor_name(id : String) -> String {
   }
 }
 
+// ---------------------------------------------------------------------------
+// S6 GPU：DRM fdinfo 聚合采样（SYS4）
+// ---------------------------------------------------------------------------
+
 ///|
-/// 枚举 GPU 设备。Linux：/sys/bus/pci/devices（class=0x03*），占用 /
-/// 显存 / 温度先试 sysfs 通用节点（amdgpu / nouveau 的 gpu_busy_percent、
-/// mem_info_vram_*、hwmon），再 NVML 覆盖（NVIDIA 专有驱动仅有此路，
-/// 且附型号名）；目录不可读返回 None。macOS：无 sysfs 设备树，改走
-/// system_profiler -json 子进程（stub 内 fork + 管道 + 超时，首跑秒级、
-/// 成功后进程内缓存），JSON 解析见 [parse_system_profiler_gpu]。
-pub fn gpu_list() -> Array[GpuInfo]? {
+/// /proc/<pid>/fdinfo/<fd> 的 DRM 用量条目。engine_ns 是该 fd 全部
+/// drm-engine-* 累计忙时间之和（ns，自客户端打开设备起累计，与
+/// intel_gpu_top / nvtop 同源）；无任何引擎键的 fd（非 DRM 设备 / 老
+/// 驱动无用量统计）解析为 None，不进条目。
+pub(all) struct DrmFdinfo {
+  driver : String
+  pdev : String
+  client_id : Int64
+  engine_ns : Int64
+}
+
+///|
+/// 是否 drm-engine-* 引擎时间键。排除 drm-engine-capacity-*：那是同类
+/// 并行引擎数（i915 多视频引擎时打印），不是时间。
+pub fn is_drm_engine_key(key : StringView) -> Bool {
+  key.has_prefix("drm-engine-") && !key.has_prefix("drm-engine-capacity-")
+}
+
+///|
+/// 解析 /proc/<pid>/fdinfo/<fd> 文本为 DRM 用量条目。键值按首个 ':'
+/// 切分（内核以 Tab 分隔；规范只要求冒号后空白可忽略，故两侧都
+/// trim），值取首个空白分隔字段（引擎值形如 "914633 ns"，单位后缀可
+/// 缺）。收 drm-driver / drm-pdev / drm-client-id 与全部引擎键求和；
+/// 无任何引擎键返回 None。client_id 缺失记 -1（聚合时不归并）。
+pub fn parse_drm_fdinfo(text : String) -> DrmFdinfo? {
+  let mut driver = ""
+  let mut pdev = ""
+  let mut client_id = -1L
+  let mut engine_ns = 0L
+  let mut any_engine = false
+  for line in text.split("\n") {
+    let (k, v) = match line.split_once(":") {
+      Some((key, val)) => (key, val)
+      None => continue
+    }
+    let key = k.trim()
+    let val = v.trim()
+    if key.equal_to_string("drm-driver") {
+      driver = val.to_owned()
+    } else if key.equal_to_string("drm-pdev") {
+      pdev = val.to_owned()
+    } else if key.equal_to_string("drm-client-id") {
+      match parse_u64(val) {
+        Some(id) => client_id = id
+        None => ()
+      }
+    } else if is_drm_engine_key(key) {
+      let f = split_fields(val)
+      if f.length() > 0 {
+        match parse_u64(f[0]) {
+          Some(ns) => {
+            engine_ns += ns
+            any_engine = true
+          }
+          None => ()
+        }
+      }
+    }
+  }
+  if any_engine {
+    Some({ driver, pdev, client_id, engine_ns, })
+  } else {
+    None
+  }
+}
+
+///|
+/// fdinfo 条目的设备键：drm-pdev（内核 ≥6.5 的 PCI 槽位地址，与 sysfs
+/// 设备目录名同形）优先；老内核 / 非 PCI 设备无该键，回退驱动名。
+pub fn drm_device_key(e : DrmFdinfo) -> String {
+  if e.pdev != "" {
+    e.pdev
+  } else {
+    e.driver
+  }
+}
+
+///|
+/// 按 drm-client-id 归并：同一客户端（dup 的 fd、经 unix socket 跨进程
+/// 传递的 fd）在多个 fdinfo 条目里重复出现且累计值相同，只取最大一次；
+/// client_id < 0（缺键）不归并，每条独立计数。各客户端求和得每个设备
+/// 键的全卡累计忙时间（ns）。client_id 是每设备计数器，故设备键进复合
+/// 键，两个同驱动设备的客户端不会互相归并。
+pub fn drm_clients_total(entries : Array[DrmFdinfo]) -> Map[String, Int64] {
+  let out : Map[String, Int64] = Map([])
+  let merged : Map[String, Int64] = Map([])
+  for i, e in entries {
+    let dev = drm_device_key(e)
+    let ck = if e.client_id >= 0 {
+      "\{dev}#\{e.client_id}"
+    } else {
+      "\{dev}#@\{i}"
+    }
+    let old = merged.get(ck).unwrap_or(0L)
+    if e.engine_ns > old {
+      merged.set(ck, e.engine_ns)
+      out.set(dev, out.get(dev).unwrap_or(0L) + (e.engine_ns - old))
+    }
+  }
+  out
+}
+
+///|
+/// 全卡利用率（%，0..100）：两次采样的全卡累计忙时间差值 / 墙钟。墙钟
+/// ≤ 0（首帧）按 0；累计值回落（客户端退出重开 / 计数器重置，内核规范
+/// 允许非单调更新）按 0；多引擎并行时合计可超墙钟，钳到 100。
+pub fn drm_busy_percent(prev_ns : Int64, cur_ns : Int64, wall_s : Double) -> Double {
+  if wall_s <= 0.0 {
+    0.0
+  } else {
+    let delta_ns = (cur_ns - prev_ns).max(0).to_double()
+    (delta_ns / (wall_s * 1.0e9) * 100.0).min(100.0)
+  }
+}
+
+///|
+/// /proc 目录条目是否为进程目录（纯数字名；过滤 cpuinfo / self / irq
+/// 等非进程条目）。
+pub fn is_pid_entry(name : String) -> Bool {
+  parse_u64(name) is Some(_)
+}
+
+///|
+/// sysfs uevent 文本的 DRIVER= 值（PCI 设备绑定的驱动名）；未绑定 /
+/// 无该行返回空串。
+pub fn parse_uevent_driver(text : String) -> String {
+  for line in text.split("\n") {
+    let (k, v) = match line.split_once("=") {
+      Some(pair) => pair
+      None => continue
+    }
+    if k.trim().equal_to_string("DRIVER") {
+      return v.trim().to_owned()
+    }
+  }
+  ""
+}
+
+///|
+/// PCI 设备绑定驱动名（/sys/bus/pci/devices/<addr>/uevent 的 DRIVER=）；
+/// 读不到 / 未绑定返回空串。
+fn pci_driver_name(addr : String) -> String {
+  match read_text_file("/sys/bus/pci/devices/\{addr}/uevent") {
+    None => ""
+    Some(t) => parse_uevent_driver(t)
+  }
+}
+
+///|
+/// 枚举半成品（fdinfo 归属扫描后再补 busy；无 mut 字段，归属在
+/// [gpu_row_busy] 里算）。
+struct GpuRow {
+  addr : String
+  vendor : String
+  device : String
+  busy : Double?
+  vram_used : Double?
+  vram_total : Double?
+  celsius : Double?
+  model : String
+}
+
+///|
+/// GPU 采样器：PCI 显示控制器枚举 + 占用来源优先级 + fdinfo 前样本差值
+/// 状态。占用来源：nvidia-smi（N 卡专有驱动）> sysfs gpu_busy_percent
+/// （amdgpu，免 root）> DRM fdinfo 聚合（i915 / xe / amdgpu 兜底，免
+/// root）。显存 / 温度走 sysfs 与 nvidia-smi（原有口径不变）。
+pub(all) struct GpuMonitor {
+  mut prev : Map[String, Int64]
+  mut prev_wall : Double
+}
+
+///|
+pub fn GpuMonitor::new() -> GpuMonitor {
+  { prev: Map([]), prev_wall: 0.0, }
+}
+
+///|
+/// 扫描 /proc/<pid>/fdinfo 聚合并折算成全卡利用率表（设备键 → %）。
+/// 只统计本用户进程的 fdinfo（他人进程 EACCES 读不到，边界见
+/// adaptation.md SYS4 条）；首帧（无前样本）返回空表但记下当前累计值，
+/// 次帧起出数；新客户端首现的那帧不计（无前样本），下帧起算。/proc
+/// 不可列（非 Linux）返回空表。
+pub fn GpuMonitor::fdinfo_usage(self : GpuMonitor) -> Map[String, Double] {
+  let cur = drm_clients_total(scan_drm_fdinfo())
+  let wall = ffi_monotonic()
+  let wall_dt = if self.prev_wall > 0.0 { wall - self.prev_wall } else { 0.0 }
+  let out : Map[String, Double] = Map([])
+  if !self.prev.is_empty() {
+    for k, v in cur.iter2() {
+      match self.prev.get(k) {
+        Some(p) => out.set(k, drm_busy_percent(p, v, wall_dt))
+        None => ()
+      }
+    }
+  }
+  self.prev = cur
+  self.prev_wall = wall
+  out
+}
+
+///|
+/// 扫全部 /proc/<pid>/fdinfo 收集 DRM 条目。非 DRM fd 与无用量统计的
+/// 驱动自然无条目；目录 / 单个文件读不到（他人进程、进程退出竞态）
+/// 跳过该条。
+fn scan_drm_fdinfo() -> Array[DrmFdinfo] {
+  let out : Array[DrmFdinfo] = []
+  let pids = match list_dir("/proc") {
+    None => return out
+    Some(names) => names
+  }
+  for pid in pids {
+    if !is_pid_entry(pid) {
+      continue
+    }
+    let fds = match list_dir("/proc/\{pid}/fdinfo") {
+      None => continue
+      Some(names) => names
+    }
+    for fd in fds {
+      match read_text_file("/proc/\{pid}/fdinfo/\{fd}") {
+        None => ()
+        Some(text) =>
+          match parse_drm_fdinfo(text) {
+            None => ()
+            Some(e) => out.push(e)
+          }
+      }
+    }
+  }
+  out
+}
+
+///|
+/// 枚举行的占用终值：sysfs / nvidia-smi 已有值优先，否则查 fdinfo 表
+/// ——先按设备目录名（drm-pdev 键，内核 ≥6.5），再按绑定驱动名（老内核
+/// 无 drm-pdev 的回退；双同驱动卡会合并成同一值，已知边界）。
+fn gpu_row_busy(row : GpuRow, usage : Map[String, Double]) -> Double? {
+  match row.busy {
+    Some(b) => Some(b)
+    None =>
+      match usage.get(row.addr) {
+        Some(v) => Some(v)
+        None => {
+          let driver = pci_driver_name(row.addr)
+          if driver == "" {
+            None
+          } else {
+            usage.get(driver)
+          }
+        }
+      }
+  }
+}
+
+///|
+/// 采样一次：枚举 PCI 显示控制器（class 0x03*），占用按 nvidia-smi >
+/// sysfs gpu_busy_percent > DRM fdinfo 聚合取值，显存 / 温度口径不变。
+/// fdinfo 只在「有显卡既无 sysfs 占用也无 nvidia-smi 覆盖」时才扫
+/// ——AMD / NVIDIA 机器整拍免扫（全 /proc 扫描实测约 56ms/拍，见
+/// adaptation.md SYS4 条）。macOS 无 sysfs 设备树，走 system_profiler
+/// 解析（[macos_gpu_list]）；目录不可读返回 None。
+pub fn GpuMonitor::tick(self : GpuMonitor) -> Array[GpuInfo]? {
   if on_macos() {
     return macos_gpu_list()
   }
@@ -604,8 +869,9 @@ pub fn gpu_list() -> Array[GpuInfo]? {
     None => return None
     Some(names) => names
   }
-  let out : Array[GpuInfo] = []
   let smi = nvidia_smi_map()
+  let rows : Array[GpuRow] = []
+  let mut need_fdinfo = false
   for addr in devs {
     let base = "/sys/bus/pci/devices/\{addr}"
     let class = match read_text_file("\{base}/class") {
@@ -642,15 +908,35 @@ pub fn gpu_list() -> Array[GpuInfo]? {
         }
       None => ()
     }
-    out.push({
-      pci: addr,
-      vendor: vendor_name(vendor),
+    if busy is None {
+      need_fdinfo = true
+    }
+    rows.push({
+      addr,
+      vendor,
       device,
-      model,
-      celsius,
       busy,
       vram_used,
       vram_total,
+      celsius,
+      model,
+    })
+  }
+  let mut usage : Map[String, Double] = Map([])
+  if need_fdinfo {
+    usage = self.fdinfo_usage()
+  }
+  let out : Array[GpuInfo] = []
+  for r in rows {
+    out.push({
+      pci: r.addr,
+      vendor: vendor_name(r.vendor),
+      device: r.device,
+      model: r.model,
+      celsius: r.celsius,
+      busy: gpu_row_busy(r, usage),
+      vram_used: r.vram_used,
+      vram_total: r.vram_total,
     })
   }
   Some(out)

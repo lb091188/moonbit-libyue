@@ -160,7 +160,8 @@ test "S4 真实采样：hwmon 传感器(Linux)" {
 
 ///|
 test "S6 真实采样：GPU 枚举(Linux sysfs / macOS system_profiler)" {
-  match gpu_list() {
+  let mon = GpuMonitor::new()
+  match mon.tick() {
     None => () // 枚举失败宿主跳过
     Some(gpus) =>
       // 虚拟机可能无显示设备；有条目则字段须完整（macOS 路径为
@@ -173,7 +174,171 @@ test "S6 真实采样：GPU 枚举(Linux sysfs / macOS system_profiler)" {
           None => ()
           Some(c) => assert_true(c >= -50.0 && c <= 200.0)
         }
+        // 占用：nvidia-smi / sysfs gpu_busy_percent / DRM fdinfo 任一
+        // 来源有值即在 0..100；全部不可用（老驱动 / 无来源）为 None
+        match g.busy {
+          None => ()
+          Some(b) => assert_true(b >= 0.0 && b <= 100.0)
+        }
       }
+  }
+}
+
+///|
+test "parse_drm_fdinfo：amdgpu 形态(drm-pdev / 多引擎求和 / ns 后缀)" {
+  // 形态照内核源码（amdgpu_fdinfo.c + drm_file.c 的 drm_show_fdinfo）：
+  // Tab 分隔、引擎值带 " ns" 后缀、零用量引擎不打印、另有 pasid /
+  // drm-memory-* 等旁支键（值带 KiB 单位，不能被当引擎时间）
+  let text = "pos:\t0\nflags:\t02102002\nmnt_id:\t22\nino:\t2665\ndrm-driver:\tamdgpu\ndrm-client-id:\t16\ndrm-pdev:\t0000:0c:00.0\npasid:\t32769\ndrm-memory-vram:\t1024 KiB\ndrm-memory-gtt: \t0 KiB\namd-requested-vram:\t0 KiB\ndrm-engine-gfx:\t914633 ns\ndrm-engine-compute:\t250000 ns\ndrm-engine-dec:\t1000 ns\n"
+  let e = parse_drm_fdinfo(text).unwrap()
+  assert_eq(e.driver, "amdgpu")
+  assert_eq(e.pdev, "0000:0c:00.0")
+  assert_eq(e.client_id, 16L)
+  assert_eq(e.engine_ns, 1165633L) // 914633+250000+1000
+}
+
+///|
+test "parse_drm_fdinfo：i915 形态(无 pdev / capacity 键排除)" {
+  // 老内核（<6.5）无 drm-pdev；i915 多视频引擎时打 capacity 键
+  // （并行引擎数，不是时间，不能计入）
+  let text = "pos:\t0\nflags:\t02102002\nmnt_id:\t22\nino:\t1001\ndrm-driver:\ti915\ndrm-client-id:\t5\ndrm-engine-render:\t123456 ns\ndrm-engine-video:\t0 ns\ndrm-engine-video-enhance:\t0 ns\ndrm-engine-capacity-video:\t2\n"
+  let e = parse_drm_fdinfo(text).unwrap()
+  assert_eq(e.driver, "i915")
+  assert_eq(e.pdev, "")
+  assert_eq(e.client_id, 5L)
+  assert_eq(e.engine_ns, 123456L)
+  // 无单位后缀的裸数值也要认（规范允许单位可缺）
+  let bare = "drm-driver:\ti915\ndrm-client-id:\t9\ndrm-engine-render:\t42\n"
+  assert_eq(parse_drm_fdinfo(bare).unwrap().engine_ns, 42L)
+}
+
+///|
+test "parse_drm_fdinfo：非 DRM fd 与无引擎统计的老驱动 → None" {
+  // 普通文件 fd：只有 pos/flags/mnt_id/ino
+  assert_true(parse_drm_fdinfo("pos:\t0\nflags:\t02\nmnt_id:\t11\nino:\t4026531841\n") is None)
+  // i915 gen<8 早退：有 drm-driver/client-id 但无引擎键
+  let old_i915 = parse_drm_fdinfo("pos:\t0\nflags:\t02\nmnt_id:\t11\nino:\t123\ndrm-driver:\ti915\ndrm-client-id:\t3\n")
+  assert_true(old_i915 is None)
+  assert_true(parse_drm_fdinfo("") is None)
+}
+
+///|
+test "is_drm_engine_key / drm_device_key：引擎键判定与设备键选择" {
+  assert_true(is_drm_engine_key("drm-engine-gfx"))
+  assert_true(is_drm_engine_key("drm-engine-video-enhance"))
+  // capacity 是并行引擎数不是时间；total / cycles / memory 都不是引擎时间
+  assert_true(!is_drm_engine_key("drm-engine-capacity-video"))
+  assert_true(!is_drm_engine_key("drm-total-gfx"))
+  assert_true(!is_drm_engine_key("drm-cycles-gfx"))
+  assert_true(!is_drm_engine_key("drm-memory-vram"))
+  assert_true(!is_drm_engine_key("drm-driver"))
+  // 设备键：pdev（与 sysfs 设备目录名同形）优先，缺失回退驱动名
+  let amd : DrmFdinfo = {
+    driver: "amdgpu",
+    pdev: "0000:0c:00.0",
+    client_id: 7,
+    engine_ns: 100,
+  }
+  assert_eq(drm_device_key(amd), "0000:0c:00.0")
+  let old : DrmFdinfo = { driver: "i915", pdev: "", client_id: 5, engine_ns: 100 }
+  assert_eq(drm_device_key(old), "i915")
+}
+
+///|
+test "drm_clients_total：同 client 归并 / 跨进程共享 fd / 按设备分键" {
+  fn e(
+    driver : String,
+    pdev : String,
+    cid : Int64,
+    ns : Int64,
+  ) -> DrmFdinfo {
+    { driver, pdev, client_id: cid, engine_ns: ns }
+  }
+
+  // 同一客户端（client 16）在两个 fd（dup）里重复出现：只计一次
+  let entries = [
+    e("amdgpu", "0000:0c:00.0", 16, 1000),
+    e("amdgpu", "0000:0c:00.0", 16, 1000),
+    e("amdgpu", "0000:0c:00.0", 17, 500),
+    // 老内核无 pdev：同驱动按驱动名归并，client-id 是该设备计数器
+    e("i915", "", 5, 2000),
+    e("i915", "", 5, 2000),
+    e("i915", "", 6, 300),
+  ]
+  let total = drm_clients_total(entries)
+  assert_eq(total.get("0000:0c:00.0"), Some(1500L)) // 1000 + 500
+  assert_eq(total.get("i915"), Some(2300L)) // 2000 + 300
+  // 同驱动两个设备（6.5+ 有 pdev）：按 PCI 地址分开，不合并
+  let dual = [
+    e("amdgpu", "0000:03:00.0", 9, 100),
+    e("amdgpu", "0000:0c:00.0", 9, 400),
+  ]
+  let dt = drm_clients_total(dual)
+  assert_eq(dt.get("0000:03:00.0"), Some(100L))
+  assert_eq(dt.get("0000:0c:00.0"), Some(400L))
+  // 缺 client-id（-1）：不归并，每条独立计数
+  let nocid = [e("xe", "", -1, 100), e("xe", "", -1, 250)]
+  assert_eq(drm_clients_total(nocid).get("xe"), Some(350L))
+  // 后出现同 client 的更高累计值：增量并入（非单调更新取较高值）
+  let grow = [e("i915", "", 5, 1000), e("i915", "", 5, 1800)]
+  assert_eq(drm_clients_total(grow).get("i915"), Some(1800L))
+  assert_eq(drm_clients_total([]).length(), 0)
+}
+
+///|
+test "drm_busy_percent：差值利用率 / 首帧 / 回落钳 0 / 并行超墙钟钳 100" {
+  // 1 秒墙钟内忙 0.5s → 50%
+  assert_eq(drm_busy_percent(1_000_000_000L, 1_500_000_000L, 1.0), 50.0)
+  assert_eq(drm_busy_percent(0, 250_000_000L, 1.0), 25.0)
+  // 首帧（墙钟 ≤ 0）按 0
+  assert_eq(drm_busy_percent(0, 1_000_000_000L, 0.0), 0.0)
+  assert_eq(drm_busy_percent(0, 1_000_000_000L, -1.0), 0.0)
+  // 累计值回落（客户端退出重开 / 计数器重置）按 0
+  assert_eq(drm_busy_percent(2_000_000_000L, 1_000_000_000L, 1.0), 0.0)
+  // 多引擎并行（gfx + compute 同时跑）合计可超墙钟：钳到 100
+  assert_eq(drm_busy_percent(0, 2_000_000_000L, 1.0), 100.0)
+  // 墙钟极短（采样间隔 << 忙增量）：同样钳 100 不出界
+  assert_eq(drm_busy_percent(0, 1_000_000_000L, 0.001), 100.0)
+}
+
+///|
+test "is_pid_entry：纯数字 pid / 过滤非进程条目" {
+  assert_true(is_pid_entry("1234"))
+  assert_true(is_pid_entry("0"))
+  assert_true(!is_pid_entry("self"))
+  assert_true(!is_pid_entry("cpuinfo"))
+  assert_true(!is_pid_entry("meminfo"))
+  assert_true(!is_pid_entry("irq"))
+  assert_true(!is_pid_entry(""))
+  assert_true(!is_pid_entry("12a"))
+}
+
+///|
+test "parse_uevent_driver：DRIVER= 提取 / 缺失回退空串" {
+  // 真实 /sys/bus/pci/devices/<addr>/uevent 形态
+  let text = "DRIVER=i915\nPCI_CLASS=030000\nPCI_ID=8086:9A49\nPCI_SLOT_NAME=0000:00:02.0\nMODALIAS=pci:v00008086d00009A49sv00001043sd00008761bc03sc00i00\n"
+  assert_eq(parse_uevent_driver(text), "i915")
+  // 尾换行 / 首尾空白容忍
+  assert_eq(parse_uevent_driver("PCI_CLASS=030000\nDRIVER=amdgpu\n"), "amdgpu")
+  assert_eq(parse_uevent_driver("DRIVER=xe"), "xe")
+  // 未绑定驱动（无 DRIVER 行）与非 uevent 文本 → 空串
+  assert_eq(parse_uevent_driver("PCI_CLASS=030000\n"), "")
+  assert_eq(parse_uevent_driver(""), "")
+  assert_eq(parse_uevent_driver("no-equal-sign\n"), "")
+}
+
+///|
+test "S6 真实采样：DRM fdinfo 聚合(Linux)" {
+  let mon = GpuMonitor::new()
+  // 首帧无前样本：利用率表为空（次帧起出数），但前样本要记下
+  let first = mon.fdinfo_usage()
+  assert_true(first.is_empty())
+  // 二帧：宿主有本用户的 DRM 客户端（i915 / xe / amdgpu）时非空；
+  // NVIDIA 专有驱动机器无 fdinfo 用量统计，空表合法
+  let second = mon.fdinfo_usage()
+  for k, v in second.iter2() {
+    assert_true(k.length() > 0)
+    assert_true(v >= 0.0 && v <= 100.0)
   }
 }
 
