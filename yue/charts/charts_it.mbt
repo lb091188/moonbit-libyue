@@ -255,7 +255,7 @@ pub fn line_chart_it(
   for kv in style {
     chart_style.push(kv)
   }
-  let node = @yue.vbox(
+  let node = @declarative.vbox(
     [
       ci_legend(items~, visible~, on_toggle=fn(_i) { repaint() }),
       ci_tooltip(
@@ -386,7 +386,7 @@ pub fn bar_chart_it(
   for kv in style {
     chart_style.push(kv)
   }
-  let node = @yue.vbox(
+  let node = @declarative.vbox(
     [
       ci_legend(items~, visible~, on_toggle=fn(_i) { repaint() }),
       ci_tooltip(
@@ -598,7 +598,7 @@ pub fn donut_chart_it(
   for kv in style {
     chart_style.push(kv)
   }
-  let node = @yue.vbox(
+  let node = @declarative.vbox(
     [
       ci_legend(items~, visible~, on_toggle=fn(_i) { repaint() }),
       ci_tooltip(draw, hit, style=chart_style, handle=fn(c) {

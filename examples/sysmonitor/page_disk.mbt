@@ -96,13 +96,13 @@ fn page_disk(app : App) -> @yue.Node {
 
   push_io(app.disks.get())
   app.disks.subscribe(push_io)
-  @yue.vbox(
+  @declarative.vbox(
     [
       @components.label_t("根分区读写", role=@components.Section, style=[
         ("marginBottom", 6.0),
       ]),
       @charts.line_chart_t(io, fill=true, style=[("height", 220.0)]),
-      @yue.separator(style=[("marginTop", 12.0), ("marginBottom", 10.0)]),
+      @declarative.separator(style=[("marginTop", 12.0), ("marginBottom", 10.0)]),
       draw_rows(disk_n, fn(p, w) { draw_disk_rows(p, w, disks.get()) }),
     ],
     style=[("padding", 12.0)],

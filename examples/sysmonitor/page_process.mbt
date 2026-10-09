@@ -358,10 +358,10 @@ fn page_process(app : App) -> @yue.Node {
     @components.TableColumn::make("线程", 56.0, align=@yue.End),
     @components.TableColumn::make("命令行", 0.0, sortable=false),
   ]
-  @yue.vbox(
+  @declarative.vbox(
     [
       // 工具栏：搜索 + 操作 + 消息
-      @yue.hbox(
+      @declarative.hbox(
         tools,
         style=[("marginBottom", 8.0), ("alignItems", "center")],
       ),

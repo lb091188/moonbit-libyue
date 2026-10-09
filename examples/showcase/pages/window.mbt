@@ -12,7 +12,7 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
       "窗口 API",
       "运行期操作窗口:改标题 / 最大化 / 全屏 / 置顶 / 还原尺寸。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("改标题", on_click=fn() {
             match win.win_ref.val {
               Some(w) => {
@@ -83,7 +83,7 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
       "全局快捷键",
       "应用外生效的系统快捷键(Ctrl+Alt+C)。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("注册 Ctrl+Alt+C", on_click=fn() {
             ignore(
               @yue.register_global_shortcut("Ctrl+Alt+C", fn() {
@@ -111,7 +111,7 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
       "拖放接收",
       "register_dragged_types 注册接收文件/文本,从文件管理器拖入下方色块。",
       [
-        @yue.vbox(
+        @declarative.vbox(
           [
             @components.label_t("把文件拖进来", role=@components.Body, handle=fn(_l) {
 
@@ -164,7 +164,7 @@ pub fn page_window(_app : @ui.App) -> @yue.Node {
       "拖出发起",
       "do_drag_file_paths 发起系统拖拽:按住下方色块拖到文件管理器即拖出 icon.png。",
       [
-        @yue.vbox(
+        @declarative.vbox(
           [@components.label_t("按住我拖出去", role=@components.Body)],
           style=[("height", 60.0), ("width", 200.0), ("padding", 10.0)],
           handle=fn(c) {

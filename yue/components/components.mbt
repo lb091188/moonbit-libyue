@@ -335,7 +335,7 @@ pub fn side_menu(
       ),
     )
   }
-  @yue.vbox(nodes, style=base, handle=fn(c) { @yue.set_panel_bg(c) })
+  @declarative.vbox(nodes, style=base, handle=fn(c) { @yue.set_panel_bg(c) })
 }
 
 ///|
@@ -393,7 +393,7 @@ pub fn segmented(
   for kv in style {
     base.push(kv)
   }
-  @yue.hbox(items, style=base, handle=fn(c) {
+  @declarative.hbox(items, style=base, handle=fn(c) {
     @yue.bind_bg(c, fn() { @yue.theme_border() })
   })
 }
@@ -578,7 +578,7 @@ pub fn breadcrumb(
   for kv in style {
     base.push(kv)
   }
-  @yue.hbox(nodes, style=base)
+  @declarative.hbox(nodes, style=base)
 }
 
 ///|
@@ -1285,7 +1285,7 @@ pub fn badge_dot(
   for kv in style {
     base.push(kv)
   }
-  @yue.container(
+  @declarative.container(
     on_draw=fn(p) {
       // 空串=默认语义红,draw 现取跟随主题;显式传色则恒定
       p.set_fill_color(if color == "" { @yue.theme_danger() } else { color })
@@ -2919,7 +2919,7 @@ pub fn form(
   for kv in style {
     base.push(kv)
   }
-  @yue.vbox(nodes, style=base)
+  @declarative.vbox(nodes, style=base)
 }
 
 ///|
@@ -4131,7 +4131,7 @@ fn build_time_row(
       on_change()
     }
   })
-  let row = @yue.hbox(
+  let row = @declarative.hbox(
     [
       label_t(label, role=Body, style=[("width", 28.0), ("marginRight", 6.0)]),
       input_number(hs, min=0.0, max=23.0, step=1.0, num_width=40.0),

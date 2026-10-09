@@ -100,13 +100,13 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       "Line 折线图",
       "定长滚动窗口(max_points=120,超出丢最旧),500ms 定时推点;多序列主题色循环,y 轴自适应 + 网格 + 最新值右端标注。左为折线形态,右为面积形态(半透明填充)。推点只重绘画布,不重建视图树。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @charts.line_chart_t(line_series, style=[
               ("width", 320.0),
               ("height", 240.0),
             ]),
-            @yue.label("  "),
+            @declarative.label("  "),
             @charts.line_chart_t(
               line_series,
               style=[("width", 320.0), ("height", 240.0)],
@@ -115,7 +115,7 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
           ],
           style=[("alignItems", "start")],
         ),
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.checkbox_t("暂停推点", checked=line_running.get(), on_change=fn(
               v,
@@ -143,13 +143,13 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       "Bar 柱状图 / 条形图",
       "纵向柱(默认)以 0 为基线支持正负值(正主题色、负红色);横向条(horizontal)适配长类目名。悬停高亮 + 行内数值标注,移动只重绘画布。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @charts.bar_chart_t(bar_data, style=[
               ("width", 320.0),
               ("height", 240.0),
             ]),
-            @yue.label("  "),
+            @declarative.label("  "),
             @charts.bar_chart_t(
               bar_h_data,
               style=[("width", 320.0), ("height", 240.0)],
@@ -188,19 +188,19 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       "Gauge 仪表盘",
       "单值百分比环 + 中心大数字,阈值分段着色(≤60% 绿 / ≤85% 橙 / 红)。左:2Hz 三角波自动更新,经 16ms 定时器插值平滑(每帧补 25% 差值)无跳变;右:滑杆手动驱动,拖拽过程同样平滑。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @charts.gauge_t(gauge_auto, thresholds=gauge_thresholds, style=[
               ("width", 240.0),
               ("height", 180.0),
             ]),
-            @yue.label("  "),
+            @declarative.label("  "),
             @charts.gauge_t(gauge_manual, thresholds=gauge_thresholds, style=[
               ("width", 240.0),
               ("height", 180.0),
             ]),
-            @yue.label("  "),
-            @yue.vbox(
+            @declarative.label("  "),
+            @declarative.vbox(
               [
                 @components.label_t("手动值", role=@components.Body),
                 @components.slider_t(gauge_manual, min=0.0, max=1.0, step=0.01, style=[
@@ -226,13 +226,13 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       "Scatter 散点图",
       "2000 点 x/y 点列(小方点),双轴自适应刻度 + 网格;右侧叠加最小二乘趋势线。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @charts.scatter_t(scatter_pts, style=[
               ("width", 320.0),
               ("height", 260.0),
             ]),
-            @yue.label("  "),
+            @declarative.label("  "),
             @charts.scatter_t(
               scatter_pts,
               style=[("width", 320.0), ("height", 260.0)],

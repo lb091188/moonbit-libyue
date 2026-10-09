@@ -52,7 +52,7 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
       "Painter 自绘",
       "fill_rect / arc / stroke_rect / draw_text 等基础绘制;线条色 + 填充色 + 圆环 + 网格 + 文本同屏。",
       [
-        @yue.container(
+        @declarative.container(
           on_draw=fn(p) { draw_canvas_scene(p) },
           handle=fn(c) {
             canvas_ref.val = Some(c)
@@ -60,7 +60,7 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
           },
           style=[("height", 300.0), ("marginBottom", 8.0), ("width", 640.0)],
         ),
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("旋转色相", on_click=fn() {
             canvas_hue.val = (canvas_hue.val + 1) % 3
             canvas_repaint()
@@ -68,7 +68,7 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
         ]),
       ],
       code=[
-        "@yue.container(", "  on_draw=fn(p) {", "    p.set_fill_color(\"#4B8BE8\")",
+        "@declarative.container(", "  on_draw=fn(p) {", "    p.set_fill_color(\"#4B8BE8\")",
         "    p.fill_rect(10.0, 10.0, 80.0, 60.0)", "    p.arc(200.0, 40.0, 30.0, 0.0, 6.28318)",
         "    p.fill()", "    p.set_stroke_color(\"#4A5060\")", "    p.stroke_rect(10.0, 90.0, 592.0, 1.0)",
         "    p.draw_text(\"自绘文本\", 24.0, 110.0, 592.0, 30.0,", "      align=@yue.TextAlign::Center)",
@@ -81,7 +81,7 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
       "富文本 AttributedText",
       "范围字体/颜色(0-6 号加粗、8-11 号红色);换行/省略号/改写。",
       [
-        @yue.container(
+        @declarative.container(
           on_draw=fn(painter) {
             match canvas_rt.val {
               Some(c) => {
@@ -109,7 +109,7 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
             ("backgroundcolor", "#F4F4F0"),
           ],
         ),
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("换行开关", on_click=fn() {
             rt_wrap.val = !rt_wrap.val
             rt.set_format({

@@ -59,7 +59,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
           },
           style=[("height", 190.0), ("marginBottom", 8.0)],
         ),
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("加载 example.com", on_click=fn() {
             match web_ref.val {
               Some(b) => {
@@ -99,7 +99,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
             }
           }),
         ]),
-        @yue.bind_label(nav_state, fn(s) { s }, style=[("marginTop", 8.0)]),
+        @declarative.bind_label(nav_state, fn(s) { s }, style=[("marginTop", 8.0)]),
       ],
       code=[
         "@browser.browser(handle=fn(b) {", "  b.load_html(\"<h3>WebView 内嵌页</h3>\")",
@@ -115,7 +115,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
       "导航与能力查询",
       "四导航按钮 + can_go_back/can_go_forward/is_loading 能力查询。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("← 后退", on_click=fn() {
             match web_ref.val {
               Some(b) => b.go_back()
@@ -150,10 +150,10 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
             }
           }),
         ]),
-        @yue.bind_label(nav_events, fn(s) { "回调:\{s}" }, style=[
+        @declarative.bind_label(nav_events, fn(s) { "回调:\{s}" }, style=[
           ("marginTop", 8.0),
         ]),
-        @yue.bind_label(title_state, fn(s) { "标题:\{s}" }),
+        @declarative.bind_label(title_state, fn(s) { "标题:\{s}" }),
       ],
       code=[
         "b.go_back()", "b.go_forward()", "b.reload()", "b.stop()", "println(b.can_go_back())",
@@ -167,7 +167,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
       "执行 JavaScript",
       "with_result 异步取回 JSON;无结果执行改页面。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("取结果 1+41", on_click=fn() {
             match web_ref.val {
               Some(b) =>
@@ -210,7 +210,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
             }
           }),
         ]),
-        @yue.bind_label(js_state, fn(s) { s }, style=[("marginTop", 8.0)]),
+        @declarative.bind_label(js_state, fn(s) { s }, style=[("marginTop", 8.0)]),
       ],
       code=[
         "b.execute_javascript(\"document.title='由原生设置'\")", "b.execute_javascript_with_result(\"1 + 41\", fn(ok, json) {",
@@ -223,7 +223,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
       "JS ↔ 原生绑定",
       "注册 demoBinding(网页按钮调用)/移除/has_bindings 查询。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("重新注册绑定", on_click=fn() {
             match web_ref.val {
               Some(b) => {
@@ -257,7 +257,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
             }
           }),
         ]),
-        @yue.bind_label(bind_state, fn(s) { s }, style=[("marginTop", 8.0)]),
+        @declarative.bind_label(bind_state, fn(s) { s }, style=[("marginTop", 8.0)]),
       ],
       code=[
         "b.add_raw_binding(\"demoBinding\", fn(json) {", "  println(\"收到网页调用:\\{json}\")",
@@ -269,7 +269,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
       "Cookie 查询",
       "异步查询 URL 的 Cookie(名称/值/域/路径/httpOnly/secure)。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("查 example.com", on_click=fn() {
             match web_ref.val {
               Some(b) =>
@@ -302,7 +302,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
             }
           }),
         ]),
-        @yue.bind_label(cookie_state, fn(s) { s }, style=[("marginTop", 8.0)]),
+        @declarative.bind_label(cookie_state, fn(s) { s }, style=[("marginTop", 8.0)]),
       ],
       code=[
         "b.get_cookies_for_url(\"https://example.com\", fn(cookies) {", "  for c in cookies {",

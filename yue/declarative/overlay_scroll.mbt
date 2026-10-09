@@ -17,17 +17,17 @@
 /// 给已挂进 host 的 Scroll 挂悬浮 thumb:隐藏平台滚动条(policy 置
 /// Never),thumb 以 yoga absolute 定位于 host 右缘(host 须为同时容纳
 /// Scroll 的容器,几何即滚动视口)。
-pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
-  s.set_scrollbar_policy(Never, Never) // 隐藏平台滚动条,thumb 全权替代
+pub fn attach_overlay_thumb(host : @yue.View, s : @yue.Scroll) -> Unit {
+  s.set_scrollbar_policy(@yue.Never, @yue.Never) // 隐藏平台滚动条,thumb 全权替代
   // ---- 悬浮 thumb:右缘窄条,占满轨道高度,可见段由绘制决定 ----
-  let thumb = themed_container(style=[
+  let thumb = @yue.themed_container(style=[
     ("width", 6.0),
     ("position", "absolute"),
     ("right", "0px"),
     ("top", "0px"),
     ("bottom", "0px"),
   ])
-  attach(host, ViewLike::view(thumb))
+  @yue.attach(host, @yue.ViewLike::view(thumb))
   // 状态(gy/thumb_len 绘制用;alpha 两级 d9≈85% 常态 / 73≈45% 渐隐中)
   let vis = Ref(false)
   let alpha = Ref("d9") // #RRGGBBAA 的 AA 段(十六进制)
@@ -43,24 +43,24 @@ pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
 
   fn arm_hide() {
     if hide_timer.val != 0 {
-      clear_timeout(hide_timer.val)
+      @yue.clear_timeout(hide_timer.val)
       hide_timer.val = 0
     }
     if drag.val || hover.val {
       return
     }
-    hide_timer.val = set_timeout(1000, fn() {
+    hide_timer.val = @yue.set_timeout(1000, fn() {
       if drag.val || hover.val {
         return
       }
       alpha.val = "73"
-      ViewLike::schedule_paint(thumb)
-      hide_timer.val = set_timeout(350, fn() {
+      @yue.ViewLike::schedule_paint(thumb)
+      hide_timer.val = @yue.set_timeout(350, fn() {
         if drag.val || hover.val {
           return
         }
         vis.val = false
-        ViewLike::set_visible(thumb, false)
+        @yue.ViewLike::set_visible(thumb, false)
         hide_timer.val = 0
       })
     })
@@ -74,7 +74,7 @@ pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
     if m <= 0.5 || track < 40.0 {
       if vis.val {
         vis.val = false
-        ViewLike::set_visible(thumb, false)
+        @yue.ViewLike::set_visible(thumb, false)
       }
       return
     }
@@ -87,9 +87,9 @@ pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
     if !vis.val {
       alpha.val = "d9"
       vis.val = true
-      ViewLike::set_visible(thumb, true)
+      @yue.ViewLike::set_visible(thumb, true)
     }
-    ViewLike::schedule_paint(thumb)
+    @yue.ViewLike::schedule_paint(thumb)
     arm_hide()
   }
 
@@ -97,50 +97,50 @@ pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
     sync()
     false
   })
-  ViewLike::on_size_changed(s, fn() { sync() })
+  @yue.ViewLike::on_size_changed(s, fn() { sync() })
   thumb.on_draw(fn(p) {
     if !vis.val || thumb_len.val <= 0.0 {
       return
     }
-    p.set_fill_color(with_alpha(theme_border(), alpha.val))
-    fill_round_rect(p, 0.0, gy.val, 6.0, thumb_len.val, 3.0)
+    p.set_fill_color(@yue.with_alpha(@yue.theme_border(), alpha.val))
+    @yue.fill_round_rect(p, 0.0, gy.val, 6.0, thumb_len.val, 3.0)
   })
-  ViewLike::on_mouse_enter(thumb, fn(_e) {
+  @yue.ViewLike::on_mouse_enter(thumb, fn(_e) {
     hover.val = true
     if vis.val {
       alpha.val = "d9"
-      ViewLike::schedule_paint(thumb)
+      @yue.ViewLike::schedule_paint(thumb)
     }
   })
-  ViewLike::on_mouse_leave(thumb, fn(_e) {
+  @yue.ViewLike::on_mouse_leave(thumb, fn(_e) {
     hover.val = false
     arm_hide()
   })
   // 按住后平台有隐式鼠标捕获,拖出 thumb 仍收 move
-  ViewLike::on_mouse_down(thumb, fn(e) {
+  @yue.ViewLike::on_mouse_down(thumb, fn(e) {
     if e.button == 1 && vis.val {
       drag.val = true
       drag_y0.val = e.view_y
       drag_pos0.val = s.get_scroll_position_y()
       alpha.val = "ff"
-      ViewLike::schedule_paint(thumb)
+      @yue.ViewLike::schedule_paint(thumb)
       true
     } else {
       false
     }
   })
-  ViewLike::on_mouse_move(thumb, fn(e) {
+  @yue.ViewLike::on_mouse_move(thumb, fn(e) {
     if drag.val && maxy.val > 0.5 && track_len.val - thumb_len.val > 0.0 {
       let dy = e.view_y - drag_y0.val
       let pos = drag_pos0.val + dy * maxy.val / (track_len.val - thumb_len.val)
       s.set_scroll_position(s.get_scroll_position_x(), pos)
     }
   })
-  ViewLike::on_mouse_up(thumb, fn(e) {
+  @yue.ViewLike::on_mouse_up(thumb, fn(e) {
     if e.button == 1 && drag.val {
       drag.val = false
       alpha.val = "d9"
-      ViewLike::schedule_paint(thumb)
+      @yue.ViewLike::schedule_paint(thumb)
       arm_hide()
       true
     } else {
@@ -148,7 +148,7 @@ pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
     }
   })
   // thumb 窄条上的滚轮不冒泡到 Scroll,手动转发
-  ViewLike::on_wheel(thumb, fn(delta) {
+  @yue.ViewLike::on_wheel(thumb, fn(delta) {
     s.set_scroll_position(
       s.get_scroll_position_x(),
       s.get_scroll_position_y() + delta * 48.0,
@@ -163,29 +163,29 @@ pub fn attach_overlay_thumb(host : View, s : Scroll) -> Unit {
 /// 挂载)或明显长高时,经 handle 调 Scroll::refresh_content_size 刷新
 /// 滚动范围。
 pub fn overlay_scroll(
-  content : Node,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Scroll) -> Unit = fn(_s) {  },
-) -> Node {
+  content : @yue.Node,
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Scroll) -> Unit = fn(_s) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let host = themed_container(style~)
-      attach(parent, ViewLike::view(host))
-      let s = Scroll::new()
+      let host = @yue.themed_container(style~)
+      @yue.attach(parent, @yue.ViewLike::view(host))
+      let s = @yue.Scroll::new()
       handle(s)
-      attach(ViewLike::view(host), ViewLike::view(s))
-      let holder = Container::new()
-      ignore((content.mount)(ViewLike::view(holder)))
+      @yue.attach(@yue.ViewLike::view(host), @yue.ViewLike::view(s))
+      let holder = @yue.Container::new()
+      ignore((content.mount)(@yue.ViewLike::view(holder)))
       s.set_content(holder)
       // Windows 原生子控件 HWND 滚动后需强制重摆(与 declarative scroll 同)
-      if platform() == "windows" {
+      if @yue.platform() == "windows" {
         s.on_scroll(fn() {
-          ViewLike::update_layout(holder)
+          @yue.ViewLike::update_layout(holder)
           false
         })
       }
-      attach_overlay_thumb(ViewLike::view(host), s)
-      ViewLike::view(host)
+      attach_overlay_thumb(@yue.ViewLike::view(host), s)
+      @yue.ViewLike::view(host)
     },
   }
 }

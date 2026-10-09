@@ -59,7 +59,7 @@ fn draw_rows(
   rows : @yue.Store[Int],
   draw : (@yue.Painter, Double) -> Unit,
 ) -> @yue.Node {
-  @yue.vbox(
+  @declarative.vbox(
     [],
     handle=fn(c) {
       c.on_draw(fn(p) {

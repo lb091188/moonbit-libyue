@@ -105,15 +105,15 @@ fn main {
     Err(e) => app.si_role.set("单实例不可用:\{e}(降级继续运行)")
   }
 
-  let window = @yue.mount_window(
+  let window = @declarative.mount_window(
     [
-      @yue.hbox(style=[("flex", 1.0), ("alignItems", "stretch")], [
+      @declarative.hbox(style=[("flex", 1.0), ("alignItems", "stretch")], [
         // 侧栏:菜单(可滚动,窗口矮时滚到底部项) + 底部钉住包版本号
         // (与 moon.mod 同步,scripts/prebuild.py 构建期校验)
-        @yue.vbox(
+        @declarative.vbox(
           [
-            @yue.scroll(
-              @yue.vbox(
+            @declarative.scroll(
+              @declarative.vbox(
                 [
                   @components.side_menu_sections(
                     [
@@ -153,7 +153,7 @@ fn main {
               ),
               style=[("flex", 1.0), ("width", 180.0)],
             ),
-            @yue.hbox(
+            @declarative.hbox(
               [
                 @components.label_t("V\{@yue.VERSION}", role=@components.Secondary),
                 // 图标随状态切换:swap_node 双预建显隐(bind_node 的
@@ -195,7 +195,7 @@ fn main {
             ignore(@yue.on_theme_change(apply))
           },
         ),
-        @yue.vbox(
+        @declarative.vbox(
           [
             @ui.nav_page("基础组件", selected, @pages.page_basic(app)),
             @ui.nav_page("图标库", selected, @pages.page_icons(app)),

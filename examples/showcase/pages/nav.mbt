@@ -30,7 +30,7 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
       "右键菜单与下拉菜单",
       "context_menu_for 包右键原生菜单(悬停高亮 + 点击);DropdownMenu 点字段弹候选(两套用途不同:前者右键显隐,后者顶部展开)。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.context_menu_for(
               @components.tag("右键我", "#2D68C4", style=[
@@ -54,7 +54,7 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
                 ("marginRight", 10.0),
               ],
             ),
-            @yue.bind(app.picked_lang, fn(s) { "最近操作:\{s}" }),
+            @declarative.bind(app.picked_lang, fn(s) { "最近操作:\{s}" }),
           ],
           style=[("alignItems", "center")],
         ),
@@ -72,7 +72,7 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
       "原生弹出菜单",
       "Menu::new + popup_at 弹原生右键菜单(系统主题外观),与上面主题化段对照。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.button_t("点我弹原生菜单", on_click=fn() {
               let menu = @yue.Menu::new()
@@ -86,7 +86,7 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
               let (mx, my) = @yue.mouse_location()
               menu.popup_at(mx, my)
             }),
-            @yue.bind(app.picked_lang, fn(s) { s }),
+            @declarative.bind(app.picked_lang, fn(s) { s }),
           ],
           style=[("alignItems", "center")],
         ),
@@ -194,7 +194,7 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
       "完成/当前/待办三态:浅蓝、实底白字、灰;点按钮推进或回退。",
       [
         @components.steps(["填写", "确认", "完成"], step.store()),
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.button_t("上一步", variant=@components.Soft, on_click=fn() {
               step.update(fn(n) {
@@ -206,7 +206,7 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
                 }
               })
             }),
-            @yue.label(" "),
+            @declarative.label(" "),
             @components.button_t("下一步", variant=@components.Solid, on_click=fn() {
               step.update(fn(n) {
                 let m = n + 2
@@ -217,8 +217,8 @@ pub fn page_nav(app : @ui.App) -> @yue.Node {
                 }
               })
             }),
-            @yue.label(" "),
-            @yue.bind(step, fn(n) { "当前第 \{n + 1} 步" }),
+            @declarative.label(" "),
+            @declarative.bind(step, fn(n) { "当前第 \{n + 1} 步" }),
           ],
           style=[("marginTop", 8.0)],
         ),

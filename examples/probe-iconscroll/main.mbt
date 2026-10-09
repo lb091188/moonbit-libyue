@@ -22,7 +22,7 @@ fn mk_sec(
 ) -> @yue.Node {
   let mounted = Ref(false)
   let scroll_ref : Ref[@yue.Scroll?] = Ref(None)
-  let holder = @yue.vbox([], handle=fn(h) {
+  let holder = @declarative.vbox([], handle=fn(h) {
     fn ensure(n : String) -> Unit {
       if !mounted.val && n == name {
         mounted.val = true
@@ -46,10 +46,10 @@ fn mk_sec(
       ("marginTop", 10.0),
     ]),
   ]
-  @yue.vbox(
+  @declarative.vbox(
     [
-      @yue.scroll(
-        @yue.vbox(inner, style=[("padding", 14.0)]),
+      @declarative.scroll(
+        @declarative.vbox(inner, style=[("padding", 14.0)]),
         style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
         handle=fn(s) {
           scroll_ref.val = Some(s)
@@ -81,7 +81,7 @@ fn mk_nav(
   content : @yue.Node,
 ) -> @yue.Node {
   let mounted = Ref(false)
-  @yue.vbox([], style=[("flex", 1.0)], handle=fn(c) {
+  @declarative.vbox([], style=[("flex", 1.0)], handle=fn(c) {
     fn ensure(s : String) -> Unit {
       if !mounted.val && s == name {
         mounted.val = true
@@ -116,9 +116,9 @@ fn main {
     for _c in 0..<5 {
       items.push(@icons.icon(@icons.Star, size=50.0))
     }
-    wall_rows.push(@yue.hbox(items, style=[("gap", 10.0)]))
+    wall_rows.push(@declarative.hbox(items, style=[("gap", 10.0)]))
   }
-  let long_wall = @yue.vbox(wall_rows, style=[("gap", 8.0)])
+  let long_wall = @declarative.vbox(wall_rows, style=[("gap", 8.0)])
   // 基础页内容:40 行文本(超屏可滚对照组)
   let base_lines : Array[@yue.Node] = []
   for i in 0..<40 {
@@ -129,13 +129,13 @@ fn main {
     )
   }
 
-  let icon_page = @yue.vbox(
+  let icon_page = @declarative.vbox(
     [
-      @yue.hbox([@components.label_t("图标库")], style=[
+      @declarative.hbox([@components.label_t("图标库")], style=[
         ("paddingLeft", 14.0),
         ("paddingTop", 10.0),
       ]),
-      @yue.vbox(
+      @declarative.vbox(
         [
           mk_sec("短", @icons.icon(@icons.Star, size=50.0), sec_sel),
           mk_sec(
@@ -161,10 +161,10 @@ fn main {
     style=[("flex", 1.0)],
     handle=fn(c) { page_box_r.val = Some(c) },
   )
-  let base_page = @yue.vbox(
+  let base_page = @declarative.vbox(
     [
-      @yue.scroll(
-        @yue.vbox(base_lines, style=[("padding", 14.0)]),
+      @declarative.scroll(
+        @declarative.vbox(base_lines, style=[("padding", 14.0)]),
         style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
         handle=fn(s) { base_scroll_r.val = Some(s) },
       ),
@@ -172,10 +172,10 @@ fn main {
     style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
   )
 
-  let root = @yue.hbox(
+  let root = @declarative.hbox(
     [
-      @yue.vbox([], style=[("width", 180.0)]),
-      @yue.vbox(
+      @declarative.vbox([], style=[("width", 180.0)]),
+      @declarative.vbox(
         [
           mk_nav("基础", page_sel, base_page),
           mk_nav("图标", page_sel, icon_page),
@@ -210,7 +210,7 @@ fn main {
     )
   }
 
-  let window = @yue.mount_window(
+  let window = @declarative.mount_window(
     [root],
     title="图标库滚动探针(端到端)",
     size=Some((1280.0, 720.0)),

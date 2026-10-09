@@ -41,7 +41,7 @@ pub fn page(secs : Array[Section]) -> @yue.Node {
   for s in secs {
     names.push(s.name)
   }
-  let strip = @yue.hbox([@components.segmented(names, selected)], style=[
+  let strip = @declarative.hbox([@components.segmented(names, selected)], style=[
     ("paddingLeft", 14.0),
     ("paddingRight", 14.0),
     ("paddingTop", 10.0),
@@ -52,12 +52,12 @@ pub fn page(secs : Array[Section]) -> @yue.Node {
   for s in secs {
     bodies.push(section_body(s, selected))
   }
-  @yue.vbox(
+  @declarative.vbox(
     [
       strip,
       // 段是显隐切换对象:按两栖容器规则用 grow/shrink 单写,不写
       // flex 简写(简写派生 basis 0 的坑见 docs/zh/adaptation.md)
-      @yue.vbox(bodies, style=[
+      @declarative.vbox(bodies, style=[
         ("flexgrow", 1.0),
         ("flexshrink", 1.0),
         ("flexDirection", "column"),
@@ -78,7 +78,7 @@ pub fn nav_page(
   content : @yue.Node,
 ) -> @yue.Node {
   let mounted : Ref[Bool] = Ref(false)
-  @yue.vbox([], style=[("flex", 1.0)], handle=fn(c) {
+  @declarative.vbox([], style=[("flex", 1.0)], handle=fn(c) {
     fn ensure(s : String) -> Unit {
       if !mounted.val && s == name {
         mounted.val = true
@@ -103,7 +103,7 @@ fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
   // 惰性挂载完成后按当前内容重算滚动范围(Linux GTK 的滚动范围取
   // set_content 时刻快照,不刷新会停在骨架高度滚不动)
   let scroll_ref : Ref[@yue.Scroll?] = Ref(None)
-  let holder = @yue.vbox([], handle=fn(h) {
+  let holder = @declarative.vbox([], handle=fn(h) {
     fn ensure(name : String) -> Unit {
       if !mounted.val && name == s.name {
         mounted.val = true
@@ -140,10 +140,10 @@ fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
     )
   }
   // 本容器是显隐切换对象:grow/shrink 单写(不写 flex 简写)
-  @yue.vbox(
+  @declarative.vbox(
     [
-      @yue.scroll(
-        @yue.vbox(inner, style=[("padding", 14.0)]),
+      @declarative.scroll(
+        @declarative.vbox(inner, style=[("padding", 14.0)]),
         style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
         handle=fn(sc) { scroll_ref.val = Some(sc) },
       ),
@@ -163,7 +163,7 @@ fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
 ///|
 /// 代码区顶行:左「代码」小标,右「复制」按钮(toast 回显)。
 fn code_copy_row(lines : Array[String]) -> @yue.Node {
-  @yue.hbox(
+  @declarative.hbox(
     [
       @components.label_t("代码", role=@components.Secondary),
       @components.label_t("", role=@components.Secondary, style=[("flex", 1.0)]),

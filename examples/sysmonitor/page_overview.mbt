@@ -41,7 +41,7 @@ fn sparkline_box(
   floor : Double,
   hand : @yue.Cursor,
 ) -> @yue.Node {
-  @yue.vbox([], style=[("height", 34.0), ("marginTop", 8.0)], handle=fn(c) {
+  @declarative.vbox([], style=[("height", 34.0), ("marginTop", 8.0)], handle=fn(c) {
     c.on_draw(fn(p) {
       let b = @yue.ViewLike::get_bounds(c)
       let t = @yue.theme_current()
@@ -101,12 +101,12 @@ fn res_card(
 ) -> @yue.Node {
   let hand_cur = @yue.Cursor::new(@yue.Hand)
   let spark = match hist {
-    None => @yue.label("")
+    None => @declarative.label("")
     Some(h) => sparkline_box(h, y_range, floor, hand_cur)
   }
-  @yue.vbox(
+  @declarative.vbox(
     [
-      @yue.hbox(
+      @declarative.hbox(
         [
           @icons.icon(icon, size=16.0),
           @components.label_t(title, role=@components.Section, style=[("marginLeft", 6.0)], handle=fn(
@@ -230,7 +230,7 @@ fn left_pane(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
   cards.push(
     res_card(@icons.TableIcon, "进程", app.card_proc, None, view, VProc),
   )
-  @yue.scroll(@yue.vbox(cards, style=[("padding", 10.0)]), style=[
+  @declarative.scroll(@declarative.vbox(cards, style=[("padding", 10.0)]), style=[
     ("width", 292.0),
   ])
 }
@@ -247,7 +247,7 @@ fn view_area(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
     (VGpu, page_sensors(app)),
     (VProc, page_process(app)),
   ]
-  @yue.vbox([], style=[("flex", 1.0), ("flexDirection", "column")], handle=fn(
+  @declarative.vbox([], style=[("flex", 1.0), ("flexDirection", "column")], handle=fn(
     area,
   ) {
     let boxes : Array[@yue.Container] = []
@@ -262,7 +262,7 @@ fn view_area(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
         view_index(item.0) == view_index(view.get()),
       )
       // 页面内容整页滚动（showcase 同款），超窗不裁切
-      let sc = @yue.scroll(node, style=[("flex", 1.0)])
+      let sc = @declarative.scroll(node, style=[("flex", 1.0)])
       ignore(sc.mount_into(@yue.ViewLike::view(pc)))
       area.add_child(pc)
       boxes.push(pc)
@@ -282,7 +282,7 @@ fn view_area(app : App, view : @yue.Store[ViewId]) -> @yue.Node {
 /// 处理器详情：总占用曲线（0-100 固定轴）+ 各核占用柱状（0-100，
 /// 自动量程会让 5% 看起来像满格）。
 fn page_cpu_detail(app : App) -> @yue.Node {
-  @yue.vbox(
+  @declarative.vbox(
     [
       @components.label_t("总占用（%）", role=@components.Section, style=[
         ("marginBottom", 6.0),
@@ -311,7 +311,7 @@ fn page_cpu_detail(app : App) -> @yue.Node {
 ///|
 /// 内存详情：已用曲线 + swap 曲线（自适应轴看细节）。
 fn page_mem_detail(app : App) -> @yue.Node {
-  @yue.vbox(
+  @declarative.vbox(
     [
       @components.label_t("内存（GB）", role=@components.Section, style=[
         ("marginBottom", 6.0),
@@ -331,5 +331,5 @@ fn page_mem_detail(app : App) -> @yue.Node {
 /// 双栏应用壳：左栏卡片导航 + 右栏详情页。
 fn app_shell(app : App) -> @yue.Node {
   let view : @yue.Store[ViewId] = @yue.Store::new(VCpu)
-  @yue.hbox([left_pane(app, view), view_area(app, view)], style=[("flex", 1.0)])
+  @declarative.hbox([left_pane(app, view), view_area(app, view)], style=[("flex", 1.0)])
 }

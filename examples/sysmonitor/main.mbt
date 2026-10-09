@@ -314,8 +314,8 @@ fn main {
     }),
   )
 
-  let window = @yue.mount_window(
-    [@yue.vbox([app_shell(app)], style=[("flex", 1.0), ("padding", 6.0)])],
+  let window = @declarative.mount_window(
+    [@declarative.vbox([app_shell(app)], style=[("flex", 1.0), ("padding", 6.0)])],
     title="系统监视器",
     size=Some((1240.0, 840.0)),
     on_close=fn(_w) { @yue.quit() },
