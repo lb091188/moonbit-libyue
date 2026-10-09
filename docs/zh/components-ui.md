@@ -104,7 +104,7 @@ let panel = @yue.Container::make()
 
 ### 主题按钮 button_t
 
-`button_t(text, on_click?, variant? = Soft)`
+`button_t(text, on_click?, variant? = Soft, color? = "", background_color? = "", style?, handle?)`
 
 自绘按钮，hover 变化收敛在主题色板内。
 
@@ -113,12 +113,15 @@ let panel = @yue.Container::make()
 | text | String | 必填 | 按钮文本 |
 | on_click | () -> Unit | 空操作 | 点击回调 |
 | variant | ButtonVariant | `Soft` | `Solid` 实底白字 / `Soft` 浅底 / `Text` 无底 / `Danger` 危险色 |
+| color | String | `""` | 文字色覆盖：非空即所有状态用它（hover 不再变色） |
+| background_color | String | `""` | 底色覆盖：非空即所有状态用它（hover 不再变色） |
 
-hover 表现：Solid / Danger 加深，Soft 变实底白字，Text 浅灰底。
+hover 表现：Solid / Danger 加深，Soft 变实底白字，Text 浅灰底；传了 color / background_color 后以传入色为准，hover 不再变色。
 
 ```moonbit
 @yue.button_t("确定", on_click=fn() { submit() })
 @yue.button_t("删除", variant=@yue.Danger)
+@yue.button_t("自定义", color="#ffd700", background_color="#1a1a2e")
 ```
 
 ### 主题标签 label_t

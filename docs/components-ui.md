@@ -104,7 +104,7 @@ let panel = @yue.Container::make()
 
 ### Themed button button_t
 
-`button_t(text, on_click?, variant? = Soft)`
+`button_t(text, on_click?, variant? = Soft, color? = "", background_color? = "", style?, handle?)`
 
 Self-drawn button; hover changes stay within the theme palette.
 
@@ -113,12 +113,15 @@ Self-drawn button; hover changes stay within the theme palette.
 | text | String | required | button text |
 | on_click | () -> Unit | no-op | click callback |
 | variant | ButtonVariant | `Soft` | `Solid` solid white text / `Soft` light fill / `Text` no fill / `Danger` danger color |
+| color | String | `""` | text color override: non-empty uses it in all states (hover no longer recolors) |
+| background_color | String | `""` | background color override: non-empty uses it in all states (hover no longer recolors) |
 
-Hover behavior: Solid / Danger darken, Soft goes solid white, Text gets a grey fill.
+Hover behavior: Solid / Danger darken, Soft goes solid white, Text gets a grey fill; once color / background_color are passed, the given colors win and hover no longer recolors.
 
 ```moonbit
 @yue.button_t("OK", on_click=fn() { submit() })
 @yue.button_t("Delete", variant=@yue.Danger)
+@yue.button_t("Custom", color="#ffd700", background_color="#1a1a2e")
 ```
 
 ### Themed label label_t
