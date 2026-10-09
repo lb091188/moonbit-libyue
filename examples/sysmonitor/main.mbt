@@ -98,6 +98,9 @@ struct App {
   proc : ProcMonitor
   disk : DiskMonitor
   net : NetMonitor
+  // GPU：占用来源优先级（nvidia-smi > sysfs gpu_busy_percent > DRM
+  // fdinfo 聚合）与 fdinfo 前样本差值状态
+  gpu : GpuMonitor
   // 概览页：资源卡片值行（标题行右侧，紧凑格式防溢出）
   card_cpu : @yue.Store[String]
   card_mem : @yue.Store[String]
@@ -179,7 +182,7 @@ fn sample_once(app : App) -> Unit {
       app.card_proc.set("\{procs.length()}")
     }
   }
-  match gpu_list() {
+  match app.gpu.tick() {
     None => ()
     Some(gpus) => {
       app.gpus.set(gpus)
@@ -261,7 +264,8 @@ fn main {
     Some(d) => d
     None => []
   }
-  let gpus0 : Array[GpuInfo] = match gpu_list() {
+  let gpu_mon = GpuMonitor::new()
+  let gpus0 : Array[GpuInfo] = match gpu_mon.tick() {
     Some(g) => g
     None => []
   }
@@ -271,6 +275,7 @@ fn main {
     proc: ProcMonitor::new(info.cores),
     disk: disk_mon,
     net: NetMonitor::new(),
+    gpu: gpu_mon,
     card_cpu: @yue.Store::new("—"),
     card_mem: @yue.Store::new("—"),
     card_net: @yue.Store::new("—"),
