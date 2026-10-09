@@ -3,14 +3,17 @@
 // 按单调时钟算出目标时刻，解码推进到该时刻的帧（跳帧追时钟）并重绘
 // 画面容器；seek 为时间戳级（avformat_seek_file）。音轨为第二个独立
 // Demuxer（同文件各开一个容器上下文，读游标互不干扰），解出 s16 PCM
-// 直推输出设备队列——音画从 play/seek 点各自按真实速率起播。
+// 直推输出设备队列——音画从 play/seek 点各自按真实速率起播。播完转
+// VpEnded，循环 EOF 或播完后再 play 均双 demuxer seek(0) 回起点重播。
 
 ///|
-/// 播放状态。
+/// 播放状态（VpEnded = 播完停驻：与初始 idle 区分——再 play 回起点
+/// 重播而非原地续播）。
 pub(all) enum VpState {
   VpIdle
   VpPlaying
   VpPaused
+  VpEnded
 }
 
 ///|
@@ -156,11 +159,18 @@ pub fn VideoPlayer::set_looping(self : VideoPlayer, on : Bool) -> Unit {
 }
 
 ///|
-/// 开始播放（idle/paused 从当前位置续播；首个 tick 解出首帧）。时钟
-/// 基准取当前位置 + 当前墙钟，恢复播放不跳秒。
+/// 开始播放（idle/paused 从当前位置续播；播完态先回起点再从头播，
+/// 对标浏览器重播；首个 tick 解出首帧）。时钟基准取当前位置 + 当前
+/// 墙钟，恢复播放不跳秒。
 pub fn VideoPlayer::play(self : VideoPlayer) -> Unit {
   if self.closed.val || self.state.val is VpPlaying {
     return
+  }
+  // 播完态：视频/音频双 demuxer 都已到 EOF，原地续播解不出任何数据
+  // （画面停末帧、全程无声）——先 seek(0) 归零再起播（对标 AudioPlayer
+  // 的 ap_restart）
+  if self.state.val is VpEnded {
+    self.vp_restart(mbt_now_ms())
   }
   self.state.val = VpPlaying
   self.base_pts.val = self.pos.val
@@ -194,7 +204,8 @@ pub fn VideoPlayer::pause(self : VideoPlayer) -> Unit {
 }
 
 ///|
-/// 停止（停音频、seek 回 0、清当前帧、状态回 idle）。
+/// 停止（停音频、双 demuxer seek 回 0、清当前帧、状态回 idle；下次
+/// play 从头有声播）。
 pub fn VideoPlayer::stop(self : VideoPlayer) -> Unit {
   if self.closed.val {
     return
@@ -207,15 +218,25 @@ pub fn VideoPlayer::stop(self : VideoPlayer) -> Unit {
   self.frame_no.val = 0
   self.vp_audio_flush()
   let _ = self.demuxer.seek(0.0)
+  // 音频 demuxer 同步回起点：只 seek 视频时音轨停在 EOF，重播时
+  // vp_fill_audio 解不出 PCM，全程有声画面无声音
+  match self.audio.val {
+    Some(a) => ignore(a.seek(0.0))
+    None => ()
+  }
 }
 
 ///|
 /// 跳转（秒；FFI 时间戳级；播放中从新位置续播，首帧由下一 tick 解出）。
+/// 播完态跳转转 paused：再 play 从落点续播，不会被当成重播回起点。
 pub fn VideoPlayer::seek(self : VideoPlayer, t : Double) -> Unit {
   if self.closed.val {
     return
   }
   let target = vp_clamp_t(t, self.duration_s)
+  if self.state.val is VpEnded {
+    self.state.val = VpPaused
+  }
   self.pos.val = target
   self.base_pts.val = target
   self.wall0.val = mbt_now_ms()
@@ -309,11 +330,12 @@ fn VideoPlayer::vp_tick(self : VideoPlayer) -> Unit {
     if self.looping.val {
       self.vp_restart(now)
     } else {
-      // 播完：位置钉在时长（进度满格；容器无时长头则保持回退值）
+      // 播完：位置钉在时长（进度满格；容器无时长头则保持回退值），
+      // 转 ended——再 play 回起点重播（区别于初始 idle 的原地续播）
       if self.duration_s > 0.0 {
         self.pos.val = self.duration_s
       }
-      self.state.val = VpIdle
+      self.state.val = VpEnded
       self.vp_audio_flush()
       match self.dev.val {
         Some(d) => {
@@ -328,7 +350,8 @@ fn VideoPlayer::vp_tick(self : VideoPlayer) -> Unit {
 }
 
 ///|
-/// 回到起点续播（循环模式 EOF 时；时钟基准归零）。
+/// 回到起点续播（循环模式 EOF 时、播完态再 play 时；双 demuxer
+/// seek(0)，时钟基准归零，音频队列重填）。
 fn VideoPlayer::vp_restart(self : VideoPlayer, now : Int64) -> Unit {
   let _ = self.demuxer.seek(0.0)
   self.frame_no.val = 0
