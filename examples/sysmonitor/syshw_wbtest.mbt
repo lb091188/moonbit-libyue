@@ -502,3 +502,174 @@ test "parse_system_profiler_gpu：Apple Silicon 单卡 / Intel 双卡 / 宽容�
   assert_eq(noname.length(), 1)
   assert_eq(noname[0].model, "Fallback GPU")
 }
+
+///|
+test "norm_pci_id / is_hex4：PCI id 归一化与四位十六进制判定" {
+  // sysfs 形态：0x 前缀 + 小写四位；pci.ids 形态：无前缀
+  assert_eq(norm_pci_id("0x10de"), "10de")
+  assert_eq(norm_pci_id("0x1002"), "1002")
+  assert_eq(norm_pci_id("0x8086"), "8086")
+  // 无前缀 / 大写 0X / 大小写混写都归一为小写
+  assert_eq(norm_pci_id("7480"), "7480")
+  assert_eq(norm_pci_id("0X10DE"), "10de")
+  assert_eq(norm_pci_id("0xAbCd"), "abcd")
+  // 位数不足左补零到四位；首尾空白裁剪
+  assert_eq(norm_pci_id("0x2"), "0002")
+  assert_eq(norm_pci_id(" 0x10de\n"), "10de")
+  // 四位十六进制判定：非十六进制 / 占位串 / 空串 / 长短不一都不算
+  assert_true(is_hex4(norm_pci_id("0x10de")))
+  assert_true(!is_hex4(norm_pci_id("0xzzzz")))
+  assert_true(!is_hex4(norm_pci_id("(未知)")))
+  assert_true(!is_hex4(norm_pci_id("")))
+  assert_true(!is_hex4("12345"))
+  assert_true(!is_hex4("abc"))
+}
+
+///|
+test "pci_ids_device_name：缩进层级解析(subsystem 跳过 / 出节提前返回 / class 节)" {
+  // 形态照真实 pci.ids（2024.03.31）：'#' 注释、无缩进 vendor、单 Tab
+  // device、双 Tab subsystem；末尾 class 节与 vendor 行同形
+  let ids = "#\n#\tList of PCI ID's\n#\n\n0001  SafeNet (wrong ID)\n0010  Allied Telesis, Inc (Wrong ID)\n# This is a relabelled RTL-8139\n\t8139  AT-2500TX V3 Ethernet\n\t\tdead beef  Subsystem Name\n1002  Advanced Micro Devices, Inc. [AMD/ATI]\n\t1304  Kaveri\n\t1309  Kaveri [Radeon R6/R7 Graphics]\n\t\t17aa 3830  Z50-75\n\t7480  Navi 33 [Radeon RX 7700S/7600/7600S/7600M XT/PRO W7600]\n\t9999\n8086  Intel Corporation\n\t3ea0  WhiskeyLake-U GT2 [UHD Graphics 620]\nC 00  Unclassified device\n\t00  Non-VGA unclassified device\n"
+  // 命中：型号名整段保留（内部空格 / 方括号 / 斜杠）
+  assert_eq(
+    pci_ids_device_name(ids, "0x1002", "0x7480"),
+    Some("Navi 33 [Radeon RX 7700S/7600/7600S/7600M XT/PRO W7600]"),
+  )
+  assert_eq(
+    pci_ids_device_name(ids, "0x8086", "0x3ea0"),
+    Some("WhiskeyLake-U GT2 [UHD Graphics 620]"),
+  )
+  // 前导零 vendor id 与无前缀 device id 都认（归一化）
+  assert_eq(pci_ids_device_name(ids, "0x0010", "8139"), Some("AT-2500TX V3 Ethernet"))
+  assert_eq(pci_ids_device_name(ids, "0X1002", "7480"), pci_ids_device_name(ids, "0x1002", "0x7480"))
+  // 同 vendor 下查无此 device：扫到下一 vendor 行即出节返回 None；
+  // 9999 有条目但无名称（真实库不出现），同样按查不到处理
+  assert_true(pci_ids_device_name(ids, "0x1002", "0x9999") is None)
+  // 跨 vendor 不串：7480 是 AMD 的，查 Intel 查不到
+  assert_true(pci_ids_device_name(ids, "0x8086", "0x7480") is None)
+  // 无 device 行的 vendor（0001）：8139 属于 0010，不跨节误配
+  assert_true(pci_ids_device_name(ids, "0x0001", "0x8139") is None)
+  // subsystem 行（双 Tab）不当 device：dead 只是 0010 的子系统 id
+  assert_true(pci_ids_device_name(ids, "0x0010", "0xdead") is None)
+  // class 节（"C 00" 行与 class 子行）不产生误配
+  assert_true(pci_ids_device_name(ids, "0x0000", "0x0000") is None)
+  assert_true(pci_ids_device_name(ids, "0x0000", "0x00") is None)
+  // 不存在的 vendor / id 非法（非四位十六进制）→ None
+  assert_true(pci_ids_device_name(ids, "0xdead", "0xbeef") is None)
+  assert_true(pci_ids_device_name(ids, "0xzzzz", "0x0001") is None)
+  assert_true(pci_ids_device_name(ids, "", "") is None)
+  // 空数据库 / 空文本
+  assert_true(pci_ids_device_name("", "0x1002", "0x7480") is None)
+}
+
+///|
+test "gpu_model_name：smi 优先 / pci.ids 命中 / 回退 device id / 占位留空" {
+  let ids = "1002  Advanced Micro Devices, Inc. [AMD/ATI]\n\t7480  Navi 33 [Radeon RX 7700S/7600]\n"
+  // nvidia-smi 命中优先（其型号名比 pci.ids 更具体），不经数据库
+  assert_eq(gpu_model_name("NVIDIA GeForce RTX 3070", "0x10de", "0x2488", ids), "NVIDIA GeForce RTX 3070")
+  // AMD / Intel 走 pci.ids 商业型号名
+  assert_eq(gpu_model_name("", "0x1002", "0x7480", ids), "Navi 33 [Radeon RX 7700S/7600]")
+  // 数据库不可达（空文本）与库内无该条目：回退 device id 原文
+  assert_eq(gpu_model_name("", "0x1002", "0x7480", ""), "0x7480")
+  assert_eq(gpu_model_name("", "0x1002", "0x9999", ids), "0x9999")
+  // id 本身不可用（sysfs 读取失败的占位串）：空型号，UI 不显示型号位
+  assert_eq(gpu_model_name("", "0x1002", "(未知)", ids), "")
+}
+
+///|
+test "GpuMonitor::gpu_model：pci.ids 常驻缓存 / smi 优先 / 占位 id" {
+  let mon = GpuMonitor::new()
+  let row : GpuRow = {
+    addr: "0000:01:00.0",
+    vendor: "0x1002",
+    device: "0x7480",
+    busy: None,
+    vram_used: None,
+    vram_total: None,
+    celsius: None,
+    model: "",
+  }
+  // 有 pci.ids 的宿主给出商业型号名，没有的宿主回退 device id——
+  // 两种形态都要求非空（UI 型号位有东西可显示）
+  let m1 = mon.gpu_model(row)
+  assert_true(m1.length() > 0)
+  // 二次调用走常驻缓存（不再扫全文），结果一致
+  assert_eq(mon.gpu_model(row), m1)
+  // nvidia-smi 命中优先，不进缓存
+  let smi : GpuRow = {
+    addr: "0000:01:00.0",
+    vendor: "0x10de",
+    device: "0x2488",
+    busy: Some(35.0),
+    vram_used: None,
+    vram_total: None,
+    celsius: None,
+    model: "NVIDIA GeForce RTX 3070",
+  }
+  assert_eq(mon.gpu_model(smi), "NVIDIA GeForce RTX 3070")
+  // device id 读不到（占位串）：空型号
+  let unknown : GpuRow = {
+    addr: "0000:02:00.0",
+    vendor: "0x1002",
+    device: "(未知)",
+    busy: None,
+    vram_used: None,
+    vram_total: None,
+    celsius: None,
+    model: "",
+  }
+  assert_eq(mon.gpu_model(unknown), "")
+}
+
+///|
+test "SYS5 真实采样：pci.ids 商业型号名(Linux)" {
+  match read_pci_ids() {
+    None => () // 无 pci.ids 数据库宿主(虚机 / Flatpak 沙箱)跳过
+    Some(text) => {
+      // 从原文动态取第一对 vendor / device 做正向断言：具体名称随
+      // 数据库版本变化，口径是「返回该行 id 之后的整段名称」
+      let mut vendor = ""
+      let mut device = ""
+      let mut raw = ""
+      for line in text.split("\n") {
+        if line.is_empty() || line.has_prefix("#") || line.has_prefix("\t\t") {
+          continue
+        }
+        if line.has_prefix("\t") {
+          if vendor == "" {
+            continue
+          }
+          let f = split_fields(line[1:])
+          if f.length() >= 2 && is_hex4(norm_pci_id(f[0].to_owned())) {
+            device = f[0].to_owned()
+            raw = line.to_owned()
+            break
+          }
+          continue
+        }
+        // vendor 行：持续更新为最近一个（0001 无 device 行，8139 属 0010）
+        let f = split_fields(line)
+        if f.length() >= 2 && is_hex4(norm_pci_id(f[0].to_owned())) {
+          vendor = f[0].to_owned()
+        }
+      }
+      if device != "" {
+        let got = pci_ids_device_name(text, vendor, device)
+        assert_true(got is Some(_))
+        match got {
+          Some(name) => {
+            assert_true(name.length() > 0)
+            // 名称须是原行 id 之后的尾部（整段保留，内部空格不塌陷）
+            assert_true(raw.trim().has_suffix(name))
+          }
+          None => ()
+        }
+      }
+      // 负向：无 device 行的 vendor（dead = Indigita）扫到出节即 None；
+      // 非法 id 不过归一化校验，直接 None
+      assert_true(pci_ids_device_name(text, "0xdead", "0xbeef") is None)
+      assert_true(pci_ids_device_name(text, "0x1002", "0xzzzz") is None)
+    }
+  }
+}
+
