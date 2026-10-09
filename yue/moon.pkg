@@ -3,7 +3,6 @@ import {
   "moonbitlang/core/json",
   "moonbitlang/core/math",
   "moonbitlang/core/env",
-  "mizchi/markdown",
   "NoahLiu/moonbit-libyue/yue/traybus",
   "chensuiyi/subproc",
   "prowk/moonsqlitefile",
