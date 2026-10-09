@@ -1,6 +1,17 @@
 // markdown_view 白盒测试:码点→UTF-16 换算层、行内展平与区间计量、
-// fence info/切行,以及旧自写解析器 CommonMark 偏差清单的前后对比
-// 验收用例(setext 标题 / ~~~ 围栏 / info 串 / 缩进代码块 / 嵌套列表)。
+// fence info/切行、GFM 渲染面(删除线/脚注/图片路径/链接地址/表格),
+// 以及旧自写解析器 CommonMark 偏差清单的前后对比验收用例(setext 标题 /
+// ~~~ 围栏 / info 串 / 缩进代码块 / 嵌套列表)。
+
+///|
+/// 测试帮手:空渲染上下文(无脚注/无链接定义,基准宽 560)。
+fn md_test_ctx() -> MDCtx {
+  {
+    foot: { no: (Map([]) : Map[String, Int]), order: [], counter: Ref(0) },
+    defs: (Map([]) : Map[String, String]),
+    width: 560.0,
+  }
+}
 
 ///|
 /// 测试帮手:解析单段落源文并展平其行内。
@@ -10,7 +21,7 @@ fn md_flat_par(src : String) -> Array[MDSpan] {
   for b in doc.children {
     match b {
       Paragraph(children~, ..) =>
-        for s in md_flatten_inline(children) {
+        for s in md_flatten_inline(children, md_test_ctx()) {
           spans.push(s)
         }
       _ => ()
@@ -40,6 +51,9 @@ test {
   assert_false(spans[0].italic)
   assert_false(spans[0].code)
   assert_false(spans[0].link)
+  assert_false(spans[0].strike)
+  assert_false(spans[0].sup)
+  assert_eq(spans[0].url, "")
 }
 
 ///|
@@ -75,27 +89,55 @@ test {
 
 ///|
 test {
-  // 链接:渲染文字带链接样式,地址不进渲染文本
+  // 链接:渲染文字带链接样式并携地址(点击打开用),地址不进渲染文本
   let spans = md_flat_par("见 [文字](https://x.y/z) 即可")
   let all = StringBuilder()
   for s in spans {
     all.write_string(s.text)
     if s.link {
       assert_eq(s.text, "文字")
+      assert_eq(s.url, "https://x.y/z")
     }
   }
   assert_eq(all.to_string(), "见 文字 即可")
   assert_false(all.to_string().contains("https"))
-  // 自动链接:地址本身带链接样式
+  // 自动链接:地址本身带链接样式并携地址
   let auto = md_flat_par("去 <https://a.b/c> 看")
   assert_eq(auto.length(), 3)
   assert_eq(auto[1].text, "https://a.b/c")
   assert_true(auto[1].link)
+  assert_eq(auto[1].url, "https://a.b/c")
 }
 
 ///|
 test {
-  // 图片降级为 alt 文本(链接样式),url 不进渲染文本
+  // 引用式链接:地址取自文档级链接定义;无定义的引用式按 CommonMark
+  // 退化为字面文本(不产生 RefLink,自然没有地址可挂)
+  let res = @markdown.parse("见 [文字][ref]\n\n[ref]: https://ref.y/x")
+  let defs : Map[String, String] = (Map([]) : Map[String, String])
+  for d in res.definitions {
+    defs.set(d.label.trim(chars=" \t\n\r").to_owned(), d.url)
+  }
+  let ctx : MDCtx = { foot: md_test_ctx().foot, defs, width: 560.0 }
+  let spans : Array[MDSpan] = []
+  for b in res.document.children {
+    match b {
+      Paragraph(children~, ..) =>
+        for s in md_flatten_inline(children, ctx) {
+          spans.push(s)
+        }
+      _ => ()
+    }
+  }
+  assert_eq(spans.length(), 2)
+  assert_eq(spans[0].text, "见 ")
+  assert_eq(spans[1].text, "文字")
+  assert_eq(spans[1].url, "https://ref.y/x")
+}
+
+///|
+test {
+  // 图片行内降级为 alt 文本(链接样式),url 不进渲染文本
   let spans = md_flat_par("前 ![图](u.png) 后")
   let all = StringBuilder()
   for s in spans {
@@ -124,12 +166,67 @@ test {
 
 ///|
 test {
-  // 删除线:AttributedText 无删除线渲染面,内容按原样式保留
+  // 删除线:内容保留并带删除线标志(渲染层按区间像素坐标画横线)
   let spans = md_flat_par("~~划掉~~")
   assert_eq(spans.length(), 1)
   assert_eq(spans[0].text, "划掉")
+  assert_true(spans[0].strike)
   assert_false(spans[0].bold)
   assert_false(spans[0].italic)
+  // 删除线与粗体叠加:两标志并存,样式边界不串
+  let mix = md_flat_par("~~**划粗**~~")
+  assert_eq(mix.length(), 1)
+  assert_true(mix[0].strike)
+  assert_true(mix[0].bold)
+}
+
+///|
+test {
+  // 脚注:正文引用按出现顺序编号,展平为上标 "[n]";同一 label 不重编
+  let res = @markdown.parse("甲[^a] 乙[^b] 丙[^a]\n\n[^a]: 定义甲\n[^b]: 定义乙")
+  let foot : MDFootScan = { no: (Map([]) : Map[String, Int]), order: [], counter: Ref(0) }
+  md_scan_blocks(res.document.children, foot)
+  assert_eq(foot.order, ["a", "b"])
+  assert_eq(foot.no.get("a"), Some(1))
+  assert_eq(foot.no.get("b"), Some(2))
+  let ctx : MDCtx = { foot, defs: (Map([]) : Map[String, String]), width: 560.0 }
+  let spans : Array[MDSpan] = []
+  for b in res.document.children {
+    match b {
+      Paragraph(children~, ..) =>
+        for s in md_flatten_inline(children, ctx) {
+          spans.push(s)
+        }
+      _ => ()
+    }
+  }
+  let sups : Array[String] = []
+  for s in spans {
+    if s.sup {
+      sups.push(s.text)
+    }
+  }
+  assert_eq(sups, ["[1]", "[2]", "[1]"])
+}
+
+///|
+test {
+  // 块级渲染忽略 FootnoteDefinition(定义由 markdown_view 收集后在文末
+  // 统一渲染):段落 1 节点,两条定义均不产节点
+  let doc = @markdown.parse("甲[^a]\n\n[^a]: 定义甲\n[^b]: 定义乙\n").document
+  let ctx = md_test_ctx()
+  md_scan_blocks(doc.children, ctx.foot)
+  assert_eq(ctx.foot.order, ["a"])
+  let nodes = md_render_blocks(doc.children, ctx)
+  assert_eq(nodes.length(), 1)
+}
+
+///|
+test {
+  // 图片地址转本地路径:剥 file:// 前缀,普通路径原样
+  assert_eq(md_image_path("file:///home/a.png"), "/home/a.png")
+  assert_eq(md_image_path("docs/images/x.png"), "docs/images/x.png")
+  assert_eq(md_image_path("https://a.b/c.png"), "https://a.b/c.png")
 }
 
 ///|
@@ -181,14 +278,16 @@ test {
 
 ///|
 test {
-  // 辅助映射:标题字号 / 列表任务勾选标记 / 提示块标题
+  // 辅助映射:标题字号 / 普通列表标记 / 提示块标题 / 列对齐映射
   assert_eq(md_heading_size(1), 22.0)
   assert_eq(md_heading_size(6), 12.5)
-  assert_eq(md_list_marker("•", None), "•")
-  assert_eq(md_list_marker("•", Some(true)), "☑")
-  assert_eq(md_list_marker("•", Some(false)), "☐")
+  assert_eq(md_list_marker("•"), "•")
   assert_eq(md_alert_title(Note), "NOTE")
   assert_eq(md_alert_title(Caution), "CAUTION")
+  assert_eq(md_align_of(@markdown.Left), "flex-start")
+  assert_eq(md_align_of(@markdown.Center), "center")
+  assert_eq(md_align_of(@markdown.Right), "flex-end")
+  assert_eq(md_align_of(@markdown.None), "flex-start")
 }
 
 ///|
@@ -280,11 +379,10 @@ test {
 
 ///|
 test {
-  // 有序列表带 start(旧解析无视起始编号);任务列表勾选态;表格
-  let doc = @markdown.parse("3. 三\n4. 四\n\n- [x] 完成\n- [ ] 待办\n\n| A | B |\n|---|---|\n| 甲 | 乙 |\n").document
+  // 有序列表带 start(旧解析无视起始编号);任务列表勾选态
+  let doc = @markdown.parse("3. 三\n4. 四\n\n- [x] 完成\n- [ ] 待办\n").document
   let mut ol = false
   let mut ul = false
-  let mut tb = false
   for b in doc.children {
     match b {
       OrderedList(start~, items~, ..) => {
@@ -297,25 +395,43 @@ test {
         assert_eq(items[0].checked, Some(true))
         assert_eq(items[1].checked, Some(false))
       }
-      Table(header~, rows~, ..) => {
-        tb = true
-        assert_eq(header.length(), 2)
-        assert_eq(rows.length(), 1)
-        let spans = md_flatten_inline(rows[0][0].children)
-        assert_eq(spans[0].text, "甲")
-      }
       _ => ()
     }
   }
   assert_true(ol)
   assert_true(ul)
-  assert_true(tb)
 }
 
 ///|
 test {
-  // 默认不渲染的块级变体:空白行与 HtmlBlock 不产节点
-  let doc = @markdown.parse("段落甲\n\n\n\n段落乙\n\n<div>x</div>\n").document
-  let nodes = md_render_blocks(doc.children)
+  // 表格渲染:出 表头行 + 分隔线 + 数据行 三节点;单元格富文本展平
+  let doc = @markdown.parse("| A | B |\n|:--|--:|\n| 甲 | 乙 |\n| **粗** | `码` |\n").document
+  match doc.children[0] {
+    Table(header~, alignments~, rows~, ..) => {
+      assert_eq(header.length(), 2)
+      assert_eq(alignments[0], @markdown.Left)
+      assert_eq(alignments[1], @markdown.Right)
+      assert_eq(rows.length(), 2)
+      let ctx = md_test_ctx()
+      let head_spans = md_table_cell_spans(header[0], true, ctx)
+      assert_eq(head_spans[0].text, "A")
+      assert_true(head_spans[0].bold)
+      let body_spans = md_table_cell_spans(rows[1][0], false, ctx)
+      assert_eq(body_spans[0].text, "粗")
+      assert_true(body_spans[0].bold)
+      assert_eq(md_table_cell_spans(rows[1][1], false, ctx)[0].text, "码")
+      // md_table 仅建树不挂载,可构造即渲染面成立
+      ignore(md_table(header, alignments, rows, ctx))
+    }
+    _ => abort("表格解析失败")
+  }
+}
+
+///|
+test {
+  // 默认不渲染的块级变体:空白行、HtmlBlock 与 FootnoteDefinition 不产
+  // 节点(脚注定义在 markdown_view 文末统一渲染)
+  let doc = @markdown.parse("段落甲\n\n\n\n段落乙\n\n<div>x</div>\n\n[^f]: 脚注\n").document
+  let nodes = md_render_blocks(doc.children, md_test_ctx())
   assert_eq(nodes.length(), 2)
 }
