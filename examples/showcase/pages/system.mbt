@@ -36,6 +36,15 @@ fn open_floating_heart() -> Unit {
 
 ///|
 pub fn page_system(app : @ui.App) -> @yue.Node {
+  // 月相循环表:set_icon 只吃 PNG 文件路径,点一次切一个相
+  let moon_idx = Ref(0)
+  let moon_phases = [
+    ("新月", "examples/showcase/assets/tray_moon_new.png"),
+    ("娥眉月", "examples/showcase/assets/tray_moon_crescent.png"),
+    ("上弦月", "examples/showcase/assets/tray_moon_quarter.png"),
+    ("盈凸月", "examples/showcase/assets/tray_moon_gibbous.png"),
+    ("满月", "examples/showcase/assets/tray_moon_full.png"),
+  ]
   let secs : Array[@ui.Section] = [
     @ui.section(
       "文件",
@@ -250,7 +259,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
     @ui.section(
       "托盘",
       "托盘状态",
-      "托盘图标左键点击计数(见上方回显),右键弹菜单;可切系统主题图标。",
+      "托盘图标左键点击计数(见上方回显),右键弹菜单;set_icon 更换图标须传 PNG 文件路径,点击在五个月相图标间循环,主题图标名仅 Linux。",
       [
         @yue.bind_label(app.tray_clicks, fn(n) {
           "托盘图标已被点击 \{n} 次"
@@ -269,13 +278,18 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
                 None => app.toast_push("托盘不可用", @yue.Warning)
               }
             }),
-            @yue.button_t("切回图片图标", on_click=fn() {
+            @yue.button_t("切换月相图标", on_click=fn() {
               match app.tray_ref.val {
                 Some(t) => {
-                  t.set_icon("examples/showcase/assets/icon.png")
-                  app.toast_push("已切回图片图标", @yue.Info)
+                  let (phase_name, phase_path) = moon_phases[moon_idx.val]
+                  t.set_icon(phase_path)
+                  app.toast_push(
+                    "托盘图标已切换:\{phase_name}(PNG)",
+                    @yue.Info,
+                  )
+                  moon_idx.val = (moon_idx.val + 1) % moon_phases.length()
                 }
-                None => ()
+                None => app.toast_push("托盘不可用", @yue.Warning)
               }
             }),
           ],
@@ -285,8 +299,9 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       code=[
         "match @yue.Tray::new(\"examples/showcase/assets/icon.png\") {", "  Ok(tray) => {",
         "    tray.set_tooltip(\"演示托盘\", \"左键计数,右键菜单\")",
-        "    let menu = @yue.Menu::new()", "    let _ = menu.add_label_item(\"退出\")",
-        "    tray.set_menu(menu)", "    tray.on_click(fn() { println(\"点了托盘\") })",
+        "    // set_icon 只吃 PNG 文件路径;月相五连循环",
+        "    tray.set_icon(\"examples/showcase/assets/tray_moon_full.png\")",
+        "    // set_icon_name 仅 Linux SNI 后端支持",
         "    tray.set_icon_name(\"utilities-terminal\")", "  }", "  Err(_e) => ()",
         "}",
       ],
