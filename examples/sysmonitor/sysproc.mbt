@@ -3,7 +3,9 @@
 // 采样 utime+stime 增量 / 墙钟增量）；RSS 取 stat 的页数 × 页大小，与
 // status 的 VmRSS 等值，省掉每进程第三次读取。
 // F1：kill / getpriority / setpriority 经应用 native-stub，errno 语义化
-// 为 Result；Windows 侧 stub 返回「不支持」哨兵，封装层统一降级文案。
+// 为 Result；Windows 侧 stub 把 kill 映射 TerminateProcess 一档、优先级
+// 映射 IDLE/NORMAL/HIGH/REALTIME 四档，Win32 错误码先译成 errno 编号
+// （errno_text 与 Result 形态零改动，SYS2 语义归一）。
 
 ///|
 /// /proc/[pid]/stat 解析结果（时间为 tick，见 ProcMonitor 的 clk_tck）。
@@ -293,5 +295,93 @@ pub fn set_priority(pid : Int, nice : Int) -> Result[Unit, String] {
     Ok(())
   } else {
     Err(errno_text(err))
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SYS2 语义归一:平台化 UI 文案辅助(纯函数,platform 由调用方经
+// on_windows() 取,文案函数显式带参便于单测)
+// ---------------------------------------------------------------------------
+
+///|
+/// 当前平台是否为 Windows(编译期由 stub 定;kill / 优先级语义按平台收敛)。
+pub fn on_windows() -> Bool {
+  ffi_is_windows() != 0
+}
+
+///|
+/// 优先级档位名:nice 就近钳制到 IDLE/NORMAL/HIGH/REALTIME 四档
+/// (档界与 stub 的 sysmon_nice_to_class 一致:10..19 IDLE / -9..9
+/// NORMAL / -16..-10 HIGH / -20..-17 REALTIME)。Windows 优先级是
+/// 离散档,get 返回档位代表值;Linux 是连续 nice。
+pub fn priority_level_name(nice : Int) -> String {
+  if nice >= 10 {
+    "空闲(IDLE)"
+  } else if nice <= -17 {
+    "实时(REALTIME)"
+  } else if nice <= -10 {
+    "高(HIGH)"
+  } else {
+    "正常(NORMAL)"
+  }
+}
+
+///|
+/// kill 按钮文案与消息口径:Linux 分温和结束(SIGTERM)与强制结束
+/// (SIGKILL)两档;Windows 首版一律 TerminateProcess 强杀一档,只出
+/// 一个按钮(force 为 None 时不显示强杀按钮;温和结束 WM_CLOSE 方案
+/// 后置)。
+pub fn kill_button_labels(platform : String) -> (String, String?) {
+  if platform == "windows" {
+    ("结束进程(立即终止)", None)
+  } else {
+    ("结束进程", Some("强制结束"))
+  }
+}
+
+///|
+/// 设优先级入口文案与说明:Linux 是连续 nice(-20..19,越大越谦让);
+/// Windows 钳制到四档离散档,说明里给档界。
+pub fn priority_ui(platform : String) -> (String, String) {
+  if platform == "windows" {
+    (
+      "设优先级",
+      "优先级为离散档:≥10 空闲 / -9..9 正常 / -16..-10 高 / ≤-17 实时,输入就近钳制",
+    )
+  } else {
+    ("设 nice", "nice 越大越谦让(-20..19)")
+  }
+}
+
+///|
+/// 设优先级结果文案:Windows 显示钳制后的档位名与代表值(effective 为
+/// set 后回读值,回读失败时为输入值);Linux 显示 nice 原值。fail 非空
+/// 时逐个附失败原因。
+pub fn priority_result(
+  platform : String,
+  effective : Int,
+  ok : Int,
+  fail : String,
+) -> String {
+  let head = if platform == "windows" {
+    "优先级已设为 \{priority_level_name(effective)}(代表值 \{effective})"
+  } else {
+    "nice 已设为 \{effective}"
+  }
+  if fail == "" {
+    "\{head}(\{ok} 个进程)"
+  } else {
+    "\{head}:\{ok} 个成功\{fail}"
+  }
+}
+
+///|
+/// 进程页优先级列列头:Windows 列值是离散档代表值,列头标「优先级」;
+/// Linux 是连续 nice。数值口径一致(nice 值),仅文案区分。
+pub fn priority_col_header(platform : String) -> String {
+  if platform == "windows" {
+    "优先级"
+  } else {
+    "nice"
   }
 }

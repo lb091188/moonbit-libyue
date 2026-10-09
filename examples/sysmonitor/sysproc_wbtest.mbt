@@ -107,13 +107,109 @@ test "errno_text：语义映射 / 不支持哨兵 / 未知码" {
 }
 
 ///|
+test "errno_text:Windows 错误码翻译表目标值(SYS2 语义归一)" {
+  // stub 内 Win32 → errno 翻译表的目标编号(ERROR_ACCESS_DENIED→1、
+  // ERROR_INVALID_PARAMETER→22、ERROR_PRIVILEGE_NOT_HELD/
+  // ERROR_SHARING_VIOLATION→13、ERROR_FILE_NOT_FOUND→2、
+  // ERROR_NOT_ENOUGH_MEMORY/ERROR_OUTOFMEMORY→12、ERROR_INVALID_HANDLE→9、
+  // ERROR_ALREADY_EXISTS→17、ERROR_BROKEN_PIPE→32、未列出归 EIO=5);
+  // 翻译在 stub 内完成,MoonBit 侧 errno_text 与 Result 形态零改动,
+  // 此处断言翻译目标值都产出语义正确的文案
+  assert_eq(errno_text(1), "权限不足(EPERM:非属主且非 root)")
+  assert_eq(errno_text(2), "系统调用失败(errno 2)")
+  assert_eq(errno_text(3), "进程不存在或已退出(ESRCH)")
+  assert_eq(errno_text(5), "系统调用失败(errno 5)")
+  assert_eq(errno_text(9), "系统调用失败(errno 9)")
+  assert_eq(errno_text(12), "系统调用失败(errno 12)")
+  assert_eq(errno_text(13), "权限不足(EACCES)")
+  assert_eq(errno_text(17), "系统调用失败(errno 17)")
+  assert_eq(errno_text(22), "参数非法(EINVAL:nice 需在 -20..19)")
+  assert_eq(errno_text(32), "系统调用失败(errno 32)")
+}
+
+///|
+test "on_windows:平台探测(Linux 宿主恒 false)" {
+  // 编译期由 stub 定;Linux / macOS 宿主上恒 false
+  assert_eq(on_windows(), false)
+}
+
+///|
+test "priority_level_name:四档档界与 stub sysmon_nice_to_class 一致" {
+  assert_eq(priority_level_name(19), "空闲(IDLE)")
+  assert_eq(priority_level_name(10), "空闲(IDLE)")
+  assert_eq(priority_level_name(9), "正常(NORMAL)")
+  assert_eq(priority_level_name(0), "正常(NORMAL)")
+  assert_eq(priority_level_name(-9), "正常(NORMAL)")
+  assert_eq(priority_level_name(-10), "高(HIGH)")
+  assert_eq(priority_level_name(-16), "高(HIGH)")
+  assert_eq(priority_level_name(-17), "实时(REALTIME)")
+  assert_eq(priority_level_name(-20), "实时(REALTIME)")
+}
+
+///|
+test "kill_button_labels:Windows 单按钮强杀 / Linux 两档" {
+  let (win_end, win_force) = kill_button_labels("windows")
+  assert_eq(win_end, "结束进程(立即终止)")
+  assert_true(win_force is None)
+  let (lin_end, lin_force) = kill_button_labels("linux")
+  assert_eq(lin_end, "结束进程")
+  assert_eq(lin_force.unwrap(), "强制结束")
+  // 未知平台按 Linux 两档兜底
+  assert_true(kill_button_labels("macos").1 is Some("强制结束"))
+}
+
+///|
+test "priority_ui:Windows 四档说明 / Linux nice 说明" {
+  let (wbtn, whint) = priority_ui("windows")
+  assert_eq(wbtn, "设优先级")
+  assert_true(whint.contains("离散档"))
+  assert_true(whint.contains("实时"))
+  let (lbtn, lhint) = priority_ui("linux")
+  assert_eq(lbtn, "设 nice")
+  assert_true(lhint.contains("-20..19"))
+}
+
+///|
+test "priority_result:Windows 档位名+代表值 / Linux nice 原值 / 失败附因" {
+  assert_eq(
+    priority_result("windows", 0, 3, ""),
+    "优先级已设为 正常(NORMAL)(代表值 0)(3 个进程)",
+  )
+  assert_eq(
+    priority_result("windows", -20, 1, ""),
+    "优先级已设为 实时(REALTIME)(代表值 -20)(1 个进程)",
+  )
+  assert_eq(priority_result("linux", 10, 2, ""), "nice 已设为 10(2 个进程)")
+  let fail = priority_result("linux", 5, 1, ",[42]权限不足(EACCES)")
+  assert_true(fail.contains("nice 已设为 5"))
+  assert_true(fail.contains("1 个成功"))
+  assert_true(fail.contains("[42]"))
+}
+
+///|
+test "priority_col_header:Windows 标优先级 / Linux 标 nice" {
+  assert_eq(priority_col_header("windows"), "优先级")
+  assert_eq(priority_col_header("linux"), "nice")
+}
+
+///|
+test "with_temp:有传感器给℃ / 来源不可用给「—」/ CPU 空值不追加" {
+  let s = { chip: "coretemp", label: "Package id 0", celsius: 45.7 }
+  assert_eq(with_temp("12%", Some(s)), "12% · 45℃")
+  // hwmon 读不到(None)与列表为空( hottest None 同形):显示「—」占位
+  assert_eq(with_temp("12%", None), "12% · —")
+  // CPU 采样失败(值行本身为空)时整体不追加
+  assert_eq(with_temp("", None), "")
+}
+
+///|
 test "F1 set_priority：越界nice参数(纯分支)" {
   assert_eq(set_priority(1, 20), Err(errno_text(22)))
   assert_eq(set_priority(1, -21), Err(errno_text(22)))
 }
 
 ///|
-test "F1 真实调用：自身 nice 读 / 不存在 pid kill(Linux)" {
+test "F1 真实调用：自身 nice 读 / 不存在 pid kill/get/set(Linux)" {
   // 读自身 pid（/proc/self/stat 是当前进程）
   let self_pid = match read_text_file("/proc/self/stat") {
     None => -1
@@ -138,6 +234,10 @@ test "F1 真实调用：自身 nice 读 / 不存在 pid kill(Linux)" {
     assert_eq(kill_signal(self_pid, 0), Ok(()))
     // pid_max 内核上限 4194304，+1 永不存在的 pid：走通 errno 失败路径
     assert_eq(kill_signal(4194305, SIGTERM), Err(errno_text(3)))
+    // get/set 对不存在 pid 同样归一 ESRCH（Windows 侧 OpenProcess 的
+    // ERROR_INVALID_PARAMETER 特判同此语义）
+    assert_eq(get_priority(4194305), Err(errno_text(3)))
+    assert_eq(set_priority(4194305, 5), Err(errno_text(3)))
   }
 }
 

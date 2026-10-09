@@ -77,6 +77,20 @@ fn pct(v : Double) -> String {
 }
 
 ///|
+/// 处理器卡值行追加温度位:有最热传感器给「· N℃」,来源不可用
+/// (hwmon 读不到 / 列表空)给「· —」——空缺会让用户分不清「没数据」
+/// 与「还没刷新」;cpu_text 为空(CPU 采样失败)时整体不追加。
+fn with_temp(cpu_text : String, hottest : TempSensor?) -> String {
+  if cpu_text == "" {
+    return ""
+  }
+  match hottest {
+    None => "\{cpu_text} · —"
+    Some(t) => "\{cpu_text} · \{t.celsius.to_int()}℃"
+  }
+}
+
+///|
 /// 应用状态：各采样器（持差值前样本）+ 跨页共享 Store。页面函数以 app
 /// 单参取用；页内私有状态不进 App。
 struct App {
@@ -129,7 +143,7 @@ fn sample_once(app : App) -> Unit {
     }
   }
   match hwmon_sensors() {
-    None => ()
+    None => cpu_text = with_temp(cpu_text, None)
     Some(sensors) => {
       app.sensors.set(sensors)
       let mut hottest : TempSensor? = None
@@ -139,10 +153,7 @@ fn sample_once(app : App) -> Unit {
           Some(t) => if s.celsius > t.celsius { hottest = Some(s) }
         }
       }
-      match hottest {
-        None => ()
-        Some(t) => cpu_text = "\{cpu_text} · \{t.celsius.to_int()}℃"
-      }
+      cpu_text = with_temp(cpu_text, hottest)
     }
   }
   if cpu_text != "" {
@@ -186,10 +197,11 @@ fn sample_once(app : App) -> Unit {
             @yue.series_push(app.gpu_vram_hists[i], 0, v / 1073741824.0)
           None => ()
         }
+        // 占用与温度任一来源不可用,对应位显示「—」(不用空缺)
         let val = match (g.busy, g.celsius) {
           (Some(b), Some(c)) => "\{b.to_int()}% · \{c.to_int()}℃"
-          (Some(b), None) => "\{b.to_int()}%"
-          (None, Some(c)) => "\{c.to_int()}℃"
+          (Some(b), None) => "\{b.to_int()}% · —"
+          (None, Some(c)) => "— · \{c.to_int()}℃"
           (None, None) => "—"
         }
         app.card_gpu_vals[i].set(val)
