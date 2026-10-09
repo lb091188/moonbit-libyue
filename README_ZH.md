@@ -85,6 +85,8 @@ moon run examples/sysmonitor
 
 ## 文档索引
 
+📚 **在线文档**:<https://moonbit-libyue.pages.dev/zh/> —— 下表所有文档的网页版,随仓库自动部署。
+
 | 文档 | 内容 |
 |---|---|
 | [tutorial.md](docs/zh/tutorial.md) | 五分钟上手:从 `moon new` 到窗口跑起来,避开三个新手坑 |

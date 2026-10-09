@@ -85,6 +85,8 @@ Prerequisite: the MoonBit native toolchain, `moonc` ≥ 0.10.14 (`moon version -
 
 ## Documentation index
 
+📚 **Online docs**: <https://moonbit-libyue.pages.dev/> — the web version of every document below, auto-deployed with the repo. 中文版在 [`/zh/`](https://moonbit-libyue.pages.dev/zh/).
+
 | Document | Content |
 |---|---|
 | [tutorial.md](docs/tutorial.md) | Five-minute quick start: from `moon new` to a running window, avoiding the three newcomer pitfalls |
