@@ -153,7 +153,7 @@ fn tagged(label_text : String, body : Node) -> Node {
    约束也靠它传导)。实测权衡:默认 1 会挤压图标、输入框等固定宽
    自绘控件,回归面过大,故维持 0、显式放开。
 
-### 组件库（yue/components.mbt）
+### 组件库（yue/components 包,按组件家族分文件）
 
 在声明式层之上沉淀的 Element Plus 风格非表单组件，纯 MoonBit 零平台代码：
 
