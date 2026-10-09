@@ -173,62 +173,114 @@ fn schedule_reconnect(bus : Int) -> Unit {
 }
 
 ///|
-/// 自愈重连（最多 3 次）：成功后重放 AddMatch、迁移订阅与托盘项。
+/// 自愈重连（最多 3 次）。先看按需路径（sni_available / system_conn /
+/// Item::create）是否已把总线重建：有活连接就直接沿用，不再新建——
+/// 否则新连接覆盖 g_conn/g_sys_conn，按需重建的那条连同 fd 与 glib
+/// 监视一起泄漏（注册表按 fd 路由，没有引用能再关掉它），订阅与
+/// 托盘项也会分裂在两条连接上。订阅/托盘项的迁移已在连接建立时
+/// 经 [Conn::adopt_saved] 完成，此处只需补一次（幂等）。
 fn try_reconnect(bus : Int, attempt : Int) -> Unit {
   if attempt > 3 {
     return
   }
-  let nc = match bus {
-    0 =>
-      match connect_session() {
-        Ok(c) => {
-          g_conn.val = Some(c)
-          c
-        }
-        // 换回环里再试；主循环未运行时（纯 CLI 场景）回调不触发，自然放弃
-        Err(_) => {
-          sys_post_delayed(1000, fn(f) { f() }, fn() {
-            try_reconnect(bus, attempt + 1)
-          })
-          return
-        }
-      }
+  let existing = match bus {
+    0 => g_conn.val
+    _ => g_sys_conn.val
+  }
+  match existing {
+    Some(c) if c.alive => c.adopt_saved(bus)
     _ =>
-      match connect_system() {
-        Ok(c) => {
-          g_sys_conn.val = Some(c)
-          c
-        }
-        Err(_) => {
-          sys_post_delayed(1000, fn(f) { f() }, fn() {
-            try_reconnect(bus, attempt + 1)
-          })
-          return
-        }
+      match bus {
+        0 =>
+          match connect_session() {
+            // 迁移（订阅 / match 规则 / 托盘项）在连接建立时已完成
+            Ok(_) => ()
+            // 换回环里再试；主循环未运行时（纯 CLI 场景）回调不触发，自然放弃
+            Err(_) => {
+              sys_post_delayed(1000, fn(f) { f() }, fn() {
+                try_reconnect(bus, attempt + 1)
+              })
+              return
+            }
+          }
+        _ =>
+          match connect_system() {
+            Ok(_) => ()
+            Err(_) => {
+              sys_post_delayed(1000, fn(f) { f() }, fn() {
+                try_reconnect(bus, attempt + 1)
+              })
+              return
+            }
+          }
       }
   }
+}
+
+///|
+/// 迁移断线旧连接的订阅、match 规则与托盘项到本连接（任一新建连接
+/// 建立时调用，自愈重连与按需重建同路）：托盘项随迁移重新注册
+/// （断线期间 watcher 已按唯一名消失清掉旧注册），本连接已占用的
+/// 路径不重复注册也不覆盖（按需重建后新建的项优先）。
+/// 重新注册投回主循环执行：register_item_path 内部 call_sync 要泵
+/// 总线，在 GUI 回调里同步泵会让期间到达的入站调用重入派发
+/// （sni_available 这类谓词也可能被回调调用，不能阻塞）。
+fn Conn::adopt_saved(self : Conn, bus : Int) -> Unit {
   match g_saved.get(bus) {
     Some(old) => {
       // 订阅表与 match 规则迁移到新连接
       for k, arr in old.subs {
-        nc.subs.set(k, arr)
+        self.subs.set(k, arr)
       }
       for rule in old.match_rules {
-        nc.add_match(rule)
+        self.add_match(rule)
       }
       if bus == 0 {
-        // 托盘项迁移并重新注册（断线期间 watcher 已按名字消失清掉旧注册）
+        // 托盘项迁移；重新注册延迟到主循环，路径当场失效（项又被
+        // 注销）时跳过
+        let paths : Array[String] = []
         for k, it in old.items {
-          nc.items.set(k, it)
+          if !self.items.contains(k) {
+            self.items.set(k, it)
+            paths.push(k)
+          }
         }
         for k, it in old.menus {
-          nc.menus.set(k, it)
+          if !self.menus.contains(k) {
+            self.menus.set(k, it)
+          }
         }
-        for k, _ in nc.items {
-          let _ = nc.register_item_path(k)
+        if paths.length() > 0 {
+          sys_post_delayed(0, fn(f) { f() }, fn() {
+            for p in paths {
+              if self.items.contains(p) {
+                let _ = self.register_item_path(p)
+              }
+            }
+          })
         }
       }
       let _ = g_saved.remove(bus)
+    }
+    None => ()
+  }
+}
+
+///|
+/// 从当前连接与断线暂存的旧连接里一并摘除托盘项（注销用）：连接已断
+/// 时当前表里没有，但暂存连接还持着本项，只清一边会让它重连后复活。
+fn sni_drop_item(path : String, menu_path : String) -> Unit {
+  match g_conn.val {
+    Some(c) => {
+      let _ = c.items.remove(path)
+      let _ = c.menus.remove(menu_path)
+    }
+    None => ()
+  }
+  match g_saved.get(0) {
+    Some(c) => {
+      let _ = c.items.remove(path)
+      let _ = c.menus.remove(menu_path)
     }
     None => ()
   }
@@ -243,7 +295,17 @@ fn connect_session() -> Result[Conn, String] {
         "找不到会话总线地址（DBUS_SESSION_BUS_ADDRESS / XDG_RUNTIME_DIR 未设置）",
       )
   }
-  connect_unix(path, 0)
+  match connect_unix(path, 0) {
+    Ok(c) => {
+      g_conn.val = Some(c)
+      // 任一新建连接都立即接管断线前的旧连接状态：按需重建
+      // （sni_available / Item::create）与自愈重连同走这一条迁移
+      // 路径，旧订阅与托盘项不丢，也不会因两条连接并存泄漏 fd
+      c.adopt_saved(0)
+      Ok(c)
+    }
+    Err(e) => Err(e)
+  }
 }
 
 ///|
@@ -252,7 +314,14 @@ fn connect_system() -> Result[Conn, String] {
     Ok(p) => p
     Err(e) => return Err(e)
   }
-  connect_unix(path, 1)
+  match connect_unix(path, 1) {
+    Ok(c) => {
+      g_sys_conn.val = Some(c)
+      c.adopt_saved(1)
+      Ok(c)
+    }
+    Err(e) => Err(e)
+  }
 }
 
 ///|

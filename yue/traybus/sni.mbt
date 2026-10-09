@@ -75,6 +75,11 @@ pub fn Item::create(id : String, icon_path : String) -> Result[Item, String] {
     return Err("会话总线连接已断开")
   }
   let path = c.next_item_path()
+  // DBusMenu 对象路径随托盘项路径派生（首项沿用 ksni 约定的 /MenuBar，
+  // 后续项加同款后缀）：固定 /MenuBar 时第二个托盘项会在 menus 注册表
+  // 里顶掉第一个的菜单路由（同键互覆），面板从此只认最后注册那项。
+  // 键带项路径身份，各项菜单对象互不覆盖。
+  let menu_path = menu_path_of(path)
   let item : Item = {
     path,
     id,
@@ -85,8 +90,7 @@ pub fn Item::create(id : String, icon_path : String) -> Result[Item, String] {
     pixmap: Bytes::make(0, 0),
     tip_title: "",
     tip_body: icon_path,
-    // DBusMenu 对象路径：跟随 ksni/fcitx5 的约定用 /MenuBar（固定名）
-    menu_path: "/MenuBar",
+    menu_path,
     menu_items: [],
     menu_revision: 1,
     on_click: None,
@@ -96,23 +100,43 @@ pub fn Item::create(id : String, icon_path : String) -> Result[Item, String] {
   let (w, h, px) = default_icon_pixmap()
   item.set_pixmap(w, h, px)
   c.items.set(path, item)
-  c.menus.set(item.menu_path, item)
+  c.menus.set(menu_path, item)
   match c.register_item_path(path) {
     Ok(_) => Ok(item)
     Err(e) => {
+      // 失败路径与 unregister 对称清理：items 与 menus 两张表都摘，
+      // 别把已占用的菜单对象路径留在注册表里
       let _ = c.items.remove(path)
+      let _ = c.menus.remove(menu_path)
       Err(e)
     }
   }
 }
 
 ///|
+/// DBusMenu 对象路径随托盘项路径派生：`/StatusNotifierItem` → `/MenuBar`，
+/// `/StatusNotifierItem_N` → `/MenuBar_N`。多托盘项各有独立菜单对象，
+/// menus 注册表键互不覆盖。
+fn menu_path_of(item_path : String) -> String {
+  if item_path == "/StatusNotifierItem" {
+    "/MenuBar"
+  } else {
+    "/MenuBar" + item_path["/StatusNotifierItem".length():].to_owned()
+  }
+}
+
+///|
+/// 下一个托盘项对象路径：按现有项递增，跳过已占用的路径（中间项注销后
+/// 不复用其路径——那会让新旧两项共享对象路径与 DBusMenu 路由）。
 fn Conn::next_item_path(self : Conn) -> String {
-  let n = self.items.length()
-  if n == 0 {
+  if !self.items.contains("/StatusNotifierItem") {
     "/StatusNotifierItem"
   } else {
-    "/StatusNotifierItem_\{n + 1}"
+    let mut n = 2
+    while self.items.contains("/StatusNotifierItem_\{n}") {
+      n += 1
+    }
+    "/StatusNotifierItem_\{n}"
   }
 }
 
@@ -172,9 +196,12 @@ pub fn Item::unregister(self : Item) -> Unit {
         [VString(self.path)],
         fn(_m) { () },
       )
-      let _ = c.items.remove(self.path)
+      sni_drop_item(self.path, self.menu_path)
     }
-    None => ()
+    None =>
+      // 连接已断（自愈重连挂起）：当前表里没有，但断线暂存的旧连接
+      // 还持着本项——只清当前连接会让它重连后复活，两张表都要摘
+      sni_drop_item(self.path, self.menu_path)
   }
 }
 

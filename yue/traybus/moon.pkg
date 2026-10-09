@@ -26,5 +26,6 @@ options(
     "filemanager_wbtest.mbt": [ "native" ],
     "dbus.mbt": [ "native" ],
     "dbus_wbtest.mbt": [ "native" ],
+    "sni_wbtest.mbt": [ "native" ],
   },
 )
