@@ -1245,10 +1245,12 @@ toast("Saved", @yue.Success)
 
 ### Carousel carousel_t
 
-`carousel_t(pages : Array[Node], width? = 360.0, height? = 180.0, interval_ms? = 3000)` — panel sequence + side arrows + bottom dots; with interval_ms > 0 it auto-advances every interval milliseconds (paused on hover), arrows/dots switch manually.
+`carousel_t(pages : Array[Node], width? = 360.0, height? = 180.0, interval_ms? = 3000, rotation?, style?, handle?)` — panel sequence + side arrows + bottom dots; with interval_ms > 0 it auto-advances every interval milliseconds (paused on hover), arrows/dots switch manually.
 
 ```moonbit
 @yue.carousel_t([banner1, banner2], interval_ms=4000)
 ```
+
+Auto-advance is a self-scheduling timeout chain: **call `carousel_stop(rotation)` before unmounting the carousel** (otherwise the chain keeps ticking against the removed views). Pass a handle you built with `CarouselHandle::make()` as `rotation` (`is_running()` reads the state); without it the component builds its own handle that callers cannot reach, which only fits carousels living for the whole app.
 
 State coordination across components goes through `Store` (subscribe / map / bind_label) or signals (`Signal`: computed with automatic dependency tracking, batch updates; pass a `sig.store()` view to component APIs taking a Store); see [declarative.md](declarative.md). Chinese version: [docs/zh/components-ui.md](zh/components-ui.md).

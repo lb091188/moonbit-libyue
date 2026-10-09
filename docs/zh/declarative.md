@@ -229,6 +229,8 @@ API 一览：
 | `get()` / `set(v)` | 读 / 写并通知 |
 | `update(f)` | `set(f(get()))` |
 | `subscribe(f)` | 订阅；**注册时不回调**，初始值请直接 `get` |
+| `subscribe_id(f)` / `remove(句柄)` | 订阅并取退订句柄 / 按句柄摘除（幂等）；重建式组件换行、`bind_node` 重挂旧子树时用，别留死订阅 |
+| `sub_bag_begin()` / `sub_bag_end()` / `sub_bag_discard(闭包表)` | 订阅回收袋：袋期间注册的订阅（Store 与主题）整代一次性退订 |
 | `map(f)` | 派生 Store，源变化时自动跟随（可链式） |
 | `bind_label(store, f, …)` | 声明树里绑定文本，`f` 把状态映射为字符串 |
 | `bind(sig, f, …)` | bind_label 的信号版；接受源信号或 computed 派生信号 |
@@ -278,7 +280,11 @@ API 一览：
    控件引用；需要引用就用 `handle`（挂载时触发）。一棵树通常只 `mount` 一次，
    对同一节点再次挂载会实例化出**第二份**控件。
 2. **`handle` 不叫 `ref`**：`ref` 也是 MoonBit 保留字。
-3. **Store 无退订**：订阅存活整个应用期，`set` 也不去重（相同值照样通知）。
+3. **订阅要退订**：`subscribe(f)` 的常规订阅随应用存活（`set` 也不去重，
+   相同值照样通知）；随视图一起销毁的订阅必须退订——`subscribe_id(f)` 拿
+   句柄 + `remove(句柄)`，或把挂载包进 `sub_bag_begin()` / `sub_bag_end()`
+   整代退订（`bind_node` 重挂、表格重建、穿梭框移动都走后者）。不退则
+   死订阅随重建次数无界累积，每次 `set` / 切主题都对已销毁的视图空跑。
    在订阅回调里再 `set` 别的 Store 是安全的（快照遍历），但别让两条 Store
    互相触发形成死循环。
 4. **bind_label 的订阅发生在挂载时**：未挂载的 bind 节点不订阅、不收通知；
