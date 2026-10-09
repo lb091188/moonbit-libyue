@@ -34,3 +34,27 @@ test "downscale_pixmap 32 到 16" {
   }
   inspect(nontransparent > 10, content="true")
 }
+
+///|
+test "downscale_pixmap 空 pixmap(0×0)返空不 panic" {
+  // set_icon_name 清空后的形态:面板查 IconPixmap 时走这条,
+  // 旧实现的「钳到 h-1」在 h=0 时产出 -1 负索引
+  let (nw, nh, npx) = @traybus.downscale_pixmap(0, 0, Bytes::make(0, 0), 16, 16)
+  inspect(nw, content="0")
+  inspect(nh, content="0")
+  inspect(npx.length(), content="0")
+}
+
+///|
+test "downscale_pixmap 退化目标尺寸与短缓冲区返空" {
+  let (w, h, px) = @traybus.default_icon_pixmap()
+  let (nw0, nh0, npx0) = @traybus.downscale_pixmap(w, h, px, 0, 16)
+  inspect(nw0, content="0")
+  inspect(nh0, content="0")
+  inspect(npx0.length(), content="0")
+  // 缓冲区短于声明宽高:同样返空而非越界
+  let (nw1, nh1, npx1) = @traybus.downscale_pixmap(8, 8, Bytes::make(16, 0), 4, 4)
+  inspect(nw1, content="0")
+  inspect(nh1, content="0")
+  inspect(npx1.length(), content="0")
+}

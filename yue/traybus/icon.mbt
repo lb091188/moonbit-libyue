@@ -45,6 +45,10 @@ pub fn default_icon_pixmap() -> (Int, Int, Bytes) {
 
 ///|
 /// 由大图最近邻缩放出小尺寸位图（供 IconPixmap 提供多档尺寸）。
+/// 退化尺寸（set_icon_name 清空后的 0×0 空 pixmap、缓冲区短于声明
+/// 宽高）直接返空：0 宽高下的「钳到 h-1」会产出 -1 负索引，在 DBus
+/// 属性回调里即 PanicError（实测点「切主题图标」后面板查 IconPixmap
+/// 触发，定案见 adaptation.md「托盘空 pixmap 属性回调 panic」条）。
 pub fn downscale_pixmap(
   w : Int,
   h : Int,
@@ -52,11 +56,14 @@ pub fn downscale_pixmap(
   nw : Int,
   nh : Int,
 ) -> (Int, Int, Bytes) {
+  if w <= 0 || h <= 0 || nw <= 0 || nh <= 0 || px.length() < w * h * 4 {
+    return (0, 0, Bytes::make(0, 0))
+  }
   let out : FixedArray[Byte] = FixedArray::make(nw * nh * 4, b'\x00')
   for y in 0..<nh {
-    let sy = if y * h / nh > h - 1 { h - 1 } else { y * h / nh }
+    let sy = y * h / nh
     for x in 0..<nw {
-      let sx = if x * w / nw > w - 1 { w - 1 } else { x * w / nw }
+      let sx = x * w / nw
       let src = (sy * w + sx) * 4
       let dst = (y * nw + x) * 4
       for c in 0..<4 {
