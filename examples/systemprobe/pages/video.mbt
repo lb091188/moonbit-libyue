@@ -89,11 +89,7 @@ fn vid_load_demo(
       if o.exit_code != 0 {
         match status.val {
           Some(l) =>
-            @ui.report_set(
-              l,
-              "测试视频生成失败(退出码 \{o.exit_code})",
-              refresh,
-            )
+            @ui.report_set(l, "测试视频生成失败(退出码 \{o.exit_code})", refresh)
           None => ()
         }
         return
@@ -136,10 +132,7 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
               on_click=fn() {
                 match status.val {
                   Some(l) =>
-                    @ui.report_set(
-                      l, "载入中:生成测试视频并解码(约 1-2 秒)…",
-                      refresh,
-                    )
+                    @ui.report_set(l, "载入中:生成测试视频并解码(约 1-2 秒)…", refresh)
                   None => ()
                 }
                 // 生成+解码同步耗时,延后一拍让状态文本先渲染
@@ -181,11 +174,11 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
           ],
           style=[("gap", 8.0), ("alignItems", "center")],
         ),
-        @components.label_t(
-          "(播放器加载状态显示在此)",
-          role=@components.Body,
-          handle=fn(l) { status.val = Some(l) },
-        ),
+        @components.label_t("(播放器加载状态显示在此)", role=@components.Body, handle=fn(
+          l,
+        ) {
+          status.val = Some(l)
+        }),
         @declarative.container(handle=fn(c) {
           holder.val = Some(c)
           if !auto_started.val {
@@ -195,10 +188,7 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
               if @ffmbt.ffmpeg_supported() {
                 match status.val {
                   Some(l) =>
-                    @ui.report_set(
-                      l, "载入中:生成测试视频并解码(约 1-2 秒)…",
-                      refresh,
-                    )
+                    @ui.report_set(l, "载入中:生成测试视频并解码(约 1-2 秒)…", refresh)
                   None => ()
                 }
                 vid_load_demo(app, holder, status, vid_view, refresh)

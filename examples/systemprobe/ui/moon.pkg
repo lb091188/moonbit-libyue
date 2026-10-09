@@ -1,5 +1,6 @@
 import {
   "NoahLiu/moonbit-libyue/yue",
+  "NoahLiu/moonbit-libyue/yue/declarative",
   "NoahLiu/moonbit-libyue/yue/components",
   "NoahLiu/moonbit-libyue/yue/declarative",
   "NoahLiu/moonbit-libyue/yue/charts",
