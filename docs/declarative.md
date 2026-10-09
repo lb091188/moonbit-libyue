@@ -88,7 +88,7 @@ let win = @yue.mount_window(
 | `picker(items, selected, on_change, …)` | Picker | |
 | `combo(items, selected, on_select, on_input, …)` | ComboBox | |
 | `group(title, content, …)` | Group | content is a single Node |
-| `scroll(content, content_size, policy, …)` | Scroll | content is a single Node |
+| `scroll(content, content_size, policy, …)` | Scroll | content is a single Node; when the content is mounted later or grows taller, call `Scroll::refresh_content_size` via the handle to refresh the range |
 | `separator(orientation)` | Separator | |
 | `tab(pages, on_change, …)` | Tab | each page gets an automatic container |
 | `date_picker(epoch, on_change)` | DatePicker | |

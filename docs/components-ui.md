@@ -737,6 +737,394 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 @yue.scatter_t(pts, trend=true)
 ```
 
+The nine charts below and the interaction layer are likewise self-drawn in pure MoonBit and driven by `Store` data: a set only calls schedule_paint on the canvas — no view-tree rebuild — and colors are picked from the theme at draw time, so `theme_apply` switches follow immediately. Unless noted otherwise, all of them can override the canvas size via `style` and stretch horizontally to fill the parent via `fill=true`.
+
+### Tree chart tree_chart_t
+
+`tree_chart_t(root : Store[TreeItem], orientation? = "horizontal", fill? = false, style?, handle?)`
+
+Hierarchical tree: leaf nodes share slots evenly along the spread direction, parent nodes take the midpoint of their children, and depth positions nodes in layers; links are right-angle elbow lines.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| root | Store[TreeItem] | required | tree root node (`children` is a mutable child list; push to add/remove, then set to repaint) |
+| orientation | String | "horizontal" | "horizontal" spreads sideways (root at left, leaves at right); "vertical" spreads downward (root at top, leaves at bottom) |
+| fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
+| width / height | Double | 560 / 320 | canvas size (when fill=false) |
+
+`TreeItem::make(name, value? = None)` creates a node: `value` is the dot-size dimension (None, or no value anywhere in the tree, makes all dots equal size); `children` can still be pushed after creation. The node dot radius ∝ value (relative to the subtree maximum), depth is shaded along a theme-primary gradient, and every node carries a name label. Companion pure functions: `tree_depth` (subtree height), `tree_leaf_count` (leaf count), `tree_max_value` (peak), `tree_vertical(orientation)` (whether the form is vertical).
+
+```moonbit
+let root = @yue.TreeItem::make("repo")
+let src = @yue.TreeItem::make("src", value=80.0)
+src.children.push(@yue.TreeItem::make("main.mbt", value=40.0))
+root.children.push(src)
+root.children.push(@yue.TreeItem::make("README.md", value=10.0))
+let tree = @yue.Store::new(root)
+@yue.tree_chart_t(tree, style=[("width", 420.0), ("height", 260.0)])
+@yue.tree_chart_t(tree, orientation="vertical") // vertical form
+```
+
+### Treemap tm_chart_t
+
+`tm_chart_t(items : Store[Array[TmItem]], levels? = 2, gap? = 4.0, fill? = false, style?, handle?)`
+
+Hierarchical data is split orthogonally with area ∝ value (squarified aspect-ratio optimization).
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| items | Store[Array[TmItem]] | required | top-level items (each item's children expands recursively) |
+| levels | Int | 2 | expansion depth: 1 = lay out the top level only; >1 yields the parent rect to its children and lays out recursively |
+| gap | Double | 4 | sibling cell gap (px) |
+| fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
+| width / height | Double | 560 / 360 | canvas size (when fill=false) |
+
+`TmItem::make(name, value? = 0.0, children? = [])` creates a node; the value rule is `tm_value_of` — a positive own value wins, otherwise children are summed recursively, and all-zero degenerates to 0 (excluded from layout). Sibling cells spread their shading evenly along the theme primary's HSL lightness axis (same color family, neighbors distinguishable); parent cells get a light background plus a name band; in-cell labels `tm_label_lines` give name + value on two lines (two lines only when the cell height is ≥30, name only for 16..30, nothing below that, truncated to the available width). Hover hits the deepest visible cell (brightened + outlined); the hit table is rebuilt on every on_draw, sharing one layout with drawing.
+
+```moonbit
+let tm = @yue.Store::new([
+  @yue.TmItem::make(
+    "East China",
+    children=[
+      @yue.TmItem::make("Shanghai", value=320.0),
+      @yue.TmItem::make("Jiangsu", value=260.0),
+    ],
+  ),
+  @yue.TmItem::make("South China", children=[@yue.TmItem::make("Guangdong", value=300.0)]),
+])
+@yue.tm_chart_t(tm, levels=2, gap=3.0, style=[("width", 420.0), ("height", 260.0)])
+```
+
+### Sunburst chart sun_chart_t
+
+`sun_chart_t(data : Store[SunItem], inner? = 0.0, show_labels? = true, center_text? = None, fill? = false, style?, handle?)`
+
+Tree data as concentric rings level by level: a parent segment's angular span is divided among its children by aggregated value share.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| data | Store[SunItem] | required | tree root node |
+| inner | Double | 0 | center hole radius (px); ≤ 0 takes 22% of the outer radius |
+| show_labels | Bool | true | in-segment name labels (drawn only when the space allows) |
+| center_text | String? | None | center text: None = aggregated total + "Total"; `Some("")` hides it; `Some(t)` is custom |
+| fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
+| width / height | Double | 440 / 380 | canvas size (when fill=false) |
+
+`SunItem::make(name, value? = None, children? = [])`: when value is omitted it is filled from the sum of the children's aggregated values. The aggregation rule is `sun_total` — an explicit value > 0 wins, otherwise children are summed recursively, negatives are excluded, and a childless node is 0. Top-level segments of one branch cycle the five semantic theme colors, brightening level by level; segments inset angularly to leave gaps (independent of stroke width).
+
+```moonbit
+let sun = @yue.Store::new(
+  @yue.SunItem::make(
+    "All",
+    children=[
+      @yue.SunItem::make("Direct", value=335.0),
+      @yue.SunItem::make("Search", children=[
+        @yue.SunItem::make("Baidu", value=120.0),
+        @yue.SunItem::make("Bing", value=80.0),
+      ]),
+    ],
+  ),
+)
+@yue.sun_chart_t(sun, style=[("width", 380.0), ("height", 320.0)])
+@yue.sun_chart_t(sun, inner=40.0, center_text=Some("Total visits"))
+```
+
+### Map and flights geo_map_t
+
+`geo_map_t(regions : Store[Array[GeoRegion]], flights? = [], show_labels? = true, fill? = false, style?, handle?)`
+
+GeoJSON regions are drawn under an equirectangular projection (fill + stroke + centroid region-name labels); flights are quadratic Bézier arcs between origin and destination coordinates.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| regions | Store[Array[GeoRegion]] | required | region table (ring lists, each ring a list of `(lon, lat)` point pairs) |
+| flights | Array[GeoFlight] | [] | flights (not backed by a Store; repainting needs a full remount or a change to regions) |
+| show_labels | Bool | true | region-name labels (drawn at the centroid, truncated to the available width, only when they fit) |
+| fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
+| width / height | Double | 560 / 360 | canvas size (when fill=false) |
+
+No map dataset is built in: text parsing goes through `geojson_parse(text) -> Result[Array[GeoRegion], GeoError]` (supports FeatureCollection / Feature / bare Polygon / MultiPolygon; malformed geometry yields `GeoError::BadGeometry`), or construct `GeoRegion::make(name?, ring list)` yourself. The projection rect is the merged bounding box of the region rings and flight endpoints, centered and inset by its own aspect ratio (no distortion); with no data it draws "No data". Region fills take the theme primary as the base and tweak lightness by ±0.06 hashed from the region name (same name, same color; unchanged across theme switches); flights are segmented gradient dashes + origin/destination dots + an end arrow — a static rendering with no animation, and no hover. Companion pure functions: `geo_project` (equirectangular projection), `geo_bbox` / `geo_bbox_points`, `geo_fit_rect`, `geo_shoelace` (ring signed area), `geo_ring_centroid` / `geo_region_centroid`, `geo_flight_points` (arc sampling), `geo_quad_bezier`.
+
+```moonbit
+let geojson = @yue.read_text_file("china.geojson") // your own text reader is fine
+let regions = match geojson {
+  Some(text) => @yue.geojson_parse(text) catch { _ => [] }
+  None => []
+}
+@yue.geo_map_t(
+  @yue.Store::new(regions),
+  flights=[
+    @yue.GeoFlight::make((121.47, 31.23), (114.06, 22.54)),
+  ],
+  style=[("width", 420.0), ("height", 300.0)],
+)
+```
+
+### Force-directed graph gph_chart_t
+
+`gph_chart_t(data : Store[GraphData], iterations? = 300, show_labels? = true, fill? = false, style?, handle?)`
+
+A node-edge graph is drawn statically after the force simulation converges: Coulomb repulsion between node pairs + Hookean springs on edges (stiffness ∝ weight) + centripetal pull toward the centroid, with damped stepping.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| data | Store[GraphData] | required | `GraphData::make(node table, edge table)`; edges reference nodes by index |
+| iterations | Int | 300 | force simulation steps |
+| show_labels | Bool | true | node-name labels (at positions after anti-overlap pushing) |
+| fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
+| width / height | Double | 560 / 320 | canvas size (when fill=false) |
+
+`GraphNode::make(name, value? = 1.0)` (value sets the node circle's area; it does not take part in the force simulation), `GraphEdge::make(source index, target index, weight? = 1.0)` (edges with out-of-range endpoints, self-loops, or weight ≤ 0 neither take part in the simulation nor get drawn). Edges are drawn as semi-transparent parallelogram bands (width ∝ weight), node circles cycle the four semantic theme colors; the simulation has no random source (starting from evenly spaced points on a circle), so identical input always yields identical output. The layout converges once at first draw for the current canvas size and is cached; it is only recomputed when the data is set or the canvas size changes.
+
+```moonbit
+let g = @yue.GraphData::make(
+  [
+    @yue.GraphNode::make("Core", value=10.0),
+    @yue.GraphNode::make("Gateway", value=5.0),
+    @yue.GraphNode::make("Terminal", value=3.0),
+  ],
+  [@yue.GraphEdge::make(0, 1, 8.0), @yue.GraphEdge::make(1, 2, 4.0)],
+)
+@yue.gph_chart_t(@yue.Store::new(g), iterations=200, style=[("width", 420.0), ("height", 300.0)])
+```
+
+### Parallel coordinates chart par_chart_t
+
+`par_chart_t(axes : Store[Array[ParAxis]], rows : Store[Array[Array[Double]]], highlight? = -1, fill? = false, style?, handle?)`
+
+N vertical axes are laid out evenly side by side, each normalized on its own range; every data row is one polyline crossing the axes.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| axes | Store[Array[ParAxis]] | required | `ParAxis::make(name, min? = None, max? = None)`; when only one end is given, the other is still inferred from the data |
+| rows | Store[Array[Array[Double]]] | required | data rows, one polyline per row (positions shorter than the column count are treated as missing) |
+| highlight | Int | -1 | highlighted row index (when ≥0 that row is redrawn opaque, with vertex dots on every axis) |
+| fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
+| width / height | Double | 640 / 320 | canvas size (when fill=false) |
+
+Each axis carries a name at the top, min/max range labels beside it, and small tick marks on its body; polylines take the series colors alpha-blended (many rows overlapping show density), while the highlighted row uses its opaque own color. `par_axis_range` infers a single axis's range (no padding; a degenerate equal-value range is stretched open around the value), `par_norm` normalizes, and `par_row_vertices` gives a row's vertices for reuse in self-drawing.
+
+```moonbit
+let axes = @yue.Store::new([
+  @yue.ParAxis::make("Render", 0.0, 100.0),
+  @yue.ParAxis::make("IO", 0.0, 100.0),
+  @yue.ParAxis::make("Memory", 0.0, 100.0),
+])
+let rows = @yue.Store::new([[88.0, 72.0, 80.0], [70.0, 90.0, 65.0]])
+@yue.par_chart_t(axes, rows, highlight=0, style=[("width", 480.0), ("height", 260.0)])
+```
+
+### Theme river chart trv_chart_t
+
+`trv_chart_t(names : Store[Array[String]], values : Store[Array[Array[Double]]], baseline? = TrvZero, tension? = 1.0, show_legend? = true, fill? = false, style?, handle?)`
+
+Multiple series are stacked into a river on an evenly spaced time axis, with smooth curves along each layer's top and bottom edges.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| names | Store[Array[String]] | required | series names, same order as values (names[i] ↔ values[i]) |
+| values | Store[Array[Array[Double]]] | required | each series' values over time (evenly aligned by time index; negatives count as 0, missing positions in short series count as 0) |
+| baseline | TrvBaseline | `TrvZero` | `TrvZero` stacks from the bottom (accumulating layer by layer from 0); `TrvSym` is symmetric about the horizontal midline (the classic wiggle center) |
+| tension | Double | 1.0 | smoothing tension: 1 = standard Catmull-Rom; 0 = degenerates to a polyline |
+| show_legend | Bool | true | right-side legend (swatch + layer name + series total) |
+| fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
+| width / height | Double | 560 / 320 | canvas size (when fill=false) |
+
+Layer colors cycle the four semantic theme colors; the time-axis length is the longest length across all series (`trv_axis_len`). Companion pure functions: `trv_row_at` / `trv_total_at` (value and column total), `trv_stack_offsets` (stacking offsets), `trv_range` (value range), `trv_layer_band` (layer-band pixel box), `trv_series_total`.
+
+```moonbit
+let names = @yue.Store::new(["Search", "Direct"])
+let values = @yue.Store::new([[120.0, 132.0, 101.0], [220.0, 182.0, 191.0]])
+@yue.trv_chart_t(names, values, baseline=@yue.TrvSym, fill=false)
+```
+
+### Ripple scatter chart eff_chart_t
+
+`eff_chart_t(points : Store[Array[EffPoint]], period_ms? = 3000, rings? = 3, x_range?, y_range?, anim? = EffAnim::make(), fill? = false, style?, handle?)`
+
+Scatter plus ripple animation: each point periodically expands N concentric rings (radius grows with phase, stroke alpha decays), with `set_timer` driving the phase Store forward and then schedule_paint repainting.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| points | Store[Array[EffPoint]] | required | `EffPoint::make(x, y, size? = 12.0)`; size is the dot diameter (logical px, clamped to 2..48 at draw time) |
+| period_ms | Int | 3000 | one ripple cycle (frame step = period ÷ 60, with a minimum fallback of 16ms) |
+| rings | Int | 3 | number of rings expanding simultaneously per point (≤0 degenerates to a static scatter) |
+| x_range / y_range | (Double, Double)? | None | manual value ranges; None = adaptive |
+| anim | EffAnim | self-built | animation handle: `eff_stop(anim)` stops the timer; when omitted, this mount builds its own (impossible to stop from outside) |
+| fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
+| width / height | Double | 560 / 320 | canvas size (when fill=false) |
+
+**Stop discipline**: views in this library have no destroy callback (`yue/view.mbt` has no dispose hook), so after a component is unmounted its timer stays alive and keeps calling schedule_paint on the unmounted view — callers must therefore call `eff_stop(anim)` explicitly before unmounting; stopping is not recoverable, and to resume, remount with a new handle. Companion pure functions: `eff_point_radius` (clamped diameter to radius), `eff_ring_progress` / `eff_ring_radius` / `eff_ring_alpha` (single-ring progress → radius / alpha), `eff_phase_advance`, `eff_tick_ms`, `eff_xy` (point-to-pair table).
+
+```moonbit
+let pts = @yue.Store::new([
+  @yue.EffPoint::make(120.0, 12.0, size=14.0),
+  @yue.EffPoint::make(320.0, 26.0, size=20.0),
+])
+let anim = @yue.EffAnim::make()
+@yue.eff_chart_t(pts, period_ms=2500, rings=3, anim=anim)
+// …before the page unmounts
+@yue.eff_stop(anim)
+```
+
+### Pictorial bar chart pb_chart_t
+
+`pb_chart_t(data : Store[Array[BarItem]], symbol? = PbRect, mode? = PbRepeat, unit? = 10.0, horizontal? = false, show_values? = false, y_range? = None, fill? = false, style?, handle?)`
+
+Values are expressed by symbols repeated along the baseline or stretched as a whole; the coordinate semantics match `bar_chart_t` (zero baseline, positive/negative values, slots, grid ticks, and category-label thinning/truncation all come from the same source).
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| data | Store[Array[BarItem]] | required | reuses the bar chart's `BarItem::make(label, value)` |
+| symbol | PbSymbol | `PbRect` | `PbRect` / `PbCircle` / `PbTriangle` (apex points toward the value end of the bar axis) / `PbCustom` self-draw callback |
+| mode | PbMode | `PbRepeat` | `PbRepeat` repeats along the bar axis (count = ceil(|value| / unit)); `PbStretch` stretches one symbol from baseline to value end |
+| unit | Double | 10 | value unit represented by each symbol (≤0 gives one symbol per bar) |
+| horizontal | Bool | false | horizontal bar form |
+| show_values | Bool | false | per-bar value labels (just outside the bar end) |
+| y_range | (Double, Double)? | None | manual value range; None = adaptive |
+| fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
+| width / height | Double | 560 / 280 | canvas size (when fill=false) |
+
+Positive values take the theme primary upward / rightward, negatives take the danger color downward / leftward. Per-bar symbol count is clamped at 64; a symbol's pixel size is computed as "unit × bar length / |value|" and clamped within the bar slot width. Custom symbol: `PbCustom((Painter, x, y, w, h, color) -> Unit)` self-draws inside the given box (set the color yourself with set_fill_color).
+
+```moonbit
+let pb = @yue.Store::new([
+  @yue.BarItem::make("Q1", 32.0),
+  @yue.BarItem::make("Q2", 48.0),
+])
+@yue.pb_chart_t(pb, symbol=@yue.PbCircle, mode=@yue.PbRepeat, unit=10.0, show_values=true)
+@yue.pb_chart_t(pb, symbol=@yue.PbTriangle, mode=@yue.PbStretch, horizontal=true)
+```
+
+## Chart interaction layer
+
+A cross-cutting layer (the tooltip and hit testing in `charts_tooltip.mbt` + the legend / zoom / marks / visual map / export in `charts_interactive.mbt` + the three interactive variants in `charts_it.mbt`): it adds hover tooltips, a clickable legend, DataZoom pan/zoom, threshold lines and highlight bands, visual-map color mapping, and export to any self-drawn chart. It shares the same rendering model as the other charts; the geometric knowledge stays with the caller (drawing and hit testing come from one source), and the interaction layer only wires up events and positions the tooltip.
+
+### Hover tooltip and hit testing ci_tooltip
+
+`ci_tooltip(draw, hit, plot? = ..., zoom? = None, pan? = false, zoom_map? = None, style? = [("width", 560.0), ("height", 280.0)], handle?)`
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| draw | (Painter, Double, Double) -> Unit | required | chart content drawing (excluding borders and the tooltip) |
+| hit | (x, y, width, height) -> (title, rows)? | required | hit → `Some((title, [(swatch color, row text), ...]))`; None hides the tooltip |
+| plot | (Double, Double) -> CiPlot | whole canvas | plot rect (the zoom anchor / hit conversion basis; must match the drawing geometry) |
+| zoom | CiZoom? | None | when not None, binds wheel zoom; `zoom_map` defaults to taking the plot fraction along the x axis — override it for category-axis-on-y scenarios like horizontal bars |
+| pan | Bool | false | left-button drag to pan the window (set_capture on press, release_capture on release) |
+| style | Array[(String, &StyVal)] | 560×280 | canvas size style |
+
+The tooltip is drawn inside the chart container's own on_draw (drawing it after the chart puts it on top, so there is no z-order problem); it always uses a dark background with light text and does not follow theme switches. Positioning goes through `ci_tooltip_pos`, clamped inside the canvas, flipping to the anchor's opposite side when it would overflow right. schedule_paint only fires when the tooltip shows/hides on mouse-enter or during a drag; static mouse movement does not repaint. The state struct `CiTip` (`CiTip::new()` / `ci_tip_show(tip, title, rows, px, py)` / `ci_tip_hide(tip)` / `ci_tip_draw(p, tip, w, h)` / `ci_tip_size(title, rows)`) can also be used directly in self-drawn charts. Hit-testing pure functions: `CiPlot::make(x0, y0, x1, y1)` (`width` / `frac` / `contains`), `ci_nearest_idx(px, n, x0, x1)` (nearest index in an evenly spaced point series; -1 outside the plot area), `ci_sector_at(px, py, cx, cy, r_in, r_out, values)` (sector hit, clockwise from 12 o'clock, same construction as `sector_angles`).
+
+```moonbit
+let zoom = @yue.ci_zoom_make()
+@yue.ci_tooltip(
+  draw=fn(p, w, h) { // self-draw after slicing by the zoom window
+    let (i0, i1) = @yue.ci_zoom_visible(zoom, pts.length())
+    my_draw(p, w, h, @yue.ci_slice_range(pts, i0, i1))
+  },
+  hit=fn(px, _py, _w, _h) {
+    match @yue.ci_nearest_idx(px, pts.length(), 46.0, 500.0) {
+      i if i >= 0 => Some(("Point \{i + 1}", [("", "\{pts[i].y}")]))
+      _ => None
+    }
+  },
+  zoom=Some(zoom),
+  pan=true,
+  style=[("width", 420.0), ("height", 240.0)],
+)
+```
+
+(The two required `draw` / `hit` callbacks can also be passed positionally: `@yue.ci_tooltip(self-draw callback, hit callback, zoom=Some(zoom))`.)
+
+### Clickable legend ci_legend + visibility bit helpers
+
+`ci_legend(items~ : Store[Array[(String, String)]], visible~ : Store[Array[Bool]], on_toggle? = (Int) -> Unit, style?)`
+
+Series swatches + names in a single row, with a light background on hover; clicking toggles the corresponding series' visibility and calls back `on_toggle` (the caller repaints the chart). `visible` need not be pre-aligned in length: at draw / click time `ci_fit_len` pads it to the items length (default true = visible), and wholesale data replacement only sets items. Items whose start exceeds the container width are not drawn (the same width threshold as the `ci_legend_hit` hit test). Visibility helpers: `ci_fit_len(flags, n)`, `ci_toggle_flag(flags, i)`, `ci_filter_visible(arr, flags)` and `ci_filter_visible_at(arr, flags, base)` (returns `(visible items, each item's original index)` — after toggling, colors / indexes still position by the original data, so colors don't shift), `ci_slice_range(arr, i0, i1)` (closed-interval slice, auto-narrowing when out of range).
+
+```moonbit
+let items = @yue.Store::new([("CPU", @yue.theme_current().primary), ("Memory", @yue.theme_current().info)])
+let visible = @yue.Store::new([true, true])
+@yue.ci_legend(items~, visible~, on_toggle=fn(_i) { my_repaint() })
+```
+
+### DataZoom state window ci_zoom
+
+| Function | Notes |
+|---|---|
+| `ci_zoom_make(start? = 0.0, end? = 100.0) -> CiZoom` | build a window (start/end percentages 0..100, full window by default) |
+| `ci_zoom_span(z) -> Double` | current window span |
+| `ci_zoom_reset(z)` | reset to the full window |
+| `ci_zoom_set(z, start, end, min_span? = 5.0)` | set the window (start/end are normalized first; a span below min_span is stretched open around the midpoint, then clamped to the edges) |
+| `ci_zoom_wheel(z, anchor, delta, min_span? = 5.0, step? = 0.2)` | wheel zoom: anchor is the mouse's percentage on the category axis, scrolling up zooms in (clamps at the boundaries, the anchor slides) |
+| `ci_zoom_pan(z, dx)` | drag to pan (span unchanged, stops at the 0/100 boundaries) |
+| `ci_zoom_visible(z, n) -> (Int, Int)` | window → visible closed index interval `[i0, i1]` (i0 floored, i1 ceil−1, so no in-window point is dropped; n ≤ 0 gives (0, −1)) |
+
+The window math is independently testable pure functions (`ci_zoom_normalize` keeps swapped inputs ordered, clamps to 0..100, and has a 1% minimum span); the state itself does not depend on a view. Data slicing is done by the drawing caller, pulling points out via `ci_zoom_visible` + `ci_slice_range` before repainting.
+
+### Threshold line and highlight band ci_mark_line / ci_mark_area
+
+Call these inside any `on_draw` callback against the plot rect `(x0,y0)-(x1,y1)`:
+
+| Function | Notes |
+|---|---|
+| `ci_mark_line(p, horizontal, value, lo, hi, x0, y0, x1, y1, label? = "", color? = theme_danger(), dashed? = true)` | horizontal (y=value) / vertical (x=value) threshold line + end label; not drawn when value falls outside the range `[lo, hi]`, with the label clamped inside the plot rect |
+| `ci_mark_area(p, horizontal, from, to, lo, hi, x0, y0, x1, y1, label? = "", color? = theme_warning(), alpha? = "26")` | semi-transparent fill of the from..to value band + end labels inside the band; from/to are swapped automatically, the band is not drawn when it has no intersection with the value range, and a partial intersection is clipped to the intersection |
+
+```moonbit
+cv.on_draw(fn(p) {
+  @yue.ci_mark_area(p, true, 0.0, 60.0, 0.0, 100.0, 46.0, 12.0, 540.0, 240.0, label="Safe zone")
+  @yue.ci_mark_line(p, true, 80.0, 0.0, 100.0, 46.0, 12.0, 540.0, 240.0, label="Alert line")
+})
+```
+
+### Visual map ci_visual_map
+
+| Function | Notes |
+|---|---|
+| `ci_visual_map_make(min, max, low, high) -> CiVisualMap` | two-color band (min/max are swapped automatically if unordered, low→high linear mix) |
+| `ci_visual_map3_make(min, mid, max, low, midc, high) -> CiVisualMap` | three-color band (when mid is missing or lands as an endpoint, the min/max midpoint is used) |
+| `ci_visual_map_frac(v, lo, hi) -> Double` | value → normalized fraction 0..1 (a degenerate range gives 0, clamped outside the ends) |
+| `CiVisualMap::color(self, v) -> String` | value → color (two-color band linear mix; three-color band linear mix on each segment, with midc at the midpoint) |
+
+The fallback semantics for invalid color strings match `mix_hex` (the high-end color is returned as-is).
+
+```moonbit
+let vm = @yue.ci_visual_map3_make(0.0, 50.0, 100.0, "#E3EDFA", "#409EFF", "#1E4FA3")
+let fill_color = vm.color(73.0)
+```
+
+### Export ci_save / ci_save_chart
+
+| Function | Notes |
+|---|---|
+| `ci_save(canvas : Canvas, path, format? = "png") -> Result[Unit, CiSaveError]` | offscreen canvas to disk: an invalid format (png/jpeg/jpg only) is rejected up front without touching the disk; write failures carry the format and path |
+| `ci_save_chart(draw, w, h, path, format? = "png") -> Result[Unit, CiSaveError]` | draws the same draw callback used at mount time onto an offscreen canvas, then exports (there is no shim API for view pixels, so re-rendering is the only way) |
+
+On non-Windows platforms libyue exposes no cross-platform Canvas export API (the shim always fails), and error messages carry a platform hint; cross-platform export goes through packaging / screenshot tools and is not solved by this layer. The error `CiSaveError`: `UnsupportedFormat(String)` / `WriteFailed(String)`.
+
+### Interactive variants line_chart_it / bar_chart_it / donut_chart_it
+
+Three ready-made "interactive" versions: data / parameter semantics match the original charts, but they mount on the `ci_tooltip` interactive canvas, with layout = vbox(legend row + canvas) and a total height one legend row (30px) taller than the original chart.
+
+| Component | Added interaction | DataZoom |
+|---|---|---|
+| `line_chart_it(series, area? = false, y_range?, show_last? = true, zoom? = true, fill? = false, style?, handle?)` | hover nearest point: tooltip "Point N" + each visible series' value, plus a vertical crosshair and the series dots (4×4 color dots); legend click toggles series visibility | supported (the window is scaled by the longest series, short series are sliced by the same window; the y axis adapts to the visible window) |
+| `bar_chart_it(data, horizontal? = false, y_range? = None, zoom? = true, fill? = false, style?, handle?)` | hover category: the tooltip shows the category label + value (bar highlighting is handled by the drawing layer's hover parameter); legend click toggles category visibility | supported (the window is scaled by category index; a horizontal bar's window is mapped along the y axis via zoom_map; the y value range is computed over all categories, so the axis stays put on zoom / visibility toggles) |
+| `donut_chart_it(data, thickness? = 34.0, center? = "", fill? = false, style?, handle?)` | hover sector: the tooltip shows label + value (the share is recomputed over the currently visible sectors), with the sector exploding 4px; legend click toggles sector visibility | none (a donut has no x axis) |
+
+The legend palette is rebuilt on theme changes (`on_theme_change`); Store subscriptions and theme callbacks are all registered at mount time — a Node that is constructed but never mounted leaves nothing behind.
+
+```moonbit
+let series = @yue.Store::new([
+  @yue.LineSeries::make("CPU", max_points=120),
+  @yue.LineSeries::make("Memory", max_points=120),
+])
+@yue.line_chart_it(series, area=true, zoom=true)
+@yue.bar_chart_it(bars, horizontal=true)
+@yue.donut_chart_it(slices)
+```
+
 ## Icons
 
 803 built-in vector icons, all generated from an iconfont package (Yuanhai common library, MES-flavored) via `scripts/gen_icons.py <iconfont-package-dir>`: SVG font outlines (beziers/arcs) are translated into Painter primitives, bbox-normalized with y-flip, fill-style, variant names are the PascalCase of `font_class` (e.g. `FilePdf`, `CaretRightSmall`), with an `Icon` suffix when clashing with a widget type (e.g. `MenuIcon`, `TableIcon`); `icon_name` returns `<font_class>`. Groups: forms & tables / editing & typography / directions / layout & view / files / cloud & ops / devices / charts / messaging / users / security / time / status / finance / system tools / weather & food / media & travel / brands — the showcase icons page renders them by group (that page is generated by `scripts/gen_showcase_icons.py`). To swap icon sets, point the script at the new package and rerun; never hand-edit the `icons-gen` marker sections.
