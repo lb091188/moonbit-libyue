@@ -11,7 +11,7 @@ test {
 test {
   // 深浅切换:订阅者在 theme_apply 时被通知,色板整体替换,焦点环随主色
   let hits = Ref(0)
-  on_theme_change(fn() { hits.val = hits.val + 1 })
+  ignore(on_theme_change(fn() { hits.val = hits.val + 1 }))
   theme_apply(dark_theme())
   assert_eq(theme_current().bg_page, "#141518")
   assert_eq(theme_current().bg_panel, "#1E2126")
@@ -95,4 +95,64 @@ test {
   // tokenize_moonbit 收敛为 moonbit 特化;其余语言关键字表不回归
   assert_eq(tokenize_moonbit("in")[0].color, "#C678DD")
   assert_eq(color_of("fn main() {}", "fn", "rust"), "#C678DD")
+}
+
+///|
+test {
+  // 主题订阅退订句柄:off_theme_change 后 theme_apply 不再回调
+  let hits = Ref(0)
+  let h = on_theme_change(fn() { hits.val = hits.val + 1 })
+  theme_apply(dark_theme())
+  let after_first = hits.val
+  assert_true(after_first >= 1)
+  off_theme_change(h)
+  theme_apply(default_theme())
+  assert_eq(hits.val, after_first)
+  // 幂等:重复退订与未知句柄都安全
+  off_theme_change(h)
+  off_theme_change(999999)
+}
+
+///|
+test {
+  // 主题订阅回收袋:模拟重建式组件换行——旧代订阅整袋退订,
+  // 不再随重建次数累积(死订阅会在 theme_apply 时被逐帧回调)
+  let old_hits = Ref(0)
+  let new_hits = Ref(0)
+  let keep_hits = Ref(0)
+  let h_keep = on_theme_change(fn() { keep_hits.val = keep_hits.val + 1 })
+  sub_bag_begin()
+  ignore(on_theme_change(fn() { old_hits.val = old_hits.val + 1 }))
+  let gen_old = sub_bag_end()
+  theme_apply(dark_theme())
+  assert_true(old_hits.val >= 1)
+  // 重建:先整袋退订旧代,再开新袋挂新一代
+  sub_bag_discard(gen_old)
+  sub_bag_begin()
+  ignore(on_theme_change(fn() { new_hits.val = new_hits.val + 1 }))
+  let gen_new = sub_bag_end()
+  let old_base = old_hits.val
+  let keep_base = keep_hits.val
+  theme_apply(default_theme())
+  assert_eq(old_hits.val, old_base) // 旧代已退订,不再回调
+  assert_true(new_hits.val >= 1) // 新代在袋里,正常回调
+  assert_true(keep_hits.val > keep_base) // 袋外订阅不受影响
+  sub_bag_discard(gen_new)
+  off_theme_change(h_keep)
+}
+
+///|
+test {
+  // 轮播句柄:stop 停自动轮播并取消已排下的超时(卸载前的回收通道)
+  let h = CarouselHandle::make()
+  assert_true(h.is_running())
+  carousel_stop(h)
+  assert_false(h.is_running())
+  // 真 SetTimeout 拿 id 再 stop:cancel 通路走通,id 归零
+  h.timer.val = set_timeout(60000, fn() { () })
+  carousel_stop(h)
+  assert_false(h.is_running())
+  assert_eq(h.timer.val, 0)
+  carousel_stop(h) // 幂等
+  assert_false(h.is_running())
 }

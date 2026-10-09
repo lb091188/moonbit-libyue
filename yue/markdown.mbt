@@ -779,7 +779,7 @@ fn md_rich_label(spans : Array[MDSpan], size : Double) -> Node {
         ViewLike::schedule_paint(c)
       }
 
-      on_theme_change(apply)
+      ignore(on_theme_change(apply))
       apply()
       attach(parent, ViewLike::view(c))
       ViewLike::view(c)

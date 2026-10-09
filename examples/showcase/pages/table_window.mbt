@@ -64,7 +64,7 @@ pub fn open_table_window() -> Unit {
     page.set_background_color(@yue.theme_current().bg_page)
   }
   apply_bg()
-  @yue.on_theme_change(apply_bg)
+  ignore(@yue.on_theme_change(apply_bg))
   let table = @yue.Table::new()
   table.add_column_with_options("语言", {
     column_type: @yue.Text,

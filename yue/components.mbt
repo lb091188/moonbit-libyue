@@ -133,20 +133,21 @@ pub let control_height : Double = 32.0
 /// (draw 回调现取 theme_* 色,重绘即跟随新主题)。
 pub fn themed_container(style? : Array[(String, &StyVal)] = []) -> Container {
   let c = Container::make(style~)
-  on_theme_change(fn() { ViewLike::schedule_paint(c) })
+  ignore(on_theme_change(fn() { ViewLike::schedule_paint(c) }))
   c
 }
 
 ///|
 /// 面板底色(挂载即设 + 主题切换重设):set_background_color 定死的
-/// 底色不经 draw,须订阅重设。
+/// 底色不经 draw,须订阅重设。随组件销毁的退订走订阅回收袋
+/// ([sub_bag_begin]/[sub_bag_end])。
 pub fn[T : ViewLike] set_panel_bg(v : T) -> Unit {
   fn apply() -> Unit {
     v.set_background_color(theme_bg_panel())
   }
 
   apply()
-  on_theme_change(apply)
+  ignore(on_theme_change(apply))
 }
 
 ///|
@@ -159,19 +160,19 @@ fn bind_popover_bg(p : Popover) -> Unit {
   }
 
   apply()
-  on_theme_change(apply)
+  ignore(on_theme_change(apply))
 }
 
 ///|
 /// 底色绑定:挂载即设 color_of() + 主题切换重设(语义浅底/禁用底等
-/// 取自主题色板的静态底色)。
+/// 取自主题色板的静态底色)。随组件销毁的退订走订阅回收袋。
 fn[T : ViewLike] bind_bg(v : T, color_of : () -> String) -> Unit {
   fn apply() -> Unit {
     v.set_background_color(color_of())
   }
 
   apply()
-  on_theme_change(apply)
+  ignore(on_theme_change(apply))
 }
 
 ///|
@@ -179,6 +180,7 @@ fn[T : ViewLike] bind_bg(v : T, color_of : () -> String) -> Unit {
 /// 用于挂载期 set_color 定死的文字;主题切换时按表达式重取。
 /// set_color 后必须同文 set_text 一次:set_color 改的 Pango 前景属性
 /// 不触发布局缓存失效,不同文重排则重绘仍用旧色(点击路径实测)。
+/// 随组件销毁的退订走订阅回收袋。
 fn bind_fg(v : Label, color_of : () -> String) -> Unit {
   fn apply() -> Unit {
     ViewLike::set_color(v, color_of())
@@ -186,7 +188,7 @@ fn bind_fg(v : Label, color_of : () -> String) -> Unit {
   }
 
   apply()
-  on_theme_change(apply)
+  ignore(on_theme_change(apply))
 }
 
 ///|
@@ -417,13 +419,19 @@ pub fn theme_from_system() -> Theme {
 ///|
 /// 主题存储：单个可变快照 + 主题变更订阅（theme_apply 整体替换并通知，
 /// 已挂载组件借此即时重着色，暗/浅切换不需要重建界面）。
+/// subs 为 (句柄, 回调) 对:on_theme_change 返回的句柄即退订 id
+/// (见 off_theme_change),重建式组件经订阅回收袋整代退订。
 priv struct ThemeBox {
   mut t : Theme
-  subs : Array[() -> Unit]
+  mut subs : Array[(Int, () -> Unit)]
 }
 
 ///|
 let theme_box : ThemeBox = { t: default_theme(), subs: [], }
+
+///|
+/// 主题订阅 id 计数器:on_theme_change 的返回值即退订句柄。
+let theme_sub_next_id : Ref[Int] = Ref(0)
 
 ///|
 /// 读取当前主题快照。
@@ -435,9 +443,23 @@ pub fn theme_current() -> Theme {
 /// 订阅主题变更（theme_apply 时回调，快照遍历）。组件在挂载时注册,
 /// 用于重设挂载期定死的颜色（容器底色/Label 文字色等）；draw 回调
 /// 现取 theme_* 的自绘组件只需在回调里 schedule_paint。
-/// 订阅随应用存活,不退订。
-pub fn on_theme_change(f : () -> Unit) -> Unit {
-  theme_box.subs.push(f)
+/// 返回退订句柄:组件随子视图一起销毁时(重建式组件重建行、旧行
+/// remove_child_view 之后)必须经 [off_theme_change] 退订,否则旧行
+/// 仍留在订阅表里被逐帧回调;批量场景把重建包进
+/// [sub_bag_begin]/[sub_bag_end] 可整代一次性退订。
+pub fn on_theme_change(f : () -> Unit) -> Int {
+  theme_sub_next_id.val += 1
+  let h = theme_sub_next_id.val
+  theme_box.subs.push((h, f))
+  sub_bag_register(fn() { off_theme_change(h) })
+  h
+}
+
+///|
+/// 退订主题变更（句柄来自 on_theme_change / bind_* 系列返回值；
+/// 幂等，未知句柄空操作）。
+pub fn off_theme_change(handle : Int) -> Unit {
+  theme_box.subs = theme_box.subs.filter(fn(e) { e.0 != handle })
 }
 
 ///|
@@ -506,8 +528,8 @@ fn apply_native_theme_css(t : Theme) -> Unit {
 pub fn theme_apply(t : Theme) -> Unit {
   theme_box.t = t
   let snapshot = theme_box.subs.copy()
-  for f in snapshot {
-    f()
+  for entry in snapshot {
+    (entry.1)()
   }
   if platform() == "linux" {
     apply_native_theme_css(t)
@@ -1364,7 +1386,7 @@ pub fn card(
       }
 
       apply_title_color()
-      on_theme_change(apply_title_color)
+      ignore(on_theme_change(apply_title_color))
       title.on_draw(fn(p) {
         let b = ViewLike::get_bounds(title)
         p.draw_attributed_text(title_at, 16.0, 0.0, b.width - 16.0, head_h)
@@ -2037,7 +2059,7 @@ pub fn steps(
         }
 
         apply_step_label()
-        on_theme_change(apply_step_label)
+        ignore(on_theme_change(apply_step_label))
         current.subscribe(fn(_v) { apply_step_label() })
         row.add_child(l)
       }
@@ -2113,7 +2135,7 @@ pub fn collapse(
         }
 
         apply_title_color()
-        on_theme_change(apply_title_color)
+        ignore(on_theme_change(apply_title_color))
         head.add_child(arrow)
         head.add_child(title)
         let body = themed_container(style=[
@@ -2220,7 +2242,7 @@ pub fn timeline(
         }
 
         apply_title_color()
-        on_theme_change(apply_title_color)
+        ignore(on_theme_change(apply_title_color))
         title.set_align(Start)
         let desc = Label::new(entry.1)
         bind_fg(desc, fn() { theme_text_secondary() })
@@ -2342,7 +2364,7 @@ pub fn result(
           }
         }
       })
-      on_theme_change(fn() { ViewLike::schedule_paint(icon) })
+      ignore(on_theme_change(fn() { ViewLike::schedule_paint(icon) }))
       let big = themed_container(style=[
         ("height", 30.0),
         ("alignItems", "center"),
@@ -2568,7 +2590,7 @@ pub fn label_t(
       }
 
       apply_color()
-      on_theme_change(apply_color)
+      ignore(on_theme_change(apply_color))
       l.set_align(Start)
       apply_style(l, style~)
       handle(l)
@@ -2726,7 +2748,7 @@ fn bind_entry_theme(e : Entry) -> Unit {
   }
 
   apply()
-  on_theme_change(apply)
+  ignore(on_theme_change(apply))
 }
 
 ///|
@@ -3452,7 +3474,7 @@ pub fn link(
       }
 
       apply_color()
-      on_theme_change(apply_color)
+      ignore(on_theme_change(apply_color))
       row.add_child(l)
       let underline = themed_container(style=[("height", 1.0)])
       bind_bg(underline, fn() { theme_primary() })
@@ -3637,6 +3659,9 @@ pub fn transfer(
 
       let left_rows : Ref[Array[View]] = Ref([])
       let right_rows : Ref[Array[View]] = Ref([])
+      // 行级订阅的本代退订闭包:每次重建(移动项/改数据)前整袋退订,
+      // 旧行随 remove_child_view 一起退场,死订阅不随移动次数累积
+      let gen : Ref[Array[() -> Unit]] = Ref([])
       fn clear_list(box : Container, rows : Ref[Array[View]]) -> Unit {
         for v in rows.val {
           ignore(box.remove_child_view(v))
@@ -3727,10 +3752,13 @@ pub fn transfer(
       }
 
       fn render_all() -> Unit {
+        sub_bag_discard(gen.val)
         clear_list(left_box, left_rows)
         clear_list(right_box, right_rows)
+        sub_bag_begin()
         build_list(left_box, left_items, left_sel, left_rows)
         build_list(right_box, right_items, right_sel, right_rows)
+        gen.val = sub_bag_end()
       }
 
       left_items.subscribe(fn(_v) { render_all() })
@@ -5337,6 +5365,8 @@ pub fn table_t(
       let selected_i = Ref(-1)
       let hover_i = Ref(-1)
       let row_cs : Ref[Array[Container]] = Ref([])
+      // 行级订阅的本代退订闭包(rebuild 前整袋退订,见 rebuild)
+      let gen : Ref[Array[() -> Unit]] = Ref([])
       // 行内列单元格按 [行][列] 存(拖动列宽时逐行改样式,不重建树)
       let row_cols : Ref[Array[Array[Container]]] = Ref([])
       let data_r : Ref[Array[TableRow]] = Ref([])
@@ -5833,6 +5863,9 @@ pub fn table_t(
       })
 
       fn rebuild(data : Array[TableRow]) -> Unit {
+        // 旧代订阅整袋退订:行与单元格挂载时登记的主题订阅随旧行视图
+        // 一起退场,不随每次数据刷新累积死订阅
+        sub_bag_discard(gen.val)
         for v in row_cs.val {
           ignore(body.remove_child_view(ViewLike::view(v)))
         }
@@ -5845,6 +5878,7 @@ pub fn table_t(
           Some(s) => s.set([])
           None => ()
         }
+        sub_bag_begin()
         for i in 0..<data.length() {
           let r = data[i]
           let idx = i
@@ -5933,6 +5967,7 @@ pub fn table_t(
           body.add_child(row)
           row_cs.val.push(row)
         }
+        gen.val = sub_bag_end()
         ViewLike::schedule_paint(head_cb)
       }
 
@@ -7709,14 +7744,50 @@ pub fn dropdown_menu(
 }
 
 ///|
+/// 轮播句柄：持自动轮播开关与已排下的超时 id（stop 取消待触发那次，
+/// 自排链随之终止）。与 video_view 的 VidHandle 同款「挂载定时器的
+/// 回收通道」。
+pub(all) struct CarouselHandle {
+  running : Ref[Bool]
+  timer : Ref[Int]
+}
+
+///|
+/// 建轮播句柄（默认自动轮播中）。
+pub fn CarouselHandle::make() -> CarouselHandle {
+  { running: Ref(true), timer: Ref(0), }
+}
+
+///|
+/// 轮播是否还在自动切换（手动箭头/指示点不受影响）。
+pub fn CarouselHandle::is_running(self : CarouselHandle) -> Bool {
+  self.running.val
+}
+
+///|
+/// 停止自动轮播（不可恢复；手动切换仍可用）。卸载轮播前必须调用：
+/// 自排的超时链不认视图已移除，不退就会继续对已销毁的子树空转。
+pub fn carousel_stop(handle : CarouselHandle) -> Unit {
+  handle.running.val = false
+  let id = handle.timer.val
+  if id != 0 {
+    clear_timeout(id)
+    handle.timer.val = 0
+  }
+}
+
+///|
 /// 轮播(EP Carousel):面板序列 + 左右箭头 + 底部指示点,自动轮播
 /// (interval_ms > 0 时,interval 毫秒一切,悬停暂停),点击箭头/指示点
 /// 手动切换。面板为任意 Node,统一按给定宽高展示。
+/// 自动轮播是自排的超时链,回收经 [carousel_stop](rotation):卸载
+/// 轮播前必须先 stop,否则链继续对已移除的视图空转。
 pub fn carousel_t(
   pages : Array[Node],
   width? : Double = 360.0,
   height? : Double = 180.0,
   interval_ms? : Int = 3000,
+  rotation? : CarouselHandle = CarouselHandle::make(),
   style? : Array[(String, &StyVal)] = [],
   handle? : (Container) -> Unit = fn(_c) {  },
 ) -> Node {
@@ -7864,14 +7935,16 @@ pub fn carousel_t(
       if interval_ms > 0 && n > 1 {
         let tick : Ref[() -> Unit] = Ref(fn() {  })
         tick.val = fn() {
-          ignore(
-            set_timeout(interval_ms, fn() {
+          // 超时 id 记进句柄:carousel_stop 取消待触发那次,running
+          // 兜底终止自排链(回调已进队时不至于再多转一圈)
+          rotation.timer.val = set_timeout(interval_ms, fn() {
+            if rotation.running.val {
               if !paused.val {
                 do_switch(cur.val + 1)
               }
               (tick.val)()
-            }),
-          )
+            }
+          })
         }
         (tick.val)()
       }
