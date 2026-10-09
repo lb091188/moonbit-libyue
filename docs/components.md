@@ -283,6 +283,7 @@ let sep = @yue.Separator::make(Horizontal)   // or Vertical
 | Group::set_title(t) | Change title |
 | Scroll::set_content(v) | Replace content |
 | Scroll::set_content_size(w, h) | Explicitly set content size |
+| Scroll::refresh_content_size() | Recompute the scroll range from the current content (call it when the content is mounted only after set_content, or grows noticeably taller) |
 | Scroll::set_scroll_position(h, v) | Set scroll position |
 | Scroll::set_scrollbar_policy(h, v) / set_overlay_scrollbar(b) | Scrollbars |
 | Scroll::get_scroll_position_x/y() / get_max_scroll_position_x/y() | Read position and max scroll amount |
@@ -756,7 +757,7 @@ All widgets (`ViewLike`) support:
 | on_size_changed | Size changes |
 | set_capture() / release_capture() / has_capture() | Mouse capture |
 | set_style(k, v) / set_style_str(k, v) | Layout styles (runtime primitives) |
-| Drag registration and drop callbacks | Drag and drop (receivers must also register handle_drag_update returning allowed operations; without it every drag is rejected; demo in the components example, "Windows & Web" page) |
+| Drag registration and drop callbacks | Drag and drop (receivers must also register handle_drag_update returning allowed operations; without it every drag is rejected; the initiator's do_drag_file_paths / do_drag_data_full must be called inside the on_mouse_down callback to take effect; demo in the components example, "Windows & Web" page) |
 
 Event payload fields:
 
