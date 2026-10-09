@@ -1,13 +1,17 @@
 /* sysmonitor 应用 native-stub：监控数据层与进程管理的系统调用入口。
-   符号全在 libc / kernel32 默认链接范围内，零 shim / fork / vendored /
-   链接参数改动；机制与实测见 docs/zh/adaptation.md。
-   平台分工：Linux / macOS 读文件 / kill / 优先级 / 目录枚举 / sysconf 走
-   POSIX；Windows 无 /proc、/sys，Win32 数据源（GetSystemTimes、
-   GlobalMemoryStatusEx、PDH、DXGI、GetIfTable2、EnumProcesses 等）在
-   读取入口虚拟出与 Linux 同构的文本，MoonBit 数据层与解析纯函数零改动；
-   进程管理语义归一（SYS2）：Windows 侧 kill 映射 TerminateProcess 一档、
-   优先级映射 IDLE/NORMAL/HIGH/REALTIME 四档，Win32 错误码先译成 errno
-   编号再返回（errno_text 与 Result 形态在 MoonBit 层零改动）；
+   符号全在 libc / libSystem / kernel32 默认链接范围内，零 shim / fork /
+   vendored / 链接参数改动；机制与实测见 docs/zh/adaptation.md。
+   平台分工：Linux / macOS 的 kill / 优先级 / statvfs / 目录枚举 /
+   sysconf 走 POSIX 共享实现；Windows 无 /proc、/sys，Win32 数据源
+   （GetSystemTimes、GlobalMemoryStatusEx、PDH、DXGI、GetIfTable2、
+   EnumProcesses 等）在读取入口虚拟出与 Linux 同构的文本，MoonBit 数据层
+   与解析纯函数零改动；macOS 同样按「Linux 路径即跨层契约」虚拟
+   /proc、/sys（Mach / libproc / getfsstat / getifaddrs，GPU 走
+   system_profiler 子进程、解析在 MoonBit 纯函数，磁盘 IO 与温度无来源
+   按「—」边界显示），进程管理语义归一（SYS2）：Windows 侧 kill 映射
+   TerminateProcess 一档、优先级映射 IDLE/NORMAL/HIGH/REALTIME 四档，
+   Win32 错误码先译成 errno 编号再返回（errno_text 与 Result 形态在
+   MoonBit 层零改动）；
    非默认链接的系统库（pdh / dxgi / iphlpapi / psapi / ntdll）一律运行期
    LoadLibrary 取函数指针，不新增任何链接参数。 */
 
@@ -31,32 +35,9 @@
 /* 通用 fopen 读取（三平台共用实现，定义在文件末尾）。 */
 static moonbit_bytes_t sysmon_read_file_generic(moonbit_bytes_t path);
 
-#if defined(_WIN32)
-
-/* ===========================================================================
-   Windows 分支：Win32 数据源 → 虚拟 /proc、/sys 文本。
-   路由总表（MoonBit 数据层请求路径 → 数据源）：
-     /proc/stat                              GetSystemTimes + ntdll 每核时间
-     /proc/cpuinfo                           注册表型号/主频 + 逻辑核枚举
-     /proc/meminfo                           GlobalMemoryStatusEx
-     /proc/mounts                            GetLogicalDrives+卷信息
-     /proc/diskstats                         PDH PhysicalDisk 原始累计字节
-     /proc/[pid]/stat                        快照+GetProcessTimes+工作集
-     /proc/[pid]/cmdline                     QueryFullProcessImageName
-     /sys/class/net[/网卡/字节计数]           GetIfTable2
-     /sys/class/hwmon[/hwmonN/...]           nvidia-smi 子进程
-     /sys/bus/pci/devices[/地址/...]          DXGI 枚举 + PDH GPU Engine
-   =========================================================================== */
-
-#include <windows.h>
-#include <pdh.h>
-#include <tlhelp32.h>
-#include <winreg.h>
-#include <iphlpapi.h>
-
-#define SYSMON_ERR_PENDING 0xC0000004UL /* STATUS_INFO_LENGTH_MISMATCH */
-
-/* ---------------- 小工具：缓冲 / 宽窄转换 / 交付 ---------------- */
+/* ---------------- 小工具：增长缓冲与交付（Windows / macOS 分支共用） ----
+   Linux 分支无用户，不编译以免 unused 告警。 */
+#if defined(_WIN32) || defined(__APPLE__)
 
 typedef struct {
   char *p;
@@ -122,6 +103,35 @@ static moonbit_bytes_t sysmon_bytes_take(SysmonBuf *b) {
   b->p = NULL;
   return out;
 }
+
+#endif /* _WIN32 || __APPLE__ */
+
+#if defined(_WIN32)
+
+/* ===========================================================================
+   Windows 分支：Win32 数据源 → 虚拟 /proc、/sys 文本。
+   路由总表（MoonBit 数据层请求路径 → 数据源）：
+     /proc/stat                              GetSystemTimes + ntdll 每核时间
+     /proc/cpuinfo                           注册表型号/主频 + 逻辑核枚举
+     /proc/meminfo                           GlobalMemoryStatusEx
+     /proc/mounts                            GetLogicalDrives+卷信息
+     /proc/diskstats                         PDH PhysicalDisk 原始累计字节
+     /proc/[pid]/stat                        快照+GetProcessTimes+工作集
+     /proc/[pid]/cmdline                     QueryFullProcessImageName
+     /sys/class/net[/网卡/字节计数]           GetIfTable2
+     /sys/class/hwmon[/hwmonN/...]           nvidia-smi 子进程
+     /sys/bus/pci/devices[/地址/...]          DXGI 枚举 + PDH GPU Engine
+   =========================================================================== */
+
+#include <windows.h>
+#include <pdh.h>
+#include <tlhelp32.h>
+#include <winreg.h>
+#include <iphlpapi.h>
+
+#define SYSMON_ERR_PENDING 0xC0000004UL /* STATUS_INFO_LENGTH_MISMATCH */
+
+/* ---------------- 小工具：宽窄转换 / DLL 加载 ---------------- */
 
 /* UTF-8 ↔ UTF-16；失败返回 NULL。返回 malloc 缓冲，调用方 free。 */
 static wchar_t *sysmon_utf8_to_wide(const char *s) {
@@ -1772,12 +1782,6 @@ int32_t yue_sysmon_page_size(void) {
 MOONBIT_FFI_EXPORT
 int32_t yue_sysmon_is_windows(void) { return 0; }
 
-MOONBIT_FFI_EXPORT
-int32_t yue_sysmon_clk_tck(void) {
-  long v = sysconf(_SC_CLK_TCK);
-  return v > 0 ? (int32_t)v : 100;
-}
-
 /* 单调时钟（CLOCK_MONOTONIC，不受墙钟调整影响），单位秒。 */
 MOONBIT_FFI_EXPORT
 double yue_sysmon_monotonic(void) {
@@ -1786,60 +1790,6 @@ double yue_sysmon_monotonic(void) {
     return 0.0;
   }
   return (double)ts.tv_sec + (double)ts.tv_nsec * 1.0e-9;
-}
-
-/* 列出 /proc 下全部纯数字目录名（pid），换行分隔；失败返回 NULL。 */
-MOONBIT_FFI_EXPORT
-moonbit_bytes_t yue_sysmon_list_pids(void) {
-  DIR *d = opendir("/proc");
-  if (d == NULL) {
-    return NULL;
-  }
-  size_t cap = 8192;
-  size_t len = 0;
-  char *buf = (char *)malloc(cap);
-  if (buf == NULL) {
-    closedir(d);
-    return NULL;
-  }
-  struct dirent *e;
-  while ((e = readdir(d)) != NULL) {
-    const char *n = e->d_name;
-    int numeric = n[0] != '\0';
-    for (const char *p = n; *p != '\0'; p++) {
-      if (*p < '0' || *p > '9') {
-        numeric = 0;
-        break;
-      }
-    }
-    if (!numeric) {
-      continue;
-    }
-    size_t nl = strlen(n);
-    while (len + nl + 1 > cap) {
-      size_t next = cap * 2;
-      char *grown = (char *)realloc(buf, next);
-      if (grown == NULL) {
-        free(buf);
-        closedir(d);
-        return NULL;
-      }
-      buf = grown;
-      cap = next;
-    }
-    memcpy(buf + len, n, nl);
-    len += nl;
-    buf[len++] = '\n';
-  }
-  closedir(d);
-  moonbit_bytes_t out = moonbit_make_bytes((int32_t)len, 0);
-  if (out == NULL) {
-    free(buf);
-    return NULL;
-  }
-  memcpy(out, buf, len);
-  free(buf);
-  return out;
 }
 
 /* 发信号；成功返回 0，失败返回 errno。 */
@@ -1873,10 +1823,10 @@ int32_t yue_sysmon_set_priority(int32_t pid, int32_t nice) {
   return (int32_t)errno;
 }
 
-/* 列出目录条目名（跳过 . 与 ..），换行分隔；失败返回 NULL。 */
-MOONBIT_FFI_EXPORT
-moonbit_bytes_t yue_sysmon_list_dir(moonbit_bytes_t path) {
-  DIR *d = opendir((const char *)path);
+/* 列出目录条目名（跳过 . 与 ..），换行分隔；失败返回 NULL。
+   Linux 直接用；macOS 作虚拟路由未命中时的回退（/sys、/proc 不存在）。 */
+static moonbit_bytes_t sysmon_list_dir_generic(const char *path) {
+  DIR *d = opendir(path);
   if (d == NULL) {
     return NULL;
   }
@@ -1998,7 +1948,928 @@ moonbit_bytes_t yue_sysmon_nvidia_smi(void) {
   return out;
 }
 
+/* ===========================================================================
+   平台分流：macOS 数据源虚拟 /proc、/sys（同 Windows 分支的跨层契约：
+   Linux 路径即契约，MoonBit 解析层与纯函数零改动）；Linux 维持直读。
+   =========================================================================== */
+
+#if defined(__APPLE__)
+
+/* ===========================================================================
+   macOS 分支：Mach / libproc / getfsstat / getifaddrs / system_profiler
+   数据源 → 虚拟 /proc、/sys 文本。
+   路由总表（MoonBit 数据层请求路径 → 数据源）：
+     /proc/stat                host_processor_info(PROCESSOR_CPU_LOAD_INFO)
+     /proc/cpuinfo             sysctl 品牌串 / hw.model / hw.ncpu / hw.cpufrequency
+     /proc/meminfo             hw.memsize + host_statistics64(HOST_VM_INFO64)
+                               + vm.swapusage
+     /proc/mounts              getfsstat(MNT_WAIT)（挂载点空格按 \040 转义）
+     /proc/diskstats           无来源（IOKit 列远期）→ NULL，速率显示「—」
+     /proc/[pid]/stat           proc_pidinfo(PROC_PIDTBSDINFO + PROC_PIDTASKINFO)
+     /proc/[pid]/cmdline       proc_pidpath
+     /sys/class/net             getifaddrs（loopback 归一 "lo"）
+     /sys/class/net/<n>/statistics/{rx,tx}_bytes    if_data64 字节计数
+     /sys/class/hwmon           无来源（SMC / IOReport 私有键列远期）→ NULL
+   GPU 不走虚拟 /sys：system_profiler -json 子进程原样回传，解析在 MoonBit
+   纯函数（syshw.mbt parse_system_profiler_gpu）。
+   Mach / proc_info / statfs / if_data64 一律按 xnu 源码布局自声明（符号在
+   libSystem 默认链接范围），免 SDK 头版本差异——同 Windows 分支手工 vtable
+   与自定义结构体的思路；进程管理 kill / 优先级 / statvfs / monotonic 复用
+   上方 POSIX 共享实现。
+   =========================================================================== */
+
+#include <fcntl.h>
+#include <poll.h>
+#include <sys/wait.h>
+
+struct sockaddr;
+
+typedef unsigned int sysmon_mach_port_t;
+typedef int sysmon_kern_return_t;
+
+extern sysmon_mach_port_t mach_host_self(void);
+extern sysmon_mach_port_t mach_task_self_(void);
+extern sysmon_kern_return_t host_processor_info(
+    sysmon_mach_port_t host,
+    int flavor,
+    unsigned int *out_num_cpus,
+    int **out_info,
+    unsigned int *out_count);
+extern sysmon_kern_return_t host_statistics64(
+    sysmon_mach_port_t host, int flavor, int *info, unsigned int *count);
+extern sysmon_kern_return_t vm_deallocate(
+    sysmon_mach_port_t task, unsigned long long address, unsigned long long size);
+
+extern int proc_listpids(unsigned int type, unsigned int typeinfo, void *buffer, int buffersize);
+extern int proc_pidpath(int pid, void *buffer, unsigned int buffersize);
+extern int proc_pidinfo(int pid, int flavor, unsigned long long arg, void *buffer, int buffersize);
+extern int sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen);
+
+/* Mach 常量（processor_info.h / host_info.h；值按 SDK 头核实） */
+#define SYSMON_PROCESSOR_CPU_LOAD_INFO 2
+#define SYSMON_CPU_STATE_USER 0
+#define SYSMON_CPU_STATE_SYSTEM 1
+#define SYSMON_CPU_STATE_IDLE 2
+#define SYSMON_CPU_STATE_NICE 3
+#define SYSMON_CPU_STATE_MAX 4
+#define SYSMON_HOST_VM_INFO64 4
+
+/* struct vm_statistics64（布局按 xnu osfmk/mach/vm_statistics.h 全字段
+   照录；只读前四个计数，其余为保持偏移一致按序补齐）。host_statistics64
+   按传入 count（整数个数）填充，count 大于内核版本字段数时按低版本填，
+   故多带字段安全。 */
+typedef struct {
+  unsigned int free_count;
+  unsigned int active_count;
+  unsigned int inactive_count;
+  unsigned int wire_count;
+  unsigned long long zero_fill_count;
+  unsigned long long reactivations;
+  unsigned long long pageins;
+  unsigned long long pageouts;
+  unsigned long long faults;
+  unsigned long long cow_faults;
+  unsigned long long lookups;
+  unsigned long long hits;
+  unsigned long long purges;
+  unsigned int purgeable_count;
+  unsigned int speculative_count;
+  unsigned long long decompressions;
+  unsigned long long compressions;
+  unsigned long long swapins;
+  unsigned long long swapouts;
+  unsigned int compressor_page_count;
+  unsigned int throttled_count;
+  unsigned int external_page_count;
+  unsigned int internal_page_count;
+  unsigned long long total_uncompressed_pages_in_compressor;
+  unsigned long long swapped_count;
+} SysmonVmStatistics64;
+
+/* vm.swapusage 返回的 xsw_usage（SDK 未公开该结构，布局按通用定义：
+   总 / 可用 / 已用字节 + 页大小 + 是否加密）。 */
+typedef struct {
+  unsigned long long xsu_total;
+  unsigned long long xsu_avail;
+  unsigned long long xsu_used;
+  unsigned int xsu_pagesize;
+  int xsu_encrypted;
+} SysmonXswUsage;
+
+/* libproc 常量与结构（proc_info.h；值按 SDK 头核实） */
+#define SYSMON_PROC_ALL_PIDS 1
+#define SYSMON_PROC_PIDTBSDINFO 3
+#define SYSMON_PROC_PIDTASKINFO 4
+
+/* struct proc_bsdinfo（布局按 xnu bsd/sys/proc_info.h；MAXCOMLEN = 16） */
+typedef struct {
+  unsigned int pbi_flags;
+  unsigned int pbi_status;
+  unsigned int pbi_xstatus;
+  unsigned int pbi_pid;
+  unsigned int pbi_ppid;
+  unsigned int pbi_uid;
+  unsigned int pbi_gid;
+  unsigned int pbi_ruid;
+  unsigned int pbi_rgid;
+  unsigned int pbi_svuid;
+  unsigned int pbi_svgid;
+  unsigned int rfu_1;
+  char pbi_comm[16];
+  char pbi_name[32];
+  unsigned int pbi_nfiles;
+  unsigned int pbi_pgid;
+  unsigned int pbi_pjobc;
+  unsigned int e_tdev;
+  unsigned int e_tpgid;
+  int pbi_nice;
+  unsigned long long pbi_start_tvsec;
+  unsigned long long pbi_start_tvusec;
+} SysmonProcBsdinfo;
+
+/* struct proc_taskinfo（布局按 xnu bsd/sys/proc_info.h；计时为纳秒） */
+typedef struct {
+  unsigned long long pti_virtual_size;
+  unsigned long long pti_resident_size;
+  unsigned long long pti_total_user;
+  unsigned long long pti_total_system;
+  unsigned long long pti_threads_user;
+  unsigned long long pti_threads_system;
+  int pti_policy;
+  int pti_faults;
+  int pti_pageins;
+  int pti_cow_faults;
+  int pti_messages_sent;
+  int pti_messages_received;
+  int pti_syscalls_mach;
+  int pti_syscalls_unix;
+  int pti_csw;
+  int pti_threadnum;
+  int pti_numrunning;
+  int pti_priority;
+} SysmonProcTaskinfo;
+
+/* 进程状态（pbi_status，BSD p_stat 口径；proc.h 常量值） */
+#define SYSMON_SIDL 1
+#define SYSMON_SRUN 2
+#define SYSMON_SZOMB 3
+#define SYSMON_SSLEEP 4
+#define SYSMON_SSTOP 5
+
+/* struct statfs（布局按 xnu bsd/sys/mount.h 的 64 位变体；MNT_WAIT = 1） */
+typedef struct {
+  unsigned int f_bsize;
+  int f_iosize;
+  unsigned long long f_blocks;
+  unsigned long long f_bfree;
+  unsigned long long f_bavail;
+  unsigned long long f_files;
+  unsigned long long f_ffree;
+  int f_fsid[2];
+  unsigned int f_owner;
+  unsigned int f_type;
+  unsigned int f_flags;
+  unsigned int f_fssubtype;
+  char f_fstypename[16];
+  char f_mntonname[1024];
+  char f_mntfromname[1024];
+  unsigned int f_flags_ext;
+  unsigned int f_reserved[7];
+} SysmonStatfs;
+
+extern int getfsstat(SysmonStatfs *buf, int bufsize, int flags);
+
+#define SYSMON_MNT_WAIT 1
+
+/* struct ifaddrs（布局按 ifaddrs.h；ifa_data 在 macOS 指向 if_data64） */
+typedef struct sysmon_ifaddrs {
+  struct sysmon_ifaddrs *ifa_next;
+  char *ifa_name;
+  int ifa_flags;
+  struct sockaddr *ifa_addr;
+  struct sockaddr *ifa_netmask;
+  struct sockaddr *ifa_dstaddr;
+  void *ifa_data;
+} sysmon_ifaddrs;
+
+extern int getifaddrs(sysmon_ifaddrs **out);
+extern void freeifaddrs(sysmon_ifaddrs *list);
+
+/* struct if_data64（布局按 xnu bsd/net/if_var.h；只读到 ifi_obytes） */
+typedef struct {
+  unsigned char ifi_type;
+  unsigned char ifi_typelen;
+  unsigned char ifi_physical;
+  unsigned char ifi_addrlen;
+  unsigned char ifi_hdrlen;
+  unsigned char ifi_recvquota;
+  unsigned char ifi_xmitquota;
+  unsigned char ifi_unused1;
+  unsigned int ifi_mtu;
+  unsigned int ifi_metric;
+  unsigned long long ifi_baudrate;
+  unsigned long long ifi_ipackets;
+  unsigned long long ifi_ierrors;
+  unsigned long long ifi_opackets;
+  unsigned long long ifi_oerrors;
+  unsigned long long ifi_collisions;
+  unsigned long long ifi_ibytes;
+  unsigned long long ifi_obytes;
+} sysmon_if_data64;
+
+/* ---------------- 单调时钟（缓存 TTL 用，毫秒） ---------------- */
+
+static unsigned long long sysmon_apple_now_ms(void) {
+  struct timespec ts;
+  if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+    return 0;
+  }
+  return (unsigned long long)ts.tv_sec * 1000ULL +
+         (unsigned long long)ts.tv_nsec / 1000000ULL;
+}
+
+/* USER_HZ：taskinfo / rusage 计时为纳秒，本 stub 统一换算成 10ms tick
+   （÷1e7），进程 CPU% 按此口径；Darwin sysconf(_SC_CLK_TCK) 亦为 100，
+   硬编码免歧义。 */
+MOONBIT_FFI_EXPORT
+int32_t yue_sysmon_clk_tck(void) { return 100; }
+
+/* ---------------- CPU：/proc/stat ---------------- */
+
+static moonbit_bytes_t sysmon_apple_proc_stat(void) {
+  unsigned int num_cpus = 0;
+  int *info = NULL;
+  unsigned int count = 0;
+  if (host_processor_info(mach_host_self(), SYSMON_PROCESSOR_CPU_LOAD_INFO,
+                          &num_cpus, &info, &count) != 0 ||
+      info == NULL || num_cpus == 0) {
+    return NULL;
+  }
+  /* tick 单位由 mach 自定（只用于差值比率，与 clk_tck 无关）；列序
+     user nice system idle，iowait / irq / softirq / steal 无对应恒 0 */
+  SysmonBuf b = {0};
+  unsigned long long tu = 0, tn = 0, ts = 0, ti = 0;
+  for (unsigned int c = 0; c < num_cpus; c++) {
+    const int *p = info + (size_t)c * SYSMON_CPU_STATE_MAX;
+    tu += (unsigned long long)(unsigned int)p[SYSMON_CPU_STATE_USER];
+    tn += (unsigned long long)(unsigned int)p[SYSMON_CPU_STATE_NICE];
+    ts += (unsigned long long)(unsigned int)p[SYSMON_CPU_STATE_SYSTEM];
+    ti += (unsigned long long)(unsigned int)p[SYSMON_CPU_STATE_IDLE];
+  }
+  int ok = sysmon_buf_putf(&b, "cpu %llu %llu %llu %llu 0 0 0 0 0 0\n", tu, tn,
+                           ts, ti);
+  for (unsigned int c = 0; ok && c < num_cpus; c++) {
+    const int *p = info + (size_t)c * SYSMON_CPU_STATE_MAX;
+    ok = sysmon_buf_putf(&b, "cpu%u %llu %llu %llu %llu 0 0 0 0 0 0\n", c,
+                         (unsigned long long)(unsigned int)p[SYSMON_CPU_STATE_USER],
+                         (unsigned long long)(unsigned int)p[SYSMON_CPU_STATE_NICE],
+                         (unsigned long long)(unsigned int)p[SYSMON_CPU_STATE_SYSTEM],
+                         (unsigned long long)(unsigned int)p[SYSMON_CPU_STATE_IDLE]);
+  }
+  /* host_processor_info 返回的缓冲须 vm_deallocate（每次采样一块，泄漏
+     在 1Hz 下可积少成多） */
+  vm_deallocate(mach_task_self_(), (unsigned long long)(uintptr_t)info,
+                (unsigned long long)count * sizeof(int));
+  if (!ok) {
+    free(b.p);
+    return NULL;
+  }
+  return sysmon_bytes_take(&b);
+}
+
+/* ---------------- CPU：/proc/cpuinfo ---------------- */
+
+static moonbit_bytes_t sysmon_apple_cpuinfo(void) {
+  char model[128] = "(未知处理器)";
+  size_t model_len = sizeof(model);
+  /* 型号：machdep.cpu.brand_string（Apple Silicon 亦实现），回退 hw.model */
+  if (sysctlbyname("machdep.cpu.brand_string", model, &model_len, NULL, 0) !=
+          0 ||
+      model[0] == '\0') {
+    size_t hw_len = sizeof(model);
+    if (sysctlbyname("hw.model", model, &hw_len, NULL, 0) != 0 ||
+        model[0] == '\0') {
+      snprintf(model, sizeof(model), "Apple 处理器");
+    }
+  }
+  model[sizeof(model) - 1] = '\0';
+  long long freq_hz = 0;
+  size_t freq_len = sizeof(freq_hz);
+  /* 主频取不到（部分机型无该键）保持 0 */
+  sysctlbyname("hw.cpufrequency", &freq_hz, &freq_len, NULL, 0);
+  int ncpu = 0;
+  size_t ncpu_len = sizeof(ncpu);
+  sysctlbyname("hw.ncpu", &ncpu, &ncpu_len, NULL, 0);
+  if (ncpu <= 0) {
+    ncpu = 1;
+  }
+  SysmonBuf b = {0};
+  for (int i = 0; i < ncpu; i++) {
+    if (!sysmon_buf_putf(&b,
+                         "processor\t: %d\nmodel name\t: %s\ncpu MHz\t\t: "
+                         "%lld\n\n",
+                         i, model, freq_hz / 1000000LL)) {
+      break;
+    }
+  }
+  return sysmon_bytes_take(&b);
+}
+
+/* ---------------- 内存：/proc/meminfo ---------------- */
+
+static moonbit_bytes_t sysmon_apple_meminfo(void) {
+  unsigned long long total_bytes = 0;
+  size_t len = sizeof(total_bytes);
+  if (sysctlbyname("hw.memsize", &total_bytes, &len, NULL, 0) != 0) {
+    return NULL;
+  }
+  SysmonVmStatistics64 vm;
+  memset(&vm, 0, sizeof(vm));
+  unsigned int count = (unsigned int)(sizeof(vm) / sizeof(int));
+  unsigned long long free_pages = 0, inactive_pages = 0;
+  if (host_statistics64(mach_host_self(), SYSMON_HOST_VM_INFO64, (int *)&vm,
+                        &count) == 0) {
+    free_pages = vm.free_count;
+    inactive_pages = vm.inactive_count;
+  }
+  unsigned long long page = (unsigned long long)sysconf(_SC_PAGESIZE);
+  if (page == 0) {
+    page = 4096;
+  }
+  SysmonXswUsage xsu;
+  memset(&xsu, 0, sizeof(xsu));
+  size_t xlen = sizeof(xsu);
+  if (sysctlbyname("vm.swapusage", &xsu, &xlen, NULL, 0) != 0 ||
+      xlen < sizeof(xsu)) {
+    memset(&xsu, 0, sizeof(xsu));
+  }
+  unsigned long long total_kb = total_bytes / 1024ULL;
+  unsigned long long free_kb = free_pages * page / 1024ULL;
+  /* 可用 = free + inactive（活动监视器口径：可立即复用的内存） */
+  unsigned long long avail_kb = free_kb + inactive_pages * page / 1024ULL;
+  SysmonBuf b = {0};
+  if (!sysmon_buf_putf(&b,
+                       "MemTotal:       %llu kB\nMemFree:        %llu kB\n"
+                       "MemAvailable:   %llu kB\nSwapTotal:      %llu kB\n"
+                       "SwapFree:       %llu kB\n",
+                       total_kb, free_kb, avail_kb, xsu.xsu_total / 1024ULL,
+                       xsu.xsu_avail / 1024ULL)) {
+    free(b.p);
+    return NULL;
+  }
+  return sysmon_bytes_take(&b);
+}
+
+/* ---------------- 磁盘：/proc/mounts ---------------- */
+
+/* /proc/mounts 八进制转义（挂载点可含空格，内核同惯例）；
+   MoonBit 侧 unescape_mount 还原。 */
+static int sysmon_buf_put_escaped(SysmonBuf *b, const char *s) {
+  for (const char *p = s; *p != '\0'; p++) {
+    int ok;
+    switch (*p) {
+    case ' ':
+      ok = sysmon_buf_puts(b, "\\040");
+      break;
+    case '\t':
+      ok = sysmon_buf_puts(b, "\\011");
+      break;
+    case '\n':
+      ok = sysmon_buf_puts(b, "\\012");
+      break;
+    case '\\':
+      ok = sysmon_buf_puts(b, "\\134");
+      break;
+    default: {
+      char one[2];
+      one[0] = *p;
+      one[1] = '\0';
+      ok = sysmon_buf_puts(b, one);
+      break;
+    }
+    }
+    if (!ok) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+static moonbit_bytes_t sysmon_apple_mounts(void) {
+  int n = getfsstat(NULL, 0, SYSMON_MNT_WAIT);
+  if (n <= 0) {
+    return NULL;
+  }
+  SysmonStatfs *buf = (SysmonStatfs *)malloc((size_t)n * sizeof(SysmonStatfs));
+  if (buf == NULL) {
+    return NULL;
+  }
+  int got = getfsstat(buf, (int)((size_t)n * sizeof(SysmonStatfs)),
+                      SYSMON_MNT_WAIT);
+  if (got <= 0) {
+    free(buf);
+    return NULL;
+  }
+  SysmonBuf b = {0};
+  for (int i = 0; i < got; i++) {
+    SysmonStatfs *m = &buf[i];
+    m->f_mntonname[sizeof(m->f_mntonname) - 1] = '\0';
+    m->f_mntfromname[sizeof(m->f_mntfromname) - 1] = '\0';
+    m->f_fstypename[sizeof(m->f_fstypename) - 1] = '\0';
+    /* 全量输出（含伪文件系统），过滤口径在 MoonBit 侧：/dev/ 前缀 +
+       is_pseudo_fs（BSD 语义）+ is_system_mount */
+    if (!sysmon_buf_put_escaped(&b, m->f_mntfromname) ||
+        !sysmon_buf_puts(&b, "\t") ||
+        !sysmon_buf_put_escaped(&b, m->f_mntonname) ||
+        !sysmon_buf_puts(&b, "\t") || !sysmon_buf_puts(&b, m->f_fstypename) ||
+        !sysmon_buf_puts(&b, "\trw 0 0\n")) {
+      break;
+    }
+  }
+  free(buf);
+  return sysmon_bytes_take(&b);
+}
+
+/* ---------------- 进程：枚举 / stat / cmdline ---------------- */
+
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t yue_sysmon_list_pids(void) {
+  for (;;) {
+    /* 先探所需字节数（NULL / 0），再加余量吸收两次调用间的新进程 */
+    int need = proc_listpids(SYSMON_PROC_ALL_PIDS, 0, NULL, 0);
+    if (need <= 0) {
+      return NULL;
+    }
+    int cap = need + 8192;
+    void *buf = malloc((size_t)cap);
+    if (buf == NULL) {
+      return NULL;
+    }
+    int n = proc_listpids(SYSMON_PROC_ALL_PIDS, 0, buf, cap);
+    if (n <= 0) {
+      free(buf);
+      return NULL;
+    }
+    if (n >= cap) {
+      /* 有余量时理论不达；防御性重试（进程数激增） */
+      free(buf);
+      continue;
+    }
+    SysmonBuf b = {0};
+    int cnt = n / (int)sizeof(int);
+    for (int i = 0; i < cnt; i++) {
+      int pid = ((int *)buf)[i];
+      /* pid 0 = kernel_task：无命令行与计时，进程表无意义，跳过 */
+      if (pid <= 0) {
+        continue;
+      }
+      if (!sysmon_buf_putf(&b, "%d\n", pid)) {
+        break;
+      }
+    }
+    free(buf);
+    return sysmon_bytes_take(&b);
+  }
+}
+
+static moonbit_bytes_t sysmon_apple_pid_stat(int pid) {
+  SysmonProcBsdinfo bi;
+  memset(&bi, 0, sizeof(bi));
+  if (proc_pidinfo(pid, SYSMON_PROC_PIDTBSDINFO, 0, &bi, (int)sizeof(bi)) <=
+      0) {
+    return NULL;
+  }
+  SysmonProcTaskinfo ti;
+  memset(&ti, 0, sizeof(ti));
+  int rt = proc_pidinfo(pid, SYSMON_PROC_PIDTASKINFO, 0, &ti, (int)sizeof(ti));
+  unsigned long long page = (unsigned long long)sysconf(_SC_PAGESIZE);
+  if (page == 0) {
+    page = 4096;
+  }
+  /* taskinfo 计时为纳秒 → 10ms tick（÷1e7，与 clk_tck = 100 对齐）；
+     RSS 字节 → 页数（与 page_kb 口径一致，见 ProcMonitor） */
+  unsigned long long utime = rt > 0 ? ti.pti_total_user / 10000000ULL : 0;
+  unsigned long long stime = rt > 0 ? ti.pti_total_system / 10000000ULL : 0;
+  unsigned long long rss = rt > 0 ? ti.pti_resident_size / page : 0;
+  int threads = rt > 0 && ti.pti_threadnum > 0 ? ti.pti_threadnum : 1;
+  char state = 'S';
+  switch (bi.pbi_status) {
+  case SYSMON_SIDL:
+    state = 'I';
+    break;
+  case SYSMON_SRUN:
+    state = 'R';
+    break;
+  case SYSMON_SZOMB:
+    state = 'Z';
+    break;
+  case SYSMON_SSTOP:
+    state = 'T';
+    break;
+  default:
+    state = 'S';
+    break;
+  }
+  bi.pbi_comm[sizeof(bi.pbi_comm) - 1] = '\0';
+  SysmonBuf b = {0};
+  /* 22 个状态后置字段：state ppid pgrp session tty tpgid flags minflt
+     cminflt majflt cmajflt utime stime cutime cstime priority nice
+     threads itreal starttime vsize rss（starttime / vsize 无对应，恒 0） */
+  if (!sysmon_buf_putf(&b,
+                       "%d (%s) %c %u 0 0 0 0 0 0 0 0 0 %llu %llu 0 0 0 %d "
+                       "%d 0 0 0 %llu 0\n",
+                       pid, bi.pbi_comm, state, (unsigned int)bi.pbi_ppid,
+                       utime, stime, bi.pbi_nice, threads, rss)) {
+    free(b.p);
+    return NULL;
+  }
+  return sysmon_bytes_take(&b);
+}
+
+/* /proc/[pid]/cmdline → 可执行文件全路径（proc_pidpath；权限不足 /
+   kernel_task 返回 NULL，MoonBit 层回退 [comm]）。 */
+static moonbit_bytes_t sysmon_apple_pid_cmdline(int pid) {
+  char path[4096];
+  int n = proc_pidpath(pid, path, sizeof(path));
+  if (n <= 0) {
+    return NULL;
+  }
+  path[sizeof(path) - 1] = '\0';
+  if (path[0] == '\0') {
+    return NULL;
+  }
+  SysmonBuf b = {0};
+  if (!sysmon_buf_puts(&b, path)) {
+    free(b.p);
+    return NULL;
+  }
+  return sysmon_bytes_take(&b);
+}
+
+/* ---------------- 网络：getifaddrs ---------------- */
+
+/* 表缓存（200ms TTL）：每块网卡 rx / tx 各读一次路径，1Hz 下无缓存会每
+   拍两次全表拉取（同 Windows GetIfTable2 的思路）。 */
+static sysmon_ifaddrs *g_ifa = NULL;
+static unsigned long long g_ifa_at = 0;
+
+static sysmon_ifaddrs *sysmon_apple_ifaddrs_cached(void) {
+  unsigned long long now = sysmon_apple_now_ms();
+  if (g_ifa != NULL && now - g_ifa_at < 200) {
+    return g_ifa;
+  }
+  if (g_ifa != NULL) {
+    freeifaddrs(g_ifa);
+    g_ifa = NULL;
+  }
+  sysmon_ifaddrs *list = NULL;
+  if (getifaddrs(&list) != 0 || list == NULL) {
+    return NULL;
+  }
+  g_ifa = list;
+  g_ifa_at = now;
+  return g_ifa;
+}
+
+/* 网卡名归一：loopback "lo0" → "lo"（main.mbt 的速率汇总排除按 "lo"
+   口径，同 Windows 分支对 Software Loopback 的处理）。 */
+static const char *sysmon_apple_if_name(const char *name, char *buf, size_t cap) {
+  if (name != NULL && strcmp(name, "lo0") == 0) {
+    snprintf(buf, cap, "lo");
+    return buf;
+  }
+  return name;
+}
+
+static moonbit_bytes_t sysmon_apple_list_netifs(void) {
+  sysmon_ifaddrs *list = sysmon_apple_ifaddrs_cached();
+  if (list == NULL) {
+    return NULL;
+  }
+  SysmonBuf b = {0};
+  char norm[64];
+  char seen[128][64];
+  int seen_n = 0;
+  /* getifaddrs 每地址族一条，按名字去重 */
+  for (sysmon_ifaddrs *p = list; p != NULL; p = p->ifa_next) {
+    if (p->ifa_name == NULL || p->ifa_name[0] == '\0') {
+      continue;
+    }
+    const char *nm = sysmon_apple_if_name(p->ifa_name, norm, sizeof(norm));
+    int dup = 0;
+    for (int i = 0; i < seen_n; i++) {
+      if (strcmp(seen[i], nm) == 0) {
+        dup = 1;
+        break;
+      }
+    }
+    if (dup) {
+      continue;
+    }
+    if (seen_n < 128) {
+      snprintf(seen[seen_n], 64, "%s", nm);
+      seen_n++;
+    }
+    if (!sysmon_buf_puts(&b, nm) || !sysmon_buf_puts(&b, "\n")) {
+      break;
+    }
+  }
+  return sysmon_bytes_take(&b);
+}
+
+/* /sys/class/net/<name>/statistics/{rx,tx}_bytes → if_data64 字节计数。 */
+static moonbit_bytes_t sysmon_apple_netif_bytes(const char *path) {
+  const char *head = "/sys/class/net/";
+  const char *p = strstr(path, head);
+  if (p == NULL) {
+    return NULL;
+  }
+  p += strlen(head);
+  const char *dir = strstr(p, "/statistics/");
+  if (dir == NULL || dir == p) {
+    return NULL;
+  }
+  int rx = strcmp(dir, "/statistics/rx_bytes") == 0;
+  if (!rx && strcmp(dir, "/statistics/tx_bytes") != 0) {
+    return NULL;
+  }
+  size_t alen = (size_t)(dir - p);
+  if (alen == 0 || alen >= 64) {
+    return NULL;
+  }
+  char want[64];
+  memcpy(want, p, alen);
+  want[alen] = '\0';
+  sysmon_ifaddrs *list = sysmon_apple_ifaddrs_cached();
+  if (list == NULL) {
+    return NULL;
+  }
+  char norm[64];
+  for (sysmon_ifaddrs *q = list; q != NULL; q = q->ifa_next) {
+    if (q->ifa_name == NULL || q->ifa_data == NULL) {
+      continue;
+    }
+    const char *nm = sysmon_apple_if_name(q->ifa_name, norm, sizeof(norm));
+    if (strcmp(nm, want) != 0) {
+      continue;
+    }
+    sysmon_if_data64 *d = (sysmon_if_data64 *)q->ifa_data;
+    SysmonBuf b = {0};
+    if (!sysmon_buf_putf(&b, "%llu\n",
+                         (unsigned long long)(rx ? d->ifi_ibytes
+                                                 : d->ifi_obytes))) {
+      free(b.p);
+      return NULL;
+    }
+    return sysmon_bytes_take(&b);
+  }
+  return NULL;
+}
+
+/* ---------------- GPU：system_profiler -json 子进程 ---------------- */
+
+/* 首跑秒级：fork + 匿名管道 + poll 超时（8s）后 SIGKILL，不用 popen——
+   GUI 进程下 shell 子进程会闪窗（同 Windows CREATE_NO_WINDOW 的考虑）。
+   成功后进程内常驻缓存（型号 / 显存总量静态，同 Windows DXGI 枚举一次
+   的思路），失败按 5s 退避重试。JSON 原样回传，解析在 MoonBit 纯函数
+   （parse_system_profiler_gpu）；利用率与温度无来源，显示位由 UI 给
+   「—」。 */
+#define SYSMON_GPU_RETRY_MS 5000
+
+static char *g_gpu_json = NULL;
+static unsigned long long g_gpu_json_at = 0;
+
+static moonbit_bytes_t sysmon_bytes_from(const char *s, size_t len) {
+  moonbit_bytes_t out = moonbit_make_bytes((int32_t)len, 0);
+  if (out == NULL) {
+    return NULL;
+  }
+  memcpy(out, s, len);
+  return out;
+}
+
+/* 跑子进程捕获 stdout/stderr；超时 / 失败返回 NULL。子进程只做
+   dup2 + execv（绝对路径免 PATH 搜索分配），不触碰父进程堆。 */
+static char *sysmon_apple_run_capture(const char *const argv[], int timeout_ms) {
+  int fds[2];
+  if (pipe(fds) != 0) {
+    return NULL;
+  }
+  pid_t pid = fork();
+  if (pid < 0) {
+    close(fds[0]);
+    close(fds[1]);
+    return NULL;
+  }
+  if (pid == 0) {
+    dup2(fds[1], STDOUT_FILENO);
+    dup2(fds[1], STDERR_FILENO);
+    close(fds[0]);
+    close(fds[1]);
+    execv(argv[0], (char *const *)argv);
+    _exit(127);
+  }
+  close(fds[1]);
+  SysmonBuf out = {0};
+  int fl = fcntl(fds[0], F_GETFL, 0);
+  if (fl >= 0) {
+    (void)fcntl(fds[0], F_SETFL, fl | O_NONBLOCK);
+  }
+  unsigned long long deadline =
+      sysmon_apple_now_ms() + (unsigned long long)(timeout_ms > 0 ? timeout_ms : 0);
+  int eof = 0;
+  for (;;) {
+    char chunk[4096];
+    ssize_t got = read(fds[0], chunk, sizeof(chunk));
+    if (got > 0) {
+      if (!sysmon_buf_reserve(&out, (size_t)got)) {
+        break;
+      }
+      memcpy(out.p + out.len, chunk, (size_t)got);
+      out.len += (size_t)got;
+      out.p[out.len] = '\0';
+      continue;
+    }
+    if (got == 0) {
+      eof = 1;
+      break;
+    }
+    if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+      break;
+    }
+    long long remain = (long long)(deadline - sysmon_apple_now_ms());
+    if (remain <= 0) {
+      break;
+    }
+    struct pollfd pfd;
+    memset(&pfd, 0, sizeof(pfd));
+    pfd.fd = fds[0];
+    pfd.events = POLLIN;
+    if (poll(&pfd, 1, (int)remain) < 0) {
+      break;
+    }
+  }
+  close(fds[0]);
+  if (!eof) {
+    kill(pid, SIGKILL);
+  }
+  int status = 0;
+  waitpid(pid, &status, 0);
+  if (!eof || out.p == NULL) {
+    free(out.p);
+    return NULL;
+  }
+  return out.p;
+}
+
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t yue_sysmon_system_profiler_gpu(void) {
+  if (g_gpu_json != NULL) {
+    return sysmon_bytes_from(g_gpu_json, strlen(g_gpu_json));
+  }
+  unsigned long long now = sysmon_apple_now_ms();
+  if (now - g_gpu_json_at < SYSMON_GPU_RETRY_MS) {
+    return NULL; /* 失败退避期内不重跑（system_profiler 首跑秒级） */
+  }
+  g_gpu_json_at = now;
+  static const char *const argv[] = {"/usr/sbin/system_profiler",
+                                     "SPDisplaysDataType", "-json", NULL};
+  char *fresh = sysmon_apple_run_capture(argv, 8000);
+  if (fresh == NULL) {
+    return NULL;
+  }
+  free(g_gpu_json);
+  g_gpu_json = fresh;
+  return sysmon_bytes_from(g_gpu_json, strlen(g_gpu_json));
+}
+
+/* ---------------- 目录枚举路由 ---------------- */
+
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t yue_sysmon_list_dir(moonbit_bytes_t path) {
+  const char *p = (const char *)path;
+  if (strcmp(p, "/sys/class/net") == 0) {
+    return sysmon_apple_list_netifs();
+  }
+  /* /sys/class/hwmon 等其余路径：macOS 无对应目录，opendir 自然失败
+     （None → 传感器页空态、处理器卡温度位「—」） */
+  return sysmon_list_dir_generic(p);
+}
+
+/* ---------------- 读文件路由 ---------------- */
+
+static moonbit_bytes_t sysmon_apple_virtual_read(const char *p) {
+  if (strcmp(p, "/proc/stat") == 0) {
+    return sysmon_apple_proc_stat();
+  }
+  if (strcmp(p, "/proc/cpuinfo") == 0) {
+    return sysmon_apple_cpuinfo();
+  }
+  if (strcmp(p, "/proc/meminfo") == 0) {
+    return sysmon_apple_meminfo();
+  }
+  if (strcmp(p, "/proc/mounts") == 0) {
+    return sysmon_apple_mounts();
+  }
+  /* /proc/diskstats 无来源（IOKit 列远期）：不特判即落到底部 NULL，
+     MoonBit 层按「速率不可用」处理，容量表照常产出 */
+  if (strncmp(p, "/proc/", 6) == 0) {
+    char *end = NULL;
+    long pid = strtol(p + 6, &end, 10);
+    if (end != p + 6 && pid > 0 && *end == '/') {
+      if (strcmp(end, "/stat") == 0) {
+        return sysmon_apple_pid_stat((int)pid);
+      }
+      if (strcmp(end, "/cmdline") == 0) {
+        return sysmon_apple_pid_cmdline((int)pid);
+      }
+    }
+  }
+  if (strncmp(p, "/sys/class/net/", 15) == 0) {
+    return sysmon_apple_netif_bytes(p);
+  }
+  return NULL;
+}
+
+#else /* !__APPLE__：Linux 直读 */
+
+MOONBIT_FFI_EXPORT
+int32_t yue_sysmon_clk_tck(void) {
+  long v = sysconf(_SC_CLK_TCK);
+  return v > 0 ? (int32_t)v : 100;
+}
+
+/* 列出 /proc 下全部纯数字目录名（pid），换行分隔；失败返回 NULL。 */
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t yue_sysmon_list_pids(void) {
+  DIR *d = opendir("/proc");
+  if (d == NULL) {
+    return NULL;
+  }
+  size_t cap = 8192;
+  size_t len = 0;
+  char *buf = (char *)malloc(cap);
+  if (buf == NULL) {
+    closedir(d);
+    return NULL;
+  }
+  struct dirent *e;
+  while ((e = readdir(d)) != NULL) {
+    const char *n = e->d_name;
+    int numeric = n[0] != '\0';
+    for (const char *p = n; *p != '\0'; p++) {
+      if (*p < '0' || *p > '9') {
+        numeric = 0;
+        break;
+      }
+    }
+    if (!numeric) {
+      continue;
+    }
+    size_t nl = strlen(n);
+    while (len + nl + 1 > cap) {
+      size_t next = cap * 2;
+      char *grown = (char *)realloc(buf, next);
+      if (grown == NULL) {
+        free(buf);
+        closedir(d);
+        return NULL;
+      }
+      buf = grown;
+      cap = next;
+    }
+    memcpy(buf + len, n, nl);
+    len += nl;
+    buf[len++] = '\n';
+  }
+  closedir(d);
+  moonbit_bytes_t out = moonbit_make_bytes((int32_t)len, 0);
+  if (out == NULL) {
+    free(buf);
+    return NULL;
+  }
+  memcpy(out, buf, len);
+  free(buf);
+  return out;
+}
+
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t yue_sysmon_list_dir(moonbit_bytes_t path) {
+  return sysmon_list_dir_generic((const char *)path);
+}
+
+#endif /* __APPLE__ */
+
 #endif /* _WIN32 */
+
+#if !defined(__APPLE__)
+/* 非 macOS 无 system_profiler：同 ABI 占位返回 NULL（MoonBit 层
+   gpu_list 的 macOS 分支只在 on_macos() 为真时调用，运行期不会到这；
+   占位只为让 extern 符号在三平台测试构建都可链接——同 SYS2 kill /
+   优先级占位的模式）。 */
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t yue_sysmon_system_profiler_gpu(void) { return NULL; }
+#endif
 
 /* 读整个文本文件为 MoonBit Bytes；失败（不存在 / 权限 / 超限 / 是目录）
    返回 NULL，MoonBit 侧映射为 None。/proc、/sys 伪文件 stat 尺寸为 0，
@@ -2056,6 +2927,14 @@ static moonbit_bytes_t sysmon_read_file_generic(moonbit_bytes_t path) {
 #ifndef _WIN32
 MOONBIT_FFI_EXPORT
 moonbit_bytes_t yue_sysmon_read_text_file(moonbit_bytes_t path) {
+#if defined(__APPLE__)
+  /* macOS 先查虚拟 /proc、/sys 路由（数据源现场生成同构文本），未命中
+     再落真实文件读取 */
+  moonbit_bytes_t v = sysmon_apple_virtual_read((const char *)path);
+  if (v != NULL) {
+    return v;
+  }
+#endif
   return sysmon_read_file_generic(path);
 }
 #endif
