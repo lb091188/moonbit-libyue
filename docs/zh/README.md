@@ -8,7 +8,7 @@
 
 ## 演示
 
-四个示例，由浅入深：
+五个示例，由浅入深：
 
 ```sh
 moon run examples/hello         # 原版控件最小窗口
@@ -47,6 +47,7 @@ showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 /
 | 文档 | 内容 |
 |---|---|
 | [tutorial.md](tutorial.md) | 五分钟上手教程(面向 MoonBit 新手):从 `moon new` 到窗口跑起来,三个新手坑逐一避开;附官方 MoonBit 教程与 Tour 链接 |
+| [aboutlibyue.md](aboutlibyue.md) | 关于我和 `libyue`:作者与这个库的相识经过、封装来龙去脉 |
 | [declarative.md](declarative.md) | 声明式 UI:`Node`/`mount` 渲染树 + `Store`/`Signal` 响应式绑定(信号 computed 自动依赖收集 + batch) |
 | [layout.md](layout.md) | 布局样式键速查:Yoga flexbox 全部样式键(枚举/数值/边缘/特殊)+ 常用组合示例 |
 | [components-ui.md](components-ui.md) | 组件库速查:Element Plus 风格主题化组件(按钮/输入/选择/表单/导航/布局/数据展示/图表/图标/反馈/浮层),逐 API 签名 + 参数表 + 示例;图表含折线/柱状/环形/仪表/散点与扩展图表(雷达/热力/K 线/漏斗/箱线/桑基),以及第二批层级/地理/力导向/时间流图表(树图/矩形树图/旭日图/地图与飞线/力导向关系图/平行坐标/主题河流/涟漪散点/象形柱)与横切交互层(hover 浮层与命中、可点击图例、DataZoom 缩放平移、阈值线与高亮域、色带映射、导出) |

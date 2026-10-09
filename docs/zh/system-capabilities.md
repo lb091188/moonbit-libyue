@@ -586,7 +586,7 @@ let _ = @yue.lc_set_timezone("Asia/Tokyo") // 需要认证
 | `bt_supported() -> Bool` | 系统有可用蓝牙适配器（`org.bluez` 在线且枚举到 Adapter1）；台式机与虚拟机无适配器是合法状态，返回 false 而非异常 |
 | `bt_adapter_info() -> Result[BtAdapter, BtError]` | 适配器快照 |
 | `bt_devices() -> Result[Array[BtDevice], BtError]` | 已发现设备列表 |
-| `bt_set_powered(on) -> Result[Unit, BtError>` | 开关适配器电源 |
+| `bt_set_powered(on) -> Result[Unit, BtError]` | 开关适配器电源 |
 | `bt_start_discovery()` / `bt_stop_discovery() -> Result[Unit, BtError]` | 开始 / 停止扫描（数秒后 `bt_devices` 可见新设备） |
 | `bt_connect(device)` / `bt_disconnect(device)` / `bt_pair(device)` | 连接 / 断开 / 配对（返回 `Result[Unit, BtError]`） |
 

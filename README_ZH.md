@@ -63,7 +63,7 @@ n.show()
 moon run examples/sysmonitor
 ```
 
-> 55 个原生控件全量封装 · 57 个主题化自绘组件 · 封装开销[启动持平 C++、内存 +0.8MB](docs/zh/adaptation.md) · 三平台 CI · [mooncakes](https://mooncakes.io/) 已发布
+> 40 个原生控件全量封装 · 58 个主题化自绘组件 · 20 个自绘图表（另 3 个交互变体） · 封装开销[启动持平 C++、内存 +0.8MB](docs/zh/adaptation.md) · 三平台 CI · [mooncakes](https://mooncakes.io/) 已发布
 
 ## 快速开始
 
