@@ -5,8 +5,7 @@
 // 响应式分层演示:
 //   主题五页(基础/表单/导航/数据/反馈)用 Signal 自动依赖收集;
 //   「Store 对照」页保留 Store 手动接线模式,可与信号页对照;
-//   原生控件页纯命令式 set;事件/系统/窗口/画布页维持 Store 手动模式。
-
+//   事件/系统/窗口/画布页维持 Store 手动模式。
 ///|
 /// 窗口标题:单实例 Windows 兜底路径按标题查找首实例窗口,两个实例须一致
 const SHOWCASE_TITLE : String = "组件库演示板"
@@ -127,10 +126,9 @@ fn main {
                         ],
                       ),
                       (
-                        "原生与自绘",
-                        ["原生控件", "画布与富文本"],
+                        "系统能力",
+                        ["系统集成", "窗口", "浏览器", "画布与富文本"],
                       ),
-                      ("系统能力", ["系统集成", "窗口", "浏览器"]),
                     ],
                     selected,
                     icons=[
@@ -144,7 +142,6 @@ fn main {
                       ("代码与文档", @yue.Code),
                       ("事件与布局", @yue.Thunderbolt),
                       ("Store 对照", @yue.Reload),
-                      ("原生控件", @yue.Monitor1),
                       ("画布与富文本", @yue.Image1),
                       ("系统集成", @yue.Setting1),
                       ("窗口", @yue.Fullscreen),
@@ -213,7 +210,6 @@ fn main {
             @ui.nav_page("系统集成", selected, @pages.page_system(app)),
             @ui.nav_page("窗口", selected, @pages.page_window(app)),
             @ui.nav_page("浏览器", selected, @pages.page_browser(app)),
-            @ui.nav_page("原生控件", selected, @pages.page_native(app)),
             @ui.nav_page(
               "画布与富文本",
               selected,

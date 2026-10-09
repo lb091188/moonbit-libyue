@@ -132,7 +132,7 @@ Customization items like the primary color, corners, and dark mode are in the "T
 
 ```sh
 git clone https://github.com/lb091188/moonbit-libyue && cd moonbit-libyue
-moon run examples/showcase    # 15 pages: basic / form / navigation / data display / feedback / events & layout / native widgets / system integration...
+moon run examples/showcase    # 14 pages: basic / form / navigation / data display / feedback / events & layout / system integration...
 ```
 
 Pick a page from the left menu and write along on the right; each page's source is its own file (`examples/showcase/pages/*.mbt`) — copy and adapt. To start smaller: `moon run examples/hello` (original widgets) and `moon run examples/hello-themed` (themed).

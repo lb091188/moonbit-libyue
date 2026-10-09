@@ -13,12 +13,12 @@ Five examples, from shallow to deep:
 ```sh
 moon run examples/hello         # minimal window with the original widgets
 moon run examples/hello-themed  # minimal example of the themed component library (theme_apply + button_t/input_t/label_t)
-moon run examples/showcase      # full-capability demo board: 15 pages, three grouped sidebars, component library + system capabilities
+moon run examples/showcase      # full-capability demo board: 14 pages, three grouped sidebars, component library + system capabilities
 moon run examples/sysmonitor    # flagship app: Ubuntu process manager & hardware monitor (1000-row process table + live curves)
 moon run examples/systemprobe   # system capabilities + extended charts demo (volume/brightness/browser & VS Code history/app lookup + radar/heatmap/candlestick/funnel/boxplot/sankey)
 ```
 
-The showcase covers: Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store comparison + Native widgets / Canvas & rich text + System Integration / Window / Browser, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). Each page's source is its own file (`examples/showcase/pages/*.mbt`) — the best copy-paste material library; screenshots of the component library:
+The showcase covers: Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store comparison + Canvas & rich text + System Integration / Window / Browser, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). Each page's source is its own file (`examples/showcase/pages/*.mbt`) — the best copy-paste material library; screenshots of the component library:
 
 ![Basic components](images/showcase-basic.png)
 
