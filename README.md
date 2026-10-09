@@ -63,7 +63,7 @@ n.show()
 moon run examples/sysmonitor
 ```
 
-> 55 native widgets fully bound · 57 themed self-drawn components · wrapper overhead [startup on par with C++, memory +0.8MB](docs/adaptation.md) · three-platform CI · published on [mooncakes](https://mooncakes.io/)
+> 40 native widgets fully bound · 58 themed self-drawn components · 20 self-drawn charts (+3 interactive variants) · wrapper overhead [startup on par with C++, memory +0.8MB](docs/adaptation.md) · three-platform CI · published on [mooncakes](https://mooncakes.io/)
 
 ## Quick start
 

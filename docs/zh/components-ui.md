@@ -173,7 +173,7 @@ let name = @yue.Store::new("")
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| margin / width / height | Double | 0 / 280 / 32 | 外边距与尺寸 |
+| margin / width / height | Double | 0 / 280 / 32 | 外边距与尺寸,经 `style` 传入 |
 | clearable | Bool | false | 悬停且非空时右侧显示 ✕，点击清空 |
 | invalid | Store[Bool] | false | true 时边框变 danger 红（轻量表单校验），set 即生效 |
 
@@ -200,7 +200,7 @@ let count = @yue.Store::new(1.0)
 input_t 同套路：外层自绘 1px 边框（聚焦变主题色）+ 8px 内边距；内容超出自行滚动。clearable / invalid 语义同 input_t。
 
 ```moonbit
-@yue.textarea_t(text="第一行\n第二行", width=320.0, height=120.0)
+@yue.textarea_t(text="第一行\n第二行", style=[("width", 320.0), ("height", 120.0)])
 ```
 
 ### 复选框 checkbox_t
@@ -438,7 +438,7 @@ let step = @yue.Store::new(1)
 `divider(vertical? = false, style?, handle?)`——水平（默认，高 1px 宽 flex）或竖直（宽 1px 高随父容器），两侧留白默认 10px、经 style 覆盖。底色挂载时读主题，重建界面生效。
 
 ```moonbit
-@yue.divider(spacing=16.0)
+@yue.divider(style=[("marginTop", 16.0), ("marginBottom", 16.0)])
 @yue.divider(vertical=true)
 ```
 
@@ -498,7 +498,7 @@ let visits = @yue.Store::new("1,024")
 
 ```moonbit
 let ratio = @yue.Store::new(0.42)
-@yue.progress_line(ratio, height=6.0)
+@yue.progress_line(ratio, style=[("height", 6.0)])
 ```
 
 ### 描述列表 descriptions
@@ -537,7 +537,7 @@ let ratio = @yue.Store::new(0.42)
 `card(title, children : Array[Node], style?, handle?)`——标题栏（加粗、底部分隔线）+ 边框（卡高默认 160、经 style 覆盖），内容区从标题栏下方开始。
 
 ```moonbit
-@yue.card("概要", [@yue.statistic("任务数", done)], height=120.0)
+@yue.card("概要", [@yue.statistic("任务数", done)], style=[("height", 120.0)])
 ```
 
 ### 代码高亮 code_view
@@ -630,7 +630,7 @@ let right = @yue.Store::new(["丙"])
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | series | Store[Array[LineSeries]] | 必填 | 多序列数据，推点见下 |
-| width / height | Double | 560 / 260 | 画布尺寸 |
+| width / height | Double | 560 / 260 | 画布尺寸,经 `style` 传入 |
 | area | Bool | false | 半透明面积填充 |
 | y_range | (Double, Double)? | None | 手动 y 值域；None 为自适应 |
 | show_last | Bool | true | 最新值右端标注 |
@@ -648,8 +648,8 @@ ignore(@yue.set_timer(500, fn() {
   @yue.series_push(series, 1, mem_usage())
   true
 }))
-@yue.line_chart_t(series, width=380.0, height=220.0)
-@yue.line_chart_t(series, width=380.0, height=220.0, area=true)
+@yue.line_chart_t(series, style=[("width", 380.0), ("height", 220.0)])
+@yue.line_chart_t(series, style=[("width", 380.0), ("height", 220.0)], area=true)
 ```
 
 ### 柱状 / 条形图 bar_chart_t
@@ -661,7 +661,7 @@ ignore(@yue.set_timer(500, fn() {
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | data | Store[Array[BarItem]] | 必填 | 类目数据（值可为负） |
-| width / height | Double | 560 / 280 | 画布尺寸 |
+| width / height | Double | 560 / 280 | 画布尺寸,经 `style` 传入 |
 | horizontal | Bool | false | 横向条形态 |
 | y_range | (Double, Double)? | None | 手动值域；缺省按数据自适应（含 0 基线 + 6% 留白） |
 （默认）与横向条（`horizontal = true`，适配长类目名）两形态。`BarItem::make(标签, 值)`，值可为负；以 0 为基线，正主题色、负红色。悬停高亮该类目并在行内标注数值（自绘，无弹层）；类目标签过密时自动抽稀截断。200 类目全量重绘实测约 0.4ms。
@@ -671,8 +671,8 @@ let bars = @yue.Store::new([
   @yue.BarItem::make("1月", 12.0),
   @yue.BarItem::make("2月", -8.0),
 ])
-@yue.bar_chart_t(bars, width=380.0, height=220.0)
-@yue.bar_chart_t(bars, width=380.0, height=220.0, horizontal=true)
+@yue.bar_chart_t(bars, style=[("width", 380.0), ("height", 220.0)])
+@yue.bar_chart_t(bars, style=[("width", 380.0), ("height", 220.0)], horizontal=true)
 ```
 
 ### 环形 / 饼图 donut_chart_t
@@ -684,7 +684,7 @@ let bars = @yue.Store::new([
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | data | Store[Array[DonutSlice]] | 必填 | 扇区数据（负值不计占比） |
-| width / height | Double | 480 / 240 | 画布尺寸 |
+| width / height | Double | 480 / 240 | 画布尺寸,经 `style` 传入 |
 | thickness | Double | 34 | 环厚（0 为实心饼） |
 | center | String | "" | 中心文案，空为汇总值 |
 （12 点方向起顺时针，五色循环，相邻扇区不同色）；中心汇总数值（默认总和，`center` 非空时改用该文案）；右侧图例（色块 + 标签 + 值与百分比）。悬停扇区外扩 4px，图例行同步高亮。`DonutSlice::make(标签, 值)`，负值不计入占比。50 扇区重绘实测约 2.9ms。
@@ -694,7 +694,7 @@ let slices = @yue.Store::new([
   @yue.DonutSlice::make("直接访问", 335.0),
   @yue.DonutSlice::make("搜索引擎", 510.0),
 ])
-@yue.donut_chart_t(slices, width=420.0, height=220.0)
+@yue.donut_chart_t(slices, style=[("width", 420.0), ("height", 220.0)])
 ```
 
 ### 仪表盘 gauge_t
@@ -706,7 +706,7 @@ let slices = @yue.Store::new([
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | value | Store[Double] | 必填 | 0..1，超出钳制 |
-| width / height | Double | 240 / 170 | 画布尺寸 |
+| width / height | Double | 240 / 170 | 画布尺寸,经 `style` 传入 |
 | thresholds | Array[(Double, String)] | [] | 升序（阈值上限, 颜色）分段着色；空表用主题主色 |
 （135° 起扫 270°，开口朝下）+ 中心大数字。`value` 取 0..1（超出钳制）；`thresholds` 为升序的 `[(阈值上限, 颜色), ...]`，值弧按落入分段着色（空表用主题主色），如 `[(0.6, 绿), (0.85, 橙), (1.0, 红)]`。数值插值平滑：目标值变化后经 16ms 定时器每帧补 25% 差值逐步逼近（非动画帧驱动），2Hz 更新无跳变。
 
@@ -728,7 +728,7 @@ x/y 点列
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | points | Store[Array[(Double, Double)]] | 必填 | (x, y) 点列 |
-| width / height | Double | 560 / 320 | 画布尺寸 |
+| width / height | Double | 560 / 320 | 画布尺寸,经 `style` 传入 |
 | trend | Bool | false | 最小二乘趋势线 |
 | dot | Double | 3 | 点边长（px） |
 （小方点），双轴自适应刻度 + 网格；`trend = true` 叠加最小二乘趋势线（红色）。10000 点首绘实测约 3ms。框选缩放后置，未做。
@@ -750,7 +750,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 |---|---|---|---|
 | indicators | Store[Array[RadarIndicator]] | 必填 | 维度定义，`RadarIndicator::make(名称, 最大值)`，量程 0..max |
 | series | Store[Array[RadarSeries]] | 必填 | `RadarSeries::make(名称, 各维取值)`，与 indicators 同序 |
-| width / height | Double | 460 / 340 | 画布尺寸 |
+| width / height | Double | 460 / 340 | 画布尺寸,经 `style` 传入 |
 | rings | Int | 4 | 同心网格层数 |
 | show_legend | Bool | true | 右侧图例列（色块 + 系列名） |
 
@@ -778,7 +778,7 @@ let ser : @yue.Store[Array[@yue.RadarSeries]] = @yue.Store::new([
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | data | Store[HeatGrid] | 必填 | `HeatGrid::make(列标签, 行标签, 行×列矩阵)`（外层行、内层列） |
-| width / height | Double | 480 / 300 | 画布尺寸 |
+| width / height | Double | 480 / 300 | 画布尺寸,经 `style` 传入 |
 | low_color / high_color | String | 跟随主题 | 色带起止色（"#RRGGBB"），空串 = 主题浅主色 → 主色 |
 | gap | Double | 2 | 格间距（px） |
 | show_values | Bool | false | 格内居中标注数值（格子宽 ≥30 且高 ≥14 才画） |
@@ -806,7 +806,7 @@ let heat : @yue.Store[@yue.HeatGrid] = @yue.Store::new(
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | candles | Store[Array[Candle]] | 必填 | `Candle::make(open, high, low, close)` |
-| width / height | Double | 560 / 280 | 画布尺寸 |
+| width / height | Double | 560 / 280 | 画布尺寸,经 `style` 传入 |
 | y_range | (Double, Double)? | 自适应 | 手动值域；缺省取全体 low/high + 8% 留白 |
 | up_color / down_color | String | 主题色 | 涨 / 跌颜色（"#RRGGBB"），空串回主题 danger / success |
 
@@ -831,7 +831,7 @@ let candles : @yue.Store[Array[@yue.Candle]] = @yue.Store::new([
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | data | Store[Array[BarItem]] | 必填 | 复用柱状图 `BarItem::make(标签, 值)`，内部按 value 降序稳定排 |
-| width / height | Double | 560 / 280 | 画布尺寸 |
+| width / height | Double | 560 / 280 | 画布尺寸,经 `style` 传入 |
 | alignment | FunnelAlign | `FunnelCenter` | 层水平对齐：居中 / `FunnelLeft` 左缘对齐 |
 | pct_of_total | Bool | false | 占比口径：false 相对首层（最大层，转化率口径），true 相对全部正值总和 |
 
@@ -857,7 +857,7 @@ let funnel : @yue.Store[Array[@yue.BarItem]] = @yue.Store::new([
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | groups | Store[Array[(String, Array[Double])]] | 必填 | (组标签, 样本值数组)，每组独立概括 |
-| width / height | Double | 560 / 280 | 画布尺寸 |
+| width / height | Double | 560 / 280 | 画布尺寸,经 `style` 传入 |
 | y_range | (Double, Double)? | 自适应 | 手动值域；缺省取全部样本 min/max（含离群点）+ 8% 留白 |
 
 五数概括按 1.5×IQR 规则：箱体 Q1-Q3（组序走四语义色循环，半透明填充 + 描边）、中位线 3px、须端取围栏内最远样本（端帽宽 60% 箱宽）、围栏外样本画 danger 色离群点圆点。组标签居中贴底轴，过密自动抽稀截断；空组只画标签。`boxp_summary(values) -> BoxSummary`（min/q1/median/q3/max/whisker_lo/whisker_hi/outliers）可脱离组件单独取概括值。
@@ -880,7 +880,7 @@ let boxp : @yue.Store[Array[(String, Array[Double])]] = @yue.Store::new([
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | data | Store[SankeyData] | 必填 | `SankeyData::make(节点, 链路)`，见下 |
-| width / height | Double | 560 / 320 | 画布尺寸 |
+| width / height | Double | 560 / 320 | 画布尺寸,经 `style` 传入 |
 | show_labels | Bool | true | 节点名标签（第 0 列标在矩形左侧、其余列右侧） |
 
 `SankeyNode::make(名称)` 建节点；`SankeyLink::make(源下标, 目标下标, 流量)` 建链路（流量 > 0 才计入布局，节点高度与色带宽度同量纲）。节点矩形高 ∝ 流量，链路画源右缘到目标左缘的半透明贝塞尔色带（宽 ∝ 流量，同一节点多条链路纵向依序排布不重叠）；节点与链路色按源节点下标走四语义色循环。
@@ -916,7 +916,7 @@ let sankey : @yue.Store[@yue.SankeyData] = @yue.Store::new(
 | root | Store[TreeItem] | 必填 | 树根节点（children 是可变子列表，直接 push 增删后 set 即重绘） |
 | orientation | String | "horizontal" | "horizontal" 横向（根居左、叶居右）；"vertical" 纵向（根居顶、叶居底） |
 | fill | Bool | false | 不设固定宽度，横向铺满父容器 |
-| width / height | Double | 560 / 320 | 画布尺寸（fill=false 时） |
+| width / height | Double | 560 / 320 | 画布尺寸（fill=false 时）,经 `style` 传入 |
 
 `TreeItem::make(名称, value? = None)` 建节点：value 为圆点大小量纲（None 或全树无 value 时圆点等大），children 建后可再 push。节点圆点半径 ∝ value（相对子树最大值），深度方向取主题主色渐变着色，每个节点带名称标签。配套纯函数：`tree_depth`（子树高度）、`tree_leaf_count`（叶子数）、`tree_max_value`（峰值）、`tree_vertical(orientation)`（是否纵形态）。
 
@@ -943,7 +943,7 @@ let tree = @yue.Store::new(root)
 | levels | Int | 2 | 展开层数：1=只排顶层；>1 把父矩形让给子项递归布局 |
 | gap | Double | 4 | 兄弟格间隙（px） |
 | fill | Bool | false | 不设固定宽度，横向铺满父容器 |
-| width / height | Double | 560 / 360 | 画布尺寸（fill=false 时） |
+| width / height | Double | 560 / 360 | 画布尺寸（fill=false 时）,经 `style` 传入 |
 
 `TmItem::make(名称, value? = 0.0, children? = [])` 建节点；计值口径 `tm_value_of`——自身 value > 0 取自身值，否则子项递归合计，全零退化为 0（不参与布局）。兄弟格沿主题主色的 HSL 明度轴均摊着色（同色系、相邻可辨），父格浅底 + 名称带；格内标签 `tm_label_lines` 给名称 + 数值两行（格高 ≥30 才两行，16..30 只名称，以下不显示，按可用宽截断）。hover 命中最深可见格（提亮 + 描边），命中表每次 on_draw 重建、与绘制同一 layout。
 
@@ -974,7 +974,7 @@ let tm = @yue.Store::new([
 | show_labels | Bool | true | 段内名称标签（按可容纳空间判定，放不下不画） |
 | center_text | String? | None | 中心文案：None=聚合总值 + 「总计」；`Some("")` 隐藏；`Some(t)` 自定义 |
 | fill | Bool | false | 不设固定宽度，横向铺满父容器 |
-| width / height | Double | 440 / 380 | 画布尺寸（fill=false 时） |
+| width / height | Double | 440 / 380 | 画布尺寸（fill=false 时）,经 `style` 传入 |
 
 `SunItem::make(名称, value? = None, children? = [])`：value 缺省时按 children 聚合值之和填好。聚合口径 `sun_total`——显式值 > 0 优先，否则子项递归合计，负值不计入，无子项为 0。同支系顶层段取主题五语义色循环、逐层提亮；段间按角度内缩留缝（不依赖描边线宽）。
 
@@ -1007,7 +1007,7 @@ GeoJSON 区域按等距圆柱投影绘制（填充 + 描边 + 质心区域名标
 | flights | Array[GeoFlight] | [] | 飞线（不经 Store，重画需整体重挂或改 regions 触发） |
 | show_labels | Bool | true | 区域名标签（画在质心，按可用宽截断，放得下才画） |
 | fill | Bool | false | 不设固定宽度，横向铺满父容器 |
-| width / height | Double | 560 / 360 | 画布尺寸（fill=false 时） |
+| width / height | Double | 560 / 360 | 画布尺寸（fill=false 时）,经 `style` 传入 |
 
 地图数据集不内置：文本解析走 `geojson_parse(text) -> Result[Array[GeoRegion], GeoError]`（支持 FeatureCollection / Feature / 裸 Polygon / MultiPolygon，几何不合规给 `GeoError::BadGeometry`），或自行构造 `GeoRegion::make(名称?, 环列表)`。投影矩形 = 区域环与飞线端点的合并包围盒按自身长宽比居中缩进（不变形），无数据时画「暂无数据」。区域填充以主题主色为底、按区域名哈希 ±0.06 微调明度（同名同色、换主题不变）；飞线分段渐变虚线 + 起终点圆点 + 末端箭头，静态表现无动画，hover 未做。配套纯函数：`geo_project`（等距圆柱投影）、`geo_bbox` / `geo_bbox_points`、`geo_fit_rect`、`geo_shoelace`（环有向面积）、`geo_ring_centroid` / `geo_region_centroid`、`geo_flight_points`（弧线采样）、`geo_quad_bezier`。
 
@@ -1038,7 +1038,7 @@ let regions = match geojson {
 | iterations | Int | 300 | 力模拟步数 |
 | show_labels | Bool | true | 节点名标签（防重叠推挤后的位置） |
 | fill | Bool | false | 不设固定宽度，横向铺满父容器 |
-| width / height | Double | 560 / 320 | 画布尺寸（fill=false 时） |
+| width / height | Double | 560 / 320 | 画布尺寸（fill=false 时）,经 `style` 传入 |
 
 `GraphNode::make(名称, value? = 1.0)`（value 定节点圆面积，不参与力模拟）、`GraphEdge::make(源下标, 目标下标, weight? = 1.0)`（两端下标越界、自环、weight ≤ 0 的边不参与模拟也不画）。边画半透明平行四边形色带（宽 ∝ weight），节点圆按主题四语义色循环；模拟无随机源（圆周均匀布点起步），同输入必同输出。布局按当前画布尺寸在首次绘制时收敛一次并缓存，数据 set 或画布尺寸变化才重算。
 
@@ -1066,7 +1066,7 @@ N 条竖轴等距横排、每轴独立量程归一，每行数据一条折线穿
 | rows | Store[Array[Array[Double]]] | 必填 | 数据行，每行一条折线（行短于列数的位按缺失处理） |
 | highlight | Int | -1 | 高亮行索引（≥0 时该行不透明重描 + 各轴顶点圆点） |
 | fill | Bool | false | 不设固定宽度，横向铺满父容器 |
-| width / height | Double | 640 / 320 | 画布尺寸（fill=false 时） |
+| width / height | Double | 640 / 320 | 画布尺寸（fill=false 时）,经 `style` 传入 |
 
 每轴顶部轴名、轴侧 min/max 量程标签、轴身刻度小横线；折线取系列色 alpha 混合（多行叠显密度），高亮行用不透明本色。`par_axis_range` 单轴量程推断（不加留白，等值退化以值为中心撑开）、`par_norm` 归一、`par_row_vertices` 行顶点可供自绘复用。
 
@@ -1094,7 +1094,7 @@ let rows = @yue.Store::new([[88.0, 72.0, 80.0], [70.0, 90.0, 65.0]])
 | tension | Double | 1.0 | 平滑张力：1 = 标准 Catmull-Rom；0 = 退化为折线 |
 | show_legend | Bool | true | 右侧图例（色块 + 层名 + 序列总量） |
 | fill | Bool | false | 不设固定宽度，横向铺满父容器 |
-| width / height | Double | 560 / 320 | 画布尺寸（fill=false 时） |
+| width / height | Double | 560 / 320 | 画布尺寸（fill=false 时）,经 `style` 传入 |
 
 层色取主题四语义色循环；时间轴长度 = 全体序列最长长度（`trv_axis_len`）。配套纯函数：`trv_row_at` / `trv_total_at`（取值与列总计）、`trv_stack_offsets`（堆叠偏移）、`trv_range`（值域）、`trv_layer_band`（层带像素盒）、`trv_series_total`。
 
@@ -1118,7 +1118,7 @@ let values = @yue.Store::new([[120.0, 132.0, 101.0], [220.0, 182.0, 191.0]])
 | x_range / y_range | (Double, Double)? | None | 手动值域；None 为自适应 |
 | anim | EffAnim | 自建 | 动画句柄：`eff_stop(anim)` 停定时器，未传则本次挂载自建（无法从外部停止） |
 | fill | Bool | false | 不设固定宽度，横向铺满父容器 |
-| width / height | Double | 560 / 320 | 画布尺寸（fill=false 时） |
+| width / height | Double | 560 / 320 | 画布尺寸（fill=false 时）,经 `style` 传入 |
 
 **停止纪律**：本库视图没有销毁回调（`yue/view.mbt` 无 dispose 钩子），组件被卸载后定时器仍会存活、持续 schedule_paint 已卸载视图，故调用方须在卸载前显式 `eff_stop(anim)`；停止不可恢复，需要恢复请用新句柄重新挂载。配套纯函数：`eff_point_radius`（直径钳制取半径）、`eff_ring_progress` / `eff_ring_radius` / `eff_ring_alpha`（单圈进度 → 半径 / alpha）、`eff_phase_advance`、`eff_tick_ms`、`eff_xy`（点数对表）。
 
@@ -1149,7 +1149,7 @@ let anim = @yue.EffAnim::make()
 | show_values | Bool | false | 逐根标注数值（贴杆端外侧） |
 | y_range | (Double, Double)? | None | 手动值域；None 为自适应 |
 | fill | Bool | false | 不设固定宽度，横向铺满父容器 |
-| width / height | Double | 560 / 280 | 画布尺寸（fill=false 时） |
+| width / height | Double | 560 / 280 | 画布尺寸（fill=false 时）,经 `style` 传入 |
 
 正数取主题主色向上 / 向右，负数取 danger 色向下 / 向左。单杆符号个数钳 64 上限；符号像素尺寸按「单位 × 杆长 / \|值\|」换算并钳在柱槽宽内。自定义符号：`PbCustom((Painter, x, y, w, h, color) -> Unit)` 在给定盒内自绘（颜色自行 set_fill_color）。
 

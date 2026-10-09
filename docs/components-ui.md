@@ -173,7 +173,7 @@ Self-drawn 1px outer border (turns theme primary on focus) + white background, s
 
 | Param | Type | Default | Notes |
 |---|---|---|---|
-| margin / width / height | Double | 0 / 280 / 32 | outer margin and size |
+| margin / width / height | Double | 0 / 280 / 32 | outer margin and size, set via `style` |
 | clearable | Bool | false | shows ✕ on the right on hover when non-empty; click clears |
 | invalid | Store[Bool] | false | when true the border turns danger red (light form validation), reacts to Store set |
 
@@ -200,7 +200,7 @@ let count = @yue.Store::new(1.0)
 Same pattern as input_t: self-drawn 1px border (turns theme primary on focus) + 8px inset; overflow scrolls per platform. clearable / invalid semantics match input_t.
 
 ```moonbit
-@yue.textarea_t(text="line one\nline two", width=320.0, height=120.0)
+@yue.textarea_t(text="line one\nline two", style=[("width", 320.0), ("height", 120.0)])
 ```
 
 ### Checkbox checkbox_t
@@ -438,7 +438,7 @@ Top form: tab header row (selected theme-colored text + 2px bottom indicator, da
 `divider(vertical? = false, style?, handle?)` — horizontal (default, 1px tall, flex width) or vertical (1px wide, height follows the parent container); side margins default to 10px, override via style. The color is read from the theme at mount, so it takes effect on UI rebuild.
 
 ```moonbit
-@yue.divider(spacing=16.0)
+@yue.divider(style=[("marginTop", 16.0), ("marginBottom", 16.0)])
 @yue.divider(vertical=true)
 ```
 
@@ -498,7 +498,7 @@ let visits = @yue.Store::new("1,024")
 
 ```moonbit
 let ratio = @yue.Store::new(0.42)
-@yue.progress_line(ratio, height=6.0)
+@yue.progress_line(ratio, style=[("height", 6.0)])
 ```
 
 ### Descriptions descriptions
@@ -537,7 +537,7 @@ let ratio = @yue.Store::new(0.42)
 `card(title, children : Array[Node], style?, handle?)` — title bar (bold, bottom separator) + border (card height defaults to 160, override via style); content starts below the title bar.
 
 ```moonbit
-@yue.card("Summary", [@yue.statistic("Tasks", done)], height=120.0)
+@yue.card("Summary", [@yue.statistic("Tasks", done)], style=[("height", 120.0)])
 ```
 
 ### Code highlighting code_view
@@ -630,7 +630,7 @@ Multi-series line chart over fixed-length rolling windows.
 | Param | Type | Default | Notes |
 |---|---|---|---|
 | series | Store[Array[LineSeries]] | required | multi-series data, see push helpers below |
-| width / height | Double | 560 / 260 | canvas size |
+| width / height | Double | 560 / 260 | canvas size, set via `style` |
 | area | Bool | false | semi-transparent area fill |
 | y_range | (Double, Double)? | None | manual y range; None = auto |
 | show_last | Bool | true | right-edge latest-value label |
@@ -648,8 +648,8 @@ ignore(@yue.set_timer(500, fn() {
   @yue.series_push(series, 1, mem_usage())
   true
 }))
-@yue.line_chart_t(series, width=380.0, height=220.0)
-@yue.line_chart_t(series, width=380.0, height=220.0, area=true)
+@yue.line_chart_t(series, style=[("width", 380.0), ("height", 220.0)])
+@yue.line_chart_t(series, style=[("width", 380.0), ("height", 220.0)], area=true)
 ```
 
 ### Bar chart bar_chart_t
@@ -661,7 +661,7 @@ Vertical bars
 | Param | Type | Default | Notes |
 |---|---|---|---|
 | data | Store[Array[BarItem]] | required | category data (values may be negative) |
-| width / height | Double | 560 / 280 | canvas size |
+| width / height | Double | 560 / 280 | canvas size, set via `style` |
 | horizontal | Bool | false | horizontal bar form |
  (default) and horizontal bars (`horizontal = true`, for long category names). `BarItem::make(label, value)` with possibly negative values; zero baseline, positive in theme color and negative in red. Hovering highlights the category and annotates its value inline (self-drawn, no popover); category labels thin out and truncate automatically when dense. Full redraw of 200 categories measured ~0.4ms.
 
@@ -670,8 +670,8 @@ let bars = @yue.Store::new([
   @yue.BarItem::make("Jan", 12.0),
   @yue.BarItem::make("Feb", -8.0),
 ])
-@yue.bar_chart_t(bars, width=380.0, height=220.0)
-@yue.bar_chart_t(bars, width=380.0, height=220.0, horizontal=true)
+@yue.bar_chart_t(bars, style=[("width", 380.0), ("height", 220.0)])
+@yue.bar_chart_t(bars, style=[("width", 380.0), ("height", 220.0)], horizontal=true)
 ```
 
 ### Donut / pie chart donut_chart_t
@@ -683,7 +683,7 @@ Proportional sectors
 | Param | Type | Default | Notes |
 |---|---|---|---|
 | data | Store[Array[DonutSlice]] | required | sector data (negatives excluded) |
-| width / height | Double | 480 / 240 | canvas size |
+| width / height | Double | 480 / 240 | canvas size, set via `style` |
 | thickness | Double | 34 | ring thickness (0 = solid pie) |
 | center | String | "" | center text; empty = total value |
  (clockwise from 12 o'clock, five-color cycle, adjacent sectors differ); the center shows the total (pass `center` to override the text); a right-side legend (swatch + label + value and percentage). Hovering explodes a sector by 4px and highlights its legend row. `DonutSlice::make(label, value)`; negative values are excluded from proportions. Redraw of 50 sectors measured ~2.9ms.
@@ -693,7 +693,7 @@ let slices = @yue.Store::new([
   @yue.DonutSlice::make("Direct", 335.0),
   @yue.DonutSlice::make("Search", 510.0),
 ])
-@yue.donut_chart_t(slices, width=420.0, height=220.0)
+@yue.donut_chart_t(slices, style=[("width", 420.0), ("height", 220.0)])
 ```
 
 ### Gauge gauge_t
@@ -705,7 +705,7 @@ Single-value percentage ring
 | Param | Type | Default | Notes |
 |---|---|---|---|
 | value | Store[Double] | required | 0..1, clamped |
-| width / height | Double | 240 / 170 | canvas size |
+| width / height | Double | 240 / 170 | canvas size, set via `style` |
 | thresholds | Array[(Double, String)] | [] | ascending (upper bound, color) bands; empty = theme primary |
  (270° sweep starting at 135°, opening downward) + big center number. `value` is 0..1 (clamped); `thresholds` is an ascending `[(upper bound, color), ...]` and the value arc takes the color of the band it falls into (empty table = theme primary), e.g. `[(0.6, green), (0.85, orange), (1.0, red)]`. Smooth interpolation: after a target change a 16ms timer closes 25% of the remaining gap per tick (not animation-frame driven), so 2Hz updates never jump.
 
@@ -727,7 +727,7 @@ x/y point series
 | Param | Type | Default | Notes |
 |---|---|---|---|
 | points | Store[Array[(Double, Double)]] | required | (x, y) points |
-| width / height | Double | 560 / 320 | canvas size |
+| width / height | Double | 560 / 320 | canvas size, set via `style` |
 | trend | Bool | false | least-squares trend line |
 | dot | Double | 3 | dot edge length (px) |
  (small squares), dual adaptive axes + grid; `trend = true` overlays a least-squares trend line (red). First draw of 10000 points measured ~3ms. Box-select zoom is post-poned, not implemented.
@@ -750,7 +750,7 @@ Hierarchical tree: leaf nodes share slots evenly along the spread direction, par
 | root | Store[TreeItem] | required | tree root node (`children` is a mutable child list; push to add/remove, then set to repaint) |
 | orientation | String | "horizontal" | "horizontal" spreads sideways (root at left, leaves at right); "vertical" spreads downward (root at top, leaves at bottom) |
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
-| width / height | Double | 560 / 320 | canvas size (when fill=false) |
+| width / height | Double | 560 / 320 | canvas size (when fill=false), set via `style` |
 
 `TreeItem::make(name, value? = None)` creates a node: `value` is the dot-size dimension (None, or no value anywhere in the tree, makes all dots equal size); `children` can still be pushed after creation. The node dot radius ∝ value (relative to the subtree maximum), depth is shaded along a theme-primary gradient, and every node carries a name label. Companion pure functions: `tree_depth` (subtree height), `tree_leaf_count` (leaf count), `tree_max_value` (peak), `tree_vertical(orientation)` (whether the form is vertical).
 
@@ -777,7 +777,7 @@ Hierarchical data is split orthogonally with area ∝ value (squarified aspect-r
 | levels | Int | 2 | expansion depth: 1 = lay out the top level only; >1 yields the parent rect to its children and lays out recursively |
 | gap | Double | 4 | sibling cell gap (px) |
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
-| width / height | Double | 560 / 360 | canvas size (when fill=false) |
+| width / height | Double | 560 / 360 | canvas size (when fill=false), set via `style` |
 
 `TmItem::make(name, value? = 0.0, children? = [])` creates a node; the value rule is `tm_value_of` — a positive own value wins, otherwise children are summed recursively, and all-zero degenerates to 0 (excluded from layout). Sibling cells spread their shading evenly along the theme primary's HSL lightness axis (same color family, neighbors distinguishable); parent cells get a light background plus a name band; in-cell labels `tm_label_lines` give name + value on two lines (two lines only when the cell height is ≥30, name only for 16..30, nothing below that, truncated to the available width). Hover hits the deepest visible cell (brightened + outlined); the hit table is rebuilt on every on_draw, sharing one layout with drawing.
 
@@ -808,7 +808,7 @@ Tree data as concentric rings level by level: a parent segment's angular span is
 | show_labels | Bool | true | in-segment name labels (drawn only when the space allows) |
 | center_text | String? | None | center text: None = aggregated total + "Total"; `Some("")` hides it; `Some(t)` is custom |
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
-| width / height | Double | 440 / 380 | canvas size (when fill=false) |
+| width / height | Double | 440 / 380 | canvas size (when fill=false), set via `style` |
 
 `SunItem::make(name, value? = None, children? = [])`: when value is omitted it is filled from the sum of the children's aggregated values. The aggregation rule is `sun_total` — an explicit value > 0 wins, otherwise children are summed recursively, negatives are excluded, and a childless node is 0. Top-level segments of one branch cycle the five semantic theme colors, brightening level by level; segments inset angularly to leave gaps (independent of stroke width).
 
@@ -841,7 +841,7 @@ GeoJSON regions are drawn under an equirectangular projection (fill + stroke + c
 | flights | Array[GeoFlight] | [] | flights (not backed by a Store; repainting needs a full remount or a change to regions) |
 | show_labels | Bool | true | region-name labels (drawn at the centroid, truncated to the available width, only when they fit) |
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
-| width / height | Double | 560 / 360 | canvas size (when fill=false) |
+| width / height | Double | 560 / 360 | canvas size (when fill=false), set via `style` |
 
 No map dataset is built in: text parsing goes through `geojson_parse(text) -> Result[Array[GeoRegion], GeoError]` (supports FeatureCollection / Feature / bare Polygon / MultiPolygon; malformed geometry yields `GeoError::BadGeometry`), or construct `GeoRegion::make(name?, ring list)` yourself. The projection rect is the merged bounding box of the region rings and flight endpoints, centered and inset by its own aspect ratio (no distortion); with no data it draws "No data". Region fills take the theme primary as the base and tweak lightness by ±0.06 hashed from the region name (same name, same color; unchanged across theme switches); flights are segmented gradient dashes + origin/destination dots + an end arrow — a static rendering with no animation, and no hover. Companion pure functions: `geo_project` (equirectangular projection), `geo_bbox` / `geo_bbox_points`, `geo_fit_rect`, `geo_shoelace` (ring signed area), `geo_ring_centroid` / `geo_region_centroid`, `geo_flight_points` (arc sampling), `geo_quad_bezier`.
 
@@ -872,7 +872,7 @@ A node-edge graph is drawn statically after the force simulation converges: Coul
 | iterations | Int | 300 | force simulation steps |
 | show_labels | Bool | true | node-name labels (at positions after anti-overlap pushing) |
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
-| width / height | Double | 560 / 320 | canvas size (when fill=false) |
+| width / height | Double | 560 / 320 | canvas size (when fill=false), set via `style` |
 
 `GraphNode::make(name, value? = 1.0)` (value sets the node circle's area; it does not take part in the force simulation), `GraphEdge::make(source index, target index, weight? = 1.0)` (edges with out-of-range endpoints, self-loops, or weight ≤ 0 neither take part in the simulation nor get drawn). Edges are drawn as semi-transparent parallelogram bands (width ∝ weight), node circles cycle the four semantic theme colors; the simulation has no random source (starting from evenly spaced points on a circle), so identical input always yields identical output. The layout converges once at first draw for the current canvas size and is cached; it is only recomputed when the data is set or the canvas size changes.
 
@@ -900,7 +900,7 @@ N vertical axes are laid out evenly side by side, each normalized on its own ran
 | rows | Store[Array[Array[Double]]] | required | data rows, one polyline per row (positions shorter than the column count are treated as missing) |
 | highlight | Int | -1 | highlighted row index (when ≥0 that row is redrawn opaque, with vertex dots on every axis) |
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
-| width / height | Double | 640 / 320 | canvas size (when fill=false) |
+| width / height | Double | 640 / 320 | canvas size (when fill=false), set via `style` |
 
 Each axis carries a name at the top, min/max range labels beside it, and small tick marks on its body; polylines take the series colors alpha-blended (many rows overlapping show density), while the highlighted row uses its opaque own color. `par_axis_range` infers a single axis's range (no padding; a degenerate equal-value range is stretched open around the value), `par_norm` normalizes, and `par_row_vertices` gives a row's vertices for reuse in self-drawing.
 
@@ -928,7 +928,7 @@ Multiple series are stacked into a river on an evenly spaced time axis, with smo
 | tension | Double | 1.0 | smoothing tension: 1 = standard Catmull-Rom; 0 = degenerates to a polyline |
 | show_legend | Bool | true | right-side legend (swatch + layer name + series total) |
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
-| width / height | Double | 560 / 320 | canvas size (when fill=false) |
+| width / height | Double | 560 / 320 | canvas size (when fill=false), set via `style` |
 
 Layer colors cycle the four semantic theme colors; the time-axis length is the longest length across all series (`trv_axis_len`). Companion pure functions: `trv_row_at` / `trv_total_at` (value and column total), `trv_stack_offsets` (stacking offsets), `trv_range` (value range), `trv_layer_band` (layer-band pixel box), `trv_series_total`.
 
@@ -952,7 +952,7 @@ Scatter plus ripple animation: each point periodically expands N concentric ring
 | x_range / y_range | (Double, Double)? | None | manual value ranges; None = adaptive |
 | anim | EffAnim | self-built | animation handle: `eff_stop(anim)` stops the timer; when omitted, this mount builds its own (impossible to stop from outside) |
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
-| width / height | Double | 560 / 320 | canvas size (when fill=false) |
+| width / height | Double | 560 / 320 | canvas size (when fill=false), set via `style` |
 
 **Stop discipline**: views in this library have no destroy callback (`yue/view.mbt` has no dispose hook), so after a component is unmounted its timer stays alive and keeps calling schedule_paint on the unmounted view — callers must therefore call `eff_stop(anim)` explicitly before unmounting; stopping is not recoverable, and to resume, remount with a new handle. Companion pure functions: `eff_point_radius` (clamped diameter to radius), `eff_ring_progress` / `eff_ring_radius` / `eff_ring_alpha` (single-ring progress → radius / alpha), `eff_phase_advance`, `eff_tick_ms`, `eff_xy` (point-to-pair table).
 
@@ -983,7 +983,7 @@ Values are expressed by symbols repeated along the baseline or stretched as a wh
 | show_values | Bool | false | per-bar value labels (just outside the bar end) |
 | y_range | (Double, Double)? | None | manual value range; None = adaptive |
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
-| width / height | Double | 560 / 280 | canvas size (when fill=false) |
+| width / height | Double | 560 / 280 | canvas size (when fill=false), set via `style` |
 
 Positive values take the theme primary upward / rightward, negatives take the danger color downward / leftward. Per-bar symbol count is clamped at 64; a symbol's pixel size is computed as "unit × bar length / |value|" and clamped within the bar slot width. Custom symbol: `PbCustom((Painter, x, y, w, h, color) -> Unit)` self-draws inside the given box (set the color yourself with set_fill_color).
 

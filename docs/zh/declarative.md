@@ -30,8 +30,7 @@ entry.on_activate(fn() { check(entry.get_text()) })
 单个 `style` 数组（数值 Double 与字符串值混装）几乎在每个构造器上都有：
 
 ```moonbit
-@yue.Label::make("标题", style=[("marginBottom", 10.0)],
-                 ("color", "#356AA0")])
+@yue.Label::make("标题", style=[("marginBottom", 10.0), ("color", "#356AA0")])
 ```
 
 已有控件想批量应用样式，用自由函数 `apply_style(view, style=...)`。
@@ -173,15 +172,15 @@ fn tagged(label_text : String, body : Node) -> Node {
 - `empty(desc)` —— 空状态;
 - `statistic(title, value)` —— 数值统计(响应式);
 - `avatar` / `badge_count` / `badge_dot` —— 头像 / 角标 / 圆点;
-- `card(title, children, height?)` —— 卡片(标题栏 + 分隔线 + 边框);
+- `card(title, children)` —— 卡片(标题栏 + 分隔线 + 边框,卡高经 style 覆盖);
 - `code_view(lines)` —— 代码高亮视图：逐 token 建 AttributedText（整段设色）
   测宽后自绘排版。**等价于区间设色的视觉效果且全平台一致**——Windows 的
   AttributedText 区间字体/颜色是上游缺陷（见 adaptation.md），此法绕开，
   是做代码高亮 / 终端渲染的可行替代。内置 `tokenize_moonbit` 极简着色器
   仅作演示，消费方可传入任意词法分析结果。
 
-全部组件配色取自 `theme_*` 主题常量(深色高级变体:蓝 #2D68C4 /
-绿 #2E9E5B / 橙 #D9822B / 红 #D64550,低饱和深色调);文字一律垂直居中。
+全部组件配色在绘制时现取 `theme_current()` 色板(深色高级变体:蓝 #2D68C4 /
+绿 #2E9E5B / 橙 #D9822B / 红 #D64550,低饱和深色调),`theme_apply` 切换深浅即跟随;文字一律垂直居中。
 组件间状态协调统一走 `Store`；主区页面联动用「订阅 Store +
 `ViewLike::set_visible`」（2026-09-16 补齐该 ABI）。完整演示见
 `examples/showcase`（侧栏 + 顶栏 + 页面切换 + 代码页）;组件清单详见 [docs/zh/components-ui.md](components-ui.md)。

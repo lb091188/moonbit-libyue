@@ -30,8 +30,7 @@ Note that L1 constructors and their same-named L2 nodes differ in callback param
 A single `style` array mixing numeric (`Double`) and string values is available on almost every constructor:
 
 ```moonbit
-@yue.Label::make("Title", style=[("marginBottom", 10.0)],
-                 ("color", "#356AA0")])
+@yue.Label::make("Title", style=[("marginBottom", 10.0), ("color", "#356AA0")])
 ```
 
 To batch-apply styles to an existing widget, use the free function `apply_style(view, style=...)`.
