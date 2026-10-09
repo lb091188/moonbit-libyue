@@ -64,7 +64,7 @@ fn vid_mount_player(
 
 ///|
 /// 载入演示视频:lavfi 生成 2 秒 160x120@5 测试视频(AVI 容器 + 正弦
-/// 音轨)→ VideoPlayer::make(probe + 帧集提取 + 音轨提取,同步耗时)。
+/// 音轨)→ VideoPlayer::make(视频/音频双 Demuxer 流式打开,同步耗时)。
 fn vid_load_demo(
   app : @ui.ProbeApp,
   holder : Ref[@yue.Container?],
@@ -107,8 +107,8 @@ fn vid_load_demo(
 
 ///|
 /// 视频播放页。首次进入自动载入演示视频;「选择本地视频…」弹文件
-/// 对话框取盘上文件真解码(帧集上限 1200 帧 @12fps,约前 100 秒,
-/// 更长视频音轨完整、画面止于帧集上限)。
+/// 对话框取盘上文件真解码(FFI 流式逐帧解码,长短视频均完整,无帧数
+/// 上限)。
 pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
   let holder : Ref[@yue.Container?] = Ref(None)
   let status : Ref[@yue.Label?] = Ref(None)
@@ -117,7 +117,7 @@ pub fn page_video(app : @ui.ProbeApp) -> @yue.Node {
   let auto_started : Ref[Bool] = Ref(false)
   @ui.page_shell(
     "视频播放",
-    "FFI 流式解码的浏览器级播放器:播放时钟为墙钟+帧时间戳(与时长同轴、1 倍速,高帧率视频跳帧追时钟);控制条悬浮于画面底部(悬停显示、播放中移开自动隐藏),双击画面或右下按钮进全屏(Esc/按钮退出),画面黑底等比 letterbox;含播放/暂停、拖进度(松手防抖)、时间、音量、循环。本地文件宽 480 按源比例。",
+    "FFI 流式解码的浏览器级播放器:播放时钟为墙钟+帧时间戳(与时长同轴、1 倍速,高帧率视频跳帧追时钟);控制条悬浮于画面底部(移动/进入即显示,静止 1s 或移出 250ms 后隐藏),双击画面或右下按钮进全屏(Esc/按钮退出),画面黑底等比 letterbox;含播放/暂停、拖进度(松手防抖)、时间、音量、循环。本地文件宽 480 按源比例。",
     fn(refresh) {
       [
         @yue.hbox(

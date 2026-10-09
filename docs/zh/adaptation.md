@@ -557,6 +557,15 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 音轨失败(无音轨/解码器不可用/无设备)时自动静音播放,不阻断视频路径。
 - 换源顺序必须是「旧播放器 stop → free(closed 置位,旧刷新定时器停摆)→ 旧根视图 `remove_child_view` → 挂新节点」,乱序会留残音/残定时器;但顺序正确也不够——free 旧后其组件的在飞定时器(seek 防抖等)仍会触发,组件侧必须自防御(closed 守卫),详见「播放器组件换载崩溃与 seek 防抖风暴」节。systemprobe 视频页首次挂载 set_timeout 300ms 自动载入(make 同步耗时);音频页换 AudioPlayer 后:载入即播放、控制条 audio_player_t 挂 holder、200ms 轮询 is_playing 状态标签、演示素材改 MP3(lavfi + libmp3lame)。
 
+### VideoPlayer 重播状态机:播完再 play 不走 / stop 后重播无声(2026-10 白盒回归)
+
+- 现象:视频播完(EOF 非循环)后再点「播放」毫无变化——位置钉在时长、画面钉末帧、音频队列已空;stop 后再 play,画面倒是从头了,但全程无声。
+- 根因一(**播完再 play 不走**):`vp_tick` 的 EOF 非循环分支把 state 置回 `VpIdle`,与初始 idle 无法区分——`play()` 对 VpIdle 一律「从当前位置续播」,而播完态 pos=duration,续播目标时刻恒超时长、demuxer 又已在 EOF,首 tick 立刻再次 EOF 转停,点了等于没点。
+- 根因二(**stop 后重播无声**):`stop()` 只 seek 了视频 demuxer;**音频 demuxer 是同文件另开的独立容器实例**(读游标与视频互不干扰,见上节),停在 EOF——重播时 `vp_fill_audio` 的 `decode_pcm` 直接 None,队列全空、全程静音。凡「回起点」类操作必须双 demuxer 都 seek,漏一个就是有声画面配静音。
+- 修复:① 显式增加 `VpEnded` 态(对标 AudioPlayer 的 `ApEnded`),EOF 非循环转 VpEnded;`play()` 对 VpEnded 先走 `vp_restart`(双 demuxer seek(0) + pos/base_pts/frame_no 归零 + 音频队列重填)再起播;② `stop()` 补音频 demuxer seek(0);③ `seek()` 把 VpEnded 迁移到 VpPaused——播完态拖进度后再 play 从落点续播,不被误判成重播(重播语义只属于「停在末尾直接再 play」)。
+- 设计取舍:**用显式态而非 `pos>=duration` 启发式**——播放中 target 超时长但尚未 EOF 时 pos 会被 clamp 到 duration(启发式假阳性,「暂停在末尾再播放」会被误判成重播回 0);且容器无时长头(duration=0)时启发式完全失效,显式态两种场景都对。
+- 验证:白盒对照——把 video_player.mbt 暂存回修复前跑 `moon test -p yue-media`,新增两条用例精确失败(播完→play 的 is_playing 断言、stop→play 的音轨 decode_pcm 断言),恢复修复后 11/11 通过;全仓 `moon check --deny-warn` 零警告 + `moon test` 641 全绿(较此前 636 新增 5 条:循环 EOF→vp_restart、播完→play、播完态 seek→play、stop→play、音量钳制)。真机交互(播完再点播放、stop 后重播的观感)由用户复验。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。
