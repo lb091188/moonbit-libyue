@@ -1,7 +1,9 @@
 // sysmonitor FFI 层：extern "c" 声明（仅 native 目标编译）。
 // 安全封装与纯函数解析在 sysdata.mbt / sysproc.mbt / syshw.mbt。
 // Windows 侧 stub 同 ABI 真实实现（kill 映射 TerminateProcess、优先级
-// 四档离散映射，Win32 错误码译成 errno 编号，SYS2 语义归一）。
+// 四档离散映射，Win32 错误码译成 errno 编号，SYS2 语义归一）；macOS 侧
+// stub 把 Mach / libproc / getfsstat / getifaddrs 数据源虚拟成同构的
+// /proc、/sys 文本（SYS3），GPU 走 system_profiler 子进程原样回传 JSON。
 
 ///|
 // 读整个文本文件；失败返回 None（C 侧 NULL 映射）。#borrow：C 仅在
@@ -64,3 +66,10 @@ extern "c" fn ffi_statvfs(
 // nvidia-smi 不存在或查询失败返回 None。C 仅在调用期间读取返回值前
 // 的缓冲，结果经 Bytes 一次性带回。
 extern "c" fn ffi_nvidia_smi() -> Bytes? = "yue_sysmon_nvidia_smi"
+
+///|
+// system_profiler SPDisplaysDataType -json 原始输出（macOS GPU 枚举）。
+// stub 内 fork + 匿名管道 + 8s 超时（不用 popen——GUI 进程下 shell 子
+// 进程会闪窗），首跑秒级、成功后进程内常驻缓存。无显卡 / 查询失败返回
+// None。JSON 解析在 syshw.mbt 的纯函数（parse_system_profiler_gpu）。
+extern "c" fn ffi_system_profiler_gpu() -> Bytes? = "yue_sysmon_system_profiler_gpu"
