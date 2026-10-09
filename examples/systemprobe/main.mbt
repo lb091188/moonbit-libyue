@@ -82,7 +82,7 @@ fn main {
               }
 
               apply()
-              @yue.on_theme_change(apply)
+              ignore(@yue.on_theme_change(apply))
             },
           ),
           @yue.vbox(
@@ -110,7 +110,7 @@ fn main {
               }
 
               apply()
-              @yue.on_theme_change(apply)
+              ignore(@yue.on_theme_change(apply))
             },
           ),
           // 轻提示层挂窗口根:absolute 顶部横条,不占布局

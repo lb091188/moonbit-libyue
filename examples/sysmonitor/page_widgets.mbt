@@ -71,7 +71,7 @@ fn draw_rows(
         c.schedule_paint()
       })
       // 主题切换后重绘（绘制时读 theme_current，与 themed 容器一致）
-      @yue.on_theme_change(fn() { c.schedule_paint() })
+      ignore(@yue.on_theme_change(fn() { c.schedule_paint() }))
     },
     style=[
       ("height", rows.get().to_double() * row_h()),

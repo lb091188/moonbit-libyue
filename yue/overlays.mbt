@@ -169,6 +169,9 @@ pub fn toast_layer(
         probe.set_font(fnt)
         let text_w = probe.get_bounds_for(10000.0, 100.0).width
         let w = text_w + 62.0
+        // 条子是「现建现撤」的短周期视图:它的主题订阅随撤下一起退订,
+        // 不退则每次 push 漏两条死订阅,随提示次数无界累积
+        sub_bag_begin()
         let bar = themed_container(style=[
           ("width", w),
           ("height", 34.0),
@@ -194,10 +197,12 @@ pub fn toast_layer(
           let x = 30.0 + (b.width - 30.0 - 16.0 - text_w) / 2.0
           p.draw_attributed_text(at, x, 0.0, b.width, b.height)
         })
+        let gen = sub_bag_end()
         c.add_child(bar)
         ignore(
           set_timeout(duration_ms, fn() {
             ignore(Container::remove_child_view(c, ViewLike::view(bar)))
+            sub_bag_discard(gen)
           }),
         )
       }

@@ -281,7 +281,7 @@ pub fn line_chart_it(
         repaint()
       })
       // 图例色板随主题重建(系列色是 theme_* 现取名)
-      on_theme_change(fn() { items.set(ci_line_items(series.get())) })
+      ignore(on_theme_change(fn() { items.set(ci_line_items(series.get())) }))
       node.mount_into(parent)
     },
   }
@@ -412,7 +412,7 @@ pub fn bar_chart_it(
         repaint()
       })
       // 柱色(正负)与图例色板随主题重建
-      on_theme_change(fn() { items.set(ci_bar_items(data.get())) })
+      ignore(on_theme_change(fn() { items.set(ci_bar_items(data.get())) }))
       node.mount_into(parent)
     },
   }
@@ -617,7 +617,7 @@ pub fn donut_chart_it(
         repaint()
       })
       // 扇区色板随主题重建
-      on_theme_change(fn() { items.set(ci_donut_items(data.get())) })
+      ignore(on_theme_change(fn() { items.set(ci_donut_items(data.get())) }))
       node.mount_into(parent)
     },
   }

@@ -98,13 +98,15 @@ pub fn vid_pause(handle : VidHandle) -> Unit {
   handle.paused.val = true
 }
 
-///
+///|
 pub fn vid_resume(handle : VidHandle) -> Unit {
   handle.paused.val = false
 }
 
 ///|
-/// 停止并注销定时器（不可恢复）。
+/// 停止并注销定时器（不可恢复）。**移除 video_view_t 视图前必须
+/// 调用**：定时器无取消 id，只有回调返回 false 才停，漏 stop 会让
+/// 帧推进对已销毁的视图空转到播完。
 pub fn vid_stop(handle : VidHandle) -> Unit {
   handle.running.val = false
 }
@@ -114,6 +116,10 @@ pub fn vid_stop(handle : VidHandle) -> Unit {
 /// frame_count/fps 定播放长度与帧率，source 为帧源；loop 默认播到
 /// 末帧停止。暂停经句柄 vid_pause/vid_resume；停止后组件应卸载。
 /// 帧缺失/解码失败画主题底色占位，不中断播放。
+/// ⚠ 生命周期契约：**卸载前必须 vid_stop(handle)**。帧推进定时器
+/// 由 libyue SetTimer 驱动（无取消 id，见 app.mbt set_timer），
+/// 只有回调返回 false 才停——不先 stop 就移除视图，定时器仍会
+/// 对已销毁的视图空转到播完为止。
 pub fn video_view_t(
   width : Int,
   height : Int,

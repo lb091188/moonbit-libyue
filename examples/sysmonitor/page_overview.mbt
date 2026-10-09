@@ -77,7 +77,7 @@ fn sparkline_box(
     })
     hist.subscribe(fn(_s) { c.schedule_paint() })
     // 主题切换后重绘（绘制时读 theme_current）
-    @yue.on_theme_change(fn() { c.schedule_paint() })
+    ignore(@yue.on_theme_change(fn() { c.schedule_paint() }))
     @yue.View::set_cursor(c, hand)
   })
 }
@@ -141,7 +141,7 @@ fn res_card(
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
       })
       // 主题切换 / 选中态变化都只重绘画布
-      @yue.on_theme_change(fn() { c.schedule_paint() })
+      ignore(@yue.on_theme_change(fn() { c.schedule_paint() }))
       view.subscribe(fn(_v) { c.schedule_paint() })
       @yue.View::set_cursor(c, hand_cur)
       @yue.ViewLike::on_mouse_down(c, fn(e) {
