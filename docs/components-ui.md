@@ -556,10 +556,10 @@ Per-token highlighting with manual layout — consistent behavior on all platfor
 
 ### Markdown rendering markdown_view
 
-`markdown_view(source, style?)` — headings 1-6, paragraphs, **bold**, *italic*, `inline code`, link text, ordered/unordered lists, blockquotes (theme-colored bar), rules, fenced code blocks (language from the fence marker, backed by code_view); consistent rendering across platforms, link/code colors follow the theme.
+`markdown_view(source, style?)` — headings 1-6 (ATX/Setext), paragraphs, **bold**, *italic*, ~~strikethrough~~ (line drawn per range), `inline code`, [links](url) (click opens the default browser, hand cursor and address tooltip on hover; reference-style links resolve from the document link definitions), autolinks, ordered/unordered lists (with start), task lists (real checkboxes, click to toggle), blockquotes (theme-colored bar), GFM alerts, rules, fenced and indented code blocks (language from the fence marker, backed by code_view), tables (equal-width column grid, rich-text cells, column alignment from `:---` `:---:` `---:`), definition lists, footnotes (superscript references numbered in order of appearance, referenced definitions rendered after a rule at the end), block images (loaded from local paths or `file://`, scaled proportionally up to 560 wide; on load failure or network URLs falls back to the alt text, inline images fall back to alt); style ranges stay aligned after non-BMP characters (emoji) via UTF-16 indexing; inline HTML and HTML blocks are not rendered; consistent rendering across platforms, link/code colors follow the theme.
 
 ```moonbit
-@yue.markdown_view("# Heading\n\nBody **bold** and `inline code`.")
+@yue.markdown_view("# Heading\n\nBody **bold**, ~~struck~~ and a [link](https://libyue.com).\n\n- [x] Task item\n\n| Col A | Col B |\n|:--|--:|\n| 1 | 2 |\n\nA footnote[^1].\n\n[^1]: Footnote body.")
 ```
 
 ### Table table_t
