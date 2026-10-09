@@ -39,7 +39,7 @@
   - moonav1(mooncakes 纯 MoonBit AV1 解码)帧源接入评估
   - 验证:真机播放实测片源截图入档
 - [ ] O4 macOS 真机验证测试(季度,前置:获得 mac 真机)
-  - 基础冒烟:hello / hello-themed / showcase / systemprobe 全量启动与视觉确认
+  - 基础冒烟:hello / hello-themed / showcase / sysmonitor 全量启动与视觉确认
   - 遗留清单逐项:reply(OS_MAC) 通知回调、Display 全字段枚举、Accelerator 类 / Tray 原生后端、mac canvas 滚轮事件、WebKit framework 拆分评估(浏览器按需化 fork 侧收尾)
   - 验证:mac 真机逐项执行,结论回填 TODO.md 与 adaptation.md
 - [ ] O5 发布闭环(季度)
@@ -55,7 +55,7 @@
   - Windows 富文本 / markdown 观感待真机复验
 - [ ] **libyue fork 根修:Windows 运行期 remove+add 子树后鼠标 hit-test 错乱**(bind_node 病根,详见 docs/zh/adaptation.md「bind_node 运行期重挂后 Windows 鼠标 hit-test 错乱」)
   - 现象:点击回调链里 remove_child+add 新子树后,新子树的 size_allocation_(ViewImpl 布局分配矩形)异常,FindChildFromPoint 恒命中它——全窗点击被误路由给重挂过的控件、不可逆、连标题栏都关不掉;推迟重挂躲不开,Linux 无恙
-  - 复现工具:examples/probe-click(行2 bind_node(button_t) 必现,事件流自动记录)
+  - 复现最小用例:bind_node(button_t) 重挂子树即必现(原复现工具 examples/probe-click 已随探针清理移除,现象与事件流记录详见 adaptation.md 对应节)
   - 排查方向:RemoveChildView 后被移除 view 的 size_allocation_ 残留、新挂 view 首轮 Layout 前的初始值;补丁方向:remove 时清零或 FindChildFromPoint 对未布局 view 防御
   - 修好随 vendor-* 重出包后:解除 bind_node 的 Windows 警示与 swap_node 的「安全替代」定位(两 API 并存,swap_node 仍有零重建的低开销价值)
 - [ ] 浏览器按需化的 fork 侧收尾(4a 治本,详见 docs/zh/adaptation.md「浏览器依赖按需化」)
