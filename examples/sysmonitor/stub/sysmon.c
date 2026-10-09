@@ -271,6 +271,18 @@ static moonbit_bytes_t sysmon_read_proc_stat(void) {
 
 /* ---------------- CPU：/proc/cpuinfo ---------------- */
 
+/* winnt.h 布局常量：SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX 头部长
+   （Relationship + Size），GROUP_RELATIONSHIP 头部长（MaximumGroupCount +
+   ActiveGroupCount + Reserved[20]），PROCESSOR_GROUP_INFO 体长
+   （MaximumProcessorCount + ActiveProcessorCount + Reserved[38] +
+   ActiveProcessorMask），以及 RelationGroup 的枚举值。GetLogical-
+   ProcessorInformationEx 的返回缓冲区里，组信息从记录起点 +8 处的联合体
+   开始，按这三项长度定位各组的活动处理器数。 */
+#define SYSMON_RELATION_GROUP 4
+#define SYSMON_SLPIEX_HEAD_SIZE 8
+#define SYSMON_GROUP_REL_SIZE 24
+#define SYSMON_PROCESSOR_GROUP_INFO_SIZE 48
+
 static moonbit_bytes_t sysmon_read_cpuinfo(void) {
   char model[256] = "(未知处理器)";
   unsigned long mhz = 0;
@@ -282,7 +294,7 @@ static moonbit_bytes_t sysmon_read_cpuinfo(void) {
   RegGetValueA(HKEY_LOCAL_MACHINE,
                "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", "~MHz",
                RRF_RT_REG_DWORD, NULL, &mhz, &mhz_len);
-  /* 逻辑核数：默认 GetSystemInfo（≤64 组一次拿全），超 64 核按
+  /* 逻辑核数：默认 GetSystemInfo（单组 ≤64 核一次拿全），超 64 核按
      GetLogicalProcessorInformationEx 的活动处理器组求和修正 */
   SYSTEM_INFO si;
   GetSystemInfo(&si);
@@ -295,10 +307,10 @@ static moonbit_bytes_t sysmon_read_cpuinfo(void) {
           k32, "GetLogicalProcessorInformationEx");
   if (glpie != NULL) {
     DWORD need = 0;
-    /* RelationGroup=3：活动组内活动逻辑处理器计数之和 */
-    if (!glpie(3, NULL, &need) && need > 0) {
+    /* RelationGroup=4：活动组内活动逻辑处理器计数之和 */
+    if (!glpie(SYSMON_RELATION_GROUP, NULL, &need) && need > 0) {
       unsigned char *buf = (unsigned char *)malloc(need);
-      if (buf != NULL && glpie(3, buf, &need)) {
+      if (buf != NULL && glpie(SYSMON_RELATION_GROUP, buf, &need)) {
         unsigned char *it = buf;
         unsigned char *end = buf + need;
         int total = 0;
@@ -308,14 +320,23 @@ static moonbit_bytes_t sysmon_read_cpuinfo(void) {
           if (size == 0 || it + size > end) {
             break;
           }
-          if (rel == 3) {
-            /* GROUP_RELATIONSHIP：ActiveGroupCount 在 +8（WORD），
-               PROCESSOR_GROUP_INFO[0].ActiveProcessorCount 在 +32+1；
-               两处偏移按 winnt.h 固定布局 */
-            unsigned short groups = *(unsigned short *)(it + 8);
-            if (groups > 0 && it + size >= it + 32 + 64 * (size_t)groups) {
+          if (rel == SYSMON_RELATION_GROUP) {
+            /* GROUP_RELATIONSHIP 起于记录 +8 的联合体：ActiveGroupCount
+               为组内 +2 处 WORD，GroupInfo[] 为组内 +24 起，每项
+               PROCESSOR_GROUP_INFO 48 字节、ActiveProcessorCount 为项内
+               +1 偏移 */
+            unsigned char *grp = it + SYSMON_SLPIEX_HEAD_SIZE;
+            unsigned short groups = *(unsigned short *)(grp + 2);
+            if (groups > 0 &&
+                (size_t)size >= SYSMON_SLPIEX_HEAD_SIZE +
+                                     SYSMON_GROUP_REL_SIZE +
+                                     SYSMON_PROCESSOR_GROUP_INFO_SIZE *
+                                         (size_t)groups) {
               for (unsigned short g = 0; g < groups; g++) {
-                total += *(unsigned char *)(it + 32 + 64 * (size_t)g + 1);
+                total += *(unsigned char *)(grp + SYSMON_GROUP_REL_SIZE +
+                                            SYSMON_PROCESSOR_GROUP_INFO_SIZE *
+                                                (size_t)g +
+                                            1);
               }
             }
           }
@@ -461,22 +482,34 @@ static void *sysmon_pdh_raw_array(void *counter, DWORD *count) {
   return buf;
 }
 
-/* 实例名（如 "0 C:"）提取盘符名：取最后一个空格后的部分；无空格或为
-   "_Total" 返回 NULL。返回 malloc 窄字符串。 */
-static char *sysmon_pdh_disk_name(const wchar_t *instance) {
-  const wchar_t *sp = NULL;
-  for (const wchar_t *p = instance; *p; p++) {
-    if (*p == L' ') {
-      sp = p;
+/* PDH PhysicalDisk 实例名（如 "0 C: D:"）提取盘符名表：按空格分词，只收
+   形如 "C:" 的双字符 token（磁盘序号与 "_Total" 自然跳过）。返回个数，
+   名字逐个 malloc 写出到 names（调用方逐项 free）。 */
+#define SYSMON_MAX_DISK_NAMES 26
+
+static DWORD sysmon_pdh_disk_names(const wchar_t *instance, char **names,
+                                   DWORD cap) {
+  DWORD n = 0;
+  const wchar_t *p = instance;
+  while (*p != L'\0' && n < cap) {
+    while (*p == L' ') {
+      p++;
+    }
+    const wchar_t *tok = p;
+    while (*p != L'\0' && *p != L' ') {
+      p++;
+    }
+    size_t len = (size_t)(p - tok);
+    if (len != 2 || tok[1] != L':') {
+      continue;
+    }
+    wchar_t w[3] = {tok[0], L':', L'\0'};
+    char *s = sysmon_wide_to_utf8(w);
+    if (s != NULL) {
+      names[n++] = s;
     }
   }
-  if (sp == NULL || sp[1] == L'\0') {
-    return NULL;
-  }
-  if (wcscmp(sp + 1, L"_Total") == 0) {
-    return NULL;
-  }
-  return sysmon_wide_to_utf8(sp + 1);
+  return n;
 }
 
 typedef struct {
@@ -506,11 +539,8 @@ static moonbit_bytes_t sysmon_read_diskstats(void) {
     aw.items = (PDH_RAW_COUNTER_ITEM_W *)sysmon_pdh_raw_array(cw, &aw.count);
     if (ar.items != NULL && aw.items != NULL) {
       SysmonBuf b = {0};
-      for (DWORD i = 0; i < ar.count; i++) {
-        char *name = sysmon_pdh_disk_name(ar.items[i].szName);
-        if (name == NULL) {
-          continue;
-        }
+      int ok = 1;
+      for (DWORD i = 0; ok && i < ar.count; i++) {
         /* 对位同实例的写计数（实例数小，线性查找足够） */
         LONGLONG written = 0;
         int found = 0;
@@ -521,16 +551,24 @@ static moonbit_bytes_t sysmon_read_diskstats(void) {
             break;
           }
         }
-        if (found) {
-          LONGLONG read_sectors = ar.items[i].RawValue.FirstValue;
-          if (!sysmon_buf_putf(&b,
-                               "8 0 %s 0 0 %lld 0 0 0 %lld 0 0 0 0 0\n", name,
-                               read_sectors / 512, written / 512)) {
-            free(name);
+        if (!found) {
+          continue;
+        }
+        LONGLONG read_sectors = ar.items[i].RawValue.FirstValue;
+        /* PhysicalDisk 计数按物理盘计：盘上每个盘符各出一行同名同值，
+           使 /proc/mounts 侧每个分区行都能归属到所属物理盘 */
+        char *names[SYSMON_MAX_DISK_NAMES];
+        DWORD nn = sysmon_pdh_disk_names(ar.items[i].szName, names,
+                                         SYSMON_MAX_DISK_NAMES);
+        for (DWORD k = 0; k < nn; k++) {
+          ok = sysmon_buf_putf(&b, "8 0 %s 0 0 %lld 0 0 0 %lld 0 0 0 0 0\n",
+                               names[k], read_sectors / 512,
+                               written / 512);
+          free(names[k]);
+          if (!ok) {
             break;
           }
         }
-        free(name);
       }
       out = sysmon_bytes_take(&b);
     }
@@ -1011,14 +1049,16 @@ typedef struct {
 } SysmonVideoMemoryInfo;
 
 /* COM 接口只取用到的槽位（vtable 前缀按接口继承序固定，二进制 ABI 稳定）；
-   IID 为 SDK 公开常量值，自定义免依赖 dxgi.h 版本差异。 */
+   IID 取 SDK dxgi.h / dxgi1_4.h 的公开常量值，自定义免依赖头文件版本差异。 */
 static const GUID sysmon_IID_IDXGIFactory1 = {
-    0x770aae78, 0xf26f, 0x4dba, {0x83, 0xa9, 0x50, 0xbc, 0x11, 0xd9, 0xee, 0x9b}};
+    0x770aae78, 0xf26f, 0x4dba, {0xa8, 0x29, 0x25, 0x3c, 0x83, 0xd1, 0xb3, 0x87}};
 static const GUID sysmon_IID_IDXGIAdapter1 = {
-    0x290462f0, 0xac1e, 0x4212, {0xaa, 0x25, 0x4f, 0x95, 0xb4, 0x96, 0x8b, 0x12}};
+    0x29038f61, 0x3839, 0x4626, {0x91, 0xfd, 0x08, 0x68, 0x79, 0x01, 0x1a, 0x05}};
 static const GUID sysmon_IID_IDXGIAdapter3 = {
-    0x645967a4, 0x1392, 0x4316, {0x9c, 0xec, 0x9c, 0xaf, 0x71, 0x13, 0xf4, 0x20}};
+    0x645967a4, 0x1392, 0x4310, {0xa7, 0x98, 0x80, 0x53, 0xce, 0x3e, 0x93, 0xfd}};
 
+/* IDXGIFactory1 vtable：前 7 槽为 IUnknown + IDXGIObject，其后按 SDK
+   dxgi.h 的 IDXGIFactory → IDXGIFactory1 声明序固定，槽位不可重排。 */
 typedef struct {
   LONG(WINAPI *QueryInterface)(void *, const GUID *, void **);
   ULONG(WINAPI *AddRef)(void *);
@@ -1029,13 +1069,17 @@ typedef struct {
   LONG(WINAPI *GetPrivateData)(void *, const GUID *, unsigned int *, void *);
   LONG(WINAPI *GetParent)(void *, const GUID *, void **);
   LONG(WINAPI *EnumAdapters)(void *, unsigned int, void **);
-  LONG(WINAPI *GetWindowAssociation)(void *, void **);
   LONG(WINAPI *MakeWindowAssociation)(void *, void *, unsigned int);
+  LONG(WINAPI *GetWindowAssociation)(void *, void **);
   LONG(WINAPI *CreateSwapChain)(void *, void *, void *, void **);
+  LONG(WINAPI *CreateSoftwareAdapter)(void *, void *, void **);
   LONG(WINAPI *EnumAdapters1)(void *, unsigned int, void **);
   int(WINAPI *IsCurrent)(void *);
 } SysmonFactory1Vtbl;
 
+/* IDXGIAdapter vtable：前 7 槽为 IUnknown + IDXGIObject，其后按 SDK
+   dxgi1_4.h 的 IDXGIAdapter → IDXGIAdapter3 声明序固定；本文件只用到
+   GetDesc1 与 QueryVideoMemoryInfo（IDXGIAdapter3 的第 15 槽）。 */
 typedef struct {
   LONG(WINAPI *QueryInterface)(void *, const GUID *, void **);
   ULONG(WINAPI *AddRef)(void *);
@@ -1045,13 +1089,15 @@ typedef struct {
   LONG(WINAPI *SetPrivateDataInterface)(void *, const GUID *, const void *);
   LONG(WINAPI *GetPrivateData)(void *, const GUID *, unsigned int *, void *);
   LONG(WINAPI *GetParent)(void *, const GUID *, void **);
-  LONG(WINAPI *GetEnumOutputs)(void *, unsigned int, void **);
+  LONG(WINAPI *EnumOutputs)(void *, unsigned int, void **);
   LONG(WINAPI *GetDesc)(void *, void *);
   LONG(WINAPI *CheckInterfaceSupport)(void *, const GUID *, LONGLONG *);
   LONG(WINAPI *GetDesc1)(void *, SysmonDxgiDesc1 *);
   LONG(WINAPI *GetDesc2)(void *, void *);
-  LONG(WINAPI *RegisterVideoMemoryBudget)(void *, void *, unsigned int *);
-  LONG(WINAPI *UnregisterVideoMemoryBudget)(void *, unsigned int);
+  LONG(WINAPI *RegisterHardwareContentProtectionTeardownStatusEvent)(
+      void *, void *, unsigned int *);
+  LONG(WINAPI *UnregisterHardwareContentProtectionTeardownStatus)(void *,
+                                                                    unsigned int);
   LONG(WINAPI *QueryVideoMemoryInfo)(void *, unsigned int, unsigned int,
                                         SysmonVideoMemoryInfo *);
 } SysmonAdapterVtbl;
