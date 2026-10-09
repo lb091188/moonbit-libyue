@@ -153,7 +153,7 @@ pub fn cbw_start_watch(
       },
     ),
   }
-  set_timer(ms, fn() { cbw_tick(watcher, cb) })
+  @yue.set_timer(ms, fn() { cbw_tick(watcher, cb) })
   watcher
 }
 

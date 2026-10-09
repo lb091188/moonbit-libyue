@@ -232,7 +232,7 @@ fn pwrc_session_call(
 /// 当前系统是否支持电源控制（Linux 且 logind 在线）。每次调用真实探测，
 /// 高频场景请调用方自行缓存结果。
 pub fn pwrc_supported() -> Bool {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return false
   }
   match

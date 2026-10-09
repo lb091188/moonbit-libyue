@@ -77,10 +77,10 @@ fn main {
 
   // 单实例:首实例持有应用专属身份并监听唤起;第二实例唤醒首实例后直接
   // 退出(不建窗口)。Windows 兜底路径按标题查找,故标题固定并登记
-  match @yue.SingleInstance::acquire("org.moonbitlibyue.Showcase") {
+  match @system.SingleInstance::acquire("org.moonbitlibyue.Showcase") {
     Ok(Some(si)) => {
       app.si_role.set("首实例:已持有 org.moonbitlibyue.Showcase")
-      @yue.set_instance_window_title(SHOWCASE_TITLE)
+      @system.set_instance_window_title(SHOWCASE_TITLE)
       si.on_activate(fn(args) {
         app.si_wake.set(
           "收到唤起:参数 \{args.length()} 个 [\{args.join(" ")}]",

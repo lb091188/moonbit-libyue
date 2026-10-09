@@ -177,7 +177,7 @@ test "Show 输出:结构体与错误枚举" {
 
 ///|
 test "本机 /etc/os-release:解析关键键存在" {
-  match read_text_file("/etc/os-release") {
+  match @yue.read_text_file("/etc/os-release") {
     None => () // 非 Linux 或读不到：跳过
     Some(text) =>
       match si_parse_os_release(text) {
@@ -193,7 +193,7 @@ test "本机 /etc/os-release:解析关键键存在" {
 
 ///|
 test "本机 /proc/meminfo:总量/可用为正且可用不超总量" {
-  match read_text_file("/proc/meminfo") {
+  match @yue.read_text_file("/proc/meminfo") {
     None => ()
     Some(text) =>
       match si_parse_meminfo(text) {
@@ -213,7 +213,7 @@ test "本机 /proc/meminfo:总量/可用为正且可用不超总量" {
 
 ///|
 test "本机 /proc/uptime:秒数为正且量级合理" {
-  match read_text_file("/proc/uptime") {
+  match @yue.read_text_file("/proc/uptime") {
     None => ()
     Some(text) =>
       match si_parse_uptime(text) {

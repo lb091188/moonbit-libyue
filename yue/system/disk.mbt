@@ -153,7 +153,7 @@ let dsk_bus_daemon_path : String = "/org/freedesktop/DBus"
 /// udisks2 是否在系统总线上在线（系统总线守护的 NameHasOwner 真实探测，
 /// 被查名是 udisks2）。每次调用真实探测，高频场景请调用方自行缓存结果。
 fn dsk_udisks_available() -> Bool {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return false
   }
   match

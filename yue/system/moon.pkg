@@ -1,10 +1,9 @@
 import {
   "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/json",
   "moonbitlang/core/env",
+  "NoahLiu/moonbit-libyue/yue",
   "NoahLiu/moonbit-libyue/yue/traybus",
+  "chensuiyi/subproc",
+  "prowk/moonsqlitefile",
 }
-
-options(
-  "native-stub": ["win_gui.c"],
-  targets: { "ffi.mbt": [ "native" ] },
-)

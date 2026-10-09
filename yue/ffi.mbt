@@ -1724,13 +1724,13 @@ extern "c" fn ffi_menu_item_click(item : MenuItem) -> Unit = "yue_mbt_menu_item_
 ///|
 /// 尝试创建/探测命名互斥体。ok=1 取得（首实例），ok=0 已存在（第二实例）。
 #borrow(name, ok)
-extern "c" fn ffi_win_named_mutex_create(name : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_win_named_mutex_create"
+pub extern "c" fn ffi_win_named_mutex_create(name : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_win_named_mutex_create"
 
 ///|
 /// 向首实例的 message-only 窗口发 Wake（WM_COPYDATA 透传命令行，'\n' 分隔）。
 /// ok=1 已送达，ok=0 窗口不在（新旧构建混跑 / 建窗失败）。
 #borrow(class_name, args, ok)
-extern "c" fn ffi_win_instance_window_send(
+pub extern "c" fn ffi_win_instance_window_send(
   class_name : Bytes,
   args : Bytes,
   ok : Ref[Int],
@@ -1740,7 +1740,7 @@ extern "c" fn ffi_win_instance_window_send(
 /// 首实例建 message-only 窗口：WM_COPYDATA 到达经 PostTask 抛回主循环，
 /// 再经蹦床调 callback(Bytes 命令行)。非零返回表示建窗失败（互斥体仍持有）。
 #borrow(class_name, invoke, callback)
-extern "c" fn ffi_win_instance_window_create(
+pub extern "c" fn ffi_win_instance_window_create(
   class_name : Bytes,
   invoke : FuncRef[((Bytes) -> Unit, Bytes) -> Unit],
   callback : (Bytes) -> Unit,
@@ -1749,7 +1749,7 @@ extern "c" fn ffi_win_instance_window_create(
 ///|
 /// 兜底路径：按标题查找顶层窗口并置前（最小化先恢复）。ok=1 找到。
 #borrow(title, ok)
-extern "c" fn ffi_win_find_and_activate(title : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_win_find_and_activate"
+pub extern "c" fn ffi_win_find_and_activate(title : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_win_find_and_activate"
 
 // ---------- 开机自启动（Linux:XDG .desktop;Windows:HKCU Run 键） ----------
 // 注册表三件套非 Windows 给桩（MoonBit 层按平台路由，桩值不会被消费）。
@@ -1758,22 +1758,22 @@ extern "c" fn ffi_win_find_and_activate(title : Bytes, ok : Ref[Int]) -> Int = "
 /// 本进程可执行文件绝对路径（Linux readlink /proc/self/exe;Windows
 /// GetModuleFileNameW）。
 #borrow(ok)
-extern "c" fn ffi_exe_path(ok : Ref[Int]) -> Bytes = "yue_mbt_exe_path"
+pub extern "c" fn ffi_exe_path(ok : Ref[Int]) -> Bytes = "yue_mbt_exe_path"
 
 ///|
 /// 删除文件：目标本就不存在也记 ok=1（disable 幂等）。
 #borrow(path, ok)
-extern "c" fn ffi_remove_file(path : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_remove_file"
+pub extern "c" fn ffi_remove_file(path : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_remove_file"
 
 ///|
 /// 读环境变量（未设置 ok=0）。
 #borrow(name, ok)
-extern "c" fn ffi_getenv_bytes(name : Bytes, ok : Ref[Int]) -> Bytes = "yue_mbt_getenv_bytes"
+pub extern "c" fn ffi_getenv_bytes(name : Bytes, ok : Ref[Int]) -> Bytes = "yue_mbt_getenv_bytes"
 
 ///|
 /// Windows:HKCU Run 键写值（exe 自动引号包裹）；非 Windows 返回 -1000 哨兵。
 #borrow(app_id, exe, ok)
-extern "c" fn ffi_autostart_set(
+pub extern "c" fn ffi_autostart_set(
   app_id : Bytes,
   exe : Bytes,
   ok : Ref[Int],
@@ -1782,12 +1782,12 @@ extern "c" fn ffi_autostart_set(
 ///|
 /// Windows:读 Run 键值（未设置 ok=0）；非 Windows ok=-1000。
 #borrow(app_id, ok)
-extern "c" fn ffi_autostart_get(app_id : Bytes, ok : Ref[Int]) -> Bytes = "yue_mbt_autostart_get"
+pub extern "c" fn ffi_autostart_get(app_id : Bytes, ok : Ref[Int]) -> Bytes = "yue_mbt_autostart_get"
 
 ///|
 /// Windows:删 Run 键值（值本就不在也记 ok=1）；非 Windows 返回 -1000。
 #borrow(app_id, ok)
-extern "c" fn ffi_autostart_remove(app_id : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_autostart_remove"
+pub extern "c" fn ffi_autostart_remove(app_id : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_autostart_remove"
 
 // ---------- 环境变量与目录枚举（fsx） ----------
 
@@ -1830,24 +1830,24 @@ extern "c" fn ffi_win_reveal_file(path : Bytes, ok : Ref[Int]) -> Int = "yue_mbt
 ///|
 /// 用户空闲毫秒数（无 X 会话/Wayland/加载失败 ok=0）。
 #borrow(ok)
-extern "c" fn ffi_idle_seconds_ms(ok : Ref[Int]) -> Int = "yue_mbt_idle_seconds_ms"
+pub extern "c" fn ffi_idle_seconds_ms(ok : Ref[Int]) -> Int = "yue_mbt_idle_seconds_ms"
 
 ///|
 /// Windows:SetThreadExecutionState(ES_CONTINUOUS|ES_DISPLAY_REQUIRED),
 /// 必须在主线程调用。
 #borrow(ok)
-extern "c" fn ffi_win_keep_awake_enable(ok : Ref[Int]) -> Int = "yue_mbt_win_keep_awake_enable"
+pub extern "c" fn ffi_win_keep_awake_enable(ok : Ref[Int]) -> Int = "yue_mbt_win_keep_awake_enable"
 
 ///|
 /// Windows:还原线程执行状态(ES_CONTINUOUS)。
 #borrow(ok)
-extern "c" fn ffi_win_keep_awake_restore(ok : Ref[Int]) -> Int = "yue_mbt_win_keep_awake_restore"
+pub extern "c" fn ffi_win_keep_awake_restore(ok : Ref[Int]) -> Int = "yue_mbt_win_keep_awake_restore"
 
 ///|
 /// Windows:GetSystemPowerStatus;出参 ac(0/1)/percent(-1 未知)/charging/
 /// has_battery;返回 0 成功、-1 失败、-1000 非 Windows。
 #borrow(ac, percent, charging, has_battery)
-extern "c" fn ffi_win_power_status(
+pub extern "c" fn ffi_win_power_status(
   ac : Ref[Int],
   percent : Ref[Int],
   charging : Ref[Int],
@@ -1858,7 +1858,7 @@ extern "c" fn ffi_win_power_status(
 /// Windows:电源/会话事件窗口(event 码 0=将睡 1=已醒 2=锁屏 3=解锁);
 /// 失败 -1,非 Windows 哨兵 -1000。
 #borrow(invoke, closure)
-extern "c" fn ffi_win_session_power_watch(
+pub extern "c" fn ffi_win_session_power_watch(
   invoke : FuncRef[((Int) -> Unit, Int) -> Unit],
   closure : (Int) -> Unit,
 ) -> Int = "yue_mbt_win_session_power_watch"
@@ -1866,11 +1866,11 @@ extern "c" fn ffi_win_session_power_watch(
 ///|
 /// Windows:启动后台轮询线程(interval_ms),查询只在后台线程发生,
 /// UI 线程经 ffi_netwin_cached 读缓存;重复启动幂等;失败 0。
-extern "c" fn ffi_netwin_start(interval_ms : Int) -> Int = "yue_mbt_netwin_start"
+pub extern "c" fn ffi_netwin_start(interval_ms : Int) -> Int = "yue_mbt_netwin_start"
 
 ///|
 /// Windows:最近一次轮询缓存(位掩码);尚未轮询到 -1,非 Windows 哨兵 -1。
-extern "c" fn ffi_netwin_cached() -> Int = "yue_mbt_netwin_cached"
+pub extern "c" fn ffi_netwin_cached() -> Int = "yue_mbt_netwin_cached"
 
 ///|
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，
@@ -1881,7 +1881,7 @@ pub fn utf8_bytes(text : String) -> Bytes {
 
 ///|
 // UTF-8 Bytes -> String：C 侧返回字符串时的统一入口。
-fn from_utf8_bytes(bytes : Bytes) -> String {
+pub fn from_utf8_bytes(bytes : Bytes) -> String {
   @utf8.decode_lossy(bytes)
 }
 

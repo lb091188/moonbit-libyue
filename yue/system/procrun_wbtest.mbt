@@ -19,7 +19,7 @@ test "pr_available:主链路 Linux 为真" {
     return
   }
   assert_true(pr_available())
-  assert_eq(platform(), "linux")
+  assert_eq(@yue.platform(), "linux")
 }
 
 ///|
@@ -75,7 +75,7 @@ test "pr_run:cat /etc/hostname 与直接读文件一致" {
   if !pr_skip_guard() {
     return
   }
-  match read_text_file("/etc/hostname") {
+  match @yue.read_text_file("/etc/hostname") {
     None => println("pr: skip (no /etc/hostname)")
     Some(expect) =>
       match pr_run("cat", ["/etc/hostname"]) {

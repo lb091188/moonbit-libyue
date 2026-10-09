@@ -19,7 +19,7 @@ pub fn keep_alive(callback : () -> Unit) -> Unit {
 }
 
 ///|
-fn keep_alive_bytes(callback : (Bytes) -> Unit) -> Unit {
+pub fn keep_alive_bytes(callback : (Bytes) -> Unit) -> Unit {
   bytes_callbacks.val.push(callback)
 }
 

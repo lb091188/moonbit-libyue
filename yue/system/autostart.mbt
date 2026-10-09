@@ -4,7 +4,7 @@
 // macOS 显式 Unsupported。
 //
 // 典型用法：
-//   let a = @yue.Autostart::new("com.example.app")
+//   let a = @system.Autostart::new("com.example.app")
 //   a.enable()   // 写盘/注册表，重新登录后拉起
 //   a.disable()  // 移除
 
@@ -79,9 +79,9 @@ pub struct Autostart {
 ///|
 /// 创建自启动句柄。app_id 走 DBus 知名名校验（≥2 点分元素、元素以
 /// 字母/下划线开头）。
-pub fn Autostart::new(app_id : String) -> Result[Autostart, AutostartError] {
+pub fn Autostart::new(app_id : String) -> Result[Autostart, @yue.AutostartError] {
   if !@traybus.valid_app_id(app_id) {
-    return Err(InvalidAppId)
+    return Err(@yue.InvalidAppId)
   }
   Ok({ app_id, })
 }
@@ -89,7 +89,7 @@ pub fn Autostart::new(app_id : String) -> Result[Autostart, AutostartError] {
 ///|
 /// 当前平台是否支持开机自启动（macOS 暂缓）。
 pub fn Autostart::is_supported() -> Bool {
-  match platform() {
+  match @yue.platform() {
     "linux" | "windows" => true
     _ => false
   }
@@ -98,28 +98,28 @@ pub fn Autostart::is_supported() -> Bool {
 ///|
 /// 自启动条目的位置：Linux 为 .desktop 完整路径；Windows 为 Run 键值
 /// 描述。排查用。
-pub fn Autostart::path(self : Autostart) -> Result[String, AutostartError] {
-  match platform() {
+pub fn Autostart::path(self : Autostart) -> Result[String, @yue.AutostartError] {
+  match @yue.platform() {
     "linux" => self.linux_file()
     "windows" =>
       Ok(
         "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\" +
         self.app_id,
       )
-    _ => Err(Unsupported)
+    _ => Err(@yue.Unsupported)
   }
 }
 
 ///|
 /// 查询是否已启用。
-pub fn Autostart::is_enabled(self : Autostart) -> Result[Bool, AutostartError] {
-  match platform() {
+pub fn Autostart::is_enabled(self : Autostart) -> Result[Bool, @yue.AutostartError] {
+  match @yue.platform() {
     "linux" => {
       let file = match self.linux_file() {
         Ok(f) => f
         Err(e) => return Err(e)
       }
-      match read_text_file(file) {
+      match @yue.read_text_file(file) {
         Some(content) => Ok(desktop_entry_enabled(content))
         // 文件不存在 = 未启用（目录存在性由 enable 时的写失败兜底报错）
         None => Ok(false)
@@ -127,96 +127,96 @@ pub fn Autostart::is_enabled(self : Autostart) -> Result[Bool, AutostartError] {
     }
     "windows" => {
       let ok = Ref(0)
-      let _ = ffi_autostart_get(utf8_bytes(self.app_id), ok)
+      let _ = @yue.ffi_autostart_get(@yue.utf8_bytes(self.app_id), ok)
       if ok.val == 1 {
         Ok(true)
       } else if ok.val == 0 {
         Ok(false)
       } else {
-        Err(IoFailed("读注册表 Run 键失败"))
+        Err(@yue.IoFailed("读注册表 Run 键失败"))
       }
     }
-    _ => Err(Unsupported)
+    _ => Err(@yue.Unsupported)
   }
 }
 
 ///|
 /// 启用：Linux 写 .desktop；Windows 写 Run 键（值自动引号包裹，重登录
 /// /重启后拉起）。幂等：重复 enable 覆盖旧值。
-pub fn Autostart::enable(self : Autostart) -> Result[Unit, AutostartError] {
+pub fn Autostart::enable(self : Autostart) -> Result[Unit, @yue.AutostartError] {
   let exe = match exe_path() {
     Some(p) => p
-    None => return Err(NoExecutablePath)
+    None => return Err(@yue.NoExecutablePath)
   }
-  match platform() {
+  match @yue.platform() {
     "linux" => {
       let file = match self.linux_file() {
         Ok(f) => f
         Err(e) => return Err(e)
       }
-      if !write_text_file(file, desktop_entry_content(exe, self.app_id)) {
+      if !@yue.write_text_file(file, desktop_entry_content(exe, self.app_id)) {
         return Err(
-          IoFailed("写入失败: " + file + " (目录不存在或无权限)"),
+          @yue.IoFailed("写入失败: " + file + " (目录不存在或无权限)"),
         )
       }
       Ok(())
     }
     "windows" => {
       let ok = Ref(0)
-      let rc = ffi_autostart_set(utf8_bytes(self.app_id), utf8_bytes(exe), ok)
+      let rc = @yue.ffi_autostart_set(@yue.utf8_bytes(self.app_id), @yue.utf8_bytes(exe), ok)
       if rc == 0 && ok.val == 1 {
         Ok(())
       } else if rc == -1000 {
-        Err(Unsupported)
+        Err(@yue.Unsupported)
       } else {
-        Err(IoFailed("写注册表 Run 键失败"))
+        Err(@yue.IoFailed("写注册表 Run 键失败"))
       }
     }
-    _ => Err(Unsupported)
+    _ => Err(@yue.Unsupported)
   }
 }
 
 ///|
 /// 禁用：删除 .desktop / 删除 Run 键值。幂等：目标本就不在也是成功。
-pub fn Autostart::disable(self : Autostart) -> Result[Unit, AutostartError] {
-  match platform() {
+pub fn Autostart::disable(self : Autostart) -> Result[Unit, @yue.AutostartError] {
+  match @yue.platform() {
     "linux" => {
       let file = match self.linux_file() {
         Ok(f) => f
         Err(e) => return Err(e)
       }
       let ok = Ref(0)
-      let _ = ffi_remove_file(utf8_bytes(file), ok)
+      let _ = @yue.ffi_remove_file(@yue.utf8_bytes(file), ok)
       if ok.val == 1 {
         Ok(())
       } else {
-        Err(IoFailed("删除失败: " + file))
+        Err(@yue.IoFailed("删除失败: " + file))
       }
     }
     "windows" => {
       let ok = Ref(0)
-      let rc = ffi_autostart_remove(utf8_bytes(self.app_id), ok)
+      let rc = @yue.ffi_autostart_remove(@yue.utf8_bytes(self.app_id), ok)
       if rc == 0 && ok.val == 1 {
         Ok(())
       } else if rc == -1000 {
-        Err(Unsupported)
+        Err(@yue.Unsupported)
       } else {
-        Err(IoFailed("删注册表 Run 键值失败"))
+        Err(@yue.IoFailed("删注册表 Run 键值失败"))
       }
     }
-    _ => Err(Unsupported)
+    _ => Err(@yue.Unsupported)
   }
 }
 
 ///|
 /// Linux 侧 .desktop 完整路径（目录解析失败给结构化错误）。
-fn Autostart::linux_file(self : Autostart) -> Result[String, AutostartError] {
+fn Autostart::linux_file(self : Autostart) -> Result[String, @yue.AutostartError] {
   let dir = match
     autostart_dir_of(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME")) {
     Some(d) => d
     None =>
       return Err(
-        IoFailed(
+        @yue.IoFailed(
           "无法定位自启动目录(XDG_CONFIG_HOME / HOME 均未设置)",
         ),
       )
@@ -227,9 +227,9 @@ fn Autostart::linux_file(self : Autostart) -> Result[String, AutostartError] {
 ///|
 fn exe_path() -> String? {
   let ok = Ref(0)
-  let data = ffi_exe_path(ok)
+  let data = @yue.ffi_exe_path(ok)
   if ok.val == 1 && data.length() > 0 {
-    Some(from_utf8_bytes(data))
+    Some(@yue.from_utf8_bytes(data))
   } else {
     None
   }
@@ -238,9 +238,9 @@ fn exe_path() -> String? {
 ///|
 fn getenv_str(name : String) -> String? {
   let ok = Ref(0)
-  let data = ffi_getenv_bytes(utf8_bytes(name), ok)
+  let data = @yue.ffi_getenv_bytes(@yue.utf8_bytes(name), ok)
   if ok.val == 1 && data.length() > 0 {
-    Some(from_utf8_bytes(data))
+    Some(@yue.from_utf8_bytes(data))
   } else {
     None
   }

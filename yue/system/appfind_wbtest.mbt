@@ -185,7 +185,7 @@ test "appfind 目录拼装：用户目录三态 + 扫描序 + bin 查找序" {
 ///|
 test "appfind_collect：真实读盘 + 非 .desktop 过滤 + 路径只留文件名" {
   let path = "/tmp/appfind_wbtest_sample.desktop"
-  let written = write_text_file(
+  let written = @yue.write_text_file(
     path, "[Desktop Entry]\nType=Application\nName=Sample\nName[zh_CN]=示例\nExec=/opt/sample %U\nIcon=sample\nCategories=Development;\n",
   )
   inspect(written, content="true")
@@ -206,7 +206,7 @@ test "appfind_collect：真实读盘 + 非 .desktop 过滤 + 路径只留文件�
   inspect(out[0].exec, content="/opt/sample %U")
   // 清理
   let ok = Ref(0)
-  ignore(ffi_remove_file(utf8_bytes(path), ok))
+  ignore(@yue.ffi_remove_file(@yue.utf8_bytes(path), ok))
 }
 
 ///|
@@ -217,7 +217,7 @@ test "appfind_collect：目录读不到静默跳过（空清单不报错）" {
   inspect(out.length(), content="0")
   // 解析后全被过滤（NoDisplay）：同样空清单
   let path = "/tmp/appfind_wbtest_hidden.desktop"
-  ignore(write_text_file(path, "[Desktop Entry]\nName=H\nNoDisplay=true\n"))
+  ignore(@yue.write_text_file(path, "[Desktop Entry]\nName=H\nNoDisplay=true\n"))
   let out2 = appfind_collect(["/tmp"], fn(dir) {
     if dir == "/tmp" {
       ["appfind_wbtest_hidden.desktop"]
@@ -227,7 +227,7 @@ test "appfind_collect：目录读不到静默跳过（空清单不报错）" {
   })
   inspect(out2.length(), content="0")
   let ok = Ref(0)
-  ignore(ffi_remove_file(utf8_bytes(path), ok))
+  ignore(@yue.ffi_remove_file(@yue.utf8_bytes(path), ok))
 }
 
 ///|
@@ -242,7 +242,7 @@ test "appfind_installed_impl：目录全打不开 Err(NoScanDir)，部分存在�
   match
     appfind_installed_impl(
       ["/nonexistent-appfind-zz-1", "/nonexistent-appfind-zz-2"],
-      fn(dir) { Err(OpenFailed(dir)) },
+      fn(dir) { Err(@yue.OpenFailed(dir)) },
     ) {
     Err(NoScanDir) => inspect(true, content="true")
     _ => inspect(false, content="true")
@@ -250,7 +250,7 @@ test "appfind_installed_impl：目录全打不开 Err(NoScanDir)，部分存在�
   // 部分目录打不开：跳过，存在的照扫
   let path = "/tmp/appfind_wbtest_real.desktop"
   ignore(
-    write_text_file(
+    @yue.write_text_file(
       path, "[Desktop Entry]\nType=Application\nName=RealScan\nExec=real %U\n",
     ),
   )
@@ -259,7 +259,7 @@ test "appfind_installed_impl：目录全打不开 Err(NoScanDir)，部分存在�
       if dir == "/tmp" {
         Ok(["appfind_wbtest_real.desktop"])
       } else {
-        Err(OpenFailed(dir))
+        Err(@yue.OpenFailed(dir))
       }
     }) {
     Ok(entries) => {
@@ -272,7 +272,7 @@ test "appfind_installed_impl：目录全打不开 Err(NoScanDir)，部分存在�
       inspect(false, content="true")
     }
   }
-  ignore(ffi_remove_file(utf8_bytes(path), Ref(0)))
+  ignore(@yue.ffi_remove_file(@yue.utf8_bytes(path), Ref(0)))
 }
 
 ///|

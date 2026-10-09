@@ -99,7 +99,7 @@ fn pr_env_blob() -> Bytes {
 ///|
 /// 读回临时文件文本（读不到为空串）。
 fn pr_slurp(path : String) -> String {
-  match read_text_file(path) {
+  match @yue.read_text_file(path) {
     Some(t) => t
     None => ""
   }
@@ -113,7 +113,7 @@ fn pr_slurp(path : String) -> String {
 /// 当前平台是否支持子进程执行（仅 Linux）。基于 [pr_run] 的模块可用它
 /// 做平台门；每次调用真实判断，高频场景请调用方自行缓存结果。
 pub fn pr_available() -> Bool {
-  platform() == "linux"
+  @yue.platform() == "linux"
 }
 
 ///|
@@ -132,7 +132,7 @@ pub fn pr_run(
   args : Array[String],
   timeout_ms? : Int = 5000,
 ) -> Result[ProcOutput, ProcError] {
-  if platform() != "linux" {
+  if @yue.platform() != "linux" {
     return Err(Unsupported)
   }
   let out_path = pr_tmp_path("out")
@@ -180,7 +180,7 @@ pub fn pr_run(
   }
   // 清理临时文件（无论成败）
   let ok = Ref(0)
-  let _ = ffi_remove_file(utf8_bytes(out_path), ok)
-  let _ = ffi_remove_file(utf8_bytes(err_path), ok)
+  let _ = @yue.ffi_remove_file(@yue.utf8_bytes(out_path), ok)
+  let _ = @yue.ffi_remove_file(@yue.utf8_bytes(err_path), ok)
   ans
 }

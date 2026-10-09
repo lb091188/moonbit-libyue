@@ -58,7 +58,7 @@ fn nlm_normalize(mask : Int) -> NetworkStatus {
 ///|
 /// 当前平台是否支持网络状态查询(macOS 暂缓;Linux 看 NM 是否在线)。
 pub fn network_supported() -> Bool {
-  match platform() {
+  match @yue.platform() {
     "linux" => @traybus.nm_available()
     "windows" => true
     _ => false
@@ -69,17 +69,17 @@ pub fn network_supported() -> Bool {
 /// 查询当前在线状态。首次调用在 Linux 上同步建总线缓存,最坏阻塞
 /// 1.5s(call_sync 超时上限);回调与定时器内请用缓存语义的
 /// on_network_status_change,勿反复 status()。
-pub fn network_status() -> Result[NetworkStatus, NetworkError] {
-  match platform() {
+pub fn network_status() -> Result[NetworkStatus, @yue.NetworkError] {
+  match @yue.platform() {
     "linux" => {
       if !@traybus.nm_available() {
-        return Err(Unsupported)
+        return Err(@yue.Unsupported)
       }
       match @traybus.nm_state() {
-        Err(e) => Err(QueryFailed(e))
+        Err(e) => Err(@yue.QueryFailed(e))
         Ok(state) =>
           match @traybus.nm_connectivity() {
-            Err(e) => Err(QueryFailed(e))
+            Err(e) => Err(@yue.QueryFailed(e))
             Ok(conn) => Ok(nm_normalize(state, conn))
           }
       }
@@ -88,14 +88,14 @@ pub fn network_status() -> Result[NetworkStatus, NetworkError] {
       // 只读后台轮询缓存:GetConnectivity 在部分环境(代理/多虚拟网卡/
       // 网管服务迟滞)单次可达秒级,在 UI 线程同步查询会整段冻结主循环。
       // 首次调用先确保后台轮询已启动,轮询未就绪前返回查询失败。
-      let _ = ffi_netwin_start(WIN_NET_POLL_MS)
-      let mask = ffi_netwin_cached()
+      let _ = @yue.ffi_netwin_start(WIN_NET_POLL_MS)
+      let mask = @yue.ffi_netwin_cached()
       if mask < 0 {
-        return Err(QueryFailed("NLM 后台轮询尚未就绪"))
+        return Err(@yue.QueryFailed("NLM 后台轮询尚未就绪"))
       }
       Ok(nlm_normalize(mask))
     }
-    _ => Err(Unsupported)
+    _ => Err(@yue.Unsupported)
   }
 }
 
@@ -144,7 +144,7 @@ pub fn on_network_status_change(cb : (NetworkStatus) -> Unit) -> Unit {
   // 登记统一放分支外:派发统一走 net_dispatch 遍历 g_net_cbs,Linux
   // 分支曾因只在 Windows 分支登记漏掉 push,信号全到而回调永不执行
   g_net_cbs.push(cb)
-  match platform() {
+  match @yue.platform() {
     "linux" => {
       let _ = @traybus.nm_on_change(fn(state, conn) {
         net_dispatch(nm_normalize(state, conn))
@@ -169,8 +169,8 @@ pub fn on_network_status_change(cb : (NetworkStatus) -> Unit) -> Unit {
         // UI 线程。后台线程首查就绪后由下方轮询读缓存派发(g_net_last
         // 初值 Offline,实际 Online 时首轮即翻转派发;实际 Offline 与
         // 初值相同,静默不派发)
-        let _ = ffi_netwin_start(WIN_NET_POLL_MS)
-        set_timer(WIN_NET_POLL_MS, fn() {
+        let _ = @yue.ffi_netwin_start(WIN_NET_POLL_MS)
+        @yue.set_timer(WIN_NET_POLL_MS, fn() {
           match network_status() {
             Ok(s) => net_dispatch(s)
             Err(_) => ()

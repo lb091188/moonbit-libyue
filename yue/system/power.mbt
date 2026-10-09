@@ -14,7 +14,7 @@ pub struct BatteryInfo {
 ///|
 /// 当前平台是否支持电量查询(macOS 暂缓;Linux 看 UPower 是否真实在线)。
 pub fn battery_supported() -> Bool {
-  match platform() {
+  match @yue.platform() {
     "linux" => @traybus.upower_available()
     "windows" => true
     _ => false
@@ -24,11 +24,11 @@ pub fn battery_supported() -> Bool {
 ///|
 /// 查询电量;无电池(台式机)返回 Ok(None),服务不在线返回
 /// Err(Unsupported)——"环境没有"与"查询失败"分开。
-pub fn battery_query() -> Result[BatteryInfo?, PowerError] {
-  match platform() {
+pub fn battery_query() -> Result[BatteryInfo?, @yue.PowerError] {
+  match @yue.platform() {
     "linux" => {
       if !@traybus.upower_available() {
-        return Err(Unsupported)
+        return Err(@yue.Unsupported)
       }
       match @traybus.upower_battery() {
         Ok(None) => Ok(None)
@@ -49,7 +49,7 @@ pub fn battery_query() -> Result[BatteryInfo?, PowerError] {
               },
             }),
           )
-        Err(e) => Err(QueryFailed(e))
+        Err(e) => Err(@yue.QueryFailed(e))
       }
     }
     "windows" => {
@@ -57,9 +57,9 @@ pub fn battery_query() -> Result[BatteryInfo?, PowerError] {
       let percent = Ref(0)
       let charging = Ref(0)
       let has = Ref(0)
-      let r = ffi_win_power_status(ac, percent, charging, has)
+      let r = @yue.ffi_win_power_status(ac, percent, charging, has)
       if r != 0 {
-        return Err(QueryFailed("GetSystemPowerStatus 失败"))
+        return Err(@yue.QueryFailed("GetSystemPowerStatus 失败"))
       }
       if has.val != 1 {
         return Ok(None)
@@ -79,7 +79,7 @@ pub fn battery_query() -> Result[BatteryInfo?, PowerError] {
         }),
       )
     }
-    _ => Err(Unsupported)
+    _ => Err(@yue.Unsupported)
   }
 }
 
@@ -106,7 +106,7 @@ pub extend PowerSource with Show::{to_string, output}
 ///|
 /// 交直流切换事件是否可用(Windows 事件接入随电源消息窗口批次)。
 pub fn power_event_supported() -> Bool {
-  match platform() {
+  match @yue.platform() {
     "linux" => @traybus.upower_available()
     _ => false
   }
@@ -114,15 +114,15 @@ pub fn power_event_supported() -> Bool {
 
 ///|
 /// 查询当前电源来源(台式机无电池,来源恒为交流在线)。
-pub fn power_source() -> Result[PowerSource, PowerError] {
-  match platform() {
+pub fn power_source() -> Result[PowerSource, @yue.PowerError] {
+  match @yue.platform() {
     "linux" => {
       if !@traybus.upower_available() {
-        return Err(Unsupported)
+        return Err(@yue.Unsupported)
       }
       match @traybus.upower_on_battery() {
         Ok(on_batt) => Ok(if on_batt { OnBattery } else { Ac })
-        Err(e) => Err(QueryFailed(e))
+        Err(e) => Err(@yue.QueryFailed(e))
       }
     }
     "windows" => {
@@ -130,13 +130,13 @@ pub fn power_source() -> Result[PowerSource, PowerError] {
       let percent = Ref(0)
       let charging = Ref(0)
       let has = Ref(0)
-      let r = ffi_win_power_status(ac, percent, charging, has)
+      let r = @yue.ffi_win_power_status(ac, percent, charging, has)
       if r != 0 {
-        return Err(QueryFailed("GetSystemPowerStatus 失败"))
+        return Err(@yue.QueryFailed("GetSystemPowerStatus 失败"))
       }
       Ok(if ac.val == 1 { Ac } else { OnBattery })
     }
-    _ => Err(Unsupported)
+    _ => Err(@yue.Unsupported)
   }
 }
 
@@ -145,7 +145,7 @@ pub fn power_source() -> Result[PowerSource, PowerError] {
 /// power_event_supported 判定)。Linux 语义:UPower 顶层 OnBattery
 /// 属性变化即派发。
 pub fn on_power_source_change(cb : (PowerSource) -> Unit) -> Unit {
-  match platform() {
+  match @yue.platform() {
     "linux" => {
       let _ = @traybus.upower_on_change(fn(on_batt) {
         cb(if on_batt { OnBattery } else { Ac })
@@ -180,7 +180,7 @@ pub extend SleepEvent with Show::{to_string, output}
 /// 休眠/唤醒事件是否可用。Linux 看 logind 是否在线;Windows 恒可用
 /// (电源广播);macOS 暂缓。
 pub fn suspend_resume_supported() -> Bool {
-  match platform() {
+  match @yue.platform() {
     "linux" => @traybus.logind_available()
     "windows" => true
     _ => false
@@ -224,7 +224,7 @@ fn win_watch_once() -> Unit {
     return
   }
   g_win_power_watched.val = true
-  let _ = ffi_win_session_power_watch(
+  let _ = @yue.ffi_win_session_power_watch(
     fn(f, evt) { f(evt) },
     win_power_evt_dispatch,
   )
@@ -235,7 +235,7 @@ fn win_watch_once() -> Unit {
 /// suspend_resume_supported 判定)。快速挂起唤醒可能连收两条
 /// Resuming(库内不去抖)。
 pub fn on_suspend_resume(cb : (SleepEvent) -> Unit) -> Unit {
-  match platform() {
+  match @yue.platform() {
     "linux" => {
       let _ = @traybus.logind_on_sleep(fn(start) {
         cb(if start { Suspending } else { Resuming })

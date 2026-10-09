@@ -211,7 +211,7 @@ fn ffx_parse_profiles_ini(text : String) -> Array[String] {
 /// Firefox profile 根目录：Linux/macOS 固定 $HOME/.mozilla/firefox，
 /// Windows 为 %APPDATA%\Mozilla\Firefox；HOME/APPDATA 未设置给 None。
 fn ffx_firefox_root() -> String? {
-  match platform() {
+  match @yue.platform() {
     "windows" =>
       match getenv_str("APPDATA") {
         Some(d) if d != "" => Some(d + "\\Mozilla\\Firefox")
@@ -268,7 +268,7 @@ let ffx_fallback_profile_names : Array[String] = [
 /// 当前平台是否支持 Firefox 历史读取（profiles.ini 定位实现了
 /// Linux/macOS/Windows 三条路径）。
 pub fn ffx_supported() -> Bool {
-  platform() == "linux" || platform() == "macos" || platform() == "windows"
+  @yue.platform() == "linux" || @yue.platform() == "macos" || @yue.platform() == "windows"
 }
 
 ///|
@@ -285,7 +285,7 @@ fn ffx_profiles_loaded() -> Result[
     Some(r) => r
     None => return Err(FfxNoProfile)
   }
-  let names = match read_text_file(root + "/profiles.ini") {
+  let names = match @yue.read_text_file(root + "/profiles.ini") {
     Some(text) => ffx_parse_profiles_ini(text)
     None => ffx_fallback_profile_names
   }
@@ -295,7 +295,7 @@ fn ffx_profiles_loaded() -> Result[
       continue
     }
     let path = ffx_places_path(root, name)
-    match read_binary_file(path) {
+    match @yue.read_binary_file(path) {
       Some(bytes) => out.push(({ profile: name, places_path: path, }, bytes))
       None => ()
     }

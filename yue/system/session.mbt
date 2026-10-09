@@ -47,7 +47,7 @@ fn lock_transition(locked : Bool) -> Unit {
 /// 锁屏/解锁事件是否可用(至少一个信号源在线;锁屏工具不调 logind
 /// 也不发屏保信号的桌面收不到事件,见 adaptation.md)。
 pub fn session_lock_supported() -> Bool {
-  match platform() {
+  match @yue.platform() {
     "linux" => @traybus.logind_available() || @traybus.screensaver_available()
     "windows" => true
     _ => false
@@ -59,25 +59,25 @@ pub fn session_lock_supported() -> Bool {
 /// 不上),不静默——调用方按需提示。可多次注册。
 pub fn session_lock_watch(
   cb : (SessionLockEvent) -> Unit,
-) -> Result[Unit, SystemError] {
-  match platform() {
+) -> Result[Unit, @yue.SystemError] {
+  match @yue.platform() {
     "linux" => {
       let registered = Ref(false)
       if @traybus.logind_available() {
         match @traybus.logind_on_lock(fn(locked) { lock_transition(locked) }) {
           Ok(_) => registered.val = true
-          Err(e) => return Err(Message(e))
+          Err(e) => return Err(@yue.Message(e))
         }
       }
       if @traybus.screensaver_available() {
         match
           @traybus.screensaver_on_active(fn(active) { lock_transition(active) }) {
           Ok(_) => registered.val = true
-          Err(e) => return Err(Message(e))
+          Err(e) => return Err(@yue.Message(e))
         }
       }
       if !registered.val {
-        return Err(Unsupported)
+        return Err(@yue.Unsupported)
       }
       g_lock_cbs.push(cb)
       Ok(())
@@ -90,6 +90,6 @@ pub fn session_lock_watch(
       win_watch_once()
       Ok(())
     }
-    _ => Err(Unsupported)
+    _ => Err(@yue.Unsupported)
   }
 }
