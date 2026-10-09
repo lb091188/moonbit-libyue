@@ -21,11 +21,16 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
       ),
     )
   })
+  // 拒绝路径:handler 返回 None,原生侧不构造应答,网页加载失败
+  //(Linux 下表现为加载错误页;是否生效须真机确认)
+  @browser.Browser::register_protocol("demo-deny", fn(_url) {
+    (None : (String, String)?)
+  })
   @ui.page([
     @ui.section(
       "加载",
       "WebView 与加载",
-      "load_url / demo:// 协议 / load_html 本地片段(内嵌 JS 按钮可调原生绑定)。",
+      "load_url / demo:// 协议(含 None 拒绝路径)/ load_html 本地片段(内嵌 JS 按钮可调原生绑定)。",
       [
         @browser.browser(
           handle=fn(x) {
@@ -73,6 +78,15 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
               None => ()
             }
           }),
+          @yue.button_t("demo-deny:// 拒绝", variant=@yue.Danger, on_click=fn() {
+            match web_ref.val {
+              Some(b) => {
+                b.load_url("demo-deny://hello")
+                nav_state.set("加载 demo-deny://hello(handler 返回 None,应加载失败)")
+              }
+              None => ()
+            }
+          }),
           @yue.button_t("本地 HTML", variant=@yue.Solid, on_click=fn() {
             match web_ref.val {
               Some(b) => {
@@ -91,6 +105,8 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
         "@browser.browser(handle=fn(b) {", "  b.load_html(\"<h3>WebView 内嵌页</h3>\")",
         "  b.load_url(\"https://example.com\")", "}, style=[(\"height\", 190.0)])",
         "@browser.Browser::register_protocol(\"demo\", fn(_url) {", "  Some((\"text/html\", \"<h2>demo:// 自定义协议</h2>\"))",
+        "})", "// 返回 None 即拒绝:原生侧无应答,网页加载失败",
+        "@browser.Browser::register_protocol(\"demo-deny\", fn(_url) {", "  (None : (String, String)?)",
         "})",
       ],
     ),

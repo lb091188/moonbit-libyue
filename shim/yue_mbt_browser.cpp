@@ -12,6 +12,7 @@
 #include "yue_mbt_internal.h"
 
 using yue_mbt::BytesFromString;
+using yue_mbt::BytesLength;
 using yue_mbt::CastTo;
 using yue_mbt::ViewStore;
 
@@ -62,24 +63,39 @@ void yue_mbt_browser_execute_javascript(void *browser, const char *code) {
   }
 }
 
-/* 自定义协议：MoonBit 回调返回 [ok:i32][mime_len:i32][mime][content] 编码,ok=0 表示拒绝 */
+/* 自定义协议：MoonBit 回调返回 [ok:i32le][mime_len:i32le][mime][content_len:i32le][content]
+ * 编码,ok=0 表示拒绝。先按 Bytes 载荷长度预验再逐段解码：ok==0 或载荷不足
+ * 12 字节即拒绝;已声称 ok==1 但长度字段越出载荷的(如旧版拒绝载荷
+ * [1,0,0,0] 被当成成功、按越界读到的垃圾长度构造 string)一律按拒绝处理,
+ * 不读越界内存。 */
 void yue_mbt_browser_register_protocol(const char *scheme,
                                        void *(*invoke)(void *, void *), void *closure) {
   nu::Browser::RegisterProtocol(
       std::string(scheme),
       [invoke, closure](std::string url) -> nu::ProtocolJob * {
         void *bytes = invoke(closure, BytesFromString(url));
-        auto *p = static_cast<const char *>(bytes);
+        if (bytes == nullptr) {
+          return nullptr;
+        }
+        const char *p = static_cast<const char *>(bytes);
+        const int32_t payload_len = BytesLength(bytes);
         int32_t ok = 0;
         std::memcpy(&ok, p, 4);
-        if (ok == 0) {
+        if (ok == 0 || payload_len < 12) {
           return nullptr;
         }
         int32_t mime_len = 0;
         std::memcpy(&mime_len, p + 4, 4);
+        if (mime_len < 0 || static_cast<int64_t>(mime_len) + 12 > payload_len) {
+          return nullptr;
+        }
         std::string mime(p + 8, mime_len);
         int32_t content_len = 0;
         std::memcpy(&content_len, p + 8 + mime_len, 4);
+        if (content_len < 0 ||
+            static_cast<int64_t>(mime_len) + 12 + content_len > payload_len) {
+          return nullptr;
+        }
         std::string content(p + 8 + mime_len + 4, content_len);
         return new nu::ProtocolStringJob(mime, content);
       });

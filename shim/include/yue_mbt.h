@@ -159,7 +159,9 @@ void yue_mbt_browser_set_magnifiable(void *browser, int32_t yes);
 int32_t yue_mbt_browser_is_magnifiable(void *browser);
 int32_t yue_mbt_browser_is_loading(void *browser);
 void yue_mbt_browser_execute_javascript(void *browser, const char *code);
-/* 自定义协议注册：回调返回 [ok:i32][mime_len:i32][mime][content] 编码,ok=0 拒绝 */
+/* 自定义协议注册：回调返回 [ok:i32le][mime_len:i32le][mime][content_len:i32le][content]
+ * 编码,ok=0 拒绝(不读后续字节);ok=1 时载荷恒不少于 12 字节,C 端先按
+ * Bytes 长度预验再逐段解码,字段越界即拒绝 */
 void yue_mbt_browser_register_protocol(const char *scheme,
                                        void *(*invoke)(void *, void *), void *closure);
 void yue_mbt_browser_unregister_protocol(const char *scheme);

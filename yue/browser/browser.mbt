@@ -249,38 +249,46 @@ pub fn Browser::on_finish_navigation(
 }
 
 ///|
+/// 协议应答载荷编码(与 shim `yue_mbt_browser_register_protocol` 的解码逐位对齐):
+/// `[ok:i32le][mime_len:i32le][mime][content_len:i32le][content]`。
+/// ok=0 即拒绝(C 端不读后续字节,直接拒绝请求);ok=1 时载荷恒不少于
+/// 12 字节,两个长度均为 UTF-8 字节数(小端)。
+fn encode_protocol_payload(result : (String, String)?) -> Bytes {
+  match result {
+    Some((mime, content)) => {
+      let mb = utf8_bytes(mime)
+      let cb = utf8_bytes(content)
+      let buf = FixedArray::make(12 + mb.length() + cb.length(), b'\x00')
+      buf[0] = 1
+      let put_len = fn(off : Int, v : Int) -> Unit {
+        buf[off] = (v & 255).to_byte()
+        buf[off + 1] = ((v >> 8) & 255).to_byte()
+        buf[off + 2] = ((v >> 16) & 255).to_byte()
+        buf[off + 3] = ((v >> 24) & 255).to_byte()
+      }
+      put_len(4, mb.length())
+      for j = 0; j < mb.length(); j = j + 1 {
+        buf[8 + j] = mb[j]
+      }
+      put_len(8 + mb.length(), cb.length())
+      for j = 0; j < cb.length(); j = j + 1 {
+        buf[12 + mb.length() + j] = cb[j]
+      }
+      Bytes::from_array(buf)
+    }
+    None => Bytes::from_array([0, 0, 0, 0])
+  }
+}
+
+///|
 /// 注册自定义协议：回调收完整 URL，返回 (mime_type, 内容) 或 None 表示拒绝。
 /// 内部以 ProtocolStringJob 承载；FileJob/AsarJob 场景暂不支持。
 pub fn Browser::register_protocol(
   scheme : String,
   handler : (String) -> (String, String)?,
 ) -> Unit {
-  let reject : Bytes = Bytes::from_array([1, 0, 0, 0])
   let wrapped : (Bytes) -> Bytes = fn(url) {
-    match handler(from_utf8_bytes(url)) {
-      Some((mime, content)) => {
-        let mb = utf8_bytes(mime)
-        let cb = utf8_bytes(content)
-        let buf = FixedArray::make(12 + mb.length() + cb.length(), b'\x00')
-        buf[0] = 1
-        let put_len = fn(off : Int, v : Int) -> Unit {
-          buf[off] = (v & 255).to_byte()
-          buf[off + 1] = ((v >> 8) & 255).to_byte()
-          buf[off + 2] = ((v >> 16) & 255).to_byte()
-          buf[off + 3] = ((v >> 24) & 255).to_byte()
-        }
-        put_len(4, mb.length())
-        for j = 0; j < mb.length(); j = j + 1 {
-          buf[8 + j] = mb[j]
-        }
-        put_len(8 + mb.length(), cb.length())
-        for j = 0; j < cb.length(); j = j + 1 {
-          buf[12 + mb.length() + j] = cb[j]
-        }
-        Bytes::from_array(buf)
-      }
-      None => reject
-    }
+    encode_protocol_payload(handler(from_utf8_bytes(url)))
   }
   keep_alive_bytes(fn(b : Bytes) { ignore(wrapped(b)) })
   ffi_browser_register_protocol(utf8_bytes(scheme), fn(f, b) { f(b) }, wrapped)
