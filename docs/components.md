@@ -502,7 +502,6 @@ clip.set_text("文本")
 | Method | Purpose |
 |---|---|
 | Clipboard::get() | Default clipboard |
-| Clipboard::from_type(t) | Get by type: CopyPaste / Selection (Linux primary selection) |
 | set_text(t) / get_text() | Text |
 | set_data(kind, t) / get_data(kind) / set_data_image(img) | Structured data |
 | clear() | Clear |

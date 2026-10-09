@@ -502,7 +502,6 @@ clip.set_text("文本")
 | 方法 | 用途 |
 |---|---|
 | Clipboard::get() | 默认剪贴板 |
-| Clipboard::from_type(t) | 按类型取：CopyPaste / Selection（Linux 主选区） |
 | set_text(t) / get_text() | 文本 |
 | set_data(kind, t) / get_data(kind) / set_data_image(img) | 结构化数据 |
 | clear() | 清空 |

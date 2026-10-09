@@ -1399,9 +1399,6 @@ extern "c" fn ffi_clipboard_set_text(
 extern "c" fn ffi_clipboard_get_text(clipboard : Clipboard) -> Bytes = "yue_mbt_clipboard_get_text"
 
 ///|
-extern "c" fn ffi_clipboard_from_type(type_ : Int) -> Clipboard = "yue_mbt_clipboard_from_type"
-
-///|
 #borrow(clipboard, text)
 extern "c" fn ffi_clipboard_set_data(
   clipboard : Clipboard,

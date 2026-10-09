@@ -36,9 +36,6 @@ fn open_floating_heart() -> Unit {
 
 ///|
 pub fn page_system(app : @ui.App) -> @yue.Node {
-  let sel_out : @yue.Store[String] = @yue.Store::new("(主选区读回)")
-  // 主选区是 X11 概念:Windows/macOS 上 from_type(Selection) 降级为公共
-  // 剪贴板,整段只在 Linux 创建
   let secs : Array[@ui.Section] = [
     @ui.section(
       "文件",
@@ -327,39 +324,6 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       code=["w.set_should_close(fn() {", "  false", "})"],
     ),
   ]
-  if @ui.is_linux() {
-    secs.push(
-      @ui.section(
-        "主选区",
-        "主选区(仅 Linux)",
-        "X11 选中即写入、中键粘贴;仅 Linux。",
-        [
-          @yue.hbox([
-            @yue.button_t("写入主选区", on_click=fn() {
-              @yue.Clipboard::from_type(@yue.Selection).set_data(
-                @yue.Text,
-                "主选区内容",
-              )
-            }),
-            @yue.button_t("读回主选区", on_click=fn() {
-              match
-                @yue.Clipboard::from_type(@yue.Selection).get_data(@yue.Text) {
-                Some(@yue.Text(t)) => sel_out.set("主选区读回:\{t}")
-                _ => sel_out.set("主选区读回失败")
-              }
-            }),
-          ]),
-          @yue.bind_label(sel_out, fn(s) { s }, style=[("marginTop", 8.0)]),
-        ],
-        code=[
-          "@yue.Clipboard::from_type(@yue.Selection).set_data(", "  @yue.Text,",
-          "  \"主选区内容\",", ")", "match @yue.Clipboard::from_type(@yue.Selection).get_data(@yue.Text) {",
-          "  Some(@yue.Text(t)) => println(t)", "  _ => println(\"读回失败\")",
-          "}",
-        ],
-      ),
-    )
-  }
   // 单实例:角色与唤起参数在 main 启动时采集,这里只展示
   secs.push(
     @ui.section(
