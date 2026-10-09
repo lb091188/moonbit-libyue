@@ -232,8 +232,8 @@ API 一览：
 | `subscribe_id(f)` / `remove(句柄)` | 订阅并取退订句柄 / 按句柄摘除（幂等）；重建式组件换行、`bind_node` 重挂旧子树时用，别留死订阅 |
 | `sub_bag_begin()` / `sub_bag_end()` / `sub_bag_discard(闭包表)` | 订阅回收袋：袋期间注册的订阅（Store 与主题）整代一次性退订 |
 | `map(f)` | 派生 Store，源变化时自动跟随（可链式） |
-| `bind_label(store, f, …)` | 声明树里绑定文本，`f` 把状态映射为字符串 |
-| `bind(sig, f, …)` | bind_label 的信号版；接受源信号或 computed 派生信号 |
+| `bind_label(store, f, color? = "", …)` | 声明树里绑定文本，`f` 把状态映射为字符串；`color` 覆盖文字色（默认主题常规文字色） |
+| `bind(sig, f, color? = "", …)` | bind_label 的信号版；接受源信号或 computed 派生信号 |
 | `bind_node(sig, f)` | 声明树里绑定任意节点：信号变化时把子树重挂为 `f(新值)`，适合低频切换；**Windows 上点击链路会重挂自身的场景禁用**（见上方警示）；Store 传 `store.signal()` 接入 |
 | `swap_node(sig, a, b)` | 两态切换：预建 a/b 两棵节点、信号值选显隐，不销毁不重建——bind_node 的 Windows 安全替代，代价是两棵子树常驻 |
 

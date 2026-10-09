@@ -189,8 +189,8 @@ API overview:
 | `update(f)` | `set(f(get()))` |
 | `subscribe(f)` | subscribe; **no callback at registration time**, read the initial value via `get` directly |
 | `map(f)` | derive a Store that follows the source automatically on change (chainable) |
-| `bind_label(store, f, …)` | bind text inside a declarative tree; `f` maps the state to a string |
-| `bind(sig, f, …)` | Signal version of bind_label; accepts source or computed signals |
+| `bind_label(store, f, color? = "", …)` | bind text inside a declarative tree; `f` maps the state to a string; `color` overrides the text color (default: theme regular text color) |
+| `bind(sig, f, color? = "", …)` | Signal version of bind_label; accepts source or computed signals |
 | `bind_node(sig, f)` | bind an arbitrary node: remounts the subtree as `f(value)` whenever the signal changes — for low-frequency switches; **on Windows, do not use in click chains that remount the clicked control itself** (see the warning above; pass `store.signal()` for a Store) |
 | `swap_node(sig, a, b)` | two-state swap: pre-build both nodes and toggle visibility by the signal — no destroy/recreate, the Windows-safe alternative to `bind_node` at the cost of keeping both subtrees alive |
 
