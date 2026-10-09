@@ -134,7 +134,7 @@ fn tagged(label_text : String, body : Node) -> Node {
 5. **Modern layouts**: plain vbox/hbox/scroll flex boxes can produce a "dark sidebar + header bar + scrolling cards" shell; the key points are that **the root node needs `style=[("flex", 1.0)]` to fill the window**, the fixed-width sidebar sets `width` without flex, the main area takes `flex=1`, and the root container uses `style=[("alignItems", "stretch")]` so child columns fill the height.
 6. **Shrink semantics**: `vbox`/`hbox` do **not** shrink by default (yoga semantics, `flexShrink 0`); overflowing children are clipped. Containers that need to shrink or wrap give it explicitly via `style=[("flexshrink", 1.0)]` (e.g. segmented multi-row wrapping — the width constraint required by wrap is propagated through it). Trade-off measured in practice: defaulting to 1 squeezes fixed-size drawn widgets (icons, inputs) across the board, so the default stays 0 and is opted into explicitly.
 
-### Component library (yue/components.mbt)
+### Component library (the yue/components package, split into per-family files)
 
 Element-Plus-style non-form components built on top of the declarative layer, pure MoonBit with zero platform code:
 
