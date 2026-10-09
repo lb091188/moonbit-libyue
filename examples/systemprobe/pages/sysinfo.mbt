@@ -35,7 +35,7 @@ fn pp_display(p : @system.PowerProfile) -> String {
 
 ///|
 /// 收集系统能力各模块的当前快照(多行文本):只读查询真调本机;设置类
-/// 命令仅文本预览(见「命令预览」页),危险操作无入口。
+/// 命令仅文本预览(见「命令与状态」页),危险操作无入口。
 fn sysprobe_collect() -> String {
   let buf = StringBuilder()
   buf.write_string("== 音量(默认 sink) ==\n")

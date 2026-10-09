@@ -35,7 +35,7 @@ fn main {
                   [
                     @components.side_menu_sections(
                       [
-                        ("能力", ["系统能力", "命令预览"]),
+                        ("能力", ["系统能力", "命令与状态"]),
                         ("媒体", ["视频播放", "音频播放"]),
                         (
                           "图表",
@@ -45,7 +45,7 @@ fn main {
                       app.selected,
                       icons=[
                         ("系统能力", @icons.Monitor1),
-                        ("命令预览", @icons.CopyDocument),
+                        ("命令与状态", @icons.CopyDocument),
                         ("视频播放", @icons.VideoPlay),
                         ("音频播放", @icons.Headset),
                         ("扩展图表", @icons.DataAnalysis),
@@ -89,7 +89,7 @@ fn main {
               @ui.nav_page("视频播放", app.selected, @pages.page_video(app)),
               @ui.nav_page("音频播放", app.selected, @pages.page_audio(app)),
               @ui.nav_page(
-                "命令预览",
+                "命令与状态",
                 app.selected,
                 @pages.page_cmdpreview(app),
               ),
