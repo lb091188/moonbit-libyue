@@ -4,9 +4,9 @@
 
 ///|
 /// 表格单元格的排序键(演示排序用:演示表格只有 CellText,其余取空串)。
-fn cell_key(v : @yue.TableCell) -> String {
+fn cell_key(v : @components.TableCell) -> String {
   match v {
-    @yue.CellText(s) => s
+    @components.CellText(s) => s
     _ => ""
   }
 }
@@ -34,13 +34,13 @@ fn cmp_num_str(a : String, b : String) -> Int {
 pub fn page_data(app : @ui.App) -> @yue.Node {
   // 语言表基础数据 + 排序显示数据(表头点击写 sort,订阅里重排)
   let lang_base = [
-    @yue.TableRow::make(["MoonBit", "2023", "多范式,云 + 端"]),
-    @yue.TableRow::make(["Rust", "2015", "系统编程"]),
-    @yue.TableRow::make(["Go", "2012", "云原生后端"]),
-    @yue.TableRow::make(["TypeScript", "2012", "前端大规模工程"]),
+    @components.TableRow::make(["MoonBit", "2023", "多范式,云 + 端"]),
+    @components.TableRow::make(["Rust", "2015", "系统编程"]),
+    @components.TableRow::make(["Go", "2012", "云原生后端"]),
+    @components.TableRow::make(["TypeScript", "2012", "前端大规模工程"]),
   ]
-  let table_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new(lang_base)
-  let table_sort : @yue.Store[@yue.TableSort] = @yue.Store::new(@yue.TableSort::{
+  let table_rows : @yue.Store[Array[@components.TableRow]] = @yue.Store::new(lang_base)
+  let table_sort : @yue.Store[@components.TableSort] = @yue.Store::new(@components.TableSort::{
     column: -1,
     asc: true,
   })
@@ -68,34 +68,34 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
   table_sort.subscribe(fn(_st) { reorder_langs() })
   let table_picked = @yue.Signal::new("未选中")
   let table_sel : @yue.Store[Array[Int]] = @yue.Store::new([])
-  let rich_base : Array[@yue.TableRow] = [
+  let rich_base : Array[@components.TableRow] = [
     {
       cells: [
-        @yue.CellText("MoonBit"),
-        @yue.CellTag("编译型", @yue.Primary),
-        @yue.CellColorBox("#2D68C4", "主题蓝"),
-        @yue.CellLines(["多范式", "云 + 端"]),
+        @components.CellText("MoonBit"),
+        @components.CellTag("编译型", @components.Primary),
+        @components.CellColorBox("#2D68C4", "主题蓝"),
+        @components.CellLines(["多范式", "云 + 端"]),
       ],
     },
     {
       cells: [
-        @yue.CellText("Rust"),
-        @yue.CellTag("编译型", @yue.Primary),
-        @yue.CellColorBox("#D9822B", "主题橙"),
-        @yue.CellLines(["系统编程", "无 GC"]),
+        @components.CellText("Rust"),
+        @components.CellTag("编译型", @components.Primary),
+        @components.CellColorBox("#D9822B", "主题橙"),
+        @components.CellLines(["系统编程", "无 GC"]),
       ],
     },
     {
       cells: [
-        @yue.CellText("Python"),
-        @yue.CellTag("解释型", @yue.Warning),
-        @yue.CellColorBox("#2E9E5B", "主题绿"),
-        @yue.CellLines(["脚本", "AI 生态"]),
+        @components.CellText("Python"),
+        @components.CellTag("解释型", @components.Warning),
+        @components.CellColorBox("#2E9E5B", "主题绿"),
+        @components.CellLines(["脚本", "AI 生态"]),
       ],
     },
   ]
-  let rich_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new(rich_base)
-  let rich_sort : @yue.Store[@yue.TableSort] = @yue.Store::new(@yue.TableSort::{
+  let rich_rows : @yue.Store[Array[@components.TableRow]] = @yue.Store::new(rich_base)
+  let rich_sort : @yue.Store[@components.TableSort] = @yue.Store::new(@components.TableSort::{
     column: -1,
     asc: true,
   })
@@ -109,11 +109,11 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
     .mut_view()
     .sort_by(fn(a, b) {
       let ka = match a.cells[0] {
-        @yue.CellText(t) => t
+        @components.CellText(t) => t
         _ => ""
       }
       let kb = match b.cells[0] {
-        @yue.CellText(t) => t
+        @components.CellText(t) => t
         _ => ""
       }
       let c = if ka < kb { -1 } else if ka > kb { 1 } else { 0 }
@@ -125,10 +125,10 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
     })
     rich_rows.set(rows)
   })
-  let v_rows_data : Array[@yue.TableRow] = []
+  let v_rows_data : Array[@components.TableRow] = []
   for i in 0..<10000 {
     v_rows_data.push(
-      @yue.TableRow::make([
+      @components.TableRow::make([
         (i + 1).to_string(),
         "条目 \{i + 1}",
         if i % 3 == 0 {
@@ -142,9 +142,9 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       ]),
     )
   }
-  let v_rows : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new(v_rows_data)
+  let v_rows : @yue.Store[Array[@components.TableRow]] = @yue.Store::new(v_rows_data)
   // 虚拟表排序:序号列(0)按数值,其余按文本;表头点击写 Store,订阅里重排
-  let v_sort : @yue.Store[@yue.TableSort] = @yue.Store::new(@yue.TableSort::{
+  let v_sort : @yue.Store[@components.TableSort] = @yue.Store::new(@components.TableSort::{
     column: -1,
     asc: true,
   })
@@ -188,30 +188,30 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.tag_of_type("Primary", @yue.Primary),
-            @yue.tag_of_type("Success", @yue.Success),
-            @yue.tag_of_type("Warning", @yue.Warning),
-            @yue.tag_of_type("Danger", @yue.Danger),
-            @yue.tag_of_type("Info", @yue.Info),
-            @yue.tag("自定义实底", "#2D68C4"),
-            @yue.tag("v1.0", "#2E9E5B"),
+            @components.tag_of_type("Primary", @components.Primary),
+            @components.tag_of_type("Success", @components.Success),
+            @components.tag_of_type("Warning", @components.Warning),
+            @components.tag_of_type("Danger", @components.Danger),
+            @components.tag_of_type("Info", @components.Info),
+            @components.tag("自定义实底", "#2D68C4"),
+            @components.tag("v1.0", "#2E9E5B"),
           ],
           style=[("alignItems", "center")],
         ),
         @yue.hbox(
           [
-            @yue.avatar("M", "#2D68C4", size=44.0),
-            @yue.avatar("N", "#2E9E5B", size=36.0),
-            @yue.avatar("X", "#D64550", size=30.0),
-            @yue.avatar("L", "#D9822B", size=26.0),
+            @components.avatar("M", "#2D68C4", size=44.0),
+            @components.avatar("N", "#2E9E5B", size=36.0),
+            @components.avatar("X", "#D64550", size=30.0),
+            @components.avatar("L", "#D9822B", size=26.0),
           ],
           style=[("marginTop", 10.0), ("alignItems", "center")],
         ),
       ],
       code=[
-        "@yue.tag_of_type(\"Primary\", @yue.Primary)", "@yue.tag_of_type(\"Success\", @yue.Success)",
-        "@yue.tag(\"自定义实底\", \"#2D68C4\")", "@yue.avatar(\"M\", \"#2D68C4\", size=44.0)",
-        "@yue.avatar(\"X\", \"#D64550\", size=30.0)",
+        "@components.tag_of_type(\"Primary\", @components.Primary)", "@components.tag_of_type(\"Success\", @components.Success)",
+        "@components.tag(\"自定义实底\", \"#2D68C4\")", "@components.avatar(\"M\", \"#2D68C4\", size=44.0)",
+        "@components.avatar(\"X\", \"#D64550\", size=30.0)",
       ],
     ),
     @ui.section(
@@ -221,17 +221,17 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.badge_count(9),
-            @yue.badge_count(128),
-            @yue.label_t("消息", role=@yue.Body),
+            @components.badge_count(9),
+            @components.badge_count(128),
+            @components.label_t("消息", role=@components.Body),
             @yue.label("      "),
-            @yue.badge_dot(),
-            @yue.label_t("在线", role=@yue.Body),
+            @components.badge_dot(),
+            @components.label_t("在线", role=@components.Body),
           ],
           style=[("alignItems", "center")],
         ),
       ],
-      code=["@yue.badge_count(9)", "@yue.badge_count(128)", "@yue.badge_dot()"],
+      code=["@components.badge_count(9)", "@components.badge_count(128)", "@components.badge_dot()"],
     ),
     @ui.section(
       "统计进度",
@@ -240,18 +240,18 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.statistic("访问量", app.visits.store()),
-            @yue.statistic("任务数", @yue.Store::new("36")),
+            @components.statistic("访问量", app.visits.store()),
+            @components.statistic("任务数", @yue.Store::new("36")),
           ],
           style=[("alignItems", "center"), ("marginBottom", 10.0)],
         ),
-        @yue.button_t(
+        @components.button_t(
           "刷新访问量",
           on_click=fn() { app.counter.update(fn(n) { n + 1 }) },
-          variant=@yue.Solid,
+          variant=@components.Solid,
           style=[("marginBottom", 10.0)],
         ),
-        @yue.progress_line(app.ratio.store()),
+        @components.progress_line(app.ratio.store()),
         @yue.bind(
           app.ratio,
           fn(v) { "当前进度 \{((v * 100.0)).round()}%" },
@@ -261,8 +261,8 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       code=[
         "let counter = @yue.Signal::new(0)", "let visits = counter.map(fn(n) { (n * 1601).to_string() })",
         "let ratio = counter.map(fn(n) {", "  let r = 0.25 + n.to_double() * 0.1",
-        "  if r > 1.0 { 1.0 } else { r }", "})", "@yue.statistic(\"访问量\", visits.store())",
-        "@yue.progress_line(ratio.store())", "@yue.bind(ratio, fn(v) { \"当前进度 \\{(v * 100.0).round()}%\" })",
+        "  if r > 1.0 { 1.0 } else { r }", "})", "@components.statistic(\"访问量\", visits.store())",
+        "@components.progress_line(ratio.store())", "@yue.bind(ratio, fn(v) { \"当前进度 \\{(v * 100.0).round()}%\" })",
       ],
     ),
     @ui.section(
@@ -270,34 +270,34 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "Card 卡片与 Collapse 折叠面板",
       "标题栏 + 底部分隔线 + 边框;折叠面板点击标题展开/收起,各面板独立,初始第一个展开。",
       [
-        @yue.card(
+        @components.card(
           "卡片标题",
           [
-            @yue.label_t(
+            @components.label_t(
               "卡片内容:组件库全部用 theme_* 主题色着色。",
             ),
           ],
           style=[("height", 110.0), ("marginBottom", 10.0)],
         ),
-        @yue.collapse([
+        @components.collapse([
           (
             "如何使用组件库?",
             [
-              @yue.label_t(
+              @components.label_t(
                 "moon add NoahLiu/moonbit-libyue 后即可用 @yue.* 访问。",
               ),
             ],
           ),
           (
             "支持哪些平台?",
-            [@yue.label_t("Linux(X11)/ Windows;macOS 进行中。")],
+            [@components.label_t("Linux(X11)/ Windows;macOS 进行中。")],
           ),
         ]),
       ],
       code=[
-        "@yue.card(\"卡片标题\", [@yue.label_t(\"卡片内容\")], style=[(\"height\", 110.0)])",
-        "@yue.collapse([", "  (\"如何使用组件库?\", [@yue.label_t(\"moon add 后即可用 @yue.*\")]),",
-        "  (\"支持哪些平台?\", [@yue.label_t(\"Linux / Windows\")]),", "])",
+        "@components.card(\"卡片标题\", [@components.label_t(\"卡片内容\")], style=[(\"height\", 110.0)])",
+        "@components.collapse([", "  (\"如何使用组件库?\", [@components.label_t(\"moon add 后即可用 @yue.*\")]),",
+        "  (\"支持哪些平台?\", [@components.label_t(\"Linux / Windows\")]),", "])",
       ],
     ),
     @ui.section(
@@ -305,21 +305,21 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "Descriptions 描述列表与 Timeline 时间线",
       "键灰值深的键值网格;左侧色点 + 竖线,节点颜色跟随语义类型,末项无连线。",
       [
-        @yue.descriptions([
+        @components.descriptions([
           ("框架", "moonbit-libyue"),
           ("渲染", "GTK 3 (Linux) / Win32 (Windows)"),
           ("组件层", "纯 MoonBit,零平台代码"),
         ]),
-        @yue.timeline([
-          ("发布 1.0", "2026-01-01,首个稳定版。", @yue.Success),
-          ("发布 1.1", "2026-05-01,新增组件库。", @yue.Primary),
-          ("进行中", "2.0 规划:终端组件。", @yue.Warning),
+        @components.timeline([
+          ("发布 1.0", "2026-01-01,首个稳定版。", @components.Success),
+          ("发布 1.1", "2026-05-01,新增组件库。", @components.Primary),
+          ("进行中", "2.0 规划:终端组件。", @components.Warning),
         ]),
       ],
       code=[
-        "@yue.descriptions([", "  (\"框架\", \"moonbit-libyue\"),", "  (\"渲染\", \"GTK 3 (Linux) / Win32 (Windows)\"),",
-        "])", "@yue.timeline([", "  (\"发布 1.0\", \"2026-01-01,首个稳定版。\", @yue.Success),",
-        "  (\"进行中\", \"2.0 规划:终端组件。\", @yue.Warning),", "])",
+        "@components.descriptions([", "  (\"框架\", \"moonbit-libyue\"),", "  (\"渲染\", \"GTK 3 (Linux) / Win32 (Windows)\"),",
+        "])", "@components.timeline([", "  (\"发布 1.0\", \"2026-01-01,首个稳定版。\", @components.Success),",
+        "  (\"进行中\", \"2.0 规划:终端组件。\", @components.Warning),", "])",
       ],
     ),
     @ui.section(
@@ -327,18 +327,18 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "Table 表格(单选)",
       "表头 + 斑马纹 + 悬停底色,点击行单选;点击表头排序(升降序箭头,新列默认升序),拖动列边界调整列宽;Store 驱动「添加一行」整表重建,选中行信号回显。",
       [
-        @yue.table_t(
+        @components.table_t(
           [
-            @yue.TableColumn::make("语言", 140.0),
-            @yue.TableColumn::make("首发", 90.0, align=@yue.Center),
-            @yue.TableColumn::make("定位", 0.0),
+            @components.TableColumn::make("语言", 140.0),
+            @components.TableColumn::make("首发", 90.0, align=@yue.Center),
+            @components.TableColumn::make("定位", 0.0),
           ],
           table_rows,
           width=440.0,
           sort=table_sort,
           on_row_click=fn(i, r) {
             let name = match r.cells[0] {
-              @yue.CellText(s) => s
+              @components.CellText(s) => s
               _ => ""
             }
             table_picked.set("第 \{i + 1} 行:\{name}")
@@ -346,10 +346,10 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
         ),
         @yue.hbox(
           [
-            @yue.button_t("添加一行", on_click=fn() {
+            @components.button_t("添加一行", on_click=fn() {
               let n = lang_base.length() + 1
               lang_base.push(
-                @yue.TableRow::make([
+                @components.TableRow::make([
                   "新语言 \{n}",
                   "2026",
                   "演示 Store 驱动",
@@ -363,10 +363,10 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "let rows = @yue.Store::new([", "  @yue.TableRow::make([\"MoonBit\", \"2023\", \"多范式\"]),",
-        "  @yue.TableRow::make([\"Rust\", \"2015\", \"系统编程\"]),", "])", "let sort = @yue.Store::new(@yue.TableSort::{ column: -1, asc: true })",
-        "@yue.table_t(", "  [", "    @yue.TableColumn::make(\"语言\", 140.0),",
-        "    @yue.TableColumn::make(\"首发\", 90.0, align=@yue.Center),", "    @yue.TableColumn::make(\"定位\", 0.0),   // 0 = 占满剩余宽",
+        "let rows = @yue.Store::new([", "  @components.TableRow::make([\"MoonBit\", \"2023\", \"多范式\"]),",
+        "  @components.TableRow::make([\"Rust\", \"2015\", \"系统编程\"]),", "])", "let sort = @yue.Store::new(@components.TableSort::{ column: -1, asc: true })",
+        "@components.table_t(", "  [", "    @components.TableColumn::make(\"语言\", 140.0),",
+        "    @components.TableColumn::make(\"首发\", 90.0, align=@yue.Center),", "    @components.TableColumn::make(\"定位\", 0.0),   // 0 = 占满剩余宽",
         "  ],", "  rows,", "  width=440.0,", "  sort=sort,", "  on_row_click=fn(i, _r) { println(\"点了第 \\{i + 1} 行\") },",
         ")",
       ],
@@ -376,12 +376,12 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "Table 表格(多选)",
       "复选框列:行点击勾选,表头全选/清空(部分选中画横条);表头排序箭头(灰 ↕ 可排 / 主题色当前排序),「语言」列可点排序,拖动列边界调宽。",
       [
-        @yue.table_t(
+        @components.table_t(
           [
-            @yue.TableColumn::make("语言", 120.0),
-            @yue.TableColumn::make("类型", 100.0, sortable=false),
-            @yue.TableColumn::make("色板", 110.0, sortable=false),
-            @yue.TableColumn::make("特性", 0.0, sortable=false),
+            @components.TableColumn::make("语言", 120.0),
+            @components.TableColumn::make("类型", 100.0, sortable=false),
+            @components.TableColumn::make("色板", 110.0, sortable=false),
+            @components.TableColumn::make("特性", 0.0, sortable=false),
           ],
           rich_rows,
           selection=table_sel,
@@ -391,8 +391,8 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
         @yue.bind(table_sel.signal(), fn(s) { "已选 \{s.length()} 行" }),
       ],
       code=[
-        "let sel : @yue.Store[Array[Int]] = @yue.Store::new([])", "@yue.table_t(",
-        "  [", "    @yue.TableColumn::make(\"语言\", 120.0),", "    @yue.TableColumn::make(\"类型\", 100.0, sortable=false),",
+        "let sel : @yue.Store[Array[Int]] = @yue.Store::new([])", "@components.table_t(",
+        "  [", "    @components.TableColumn::make(\"语言\", 120.0),", "    @components.TableColumn::make(\"类型\", 100.0, sortable=false),",
         "  ],", "  rows,", "  selection=sel,", "  width=460.0,", ")", "@yue.bind(sel.signal(), fn(s) { \"已选 \\{s.length()} 行\" })",
       ],
     ),
@@ -403,12 +403,12 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.table_t(
+            @components.table_t(
               [
-                @yue.TableColumn::make("语言", 120.0),
-                @yue.TableColumn::make("类型", 100.0),
-                @yue.TableColumn::make("色板", 110.0),
-                @yue.TableColumn::make("特性", 0.0),
+                @components.TableColumn::make("语言", 120.0),
+                @components.TableColumn::make("类型", 100.0),
+                @components.TableColumn::make("色板", 110.0),
+                @components.TableColumn::make("特性", 0.0),
               ],
               rich_rows,
               selection=table_sel,
@@ -416,14 +416,14 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
             ),
             @yue.vbox(
               [
-                @yue.label_t("CellTag:彩色语义标签", role=@yue.Secondary),
-                @yue.label_t(
+                @components.label_t("CellTag:彩色语义标签", role=@components.Secondary),
+                @components.label_t(
                   "CellColorBox:色块 + 说明",
-                  role=@yue.Secondary,
+                  role=@components.Secondary,
                 ),
-                @yue.label_t(
+                @components.label_t(
                   "CellLines:多行文本自动撑高",
-                  role=@yue.Secondary,
+                  role=@components.Secondary,
                 ),
               ],
               style=[("marginLeft", 12.0)],
@@ -433,12 +433,12 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "let rich : @yue.Store[Array[@yue.TableRow]] = @yue.Store::new([", "  {",
-        "    cells: [", "      @yue.CellText(\"MoonBit\"),", "      @yue.CellTag(\"编译型\", @yue.Primary),",
-        "      @yue.CellColorBox(\"#2D68C4\", \"主题蓝\"),", "      @yue.CellLines([\"多范式\", \"云 + 端\"]),",
-        "    ],", "  },", "])", "@yue.table_t(", "  [", "    @yue.TableColumn::make(\"语言\", 120.0),",
-        "    @yue.TableColumn::make(\"类型\", 100.0),", "    @yue.TableColumn::make(\"色板\", 110.0),",
-        "    @yue.TableColumn::make(\"特性\", 0.0),", "  ],", "  rich,", "  width=460.0,",
+        "let rich : @yue.Store[Array[@components.TableRow]] = @yue.Store::new([", "  {",
+        "    cells: [", "      @components.CellText(\"MoonBit\"),", "      @components.CellTag(\"编译型\", @components.Primary),",
+        "      @components.CellColorBox(\"#2D68C4\", \"主题蓝\"),", "      @components.CellLines([\"多范式\", \"云 + 端\"]),",
+        "    ],", "  },", "])", "@components.table_t(", "  [", "    @components.TableColumn::make(\"语言\", 120.0),",
+        "    @components.TableColumn::make(\"类型\", 100.0),", "    @components.TableColumn::make(\"色板\", 110.0),",
+        "    @components.TableColumn::make(\"特性\", 0.0),", "  ],", "  rich,", "  width=460.0,",
         ")",
       ],
     ),
@@ -447,12 +447,12 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "Table 虚拟滚动",
       "整面自绘只画可见行,万行流畅;点击表头排序(序号列按数值),拖动列边界调整列宽;滚轮/拖右侧滚动条/键盘 ↑↓ PageUp PageDown 翻页。",
       [
-        @yue.table_v_t(
+        @components.table_v_t(
           [
-            @yue.TableColumn::make("序号", 90.0, align=@yue.End),
-            @yue.TableColumn::make("名称", 160.0),
-            @yue.TableColumn::make("分组", 110.0, align=@yue.Center),
-            @yue.TableColumn::make("备注", 0.0),
+            @components.TableColumn::make("序号", 90.0, align=@yue.End),
+            @components.TableColumn::make("名称", 160.0),
+            @components.TableColumn::make("分组", 110.0, align=@yue.Center),
+            @components.TableColumn::make("备注", 0.0),
           ],
           v_rows,
           height=220.0,
@@ -460,9 +460,9 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "let data : Array[@yue.TableRow] = []", "for i in 0..<10000 {", "  data.push(@yue.TableRow::make([(i + 1).to_string(), \"条目 \\{i + 1}\"]))",
-        "}", "@yue.table_v_t(", "  [", "    @yue.TableColumn::make(\"序号\", 90.0, align=@yue.End),",
-        "    @yue.TableColumn::make(\"名称\", 160.0),", "  ],", "  @yue.Store::new(data),",
+        "let data : Array[@components.TableRow] = []", "for i in 0..<10000 {", "  data.push(@components.TableRow::make([(i + 1).to_string(), \"条目 \\{i + 1}\"]))",
+        "}", "@components.table_v_t(", "  [", "    @components.TableColumn::make(\"序号\", 90.0, align=@yue.End),",
+        "    @components.TableColumn::make(\"名称\", 160.0),", "  ],", "  @yue.Store::new(data),",
         "  height=220.0,", ")",
       ],
     ),
@@ -471,7 +471,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "Tree 树形控件",
       "缩进层级 + 点击展开/折叠(▸/▾)。",
       [
-        @yue.tree([
+        @components.tree([
           {
             label: "src",
             children: [
@@ -489,7 +489,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
         ]),
       ],
       code=[
-        "@yue.tree([", "  {", "    label: \"src\",", "    children: [", "      { label: \"components.mbt\", children: [] },",
+        "@components.tree([", "  {", "    label: \"src\",", "    children: [", "      { label: \"components.mbt\", children: [] },",
         "      { label: \"examples\", children: [{ label: \"showcase\", children: [] }] },",
         "    ],", "  },", "])",
       ],
@@ -500,20 +500,20 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "穿梭框:点击行选中,中间 ›/‹ 移对侧;轮播:箭头/圆点手动切,3 秒自动切换(悬停暂停)。",
       [
         @yue.hbox([
-          @yue.transfer(transfer_left, transfer_right),
-          @yue.carousel_t(
+          @components.transfer(transfer_left, transfer_right),
+          @components.carousel_t(
             [
-              @yue.label_t(
+              @components.label_t(
                 "第一屏:轮播内容可为任意 Node。",
-                role=@yue.Body,
+                role=@components.Body,
               ),
-              @yue.label_t(
+              @components.label_t(
                 "第二屏:自动轮播 3s 一切。",
-                role=@yue.Body,
+                role=@components.Body,
               ),
-              @yue.label_t(
+              @components.label_t(
                 "第三屏:悬停暂停,箭头/圆点手动切。",
-                role=@yue.Body,
+                role=@components.Body,
               ),
             ],
             style=[("width", 320.0), ("marginLeft", 20.0)],
@@ -523,8 +523,8 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       ],
       code=[
         "let left = @yue.Store::new([\"北京\", \"上海\", \"广州\"])", "let right = @yue.Store::new([\"深圳\"])",
-        "@yue.transfer(left, right)", "@yue.carousel_t(", "  [", "    @yue.label_t(\"第一屏:任意 Node。\", role=@yue.Body),",
-        "    @yue.label_t(\"第二屏:自动轮播 3s 一切。\", role=@yue.Body),",
+        "@components.transfer(left, right)", "@components.carousel_t(", "  [", "    @components.label_t(\"第一屏:任意 Node。\", role=@components.Body),",
+        "    @components.label_t(\"第二屏:自动轮播 3s 一切。\", role=@components.Body),",
         "  ],", "  style=[(\"width\", 320.0), (\"height\", 80.0)],", ")",
       ],
     ),
@@ -532,8 +532,8 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "空状态",
       "Empty 空状态",
       "占位图 + 说明文字。",
-      [@yue.empty("这里还没有内容")],
-      code=["@yue.empty(\"这里还没有内容\")"],
+      [@components.empty("这里还没有内容")],
+      code=["@components.empty(\"这里还没有内容\")"],
     ),
   ])
 }

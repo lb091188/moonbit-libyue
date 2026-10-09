@@ -16,7 +16,7 @@ fn main {
     return
   }
   let selected : @yue.Store[String] = @yue.Store::new("基础组件")
-  let (toast_node, toast_push) = @yue.toast_layer()
+  let (toast_node, toast_push) = @components.toast_layer()
   // 章节「复制」按钮的回显走同一 toast 层(见 ui/section.mbt)
   @ui.code_toast.val = Some(toast_push)
   let counter = @yue.Signal::new(0)
@@ -85,7 +85,7 @@ fn main {
         app.si_wake.set(
           "收到唤起:参数 \{args.length()} 个 [\{args.join(" ")}]",
         )
-        app.toast_push("第二实例唤起了本窗口", @yue.Info)
+        app.toast_push("第二实例唤起了本窗口", @components.Info)
         match app.win_ref.val {
           Some(w) => {
             if w.is_minimized() {
@@ -115,7 +115,7 @@ fn main {
             @yue.scroll(
               @yue.vbox(
                 [
-                  @yue.side_menu_sections(
+                  @components.side_menu_sections(
                     [
                       (
                         "组件",
@@ -155,7 +155,7 @@ fn main {
             ),
             @yue.hbox(
               [
-                @yue.label_t("V\{@yue.VERSION}", role=@yue.Secondary),
+                @components.label_t("V\{@yue.VERSION}", role=@components.Secondary),
                 // 图标随状态切换:swap_node 双预建显隐(bind_node 的
                 // Windows 安全替代——重挂的 remove+add 会令 hit-test
                 // 错乱,真机实证;显隐走 display:none 安全路径)
@@ -229,17 +229,17 @@ fn main {
         // 轻提示层挂窗口根:absolute 顶部横条,不占布局
         toast_node,
         // 对话框挂窗口根:absolute 遮罩相对挂载容器,盖全窗
-        @yue.dialog_t(
+        @components.dialog_t(
           app.dlg_basic,
           "删除确认",
           [
-            @yue.alert_closeable(
+            @components.alert_closeable(
               "此操作不可撤销,请确认。",
-              @yue.Warning,
+              @components.Warning,
             ),
-            @yue.label_t(
+            @components.label_t(
               "确定要删除「示例项目」吗?",
-              role=@yue.Body,
+              role=@components.Body,
             ),
           ],
           confirm_text="删除",
@@ -247,18 +247,18 @@ fn main {
           on_confirm=fn() { app.dlg_name.set("(确认删除)") },
           close_on_mask=true,
         ),
-        @yue.dialog_t(
+        @components.dialog_t(
           app.dlg_form,
           "新建连接",
           [
-            @yue.label_t("名称", role=@yue.Body),
-            @yue.input_t(text="例如:开发库", style=[("width", 320.0)], on_input=fn(
+            @components.label_t("名称", role=@components.Body),
+            @components.input_t(text="例如:开发库", style=[("width", 320.0)], on_input=fn(
               t,
             ) {
               app.dlg_name.set(t)
             }),
-            @yue.label_t("地址", role=@yue.Body),
-            @yue.input_t(text="host:port", style=[("width", 320.0)]),
+            @components.label_t("地址", role=@components.Body),
+            @components.input_t(text="host:port", style=[("width", 320.0)]),
           ],
           style=[("width", 380.0)],
         ),
@@ -309,7 +309,7 @@ fn main {
         for i in 0..<demo.item_count() {
           text = text + " [\{i}]\{demo.item_at(i).get_label()}"
         }
-        app.toast_push(text, @yue.Info)
+        app.toast_push(text, @components.Info)
       })
       w.set_menubar(bar)
       // 关闭拦截:系统集成页勾选后,点窗口关闭被 set_should_close 拦下

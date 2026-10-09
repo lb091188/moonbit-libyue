@@ -384,7 +384,7 @@ test "bench: ProcMonitor 全量采样耗时(release 计时)" {
 
 ///|
 /// 取单元格文本（非文本单元格给占位，测试断言用）。
-fn cell_text(c : @yue.TableCell) -> String {
+fn cell_text(c : @components.TableCell) -> String {
   match c {
     CellText(t) => t
     _ => "(non-text)"

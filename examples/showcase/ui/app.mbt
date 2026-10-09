@@ -10,7 +10,7 @@ pub fn is_linux() -> Bool {
 /// 跨页共享状态:导航、窗口/托盘句柄、对话框、主题页共享计数。
 pub(all) struct App {
   selected : @yue.Store[String]
-  toast : (String, @yue.SemanticType) -> Unit
+  toast : (String, @components.SemanticType) -> Unit
   win_ref : Ref[@yue.Window?]
   tray_ref : Ref[@yue.Tray?]
   close_veto : Ref[Bool]
@@ -39,7 +39,7 @@ pub(all) struct App {
 pub fn App::toast_push(
   self : App,
   text : String,
-  t : @yue.SemanticType,
+  t : @components.SemanticType,
 ) -> Unit {
   (self.toast)(text, t)
 }

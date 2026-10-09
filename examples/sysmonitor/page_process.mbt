@@ -100,8 +100,8 @@ pub fn sort_procs(
 ///|
 /// 进程行 → 表格行（列序：PID / 进程名 / 状态 / CPU% / 内存 / nice / 线程 /
 /// 命令行；与 page_process 的 columns 定义一致）。
-pub fn proc_row(p : ProcInfo) -> @yue.TableRow {
-  @yue.TableRow::make([
+pub fn proc_row(p : ProcInfo) -> @components.TableRow {
+  @components.TableRow::make([
     "\{p.pid}",
     p.name,
     p.state,
@@ -129,14 +129,14 @@ fn sort_of_col(j : Int) -> ProcSort? {
 
 ///|
 /// 页面状态：派生表格数据 + 过滤 / 排序条件 + 操作消息。
-/// 排序条件走 @yue.TableSort Store（表头点击由 table_v_t 组件内切换，
+/// 排序条件走 @components.TableSort Store（表头点击由 table_v_t 组件内切换，
 /// 本页订阅后重建数据），箭头显示与点击切换因此对组件透明。
 struct ProcPage {
-  rows : @yue.Store[Array[@yue.TableRow]]
+  rows : @yue.Store[Array[@components.TableRow]]
   sel : @yue.Store[Array[Int]]
   msg : @yue.Store[String]
   status : @yue.Store[String]
-  sort : @yue.Store[@yue.TableSort]
+  sort : @yue.Store[@components.TableSort]
   mut pids : Array[Int]
   mut query : String
   mut nice_text : String
@@ -159,7 +159,7 @@ fn ProcPage::rebuild(self : ProcPage, procs : Array[ProcInfo]) -> Unit {
     None => filtered
     Some(by) => sort_procs(filtered, by, st.asc)
   }
-  let rows : Array[@yue.TableRow] = []
+  let rows : Array[@components.TableRow] = []
   let pids : Array[Int] = []
   for p in sorted {
     rows.push(proc_row(p))
@@ -288,7 +288,7 @@ fn page_process(app : App) -> @yue.Node {
     msg: @yue.Store::new(prio_hint),
     status: @yue.Store::new("采样中…"),
     // 初始排序：CPU% 降序（列 3）
-    sort: @yue.Store::new(@yue.TableSort::{ column: 3, asc: false, }),
+    sort: @yue.Store::new(@components.TableSort::{ column: 3, asc: false, }),
     pids: [],
     query: "",
     nice_text: "10",
@@ -300,10 +300,10 @@ fn page_process(app : App) -> @yue.Node {
   page.sort.subscribe(fn(_s) { page.rebuild(app.procs.get()) })
 
   let tools : Array[@yue.Node] = [
-    @yue.label_t("搜索", role=@yue.Secondary),
+    @components.label_t("搜索", role=@components.Secondary),
     // 搜索框：主题化输入（自绘主题边框 + 主题底色 + 聚焦变色，
     // 悬停非空显示清空 ✕）——不用裸原生 Entry（Linux 下不跟主题）
-    @yue.input_t(
+    @components.input_t(
       text=page.query,
       style=[("width", 220.0)],
       clearable=true,
@@ -317,46 +317,46 @@ fn page_process(app : App) -> @yue.Node {
     None =>
       // Windows：一律立即终止，单按钮
       tools.push(
-        @yue.button_t(end_label, variant=@yue.Danger, on_click=fn() {
+        @components.button_t(end_label, variant=@components.Danger, on_click=fn() {
           page.signal_selected(SIGKILL, "强制结束")
         }),
       )
     Some(fl) => {
       // Linux：温和结束（SIGTERM）+ 强制结束（SIGKILL 兜底）两档
       tools.push(
-        @yue.button_t(end_label, variant=@yue.Soft, on_click=fn() {
+        @components.button_t(end_label, variant=@components.Soft, on_click=fn() {
           page.signal_selected(SIGTERM, "结束")
         }),
       )
       tools.push(
-        @yue.button_t(fl, variant=@yue.Danger, on_click=fn() {
+        @components.button_t(fl, variant=@components.Danger, on_click=fn() {
           page.signal_selected(SIGKILL, "强制结束")
         }),
       )
     }
   }
   tools.push(
-    @yue.input_t(text=page.nice_text, style=[("width", 72.0)], on_input=fn(
+    @components.input_t(text=page.nice_text, style=[("width", 72.0)], on_input=fn(
       s,
     ) {
       page.nice_text = s
     }),
   )
   tools.push(
-    @yue.button_t(prio_btn, variant=@yue.Soft, on_click=fn() {
+    @components.button_t(prio_btn, variant=@components.Soft, on_click=fn() {
       page.renice_selected(platform)
     }),
   )
 
   let columns = [
-    @yue.TableColumn::make("PID", 86.0, align=@yue.End),
-    @yue.TableColumn::make("进程名", 150.0),
-    @yue.TableColumn::make("状态", 56.0, align=@yue.Center, sortable=false),
-    @yue.TableColumn::make("CPU%", 72.0, align=@yue.End),
-    @yue.TableColumn::make("内存", 96.0, align=@yue.End),
-    @yue.TableColumn::make(priority_col_header(platform), 72.0, align=@yue.End),
-    @yue.TableColumn::make("线程", 56.0, align=@yue.End),
-    @yue.TableColumn::make("命令行", 0.0, sortable=false),
+    @components.TableColumn::make("PID", 86.0, align=@yue.End),
+    @components.TableColumn::make("进程名", 150.0),
+    @components.TableColumn::make("状态", 56.0, align=@yue.Center, sortable=false),
+    @components.TableColumn::make("CPU%", 72.0, align=@yue.End),
+    @components.TableColumn::make("内存", 96.0, align=@yue.End),
+    @components.TableColumn::make(priority_col_header(platform), 72.0, align=@yue.End),
+    @components.TableColumn::make("线程", 56.0, align=@yue.End),
+    @components.TableColumn::make("命令行", 0.0, sortable=false),
   ]
   @yue.vbox(
     [
@@ -365,13 +365,13 @@ fn page_process(app : App) -> @yue.Node {
         tools,
         style=[("marginBottom", 8.0), ("alignItems", "center")],
       ),
-      @yue.label_t(
+      @components.label_t(
         page.msg.get(),
-        role=@yue.Secondary,
+        role=@components.Secondary,
         handle=fn(l) { page.msg.subscribe(fn(m) { l.set_text(m) }) },
         style=[("marginBottom", 6.0)],
       ),
-      @yue.table_v_t(
+      @components.table_v_t(
         columns,
         page.rows,
         height=520.0,
@@ -380,9 +380,9 @@ fn page_process(app : App) -> @yue.Node {
         sort=page.sort,
         fill=true,
       ),
-      @yue.label_t(
+      @components.label_t(
         page.status.get(),
-        role=@yue.Secondary,
+        role=@components.Secondary,
         handle=fn(l) { page.status.subscribe(fn(s) { l.set_text(s) }) },
         style=[("marginTop", 6.0)],
       ),

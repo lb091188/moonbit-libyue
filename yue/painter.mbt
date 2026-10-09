@@ -686,3 +686,43 @@ pub fn ImageSlot::set(self : ImageSlot, img : Image?) -> Unit {
 pub fn ImageSlot::get(self : ImageSlot) -> Image? {
   self.value
 }
+pub fn draw_focus_ring(
+  p : Painter,
+  w : Double,
+  h : Double,
+  color? : String = theme_focus_accent(),
+) -> Unit {
+  p.set_stroke_color(color)
+  p.stroke_rect(0.5, 0.5, w - 1.0, h - 1.0)
+}
+
+pub fn fill_round_rect(
+  p : Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+  r : Double,
+) -> Unit {
+  let r = if r > w / 2.0 { w / 2.0 } else if r > h / 2.0 { h / 2.0 } else { r }
+  let k = 0.5522847498
+  p.begin_path()
+  p.move_to(x + r, y)
+  p.line_to(x + w - r, y)
+  p.bezier_curve_to(x + w - r + k * r, y, x + w, y + r - k * r, x + w, y + r)
+  p.line_to(x + w, y + h - r)
+  p.bezier_curve_to(
+    x + w,
+    y + h - r + k * r,
+    x + w - r + k * r,
+    y + h,
+    x + w - r,
+    y + h,
+  )
+  p.line_to(x + r, y + h)
+  p.bezier_curve_to(x + r - k * r, y + h, x, y + h - r + k * r, x, y + h - r)
+  p.line_to(x, y + r)
+  p.bezier_curve_to(x, y + r - k * r, x + r - k * r, y, x + r, y)
+  p.close_path()
+  p.fill()
+}

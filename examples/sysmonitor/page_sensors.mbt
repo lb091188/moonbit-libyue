@@ -121,14 +121,14 @@ fn page_sensors(app : App) -> @yue.Node {
   let nodes : Array[@yue.Node] = []
   if app.gpu_busy_hists.length() == 0 {
     nodes.push(
-      @yue.label_t("未检测到显卡", role=@yue.Secondary, style=[
+      @components.label_t("未检测到显卡", role=@components.Secondary, style=[
         ("marginBottom", 6.0),
       ]),
     )
   }
   for i in 0..<app.gpu_busy_hists.length() {
     nodes.push(
-      @yue.label_t(gpu_label(i, "使用率（%）"), role=@yue.Section, style=[
+      @components.label_t(gpu_label(i, "使用率（%）"), role=@components.Section, style=[
         ("marginBottom", 6.0),
       ]),
     )
@@ -141,7 +141,7 @@ fn page_sensors(app : App) -> @yue.Node {
       ),
     )
     nodes.push(
-      @yue.label_t(gpu_label(i, "显存（GB）"), role=@yue.Section, style=[
+      @components.label_t(gpu_label(i, "显存（GB）"), role=@components.Section, style=[
         ("marginTop", 14.0),
         ("marginBottom", 6.0),
       ]),
@@ -156,14 +156,14 @@ fn page_sensors(app : App) -> @yue.Node {
     @yue.separator(style=[("marginTop", 14.0), ("marginBottom", 10.0)]),
   )
   nodes.push(
-    @yue.label_t("温度传感器", role=@yue.Section, style=[
+    @components.label_t("温度传感器", role=@components.Section, style=[
       ("marginBottom", 4.0),
     ]),
   )
   // 空态:无可用温度来源(非 N 卡无厂商 SDK / 机器无 hwmon 节点)是
   // 合法状态,给一行说明而不是空白
   nodes.push(
-    @yue.label_t("暂无可用温度来源", role=@yue.Secondary, handle=fn(l) {
+    @components.label_t("暂无可用温度来源", role=@components.Secondary, handle=fn(l) {
       @yue.ViewLike::set_visible(l, page.rows.get().length() == 0)
       page.rows.subscribe(fn(r) {
         @yue.ViewLike::set_visible(l, r.length() == 0)

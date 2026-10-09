@@ -13,7 +13,7 @@ fn icon_grid(kinds : Array[@yue.IconKind], per_row : Int) -> @yue.Node {
       let idx = row * per_row + col
       if idx < kinds.length() {
         items.push(
-          @yue.tooltip_t(
+          @components.tooltip_t(
             @yue.icon(kinds[idx], size=30.0),
             @yue.icon_name(kinds[idx]),
           ),
@@ -71,7 +71,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.TreeTable, size=18.0),", "  @yue.icon(@yue.TextField, size=18.0),",
-        "  @yue.icon(@yue.SelectField, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.TreeTable, size=18.0), @yue.icon_name(@yue.TreeTable)),",
+        "  @yue.icon(@yue.SelectField, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.TreeTable, size=18.0), @yue.icon_name(@yue.TreeTable)),",
       ]),
     ),
     @ui.section(
@@ -124,7 +124,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.Bold, size=18.0),", "  @yue.icon(@yue.Strikethrough, size=18.0),",
-        "  @yue.icon(@yue.Undo, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.Bold, size=18.0), @yue.icon_name(@yue.Bold)),",
+        "  @yue.icon(@yue.Undo, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.Bold, size=18.0), @yue.icon_name(@yue.Bold)),",
       ]),
     ),
     @ui.section(
@@ -177,7 +177,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.CaretRightSmall, size=18.0),", "  @yue.icon(@yue.ArrowUp, size=18.0),",
-        "  @yue.icon(@yue.ToTop, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.CaretRightSmall, size=18.0), @yue.icon_name(@yue.CaretRightSmall)),",
+        "  @yue.icon(@yue.ToTop, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.CaretRightSmall, size=18.0), @yue.icon_name(@yue.CaretRightSmall)),",
       ]),
     ),
     @ui.section(
@@ -239,7 +239,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.Appstore, size=18.0),", "  @yue.icon(@yue.BorderInner, size=18.0),",
-        "  @yue.icon(@yue.Layers, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.Appstore, size=18.0), @yue.icon_name(@yue.Appstore)),",
+        "  @yue.icon(@yue.Layers, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.Appstore, size=18.0), @yue.icon_name(@yue.Appstore)),",
       ]),
     ),
     @ui.section(
@@ -320,7 +320,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.FilePdf, size=18.0),", "  @yue.icon(@yue.FolderOpen, size=18.0),",
-        "  @yue.icon(@yue.Snippets, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.FilePdf, size=18.0), @yue.icon_name(@yue.FilePdf)),",
+        "  @yue.icon(@yue.Snippets, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.FilePdf, size=18.0), @yue.icon_name(@yue.FilePdf)),",
       ]),
     ),
     @ui.section(
@@ -364,7 +364,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.CloudServer, size=18.0),", "  @yue.icon(@yue.Qrcode, size=18.0),",
-        "  @yue.icon(@yue.Database, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.CloudServer, size=18.0), @yue.icon_name(@yue.CloudServer)),",
+        "  @yue.icon(@yue.Database, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.CloudServer, size=18.0), @yue.icon_name(@yue.CloudServer)),",
       ]),
     ),
     @ui.section(
@@ -405,7 +405,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.Laptop, size=18.0),", "  @yue.icon(@yue.Printer, size=18.0),",
-        "  @yue.icon(@yue.VideoCamera, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.Laptop, size=18.0), @yue.icon_name(@yue.Laptop)),",
+        "  @yue.icon(@yue.VideoCamera, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.Laptop, size=18.0), @yue.icon_name(@yue.Laptop)),",
       ]),
     ),
     @ui.section(
@@ -450,7 +450,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.AreaChart, size=18.0),", "  @yue.icon(@yue.PieChart, size=18.0),",
-        "  @yue.icon(@yue.Dashboard, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.AreaChart, size=18.0), @yue.icon_name(@yue.AreaChart)),",
+        "  @yue.icon(@yue.Dashboard, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.AreaChart, size=18.0), @yue.icon_name(@yue.AreaChart)),",
       ]),
     ),
     @ui.section(
@@ -492,7 +492,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.Message, size=18.0),", "  @yue.icon(@yue.Bell, size=18.0),",
-        "  @yue.icon(@yue.Share2, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.Message, size=18.0), @yue.icon_name(@yue.Message)),",
+        "  @yue.icon(@yue.Share2, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.Message, size=18.0), @yue.icon_name(@yue.Message)),",
       ]),
     ),
     @ui.section(
@@ -525,7 +525,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.User1, size=18.0),", "  @yue.icon(@yue.Team, size=18.0),",
-        "  @yue.icon(@yue.Adduser, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.User1, size=18.0), @yue.icon_name(@yue.User1)),",
+        "  @yue.icon(@yue.Adduser, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.User1, size=18.0), @yue.icon_name(@yue.User1)),",
       ]),
     ),
     @ui.section(
@@ -561,7 +561,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.Lock, size=18.0),", "  @yue.icon(@yue.Eye, size=18.0),",
-        "  @yue.icon(@yue.Safetycertificate, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.Lock, size=18.0), @yue.icon_name(@yue.Lock)),",
+        "  @yue.icon(@yue.Safetycertificate, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.Lock, size=18.0), @yue.icon_name(@yue.Lock)),",
       ]),
     ),
     @ui.section(
@@ -594,7 +594,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.Time, size=18.0),", "  @yue.icon(@yue.CalendarCheck, size=18.0),",
-        "  @yue.icon(@yue.Loading, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.Time, size=18.0), @yue.icon_name(@yue.Time)),",
+        "  @yue.icon(@yue.Loading, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.Time, size=18.0), @yue.icon_name(@yue.Time)),",
       ]),
     ),
     @ui.section(
@@ -673,7 +673,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.CheckCircleFill, size=18.0),", "  @yue.icon(@yue.CloseCircleFill, size=18.0),",
-        "  @yue.icon(@yue.Smile, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.CheckCircleFill, size=18.0), @yue.icon_name(@yue.CheckCircleFill)),",
+        "  @yue.icon(@yue.Smile, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.CheckCircleFill, size=18.0), @yue.icon_name(@yue.CheckCircleFill)),",
       ]),
     ),
     @ui.section(
@@ -745,7 +745,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.DollarCircleFill, size=18.0),", "  @yue.icon(@yue.Wallet, size=18.0),",
-        "  @yue.icon(@yue.Creditcard, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.DollarCircleFill, size=18.0), @yue.icon_name(@yue.DollarCircleFill)),",
+        "  @yue.icon(@yue.Creditcard, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.DollarCircleFill, size=18.0), @yue.icon_name(@yue.DollarCircleFill)),",
       ]),
     ),
     @ui.section(
@@ -834,7 +834,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.Login, size=18.0),", "  @yue.icon(@yue.SettingFill, size=18.0),",
-        "  @yue.icon(@yue.Filter, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.Login, size=18.0), @yue.icon_name(@yue.Login)),",
+        "  @yue.icon(@yue.Filter, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.Login, size=18.0), @yue.icon_name(@yue.Login)),",
       ]),
     ),
     @ui.section(
@@ -896,7 +896,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.Sunny, size=18.0),", "  @yue.icon(@yue.Cloudy, size=18.0),",
-        "  @yue.icon(@yue.CoffeeCup, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.Sunny, size=18.0), @yue.icon_name(@yue.Sunny)),",
+        "  @yue.icon(@yue.CoffeeCup, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.Sunny, size=18.0), @yue.icon_name(@yue.Sunny)),",
       ]),
     ),
     @ui.section(
@@ -950,7 +950,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.ImageIcon, size=18.0),", "  @yue.icon(@yue.Car, size=18.0),",
-        "  @yue.icon(@yue.Compass, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.ImageIcon, size=18.0), @yue.icon_name(@yue.ImageIcon)),",
+        "  @yue.icon(@yue.Compass, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.ImageIcon, size=18.0), @yue.icon_name(@yue.ImageIcon)),",
       ]),
     ),
     @ui.section(
@@ -1014,7 +1014,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.Wechat, size=18.0),", "  @yue.icon(@yue.GithubFill, size=18.0),",
-        "  @yue.icon(@yue.Chrome, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.Wechat, size=18.0), @yue.icon_name(@yue.Wechat)),",
+        "  @yue.icon(@yue.Chrome, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.Wechat, size=18.0), @yue.icon_name(@yue.Wechat)),",
       ]),
     ),
     @ui.section(
@@ -1144,7 +1144,7 @@ pub fn page_icons(_app : @ui.App) -> @yue.Node {
       ],
       code=icon_group_code([
         "  @yue.icon(@yue.Shangduiqi, size=18.0),", "  @yue.icon(@yue.Youduiqi, size=18.0),",
-        "  @yue.icon(@yue.Zuoduiqi, size=18.0),", "  @yue.tooltip_t(@yue.icon(@yue.Shangduiqi, size=18.0), @yue.icon_name(@yue.Shangduiqi)),",
+        "  @yue.icon(@yue.Zuoduiqi, size=18.0),", "  @components.tooltip_t(@yue.icon(@yue.Shangduiqi, size=18.0), @yue.icon_name(@yue.Shangduiqi)),",
       ]),
     ),
   ])

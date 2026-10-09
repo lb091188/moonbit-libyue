@@ -10,24 +10,24 @@
 /// 空则整行不显示)。确定/取消/✕ 触发回调后自动收起;close_on_mask=true
 /// 时点遮罩空白处也收起。width 为面板宽(默认 420)。
 pub fn dialog_t(
-  visible : Store[Bool],
+  visible : @yue.Store[Bool],
   title : String,
-  children : Array[Node],
+  children : Array[@yue.Node],
   confirm_text? : String = "确定",
   cancel_text? : String = "取消",
   on_confirm? : () -> Unit = fn() {  },
   on_cancel? : () -> Unit = fn() {  },
   close_on_mask? : Bool = false,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let close = fn() -> Unit { visible.set(false) }
       // 遮罩:absolute 全覆盖 + 居中排布;半透明黑经 on_draw 填充——
       // 背景色 hex 的 alpha 在 GTK 按不透明处理,半透明底必须走
       // Painter(定案见 adaptation.md「对话框遮罩」条)
-      let overlay = themed_container(style=[
+      let overlay = @yue.themed_container(style=[
         ("position", "absolute"),
         ("top", "0"),
         ("left", "0"),
@@ -37,12 +37,12 @@ pub fn dialog_t(
         ("alignItems", "center"),
       ])
       overlay.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(overlay)
+        let b = @yue.ViewLike::get_bounds(overlay)
         p.set_fill_color("#59000000")
         p.fill_rect(0.0, 0.0, b.width, b.height)
       })
       // 面板:主题面板底 + 1px 边框(on_draw 描);style 落面板
-      let base : Array[(String, &StyVal)] = [
+      let base : Array[(String, &@yue.StyVal)] = [
         ("width", 420.0),
         ("flexDirection", "column"),
         ("maxHeight", "80%"),
@@ -50,18 +50,18 @@ pub fn dialog_t(
       for kv in style {
         base.push(kv)
       }
-      let panel = themed_container(style=base)
+      let panel = @yue.themed_container(style=base)
       handle(panel)
-      set_panel_bg(panel)
+      @yue.set_panel_bg(panel)
       panel.on_draw(fn(p) {
-        let b = ViewLike::get_bounds(panel)
-        p.set_stroke_color(theme_border())
+        let b = @yue.ViewLike::get_bounds(panel)
+        p.set_stroke_color(@yue.theme_border())
         p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
       })
       // 面板消费鼠标,避免点击内容冒泡到遮罩触发 close_on_mask
-      ViewLike::on_mouse_down(panel, fn(_e) { true })
+      @yue.ViewLike::on_mouse_down(panel, fn(_e) { true })
       // 标题栏:标题 + 弹性空档 + ✕
-      let head = themed_container(style=[
+      let head = @yue.themed_container(style=[
         ("height", 44.0),
         ("paddingLeft", 16.0),
         ("paddingRight", 10.0),
@@ -69,13 +69,13 @@ pub fn dialog_t(
         ("flexDirection", "row"),
         ("alignItems", "center"),
       ])
-      attach(
-        ViewLike::view(head),
-        label_t(title, role=Section).mount_into(ViewLike::view(head)),
+      @yue.attach(
+        @yue.ViewLike::view(head),
+        label_t(title, role=Section).mount_into(@yue.ViewLike::view(head)),
       )
-      let spacer = themed_container(style=[("flex", 1.0)])
+      let spacer = @yue.themed_container(style=[("flex", 1.0)])
       head.add_child(spacer)
-      let close_btn = icon_button_t(
+      let close_btn = @yue.icon_button_t(
         Close2,
         on_click=fn() {
           on_cancel()
@@ -83,47 +83,50 @@ pub fn dialog_t(
         },
         tip="关闭",
       )
-      attach(ViewLike::view(head), close_btn.mount_into(ViewLike::view(head)))
+      @yue.attach(
+        @yue.ViewLike::view(head),
+        close_btn.mount_into(@yue.ViewLike::view(head)),
+      )
       panel.add_child(head)
       // 内容区:统一 16px 内边距
-      let body = themed_container(style=[
+      let body = @yue.themed_container(style=[
         ("padding", 16.0),
         ("flexDirection", "column"),
       ])
       for ch in children {
-        ignore((ch.mount)(ViewLike::view(body)))
+        ignore((ch.mount)(@yue.ViewLike::view(body)))
       }
       panel.add_child(body)
       // 底部按钮区:右对齐;两个文案都空则不显示
       if confirm_text != "" || cancel_text != "" {
-        let foot = themed_container(style=[
+        let foot = @yue.themed_container(style=[
           ("paddingRight", 16.0),
           ("paddingBottom", 14.0),
           ("flexDirection", "row"),
           ("justifyContent", "flex-end"),
         ])
         if cancel_text != "" {
-          attach(
-            ViewLike::view(foot),
+          @yue.attach(
+            @yue.ViewLike::view(foot),
             button_t(cancel_text, on_click=fn() {
               on_cancel()
               close()
-            }).mount_into(ViewLike::view(foot)),
+            }).mount_into(@yue.ViewLike::view(foot)),
           )
         }
         if confirm_text != "" {
-          attach(
-            ViewLike::view(foot),
+          @yue.attach(
+            @yue.ViewLike::view(foot),
             button_t(confirm_text, variant=Solid, on_click=fn() {
               on_confirm()
               close()
-            }).mount_into(ViewLike::view(foot)),
+            }).mount_into(@yue.ViewLike::view(foot)),
           )
         }
         panel.add_child(foot)
       }
       // 遮罩点击(面板外空白):可选收起
-      ViewLike::on_mouse_down(overlay, fn(_e) {
+      @yue.ViewLike::on_mouse_down(overlay, fn(_e) {
         if close_on_mask {
           close()
           true
@@ -133,10 +136,10 @@ pub fn dialog_t(
       })
       overlay.add_child(panel)
       // 显示态:Store 驱动
-      ViewLike::set_visible(overlay, visible.get())
-      visible.subscribe(fn(v) { ViewLike::set_visible(overlay, v) })
-      attach(parent, ViewLike::view(overlay))
-      ViewLike::view(overlay)
+      @yue.ViewLike::set_visible(overlay, visible.get())
+      visible.subscribe(fn(v) { @yue.ViewLike::set_visible(overlay, v) })
+      @yue.attach(parent, @yue.ViewLike::view(overlay))
+      @yue.ViewLike::view(overlay)
     },
   }
 }
@@ -148,11 +151,11 @@ pub fn dialog_t(
 /// 调用(典型:按钮回调里推)。
 pub fn toast_layer(
   duration_ms? : Int = 2600,
-) -> (Node, (String, SemanticType) -> Unit) {
-  let host : Ref[Container?] = Ref(None)
-  let layer = {
+) -> (@yue.Node, (String, SemanticType) -> Unit) {
+  let host : Ref[@yue.Container?] = Ref(None)
+  let layer : @yue.Node = {
     mount: fn(parent) {
-      let c = themed_container(style=[
+      let c = @yue.themed_container(style=[
         ("paddingTop", 8.0),
         ("position", "absolute"),
         ("top", "0"),
@@ -162,53 +165,59 @@ pub fn toast_layer(
         ("alignItems", "center"),
       ])
       host.val = Some(c)
-      attach(parent, ViewLike::view(c))
-      ViewLike::view(c)
+      @yue.attach(parent, @yue.ViewLike::view(c))
+      @yue.ViewLike::view(c)
     },
   }
   fn push(text : String, t : SemanticType) -> Unit {
     match host.val {
       None => ()
       Some(c) => {
-        let fnt = Font::new("Sans", 13.0)
-        let probe = AttributedText::new(text, wrap=false)
+        let fnt = @yue.Font::new("Sans", 13.0)
+        let probe = @yue.AttributedText::new(text, wrap=false)
         probe.set_font(fnt)
         let text_w = probe.get_bounds_for(10000.0, 100.0).width
         let w = text_w + 62.0
         // 条子是「现建现撤」的短周期视图:它的主题订阅随撤下一起退订,
         // 不退则每次 push 漏两条死订阅,随提示次数无界累积
-        sub_bag_begin()
-        let bar = themed_container(style=[
+        @yue.sub_bag_begin()
+        let bar = @yue.themed_container(style=[
           ("width", w),
           ("height", 34.0),
           ("marginBottom", 8.0),
         ])
-        set_panel_bg(bar)
+        @yue.set_panel_bg(bar)
         bar.on_draw(fn(p) {
-          let b = ViewLike::get_bounds(bar)
-          p.set_stroke_color(theme_border())
+          let b = @yue.ViewLike::get_bounds(bar)
+          p.set_stroke_color(@yue.theme_border())
           p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
-          let kind : IconKind = match t {
-            Info => IconKind::InfoCircleFill
-            Success => IconKind::CheckCircleFill
-            Warning => IconKind::WarningCircleFill
-            Danger => IconKind::CloseCircleFill
-            Primary => IconKind::InfoCircleFill
+          let kind : @yue.IconKind = match t {
+            Info => @yue.IconKind::InfoCircleFill
+            Success => @yue.IconKind::CheckCircleFill
+            Warning => @yue.IconKind::WarningCircleFill
+            Danger => @yue.IconKind::CloseCircleFill
+            Primary => @yue.IconKind::InfoCircleFill
           }
-          draw_icon(p, kind, 18.0, b.height / 2.0, 7.0, type_color(t))
-          let at = AttributedText::new(text, valign=Center, wrap=false)
+          @yue.draw_icon(p, kind, 18.0, b.height / 2.0, 7.0, type_color(t))
+          let at = @yue.AttributedText::new(
+            text,
+            valign=@yue.Center,
+            wrap=false,
+          )
           at.set_font(fnt)
-          at.set_color(theme_text_regular())
+          at.set_color(@yue.theme_text_regular())
           // GTK 端水平 align 无效,按测宽手动居中(图标 24 + 右侧留白)
           let x = 30.0 + (b.width - 30.0 - 16.0 - text_w) / 2.0
           p.draw_attributed_text(at, x, 0.0, b.width, b.height)
         })
-        let gen = sub_bag_end()
+        let gen = @yue.sub_bag_end()
         c.add_child(bar)
         ignore(
-          set_timeout(duration_ms, fn() {
-            ignore(Container::remove_child_view(c, ViewLike::view(bar)))
-            sub_bag_discard(gen)
+          @yue.set_timeout(duration_ms, fn() {
+            ignore(
+              @yue.Container::remove_child_view(c, @yue.ViewLike::view(bar)),
+            )
+            @yue.sub_bag_discard(gen)
           }),
         )
       }
@@ -223,23 +232,23 @@ pub fn toast_layer(
 /// 系统真相,不受 GetBoundsInScreen 在 Windows 嵌套滚动容器下的布局累加
 /// 污染,见 adaptation.md)。菜单每次右键现建,避免原生菜单复用的状态残留。
 pub fn context_menu_for(
-  content : Node,
+  content : @yue.Node,
   items : Array[(String, () -> Unit)],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let base : Array[(String, &StyVal)] = [("flexDirection", "column")]
+      let base : Array[(String, &@yue.StyVal)] = [("flexDirection", "column")]
       for kv in style {
         base.push(kv)
       }
-      let wrap = themed_container(style=base)
+      let wrap = @yue.themed_container(style=base)
       handle(wrap)
-      ignore((content.mount)(ViewLike::view(wrap)))
-      ViewLike::on_mouse_down(wrap, fn(e) {
+      ignore((content.mount)(@yue.ViewLike::view(wrap)))
+      @yue.ViewLike::on_mouse_down(wrap, fn(e) {
         if e.button == 2 {
-          let menu = Menu::new()
+          let menu = @yue.Menu::new()
           for it in items {
             if it.0 == "-" {
               ignore(menu.add_separator())
@@ -255,8 +264,8 @@ pub fn context_menu_for(
           false
         }
       })
-      attach(parent, ViewLike::view(wrap))
-      ViewLike::view(wrap)
+      @yue.attach(parent, @yue.ViewLike::view(wrap))
+      @yue.ViewLike::view(wrap)
     },
   }
 }

@@ -1,4 +1,4 @@
 import {
   "NoahLiu/moonbit-libyue/yue",
-  "NoahLiu/moonbit-libyue/yue/components",
+  "moonbitlang/core/math",
 }

@@ -12,62 +12,62 @@ pub fn theme_primary() -> String {
 }
 
 ///|
-fn theme_primary_light() -> String {
+pub fn theme_primary_light() -> String {
   theme_box.t.primary_light
 }
 
 ///|
-fn theme_primary_hover() -> String {
+pub fn theme_primary_hover() -> String {
   theme_box.t.primary_hover
 }
 
 ///|
-fn theme_danger_hover() -> String {
+pub fn theme_danger_hover() -> String {
   theme_box.t.danger_hover
 }
 
 ///|
-fn theme_success() -> String {
+pub fn theme_success() -> String {
   theme_box.t.success
 }
 
 ///|
-fn theme_success_light() -> String {
+pub fn theme_success_light() -> String {
   theme_box.t.success_light
 }
 
 ///|
-fn theme_warning() -> String {
+pub fn theme_warning() -> String {
   theme_box.t.warning
 }
 
 ///|
-fn theme_warning_light() -> String {
+pub fn theme_warning_light() -> String {
   theme_box.t.warning_light
 }
 
 ///|
-fn theme_danger() -> String {
+pub fn theme_danger() -> String {
   theme_box.t.danger
 }
 
 ///|
-fn theme_danger_light() -> String {
+pub fn theme_danger_light() -> String {
   theme_box.t.danger_light
 }
 
 ///|
-fn theme_info() -> String {
+pub fn theme_info() -> String {
   theme_box.t.info
 }
 
 ///|
-fn theme_info_light() -> String {
+pub fn theme_info_light() -> String {
   theme_box.t.info_light
 }
 
 ///|
-fn theme_text_primary() -> String {
+pub fn theme_text_primary() -> String {
   theme_box.t.text_primary
 }
 
@@ -77,7 +77,7 @@ pub fn theme_text_regular() -> String {
 }
 
 ///|
-fn theme_text_secondary() -> String {
+pub fn theme_text_secondary() -> String {
   theme_box.t.text_secondary
 }
 
@@ -87,12 +87,12 @@ pub fn theme_border() -> String {
 }
 
 ///|
-fn theme_fill_hover() -> String {
+pub fn theme_fill_hover() -> String {
   theme_box.t.fill_hover
 }
 
 ///|
-fn theme_fill_zebra() -> String {
+pub fn theme_fill_zebra() -> String {
   theme_box.t.fill_zebra
 }
 
@@ -105,7 +105,7 @@ pub fn theme_bg_panel() -> String {
 /// 焦点/激活反馈色:中性灰(取 text_secondary),不用主题色——
 /// 主题蓝只用于主要按钮/选中态等强调语义,active 反馈不喧宾夺主。
 /// 焦点环与字段聚焦边框共用。
-fn theme_focus_accent() -> String {
+pub fn theme_focus_accent() -> String {
   theme_text_secondary()
 }
 
@@ -141,7 +141,7 @@ pub fn[T : ViewLike] set_panel_bg(v : T) -> Unit {
 /// 弹层底色跟随主题:Windows 替代弹层是独立裸窗口(默认白底,应用内
 /// 全局接管 CSS 罩不到,深色主题下白底浅字不可读),显式设主题面板色
 /// 并订阅切换重设;其余平台弹层在应用窗口体系内由 CSS 覆盖,空操作。
-fn bind_popover_bg(p : Popover) -> Unit {
+pub fn bind_popover_bg(p : Popover) -> Unit {
   fn apply() -> Unit {
     p.set_background_color(theme_bg_panel())
   }
@@ -153,7 +153,7 @@ fn bind_popover_bg(p : Popover) -> Unit {
 ///|
 /// 底色绑定:挂载即设 color_of() + 主题切换重设(语义浅底/禁用底等
 /// 取自主题色板的静态底色)。随组件销毁的退订走订阅回收袋。
-fn[T : ViewLike] bind_bg(v : T, color_of : () -> String) -> Unit {
+pub fn[T : ViewLike] bind_bg(v : T, color_of : () -> String) -> Unit {
   fn apply() -> Unit {
     v.set_background_color(color_of())
   }
@@ -168,7 +168,7 @@ fn[T : ViewLike] bind_bg(v : T, color_of : () -> String) -> Unit {
 /// set_color 后必须同文 set_text 一次:set_color 改的 Pango 前景属性
 /// 不触发布局缓存失效,不同文重排则重绘仍用旧色(点击路径实测)。
 /// 随组件销毁的退订走订阅回收袋。
-fn bind_fg(v : Label, color_of : () -> String) -> Unit {
+pub fn bind_fg(v : Label, color_of : () -> String) -> Unit {
   fn apply() -> Unit {
     ViewLike::set_color(v, color_of())
     v.set_text(v.get_text())
@@ -203,7 +203,7 @@ pub fn[T : ViewLike] theme_bind_bg(v : T, color_of : () -> String) -> Unit {
 ///   @yue.Theme::{ primary: "#1E4FA3", primary_light: "#E3EDFA", ..@yue.default_theme() },
 /// )
 /// ```
-pub struct Theme {
+pub(all) struct Theme {
   primary : String
   primary_light : String
   primary_hover : String
@@ -529,4 +529,22 @@ pub fn theme_apply(t : Theme) -> Unit {
     // remove+add(探针定案),与重绘时机无关,勿再动此处
     ffi_repaint_all()
   }
+}
+pub fn entry_ctrl_height(bordered : Bool) -> Double {
+  let probe = AttributedText::new("Ag", wrap=false)
+  probe.set_font(Font::new("Sans", 13.0))
+  probe.get_bounds_for(10000.0, 1000.0).height +
+  (if bordered { 2.0 } else { 0.0 })
+}
+
+pub fn bind_entry_theme(e : Entry) -> Unit {
+  if platform() == "linux" {
+    return
+  }
+  fn apply() -> Unit {
+    e.set_colors(fg=theme_text_regular(), bg=theme_bg_panel())
+  }
+
+  apply()
+  ignore(on_theme_change(apply))
 }

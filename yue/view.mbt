@@ -14,7 +14,7 @@ let bytes_callbacks : Ref[Array[(Bytes) -> Unit]] = Ref([])
 let draw_callbacks : Ref[Array[(Painter) -> Unit]] = Ref([])
 
 ///|
-fn keep_alive(callback : () -> Unit) -> Unit {
+pub fn keep_alive(callback : () -> Unit) -> Unit {
   callbacks.val.push(callback)
 }
 
@@ -249,6 +249,12 @@ pub fn native_handle_view(v : View) -> UInt64 {
 /// 对底层视图句柄直接设置显隐(声明式 Node 挂载返回的 View 用)。
 pub fn set_visible_view(v : View, visible : Bool) -> Unit {
   ffi_view_set_visible(v, if visible { 1 } else { 0 })
+}
+
+///|
+/// 可点击自绘控件统一手型光标(组件库与 charts 交互层共用)。
+pub fn hand() -> Cursor {
+  Cursor::new(Hand)
 }
 
 ///|
@@ -576,4 +582,30 @@ pub fn Window::set_should_close(self : Window, callback : () -> Bool) -> Unit {
   let wrapped : () -> Int = fn() { if callback() { 1 } else { 0 } }
   keep_alive(fn() { ignore(wrapped) })
   ffi_window_set_should_close(self.view, fn(f) { f() }, wrapped)
+}
+pub fn bind_focus(
+  v : Container,
+  repaint : () -> Unit,
+  focused : Ref[Bool],
+  on_activate : () -> Unit,
+) -> Unit {
+  ViewLike::set_focusable(v, true)
+  ViewLike::on_focus_in(v, fn() {
+    focused.val = true
+    repaint()
+    false
+  })
+  ViewLike::on_focus_out(v, fn() {
+    focused.val = false
+    repaint()
+    false
+  })
+  ViewLike::on_key_down(v, fn(e) {
+    if e.code == VKEY_RETURN || e.code == VKEY_SPACE {
+      on_activate()
+      true
+    } else {
+      false
+    }
+  })
 }

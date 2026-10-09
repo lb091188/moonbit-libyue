@@ -10,7 +10,7 @@ fn main {
   @yue.theme_apply(@yue.theme_from_system())
   let items : Array[@yue.Node] = []
   for i in 0..<8 {
-    items.push(@yue.label_t("标签\{i}"))
+    items.push(@components.label_t("标签\{i}"))
   }
   ignore(
     @yue.mount_window(

@@ -12,14 +12,14 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.button_t("跟随系统", variant=@yue.Solid, on_click=fn() {
+            @components.button_t("跟随系统", variant=@components.Solid, on_click=fn() {
               app.accent.set(@yue.system_accent())
             }),
-            @yue.button_t("默认蓝", on_click=fn() { app.accent.set("") }),
-            @yue.button_t("青", on_click=fn() { app.accent.set("#009688") }),
-            @yue.button_t("绿", on_click=fn() { app.accent.set("#2E9E5B") }),
-            @yue.button_t("紫", on_click=fn() { app.accent.set("#9141AC") }),
-            @yue.button_t("红", on_click=fn() { app.accent.set("#D64550") }),
+            @components.button_t("默认蓝", on_click=fn() { app.accent.set("") }),
+            @components.button_t("青", on_click=fn() { app.accent.set("#009688") }),
+            @components.button_t("绿", on_click=fn() { app.accent.set("#2E9E5B") }),
+            @components.button_t("紫", on_click=fn() { app.accent.set("#9141AC") }),
+            @components.button_t("红", on_click=fn() { app.accent.set("#D64550") }),
           ],
           style=[("alignItems", "center")],
         ),
@@ -49,22 +49,22 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.button_t(
+            @components.button_t(
               "主要操作",
               on_click=fn() { app.counter.update(fn(n) { n + 1 }) },
-              variant=@yue.Solid,
+              variant=@components.Solid,
             ),
-            @yue.button_t("次要操作", variant=@yue.Soft),
-            @yue.button_t("文字按钮", variant=@yue.Text),
-            @yue.button_t("危险操作", variant=@yue.Danger),
+            @components.button_t("次要操作", variant=@components.Soft),
+            @components.button_t("文字按钮", variant=@components.Text),
+            @components.button_t("危险操作", variant=@components.Danger),
           ],
           style=[("alignItems", "center")],
         ),
       ],
       code=[
-        "@yue.hbox([", "  @yue.button_t(\"主要操作\", variant=@yue.Solid, on_click=fn() { }),",
-        "  @yue.button_t(\"次要操作\", variant=@yue.Soft),", "  @yue.button_t(\"文字按钮\", variant=@yue.Text),",
-        "  @yue.button_t(\"危险操作\", variant=@yue.Danger),", "])",
+        "@yue.hbox([", "  @components.button_t(\"主要操作\", variant=@components.Solid, on_click=fn() { }),",
+        "  @components.button_t(\"次要操作\", variant=@components.Soft),", "  @components.button_t(\"文字按钮\", variant=@components.Text),",
+        "  @components.button_t(\"危险操作\", variant=@components.Danger),", "])",
       ],
     ),
     @ui.section(
@@ -72,36 +72,36 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
       "Label 与 Link",
       "五级排版角色,字号颜色随角色;Link 主题色文字悬停下划线,最近点击信号回显。",
       [
-        @yue.label_t("标题文字(Title)", role=@yue.Title, style=[
+        @components.label_t("标题文字(Title)", role=@components.Title, style=[
           ("marginTop", 8.0),
         ]),
-        @yue.label_t("小节标题(Section)", role=@yue.Section, style=[
+        @components.label_t("小节标题(Section)", role=@components.Section, style=[
           ("marginTop", 8.0),
         ]),
-        @yue.label_t("正文文字(Body)", role=@yue.Body, style=[
+        @components.label_t("正文文字(Body)", role=@components.Body, style=[
           ("marginTop", 8.0),
         ]),
-        @yue.label_t("辅助文字(Secondary)", role=@yue.Secondary, style=[
+        @components.label_t("辅助文字(Secondary)", role=@components.Secondary, style=[
           ("marginTop", 8.0),
         ]),
-        @yue.label_t("强调文字(Accent)", role=@yue.Accent, style=[
+        @components.label_t("强调文字(Accent)", role=@components.Accent, style=[
           ("marginTop", 8.0),
         ]),
         @yue.hbox(
           [
-            @yue.link("打开文档", fn() { app.picked_lang.set("docs") }),
+            @components.link("打开文档", fn() { app.picked_lang.set("docs") }),
             @yue.label("   "),
-            @yue.link("帮助中心", fn() { app.picked_lang.set("help") }),
-            @yue.label_t("最近点击:", role=@yue.Body),
+            @components.link("帮助中心", fn() { app.picked_lang.set("help") }),
+            @components.label_t("最近点击:", role=@components.Body),
             @yue.bind(app.picked_lang, fn(s) { s }),
           ],
           style=[("marginTop", 8.0), ("alignItems", "center")],
         ),
       ],
       code=[
-        "@yue.label_t(\"标题文字\", role=@yue.Title)", "@yue.label_t(\"小节标题\", role=@yue.Section)",
-        "@yue.label_t(\"正文文字\", role=@yue.Body)", "@yue.label_t(\"辅助文字\", role=@yue.Secondary)",
-        "@yue.label_t(\"强调文字\", role=@yue.Accent)", "@yue.link(\"打开文档\", fn() { println(\"link clicked\") })",
+        "@components.label_t(\"标题文字\", role=@components.Title)", "@components.label_t(\"小节标题\", role=@components.Section)",
+        "@components.label_t(\"正文文字\", role=@components.Body)", "@components.label_t(\"辅助文字\", role=@components.Secondary)",
+        "@components.label_t(\"强调文字\", role=@components.Accent)", "@components.link(\"打开文档\", fn() { println(\"link clicked\") })",
       ],
     ),
     @ui.section(
@@ -109,17 +109,17 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
       "Divider 与 Tooltip",
       "水平(默认)/竖直 1px 主题边框色;tooltip_t 给任意节点包原生悬浮提示(系统样式,主题化气泡见反馈页 Popover)。",
       [
-        @yue.label_t("上方内容"),
-        @yue.divider(style=[("marginTop", 6.0), ("marginBottom", 6.0)]),
-        @yue.label_t("下方内容"),
+        @components.label_t("上方内容"),
+        @components.divider(style=[("marginTop", 6.0), ("marginBottom", 6.0)]),
+        @components.label_t("下方内容"),
         @yue.hbox(
           [
-            @yue.tooltip_t(
-              @yue.button_t("悬停看提示"),
+            @components.tooltip_t(
+              @components.button_t("悬停看提示"),
               "原生 tooltip:系统样式",
             ),
-            @yue.tooltip_t(
-              @yue.button_t("再来一个", variant=@yue.Soft),
+            @components.tooltip_t(
+              @components.button_t("再来一个", variant=@components.Soft),
               "第二个提示",
             ),
           ],
@@ -127,7 +127,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "@yue.divider()", "@yue.divider(vertical=true)", "@yue.tooltip_t(@yue.button_t(\"悬停看提示\"), \"原生 tooltip:系统样式\")",
+        "@components.divider()", "@components.divider(vertical=true)", "@components.tooltip_t(@components.button_t(\"悬停看提示\"), \"原生 tooltip:系统样式\")",
       ],
     ),
     @ui.section(
@@ -138,20 +138,20 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         @yue.hover_group(
           @yue.vbox(
             [
-              @yue.label_t(
+              @components.label_t(
                 "组标题:悬停我,或下面的子控件",
-                role=@yue.Section,
+                role=@components.Section,
               ),
               @yue.hbox(
                 [
-                  @yue.input_t(text="组内输入框", style=[("width", 200.0)]),
-                  @yue.button_t("组内按钮"),
+                  @components.input_t(text="组内输入框", style=[("width", 200.0)]),
+                  @components.button_t("组内按钮"),
                 ],
                 style=[("marginTop", 10.0), ("alignItems", "center")],
               ),
-              @yue.label_t(
+              @components.label_t(
                 "子控件触发的事件同样改变组的样式",
-                role=@yue.Secondary,
+                role=@components.Secondary,
                 style=[("marginTop", 8.0)],
               ),
             ],
@@ -167,8 +167,8 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "@yue.hover_group(", "  @yue.vbox(", "    [", "      @yue.label_t(\"组标题\", role=@yue.Section),",
-        "      @yue.button_t(\"组内按钮\"),", "    ],", "    style=[(\"padding\", 14.0)],",
+        "@yue.hover_group(", "  @yue.vbox(", "    [", "      @components.label_t(\"组标题\", role=@components.Section),",
+        "      @components.button_t(\"组内按钮\"),", "    ],", "    style=[(\"padding\", 14.0)],",
         "  ),", "  radius=8.0,", "  on_change=fn(hover, host) {", "    @yue.View::set_cursor(",
         "      host,", "      @yue.Cursor::new(if hover { @yue.Hand } else { @yue.Default }),",
         "    )", "  },", ")",
@@ -182,14 +182,14 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         @yue.cursor_group(
           @yue.vbox(
             [
-              @yue.label_t(
+              @components.label_t(
                 "整组都是手型:移入试试,或移到子控件上",
-                role=@yue.Section,
+                role=@components.Section,
               ),
               @yue.hbox(
                 [
-                  @yue.input_t(text="组内输入框", style=[("width", 200.0)]),
-                  @yue.button_t("组内按钮"),
+                  @components.input_t(text="组内输入框", style=[("width", 200.0)]),
+                  @components.button_t("组内按钮"),
                 ],
                 style=[("marginTop", 10.0), ("alignItems", "center")],
               ),
@@ -199,9 +199,9 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "@yue.cursor_group(", "  @yue.vbox(", "    [", "      @yue.label_t(\"整组都是手型\", role=@yue.Section),",
-        "      @yue.input_t(text=\"组内输入框\", style=[(\"width\", 200.0)]),",
-        "      @yue.button_t(\"组内按钮\"),", "    ],", "    style=[(\"padding\", 14.0)],",
+        "@yue.cursor_group(", "  @yue.vbox(", "    [", "      @components.label_t(\"整组都是手型\", role=@components.Section),",
+        "      @components.input_t(text=\"组内输入框\", style=[(\"width\", 200.0)]),",
+        "      @components.button_t(\"组内按钮\"),", "    ],", "    style=[(\"padding\", 14.0)],",
         "  ),", ")",
       ],
     ),

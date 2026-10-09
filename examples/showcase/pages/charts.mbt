@@ -117,14 +117,14 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
         ),
         @yue.hbox(
           [
-            @yue.checkbox_t("暂停推点", checked=line_running.get(), on_change=fn(
+            @components.checkbox_t("暂停推点", checked=line_running.get(), on_change=fn(
               v,
             ) {
               line_running.set(v)
             }),
-            @yue.label_t(
+            @components.label_t(
               "窗口容量 120,推点频率 2Hz;暂停只断数据流,定时器不取消。",
-              role=@yue.Secondary,
+              role=@components.Secondary,
             ),
           ],
           style=[("marginTop", 8.0), ("alignItems", "center")],
@@ -202,8 +202,8 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
             @yue.label("  "),
             @yue.vbox(
               [
-                @yue.label_t("手动值", role=@yue.Body),
-                @yue.slider_t(gauge_manual, min=0.0, max=1.0, step=0.01, style=[
+                @components.label_t("手动值", role=@components.Body),
+                @components.slider_t(gauge_manual, min=0.0, max=1.0, step=0.01, style=[
                   ("flexgrow", 0.0),
                   ("width", 160.0),
                 ]),
@@ -218,7 +218,7 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
         "let gauge = @yue.Store::new(0.35)", "let thresholds = [", "  (0.6, @yue.theme_current().success),",
         "  (0.85, @yue.theme_current().warning),", "  (1.0, @yue.theme_current().danger),",
         "]", "@yue.gauge_t(gauge, thresholds=thresholds, style=[(\"width\", 240.0), (\"height\", 180.0)])",
-        "@yue.slider_t(gauge, min=0.0, max=1.0, step=0.01, style=[(\"width\", 160.0)])",
+        "@components.slider_t(gauge, min=0.0, max=1.0, step=0.01, style=[(\"width\", 160.0)])",
       ],
     ),
     @ui.section(

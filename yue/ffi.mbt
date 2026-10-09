@@ -1019,7 +1019,7 @@ extern "c" fn ffi_view_on_mouse_down(
 
 ///|
 #borrow(view, invoke, callback)
-extern "c" fn ffi_view_on_mouse_up(
+pub extern "c" fn ffi_view_on_mouse_up(
   view : View,
   invoke : FuncRef[
     (
@@ -1295,7 +1295,7 @@ extern "c" fn ffi_popover_set_content_size(
 
 ///|
 #borrow(popover, view)
-extern "c" fn ffi_popover_show_relative_to(
+pub extern "c" fn ffi_popover_show_relative_to(
   popover : Popover,
   view : View,
 ) -> Unit = "yue_mbt_popover_show_relative_to"
@@ -1554,7 +1554,7 @@ extern "c" fn ffi_appearance_is_dark() -> Int = "yue_mbt_appearance_is_dark"
 
 ///|
 /// 本地时区的今天,打包 Int64:y*10000+m*100+d(日历组件"今天"高亮用)。
-extern "c" fn ffi_local_date() -> Int64 = "yue_mbt_local_date"
+pub extern "c" fn ffi_local_date() -> Int64 = "yue_mbt_local_date"
 
 ///|
 /// 读取系统区域标识到容量 cap 的缓冲，返回实际长度。
@@ -1656,7 +1656,7 @@ extern "c" fn ffi_cursor_new(type_ : Int) -> Cursor = "yue_mbt_cursor_new"
 
 ///|
 #borrow(view, cursor)
-extern "c" fn ffi_view_set_cursor(view : View, cursor : Cursor) -> Unit = "yue_mbt_view_set_cursor"
+pub extern "c" fn ffi_view_set_cursor(view : View, cursor : Cursor) -> Unit = "yue_mbt_view_set_cursor"
 
 ///|
 /// 对视图自身及其全部子孙递归设置光标(光标组透传:GTK 光标按原生窗口
@@ -1875,7 +1875,7 @@ extern "c" fn ffi_netwin_cached() -> Int = "yue_mbt_netwin_cached"
 ///|
 // String -> UTF-8 Bytes 的统一出口：MoonBit String 是 UTF-16，
 // FFI 边界上一律转成 C 侧期望的 UTF-8，转换成本留在库内。
-fn utf8_bytes(text : String) -> Bytes {
+pub fn utf8_bytes(text : String) -> Bytes {
   @utf8.encode(text)
 }
 
@@ -2077,7 +2077,7 @@ extern "c" fn ffi_window_on_blur(
 
 ///|
 #borrow(v, text)
-extern "c" fn ffi_view_set_tooltip(v : View, text : Bytes) -> Unit = "yue_mbt_view_set_tooltip"
+pub extern "c" fn ffi_view_set_tooltip(v : View, text : Bytes) -> Unit = "yue_mbt_view_set_tooltip"
 
 ///|
 #borrow(v, text)

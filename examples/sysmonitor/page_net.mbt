@@ -161,7 +161,7 @@ fn page_net(app : App) -> @yue.Node {
   app.nets.subscribe(push_total)
   @yue.vbox(
     [
-      @yue.label_t("收发速率（不含 lo）", role=@yue.Section, style=[
+      @components.label_t("收发速率（不含 lo）", role=@components.Section, style=[
         ("marginBottom", 6.0),
       ]),
       @yue.line_chart_t(total, fill=true, style=[("height", 220.0)]),

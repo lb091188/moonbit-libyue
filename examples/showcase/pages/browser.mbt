@@ -60,7 +60,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
           style=[("height", 190.0), ("marginBottom", 8.0)],
         ),
         @yue.hbox([
-          @yue.button_t("加载 example.com", on_click=fn() {
+          @components.button_t("加载 example.com", on_click=fn() {
             match web_ref.val {
               Some(b) => {
                 b.load_url("https://example.com")
@@ -69,7 +69,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
               None => ()
             }
           }),
-          @yue.button_t("demo:// 协议", on_click=fn() {
+          @components.button_t("demo:// 协议", on_click=fn() {
             match web_ref.val {
               Some(b) => {
                 b.load_url("demo://hello")
@@ -78,7 +78,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
               None => ()
             }
           }),
-          @yue.button_t("demo-deny:// 拒绝", variant=@yue.Danger, on_click=fn() {
+          @components.button_t("demo-deny:// 拒绝", variant=@components.Danger, on_click=fn() {
             match web_ref.val {
               Some(b) => {
                 b.load_url("demo-deny://hello")
@@ -87,7 +87,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
               None => ()
             }
           }),
-          @yue.button_t("本地 HTML", variant=@yue.Solid, on_click=fn() {
+          @components.button_t("本地 HTML", variant=@components.Solid, on_click=fn() {
             match web_ref.val {
               Some(b) => {
                 b.load_html(
@@ -116,31 +116,31 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
       "四导航按钮 + can_go_back/can_go_forward/is_loading 能力查询。",
       [
         @yue.hbox([
-          @yue.button_t("← 后退", on_click=fn() {
+          @components.button_t("← 后退", on_click=fn() {
             match web_ref.val {
               Some(b) => b.go_back()
               None => ()
             }
           }),
-          @yue.button_t("前进 →", on_click=fn() {
+          @components.button_t("前进 →", on_click=fn() {
             match web_ref.val {
               Some(b) => b.go_forward()
               None => ()
             }
           }),
-          @yue.button_t("刷新", on_click=fn() {
+          @components.button_t("刷新", on_click=fn() {
             match web_ref.val {
               Some(b) => b.reload()
               None => ()
             }
           }),
-          @yue.button_t("停止", on_click=fn() {
+          @components.button_t("停止", on_click=fn() {
             match web_ref.val {
               Some(b) => b.stop()
               None => ()
             }
           }),
-          @yue.button_t("能力查询", variant=@yue.Soft, on_click=fn() {
+          @components.button_t("能力查询", variant=@components.Soft, on_click=fn() {
             match web_ref.val {
               Some(b) =>
                 nav_state.set(
@@ -168,7 +168,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
       "with_result 异步取回 JSON;无结果执行改页面。",
       [
         @yue.hbox([
-          @yue.button_t("取结果 1+41", on_click=fn() {
+          @components.button_t("取结果 1+41", on_click=fn() {
             match web_ref.val {
               Some(b) =>
                 b.execute_javascript_with_result("1 + 41", fn(ok, json) {
@@ -183,7 +183,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
               None => ()
             }
           }),
-          @yue.button_t("读当前 URL", on_click=fn() {
+          @components.button_t("读当前 URL", on_click=fn() {
             match web_ref.val {
               Some(b) =>
                 b.execute_javascript_with_result("location.href", fn(ok, json) {
@@ -198,7 +198,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
               None => ()
             }
           }),
-          @yue.button_t("改页面标题", variant=@yue.Solid, on_click=fn() {
+          @components.button_t("改页面标题", variant=@components.Solid, on_click=fn() {
             match web_ref.val {
               Some(b) => {
                 b.execute_javascript("document.title='由原生 JS 设置 ✓'")
@@ -224,7 +224,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
       "注册 demoBinding(网页按钮调用)/移除/has_bindings 查询。",
       [
         @yue.hbox([
-          @yue.button_t("重新注册绑定", on_click=fn() {
+          @components.button_t("重新注册绑定", on_click=fn() {
             match web_ref.val {
               Some(b) => {
                 b.add_raw_binding("demoBinding", fn(json) {
@@ -241,7 +241,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
               None => ()
             }
           }),
-          @yue.button_t("移除绑定", variant=@yue.Danger, on_click=fn() {
+          @components.button_t("移除绑定", variant=@components.Danger, on_click=fn() {
             match web_ref.val {
               Some(b) => {
                 b.remove_binding("demoBinding")
@@ -270,7 +270,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
       "异步查询 URL 的 Cookie(名称/值/域/路径/httpOnly/secure)。",
       [
         @yue.hbox([
-          @yue.button_t("查 example.com", on_click=fn() {
+          @components.button_t("查 example.com", on_click=fn() {
             match web_ref.val {
               Some(b) =>
                 b.get_cookies_for_url("https://example.com", fn(cookies) {
@@ -290,7 +290,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
               None => ()
             }
           }),
-          @yue.button_t("查 demo://hello", on_click=fn() {
+          @components.button_t("查 demo://hello", on_click=fn() {
             match web_ref.val {
               Some(b) =>
                 b.get_cookies_for_url("demo://hello", fn(cookies) {
@@ -314,7 +314,7 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
       "创建选项与平台差异",
       "BrowserOptions 四选项与平台差异速览(自定义协议 Windows 静默无效等)。",
       [
-        @yue.descriptions([
+        @components.descriptions([
           (
             "devtools", "默认关;开则右键可审查元素(Windows 需环境变量)",
           ),
@@ -324,13 +324,13 @@ pub fn page_browser(_app : @ui.App) -> @yue.Node {
           ),
           ("自定义协议", "Linux 可用;Windows WebView2 静默无效"),
         ]),
-        @yue.button_t(
+        @components.button_t(
           "以 devtools 开启重建(下个窗口生效)",
-          variant=@yue.Soft,
+          variant=@components.Soft,
           on_click=fn() {
             win.toast_push(
               "演示项:BrowserOptions 在 Browser::new_with_options 创建期生效,重建需换实例",
-              @yue.Info,
+              @components.Info,
             )
           },
         ),

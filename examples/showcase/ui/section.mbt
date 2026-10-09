@@ -6,7 +6,7 @@
 
 ///|
 /// 全局 toast 推送钩子:main 创建 toast_layer 后注入,复制回显用。
-pub let code_toast : Ref[((String, @yue.SemanticType) -> Unit)?] = Ref(None)
+pub let code_toast : Ref[((String, @components.SemanticType) -> Unit)?] = Ref(None)
 
 ///|
 /// 一段演示:name 进页面顶部 segmented 标签列表(短名,页内唯一);
@@ -41,7 +41,7 @@ pub fn page(secs : Array[Section]) -> @yue.Node {
   for s in secs {
     names.push(s.name)
   }
-  let strip = @yue.hbox([@yue.segmented(names, selected)], style=[
+  let strip = @yue.hbox([@components.segmented(names, selected)], style=[
     ("paddingLeft", 14.0),
     ("paddingRight", 14.0),
     ("paddingTop", 10.0),
@@ -120,11 +120,11 @@ fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
     selected.subscribe(ensure)
   })
   let inner : Array[@yue.Node] = [
-    @yue.label_t(s.title, role=@yue.Section, style=[("marginBottom", 10.0)]),
+    @components.label_t(s.title, role=@components.Section, style=[("marginBottom", 10.0)]),
   ]
   if s.desc != "" {
     inner.push(
-      @yue.label_t(s.desc, role=@yue.Secondary, style=[
+      @components.label_t(s.desc, role=@components.Secondary, style=[
         ("marginTop", 10.0),
         ("marginBottom", 10.0),
       ]),
@@ -134,7 +134,7 @@ fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
   if s.code.length() > 0 {
     inner.push(code_copy_row(s.code))
     inner.push(
-      @yue.code_view(s.code, lang="moonbit", line_numbers=true, style=[
+      @components.code_view(s.code, lang="moonbit", line_numbers=true, style=[
         ("width", 1000.0),
       ]),
     )
@@ -165,12 +165,12 @@ fn section_body(s : Section, selected : @yue.Store[String]) -> @yue.Node {
 fn code_copy_row(lines : Array[String]) -> @yue.Node {
   @yue.hbox(
     [
-      @yue.label_t("代码", role=@yue.Secondary),
-      @yue.label_t("", role=@yue.Secondary, style=[("flex", 1.0)]),
-      @yue.button_t("复制", variant=@yue.Text, on_click=fn() {
+      @components.label_t("代码", role=@components.Secondary),
+      @components.label_t("", role=@components.Secondary, style=[("flex", 1.0)]),
+      @components.button_t("复制", variant=@components.Text, on_click=fn() {
         @yue.Clipboard::get().set_text(lines.join("\n"))
         match code_toast.val {
-          Some(push) => push("代码已复制 ✓", @yue.Success)
+          Some(push) => push("代码已复制 ✓", @components.Success)
           None => ()
         }
       }),

@@ -41,26 +41,26 @@ fn main {
 
   let toggle : @yue.Store[Bool] = @yue.Store::new(true)
   let body : Array[@yue.Node] = [
-    @yue.label_t("点击劫持诊断探针 v3(Esc 退出)", role=@yue.Title),
-    @yue.label_t(
+    @components.label_t("点击劫持诊断探针 v3(Esc 退出)", role=@components.Title),
+    @components.label_t(
       "每测一行前重开探针;点击后看下方事件流",
-      role=@yue.Secondary,
+      role=@components.Secondary,
     ),
-    @yue.button_t(
+    @components.button_t(
       "行1 对照 \{n.get()}",
       on_click=fn() {
         n.update(fn(v) { v + 1 })
         say("行1", "自增")
       },
-      variant=@yue.Solid,
+      variant=@components.Solid,
     ),
     @yue.bind_node(n, fn(v) {
-      @yue.button_t("行2 bind_node 重挂 \{v}", on_click=fn() {
+      @components.button_t("行2 bind_node 重挂 \{v}", on_click=fn() {
         n.update(fn(x) { x + 1 })
         say("行2", "重挂触发")
       })
     }),
-    @yue.button_t(
+    @components.button_t(
       "行3 切主题",
       on_click=fn() {
         dark.update(fn(v) { !v })
@@ -73,11 +73,11 @@ fn main {
         )
         say("行3", "主题切换")
       },
-      variant=@yue.Danger,
+      variant=@components.Danger,
     ),
     @yue.hbox(
       [
-        @yue.label_t("行4:"),
+        @components.label_t("行4:"),
         @yue.bind_node(dark.signal(), fn(d) {
           @yue.icon_button_t(
             if d {
@@ -105,8 +105,8 @@ fn main {
     // 行5:规避方案验证——双预建按钮显隐切换(不 remove/add)
     @yue.hbox(
       [
-        @yue.label_t("行5 显隐切换:"),
-        @yue.button_t(
+        @components.label_t("行5 显隐切换:"),
+        @components.button_t(
           "行5-A(显示时)",
           on_click=fn() {
             toggle.update(fn(v) { !v })
@@ -114,7 +114,7 @@ fn main {
           },
           handle=fn(c) { toggle.subscribe(fn(v) { c.set_visible(v) }) },
         ),
-        @yue.button_t(
+        @components.button_t(
           "行5-B(隐藏时)",
           on_click=fn() {
             toggle.update(fn(v) { !v })
@@ -133,7 +133,7 @@ fn main {
       },
     ),
     @yue.separator(),
-    @yue.label_t("事件流(新在前):", role=@yue.Secondary),
+    @components.label_t("事件流(新在前):", role=@components.Secondary),
     @yue.bind_label(log, fn(s) { s }),
   ]
   ignore(

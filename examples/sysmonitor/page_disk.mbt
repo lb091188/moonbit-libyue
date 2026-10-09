@@ -98,7 +98,7 @@ fn page_disk(app : App) -> @yue.Node {
   app.disks.subscribe(push_io)
   @yue.vbox(
     [
-      @yue.label_t("根分区读写", role=@yue.Section, style=[
+      @components.label_t("根分区读写", role=@components.Section, style=[
         ("marginBottom", 6.0),
       ]),
       @yue.line_chart_t(io, fill=true, style=[("height", 220.0)]),

@@ -1,25 +1,26 @@
 ///|
 test {
-  let t = default_theme()
-  theme_apply({ ..t, primary: "#1E4FA3", primary_light: "#E3EDFA", })
-  assert_eq(theme_current().primary, "#1E4FA3")
-  assert_eq(theme_current().border, "#D8DCE1")
-  theme_apply(default_theme())
+  @yue.theme_apply(
+    @yue.Theme::{ ..@yue.default_theme(), primary: "#1E4FA3", primary_light: "#E3EDFA" },
+  )
+  assert_eq(@yue.theme_current().primary, "#1E4FA3")
+  assert_eq(@yue.theme_current().border, "#D8DCE1")
+  @yue.theme_apply(@yue.default_theme())
 }
 
 ///|
 test {
   // 深浅切换:订阅者在 theme_apply 时被通知,色板整体替换,焦点环随主色
   let hits = Ref(0)
-  ignore(on_theme_change(fn() { hits.val = hits.val + 1 }))
-  theme_apply(dark_theme())
-  assert_eq(theme_current().bg_page, "#141518")
-  assert_eq(theme_current().bg_panel, "#1E2126")
-  assert_eq(theme_current().primary, "#5B8DEF")
+  ignore(@yue.on_theme_change(fn() { hits.val = hits.val + 1 }))
+  @yue.theme_apply(@yue.dark_theme())
+  assert_eq(@yue.theme_current().bg_page, "#141518")
+  assert_eq(@yue.theme_current().bg_panel, "#1E2126")
+  assert_eq(@yue.theme_current().primary, "#5B8DEF")
   let after_dark = hits.val
   assert_true(after_dark >= 1)
-  theme_apply(default_theme())
-  assert_eq(theme_current().bg_panel, "#FFFFFF")
+  @yue.theme_apply(@yue.default_theme())
+  assert_eq(@yue.theme_current().bg_panel, "#FFFFFF")
   assert_eq(hits.val, after_dark + 1)
 }
 
@@ -101,16 +102,16 @@ test {
 test {
   // 主题订阅退订句柄:off_theme_change 后 theme_apply 不再回调
   let hits = Ref(0)
-  let h = on_theme_change(fn() { hits.val = hits.val + 1 })
-  theme_apply(dark_theme())
+  let h = @yue.on_theme_change(fn() { hits.val = hits.val + 1 })
+  @yue.theme_apply(@yue.dark_theme())
   let after_first = hits.val
   assert_true(after_first >= 1)
-  off_theme_change(h)
-  theme_apply(default_theme())
+  @yue.off_theme_change(h)
+  @yue.theme_apply(@yue.default_theme())
   assert_eq(hits.val, after_first)
   // 幂等:重复退订与未知句柄都安全
-  off_theme_change(h)
-  off_theme_change(999999)
+  @yue.off_theme_change(h)
+  @yue.off_theme_change(999999)
 }
 
 ///|
@@ -120,25 +121,25 @@ test {
   let old_hits = Ref(0)
   let new_hits = Ref(0)
   let keep_hits = Ref(0)
-  let h_keep = on_theme_change(fn() { keep_hits.val = keep_hits.val + 1 })
-  sub_bag_begin()
-  ignore(on_theme_change(fn() { old_hits.val = old_hits.val + 1 }))
-  let gen_old = sub_bag_end()
-  theme_apply(dark_theme())
+  let h_keep = @yue.on_theme_change(fn() { keep_hits.val = keep_hits.val + 1 })
+  @yue.sub_bag_begin()
+  ignore(@yue.on_theme_change(fn() { old_hits.val = old_hits.val + 1 }))
+  let gen_old = @yue.sub_bag_end()
+  @yue.theme_apply(@yue.dark_theme())
   assert_true(old_hits.val >= 1)
   // 重建:先整袋退订旧代,再开新袋挂新一代
-  sub_bag_discard(gen_old)
-  sub_bag_begin()
-  ignore(on_theme_change(fn() { new_hits.val = new_hits.val + 1 }))
-  let gen_new = sub_bag_end()
+  @yue.sub_bag_discard(gen_old)
+  @yue.sub_bag_begin()
+  ignore(@yue.on_theme_change(fn() { new_hits.val = new_hits.val + 1 }))
+  let gen_new = @yue.sub_bag_end()
   let old_base = old_hits.val
   let keep_base = keep_hits.val
-  theme_apply(default_theme())
+  @yue.theme_apply(@yue.default_theme())
   assert_eq(old_hits.val, old_base) // 旧代已退订,不再回调
   assert_true(new_hits.val >= 1) // 新代在袋里,正常回调
   assert_true(keep_hits.val > keep_base) // 袋外订阅不受影响
-  sub_bag_discard(gen_new)
-  off_theme_change(h_keep)
+  @yue.sub_bag_discard(gen_new)
+  @yue.off_theme_change(h_keep)
 }
 
 ///|
@@ -149,10 +150,44 @@ test {
   carousel_stop(h)
   assert_false(h.is_running())
   // 真 SetTimeout 拿 id 再 stop:cancel 通路走通,id 归零
-  h.timer.val = set_timeout(60000, fn() { () })
+  h.timer.val = @yue.set_timeout(60000, fn() { () })
   carousel_stop(h)
   assert_false(h.is_running())
   assert_eq(h.timer.val, 0)
   carousel_stop(h) // 幂等
   assert_false(h.is_running())
+}
+
+///|
+test {
+  // 按钮配色:显式 color / background_color 优先,所有状态一致(hover 不再变色)
+  let (fg1, bg1) = button_colors(Solid, true, "#123456", "#abcdef")
+  assert_eq(fg1, "#123456")
+  assert_eq(bg1, "#abcdef")
+  let (fg2, bg2) = button_colors(Soft, false, "#000000", "#ffffff")
+  assert_eq(fg2, "#000000")
+  assert_eq(bg2, "#ffffff")
+  // 只设一个:另一个仍走预设
+  let (fg3, bg3) = button_colors(Danger, true, "#ffd700", "")
+  assert_eq(fg3, "#ffd700")
+  assert_true(bg3 != "")
+}
+
+///|
+test {
+  // 按钮配色:未传时按 variant + hover 走预设(与主题访问函数对照,
+  // 不依赖具体色板,theme_apply 切换后依然成立)
+  let (fg_solid, bg_solid) = button_colors(Solid, false, "", "")
+  assert_eq(fg_solid, "#FFFFFF")
+  assert_eq(bg_solid, @yue.theme_primary())
+  let (fg_soft, bg_soft) = button_colors(Soft, false, "", "")
+  assert_eq(fg_soft, @yue.theme_primary())
+  assert_eq(bg_soft, @yue.theme_primary_light())
+  let (_, bg_text) = button_colors(Text, false, "", "")
+  assert_eq(bg_text, "") // Text 常态无底
+  let (fg_soft_hover, bg_soft_hover) = button_colors(Soft, true, "", "")
+  assert_eq(fg_soft_hover, "#FFFFFF")
+  assert_eq(bg_soft_hover, @yue.theme_primary()) // Soft hover 变实底
+  let (fg_danger, _) = button_colors(Danger, true, "", "")
+  assert_eq(fg_danger, "#FFFFFF")
 }
