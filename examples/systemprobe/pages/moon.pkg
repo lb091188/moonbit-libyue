@@ -1,0 +1,14 @@
+import {
+  "NoahLiu/moonbit-libyue/yue",
+  "NoahLiu/moonbit-libyue/yue/system",
+  "NoahLiu/moonbit-libyue/yue/declarative",
+  "NoahLiu/moonbit-libyue/yue/components",
+  "NoahLiu/moonbit-libyue/yue/declarative",
+  "NoahLiu/moonbit-libyue/yue/system",
+  "NoahLiu/moonbit-libyue/yue/charts",
+  "NoahLiu/yue-media/src" @yuemedia,
+  "NoahLiu/ffmpeg-mbt/src" @ffmbt,
+  "NoahLiu/moonbit-libyue/examples/systemprobe/ui",
+}
+
+supported_targets = "native"

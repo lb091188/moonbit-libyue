@@ -11,7 +11,7 @@ test "checksum 已知答案：CRC32/Adler32 of 123456789" {
 ///|
 /// 1x1 像素 PNG 的字节级自校验（headless 测试环境无 GUI 上下文，
 /// Image::new_from_png 恒空，故按容器结构逐段断言；真机解码验证走
-/// showcase 窗口页 icon.png 解码）。
+/// systemprobe 示例）。
 test "pngr_encode_rgba：1x1 容器结构自校验" {
   let px = FixedArray::make(4, b'\x00')
   px[0] = b'\xF0'

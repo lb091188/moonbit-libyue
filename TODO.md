@@ -39,7 +39,7 @@
   - moonav1(mooncakes 纯 MoonBit AV1 解码)帧源接入评估
   - 验证:真机播放实测片源截图入档
 - [ ] O4 macOS 真机验证测试(季度,前置:获得 mac 真机)
-  - 基础冒烟:hello / hello-themed / showcase / sysmonitor 全量启动与视觉确认
+  - 基础冒烟:hello / hello-themed / showcase / systemprobe / sysmonitor 全量启动与视觉确认
   - 遗留清单逐项:reply(OS_MAC) 通知回调、Display 全字段枚举、Accelerator 类 / Tray 原生后端、mac canvas 滚轮事件、WebKit framework 拆分评估(浏览器按需化 fork 侧收尾)
   - 验证:mac 真机逐项执行,结论回填 TODO.md 与 adaptation.md
 - [ ] O5 发布闭环(季度)
