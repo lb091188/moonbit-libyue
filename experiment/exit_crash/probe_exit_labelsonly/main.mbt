@@ -13,8 +13,8 @@ fn main {
     items.push(@components.label_t("标签\{i}"))
   }
   ignore(
-    @yue.mount_window(
-      [@yue.vbox([..items], style=[("padding", 24.0), ("gap", 6.0)])],
+    @declarative.mount_window(
+      [@declarative.vbox([..items], style=[("padding", 24.0), ("gap", 6.0)])],
       title="exit-crash-labelsonly",
       size=Some((260.0, 420.0)),
       center=true,

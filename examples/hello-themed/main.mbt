@@ -14,9 +14,9 @@ fn main {
   let name : @yue.Store[String] = @yue.Store::new("MoonBit")
   let greet : @yue.Store[String] = @yue.Store::new("(点「问候」)")
   ignore(
-    @yue.mount_window(
+    @declarative.mount_window(
       [
-        @yue.vbox(
+        @declarative.vbox(
           [
             @components.label_t("Hello, 主题组件库!", role=@components.Title),
             @components.label_t(
@@ -31,7 +31,7 @@ fn main {
             @components.button_t("问候", variant=@components.Solid, on_click=fn() {
               greet.set("你好,\{name.get()}!")
             }),
-            @yue.bind_label(greet, fn(s) { s }),
+            @declarative.bind_label(greet, fn(s) { s }),
           ],
           style=[("padding", 24.0), ("gap", 12.0)],
         ),

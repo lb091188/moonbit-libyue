@@ -186,7 +186,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "Tag 标签与 Avatar 头像",
       "五种语义 Tag(浅底深字)+ 自定义实底色,宽度自适应;Avatar 方形实底 + 白色字母,三种尺寸。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.tag_of_type("Primary", @components.Primary),
             @components.tag_of_type("Success", @components.Success),
@@ -198,7 +198,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
           ],
           style=[("alignItems", "center")],
         ),
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.avatar("M", "#2D68C4", size=44.0),
             @components.avatar("N", "#2E9E5B", size=36.0),
@@ -219,12 +219,12 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "Badge 徽标",
       "数字角标(红底白字,宽度自适应)与圆点两种形态。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.badge_count(9),
             @components.badge_count(128),
             @components.label_t("消息", role=@components.Body),
-            @yue.label("      "),
+            @declarative.label("      "),
             @components.badge_dot(),
             @components.label_t("在线", role=@components.Body),
           ],
@@ -238,7 +238,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "Statistic 数值统计与 Progress 进度条",
       "大号数值经 computed 派生信号自动刷新;进度条主题色填充 + 浅灰轨道,随同一按钮联动。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.statistic("访问量", app.visits.store()),
             @components.statistic("任务数", @yue.Store::new("36")),
@@ -252,7 +252,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
           style=[("marginBottom", 10.0)],
         ),
         @components.progress_line(app.ratio.store()),
-        @yue.bind(
+        @declarative.bind(
           app.ratio,
           fn(v) { "当前进度 \{((v * 100.0)).round()}%" },
           style=[("marginTop", 10.0)],
@@ -262,7 +262,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
         "let counter = @yue.Signal::new(0)", "let visits = counter.map(fn(n) { (n * 1601).to_string() })",
         "let ratio = counter.map(fn(n) {", "  let r = 0.25 + n.to_double() * 0.1",
         "  if r > 1.0 { 1.0 } else { r }", "})", "@components.statistic(\"访问量\", visits.store())",
-        "@components.progress_line(ratio.store())", "@yue.bind(ratio, fn(v) { \"当前进度 \\{(v * 100.0).round()}%\" })",
+        "@components.progress_line(ratio.store())", "@declarative.bind(ratio, fn(v) { \"当前进度 \\{(v * 100.0).round()}%\" })",
       ],
     ),
     @ui.section(
@@ -344,7 +344,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
             table_picked.set("第 \{i + 1} 行:\{name}")
           },
         ),
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.button_t("添加一行", on_click=fn() {
               let n = lang_base.length() + 1
@@ -357,7 +357,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
               )
               reorder_langs()
             }),
-            @yue.bind(table_picked, fn(s) { s }, style=[("marginLeft", 12.0)]),
+            @declarative.bind(table_picked, fn(s) { s }, style=[("marginLeft", 12.0)]),
           ],
           style=[("marginTop", 8.0), ("alignItems", "center")],
         ),
@@ -388,12 +388,12 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
           width=460.0,
           sort=rich_sort,
         ),
-        @yue.bind(table_sel.signal(), fn(s) { "已选 \{s.length()} 行" }),
+        @declarative.bind(table_sel.signal(), fn(s) { "已选 \{s.length()} 行" }),
       ],
       code=[
         "let sel : @yue.Store[Array[Int]] = @yue.Store::new([])", "@components.table_t(",
         "  [", "    @components.TableColumn::make(\"语言\", 120.0),", "    @components.TableColumn::make(\"类型\", 100.0, sortable=false),",
-        "  ],", "  rows,", "  selection=sel,", "  width=460.0,", ")", "@yue.bind(sel.signal(), fn(s) { \"已选 \\{s.length()} 行\" })",
+        "  ],", "  rows,", "  selection=sel,", "  width=460.0,", ")", "@declarative.bind(sel.signal(), fn(s) { \"已选 \\{s.length()} 行\" })",
       ],
     ),
     @ui.section(
@@ -401,7 +401,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "Table 表格(富单元格)",
       "单元格支持 Tag / 颜色块 / 多行文本(行自动撑高)。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.table_t(
               [
@@ -414,7 +414,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
               selection=table_sel,
               width=460.0,
             ),
-            @yue.vbox(
+            @declarative.vbox(
               [
                 @components.label_t("CellTag:彩色语义标签", role=@components.Secondary),
                 @components.label_t(
@@ -499,7 +499,7 @@ pub fn page_data(app : @ui.App) -> @yue.Node {
       "Transfer 穿梭框与 Carousel 轮播",
       "穿梭框:点击行选中,中间 ›/‹ 移对侧;轮播:箭头/圆点手动切,3 秒自动切换(悬停暂停)。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.transfer(transfer_left, transfer_right),
           @components.carousel_t(
             [

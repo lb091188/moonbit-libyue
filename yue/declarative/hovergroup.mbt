@@ -26,22 +26,22 @@
 
 ///|
 /// 点是否在矩形内(含边界)。
-pub fn rect_contains(b : RectF, px : Double, py : Double) -> Bool {
+pub fn rect_contains(b : @yue.RectF, px : Double, py : Double) -> Bool {
   px >= b.x && px <= b.x + b.width && py >= b.y && py <= b.y + b.height
 }
 
 ///|
 /// 全局 hover 中心的注册项。
 priv struct HoverEntry {
-  host : Container
+  host : @yue.Container
   apply : (Bool) -> Unit
 }
 
 ///|
 /// 全局光标组的注册项。
 priv struct CursorEntry {
-  host : Container
-  cursor : Cursor
+  host : @yue.Container
+  cursor : @yue.Cursor
   active : Ref[Bool]
 }
 
@@ -62,26 +62,26 @@ fn hover_tick() -> Unit {
     return
   }
   // 每 tick 一次指针查询,各组只做矩形比对
-  let px = cursor_screen_x()
-  let py = cursor_screen_y()
+  let px = @yue.cursor_screen_x()
+  let py = @yue.cursor_screen_y()
   for e in g_hover_entries {
-    (e.apply)(rect_contains(ViewLike::get_bounds_in_screen(e.host), px, py))
+    (e.apply)(rect_contains(@yue.ViewLike::get_bounds_in_screen(e.host), px, py))
   }
   for e in g_cursor_entries {
-    let inside = rect_contains(ViewLike::get_bounds_in_screen(e.host), px, py)
+    let inside = rect_contains(@yue.ViewLike::get_bounds_in_screen(e.host), px, py)
     if inside != e.active.val {
       e.active.val = inside
-      ffi_view_set_cursor_deep(
-        ViewLike::view(e.host),
+      @yue.ffi_view_set_cursor_deep(
+        @yue.ViewLike::view(e.host),
         if inside {
           e.cursor
         } else {
-          Cursor::new(Default)
+          @yue.Cursor::new(@yue.Default)
         },
       )
     }
   }
-  g_hover_timer.val = set_timeout(100, fn() { hover_tick() })
+  g_hover_timer.val = @yue.set_timeout(100, fn() { hover_tick() })
 }
 
 ///|
@@ -107,23 +107,23 @@ fn cursor_register(entry : CursorEntry) -> Unit {
 /// - on_change:组 hover 态翻转时回调(仅变化时),携带组容器——
 ///   光标、边框等额外反馈在回调里对它应用;底色已内置无需处理。
 pub fn hover_group(
-  child : Node,
+  child : @yue.Node,
   hover_bg? : String = "",
   base_bg? : String = "",
   radius? : Double = 0.0,
-  on_change? : (Bool, Container) -> Unit = fn(_b, _c) {  },
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  on_change? : (Bool, @yue.Container) -> Unit = fn(_b, _c) {  },
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let host = themed_container(style~)
-      attach(parent, ViewLike::view(host))
-      ignore((child.mount)(ViewLike::view(host)))
+      let host = @yue.themed_container(style~)
+      @yue.attach(parent, @yue.ViewLike::view(host))
+      ignore((child.mount)(@yue.ViewLike::view(host)))
       let hover = Ref(false)
       fn set(h : Bool) -> Unit {
         if h != hover.val {
           hover.val = h
-          ViewLike::schedule_paint(host)
+          @yue.ViewLike::schedule_paint(host)
           on_change(h, host)
         }
       }
@@ -132,16 +132,16 @@ pub fn hover_group(
           if hover_bg != "" {
             hover_bg
           } else {
-            theme_fill_hover()
+            @yue.theme_fill_hover()
           }
         } else {
           base_bg
         }
         if bg != "" {
-          let b = ViewLike::get_bounds(host)
+          let b = @yue.ViewLike::get_bounds(host)
           p.set_fill_color(bg)
           if radius > 0.0 {
-            fill_round_rect(p, 0.0, 0.0, b.width, b.height, radius)
+            @yue.fill_round_rect(p, 0.0, 0.0, b.width, b.height, radius)
           } else {
             p.fill_rect(0.0, 0.0, b.width, b.height)
           }
@@ -149,8 +149,8 @@ pub fn hover_group(
       })
       hover_register({ host, apply: set, })
       // enter 仅加速:host 自身空白区命中时立即置真(下一拍全局确认)
-      ViewLike::on_mouse_enter(host, fn(_e) { set(true) })
-      ViewLike::view(host)
+      @yue.ViewLike::on_mouse_enter(host, fn(_e) { set(true) })
+      @yue.ViewLike::view(host)
     },
   }
 }
@@ -160,17 +160,17 @@ pub fn hover_group(
 /// 原生子件)时保持指定光标(默认手型),离开恢复默认。与 hover_group
 /// 同机制(指针位置轮询);组根+子孙由 shim 递归设置,父设子随。
 pub fn cursor_group(
-  child : Node,
-  cursor? : Cursor = hand(),
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  child : @yue.Node,
+  cursor? : @yue.Cursor = @yue.hand(),
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let host = themed_container(style~)
-      attach(parent, ViewLike::view(host))
-      ignore((child.mount)(ViewLike::view(host)))
+      let host = @yue.themed_container(style~)
+      @yue.attach(parent, @yue.ViewLike::view(host))
+      ignore((child.mount)(@yue.ViewLike::view(host)))
       cursor_register({ host, cursor, active: Ref(false), })
-      ViewLike::view(host)
+      @yue.ViewLike::view(host)
     },
   }
 }

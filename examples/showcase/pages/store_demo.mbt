@@ -19,14 +19,14 @@ pub fn page_store_demo(_app : @ui.App) -> @yue.Node {
       "手动计数器",
       "Store::update 改源,bind_label 回显——「改值」与「刷新界面」已自动,但派生值全要手动接。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.button_t("计数 +1", variant=@components.Solid, on_click=fn() {
               counter.update(fn(n) { n + 1 })
               // ↑ 动作本体;若 doubled 不靠 subscribe,这里就得再写
               //   doubled.set(counter.get() * 2)——信号版无此负担
             }),
-            @yue.bind_label(counter, fn(n) { "计数:\{n}" }, style=[
+            @declarative.bind_label(counter, fn(n) { "计数:\{n}" }, style=[
               ("marginLeft", 10.0),
             ]),
           ],
@@ -35,17 +35,17 @@ pub fn page_store_demo(_app : @ui.App) -> @yue.Node {
       ],
       code=[
         "let counter = @yue.Store::new(0)", "@components.button_t(\"计数 +1\", variant=@components.Solid, on_click=fn() {",
-        "  counter.update(fn(n) { n + 1 })", "})", "@yue.bind_label(counter, fn(n) { \"计数:\\{n}\" })",
+        "  counter.update(fn(n) { n + 1 })", "})", "@declarative.bind_label(counter, fn(n) { \"计数:\\{n}\" })",
       ],
     ),
     @ui.section(
       "手动接线",
       "手动派生:subscribe",
       "counter.subscribe(fn(n) { doubled.set(n * 2) })——派生关系散落在动作代码各处,链一长就是胶水瀑布。",
-      [@yue.bind_label(doubled, fn(n) { "双倍(手动接线):\{n}" })],
+      [@declarative.bind_label(doubled, fn(n) { "双倍(手动接线):\{n}" })],
       code=[
         "let counter = @yue.Store::new(0)", "let doubled = @yue.Store::new(0)", "counter.subscribe(fn(n) { doubled.set(n * 2) })",
-        "@yue.bind_label(doubled, fn(n) { \"双倍:\\{n}\" })",
+        "@declarative.bind_label(doubled, fn(n) { \"双倍:\\{n}\" })",
       ],
     ),
     @ui.section(
@@ -53,11 +53,11 @@ pub fn page_store_demo(_app : @ui.App) -> @yue.Node {
       "手动派生:Store::map",
       "一对一映射有现成糖(map 派生只读 Store),但两个以上源合成仍要 subscribe 手动同步。",
       [
-        @yue.bind_label(text, fn(s) { s }),
-        @yue.bind_label(merged, fn(s) { s }, style=[("marginTop", 6.0)]),
+        @declarative.bind_label(text, fn(s) { s }),
+        @declarative.bind_label(merged, fn(s) { s }, style=[("marginTop", 6.0)]),
       ],
       code=[
-        "let text = counter.map(fn(n) { \"当前计数 \\{n}\" })", "@yue.bind_label(text, fn(s) { s })",
+        "let text = counter.map(fn(n) { \"当前计数 \\{n}\" })", "@declarative.bind_label(text, fn(s) { s })",
         "let merged = @yue.Store::new(\"\")", "counter.subscribe(fn(n) { merged.set(\"计数 \\{n}\") })",
       ],
     ),
@@ -80,7 +80,7 @@ pub fn page_store_demo(_app : @ui.App) -> @yue.Node {
       ],
       code=[
         "let a = @yue.Signal::new(2)", "let b = @yue.Signal::new(3)", "let sum = @yue.Signal::computed(fn() { a.get() + b.get() })",
-        "let doubled = a.map(fn(n) { n * 2 })", "@yue.bind(sum, fn(v) { \"和:\\{v}\" })",
+        "let doubled = a.map(fn(n) { n * 2 })", "@declarative.bind(sum, fn(v) { \"和:\\{v}\" })",
       ],
     ),
   ])

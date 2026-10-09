@@ -10,7 +10,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
       "主题色板",
       "选一个主色,整套色板(hover/浅底/语义色)按 HSL 公式即时派生,切换深浅沿用当前主色;「跟随系统」读系统主色调,读不到回落内置。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.button_t("跟随系统", variant=@components.Solid, on_click=fn() {
               app.accent.set(@yue.system_accent())
@@ -23,7 +23,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
           ],
           style=[("alignItems", "center")],
         ),
-        @yue.bind(
+        @declarative.bind(
           app.accent.signal(),
           fn(s) {
             if s == "" {
@@ -47,7 +47,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
       "Button 按钮",
       "四变体;「主要操作」联动数据页访问量/进度条(信号)。",
       [
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.button_t(
               "主要操作",
@@ -62,7 +62,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "@yue.hbox([", "  @components.button_t(\"主要操作\", variant=@components.Solid, on_click=fn() { }),",
+        "@declarative.hbox([", "  @components.button_t(\"主要操作\", variant=@components.Solid, on_click=fn() { }),",
         "  @components.button_t(\"次要操作\", variant=@components.Soft),", "  @components.button_t(\"文字按钮\", variant=@components.Text),",
         "  @components.button_t(\"危险操作\", variant=@components.Danger),", "])",
       ],
@@ -87,13 +87,13 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         @components.label_t("强调文字(Accent)", role=@components.Accent, style=[
           ("marginTop", 8.0),
         ]),
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.link("打开文档", fn() { app.picked_lang.set("docs") }),
-            @yue.label("   "),
+            @declarative.label("   "),
             @components.link("帮助中心", fn() { app.picked_lang.set("help") }),
             @components.label_t("最近点击:", role=@components.Body),
-            @yue.bind(app.picked_lang, fn(s) { s }),
+            @declarative.bind(app.picked_lang, fn(s) { s }),
           ],
           style=[("marginTop", 8.0), ("alignItems", "center")],
         ),
@@ -112,7 +112,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         @components.label_t("上方内容"),
         @components.divider(style=[("marginTop", 6.0), ("marginBottom", 6.0)]),
         @components.label_t("下方内容"),
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.tooltip_t(
               @components.button_t("悬停看提示"),
@@ -135,14 +135,14 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
       "HoverGroup 悬停组",
       "组内任意位置(含子控件)悬停即整组进入 hover 态:把指针移到卡片里的按钮或输入框上,整张卡片同样高亮且光标变手型——GTK 下子控件的事件窗口会独占指针事件,组件用指针位置轮询判定,不依赖 enter/leave,不闪烁。",
       [
-        @yue.hover_group(
-          @yue.vbox(
+        @declarative.hover_group(
+          @declarative.vbox(
             [
               @components.label_t(
                 "组标题:悬停我,或下面的子控件",
                 role=@components.Section,
               ),
-              @yue.hbox(
+              @declarative.hbox(
                 [
                   @components.input_t(text="组内输入框", style=[("width", 200.0)]),
                   @components.button_t("组内按钮"),
@@ -167,7 +167,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "@yue.hover_group(", "  @yue.vbox(", "    [", "      @components.label_t(\"组标题\", role=@components.Section),",
+        "@declarative.hover_group(", "  @declarative.vbox(", "    [", "      @components.label_t(\"组标题\", role=@components.Section),",
         "      @components.button_t(\"组内按钮\"),", "    ],", "    style=[(\"padding\", 14.0)],",
         "  ),", "  radius=8.0,", "  on_change=fn(hover, host) {", "    @yue.View::set_cursor(",
         "      host,", "      @yue.Cursor::new(if hover { @yue.Hand } else { @yue.Default }),",
@@ -179,14 +179,14 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
       "CursorGroup 光标组",
       "父设子随:指针落在组内任意位置(含输入框、按钮等有独立窗口的子控件)都保持手型,移出恢复默认——与 hover_group 同机制的指针位置轮询,递归对组根+全部子孙设置。",
       [
-        @yue.cursor_group(
-          @yue.vbox(
+        @declarative.cursor_group(
+          @declarative.vbox(
             [
               @components.label_t(
                 "整组都是手型:移入试试,或移到子控件上",
                 role=@components.Section,
               ),
-              @yue.hbox(
+              @declarative.hbox(
                 [
                   @components.input_t(text="组内输入框", style=[("width", 200.0)]),
                   @components.button_t("组内按钮"),
@@ -199,7 +199,7 @@ pub fn page_basic(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "@yue.cursor_group(", "  @yue.vbox(", "    [", "      @components.label_t(\"整组都是手型\", role=@components.Section),",
+        "@declarative.cursor_group(", "  @declarative.vbox(", "    [", "      @components.label_t(\"整组都是手型\", role=@components.Section),",
         "      @components.input_t(text=\"组内输入框\", style=[(\"width\", 200.0)]),",
         "      @components.button_t(\"组内按钮\"),", "    ],", "    style=[(\"padding\", 14.0)],",
         "  ),", ")",

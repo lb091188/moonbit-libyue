@@ -12,7 +12,7 @@ pub fn browser(
   {
     mount: fn(parent) {
       let b = Browser::make(url~, html~)
-      let node = @yue.node_of(b, style~)
+      let node = @declarative.node_of(b, style~)
       handle(b)
       node.mount_into(parent)
     },

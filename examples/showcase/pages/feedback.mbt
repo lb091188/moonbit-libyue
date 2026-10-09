@@ -39,7 +39,7 @@ pub fn page_feedback(app : @ui.App) -> @yue.Node {
       "Result 结果页",
       "大色块符号 + 标题 + 描述 + 操作区;四种语义类型。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.result(
             @components.Success,
             "操作成功",
@@ -81,7 +81,7 @@ pub fn page_feedback(app : @ui.App) -> @yue.Node {
       "Toast 轻提示",
       "操作反馈瞬态提示:推送后顶部居中出现,2.6 秒自动消失,多条堆叠;层挂在窗口根(absolute 顶部,不占布局)。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("成功", on_click=fn() {
             app.toast_push("保存成功", @components.Success)
           }),
@@ -106,14 +106,14 @@ pub fn page_feedback(app : @ui.App) -> @yue.Node {
       "Dialog 对话框",
       "同窗遮罩 + 居中面板;回调后自动收起,visible 由 Store 驱动。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("基础对话框", on_click=fn() {
             app.dlg_basic.set(true)
           }),
           @components.button_t("表单对话框", variant=@components.Solid, on_click=fn() {
             app.dlg_form.set(true)
           }),
-          @yue.bind(app.dlg_name.signal(), fn(n) {
+          @declarative.bind(app.dlg_name.signal(), fn(n) {
             if n == "" {
               "尚未提交"
             } else {

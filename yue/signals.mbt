@@ -288,18 +288,6 @@ pub fn[T] Signal::store(self : Signal[T]) -> Store[T] {
 }
 
 ///|
-/// 声明式文本绑定(信号版):节点挂载时创建 Label(初值 f(get))并
-/// 订阅,之后信号变化自动更新文本。与 bind_label(Store) 同一实现内核,
-/// 接受源信号或 computed 派生信号。
-pub fn[A] bind(
-  sig : Signal[A],
-  f : (A) -> String,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
-  bind_label({ sig, }, f, style~)
-}
-
-///|
 /// 声明式节点绑定:信号变化时把容器内容重挂为 f(新值) 的节点。
 /// 每次变化重建整棵子树,适合低频切换(如随状态换图标/换整块视图);
 /// 高频更新请改用 bind 文本绑定或经 handle 命令式改属性。Store 传

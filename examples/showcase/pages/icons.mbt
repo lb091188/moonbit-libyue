@@ -20,15 +20,15 @@ fn icon_grid(kinds : Array[@icons.IconKind], per_row : Int) -> @yue.Node {
         )
       }
     }
-    rows.push(@yue.hbox(items, style=[("gap", 10.0)]))
+    rows.push(@declarative.hbox(items, style=[("gap", 10.0)]))
   }
-  @yue.vbox(rows, style=[("gap", 8.0)])
+  @declarative.vbox(rows, style=[("gap", 8.0)])
 }
 
 ///|
 /// 图标页各分组共用的演示代码形态:icon 画矢量图标,悬停 tooltip 显名。
 fn icon_group_code(sample : Array[String]) -> Array[String] {
-  let head : Array[String] = ["@yue.hbox(["]
+  let head : Array[String] = ["@declarative.hbox(["]
   for line in sample {
     head.push(line)
   }

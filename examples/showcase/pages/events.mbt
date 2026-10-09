@@ -49,7 +49,7 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
       "鼠标事件",
       "五鼠标事件 + 连击计数;事件带视图/屏幕坐标、按键、修饰键。",
       [
-        @yue.vbox(
+        @declarative.vbox(
           [@components.label_t("鼠标操作区", role=@components.Body)],
           style=[("height", 88.0), ("marginBottom", 8.0)],
           handle=fn(c) {
@@ -75,16 +75,16 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
             })
           },
         ),
-        @yue.bind_label(evt_mouse, fn(s) { s }),
-        @yue.bind_label(evt_dbl, fn(s) { s }),
+        @declarative.bind_label(evt_mouse, fn(s) { s }),
+        @declarative.bind_label(evt_dbl, fn(s) { s }),
       ],
       code=[
-        "let info : @yue.Store[String] = @yue.Store::new(\"(移入操作)\")", "@yue.vbox(",
+        "let info : @yue.Store[String] = @yue.Store::new(\"(移入操作)\")", "@declarative.vbox(",
         "  [@components.label_t(\"鼠标操作区\", role=@components.Body)],", "  style=[(\"height\", 88.0)],",
         "  handle=fn(c) {", "    c.on_mouse_enter(fn(e) { info.set(\"enter (\\{e.view_x}, \\{e.view_y})\") })",
         "    c.on_mouse_leave(fn(_e) { info.set(\"leave\") })", "    c.on_mouse_move(fn(e) { info.set(\"move btn=\\{e.button}\") })",
         "    c.on_mouse_down(fn(e) { info.set(\"down btn=\\{e.button}\"); false })",
-        "    c.on_mouse_up(fn(_e) { false })", "  },", ")", "@yue.bind_label(info, fn(s) { s })",
+        "    c.on_mouse_up(fn(_e) { false })", "  },", ")", "@declarative.bind_label(info, fn(s) { s })",
       ],
     ),
     @ui.section(
@@ -92,7 +92,7 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
       "鼠标捕获",
       "set_capture 后移动/抬升都送给该控件;捕获可被其他控件夺走(on_capture_lost)。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("切换捕获", on_click=fn() {
             match evt_area.val {
               Some(c) => {
@@ -112,7 +112,7 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
               None => ()
             }
           }),
-          @yue.bind_label(evt_cap, fn(s) { s }, style=[("marginLeft", 10.0)]),
+          @declarative.bind_label(evt_cap, fn(s) { s }, style=[("marginLeft", 10.0)]),
         ]),
       ],
       code=[
@@ -123,7 +123,7 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
       "轮询",
       "全局鼠标轮询",
       "mouse_location + 修饰键查询,200ms 轮询。",
-      [@yue.bind_label(evt_gmouse, fn(s) { s })],
+      [@declarative.bind_label(evt_gmouse, fn(s) { s })],
       code=[
         "ignore(@yue.set_timer(200, fn() {", "  let (mx, my) = @yue.mouse_location()",
         "  let shift = @yue.shift_pressed()", "  let ctrl = @yue.control_pressed()",
@@ -136,7 +136,7 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
       "光标 Cursor",
       "View::set_cursor 切换悬停光标——把鼠标移到下方色块上再点按钮。",
       [
-        @yue.vbox(
+        @declarative.vbox(
           [@components.label_t("光标预览区", role=@components.Body)],
           style=[("height", 48.0), ("marginBottom", 8.0)],
           handle=fn(c) {
@@ -144,7 +144,7 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
             @yue.theme_bind_bg(c, fn() { @yue.theme_current().primary })
           },
         ),
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("手型", on_click=fn() {
             apply_cursor(@yue.Hand, "Hand")
           }),
@@ -161,7 +161,7 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
             apply_cursor(@yue.Default, "Default")
           }),
         ]),
-        @yue.bind_label(cursor_now, fn(s) { "当前光标:\{s}" }, style=[
+        @declarative.bind_label(cursor_now, fn(s) { "当前光标:\{s}" }, style=[
           ("marginTop", 8.0),
         ]),
       ],
@@ -176,7 +176,7 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
       "键盘钩子",
       "窗口级 on_key_down 全局生效(按任意键试试);describe 输出如 Ctrl+A。",
       [
-        @yue.bind_label(app.key_info, fn(s) { "最后按键:\{s}" }, style=[
+        @declarative.bind_label(app.key_info, fn(s) { "最后按键:\{s}" }, style=[
           ("marginBottom", 8.0),
         ]),
       ],
@@ -190,7 +190,7 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
       "嵌套布局",
       "固定宽 / 百分比 / flex 三种宽度模型(全集见 docs/zh/layout.md);6px Splitter 把手可拖动调整占比。",
       [
-        @yue.vbox(
+        @declarative.vbox(
           [
             @yue.hsplit(
               @components.tree([
@@ -211,7 +211,7 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
                   ],
                 },
               ]),
-              @yue.vbox(
+              @declarative.vbox(
                 [
                   @components.label_t(
                     "右侧详情区:拖动中间把手调整占比",
@@ -225,7 +225,7 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
           ],
           style=[("height", 200.0), ("width", 520.0), ("marginBottom", 10.0)],
         ),
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.label_t("固定 80", role=@components.Body, style=[
               ("width", 80.0),
@@ -248,7 +248,7 @@ pub fn page_events(app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "@yue.hbox([", "  @components.label_t(\"固定 80\", role=@components.Body,", "    style=[(\"width\", 80.0), (\"height\", 40.0)]),",
+        "@declarative.hbox([", "  @components.label_t(\"固定 80\", role=@components.Body,", "    style=[(\"width\", 80.0), (\"height\", 40.0)]),",
         "  @components.label_t(\"50%\", role=@components.Body,", "    style=[(\"height\", 40.0), (\"width\", \"50%\")]),",
         "  @components.label_t(\"flex 1\", role=@components.Body,", "    style=[(\"height\", 40.0), (\"flex\", 1.0)]),",
         "])", "@yue.hsplit(tree_view, detail_view, min_first=120.0)",

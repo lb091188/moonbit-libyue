@@ -51,7 +51,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "文件对话框",
       "FileDialog 模态打开/保存,回显所选路径;API: read/write_text_file",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("打开文件…", on_click=fn() {
             match app.win_ref.val {
               Some(w) => {
@@ -110,7 +110,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "消息框",
       "原生 MessageBox:标题/正文/按钮,响应 id 回传。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("询问框", on_click=fn() {
             match app.win_ref.val {
               Some(w) => {
@@ -155,7 +155,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "系统通知",
       "提交系统通知中心:普通通知、带操作按钮、静默入中心三种形态。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("普通通知", on_click=fn() {
             let n = @yue.Notification::new()
             n.set_title("components 演示")
@@ -192,7 +192,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "剪贴板",
       "Clipboard 读写系统剪贴板文本;set_data 写富文本(Html)。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("写入文本", on_click=fn() {
             @yue.Clipboard::get().set_text(
               "来自 components 的剪贴板内容",
@@ -233,7 +233,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "定时器与延迟任务",
       "set_timeout 单次 / set_timer 周期(返回 false 停)。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("1.5 秒后提示", on_click=fn() {
             ignore(
               @yue.set_timeout(1500, fn() {
@@ -261,10 +261,10 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "托盘状态",
       "托盘图标左键点击计数(见上方回显),右键弹菜单;set_icon 更换图标须传 PNG 文件路径,点击在五个月相图标间循环,主题图标名仅 Linux。",
       [
-        @yue.bind_label(app.tray_clicks, fn(n) {
+        @declarative.bind_label(app.tray_clicks, fn(n) {
           "托盘图标已被点击 \{n} 次"
         }),
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.button_t("切主题图标(Linux)", on_click=fn() {
               match app.tray_ref.val {
@@ -334,7 +334,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
             app.veto_info.set("(未开启拦截)")
           }
         }),
-        @yue.bind_label(app.veto_info, fn(s) { s }, style=[("marginTop", 8.0)]),
+        @declarative.bind_label(app.veto_info, fn(s) { s }, style=[("marginTop", 8.0)]),
       ],
       code=["w.set_should_close(fn() {", "  false", "})"],
     ),
@@ -346,8 +346,8 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "单实例与二次唤起",
       "再启动一个本程序,新实例会唤醒本窗口后退出。",
       [
-        @yue.bind_label(app.si_role, fn(s) { s }, style=[("marginBottom", 4.0)]),
-        @yue.bind_label(app.si_wake, fn(s) { s }),
+        @declarative.bind_label(app.si_role, fn(s) { s }, style=[("marginBottom", 4.0)]),
+        @declarative.bind_label(app.si_wake, fn(s) { s }),
       ],
       code=[
         "match @yue.SingleInstance::acquire(\"org.app.Id\") {", "  Ok(Some(si)) => si.on_activate(fn(args) {",
@@ -392,11 +392,11 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "开机自启动",
       "开关直连真实自启动状态,重新登录后生效。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.switch_t(auto_on),
           @components.label_t("org.moonbitlibyue.Showcase", role=@components.Secondary),
         ]),
-        @yue.bind_label(auto_out, fn(s) { s }, style=[("marginTop", 8.0)]),
+        @declarative.bind_label(auto_out, fn(s) { s }, style=[("marginTop", 8.0)]),
       ],
       code=[
         "match @yue.Autostart::new(\"org.app.Id\") {", "  Ok(auto) => {", "    ignore(auto.enable())",
@@ -412,7 +412,7 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "打开外部",
       "Ok 只表示已交给系统。",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.button_t("打开 libyue.com", on_click=fn() {
             match @yue.open_url("https://libyue.com") {
               Ok(_) => app.toast_push("已交给系统打开", @components.Success)
@@ -504,19 +504,19 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "屏幕常亮与用户空闲",
       "KeepAwake 抑制系统屏保 / 自动息屏",
       [
-        @yue.hbox([
+        @declarative.hbox([
           @components.switch_t(ka_on),
           @components.label_t("保持屏幕常亮", role=@components.Secondary),
         ]),
-        @yue.bind_label(ka_out, fn(s) { s }, style=[("marginTop", 8.0)]),
-        @yue.hbox(
+        @declarative.bind_label(ka_out, fn(s) { s }, style=[("marginTop", 8.0)]),
+        @declarative.hbox(
           [
             @components.switch_t(idle_running),
             @components.label_t("每秒刷新空闲秒数", role=@components.Secondary),
           ],
           style=[("marginTop", 8.0)],
         ),
-        @yue.bind_label(idle_out, fn(s) { s }, style=[("marginTop", 8.0)]),
+        @declarative.bind_label(idle_out, fn(s) { s }, style=[("marginTop", 8.0)]),
       ],
       code=[
         "match @yue.KeepAwake::enable(\"org.app.Id\") {", "  Ok(k) => ignore(k.release())",
@@ -568,8 +568,8 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "休眠唤醒与锁屏解锁",
       "事件计数演示:真机休眠一次 / Win+L 锁屏一次即见变化。",
       [
-        @yue.bind_label(sleep_out, fn(s) { s }, style=[("marginBottom", 4.0)]),
-        @yue.bind_label(lock_out, fn(s) { s }),
+        @declarative.bind_label(sleep_out, fn(s) { s }, style=[("marginBottom", 4.0)]),
+        @declarative.bind_label(lock_out, fn(s) { s }),
       ],
       code=[
         "@yue.on_suspend_resume(fn(e) {", "  match e {", "    @yue.Suspending => println(\"休眠\")",
@@ -642,8 +642,8 @@ pub fn page_system(app : @ui.App) -> @yue.Node {
       "电量与网络",
       "电量 30 秒轮询 + 电源切换即时刷新;网络状态变化事件计数(真机拔插电源 / 断联网即见)。",
       [
-        @yue.bind_label(power_out, fn(s) { s }, style=[("marginBottom", 4.0)]),
-        @yue.bind_label(net_out, fn(s) { s }),
+        @declarative.bind_label(power_out, fn(s) { s }, style=[("marginBottom", 4.0)]),
+        @declarative.bind_label(net_out, fn(s) { s }),
       ],
       code=[
         "match @yue.battery_query() {", "  Ok(Some(b)) => println(\"电量 \\{b.percent}% 充电中:\\{b.charging}\")",

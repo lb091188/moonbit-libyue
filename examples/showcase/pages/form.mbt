@@ -25,7 +25,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
       "Input 与 Textarea",
       "自绘 1px 边框(聚焦变中性灰)+ 白底;clearable 悬停非空时 ✕ 清空;多行内容超出按平台滚动。",
       [
-        @yue.vbox([
+        @declarative.vbox([
           @components.input_t(text="输入点什么…", clearable=true),
           @components.input_t(text="密码框", password=true, clearable=true, style=[
             ("marginTop", 10.0),
@@ -51,17 +51,17 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
       "步进器 0..10 钳制;滑杆自绘轨道 + thumb(拖拽 step 5 量化);评分五角星 hover 预亮,值均响应式。",
       [
         @components.input_number(qty.store(), min=0.0, max=10.0, step=1.0),
-        @yue.bind(qty, fn(v) { "当前数量:\{v.round()}" }, style=[
+        @declarative.bind(qty, fn(v) { "当前数量:\{v.round()}" }, style=[
           ("marginTop", 6.0),
         ]),
         @components.slider_t(slider_val.store(), min=0.0, max=100.0, step=5.0),
-        @yue.bind(slider_val, fn(v) { "当前值:\{v.round()}" }),
+        @declarative.bind(slider_val, fn(v) { "当前值:\{v.round()}" }),
         @components.rate_t(rate_val.store(), on_change=fn(v) { ignore(v) }),
-        @yue.bind(rate_val, fn(v) { "评分:\{v} 星" }),
+        @declarative.bind(rate_val, fn(v) { "评分:\{v} 星" }),
       ],
       code=[
         "let qty = @yue.Signal::new(3.0)", "@components.input_number(qty.store(), min=0.0, max=10.0, step=1.0)",
-        "@yue.bind(qty, fn(v) { \"当前数量:\\{v.round()}\" })", "let slider_val = @yue.Signal::new(30.0)",
+        "@declarative.bind(qty, fn(v) { \"当前数量:\\{v.round()}\" })", "let slider_val = @yue.Signal::new(30.0)",
         "@components.slider_t(slider_val.store(), min=0.0, max=100.0, step=5.0)", "let rate_val = @yue.Signal::new(3)",
         "@components.rate_t(rate_val.store())",
       ],
@@ -71,7 +71,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
       "Select 与 ColorPicker",
       "下拉点字段弹候选(悬停高亮/选中 ✓),clearable ✕ 清空;取色器预设色板点击选色,hex 值响应式。",
       [
-        @yue.vbox(
+        @declarative.vbox(
           [
             @components.select_t(
               ["杭州", "北京", "上海", "深圳", "广州"],
@@ -80,7 +80,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
               clearable=true,
             ),
             @components.color_picker_t(picked_color.store()),
-            @yue.bind(picked_color, fn(c) { c }),
+            @declarative.bind(picked_color, fn(c) { c }),
           ],
           style=[("alignItems", "flex-start")],
         ),
@@ -89,7 +89,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
         "let city = @yue.Signal::new(\"\")", "@components.select_t(", "  [\"杭州\", \"北京\", \"上海\", \"深圳\", \"广州\"],",
         "  city.store(),", "  style=[(\"width\", 170.0)],", "  clearable=true,",
         ")", "let color = @yue.Signal::new(\"#2D68C4\")", "@components.color_picker_t(color.store())",
-        "@yue.bind(color, fn(c) { c })",
+        "@declarative.bind(color, fn(c) { c })",
       ],
     ),
     @ui.section(
@@ -97,22 +97,22 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
       "Checkbox / Radio / Switch",
       "勾选经 on_change 写回信号即时回显;单选组整行悬停、点击互斥(第二组禁用);开关开=主题蓝靠右,含禁用态。",
       [
-        @yue.vbox([
+        @declarative.vbox([
           @components.checkbox_t("启用自动同步", on_change=fn(v) { sync.set(v) }),
           @components.checkbox_t("接收通知", checked=true, on_change=fn(v) {
             notify.set(v)
           }),
-          @yue.hbox(
+          @declarative.hbox(
             [
-              @yue.bind(sync, fn(v) {
+              @declarative.bind(sync, fn(v) {
                 if v {
                   "同步:开"
                 } else {
                   "同步:关"
                 }
               }),
-              @yue.label("   "),
-              @yue.bind(notify, fn(v) {
+              @declarative.label("   "),
+              @declarative.bind(notify, fn(v) {
                 if v {
                   "通知:开"
                 } else {
@@ -123,13 +123,13 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
             style=[("marginTop", 8.0)],
           ),
         ]),
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.radio_group(
               ["浅色", "深色", "跟随系统"],
               theme_mode.store(),
             ),
-            @yue.label("        "),
+            @declarative.label("        "),
             @components.radio_group(
               ["选项一", "选项二"],
               radio_disabled.store(),
@@ -138,17 +138,17 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
           ],
           style=[("marginTop", 10.0)],
         ),
-        @yue.hbox(
+        @declarative.hbox(
           [
             @components.switch_t(wifi_on.store()),
-            @yue.bind(wifi_on, fn(v) {
+            @declarative.bind(wifi_on, fn(v) {
               if v {
                 "已开启"
               } else {
                 "已关闭"
               }
             }),
-            @yue.label("     "),
+            @declarative.label("     "),
             @components.switch_t(locked.store(), disabled=true),
             @components.label_t("禁用", role=@components.Body),
           ],
@@ -157,7 +157,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
       ],
       code=[
         "let sync = @yue.Signal::new(false)", "@components.checkbox_t(\"启用自动同步\", on_change=fn(v) { sync.set(v) })",
-        "@yue.bind(sync, fn(v) { if v { \"同步:开\" } else { \"同步:关\" } })",
+        "@declarative.bind(sync, fn(v) { if v { \"同步:开\" } else { \"同步:关\" } })",
         "let mode = @yue.Signal::new(\"深色\")", "@components.radio_group([\"浅色\", \"深色\", \"跟随系统\"], mode.store())",
         "let wifi_on = @yue.Signal::new(true)", "@components.switch_t(wifi_on.store())",
         "@components.switch_t(@yue.Signal::new(false).store(), disabled=true)",
@@ -168,16 +168,16 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
       "日期与时间选择",
       "全自绘月历(‹/› 切月)+ 内联 calendar_t;日期/时间/日期时间三区间选择器,选中值响应式。",
       [
-        @yue.vbox(
+        @declarative.vbox(
           [
             @components.date_picker_t(
               value=dp_val.store(),
               style=[("width", 170.0)],
               clearable=true,
             ),
-            @yue.hbox([
+            @declarative.hbox([
               @components.label_t("选中:", role=@components.Body),
-              @yue.bind(dp_val, fn(d) {
+              @declarative.bind(dp_val, fn(d) {
                 match d {
                   Some(v) => v.format()
                   None => "未选"
@@ -188,9 +188,9 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
           style=[("alignItems", "flex-start"), ("marginBottom", 10.0)],
         ),
         @components.calendar_t(style=[("marginBottom", 10.0)]),
-        @yue.vbox([
+        @declarative.vbox([
           @components.datetime_range_picker_t(value=dtr),
-          @yue.bind_label(dtr, fn(r) {
+          @declarative.bind_label(dtr, fn(r) {
             match (r.start, r.end) {
               (Some((sd, st)), Some((ed, et))) =>
                 "日期时间区间:\{sd.format()} \{st.format()} ~ \{ed.format()} \{et.format()}"
@@ -201,7 +201,7 @@ pub fn page_form(app : @ui.App) -> @yue.Node {
       ],
       code=[
         "let dp : @yue.Signal[@components.DateYMD?] = @yue.Signal::new(None)", "@components.date_picker_t(value=dp.store(), style=[(\"width\", 170.0)], clearable=true)",
-        "@yue.bind(dp, fn(d) {", "  match d {", "    Some(v) => v.format()", "    None => \"未选\"",
+        "@declarative.bind(dp, fn(d) {", "  match d {", "    Some(v) => v.format()", "    None => \"未选\"",
         "  }", "})", "@components.calendar_t()", "let dr : @yue.Store[@components.DateRange] =",
         "  @yue.Store::new({ start: None, end: None })", "@components.date_range_picker_t(value=dr)",
         "let tr : @yue.Store[@components.TimeRange] =", "  @yue.Store::new({ start: None, end: None })",

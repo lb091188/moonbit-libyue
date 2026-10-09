@@ -392,8 +392,8 @@ fn md_quoted(content : Array[@yue.Node]) -> @yue.Node {
     p.set_fill_color(@yue.theme_primary())
     p.fill_rect(0.0, 0.0, b.width, b.height)
   })
-  @yue.hbox(
-    [@yue.node_of(bar, style=[("height", 24.0)]), @yue.vbox(content, style=[("marginLeft", 10.0)])],
+  @declarative.hbox(
+    [@declarative.node_of(bar, style=[("height", 24.0)]), @declarative.vbox(content, style=[("marginLeft", 10.0)])],
     style=[("marginBottom", 10.0)],
   )
 }
@@ -463,7 +463,7 @@ fn md_table(
         None => "flex-start"
       }
       cells.push(
-        @yue.vbox(
+        @declarative.vbox(
           [md_rich_label(md_table_cell_spans(cell, head, ctx), 13.0)],
           style=[("width", col_w), ("alignItems", al)],
         ),
@@ -471,12 +471,12 @@ fn md_table(
     }
     cells
   }
-  let nodes : Array[@yue.Node] = [@yue.hbox(cells_of(header, true))]
-  nodes.push(@yue.separator(style=[("marginTop", 2.0), ("marginBottom", 4.0)]))
+  let nodes : Array[@yue.Node] = [@declarative.hbox(cells_of(header, true))]
+  nodes.push(@declarative.separator(style=[("marginTop", 2.0), ("marginBottom", 4.0)]))
   for row in rows {
-    nodes.push(@yue.hbox(cells_of(row, false), style=[("marginBottom", 2.0)]))
+    nodes.push(@declarative.hbox(cells_of(row, false), style=[("marginBottom", 2.0)]))
   }
-  @yue.vbox(nodes, style=[("marginBottom", 10.0)])
+  @declarative.vbox(nodes, style=[("marginBottom", 10.0)])
 }
 
 ///|
@@ -488,7 +488,7 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@yue.Nod
     match block {
       Heading(level~, children~, ..) =>
         nodes.push(
-          @yue.vbox(
+          @declarative.vbox(
             [md_rich_label(md_flatten_inline(children, ctx), md_heading_size(level))],
             style=[
               ("marginTop", if level <= 2 { 10.0 } else { 6.0 }),
@@ -515,7 +515,7 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@yue.Nod
           nodes.push(md_image(img.0, img.1, ctx))
         } else {
           nodes.push(
-            @yue.vbox(
+            @declarative.vbox(
               [md_rich_label(md_flatten_inline(children, ctx), 13.0)],
               style=[("marginBottom", 8.0)],
             ),
@@ -524,18 +524,18 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@yue.Nod
       }
       FencedCode(info~, code~, ..) =>
         nodes.push(
-          @yue.vbox(
+          @declarative.vbox(
             [@components.code_view(md_split_code_lines(code), lang=md_info_lang(info))],
             style=[("marginBottom", 10.0)],
           ),
         )
       IndentedCode(code~, ..) =>
         nodes.push(
-          @yue.vbox([@components.code_view(md_split_code_lines(code))], style=[("marginBottom", 10.0)]),
+          @declarative.vbox([@components.code_view(md_split_code_lines(code))], style=[("marginBottom", 10.0)]),
         )
       MathBlock(value~, ..) =>
         nodes.push(
-          @yue.vbox(
+          @declarative.vbox(
             [@components.code_view(md_split_code_lines(value), lang="math")],
             style=[("marginBottom", 10.0)],
           ),
@@ -544,7 +544,7 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@yue.Nod
         // 引用收块:子块(段落/列表/嵌套引用)整体递归进竖条内容区
         nodes.push(md_quoted(md_render_blocks(children, ctx)))
       Alert(kind~, children~, ..) => {
-        let content : Array[@yue.Node] = [@yue.label(md_alert_title(kind), style=[("marginBottom", 4.0)])]
+        let content : Array[@yue.Node] = [@declarative.label(md_alert_title(kind), style=[("marginBottom", 4.0)])]
         for n in md_render_blocks(children, ctx) {
           content.push(n)
         }
@@ -556,20 +556,20 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@yue.Nod
             // GFM 任务列表:真复选框(可勾选),内容并排
             Some(ck) =>
               nodes.push(
-                @yue.hbox(
+                @declarative.hbox(
                   [
                     @components.checkbox_t("", checked=ck, style=[("width", 24.0)]),
-                    @yue.vbox(md_item_content(item.children, ctx)),
+                    @declarative.vbox(md_item_content(item.children, ctx)),
                   ],
                   style=[("marginBottom", 4.0), ("marginLeft", 8.0)],
                 ),
               )
             None =>
               nodes.push(
-                @yue.hbox(
+                @declarative.hbox(
                   [
-                    @yue.label(md_list_marker("•"), style=[("width", 18.0)]),
-                    @yue.vbox(md_item_content(item.children, ctx)),
+                    @declarative.label(md_list_marker("•"), style=[("width", 18.0)]),
+                    @declarative.vbox(md_item_content(item.children, ctx)),
                   ],
                   style=[("marginBottom", 4.0), ("marginLeft", 8.0)],
                 ),
@@ -580,10 +580,10 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@yue.Nod
         let mut no = start
         for item in items {
           nodes.push(
-            @yue.hbox(
+            @declarative.hbox(
               [
-                @yue.label("\{no}.", style=[("width", 18.0)]),
-                @yue.vbox(md_item_content(item.children, ctx)),
+                @declarative.label("\{no}.", style=[("width", 18.0)]),
+                @declarative.vbox(md_item_content(item.children, ctx)),
               ],
               style=[("marginBottom", 4.0), ("marginLeft", 8.0)],
             ),
@@ -595,16 +595,16 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@yue.Nod
       DefinitionList(items~, ..) =>
         for item in items {
           nodes.push(
-            @yue.vbox(
+            @declarative.vbox(
               [md_rich_label(md_flatten_inline(item.term, ctx), 13.0)],
               style=[("marginBottom", 2.0)],
             ),
           )
           for def in item.definitions {
             nodes.push(
-              @yue.hbox(
+              @declarative.hbox(
                 [
-                  @yue.label("·", style=[("width", 18.0)]),
+                  @declarative.label("·", style=[("width", 18.0)]),
                   md_rich_label(md_flatten_inline(def, ctx), 13.0),
                 ],
                 style=[("marginBottom", 4.0), ("marginLeft", 8.0)],
@@ -623,7 +623,7 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@yue.Nod
         }
       ThematicBreak(..) =>
         nodes.push(
-          @yue.separator(style=[("marginTop", 6.0), ("marginBottom", 10.0)]),
+          @declarative.separator(style=[("marginTop", 6.0), ("marginBottom", 10.0)]),
         )
       HtmlBlock(..) | BlankLines(..) | FootnoteDefinition(..) => ()
     }
@@ -815,7 +815,7 @@ pub fn markdown_view(
       }
     }
     if fd.length() > 0 {
-      nodes.push(@yue.separator(style=[("marginTop", 6.0), ("marginBottom", 8.0)]))
+      nodes.push(@declarative.separator(style=[("marginTop", 6.0), ("marginBottom", 8.0)]))
       for lbl in foot.order {
         match fd.get(lbl) {
           Some(children) => {
@@ -824,10 +824,10 @@ pub fn markdown_view(
               None => 0
             }
             nodes.push(
-              @yue.hbox(
+              @declarative.hbox(
                 [
-                  @yue.label("\{num}.", style=[("width", 24.0)]),
-                  @yue.vbox(md_item_content(children, ctx)),
+                  @declarative.label("\{num}.", style=[("width", 24.0)]),
+                  @declarative.vbox(md_item_content(children, ctx)),
                 ],
                 style=[("marginBottom", 4.0), ("marginLeft", 8.0)],
               ),
@@ -842,5 +842,5 @@ pub fn markdown_view(
   for kv in style {
     base.push(kv)
   }
-  @yue.vbox(nodes, style=base)
+  @declarative.vbox(nodes, style=base)
 }

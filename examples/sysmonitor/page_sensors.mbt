@@ -153,7 +153,7 @@ fn page_sensors(app : App) -> @yue.Node {
     )
   }
   nodes.push(
-    @yue.separator(style=[("marginTop", 14.0), ("marginBottom", 10.0)]),
+    @declarative.separator(style=[("marginTop", 14.0), ("marginBottom", 10.0)]),
   )
   nodes.push(
     @components.label_t("温度传感器", role=@components.Section, style=[
@@ -174,5 +174,5 @@ fn page_sensors(app : App) -> @yue.Node {
     draw_rows(sensor_n, fn(p, w) { draw_sensor_rows(p, w, page.rows.get()) }),
   )
 
-  @yue.vbox(nodes, style=[("padding", 12.0)])
+  @declarative.vbox(nodes, style=[("padding", 12.0)])
 }

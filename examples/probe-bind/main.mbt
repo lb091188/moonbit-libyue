@@ -65,29 +65,29 @@ fn main {
     n.val < 5
   })
   ignore(
-    @yue.mount_window(
+    @declarative.mount_window(
       [
         // 复刻 showcase 段内滚动架构:bind/复刻行都在 Scroll 内
-        @yue.scroll(
-          @yue.vbox(
+        @declarative.scroll(
+          @declarative.vbox(
             [
-              @yue.hbox(
+              @declarative.hbox(
                 [
                   @components.label_t("bind:", role=@components.Body),
-                  @yue.bind(sig, fn(v) { v }),
+                  @declarative.bind(sig, fn(v) { v }),
                   @components.label_t("  ←[\{phase.get()}]", role=@components.Secondary),
                 ],
                 style=[("alignItems", "center"), ("marginBottom", 14.0)],
               ),
-              @yue.hbox(
+              @declarative.hbox(
                 [
                   @components.label_t("复刻行:", role=@components.Body),
-                  @yue.node_of(probe),
+                  @declarative.node_of(probe),
                   @components.label_t("  (stdout 打 bounds)", role=@components.Secondary),
                 ],
                 style=[("alignItems", "center"), ("marginBottom", 14.0)],
               ),
-              @yue.hbox(
+              @declarative.hbox(
                 [
                   @components.label_t("静态对照:", role=@components.Body),
                   @components.label_t(LONG, role=@components.Body),

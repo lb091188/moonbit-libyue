@@ -13,8 +13,8 @@ fn main {
     btns.push(@components.button_t("按钮\{i}"))
   }
   ignore(
-    @yue.mount_window(
-      [@yue.vbox([..btns], style=[("padding", 24.0), ("gap", 6.0)])],
+    @declarative.mount_window(
+      [@declarative.vbox([..btns], style=[("padding", 24.0), ("gap", 6.0)])],
       title="exit-crash-nofocus",
       size=Some((260.0, 420.0)),
       center=true,

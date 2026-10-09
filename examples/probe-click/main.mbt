@@ -75,7 +75,7 @@ fn main {
       },
       variant=@components.Danger,
     ),
-    @yue.hbox(
+    @declarative.hbox(
       [
         @components.label_t("行4:"),
         @yue.bind_node(dark.signal(), fn(d) {
@@ -103,7 +103,7 @@ fn main {
       style=[("alignItems", "center")],
     ),
     // 行5:规避方案验证——双预建按钮显隐切换(不 remove/add)
-    @yue.hbox(
+    @declarative.hbox(
       [
         @components.label_t("行5 显隐切换:"),
         @components.button_t(
@@ -132,15 +132,15 @@ fn main {
         ignore(row)
       },
     ),
-    @yue.separator(),
+    @declarative.separator(),
     @components.label_t("事件流(新在前):", role=@components.Secondary),
-    @yue.bind_label(log, fn(s) { s }),
+    @declarative.bind_label(log, fn(s) { s }),
   ]
   ignore(
-    @yue.mount_window(
+    @declarative.mount_window(
       [
         // 根容器:记录窗口层收到的每次点击坐标(判断整窗是否还活着)
-        @yue.vbox(body, style=[("padding", 16.0), ("flexgrow", 1.0)], handle=fn(
+        @declarative.vbox(body, style=[("padding", 16.0), ("flexgrow", 1.0)], handle=fn(
           root,
         ) {
           root.on_mouse_down(fn(e) {

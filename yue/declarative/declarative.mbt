@@ -1,38 +1,22 @@
 // L2 声明式层：Node 树 + mount（Vue render 函数 / React 元素风格）。
 // Node 是"未挂载的 UI 片段"：构造器只是建树，mount 时才实例化控件、
 // 挂到父视图并注册回调。children 数组天然异构（Node 是函数字段的存在类型）。
+// Node 协议（Node struct、attach、Node::mount_into）在核心包 node.mbt，本包经
+// @yue. 使用——components / icons / markdown / charts 等包也直接引用 Node，
+// 故 Node 不随本包拆分搬走。
 // 自定义控件：用 node_of 包已有视图，或直接写 Node 字面量。
-// bind_label：Store 值驱动的文本节点（挂载即订阅，set 时自动更新文本）。
-
-///|
-/// 把子视图挂到父视图（父须为容器：Container/Group/Scroll/Tab 均可，
-/// 错型由 shim 侧 dynamic_cast 校验拒绝）。
-pub fn attach(parent : View, child : View) -> Unit {
-  ffi_container_add_child(parent, child)
-}
-
-///|
-/// 未挂载的 UI 片段：mount 把自己实例化并挂到 parent，返回自己的视图句柄。
-pub(all) struct Node {
-  mount : (View) -> View
-}
-
-///|
-/// 把节点挂到 parent，返回该节点的视图句柄。
-pub fn Node::mount_into(self : Node, parent : View) -> View {
-  (self.mount)(parent)
-}
+// bind_label / bind：Store / Signal 值驱动的文本节点（挂载即订阅，set 时自动更新文本）。
 
 ///|
 /// 把已有视图包装成节点（可顺带应用样式）——命令式与声明式混用的桥。
-pub fn[T : ViewLike] node_of(
+pub fn[T : @yue.ViewLike] node_of(
   v : T,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
-  apply_style(v, style~)
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
+  @yue.apply_style(v, style~)
   {
     mount: fn(parent) {
-      attach(parent, v.view())
+      @yue.attach(parent, v.view())
       v.view()
     },
   }
@@ -41,10 +25,10 @@ pub fn[T : ViewLike] node_of(
 ///|
 fn container_node(
   direction : String,
-  children : Array[Node],
-  style : Array[(String, &StyVal)],
-  handle~ : (Container) -> Unit,
-) -> Node {
+  children : Array[@yue.Node],
+  style : Array[(String, &@yue.StyVal)],
+  handle~ : (@yue.Container) -> Unit,
+) -> @yue.Node {
   let s = style.copy()
   s.push(("flexDirection", direction))
   // shrink 维持 yoga 默认 0:实测默认 1 会挤压全库固定宽自绘控件
@@ -52,13 +36,13 @@ fn container_node(
   // 容器(如 segmented 超宽换行)显式 style 给 1。
   {
     mount: fn(parent) {
-      let c = Container::make(style=s)
+      let c = @yue.Container::make(style=s)
       handle(c)
-      attach(parent, ViewLike::view(c))
+      @yue.attach(parent, @yue.ViewLike::view(c))
       for ch in children {
-        ignore((ch.mount)(ViewLike::view(c)))
+        ignore((ch.mount)(@yue.ViewLike::view(c)))
       }
-      ViewLike::view(c)
+      @yue.ViewLike::view(c)
     },
   }
 }
@@ -66,20 +50,20 @@ fn container_node(
 ///|
 /// 垂直布局容器（flexDirection=column，libyue 默认即 column）。
 pub fn vbox(
-  children : Array[Node],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  children : Array[@yue.Node],
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   container_node("column", children, style, handle~)
 }
 
 ///|
 /// 水平布局容器（flexDirection=row）。
 pub fn hbox(
-  children : Array[Node],
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Container) -> Unit = fn(_c) {  },
-) -> Node {
+  children : Array[@yue.Node],
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   container_node("row", children, style, handle~)
 }
 
@@ -91,16 +75,16 @@ pub fn hbox(
 /// 便于后续命令式补充。
 pub fn label(
   text : String,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Label) -> Unit = fn(_l) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Label) -> Unit = fn(_l) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let l = Label::make(text, style~)
-      bind_fg(l, fn() { theme_text_regular() })
+      let l = @yue.Label::make(text, style~)
+      @yue.bind_fg(l, fn() { @yue.theme_text_regular() })
       handle(l)
-      attach(parent, ViewLike::view(l))
-      ViewLike::view(l)
+      @yue.attach(parent, @yue.ViewLike::view(l))
+      @yue.ViewLike::view(l)
     },
   }
 }
@@ -110,15 +94,15 @@ pub fn label(
 pub fn button(
   title : String,
   on_click? : () -> Unit = fn() {  },
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Button) -> Unit = fn(_b) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Button) -> Unit = fn(_b) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let b = Button::make(title, on_click~, style~)
+      let b = @yue.Button::make(title, on_click~, style~)
       handle(b)
-      attach(parent, ViewLike::view(b))
-      ViewLike::view(b)
+      @yue.attach(parent, @yue.ViewLike::view(b))
+      @yue.ViewLike::view(b)
     },
   }
 }
@@ -129,16 +113,16 @@ pub fn checkbox(
   title : String,
   checked? : Bool = false,
   on_change? : (Bool) -> Unit = fn(_v) {  },
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Button) -> Unit = fn(_b) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Button) -> Unit = fn(_b) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let b = Button::make(title, button_type=Checkbox, checked~, style~)
+      let b = @yue.Button::make(title, button_type=@yue.Checkbox, checked~, style~)
       b.on_click(fn() { on_change(b.is_checked()) })
       handle(b)
-      attach(parent, ViewLike::view(b))
-      ViewLike::view(b)
+      @yue.attach(parent, @yue.ViewLike::view(b))
+      @yue.ViewLike::view(b)
     },
   }
 }
@@ -151,46 +135,46 @@ pub fn entry(
   password? : Bool = false,
   on_enter? : (String) -> Unit = fn(_s) {  },
   on_input? : (String) -> Unit = fn(_s) {  },
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Entry) -> Unit = fn(_e) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Entry) -> Unit = fn(_e) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
       // Windows 上 height 不直接落到原生控件(文字贴顶),拆出包进
       // 外壳容器(值原样应用,百分比也支持),挂载后一帧读外壳实际
       // 高做 entry_vcenter 垂直居中
-      let (make_style, height_kv) = if platform() == "windows" {
+      let (make_style, height_kv) = if @yue.platform() == "windows" {
         take_style_height(style)
       } else {
         (style, None)
       }
-      let e = Entry::make(
+      let e = @yue.Entry::make(
         text~,
-        entry_type=if password { Password } else { Normal },
+        entry_type=if password { @yue.Password } else { @yue.Normal },
         style=make_style,
       )
-      let target : View = if platform() == "windows" {
+      let target : @yue.View = if @yue.platform() == "windows" {
         // 与 entry_t 一致:字体先设(行高测量吻合),控件收窄到行高,
         // height 键值原样包进外壳容器 justifyContent=center 垂直居中
-        ViewLike::set_font(e, Font::new("Sans", 13.0))
-        ViewLike::set_style(e, "height", entry_ctrl_height(true))
-        let shell_style : Array[(String, &StyVal)] = match height_kv {
+        @yue.ViewLike::set_font(e, @yue.Font::new("Sans", 13.0))
+        @yue.ViewLike::set_style(e, "height", @yue.entry_ctrl_height(true))
+        let shell_style : Array[(String, &@yue.StyVal)] = match height_kv {
           Some(kv) => [kv]
-          None => [("height", control_height)]
+          None => [("height", @yue.control_height)]
         }
         shell_style.push(("justifyContent", "center"))
-        let shell = themed_container(style=shell_style)
-        attach(ViewLike::view(shell), ViewLike::view(e))
-        bind_entry_theme(e)
-        ViewLike::view(shell)
+        let shell = @yue.themed_container(style=shell_style)
+        @yue.attach(@yue.ViewLike::view(shell), @yue.ViewLike::view(e))
+        @yue.bind_entry_theme(e)
+        @yue.ViewLike::view(shell)
       } else {
-        bind_entry_theme(e)
-        ViewLike::view(e)
+        @yue.bind_entry_theme(e)
+        @yue.ViewLike::view(e)
       }
       e.on_activate(fn() { on_enter(e.get_text()) })
       e.on_text_change(fn() { on_input(e.get_text()) })
       handle(e)
-      attach(parent, target)
+      @yue.attach(parent, target)
       target
     },
   }
@@ -200,10 +184,10 @@ pub fn entry(
 /// 从样式表拆出 height 键（重复出现以最后一个为准，按键拆不解析值），
 /// 返回剩余样式与被拆出的键值对。
 fn take_style_height(
-  style : Array[(String, &StyVal)],
-) -> (Array[(String, &StyVal)], (String, &StyVal)?) {
-  let mut kv : (String, &StyVal)? = None
-  let rest : Array[(String, &StyVal)] = []
+  style : Array[(String, &@yue.StyVal)],
+) -> (Array[(String, &@yue.StyVal)], (String, &@yue.StyVal)?) {
+  let mut kv : (String, &@yue.StyVal)? = None
+  let rest : Array[(String, &@yue.StyVal)] = []
   for pair in style {
     if pair.0 == "height" {
       kv = Some(pair)
@@ -219,16 +203,16 @@ fn take_style_height(
 pub fn text_edit(
   text? : String = "",
   on_input? : (String) -> Unit = fn(_s) {  },
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (TextEdit) -> Unit = fn(_t) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.TextEdit) -> Unit = fn(_t) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let t = TextEdit::make(text~, style~)
+      let t = @yue.TextEdit::make(text~, style~)
       t.on_text_change(fn() { on_input(t.get_text()) })
       handle(t)
-      attach(parent, ViewLike::view(t))
-      ViewLike::view(t)
+      @yue.attach(parent, @yue.ViewLike::view(t))
+      @yue.ViewLike::view(t)
     },
   }
 }
@@ -239,16 +223,16 @@ pub fn radio(
   title : String,
   checked? : Bool = false,
   on_change? : (Bool) -> Unit = fn(_v) {  },
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Button) -> Unit = fn(_b) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Button) -> Unit = fn(_b) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let b = Button::make(title, button_type=Radio, checked~, style~)
+      let b = @yue.Button::make(title, button_type=@yue.Radio, checked~, style~)
       b.on_click(fn() { on_change(b.is_checked()) })
       handle(b)
-      attach(parent, ViewLike::view(b))
-      ViewLike::view(b)
+      @yue.attach(parent, @yue.ViewLike::view(b))
+      @yue.ViewLike::view(b)
     },
   }
 }
@@ -260,16 +244,16 @@ pub fn slider(
   range? : (Double, Double)? = None,
   step? : Double? = None,
   on_change? : (Double) -> Unit = fn(_v) {  },
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Slider) -> Unit = fn(_s) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Slider) -> Unit = fn(_s) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let s = Slider::make(value~, range~, step~, style~)
+      let s = @yue.Slider::make(value~, range~, step~, style~)
       s.on_value_change(fn() { on_change(s.get_value()) })
       handle(s)
-      attach(parent, ViewLike::view(s))
-      ViewLike::view(s)
+      @yue.attach(parent, @yue.ViewLike::view(s))
+      @yue.ViewLike::view(s)
     },
   }
 }
@@ -279,15 +263,15 @@ pub fn slider(
 pub fn progress(
   value? : Double = 0.0,
   indeterminate? : Bool = false,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (ProgressBar) -> Unit = fn(_p) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.ProgressBar) -> Unit = fn(_p) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let p = ProgressBar::make(value~, indeterminate~, style~)
+      let p = @yue.ProgressBar::make(value~, indeterminate~, style~)
       handle(p)
-      attach(parent, ViewLike::view(p))
-      ViewLike::view(p)
+      @yue.attach(parent, @yue.ViewLike::view(p))
+      @yue.ViewLike::view(p)
     },
   }
 }
@@ -298,20 +282,20 @@ pub fn picker(
   items? : Array[String] = [],
   selected? : Int = 0,
   on_change? : () -> Unit = fn() {  },
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Picker) -> Unit = fn(_p) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Picker) -> Unit = fn(_p) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let p = Picker::make(
+      let p = @yue.Picker::make(
         items~,
         selected~,
         on_selection_change=on_change,
         style~,
       )
       handle(p)
-      attach(parent, ViewLike::view(p))
-      ViewLike::view(p)
+      @yue.attach(parent, @yue.ViewLike::view(p))
+      @yue.ViewLike::view(p)
     },
   }
 }
@@ -323,12 +307,12 @@ pub fn combo(
   selected? : Int = 0,
   on_select? : () -> Unit = fn() {  },
   on_input? : () -> Unit = fn() {  },
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (ComboBox) -> Unit = fn(_c) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.ComboBox) -> Unit = fn(_c) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let c = ComboBox::make(
+      let c = @yue.ComboBox::make(
         items~,
         selected~,
         on_selection_change=on_select,
@@ -336,8 +320,8 @@ pub fn combo(
         style~,
       )
       handle(c)
-      attach(parent, ViewLike::view(c))
-      ViewLike::view(c)
+      @yue.attach(parent, @yue.ViewLike::view(c))
+      @yue.ViewLike::view(c)
     },
   }
 }
@@ -348,18 +332,18 @@ pub fn combo(
 /// 故先把内容挂进一个容器再整块设为 Group 内容。
 pub fn group(
   title : String,
-  content : Node,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  content : @yue.Node,
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let g = Group::new(title)
-      apply_style(g, style~)
-      attach(parent, ViewLike::view(g))
-      let holder = Container::new()
-      ignore((content.mount)(ViewLike::view(holder)))
+      let g = @yue.Group::new(title)
+      @yue.apply_style(g, style~)
+      @yue.attach(parent, @yue.ViewLike::view(g))
+      let holder = @yue.Container::new()
+      ignore((content.mount)(@yue.ViewLike::view(holder)))
       g.set_content(holder)
-      ViewLike::view(g)
+      @yue.ViewLike::view(g)
     },
   }
 }
@@ -379,16 +363,16 @@ pub fn group(
 /// 布局提示：Scroll 视口高度来自弹性分配,作为窗口根或需占满父容器时
 /// 要自带 style flex(如 [("flex", 1.0)]),否则视口塌陷为 0(空白)。
 pub fn scroll(
-  content : Node,
+  content : @yue.Node,
   content_size? : (Double, Double)? = None,
-  policy? : (ScrollPolicy, ScrollPolicy)? = None,
+  policy? : (@yue.ScrollPolicy, @yue.ScrollPolicy)? = None,
   overlay? : Bool = true,
-  style? : Array[(String, &StyVal)] = [],
-  handle? : (Scroll) -> Unit = fn(_s) {  },
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+  handle? : (@yue.Scroll) -> Unit = fn(_s) {  },
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let s = Scroll::new()
+      let s = @yue.Scroll::new()
       handle(s)
       match content_size {
         Some((w, h)) => s.set_content_size(w, h)
@@ -400,37 +384,37 @@ pub fn scroll(
       }
       // Windows 上原生子控件(Entry 等)的 HWND 不随容器滚动实时移动,
       // 会浮在滚动内容之上遮挡其它组件;每次滚动后强制重摆一次布局。
-      let holder = Container::new()
-      ignore((content.mount)(ViewLike::view(holder)))
+      let holder = @yue.Container::new()
+      ignore((content.mount)(@yue.ViewLike::view(holder)))
       s.set_content(holder)
-      let mounted : View = if overlay &&
+      let mounted : @yue.View = if overlay &&
         policy is None &&
-        platform() == "windows" {
+        @yue.platform() == "windows" {
         // Windows 悬浮细条:style 挪给 host(thumb 的 absolute 定位以
         // host 为基准,直接挂页面容器会被 padding/margin 带偏),Scroll
         // 在内撑满(flex 配 basis 0 即 CSS flex:1 1 0,高度只由 flex 分配
         // 决定,防内容测量污染致视口塌陷),attach_overlay_thumb 置平台
         // 条 Never 并挂自绘 thumb
-        let host = themed_container(style~)
-        attach(parent, ViewLike::view(host))
-        ViewLike::set_style(s, "flex", 1.0)
-        ViewLike::set_style(s, "flexbasis", 0.0)
-        attach(ViewLike::view(host), ViewLike::view(s))
-        attach_overlay_thumb(ViewLike::view(host), s)
-        ViewLike::view(host)
+        let host = @yue.themed_container(style~)
+        @yue.attach(parent, @yue.ViewLike::view(host))
+        @yue.ViewLike::set_style(s, "flex", 1.0)
+        @yue.ViewLike::set_style(s, "flexbasis", 0.0)
+        @yue.attach(@yue.ViewLike::view(host), @yue.ViewLike::view(s))
+        attach_overlay_thumb(@yue.ViewLike::view(host), s)
+        @yue.ViewLike::view(host)
       } else {
         if overlay {
           s.set_overlay_scrollbar(true)
         } else {
           s.set_overlay_scrollbar(false)
         }
-        apply_style(s, style~)
-        attach(parent, ViewLike::view(s))
-        ViewLike::view(s)
+        @yue.apply_style(s, style~)
+        @yue.attach(parent, @yue.ViewLike::view(s))
+        @yue.ViewLike::view(s)
       }
-      if platform() == "windows" {
+      if @yue.platform() == "windows" {
         s.on_scroll(fn() {
-          ViewLike::update_layout(holder)
+          @yue.ViewLike::update_layout(holder)
           false
         })
       }
@@ -442,15 +426,15 @@ pub fn scroll(
 ///|
 /// 分隔线节点。
 pub fn separator(
-  orientation? : Orientation = Horizontal,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  orientation? : @yue.Orientation = @yue.Horizontal,
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let s = Separator::new(orientation)
-      apply_style(s, style~)
-      attach(parent, ViewLike::view(s))
-      ViewLike::view(s)
+      let s = @yue.Separator::new(orientation)
+      @yue.apply_style(s, style~)
+      @yue.attach(parent, @yue.ViewLike::view(s))
+      @yue.ViewLike::view(s)
     },
   }
 }
@@ -458,18 +442,18 @@ pub fn separator(
 ///|
 /// 页签节点：每页自动包一层容器挂载；页内容异构无限制。
 pub fn tab(
-  pages : Array[(String, Node)],
+  pages : Array[(String, @yue.Node)],
   on_change? : () -> Unit = fn() {  },
-  handle? : (Tab) -> Unit = fn(_t) {  },
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  handle? : (@yue.Tab) -> Unit = fn(_t) {  },
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let t = Tab::new()
-      apply_style(t, style~)
+      let t = @yue.Tab::new()
+      @yue.apply_style(t, style~)
       for (title, page) in pages {
-        let holder = Container::new()
-        ignore((page.mount)(ViewLike::view(holder)))
+        let holder = @yue.Container::new()
+        ignore((page.mount)(@yue.ViewLike::view(holder)))
         t.add_page(title, holder)
       }
       // 登记放在加页之后:原生添加首页会内部选中一次并回调,那不是
@@ -477,8 +461,8 @@ pub fn tab(
       // 凭空起跳)
       t.on_selected_page_change(on_change)
       handle(t)
-      attach(parent, ViewLike::view(t))
-      ViewLike::view(t)
+      @yue.attach(parent, @yue.ViewLike::view(t))
+      @yue.ViewLike::view(t)
     },
   }
 }
@@ -488,14 +472,14 @@ pub fn tab(
 pub fn date_picker(
   epoch? : Int64? = None,
   on_change? : () -> Unit = fn() {  },
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let d = DatePicker::make(epoch~, on_date_change=on_change)
-      apply_style(d, style~)
-      attach(parent, ViewLike::view(d))
-      ViewLike::view(d)
+      let d = @yue.DatePicker::make(epoch~, on_date_change=on_change)
+      @yue.apply_style(d, style~)
+      @yue.attach(parent, @yue.ViewLike::view(d))
+      @yue.ViewLike::view(d)
     },
   }
 }
@@ -503,16 +487,16 @@ pub fn date_picker(
 ///|
 /// GIF 播放节点。
 pub fn gif(
-  image? : Image? = None,
-  scale? : ImageScale = Down,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  image? : @yue.Image? = None,
+  scale? : @yue.ImageScale = @yue.Down,
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let g = GifPlayer::make(image~, scale~)
-      apply_style(g, style~)
-      attach(parent, ViewLike::view(g))
-      ViewLike::view(g)
+      let g = @yue.GifPlayer::make(image~, scale~)
+      @yue.apply_style(g, style~)
+      @yue.attach(parent, @yue.ViewLike::view(g))
+      @yue.ViewLike::view(g)
     },
   }
 }
@@ -521,17 +505,17 @@ pub fn gif(
 /// 容器节点：需要自绘（on_draw）或要拿 Container 句柄时用；纯布局用
 /// vbox/hbox。
 pub fn container(
-  on_draw? : (Painter) -> Unit = fn(_p) {  },
-  handle? : (Container) -> Unit = fn(_c) {  },
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  on_draw? : (@yue.Painter) -> Unit = fn(_p) {  },
+  handle? : (@yue.Container) -> Unit = fn(_c) {  },
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
-      let c = Container::make(style~)
+      let c = @yue.Container::make(style~)
       c.on_draw(on_draw)
       handle(c)
-      attach(parent, ViewLike::view(c))
-      ViewLike::view(c)
+      @yue.attach(parent, @yue.ViewLike::view(c))
+      @yue.ViewLike::view(c)
     },
   }
 }
@@ -540,12 +524,12 @@ pub fn container(
 /// 声明一棵 UI 树的根：创建容器、挂载全部子节点，返回根容器
 /// （直接传给 Window::set_content 或作为更外层的孩子）。
 pub fn mount(
-  children : Array[Node],
-  style? : Array[(String, &StyVal)] = [],
-) -> Container {
-  let root = Container::make(style~)
+  children : Array[@yue.Node],
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Container {
+  let root = @yue.Container::make(style~)
   for ch in children {
-    ignore((ch.mount)(ViewLike::view(root)))
+    ignore((ch.mount)(@yue.ViewLike::view(root)))
   }
   root
 }
@@ -556,14 +540,14 @@ pub fn mount(
 /// handle 补挂菜单栏/托盘等非视图资产，随后激活显示——返回后直接
 /// run 即可，无需再手动 activate；需抢在显示前调整窗口，写进 handle。
 pub fn mount_window(
-  children : Array[Node],
+  children : Array[@yue.Node],
   title? : String = "",
   size? : (Double, Double)? = None,
   center? : Bool = false,
-  on_close? : (Window) -> Unit = fn(_w) {  },
-  handle? : (Window) -> Unit = fn(_w) {  },
-) -> Window {
-  let win = Window::make(title~, size~, on_close~, center~)
+  on_close? : (@yue.Window) -> Unit = fn(_w) {  },
+  handle? : (@yue.Window) -> Unit = fn(_w) {  },
+) -> @yue.Window {
+  let win = @yue.Window::make(title~, size~, on_close~, center~)
   // 根容器默认撑满窗口：scroll 等依赖弹性高度的子节点若不加自己的
   // flex,视口会塌陷为 0(空白窗口),因此根默认 flex=1,子节点按需再给
   win.set_content(mount(children, style=[("flex", 1.0)]))
@@ -582,33 +566,47 @@ pub fn mount_window(
 /// 标签宽度跟随文本:set_text 后强制重排一次,变长/变短即时生效
 /// (不补则停在挂载时的宽度,长文本截断,详见 adaptation.md)。
 pub fn[A] bind_label(
-  store : Store[A],
+  store : @yue.Store[A],
   f : (A) -> String,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
   {
     mount: fn(parent) {
       let init = f(store.get())
-      let l = Label::make(init, style~)
-      let at = AttributedText::new(init, valign=Center, wrap=false)
-      at.set_font(Font::new("Sans", 13.0))
+      let l = @yue.Label::make(init, style~)
+      let at = @yue.AttributedText::new(init, valign=@yue.Center, wrap=false)
+      at.set_font(@yue.Font::new("Sans", 13.0))
       fn apply_color() -> Unit {
-        at.set_color(theme_text_regular())
+        at.set_color(@yue.theme_text_regular())
         at.set_text(at.get_text())
-        ViewLike::schedule_paint(l)
+        @yue.ViewLike::schedule_paint(l)
       }
 
       apply_color()
-      ignore(on_theme_change(apply_color))
+      ignore(@yue.on_theme_change(apply_color))
       l.set_attributed_text(at)
       // set_text 只标脏 yoga + 按旧尺寸重绘,不触发布局下发(标签宽度
       // 不会跟随文本变化,变长即截断),须补一次强制重排
       store.subscribe(fn(v) {
         l.set_text(f(v))
-        ViewLike::update_layout(l)
+        @yue.ViewLike::update_layout(l)
       })
-      attach(parent, ViewLike::view(l))
-      ViewLike::view(l)
+      @yue.attach(parent, @yue.ViewLike::view(l))
+      @yue.ViewLike::view(l)
     },
   }
+}
+
+///|
+/// 声明式文本绑定(信号版):节点挂载时创建 Label(初值 f(get))并
+/// 订阅,之后信号变化自动更新文本。与 bind_label(Store) 同一实现内核,
+/// 接受源信号或 computed 派生信号。
+pub fn[A] bind(
+  sig : @yue.Signal[A],
+  f : (A) -> String,
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
+  // Store 的字段跨包不可见,Struct 字面量 { sig, } 在包外编译不过,
+  // 改用 Signal::store(与 { sig: self, } 等价)完成同包内到跨包的转换
+  bind_label(sig.store(), f, style~)
 }
