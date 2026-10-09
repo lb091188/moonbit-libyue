@@ -108,17 +108,17 @@ struct App {
   card_proc : @yue.Store[String]
   // 磁盘卡：每个用户挂载一张（数量取启动枚举结果，热插拔不重建）
   card_disk_vals : Array[@yue.Store[String]]
-  disk_hists : Array[@yue.Store[Array[@yue.LineSeries]]]
+  disk_hists : Array[@yue.Store[Array[@charts.LineSeries]]]
   // 概览页：实时曲线（定长滚动窗口 120 点 = 2 分钟 @1Hz）
-  cpu_hist : @yue.Store[Array[@yue.LineSeries]]
-  core_bars : @yue.Store[Array[@yue.BarItem]]
-  mem_hist : @yue.Store[Array[@yue.LineSeries]]
-  swap_hist : @yue.Store[Array[@yue.LineSeries]]
-  net_hist : @yue.Store[Array[@yue.LineSeries]]
+  cpu_hist : @yue.Store[Array[@charts.LineSeries]]
+  core_bars : @yue.Store[Array[@charts.BarItem]]
+  mem_hist : @yue.Store[Array[@charts.LineSeries]]
+  swap_hist : @yue.Store[Array[@charts.LineSeries]]
+  net_hist : @yue.Store[Array[@charts.LineSeries]]
   // GPU 详情页与卡值：每块物理卡一套（数量取启动枚举结果，热插拔不重建）
   card_gpu_vals : Array[@yue.Store[String]]
-  gpu_busy_hists : Array[@yue.Store[Array[@yue.LineSeries]]]
-  gpu_vram_hists : Array[@yue.Store[Array[@yue.LineSeries]]]
+  gpu_busy_hists : Array[@yue.Store[Array[@charts.LineSeries]]]
+  gpu_vram_hists : Array[@yue.Store[Array[@charts.LineSeries]]]
   // 其余页数据源（进程 / 传感器 / 磁盘 / 网络页订阅）
   procs : @yue.Store[Array[ProcInfo]]
   sensors : @yue.Store[Array[TempSensor]]
@@ -137,10 +137,10 @@ fn sample_once(app : App) -> Unit {
     None => ()
     Some((usage, per_core)) => {
       cpu_text = pct(usage)
-      @yue.series_push(app.cpu_hist, 0, usage * 100.0)
-      let bars : Array[@yue.BarItem] = []
+      @charts.series_push(app.cpu_hist, 0, usage * 100.0)
+      let bars : Array[@charts.BarItem] = []
       for i, u in per_core {
-        bars.push(@yue.BarItem::make("\{i}", u * 100.0))
+        bars.push(@charts.BarItem::make("\{i}", u * 100.0))
       }
       app.core_bars.set(bars)
     }
@@ -171,8 +171,8 @@ fn sample_once(app : App) -> Unit {
       app.card_mem.set(
         "\{fmt_rate_c(mem.used_kb().to_double() * 1024.0)} / \{fmt_rate_c(mem.total_kb.to_double() * 1024.0)}",
       )
-      @yue.series_push(app.mem_hist, 0, used_gb)
-      @yue.series_push(app.swap_hist, 0, swap_gb)
+      @charts.series_push(app.mem_hist, 0, used_gb)
+      @charts.series_push(app.swap_hist, 0, swap_gb)
     }
   }
   match app.proc.tick() {
@@ -192,12 +192,12 @@ fn sample_once(app : App) -> Unit {
           break
         }
         match g.busy {
-          Some(b) => @yue.series_push(app.gpu_busy_hists[i], 0, b)
+          Some(b) => @charts.series_push(app.gpu_busy_hists[i], 0, b)
           None => ()
         }
         match g.vram_used {
           Some(v) =>
-            @yue.series_push(app.gpu_vram_hists[i], 0, v / 1073741824.0)
+            @charts.series_push(app.gpu_vram_hists[i], 0, v / 1073741824.0)
           None => ()
         }
         // 占用与温度任一来源不可用,对应位显示「—」(不用空缺)
@@ -223,7 +223,7 @@ fn sample_once(app : App) -> Unit {
         app.card_disk_vals[i].set(
           "\{pct(d.usage())} · \{fmt_rate_c((d.total_bytes - d.avail_bytes).to_double())}",
         )
-        @yue.series_push(app.disk_hists[i], 0, d.usage() * 100.0)
+        @charts.series_push(app.disk_hists[i], 0, d.usage() * 100.0)
       }
     }
   }
@@ -240,8 +240,8 @@ fn sample_once(app : App) -> Unit {
         }
       }
       app.card_net.set("↓\{fmt_rate_c(rx)} ↑\{fmt_rate_c(tx)}")
-      @yue.series_push(app.net_hist, 0, rx)
-      @yue.series_push(app.net_hist, 1, tx)
+      @charts.series_push(app.net_hist, 0, rx)
+      @charts.series_push(app.net_hist, 1, tx)
     }
   }
 }
@@ -282,22 +282,22 @@ fn main {
     card_proc: @yue.Store::new("—"),
     card_disk_vals: disks0.map(fn(_d) { @yue.Store::new("—") }),
     disk_hists: disks0.map(fn(_d) {
-      @yue.Store::new([@yue.LineSeries::make("已用", max_points=120)])
+      @yue.Store::new([@charts.LineSeries::make("已用", max_points=120)])
     }),
-    cpu_hist: @yue.Store::new([@yue.LineSeries::make("CPU", max_points=120)]),
+    cpu_hist: @yue.Store::new([@charts.LineSeries::make("CPU", max_points=120)]),
     core_bars: @yue.Store::new([]),
-    mem_hist: @yue.Store::new([@yue.LineSeries::make("内存", max_points=120)]),
-    swap_hist: @yue.Store::new([@yue.LineSeries::make("swap", max_points=120)]),
+    mem_hist: @yue.Store::new([@charts.LineSeries::make("内存", max_points=120)]),
+    swap_hist: @yue.Store::new([@charts.LineSeries::make("swap", max_points=120)]),
     net_hist: @yue.Store::new([
-      @yue.LineSeries::make("接收", max_points=120),
-      @yue.LineSeries::make("发送", max_points=120),
+      @charts.LineSeries::make("接收", max_points=120),
+      @charts.LineSeries::make("发送", max_points=120),
     ]),
     card_gpu_vals: gpus0.map(fn(_g) { @yue.Store::new("—") }),
     gpu_busy_hists: gpus0.map(fn(_g) {
-      @yue.Store::new([@yue.LineSeries::make("占用", max_points=120)])
+      @yue.Store::new([@charts.LineSeries::make("占用", max_points=120)])
     }),
     gpu_vram_hists: gpus0.map(fn(_g) {
-      @yue.Store::new([@yue.LineSeries::make("显存", max_points=120)])
+      @yue.Store::new([@charts.LineSeries::make("显存", max_points=120)])
     }),
     procs: @yue.Store::new([]),
     sensors: @yue.Store::new([]),

@@ -36,7 +36,7 @@ fn view_index(v : ViewId) -> Int {
 /// hand 为卡片导航光标：GTK 光标按原生窗口生效，卡内每个子控件都要
 /// 各设一份（无原生窗口的控件上是安全空操作）。
 fn sparkline_box(
-  hist : @yue.Store[Array[@yue.LineSeries]],
+  hist : @yue.Store[Array[@charts.LineSeries]],
   y_range : (Double, Double)?,
   floor : Double,
   hand : @yue.Cursor,
@@ -93,7 +93,7 @@ fn res_card(
   icon : @icons.IconKind,
   title : String,
   value : @yue.Store[String],
-  hist : @yue.Store[Array[@yue.LineSeries]]?,
+  hist : @yue.Store[Array[@charts.LineSeries]]?,
   view : @yue.Store[ViewId],
   target : ViewId,
   y_range? : (Double, Double)? = None,
@@ -287,7 +287,7 @@ fn page_cpu_detail(app : App) -> @yue.Node {
       @components.label_t("总占用（%）", role=@components.Section, style=[
         ("marginBottom", 6.0),
       ]),
-      @yue.line_chart_t(
+      @charts.line_chart_t(
         app.cpu_hist,
         style=[("height", 250.0)],
         y_range=Some((0.0, 100.0)),
@@ -297,7 +297,7 @@ fn page_cpu_detail(app : App) -> @yue.Node {
         ("marginTop", 14.0),
         ("marginBottom", 6.0),
       ]),
-      @yue.bar_chart_t(
+      @charts.bar_chart_t(
         app.core_bars,
         style=[("height", 250.0)],
         y_range=Some((0.0, 100.0)),
@@ -316,12 +316,12 @@ fn page_mem_detail(app : App) -> @yue.Node {
       @components.label_t("内存（GB）", role=@components.Section, style=[
         ("marginBottom", 6.0),
       ]),
-      @yue.line_chart_t(app.mem_hist, fill=true, style=[("height", 250.0)]),
+      @charts.line_chart_t(app.mem_hist, fill=true, style=[("height", 250.0)]),
       @components.label_t("swap（GB）", role=@components.Section, style=[
         ("marginTop", 14.0),
         ("marginBottom", 6.0),
       ]),
-      @yue.line_chart_t(app.swap_hist, fill=true, style=[("height", 250.0)]),
+      @charts.line_chart_t(app.swap_hist, fill=true, style=[("height", 250.0)]),
     ],
     style=[("padding", 12.0)],
   )

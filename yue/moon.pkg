@@ -1,7 +1,6 @@
 import {
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
-  "moonbitlang/core/math",
   "moonbitlang/core/env",
   "NoahLiu/moonbit-libyue/yue/traybus",
   "chensuiyi/subproc",

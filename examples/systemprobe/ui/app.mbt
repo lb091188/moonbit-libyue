@@ -8,8 +8,8 @@
 pub(all) struct ProbeApp {
   selected : @yue.Store[String]
   win_ref : Ref[@yue.Window?]
-  toast : (String, @yue.SemanticType) -> Unit
-  eff_anim : @yue.EffAnim
+  toast : (String, @components.SemanticType) -> Unit
+  eff_anim : @charts.EffAnim
   vid_player : Ref[@yuemedia.VideoPlayer?]
   aud_ap : Ref[@yuemedia.AudioPlayer?]
 }
@@ -19,7 +19,7 @@ pub(all) struct ProbeApp {
 pub fn ProbeApp::toast_push(
   self : ProbeApp,
   text : String,
-  t : @yue.SemanticType,
+  t : @components.SemanticType,
 ) -> Unit {
   (self.toast)(text, t)
 }
