@@ -12,7 +12,7 @@ hero:
       text: 包结构
       link: /zh/README
 features:
-  - title: 原生,不是网页套壳
+  - title: 原生,界面闪现
     details: libyue(C++)的完整绑定——真原生窗口与控件,二进制约 7 MB,启动约 80 ms。
   - title: 按需引入
     details: 核心、声明式、主题组件、图表、图标、markdown、系统能力各自独立成包,用不到的包不进二进制。
