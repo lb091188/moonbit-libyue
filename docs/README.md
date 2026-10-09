@@ -37,15 +37,15 @@ moon run examples/systemprobe   # system capabilities + extended charts demo (vo
 
 The showcase covers: Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store comparison + Canvas & rich text + System Integration / Window / Browser, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). Each page's source is its own file (`examples/showcase/pages/*.mbt`) — the best copy-paste material library; screenshots of the component library:
 
-![Basic components](images/showcase-basic.png)
+![Basic components](/images/showcase-basic.png)
 
-![Form components](images/showcase-form.png)
+![Form components](/images/showcase-form.png)
 
-![Data display](images/showcase-data.png)
+![Data display](/images/showcase-data.png)
 
-![Code & docs](images/showcase-code.png)
+![Code & docs](/images/showcase-code.png)
 
-![System integration](images/showcase-system.png)
+![System integration](/images/showcase-system.png)
 
 ### sysmonitor: process manager & hardware monitor
 
@@ -53,11 +53,11 @@ The library's flagship app for expressiveness + performance: the data layer read
 
 Process page: a virtual table at the 1000-row scale with search filtering, six sortable columns, and selection-driven kill (SIGTERM, falling back to SIGKILL) / renice, with errno mapped to Chinese notices. Measured: full sampling of 1053 processes in 14.94ms/pass, steady-state 1Hz CPU 2-3% (figures in [adaptation.md](adaptation.md)).
 
-![Overview](images/sysmonitor-overview.png)
+![Overview](/images/sysmonitor-overview.png)
 
-![Processes](images/sysmonitor-process.png)
+![Processes](/images/sysmonitor-process.png)
 
-![Dark theme](images/sysmonitor-dark.png)
+![Dark theme](/images/sysmonitor-dark.png)
 
 ## Routing
 
@@ -72,10 +72,10 @@ Process page: a virtual table at the 1000-row scale with search filtering, six s
 | [adaptation.md](adaptation.md) | Platform adaptation notes: field-tested pitfalls per platform, root causes, and verification conclusions (continuously updated) |
 | [tray.md](tray.md) | Linux tray solution: SNI protocol stack design, architecture, backend fallback, desktop compatibility |
 | [autostart.md](autostart.md) | Cross-platform autostart: XDG .desktop on Linux / HKCU Run key on Windows, unified is_enabled / enable / disable |
-| [zh/system-capabilities.md](zh/system-capabilities.md) (Chinese) | System capabilities (package `@system`, Chinese only): screen brightness / keyboard backlight / system volume (wpctl first, pactl fallback; output devices + per-app streams) / media playback control (MPRIS, playerctl fallback) / night color temperature / wallpaper / monitor configuration / window management / clipboard watching / disk volumes (udisks2 first, lsblk fallback) / power & sessions / power profiles / system info / timezone & language / Bluetooth / sensors / printers / process env & directory listing / recent files / browser bookmarks & Firefox history / installed-app lookup / VS Code local history & recent workspaces / browser history & downloads, unified Result semantics; includes the shared subprocess (procrun) and generic D-Bus (traybus) layers |
-| [zh/plan-system-integration.md](zh/plan-system-integration.md) (Chinese) | System-integration expansion master plan: the batch breakdown of P1-P12 plus the closing item P14, acceptance gates, shared-infrastructure decisions and risks (finalized) |
+| [zh/system-capabilities.md](/zh/system-capabilities.md) (Chinese) | System capabilities (package `@system`, Chinese only): screen brightness / keyboard backlight / system volume (wpctl first, pactl fallback; output devices + per-app streams) / media playback control (MPRIS, playerctl fallback) / night color temperature / wallpaper / monitor configuration / window management / clipboard watching / disk volumes (udisks2 first, lsblk fallback) / power & sessions / power profiles / system info / timezone & language / Bluetooth / sensors / printers / process env & directory listing / recent files / browser bookmarks & Firefox history / installed-app lookup / VS Code local history & recent workspaces / browser history & downloads, unified Result semantics; includes the shared subprocess (procrun) and generic D-Bus (traybus) layers |
+| [zh/plan-system-integration.md](/zh/plan-system-integration.md) (Chinese) | System-integration expansion master plan: the batch breakdown of P1-P12 plus the closing item P14, acceptance gates, shared-infrastructure decisions and risks (finalized) |
 | [relink.md](relink.md) | Forcing a relink after native layer (shim/vendor) changes: detection and handling |
 
-For the project overview and quick-start entry points, see the repository root [README.md](../README.md).
+For the project overview and quick-start entry points, see the repository root [README.md](https://github.com/lb091188/moonbit-libyue/#readme).
 
-[中文版文档索引](zh/README.md)
+[中文版文档索引](/zh/README.md)

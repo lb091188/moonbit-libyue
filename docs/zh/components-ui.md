@@ -559,7 +559,7 @@ let ratio = @yue.Store::new(0.42)
 
 ### Markdown 展示 markdown_view
 
-`markdown_view(source, style?)`——标题 1-6（ATX/Setext）/ 段落 / **粗体** / *斜体* / ~~删除线~~（区间自画横线）/ `行内代码` / [链接](url)（点击经默认浏览器打开，悬浮手型光标 + 地址提示；引用式链接取文档级链接定义）/ 自动链接 / 无序有序列表（带 start）/ 任务列表（真复选框，点击可勾选）/ 引用（主题色竖条）/ GFM 提示块 / 分隔线 / 围栏与缩进代码块（语言随 fence 标注，复用 code_view）/ 表格（等分列宽网格，单元格富文本，列对齐随 `:---` `:---:` `---:` 标注）/ 定义列表 / 脚注（正文上标引用按出现顺序编号，文末分隔线后渲染被引用的定义）/ 块级图片（本地路径或 `file://` 加载显示，等比缩放、宽度上限 560；加载失败或网络地址降级 alt 文本，行内图片降级 alt）；emoji 等非 BMP 字符后样式区间按 UTF-16 计量不错位；行内 HTML 与 HTML 块默认不渲染；三平台显示一致，链接 / 代码色跟主题。
+`markdown_view(source, style?)`——标题 1-6（ATX/Setext）/ 段落 / **粗体** / *斜体* / ~~删除线~~（区间自画横线）/ `行内代码` / `[链接](url)`（点击经默认浏览器打开，悬浮手型光标 + 地址提示；引用式链接取文档级链接定义）/ 自动链接 / 无序有序列表（带 start）/ 任务列表（真复选框，点击可勾选）/ 引用（主题色竖条）/ GFM 提示块 / 分隔线 / 围栏与缩进代码块（语言随 fence 标注，复用 code_view）/ 表格（等分列宽网格，单元格富文本，列对齐随 `:---` `:---:` `---:` 标注）/ 定义列表 / 脚注（正文上标引用按出现顺序编号，文末分隔线后渲染被引用的定义）/ 块级图片（本地路径或 `file://` 加载显示，等比缩放、宽度上限 560；加载失败或网络地址降级 alt 文本，行内图片降级 alt）；emoji 等非 BMP 字符后样式区间按 UTF-16 计量不错位；行内 HTML 与 HTML 块默认不渲染；三平台显示一致，链接 / 代码色跟主题。
 
 ```moonbit
 @markdown.markdown_view("# 标题\n\n正文 **粗体**、~~删除线~~ 与 [链接](https://libyue.com)。\n\n- [x] 任务项\n\n| 列甲 | 列乙 |\n|:--|--:|\n| 1 | 2 |\n\n脚注引用[^1]。\n\n[^1]: 脚注定义。")
@@ -1422,4 +1422,4 @@ toast("已保存", @components.Success)
 
 自动轮播是自排的超时链，**卸载轮播前必须 `carousel_stop(rotation)`**（不 stop 则链继续对已移除的视图空转）：`rotation` 传自建句柄 `CarouselHandle::make()`（`is_running()` 查状态）；不传则组件自建、外部拿不到句柄，仅适合随应用常驻的轮播。
 
-组件间状态协调统一走 `Store`（subscribe / map / bind_label）或信号 `Signal`（computed 自动依赖收集，batch 批处理；组件 Store 参数可传 `sig.store()` 视图），见 [declarative.md](declarative.md)。English version: [components-ui.md](../components-ui.md).
+组件间状态协调统一走 `Store`（subscribe / map / bind_label）或信号 `Signal`（computed 自动依赖收集，batch 批处理；组件 Store 参数可传 `sig.store()` 视图），见 [declarative.md](declarative.md)。English version: [components-ui.md](/components-ui).

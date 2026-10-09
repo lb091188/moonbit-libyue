@@ -339,7 +339,7 @@ let _ = @system.wp_set("/home/me/Pictures/wall.png")
 
 解码走 ffmpeg FFI（进程内动态链，格式随系统 ffmpeg：MP3/OGG/M4A/AAC/FLAC/WAV…），输出设备由内嵌 miniaudio 设备层直出（s16 PCM 队列，零重采样）。无输出设备环境（CI/headless）自动静音降级，状态机照常。
 
-### AudioPlayer（对标浏览器 <audio>）
+### AudioPlayer（对标浏览器 `<audio>`）
 
 ```moonbit
 let player = @yuemedia.AudioPlayer::make("/path/song.mp3")?
@@ -377,7 +377,7 @@ fn source(i : Int) -> Bytes? {
 let view = @yue.video_view_t(320, 240, 120, source, fps=30)
 ```
 
-### VideoPlayer（对标浏览器 <video>）
+### VideoPlayer（对标浏览器 `<video>`）
 
 FFI 全链路：视频流逐帧 RGBA（时间戳级 seek），音轨是同文件的第二个独立解码器（读游标互不干扰）解出 PCM 直推输出设备——无 CLI 子进程。无音轨/无输出设备自动静音。
 
@@ -708,7 +708,7 @@ match @system.rf_recent(limit=8) {
 | `bm_browsers() -> Result[Array[BookmarkProfile], BookmarkError]` | 列出有可读 Bookmarks 文件的 profile |
 | `bm_bookmarks(browser) -> Result[BookmarkNode, BookmarkError]` | 指定浏览器的首个可读书签树（浏览器标识取 "google-chrome"/"chromium"/"microsoft-edge"/"brave"，profile 取 Default 优先、其次 Profile 1..24） |
 
-`BookmarkProfile{ browser, profile, bookmarks_path }`；`BookmarkNode{ name, url?, children, added, root }`（added 为 Unix 毫秒、root 标注所属根 bookmark_bar / other / synced）——返回虚拟根树（名称 "<浏览器>/<profile>"，children 为三根合并），`BookmarkNode::is_folder()` / `is_url()` 分类，`bm_flatten(node)` 给先序扁平 url 书签列表。错误 `BookmarkError`：`BmUnsupported` / `BmNoConfigDir` / `BmNoBrowser` / `BmIoFailed(String)`。
+`BookmarkProfile{ browser, profile, bookmarks_path }`；`BookmarkNode{ name, url?, children, added, root }`（added 为 Unix 毫秒、root 标注所属根 bookmark_bar / other / synced）——返回虚拟根树（名称 `"<浏览器>/<profile>"`，children 为三根合并），`BookmarkNode::is_folder()` / `is_url()` 分类，`bm_flatten(node)` 给先序扁平 url 书签列表。错误 `BookmarkError`：`BmUnsupported` / `BmNoConfigDir` / `BmNoBrowser` / `BmIoFailed(String)`。
 
 ```moonbit
 match @system.bm_bookmarks("google-chrome") {

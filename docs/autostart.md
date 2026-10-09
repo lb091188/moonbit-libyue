@@ -39,4 +39,4 @@ match @system.Autostart::new("com.example.app") {
 - enable 的自启动目标取本进程可执行文件绝对路径：AppImage / 便携解压目录等临时位置下，应用更新或挪动目录后旧条目失效，需要重新 enable。
 - Linux 自启动目录可能被清理工具清空；Windows Run 键可被组策略禁用（条目在但不执行）——两类均为环境侧行为，库不做探测。
 
-[中文文档](zh/autostart.md)
+[中文文档](/zh/autostart.md)

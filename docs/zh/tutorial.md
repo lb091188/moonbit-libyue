@@ -154,4 +154,4 @@ moon run examples/showcase    # 14 页：基础/表单/导航/数据展示/反�
 - **控件与能力**：libyue 文档里还没封装的条目、各平台的适配坑，都欢迎从 issue 开始讨论。
 - **文档与示例**：教程、组件文档、演示板每一页的例子，都欢迎改进。
 
-参与没有门槛：提 issue 描述问题或想法、直接提 PR 都行。开始前只需记住三条——`moon check && moon test` 零错误零警告再提交、实测踩坑连同修复写进 [adaptation.md](adaptation.md)、一个内聚改动一批提交。完整流程（新增控件的 FFI 规范、原生层发布）见仓库根 [AGENTS.md](../../AGENTS.md)。
+参与没有门槛：提 issue 描述问题或想法、直接提 PR 都行。开始前只需记住三条——`moon check && moon test` 零错误零警告再提交、实测踩坑连同修复写进 [adaptation.md](adaptation.md)、一个内聚改动一批提交。完整流程（新增控件的 FFI 规范、原生层发布）见仓库根 [AGENTS.md](https://github.com/lb091188/moonbit-libyue/blob/master/AGENTS.md)。
