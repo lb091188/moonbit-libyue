@@ -73,9 +73,9 @@ fn page_disk(app : App) -> @yue.Node {
   let disk_n : @yue.Store[Int] = @yue.Store::new(disks.get().length())
   disks.subscribe(fn(d) { disk_n.set(d.length()) })
   // 根分区 IO 曲线（读 / 写两序列，120 点窗口）
-  let io : @yue.Store[Array[@yue.LineSeries]] = @yue.Store::new([
-    @yue.LineSeries::make("读", max_points=120),
-    @yue.LineSeries::make("写", max_points=120),
+  let io : @yue.Store[Array[@charts.LineSeries]] = @yue.Store::new([
+    @charts.LineSeries::make("读", max_points=120),
+    @charts.LineSeries::make("写", max_points=120),
   ])
   // 根分区 IO 曲线（读 / 写两序列，120 点窗口）；速率来源不可用时
   // （macOS 无 IO 数据）不推点，曲线保持空态而不是画一条假的 0 线
@@ -83,11 +83,11 @@ fn page_disk(app : App) -> @yue.Node {
     for d in ds {
       if d.mount == "/" {
         match d.read_bps {
-          Some(v) => @yue.series_push(io, 0, v)
+          Some(v) => @charts.series_push(io, 0, v)
           None => ()
         }
         match d.write_bps {
-          Some(v) => @yue.series_push(io, 1, v)
+          Some(v) => @charts.series_push(io, 1, v)
           None => ()
         }
       }
@@ -101,7 +101,7 @@ fn page_disk(app : App) -> @yue.Node {
       @components.label_t("根分区读写", role=@components.Section, style=[
         ("marginBottom", 6.0),
       ]),
-      @yue.line_chart_t(io, fill=true, style=[("height", 220.0)]),
+      @charts.line_chart_t(io, fill=true, style=[("height", 220.0)]),
       @yue.separator(style=[("marginTop", 12.0), ("marginBottom", 10.0)]),
       draw_rows(disk_n, fn(p, w) { draw_disk_rows(p, w, disks.get()) }),
     ],

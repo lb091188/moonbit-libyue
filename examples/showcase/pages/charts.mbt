@@ -6,10 +6,10 @@
 ///|
 pub fn page_charts(_app : @ui.App) -> @yue.Node {
   // ---- 折线:3 序列定长窗口,500ms 推点(三角波模拟监控曲线),可暂停 ----
-  let line_series : @yue.Store[Array[@yue.LineSeries]] = @yue.Store::new([
-    @yue.LineSeries::make("CPU", max_points=120),
-    @yue.LineSeries::make("内存", max_points=120),
-    @yue.LineSeries::make("磁盘", max_points=120),
+  let line_series : @yue.Store[Array[@charts.LineSeries]] = @yue.Store::new([
+    @charts.LineSeries::make("CPU", max_points=120),
+    @charts.LineSeries::make("内存", max_points=120),
+    @charts.LineSeries::make("磁盘", max_points=120),
   ])
   let line_running : @yue.Store[Bool] = @yue.Store::new(true)
   let line_tick = @yue.Signal::new(0)
@@ -29,38 +29,38 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       if line_running.get() {
         let t = line_tick.get() + 1
         line_tick.set(t)
-        @yue.series_push(line_series, 0, triangle(t, 60, 35.0, 40.0))
-        @yue.series_push(line_series, 1, triangle(t, 90, 45.0, 20.0))
-        @yue.series_push(line_series, 2, triangle(t, 120, 20.0, 30.0))
+        @charts.series_push(line_series, 0, triangle(t, 60, 35.0, 40.0))
+        @charts.series_push(line_series, 1, triangle(t, 90, 45.0, 20.0))
+        @charts.series_push(line_series, 2, triangle(t, 120, 20.0, 30.0))
       }
       true
     }),
   )
   // ---- 柱状:月度净值(含负值)+ Top 语言横向条 ----
-  let bar_data : @yue.Store[Array[@yue.BarItem]] = @yue.Store::new([
-    @yue.BarItem::make("1月", 12.0),
-    @yue.BarItem::make("2月", -8.0),
-    @yue.BarItem::make("3月", 25.0),
-    @yue.BarItem::make("4月", 18.0),
-    @yue.BarItem::make("5月", -14.0),
-    @yue.BarItem::make("6月", 32.0),
-    @yue.BarItem::make("7月", 22.0),
-    @yue.BarItem::make("8月", 9.0),
+  let bar_data : @yue.Store[Array[@charts.BarItem]] = @yue.Store::new([
+    @charts.BarItem::make("1月", 12.0),
+    @charts.BarItem::make("2月", -8.0),
+    @charts.BarItem::make("3月", 25.0),
+    @charts.BarItem::make("4月", 18.0),
+    @charts.BarItem::make("5月", -14.0),
+    @charts.BarItem::make("6月", 32.0),
+    @charts.BarItem::make("7月", 22.0),
+    @charts.BarItem::make("8月", 9.0),
   ])
-  let bar_h_data : @yue.Store[Array[@yue.BarItem]] = @yue.Store::new([
-    @yue.BarItem::make("MoonBit", 92.0),
-    @yue.BarItem::make("Rust", 78.0),
-    @yue.BarItem::make("Go", 65.0),
-    @yue.BarItem::make("TS", 58.0),
-    @yue.BarItem::make("Python", 41.0),
+  let bar_h_data : @yue.Store[Array[@charts.BarItem]] = @yue.Store::new([
+    @charts.BarItem::make("MoonBit", 92.0),
+    @charts.BarItem::make("Rust", 78.0),
+    @charts.BarItem::make("Go", 65.0),
+    @charts.BarItem::make("TS", 58.0),
+    @charts.BarItem::make("Python", 41.0),
   ])
   // ---- 环形:流量来源占比 ----
-  let donut_data : @yue.Store[Array[@yue.DonutSlice]] = @yue.Store::new([
-    @yue.DonutSlice::make("直接访问", 335.0),
-    @yue.DonutSlice::make("搜索引擎", 510.0),
-    @yue.DonutSlice::make("社交媒体", 234.0),
-    @yue.DonutSlice::make("外部链接", 148.0),
-    @yue.DonutSlice::make("邮件", 96.0),
+  let donut_data : @yue.Store[Array[@charts.DonutSlice]] = @yue.Store::new([
+    @charts.DonutSlice::make("直接访问", 335.0),
+    @charts.DonutSlice::make("搜索引擎", 510.0),
+    @charts.DonutSlice::make("社交媒体", 234.0),
+    @charts.DonutSlice::make("外部链接", 148.0),
+    @charts.DonutSlice::make("邮件", 96.0),
   ])
   // ---- 仪表盘:自动(2Hz 三角波)+ 手动(滑杆)双演示 ----
   let gauge_auto : @yue.Store[Double] = @yue.Store::new(0.0)
@@ -102,12 +102,12 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.line_chart_t(line_series, style=[
+            @charts.line_chart_t(line_series, style=[
               ("width", 320.0),
               ("height", 240.0),
             ]),
             @yue.label("  "),
-            @yue.line_chart_t(
+            @charts.line_chart_t(
               line_series,
               style=[("width", 320.0), ("height", 240.0)],
               area=true,
@@ -131,11 +131,11 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "let series = @yue.Store::new([", "  @yue.LineSeries::make(\"CPU\", max_points=120),",
-        "  @yue.LineSeries::make(\"内存\", max_points=120),", "])", "let t = Ref(0)",
-        "ignore(@yue.set_timer(500, fn() {", "  t.val = t.val + 1", "  @yue.series_push(series, 0, (t.val % 100).to_double())",
-        "  true", "}))", "@yue.line_chart_t(series, style=[(\"width\", 320.0), (\"height\", 240.0)])",
-        "@yue.line_chart_t(series, style=[(\"width\", 320.0), (\"height\", 240.0)], area=true)",
+        "let series = @yue.Store::new([", "  @charts.LineSeries::make(\"CPU\", max_points=120),",
+        "  @charts.LineSeries::make(\"内存\", max_points=120),", "])", "let t = Ref(0)",
+        "ignore(@yue.set_timer(500, fn() {", "  t.val = t.val + 1", "  @charts.series_push(series, 0, (t.val % 100).to_double())",
+        "  true", "}))", "@charts.line_chart_t(series, style=[(\"width\", 320.0), (\"height\", 240.0)])",
+        "@charts.line_chart_t(series, style=[(\"width\", 320.0), (\"height\", 240.0)], area=true)",
       ],
     ),
     @ui.section(
@@ -145,12 +145,12 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.bar_chart_t(bar_data, style=[
+            @charts.bar_chart_t(bar_data, style=[
               ("width", 320.0),
               ("height", 240.0),
             ]),
             @yue.label("  "),
-            @yue.bar_chart_t(
+            @charts.bar_chart_t(
               bar_h_data,
               style=[("width", 320.0), ("height", 240.0)],
               horizontal=true,
@@ -160,11 +160,11 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
         ),
       ],
       code=[
-        "let bars = @yue.Store::new([", "  @yue.BarItem::make(\"1月\", 12.0),",
-        "  @yue.BarItem::make(\"2月\", -8.0),", "  @yue.BarItem::make(\"3月\", 25.0),",
-        "])", "@yue.bar_chart_t(bars, style=[(\"width\", 320.0), (\"height\", 240.0)])",
-        "let top = @yue.Store::new([", "  @yue.BarItem::make(\"MoonBit\", 92.0),",
-        "  @yue.BarItem::make(\"Rust\", 78.0),", "])", "@yue.bar_chart_t(top, style=[(\"width\", 320.0), (\"height\", 240.0)], horizontal=true)",
+        "let bars = @yue.Store::new([", "  @charts.BarItem::make(\"1月\", 12.0),",
+        "  @charts.BarItem::make(\"2月\", -8.0),", "  @charts.BarItem::make(\"3月\", 25.0),",
+        "])", "@charts.bar_chart_t(bars, style=[(\"width\", 320.0), (\"height\", 240.0)])",
+        "let top = @yue.Store::new([", "  @charts.BarItem::make(\"MoonBit\", 92.0),",
+        "  @charts.BarItem::make(\"Rust\", 78.0),", "])", "@charts.bar_chart_t(top, style=[(\"width\", 320.0), (\"height\", 240.0)], horizontal=true)",
       ],
     ),
     @ui.section(
@@ -172,15 +172,15 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       "Donut 环形图",
       "占比扇区(12 点方向起顺时针,五色循环);中心汇总数值;右侧图例(标签 + 值 + 百分比)。悬停扇区外扩 4px,图例行同步高亮。",
       [
-        @yue.donut_chart_t(donut_data, style=[
+        @charts.donut_chart_t(donut_data, style=[
           ("width", 440.0),
           ("height", 240.0),
         ]),
       ],
       code=[
-        "let donut = @yue.Store::new([", "  @yue.DonutSlice::make(\"直接访问\", 335.0),",
-        "  @yue.DonutSlice::make(\"搜索引擎\", 510.0),", "  @yue.DonutSlice::make(\"社交媒体\", 234.0),",
-        "])", "@yue.donut_chart_t(donut, style=[(\"width\", 440.0), (\"height\", 240.0)])",
+        "let donut = @yue.Store::new([", "  @charts.DonutSlice::make(\"直接访问\", 335.0),",
+        "  @charts.DonutSlice::make(\"搜索引擎\", 510.0),", "  @charts.DonutSlice::make(\"社交媒体\", 234.0),",
+        "])", "@charts.donut_chart_t(donut, style=[(\"width\", 440.0), (\"height\", 240.0)])",
       ],
     ),
     @ui.section(
@@ -190,12 +190,12 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.gauge_t(gauge_auto, thresholds=gauge_thresholds, style=[
+            @charts.gauge_t(gauge_auto, thresholds=gauge_thresholds, style=[
               ("width", 240.0),
               ("height", 180.0),
             ]),
             @yue.label("  "),
-            @yue.gauge_t(gauge_manual, thresholds=gauge_thresholds, style=[
+            @charts.gauge_t(gauge_manual, thresholds=gauge_thresholds, style=[
               ("width", 240.0),
               ("height", 180.0),
             ]),
@@ -217,7 +217,7 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       code=[
         "let gauge = @yue.Store::new(0.35)", "let thresholds = [", "  (0.6, @yue.theme_current().success),",
         "  (0.85, @yue.theme_current().warning),", "  (1.0, @yue.theme_current().danger),",
-        "]", "@yue.gauge_t(gauge, thresholds=thresholds, style=[(\"width\", 240.0), (\"height\", 180.0)])",
+        "]", "@charts.gauge_t(gauge, thresholds=thresholds, style=[(\"width\", 240.0), (\"height\", 180.0)])",
         "@components.slider_t(gauge, min=0.0, max=1.0, step=0.01, style=[(\"width\", 160.0)])",
       ],
     ),
@@ -228,12 +228,12 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       [
         @yue.hbox(
           [
-            @yue.scatter_t(scatter_pts, style=[
+            @charts.scatter_t(scatter_pts, style=[
               ("width", 320.0),
               ("height", 260.0),
             ]),
             @yue.label("  "),
-            @yue.scatter_t(
+            @charts.scatter_t(
               scatter_pts,
               style=[("width", 320.0), ("height", 260.0)],
               trend=true,
@@ -244,8 +244,8 @@ pub fn page_charts(_app : @ui.App) -> @yue.Node {
       ],
       code=[
         "let pts : @yue.Store[Array[(Double, Double)]] = @yue.Store::new([", "  (12.0, 28.0),",
-        "  (44.0, 51.0),", "  (70.0, 66.0),", "])", "@yue.scatter_t(pts, style=[(\"width\", 320.0), (\"height\", 260.0)])",
-        "@yue.scatter_t(pts, style=[(\"width\", 320.0), (\"height\", 260.0)], trend=true)",
+        "  (44.0, 51.0),", "  (70.0, 66.0),", "])", "@charts.scatter_t(pts, style=[(\"width\", 320.0), (\"height\", 260.0)])",
+        "@charts.scatter_t(pts, style=[(\"width\", 320.0), (\"height\", 260.0)], trend=true)",
       ],
     ),
   ])

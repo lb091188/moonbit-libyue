@@ -27,8 +27,8 @@ fn NetPage::rebuild(self : NetPage, nets : Array[NetInfo]) -> Unit {
   let out : Array[NetRow] = []
   for n in nets {
     let (rx_old, tx_old) = self.hist.get(n.name).unwrap_or(([], []))
-    let rx_h = @yue.win_push(rx_old, 120, n.rx_bps)
-    let tx_h = @yue.win_push(tx_old, 120, n.tx_bps)
+    let rx_h = @charts.win_push(rx_old, 120, n.rx_bps)
+    let tx_h = @charts.win_push(tx_old, 120, n.tx_bps)
     self.hist.set(n.name, (rx_h, tx_h))
     out.push({
       name: n.name,
@@ -140,9 +140,9 @@ fn page_net(app : App) -> @yue.Node {
   let net_n : @yue.Store[Int] = @yue.Store::new(page.rows.get().length())
   page.rows.subscribe(fn(r) { net_n.set(r.length()) })
   // 非 lo 汇总收发曲线（两序列，120 点窗口）
-  let total : @yue.Store[Array[@yue.LineSeries]] = @yue.Store::new([
-    @yue.LineSeries::make("接收", max_points=120),
-    @yue.LineSeries::make("发送", max_points=120),
+  let total : @yue.Store[Array[@charts.LineSeries]] = @yue.Store::new([
+    @charts.LineSeries::make("接收", max_points=120),
+    @charts.LineSeries::make("发送", max_points=120),
   ])
   let push_total = fn(ns : Array[NetInfo]) -> Unit {
     let mut rx = 0.0
@@ -153,8 +153,8 @@ fn page_net(app : App) -> @yue.Node {
         tx += n.tx_bps
       }
     }
-    @yue.series_push(total, 0, rx)
-    @yue.series_push(total, 1, tx)
+    @charts.series_push(total, 0, rx)
+    @charts.series_push(total, 1, tx)
   }
 
   push_total(app.nets.get())
@@ -164,7 +164,7 @@ fn page_net(app : App) -> @yue.Node {
       @components.label_t("收发速率（不含 lo）", role=@components.Section, style=[
         ("marginBottom", 6.0),
       ]),
-      @yue.line_chart_t(total, fill=true, style=[("height", 220.0)]),
+      @charts.line_chart_t(total, fill=true, style=[("height", 220.0)]),
       @yue.separator(style=[("marginTop", 12.0), ("marginBottom", 10.0)]),
       draw_rows(net_n, fn(p, w) { draw_net_rows(p, w, page.rows.get()) }),
     ],

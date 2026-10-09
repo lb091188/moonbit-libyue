@@ -640,16 +640,16 @@ Rendering strategy: when points outnumber pixel columns the chart decimates to c
 
 ```moonbit
 let series = @yue.Store::new([
-  @yue.LineSeries::make("CPU", max_points=120),
-  @yue.LineSeries::make("Memory", max_points=120),
+  @charts.LineSeries::make("CPU", max_points=120),
+  @charts.LineSeries::make("Memory", max_points=120),
 ])
 ignore(@yue.set_timer(500, fn() {
-  @yue.series_push(series, 0, cpu_usage())
-  @yue.series_push(series, 1, mem_usage())
+  @charts.series_push(series, 0, cpu_usage())
+  @charts.series_push(series, 1, mem_usage())
   true
 }))
-@yue.line_chart_t(series, style=[("width", 380.0), ("height", 220.0)])
-@yue.line_chart_t(series, style=[("width", 380.0), ("height", 220.0)], area=true)
+@charts.line_chart_t(series, style=[("width", 380.0), ("height", 220.0)])
+@charts.line_chart_t(series, style=[("width", 380.0), ("height", 220.0)], area=true)
 ```
 
 ### Bar chart bar_chart_t
@@ -667,11 +667,11 @@ Vertical bars
 
 ```moonbit
 let bars = @yue.Store::new([
-  @yue.BarItem::make("Jan", 12.0),
-  @yue.BarItem::make("Feb", -8.0),
+  @charts.BarItem::make("Jan", 12.0),
+  @charts.BarItem::make("Feb", -8.0),
 ])
-@yue.bar_chart_t(bars, style=[("width", 380.0), ("height", 220.0)])
-@yue.bar_chart_t(bars, style=[("width", 380.0), ("height", 220.0)], horizontal=true)
+@charts.bar_chart_t(bars, style=[("width", 380.0), ("height", 220.0)])
+@charts.bar_chart_t(bars, style=[("width", 380.0), ("height", 220.0)], horizontal=true)
 ```
 
 ### Donut / pie chart donut_chart_t
@@ -690,10 +690,10 @@ Proportional sectors
 
 ```moonbit
 let slices = @yue.Store::new([
-  @yue.DonutSlice::make("Direct", 335.0),
-  @yue.DonutSlice::make("Search", 510.0),
+  @charts.DonutSlice::make("Direct", 335.0),
+  @charts.DonutSlice::make("Search", 510.0),
 ])
-@yue.donut_chart_t(slices, style=[("width", 420.0), ("height", 220.0)])
+@charts.donut_chart_t(slices, style=[("width", 420.0), ("height", 220.0)])
 ```
 
 ### Gauge gauge_t
@@ -711,7 +711,7 @@ Single-value percentage ring
 
 ```moonbit
 let usage = @yue.Store::new(0.0)
-@yue.gauge_t(usage, thresholds=[
+@charts.gauge_t(usage, thresholds=[
   (0.6, @yue.theme_current().success),
   (0.85, @yue.theme_current().warning),
   (1.0, @yue.theme_current().danger),
@@ -734,7 +734,7 @@ x/y point series
 
 ```moonbit
 let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
-@yue.scatter_t(pts, trend=true)
+@charts.scatter_t(pts, trend=true)
 ```
 
 The nine charts below and the interaction layer are likewise self-drawn in pure MoonBit and driven by `Store` data: a set only calls schedule_paint on the canvas — no view-tree rebuild — and colors are picked from the theme at draw time, so `theme_apply` switches follow immediately. Unless noted otherwise, all of them can override the canvas size via `style` and stretch horizontally to fill the parent via `fill=true`.
@@ -755,14 +755,14 @@ Hierarchical tree: leaf nodes share slots evenly along the spread direction, par
 `TreeItem::make(name, value? = None)` creates a node: `value` is the dot-size dimension (None, or no value anywhere in the tree, makes all dots equal size); `children` can still be pushed after creation. The node dot radius ∝ value (relative to the subtree maximum), depth is shaded along a theme-primary gradient, and every node carries a name label. Companion pure functions: `tree_depth` (subtree height), `tree_leaf_count` (leaf count), `tree_max_value` (peak), `tree_vertical(orientation)` (whether the form is vertical).
 
 ```moonbit
-let root = @yue.TreeItem::make("repo")
-let src = @yue.TreeItem::make("src", value=80.0)
-src.children.push(@yue.TreeItem::make("main.mbt", value=40.0))
+let root = @charts.TreeItem::make("repo")
+let src = @charts.TreeItem::make("src", value=80.0)
+src.children.push(@charts.TreeItem::make("main.mbt", value=40.0))
 root.children.push(src)
-root.children.push(@yue.TreeItem::make("README.md", value=10.0))
+root.children.push(@charts.TreeItem::make("README.md", value=10.0))
 let tree = @yue.Store::new(root)
-@yue.tree_chart_t(tree, style=[("width", 420.0), ("height", 260.0)])
-@yue.tree_chart_t(tree, orientation="vertical") // vertical form
+@charts.tree_chart_t(tree, style=[("width", 420.0), ("height", 260.0)])
+@charts.tree_chart_t(tree, orientation="vertical") // vertical form
 ```
 
 ### Treemap tm_chart_t
@@ -783,16 +783,16 @@ Hierarchical data is split orthogonally with area ∝ value (squarified aspect-r
 
 ```moonbit
 let tm = @yue.Store::new([
-  @yue.TmItem::make(
+  @charts.TmItem::make(
     "East China",
     children=[
-      @yue.TmItem::make("Shanghai", value=320.0),
-      @yue.TmItem::make("Jiangsu", value=260.0),
+      @charts.TmItem::make("Shanghai", value=320.0),
+      @charts.TmItem::make("Jiangsu", value=260.0),
     ],
   ),
-  @yue.TmItem::make("South China", children=[@yue.TmItem::make("Guangdong", value=300.0)]),
+  @charts.TmItem::make("South China", children=[@charts.TmItem::make("Guangdong", value=300.0)]),
 ])
-@yue.tm_chart_t(tm, levels=2, gap=3.0, style=[("width", 420.0), ("height", 260.0)])
+@charts.tm_chart_t(tm, levels=2, gap=3.0, style=[("width", 420.0), ("height", 260.0)])
 ```
 
 ### Sunburst chart sun_chart_t
@@ -814,19 +814,19 @@ Tree data as concentric rings level by level: a parent segment's angular span is
 
 ```moonbit
 let sun = @yue.Store::new(
-  @yue.SunItem::make(
+  @charts.SunItem::make(
     "All",
     children=[
-      @yue.SunItem::make("Direct", value=335.0),
-      @yue.SunItem::make("Search", children=[
-        @yue.SunItem::make("Baidu", value=120.0),
-        @yue.SunItem::make("Bing", value=80.0),
+      @charts.SunItem::make("Direct", value=335.0),
+      @charts.SunItem::make("Search", children=[
+        @charts.SunItem::make("Baidu", value=120.0),
+        @charts.SunItem::make("Bing", value=80.0),
       ]),
     ],
   ),
 )
-@yue.sun_chart_t(sun, style=[("width", 380.0), ("height", 320.0)])
-@yue.sun_chart_t(sun, inner=40.0, center_text=Some("Total visits"))
+@charts.sun_chart_t(sun, style=[("width", 380.0), ("height", 320.0)])
+@charts.sun_chart_t(sun, inner=40.0, center_text=Some("Total visits"))
 ```
 
 ### Map and flights geo_map_t
@@ -848,13 +848,13 @@ No map dataset is built in: text parsing goes through `geojson_parse(text) -> Re
 ```moonbit
 let geojson = @yue.read_text_file("china.geojson") // your own text reader is fine
 let regions = match geojson {
-  Some(text) => @yue.geojson_parse(text) catch { _ => [] }
+  Some(text) => @charts.geojson_parse(text) catch { _ => [] }
   None => []
 }
-@yue.geo_map_t(
+@charts.geo_map_t(
   @yue.Store::new(regions),
   flights=[
-    @yue.GeoFlight::make((121.47, 31.23), (114.06, 22.54)),
+    @charts.GeoFlight::make((121.47, 31.23), (114.06, 22.54)),
   ],
   style=[("width", 420.0), ("height", 300.0)],
 )
@@ -877,15 +877,15 @@ A node-edge graph is drawn statically after the force simulation converges: Coul
 `GraphNode::make(name, value? = 1.0)` (value sets the node circle's area; it does not take part in the force simulation), `GraphEdge::make(source index, target index, weight? = 1.0)` (edges with out-of-range endpoints, self-loops, or weight ≤ 0 neither take part in the simulation nor get drawn). Edges are drawn as semi-transparent parallelogram bands (width ∝ weight), node circles cycle the four semantic theme colors; the simulation has no random source (starting from evenly spaced points on a circle), so identical input always yields identical output. The layout converges once at first draw for the current canvas size and is cached; it is only recomputed when the data is set or the canvas size changes.
 
 ```moonbit
-let g = @yue.GraphData::make(
+let g = @charts.GraphData::make(
   [
-    @yue.GraphNode::make("Core", value=10.0),
-    @yue.GraphNode::make("Gateway", value=5.0),
-    @yue.GraphNode::make("Terminal", value=3.0),
+    @charts.GraphNode::make("Core", value=10.0),
+    @charts.GraphNode::make("Gateway", value=5.0),
+    @charts.GraphNode::make("Terminal", value=3.0),
   ],
-  [@yue.GraphEdge::make(0, 1, 8.0), @yue.GraphEdge::make(1, 2, 4.0)],
+  [@charts.GraphEdge::make(0, 1, 8.0), @charts.GraphEdge::make(1, 2, 4.0)],
 )
-@yue.gph_chart_t(@yue.Store::new(g), iterations=200, style=[("width", 420.0), ("height", 300.0)])
+@charts.gph_chart_t(@yue.Store::new(g), iterations=200, style=[("width", 420.0), ("height", 300.0)])
 ```
 
 ### Parallel coordinates chart par_chart_t
@@ -906,12 +906,12 @@ Each axis carries a name at the top, min/max range labels beside it, and small t
 
 ```moonbit
 let axes = @yue.Store::new([
-  @yue.ParAxis::make("Render", 0.0, 100.0),
-  @yue.ParAxis::make("IO", 0.0, 100.0),
-  @yue.ParAxis::make("Memory", 0.0, 100.0),
+  @charts.ParAxis::make("Render", 0.0, 100.0),
+  @charts.ParAxis::make("IO", 0.0, 100.0),
+  @charts.ParAxis::make("Memory", 0.0, 100.0),
 ])
 let rows = @yue.Store::new([[88.0, 72.0, 80.0], [70.0, 90.0, 65.0]])
-@yue.par_chart_t(axes, rows, highlight=0, style=[("width", 480.0), ("height", 260.0)])
+@charts.par_chart_t(axes, rows, highlight=0, style=[("width", 480.0), ("height", 260.0)])
 ```
 
 ### Theme river chart trv_chart_t
@@ -935,7 +935,7 @@ Layer colors cycle the four semantic theme colors; the time-axis length is the l
 ```moonbit
 let names = @yue.Store::new(["Search", "Direct"])
 let values = @yue.Store::new([[120.0, 132.0, 101.0], [220.0, 182.0, 191.0]])
-@yue.trv_chart_t(names, values, baseline=@yue.TrvSym, fill=false)
+@charts.trv_chart_t(names, values, baseline=@charts.TrvSym, fill=false)
 ```
 
 ### Ripple scatter chart eff_chart_t
@@ -958,13 +958,13 @@ Scatter plus ripple animation: each point periodically expands N concentric ring
 
 ```moonbit
 let pts = @yue.Store::new([
-  @yue.EffPoint::make(120.0, 12.0, size=14.0),
-  @yue.EffPoint::make(320.0, 26.0, size=20.0),
+  @charts.EffPoint::make(120.0, 12.0, size=14.0),
+  @charts.EffPoint::make(320.0, 26.0, size=20.0),
 ])
-let anim = @yue.EffAnim::make()
-@yue.eff_chart_t(pts, period_ms=2500, rings=3, anim=anim)
+let anim = @charts.EffAnim::make()
+@charts.eff_chart_t(pts, period_ms=2500, rings=3, anim=anim)
 // …before the page unmounts
-@yue.eff_stop(anim)
+@charts.eff_stop(anim)
 ```
 
 ### Pictorial bar chart pb_chart_t
@@ -989,11 +989,11 @@ Positive values take the theme primary upward / rightward, negatives take the da
 
 ```moonbit
 let pb = @yue.Store::new([
-  @yue.BarItem::make("Q1", 32.0),
-  @yue.BarItem::make("Q2", 48.0),
+  @charts.BarItem::make("Q1", 32.0),
+  @charts.BarItem::make("Q2", 48.0),
 ])
-@yue.pb_chart_t(pb, symbol=@yue.PbCircle, mode=@yue.PbRepeat, unit=10.0, show_values=true)
-@yue.pb_chart_t(pb, symbol=@yue.PbTriangle, mode=@yue.PbStretch, horizontal=true)
+@charts.pb_chart_t(pb, symbol=@charts.PbCircle, mode=@charts.PbRepeat, unit=10.0, show_values=true)
+@charts.pb_chart_t(pb, symbol=@charts.PbTriangle, mode=@charts.PbStretch, horizontal=true)
 ```
 
 ## Chart interaction layer
@@ -1016,14 +1016,14 @@ A cross-cutting layer (the tooltip and hit testing in `charts_tooltip.mbt` + the
 The tooltip is drawn inside the chart container's own on_draw (drawing it after the chart puts it on top, so there is no z-order problem); it always uses a dark background with light text and does not follow theme switches. Positioning goes through `ci_tooltip_pos`, clamped inside the canvas, flipping to the anchor's opposite side when it would overflow right. schedule_paint only fires when the tooltip shows/hides on mouse-enter or during a drag; static mouse movement does not repaint. The state struct `CiTip` (`CiTip::new()` / `ci_tip_show(tip, title, rows, px, py)` / `ci_tip_hide(tip)` / `ci_tip_draw(p, tip, w, h)` / `ci_tip_size(title, rows)`) can also be used directly in self-drawn charts. Hit-testing pure functions: `CiPlot::make(x0, y0, x1, y1)` (`width` / `frac` / `contains`), `ci_nearest_idx(px, n, x0, x1)` (nearest index in an evenly spaced point series; -1 outside the plot area), `ci_sector_at(px, py, cx, cy, r_in, r_out, values)` (sector hit, clockwise from 12 o'clock, same construction as `sector_angles`).
 
 ```moonbit
-let zoom = @yue.ci_zoom_make()
-@yue.ci_tooltip(
+let zoom = @charts.ci_zoom_make()
+@charts.ci_tooltip(
   draw=fn(p, w, h) { // self-draw after slicing by the zoom window
-    let (i0, i1) = @yue.ci_zoom_visible(zoom, pts.length())
-    my_draw(p, w, h, @yue.ci_slice_range(pts, i0, i1))
+    let (i0, i1) = @charts.ci_zoom_visible(zoom, pts.length())
+    my_draw(p, w, h, @charts.ci_slice_range(pts, i0, i1))
   },
   hit=fn(px, _py, _w, _h) {
-    match @yue.ci_nearest_idx(px, pts.length(), 46.0, 500.0) {
+    match @charts.ci_nearest_idx(px, pts.length(), 46.0, 500.0) {
       i if i >= 0 => Some(("Point \{i + 1}", [("", "\{pts[i].y}")]))
       _ => None
     }
@@ -1034,7 +1034,7 @@ let zoom = @yue.ci_zoom_make()
 )
 ```
 
-(The two required `draw` / `hit` callbacks can also be passed positionally: `@yue.ci_tooltip(self-draw callback, hit callback, zoom=Some(zoom))`.)
+(The two required `draw` / `hit` callbacks can also be passed positionally: `@charts.ci_tooltip(self-draw callback, hit callback, zoom=Some(zoom))`.)
 
 ### Clickable legend ci_legend + visibility bit helpers
 
@@ -1045,7 +1045,7 @@ Series swatches + names in a single row, with a light background on hover; click
 ```moonbit
 let items = @yue.Store::new([("CPU", @yue.theme_current().primary), ("Memory", @yue.theme_current().info)])
 let visible = @yue.Store::new([true, true])
-@yue.ci_legend(items~, visible~, on_toggle=fn(_i) { my_repaint() })
+@charts.ci_legend(items~, visible~, on_toggle=fn(_i) { my_repaint() })
 ```
 
 ### DataZoom state window ci_zoom
@@ -1073,8 +1073,8 @@ Call these inside any `on_draw` callback against the plot rect `(x0,y0)-(x1,y1)`
 
 ```moonbit
 cv.on_draw(fn(p) {
-  @yue.ci_mark_area(p, true, 0.0, 60.0, 0.0, 100.0, 46.0, 12.0, 540.0, 240.0, label="Safe zone")
-  @yue.ci_mark_line(p, true, 80.0, 0.0, 100.0, 46.0, 12.0, 540.0, 240.0, label="Alert line")
+  @charts.ci_mark_area(p, true, 0.0, 60.0, 0.0, 100.0, 46.0, 12.0, 540.0, 240.0, label="Safe zone")
+  @charts.ci_mark_line(p, true, 80.0, 0.0, 100.0, 46.0, 12.0, 540.0, 240.0, label="Alert line")
 })
 ```
 
@@ -1090,7 +1090,7 @@ cv.on_draw(fn(p) {
 The fallback semantics for invalid color strings match `mix_hex` (the high-end color is returned as-is).
 
 ```moonbit
-let vm = @yue.ci_visual_map3_make(0.0, 50.0, 100.0, "#E3EDFA", "#409EFF", "#1E4FA3")
+let vm = @charts.ci_visual_map3_make(0.0, 50.0, 100.0, "#E3EDFA", "#409EFF", "#1E4FA3")
 let fill_color = vm.color(73.0)
 ```
 
@@ -1117,12 +1117,12 @@ The legend palette is rebuilt on theme changes (`on_theme_change`); Store subscr
 
 ```moonbit
 let series = @yue.Store::new([
-  @yue.LineSeries::make("CPU", max_points=120),
-  @yue.LineSeries::make("Memory", max_points=120),
+  @charts.LineSeries::make("CPU", max_points=120),
+  @charts.LineSeries::make("Memory", max_points=120),
 ])
-@yue.line_chart_it(series, area=true, zoom=true)
-@yue.bar_chart_it(bars, horizontal=true)
-@yue.donut_chart_it(slices)
+@charts.line_chart_it(series, area=true, zoom=true)
+@charts.bar_chart_it(bars, horizontal=true)
+@charts.donut_chart_it(slices)
 ```
 
 ## Icons

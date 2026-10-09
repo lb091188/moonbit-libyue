@@ -13,13 +13,13 @@ fn main {
     return
   }
   @yue.theme_apply(@yue.theme_from_system())
-  let (toast_node, toast_push) = @yue.toast_layer()
+  let (toast_node, toast_push) = @components.toast_layer()
   let app : @ui.ProbeApp = {
     selected: @yue.Store::new("系统能力"),
     win_ref: Ref(None),
     toast: toast_push,
     // 特效散点涟漪动画句柄:关窗时停止定时器
-    eff_anim: @yue.EffAnim::make(),
+    eff_anim: @charts.EffAnim::make(),
     vid_player: Ref(None),
     aud_ap: Ref(None),
   }
@@ -33,7 +33,7 @@ fn main {
               @yue.scroll(
                 @yue.vbox(
                   [
-                    @yue.side_menu_sections(
+                    @components.side_menu_sections(
                       [
                         (
                           "能力",
@@ -45,18 +45,18 @@ fn main {
                         ),
                         (
                           "图表",
-                          ["扩展图表(第一批:六种)", "新图表(第二批:九种)", "交互图表"],
+                          ["扩展图表", "新图表", "交互图表"],
                         ),
                       ],
                       app.selected,
                       icons=[
-                        ("系统能力", @yue.Monitor1),
-                        ("命令预览", @yue.CopyDocument),
-                        ("视频播放", @yue.VideoPlay),
-                        ("音频播放", @yue.Headset),
-                        ("扩展图表(第一批:六种)", @yue.DataAnalysis),
-                        ("新图表(第二批:九种)", @yue.DataLine),
-                        ("交互图表", @yue.PieChart),
+                        ("系统能力", @icons.Monitor1),
+                        ("命令预览", @icons.CopyDocument),
+                        ("视频播放", @icons.VideoPlay),
+                        ("音频播放", @icons.Headset),
+                        ("扩展图表", @icons.DataAnalysis),
+                        ("新图表", @icons.DataLine),
+                        ("交互图表", @icons.PieChart),
                       ],
                     ),
                   ],
@@ -64,9 +64,9 @@ fn main {
                 ),
                 style=[("flex", 1.0), ("width", 200.0)],
               ),
-              @yue.label_t(
+              @components.label_t(
                 "系统能力真读本机\n图表为演示数据",
-                role=@yue.Secondary,
+                role=@components.Secondary,
                 style=[
                   ("paddingLeft", 20.0),
                   ("paddingRight", 12.0),
@@ -90,18 +90,10 @@ fn main {
               @ui.nav_page("系统能力", app.selected, @pages.page_sysinfo(app)),
               @ui.nav_page("视频播放", app.selected, @pages.page_video(app)),
               @ui.nav_page("音频播放", app.selected, @pages.page_audio(app)),
-              @ui.nav_page(
-                "扩展图表(第一批:六种)",
-                app.selected,
-                @pages.page_charts1(app),
-              ),
-              @ui.nav_page(
-                "新图表(第二批:九种)",
-                app.selected,
-                @pages.page_charts2(app),
-              ),
-              @ui.nav_page("交互图表", app.selected, @pages.page_charts_it(app)),
               @ui.nav_page("命令预览", app.selected, @pages.page_cmdpreview(app)),
+              @ui.nav_page( "扩展图表", app.selected, @pages.page_charts1(app), ),
+              @ui.nav_page( "新图表", app.selected, @pages.page_charts2(app), ),
+              @ui.nav_page("交互图表", app.selected, @pages.page_charts_it(app)),
             ],
             style=[("flex", 1.0)],
             handle=fn(c) {
@@ -121,7 +113,7 @@ fn main {
       size=Some((1080.0, 760.0)),
       center=true,
       on_close=fn(_w) {
-        @yue.eff_stop(app.eff_anim)
+        @charts.eff_stop(app.eff_anim)
         match app.aud_ap.val {
           Some(a) => a.free()
           None => ()

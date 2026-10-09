@@ -91,7 +91,7 @@ fn SensorPage::rebuild(self : SensorPage, sensors : Array[TempSensor]) -> Unit {
   for s in sensors {
     let key = "\{s.chip}/\{s.label}"
     let prev = self.hist.get(key).unwrap_or([])
-    let h = @yue.win_push(prev, 120, s.celsius)
+    let h = @charts.win_push(prev, 120, s.celsius)
     self.hist.set(key, h)
     out.push({ chip: s.chip, label: s.label, celsius: s.celsius, hist: h, })
   }
@@ -133,7 +133,7 @@ fn page_sensors(app : App) -> @yue.Node {
       ]),
     )
     nodes.push(
-      @yue.line_chart_t(
+      @charts.line_chart_t(
         app.gpu_busy_hists[i],
         style=[("height", 220.0)],
         y_range=Some((0.0, 100.0)),
@@ -147,7 +147,7 @@ fn page_sensors(app : App) -> @yue.Node {
       ]),
     )
     nodes.push(
-      @yue.line_chart_t(app.gpu_vram_hists[i], fill=true, style=[
+      @charts.line_chart_t(app.gpu_vram_hists[i], fill=true, style=[
         ("height", 220.0),
       ]),
     )

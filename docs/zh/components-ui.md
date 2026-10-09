@@ -640,16 +640,16 @@ let right = @yue.Store::new(["丙"])
 
 ```moonbit
 let series = @yue.Store::new([
-  @yue.LineSeries::make("CPU", max_points=120),
-  @yue.LineSeries::make("内存", max_points=120),
+  @charts.LineSeries::make("CPU", max_points=120),
+  @charts.LineSeries::make("内存", max_points=120),
 ])
 ignore(@yue.set_timer(500, fn() {
-  @yue.series_push(series, 0, cpu_usage())
-  @yue.series_push(series, 1, mem_usage())
+  @charts.series_push(series, 0, cpu_usage())
+  @charts.series_push(series, 1, mem_usage())
   true
 }))
-@yue.line_chart_t(series, style=[("width", 380.0), ("height", 220.0)])
-@yue.line_chart_t(series, style=[("width", 380.0), ("height", 220.0)], area=true)
+@charts.line_chart_t(series, style=[("width", 380.0), ("height", 220.0)])
+@charts.line_chart_t(series, style=[("width", 380.0), ("height", 220.0)], area=true)
 ```
 
 ### 柱状 / 条形图 bar_chart_t
@@ -668,11 +668,11 @@ ignore(@yue.set_timer(500, fn() {
 
 ```moonbit
 let bars = @yue.Store::new([
-  @yue.BarItem::make("1月", 12.0),
-  @yue.BarItem::make("2月", -8.0),
+  @charts.BarItem::make("1月", 12.0),
+  @charts.BarItem::make("2月", -8.0),
 ])
-@yue.bar_chart_t(bars, style=[("width", 380.0), ("height", 220.0)])
-@yue.bar_chart_t(bars, style=[("width", 380.0), ("height", 220.0)], horizontal=true)
+@charts.bar_chart_t(bars, style=[("width", 380.0), ("height", 220.0)])
+@charts.bar_chart_t(bars, style=[("width", 380.0), ("height", 220.0)], horizontal=true)
 ```
 
 ### 环形 / 饼图 donut_chart_t
@@ -691,10 +691,10 @@ let bars = @yue.Store::new([
 
 ```moonbit
 let slices = @yue.Store::new([
-  @yue.DonutSlice::make("直接访问", 335.0),
-  @yue.DonutSlice::make("搜索引擎", 510.0),
+  @charts.DonutSlice::make("直接访问", 335.0),
+  @charts.DonutSlice::make("搜索引擎", 510.0),
 ])
-@yue.donut_chart_t(slices, style=[("width", 420.0), ("height", 220.0)])
+@charts.donut_chart_t(slices, style=[("width", 420.0), ("height", 220.0)])
 ```
 
 ### 仪表盘 gauge_t
@@ -712,7 +712,7 @@ let slices = @yue.Store::new([
 
 ```moonbit
 let usage = @yue.Store::new(0.0)
-@yue.gauge_t(usage, thresholds=[
+@charts.gauge_t(usage, thresholds=[
   (0.6, @yue.theme_current().success),
   (0.85, @yue.theme_current().warning),
   (1.0, @yue.theme_current().danger),
@@ -735,7 +735,7 @@ x/y 点列
 
 ```moonbit
 let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
-@yue.scatter_t(pts, trend=true)
+@charts.scatter_t(pts, trend=true)
 ```
 
 以下六个扩展图表与上述同渲染模型（Store 驱动、只重绘画布、主题切换跟随），完整演示见 `examples/systemprobe`。其后九个层级 / 地理 / 力导向 / 时间流图表与图表交互层为后续批次，同样纯 MoonBit 自绘、Store 驱动。
@@ -757,16 +757,16 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 系列色按主题四语义色循环；维度取值超出量程钳制、缺失按 0（折到中心），量程 max ≤ 0 的维度恒为 0；维度数 < 3 时画「暂无数据」占位。顶点 0 在 12 点方向、顺时针均布。
 
 ```moonbit
-let ind : @yue.Store[Array[@yue.RadarIndicator]] = @yue.Store::new([
-  @yue.RadarIndicator::make("渲染", 100.0),
-  @yue.RadarIndicator::make("IO", 100.0),
-  @yue.RadarIndicator::make("内存", 100.0),
+let ind : @yue.Store[Array[@charts.RadarIndicator]] = @yue.Store::new([
+  @charts.RadarIndicator::make("渲染", 100.0),
+  @charts.RadarIndicator::make("IO", 100.0),
+  @charts.RadarIndicator::make("内存", 100.0),
 ])
-let ser : @yue.Store[Array[@yue.RadarSeries]] = @yue.Store::new([
-  @yue.RadarSeries::make("本方案", [88.0, 72.0, 80.0]),
-  @yue.RadarSeries::make("对照", [70.0, 90.0, 65.0]),
+let ser : @yue.Store[Array[@charts.RadarSeries]] = @yue.Store::new([
+  @charts.RadarSeries::make("本方案", [88.0, 72.0, 80.0]),
+  @charts.RadarSeries::make("对照", [70.0, 90.0, 65.0]),
 ])
-@yue.radar_chart_t(ind, ser, rings=5, style=[("width", 420.0), ("height", 320.0)])
+@charts.radar_chart_t(ind, ser, rings=5, style=[("width", 420.0), ("height", 320.0)])
 ```
 
 ### 热力图 heatmap_t
@@ -786,15 +786,15 @@ let ser : @yue.Store[Array[@yue.RadarSeries]] = @yue.Store::new([
 量程自动取矩阵实际 min/max（两端必被数据命中，不加留白）；全部同值时整表取色带中点色。行标签居左、列标签居底，过密自动抽稀截断；空矩阵画「暂无数据」。
 
 ```moonbit
-let heat : @yue.Store[@yue.HeatGrid] = @yue.Store::new(
-  @yue.HeatGrid::make(
+let heat : @yue.Store[@charts.HeatGrid] = @yue.Store::new(
+  @charts.HeatGrid::make(
     ["周一", "周二", "周三"],
     ["上午", "下午"],
     [[3.0, 5.0, 7.0], [6.0, 8.0, 9.0]],
   ),
 )
-@yue.heatmap_t(heat, show_values=true, style=[("width", 420.0), ("height", 280.0)])
-@yue.heatmap_t(heat, low_color="#E3EDFA", high_color="#1E4FA3", gap=1.0)
+@charts.heatmap_t(heat, show_values=true, style=[("width", 420.0), ("height", 280.0)])
+@charts.heatmap_t(heat, low_color="#E3EDFA", high_color="#1E4FA3", gap=1.0)
 ```
 
 ### K 线图 candlestick_t
@@ -813,13 +813,13 @@ let heat : @yue.Store[@yue.HeatGrid] = @yue.Store::new(
 涨跌判定 close ≥ open 记涨（平盘归涨）；默认涨红跌绿（中国习惯配色）；平盘实体高度钳 1px 保持可见。横向网格 + 左侧刻度。
 
 ```moonbit
-let candles : @yue.Store[Array[@yue.Candle]] = @yue.Store::new([
-  @yue.Candle::make(100.0, 108.0, 98.0, 105.0),
-  @yue.Candle::make(105.0, 107.0, 99.0, 101.0),
-  @yue.Candle::make(101.0, 110.0, 100.0, 108.0),
+let candles : @yue.Store[Array[@charts.Candle]] = @yue.Store::new([
+  @charts.Candle::make(100.0, 108.0, 98.0, 105.0),
+  @charts.Candle::make(105.0, 107.0, 99.0, 101.0),
+  @charts.Candle::make(101.0, 110.0, 100.0, 108.0),
 ])
-@yue.candlestick_t(candles, style=[("width", 420.0), ("height", 260.0)])
-@yue.candlestick_t(candles, y_range=Some((90.0, 115.0)))
+@charts.candlestick_t(candles, style=[("width", 420.0), ("height", 260.0)])
+@charts.candlestick_t(candles, y_range=Some((90.0, 115.0)))
 ```
 
 ### 漏斗图 funnel_t
@@ -838,14 +838,14 @@ let candles : @yue.Store[Array[@yue.Candle]] = @yue.Store::new([
 画布足够宽（扣除右侧标注列后 ≥100px）时逐层标注 标签 + 数值 (百分比)，过窄时省略标注只画梯形；值 ≤ 0 的层宽钳 0。
 
 ```moonbit
-let funnel : @yue.Store[Array[@yue.BarItem]] = @yue.Store::new([
-  @yue.BarItem::make("浏览", 1000.0),
-  @yue.BarItem::make("加购", 420.0),
-  @yue.BarItem::make("下单", 260.0),
-  @yue.BarItem::make("支付", 190.0),
+let funnel : @yue.Store[Array[@charts.BarItem]] = @yue.Store::new([
+  @charts.BarItem::make("浏览", 1000.0),
+  @charts.BarItem::make("加购", 420.0),
+  @charts.BarItem::make("下单", 260.0),
+  @charts.BarItem::make("支付", 190.0),
 ])
-@yue.funnel_t(funnel, style=[("width", 420.0), ("height", 260.0)])
-@yue.funnel_t(funnel, alignment=@yue.FunnelLeft, pct_of_total=true)
+@charts.funnel_t(funnel, style=[("width", 420.0), ("height", 260.0)])
+@charts.funnel_t(funnel, alignment=@charts.FunnelLeft, pct_of_total=true)
 ```
 
 ### 箱线图 boxplot_t
@@ -867,8 +867,8 @@ let boxp : @yue.Store[Array[(String, Array[Double])]] = @yue.Store::new([
   ("渲染", [12.0, 14.0, 15.0, 16.0, 18.0, 21.0, 25.0, 30.0]),
   ("IO", [5.0, 6.0, 6.5, 7.0, 8.0, 9.0, 12.0]),
 ])
-@yue.boxplot_t(boxp, style=[("width", 420.0), ("height", 260.0)])
-// 单独取概括值: @yue.boxp_summary([1.0, 2.0, 3.0, 8.0]).median
+@charts.boxplot_t(boxp, style=[("width", 420.0), ("height", 260.0)])
+// 单独取概括值: @charts.boxp_summary([1.0, 2.0, 3.0, 8.0]).median
 ```
 
 ### 桑基图 sankey_t
@@ -886,21 +886,21 @@ let boxp : @yue.Store[Array[(String, Array[Double])]] = @yue.Store::new([
 `SankeyNode::make(名称)` 建节点；`SankeyLink::make(源下标, 目标下标, 流量)` 建链路（流量 > 0 才计入布局，节点高度与色带宽度同量纲）。节点矩形高 ∝ 流量，链路画源右缘到目标左缘的半透明贝塞尔色带（宽 ∝ 流量，同一节点多条链路纵向依序排布不重叠）；节点与链路色按源节点下标走四语义色循环。
 
 ```moonbit
-let sankey : @yue.Store[@yue.SankeyData] = @yue.Store::new(
-  @yue.SankeyData::make(
+let sankey : @yue.Store[@charts.SankeyData] = @yue.Store::new(
+  @charts.SankeyData::make(
     [
-      @yue.SankeyNode::make("浏览"),
-      @yue.SankeyNode::make("加购"),
-      @yue.SankeyNode::make("支付"),
+      @charts.SankeyNode::make("浏览"),
+      @charts.SankeyNode::make("加购"),
+      @charts.SankeyNode::make("支付"),
     ],
     [
-      @yue.SankeyLink::make(0, 1, 420.0),
-      @yue.SankeyLink::make(1, 2, 190.0),
-      @yue.SankeyLink::make(0, 2, 160.0),
+      @charts.SankeyLink::make(0, 1, 420.0),
+      @charts.SankeyLink::make(1, 2, 190.0),
+      @charts.SankeyLink::make(0, 2, 160.0),
     ],
   ),
 )
-@yue.sankey_t(sankey, style=[("width", 420.0), ("height", 300.0)])
+@charts.sankey_t(sankey, style=[("width", 420.0), ("height", 300.0)])
 ```
 
 以下九个图表与交互层同样纯 MoonBit 自绘、数据经 Store 驱动、set 后只 schedule_paint 画布不重建视图树，主题切换现取色自动跟随；除注明外都能经 `style` 覆盖画布尺寸、经 `fill=true` 横向铺满父容器。
@@ -921,14 +921,14 @@ let sankey : @yue.Store[@yue.SankeyData] = @yue.Store::new(
 `TreeItem::make(名称, value? = None)` 建节点：value 为圆点大小量纲（None 或全树无 value 时圆点等大），children 建后可再 push。节点圆点半径 ∝ value（相对子树最大值），深度方向取主题主色渐变着色，每个节点带名称标签。配套纯函数：`tree_depth`（子树高度）、`tree_leaf_count`（叶子数）、`tree_max_value`（峰值）、`tree_vertical(orientation)`（是否纵形态）。
 
 ```moonbit
-let root = @yue.TreeItem::make("仓库")
-let src = @yue.TreeItem::make("src", value=80.0)
-src.children.push(@yue.TreeItem::make("main.mbt", value=40.0))
+let root = @charts.TreeItem::make("仓库")
+let src = @charts.TreeItem::make("src", value=80.0)
+src.children.push(@charts.TreeItem::make("main.mbt", value=40.0))
 root.children.push(src)
-root.children.push(@yue.TreeItem::make("README.md", value=10.0))
+root.children.push(@charts.TreeItem::make("README.md", value=10.0))
 let tree = @yue.Store::new(root)
-@yue.tree_chart_t(tree, style=[("width", 420.0), ("height", 260.0)])
-@yue.tree_chart_t(tree, orientation="vertical") // 纵向形态
+@charts.tree_chart_t(tree, style=[("width", 420.0), ("height", 260.0)])
+@charts.tree_chart_t(tree, orientation="vertical") // 纵向形态
 ```
 
 ### 矩形树图 tm_chart_t
@@ -949,16 +949,16 @@ let tree = @yue.Store::new(root)
 
 ```moonbit
 let tm = @yue.Store::new([
-  @yue.TmItem::make(
+  @charts.TmItem::make(
     "华东",
     children=[
-      @yue.TmItem::make("上海", value=320.0),
-      @yue.TmItem::make("江苏", value=260.0),
+      @charts.TmItem::make("上海", value=320.0),
+      @charts.TmItem::make("江苏", value=260.0),
     ],
   ),
-  @yue.TmItem::make("华南", children=[@yue.TmItem::make("广东", value=300.0)]),
+  @charts.TmItem::make("华南", children=[@charts.TmItem::make("广东", value=300.0)]),
 ])
-@yue.tm_chart_t(tm, levels=2, gap=3.0, style=[("width", 420.0), ("height", 260.0)])
+@charts.tm_chart_t(tm, levels=2, gap=3.0, style=[("width", 420.0), ("height", 260.0)])
 ```
 
 ### 旭日图 sun_chart_t
@@ -980,19 +980,19 @@ let tm = @yue.Store::new([
 
 ```moonbit
 let sun = @yue.Store::new(
-  @yue.SunItem::make(
+  @charts.SunItem::make(
     "全部",
     children=[
-      @yue.SunItem::make("直接", value=335.0),
-      @yue.SunItem::make("搜索", children=[
-        @yue.SunItem::make("百度", value=120.0),
-        @yue.SunItem::make("必应", value=80.0),
+      @charts.SunItem::make("直接", value=335.0),
+      @charts.SunItem::make("搜索", children=[
+        @charts.SunItem::make("百度", value=120.0),
+        @charts.SunItem::make("必应", value=80.0),
       ]),
     ],
   ),
 )
-@yue.sun_chart_t(sun, style=[("width", 380.0), ("height", 320.0)])
-@yue.sun_chart_t(sun, inner=40.0, center_text=Some("总计访问"))
+@charts.sun_chart_t(sun, style=[("width", 380.0), ("height", 320.0)])
+@charts.sun_chart_t(sun, inner=40.0, center_text=Some("总计访问"))
 ```
 
 ### 地图与飞线 geo_map_t
@@ -1014,13 +1014,13 @@ GeoJSON 区域按等距圆柱投影绘制（填充 + 描边 + 质心区域名标
 ```moonbit
 let geojson = @yue.read_text_file("china.geojson") // 自有文本读取即可
 let regions = match geojson {
-  Some(text) => @yue.geojson_parse(text) catch { _ => [] }
+  Some(text) => @charts.geojson_parse(text) catch { _ => [] }
   None => []
 }
-@yue.geo_map_t(
+@charts.geo_map_t(
   @yue.Store::new(regions),
   flights=[
-    @yue.GeoFlight::make((121.47, 31.23), (114.06, 22.54)),
+    @charts.GeoFlight::make((121.47, 31.23), (114.06, 22.54)),
   ],
   style=[("width", 420.0), ("height", 300.0)],
 )
@@ -1043,15 +1043,15 @@ let regions = match geojson {
 `GraphNode::make(名称, value? = 1.0)`（value 定节点圆面积，不参与力模拟）、`GraphEdge::make(源下标, 目标下标, weight? = 1.0)`（两端下标越界、自环、weight ≤ 0 的边不参与模拟也不画）。边画半透明平行四边形色带（宽 ∝ weight），节点圆按主题四语义色循环；模拟无随机源（圆周均匀布点起步），同输入必同输出。布局按当前画布尺寸在首次绘制时收敛一次并缓存，数据 set 或画布尺寸变化才重算。
 
 ```moonbit
-let g = @yue.GraphData::make(
+let g = @charts.GraphData::make(
   [
-    @yue.GraphNode::make("核心", value=10.0),
-    @yue.GraphNode::make("网关", value=5.0),
-    @yue.GraphNode::make("终端", value=3.0),
+    @charts.GraphNode::make("核心", value=10.0),
+    @charts.GraphNode::make("网关", value=5.0),
+    @charts.GraphNode::make("终端", value=3.0),
   ],
-  [@yue.GraphEdge::make(0, 1, 8.0), @yue.GraphEdge::make(1, 2, 4.0)],
+  [@charts.GraphEdge::make(0, 1, 8.0), @charts.GraphEdge::make(1, 2, 4.0)],
 )
-@yue.gph_chart_t(@yue.Store::new(g), iterations=200, style=[("width", 420.0), ("height", 300.0)])
+@charts.gph_chart_t(@yue.Store::new(g), iterations=200, style=[("width", 420.0), ("height", 300.0)])
 ```
 
 ### 平行坐标图 par_chart_t
@@ -1072,12 +1072,12 @@ N 条竖轴等距横排、每轴独立量程归一，每行数据一条折线穿
 
 ```moonbit
 let axes = @yue.Store::new([
-  @yue.ParAxis::make("渲染", 0.0, 100.0),
-  @yue.ParAxis::make("IO", 0.0, 100.0),
-  @yue.ParAxis::make("内存", 0.0, 100.0),
+  @charts.ParAxis::make("渲染", 0.0, 100.0),
+  @charts.ParAxis::make("IO", 0.0, 100.0),
+  @charts.ParAxis::make("内存", 0.0, 100.0),
 ])
 let rows = @yue.Store::new([[88.0, 72.0, 80.0], [70.0, 90.0, 65.0]])
-@yue.par_chart_t(axes, rows, highlight=0, style=[("width", 480.0), ("height", 260.0)])
+@charts.par_chart_t(axes, rows, highlight=0, style=[("width", 480.0), ("height", 260.0)])
 ```
 
 ### 主题河流图 trv_chart_t
@@ -1101,7 +1101,7 @@ let rows = @yue.Store::new([[88.0, 72.0, 80.0], [70.0, 90.0, 65.0]])
 ```moonbit
 let names = @yue.Store::new(["搜索", "直接"])
 let values = @yue.Store::new([[120.0, 132.0, 101.0], [220.0, 182.0, 191.0]])
-@yue.trv_chart_t(names, values, baseline=@yue.TrvSym, fill=false)
+@charts.trv_chart_t(names, values, baseline=@charts.TrvSym, fill=false)
 ```
 
 ### 涟漪散点图 eff_chart_t
@@ -1124,13 +1124,13 @@ let values = @yue.Store::new([[120.0, 132.0, 101.0], [220.0, 182.0, 191.0]])
 
 ```moonbit
 let pts = @yue.Store::new([
-  @yue.EffPoint::make(120.0, 12.0, size=14.0),
-  @yue.EffPoint::make(320.0, 26.0, size=20.0),
+  @charts.EffPoint::make(120.0, 12.0, size=14.0),
+  @charts.EffPoint::make(320.0, 26.0, size=20.0),
 ])
-let anim = @yue.EffAnim::make()
-@yue.eff_chart_t(pts, period_ms=2500, rings=3, anim=anim)
+let anim = @charts.EffAnim::make()
+@charts.eff_chart_t(pts, period_ms=2500, rings=3, anim=anim)
 // ……页面卸载前
-@yue.eff_stop(anim)
+@charts.eff_stop(anim)
 ```
 
 ### 象形柱图 pb_chart_t
@@ -1155,11 +1155,11 @@ let anim = @yue.EffAnim::make()
 
 ```moonbit
 let pb = @yue.Store::new([
-  @yue.BarItem::make("Q1", 32.0),
-  @yue.BarItem::make("Q2", 48.0),
+  @charts.BarItem::make("Q1", 32.0),
+  @charts.BarItem::make("Q2", 48.0),
 ])
-@yue.pb_chart_t(pb, symbol=@yue.PbCircle, mode=@yue.PbRepeat, unit=10.0, show_values=true)
-@yue.pb_chart_t(pb, symbol=@yue.PbTriangle, mode=@yue.PbStretch, horizontal=true)
+@charts.pb_chart_t(pb, symbol=@charts.PbCircle, mode=@charts.PbRepeat, unit=10.0, show_values=true)
+@charts.pb_chart_t(pb, symbol=@charts.PbTriangle, mode=@charts.PbStretch, horizontal=true)
 ```
 
 ## 图表交互层
@@ -1182,14 +1182,14 @@ let pb = @yue.Store::new([
 浮层画在图表容器自身 on_draw 内（图表之后绘制即在最上层，无 z-order 问题），恒深底浅字、不随主题变换；定位经 `ci_tooltip_pos` 钳在画布内，右溢时翻到锚点对侧。鼠标移入即刻显隐变化或拖拽时才 schedule_paint，静态移动不重绘。状态结构 `CiTip`（`CiTip::new()` / `ci_tip_show(tip, 标题, 行, px, py)` / `ci_tip_hide(tip)` / `ci_tip_draw(p, tip, w, h)` / `ci_tip_size(标题, 行)`）也可直接用于自绘图表。命中纯函数：`CiPlot::make(x0, y0, x1, y1)`（`width` / `frac` / `contains`）、`ci_nearest_idx(px, n, x0, x1)`（均布点列最近序号，绘制区外 -1）、`ci_sector_at(px, py, cx, cy, r_in, r_out, values)`（扇形命中，12 点方向起顺时针，与 `sector_angles` 同构造）。
 
 ```moonbit
-let zoom = @yue.ci_zoom_make()
-@yue.ci_tooltip(
+let zoom = @charts.ci_zoom_make()
+@charts.ci_tooltip(
   draw=fn(p, w, h) { // 按 zoom 窗切片后自绘
-    let (i0, i1) = @yue.ci_zoom_visible(zoom, pts.length())
-    my_draw(p, w, h, @yue.ci_slice_range(pts, i0, i1))
+    let (i0, i1) = @charts.ci_zoom_visible(zoom, pts.length())
+    my_draw(p, w, h, @charts.ci_slice_range(pts, i0, i1))
   },
   hit=fn(px, _py, _w, _h) {
-    match @yue.ci_nearest_idx(px, pts.length(), 46.0, 500.0) {
+    match @charts.ci_nearest_idx(px, pts.length(), 46.0, 500.0) {
       i if i >= 0 => Some(("第 \{i + 1} 点", [("", "\{pts[i].y}")]))
       _ => None
     }
@@ -1200,7 +1200,7 @@ let zoom = @yue.ci_zoom_make()
 )
 ```
 
-（`draw` / `hit` 两个必填回调也可只写位置参数：`@yue.ci_tooltip(自绘回调, 命中回调, zoom=Some(zoom))`。）
+（`draw` / `hit` 两个必填回调也可只写位置参数：`@charts.ci_tooltip(自绘回调, 命中回调, zoom=Some(zoom))`。）
 
 ### 可点击图例 ci_legend + 显隐位工具
 
@@ -1211,7 +1211,7 @@ let zoom = @yue.ci_zoom_make()
 ```moonbit
 let items = @yue.Store::new([("CPU", @yue.theme_current().primary), ("内存", @yue.theme_current().info)])
 let visible = @yue.Store::new([true, true])
-@yue.ci_legend(items~, visible~, on_toggle=fn(_i) { my_repaint() })
+@charts.ci_legend(items~, visible~, on_toggle=fn(_i) { my_repaint() })
 ```
 
 ### DataZoom 状态窗口 ci_zoom
@@ -1239,8 +1239,8 @@ let visible = @yue.Store::new([true, true])
 
 ```moonbit
 cv.on_draw(fn(p) {
-  @yue.ci_mark_area(p, true, 0.0, 60.0, 0.0, 100.0, 46.0, 12.0, 540.0, 240.0, label="安全区")
-  @yue.ci_mark_line(p, true, 80.0, 0.0, 100.0, 46.0, 12.0, 540.0, 240.0, label="告警线")
+  @charts.ci_mark_area(p, true, 0.0, 60.0, 0.0, 100.0, 46.0, 12.0, 540.0, 240.0, label="安全区")
+  @charts.ci_mark_line(p, true, 80.0, 0.0, 100.0, 46.0, 12.0, 540.0, 240.0, label="告警线")
 })
 ```
 
@@ -1256,7 +1256,7 @@ cv.on_draw(fn(p) {
 非法色串的回退语义同 `mix_hex`（原样返回高端色）。
 
 ```moonbit
-let vm = @yue.ci_visual_map3_make(0.0, 50.0, 100.0, "#E3EDFA", "#409EFF", "#1E4FA3")
+let vm = @charts.ci_visual_map3_make(0.0, 50.0, 100.0, "#E3EDFA", "#409EFF", "#1E4FA3")
 let fill_color = vm.color(73.0)
 ```
 
@@ -1283,12 +1283,12 @@ let fill_color = vm.color(73.0)
 
 ```moonbit
 let series = @yue.Store::new([
-  @yue.LineSeries::make("CPU", max_points=120),
-  @yue.LineSeries::make("内存", max_points=120),
+  @charts.LineSeries::make("CPU", max_points=120),
+  @charts.LineSeries::make("内存", max_points=120),
 ])
-@yue.line_chart_it(series, area=true, zoom=true)
-@yue.bar_chart_it(bars, horizontal=true)
-@yue.donut_chart_it(slices)
+@charts.line_chart_it(series, area=true, zoom=true)
+@charts.bar_chart_it(bars, horizontal=true)
+@charts.donut_chart_it(slices)
 ```
 
 ## 图标

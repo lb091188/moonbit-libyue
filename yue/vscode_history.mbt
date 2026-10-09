@@ -16,7 +16,7 @@
 ///|
 /// 最小 JSON 值（解析 entries.json / storage.json 用；整数保持 Int64 精度，
 /// 时间戳毫秒值超 Int32 表示范围）。
-priv enum VscJson {
+pub(all) enum VscJson {
   VscJNull
   VscJBool
   VscJInt(Int64)
@@ -35,7 +35,7 @@ priv struct VscJsonParser {
 
 ///|
 /// 解析 JSON 文本：语法完整且无尾随内容返回值，否则 None。
-fn vsc_json_parse(text : String) -> VscJson? {
+pub fn vsc_json_parse(text : String) -> VscJson? {
   let p : VscJsonParser = { text, pos: 0, }
   p.skip_ws()
   let v = match p.value() {
@@ -404,7 +404,7 @@ fn vsc_number_value(chars : Array[Int]) -> VscJson {
 
 ///|
 /// 对象按键取首个匹配（键不存在或值非对象返回 None）。
-fn vsc_json_get(v : VscJson, key : String) -> VscJson? {
+pub fn vsc_json_get(v : VscJson, key : String) -> VscJson? {
   match v {
     VscJObj(pairs) => {
       for pair in pairs {
@@ -420,7 +420,7 @@ fn vsc_json_get(v : VscJson, key : String) -> VscJson? {
 
 ///|
 /// 字符串值；缺失或非字符串返回 None。
-fn vsc_json_str(v : VscJson?) -> String? {
+pub fn vsc_json_str(v : VscJson?) -> String? {
   match v {
     Some(VscJStr(s)) => Some(s)
     Some(
