@@ -363,7 +363,7 @@ let view = @yuemedia.audio_player_t(player)  // 播放/暂停/进度/时间/音�
 | 函数 | 说明 |
 |---|---|
 | `video_view_t(width, height, frame_count, source, fps?=30, looping?=false, handle?, fill?, style?, on_ready?)` | 视频视图；帧缺失/解码失败画主题底色占位，不中断播放 |
-| `vid_pause(handle)` / `vid_resume(handle)` / `vid_stop(handle)` | 暂停/恢复/停止（stop 后定时器下一帧注销，不可恢复；组件卸载前应显式停） |
+| `vid_pause(handle)` / `vid_resume(handle)` / `vid_stop(handle)` | 暂停/恢复/停止（stop 后定时器下一帧注销，不可恢复；**卸载组件前必须 vid_stop**——帧推进定时器无取消 id，漏 stop 会继续对已销毁的视图空转到播完） |
 | `VidHandle::make()` / `is_running()` / `is_paused()` | 播放句柄 |
 | `vid_frame_image(source, idx, w, h)` | 单体帧 → Image（长度校验+编码+解码，失败 None） |
 | `pngr_encode_rgba(data, w, h)` | RGBA → PNG（Result；尺寸/长度不符 Err） |

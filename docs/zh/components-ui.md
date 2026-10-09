@@ -1411,10 +1411,12 @@ toast("已保存", @yue.Success)
 
 ### 轮播 carousel_t
 
-`carousel_t(pages : Array[Node], width? = 360.0, height? = 180.0, interval_ms? = 3000)`——面板序列 + 左右箭头 + 底部指示点；interval_ms > 0 时每 interval 毫秒自动切换（悬停暂停），点击箭头 / 指示点手动切换。
+`carousel_t(pages : Array[Node], width? = 360.0, height? = 180.0, interval_ms? = 3000, rotation?, style?, handle?)`——面板序列 + 左右箭头 + 底部指示点；interval_ms > 0 时每 interval 毫秒自动切换（悬停暂停），点击箭头 / 指示点手动切换。
 
 ```moonbit
 @yue.carousel_t([banner1, banner2], interval_ms=4000)
 ```
+
+自动轮播是自排的超时链，**卸载轮播前必须 `carousel_stop(rotation)`**（不 stop 则链继续对已移除的视图空转）：`rotation` 传自建句柄 `CarouselHandle::make()`（`is_running()` 查状态）；不传则组件自建、外部拿不到句柄，仅适合随应用常驻的轮播。
 
 组件间状态协调统一走 `Store`（subscribe / map / bind_label）或信号 `Signal`（computed 自动依赖收集，batch 批处理；组件 Store 参数可传 `sig.store()` 视图），见 [declarative.md](declarative.md)。English version: [components-ui.md](../components-ui.md).
