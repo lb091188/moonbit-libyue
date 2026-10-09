@@ -1,34 +1,11 @@
-// 画布与富文本页:Painter / Image / AttributedText 演示。自绘场景是
-// 命令式语义(Ref + schedule_paint),混合模式信息走 Store 手动回显。
+// 画布与富文本页:Painter / AttributedText 演示。自绘场景是命令式
+// 语义(Ref + schedule_paint)。
 
 ///|
 pub fn page_canvas(_app : @ui.App) -> @yue.Node {
   let canvas_hue = Ref(0)
-  let canvas_blend = Ref(0)
-  let canvas_blends = [
-    @yue.BlendMode::Normal,
-    @yue.Multiply,
-    @yue.Screen,
-    @yue.Difference,
-    @yue.Xor,
-  ]
-  let canvas_blend_names = ["Normal", "Multiply", "Screen", "Difference", "Xor"]
-  let canvas_info : @yue.Store[String] = @yue.Store::new("Normal")
   let canvas_ref : Ref[@yue.Container?] = Ref(None)
   let canvas_rt : Ref[@yue.Container?] = Ref(None)
-  let canvas_img : Ref[@yue.Image?] = Ref(
-    match @yue.read_binary_file("examples/showcase/assets/icon.png") {
-      Some(bytes) => {
-        let img = @yue.Image::new_from_png(bytes)
-        if img.is_empty() {
-          None
-        } else {
-          Some(img)
-        }
-      }
-      None => None
-    },
-  )
   let canvas_repaint = fn() -> Unit {
     match canvas_ref.val {
       Some(c) => c.schedule_paint()
@@ -57,15 +34,6 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
       align=@yue.TextAlign::Center,
       color="#F0F0F0",
     )
-    match (canvas_ref.val, canvas_img.val) {
-      (Some(c), Some(img)) => {
-        painter.set_blend_mode(canvas_blends[canvas_blend.val])
-        let b = c.get_bounds()
-        painter.draw_image(img, b.width - 90.0, 10.0, 80.0, 80.0)
-        painter.set_blend_mode(@yue.Normal)
-      }
-      (_, _) => ()
-    }
   }
   // 富文本对象
   let rt = @yue.AttributedText::new_with(
@@ -97,40 +65,6 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
             canvas_hue.val = (canvas_hue.val + 1) % 3
             canvas_repaint()
           }),
-          @yue.button_t("切换混合模式", on_click=fn() {
-            canvas_blend.val = (canvas_blend.val + 1) % canvas_blends.length()
-            // Windows 的 GDI+ 合成只有 SourceOver/SourceCopy 两种,
-            // 其余混合模式静默无效(见 adaptation.md),回显里如实提示
-            let note = if @yue.platform() == "windows" && canvas_blend.val != 0 {
-              "(此平台仅 Normal 生效)"
-            } else {
-              ""
-            }
-            canvas_info.set(canvas_blend_names[canvas_blend.val] + note)
-            canvas_repaint()
-          }),
-          @yue.button_t("导出缩放图", variant=@yue.Solid, on_click=fn() {
-            match canvas_img.val {
-              Some(img) => {
-                let half = img.resize(
-                  img.get_width() / 2.0,
-                  img.get_height() / 2.0,
-                )
-                let ok = half.write_to_file("png", "build/components_half.png")
-                canvas_info.set(
-                  if ok {
-                    "已导出 build/components_half.png"
-                  } else {
-                    "导出失败"
-                  },
-                )
-              }
-              None => canvas_info.set("无图片可导出")
-            }
-          }),
-        ]),
-        @yue.bind_label(canvas_info, fn(s) { "混合模式:\{s}" }, style=[
-          ("marginTop", 8.0),
         ]),
       ],
       code=[
@@ -140,32 +74,6 @@ pub fn page_canvas(_app : @ui.App) -> @yue.Node {
         "    p.draw_text(\"自绘文本\", 24.0, 110.0, 592.0, 30.0,", "      align=@yue.TextAlign::Center)",
         "  },", "  handle=fn(c) { c.on_size_changed(fn() { c.schedule_paint() }) },",
         "  style=[(\"height\", 300.0), (\"width\", 640.0)],", ")",
-      ],
-    ),
-    @ui.section(
-      "图像",
-      "图像与混合模式",
-      "draw_image 叠 PNG(右下角)+ blend_mode(Normal/Multiply/Screen/Difference/Xor);导出缩略图到运行目录 build/。Windows 的 GDI+ 合成仅支持 Normal/Copy,其余模式无效果(Linux/macOS 完整)。",
-      [
-        @yue.descriptions([
-          ("Normal", "默认覆盖"),
-          ("Multiply", "正片叠底,暗部加深"),
-          ("Screen", "滤色,亮部提亮"),
-          ("Difference", "差值,反相差异"),
-          ("Xor", "异或,重叠区挖空"),
-        ]),
-        @yue.label_t(
-          "拖动/缩放图像由 Container on_size_changed + schedule_paint 驱动(本示例固定尺寸)。",
-          role=@yue.Secondary,
-          style=[("marginTop", 6.0)],
-        ),
-      ],
-      code=[
-        "match @yue.read_binary_file(\"examples/showcase/assets/icon.png\") {", "  Some(bytes) => {",
-        "    let img = @yue.Image::new_from_png(bytes)", "    p.set_blend_mode(@yue.Multiply)",
-        "    p.draw_image(img, 10.0, 10.0, 80.0, 80.0)", "    p.set_blend_mode(@yue.Normal)",
-        "  }", "  None => ()", "}", "let half = img.resize(img.get_width() / 2.0, img.get_height() / 2.0)",
-        "half.write_to_file(\"png\", \"build/half.png\")",
       ],
     ),
     @ui.section(
