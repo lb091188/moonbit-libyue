@@ -12,7 +12,7 @@ hero:
       text: Package structure
       link: /README
 features:
-  - title: Native, not webview
+  - title: Native, windows in a flash
     details: A full binding of libyue (C++) — real native windows and widgets, ~7 MB binaries, ~80 ms startup.
   - title: Import only what you use
     details: Core, declarative, themed components, charts, icons, markdown and OS capabilities are separate packages; unused ones never enter your binary.
