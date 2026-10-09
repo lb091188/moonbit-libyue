@@ -42,6 +42,39 @@ test "parse_proc_pid_stat：真实格式 / comm 含空格括号 / 字段不足" 
 }
 
 ///|
+test "parse_proc_pid_stat：负 nice 真实样本(nice=-20 内核线程)" {
+  // 真实 /proc/4/stat（kworker/R-rcu_gp，nice=-20）；本机 142 个负 nice
+  // 进程，负号不能被当非法字符丢掉（否则负 nice 全显示 0、ByNice 排序失真）
+  let kt = "4 (kworker/R-rcu_gp) I 2 0 0 0 -1 69238880 0 0 0 0 0 0 0 0 0 -20 1 0 9 0 0 18446744073709551615 0 0 0 0 0 0 0 2147483647 0 0 0 0 17 0 0 0 0 0 0 0 0 0 0 0 0 0\n"
+  let st = parse_proc_pid_stat(kt).unwrap()
+  assert_eq(st.pid, 4)
+  assert_eq(st.comm, "kworker/R-rcu_gp")
+  assert_eq(st.state, "I")
+  assert_eq(st.ppid, 2)
+  assert_eq(st.nice, -20)
+  assert_eq(st.threads, 1)
+  assert_eq(st.start_time, 9)
+  assert_eq(st.rss_pages, 0)
+  // nice=-1（合法普通用户值）：字段合法长度 22 个的紧凑行
+  let renice = "42 (renice) S 1 42 42 0 -1 4194304 1 0 0 0 2 3 0 0 0 -1 2 0 30 100 5\n"
+  let r = parse_proc_pid_stat(renice).unwrap()
+  assert_eq(r.pid, 42)
+  assert_eq(r.comm, "renice")
+  assert_eq(r.utime, 2)
+  assert_eq(r.stime, 3)
+  assert_eq(r.nice, -1)
+  assert_eq(r.threads, 2)
+  assert_eq(r.start_time, 30)
+  assert_eq(r.rss_pages, 5)
+  // nice=19（最大谦让）正样本同样按有符号解析
+  let idle = "7 (idle) S 1 7 7 0 -1 4194304 1 0 0 0 2 3 0 0 0 19 2 0 30 100 5\n"
+  assert_eq(parse_proc_pid_stat(idle).unwrap().nice, 19)
+  // 字段值非法（非数字、裸负号）按 0 兜底，不当解析失败
+  let bad = "7 (bad) S 1 7 7 0 -1 4194304 1 0 0 0 2 3 0 0 0 - 2 0 30 100 5\n"
+  assert_eq(parse_proc_pid_stat(bad).unwrap().nice, 0)
+}
+
+///|
 test "parse_cmdline：NUL 分隔转空格 / 去尾随 / 空串" {
   assert_eq(
     parse_cmdline("cat\u{0}/proc/self/stat\u{0}"),
@@ -69,6 +102,24 @@ test "proc_cpu_pct：单核满负荷 / 半负荷 / 首帧 / 多线程钳制 / �
   assert_eq(proc_cpu_pct(1100, 1000, 100, 1.0, 4), 0.0)
   // clk_tck 非法
   assert_eq(proc_cpu_pct(0, 100, 0, 1.0, 4), 0.0)
+}
+
+///|
+test "proc_tick_cpu_pct：无前样本当拍置 0(不拿开机累计当增量)" {
+  // 新出现 pid：prev 缺失，cur 已是开机以来累计 tick。旧实现按 prev=0
+  // 取差值会把全部累计算成本拍增量，CPU% 钉满格一拍；现在直接给 0，
+  // 下一拍建立前样本后才出真实差值
+  assert_eq(proc_tick_cpu_pct(None, 12_345_678, 100, 1.0, 4), 0.0)
+  assert_eq(proc_tick_cpu_pct(None, 0, 100, 1.0, 4), 0.0)
+  assert_eq(proc_tick_cpu_pct(None, 500, 100, 1.0, 8), 0.0)
+  // 有前样本：与 proc_cpu_pct 同口径（满负荷 / 半负荷 / 钳制）
+  assert_eq(proc_tick_cpu_pct(Some(1000), 1100, 100, 1.0, 4), 100.0)
+  assert_eq(proc_tick_cpu_pct(Some(1000), 1050, 100, 1.0, 4), 50.0)
+  assert_eq(proc_tick_cpu_pct(Some(0), 500, 100, 1.0, 2), 200.0)
+  // 墙钟增量无效（同拍重采）仍为 0，与 proc_cpu_pct 一致
+  assert_eq(proc_tick_cpu_pct(Some(1000), 5000, 100, 0.0, 4), 0.0)
+  // 计数回绕式负增量 → 0
+  assert_eq(proc_tick_cpu_pct(Some(1100), 1000, 100, 1.0, 4), 0.0)
 }
 
 ///|
@@ -267,8 +318,27 @@ test "S3 ProcMonitor：真实 /proc 全量采样 + 二次差值(Linux)" {
       // 二次采样：前样本已建立，墙钟增量有效
       let second = mon.tick()
       assert_true(second is Some(_))
-      // 忙等 60ms 让本进程积累 tick，第三次采样后自身 CPU% 可非 0
-      // （不强求非 0：调度窗口可能恰好未采到）
+      // 新出现 pid 当拍 CPU% 置 0（端到端）：忙等 200ms 让系统起新进程，
+      // 之后凡前样本没有的 pid，本拍必须是 0——旧逻辑按 prev=0 取差值会
+      // 拿开机累计 tick 当增量钉满格一拍。窗口内没有新进程时这组断言空转，
+      // 不构成 flaky。
+      let seen : Array[Int] = []
+      for p in procs {
+        seen.push(p.pid)
+      }
+      let ts = mono_start()
+      while mono_end(ts) < 200_000.0 {
+        continue
+      }
+      match mon.tick() {
+        None => ()
+        Some(after) =>
+          for p in after {
+            if !seen.contains(p.pid) {
+              assert_eq(p.cpu_pct, 0.0)
+            }
+          }
+      }
     }
   }
 }
@@ -409,6 +479,29 @@ test "sort_procs：各列升降序 + 名称大小写不敏感 + 空数组" {
   assert_eq(sort_procs([], ByCpu, false).length(), 0)
   // 入参不被修改
   assert_eq(procs[0].pid, 1)
+}
+
+///|
+test "sort_procs：ByNice 负值排序(负 nice 不再被钳成 0)" {
+  // nice=-20 的进程（内核 worker / 提权进程）解析回归后不再是 0，
+  // 否则降序时与普通进程混在一档、排不出真实优先级
+  let procs = [
+    mk_proc(101, 1, "kworker", "[kworker]", "I", 0.0, 0, -20, 1),
+    mk_proc(102, 1, "normal", "/bin/normal", "S", 0.0, 0, 0, 1),
+    mk_proc(103, 1, "idle", "/bin/idle", "S", 0.0, 0, 19, 1),
+  ]
+  // 降序：nice 越大越谦让 → 19 / 0 / -20
+  let desc = sort_procs(procs, ByNice, false)
+  assert_eq(desc[0].pid, 103)
+  assert_eq(desc[1].pid, 102)
+  assert_eq(desc[2].pid, 101)
+  // 升序：-20 / 0 / 19
+  let asc = sort_procs(procs, ByNice, true)
+  assert_eq(asc[0].pid, 101)
+  assert_eq(asc[1].pid, 102)
+  assert_eq(asc[2].pid, 103)
+  // 入参不被修改
+  assert_eq(procs[0].pid, 101)
 }
 
 ///|

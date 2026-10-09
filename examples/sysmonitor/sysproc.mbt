@@ -60,7 +60,8 @@ fn last_paren(text : String) -> Int {
 ///|
 /// 解析 /proc/[pid]/stat。comm 后的字段序号（从 state 起 0 基）：
 /// state=0 ppid=1 utime=11 stime=12 nice=16 threads=17 starttime=19
-/// rss=21；字段不足 22 个或 pid 非法返回 None。
+/// rss=21；字段不足 22 个或 pid 非法返回 None。nice 是有符号字段
+/// （-20..19），按有符号解析。
 pub fn parse_proc_pid_stat(text : String) -> ProcStat? {
   let open = match text.find("(") {
     Some(i) => i
@@ -83,8 +84,10 @@ pub fn parse_proc_pid_stat(text : String) -> ProcStat? {
     parse_u64(f[i]).unwrap_or(0)
   }
 
+  // nice 可为负（-20..19），必须走有符号解析；parse_u64 遇负号整字段
+  // 返回 None，负 nice 会静默变 0（显示失真且 ByNice 排序失真）
   fn num_s(i : Int) -> Int {
-    parse_u64(f[i]).unwrap_or(0).to_int()
+    parse_i64(f[i]).unwrap_or(0).to_int()
   }
 
   Some({
@@ -132,6 +135,24 @@ pub fn proc_cpu_pct(
 }
 
 ///|
+/// 进程采样器差值口径：prev 为前样本 tick 累计（None = 该 pid 本拍首次
+/// 出现）。无前样本时返回 0——新出现 pid 若按 prev=0 取差值，会把开机
+/// 以来全部累计 tick 算成本拍增量，CPU% 钉满格一拍；有前样本时与
+/// [proc_cpu_pct] 完全一致（墙钟增量 ≤0 同样给 0）。
+pub fn proc_tick_cpu_pct(
+  prev : Int64?,
+  cur : Int64,
+  clk_tck : Int,
+  wall_s : Double,
+  cores : Int,
+) -> Double {
+  match prev {
+    None => 0.0
+    Some(p) => proc_cpu_pct(p, cur, clk_tck, wall_s, cores)
+  }
+}
+
+///|
 /// ppid → 子进程 pid 列表（只收列表中出现的 pid，按 pid 升序）。
 pub fn proc_children(procs : Array[ProcInfo]) -> Map[Int, Array[Int]] {
   let by_pid : Map[Int, Bool] = Map([])
@@ -156,7 +177,8 @@ pub fn proc_children(procs : Array[ProcInfo]) -> Map[Int, Array[Int]] {
 
 ///|
 /// 进程采样器：持前一次各进程 tick 累计与墙钟，每次 [tick] 全量刷新。
-/// 首次采样所有进程 cpu_pct 为 0（无前样本），第二次起为真实差值。
+/// 首次采样所有进程 cpu_pct 为 0（无前样本），第二次起为真实差值；
+/// 采样间隙新出现的 pid 同样当拍为 0，下一拍起才有真实差值。
 pub(all) struct ProcMonitor {
   mut prev : Map[Int, Int64]
   mut prev_wall : Double
@@ -177,9 +199,9 @@ pub fn ProcMonitor::new(cores : Int) -> ProcMonitor {
 }
 
 ///|
-/// 采样一次：枚举 /proc pid，逐进程读 stat + cmdline，算差值 CPU%。
-/// 读取失败（进程在枚举与读取间退出）跳过该进程；平台不支持
-/// （Windows）返回 None。
+/// 采样一次：枚举 /proc pid，逐进程读 stat + cmdline，算差值 CPU%
+/// （口径见 [proc_tick_cpu_pct]）。读取失败（进程在枚举与读取间退出）
+/// 跳过该进程；平台不支持（Windows）返回 None。
 pub fn ProcMonitor::tick(self : ProcMonitor) -> Array[ProcInfo]? {
   let listed = match ffi_list_pids() {
     None => return None
@@ -210,12 +232,13 @@ pub fn ProcMonitor::tick(self : ProcMonitor) -> Array[ProcInfo]? {
       None => ""
       Some(t) => parse_cmdline(t)
     }
-    let cpu_pct = if wall_dt > 0.0 {
-      let prev = self.prev.get(pid).unwrap_or(0)
-      proc_cpu_pct(prev, ticks, self.clk_tck, wall_dt, self.cores)
-    } else {
-      0.0
-    }
+    let cpu_pct = proc_tick_cpu_pct(
+      self.prev.get(pid),
+      ticks,
+      self.clk_tck,
+      wall_dt,
+      self.cores,
+    )
     out.push({
       pid: st.pid,
       ppid: st.ppid,
