@@ -11,6 +11,18 @@
 // 生效;样式值供窗口 resize 触发全链重排时按最后宽度接管。
 
 ///|
+/// 整圆弧度(2π,圆/点绘制用)。
+const ICON_TAU : Double = 6.283185307179586
+
+///|
+/// 实心圆点(圆心 x,y,半径 r):把手点纹。
+fn icon_dot(p : Painter, x : Double, y : Double, r : Double) -> Unit {
+  p.begin_path()
+  p.arc(x, y, r, 0.0, ICON_TAU)
+  p.fill()
+}
+
+///|
 /// 水平分隔:左右两栏,中间纵向把手左右拖动。
 pub fn hsplit(
   first : Node,

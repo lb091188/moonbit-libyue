@@ -1136,7 +1136,7 @@ let series = @yue.Store::new([
 | `draw_icon(p : Painter, kind, cx, cy, s, color)` | unified self-drawing entry (center coordinates + edge length) |
 | `all_icons()` / `icon_name(kind)` | full list / name lookup |
 
-Quick reference by group (full enum in `yue/icons.mbt` `IconKind`; live wall on the showcase icons page):
+Quick reference by group (full enum in `yue/icons/icons.mbt` `IconKind`; live wall on the showcase icons page):
 
 | Group | Icons |
 |---|---|

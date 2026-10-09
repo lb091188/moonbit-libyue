@@ -75,7 +75,7 @@ pub fn dialog_t(
       )
       let spacer = @yue.themed_container(style=[("flex", 1.0)])
       head.add_child(spacer)
-      let close_btn = @yue.icon_button_t(
+      let close_btn = @icons.icon_button_t(
         Close2,
         on_click=fn() {
           on_cancel()
@@ -191,14 +191,14 @@ pub fn toast_layer(
           let b = @yue.ViewLike::get_bounds(bar)
           p.set_stroke_color(@yue.theme_border())
           p.stroke_rect(0.5, 0.5, b.width - 1.0, b.height - 1.0)
-          let kind : @yue.IconKind = match t {
-            Info => @yue.IconKind::InfoCircleFill
-            Success => @yue.IconKind::CheckCircleFill
-            Warning => @yue.IconKind::WarningCircleFill
-            Danger => @yue.IconKind::CloseCircleFill
-            Primary => @yue.IconKind::InfoCircleFill
+          let kind : @icons.IconKind = match t {
+            Info => @icons.IconKind::InfoCircleFill
+            Success => @icons.IconKind::CheckCircleFill
+            Warning => @icons.IconKind::WarningCircleFill
+            Danger => @icons.IconKind::CloseCircleFill
+            Primary => @icons.IconKind::InfoCircleFill
           }
-          @yue.draw_icon(p, kind, 18.0, b.height / 2.0, 7.0, type_color(t))
+          @icons.draw_icon(p, kind, 18.0, b.height / 2.0, 7.0, type_color(t))
           let at = @yue.AttributedText::new(
             text,
             valign=@yue.Center,

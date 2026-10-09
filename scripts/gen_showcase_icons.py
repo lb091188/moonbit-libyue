@@ -2,7 +2,7 @@
 """重写 examples/showcase/pages/icons.mbt:按主题组铺全量图标墙。
 
 用法: python3 scripts/gen_showcase_icons.py
-读取 yue/icons.mbt 的生成标记区(变体+中文名),按 GROUPS 分组输出,
+读取 yue/icons/icons.mbt 的生成标记区(变体+中文名),按 GROUPS 分组输出,
 未分组的落入「其他」。页面结构(icon_grid/icon_group_code/@ui.page)
 与原页一致,只换图标清单与分组。
 """
@@ -10,7 +10,7 @@
 import re
 
 REPO = __file__.rsplit("/scripts/", 1)[0]
-ICONS_MBT = REPO + "/yue/icons.mbt"
+ICONS_MBT = REPO + "/yue/icons/icons.mbt"
 PAGE = REPO + "/examples/showcase/pages/icons.mbt"
 
 # (组名, 中文标题, 一句描述, [font_class...])
@@ -248,7 +248,7 @@ def main():
     out.append("")
     out.append("///|")
     out.append("/// 一组图标的网格:vbox 包行,每行 per_row 个,悬停 tooltip 显示名称。")
-    out.append("fn icon_grid(kinds : Array[@yue.IconKind], per_row : Int) -> @yue.Node {")
+    out.append("fn icon_grid(kinds : Array[@icons.IconKind], per_row : Int) -> @yue.Node {")
     out.append("  let rows : Array[@yue.Node] = []")
     out.append("  for row in 0..<((kinds.length() + per_row - 1) / per_row) {")
     out.append("    let items : Array[@yue.Node] = []")
@@ -256,9 +256,9 @@ def main():
     out.append("      let idx = row * per_row + col")
     out.append("      if idx < kinds.length() {")
     out.append("        items.push(")
-    out.append("          @yue.tooltip_t(")
-    out.append("            @yue.icon(kinds[idx], size=30.0),")
-    out.append("            @yue.icon_name(kinds[idx]),")
+    out.append("          @components.tooltip_t(")
+    out.append("            @icons.icon(kinds[idx], size=30.0),")
+    out.append("            @icons.icon_name(kinds[idx]),")
     out.append("          ),")
     out.append("        )")
     out.append("      }")
@@ -295,7 +295,7 @@ def main():
         out.append("          [")
         for i in range(0, len(kinds), 3):
             chunk = kinds[i : i + 3]
-            out.append("            " + " ".join("@yue." + k + "," for k in chunk))
+            out.append("            " + " ".join("@icons." + k + "," for k in chunk))
         out.append("          ],")
         out.append("          24,")
         out.append("        ),")
@@ -303,9 +303,9 @@ def main():
         code_lines = []
         if samples:
             for s in samples[:3]:
-                code_lines.append("        \"  @yue.icon(@yue.%s, size=18.0),\"," % s)
+                code_lines.append("        \"  @icons.icon(@icons.%s, size=18.0),\"," % s)
             code_lines.append(
-                "        \"  @yue.tooltip_t(@yue.icon(@yue.%s, size=18.0), @yue.icon_name(@yue.%s)),\","
+                "        \"  @components.tooltip_t(@icons.icon(@icons.%s, size=18.0), @icons.icon_name(@icons.%s)),\","
                 % (samples[0], samples[0]))
         out.append("      code=icon_group_code([")
         out.extend(code_lines)

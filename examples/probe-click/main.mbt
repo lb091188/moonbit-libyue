@@ -79,11 +79,11 @@ fn main {
       [
         @components.label_t("行4:"),
         @yue.bind_node(dark.signal(), fn(d) {
-          @yue.icon_button_t(
+          @icons.icon_button_t(
             if d {
-              @yue.Sunny
+              @icons.Sunny
             } else {
-              @yue.Moon
+              @icons.Moon
             },
             on_click=fn() {
               dark.update(fn(v) { !v })

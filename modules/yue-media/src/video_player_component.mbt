@@ -306,12 +306,12 @@ pub fn video_player_t(
           p.set_fill_color("#26ffffff")
           p.fill_rect(0.0, 0.0, b.width, b.height)
         }
-        let kind : @yue.IconKind = if fs_active.val {
-          @yue.IconKind::FullscreenExit
+        let kind : @icons.IconKind = if fs_active.val {
+          @icons.IconKind::FullscreenExit
         } else {
-          @yue.IconKind::Fullscreen
+          @icons.IconKind::Fullscreen
         }
-        @yue.draw_icon(
+        @icons.draw_icon(
           p,
           kind,
           b.width / 2.0,
