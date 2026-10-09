@@ -121,9 +121,9 @@ fn md_utf16_len(text : String) -> Int {
 /// http 不挂点击);图片渲染 alt 并加链接样式(块级单图段落才显示图片);
 /// FootnoteReference 渲染为上标 "[n]"(编号取脚注扫描);SoftBreak 渲染
 /// 为空格;HardBreak 渲染为换行;行内 HTML/行内指令不渲染。
-fn md_flatten_inline(inlines : Array[@markdown.Inline], ctx : MDCtx) -> Array[MDSpan] {
+fn md_flatten_inline(inlines : Array[@mdast.Inline], ctx : MDCtx) -> Array[MDSpan] {
   let spans : Array[MDSpan] = []
-  let nodes : Array[@markdown.Inline] = []
+  let nodes : Array[@mdast.Inline] = []
   let styles : Array[MDStyle] = []
   fn same_style(a : MDSpan, st : MDStyle) -> Bool {
     a.bold == st.bold && a.italic == st.italic && a.code == st.code && a.link == st.link && a.strike == st.strike && a.sup == st.sup && a.url == st.url
@@ -151,7 +151,7 @@ fn md_flatten_inline(inlines : Array[@markdown.Inline], ctx : MDCtx) -> Array[MD
   }
 
   // 逆序压栈保持文档顺序
-  fn push_all(arr : Array[@markdown.Inline], st : MDStyle) -> Unit {
+  fn push_all(arr : Array[@mdast.Inline], st : MDStyle) -> Unit {
     for i = arr.length() - 1; i >= 0; i = i - 1 {
       nodes.push(arr[i])
       styles.push(st)
@@ -256,7 +256,7 @@ fn md_list_marker(base : String) -> String {
 
 ///|
 /// GFM 提示块标题文字。
-fn md_alert_title(kind : @markdown.AlertKind) -> String {
+fn md_alert_title(kind : @mdast.AlertKind) -> String {
   match kind {
     Note => "NOTE"
     Tip => "TIP"
@@ -268,10 +268,10 @@ fn md_alert_title(kind : @markdown.AlertKind) -> String {
 
 ///|
 /// 表格列对齐:mdast TableAlign → 文本对齐(None 归左)。
-fn md_align_of(a : @markdown.TableAlign) -> String {
+fn md_align_of(a : @mdast.TableAlign) -> String {
   match a {
-    @markdown.Center => "center"
-    @markdown.Right => "flex-end"
+    @mdast.Center => "center"
+    @mdast.Right => "flex-end"
     _ => "flex-start"
   }
 }
@@ -297,7 +297,7 @@ fn md_image_path(url : String) -> String {
 ///|
 /// 脚注引用行内预扫描:行内树递归,遇 FootnoteReference 按出现顺序编号
 /// (同一 label 只编号一次)。
-fn md_scan_inline(inlines : Array[@markdown.Inline], s : MDFootScan) -> Unit {
+fn md_scan_inline(inlines : Array[@mdast.Inline], s : MDFootScan) -> Unit {
   for node in inlines {
     match node {
       FootnoteReference(label~, ..) =>
@@ -328,7 +328,7 @@ fn md_scan_inline(inlines : Array[@markdown.Inline], s : MDFootScan) -> Unit {
 ///|
 /// 脚注引用块级预扫描:遍历全部块(含嵌套列表/引用/表格单元格);
 /// FootnoteDefinition 自身跳过(定义内的引用不参与编号)。
-fn md_scan_blocks(blocks : Array[@markdown.Block], s : MDFootScan) -> Unit {
+fn md_scan_blocks(blocks : Array[@mdast.Block], s : MDFootScan) -> Unit {
   for b in blocks {
     match b {
       Heading(children~, ..) | Paragraph(children~, ..) => md_scan_inline(children, s)
@@ -369,8 +369,8 @@ fn md_scan_blocks(blocks : Array[@markdown.Block], s : MDFootScan) -> Unit {
 
 ///|
 /// 列表项内容:段落直接展平(不套段落外距,行距一致),其余块递归。
-fn md_item_content(children : Array[@markdown.Block], ctx : MDCtx) -> Array[Node] {
-  let nodes : Array[Node] = []
+fn md_item_content(children : Array[@mdast.Block], ctx : MDCtx) -> Array[@yue.Node] {
+  let nodes : Array[@yue.Node] = []
   for b in children {
     match b {
       Paragraph(children=inl, ..) => nodes.push(md_rich_label(md_flatten_inline(inl, ctx), 13.0))
@@ -385,15 +385,15 @@ fn md_item_content(children : Array[@markdown.Block], ctx : MDCtx) -> Array[Node
 
 ///|
 /// 引用/提示块:主题色竖条 + 缩进内容。
-fn md_quoted(content : Array[Node]) -> Node {
-  let bar = themed_container(style=[("width", 3.0)])
+fn md_quoted(content : Array[@yue.Node]) -> @yue.Node {
+  let bar = @yue.themed_container(style=[("width", 3.0)])
   bar.on_draw(fn(p) {
-    let b = ViewLike::get_bounds(bar)
-    p.set_fill_color(theme_primary())
+    let b = @yue.ViewLike::get_bounds(bar)
+    p.set_fill_color(@yue.theme_primary())
     p.fill_rect(0.0, 0.0, b.width, b.height)
   })
-  hbox(
-    [node_of(bar, style=[("height", 24.0)]), vbox(content, style=[("marginLeft", 10.0)])],
+  @yue.hbox(
+    [@yue.node_of(bar, style=[("height", 24.0)]), @yue.vbox(content, style=[("marginLeft", 10.0)])],
     style=[("marginBottom", 10.0)],
   )
 }
@@ -402,10 +402,10 @@ fn md_quoted(content : Array[Node]) -> Node {
 /// 块级图片:本地路径加载显示(等比缩放,宽度上限取 ctx.width,alt 做
 /// 悬浮提示);加载失败或网络地址降级为 alt 富文本(链接样式)——富文本
 /// 行不支持行内嵌图。
-fn md_image(url : String, alt : String, ctx : MDCtx) -> Node {
+fn md_image(url : String, alt : String, ctx : MDCtx) -> @yue.Node {
   {
     mount: fn(parent) {
-      let img = Image::new_from_file(md_image_path(url))
+      let img = @yue.Image::new_from_file(md_image_path(url))
       if img.is_empty() {
         md_rich_label([md_plain_span(alt, link=true)], 13.0).mount_into(parent)
       } else {
@@ -413,17 +413,17 @@ fn md_image(url : String, alt : String, ctx : MDCtx) -> Node {
         let ih = img.get_height()
         let w = if iw > 1.0 { iw.min(ctx.width) } else { 1.0 }
         let h = if iw > 1.0 { (w * ih / iw).max(1.0) } else { 1.0 }
-        let c = themed_container(style=[
+        let c = @yue.themed_container(style=[
           ("width", w),
           ("height", h),
           ("marginBottom", 10.0),
         ])
         if alt != "" {
-          ViewLike::set_tooltip(c, alt)
+          @yue.ViewLike::set_tooltip(c, alt)
         }
         c.on_draw(fn(p) { p.draw_image(img, 0.0, 0.0, w, h) })
-        attach(parent, ViewLike::view(c))
-        ViewLike::view(c)
+        @yue.attach(parent, @yue.ViewLike::view(c))
+        @yue.ViewLike::view(c)
       }
     },
   }
@@ -431,7 +431,7 @@ fn md_image(url : String, alt : String, ctx : MDCtx) -> Node {
 
 ///|
 /// 表格单元格 → 展平片段(表头加粗)。
-fn md_table_cell_spans(cell : @markdown.TableCell, head : Bool, ctx : MDCtx) -> Array[MDSpan] {
+fn md_table_cell_spans(cell : @mdast.TableCell, head : Bool, ctx : MDCtx) -> Array[MDSpan] {
   if head {
     let spans : Array[MDSpan] = []
     for s in md_flatten_inline(cell.children, ctx) {
@@ -448,22 +448,22 @@ fn md_table_cell_spans(cell : @markdown.TableCell, head : Bool, ctx : MDCtx) -> 
 /// 表头加粗、表头下分隔线,列对齐随源标注(:--- / :---: / ---:)经
 /// 格子容器 alignItems 落地;单元格为富文本(粗体/代码/链接可用)。
 fn md_table(
-  header : Array[@markdown.TableCell],
-  alignments : Array[@markdown.TableAlign],
-  rows : Array[Array[@markdown.TableCell]],
+  header : Array[@mdast.TableCell],
+  alignments : Array[@mdast.TableAlign],
+  rows : Array[Array[@mdast.TableCell]],
   ctx : MDCtx,
-) -> Node {
+) -> @yue.Node {
   let n = header.length().max(1)
   let col_w = "\{100.0 / n.to_double()}%"
-  let cells_of = fn(row : Array[@markdown.TableCell], head : Bool) -> Array[Node] {
-    let cells : Array[Node] = []
+  let cells_of = fn(row : Array[@mdast.TableCell], head : Bool) -> Array[@yue.Node] {
+    let cells : Array[@yue.Node] = []
     for i, cell in row {
       let al = match alignments.get(i) {
         Some(a) => md_align_of(a)
         None => "flex-start"
       }
       cells.push(
-        vbox(
+        @yue.vbox(
           [md_rich_label(md_table_cell_spans(cell, head, ctx), 13.0)],
           style=[("width", col_w), ("alignItems", al)],
         ),
@@ -471,24 +471,24 @@ fn md_table(
     }
     cells
   }
-  let nodes : Array[Node] = [hbox(cells_of(header, true))]
-  nodes.push(separator(style=[("marginTop", 2.0), ("marginBottom", 4.0)]))
+  let nodes : Array[@yue.Node] = [@yue.hbox(cells_of(header, true))]
+  nodes.push(@yue.separator(style=[("marginTop", 2.0), ("marginBottom", 4.0)]))
   for row in rows {
-    nodes.push(hbox(cells_of(row, false), style=[("marginBottom", 2.0)]))
+    nodes.push(@yue.hbox(cells_of(row, false), style=[("marginBottom", 2.0)]))
   }
-  vbox(nodes, style=[("marginBottom", 10.0)])
+  @yue.vbox(nodes, style=[("marginBottom", 10.0)])
 }
 
 ///|
 /// 块级渲染:mdast Block 17 变体 → 节点序列。不渲染的变体:HtmlBlock、
 /// BlankLines、FootnoteDefinition(定义在 markdown_view 文末统一渲染)。
-fn md_render_blocks(blocks : Array[@markdown.Block], ctx : MDCtx) -> Array[Node] {
-  let nodes : Array[Node] = []
+fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@yue.Node] {
+  let nodes : Array[@yue.Node] = []
   for block in blocks {
     match block {
       Heading(level~, children~, ..) =>
         nodes.push(
-          vbox(
+          @yue.vbox(
             [md_rich_label(md_flatten_inline(children, ctx), md_heading_size(level))],
             style=[
               ("marginTop", if level <= 2 { 10.0 } else { 6.0 }),
@@ -515,7 +515,7 @@ fn md_render_blocks(blocks : Array[@markdown.Block], ctx : MDCtx) -> Array[Node]
           nodes.push(md_image(img.0, img.1, ctx))
         } else {
           nodes.push(
-            vbox(
+            @yue.vbox(
               [md_rich_label(md_flatten_inline(children, ctx), 13.0)],
               style=[("marginBottom", 8.0)],
             ),
@@ -524,19 +524,19 @@ fn md_render_blocks(blocks : Array[@markdown.Block], ctx : MDCtx) -> Array[Node]
       }
       FencedCode(info~, code~, ..) =>
         nodes.push(
-          vbox(
-            [code_view(md_split_code_lines(code), lang=md_info_lang(info))],
+          @yue.vbox(
+            [@yue.code_view(md_split_code_lines(code), lang=md_info_lang(info))],
             style=[("marginBottom", 10.0)],
           ),
         )
       IndentedCode(code~, ..) =>
         nodes.push(
-          vbox([code_view(md_split_code_lines(code))], style=[("marginBottom", 10.0)]),
+          @yue.vbox([@yue.code_view(md_split_code_lines(code))], style=[("marginBottom", 10.0)]),
         )
       MathBlock(value~, ..) =>
         nodes.push(
-          vbox(
-            [code_view(md_split_code_lines(value), lang="math")],
+          @yue.vbox(
+            [@yue.code_view(md_split_code_lines(value), lang="math")],
             style=[("marginBottom", 10.0)],
           ),
         )
@@ -544,7 +544,7 @@ fn md_render_blocks(blocks : Array[@markdown.Block], ctx : MDCtx) -> Array[Node]
         // 引用收块:子块(段落/列表/嵌套引用)整体递归进竖条内容区
         nodes.push(md_quoted(md_render_blocks(children, ctx)))
       Alert(kind~, children~, ..) => {
-        let content : Array[Node] = [label(md_alert_title(kind), style=[("marginBottom", 4.0)])]
+        let content : Array[@yue.Node] = [@yue.label(md_alert_title(kind), style=[("marginBottom", 4.0)])]
         for n in md_render_blocks(children, ctx) {
           content.push(n)
         }
@@ -556,20 +556,20 @@ fn md_render_blocks(blocks : Array[@markdown.Block], ctx : MDCtx) -> Array[Node]
             // GFM 任务列表:真复选框(可勾选),内容并排
             Some(ck) =>
               nodes.push(
-                hbox(
+                @yue.hbox(
                   [
-                    checkbox_t("", checked=ck, style=[("width", 24.0)]),
-                    vbox(md_item_content(item.children, ctx)),
+                    @yue.checkbox_t("", checked=ck, style=[("width", 24.0)]),
+                    @yue.vbox(md_item_content(item.children, ctx)),
                   ],
                   style=[("marginBottom", 4.0), ("marginLeft", 8.0)],
                 ),
               )
             None =>
               nodes.push(
-                hbox(
+                @yue.hbox(
                   [
-                    label(md_list_marker("•"), style=[("width", 18.0)]),
-                    vbox(md_item_content(item.children, ctx)),
+                    @yue.label(md_list_marker("•"), style=[("width", 18.0)]),
+                    @yue.vbox(md_item_content(item.children, ctx)),
                   ],
                   style=[("marginBottom", 4.0), ("marginLeft", 8.0)],
                 ),
@@ -580,10 +580,10 @@ fn md_render_blocks(blocks : Array[@markdown.Block], ctx : MDCtx) -> Array[Node]
         let mut no = start
         for item in items {
           nodes.push(
-            hbox(
+            @yue.hbox(
               [
-                label("\{no}.", style=[("width", 18.0)]),
-                vbox(md_item_content(item.children, ctx)),
+                @yue.label("\{no}.", style=[("width", 18.0)]),
+                @yue.vbox(md_item_content(item.children, ctx)),
               ],
               style=[("marginBottom", 4.0), ("marginLeft", 8.0)],
             ),
@@ -595,16 +595,16 @@ fn md_render_blocks(blocks : Array[@markdown.Block], ctx : MDCtx) -> Array[Node]
       DefinitionList(items~, ..) =>
         for item in items {
           nodes.push(
-            vbox(
+            @yue.vbox(
               [md_rich_label(md_flatten_inline(item.term, ctx), 13.0)],
               style=[("marginBottom", 2.0)],
             ),
           )
           for def in item.definitions {
             nodes.push(
-              hbox(
+              @yue.hbox(
                 [
-                  label("·", style=[("width", 18.0)]),
+                  @yue.label("·", style=[("width", 18.0)]),
                   md_rich_label(md_flatten_inline(def, ctx), 13.0),
                 ],
                 style=[("marginBottom", 4.0), ("marginLeft", 8.0)],
@@ -623,7 +623,7 @@ fn md_render_blocks(blocks : Array[@markdown.Block], ctx : MDCtx) -> Array[Node]
         }
       ThematicBreak(..) =>
         nodes.push(
-          separator(style=[("marginTop", 6.0), ("marginBottom", 10.0)]),
+          @yue.separator(style=[("marginTop", 6.0), ("marginBottom", 10.0)]),
         )
       HtmlBlock(..) | BlankLines(..) | FootnoteDefinition(..) => ()
     }
@@ -637,16 +637,16 @@ fn md_render_blocks(blocks : Array[@markdown.Block], ctx : MDCtx) -> Array[Node]
 /// (md_span_ranges 计量)。带地址的链接段可点击(命中按像素区间换算,
 /// 经 open_url 走默认浏览器),悬浮手型光标 + 地址矩形提示;sup 段用
 /// 小一号字体;链接/代码段主题色,跟随主题切换重建。
-fn md_rich_label(spans : Array[MDSpan], size : Double) -> Node {
+fn md_rich_label(spans : Array[MDSpan], size : Double) -> @yue.Node {
   {
     mount: fn(parent) {
-      let regular = Font::new("Sans", size)
-      let bold = Font::new("Sans", size, weight=Bold)
-      let italic = Font::new("Sans", size, weight=Normal, style=Italic)
-      let bold_italic = Font::new("Sans", size, weight=Bold, style=Italic)
-      let mono = Font::new("Monospace", size - 1.0)
-      let sup_font = Font::new("Sans", (size - 4.0).max(8.0))
-      fn font_of(span : MDSpan) -> Font {
+      let regular = @yue.Font::new("Sans", size)
+      let bold = @yue.Font::new("Sans", size, weight=Bold)
+      let italic = @yue.Font::new("Sans", size, weight=Normal, style=Italic)
+      let bold_italic = @yue.Font::new("Sans", size, weight=Bold, style=Italic)
+      let mono = @yue.Font::new("Monospace", size - 1.0)
+      let sup_font = @yue.Font::new("Sans", (size - 4.0).max(8.0))
+      fn font_of(span : MDSpan) -> @yue.Font {
         if span.sup {
           sup_font
         } else if span.code {
@@ -668,7 +668,7 @@ fn md_rich_label(spans : Array[MDSpan], size : Double) -> Node {
       let ws : Array[Double] = []
       let mut x = 0.0
       for span in spans {
-        let probe = AttributedText::new(span.text, wrap=false)
+        let probe = @yue.AttributedText::new(span.text, wrap=false)
         probe.set_font(font_of(span))
         let w = probe.get_bounds_for(10000.0, 100.0).width
         xs.push(x)
@@ -677,12 +677,12 @@ fn md_rich_label(spans : Array[MDSpan], size : Double) -> Node {
       }
       let row_w = if x < 1.0 { 1.0 } else { x }
 
-      fn build() -> AttributedText {
+      fn build() -> @yue.AttributedText {
         let parts : Array[String] = []
         for span in spans {
           parts.push(span.text)
         }
-        let at = AttributedText::new(parts.join(""), valign=Center)
+        let at = @yue.AttributedText::new(parts.join(""), valign=Center)
         at.set_font(regular)
         for mark in md_span_ranges(spans) {
           let (s, e, span) = mark
@@ -698,7 +698,7 @@ fn md_rich_label(spans : Array[MDSpan], size : Double) -> Node {
             at.set_font_for(mono, s, e)
           }
           if span.link || span.code {
-            at.set_color_for(theme_primary(), s, e)
+            at.set_color_for(@yue.theme_primary(), s, e)
           }
         }
         at
@@ -706,10 +706,10 @@ fn md_rich_label(spans : Array[MDSpan], size : Double) -> Node {
 
       let at = Ref(build())
       let line_h = at.val.get_one_line_height().max(1.0)
-      let c = themed_container(style=[("width", row_w), ("height", line_h)])
+      let c = @yue.themed_container(style=[("width", row_w), ("height", line_h)])
       c.on_draw(fn(p) {
         p.draw_attributed_text(at.val, 0.0, 0.0, row_w, line_h)
-        p.set_stroke_color(theme_text_regular())
+        p.set_stroke_color(@yue.theme_text_regular())
         for i, span in spans {
           if span.strike {
             let y = line_h * 0.5
@@ -737,10 +737,10 @@ fn md_rich_label(spans : Array[MDSpan], size : Double) -> Node {
           ""
         }
 
-        ViewLike::on_mouse_down(c, fn(e) {
+        @yue.ViewLike::on_mouse_down(c, fn(e) {
           let u = hit_url(e.view_x)
           if u != "" {
-            let _ = open_url(u)
+            let _ = @yue.open_url(u)
             true
           } else {
             false
@@ -751,20 +751,20 @@ fn md_rich_label(spans : Array[MDSpan], size : Double) -> Node {
           let hit = hit_url(mx) != ""
           if hit != on_link.val {
             on_link.val = hit
-            View::set_cursor(c, if hit { hand() } else { Cursor::new(Default) })
+            @yue.View::set_cursor(c, if hit { @yue.hand() } else { @yue.Cursor::new(Default) })
           }
         }
 
-        ViewLike::on_mouse_move(c, fn(e) { sync_cursor(e.view_x) })
-        ViewLike::on_mouse_leave(c, fn(_e) {
+        @yue.ViewLike::on_mouse_move(c, fn(e) { sync_cursor(e.view_x) })
+        @yue.ViewLike::on_mouse_leave(c, fn(_e) {
           if on_link.val {
             on_link.val = false
-            View::set_cursor(c, Cursor::new(Default))
+            @yue.View::set_cursor(c, @yue.Cursor::new(Default))
           }
         })
         for i, s in spans {
           if s.url != "" {
-            let _ = ViewLike::add_tooltip_for_rect(
+            let _ = @yue.ViewLike::add_tooltip_for_rect(
               c,
               s.url,
               { x: xs[i], y: 0.0, width: ws[i].max(1.0), height: line_h },
@@ -776,13 +776,13 @@ fn md_rich_label(spans : Array[MDSpan], size : Double) -> Node {
       fn apply() -> Unit {
         // 主题切换后重建(链接/代码的主题色随色板,基色随前景)
         at.val = build()
-        ViewLike::schedule_paint(c)
+        @yue.ViewLike::schedule_paint(c)
       }
 
-      ignore(on_theme_change(apply))
+      ignore(@yue.on_theme_change(apply))
       apply()
-      attach(parent, ViewLike::view(c))
-      ViewLike::view(c)
+      @yue.attach(parent, @yue.ViewLike::view(c))
+      @yue.ViewLike::view(c)
     },
   }
 }
@@ -794,9 +794,9 @@ fn md_rich_label(spans : Array[MDSpan], size : Double) -> Node {
 /// 脚注定义。
 pub fn markdown_view(
   source : String,
-  style? : Array[(String, &StyVal)] = [],
-) -> Node {
-  let res = @markdown.parse(source)
+  style? : Array[(String, &@yue.StyVal)] = [],
+) -> @yue.Node {
+  let res = @mdast.parse(source)
   let doc = res.document
   let foot : MDFootScan = { no: (Map([]) : Map[String, Int]), order: [], counter: Ref(0) }
   md_scan_blocks(doc.children, foot)
@@ -807,7 +807,7 @@ pub fn markdown_view(
   let ctx : MDCtx = { foot, defs, width: 560.0 }
   let nodes = md_render_blocks(doc.children, ctx)
   if foot.order.length() > 0 {
-    let fd : Map[String, Array[@markdown.Block]] = (Map([]) : Map[String, Array[@markdown.Block]])
+    let fd : Map[String, Array[@mdast.Block]] = (Map([]) : Map[String, Array[@mdast.Block]])
     for b in doc.children {
       match b {
         FootnoteDefinition(label~, children~, ..) => fd.set(label, children)
@@ -815,7 +815,7 @@ pub fn markdown_view(
       }
     }
     if fd.length() > 0 {
-      nodes.push(separator(style=[("marginTop", 6.0), ("marginBottom", 8.0)]))
+      nodes.push(@yue.separator(style=[("marginTop", 6.0), ("marginBottom", 8.0)]))
       for lbl in foot.order {
         match fd.get(lbl) {
           Some(children) => {
@@ -824,10 +824,10 @@ pub fn markdown_view(
               None => 0
             }
             nodes.push(
-              hbox(
+              @yue.hbox(
                 [
-                  label("\{num}.", style=[("width", 24.0)]),
-                  vbox(md_item_content(children, ctx)),
+                  @yue.label("\{num}.", style=[("width", 24.0)]),
+                  @yue.vbox(md_item_content(children, ctx)),
                 ],
                 style=[("marginBottom", 4.0), ("marginLeft", 8.0)],
               ),
@@ -838,9 +838,9 @@ pub fn markdown_view(
       }
     }
   }
-  let base : Array[(String, &StyVal)] = [("width", 560.0)]
+  let base : Array[(String, &@yue.StyVal)] = [("width", 560.0)]
   for kv in style {
     base.push(kv)
   }
-  vbox(nodes, style=base)
+  @yue.vbox(nodes, style=base)
 }

@@ -70,7 +70,7 @@ fn md_demo_escape(s : String) -> String {
 /// 复制串:由演示源文逐行派生的 markdown_view 调用源码。
 fn demo_md_code(width : Double) -> Array[String] {
   let lines = demo_md_lines()
-  let code : Array[String] = ["@yue.markdown_view("]
+  let code : Array[String] = ["@markdown.markdown_view("]
   let n = lines.length()
   for i, line in lines {
     let tail = if i < n - 1 { " +" } else { "," }
@@ -132,7 +132,7 @@ pub fn page_code(_app : @ui.App) -> @yue.Node {
       "Markdown 渲染",
       "mdast 解析 + 富文本行自绘:标题/段落/粗斜体/删除线(自画横线)/行内代码/链接(点击经默认浏览器打开,悬浮手型+地址提示)/自动链接/引用式链接/嵌套列表/任务列表(真复选框)/引用/分隔线/围栏与缩进代码块/表格(等分列宽+列对齐)/脚注(正文上标+文末定义)/本地图片(失败降级 alt);emoji 区间按 UTF-16 计量不错位,演示文本与复制串同源。",
       [
-        @yue.markdown_view(demo, style=[("width", md_w)]),
+        @markdown.markdown_view(demo, style=[("width", md_w)]),
       ],
       code=demo_md_code(md_w),
     ),

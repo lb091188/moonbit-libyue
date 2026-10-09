@@ -7,7 +7,7 @@
 /// 组件每次绘制/挂载经 getter 读取当前值。
 
 ///|
-fn theme_primary() -> String {
+pub fn theme_primary() -> String {
   theme_box.t.primary
 }
 
@@ -72,7 +72,7 @@ fn theme_text_primary() -> String {
 }
 
 ///|
-fn theme_text_regular() -> String {
+pub fn theme_text_regular() -> String {
   theme_box.t.text_regular
 }
 

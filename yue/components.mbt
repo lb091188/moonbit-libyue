@@ -17,7 +17,7 @@
 
 ///|
 /// 可点击自绘控件统一手型光标。
-fn hand() -> Cursor {
+pub fn hand() -> Cursor {
   Cursor::new(Hand)
 }
 

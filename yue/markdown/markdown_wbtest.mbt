@@ -16,7 +16,7 @@ fn md_test_ctx() -> MDCtx {
 ///|
 /// 测试帮手:解析单段落源文并展平其行内。
 fn md_flat_par(src : String) -> Array[MDSpan] {
-  let doc = @markdown.parse(src).document
+  let doc = @mdast.parse(src).document
   let spans : Array[MDSpan] = []
   for b in doc.children {
     match b {
@@ -113,7 +113,7 @@ test {
 test {
   // 引用式链接:地址取自文档级链接定义;无定义的引用式按 CommonMark
   // 退化为字面文本(不产生 RefLink,自然没有地址可挂)
-  let res = @markdown.parse("见 [文字][ref]\n\n[ref]: https://ref.y/x")
+  let res = @mdast.parse("见 [文字][ref]\n\n[ref]: https://ref.y/x")
   let defs : Map[String, String] = (Map([]) : Map[String, String])
   for d in res.definitions {
     defs.set(d.label.trim(chars=" \t\n\r").to_owned(), d.url)
@@ -183,7 +183,7 @@ test {
 ///|
 test {
   // 脚注:正文引用按出现顺序编号,展平为上标 "[n]";同一 label 不重编
-  let res = @markdown.parse("甲[^a] 乙[^b] 丙[^a]\n\n[^a]: 定义甲\n[^b]: 定义乙")
+  let res = @mdast.parse("甲[^a] 乙[^b] 丙[^a]\n\n[^a]: 定义甲\n[^b]: 定义乙")
   let foot : MDFootScan = { no: (Map([]) : Map[String, Int]), order: [], counter: Ref(0) }
   md_scan_blocks(res.document.children, foot)
   assert_eq(foot.order, ["a", "b"])
@@ -213,7 +213,7 @@ test {
 test {
   // 块级渲染忽略 FootnoteDefinition(定义由 markdown_view 收集后在文末
   // 统一渲染):段落 1 节点,两条定义均不产节点
-  let doc = @markdown.parse("甲[^a]\n\n[^a]: 定义甲\n[^b]: 定义乙\n").document
+  let doc = @mdast.parse("甲[^a]\n\n[^a]: 定义甲\n[^b]: 定义乙\n").document
   let ctx = md_test_ctx()
   md_scan_blocks(doc.children, ctx.foot)
   assert_eq(ctx.foot.order, ["a"])
@@ -284,16 +284,16 @@ test {
   assert_eq(md_list_marker("•"), "•")
   assert_eq(md_alert_title(Note), "NOTE")
   assert_eq(md_alert_title(Caution), "CAUTION")
-  assert_eq(md_align_of(@markdown.Left), "flex-start")
-  assert_eq(md_align_of(@markdown.Center), "center")
-  assert_eq(md_align_of(@markdown.Right), "flex-end")
-  assert_eq(md_align_of(@markdown.None), "flex-start")
+  assert_eq(md_align_of(@mdast.Left), "flex-start")
+  assert_eq(md_align_of(@mdast.Center), "center")
+  assert_eq(md_align_of(@mdast.Right), "flex-end")
+  assert_eq(md_align_of(@mdast.None), "flex-start")
 }
 
 ///|
 test {
   // 前后对比验收①:setext 标题(旧解析不识别,整段当正文)
-  let doc = @markdown.parse("标题甲\n===\n正文\n\n副标题\n---\n").document
+  let doc = @mdast.parse("标题甲\n===\n正文\n\n副标题\n---\n").document
   let mut h1 = 0
   let mut h2 = 0
   for b in doc.children {
@@ -317,7 +317,7 @@ test {
 ///|
 test {
   // 前后对比验收②:~~~ 波浪围栏(旧解析只认 ```)
-  let doc = @markdown.parse("~~~py\ncode\n~~~\n").document
+  let doc = @mdast.parse("~~~py\ncode\n~~~\n").document
   match doc.children[0] {
     FencedCode(fence_marker~, info~, ..) => {
       assert_eq(fence_marker, Tilde)
@@ -330,7 +330,7 @@ test {
 ///|
 test {
   // 前后对比验收③:info 串(旧解析把 "rust title=x" 整串当语言)
-  let doc = @markdown.parse("```rust title=abc.rs\nfn a() {}\n```\n").document
+  let doc = @mdast.parse("```rust title=abc.rs\nfn a() {}\n```\n").document
   match doc.children[0] {
     FencedCode(info~, ..) => assert_eq(md_info_lang(info), "rust")
     _ => abort("info 串解析失败")
@@ -340,7 +340,7 @@ test {
 ///|
 test {
   // 前后对比验收④:缩进代码块(旧解析不识别,4 空格缩进当正文)
-  let doc = @markdown.parse("段落\n\n    indented\n    lines\n").document
+  let doc = @mdast.parse("段落\n\n    indented\n    lines\n").document
   let mut found = false
   for b in doc.children {
     match b {
@@ -357,7 +357,7 @@ test {
 ///|
 test {
   // 前后对比验收⑤:嵌套列表(旧解析整体拍平为一级)
-  let doc = @markdown.parse("- 甲\n  - 甲一\n  - 甲二\n- 乙\n").document
+  let doc = @mdast.parse("- 甲\n  - 甲一\n  - 甲二\n- 乙\n").document
   match doc.children[0] {
     BulletList(items~, ..) => {
       assert_eq(items.length(), 2)
@@ -380,7 +380,7 @@ test {
 ///|
 test {
   // 有序列表带 start(旧解析无视起始编号);任务列表勾选态
-  let doc = @markdown.parse("3. 三\n4. 四\n\n- [x] 完成\n- [ ] 待办\n").document
+  let doc = @mdast.parse("3. 三\n4. 四\n\n- [x] 完成\n- [ ] 待办\n").document
   let mut ol = false
   let mut ul = false
   for b in doc.children {
@@ -405,12 +405,12 @@ test {
 ///|
 test {
   // 表格渲染:出 表头行 + 分隔线 + 数据行 三节点;单元格富文本展平
-  let doc = @markdown.parse("| A | B |\n|:--|--:|\n| 甲 | 乙 |\n| **粗** | `码` |\n").document
+  let doc = @mdast.parse("| A | B |\n|:--|--:|\n| 甲 | 乙 |\n| **粗** | `码` |\n").document
   match doc.children[0] {
     Table(header~, alignments~, rows~, ..) => {
       assert_eq(header.length(), 2)
-      assert_eq(alignments[0], @markdown.Left)
-      assert_eq(alignments[1], @markdown.Right)
+      assert_eq(alignments[0], @mdast.Left)
+      assert_eq(alignments[1], @mdast.Right)
       assert_eq(rows.length(), 2)
       let ctx = md_test_ctx()
       let head_spans = md_table_cell_spans(header[0], true, ctx)
@@ -431,7 +431,7 @@ test {
 test {
   // 默认不渲染的块级变体:空白行、HtmlBlock 与 FootnoteDefinition 不产
   // 节点(脚注定义在 markdown_view 文末统一渲染)
-  let doc = @markdown.parse("段落甲\n\n\n\n段落乙\n\n<div>x</div>\n\n[^f]: 脚注\n").document
+  let doc = @mdast.parse("段落甲\n\n\n\n段落乙\n\n<div>x</div>\n\n[^f]: 脚注\n").document
   let nodes = md_render_blocks(doc.children, md_test_ctx())
   assert_eq(nodes.length(), 2)
 }
