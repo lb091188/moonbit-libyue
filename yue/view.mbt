@@ -185,7 +185,8 @@ impl ViewLike with fn set_style_str(self, name, value) -> Unit {
 }
 
 ///|
-/// 设置背景色（hex：#RGB/#RGBA/#RRGGBB/#RRGGBBAA）。
+/// 设置背景色（hex：#RGB/#RRGGBB/#AARRGGBB；8 位 alpha 在前，且不保证
+/// 生效（Linux/GTK 按不透明处理）——半透明底走 on_draw + Painter 填充）。
 impl ViewLike with fn set_background_color(self, hex) -> Unit {
   ffi_view_set_background_color(self.view(), utf8_bytes(hex))
 }

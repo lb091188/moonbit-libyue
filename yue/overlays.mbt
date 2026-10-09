@@ -24,17 +24,23 @@ pub fn dialog_t(
   {
     mount: fn(parent) {
       let close = fn() -> Unit { visible.set(false) }
-      // 遮罩:absolute 全覆盖 + 居中排布;固定半透明黑(EP 遮罩语义)
+      // 遮罩:absolute 全覆盖 + 居中排布;半透明黑经 on_draw 填充——
+      // 背景色 hex 的 alpha 在 GTK 按不透明处理,半透明底必须走
+      // Painter(定案见 adaptation.md「对话框遮罩」条)
       let overlay = themed_container(style=[
         ("position", "absolute"),
         ("top", "0"),
-        ("bottom", "0"),
         ("left", "0"),
         ("right", "0"),
+        ("height", "100%"),
         ("justifyContent", "center"),
         ("alignItems", "center"),
       ])
-      ViewLike::set_background_color(overlay, "#59000000")
+      overlay.on_draw(fn(p) {
+        let b = ViewLike::get_bounds(overlay)
+        p.set_fill_color("#59000000")
+        p.fill_rect(0.0, 0.0, b.width, b.height)
+      })
       // 面板:主题面板底 + 1px 边框(on_draw 描);style 落面板
       let base : Array[(String, &StyVal)] = [
         ("width", 420.0),
