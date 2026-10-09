@@ -110,22 +110,20 @@ pub fn page_audio(app : @ui.ProbeApp) -> @yue.Node {
               variant=@components.Solid,
               on_click=fn() {
                 let mp3 = "/tmp/yue-probe-demo.mp3"
-                match
-                  @system.pr_run(
-                    "ffmpeg",
-                    [
-                      "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
-                      "-ar", "44100", "-c:a", "libmp3lame", mp3,
-                    ],
-                    timeout_ms=30000,
-                  ) {
+                match @system.pr_run(
+                  "ffmpeg",
+                  [
+                    "-v", "error", "-y",
+                    "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
+                    "-ar", "44100", "-c:a", "libmp3lame",
+                    mp3,
+                  ],
+                  timeout_ms=30000,
+                ) {
                   Ok(o) =>
                     if o.exit_code != 0 {
                       match status.val {
-                        Some(l) =>
-                          l.set_text(
-                            "测试音频生成失败(退出码 \{o.exit_code})",
-                          )
+                        Some(l) => l.set_text("测试音频生成失败(退出码 \{o.exit_code})")
                         None => ()
                       }
                       refresh()
@@ -143,34 +141,36 @@ pub fn page_audio(app : @ui.ProbeApp) -> @yue.Node {
                 aud_load(app, holder, ctrl_view, mp3, path_lbl, status, refresh)
               },
             ),
-            @components.button_t("选择本地音频…", on_click=fn() {
-              match app.win_ref.val {
-                Some(w) => {
-                  let dlg = @yue.FileDialog::new_open()
-                  dlg.set_title("选择音频文件")
-                  dlg.set_filters(
-                    "音频文件:wav,mp3,ogg,m4a,flac,aac|所有文件:*",
-                  )
-                  if dlg.run_for_window(w) {
-                    let path = dlg.get_result()
-                    app.toast_push("已选 \{path}", @components.Success)
-                    // 大文件探测/设备握手同步耗时,延后一拍让对话框先
-                    // 关、状态先渲染(UI 不冻结)
-                    match status.val {
-                      Some(l) => l.set_text("载入中:\{path}…")
-                      None => ()
-                    }
-                    refresh()
-                    let _ = @yue.set_timeout(50, fn() {
-                      aud_load(
-                        app, holder, ctrl_view, path, path_lbl, status, refresh,
+            @components.button_t(
+              "选择本地音频…",
+              on_click=fn() {
+                match app.win_ref.val {
+                  Some(w) => {
+                    let dlg = @yue.FileDialog::new_open()
+                    dlg.set_title("选择音频文件")
+                    dlg.set_filters("音频文件:wav,mp3,ogg,m4a,flac,aac|所有文件:*")
+                    if dlg.run_for_window(w) {
+                      let path = dlg.get_result()
+                      app.toast_push("已选 \{path}", @components.Success)
+                      // 大文件探测/设备握手同步耗时,延后一拍让对话框先
+                      // 关、状态先渲染(UI 不冻结)
+                      match status.val {
+                        Some(l) => l.set_text("载入中:\{path}…")
+                        None => ()
+                      }
+                      refresh()
+                      let _ = @yue.set_timeout(
+                        50,
+                        fn() {
+                          aud_load(app, holder, ctrl_view, path, path_lbl, status, refresh)
+                        },
                       )
-                    })
+                    }
                   }
+                  None => ()
                 }
-                None => ()
-              }
-            }),
+              },
+            ),
           ],
           style=[("gap", 8.0), ("alignItems", "center")],
         ),
@@ -179,9 +179,7 @@ pub fn page_audio(app : @ui.ProbeApp) -> @yue.Node {
         }),
         // 控制条宿主:载入后由 aud_load 挂 audio_player_t(换载重挂)
         @declarative.container(handle=fn(c) { holder.val = Some(c) }),
-        @components.label_t("(等待载入)", role=@components.Body, handle=fn(
-          l,
-        ) {
+        @components.label_t("(等待载入)", role=@components.Body, handle=fn(l) {
           status.val = Some(l)
           // 状态标签就位后启动轮询(页面惰性挂载,首次进页才计时)
           aud_poll_status(app, status, refresh)

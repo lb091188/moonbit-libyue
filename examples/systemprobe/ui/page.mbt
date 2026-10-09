@@ -29,10 +29,7 @@ pub fn page_shell(
     [
       @declarative.vbox(head, style=[("padding", 14.0), ("gap", 8.0)]),
       @declarative.scroll(
-        @declarative.vbox(body(refresh), style=[
-          ("padding", 14.0),
-          ("gap", 14.0),
-        ]),
+        @declarative.vbox(body(refresh), style=[("padding", 14.0), ("gap", 14.0)]),
         style=[("flexgrow", 1.0), ("flexshrink", 1.0)],
         handle=fn(sc) { scroll_ref.val = Some(sc) },
       ),
@@ -43,19 +40,27 @@ pub fn page_shell(
 }
 
 ///|
-/// 报告标签写入并强制长高:GTK 标签的 yoga 高度只在挂载时测量一次,
-/// set_text 不标记重测——写入比占位文本更长的内容时按旧高度裁剪
-/// (实测 16 行报告只显示第 1 行)。显隐切换经 shim 的 set_visible
-/// 做根级重算,迫使重新测量标签高度;末尾刷新滚动范围(定案见
-/// adaptation.md「报告标签 set_text 后不长高」条)。
+/// 报告标签写入并强制长高:GTK 标签的自然高不能交给 yoga 重测——
+/// pango 的 GetBoundsFor 对未定义高度按一行量(refresh 读到 92px),
+/// 视口确定高度又把文本裁掉(40 行只分 19 行),两者都导致内容不超
+/// 视口、滚动范围为 0。先用同角色字体量出自然后显式设定高度,yoga
+/// 便不再测量;显隐切换经 shim 的 set_visible 做根级重算迫使重新
+/// 分配,末尾刷新滚动范围(定案见 adaptation.md「报告标签自然高」条)。
 pub fn report_set(
   label : @yue.Label,
   text : String,
   refresh : () -> Unit,
 ) -> Unit {
   label.set_text(text)
-  label.set_visible(false)
-  label.set_visible(true)
+  let w = @yue.ViewLike::get_bounds(label).width
+  let h = @components.measure_text_height(
+    text,
+    role=@components.Body,
+    width=(if w > 1.0 { w } else { 600.0 }),
+  )
+  @yue.ViewLike::set_style(label, "height", h + 2.0)
+  @yue.ViewLike::set_visible(label, false)
+  @yue.ViewLike::set_visible(label, true)
   refresh()
 }
 
