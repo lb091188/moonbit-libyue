@@ -35,3 +35,35 @@ test "store 初始派生值在订阅前就绪" {
   let len = src.map(fn(s) { s.length() })
   inspect(len.get(), content="1")
 }
+
+///|
+test "store subscribe_id/remove:按句柄精确退订,幂等" {
+  let s : @yue.Store[Int] = @yue.Store::new(0)
+  let seen : Array[String] = []
+  let h1 = s.subscribe_id(fn(v) { seen.push("a\{v}") })
+  let h2 = s.subscribe_id(fn(v) { seen.push("b\{v}") })
+  s.set(1)
+  inspect(seen.join(","), content="a1,b1")
+  s.remove(h1)
+  s.set(2)
+  inspect(seen.join(","), content="a1,b1,b2")
+  // 幂等:重复退订与未知句柄都安全,不影响其余订阅
+  s.remove(h1)
+  s.remove(999999)
+  s.set(3)
+  inspect(seen.join(","), content="a1,b1,b2,b3")
+  s.remove(h2)
+  s.set(4)
+  inspect(seen.join(","), content="a1,b1,b2,b3")
+}
+
+///|
+test "store signal().subscribe 句柄经 store.remove 退订" {
+  let s : @yue.Store[Int] = @yue.Store::new(0)
+  let seen : Array[Int] = []
+  let h = s.signal().subscribe(fn(v) { seen.push(v) })
+  s.set(1)
+  s.remove(h)
+  s.set(2)
+  inspect(seen.map(fn(v) { v.to_string() }).join(","), content="1")
+}

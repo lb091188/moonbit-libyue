@@ -5,7 +5,7 @@
 test "Signal 源:get/set/update/subscribe" {
   let s : @yue.Signal[Int] = @yue.Signal::new(1)
   let seen : Array[Int] = []
-  s.subscribe(fn(v) { seen.push(v) })
+  ignore(s.subscribe(fn(v) { seen.push(v) }))
   inspect(seen.length(), content="0") // 注册不回调
   s.set(2)
   debug_inspect(seen, content="[2]")
@@ -41,7 +41,7 @@ test "computed:订阅者收到的值已重算" {
   let a = @yue.Signal::new("x")
   let c = @yue.Signal::computed(fn() { "v=\{a.get()}" })
   let seen : Array[String] = []
-  c.subscribe(fn(v) { seen.push(v) })
+  ignore(c.subscribe(fn(v) { seen.push(v) }))
   a.set("y")
   inspect(seen.map(fn(v) { v }).join(","), content="v=y") // 源未 get 前变化,通知链不断
 }
@@ -82,7 +82,7 @@ test "computed:钻石依赖收敛到正确终值" {
 test "batch:多次 set 合并为一次通知" {
   let a = @yue.Signal::new(0)
   let mut calls = 0
-  a.subscribe(fn(_v) { calls += 1 })
+  ignore(a.subscribe(fn(_v) { calls += 1 }))
   @yue.batch(fn() {
     a.set(1)
     a.set(2)
@@ -132,7 +132,7 @@ test "Store 与 Signal 互转:共享同一状态" {
 test "Store 语义回归:get/set/update/subscribe/map 与旧实现一致" {
   let s : @yue.Store[Int] = @yue.Store::new(1)
   let seen : Array[Int] = []
-  s.subscribe(fn(v) { seen.push(v) })
+  ignore(s.subscribe(fn(v) { seen.push(v) }))
   s.set(2)
   s.update(fn(n) { n + 1 })
   debug_inspect(seen, content="[2, 3]")
@@ -149,4 +149,62 @@ test "信号驱动 Store 参数组件形态:computed 经 store() 只读接入" {
   inspect(label.get(), content="共 2 项")
   count.set(5)
   inspect(label.get(), content="共 5 项")
+}
+
+///|
+test "Signal subscribe 返回句柄,remove 按 id 精确退订" {
+  let s : @yue.Signal[Int] = @yue.Signal::new(0)
+  let a : Array[Int] = []
+  let b : Array[Int] = []
+  let ha = s.subscribe(fn(v) { a.push(v) })
+  let hb = s.subscribe(fn(v) { b.push(v) })
+  s.set(1)
+  s.remove(ha)
+  s.set(2)
+  s.remove(ha) // 幂等
+  inspect(a.map(fn(v) { v.to_string() }).join(","), content="1")
+  inspect(b.map(fn(v) { v.to_string() }).join(","), content="1,2")
+  s.remove(hb)
+  s.set(3)
+  inspect(b.map(fn(v) { v.to_string() }).join(","), content="1,2")
+}
+
+///|
+test "订阅回收袋:袋内订阅整代退订,袋外不受影响" {
+  let s : @yue.Signal[Int] = @yue.Signal::new(0)
+  let in_bag : Array[Int] = []
+  let out_bag : Array[Int] = []
+  let hout = s.subscribe(fn(v) { out_bag.push(v) })
+  @yue.sub_bag_begin()
+  ignore(s.subscribe(fn(v) { in_bag.push(v) }))
+  let gen = @yue.sub_bag_end()
+  s.set(1)
+  inspect(in_bag.map(fn(v) { v.to_string() }).join(","), content="1")
+  inspect(out_bag.map(fn(v) { v.to_string() }).join(","), content="1")
+  // 模拟重建式组件换行:旧代整袋退订,再开新袋挂新一代
+  @yue.sub_bag_discard(gen)
+  @yue.sub_bag_begin()
+  ignore(s.subscribe(fn(v) { in_bag.push(v * 10) }))
+  let gen2 = @yue.sub_bag_end()
+  s.set(2)
+  inspect(in_bag.map(fn(v) { v.to_string() }).join(","), content="1,20")
+  inspect(out_bag.map(fn(v) { v.to_string() }).join(","), content="1,2")
+  // 嵌套袋:内袋收走的闭包归内代,外袋不受影响
+  @yue.sub_bag_discard(gen2)
+  s.remove(hout)
+  s.set(3)
+  inspect(in_bag.map(fn(v) { v.to_string() }).join(","), content="1,20")
+  inspect(out_bag.map(fn(v) { v.to_string() }).join(","), content="1,2")
+}
+
+///|
+test "订阅回收袋:无袋时订阅不入袋(subscribe 常态不退化)" {
+  let s : @yue.Signal[Int] = @yue.Signal::new(0)
+  let seen : Array[Int] = []
+  let bag = @yue.sub_bag_end() // 空栈收袋:不应崩,返回空表
+  inspect(bag.length(), content="0")
+  ignore(s.subscribe(fn(v) { seen.push(v) }))
+  @yue.sub_bag_discard(bag) // 空表退订:无害
+  s.set(7)
+  inspect(seen.map(fn(v) { v.to_string() }).join(","), content="7")
 }

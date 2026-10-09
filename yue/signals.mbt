@@ -11,17 +11,24 @@
 ///|
 /// 信号内核(非泛型):脏标记 + 订阅/依赖关系。泛型壳(Signal[T])
 /// 持有值与计算函数;id 用于关系数组里的身份比较。
+/// subs 为 (订阅 id, 回调) 对:subscribe 返回的 id 即退订句柄
+/// (见 Signal::remove),recompute 期间登记的依赖不受影响。
 struct SigNode {
   id : Int
   mut dirty : Bool
   mut queued : Bool
-  subs : Array[() -> Unit]
+  mut subs : Array[(Int, () -> Unit)]
   mut deps : Array[SigNode]
   mut observers : Array[SigNode]
 }
 
 ///|
 let sig_next_id : Ref[Int] = Ref(0)
+
+///|
+/// 订阅 id 计数器:subscribe 的返回值即本计数器的当期值,
+/// remove 按 id 精确摘除,互不影响同一信号上的其他订阅。
+let sig_sub_next_id : Ref[Int] = Ref(0)
 
 ///|
 let sig_batch_depth : Ref[Int] = Ref(0)
@@ -34,9 +41,61 @@ let sig_pending : Ref[Array[SigNode]] = Ref([])
 let sig_collector : Ref[(SigNode, Array[SigNode])?] = Ref(None)
 
 ///|
+/// 订阅回收袋栈:重建式组件(bind_node 重挂 / 表格重建 / 穿梭框移动)
+/// 在重建前开袋,重建期间注册的全部订阅(Store 与主题)把退订闭包
+/// 压进袋中;旧代订阅在下次重建前整袋退订——随旧视图一起死掉的
+/// 订阅不再随重建次数无界累积。袋可嵌套(子树内再开袋),与
+/// sig_collector 同款「收集期全局上下文」模式。
+let sub_bags : Ref[Array[Array[() -> Unit]]] = Ref([])
+
+///|
 fn sig_fresh_id() -> Int {
   sig_next_id.val += 1
   sig_next_id.val
+}
+
+///|
+fn sig_fresh_sub_id() -> Int {
+  sig_sub_next_id.val += 1
+  sig_sub_next_id.val
+}
+
+///|
+/// 把一条订阅的退订闭包压入当前回收袋(无袋时忽略:常规挂载订阅
+/// 随应用存活,不进袋)。
+fn sub_bag_register(off : () -> Unit) -> Unit {
+  match sub_bags.val.last() {
+    Some(bag) => bag.push(off)
+    None => ()
+  }
+}
+
+///|
+/// 开订阅回收袋(与 [sub_bag_end] 成对;嵌套安全)。
+pub fn sub_bag_begin() -> Unit {
+  sub_bags.val.push([])
+}
+
+///|
+/// 收袋:返回本代注册的退订闭包表(调用方留存,下次重建前经
+/// [sub_bag_discard] 整体退订)。
+pub fn sub_bag_end() -> Array[() -> Unit] {
+  let n = sub_bags.val.length()
+  if n == 0 {
+    []
+  } else {
+    let top = sub_bags.val[n - 1]
+    sub_bags.val.truncate(n - 1)
+    top
+  }
+}
+
+///|
+/// 整体退订一袋订阅(闭包来自 [sub_bag_end])。
+pub fn sub_bag_discard(offs : Array[() -> Unit]) -> Unit {
+  for off in offs {
+    off()
+  }
 }
 
 ///|
@@ -62,8 +121,8 @@ fn sig_deliver(node : SigNode) -> Unit {
     return
   }
   let snapshot = node.subs.copy()
-  for f in snapshot {
-    f()
+  for entry in snapshot {
+    (entry.1)()
   }
   for o in node.observers.copy() {
     o.dirty = true
@@ -196,10 +255,23 @@ pub fn[T] Signal::update(self : Signal[T], f : (T) -> T) -> Unit {
 }
 
 ///|
-/// 订阅变化,回调收到最新值。注册时不回调(初值请直接 get);暂无退订,
-/// 订阅默认存活整个应用期。
-pub fn[T] Signal::subscribe(self : Signal[T], f : (T) -> Unit) -> Unit {
-  self.node.subs.push(fn() { f(self.get()) })
+/// 订阅变化,回调收到最新值。注册时不回调(初值请直接 get)。
+/// 返回订阅 id(退订句柄):经 [Signal::remove] 按 id 摘除;重建式
+/// 组件更省事的做法是把挂载包进 [sub_bag_begin]/[sub_bag_end],
+/// 旧代订阅整袋退订(见 bind_node)。
+pub fn[T] Signal::subscribe(self : Signal[T], f : (T) -> Unit) -> Int {
+  let sid = sig_fresh_sub_id()
+  self.node.subs.push((sid, fn() { f(self.get()) }))
+  sub_bag_register(fn() { self.remove(sid) })
+  sid
+}
+
+///|
+/// 退订:摘除 subscribe 返回的 id 对应的回调(幂等,其余订阅不受
+/// 影响;已随视图销毁的订阅应及时退订,否则主题/Signal 变更时仍
+/// 会对死视图空跑)。
+pub fn[T] Signal::remove(self : Signal[T], sid : Int) -> Unit {
+  self.node.subs = self.node.subs.filter(fn(e) { e.0 != sid })
 }
 
 ///|
@@ -241,13 +313,19 @@ pub fn[T] bind_node(sig : Signal[T], f : (T) -> Node) -> Node {
     mount: fn(parent) {
       let c = Container::new()
       let current : Ref[View?] = Ref(None)
+      // 本代子树的订阅退订闭包(重建前整袋退订:旧子树连同它订阅的
+      // Store/主题回调一起退场,不随重建次数累积死订阅)
+      let gen : Ref[Array[() -> Unit]] = Ref([])
       fn rebuild(v : T) -> Unit {
+        sub_bag_discard(gen.val)
         match current.val {
           Some(old) => ignore(Container::remove_child_view(c, old))
           None => ()
         }
+        sub_bag_begin()
         let node = f(v)
         current.val = Some((node.mount)(ViewLike::view(c)))
+        gen.val = sub_bag_end()
         // Windows:运行期 remove+add 后 yoga 根不重算(native 只修被清零
         // 节点自身,见 view.mbt 的 refresh_layout 注释),新挂子树 bounds
         // 停在脏值,鼠标 hit-test 恒命中它——点击窗口任意处都误触重挂
@@ -267,9 +345,9 @@ pub fn[T] bind_node(sig : Signal[T], f : (T) -> Node) -> Node {
       // 按钮触发别的 bind_node 重挂,同栈内执行也正常,同为探针实证)。
       // Linux 的 GTK 布局同步安全,保持即时重挂
       if platform() == "windows" {
-        sig.subscribe(fn(v) { post_task(fn() { rebuild(v) }) })
+        ignore(sig.subscribe(fn(v) { post_task(fn() { rebuild(v) }) }))
       } else {
-        sig.subscribe(fn(v) { rebuild(v) })
+        ignore(sig.subscribe(fn(v) { rebuild(v) }))
       }
       attach(parent, ViewLike::view(c))
       ViewLike::view(c)
@@ -300,7 +378,7 @@ pub fn swap_node(sig : Signal[Bool], a : Node, b : Node) -> Node {
       }
 
       apply(sig.get())
-      sig.subscribe(apply)
+      ignore(sig.subscribe(apply))
       ignore(parent)
       va
     },
