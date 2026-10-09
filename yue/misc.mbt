@@ -167,24 +167,6 @@ pub fn Clipboard::get_text(self : Clipboard) -> String {
 /// 清空剪贴板。
 
 ///|
-/// 剪贴板类型（对照 Clipboard::Type；Linux 有主选区 Selection）。
-pub(all) enum ClipboardType {
-  CopyPaste
-  Selection
-}
-
-///|
-/// 取指定类型剪贴板（进程级单例）。
-pub fn Clipboard::from_type(clipboard_type : ClipboardType) -> Clipboard {
-  ffi_clipboard_from_type(
-    match clipboard_type {
-      CopyPaste => 0
-      Selection => 1
-    },
-  )
-}
-
-///|
 /// 写入一条数据（文本类：Text/Html/FilePaths，路径以 \n 连接）。
 pub fn Clipboard::set_data(
   self : Clipboard,

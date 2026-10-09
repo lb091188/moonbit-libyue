@@ -3491,18 +3491,6 @@ void yue_mbt_clipboard_clear(void *clipboard) {
   }
 }
 
-/* Clipboard::Type：0=CopyPaste 1=Selection(Linux)。返回进程级单例裸指针 */
-void *yue_mbt_clipboard_from_type(int32_t type) {
-#if defined(OS_LINUX)
-  return static_cast<void *>(nu::Clipboard::FromType(
-      type == 1 ? nu::Clipboard::Type::Selection : nu::Clipboard::Type::CopyPaste));
-#else
-  (void)type; // Windows/macOS 无 Selection 剪贴板
-  return static_cast<void *>(
-      nu::Clipboard::FromType(nu::Clipboard::Type::CopyPaste));
-#endif
-}
-
 /* 写入单条数据：kind 1=Text 2=HTML 4=FilePaths(路径 \n 连接) */
 void yue_mbt_clipboard_set_data(void *clipboard, int32_t kind, const char *text) {
   if (auto *c = static_cast<nu::Clipboard *>(clipboard)) {

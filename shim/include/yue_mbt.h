@@ -524,8 +524,6 @@ void *yue_mbt_clipboard_get(void);
 void yue_mbt_clipboard_set_text(void *clipboard, const char *text);
 void *yue_mbt_clipboard_get_text(void *clipboard);
 void yue_mbt_clipboard_clear(void *clipboard);
-/* Clipboard::Type：0=CopyPaste 1=Selection(Linux) */
-void *yue_mbt_clipboard_from_type(int32_t type);
 /* kind 1=Text 2=HTML 4=FilePaths(路径 \n 连接) */
 void yue_mbt_clipboard_set_data(void *clipboard, int32_t kind, const char *text);
 void yue_mbt_clipboard_set_data_image(void *clipboard, void *image);
