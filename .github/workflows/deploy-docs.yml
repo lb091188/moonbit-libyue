@@ -1,0 +1,38 @@
+name: Deploy docs to Cloudflare Pages
+
+# 手动触发(actions 页或 gh workflow run)。两种用法:
+#
+# A. Cloudflare Pages Git 集成(推荐,零 secret):CF 后台连本仓库,
+#    Root directory = docs,build command = `npm install && npm run build`,
+#    output directory = `.vitepress/dist`,之后每次推送自动部署,无需本文件。
+#
+# B. 本工作流(wrangler 部署):先在 CF 建好 Pages 项目,并在仓库
+#    Settings → Secrets 配 CLOUDFLARE_API_TOKEN 与 CLOUDFLARE_ACCOUNT_ID,
+#    然后手动 dispatch;project 名默认 moonbit-libyue-docs。
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Cloudflare Pages project name'
+        default: 'moonbit-libyue-docs'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build VitePress site
+        working-directory: docs
+        run: |
+          npm install
+          npm run build
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy docs/.vitepress/dist --project-name=${{ inputs.project }}

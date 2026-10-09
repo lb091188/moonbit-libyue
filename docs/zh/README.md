@@ -37,15 +37,15 @@ moon run examples/systemprobe   # 系统能力 + 扩展图表演示板（音量/
 
 showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 / 反馈 / 代码与文档 / 事件与布局 / Store 对照 + 画布与富文本 + 系统集成 / 窗口 / 浏览器；左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。每页源码独立成文件（`examples/showcase/pages/*.mbt`），是最好的复制粘贴素材库；组件库各组件的截图：
 
-![基础组件](../images/showcase-basic.png)
+![基础组件](/images/showcase-basic.png)
 
-![表单组件](../images/showcase-form.png)
+![表单组件](/images/showcase-form.png)
 
-![数据展示](../images/showcase-data.png)
+![数据展示](/images/showcase-data.png)
 
-![代码与文档](../images/showcase-code.png)
+![代码与文档](/images/showcase-code.png)
 
-![系统集成](../images/showcase-system.png)
+![系统集成](/images/showcase-system.png)
 
 ### sysmonitor：进程管理与硬件信息查看
 
@@ -53,11 +53,11 @@ showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 /
 
 进程页：虚拟表格千行级，搜索过滤、六列排序、选中 kill（SIGTERM 失败转 SIGKILL）/ renice，errno 语义化为中文提示；实测 1053 进程全量采样 14.94ms/次、稳态 1Hz CPU 2-3%（数据见 [adaptation.md](adaptation.md)）。
 
-![概览](../images/sysmonitor-overview.png)
+![概览](/images/sysmonitor-overview.png)
 
-![进程页](../images/sysmonitor-process.png)
+![进程页](/images/sysmonitor-process.png)
 
-![深色主题](../images/sysmonitor-dark.png)
+![深色主题](/images/sysmonitor-dark.png)
 
 ## 分流
 
@@ -76,4 +76,4 @@ showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 /
 | [plan-system-integration.md](plan-system-integration.md) | 系统集成扩容总体实施计划:P1-P12 与收口项 P14 的批次划分、验收门、共享基建决策与风险(定稿) |
 | [relink.md](relink.md) | 原生层(shim/vendor)变更后强制重链:判别与处理 |
 
-项目总览与快速开始入口见仓库根 [README_ZH.md](../../README_ZH.md)。
+项目总览与快速开始入口见仓库根 [README_ZH.md](https://github.com/lb091188/moonbit-libyue/blob/master/README_ZH.md)。

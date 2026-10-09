@@ -57,7 +57,7 @@ n.show()
 
 **📊 旗舰应用 — Linux 进程管理与硬件信息查看**：
 
-![进程](./docs/images/sys.png)
+![进程](./docs/public/images/sys.png)
 
 ```moonbit
 moon run examples/sysmonitor
