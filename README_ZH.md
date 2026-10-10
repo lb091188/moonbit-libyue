@@ -81,7 +81,7 @@ moon run examples/sysmonitor
 |---|---|
 | Windows 10/11 x64 | [`bin-windows-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-windows-x64.zip) |
 | Linux x64(需 GTK3,Ubuntu 自带) | [`bin-linux-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-linux-x64.zip) |
-| macOS(Apple Silicon) 🟡 未真机验证 | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
+| macOS(Apple Silicon) 🟡 仅 CI 构建验证,未做 GUI 验证 | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
 
 > **0.5.11 起模块拆成多个子包**:`moon add` 仍一次拿全,但只有你 import 的包进二进制(MoonBit 按 import 闭包构建)。
 
@@ -102,13 +102,13 @@ moon run examples/sysmonitor
 
 ## 平台支持
 
-Ubuntu 24.04(XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🟡 构建通过(CI,无真机)
+Ubuntu 24.04(XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🟡 仅 CI 验证(构建通过,未做 GUI 验证)
 
 Windows 下 exe 自动为 GUI 子系统,双击无控制台黑框。
 
 ## 开发贡献
 
-欢迎参与：报平台兼容问题、补控件、补文档都算，尤其欢迎 macOS 真机测试。几条基本要求：
+欢迎参与：报平台兼容问题、补控件、补文档都算，尤其欢迎 macOS 平台的问题反馈（本仓 macOS 只做 CI 验证）。几条基本要求：
 
 - **提交门槛**：`moon check && moon test` 全仓零错误零警告
 - **经验入档**：实测踩坑连同修复写进 [adaptation.md](docs/zh/adaptation.md)，不留只在提交说明里

@@ -11,7 +11,7 @@
 - [x] MD3 GFM 渲染面补齐——表格 / 任务列表 / 脚注 / 删除线 / 图片 / 可点击链接可渲染,showcase「代码与文档」页演示与复制串同源并补新语法,components-ui 中英能力清单同步。验证:`moon check` 零警告 + `moon test` 600 全绿(markdown_wbtest 24 条,新增删除线/携址链接/引用式链接/脚注编号上标/图片路径/表格单元格断言);真机视觉与点击项由用户在 showcase「代码与文档」页 Markdown 段验证(删除线横线/链接点击与悬浮/表格/图片/任务勾选/脚注),跨层契约与上游核实结论回写 adaptation.md「声明式层与自绘组件」节 MD3 条
 - [x] SYS1 sysmonitor Windows 数据层——stub/sysmon.c Windows 分支以 Win32 补齐 CPU / 内存 / 磁盘 / 网络 / 进程 / GPU / 温度七路数据源(GetSystemTimes、GlobalMemoryStatusEx、PDH、DXGI、EnumProcesses 等,子进程原语 CREATE_NO_WINDOW),解析纯函数单测全绿,真机五页出数据(真机验证项列清单由用户执行)。验证:`moon check` 零警告 + `moon test` 600 全绿 + touch stub 后 `moon build` 零警告(sysmon.o 真实重编);Windows 分支以最小 Win32 桩头过 `gcc -fsyntax-only -Wall -Wextra` 零告警(桩不进仓库,真编译靠 CI Windows runner);Win32 虚拟 /proc、/sys 路由映射与偏差定案入 adaptation.md「系统监控数据层」节 SYS1 条;真机由用户执行五页清单:①概览页七卡出数(CPU 占用%·温度 / 内存已用·总量 / 每盘一张 / 网络收发 / N 卡占用·温度或 A·I 卡「—」/ 进程数)②CPU 详情曲线 + 各核柱 ③内存与 swap 曲线(无页面文件机器 swap 为 0 属预期)④进程页全量表可排序筛选 ⑤传感器页 N 卡温度行、A·I 卡机器为空属预期 ⑥磁盘页每盘容量条 + 读写速率(读盘时非 0)⑦网络页每网卡速率;重点核实项:中文 Windows 的 PDH 磁盘 IO 与 GPU Engine 计数器路径、GPU 占用 LUID 聚合数值、nvidia-smi 与 DXGI 型号匹配、进程管理按钮提示「不支持(仅 Linux)」属 SYS2 预期
 - [x] SYS2 sysmonitor Windows 语义归一——kill / 优先级 / 错误码翻译为统一语义形态且错误码翻译表单测全绿,温度等不可用来源按位显示「—」,UI 文案平台化,TODO 边界节同步(实际终止 / 提权行为真机验证项列清单由用户执行)。验证:`moon check` 零警告 + `moon test` 608 全绿(sysproc_wbtest 新增 8 条:errno_text 翻译目标值、四档档界、kill/优先级按钮与结果文案、优先级列头、with_temp「—」占位、不存在 pid 的 get/set 归一 ESRCH)+ touch stub 后 `moon build examples/sysmonitor` 零警告(sysmon.o 真实重编);Windows 分支以最小 Win32 桩头(按真实 SDK 形状定义,不进仓库)过 `gcc -fsyntax-only -Wall -Wextra` 零告警,并修正 SYS1 遗留的 PDH `RawValue.FirstValue.largeValue` 笔误(真实 pdh.h 无该后缀,CI Windows 真实编译会红);Win32→errno 翻译表、OpenProcess 87→ESRCH 特判、优先级四档钳制与代表值反查、UI 平台化文案定案入 adaptation.md「系统监控数据层」节 SYS2 条;真机由用户执行清单:①进程页选中进程点「结束进程(立即终止)」确认进程确已退出(消息「已强制结束 N 个进程」)②对系统进程(如 csrss / audiodg)操作提示「权限不足(EACCES/EPERM)」而非异常③设优先级分别输入 7 / -10 / -20,消息依次为 正常(NORMAL)(代表值 0)/ 高(HIGH)(代表值 -13)/ 实时(REALTIME)(代表值 -20),nice 列值同步变化④普通身份设「实时」档提示权限不足,以管理员身份启动后成功⑤无 N 卡机器概览页处理器卡温度位显示「· —」、显卡卡显示「—」⑥传感器页无温度来源时显示「暂无可用温度来源」
-- [x] SYS3 sysmonitor macOS 数据层——stub 补 macOS 分支(proc_listpids 进程枚举、sysctl + host_processor_info CPU、hw.memsize + host_statistics64 内存、getfsstat+statvfs 磁盘、getifaddrs 网络、system_profiler -json GPU 子进程),IO 速率与温度按边界显示「—」,解析纯函数单测全绿(真机验证项列清单由用户执行)。验证:`moon check` 零警告 + `moon test` 614 全绿(syshw_wbtest 新增 6 条:unescape_mount / parse_mounts macOS 形态 / is_system_mount 系统宗卷 / parse_vram / json 切分 / parse_system_profiler_gpu 双卡)+ touch stub 后 `moon build examples/sysmonitor` 零警告;macOS 分支以 `gcc -fsyntax-only -Wall -Wextra -D__APPLE__` 零告警(Mach / statfs / if_data64 布局按 xnu 源码逐字段核实,桩头不进仓库,真编译靠 CI macos-15 runner);七路映射与自声明布局核实过程、host_statistics64 count 语义、unsafe_get 返回 UInt16 等踩坑入 adaptation.md「系统监控数据层」节 SYS3 条;真机由用户执行清单:①概览页七卡出数(CPU 占用%·「· —」温度位 / 内存已用·总量 / 每卷一张(根 + Macintosh HD 数据卷,swap 有值)/ 网络收发 / 显卡卡「—」/ 进程数)②CPU 详情曲线 + 各核柱(重点核实占用数值合理、顺序无错位)③内存与 swap 曲线(与活动监视器对照)④进程页全量表可排序筛选(进程数与 ps 对照,选中→结束进程 / 设 nice 实际生效)⑤传感器页无温度来源显示「暂无可用温度来源」、显卡使用率与显存曲线为空属预期(无来源)⑥磁盘页每卷容量条 + 读写速率「—」(容量与 df 对照,含含空格卷名)⑦网络页每网卡速率;重点核实项:system_profiler -json 的键名与解析对位(Apple Silicon 与 Intel/AMD 卡各测)、中文/含空格卷名的挂载行、kill 提示语义与 Linux 一致
+- [x] SYS3 sysmonitor macOS 数据层——stub 补 macOS 分支(proc_listpids 进程枚举、sysctl + host_processor_info CPU、hw.memsize + host_statistics64 内存、getfsstat+statvfs 磁盘、getifaddrs 网络、system_profiler -json GPU 子进程),IO 速率与温度按边界显示「—」,解析纯函数单测全绿。验证:`moon check` 零警告 + `moon test` 614 全绿(syshw_wbtest 新增 6 条:unescape_mount / parse_mounts macOS 形态 / is_system_mount 系统宗卷 / parse_vram / json 切分 / parse_system_profiler_gpu 双卡)+ touch stub 后 `moon build examples/sysmonitor` 零警告;macOS 分支以 `gcc -fsyntax-only -Wall -Wextra -D__APPLE__` 零告警(Mach / statfs / if_data64 布局按 xnu 源码逐字段核实,桩头不进仓库,真编译靠 CI macos-15 runner);七路映射与自声明布局核实过程、host_statistics64 count 语义、unsafe_get 返回 UInt16 等踩坑入 adaptation.md「系统监控数据层」节 SYS3 条;macOS 侧只做 CI 验证,不做真机验证。
 - [x] SYS4 Linux GPU 利用率补全(Intel 集显 / AMD)——DRM fdinfo 聚合采样免 root 得全卡利用率(AMD 保留 sysfs gpu_busy_percent 优先、fdinfo 兜底),「常规显卡数据无需超管、debugfs 细分不支持、polkit 暂不集成」边界入 adaptation.md,解析纯函数单测全绿。验证:`moon check` 零警告 + `moon test` 623 全绿(syshw_wbtest 新增 9 条:parse_drm_fdinfo 三形态 / is_drm_engine_key 与 drm_device_key / drm_clients_total 归并 / drm_busy_percent / is_pid_entry / parse_uevent_driver / fdinfo 真实采样两拍)+ 删 `_build` 下 sysmonitor `.o` 后 `moon build examples/sysmonitor` 零警告;免 root 权限实证(hwmon 0444 / debugfs 0700 / 他人 fdinfo EACCES)、fdinfo 键格式与版本边界(引擎键 5.19 起、drm-pdev 6.5 起)、扫描 56ms 成本等定案入 adaptation.md「系统监控数据层」节 SYS4 条;i915 / xe / amdgpu 真机七项由用户执行(intel_gpu_top 对照、AMD 双源对照、双卡归属、老内核回退、短命客户端漏计、sudo 差异量级、采样占空)
 - [x] SYS5 GPU 型号名解析——AMD / Intel 显卡经 pci.ids 显示商业型号(查不到回退现 id 显示),解析纯函数单测全绿。验证:`moon check` 零警告 + `moon test` 628 全绿(syshw_wbtest 新增 5 条:norm_pci_id / is_hex4 归一化与判定、pci_ids_device_name 缩进层级解析、gpu_model_name 四形态、GpuMonitor::gpu_model 常驻缓存与 smi 优先、真实 pci.ids 采样)+ 删 `_build` 下 sysmonitor `.o` 后 `moon build examples/sysmonitor` 零警告;本机(Ubuntu 24.04)实测三对真实条目解析正确(1002:7480 → Navi 33、8086:3ea0 → WhiskeyLake-U GT2、10de:2488 → GA104),单次全文查找约 14ms 故按 PCI 地址常驻;pci.ids 路径差异与 Flatpak 沙箱兜底、空 id 补零踩坑入 adaptation.md「系统监控数据层」节 SYS5 条;AMD / Intel 真机七项(型号名与 lspci 对照、双卡、查不到回退、无 hwdata / Flatpak 兜底、跨发行版路径、长名换行)由用户执行
 - [x] DOC1 英文 components-ui.md 补齐——第二批九图表与图表交互层整章翻译入英文档,Scroll::refresh_content_size 等三处英文滞后点同步,与 docs/README.md 索引描述对齐。验证:英文 components-ui.md 图表章补入树图/矩形树图/旭日图/地图与飞线/力导向/平行坐标/主题河流/涟漪散点/象形柱九节与图表交互层七小节(签名/参数表/示例逐节对齐中文版),components.md 补 Scroll::refresh_content_size 方法行与拖拽须在 on_mouse_down 内调用一句、declarative.md 补 scroll 备注句;`moon check` 零警告 + `moon test` 628 全绿
@@ -25,7 +25,7 @@
 
 ## 2026 年 10 月月度目标与 Q4 季度目标
 
-10 月(月度):完成现在规划的三大能力域收尾——系统接口、音频、视频渲染;Q4(季度):月度目标全部达成后,macOS 真机验证测试收尾 + 发布闭环。
+10 月(月度):完成现在规划的三大能力域收尾——系统接口、音频、视频渲染;Q4(季度):月度目标全部达成后,发布闭环(macOS 维持 CI 验证,不做真机验证)。
 
 音视频主体已落地(modules/yue-media + modules/ffmpeg-mbt 两子模块,2026-10-08~09 修复链实测):FFI 流式解码全链路、AudioPlayer / VideoPlayer、悬浮控制条与全屏、墙钟同轴时钟;O2 / O3 为其收尾项。
 
@@ -40,10 +40,6 @@
   - 真实片源实测:mp4 已随修复链实际播放,mkv 等常见容器与长视频未系统实测;复核 ffmpeg-mbt 流式逐帧解码下长视频内存平稳性(原 CLI 帧集钳制已随路线删除)
   - moonav1(mooncakes 纯 MoonBit AV1 解码)帧源接入评估
   - 验证:真机播放实测片源截图入档
-- [ ] O4 macOS 真机验证测试(季度,前置:获得 mac 真机)
-  - 基础冒烟:hello / hello-themed / showcase / systemprobe / sysmonitor 全量启动与视觉确认
-  - 遗留清单逐项:reply(OS_MAC) 通知回调、Display 全字段枚举、Accelerator 类 / Tray 原生后端、mac canvas 滚轮事件、WebKit framework 拆分评估(浏览器按需化 fork 侧收尾)
-  - 验证:mac 真机逐项执行,结论回填 TODO.md 与 adaptation.md
 - [ ] O5 发布闭环(季度)
   - mooncakes 发 0.5.11:携带 yue-media / ffmpeg-mbt 依赖与悬浮控制条修复链(0.5.10 已于 2026-10-04 前后发布)
   - README 截图补齐(sysmonitor 传感器 / 磁盘 / 网络三页)
@@ -63,7 +59,7 @@
 - [ ] 浏览器按需化的 fork 侧收尾(4a 治本,详见 docs/zh/adaptation.md「浏览器依赖按需化」)
   - fork(lb091188/yue)发行脚本把 browser.cc / browser_gtk.cc 与 menu_item_gtk 的 webkit 耦合拆出 jumbo(补丁原型已在本仓库 prepare.py 源码路径实测:抽段 + GType/dlsym 运行时探测)
   - 重发 vendor-* 三平台预构建库,prepare.py 升版本后,预构建模式(mooncakes 零编译路径)获得与源码模式同等的 webkit 按需化
-  - macOS 的 WebKit framework 拆分随该批次一并评估(需先在 mac 侧核验 libyue_prebuilt(macos) 的 WebKit 引用面)
+  - macOS 的 WebKit framework 拆分随该批次一并评估(需核验 libyue_prebuilt(macos) 的 WebKit 引用面,本机无 Mach-O archive 工具链,暂缓)
 
 ## Chart 图表组件
 
@@ -165,7 +161,7 @@
 
 ### 边界
 
-- Linux 仅测试 Ubuntu 24.04:GNOME、XFCE、KDE 桌面环境;Windows 窗口可编译启动(CI 三平台在跑),sysmonitor Windows 数据层(SYS1)与进程管理语义归一(SYS2)已完成,真机行为验证项列清单由用户执行;macOS 数据层(SYS3)已落地(七路虚拟 /proc、/sys 文本 + GPU system_profiler 解析,IO 速率与温度无来源按「—」显示),真机七页验证项列清单由用户执行
+- Linux 仅测试 Ubuntu 24.04:GNOME、XFCE、KDE 桌面环境;Windows 窗口可编译启动(CI 三平台在跑),sysmonitor Windows 数据层(SYS1)与进程管理语义归一(SYS2)已完成,真机行为验证项列清单由用户执行;macOS 数据层(SYS3)已落地(七路虚拟 /proc、/sys 文本 + GPU system_profiler 解析,IO 速率与温度无来源按「—」显示),macOS 侧只做 CI 验证,不做真机验证
 - Windows 进程管理边界(SYS2):结束进程一律立即终止(TerminateProcess,温和结束 WM_CLOSE 关闭通知方案后置);优先级为 IDLE/NORMAL/HIGH/REALTIME 四档离散值(nice 列显示档位代表值,输入就近钳制),「实时」档需管理员提权;非 NVIDIA 卡温度无来源,对应显示位显示「—」
 - systemd 服务管理、连接级网络监控(只做网卡速率)
 - GPU 受限项:Intel 集显温度无 sysfs / hwmon 节点(i915 hwmon 仅 dGfx)、macOS 温度走私有键、Windows 非 NVIDIA 温度需厂商 SDK;AMD gpu_busy_percent 为标准 sysfs 属性、Intel 利用率有 DRM fdinfo 标准接口,均免 root(Intel / AMD 利用率已由 SYS4 补全:DRM fdinfo 聚合采样,型号名解析见 SYS5)

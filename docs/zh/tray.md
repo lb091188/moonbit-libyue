@@ -106,11 +106,11 @@ XFCE 的 libdbusmenu 客户端只发批量版 `EventGroup` / `AboutToShowGroup`,
 | GNOME + AppIndicator 扩展 | ❓ 待实测 | 协议层可用,待真机验证 |
 | 纯净 GNOME | ❌ | 无托盘协议,`Err(Unsupported)` 属预期行为 |
 | Windows 10 / 11 | ✅ 实测 | 原生 `Shell_NotifyIconW` 后端 |
-| macOS | ❓ 未实测 | 原生后端 |
+| macOS | ❓ 未实测 | 原生后端;本仓 macOS 只做 CI 验证 |
 
 状态标记与 [docs/adaptation.md](adaptation.md) 一致:
 ✅ 实测通过 / ⚠️ 部分可用或带条件 / ❌ 不可用 / ❓ 未实测。
-逐一真机实测后,把版本号与差异按维护约定回写 adaptation.md 并更新本表。
+各 Linux 桌面环境逐一真机实测后,把版本号与差异按维护约定回写 adaptation.md 并更新本表(macOS 不在真机实测范围,只做 CI 验证)。
 
 ## 调试与验证
 

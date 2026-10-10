@@ -80,10 +80,10 @@ XFCE's libdbusmenu client only sends the batch versions `EventGroup` / `AboutToS
 | GNOME + AppIndicator extension | ❓ pending verification | protocol-level support, pending real-machine verification |
 | vanilla GNOME | ❌ | no tray protocol; `Err(Unsupported)` is expected behavior |
 | Windows 10 / 11 | ✅ verified | native `Shell_NotifyIconW` backend |
-| macOS | ❓ untested | native backend |
+| macOS | ❓ untested | native backend; this repo verifies macOS by CI only |
 
 Status markers are consistent with [docs/adaptation.md](adaptation.md): ✅ verified working / ⚠️ partially working or conditional / ❌ not working / ❓ untested.
-After real-machine testing of each, write version numbers and differences back into adaptation.md per the maintenance conventions and update this table.
+After real-machine testing of each Linux desktop environment, write version numbers and differences back into adaptation.md per the maintenance conventions and update this table (macOS is out of scope — CI only).
 
 ## Debugging and verification
 

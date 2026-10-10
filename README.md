@@ -81,7 +81,7 @@ Prerequisite: the MoonBit native toolchain, `moonc` ≥ 0.10.14 (`moon version -
 |---|---|
 | Windows 10/11 x64 | [`bin-windows-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-windows-x64.zip) |
 | Linux x64 (GTK3, on Ubuntu by default) | [`bin-linux-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-linux-x64.zip) |
-| macOS (Apple Silicon) 🟡 no real-machine test | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
+| macOS (Apple Silicon) 🟡 CI build only, no GUI verification | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
 
 > **Since 0.5.11** the module is split into sub-packages: `moon add` still gets you everything, but only imported packages enter your binary (MoonBit builds the import closure).
 
@@ -102,13 +102,13 @@ Prerequisite: the MoonBit native toolchain, `moonc` ≥ 0.10.14 (`moon version -
 
 ## Platform support
 
-Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🟡 builds pass (CI, no real machine)
+Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🟡 CI build only (no GUI verification)
 
 Exes built on Windows run as a GUI subsystem — no console window on double-click.
 
 ## Contributing
 
-Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — macOS real-machine testing is especially appreciated. A few basic requirements:
+Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — macOS compat reports are especially appreciated (this project verifies macOS by CI only). A few basic requirements:
 
 - **Commit gate**: `moon check && moon test` zero errors and zero warnings repo-wide
 - **Experience on record**: write field-tested pitfalls together with their fixes into [adaptation.md](docs/adaptation.md) — not only in commit messages

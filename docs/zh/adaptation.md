@@ -126,7 +126,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 边界：macOS 持久化需 14+ **且**进程有 bundle identifier（裸可执行文件按内存隔离处理——用 identifier 建 store 无处落盘，与 issue #4 的「裸 Mach-O 无身份」同源）；Windows 的 IE 后端无 profile 概念仍用默认会话；profile 目录按应用名隔离（`App::GetID()`，空则回退 `g_get_prgname()`）。
 - 封装侧已接线（shim 透传 + `BrowserOptions.profile` + yue 文档），随 `mbt.20` 落地。
 - **Linux 端到端验证（经 shim + yue 层，不是直接调 C）**：临时探针建三个 Browser（`probe_a` / `probe_b` / 空 profile），各自用用户脚本写 `document.cookie='who=<标签>'`，加载后 `get_cookies_for_url` 回读——三个会话各只看到自己那条（`who=a` / `who=b` / `who=d`，各 1 条），证明 cookie jar 真的按 profile 分离；磁盘上只生成 `yue-profiles/<app>/probe_a|probe_b/{data,cache}`，**空 profile 不建任何目录**（默认会话行为与改造前一致）；探针验后即删。
-- 待办与真机验证；真机清单：①同站点两账号窗口互不影响登录（切窗即切账号）②关闭重开进程后各自仍登录（mac 需 14+ 且签名 bundle）③两 profile 的 localStorage 互不可见 ④自定义协议在带 profile 的窗口里仍能加载 ⑤`profile` 留空时行为与改造前一致（回归）。
+- 待办与真机验证；真机清单：①同站点两账号窗口互不影响登录（切窗即切账号）②关闭重开进程后各自仍登录③两 profile 的 localStorage 互不可见 ④自定义协议在带 profile 的窗口里仍能加载 ⑤`profile` 留空时行为与改造前一致（回归）。
 
 ### Browser 用户脚本注入（跨导航持续生效，fork 侧已改待出包）
 
@@ -135,7 +135,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 三平台都是「整表重建」：WebKit `remove_all_scripts` 后重加（绑定脚本 + 用户脚本）；`WKUserContentController removeAllUserScripts` 后重加（`WKUserScript` 的 `atDocumentStart`/`atDocumentEnd`）；WebView2 按 id 逐个 remove 再逐条 add（`script_ids_` 向量 + 计数，回调按序号回填 id）。
 - **顺手修掉的坑（issue 未提）**：原 `PlatformUpdateBindings` 会 `remove_all_scripts` 后只补回绑定脚本，用户脚本会被 `AddRawBinding`/`RemoveBinding`/`SetBindingName` 触发的刷新清掉。更名 `PlatformUpdateScripts` 后两类脚本一起重建，用户脚本不再被清——**这是需要维持的不变量**，后续任何维护脚本列表的代码都不能只重建绑定脚本。
 - Windows 边界：WebView2 只有「文档创建前」一条注入通道，`DocumentEnd` 以 `document.addEventListener('DOMContentLoaded', ...)` 包装模拟（近似而非等同）；原先「无绑定则不注入任何脚本」的判断放宽为「无绑定且无用户脚本才不注入」。
-- 验证（Linux，经 shim + yue 层）：三个 Browser（两个带 profile、一个默认）各注册 `add_user_script("document.cookie='who=<标签>'; probeReport('injected-<标签>')")` 与对应绑定，加载后全部收到 `PROBE-REPORT ... payload=["injected-<标签>"]`——document-start 注入 + 绑定调用链路成立，且注入脚本先于页面自身脚本执行。mac / Windows 行为待真机。
+- 验证（Linux，经 shim + yue 层）：三个 Browser（两个带 profile、一个默认）各注册 `add_user_script("document.cookie='who=<标签>'; probeReport('injected-<标签>')")` 与对应绑定，加载后全部收到 `PROBE-REPORT ... payload=["injected-<标签>"]`——document-start 注入 + 绑定调用链路成立，且注入脚本先于页面自身脚本执行。Windows 行为待真机；macOS 仅 CI 构建验证，不做真机验证。
 
 ### MoonBit cfg(platform=)
 
@@ -544,8 +544,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
   - 踩坑:宿主机时钟回跳会让 moon 增量构建把未来 mtime 的 `.o` 当最新,`touch` 源码不触发重编——验证 stub 改动时若 `moon build` 报 up to date,先删 `_build` 下对应 `.o` 再构建。
   - SYS3 验证方式:本环境无 macOS 实机。
     - Linux 宿主 `moon check` 零警告 + `moon test` 614 全绿(syshw_wbtest 新增 6 条:unescape_mount 转义还原与非法序列、parse_mounts 的 macOS getfsstat 形态(含空格卷名 / BSD 伪文件系统)、is_system_mount 系统宗卷、parse_vram、json_string_value / json_items_objects 切分与嵌套、parse_system_profiler_gpu 双卡解析与宽容口径;DiskInfo 速率字段改 Option 后 S5 / S6 真实采样断言同步放宽为双形态)。
-    - macOS 分支以 `gcc -fsyntax-only -Wall -Wextra -D__APPLE__` 零告警(只验语法与符号面,结构体布局按 xnu 源码逐字段核对,语义由真机把关);touch stub 后 `moon build examples/sysmonitor` 零警告;非 macOS 占位符号已核在 Linux 构建产物中导出。
-    - **七路数据与进程管理必须 mac 真机验证**(清单见 TODO.md SYS3):重点核实 host_processor_info 各核占用数值(顺序错会把 idle 当 user)、system_profiler -json 的键名与解析对位(sppci_model / spdisplays_vram / spdisplays_vendor,Apple Silicon 与 Intel / AMD 卡各测)、getfsstat 挂载表与 df 对照(含含空格卷名与 /System/Volumes/Data)、proc_listpids 进程数与 ps 对照、kill / setpriority 实际生效。
+    - macOS 分支以 `gcc -fsyntax-only -Wall -Wextra -D__APPLE__` 零告警(只验语法与符号面,结构体布局按 xnu 源码逐字段核对);touch stub 后 `moon build examples/sysmonitor` 零警告;非 macOS 占位符号已核在 Linux 构建产物中导出;macOS 侧只承诺 CI 构建与静态检查,不做真机验证。
 - **Linux GPU 利用率补全(SYS4):DRM fdinfo 聚合采样免 root 得全卡利用率(i915 / xe / amdgpu);点名域原表述「请求超管权限读显卡」经本机实证改为「免 root 数据源补全 + 提权边界显式化」**。定案六条:
 
   - ① **权限实证**(Ubuntu 24.04 uid 1000 本机实测):`/sys/class/hwmon/hwmon*/temp*_input` 与 amdgpu `gpu_busy_percent` 均 0444,DRM fdinfo 走 /proc 标准接口(本用户进程的 fdinfo 文件 `r--r--r--`),面板所需常规数据本就免 root;唯一受限的 `/sys/kernel/debug/dri`(debugfs,`drwx------ root`)是 i915 调试视图(per-engine / per-client 细分),并不含面板所需指标——「请求超管权限读显卡」没有数据支撑,polkit / pkexec 集成暂不做(若用户坚持提权路线再单独排批)。
@@ -892,9 +891,9 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
   - SDK 事实两则(照例凭记忆写错):`BLUETOOTH_DEVICE_SEARCH_PARAMS` 的字段是 **fIssueInquiry**(直觉的 fIssueQuery 不存在)且 `cTimeoutMultiplier` 是 **UCHAR** 非 ULONG;本机 SDK 真头 `bluetoothapis.h` 逐一核过后才过编。
   - 错误分流设计:枚举首查失败且 `GetLastError()==ERROR_NO_MORE_ITEMS` 归「无可用无线电/无已知设备」(ok=1 空文本 → Unsupported/空列表),其余错误归 API 故障(ok=0 → BusFailed)——服务未运行(如 ERROR_SERVICE_NOT_ACTIVE)不会被吞成「不支持」。
   - **本机形态(硬件在位但栈未运行)**:设备管理器 MediaTek Bluetooth MT7921 Status OK、bthserv Running,但 BTHENUM 子树全为 CM_PROB_PHANTOM(幻影残留),PowerShell P/Invoke 与 shim 实测 `BluetoothFindFirstRadio` 同样 NULL + GetLastError=259(NO_MORE_ITEMS)——`bt_supported()` 如实报 false。「设备管理器里有蓝牙适配器」≠「蓝牙栈在跑」,面板显示不支持是系统真实状态(与 Perflib 计数器表被裁同族,精简系统嫌疑);封装代码在栈正常的 Windows 上即如实显示支持,本机不构成代码缺陷的证明。
-- **后补符号的桩策略定案(2026-10-11,并入 mac 批时定案)**:MoonBit 层的平台门是运行时分支,FFI 符号层无平台可言——**每个平台的链接符号都必须存在**,后补符号(如本批的 WMI 亮度、蓝牙快照)的桩归属按「Windows 有无真实现」分三种:①Windows 有真实现(含后补的 WMI 三符号/蓝牙两符号)→ 桩进 `#elif !defined(OS_MAC)` 桩分支(该分支只有 Linux 评估:Windows 走 OS_WIN 真实现、mac 走 yue_system_mac.mm);②Windows 无真实现的 mac 符号(mac_machine_info)→ 桩用 `#if !defined(OS_MAC)` 单独包(Windows/Linux 都编、mac 排除);③mac TU 提供 mac 全部符号(缺谁补谁,wmi/蓝牙本批补了五根 Unsupported 哨兵)。两个反面教材(远端合并批实况,CI 三平台都只到 moon check 不编 C 所以全没暴露):WMI 桩放在平台分支 `#endif` 之外无条件编译 → Windows 与 OS_WIN 真实现**双重定义**(本机真编译即炸);桩区声称收窄 `#elif !defined(OS_MAC)` 实际未收窄(裸 `#else`)→ mac 下桩与 mac TU **双重定义**(待 mac 真编译验证);另外 mac_machine_info 放桩区 → Windows 下链接 undefined(Windows 无真实现,桩必须覆盖 Windows)。教训:桩归属是「每符号逐个推」的事,「统一挪到分支外无条件编」看似省事实则把三平台符号矩阵全打乱。
+- **后补符号的桩策略定案(2026-10-11,并入 mac 批时定案)**:MoonBit 层的平台门是运行时分支,FFI 符号层无平台可言——**每个平台的链接符号都必须存在**,后补符号(如本批的 WMI 亮度、蓝牙快照)的桩归属按「Windows 有无真实现」分三种:①Windows 有真实现(含后补的 WMI 三符号/蓝牙两符号)→ 桩进 `#elif !defined(OS_MAC)` 桩分支(该分支只有 Linux 评估:Windows 走 OS_WIN 真实现、mac 走 yue_system_mac.mm);②Windows 无真实现的 mac 符号(mac_machine_info)→ 桩用 `#if !defined(OS_MAC)` 单独包(Windows/Linux 都编、mac 排除);③mac TU 提供 mac 全部符号(缺谁补谁,wmi/蓝牙本批补了五根 Unsupported 哨兵)。两个反面教材(远端合并批实况,CI 三平台都只到 moon check 不编 C 所以全没暴露):WMI 桩放在平台分支 `#endif` 之外无条件编译 → Windows 与 OS_WIN 真实现**双重定义**(本机真编译即炸);桩区声称收窄 `#elif !defined(OS_MAC)` 实际未收窄(裸 `#else`)→ mac 下桩与 mac TU **双重定义**(待 CI 的 mac 编译验证);另外 mac_machine_info 放桩区 → Windows 下链接 undefined(Windows 无真实现,桩必须覆盖 Windows)。教训:桩归属是「每符号逐个推」的事,「统一挪到分支外无条件编」看似省事实则把三平台符号矩阵全打乱。
 
-## macOS(CI 构建链已验,GUI 待真机)
+## macOS(只做 CI 验证:构建链已验,不做真机验证)
 
 - libyue v0.15.6 发行包含 ARC / no-ARC 双库:Darwin 链接参数 = 主库 + `-lyue_mbt_noarc`(no-ARC 符号被主库引用,须排其后)+ AppKit / Carbon / IOKit / Security / WebKit / OpenDirectory 框架 + `-lobjc -lc++ -lpthread -lbsm -Wl,-dead_strip`;prebuild Darwin 分支已按此预修。
 - CI(macos runner)承担构建 + 测试;headless 无 WindowServer,不做 GUI 冒烟。
@@ -909,18 +908,16 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 权限边界(macOS 10.15+ 全部已文档化):跨应用窗口标题(kCGWindowName)需**屏幕录制**权限,未授权清单只见本进程窗口;AX 关窗需**辅助功能**权限,未授权返回 -99(MoonBit 文档化该错误码);kCGWindowLayer==0 过滤跳过菜单栏/Dock。
 - Unsupported 明示哨兵(不做半吊子模拟):注册表串/.lnk 解析(Windows 专属)、电源计划三 GUID 接口(Windows 专属)、NTP 服务状态(systemsetup 需 root)、会话睡眠/锁屏事件与网络连通性轮询(Windows 批次能力,需回调蹦床/轮询线程,本批不带)。
 - 单实例(mac)未做:标准做法 NSDistributedNotificationCenter/端口注册,后续按需求补。
-- 真机验证清单(报告方 mac 14.5 执行):① moon test -p yue/system 只读面(时区/语言/sysinfo/内存/uptime/显示器/打印机/磁盘卷/电量);② 壁纸读写(多屏机器注意只改主屏);③ 音量 get/set/mute(注意无 master 通道的 USB 设备行为);④ 亮度 devices/get/set(内建屏 + 外接 DDC 屏各一);⑤ 窗口列表/置前(给本进程授权屏幕录制前后对比);⑥ AX 关窗(授权辅助功能后试,未授权预期 -99);⑦ 关机/重启/注销三动作只做 talk 探针验证参数分发,**不要真关**——建议在虚拟机验;⑧ idle_seconds/keepawake enable+release。
 
 - CI 首编实录补遗(两轮迭代,SDK 形态漂移是主旋律):①`kAudioElementMaster` 不在 SDK,音量 element 常量用 `kAudioObjectPropertyElementMaster`;②`cupsGetJobs` 新旧两种签名(旧五参出参/新四参返回)在 macOS SDK 都 no matching——打印机队列不走 CUPS API,FFI 留哨兵,MoonBit mac 分支与 Linux 同走 `lpstat -o`(CUPS CLI 恒在);③`LSCopyDefaultApplicationURLForURL` 报 no matching,协议默认应用改 `NSWorkspace.URLForApplicationToOpenURL`(非废弃现代等价),扩展名路线 UTTypeCreatePreferredIdentifierForTag+LSCopyDefaultRoleHandlerForContentType 编译通过;④私有 `_AXUIElementGetWindow` 声明必须按真实签名 `(AXUIElementRef, CGWindowID*)`,void* 形态与 SDK 隐式声明冲突报 no matching function;⑤`IOPSGetPowerSourceState` 头未导出,交流判定改逐源读 `kIOPSPowerSourceStateKey`(内部电池接交流时报 kIOPSACPowerValue);⑥CFArrayGetValueAtIndex 出参需 const_cast 再转 CGDisplayModeRef;⑦ObjC 多行消息发送跨行排版断裂会报 missing '[',长消息拆局部变量。
 ### Scroll 未显式内容尺寸时不可滚(macOS 缺「内容自然高度」这层)
 
-- 环境:报告方真机 macOS 14.5 / arm64(跟踪 issue #1,`examples/showcase` 全分页含侧边菜单),fork v0.15.6-mbt.18 预构建库;本机为 Linux、无 mac,未复现,以下结论来自 fork 源码逐行核对(引用代码与本地 `nativeui/mac/scroll_mac.mm` 逐字一致)。
+- 环境:报告方机器 macOS 14.5 / arm64(跟踪 issue #1,`examples/showcase` 全分页含侧边菜单),fork v0.15.6-mbt.18 预构建库;本机为 Linux、无 mac,未复现,以下结论来自 fork 源码逐行核对(引用代码与本地 `nativeui/mac/scroll_mac.mm` 逐字一致)。
 - 现象:Scroll 只给外框 `flex:1`、不显式设内容尺寸时,滚轮与滚动条都不动(最大滚动位置恒 0),超出视口的内容被直接裁掉;显式 `set_content_size` 可绕过,但动态高度内容不适用。同一程序 Win / Linux 正常。
 - 根因:`-[NUScroll resizeSubviewsWithOldSize:]` 只用 `content_size_`——未显式设置时该值是 `{0,0}`,被「不小于视口」两行钳成视口高再 `setFrameSize:` 给 documentView;而 macOS 的可滚范围正是 `documentView frame − clipBounds`,高度恒等视口即范围恒 0,同时内容 Container 被按视口高布局、子内容随之压缩裁剪。对照:Win `ScrollImpl::Layout()` 未显式时取 `Container::GetPreferredSize()`,GTK 侧由 size request 承载——「未显式尺寸取内容自然高度」这层只有 macOS 缺,属 fork 增强自身的平台一致性缺口(上游三平台同样没有此逻辑)。
 - 修复(fork 提交 `0df24ee3`):未显式设置时按内容 `Container` 的自然尺寸定 documentView frame——宽度取「视口宽 / 内容自然宽」较大者(内容更宽时保留其宽以支持横向滚动),高度用 `GetPreferredHeightForWidth(该宽)` 测量(先定宽再量高,换行与最终布局一致);显式 `SetContentSize` 行为不变(新增 `content_size_explicit_` 标记)。重算入口三处:视口尺寸变化(`resizeSubviewsWithOldSize:`)、内容挂入(`PlatformSetContentView`,内容可在布局之后再 `set_content`)、新增的 mac 专属 `Scroll::RefreshContentSize()`。
-- 本批验证:`nativeui/scroll.h` 过 fork 的 cpplint 零告警;本机为 Linux,无法编译 mac 代码,且 fork 的 `build.yml` 实测从未被 push 触发(该工作流运行数为 0),故 mac 编译验证只能落在打 `v*-mbt*` 标签触发的 prebuilt 工作流(本批尚未打标签);真机行为见下清单。
+- 本批验证:`nativeui/scroll.h` 过 fork 的 cpplint 零告警;本机为 Linux,无法编译 mac 代码,且 fork 的 `build.yml` 实测从未被 push 触发(该工作流运行数为 0),故 mac 编译验证只能落在打 `v*-mbt*` 标签触发的 prebuilt 工作流(本批尚未打标签)。
 - 待办与顺序(跨仓链路,勿跳步):① shim 的 `yue_mbt_scroll_refresh_content_size` 已增 `#elif defined(OS_MAC)` 分支调 `Scroll::RefreshContentSize()`(内容动态增高不改变视口尺寸,自动路径覆盖不到,须显式触发)——按「先出包再接线」的顺序,已随 `mbt.20` 出库后落地(旧库上该符号不存在,提前接会链接 undefined)。② 本仓打包侧(.app 骨架 + ad-hoc 签名)与 mac 通知迁移属 issue #4,已随 `mbt.20` 落地,见本文档「系统通知不弹」小节。
-- 真机验证清单(用户执行):① showcase 各分页(含侧边菜单)可滚到底;② A/B 对照:同一 30 行文本,不设内容尺寸可滚、显式设 1200 同样可滚;③ 窗口压到很矮后内容仍可滚、滚动条 thumb 比例合理;④ 含宽表的页可横向滚(不裁列);⑤ systemprobe 报告 `set_text` 长高后可滚到底——本项依赖待办 ①,未接线前预期仍不动。
 
 ### 系统通知不弹(裸可执行文件无应用身份 + NSUserNotification 已弃用)
 
@@ -933,9 +930,8 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
   - 交互:action 用 `UNNotificationAction`(identifier 取该 action 的 info,与 delegate 读法对齐);reply 用 `UNTextInputNotificationAction` 放进 category(category identifier 复用通知 identifier,options 带 `CustomDismissAction` 以保留关闭事件)。
   - delegate 同时实现两套协议:`willPresentNotification:` 发 `on_notification_show`(前台展示);`didReceiveNotificationResponse:` 按 DefaultAction / DismissAction / `UNTextInputNotificationResponse` / 其余 action 分别映射到 click / close / reply / action。
 - **按应用身份分流,而不是无脑迁移**:`UNUserNotificationCenter` 对无身份进程直接抛异常,故按 `bundleIdentifier` 是否存在分流——有身份走新 API,裸可执行文件保留旧 API(不崩、行为与改造前一致)。这是**有意保留的降级分支**,不是没清理干净的旧代码。
-- 已知边界(待真机确认):① `on_notification_show` 在新 API 下只在前台(`willPresentNotification:`)触发,后台投递框架没有对应回调;② action 不再区分「首个作 action 按钮 / 其余作 additionalActions」,全部作为 category 的 action 呈现(有 reply 时旧 API 的 actionButton 本就不生效);③ `SetImage`(内存图)在新路径不生效,须用 `SetImagePath`(框架按文件 URL 挂附件)。
+- 已知边界:① `on_notification_show` 在新 API 下只在前台(`willPresentNotification:`)触发,后台投递框架没有对应回调;② action 不再区分「首个作 action 按钮 / 其余作 additionalActions」,全部作为 category 的 action 呈现(有 reply 时旧 API 的 actionButton 本就不生效);③ `SetImage`(内存图)在新路径不生效,须用 `SetImagePath`(框架按文件 URL 挂附件)。
 - 配套(本仓):`scripts/mac_bundle.py` 把 moon 产物包成 `Foo.app`(`Contents/MacOS` + `Info.plist` + `Resources`)并 ad-hoc 签名(`codesign --force --sign -`),`LSMinimumSystemVersion` 默认 11.0(与预构建库部署目标一致)。**macOS 通知只对签名后的 .app 生效,`moon run` 裸跑不弹是系统限制而非库 bug**,使用文档已写明。
-- 真机验证清单(用户执行):① 程序包成 .app 并 ad-hoc 签名后启动,首次应弹授权对话框,允许后 `show()` 弹横幅;② 拒绝授权时能看到 WARNING 日志;③ 点击正文触发 `on_notification_click`;④ 带 action 的通知点按钮触发 `on_notification_action`;⑤ reply 通知输入文本回传 `on_notification_reply`;⑥ 通知被划掉触发 `on_notification_close`;⑦ 未打包的裸可执行文件仍是「不弹但不崩」(与改造前一致)。
 
 ### ffmpeg CLI 视频解码路线(帧集整读 + 偏移切片)
 
@@ -1091,4 +1087,5 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。
 2. 中英两份(本文与 docs/adaptation.md)同批同步。
+3. macOS 只做 CI 验证:本仓无 mac 真机,macOS 条目只记 CI 构建 / 静态检查结论与源码逐行核对结论,不列真机验证清单、不承诺真机验证(能力边界照实写明即可)。
 3. 影音与桌面控制批次的落点:`影音与桌面控制命令路线`(Linux 系统能力数据层下)、`系统信息与系统级安全边界`、`目录枚举与进程内环境变量`(跨平台通用下)、`通用 D-Bus 调用层`(DBus 线路协议下)、`地图与飞线的投影方案`(自绘画布与图表渲染下);浏览器侧结论进 `Firefox places.sqlite` 小节。
