@@ -165,7 +165,9 @@ void yue_mbt_browser_execute_javascript(void *browser, const char *code);
 void yue_mbt_browser_register_protocol(const char *scheme,
                                        void *(*invoke)(void *, void *), void *closure);
 void yue_mbt_browser_unregister_protocol(const char *scheme);
-void *yue_mbt_browser_new_ex(int32_t devtools, int32_t context_menu, int32_t allow_file_access, int32_t hardware_acceleration);
+/* profile 为会话档案名(空串 = 进程默认会话):同名共用一个会话,
+ * 异名互不可见(cookie / localStorage / 缓存),详见 fork 的 Browser::Options */
+void *yue_mbt_browser_new_ex(int32_t devtools, int32_t context_menu, int32_t allow_file_access, int32_t hardware_acceleration, const char *profile);
 /* Cookie 回调：每行一条，字段 \x1f 分隔 name/value/domain/path/http_only/secure */
 void yue_mbt_browser_get_cookies_for_url(void *browser, const char *url,
                                          void (*invoke)(void *closure, void *flat_bytes), void *closure);
@@ -746,6 +748,10 @@ void yue_mbt_browser_execute_javascript_callback(void *browser, const char *code
 void yue_mbt_browser_add_raw_binding(void *browser, const char *name, void (*invoke)(void *, void *), void *closure);
 void yue_mbt_browser_remove_binding(void *browser, const char *name);
 int32_t yue_mbt_browser_has_bindings(void *browser);
+/* 用户脚本:timing 0=文档开始 1=文档结束(仅 Windows 用 DOMContentLoaded 模拟),
+ * 跨导航持续生效;绑定脚本恒排在用户脚本之前 */
+void yue_mbt_browser_add_user_script(void *browser, const char *code, int32_t timing, int32_t main_frame_only);
+void yue_mbt_browser_remove_all_user_scripts(void *browser);
 int32_t yue_mbt_view_do_drag_data(void *view, const char *text, const char *file_paths, int32_t operations, int64_t drag_image);
 int32_t yue_mbt_view_cancel_drag(void *view);
 int32_t yue_mbt_view_is_dragging(void *view);

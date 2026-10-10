@@ -35,11 +35,13 @@ fn keep_alive_bytes(callback : (Bytes) -> Unit) -> Unit {
 }
 
 ///|
+#borrow(profile)
 extern "c" fn ffi_browser_new_ex(
   devtools : Int,
   context_menu : Int,
   allow_file_access : Int,
   hardware_acceleration : Int,
+  profile : Bytes,
 ) -> @yue.View = "yue_mbt_browser_new_ex"
 
 ///|
@@ -196,3 +198,18 @@ extern "c" fn ffi_browser_remove_binding(
 ///|
 #borrow(browser)
 extern "c" fn ffi_browser_has_bindings(browser : @yue.View) -> Int = "yue_mbt_browser_has_bindings"
+
+///|
+#borrow(browser, code)
+extern "c" fn ffi_browser_add_user_script(
+  browser : @yue.View,
+  code : Bytes,
+  timing : Int,
+  main_frame_only : Int,
+) -> Unit = "yue_mbt_browser_add_user_script"
+
+///|
+#borrow(browser)
+extern "c" fn ffi_browser_remove_all_user_scripts(
+  browser : @yue.View,
+) -> Unit = "yue_mbt_browser_remove_all_user_scripts"

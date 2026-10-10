@@ -485,12 +485,15 @@ let b = @browser.Browser::make(url="https://example.com")   // or html="<h1>本�
 | set_user_agent(s) | UA |
 | execute_javascript(code) / execute_javascript_with_result(code, fn(ok, json)) | Execute JS; the latter fetches the result asynchronously (ok=success, json=result JSON text) |
 | add_raw_binding(name, fn(json)) / remove_binding(name) / has_bindings() | JS↔native bindings (when the page calls name(...), it receives JSON argument text) |
+| add_user_script(code, timing?, main_frame_only?) / remove_all_user_scripts() | User scripts that survive navigation (injected at document start in the main frame by default; `timing` is `DocumentStart` / `DocumentEnd`, the latter emulated with DOMContentLoaded on Windows only); binding scripts always come first |
 | register_protocol(scheme, fn(url) -> (mime, content)?) | Custom protocol (return None to refuse) |
 | unregister_protocol(scheme) | Unregister protocol |
 | get_cookies_for_url(url, fn(cookies)) | Query cookies |
 | on_change_loading / on_update_title / on_update_command / on_commit_navigation / on_finish_navigation | Events |
 
-For customization options, use `Browser::new_with_options(BrowserOptions)`.
+For customization options, use `Browser::new_with_options(BrowserOptions)`: `devtools` / `context_menu` / `allow_file_access_from_files` (macOS/Linux) / `hardware_acceleration` (Linux) / `profile` (session profile).
+
+> **Session profile**: browsers created with the same `profile` share one session (cookies / localStorage / cache) and stay invisible to each other, which is what makes "several accounts on the same site at once" work — two windows, two accounts, no interference. An empty string means the process-wide default session and behaves exactly as before. Profiles are stored under the application data directory and can persist (on macOS this needs 14+ and a signed `.app` with a bundle id, otherwise only an in-memory session is isolated; the Windows IE backend has no notion of profiles). Custom protocols are registered on every profile — see "Browser session profiles" in [adaptation.md](adaptation.md).
 
 > Since 0.5.0 Browser lives in the standalone package `NoahLiu/moonbit-libyue/yue/browser` (API unchanged; `@browser.Browser` becomes `@browser.Browser`); apps that don't import it no longer link WebKit/WebView2.
 

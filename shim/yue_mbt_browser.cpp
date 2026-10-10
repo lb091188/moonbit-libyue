@@ -106,10 +106,14 @@ void yue_mbt_browser_unregister_protocol(const char *scheme) {
 }
 
 void *yue_mbt_browser_new_ex(int32_t devtools, int32_t context_menu,
-                             int32_t allow_file_access, int32_t hardware_acceleration) {
+                             int32_t allow_file_access,
+                             int32_t hardware_acceleration,
+                             const char *profile) {
   nu::Browser::Options options;
   options.devtools = devtools != 0;
   options.context_menu = context_menu != 0;
+  // 空串即进程默认会话,与不带 profile 的行为完全一致
+  options.profile = profile ? profile : "";
 #if defined(OS_MAC) || defined(OS_LINUX)
   options.allow_file_access_from_files = allow_file_access != 0;
 #else
@@ -287,4 +291,22 @@ int32_t yue_mbt_browser_has_bindings(void *browser) {
     return b->HasBindings() ? 1 : 0;
   }
   return 0;
+}
+
+void yue_mbt_browser_add_user_script(void *browser, const char *code,
+                                     int32_t timing,
+                                     int32_t main_frame_only) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->AddUserScript(code,
+                     timing == 1
+                         ? nu::Browser::UserScriptInjectionTime::kDocumentEnd
+                         : nu::Browser::UserScriptInjectionTime::kDocumentStart,
+                     main_frame_only != 0);
+  }
+}
+
+void yue_mbt_browser_remove_all_user_scripts(void *browser) {
+  if (auto *b = CastTo<nu::Browser>(browser)) {
+    b->RemoveAllUserScripts();
+  }
 }

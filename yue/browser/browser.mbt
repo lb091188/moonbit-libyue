@@ -15,16 +15,20 @@ pub(all) struct BrowserOptions {
   allow_file_access_from_files : Bool
   /// Linux：硬件加速（默认开）
   hardware_acceleration : Bool
+  /// 会话档案：同名共用一个会话（cookie / localStorage / 缓存），异名互不可见，
+  /// 用于「同一站点多账号并存」。空串 = 进程默认会话，与不带档案完全一致。
+  profile : String
 }
 
 ///|
-/// 默认选项（devtools/右键菜单关，硬件加速开）。
+/// 默认选项（devtools/右键菜单关，硬件加速开，档案为空即默认会话）。
 pub fn BrowserOptions::new() -> BrowserOptions {
   {
     devtools: false,
     context_menu: false,
     allow_file_access_from_files: false,
     hardware_acceleration: true,
+    profile: "",
   }
 }
 
@@ -53,6 +57,7 @@ pub fn Browser::new_with_options(options : BrowserOptions) -> Browser {
       } else {
         0
       },
+      utf8_bytes(options.profile),
     ),
   }
 }
@@ -173,6 +178,46 @@ pub fn Browser::set_user_agent(self : Browser, agent : String) -> Unit {
 /// 执行 JavaScript（不取回结果；结果回传需异步链，后补）。
 pub fn Browser::execute_javascript(self : Browser, code : String) -> Unit {
   ffi_browser_execute_javascript(self.view, utf8_bytes(code))
+}
+
+///|
+/// 用户脚本的注入时机。
+pub(all) enum UserScriptInjectionTime {
+  /// 文档开始——在页面自身脚本之前
+  DocumentStart
+  /// 文档结束——Windows 后端用 DOMContentLoaded 包装模拟，语义近似而非等同
+  DocumentEnd
+}
+
+///|
+/// 注册一段跨导航持续生效的用户脚本（默认文档开始、仅主框架）。
+/// 绑定脚本恒排在用户脚本之前，所以用户脚本可直接使用 `window` 上的绑定。
+/// 多次调用按注册顺序注入；与 `execute_javascript` 不同，导航后不会失效。
+pub fn Browser::add_user_script(
+  self : Browser,
+  code : String,
+  timing? : UserScriptInjectionTime = DocumentStart,
+  main_frame_only? : Bool = true,
+) -> Unit {
+  ffi_browser_add_user_script(
+    self.view,
+    utf8_bytes(code),
+    match timing {
+      DocumentStart => 0
+      DocumentEnd => 1
+    },
+    if main_frame_only {
+      1
+    } else {
+      0
+    },
+  )
+}
+
+///|
+/// 移除所有用户脚本（绑定脚本不受影响）。
+pub fn Browser::remove_all_user_scripts(self : Browser) -> Unit {
+  ffi_browser_remove_all_user_scripts(self.view)
 }
 
 ///|

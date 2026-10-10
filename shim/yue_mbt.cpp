@@ -5894,7 +5894,7 @@ void yue_mbt_scroll_refresh_content_size(void *scroll) {
   // 且重挂时读到旧快照值即跳过重算——内容后挂(惰性挂载)后滚动范围
   // 永远停在骨架高度。此处在运行期按当前内容重写(宽度请求保持现值,
   // 水平行为与常驻路径一致)。Windows 的 ScrollImpl::Layout 每轮重查内容
-  // 自然尺寸、macOS 由 documentView frame 决定范围,均无快照问题,空操作。
+  // 自然尺寸,是空操作;macOS 的自动路径同样看不到后挂/长高,走下面的分支。
   if (auto *s = CastTo<nu::Scroll>(scroll)) {
     nu::View *content = s->GetContentView();
     if (content == nullptr || !content->IsContainer()) {
@@ -5906,6 +5906,14 @@ void yue_mbt_scroll_refresh_content_size(void *scroll) {
     double h = static_cast<nu::Container *>(content)->GetPreferredSize().height();
     gtk_widget_set_size_request(w, cur_w,
                                 h > 0.0 ? static_cast<gint>(h) : -1);
+  }
+#elif defined(OS_MAC)
+  // macOS 的可滚范围由 documentView frame 决定,内容在 set_content 之后才挂入
+  // (惰性挂载)或运行期长高都不改变视口尺寸,`resizeSubviewsWithOldSize:` 这类
+  // 自动路径看不到,须显式重测(见 fork 的 Scroll::RefreshContentSize)。
+  // Windows 的 ScrollImpl::Layout 每轮重查内容自然尺寸,仍是空操作。
+  if (auto *s = CastTo<nu::Scroll>(scroll)) {
+    s->RefreshContentSize();
   }
 #endif
 }

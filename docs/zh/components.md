@@ -483,12 +483,15 @@ let b = @browser.Browser::make(url="https://example.com")   // 或 html="<h1>本
 | set_user_agent(s) | UA |
 | execute_javascript(code) / execute_javascript_with_result(code, fn(ok, json)) | 执行 JS；后者异步取回结果（ok=成功，json 为结果 JSON 文本） |
 | add_raw_binding(name, fn(json)) / remove_binding(name) / has_bindings() | JS↔原生绑定（网页调 name(...) 时收到 JSON 参数文本） |
+| add_user_script(code, timing?, main_frame_only?) / remove_all_user_scripts() | 跨导航持续生效的用户脚本（默认文档开始注入、仅主框架；`timing` 取 `DocumentStart` / `DocumentEnd`，后者仅 Windows 用 DOMContentLoaded 模拟）；绑定脚本恒排在用户脚本之前 |
 | register_protocol(scheme, fn(url) -> (mime, content)?) | 自定义协议（返回 None 拒绝） |
 | unregister_protocol(scheme) | 注销协议 |
 | get_cookies_for_url(url, fn(cookies)) | 查 Cookie |
 | on_change_loading / on_update_title / on_update_command / on_commit_navigation / on_finish_navigation | 事件 |
 
-定制选项用 `Browser::new_with_options(BrowserOptions)`。
+定制选项用 `Browser::new_with_options(BrowserOptions)`：`devtools` / `context_menu` / `allow_file_access_from_files`（macOS/Linux）/ `hardware_acceleration`（Linux）/ `profile`（会话档案）。
+
+> **会话档案 `profile`**：同名共用一个会话（cookie / localStorage / 缓存），异名互不可见，用于「同一站点多账号并存」——两个窗口各登一个账号、互不影响。空串即进程默认会话，与不设档案的行为完全一致。档案落盘在应用数据目录下并可持久化（macOS 需 14+ 且程序是带 bundle id 的签名 `.app`，否则仅内存隔离；Windows 的 IE 后端无档案概念）。自定义协议注册到全部档案，详见 [adaptation.md](adaptation.md) 的「Browser 会话 profile」小节。
 
 > 0.5.0 起 Browser 迁入独立包 `NoahLiu/moonbit-libyue/yue/browser`(API 不变,`@browser.Browser` 改 `@browser.Browser`);未 import 该包的程序不再链接 WebKit/WebView2。
 

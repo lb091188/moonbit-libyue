@@ -109,7 +109,18 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 探针副产物：本机 WebKitGTK 的 `script-message-received` 传 `WebKitJavascriptResult*`（与 fork 现有 `OnScriptMessage` 一致），用 `jsc_value_to_string(JSCValue*)` 会断言失败，须走 JavaScriptCore C API（`JSValueToStringCopy` + `JSStringGetUTF8CString`）；`webkit_uri_scheme_request_finish` 要 `GInputStream*` 而非裸字符串。
 - 协议注册语义变化：`RegisterProtocol`/`UnregisterProtocol` 原固定注册在默认 context 上，多 context 后改为「默认 + 全部 profile context」，新建 context 时补齐已注册 scheme；`GetCookiesForURL` 本就是 `webkit_web_view_get_context(GetNative())`，天然跟随 profile，未改。
 - 边界：macOS 持久化需 14+ **且**进程有 bundle identifier（裸可执行文件按内存隔离处理——用 identifier 建 store 无处落盘，与 issue #4 的「裸 Mach-O 无身份」同源）；Windows 的 IE 后端无 profile 概念仍用默认会话；profile 目录按应用名隔离（`App::GetID()`，空则回退 `g_get_prgname()`）。
-- 待办与真机验证：封装侧（shim 透传 + `BrowserOptions.profile` + yue 层文档）须等新预构建库与 `LIBYUE_VERSION` 升版后再落；真机清单：①同站点两账号窗口互不影响登录（切窗即切账号）②关闭重开进程后各自仍登录（mac 需 14+ 且签名 bundle）③两 profile 的 localStorage 互不可见 ④自定义协议在带 profile 的窗口里仍能加载 ⑤`profile` 留空时行为与改造前一致（回归）。
+- 封装侧已接线（shim 透传 + `BrowserOptions.profile` + yue 文档），随 `mbt.20` 落地。
+- **Linux 端到端验证（经 shim + yue 层，不是直接调 C）**：临时探针建三个 Browser（`probe_a` / `probe_b` / 空 profile），各自用用户脚本写 `document.cookie='who=<标签>'`，加载后 `get_cookies_for_url` 回读——三个会话各只看到自己那条（`who=a` / `who=b` / `who=d`，各 1 条），证明 cookie jar 真的按 profile 分离；磁盘上只生成 `yue-profiles/<app>/probe_a|probe_b/{data,cache}`，**空 profile 不建任何目录**（默认会话行为与改造前一致）；探针验后即删。
+- 待办与真机验证；真机清单：①同站点两账号窗口互不影响登录（切窗即切账号）②关闭重开进程后各自仍登录（mac 需 14+ 且签名 bundle）③两 profile 的 localStorage 互不可见 ④自定义协议在带 profile 的窗口里仍能加载 ⑤`profile` 留空时行为与改造前一致（回归）。
+
+### Browser 用户脚本注入（跨导航持续生效，fork 侧已改待出包）
+
+- 需求：`execute_javascript` 只在调用那一刻执行一次，导航到新页面即失效，也没法在文档解析前注入——调用方只能拼「导航完成回调 + execute_javascript」，页面自身的早期脚本读不到预置对象。
+- 入口（fork 提交 `b3b02733`）：`Browser::AddUserScript(code, timing = kDocumentStart, main_frame_only = true)` / `RemoveAllUserScripts()`，配合 `enum class UserScriptInjectionTime { kDocumentStart, kDocumentEnd }`。**绑定脚本恒排在用户脚本之前**，所以用户脚本可直接用 `window.<绑定名>`；用户脚本按注册顺序注入。
+- 三平台都是「整表重建」：WebKit `remove_all_scripts` 后重加（绑定脚本 + 用户脚本）；`WKUserContentController removeAllUserScripts` 后重加（`WKUserScript` 的 `atDocumentStart`/`atDocumentEnd`）；WebView2 按 id 逐个 remove 再逐条 add（`script_ids_` 向量 + 计数，回调按序号回填 id）。
+- **顺手修掉的坑（issue 未提）**：原 `PlatformUpdateBindings` 会 `remove_all_scripts` 后只补回绑定脚本，用户脚本会被 `AddRawBinding`/`RemoveBinding`/`SetBindingName` 触发的刷新清掉。更名 `PlatformUpdateScripts` 后两类脚本一起重建，用户脚本不再被清——**这是需要维持的不变量**，后续任何维护脚本列表的代码都不能只重建绑定脚本。
+- Windows 边界：WebView2 只有「文档创建前」一条注入通道，`DocumentEnd` 以 `document.addEventListener('DOMContentLoaded', ...)` 包装模拟（近似而非等同）；原先「无绑定则不注入任何脚本」的判断放宽为「无绑定且无用户脚本才不注入」。
+- 验证（Linux，经 shim + yue 层）：三个 Browser（两个带 profile、一个默认）各注册 `add_user_script("document.cookie='who=<标签>'; probeReport('injected-<标签>')")` 与对应绑定，加载后全部收到 `PROBE-REPORT ... payload=["injected-<标签>"]`——document-start 注入 + 绑定调用链路成立，且注入脚本先于页面自身脚本执行。mac / Windows 行为待真机。
 
 ### MoonBit cfg(platform=)
 
@@ -849,7 +860,7 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 根因:`-[NUScroll resizeSubviewsWithOldSize:]` 只用 `content_size_`——未显式设置时该值是 `{0,0}`,被「不小于视口」两行钳成视口高再 `setFrameSize:` 给 documentView;而 macOS 的可滚范围正是 `documentView frame − clipBounds`,高度恒等视口即范围恒 0,同时内容 Container 被按视口高布局、子内容随之压缩裁剪。对照:Win `ScrollImpl::Layout()` 未显式时取 `Container::GetPreferredSize()`,GTK 侧由 size request 承载——「未显式尺寸取内容自然高度」这层只有 macOS 缺,属 fork 增强自身的平台一致性缺口(上游三平台同样没有此逻辑)。
 - 修复(fork 提交 `0df24ee3`):未显式设置时按内容 `Container` 的自然尺寸定 documentView frame——宽度取「视口宽 / 内容自然宽」较大者(内容更宽时保留其宽以支持横向滚动),高度用 `GetPreferredHeightForWidth(该宽)` 测量(先定宽再量高,换行与最终布局一致);显式 `SetContentSize` 行为不变(新增 `content_size_explicit_` 标记)。重算入口三处:视口尺寸变化(`resizeSubviewsWithOldSize:`)、内容挂入(`PlatformSetContentView`,内容可在布局之后再 `set_content`)、新增的 mac 专属 `Scroll::RefreshContentSize()`。
 - 本批验证:`nativeui/scroll.h` 过 fork 的 cpplint 零告警;本机为 Linux,无法编译 mac 代码,且 fork 的 `build.yml` 实测从未被 push 触发(该工作流运行数为 0),故 mac 编译验证只能落在打 `v*-mbt*` 标签触发的 prebuilt 工作流(本批尚未打标签);真机行为见下清单。
-- 待办与顺序(跨仓链路,勿跳步):① shim 的 `yue_mbt_scroll_refresh_content_size` 增 `#if defined(OS_MAC)` 分支调 `Scroll::RefreshContentSize()`(内容动态增高不改变视口尺寸,自动路径覆盖不到,须显式触发);该 shim 改动**必须等 fork 出新预构建库并升 `prepare.py` 的 `LIBYUE_VERSION` 之后再落**,否则本仓 mac CI 对旧库链接 undefined。② 本仓打包侧(.app 骨架 + ad-hoc 签名)与 mac 通知迁移属 issue #4,已随 `mbt.20` 落地,见本文档「系统通知不弹」小节。
+- 待办与顺序(跨仓链路,勿跳步):① shim 的 `yue_mbt_scroll_refresh_content_size` 已增 `#elif defined(OS_MAC)` 分支调 `Scroll::RefreshContentSize()`(内容动态增高不改变视口尺寸,自动路径覆盖不到,须显式触发)——按「先出包再接线」的顺序,已随 `mbt.20` 出库后落地(旧库上该符号不存在,提前接会链接 undefined)。② 本仓打包侧(.app 骨架 + ad-hoc 签名)与 mac 通知迁移属 issue #4,已随 `mbt.20` 落地,见本文档「系统通知不弹」小节。
 - 真机验证清单(用户执行):① showcase 各分页(含侧边菜单)可滚到底;② A/B 对照:同一 30 行文本,不设内容尺寸可滚、显式设 1200 同样可滚;③ 窗口压到很矮后内容仍可滚、滚动条 thumb 比例合理;④ 含宽表的页可横向滚(不裁列);⑤ systemprobe 报告 `set_text` 长高后可滚到底——本项依赖待办 ①,未接线前预期仍不动。
 
 ### 系统通知不弹(裸可执行文件无应用身份 + NSUserNotification 已弃用)
