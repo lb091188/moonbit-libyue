@@ -256,3 +256,9 @@
 - FFI 规范与坑清单:全局技能 `moonbit-c-binding`(安装于 `~/.agents/skills/`,源自 https://github.com/moonbitlang/skills)
 - 平台适配经验:`docs/adaptation.md`
 - 完整 API 对照:libyue TS 声明(github.com/yue/yue releases);Lua 绑定参考(github.com/yue/yue 的 `lua_yue/`)
+
+## CI 平台矩阵补全(2026-10-10 排障新增)
+
+- [x] registry 索引:三个会调 moon 的工作流补 `moon update`(全新 runner 不自动拉索引,10-06 起三平台全红的根因)
+- [x] mac 链接面:CI `brew install ffmpeg`(ffmpeg_stub.c 真调 libav,mac 由 brew 供库)
+- [ ] ffmpeg 的 MSVC 链接面:Windows 的 `moon test`/`moon build` 与 bin-* 发布的全量构建都卡 systemprobe→yue-media→ffmpeg 链接;待 NuGet 或 ShiftMediaProject 预编译 .lib(仿 WebView2 的钉版本 + sha256 模式),运行期 DLL 需随发布包
