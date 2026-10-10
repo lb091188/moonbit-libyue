@@ -45,10 +45,20 @@ fn draw_boxes(
     p.set_stroke_color(if is_focus { "#89b4fa" } else { "#45475a" })
     p.set_line_width(1.0)
     p.stroke_rect(b.x, b.y, b.w, b.h)
-    let _ = @text.draw_to(
-      p.bitmap, b.x + 4.0, b.y + (b.h - lh) / 2.0, b.ed.get_text(), size,
-      "#cdd6f4",
-    )
+    let ty = b.y + (b.h - lh) / 2.0
+    let _ = @text.draw_to(p.bitmap, b.x + 4.0, ty, b.ed.get_text(), size, "#cdd6f4")
+    // 组合串接在已提交文本之后，带下划线（与 GtkEntry 同观感）；它不进文本状态
+    let pe = b.ed.preedit_text()
+    if pe.length() > 0 {
+      let px = b.x + 4.0 + prefix_width(b.ed, b.ed.caret_pos(), size)
+      let _ = @text.draw_to(p.bitmap, px, ty, pe, size, "#f9e2af")
+      let pw = match @text.measure(pe, size) {
+        Some(m) => m.width.to_double()
+        None => 0.0
+      }
+      p.set_fill_color("#f9e2af")
+      p.fill_rect(px, ty + lh - 1.0, pw, 1.0)
+    }
     if is_focus && blink {
       let cx = b.x + 4.0 + prefix_width(b.ed, b.ed.caret_pos(), size)
       p.set_fill_color("#f5e0dc")
@@ -111,6 +121,14 @@ fn place_caret(b : Box, local_x : Double, size : Double) -> Unit {
     }
   }
   b.ed.select_range(best, best)
+}
+
+// 逻辑焦点换人前丢弃旧框未提交的组合串（输入法侧由 surrounding 的 reset 语义处理）
+fn drop_preedit(boxes : Array[Box], fs : @core.FocusStack) -> Unit {
+  match fs.current() {
+    Some(f) => boxes[f - 1].ed.set_preedit("")
+    None => ()
+  }
 }
 
 ///|
@@ -197,10 +215,12 @@ fn main {
               if ev.code == 0 {
                 // 键按下
                 if ev.keysym == @core.KS_TAB {
+                  drop_preedit(boxes, fs)
                   let _ = fs.move_focus(false)
                   win.request_focus()
                   dirty.val = true
                 } else if ev.keysym == @core.KS_ISO_LEFT_TAB {
+                  drop_preedit(boxes, fs)
                   let _ = fs.move_focus(true)
                   win.request_focus()
                   dirty.val = true
@@ -235,6 +255,38 @@ fn main {
         }
         @win.Event::NoEvent => keep = false
       }
+    }
+    // —— 输入法通道（G5 四条件的 ③④：每拍喂已提交文本与光标位）——
+    match fs.current() {
+      Some(f) => {
+        let cur = boxes[f - 1]
+        win.set_im_surrounding(cur.ed.get_text(), cur.ed.caret_pos())
+        let pe = cur.ed.preedit_text()
+        let pe_w = match @text.measure(pe, 14.0) {
+          Some(m) => m.width.to_double()
+          None => 0.0
+        }
+        let cx = cur.x + 4.0 + prefix_width(cur.ed, cur.ed.caret_pos(), 14.0) + pe_w
+                win.set_im_cursor(
+          cx.floor().to_int(), cur.y.floor().to_int(), 1, cur.h.ceil().to_int(),
+        )
+        let mut more = true
+        while more {
+          match win.take_commit() {
+            Some(text) => {
+              let _ = cur.ed.insert_text(text)
+              dirty.val = true
+            }
+            None => more = false
+          }
+        }
+        let st = win.preedit()
+        if cur.ed.preedit_text() != st.text {
+          cur.ed.set_preedit(st.text)
+          dirty.val = true
+        }
+      }
+      None => ()
     }
     queue_left.val = win.pending_input()
     if dirty.val {

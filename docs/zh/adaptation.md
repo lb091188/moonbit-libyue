@@ -263,6 +263,18 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **反证的一条**：修完映射后示例一度不自动退出，我先怀疑 `Loop::advance`「只看队首就 break」会饿死后序定时器，写成无头用例后**通过**（core 15/15），猜想去掉；实际卡住是第 ③ 条（draw 之外画 GdkWindow 撞死窗口，见 G2/G4 时序条）与测试等待时长不够叠加造成，不是调度器问题。
 - **验证（客观）**：注入 `a b c Tab d e f` 后 `NATIVE-WINDOW-OK ... a='helloabc' b='第二个框def'`——前三键进第一框、Tab 切焦点、后三键进第二框；`mods=0`。五包 `moon check` 零警告，core 15/15、input 10/10、render 14/14、text 7/7、yoga-mbt 79/79，全仓红点仍 290 errors。**仍需肉眼确认**：点击定位光标与 caret 500ms 闪烁的观感（xdotool 能注入点击、但看不到画出来的 caret）。
 
+### MoonBit 原生 GUI 栈 G5 首批（Linux 纯通道输入法接入）· 四条件落到 yue/win 上的四条坑
+
+配方来自 G0 探针（`ec2849d` 四条件），本批把它实现进新栈自己的窗口层：`yue/win` 建 `GtkIMMulticontext`（`use_preedit=TRUE`）、收键先 `filter_keypress`（消费即吃掉、不推给内核）、提交文本与组合串以「取一条 + 逐字段读」回 MoonBit、每拍喂 surrounding 与插入符矩形；`yue/input` 增加 `set_preedit`/`preedit_text`（组合串只作显示，**绝不并入文本状态**，文本仍只有一份）；示例把组合串画在已提交文本之后并加下划线，候选窗矩形算上组合串宽。
+
+- **坑①（拼音原样进文本、输入法像没工作）**：`set_client_window` 在 `show` 之前调，那时 drawing area 还没 realize、`gtk_widget_get_window` 返回 NULL，multicontext 于是没挂上任何输入法模块，`filter_keypress` 恒返回不消费。**必须挂在 `realize` 信号里**（探针同此），并配 `focus-in/out-event` 做 `focus_in`/`focus_out`。
+- **坑②（core dump：`free(): double free detected in tcache 2`）**：`commit` 信号给的 UTF-8 串所有权在 GTK，回调返回后它自己释放，处理器里 `g_free(text)` 即双释放。探针的处理函数也确实不 free。
+- **坑③（永远出不来中文）**：每拍喂 surrounding 时顺手调 `gtk_im_context_reset` 会**打断组合**——reset 的语义是「当前组合串作废」。喂 surrounding 只调 `gtk_im_context_set_surrounding(im, text, len, caret_bytes)`（四参旧接口，探针同此，不走带 SelectionData 的新接口）。
+- **坑④**：`preedit-changed` 的信号签名是 `(GtkIMContext*, gpointer)`，串要用 `gtk_im_context_get_preedit_string(ctx, &str, &attrs, &caret)` 取（按 `(ctx, text, data)` 接会拿到错的指针）；`caret` 是组合串内的**字节**偏移，与我们 UTF-8 字节光标同口径。
+- **工具链补充**：`FixedArray[Byte]` → `String` 的现行路子是 `@utf8.decode_lossy(FixedArray::unsafe_reinterpret_as_bytes(buf))`（`@utf8.decode_utf8`/`buf.to_bytes()` 在本版本都不存在）；`Double → Int` 用 `x.floor().to_int()`（无 `Int.floor_of_double`，也没有 `+.` 运算符，且**续行运算符必须收在上一行行尾**）。
+- **验证（客观，`xdotool` 注入，`GTK_IM_MODULE=fcitx`）**：输入 `nihao` + 空格 → 退出行 `a='hello你哈哦'`，拼音字母零残留、`seen=6` 只剩未被消费的键，说明过滤与「消费即吃掉」都按预期工作；进程干净退出。五包 `moon check` 零警告，core 15/15、input 10/10、render 14/14、text 7/7、yoga-mbt 79/79，全仓红点仍 290 errors。
+- **待肉眼/待补**：preedit 下划线的观感、候选窗是否贴组合串末尾（本机只能证明矩形已推送）、ibus 一套（探针侧结论：ibus 无内联预览疑为 libpinyin display-style 设置，与本层无关，另记）、Windows `ImmAssociateContext` 与 macOS。
+
 ## Linux
 
 ### 发行版

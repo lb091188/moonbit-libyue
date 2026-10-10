@@ -40,6 +40,13 @@ typedef struct {
   const unsigned char *pending; // 待贴的 RGBA 缓冲（所有权在 MoonBit）
   int pending_w;
   int pending_h;
+  GtkIMContext *im;
+  char commit[256]; // 已提交文本（UTF-8），MoonBit 逐字节读走后清零
+  int commit_len;
+  char preedit[256]; // 未提交的组合串，仅用于自绘显示
+  int preedit_len;
+  int preedit_caret;
+  int preedit_active;
   WmEv evs[64];
   WmEv last;
   int ev_head;
@@ -80,6 +87,97 @@ static void wm_push(WmWindow *w, const WmEv *ev) {
   w->ev_count++;
 }
 
+static void wm_store_text(char *dst, int *dst_len, const char *src) {
+  int n = 0;
+  if (src != NULL) {
+    while (src[n] != '\0' && n < 255) {
+      dst[n] = src[n];
+      n++;
+    }
+  }
+  dst[n] = '\0';
+  *dst_len = n;
+}
+
+static void wm_on_im_commit(GtkIMContext *im, gchar *text, gpointer data) {
+  (void)im;
+  WmWindow *w = (WmWindow *)data;
+  wm_store_text(w->commit, &w->commit_len, text);
+  // 串的所有权在 GTK（信号返回后它自己释放），这里绝不能 g_free ——
+  // 实测 free(): double free detected in tcache 2 直接 core dump。探针同此。
+}
+
+// 「commit」信号带文本；「preedit-changed」只带上下文，串要用
+// gtk_im_context_get_preedit_string 取（探针里就是这个形态，签名照抄会错）
+static void wm_on_preedit_changed(GtkIMContext *ctx, gpointer data) {
+  WmWindow *w = (WmWindow *)data;
+  gchar *str = NULL;
+  PangoAttrList *attrs = NULL;
+  gint caret = 0;
+  gtk_im_context_get_preedit_string(ctx, &str, &attrs, &caret);
+  wm_store_text(w->preedit, &w->preedit_len, str != NULL ? str : "");
+  // caret 是组合串内的**字节**偏移（MoonBit 侧按 UTF-8 字节管光标，同口径）
+  w->preedit_caret = caret > w->preedit_len ? w->preedit_len : caret;
+  if (attrs != NULL) {
+    pango_attr_list_unref(attrs);
+  }
+  g_free(str);
+}
+
+static void wm_on_preedit_start(GtkIMContext *im, gpointer data) {
+  (void)im;
+  ((WmWindow *)data)->preedit_active = 1;
+}
+
+static void wm_on_preedit_end(GtkIMContext *im, gpointer data) {
+  (void)im;
+  WmWindow *w = (WmWindow *)data;
+  w->preedit_active = 0;
+  w->preedit_len = 0;
+  w->preedit[0] = '\0';
+}
+
+// 输入法上下文必须在 realize 之后才拿得到 client window：早于 realize 时
+// gtk_widget_get_window 返回 NULL，set_client_window 等于没做，multicontext
+// 就不会挂上任何输入法模块（实测表现为 filter_keypress 恒不消费、拼音原样进文本）
+static void wm_on_realize(GtkWidget *area, gpointer data) {
+  WmWindow *w = (WmWindow *)data;
+  if (w->im == NULL) {
+    return;
+  }
+  GdkWindow *gw = gtk_widget_get_window(area);
+  if (gw != NULL) {
+    gtk_im_context_set_client_window(w->im, gw);
+  }
+  gtk_im_context_focus_in(w->im);
+}
+
+static gboolean wm_on_area_focus_in(GtkWidget *area, GdkEventFocus *ev,
+                                    gpointer data) {
+  (void)area;
+  (void)ev;
+  WmWindow *w = (WmWindow *)data;
+  if (w->im != NULL) {
+    gtk_im_context_focus_in(w->im);
+  }
+  return FALSE;
+}
+
+// 失焦必须 focus_out，否则输入法侧残留未完成组合串（清单第 5 项）
+static gboolean wm_on_area_focus_out(GtkWidget *area, GdkEventFocus *ev,
+                                     gpointer data) {
+  (void)area;
+  (void)ev;
+  WmWindow *w = (WmWindow *)data;
+  if (w->im != NULL) {
+    gtk_im_context_focus_out(w->im);
+    w->preedit_active = 0;
+    w->preedit_len = 0;
+    w->preedit[0] = '\0';
+  }
+  return FALSE;
+}
+
 static void wm_mark_draw(WmWindow *w) {
   w->need_draw = 1;
 }
@@ -116,6 +214,10 @@ static void wm_on_size_allocate(GtkWidget *area, GdkRectangle *alloc,
 static gboolean wm_on_key(GtkWidget *widget, GdkEventKey *ev, gpointer data) {
   (void)widget;
   WmWindow *w = (WmWindow *)data;
+  if (ev->type == GDK_KEY_PRESS && w->im != NULL &&
+      gtk_im_context_filter_keypress(w->im, ev)) {
+    return TRUE; // 输入法吃掉了：不推按键事件，改由 commit/preedit 通道回报
+  }
   WmEv e;
   memset(&e, 0, sizeof(e));
   e.code = ev->type == GDK_KEY_PRESS ? 0u : 1u;
@@ -230,8 +332,20 @@ int64_t wm_window_new(int width, int height, const char *title) {
                                    GDK_POINTER_MOTION_MASK |
                                    GDK_SCROLL_MASK);
   gtk_container_add(GTK_CONTAINER(w->window), w->area);
+  g_signal_connect(w->area, "realize", G_CALLBACK(wm_on_realize), w);
+  g_signal_connect(w->area, "focus-in-event", G_CALLBACK(wm_on_area_focus_in), w);
+  g_signal_connect(w->area, "focus-out-event",
+                   G_CALLBACK(wm_on_area_focus_out), w);
   g_signal_connect(w->area, "draw", G_CALLBACK(wm_on_draw), w);
   g_signal_connect(w->area, "size-allocate", G_CALLBACK(wm_on_size_allocate), w);
+  w->im = gtk_im_multicontext_new();
+  // use_preedit 语义是「用 preedit 串做内联反馈」：TRUE（默认）才是自绘内联那一档，
+  // 填 FALSE 会让输入法改用自带子窗且本环境一条 preedit 信号都不推（G0 实测读反过）
+  gtk_im_context_set_use_preedit(w->im, TRUE);
+  g_signal_connect(w->im, "commit", G_CALLBACK(wm_on_im_commit), w);
+  g_signal_connect(w->im, "preedit-changed", G_CALLBACK(wm_on_preedit_changed), w);
+  g_signal_connect(w->im, "preedit-start", G_CALLBACK(wm_on_preedit_start), w);
+  g_signal_connect(w->im, "preedit-end", G_CALLBACK(wm_on_preedit_end), w);
   w->ev_head = 0;
   w->ev_count = 0;
   memset(&w->last, 0, sizeof(WmEv));
@@ -460,6 +574,99 @@ void wm_request_focus(int64_t id) {
   if (w->area != NULL) {
     gtk_widget_grab_focus(w->area);
   }
+}
+
+void wm_im_set_surrounding(int64_t id, const char *text, int caret) {
+  if (text == NULL) {
+    return;
+  }
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->im == NULL) {
+    return;
+  }
+  // 只喂已提交文本：组合串不进 surrounding，否则输入法按错上下文推断。
+  // 用探针验证过的四参形态（text, len, cursor 为字节偏移），不走带 SelectionData 的新接口。
+  gtk_im_context_set_surrounding(w->im, text, (gint)strlen(text), caret);
+}
+
+void wm_im_set_cursor(int64_t id, int x, int y, int w_, int h_) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->im == NULL) {
+    return;
+  }
+  GdkRectangle r;
+  r.x = x;
+  r.y = y;
+  r.width = w_;
+  r.height = h_;
+  gtk_im_context_set_cursor_location(w->im, &r);
+}
+
+// 取一条已提交文本：返回字节数并把内容留在原处供逐字节读，
+// 读完必须调 wm_im_commit_done 清零
+int wm_im_commit_len(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  return wm_windows[id].commit_len;
+}
+
+int wm_im_commit_byte(int64_t id, int index) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (index < 0 || index >= w->commit_len) {
+    return 0;
+  }
+  return (int)(guchar)w->commit[index];
+}
+
+void wm_im_commit_done(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  wm_windows[id].commit_len = 0;
+  wm_windows[id].commit[0] = '\0';
+}
+
+// preedit（组合串）状态：仅供自绘显示，绝不计入文本状态
+int wm_im_preedit_len(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  return wm_windows[id].preedit_len;
+}
+
+int wm_im_preedit_byte(int64_t id, int index) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (index < 0 || index >= w->preedit_len) {
+    return 0;
+  }
+  return (int)(guchar)w->preedit[index];
+}
+
+int wm_im_preedit_caret(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  return wm_windows[id].preedit_caret;
+}
+
+int wm_im_preedit_active(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  return wm_windows[id].preedit_active;
 }
 
 void wm_wakeup(void) {
