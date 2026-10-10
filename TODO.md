@@ -32,35 +32,48 @@
 
 ## 2. 框架能力域 — 全部待在新栈重做
 
-### 绘图与资源
-- [ ] Painter 语义补齐到旧契约同等面：路径/曲线/渐变/`blend`/`clip`/变换、`draw_image`、离屏 `Canvas`（对照 `docs/zh/components.md` 的 Painter 章）
-- [ ] 图片解码（现 `yue/png_rgba.mbt` **只有编码**）：PNG/JPEG/GIF 解码或直连 GdkPixbuf 的等价替代
-- [ ] 图标渲染：803 条路径数据经新 Painter 出图（`yue/icons`）
-- [ ] 字体子系统：字体枚举与回退、`Font`/`TextFormat`/`AttributedText` 语义镜像（富文本区间测量、省略、换行、行高）
+> 清单已按 master 线参考副本逐包核对（2026-10-11，`/home/lkyh/ownCode/moonbit-libyue` 的 master，比本仓 origin/master 新）；条目里的文件/函数名均指 master 现行资产。
 
-### 控件（一律自绘，不再引入原生控件皮肤）
-- [ ] 基础：按钮 / 复选 / 单选 / 开关 / 滑块 / 进度 / 步进 / 标签 / 分隔线 / 图像 / 图标
-- [ ] 文本输入：单行与多行（选区、双击选词、拖放插入点、Shift+箭头、undo/redo、placeholder、粘贴降级、只读、密码遮罩、IME 与 preedit 内联）
-- [ ] 容器与滚动：`container`/`group`/`splitter`/`tab`/垂直滚动条与滚轮+拖动、虚拟列表、粘性列表
-- [ ] 选择类：下拉 `picker` / 日期选择 / 颜色选择（旧 `color_picker_t` 是色板形态，HSL 面板未做）
-- [ ] 表格 `table_v_t`：虚拟滚动、列宽拖动、排序、搜索、行选择
-- [ ] 弹层：菜单 / 上下文菜单 / 气泡提示 / 对话框 / 消息框 / 通知 / 通知进度条 / 轮播（切换动画旧栈即缺）
-- [ ] 托盘（含 DBusMenu 协议，按规则 5 上真实总线+真实面板复验）
+### 绘图与资源
+- [ ] `Painter` 契约补齐（旧 `yue/painter.mbt` 共 58 法；对照 `docs/zh/components.md` 画布与图片章）：路径/曲线/弧/变换/裁剪已有实现，缺**渐变**（线性/径向）、`set_blend_mode`（25 种 `BlendMode`）、`draw_image(_from_rect)`、`draw_canvas(_from_rect)`、离屏 `Canvas`
+- [ ] 图片：`Image` 类型（`new_from_file` / `new_from_png` / `resize` / `get_width|height` / `write_to_file` / `ImageSlot`）+ 解码（现 `yue/png_rgba.mbt` **只有编码**，master 也无解码；Linux 走 GdkPixbuf 等价，Windows GDI+ / mac 随平台定）
+- [ ] 图标（`yue/icons/icons.mbt` 4297 行）：803 条路径串 + `fill_icon_path` 千分定点解释器 + `IconKind` 枚举与 `icon_name`/`all_icons` + `draw_icon` 坐标语义 + `icon`/`icon_button_t` 两个声明式包装 + 主题取色跟随
+- [ ] 字体与富文本子系统：`Font::new`（`FontWeight` 9 档 / `FontStyle`）、字体枚举与回退、`TextAlign`/`TextFormat`/`TextAttributes`、`AttributedText` 语义镜像（区间字体/颜色、`get_bounds_for`、换行/省略/行高）
+
+### 控件（一律自绘，不再引入原生控件皮肤；家族名对应 master `yue/components/` 九个源文件）
+- [ ] 基础原语：`group`/`scroll`/`separator`/`splitter`/`tab`（yue 根）＋ 按钮 / 复选 / 单选 / 开关 / 滑块 / 进度 / 步进 / 标签 / 分隔线 / 图像 / 图标
+- [ ] 文本族 `components_text.mbt`：`label_t`、`code_view`＋`tokenize_lang`/`tokenize_moonbit`、`measure_text_height`
+- [ ] 表单族 `components_form.mbt`（15）：`button_t`/`entry_t`/`checkbox_t`/`radio_group`/`switch_t`/`input_t`/`input_number`/`form_item`/`form`/`link`/`textarea_t`/`slider_t`/`select_t`/`rate_t`/`color_picker_t`
+- [ ] 输入框全语义（跨文本/表单两族）：选区、双击选词、拖放插入点、Shift+箭头、undo/redo、placeholder、粘贴降级、只读、密码遮罩、IME 与 preedit 内联
+- [ ] 显示族 `components_display.mbt`（16）：`tag`/`tag_of_type`/`badge_count`/`badge_dot`/`avatar`/`timeline`/`descriptions`/`result`/`empty`/`statistic`/`progress_line`/`divider`/`card`/`alert`/`alert_closeable`/`carousel_t`
+- [ ] 日期族 `components_datetime.mbt`（5）：`calendar_t`/`date_picker_t`/`date_range_picker_t`/`time_range_picker_t`/`datetime_range_picker_t`
+- [ ] 导航族 `components_nav.mbt`（10）：`side_menu(_sections)`/`segmented`/`breadcrumb`/`pagination`/`steps`/`collapse`/`tree`/`transfer`/`tabs_t`
+- [ ] 表格 `components_table.mbt`：`table_t`/`table_v_t` + `TableColumn`/`TableRow` 模型 —— 虚拟滚动、列宽拖动、排序、搜索、行选择
+- [ ] 浮层族 `components_overlay.mbt` + `overlays.mbt`：`tooltip_t`/`popover_t`/`dropdown_menu`/`dialog_t`/`toast_layer`/`context_menu_for`（轮播切换动画旧栈即缺，列同批补）
+- [ ] 容器与滚动补充：虚拟列表、粘性列表、垂直滚动条（滚轮 + 拖动）
+- [ ] 托盘：SNI 后端 + DBusMenu 协议（按规则 5 上真实总线 + 真实面板复验）
 
 ### 主题、声明式与应用层
-- [ ] 主题系统：色板派生 + 浅深自动跟随 + 组件皮肤全走新 Painter（旧「原生控件不跟暗色」这条边界随自绘自然消失）
-- [ ] 声明式层：`Node`/`mount`/relink/`Store`/signals 在新宿主上跑通，公开签名对齐旧 `@yue`
-- [ ] 组件库约 58 个组件（`yue/components`，调用点应不变，只换实现）
-- [ ] 图表 20 种 + 3 个交互变体（纯算法层可直接复用，绘制段换新 Painter）
-- [ ] Markdown：解析产物（mdast）→ 新 AttributedText；GFM 渲染面（表格/任务列表/脚注/删除线/图片/可点击链接）
+- [ ] 主题系统：`theme_from_accent`（主色公式派生）/`theme_from_system`/`theme_current`/`on_theme_change`/`theme_apply` + 浅深自动跟随；组件 style 通道（`set_panel_bg`/`bind_bg`/`bind_fg`/`bind_popover_bg`/`entry_ctrl_height`）；皮肤全走新 Painter（旧「原生控件不跟暗色」这条边界随自绘自然消失）
+- [ ] 声明式层（`declarative/` 612 行、24 构造器）：L1 构造器全集（`vbox`/`hbox`/`label`/`button`/`checkbox`/`entry`/`text_edit`/`radio`/`slider`/`progress`/`picker`/`combo`/`group`/`scroll`/`separator`/`tab`/`date_picker`/`gif`/`container`…）+ `node_of`/`mount`/`mount_window` + `bind`/`bind_label`；`hover_group`/`cursor_group`；`overlay_scroll`
+- [ ] Store 与 signals：`Store` 9 方法、`computed`/`batch`/`sub_bag`、store↔signal 双向绑定、`bind_node`/`swap_node`、relink 语义
+- [ ] 组件库约 55 个声明式组件（家族划分见「控件」节；调用点应不变，只换实现）
+- [ ] 图表（`yue/charts/`）：共享算法层（`LineSeries`/`win_push`/`auto_y_range`/`nice_ticks`/`bar_hit`/`sector_angles`/`gauge_angle`/`linreg`…）+ 20 种图（5 通用 + 15 专项 + tooltip 支撑层）+ 交互层（`ci_zoom`/`ci_visual_map`/`ci_mark_line`/`ci_mark_area`/`ci_save`/`ci_legend_hit`/`ci_filter_visible`）+ 3 个交互变体 `charts_it`（line/bar/donut）
+- [ ] Markdown（`markdown/markdown.mbt`）：`markdown_view` 17 种 block 变体 → 新 AttributedText；GFM 渲染面（表格/任务列表/脚注/删除线/图片/可点击链接）
 - [ ] 富文本编辑（远期 WYSIWYG 块编辑器）
 - [ ] 代码高亮、终端模拟器、WebGL 画布（旧栈即无，列为待评估）
 
-### 系统集成（`yue/system` 559 fn + `yue/traybus` 175 fn 属可平移资产）
-- [ ] 平移 A 类纯 MoonBit 能力：文件/目录读写、进程与子进程执行、系统信息、locale、剪贴板监听、音量、亮度、电源与电量、在线状态、空闲秒数、保活/屏保、勿扰、关机重启注销、蓝牙、打印机、壁纸、默认应用与 URL 打开、文件管理器定位、浏览器历史与书签与下载、VSCode/Firefox 历史、开机自启、单实例与二次唤起、任务栏固定、窗口管理、显示器信息、传感器、磁盘
-- [ ] DBus 系（托盘 / 通知 / logind / UPower / NetworkManager / 屏保 / 媒体键 MPRIS）在新栈事件循环下重验：总线重连、fd 泄漏、信号注册表、注销与注册对称清理
-- [ ] 系统集成剩余项：任务栏进度、dock 徽标、最近文档（旧栈 P13 后置）
-- [ ] Wayland 后端（旧栈用 X11 屏保扩展查空闲，Wayland 不适用）
+### 系统集成（master 参考面：`yue/system` 31 源文件 + `yue/traybus` 16 源文件，属可平移资产）
+- [ ] A 类平移 · 环境/文件原语：`envx`/`fsx`/`dialog`（文件对话框与文本读写）/`procrun`/`singleinstance`/`vscjson`
+- [ ] A 类平移 · 硬件族：`brightness`（含键盘背光）/`volume`（含 volx 音量增强）/`nightlight`/`sensor`/`bluetooth`/`printer`/`disk`/`powerprofile`
+- [ ] A 类平移 · 桌面集成族：`wallpaper`/`defaultapps`/`appfind`/`open_url`+`reveal`（文件管理器定位）/`recent_files`
+- [ ] A 类平移 · 历史族：`browser_history`（含下载）/`browser_bookmarks`/`firefox_history`/`vscode_history`
+- [ ] A 类平移 · 会话与状态：`power`/`session`/`powerctl`/`online`/`idle`/`keepawake`/`clipboard_watch`/`monitor`/`locale_sys`/`sysinfo`/`windowctl`
+- [ ] DBus 系在新事件循环下**重写/重验**：SNI 托盘（`traybus/sni.mbt`）、通知（新栈须重写 `org.freedesktop.Notifications`，含 `Notification::set_progress` 进度文本）、logind（`SetBrightness`/inhibit）、UPower、NetworkManager（`netmon`/`online`）、屏保 `screensaver`、媒体键 MPRIS（`media` 含状态监视轮询）
+- [ ] DBus 通用基建：`bus`/`gdbus`/`wire`（41 内部 fn 编解码）/信号注册表/断线重连/注销与注册对称清理（CORE2 教训）
+- [ ] 新建项（master 全仓无资产，属新做）：任务栏进度、dock 徽标、勿扰
+- [ ] Wayland 后端：`idle`（X11 屏保扩展）/`windowctl`（wmctrl）/`clipboard_watch`（xclip）/`monitor`（xrandr）逐项定替代或降级
+- [ ] 平台分派随各能力同批（master 有 Win32 直连族与 mac ObjC++ 族可参照）；真机清单见 `docs/zh/plan-system-integration.md` B8
 
 ### 浏览器与视频（原生子表面）
 - [ ] `mount_child_surface(handle, rect)` 的 C 端实现（形状已在方案 §4 冻结）
@@ -69,11 +82,12 @@
 - [ ] 音频：`AudioPlayer` 在新栈下的设备与时钟复验；精确音画同步（音频光标回读）
 
 ### 交付面
-- [ ] 示例迁移：`hello` / `hello-themed` / `showcase`（全功能演示板）/ `sysmonitor` / `systemprobe` / `yue-examples`
+- [ ] 示例迁移：`hello` / `hello-themed` / `showcase`（全功能演示板，15 页）/ `sysmonitor`（6 页）/ `systemprobe`（8 页，`modules/yue-examples`）/ `yue-examples`
 - [ ] 文档：中英使用文档按新栈重写（`components`/`components-ui`/`declarative`/`layout`/`relink`/`system-capabilities`/`tutorial`），README 挂新截图
 - [ ] 发布：mooncakes 新版本；旧 `bin-*`/`vendor-*` 预构建发布链退役
 - [ ] CI：三平台构建与测试脚本随新栈调整（当前分支构建预期为红）
 - [ ] 真机验证矩阵：Ubuntu GNOME / KDE / XFCE；Windows 10 / 11；macOS（前置：取得设备）
+- [ ] 本仓 `docs/zh/{adaptation,system-capabilities,components-ui}.md` 落后于 master 参考副本（742/1066、797/833、1425/1458 行），按新栈重写前先以参考副本为准查证
 
 ## 3. 里程碑
 
@@ -96,4 +110,5 @@
 - 平台实测坑：[docs/zh/adaptation.md](docs/zh/adaptation.md)（中英两份）
 - 布局引擎交接与决策：[modules/yoga-mbt/HANDOFF.md](modules/yoga-mbt/HANDOFF.md)
 - libyue 源码（只读老师）：`/home/lkyh/ownCode/yue`，含 `patches/` bug 语料
-- FFI 规范与坑：`.agents/skills/moonbit-c-binding/`
+- master 线参考副本（代码权威）：`/home/lkyh/ownCode/moonbit-libyue`（比本仓 origin/master 新，Windows/mac 批次在此；本仓文档落后量见「交付面」）
+- FFI 规范与坑：`.agents/skills/moonbit-c-binding/`（同步自 [moonbitlang/skills](https://github.com/moonbitlang/skills)，`~/.agents/skills/` 同版）
