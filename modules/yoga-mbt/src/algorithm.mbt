@@ -6,9 +6,8 @@
 // （align-content 处理多行）→ 递归子树。
 //
 // 宽高语义为 border-box（与 Yoga 一致）：width/height 含自身的
-// padding 与 border。首版未实现：absolute 定位、baseline 对齐
-// （按 flex-start 处理）、RTL（direction）、aspect-ratio、测量缓存、
-// 像素网格取整。
+// padding 与 border。尚未实现：RTL（direction）、aspect-ratio、
+// 测量缓存、像素网格取整、容器内在尺寸（min/max-content）精确语义。
 
 ///|
 let max_dim : Double = 1000000000000000.0
@@ -63,6 +62,30 @@ fn align_offset(a : AlignItems, free : Double) -> Double {
     FlexEnd => free
     Center => free / 2.0
     _ => 0.0
+  }
+}
+
+///|
+/// 项的交叉轴对齐方式：`align-self` 优先，`auto`（None）继承父容器
+/// `align-items`。
+fn resolved_align(it : Item, items_align : AlignItems) -> AlignItems {
+  match it.node.style.align_self {
+    Some(a) => a
+    None => items_align
+  }
+}
+
+///|
+/// 项是否参与基线对齐（规范 §9.4：inline 轴平行于主轴 + align-self 为
+/// baseline + 交叉轴两侧 margin 均非 auto + 有真实基线）。
+fn is_baseline_item(it : Item, items_align : AlignItems, main_is_row : Bool) -> Bool {
+  if !main_is_row || it.m.auto_cross_start || it.m.auto_cross_end {
+    false
+  } else {
+    match (resolved_align(it, items_align), it.baseline) {
+      (Baseline, Some(_)) => true
+      _ => false
+    }
   }
 }
 
@@ -184,6 +207,7 @@ priv struct Item {
   min_cross : Double
   max_cross : Double
   cross_definite : Option[Double]
+  mut baseline : Option[Double]
   grow : Double
   shrink : Double
   mut size_main : Double
@@ -196,6 +220,7 @@ priv struct Item {
 
 ///|
 /// 测量节点内容尺寸（border-box）：叶子走 measure 函数，容器递归布局。
+/// 两条路径都会同时刷新节点的基线。
 fn measure_content(
   c : Node,
   avail_w : Option[Double],
@@ -211,14 +236,23 @@ fn measure_content(
       resolve_value(edge_value(s.padding, 3), avail_w) +
       resolve_value(edge_value(s.border, 2), avail_w) +
       resolve_value(edge_value(s.border, 3), avail_w)
+    let iw = avail_w.map(fn(w) { (w - pb_w).max(0.0) })
+    let ih = avail_h.map(fn(h) { (h - pb_h).max(0.0) })
     let (cw, ch) = match c.measure {
-      Some(f) => {
-        let iw = avail_w.map(fn(w) { (w - pb_w).max(0.0) })
-        let ih = avail_h.map(fn(h) { (h - pb_h).max(0.0) })
-        f(iw, ih)
-      }
+      Some(f) => f(iw, ih)
       None => (0.0, 0.0)
     }
+    let pb_top = resolve_value(edge_value(s.padding, 2), avail_w) +
+      resolve_value(edge_value(s.border, 2), avail_w)
+    c.baseline =
+      match c.baseline_fn {
+        Some(g) =>
+          match g(iw, ih) {
+            Some(b) => Some(pb_top + b)
+            None => None
+          }
+        None => None
+      }
     let w = first_some(definite_size(s.width, avail_w), None).unwrap_or(cw + pb_w)
     let h = first_some(definite_size(s.height, avail_h), None).unwrap_or(ch + pb_h)
     (w, h)
@@ -274,6 +308,17 @@ fn layout_into(
     )
     node.layout_width = w
     node.layout_height = h
+    // 基线：测量函数给的是「基线到内容盒顶部」，叠加自身 padding/border 后
+    // 才是到边框盒顶部的距离（与 measure 的语义对称）
+    node.baseline =
+      match node.baseline_fn {
+        Some(f) =>
+          match f(iw, ih) {
+            Some(b) => Some(own_border.top + own_pad.top + b)
+            None => None
+          }
+        None => None
+      }
     return (w, h)
   }
   let main_is_row = is_row(s.flex_direction)
@@ -377,6 +422,7 @@ fn layout_into(
       min_cross,
       max_cross,
       cross_definite,
+      baseline : c.baseline,
       grow : c.style.flex_grow,
       shrink : c.style.flex_shrink,
       size_main : 0.0,
@@ -423,6 +469,7 @@ fn layout_into(
   // ---- 逐行：弹性解析 → 主轴定位 → 交叉轴内容尺寸 ----
   let nlines = lines.length()
   let line_crosses : Array[Double] = []
+  let line_ascents : Array[Option[Double]] = []
   for line in lines {
     for it in line {
       it.size_main = it.hyp_main
@@ -604,6 +651,7 @@ fn layout_into(
           }
           it.content_cross = content.1
           it.final_cross = clamp3(it.content_cross, it.min_cross, it.max_cross)
+          it.baseline = it.node.baseline
         }
       }
     }
@@ -615,14 +663,39 @@ fn layout_into(
         acc
       }
     })
+    // 规范 §9.4：基线分组——参与基线对齐的项取「基线到外沿交叉起端」最大值
+    // 与「基线到外沿交叉末端」最大值，两者之和即本行的基线尺寸
+    let mut max_ascent = 0.0
+    let mut max_descent = 0.0
+    let mut baseline_items = 0
+    for it in line {
+      if is_baseline_item(it, s.align_items, main_is_row) {
+        let b = it.baseline.unwrap_or(0.0)
+        let ascent = it.m.cross_start + b
+        let descent = it.final_cross + it.m.cross_end - b
+        if ascent > max_ascent {
+          max_ascent = ascent
+        }
+        if descent > max_descent {
+          max_descent = descent
+        }
+        baseline_items = baseline_items + 1
+      }
+    }
+    let baseline_cross = if baseline_items > 0 {
+      max_ascent + max_descent
+    } else {
+      0.0
+    }
+    line_ascents.push(if baseline_items > 0 { Some(max_ascent) } else { None })
     // 规范 §9.6：单行且容器交叉轴确定时，行交叉尺寸 = 容器内交叉尺寸
     let line_cross = if nlines == 1 {
       match inner_cross {
         Some(ic) => ic
-        None => content_cross
+        None => content_cross.max(baseline_cross)
       }
     } else {
-      content_cross
+      content_cross.max(baseline_cross)
     }
     line_crosses.push(line_cross)
   }
@@ -706,10 +779,7 @@ fn layout_into(
     let lc = line_crosses[li]
     let loff = line_offsets[li]
     for it in line {
-      let align = match it.node.style.align_self {
-        Some(a) => a
-        None => s.align_items
-      }
+      let align = resolved_align(it, s.align_items)
       let has_cross_auto = it.m.auto_cross_start || it.m.auto_cross_end
       match it.cross_definite {
         Some(_) => ()
@@ -740,10 +810,16 @@ fn layout_into(
         match align {
           FlexEnd => free_c
           Center => free_c / 2.0
+          // 规范 §9.6：升距最大的项贴行交叉起端，其余项按共同基线定位
+          Baseline =>
+            match (line_ascents[li], it.baseline) {
+              (Some(a), Some(b)) => (a - it.m.cross_start - b).max(0.0)
+              _ => 0.0
+            }
           _ => 0.0
         }
       }
-      it.pos_cross = loff + off
+      it.pos_cross = loff + off + it.m.cross_start
       let c_w = if main_is_row { it.size_main } else { it.final_cross }
       let c_h = if main_is_row { it.final_cross } else { it.size_main }
       let inner_main_dim = if main_is_row { inner_w } else { inner_h }
@@ -773,6 +849,32 @@ fn layout_into(
       }
     }
   }
+  // ---- 本节点的基线（规范 §8.5 容器基线）----
+  // 首行有基线对齐项 → 取该行共同基线；否则取交叉轴起端最靠前的
+  // 有基线 in-flow 项（含嵌套容器上抛的基线），无则本节点无基线。
+  let mut first_top = max_dim
+  let mut item_baseline : Option[Double] = None
+  for line in lines {
+    for it in line {
+      match it.node.baseline {
+        Some(b) =>
+          if it.node.layout_top < first_top {
+            first_top = it.node.layout_top
+            item_baseline = Some(it.node.layout_top + b)
+          }
+        None => ()
+      }
+    }
+  }
+  node.baseline =
+    if nlines > 0 {
+      match line_ascents[0] {
+        Some(a) => Some(own_border.top + own_pad.top + line_offsets[0] + a)
+        None => item_baseline
+      }
+    } else {
+      None
+    }
   // ---- 自身尺寸 ----
   let content_main_sum = if nlines == 1 {
     lines[0].iter().fold(init=0.0, fn(acc, it) {
