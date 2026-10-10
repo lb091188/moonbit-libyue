@@ -147,6 +147,8 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 消费方验证方法(必做,不以"发布成功"自证):新建临时模块,写三个 import + 一个调用 yue-media API 的包,`moon check` 零错误零警告即证明发布闭包可解析可编译;registry 索引有缓存,新发布包须先 `moon update`,否则报 `module was not found in the registry`(本机两次命中)。
 - 迁到发布分支时:发布相关提交 cherry-pick 到 master 必冲突于 `moon.work`(两分支成员表不同),按目标分支实际存在的成员解决后 `--continue`;门控口径=moon check 零警告 + 全量测试(master 661/661,含 yoga-mbt 子包的特性分支 680/680)。
 
+- 包页 README 与文档链接读自**发布包快照**(`assets.mooncakes.io/source/<module>@<version>/...`):改 README 不重发则线上页面完全不变——0.5.12 即为此而发(纯 README 修复也要升号,moon.mod 与 yue/version.mbt 同步)。配套教训:发布类改动必须连带核对 README 里的外链资源路径——VitePress 迁移(6ad1ba8)把图片移到 `docs/public/images/`,而 README 的 jsdelivr 绝对 URL 仍写 `docs/images/`,0.5.10/0.5.11 包页整页配图 404(图片本身在发布包内,是路径失效);包页不渲染包内相对路径(见「构建与链接」节),门面图一律绝对 URL,图片搬目录后逐个 curl 复验。
+
 ## Linux
 
 ### 发行版

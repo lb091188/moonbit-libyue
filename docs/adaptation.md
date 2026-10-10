@@ -128,6 +128,8 @@ Methodology: Ubuntu 24.04 XFCE (X11), same machine and session; the startup delt
 - Consumer-side verification (mandatory; "publish succeeded" is not evidence): create a scratch module with the three imports in moon.mod plus one package that calls a yue-media API; `moon check` with zero errors and zero warnings proves the published closure resolves and compiles. The registry index is cached — run `moon update` first, otherwise you get `module was not found in the registry` (hit twice locally).
 - Migrating to the release branch: cherry-picking publish-related commits onto master always conflicts on `moon.work` (the member lists differ), so resolve it against the members that actually exist on the target branch and continue; the gate is moon check zero-warning + the full test suite (661/661 on master, 680/680 on the feature branch that carries the yoga-mbt sub-module).
 
+- A package page's README and doc links are read from the **published snapshot** (`assets.mooncakes.io/source/<module>@<version>/...`), so editing the README without republishing leaves the live page unchanged — 0.5.12 exists purely for that (a README-only fix still needs a version bump, keeping moon.mod and yue/version.mbt in sync). Corollary: release work must re-check the external asset paths the README points at — the VitePress migration (6ad1ba8) moved images to `docs/public/images/` while the README's jsdelivr URLs still said `docs/images/`, so the 0.5.10/0.5.11 package pages had every image broken (the files were in the package; the path was stale). The package page never renders in-package relative paths (see Build and Linking), so hero images must be absolute URLs, curl-verified one by one after any move.
+
 ## Linux
 
 ### Distributions
