@@ -44,7 +44,8 @@
   - [ ] `icon`/`icon_button_t` 两个声明式包装 + 主题取色跟随（随声明式层 G7）
 - [~] 字体与富文本子系统
   - [x] 首批：`Font`（族名/字号/9 档字重/斜体）+ `TextAlign`/`TextFormat`/`TextAttributes`/`SizeF` + `AttributedText` **整体属性**面（对齐/换行/省略/`get_bounds_for`）；顺带修正 `wrap=false` 未生效的语义（Pango 一设宽就折行）与 `draw_in_box` 盒内对齐；`yue/text` 14/14
-  - [ ] 次批：`set_font_for`/`set_color_for` **区间属性**（Pango attribute list）、字体枚举与回退（`pango_font_map` 列族）、行高在多字体下的口径
+  - [x] 次批：`set_font_for`/`set_color_for` **区间属性**（`yue/text` 走 C 端 `rt_*` 会话 + Pango attribute list，区间为 UTF-8 字节下标、后设覆盖先设、越界钳制）；`text` 20/20
+  - [ ] 字体枚举与回退（`pango_font_map` 列族、按族可用性回退）、行高在多字体混排下的口径
   - [ ] 绘制入口形态：旧契约的 `Painter::draw_text` 在组件接线（G7）时逐点改 `@text.draw_in_box(p.bitmap, …)`
 
 ### 控件（一律自绘，不再引入原生控件皮肤；家族名对应 master `yue/components/` 九个源文件）

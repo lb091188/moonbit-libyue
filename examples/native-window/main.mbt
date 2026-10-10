@@ -180,6 +180,8 @@ fn draw(
   let title = @text.AttributedText::new("MoonBit 原生 GUI 栈", align=@text.Center)
   title.set_font(@text.Font::new("", 16.0, weight=@text.Bold))
   title.set_color("#cdd6f4")
+  // 区间属性：把开头的 "MoonBit"（7 字节）换成另一色
+  title.set_color_for("#f38ba8", 0, 7)
   p.flush()
   let _ = title.draw(bm, 0.0, 240.0, fw, 24.0)
   p.flush()
