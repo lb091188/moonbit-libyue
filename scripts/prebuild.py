@@ -1,270 +1,49 @@
 #!/usr/bin/env python3
-"""moon 原生预构建脚本（--moonbit-unstable-prebuild）。
+"""libyue MoonBit 封装的链接预构建脚本（--moonbit-unstable-prebuild）。
 
-moon 每次构建执行本脚本，stdout 输出 link_configs 自动传播给所有依赖
-yue 的 main 包。约束：stdout 只能是 JSON；定位自身用 __file__（cwd 是
-moon 调用目录）；传播路径用绝对路径。
+现状（MoonBit 原生 GUI 栈 G0b 起）：老的 `shim + libyue` 绑定链已从本分支摘除，
+本脚本不再下载/构建/链接任何 libyue 产物，只保留两件事——
 
-原生库来源级联：
-  1. lib/<平台>/ 随包分发的 vendored 库（mooncakes 用户零 C++ 编译）；
-  2. build/ 本地构建产物（仓库开发 / 无 vendored 库的平台），缺失时自动
-     调 prepare.py 补建（预构建优先，源码回退）。
+1. 把 G0 输入法探针的 C 端编成静态库（moon 的 link_configs 只有链接期字段、
+   没有编译期字段，`c_flags` 会被静默忽略，故必须在脚本里编译，实测记录见
+   docs/zh/adaptation.md「跨平台通用」节的 G1/G0 条）。
+2. 输出 link_configs，按当前系统给出 pkg-config 探到的 GTK3/Pango/X11 参数。
+   新栈自己的平台后端（yue/win）落地后，链接参数继续从这里传播。
+
+约束：stdout 只允许输出 JSON，进度信息走 stderr。
 """
 
 from __future__ import annotations
 
 import json
-import os
 import platform
-import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import prepare as _prepare  # noqa: E402  读取 LIBYUE_VERSION 做过期判断
-
 MODULE_ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = MODULE_ROOT / "build"
-VENDOR_LIB_DIR = MODULE_ROOT / "lib"
 
-# Linux 链接期系统库，与 shim/CMakeLists.txt 的依赖一致
-LINUX_PKG_CONFIG_LIBS = [
-    "gtk+-3.0",
-    "pangoft2",
-    "fontconfig",
-    "x11",
-]
-# webkit2gtk 在不同发行版包名不同，4.0/4.1 任一存在即可
-LINUX_PKG_CONFIG_LIBS_ANY = ["webkit2gtk-4.0", "webkit2gtk-4.1"]
+# Linux 系统库清单：GTK3 是新栈锁定的后端（零新增运行期依赖，本仓此前已在用），
+# 探针与后续 yue/win 都从这里拿 cflags/libs。
+LINUX_PKG_CONFIG_LIBS = ["gtk+-3.0", "pangoft2", "fontconfig", "x11"]
 
-# Windows 最终链接需要的系统库（cl 命令行风格），在官方 CMakeLists 清单
-# 基础上补齐 GUI 基础库；多余的库链接器会忽略，无害。
-WINDOWS_LINK_LIBS = [
-    "user32.lib", "gdi32.lib", "shell32.lib", "ole32.lib", "oleaut32.lib",
-    "advapi32.lib", "comdlg32.lib", "imm32.lib", "msimg32.lib", "oleacc.lib",
-    "usp10.lib", "setupapi.lib", "powrprof.lib", "ws2_32.lib", "dbghelp.lib",
-    "shlwapi.lib", "version.lib", "winmm.lib", "wbemuuid.lib", "psapi.lib",
-    "dwmapi.lib", "propsys.lib", "comctl32.lib", "gdiplus.lib", "urlmon.lib",
-    "userenv.lib", "uxtheme.lib", "delayimp.lib", "runtimeobject.lib",
-    "ntdll.lib", "shcore.lib", "pdh.lib", "wtsapi32.lib",
-]
+IME_PROBE_PACKAGE = "NoahLiu/moonbit-libyue/experiment/ime_probe"
 
 
-def _platform_dir() -> str | None:
-    """vendored 库的平台目录名；无对应资产平台（如 linux/arm64）为 None。"""
-    machine = platform.machine().lower()
-    if sys.platform == "win32":
-        return "windows-x64" if machine in ("x86_64", "amd64") else None
-    if platform.system() == "Linux":
-        return "linux-x64" if machine in ("x86_64", "amd64") else None
-    if platform.system() == "Darwin":
-        return "macos-universal"
-    return None
-
-
-def _shim_lib_name() -> str:
-    return "yue_mbt.lib" if sys.platform == "win32" else "libyue_mbt.a"
-
-
-def _git(args: list[str]) -> str | None:
-    """git 只读查询；不可用（非仓库/无 git）返回 None，调用方回退 mtime。"""
-    try:
-        proc = subprocess.run(["git", *args], cwd=MODULE_ROOT,
-                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                              text=True, encoding="utf-8", errors="replace")
-    except OSError:
-        return None
-    return proc.stdout if proc.returncode == 0 else None
-
-
-def _sources_newer(vendored: Path) -> bool:
-    """shim 源码比 vendored 库新 → 开发者在改 shim，回退 build/ 流程。
-
-    git 仓库下按提交时间比较；shim 有未提交改动视为更新。判定不了
-    （浅克隆查不到 lib/ 历史、非 git 环境、mtime 并行检出竞态）一律
-    保守返回 True：回退 build/ 宁可重编，也不误链缺新符号的 vendored
-    旧库（CI 曾因浅克隆+大文件后写完的 mtime 竞态误判,链接 undefined）。
-    """
-    rel = vendored.relative_to(MODULE_ROOT).as_posix()
-    if _git(["status", "--porcelain", "--", "shim"]) == "":
-        t_shim = _git(["log", "-1", "--format=%ct", "--", "shim"])
-        t_lib = _git(["log", "-1", "--format=%ct", "--", rel])
-        if t_shim is not None and t_lib is not None and t_lib.strip():
-            ts, tl = int(t_shim.strip() or 0), int(t_lib.strip() or 0)
-            if ts != tl:
-                return ts > tl
-            # 浅克隆(actions/checkout 默认 fetch-depth=1)下 pathspec 限定的
-            # log 退化为 HEAD 时间,两值恒等不可信——保守回退 build/
-            return True
-        return True
-
-
-def _native_dir() -> Path:
-    """原生库目录：build/ 有 prepare 产物时优先，否则 vendored lib/<平台>/。
-
-    build/ 存在 stamp+库说明 prepare 已跑过(开发/CI 链路),产物按当前
-    shim 全新编译,恒不旧于 vendored——vendored 只服务无 build/ 的
-    mooncakes 分发用户。此前 vendored 优先且判定依赖 git 历史/mtime,
-    CI 浅克隆下误走旧 vendored 库导致新 shim 符号链接 undefined。"""
-    if (BUILD_DIR / _shim_lib_name()).exists() and _stamp():
-        return BUILD_DIR
-    plat = _platform_dir()
-    if plat is not None:
-        vendored = VENDOR_LIB_DIR / plat
-        if (vendored / _shim_lib_name()).exists() and not _sources_newer(vendored):
-            return vendored
-    return BUILD_DIR
-
-
-def _native_lib_path() -> Path:
-    return _native_dir() / _shim_lib_name()
-
-
-def _stamp() -> str:
-    """prepare.py 落盘的「版本 模式」戳；旧版本构建无戳视为有效。"""
-    try:
-        return (BUILD_DIR / "prepare_stamp").read_text(encoding="utf-8").strip()
-    except OSError:
-        return ""
-
-
-def _stamp_stale() -> bool:
-    """build/ 产物与当前版本/模式不符 → 需重跑 prepare（防误链旧产物）。"""
-    stamp = _stamp()
-    if not stamp:
-        return False
-    version, _, mode = stamp.partition(" ")
-    if version != _prepare.LIBYUE_VERSION:
-        return True
-    # 只在环境显式强制源码模式而现有产物是预构建时重建；反向不重建，
-    # 否则无预构建资产的平台（如 linux/arm64）会每次构建都重跑 prepare。
-    return os.environ.get("LIBYUE_FORCE_SOURCE") == "1" and not mode.startswith("source")
-
-
-def _shim_newer_than_lib() -> bool:
-    """shim 源码比静态库新 → 需要增量重编（防止链接旧库误判修复无效）。"""
-    lib = _native_lib_path()
-    if not lib.exists():
-        return False
-    lib_mtime = lib.stat().st_mtime
-    for pattern in ("shim/*.cpp", "shim/*.h", "shim/include/*.h"):
-        for src in (MODULE_ROOT / "shim").glob(pattern.removeprefix("shim/")):
-            if src.stat().st_mtime > lib_mtime:
-                return True
-    return False
-
-
-def _copy_webview2_loader() -> None:
-    """Windows：把 loader DLL 复制到 moon 调用目录（用户工程根），
-    供 LoadLibrary 按工作目录搜索（moon run 的工作目录即工程根）。"""
-    if sys.platform != "win32":
-        return
-    plat = _platform_dir()
-    sources = [VENDOR_LIB_DIR / plat / "WebView2Loader.dll" if plat else None,
-               MODULE_ROOT / "WebView2Loader.dll"]
-    target = Path.cwd() / "WebView2Loader.dll"
-    for src in sources:
-        if src is None or not src.exists():
-            continue
-        if target.exists() and target.resolve() == src.resolve():
-            return  # cwd 即模块根：目标就是源文件，无需复制
-        # 共享卷上 os.path.samefile 会把独立文件误判为同一文件
-        # (SameFileError)，且先删目标再复制会在「目标即源」时自毁——
-        # 上面已用 resolve() 精确比较排除该情形，此处再兜底跳过异常。
-        # 注意 except 名字仅在异常发生时求值：曾写成裸 SameFileError
-        # (未导入)潜伏数轮，直到目标 DLL 被占用真正抛异常才以 NameError 炸出
-        try:
-            if target.exists():
-                target.unlink()
-            shutil.copyfile(src, target)
-        except (shutil.SameFileError, PermissionError):
-            pass
-        return
-
-
-def ensure_native_artifacts() -> None:
-    """原生库缺失或过期时现场调 prepare.py 构建；shim 源码更新时增量重编；
-    进度一律走 stderr。vendored 库就位时直接返回（零编译）。"""
-    if _native_dir() != BUILD_DIR:
-        _copy_webview2_loader()
-        return
-    ready = _native_lib_path().exists() and not _stamp_stale()
-    if ready and _shim_newer_than_lib():
-        print("[moonbit-libyue] shim 源码已更新，增量重编原生库；"
-              "编完请删除 _build 下已生成的 exe 以触发重链…", file=sys.stderr)
-        build_cmd = ["cmake", "--build", str(BUILD_DIR), "--parallel"]
-        if sys.platform == "win32":
-            # VS 多配置生成器必须显式 --config，与 prepare.py 的 cmake_build 一致
-            build_cmd += ["--config", "Release"]
-        proc = subprocess.run(build_cmd, stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT, text=True)
-        sys.stderr.write(proc.stdout or "")
-        if proc.returncode != 0:
-            raise SystemExit(
-                f"[moonbit-libyue] 原生库增量重编失败（退出码 {proc.returncode}）；"
-                "可手动执行 python3 scripts/prepare.py 排查")
-        _copy_webview2_loader()
-        return
-    if ready:
-        _copy_webview2_loader()
-        return
-    reason = "版本或模式已变化" if _native_lib_path().exists() else "缺失"
-    print(f"[moonbit-libyue] 原生库{reason}，开始自动准备（首次需 GitHub 网络）…",
-          file=sys.stderr)
-    prepare = Path(__file__).resolve().parent / "prepare.py"
-    proc = subprocess.run([sys.executable, str(prepare)],
-                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                          text=True)
-    sys.stderr.write(proc.stdout or "")
-    if proc.returncode != 0:
-        raise SystemExit(f"[moonbit-libyue] 原生层自动构建失败（退出码 {proc.returncode}）")
-    _copy_webview2_loader()
-
-
-def pkg_config_libs() -> tuple[list[str], list[str]]:
-    """Linux 链接期系统库（pkg-config 原样输出），分 (公共, webkit) 两组：
-    webkit 组只进 yue/browser 条目——MoonBit 包边界即链接依赖边界，
-    未 import yue/browser 的程序不拿 webkit flags，链接期也不引用其符号。
-    webkit 包名做 4.0/4.1 兼容。"""
-    common: list[str] = []
-    for pkg in LINUX_PKG_CONFIG_LIBS:
-        out = subprocess.run(["pkg-config", "--libs", pkg],
-                             capture_output=True, text=True)
-        if out.returncode != 0:
-            raise SystemExit(f"缺少系统依赖：请安装 {pkg} 的开发包（pkg-config 找不到）")
-        common += out.stdout.split()
-    webkit: list[str] = []
-    for pkg in LINUX_PKG_CONFIG_LIBS_ANY:
-        out = subprocess.run(["pkg-config", "--libs", pkg],
-                             capture_output=True, text=True)
-        if out.returncode == 0:
-            webkit += out.stdout.split()
-            break
-    else:
-        raise SystemExit("缺少系统依赖：webkit2gtk-4.0 或 4.1 的开发包至少装一个")
-    if "-lwebkit2gtk-4.1" in webkit and "-ljavascriptcoregtk-4.1" not in webkit:
-        webkit.append("-ljavascriptcoregtk-4.1")
-    return common, webkit
-
-
-def _prebuilt(name: str) -> str:
-    """预构建模式下解出的 libyue 静态库绝对路径；不存在返回空串。"""
-    p = _native_dir() / name
-    if not p.exists():
-        return ""
-    return str(p.resolve()).replace("\\", "/")
+def pkg_config(args: list[str], flag: str) -> list[str]:
+    run = subprocess.run(
+        ["pkg-config", flag] + args, capture_output=True, text=True
+    )
+    if run.returncode != 0:
+        print(f"prebuild: pkg-config {flag} {' '.join(args)} 失败", file=sys.stderr)
+        return []
+    return run.stdout.split()
 
 
 def build_ime_probe_stub() -> str:
-    """G0 输入法探针（MoonBit 原生 GUI 栈首个 spike）的 C 端编译。
-
-    moon 不给 native-stub 传系统头文件搜索路径——link_configs 只有链接期
-    字段，没有编译期字段（c_flags 会被静默忽略，实测）。故与 shim 同法：
-    本脚本把探针的 .c 编成静态库，链接参数仍由 link_configs 全权托管。
-    探针迁入 modules/mbt-gui 自带 prebuild 后本函数与其条目一并删除。
-    """
+    """G0 输入法探针（MoonBit 原生 GUI 栈首个 spike）的 C 端编译。"""
     src = MODULE_ROOT / "experiment" / "ime_probe" / "ime_probe_stub.c"
     if not src.exists():
         return ""
@@ -274,205 +53,49 @@ def build_ime_probe_stub() -> str:
         return lib.as_posix()
     cflags: list[str] = []
     for name in LINUX_PKG_CONFIG_LIBS:
-        probe = subprocess.run(
-            ["pkg-config", "--cflags", name], capture_output=True, text=True
-        )
-        if probe.returncode != 0:
+        got = pkg_config([name], "--cflags")
+        if not got:
             print(f"ime_probe: 缺少 {name} 开发包", file=sys.stderr)
             return ""
-        cflags.extend(probe.stdout.split())
+        cflags.extend(got)
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
     cc = shutil.which("cc") or shutil.which("gcc") or "cc"
     for cmd in (
-        [cc, "-c", "-O0", "-fPIC", "-o", obj.as_posix(), src.as_posix()]
-        + cflags,
+        [cc, "-c", "-O0", "-fPIC", "-o", obj.as_posix(), src.as_posix()] + cflags,
         ["ar", "rcs", lib.as_posix(), obj.as_posix()],
     ):
         run = subprocess.run(cmd, capture_output=True, text=True)
         if run.returncode != 0:
-            print(f"ime_probe: {' '.join(cmd)} 失败\n{run.stderr}",
-                  file=sys.stderr)
+            print(f"ime_probe: {' '.join(cmd)} 失败\n{run.stderr}", file=sys.stderr)
             return ""
     return lib.as_posix()
 
 
 def link_configs() -> dict:
-    """各平台链接配置：Linux/macOS 为 GNU ld 风格，Windows 为 cl 命令行风格。
-
-    全部参数放 link_flags 单一字符串自控顺序（-lyue_mbt 必须排在
-    -lstdc++ 之前；预构建模式下 libyue_prebuilt 必须排在 shim 之后，
-    GNU ld 单遍扫描依赖先序）；Windows 的静态库与 manifest.res 以绝对
-    路径作为链接输入，分隔符用正斜杠。实测细节见 docs/adaptation.md。
-
-    浏览器依赖按需化：webkit（Linux）/WebKit framework（macOS）只进
-    yue/browser 条目，与 MoonBit 包边界对应——主包严禁 import
-    yue/browser，否则依赖闭包会让所有下游重新拿到 webkit flags。
-    Windows 的 WebView2 loader 由 libyue 运行时动态加载，链接期无
-    webkit 专属输入，三份条目一致即现状行为。
-    """
-    build = str(_native_dir().resolve()).replace("\\", "/")
-    if sys.platform == "win32":
-        # 库与 manifest 一律用相对模块根路径：moon 链接子进程 cwd 为
-        # 模块根，相对路径即可解析；绝对路径在用户目录含引号/空格时会被
-        # 链接命令行 quoting 剥字符并黏成单参数（LNK1104，用户名
-        # noah'liu 实测：两个库路径变成一个输入、撇号被删）。
-        # Linux/macOS 走参数数组不经命令行拼接，无此问题，仍用绝对路径。
-        build = "build"
-        # manifest.res 默认不传，仅 YUE_MBT_KEEP_MANIFEST=1 时随 yue 份
-        # 传入（用于分发型 moon build：main 包对每个包的 link_flags 只
-        # 拼一遍，恰好嵌入一份清单）。默认不传的原因：moon 按依赖闭包
-        # 逐包拼 link_flags，且对 blackbox 测试目标把「被测包」的份拼
-        # 两遍（yue/traybus 的 blackbox 实测），.res 重复列出会让同名
-        # MANIFEST 资源进两次（CVT1100）——moon test 无法与清单共存。
-        # 无清单的运行代价实测仅剩视觉样式退化（经典外观），开发与
-        # 测试链路零配置；分发 exe 由 KEEP 开关或 release 流程保障。
-        # /MANIFESTINPUT 等 link 选项路线不通：cl 把 /link 之前的链接
-        # 选项当编译选项丢弃（D9002）。
-        manifest = f"{build}/yue_mbt_manifest.res " \
-            if os.environ.get("YUE_MBT_KEEP_MANIFEST") == "1" else ""
-        prebuilt = _prebuilt("yue_prebuilt.lib")
-        if prebuilt:
-            prebuilt = str(Path(prebuilt).relative_to(MODULE_ROOT)).replace("\\", "/")
-        libs = (
-            f"{build}/yue_mbt.lib"
-            + (f" {prebuilt}" if prebuilt else "")
-            + " " + " ".join(WINDOWS_LINK_LIBS)
-        )
-        # traybus 须单列一份，缘由见下方 Linux/macOS 分支的注释
-        return {"link_configs": [
-            {
-                "package": "NoahLiu/moonbit-libyue/yue",
-                "link_flags": manifest + libs,
-            },
-            {
-                "package": "NoahLiu/moonbit-libyue/yue/traybus",
-                "link_flags": libs,
-            },
-            {
-                "package": "NoahLiu/moonbit-libyue/yue/browser",
-                "link_flags": libs,
-            },
-        ]}
+    entries: list[dict] = []
     if platform.system() == "Linux":
-        arc = _prebuilt("libyue_prebuilt.a")
-        core = f"-L{build} -lyue_mbt" + (f" {arc}" if arc else "")
-        pc_common, pc_webkit = pkg_config_libs()
-        # 浏览器按需化按「库形态」分化:vendored 库恒为预构建(浏览器
-        # 混编 jumbo),build/ 预构建同;仅 prepare 源码模式抽段成功
-        # (stamp source-split)后浏览器才独立成成员——混编形态的主包
-        # 条目必须带 webkit,否则非浏览器程序链接期 undefined 断链
-        # (mbt.14 升版实测);抽段形态才可免。
-        if _native_dir() != BUILD_DIR:
-            browser_mixed = True
-        else:
-            stamp = _stamp()
-            if not stamp:
-                browser_mixed = True  # 无 stamp 无法判定,保守带 webkit
-            else:
-                mode = stamp.partition(" ")[2].strip()
-                browser_mixed = not mode.startswith("source") \
-                    or "split" not in mode
-        if browser_mixed:
-            pc_common = pc_webkit + pc_common
-            pc_webkit = []
-        # -latomic：预构建库(官方 CMakeLists 清单也链 atomic)引用
-        # __atomic_store，Ubuntu 22.04 工具链产物在最终链接必须显式给出
+        libs = []
+        for name in LINUX_PKG_CONFIG_LIBS:
+            got = pkg_config([name], "--libs")
+            if not got:
+                print(f"prebuild: 缺少 {name} 开发包", file=sys.stderr)
+                return {"link_configs": entries}
+            libs.extend(got)
+        # 系统库不会被自动带上，显式补（与旧链路同一口径）。
         sys_libs = ["-lpthread", "-ldl", "-lm", "-lstdc++", "-latomic"]
-        # webkit 只进 browser 条目（MoonBit 包边界 = 链接依赖边界）。
-        # 库层面的符号隔离由 prepare.py 源码模式的 jumbo 抽段完成：
-        # 浏览器实现独立成编译单元后，非浏览器程序链接期不接触任何
-        # webkit 符号，静态 stub 兜底反而有害——moon 默认 --as-needed
-        # 且按拓扑序拼 flags，stub 先于真库绑定引用，实测浏览器页段错误
-        # （全程记录见 make_webkit_stubs.py 与 docs/adaptation.md）。
-        common = [*pc_common, *sys_libs]
-        browser = [*pc_webkit, *pc_common, *sys_libs]
-    else:  # Darwin
-        # macOS 双库结构（no-ARC 排其后）；源码模式第二库是 cmake 产出的
-        # yue_mbt_noarc（-l 搜索），vendored/预构建模式第二库是随包的
-        # libyue_noarc_prebuilt.a（绝对路径）。系统框架与运行时库不会自动
-        # 传播到 moon 的链接命令行，必须显式给出（与 Linux 侧 pkg-config
-        # 补系统库同构）。
-        arc = _prebuilt("libyue_prebuilt.a")
-        core = f"-L{build} -lyue_mbt" + (f" {arc}" if arc else "")
-        if (_native_dir() / "libyue_mbt_noarc.a").exists():
-            core += " -lyue_mbt_noarc"
-        noarc = _prebuilt("libyue_noarc_prebuilt.a")
-        if noarc:
-            core += f" {noarc}"
-        sys_libs = [
-            "-framework", "AppKit",
-            "-framework", "Carbon",
-            "-framework", "IOKit",
-            "-framework", "Security",
-            "-framework", "WebKit",
-            "-framework", "OpenDirectory",
-            # audit_token_to_pid（MachPortRendezvous）在 libbsm；
-            # -Wl,-dead_strip 为官方构建的链接选项（CI 实测缺失即 undefined）
-            "-lbsm", "-Wl,-dead_strip",
-            "-lobjc", "-lc++", "-lpthread",
-        ]
-        # macOS 暂不拆 WebKit：本机无 Mach-O archive 工具链，无法核验
-        # libyue_prebuilt(macos) 的 WebKit 引用面（llvm-nm 读 universal
-        # archive 成员符号表不完整），拆错即 mac 全线断链且无真机兜底。
-        # 待 libyue fork 侧拆分浏览器编译单元（vendor 重发）时一并处理。
-        common = sys_libs
-        browser = sys_libs
-    # traybus 的 whitebox 测试目标直接引用 wire.mbt 的 f64 位转换 extern，
-    # 而 link_configs 按「依赖该包的目标」传播——traybus 不依赖 yue（反向），
-    # 须单列一份；静态库单成员引用 gtk 全套，flags 与主份一致
-    entries = [
-        {
-            "package": "NoahLiu/moonbit-libyue/yue",
-            "link_flags": core + " " + " ".join(common),
-        },
-        {
-            "package": "NoahLiu/moonbit-libyue/yue/traybus",
-            "link_flags": core + " " + " ".join(common),
-        },
-        {
-            "package": "NoahLiu/moonbit-libyue/yue/browser",
-            "link_flags": core + " " + " ".join(browser),
-        },
-    ]
-    if platform.system() == "Linux":
-        # G0 输入法探针（不经 libyue）：自己的 stub 静态库 + gtk/pango/cairo
-        # 系统库，不含 -lyue_mbt；顺序须先库后系统库（GNU ld 单遍扫描）。
-        # 探针迁入 modules/mbt-gui 自带 prebuild 后此条删除
         stub = build_ime_probe_stub()
         if stub:
             entries.append({
-                "package": "NoahLiu/moonbit-libyue/experiment/ime_probe",
+                "package": IME_PROBE_PACKAGE,
+                # 顺序要紧：先库后系统库（GNU ld 单遍扫描）。
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lime_probe_stub "
-                + " ".join(common),
+                + " ".join([*libs, *sys_libs]),
             })
     return {"link_configs": entries}
 
 
-def check_package_version() -> None:
-    """yue/version.mbt 的 VERSION 与 moon.mod 的 version 一致性校验。
-
-    showcase 等示例在界面上展示 @yue.VERSION,两者脱节即构建期报错,
-    而不是等用户发现界面版本号对不上。
-    """
-    mod = (MODULE_ROOT / "moon.mod").read_text(encoding="utf-8")
-    vm = re.search(r'^version\s*=\s*"([^"]+)"', mod, re.M)
-    vv = re.search(
-        r'VERSION\s*:\s*String\s*=\s*"([^"]+)"',
-        (MODULE_ROOT / "yue" / "version.mbt").read_text(encoding="utf-8"),
-    )
-    mod_v = vm.group(1) if vm else "?"
-    yue_v = vv.group(1) if vv else "?"
-    if mod_v != yue_v:
-        sys.stderr.write(
-            f"[prebuild] 版本不同步: moon.mod={mod_v} yue/version.mbt={yue_v},"
-            "请同时更新两处\n"
-        )
-        sys.exit(1)
-
-
 def main() -> None:
-    # Windows CI/控制台常为 cp1252 等无法编码中文的代码页，stderr 进度
-    # 输出会 UnicodeEncodeError；转 UTF-8（stdout 是纯 ASCII JSON，不受影响）。
+    # Windows 控制台常为 cp1252，stderr 打中文会 UnicodeEncodeError；转 UTF-8。
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -482,8 +105,6 @@ def main() -> None:
         json.load(sys.stdin)  # moon 传入构建环境，当前无需使用
     except json.JSONDecodeError:
         pass
-    check_package_version()
-    ensure_native_artifacts()
     print(json.dumps(link_configs()))
 
 

@@ -4,7 +4,5 @@ import {
   "NoahLiu/moonbit-libyue/yue/traybus",
 }
 
-options(
-  "native-stub": ["win_gui.c"],
-  targets: { "ffi.mbt": [ "native" ] },
-)
+// 本栈不写 native-stub 与链接参数：平台后端的 C 端在 G2 起由新 stub 提供，
+// 链接参数按 AGENTS 规则 1 全部由 scripts/prebuild.py 托管。
