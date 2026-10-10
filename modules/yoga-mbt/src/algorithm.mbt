@@ -43,6 +43,30 @@ fn clamp3(v : Double, lo : Double, hi : Double) -> Double {
 }
 
 ///|
+/// justify-content 在一段剩余空间里的前导偏移（间隙类取 0，间隙由主轴
+/// 定位阶段处理；此处用于绝对定位静态位置）。
+fn justify_leading(j : JustifyContent, free : Double) -> Double {
+  match j {
+    FlexStart => 0.0
+    FlexEnd => free
+    Center => free / 2.0
+    SpaceBetween => 0.0
+    SpaceAround => 0.0
+    SpaceEvenly => 0.0
+  }
+}
+
+///|
+/// align-items 在一段剩余空间里的偏移。
+fn align_offset(a : AlignItems, free : Double) -> Double {
+  match a {
+    FlexEnd => free
+    Center => free / 2.0
+    _ => 0.0
+  }
+}
+
+///|
 fn[T] first_some(a : Option[T], b : Option[T]) -> Option[T] {
   match a {
     Some(_) => a
@@ -283,10 +307,19 @@ fn layout_into(
   let wrap_limit = first_some(inner_main, inner_main_avail)
   // ---- 构建 flex 项 ----
   let items : Array[Item] = []
+  let abs_children : Array[Node] = []
   for c in node.children {
     match c.style.display {
       None => continue
       Flex => ()
+    }
+    match c.style.position {
+      Absolute => {
+        // 脱离文档流：不参与换行 / 弹性解析 / 容器尺寸计算
+        abs_children.push(c)
+        continue
+      }
+      Relative => ()
     }
     let cm = resolve_edges(c.style.margin, child_pct_w)
     let m = axis_margin(cm, main_is_row, reverse)
@@ -783,5 +816,107 @@ fn layout_into(
   let h = if main_is_row { own_cross } else { own_main }
   node.layout_width = w
   node.layout_height = h
+  // ---- 绝对定位子项：包含块 = 本节点 padding box ----
+  if abs_children.length() > 0 {
+    let cb_w = (w - own_border.left - own_border.right).max(0.0)
+    let cb_h = (h - own_border.top - own_border.bottom).max(0.0)
+    let cbw = Some(cb_w)
+    let cbh = Some(cb_h)
+    for c in abs_children {
+      let cs = c.style
+      let cm = resolve_edges(cs.margin, cbw)
+      let cp = resolve_edges(cs.padding, cbw)
+      let cbd = resolve_edges(cs.border, cbw)
+      let cpb_w = cp.left + cp.right + cbd.left + cbd.right
+      let cpb_h = cp.top + cp.bottom + cbd.top + cbd.bottom
+      let ins_l = definite_size(cs.left, cbw)
+      let ins_r = definite_size(cs.right, cbw)
+      let ins_t = definite_size(cs.top, cbh)
+      let ins_b = definite_size(cs.bottom, cbh)
+      // 尺寸：显式宽高优先；同轴两侧 inset 都设时由 inset 撑出；否则内容
+      let sized_w = match definite_size(cs.width, cbw) {
+        Some(v) => Some(v.max(cpb_w))
+        None =>
+          match (ins_l, ins_r) {
+            (Some(lv), Some(rv)) => Some((cb_w - lv - rv - cm.left - cm.right).max(cpb_w))
+            _ => None
+          }
+      }
+      let sized_h = match definite_size(cs.height, cbh) {
+        Some(v) => Some(v.max(cpb_h))
+        None =>
+          match (ins_t, ins_b) {
+            (Some(tv), Some(bv)) => Some((cb_h - tv - bv - cm.top - cm.bottom).max(cpb_h))
+            _ => None
+          }
+      }
+      // 内容测量的可用空间以 AtMost 形式传给测量函数（是否折行/收缩由测量
+      // 函数决定，引擎不额外截断——固定内容尺寸的叶子因此不会被压小）
+      let avail_w = match sized_w {
+        Some(v) => (v - cpb_w).max(0.0)
+        None =>
+          (cb_w - cm.left - cm.right - ins_l.unwrap_or(0.0) - ins_r.unwrap_or(0.0)).max(0.0)
+      }
+      let avail_h = match sized_h {
+        Some(v) => (v - cpb_h).max(0.0)
+        None =>
+          (cb_h - cm.top - cm.bottom - ins_t.unwrap_or(0.0) - ins_b.unwrap_or(0.0)).max(0.0)
+      }
+      let (ccw, cch) = measure_content(c, Some(avail_w), Some(avail_h))
+      let w0 = match sized_w {
+        Some(v) => v
+        None => ccw + cpb_w
+      }
+      let h0 = match sized_h {
+        Some(v) => v
+        None => cch + cpb_h
+      }
+      let aw = clamp3(
+        w0,
+        definite_size(cs.min_width, cbw).unwrap_or(0.0),
+        definite_size(cs.max_width, cbw).unwrap_or(max_dim),
+      )
+      let ah = clamp3(
+        h0,
+        definite_size(cs.min_height, cbh).unwrap_or(0.0),
+        definite_size(cs.max_height, cbh).unwrap_or(max_dim),
+      )
+      // 定位：inset 优先；同轴双 auto 落静态位置（按容器对齐属性摆一个虚拟项）
+      let x = match ins_l {
+        Some(lv) => lv + cm.left
+        None =>
+          match ins_r {
+            Some(rv) => cb_w - rv - cm.right - aw
+            None =>
+              (if main_is_row {
+                justify_leading(s.justify_content, cb_w - aw)
+              } else {
+                align_offset(s.align_items, cb_w - aw)
+              }) + cm.left
+          }
+      }
+      let y = match ins_t {
+        Some(tv) => tv + cm.top
+        None =>
+          match ins_b {
+            Some(bv) => cb_h - bv - cm.bottom - ah
+            None =>
+              (if main_is_row {
+                align_offset(s.align_items, cb_h - ah)
+              } else {
+                justify_leading(s.justify_content, cb_h - ah)
+              }) + cm.top
+          }
+      }
+      c.layout_left = own_border.left + x
+      c.layout_top = own_border.top + y
+      if c.children.length() > 0 {
+        let _ = layout_into(c, cbw, cbh, Some(aw), Some(ah))
+      } else {
+        c.layout_width = aw
+        c.layout_height = ah
+      }
+    }
+  }
   (w, h)
 }

@@ -50,11 +50,13 @@ let l = child.layout()   // left / top 相对父边框盒；width / height 边�
 align-items / self / content、wrap 与 wrap-reverse 换行、margin auto 吸收
 （主轴优先于 justify-content、交叉轴替代 align）、padding / border /
 margin、百分比、min / max（含主轴 min:auto 内容下限）、row / column gap、
-叶子测量函数、Row / RowReverse / Column / ColumnReverse。
+叶子测量函数、Row / RowReverse / Column / ColumnReverse、absolute 定位
+（`set_position(Absolute)` + top/right/bottom/left：包含块为父容器
+padding box，同轴两侧 inset 都设时撑出尺寸，四向全 auto 落静态位置并按
+父容器 justify-content / align-items 摆放）。
 
 ## 未实现（按批次补）
 
-- absolute 定位（position: absolute 子项）
 - baseline 对齐（当前按 flex-start 处理）
 - RTL（direction: rtl）
 - aspect-ratio

@@ -42,6 +42,13 @@ pub enum Display {
 }
 
 ///|
+/// 定位方式。`Absolute` 的子项脱离文档流，包含块为本节点 padding box。
+pub enum PositionType {
+  Relative
+  Absolute
+}
+
+///|
 pub enum FlexDirection {
   Row
   RowReverse

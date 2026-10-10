@@ -3,6 +3,11 @@
 ///|
 pub struct Style {
   mut display : Display
+  mut position : PositionType
+  mut top : Value
+  mut right : Value
+  mut bottom : Value
+  mut left : Value
   mut flex_direction : FlexDirection
   mut flex_wrap : FlexWrap
   mut flex_grow : Double
@@ -31,6 +36,11 @@ pub struct Style {
 pub fn Style::new() -> Style {
   {
     display : Flex,
+    position : Relative,
+    top : Auto,
+    right : Auto,
+    bottom : Auto,
+    left : Auto,
     flex_direction : Row,
     flex_wrap : NoWrap,
     flex_grow : 0.0,
