@@ -911,6 +911,7 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 单实例(mac)未做:标准做法 NSDistributedNotificationCenter/端口注册,后续按需求补。
 - 真机验证清单(报告方 mac 14.5 执行):① moon test -p yue/system 只读面(时区/语言/sysinfo/内存/uptime/显示器/打印机/磁盘卷/电量);② 壁纸读写(多屏机器注意只改主屏);③ 音量 get/set/mute(注意无 master 通道的 USB 设备行为);④ 亮度 devices/get/set(内建屏 + 外接 DDC 屏各一);⑤ 窗口列表/置前(给本进程授权屏幕录制前后对比);⑥ AX 关窗(授权辅助功能后试,未授权预期 -99);⑦ 关机/重启/注销三动作只做 talk 探针验证参数分发,**不要真关**——建议在虚拟机验;⑧ idle_seconds/keepawake enable+release。
 
+- CI 首编实录补遗(两轮迭代,SDK 形态漂移是主旋律):①`kAudioElementMaster` 不在 SDK,音量 element 常量用 `kAudioObjectPropertyElementMaster`;②`cupsGetJobs` 新旧两种签名(旧五参出参/新四参返回)在 macOS SDK 都 no matching——打印机队列不走 CUPS API,FFI 留哨兵,MoonBit mac 分支与 Linux 同走 `lpstat -o`(CUPS CLI 恒在);③`LSCopyDefaultApplicationURLForURL` 报 no matching,协议默认应用改 `NSWorkspace.URLForApplicationToOpenURL`(非废弃现代等价),扩展名路线 UTTypeCreatePreferredIdentifierForTag+LSCopyDefaultRoleHandlerForContentType 编译通过;④私有 `_AXUIElementGetWindow` 声明必须按真实签名 `(AXUIElementRef, CGWindowID*)`,void* 形态与 SDK 隐式声明冲突报 no matching function;⑤`IOPSGetPowerSourceState` 头未导出,交流判定改逐源读 `kIOPSPowerSourceStateKey`(内部电池接交流时报 kIOPSACPowerValue);⑥CFArrayGetValueAtIndex 出参需 const_cast 再转 CGDisplayModeRef;⑦ObjC 多行消息发送跨行排版断裂会报 missing '[',长消息拆局部变量。
 ### Scroll 未显式内容尺寸时不可滚(macOS 缺「内容自然高度」这层)
 
 - 环境:报告方真机 macOS 14.5 / arm64(跟踪 issue #1,`examples/showcase` 全分页含侧边菜单),fork v0.15.6-mbt.18 预构建库;本机为 Linux、无 mac,未复现,以下结论来自 fork 源码逐行核对(引用代码与本地 `nativeui/mac/scroll_mac.mm` 逐字一致)。
