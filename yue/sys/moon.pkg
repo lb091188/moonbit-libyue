@@ -1,0 +1,5 @@
+// 系统能力包（方案 §2 的 `yue/sys`）：从 master 线 `yue/system`/`yue/traybus`
+// 按族平移的纯 MoonBit 能力住这里；需要 C 的部分（环境变量写删、目录枚举、
+// 子进程）随各自的 stub 批次进来，链接参数仍由 scripts/prebuild.py 托管。
+
+supported_targets = "native"
