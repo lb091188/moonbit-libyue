@@ -76,6 +76,13 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 - **单测共享可变全局(主题 theme_box)时,断言结果依赖执行顺序**:`geo_region_color(None)` 原走 `lighten_hex(base, 0.0)` 的 HSL 往返,`hex6` 输出小写,把主题色 `#2D68C4` 重写成 `#2d68c4`;本机因先前用例改过主题而「碰巧」相等,CI 调度顺序不同即挂(`"#2d68c4" != "#2D68C4"`)。修复:零微调原样返回主题色(语义本就是「不微调」),不经往返。教训:「字符串相等」断言遇到经序列化函数的值,先问大小写/格式是否稳定;同值异形的全局状态会让测试变成顺序彩票。
 
+### CI 三平台全红三例:registry 索引不自动拉取、BSD sed 注解、测试顺序依赖(2026-10-10)
+
+- **全新环境跑 moon 前必须先 `moon update`**:moon 不会在首次解析依赖时自动拉取 registry 索引,缺索引时报「module was not found in the registry」并把仓库自己的依赖逐个点名(它们其实都在注册表)。本仓 CI 三平台 2026-10-06 起全红即此因——CI 每次装新工具链,缓存又不含 `~/.moon`;本机一直正常纯属索引早已就位。定位:把本机 `~/.moon` 复制到临时 HOME 并清空 `registry/` 即逐字复现;补 `moon update` 后 check 退出码 0,且 moon.mod 不被改动(update 只刷新索引)。三个会调 moon 的工作流已统一在工具链安装后插「moon update」步骤。
+- **CI 失败注解在 mac 上全空的一例**:注解脚本用 `sed ':a;N;$!ba;s/\n/%0A/g'` 做多行合并——GNU 语法,BSD sed(macOS)报 `unused label` 且输出为空,失败注解看起来「没有内容」其实是工具不移植。改 awk:`awk 'BEGIN{s=""}{printf "%s%s", s, $0; s="%0A"}'`(分隔符作 printf 实参,不会被当转义)。
+- **依赖测试顺序的隐性全局**:单测共享可变全局(主题 theme_box)时,断言结果依赖执行顺序——`geo_region_color(None)` 原走 `lighten_hex(base, 0.0)` 的 HSL 往返,`hex6` 输出小写,把 `#2D68C4` 重写成 `#2d68c4`;本机因先前用例改过主题而「碰巧」相等,CI 顺序不同即挂。修复:零微调原样返回主题色(语义本就是「不微调」)。教训:「字符串相等」断言遇到经序列化函数的值,先问大小写/格式是否稳定。
+- **ffmpeg-mbt 平台矩阵(Windows CI 与 bin-* 发布的已知缺口)**:`ffmpeg_stub.c` 真调 libav,任何链接(含 `moon test` 的测试二进制)都要真库——mac 由 brew ffmpeg 供(CI 已装,pkg-config 文件齐全);Windows 无 MSVC 库供货,CI 的 Windows job 收窄为只跑 `moon check`,`moon test`/`moon build` 待 NuGet 或 ShiftMediaProject 预编译 .lib 方案(仿 WebView2 钉版本 + sha256;release-bin 的 Windows 全量构建同样会卡 systemprobe→yue-media→ffmpeg 链接,见 TODO)。配套:prebuild.py 缺包行为由「非零退出」改为「stderr 告警 + 缺失库链接参数留空 + 退出 0」——硬失败会让无 ffmpeg 平台连 check 都跑不了,真实缺库由链接期未定义符号报出。
+
 ### macOS 新 API 的可用性门槛(两套构建系统部署目标不同)
 
 - **两套 mac 构建的部署目标不一致**:GN/ninja 构建(`scripts/create_source_dist.js`,即 `Create source distribution` 步骤)取 `third_party/build-gn/build/config/mac/mac_sdk.gni` 的 `mac_deployment_target = "10.15"`;CMake 预构建(`scripts/prebuilt/CMakeLists.txt`)取 `CMAKE_OSX_DEPLOYMENT_TARGET 11.0`。
