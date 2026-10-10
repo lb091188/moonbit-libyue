@@ -75,13 +75,17 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 ### 测试顺序依赖:字符串相等断言遇上「序列化往返改大小写」(2026-10-10)
 
 - **单测共享可变全局(主题 theme_box)时,断言结果依赖执行顺序**:`geo_region_color(None)` 原走 `lighten_hex(base, 0.0)` 的 HSL 往返,`hex6` 输出小写,把主题色 `#2D68C4` 重写成 `#2d68c4`;本机因先前用例改过主题而「碰巧」相等,CI 调度顺序不同即挂(`"#2d68c4" != "#2D68C4"`)。修复:零微调原样返回主题色(语义本就是「不微调」),不经往返。教训:「字符串相等」断言遇到经序列化函数的值,先问大小写/格式是否稳定;同值异形的全局状态会让测试变成顺序彩票。
+- **同类第二处在 `geo_flight_seg_color` 端点**:它走 `mix_hex(primary, info, 1.0-t)`,t=0/1 时 `hex6` 同样改写大小写,CI 挂在同一测试的另一断言上(`#2d68c4 != #2D68C4`,行号还从 330 挪到 338)。修复推广到 `mix_hex` 本身:两色都合法时端点原样返回端点色(t≥1 返 a、t≤0 返 b),中点混色不变;`ci_visual_map` 的既有端点断言输入本就是小写,不受影响。**修这类问题要把不变式落在序列化函数上,而不是逐个调用点打补丁**——第一个调用点修完后,CI 立刻暴露了下一个。
 
 ### CI 三平台全红三例:registry 索引不自动拉取、BSD sed 注解、测试顺序依赖(2026-10-10)
 
 - **全新环境跑 moon 前必须先 `moon update`**:moon 不会在首次解析依赖时自动拉取 registry 索引,缺索引时报「module was not found in the registry」并把仓库自己的依赖逐个点名(它们其实都在注册表)。本仓 CI 三平台 2026-10-06 起全红即此因——CI 每次装新工具链,缓存又不含 `~/.moon`;本机一直正常纯属索引早已就位。定位:把本机 `~/.moon` 复制到临时 HOME 并清空 `registry/` 即逐字复现;补 `moon update` 后 check 退出码 0,且 moon.mod 不被改动(update 只刷新索引)。三个会调 moon 的工作流已统一在工具链安装后插「moon update」步骤。
 - **CI 失败注解在 mac 上全空的一例**:注解脚本用 `sed ':a;N;$!ba;s/\n/%0A/g'` 做多行合并——GNU 语法,BSD sed(macOS)报 `unused label` 且输出为空,失败注解看起来「没有内容」其实是工具不移植。改 awk:`awk 'BEGIN{s=""}{printf "%s%s", s, $0; s="%0A"}'`(分隔符作 printf 实参,不会被当转义)。
 - **依赖测试顺序的隐性全局**:单测共享可变全局(主题 theme_box)时,断言结果依赖执行顺序——`geo_region_color(None)` 原走 `lighten_hex(base, 0.0)` 的 HSL 往返,`hex6` 输出小写,把 `#2D68C4` 重写成 `#2d68c4`;本机因先前用例改过主题而「碰巧」相等,CI 顺序不同即挂。修复:零微调原样返回主题色(语义本就是「不微调」)。教训:「字符串相等」断言遇到经序列化函数的值,先问大小写/格式是否稳定。
-- **ffmpeg-mbt 平台矩阵(Windows CI 与 bin-* 发布的已知缺口)**:`ffmpeg_stub.c` 真调 libav,任何链接(含 `moon test` 的测试二进制)都要真库——mac 由 brew ffmpeg 供(CI 已装,pkg-config 文件齐全);Windows 无 MSVC 库供货,CI 的 Windows job 收窄为只跑 `moon check`,`moon test`/`moon build` 待 NuGet 或 ShiftMediaProject 预编译 .lib 方案(仿 WebView2 钉版本 + sha256;release-bin 的 Windows 全量构建同样会卡 systemprobe→yue-media→ffmpeg 链接,见 TODO)。配套:prebuild.py 缺包行为由「非零退出」改为「stderr 告警 + 缺失库链接参数留空 + 退出 0」——硬失败会让无 ffmpeg 平台连 check 都跑不了,真实缺库由链接期未定义符号报出。
+- **平台矩阵定案(Windows / macOS 的 CI 与 bin-* 发布都是已知缺口)**:`ffmpeg_stub.c` 真调 libav,任何链接(含 `moon test` 的测试二进制)都要真库;而 **`moon check` 不编译 native-stub 的 C**(探针实证:含 `#error` 的桩 check 照样过),所以静态检查三平台都能做。
+  - Windows:无 MSVC 库供货,`moon test`/`moon build` 必炸;CI 收窄为静态检查。
+  - macOS:两道坎——① `chensuiyi/subproc@0.3.0` 的 `native.c` 用 `execvpe`/`SOCK_CLOEXEC`/`SYS_pidfd_open` 等 Linux 专属 API,mac 编不过(**上游问题,主阻断**);② brew ffmpeg 的 pkg-config `--libs` 只出链接参数,桩编译缺 `libavformat/avformat.h` 的头文件路径(要 `CPATH=/opt/homebrew/include` 或 prebuild 供 `--cflags`)。CI 同样收窄为静态检查,brew ffmpeg 步骤撤掉(check 用不上)。
+  - `release-bin.yml` 的全量构建在 Windows/macOS 上会卡 systemprobe→yue-media→ffmpeg 链接,bin-* 发布同理;恢复条件与 NuGet/ShiftMediaProject 供货方案见 TODO。配套:prebuild.py 缺包行为由「非零退出」改为「stderr 告警 + 缺失库链接参数留空 + 退出 0」——硬失败会让无 ffmpeg 平台连 check 都跑不了,真实缺库由链接期未定义符号报出。
 
 ### macOS 新 API 的可用性门槛(两套构建系统部署目标不同)
 

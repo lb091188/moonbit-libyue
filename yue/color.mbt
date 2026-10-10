@@ -212,23 +212,30 @@ pub fn from_hsl(h : Double, s : Double, l : Double) -> String {
 }
 
 ///|
-/// 两色线性混色:t 为取 a 的比例(0..1),其余取 b;任一输入非法时
-/// 原样返回 a。
+/// 两色线性混色:t 为取 a 的比例(0..1),其余取 b;端点(t=0/1)与任一
+/// 输入非法时原样返回对应输入色,不经 hex6 往返(hex6 输出小写,会把
+/// 主题色 #2D68C4 重写成 #2d68c4,与原串比较不等)。
 pub fn mix_hex(a : String, b : String, t : Double) -> String {
-  let tt = if t < 0.0 { 0.0 } else if t > 1.0 { 1.0 } else { t }
   match (parse_hex(a), parse_hex(b)) {
-    (Some((r1, g1, b1)), Some((r2, g2, b2))) =>
+    (Some((r1, g1, b1)), Some((r2, g2, b2))) => {
+      if t >= 1.0 {
+        return a
+      }
+      if t <= 0.0 {
+        return b
+      }
       hex6(
         clamp8(
-          (r1.to_double() * tt + r2.to_double() * (1.0 - tt)).round().to_int(),
+          (r1.to_double() * t + r2.to_double() * (1.0 - t)).round().to_int(),
         ),
         clamp8(
-          (g1.to_double() * tt + g2.to_double() * (1.0 - tt)).round().to_int(),
+          (g1.to_double() * t + g2.to_double() * (1.0 - t)).round().to_int(),
         ),
         clamp8(
-          (b1.to_double() * tt + b2.to_double() * (1.0 - tt)).round().to_int(),
+          (b1.to_double() * t + b2.to_double() * (1.0 - t)).round().to_int(),
         ),
       )
+    }
     _ => a
   }
 }
