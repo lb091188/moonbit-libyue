@@ -130,7 +130,8 @@ pub(all) struct DiskStat {
 ///|
 /// 磁盘行：挂载点 + 容量 + IO 速率（bps，两次采样差值）。
 /// 速率为 None 表示来源不可用：macOS 无等价 diskstats（IOKit 列远期）、
-/// 挂载点归属不到物理盘（如 NFS）、首帧无前样本——UI 一律显示「—」。
+/// Windows 上卷打不开 / IOCTL 不支持（光驱 / 无介质）、挂载点归属不到
+/// diskstats 条目（如 NFS）、首帧无前样本——UI 一律显示「—」。
 pub(all) struct DiskInfo {
   mount : String
   device : String
