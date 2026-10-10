@@ -77,6 +77,9 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **两套 mac 构建的部署目标不一致**:GN/ninja 构建(`scripts/create_source_dist.js`,即 `Create source distribution` 步骤)取 `third_party/build-gn/build/config/mac/mac_sdk.gni` 的 `mac_deployment_target = "10.15"`;CMake 预构建(`scripts/prebuilt/CMakeLists.txt`)取 `CMAKE_OSX_DEPLOYMENT_TARGET 11.0`。
 - **clang 的可用性告警只对「引入/废弃版本 ≤ 部署目标」触发**:`-Wunguarded-availability-new` 默认开启,GN 侧还带 `-Werror`(Windows 是 `/WX`),因此 10.15 目标下用 macOS 11+/14+ 的 API 而不加 `@available` 是硬编译失败;反过来,**废弃版本高于部署目标的旧 API 不告警**——`NSUserNotification`、`UNNotificationPresentationOptionAlert` 都废弃于 11.0,在 10.15 目标下一直能编过,这就是旧代码多年无事的原因。
 - **踩坑:`@available` 必须包住调用本身**,只包住外围条件判断不算: `if (@available(macOS 14.0, *)) ok = 检查(); if (ok) 用新 API();` 仍会报错(`WKWebsiteDataStore initWithIdentifier:` 实测)。
+- **两个写错就编译不过的 mac API 事实**:① `base::apple::scoped_nsobject<T>` 是**包装类型不是指针**,给它发消息报 `bad receiver type 'scoped_nsobject<...>'`,必须写 `obj.get()`(仓库既有写法见 `browser_mac.mm` 的 `config.get()`、`painter_mac.mm` 的 `image.get()`);② 持久化 `WKWebsiteDataStore`(macOS 14+)只有**类方法** `+dataStoreForIdentifier:`,**不存在** `-initWithIdentifier:`——报 `may not respond to` 是方法名/类实例归属写错,不是可用性问题;且它对同一 identifier 每次返回**不同对象**(指向同一磁盘存储),必须自己缓存复用,否则失去进程共享。写新 API 前先查 SDK 头或 Apple 文档确认归属。
+- **取证教训:日志尾段缺诊断 ≠ 没有诊断**。注解每步只保留 10 条、job 页面 HTML 也只内联最后 10 行,编译错误块常位于输出后段而被这个窗口挡掉。本批曾据尾段误判「mac 是与代码无关的静默终止、重试即可」,白烧两轮 CI;改成 `grep -aE 'error:|FAILED:|undefined reference|undefined symbol|ld: '` 扫**整个**日志后立刻拿到真实诊断。筛选时还要剔除超长编译命令行(它以 `-Werror` 命中关键字却无信息)与 `ninja: Entering directory` 这类噪声,10 条额度很紧。
+
 - 取证:失败时 check-runs annotations API 匿名可读(`/repos/<owner>/<repo>/check-runs/<check_run_id>/annotations`),这是仓库无 Actions 日志权限时唯一能看到编译错误的通道。但**把多行塞进一条注解**(以 `%0A` 转义)在 mac 上会被截成读不出内容的碎片——`prebuilt.yml` 已改成**一行一条注解**(行内 `%` 转义为 `%25`);本仓 `ci.yml` 仍是旧的字节切片写法,后续按同一思路收敛。
 
 ### 浏览器依赖按需化（0.5.0）
