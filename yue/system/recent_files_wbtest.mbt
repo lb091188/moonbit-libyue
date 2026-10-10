@@ -142,6 +142,22 @@ test "rf_uri_to_path：file:// 还原/ authority / 非 file 方案" {
 }
 
 ///|
+test "rf_win_abs_path：盘符/UNC/URL 形态判别" {
+  assert_true(rf_win_abs_path("D:\\code\\a.md"))
+  assert_true(rf_win_abs_path("c:/users/x"))
+  assert_true(rf_win_abs_path("\\\\srv\\share\\x.txt"))
+  assert_true(rf_win_abs_path("Z:/"))
+  // 非 Windows 绝对路径形态
+  assert_true(!rf_win_abs_path("http://example.com/x"))
+  assert_true(!rf_win_abs_path("file:///C:/x"))
+  assert_true(!rf_win_abs_path("relative/x.txt"))
+  assert_true(!rf_win_abs_path("C:x")) // 缺分隔符
+  assert_true(!rf_win_abs_path("1:/x")) // 非盘符
+  assert_true(!rf_win_abs_path("D:")) // 过短
+  assert_true(!rf_win_abs_path(""))
+}
+
+///|
 test "rf_parse_xbel：完整样例（转义/多 application/缺属性/自闭合/注释）" {
   let xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
     "<!DOCTYPE xbel PUBLIC \"-//freedesktop//DTD XBEL 1.0//EN\" \"http://example/xbel-1.0.dtd\">\n" +
