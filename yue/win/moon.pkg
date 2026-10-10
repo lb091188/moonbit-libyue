@@ -1,0 +1,13 @@
+import {
+  "moonbitlang/core/encoding/utf8",
+}
+
+supported_targets = "native"
+
+// GTK 端不由 moon 编译：link_configs 只有链接期字段，native-stub 拿不到系统头
+// （实测同 G0 探针），故 gtk_stub.c 由 scripts/prebuild.py 编成
+// build/libyue_win_stub.a 后经 link_flags 传入；这里只带非 Linux 的占位实现，
+// 保证三平台链接不断符号。链接参数按 AGENTS 规则 1 全部由 prebuild 托管。
+options(
+  "native-stub": [ "gtk_stub_portable.c" ],
+)

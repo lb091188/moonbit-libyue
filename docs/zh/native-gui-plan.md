@@ -62,6 +62,12 @@ set_cursor_rect(x, y, w, h)
 - **不找第三方绑定**：渲染引擎必然是系统那三家，第三方也绕不开，真正的选择题只是绑定层谁写。MoonBit 生态内没有可靠的现成 webview 封装（待查证），C 层的通用 webview 库其同步模型不覆盖 custom scheme 流式与 JS binding 面，省不了工作量。结论：**自研薄绑定，libyue 当语义参考**。
 - **契约沿用**：`yue/browser/browser.mbt` 的 22+6 个方法名（`load_url`/`go_back`/`execute_javascript`/`on_update_title`…）平台中立，直接作为新栈 browser 契约。三个绑死点要重做：协议载荷那套 `[ok][mime_len][mime][content_len][content]` 小端裸字节 ABI（`browser.mbt:252-292`，CORE1 越界读教训即出于此，见 `adaptation.md:133`）改**结构化返回值**；`(f, closure)` 蹦床随新 shim 重设计；内嵌 `@yue.View` 并 extend 40+ ViewLike（`types.mbt:7-13`）换成新宿主类型。现有面还缺 `on_close`/`on_start|fail_navigation`/`AddUserScript`/高级 binding，新栈补齐。
 
+**`mount_child_surface` 接口形状（G2 冻结，实现随首个消费者）**：
+
+- MoonBit 面：`win.mount_child_surface(kind : ChildKind, rect : (Double, Double, Double, Double)) -> ChildSurface`、`ChildSurface::set_rect(..)`、`ChildSurface::unmount()`、`ChildSurface::handle() -> Int64`（能力层拿它去挂真控件）。
+- 语义：子表面**不被 Painter 绘制**，z 序在原生侧、恒覆盖在自绘像素之上；**不能用 `clip_rect` 裁剪**，超出窗口的部分由窗口系统裁掉；`rect` 由 yoga-mbt 布局给出，DPI 换算在后端。
+- 实现落点：Linux 把窗口内容改成「绘制区 + 可定位子件」的容器（GtkOverlay/GtkFixed），在 G8 的首个消费者（browser 或 `yue-media` 的 VideoPlayer）落地时一并做——无消费者时先把形状冻结，不写猜测性实现。
+
 ## 5. 阶段划分与每批验收
 
 **本分支门禁口径**（因 §1 分支纪律而立的例外）：主链路与发布分支仍按 AGENTS 规则 9（`moon check` 零警告 + 全仓 `moon test` 全绿才提交）；本分支 G1–G6 期间**允许全仓为红**，逐批验收改为分包门禁——① `moon test -p NoahLiu/yoga-mbt/src` 全绿且基线 740 条不掉；② 新栈各包单独 `moon check` 零警告 + 各自测试全绿；③ 提交说明记录当前全仓红点数量与原因，**红点只减不增**；④ G7 组件与声明式层接线完成后恢复全仓门禁。真机视觉/交互验证仍按 AGENTS 规则 6 出清单由协作方执行，实测结论回写 `adaptation.md`，一批一提交一推送。此例外与 AGENTS 条文的差异在 G7 收口时一并回写 AGENTS.md。
@@ -71,7 +77,7 @@ set_cursor_rect(x, y, w, h)
 | **G0** | **Linux IME spike**（`experiment/ime_probe`，纯通道 `GtkIMContext` 与可见 `GtkEntry` 两模式同二进制切换）——**探针已落地**（`5a79180`：循环所有权在 MoonBit、preedit 与插入符全自绘、光标按 UTF-8 字节自管；实测「22px 盒子的 GtkEntry 被主题撑到 33、加 `min-height:0` 后 24」已记档） | **待协作方真机回填**：fcitx5 与 ibus 两套各验 commit 送达、preedit 内联、候选窗定位、快捷键穿透；结论回填 `adaptation.md` 并据此确认第 3 节表 |
 | **G0b** | 绑定层摘除与目录重排：删 §2 清单里的 FFI 绑定文件与 `shim/`、`lib/`、`vendor/` 构建链，建 `yue/{win,core,render,text,input,sys}` 骨架 | 新栈各包可 `moon check`；全仓红点清单成文，此后**只减不增** |
 | **G1** | 绘制契约 + 离屏回归：`Painter` 矩形级子集签名定稿、`Bitmap`、yoga-mbt 盒子→像素 | 断言比 RGBA 字节；`moon check` 零警告 |
-| **G2** | GTK3 窗口地基：建窗、`g_main_context_iteration` 驱动循环（不用 `gtk_main`）、`g_main_context_wakeup` 留跨线程唤醒位、事件全排空、**`mount_child_surface` 接口形状定死**（§4） | 独立进程出图；`open→create→loop→close` 干净退出，无退出期崩溃 |
+| **G2** ✅ | GTK3 窗口地基：建窗、`g_main_context_iteration` 驱动循环（不用 `gtk_main`）、`g_main_context_wakeup` 留跨线程唤醒位、事件全排空、**`mount_child_surface` 接口形状定死**（§4，形状已冻结、实现随首个消费者落地） | 独立进程出图；`open→create→loop→close` 干净退出，无退出期崩溃 |
 | **G3** | Cairo 绘制 + Pango 文本（路径/变换/裁剪/图标；单行与多行测量绘制） | 图标页与两张图表自绘出图；测量语义与 `GetOneLineHeight` 等对齐 |
 | **G4** | 焦点栈与键盘、自绘 caret/选区、剪贴板；`TextEditorHost` 抽象落地 | 英文/数字在自绘输入框可打字；Tab/Shift+Tab 焦点跳转可用 |
 | **G5** | 输入法接入（按第 3 节表逐平台） | Linux 真机中文输入（fcitx5 / ibus 两套）；Windows 逐 IME 验，不通者降 C |
@@ -87,6 +93,9 @@ set_cursor_rect(x, y, w, h)
 - `scripts/prebuild.py` 收缩为只服务输入法探针与新栈系统库参数（GTK3/Pango/X11 由 pkg-config 探测），不再下载或构建任何 libyue 产物。
 - 命令口径两条：workspace 下 `moon check`（无参数）会连根包一起查，因此绿色包用路径形式点名 `moon check yue/render modules/yoga-mbt/src`；`-p` 只对 `moon test` 有效（`moon check -p 包名` 会把包名当目录）。
 - 绿色基线复验：`moon test -p NoahLiu/yoga-mbt/src` **79/79**、`moon test -p NoahLiu/moonbit-libyue/yue/render` **8/8**，两者 `moon check` 均零警告。
+
+**G2 完成记录（2026-10-10）**：`yue/core/loop.mbt`（循环与任务调度，9 条单测）+ `yue/win`（GTK3 建窗、`GtkDrawingArea` 上屏、`pump/wait/wake` 泵、事件全排空）+ `examples/native-window` 驱动示例。冒烟（本机 X11/XFCE，助手宿主）：进程存活、动画 52 帧、`open→create→loop→close` 干净退出、退出码 0；三个绿色包 `moon check` 零警告，`yoga-mbt` 79/79 未掉。四条实测坑与「Loop 时基必须显式 start」一并记入 adaptation.md「跨平台通用」节 G2 条。
+
 
 **布局侧遗留**：`/home/lkyh/ownCode/yue/patches/` 是真实 bug 语料，须转成 yoga-mbt 回归用例——首条 `93078300`（`display:none` 清零重显后 flex 简写派生的 basis-0 永久驻留，auto 高父容器下节点永久 0 高，即 MoonBit 层 tabs 切页塌陷根因）。yoga-mbt 与 libyue 复刻**同工程同批推进**：每个 G 阶段用到布局就顺带补该路径的 yoga 回归，不再分两条时间线。
 

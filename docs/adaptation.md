@@ -133,6 +133,18 @@ Environment: Ubuntu 24.04 + X11 + XFCE, moon 0.1.20260920 / moonc v0.10.14. Adds
 
 - Verification: `moon check` with no warnings + repo-wide `moon test` 748/748 (8 new pixel-level assertions in `yue/render`).
 
+### MoonBit native GUI stack G2 (GTK3 window layer) · five pitfalls in the pump and present path
+
+Environment: Ubuntu 24.04 + X11 + XFCE, moon 0.1.20260920 / moonc v0.10.14, GTK3 3.24.x. Adds `yue/win` and `examples/native-window`.
+
+- **Window never paints (frames=0)**: after `gtk_widget_show_all` the GDK map request still sits in the output buffer, so the server never sees the map and poll waits for an event that never comes. Fix: `gdk_display_flush(...)` plus one round of `gtk_main_iteration_do(FALSE)` after show (`gdk_flush` is deprecated).
+- **Busy loop (dt=0, 100% CPU)**: calling `g_main_context_wakeup` right before `poll` makes GLib's internal wakeup pipe readable, so poll returns immediately forever. Fix: never call wakeup inside the wait; cross-thread wakeup only enters via the external `wm_wakeup()` (which is exactly what should make the current poll return early).
+- **Hardened GLib signatures**: this machine's `g_main_context_query/check` take an extra `n_fds` argument (query's 5th is the buffer capacity; check's 4th is n_fds, not n_ready). Read `/usr/include/glib-2.0/glib/gmain.h` instead of copying examples.
+- **Time base for relative delays**: `CLOCK_MONOTONIC` starts at boot (21405569 ms measured here). A Loop whose `last_now` starts at 0 fires every timer queued before the first `advance` immediately - the animation ran exactly one frame and the 5 s quit timer stopped the loop in the first tick. Fix: explicit `Loop::start(now_ms)`; unstarted loops use base 0 (covered by a test).
+- **Known pitfall reproduced: moon does not relink on native static library changes**: after editing `yue/win/gtk_stub.c`, `moon build` reports "no work to do" and runs the old exe. Fix: delete `build/libyue_win_stub.a` and the example's `_build` output.
+- **Convention note**: the present path copies the caller's RGBA buffer into a backend scratch before swizzling to BGRx; it never modifies the caller's buffer in place, because offscreen snapshots share that buffer.
+- Verification: `moon check yue/{core,win,render}` warning-free; `moon test -p NoahLiu/moonbit-libyue/yue/core` 9/9; `examples/native-window` smoke: 52 frames, exit code 0, no shutdown crash; yoga-mbt 79/79 unchanged.
+
 ## Linux
 
 ### Distributions

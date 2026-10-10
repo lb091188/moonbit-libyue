@@ -30,16 +30,47 @@ BUILD_DIR = MODULE_ROOT / "build"
 LINUX_PKG_CONFIG_LIBS = ["gtk+-3.0", "pangoft2", "fontconfig", "x11"]
 
 IME_PROBE_PACKAGE = "NoahLiu/moonbit-libyue/experiment/ime_probe"
+WIN_PACKAGE = "NoahLiu/moonbit-libyue/yue/win"
 
 
-def pkg_config(args: list[str], flag: str) -> list[str]:
+def pkg_config(args: list[str], flag: str) -> list[str] | None:
+    """探包配置：返回 None 表示包不存在，返回空列表表示存在但该 flag 无输出
+    （`--cflags x11` 就是合法的空输出，当成缺失会让所有主包退避）。"""
     run = subprocess.run(
         ["pkg-config", flag] + args, capture_output=True, text=True
     )
     if run.returncode != 0:
-        print(f"prebuild: pkg-config {flag} {' '.join(args)} 失败", file=sys.stderr)
-        return []
+        return None
     return run.stdout.split()
+
+
+def compile_stub(src: Path, lib_name: str) -> str:
+    """把需要系统头文件的 C 端编成静态库（moon 的 link_configs 只有链接期字段、
+    c_flags 会被静默忽略，实测），返回库路径；缺依赖或编译失败返回空串。"""
+    if not src.exists():
+        return ""
+    cflags: list[str] = []
+    for name in LINUX_PKG_CONFIG_LIBS:
+        got = pkg_config([name], "--cflags")
+        if got is None:
+            print(f"stub: 缺少 {name} 开发包", file=sys.stderr)
+            return ""
+        cflags.extend(got)
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    lib = BUILD_DIR / lib_name  # ld 的 -l 命名约定：lib<name>.a
+    obj = BUILD_DIR / (lib_name.removesuffix(".a") + ".o")
+    if lib.exists() and lib.stat().st_mtime >= src.stat().st_mtime:
+        return lib.as_posix()
+    cc = shutil.which("cc") or shutil.which("gcc") or "cc"
+    for cmd in (
+        [cc, "-c", "-O2", "-fPIC", "-o", obj.as_posix(), src.as_posix()] + cflags,
+        ["ar", "rcs", lib.as_posix(), obj.as_posix()],
+    ):
+        run = subprocess.run(cmd, capture_output=True, text=True)
+        if run.returncode != 0:
+            print(f"stub: {' '.join(cmd)} 失败\n{run.stderr}", file=sys.stderr)
+            return ""
+    return lib.as_posix()
 
 
 def build_ime_probe_stub() -> str:
@@ -77,12 +108,21 @@ def link_configs() -> dict:
         libs = []
         for name in LINUX_PKG_CONFIG_LIBS:
             got = pkg_config([name], "--libs")
-            if not got:
+            if got is None:
                 print(f"prebuild: 缺少 {name} 开发包", file=sys.stderr)
                 return {"link_configs": entries}
             libs.extend(got)
         # 系统库不会被自动带上，显式补（与旧链路同一口径）。
         sys_libs = ["-lpthread", "-ldl", "-lm", "-lstdc++", "-latomic"]
+        win_lib = compile_stub(
+            MODULE_ROOT / "yue" / "win" / "gtk_stub.c", "libyue_win_stub.a"
+        )
+        if win_lib:
+            entries.append({
+                "package": WIN_PACKAGE,
+                "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_win_stub "
+                + " ".join([*libs, *sys_libs]),
+            })
         stub = build_ime_probe_stub()
         if stub:
             entries.append({

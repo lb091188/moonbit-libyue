@@ -26,7 +26,24 @@ pub struct Loop {
 
 ///|
 pub fn Loop::new() -> Loop {
-  { next_id: 1, next_seq: 0, last_now: 0L, running: true, jobs: [], }
+  // -1 = 时基未建立。平台时钟是 CLOCK_MONOTONIC（开机起算），若从 0 起算
+  // 相对延时，首次 advance 前排的定时器会全部立刻到期（实测骨架动画只跑
+  // 一拍就是这么来的），故必须由宿主先 start 一次。
+  { next_id: 1, next_seq: 0, last_now: -1L, running: true, jobs: [] }
+}
+
+///|
+/// 建立时基：传入平台单调时钟读数，必须在排任何定时器之前调用一次。
+pub fn Loop::start(self : Loop, now_ms : Int64) -> Unit {
+  if self.last_now < 0L {
+    self.last_now = now_ms
+  }
+}
+
+///|
+/// 时基是否已建立。
+pub fn Loop::started(self : Loop) -> Bool {
+  self.last_now >= 0L
 }
 
 // 立即项恒早于任何定时器：due 取 -1，单调时钟读数总 >= 0。
@@ -67,9 +84,11 @@ pub fn Loop::timer(self : Loop, delay_ms : Int, work : () -> Unit) -> Int {
   let id = self.next_id
   self.next_id = self.next_id + 1
   let js = self.jobs
+  // 未 start 时基准取 0（-1 只是「未建立」的哨兵，不参与运算）
+  let base = if self.last_now < 0L { 0L } else { self.last_now }
   insert(js, {
     id,
-    due_ms: self.last_now + delay.to_int64(),
+    due_ms: base + delay.to_int64(),
     seq: self.next_seq,
     run: work,
   })

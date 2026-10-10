@@ -178,6 +178,18 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 - **验证**：`moon check` 零警告 + 全仓 `moon test` 748/748（`yue/render` 新增 8 条像素级断言：半开区间覆盖、source-over 混合、translate+restore、clip 只收紧、内侧描边一圈、窄矩形整块填满、100/3 等分共用边不留缝、非法 hex 与零尺寸位图保持原状）。
 
+### MoonBit 原生 GUI 栈 G2（GTK3 窗口地基）· 循环泵与上屏的五条实测坑
+
+环境：Ubuntu 24.04 + X11 + XFCE，moon 0.1.20260920 / moonc v0.10.14，GTK3 3.24.x。新增 `yue/win`（GTK3 后端）、`examples/native-window`。
+
+- **坑 ①（窗口不画、frames=0）**：`gtk_widget_show_all` 之后 GDK 的 map 请求还压在输出缓冲里，X 服务端收不到 map，poll 等的是一个永远不会来的事件。**修复**：show 后 `gdk_display_flush(...)` 并跑一轮 `gtk_main_iteration_do(FALSE)`（不要用已弃用的 `gdk_flush`）。
+- **坑 ②（忙轮询占满 CPU，dt=0）**：在 `poll` 之前调 `g_main_context_wakeup` 会把 GLib 内部唤醒管道置为可读，poll 立刻返回，外层退化成空转。**修复**：等待内部绝不调 wakeup，跨线程唤醒只由外部 `wm_wakeup()` 触发（效果正是让本次 poll 提前返回）。
+- **坑 ③（GLib 加固签名）**：本机 `g_main_context_query/check` 比网上示例多一个 `n_fds` 参数（query 第 5 位传缓冲容量；check 第 4 位是 n_fds，不是 n_ready）。**做法**：按 `/usr/include/glib-2.0/glib/gmain.h` 核对，不照抄文档示例。
+- **坑 ④（相对延时的时基）**：`CLOCK_MONOTONIC` 是开机起算的大数（本机实测 21405569ms）。`Loop` 的 last_now 若从 0 起算，首次 advance 前排的定时器会**全部立刻到期**——骨架动画只跑一拍、5 秒退出定时器当拍就停循环。**修复**：`Loop::start(now_ms)` 显式建立时基，未 start 时基准取 0（已入单测）。
+- **坑 ⑤（已知坑复现：moon 不因原生静态库变化重链）**：改 `yue/win/gtk_stub.c` 后 `moon build` 报 `no work to do`，跑的还是旧 exe（与「改 shim 后须删产物」同一条）。**修复**：删 `build/libyue_win_stub.a` 与该示例的 `_build` 输出再来。
+- **另记（口径）**：上屏路径把调用方的 RGBA 缓冲拷进后端暂存再换序（BGRx），**绝不就地改调用方缓冲**——离屏快照与窗口同源，就地换序会让下一次快照通道错位、重复上屏还会来回颠倒。
+- **验证**：`moon check yue/{core,win,render}` 零警告；`moon test -p NoahLiu/moonbit-libyue/yue/core` 9/9；`examples/native-window` 本机冒烟 52 帧、退出码 0、无退出期崩溃；yoga-mbt 79/79 未掉。
+
 ## Linux
 
 ### 发行版
