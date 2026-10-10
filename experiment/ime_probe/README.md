@@ -52,3 +52,14 @@ rm -f build/libime_probe_stub.a _build/native/debug/build/NoahLiu/moonbit-libyue
 
 - 非 Linux 平台下本探针链接的是空实现（`ime_probe_stub_portable.c`，仅为让 CI 的三平台 `moon build --target native` 不断符号），运行会直接报告"本平台无探针"。
 - GTK 端不由 `moon.pkg` 的 `native-stub` 编译：moon 的 `link_configs` 没有编译期字段，头文件搜索路径传不进去，故由 `scripts/prebuild.py` 编成 `build/libime_probe_stub.a` 后经 `link_flags` 传入（与 shim 同一形态，链接参数照仓库规则全部由 prebuild 托管）。
+
+## 真机回填（2026-10-10，执行人：协作方，fcitx5）
+
+| 清单项 | 结论 |
+|---|---|
+| 1 / 2 / 6（中文提交） | **补 `gtk_im_context_focus_in` 后通过**——未调它时 `GtkIMMulticontext` 落回内建 `GtkIMContextSimple`，表现为每键一次 commit、preedit 恒 0（这不是 fcitx5 的问题） |
+| 5（组合中切窗口） | 需要在顶层 focus-in/out 里同步 `focus_in`/`focus_out`，否则输入法侧残留未完成组合串（已按此实现） |
+| 1 的 preedit 内联 | **仍缺**：组合串没有自绘出来。定位在探针自身的挂法，不是输入法侧；G5 正式实现按「commit 已可达、preedit 必须自绘并随焦点同步」两条事实设计 |
+| 8 / 9（模式 C 兜底） | 可见 `GtkEntry` 的预览与提交行为与 Electron 一致，可作兜底形态的参照基线 |
+
+结论详情与根因见 `docs/zh/adaptation.md`「G0 · 真机回证」条。

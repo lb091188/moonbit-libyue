@@ -232,6 +232,16 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **caret 定位口径**：点击定位逐码点量前缀宽，取「不超过点击点的最右边界」；`Editor::boundary_after` 由私有提升为公开，供上层做同一种推进。
 - **验证**：五包 `moon check` 零警告；测试 core 14/14、input 10/10、render 14/14、text 7/7、yoga-mbt 79/79；`examples/native-window` 本机冒烟 49 帧、退出码 0、两个框文本状态完好。**真机项待协作方**：英文/数字可打字、退格与方向键、Tab/Shift+Tab 在两框间环绕、点击定位光标、caret 500ms 闪烁、中文标点与组合键（IME 属 G5）。
 
+### MoonBit 原生 GUI 栈 G0 · 真机回证：`im_focus` 是纯通道成立的前提，preedit 缺口定位在探针挂法
+
+环境：Ubuntu 24.04 + X11 + XFCE，`GTK_IM_MODULE=fcitx`（fcitx5）。执行人：协作方真机（AGENTS 规则 6）。
+
+- **现象**：探针模式 B 下每按一键都直接落成一次 commit、preedit 恒 0，输入法像根本没接管——不是 fcitx5 不工作，而是 `GtkIMMulticontext` 在上下文**未激活**时落回内建的 `GtkIMContextSimple`（只处理 Latin-1，组合串与候选都不走）。
+- **根因**：只调了 `gtk_im_context_set_client_window` 就够了让上下文可用，但**没调 `gtk_im_context_focus_in`**，它一直处于失活态，`filter_keypress` 因此从不消费按键。
+- **修复**：realize 时 `gtk_im_context_focus_in(pr.im)`；顶层窗口 focus-in/out 事件里同步 in/out（失焦必须 `focus_out`，否则输入法侧残留未完成的组合串——即清单第 5 项）。补上后**中文 commit 路径真机可用**。
+- **仍然存在的缺口**：preedit 内联（组合串自绘显示）未达成，定位在探针自身的挂法而非输入法侧；模式 C 的可见 `GtkEntry` 预览行为与 Electron 一致，可作为兜底形态的参照基线。G5 正式实现时按「commit 已通 + preedit 需自己画且需 focus 同步」这两条事实设计，不再重复验证 commit 是否可达。
+- **验证方式**：`moon build experiment/ime_probe` + 两模式冒烟退出码 0（本机，助手侧）；中文可打性由协作方在真机按 README 清单执行并回证。
+
 ## Linux
 
 ### 发行版
