@@ -1031,3 +1031,61 @@ test "rtl 列容器折行:首行靠右、次行在其左" {
   assert_eq(d.layout().left, 0.0)
   assert_eq(d.layout().top, 0.0)
 }
+
+// ---- 绝对定位子项的 aspect-ratio（YG2e）----
+
+///|
+test "绝对定位项由宽按比例推高" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(200.0))
+  let b = leaf(0.0, 0.0)
+  b.set_position(Absolute)
+  b.set_left(fixed(20.0))
+  b.set_top(fixed(10.0))
+  b.set_width(fixed(100.0))
+  b.set_aspect_ratio(Some(2.0))
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(200.0))
+  assert_eq(b.layout().width, 100.0)
+  assert_eq(b.layout().height, 50.0)
+  assert_eq(b.layout().left, 20.0)
+  assert_eq(b.layout().top, 10.0)
+}
+
+///|
+test "绝对定位项由高按比例推宽" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(200.0))
+  let b = leaf(0.0, 0.0)
+  b.set_position(Absolute)
+  b.set_top(fixed(30.0))
+  b.set_height(fixed(40.0))
+  b.set_aspect_ratio(Some(2.0))
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(200.0))
+  // 左右 inset 全 auto → 横向落静态位置
+  assert_eq(b.layout().width, 80.0)
+  assert_eq(b.layout().height, 40.0)
+  assert_eq(b.layout().left, 0.0)
+  assert_eq(b.layout().top, 30.0)
+}
+
+///|
+test "绝对定位项两侧 inset 撑出宽后按比例推高" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(200.0))
+  let b = leaf(0.0, 0.0)
+  b.set_position(Absolute)
+  b.set_left(fixed(10.0))
+  b.set_right(fixed(10.0))
+  b.set_top(fixed(20.0))
+  b.set_aspect_ratio(Some(4.0))
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(200.0))
+  assert_eq(b.layout().width, 280.0)
+  assert_eq(b.layout().height, 70.0)
+  assert_eq(b.layout().left, 10.0)
+}
