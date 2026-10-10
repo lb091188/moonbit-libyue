@@ -1,6 +1,9 @@
 # Layout Style Key Quick Reference
 
-libyue's layout engine is Yoga flexbox. This document is a quick reference for all usable style keys: name-resolution rules, value tables for the four key categories (enum / numeric / edge / special), and common-combination examples — set styles according to this table without consulting yoga docs. Styles are applied at creation via a single `style` array that mixes numeric (Double) and string values, and can be changed at runtime with the lower-level `set_style` / `set_style_str` primitives; container and native control APIs are in [components.md](components.md), and style keys inside the declarative tree are covered in [declarative.md](declarative.md).
+libyue's layout engine is Yoga flexbox. This document is a quick reference for all usable style keys: name-resolution rules, value tables for the four key categories (enum / numeric / edge / special), and common-combination examples — set styles from this table without consulting yoga docs.
+
+- Styles are applied at creation via a single `style` array mixing numeric (Double) and string values; they can be changed at runtime with the lower-level `set_style` / `set_style_str` primitives.
+- Container and native control APIs: [components.md](components.md). Style keys inside the declarative tree: [declarative.md](declarative.md).
 
 ## Conventions
 

@@ -215,7 +215,13 @@ match @system.vsc_recent() {
 | `bh_search(keyword, limit? = 50) -> Result[Array[HistoryItem], BrowserHistoryError]` | url 或 title 子串搜索（ASCII 大小写不敏感）；keyword 为空匹配一切 |
 | `bh_download_state_name(state) -> String` | 下载状态数值 → 名称（进行中 / 完成 / 已取消 / 中断） |
 
-`BrowserProfile{ browser, profile, history_path }`：browser 为 google-chrome / chromium / microsoft-edge / brave，profile 为目录名（Default 或 Profile N）。`HistoryItem{ url, title, visit_count, last_visit_time }`（时间为 Unix 毫秒，未知为 0）；`DownloadItem{ target_path, received_bytes, total_bytes, start_time, end_time, state }`。错误 `BrowserHistoryError`：`BhUnsupported` / `BhNoConfigDir` / `BhNoBrowser` / `BhIoFailed(String)`（单 profile 读失败跳过，全部失败才报错）。
+| 类型 | 字段 |
+|---|---|
+| `BrowserProfile` | `browser`(google-chrome / chromium / microsoft-edge / brave)、`profile`(目录名,`Default` 或 `Profile N`)、`history_path` |
+| `HistoryItem` | `url` / `title` / `visit_count` / `last_visit_time`(Unix 毫秒,未知为 0) |
+| `DownloadItem` | `target_path` / `received_bytes` / `total_bytes` / `start_time` / `end_time` / `state` |
+
+错误 `BrowserHistoryError`:`BhUnsupported` / `BhNoConfigDir` / `BhNoBrowser` / `BhIoFailed(String)`(单 profile 读失败跳过,全部失败才报错)。
 
 ```moonbit
 match @system.bh_history(limit=6) {
@@ -698,7 +704,17 @@ match @yue.fsx_list_dir("/usr/share/applications") {
 | `rf_recent(limit? = 100) -> Result[Array[RecentItem], RecentError]` | 最近文件列表（modified 倒序，并列按 path 升序）；limit ≤ 0 取全部 |
 | `rf_by_app(name, limit? = 100) -> Result[Array[RecentItem], RecentError]` | 按应用名过滤（`bookmark:application` 的 name 精确匹配），同样倒序 |
 
-`RecentItem{ uri, path, mime, added, modified, app_count }`：path 为 href 去 `file://` 前缀并百分号解码后的本地路径（非 file:// 方案给空串）、mime 为 MIME 类型（该 bookmark 无此节点给 None）、added / modified 为 Unix 毫秒（缺失或非法为 0）、app_count 为记录过该文件的应用个数。错误 `RecentError`：`RfUnsupported` / `RfNoDataDir` / `RfNoFile`（从未记录过）/ `RfParseFailed(String)`。解码与换算纯函数：`rf_xml_unescape` / `rf_percent_decode` / `rf_uri_to_path` / `rf_iso_to_unix_ms` / `rf_sort_recent`。
+`RecentItem` 字段:
+
+| 字段 | 含义 |
+|---|---|
+| `uri` | 原始 href |
+| `path` | 去 `file://` 前缀并百分号解码后的本地路径(非 file:// 方案给空串) |
+| `mime` | MIME 类型(该 bookmark 无此节点给 None) |
+| `added` / `modified` | Unix 毫秒(缺失或非法为 0) |
+| `app_count` | 记录过该文件的应用个数 |
+
+错误 `RecentError`:`RfUnsupported` / `RfNoDataDir` / `RfNoFile`(从未记录过)/ `RfParseFailed(String)`。解码与换算为纯函数:`rf_xml_unescape` / `rf_percent_decode` / `rf_uri_to_path` / `rf_iso_to_unix_ms` / `rf_sort_recent`。
 
 ```moonbit
 match @system.rf_recent(limit=8) {
@@ -780,7 +796,18 @@ match @system.pr_run("wpctl", ["get-volume", "@DEFAULT_SINK@"]) {
 | `gdbus_get_property_session(dest, path, iface, prop)` / `gdbus_get_property_system(...)` | 读属性（走 `org.freedesktop.DBus.Properties.Get`，返回值已拆掉 variant 包裹） |
 | `gdbus_set_property_session(dest, path, iface, prop, value)` / `gdbus_set_property_system(...)` | 写属性（走 `Properties.Set`；value 传裸值，variant 包裹在本层完成） |
 
-值模型 `GDBusValue`：`GVNone`（无返回值，不能作调用参数）/ `GVBool` / `GVInt32` / `GVUInt32` / `GVInt64` / `GVU64`（'t'，udisks 的 Size/Time 等无符号 64 位）/ `GVDouble` / `GVString` / `GVPath`（'o'）/ `GVArray(元素签名, 元素表)` / `GVDict(a{sv}，值已拆掉 variant 包裹，Map 按插入序序列化)` / `GVVariant`（保持包裹）/ `GVStruct`。应答侧 `{sv}` 数组折成 `GVDict`，多返回值折成 `GVStruct`。错误 `GDBusError{ name, message }`：name 为 D-Bus 错误名或本地前缀 `gdbus.io`（连不上 / 已断开）/ `gdbus.timeout` / `gdbus.encode`。
+`GDBusValue` 值模型:
+
+| 变体 | 含义 |
+|---|---|
+| `GVNone` | 无返回值,不能作调用参数 |
+| `GVBool` / `GVInt32` / `GVUInt32` / `GVInt64` / `GVU64` | 基本类型(`GVU64` 对应签名 't',udisks 的 Size / Time 等) |
+| `GVDouble` / `GVString` / `GVPath` | 浮点 / 字符串 / 对象路径('o') |
+| `GVArray(元素签名, 元素表)` / `GVStruct` | 数组 / 结构体 |
+| `GVDict` | `a{sv}`;值已拆掉 variant 包裹,Map 按插入序序列化 |
+| `GVVariant` | 保持 variant 包裹 |
+
+应答侧 `{sv}` 数组折成 `GVDict`,多返回值折成 `GVStruct`。错误 `GDBusError{ name, message }`:name 为 D-Bus 错误名或本地前缀 `gdbus.io`(连不上 / 已断开)/ `gdbus.timeout` / `gdbus.encode`。
 
 ```moonbit
 match

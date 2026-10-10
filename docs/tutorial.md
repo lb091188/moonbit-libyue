@@ -101,7 +101,10 @@ fn main {
 moon run .
 ```
 
-A window appears: a label and a button; click the button and the "Clicked N times" line in the middle increments itself — this is **signal reactivity**: when state changes, bound spots refresh automatically, with no "update the text on click" glue code. `mount_window` takes an array of nodes that **declaratively** describes the UI; the `label`/`button` styles can be swapped for the component library's themed widgets at any time (see "Next steps").
+A window appears: a label and a button; click the button and the "Clicked N times" line in the middle increments itself.
+
+- This is **signal reactivity**: when state changes, bound spots refresh automatically, with no "update the text on click" glue code.
+- `mount_window` takes an array of nodes that **declaratively** describes the UI; the `label`/`button` styles can be swapped for the component library's themed widgets at any time (see "Next steps").
 
 ## 4. MoonBit syntax in five rows (only what the code above uses)
 
@@ -154,4 +157,10 @@ This library started from a simple idea (the full story in [aboutlibyue.md](abou
 - **Widgets and capabilities**: entries in the libyue documentation not yet wrapped, and per-platform adaptation pitfalls — all welcome, starting from an issue.
 - **Docs and examples**: the tutorial, the component docs, and every page of the demo board welcome improvements.
 
-No barrier to joining: open an issue describing the problem or idea, or send a PR directly. Before starting, remember only three rules — `moon check && moon test` with zero errors and zero warnings before committing, write field-tested pitfalls together with their fixes into [adaptation.md](adaptation.md), and commit one cohesive change per batch. The full process (FFI conventions for adding widgets, native-layer releases) is in the repo-root [AGENTS.md](https://github.com/lb091188/moonbit-libyue/blob/master/AGENTS.md).
+No barrier to joining: open an issue describing the problem or idea, or send a PR directly. Three rules before starting:
+
+- `moon check && moon test` with zero errors and zero warnings before committing.
+- Write field-tested pitfalls together with their fixes into [adaptation.md](adaptation.md).
+- One cohesive change per batch.
+
+The full process (FFI conventions for adding widgets, native-layer releases) is in the repo-root [AGENTS.md](https://github.com/lb091188/moonbit-libyue/blob/master/AGENTS.md).

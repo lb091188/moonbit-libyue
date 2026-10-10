@@ -317,7 +317,9 @@ The detection mechanism is pointer-position polling (100ms, comparing the global
 
 ## Overlay Scrollbar (OverlayScroll)
 
-On Windows, `scroll()`'s default form (overlay=true with no explicit policy) already routes through this self-drawn floating thumb; this component is the **explicitly opted-in** entry point — use it when you want the same self-drawn floating thumb on Linux/macOS (instead of the platform overlay style), unified across all three platforms. Behavior: hides the platform scrollbar and draws a themed slim bar over the content's right edge — appears on scroll / hover, fades out in two steps after about 1s of inactivity, draggable along the track, wheel events on the slim bar forwarded to content scrolling.
+On Windows, `scroll()`'s default form (overlay=true with no explicit policy) already routes through this self-drawn floating thumb; this component is the **explicitly opted-in** entry point — use it when you want the same self-drawn floating thumb on Linux/macOS (instead of the platform overlay style), unified across all three platforms.
+
+Behavior: hides the platform scrollbar and draws a themed slim bar over the content's right edge — appears on scroll / hover, fades out in two steps after about 1s of inactivity, draggable along the track, and wheel events on the slim bar are forwarded to content scrolling.
 
 Standalone use (when the content is already a Node):
 

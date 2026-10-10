@@ -55,7 +55,11 @@ win.set_content(page(state))   // mount returns the root Container; feed it stra
 
 ### Windows as the declarative root: mount_window
 
-A `Window` has no parent view, so instead of being a Node it serves as the mount entry point: it creates the window, mounts the subtree as its content, and returns the window handle; non-view assets such as menu bars and tray icons are attached via `handle`. The window is activated and shown right after `handle` returns — feed the result straight into `run`, no manual `activate` needed; adjustments that must happen before the window shows go inside `handle`:
+A `Window` has no parent view, so instead of being a Node it serves as the mount entry point: it creates the window, mounts the subtree as its content, and returns the window handle.
+
+- Non-view assets such as menu bars and tray icons are attached via `handle`.
+- The window is activated and shown right after `handle` returns — feed the result straight into `run`, no manual `activate` needed.
+- Adjustments that must happen before the window shows go inside `handle`:
 
 ```moonbit
 let win = @declarative.mount_window(
@@ -130,9 +134,12 @@ fn tagged(label_text : String, body : Node) -> Node {
 1. **Composite components** (recommended): an ordinary function returning a Node; parameters are props, closures are private state (e.g. `card`/`nav_item`).
 2. **Drawn components**: `container(on_draw=...)` + Painter draws badges etc. with zero image assets.
 3. **Stateful components**: the component holds a private `Store`, refreshed automatically via `bind_label`; each instance has independent state (e.g. `counter_widget`). Cross-component coordination uses a shared Store + `map` derivation (the sidebar highlight works this way).
-4. **Extending built-in nodes**: `vbox`/`hbox` accept `handle` (returns the Container handle at mount time, for background colors etc.). Note: the `parent : View` received by a `Node`'s `mount` only has `attach` available **inside the `yue` package** — outside the package you cannot write a Node literal that mounts a container into the parent directly; extend the library instead, or wrap existing views with `node_of`.
+4. **Extending built-in nodes**: `vbox`/`hbox` accept `handle` (the Container handle at mount time, for background colors etc.). Note: the `parent : View` a `Node`'s `mount` receives only exposes `attach` **inside the `yue` package** — outside it you cannot write a Node literal that mounts a container into the parent; extend the library, or wrap existing views with `node_of`.
 5. **Modern layouts**: plain vbox/hbox/scroll flex boxes can produce a "dark sidebar + header bar + scrolling cards" shell; the key points are that **the root node needs `style=[("flex", 1.0)]` to fill the window**, the fixed-width sidebar sets `width` without flex, the main area takes `flex=1`, and the root container uses `style=[("alignItems", "stretch")]` so child columns fill the height.
-6. **Shrink semantics**: `vbox`/`hbox` do **not** shrink by default (yoga semantics, `flexShrink 0`); overflowing children are clipped. Containers that need to shrink or wrap give it explicitly via `style=[("flexshrink", 1.0)]` (e.g. segmented multi-row wrapping — the width constraint required by wrap is propagated through it). Trade-off measured in practice: defaulting to 1 squeezes fixed-size drawn widgets (icons, inputs) across the board, so the default stays 0 and is opted into explicitly.
+6. **Shrink semantics**: `vbox`/`hbox` do **not** shrink by default (yoga semantics, `flexShrink 0`); overflowing children are clipped.
+
+- Containers that need to shrink or wrap opt in explicitly via `style=[("flexshrink", 1.0)]` (e.g. segmented multi-row wrapping — the width constraint wrap needs is propagated through it).
+- Trade-off measured in practice: defaulting to 1 squeezes fixed-size drawn widgets (icons, inputs) across the board, so the default stays 0.
 
 ### Component library (the yue/components package, split into per-family files)
 
@@ -145,7 +152,8 @@ Element-Plus-style non-form components built on top of the declarative layer, pu
 - `code_view(lines)` — syntax-highlighted code view
 - `segmented(options, selected)` — segmented control / top-bar navigation (selected item floats on white);
 - `tag(text, color)` — colored rounded label (width auto-fits the text at mount time);
-- `code_view(lines)` — syntax-highlighted code view: one AttributedText per token (whole-range coloring) measured and drawn manually. **Visually equivalent to range coloring and consistent across platforms** — on Windows, AttributedText range font/color is an upstream deficiency (see adaptation.md); this approach bypasses it and is a viable alternative for code highlighting / terminal rendering. The built-in `tokenize_moonbit` is a demo tokenizer; consumers can feed any lexical analysis result.
+- `code_view(lines)` — syntax-highlighted code view: one AttributedText per token (whole-range coloring) measured and drawn manually. **Visually equivalent to range coloring and consistent across platforms** — on Windows, AttributedText range font/color is an upstream deficiency (see adaptation.md), and this approach bypasses it, making it a viable route for code highlighting / terminal rendering.
+- The built-in `tokenize_moonbit` is a demo tokenizer; consumers can feed any lexical analysis result.
 
 Component state coordination goes through `Store`; main-area page switching uses "subscribe to Store + `ViewLike::set_visible`" (the ABI was added on 2026-09-16). Full demo in `examples/showcase` (sidebar + top bar + page switching + code page); component list in [docs/components-ui.md](components-ui.md).
 
@@ -165,7 +173,9 @@ win.set_content(@declarative.mount([
 Clicking the button → `count` changes → the `bind_label` text automatically becomes "Clicked 1 times".
 Where you don't use a Store, keep using `handle` + setter as before; both coexist.
 
-To swap an arbitrary node (not just text) on state change, use `bind_node`: it remounts the whole subtree when the signal changes, which suits low-frequency switches. ⚠ **Windows limitation (upstream libyue bug, see adaptation.md)**: remounting a subtree that contains the clicked control itself from inside a click handler corrupts subsequent mouse hit-testing (every click gets mis-routed, irreversibly) — for such cases use `swap_node`, which pre-builds both nodes and toggles visibility (no destroy/recreate; the display:none path):
+To swap an arbitrary node (not just text) on state change, use `bind_node`: it remounts the whole subtree when the signal changes, which suits low-frequency switches.
+
+⚠ **Windows limitation (upstream libyue bug, see adaptation.md)**: remounting a subtree that contains the clicked control itself from inside a click handler corrupts subsequent mouse hit-testing (every click gets mis-routed, irreversibly). For such cases use `swap_node`, which pre-builds both nodes and toggles visibility (no destroy/recreate; the display:none path):
 
 ```moonbit
 // swapping whole blocks (not on the clicked control's own chain): bind_node

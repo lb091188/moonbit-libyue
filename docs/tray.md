@@ -1,6 +1,8 @@
 # Linux Tray Design
 
-The tray is the area with the largest platform differences in moonbit-libyue: Linux has no tray runtime library that can be depended on directly, so this project implements the StatusNotifierItem (SNI) protocol stack in pure MoonBit, connecting directly to the panel over the session bus without depending on any AppIndicator runtime library. This document explains the design motivation, architecture layers, backend fallback, and desktop compatibility of the design; for a quick API reference see the "Menu / Tray" section of [docs/components.md](components.md), and pitfalls and verification conclusions from real-desktop testing are recorded uniformly in [docs/adaptation.md](adaptation.md).
+The tray is the area with the largest platform differences in moonbit-libyue: Linux has no tray runtime library that can be depended on directly, so this project implements the StatusNotifierItem (SNI) protocol stack in pure MoonBit, connecting straight to the panel over the session bus without depending on any AppIndicator runtime library.
+
+This document covers the design motivation, architecture layers, backend fallback and desktop compatibility; for a quick API reference see the "Menu / Tray" section of [docs/components.md](components.md), and real-desktop pitfalls plus verification conclusions are recorded uniformly in [docs/adaptation.md](adaptation.md).
 
 ## Background and constraints
 
@@ -54,13 +56,17 @@ The consumer API is completely identical across the three major platforms: `Tray
 | `on_click` | panel Activate signal | icon click |
 | `set_menu` | builds DBusMenu + ContextMenu self-drawn fallback | native SetMenu |
 
-Linux icon notes: the image path passed to `Tray::new` is only used to take the file name as the tray Id; the bitmap is generated programmatically by `icon.mbt` (an outer circle plus an offset cut-out circle forming a crescent, 2×2 supersampled anti-aliasing, output as big-endian ARGB required by the SNI spec), without depending on any image assets or decoders; to change the icon with the system theme, use `set_icon_name`.
+Linux icon notes: the image path passed to `Tray::new` is only used to take the file name as the tray Id.
+
+- The bitmap is generated programmatically by `icon.mbt` (an outer circle plus an offset cut-out circle forming a crescent, 2×2 supersampled anti-aliasing, output as the big-endian ARGB the SNI spec requires) — no image assets or decoders involved.
+- To change the icon with the system theme, use `set_icon_name`.
 
 ## Menus: the two paths of set_menu
 
 Different panels consume tray menus differently, so the SNI backend prepares both paths:
 
-- **Panel mirrors the DBusMenu for rendering** (XFCE 4.18, verified to take this path): `set_menu` walks the top-level items and separators of the unified `Menu` model to build the DBusMenu (id = array index + 1, 0 is the root); clicking a menu item triggers the original callback via `MenuItem::Click`; submenus are not yet supported. DBusMenu's `AboutToShow` always returns false — returning true would make the panel treat the left click as a menu click and stop sending Activate (same semantics as ksni).
+- **Panel mirrors the DBusMenu for rendering** (XFCE 4.18, verified to take this path): `set_menu` walks the top-level items and separators of the unified `Menu` model to build the DBusMenu (id = array index + 1, 0 is the root); clicking a menu item triggers the original callback via `MenuItem::Click`; submenus are not yet supported.
+- DBusMenu's `AboutToShow` always returns false — returning true would make the panel treat the left click as a menu click and stop sending Activate (same semantics as ksni).
 - **ContextMenu(x, y) → application self-draws** (Qt style): the panel calls `ContextMenu` with the icon's screen coordinates, and the application pops up its own menu at that point using `Menu::popup_at(x, y)`, with the callback registered via `set_context_menu_handler`.
 
 XFCE's libdbusmenu client only sends the batch versions `EventGroup` / `AboutToShowGroup`; single-item versions are silently rejected with UnknownMethod — traybus implements both the single-item and batch method groups. See [docs/adaptation.md](adaptation.md) for the packet-capture diagnosis process.
