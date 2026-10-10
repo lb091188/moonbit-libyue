@@ -153,6 +153,15 @@ Environment: Ubuntu 24.04 + X11 + XFCE, moon 0.1.20260920 / moonc v0.10.14, GTK3
 - **Invariant under test**: the same rect and colour (including alpha) rendered through the pure-MoonBit rect painter and through Cairo are **pixel-for-pixel identical** (including `#00000080` over white = 127,127,127,255); a diagonal fill produces intermediate alpha, proving the anti-aliased path is actually used.
 - Verification: `moon test -p NoahLiu/moonbit-libyue/yue/render` 14/14 (6 new Cairo assertions); `moon check yue/{core,win,render}` warning-free; `examples/native-window` smoke 52 frames, exit code 0 (the demo now draws a Cairo circle and bezier arc end to end).
 
+### MoonBit native GUI stack G3b (Pango text layer) · FFI out parameters and cross-package field visibility
+
+- **SIGSEGV with no test output**: using `Array[Int]` as a C out-array (C writes `out[0..2]` through an `int32_t*`) crashes - MoonBit hands C the array *object*, so writing `out[0]` corrupts its length header and everything touching that array afterwards dies. The repo's established form is one `Ref[Int]` per out value (`ok : Ref[Int]`, `yue/ffi.mbt:452`); switching to three `Ref[Int]` params made it 7/7. **Rule**: never borrow an `Array[Int]` pointer to return several values.
+- Constructing or reading struct fields across packages requires `pub(all) struct` (see `RectF` in `yue/geometry.mbt:20`); plain `pub struct` gives `Cannot create values of the read-only type`. Same story as `pub(all) enum`.
+- Parameters with defaults must be labelled (`family? : String = ""`); `family : String = ""` errors with "Only labelled arguments can have default value".
+- **Conventions**: font size is in **logical pixels** via `pango_font_description_set_absolute_size(desc, px * PANGO_SCALE)` (not points); `baseline` is the first baseline measured from the top of the layout box, matching yoga-mbt's `set_baseline` definition so wiring needs no conversion; ellipsize/wrap follow the teacher's `attributed_text_gtk.cc:82/128-132`.
+- **Test philosophy**: no exact pixel widths/heights (they depend on the machine's font configuration - the G0 probe's "14px line height = 17px" is this machine's number); assert monotonicity, constraint behaviour under `max_width`/wrap, and painted-pixel counts instead, so another machine cannot produce a false red.
+- Verification: `moon test -p NoahLiu/moonbit-libyue/yue/text` 7/7; `moon check yue/{core,win,render,text}` warning-free; `examples/native-window` smoke 52 frames, exit code 0 (mixed CJK/Latin text drawn in the window); repo-wide red unchanged at 290 errors.
+
 ## Linux
 
 ### Distributions

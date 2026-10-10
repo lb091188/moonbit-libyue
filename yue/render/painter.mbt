@@ -9,7 +9,7 @@
 //   因此调用点不需要 `mut p`（组件层一万行按不可变句柄书写，改签名不可接受）。
 
 ///|
-pub struct PainterState {
+pub(all) struct PainterState {
   mut tx : Double
   mut ty : Double
   mut clip_x0 : Int
@@ -22,7 +22,7 @@ pub struct PainterState {
 }
 
 ///|
-pub struct Painter {
+pub(all) struct Painter {
   bitmap : Bitmap
   state : PainterState
   stack : Array[PainterState]
