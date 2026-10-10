@@ -26,7 +26,7 @@
 为 MoonBit 化 libyue 预置的布局层,独立子包(modules/yoga-mbt,纯 MoonBit 零 FFI),只对齐 Web Flexbox 标准(CSS Flexible Box Layout L1),不做 Yoga 双标准;弹性解析按规范 §9.7 逐条实现(与 Yoga 内核两遍法有意不同,见 adaptation.md「布局几何」节 yoga-mbt 条)。与内嵌 C++ Yoga 的「shrink 默认 0」定案互不冲突:那条管原生控件树,本引擎管未来 MoonBit 版 libyue。
 
 - [x] YG1 骨架 + 核心算法——types/style/node/api/algorithm 五文件,主轴/交叉轴、grow/shrink/basis(规范冻结算法)、justify 全系、align 系、wrap/wrap-reverse、margin auto 吸收、padding/border/margin、百分比、min/max(主轴 min:auto 内容下限)、gap、叶子 measure;19 条手算单测。验证:`moon check` 零警告 + `moon test -p NoahLiu/yoga-mbt/src` 19/19 全绿;对照材料:W3C css-flexbox-1 §9 全文 + Yoga 官方源码(CalculateLayout.cpp / FlexLine.cpp)逐条核对,差异与取舍入 adaptation.md「布局几何」节
-- [ ] YG2 标准剩余面——absolute 定位、baseline 对齐、aspect-ratio、RTL(direction);baseline 行交叉尺寸贡献与 static position 按 §9.6 补
+- [~] YG2 标准剩余面——absolute 定位已落地(YG2a:包含块=padding box、同轴两侧 inset 撑尺寸、四向全 auto 落静态位置、内嵌子树继续递归;7 条单测,全仓 687/687);缺口:baseline 对齐(行交叉尺寸贡献按 §9.4.2)、aspect-ratio、RTL(direction)
 - [ ] YG3 工程化——测量缓存(Yoga 16 槽思路)、像素网格取整开关、容器内在尺寸(min-content/max-content)精确语义、性能基线(千节点树布局耗时)
 - [ ] YG4 集成预留——与 MoonBit 版 libyue 的对接层(布局树 ↔ 控件树映射、脏区增量重排),依赖 libyue 复刻整体方案定案
 

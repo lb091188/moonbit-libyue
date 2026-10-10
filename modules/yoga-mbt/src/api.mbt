@@ -30,6 +30,34 @@ pub fn Node::set_display(self : Node, v : Display) -> Unit {
 }
 
 ///|
+/// 设为 Absolute 时该子项脱离文档流，按 top/right/bottom/left 相对父容器
+/// padding box 定位；四向全 auto 时落在静态位置（按父容器
+/// justify-content / align-items 摆放一个虚拟项）。
+pub fn Node::set_position(self : Node, v : PositionType) -> Unit {
+  self.style.position = v
+}
+
+///|
+pub fn Node::set_top(self : Node, v : Value) -> Unit {
+  self.style.top = v
+}
+
+///|
+pub fn Node::set_right(self : Node, v : Value) -> Unit {
+  self.style.right = v
+}
+
+///|
+pub fn Node::set_bottom(self : Node, v : Value) -> Unit {
+  self.style.bottom = v
+}
+
+///|
+pub fn Node::set_left(self : Node, v : Value) -> Unit {
+  self.style.left = v
+}
+
+///|
 pub fn Node::set_flex_direction(self : Node, v : FlexDirection) -> Unit {
   self.style.flex_direction = v
 }
