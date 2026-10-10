@@ -463,6 +463,106 @@ pub fn Painter::arc(
 }
 
 ///|
+/// 绘制离屏画布（拉伸到目标矩形）；降级实现无此能力。
+pub fn Painter::draw_canvas(
+  self : Painter,
+  canvas : Canvas,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+) -> Unit {
+  let bm = canvas.bitmap
+  match self.session {
+    Some(c) =>
+      c.blit(
+        bm,
+        0.0,
+        0.0,
+        bm.width.to_double(),
+        bm.height.to_double(),
+        x,
+        y,
+        w,
+        h,
+      )
+    None => ()
+  }
+}
+
+///|
+/// 画布源矩形 → 目标矩形。
+pub fn Painter::draw_canvas_from_rect(
+  self : Painter,
+  canvas : Canvas,
+  sx : Double,
+  sy : Double,
+  sw : Double,
+  sh : Double,
+  dx : Double,
+  dy : Double,
+  dw : Double,
+  dh : Double,
+) -> Unit {
+  match self.session {
+    Some(c) => c.blit(canvas.bitmap, sx, sy, sw, sh, dx, dy, dw, dh)
+    None => ()
+  }
+}
+
+///|
+/// 绘制图片（拉伸到目标矩形）；空图忽略。
+pub fn Painter::draw_image(
+  self : Painter,
+  image : Image,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+) -> Unit {
+  if image.is_empty() {
+    return ()
+  }
+  self.draw_canvas(
+    { bitmap: image.pixels },
+    x,
+    y,
+    w,
+    h,
+  )
+}
+
+///|
+/// 图片源矩形 → 目标矩形；空图忽略。
+pub fn Painter::draw_image_from_rect(
+  self : Painter,
+  image : Image,
+  sx : Double,
+  sy : Double,
+  sw : Double,
+  sh : Double,
+  dx : Double,
+  dy : Double,
+  dw : Double,
+  dh : Double,
+) -> Unit {
+  if image.is_empty() {
+    return ()
+  }
+  self.draw_canvas_from_rect(
+    { bitmap: image.pixels },
+    sx,
+    sy,
+    sw,
+    sh,
+    dx,
+    dy,
+    dw,
+    dh,
+  )
+}
+
+///|
 pub fn Painter::fill(self : Painter) -> Unit {
   match self.session {
     Some(c) => {

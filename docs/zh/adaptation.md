@@ -288,6 +288,16 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **渐变**：`Gradient::linear`/`radial` + `add_stop`，offset 钳到 [0,1]、hex 非法忽略、无 stop 的渐变整体忽略、`set_fill_color` 覆盖渐变；实现为一次性 pattern（建 → 逐 stop 加色 → 设为 source 即释放句柄）。实测口径：线性在像素中心采样（`(x+0.5)/轴长`）、超端点 pad 复现端点色；径向同心、四角对称。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/render` 25/25（新增 11 条：Porter-Duff 精确值、25 模式实测表、半透明公式、透明底退化、模式与设色顺序无关、线性渐变采样与 pad、径向对称、空渐变忽略与纯色覆盖、门面路径与抗锯齿、save/restore 变换与样式同退、会话槽回收）；五包 `moon check` 零警告、core 15/15、input 10/10、text 7/7、yoga-mbt 80/80；`examples/native-window` 冒烟 49 帧、退出码 0（示例改为走门面，并用上渐变辉光、乘算方块与路径圆）；全仓红点仍 290 errors / 68 warnings 未增。
 
+### MoonBit 原生 GUI 栈 · Painter 次批（离屏 Canvas 与图片）· 采样域与归档重建
+
+- **图片解码**：走 **GdkPixbuf**（GTK3 既有依赖，零新增运行期依赖；`GdkPixbufLoader` 按内容嗅探格式），像素统一转成本栈 `Bitmap` 布局（ARGB32 预乘、小端 B,G,R,A），预乘取整与 `Bitmap::paint` 同口径 `(c*a+127)/255`，因此「编码 → 解码 → 再编码」字节稳定（`#12345680` 这类半透明色也精确往返）。解码器只取**静态首帧**——旧链路的 `Image` 是 `GdkPixbufAnimation`（GIF 会动），动画属已知缺口，不假装支持。
+- **尺寸口径照老师**：`get_width`/`get_height` 返回**逻辑尺寸**（像素 / scale），`get_scale_factor` 返回记录比例——与 libyue `image_gtk.cc:75-77` 的 `ScaleSize(.., 1.f / scale_factor_)` 一致。
+- **坑（blit 的采样域必须收在源子矩形内）**：直接给「整张源位图」建图案、只把源矩形写进图案矩阵，双线性会从子矩形**外**取色——精灵图/图标拼接会串色（测试里「取左上象限铺到 4x4」先红：右缘采到了隔壁绿块）。修法：`cairo_surface_create_for_rectangle(s, sx, sy, ssw, ssh)` 建**子表面**，采样空间随子矩形原点平移，再叠 `PAD` 扩展让边缘不越界成透明缝。
+- **坑（`ar rcs` 对改名成员是追加）**：源文件从单个拆成 `cairo_stub.c` + `image_stub.c` 后，旧归档里残留的 `librender_cairo_stub.o` 与新对象**同时**进库 → 链接期 `multiple definition`。prebuild 的 `compile_stub` 改为「先删旧归档再 `ar rcs`」，并把「任一源更新即整体重编」写进缓存判据（原来是单源 mtime 比较）。
+- **资产搬家的连带**：PNG 编码器从根包 `yue/png_rgba.mbt` 搬进 `yue/render/png.mbt`（公共入口改名 `png_encode_rgba`，内部 `pngr_*` 保留），随包带走 6 条既有用例；根包私有 helper `utf8_bytes` 在外包不存在，要改用 `@utf8.encode` 并在 `moon.pkg` 加 `moonbitlang/core/encoding/utf8`。搬完红点从 290 降到 **287**（根包少了一个文件与一份测试）。
+- **文件写入**：`Canvas`/`Image` 的 `write_to_file` 目前只支持 "png"，落盘经 C 端 `fsw_write_file` 兜底（系统层落地前的临时通道，路径按 UTF-8 字节收）。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/render` 40/40（新增 9 条：PNG 往返不透明/半透明、空图语义与空图上不落像素、逻辑尺寸随 scale、`resize` 放大实心色保持、`draw_canvas` 2 倍放大四象限、`draw_canvas_from_rect` 子矩形无串色、blit 尊重混合模式乘算、PNG 落盘读回逐像素；另有 6 条 PNG 编码器用例随搬家并入）；五包 `moon check` 零警告、core 15/15、input 10/10、text 7/7、yoga-mbt 80/80；`examples/native-window` 冒烟 49 帧、退出码 0（新增离屏画布精灵 4× 放大上屏）；全仓红点 **287 errors / 68 warnings**（较 290 减少，未增）。
+
 ## Linux
 
 ### 发行版

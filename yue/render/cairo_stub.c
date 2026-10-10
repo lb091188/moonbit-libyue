@@ -409,3 +409,68 @@ void cr_flush(int64_t id) {
     cairo_surface_flush(cairo_get_target(cr));
   }
 }
+
+// 源位图（本栈 Bitmap 布局：ARGB32 预乘）的子矩形 → 目标矩形。目标矩形走
+// **设备空间取整**（与 fill_rect 同口径），源矩形可为小数（像素中心采样）；
+// 缩放由图案矩阵承担，混合算子与裁剪区沿用会话当前状态。
+// 注意：不要把某位图画到它自己（同一块内存既当源又当目标）。
+void cr_blit(int64_t id, unsigned char *src, int sw, int sh, double sx,
+             double sy, double ssw, double ssh, double dx, double dy,
+             double dw, double dh) {
+  cairo_t *cr = CR_OF(id);
+  if (!cr || src == NULL || sw < 1 || sh < 1) {
+    return;
+  }
+  if (ssw <= 0.0 || ssh <= 0.0 || dw <= 0.0 || dh <= 0.0) {
+    return;
+  }
+  cairo_surface_t *s = cairo_image_surface_create_for_data(
+      src, CAIRO_FORMAT_ARGB32, sw, sh, sw * 4);
+  if (cairo_surface_status(s) != CAIRO_STATUS_SUCCESS) {
+    cairo_surface_destroy(s);
+    return;
+  }
+  // 采样域收在源子矩形内：否则双线性会从子矩形外（邻块像素）取色——
+  // 精灵图/图标拼接场景不可接受（子表面把取样空间平移到子矩形原点）。
+  cairo_surface_t *sub = cairo_surface_create_for_rectangle(s, sx, sy, ssw, ssh);
+  if (cairo_surface_status(sub) != CAIRO_STATUS_SUCCESS) {
+    cairo_surface_destroy(sub);
+    cairo_surface_destroy(s);
+    return;
+  }
+  cairo_pattern_t *pat = cairo_pattern_create_for_surface(sub);
+  // 缩小走双线性避免最近邻锯齿；PAD 让取整后的边缘采样不越界成透明缝
+  cairo_pattern_set_filter(pat, CAIRO_FILTER_BILINEAR);
+  cairo_pattern_set_extend(pat, CAIRO_EXTEND_PAD);
+  double d[4];
+  int snapped = cr_rect_device(cr, dx, dy, dw, dh, d);
+  if (snapped && (d[2] <= d[0] || d[3] <= d[1])) {
+    // 取整后为空：什么都不画
+  } else if (snapped) {
+    // 图案矩阵在设备空间给出：源像素 (u,v) → 设备 (d0 + (u-sx)*kx, d1 + (v-sy)*ky)
+    cairo_matrix_t m;
+    cairo_matrix_init_identity(&m);
+    cairo_matrix_translate(&m, d[0], d[1]);
+    cairo_matrix_scale(&m, (d[2] - d[0]) / ssw, (d[3] - d[1]) / ssh);
+    cairo_pattern_set_matrix(pat, &m);
+    cairo_save(cr);
+    cairo_identity_matrix(cr);
+    cairo_set_source(cr, pat);
+    cairo_rectangle(cr, d[0], d[1], d[2] - d[0], d[3] - d[1]);
+    cairo_fill(cr);
+    cairo_restore(cr);
+  } else {
+    // 含旋转/斜切：不做取整，图案矩阵留在用户空间，交给抗锯齿
+    cairo_matrix_t m;
+    cairo_matrix_init_identity(&m);
+    cairo_matrix_translate(&m, dx, dy);
+    cairo_matrix_scale(&m, dw / ssw, dh / ssh);
+    cairo_pattern_set_matrix(pat, &m);
+    cairo_set_source(cr, pat);
+    cairo_rectangle(cr, dx, dy, dw, dh);
+    cairo_fill(cr);
+  }
+  cairo_pattern_destroy(pat);
+  cairo_surface_destroy(sub);
+  cairo_surface_destroy(s);
+}

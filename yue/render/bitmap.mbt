@@ -91,6 +91,24 @@ pub fn Bitmap::paint(self : Bitmap, x : Int, y : Int, c : Color) -> Unit {
 }
 
 ///|
+/// 导出为独立分量 RGBA（非预乘、行主序，长度 width*height*4）——
+/// PNG 编码等对外格式用；内部绘制一律走预乘缓冲，不经过这里。
+pub fn Bitmap::to_rgba_bytes(self : Bitmap) -> Bytes {
+  let out = FixedArray::make(self.width * self.height * 4, b'\x00')
+  for y = 0; y < self.height; y = y + 1 {
+    for x = 0; x < self.width; x = x + 1 {
+      let c = self.pixel(x, y)
+      let i = (y * self.width + x) * 4
+      out[i] = c.r.to_byte()
+      out[i + 1] = c.g.to_byte()
+      out[i + 2] = c.b.to_byte()
+      out[i + 3] = c.a.to_byte()
+    }
+  }
+  Bytes::from_array(out)
+}
+
+///|
 /// 在闭区间 [x0,x1) × [y0,y1) 内逐像素覆盖；非法区间不做任何事。
 pub fn Bitmap::fill_area(
   self : Bitmap,
