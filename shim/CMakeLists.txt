@@ -46,11 +46,19 @@ else()
 endif()
 
 add_library(yue_mbt STATIC ${YUE_SOURCES} yue_mbt.cpp yue_mbt_browser.cpp)
-# macOS 系统主色调读 controlAccentColor 需 ObjC++ 翻译单元(shim 主体纯 C++)
-# system 子包 macOS 直连族(yue_system_mac.mm)同理:NSWorkspace/NSPasteboard/
-# IOPowerSources/IOPMAssertion 均需 ObjC 运行时
+# 平台专属翻译单元:macOS 系统主色调读 controlAccentColor 需 ObjC++ 单元
+# (shim 主体纯 C++);系统能力直连族同理——macOS 侧 NSWorkspace/NSPasteboard/
+# IOPowerSources/IOPMAssertion 均需 ObjC 运行时。
+#
+# 直连族另两路也拆成独立 TU(Windows Win32 直连、Linux 哨兵桩),三份实现的
+# 符号集完全一致、此处按平台互斥挂载:符号唯一定义,故不需要 #if 宏分支;
+# Linux 侧由 MoonBit 走子进程解析文本,桩仅为链接期符号存在。
 if(APPLE)
   target_sources(yue_mbt PRIVATE yue_accent_mac.mm yue_system_mac.mm)
+elseif(WIN32)
+  target_sources(yue_mbt PRIVATE yue_system_win.cpp)
+else()
+  target_sources(yue_mbt PRIVATE yue_system_linux.cpp)
 endif()
 
 target_include_directories(yue_mbt PUBLIC
