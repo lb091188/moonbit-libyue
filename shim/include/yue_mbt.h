@@ -889,6 +889,10 @@ int32_t yue_mbt_wmi_brightness_get(int32_t *cur, int32_t *levels,
                                    int32_t *ok);
 /* 内屏亮度写（percent 0-100） */
 int32_t yue_mbt_wmi_brightness_set(int32_t percent, int32_t *ok);
+/* 蓝牙无线电列表（"name\tmac" 行；空文本 = 无可用无线电） */
+void *yue_mbt_bt_radio_info(int32_t *ok);
+/* 已知蓝牙设备列表（"name\tmac\tconnected\tremembered\tauth" 行） */
+void *yue_mbt_bt_devices(int32_t *ok);
 /* 默认输出端点音量（level 0..1 标量，double 与 MoonBit Ref[Double] 同宽；
  * muted 0/1）。[win] IAudioEndpointVolume；[mac] Core Audio master element，
  * 设备无 mute 通道视为未静音、无音量通道返回失败 */

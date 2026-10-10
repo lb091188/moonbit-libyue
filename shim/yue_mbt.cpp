@@ -4506,6 +4506,7 @@ extern "C" int32_t yue_mbt_proc_getpid(void) { return -1; }
 #if defined(OS_WIN)
 
 #include <endpointvolume.h>
+#include <bluetoothapis.h> // 蓝牙无线电/已知设备枚举（经典 BluetoothAPIs）
 #include <highlevelmonitorconfigurationapi.h> // Get/SetMonitorBrightness
 #include <lowlevelmonitorconfigurationapi.h> // DDC 物理监视器 API
 #include <mmdeviceapi.h>
@@ -5781,9 +5782,108 @@ extern "C" void *yue_mbt_dsk_volumes(int32_t *ok) {
   return BytesFromString(out);
 }
 
-#else  // 非 Windows：哨兵桩（MoonBit 层平台门拦截；Linux 纯 MoonBit 路由
+// ---- 蓝牙：经典 BluetoothAPIs 无线电/已知设备快照 ----
+// 动作族（扫描/配对/连接/电源）需 WinRT 或 UI 向导，不在本层——MoonBit
+// 侧对 Windows 的动作族直接 Unsupported。radio 行 "name\tmac"；devices
+// 行 "name\tmac\tconnected\tremembered\tauthenticated"。
+
+namespace {
+
+std::string mbt_bt_mac(const unsigned char *b) {
+  char buf[18];
+  snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X", b[5], b[4], b[3],
+           b[2], b[1], b[0]);
+  return std::string(buf);
+}
+
+}  // namespace
+
+extern "C" void *yue_mbt_bt_radio_info(int32_t *ok) {
+  *ok = 0;
+  BLUETOOTH_FIND_RADIO_PARAMS p;
+  p.dwSize = sizeof(p);
+  HANDLE radio = nullptr;
+  HBLUETOOTH_RADIO_FIND find = ::BluetoothFindFirstRadio(&p, &radio);
+  if (find == nullptr) {
+    if (::GetLastError() != ERROR_NO_MORE_ITEMS) {
+      return moonbit_make_bytes(0, 0); // 服务未运行等真故障：ok=0
+    }
+    *ok = 1; // 无可用无线电（硬件缺席/禁用/飞行模式）：ok=1 空文本
+    return BytesFromString("");
+  }
+  BLUETOOTH_RADIO_INFO info;
+  memset(&info, 0, sizeof(info));
+  info.dwSize = sizeof(info);
+  std::string out;
+  while (radio != nullptr) {
+    if (::BluetoothGetRadioInfo(radio, &info) == ERROR_SUCCESS) {
+      if (!out.empty()) {
+        out += '\n';
+      }
+      out += base::SysWideToUTF8(info.szName);
+      out += '\t';
+      out += mbt_bt_mac(&info.address.rgBytes[0]);
+    }
+    ::CloseHandle(radio);
+    radio = nullptr;
+    if (!::BluetoothFindNextRadio(find, &radio)) {
+      break;
+    }
+  }
+  ::BluetoothFindRadioClose(find);
+  *ok = 1;
+  return BytesFromString(out);
+}
+
+extern "C" void *yue_mbt_bt_devices(int32_t *ok) {
+  *ok = 0;
+  BLUETOOTH_DEVICE_SEARCH_PARAMS sp;
+  memset(&sp, 0, sizeof(sp));
+  sp.dwSize = sizeof(sp);
+  sp.fReturnAuthenticated = TRUE;
+  sp.fReturnRemembered = TRUE;
+  sp.fReturnUnknown = TRUE;
+  sp.fReturnConnected = TRUE;
+  sp.fIssueInquiry = FALSE; // 只列已知设备缓存，不触发扫描
+  sp.cTimeoutMultiplier = 0;
+  sp.hRadio = nullptr; // 全部无线电
+  BLUETOOTH_DEVICE_INFO di;
+  memset(&di, 0, sizeof(di));
+  di.dwSize = sizeof(di);
+  HBLUETOOTH_DEVICE_FIND find = ::BluetoothFindFirstDevice(&sp, &di);
+  if (find == nullptr) {
+    if (::GetLastError() != ERROR_NO_MORE_ITEMS) {
+      return moonbit_make_bytes(0, 0); // 服务未运行等真故障：ok=0
+    }
+    *ok = 1; // 无已知设备：ok=1 空文本
+    return BytesFromString("");
+  }
+  std::string out;
+  while (true) {
+    if (!out.empty()) {
+      out += '\n';
+    }
+    out += base::SysWideToUTF8(di.szName);
+    out += '\t';
+    out += mbt_bt_mac(&di.Address.rgBytes[0]);
+    out += '\t';
+    out += di.fConnected ? "1" : "0";
+    out += '\t';
+    out += di.fRemembered ? "1" : "0";
+    out += '\t';
+    out += di.fAuthenticated ? "1" : "0";
+    if (!::BluetoothFindNextDevice(find, &di)) {
+      break;
+    }
+  }
+  ::BluetoothFindDeviceClose(find);
+  *ok = 1;
+  return BytesFromString(out);
+}
+
+#elif !defined(OS_MAC)  // 非 Windows 哨兵桩，仅 Linux 编译：纯 MoonBit 路由
        // 不经过这些符号，桩仅为链接期符号存在。macOS 直连实现见
-       // yue_system_mac.mm——同名符号由该 TU 提供，此处不编）
+       // yue_system_mac.mm——同名符号由该 TU 提供，此分支在 mac 下不编。
 
 extern "C" void *yue_mbt_win_reg_str(int32_t, const char *, const char *,
                                      int32_t *ok) {
@@ -5855,6 +5955,32 @@ extern "C" int32_t yue_mbt_brightness_get(int32_t, int32_t *, int32_t *,
 extern "C" int32_t yue_mbt_brightness_set(int32_t, int32_t, int32_t *ok) {
   *ok = 0;
   return -1000;
+}
+
+extern "C" void *yue_mbt_wmi_brightness_devices(int32_t *ok) {
+  *ok = -1000;
+  return moonbit_make_bytes(0, 0);
+}
+
+extern "C" int32_t yue_mbt_wmi_brightness_get(int32_t *, int32_t *,
+                                              int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+extern "C" int32_t yue_mbt_wmi_brightness_set(int32_t, int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+extern "C" void *yue_mbt_bt_radio_info(int32_t *ok) {
+  *ok = -1000;
+  return moonbit_make_bytes(0, 0);
+}
+
+extern "C" void *yue_mbt_bt_devices(int32_t *ok) {
+  *ok = -1000;
+  return moonbit_make_bytes(0, 0);
 }
 
 extern "C" int32_t yue_mbt_vol_master(double *, int32_t *, int32_t *ok) {
@@ -5932,33 +6058,21 @@ extern "C" void *yue_mbt_dsk_volumes(int32_t *ok) {
   return moonbit_make_bytes(0, 0);
 }
 
+#endif  // 系统能力 Windows 直连组平台分支结束
+        // （OS_WIN 实现 + 非 OS_MAC 哨兵桩；OS_MAC 在 yue_system_mac.mm）
+        // WMI/蓝牙等后补符号的桩同样放在上面的非 OS_MAC 分支——平台分支
+        // 之外无条件定义会与 OS_WIN 区真实现双重定义（CI 只到 moon check
+        // 不编 C，本机真编译才暴露）。
+
+// mac 机器信息：真实现只在 yue_system_mac.mm；但 MoonBit 侧 si_machine
+// 全平台含 mac 分支调用点，Windows/Linux 都需要链接哨兵（mac 排除，
+// 否则与 mac TU 双重定义）。
+#if !defined(OS_MAC)
 extern "C" void *yue_mbt_mac_machine_info(int32_t *ok) {
   *ok = -1000;
   return moonbit_make_bytes(0, 0);
 }
-
-#endif  // 系统能力 Windows 直连组平台分支结束
-        // （OS_WIN 实现 + 非 OS_MAC 哨兵桩；OS_MAC 在 yue_system_mac.mm）
-
-// WMI 内屏亮度三符号：Windows 专属实现，但 MoonBit 二进制在所有平台都
-// 含调用点（bright_wmi_get/set 按 subsystem=="wmi" 分派，编译期无法剔除），
-// mac/Linux 必须有链接符号——哨兵桩在平台分支之外无条件编译。
-// （Linux CI 连红根因：只加了 OS_WIN 实现，Linux 链接即 undefined。）
-extern "C" void *yue_mbt_wmi_brightness_devices(int32_t *ok) {
-  *ok = -1000;
-  return moonbit_make_bytes(0, 0);
-}
-
-extern "C" int32_t yue_mbt_wmi_brightness_get(int32_t *cur, int32_t *levels,
-                                              int32_t *ok) {
-  *ok = 0;
-  return -1000;
-}
-
-extern "C" int32_t yue_mbt_wmi_brightness_set(int32_t percent, int32_t *ok) {
-  *ok = 0;
-  return -1000;
-}
+#endif
 
 
 

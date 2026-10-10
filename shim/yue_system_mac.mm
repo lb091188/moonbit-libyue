@@ -352,6 +352,38 @@ extern "C" int32_t yue_mbt_brightness_set(int32_t index, int32_t value,
   }
 }
 
+// ---- 内屏亮度 WMI 路径 / 蓝牙快照族：Windows 专属路径，mac 哨兵 ----
+// 内屏亮度在 mac 只走 IODisplay（上面的 brightness_* 真实现），
+// wmi 符号是 Windows ROOT\WMI 专属路径；蓝牙快照族（无线电/已知设备
+// 枚举）mac 待后续批次（IOBluetooth）。MoonBit 二进制全平台含调用点，
+// 符号必须存在，Unsupported 哨兵维持语义。
+
+extern "C" void *yue_mbt_wmi_brightness_devices(int32_t *ok) {
+  *ok = -1000;
+  return EmptyBytes();
+}
+
+extern "C" int32_t yue_mbt_wmi_brightness_get(int32_t *, int32_t *,
+                                              int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+extern "C" int32_t yue_mbt_wmi_brightness_set(int32_t, int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+extern "C" void *yue_mbt_bt_radio_info(int32_t *ok) {
+  *ok = -1000;
+  return EmptyBytes();
+}
+
+extern "C" void *yue_mbt_bt_devices(int32_t *ok) {
+  *ok = -1000;
+  return EmptyBytes();
+}
+
 // ---- 音量：Core Audio 默认输出设备（kAudioDevicePropertyVolumeScalar /
 //      Mute，master element；与 Windows 端点标量同语义） ----
 

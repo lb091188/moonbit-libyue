@@ -107,7 +107,9 @@ pub extend BtDevice with Show::{to_string, output}
 
 ///|
 pub(all) enum BtError {
-  /// 系统无蓝牙适配器(org.bluez 不在线,或枚举不到 Adapter1 对象)
+  /// 系统无蓝牙适配器(Linux:org.bluez 不在线或无 Adapter1 对象;Windows:
+  /// 枚举不到无线电或蓝牙服务未运行)或平台不支持该动作(Windows 动作族,
+  /// 见各函数说明)
   Unsupported
   /// D-Bus 调用失败(bluez 拒绝/应答超时等),带错误名与说明
   BusFailed(String)
@@ -328,6 +330,77 @@ fn bt_adapter_path() -> Result[String, BtError] {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Windows 直连(经典 BluetoothAPIs):快照族三 API;动作族待 WinRT 批次
+// ---------------------------------------------------------------------------
+
+///|
+/// Windows 无线电快照解析("name\tmac" 行):地址非法/无 radio 为 None。
+/// path 恒空(无 D-Bus 对象路径语义);powered=true 为「枚举得到即无线电
+/// 可打开」的可得真值近似(设备禁用/飞行模式下枚举为空);discovering
+/// 恒 false(经典 API 无扫描状态查询)。
+fn bt_win_parse_adapter(text : String) -> BtAdapter? {
+  let fields = sys_split_fields(text, '\t')
+  if fields.length() != 2 || fields[1] == "" {
+    return None
+  }
+  Some({
+    path: "",
+    address: fields[1],
+    name: fields[0],
+    powered: true,
+    discovering: false,
+  })
+}
+
+///|
+/// Windows 已知设备快照解析(五字段行,逐行;形状不符安全跳过)。
+/// name 空回退 address;trusted 映射 fRemembered(重连信任语义同源)。
+fn bt_win_parse_devices(text : String) -> Array[BtDevice] {
+  let out : Array[BtDevice] = []
+  for line in text.split("\n") {
+    let f = sys_split_fields(line.to_owned(), '\t')
+    if f.length() != 5 {
+      continue
+    }
+    let name = if f[0] == "" { f[1] } else { f[0] }
+    out.push({
+      path: "",
+      address: f[1],
+      name,
+      paired: f[4] == "1",
+      connected: f[2] == "1",
+      trusted: f[3] == "1",
+    })
+  }
+  out
+}
+
+///|
+/// Windows 适配器快照(shim BluetoothFindFirstRadio/GetRadioInfo)。
+fn bt_win_adapter() -> Result[BtAdapter, BtError] {
+  let ok = Ref(0)
+  let text = @utf8.decode_lossy(@yue.ffi_bt_radio_info(ok))
+  if ok.val != 1 {
+    return Err(BusFailed("BluetoothFindFirstRadio 失败(蓝牙服务未运行?)"))
+  }
+  match bt_win_parse_adapter(text) {
+    Some(a) => Ok(a)
+    None => Err(Unsupported)
+  }
+}
+
+///|
+/// Windows 已知设备快照(不触发扫描,BluetoothFindFirstDevice 缓存枚举)。
+fn bt_win_devices() -> Result[Array[BtDevice], BtError] {
+  let ok = Ref(0)
+  let text = @utf8.decode_lossy(@yue.ffi_bt_devices(ok))
+  if ok.val != 1 {
+    return Err(BusFailed("BluetoothFindFirstDevice 失败(蓝牙服务未运行?)"))
+  }
+  Ok(bt_win_parse_devices(text))
+}
+
 ///|
 /// 无参方法调用统一出口(StartDiscovery/Connect 等;成功无返回值)。
 fn bt_void_call(
@@ -367,16 +440,25 @@ fn bt_device_action(
 // ---------------------------------------------------------------------------
 
 ///|
-/// 当前系统是否支持蓝牙:系统总线上 org.bluez 至少有一个 Adapter1 对象。
+/// 当前系统是否支持蓝牙:Linux 为系统总线上 org.bluez 至少有一个
+/// Adapter1 对象;Windows 为经典 BluetoothAPIs 枚举到无线电。
 /// 每次调用真实探测,高频场景请调用方自行缓存结果。
 pub fn bt_supported() -> Bool {
+  if @yue.platform() == "windows" {
+    return bt_win_adapter() is Ok(_)
+  }
   bt_adapter_path() is Ok(_)
 }
 
 ///|
 /// 适配器快照(首个 Adapter1 的 Powered/Discovering/Address/Name);无
-/// 蓝牙回复 Unsupported。
+/// 蓝牙回复 Unsupported。Windows 为无线电快照:powered 是「枚举得到即
+/// 可打开」的近似、discovering 恒 false、path 恒空(语义见
+/// bt_win_parse_adapter)。
 pub fn bt_adapter_info() -> Result[BtAdapter, BtError] {
+  if @yue.platform() == "windows" {
+    return bt_win_adapter()
+  }
   match bt_adapter_path() {
     Err(e) => Err(e)
     Ok(path) =>
@@ -390,8 +472,12 @@ pub fn bt_adapter_info() -> Result[BtAdapter, BtError] {
 ///|
 /// 已发现设备列表(枚举全部 org.bluez.Device1 对象)。注意含历史扫描
 /// 残留对象(配对记录),以 paired/connected 区分;无蓝牙回复
-/// Unsupported。
+/// Unsupported。Windows 为已知设备快照(含配对记录与缓存发现的设备,
+/// 不触发扫描)。
 pub fn bt_devices() -> Result[Array[BtDevice], BtError] {
+  if @yue.platform() == "windows" {
+    return bt_win_devices()
+  }
   match bt_managed_objects() {
     Err(e) => Err(e)
     Ok(v) => {
@@ -405,8 +491,12 @@ pub fn bt_devices() -> Result[Array[BtDevice], BtError] {
 }
 
 ///|
-/// 开 / 关适配器电源(写 Adapter1 的 Powered 属性)。
+/// 开 / 关适配器电源(写 Adapter1 的 Powered 属性)。Windows 不支持
+/// (经典 API 无电源开关,动作族待 WinRT 批次),恒 Unsupported。
 pub fn bt_set_powered(on : Bool) -> Result[Unit, BtError] {
+  if @yue.platform() == "windows" {
+    return Err(Unsupported)
+  }
   match bt_adapter_path() {
     Err(e) => Err(e)
     Ok(path) =>
@@ -426,31 +516,50 @@ pub fn bt_set_powered(on : Bool) -> Result[Unit, BtError] {
 
 ///|
 /// 开始扫描(Adapter1.StartDiscovery;扫描到的设备经 bt_devices 查看,
-/// 事件未在事件循环派发)。
+/// 事件未在事件循环派发)。Windows 不支持(经典 API 扫描是阻塞式查询
+/// 且无持续状态,动作族待 WinRT 批次),恒 Unsupported。
 pub fn bt_start_discovery() -> Result[Unit, BtError] {
+  if @yue.platform() == "windows" {
+    return Err(Unsupported)
+  }
   bt_adapter_action("StartDiscovery")
 }
 
 ///|
-/// 停止扫描(Adapter1.StopDiscovery)。
+/// 停止扫描(Adapter1.StopDiscovery)。Windows 不支持,恒 Unsupported。
 pub fn bt_stop_discovery() -> Result[Unit, BtError] {
+  if @yue.platform() == "windows" {
+    return Err(Unsupported)
+  }
   bt_adapter_action("StopDiscovery")
 }
 
 ///|
-/// 连接设备(Device1.Connect;未配对设备通常需先 bt_pair)。
+/// 连接设备(Device1.Connect;未配对设备通常需先 bt_pair)。Windows
+/// 不支持(需系统 UI 或 WinRT,动作族待后续批次),恒 Unsupported。
 pub fn bt_connect(device : BtDevice) -> Result[Unit, BtError] {
+  if @yue.platform() == "windows" {
+    return Err(Unsupported)
+  }
   bt_device_action(device, "Connect")
 }
 
 ///|
-/// 断开设备(Device1.Disconnect)。
+/// 断开设备(Device1.Disconnect)。Windows 不支持,恒 Unsupported。
 pub fn bt_disconnect(device : BtDevice) -> Result[Unit, BtError] {
+  if @yue.platform() == "windows" {
+    return Err(Unsupported)
+  }
   bt_device_action(device, "Disconnect")
 }
 
 ///|
 /// 配对设备(Device1.Pair;配对需用户确认的授权码,过程可能持续数秒)。
+/// Windows 不支持(经典 API 配对要弹系统向导 UI,动作族待后续批次),
+/// 恒 Unsupported。
 pub fn bt_pair(device : BtDevice) -> Result[Unit, BtError] {
+  if @yue.platform() == "windows" {
+    return Err(Unsupported)
+  }
   bt_device_action(device, "Pair")
 }

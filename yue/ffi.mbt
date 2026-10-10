@@ -1981,6 +1981,16 @@ pub extern "c" fn ffi_wmi_brightness_set(
 ) -> Int = "yue_mbt_wmi_brightness_set"
 
 ///|
+/// 蓝牙无线电列表（"name\tmac" 行；空文本 = 无可用无线电）。
+#borrow(ok)
+pub extern "c" fn ffi_bt_radio_info(ok : Ref[Int]) -> Bytes = "yue_mbt_bt_radio_info"
+
+///|
+/// 已知蓝牙设备列表（"name\tmac\tconnected\tremembered\tauth" 行）。
+#borrow(ok)
+pub extern "c" fn ffi_bt_devices(ok : Ref[Int]) -> Bytes = "yue_mbt_bt_devices"
+
+///|
 /// 默认输出端点音量（level 0..1 标量；muted 0/1）。
 #borrow(level, muted, ok)
 pub extern "c" fn ffi_vol_master(

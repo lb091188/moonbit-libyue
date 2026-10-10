@@ -244,3 +244,60 @@ test "Show 输出:适配器/设备/错误" {
     content="BtError::InvalidParam(路径空)",
   )
 }
+
+///|
+test "bt_win_parse_adapter:单行两字段与空文本" {
+  match bt_win_parse_adapter("MediaTek Bluetooth MT7921\tA0:1B:2C:3D:4E:5F") {
+    Some(a) => {
+      assert_eq(a.name, "MediaTek Bluetooth MT7921")
+      assert_eq(a.address, "A0:1B:2C:3D:4E:5F")
+      assert_eq(a.path, "")
+      assert_true(a.powered)
+      assert_true(!a.discovering)
+    }
+    None => assert_true(false)
+  }
+  // 无 radio(空文本)/字段缺失/地址空:None
+  assert_true(bt_win_parse_adapter("") is None)
+  assert_true(bt_win_parse_adapter("only-name") is None)
+  assert_true(bt_win_parse_adapter("name\t") is None)
+}
+
+///|
+test "bt_win_parse_devices:五字段行/name 空回退 mac/形状不符跳过" {
+  let devs = bt_win_parse_devices(
+    "MX Master 3\tA0:1B:2C:3D:4E:5F\t1\t1\t1\n\n\tF0:E1:D2:C3:B4:A5\t0\t1\t0\nbroken-line",
+  )
+  assert_eq(devs.length(), 2)
+  assert_eq(devs[0].name, "MX Master 3")
+  assert_eq(devs[0].address, "A0:1B:2C:3D:4E:5F")
+  assert_true(devs[0].connected && devs[0].trusted && devs[0].paired)
+  assert_eq(devs[1].name, "F0:E1:D2:C3:B4:A5") // 空名回退地址
+  assert_true(!devs[1].connected && devs[1].trusted && !devs[1].paired)
+}
+
+///|
+test "bt:Windows 本机冒烟(有无线电才断言)" {
+  if @yue.platform() != "windows" {
+    return
+  }
+  match bt_win_adapter() {
+    Err(e) => println("bt: adapter err: \{e}") // 本机无蓝牙或服务未运行
+    Ok(a) => {
+      println("bt: adapter \{a.name} \{a.address}")
+      assert_true(a.address != "")
+      assert_true(a.name != "")
+    }
+  }
+  match bt_win_devices() {
+    Err(e) => println("bt: devices err: \{e}")
+    Ok(devs) => {
+      println("bt: \{devs.length()} known device(s)")
+      for d in devs {
+        println(
+          "bt: dev \{d.name} \{d.address} paired=\{d.paired} connected=\{d.connected}",
+        )
+      }
+    }
+  }
+}

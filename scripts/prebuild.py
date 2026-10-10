@@ -49,8 +49,8 @@ WINDOWS_LINK_LIBS = [
     "dwmapi.lib", "propsys.lib", "comctl32.lib", "gdiplus.lib", "urlmon.lib",
     "userenv.lib", "uxtheme.lib", "delayimp.lib", "runtimeobject.lib",
     "ntdll.lib", "shcore.lib", "pdh.lib", "wtsapi32.lib",
-    # system 子包 Windows 直连族（亮度 DDC / 打印机）
-    "dxva2.lib", "winspool.lib",
+    # system 子包 Windows 直连族（亮度 DDC / 打印机 / 蓝牙经典枚举）
+    "dxva2.lib", "winspool.lib", "bthprops.lib",
 ]
 
 

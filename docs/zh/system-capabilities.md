@@ -594,18 +594,20 @@ let _ = @system.lc_set_timezone("Asia/Tokyo") // 需要认证
 
 ## 蓝牙
 
-经 `org.bluez`（系统总线）查询适配器与已发现设备，支持开关电源、扫描发现、连接 / 断开 / 配对。对象枚举用 `ObjectManager.GetManagedObjects`（a{oa{sa{sv}}} 形状），属性读取用 `Properties.GetAll`。仅 Linux（Windows 的 BluetoothAPIs/WinRT 蓝牙栈不在本批，恒 `Unsupported`）。
+Linux 经 `org.bluez`（系统总线）查询适配器与已发现设备，支持开关电源、扫描发现、连接 / 断开 / 配对。对象枚举用 `ObjectManager.GetManagedObjects`（a{oa{sa{sv}}} 形状），属性读取用 `Properties.GetAll`。
+
+Windows 经经典 BluetoothAPIs（`bthprops`）覆盖快照族三函数：适配器 = 无线电枚举（`BluetoothFindFirstRadio/GetRadioInfo`），设备 = 已知设备缓存枚举（不触发扫描）。快照语义边界：`path` 恒空（无 D-Bus 对象路径语义）、`powered` 是「枚举得到即无线电可打开」的近似、`discovering` 恒 false；`paired/connected/trusted` 分别映射 `fAuthenticated/fConnected/fRemembered`。动作族（开关电源 / 扫描 / 连接 / 断开 / 配对）在 Windows 恒 `Unsupported`（需 WinRT 或系统 UI，后续批次）。
 
 | 函数 | 说明 |
 |---|---|
-| `bt_supported() -> Bool` | 系统有可用蓝牙适配器（`org.bluez` 在线且枚举到 Adapter1）；台式机与虚拟机无适配器是合法状态，返回 false 而非异常 |
+| `bt_supported() -> Bool` | 系统有可用蓝牙适配器（Linux：`org.bluez` 在线且枚举到 Adapter1；Windows：枚举到无线电）；无适配器是合法状态，返回 false 而非异常 |
 | `bt_adapter_info() -> Result[BtAdapter, BtError]` | 适配器快照 |
-| `bt_devices() -> Result[Array[BtDevice], BtError]` | 已发现设备列表 |
-| `bt_set_powered(on) -> Result[Unit, BtError]` | 开关适配器电源 |
-| `bt_start_discovery()` / `bt_stop_discovery() -> Result[Unit, BtError]` | 开始 / 停止扫描（数秒后 `bt_devices` 可见新设备） |
-| `bt_connect(device)` / `bt_disconnect(device)` / `bt_pair(device)` | 连接 / 断开 / 配对（返回 `Result[Unit, BtError]`） |
+| `bt_devices() -> Result[Array[BtDevice], BtError]` | 已发现设备列表（Windows 为已知设备快照，含配对记录与缓存的发现结果） |
+| `bt_set_powered(on) -> Result[Unit, BtError]` | 开关适配器电源（Windows 不支持） |
+| `bt_start_discovery()` / `bt_stop_discovery() -> Result[Unit, BtError]` | 开始 / 停止扫描（数秒后 `bt_devices` 可见新设备）（Windows 不支持） |
+| `bt_connect(device)` / `bt_disconnect(device)` / `bt_pair(device)` | 连接 / 断开 / 配对（返回 `Result[Unit, BtError]`）（Windows 不支持） |
 
-`BtAdapter{ path, address, name, powered, discovering }`；`BtDevice{ path, address, name, paired, connected, trusted }`（name 取 Name 属性，空则回退 Alias，仍空回退 MAC）。错误 `BtError`：`Unsupported`（无适配器或服务不在线）/ `BusFailed(String)`。
+`BtAdapter{ path, address, name, powered, discovering }`；`BtDevice{ path, address, name, paired, connected, trusted }`（name 取 Name 属性，空则回退 Alias，仍空回退 MAC；Windows 侧空名回退地址）。错误 `BtError`：`Unsupported`（无适配器、服务不在线或平台不支持该动作）/ `BusFailed(String)`。
 
 ```moonbit
 if @system.bt_supported() {
