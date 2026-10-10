@@ -21,6 +21,15 @@ extern "c" fn pt_measure(
 ) -> Int = "pt_measure"
 
 ///|
+#borrow(family, out_h, out_ascent)
+extern "c" fn pt_font_line_height(
+  size : Double,
+  family : Bytes,
+  out_h : Ref[Int],
+  out_ascent : Ref[Int],
+) -> Int = "pt_font_line_height"
+
+///|
 #borrow(data, text, family)
 extern "c" fn pt_draw(
   data : FixedArray[Byte],
@@ -83,11 +92,30 @@ pub fn measure(
 }
 
 ///|
-/// 单行行高（布局给文本盒子高度时用）。后端不可用返回近似值 0。
-pub fn line_height(size : Double, family? : String = "") -> Int {
-  match measure("Mg", size, family=family) {
-    Some(m) => m.height
-    None => 0
+/// 单行行高：字体 ascent+descent（像素），**与样例文本无关**——绑文本会把
+/// 有无下伸部（g/y）当成行高差，布局盒高会随内容抖。探针记的「14px 量得
+/// 17」是文本 "M" 的盒高（等于首行基线），不是行高，两者在这里分开。
+pub fn line_height(size : Double, family? : String = "") -> Option[Int] {
+  let fb = @utf8.encode(family)
+  let oh = Ref(0)
+  let oa = Ref(0)
+  if pt_font_line_height(size, fb, oh, oa) == 1 {
+    Some(oh.val)
+  } else {
+    None
+  }
+}
+
+///|
+/// 首行基线（ascent，像素），给自绘 caret 与文本垂直居中使用。
+pub fn line_ascent(size : Double, family? : String = "") -> Option[Int] {
+  let fb = @utf8.encode(family)
+  let oh = Ref(0)
+  let oa = Ref(0)
+  if pt_font_line_height(size, fb, oh, oa) == 1 {
+    Some(oa.val)
+  } else {
+    None
   }
 }
 
