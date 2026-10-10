@@ -110,7 +110,7 @@ fn main {
 - **图表组件**：折线 / 柱状 / 环形 / 仪表 / 散点五图型自绘组件，千点推点单帧重绘毫秒级（release 实测 1.8~3.1ms），挂 showcase「图表」页
 - **sysmonitor 示例**：Ubuntu 进程管理与硬件信息查看器——纯 MoonBit 读 /proc、/sys（CPU / 内存 / 进程 / 温度 / 磁盘 / GPU / 网络），1Hz 刷新、千行虚拟表格、进程 kill / renice，启动中位 81ms、稳态 RSS 86MB、二进制 7.7MB
 - **系统集成扩容**（Electron 对标，Linux + Windows 双平台同 API）：防多开与二次唤起、开机自启动、休眠 / 锁屏事件、空闲秒数、屏幕常亮、电量与电源切换、网络状态、打开浏览器 / 文件定位——Linux 侧 DBus 真总线逐项验证
-- **系统能力族**：屏幕亮度、键盘背光、系统音量（含逐应用）、媒体播放控制（MPRIS）、夜间色温、壁纸、显示器配置、蓝牙、传感器、打印机、剪贴板监听、最近文件、浏览器书签与历史等 25+ 项，`examples/systemprobe` 一键呈现本机真实结果
+- **系统能力族**：屏幕亮度、键盘背光、系统音量（含逐应用）、媒体播放控制（MPRIS）、夜间色温、壁纸、显示器配置、蓝牙、传感器、打印机、剪贴板监听、最近文件、浏览器书签与历史等 25+ 项，`NoahLiu/yue-examples/systemprobe` 一键呈现本机真实结果
 - **音频播放**：miniaudio 后端（WAV / MP3 / FLAC / OGG），引擎 + 剪辑两级 API，音量 / 循环 / 全解码低延迟音效
 - **视频播放**：ffprobe CSV 元信息 + ffmpeg CLI 解码 RGBA 帧集（与解码器解耦的帧源回调接口），VideoPlayer 组件（播放 / 暂停 / 进度拖拽防抖 seek / 音量 / 循环 / 时间文本），音画同源时钟
 - **质量门禁**：`moon check` 零警告、`moon test` 500+ 用例全绿（每次提交必过）、三平台 GitHub Actions CI、Linux 虚拟显示 GUI 冒烟
@@ -229,7 +229,7 @@ fn main {
 - 可运行示例：examples/ 下 8 个：
   - `moon run examples/hello` 最小示例直接启动验证；
   - `moon run examples/showcase` 全功能演示板（组件库 + 图表 + 系统集成演示）；
-  - `moon run examples/systemprobe` 系统能力族本机实测面板；
+  - `moon run NoahLiu/yue-examples/systemprobe` 系统能力族本机实测面板；
   - `moon run examples/sysmonitor` 系统监视器：进程管理 + 硬件监控。
 - 三平台 CI：GitHub Actions 在 Linux、Windows、macOS 上自动构建、检查与测试，Linux 含虚拟显示下的 GUI 冒烟，push 与 PR 均触发，结果公开可查；`moon check` 零警告、`moon test` 500+ 用例全绿为每次提交门槛。
 
