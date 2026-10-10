@@ -351,6 +351,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **两条实测口径（写测试时踩出来的）**：① 本工具链的 `String.unsafe_get(i)` 返回的是 **UTF-16 码元**而不是码点——`vsc_codepoint_at("😀", 0)` 给 `(0x1F600, 2)`，这个「代理对合并」助手存在的意义正在于此；② 整值浮点转 Int64 的 2^53 门是拿**取整后的 double 值**判定的，`9007199254740993.0` 这个字面量本身在二进制里就落到 2^53，所以照样放行；要断「超范围拒绝」得用 `1e20` 这一类量级。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/sys` 7/7；`moon check yue/sys --deny-warn` 零警告；全仓红点仍 287 errors / 68 warnings。
 
+### MoonBit 原生 GUI 栈 · 富文本区间属性（`rt_*` 会话）· Pango 属性侧三条实测
+
+- **实现形态**：`AttributedText` 只存数据（文本 + 格式 + 基准字体/颜色 + `Array[TextRange]`），每次测量或绘制把会话建到 C 端的 `rt_*` 槽表（`RT_MAX 16`）、用完立刻 `rt_free`——不留长驻句柄，也就不存在「MoonBit 对象被回收而 C 侧还握着指针」。文本与字体名在入口处拷进自有内存（MoonBit 交来的 `Bytes` 指针只在调用期内有效）。
+- **区间口径**：**UTF-8 字节下标** `[start, end)`（与编辑内核同源；libyue 的区间是字符区间，属记档的分岔）。越界在建树时钳掉、起点不小于终点的空区间直接跳过、非法 hex 不入表；`set_text` 按旧语义保留区间表。公共面加 `range_count()`（组件层判断「要不要走富文本路径」用）。
+- **Pango 侧三条实测**：① `pango_layout_insert_attr` 要 Pango 1.52+，本机头文件里没有它的声明——C 侧按**隐式声明返回 int** 编译通过、把指针截断，症状会是莫名其妙的段错误，改用 `PangoAttrList` + `pango_layout_set_attributes`（1.44 起可用）；② 前景色与前景 alpha 是**两条属性**——`pango_attr_foreground_alpha_new` 只收一个 `guint16`（不是 RGBA 四参），半透明区间要 `foreground_new` + `foreground_alpha_new` 一起插；③ `pango_attr_font_desc_new` 会自己复制描述，本地那份建完即 `pango_font_description_free`。
+- **覆盖顺序**：同类型属性按插入顺序生效（后设覆盖先设），用「整段染红 + 首字符改回黑」的像素包围盒验，而不是靠读 Pango 文档。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/text` 20/20（新增 6 条：颜色区间落在正确的字形上且其余保持基准色、多字节文本证明切的是**字节**不是字符、字号区间抬高包围盒、后设覆盖先设、越界/空区间/非法色不落像素也不炸、空文本与 `set_text` 后的区间保留）；`moon check yue/text --deny-warn` 零警告；示例标题把开头 `MoonBit` 7 字节换色上屏，冒烟 49 帧、退出码 0；全仓红点仍 287 errors / 68 warnings、yoga-mbt 81/81。
+
 ## Linux
 
 ### 发行版

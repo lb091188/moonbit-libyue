@@ -258,3 +258,350 @@ int pt_draw_box(unsigned char *data, int buf_w, int buf_h, double x, double y,
   cairo_surface_destroy(surf);
   return 1;
 }
+
+// ---- 富文本会话（AttributedText 的 C 端）----
+// 文本与字体名一律在入口拷进自有内存（MoonBit 交来的字节指针只在调用期有效）；
+// 区间属性按 **UTF-8 字节下标** 存 [start, end) 再翻成 Pango attribute list。
+// 旧链路的区间是字符区间，本栈统一字节下标（与编辑内核同口径）。
+// 会话句柄与 cairo/win 侧同形：槽表 + 显式 free，不做引用计数。
+
+#define RT_MAX 16
+#define RT_MAX_ATTR 256
+
+typedef struct {
+  int start, end;
+  int kind; /* 1 = 字体, 2 = 前景色 */
+  char *family; /* 自有，可为 NULL */
+  double size;
+  int weight, italic;
+  int r, g, b, a;
+} RtAttr;
+
+typedef struct {
+  int used;
+  char *text;
+  int tlen;
+  double size;
+  char *family;
+  int weight, italic;
+  int align, valign, wrap, ellipsize;
+  RtAttr attrs[RT_MAX_ATTR];
+  int n_attrs;
+} Rt;
+
+static Rt rt_slots[RT_MAX];
+
+static char *rt_strdup(const char *s, int len) {
+  if (s == NULL || len <= 0) {
+    return NULL;
+  }
+  char *out = (char *)g_malloc((gsize)len + 1);
+  memcpy(out, s, (size_t)len);
+  out[len] = '\0';
+  return out;
+}
+
+static Rt *rt_of(int64_t h) {
+  if (h > 0 && h < RT_MAX && rt_slots[h].used) {
+    return &rt_slots[h];
+  }
+  return NULL;
+}
+
+static void rt_clear(Rt *r) {
+  g_free(r->text);
+  g_free(r->family);
+  for (int i = 0; i < r->n_attrs; i++) {
+    g_free(r->attrs[i].family);
+  }
+  memset(r, 0, sizeof(Rt));
+}
+
+int64_t rt_new(const char *text, int tlen, double size, const char *family,
+               int flen, int weight, int italic);
+
+int64_t rt_new(const char *text, int tlen, double size, const char *family,
+               int flen, int weight, int italic) {
+  for (int i = 1; i < RT_MAX; i++) {
+    if (!rt_slots[i].used) {
+      Rt *r = &rt_slots[i];
+      memset(r, 0, sizeof(Rt));
+      r->used = 1;
+      r->text = rt_strdup(text, tlen);
+      r->tlen = r->text ? tlen : 0;
+      r->size = size;
+      r->family = rt_strdup(family, flen);
+      r->weight = weight;
+      r->italic = italic;
+      return i;
+    }
+  }
+  return 0;
+}
+
+void rt_free(int64_t h);
+
+void rt_free(int64_t h) {
+  Rt *r = rt_of(h);
+  if (r) {
+    rt_clear(r);
+  }
+}
+
+void rt_set_text(int64_t h, const char *text, int len);
+
+void rt_set_text(int64_t h, const char *text, int len) {
+  Rt *r = rt_of(h);
+  if (!r) {
+    return;
+  }
+  g_free(r->text);
+  r->text = rt_strdup(text, len);
+  r->tlen = r->text ? len : 0;
+  /* 区间属性按旧语义保留（越界部分在建树时钳掉） */
+}
+
+void rt_set_font(int64_t h, const char *family, int flen, double size,
+                 int weight, int italic);
+
+void rt_set_font(int64_t h, const char *family, int flen, double size,
+                 int weight, int italic) {
+  Rt *r = rt_of(h);
+  if (!r) {
+    return;
+  }
+  g_free(r->family);
+  r->family = rt_strdup(family, flen);
+  r->size = size;
+  r->weight = weight;
+  r->italic = italic;
+}
+
+void rt_set_format(int64_t h, int align, int valign, int wrap, int ellipsize);
+
+void rt_set_format(int64_t h, int align, int valign, int wrap, int ellipsize) {
+  Rt *r = rt_of(h);
+  if (!r) {
+    return;
+  }
+  r->align = align;
+  r->valign = valign;
+  r->wrap = wrap;
+  r->ellipsize = ellipsize;
+}
+
+void rt_add_color(int64_t h, int start, int end, int r, int g, int b, int a);
+
+void rt_add_color(int64_t h, int start, int end, int r, int g, int b, int a) {
+  Rt *rt = rt_of(h);
+  if (!rt || rt->n_attrs >= RT_MAX_ATTR) {
+    return;
+  }
+  RtAttr *at = &rt->attrs[rt->n_attrs++];
+  memset(at, 0, sizeof(RtAttr));
+  at->kind = 2;
+  at->start = start;
+  at->end = end;
+  at->r = r;
+  at->g = g;
+  at->b = b;
+  at->a = a;
+}
+
+void rt_add_font(int64_t h, int start, int end, const char *family, int flen,
+                 double size, int weight, int italic);
+
+void rt_add_font(int64_t h, int start, int end, const char *family, int flen,
+                 double size, int weight, int italic) {
+  Rt *rt = rt_of(h);
+  if (!rt || rt->n_attrs >= RT_MAX_ATTR) {
+    return;
+  }
+  RtAttr *at = &rt->attrs[rt->n_attrs++];
+  memset(at, 0, sizeof(RtAttr));
+  at->kind = 1;
+  at->start = start;
+  at->end = end;
+  at->family = rt_strdup(family, flen);
+  at->size = size;
+  at->weight = weight;
+  at->italic = italic;
+}
+
+static int rt_clamp(int v, int lo, int hi) {
+  if (v < lo) {
+    return lo;
+  }
+  if (v > hi) {
+    return hi;
+  }
+  return v;
+}
+
+static PangoLayout *rt_build(Rt *r) {
+  if (!r || !r->text) {
+    return NULL;
+  }
+  PangoLayout *layout = pt_make_layout(r->text, r->tlen, r->size,
+                                       r->family ? r->family : "", r->weight,
+                                       r->italic);
+  if (layout == NULL) {
+    return NULL;
+  }
+  if (r->n_attrs == 0) {
+    return layout;
+  }
+  PangoAttrList *list = pango_attr_list_new();
+  for (int i = 0; i < r->n_attrs; i++) {
+    RtAttr *a = &r->attrs[i];
+    int s = rt_clamp(a->start, 0, r->tlen);
+    int e = rt_clamp(a->end, s, r->tlen);
+    if (e <= s) {
+      continue;
+    }
+    PangoAttribute *pa = NULL;
+    PangoAttribute *pa2 = NULL;
+    if (a->kind == 2) {
+      /* 前景色与前景 alpha 是两条属性（foreground_alpha_new 只收一个通道），
+       * 半透明区间要两条一起插 */
+      pa = pango_attr_foreground_new((guint16)(a->r * 65535 / 255),
+                                     (guint16)(a->g * 65535 / 255),
+                                     (guint16)(a->b * 65535 / 255));
+      if (a->a != 255) {
+        pa2 = pango_attr_foreground_alpha_new(
+            (guint16)(a->a * 65535 / 255));
+      }
+    } else {
+      PangoFontDescription *d = pango_font_description_new();
+      if (a->family != NULL) {
+        pango_font_description_set_family(d, a->family);
+      }
+      if (a->size > 0.0) {
+        pango_font_description_set_absolute_size(d, a->size * PANGO_SCALE);
+      }
+      if (a->weight > 0) {
+        pango_font_description_set_weight(d, (PangoWeight)a->weight);
+      }
+      if (a->italic != 0) {
+        pango_font_description_set_style(d, PANGO_STYLE_ITALIC);
+      }
+      /* pango_attr_font_desc_new 会复制描述，之后即可释放本地那份 */
+      pa = pango_attr_font_desc_new(d);
+      pango_font_description_free(d);
+    }
+    if (pa != NULL) {
+      pa->start_index = (guint)s;
+      pa->end_index = (guint)e;
+      /* pango_layout_insert_attr 要 1.52+，用 attr list 这条路（1.44 起可用） */
+      pango_attr_list_insert(list, pa);
+    }
+    if (pa2 != NULL) {
+      pa2->start_index = (guint)s;
+      pa2->end_index = (guint)e;
+      pango_attr_list_insert(list, pa2);
+    }
+  }
+  pango_layout_set_attributes(layout, list);
+  pango_attr_list_unref(list);
+  return layout;
+}
+
+// 量尺寸：box_w > 0 时作为宽度约束（换行/省略的判定同 pt_apply_width）
+int rt_measure(int64_t h, double box_w, int32_t *out_w, int32_t *out_h,
+               int32_t *out_baseline);
+
+int rt_measure(int64_t h, double box_w, int32_t *out_w, int32_t *out_h,
+               int32_t *out_baseline) {
+  Rt *r = rt_of(h);
+  if (!r || out_w == NULL || out_h == NULL || out_baseline == NULL) {
+    return 0;
+  }
+  PangoLayout *layout = rt_build(r);
+  if (layout == NULL) {
+    return 0;
+  }
+  pt_apply_width(layout, (int)(box_w > 0.0 ? box_w : 0.0), r->wrap,
+                 r->ellipsize);
+  int w = 0, bh = 0;
+  pango_layout_get_pixel_size(layout, &w, &bh);
+  int baseline = pango_layout_get_baseline(layout);
+  g_object_unref(layout);
+  *out_w = w;
+  *out_h = bh;
+  int bl = baseline / PANGO_SCALE;
+  if (baseline % PANGO_SCALE >= PANGO_SCALE / 2) {
+    bl += 1;
+  }
+  *out_baseline = bl;
+  return 1;
+}
+
+// 绘制：盒内对齐与 pt_draw_box 同一套算法；r/g/b/a 是**基准色**，
+// 被前景色区间覆盖的部分由 Pango 属性决定。
+int rt_draw(int64_t h, unsigned char *data, int buf_w, int buf_h, double x,
+            double y, double box_w, double box_h, int r0, int g0, int b0,
+            int a0);
+
+int rt_draw(int64_t h, unsigned char *data, int buf_w, int buf_h, double x,
+            double y, double box_w, double box_h, int r0, int g0, int b0,
+            int a0) {
+  Rt *r = rt_of(h);
+  if (!r || data == NULL || buf_w < 1 || buf_h < 1) {
+    return 0;
+  }
+  cairo_surface_t *surf = cairo_image_surface_create_for_data(
+      data, CAIRO_FORMAT_ARGB32, buf_w, buf_h, buf_w * 4);
+  if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
+    cairo_surface_destroy(surf);
+    return 0;
+  }
+  cairo_t *cr = cairo_create(surf);
+  PangoLayout *layout = rt_build(r);
+  if (layout == NULL) {
+    cairo_destroy(cr);
+    cairo_surface_destroy(surf);
+    return 0;
+  }
+  int wrapped_axis = 0;
+  if (box_w > 0.0 && (r->wrap != 0 || r->ellipsize != 0)) {
+    wrapped_axis = 1;
+    pango_layout_set_width(layout, (int)(box_w * PANGO_SCALE + 0.5));
+    if (r->wrap != 0) {
+      pango_layout_set_wrap(layout, PANGO_WRAP_WORD_CHAR);
+    }
+    PangoAlignment pa = PANGO_ALIGN_LEFT;
+    if (r->align == 1) {
+      pa = PANGO_ALIGN_CENTER;
+    } else if (r->align == 2) {
+      pa = PANGO_ALIGN_RIGHT;
+    }
+    pango_layout_set_alignment(layout, pa);
+  }
+  if (r->ellipsize != 0) {
+    pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_END);
+  }
+  int lw = 0, lh = 0;
+  pango_layout_get_pixel_size(layout, &lw, &lh);
+  double dx = 0.0;
+  if (box_w > 0.0 && wrapped_axis == 0) {
+    double slack = box_w - (double)lw;
+    if (slack > 0.0) {
+      dx = r->align == 1 ? slack / 2.0 : (r->align == 2 ? slack : 0.0);
+    }
+  }
+  double dy = 0.0;
+  if (box_h > 0.0 && r->valign != 0) {
+    double slack = box_h - (double)lh;
+    if (slack > 0.0) {
+      dy = r->valign == 1 ? slack / 2.0 : slack;
+    }
+  }
+  cairo_set_source_rgba(cr, r0 / 255.0, g0 / 255.0, b0 / 255.0, a0 / 255.0);
+  cairo_move_to(cr, x + dx, y + dy);
+  pango_cairo_show_layout(cr, layout);
+  g_object_unref(layout);
+  cairo_destroy(cr);
+  cairo_surface_flush(surf);
+  cairo_surface_destroy(surf);
+  return 1;
+}
