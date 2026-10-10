@@ -83,6 +83,7 @@ pub fn Window::poll_event(self : Window) -> Event {
       Event::Resized
     }
     1 => Event::NeedsDraw
+    4 => Event::Input
     _ => Event::NoEvent
   }
 }

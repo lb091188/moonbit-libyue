@@ -131,3 +131,28 @@ test "时基未建立时相对延时按 0 起算，start 之后按平台时钟�
   assert_eq(l2.advance(20000100L), 1)
   assert_eq(late, 1)
 }
+
+test "自重排的短周期节拍不应饿死长周期定时器" {
+  // 现象复现：示例里 100ms 节拍 + 5000ms 自动退出，实测退出定时器从不触发。
+  // 若本用例红，说明 Loop::advance 在「队首未到期即 break」的写法上丢了后序到期项。
+  let l = Loop::new()
+  l.start(0L)
+  let quit = Ref(false)
+  let ticks = Ref(0)
+  let ticker : Ref[() -> Unit] = Ref(fn() { () })
+  ticker.val = fn() {
+    ticks.val = ticks.val + 1
+    if !quit.val {
+      let _ = l.timer(10, ticker.val)
+    }
+  }
+  let _ = l.timer(10, ticker.val)
+  let _ = l.timer(35, fn() { quit.val = true })
+  let mut t = 0L
+  while t < 200L {
+    t = t + 5L
+    let _ = l.advance(t)
+  }
+  assert_eq(quit.val, true)
+  assert_eq(ticks.val > 3, true)
+}
