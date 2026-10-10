@@ -884,6 +884,15 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **AppleClang 17(macos-15 镜像更新后)把 `getRed:green:blue:alpha:` 返回值解析成 void**,`![...]` 一元取反编译错误;已判空且转 sRGB 后取分量必然成功,丢弃返回值写法对 BOOL/void 双解析都可编译(69136b7,曾被整树回退丢失又捡回——回退基线含带病文件时,后续修复会随回退消失,重推 vendor 前需对照该文件历史)。
 - **0.5.0 发布前的 CI 连红三根因(9-22 起,Linux/macOS 红、Windows 绿)**:① `yue_accent_mac.mm` 的 AppleClang 编译错误(见上)卡死 prepare;② extern "C" 缺失(见 ABI 小节)卡死链接;③ sysmonitor 的 S4 硬件采样测试断「coretemp 必有 Package 传感器」,虚机 runner 无此硬件即败——环境缺件(无传感器/无 DISPLAY)只跳过不硬断。另:CI 原生层缓存 key 必须含 shim 源码哈希(只含 prepare.py 时,shim 变更不换 key,恢复的 build/ 缓存里是旧 shim 库);无 Actions 日志权限时,把失败输出切片塞进 `::error` 注解(check-runs annotations API 匿名可读)是唯一取证通道。
 
+### system 子包 macOS 直连族(ObjC++ 翻译单元 + 运行时平台门,2026-10)
+
+- 形态定案:与 Windows 直连族同构——shim 新增 `yue_system_mac.mm`(ObjC++,CMake APPLE 分支挂入并补 CoreAudio/cups 框架),符号名沿用 `yue_mbt_win_*` 等历史 ABI 命名(非平台含义),文本协议逐字段对齐 Windows 侧,MoonBit 层解析跨平台复用;MoonBit 端不用 `#cfg(platform=)` 做分发(实测 moon 构建链只给泛型 native、不注入 platform,声明级 cfg 分支会被静默排除——见「MoonBit 工具链」小节),继续用运行时 `match @yue.platform()` 加 `"macos"` 分支,保证三平台分支全被类型检查。yue_mbt.cpp 的 `#else` 哨兵桩区收窄为 `#elif !defined(OS_MAC)`,mac 符号由 .mm 独家提供(Linux 保留桩仅为链接符号存在)。
+- API 选型:sysinfo=hw.memsize+host_statistics64(可用=free+inactive+purgeable)/kern.boottime/SystemVersion.plist(明文 XML,MoonBit 读)+IOPlatformExpertDevice(vendor 恒 "Apple Inc.",serial=IOPlatformSerialNumber);壁纸/剪贴板=NSWorkspace/NSPasteboard;电源动作=loginwindow AppleEvent(`osascript -e 'tell application "loginwindow" to «event aevtsdwn|aevtrlgo|aevtlout»'`,免 root 免确认);亮度=IODisplay 浮点参数归一 0..100(内建走 CoreDisplay、外接桥接 DDC,Windows 是 DDC 原始量纲——两平台 max 不同属预期);音量=CoreAudio master element(无 mute 通道视为未静音,与 Windows 端点恒有不同);显示器=CGDisplay 在线/激活两级(对应 connected 与点亮),preferred 取 `kDisplayModeNativeFlag`(Windows 恒 0);打印机=CUPS 本体(`printer-state` 3/4/5 → 空闲/打印中/不可用);窗口=CGWindowList+NSRunningApplication 置前,关窗走 AXCloseButton+`_AXUIElementGetWindow`(事实标准私有 API,Chromium 同款,无公开替代);默认应用=扩展名 UTI→`LSCopyDefaultRoleHandlerForContentType`→应用路径,协议直接 LSCopyDefaultApplicationURLForURL;磁盘卷=NSFileManager 挂载卷+statfs,**行格式比 Windows 多一列挂载点**(`/dev/diskXsY` 与 `/`、`/Volumes/X` 不同一,Windows 盘符即挂载点),MoonBit 侧新增 `dsk_parse_mac_volumes` 分平台解析;电量=IOPowerSources(口径对齐 GetSystemPowerStatus);屏幕常亮=IOPMAssertion,空闲=CGEventSource。
+- 权限边界(macOS 10.15+ 全部已文档化):跨应用窗口标题(kCGWindowName)需**屏幕录制**权限,未授权清单只见本进程窗口;AX 关窗需**辅助功能**权限,未授权返回 -99(MoonBit 文档化该错误码);kCGWindowLayer==0 过滤跳过菜单栏/Dock。
+- Unsupported 明示哨兵(不做半吊子模拟):注册表串/.lnk 解析(Windows 专属)、电源计划三 GUID 接口(Windows 专属)、NTP 服务状态(systemsetup 需 root)、会话睡眠/锁屏事件与网络连通性轮询(Windows 批次能力,需回调蹦床/轮询线程,本批不带)。
+- 单实例(mac)未做:标准做法 NSDistributedNotificationCenter/端口注册,后续按需求补。
+- 真机验证清单(报告方 mac 14.5 执行):① moon test -p yue/system 只读面(时区/语言/sysinfo/内存/uptime/显示器/打印机/磁盘卷/电量);② 壁纸读写(多屏机器注意只改主屏);③ 音量 get/set/mute(注意无 master 通道的 USB 设备行为);④ 亮度 devices/get/set(内建屏 + 外接 DDC 屏各一);⑤ 窗口列表/置前(给本进程授权屏幕录制前后对比);⑥ AX 关窗(授权辅助功能后试,未授权预期 -99);⑦ 关机/重启/注销三动作只做 talk 探针验证参数分发,**不要真关**——建议在虚拟机验;⑧ idle_seconds/keepawake enable+release。
+
 ### Scroll 未显式内容尺寸时不可滚(macOS 缺「内容自然高度」这层)
 
 - 环境:报告方真机 macOS 14.5 / arm64(跟踪 issue #1,`examples/showcase` 全分页含侧边菜单),fork v0.15.6-mbt.18 预构建库;本机为 Linux、无 mac,未复现,以下结论来自 fork 源码逐行核对(引用代码与本地 `nativeui/mac/scroll_mac.mm` 逐字一致)。

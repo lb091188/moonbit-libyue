@@ -25,7 +25,7 @@
 | `brightness_set_percent(dev, percent) -> Result[Unit, BrightnessError]` | 设百分比（0-100，出界报错） |
 | `brightness_step_percent(dev, delta) -> Result[Unit, BrightnessError]` | 按百分比步进（delta 可正可负，加后钳 0-100） |
 
-`BrightnessDevice{ subsystem, name, max, current }`：subsystem 为 `"backlight"`（Linux 屏幕 sysfs）、`"leds"`（Linux 键盘背光）或 `"ddc"`（Windows 物理监视器，name 为 `\\.\DISPLAYn`）、max 为量程上限、current 为枚举时快照（实时值用 `brightness_get`）。设备名不在探测表时可手工构造 `BrightnessDevice` 访问。错误 `BrightnessError`：`Unsupported`（macOS 或系统服务不在线）/ `BusFailed(String)` / `DeviceNotFound` / `InvalidParam(String)`。
+`BrightnessDevice{ subsystem, name, max, current }`：subsystem 为 `"backlight"`（Linux 屏幕 sysfs）、`"leds"`（Linux 键盘背光）或 `"ddc"`（Windows 物理监视器，name 为 `\\.\DISPLAYn`）、max 为量程上限、current 为枚举时快照（实时值用 `brightness_get`）。设备名不在探测表时可手工构造 `BrightnessDevice` 访问。错误 `BrightnessError`：`Unsupported`（系统服务不在线）/ `BusFailed(String)` / `DeviceNotFound` / `InvalidParam(String)`。
 
 ```moonbit
 match @system.brightness_devices() {
@@ -333,7 +333,7 @@ let _ = @system.nl_reset()
 | `wp_get() -> Result[String, WallpaperError]` | 读当前壁纸路径 |
 | `wp_set(path) -> Result[Unit, WallpaperError]` | 设置壁纸（会改变桌面外观） |
 
-错误 `WallpaperError`：`Unsupported`（macOS、Linux 子进程不可用、KDE 的 qdbus 不在）/ `UnknownDesktop(String)`（Linux 非 XFCE/GNOME/KDE，带 `XDG_CURRENT_DESKTOP` 原文）/ `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)`。XFCE 写入时属性不存在会创建。
+错误 `WallpaperError`：`Unsupported`（Linux 子进程不可用、KDE 的 qdbus 不在；macOS 走 NSWorkspace，写壁纸只作用于主屏）/ `UnknownDesktop(String)`（Linux 非 XFCE/GNOME/KDE，带 `XDG_CURRENT_DESKTOP` 原文）/ `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)`。XFCE 写入时属性不存在会创建。
 
 ```moonbit
 match @system.wp_get() {
@@ -423,7 +423,7 @@ systemprobe 启动即自动载入演示播放器，播放/暂停/拖进度/音�
 | `mon_list() -> Result[Array[MonitorInfo], MonitorError]` | 枚举全部输出（含未连接），保持后端返回序 |
 | `mon_current() -> Result[Array[CurrentOutput], MonitorError]` | 当前输出简化快照（已连接且有当前模式），不含模式列表 |
 
-`MonitorInfo{ name, connected, primary, width, height, refresh_centi, pos_x, pos_y, mm_width, mm_height, modes }`；`MonitorMode{ width, height, refresh_centi, preferred, current }`；`CurrentOutput{ name, width, height, refresh_centi, pos_x, pos_y }`。错误 `MonitorError`：`Unsupported`（macOS 或 Linux xrandr 不可用）/ `CommandFailed(String)` / `ParseFailed(String)`（无任何输出条目）。
+`MonitorInfo{ name, connected, primary, width, height, refresh_centi, pos_x, pos_y, mm_width, mm_height, modes }`；`MonitorMode{ width, height, refresh_centi, preferred, current }`；`CurrentOutput{ name, width, height, refresh_centi, pos_x, pos_y }`。错误 `MonitorError`：`Unsupported`（Linux xrandr 不可用；macOS 走 CGDisplay，跨平台连接未点亮的输出只有头行）/ `CommandFailed(String)` / `ParseFailed(String)`（无任何输出条目）。
 
 ```moonbit
 match @system.mon_current() {
@@ -468,7 +468,7 @@ let _ = @system.win_close("ZCode")
 | `cbw_start_watch(interval_ms? = 800, cb) -> ClipboardWatcher` | 启动监听（轮询间隔钳 100..60000；基线取启动瞬间内容，初始内容不触发回调） |
 | `cbw_stop(watcher)` | 停止监听（置停靠标志，至多再跑一拍自行终止；幂等） |
 
-错误 `ClipboardError`：`Unsupported`（macOS 或 Linux xclip 不存在）/ `CommandFailed(String)`（Linux 命令失败或 Windows 无文本 / 剪贴板打开失败）。读失败静默跳过该拍，不触发回调。轮询挂在 libyue 定时器上，需在 GUI 消息循环运行后才实际派发。
+错误 `ClipboardError`：`Unsupported`（Linux xclip 不存在）/ `CommandFailed(String)`（Linux 命令失败或 Windows 无文本 / 剪贴板打开失败）。读失败静默跳过该拍，不触发回调。轮询挂在 libyue 定时器上，需在 GUI 消息循环运行后才实际派发。
 
 ```moonbit
 let w = @system.cbw_start_watch(interval_ms=500, fn(text) {
@@ -565,7 +565,7 @@ match @system.pp_profiles() {
 | `si_memory() -> Result[MemoryInfo, SysInfoError]` | 内存：`MemoryInfo{ total_kb, available_kb }`（单位 kB，Linux MemAvailable 与 Windows 可用物理内存同为「还能拿来用多少」口径） |
 | `si_uptime() -> Result[Double, SysInfoError]` | 开机时长（秒） |
 
-错误 `SysInfoError`：`SiUnsupported`（macOS）/ `SiReadFailed(String)`（带路径或来源）/ `SiParseFailed(String)`。
+错误 `SysInfoError`：`SiUnsupported`（其他平台）/ `SiReadFailed(String)`（带路径或来源）/ `SiParseFailed(String)`。macOS：os 走 SystemVersion.plist（id 恒 "macos"）、machine 走 IOPlatformExpertDevice（vendor 恒 "Apple Inc."，serial 读不到为空字段）、memory/uptime 走 shim 直连。
 
 ```moonbit
 let os = @system.si_os() // Ok({ pretty_name: "Ubuntu 24.04.5 LTS", id: "ubuntu", .. })
