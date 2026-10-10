@@ -177,6 +177,16 @@ Environment: Ubuntu 24.04 + X11 + XFCE, moon 0.1.20260920 / moonc v0.10.14, GTK3
 - **Pitfall (bounds)**: `floor_boundary` accepts k == length (end is a legal boundary), so the loop must short-circuit on `k < n` before indexing, otherwise `Array::at` panics (SIGABRT observed).
 - Verification: `moon test -p NoahLiu/moonbit-libyue/yue/input` 10/10; `moon check yue/{core,input}` warning-free; render 14/14, text 7/7, yoga-mbt 79/79 unchanged.
 
+### MoonBit native GUI stack G4b (key/pointer events and focus wiring) · four GTK-side rules
+
+- **Pitfall**: `gdk_keyval_to_lower(ev->keyval)` erases the shift case - X11 keyvals **already encode shift** ('a' and 'A' are different keysyms), so the kernel's `keysym_to_text` yields the right character when the raw keyval is kept.
+- **Pitfall**: modifier bits must be remapped explicitly. GDK uses Shift=1/Control=4/Mod1=8/Mod2=64/Meta=16, this stack uses `MOD_SHIFT=1 / MOD_CTRL=2 / MOD_ALT=4 / MOD_META=8`; passing raw state makes every `Ctrl+Left` / `Shift+Tab` combination misfire.
+- **Keys only arrive if all three are done**: `gtk_widget_set_can_focus(area, TRUE)`, `gtk_widget_add_events(... GDK_KEY_PRESS_MASK | ... | GDK_SCROLL_MASK)`, and `gtk_widget_grab_focus` after `show_all`. Missing any one gives a live window that reports **nothing** - the same class of failure as G2's "no flush, waiting on an event that never arrives": it shows as silence, not as an error.
+- **Queue rule**: per-window 64-slot FIFO; when full it **drops the new event rather than overwriting**, so ordering is never corrupted. Events are read as "take returns the code, then `wm_ev_*` reads the last taken one" instead of many out parameters - MoonBit cannot hand C a writable array (see the G3b SIGSEGV entry).
+- **Focus lives in MoonBit**: `yue/core/focus.mbt` owns order and wrap-around (Tab from last to first, Shift+Tab from first to last, unregistering the focused item hands focus to its successor); the platform exposes a single action `Window::request_focus`. Logical focus in the toolkit mirrors libyue's `FocusManager`, where containers hold no system focus.
+- **Caret placement**: hit-testing measures prefix widths code point by code point and picks the right-most boundary at or before the click; `Editor::boundary_after` was promoted from private to public so the upper layers advance the same way.
+- Verification: all five packages warning-free; core 14/14, input 10/10, render 14/14, text 7/7, yoga-mbt 79/79; `examples/native-window` smoke on this machine: 49 frames, exit code 0, both boxes' text intact. **Pending real-machine checks** (user): typing letters/digits, backspace and arrows, Tab/Shift+Tab wrapping between the two boxes, click-to-place caret, 500 ms caret blink, CJK punctuation and compose keys (IME is G5).
+
 ## Linux
 
 ### Distributions

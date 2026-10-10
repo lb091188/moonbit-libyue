@@ -222,6 +222,16 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **坑（越界）**：`floor_boundary` 允许 k == 缓冲长度（末尾是合法边界），循环里必须 `k < n` 短路后再取字符，否则 `Array::at` panic（实测 SIGABRT）。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/input` 10/10（中英混排 roundtrip、退格删整字不残留、选区替换、词跳转三个方向、shift 延长/折叠、copy 不动状态而 cut 删、undo/redo 往返、handle_key 路由与 Tab 归属、Ctrl+A/Ctrl+Z/Ctrl+左、区间对齐）；`moon check yue/{core,input}` 零警告；render 14/14、text 7/7、yoga-mbt 79/79 未掉。
 
+### MoonBit 原生 GUI 栈 G4 次批（键/指针事件与焦点接入）· GTK 侧四条口径
+
+- **坑**：`gdk_keyval_to_lower(ev->keyval)` 会把 Shift 后的大写抹成小写——X11 的 keyval **本身已含 shift 语义**（'a' 与 'A' 是不同 keysym），内核的 `keysym_to_text` 因此能直接得到正确字符。事件里保留原 keyval，不做小写化。
+- **坑**：修饰位不能直接透传 GDK 的位值（Shift=1、Control=4、Mod1=8、Mod2=64、Meta=16），必须显式重映射到本栈的 `MOD_SHIFT=1 / MOD_CTRL=2 / MOD_ALT=4 / MOD_META=8`，否则 `Ctrl+Left`、`Shift+Tab` 一类组合全判错。
+- **收键前提**：`gtk_widget_set_can_focus(area, TRUE)` + `gtk_widget_add_events(area, GDK_KEY_PRESS_MASK | ... | GDK_SCROLL_MASK)`，并在 `show_all` 之后 `gtk_widget_grab_focus`；少任一步窗口存在但一个键事件都不回（与 G2 的「不 flush 就等空事件」同类：现象是「没反应」而不是「报错」）。
+- **口径**：事件队列是每窗口 64 槽 FIFO，满了**丢弃而不是覆盖**（宁可丢一个事件也不能把顺序打乱）；取事件用「`wm_take_event` 返回 code + `wm_ev_*` 逐字段读最后一条」而不是多个出参——MoonBit 不能给 C 传可写数组（见 G3b 那条 SIGSEGV）。
+- **焦点栈在 MoonBit 侧**：`yue/core/focus.mbt` 只管次序与环绕（Tab 到末尾回第一个、Shift+Tab 到首位回最后一个、注销当前项焦点交给后继），平台侧只有一个动作 `Window::request_focus`。逻辑焦点归 MoonBit 与 libyue 的 `FocusManager` 同构（容器不持有系统焦点）。
+- **caret 定位口径**：点击定位逐码点量前缀宽，取「不超过点击点的最右边界」；`Editor::boundary_after` 由私有提升为公开，供上层做同一种推进。
+- **验证**：五包 `moon check` 零警告；测试 core 14/14、input 10/10、render 14/14、text 7/7、yoga-mbt 79/79；`examples/native-window` 本机冒烟 49 帧、退出码 0、两个框文本状态完好。**真机项待协作方**：英文/数字可打字、退格与方向键、Tab/Shift+Tab 在两框间环绕、点击定位光标、caret 500ms 闪烁、中文标点与组合键（IME 属 G5）。
+
 ## Linux
 
 ### 发行版

@@ -50,3 +50,30 @@ extern "c" fn wm_wakeup() -> Unit = "wm_wakeup"
 
 ///|
 extern "c" fn wm_now_ms() -> Int64 = "wm_now_ms"
+
+///|
+extern "c" fn wm_take_event(id : Int64) -> Int = "wm_take_event"
+
+///|
+extern "c" fn wm_pending_events(id : Int64) -> Int = "wm_pending_events"
+
+///|
+extern "c" fn wm_ev_keysym(id : Int64) -> Int = "wm_ev_keysym"
+
+///|
+extern "c" fn wm_ev_mods(id : Int64) -> Int = "wm_ev_mods"
+
+///|
+extern "c" fn wm_ev_x(id : Int64) -> Int = "wm_ev_x"
+
+///|
+extern "c" fn wm_ev_y(id : Int64) -> Int = "wm_ev_y"
+
+///|
+extern "c" fn wm_ev_button(id : Int64) -> Int = "wm_ev_button"
+
+///|
+extern "c" fn wm_ev_axis(id : Int64) -> Int = "wm_ev_axis"
+
+///|
+extern "c" fn wm_request_focus(id : Int64) -> Unit = "wm_request_focus"
