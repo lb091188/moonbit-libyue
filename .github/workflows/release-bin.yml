@@ -63,6 +63,13 @@ jobs:
           $py = (Get-Command python).Source
           Copy-Item $py "$env:USERPROFILE\.moon\bin\python3.exe"
 
+      # 全新 runner 上没有 registry 索引,moon 不会自动拉取——不先 moon update
+      # 会以「module was not found in the registry」在 moon check 阶段失败
+      # (本机正常是因为索引早已就位;moon update 只刷新索引,不改 moon.mod)。
+      - name: 更新 registry 索引(moon update)
+        shell: pwsh
+        run: moon update
+
       # YUE_MBT_KEEP_MANIFEST=1:发布 exe 嵌入应用清单(Common-Controls v6
       # 与 supportedOS);moon build 的 main 包对每份 link_flags 只拼一遍,
       # 恰好一份清单(全仓 moon test 不能设此开关,blackbox 测试目标会

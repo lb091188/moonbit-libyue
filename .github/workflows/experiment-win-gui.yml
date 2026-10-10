@@ -29,6 +29,13 @@ jobs:
           $py = (Get-Command python).Source
           Copy-Item $py "$env:USERPROFILE\.moon\bin\python3.exe"
 
+      # 全新 runner 上没有 registry 索引,moon 不会自动拉取——不先 moon update
+      # 会以「module was not found in the registry」在 moon check 阶段失败
+      # (本机正常是因为索引早已就位;moon update 只刷新索引,不改 moon.mod)。
+      - name: 更新 registry 索引(moon update)
+        shell: pwsh
+        run: moon update
+
       # verbose 全量命令行落盘,供摘录 CStubLibrary 在链接命令中的真实位置
       - name: 构建(MSVC 环境)
         shell: cmd

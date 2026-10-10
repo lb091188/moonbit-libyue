@@ -50,6 +50,12 @@ jobs:
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
+      # 全新 runner 上没有 registry 索引,moon 不会自动拉取——不先 moon update
+      # 会以「module was not found in the registry」在 moon check 阶段失败
+      # (本机正常是因为索引早已就位;moon update 只刷新索引,不改 moon.mod)。
+      - name: 更新 registry 索引(moon update)
+        run: moon update
+
       - name: 缓存原生层产物(build + vendor + 下载缓存)
         uses: actions/cache@v6
         with:
@@ -134,6 +140,13 @@ jobs:
           $py = (Get-Command python).Source
           Copy-Item $py "$env:USERPROFILE\.moon\bin\python3.exe"
 
+      # 全新 runner 上没有 registry 索引,moon 不会自动拉取——不先 moon update
+      # 会以「module was not found in the registry」在 moon check 阶段失败
+      # (本机正常是因为索引早已就位;moon update 只刷新索引,不改 moon.mod)。
+      - name: 更新 registry 索引(moon update)
+        shell: pwsh
+        run: moon update
+
       - name: 缓存原生层产物(build + vendor + 下载缓存)
         uses: actions/cache@v6
         with:
@@ -179,6 +192,12 @@ jobs:
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      # 全新 runner 上没有 registry 索引,moon 不会自动拉取——不先 moon update
+      # 会以「module was not found in the registry」在 moon check 阶段失败
+      # (本机正常是因为索引早已就位;moon update 只刷新索引,不改 moon.mod)。
+      - name: 更新 registry 索引(moon update)
+        run: moon update
 
       - name: 缓存原生层产物(build + vendor + 下载缓存)
         uses: actions/cache@v6
