@@ -283,6 +283,21 @@ pub fn AttributedText::range_count(self : AttributedText) -> Int {
 }
 
 ///|
+/// 混排行高（像素）：基准字体加上每一条区间字体，按 `line_height_multi`
+/// 取「升距最大 + 降距最大」。区间里有更大字号时**别再用基准字体的
+/// `line_height_font`** 定盒高——盒会矮一截、字被裁。
+pub fn AttributedText::line_height(self : AttributedText) -> Option[Int] {
+  let fonts : Array[Font] = [self.effective_font()]
+  for r in self.spans {
+    match r.font {
+      Some(f) => fonts.push(f)
+      None => ()
+    }
+  }
+  line_height_multi(fonts)
+}
+
+///|
 /// 把本对象物化成 C 端会话句柄（0 = 建不了，调用方须回落到无区间的路径）。
 fn AttributedText::rt(self : AttributedText) -> Int64 {
   let f = self.effective_font()

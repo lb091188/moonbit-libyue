@@ -86,4 +86,10 @@ int rt_draw(int64_t h, unsigned char *data, int buf_w, int buf_h, double x,
   return 0;
 }
 
+int pt_families_len(void) { return 0; }
+int pt_families_byte(int index) { (void)index; return 0; }
+int pt_family_available(const char *name, int len) {
+  (void)name; (void)len; return 0;
+}
+
 #endif

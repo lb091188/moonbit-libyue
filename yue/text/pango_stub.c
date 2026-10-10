@@ -605,3 +605,93 @@ int rt_draw(int64_t h, unsigned char *data, int buf_w, int buf_h, double x,
   cairo_surface_destroy(surf);
   return 1;
 }
+
+// ---- 字体族枚举与可用性 ----
+// 整表构建一次，族名按 '\n' 拼进这份进程内缓存；MoonBit 只能逐字节读
+// （本工具链不能把可写缓冲交给 C，见 adaptation「G3b」条那条 SIGSEGV）。
+// 排序 + 相邻去重：fontconfig 的枚举次序随装载顺序变化，且同一族会带多个
+// locale 名，不处理的话同机两次跑拿到的表不一样，测试就写不了。
+static char *pt_fam_buf = NULL;
+static int pt_fam_len = -1;
+
+static void pt_fam_build(void) {
+  if (pt_fam_len >= 0) {
+    return;
+  }
+  pt_fam_len = 0;
+  PangoFontMap *fm = pango_cairo_font_map_get_default();
+  if (fm == NULL) {
+    return;
+  }
+  PangoFontFamily **fams = NULL;
+  int n = 0;
+  pango_font_map_list_families(fm, &fams, &n);
+  if (fams == NULL || n <= 0) {
+    g_free(fams);
+    return;
+  }
+  for (int i = 0; i < n; i++) {
+    for (int j = i + 1; j < n; j++) {
+      const char *a = pango_font_family_get_name(fams[i]);
+      const char *b = pango_font_family_get_name(fams[j]);
+      if (b != NULL && g_strcmp0(a, b) > 0) {
+        PangoFontFamily *t = fams[i];
+        fams[i] = fams[j];
+        fams[j] = t;
+      }
+    }
+  }
+  GString *out = g_string_new(NULL);
+  const char *prev = NULL;
+  for (int i = 0; i < n; i++) {
+    const char *name = pango_font_family_get_name(fams[i]);
+    if (name == NULL || name[0] == '\0') {
+      continue;
+    }
+    if (prev != NULL && g_strcmp0(prev, name) == 0) {
+      continue;
+    }
+    if (out->len > 0) {
+      g_string_append_c(out, '\n');
+    }
+    g_string_append(out, name);
+    prev = name;
+  }
+  g_free(fams);
+  pt_fam_len = (int)out->len;
+  pt_fam_buf = g_string_free(out, FALSE);
+}
+
+int pt_families_len(void) {
+  pt_fam_build();
+  return pt_fam_len;
+}
+
+int pt_families_byte(int index) {
+  pt_fam_build();
+  if (index < 0 || index >= pt_fam_len) {
+    return 0;
+  }
+  return (int)(guchar)pt_fam_buf[index];
+}
+
+// 族名可用性：与枚举表逐行比 ASCII 大小写不敏感（fontconfig/Pango 侧同口径，
+// CSS 的 fontconfig 族名匹配本来不区分大小写）。1 = 表里有这个族。
+int pt_family_available(const char *name, int len) {
+  pt_fam_build();
+  if (name == NULL || len <= 0 || pt_fam_len <= 0) {
+    return 0;
+  }
+  int i = 0;
+  while (i < pt_fam_len) {
+    int j = i;
+    while (j < pt_fam_len && pt_fam_buf[j] != '\n') {
+      j++;
+    }
+    if (j - i == len && g_ascii_strncasecmp(pt_fam_buf + i, name, (gsize)len) == 0) {
+      return 1;
+    }
+    i = j + 1;
+  }
+  return 0;
+}

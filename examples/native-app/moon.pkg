@@ -1,4 +1,5 @@
 import {
+  "moonbitlang/core/encoding/utf8",
   "NoahLiu/moonbit-libyue/yue/core",
   "NoahLiu/moonbit-libyue/yue/input",
   "NoahLiu/moonbit-libyue/yue/render",

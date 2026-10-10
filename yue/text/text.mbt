@@ -256,8 +256,16 @@ pub fn measure_font(
 }
 
 ///|
-/// 字体行高（ascent+descent，像素），字重/斜体参与度量。
-pub fn line_height_font(font : Font) -> Option[Int] {
+/// 一份字体的行盒度量（像素）：`ascent` 是基线到盒顶、`descent` 是基线以下，
+/// 都来自字体度量本身（字重/斜体参与），与样例文本无关。
+pub(all) struct FontMetrics {
+  ascent : Int
+  descent : Int
+}
+
+///|
+/// 字体度量。后端不可用返回 None。
+pub fn font_metrics(font : Font) -> FontMetrics? {
   let fb = @utf8.encode(font.name)
   let oh = Ref(0)
   let oa = Ref(0)
@@ -270,31 +278,50 @@ pub fn line_height_font(font : Font) -> Option[Int] {
     oa,
   ) ==
     1 {
-    Some(oh.val)
+    Some({ ascent: oa.val, descent: oh.val - oa.val })
   } else {
     None
   }
 }
 
 ///|
+/// 字体行高（ascent+descent，像素），字重/斜体参与度量。
+pub fn line_height_font(font : Font) -> Option[Int] {
+  font_metrics(font).map(fn(m) { m.ascent + m.descent })
+}
+
+///|
 /// 字体首行基线（ascent，像素）。
 pub fn line_ascent_font(font : Font) -> Option[Int] {
-  let fb = @utf8.encode(font.name)
-  let oh = Ref(0)
-  let oa = Ref(0)
-  if pt_font_line_height(
-    font.size,
-    fb,
-    weight_value(font.weight),
-    style_id(font.style),
-    oh,
-    oa,
-  ) ==
-    1 {
-    Some(oa.val)
-  } else {
-    None
+  font_metrics(font).map(fn(m) { m.ascent })
+}
+
+///|
+/// **多字体混排的行高**：一行里每个 inline 盒按自己的字体上抛升距与降距，
+/// 行盒取「升距最大者 + 降距最大者」（Pango/CSS 的算法），不是「取字号最大的
+/// 那一份的行高」——两份字体的 descent 可以来自不同字体。
+/// 空表给 None；任一份取不到度量也整体给 None（宁可不给数，也不给按部分字体
+/// 算出的偏小行高——布局盒矮了会裁字，比高了难看得多）。
+pub fn line_height_multi(fonts : Array[Font]) -> Option[Int] {
+  if fonts.length() == 0 {
+    return None
   }
+  let mut up = 0
+  let mut down = 0
+  for f in fonts {
+    match font_metrics(f) {
+      None => return None
+      Some(m) => {
+        if m.ascent > up {
+          up = m.ascent
+        }
+        if m.descent > down {
+          down = m.descent
+        }
+      }
+    }
+  }
+  Some(up + down)
 }
 
 ///|

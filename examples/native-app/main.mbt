@@ -7,6 +7,9 @@
 // 事件翻译、焦点栈、输入法四条件、脏标上屏都在宿主里，界面内容只是一棵
 // `@core.Widget` 树。跑法：moon run examples/native-app（需显示服务），5 秒后
 // 自动退出并打印状态行。
+//
+// 批次 3（字体）：末尾一行演示「族名回退 + 混排行高」，两个盒子的盒高都来自
+// `@text.AttributedText::line_height`。
 
 ///|
 const FONT : Double = 14.0
@@ -16,6 +19,10 @@ priv struct Ctr {
   mut frames : Int
   mut clicks : Int
   mut blink : Bool
+  // 批次 3（字体）的三个观测值
+  mut fam_count : Int
+  mut use_family : String
+  mut lh_mixed : Int
 }
 
 ///|
@@ -220,6 +227,54 @@ fn text_line(
 }
 
 ///|
+/// 批次 3（字体枚举与回退 + 混排行高）：同一段文字画两次——左边只用基准字体，
+/// 右边把末尾的「28」换成 28px。两个盒子的**盒高都取 `line_height()`**，
+/// 混排那盒必须被抬起来，否则大字会被裁；族名走 `resolve_family`
+/// （不存在的族退到 monospace）。
+fn make_font_row(ctr : Ctr) -> @core.Widget {
+  let w = @core.Widget::new()
+  w.set_size(388.0, 72.0)
+  w.set_margin(12.0, 0.0, 0.0, 0.0)
+  w.on_draw = Some(fn(p : @render.Painter, r : @core.Rect) -> Unit {
+    p.set_fill_color(@theme.theme_bg_panel())
+    p.fill_rect(0.0, 0.0, r.w, r.h)
+    let base = @text.AttributedText::new("基准 Base 28")
+    let lh_base = match base.line_height() {
+      Some(v) => v.to_double()
+      None => FONT * 1.5
+    }
+    let mixed = @text.AttributedText::new("基准 Base 28")
+    // 「28」是末尾两字节起、长 2 字节（字节下标口径，与编辑内核同源）
+    let nb = @utf8.encode("基准 Base 28")
+    let at = nb.length() - 2
+    mixed.set_font_for(@text.Font::new("", 28.0), at, nb.length())
+    let lh_mixed = match mixed.line_height() {
+      Some(v) => v
+      None => 0
+    }
+    ctr.lh_mixed = lh_mixed
+    // 两个盒子的边框：右盒没被抬起来就是行高口径错了
+    p.set_stroke_color(@theme.theme_border())
+    p.set_line_width(1.0)
+    p.stroke_rect(0.0, 0.0, 190.0, lh_base)
+    p.stroke_rect(198.0, 0.0, 190.0, lh_mixed.to_double())
+    p.flush()
+    let _ = base.draw(p.bitmap, 4.0, 0.0, 186.0, lh_base)
+    let _ = mixed.draw(p.bitmap, 202.0, 0.0, 186.0, lh_mixed.to_double())
+    let fam = @text.resolve_family(["绝对没有的族 Qzz", "monospace"])
+    let _ = @text.draw_font(
+      p.bitmap,
+      4.0,
+      52.0,
+      "回退族名：" + fam + " 可用族 " + ctr.fam_count.to_string(),
+      @text.Font::new(fam, 12.0),
+      @theme.theme_text_regular(),
+    )
+  })
+  w
+}
+
+///|
 fn main {
   let app = match @core.App::new(420, 300, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
@@ -228,9 +283,21 @@ fn main {
       return
     }
   }
-  let ctr : Ctr = { frames: 0, clicks: 0, blink: true, }
+  let ctr : Ctr = {
+    frames: 0,
+    clicks: 0,
+    blink: true,
+    fam_count: 0,
+    use_family: "",
+    lh_mixed: 0,
+  }
   let root = app.root
   root.set_column()
+  ctr.fam_count = match @text.families() {
+    Some(list) => list.length()
+    None => 0
+  }
+  ctr.use_family = @text.resolve_family(["绝对没有的族 Qzz", "monospace"])
   root.set_padding(16.0, 12.0)
   root.on_draw = Some(fn(p : @render.Painter, r : @core.Rect) -> Unit {
     p.set_fill_color(@theme.theme_bg_page())
@@ -245,6 +312,7 @@ fn main {
   root.append_child(f1.w)
   root.append_child(f2.w)
   root.append_child(btn)
+  root.append_child(make_font_row(ctr))
   let _ = app.focus.register(1)
   let _ = app.focus.register(2)
   let _ = app.focus.register(3)
@@ -275,7 +343,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str}",
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed}",
   )
   app.shutdown()
 }
