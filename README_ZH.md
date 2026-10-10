@@ -6,9 +6,9 @@
 
 简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
 
-![组件库演示板](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-main.png)
+![组件库演示板](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/public/images/showcase-main.png)
 
-![Linux(XFCE)实机演示](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-anim-linux.webp) ![Windows 实机演示](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-anim-windows.webp)
+![Linux(XFCE)实机演示](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/public/images/showcase-anim-linux.webp) ![Windows 实机演示](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/public/images/showcase-anim-windows.webp)
 
 *图二 Linux(XFCE) · 图三:Windows —— 同一套 MoonBit 代码*
 
@@ -57,7 +57,7 @@ n.show()
 
 **📊 旗舰应用 — Linux 进程管理与硬件信息查看**：
 
-![进程](./docs/public/images/sys.png)
+![进程](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/public/images/sys.png)
 
 ```moonbit
 moon run examples/sysmonitor

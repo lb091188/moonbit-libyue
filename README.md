@@ -6,9 +6,9 @@ A **native cross-platform desktop GUI library** for the [MoonBit](https://github
 
 English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)
 
-![Component showcase](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-main.png)
+![Component showcase](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/public/images/showcase-main.png)
 
-![Live demo on Linux (XFCE)](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-anim-linux.webp) ![Live demo on Windows](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-anim-windows.webp)
+![Live demo on Linux (XFCE)](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/public/images/showcase-anim-linux.webp) ![Live demo on Windows](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/public/images/showcase-anim-windows.webp)
 
 *Left: Linux (XFCE) · Right: Windows — one MoonBit codebase*
 
@@ -57,7 +57,7 @@ n.show()
 
 **📊 Flagship app — Linux process manager & hardware monitor**:
 
-![Processes](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/sys.png)
+![Processes](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/public/images/sys.png)
 
 ```moonbit
 moon run examples/sysmonitor

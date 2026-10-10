@@ -42,7 +42,7 @@ fn demo_md_lines() -> Array[String] {
     "",
     "脚注引用在正文里[^1],再来一条[^note]。",
     "",
-    "![Showcase 截图](docs/images/showcase-code.png)",
+    "![Showcase 截图](docs/public/images/showcase-code.png)",
     "",
     "段落文本收尾。",
     "",
