@@ -74,13 +74,13 @@ top/right/bottom/left：包含块为父容器 padding box，同轴两侧 inset �
 本行交叉尺寸。无基线的项按 flex-start 摆放，交叉轴有 auto margin 的项不做
 基线对齐。嵌套容器的基线取首行共同基线，否则取交叉轴起端最靠前的有基线项）、
 aspect-ratio（`set_aspect_ratio`，比例语义为 border-box：一轴确定 → 另一轴
-换算，容器自身尺寸同理；`min:auto` 不超过换算值）、RTL
+换算，容器自身尺寸同理；`min:auto` 不超过换算值；绝对定位子项同样按比例
+互推（显式尺寸或两侧 inset 撑出的一轴为源））、RTL
 （`set_direction(Rtl)`：主轴 / 交叉轴起端按方向翻转，margin、auto margin、
 绝对定位静态位置随之换算）。
 
 ## 未实现（按批次补）
 
-- 绝对定位子项的 aspect-ratio 换算（该路径仍只按显式尺寸 / 两侧 inset / 内容定尺寸）
 - 测量缓存（Yoga 的 16 槽缓存）与像素网格取整
 - 容器内在尺寸（min-content / max-content）的精确语义（当前 fit-content
   近似）

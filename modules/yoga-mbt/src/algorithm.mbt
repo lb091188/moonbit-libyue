@@ -7,8 +7,7 @@
 //
 // 宽高语义为 border-box（与 Yoga 一致）：width/height 含自身的
 // padding 与 border；aspect-ratio 的比例同样按边框盒计算。
-// 尚未实现：测量缓存、像素网格取整、容器内在尺寸（min/max-content）
-// 精确语义、绝对定位项的比例换算。
+// 尚未实现：测量缓存、像素网格取整、容器内在尺寸（min/max-content）精确语义。
 
 ///|
 let max_dim : Double = 1000000000000000.0
@@ -1053,6 +1052,16 @@ fn layout_into(
             (Some(tv), Some(bv)) => Some((cb_h - tv - bv - cm.top - cm.bottom).max(cpb_h))
             _ => None
           }
+      }
+      // 首选比例（border-box 语义）：一轴已由显式尺寸或两侧 inset 定下,
+      // 另一轴按比例换算
+      let sized_w = match (sized_w, sized_h, cs.aspect_ratio) {
+        (None, Some(hv), Some(r)) => Some((hv * r).max(cpb_w))
+        _ => sized_w
+      }
+      let sized_h = match (sized_w, sized_h, cs.aspect_ratio) {
+        (Some(wv), None, Some(r)) => Some((wv / r).max(cpb_h))
+        _ => sized_h
       }
       // 内容测量的可用空间以 AtMost 形式传给测量函数（是否折行/收缩由测量
       // 函数决定，引擎不额外截断——固定内容尺寸的叶子因此不会被压小）
