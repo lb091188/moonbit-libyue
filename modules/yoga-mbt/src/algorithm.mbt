@@ -246,13 +246,36 @@ fn opt_eq(a : Option[Double], b : Option[Double]) -> Bool {
 }
 
 ///|
-/// 清空整棵树的测量缓存与内在尺寸缓存。样式没有脏标记、可能在两次布局之间
-/// 被改，所以两类缓存在单次 `calculate_layout` 内有效，入口整体清一次。
-fn clear_measure_cache(n : Node) -> Unit {
-  n.measure_cache.clear()
-  n.intrinsic_cache.clear()
+/// 单次布局内每份缓存的槽位上限。连续改可用宽（拖动窗口、滚动列表）会让
+/// 同一节点攒出「每个宽度一条」的无限缓存，超限先整体丢——丢的是复用率，
+/// 不影响正确性。
+let cache_slots : Int = 16
+
+///|
+/// 自顶向下扫一遍：给每个节点写下「本节点子树内最大 rev」。
+/// 这是 O(节点数) 的整数比较，不做任何测量与布局数学，换来两处收益：
+/// - 布局时能判断「这棵子树自上次布局以来一点没变」→ 整棵跳过；
+/// - 缓存失效不需要父指针（祖先的内在尺寸依赖子孙，子孙一变祖先的
+///   subtree_rev 就变，缓存自然废）。
+fn scan_subtree_rev(n : Node) -> Int {
+  let mut m = n.rev
   for c in n.children {
-    clear_measure_cache(c)
+    let cm = scan_subtree_rev(c)
+    if cm > m {
+      m = cm
+    }
+  }
+  n.subtree_rev = m
+  m
+}
+
+///|
+/// 缓存所属版本与当前子树版本不一致 → 先整体清一次（不清就会拿旧样式的答案）。
+fn cache_fresh(n : Node) -> Unit {
+  if n.cache_rev != n.subtree_rev {
+    n.measure_cache.clear()
+    n.intrinsic_cache.clear()
+    n.cache_rev = n.subtree_rev
   }
 }
 
@@ -300,6 +323,7 @@ fn measure_content(
   avail_w : Option[Double],
   avail_h : Option[Double],
 ) -> (Double, Double) {
+  cache_fresh(c)
   // 命中比较逐项做，避免每次调用都为构造键而分配
   for e in c.measure_cache {
     let (kw, kh) = e.0
@@ -309,6 +333,9 @@ fn measure_content(
     }
   }
   let result = measure_content_uncached(c, avail_w, avail_h)
+  if c.measure_cache.length() >= cache_slots {
+    c.measure_cache.clear()
+  }
   c.measure_cache.push(((avail_w, avail_h), (result.0, result.1, c.baseline)))
   result
 }
@@ -379,6 +406,7 @@ fn intrinsic_size(
     Min => true
     Max => false
   }
+  cache_fresh(n)
   // 命中比较逐项做，避免每次调用都为构造键而分配
   for e in n.intrinsic_cache {
     let (flag, refs) = e.0
@@ -390,6 +418,9 @@ fn intrinsic_size(
     }
   }
   let v = intrinsic_border_size(n, want_row, kind, base_w, base_h)
+  if n.intrinsic_cache.length() >= cache_slots {
+    n.intrinsic_cache.clear()
+  }
   n.intrinsic_cache.push((((want_row, is_min), (base_w, base_h)), v))
   v
 }
@@ -644,7 +675,34 @@ fn axis_size(
 /// 对节点做布局：返回其 border-box (width, height)。
 /// avail_w/h 为父内容盒给到本节点的可用空间；pinned_w/h 由父级
 /// 弹性解析后钦定的最终尺寸（覆盖自身 style/内容推算）。
+///
+/// 脏区跳过：本节点自上次布局以来**整棵子树**没有任何变更（subtree_rev
+/// 对得上），且入参指纹（可用宽高 + 钦定尺寸）与上次一致 → 子树内的坐标、
+/// 尺寸与基线就是上次落地的结果，直接复用，既不走布局数学也不跑测量回调。
+/// 记的是 `layout_into_impl` 的返回值（像素网格取整**前**）而非
+/// `layout_width/height`，后者会被 `round_to_grid` 后处理改写。
 fn layout_into(
+  node : Node,
+  avail_w : Option[Double],
+  avail_h : Option[Double],
+  pinned_w : Option[Double],
+  pinned_h : Option[Double],
+) -> (Double, Double) {
+  let fp = (avail_w, avail_h, pinned_w, pinned_h)
+  if node.laid && node.subtree_rev == node.laid_rev && node.laid_fp == fp {
+    return node.laid_size
+  }
+  let r = layout_into_impl(node, avail_w, avail_h, pinned_w, pinned_h)
+  node.laid = true
+  node.laid_rev = node.subtree_rev
+  node.laid_fp = fp
+  node.laid_size = r
+  r
+}
+
+///|
+/// 布局的实际工作（无跳过）。
+fn layout_into_impl(
   node : Node,
   avail_w : Option[Double],
   avail_h : Option[Double],

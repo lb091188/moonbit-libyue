@@ -34,15 +34,31 @@ pub struct Node {
   // 像素网格取整间隔（0 = 关闭）；只有作为布局根节点的设置生效
   mut pixel_grid : Double
   // 测量缓存：键 = (可用宽, 可用高)，值 = (宽, 高, 基线)。
-  // 单次 calculate_layout 内有效，入口会整体清空（样式可能在两次布局间被改）
+  // **跨布局驻留**：有效性由节点的版本面判定（见 cache_rev），样式没变的
+  // 子树在下一轮直接拿它，测量回调（文本即 Pango）因此不必每帧重跑
   measure_cache : Array[((Option[Double], Option[Double]), (Double, Double, Option[Double]))]
   // 内在尺寸缓存：键 = ((请求行轴?, 求 min-content?), (宽参照, 高参照))，
-  // 值 = 边框盒尺寸。与测量缓存同一失效时机
+  // 值 = 边框盒尺寸。与测量缓存同一失效时机（cache_rev）
   intrinsic_cache : Array[(((Bool, Bool), (Option[Double], Option[Double])), Double)]
   mut layout_left : Double
   mut layout_top : Double
   mut layout_width : Double
   mut layout_height : Double
+  // ---- 变更通知面（脏区增量重排与缓存驻留的判据，见 algorithm.mbt）----
+  // 本节点最后一次「自身变更」的时钟值（样式 setter、增删子项、换测量回调）
+  mut rev : Int
+  // 本次扫描算出的「本节点子树内最大 rev」
+  mut subtree_rev : Int
+  // 两份缓存当前所属的 subtree_rev：不等先整体清一次。祖先的内在尺寸依赖
+  // 子孙，子孙一变祖先就该废——靠它替代「父指针往上清」的形态
+  mut cache_rev : Int
+  // 上次完整布局本节点时的 subtree_rev / 入参指纹 / 返回值（跳过判据）
+  mut laid_rev : Int
+  mut laid : Bool
+  mut laid_fp : (Option[Double], Option[Double], Option[Double], Option[Double])
+  // 上次 `layout_into` 返回的边框盒尺寸，取整**前**的值：layout_width/height
+  // 会被像素网格后处理改写，跳过时必须还它取整前的原值
+  mut laid_size : (Double, Double)
 }
 
 ///|
@@ -60,19 +76,41 @@ pub fn Node::new() -> Node {
     layout_top : 0.0,
     layout_width : 0.0,
     layout_height : 0.0,
+    rev : 0,
+    subtree_rev : 0,
+    cache_rev : 0,
+    laid_rev : -1,
+    laid : false,
+    laid_fp : (None, None, None, None),
+    laid_size : (0.0, 0.0),
   }
+}
+
+// 全局变更时钟。用 `Ref` 而不是顶层可变绑定：跨文件可见性一致，且
+// 顶层 `let mut` 在本工具链不是稳定写法。
+let rev_clock : Ref[Int] = Ref(0)
+
+///|
+/// 记一次「本节点自身发生变更」。不标自身的话，子树扫描看不出这里变过；
+/// 也不走「往上标脏」的传统形态——父指针会与 `children` 成引用环，
+/// 本工具链的回收处理不了环，长驻 GUI 里就是稳定泄漏。
+fn Node::mark_changed(self : Node) -> Unit {
+  rev_clock.val = rev_clock.val + 1
+  self.rev = rev_clock.val
 }
 
 ///|
 /// 追加子节点。
 pub fn Node::append_child(self : Node, child : Node) -> Unit {
   self.children.push(child)
+  self.mark_changed()
 }
 
 ///|
 /// 移除全部子节点。
 pub fn Node::clear_children(self : Node) -> Unit {
   self.children.clear()
+  self.mark_changed()
 }
 
 ///|
@@ -88,6 +126,7 @@ pub fn Node::set_measure(
   f : (Option[Double], Option[Double]) -> (Double, Double),
 ) -> Unit {
   self.measure = Some(f)
+  self.mark_changed()
 }
 
 ///|
@@ -100,6 +139,7 @@ pub fn Node::set_baseline(
   f : (Option[Double], Option[Double]) -> Option[Double],
 ) -> Unit {
   self.baseline_fn = Some(f)
+  self.mark_changed()
 }
 
 ///|
@@ -109,6 +149,7 @@ pub fn Node::set_baseline(
 /// 间隔为 1.0 即整像素对齐，0.5 即半像素。
 pub fn Node::set_pixel_grid(self : Node, interval : Double) -> Unit {
   self.pixel_grid = if interval > 0.0 { interval } else { 0.0 }
+  self.mark_changed()
 }
 
 ///|

@@ -10,8 +10,8 @@
 
 - **在做什么**：用纯 MoonBit 复刻 Yoga 布局引擎（`modules/yoga-mbt` 独立子包），作为 MoonBit 化 libyue 的布局层。
 - **当前进度**：YG1（骨架 + 核心算法）、YG2a（absolute 定位）、YG2b（baseline 对齐 + 交叉轴 margin 定位修复）、YG2b′（容器 auto 尺寸补 padding/border + 多行主轴尺寸）、YG2c（aspect-ratio）、YG2d（RTL direction）、YG2e（绝对定位项比例换算）已完成并推送——**YG2 标准面已收尾**；YG3 工程化四批全部完成：YG3a（发现并修掉「外部包无法构造枚举」的阻断级坑 + 性能基线）、YG3b（测量缓存）、YG3c（`set_pixel_grid` 像素网格取整，默认关闭）、YG3d（内在尺寸 min/max/fit-content，撤掉两处 fit-content 近似）——**YG1/YG2/YG3 已收尾**；全部提交在 `feature/yoga-mbt`（**分支最新提交以 `git log` 为准**）。
-- **门控现状**：`moon check` 零警告 + 全仓 `moon test` **740/740** 全绿；yoga-mbt 自身 79 条白盒断言。
-- **下一步**：只剩 **YG4 与 libyue 集成**（**依赖 libyue 复刻整体范围定案，不要自行开工，先与用户对齐**），以及两件交付动作：`feature/yoga-mbt` 合回 `master`（要先剔掉两个已在 master 的【构建】提交，见 §1/§9）与 `yoga-mbt` 发 mooncakes（见 §9 第 5 条）。
+- **门控现状**（2026-10-11 校准）：yoga-mbt `moon test -p NoahLiu/yoga-mbt` **91/91**（79 条白盒 + 12 条语料/增量，`src` 包 `--deny-warn` 零警告）。主包新栈各包**分包门禁**（core 28 / input 10 / render 40 / text 20 / icons 4 / theme 7 / sys 7，全部 `--deny-warn` 零警告），全仓 `moon check` 处于过渡期红点基线 **287 errors / 68 warnings**（只减不增，口径见根目录 `TODO.md`；老链路 740 条那条门已在 G0b 摘除绑定层时作废）。
+- **下一步**：YG4 的三块里，「布局树 ↔ 控件树映射」与「脏区增量重排」都已落地（主包 `yue/core/widget.mbt` 控件宿主 + `app.mbt` App 宿主，见 §8 YG3e 与根 `TODO.md` §1 G6）；剩「文本 measure/baseline 接线到声明式层」随 G7。另有两件交付动作：`feature/yoga-mbt` 合回 `master`（要先剔掉两个已在 master 的【构建】提交，见 §1/§9）与 `yoga-mbt` 发 mooncakes（见 §9 第 5 条）。
 - **口径已定**：aspect-ratio 比例作用在 **border-box**（用户 2026-10-10 确认），与 CSS 默认的 content-box 不同，动这块代码前先读 §5 第 12 条。
 - **三条纪律**（最容易踩）：① 只对齐 **Web Flexbox 标准**，不做 Yoga 双默认值；② 提交前先 `git fetch` 且用 `git add <显式路径>`，**不要 `git add -A`**；③ 每批改动配套回写 `docs/zh/adaptation.md` 与 `TODO.md`，一批一提交一推送。
 
@@ -68,22 +68,23 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 |---|---|---|
 | `src/types.mbt` | 117 | 九个枚举一律 `pub(all) enum`（`pub enum` 的变体对外只读，见 §6 第 18 条）；`Value`(Undefined/Fixed/Percent/Auto/MinContent/MaxContent/FitContent，内在关键词只对尺寸类属性有意义)、`Edges`、`Display`、`PositionType`、`FlexDirection`、`FlexWrap`、`JustifyContent`、`AlignItems`、`AlignContent` |
 | `src/style.mbt` | 119 | `Style`（web 默认值集中在此）+ `edge_value`/`resolve_value`/`definite_size` 三个解析原语 |
-| `src/node.mbt` | 123 | `Node` 树、`Layout`（left/top/width/height）、`set_measure`、`set_baseline`、`set_pixel_grid`、`append_child`、`layout()` |
-| `src/api.mbt` | 283 | 全部 setter、`fixed/percent/auto/undefined/min_content/max_content/fit_content` 取值辅助、`calculate_layout` 入口 |
-| `src/algorithm.mbt` | 1516 | **核心算法**（见下） |
+| `src/node.mbt` | 164 | `Node` 树、`Layout`（left/top/width/height）、`set_measure`、`set_baseline`、`set_pixel_grid`、`append_child`、`layout()`；外加**变更通知面**（全局时钟 `rev_clock` + `mark_changed` + 每节点 `rev`/`subtree_rev`/`cache_rev`/`laid*`） |
+| `src/api.mbt` | 325 | 全部 setter（每个第一件事是 `mark_changed`）、`fixed/percent/auto/undefined/min_content/max_content/fit_content` 取值辅助、`calculate_layout` 入口（先 `scan_subtree_rev`） |
+| `src/algorithm.mbt` | 1608 | **核心算法**（见下）：`layout_into` 是「脏区跳过外壳 + `layout_into_impl` 实际工作」两层 |
 | `src/layout_wbtest.mbt` | 1453 | 79 条白盒断言（手算预期值） |
+| `src/incremental_wbtest.mbt` | 291 | 10 条增量布局断言：一律「与同状态从零全量布局的参考树逐节点快照相等」+ 测量调用次数 |
 | `src/moon.pkg.json` | 3 | `{"warn_list": "-6"}`，关闭「枚举构造器包内未构造」的误报（仅面向消费方的 API） |
 | `README.md` | — | 用法 / 已实现 / 未实现清单（内容类文档，只写怎么用） |
-| `bench/main.mbt` | 87 | 性能基线（外部包，兼作「枚举可跨包构造」的常驻编译回归）：1121 节点树 × 500 轮布局 |
+| `bench/main.mbt` | 139 | 性能基线（外部包，兼作「枚举可跨包构造」的常驻编译回归）：1121 节点树 × 500 轮 × **三场景**（steady / one_leaf / resize），计时用 `moonbitlang/core/env` 的毫秒时钟（引擎本体仍零依赖，时钟只在 bench 包） |
 
-**算法入口**：`fn layout_into(node, avail_w, avail_h, pinned_w, pinned_h) -> (Double, Double)`
+**算法入口**：`fn layout_into(node, avail_w, avail_h, pinned_w, pinned_h) -> (Double, Double)`（脏区跳过外壳）→ `layout_into_impl`（实际工作）
 
 - `avail_*` = 父内容盒给出的可用空间；`pinned_*` = 父级弹性解析后**钦定**的最终尺寸（覆盖自身 style/内容推算）；返回 border-box 尺寸。
 - 单节点流程（`algorithm.mbt` 内按序）：display 判定 → 自身 padding/border 解析 → **叶子路径**（measure 函数 + 基线函数）→ **flex 项构建**（同时把 `position: absolute` 的子项分流到 `abs_children`）→ **换行**（§9.3）→ 逐行 **§9.7 弹性解析**（§9.2 比例换算基准与 §4.5 自动最小尺寸在 flex 项构建阶段算好） → 主轴 auto margin / justify 定位（§9.5）→ 交叉轴内容测量 + **§9.4 基线分组**与行交叉尺寸（§9.6）→ align-content 整行分布（§9.4/§9.6）→ 逐项定尺寸/定位/递归子树 → **本节点基线定案**（§8.5）→ 自身尺寸定案（内容推算 = 各行最大 + 自身 padding/border，含 min/max 收顶）→ **绝对定位子项**布局。
 - 辅助函数：`clamp3`、`first_some`、`justify_leading`、`align_offset`、`resolved_align`（align-self 继承 align-items）、`is_baseline_item`（§9.4 收集条件）、`opt_eq`（Option 尺寸逐项比较）、`measure_content`（叶子走 measure、容器递归布局，**两条路径都会刷新节点基线**——内在探询不走它，见下）。
 - 方向标志两枚（YG2d）：`rev_main = is_reverse(flex_direction) != (rtl && 主轴为行)`、`rev_cross = rtl && 主轴为列`；生效于 `axis_margin` 的起端取边、坐标映射的翻转、绝对定位静态位置。翻转参照必须用「容器确定的内轴尺寸，否则内容推算值」（`flip_main_ref` / `flip_cross_ref`），用 0 会让 reverse + auto 尺寸算出负偏移。
 - 比例接入点共四处：flex 项构建（换算主轴基准 + 给 `min:auto` 封顶）、交叉轴定尺寸（换算 `final_cross`）、容器自身 `inner_main` / `inner_cross`（换算结果当作确定尺寸）、叶子路径（宽高互推）、绝对定位子项（以「显式尺寸或两侧 inset 已定的一轴」为源换算另一轴）。
-- 测量缓存（YG3b）：`Node.measure_cache` 键 = (可用宽, 可用高)、值 = (宽, 高, 基线)，命中时连基线一起回灌；`calculate_layout` 入口 `clear_measure_cache` 整树清一次（引擎无脏标记，样式可在两次布局间被改）。`measure_content` 是带缓存的外壳，实际工作在同名 `_uncached`。
+- 测量缓存（YG3b，YG3e 起**跨布局驻留**）：`Node.measure_cache` 键 = (可用宽, 可用高)、值 = (宽, 高, 基线)，命中时连基线一起回灌；`measure_content` 是带缓存的外壳，实际工作在同名 `_uncached`。有效性不再靠「入口整树清」，而靠版本面：`calculate_layout` 入口 `scan_subtree_rev(root)` 自顶向下算出每节点子树最大 `rev`，`cache_fresh(node)` 见 `cache_rev != subtree_rev` 就把该节点两份缓存清一次——样式变了的那一支自然废、没变的整支留着（深叶变更会连带祖先的内在尺寸缓存作废，靠子树版本而不是父指针）。每份缓存另有 `cache_slots = 16` 的槽位上限，超限整体丢（连续换可用宽时「丢复用不丢正确」）。
 - 内在尺寸（YG3d）：`intrinsic_size(node, want_row, kind, base_w, base_h)`（带缓存外壳）→ `intrinsic_border_size`（自身确定尺寸短路 / 叶子直接调 measure 探询 / 容器走 `container_intrinsic_size`）→ `axis_size(node, value, want_row, base_w, base_h)` 把 `min_content / max_content / fit_content` 关键词收口成一处，被 width / height / min-* / max-* / flex-basis 与绝对定位段调用。三条必须记住的约定：①**探询口径**——max-content 用「双轴 `None`」，min-content 用「请求轴 `Some(0.0)`、另一轴 `None`」（与 Yoga 的 `Undefined` / `AtMost 0` 同构，`set_measure` 签名不变）；②**探询不得刷新 `Node.baseline`**，所以叶子路径直接调测量函数而不是 `measure_content`；③容器合成做**换行感知**（可换行 + min-content：主轴取最宽单项、按该宽度贪心分行求交叉轴；不换行：单项之和含 gap），且只请求主轴时不算子项交叉贡献（热路径短路，见 §6 第 20 条）。§4.5 `min:auto` 与 §9.2 content 基准分别用 min-content 与 max-content。
 - 像素网格取整（YG3c）：`calculate_layout` 在 `layout_into` 之后、按 `root.pixel_grid > 0.0` 追加 `round_to_grid` 后处理（`algorithm.mbt` 末段，`snap` + 递归）。递归签名六参：`raw_*` 为父项**取整前**绝对起端（用来还原子项真实绝对边），`snap_*` 为父项**取整后**绝对起端（用来换算子项相对坐标）——只传 `snap_*` 会把父项自身的取整误差转嫁进子项宽度。后处理遍历 `node.children`（含绝对定位子项），故 `calculate_layout` 里 `root.layout_left/top = 0.0` 必须在该趟之前。
 - 关键内部结构：`Resolved`/`AxisMargin`（四边在主轴/交叉轴视角下的映射，含 auto 标记）、`Item`（单个 flex 项的全部中间量：base / inner_base / hyp_main / min-max / grow / shrink / size_main / final_cross / baseline / frozen / violation / pos）。`Node.baseline`（`Option[Double]`，到本节点边框盒顶部的距离）是节点间上抛基线的通道。
@@ -94,6 +95,7 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 
 | 提交 | 内容 | 测试 |
 |---|---|---|
+| （未提交，本批） | **YG3e** 脏区增量重排 + 缓存跨布局驻留：setter 一律 `mark_changed`（全局时钟 + 节点 `rev`）、入口 `scan_subtree_rev` 算子树版本、`layout_into` 用「版本 + 入参指纹」跳过整棵干净子树、两份缓存按 `cache_rev` 作废并加 16 槽上限。同机 A/B（release µs/轮）steady 3652→4、one_leaf 3656→78、全量路径 3664→3602 无回归 | 10 条 |
 | `ab7c12a` | **YG1** 骨架 + 核心算法：主轴/交叉轴、grow/shrink/basis（规范冻结算法）、justify 全系、align-items/self/content、wrap/wrap-reverse、margin auto 吸收、padding/border/margin、百分比、min/max（主轴 min:auto 内容下限）、gap、叶子 measure | 19 条 |
 | `105d3c7` | **YG2a** absolute 定位：包含块 = 父 padding box、同轴两侧 inset 撑尺寸、四向全 auto 落静态位置、内嵌子树继续递归 | 7 条 |
 | `f994a15` | 发布元数据（readme/keywords） | — |
@@ -107,7 +109,7 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 | YG2d | **RTL**：`set_direction`（按节点、不继承）+ margin/auto margin/静态位置随之换算；修 row-reverse + auto 主轴尺寸负偏移、修绝对定位静态位置不随 reverse 翻转 | 13 条 |
 | YG2c | **aspect-ratio**：`set_aspect_ratio`（比例 = 边框盒宽/高），§9.2 换算基准、§4.5 换算值封顶 min:auto、§9.4 交叉轴换算、容器自身两轴按比例视作确定尺寸；`align-items: stretch` 覆盖交叉轴比例结果（规范直译）| 7 条 |
 
-门控基线：`moon check` 零警告 + 全仓 `moon test` **740/740**（其中 yoga-mbt 79 条，其余 661 条为仓库既有测试）。
+门控基线（2026-10-11 校准）：`moon check src --deny-warn` 零警告 + `moon test -p NoahLiu/yoga-mbt` **91/91**；主包新栈走**分包门禁**，全仓 `moon check` 是过渡期红点基线 287 errors / 68 warnings（见 §0）。
 
 ---
 
@@ -167,10 +169,12 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 ## 7. 构建、验证与仓库纪律
 
 ```sh
-cd <副本>/modules/yoga-mbt
-~/.moon/bin/moon check          # 必须零警告
-~/.moon/bin/moon test           # yoga-mbt 79 条
-cd <副本> && ~/.moon/bin/moon check && ~/.moon/bin/moon test    # 全仓门控：740/740
+# 在仓库根执行（本仓是「主项目 + modules/yoga-mbt 子模块」两份 moon.mod 并存，
+# 在 modules/yoga-mbt 里裸跑 moon check/moon test 会连带把主项目也编进来）
+~/.moon/bin/moon check src --deny-warn        # 在模块目录内，只查引擎包
+~/.moon/bin/moon test -p NoahLiu/yoga-mbt     # 91 条
+~/.moon/bin/moon run --release bench          # 三场景性能基线
+~/.moon/bin/moon check && ~/.moon/bin/moon test   # 全仓：过渡期红点基线，见 §0
 ```
 
 仓库硬性规则摘要（完整版见根目录 `AGENTS.md`）：
@@ -214,10 +218,33 @@ abspos 段的尺寸优先级改为：显式宽高 > 同轴两侧 inset 都设撑
 
 **YG3d 已完成（YG3 收尾）**：`Value` 增 `MinContent / MaxContent / FitContent` 三变体 + `min_content() / max_content() / fit_content()` 辅助；`intrinsic_size` 带缓存做递归（叶子按 Yoga 口径探询、容器换行感知合成）；`axis_size` 收口关键词解析，接进 width/height/min-*/max-*/flex-basis 与绝对定位段；§4.5 `min:auto` 改用真 min-content、§9.2 content 基准改用 max-content（撤掉两处 fit-content 近似，79 条断言里 69 条既有值零回归）。成本：每轮 debug 4.9→7.3ms、release 2.4→3.4ms（止损过程见 §6 第 20 条）。
 
-### YG4 与 libyue 集成（唯一剩余批次，需先与用户确认整体方案）
+### YG3e 脏区增量重排 + 缓存跨布局驻留（已完成）
 
-- 布局树 ↔ 控件树的映射（哪些控件是叶子 + measure 从哪来：原生控件尺寸、文本测量）、脏区增量重排（改样式只重排受影响子树）、与事件命中测试的坐标对齐。
-- 依赖 MoonBit 化 libyue 的**整体范围定案**（是复刻 libyue 全部控件还是分层替换），这块不要自行开工，先对齐。
+三条判据，缺一不可：
+
+1. **变更通知面**：每个 setter、`append_child`/`clear_children`、`set_measure`/`set_baseline`/`set_pixel_grid` 第一件事都是 `mark_changed(self)`——全局时钟 `rev_clock` +1 并把本节点 `rev` 置为当时值。**新增 setter 漏标就是脏区漏算**（api.mbt 头部写了这条纪律）。
+2. **子树版本**：`calculate_layout` 入口 `scan_subtree_rev(root)` 给每个节点写下「子树内最大 rev」。这是 O(节点数) 的整数比较，不做任何测量与数学。有了它，「这棵子树自上次布局以来一点没变」= `subtree_rev == laid_rev`，**不需要父指针**（父指针会与 `children` 成引用环，本工具链的回收处理不了环，长驻 GUI 就是稳定泄漏）。
+3. **入参指纹**：`layout_into` 记上次执行的 `(avail_w, avail_h, pinned_w, pinned_h)`。跳过条件 = 版本对得上 **且** 指纹逐位相等（`laid` 首轮必不成立）。指纹的意义：父容器重排后给子项的可用空间/钦定尺寸可能变了，这时即便子树自身没变也必须重算。
+
+两条实现上的坑：
+
+- **记的是取整前的返回值**（`laid_size`），不是 `layout_width/height`：后者会被 `round_to_grid` 后处理改写，拿它当复用值会让像素网格那条路径每轮往下漂。`round_to_grid` 本身仍无条件遍历整棵树（取整是幂等的，已贴格的值再取整不变）。
+- **跳过路径返回的是子树内已落地的相对坐标**：`layout_left/top` 相对父边框盒，父级重排时由父改写，所以子树内部照旧复用是对的；子树在两个父容器之间搬移也一样（新增回归用例覆盖）。
+
+A/B（同机、同一份 bench 程序，`git archive HEAD` 拿改前引擎对照，release/µs 每轮，1121 节点）：
+
+| 场景 | 改前 | 改后 | 说明 |
+|---|---|---|---|
+| steady 同参数重复 | 3652 | **4** | 整树跳过（GUI 每帧 relayout 的实际形态） |
+| one_leaf 单点变更 | 3656 | **78** | 只重算那一条链及其祖先 |
+| resize 换根宽（全树重排） | 3664 | 3602 | 全量路径无回归 |
+
+debug 同步量：7622→14 / 7570→176 / 7572→5940。**三场景校验值（探针布局结果之和）改前改后逐位相同**，这是跨引擎的独立正确性信号；加上 91 条 src 断言（81 条既有零回归 + 10 条增量用例，一律与「同状态从零全量布局的参考树」逐节点快照相等）。
+
+### YG4 与 libyue 集成（部分完成，随主包新栈推进）
+
+- **已落地**：布局树 ↔ 控件树映射、事件命中测试的坐标对齐、脏区增量重排（本包 YG3e）——分别在主包 `yue/core/widget.mbt`（绝对矩形只在 `collect_abs` 一处折算、命中取最深+后画、沿祖先链冒泡）与 `yue/core/app.mbt`（App 宿主每帧 `relayout` 走的就是跳过路径）。
+- **未落地**：文本 measure/baseline 从 `yue/text` 接到控件叶子（`set_measure` + `set_baseline` 的供数），随声明式层 G7 一起做；原生控件尺寸作为叶子的情形在全自绘方案下不存在。
 
 ---
 
@@ -231,7 +258,7 @@ abspos 段的尺寸优先级改为：显式宽高 > 同轴两侧 inset 都设撑
 6. **基线依赖消费方给回调**：`set_baseline` 未设置的叶子一律不参与基线分组——libyue 集成时文本控件必须同时接 measure 与 baseline，否则文字混排会退化成顶部对齐。
 7. **direction 不继承**：rtl 语言环境里每个需要翻转的容器都要显式 `set_direction(Rtl)`，漏设的子树按 LTR 排布；文本/图标内容自身的 rtl 形状由 measure/baseline 回调负责，引擎不管。
 8. **比例项在默认 stretch 容器里交叉轴不按比例**（规范直译，见 §5 第 12 条）：集成方若要「等比方块」语义，得显式给 `align-self` 非 stretch 或直接给交叉尺寸（绝对定位子项已按比例互推，见 YG2e）。
-9. **全树布局成本上升约 40%**（YG3d 的内在尺寸递归）：1121 节点 release 每轮 2.4→3.4ms，因为测量缓存与内在缓存都只在单次 `calculate_layout` 内有效、入口整树清空。真正的解法是 YG4 的脏区增量重排 + 缓存跨布局驻留（需要样式变更通知面），不要在集成前做局部微调式的过度优化。
+9. **~~全树布局成本上升约 40%~~（已结案，YG3e）**：脏区增量重排 + 缓存跨布局驻留已落地，同机 A/B 见 §8 的 YG3e 条（steady 3652→4µs、one_leaf 3656→78µs、全量路径 3664→3602µs 无回归）。仍要注意的两点：①跳过只在「子树版本 + 入参指纹」双双对上时发生，任何新 setter 忘了 `mark_changed` 就是**静默的旧结果**（最难查的一类 bug，改 setter 时务必带上）；②`cache_slots=16` 是内存上限，命中率的绝对上限因此有顶，连续改可用宽会退化成全测（正确性不受影响）。
 
 ---
 
@@ -259,7 +286,7 @@ abspos 段的尺寸优先级改为：显式宽高 > 同轴两侧 inset 都设撑
 ## 11. 接手后 10 分钟动作清单
 
 1. `cd /home/lkyh/ownCode/moonbit-libyue-native && git fetch && git status`——确认在 `feature/yoga-mbt` 且与 origin 一致、工作区干净。
-2. `~/.moon/bin/moon check && ~/.moon/bin/moon test`——确认基线 740/740（若数字不同，先查是不是另一会话又推了新提交）。
+2. `~/.moon/bin/moon test -p NoahLiu/yoga-mbt`（91/91）与 `cd modules/yoga-mbt && ~/.moon/bin/moon check src --deny-warn`（零警告）——数字对不上先查是不是另一会话又推了新提交；全仓 `moon check` 只看不改，红点基线 287 errors / 68 warnings。
 3. 读 `modules/yoga-mbt/README.md` + 本文 §3 / §5 / §6。
-4. YG1/YG2/YG3 已收尾，只剩 YG4（与 libyue 集成 + 脏区增量重排），**依赖 libyue 复刻整体范围定案，先问用户再动手**；可先行的交付动作是 §9 第 2 条（分支合回 master 前剔两个【构建】提交）与第 5 条（发 mooncakes），两件都要先打招呼。
+4. YG1/YG2/YG3（含 YG3e 脏区增量重排）已收尾；YG4 的控件树映射与 App 宿主已随主包新栈落地（§8 YG4 条），剩「文本 measure/baseline 接线」随主包 G7 做。两件交付动作——§9 第 2 条（分支合回 master 前剔两个【构建】提交）与第 5 条（发 mooncakes）——都要先打招呼。
 5. 发现本文与代码/事实不一致 → **以代码为准**，并顺手把本文改成正确的（本文也受「一批一提交」纪律约束）。

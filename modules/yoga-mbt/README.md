@@ -103,12 +103,12 @@ aspect-ratio（`set_aspect_ratio`，比例语义为 border-box：一轴确定 �
 按绝对边框取整后回推相对坐标）、内在尺寸（`min_content()` / `max_content()` /
 `fit_content()` 关键词 + §4.5 `min:auto` 用 min-content、§9.2 content 基准用
 max-content；容器按 in-flow 子项贡献合成，可换行容器的 min-content 主轴取
-最宽单项并按该宽度分行算交叉轴，不换行容器取子项之和）。
+最宽单项并按该宽度分行算交叉轴，不换行容器取子项之和）、
+脏区增量重排（样式 setter 与增删子项即变更通知，`calculate_layout` 只重排
+「变过的子树 + 入参变了的子树」，测量与内在尺寸缓存跨布局驻留；同参数重复
+布局整树跳过）。**调用方写法不变**：改完样式照常调 `calculate_layout`。
 
 ## 未实现（按批次补）
-
-- 测量缓存与内在尺寸缓存的跨布局驻留（当前缓存只在单次
-  `calculate_layout` 内有效，入口整树清空；脏区增量重排留给集成层）
 - `stretch` 尺寸关键词（css-sizing-4，Yoga 有、Web 侧与 `auto` +
   `align-self: stretch` 语义重叠，暂不做）
 - 内在尺寸递归中的百分比近似：子项的百分比尺寸只在父容器该轴尺寸确定时
@@ -121,12 +121,15 @@ max-content；容器按 in-flow 子项贡献合成，可换行容器的 min-cont
 
 ```sh
 cd modules/yoga-mbt
-moon check   # 零警告
-moon test    # 全绿（预期值按规范手算）
+moon check src --deny-warn   # 零警告（在本模块目录内查，别裸跑 moon check：
+                             # 本仓同时有主项目，裸跑会连带把主包编进来）
+moon test src                # 全绿（预期值按规范手算）
 
-# 性能基线：1121 节点树（20 组 × 11 行 × 每行 5 节点，含 baseline/grow/gap）
+# 性能基线：1121 节点树（20 组 × 11 行 × 每行 5 节点，含 baseline/grow/gap），
+# 三个场景各 500 轮并打印每轮 µs：
+#   steady   同参数重复布局（干净整树跳过）
+#   one_leaf 每轮改一个叶子的内容（只重排那条链）
+#   resize   每轮换根的显式宽（全树重排，等价于旧口径的成本基线）
 moon run bench            # debug
 moon run --release bench  # release
-# 把 bench/main.mbt 的 rounds 改成 0 再跑一次，即「进程 + 建树」基线，
-# 两次差值除以轮数就是每轮布局成本
 ```

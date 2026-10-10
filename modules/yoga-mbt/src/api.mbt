@@ -1,4 +1,7 @@
 // 公开 API：取值构造辅助与样式 setter。
+//
+// 每个 setter 第一件事是 `mark_changed(self)`——那是脏区增量重排与缓存跨布局
+// 驻留的唯一变更通知面（见 node.mbt 的时钟说明）。新增 setter 别漏。
 
 ///|
 /// 固定值。
@@ -46,6 +49,7 @@ pub fn fit_content() -> Value {
 
 ///|
 pub fn Node::set_display(self : Node, v : Display) -> Unit {
+  self.mark_changed()
   self.style.display = v
 }
 
@@ -54,26 +58,31 @@ pub fn Node::set_display(self : Node, v : Display) -> Unit {
 /// padding box 定位；四向全 auto 时落在静态位置（按父容器
 /// justify-content / align-items 摆放一个虚拟项）。
 pub fn Node::set_position(self : Node, v : PositionType) -> Unit {
+  self.mark_changed()
   self.style.position = v
 }
 
 ///|
 pub fn Node::set_top(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.top = v
 }
 
 ///|
 pub fn Node::set_right(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.right = v
 }
 
 ///|
 pub fn Node::set_bottom(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.bottom = v
 }
 
 ///|
 pub fn Node::set_left(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.left = v
 }
 
@@ -82,16 +91,19 @@ pub fn Node::set_left(self : Node, v : Value) -> Unit {
 /// 起端落在右侧（与 `RowReverse` 叠加时两番翻转回到左起端）。
 /// 只管本节点排布子项，不继承、不改变子项自身的内容方向。
 pub fn Node::set_direction(self : Node, v : Direction) -> Unit {
+  self.mark_changed()
   self.style.direction = v
 }
 
 ///|
 pub fn Node::set_flex_direction(self : Node, v : FlexDirection) -> Unit {
+  self.mark_changed()
   self.style.flex_direction = v
 }
 
 ///|
 pub fn Node::set_flex_wrap(self : Node, v : FlexWrap) -> Unit {
+  self.mark_changed()
   self.style.flex_wrap = v
 }
 
@@ -103,6 +115,7 @@ pub fn Node::set_flex(
   shrink : Double,
   basis : Value,
 ) -> Unit {
+  self.mark_changed()
   self.style.flex_grow = grow
   self.style.flex_shrink = shrink
   self.style.flex_basis = basis
@@ -110,68 +123,81 @@ pub fn Node::set_flex(
 
 ///|
 pub fn Node::set_flex_grow(self : Node, v : Double) -> Unit {
+  self.mark_changed()
   self.style.flex_grow = v
 }
 
 ///|
 pub fn Node::set_flex_shrink(self : Node, v : Double) -> Unit {
+  self.mark_changed()
   self.style.flex_shrink = v
 }
 
 ///|
 pub fn Node::set_flex_basis(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.flex_basis = v
 }
 
 ///|
 pub fn Node::set_justify_content(self : Node, v : JustifyContent) -> Unit {
+  self.mark_changed()
   self.style.justify_content = v
 }
 
 ///|
 pub fn Node::set_align_items(self : Node, v : AlignItems) -> Unit {
+  self.mark_changed()
   self.style.align_items = v
 }
 
 ///|
 /// 覆盖自身在父容器交叉轴的对齐（None = 跟随父容器 align-items）。
 pub fn Node::set_align_self(self : Node, v : Option[AlignItems]) -> Unit {
+  self.mark_changed()
   self.style.align_self = v
 }
 
 ///|
 /// 多行时的整行对齐（仅 flex-wrap 开启且有确定交叉轴尺寸时生效）。
 pub fn Node::set_align_content(self : Node, v : AlignContent) -> Unit {
+  self.mark_changed()
   self.style.align_content = v
 }
 
 ///|
 pub fn Node::set_width(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.width = v
 }
 
 ///|
 pub fn Node::set_height(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.height = v
 }
 
 ///|
 pub fn Node::set_min_width(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.min_width = v
 }
 
 ///|
 pub fn Node::set_min_height(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.min_height = v
 }
 
 ///|
 pub fn Node::set_max_width(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.max_width = v
 }
 
 ///|
 pub fn Node::set_max_height(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.max_height = v
 }
 
@@ -180,6 +206,7 @@ pub fn Node::set_max_height(self : Node, v : Value) -> Unit {
 /// （与 CSS 默认的 content-box 比例不同）。一个轴尺寸确定时，另一个轴按
 /// 比例换算；`None` 表示不设比例，非正数视同 `None`。
 pub fn Node::set_aspect_ratio(self : Node, ratio : Option[Double]) -> Unit {
+  self.mark_changed()
   self.style.aspect_ratio = match ratio {
     Some(r) => if r > 0.0 { Some(r) } else { None }
     None => None
@@ -188,78 +215,93 @@ pub fn Node::set_aspect_ratio(self : Node, ratio : Option[Double]) -> Unit {
 
 ///|
 pub fn Node::set_margin_left(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.margin.left = v
 }
 
 ///|
 pub fn Node::set_margin_right(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.margin.right = v
 }
 
 ///|
 pub fn Node::set_margin_top(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.margin.top = v
 }
 
 ///|
 pub fn Node::set_margin_bottom(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.margin.bottom = v
 }
 
 ///|
 pub fn Node::set_padding_left(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.padding.left = v
 }
 
 ///|
 pub fn Node::set_padding_right(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.padding.right = v
 }
 
 ///|
 pub fn Node::set_padding_top(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.padding.top = v
 }
 
 ///|
 pub fn Node::set_padding_bottom(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.padding.bottom = v
 }
 
 ///|
 pub fn Node::set_border_left(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.border.left = v
 }
 
 ///|
 pub fn Node::set_border_right(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.border.right = v
 }
 
 ///|
 pub fn Node::set_border_top(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.border.top = v
 }
 
 ///|
 pub fn Node::set_border_bottom(self : Node, v : Value) -> Unit {
+  self.mark_changed()
   self.style.border.bottom = v
 }
 
 ///|
 /// 行间距（交叉轴方向行与行之间）与列间距（主轴方向项与项之间）。
 pub fn Node::set_gap(self : Node, row : Double, column : Double) -> Unit {
+  self.mark_changed()
   self.style.row_gap = row
   self.style.column_gap = column
 }
 
 ///|
 pub fn Node::set_row_gap(self : Node, v : Double) -> Unit {
+  self.mark_changed()
   self.style.row_gap = v
 }
 
 ///|
 pub fn Node::set_column_gap(self : Node, v : Double) -> Unit {
+  self.mark_changed()
   self.style.column_gap = v
 }
 
@@ -272,8 +314,8 @@ pub fn calculate_layout(
   width : Option[Double],
   height : Option[Double],
 ) -> Unit {
-  // 测量缓存只在单次布局内有效：入口先整体清一次
-  clear_measure_cache(root)
+  // 入口只扫一遍版本号（整数比较，不碰测量），缓存与子树结果按版本判定复用
+  let _ = scan_subtree_rev(root)
   let _ = layout_into(root, width, height, None, None)
   root.layout_left = 0.0
   root.layout_top = 0.0
