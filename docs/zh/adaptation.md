@@ -332,6 +332,18 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **测试取向**：不断言派生出的具体色值（换基准盘就整片红），只断**公式不变量**——灰 accent 饱和度被抬到保底、白 accent 明度被钳上限、深模式把暗 accent 抬到下限、hover 的明度方向、语义色色相轮 ±1°、浅底变体的混色方向、非法 accent 回落基准盘；订阅面断「通知走快照」（回调里新注册的不进本轮）、退订幂等、未知句柄空操作、`theme_apply` 后 getter 跟随。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/theme` 7/7；`moon check yue/theme --deny-warn` 零警告；全仓红点仍 287 errors / 68 warnings；其余包与 yoga-mbt 未动。
 
+### MoonBit 原生 GUI 栈 · 控件宿主首批（布局树 ↔ 控件树、命中与事件路由）
+
+- **落点**：按计划 §2 的包表放在 `yue/core`（循环/焦点栈同在本包，平台后端在 `yue/win`，绘制契约在 `yue/render`），本层不认识任何平台句柄。这也是 yoga-mbt 第一次成为主包的依赖——`moon.mod` 的 `import` 加了 `"NoahLiu/yoga-mbt@0.1.0"`（工作区里已有该模块，缺这句会报「containing module is not imported」）。
+- **坐标口径（只在一处换算）**：yoga 的 `left/top` 是「相对父节点边框盒」的偏移；`relayout`/`relayout_at` 在布局后一次遍历（`collect_abs`）把它折算成窗口坐标的绝对矩形写回控件。命中测试与绘制遍历都只吃绝对矩形；事件交给处理器前再平移为控件本地坐标（本地 (0,0) = 该控件边框盒左上角）。绘制逐层 `translate + clip_rect`，所以控件的 `on_draw` 只写本地坐标、不需要自己裁剪。
+- **传播规则**：从命中控件起沿祖先链向上，第一个返回 `true` 的处理器消费掉事件（指针/滚轮/按键同一条规则）。宿主**不存父指针**，冒泡靠命中路径（`hit_path` / 按焦点 id 寻路），因此重挂子树不会留下悬垂的父引用。
+- **坑①（控件本体不能比 `==`）**：`Widget` 带闭包字段 → 派生不出 `Eq`，`Option[Widget] == None` 直接编译错（报在 `impl Eq for Option` 的约束上）。做法：控件自增 `id`，本体比较与测试断言一律走 id（命中不到给 -1 的辅助函数）。
+- **坑②（隐藏子树留着旧矩形）**：布局引擎碰到 `display:none` 就**不再往下递归**，其后代的 `layout_*` 保留上一轮数值。若 `collect_abs` 不跳过隐藏子树，被隐藏的后代仍可能拿陈旧矩形被命中/绘制。修法：控件不可见时把**整棵子树**的矩形清零后再返回。
+- **坑③（`local` 是保留字）**：`let local = ...` 触发 `Warning [0035] reserved_keyword`（本工具链把 `local` 留给未来），零警告门禁下必须改名。
+- **真窗口回证（坐标对齐不是纸面结论）**：示例加了一条 200×28 的演示带（四个 50×28 单元格，各自 `on_draw` 画色块、`on_pointer` 只数按下）。`xdotool mousemove --window <id> X 250` + `click 1` 在窗口坐标 200/250/300/360 各点一次 → 退出行 `NATIVE-WINDOW-OK band_h=1/1/1/1`（每格恰一次、无错格无重计），同轮 `frames=49`、`queue=0`、退出码 0。
+- **本批未做（G6 余项）**：脏区增量重排 + 测量/内在缓存跨布局驻留；`App` 宿主（把 `yue/win` 的原始事件翻成本层 `PointerEvent`/`KeyEvent`、以及 present 循环的收包方）随声明式层 G7 一起落。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/core` 22/22（新增 7 条：绝对矩形折算含父 padding、命中取最深/后画优先/出界与零尺寸与隐藏不命中、指针本地化与三级冒泡与消费即停、带偏移树的本地坐标 (12,45)→(12,15)、滚轮冒泡到容器且出界不路由、按键按焦点 id 定位并冒泡且隐藏后不可达、绘制遍历的平移与裁剪（子控件越界部分不留色）+ 隐藏子树不绘制）；`moon check yue/{core,input,render,text,win}` 与示例 `--deny-warn` 零警告；yoga-mbt 81/81；全仓红点仍 287 errors / 68 warnings。
+
 ## Linux
 
 ### 发行版

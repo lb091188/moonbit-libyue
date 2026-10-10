@@ -87,6 +87,37 @@ fn make_sprite() -> @render.Canvas {
   cv
 }
 
+// 控件宿主演示带（G6：布局树 ↔ 控件树映射与命中坐标对齐的真窗口回证）：
+// 一块 200×28 的横排容器摆在下半区，四个单元格各自画色块、并把命中计数记进 hits。
+// 坐标一律由宿主折算（relayout_at + hit_test），示例侧不再手写矩形。
+fn make_band(hits : Ref[Array[Int]]) -> @core.Widget {
+  let band = @core.Widget::new()
+  band.set_size(200.0, 28.0)
+  let colors = ["#f38ba8", "#a6e3a1", "#f9e2af", "#89b4fa"]
+  for i = 0; i < 4; i = i + 1 {
+    let cell = @core.Widget::new()
+    cell.set_size(50.0, 28.0)
+    let k = i
+    cell.on_draw = Some(fn(p : @render.Painter, r : @core.Rect) -> Unit {
+      p.set_fill_color(colors[k])
+      p.fill_rect(0.0, 0.0, r.w, r.h)
+    })
+    cell.on_pointer = Some(fn(ev : @core.PointerEvent) -> Bool {
+      // 只数按下：移动也路由到控件（真控件要它做 hover），计数得可解释
+      match ev.kind {
+        @core.Down => {
+          let h = hits.val
+          h[k] = h[k] + 1
+        }
+        _ => ()
+      }
+      true
+    })
+    band.append_child(cell)
+  }
+  band
+}
+
 fn draw(
   win : @win.Window,
   boxes : Array[Box],
@@ -94,6 +125,7 @@ fn draw(
   blink : Bool,
   tick : Int,
   sprite : @render.Canvas,
+  band : @core.Widget,
 ) -> Unit {
   let (w, h) = win.size()
   let bm = @render.Bitmap::new(w, h)
@@ -152,6 +184,9 @@ fn draw(
   let _ = title.draw(bm, 0.0, 240.0, fw, 24.0)
   p.flush()
   let _ = @text.draw_to(bm, 24.0, 30.0, note, 12.0, "#a6adc8")
+  // 宿主带：摆到窗口坐标 (180,240) 并整棵树绘制
+  band.relayout_at(180.0, 240.0, 200.0, 28.0)
+  band.paint(p)
   p.end()
   win.present(bm.data, bm.width, bm.height)
 }
@@ -212,6 +247,8 @@ fn main {
   let _ = fs.register(1)
   let _ = fs.register(2)
   let sprite = make_sprite()
+  let hits = Ref([0, 0, 0, 0])
+  let band = make_band(hits)
 
   let l = @core.Loop::new()
   l.start(@win.now_ms())
@@ -266,6 +303,23 @@ fn main {
           seen.val = seen.val + 1
           match win.take_input() {
             Some(ev) => {
+              // 指针类事件先交控件宿主（命中与本地坐标由宿主折算）
+              if ev.code == 2 || ev.code == 3 || ev.code == 4 {
+                let kind = if ev.code == 2 {
+                  @core.Down
+                } else if ev.code == 3 {
+                  @core.Up
+                } else {
+                  @core.Move
+                }
+                let _ = band.dispatch_pointer({
+                  kind: kind,
+                  x: ev.x.to_double(),
+                  y: ev.y.to_double(),
+                  button: ev.button,
+                  mods: ev.mods,
+                })
+              }
               if ev.code == 0 {
                 // 键按下
                 if ev.keysym == @core.KS_TAB {
@@ -345,10 +399,14 @@ fn main {
     queue_left.val = win.pending_input()
     if dirty.val {
       dirty.val = false
-      draw(win, boxes, fs.current(), blink.val, frames.val, sprite)
+      draw(win, boxes, fs.current(), blink.val, frames.val, sprite, band)
     }
   }
   win.close()
+  let hv = hits.val
+  println(
+    "NATIVE-WINDOW-OK band_h=\{hv[0]}/\{hv[1]}/\{hv[2]}/\{hv[3]}",
+  )
   println(
     "NATIVE-WINDOW-OK frames=\{frames.val} seen=\{seen.val} queue=\{queue_left.val} a='\{a.get_text()}' b='\{b.get_text()}'",
   )
