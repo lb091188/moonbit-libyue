@@ -1,8 +1,10 @@
-// 应用查找：已装应用清单（desktop entries 扫描）与应用二进制查找
-// （which 语义的固定目录版）。desktop 文件读取复用 read_text_file；
-// 目录枚举与存在性判断走 fsx_list_dir（只列条目名，不读文件内容），
-// 按"存在才扫、读不到静默跳过"处理，全部扫描目录都不存在时报
-// NoScanDir。
+// 应用查找：已装应用清单与应用二进制查找。
+// Linux：XDG .desktop 条目扫描 + which 语义固定目录查找；
+// Windows：开始菜单 .lnk 递归扫描（全用户 %ProgramData% 与用户
+// %APPDATA% 两层，同名用户覆盖全用户）+ PATH/PATHEXT 语义查找。
+// 文件读取复用 read_text_file；目录枚举与存在性判断走 fsx_list_dir
+// （只列条目名，不读文件内容），按"存在才扫、读不到静默跳过"处理，
+// 全部扫描目录都不存在时报 NoScanDir。
 
 ///|
 /// 已装应用条目（来自 .desktop 的 [Desktop Entry] 段）。
@@ -23,11 +25,12 @@ pub(all) struct AppEntry {
 
 ///|
 pub(all) enum AppFindError {
-  /// 平台不支持（macOS/Windows 无 XDG 桌面项体系）
+  /// 平台不支持（macOS 无 XDG 桌面项体系与开始菜单体系）
   Unsupported
   /// 未找到该名称的可执行文件，带查找名
   NotFound(String)
-  /// 扫描目录全都不存在（系统与用户 applications 目录皆缺失）
+  /// 扫描目录全都不存在（Linux 系统与用户 applications 目录、Windows
+  /// 两层开始菜单目录皆缺失）
   NoScanDir
 }
 
@@ -300,8 +303,9 @@ fn appfind_basename(path : String) -> String {
   let mut cut = 0
   let mut i = 0
   while i < path.length() {
-    if path.unsafe_get(i).to_int() == 47 {
-      // '/'
+    let c = path.unsafe_get(i).to_int()
+    if c == 47 || c == 92 {
+      // '/' 与 '\'
       cut = i + 1
     }
     i += 1
@@ -381,7 +385,8 @@ fn appfind_installed_impl(
 /// /usr/local/share/applications、~/.local/share/applications（XDG
 /// 数据目录约定）下的 .desktop，按 desktop id 去重（用户目录覆盖系统
 /// 目录），结果按 name 排序；不存在的目录跳过，全部扫描目录都不存在
-/// 时报 NoScanDir；非 Linux 给 [Unsupported]。
+/// 时报 NoScanDir；Linux / Windows 之外给 [Unsupported]（Windows 走
+/// 开始菜单 .lnk 扫描，见 [appfind_installed_win]）。
 pub fn appfind_installed() -> Result[Array[AppEntry], AppFindError] {
   match @yue.platform() {
     "linux" =>
@@ -389,15 +394,16 @@ pub fn appfind_installed() -> Result[Array[AppEntry], AppFindError] {
         appfind_scan_dirs(getenv_str("XDG_DATA_HOME"), getenv_str("HOME")),
         fn(path) { @yue.fsx_list_dir(path) },
       )
+    "windows" => appfind_installed_win(fn(path) { @yue.fsx_list_dir(path) })
     _ => Err(Unsupported)
   }
 }
 
 ///|
 /// 已装应用清单（注入版）：与 [appfind_installed] 同流程，目录枚举由
-/// 调用方注入（收目录路径、返回该目录下文件名数组，.desktop 之外的
-/// 条目会被过滤），供无 fsx 层的调用方与测试使用；非 Linux 给
-/// [Unsupported]。
+/// 调用方注入（收目录路径、返回该目录下文件名数组，.desktop / .lnk
+/// 之外的条目会被过滤），供无 fsx 层的调用方与测试使用；Linux /
+/// Windows 之外给 [Unsupported]。
 pub fn appfind_installed_with(
   list_dir : (String) -> Array[String],
 ) -> Result[Array[AppEntry], AppFindError] {
@@ -409,16 +415,19 @@ pub fn appfind_installed_with(
           list_dir,
         ),
       )
+    "windows" =>
+      appfind_installed_win(fn(path) { Ok(list_dir(path)) })
     _ => Err(Unsupported)
   }
 }
 
 ///|
-/// 应用二进制查找（which 语义的固定目录版）：在 ~/.local/bin、
-/// /usr/local/bin、/usr/bin、/bin、/usr/sbin、/sbin 中按序找名为 name 的
-/// 条目，返回首个命中的完整路径；找不到给 NotFound。name 为空或含路径
-/// 分隔符直接 NotFound。命中判定为目录枚举里有该名字的条目（不读文件
-/// 内容；本包不校验执行权限位）。
+/// 应用二进制查找（which 语义）：Linux 在 ~/.local/bin、/usr/local/bin、
+/// /usr/bin、/bin、/usr/sbin、/sbin 中按序找名为 name 的条目；Windows
+/// 按 %PATH% 目录序找 name（无扩展名时依次试 %PATHEXT% 扩展，缺省
+/// .com/.exe/.bat/.cmd）。返回首个命中的完整路径；找不到给 NotFound。
+/// name 为空或含路径分隔符直接 NotFound。命中判定为目录枚举里有该名字
+/// 的条目（不读文件内容；本包不校验执行权限位）。
 pub fn appfind_executable(name : String) -> Result[String, AppFindError] {
   match @yue.platform() {
     "linux" => {
@@ -436,6 +445,187 @@ pub fn appfind_executable(name : String) -> Result[String, AppFindError] {
       }
       Err(NotFound(name))
     }
+    "windows" => {
+      if name == "" || name.contains("/") || name.contains("\\") || name.contains(":") {
+        return Err(NotFound(name))
+      }
+      let exts = appfind_win_probe_names(name, getenv_str("PATHEXT"))
+      let path_env = match getenv_str("PATH") {
+        Some(p) => p
+        None => ""
+      }
+      for dir in appfind_win_path_dirs(path_env) {
+        match @yue.fsx_list_dir(dir) {
+          Ok(names) =>
+            for cand in exts {
+              if appfind_names_hit(names, cand) {
+                return Ok(dir + "/" + cand)
+              }
+            }
+          Err(_) => () // 目录打不开：当无此目录
+        }
+      }
+      Err(NotFound(name))
+    }
     _ => Err(Unsupported)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Windows：开始菜单 .lnk 扫描与 PATH 查找（纯函数层白盒测试覆盖）
+// ---------------------------------------------------------------------------
+
+///|
+/// .lnk 后缀判定（ASCII 大小写不敏感，长度含 4 字符扩展）。
+pub fn appfind_is_lnk(name : String) -> Bool {
+  let n = name.length()
+  if n <= 4 {
+    return false
+  }
+  let s = name[n - 4:].to_owned().to_lower()
+  s == ".lnk"
+}
+
+///|
+/// Windows 开始菜单扫描目录（低 → 高优先级）：全用户 %ProgramData%
+/// 在前、用户 %APPDATA% 在后（同名条目用户覆盖全用户）；环境变量缺失
+/// 的层不入列。
+pub fn appfind_win_scan_dirs(
+  program_data : String?,
+  appdata : String?,
+) -> Array[String] {
+  let dirs : Array[String] = []
+  match program_data {
+    Some(d) if d != "" => dirs.push(d + "/Microsoft/Windows/Start Menu/Programs")
+    _ => ()
+  }
+  match appdata {
+    Some(d) if d != "" => dirs.push(d + "/Microsoft/Windows/Start Menu/Programs")
+    _ => ()
+  }
+  dirs
+}
+
+///|
+/// %PATH% 拆分为目录数组（';' 分隔，空段滤除，保持原序）。
+pub fn appfind_win_path_dirs(path_env : String) -> Array[String] {
+  let dirs : Array[String] = []
+  for part in path_env.split(";") {
+    let p = part.trim().to_owned()
+    if p != "" {
+      dirs.push(p)
+    }
+  }
+  dirs
+}
+
+///|
+/// 候选文件名表：name 已含 '.' 视为带扩展，只试原名；否则依次试原名与
+/// PATHEXT 各扩展（PATHEXT 形如 ".COM;.EXE;.BAT;.CMD"，缺省同此四项，
+/// 统一小写）。
+pub fn appfind_win_probe_names(
+  name : String,
+  pathext : String?,
+) -> Array[String] {
+  let cands : Array[String] = [name]
+  if name.contains(".") {
+    return cands
+  }
+  let raw = match pathext {
+    Some(p) if p != "" => p
+    _ => ".COM;.EXE;.BAT;.CMD"
+  }
+  for part in raw.split(";") {
+    let e = part.trim().to_owned().to_lower()
+    if e != "" {
+      cands.push(name + e)
+    }
+  }
+  cands
+}
+
+///|
+/// 开始菜单单层条目收集：非 .lnk 与名为 ".lnk" 的条目过滤；条目字段为
+/// 文件名派生（id/name 去 .lnk 扩展，exec 为 .lnk 完整路径——启动器
+/// 本体，icon/categories 无来源留空，.lnk 元数据不解析）。
+fn appfind_win_lnk_layer(dir : String, names : Array[String]) -> Array[AppEntry] {
+  let layer : Array[AppEntry] = []
+  for fname in names {
+    let base = appfind_basename(fname)
+    if !appfind_is_lnk(base) {
+      continue
+    }
+    let id = base[:base.length() - 4].to_owned()
+    if id == "" {
+      continue
+    }
+    layer.push({
+      id,
+      name: id,
+      locale_name: id,
+      exec: dir + "/" + base,
+      icon: "",
+      categories: [],
+    })
+  }
+  layer
+}
+
+///|
+/// 开始菜单目录树递归收集（应用组嵌套子目录，深度钳 3）：list_dir 打得
+/// 开的目录收 .lnk 条目并对非 .lnk 子项递归（对文件 list_dir 报错即当
+/// 非目录跳过）；根目录打不开返回 false。
+fn appfind_win_lnk_walk(
+  dir : String,
+  depth : Int,
+  list_dir : (String) -> Result[Array[String], @yue.FsError],
+  layer : Array[AppEntry],
+) -> Bool {
+  let names = match list_dir(dir) {
+    Ok(ns) => ns
+    Err(_) => return false
+  }
+  for e in appfind_win_lnk_layer(dir, names) {
+    layer.push(e)
+  }
+  if depth <= 0 {
+    return true
+  }
+  for fname in names {
+    let base = appfind_basename(fname)
+    if appfind_is_lnk(base) || base == "" {
+      continue
+    }
+    // 子目录尝试：枚举失败（普通文件 / 无权限）静默跳过
+    let child : Array[AppEntry] = []
+    let _ = appfind_win_lnk_walk(dir + "/" + base, depth - 1, list_dir, child)
+    for e in child {
+      layer.push(e)
+    }
+  }
+  true
+}
+
+///|
+/// Windows 已装应用清单公共实现：两层开始菜单（全用户 → 用户）递归扫
+/// .lnk，按 id 去重合并排序；两层都打不开报 NoScanDir。
+fn appfind_installed_win(
+  list_dir : (String) -> Result[Array[String], @yue.FsError],
+) -> Result[Array[AppEntry], AppFindError] {
+  let layers : Array[Array[AppEntry]] = []
+  let mut scanned = false
+  for dir in appfind_win_scan_dirs(
+      getenv_str("ProgramData"),
+      getenv_str("APPDATA"),
+    ) {
+    let layer : Array[AppEntry] = []
+    if appfind_win_lnk_walk(dir, 3, list_dir, layer) {
+      scanned = true
+    }
+    layers.push(layer)
+  }
+  if !scanned {
+    return Err(NoScanDir)
+  }
+  Ok(appfind_merge_entries(layers))
 }

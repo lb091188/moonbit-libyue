@@ -866,6 +866,9 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - Windows 真机实测(本机 Win10 19045)五则:①`cmd /c echo` 重定向输出为 `\r\n` 行尾且按 OEM 代码页编码——procrun 消费方解析按 ASCII 输出设计,中文输出会按 GBK 落盘;②命令不存在是 CreateProcessW 直接失败(GetLastError=2),归一 `SpawnFailed` 而非 Unix 的「子进程退出码 127→NonZeroExit」,两平台语义都写进了 ProcError 文档;③超时强杀 `ping -n 6` 配 100ms 预算实测 ~100ms 返回(TerminateProcess+5s 兜底等待);④环境块按名排序是 Windows 环境块的规范要求(不排序个别程序读环境会错),宽字符双 NUL 收尾;⑤参数含空白/引号需 CommandLineToArgvW 兼容的引号转义(引号前反斜杠翻倍),procrun 的实参是路径与固定开关,简化实现够用。
 - Linux 侧行为等价替换(待 Ubuntu 主机全量 moon test 复验):env blob 仍是 PATH/XDG_RUNTIME_DIR/HOME/LC_ALL=C,临时文件仍走 TMPDIR;差异仅「wait 由 subproc 的 wait_child_timeout 换为 shim 内 WNOHANG 10ms 轮询 + 超时组杀」,对外语义(Timeout/Signaled/NonZeroExit 归一)不变。
 
+- **浏览器历史/书签的 Windows 配置根多一层 User Data**:Linux 是 `<XDG 根>/<浏览器>/Default/History`,Windows 是 `%LOCALAPPDATA%\<厂商>\<产品>\User Data\Default\History`(Chrome=Google/Chrome、Edge=Microsoft/Edge、Brave=BraveSoftware/Brave-Browser、Chromium 同 Chrome 形态);`bh_defs()` 按平台出定义表,`bh_config_root` 保持纯函数不动(白盒测试直接断言其 XDG 语义),Windows 根在 `bh_root_or_err` 里取 LOCALAPPDATA。本机实测 Chrome 多 profile 探测/书签解析通过。
+- **appfind 的 Windows 形态**:已装清单 = 开始菜单 .lnk 递归扫描(%ProgramData% 全用户层 → %APPDATA% 用户层,同名用户覆盖;深度钳 3,子目录靠「对条目试 list_dir,打得开即目录」判定——fsx_list_dir 只给名字不给类型);条目字段从文件名派生(id/name 去 .lnk,exec 为 .lnk 完整路径即启动器本体,icon/categories 留空,.lnk 二进制元数据不解析)。可执行查找 = %PATH% 目录序 × PATHEXT 扩展探测(缺省 .com/.exe/.bat/.cmd,统一小写;名字已含 '.' 只试原名);名字含 `/`、`\`、`:` 直接 NotFound。本机实测开始菜单扫描出条目、`cmd` 命中 System32。
+
 ## macOS(CI 构建链已验,GUI 待真机)
 
 - libyue v0.15.6 发行包含 ARC / no-ARC 双库:Darwin 链接参数 = 主库 + `-lyue_mbt_noarc`(no-ARC 符号被主库引用,须排其后)+ AppKit / Carbon / IOKit / Security / WebKit / OpenDirectory 框架 + `-lobjc -lc++ -lpthread -lbsm -Wl,-dead_strip`;prebuild Darwin 分支已按此预修。

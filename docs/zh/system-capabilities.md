@@ -119,14 +119,14 @@ match @system.volx_app_streams() {
 
 ## 应用查找
 
-两部分：已装应用清单（扫描 XDG `.desktop` 条目）与应用二进制查找（which 语义的固定目录版）。仅 Linux；macOS / Windows 无 XDG 桌面项体系，返回 `AppFindError::Unsupported`。
+两部分：已装应用清单与应用二进制查找（which 语义）。Linux 扫描 XDG `.desktop` 条目、按固定目录序查找二进制；Windows 递归扫描开始菜单 `.lnk`（用户层覆盖全用户层）、按 `%PATH%` × PATHEXT 扩展查找。macOS 返回 `AppFindError::Unsupported`。
 
 | 函数 | 说明 |
 |---|---|
 | `appfind_installed_with(list_dir) -> Result[Array[AppEntry], AppFindError]` | 已装应用清单；`list_dir : (String) -> Array[String]` 由调用方注入（收目录路径、返回该目录下文件名数组） |
-| `appfind_executable(name) -> Result[String, AppFindError]` | 在 `~/.local/bin`、`/usr/local/bin`、`/usr/bin`、`/bin`、`/usr/sbin`、`/sbin` 中按序找名为 name 的文件，返回首个命中完整路径；找不到给 `NotFound` |
+| `appfind_executable(name) -> Result[String, AppFindError]` | which 语义查找：Linux 在 `~/.local/bin`、`/usr/local/bin`、`/usr/bin`、`/bin`、`/usr/sbin`、`/sbin` 中按序找名为 name 的文件；Windows 按 `%PATH%` 目录序找 name（无扩展名时依次试 PATHEXT 扩展）。返回首个命中完整路径；找不到给 `NotFound` |
 
-`AppEntry{ id, name, locale_name, exec, icon, categories }`：id 为 desktop id（.desktop 文件名去扩展名）、name 为显示名、locale_name 为本地化名（`Name[zh_CN]` 优先回退 Name）、exec / icon 原样、categories 按分号拆分。结果按 desktop id 去重（用户目录覆盖系统目录）、按 name 排序；Type 非 Application、NoDisplay=true、缺 Name 的条目已滤除。
+`AppEntry{ id, name, locale_name, exec, icon, categories }`：Linux 条目来自 `.desktop`——id 为 desktop id（文件名去扩展名）、name 为显示名、locale_name 为本地化名（`Name[zh_CN]` 优先回退 Name）、exec / icon 原样、categories 按分号拆分；Type 非 Application、NoDisplay=true、缺 Name 的条目已滤除。Windows 条目来自开始菜单 `.lnk`——id/name 为文件名去 `.lnk`、exec 为 `.lnk` 完整路径（启动器本体）、icon/categories 留空。结果按 id 去重（用户层覆盖系统层）、按 name 排序。
 
 ```moonbit
 // 已装清单:注入目录列举函数(如自有的 readdir 封装)
@@ -204,7 +204,7 @@ match @system.vsc_recent() {
 
 ## 浏览器历史与下载记录
 
-只读读取 Chrome / Chromium / Edge / Brave 的 History 库（直接解析磁盘文件，不复制、不修改原库）；自动探测全部 profile（Default 与 Profile 1..24）。仅实现 Linux 路径探测，其余平台 `BhUnsupported`。
+只读读取 Chrome / Chromium / Edge / Brave 的 History 库（直接解析磁盘文件，不复制、不修改原库）；自动探测全部 profile（Default 与 Profile 1..24）。Linux 走 XDG 配置根、Windows 走 `%LOCALAPPDATA%\...\User Data`，其余平台 `BhUnsupported`。
 
 | 函数 | 说明 |
 |---|---|
@@ -729,7 +729,7 @@ match @system.rf_recent(limit=8) {
 
 | 函数 | 说明 |
 |---|---|
-| `bm_supported() -> Bool` | Linux（本文件仅实现 Linux 路径探测） |
+| `bm_supported() -> Bool` | Linux / Windows（已实现路径探测，macOS 未实现） |
 | `bm_browsers() -> Result[Array[BookmarkProfile], BookmarkError]` | 列出有可读 Bookmarks 文件的 profile |
 | `bm_bookmarks(browser) -> Result[BookmarkNode, BookmarkError]` | 指定浏览器的首个可读书签树（浏览器标识取 "google-chrome"/"chromium"/"microsoft-edge"/"brave"，profile 取 Default 优先、其次 Profile 1..24） |
 
@@ -770,10 +770,10 @@ match @system.ffx_history(limit=10) {
 
 | 函数 | 说明 |
 |---|---|
-| `pr_available() -> Bool` | 当前平台是否支持子进程执行（仅 Linux，基于 `@subproc`） |
+| `pr_available() -> Bool` | 当前平台是否支持子进程执行（Linux / Windows，原生 spawn/wait 由 shim 提供） |
 | `pr_run(cmd, args, timeout_ms? = 5000) -> Result[ProcOutput, ProcError]` | 运行命令并归一结果（超时进程会被强制终止） |
 
-`ProcOutput{ stdout, exit_code }`；错误 `ProcError`：`Unsupported`（非 Linux）/ `SpawnFailed(String)`（命令不存在按 Unix 惯例由子进程以退出码 127 呈现，归入非零退出）/ `Timeout(String)` / `NonZeroExit(Int, String)` / `Signaled(Int)`。
+`ProcOutput{ stdout, exit_code }`；错误 `ProcError`：`Unsupported`（非 Linux / Windows）/ `SpawnFailed(String)`（spawn 系统调用失败；Unix 下命令不存在按惯例由子进程以退出码 127 呈现、归入非零退出，Windows 下 CreateProcessW 直接失败即此错误）/ `Timeout(String)` / `NonZeroExit(Int, String)` / `Signaled(Int)`（仅 Unix 呈现）。
 
 命令缺失与「存在但失败」是两种语义：前者在该模块自身通常归一为 `*Supported == false` 或 `Unsupported`（如 `PpUnsupported`、`PrtUnsupported`），后者是 `CommandFailed`——调用方按错误值分类处理即可。
 

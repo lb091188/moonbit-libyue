@@ -281,7 +281,8 @@ test "bm_bookmarks_path：子目录拼装" {
 
 ///|
 test "bm_supported：与平台一致的探测口径" {
-  assert_eq(bm_supported(), @yue.platform() == "linux")
+  let p = @yue.platform()
+  assert_eq(bm_supported(), p == "linux" || p == "windows")
 }
 
 ///|

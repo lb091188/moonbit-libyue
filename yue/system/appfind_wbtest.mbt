@@ -183,17 +183,30 @@ test "appfind 目录拼装：用户目录三态 + 扫描序 + bin 查找序" {
 }
 
 ///|
+/// 平台临时目录（真实读盘用例的样本文件落点）。
+fn af_tmp() -> String {
+  if @yue.platform() == "windows" {
+    match getenv_str("TEMP") {
+      Some(t) if t != "" => t
+      _ => "."
+    }
+  } else {
+    "/tmp"
+  }
+}
+
+///|
 test "appfind_collect：真实读盘 + 非 .desktop 过滤 + 路径只留文件名" {
-  let path = "/tmp/appfind_wbtest_sample.desktop"
+  let path = af_tmp() + "/appfind_wbtest_sample.desktop"
   let written = @yue.write_text_file(
     path, "[Desktop Entry]\nType=Application\nName=Sample\nName[zh_CN]=示例\nExec=/opt/sample %U\nIcon=sample\nCategories=Development;\n",
   )
   inspect(written, content="true")
-  let out = appfind_collect(["/tmp"], fn(dir) {
-    if dir == "/tmp" {
-      [
-        "appfind_wbtest_sample.desktop", "not_desktop.txt", ".desktop", "/tmp/appfind_wbtest_sample.desktop",
-      ]
+  let dir = af_tmp()
+  let fname = "appfind_wbtest_sample.desktop"
+  let out = appfind_collect([dir], fn(d) {
+    if d == dir {
+      [fname, "not_desktop.txt", ".desktop", dir + "/" + fname]
     } else {
       []
     }
@@ -216,10 +229,11 @@ test "appfind_collect：目录读不到静默跳过（空清单不报错）" {
   })
   inspect(out.length(), content="0")
   // 解析后全被过滤（NoDisplay）：同样空清单
-  let path = "/tmp/appfind_wbtest_hidden.desktop"
+  let path = af_tmp() + "/appfind_wbtest_hidden.desktop"
   ignore(@yue.write_text_file(path, "[Desktop Entry]\nName=H\nNoDisplay=true\n"))
-  let out2 = appfind_collect(["/tmp"], fn(dir) {
-    if dir == "/tmp" {
+  let dir = af_tmp()
+  let out2 = appfind_collect([dir], fn(d) {
+    if d == dir {
       ["appfind_wbtest_hidden.desktop"]
     } else {
       []
@@ -248,18 +262,19 @@ test "appfind_installed_impl：目录全打不开 Err(NoScanDir)，部分存在�
     _ => inspect(false, content="true")
   }
   // 部分目录打不开：跳过，存在的照扫
-  let path = "/tmp/appfind_wbtest_real.desktop"
+  let path = af_tmp() + "/appfind_wbtest_real.desktop"
   ignore(
     @yue.write_text_file(
       path, "[Desktop Entry]\nType=Application\nName=RealScan\nExec=real %U\n",
     ),
   )
+  let dir = af_tmp()
   match
-    appfind_installed_impl(["/nonexistent-appfind-zz-1", "/tmp"], fn(dir) {
-      if dir == "/tmp" {
+    appfind_installed_impl(["/nonexistent-appfind-zz-1", dir], fn(d) {
+      if d == dir {
         Ok(["appfind_wbtest_real.desktop"])
       } else {
-        Err(@yue.OpenFailed(dir))
+        Err(@yue.OpenFailed(d))
       }
     }) {
     Ok(entries) => {
@@ -276,7 +291,8 @@ test "appfind_installed_impl：目录全打不开 Err(NoScanDir)，部分存在�
 }
 
 ///|
-test "appfind_installed：真实扫描（本链路宿主机 /usr/share/applications 必有）" {
+test "appfind_installed：真实扫描必有应用条目" {
+  // Linux：/usr/share/applications 必有；Windows：开始菜单两层必有 .lnk
   match appfind_installed() {
     Ok(entries) => inspect(entries.length() > 0, content="true")
     Err(e) => {
@@ -288,10 +304,18 @@ test "appfind_installed：真实扫描（本链路宿主机 /usr/share/applicati
 
 ///|
 test "appfind_executable：真实目录探测" {
-  // /usr/bin 先于 /bin：sh 命中 /usr/bin/sh（本链路宿主机必有）
-  match appfind_executable("sh") {
-    Ok(p) => inspect(p, content="/usr/bin/sh")
-    Err(_) => inspect(false, content="true")
+  if @yue.platform() == "windows" {
+    // Windows：System32 在 PATH 内，cmd 必能命中（扩展名来自 PATHEXT）
+    match appfind_executable("cmd") {
+      Ok(p) => inspect(p.to_lower().contains("cmd"), content="true")
+      Err(_) => inspect(false, content="true")
+    }
+  } else {
+    // /usr/bin 先于 /bin：sh 命中 /usr/bin/sh（本链路宿主机必有）
+    match appfind_executable("sh") {
+      Ok(p) => inspect(p, content="/usr/bin/sh")
+      Err(_) => inspect(false, content="true")
+    }
   }
   // 找不到：NotFound 带查找名
   match appfind_executable("appfind_no_such_bin_zzz") {
@@ -307,4 +331,107 @@ test "appfind_executable：真实目录探测" {
     Err(NotFound(n)) => inspect(n, content="a/b")
     _ => inspect(false, content="true")
   }
+  // Windows 分支的分隔符防御
+  if @yue.platform() == "windows" {
+    inspect(appfind_executable("a\\b") is Err(NotFound(_)), content="true")
+    inspect(appfind_executable("C:x") is Err(NotFound(_)), content="true")
+  }
+}
+
+///|
+test "appfind Windows 纯函数：.lnk 判定 / 扫描目录 / PATH 拆分 / 扩展探测" {
+  // .lnk 判定：大小写不敏感；长度不足 / 无扩展为假
+  inspect(appfind_is_lnk("WeChat.lnk"), content="true")
+  inspect(appfind_is_lnk("wechat.LNK"), content="true")
+  inspect(appfind_is_lnk("a.ln"), content="false")
+  inspect(appfind_is_lnk(".lnk"), content="false")
+  inspect(appfind_is_lnk("plain"), content="false")
+  inspect(appfind_is_lnk(""), content="false")
+  // 扫描目录：全用户 → 用户（低 → 高），缺环境变量的层不入列
+  let dirs = appfind_win_scan_dirs(
+    Some("C:\\ProgramData"),
+    Some("C:\\Users\\u\\AppData\\Roaming"),
+  )
+  inspect(dirs.length(), content="2")
+  inspect(
+    dirs[0],
+    content="C:\\ProgramData/Microsoft/Windows/Start Menu/Programs",
+  )
+  inspect(
+    dirs[1],
+    content="C:\\Users\\u\\AppData\\Roaming/Microsoft/Windows/Start Menu/Programs",
+  )
+  inspect(appfind_win_scan_dirs(Some("C:\\ProgramData"), None).length(), content="1")
+  inspect(appfind_win_scan_dirs(None, None).length(), content="0")
+  // PATH 拆分：';' 分隔、空段滤除、保序
+  let pd = appfind_win_path_dirs("C:\\Windows;C:\\Windows\\System32;;D:\\bin; ")
+  inspect(pd.length(), content="3")
+  inspect(pd[0], content="C:\\Windows")
+  inspect(pd[2], content="D:\\bin")
+  inspect(appfind_win_path_dirs("").length(), content="0")
+  // 扩展探测：带 '.' 只试原名；无扩展试原名 + PATHEXT（小写归一）
+  let c1 = appfind_win_probe_names("cmd", Some(".COM;.EXE;.BAT;.CMD"))
+  inspect(c1.length(), content="5")
+  inspect(c1[0], content="cmd")
+  inspect(c1[1], content="cmd.com")
+  inspect(c1[2], content="cmd.exe")
+  let c2 = appfind_win_probe_names("run.bat", None)
+  inspect(c2.length(), content="1")
+  inspect(c2[0], content="run.bat")
+  let c3 = appfind_win_probe_names("x", Some(""))
+  inspect(c3.length(), content="5")
+  inspect(c3[1], content="x.com")
+}
+
+///|
+test "appfind Windows .lnk 层收集与递归（注入枚举）" {
+  // 单层：.lnk 收录（id 去扩展、exec 为完整路径），非 .lnk 过滤
+  let layer = appfind_win_lnk_layer("C:/ProgramData/Programs", [
+    "WeChat.lnk", "readme.txt", "Note.LNK", "x.ln",
+  ])
+  inspect(layer.length(), content="2")
+  inspect(layer[0].id, content="WeChat")
+  inspect(layer[0].name, content="WeChat")
+  inspect(layer[0].locale_name, content="WeChat")
+  inspect(layer[0].exec, content="C:/ProgramData/Programs/WeChat.lnk")
+  inspect(layer[0].icon, content="")
+  debug_inspect(layer[0].categories, content="[]")
+  inspect(layer[1].id, content="Note")
+  // 递归：根目录打不开返回 false；打得开收 .lnk 并下钻一层子目录
+  inspect(
+    appfind_win_lnk_walk(
+      "C:/no-such",
+      2,
+      fn(_d) { Err(@yue.OpenFailed("x")) },
+      [],
+    )
+    is false,
+    content="true",
+  )
+  let acc : Array[AppEntry] = []
+  let ok = appfind_win_lnk_walk("root", 2, fn(d) {
+      if d == "root" {
+        Ok(["App.lnk", "Group"])
+      } else if d == "root/Group" {
+        Ok(["Nested.lnk"])
+      } else {
+        Err(@yue.OpenFailed(d))
+      }
+    }, acc)
+  inspect(ok, content="true")
+  inspect(acc.length(), content="2")
+  // 同目录内保持列举序（最终清单的排序由 merge 统一做）
+  inspect(acc[0].id, content="App")
+  inspect(acc[1].id, content="Nested")
+  inspect(acc[1].exec, content="root/Group/Nested.lnk")
+  // 深度 0：只收根层，不下钻
+  let acc0 : Array[AppEntry] = []
+  let _ = appfind_win_lnk_walk("root", 0, fn(d) {
+      if d == "root" {
+        Ok(["App.lnk", "Group"])
+      } else {
+        Ok(["Nested.lnk"])
+      }
+    }, acc0)
+  inspect(acc0.length(), content="1")
 }

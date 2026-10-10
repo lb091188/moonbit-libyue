@@ -87,6 +87,7 @@ test "da 真机探测：xdg-mime 文件类型与默认应用查询（存在该�
       Err(e) => inspect(e.to_string(), content="查询链路不应报其他错")
     }
   } else {
-    inspect("skipped", content="无 xdg-mime,跳过真机断言")
+    // 无 xdg-mime 的平台（Windows / 最小系统）走此分支
+    inspect("skipped", content="skipped")
   }
 }

@@ -231,16 +231,6 @@ pub fn bm_flatten(node : BookmarkNode) -> Array[BookmarkNode] {
 }
 
 ///|
-/// 浏览器定义：(标识, 配置目录名, 目录内子目录)。
-/// Brave 的 profile 在 BraveSoftware/Brave-Browser 下一层。
-let bm_browser_defs : Array[(String, String, String)] = [
-  ("google-chrome", "google-chrome", ""),
-  ("chromium", "chromium", ""),
-  ("microsoft-edge", "microsoft-edge", ""),
-  ("brave", "BraveSoftware", "Brave-Browser"),
-]
-
-///|
 /// Bookmarks 文件路径拼装：
 /// <配置根>/<目录[/子目录]>/<profile>/Bookmarks。
 pub fn bm_bookmarks_path(
@@ -262,27 +252,40 @@ pub fn bm_bookmarks_path(
 // ---------------------------------------------------------------------------
 
 ///|
-/// 当前平台是否支持浏览器书签读取（本文件仅实现 Linux 路径探测）。
+/// 当前平台是否支持浏览器书签读取（Linux 与 Windows 已实现路径探测，
+/// macOS 未实现）。
 pub fn bm_supported() -> Bool {
-  @yue.platform() == "linux"
+  bh_supported()
+}
+
+///|
+/// 配置根定位（书签侧与历史侧同源）：Windows 取 %LOCALAPPDATA%，Linux
+/// 走 XDG_CONFIG_HOME / HOME，其余平台 None。
+fn bm_root() -> String? {
+  if @yue.platform() == "windows" {
+    return match getenv_str("LOCALAPPDATA") {
+      Some(d) if d != "" => Some(d)
+      _ => None
+    }
+  }
+  bh_config_root(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME"))
 }
 
 ///|
 /// 列出有可读 Bookmarks 文件的浏览器 profile：在配置根下按浏览器定义 ×
 /// profile 候选名（Default 与 Profile 1..24，见 [bh_profile_candidates]）
-/// 逐一探测；无可读文件给 [BmNoBrowser]，非 Linux 给 [BmUnsupported]，
-/// 配置目录定位失败给 [BmNoConfigDir]。
+/// 逐一探测；无可读文件给 [BmNoBrowser]，非 Linux / Windows 给
+/// [BmUnsupported]，配置目录定位失败给 [BmNoConfigDir]。
 pub fn bm_browsers() -> Result[Array[BookmarkProfile], BookmarkError] {
-  if @yue.platform() != "linux" {
+  if !bm_supported() {
     return Err(BmUnsupported)
   }
-  let root = match
-    bh_config_root(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME")) {
+  let root = match bm_root() {
     Some(r) => r
     None => return Err(BmNoConfigDir)
   }
   let out : Array[BookmarkProfile] = []
-  for def in bm_browser_defs {
+  for def in bh_defs() {
     let (id, dir, subdir) = def
     for profile in bh_profile_candidates() {
       let path = bm_bookmarks_path(root, dir, subdir, profile)
@@ -304,15 +307,14 @@ pub fn bm_browsers() -> Result[Array[BookmarkProfile], BookmarkError] {
 /// 返回虚拟根树（名称 "<浏览器>/<profile>"，children 为三根），解析
 /// 失败给 [BmIoFailed]，该书签文件不存在给 [BmNoBrowser]。
 pub fn bm_bookmarks(browser : String) -> Result[BookmarkNode, BookmarkError] {
-  if @yue.platform() != "linux" {
+  if !bm_supported() {
     return Err(BmUnsupported)
   }
-  let root = match
-    bh_config_root(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME")) {
+  let root = match bm_root() {
     Some(r) => r
     None => return Err(BmNoConfigDir)
   }
-  for def in bm_browser_defs {
+  for def in bh_defs() {
     let (id, dir, subdir) = def
     if id != browser {
       continue
