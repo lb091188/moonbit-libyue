@@ -1130,7 +1130,10 @@ typedef struct {
 #ifndef PDH_MORE_DATA
 #define PDH_MORE_DATA 0x800007D2L
 #endif
-#define SYSMON_DXGI_ADAPTER_FLAG_SOFTWARE 1u
+/* DXGI_ADAPTER_FLAG：REMOTE=1、SOFTWARE=2（dxgi.h 枚举值，写错常量会让
+   软件渲染适配器「Microsoft Basic Render Driver」混进 GPU 列表） */
+#define SYSMON_DXGI_ADAPTER_FLAG_SOFTWARE 2u
+#define SYSMON_DXGI_ADAPTER_FLAG_REMOTE 1u
 
 typedef struct {
   unsigned int vendor;
@@ -1174,8 +1177,11 @@ static void sysmon_gpu_enum(void) {
     SysmonAdapterVtbl *av = *(SysmonAdapterVtbl **)adapter;
     SysmonDxgiDesc1 desc;
     memset(&desc, 0, sizeof(desc));
+    /* 软件渲染 / 远程适配器不是真 GPU（Basic Render Driver / 远程会话
+       虚拟适配器），跳过 */
     if (av->GetDesc1(adapter, &desc) == 0 &&
-        !(desc.Flags & SYSMON_DXGI_ADAPTER_FLAG_SOFTWARE)) {
+        (desc.Flags & (SYSMON_DXGI_ADAPTER_FLAG_SOFTWARE |
+                       SYSMON_DXGI_ADAPTER_FLAG_REMOTE)) == 0) {
       SysmonGpuEntry *e = &g_gpus[g_gpu_n];
       memset(e, 0, sizeof(*e));
       e->vendor = desc.VendorId;
@@ -1205,7 +1211,7 @@ static SysmonGpuEntry *sysmon_gpu_by_addr(const char *addr) {
   return NULL;
 }
 
-/* /sys/bus/pci/devices/<addr>/{class,vendor,device} */
+/* /sys/bus/pci/devices/<addr>/{class,vendor,device,name} */
 static moonbit_bytes_t sysmon_read_gpu_id(const char *addr, const char *what) {
   sysmon_gpu_enum();
   SysmonGpuEntry *e = sysmon_gpu_by_addr(addr);
@@ -1219,6 +1225,15 @@ static moonbit_bytes_t sysmon_read_gpu_id(const char *addr, const char *what) {
     sysmon_buf_putf(&b, "0x%04x\n", e->vendor);
   } else if (strcmp(what, "device") == 0) {
     sysmon_buf_putf(&b, "0x%04x\n", e->device);
+  } else if (strcmp(what, "name") == 0) {
+    /* Windows 专有：DXGI Description（适配器友好名，如
+       "Intel(R) UHD Graphics 620"）——Linux sysfs 无对应文件，读不到
+       为 None，MoonBit 侧取名链顺序不变 */
+    if (e->name[0] == '\0' || !sysmon_buf_puts(&b, e->name) ||
+        !sysmon_buf_puts(&b, "\n")) {
+      free(b.p);
+      return NULL;
+    }
   } else {
     free(b.p);
     return NULL;
@@ -1723,7 +1738,7 @@ static moonbit_bytes_t sysmon_virtual_read(const char *p) {
       return sysmon_read_hwmon((int)idx, end + 1);
     }
   }
-  /* /sys/bus/pci/devices/<addr>/{class,vendor,device,gpu_busy_percent,
+  /* /sys/bus/pci/devices/<addr>/{class,vendor,device,name,gpu_busy_percent,
      mem_info_vram_used,mem_info_vram_total} */
   if (strncmp(p, "/sys/bus/pci/devices/", 21) == 0) {
     const char *addr = p + 21;
@@ -1736,7 +1751,7 @@ static moonbit_bytes_t sysmon_virtual_read(const char *p) {
         a[al] = '\0';
         const char *what = slash + 1;
         if (strcmp(what, "class") == 0 || strcmp(what, "vendor") == 0 ||
-            strcmp(what, "device") == 0) {
+            strcmp(what, "device") == 0 || strcmp(what, "name") == 0) {
           return sysmon_read_gpu_id(a, what);
         }
         if (strcmp(what, "gpu_busy_percent") == 0) {

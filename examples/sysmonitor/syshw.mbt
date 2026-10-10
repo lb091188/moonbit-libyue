@@ -750,11 +750,12 @@ pub fn pci_ids_device_name(
 }
 
 ///|
-/// 显卡型号名：nvidia-smi 命中时用其型号（比 pci.ids 更具体）；否则按
-/// vendor:device 查 pci.ids 商业型号名（AMD / Intel 等免 smi 的卡）；
-/// 查不到（pci.ids 无该条目 / 数据库不可达）回退 device id 原文（UI
-/// 显示「0x7480」，至少可区分多卡）；id 本身不可用（sysfs 读取失败，
-/// 占位 "(未知)"）时留空，UI 不显示型号位。
+/// 显卡型号名：nvidia-smi 命中时用其型号（比 pci.ids 更具体）；Windows
+/// 的 stub 虚拟 <addr>/name（DXGI Description，见 GpuMonitor::tick 的
+/// 预读）；否则按 vendor:device 查 pci.ids 商业型号名（AMD / Intel 等
+/// 免 smi 的卡）；查不到（pci.ids 无该条目 / 数据库不可达）回退 device
+/// id 原文（UI 显示「0x7480」，至少可区分多卡）；id 本身不可用（sysfs
+/// 读取失败，占位 "(未知)"）时留空，UI 不显示型号位。
 fn gpu_model_name(
   smi_model : String,
   vendor : String,
@@ -1129,6 +1130,14 @@ pub fn GpuMonitor::tick(self : GpuMonitor) -> Array[GpuInfo]? {
           None => ()
         }
       None => ()
+    }
+    if model == "" {
+      // Windows：stub 以 DXGI Description 虚拟 <addr>/name（真适配器
+      // 友好名）。Linux sysfs 无此文件，读不到为 None，取名链不变
+      model = match read_text_file("\{base}/name") {
+        Some(t) => t.trim().to_owned()
+        None => ""
+      }
     }
     if busy is None {
       need_fdinfo = true
