@@ -260,5 +260,5 @@
 ## CI 平台矩阵补全(2026-10-10 排障新增)
 
 - [x] registry 索引:三个会调 moon 的工作流补 `moon update`(全新 runner 不自动拉索引,10-06 起三平台全红的根因)
-- [x] mac 链接面:CI `brew install ffmpeg`(ffmpeg_stub.c 真调 libav,mac 由 brew 供库)
+- [ ] mac 的 test/build 链接面(两道坎):① 主阻断是上游 `chensuiyi/subproc@0.3.0` 的 native.c 用 Linux 专属 API(execvpe/SOCK_CLOEXEC/SYS_pidfd_open),需上游支持 mac 或 fork;② ffmpeg-mbt 桩编译缺 libav 头文件路径(pkg-config --libs 只出链接参数,需 CPATH=/opt/homebrew/include 或 prebuild 供 --cflags;届时恢复 CI 的 brew install ffmpeg)
 - [ ] ffmpeg 的 MSVC 链接面:Windows 的 `moon test`/`moon build` 与 bin-* 发布的全量构建都卡 systemprobe→yue-media→ffmpeg 链接;待 NuGet 或 ShiftMediaProject 预编译 .lib(仿 WebView2 的钉版本 + sha256 模式),运行期 DLL 需随发布包
