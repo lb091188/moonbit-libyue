@@ -10,7 +10,7 @@ libyue(libyue.com)的 MoonBit 封装,跨平台原生桌面 GUI。
 
 1. **链接参数由 `scripts/prebuild.py` 全权托管**——moon 构建时执行该脚本（`moon.mod` 的 `options(--moonbit-unstable-prebuild)`），按当前系统输出 link_configs 自动传播给所有依赖 yue 的 main 包；任何包的 `moon.pkg` 都不写链接参数，勿手改。脚本 stdout 只允许输出 JSON，进度信息走 stderr。
 2. **库包(如 `yue/`)不得放 `link` 段**——moon 会生成无 main 的 `.exe` 导致构建失败;链接配置统一走 prebuild 传播,任何包都不写 `cc-link-flags`。
-3. **FFI 改动必须对照 `.agents/skills/moonbit-c-binding/` 规范**;新增控件按固定流程:`shim/yue_mbt.cpp` 机械转换 → `shim/include/yue_mbt.h` 声明 → `yue/ffi.mbt` extern → `yue/<控件>.mbt` 类型与方法(字符串统一 `utf8_bytes()`,事件照抄 `yue/view.mbt` 注册表+蹦床模式)。
+3. **FFI 改动必须对照全局技能 `moonbit-c-binding`(安装于 `~/.agents/skills/moonbit-c-binding/`,源自 https://github.com/moonbitlang/skills)规范**;新增控件按固定流程:`shim/yue_mbt.cpp` 机械转换 → `shim/include/yue_mbt.h` 声明 → `yue/ffi.mbt` extern → `yue/<控件>.mbt` 类型与方法(字符串统一 `utf8_bytes()`,事件照抄 `yue/view.mbt` 注册表+蹦床模式)。
 4. **extern 蹦床与 C 函数指针原型逐位对齐,含参数个数**——C 以 `(closure, args...)` 调用,蹦床首参收 closure;多带/少带一位会形参错位,部分接口"看似能跑"掩盖问题。案例与更多 ABI 坑见适配经验文档。
 5. **协议级互操作(DBus/DBusMenu/SNI)必须上真实总线、真实面板验证**——单测自洽 ≠ 互操作通过(XFCE 只发批量版 `EventGroup`/`AboutToShowGroup` 就是 dbus-monitor 抓出来的)。
 6. **真机 GUI 测试由用户执行,助手只提供操作步骤并等待反馈**——助手负责:代码修复、`moon check`/`moon test`/`moon build` 全仓零错误零警告通过(提交门槛)、启动冒烟(进程存活 + 退出行为,仅限助手所在宿主机);涉及虚拟机/其他桌面环境的视觉与交互验证,一律给出明确的操作步骤清单,由用户在真机执行并回反馈结果,助手不得自行远程驱动 GUI 测试,也不得在用户反馈前下结论。
@@ -33,7 +33,7 @@ moon check && moon test       # 纯 MoonBit 测试
 
 - 使用文档索引(内容类): `docs/README.md`
 - **平台适配经验**(Windows/macOS 分版本,Linux 分发行版→桌面环境→版本,含全部实测坑与维护约定): `docs/zh/adaptation.md`
-- FFI 规范与坑清单:`.agents/skills/moonbit-c-binding/`、`.agents/skills/make-moonbit-c-bindings/`
-- MoonBit 语言与工具链:`.agents/skills/moonbit-agent-guide/`
+- FFI 规范与坑清单:全局技能 `moonbit-c-binding`、`make-moonbit-c-bindings`(安装于 `~/.agents/skills/`,源自 https://github.com/moonbitlang/skills)
+- MoonBit 语言与工具链:全局技能 `moonbit-agent-guide`(安装于 `~/.agents/skills/`)
 - 路线图与下一步: `TODO.md`
 - 快速开始/架构说明: `README.md`(中文版 `README_ZH.md`)

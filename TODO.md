@@ -251,6 +251,6 @@
 
 ## 随手可查
 
-- FFI 规范与坑清单:`.agents/skills/moonbit-c-binding/`
+- FFI 规范与坑清单:全局技能 `moonbit-c-binding`(安装于 `~/.agents/skills/`,源自 https://github.com/moonbitlang/skills)
 - 平台适配经验:`docs/adaptation.md`
 - 完整 API 对照:libyue TS 声明(github.com/yue/yue releases);Lua 绑定参考(github.com/yue/yue 的 `lua_yue/`)
