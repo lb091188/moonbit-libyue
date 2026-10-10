@@ -154,28 +154,12 @@ void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
   if (gw == NULL) {
     return; // 还没 realized，等下一次 draw 事件再画
   }
-  // 换序到后端暂存缓冲：调用方的 RGBA 位图必须保持原样（离屏快照与它同源，
-  // 就地换序会让下一次快照通道错位，重复上屏还会来回颠倒）。
-  static unsigned char *scratch = NULL;
-  static size_t scratch_len = 0;
-  size_t need = (size_t)width * (size_t)height * 4;
-  if (need > scratch_len) {
-    free(scratch);
-    scratch = (unsigned char *)malloc(need);
-    scratch_len = need;
-  }
-  if (scratch == NULL) {
-    return;
-  }
-  for (size_t i = 0; i < (size_t)width * (size_t)height; i++) {
-    const unsigned char *px = rgba + i * 4;
-    scratch[i * 4] = px[2];      // B
-    scratch[i * 4 + 1] = px[1];  // G
-    scratch[i * 4 + 2] = px[0];  // R
-    scratch[i * 4 + 3] = 0xff;   // Cairo RGB24 忽略 alpha，这里按不透明上屏
-  }
-  cairo_surface_t *surf = cairo_image_surface_create_for_data(
-      scratch, CAIRO_FORMAT_RGB24, width, height, width * 4);
+  // 缓冲布局即 CAIRO_FORMAT_ARGB32（yue/render 的单一格式），直建 surface
+  // 即可，无需换序或拷贝；会话期间 MoonBit 侧持有该缓冲（#borrow）。
+  cairo_surface_t *surf =
+      cairo_image_surface_create_for_data((unsigned char *)rgba,
+                                          CAIRO_FORMAT_ARGB32, width, height,
+                                          width * 4);
   if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
     cairo_surface_destroy(surf);
     return;
