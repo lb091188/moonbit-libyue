@@ -61,7 +61,11 @@
 - [ ] 托盘：SNI 后端 + DBusMenu 协议（按规则 5 上真实总线 + 真实面板复验）
 
 ### 主题、声明式与应用层
-- [ ] 主题系统：`theme_from_accent`（主色公式派生）/`theme_from_system`/`theme_current`/`on_theme_change`/`theme_apply` + 浅深自动跟随；组件 style 通道（`set_panel_bg`/`bind_bg`/`bind_fg`/`bind_popover_bg`/`entry_ctrl_height`）；皮肤全走新 Painter（旧「原生控件不跟暗色」这条边界随自绘自然消失）
+- [~] 主题系统
+  - [x] 首批（`yue/theme`）：`Theme` 20 字段色板 + `default_theme`/`dark_theme` + `theme_from_accent` 主色派生公式 + `theme_current`/`on_theme_change`/`off_theme_change`/`theme_apply` + 20 getter + `control_height`/`entry_ctrl_height`；7/7
+  - [ ] `theme_from_system`（跟随系统深浅与主色）随系统集成层
+  - [ ] 组件 style 通道（`themed_container`/`set_panel_bg`/`bind_bg`/`bind_fg`/`bind_popover_bg`）与 `sub_bag` 批量退订随组件/relink 批次
+  - 新栈刻意不做：原生控件 CSS 下发（全自绘后色板是唯一来源）
 - [ ] 声明式层（`declarative/` 612 行、24 构造器）：L1 构造器全集（`vbox`/`hbox`/`label`/`button`/`checkbox`/`entry`/`text_edit`/`radio`/`slider`/`progress`/`picker`/`combo`/`group`/`scroll`/`separator`/`tab`/`date_picker`/`gif`/`container`…）+ `node_of`/`mount`/`mount_window` + `bind`/`bind_label`；`hover_group`/`cursor_group`；`overlay_scroll`
 - [ ] Store 与 signals：`Store` 9 方法、`computed`/`batch`/`sub_bag`、store↔signal 双向绑定、`bind_node`/`swap_node`、relink 语义
 - [ ] 组件库约 55 个声明式组件（家族划分见「控件」节；调用点应不变，只换实现）
