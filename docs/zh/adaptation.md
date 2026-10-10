@@ -275,6 +275,19 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **验证（客观，`xdotool` 注入，`GTK_IM_MODULE=fcitx`）**：输入 `nihao` + 空格 → 退出行 `a='hello你哈哦'`，拼音字母零残留、`seen=6` 只剩未被消费的键，说明过滤与「消费即吃掉」都按预期工作；进程干净退出。五包 `moon check` 零警告，core 15/15、input 10/10、render 14/14、text 7/7、yoga-mbt 79/79，全仓红点仍 290 errors。
 - **待肉眼/待补**：preedit 下划线的观感、候选窗是否贴组合串末尾（本机只能证明矩形已推送）、ibus 一套（探针侧结论：ibus 无内联预览疑为 libpinyin display-style 设置，与本层无关，另记）、Windows `ImmAssociateContext` 与 macOS。
 
+### MoonBit 原生 GUI 栈 · Painter 契约补齐首批（门面化 + 混合模式 + 渐变）
+
+- **门面化定案**：`Painter` 从「纯矩形子集」升为**完整契约门面**——`new(bitmap)` 即开一个 Cairo 会话，矩形/路径/变换/裁剪/混合/渐变都走 Cairo；Cairo 不可用（非 Linux 占位 stub、或 16 个会话槽耗尽）时退回纯矩形实现（路径类调用为无操作）。矩形类绘制在**两条路径上逐像素一致**（新增矩阵等价用例：取整、内侧描边、裁剪求交、平移、半透明叠色一段序列跑两遍比对）。
+- **会话纪律**：Cairo 会话槽 16 个（`CR_MAX`），每帧一个会话的用法要求 `Painter::end()` 回收；泄漏会让后续 Painter 静默退回降级实现。新增「连续开合 20 个 Painter 仍持有会话」的回收用例；旧测试有 9 处没回收（累计 14 个泄漏），补 `end()` 后余量才回到安全区。
+- **混合模式**：25 个 `BlendMode` 与 Cairo 算子 **1:1 映射**（前 16 个 W3C 混合 + 后 9 个 Porter-Duff）。独立 C 探针实测本机（cairo 1.18 + pixman）**25 个算子全部真实生效**（pigment 系与 HSL 系含），无需自实现混合算法；半透明源按 W3C 公式（`(1-α)·底 + α·Blend(底,源)`，实测 0.5 α 乘算 = 0.5·底 + 0.5·底×源），透明底上 Multiply 退化为源色。25 模式实测表落成断言行（混合/HSL 行留 ±2 容差防跨 pixman 定标差异，Porter-Duff 行精确值）。
+- **坑（取整必须在设备空间）**：矩形取整若发生在**用户空间**，经 CTM 平移（如 `translate(1.3, 0.6)`）后的设备坐标是分数像素 → Cairo 抗锯齿出灰边，与纯实现分岔——「门面 vs 降级」矩阵等价用例正是靠这一条先红后绿。修法：`cairo_user_to_device` 换算后在**设备空间** `floor(v + 0.5)`，再临时换单位矩阵按整数矩形填充；矩阵含旋转/斜切（off-diagonal 非零）时不做取整，原样交给抗锯齿。
+- **坑（裁剪区是图形状态）**：临时单位矩阵 + `cairo_rectangle` + `cairo_clip` **不能**用 `cairo_save`/`cairo_restore` 包住——裁剪属于被保存的状态，`restore` 会把刚设的裁剪一起回退；必须手动 `cairo_get_matrix`/`cairo_set_matrix` 还原（裁剪终值存设备空间，之后 CTM 再变不影响已设的裁剪区）。
+- **坑（默认线宽不同源）**：Cairo 会话默认线宽 **2.0**、契约默认 **1.0**，`Painter::new` 里不同步会让不调 `set_line_width` 的描边（如 `stroke_rect` 的内侧带）粗一圈——「描内侧一圈」用例给出定位。
+- **坑（不存在的函数）**：`cairo_pattern_get_status` 不存在（正确的是 `cairo_pattern_status`），写错报在**链接期** undefined reference 而非编译期。
+- **坑（产物路径大小写，G3b 那条的补充）**：本仓测试产物路径是 `_build/native/debug/test/NoahLiu`（**首字母大写**），删小写路径静默不生效、测试继续跑旧二进制——本批一度在修好设备空间取整后仍见 20 像素差异，实为旧产物。改原生库后删产物的正确路径：`_build/native/debug/test/NoahLiu/moonbit-libyue/<pkg>`。
+- **渐变**：`Gradient::linear`/`radial` + `add_stop`，offset 钳到 [0,1]、hex 非法忽略、无 stop 的渐变整体忽略、`set_fill_color` 覆盖渐变；实现为一次性 pattern（建 → 逐 stop 加色 → 设为 source 即释放句柄）。实测口径：线性在像素中心采样（`(x+0.5)/轴长`）、超端点 pad 复现端点色；径向同心、四角对称。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/render` 25/25（新增 11 条：Porter-Duff 精确值、25 模式实测表、半透明公式、透明底退化、模式与设色顺序无关、线性渐变采样与 pad、径向对称、空渐变忽略与纯色覆盖、门面路径与抗锯齿、save/restore 变换与样式同退、会话槽回收）；五包 `moon check` 零警告、core 15/15、input 10/10、text 7/7、yoga-mbt 80/80；`examples/native-window` 冒烟 49 帧、退出码 0（示例改为走门面，并用上渐变辉光、乘算方块与路径圆）；全仓红点仍 290 errors / 68 warnings 未增。
+
 ## Linux
 
 ### 发行版

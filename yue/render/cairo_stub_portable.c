@@ -42,6 +42,18 @@ void cr_rotate(int64_t id, double rad) { (void)id; (void)rad; }
 void cr_clip_rect(int64_t id, double x, double y, double w, double h) {
   (void)id; (void)x; (void)y; (void)w; (void)h;
 }
+void cr_set_operator(int64_t id, int mode) { (void)id; (void)mode; }
+int64_t cr_grad_linear(double x0, double y0, double x1, double y1) {
+  (void)x0; (void)y0; (void)x1; (void)y1; return 0;
+}
+int64_t cr_grad_radial(double cx, double cy, double r0, double r1) {
+  (void)cx; (void)cy; (void)r0; (void)r1; return 0;
+}
+void cr_grad_stop(int64_t pid, double offset, int r, int g, int b, int a) {
+  (void)pid; (void)offset; (void)r; (void)g; (void)b; (void)a;
+}
+void cr_grad_apply(int64_t id, int64_t pid) { (void)id; (void)pid; }
+void cr_grad_drop(int64_t pid) { (void)pid; }
 void cr_flush(int64_t id) { (void)id; }
 
 #endif

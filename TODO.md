@@ -35,7 +35,9 @@
 > 清单已按 master 线参考副本逐包核对（2026-10-11，`/home/lkyh/ownCode/moonbit-libyue` 的 master，比本仓 origin/master 新）；条目里的文件/函数名均指 master 现行资产。
 
 ### 绘图与资源
-- [ ] `Painter` 契约补齐（旧 `yue/painter.mbt` 共 58 法；对照 `docs/zh/components.md` 画布与图片章）：路径/曲线/弧/变换/裁剪已有实现，缺**渐变**（线性/径向）、`set_blend_mode`（25 种 `BlendMode`）、`draw_image(_from_rect)`、`draw_canvas(_from_rect)`、离屏 `Canvas`
+- [~] `Painter` 契约补齐（旧 `yue/painter.mbt` 共 58 法；对照 `docs/zh/components.md` 画布与图片章）
+  - [x] 首批：门面化（Cairo 后端 + 无 Cairo 纯矩形降级，两路径逐像素一致）＋路径/曲线/弧/变换/裁剪/混合（25 模式映射 Cairo 算子，探针实测全部生效）/渐变（线性、径向）；`yue/render` 25/25
+  - [ ] 次批：`draw_image(_from_rect)`、`draw_canvas(_from_rect)`、离屏 `Canvas`（与下一条「图片」同批）
 - [ ] 图片：`Image` 类型（`new_from_file` / `new_from_png` / `resize` / `get_width|height` / `write_to_file` / `ImageSlot`）+ 解码（现 `yue/png_rgba.mbt` **只有编码**，master 也无解码；Linux 走 GdkPixbuf 等价，Windows GDI+ / mac 随平台定）
 - [ ] 图标（`yue/icons/icons.mbt` 4297 行）：803 条路径串 + `fill_icon_path` 千分定点解释器 + `IconKind` 枚举与 `icon_name`/`all_icons` + `draw_icon` 坐标语义 + `icon`/`icon_button_t` 两个声明式包装 + 主题取色跟随
 - [ ] 字体与富文本子系统：`Font::new`（`FontWeight` 9 档 / `FontStyle`）、字体枚举与回退、`TextAlign`/`TextFormat`/`TextAttributes`、`AttributedText` 语义镜像（区间字体/颜色、`get_bounds_for`、换行/省略/行高）

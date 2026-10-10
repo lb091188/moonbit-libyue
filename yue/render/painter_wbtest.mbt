@@ -24,6 +24,7 @@ test "fill_rect 覆盖半开区间" {
   assert_eq(rgba(p, 0, 0), (0, 0, 0, 0))
   // 右下端点不在覆盖区内
   assert_eq(rgba(p, 3, 1), (0, 0, 0, 0))
+  p.end()
 }
 
 ///|
@@ -34,6 +35,7 @@ test "半透明按 source-over 混合" {
   p.set_fill_color("#00000080")
   p.fill_rect(0.0, 0.0, 2.0, 2.0)
   assert_eq(rgba(p, 1, 1), (127, 127, 127, 255))
+  p.end()
 }
 
 ///|
@@ -47,6 +49,7 @@ test "translate 生效且 restore 回退" {
   assert_eq(rgba(p, 5, 5), (255, 0, 0, 255))
   assert_eq(rgba(p, 1, 1), (255, 0, 0, 255))
   assert_eq(rgba(p, 3, 3), (0, 0, 0, 0))
+  p.end()
 }
 
 ///|
@@ -61,6 +64,7 @@ test "clip_rect 只收紧不放宽" {
   assert_eq(rgba(p, 3, 3), (255, 0, 0, 255))
   let (x0, y0, x1, y1) = p.clip_bounds()
   assert_eq((x0, y0, x1, y1), (0, 0, 6, 6))
+  p.end()
 }
 
 ///|
@@ -73,6 +77,7 @@ test "stroke_rect 描内侧一圈" {
   assert_eq(rgba(p, 2, 2), (0, 0, 0, 0))
   assert_eq(rgba(p, 0, 3), (0, 0, 0, 0))
   assert_eq(rgba(p, 5, 3), (0, 0, 0, 0))
+  p.end()
 }
 
 ///|
@@ -82,6 +87,7 @@ test "矩形窄于两倍线宽时整块填满" {
   p.stroke_rect(0.0, 0.0, 1.0, 10.0)
   assert_eq(rgba(p, 0, 5), (0, 255, 0, 255))
   assert_eq(rgba(p, 1, 5), (0, 0, 0, 0))
+  p.end()
 }
 
 ///|
@@ -98,6 +104,7 @@ test "等分三段共用边不留缝" {
     }
   }
   assert_eq(painted, 100)
+  p.end()
 }
 
 ///|
@@ -110,4 +117,6 @@ test "非法 hex 与非法尺寸保持原状" {
   empty.set_fill_color("#ff0000")
   empty.fill_rect(0.0, 0.0, 4.0, 4.0)
   assert_eq(rgba(empty, 0, 0), (0, 0, 0, 0))
+  p.end()
+  empty.end()
 }

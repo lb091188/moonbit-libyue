@@ -118,6 +118,38 @@ extern "c" fn cr_clip_rect(
 extern "c" fn cr_flush(id : Int64) -> Unit = "cr_flush"
 
 ///|
+extern "c" fn cr_set_operator(id : Int64, mode : Int) -> Unit = "cr_set_operator"
+
+///|
+extern "c" fn cr_grad_linear(
+  x0 : Double,
+  y0 : Double,
+  x1 : Double,
+  y1 : Double,
+) -> Int64 = "cr_grad_linear"
+
+///|
+extern "c" fn cr_grad_radial(
+  cx : Double,
+  cy : Double,
+  r0 : Double,
+  r1 : Double,
+) -> Int64 = "cr_grad_radial"
+
+///|
+extern "c" fn cr_grad_stop(
+  pid : Int64,
+  offset : Double,
+  r : Int,
+  g : Int,
+  b : Int,
+  a : Int,
+) -> Unit = "cr_grad_stop"
+
+///|
+extern "c" fn cr_grad_apply(id : Int64, pid : Int64) -> Unit = "cr_grad_apply"
+
+///|
 /// Cairo 绘制会话：目标位图由调用方持有，会话只借它的内存。
 pub struct Cairo {
   id : Int64
@@ -276,4 +308,45 @@ pub fn Cairo::set_stroke_color(self : Cairo, hex : String) -> Unit {
 /// 线宽为负按 0 处理。
 pub fn Cairo::set_line_width(self : Cairo, width : Double) -> Unit {
   cr_set_line_width(self.id, if width < 0.0 { 0.0 } else { width })
+}
+
+///|
+/// 把内存里的颜色对象落为 source（Painter 门面按绘制时机调用）。
+fn Cairo::source_rgba(self : Cairo, c : Color) -> Unit {
+  cr_set_fill_rgba(self.id, c.r, c.g, c.b, c.a)
+}
+
+///|
+/// 混合模式（对后续绘制生效）。
+pub fn Cairo::set_blend_mode(self : Cairo, mode : BlendMode) -> Unit {
+  cr_set_operator(self.id, blend_mode_id(mode))
+}
+
+///|
+/// 渐变设为当前 source（一次性：建 pattern → 加 stop → 设为 source 即释放句柄）。
+pub fn Cairo::set_fill_gradient(self : Cairo, g : Gradient) -> Unit {
+  let pid = match g.kind {
+    Linear(x0, y0, x1, y1) => cr_grad_linear(x0, y0, x1, y1)
+    Radial(cx, cy, r0, r1) => cr_grad_radial(cx, cy, r0, r1)
+  }
+  if pid == 0L {
+    return ()
+  }
+  for s in g.stops {
+    let (off, c) = s
+    cr_grad_stop(pid, off, c.r, c.g, c.b, c.a)
+  }
+  cr_grad_apply(self.id, pid)
+}
+
+///|
+/// 描边同样只有单一 source，与填充同实现（Painter 门面在描边前自行切换）。
+pub fn Cairo::set_stroke_gradient(self : Cairo, g : Gradient) -> Unit {
+  self.set_fill_gradient(g)
+}
+
+///|
+/// 把会话数据刷回缓冲。
+pub fn Cairo::flush(self : Cairo) -> Unit {
+  cr_flush(self.id)
 }
