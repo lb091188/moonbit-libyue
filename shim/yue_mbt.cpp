@@ -5603,12 +5603,12 @@ extern "C" int32_t yue_mbt_brightness_set(int32_t, int32_t, int32_t *ok) {
   return -1000;
 }
 
-extern "C" int32_t yue_mbt_vol_master(float *, int32_t *, int32_t *ok) {
+extern "C" int32_t yue_mbt_vol_master(double *, int32_t *, int32_t *ok) {
   *ok = 0;
   return -1000;
 }
 
-extern "C" int32_t yue_mbt_vol_set_master(float, int32_t *ok) {
+extern "C" int32_t yue_mbt_vol_set_master(double, int32_t *ok) {
   *ok = 0;
   return -1000;
 }
