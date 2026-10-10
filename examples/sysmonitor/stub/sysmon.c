@@ -1,4 +1,4 @@
-/* sysmonitor 应用 native-stub：监控数据层与进程管理的系统调用入口。
+﻿/* sysmonitor 应用 native-stub：监控数据层与进程管理的系统调用入口。
    符号全在 libc / libSystem / kernel32 默认链接范围内，零 shim / fork /
    vendored / 链接参数改动；机制与实测见 docs/zh/adaptation.md。
    平台分工：Linux / macOS 的 kill / 优先级 / statvfs / 目录枚举 /
@@ -20,6 +20,11 @@
 #endif
 #ifndef WINVER
 #define WINVER 0x0A00
+#endif
+/* ws2def 与 windows.h 自带的 winsock.h 互斥；本文件不用 winsock，
+   LEAN_AND_MEAN 掐掉 winsock.h 以便下方先引 ws2def/ws2ipdef。 */
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
 #endif
 
 #include <moonbit.h>
@@ -125,8 +130,18 @@ static moonbit_bytes_t sysmon_bytes_take(SysmonBuf *b) {
 
 #include <windows.h>
 #include <pdh.h>
+/* PDH_MORE_DATA 声明在 pdhmsg.h，pdh.h 不自动带（本文件按函数指针调
+   PDH，不走 pdh.lib，定义兜底即可） */
+#ifndef PDH_MORE_DATA
+#define PDH_MORE_DATA 0x800007D2L
+#endif
 #include <tlhelp32.h>
 #include <winreg.h>
+/* MIB_IF_TABLE2/MIB_IF_ROW2 在 netioapi.h 的 #ifdef _WS2IPDEF_ 分支里，
+   SDK 26100 的 iphlpapi.h 不再先引 ws2def/ws2ipdef——按 netioapi.h 自述
+   的包含顺序先给这两个头，再进 iphlpapi。 */
+#include <ws2def.h>
+#include <ws2ipdef.h>
 #include <iphlpapi.h>
 
 #define SYSMON_ERR_PENDING 0xC0000004UL /* STATUS_INFO_LENGTH_MISMATCH */
@@ -663,7 +678,7 @@ static moonbit_bytes_t sysmon_list_netifs(void) {
     if (r->Type == IF_TYPE_SOFTWARE_LOOPBACK) {
       name = sysmon_wide_to_utf8(L"lo");
     } else {
-      name = sysmon_wide_to_utf8(r->InterfaceAlias);
+      name = sysmon_wide_to_utf8(r->Alias);
     }
     if (name == NULL || name[0] == '\0') {
       free(name);
@@ -709,7 +724,7 @@ static moonbit_bytes_t sysmon_read_netif_bytes(const char *path) {
     const MIB_IF_ROW2 *r = &tab->Table[i];
     char *name = r->Type == IF_TYPE_SOFTWARE_LOOPBACK
                      ? sysmon_wide_to_utf8(L"lo")
-                     : sysmon_wide_to_utf8(r->InterfaceAlias);
+                     : sysmon_wide_to_utf8(r->Alias);
     int hit = name != NULL && strcmp(name, alias) == 0;
     free(name);
     if (hit) {
@@ -892,7 +907,9 @@ static int sysmon_snap_refresh(void) {
       }
       arr[n].pid = e.th32ProcessID;
       arr[n].ppid = e.th32ParentProcessID;
-      arr[n].threads = e.cntThreads;
+      /* cntThreads 对 VBS 的 Secure System（pid 72）会报 0——Linux 语义
+         里 num_threads>=1 是跨层契约不变量，虚拟层垫底维持同构 */
+      arr[n].threads = e.cntThreads != 0 ? e.cntThreads : 1;
       memset(arr[n].exe, 0, sizeof(arr[n].exe));
       for (int i = 0; i < MAX_PATH && e.szExeFile[i]; i++) {
         arr[n].exe[i] = e.szExeFile[i];
@@ -1026,6 +1043,12 @@ static moonbit_bytes_t sysmon_read_pid_cmdline(DWORD pid) {
 
 /* ---------------- GPU：DXGI 枚举 + PDH GPU Engine ---------------- */
 
+/* DXGI_ADAPTER_DESC1 逐字段镜像（dxgi1_4.h）：
+   WCHAR Description[128]; UINT VendorId; UINT DeviceId; UINT SubSysId;
+   UINT Revision; SIZE_T DedicatedVideoMemory; SIZE_T
+   DedicatedSystemMemory; SIZE_T SharedSystemMemory; LUID AdapterLuid;
+   UINT Flags;——DedicatedSystemMemory 不可省：漏一个 SIZE_T 会让
+   GetDesc1 写爆调用方结构（栈越界），且 AdapterLuid/Flags 全错位。 */
 typedef struct {
   wchar_t Description[128];
   unsigned int VendorId;
@@ -1033,6 +1056,7 @@ typedef struct {
   unsigned int SubSysId;
   unsigned int Revision;
   unsigned long long DedicatedVideoMemory;
+  unsigned long long DedicatedSystemMemory;
   unsigned long long SharedSystemMemory;
   struct {
     unsigned long LowPart;

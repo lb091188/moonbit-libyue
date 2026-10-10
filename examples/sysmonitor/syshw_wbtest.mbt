@@ -367,6 +367,10 @@ test "S5 真实采样：磁盘容量 + IO(Linux / macOS)" {
         if d.mount == "/" {
           has_root = true
         }
+        // Windows 虚拟 mounts 无 "/"，盘符根（"C:\"）等价于根卷
+        if on_windows() && d.mount.length() == 3 && d.mount[1] == ':' {
+          has_root = true
+        }
       }
       assert_true(has_root)
       // 二次采样：速率有定义(不强求非 0,磁盘可能静置)
