@@ -55,5 +55,26 @@ void cr_grad_stop(int64_t pid, double offset, int r, int g, int b, int a) {
 void cr_grad_apply(int64_t id, int64_t pid) { (void)id; (void)pid; }
 void cr_grad_drop(int64_t pid) { (void)pid; }
 void cr_flush(int64_t id) { (void)id; }
+void cr_blit(int64_t id, unsigned char *src, int sw, int sh, double sx,
+             double sy, double ssw, double ssh, double dx, double dy,
+             double dw, double dh) {
+  (void)id; (void)src; (void)sw; (void)sh; (void)sx; (void)sy; (void)ssw;
+  (void)ssh; (void)dx; (void)dy; (void)dw; (void)dh;
+}
+
+// 图片解码与文件写入在其余平台同样占位（各自后端随窗口层落地时补）。
+int64_t img_decode_bytes(unsigned char *data, int len) {
+  (void)data; (void)len; return 0;
+}
+int64_t img_decode_file(const char *path, int len) {
+  (void)path; (void)len; return 0;
+}
+int img_w(int64_t h) { (void)h; return 0; }
+int img_h(int64_t h) { (void)h; return 0; }
+int img_copy(int64_t h, unsigned char *out) { (void)h; (void)out; return 0; }
+void img_free(int64_t h) { (void)h; }
+int fsw_write_file(const char *path, int plen, unsigned char *data, int dlen) {
+  (void)path; (void)plen; (void)data; (void)dlen; return 0;
+}
 
 #endif

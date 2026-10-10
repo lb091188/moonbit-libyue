@@ -1,7 +1,28 @@
-// RGBA 位图编码为 PNG（8 bit、color type 6、无隔行）。用于把逐帧
-// 像素数据喂给 Image::new_from_png——libyue 的 Image 没有裸像素构造
-// 入口，PNG 内存编码是纯 MoonBit 的中转通道；压缩用 zlib stored
-// 块（不压缩但合法），小图够用，详见 system-capabilities.md「视频播放」。
+// RGBA 位图编码为 PNG（8 bit、color type 6、无隔行）：纯 MoonBit、零依赖，
+// 给 Canvas/Image 的 write_to_file 出图用。压缩用 zlib stored 块（不压缩
+// 但合法），小图够用；输入是**独立分量**的 RGBA 字节（见 Bitmap::to_rgba_bytes），
+// 与本栈内部的预乘 ARGB32 布局不同。
+
+///|
+#borrow(path, data)
+extern "c" fn fsw_write_file(
+  path : Bytes,
+  plen : Int,
+  data : Bytes,
+  dlen : Int,
+) -> Int = "fsw_write_file"
+
+///|
+/// 位图落盘为 PNG 文件（当前唯一支持的格式）；编码或写失败返回 false。
+pub fn png_write_bitmap(bm : Bitmap, path : String) -> Bool {
+  match png_encode_rgba(bm.to_rgba_bytes(), bm.width, bm.height) {
+    Ok(bytes) => {
+      let p = @utf8.encode(path)
+      fsw_write_file(p, p.length(), bytes, bytes.length()) == 1
+    }
+    Err(_) => false
+  }
+}
 
 ///|
 /// PNG 文件签名（8 字节魔数）。
@@ -119,7 +140,7 @@ fn pngr_push_chunk(
   ctype : String,
   data : Bytes,
 ) -> Int {
-  let type_bytes = utf8_bytes(ctype)
+  let type_bytes = @utf8.encode(ctype)
   let mut o = off
   for i = 0; i < 4; i = i + 1 {
     out[o + i] = ((data.length() >> (24 - 8 * i)) & 255).to_byte()
@@ -151,7 +172,7 @@ fn pngr_push_chunk(
 /// 把 RGBA 位图编码为 PNG 字节流（8 bit、color type 6、无隔行、stored
 /// 压缩）。data 为 width*height*4 字节的行主序 RGBA；尺寸或数据长度
 /// 不符给 Err。
-pub fn pngr_encode_rgba(
+pub fn png_encode_rgba(
   data : Bytes,
   width : Int,
   height : Int,

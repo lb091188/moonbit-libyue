@@ -46,10 +46,13 @@ def pkg_config(args: list[str], flag: str) -> list[str] | None:
     return run.stdout.split()
 
 
-def compile_stub(src: Path, lib_name: str) -> str:
+def compile_stub(src: Path | list[Path], lib_name: str) -> str:
     """把需要系统头文件的 C 端编成静态库（moon 的 link_configs 只有链接期字段、
-    c_flags 会被静默忽略，实测），返回库路径；缺依赖或编译失败返回空串。"""
-    if not src.exists():
+    c_flags 会被静默忽略，实测），返回库路径；缺依赖或编译失败返回空串。
+    可传多个源文件，编进同一个 .a（任一源更新即整体重编）。"""
+    srcs = [src] if isinstance(src, Path) else list(src)
+    srcs = [s for s in srcs if s.exists()]
+    if not srcs:
         return ""
     cflags: list[str] = []
     for name in LINUX_PKG_CONFIG_LIBS:
@@ -60,18 +63,27 @@ def compile_stub(src: Path, lib_name: str) -> str:
         cflags.extend(got)
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
     lib = BUILD_DIR / lib_name  # ld 的 -l 命名约定：lib<name>.a
-    obj = BUILD_DIR / (lib_name.removesuffix(".a") + ".o")
-    if lib.exists() and lib.stat().st_mtime >= src.stat().st_mtime:
+    newest = max(s.stat().st_mtime for s in srcs)
+    if lib.exists() and lib.stat().st_mtime >= newest:
         return lib.as_posix()
     cc = shutil.which("cc") or shutil.which("gcc") or "cc"
-    for cmd in (
-        [cc, "-c", "-O2", "-fPIC", "-o", obj.as_posix(), src.as_posix()] + cflags,
-        ["ar", "rcs", lib.as_posix(), obj.as_posix()],
-    ):
+    objs: list[str] = []
+    for s in srcs:
+        obj = BUILD_DIR / (s.stem + ".o")
+        cmd = [cc, "-c", "-O2", "-fPIC", "-o", obj.as_posix(), s.as_posix()] + cflags
         run = subprocess.run(cmd, capture_output=True, text=True)
         if run.returncode != 0:
             print(f"stub: {' '.join(cmd)} 失败\n{run.stderr}", file=sys.stderr)
             return ""
+        objs.append(obj.as_posix())
+    # 先删旧归档再建：`ar rcs` 对同名成员是替换，但对改了名的成员是**追加**，
+    # 源文件改名/拆分后会留下重名符号（multiple definition）。
+    lib.unlink(missing_ok=True)
+    cmd = ["ar", "rcs", lib.as_posix(), *objs]
+    run = subprocess.run(cmd, capture_output=True, text=True)
+    if run.returncode != 0:
+        print(f"stub: {' '.join(cmd)} 失败\n{run.stderr}", file=sys.stderr)
+        return ""
     return lib.as_posix()
 
 
@@ -127,7 +139,11 @@ def link_configs() -> dict:
                 + " ".join([*libs, *sys_libs]),
             })
         cairo_lib = compile_stub(
-            MODULE_ROOT / "yue" / "render" / "cairo_stub.c", "librender_cairo_stub.a"
+            [
+                MODULE_ROOT / "yue" / "render" / "cairo_stub.c",
+                MODULE_ROOT / "yue" / "render" / "image_stub.c",
+            ],
+            "librender_cairo_stub.a",
         )
         if cairo_lib:
             entries.append({

@@ -1,7 +1,7 @@
 ///|
 /// CRC32 / Adler32 已知答案（zlib 标准："123456789"）。
 test "checksum 已知答案：CRC32/Adler32 of 123456789" {
-  let v = utf8_bytes("123456789")
+  let v = @utf8.encode("123456789")
   // 0xCBF43926 的 32 位有符号视角
   inspect(pngr_crc32(v), content="-873187034")
   // 0x91E01DE
@@ -12,13 +12,13 @@ test "checksum 已知答案：CRC32/Adler32 of 123456789" {
 /// 1x1 像素 PNG 的字节级自校验（headless 测试环境无 GUI 上下文，
 /// Image::new_from_png 恒空，故按容器结构逐段断言；真机解码验证走
 /// systemprobe 示例）。
-test "pngr_encode_rgba：1x1 容器结构自校验" {
+test "png_encode_rgba：1x1 容器结构自校验" {
   let px = FixedArray::make(4, b'\x00')
   px[0] = b'\xF0'
   px[1] = b'\xF0'
   px[2] = b'\xF0'
   px[3] = b'\xFF'
-  let png = match pngr_encode_rgba(Bytes::from_array(px), 1, 1) {
+  let png = match png_encode_rgba(Bytes::from_array(px), 1, 1) {
     Ok(b) => b
     Err(e) => fail("编码失败：\{e}")
   }
@@ -77,9 +77,9 @@ test "pngr_encode_rgba：1x1 容器结构自校验" {
 
 ///|
 /// 4x4 棋盘：容器长度与 IDAT stored 块数自洽（raw=4*(1+16)=68 单块）。
-test "pngr_encode_rgba：4x4 长度自洽" {
+test "png_encode_rgba：4x4 长度自洽" {
   let px = FixedArray::make(4 * 4 * 4, b'\x7F')
-  let png = match pngr_encode_rgba(Bytes::from_array(px), 4, 4) {
+  let png = match png_encode_rgba(Bytes::from_array(px), 4, 4) {
     Ok(b) => b
     Err(e) => fail("编码失败：\{e}")
   }
@@ -90,9 +90,9 @@ test "pngr_encode_rgba：4x4 长度自洽" {
 
 ///|
 /// 多 stored 块大图（扫描流 80200 字节 > 65535 → 2 块）。
-test "pngr_encode_rgba：多 stored 块长度自洽" {
+test "png_encode_rgba：多 stored 块长度自洽" {
   let px = FixedArray::make(200 * 100 * 4, b'\x80')
-  let png = match pngr_encode_rgba(Bytes::from_array(px), 200, 100) {
+  let png = match png_encode_rgba(Bytes::from_array(px), 200, 100) {
     Ok(b) => b
     Err(e) => fail("编码失败：\{e}")
   }
@@ -105,11 +105,11 @@ test "pngr_encode_rgba：多 stored 块长度自洽" {
 
 ///|
 /// 半透明渐变帧（16x16）长度自洽。
-test "pngr_encode_rgba：渐变帧长度自洽" {
+test "png_encode_rgba：渐变帧长度自洽" {
   let w = 16
   let h = 16
   let px = FixedArray::make(w * h * 4, b'\x33')
-  let png = match pngr_encode_rgba(Bytes::from_array(px), w, h) {
+  let png = match png_encode_rgba(Bytes::from_array(px), w, h) {
     Ok(b) => b
     Err(e) => fail("编码失败：\{e}")
   }
@@ -120,12 +120,12 @@ test "pngr_encode_rgba：渐变帧长度自洽" {
 
 ///|
 /// 非法参数给 Err（尺寸零 / 数据长度不符）。
-test "pngr_encode_rgba：非法参数给 Err" {
-  match pngr_encode_rgba(utf8_bytes("x"), 2, 2) {
+test "png_encode_rgba：非法参数给 Err" {
+  match png_encode_rgba(@utf8.encode("x"), 2, 2) {
     Ok(_) => fail("长度不符应给 Err")
     Err(_) => ()
   }
-  match pngr_encode_rgba(utf8_bytes("x"), 0, 1) {
+  match png_encode_rgba(@utf8.encode("x"), 0, 1) {
     Ok(_) => fail("零尺寸应给 Err")
     Err(_) => ()
   }

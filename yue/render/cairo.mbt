@@ -118,6 +118,23 @@ extern "c" fn cr_clip_rect(
 extern "c" fn cr_flush(id : Int64) -> Unit = "cr_flush"
 
 ///|
+#borrow(src)
+extern "c" fn cr_blit(
+  dst : Int64,
+  src : FixedArray[Byte],
+  sw : Int,
+  sh : Int,
+  sx : Double,
+  sy : Double,
+  ssw : Double,
+  ssh : Double,
+  dx : Double,
+  dy : Double,
+  dw : Double,
+  dh : Double,
+) -> Unit = "cr_blit"
+
+///|
 extern "c" fn cr_set_operator(id : Int64, mode : Int) -> Unit = "cr_set_operator"
 
 ///|
@@ -349,4 +366,22 @@ pub fn Cairo::set_stroke_gradient(self : Cairo, g : Gradient) -> Unit {
 /// 把会话数据刷回缓冲。
 pub fn Cairo::flush(self : Cairo) -> Unit {
   cr_flush(self.id)
+}
+
+///|
+/// 源位图子矩形 → 目标矩形（拉伸/缩小，双线性采样；目标矩形设备空间取整）。
+/// 混合算子与裁剪区沿用会话当前状态；不要把某位图画到它自己。
+pub fn Cairo::blit(
+  self : Cairo,
+  src : Bitmap,
+  sx : Double,
+  sy : Double,
+  sw : Double,
+  sh : Double,
+  dx : Double,
+  dy : Double,
+  dw : Double,
+  dh : Double,
+) -> Unit {
+  cr_blit(self.id, src.data, src.width, src.height, sx, sy, sw, sh, dx, dy, dw, dh)
 }

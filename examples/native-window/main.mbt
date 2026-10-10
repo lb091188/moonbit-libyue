@@ -70,7 +70,31 @@ fn draw_boxes(
   }
 }
 
-fn draw(win : @win.Window, boxes : Array[Box], focused : Int?, blink : Bool, tick : Int) -> Unit {
+// 离屏画布精灵（4x4 棋盘 + 对角块）：验证 Canvas → draw_canvas 缩放上屏这条路
+fn make_sprite() -> @render.Canvas {
+  let cv = @render.Canvas::new(8.0, 8.0)
+  let p = cv.get_painter()
+  for i = 0; i < 4; i = i + 1 {
+    for j = 0; j < 4; j = j + 1 {
+      let odd = (i + j) % 2 == 1
+      p.set_fill_color(if odd { "#89b4fa" } else { "#313244" })
+      p.fill_rect((i * 2).to_double(), (j * 2).to_double(), 2.0, 2.0)
+    }
+  }
+  p.set_fill_color("#f9e2af")
+  p.fill_rect(0.0, 0.0, 2.0, 2.0)
+  p.end()
+  cv
+}
+
+fn draw(
+  win : @win.Window,
+  boxes : Array[Box],
+  focused : Int?,
+  blink : Bool,
+  tick : Int,
+  sprite : @render.Canvas,
+) -> Unit {
   let (w, h) = win.size()
   let bm = @render.Bitmap::new(w, h)
   let p = @render.Painter::new(bm)
@@ -106,6 +130,7 @@ fn draw(win : @win.Window, boxes : Array[Box], focused : Int?, blink : Bool, tic
   p.set_fill_color("#808080")
   p.fill_rect(fw - 96.0, 64.0, 52.0, 52.0)
   p.set_blend_mode(@render.Normal)
+  p.draw_canvas(sprite, fw - 190.0, 120.0, 32.0, 32.0)
   let note = "帧 \{tick} · 焦点 \{focus_text} · Tab 切换、点击可定位光标"
   p.flush()
   let _ = @text.draw_to(bm, 24.0, 30.0, note, 12.0, "#a6adc8")
@@ -168,6 +193,7 @@ fn main {
   let fs = @core.FocusStack::new()
   let _ = fs.register(1)
   let _ = fs.register(2)
+  let sprite = make_sprite()
 
   let l = @core.Loop::new()
   l.start(@win.now_ms())
@@ -301,7 +327,7 @@ fn main {
     queue_left.val = win.pending_input()
     if dirty.val {
       dirty.val = false
-      draw(win, boxes, fs.current(), blink.val, frames.val)
+      draw(win, boxes, fs.current(), blink.val, frames.val, sprite)
     }
   }
   win.close()
