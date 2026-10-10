@@ -741,7 +741,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 @charts.scatter_t(pts, trend=true)
 ```
 
-以下六个扩展图表与上述同渲染模型（Store 驱动、只重绘画布、主题切换跟随），完整演示见 `examples/systemprobe`。其后九个层级 / 地理 / 力导向 / 时间流图表与图表交互层为后续批次，同样纯 MoonBit 自绘、Store 驱动。
+以下六个扩展图表与上述同渲染模型（Store 驱动、只重绘画布、主题切换跟随），完整演示见 `NoahLiu/yue-examples/systemprobe`。其后九个层级 / 地理 / 力导向 / 时间流图表与图表交互层为后续批次，同样纯 MoonBit 自绘、Store 驱动。
 
 ### 雷达图 radar_chart_t
 
