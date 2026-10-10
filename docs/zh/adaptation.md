@@ -298,6 +298,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **文件写入**：`Canvas`/`Image` 的 `write_to_file` 目前只支持 "png"，落盘经 C 端 `fsw_write_file` 兜底（系统层落地前的临时通道，路径按 UTF-8 字节收）。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/render` 40/40（新增 9 条：PNG 往返不透明/半透明、空图语义与空图上不落像素、逻辑尺寸随 scale、`resize` 放大实心色保持、`draw_canvas` 2 倍放大四象限、`draw_canvas_from_rect` 子矩形无串色、blit 尊重混合模式乘算、PNG 落盘读回逐像素；另有 6 条 PNG 编码器用例随搬家并入）；五包 `moon check` 零警告、core 15/15、input 10/10、text 7/7、yoga-mbt 80/80；`examples/native-window` 冒烟 49 帧、退出码 0（新增离屏画布精灵 4× 放大上屏）；全仓红点 **287 errors / 68 warnings**（较 290 减少，未增）。
 
+### MoonBit 原生 GUI 栈 · 图标绘制面平移（803 条千分定点路径）
+
+- **平移范围与保真**：master `yue/icons/icons.mbt` 前 4197 行（`IconKind` 803 变体、`path_num`/`fill_icon_path` 解释器、`draw_icon`、`icon_path_data` 数据块、`kind_index`/`all_icons`/`icon_name` 三张表）整段搬入新包 `yue/icons`；改动只有两处类型引用 `@yue.Painter → @render.Painter` 与头部说明，**数据块与本尊逐行零差异**（`diff` 只报头部 7 行与 2 行类型引用）。声明式包装 `icon`/`icon_button_t` 依赖声明式层，留给组件接线那批（G7）。
+- **语义照搬不重造**：坐标为归一化值 ×1000 的整数定点、命令集 M/L/C/Z、每子路径 M…Z 闭合、整体一次 `fill`（iconfont 轮廓型）、安全边距 0.88（`v × s × 0.88 / 1000 + 中心`）、单命令即读即调不缓存（解析微秒级）。
+- **测试口径**：①清单/名字/路径数据三表一一对应——用「计数数组每格恰为 1」代替哈希集合（不为此引入容器），名字唯一用平方比对（803 项规模够用）；②路径串字符集封闭**全量扫描**（只允许 M/L/C/Z、数字、`-`、`,`，且首 M 尾 Z）；③`draw_icon` 落像素且已画像素包围盒中心 ±2px（验居中语义，不锁具体形状）；④803 图标 24px **全量扫描无空图**（含解析 + 光栅化，0.7s 内跑完）。
+- **环境观察（避免误判）**：示例退出行的 `seen` 计数含**指针移动**事件（motion 的 code 4 同样走输入队列），冒烟时鼠标停在窗口上会看到 `seen` 非 0 而文本不变，属预期，不是「按键乱入」。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/icons` 4/4；`moon check yue/icons` 零警告；`examples/native-window` 冒烟 49 帧、退出码 0（示例新增一排五个矢量图标）。
+
 ## Linux
 
 ### 发行版
