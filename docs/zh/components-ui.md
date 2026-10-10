@@ -1,6 +1,10 @@
 # 主题组件库速查
 
-主题组件库速查：Element Plus 风格的成套界面组件（按钮 / 输入 / 选择 / 表单 / 导航 / 布局 / 数据展示 / 图标 / 反馈 / 浮层），全部经 `@components` 调用(moon.pkg 的 import 加 `"NoahLiu/moonbit-libyue/yue/components"`;`Node` 类型与 `mount` 来自 `@declarative`,即还要 import `"NoahLiu/moonbit-libyue/yue/declarative"`)、返回 `Node` 直接进界面树。签名中带 `?` 的可选参数必须具名传值（如 `date_picker_t(value=day)`），不带 `?` 的位置参数按序传。响应式 `Store` / `Signal` 参数见 [declarative.md](declarative.md)；原生控件（Window / Label / Button / Entry 等）见 [components.md](components.md)。
+主题组件库速查:Element Plus 风格的成套界面组件(按钮 / 输入 / 选择 / 表单 / 导航 / 布局 / 数据展示 / 图标 / 反馈 / 浮层)。每个函数返回 `Node`,直接进界面树。
+
+- 全部经 `@components` 调用:在 `moon.pkg` 的 import 加 `"NoahLiu/moonbit-libyue/yue/components"`;`Node` 类型与 `mount` 来自 `@declarative`,还要 import `"NoahLiu/moonbit-libyue/yue/declarative"`。
+- 签名中带 `?` 的可选参数必须具名传值(如 `date_picker_t(value=day)`);不带 `?` 的位置参数按序传。
+- 响应式 `Store` / `Signal` 参数见 [declarative.md](declarative.md);原生控件(Window / Label / Button / Entry 等)见 [components.md](components.md)。
 
 完整演示见 `examples/showcase`。
 
@@ -559,7 +563,16 @@ let ratio = @yue.Store::new(0.42)
 
 ### Markdown 展示 markdown_view
 
-`markdown_view(source, style?)`——标题 1-6（ATX/Setext）/ 段落 / **粗体** / *斜体* / ~~删除线~~（区间自画横线）/ `行内代码` / `[链接](url)`（点击经默认浏览器打开，悬浮手型光标 + 地址提示；引用式链接取文档级链接定义）/ 自动链接 / 无序有序列表（带 start）/ 任务列表（真复选框，点击可勾选）/ 引用（主题色竖条）/ GFM 提示块 / 分隔线 / 围栏与缩进代码块（语言随 fence 标注，复用 code_view）/ 表格（等分列宽网格，单元格富文本，列对齐随 `:---` `:---:` `---:` 标注）/ 定义列表 / 脚注（正文上标引用按出现顺序编号，文末分隔线后渲染被引用的定义）/ 块级图片（本地路径或 `file://` 加载显示，等比缩放、宽度上限 560；加载失败或网络地址降级 alt 文本，行内图片降级 alt）；emoji 等非 BMP 字符后样式区间按 UTF-16 计量不错位；行内 HTML 与 HTML 块默认不渲染；三平台显示一致，链接 / 代码色跟主题。
+`markdown_view(source, style?)` 渲染 CommonMark + GFM:
+
+- **块级**:标题 1-6(ATX/Setext)、段落、引用(主题色竖条)、GFM 提示块、分隔线、围栏与缩进代码块(语言随 fence 标注,复用 code_view)、表格(等分列宽网格,单元格富文本,列对齐随 `:---` `:---:` `---:` 标注)、定义列表、块级图片。
+- **行内**:**粗体** / *斜体* / ~~删除线~~(区间自画横线) / `行内代码` / `[链接](url)` / 自动链接;引用式链接取文档级链接定义。
+- **列表**:无序有序(带 `start`)、任务列表(真复选框,点击可勾选)。
+- **链接**:点击经默认浏览器打开;悬浮手型光标 + 地址提示。
+- **脚注**:正文上标引用按出现顺序编号;文末分隔线后渲染被引用的定义。
+- **图片**:本地路径或 `file://` 加载,等比缩放、宽度上限 560;加载失败或网络地址降级 alt 文本,行内图片降级 alt。
+- **计量**:emoji 等非 BMP 字符后样式区间按 UTF-16 计量,不错位。
+- **不渲染**:行内 HTML 与 HTML 块。三平台显示一致,链接 / 代码色跟主题。
 
 ```moonbit
 @markdown.markdown_view("# 标题\n\n正文 **粗体**、~~删除线~~ 与 [链接](https://libyue.com)。\n\n- [x] 任务项\n\n| 列甲 | 列乙 |\n|:--|--:|\n| 1 | 2 |\n\n脚注引用[^1]。\n\n[^1]: 脚注定义。")
@@ -1012,7 +1025,13 @@ GeoJSON 区域按等距圆柱投影绘制（填充 + 描边 + 质心区域名标
 | fill | Bool | false | 不设固定宽度，横向铺满父容器 |
 | width / height | Double | 560 / 360 | 画布尺寸（fill=false 时）,经 `style` 传入 |
 
-地图数据集不内置：文本解析走 `geojson_parse(text) -> Result[Array[GeoRegion], GeoError]`（支持 FeatureCollection / Feature / 裸 Polygon / MultiPolygon，几何不合规给 `GeoError::BadGeometry`），或自行构造 `GeoRegion::make(名称?, 环列表)`。投影矩形 = 区域环与飞线端点的合并包围盒按自身长宽比居中缩进（不变形），无数据时画「暂无数据」。区域填充以主题主色为底、按区域名哈希 ±0.06 微调明度（同名同色、换主题不变）；飞线分段渐变虚线 + 起终点圆点 + 末端箭头，静态表现无动画，hover 未做。配套纯函数：`geo_project`（等距圆柱投影）、`geo_bbox` / `geo_bbox_points`、`geo_fit_rect`、`geo_shoelace`（环有向面积）、`geo_ring_centroid` / `geo_region_centroid`、`geo_flight_points`（弧线采样）、`geo_quad_bezier`。
+地图数据集不内置。
+
+- 解析:`geojson_parse(text) -> Result[Array[GeoRegion], GeoError]` 支持 FeatureCollection / Feature / 裸 Polygon / MultiPolygon,几何不合规给 `GeoError::BadGeometry`;或自行构造 `GeoRegion::make(名称?, 环列表)`。
+- 投影:矩形 = 区域环与飞线端点的合并包围盒,按自身长宽比居中缩进(不变形);无数据时画「暂无数据」。
+- 区域填充:以主题主色为底,按区域名哈希 ±0.06 微调明度(同名同色、换主题不变)。
+- 飞线:分段渐变虚线 + 起终点圆点 + 末端箭头;静态表现无动画,hover 未做。
+- 配套纯函数:`geo_project`(等距圆柱投影)、`geo_bbox` / `geo_bbox_points`、`geo_fit_rect`、`geo_shoelace`(环有向面积)、`geo_ring_centroid` / `geo_region_centroid`、`geo_flight_points`(弧线采样)、`geo_quad_bezier`。
 
 ```moonbit
 let geojson = @yue.read_text_file("china.geojson") // 自有文本读取即可
@@ -1182,7 +1201,12 @@ let pb = @yue.Store::new([
 | pan | Bool | false | 左键拖拽平移窗口（按下 `set_capture`、抬起 `release_capture`） |
 | style | Array[(String, &StyVal)] | 560×280 | 画布尺寸样式 |
 
-浮层画在图表容器自身 on_draw 内（图表之后绘制即在最上层，无 z-order 问题），恒深底浅字、不随主题变换；定位经 `ci_tooltip_pos` 钳在画布内，右溢时翻到锚点对侧。鼠标移入即刻显隐变化或拖拽时才 schedule_paint，静态移动不重绘。状态结构 `CiTip`（`CiTip::new()` / `ci_tip_show(tip, 标题, 行, px, py)` / `ci_tip_hide(tip)` / `ci_tip_draw(p, tip, w, h)` / `ci_tip_size(标题, 行)`）也可直接用于自绘图表。命中纯函数：`CiPlot::make(x0, y0, x1, y1)`（`width` / `frac` / `contains`）、`ci_nearest_idx(px, n, x0, x1)`（均布点列最近序号，绘制区外 -1）、`ci_sector_at(px, py, cx, cy, r_in, r_out, values)`（扇形命中，12 点方向起顺时针，与 `sector_angles` 同构造）。
+浮层行为:
+
+- 画在图表容器自身 on_draw 内(图表之后绘制即在最上层,无 z-order 问题);恒深底浅字,不随主题变换。
+- 定位经 `ci_tooltip_pos` 钳在画布内,右溢时翻到锚点对侧;鼠标移入即刻显隐变化或拖拽时才 schedule_paint,静态移动不重绘。
+- 状态结构 `CiTip`(`CiTip::new()` / `ci_tip_show(tip, 标题, 行, px, py)` / `ci_tip_hide(tip)` / `ci_tip_draw(p, tip, w, h)` / `ci_tip_size(标题, 行)`)也可直接用于自绘图表。
+- 命中纯函数:`CiPlot::make(x0, y0, x1, y1)`(`width` / `frac` / `contains`)、`ci_nearest_idx(px, n, x0, x1)`(均布点列最近序号,绘制区外 -1)、`ci_sector_at(px, py, cx, cy, r_in, r_out, values)`(扇形命中,12 点方向起顺时针,与 `sector_angles` 同构造)。
 
 ```moonbit
 let zoom = @charts.ci_zoom_make()
@@ -1209,7 +1233,11 @@ let zoom = @charts.ci_zoom_make()
 
 `ci_legend(items~ : Store[Array[(String, String)]], visible~ : Store[Array[Bool]], on_toggle? = (Int) -> Unit, style?)`
 
-系列色块 + 名称单行排布，hover 浅底，点击切换对应系列显隐并回调 `on_toggle`（调用方重绘图表）；`visible` 不必预先对齐长度，绘制 / 点击时按 `ci_fit_len` 补齐到 items 长度（缺省 true=可见），数据整体更换只 set items。起点超出容器宽的项不绘制（与命中 `ci_legend_hit` 的 width 门槛同源）。显隐辅助：`ci_fit_len(flags, n)`、`ci_toggle_flag(flags, i)`、`ci_filter_visible(arr, flags)` 与 `ci_filter_visible_at(arr, flags, base)`（返回 `(可见项, 各项原序号)`——显隐后颜色 / 索引仍按原始数据定位，不串色）、`ci_slice_range(arr, i0, i1)`（闭区间切片，越界自动收窄）。
+系列色块 + 名称单行排布,hover 浅底,点击切换对应系列显隐并回调 `on_toggle`(调用方重绘图表)。
+
+- `visible` 不必预先对齐长度:绘制 / 点击时按 `ci_fit_len` 补齐到 items 长度(缺省 true=可见);数据整体更换只 set items。
+- 起点超出容器宽的项不绘制(与命中 `ci_legend_hit` 的 width 门槛同源)。
+- 显隐辅助:`ci_fit_len(flags, n)`、`ci_toggle_flag(flags, i)`、`ci_filter_visible(arr, flags)` 与 `ci_filter_visible_at(arr, flags, base)`(返回 `(可见项, 各项原序号)`——显隐后颜色 / 索引仍按原始数据定位,不串色)、`ci_slice_range(arr, i0, i1)`(闭区间切片,越界自动收窄)。
 
 ```moonbit
 let items = @yue.Store::new([("CPU", @yue.theme_current().primary), ("内存", @yue.theme_current().info)])
@@ -1296,7 +1324,12 @@ let series = @yue.Store::new([
 
 ## 图标
 
-内置矢量图标 803 种，全部由 iconfont 包（元海公共库，MES 场景）经 `scripts/gen_icons.py <iconfont包目录>` 生成：SVG 字体轮廓（贝塞尔/弧线）翻译为 Painter 原语，bbox 归一化 + y 翻转，填充风格，变体名取 `font_class` 的 PascalCase（如 `FilePdf`、`CaretRightSmall`），与控件类型重名的加 `Icon` 后缀（如 `MenuIcon`、`TableIcon`）；`icon_name` 返回 `<font_class>`。覆盖表单表格 / 编辑排版 / 方向翻页 / 布局视图 / 文件文档 / 云运维 / 设备 / 图表 / 通信 / 用户 / 安全 / 时间 / 状态 / 金融商业 / 系统工具 / 天气饮食 / 媒体出行 / 品牌平台等分组，showcase 图标页按组展示（该页由 `scripts/gen_showcase_icons.py` 生成）。换图标库 = 把新包目录传给 `scripts/gen_icons.py` 重跑，`icons-gen` 标记段落勿手改。
+内置矢量图标 803 种,全部由 iconfont 包(元海公共库,MES 场景)经 `scripts/gen_icons.py <iconfont包目录>` 生成:
+
+- SVG 字体轮廓(贝塞尔 / 弧线)翻译为 Painter 原语,bbox 归一化 + y 翻转,填充风格。
+- 变体名取 `font_class` 的 PascalCase(如 `FilePdf`、`CaretRightSmall`),与控件类型重名的加 `Icon` 后缀(如 `MenuIcon`、`TableIcon`);`icon_name` 返回 `<font_class>`。
+- 分组:表单表格 / 编辑排版 / 方向翻页 / 布局视图 / 文件文档 / 云运维 / 设备 / 图表 / 通信 / 用户 / 安全 / 时间 / 状态 / 金融商业 / 系统工具 / 天气饮食 / 媒体出行 / 品牌平台;showcase 图标页按组展示(该页由 `scripts/gen_showcase_icons.py` 生成)。
+- 换图标库 = 把新包目录传给 `scripts/gen_icons.py` 重跑;`icons-gen` 标记段落勿手改。
 
 | API | 用途 |
 |---|---|

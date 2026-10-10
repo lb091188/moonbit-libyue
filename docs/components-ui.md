@@ -1,12 +1,20 @@
 # Themed Component Library Quick Reference
 
-Themed component library quick reference: a full set of Element-Plus-style UI components (buttons / input / selection / forms / navigation / layout / data display / icons / feedback / overlays). Every function is called via `@components` (add `"NoahLiu/moonbit-libyue/yue/components"` to your `moon.pkg` imports; the `Node` type and `mount` come from `@declarative`, i.e. also import `"NoahLiu/moonbit-libyue/yue/declarative"`) and returns a `Node` that goes straight into the UI tree. Optional parameters (marked `?` in the signatures below) must be passed by name, e.g. `date_picker_t(value=day)`; parameters without `?` are positional. Reactive `Store` / `Signal` parameters are covered in [declarative.md](declarative.md); native controls (Window / Label / Button / Entry, etc.) are in [components.md](components.md).
+Themed component library quick reference: a full set of Element-Plus-style UI components (buttons / input / selection / forms / navigation / layout / data display / icons / feedback / overlays). Every function returns a `Node` that goes straight into the UI tree.
+
+- Call everything via `@components`: add `"NoahLiu/moonbit-libyue/yue/components"` to your `moon.pkg` imports. The `Node` type and `mount` come from `@declarative`, so also import `"NoahLiu/moonbit-libyue/yue/declarative"`.
+- Optional parameters (marked `?` below) are passed by name, e.g. `date_picker_t(value=day)`; parameters without `?` are positional.
+- Reactive `Store` / `Signal` parameters: see [declarative.md](declarative.md). Native controls (Window / Label / Button / Entry…): see [components.md](components.md).
 
 Full demo: `examples/showcase`.
 
 ## Theme
 
-All colors come from the theme palette — a deep, low-saturation scheme: blue `#2D68C4`, green `#2E9E5B`, orange `#D9822B`, red `#D64550`, plus greys for text / border / fill. Components render straight corners, use background colors for hover/active states, and center text vertically. Form controls share a unified height of 32px (`control_height`), so buttons / inputs / selects / steppers / picker fields align on one row.
+All colors come from the theme palette — a deep, low-saturation scheme:
+
+- Accents: blue `#2D68C4`, green `#2E9E5B`, orange `#D9822B`, red `#D64550`; plus greys for text / border / fill.
+- Components render straight corners, use background colors for hover/active states, and center text vertically.
+- Form controls share a unified height of 32px (`control_height`), so buttons / inputs / selects / steppers / picker fields align on one row.
 
 ### Switching and customization
 
@@ -53,7 +61,12 @@ Following the system: `theme_from_system()` gives you a theme that follows the s
 
 ### Formula-derived palettes and the system accent
 
-With a single accent color you don't have to hand-tune a whole palette: `theme_from_accent(accent, dark?)` derives one via HSL formulas — the accent keeps its hue while lightness is clamped per mode (0.34..0.52 light / 0.55..0.72 dark) with a saturation floor for readability; `primary_hover` shifts lightness by ∓8%, `primary_light` mixes toward the panel background (this is the Soft button fill); semantic colors (success/warning/danger/info) use a fixed hue wheel 142/36/4/210 borrowing the accent's saturation, with lightness following the mode; neutrals (text / border / fills / backgrounds) stay on the built-in base ramps and never shift with the accent.
+`theme_from_accent(accent, dark?)` derives a whole palette from a single accent color via HSL formulas — no hand-tuning:
+
+- The accent keeps its hue; lightness is clamped per mode (0.34..0.52 light / 0.55..0.72 dark) with a saturation floor for readability.
+- `primary_hover` shifts lightness by ∓8%; `primary_light` mixes toward the panel background (this is the Soft button fill).
+- Semantic colors (success/warning/danger/info) use a fixed hue wheel 142/36/4/210 borrowing the accent's saturation, with lightness following the mode.
+- Neutrals (text / border / fills / backgrounds) stay on the built-in base ramps and never shift with the accent.
 
 `system_accent()` reads the system accent color: on Linux a three-step fallback (GNOME 47+ accent-color setting → the selected-background color in the current GTK theme CSS → empty string), on Windows the DWM colorization color, on macOS `controlAccentColor`; see [adaptation.md](adaptation.md) for the read paths and measured values.
 
@@ -89,7 +102,9 @@ Every themed component exposes `style?` (style key-value pairs, numeric and stri
 @components.slider_t(v, style=[("flexgrow", 0.0), ("width", 240.0)])
 ```
 
-`style` is the single entry for layout customization — component signatures no longer carry layout named parameters such as margin / width / height / spacing. Named parameters that remain are semantic/structural: `size` on `avatar` / `icon` (drawn content size), `width` on `table_t` (column-distribution basis) and `row_height`, `width` / `height` on `popover_t` (native popup window size, not layout), `width` on `transfer` (column width), `ratio` on `hsplit` / `vsplit` (drag geometry), plus data/interaction parameters (min/max/step/placeholder/clearable/foldable etc.).
+`style` is the single entry for layout customization — component signatures no longer carry layout named parameters such as margin / width / height / spacing.
+
+Remaining named parameters are semantic/structural: `size` on `avatar` / `icon` (drawn content size); `width` on `table_t` / `row_height`; `width` / `height` on `popover_t` (native popup size, not layout); `width` on `transfer`; `ratio` on `hsplit` / `vsplit` (drag geometry); plus data/interaction parameters (min/max/step/placeholder/clearable/foldable etc.).
 
 `style` is applied once at mount; prefer the theme palette for colors — colors set via `style` may conflict with theme switching (`theme_apply`).
 
@@ -547,7 +562,11 @@ let ratio = @yue.Store::new(0.42)
 
 `code_view(lines, lang? = "moonbit", font_size? = 13.0, line_numbers? = false, style?, handle?)`
 
-Per-token highlighting with manual layout — consistent behavior on all platforms (including Windows). Color classes: keywords purple / types and capitalized constructors yellow / calls followed by `(` blue / numbers orange / strings green / line comments gray; punctuation and operators tokenize separately (`items.push(`, `0..<` each color correctly). lang keyword sets: moonbit / js / ts / python / rust / c / go / bash / sql (case-insensitive); line_numbers=true draws a left gutter.
+Per-token highlighting with manual layout — consistent behavior on all platforms (including Windows).
+
+- Color classes: keywords purple / types and capitalized constructors yellow / calls followed by `(` blue / numbers orange / strings green / line comments gray; punctuation and operators tokenize separately (`items.push(`, `0..<` each color correctly).
+- `lang` keyword sets: moonbit / js / ts / python / rust / c / go / bash / sql (case-insensitive).
+- `line_numbers=true` draws a left gutter.
 
 ```moonbit
 @components.code_view(
@@ -559,7 +578,16 @@ Per-token highlighting with manual layout — consistent behavior on all platfor
 
 ### Markdown rendering markdown_view
 
-`markdown_view(source, style?)` — headings 1-6 (ATX/Setext), paragraphs, **bold**, *italic*, ~~strikethrough~~ (line drawn per range), `inline code`, `[links](url)` (click opens the default browser, hand cursor and address tooltip on hover; reference-style links resolve from the document link definitions), autolinks, ordered/unordered lists (with start), task lists (real checkboxes, click to toggle), blockquotes (theme-colored bar), GFM alerts, rules, fenced and indented code blocks (language from the fence marker, backed by code_view), tables (equal-width column grid, rich-text cells, column alignment from `:---` `:---:` `---:`), definition lists, footnotes (superscript references numbered in order of appearance, referenced definitions rendered after a rule at the end), block images (loaded from local paths or `file://`, scaled proportionally up to 560 wide; on load failure or network URLs falls back to the alt text, inline images fall back to alt); style ranges stay aligned after non-BMP characters (emoji) via UTF-16 indexing; inline HTML and HTML blocks are not rendered; consistent rendering across platforms, link/code colors follow the theme.
+`markdown_view(source, style?)` renders CommonMark + GFM:
+
+- **Blocks**: headings 1-6 (ATX/Setext), paragraphs, blockquotes (theme-colored bar), GFM alerts, rules, fenced and indented code blocks (language from the fence marker, backed by code_view), tables (equal-width column grid, rich-text cells, column alignment from `:---` `:---:` `---:`), definition lists, block images.
+- **Inline**: bold, italic, strikethrough (line drawn per range), `inline code`, `[links](url)`, autolinks; reference-style links resolve from the document link definitions.
+- **Lists**: ordered/unordered (with `start`) and task lists (real checkboxes, click to toggle).
+- **Links**: clicking opens the default browser; hand cursor and address tooltip on hover.
+- **Footnotes**: superscript references numbered in order of appearance; referenced definitions render after a rule at the end.
+- **Images**: loaded from local paths or `file://`, scaled proportionally up to 560 wide; on load failure or for network URLs falls back to the alt text, and inline images fall back to alt.
+- **Indexing**: style ranges stay aligned after non-BMP characters (emoji) via UTF-16 indexing.
+- **Not rendered**: inline HTML and HTML blocks. Consistent rendering across platforms; link/code colors follow the theme.
 
 ```moonbit
 @markdown.markdown_view("# Heading\n\nBody **bold**, ~~struck~~ and a [link](https://libyue.com).\n\n- [x] Task item\n\n| Col A | Col B |\n|:--|--:|\n| 1 | 2 |\n\nA footnote[^1].\n\n[^1]: Footnote body.")
@@ -569,9 +597,18 @@ Per-token highlighting with manual layout — consistent behavior on all platfor
 
 `table_t(columns, rows : Store[Array[TableRow]], width? = 560.0, row_height? = 36.0, selection? : Store[Array[Int]], sort? : Store[TableSort], on_row_click?, style?, handle?)`
 
-Header + zebra stripes + hover highlight + Store-driven (a set rebuilds all rows and clears the selection). Columns via `TableColumn::make(title, width, align?, sortable?)` (width ≤ 0 = flexible columns sharing the remaining width; `sortable=false` keeps a column out of header sorting). Cells are `TableCell`: `CellText` (single-line ellipsis when overflowing; re-truncated at the new width after column resize) / `CellTag(text, semantic type)` / `CellColorBox(hex, name)` / `CellLines(multi-line, row auto-grows)`; `TableRow::make(string array)` builds plain rows. Without `selection` rows single-select on click; pass `selection` to enable a checkbox column (row click toggles, header select-all/clear, dash when partial, selected rows get a light-blue fill); the callback receives `(index, row)`.
+Header + zebra stripes + hover highlight + Store-driven (a set rebuilds all rows and clears the selection).
 
-Header sorting and column resizing: pass `sort` (a `Store[TableSort]`; `TableSort{ column, asc }` where `column` is the column-definition index, < 0 = unsorted) and sortable columns keep a grey ↕ double-triangle hint at the right of the header so users can tell the column is clickable; clicking runs a three-state cycle "new column ascending → same column descending → click again to clear" (column set back to -1, subscribers restore the original order), and the actively sorted column switches to a solid theme-colored ▲ / ▼ so the sort state is obvious at a glance; actual data sorting is up to you — subscribe to the store, sort, and write back to `rows`. Header column boundaries stay visible as light lines and turn theme-colored on hover / while dragging; press within 4px of either edge of a column (no handle on the last column's right edge) to resize, with the two neighbors trading width (minimum 56px), mouse capture keeping the drag alive, and no row rebuild or selection loss.
+- Columns: `TableColumn::make(title, width, align?, sortable?)` — width ≤ 0 = a flexible column sharing the remaining width; `sortable=false` keeps a column out of header sorting.
+- Cells are `TableCell`: `CellText` (single-line ellipsis when overflowing; re-truncated at the new width after a column resize) / `CellTag(text, semantic type)` / `CellColorBox(hex, name)` / `CellLines(multi-line, row auto-grows)`; `TableRow::make(string array)` builds plain rows.
+- Without `selection` rows single-select on click; pass `selection` to enable a checkbox column (row click toggles, header select-all/clear, dash when partial, selected rows get a light-blue fill); the callback receives `(index, row)`.
+
+Header sorting and column resizing:
+
+- Pass `sort` (a `Store[TableSort]`, `TableSort{ column, asc }` where `column` is the column-definition index, < 0 = unsorted); sortable columns keep a grey ↕ hint at the header's right so users can tell they are clickable.
+- Clicking runs a three-state cycle: new column ascending → same column descending → click again to clear (column back to -1, subscribers restore the original order); the actively sorted column switches to a solid theme-colored ▲ / ▼.
+- Sorting data is up to you: subscribe to the store, sort, and write back to `rows`.
+- Column boundaries stay visible as light lines, turning theme-colored on hover / while dragging; press within 4px of either edge (no handle on the last column's right edge) to resize — the two neighbors trade width (minimum 56px), mouse capture keeps the drag alive, and there is no row rebuild or selection loss.
 
 ```moonbit
 let rows = @yue.Store::new([@components.TableRow::make(["A", "1"]), @components.TableRow::make(["B", "2"])])
@@ -637,9 +674,16 @@ Multi-series line chart over fixed-length rolling windows.
 | area | Bool | false | semi-transparent area fill |
 | y_range | (Double, Double)? | None | manual y range; None = auto |
 | show_last | Bool | true | right-edge latest-value label |
- `LineSeries::make(name, max_points?)` creates a series (window capacity defaults to 100, oldest dropped on overflow); push points with `series_push(store, series index, value)` (or `win_push(window, max_points, value)` for a new window, then set it wholesale). The y-axis auto-ranges (window min/max + 8% padding) or is pinned via `y_range = (low, high)`; horizontal grid + left ticks; `area = true` adds semi-transparent area fill (to the zero line when 0 is in range, plot bottom for all-positive, plot top for all-negative); `show_last` toggles the right-edge latest-value label.
+`LineSeries::make(name, max_points?)` creates a series (window capacity defaults to 100, oldest dropped on overflow); push points with `series_push(store, series index, value)`, or `win_push(window, max_points, value)` for a new window and then set it wholesale.
 
-Rendering strategy: when points outnumber pixel columns the chart decimates to columns (keeping each column's min/max extremes) and switches to rect paths — area mode fills one rect per column up to the anchor (the fill's top edge *is* the line), line mode draws a min..max vertical bar per column; when points are fewer than columns it uses a true polyline plus polygon area fill. Per-frame cost is decoupled from window size (1000 points × 4 series measured ~3ms, see adaptation.md).
+- The y-axis auto-ranges (window min/max + 8% padding) or is pinned via `y_range = (low, high)`; horizontal grid + left ticks.
+- `area = true` adds a semi-transparent area fill (to the zero line when 0 is in range, plot bottom for all-positive, plot top for all-negative); `show_last` toggles the right-edge latest-value label.
+
+Rendering strategy:
+
+- When points outnumber pixel columns the chart decimates to columns (keeping each column's min/max extremes) and switches to rect paths — area mode fills one rect per column up to the anchor (the fill's top edge *is* the line), line mode draws a min..max vertical bar per column.
+- When points are fewer than columns it uses a true polyline plus polygon area fill.
+- Per-frame cost is decoupled from window size (1000 points × 4 series measured ~3ms, see adaptation.md).
 
 ```moonbit
 let series = @yue.Store::new([
@@ -703,14 +747,16 @@ let slices = @yue.Store::new([
 
 `gauge_t(value : Store[Double], thresholds?, style?, handle?)`
 
-Single-value percentage ring
+Single-value percentage ring (270° sweep starting at 135°, opening downward) + big center number.
+
+- `value` is 0..1 (clamped); `thresholds` is an ascending `[(upper bound, color), ...]`; the value arc takes the color of the band it falls into (empty table = theme primary), e.g. `[(0.6, green), (0.85, orange), (1.0, red)]`.
+- Smooth interpolation: after a target change a 16ms timer closes 25% of the remaining gap per tick (not animation-frame driven), so 2Hz updates never jump.
 
 | Param | Type | Default | Notes |
 |---|---|---|---|
 | value | Store[Double] | required | 0..1, clamped |
 | width / height | Double | 240 / 170 | canvas size, set via `style` |
 | thresholds | Array[(Double, String)] | [] | ascending (upper bound, color) bands; empty = theme primary |
- (270° sweep starting at 135°, opening downward) + big center number. `value` is 0..1 (clamped); `thresholds` is an ascending `[(upper bound, color), ...]` and the value arc takes the color of the band it falls into (empty table = theme primary), e.g. `[(0.6, green), (0.85, orange), (1.0, red)]`. Smooth interpolation: after a target change a 16ms timer closes 25% of the remaining gap per tick (not animation-frame driven), so 2Hz updates never jump.
 
 ```moonbit
 let usage = @yue.Store::new(0.0)
@@ -740,7 +786,10 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 @charts.scatter_t(pts, trend=true)
 ```
 
-The nine charts below and the interaction layer are likewise self-drawn in pure MoonBit and driven by `Store` data: a set only calls schedule_paint on the canvas — no view-tree rebuild — and colors are picked from the theme at draw time, so `theme_apply` switches follow immediately. Unless noted otherwise, all of them can override the canvas size via `style` and stretch horizontally to fill the parent via `fill=true`.
+The nine charts below and the interaction layer are likewise self-drawn in pure MoonBit and driven by `Store` data:
+
+- A set only calls schedule_paint on the canvas — no view-tree rebuild; colors are picked from the theme at draw time, so `theme_apply` switches follow immediately.
+- Unless noted otherwise, all of them can override the canvas size via `style` and stretch horizontally to fill the parent via `fill=true`.
 
 ### Tree chart tree_chart_t
 
@@ -755,7 +804,10 @@ Hierarchical tree: leaf nodes share slots evenly along the spread direction, par
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
 | width / height | Double | 560 / 320 | canvas size (when fill=false), set via `style` |
 
-`TreeItem::make(name, value? = None)` creates a node: `value` is the dot-size dimension (None, or no value anywhere in the tree, makes all dots equal size); `children` can still be pushed after creation. The node dot radius ∝ value (relative to the subtree maximum), depth is shaded along a theme-primary gradient, and every node carries a name label. Companion pure functions: `tree_depth` (subtree height), `tree_leaf_count` (leaf count), `tree_max_value` (peak), `tree_vertical(orientation)` (whether the form is vertical).
+`TreeItem::make(name, value? = None)` creates a node: `value` is the dot-size dimension (None, or no value anywhere in the tree, makes all dots equal size); `children` can still be pushed after creation.
+
+- Node dot radius ∝ value (relative to the subtree maximum); depth is shaded along a theme-primary gradient; every node carries a name label.
+- Companion pure functions: `tree_depth` (subtree height), `tree_leaf_count` (leaf count), `tree_max_value` (peak), `tree_vertical(orientation)` (whether the form is vertical).
 
 ```moonbit
 let root = @charts.TreeItem::make("repo")
@@ -782,7 +834,11 @@ Hierarchical data is split orthogonally with area ∝ value (squarified aspect-r
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
 | width / height | Double | 560 / 360 | canvas size (when fill=false), set via `style` |
 
-`TmItem::make(name, value? = 0.0, children? = [])` creates a node; the value rule is `tm_value_of` — a positive own value wins, otherwise children are summed recursively, and all-zero degenerates to 0 (excluded from layout). Sibling cells spread their shading evenly along the theme primary's HSL lightness axis (same color family, neighbors distinguishable); parent cells get a light background plus a name band; in-cell labels `tm_label_lines` give name + value on two lines (two lines only when the cell height is ≥30, name only for 16..30, nothing below that, truncated to the available width). Hover hits the deepest visible cell (brightened + outlined); the hit table is rebuilt on every on_draw, sharing one layout with drawing.
+`TmItem::make(name, value? = 0.0, children? = [])` creates a node; the value rule is `tm_value_of` — a positive own value wins, otherwise children are summed recursively, and all-zero degenerates to 0 (excluded from layout).
+
+- Sibling cells spread their shading evenly along the theme primary's HSL lightness axis (same color family, neighbors distinguishable); parent cells get a light background plus a name band.
+- In-cell labels `tm_label_lines` give name + value on two lines — two lines only when the cell height is ≥30, name only for 16..30, nothing below that, truncated to the available width.
+- Hover hits the deepest visible cell (brightened + outlined); the hit table is rebuilt on every on_draw, sharing one layout with drawing.
 
 ```moonbit
 let tm = @yue.Store::new([
@@ -813,7 +869,10 @@ Tree data as concentric rings level by level: a parent segment's angular span is
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
 | width / height | Double | 440 / 380 | canvas size (when fill=false), set via `style` |
 
-`SunItem::make(name, value? = None, children? = [])`: when value is omitted it is filled from the sum of the children's aggregated values. The aggregation rule is `sun_total` — an explicit value > 0 wins, otherwise children are summed recursively, negatives are excluded, and a childless node is 0. Top-level segments of one branch cycle the five semantic theme colors, brightening level by level; segments inset angularly to leave gaps (independent of stroke width).
+`SunItem::make(name, value? = None, children? = [])`: when value is omitted it is filled from the sum of the children's aggregated values.
+
+- Aggregation rule `sun_total`: an explicit value > 0 wins, otherwise children are summed recursively; negatives are excluded and a childless node is 0.
+- Top-level segments of one branch cycle the five semantic theme colors, brightening level by level; segments inset angularly to leave gaps (independent of stroke width).
 
 ```moonbit
 let sun = @yue.Store::new(
@@ -846,7 +905,13 @@ GeoJSON regions are drawn under an equirectangular projection (fill + stroke + c
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
 | width / height | Double | 560 / 360 | canvas size (when fill=false), set via `style` |
 
-No map dataset is built in: text parsing goes through `geojson_parse(text) -> Result[Array[GeoRegion], GeoError]` (supports FeatureCollection / Feature / bare Polygon / MultiPolygon; malformed geometry yields `GeoError::BadGeometry`), or construct `GeoRegion::make(name?, ring list)` yourself. The projection rect is the merged bounding box of the region rings and flight endpoints, centered and inset by its own aspect ratio (no distortion); with no data it draws "No data". Region fills take the theme primary as the base and tweak lightness by ±0.06 hashed from the region name (same name, same color; unchanged across theme switches); flights are segmented gradient dashes + origin/destination dots + an end arrow — a static rendering with no animation, and no hover. Companion pure functions: `geo_project` (equirectangular projection), `geo_bbox` / `geo_bbox_points`, `geo_fit_rect`, `geo_shoelace` (ring signed area), `geo_ring_centroid` / `geo_region_centroid`, `geo_flight_points` (arc sampling), `geo_quad_bezier`.
+No map dataset is built in.
+
+- Parsing: `geojson_parse(text) -> Result[Array[GeoRegion], GeoError]` supports FeatureCollection / Feature / bare Polygon / MultiPolygon; malformed geometry yields `GeoError::BadGeometry`. Or construct `GeoRegion::make(name?, ring list)` yourself.
+- Projection: the rect is the merged bounding box of the region rings and flight endpoints, centered and inset by its own aspect ratio (no distortion); with no data it draws "No data".
+- Region fills take the theme primary as the base and tweak lightness by ±0.06 hashed from the region name (same name, same color; unchanged across theme switches).
+- Flights are segmented gradient dashes + origin/destination dots + an end arrow — a static rendering with no animation and no hover.
+- Companion pure functions: `geo_project` (equirectangular projection), `geo_bbox` / `geo_bbox_points`, `geo_fit_rect`, `geo_shoelace` (ring signed area), `geo_ring_centroid` / `geo_region_centroid`, `geo_flight_points` (arc sampling), `geo_quad_bezier`.
 
 ```moonbit
 let geojson = @yue.read_text_file("china.geojson") // your own text reader is fine
@@ -877,7 +942,13 @@ A node-edge graph is drawn statically after the force simulation converges: Coul
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
 | width / height | Double | 560 / 320 | canvas size (when fill=false), set via `style` |
 
-`GraphNode::make(name, value? = 1.0)` (value sets the node circle's area; it does not take part in the force simulation), `GraphEdge::make(source index, target index, weight? = 1.0)` (edges with out-of-range endpoints, self-loops, or weight ≤ 0 neither take part in the simulation nor get drawn). Edges are drawn as semi-transparent parallelogram bands (width ∝ weight), node circles cycle the four semantic theme colors; the simulation has no random source (starting from evenly spaced points on a circle), so identical input always yields identical output. The layout converges once at first draw for the current canvas size and is cached; it is only recomputed when the data is set or the canvas size changes.
+Nodes and edges:
+
+- `GraphNode::make(name, value? = 1.0)` — value sets the node circle's area; it does not take part in the force simulation.
+- `GraphEdge::make(source index, target index, weight? = 1.0)` — edges with out-of-range endpoints, self-loops, or weight ≤ 0 neither take part in the simulation nor get drawn.
+- Edges are drawn as semi-transparent parallelogram bands (width ∝ weight); node circles cycle the four semantic theme colors.
+- The simulation has no random source (starting from evenly spaced points on a circle), so identical input always yields identical output.
+- The layout converges once at first draw for the current canvas size and is cached; it is only recomputed when the data is set or the canvas size changes.
 
 ```moonbit
 let g = @charts.GraphData::make(
@@ -905,7 +976,10 @@ N vertical axes are laid out evenly side by side, each normalized on its own ran
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
 | width / height | Double | 640 / 320 | canvas size (when fill=false), set via `style` |
 
-Each axis carries a name at the top, min/max range labels beside it, and small tick marks on its body; polylines take the series colors alpha-blended (many rows overlapping show density), while the highlighted row uses its opaque own color. `par_axis_range` infers a single axis's range (no padding; a degenerate equal-value range is stretched open around the value), `par_norm` normalizes, and `par_row_vertices` gives a row's vertices for reuse in self-drawing.
+Each axis carries a name at the top, min/max range labels beside it, and small tick marks on its body.
+
+- Polylines take the series colors alpha-blended (many rows overlapping show density); the highlighted row uses its opaque own color.
+- `par_axis_range` infers a single axis's range (no padding; a degenerate equal-value range is stretched open around the value); `par_norm` normalizes; `par_row_vertices` gives a row's vertices for reuse in self-drawing.
 
 ```moonbit
 let axes = @yue.Store::new([
@@ -957,7 +1031,9 @@ Scatter plus ripple animation: each point periodically expands N concentric ring
 | fill | Bool | false | no fixed width; stretches horizontally to fill the parent |
 | width / height | Double | 560 / 320 | canvas size (when fill=false), set via `style` |
 
-**Stop discipline**: views in this library have no destroy callback (`yue/view.mbt` has no dispose hook), so after a component is unmounted its timer stays alive and keeps calling schedule_paint on the unmounted view — callers must therefore call `eff_stop(anim)` explicitly before unmounting; stopping is not recoverable, and to resume, remount with a new handle. Companion pure functions: `eff_point_radius` (clamped diameter to radius), `eff_ring_progress` / `eff_ring_radius` / `eff_ring_alpha` (single-ring progress → radius / alpha), `eff_phase_advance`, `eff_tick_ms`, `eff_xy` (point-to-pair table).
+**Stop discipline**: views in this library have no destroy callback (`yue/view.mbt` has no dispose hook), so after a component is unmounted its timer stays alive and keeps calling schedule_paint on the unmounted view — call `eff_stop(anim)` explicitly before unmounting. Stopping is not recoverable; to resume, remount with a new handle.
+
+Companion pure functions: `eff_point_radius` (clamped diameter to radius), `eff_ring_progress` / `eff_ring_radius` / `eff_ring_alpha` (single-ring progress → radius / alpha), `eff_phase_advance`, `eff_tick_ms`, `eff_xy` (point-to-pair table).
 
 ```moonbit
 let pts = @yue.Store::new([
@@ -980,7 +1056,7 @@ Values are expressed by symbols repeated along the baseline or stretched as a wh
 |---|---|---|---|
 | data | Store[Array[BarItem]] | required | reuses the bar chart's `BarItem::make(label, value)` |
 | symbol | PbSymbol | `PbRect` | `PbRect` / `PbCircle` / `PbTriangle` (apex points toward the value end of the bar axis) / `PbCustom` self-draw callback |
-| mode | PbMode | `PbRepeat` | `PbRepeat` repeats along the bar axis (count = ceil(|value| / unit)); `PbStretch` stretches one symbol from baseline to value end |
+| mode | PbMode | `PbRepeat` | `PbRepeat` repeats along the bar axis (count = ceil(abs(value) / unit)); `PbStretch` stretches one symbol from baseline to value end |
 | unit | Double | 10 | value unit represented by each symbol (≤0 gives one symbol per bar) |
 | horizontal | Bool | false | horizontal bar form |
 | show_values | Bool | false | per-bar value labels (just outside the bar end) |
@@ -1001,7 +1077,9 @@ let pb = @yue.Store::new([
 
 ## Chart interaction layer
 
-A cross-cutting layer (the tooltip and hit testing in `charts_tooltip.mbt` + the legend / zoom / marks / visual map / export in `charts_interactive.mbt` + the three interactive variants in `charts_it.mbt`): it adds hover tooltips, a clickable legend, DataZoom pan/zoom, threshold lines and highlight bands, visual-map color mapping, and export to any self-drawn chart. It shares the same rendering model as the other charts; the geometric knowledge stays with the caller (drawing and hit testing come from one source), and the interaction layer only wires up events and positions the tooltip.
+A cross-cutting layer (tooltip and hit testing in `charts_tooltip.mbt` + legend / zoom / marks / visual map / export in `charts_interactive.mbt` + the three interactive variants in `charts_it.mbt`): it adds hover tooltips, a clickable legend, DataZoom pan/zoom, threshold lines and highlight bands, visual-map color mapping, and export to any self-drawn chart.
+
+It shares the same rendering model as the other charts: geometric knowledge stays with the caller (drawing and hit testing come from one source), and the interaction layer only wires up events and positions the tooltip.
 
 ### Hover tooltip and hit testing ci_tooltip
 
@@ -1016,7 +1094,10 @@ A cross-cutting layer (the tooltip and hit testing in `charts_tooltip.mbt` + the
 | pan | Bool | false | left-button drag to pan the window (set_capture on press, release_capture on release) |
 | style | Array[(String, &StyVal)] | 560×280 | canvas size style |
 
-The tooltip is drawn inside the chart container's own on_draw (drawing it after the chart puts it on top, so there is no z-order problem); it always uses a dark background with light text and does not follow theme switches. Positioning goes through `ci_tooltip_pos`, clamped inside the canvas, flipping to the anchor's opposite side when it would overflow right. schedule_paint only fires when the tooltip shows/hides on mouse-enter or during a drag; static mouse movement does not repaint. The state struct `CiTip` (`CiTip::new()` / `ci_tip_show(tip, title, rows, px, py)` / `ci_tip_hide(tip)` / `ci_tip_draw(p, tip, w, h)` / `ci_tip_size(title, rows)`) can also be used directly in self-drawn charts. Hit-testing pure functions: `CiPlot::make(x0, y0, x1, y1)` (`width` / `frac` / `contains`), `ci_nearest_idx(px, n, x0, x1)` (nearest index in an evenly spaced point series; -1 outside the plot area), `ci_sector_at(px, py, cx, cy, r_in, r_out, values)` (sector hit, clockwise from 12 o'clock, same construction as `sector_angles`).
+- The tooltip is drawn inside the chart container's own on_draw (drawing it after the chart puts it on top — no z-order problem); it always uses a dark background with light text and does not follow theme switches.
+- Positioning goes through `ci_tooltip_pos`, clamped inside the canvas, flipping to the anchor's opposite side when it would overflow right. schedule_paint only fires when the tooltip shows/hides on mouse-enter or during a drag; static mouse movement does not repaint.
+- The state struct `CiTip` (`CiTip::new()` / `ci_tip_show(tip, title, rows, px, py)` / `ci_tip_hide(tip)` / `ci_tip_draw(p, tip, w, h)` / `ci_tip_size(title, rows)`) can also be used directly in self-drawn charts.
+- Hit-testing pure functions: `CiPlot::make(x0, y0, x1, y1)` (`width` / `frac` / `contains`), `ci_nearest_idx(px, n, x0, x1)` (nearest index in an evenly spaced point series; -1 outside the plot area), `ci_sector_at(px, py, cx, cy, r_in, r_out, values)` (sector hit, clockwise from 12 o'clock, same construction as `sector_angles`).
 
 ```moonbit
 let zoom = @charts.ci_zoom_make()
@@ -1043,7 +1124,11 @@ let zoom = @charts.ci_zoom_make()
 
 `ci_legend(items~ : Store[Array[(String, String)]], visible~ : Store[Array[Bool]], on_toggle? = (Int) -> Unit, style?)`
 
-Series swatches + names in a single row, with a light background on hover; clicking toggles the corresponding series' visibility and calls back `on_toggle` (the caller repaints the chart). `visible` need not be pre-aligned in length: at draw / click time `ci_fit_len` pads it to the items length (default true = visible), and wholesale data replacement only sets items. Items whose start exceeds the container width are not drawn (the same width threshold as the `ci_legend_hit` hit test). Visibility helpers: `ci_fit_len(flags, n)`, `ci_toggle_flag(flags, i)`, `ci_filter_visible(arr, flags)` and `ci_filter_visible_at(arr, flags, base)` (returns `(visible items, each item's original index)` — after toggling, colors / indexes still position by the original data, so colors don't shift), `ci_slice_range(arr, i0, i1)` (closed-interval slice, auto-narrowing when out of range).
+Series swatches + names in a single row, with a light background on hover; clicking toggles the corresponding series' visibility and calls back `on_toggle` (the caller repaints the chart).
+
+- `visible` need not be pre-aligned in length: at draw / click time `ci_fit_len` pads it to the items length (default true = visible); wholesale data replacement only sets items.
+- Items whose start exceeds the container width are not drawn (the same width threshold as the `ci_legend_hit` hit test).
+- Visibility helpers: `ci_fit_len(flags, n)`, `ci_toggle_flag(flags, i)`, `ci_filter_visible(arr, flags)` and `ci_filter_visible_at(arr, flags, base)` (returns `(visible items, each item's original index)` — after toggling, colors / indexes still position by the original data, so colors don't shift), `ci_slice_range(arr, i0, i1)` (closed-interval slice, auto-narrowing when out of range).
 
 ```moonbit
 let items = @yue.Store::new([("CPU", @yue.theme_current().primary), ("Memory", @yue.theme_current().info)])
@@ -1112,8 +1197,8 @@ Three ready-made "interactive" versions: data / parameter semantics match the or
 
 | Component | Added interaction | DataZoom |
 |---|---|---|
-| `line_chart_it(series, area? = false, y_range?, show_last? = true, zoom? = true, fill? = false, style?, handle?)` | hover nearest point: tooltip "Point N" + each visible series' value, plus a vertical crosshair and the series dots (4×4 color dots); legend click toggles series visibility | supported (the window is scaled by the longest series, short series are sliced by the same window; the y axis adapts to the visible window) |
-| `bar_chart_it(data, horizontal? = false, y_range? = None, zoom? = true, fill? = false, style?, handle?)` | hover category: the tooltip shows the category label + value (bar highlighting is handled by the drawing layer's hover parameter); legend click toggles category visibility | supported (the window is scaled by category index; a horizontal bar's window is mapped along the y axis via zoom_map; the y value range is computed over all categories, so the axis stays put on zoom / visibility toggles) |
+| `line_chart_it(series, area? = false, y_range?, show_last? = true, zoom? = true, fill? = false, style?, handle?)` | hover: tooltip "Point N" + each visible series' value, crosshair and dots; legend toggles visibility | yes (window by longest series; short series sliced alike; y axis adapts) |
+| `bar_chart_it(data, horizontal? = false, y_range? = None, zoom? = true, fill? = false, style?, handle?)` | hover: category label + value tooltip (bar highlight via the draw layer's hover param); legend toggles category visibility | yes (window by category index; horizontal bars map the window on y; value range over all categories, so the axis stays put) |
 | `donut_chart_it(data, thickness? = 34.0, center? = "", fill? = false, style?, handle?)` | hover sector: the tooltip shows label + value (the share is recomputed over the currently visible sectors), with the sector exploding 4px; legend click toggles sector visibility | none (a donut has no x axis) |
 
 The legend palette is rebuilt on theme changes (`on_theme_change`); Store subscriptions and theme callbacks are all registered at mount time — a Node that is constructed but never mounted leaves nothing behind.
@@ -1130,7 +1215,12 @@ let series = @yue.Store::new([
 
 ## Icons
 
-803 built-in vector icons, all generated from an iconfont package (Yuanhai common library, MES-flavored) via `scripts/gen_icons.py <iconfont-package-dir>`: SVG font outlines (beziers/arcs) are translated into Painter primitives, bbox-normalized with y-flip, fill-style, variant names are the PascalCase of `font_class` (e.g. `FilePdf`, `CaretRightSmall`), with an `Icon` suffix when clashing with a widget type (e.g. `MenuIcon`, `TableIcon`); `icon_name` returns `<font_class>`. Groups: forms & tables / editing & typography / directions / layout & view / files / cloud & ops / devices / charts / messaging / users / security / time / status / finance / system tools / weather & food / media & travel / brands — the showcase icons page renders them by group (that page is generated by `scripts/gen_showcase_icons.py`). To swap icon sets, point the script at the new package and rerun; never hand-edit the `icons-gen` marker sections.
+803 built-in vector icons, all generated from an iconfont package (Yuanhai common library, MES-flavored) via `scripts/gen_icons.py <iconfont-package-dir>`:
+
+- SVG font outlines (beziers/arcs) are translated into Painter primitives, bbox-normalized with y-flip, fill-style.
+- Variant names are the PascalCase of `font_class` (e.g. `FilePdf`, `CaretRightSmall`), with an `Icon` suffix when clashing with a widget type (e.g. `MenuIcon`, `TableIcon`); `icon_name` returns `<font_class>`.
+- Groups: forms & tables / editing & typography / directions / layout & view / files / cloud & ops / devices / charts / messaging / users / security / time / status / finance / system tools / weather & food / media & travel / brands — the showcase icons page renders them by group (generated by `scripts/gen_showcase_icons.py`).
+- To swap icon sets, point the script at the new package and rerun; never hand-edit the `icons-gen` marker sections.
 
 | API | Purpose |
 |---|---|
@@ -1192,7 +1282,10 @@ Light fill of the type + 4px left color bar + same-family dark text, full width;
 
 `dialog_t(visible : Store[Bool], title, children : Array[Node], width? = 420.0, confirm_text? = "确定", cancel_text? = "取消", on_confirm?, on_cancel?, close_on_mask? = false)`
 
-In-app dialog: same-window mask (semi-transparent black, absolute relative to the mount container — mounted at the window root it covers the whole window) + centered panel (title bar with ✕ + body + right-aligned buttons). `visible` drives show/hide; ✕ / cancel / confirm auto-close after the callback, empty text hides that button (both empty hides the whole row), close_on_mask=true also closes on mask clicks. Visually modal, not keyboard-modal.
+In-app dialog: same-window mask (semi-transparent black, absolute relative to the mount container — mounted at the window root it covers the whole window) + centered panel (title bar with ✕ + body + right-aligned buttons).
+
+- `visible` drives show/hide; ✕ / cancel / confirm auto-close after the callback; empty text hides that button (both empty hides the whole row); `close_on_mask=true` also closes on mask clicks.
+- Visually modal, not keyboard-modal.
 
 ```moonbit
 let show = @yue.Store::new(false)
@@ -1254,6 +1347,8 @@ toast("Saved", @components.Success)
 @components.carousel_t([banner1, banner2], interval_ms=4000)
 ```
 
-Auto-advance is a self-scheduling timeout chain: **call `carousel_stop(rotation)` before unmounting the carousel** (otherwise the chain keeps ticking against the removed views). Pass a handle you built with `CarouselHandle::make()` as `rotation` (`is_running()` reads the state); without it the component builds its own handle that callers cannot reach, which only fits carousels living for the whole app.
+Auto-advance is a self-scheduling timeout chain: **call `carousel_stop(rotation)` before unmounting the carousel** (otherwise the chain keeps ticking against the removed views).
+
+Pass a handle you built with `CarouselHandle::make()` as `rotation` (`is_running()` reads the state); without it the component builds its own handle that callers cannot reach, which only fits carousels living for the whole app.
 
 State coordination across components goes through `Store` (subscribe / map / bind_label) or signals (`Signal`: computed with automatic dependency tracking, batch updates; pass a `sig.store()` view to component APIs taking a Store); see [declarative.md](declarative.md). Chinese version: [docs/zh/components-ui.md](/zh/components-ui.md).
