@@ -1,10 +1,10 @@
-// 图标系统:统一矢量绘制入口 draw_icon + 展示视图 icon + 图标按钮
-// icon_button_t。全库定案:图标一律矢量自绘,不依赖字体字形(字形图标
-// Windows 渲染发虚、跨平台不一致,GTK align=Center 无效,矢量顺带解决
-// 居中);全库填充型(iconfont 轮廓一次 fill)。绘制为数据形状:路径
-// 以千分定点串存 icon_path_data,draw_icon 经 fill_icon_path 解释——
-// 803 图标 ~0.6MB 数据替代旧代码形状 ~16MB 绘制代码(编译/体积双赢)。
-// 主题跟随:on_draw 现取色板,theme_apply 触发整窗重绘。
+// 图标系统(绘制面):统一矢量绘制入口 draw_icon,数据形状——路径以千分定点串
+// 存 icon_path_data,经 fill_icon_path 解释执行,803 图标约 0.6MB 数据替代旧代码
+// 形状约 16MB 绘制代码(编译/体积双赢)。全库定案:图标一律矢量自绘,不依赖
+// 字体字形(字形图标 Windows 渲染发虚、跨平台不一致,GTK align=Center 无效,
+// 矢量顺带解决居中);全库填充型(iconfont 轮廓一次 fill)。
+// 本文件自 master 线 yue/icons/icons.mbt 平移,族内只依赖 @render.Painter;
+// 声明式包装 icon/icon_button_t 依赖声明式层,留到组件接线那一批(G7)。
 
 ///|
 /// 图标种类(线条风格为主,个别实心)。绘制语义:中心 (cx,cy)、
@@ -880,7 +880,7 @@ fn path_num(d : String, i : Int) -> (Double, Int) {
 /// 坐标换算 v × s × 0.88 / 1000 + 中心(0.88 为图标安全边距,同生成器;
 /// 单命令即读即调,数值解析全程微秒级,无需缓存)。
 fn fill_icon_path(
-  p : @yue.Painter,
+  p : @render.Painter,
   d : String,
   cx : Double,
   cy : Double,
@@ -940,7 +940,7 @@ fn fill_icon_path(
 /// 线条图标以 color 为描边色,实心图标(Star/Play/圆点)以 color 为填充色;
 /// 混合型(圆底 + 内符)内符沿用 color。
 pub fn draw_icon(
-  p : @yue.Painter,
+  p : @render.Painter,
   kind : IconKind,
   cx : Double,
   cy : Double,
@@ -4193,105 +4193,5 @@ pub fn icon_name(kind : IconKind) -> String {
     UserTalk => "user-talk"
     More => "more"
     // ---- icons-gen:end ----
-  }
-}
-
-///|
-/// 图标展示视图:颜色默认主题常规文字色,传 color 固定色。
-/// size 为视图边长(默认与 Body 正文字号一致,图文并排时基线协调),
-/// 图标内容约占 84%。
-pub fn icon(
-  kind : IconKind,
-  size? : Double = 13.0,
-  color? : String = "",
-  style? : Array[(String, &@yue.StyVal)] = [],
-  handle? : (@yue.Container) -> Unit = fn(_c) {  },
-) -> @yue.Node {
-  {
-    mount: fn(parent) {
-      let base : Array[(String, &@yue.StyVal)] = [("width", size), ("height", size)]
-      for kv in style {
-        base.push(kv)
-      }
-      let v = @yue.themed_container(style=base)
-      handle(v)
-      v.on_draw(fn(p) {
-        let c = if color != "" { color } else { @yue.theme_text_regular() }
-        draw_icon(p, kind, size / 2.0, size / 2.0, size * 0.42, c)
-      })
-      @yue.attach(parent, @yue.ViewLike::view(v))
-      @yue.ViewLike::view(v)
-    },
-  }
-}
-
-///|
-/// 图标按钮:方形自绘,hover 浅灰底 + 文字色提亮,点击/Enter/Space 触发
-/// on_click;tip 非空时挂原生悬浮提示。默认 marginRight 6 便于工具栏
-/// 横向排列;style 由调用方追加(后应用,可覆盖默认值,
-/// 如去掉右边距 ["marginRight", 0.0] 或加外边距)。
-pub fn icon_button_t(
-  kind : IconKind,
-  on_click? : () -> Unit = fn() {  },
-  size? : Double = 28.0,
-  tip? : String = "",
-  style? : Array[(String, &@yue.StyVal)] = [],
-  handle? : (@yue.Container) -> Unit = fn(_c) {  },
-) -> @yue.Node {
-  {
-    mount: fn(parent) {
-      let hover = Ref(false)
-      let focused = Ref(false)
-      let base : Array[(String, &@yue.StyVal)] = [
-        ("width", size),
-        ("height", size),
-        ("marginRight", 6.0),
-      ]
-      for kv in style {
-        base.push(kv)
-      }
-      let v = @yue.themed_container(style=base)
-      handle(v)
-      v.on_draw(fn(p) {
-        let b = @yue.ViewLike::get_bounds(v)
-        if hover.val {
-          p.set_fill_color(@yue.theme_fill_hover())
-          p.fill_rect(0.0, 0.0, b.width, b.height)
-        }
-        let c = if hover.val {
-          @yue.theme_text_primary()
-        } else {
-          @yue.theme_text_regular()
-        }
-        draw_icon(p, kind, b.width / 2.0, b.height / 2.0, size * 0.26, c)
-        if focused.val {
-          @yue.draw_focus_ring(p, b.width, b.height)
-        }
-      })
-      @yue.View::set_cursor(v, @yue.hand())
-      @yue.ViewLike::on_mouse_down(v, fn(e) {
-        if e.button == 1 {
-          @yue.ViewLike::focus(v)
-          on_click()
-          true
-        } else {
-          false
-        }
-      })
-      @yue.bind_focus(v, fn() { @yue.ViewLike::schedule_paint(v) }, focused, on_click)
-      @yue.ViewLike::on_mouse_enter(v, fn(_e) {
-        hover.val = true
-        @yue.ViewLike::schedule_paint(v)
-      })
-      @yue.ViewLike::on_mouse_leave(v, fn(_e) {
-        hover.val = false
-        @yue.ViewLike::schedule_paint(v)
-      })
-      if tip != "" {
-        @yue.ffi_view_set_tooltip(@yue.ViewLike::view(v), @yue.utf8_bytes(tip))
-      }
-      @yue.attach(parent, @yue.ViewLike::view(v))
-      @yue.ViewLike::view(v)
-    },
   }
 }

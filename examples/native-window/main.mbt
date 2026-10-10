@@ -131,6 +131,18 @@ fn draw(
   p.fill_rect(fw - 96.0, 64.0, 52.0, 52.0)
   p.set_blend_mode(@render.Normal)
   p.draw_canvas(sprite, fw - 190.0, 120.0, 32.0, 32.0)
+  // 图标面：五个矢量图标横排（数据驱动的千分定点路径解释执行）
+  let icon_row = [
+    @icons.TreeStructure,
+    @icons.Hide,
+    @icons.Switch,
+    @icons.TableIcon,
+    @icons.More,
+  ]
+  for i = 0; i < icon_row.length(); i = i + 1 {
+    let cx = 300.0 + i.to_double() * 30.0
+    @icons.draw_icon(p, icon_row[i], cx, 180.0, 11.0, "#cba6f7")
+  }
   let note = "帧 \{tick} · 焦点 \{focus_text} · Tab 切换、点击可定位光标"
   p.flush()
   let _ = @text.draw_to(bm, 24.0, 30.0, note, 12.0, "#a6adc8")
