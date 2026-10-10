@@ -257,6 +257,45 @@ def _prebuilt(name: str) -> str:
     return str(p.resolve()).replace("\\", "/")
 
 
+def build_ime_probe_stub() -> str:
+    """G0 输入法探针（MoonBit 原生 GUI 栈首个 spike）的 C 端编译。
+
+    moon 不给 native-stub 传系统头文件搜索路径——link_configs 只有链接期
+    字段，没有编译期字段（c_flags 会被静默忽略，实测）。故与 shim 同法：
+    本脚本把探针的 .c 编成静态库，链接参数仍由 link_configs 全权托管。
+    探针迁入 modules/mbt-gui 自带 prebuild 后本函数与其条目一并删除。
+    """
+    src = MODULE_ROOT / "experiment" / "ime_probe" / "ime_probe_stub.c"
+    if not src.exists():
+        return ""
+    obj = BUILD_DIR / "ime_probe_stub.o"
+    lib = BUILD_DIR / "libime_probe_stub.a"  # ld 的 -l 命名约定
+    if lib.exists() and lib.stat().st_mtime >= src.stat().st_mtime:
+        return lib.as_posix()
+    cflags: list[str] = []
+    for name in LINUX_PKG_CONFIG_LIBS:
+        probe = subprocess.run(
+            ["pkg-config", "--cflags", name], capture_output=True, text=True
+        )
+        if probe.returncode != 0:
+            print(f"ime_probe: 缺少 {name} 开发包", file=sys.stderr)
+            return ""
+        cflags.extend(probe.stdout.split())
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    cc = shutil.which("cc") or shutil.which("gcc") or "cc"
+    for cmd in (
+        [cc, "-c", "-O0", "-fPIC", "-o", obj.as_posix(), src.as_posix()]
+        + cflags,
+        ["ar", "rcs", lib.as_posix(), obj.as_posix()],
+    ):
+        run = subprocess.run(cmd, capture_output=True, text=True)
+        if run.returncode != 0:
+            print(f"ime_probe: {' '.join(cmd)} 失败\n{run.stderr}",
+                  file=sys.stderr)
+            return ""
+    return lib.as_posix()
+
+
 def link_configs() -> dict:
     """各平台链接配置：Linux/macOS 为 GNU ld 风格，Windows 为 cl 命令行风格。
 
@@ -381,7 +420,7 @@ def link_configs() -> dict:
     # traybus 的 whitebox 测试目标直接引用 wire.mbt 的 f64 位转换 extern，
     # 而 link_configs 按「依赖该包的目标」传播——traybus 不依赖 yue（反向），
     # 须单列一份；静态库单成员引用 gtk 全套，flags 与主份一致
-    return {"link_configs": [
+    entries = [
         {
             "package": "NoahLiu/moonbit-libyue/yue",
             "link_flags": core + " " + " ".join(common),
@@ -394,7 +433,19 @@ def link_configs() -> dict:
             "package": "NoahLiu/moonbit-libyue/yue/browser",
             "link_flags": core + " " + " ".join(browser),
         },
-    ]}
+    ]
+    if platform.system() == "Linux":
+        # G0 输入法探针（不经 libyue）：自己的 stub 静态库 + gtk/pango/cairo
+        # 系统库，不含 -lyue_mbt；顺序须先库后系统库（GNU ld 单遍扫描）。
+        # 探针迁入 modules/mbt-gui 自带 prebuild 后此条删除
+        stub = build_ime_probe_stub()
+        if stub:
+            entries.append({
+                "package": "NoahLiu/moonbit-libyue/experiment/ime_probe",
+                "link_flags": f"-L{BUILD_DIR.as_posix()} -lime_probe_stub "
+                + " ".join(common),
+            })
+    return {"link_configs": entries}
 
 
 def check_package_version() -> None:
