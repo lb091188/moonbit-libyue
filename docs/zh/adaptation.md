@@ -66,7 +66,8 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
   - 探针输出(`moon run examples/probe-markdown --target native`):`PROBE-OK`——parse 11 块含标题 / 围栏代码 / 表格 / 引用 / 列表各 1;render_html 出 h1 / strong / em / code / a / ul / li / pre / blockquote / table 且链接地址保留;serialize 往返重解析重渲染全过。moon check 零警告 + moon test 576 全绿。
   - native 支持有据:registry 索引 0.8.0 仅 js + wasm,**0.8.1 起才加 native**,0.8.2 起加 wasm-gc,钉 0.8.3(supported-targets=js+wasm+wasm-gc+native)是支持矩阵的第一个稳妥点。其 src/moon.pkg import 实验性 `moonbitlang/core/v128`(包内注释自述仅 linear-memory 目标可达),native 属 linear-memory,探针编译通过即实证可用,无需任何额外开关。
-  - **依赖闭包名义 5 项、实际 21 包**:直接依赖 moonbitlang/async@0.20.3 / parser@0.3.18 / x@0.5.1 / mizchi/syntree@0.2.4 / mizchi/moomaid@0.4.0,经各包 moon.mod 二级展开实装 .mooncakes 共 21 外部包(parser→lexer / moon_config / prettyprinter;moomaid→tui / signals / svg / font / css / crater-layout / crater-core 及其下级 tui-terminal-buffer / brotli / zlib / pixelmatch / layout)。x 与 syntree 存在上游多版本声明共置(markdown 要 x@0.5.1、parser 要 0.4.39、moomaid 要 0.4.47;syntree 0.2.4/0.2.3),mooncakes 单版本空间取高版本一份实装——上游各自发版漂移时闭包版本由 moon 择高,升级 markdown 须留意级联。
+  - **依赖闭包名义 5 项、实际 21 包**:直接依赖 moonbitlang/async@0.20.3 / parser@0.3.18 / x@0.5.1 / mizchi/syntree@0.2.4 / mizchi/moomaid@0.4.0,经各包 moon.mod 二级展开实装 .mooncakes 共 21 外部包(parser→lexer / moon_config / prettyprinter;moomaid→tui / signals / svg / font / css / crater-layout / crater-core 及其下级 tui-terminal-buffer / brotli / zlib / pixelmatch / layout)。
+  - x 与 syntree 存在上游多版本声明共置(markdown 要 x@0.5.1、parser 要 0.4.39、moomaid 要 0.4.47;syntree 0.2.4/0.2.3),mooncakes 单版本空间取高版本一份实装——上游各自发版漂移时闭包版本由 moon 择高,升级 markdown 须留意级联。
   - **`moon add` 传递机制实测**:消费方 `moon add mizchi/markdown@0.8.3` 只写入直接依赖一行,传递闭包不进 moon.mod、安装期按 registry 索引递归解析拉取(临时模块实测输出 `Using cached mizchi/syntree` 等)——即本仓发布后消费方 add 本模块时构建器自动拉全闭包,依赖面成本纯安装 / 编译期。
   - **定案:接受传递,不拆独立模块**(MD2 起 markdown_view 桥接 mizchi/markdown 随主模块走)。依据:闭包全为纯 MoonBit 源码包,无 native stub 无链接面,不碰 prebuild 托管,对消费方零 ABI / 平台矩阵 / 发布物体积风险,与 ffmpeg-mbt 因二进制矩阵 + 许可 + 体积拆独立模块的性质不同;降级路径预留——消费方依赖面反馈过重或上游 0.x API 波及时,再下沉独立模块(yue 主模块退回零 markdown 依赖,仿媒体三层拆分)。
   - 注意:模块内子包(如 yue/browser 模式)解决不了依赖面——mooncakes deps 是模块级声明,子包 import 一样进发布闭包;browser 模式隔离的是链接 flags 层,两者机理不同勿混用。
@@ -105,7 +106,9 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
   - 验证:`moon check` 零警告 + `moon test` 595 全绿(19 条新 wbtest 覆盖换算 / 展平 / 区间 / info / 切行,及 CommonMark 偏差五项前后对比:setext 标题 / `~~~` 围栏 / info 串 / 缩进代码块 / 嵌套列表)。
 - **markdown_view GFM 渲染面补齐(MD3,2026-10)**:七项实现与决策如下。
 
-  - ① **删除线不上原生属性,MoonBit 层自绘**——上游 AttributedText 仅有 SetFontFor / SetColorFor(vendor libyue `attributed_text.h`,GTK Pango 底层有删除线但封装未暴露,shim 同样无入口),走 fork 补丁需重建三平台预构建库不在本批边界。`md_rich_label` 由 Label 改为挂载时自绘(themed_container + draw_attributed_text),**逐段用同字体独立测宽(`get_bounds_for`)得区间像素坐标表**,删除线段按坐标补画横线(行高中线,前景色),**链接命中与悬浮光标同用此坐标表**——跨层契约即「富文本行的区间语义是 UTF-16 端点 + 像素 x 区间并存:样式区间给 AttributedText,命中区间给鼠标事件」。单行(wrap=false)场景逐段测宽累计与整体拼排在亚像素级一致,点击命中天然容忍小偏差(多行 wrap 下该坐标表失效,本组件富文本行不换行故不涉及,若未来引入 wrap 须改为逐行布局)。
+  - ① **删除线不上原生属性,MoonBit 层自绘**:上游 AttributedText 仅有 SetFontFor / SetColorFor(vendor libyue `attributed_text.h`,GTK Pango 底层有删除线但封装未暴露,shim 同样无入口),走 fork 补丁需重建三平台预构建库不在本批边界。
+    - `md_rich_label` 由 Label 改为挂载时自绘(themed_container + draw_attributed_text),**逐段用同字体独立测宽(`get_bounds_for`)得区间像素坐标表**,删除线段按坐标补画横线(行高中线,前景色),**链接命中与悬浮光标同用此坐标表**——跨层契约即「富文本行的区间语义是 UTF-16 端点 + 像素 x 区间并存:样式区间给 AttributedText,命中区间给鼠标事件」。
+    - 单行(wrap=false)场景逐段测宽累计与整体拼排在亚像素级一致,点击命中天然容忍小偏差(多行 wrap 下该坐标表失效,本组件富文本行不换行故不涉及,若未来引入 wrap 须改为逐行布局)。
   - ② **链接点击**:MDSpan 携 url(Link 直接取、RefLink / RefImage 查 `ParseResult.definitions` 按 label 精确匹配,查不到降级为无地址的链接样式);`on_mouse_down` 的 view_x 落在 `[xs, xs+ws)` 即 open_url(复用系统能力,Linux 走 xdg-open);`on_mouse_move` 换手型光标,`add_tooltip_for_rect` 按 url 区间挂地址提示(挂载时一次性注册,主题切换不改几何无需重挂)。
   - ③ **脚注两遍法**:预扫描正文(嵌套列表 / 引用 / 表格单元格 / 定义列表全递归)按出现顺序编号,FootnoteDefinition 自身跳过(定义内引用不进编号,防文末内容污染顺序);FootnoteReference 展平为上标 "[n]"(区间小四号字体,AttributedText 行内混排字号 Pango / CoreText / DirectWrite 均支持);markdown_view 主内容后分隔线 + 只渲染被引用的定义(未被引用不渲染,符合 GFM 语义)。
   - ④ **图片**:块级「段落恰为单图」才显示(行内混排图降级 alt——富文本行不支持行内嵌图);`Image::new_from_file` 吃本地路径 / `file://` 前缀(剥前缀),`is_empty` 即降级 alt;无网络图加载能力,网络 url 一律 alt 降级;等比缩放宽度上限 560(与 markdown_view 默认宽一致,外层更窄时溢出,同现状单行文本溢出行为)。
@@ -115,7 +118,10 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
   - 验证:`moon check` 零警告 + `moon test` 600 全绿(markdown_wbtest 24 条,新增删除线标志 / 链接携址 / 引用式链接取定义 / 无定义退化字面文本 / 脚注编号与上标 / 块级忽略定义 / 图片路径换算 / 表格单元格与列对齐映射断言);真机视觉项(删除线横线位置 / 链接点击与悬浮 / 表格对齐与网格 / 图片显示 / 任务列表勾选 / 脚注上标与文末)由用户按 showcase「代码与文档」页 Markdown 段验证。
 - **订阅必须可退订,否则重建式组件的死订阅无界累积(CORE2)**:Store / Signal 订阅闭包由信号内核持有、主题订阅由 `theme_box.subs` 持有,都没有退订入口——任何「重建行 / 重挂子树」的组件每次重建都漏下一整代死订阅:transfer 移动 N 次漏 N 套;table_t 每次 rows Store set 漏「行容器 + 每单元格 themed_container + bind_fg」一整套(千行表格一次刷新即上千条);snackbar 每次 push 漏两条;bind_node 每次重挂漏旧子树里 bind_label 的 Store 订阅。死订阅内存占用不大,但每次 set / theme_apply 都会对已销毁视图空跑(set_color / schedule_paint 打到已移除控件),且闭包捕获的视图子树永不回收。
 
-  - 修复分内核与用法两侧:① **订阅带 id**——`Signal::subscribe` 返回句柄、`Signal::remove(id)`;Store 侧 `subscribe_id(f)` 取句柄、`remove(句柄)`(`Store::subscribe` 保持 Unit 不变:MoonBit 非 Unit 值不能隐式丢弃,改它的返回类型要动全仓上百个调用点)。② **主题订阅同款**:`on_theme_change` 返回句柄、`off_theme_change(句柄)`。③ **深层 / 成片订阅用订阅回收袋** `sub_bag_begin() / sub_bag_end() / sub_bag_discard(闭包表)`:重建前开袋,重建期间注册的全部订阅(Store + 主题,含任意深度子树里的 themed_container / bind_fg / bind_label)把退订闭包压进袋,旧代整袋退订后再重建——transfer 的 render_all、table_t 的 rebuild、bind_node 的 rebuild、snackbar 的撤下定时器都走这条;袋是栈(嵌套安全),与 signals.mbt 既有 sig_collector 的「收集期全局上下文」同模式。
+  - 修复分内核与用法两侧:
+    - ① **订阅带 id**——`Signal::subscribe` 返回句柄、`Signal::remove(id)`;Store 侧 `subscribe_id(f)` 取句柄、`remove(句柄)`(`Store::subscribe` 保持 Unit 不变:MoonBit 非 Unit 值不能隐式丢弃,改它的返回类型要动全仓上百个调用点)。
+    - ② **主题订阅同款**:`on_theme_change` 返回句柄、`off_theme_change(句柄)`。
+    - ③ **深层 / 成片订阅用订阅回收袋** `sub_bag_begin() / sub_bag_end() / sub_bag_discard(闭包表)`:重建前开袋,重建期间注册的全部订阅(Store + 主题,含任意深度子树里的 themed_container / bind_fg / bind_label)把退订闭包压进袋,旧代整袋退订后再重建——transfer 的 render_all、table_t 的 rebuild、bind_node 的 rebuild、snackbar 的撤下定时器都走这条;袋是栈(嵌套安全),与 signals.mbt 既有 sig_collector 的「收集期全局上下文」同模式。
   - 验证:`moon check` 零警告 + `moon test` 657 全绿(新增 store 退订与幂等、Signal 句柄退订、回收袋三代与嵌套、主题 off 与回收袋、空栈收袋、组件重建走主题回收袋、carousel_stop 共 8 条)。
 - **挂载即常驻的定时器要有回收通道,两条定时器 API 契约不同(CORE2)**:组件挂载时起的定时器没有「视图已移除」通知,不回收就继续对已销毁子树空转。libyue 侧两种定时器契约不同:
 
@@ -213,7 +219,8 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
   - 修复(MoonBit 侧):拒绝载荷改 `[0,0,0,0]`(ok=0,C 端直接返回 nullptr、不读后续字节),编码抽成包内纯函数 `encode_protocol_payload` 供白盒测试。
   - 修复(C 侧):先按 MoonBit Bytes 长度预验再逐段解码——ok==0 或载荷不足 12 字节即拒,mime_len / content_len 为负或越出载荷同样按拒(长度比较走 int64 防 `8+mime_len+4` 溢出),nullptr 载荷也兜底拒。Bytes 长度取数据指针前 4 字节(moonbit_object 头的 meta,VAL_ARRAY 即长度;布局照 `moonbit.h` 的 `Moonbit_array_length`,不引入 moonbit.h 以避免其 `extern "C"` memcpy 声明与 glibc 冲突),该假设用直链 libmoonbitrun.o + libruntime 归档的最小 C 探针实证(`make_bytes(23/4/0)` 三态读回长度全对)。
   - 教训:**带长度字段的自编码 ABI 载荷,C 端必须自己拿得到总长度并先预验**,不能信任对端「声称成功」后的字段;跨 ABI 的契约测试要与 C 端解码逻辑同构(先长度预验再逐段取值),而不是只验编码侧形状。
-  - 验证:`moon check` 零警告 + `moon test` 636 全绿(新增 `yue/browser/browser_wbtest.mbt` 8 条:None 载荷逐字节为 `[0,0,0,0]`、Some 逐字节对齐 ok/mime_len/mime/content_len/content、UTF-8 多字节按字节计长、空 mime/content 的 12 字节最小载荷、旧版 `[1,0,0,0]` 形态与 ok=1 的 8 字节短载荷均按拒、mime_len/content_len 越界按拒、长内容含引号换行往返);shim 改动经 prebuild 增量重编,删 `_build` 下 showcase exe 后 `moon build examples/showcase` 重链零警告(`nm` 确认 exe 引用 yue_mbt_browser_register_protocol);showcase 补 demo-deny 拒绝路径按钮与代码片段,加载失败的真机表现由用户在 Linux WebKitGTK 下确认(Windows WebView2 自定义协议本就静默无效)。
+  - 验证:`moon check` 零警告 + `moon test` 636 全绿(新增 `yue/browser/browser_wbtest.mbt` 8 条:None 载荷逐字节为 `[0,0,0,0]`、Some 逐字节对齐 ok/mime_len/mime/content_len/content、UTF-8 多字节按字节计长、空 mime/content 的 12 字节最小载荷、旧版 `[1,0,0,0]` 形态与 ok=1 的 8 字节短载荷均按拒、mime_len/content_len 越界按拒、长内容含引号换行往返)。
+  - shim 改动经 prebuild 增量重编,删 `_build` 下 showcase exe 后 `moon build examples/showcase` 重链零警告(`nm` 确认 exe 引用 yue_mbt_browser_register_protocol);showcase 补 demo-deny 拒绝路径按钮与代码片段,加载失败的真机表现由用户在 Linux WebKitGTK 下确认(Windows WebView2 自定义协议本就静默无效)。
 
 ### 统一 style 值模型(StyVal trait)与 MoonBit trait object 限制(0.5.2)
 
@@ -391,7 +398,9 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 - sysmonitor 实测(Ubuntu 24.04 XFCE X11,口径同篇首性能基准:启动中位、稳态 Rss、release 二进制):启动(exec → 窗口 map)5 轮 77/78/81/82/88ms,中位 81ms(hello 基线 70ms 是空载系统,本次系统载有 1042 进程);稳态进程页前台 1Hz 刷新 CPU 2-3%(采样 + 派生数据 + 千行表格重建 + 重绘合计约 25ms/秒),Rss 84.9MB → 100s 后 85.8MB 走平;二进制 7.72MB(hello 对照 7.03MB)。千行进程页验收达标:1053 进程全量采样 14.94ms/次(release,≈14µs/进程,每进程两次 /proc 读取),1Hz 下采样占空 1.5%。
 - 千行表格用 table_v_t 虚拟滚动(只画可见行):刷新走「数据层全量采样 → 过滤/排序派生 → rows Store set → 表格 load + schedule_paint」,不重建视图树;选择按 pid 重映射(排序每秒变化时选中不漂)。无 C++ 对照副本,「封装层 + 数据层」合计开销以上述数值直接归因,UI 绘制部分与 hello 基线同口径(持平量级)。
-- **空 pixmap 形态下 IconPixmap 属性回调 panic(2026-10 用户真机栈 + 修复前后对照实证)**:showcase 托盘 demo 点「切主题图标(Linux)」后,`set_icon_name` 按既定策略清空位图(XFCE 面板 IconPixmap 优先于 IconName,不清则换名后仍画旧图),形态为 w=0/h=0/空 buf;面板收到 NewIcon 回查 IconPixmap,`Item::property` 对空 pixmap 调 `downscale_pixmap(0, 0, …)` 生成 16×16 附档——旧实现的钳位守卫 `if y*h/nh > h-1 { h-1 }` 在 h=0 时条件 `0 > -1` 成立,钳出 **sy=-1**,`px[src+c]` 负索引,DBus 回调里直接 PanicError(exit 134)。用户真机栈:`traybus.downscale_pixmap(icon.mbt:63) ← Item::property(sni.mbt:539) ← Conn::handle_call(sni.mbt:660) ← drain ← on_bus_ready`。
+- 现象(2026-10 用户真机栈 + 修复前后对照实证):showcase 托盘 demo 点「切主题图标(Linux)」后,`set_icon_name` 按既定策略清空位图(XFCE 面板 IconPixmap 优先于 IconName,不清则换名后仍画旧图),形态为 w=0/h=0/空 buf;面板收到 NewIcon 回查 IconPixmap,`Item::property` 对空 pixmap 调 `downscale_pixmap(0, 0, …)` 生成 16×16 附档。
+    - 旧实现的钳位守卫 `if y*h/nh > h-1 { h-1 }` 在 h=0 时条件 `0 > -1` 成立,钳出 **sy=-1**,`px[src+c]` 负索引,DBus 回调里直接 PanicError(exit 134)。
+    - 用户真机栈:`traybus.downscale_pixmap(icon.mbt:63) ← Item::property(sni.mbt:539) ← Conn::handle_call(sni.mbt:660) ← drain ← on_bus_ready`。
 
   - 修复:`downscale_pixmap` 对退化尺寸(w/h/nw/nh ≤ 0 或缓冲区短于 w*h*4)**早退返 (0,0,空)**,删掉两处合法输入下永不命中的死钳位(y*h/nh 恒 < h);主档 `pixmap_value` 本就容忍空态,面板回落 IconName 走主题图标,SNI 语义不变。
   - 修复前后对照(同探针同路径,建托盘 → set_icon_name → 面板 / 手动回查 IconPixmap):修复前 exit 134 崩、栈与用户报告逐帧一致;修复后属性返回 `[(0,0,[]), (0,0,[])]`、进程稳定存活(手动 gdbus Properties.Get 复核亦然)。
@@ -514,7 +523,8 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
   - **踩坑:空 id 归一化不能补零**:`norm_pci_id("")` 按「左补零到 4 位」会补成 "0000" 假有效 id(单测首跑即抓出),空串须保持空串;sysfs 读取失败时 vendor / device 是 "(未知)" 占位串,靠 is_hex4 挡掉后才能走回退。
   - 踩坑:型号名整段保留内部空格与方括号(如 "Navi 33 [Radeon RX 7700S/7600/7600S/7600M XT/PRO W7600]"),不能按空白切 fields 再 join(当前版本名称内含双空格虽为 0 条,按整段切片才是正解);切片按 UTF-16 码元索引(`StringView::exact_view` 的基准),不能用 `iter2` 的码点索引——结构性字符全是 ASCII,代理对只可能出现在名称里;device 行有条目但无名称(真实库不出现)不当命中,继续扫、按查不到回退 id。
   - SYS5 验证方式:stub 零改动(纯 MoonBit 侧,复用 read_text_file 一类原语)。
-    - Linux 宿主 `moon check` 零警告 + `moon test` 628 全绿(syshw_wbtest 新增 5 条:norm_pci_id / is_hex4 归一化与判定、pci_ids_device_name 缩进层级解析(subsystem 跳过 / 跨 vendor 不串 / 无 device 行 vendor / class 节 / 出节提前返回 / 非法 id)、gpu_model_name 四形态(smi 优先 / 库命中 / 库不可达与无条目回退 id / 占位 id 留空)、GpuMonitor::gpu_model 常驻缓存与 smi 优先、真实 pci.ids 采样(动态取首对 vendor/device 正向断言 + 无 device 行的 dead vendor 负向));删 `_build` 下 sysmonitor `.o` 后 `moon build examples/sysmonitor` 零警告;本机(Ubuntu 24.04,NVIDIA 专有驱动机)实测三对真实条目解析正确(1002:7480 → Navi 33、8086:3ea0 → WhiskeyLake-U GT2、10de:2488 → GA104)。
+    - Linux 宿主 `moon check` 零警告 + `moon test` 628 全绿(syshw_wbtest 新增 5 条:norm_pci_id / is_hex4 归一化与判定、pci_ids_device_name 缩进层级解析(subsystem 跳过 / 跨 vendor 不串 / 无 device 行 vendor / class 节 / 出节提前返回 / 非法 id)、gpu_model_name 四形态(smi 优先 / 库命中 / 库不可达与无条目回退 id / 占位 id 留空)、GpuMonitor::gpu_model 常驻缓存与 smi 优先、真实 pci.ids 采样(动态取首对 vendor/device 正向断言 + 无 device 行的 dead vendor 负向));
+    - 删 `_build` 下 sysmonitor `.o` 后 `moon build examples/sysmonitor` 零警告;本机(Ubuntu 24.04,NVIDIA 专有驱动机)实测三对真实条目解析正确(1002:7480 → Navi 33、8086:3ea0 → WhiskeyLake-U GT2、10de:2488 → GA104)。
     - **AMD / Intel 真机验证由用户执行**:①AMD 独显传感器页小节标题显示商业型号名(与 `lspci -nn` 对照)②Intel 集显同上 ③双卡机(iGPU + dGPU)两块各显示各的型号 ④查不到(极新卡 / 数据库缺条目)时回退显示 device id 而非空白 ⑤最小化安装(无 hwdata / pciutils)与 Flatpak 沙箱下的回退形态 ⑥其它发行版路径差异(Fedora / Arch 的 hwdata、openSUSE 等)⑦长型号名在小节标题的换行 / 溢出观感。
 - sysmonitor 界面文案纪律(整批界面打磨实测):界面文字只说「是什么 / 怎么用」,不写数据口径与实现路径(如 /proc 路径、两次差值、毫摄氏度换算、"nvidia-smi 后置"这类计划说明);速率 / 容量 / 坐标轴一律多级单位动态换挡(B→K→M→G),数值保持短,大号数值卡(24px)尤其忌换行溢出卡片。
 - sysmonitor 概览页卡片范式对标 Mission Center(资源管理器式):图标 + 标题、规格副标题(CPU 型号 / 总容量 / 挂载点等硬件规格放卡片副标题,不在窗口顶层占副标题行)、当前值行(占用% · 温度、已用 / 总量 · swap 等组合)、卡内迷你曲线(序列末窗 + 末端圆点;值域固定 0-100 或峰值自适应,双序列同窗叠加如网络 rx/tx)。卡片 flex 均分、同排 stretch 等高,随窗口伸缩;单卡自包含,不看窗口其他部分也能读懂。
@@ -538,7 +548,12 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
   - **pactl 的可读输出按 locale 本地化**(中文环境输出「音量:」而非 `"Volume:"`),按英文文案写的解析在本地化环境必挂——子进程环境必须固定 `LC_ALL=C`(vol_env_blob 同时传 PATH、XDG_RUNTIME_DIR、HOME:PipeWire / Pulse 套接字定位靠 XDG_RUNTIME_DIR,缺了工具连不上服务、退出码非 0)。
   - 样例断言用实机采集文本(volume_wbtest,pactl 样例即 LC_ALL=C 下输出;出现本地化文案即视为解析失败)。
-- 浏览器历史直读 Chrome 系 SQLite 库(moonsqlitefile 纯解析,无 SQLite FFI、不开锁、不复制原库):①时间基准是 1601-01-01 UTC 起微秒(Windows FILETIME 同源),Unix 毫秒 = µs/1000 − 11644473600000,实测样本 `13435769563030519` → `2026-10-06T14:12:43.030Z`;②urls 表 id 列虽是 INTEGER PRIMARY KEY,磁盘记录里存 **Null**(rowid 别名不落盘),按列序取值不能假设类型;③hidden 列非 0 是重定向等隐藏条目须滤除;④Chrome 运行中的新写入落库的 -wal 文件,当前实现只传主库文件给 `open_database`(未做 WAL 合并,moonsqlitefile 另有 `open_wal_database` 可接);⑤探测读入的库字节直接作打开输入,同一库不读第二遍(History 库常达数十 MB)。
+- 浏览器历史直读 Chrome 系 SQLite 库(moonsqlitefile 纯解析,无 SQLite FFI、不开锁、不复制原库):
+  - ① 时间基准是 1601-01-01 UTC 起微秒(Windows FILETIME 同源),Unix 毫秒 = µs/1000 − 11644473600000,实测样本 `13435769563030519` → `2026-10-06T14:12:43.030Z`;
+  - ② urls 表 id 列虽是 INTEGER PRIMARY KEY,磁盘记录里存 **Null**(rowid 别名不落盘),按列序取值不能假设类型;
+  - ③ hidden 列非 0 是重定向等隐藏条目须滤除;
+  - ④ Chrome 运行中的新写入落库的 -wal 文件,当前实现只传主库文件给 `open_database`(未做 WAL 合并,moonsqlitefile 另有 `open_wal_database` 可接);
+  - ⑤ 探测读入的库字节直接作打开输入,同一库不读第二遍(History 库常达数十 MB)。
 - VS Code 本地历史:①`User/History/<hash>/entries.json` 的目录名哈希是 31 进制滚动哈希(种子 149417,Int32 回绕),输出**有符号**小写十六进制——负值目录名真实存在(实测 `-10b5e510`),按资源 URI 复算三例(正数/负数/vscode-userdata 方案)全部命中;②entries.json 部分条目**无 source 字段**(实测),解析不能假设必有;③storage.json 的 windowsState:lastActiveWindow 在前 + openedWindows 数组,窗口对象有 folder(普通文件夹)与 workspaceUri(.code-workspace)两种形态,URI 百分号编码(空格 `%20`、中文 `%E4%B8%AD`)须解码;④端到端仅在存在 VS Code 用户数据的环境执行(vsc_supported 门控),纯逻辑层全部在内存样例上白盒断言。
 - 亮度:设置走 logind 的 SetBrightness(系统总线 session/auto 对象,@traybus 层),枚举与当前值走 /sys/class/backlight sysfs 只读——logind 不在线时 set 报 Unsupported 而 devices/get 仍可用;键盘背光在 leds 子系统(设备名形如 `inputN::kbd_backlight`)。sysfs 值文本解析容忍首尾空白与尾换行。
 - 应用查找(appfind):desktop entries 无目录枚举原语,`appfind_installed_with` 由调用方注入列举函数,默认便捷入口因恒空已裁撤(名不副实);`appfind_executable` 命中判定为整文件可读(read_binary_file),大体积可执行文件全量读入仅判存在是已知取舍(修需新增原生 stat 原语,暂不动 shim)。
@@ -753,7 +768,9 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 
   - 修复:shim 的 `yue_mbt_view_layout`(即 update_layout)改为沿父链遍历到根容器再 `Layout()`,tabs_t 的 `sel.subscribe` 在显隐翻转后补一次 `update_layout(outer)`;探针(页内容 on_draw 自证 + bounds 打印)验证每次切换绘制到位、页高稳定。
   - 注意:只对 root 的直接 flex 子场景不触发(根重算一直有),必须经 Scroll 的内容树才断。
-- 显隐页切换消失·三层嵌套残余场景(showcase 结构:页容器 set_visible 切页 + scroll + section + tabs_t,真机仍复现):页签切换时,`Container::Layout` 的 dirty 自愈分支(view.cc 里自带 TODO 注释的那条)会用 display 切换中间态的 yoga 值分配外层容器——并列 `flex:1` 的页容器被按「scroll 内容测量中间态」分配成压缩高度(实测 210→56),且此后无法自救:自愈传播链断在 Scroll(非 Container),根级重算的 SetBounds 链又断在「尺寸未变的中间容器」(hbox 等尺寸相同 → `ViewImpl::SizeAllocate` 早退 → 不向下触发子级 UpdateChildBounds)。后果:WM_PAINT 的 dirty 被压缩的页容器裁成 24 高碎片,与页区域 `(74,278,512,50)` 不相交,`DrawChild` 的 `child_dirty.IsEmpty()` 整块跳过——on_draw 不触发、bounds 却正常。
+- 显隐页切换消失·三层嵌套残余场景(showcase 结构:页容器 set_visible 切页 + scroll + section + tabs_t,真机仍复现):页签切换时,`Container::Layout` 的 dirty 自愈分支(view.cc 里自带 TODO 注释的那条)会用 display 切换中间态的 yoga 值分配外层容器——并列 `flex:1` 的页容器被按「scroll 内容测量中间态」分配成压缩高度(实测 210→56)。
+  - 此后无法自救:自愈传播链断在 Scroll(非 Container),根级重算的 SetBounds 链又断在「尺寸未变的中间容器」(hbox 等尺寸相同 → `ViewImpl::SizeAllocate` 早退 → 不向下触发子级 UpdateChildBounds)。
+  - 后果:WM_PAINT 的 dirty 被压缩的页容器裁成 24 高碎片,与页区域 `(74,278,512,50)` 不相交,`DrawChild` 的 `child_dirty.IsEmpty()` 整块跳过——on_draw 不触发、bounds 却正常。
 
   - 已试无效(均实测):根级重算 ×N、反转显隐顺序(先 true 后 false)、set_visible 内联根重算(shim 侧)、叶子层显隐(显隐只切页内容)、page_c 的 flexbasis 置 0(CSS `flex:1 1 0` 语义)。
   - 结论:根因在 libyue win 的 yoga 集成本身(dirty 自愈用过期布局 + Scroll 断链的双重断裂),yue / shim 层外部修补打不穿,需 fork 侧根治(备选方向:UpdateChildBounds 的分配前强制 YGNodeCalculateLayout,或 Scroll 内容测量避开中间态)。
