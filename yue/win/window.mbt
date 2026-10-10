@@ -9,6 +9,8 @@ pub(all) enum Event {
   NeedsDraw
   Resized
   Closing
+  /// 有输入事件待取（用 take_input 排空）
+  Input
 }
 
 ///|
@@ -104,6 +106,51 @@ pub fn Window::present(
   height : Int,
 ) -> Unit {
   wm_present(self.id, rgba, width, height)
+}
+
+///|
+/// 一条输入事件。`code`：0 键按下 1 键释放 2 按钮按下 3 按钮释放 4 指针移动
+/// 5 滚轮；键事件用 `keysym`/`mods`，指针与滚轮用 `x`/`y`（按钮号在
+/// `button`，滚轮方向在 `axis`）。
+pub(all) struct InputEvent {
+  code : Int
+  keysym : Int
+  mods : Int
+  x : Int
+  y : Int
+  button : Int
+  axis : Int
+}
+
+///|
+/// 待取的输入事件条数。
+pub fn Window::pending_input(self : Window) -> Int {
+  wm_pending_events(self.id)
+}
+
+///|
+/// 取一条输入事件；没有则 None。字段取自刚取出的那一条（后端逐字段读）。
+pub fn Window::take_input(self : Window) -> InputEvent? {
+  let code = wm_take_event(self.id)
+  if code < 0 {
+    None
+  } else {
+    Some({
+      code,
+      keysym: wm_ev_keysym(self.id),
+      mods: wm_ev_mods(self.id),
+      x: wm_ev_x(self.id),
+      y: wm_ev_y(self.id),
+      button: wm_ev_button(self.id),
+      axis: wm_ev_axis(self.id),
+    })
+  }
+}
+
+///|
+/// 把焦点要给自己（Tab/点击后调用；无焦点时按键不会回来）。
+pub fn Window::request_focus(self : Window) -> Unit {
+  wm_request_focus(self.id)
 }
 
 ///|

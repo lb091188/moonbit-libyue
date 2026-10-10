@@ -45,7 +45,9 @@ pub fn Editor::floor_boundary(self : Editor, i : Int) -> Int {
   k
 }
 
-fn Editor::ceil_boundary(self : Editor, i : Int) -> Int {
+///|
+/// 码点边界前进：落到续字节上就一直往后走。
+pub fn Editor::boundary_after(self : Editor, i : Int) -> Int {
   let n = self.chars.length()
   let mut k = if i > n { n } else { if i < 0 { 0 } else { i } }
   while k < n && is_cont(self.chars[k]) {
@@ -117,7 +119,7 @@ pub fn Editor::get_text(self : Editor) -> String {
 /// 取 [start,end) 的文本；越界钳制并对齐码点边界。
 pub fn Editor::get_text_in_range(self : Editor, start : Int, end : Int) -> String {
   let s = self.floor_boundary(start)
-  let e = self.ceil_boundary(end)
+  let e = self.boundary_after(end)
   if e <= s {
     ""
   } else {
@@ -230,7 +232,7 @@ pub fn Editor::insert_text(self : Editor, text : String) -> Int {
 /// 选中 [start,end)（end 即 caret）；两端相同则视为折叠。
 pub fn Editor::select_range(self : Editor, start : Int, end : Int) -> Unit {
   let a = self.floor_boundary(start)
-  let c = self.ceil_boundary(end)
+  let c = self.boundary_after(end)
   self.caret = c
   if a == c {
     self.anchor = None
@@ -275,10 +277,10 @@ pub fn Editor::move_caret(self : Editor, dir : Int, unit : Int, shift : Bool) ->
       }
     } else {
       while k < n && !is_word_byte(self.chars[k]) {
-        k = self.ceil_boundary(k + 1)
+        k = self.boundary_after(k + 1)
       }
       while k < n && is_word_byte(self.chars[k]) {
-        k = self.ceil_boundary(k + 1)
+        k = self.boundary_after(k + 1)
       }
     }
   } else if dir < 0 {
@@ -287,9 +289,9 @@ pub fn Editor::move_caret(self : Editor, dir : Int, unit : Int, shift : Bool) ->
       k = self.floor_boundary(k - 1)
     }
   } else {
-    k = self.ceil_boundary(k)
+    k = self.boundary_after(k)
     if k < n {
-      k = self.ceil_boundary(k + 1)
+      k = self.boundary_after(k + 1)
     }
   }
   self.caret = k
@@ -319,7 +321,7 @@ pub fn Editor::delete_forward(self : Editor) -> Unit {
     let _ = self.delete_selection()
   } else if self.caret < n {
     self.snapshot()
-    let to = self.ceil_boundary(self.caret + 1)
+    let to = self.boundary_after(self.caret + 1)
     self.replace_range(self.caret, to, [])
   }
 }
