@@ -1,8 +1,10 @@
-// 系统能力页:真实读取本机数据(音量/亮度/浏览器历史与下载/VS Code
+﻿﻿﻿// 系统能力页:真实读取本机数据(音量/亮度/浏览器历史与下载/VS Code
 // 最近工作区/应用查找/媒体播放/显示器/窗口/剪贴板/磁盘/电源/电源计划/
 // 系统信息/时区/蓝牙/传感器/打印机/环境变量/书签/Firefox/最近文件),
 // 点「读取系统能力」后逐段呈现,结果因机而异;不支持的能力显示对应
 // 错误文本,不影响其余部分。
+// 文案约定:只写通用概念(是什么/怎么用);各能力后端的实现名与探测降级
+// 差异一律不进面板,见 docs/zh/adaptation.md。
 
 ///|
 /// 截断文本到前 n 个字符(超出补省略号),用于快照里的单行摘要。
@@ -17,19 +19,32 @@ fn trunc_str(s : String, n : Int) -> String {
       break
     }
     buf.write_char(ch)
-    i = i + 1
+    i += 1
   }
   buf.write_string("…")
   buf.to_string()
 }
 
 ///|
-/// 电源计划展示名(与 powerprofilesctl 侧命令名对应)。
+/// 电源计划展示名(三档通用名,不含后端命令词)。
 fn pp_display(p : @system.PowerProfile) -> String {
   match p {
-    @system.PPerformance => "性能(performance)"
-    @system.PBalanced => "均衡(balanced)"
-    @system.PPowerSaver => "省电(power-saver)"
+    @system.PPerformance => "性能"
+    @system.PBalanced => "均衡"
+    @system.PPowerSaver => "省电"
+  }
+}
+
+///|
+/// 平台无关的探测样本路径:本进程可执行文件(必然存在、必然带扩展名),
+/// 替代各平台硬编码路径(如 /etc/hostname 在 Windows 上不存在)。
+fn sysprobe_probe_path() -> String {
+  let ok = Ref(0)
+  let p = @utf8.decode_lossy(@yue.ffi_exe_path(ok))
+  if ok.val == 1 && p != "" {
+    p
+  } else {
+    "probe"
   }
 }
 
@@ -38,29 +53,29 @@ fn pp_display(p : @system.PowerProfile) -> String {
 /// 命令仅文本预览(见「命令与状态」页),危险操作无入口。
 fn sysprobe_collect() -> String {
   let buf = StringBuilder()
-  buf.write_string("== 音量(默认 sink) ==\n")
+  buf.write_string("== 系统音量 ==\n")
   match @system.vol_get() {
     Ok(v) =>
       buf.write_string(
-        "sink: \{v.sink}\n音量: \{v.volume}%  静音: \{if v.muted { "是" } else { "否" }}\n",
+        "输出设备: \{v.sink}\n音量: \{v.volume}%  静音: \{if v.muted { "是" } else { "否" }}\n",
       )
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 当前环境没有可查询的音频输出设备\n")
   }
   buf.write_string("\n== 屏幕亮度 ==\n")
   match @system.brightness_devices() {
     Ok(devs) => {
       if devs.is_empty() {
-        buf.write_string("无背光设备\n")
+        buf.write_string("无可用亮度设备\n")
       }
       for d in devs {
         let cur = match @system.brightness_get(d) {
           Ok(p) => "\{p}%"
-          Err(e) => "读取失败(\{e})"
+          Err(_) => "读取失败"
         }
         buf.write_string("\{d.name}(量程 \{d.max}): \{cur}\n")
       }
     }
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 当前环境不支持此能力\n")
   }
   buf.write_string("\n== 浏览器历史(前 6 条) ==\n")
   match @system.bh_history(limit=6) {
@@ -73,7 +88,7 @@ fn sysprobe_collect() -> String {
         buf.write_string("[\{it.visit_count}次] \{title}\n  \{it.url}\n")
       }
     }
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 当前环境不支持此能力\n")
   }
   match @system.bh_downloads(limit=3) {
     Ok(items) => {
@@ -100,10 +115,15 @@ fn sysprobe_collect() -> String {
         buf.write_string("\{paths[i]}\n")
       }
     }
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 当前环境不支持此能力\n")
   }
   buf.write_string("\n== 应用二进制查找 ==\n")
-  for name in ["sh", "firefox", "code", "google-chrome"] {
+  let bins : Array[String] = if @yue.platform() == "windows" {
+    ["cmd", "code", "firefox"]
+  } else {
+    ["sh", "firefox", "code"]
+  }
+  for name in bins {
     match @system.appfind_executable(name) {
       Ok(p) => buf.write_string("\{name} -> \{p}\n")
       Err(_) => buf.write_string("\{name} -> 未找到\n")
@@ -111,13 +131,14 @@ fn sysprobe_collect() -> String {
   }
   buf.write_string("\n== 默认应用查询(只读) ==\n")
   if @system.da_supported() {
-    match @system.da_file_type("/etc/hostname") {
+    let sample = sysprobe_probe_path()
+    match @system.da_file_type(sample) {
       Ok(mime) => {
-        buf.write_string("/etc/hostname 类型: \{mime}\n")
+        buf.write_string("\{sample} 类型: \{mime}\n")
         match @system.da_default_for(mime) {
           Ok(d) => buf.write_string("默认应用: \{d}\n")
           Err(@system.DefaultAppError::NoDefault(_)) => buf.write_string("默认应用: 未登记\n")
-          Err(e) => buf.write_string("默认应用查询失败: \{e}\n")
+          Err(_) => buf.write_string("默认应用查询失败\n")
         }
         let htmls = @system.da_associations_for("text/html")
         if htmls.is_empty() {
@@ -126,12 +147,12 @@ fn sysprobe_collect() -> String {
           buf.write_string("text/html 关联: \{htmls.join(", ")}\n")
         }
       }
-      Err(e) => buf.write_string("文件类型查询失败: \{e}\n")
+      Err(_) => buf.write_string("文件类型查询失败\n")
     }
   } else {
-    buf.write_string("xdg-mime 不可用,跳过\n")
+    buf.write_string("当前环境不提供默认应用查询\n")
   }
-  buf.write_string("\n== 媒体播放(MPRIS,只读) ==\n")
+  buf.write_string("\n== 媒体播放(只读) ==\n")
   match @system.media_players() {
     Ok(players) => {
       if players.is_empty() {
@@ -144,13 +165,13 @@ fn sysprobe_collect() -> String {
             buf.write_string(
               "  状态: \{st.playback}  标题: \{trunc_str(st.title, 40)}  艺术家: \{trunc_str(st.artist, 20)}  专辑: \{trunc_str(st.album, 20)}\n",
             )
-          Err(e) => buf.write_string("  状态读取失败: \{e}\n")
+          Err(_) => buf.write_string("  状态读取失败\n")
         }
       }
     }
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 当前环境不支持此能力\n")
   }
-  buf.write_string("\n== 显示器(xrandr,只读) ==\n")
+  buf.write_string("\n== 显示器(只读) ==\n")
   match @system.mon_current() {
     Ok(outs) => {
       if outs.is_empty() {
@@ -162,7 +183,7 @@ fn sysprobe_collect() -> String {
         )
       }
     }
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 当前环境不支持此能力\n")
   }
   match @system.mon_list() {
     Ok(mons) => {
@@ -172,9 +193,9 @@ fn sysprobe_collect() -> String {
         buf.write_string("\{m.name}: \{conn} \{prim} 支持模式 \{m.modes.length()} 种\n")
       }
     }
-    Err(e) => buf.write_string("模式列表不可用: \{e}\n")
+    Err(_) => buf.write_string("模式列表不可用\n")
   }
-  buf.write_string("\n== 窗口列表(wmctrl,只读;前 8 个) ==\n")
+  buf.write_string("\n== 窗口列表(只读;前 8 个) ==\n")
   match @system.win_list() {
     Ok(wins) => {
       if wins.is_empty() {
@@ -183,18 +204,18 @@ fn sysprobe_collect() -> String {
       let n = if wins.length() > 8 { 8 } else { wins.length() }
       for i = 0; i < n; i = i + 1 {
         buf.write_string(
-          "\{wins[i].id} [桌面 \{wins[i].desktop}] \{trunc_str(wins[i].title, 40)}\n",
+          "\{wins[i].id}  \{trunc_str(wins[i].title, 40)}\n",
         )
       }
     }
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 当前环境不支持此能力\n")
   }
-  buf.write_string("\n== 剪贴板文本(xclip,只读) ==\n")
+  buf.write_string("\n== 剪贴板(只读) ==\n")
   match @system.cbw_get_text() {
     Ok(t) => buf.write_string("当前文本: \{trunc_str(t, 60)}\n")
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 剪贴板无文本或当前环境不支持读取\n")
   }
-  buf.write_string("\n== 磁盘卷(udisks2/lsblk,只读) ==\n")
+  buf.write_string("\n== 磁盘卷(只读) ==\n")
   match @system.dsk_volumes() {
     Ok(vols) => {
       if vols.is_empty() {
@@ -212,9 +233,9 @@ fn sysprobe_collect() -> String {
         )
       }
     }
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 当前环境不支持此能力\n")
   }
-  buf.write_string("\n== 电源(logind,只读) ==\n")
+  buf.write_string("\n== 电源与登录会话(只读) ==\n")
   if @system.pwrc_supported() {
     match @system.pwrc_sessions() {
       Ok(sessions) => {
@@ -222,25 +243,24 @@ fn sysprobe_collect() -> String {
           buf.write_string("无登录会话\n")
         }
         for s in sessions {
-          let seat = if s.seat == "" { "远程/无 seat" } else { s.seat }
-          buf.write_string("会话 \{s.id}: 用户 \{s.user}(uid \{s.uid}) 座位 \{seat}\n")
+          buf.write_string("会话 \{s.id}: 用户 \{s.user}(uid \{s.uid})\n")
         }
       }
-      Err(e) => buf.write_string("会话列表不可用: \{e}\n")
+      Err(_) => buf.write_string("会话列表不可用: 当前环境不提供登录会话查询\n")
     }
     match @system.pwrc_can_power_off() {
       Ok(b) => buf.write_string("允许关机: \{if b { "是" } else { "否" }}\n")
-      Err(e) => buf.write_string("关机权限查询失败: \{e}\n")
+      Err(_) => buf.write_string("关机权限查询失败\n")
     }
     match @system.pwrc_can_reboot() {
       Ok(b) => buf.write_string("允许重启: \{if b { "是" } else { "否" }}\n")
-      Err(e) => buf.write_string("重启权限查询失败: \{e}\n")
+      Err(_) => buf.write_string("重启权限查询失败\n")
     }
     buf.write_string("关机/重启/注销为危险操作,本演示板不提供执行入口\n")
   } else {
-    buf.write_string("不可用: 无 logind 或非 Linux\n")
+    buf.write_string("不可用: 当前环境不提供登录会话查询\n")
   }
-  buf.write_string("\n== 电源计划(powerprofilesctl,只读) ==\n")
+  buf.write_string("\n== 电源计划(只读) ==\n")
   match @system.pp_profiles() {
     Ok(profs) => {
       if profs.is_empty() {
@@ -252,50 +272,59 @@ fn sysprobe_collect() -> String {
       }
       buf.write_string("可用计划: \{names.join(" / ")}\n")
     }
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 当前环境不支持此能力\n")
   }
   match @system.pp_current() {
     Ok(p) => buf.write_string("当前计划: \{pp_display(p)}\n")
-    Err(e) => buf.write_string("当前计划读取失败: \{e}\n")
+    Err(_) => buf.write_string("当前计划读取失败\n")
   }
   buf.write_string("\n== 系统信息(只读) ==\n")
   match @system.si_os() {
-    Ok(o) =>
-      buf.write_string("发行版: \{o.pretty_name}(id \{o.id},版本 \{o.version_id})\n")
-    Err(e) => buf.write_string("发行版读取失败: \{e}\n")
+    Ok(o) => {
+      let ver = if o.version_id != "" && !o.pretty_name.contains(o.version_id) {
+        "(版本 \{o.version_id})"
+      } else {
+        ""
+      }
+      buf.write_string("操作系统: \{o.pretty_name}\{ver}\n")
+    }
+    Err(_) => buf.write_string("操作系统读取失败\n")
   }
   match @system.si_machine() {
-    Ok(m) => buf.write_string("机器: \{m.vendor} \{m.product}(序列号 \{m.serial})\n")
-    Err(e) => buf.write_string("机器标识读取失败: \{e}\n")
+    Ok(m) => {
+      let serial = if m.serial == "" { "" } else { "  序列号 \{m.serial}" }
+      buf.write_string("机器: \{m.vendor} \{m.product}\{serial}\n")
+    }
+    Err(_) => buf.write_string("机器标识读取失败\n")
   }
   match @system.si_memory() {
     Ok(mem) =>
       buf.write_string(
         "内存: 共 \{mem.total_kb / 1024} MB,可用 \{mem.available_kb / 1024} MB\n",
       )
-    Err(e) => buf.write_string("内存读取失败: \{e}\n")
+    Err(_) => buf.write_string("内存读取失败\n")
   }
   match @system.si_uptime() {
     Ok(secs) =>
       buf.write_string(
         "开机时长: \{secs / 3600.0} 小时(约 \{secs / 86400.0} 天)\n",
       )
-    Err(e) => buf.write_string("开机时长读取失败: \{e}\n")
+    Err(_) => buf.write_string("开机时长读取失败\n")
   }
   buf.write_string("\n== 时区与语言(只读) ==\n")
   match @system.lc_timezone() {
     Ok(tz) => buf.write_string("时区: \{tz}\n")
-    Err(e) => buf.write_string("时区读取失败: \{e}\n")
+    Err(_) => buf.write_string("时区读取失败\n")
   }
   match @system.lc_ntp() {
     Ok(b) => buf.write_string("NTP 同步: \{if b { "已开启" } else { "未开启" }}\n")
-    Err(e) => buf.write_string("NTP 状态读取失败: \{e}\n")
+    Err(_) => buf.write_string("NTP 状态读取失败\n")
   }
   match @system.lc_lang() {
     Ok(l) => buf.write_string("语言: \{l}\n")
-    Err(e) => buf.write_string("语言读取失败: \{e}\n")
+    Err(_) => buf.write_string("语言读取失败\n")
   }
-  buf.write_string("\n== 蓝牙(bluez,只读) ==\n")
+  buf.write_string("\n== 蓝牙(只读) ==\n")
   if @system.bt_supported() {
     match @system.bt_adapter_info() {
       Ok(a) => {
@@ -303,7 +332,7 @@ fn sysprobe_collect() -> String {
         let scanning = if a.discovering { "是" } else { "否" }
         buf.write_string("适配器: \{a.name}(\{a.address}) 电源: \{power} 扫描中: \{scanning}\n")
       }
-      Err(e) => buf.write_string("适配器读取失败: \{e}\n")
+      Err(_) => buf.write_string("适配器读取失败\n")
     }
     match @system.bt_devices() {
       Ok(devs) => {
@@ -321,29 +350,29 @@ fn sysprobe_collect() -> String {
           )
         }
       }
-      Err(e) => buf.write_string("设备列表读取失败: \{e}\n")
+      Err(_) => buf.write_string("设备列表读取失败\n")
     }
   } else {
-    buf.write_string("不可用: 无蓝牙适配器或 bluez 不在线\n")
+    buf.write_string("不可用: 无可用蓝牙适配器\n")
   }
-  buf.write_string("\n== 传感器(iio-sensor-proxy,只读) ==\n")
+  buf.write_string("\n== 传感器(只读) ==\n")
   if @system.sns_supported() {
     if @system.sns_has_ambient_light() {
       match @system.sns_ambient_light() {
         Ok(lux) => buf.write_string("环境光照度: \{lux} lx\n")
-        Err(e) => buf.write_string("环境光读取失败: \{e}\n")
+        Err(_) => buf.write_string("环境光读取失败\n")
       }
     } else {
       buf.write_string("无环境光传感器\n")
     }
     match @system.sns_accelerometer_orientation() {
       Ok(o) => buf.write_string("加速度计方向: \{o}\n")
-      Err(e) => buf.write_string("加速度计读取失败: \{e}\n")
+      Err(_) => buf.write_string("加速度计读取失败\n")
     }
   } else {
-    buf.write_string("不可用: 无 iio-sensor-proxy 服务或无传感器\n")
+    buf.write_string("不可用: 无可用传感器\n")
   }
-  buf.write_string("\n== 打印机(CUPS,只读) ==\n")
+  buf.write_string("\n== 打印机(只读) ==\n")
   if @system.prt_supported() {
     match @system.prt_list() {
       Ok(ps) => {
@@ -355,7 +384,7 @@ fn sysprobe_collect() -> String {
           buf.write_string("\{p.name}: \{p.status} \{ok}\n")
         }
       }
-      Err(e) => buf.write_string("打印机列表读取失败: \{e}\n")
+      Err(_) => buf.write_string("打印机列表读取失败\n")
     }
     match @system.prt_default() {
       Ok(d) => {
@@ -369,15 +398,15 @@ fn sysprobe_collect() -> String {
               buf.write_string("  任务 \{j.id}: \{j.name}\n")
             }
           }
-          Err(e) => buf.write_string("打印队列读取失败: \{e}\n")
+          Err(_) => buf.write_string("打印队列读取失败\n")
         }
       }
       Err(_) => buf.write_string("未设置默认打印机\n")
     }
   } else {
-    buf.write_string("不可用: 未装 CUPS(lpstat 缺失)或非 Linux\n")
+    buf.write_string("不可用: 当前环境不提供打印机查询\n")
   }
-  buf.write_string("\n== 环境变量(常用 + XDG_*) ==\n")
+  buf.write_string("\n== 环境变量(常用) ==\n")
   let envs = @yue.envx_common()
   if envs.is_empty() {
     buf.write_string("无\n")
@@ -410,11 +439,11 @@ fn sysprobe_collect() -> String {
               }
             }
           }
-          Err(e) => buf.write_string("书签树读取失败: \{e}\n")
+          Err(_) => buf.write_string("书签树读取失败\n")
         }
       }
     }
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 当前环境不支持此能力\n")
   }
   buf.write_string("\n== Firefox 历史(只读;前 6 条) ==\n")
   match @system.ffx_history(limit=6) {
@@ -427,9 +456,9 @@ fn sysprobe_collect() -> String {
         buf.write_string("[\{it.visit_count}次] \{trunc_str(title, 40)}\n  \{it.url}\n")
       }
     }
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 当前环境不支持此能力\n")
   }
-  buf.write_string("\n== GTK 最近文件(recently-used.xbel,只读;前 8 条) ==\n")
+  buf.write_string("\n== 最近文件(只读;前 8 条) ==\n")
   match @system.rf_recent(limit=8) {
     Ok(items) => {
       if items.is_empty() {
@@ -443,14 +472,14 @@ fn sysprobe_collect() -> String {
         buf.write_string("\{trunc_str(it.path, 60)} (MIME \{mime}, \{it.app_count} 个应用)\n")
       }
     }
-    Err(e) => buf.write_string("不可用: \{e}\n")
+    Err(_) => buf.write_string("不可用: 当前环境不支持此能力\n")
   }
   buf.to_string()
 }
 
 ///|
 /// 系统能力页:读取按钮把快照写进报告标签,随后刷新滚动范围(报告文本
-//  在挂载后才长高,GTK 滚动范围不会自动跟上)。
+//  在挂载后才长高,部分平台的滚动范围不会自动跟上)。
 pub fn page_sysinfo(app : @ui.ProbeApp) -> @yue.Node {
   ignore(app)
   let report : Ref[@yue.Label?] = Ref(None)
