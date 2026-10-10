@@ -49,6 +49,15 @@ pub enum PositionType {
 }
 
 ///|
+/// 书写方向。决定本节点排布**子项**时的轴向起端：行容器主轴起端
+/// （`Ltr` 在左 / `Rtl` 在右）与列容器交叉轴起端（`Ltr` 在左 / `Rtl` 在右）。
+/// 本引擎按节点独立生效，不做继承（不做 CSS 的 direction 继承链）。
+pub enum Direction {
+  Ltr
+  Rtl
+}
+
+///|
 pub enum FlexDirection {
   Row
   RowReverse
