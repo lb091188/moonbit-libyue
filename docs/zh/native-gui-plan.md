@@ -78,7 +78,7 @@ set_cursor_rect(x, y, w, h)
 | **G0b** | 绑定层摘除与目录重排：删 §2 清单里的 FFI 绑定文件与 `shim/`、`lib/`、`vendor/` 构建链，建 `yue/{win,core,render,text,input,sys}` 骨架 | 新栈各包可 `moon check`；全仓红点清单成文，此后**只减不增** |
 | **G1** | 绘制契约 + 离屏回归：`Painter` 矩形级子集签名定稿、`Bitmap`、yoga-mbt 盒子→像素 | 断言比 RGBA 字节；`moon check` 零警告 |
 | **G2** ✅ | GTK3 窗口地基：建窗、`g_main_context_iteration` 驱动循环（不用 `gtk_main`）、`g_main_context_wakeup` 留跨线程唤醒位、事件全排空、**`mount_child_surface` 接口形状定死**（§4，形状已冻结、实现随首个消费者落地） | 独立进程出图；`open→create→loop→close` 干净退出，无退出期崩溃 |
-| **G3** | Cairo 绘制 + Pango 文本（路径/变换/裁剪/图标；单行与多行测量绘制） | 图标页与两张图表自绘出图；测量语义与 `GetOneLineHeight` 等对齐 |
+| **G3** ◐ | 首批**已完成**：Cairo 光栅器（位图格式对齐 ARGB32 预乘、路径/贝塞尔/弧/变换/裁剪/内侧描边，与纯矩形绘制器逐像素一致，14/14 断言）。余下第二批：Pango 文本（单行/多行测量与绘制、行高语义对齐 `GetOneLineHeight`、缓存） + 图标路径数据渲染 | 首批：`moon test yue/render` 14/14 + 示例冒烟 52 帧。第二批：图标页与两张图表自绘出图；文本测量语义对齐 |
 | **G4** | 焦点栈与键盘、自绘 caret/选区、剪贴板；`TextEditorHost` 抽象落地 | 英文/数字在自绘输入框可打字；Tab/Shift+Tab 焦点跳转可用 |
 | **G5** | 输入法接入（按第 3 节表逐平台） | Linux 真机中文输入（fcitx5 / ibus 两套）；Windows 逐 IME 验，不通者降 C |
 | **G6** | 系统能力平移（`yue/system`、`yue/traybus`、图标数据）+ 图片解码补齐 | 既有 wbtest 随包平移全绿 |

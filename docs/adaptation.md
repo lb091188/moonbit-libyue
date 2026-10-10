@@ -145,6 +145,14 @@ Environment: Ubuntu 24.04 + X11 + XFCE, moon 0.1.20260920 / moonc v0.10.14, GTK3
 - **Convention note**: the present path copies the caller's RGBA buffer into a backend scratch before swizzling to BGRx; it never modifies the caller's buffer in place, because offscreen snapshots share that buffer.
 - Verification: `moon check yue/{core,win,render}` warning-free; `moon test -p NoahLiu/moonbit-libyue/yue/core` 9/9; `examples/native-window` smoke: 52 frames, exit code 0, no shutdown crash; yoga-mbt 79/79 unchanged.
 
+### MoonBit native GUI stack G3a (Cairo rasterizer) · bitmap format and parity between the two backends
+
+- **Format decision (key)**: the `yue/render` Bitmap now uses the exact `CAIRO_FORMAT_ARGB32` layout (little-endian B,G,R,A with **premultiplied** alpha). Cairo can then draw straight into our own buffer and the window present becomes a direct copy - one format end to end, no conversions. Consequences: the hand-written `Bitmap::paint` does source-over in premultiplied space (same arithmetic as Cairo) and `Bitmap::pixel` unpremultiplies, so the public semantics (independent RGBA components) and all G1 assertions stay unchanged.
+- **Simpler present**: `wm_present` no longer swizzles RGBA to BGRx or copies into a scratch; it builds an ARGB32 surface over the caller's buffer (held by `#borrow` for the duration).
+- **`stroke_rect` has one meaning on both sides**: Cairo's `stroke` is centered, which contradicts the border-box convention, so the C side reproduces inset semantics with four inner band fills.
+- **Invariant under test**: the same rect and colour (including alpha) rendered through the pure-MoonBit rect painter and through Cairo are **pixel-for-pixel identical** (including `#00000080` over white = 127,127,127,255); a diagonal fill produces intermediate alpha, proving the anti-aliased path is actually used.
+- Verification: `moon test -p NoahLiu/moonbit-libyue/yue/render` 14/14 (6 new Cairo assertions); `moon check yue/{core,win,render}` warning-free; `examples/native-window` smoke 52 frames, exit code 0 (the demo now draws a Cairo circle and bezier arc end to end).
+
 ## Linux
 
 ### Distributions

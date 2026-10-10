@@ -28,6 +28,26 @@ fn paint(win : @win.Window, tick : Int) -> Unit {
   p.set_fill_color("#f5e0dc")
   let x = (fw - 40.0) * (tick % 10).to_double() / 9.0
   p.fill_rect(x, fh - 80.0, 40.0, 40.0)
+  // Cairo 路径层：抗锯齿的圆 + 贝塞尔弧，证明整条链（Cairo → 自有缓冲 → 窗口）
+  match @render.Cairo::over(bm) {
+    Some(c) => {
+      c.set_fill_color("#cba6f7")
+      c.begin_path()
+      c.arc(fw / 2.0, fh / 2.0, 40.0, 0.0, 6.283185307179586)
+      c.fill()
+      c.set_fill_color("#94e2d5")
+      c.begin_path()
+      c.move_to(fw / 2.0, fh / 2.0)
+      c.bezier_curve_to(
+        fw / 2.0 + 60.0, fh / 2.0 - 60.0, fw / 2.0 + 120.0, fh / 2.0 + 60.0,
+        fw / 2.0 + 140.0, fh / 2.0,
+      )
+      c.set_line_width(3.0)
+      c.stroke()
+      c.end()
+    }
+    None => ()
+  }
   win.present(bm.data, bm.width, bm.height)
 }
 

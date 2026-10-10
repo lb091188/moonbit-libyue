@@ -1,7 +1,9 @@
 // RGBA8888 位图：本栈唯一拥有的像素缓冲。
-// 布局顺序为逐行、每像素 4 字节（stride = width * 4，无行末填充），
-// 与窗口上屏（XPutImage / Cairo ARGB32）之间的字节序换算在 G2/G3 的
-// win 层处理，这里只保证「缓冲归 MoonBit、逐像素口径单一」。
+//
+// 内部布局与 Cairo 的 `CAIRO_FORMAT_ARGB32` 一致（小端 = 字节序 B,G,R,A，
+// 且颜色分量**预乘** alpha）——这样 Cairo 光栅器可以直接画进这块内存，
+// 上屏也可以直拷，全链路单一格式、零转换。默认格式是 CGBA(预乘)，`pixel`
+// 负责反预乘，所以对外语义仍是普通的 RGBA 分量（0~255，独立于 alpha）。
 
 ///|
 pub struct Bitmap {
@@ -15,7 +17,7 @@ pub struct Bitmap {
 pub fn Bitmap::new(width : Int, height : Int) -> Bitmap {
   let w = if width < 0 { 0 } else { width }
   let h = if height < 0 { 0 } else { height }
-  { width: w, height: h, data: FixedArray::make(w * h * 4, b'\x00'), }
+  { width: w, height: h, data: FixedArray::make(w * h * 4, b'\x00') }
 }
 
 ///|
@@ -23,53 +25,68 @@ pub fn Bitmap::inside(self : Bitmap, x : Int, y : Int) -> Bool {
   x >= 0 && y >= 0 && x < self.width && y < self.height
 }
 
+// 反预乘：预乘分量 p、alpha a → 独立分量 p*255/a（a=0 视为全透明）。
+fn unpremul(p : Int, a : Int) -> Int {
+  if a == 0 {
+    0
+  } else {
+    (p * 255 + a / 2) / a
+  }
+}
+
 ///|
-/// 取像素；越界返回全透明。
+/// 取像素（反预乘后的独立 RGBA 分量）；越界返回全透明。
 pub fn Bitmap::pixel(self : Bitmap, x : Int, y : Int) -> Color {
   if !self.inside(x, y) {
     color_transparent
   } else {
     let i = (y * self.width + x) * 4
     let bs = self.data
-    {
-      r: bs[i].to_int(),
-      g: bs[i + 1].to_int(),
-      b: bs[i + 2].to_int(),
-      a: bs[i + 3].to_int(),
+    let b = bs[i].to_int()
+    let g = bs[i + 1].to_int()
+    let r = bs[i + 2].to_int()
+    let a = bs[i + 3].to_int()
+    if a == 0 {
+      color_transparent
+    } else {
+      { r: unpremul(r, a), g: unpremul(g, a), b: unpremul(b, a), a }
     }
   }
 }
 
 ///|
-/// source-over 覆盖一个像素（整数定点混合，a=255 时即直接替换）。
+/// source-over 覆盖一个像素（在预乘域上混合，与 Cairo 同一套算术）。
 pub fn Bitmap::paint(self : Bitmap, x : Int, y : Int, c : Color) -> Unit {
   if !self.inside(x, y) {
     return ()
   }
   let i = (y * self.width + x) * 4
   let sa = c.a
-  // 像素缓冲用 FixedArray[Byte]：本工具链的 Bytes 只读（无 op_set），
-  // 而 FixedArray 就地写入不需要 mut 绑定，调用点因此不必写 `mut`。
+  // 写像素一律经局部句柄：Bytes 的 op_set 只接受可变接收者，
+  // 直接 self.data[..] = .. 会让整个方法要求 `Bitmap &mut`，调用点就得写 mut。
   let d = self.data
   if sa == 255 {
-    d[i] = c.r.to_byte()
+    d[i] = c.b.to_byte()
     d[i + 1] = c.g.to_byte()
-    d[i + 2] = c.b.to_byte()
+    d[i + 2] = c.r.to_byte()
     d[i + 3] = b'\xff'
   } else if sa == 0 {
     ()
   } else {
-    let dr = d[i].to_int()
+    // src 预乘
+    let sr = (c.r * sa + 127) / 255
+    let sg = (c.g * sa + 127) / 255
+    let sb = (c.b * sa + 127) / 255
+    let inv = 255 - sa
+    let mix = fn(s : Int, dst : Int) -> Int { s + (dst * inv + 127) / 255 }
+    let db = d[i].to_int()
     let dg = d[i + 1].to_int()
-    let db = d[i + 2].to_int()
+    let dr = d[i + 2].to_int()
     let da = d[i + 3].to_int()
-    let mix = fn(sc : Int, dc : Int) -> Int {
-      (sc * sa + dc * (255 - sa) + 127) / 255
-    }
-    d[i] = mix(c.r, dr).to_byte()
-    d[i + 1] = mix(c.g, dg).to_byte()
-    d[i + 2] = mix(c.b, db).to_byte()
-    d[i + 3] = (sa + (da * (255 - sa) + 127) / 255).to_byte()
+    d[i] = mix(sb, db).to_byte()
+    d[i + 1] = mix(sg, dg).to_byte()
+    d[i + 2] = mix(sr, dr).to_byte()
+    d[i + 3] = mix(sa, da).to_byte()
   }
 }
 

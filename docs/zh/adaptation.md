@@ -190,6 +190,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **另记（口径）**：上屏路径把调用方的 RGBA 缓冲拷进后端暂存再换序（BGRx），**绝不就地改调用方缓冲**——离屏快照与窗口同源，就地换序会让下一次快照通道错位、重复上屏还会来回颠倒。
 - **验证**：`moon check yue/{core,win,render}` 零警告；`moon test -p NoahLiu/moonbit-libyue/yue/core` 9/9；`examples/native-window` 本机冒烟 52 帧、退出码 0、无退出期崩溃；yoga-mbt 79/79 未掉。
 
+### MoonBit 原生 GUI 栈 G3 首批（Cairo 光栅器）· 位图格式与两侧口径对齐
+
+- **格式定案（关键）**：`yue/render` 的 Bitmap 内部布局改为与 `CAIRO_FORMAT_ARGB32` 一致（小端 = B,G,R,A 且**预乘** alpha）。收益：Cairo 可以直接画进我们自己的缓冲（`cairo_image_surface_create_for_data`）、上屏直拷，全链路单一格式零转换。代价与对策：自写的 `Bitmap::paint` 改在预乘域做 source-over（与 Cairo 同一套算术），`Bitmap::pixel` 负责**反预乘**，所以对外语义（独立 RGBA 分量）与 G1 的断言完全不变。
+- **上屏简化**：`wm_present` 去掉 RGBA→BGRx 换序与暂存拷贝，直接用调用方缓冲建 ARGB32 surface 贴上（会话期间由 `#borrow` 持有，缓冲不会动）。
+- **`stroke_rect` 两侧同口径**：Cairo 的 `stroke` 是**居中**描边，与布局层 border-box 口径不符，故 C 端用「四条内边带填充」复现内侧语义；界面上要与 Cairo 居中描边区分时另开方法，不改本契约。
+- **不变量（已入单测）**：同一矩形、同一颜色（含 alpha）经「纯 MoonBit 矩形绘制器」与「Cairo」两条路径，**逐像素完全相等**（含 `#00000080` 叠白底 = 127,127,127,255 的情形）；斜边填充出现中间 alpha，证明确实走了抗锯齿。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/render` 14/14（新增 6 条 Cairo 断言：逐像素一致、三角形填充、抗锯齿中间 alpha、clip+translate、内侧描边两侧同语义、半透明混合一致）；`moon check yue/{core,win,render}` 零警告；`examples/native-window` 冒烟 52 帧、退出码 0（示例已加 Cairo 画的圆与贝塞尔弧，整条链路过一遍）。
+
 ## Linux
 
 ### 发行版

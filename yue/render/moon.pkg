@@ -1,0 +1,8 @@
+// GTK/Cairo 端不由 moon 编译（link_configs 只有链接期字段、native-stub 拿不到
+// 系统头），cairo_stub.c 由 scripts/prebuild.py 编成 build/librender_cairo_stub.a
+// 经 link_flags 传入；这里只带非 Linux 的占位实现保三平台链接。
+supported_targets = "native"
+
+options(
+  "native-stub": [ "cairo_stub_portable.c" ],
+)

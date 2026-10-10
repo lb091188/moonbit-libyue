@@ -31,6 +31,7 @@ LINUX_PKG_CONFIG_LIBS = ["gtk+-3.0", "pangoft2", "fontconfig", "x11"]
 
 IME_PROBE_PACKAGE = "NoahLiu/moonbit-libyue/experiment/ime_probe"
 WIN_PACKAGE = "NoahLiu/moonbit-libyue/yue/win"
+RENDER_PACKAGE = "NoahLiu/moonbit-libyue/yue/render"
 
 
 def pkg_config(args: list[str], flag: str) -> list[str] | None:
@@ -121,6 +122,15 @@ def link_configs() -> dict:
             entries.append({
                 "package": WIN_PACKAGE,
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_win_stub "
+                + " ".join([*libs, *sys_libs]),
+            })
+        cairo_lib = compile_stub(
+            MODULE_ROOT / "yue" / "render" / "cairo_stub.c", "librender_cairo_stub.a"
+        )
+        if cairo_lib:
+            entries.append({
+                "package": RENDER_PACKAGE,
+                "link_flags": f"-L{BUILD_DIR.as_posix()} -lrender_cairo_stub "
                 + " ".join([*libs, *sys_libs]),
             })
         stub = build_ime_probe_stub()
