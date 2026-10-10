@@ -6,8 +6,9 @@
 // （align-content 处理多行）→ 递归子树。
 //
 // 宽高语义为 border-box（与 Yoga 一致）：width/height 含自身的
-// padding 与 border。尚未实现：RTL（direction）、aspect-ratio、
-// 测量缓存、像素网格取整、容器内在尺寸（min/max-content）精确语义。
+// padding 与 border；aspect-ratio 的比例同样按边框盒计算。
+// 尚未实现：RTL（direction）、测量缓存、像素网格取整、
+// 容器内在尺寸（min/max-content）精确语义、绝对定位项的比例换算。
 
 ///|
 let max_dim : Double = 1000000000000000.0
@@ -294,15 +295,24 @@ fn layout_into(
       Some(f) => f(iw, ih)
       None => (0.0, 0.0)
     }
-    let w0 = first_some(pinned_w, definite_size(s.width, avail_w)).unwrap_or(cw + pad_border_w)
-    let h0 = first_some(pinned_h, definite_size(s.height, avail_h)).unwrap_or(ch + pad_border_h)
+    let w0_ = first_some(pinned_w, definite_size(s.width, avail_w))
+    let h0_ = first_some(pinned_h, definite_size(s.height, avail_h))
+    // 首选比例（border-box 语义：比例 = 宽/高）：一个轴确定 → 另一轴换算
+    let w0 = match (w0_, h0_, s.aspect_ratio) {
+      (None, Some(h), Some(r)) => Some(h * r)
+      _ => w0_
+    }
+    let h0 = match (w0, h0_, s.aspect_ratio) {
+      (Some(w), None, Some(r)) => Some(w / r)
+      _ => h0_
+    }
     let w = clamp3(
-      w0,
+      w0.unwrap_or(cw + pad_border_w),
       definite_size(s.min_width, avail_w).unwrap_or(0.0),
       definite_size(s.max_width, avail_w).unwrap_or(max_dim),
     )
     let h = clamp3(
-      h0,
+      h0.unwrap_or(ch + pad_border_h),
       definite_size(s.min_height, avail_h).unwrap_or(0.0),
       definite_size(s.max_height, avail_h).unwrap_or(max_dim),
     )
@@ -345,8 +355,31 @@ fn layout_into(
   let inner_main_avail = avail_main.map(fn(v) { (v - pad_border_main).max(0.0) })
   let own_main_def = if main_is_row { own_w_def } else { own_h_def }
   let own_cross_def = if main_is_row { own_h_def } else { own_w_def }
-  let inner_main = own_main_def.map(fn(v) { (v - pad_border_main).max(0.0) })
-  let inner_cross = own_cross_def.map(fn(v) { (v - pad_border_cross).max(0.0) })
+  // 主轴无确定尺寸、但交叉轴确定且有比例 → 主轴按比例换算后视同确定
+  let ratio_main_own = match (s.aspect_ratio, own_cross_def) {
+    (Some(r), Some(cv)) => {
+      let bb = if main_is_row { (cv * r).max(0.0) } else { cv / r }
+      Some((bb - pad_border_main).max(0.0))
+    }
+    _ => None
+  }
+  let inner_main = first_some(
+    own_main_def.map(fn(v) { (v - pad_border_main).max(0.0) }),
+    ratio_main_own,
+  )
+  // 交叉轴无确定尺寸、但主轴确定且有比例 → 交叉轴按比例换算后视同确定
+  // （参与行交叉尺寸与 stretch，否则容器撑不开子项）
+  let ratio_cross = match (s.aspect_ratio, own_main_def) {
+    (Some(r), Some(mv)) => {
+      let bb = if main_is_row { (mv / r).max(0.0) } else { mv * r }
+      Some((bb - pad_border_cross).max(0.0))
+    }
+    _ => None
+  }
+  let inner_cross = first_some(
+    own_cross_def.map(fn(v) { (v - pad_border_cross).max(0.0) }),
+    ratio_cross,
+  )
   let main_gap = if main_is_row { s.column_gap } else { s.row_gap }
   let cross_gap = if main_is_row { s.row_gap } else { s.column_gap }
   let wrap_limit = first_some(inner_main, inner_main_avail)
@@ -398,13 +431,24 @@ fn layout_into(
       Auto => child_main_style
       v => v
     }
-    let base = definite_size(basis_val, pct_base_main).unwrap_or(content_main)
+    let cross_definite = definite_size(child_cross_style, pct_base_cross)
+    // 规范 §9.2：有首选比例 + 基准为 content + 交叉轴尺寸确定 → 主轴基准由比例换算
+    let ratio_main = match (c.style.aspect_ratio, cross_definite) {
+      (Some(r), Some(cv)) => Some(if main_is_row { cv * r } else { cv / r })
+      _ => None
+    }
+    let base = first_some(definite_size(basis_val, pct_base_main), ratio_main)
+      .unwrap_or(content_main)
     let min_v = if main_is_row { c.style.min_width } else { c.style.min_height }
-    // web 语义：主轴 min:auto → 内容下限；显式 Fixed(0) 才是 0
-    let min_main = definite_size(min_v, pct_base_main).unwrap_or(content_main)
+    // web 语义：主轴 min:auto → 内容下限（§4.5：有换算值时不超过它）；
+    // 显式 Fixed(0) 才是 0
+    let auto_min = match ratio_main {
+      Some(t) => content_main.min(t)
+      None => content_main
+    }
+    let min_main = definite_size(min_v, pct_base_main).unwrap_or(auto_min)
     let max_v = if main_is_row { c.style.max_width } else { c.style.max_height }
     let max_main = definite_size(max_v, pct_base_main).unwrap_or(max_dim)
-    let cross_definite = definite_size(child_cross_style, pct_base_cross)
     let cmin_v = if main_is_row { c.style.min_height } else { c.style.min_width }
     let min_cross = definite_size(cmin_v, pct_base_cross).unwrap_or(0.0)
     let cmax_v = if main_is_row { c.style.max_height } else { c.style.max_width }
@@ -640,19 +684,31 @@ fn layout_into(
     for it in line {
       match it.cross_definite {
         Some(v) => it.final_cross = v
-        None => {
-          // 规范 §9.4：以已用主尺寸约束重测内容交叉尺寸
-          let cim = (it.size_main - it.pb_main).max(0.0)
-          let content = if main_is_row {
-            measure_content(it.node, Some(cim), None)
-          } else {
-            let (w, h) = measure_content(it.node, None, Some(cim))
-            (h, w)
+        None =>
+          match it.node.style.aspect_ratio {
+            // 规范 §9.4：主轴尺寸已定（含弹性解析结果）→ 交叉轴假想尺寸由比例换算
+            Some(r) => {
+              let derived = if main_is_row {
+                (it.size_main / r).max(0.0)
+              } else {
+                it.size_main * r
+              }
+              it.final_cross = clamp3(derived, it.min_cross, it.max_cross)
+            }
+            None => {
+              // 规范 §9.4：以已用主尺寸约束重测内容交叉尺寸
+              let cim = (it.size_main - it.pb_main).max(0.0)
+              let content = if main_is_row {
+                measure_content(it.node, Some(cim), None)
+              } else {
+                let (w, h) = measure_content(it.node, None, Some(cim))
+                (h, w)
+              }
+              it.content_cross = content.1
+              it.final_cross = clamp3(it.content_cross, it.min_cross, it.max_cross)
+              it.baseline = it.node.baseline
+            }
           }
-          it.content_cross = content.1
-          it.final_cross = clamp3(it.content_cross, it.min_cross, it.max_cross)
-          it.baseline = it.node.baseline
-        }
       }
     }
     let content_cross = line.iter().fold(init=0.0, fn(acc, it) {
@@ -894,11 +950,19 @@ fn layout_into(
   let content_main_sum = content_main + pad_border_main
   let own_main0 = match own_main_def {
     Some(v) => v
-    None => content_main_sum
+    None =>
+      match inner_main {
+        Some(im) => im + pad_border_main
+        None => content_main_sum
+      }
   }
   let own_cross0 = match own_cross_def {
     Some(v) => v
-    None => own_cross_content + pad_border_cross
+    None =>
+      match inner_cross {
+        Some(ic) => ic + pad_border_cross
+        None => own_cross_content + pad_border_cross
+      }
   }
   let own_main = clamp3(
     own_main0,

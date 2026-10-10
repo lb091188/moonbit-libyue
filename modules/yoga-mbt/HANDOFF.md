@@ -1,7 +1,7 @@
 # yoga-mbt 复刻工作交接
 
 > 交接时间：2026-10-10 10:45（GMT+8）· 交接方：本会话（WorkBuddy）· 接收方：同仓库协作方 / 后续会话
-> 修订：2026-10-10 11:10 合入 YG2b（baseline + 交叉轴 margin 定位修复）；11:40 合入 YG2b′（容器 auto 尺寸补 padding/border + 多行主轴尺寸）——两次都同步更新了 §0/§3/§4/§5/§6/§7/§8/§9/§10/§11
+> 修订：2026-10-10 11:10 合入 YG2b（baseline + 交叉轴 margin 定位修复）；11:40 合入 YG2b′（容器 auto 尺寸补 padding/border + 多行主轴尺寸）；12:10 合入 YG2c（aspect-ratio，比例语义 border-box）——各批都同步更新了 §0/§3/§4/§5/§6/§7/§8/§9/§10/§11
 > 交接范围：`feature/yoga-mbt` 分支上的「纯 MoonBit Flexbox 布局引擎」复刻工作
 
 ---
@@ -9,9 +9,10 @@
 ## 0. 三十秒速览
 
 - **在做什么**：用纯 MoonBit 复刻 Yoga 布局引擎（`modules/yoga-mbt` 独立子包），作为 MoonBit 化 libyue 的布局层。
-- **当前进度**：YG1（骨架 + 核心算法）、YG2a（absolute 定位）、YG2b（baseline 对齐 + 交叉轴 margin 定位修复）、YG2b′（容器 auto 尺寸补 padding/border + 多行主轴尺寸）已完成并推送；全部提交在 `feature/yoga-mbt`（**分支最新提交以 `git log` 为准**）。
-- **门控现状**：`moon check` 零警告 + 全仓 `moon test` **701/701** 全绿；yoga-mbt 自身 40 条白盒断言。
-- **下一步**：YG2c aspect-ratio → YG2d RTL → YG3 工程化 → YG4 与 libyue 集成（详见 §8；aspect-ratio 动手前要先定比例作用在 border-box 还是 content-box）。
+- **当前进度**：YG1（骨架 + 核心算法）、YG2a（absolute 定位）、YG2b（baseline 对齐 + 交叉轴 margin 定位修复）、YG2b′（容器 auto 尺寸补 padding/border + 多行主轴尺寸）、YG2c（aspect-ratio）已完成并推送；全部提交在 `feature/yoga-mbt`（**分支最新提交以 `git log` 为准**）。
+- **门控现状**：`moon check` 零警告 + 全仓 `moon test` **708/708** 全绿；yoga-mbt 自身 47 条白盒断言。
+- **下一步**：YG2d RTL → YG3 工程化 → YG4 与 libyue 集成（详见 §8；YG2c 留下一小口：绝对定位子项的比例换算未做）。
+- **口径已定**：aspect-ratio 比例作用在 **border-box**（用户 2026-10-10 确认），与 CSS 默认的 content-box 不同，动这块代码前先读 §5 第 12 条。
 - **三条纪律**（最容易踩）：① 只对齐 **Web Flexbox 标准**，不做 Yoga 双默认值；② 提交前先 `git fetch` 且用 `git add <显式路径>`，**不要 `git add -A`**；③ 每批改动配套回写 `docs/zh/adaptation.md` 与 `TODO.md`，一批一提交一推送。
 
 ---
@@ -61,24 +62,25 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 
 ---
 
-## 3. 代码地图（`modules/yoga-mbt`，合计约 2267 行）
+## 3. 代码地图（`modules/yoga-mbt`，合计约 2459 行）
 
 | 文件 | 行数 | 职责 |
 |---|---|---|
 | `src/types.mbt` | 98 | `Value`(Undefined/Fixed/Percent/Auto)、`Edges`、`Display`、`PositionType`、`FlexDirection`、`FlexWrap`、`JustifyContent`、`AlignItems`、`AlignContent` |
-| `src/style.mbt` | 109 | `Style`（web 默认值集中在此）+ `edge_value`/`resolve_value`/`definite_size` 三个解析原语 |
+| `src/style.mbt` | 111 | `Style`（web 默认值集中在此）+ `edge_value`/`resolve_value`/`definite_size` 三个解析原语 |
 | `src/node.mbt` | 97 | `Node` 树、`Layout`（left/top/width/height）、`set_measure`、`set_baseline`、`append_child`、`layout()` |
-| `src/api.mbt` | 239 | 全部 setter、`fixed/percent/auto/undefined` 取值辅助、`calculate_layout` 入口 |
-| `src/algorithm.mbt` | 1032 | **核心算法**（见下） |
-| `src/layout_wbtest.mbt` | 692 | 40 条白盒断言（手算预期值） |
+| `src/api.mbt` | 250 | 全部 setter、`fixed/percent/auto/undefined` 取值辅助、`calculate_layout` 入口 |
+| `src/algorithm.mbt` | 1095 | **核心算法**（见下） |
+| `src/layout_wbtest.mbt` | 808 | 47 条白盒断言（手算预期值） |
 | `src/moon.pkg.json` | 3 | `{"warn_list": "-6"}`，关闭「枚举构造器包内未构造」的误报（仅面向消费方的 API） |
 | `README.md` | — | 用法 / 已实现 / 未实现清单（内容类文档，只写怎么用） |
 
 **算法入口**：`fn layout_into(node, avail_w, avail_h, pinned_w, pinned_h) -> (Double, Double)`
 
 - `avail_*` = 父内容盒给出的可用空间；`pinned_*` = 父级弹性解析后**钦定**的最终尺寸（覆盖自身 style/内容推算）；返回 border-box 尺寸。
-- 单节点流程（`algorithm.mbt` 内按序）：display 判定 → 自身 padding/border 解析 → **叶子路径**（measure 函数 + 基线函数）→ **flex 项构建**（同时把 `position: absolute` 的子项分流到 `abs_children`）→ **换行**（§9.3）→ 逐行 **§9.7 弹性解析** → 主轴 auto margin / justify 定位（§9.5）→ 交叉轴内容测量 + **§9.4 基线分组**与行交叉尺寸（§9.6）→ align-content 整行分布（§9.4/§9.6）→ 逐项定尺寸/定位/递归子树 → **本节点基线定案**（§8.5）→ 自身尺寸定案（内容推算 = 各行最大 + 自身 padding/border，含 min/max 收顶）→ **绝对定位子项**布局。
+- 单节点流程（`algorithm.mbt` 内按序）：display 判定 → 自身 padding/border 解析 → **叶子路径**（measure 函数 + 基线函数）→ **flex 项构建**（同时把 `position: absolute` 的子项分流到 `abs_children`）→ **换行**（§9.3）→ 逐行 **§9.7 弹性解析**（§9.2 比例换算基准与 §4.5 自动最小尺寸在 flex 项构建阶段算好） → 主轴 auto margin / justify 定位（§9.5）→ 交叉轴内容测量 + **§9.4 基线分组**与行交叉尺寸（§9.6）→ align-content 整行分布（§9.4/§9.6）→ 逐项定尺寸/定位/递归子树 → **本节点基线定案**（§8.5）→ 自身尺寸定案（内容推算 = 各行最大 + 自身 padding/border，含 min/max 收顶）→ **绝对定位子项**布局。
 - 辅助函数：`clamp3`、`first_some`、`justify_leading`、`align_offset`、`resolved_align`（align-self 继承 align-items）、`is_baseline_item`（§9.4 收集条件）、`measure_content`（叶子走 measure，容器递归；两条路径都刷新节点基线）。
+- 比例接入点共四处：flex 项构建（换算主轴基准 + 给 `min:auto` 封顶）、交叉轴定尺寸（换算 `final_cross`）、容器自身 `inner_main` / `inner_cross`（换算结果当作确定尺寸）、叶子路径（宽高互推）。绝对定位子项未接。
 - 关键内部结构：`Resolved`/`AxisMargin`（四边在主轴/交叉轴视角下的映射，含 auto 标记）、`Item`（单个 flex 项的全部中间量：base / inner_base / hyp_main / min-max / grow / shrink / size_main / final_cross / baseline / frozen / violation / pos）。`Node.baseline`（`Option[Double]`，到本节点边框盒顶部的距离）是节点间上抛基线的通道。
 
 ---
@@ -92,8 +94,9 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 | `f994a15` | 发布元数据（readme/keywords） | — |
 | YG2b | **baseline 对齐**：`set_baseline` 回调（基线到内容盒顶部）、§9.4 基线分组决定行交叉尺寸、§9.6 升距最大者贴行起端、§8.5 容器基线上抛；附带修复**交叉轴 margin 从不参与子项定位** | 10 条 |
 | YG2b′ | **容器 auto 尺寸**：主轴按各行外沿取最大（原写死 0）、主轴与交叉轴都补自身 padding/border | 4 条 |
+| YG2c | **aspect-ratio**：`set_aspect_ratio`（比例 = 边框盒宽/高），§9.2 换算基准、§4.5 换算值封顶 min:auto、§9.4 交叉轴换算、容器自身两轴按比例视作确定尺寸；`align-items: stretch` 覆盖交叉轴比例结果（规范直译）| 7 条 |
 
-门控基线：`moon check` 零警告 + 全仓 `moon test` **701/701**（其中 yoga-mbt 40 条，其余 661 条为仓库既有测试）。
+门控基线：`moon check` 零警告 + 全仓 `moon test` **708/708**（其中 yoga-mbt 47 条，其余 661 条为仓库既有测试）。
 
 ---
 
@@ -115,7 +118,8 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 9. **baseline（YG2b）**：`set_baseline` 返回**基线到内容盒顶部**（与 `set_measure` 对称，引擎叠加自身 padding/border）；容器不设回调，基线按 §8.5 由内部项推出（首行有基线对齐项 → 该行共同基线；否则交叉轴起端最靠前的有基线 in-flow 项，逐层上抛）。三条取舍：①主轴为列时不做基线对齐（规范收集条件要求项的 inline 轴平行于主轴）；②**无基线的项不进分组、按 flex-start 摆放**——规范对「合成基线在哪条边」有分歧（css-align-3 说块起边，浏览器对替换元素/空块历史用底边），本引擎选择不合成，与 Yoga 的 dimbound 分支及改前行为一致，需要「图片底边坐落基线」的消费方自己返回基线 = 自身高度；③单行 + 容器交叉轴确定时基线只决定偏移不决定行高（§9.6 短路优先）。
 10. **交叉轴 margin 参与定位**（YG2b 修复）：子项位置 = 行偏移 + 对齐偏移 + **margin 起端**；此前只加了行偏移与对齐偏移，而剩余空间 `free_c` 已按含 margin 的外沿算，导致 `margin_top` 被吞（主轴方向一直是对的，`pos_main` 累加了 `m.start`）。
 11. **容器 auto 尺寸 = 内容推算 + 自身 padding/border**（YG2b′）：主轴取各行外沿（`size_main` + 两侧 margin + 该行 gap）最大值，交叉轴取各行交叉尺寸之和（+ 行 gap），两者再叠 `pad_border_main / pad_border_cross`——宽高语义是 border-box，不叠就是尺寸小一圈。auto 主轴容器不参与 §9.7 弹性解析（`inner_main` 为 None），`size_main` 恒等于 `hyp_main`，所以「按行取最大」在单行时与旧公式等价，无回归。
-12. **未实现的能力不留半成品接口**：宁可没有 API，也不给会静默算错的参数。
+12. **aspect-ratio 比例语义 = border-box**（用户定案，与 CSS 默认 content-box 不同）：`ratio = 边框盒宽 / 边框盒高`，换算处不扣 padding；四个接入点见 §3。其中「容器一轴确定 → 另一轴换算结果写进 `inner_main` / `inner_cross` 当作确定尺寸」是必须的，否则换行上限、弹性解析、行交叉尺寸与 stretch 全按内容尺寸走，会出现「`width:320 + ratio:2` 的容器高塌成内容 50、子项也只拉到 50」。另：`align-items: stretch`（本引擎默认）覆盖交叉轴的比例结果——规范 §9.4 algo-stretch 的条件是「computed 交叉尺寸属性为 auto」，并有尾注「本步不影响主轴，即使项有首选比例」，要保持比例需给非 stretch 对齐或显式交叉尺寸（浏览器同款，已入单测）。
+13. **未实现的能力不留半成品接口**：宁可没有 API，也不给会静默算错的参数。
 
 ---
 
@@ -148,8 +152,8 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 ```sh
 cd <副本>/modules/yoga-mbt
 ~/.moon/bin/moon check          # 必须零警告
-~/.moon/bin/moon test           # yoga-mbt 40 条
-cd <副本> && ~/.moon/bin/moon check && ~/.moon/bin/moon test    # 全仓门控：701/701
+~/.moon/bin/moon test           # yoga-mbt 47 条
+cd <副本> && ~/.moon/bin/moon check && ~/.moon/bin/moon test    # 全仓门控：708/708
 ```
 
 仓库硬性规则摘要（完整版见根目录 `AGENTS.md`）：
@@ -171,16 +175,15 @@ cd <副本> && ~/.moon/bin/moon check && ~/.moon/bin/moon test    # 全仓门控
 
 修复落在 `algorithm.mbt` 末尾「自身尺寸」段：主轴改为按各行外沿（`size_main` + 两侧 margin + 该行 gap）取最大，主轴与交叉轴的内容推算尺寸都再叠 `pad_border_main / pad_border_cross`。YG2b 撤下的 `b.layout().height == 35` 断言已合回，四条探针转正为单测（40 条全绿）。
 
-### YG2c aspect-ratio
+### YG2c aspect-ratio（已完成，留此备案）
 
-- `Style` 加 `aspect_ratio : Option[Double]`；一个轴确定 → 另一轴按比例推导，再跑 min/max 收顶。
-- **需先决策**：比例作用在 border-box（与引擎既有语义一致）还是 content-box（CSS 默认）——建议 border-box 并在 README 标注差异。
-- 互作用点：与 flex base 计算（§9.2「有 preferred aspect ratio + definite cross size 时由 cross 推 base」）、与自动最小尺寸。
+口径：比例作用在 **border-box**（用户 2026-10-10 定案，`ratio = 边框盒宽 / 边框盒高`）。落在四处——§9.2 项的主轴基准换算、§4.5 `min:auto` 用换算值封顶、§9.4 交叉轴假想尺寸换算、容器自身 `inner_main` / `inner_cross` 按比例当作确定尺寸（这一条不做会出现「`width:320 + ratio:2` 的容器高只按内容 50 算、子项也只拉到 50」）。`align-items: stretch` 覆盖交叉轴比例结果为规范直译，已入单测。**留下一口**：绝对定位子项不走比例换算（该路径仍只按显式尺寸 / 同轴两侧 inset / 内容定尺寸），需要时并给 YG2d 之后补。
 
 ### YG2d RTL（direction）
 
+- 先做一组「LTR 现有行为快照测试」防回归（含 baseline 与 aspect-ratio 两条新路径），再动映射。
 - `Style` 加 `direction`（Ltr/Rtl）+ 逻辑轴的 start/end 映射：主轴/交叉轴起端、margin/inset 的 start/end 语义、`RowReverse` 的组合。
-- 只影响「解析与映射」层，不动数据结构；建议实现前先补一组「LTR 现有行为快照测试」防回归。
+- 只影响「解析与映射」层，不动数据结构。
 
 ### YG3 工程化
 
@@ -203,6 +206,7 @@ cd <副本> && ~/.moon/bin/moon check && ~/.moon/bin/moon test    # 全仓门控
 4. **近似实现**（已在 README/adaptation 标注，别当 bug 修）：绝对定位静态位置忽略兄弟项与间距类 justify；容器内在尺寸用 fit-content 近似；基线分组**不收无基线的项**（规范对「合成基线在哪条边」本身有分歧，见 §5 第 9 条）。
 5. **发布未做**：`yoga-mbt` 尚未发 mooncakes（`license/description/repository/readme/keywords` 已备）。发布前注意仓库已有的教训：主包与 `yue-media` 曾有模块级循环依赖导致发布互等死锁，且 `mooncakes` 同版本不可重发。
 6. **基线依赖消费方给回调**：`set_baseline` 未设置的叶子一律不参与基线分组——libyue 集成时文本控件必须同时接 measure 与 baseline，否则文字混排会退化成顶部对齐。
+7. **比例项在默认 stretch 容器里交叉轴不按比例**（规范直译，见 §5 第 12 条）：集成方若要「等比方块」语义，得显式给 `align-self` 非 stretch 或直接给交叉尺寸；另外绝对定位子项不吃比例。
 
 ---
 
@@ -224,7 +228,7 @@ cd <副本> && ~/.moon/bin/moon check && ~/.moon/bin/moon test    # 全仓门控
 ## 11. 接手后 10 分钟动作清单
 
 1. `cd /home/lkyh/ownCode/moonbit-libyue-native && git fetch && git status`——确认在 `feature/yoga-mbt` 且与 origin 一致、工作区干净。
-2. `~/.moon/bin/moon check && ~/.moon/bin/moon test`——确认基线 701/701（若数字不同，先查是不是另一会话又推了新提交）。
+2. `~/.moon/bin/moon check && ~/.moon/bin/moon test`——确认基线 708/708（若数字不同，先查是不是另一会话又推了新提交）。
 3. 读 `modules/yoga-mbt/README.md` + 本文 §3 / §5 / §6。
-4. 认领 §8 的 YG2c（aspect-ratio）——动手前先向用户确认「比例作用在 border-box 还是 content-box」，再按「先写测试预期 → 改代码 → 三类检查 → 回写文档 → 提交推送」的节奏推进。
+4. 认领 §8 的 YG2d（RTL direction）——按「先补 LTR 快照测试 → 先写测试预期 → 改代码 → 三类检查 → 回写文档 → 提交推送」的节奏推进；顺手评估要不要先把绝对定位项的比例换算补齐。
 5. 发现本文与代码/事实不一致 → **以代码为准**，并顺手把本文改成正确的（本文也受「一批一提交」纪律约束）。

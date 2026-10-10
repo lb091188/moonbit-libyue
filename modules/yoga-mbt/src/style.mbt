@@ -23,6 +23,7 @@ pub struct Style {
   mut min_height : Value
   mut max_width : Value
   mut max_height : Value
+  mut aspect_ratio : Option[Double]
   margin : Edges
   padding : Edges
   border : Edges
@@ -56,6 +57,7 @@ pub fn Style::new() -> Style {
     min_height : Undefined,
     max_width : Undefined,
     max_height : Undefined,
+    aspect_ratio : None,
     margin : Edges::zero(),
     padding : Edges::zero(),
     border : Edges::zero(),

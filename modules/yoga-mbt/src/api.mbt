@@ -148,6 +148,17 @@ pub fn Node::set_max_height(self : Node, v : Value) -> Unit {
 }
 
 ///|
+/// 首选宽高比。比例语义为 **border-box**：`ratio = 边框盒宽 / 边框盒高`
+/// （与 CSS 默认的 content-box 比例不同）。一个轴尺寸确定时，另一个轴按
+/// 比例换算；`None` 表示不设比例，非正数视同 `None`。
+pub fn Node::set_aspect_ratio(self : Node, ratio : Option[Double]) -> Unit {
+  self.style.aspect_ratio = match ratio {
+    Some(r) => if r > 0.0 { Some(r) } else { None }
+    None => None
+  }
+}
+
+///|
 pub fn Node::set_margin_left(self : Node, v : Value) -> Unit {
   self.style.margin.left = v
 }
