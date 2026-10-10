@@ -136,6 +136,17 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 修复(批次顺序即循环依赖规避):①markdown 先搬——它调 components 的 code_view,晚搬则核心→components→核心成环;②components——前置手术是把 `hand()` 光标助手从 components.mbt 提入核心并 pub(charts_interactive 跨包引用它,charts 后搬),主题块约 17 个私有 getter 及 bind_fg/bind_entry_theme/entry_ctrl_height 被 20+ 文件跨包引用,按需 pub 化;③icons;④charts(charts_wbtest.mbt 自带 extern "C",moon.pkg 须 targets 声明 native-only);⑤declarative——前置手术两步:Node 协议(struct Node + attach)从 declarative.mbt 抽留核心 yue/node.mbt(否则 components/icons/markdown/charts 四包对 Node 的无前缀引用全要改),signals.mbt 末尾的 `bind()`(内部调 bind_label)随 bind_label 迁入 declarative 包;⑥system——打开外部 `open_url`(system.mbt)与托盘 tray.mbt 留核心(markdown 的链接点击依赖 open_url,procrun 随系统层走);⑦版本收口 0.5.11:moon.mod、yue/version.mbt、modules/yue-media 钉版三处同步(prebuild 构建期校验一致,不一致 moon build 直接失败)。
 - 验证方式与教训:每批 moon check 零警告 + moon test 全量 + moon build examples/showcase 与 sysmonitor;独立验收员只读审 git diff(符号逐位等价、moon.pkg 卫生、无夹带)。**教训:门控漏了 systemprobe**——批处理提交后,已推送的树 systemprobe 构建 15 处断链(导入适配留在工作区未随批提交),hello/hello-themed 不受影响故双示例门控无感;用 `git stash` 在已提交态实测才发现。拆包类改动的门控必须覆盖全部示例,提交范围须以 git status 逐批核对(并行工作流的未提交文件极易被整文件提交扫入)。
 
+### mooncakes 发布:模块级循环依赖死锁与发布产物校验(0.5.11 / yue-media 0.1.0 / ffmpeg-mbt 0.1.0,2026-10)
+
+- 环境:moon 0.1.20260920 / moonc v0.10.14,Ubuntu 24.04,mooncakes 已登录(~/.moon/credentials.json)。
+- 机制(实测):`moon publish` 打包后把 zip 解到**临时目录独立**再跑一次 `moon check`(脱离 moon.work,依赖全部从 registry 同步),过了才上传;`--frozen` 不跳过该步(实测仍报 Failed to resolve),`--dry-run` 零副作用预检(服务器 202 Accepted,而 CLI 仍打印 `Error: moon publish failed`,属正常输出非失败)。
+- 现象(发布死锁):主包 moon.mod import yue-media@0.1.0、yue-media import moonbit-libyue@0.5.11 时,两侧发布校验都在 registry 找对方版本 → 谁先发都报 `Failed to resolve registry dependency ...: no version satisfies requirement / module was not found in the registry`。**模块级依赖须是 DAG,发布顺序即拓扑序;环内成员无法引导发布(无 unpublish 引导通道)。**
+- 根因与修复:环由「示例依赖可选扩展包」引入——systemprobe(示例)用 yue-media,主包为让示例可编译把媒体包写进自己的 moon.mod,而 yue-media 依赖主包。修复按依赖性质拆模块:示例移出主包成立 `modules/yue-examples`(依赖 主包/yue-media/ffmpeg-mbt 三个已发布包),主包 moon.mod 去掉媒体包 import;发布顺序 ffmpeg-mbt(无依赖)→ moonbit-libyue → yue-media。**模块内子包(yue/browser 模式)不解决依赖面:实例来源=mooncakes deps 是模块级声明,子包被 import 一样进发布闭包,隔离依赖闭包只能拆模块**(与「按包拆分」节 `yue/browser` 结论同源)。
+- 注册表硬校验:`license` 必填,缺则整包 400 Bad Request(`The license field is required in the module config file`);readme/repository 缺失只告警(`Warning: 'readme' field is not set ...`),但包页与文档站展示依赖它们,照补;description/keywords 同理。
+- 发布前置(需人工确认的两条):发布必须在发布分支(本次误在特性分支发过 ffmpeg-mbt@0.1.0,事后核对 master 与分支源码零差异、registry 包与本地逐文件一致——仅生成物 `pkg.generated.mbti` 不入包属正常——才判定无影响);**同模块同版本不可重发**,改动后须升版本号。
+- 消费方验证方法(必做,不以"发布成功"自证):新建临时模块,写三个 import + 一个调用 yue-media API 的包,`moon check` 零错误零警告即证明发布闭包可解析可编译;registry 索引有缓存,新发布包须先 `moon update`,否则报 `module was not found in the registry`(本机两次命中)。
+- 迁到发布分支时:发布相关提交 cherry-pick 到 master 必冲突于 `moon.work`(两分支成员表不同),按目标分支实际存在的成员解决后 `--continue`;门控口径=moon check 零警告 + 全量测试(master 661/661,含 yoga-mbt 子包的特性分支 680/680)。
+
 ## Linux
 
 ### 发行版
