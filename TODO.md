@@ -75,7 +75,9 @@
 - [ ] 代码高亮、终端模拟器、WebGL 画布（旧栈即无，列为待评估）
 
 ### 系统集成（master 参考面：`yue/system` 31 源文件 + `yue/traybus` 16 源文件，属可平移资产）
-- [ ] A 类平移 · 环境/文件原语：`envx`/`fsx`/`dialog`（文件对话框与文本读写）/`procrun`/`singleinstance`/`vscjson`
+- [~] A 类平移 · 环境/文件原语
+  - [x] `vscjson` → 新包 `yue/sys/json.mbt`（零依赖 JSON，公共名不变、只换包前缀），并按「每包自建 wbtest」补 7 条覆盖
+  - [ ] `envx`/`fsx`（目录枚举与环境变量写删要 C 层）与 `dialog`/`procrun`/`singleinstance` 随各自的 sys stub 批次进来
 - [ ] A 类平移 · 硬件族：`brightness`（含键盘背光）/`volume`（含 volx 音量增强）/`nightlight`/`sensor`/`bluetooth`/`printer`/`disk`/`powerprofile`
 - [ ] A 类平移 · 桌面集成族：`wallpaper`/`defaultapps`/`appfind`/`open_url`+`reveal`（文件管理器定位）/`recent_files`
 - [ ] A 类平移 · 历史族：`browser_history`（含下载）/`browser_bookmarks`/`firefox_history`/`vscode_history`

@@ -1,7 +1,7 @@
-// 最小 JSON 解析器(纯 MoonBit,零依赖):VscJson 值模型 + 手写递归下降解析,
-// 整数保持 Int64 精度(时间戳毫秒值超 Int32 范围);附码点取值助手。
-// system 包的 vscode_history / browser_bookmarks 与 charts 包的 GeoJSON
-// 解析(charts_geo.mbt)共用同一解析器,故置于核心包,消费方经 @yue. 引用。
+// 最小 JSON 解析器（纯 MoonBit，零依赖）：VscJson 值模型 + 手写递归下降解析，
+// 整数保持 Int64 精度（时间戳毫秒值超 Int32 范围）；附码点取值助手。
+// vscode_history / browser_bookmarks 与图表包的 GeoJSON 共用同一解析器。
+// 自 master 线 `yue/vscjson.mbt` 平移，API 名保持不变（消费方改 `@sys.` 前缀）。
 
 // ---------------------------------------------------------------------------
 // 纯函数层:JSON 解析(entries.json / storage.json / GeoJSON 形态)

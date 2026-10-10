@@ -344,6 +344,13 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **本批未做（G6 余项）**：脏区增量重排 + 测量/内在缓存跨布局驻留；`App` 宿主（把 `yue/win` 的原始事件翻成本层 `PointerEvent`/`KeyEvent`、以及 present 循环的收包方）随声明式层 G7 一起落。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/core` 22/22（新增 7 条：绝对矩形折算含父 padding、命中取最深/后画优先/出界与零尺寸与隐藏不命中、指针本地化与三级冒泡与消费即停、带偏移树的本地坐标 (12,45)→(12,15)、滚轮冒泡到容器且出界不路由、按键按焦点 id 定位并冒泡且隐藏后不可达、绘制遍历的平移与裁剪（子控件越界部分不留色）+ 隐藏子树不绘制）；`moon check yue/{core,input,render,text,win}` 与示例 `--deny-warn` 零警告；yoga-mbt 81/81；全仓红点仍 287 errors / 68 warnings。
 
+### MoonBit 原生 GUI 栈 · `yue/sys` 起包（JSON 解析器平移 + 本包自建测试）
+
+- **落点**：新栈的系统能力包按方案 §2 命名 `yue/sys`。第一个资产是零依赖 JSON 解析器——master 线 `yue/vscjson.mbt` 整段搬入（公共名 `VscJson`/`vsc_json_parse`/`vsc_json_get`/`vsc_json_str`/`vsc_json_int64`/`vsc_hex_val`/`vsc_codepoint_at` 一律不改，消费方只把包前缀从 `@yue.` 换成 `@sys.`），搬完根包少一个文件，红点数不变（该文件本就无错）。
+- **覆盖补齐**：旧链路里这个解析器**没有独立测试**（覆盖散在 `vscode_history`/`browser_bookmarks` 的用例中），按「新栈每包自建 wbtest」的基线补 7 条：标量与类型门、Int64 毫秒时间戳精度、嵌套结构链式取值、字符串转义（常规 / `\u` / 代理对 / 孤立代理→U+FFFD / 未闭合 / 坏 `\u`）、9 条语法错误全拒 + 松散空白对照、GeoJSON 取点路径、十六进制与码点助手。
+- **两条实测口径（写测试时踩出来的）**：① 本工具链的 `String.unsafe_get(i)` 返回的是 **UTF-16 码元**而不是码点——`vsc_codepoint_at("😀", 0)` 给 `(0x1F600, 2)`，这个「代理对合并」助手存在的意义正在于此；② 整值浮点转 Int64 的 2^53 门是拿**取整后的 double 值**判定的，`9007199254740993.0` 这个字面量本身在二进制里就落到 2^53，所以照样放行；要断「超范围拒绝」得用 `1e20` 这一类量级。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/sys` 7/7；`moon check yue/sys --deny-warn` 零警告；全仓红点仍 287 errors / 68 warnings。
+
 ## Linux
 
 ### 发行版
