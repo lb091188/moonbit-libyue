@@ -13,7 +13,7 @@
 /// - `Percent(p)`：相对父容器对应轴内容区尺寸的百分比（p 取 0~100）
 /// - `Auto`：自动（尺寸交给布局算法；margin 的 Auto 有特殊语义：
 ///   在主轴吸收剩余空间，优先级高于 justify-content）
-pub enum Value {
+pub(all) enum Value {
   Undefined
   Fixed(Double)
   Percent(Double)
@@ -36,14 +36,14 @@ pub fn Edges::zero() -> Edges {
 }
 
 ///|
-pub enum Display {
+pub(all) enum Display {
   Flex
   None
 }
 
 ///|
 /// 定位方式。`Absolute` 的子项脱离文档流，包含块为本节点 padding box。
-pub enum PositionType {
+pub(all) enum PositionType {
   Relative
   Absolute
 }
@@ -52,13 +52,13 @@ pub enum PositionType {
 /// 书写方向。决定本节点排布**子项**时的轴向起端：行容器主轴起端
 /// （`Ltr` 在左 / `Rtl` 在右）与列容器交叉轴起端（`Ltr` 在左 / `Rtl` 在右）。
 /// 本引擎按节点独立生效，不做继承（不做 CSS 的 direction 继承链）。
-pub enum Direction {
+pub(all) enum Direction {
   Ltr
   Rtl
 }
 
 ///|
-pub enum FlexDirection {
+pub(all) enum FlexDirection {
   Row
   RowReverse
   Column
@@ -66,14 +66,14 @@ pub enum FlexDirection {
 }
 
 ///|
-pub enum FlexWrap {
+pub(all) enum FlexWrap {
   NoWrap
   Wrap
   WrapReverse
 }
 
 ///|
-pub enum JustifyContent {
+pub(all) enum JustifyContent {
   FlexStart
   FlexEnd
   Center
@@ -86,7 +86,7 @@ pub enum JustifyContent {
 /// 交叉轴对齐。`Baseline` 只在主轴为行方向（`Row` / `RowReverse`）时生效
 /// （规范要求项的 inline 轴平行于主轴）；无基线的项按 `FlexStart` 处理。
 /// 基线由叶子节点的 `set_baseline` 提供，或由容器节点按规范从内部项推出。
-pub enum AlignItems {
+pub(all) enum AlignItems {
   Stretch
   FlexStart
   FlexEnd
@@ -96,7 +96,7 @@ pub enum AlignItems {
 
 ///|
 /// 多行容器的整行分布对齐（align-content）。
-pub enum AlignContent {
+pub(all) enum AlignContent {
   Stretch
   FlexStart
   FlexEnd

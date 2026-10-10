@@ -57,6 +57,8 @@ let l = child.layout()   // left / top 相对父边框盒；width / height 边�
   top/right/bottom/left 仍是物理边，其「起端 / 末端」含义随方向换算。
 - 根节点宽高是 `Option[Double]`，`None` 表示该方向不约束、按内容取尺寸；
   需要撑满可用空间时给根设置 `percent(100.0)`。
+- 样式枚举可直接传入：`node.set_flex_direction(@yoga.FlexDirection::Column)`
+  或简写 `@yoga.Column`（枚举按 `pub(all)` 导出，外部包可构造）。
 - 布局结果 `node.layout()` 需在 `calculate_layout` 之后读取。
 
 ## 已实现
@@ -91,4 +93,10 @@ aspect-ratio（`set_aspect_ratio`，比例语义为 border-box：一轴确定 �
 cd modules/yoga-mbt
 moon check   # 零警告
 moon test    # 全绿（预期值按规范手算）
+
+# 性能基线：1121 节点树（20 组 × 11 行 × 每行 5 节点，含 baseline/grow/gap）
+moon run bench            # debug
+moon run --release bench  # release
+# 把 bench/main.mbt 的 rounds 改成 0 再跑一次，即「进程 + 建树」基线，
+# 两次差值除以轮数就是每轮布局成本
 ```
