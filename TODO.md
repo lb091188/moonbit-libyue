@@ -24,7 +24,8 @@
   - `TextEditorHost` 抽象收口（四签名 `process_key`/`commit`/`preedit`/`set_cursor_rect`）
 - [ ] **G6** 布局层承接
   - 脏区增量重排 + 测量/内在缓存跨布局驻留
-  - `patches/` 的 yoga bug 语料转回归用例（首条 `93078300`：`display:none` 清零重显后 flex 简写 basis-0 永久驻留 → auto 高父容器下节点永久 0 高）
+  - [x] `patches/` 的 yoga bug 语料转回归用例：首条 `93078300` 已落成 `modules/yoga-mbt/src/patches_regression_wbtest.mbt`（守的是可观察契约——auto 高列容器下的弹性项隐藏/重显一轮后高度仍来自内容测量；本引擎无 Yoga 那条 computedFlexBasis 驻留路径）
+  - [ ] 语料派生待查：显式 `flex-basis:0` + `min-height:0` 在 auto 高列容器下本引擎给 60、按 CSS 推导应为 0，需 Chrome 对照后再定修引擎还是记为取舍（涉及 §4.5 min:auto 与 auto 主轴尺寸推算的交互）
   - 布局树 ↔ 自绘控件树映射、命中测试坐标对齐
 - [ ] **G7** 声明式层与组件宿主接线（`mount` 目标从 `View` 换 yoga-mbt 节点；恢复全仓门禁）
 - [ ] **G8** 原生子表面通道与其消费者（见 §4「浏览器」「视频」）
