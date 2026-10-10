@@ -15,6 +15,7 @@ license = "MIT"
 repository = "https://github.com/lb091188/moonbit-libyue"
 
 import {
+  "NoahLiu/yoga-mbt@0.1.0",
   "chensuiyi/subproc@0.3.0",
   "prowk/moonsqlitefile@0.8.0",
   "mizchi/markdown@0.8.3",

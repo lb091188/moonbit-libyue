@@ -22,11 +22,11 @@
   - macOS：`NSTextInputClient`（前置：有 mac 真机）
   - 肉眼确认项：preedit 下划线观感、候选窗是否贴组合串末尾、点击定位与 caret 闪烁观感
   - `TextEditorHost` 抽象收口（四签名 `process_key`/`commit`/`preedit`/`set_cursor_rect`）
-- [ ] **G6** 布局层承接
-  - 脏区增量重排 + 测量/内在缓存跨布局驻留
+- [~] **G6** 布局层承接
+  - [ ] 脏区增量重排 + 测量/内在缓存跨布局驻留
+  - [x] 控件宿主（`yue/core/widget.mbt`）：布局树 ↔ 控件树映射、绝对矩形只在 `collect_abs` 一处折算、命中（最深+后画优先）、指针/滚轮/按键沿祖先链冒泡、绘制逐层 translate+clip；yoga-mbt 首次进主包依赖；真窗口用 xdotool 点击四格回证 `band_h=1/1/1/1`（core 22/22）
   - [x] `patches/` 的 yoga bug 语料转回归用例：首条 `93078300` 已落成 `modules/yoga-mbt/src/patches_regression_wbtest.mbt`（守的是可观察契约——auto 高列容器下的弹性项隐藏/重显一轮后高度仍来自内容测量；本引擎无 Yoga 那条 computedFlexBasis 驻留路径）
   - [x] 语料派生结案：Chrome 实测口径 = auto 主轴尺寸取各子项**假想主轴尺寸之和**（growth 不参与）；根因是引擎把子项基准读成了容器的 `flex_basis`（子项 flex-basis 全程失效），已修并落 7 行 Chrome 矩阵回归（`patches_regression_wbtest.mbt`）
-  - 布局树 ↔ 自绘控件树映射、命中测试坐标对齐
 - [ ] **G7** 声明式层与组件宿主接线（`mount` 目标从 `View` 换 yoga-mbt 节点；恢复全仓门禁）
 - [ ] **G8** 原生子表面通道与其消费者（见 §4「浏览器」「视频」）
 

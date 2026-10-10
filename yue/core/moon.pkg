@@ -1,2 +1,10 @@
 // 循环归 MoonBit（不用 gtk_main）：本包只做「什么时候干什么」的调度，
 // 平台泵（G2 的 yue/win）负责等事件并把单调时钟读数交给 advance。
+// widget.mbt 是自绘控件宿主：布局树映射、命中测试、事件路由与绘制遍历。
+
+supported_targets = "native"
+
+import {
+  "NoahLiu/yoga-mbt/src" @yoga,
+  "NoahLiu/moonbit-libyue/yue/render",
+}
