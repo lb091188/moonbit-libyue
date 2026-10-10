@@ -45,7 +45,8 @@
 // Chromium/Qt 同款用法）；未声明于公开头，链接符号在 libAXRuntime
 using yue_mbt::BytesFromString;
 
-extern "C" int32_t _AXUIElementGetWindow(void *window, uint32_t *id);
+// 私有 API 的准确签名（Chromium 同款；SDK 公开头不含，符号在 HIServices）
+extern "C" int _AXUIElementGetWindow(AXUIElementRef window, CGWindowID *window_id);
 
 namespace {
 
@@ -395,7 +396,7 @@ AudioDeviceID mbt_default_output() {
   UInt32 size = sizeof(dev);
   AudioObjectPropertyAddress addr = {
       kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal,
-      kAudioElementMaster};
+      kAudioObjectPropertyElementMaster};
   OSStatus st = AudioObjectGetPropertyData(kAudioObjectSystemObject, &addr, 0,
                                            nullptr, &size, &dev);
   if (st != noErr || dev == kAudioObjectUnknown || dev == 0) {
@@ -409,7 +410,7 @@ bool mbt_has_master_volume(AudioDeviceID dev) {
   UInt32 size = 0;
   AudioObjectPropertyAddress addr = {
       kAudioDevicePropertyVolumeScalar, kAudioObjectPropertyScopeOutput,
-      kAudioElementMaster};
+      kAudioObjectPropertyElementMaster};
   if (AudioObjectGetPropertyDataSize(dev, &addr, 0, nullptr, &size) !=
       noErr) {
     return false;
@@ -431,7 +432,7 @@ extern "C" int32_t yue_mbt_vol_master(double *level_out, int32_t *muted_out,
     UInt32 size = sizeof(level);
     AudioObjectPropertyAddress addr = {
         kAudioDevicePropertyVolumeScalar, kAudioObjectPropertyScopeOutput,
-        kAudioElementMaster};
+        kAudioObjectPropertyElementMaster};
     if (AudioObjectGetPropertyData(dev, &addr, 0, nullptr, &size,
                                    &level) != noErr) {
       return -1;
@@ -463,7 +464,7 @@ extern "C" int32_t yue_mbt_vol_set_master(double level, int32_t *ok) {
     Float32 v = static_cast<Float32>(level);
     AudioObjectPropertyAddress addr = {
         kAudioDevicePropertyVolumeScalar, kAudioObjectPropertyScopeOutput,
-        kAudioElementMaster};
+        kAudioObjectPropertyElementMaster};
     if (AudioObjectSetPropertyData(dev, &addr, 0, nullptr, sizeof(v), &v) !=
         noErr) {
       return -1;
@@ -484,7 +485,7 @@ extern "C" int32_t yue_mbt_vol_set_mute(int32_t mute, int32_t *ok) {
     UInt32 size = 0;
     AudioObjectPropertyAddress addr = {
         kAudioDevicePropertyMute, kAudioObjectPropertyScopeOutput,
-        kAudioElementMaster};
+        kAudioObjectPropertyElementMaster};
     // 设备无 mute 通道：不视为错误（Windows 端点恒有，这里如实降级）
     if (AudioObjectGetPropertyDataSize(dev, &addr, 0, nullptr, &size) !=
         noErr) {
@@ -565,7 +566,8 @@ extern "C" void *yue_mbt_mon_list(int32_t *ok) {
       CGDisplayModeRef current = CGDisplayCopyDisplayMode(did);
       for (CFIndex k = 0; k < CFArrayGetCount(modes); k++) {
         CGDisplayModeRef m =
-            static_cast<CGDisplayModeRef>(CFArrayGetValueAtIndex(modes, k));
+            static_cast<CGDisplayModeRef>(const_cast<void *>(
+                CFArrayGetValueAtIndex(modes, k)));
         double hz = CGDisplayModeGetRefreshRate(m);
         // preferred：IO 标志位 native（面板原生分辨率）近似 Windows 的
         // 首选概念；Windows 侧恒 0
@@ -654,17 +656,21 @@ extern "C" void *yue_mbt_prt_queue(const char *printer, int32_t *ok) {
     if (printer == nullptr || printer[0] == 0) {
       return EmptyBytes();
     }
-    cups_job_t *jobs = nullptr;
-    int n = cupsGetJobs(CUPS_HTTP_DEFAULT, printer, 0,
-                        CUPS_WHICHJOBS_ACTIVE, &jobs);
+    // 新 CUPS 的 cupsGetJobs 返回数组本体（dest 为 NULL 的终结项收尾）
+    cups_job_t *jobs =
+        cupsGetJobs(CUPS_HTTP_DEFAULT, printer, 0, CUPS_WHICHJOBS_ACTIVE);
     std::string out;
-    for (int i = 0; i < n; i++) {
-      out += std::to_string(jobs[i].id);
-      out += '\t';
-      out += jobs[i].title != nullptr ? jobs[i].title : "";
-      out += '\n';
-    }
+    int n = 0;
     if (jobs != nullptr) {
+      while (n < 4096 && jobs[n].dest != nullptr) {
+        n++;
+      }
+      for (int i = 0; i < n; i++) {
+        out += std::to_string(jobs[i].id);
+        out += '\t';
+        out += jobs[i].title != nullptr ? jobs[i].title : "";
+        out += '\n';
+      }
       cupsFreeJobs(n, jobs);
     }
     *ok = 1;
@@ -915,8 +921,8 @@ extern "C" void *yue_mbt_assoc_query(const char *assoc, int32_t kind,
       if (url != nil) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        app_url = LSCopyDefaultApplicationURLForURL(url, kLSRolesAll,
-                                                    nullptr);
+        app_url = (__bridge NSURL *)LSCopyDefaultApplicationURLForURL(
+            url, kLSRolesAll, nullptr);
 #pragma clang diagnostic pop
       }
     }
@@ -1017,12 +1023,6 @@ extern "C" int32_t yue_mbt_win_power_status(
     if (blob == nullptr) {
       return -1;
     }
-    // 全局电源状态：AC / Battery / UPS
-    CFStringRef src = IOPSGetPowerSourceState(blob);
-    *ac_online = src != nullptr &&
-                         CFEqual(src, CFSTR(kIOPSACPowerValue))
-                     ? 1
-                     : 0;
     CFArrayRef list = IOPSCopyPowerSourcesList(blob);
     if (list == nullptr) {
       CFRelease(blob);
@@ -1040,6 +1040,12 @@ extern "C" int32_t yue_mbt_win_power_status(
               desc, CFSTR(kIOPSIsPresentKey)));
       if (present == nullptr || !CFBooleanGetValue(present)) {
         continue;
+      }
+      // 各电源源自报状态：内部电池接交流时为 kIOPSACPowerValue
+      CFStringRef state = static_cast<CFStringRef>(CFDictionaryGetValue(
+          desc, CFSTR(kIOPSPowerSourceStateKey)));
+      if (state != nullptr && CFEqual(state, CFSTR(kIOPSACPowerValue))) {
+        *ac_online = 1;
       }
       CFStringRef type = static_cast<CFStringRef>(CFDictionaryGetValue(
           desc, CFSTR(kIOPSTypeKey)));
