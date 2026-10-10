@@ -257,4 +257,7 @@ pub fn calculate_layout(
   let _ = layout_into(root, width, height, None, None)
   root.layout_left = 0.0
   root.layout_top = 0.0
+  if root.pixel_grid > 0.0 {
+    round_to_grid(root, root.pixel_grid, 0.0, 0.0, 0.0, 0.0)
+  }
 }

@@ -60,6 +60,11 @@ let l = child.layout()   // left / top 相对父边框盒；width / height 边�
 - 样式枚举可直接传入：`node.set_flex_direction(@yoga.FlexDirection::Column)`
   或简写 `@yoga.Column`（枚举按 `pub(all)` 导出，外部包可构造）。
 - 布局结果 `node.layout()` 需在 `calculate_layout` 之后读取。
+- `set_pixel_grid(1.0)` 打开像素网格取整（只对**作为布局根**的节点生效，
+  `0.0` / 负数为关闭）：布局结束后按绝对边框取整再回推相对坐标，等分
+  `100 / 3` 会得到 `33 / 34 / 33` 这类和为总宽的整数尺寸，相邻项共用边
+  取整一致故不留缝。不做 Yoga 的贴父末端回推补偿，因此贴到容器内缘尽头
+  的项，其取整后的末端边与父内缘可能差一个网格单位以内。
 - 改样式后直接再调一次 `calculate_layout` 即可：引擎内部有测量缓存，但每次
   布局入口会自动整树清一次，不需要手动通知失效。
 
@@ -81,11 +86,13 @@ aspect-ratio（`set_aspect_ratio`，比例语义为 border-box：一轴确定 �
 换算，容器自身尺寸同理；`min:auto` 不超过换算值；绝对定位子项同样按比例
 互推（显式尺寸或两侧 inset 撑出的一轴为源））、RTL
 （`set_direction(Rtl)`：主轴 / 交叉轴起端按方向翻转，margin、auto margin、
-绝对定位静态位置随之换算）。
+绝对定位静态位置随之换算）、像素网格取整（`set_pixel_grid`，根节点开关，
+按绝对边框取整后回推相对坐标）。
 
 ## 未实现（按批次补）
 
-- 测量缓存（Yoga 的 16 槽缓存）与像素网格取整
+- 测量缓存的跨布局复用（当前缓存只在单次 `calculate_layout` 内有效，
+  入口整树清空；脏区增量重排留给与 libyue 集成那批）
 - 容器内在尺寸（min-content / max-content）的精确语义（当前 fit-content
   近似）
 
