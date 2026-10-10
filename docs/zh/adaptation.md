@@ -306,6 +306,15 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **环境观察（避免误判）**：示例退出行的 `seen` 计数含**指针移动**事件（motion 的 code 4 同样走输入队列），冒烟时鼠标停在窗口上会看到 `seen` 非 0 而文本不变，属预期，不是「按键乱入」。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/icons` 4/4；`moon check yue/icons` 零警告；`examples/native-window` 冒烟 49 帧、退出码 0（示例新增一排五个矢量图标）。
 
+### MoonBit 原生 GUI 栈 · 字体与富文本子系统（Font / TextFormat / AttributedText）
+
+- **面**：`Font`（族名 + 逻辑像素字号 + 9 档字重 + 斜体；字重数值就是 CSS 的 100..900，直传 Pango 的 `PangoWeight`）、`TextAlign`/`TextFormat`/`TextAttributes`/`SizeF`/`AttributedText`（本批为**整体属性**面：字体、颜色、对齐、换行、省略、`get_bounds_for`、`set_text`/`get_text`/`clear`）。区间属性（`set_font_for`/`set_color_for`）要把范围挂进 Pango attribute list，留次批。
+- **绘制入口按包边界放 `yue/text`**（`draw_in_box`/`draw_font`），不做 `Painter::draw_text` 方法：MoonBit 不能给外包类型加方法（render 也不能反向依赖 text）。组件层接线时调用点从旧契约的 `p.draw_text(..)` 改 `@text.draw_in_box(p.bitmap, ..)` 形态，属 G7 的定点改写。
+- **坑（语义级，探针实测抓出）**：`wrap=false` 此前**根本未生效**——Pango 只要 `pango_layout_set_width` 就按默认 `WRAP_WORD` 折行（实测：120px 宽 + 不带换行标志，长文本仍折成 4 行 88px）。修法：宽度只在「要换行或要省略」时才交给 Pango；单行不省略时按自然宽绘制（可溢出盒界），盒内对齐改为自己算偏移（与垂直对齐同一套写法）。这也纠正了旧文档「定高行内长文本会溢出行界」的说法——它其实是折行。
+- **坑（FFI 原型要三处同批改）**：给 `pt_font_line_height` 加 weight/italic 时只改了 MoonBit extern 与 portable 占位，**真实现**（`pango_stub.c`）还是 4 参——多传的实参按调用约定落进 `out_h` 指针位，症状不是崩而是「行高断言莫名变假」。规则：改 FFI 签名 = moon extern + 真实现 + portable 占位三处一起。
+- **坑（本工具链派生 trait 是弃用路径）**：`pub(all) enum X { .. } derive(Eq)` 触发 `implicit_impl_as_method` 弃用警告（`equal`/`not_equal` 被隐式提升为普通方法）；把 `derive(Eq)` 写在枚举名之后更是直接编译错（正确位置是 `}` 之后）。为守住零警告，本批不派生 trait，测试用包内 id 映射比较枚举（`align_id`/`weight_value`）。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/text` 14/14（新增 7 条：`wrap=false` 单行自然宽与 `wrap=true` 的高度对照、省略宽度受钳、粗体不窄于常规、盒内水平/垂直对齐落点与居中、`AttributedText` 属性面与包围盒、`new_with`/`format` 往返）；`moon check yue/text` 零警告；`examples/native-window` 冒烟 49 帧、退出码 0（示例新增居中粗体标题，把 Font/TextAlign/AttributedText 跑了一遍）。
+
 ## Linux
 
 ### 发行版
