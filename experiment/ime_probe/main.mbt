@@ -203,11 +203,15 @@ fn caret_prefix() -> Bytes {
 /// 把当前状态推给 C 显示，并把插入点矩形交给输入法（候选窗定位的关键）
 fn push_display() -> Unit {
   let t = text.val
+  // 只推已提交文本：组合串由 C 侧单独画（拼接与下划线都在那边），
+  // 两边都拼就会显示两份——本探针真机踩过这个坑。
+  ip_set_display(t, t.length(), caret.val)
+  ip_set_surrounding(t, t.length(), caret.val)
+  // 插入符矩形要落在「已提交前缀 + 组合串」之后，候选窗才会贴着组合串末尾
   let pre = if preedit_active.val { preedit.val } else { Bytes::make(0, 0) }
-  let shown = splice(t, t.length(), pre, Bytes::make(0, 0), 0)
-  ip_set_display(shown, shown.length(), caret.val)
   let pfx = caret_prefix()
-  let px = ip_measure(pfx, pfx.length())
+  let full = splice(pfx, pfx.length(), pre, Bytes::make(0, 0), 0)
+  let px = ip_measure(full, full.length())
   let lh = ip_line_height()
   ip_set_cursor_rect(24 + px.to_int(), 22, 1, lh.to_int())
 }

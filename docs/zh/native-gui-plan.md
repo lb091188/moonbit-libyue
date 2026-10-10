@@ -37,7 +37,7 @@
 
 | 平台 | 后端 | 系统 API | 状态权威 | 兜底 |
 |---|---|---|---|---|
-| Linux | **B 纯通道** | `gtk_im_multicontext_new` + `gtk_im_context_filter_keypress` + `commit`/`preedit-*` 信号 + `gtk_im_context_set_cursor_location` | 单状态（自绘编辑器） | 无 |
+| Linux | **B 纯通道（真机已闭环）** | `gtk_im_multicontext_new` + `filter_keypress` + `commit`/`preedit-*` 信号 + `set_cursor_location`；**四条件缺一不可**：`focus_in/out` 随焦点同步、按键挂焦点控件层、每拍 `set_surrounding`（已提交文本 + UTF-8 字节光标）、`use_preedit=TRUE`（语义＝用 preedit 串做内联反馈）；组合串只在一处拼接（绘制侧，正文不带线、组合串带线） | 单状态（自绘编辑器） | 无（ibus 未装未测） |
 | Windows | **B 优先** | 无文本子窗口 + `ImmAssociateContext`；`WM_IME_COMPOSITION` 读 `GCS_COMPSTR`/`GCS_RESULTSTR`，`ImmSetCompositionWindow`/`ImmSetCandidateWindow` 定位 | 单状态 | **C**：可见 `EDIT` 子窗口（用于只走 TSF、legacy 通道打不出中文的 IME） |
 | macOS | **C 先行** | `NSTextField`（borderless + `drawsBackground=NO` + `textColor`/`font` + `focusRingType=None`），marked text 由系统显示 | 控件持有 | 待有 mac 真机后升级为 **B**（自研 `NSTextInputClient`） |
 
@@ -74,7 +74,7 @@ set_cursor_rect(x, y, w, h)
 
 | 阶段 | 内容 | 验收 |
 |---|---|---|
-| **G0** | **Linux IME spike**（`experiment/ime_probe`，纯通道 `GtkIMContext` 与可见 `GtkEntry` 两模式同二进制切换）——**探针已落地**（`5a79180`：循环所有权在 MoonBit、preedit 与插入符全自绘、光标按 UTF-8 字节自管；实测「22px 盒子的 GtkEntry 被主题撑到 33、加 `min-height:0` 后 24」已记档） | **真机已回证（fcitx5）**：补 `gtk_im_context_focus_in`（未调时 `GtkIMMulticontext` 落回内建 Simple 上下文，每键直commit、preedit 恒 0）后**中文 commit 路径可用**；顶层 focus-in/out 需同步以丢残留组合串；**preedit 内联仍缺**（探针挂法问题，非输入法侧）。ibus 一套与 preedit 复验待补。结论入 `adaptation.md`「G0 · 真机回证」条 |
+| **G0** | **Linux IME spike**（`experiment/ime_probe`，纯通道 `GtkIMContext` 与可见 `GtkEntry` 两模式同二进制切换）——**探针已落地**（`5a79180`：循环所有权在 MoonBit、preedit 与插入符全自绘、光标按 UTF-8 字节自管；实测「22px 盒子的 GtkEntry 被主题撑到 33、加 `min-height:0` 后 24」已记档） | **真机已回证（fcitx5）**：补 `gtk_im_context_focus_in`（未调时 `GtkIMMulticontext` 落回内建 Simple 上下文，每键直commit、preedit 恒 0）后**中文 commit 路径可用**；顶层 focus-in/out 需同步以丢残留组合串；**preedit 内联已闭环**（四条件 + 组合串单处拼接，详见 §3 表与 adaptation；主体重复显示曾疑输入法、实为探针两处拼接）。ibus 未装未测。结论入 `adaptation.md`「G0 · 真机回证」条 |
 | **G0b** | 绑定层摘除与目录重排：删 §2 清单里的 FFI 绑定文件与 `shim/`、`lib/`、`vendor/` 构建链，建 `yue/{win,core,render,text,input,sys}` 骨架 | 新栈各包可 `moon check`；全仓红点清单成文，此后**只减不增** |
 | **G1** | 绘制契约 + 离屏回归：`Painter` 矩形级子集签名定稿、`Bitmap`、yoga-mbt 盒子→像素 | 断言比 RGBA 字节；`moon check` 零警告 |
 | **G2** ✅ | GTK3 窗口地基：建窗、`g_main_context_iteration` 驱动循环（不用 `gtk_main`）、`g_main_context_wakeup` 留跨线程唤醒位、事件全排空、**`mount_child_surface` 接口形状定死**（§4，形状已冻结、实现随首个消费者落地） | 独立进程出图；`open→create→loop→close` 干净退出，无退出期崩溃 |

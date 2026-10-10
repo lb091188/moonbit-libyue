@@ -239,8 +239,11 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **现象**：探针模式 B 下每按一键都直接落成一次 commit、preedit 恒 0，输入法像根本没接管——不是 fcitx5 不工作，而是 `GtkIMMulticontext` 在上下文**未激活**时落回内建的 `GtkIMContextSimple`（只处理 Latin-1，组合串与候选都不走）。
 - **根因**：只调了 `gtk_im_context_set_client_window` 就够了让上下文可用，但**没调 `gtk_im_context_focus_in`**，它一直处于失活态，`filter_keypress` 因此从不消费按键。
 - **修复**：realize 时 `gtk_im_context_focus_in(pr.im)`；顶层窗口 focus-in/out 事件里同步 in/out（失焦必须 `focus_out`，否则输入法侧残留未完成的组合串——即清单第 5 项）。补上后**中文 commit 路径真机可用**。
-- **仍然存在的缺口**：preedit 内联（组合串自绘显示）未达成，定位在探针自身的挂法而非输入法侧；模式 C 的可见 `GtkEntry` 预览行为与 Electron 一致，可作为兜底形态的参照基线。G5 正式实现时按「commit 已通 + preedit 需自己画且需 focus 同步」这两条事实设计，不再重复验证 commit 是否可达。
-- **验证方式**：`moon build experiment/ime_probe` + 两模式冒烟退出码 0（本机，助手侧）；中文可打性由协作方在真机按 README 清单执行并回证。
+- **闭环（同日追加）**：preedit 内联已达成，纯通道**四条件**齐备——①`focus_in`/`focus_out` 随焦点同步；②按键处理挂**焦点控件**层（挂窗口层时事件顺序与消费都不对，这正是与 `GtkEntry` 行为的差别所在）；③每拍 `gtk_im_context_set_surrounding`（只喂已提交文本、光标按 UTF-8 字节）；④`use_preedit=TRUE`——它的语义是「用 preedit 串做内联反馈」，不是「输入法自绘」，一度读反，代价是两轮假阴性。
+- **另一处真机坑（与输入法无关）**：组合串**只能在一处拼接**。探针原先 MoonBit 侧把 preedit 拼进显示串、C 侧绘制时又拼一次，同一段文字显示两份；修法是把拼接与下划线统一收到绘制侧（正文不带线、组合串带线，与 `GtkEntry` 同观感），MoonBit 只推已提交文本。
+- **一处误判要记**：曾按「前端版本错配」怀疑依赖，被模式 C 对照否证（同环境下 `GtkEntry` 预览正常）——真机症状先用参照实现对照，再谈归因。
+- **ibus 未装**：清单中 ibus 两轮标「环境未装 ibus daemon，未测」。
+- **验证方式**：`moon build experiment/ime_probe` + 两模式冒烟退出码 0（助手侧）；真机（fcitx5）由协作方回证：preedit 内联一份带下划线、流水有 `[preedit] changed`、`[commit] 中文` 正常、候选窗贴组合串末尾。
 
 ## Linux
 
