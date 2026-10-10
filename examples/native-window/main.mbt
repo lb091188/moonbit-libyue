@@ -144,6 +144,12 @@ fn draw(
     @icons.draw_icon(p, icon_row[i], cx, 180.0, 11.0, "#cba6f7")
   }
   let note = "帧 \{tick} · 焦点 \{focus_text} · Tab 切换、点击可定位光标"
+  // 富文本面对齐：粗体标题居中于整窗宽（Font/TextAlign/AttributedText 走一遍）
+  let title = @text.AttributedText::new("MoonBit 原生 GUI 栈", align=@text.Center)
+  title.set_font(@text.Font::new("", 16.0, weight=@text.Bold))
+  title.set_color("#cdd6f4")
+  p.flush()
+  let _ = title.draw(bm, 0.0, 240.0, fw, 24.0)
   p.flush()
   let _ = @text.draw_to(bm, 24.0, 30.0, note, 12.0, "#a6adc8")
   p.end()

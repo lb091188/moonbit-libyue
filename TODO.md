@@ -42,7 +42,10 @@
 - [~] 图标（master `yue/icons/icons.mbt` 4297 行）
   - [x] 绘制面平移（`yue/icons`，自 master 前 4197 行逐行搬入、数据块零差异）：803 条定点路径串 + `fill_icon_path` 解释器 + `IconKind`/`icon_name`/`all_icons` + `draw_icon`（含全量出图扫描 4/4）
   - [ ] `icon`/`icon_button_t` 两个声明式包装 + 主题取色跟随（随声明式层 G7）
-- [ ] 字体与富文本子系统：`Font::new`（`FontWeight` 9 档 / `FontStyle`）、字体枚举与回退、`TextAlign`/`TextFormat`/`TextAttributes`、`AttributedText` 语义镜像（区间字体/颜色、`get_bounds_for`、换行/省略/行高）
+- [~] 字体与富文本子系统
+  - [x] 首批：`Font`（族名/字号/9 档字重/斜体）+ `TextAlign`/`TextFormat`/`TextAttributes`/`SizeF` + `AttributedText` **整体属性**面（对齐/换行/省略/`get_bounds_for`）；顺带修正 `wrap=false` 未生效的语义（Pango 一设宽就折行）与 `draw_in_box` 盒内对齐；`yue/text` 14/14
+  - [ ] 次批：`set_font_for`/`set_color_for` **区间属性**（Pango attribute list）、字体枚举与回退（`pango_font_map` 列族）、行高在多字体下的口径
+  - [ ] 绘制入口形态：旧契约的 `Painter::draw_text` 在组件接线（G7）时逐点改 `@text.draw_in_box(p.bitmap, …)`
 
 ### 控件（一律自绘，不再引入原生控件皮肤；家族名对应 master `yue/components/` 九个源文件）
 - [ ] 基础原语：`group`/`scroll`/`separator`/`splitter`/`tab`（yue 根）＋ 按钮 / 复选 / 单选 / 开关 / 滑块 / 进度 / 步进 / 标签 / 分隔线 / 图像 / 图标
