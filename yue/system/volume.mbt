@@ -479,7 +479,7 @@ fn vol_backend() -> VolBackend? {
 /// 当前系统是否支持音量控制（Linux：wpctl 或 pactl 任一可用；Windows：
 /// 默认输出端点可打开）。每次调用真实探测，高频场景请调用方自行缓存。
 pub fn vol_supported() -> Bool {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let level = Ref(0.0)
     let muted = Ref(0)
     let ok = Ref(0)
@@ -497,7 +497,7 @@ pub fn vol_supported() -> Bool {
 /// 为次要信息，取不到置空串不影响音量与静音。Windows 走默认输出端点
 /// （Core Audio 标量音量 0..1 换算百分比，sink 名无对应置空串）。
 pub fn vol_get() -> Result[VolumeInfo, VolumeError] {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let level = Ref(0.0)
     let muted = Ref(0)
     let ok = Ref(0)
@@ -592,7 +592,7 @@ fn vol_apply(prog : String, args : Array[String]) -> Result[Unit, VolumeError] {
 ///|
 /// 设绝对音量（0-100，出界钳制），作用于默认 sink / 默认输出端点。
 pub fn vol_set(percent : Int) -> Result[Unit, VolumeError] {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     return vol_win_apply(vol_clamp_percent(percent).to_double() / 100.0, None)
   }
   match vol_backend() {
@@ -623,7 +623,7 @@ fn vol_win_apply(
 /// Linux 每步量取绝对值交给工具的相对语法执行，Windows 先读当前值加
 /// delta 钳制后设置，最终音量均由后端钳制）。
 pub fn vol_add(delta : Int) -> Result[Unit, VolumeError] {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let cur = match vol_get() {
       Ok(info) => info.volume
       Err(e) => return Err(e)
@@ -639,7 +639,7 @@ pub fn vol_add(delta : Int) -> Result[Unit, VolumeError] {
 ///|
 /// 设 / 取消默认 sink / 默认输出端点静音。
 pub fn vol_set_mute(mute : Bool) -> Result[Unit, VolumeError] {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     return vol_win_apply(0.0, Some(mute))
   }
   match vol_backend() {

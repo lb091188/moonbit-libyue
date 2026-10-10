@@ -643,14 +643,15 @@ fn mon_current_from(infos : Array[MonitorInfo]) -> Array[CurrentOutput] {
 ///|
 /// 枚举全部输出（含未连接）：名称 / 连接状态 / 当前分辨率×刷新率 /
 /// 位置 / 物理尺寸 / 支持的模式列表。Linux 解析 xrandr；Windows 走
-/// EnumDisplayDevices/EnumDisplaySettingsEx（物理毫米尺寸 Windows 无
-/// 直接对应，恒 0）。
+/// EnumDisplayDevices/EnumDisplaySettingsEx；macOS 走 CGDisplay 在线/
+/// 激活两级（连接未点亮 = 仅头行，preferred 取面板 native 标志）。
+/// 物理毫米尺寸 ABI 无字段，三平台恒 0。
 pub fn mon_list() -> Result[Array[MonitorInfo], MonitorError] {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let ok = Ref(0)
     let text = @utf8.decode_lossy(@yue.ffi_mon_list(ok))
     if ok.val != 1 {
-      return Err(CommandFailed("EnumDisplayDevices 失败"))
+      return Err(CommandFailed("显示器枚举失败"))
     }
     let infos = mon_parse_win(text)
     if infos.length() == 0 {

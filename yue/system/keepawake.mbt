@@ -18,12 +18,12 @@ pub fn keep_awake_active() -> Bool {
 let g_keep_awake_held : Ref[Bool] = Ref(false)
 
 ///|
-/// 屏幕常亮是否可用:macOS 暂缓;Linux 看抑制服务是否真实在线(以
-/// NameHasOwner 为准,GNOME/KDE 未装屏保服务时不可用);Windows 恒可用。
+/// 屏幕常亮是否可用:Linux 看抑制服务是否真实在线(以 NameHasOwner 为
+/// 准,GNOME/KDE 未装屏保服务时不可用);Windows/macOS 恒可用。
 pub fn KeepAwake::is_supported() -> Bool {
   match @yue.platform() {
     "linux" => @traybus.inhibit_available()
-    "windows" => true
+    "windows" | "macos" => true
     _ => false
   }
 }
@@ -45,7 +45,7 @@ pub fn KeepAwake::enable(app_id : String) -> Result[KeepAwake, @yue.KeepAwakeErr
         Err(_) => Err(@yue.Failed)
       }
     }
-    "windows" => {
+    "windows" | "macos" => {
       let ok = Ref(0)
       let _ = @yue.ffi_win_keep_awake_enable(ok)
       if ok.val == 1 {
@@ -72,7 +72,7 @@ pub fn KeepAwake::release(_self : KeepAwake) -> Result[Unit, @yue.KeepAwakeError
         }
         Err(_) => Err(@yue.Failed)
       }
-    "windows" => {
+    "windows" | "macos" => {
       let ok = Ref(0)
       let _ = @yue.ffi_win_keep_awake_restore(ok)
       if ok.val == 1 {

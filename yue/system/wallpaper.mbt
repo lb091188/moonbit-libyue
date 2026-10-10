@@ -383,11 +383,11 @@ fn wp_kde_prog() -> String? {
 /// 回退 picture-uri-dark；KDE 走 plasmashell evaluateScript。不认识的
 /// DE / 工具缺失为语义化 Err。
 pub fn wp_get() -> Result[String, WallpaperError] {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let ok = Ref(0)
     let path = wp_trim(@utf8.decode_lossy(@yue.ffi_wallpaper_get(ok)))
     if ok.val != 1 {
-      return Err(CommandFailed("SystemParametersInfo(SPI_GETDESKWALLPAPER)"))
+      return Err(CommandFailed("壁纸读失败"))
     }
     if path == "" {
       return Err(ParseFailed("壁纸未设置"))
@@ -413,13 +413,11 @@ pub fn wp_set(path : String) -> Result[Unit, WallpaperError] {
   if wp_trim(path) == "" {
     return Err(InvalidParam("壁纸路径为空"))
   }
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let ok = Ref(0)
     let _ = @yue.ffi_wallpaper_set(@yue.utf8_bytes(path), ok)
     if ok.val != 1 {
-      return Err(
-        CommandFailed("SystemParametersInfo(SPI_SETDESKWALLPAPER) 失败"),
-      )
+      return Err(CommandFailed("壁纸写失败（路径不存在或被系统拒绝）"))
     }
     return Ok(())
   }

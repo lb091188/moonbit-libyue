@@ -3,11 +3,11 @@
 // 显式不支持);Windows 走最后输入时间;macOS 暂缓。
 
 ///|
-/// 当前平台是否提供空闲查询(macOS 暂缓)。Wayland 会话在 idle_seconds
-/// 里给结构化 Unsupported。
+/// 当前平台是否提供空闲查询。Wayland 会话在 idle_seconds 里给结构化
+/// Unsupported。
 pub fn idle_supported() -> Bool {
   match @yue.platform() {
-    "linux" | "windows" => true
+    "linux" | "windows" | "macos" => true
     _ => false
   }
 }

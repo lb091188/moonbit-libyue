@@ -5529,7 +5529,9 @@ extern "C" void *yue_mbt_dsk_volumes(int32_t *ok) {
   return BytesFromString(out);
 }
 
-#else  // 非 Windows：哨兵桩（MoonBit 层平台门拦截，macOS 暂缓）
+#else  // 非 Windows：哨兵桩（MoonBit 层平台门拦截；Linux 纯 MoonBit 路由
+       // 不经过这些符号，桩仅为链接期符号存在。macOS 直连实现见
+       // yue_system_mac.mm——同名符号由该 TU 提供，此处不编）
 
 extern "C" void *yue_mbt_win_reg_str(int32_t, const char *, const char *,
                                      int32_t *ok) {
@@ -5678,7 +5680,13 @@ extern "C" void *yue_mbt_dsk_volumes(int32_t *ok) {
   return moonbit_make_bytes(0, 0);
 }
 
+extern "C" void *yue_mbt_mac_machine_info(int32_t *ok) {
+  *ok = -1000;
+  return moonbit_make_bytes(0, 0);
+}
+
 #endif  // 系统能力 Windows 直连组平台分支结束
+        // （OS_WIN 实现 + 非 OS_MAC 哨兵桩；OS_MAC 在 yue_system_mac.mm）
 
 
 
@@ -5852,7 +5860,8 @@ extern "C" int32_t yue_mbt_win_keep_awake_restore(int32_t *ok) {
   return 0;
 }
 
-#else  // macOS:暂缓
+#elif !defined(OS_MAC)  // macOS：IOPMAssertion / CGEventSource 在
+                        // yue_system_mac.mm
 
 extern "C" int32_t yue_mbt_idle_seconds_ms(int32_t *ok) {
   *ok = 0;
@@ -5895,7 +5904,8 @@ extern "C" int32_t yue_mbt_win_power_status(
   return 0;
 }
 
-#else  // Linux 电源查询走 DBus UPower（MoonBit 层），非 Windows 哨兵
+#elif !defined(OS_MAC)  // Linux 电源查询走 DBus UPower（MoonBit 层），非
+                        // Windows 哨兵；macOS IOPS 在 yue_system_mac.mm
 
 extern "C" int32_t yue_mbt_win_power_status(
     int32_t *ac_online, int32_t *percent, int32_t *charging,

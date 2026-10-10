@@ -16,7 +16,7 @@ pub struct BatteryInfo {
 pub fn battery_supported() -> Bool {
   match @yue.platform() {
     "linux" => @traybus.upower_available()
-    "windows" => true
+    "windows" | "macos" => true
     _ => false
   }
 }
@@ -52,14 +52,14 @@ pub fn battery_query() -> Result[BatteryInfo?, @yue.PowerError] {
         Err(e) => Err(@yue.QueryFailed(e))
       }
     }
-    "windows" => {
+    "windows" | "macos" => {
       let ac = Ref(0)
       let percent = Ref(0)
       let charging = Ref(0)
       let has = Ref(0)
       let r = @yue.ffi_win_power_status(ac, percent, charging, has)
       if r != 0 {
-        return Err(@yue.QueryFailed("GetSystemPowerStatus 失败"))
+        return Err(@yue.QueryFailed("电源状态查询失败"))
       }
       if has.val != 1 {
         return Ok(None)
@@ -125,14 +125,14 @@ pub fn power_source() -> Result[PowerSource, @yue.PowerError] {
         Err(e) => Err(@yue.QueryFailed(e))
       }
     }
-    "windows" => {
+    "windows" | "macos" => {
       let ac = Ref(0)
       let percent = Ref(0)
       let charging = Ref(0)
       let has = Ref(0)
       let r = @yue.ffi_win_power_status(ac, percent, charging, has)
       if r != 0 {
-        return Err(@yue.QueryFailed("GetSystemPowerStatus 失败"))
+        return Err(@yue.QueryFailed("电源状态查询失败"))
       }
       Ok(if ac.val == 1 { Ac } else { OnBattery })
     }
