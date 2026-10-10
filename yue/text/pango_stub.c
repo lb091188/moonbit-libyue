@@ -70,6 +70,41 @@ int pt_measure(const char *text, int len, double size, const char *family,
   return 1;
 }
 
+// 字体行高：ascent + descent（像素），与样例文本无关。out = [height, ascent]
+int pt_font_line_height(double size, const char *family, int32_t *out_h,
+                        int32_t *out_ascent) {
+  if (out_h == NULL || out_ascent == NULL) {
+    return 0;
+  }
+  PangoFontMap *fm = pango_cairo_font_map_get_default();
+  if (fm == NULL) {
+    return 0;
+  }
+  PangoContext *ctx = pango_font_map_create_context(fm);
+  if (ctx == NULL) {
+    return 0;
+  }
+  PangoFontDescription *desc = pango_font_description_new();
+  if (family != NULL && family[0] != '\0') {
+    pango_font_description_set_family(desc, family);
+  }
+  pango_font_description_set_absolute_size(desc, size * PANGO_SCALE);
+  PangoFontMetrics *m = pango_context_get_metrics(ctx, desc, NULL);
+  g_object_unref(ctx);
+  pango_font_description_free(desc);
+  if (m == NULL) {
+    return 0;
+  }
+  int ascent = pango_font_metrics_get_ascent(m);
+  int descent = pango_font_metrics_get_descent(m);
+  // PangoFontMetrics 不是 GObject，必须用 pango_font_metrics_unref；
+  // 误用 g_object_unref 会 SIGSEGV（实测）。
+  pango_font_metrics_unref(m);
+  *out_ascent = (ascent + PANGO_SCALE / 2) / PANGO_SCALE;
+  *out_h = (ascent + descent + PANGO_SCALE / 2) / PANGO_SCALE;
+  return 1;
+}
+
 // 在调用方缓冲上画文本：(x,y) 是布局盒左上角；返回 0 表示后端不可用。
 int pt_draw(unsigned char *data, int buf_w, int buf_h, double x, double y,
             const char *text, int len, double size, const char *family,

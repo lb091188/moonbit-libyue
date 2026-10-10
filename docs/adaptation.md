@@ -162,6 +162,14 @@ Environment: Ubuntu 24.04 + X11 + XFCE, moon 0.1.20260920 / moonc v0.10.14, GTK3
 - **Test philosophy**: no exact pixel widths/heights (they depend on the machine's font configuration - the G0 probe's "14px line height = 17px" is this machine's number); assert monotonicity, constraint behaviour under `max_width`/wrap, and painted-pixel counts instead, so another machine cannot produce a false red.
 - Verification: `moon test -p NoahLiu/moonbit-libyue/yue/text` 7/7; `moon check yue/{core,win,render,text}` warning-free; `examples/native-window` smoke 52 frames, exit code 0 (mixed CJK/Latin text drawn in the window); repo-wide red unchanged at 290 errors.
 
+### MoonBit native GUI stack G3b addendum · line-height definition and the test binary that never relinks
+
+- **Definition**: `line_height` is the **font's ascent + descent** from `pango_context_get_metrics`, and `line_ascent` is the ascent (= first baseline). Never derive line height from a sample string's box height - that turns "does the text have a descender" into a layout height difference.
+- **Reconciliation with the G0 probe**: the probe's "14px measured 17" was actually the **first baseline**, which this layer reproduces as `line_ascent(14) = 17`; `line_height(14) = 22` here. Both numbers are right, the label was wrong; G5 should size text boxes from the 22 path.
+- **Pitfall**: `PangoFontMetrics` is not a GObject - use `pango_font_metrics_unref`. Calling `g_object_unref` on it SIGSEGVs inside the test driver with no test output at all, which is easy to misread as an FFI argument problem.
+- **Pitfall (new face of a known one)**: after changing a native static library, `moon test` executables are **not relinked either** - previously this was only recorded for `moon build` output, reproduced here under `_build/native/debug/test/<pkg>`: the fixed SIGSEGV kept happening because the test binary was still linked against the old archive. Reproduce with a plain main target first (a fresh target is always newly linked): "main fine, test crashes" points at stale artifacts. Delete `_build/native/debug/test/<pkg>` along with the library.
+- Verification: after removing the artifacts, `moon test -p NoahLiu/moonbit-libyue/yue/text` 7/7; `moon check yue/{core,win,render,text}` warning-free; render 14/14, core 9/9, yoga-mbt 79/79 unchanged.
+
 ## Linux
 
 ### Distributions

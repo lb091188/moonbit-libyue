@@ -207,6 +207,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **测试取向**：不断言具体像素宽/高（随机器字体配置变，G0 探针记的「14px 行高 17px」是本机值），只断单调性（文本更长更宽、字号更大更高）、约束性（`max_width` 下宽受钳、换行后高增长）与「确实落像素」的计数，保证换机不假红。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/text` 7/7；`moon check yue/{core,win,render,text}` 零警告；`examples/native-window` 冒烟 52 帧退出码 0（窗口内画中英混排文本）；全仓红点仍 290 errors 未增。
 
+### MoonBit 原生 GUI 栈 G3b 补充 · 行高口径定案与「测试可执行文件不重链」
+
+- **口径定案**：`line_height` 取**字体 metrics 的 ascent+descent**（`pango_context_get_metrics`），`line_ascent` 取 ascent（= 首行基线）。不能用样例文本的盒高当行高——那会把「有无下伸部」当成行高差，布局盒高随内容抖。
+- **与 G0 探针对账**：探针记的「14px 字面行高量得 17」其实是**首行基线**（本层 `line_ascent(14) = 17` 与之一致），本层 `line_height(14) = 22`（ascent+descent）。两个数都对，名字用错了；G5 定文本盒高时按 22 这一路走。
+- **坑**：`PangoFontMetrics` 不是 GObject，必须 `pango_font_metrics_unref`；误用 `g_object_unref` 直接 SIGSEGV（且崩在测试驱动里、无任何测试输出，极易误判成 FFI 参数问题）。
+- **坑（既有坑的新面）**：改原生静态库后 `moon test` 的可执行文件**同样不重链**——此前记录只针对 `moon build` 的 exe，本次复现于 `_build/native/debug/test/<pkg>`：修好 SIGSEGV 之后测试仍崩，因为跑的是旧链接产物。排查时先用一个普通 main 目标复现（它是新目标、必然新链接），一致地「main 正常、测试崩」即指向产物过期；修复要连 `_build/native/debug/test/<pkg>` 一起删。
+- **验证**：删产物后 `moon test -p NoahLiu/moonbit-libyue/yue/text` 7/7；`moon check yue/{core,win,render,text}` 零警告；render 14/14、core 9/9、yoga-mbt 79/79 未掉。
+
 ## Linux
 
 ### 发行版

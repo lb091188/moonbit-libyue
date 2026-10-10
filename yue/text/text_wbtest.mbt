@@ -27,11 +27,26 @@ test "测量单调：文本更长更宽、字号更大更高" {
   }
 }
 
-test "行高随字号增长且非零" {
-  let h14 = line_height(14.0)
-  let h28 = line_height(28.0)
-  assert_eq(h14 > 0, true)
-  assert_eq(h28 > h14, true)
+test "行高取字体口径：随字号增长、不绑样例文本" {
+  match (line_height(14.0), line_height(28.0), line_ascent(14.0)) {
+    (Some(h14), Some(h28), Some(a14)) => {
+      assert_eq(h14 > 0, true)
+      assert_eq(h28 > h14, true)
+      assert_eq(a14 > 0, true)
+      assert_eq(a14 < h14, true)
+      // 字体行高（ascent+descent）不该小于任何单行盒高：探针量的「14px→17」
+      // 是文本 "M" 的盒高（等于首行基线），属样例文本口径，两者在此分开
+      match measure("M", 14.0) {
+        Some(m) => assert_eq(h14 >= m.height, true)
+        None => ()
+      }
+      match measure("Mg", 14.0) {
+        Some(m) => assert_eq(h14 >= m.height, true)
+        None => ()
+      }
+    }
+    _ => assert_eq(false, true)
+  }
 }
 
 test "max_width 约束换行：宽度受钳、高度增长" {
