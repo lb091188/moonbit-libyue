@@ -1,4 +1,5 @@
-// 当前桌面壁纸：按桌面环境分派读取/设置路径。
+// 当前桌面壁纸：按平台分派读取/设置路径。
+//   Windows: SystemParametersInfo（SPI_GET/SETDESKWALLPAPER）直连
 //   XFCE   : xfconf-query 读写 xfce4-desktop 频道的
 //            /backdrop/<screen>/monitor<输出>/<workspace>/last-image 属性
 //   GNOME  : gsettings 读写 org.gnome.desktop.background 的 picture-uri
@@ -382,6 +383,17 @@ fn wp_kde_prog() -> String? {
 /// 回退 picture-uri-dark；KDE 走 plasmashell evaluateScript。不认识的
 /// DE / 工具缺失为语义化 Err。
 pub fn wp_get() -> Result[String, WallpaperError] {
+  if @yue.platform() == "windows" {
+    let ok = Ref(0)
+    let path = wp_trim(@utf8.decode_lossy(@yue.ffi_wallpaper_get(ok)))
+    if ok.val != 1 {
+      return Err(CommandFailed("SystemParametersInfo(SPI_GETDESKWALLPAPER)"))
+    }
+    if path == "" {
+      return Err(ParseFailed("壁纸未设置"))
+    }
+    return Ok(path)
+  }
   if !pr_available() {
     return Err(Unsupported)
   }
@@ -398,11 +410,21 @@ pub fn wp_get() -> Result[String, WallpaperError] {
 /// 属性（不存在则创建）；GNOME 写 picture-uri；KDE 走 plasmashell
 /// evaluateScript。仅在明确知道环境后才可调用，会改变桌面外观。
 pub fn wp_set(path : String) -> Result[Unit, WallpaperError] {
-  if !pr_available() {
-    return Err(Unsupported)
-  }
   if wp_trim(path) == "" {
     return Err(InvalidParam("壁纸路径为空"))
+  }
+  if @yue.platform() == "windows" {
+    let ok = Ref(0)
+    let _ = @yue.ffi_wallpaper_set(@yue.utf8_bytes(path), ok)
+    if ok.val != 1 {
+      return Err(
+        CommandFailed("SystemParametersInfo(SPI_SETDESKWALLPAPER) 失败"),
+      )
+    }
+    return Ok(())
+  }
+  if !pr_available() {
+    return Err(Unsupported)
   }
   match @traybus.detect_desktop() {
     Xfce => wp_set_xfce(path)

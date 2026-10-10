@@ -226,6 +226,10 @@ test "prt_print_args：默认打印机/指定打印机/份数" {
 
 ///|
 test "prt_run_tool：退出码映射（真实命令，只读）" {
+  if @yue.platform() == "windows" {
+    println("prt: skip (Linux 子进程语义)")
+    return
+  }
   if !pr_available() {
     println("prt: skip (non-linux)")
     return

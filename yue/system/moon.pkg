@@ -1,5 +1,6 @@
 import {
   "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/string",
   "moonbitlang/core/json",
   "moonbitlang/core/env",
   "NoahLiu/moonbit-libyue/yue",

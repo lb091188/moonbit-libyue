@@ -1,6 +1,7 @@
-// 剪贴板文本监听：经 xclip 只读轮询系统剪贴板（X11 CLIPBOARD 选区），
-// 文本内容变化时通过回调派发新文本。命令路线经 procrun 的 [pr_run]
-// （spawn → 限时回收 → 捕获 stdout），不自行 spawn。
+// 剪贴板文本监听：只读轮询系统剪贴板，文本内容变化时通过回调派发新
+// 文本。Linux 经 xclip（命令路线走 procrun 的 [pr_run]，spawn → 限时
+// 回收 → 捕获 stdout，X11 CLIPBOARD 选区）；Windows 直连 Win32 剪贴板
+// （CF_UNICODETEXT，shim 提供）。
 //
 // 与 methods.mbt 里 libyue 原生 Clipboard 的 start_watching / on_change
 // 的分工：后者由 GUI 事件循环驱动（需 initialize 的应用环境）；本模块
@@ -19,10 +20,11 @@
 
 ///|
 pub(all) enum ClipboardError {
-  /// 当前平台/环境不支持（非 Linux，或 xclip 不存在——Unix 以退出码
-  /// 127 呈现命令缺失）
+  /// 当前平台/环境不支持（非 Linux / Windows；Linux 下 xclip 不存在——
+  /// Unix 以退出码 127 呈现命令缺失）
   Unsupported
-  /// 命令执行失败（spawn 失败 / 非零退出 / 超时 / 被信号终止），带原因
+  /// 命令执行失败（spawn 失败 / 非零退出 / 超时 / 被信号终止 /
+  /// Win32 剪贴板打开失败），带原因
   CommandFailed(String)
 }
 
@@ -97,9 +99,18 @@ fn cbw_first_line(s : String) -> String {
 // ---------------------------------------------------------------------------
 
 ///|
-/// 读剪贴板当前文本（xclip -selection clipboard -o，只读；文本原样返回，
-/// 不做去空白）。xclip 缺失（退出码 127）或无 X 会话时为对应 Err。
+/// 读剪贴板当前文本（只读，文本原样返回，不做去空白）：Linux 走
+/// `xclip -selection clipboard -o`（xclip 缺失（退出码 127）或无 X 会话
+/// 时为对应 Err）；Windows 走 Win32 剪贴板（无文本时为 CommandFailed）。
 pub fn cbw_get_text() -> Result[String, ClipboardError] {
+  if @yue.platform() == "windows" {
+    let ok = Ref(0)
+    let text = @utf8.decode_lossy(@yue.ffi_clipboard_text(ok))
+    if ok.val != 1 {
+      return Err(CommandFailed("剪贴板无文本或打开失败"))
+    }
+    return Ok(text)
+  }
   match pr_run("xclip", ["-selection", "clipboard", "-o"], timeout_ms=2000) {
     Ok(o) => Ok(o.stdout)
     Err(NonZeroExit(127, _)) => Err(Unsupported)

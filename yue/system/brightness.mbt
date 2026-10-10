@@ -15,9 +15,10 @@
 //   }
 
 ///|
-/// 亮度设备:subsystem 为 "backlight"(屏幕)或 "leds"(键盘背光),
-/// name 为 sysfs 设备名;max 为量程上限,current 为枚举时的原始值快照
-/// (实时值用 [brightness_get] / [kbd_brightness_get])。
+/// 亮度设备：subsystem 为 "backlight"（Linux 屏幕 sysfs）、"leds"（Linux
+/// 键盘背光 sysfs）或 "ddc"（Windows 物理监视器 DDC/CI）；name 为 sysfs
+/// 设备名（Linux）或 \\.\DISPLAYn（Windows）；max 为量程上限，current 为
+/// 枚举时的原始值快照（实时值用 [brightness_get] / [kbd_brightness_get]）。
 pub(all) struct BrightnessDevice {
   subsystem : String
   name : String
@@ -244,49 +245,145 @@ fn bright_check_dev(
 // ---------------------------------------------------------------------------
 
 ///|
-/// 屏幕亮度调节是否可用:Linux 看 logind 在线(设置走其 SetBrightness;
-// devices/get 只读 sysfs 不依赖它)。每次调用真实探测。
+/// 屏幕亮度调节是否可用：Linux 看 logind 在线（设置走其 SetBrightness；
+/// devices/get 只读 sysfs 不依赖它）；Windows 看有无 DDC/CI 可控的物理
+/// 监视器（内建面板多不走 DDC，见文档边界）。每次调用真实探测。
 pub fn brightness_supported() -> Bool {
   match @yue.platform() {
     "linux" => @traybus.logind_available()
+    "windows" => brightness_devices() is Ok(devs) && devs.length() > 0
     _ => false
   }
 }
 
 ///|
-/// 枚举屏幕背光设备(按探测表读 /sys/class/backlight,列表序即推荐序;
-/// 空列表 = 无背光设备或设备名不在探测表,后者可手工构造
-/// BrightnessDevice 访问)。
+/// 枚举屏幕亮度设备：Linux 按探测表读 /sys/class/backlight（列表序即
+/// 推荐序，空列表 = 无背光或设备名不在探测表）；Windows 枚举 DDC/CI
+/// 可控的物理监视器（name 为 \\.\DISPLAYn，subsystem 为 "ddc"，空列表
+/// = 无 DDC 监视器）。
 pub fn brightness_devices() -> Result[Array[BrightnessDevice], BrightnessError] {
   match @yue.platform() {
     "linux" => Ok(bright_probe_devices("backlight", bright_backlight_names))
+    "windows" => Ok(bright_win_devices())
     _ => Err(Unsupported)
   }
 }
 
 ///|
-/// 屏幕当前亮度百分比(0-100,实时读 sysfs)。
+/// Windows DDC 设备枚举：解析 shim 的 "name\tmax\tcur" 行文本。
+fn bright_win_devices() -> Array[BrightnessDevice] {
+  let ok = Ref(0)
+  let text = @utf8.decode_lossy(@yue.ffi_brightness_devices(ok))
+  let out : Array[BrightnessDevice] = []
+  if ok.val != 1 {
+    return out
+  }
+  for line in text.split("\n") {
+    let fields = sys_split_fields(line.to_owned(), '\t')
+    if fields.length() == 3 {
+      let max = bright_parse_sysfs(fields[1])
+      let cur = bright_parse_sysfs(fields[2])
+      match (max, cur) {
+        (Some(m), Some(c)) =>
+          if m > 0 {
+            out.push({
+              subsystem: "ddc",
+              name: fields[0],
+              max: m,
+              current: c,
+            })
+          }
+        _ => ()
+      }
+    }
+  }
+  out
+}
+
+///|
+/// Windows：按设备名找枚举序号（get/set 的索引基准）。
+fn bright_win_index_of(name : String) -> Int? {
+  let devs = bright_win_devices()
+  for i = 0; i < devs.length(); i = i + 1 {
+    if devs[i].name == name {
+      return Some(i)
+    }
+  }
+  None
+}
+
+///|
+/// Windows DDC 读当前百分比（设备名 → 枚举序号 → 实时读）。
+fn bright_win_get(dev : BrightnessDevice) -> Result[Int, BrightnessError] {
+  let idx = match bright_win_index_of(dev.name) {
+    Some(i) => i
+    None => return Err(DeviceNotFound)
+  }
+  let cur = Ref(0)
+  let max_v = Ref(0)
+  let ok = Ref(0)
+  if @yue.ffi_brightness_get(idx, cur, max_v, ok) != 0 || ok.val != 1 {
+    return Err(DeviceNotFound)
+  }
+  Ok(bright_percent(cur.val, max_v.val))
+}
+
+///|
+/// Windows DDC 设百分比（百分比 → 设备量纲原始值，DDC 侧再钳制）。
+fn bright_win_set(
+  dev : BrightnessDevice,
+  percent : Int,
+) -> Result[Unit, BrightnessError] {
+  let idx = match bright_win_index_of(dev.name) {
+    Some(i) => i
+    None => return Err(DeviceNotFound)
+  }
+  if percent < 0 || percent > 100 {
+    return Err(InvalidParam("百分比越界: \{percent}"))
+  }
+  let ok = Ref(0)
+  let value = bright_value_of(percent, dev.max)
+  if @yue.ffi_brightness_set(idx, value, ok) != 0 || ok.val != 1 {
+    return Err(BusFailed("SetMonitorBrightness 失败"))
+  }
+  Ok(())
+}
+
+///|
+/// 屏幕当前亮度百分比（0-100，实时读：Linux 读 sysfs，Windows 读 DDC）。
 pub fn brightness_get(dev : BrightnessDevice) -> Result[Int, BrightnessError] {
+  if dev.subsystem == "ddc" {
+    return bright_win_get(dev)
+  }
   bright_get_impl(dev, "backlight")
 }
 
 ///|
-/// 设置屏幕亮度百分比(0-100;写走 logind,logind 不在线返回
-/// Unsupported)。
+/// 设置屏幕亮度百分比（0-100；Linux 写走 logind，logind 不在线返回
+/// Unsupported；Windows 走 DDC/CI，设备消失给 DeviceNotFound）。
 pub fn brightness_set_percent(
   dev : BrightnessDevice,
   percent : Int,
 ) -> Result[Unit, BrightnessError] {
+  if dev.subsystem == "ddc" {
+    return bright_win_set(dev, percent)
+  }
   bright_set_impl(dev, "backlight", percent)
 }
 
 ///|
-/// 屏幕亮度按百分比步进(delta 可正可负;先读当前值,加 delta 钳 0-100
-/// 后设置)。
+/// 屏幕亮度按百分比步进（delta 可正可负；先读当前值，加 delta 钳 0-100
+/// 后设置）。
 pub fn brightness_step_percent(
   dev : BrightnessDevice,
   delta : Int,
 ) -> Result[Unit, BrightnessError] {
+  if dev.subsystem == "ddc" {
+    match bright_win_get(dev) {
+      Err(e) => return Err(e)
+      Ok(cur) => return bright_win_set(dev, cur + delta)
+    }
+  }
   bright_step_impl(dev, "backlight", delta)
 }
 

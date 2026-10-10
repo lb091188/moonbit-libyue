@@ -833,6 +833,74 @@ int32_t yue_mbt_proc_wait(int32_t pid, int32_t timeout_ms, int32_t *status,
 /* 当前进程 id */
 int32_t yue_mbt_proc_getpid(void);
 
+/* ---------- 系统能力 Windows 直连组（sysinfo/wallpaper/locale/powerctl/
+ * powerprofile/brightness/volume/monitor/printer/clipboard/windowctl/
+ * defaultapps/recent/disk；非 Windows 均为 -1000 哨兵） ---------- */
+
+/* 注册表 REG_SZ 读取（root: 0=HKLM 1=HKCU；REG_EXPAND_SZ 展开后） */
+void *yue_mbt_win_reg_str(int32_t root, const char *path, const char *value,
+                          int32_t *ok);
+/* 物理内存（kB）；返回 1 成功 0 失败 */
+int32_t yue_mbt_win_memory(int64_t *total_kb, int64_t *avail_kb);
+/* 开机毫秒数；<0 错误 */
+int64_t yue_mbt_win_uptime_ms(void);
+/* 壁纸读（SPI_GETDESKWALLPAPER） */
+void *yue_mbt_wallpaper_get(int32_t *ok);
+/* 壁纸写（SPI_SETDESKWALLPAPER，带 INI 刷新与广播） */
+int32_t yue_mbt_wallpaper_set(const char *path, int32_t *ok);
+/* 时区名（Windows 时区键名，如 "China Standard Time"，非 IANA 名） */
+void *yue_mbt_win_tz_name(int32_t *ok);
+/* 用户界面区域名（BCP-47，如 "zh-CN"） */
+void *yue_mbt_win_lang(int32_t *ok);
+/* W32Time（Windows 时间服务）是否在跑；返回 1/0，-1 错误 */
+int32_t yue_mbt_win_ntp_running(int32_t *ok);
+/* 关机/重启/注销（how: 0=关机 1=重启 2=注销当前用户；需关机特权） */
+int32_t yue_mbt_win_shutdown(int32_t how, int32_t *ok);
+/* 当前电源计划 GUID（16 字节裸序） */
+int32_t yue_mbt_power_active_guid(uint8_t *out16, int32_t *ok);
+/* 切换电源计划（16 字节裸序 GUID） */
+int32_t yue_mbt_power_set_guid(const uint8_t *guid16, int32_t *ok);
+/* 枚举电源计划 GUID（out 每项 16 字节，cap 为方案数上限）；返回方案数 */
+int32_t yue_mbt_power_enumerate_guids(uint8_t *out, int32_t cap_guids,
+                                      int32_t *ok);
+/* DDC 亮度设备枚举（'\n' 分行 "name\tmax\tcur"） */
+void *yue_mbt_brightness_devices(int32_t *ok);
+/* DDC 亮度当前值（index 与 devices 同序） */
+int32_t yue_mbt_brightness_get(int32_t index, int32_t *cur, int32_t *max_v,
+                               int32_t *ok);
+/* DDC 亮度设置（value 为设备量纲原始值） */
+int32_t yue_mbt_brightness_set(int32_t index, int32_t value, int32_t *ok);
+/* 默认输出端点音量（level 0..1 标量，double 与 MoonBit Ref[Double] 同宽；
+ * muted 0/1） */
+int32_t yue_mbt_vol_master(double *level, int32_t *muted, int32_t *ok);
+int32_t yue_mbt_vol_set_master(double level, int32_t *ok);
+int32_t yue_mbt_vol_set_mute(int32_t mute, int32_t *ok);
+/* 显示器配置（H|.. 头行 + M|.. 模式行，物理毫米恒 0） */
+void *yue_mbt_mon_list(int32_t *ok);
+/* 打印机列表（"name\tstatus_code" 行，code: 0 空闲 1 打印中 2 暂停 3 不可用）*/
+void *yue_mbt_prt_list(int32_t *ok);
+/* 默认打印机名 */
+void *yue_mbt_prt_default(int32_t *ok);
+/* 打印队列（"job_id\tdoc_name" 行） */
+void *yue_mbt_prt_queue(const char *printer, int32_t *ok);
+/* 提交打印（文件 "print" 动词，走默认打印机） */
+int32_t yue_mbt_prt_print(const char *path, int32_t *ok);
+/* 剪贴板文本读（CF_UNICODETEXT；无文本 ok=0） */
+void *yue_mbt_clipboard_text(int32_t *ok);
+/* 可见窗口列表（"0xHWND\t标题" 行） */
+void *yue_mbt_win_list_windows(int32_t *ok);
+/* 窗口置前（"0x" 前缀按句柄，否则按标题精确匹配） */
+int32_t yue_mbt_win_activate_window(const char *id_or_title, int32_t *ok);
+/* 按 "0x" 句柄或标题精确匹配关闭窗口（WM_CLOSE） */
+int32_t yue_mbt_win_close_window(const char *id_or_title, int32_t *ok);
+/* 文件关联查询（assoc 为扩展名或协议；kind: 0=可执行 1=命令行） */
+void *yue_mbt_assoc_query(const char *assoc, int32_t kind, int32_t *ok);
+/* .lnk 解析（"mtime_ms\t目标路径"，mtime 为 .lnk 自身修改时间） */
+void *yue_mbt_lnk_target(const char *path, int32_t *ok);
+/* 磁盘卷枚举（"C:|label|total|free|kind" 行，kind: 0 固定 1 可移除 2 光驱
+ * 3 网络 4 虚拟盘） */
+void *yue_mbt_dsk_volumes(int32_t *ok);
+
 /* ---------- 系统总线基建与电源 ---------- */
 
 /* 撤销 fd 监视（与 yue_mbt_sys_watch_fd 配对） */

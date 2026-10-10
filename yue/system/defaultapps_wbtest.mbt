@@ -75,6 +75,27 @@ test "da 关联合并：默认应用排最前 + 分号拆分去重 + 多文件�
 
 ///|
 test "da 真机探测：xdg-mime 文件类型与默认应用查询（存在该工具才断言）" {
+  if @yue.platform() == "windows" {
+    // Windows：文件类型为小写扩展名；.txt 通常有默认处理器（记事本）
+    match da_file_type("C:\\Windows\\win.ini") {
+      Ok(ext) => inspect(ext, content=".ini")
+      Err(e) => {
+        inspect(e.to_string(), content="<应成功>")
+        inspect(false, content="true")
+      }
+    }
+    match da_default_for(".txt") {
+      Ok(exe) => inspect(exe.length() > 0, content="true")
+      Err(NoDefault(_)) => () // 未登记默认处理器：合法
+      Err(e) => {
+        inspect(e.to_string(), content="<不应报错>")
+        inspect(false, content="true")
+      }
+    }
+    // 关联枚举无对应接口：恒空
+    inspect(da_associations_for(".txt").length(), content="0")
+    return
+  }
   if da_supported() {
     match da_file_type("/etc/hostname") {
       Ok(mime) => inspect(mime.contains("/") is true, content="true")

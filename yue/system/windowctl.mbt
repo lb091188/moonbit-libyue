@@ -1,7 +1,8 @@
-// 系统窗口管理（X11）：解析 `wmctrl -l` 的窗口列表（窗口 id / 桌面 /
-// 主机 / 标题），并按 id 或标题激活、按标题关闭窗口。不依赖 libyue
-// GUI 应用环境，普通 MoonBit 进程即可使用；命令路线经 procrun 的
-// [pr_run]（spawn → 限时回收 → 捕获 stdout），不自行 spawn。
+// 系统窗口管理：Linux（X11）解析 `wmctrl -l` 的窗口列表（窗口 id /
+// 桌面 / 主机 / 标题），并按 id 或标题激活、按标题关闭窗口；Windows 走
+// Win32 直连（EnumWindows 可见窗口列表 / SetForegroundWindow 置前 /
+// WM_CLOSE 关闭）。不依赖 libyue GUI 应用环境，普通 MoonBit 进程即可
+// 使用；Linux 命令路线经 procrun 的 [pr_run]，不自行 spawn。
 //
 // 激活 / 关闭会改变真实窗口状态（设置类）：接口完整实现，白盒只验证
 // 命令构造与输出解析（windowctl_wbtest.mbt），不真实执行动作。
@@ -9,16 +10,18 @@
 // 典型用法：
 //   match win_list() {
 //     Ok(wins) => for w in wins { println("\{w.desktop} \{w.title}") }
-//     Err(Unsupported) => () // 非 Linux 或 wmctrl 缺失
+//     Err(Unsupported) => () // 非 Linux / Windows 或 wmctrl 缺失
 //     Err(e) => println(e)
 //   }
 //   win_activate("0x02400004") // 按窗口 id 激活
 //   win_close("ZCode")         // 按标题关闭
 
 ///|
-/// 受管窗口快照：id 为 wmctrl 输出的 "0x" 十六进制窗口 id（可直接回传
-/// [win_activate]）；desktop 为窗口所在桌面，-1 表示全部桌面（sticky）；
-/// host 为窗口所属主机名；title 为窗口标题（保留原标题内的空白）。
+/// 受管窗口快照：Linux 的 id 为 wmctrl 输出的 "0x" 十六进制窗口 id、
+/// Windows 为 "0x" 十六进制 HWND（可直接回传 [win_activate]）；
+/// desktop 为窗口所在桌面（Linux），-1 表示全部桌面（sticky），Windows
+/// 无虚拟桌面枚举恒 0；host 为窗口所属主机名（Windows 取 %COMPUTERNAME%）；
+/// title 为窗口标题（保留原标题内的空白）。
 pub(all) struct WindowInfo {
   id : String
   desktop : Int
@@ -340,6 +343,9 @@ fn win_probe(prog : String) -> Bool {
 /// 工具缺失是合法状态（返回 false，不是失败）。每次调用真实探测，高频
 /// 场景请调用方自行缓存结果。
 pub fn win_supported() -> Bool {
+  if @yue.platform() == "windows" {
+    return true
+  }
   if !pr_available() {
     return false
   }
@@ -347,10 +353,22 @@ pub fn win_supported() -> Bool {
 }
 
 ///|
-/// 列出当前窗口管理器接管的窗口（wmctrl -l 的逐行解析）。
-/// 需要 X 会话；无会话时 wmctrl 以非零退出呈现，返回
-/// Err([WinError.CommandFailed])。
+/// 列出窗口：Linux 解析 wmctrl -l（需 X 会话，无会话时 wmctrl 以非零
+/// 退出呈现，返回 Err([WinError.CommandFailed])）；Windows 枚举全部
+/// 可见且有标题的顶层窗口。
 pub fn win_list() -> Result[Array[WindowInfo], WinError] {
+  if @yue.platform() == "windows" {
+    let ok = Ref(0)
+    let text = @utf8.decode_lossy(@yue.ffi_win_list_windows(ok))
+    if ok.val != 1 {
+      return Err(CommandFailed("EnumWindows 失败"))
+    }
+    let host = match getenv_str("COMPUTERNAME") {
+      Some(h) if h != "" => h
+      _ => ""
+    }
+    return win_parse_win_list(text, host)
+  }
   match pr_run("wmctrl", ["-l"], timeout_ms=4000) {
     Ok(o) => win_parse_list(o.stdout)
     Err(e) => Err(win_map_err("wmctrl -l", e))
@@ -358,22 +376,108 @@ pub fn win_list() -> Result[Array[WindowInfo], WinError] {
 }
 
 ///|
+/// 解析 Windows 直连文本（"0xHWND\t标题" 行；desktop 恒 0，host 由
+/// 调用方传入）。无任何可解析行给 ParseFailed。
+pub fn win_parse_win_list(
+  text : String,
+  host : String,
+) -> Result[Array[WindowInfo], WinError] {
+  let wins : Array[WindowInfo] = []
+  for line in win_split_lines(text) {
+    let fields = sys_split_fields(line, '\t')
+    if fields.length() == 2 && fields[0].length() > 2 {
+      wins.push({
+        id: fields[0],
+        desktop: 0,
+        host,
+        title: fields[1],
+      })
+    }
+  }
+  if wins.is_empty() {
+    Err(ParseFailed("无任何可见窗口"))
+  } else {
+    Ok(wins)
+  }
+}
+
+///|
+/// 标题子串匹配（不区分 ASCII 大小写，与 wmctrl 激活/关闭的匹配语义
+/// 对齐）：返回首个命中窗口的 id，无命中为 None。
+fn win_find_by_title(
+  wins : Array[WindowInfo],
+  query : String,
+) -> String? {
+  let q = query.to_lower()
+  for w in wins {
+    if w.title.to_lower().contains(q) {
+      return Some(w.id)
+    }
+  }
+  None
+}
+
+///|
 /// 激活窗口：id_or_title 为 [WindowInfo.id]（"0x" 十六进制）时按 id
-/// 激活，否则按标题子串匹配（不区分大小写）。会切换桌面并置顶目标
-/// 窗口；空参数返回 Err([WinError.InvalidParam])。
+/// 激活，否则按标题子串匹配（不区分大小写）。Linux 会切换桌面并置顶
+/// 目标窗口；Windows 置前目标窗口（最小化先恢复）。空参数返回
+/// Err([WinError.InvalidParam])。
 pub fn win_activate(id_or_title : String) -> Result[Unit, WinError] {
   if id_or_title == "" {
     return Err(InvalidParam("窗口 id 或标题为空"))
+  }
+  if @yue.platform() == "windows" {
+    return win_win_apply(
+      id_or_title,
+      fn(id, ok) { @yue.ffi_win_activate_window(@yue.utf8_bytes(id), ok) },
+      "置前",
+    )
   }
   win_apply(win_activate_args(id_or_title))
 }
 
 ///|
+/// Windows 动作公共实现：id 直用；标题先经窗口列表按子串匹配解析成
+/// 精确 id，再交 shim 动作函数（ok=1 为成功）。
+fn win_win_apply(
+  id_or_title : String,
+  act : (String, Ref[Int]) -> Int,
+  what : String,
+) -> Result[Unit, WinError] {
+  let id = if id_or_title.has_prefix("0x") || id_or_title.has_prefix("0X") {
+    id_or_title
+  } else {
+    match win_list() {
+      Err(e) => return Err(e)
+      Ok(wins) =>
+        match win_find_by_title(wins, id_or_title) {
+          Some(i) => i
+          None =>
+            return Err(CommandFailed("未找到标题匹配的窗口: \{id_or_title}"))
+        }
+    }
+  }
+  let ok = Ref(0)
+  if act(id, ok) != 0 || ok.val != 1 {
+    return Err(CommandFailed("窗口\{what}失败（窗口可能已关闭）"))
+  }
+  Ok(())
+}
+
+///|
 /// 关闭窗口：title 按标题子串匹配（不区分大小写），关闭首个匹配窗口
-/// （wmctrl -c 语义）。空参数返回 Err([WinError.InvalidParam])。
+/// （wmctrl -c 语义；Windows 同样只关首个匹配，经 WM_CLOSE 温和关闭）。
+/// 空参数返回 Err([WinError.InvalidParam])。
 pub fn win_close(title : String) -> Result[Unit, WinError] {
   if title == "" {
     return Err(InvalidParam("窗口标题为空"))
+  }
+  if @yue.platform() == "windows" {
+    return win_win_apply(
+      title,
+      fn(id, ok) { @yue.ffi_win_close_window(@yue.utf8_bytes(id), ok) },
+      "关闭",
+    )
   }
   win_apply(win_close_args(title))
 }

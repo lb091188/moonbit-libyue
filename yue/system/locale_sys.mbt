@@ -317,10 +317,10 @@ fn lc_ntp_cmd() -> Result[Bool, LocaleError] {
 // ---------------------------------------------------------------------------
 
 ///|
-/// 当前时区（IANA 标识，如 "Asia/Shanghai"）：优先 timedate1 的
-/// Timezone 属性（系统总线）；总线调用失败（服务不在线 / 总线不可达 /
-/// 应答超时）自动回退 `timedatectl show`；两条路都不可用 →
-/// LcUnsupported。
+/// 当前时区：Linux 给 IANA 标识（如 "Asia/Shanghai"，优先 timedate1 的
+/// Timezone 属性，总线调用失败自动回退 `timedatectl show`）；Windows 给
+/// 系统时区键名（如 "China Standard Time"，非 IANA 名，形态差异由调用
+/// 方消化）。两条路都不可用 → LcUnsupported。
 pub fn lc_timezone() -> Result[String, LocaleError] {
   match @yue.platform() {
     "linux" =>
@@ -329,13 +329,22 @@ pub fn lc_timezone() -> Result[String, LocaleError] {
         Err(LcBusFailed(_)) => lc_timezone_cmd()
         Err(e) => Err(e)
       }
+    "windows" => {
+      let ok = Ref(0)
+      let tz = lc_trim(@utf8.decode_lossy(@yue.ffi_win_tz_name(ok)))
+      if ok.val != 1 || tz == "" {
+        return Err(LcUnsupported)
+      }
+      Ok(tz)
+    }
     _ => Err(LcUnsupported)
   }
 }
 
 ///|
-/// NTP 时间同步是否开启：优先 timedate1 的 NTP 属性；总线调用失败自动
-/// 回退 `timedatectl show`；两条路都不可用 → LcUnsupported。
+/// NTP 时间同步是否开启：Linux 优先 timedate1 的 NTP 属性（总线调用失败
+/// 自动回退 `timedatectl show`）；Windows 看 W32Time（Windows 时间）服务
+/// 是否在跑。两条路都不可用 → LcUnsupported。
 pub fn lc_ntp() -> Result[Bool, LocaleError] {
   match @yue.platform() {
     "linux" =>
@@ -344,14 +353,23 @@ pub fn lc_ntp() -> Result[Bool, LocaleError] {
         Err(LcBusFailed(_)) => lc_ntp_cmd()
         Err(e) => Err(e)
       }
+    "windows" => {
+      let ok = Ref(0)
+      let running = @yue.ffi_win_ntp_running(ok)
+      if ok.val != 1 {
+        return Err(LcUnsupported)
+      }
+      Ok(running == 1)
+    }
     _ => Err(LcUnsupported)
   }
 }
 
 ///|
-/// 设置系统时区（IANA 标识，如 "Asia/Shanghai"）：写 timedate1 的
-/// Timezone 属性（系统总线，需要认证，调用方自行走授权流程；有副作用，
-/// 仅实现不执行）。标识非法先给 LcInvalidTimezone，不发起总线调用。
+/// 设置系统时区（有副作用、需要管理员权限，调用方自行走授权流程）：
+/// Linux 写 timedate1 的 Timezone 属性（IANA 标识，标识非法先给
+/// LcInvalidTimezone，不发起总线调用）；Windows 经 `tzutil /s` 写系统
+/// 时区键名（非空即可，键名不存在由 tzutil 以非零退出报出）。
 pub fn lc_set_timezone(tz : String) -> Result[Unit, LocaleError] {
   match @yue.platform() {
     "linux" => {
@@ -370,14 +388,34 @@ pub fn lc_set_timezone(tz : String) -> Result[Unit, LocaleError] {
         Err(e) => Err(lc_bus_err(e))
       }
     }
+    "windows" => {
+      let t = lc_trim(tz)
+      if t == "" {
+        return Err(LcInvalidTimezone(tz))
+      }
+      match pr_run("tzutil", ["/s", t], timeout_ms=8000) {
+        Ok(_) => Ok(())
+        Err(NonZeroExit(_, err)) => Err(LcCommandFailed("tzutil /s: \{err}"))
+        Err(e) => Err(LcCommandFailed(e.to_string()))
+      }
+    }
     _ => Err(LcUnsupported)
   }
 }
 
 ///|
-/// 当前本地语言（$LANG 环境变量，如 "zh_CN.UTF-8"；未设置或为空 →
+/// 当前本地语言：Linux 读 $LANG 环境变量（如 "zh_CN.UTF-8"）；Windows
+/// 给用户界面区域名（BCP-47 形态，如 "zh-CN"；未设置或为空 →
 /// LcUnsupported）。
 pub fn lc_lang() -> Result[String, LocaleError] {
+  if @yue.platform() == "windows" {
+    let ok = Ref(0)
+    let lang = lc_trim(@utf8.decode_lossy(@yue.ffi_win_lang(ok)))
+    if ok.val != 1 || lang == "" {
+      return Err(LcUnsupported)
+    }
+    return Ok(lang)
+  }
   match @env.get_env_var("LANG") {
     None => Err(LcUnsupported)
     Some(v) => {

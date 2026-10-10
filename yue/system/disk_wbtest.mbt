@@ -365,6 +365,25 @@ test "dsk_lsblk_args：命令构造（只读枚举参数）" {
 
 ///|
 test "dsk_volumes 真机只读冒烟（无后端时跳过）" {
+  if @yue.platform() == "windows" {
+    // Windows 直连：盘符形如 "C:"，挂载点为根路径，恒有系统卷
+    match dsk_volumes() {
+      Err(e) => {
+        println("dsk_volumes failed: \{e}")
+        assert_true(false)
+      }
+      Ok(vols) => {
+        assert_true(vols.length() > 0)
+        for v in vols {
+          assert_true(v.device.length() == 2 && v.device[1] == ':')
+          assert_true(v.mountpoint is Some(_))
+          assert_true(v.size_bytes >= 0L)
+          println("dsk: \{v}")
+        }
+      }
+    }
+    return
+  }
   if !dsk_supported() {
     println("dsk: skip (no udisks2/lsblk)")
     return
@@ -416,6 +435,21 @@ test "dsk_volumes 真机只读冒烟（无后端时跳过）" {
 
 ///|
 test "dsk_mount/dsk_unmount：设置类动作不执行（仅校验参数路径）" {
+  if @yue.platform() == "windows" {
+    // Windows：卷恒挂载 → mount 恒 AlreadyMounted；卸载走安全移除（不在
+    // 本批）→ Unsupported
+    let c : DskVolume = {
+      device: "C:",
+      label: "",
+      mountpoint: Some("C:\\"),
+      size_bytes: 0L,
+      removable: false,
+      path: "",
+    }
+    assert_true(dsk_mount(c) is Err(AlreadyMounted(_)))
+    assert_true(dsk_unmount(c) is Err(Unsupported))
+    return
+  }
   // 空设备名与非法设备路径都应在调用侧即被拒（不会走到总线）
   let empty : DskVolume = {
     device: "",

@@ -567,19 +567,57 @@ fn dsk_fs_action(path : String, action : String) -> Result[Unit, DiskError] {
 /// 当前系统是否支持磁盘卷管理：udisks2 在线（完整能力）或 lsblk 命令可用
 /// （仅枚举）。每次调用真实探测，高频场景请调用方自行缓存结果。
 pub fn dsk_supported() -> Bool {
+  if @yue.platform() == "windows" {
+    return true
+  }
   dsk_probe() is Some(_)
 }
 
 ///|
-/// 枚举可挂载卷（device/label/mountpoint/size_bytes/removable）。探测
-/// 优先级：udisks2 D-Bus 通 → 用 D-Bus；否则回退 lsblk 输出解析。系统无
-/// 任何卷（台式机）返回 Ok(空列表)。
+/// 枚举卷（device/label/mountpoint/size_bytes/removable）。Linux 探测
+/// 优先级：udisks2 D-Bus 通 → 用 D-Bus；否则回退 lsblk 输出解析；Windows
+/// 走 GetLogicalDrives/GetVolumeInformation 直连（盘符即 device，根路径
+/// 即挂载点——Windows 卷恒处于挂载态）。系统无任何卷（台式机）返回
+/// Ok(空列表)。
 pub fn dsk_volumes() -> Result[Array[DskVolume], DiskError] {
+  if @yue.platform() == "windows" {
+    let ok = Ref(0)
+    let text = @utf8.decode_lossy(@yue.ffi_dsk_volumes(ok))
+    if ok.val != 1 {
+      return Err(CommandFailed("GetLogicalDrives 失败"))
+    }
+    return Ok(dsk_parse_win_volumes(text))
+  }
   match dsk_probe() {
     None => Err(Unsupported)
     Some(Udisks) => dsk_volumes_udisks()
     Some(Lsblk) => dsk_volumes_lsblk()
   }
+}
+
+///|
+/// 解析 Windows 直连文本（"C:|label|total|free|kind" 行；kind：0=固定
+/// 1=可移除 2=光驱 3=网络 4=虚拟盘）。
+pub fn dsk_parse_win_volumes(text : String) -> Array[DskVolume] {
+  let out : Array[DskVolume] = []
+  for line in text.split("\n") {
+    let fields = sys_split_fields(line.to_owned(), '|')
+    if fields.length() != 5 {
+      continue
+    }
+    let kind = try @string.parse_int(fields[4]) catch {
+      _ => 0
+    }
+    out.push({
+      device: fields[0],
+      label: fields[1],
+      mountpoint: Some(fields[0] + "\\"),
+      size_bytes: sys_parse_i64(fields[2]),
+      removable: kind == 1 || kind == 2,
+      path: "",
+    })
+  }
+  out
 }
 
 ///|
@@ -660,14 +698,23 @@ fn dsk_fs_apply(volume : DskVolume, action : String) -> Result[Unit, DiskError] 
 }
 
 ///|
-/// 挂载卷（udisks2 在系统总线上 Filesystem.Mount；不可用时返回
-/// Unsupported）。已挂载返回 AlreadyMounted。
+/// 挂载卷（Linux：udisks2 在系统总线上 Filesystem.Mount，不可用时返回
+/// Unsupported，已挂载返回 AlreadyMounted；Windows：卷恒处于挂载态，
+/// 恒返回 AlreadyMounted）。
 pub fn dsk_mount(volume : DskVolume) -> Result[Unit, DiskError] {
+  if @yue.platform() == "windows" {
+    return Err(AlreadyMounted(volume.device))
+  }
   dsk_fs_apply(volume, "Mount")
 }
 
 ///|
-/// 卸载卷（Filesystem.Unmount）。未挂载返回 NotMounted。
+/// 卸载卷（Linux：Filesystem.Unmount，未挂载返回 NotMounted；Windows：
+/// 弹出介质（CM_RequestDeviceEject 安全移除）不在本批，返回
+/// Unsupported）。
 pub fn dsk_unmount(volume : DskVolume) -> Result[Unit, DiskError] {
+  if @yue.platform() == "windows" {
+    return Err(Unsupported)
+  }
   dsk_fs_apply(volume, "Unmount")
 }

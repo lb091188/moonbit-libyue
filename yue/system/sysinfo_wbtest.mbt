@@ -230,12 +230,15 @@ test "本机 /proc/uptime:秒数为正且量级合理" {
 ///|
 test "本机 DMI:sys_vendor/product_name 可读,product_serial 可缺" {
   // 多数发行版 product_serial 仅 root 可读,读不到给 Err 不糊弄;可读
-  // 时三项均应为非空
+  // 时三项均应为非空。Windows 侧 serial 无注册表对应恒空串(文档边界),
+  // 只断言 vendor/product。
   match si_machine() {
     Ok(m) => {
       assert_true(m.vendor != "")
       assert_true(m.product != "")
-      assert_true(m.serial != "")
+      if @yue.platform() == "linux" {
+        assert_true(m.serial != "")
+      }
     }
     Err(SiReadFailed(_)) => ()
     Err(_) => assert_true(false, msg="si_machine 只应给 ReadFailed 或 Ok")

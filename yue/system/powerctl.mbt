@@ -229,9 +229,12 @@ fn pwrc_session_call(
 // ---------------------------------------------------------------------------
 
 ///|
-/// 当前系统是否支持电源控制（Linux 且 logind 在线）。每次调用真实探测，
-/// 高频场景请调用方自行缓存结果。
+/// 当前系统是否支持电源控制（Linux 且 logind 在线；Windows 恒支持）。
+/// 每次调用真实探测，高频场景请调用方自行缓存结果。
 pub fn pwrc_supported() -> Bool {
+  if @yue.platform() == "windows" {
+    return true
+  }
   if @yue.platform() != "linux" {
     return false
   }
@@ -251,7 +254,8 @@ pub fn pwrc_supported() -> Bool {
 ///|
 /// 枚举登录会话（会话号/用户名/uid/座位/对象路径）；logind 不在线时返回
 /// Unsupported。本机桌面会话通常形如 seat0 上的 c2/c3（c 前缀为图形
-/// 会话序号）。
+/// 会话序号）。Windows 无对应枚举（WTS 会话表与本结构不同构），
+/// LcUnsupported 语义由 [pwrc_logout_self] 的注销动作覆盖。
 pub fn pwrc_sessions() -> Result[Array[SessionInfo], PwrcError] {
   match pwrc_manager_call("ListSessions") {
     Err(e) => Err(e)
@@ -261,8 +265,12 @@ pub fn pwrc_sessions() -> Result[Array[SessionInfo], PwrcError] {
 
 ///|
 /// 查询当前环境是否允许关机（Can* 结果为 yes/challenge 为允许）。logind
-/// 不在线时返回 Unsupported；其它查询失败为 BusFailed。
+/// 不在线时返回 Unsupported；其它查询失败为 BusFailed；Windows 恒允许
+/// （动作本身要 SE_SHUTDOWN_NAME 特权，由动作执行处开通）。
 pub fn pwrc_can_power_off() -> Result[Bool, PwrcError] {
+  if @yue.platform() == "windows" {
+    return Ok(true)
+  }
   match pwrc_manager_call("CanPowerOff") {
     Err(e) => Err(e)
     Ok(@traybus.GVString(s)) => Ok(pwrc_can_parse(s))
@@ -273,6 +281,9 @@ pub fn pwrc_can_power_off() -> Result[Bool, PwrcError] {
 ///|
 /// 查询当前环境是否允许重启（CanReboot）。语义同 [pwrc_can_power_off]。
 pub fn pwrc_can_reboot() -> Result[Bool, PwrcError] {
+  if @yue.platform() == "windows" {
+    return Ok(true)
+  }
   match pwrc_manager_call("CanReboot") {
     Err(e) => Err(e)
     Ok(@traybus.GVString(s)) => Ok(pwrc_can_parse(s))
@@ -281,9 +292,14 @@ pub fn pwrc_can_reboot() -> Result[Bool, PwrcError] {
 }
 
 ///|
-/// 关机（logind PowerOff，interactive=true 允许 polkit 交互授权）。
-/// 需要 polkit 授权；环境不允许时返回 NotAllowed。
+/// 关机（有副作用）：Linux 走 logind PowerOff（interactive=true 允许
+/// polkit 交互授权，环境不允许时返回 NotAllowed）；Windows 走
+/// ExitWindowsEx(EWX_POWEROFF|EWX_FORCEIFHUNG)（进程内开通关机特权，
+/// 温和模式只杀挂起进程）。
 pub fn pwrc_power_off() -> Result[Unit, PwrcError] {
+  if @yue.platform() == "windows" {
+    return pwrc_win_shutdown(0)
+  }
   match
     @traybus.gdbus_call_system(
       pwrc_logind,
@@ -298,9 +314,12 @@ pub fn pwrc_power_off() -> Result[Unit, PwrcError] {
 }
 
 ///|
-/// 重启（logind Reboot，interactive=true 允许 polkit 交互授权）。
-/// 需要 polkit 授权；环境不允许时返回 NotAllowed。
+/// 重启（有副作用）：Linux 走 logind Reboot；Windows 走
+/// ExitWindowsEx(EWX_REBOOT|EWX_FORCEIFHUNG)。
 pub fn pwrc_reboot() -> Result[Unit, PwrcError] {
+  if @yue.platform() == "windows" {
+    return pwrc_win_shutdown(1)
+  }
   match
     @traybus.gdbus_call_system(
       pwrc_logind,
@@ -315,19 +334,39 @@ pub fn pwrc_reboot() -> Result[Unit, PwrcError] {
 }
 
 ///|
+/// Windows 关机类动作公共实现：shim 临时开通 SE_SHUTDOWN_NAME 特权后
+/// ExitWindowsEx；失败按 GetLastError 码给 NotAllowed。
+fn pwrc_win_shutdown(how : Int) -> Result[Unit, PwrcError] {
+  let ok = Ref(0)
+  let r = @yue.ffi_win_shutdown(how, ok)
+  if r == 0 && ok.val == 1 {
+    return Ok(())
+  }
+  Err(NotAllowed("ExitWindowsEx 失败（错误码 \{r}）"))
+}
+
+///|
 /// 注销指定会话（logind 会话对象的 Terminate；传入 [pwrc_sessions] 枚举
-/// 所得的会话）。仅终止该会话自身，不影响其它用户。
+/// 所得的会话）。仅终止该会话自身，不影响其它用户。Windows 无逐会话
+/// 终断对应（会话表结构不同），返回 Unsupported。
 pub fn pwrc_logout(session : SessionInfo) -> Result[Unit, PwrcError] {
   if session.path == "" {
     return Err(BusFailed("会话对象路径为空"))
+  }
+  if @yue.platform() == "windows" {
+    return Err(Unsupported)
   }
   pwrc_session_call(session.path, "Terminate")
 }
 
 ///|
-/// 注销当前会话：取第一个非空 seat 的会话（多会话时只退本座位的首个）。
-/// 无任何会话时返回 Unsupported。
+/// 注销当前会话（有副作用）：Linux 取第一个非空 seat 的会话（多会话时
+/// 只退本座位的首个）；Windows 走 ExitWindowsEx(EWX_LOGOFF)（当前用户
+/// 全部会话）。无任何会话时返回 Unsupported。
 pub fn pwrc_logout_self() -> Result[Unit, PwrcError] {
+  if @yue.platform() == "windows" {
+    return pwrc_win_shutdown(2)
+  }
   match pwrc_sessions() {
     Err(e) => Err(e)
     Ok(sessions) => {

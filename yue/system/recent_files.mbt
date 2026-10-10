@@ -921,8 +921,16 @@ pub fn rf_data_dir(xdg_data_home : String?, home : String?) -> String? {
 }
 
 ///|
-/// 本机 recently-used.xbel 路径（非 Linux 给 None）。
-fn rf_recent_file() -> String? {
+/// 本机最近文件数据源定位：Linux 为 XDG 数据目录的 recently-used.xbel；
+/// Windows 为 %APPDATA%\Microsoft\Windows\Recent（.lnk 集合）；其余平台
+/// None。
+fn rf_recent_source() -> String? {
+  if @yue.platform() == "windows" {
+    return match getenv_str("APPDATA") {
+      Some(d) if d != "" => Some(d + "/Microsoft/Windows/Recent")
+      _ => None
+    }
+  }
   if @yue.platform() != "linux" {
     return None
   }
@@ -933,12 +941,16 @@ fn rf_recent_file() -> String? {
 }
 
 ///|
-/// 读取并解析 recently-used.xbel（每次调用真实读盘）。
+/// 读取并解析最近文件条目：Linux 读 recently-used.xbel；Windows 枚举
+/// Recent 目录 .lnk 并逐个解析目标路径与 mtime（每次调用真实读盘）。
 fn rf_load_entries() -> Result[Array[RfEntry], RecentError] {
+  if @yue.platform() == "windows" {
+    return rf_load_win()
+  }
   if @yue.platform() != "linux" {
     return Err(RfUnsupported)
   }
-  let path = match rf_recent_file() {
+  let path = match rf_recent_source() {
     Some(p) => p
     None => return Err(RfNoDataDir)
   }
@@ -953,10 +965,62 @@ fn rf_load_entries() -> Result[Array[RfEntry], RecentError] {
 }
 
 ///|
-/// 本机是否可读 GTK 最近文件（Linux 且 recently-used.xbel 可读）。
-/// 每次调用真实探测，高频场景请调用方自行缓存结果。
+/// Windows 路径：毫秒时间戳文本 → Int64（非法为 0）。
+fn rf_parse_ms(s : String) -> Int64 {
+  sys_parse_i64(s)
+}
+
+///|
+/// Windows 读取路径：枚举 Recent 目录 .lnk → shim 解析 "mtime\t目标路径"
+/// → RfEntry（uri 为目标路径本体、mime 无来源、应用名无来源 app_count=1、
+/// added=0 / modified 取 .lnk mtime）。
+fn rf_load_win() -> Result[Array[RfEntry], RecentError] {
+  let dir = match rf_recent_source() {
+    Some(d) => d
+    None => return Err(RfNoDataDir)
+  }
+  let names = match @yue.fsx_list_dir(dir) {
+    Ok(ns) => ns
+    Err(_) => return Err(RfNoFile)
+  }
+  let entries : Array[RfEntry] = []
+  for name in names {
+    if !appfind_is_lnk(name) {
+      continue
+    }
+    let lnk_path = dir + "/" + name
+    let ok = Ref(0)
+    let text = @utf8.decode_lossy(@yue.ffi_lnk_target(@yue.utf8_bytes(lnk_path), ok))
+    if ok.val != 1 {
+      continue // 解析失败（无目标/损坏）：跳过该项
+    }
+    let fields = sys_split_fields(text, '\t')
+    if fields.length() != 2 || fields[1] == "" {
+      continue
+    }
+    entries.push({
+      uri: fields[1],
+      mime: None,
+      added: 0L,
+      modified: rf_parse_ms(fields[0]),
+      apps: [""], // .lnk 无应用名来源；空串占位
+    })
+  }
+  Ok(entries)
+}
+
+///|
+/// 本机是否可读最近文件（Linux 且 recently-used.xbel 可读；Windows 且
+/// Recent 目录可枚举）。每次调用真实探测，高频场景请调用方自行缓存。
 pub fn rf_supported() -> Bool {
-  match rf_recent_file() {
+  if @yue.platform() == "windows" {
+    let dir = match rf_recent_source() {
+      Some(d) => d
+      None => return false
+    }
+    return @yue.fsx_list_dir(dir) is Ok(_)
+  }
+  match rf_recent_source() {
     Some(p) => @yue.read_text_file(p) is Some(_)
     None => false
   }

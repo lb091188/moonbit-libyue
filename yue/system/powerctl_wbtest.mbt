@@ -139,6 +139,10 @@ test "pwrc_bus_err/pwrc_session_err：错误名映射" {
 
 ///|
 test "pwrc 真机只读冒烟（logind 不在线时跳过）" {
+  if @yue.platform() == "windows" {
+    println("pwrc: skip (Windows 无 logind 会话表，语义见 pwrc_windows 冒烟)")
+    return
+  }
   if !pwrc_supported() {
     println("pwrc: skip (logind offline)")
     return
@@ -177,4 +181,18 @@ test "pwrc 真机只读冒烟（logind 不在线时跳过）" {
 test "pwrc_logout：空会话路径在调用侧即拒（不触发总线动作）" {
   let empty : SessionInfo = { id: "", uid: 0, user: "", seat: "", path: "", }
   assert_true(pwrc_logout(empty) is Err(BusFailed(_)))
+}
+
+///|
+test "pwrc Windows 冒烟：supported 恒真 / Can* 恒允许 / 会话表 Unsupported" {
+  if @yue.platform() != "windows" {
+    return
+  }
+  assert_true(pwrc_supported())
+  assert_true(pwrc_can_power_off() is Ok(true))
+  assert_true(pwrc_can_reboot() is Ok(true))
+  assert_true(pwrc_sessions() is Err(Unsupported))
+  // 逐会话终断无对应：非空路径在 Windows 也给 Unsupported
+  let s : SessionInfo = { id: "1", uid: 0, user: "u", seat: "", path: "/x", }
+  assert_true(pwrc_logout(s) is Err(Unsupported))
 }

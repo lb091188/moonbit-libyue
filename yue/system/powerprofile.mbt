@@ -272,17 +272,24 @@ fn pp_available() -> Bool {
 // ---------------------------------------------------------------------------
 
 ///|
-/// 当前系统是否支持电源计划（powerprofilesctl 存在且可查询）。每次调用
-/// 真实探测，高频场景请调用方自行缓存结果。
+/// 当前系统是否支持电源计划（Linux：powerprofilesctl 存在且可查询；
+/// Windows：电源计划 API 恒在）。每次调用真实探测，高频场景请调用方
+/// 自行缓存结果。
 pub fn pp_supported() -> Bool {
+  if @yue.platform() == "windows" {
+    return true
+  }
   pp_available()
 }
 
 ///|
-/// 可用电源计划列表（按 `powerprofilesctl list` 输出序；power-profiles-
-/// daemon 未安装 → PpUnsupported；查询失败 → PpCommandFailed；输出中
-/// 解析不到任何计划 → PpParseFailed）。
+/// 可用电源计划列表（Linux 按 `powerprofilesctl list` 输出序；Windows 枚举
+/// 系统电源方案，未知 GUID 的自定义方案跳过）。查询失败 →
+/// PpCommandFailed；解析不到任何已知计划 → PpParseFailed。
 pub fn pp_profiles() -> Result[Array[PowerProfile], PowerProfileError] {
+  if @yue.platform() == "windows" {
+    return pp_win_profiles()
+  }
   if !pr_available() {
     return Err(PpUnsupported)
   }
@@ -300,10 +307,13 @@ pub fn pp_profiles() -> Result[Array[PowerProfile], PowerProfileError] {
 }
 
 ///|
-/// 当前电源计划（`powerprofilesctl get`；power-profiles-daemon 未安装
-/// → PpUnsupported；查询失败 → PpCommandFailed；输出不是已知计划名 →
-/// PpParseFailed）。
+/// 当前电源计划（Linux：`powerprofilesctl get`；Windows 读活动方案 GUID
+/// 映射三档计划）。查询失败 → PpCommandFailed；活动方案是自定义方案 →
+/// PpParseFailed（带 GUID）。
 pub fn pp_current() -> Result[PowerProfile, PowerProfileError] {
+  if @yue.platform() == "windows" {
+    return pp_win_current()
+  }
   if !pr_available() {
     return Err(PpUnsupported)
   }
@@ -323,6 +333,9 @@ pub fn pp_current() -> Result[PowerProfile, PowerProfileError] {
 /// 调用方自行走授权流程）。power-profiles-daemon 未安装 → PpUnsupported；
 /// 查询与执行失败 → PpCommandFailed。
 pub fn pp_set(profile : PowerProfile) -> Result[Unit, PowerProfileError] {
+  if @yue.platform() == "windows" {
+    return pp_win_set(profile)
+  }
   if !pr_available() {
     return Err(PpUnsupported)
   }
@@ -341,4 +354,195 @@ pub fn pp_set(profile : PowerProfile) -> Result[Unit, PowerProfileError] {
       Err(PpCommandFailed("powerprofilesctl set: 被信号 \{sig} 终止"))
     Err(Unsupported) => Err(PpUnsupported)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Windows 实现：电源方案 GUID ↔ 三档计划映射（powrprof 直连）
+// ---------------------------------------------------------------------------
+
+///|
+/// 半字节值 → 十六进制字符（小写）。
+fn pp_hex_digit(d : Int) -> Char {
+  if d < 10 {
+    (d + 48).unsafe_to_char()
+  } else {
+    (d + 87).unsafe_to_char()
+  }
+}
+
+///|
+/// GUID 内存字节（小端前三字段）→ canonical 文本形（"381b4222-…"，
+/// 便于比对与错误信息呈现）。
+pub fn pp_guid_text(b : Bytes, off : Int) -> String {
+  let sb = StringBuilder()
+  let write_byte = fn(i : Int) {
+    let v = b[off + i].to_int()
+    sb.write_char(pp_hex_digit(v >> 4))
+    sb.write_char(pp_hex_digit(v & 15))
+  }
+  for i = 3; i >= 0; i = i - 1 {
+    write_byte(i)
+  }
+  sb.write_char('-')
+  for i = 5; i >= 4; i = i - 1 {
+    write_byte(i)
+  }
+  sb.write_char('-')
+  for i = 7; i >= 6; i = i - 1 {
+    write_byte(i)
+  }
+  sb.write_char('-')
+  write_byte(8)
+  write_byte(9)
+  sb.write_char('-')
+  for i = 10; i < 16; i = i + 1 {
+    write_byte(i)
+  }
+  sb.to_string()
+}
+
+///|
+/// 系统内置三档方案的 GUID canonical 文本（Windows 电源方案注册表同款）。
+let pp_win_guids : Array[(PowerProfile, String)] = [
+  (PPerformance, "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"),
+  (PBalanced, "381b4222-f694-41f0-9685-ff5bb260df2e"),
+  (PPowerSaver, "a1841308-3541-4fab-bc81-f71556f20b4a"),
+]
+
+///|
+/// GUID 文本 → 计划（未知为 None）。
+fn pp_profile_of_guid(text : String) -> PowerProfile? {
+  for pair in pp_win_guids {
+    if pair.1 == text {
+      return Some(pair.0)
+    }
+  }
+  None
+}
+
+///|
+/// 十六进制字符 → 半字节值（非法字符为 None）。
+fn pp_nibble(c : Int) -> Int? {
+  if c >= 48 && c <= 57 {
+    Some(c - 48)
+  } else if c >= 97 && c <= 102 {
+    Some(c - 87)
+  } else if c >= 65 && c <= 70 {
+    Some(c - 55)
+  } else {
+    None
+  }
+}
+
+///|
+/// GUID 文本（canonical 形，'-' 可有可无）的小端内存字节（前三段字节
+/// 反转、后两段原序）。
+pub fn pp_guid_bytes(text : String) -> Bytes {
+  let digits : Array[Int] = []
+  for i = 0; i < text.length(); i = i + 1 {
+    let c = text.unsafe_get(i).to_int()
+    if c != 45 {
+      digits.push(c) // '-'
+    }
+  }
+  let canonical = FixedArray::make(16, b'\x00')
+  for i = 0; i < 16 && i * 2 + 1 < digits.length(); i = i + 1 {
+    let hi = match pp_nibble(digits[i * 2]) {
+      Some(v) => v
+      None => 0
+    }
+    let lo = match pp_nibble(digits[i * 2 + 1]) {
+      Some(v) => v
+      None => 0
+    }
+    canonical[i] = ((hi * 16) + lo).to_byte()
+  }
+  // 内存布局:Data1(4B 小端) Data2(2B) Data3(2B) Data4(8B 原序)
+  let out = FixedArray::make(16, b'\x00')
+  for i = 0; i < 4; i = i + 1 {
+    out[i] = canonical[3 - i]
+  }
+  for i = 0; i < 2; i = i + 1 {
+    out[4 + i] = canonical[5 - i]
+  }
+  for i = 0; i < 2; i = i + 1 {
+    out[6 + i] = canonical[7 - i]
+  }
+  for i = 8; i < 16; i = i + 1 {
+    out[i] = canonical[i]
+  }
+  Bytes::from_array(out)
+}
+
+///|
+/// Windows 枚举电源方案：逐 GUID 映射三档计划（未知方案跳过），保持
+/// 枚举序（系统注册序）。
+fn pp_win_profiles() -> Result[Array[PowerProfile], PowerProfileError] {
+  let buf = Bytes::make(16 * 16, b'0')
+  let ok = Ref(0)
+  let count = @yue.ffi_power_enumerate_guids(buf, 16, ok)
+  if ok.val != 1 || count < 0 {
+    return Err(PpCommandFailed("PowerEnumerate 失败（\{count}）"))
+  }
+  let out : Array[PowerProfile] = []
+  for i = 0; i < count; i = i + 1 {
+    match pp_profile_of_guid(pp_guid_text(buf, i * 16)) {
+      Some(p) => out.push(p)
+      None => ()
+    }
+  }
+  if out.is_empty() {
+    return Err(PpParseFailed("无已知电源方案"))
+  }
+  Ok(out)
+}
+
+///|
+/// Windows 当前方案：活动 GUID 映射三档，自定义方案 → PpParseFailed 带 GUID。
+fn pp_win_current() -> Result[PowerProfile, PowerProfileError] {
+  let buf = Bytes::make(16, b'0')
+  let ok = Ref(0)
+  let r = @yue.ffi_power_active_guid(buf, ok)
+  if r != 0 || ok.val != 1 {
+    return Err(PpCommandFailed("PowerGetActiveScheme 失败（\{r}）"))
+  }
+  let text = pp_guid_text(buf, 0)
+  match pp_profile_of_guid(text) {
+    Some(p) => Ok(p)
+    None => Err(PpParseFailed("自定义电源方案: \{text}"))
+  }
+}
+
+///|
+/// Windows 切换方案（PowerSetActiveScheme，需要管理员权限）。
+fn pp_win_set(profile : PowerProfile) -> Result[Unit, PowerProfileError] {
+  let guid = match pp_profile_of_guid_match(profile) {
+    Some(g) => g
+    None => return Err(PpCommandFailed("无内置方案 GUID"))
+  }
+  let ok = Ref(0)
+  let r = @yue.ffi_power_set_guid(pp_guid_bytes(guid), ok)
+  if r != 0 || ok.val != 1 {
+    return Err(
+      PpCommandFailed("PowerSetActiveScheme 失败（错误码 \{r}，需管理员）"),
+    )
+  }
+  Ok(())
+}
+
+///|
+/// 计划 → 内置方案 GUID 文本。
+fn pp_profile_of_guid_match(profile : PowerProfile) -> String? {
+  for pair in pp_win_guids {
+    let same = match (pair.0, profile) {
+      (PPerformance, PPerformance) => true
+      (PBalanced, PBalanced) => true
+      (PPowerSaver, PPowerSaver) => true
+      _ => false
+    }
+    if same {
+      return Some(pair.1)
+    }
+  }
+  None
 }

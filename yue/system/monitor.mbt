@@ -1,9 +1,10 @@
-// 显示器配置：解析 xrandr --query 的输出，给出每个输出的名称 / 连接
-// 状态 / 当前分辨率×刷新率 / 位置 / 物理尺寸 / 支持的模式列表。
-// 刷新率以「厘赫兹」整数表示（×100，如 5995 = 59.95Hz），避免浮点解析
-// 与比较。mon_current 只回当前（已连接且有当前模式）输出的简化快照，
-// 供窗口布局/多屏摆放使用。解析为纯函数，monitor_wbtest.mbt 用本机
-// 真实 xrandr 输出样例白盒覆盖。
+// 显示器配置：Linux 解析 xrandr --query 的输出，Windows 走
+// EnumDisplayDevices/EnumDisplaySettingsEx 直连（shim 输出同构文本），
+// 给出每个输出的名称 / 连接状态 / 当前分辨率×刷新率 / 位置 / 物理尺寸 /
+// 支持的模式列表。刷新率以「厘赫兹」整数表示（×100，如 5995 = 59.95Hz），
+// 避免浮点解析与比较。mon_current 只回当前（已连接且有当前模式）输出的
+// 简化快照，供窗口布局/多屏摆放使用。解析为纯函数，monitor_wbtest.mbt
+// 用本机真实 xrandr 输出样例白盒覆盖。
 
 ///|
 /// 单个显示模式：分辨率、刷新率厘赫兹（×100）、是否首选（'+'）、
@@ -641,8 +642,22 @@ fn mon_current_from(infos : Array[MonitorInfo]) -> Array[CurrentOutput] {
 
 ///|
 /// 枚举全部输出（含未连接）：名称 / 连接状态 / 当前分辨率×刷新率 /
-/// 位置 / 物理尺寸 / 支持的模式列表。
+/// 位置 / 物理尺寸 / 支持的模式列表。Linux 解析 xrandr；Windows 走
+/// EnumDisplayDevices/EnumDisplaySettingsEx（物理毫米尺寸 Windows 无
+/// 直接对应，恒 0）。
 pub fn mon_list() -> Result[Array[MonitorInfo], MonitorError] {
+  if @yue.platform() == "windows" {
+    let ok = Ref(0)
+    let text = @utf8.decode_lossy(@yue.ffi_mon_list(ok))
+    if ok.val != 1 {
+      return Err(CommandFailed("EnumDisplayDevices 失败"))
+    }
+    let infos = mon_parse_win(text)
+    if infos.length() == 0 {
+      return Err(ParseFailed("无任何显示输出"))
+    }
+    return Ok(infos)
+  }
   if @yue.platform() != "linux" {
     return Err(Unsupported)
   }
@@ -661,6 +676,86 @@ pub fn mon_list() -> Result[Array[MonitorInfo], MonitorError] {
         Ok(infos)
       }
     }
+  }
+}
+
+///|
+/// 解析 Windows 直连文本（H| 头行 + M| 模式行，'|' 分隔字段）：
+/// H|name|connected|primary|w|h|refresh_centi|pos_x|pos_y；
+/// M|w|h|refresh_centi|preferred|current。物理毫米恒 0。
+pub fn mon_parse_win(text : String) -> Array[MonitorInfo] {
+  let out : Array[MonitorInfo] = []
+  for line in mon_split_lines(text) {
+    if line.has_prefix("H|") {
+      let fields = mon_split_bar(line)
+      if fields.length() >= 9 {
+        out.push({
+          name: fields[1],
+          connected: fields[2] == "1",
+          primary: fields[3] == "1",
+          width: mon_parse_uint(fields[4]),
+          height: mon_parse_uint(fields[5]),
+          refresh_centi: mon_parse_uint(fields[6]),
+          pos_x: mon_parse_uint(fields[7]),
+          pos_y: mon_parse_uint(fields[8]),
+          mm_width: 0,
+          mm_height: 0,
+          modes: [],
+        })
+      }
+    } else if line.has_prefix("M|") {
+      let fields = mon_split_bar(line)
+      if fields.length() >= 6 && out.length() > 0 {
+        let last = out[out.length() - 1]
+        last.modes.push({
+          width: mon_parse_uint(fields[1]),
+          height: mon_parse_uint(fields[2]),
+          refresh_centi: mon_parse_uint(fields[3]),
+          preferred: fields[4] == "1",
+          current: fields[5] == "1",
+        })
+      }
+    }
+  }
+  out
+}
+
+///|
+/// 按 '|' 切分文本（空字段保留为空串，首字段为标记 H/M）。
+fn mon_split_bar(line : String) -> Array[String] {
+  let out : Array[String] = []
+  let mut cur = StringBuilder()
+  for ch in line {
+    if ch == '|' {
+      out.push(cur.to_string())
+      cur = StringBuilder()
+    } else {
+      cur.write_char(ch)
+    }
+  }
+  out.push(cur.to_string())
+  out
+}
+
+///|
+/// 无符号十进制文本 → 整数（空串或含非数字为 0）。
+fn mon_parse_uint(s : String) -> Int {
+  let mut v = 0
+  let mut neg = false
+  for ch in s {
+    if ch == '-' && v == 0 && !neg {
+      neg = true
+      continue
+    }
+    if ch < '0' || ch > '9' {
+      return 0
+    }
+    v = v * 10 + (ch.to_int() - 48)
+  }
+  if neg {
+    -v
+  } else {
+    v
   }
 }
 

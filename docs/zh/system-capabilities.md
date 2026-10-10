@@ -15,17 +15,17 @@
 
 ## 屏幕亮度
 
-设备经 `brightness_devices()` 枚举（列表序即推荐序，原生驱动在前），读写以 `BrightnessDevice` 为句柄；读走 sysfs 只读，写走系统服务（logind）。
+设备经 `brightness_devices()` 枚举（列表序即推荐序，原生驱动在前），读写以 `BrightnessDevice` 为句柄；Linux 读走 sysfs 只读、写走系统服务（logind），Windows 走物理监视器 DDC/CI 直连（内建面板多不走 DDC，无 DDC 监视器时枚举为空列表）。
 
 | 函数 | 说明 |
 |---|---|
 | `brightness_supported() -> Bool` | 当前环境是否可设置亮度（读枚举 / 当前值不依赖它） |
-| `brightness_devices() -> Result[Array[BrightnessDevice], BrightnessError]` | 枚举背光设备；空列表 = 无背光或设备名不在探测表 |
+| `brightness_devices() -> Result[Array[BrightnessDevice], BrightnessError]` | 枚举背光 / DDC 设备；Linux 空列表 = 无背光或设备名不在探测表，Windows 空列表 = 无 DDC 监视器 |
 | `brightness_get(dev) -> Result[Int, BrightnessError]` | 当前亮度百分比（0-100，实时读） |
 | `brightness_set_percent(dev, percent) -> Result[Unit, BrightnessError]` | 设百分比（0-100，出界报错） |
 | `brightness_step_percent(dev, delta) -> Result[Unit, BrightnessError]` | 按百分比步进（delta 可正可负，加后钳 0-100） |
 
-`BrightnessDevice{ subsystem, name, max, current }`：subsystem 为 `"backlight"`（屏幕）、name 为 sysfs 设备名、max 为量程上限、current 为枚举时快照（实时值用 `brightness_get`）。设备名不在探测表时可手工构造 `BrightnessDevice` 访问。错误 `BrightnessError`：`Unsupported`（非 Linux 或系统服务不在线）/ `BusFailed(String)` / `DeviceNotFound` / `InvalidParam(String)`。
+`BrightnessDevice{ subsystem, name, max, current }`：subsystem 为 `"backlight"`（Linux 屏幕 sysfs）、`"leds"`（Linux 键盘背光）或 `"ddc"`（Windows 物理监视器，name 为 `\\.\DISPLAYn`）、max 为量程上限、current 为枚举时快照（实时值用 `brightness_get`）。设备名不在探测表时可手工构造 `BrightnessDevice` 访问。错误 `BrightnessError`：`Unsupported`（macOS 或系统服务不在线）/ `BusFailed(String)` / `DeviceNotFound` / `InvalidParam(String)`。
 
 ```moonbit
 match @system.brightness_devices() {
@@ -41,7 +41,7 @@ match @system.brightness_devices() {
 
 ## 键盘背光
 
-与屏幕亮度同构，仅子系统不同（`"leds"`），设备名形如 `input3::kbd_backlight`。
+与屏幕亮度同构，仅子系统不同（`"leds"`），设备名形如 `input3::kbd_backlight`。仅 Linux（Windows 键盘背光无公开 API，恒 `Unsupported`）。
 
 | 函数 | 说明 |
 |---|---|
@@ -63,7 +63,7 @@ match @system.kbd_brightness_devices() {
 
 ## 系统音量
 
-作用于默认输出设备（default sink）。后端自动探测：优先 wpctl（PipeWire/WirePlumber），不可用回退 pactl（pipewire-pulse / PulseAudio），两者都不可用即 `Unsupported`。探测每次真实执行，高频场景请调用方自行缓存结果。
+作用于默认输出设备（Linux default sink / Windows 默认输出端点）。Linux 后端自动探测：优先 wpctl（PipeWire/WirePlumber），不可用回退 pactl（pipewire-pulse / PulseAudio），两者都不可用即 `Unsupported`；Windows 走 Core Audio 直连（默认输出端点标量音量）。探测每次真实执行，高频场景请调用方自行缓存结果。
 
 | 函数 | 说明 |
 |---|---|
@@ -90,7 +90,7 @@ let _ = @system.vol_set_mute(false)
 
 ### 音量增强（输出设备与逐应用音量 volx_）
 
-`volx_` 前缀的第二组能力：设备枚举、默认设备切换、逐应用播放流音量。这一组依赖 pactl（wpctl 无等价的设备枚举与逐流接口），单独探测门控，探测失败不影响 `vol_` 组行为。
+`volx_` 前缀的第二组能力：设备枚举、默认设备切换、逐应用播放流音量。这一组依赖 pactl（wpctl 无等价的设备枚举与逐流接口），单独探测门控，探测失败不影响 `vol_` 组行为。仅 Linux（Windows 侧 IAudioSessionManager2 逐流枚举不在本批，恒 `Unsupported`）。
 
 | 函数 | 说明 |
 |---|---|
@@ -146,7 +146,7 @@ match @system.appfind_executable("code") {
 
 ## 默认应用查询
 
-查询文件类型与 MIME 类型的默认应用、枚举某类型的全部关联应用，以及设置默认应用。查询走 `xdg-mime`（PATH 探测），关联枚举直读三层 `mimeapps.list`（XDG mimeapps 规范：用户配置 `~/.config/mimeapps.list` 优先、`~/.local/share/applications/mimeapps.list` 次之、`/usr/share/applications/mimeapps.list` 兜底）。仅 Linux。
+查询文件类型的默认应用、枚举某类型的全部关联应用，以及设置默认应用。Linux 查询走 `xdg-mime`（PATH 探测），关联枚举直读三层 `mimeapps.list`（XDG mimeapps 规范：用户配置 `~/.config/mimeapps.list` 优先、`~/.local/share/applications/mimeapps.list` 次之、`/usr/share/applications/mimeapps.list` 兜底）；Windows 查询走 `AssocQueryString`（mime 传扩展名（`.txt`）或协议（`http`），默认应用返回可执行文件完整路径而非 `.desktop` 名，关联枚举无对应接口恒空，`da_set_default` 走 IApplicationAssociationRegistration（需 UI 授权）不在本批给 `Unsupported`）。
 
 | 函数 | 说明 |
 |---|---|
@@ -242,7 +242,7 @@ let _ = @system.bh_search("moonbit", limit=10)
 
 ## 媒体控制（MPRIS）
 
-枚举会话总线上的 `org.mpris.MediaPlayer2.*` 播放器实例，播放控制（play / pause / play_pause / next / previous / stop）与状态读取（PlaybackStatus + Metadata 的 title / artist / album）走 MPRIS Player 接口；总线失败的播放控制可回退 `playerctl` 子命令（命令类回退路径）。目前仅实现 Linux 路径，其余平台一律 `Unsupported`。
+枚举会话总线上的 `org.mpris.MediaPlayer2.*` 播放器实例，播放控制（play / pause / play_pause / next / previous / stop）与状态读取（PlaybackStatus + Metadata 的 title / artist / album）走 MPRIS Player 接口；总线失败的播放控制可回退 `playerctl` 子命令（命令类回退路径）。仅实现 Linux 路径（Windows 的 SMTC 系统媒体控制不在本批），其余平台一律 `Unsupported`。
 
 | 函数 | 说明 |
 |---|---|
@@ -309,7 +309,7 @@ n.show()
 
 ## 夜间色温
 
-以百分比 0-100 表示色温（0 = 最暖、100 = 6500K 中性即不改动）。两条后端自动探测：`redshift` 存在时优先（`-P -O <K>` 一次性设色温），否则 `xrandr --output <首选输出> --gamma R:G:B`（蓝通道衰减越多越暖；绿通道恒 1.00）。
+以百分比 0-100 表示色温（0 = 最暖、100 = 6500K 中性即不改动）。仅 Linux：`redshift` 存在时优先（`-P -O <K>` 一次性设色温），否则 `xrandr --output <首选输出> --gamma R:G:B`（蓝通道衰减越多越暖；绿通道恒 1.00）。Windows 夜间光的注册表键无公开 API，恒 `Unsupported`。
 
 | 函数 | 说明 |
 |---|---|
@@ -326,14 +326,14 @@ let _ = @system.nl_reset()
 
 ## 壁纸
 
-按桌面环境分派（DE 识别复用 `@traybus.detect_desktop()`，即 `XDG_CURRENT_DESKTOP`）。**XFCE** 走 `xfconf-query` 读写 xfce4-desktop 频道的 `/backdrop/<screen>/monitor<输出>/<workspace>/last-image` 属性（多个显示器时取已连接输出）；**GNOME** 走 `gsettings` 读写 `org.gnome.desktop.background` 的 `picture-uri`（未设置回退 `picture-uri-dark`）；**KDE** 走 `qdbus6`/`qdbus` 调 plasmashell 的 `evaluateScript`（Plasma 脚本约定，本仓库未在 KDE 真机验证）。
+按平台与桌面环境分派。Windows 走 `SystemParametersInfo`（SPI_GET/SETDESKWALLPAPER）直连；Linux 按 DE 分派（DE 识别复用 `@traybus.detect_desktop()`，即 `XDG_CURRENT_DESKTOP`）：**XFCE** 走 `xfconf-query` 读写 xfce4-desktop 频道的 `/backdrop/<screen>/monitor<输出>/<workspace>/last-image` 属性（多个显示器时取已连接输出）；**GNOME** 走 `gsettings` 读写 `org.gnome.desktop.background` 的 `picture-uri`（未设置回退 `picture-uri-dark`）；**KDE** 走 `qdbus6`/`qdbus` 调 plasmashell 的 `evaluateScript`（Plasma 脚本约定，本仓库未在 KDE 真机验证）。
 
 | 函数 | 说明 |
 |---|---|
 | `wp_get() -> Result[String, WallpaperError]` | 读当前壁纸路径 |
 | `wp_set(path) -> Result[Unit, WallpaperError]` | 设置壁纸（会改变桌面外观） |
 
-错误 `WallpaperError`：`Unsupported`（非 Linux、子进程不可用、KDE 的 qdbus 不在）/ `UnknownDesktop(String)`（非 XFCE/GNOME/KDE，带 `XDG_CURRENT_DESKTOP` 原文）/ `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)`。XFCE 写入时属性不存在会创建。
+错误 `WallpaperError`：`Unsupported`（macOS、Linux 子进程不可用、KDE 的 qdbus 不在）/ `UnknownDesktop(String)`（Linux 非 XFCE/GNOME/KDE，带 `XDG_CURRENT_DESKTOP` 原文）/ `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)`。XFCE 写入时属性不存在会创建。
 
 ```moonbit
 match @system.wp_get() {
@@ -416,14 +416,14 @@ systemprobe 启动即自动载入演示播放器，播放/暂停/拖进度/音�
 
 ## 显示器配置
 
-解析 `xrandr --query` 输出，给出每个输出的名称 / 连接状态 / 当前分辨率 × 刷新率 / 位置 / 物理尺寸 / 支持的模式列表。刷新率以厘赫兹整数表示（×100，如 5995 = 59.95Hz），避免浮点解析与比较。
+给出每个输出的名称 / 连接状态 / 当前分辨率 × 刷新率 / 位置 / 物理尺寸 / 支持的模式列表。Linux 解析 `xrandr --query` 输出；Windows 走 `EnumDisplayDevices`/`EnumDisplaySettingsEx` 直连（name 为 `\\.\DISPLAYn`，物理毫米尺寸无直接对应恒 0，Windows 也无首选模式标记 preferred 恒 false）。刷新率以厘赫兹整数表示（×100，如 5995 = 59.95Hz），避免浮点解析与比较。
 
 | 函数 | 说明 |
 |---|---|
-| `mon_list() -> Result[Array[MonitorInfo], MonitorError]` | 枚举全部输出（含未连接），保持 xrandr 顺序 |
+| `mon_list() -> Result[Array[MonitorInfo], MonitorError]` | 枚举全部输出（含未连接），保持后端返回序 |
 | `mon_current() -> Result[Array[CurrentOutput], MonitorError]` | 当前输出简化快照（已连接且有当前模式），不含模式列表 |
 
-`MonitorInfo{ name, connected, primary, width, height, refresh_centi, pos_x, pos_y, mm_width, mm_height, modes }`；`MonitorMode{ width, height, refresh_centi, preferred, current }`；`CurrentOutput{ name, width, height, refresh_centi, pos_x, pos_y }`。错误 `MonitorError`：`Unsupported`（非 Linux 或 xrandr 不可用）/ `CommandFailed(String)` / `ParseFailed(String)`（无任何输出条目）。
+`MonitorInfo{ name, connected, primary, width, height, refresh_centi, pos_x, pos_y, mm_width, mm_height, modes }`；`MonitorMode{ width, height, refresh_centi, preferred, current }`；`CurrentOutput{ name, width, height, refresh_centi, pos_x, pos_y }`。错误 `MonitorError`：`Unsupported`（macOS 或 Linux xrandr 不可用）/ `CommandFailed(String)` / `ParseFailed(String)`（无任何输出条目）。
 
 ```moonbit
 match @system.mon_current() {
@@ -434,18 +434,18 @@ match @system.mon_current() {
 }
 ```
 
-## 系统窗口管理（X11）
+## 系统窗口管理
 
-解析 `wmctrl -l` 的窗口列表（窗口 id / 桌面 / 主机 / 标题），并按 id 或标题激活、按标题关闭窗口。不依赖 libyue GUI 应用环境，普通 MoonBit 进程即可使用（命令经 `pr_run` 执行）。
+Linux（X11）解析 `wmctrl -l` 的窗口列表（窗口 id / 桌面 / 主机 / 标题）并按 id 或标题激活、按标题关闭窗口；Windows 走 Win32 直连（`EnumWindows` 可见窗口列表 / 置前（最小化先恢复，前台互斥下带回退手段）/ `WM_CLOSE` 温和关闭）。不依赖 libyue GUI 应用环境，普通 MoonBit 进程即可使用（Linux 命令经 `pr_run` 执行）。
 
 | 函数 | 说明 |
 |---|---|
-| `win_supported() -> Bool` | Linux 且 wmctrl 可用（wmctrl 缺失时 Unix 以退出码 127 呈现） |
+| `win_supported() -> Bool` | Linux 且 wmctrl/xdotool 可用；Windows 恒可用 |
 | `win_list() -> Result[Array[WindowInfo], WinError]` | 窗口列表 |
-| `win_activate(id_or_title) -> Result[Unit, WinError]` | 按窗口 id（wmctrl 的 `0x...` 十六进制）或标题激活 |
-| `win_close(title) -> Result[Unit, WinError]` | 按标题关闭窗口 |
+| `win_activate(id_or_title) -> Result[Unit, WinError]` | 按窗口 id（`0x` 十六进制）或标题子串激活（不区分大小写） |
+| `win_close(title) -> Result[Unit, WinError]` | 按标题子串关闭首个匹配窗口 |
 
-`WindowInfo{ id, desktop, host, title }`：id 可直接回传 `win_activate`；desktop 为窗口所在桌面，-1 为全部桌面（sticky）。错误 `WinError`：`Unsupported` / `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)`。
+`WindowInfo{ id, desktop, host, title }`：id（`0x` 十六进制，Windows 为 HWND）可直接回传 `win_activate`；desktop 为窗口所在桌面，-1 为全部桌面（sticky），Windows 无虚拟桌面枚举恒 0；host 为窗口所属主机名。错误 `WinError`：`Unsupported` / `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)`。
 
 激活与关闭会改变真实窗口状态（设置类）：接口完整实现，应用层只在用户操作时调用。
 
@@ -460,7 +460,7 @@ let _ = @system.win_close("ZCode")
 
 ## 剪贴板监听
 
-经 `xclip` 只读轮询系统剪贴板（X11 CLIPBOARD 选区），文本内容变化时回调派发新文本。与 `methods.mbt` 里 libyue 原生 Clipboard 的 `start_watching` / `on_change` 分工：后者由 GUI 事件循环驱动（需 initialize 的应用环境），本模块是纯轮询实现，任意 MoonBit 进程可用、回调落在调用方上下文。
+只读轮询系统剪贴板（Linux 经 `xclip` 读 X11 CLIPBOARD 选区；Windows 直连 Win32 剪贴板读 CF_UNICODETEXT），文本内容变化时回调派发新文本。与 `methods.mbt` 里 libyue 原生 Clipboard 的 `start_watching` / `on_change` 分工：后者由 GUI 事件循环驱动（需 initialize 的应用环境），本模块是纯轮询实现，任意 MoonBit 进程可用、回调落在调用方上下文。
 
 | 函数 | 说明 |
 |---|---|
@@ -468,7 +468,7 @@ let _ = @system.win_close("ZCode")
 | `cbw_start_watch(interval_ms? = 800, cb) -> ClipboardWatcher` | 启动监听（轮询间隔钳 100..60000；基线取启动瞬间内容，初始内容不触发回调） |
 | `cbw_stop(watcher)` | 停止监听（置停靠标志，至多再跑一拍自行终止；幂等） |
 
-错误 `ClipboardError`：`Unsupported`（非 Linux 或 xclip 不存在）/ `CommandFailed(String)`。读失败静默跳过该拍，不触发回调。轮询挂在 libyue 定时器上，需在 GUI 消息循环运行后才实际派发。
+错误 `ClipboardError`：`Unsupported`（macOS 或 Linux xclip 不存在）/ `CommandFailed(String)`（Linux 命令失败或 Windows 无文本 / 剪贴板打开失败）。读失败静默跳过该拍，不触发回调。轮询挂在 libyue 定时器上，需在 GUI 消息循环运行后才实际派发。
 
 ```moonbit
 let w = @system.cbw_start_watch(interval_ms=500, fn(text) {
@@ -480,16 +480,16 @@ let w = @system.cbw_start_watch(interval_ms=500, fn(text) {
 
 ## 磁盘卷管理
 
-枚举可挂载卷、挂载与卸载。Linux 优先走 udisks2 D-Bus（系统总线 `org.freedesktop.UDisks2`：Manager 列块设备、Block 取设备 / 卷标 / 容量 / 可移动、Filesystem 的 Mount / Unmount）；udisks2 不在线时回退 `lsblk --json` 子进程输出解析（经 `pr_run`，仅枚举，挂载卸载不可用）。
+枚举卷、挂载与卸载。Linux 优先走 udisks2 D-Bus（系统总线 `org.freedesktop.UDisks2`：Manager 列块设备、Block 取设备 / 卷标 / 容量 / 可移动、Filesystem 的 Mount / Unmount）；udisks2 不在线时回退 `lsblk --json` 子进程输出解析（经 `pr_run`，仅枚举，挂载卸载不可用）。Windows 走 `GetLogicalDrives`/`GetVolumeInformation` 直连（盘符即 device、根路径即挂载点——Windows 卷恒处于挂载态，`dsk_mount` 恒 `AlreadyMounted`、`dsk_unmount` 的弹出介质不在本批给 `Unsupported`）。
 
 | 函数 | 说明 |
 |---|---|
-| `dsk_supported() -> Bool` | udisks2 在线（完整能力）或 lsblk 可用（仅枚举） |
-| `dsk_volumes() -> Result[Array[DskVolume], DiskError]` | 枚举可挂载卷；系统无任何卷（台式机）返回 `Ok([])` |
+| `dsk_supported() -> Bool` | Linux：udisks2 在线（完整能力）或 lsblk 可用（仅枚举）；Windows 恒可用 |
+| `dsk_volumes() -> Result[Array[DskVolume], DiskError]` | 枚举卷；系统无任何卷（台式机）返回 `Ok([])` |
 | `dsk_mount(volume) -> Result[Unit, DiskError]` | 挂载（已挂载给 `AlreadyMounted`） |
 | `dsk_unmount(volume) -> Result[Unit, DiskError]` | 卸载（未挂载给 `NotMounted`） |
 
-`DskVolume{ device, label, mountpoint, size_bytes, removable, path }`：device 为块设备文件（`/dev/sda1`）、label 为卷标（无卷标空串）、mountpoint 为已挂载路径（未挂载 None）、size_bytes 为字节、removable 指示可移动介质、path 为 udisks2 对象路径（lsblk 路线取不到为空串，供挂载卸载内部定位）。错误 `DiskError`：`Unsupported` / `BusFailed(String)` / `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)` / `NotMounted(String)` / `AlreadyMounted(String)`。
+`DskVolume{ device, label, mountpoint, size_bytes, removable, path }`：Linux 的 device 为块设备文件（`/dev/sda1`）、Windows 为盘符（`C:`）；label 为卷标（无卷标空串）、mountpoint 为已挂载路径（未挂载 None）、size_bytes 为字节、removable 指示可移动介质（Windows 含光驱）、path 为 udisks2 对象路径（其他路线为空串，供挂载卸载内部定位）。错误 `DiskError`：`Unsupported` / `BusFailed(String)` / `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)` / `NotMounted(String)` / `AlreadyMounted(String)`。
 
 ```moonbit
 match @system.dsk_volumes() {
@@ -506,18 +506,18 @@ match @system.dsk_volumes() {
 
 ## 电源与登录会话
 
-关机 / 重启 / 注销统一走 logind（系统总线 `org.freedesktop.login1`）的 PowerOff / Reboot 与会话终断。关机类动作需要 polkit 授权（交互式桌面由 auth agent 弹框）；Vagrant / 容器 / 权限不足时 `Can*` 查询返回 false 或错误。
+关机 / 重启 / 注销：Linux 统一走 logind（系统总线 `org.freedesktop.login1`）的 PowerOff / Reboot 与会话终断（关机类动作需要 polkit 授权，交互式桌面由 auth agent 弹框；Vagrant / 容器 / 权限不足时 `Can*` 查询返回 false 或错误）；Windows 走 `ExitWindowsEx`（进程内临时开通 SE_SHUTDOWN_NAME 特权，温和模式 EWX_FORCEIFHUNG 只杀挂起进程）。
 
 | 函数 | 说明 |
 |---|---|
-| `pwrc_supported() -> Bool` | Linux 且 logind 在线 |
-| `pwrc_sessions() -> Result[Array[SessionInfo], PwrcError]` | 登录会话列表（id/user/uid/seat/对象路径） |
+| `pwrc_supported() -> Bool` | Linux 且 logind 在线；Windows 恒可用 |
+| `pwrc_sessions() -> Result[Array[SessionInfo], PwrcError]` | 登录会话列表（id/user/uid/seat/对象路径）；Windows 无对应枚举给 `Unsupported` |
 | `pwrc_can_power_off()` / `pwrc_can_reboot() -> Result[Bool, PwrcError]` | 当前环境是否允许对应动作 |
 | `pwrc_power_off()` / `pwrc_reboot() -> Result[Unit, PwrcError]` | 关机 / 重启（有副作用） |
-| `pwrc_logout(session) -> Result[Unit, PwrcError]` | 终断指定会话 |
-| `pwrc_logout_self() -> Result[Unit, PwrcError]` | 终断当前会话（无关机权限时只退出自己） |
+| `pwrc_logout(session) -> Result[Unit, PwrcError]` | 终断指定会话（Windows 无逐会话终断给 `Unsupported`） |
+| `pwrc_logout_self() -> Result[Unit, PwrcError]` | 注销当前用户（Linux 取本座位首个会话；Windows 为 EWX_LOGOFF 当前用户全部会话） |
 
-`SessionInfo{ id, uid, user, seat, path }`：seat 本地为 "seat0"，远程 / 无 seat 的会话为空串。错误 `PwrcError`：`Unsupported`（非 Linux 或 logind 不在线 / 总线不可达）/ `NotAllowed(String)`（Can* 返回 no/na、polkit 授权被拒）/ `BusFailed(String)`。
+`SessionInfo{ id, uid, user, seat, path }`：seat 本地为 "seat0"，远程 / 无 seat 的会话为空串。错误 `PwrcError`：`Unsupported`（macOS、Linux logind 不在线 / 总线不可达、Windows 无对应能力）/ `NotAllowed(String)`（Can* 返回 no/na、polkit 授权被拒、ExitWindowsEx 失败）/ `BusFailed(String)`。
 
 ```moonbit
 if @system.pwrc_supported() {
@@ -534,14 +534,14 @@ if @system.pwrc_supported() {
 
 ## 电源计划
 
-经 `powerprofilesctl` 三条命令读可用计划集、读当前计划、切换计划（`power-profiles-daemon` 未安装时 shell 以退出码 127 呈现 → `PpUnsupported`）。
+Linux 经 `powerprofilesctl` 三条命令读可用计划集、读当前计划、切换计划（`power-profiles-daemon` 未安装时 shell 以退出码 127 呈现 → `PpUnsupported`）；Windows 经 PowerEnumerate / PowerGetActiveScheme / PowerSetActiveScheme（三档内置方案按 GUID 映射：均衡 381b4222-…、高性能 8c5e7fda-…、省电 a1841308-…；自定义方案枚举时跳过、当前为自定义方案给 `PpParseFailed` 带 GUID）。
 
 | 函数 | 说明 |
 |---|---|
-| `pp_supported() -> Bool` | powerprofilesctl 存在且可查询 |
-| `pp_profiles() -> Result[Array[PowerProfile], PowerProfileError]` | 可用计划列表（按后端输出序，推荐序在前时即推荐序） |
+| `pp_supported() -> Bool` | Linux：powerprofilesctl 存在且可查询；Windows 恒可用 |
+| `pp_profiles() -> Result[Array[PowerProfile], PowerProfileError]` | 可用计划列表（按后端返回序） |
 | `pp_current() -> Result[PowerProfile, PowerProfileError]` | 当前计划 |
-| `pp_set(profile) -> Result[Unit, PowerProfileError]` | 切换计划（有副作用、需要认证，调用方自行走授权流程） |
+| `pp_set(profile) -> Result[Unit, PowerProfileError]` | 切换计划（有副作用；Windows 需管理员权限） |
 
 `PowerProfile`：`PPerformance`（性能）/ `PBalanced`（均衡）/ `PPowerSaver`（省电）。错误 `PowerProfileError`：`PpUnsupported` / `PpCommandFailed(String)` / `PpParseFailed(String)`。
 
@@ -556,16 +556,16 @@ match @system.pp_profiles() {
 
 ## 系统信息
 
-只读 `/proc` 与 `/sys` 文本：发行版标识（`/etc/os-release`）、机器 DMI 标识（`/sys/class/dmi/id/`）、物理内存（`/proc/meminfo`）、开机时长（`/proc/uptime`）。非 Linux 一律 `Unsupported`；读不到（文件不存在 / 权限不足）给 `Err` 并带路径，不糊弄成空串。
+只读系统标识：Linux 读 `/proc` 与 `/sys` 文本（发行版标识 `/etc/os-release`、机器 DMI 标识 `/sys/class/dmi/id/`、物理内存 `/proc/meminfo`、开机时长 `/proc/uptime`）；Windows 走注册表与 API（发行版读 ProductName / DisplayVersion、机器标识读 BIOS 键的 SystemManufacturer / SystemProductName（序列号需 WMI/SMBIOS 解析，恒空串）、内存 GlobalMemoryStatusEx、开机时长 GetTickCount64）。读不到（文件不存在 / 权限不足 / 注册表键缺失）给 `Err` 并带来源，不糊弄成空串。
 
 | 函数 | 说明 |
 |---|---|
-| `si_os() -> Result[OsInfo, SysInfoError]` | 发行版：`OsInfo{ pretty_name, id, version_id }` |
-| `si_machine() -> Result[MachineInfo, SysInfoError]` | 机器：`MachineInfo{ vendor, product, serial }`（序列号多数发行版仅 root 可读，读不到给 `Err`） |
-| `si_memory() -> Result[MemoryInfo, SysInfoError]` | 内存：`MemoryInfo{ total_kb, available_kb }`（单位 kB，MemAvailable 为「还能拿来用多少」的实口径） |
+| `si_os() -> Result[OsInfo, SysInfoError]` | 发行版：`OsInfo{ pretty_name, id, version_id }`（Windows 的 id 恒 "windows"） |
+| `si_machine() -> Result[MachineInfo, SysInfoError]` | 机器：`MachineInfo{ vendor, product, serial }`（Linux 序列号多数发行版仅 root 可读，读不到给 `Err`；Windows 序列号无注册表对应恒空串） |
+| `si_memory() -> Result[MemoryInfo, SysInfoError]` | 内存：`MemoryInfo{ total_kb, available_kb }`（单位 kB，Linux MemAvailable 与 Windows 可用物理内存同为「还能拿来用多少」口径） |
 | `si_uptime() -> Result[Double, SysInfoError]` | 开机时长（秒） |
 
-错误 `SysInfoError`：`SiUnsupported`（非 Linux）/ `SiReadFailed(String)`（带路径）/ `SiParseFailed(String)`。
+错误 `SysInfoError`：`SiUnsupported`（macOS）/ `SiReadFailed(String)`（带路径或来源）/ `SiParseFailed(String)`。
 
 ```moonbit
 let os = @system.si_os() // Ok({ pretty_name: "Ubuntu 24.04.5 LTS", id: "ubuntu", .. })
@@ -575,14 +575,14 @@ let up = @system.si_uptime() // Ok(84088.08)
 
 ## 时区与本地语言
 
-读走系统总线 D-Bus 属性 `org.freedesktop.timedate1` 的 Timezone（字符串）/ NTP（布尔）；总线不可达或服务不在线时回退 `timedatectl show` 的 KEY=VALUE 文本输出（子进程固定 C locale，输出恒定可解析）。本地语言读 `$LANG` 环境变量。
+读系统时区、NTP 状态与本地语言。Linux 读走系统总线 D-Bus 属性 `org.freedesktop.timedate1` 的 Timezone（字符串）/ NTP（布尔），总线不可达或服务不在线时回退 `timedatectl show` 的 KEY=VALUE 文本输出（子进程固定 C locale，输出恒定可解析），本地语言读 `$LANG` 环境变量；Windows 时区读 `GetDynamicTimeZoneInformation`（系统时区键名，如 "China Standard Time"，**非 IANA 名**）、NTP 看 W32Time（Windows 时间）服务是否在跑、本地语言读 `GetUserDefaultLocaleName`（BCP-47 形态，如 "zh-CN"）、设时区经 `tzutil /s`（需管理员）。
 
 | 函数 | 说明 |
 |---|---|
-| `lc_timezone() -> Result[String, LocaleError]` | 当前时区（如 "Asia/Shanghai"） |
-| `lc_ntp() -> Result[Bool, LocaleError]` | NTP 是否开启 |
-| `lc_set_timezone(tz) -> Result[Unit, LocaleError]` | 设时区（D-Bus 属性写，有副作用、需认证） |
-| `lc_lang() -> Result[String, LocaleError]` | 当前本地语言（`$LANG`，如 "zh_CN.UTF-8"） |
+| `lc_timezone() -> Result[String, LocaleError]` | 当前时区（Linux IANA 名 / Windows 时区键名） |
+| `lc_ntp() -> Result[Bool, LocaleError]` | NTP 是否开启（Windows 为 W32Time 服务在跑） |
+| `lc_set_timezone(tz) -> Result[Unit, LocaleError]` | 设时区（Linux D-Bus 属性写 / Windows `tzutil /s`；有副作用、需认证） |
+| `lc_lang() -> Result[String, LocaleError]` | 当前本地语言（Linux `$LANG` / Windows BCP-47 区域名） |
 
 错误 `LocaleError`：`LcUnsupported` / `LcBusFailed(String)` / `LcCommandFailed(String)` / `LcParseFailed(String)` / `LcInvalidTimezone(String)`（空串 / 含空白 / 以 '/' 开头 / 含 '..'）。
 
@@ -594,7 +594,7 @@ let _ = @system.lc_set_timezone("Asia/Tokyo") // 需要认证
 
 ## 蓝牙
 
-经 `org.bluez`（系统总线）查询适配器与已发现设备，支持开关电源、扫描发现、连接 / 断开 / 配对。对象枚举用 `ObjectManager.GetManagedObjects`（a{oa{sa{sv}}} 形状），属性读取用 `Properties.GetAll`。
+经 `org.bluez`（系统总线）查询适配器与已发现设备，支持开关电源、扫描发现、连接 / 断开 / 配对。对象枚举用 `ObjectManager.GetManagedObjects`（a{oa{sa{sv}}} 形状），属性读取用 `Properties.GetAll`。仅 Linux（Windows 的 BluetoothAPIs/WinRT 蓝牙栈不在本批，恒 `Unsupported`）。
 
 | 函数 | 说明 |
 |---|---|
@@ -625,7 +625,7 @@ if @system.bt_supported() {
 
 ## 传感器
 
-经 `iio-sensor-proxy`（`net.hadess.SensorProxy`，系统总线）汇总 IIO 子系统传感器读数，当前支持环境光（LightLevel，勒克斯）与加速度计方向。本机 / 虚拟机没有该服务、没有对应传感器是合法状态：`sns_supported()` 为 false，取值为 `Unsupported`，不视为异常。
+经 `iio-sensor-proxy`（`net.hadess.SensorProxy`，系统总线）汇总 IIO 子系统传感器读数，当前支持环境光（LightLevel，勒克斯）与加速度计方向。本机 / 虚拟机没有该服务、没有对应传感器是合法状态：`sns_supported()` 为 false，取值为 `Unsupported`，不视为异常。仅 Linux（Windows 的 WinRT LightSensor/Accelerometer 不在本批）。
 
 | 函数 | 说明 |
 |---|---|
@@ -645,19 +645,19 @@ if @system.sns_supported() && @system.sns_has_ambient_light() {
 }
 ```
 
-## 打印机（CUPS）
+## 打印机
 
-经 `lpstat` 三条只读命令读打印机列表（`-p`）、默认打印机（`-d`）、任务队列（`-o <打印机>`），以及 `lp` 提交打印任务的命令构造。子进程环境固定 C locale，输出语言恒定可解析；未装 CUPS（lpstat 以退出码 127 呈现）→ `PrtUnsupported`，属合法降级。
+Linux（CUPS）经 `lpstat` 三条只读命令读打印机列表（`-p`）、默认打印机（`-d`）、任务队列（`-o <打印机>`），以及 `lp` 提交打印任务的命令构造（子进程环境固定 C locale，输出语言恒定可解析；未装 CUPS（lpstat 以退出码 127 呈现）→ `PrtUnsupported`，属合法降级）；Windows 走 winspool 直连（EnumPrinters 列表 / GetDefaultPrinter / EnumJobs 队列），提交打印用文件的 "print" 动词（走默认打印机，份数按动作次数实现）。
 
 | 函数 | 说明 |
 |---|---|
-| `prt_supported() -> Bool` | lpstat 可用 |
+| `prt_supported() -> Bool` | Linux lpstat 可用；Windows winspool 枚举成功 |
 | `prt_list() -> Result[Array[PrinterInfo], PrinterError]` | 打印机列表（名称 + 可用状态） |
 | `prt_default() -> Result[String, PrinterError]` | 默认打印机名 |
 | `prt_queue(printer) -> Result[Array[PrinterJob], PrinterError]` | 指定打印机任务队列 |
 | `prt_print(printer? = "", path, copies? = 1) -> Result[Unit, PrinterError]` | 提交打印任务（printer 缺省用系统默认打印机；有副作用，真实排队打印） |
 
-`PrinterStatus`：`Idle` / `Printing` / `Paused`（暂停接新任务）/ `Disabled`；`prt_status_available(status)` 判是否可用接任务。`PrinterInfo{ name, status }`；`PrinterJob{ name, id }`（name 为 "目标名-编号" 形态，如 `Gprinter-GP-9034T-12`）。错误 `PrinterError`：`PrtUnsupported` / `PrtCommandFailed(String)` / `PrtParseFailed(String)` / `PrtInvalidParam(String)`（打印机名 / 文件路径为空、份数 < 1）。
+`PrinterStatus`：`Idle` / `Printing` / `Paused`（暂停接新任务）/ `Disabled`；`prt_status_available(status)` 判是否可用接任务。`PrinterInfo{ name, status }`；`PrinterJob{ name, id }`（Linux 的 name 为 "目标名-编号" 形态如 `Gprinter-GP-9034T-12`，Windows 为文档名）。错误 `PrinterError`：`PrtUnsupported` / `PrtCommandFailed(String)` / `PrtParseFailed(String)` / `PrtInvalidParam(String)`（打印机名 / 文件路径为空、份数 < 1；Windows 显式指定非默认打印机也给 `PrtInvalidParam`——"print" 动词只走默认打印机）。
 
 ```moonbit
 match @system.prt_default() {
@@ -694,15 +694,15 @@ match @yue.fsx_list_dir("/usr/share/applications") {
 }
 ```
 
-## 最近文件（GTK recently-used.xbel）
+## 最近文件
 
-解析 freedesktop 的 `recently-used.xbel`（GTK 应用经 GtkRecentManager / xdg-desktop-portal-gtk 统一写这份清单，Thunar / Nautilus / GIO 打开文件都会往里追加）。文件位置 `$XDG_DATA_HOME/recently-used.xbel`（缺省 `$HOME/.local/share/`）。XML 解析为手写薄扫描器：只取 bookmark 节点与 `bookmark:application` / `mime:mime-type` 子节点属性，属性值做 XML 实体解码，href 的 `file://` URI 做百分号解码；时间戳 ISO 8601 → Unix 毫秒。
+Linux 解析 freedesktop 的 `recently-used.xbel`（GTK 应用经 GtkRecentManager / xdg-desktop-portal-gtk 统一写这份清单，Thunar / Nautilus / GIO 打开文件都会往里追加；文件位置 `$XDG_DATA_HOME/recently-used.xbel`（缺省 `$HOME/.local/share/`），XML 解析为手写薄扫描器：只取 bookmark 节点与 `bookmark:application` / `mime:mime-type` 子节点属性，属性值做 XML 实体解码，href 的 `file://` URI 做百分号解码，时间戳 ISO 8601 → Unix 毫秒）；Windows 解析 `%APPDATA%\Microsoft\Windows\Recent` 下的 `.lnk`（IShellLink 解析目标路径，`.lnk` 自身 mtime 作最近使用序；uri 即目标路径、mime / 应用名无来源）。
 
 | 函数 | 说明 |
 |---|---|
-| `rf_supported() -> Bool` | Linux 且文件可读 |
+| `rf_supported() -> Bool` | Linux 且 xbel 可读；Windows 且 Recent 目录可枚举 |
 | `rf_recent(limit? = 100) -> Result[Array[RecentItem], RecentError]` | 最近文件列表（modified 倒序，并列按 path 升序）；limit ≤ 0 取全部 |
-| `rf_by_app(name, limit? = 100) -> Result[Array[RecentItem], RecentError]` | 按应用名过滤（`bookmark:application` 的 name 精确匹配），同样倒序 |
+| `rf_by_app(name, limit? = 100) -> Result[Array[RecentItem], RecentError]` | 按应用名过滤（`bookmark:application` 的 name 精确匹配），同样倒序（Windows 无应用名来源恒空列表） |
 
 `RecentItem` 字段:
 

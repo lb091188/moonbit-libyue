@@ -105,7 +105,15 @@ test "Show 输出:错误枚举" {
 // ---------------------------------------------------------------------------
 
 ///|
-test "本机 lc_timezone:D-Bus 或 timedatectl 给出合法时区" {
+test "本机 lc_timezone:D-Bus 或 timedatectl 给出合法时区（Windows 给时区键名）" {
+  if @yue.platform() == "windows" {
+    // Windows 时区为系统键名（如 "China Standard Time"），非 IANA 名
+    match lc_timezone() {
+      Ok(tz) => assert_true(tz.length() > 0 && !tz.contains("/"))
+      Err(_) => assert_true(false)
+    }
+    return
+  }
   match lc_timezone() {
     Ok(tz) => {
       assert_true(lc_valid_timezone(tz))
@@ -124,7 +132,11 @@ test "本机 lc_timezone:D-Bus 或 timedatectl 给出合法时区" {
 }
 
 ///|
-test "本机 lc_ntp:布尔值与命令路径一致" {
+test "本机 lc_ntp:布尔值与命令路径一致（Windows 看 W32Time 服务）" {
+  if @yue.platform() == "windows" {
+    assert_true(lc_ntp() is Ok(_))
+    return
+  }
   match lc_ntp() {
     Ok(on) =>
       match pr_run("timedatectl", ["show"], timeout_ms=3000) {
@@ -140,7 +152,15 @@ test "本机 lc_ntp:布尔值与命令路径一致" {
 }
 
 ///|
-test "本机 lc_lang:$LANG 环境变量读取" {
+test "本机 lc_lang:$LANG 环境变量读取（Windows 为 BCP-47 区域名）" {
+  if @yue.platform() == "windows" {
+    // 形如 "zh-CN"（含 '-'，BCP-47）
+    match lc_lang() {
+      Ok(lang) => assert_true(lang.contains("-"))
+      Err(_) => assert_true(false)
+    }
+    return
+  }
   match @env.get_env_var("LANG") {
     None => assert_true(lc_lang() is Err(LcUnsupported))
     Some(v) =>

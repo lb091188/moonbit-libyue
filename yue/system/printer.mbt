@@ -1,11 +1,13 @@
-// 打印机（CUPS）：经 procrun 的 [pr_run] 调 lpstat 三条只读命令——
+// 打印机：Linux（CUPS）经 procrun 的 [pr_run] 调 lpstat 三条只读命令——
 // `-p` 打印机列表（名称 / 可用状态）、`-d` 默认打印机、`-o <打印机>`
-// 任务队列——以及 lp 提交打印任务的命令构造。子进程环境由 procrun 固定
+// 任务队列——以及 lp 提交打印任务的命令构造；子进程环境由 procrun 固定
 // C locale，lpstat 输出语言恒定可解析。lpstat 缺失（系统未装 CUPS，
-// shell 以退出码 127 呈现）→ PrtUnsupported，属合法降级；lp 有副作用
-// （真实提交打印任务），仅实现不执行，wbtest 只断言其参数表。lpstat
-// 输出解析与 lp 参数构造为纯函数（prt_ 前缀），printer_wbtest.mbt 白盒
-// 覆盖（真实样例取自本机 CUPS 的 C locale 输出）。
+// shell 以退出码 127 呈现）→ PrtUnsupported，属合法降级。
+// Windows 走 winspool 直连（EnumPrinters / GetDefaultPrinter / EnumJobs），
+// 提交打印用文件的 "print" 动词（默认打印机）。lp 有副作用（真实提交
+// 打印任务），仅实现不执行，wbtest 只断言其参数表。文本解析与命令构造
+// 为纯函数（prt_ 前缀），printer_wbtest.mbt 白盒覆盖（真实样例取自本机
+// CUPS 的 C locale 输出）。
 //
 // 典型用法：
 //   match prt_default() {
@@ -453,9 +455,14 @@ fn prt_lpstat(
 // ---------------------------------------------------------------------------
 
 ///|
-/// 当前系统是否装有 CUPS 命令行工具（跑通只读的 lpstat -p 即为可用）。
-/// 每次调用真实探测，高频场景请调用方自行缓存结果。
+/// 当前系统是否支持打印机查询（Linux 跑通只读的 lpstat -p；Windows
+/// winspool 枚举成功）。每次调用真实探测，高频场景请调用方自行缓存。
 pub fn prt_supported() -> Bool {
+  if @yue.platform() == "windows" {
+    let ok = Ref(0)
+    let _ = @yue.ffi_prt_list(ok)
+    return ok.val == 1
+  }
   match prt_lpstat(["-p"], timeout_ms=3000) {
     Ok(_) => true
     Err(PrtUnsupported) => false
@@ -464,9 +471,17 @@ pub fn prt_supported() -> Bool {
 }
 
 ///|
-/// 列出全部打印机（CUPS 队列名 + 可用状态）；未装 CUPS → PrtUnsupported。
-/// 顺序保持 lpstat 返回序；空数组表示未配置任何打印机。
+/// 列出全部打印机（队列名 + 可用状态）；Linux 未装 CUPS →
+/// PrtUnsupported。顺序保持返回序；空数组表示未配置任何打印机。
 pub fn prt_list() -> Result[Array[PrinterInfo], PrinterError] {
+  if @yue.platform() == "windows" {
+    let ok = Ref(0)
+    let text = @utf8.decode_lossy(@yue.ffi_prt_list(ok))
+    if ok.val != 1 {
+      return Err(PrtCommandFailed("EnumPrinters 失败"))
+    }
+    return Ok(prt_parse_win_list(text))
+  }
   match prt_lpstat(["-p"]) {
     Ok(out) => Ok(prt_parse_printer_list(out))
     Err(e) => Err(e)
@@ -474,9 +489,46 @@ pub fn prt_list() -> Result[Array[PrinterInfo], PrinterError] {
 }
 
 ///|
-/// 读默认打印机名（`lpstat -d`）；类默认返回 "类名/成员名" 形态。
-/// 未装 CUPS → PrtUnsupported；未设默认目标或无输出 → PrtParseFailed。
+/// Windows 状态码 → PrinterStatus（shim 已归并：0 空闲 1 打印中 2 暂停
+/// 3 不可用）。
+pub fn prt_win_status_of(code : Int) -> PrinterStatus {
+  match code {
+    1 => Printing
+    2 => Paused
+    3 => Disabled
+    _ => Idle
+  }
+}
+
+///|
+/// 解析 Windows 直连列表文本（"name\tstatus_code" 行）。
+pub fn prt_parse_win_list(text : String) -> Array[PrinterInfo] {
+  let infos : Array[PrinterInfo] = []
+  for line in prt_split_lines(text) {
+    let fields = sys_split_fields(line, '\t')
+    if fields.length() == 2 {
+      match prt_parse_uint(fields[1]) {
+        Some(code) =>
+          infos.push({ name: fields[0], status: prt_win_status_of(code) })
+        None => ()
+      }
+    }
+  }
+  infos
+}
+
+///|
+/// 读默认打印机名；Linux 未装 CUPS → PrtUnsupported；未设默认目标或无
+/// 输出 → PrtParseFailed。
 pub fn prt_default() -> Result[String, PrinterError] {
+  if @yue.platform() == "windows" {
+    let ok = Ref(0)
+    let name = prt_trim(@utf8.decode_lossy(@yue.ffi_prt_default(ok)))
+    if ok.val != 1 || name == "" {
+      return Err(PrtParseFailed("无默认打印机"))
+    }
+    return Ok(name)
+  }
   match prt_lpstat(["-d"]) {
     Err(e) => Err(e)
     Ok(out) =>
@@ -489,11 +541,22 @@ pub fn prt_default() -> Result[String, PrinterError] {
 
 ///|
 /// 列出指定打印机队列上的任务（作业名 + 编号）；printer 为空串
-/// → PrtInvalidParam；未装 CUPS → PrtUnsupported；目标不存在等
-/// lpstat 非零退出 → PrtCommandFailed；空数组表示队列为空。
+/// → PrtInvalidParam；Linux 未装 CUPS → PrtUnsupported；目标不存在等
+/// 非零退出 → PrtCommandFailed；空数组表示队列为空。Windows 的任务名
+/// 为文档名（CUPS 的 "目标名-编号" 形态无对应）。
 pub fn prt_queue(printer : String) -> Result[Array[PrinterJob], PrinterError] {
   if printer == "" {
     return Err(PrtInvalidParam("打印机名为空"))
+  }
+  if @yue.platform() == "windows" {
+    let ok = Ref(0)
+    let text = @utf8.decode_lossy(
+      @yue.ffi_prt_queue(@yue.utf8_bytes(printer), ok),
+    )
+    if ok.val != 1 {
+      return Err(PrtCommandFailed("OpenPrinter/EnumJobs 失败"))
+    }
+    return Ok(prt_parse_win_queue(text))
   }
   match prt_lpstat(["-o", printer]) {
     Ok(out) => Ok(prt_parse_queue(out))
@@ -502,10 +565,26 @@ pub fn prt_queue(printer : String) -> Result[Array[PrinterJob], PrinterError] {
 }
 
 ///|
-/// 提交打印任务（`lp [-d 打印机] -n 份数 文件`）：printer 缺省或用
-/// 系统默认打印机，copies 默认 1 份；path 空串 / copies < 1 →
-/// PrtInvalidParam；未装 CUPS → PrtUnsupported。执行有副作用（真实
-/// 排队打印），调用方自行确认时机。
+/// 解析 Windows 队列文本（"job_id\tdoc_name" 行）。
+pub fn prt_parse_win_queue(text : String) -> Array[PrinterJob] {
+  let jobs : Array[PrinterJob] = []
+  for line in prt_split_lines(text) {
+    let fields = sys_split_fields(line, '\t')
+    if fields.length() == 2 {
+      match prt_parse_uint(fields[0]) {
+        Some(id) => jobs.push({ name: fields[1], id, })
+        None => ()
+      }
+    }
+  }
+  jobs
+}
+
+///|
+/// 提交打印任务（真实排队打印，有副作用，调用方自行确认时机）：Linux
+/// 走 `lp [-d 打印机] -n 份数 文件`；Windows 用文件的 "print" 动词走
+/// 默认打印机（显式 printer 必须与默认打印机一致，份数按动作次数实现）。
+/// path 空串 / copies < 1 → PrtInvalidParam。
 pub fn prt_print(
   printer? : String,
   path : String,
@@ -516,6 +595,26 @@ pub fn prt_print(
   }
   if copies < 1 {
     return Err(PrtInvalidParam("份数必须 ≥ 1：\{copies}"))
+  }
+  if @yue.platform() == "windows" {
+    match printer {
+      Some(p) if p != "" =>
+        match prt_default() {
+          Ok(def) if def == p => ()
+          _ =>
+            return Err(
+              PrtInvalidParam("Windows 仅支持默认打印机提交（传入 \{p}）"),
+            )
+        }
+      _ => ()
+    }
+    for i = 0; i < copies; i = i + 1 {
+      let ok = Ref(0)
+      if @yue.ffi_prt_print(@yue.utf8_bytes(path), ok) != 0 || ok.val != 1 {
+        return Err(PrtCommandFailed("print 动词提交失败"))
+      }
+    }
+    return Ok(())
   }
   match
     prt_run_tool("lp", prt_print_args(printer, path, copies), timeout_ms=10000) {

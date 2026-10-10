@@ -463,13 +463,39 @@ fn si_read_dmi(name : String) -> String? {
   }
 }
 
+///|
+/// 按单字符切分文本为字符串数组（保留空字段；Windows 直连组各模块共用）。
+fn sys_split_fields(s : String, sep : Char) -> Array[String] {
+  let out : Array[String] = []
+  let mut cur = StringBuilder()
+  for ch in s {
+    if ch == sep {
+      out.push(cur.to_string())
+      cur = StringBuilder()
+    } else {
+      cur.write_char(ch)
+    }
+  }
+  out.push(cur.to_string())
+  out
+}
+
+///|
+/// 整数文本 → Int64（非法或溢出为 0；Windows 直连组各模块共用）。
+fn sys_parse_i64(s : String) -> Int64 {
+  try @string.parse_int64(s) catch {
+    _ => 0L
+  }
+}
+
 // ---------------------------------------------------------------------------
-// 公开 API（都只读；非 Linux → SiUnsupported）
+// 公开 API（都只读；非 Linux / Windows → SiUnsupported）
 // ---------------------------------------------------------------------------
 
 ///|
-/// 发行版标识（/etc/os-release 的 PRETTY_NAME / ID / VERSION_ID；文件
-/// 读不到 → SiReadFailed，格式不符 → SiParseFailed）。
+/// 发行版标识：Linux 读 /etc/os-release 的 PRETTY_NAME / ID / VERSION_ID
+/// （文件读不到 → SiReadFailed，格式不符 → SiParseFailed）；Windows 读
+/// 注册表 ProductName / DisplayVersion（id 恒 "windows"）。
 pub fn si_os() -> Result[OsInfo, SysInfoError] {
   match @yue.platform() {
     "linux" =>
@@ -481,14 +507,62 @@ pub fn si_os() -> Result[OsInfo, SysInfoError] {
             None => Err(SiParseFailed("/etc/os-release: 缺少 PRETTY_NAME"))
           }
       }
+    "windows" => {
+      let pretty = match si_win_reg("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "ProductName") {
+        Some(p) => p
+        None => return Err(SiReadFailed("HKLM:...ProductName"))
+      }
+      // DisplayVersion（22H2 形态，Win10 20H1+ 写入）缺失回退 CurrentBuildNumber
+      let version = match
+        si_win_reg(
+          "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+          "DisplayVersion",
+        ) {
+        Some(v) => v
+        None =>
+          match
+            si_win_reg(
+              "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+              "CurrentBuildNumber",
+            ) {
+            Some(v) => v
+            None => return Err(SiReadFailed("HKLM:...CurrentBuildNumber"))
+          }
+      }
+      Ok({ pretty_name: pretty, id: "windows", version_id: version })
+    }
     _ => Err(SiUnsupported)
   }
 }
 
 ///|
-/// 机器 DMI 标识（/sys/class/dmi/id/ 的 sys_vendor / product_name /
-/// product_serial）。任一项读不到（权限不足或非 x86/ACPI 平台）给
-/// Err(SiReadFailed(路径))，不用空串糊弄。
+/// Windows 注册表字符串读（HKLM；读不到或非 REG_SZ 为 None）。
+fn si_win_reg(path : String, value : String) -> String? {
+  let ok = Ref(0)
+  let bytes = @yue.ffi_win_reg_str(
+    0,
+    @yue.utf8_bytes(path),
+    @yue.utf8_bytes(value),
+    ok,
+  )
+  if ok.val != 1 {
+    return None
+  }
+  let text = @utf8.decode_lossy(bytes)
+  let t = si_trim(text)
+  if t == "" {
+    None
+  } else {
+    Some(t)
+  }
+}
+
+///|
+/// 机器 DMI 标识：Linux 读 /sys/class/dmi/id/ 的 sys_vendor /
+/// product_name / product_serial（任一项读不到给 Err(SiReadFailed(路径))，
+/// 不用空串糊弄）；Windows 读注册表 BIOS 键的 SystemManufacturer /
+/// SystemProductName（serial 无注册表对应、需 WMI/SMBIOS 解析，本批
+/// 恒空串，见文档边界）。
 pub fn si_machine() -> Result[MachineInfo, SysInfoError] {
   match @yue.platform() {
     "linux" => {
@@ -506,13 +580,29 @@ pub fn si_machine() -> Result[MachineInfo, SysInfoError] {
       }
       Ok({ vendor, product, serial, })
     }
+    "windows" => {
+      let vendor = match
+        si_win_reg("HARDWARE\\DESCRIPTION\\System\\BIOS", "SystemManufacturer") {
+        Some(v) => v
+        None =>
+          return Err(SiReadFailed("HKLM:HARDWARE\\DESCRIPTION\\System\\BIOS: SystemManufacturer"))
+      }
+      let product = match
+        si_win_reg("HARDWARE\\DESCRIPTION\\System\\BIOS", "SystemProductName") {
+        Some(v) => v
+        None =>
+          return Err(SiReadFailed("HKLM:HARDWARE\\DESCRIPTION\\System\\BIOS: SystemProductName"))
+      }
+      Ok({ vendor, product, serial: "", })
+    }
     _ => Err(SiUnsupported)
   }
 }
 
 ///|
-/// 物理内存快照（/proc/meminfo 的 MemTotal / MemAvailable，单位 kB；
-/// 文件读不到 → SiReadFailed，关键行缺失 → SiParseFailed）。
+/// 物理内存快照：Linux 读 /proc/meminfo 的 MemTotal / MemAvailable（单位
+/// kB；文件读不到 → SiReadFailed，关键行缺失 → SiParseFailed）；Windows
+/// 走 GlobalMemoryStatusEx（total=物理总量，available=当前可用物理内存）。
 pub fn si_memory() -> Result[MemoryInfo, SysInfoError] {
   match @yue.platform() {
     "linux" =>
@@ -525,13 +615,24 @@ pub fn si_memory() -> Result[MemoryInfo, SysInfoError] {
               Err(SiParseFailed("/proc/meminfo: 缺少 MemTotal/MemAvailable"))
           }
       }
+    "windows" => {
+      let total = Ref(0L)
+      let avail = Ref(0L)
+      if @yue.ffi_win_memory(total, avail) != 1 {
+        return Err(SiReadFailed("GlobalMemoryStatusEx"))
+      }
+      Ok({
+        total_kb: total.val.to_int(),
+        available_kb: avail.val.to_int(),
+      })
+    }
     _ => Err(SiUnsupported)
   }
 }
 
 ///|
-/// 开机时长（/proc/uptime 首列，单位秒；文件读不到 → SiReadFailed，
-/// 格式不符 → SiParseFailed）。
+/// 开机时长（秒）：Linux 读 /proc/uptime 首列（文件读不到 → SiReadFailed，
+/// 格式不符 → SiParseFailed）；Windows 走 GetTickCount64（毫秒换算秒）。
 pub fn si_uptime() -> Result[Double, SysInfoError] {
   match @yue.platform() {
     "linux" =>
@@ -543,6 +644,13 @@ pub fn si_uptime() -> Result[Double, SysInfoError] {
             None => Err(SiParseFailed("/proc/uptime"))
           }
       }
+    "windows" => {
+      let ms = @yue.ffi_win_uptime_ms()
+      if ms < 0L {
+        return Err(SiReadFailed("GetTickCount64"))
+      }
+      Ok(ms.to_double() / 1000.0)
+    }
     _ => Err(SiUnsupported)
   }
 }

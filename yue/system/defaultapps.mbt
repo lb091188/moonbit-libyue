@@ -201,6 +201,9 @@ fn da_str_has(arr : Array[String], s : String) -> Bool {
 ///|
 /// 是否有可用的查询命令（xdg-mime 在 PATH）。
 pub fn da_supported() -> Bool {
+  if @yue.platform() == "windows" {
+    return true // AssocQueryString 直连，无外部工具依赖
+  }
   match appfind_executable("xdg-mime") {
     Ok(_) => true
     Err(_) => false
@@ -233,8 +236,21 @@ fn da_mimeapps_files() -> Array[String] {
 }
 
 ///|
-/// 推断文件的 MIME 类型(xdg-mime query filetype)。
+/// 推断文件的类型：Linux 经 xdg-mime query filetype 给 MIME 类型
+/// （"application/pdf" 形态）；Windows 无 MIME 层，给小写扩展名
+/// （".pdf" 形态——文件类型键即扩展名，形态差异由调用方消化）。
 pub fn da_file_type(path : String) -> Result[String, DefaultAppError] {
+  if @yue.platform() == "windows" {
+    let dot = da_last_index_of(path, '.')
+    let slash = da_max(
+      da_last_index_of(path, '/'),
+      da_last_index_of(path, '\\'),
+    )
+    if dot < 0 || dot < slash || dot == path.length() - 1 {
+      return Err(QueryFailed("无扩展名: \{path}"))
+    }
+    return Ok(path[dot:].to_owned().to_lower())
+  }
   if !da_supported() {
     return Err(Unsupported)
   }
@@ -260,9 +276,46 @@ pub fn da_file_type(path : String) -> Result[String, DefaultAppError] {
 }
 
 ///|
-/// 查询 MIME 类型的默认应用(.desktop 文件名)。优先 xdg-mime query default;
-/// 命令不可用或无结果时,回退解析 mimeapps.list 的 [Default Applications] 段。
+/// 字符在文本中最后出现的下标（无则 -1）。
+fn da_last_index_of(s : String, c : Char) -> Int {
+  let mut at = -1
+  for i = 0; i < s.length(); i = i + 1 {
+    if s.unsafe_get(i).to_int() == c.to_int() {
+      at = i
+    }
+  }
+  at
+}
+
+///|
+/// 两数取大。
+fn da_max(a : Int, b : Int) -> Int {
+  if a >= b {
+    a
+  } else {
+    b
+  }
+}
+
+///|
+/// 查询类型的默认应用：Linux 优先 xdg-mime query default（.desktop 名），
+/// 回退解析 mimeapps.list 的 [Default Applications] 段；Windows 经
+/// AssocQueryString 查关联的可执行文件完整路径（mime 传扩展名
+/// （".pdf"）或协议（"http"），查不到给 NoDefault）。
 pub fn da_default_for(mime : String) -> Result[String, DefaultAppError] {
+  if @yue.platform() == "windows" {
+    if mime == "" {
+      return Err(QueryFailed("类型/协议为空"))
+    }
+    let ok = Ref(0)
+    let exe = @utf8.decode_lossy(
+      @yue.ffi_assoc_query(@yue.utf8_bytes(mime), 0, ok),
+    )
+    if ok.val != 1 || exe == "" {
+      return Err(NoDefault(mime))
+    }
+    return Ok(exe)
+  }
   if da_supported() {
     match pr_run("xdg-mime", ["query", "default", mime]) {
       Ok(out) => {
@@ -297,10 +350,12 @@ pub fn da_default_for(mime : String) -> Result[String, DefaultAppError] {
 }
 
 ///|
-/// 列出 MIME 类型的全部关联应用(.desktop 名列表,去重,默认应用排最前)。
-/// 扫描 ~/.config、~/.local/share/applications、/usr/share/applications 三处
-/// mimeapps.list(对应 XDG 规范优先级)。
+/// 列出类型的全部关联应用：Linux 扫描三处 mimeapps.list（默认应用排
+/// 最前，去重）；Windows 无关联应用枚举接口，恒空列表。
 pub fn da_associations_for(mime : String) -> Array[String] {
+  if @yue.platform() == "windows" {
+    return []
+  }
   let texts : Array[String] = []
   for file in da_mimeapps_files() {
     match @yue.read_text_file(file) {
@@ -315,11 +370,15 @@ pub fn da_associations_for(mime : String) -> Array[String] {
 }
 
 ///|
-/// 设置默认应用:把 mime=desktop_id 写入用户 mimeapps.list
-/// (~/.config/mimeapps.list,XDG_CONFIG_HOME 覆盖)的 [Default Applications]
-/// 段;已有该 mime 行则替换,否则段内追加/新建段。设置类:由调用方决定何时
-/// 执行(演示板不提供直接入口,仅文档说明)。
+/// 设置默认应用（设置类，由调用方决定何时执行）：Linux 把 mime=
+/// desktop_id 写入用户 mimeapps.list 的 [Default Applications] 段（已有
+/// 该 mime 行则替换，否则段内追加/新建段）；Windows 的用户级默认应用
+/// 注册走 IApplicationAssociationRegistration（需 UI 授权流程），本包
+/// 未实现，返回 Unsupported。
 pub fn da_set_default(mime : String, desktop_id : String) -> Result[Unit, DefaultAppError] {
+  if @yue.platform() == "windows" {
+    return Err(Unsupported)
+  }
   if !desktop_id.has_suffix(".desktop") {
     return Err(QueryFailed("desktop_id 必须是 .desktop 文件名: \{desktop_id}"))
   }

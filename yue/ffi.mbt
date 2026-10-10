@@ -1845,6 +1845,217 @@ pub extern "c" fn ffi_proc_wait(
 /// 当前进程 id（macOS 桩 -1）。
 pub extern "c" fn ffi_proc_getpid() -> Int = "yue_mbt_proc_getpid"
 
+// ---------- 系统能力 Windows 直连组（system 包；非 Windows 均为哨兵） ----------
+
+///|
+/// 注册表 REG_SZ 读取（root：0=HKLM 1=HKCU；REG_EXPAND_SZ 展开后）。
+#borrow(path, value, ok)
+pub extern "c" fn ffi_win_reg_str(
+  root : Int,
+  path : Bytes,
+  value : Bytes,
+  ok : Ref[Int],
+) -> Bytes = "yue_mbt_win_reg_str"
+
+///|
+/// 物理内存（kB；返回 1 成功 0 失败）。
+#borrow(total_kb, avail_kb)
+pub extern "c" fn ffi_win_memory(
+  total_kb : Ref[Int64],
+  avail_kb : Ref[Int64],
+) -> Int = "yue_mbt_win_memory"
+
+///|
+/// 开机毫秒数（<0 错误）。
+pub extern "c" fn ffi_win_uptime_ms() -> Int64 = "yue_mbt_win_uptime_ms"
+
+///|
+/// 壁纸读（ok=0 未取得）。
+#borrow(ok)
+pub extern "c" fn ffi_wallpaper_get(ok : Ref[Int]) -> Bytes = "yue_mbt_wallpaper_get"
+
+///|
+/// 壁纸写（0 成功 / 负数错误）。
+#borrow(path, ok)
+pub extern "c" fn ffi_wallpaper_set(
+  path : Bytes,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_wallpaper_set"
+
+///|
+/// 时区名（Windows 时区键名，如 "China Standard Time"，非 IANA 名）。
+#borrow(ok)
+pub extern "c" fn ffi_win_tz_name(ok : Ref[Int]) -> Bytes = "yue_mbt_win_tz_name"
+
+///|
+/// 用户界面区域名（BCP-47，如 "zh-CN"）。
+#borrow(ok)
+pub extern "c" fn ffi_win_lang(ok : Ref[Int]) -> Bytes = "yue_mbt_win_lang"
+
+///|
+/// W32Time 服务是否在跑（1/0，-1 错误）。
+#borrow(ok)
+pub extern "c" fn ffi_win_ntp_running(ok : Ref[Int]) -> Int = "yue_mbt_win_ntp_running"
+
+///|
+/// 关机/重启/注销（how：0=关机 1=重启 2=注销当前用户；需关机特权）。
+#borrow(ok)
+pub extern "c" fn ffi_win_shutdown(how : Int, ok : Ref[Int]) -> Int = "yue_mbt_win_shutdown"
+
+///|
+/// 当前电源计划 GUID（16 字节裸序写入 guid）。
+#borrow(guid, ok)
+pub extern "c" fn ffi_power_active_guid(
+  guid : Bytes,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_power_active_guid"
+
+///|
+/// 切换电源计划（16 字节裸序 GUID）。
+#borrow(guid, ok)
+pub extern "c" fn ffi_power_set_guid(
+  guid : Bytes,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_power_set_guid"
+
+///|
+/// 枚举电源计划 GUID（每项 16 字节写入 out，cap 为方案数上限；返回
+/// 方案数）。
+#borrow(out, ok)
+pub extern "c" fn ffi_power_enumerate_guids(
+  out : Bytes,
+  cap : Int,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_power_enumerate_guids"
+
+///|
+/// DDC 亮度设备枚举（'\n' 分行 "name\tmax\tcur"）。
+#borrow(ok)
+pub extern "c" fn ffi_brightness_devices(ok : Ref[Int]) -> Bytes = "yue_mbt_brightness_devices"
+
+///|
+/// DDC 亮度当前值（index 与 devices 同序）。
+#borrow(cur, max_v, ok)
+pub extern "c" fn ffi_brightness_get(
+  index : Int,
+  cur : Ref[Int],
+  max_v : Ref[Int],
+  ok : Ref[Int],
+) -> Int = "yue_mbt_brightness_get"
+
+///|
+/// DDC 亮度设置（value 为设备量纲原始值）。
+#borrow(ok)
+pub extern "c" fn ffi_brightness_set(
+  index : Int,
+  value : Int,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_brightness_set"
+
+///|
+/// 默认输出端点音量（level 0..1 标量；muted 0/1）。
+#borrow(level, muted, ok)
+pub extern "c" fn ffi_vol_master(
+  level : Ref[Double],
+  muted : Ref[Int],
+  ok : Ref[Int],
+) -> Int = "yue_mbt_vol_master"
+
+///|
+/// 设默认输出端点音量（0..1 标量）。
+#borrow(ok)
+pub extern "c" fn ffi_vol_set_master(
+  level : Double,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_vol_set_master"
+
+///|
+/// 设默认输出端点静音（1/0）。
+#borrow(ok)
+pub extern "c" fn ffi_vol_set_mute(
+  mute : Int,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_vol_set_mute"
+
+///|
+/// 显示器配置文本（H|.. 头行 + M|.. 模式行）。
+#borrow(ok)
+pub extern "c" fn ffi_mon_list(ok : Ref[Int]) -> Bytes = "yue_mbt_mon_list"
+
+///|
+/// 打印机列表（"name\tstatus_code" 行）。
+#borrow(ok)
+pub extern "c" fn ffi_prt_list(ok : Ref[Int]) -> Bytes = "yue_mbt_prt_list"
+
+///|
+/// 默认打印机名。
+#borrow(ok)
+pub extern "c" fn ffi_prt_default(ok : Ref[Int]) -> Bytes = "yue_mbt_prt_default"
+
+///|
+/// 打印队列（"job_id\tdoc_name" 行）。
+#borrow(printer, ok)
+pub extern "c" fn ffi_prt_queue(
+  printer : Bytes,
+  ok : Ref[Int],
+) -> Bytes = "yue_mbt_prt_queue"
+
+///|
+/// 提交打印（文件 "print" 动词，走默认打印机）。
+#borrow(path, ok)
+pub extern "c" fn ffi_prt_print(
+  path : Bytes,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_prt_print"
+
+///|
+/// 剪贴板文本读（无文本 ok=0）。
+#borrow(ok)
+pub extern "c" fn ffi_clipboard_text(ok : Ref[Int]) -> Bytes = "yue_mbt_clipboard_text"
+
+///|
+/// 可见窗口列表（"0xHWND\t标题" 行）。
+#borrow(ok)
+pub extern "c" fn ffi_win_list_windows(ok : Ref[Int]) -> Bytes = "yue_mbt_win_list_windows"
+
+///|
+/// 窗口置前（"0x" 前缀按句柄，否则按标题精确匹配）。
+#borrow(id_or_title, ok)
+pub extern "c" fn ffi_win_activate_window(
+  id_or_title : Bytes,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_win_activate_window"
+
+///|
+/// 按标题精确匹配关闭窗口（WM_CLOSE）。
+#borrow(title, ok)
+pub extern "c" fn ffi_win_close_window(
+  title : Bytes,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_win_close_window"
+
+///|
+/// 文件关联查询（assoc 为扩展名或协议；kind：0=可执行 1=命令行）。
+#borrow(assoc, ok)
+pub extern "c" fn ffi_assoc_query(
+  assoc : Bytes,
+  kind : Int,
+  ok : Ref[Int],
+) -> Bytes = "yue_mbt_assoc_query"
+
+///|
+/// .lnk 目标路径解析（IShellLink）。
+#borrow(path, ok)
+pub extern "c" fn ffi_lnk_target(
+  path : Bytes,
+  ok : Ref[Int],
+) -> Bytes = "yue_mbt_lnk_target"
+
+///|
+/// 磁盘卷枚举（"C:|label|total|free|kind" 行）。
+#borrow(ok)
+pub extern "c" fn ffi_dsk_volumes(ok : Ref[Int]) -> Bytes = "yue_mbt_dsk_volumes"
+
 // ---------- 打开外部（URL / 文件管理器选中） ----------
 
 ///|
