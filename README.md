@@ -2,7 +2,7 @@
 
 > Thanks to [Cheng Zhao (zcbenz)](https://github.com/zcbenz) and his [Yue](https://github.com/yue/yue) framework, and to [MoonBit](https://github.com/moonbitlang). As it happens, both of these programming tools carry the character for "moon" — and I have grown fond of them both. [About me and `libyue`](docs/aboutlibyue.md)
 
-A **native cross-platform desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — a full binding of [libyue](https://libyue.com/docs/latest/cpp/) (C++): one MoonBit codebase runs native windows on Windows ✅ / Linux ✅ / macOS 🟡, zero-config right after `moon add`.
+A **native cross-platform desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — a full binding of [libyue](https://libyue.com/docs/latest/cpp/) (C++): one MoonBit codebase runs native windows on Windows ✅ / Linux ✅ / macOS 🟡, zero-config right after `moon add`. 📚 **Online docs**: <https://moonbit-libyue.pages.dev/> — every guide in this repo as a website, auto-deployed with the repo (中文版在 [/zh/](https://moonbit-libyue.pages.dev/zh/)).
 
 English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)
 

@@ -2,7 +2,7 @@
 
 > 感谢 [赵成(zcbenz)](https://github.com/zcbenz) 和他的 [Yue](https://github.com/yue/yue) 框架，以及 [MoonBit](https://github.com/moonbitlang)。很凑巧，这两个编程工具都有 “月”，现在我也很喜欢它们。 [关于我和 `libyue`](docs/zh/aboutlibyue.md)
 
-[MoonBit](https://github.com/moonbitlang) 生态的**原生跨平台桌面 GUI 库**——对 [libyue](https://libyue.com/docs/latest/cpp/)(C++) 全量封装,一套 MoonBit 代码跑 Windows ✅ / Linux ✅ / macOS 🟡 原生窗口,`moon add` 后零配置直接运行。
+[MoonBit](https://github.com/moonbitlang) 生态的**原生跨平台桌面 GUI 库**——对 [libyue](https://libyue.com/docs/latest/cpp/)(C++) 全量封装,一套 MoonBit 代码跑 Windows ✅ / Linux ✅ / macOS 🟡 原生窗口,`moon add` 后零配置直接运行。📚 **在线文档**:<https://moonbit-libyue.pages.dev/zh/> —— 本仓各文档的网页版,随仓库自动部署(English: <https://moonbit-libyue.pages.dev/>)。
 
 简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
 
