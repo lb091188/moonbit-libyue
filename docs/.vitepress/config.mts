@@ -160,6 +160,7 @@ export default defineConfig({
               { text: '文档索引', link: '/zh/README' },
               { text: '平台适配经验', link: '/zh/adaptation' },
               { text: '异步共存调研', link: '/zh/async-research' },
+              { text: '音频输出后端评估', link: '/zh/audio-output-backend' },
               { text: '原生层重链', link: '/zh/relink' },
             ],
           },
