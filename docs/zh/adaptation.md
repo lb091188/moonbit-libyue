@@ -876,6 +876,8 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **本机 Win10 19045 实测(只读面)**:`moon test yue/system` 255/255 全绿,其中真机直连:打印机 7 台 + 默认 EPSON L3250 + 队列查询;显示器 \\.\DISPLAY1 1920x1080 主输出 49 个模式;磁盘卷 C:/D: 两卷容量与资源管理器一致;时区键名/BCP-47 语言/W32Time 状态/注册表发行版标识(ProductName+DisplayVersion)/电源方案枚举与当前方案映射均通过。待用户真机执行(设置类与视觉面):音量实际调节、壁纸切换视觉确认、DDC 亮度对外接显示器实际生效(内建面板预期枚举为空)、win_activate/win_close 对真实窗口、pwrc/pp_set/lc_set/prt_print 设置类动作。
 - **操作纪律(本批自伤两则)**:①Windows PowerShell 5.1 的 `Get-Content` 无 -Encoding 时按 ANSI 读、`Set-Content -Encoding UTF8` 带写 BOM——对含中文注释的源文件做读改写会把全部中文毁成乱码(本批 ffi.mbt/yue_mbt.h 各毁一次,git checkout 恢复后用编辑器工具重做);文本修补一律走编辑器或显式 `[IO.File]::ReadAllText/WriteAllText(UTF8Encoding($false))`;②CMD 里 `git commit -m` 消息中的 `%VAR%` 会被 shell 展开(本批 %LOCALAPPDATA%/%PATH% 展开成真实路径),含百分号的提交信息必须走 `-F 消息文件`。
 
+- **媒体桩缺件降级(2026-10-10,Windows 全量构建解锁)**:TODO「ffmpeg 的 MSVC 链接面」曾把 Windows 的 systemprobe(→yue-media→ffmpeg)全量构建卡死在桩编译——`ffmpeg_stub.c` 无条件 `#include <libavformat/avformat.h>`(C1083)、`audio_stub.c` 用 POSIX `CLOCK_MONOTONIC`(C2065)。修法两则:①ffmpeg_stub 以 `__has_include(<libavformat/avformat.h>)` 探测,缺头时整文件走降级哑实现(句柄/失败返回值与真实现的失败路径逐一同构:vf_version=0、宽高/声道=0、解码=-1),MoonBit 层据此报「解码不可用」——与 91a99c5 的 prebuild 缺包降级(链接参数留空)同一哲学,头文件一旦经 INCLUDE/CPATH 供给即自动回到真实现(MSVC 认 INCLUDE,GCC/Clang 认 CPATH);②`mbt_now_ms` 补 Win32 分支 QueryPerformanceCounter(静态缓存 freq,同单调不受系统时间调整影响),POSIX 分支不动。实测:`moon run modules/yue-examples/systemprobe` 在 Windows 首次完整构建+启动(窗口存活),音视频演示页按预期降级;真实播放仍待 ffmpeg 的 MSVC 库供货(NuGet/ShiftMediaProject,TODO 维持)。
+
 ## macOS(CI 构建链已验,GUI 待真机)
 
 - libyue v0.15.6 发行包含 ARC / no-ARC 双库:Darwin 链接参数 = 主库 + `-lyue_mbt_noarc`(no-ARC 符号被主库引用,须排其后)+ AppKit / Carbon / IOKit / Security / WebKit / OpenDirectory 框架 + `-lobjc -lc++ -lpthread -lbsm -Wl,-dead_strip`;prebuild Darwin 分支已按此预修。
