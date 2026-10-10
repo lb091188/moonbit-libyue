@@ -25,6 +25,9 @@ pub struct Node {
   mut baseline_fn : Option[(Option[Double], Option[Double]) -> Option[Double]]
   // 本次布局算出的基线（到本节点边框盒顶部的距离），None = 无基线
   mut baseline : Option[Double]
+  // 测量缓存：键 = (可用宽, 可用高)，值 = (宽, 高, 基线)。
+  // 单次 calculate_layout 内有效，入口会整体清空（样式可能在两次布局间被改）
+  measure_cache : Array[((Option[Double], Option[Double]), (Double, Double, Option[Double]))]
   mut layout_left : Double
   mut layout_top : Double
   mut layout_width : Double
@@ -39,6 +42,7 @@ pub fn Node::new() -> Node {
     measure : None,
     baseline_fn : None,
     baseline : None,
+    measure_cache : [],
     layout_left : 0.0,
     layout_top : 0.0,
     layout_width : 0.0,
