@@ -523,6 +523,8 @@ n.show()
 | close() | 关闭 |
 | NotificationCenter::get() + add(n) | 经通知中心发送 |
 
+> **macOS**:系统通知只对**签名后的 `.app`** 生效——裸可执行文件没有应用身份,系统不会投递(`moon run` 直接跑不弹属系统限制,不是库的问题)。用 `python3 scripts/mac_bundle.py <示例名>` 把产物包成 `.app` 并 ad-hoc 签名后再启动;接口与包装的详细边界见 [adaptation.md](adaptation.md) 的「系统通知不弹」小节。
+
 ## 消息框 MessageBox
 
 ```moonbit

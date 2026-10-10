@@ -72,6 +72,13 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
   - **定案:接受传递,不拆独立模块**(MD2 起 markdown_view 桥接 mizchi/markdown 随主模块走)。依据:闭包全为纯 MoonBit 源码包,无 native stub 无链接面,不碰 prebuild 托管,对消费方零 ABI / 平台矩阵 / 发布物体积风险,与 ffmpeg-mbt 因二进制矩阵 + 许可 + 体积拆独立模块的性质不同;降级路径预留——消费方依赖面反馈过重或上游 0.x API 波及时,再下沉独立模块(yue 主模块退回零 markdown 依赖,仿媒体三层拆分)。
   - 注意:模块内子包(如 yue/browser 模式)解决不了依赖面——mooncakes deps 是模块级声明,子包 import 一样进发布闭包;browser 模式隔离的是链接 flags 层,两者机理不同勿混用。
 
+### macOS 新 API 的可用性门槛(两套构建系统部署目标不同)
+
+- **两套 mac 构建的部署目标不一致**:GN/ninja 构建(`scripts/create_source_dist.js`,即 `Create source distribution` 步骤)取 `third_party/build-gn/build/config/mac/mac_sdk.gni` 的 `mac_deployment_target = "10.15"`;CMake 预构建(`scripts/prebuilt/CMakeLists.txt`)取 `CMAKE_OSX_DEPLOYMENT_TARGET 11.0`。
+- **clang 的可用性告警只对「引入/废弃版本 ≤ 部署目标」触发**:`-Wunguarded-availability-new` 默认开启,GN 侧还带 `-Werror`(Windows 是 `/WX`),因此 10.15 目标下用 macOS 11+/14+ 的 API 而不加 `@available` 是硬编译失败;反过来,**废弃版本高于部署目标的旧 API 不告警**——`NSUserNotification`、`UNNotificationPresentationOptionAlert` 都废弃于 11.0,在 10.15 目标下一直能编过,这就是旧代码多年无事的原因。
+- **踩坑:`@available` 必须包住调用本身**,只包住外围条件判断不算: `if (@available(macOS 14.0, *)) ok = 检查(); if (ok) 用新 API();` 仍会报错(`WKWebsiteDataStore initWithIdentifier:` 实测)。
+- 取证:失败时 check-runs annotations API 匿名可读(`/repos/<owner>/<repo>/check-runs/<check_run_id>/annotations`),这是仓库无 Actions 日志权限时唯一能看到编译错误的通道。但**把多行塞进一条注解**(以 `%0A` 转义)在 mac 上会被截成读不出内容的碎片——`prebuilt.yml` 已改成**一行一条注解**(行内 `%` 转义为 `%25`);本仓 `ci.yml` 仍是旧的字节切片写法,后续按同一思路收敛。
+
 ### 浏览器依赖按需化（0.5.0）
 
 - 机制：MoonBit 包边界即链接依赖边界。`Browser` 全部绑定迁入独立包 `yue/browser`（`@browser.Browser` → `@browser.Browser`，API 不变；`examples/showcase/moon.pkg` 是 import 样例），prebuild 的 link_configs 相应拆三份——Linux 的 webkit2gtk pkg-config 输出只进 `yue/browser` 条目，`yue`/`yue/traybus` 只带公共库；**主包严禁 import `yue/browser`**，否则依赖闭包让所有下游重新拿到 webkit flags。
@@ -839,8 +846,23 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 根因:`-[NUScroll resizeSubviewsWithOldSize:]` 只用 `content_size_`——未显式设置时该值是 `{0,0}`,被「不小于视口」两行钳成视口高再 `setFrameSize:` 给 documentView;而 macOS 的可滚范围正是 `documentView frame − clipBounds`,高度恒等视口即范围恒 0,同时内容 Container 被按视口高布局、子内容随之压缩裁剪。对照:Win `ScrollImpl::Layout()` 未显式时取 `Container::GetPreferredSize()`,GTK 侧由 size request 承载——「未显式尺寸取内容自然高度」这层只有 macOS 缺,属 fork 增强自身的平台一致性缺口(上游三平台同样没有此逻辑)。
 - 修复(fork 提交 `0df24ee3`):未显式设置时按内容 `Container` 的自然尺寸定 documentView frame——宽度取「视口宽 / 内容自然宽」较大者(内容更宽时保留其宽以支持横向滚动),高度用 `GetPreferredHeightForWidth(该宽)` 测量(先定宽再量高,换行与最终布局一致);显式 `SetContentSize` 行为不变(新增 `content_size_explicit_` 标记)。重算入口三处:视口尺寸变化(`resizeSubviewsWithOldSize:`)、内容挂入(`PlatformSetContentView`,内容可在布局之后再 `set_content`)、新增的 mac 专属 `Scroll::RefreshContentSize()`。
 - 本批验证:`nativeui/scroll.h` 过 fork 的 cpplint 零告警;本机为 Linux,无法编译 mac 代码,且 fork 的 `build.yml` 实测从未被 push 触发(该工作流运行数为 0),故 mac 编译验证只能落在打 `v*-mbt*` 标签触发的 prebuilt 工作流(本批尚未打标签);真机行为见下清单。
-- 待办与顺序(跨仓链路,勿跳步):① shim 的 `yue_mbt_scroll_refresh_content_size` 增 `#if defined(OS_MAC)` 分支调 `Scroll::RefreshContentSize()`(内容动态增高不改变视口尺寸,自动路径覆盖不到,须显式触发);该 shim 改动**必须等 fork 出新预构建库并升 `prepare.py` 的 `LIBYUE_VERSION` 之后再落**,否则本仓 mac CI 对旧库链接 undefined。② 本仓打包侧(.app 骨架)与 mac 通知迁移属 issue #4,另行评估。
+- 待办与顺序(跨仓链路,勿跳步):① shim 的 `yue_mbt_scroll_refresh_content_size` 增 `#if defined(OS_MAC)` 分支调 `Scroll::RefreshContentSize()`(内容动态增高不改变视口尺寸,自动路径覆盖不到,须显式触发);该 shim 改动**必须等 fork 出新预构建库并升 `prepare.py` 的 `LIBYUE_VERSION` 之后再落**,否则本仓 mac CI 对旧库链接 undefined。② 本仓打包侧(.app 骨架 + ad-hoc 签名)与 mac 通知迁移属 issue #4,已随 `mbt.20` 落地,见本文档「系统通知不弹」小节。
 - 真机验证清单(用户执行):① showcase 各分页(含侧边菜单)可滚到底;② A/B 对照:同一 30 行文本,不设内容尺寸可滚、显式设 1200 同样可滚;③ 窗口压到很矮后内容仍可滚、滚动条 thumb 比例合理;④ 含宽表的页可横向滚(不裁列);⑤ systemprobe 报告 `set_text` 长高后可滚到底——本项依赖待办 ①,未接线前预期仍不动。
+
+### 系统通知不弹(裸可执行文件无应用身份 + NSUserNotification 已弃用)
+
+- 环境:报告方 mac 14.5 / arm64,`examples/notifycheck` 最小探针,fork `v0.15.6-mbt.18` 预构建库;本机为 Linux 未复现,结论来自 fork 源码逐行核对 + 报告方运行时取证。
+- 现象:`Notification::show()` 后通知完全不弹——无横幅、无通知中心条目、无声音,也没有任何错误回调;Linux(libnotify)与 Windows 正常。
+- 根因两层:① 实现建在 `NSUserNotification` / `NSUserNotificationCenter` 上,该 API 弃用于 macOS 10.14、macOS 11+ 对未注册应用静默失效;② **裸 Mach-O 没有应用身份**——`[[NSBundle mainBundle] bundleIdentifier]` 为 nil,系统不会把它登记为可通知应用,拼出的通知 identifier 还是 `(null).notification.<UUID>`。系统统一日志无任何投递记录、`com.apple.ncprefs.plist` 无该程序条目,而对照 `osascript -e 'display notification'` 能到达 `usernoted`(被拒仅因未授权)——通道正常,问题在调用方 API 与应用身份。
+- 修复(fork 提交 `d6dc1b3b`):`notification_mac.mm` / `notification_center_mac.mm` 迁移到 UserNotifications。
+
+  - 投递:`UNMutableNotificationContent` + `UNNotificationRequest`(`trigger=nil` 立即投递);`Close` 走 `removeDeliveredNotificationsWithIdentifiers:`;图片按 `SetImagePath` 的文件 URL 挂 `UNNotificationAttachment`;授权在构造期请求(alert|sound|badge),被拒落 WARNING 日志便于自查。
+  - 交互:action 用 `UNNotificationAction`(identifier 取该 action 的 info,与 delegate 读法对齐);reply 用 `UNTextInputNotificationAction` 放进 category(category identifier 复用通知 identifier,options 带 `CustomDismissAction` 以保留关闭事件)。
+  - delegate 同时实现两套协议:`willPresentNotification:` 发 `on_notification_show`(前台展示);`didReceiveNotificationResponse:` 按 DefaultAction / DismissAction / `UNTextInputNotificationResponse` / 其余 action 分别映射到 click / close / reply / action。
+- **按应用身份分流,而不是无脑迁移**:`UNUserNotificationCenter` 对无身份进程直接抛异常,故按 `bundleIdentifier` 是否存在分流——有身份走新 API,裸可执行文件保留旧 API(不崩、行为与改造前一致)。这是**有意保留的降级分支**,不是没清理干净的旧代码。
+- 已知边界(待真机确认):① `on_notification_show` 在新 API 下只在前台(`willPresentNotification:`)触发,后台投递框架没有对应回调;② action 不再区分「首个作 action 按钮 / 其余作 additionalActions」,全部作为 category 的 action 呈现(有 reply 时旧 API 的 actionButton 本就不生效);③ `SetImage`(内存图)在新路径不生效,须用 `SetImagePath`(框架按文件 URL 挂附件)。
+- 配套(本仓):`scripts/mac_bundle.py` 把 moon 产物包成 `Foo.app`(`Contents/MacOS` + `Info.plist` + `Resources`)并 ad-hoc 签名(`codesign --force --sign -`),`LSMinimumSystemVersion` 默认 11.0(与预构建库部署目标一致)。**macOS 通知只对签名后的 .app 生效,`moon run` 裸跑不弹是系统限制而非库 bug**,使用文档已写明。
+- 真机验证清单(用户执行):① 程序包成 .app 并 ad-hoc 签名后启动,首次应弹授权对话框,允许后 `show()` 弹横幅;② 拒绝授权时能看到 WARNING 日志;③ 点击正文触发 `on_notification_click`;④ 带 action 的通知点按钮触发 `on_notification_action`;⑤ reply 通知输入文本回传 `on_notification_reply`;⑥ 通知被划掉触发 `on_notification_close`;⑦ 未打包的裸可执行文件仍是「不弹但不崩」(与改造前一致)。
 
 ### ffmpeg CLI 视频解码路线(帧集整读 + 偏移切片)
 

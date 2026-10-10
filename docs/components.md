@@ -525,6 +525,8 @@ n.show()
 | close() | Close |
 | NotificationCenter::get() + add(n) | Send via the notification center |
 
+> **macOS**: system notifications only work for a **signed `.app`** — a bare executable has no application identity, so the system never delivers its notifications (`moon run` not notifying is a system limitation, not a library bug). Use `python3 scripts/mac_bundle.py <example>` to wrap the product into a `.app` and ad-hoc sign it before launching; the API and packaging boundaries are in [adaptation.md](adaptation.md) under "System notifications never appear".
+
 ## MessageBox
 
 ```moonbit

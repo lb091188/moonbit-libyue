@@ -37,6 +37,15 @@ Methodology: Ubuntu 24.04 XFCE (X11), same machine and session; the startup delt
   - Fix: nightly version numbers are delisted the same day (the CLI server 403s any named historical version), so pinning via `MOONBIT_INSTALL_VERSION` is not viable — the only repair is rerunning `install/unix.sh` with no version to install the latest full bundle (binaries and core replaced in one pass), matching CI.
   - Verify: check that `moon version --all` and `~/.moon/lib/core/moon.mod` agree, then bump the version to force a full re-check — 133 tests green.
 
+### Availability gate for newer macOS APIs (two builds, two deployment targets)
+
+- **The two macOS builds disagree on the deployment target**: the GN/ninja build (`scripts/create_source_dist.js`, the `Create source distribution` step) uses `mac_deployment_target = "10.15"` from `third_party/build-gn/build/config/mac/mac_sdk.gni`, while the CMake prebuilt build (`scripts/prebuilt/CMakeLists.txt`) uses `CMAKE_OSX_DEPLOYMENT_TARGET 11.0`.
+- **Clang warns about availability only when the introduced/deprecated version is at or below the deployment target**: `-Wunguarded-availability-new` is on by default and the GN build adds `-Werror` (`/WX` on Windows), so using a macOS 11+/14+ API without `@available` under a 10.15 target is a hard compile failure.
+  - Conversely an API *deprecated* in 11.0 (`NSUserNotification`, `UNNotificationPresentationOptionAlert`) produces no warning under a 10.15 target, which is why the old code compiled for years.
+- **Pitfall: `@available` has to wrap the call itself**, not just an outer condition — `if (@available(macOS 14.0, *)) ok = check(); if (ok) useNewAPI();` still fails (measured on `WKWebsiteDataStore initWithIdentifier:`).
+- Evidence: on failure the check-runs annotations API is anonymously readable (`/repos/<owner>/<repo>/check-runs/<check_run_id>/annotations`), the only channel that shows the compiler error when the repository has no Actions log permission.
+  - But **packing multiple lines into one annotation** (`%0A` escaping) gets truncated into unreadable fragments on macOS; `prebuilt.yml` now emits **one annotation per line** (escaping `%` as `%25`). This repo's `ci.yml` still uses the old byte-slice form and should converge later.
+
 ### On-demand Browser dependency (0.5.0)
 
 - Mechanism: the MoonBit package boundary is the link-dependency boundary. All `Browser` bindings moved into the standalone package `yue/browser` (`@browser.Browser` → `@browser.Browser`, API unchanged; `examples/showcase/moon.pkg` is the import example), and prebuild's link_configs now has three entries — the Linux webkit2gtk pkg-config output goes only into the `yue/browser` entry, while `yue`/`yue/traybus` keep only the common libraries.
@@ -596,9 +605,26 @@ First full local-chain verification environment: Windows 10 19045 + VS BuildTool
 - Follow-ups, in order (blocked by a cross-repo chain — do not skip a step):
   - ① the shim's `yue_mbt_scroll_refresh_content_size` needs an `#if defined(OS_MAC)` branch calling `Scroll::RefreshContentSize()` (content that grows does not change the viewport size, so no automatic path sees it).
     - That shim change must land **only after** the fork publishes a new prebuilt library and `prepare.py`'s `LIBYUE_VERSION` is bumped, otherwise this repo's macOS CI links against the old library and fails on an undefined symbol.
-  - ② The packaging half (.app skeleton) and the macOS notification migration are issue #4, assessed separately.
+  - ② The packaging half (.app skeleton + ad-hoc signing) and the macOS notification migration are issue #4, landed with `mbt.20`; see the "System notifications never appear" section.
 - Real-machine checklist (run by the user): ① every showcase page (including the side menu) scrolls to the bottom; ② A/B control — the same 30 lines scrolls without a content size and also with an explicit 1200; ③ after shrinking the window to a very short height the content still scrolls and the thumb ratio looks right.
   - ④ a page with a wide table scrolls horizontally rather than clipping columns; ⑤ a systemprobe report that grew via `set_text` scrolls to the bottom — this one depends on follow-up ① and is expected to stay stuck until it lands.
+
+### System notifications never appear (bare executable has no app identity + NSUserNotification deprecated)
+
+- Environment: reporter's real machine, macOS 14.5 / arm64, a minimal `examples/notifycheck` probe, fork `v0.15.6-mbt.18` prebuilt library; this machine is Linux and could not reproduce it — the conclusions come from reading the fork sources plus the reporter's runtime evidence.
+- Symptom: nothing at all after `Notification::show()` — no banner, no notification-center entry, no sound, no error callback. Linux (libnotify) and Windows are fine.
+- Two root causes: ① the implementation was built on `NSUserNotification`/`NSUserNotificationCenter`, deprecated in macOS 10.14 and silently ignored for unregistered apps on macOS 11+; ② **a bare Mach-O has no application identity** — `[[NSBundle mainBundle] bundleIdentifier]` is nil, so the system never registers it as an app that may notify, and the identifier it builds reads `(null).notification.<UUID>`.
+  - The unified log has no delivery record and `com.apple.ncprefs.plist` has no entry for the program, while `osascript -e 'display notification'` does reach `usernoted` (rejected only as unauthorized) — the channel works, the caller's API and identity are the problem.
+- Fix (fork commit `d6dc1b3b`): `notification_mac.mm`/`notification_center_mac.mm` moved to UserNotifications.
+
+  - Delivery: `UNMutableNotificationContent` plus `UNNotificationRequest` with `trigger=nil` for immediate delivery; `Close` through `removeDeliveredNotificationsWithIdentifiers:`; images attached from `SetImagePath`'s file URL; authorization requested at construction (alert|sound|badge) with a WARNING log when denied.
+  - Interaction: actions as `UNNotificationAction` (identifier = the action's info, matching what the delegate reads); reply as `UNTextInputNotificationAction` inside a category (the category identifier reuses the notification identifier, `CustomDismissAction` keeps the close event).
+  - The delegate implements both protocols: `willPresentNotification:` emits `on_notification_show` (foreground presentation), and `didReceiveNotificationResponse:` maps DefaultAction / DismissAction / `UNTextInputNotificationResponse` / other actions to click / close / reply / action.
+- **Split by application identity instead of migrating blindly**: `UNUserNotificationCenter` raises an exception for a process without an identity, so the code branches on whether `bundleIdentifier` exists — with an identity it uses the new API, and a bare executable keeps the legacy one (no crash, behavior unchanged). That is a **deliberate fallback branch**, not leftover code.
+- Known boundaries (need real-machine confirmation): ① `on_notification_show` only fires in the foreground under the new API, since the framework has no delivery callback; ② actions are no longer split into "first one as the action button / the rest as additional actions" — all become category actions (with a reply button the legacy action button did not work either); ③ `SetImage` (in-memory image) does not apply on the new path, `SetImagePath` must be used.
+- Packaging counterpart (this repo): `scripts/mac_bundle.py` wraps a moon product into a `Foo.app` (`Contents/MacOS` + `Info.plist` + `Resources`) and ad-hoc signs it (`codesign --force --sign -`), with `LSMinimumSystemVersion` defaulting to 11.0 to match the prebuilt library.
+  - **System notifications only work for a signed .app; `moon run` on a bare executable not notifying is a system limitation, not a library bug.**
+- Real-machine checklist (run by the user): ① package and ad-hoc sign the program, launch it — an authorization prompt should appear once and, after allowing it, `show()` should produce a banner; ② denying it produces the WARNING log; ③ clicking the body triggers `on_notification_click`; ④ an action button triggers `on_notification_action`; ⑤ a reply input comes back through `on_notification_reply`; ⑥ dismissing triggers `on_notification_close`; ⑦ an unpackaged bare executable still does not notify but does not crash (same as before).
 
 ## Maintenance
 

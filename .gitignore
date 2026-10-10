@@ -25,3 +25,6 @@ __pycache__/
 
 # yue-media 内嵌 miniaudio 头文件(prebuild.py 按钉版本 + sha256 构建期取回,勿入库)
 /modules/yue-media/src/miniaudio.h
+
+# mac_bundle.py 产物(.app 骨架)
+/dist/

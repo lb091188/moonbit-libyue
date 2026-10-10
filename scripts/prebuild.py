@@ -367,6 +367,9 @@ def link_configs() -> dict:
             "-framework", "Security",
             "-framework", "WebKit",
             "-framework", "OpenDirectory",
+            # 通知实现（UNUserNotificationCenter）在 UserNotifications
+            # framework 里，静态库不传递框架依赖，须在最终链接显式给出。
+            "-framework", "UserNotifications",
             # audit_token_to_pid（MachPortRendezvous）在 libbsm；
             # -Wl,-dead_strip 为官方构建的链接选项（CI 实测缺失即 undefined）
             "-lbsm", "-Wl,-dead_strip",
