@@ -313,13 +313,32 @@ static gboolean on_draw(GtkWidget *w, cairo_t *cr, gpointer data) {
     cairo_stroke(cr);
   }
 
-  // 文本 + 组合串 + 插入符，全部按 MoonBit 推下来的状态画
+  // 正文与组合串分开画：只有组合串带下划线（与 GtkEntry 同观感）。
+  // pr.text 是 MoonBit 推下来的**已提交文本**，组合串在这里拼——两边都拼会
+  // 出现同一段字显示两份（本探针真机踩过）。
   cairo_set_source_rgb(cr, 0.92, 0.93, 0.95);
-  char composed[5120];
   int caret_x = 0;
+  int text_px = 0;
+  int pre_px = 0;
   pango_font_description_set_absolute_size(pr.font, 14.0 * PANGO_SCALE);
   pango_layout_set_font_description(pr.layout, pr.font);
-  // 插入符横坐标 = 光标前缀的像素宽
+  draw_line(cr, box_x + 4.0, box_y + 2.0, pr.text, 0);
+  {
+    int tw = 0;
+    int th = 0;
+    pango_layout_set_text(pr.layout, pr.text, -1);
+    pango_layout_get_pixel_size(pr.layout, &tw, &th);
+    text_px = tw;
+  }
+  if (pr.preedit_active) {
+    int pw = 0;
+    int ph = 0;
+    pango_layout_set_text(pr.layout, pr.preedit, -1);
+    pango_layout_get_pixel_size(pr.layout, &pw, &ph);
+    pre_px = pw;
+    draw_line(cr, box_x + 4.0 + text_px, box_y + 2.0, pr.preedit, 1);
+  }
+  // 插入符横坐标 = 光标前缀像素宽 +（组合中）整段组合串宽
   if (pr.caret_byte >= 0 && pr.caret_byte <= pr.text_len) {
     char prefix[4096];
     memcpy(prefix, pr.text, (gsize)pr.caret_byte);
@@ -328,11 +347,8 @@ static gboolean on_draw(GtkWidget *w, cairo_t *cr, gpointer data) {
     int pw = 0;
     int ph = 0;
     pango_layout_get_pixel_size(pr.layout, &pw, &ph);
-    caret_x = pw;
+    caret_x = pw + pre_px;
   }
-  g_snprintf(composed, sizeof(composed), "%s%s", pr.text,
-             pr.preedit_active ? pr.preedit : "");
-  draw_line(cr, box_x + 4.0, box_y + 2.0, composed, pr.preedit_active);
   cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
   cairo_set_line_width(cr, 1.0);
   cairo_move_to(cr, box_x + 4.0 + caret_x, box_y + 2.0);
@@ -390,10 +406,11 @@ int ip_init(int mode) {
   } else {
     gtk_widget_set_can_focus(pr.area, TRUE);
     pr.im = gtk_im_multicontext_new();
-    // 自绘路线必须关掉输入法客户端的自带 preedit 绘制：默认 use_preedit=TRUE
-    // 时输入法会另画一份组合串浮窗，而本探针把 preedit 内联画在文本里，
-    // 同一段文字就会显示两份（实测 focus_in 激活输入法之后立刻可见）。
-    gtk_im_context_set_use_preedit(pr.im, FALSE);
+    // use_preedit 的语义是「是否用 preedit 串做反馈」：TRUE（默认）= 用串内联反馈
+    // （由应用/控件画，GtkEntry 即此形态，带下划线）；FALSE = 允许输入法改用
+    // 它自己的子窗反馈。自绘路线要的是前者，故保持 TRUE——此前填 FALSE 属读反
+    // 语义，实测后果是两边都不画、preedit 信号也一条不来。
+    gtk_im_context_set_use_preedit(pr.im, TRUE);
     g_signal_connect(pr.im, "commit", G_CALLBACK(on_im_commit), NULL);
     g_signal_connect(pr.im, "preedit-start", G_CALLBACK(on_im_preedit_start),
                      NULL);
@@ -402,9 +419,14 @@ int ip_init(int mode) {
     g_signal_connect(pr.im, "preedit-end", G_CALLBACK(on_im_preedit_end), NULL);
     gtk_widget_grab_focus(pr.area);
   }
-  g_signal_connect(pr.window, "key-press-event", G_CALLBACK(on_key_press),
+  // 模式 B 把按键处理挂到焦点控件（pr.area）上，与 GtkEntry 的挂法一致：
+  // 事件进 IM 过滤的顺序、以及消费后能否真正吃掉，都取决于挂在焦点控件这一层。
+  // 模式 C 里输入法挂在 GtkEntry 自己身上，本处只做观察，维持窗口级。
+  GtkWidget *key_target = (pr.mode == MODE_CHANNEL && pr.im != NULL) ? pr.area
+                                                                     : pr.window;
+  g_signal_connect(key_target, "key-press-event", G_CALLBACK(on_key_press),
                    NULL);
-  g_signal_connect(pr.window, "key-release-event", G_CALLBACK(on_key_release),
+  g_signal_connect(key_target, "key-release-event", G_CALLBACK(on_key_release),
                    NULL);
   g_signal_connect(pr.window, "focus-in-event", G_CALLBACK(on_window_focus_in),
                    NULL);
@@ -514,6 +536,16 @@ int ip_apply_css(void *css, int len) {
   g_object_unref(provider);
   note("css", "applied");
   return 1;
+}
+
+// 喂 surrounding text：GtkEntry 每次文本/光标变化都会同步，缺了它输入法
+// 可能不承认本应用支持 client preedit（实测模式 C 的内联预览能出来、本探针
+// 不能，差别就在这类挂法细节）。文本与光标索引都按 UTF-8 字节。
+void ip_set_surrounding(const char *text, int len, int cursor_bytes) {
+  if (pr.im == NULL || text == NULL) {
+    return;
+  }
+  gtk_im_context_set_surrounding(pr.im, text, len, cursor_bytes);
 }
 
 // 输入法模块识别：multicontext 实际加载了哪个子上下文

@@ -59,7 +59,7 @@ rm -f build/libime_probe_stub.a _build/native/debug/build/NoahLiu/moonbit-libyue
 |---|---|
 | 1 / 2 / 6（中文提交） | **补 `gtk_im_context_focus_in` 后通过**——未调它时 `GtkIMMulticontext` 落回内建 `GtkIMContextSimple`，表现为每键一次 commit、preedit 恒 0（这不是 fcitx5 的问题） |
 | 5（组合中切窗口） | 需要在顶层 focus-in/out 里同步 `focus_in`/`focus_out`，否则输入法侧残留未完成组合串（已按此实现） |
-| 1 的 preedit 内联 | **仍缺**：组合串没有自绘出来。定位在探针自身的挂法，不是输入法侧；G5 正式实现按「commit 已可达、preedit 必须自绘并随焦点同步」两条事实设计 |
+| 1 的 preedit 内联 | **已闭环**：四条件＝`focus_in/out` 随焦点同步、按键挂焦点控件层、每拍 `set_surrounding`（已提交文本 + UTF-8 字节光标）、`use_preedit=TRUE`（语义＝用 preedit 串做内联反馈）；另：组合串只在一处拼接（绘制侧，正文不带线、组合串带线），两处都拼会显示两份。ibus 未装未测 |
 | 8 / 9（模式 C 兜底） | 可见 `GtkEntry` 的预览与提交行为与 Electron 一致，可作兜底形态的参照基线 |
 
 结论详情与根因见 `docs/zh/adaptation.md`「G0 · 真机回证」条。

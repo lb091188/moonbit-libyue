@@ -197,6 +197,12 @@ Environment: Ubuntu 24.04 + X11 + XFCE, `GTK_IM_MODULE=fcitx` (fcitx5). Run by t
 - **Remaining gap**: inline preedit (drawing the compose string ourselves) still does not show, localized to the probe's own wiring rather than the IME. Mode C's visible `GtkEntry` preview behaves like Electron, which is a useful baseline for the fallback shape. G5 should be designed from these two facts (commit reachable; preedit must be self-drawn with focus sync) and stop re-verifying that commit is reachable at all.
 - Verification: `moon build experiment/ime_probe` and both modes exit 0 on this machine (assistant side); CJK typing itself was executed and reported by the collaborator per the README checklist.
 
+- **Closed the same day**: inline preedit now works; the pure channel needs **four conditions** - (1) `focus_in`/`focus_out` synced with window focus, (2) key handling installed on the **focused widget**, not the window (that is exactly where our behaviour differed from `GtkEntry`), (3) `gtk_im_context_set_surrounding` fed every frame (committed text only, cursor in UTF-8 bytes), (4) `use_preedit=TRUE` - its meaning is "use the preedit string for inline feedback", not "the IM draws it itself" (reading it backwards cost two false negatives).
+- **Another real-machine pitfall, unrelated to the IM**: the composition string may be assembled in **exactly one place**. The probe used to splice the preedit into the display string on the MoonBit side and splice it again while drawing in C, so the same text appeared twice; the fix moves both splicing and the underline into the draw side (plain text unlined, composition underlined, matching `GtkEntry`), with MoonBit pushing committed text only.
+- **One misdiagnosis to remember**: blaming a frontend version mismatch was refuted by the mode-C control (a real `GtkEntry` previews fine in the same environment). Run a reference implementation before attributing to dependencies.
+- **ibus not installed**: those two checklist rounds are marked "no ibus daemon in this environment, untested".
+- **Verification**: `moon build experiment/ime_probe` plus smoke runs in both modes (exit code 0, assistant side); real machine (fcitx5) confirmed by the collaborator: one inline underlined composition, `[preedit] changed` in the stream, `[commit] 中文` intact, candidate window hugging the end of the composition.
+
 ## Linux
 
 ### Distributions

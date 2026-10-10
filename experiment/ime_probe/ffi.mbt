@@ -31,6 +31,14 @@ extern "c" fn ip_on_note(
 ) -> Unit = "ip_on_note"
 
 ///|
+#borrow(text)
+extern "c" fn ip_set_surrounding(
+  text : Bytes,
+  len : Int,
+  cursor_bytes : Int,
+) -> Unit = "ip_set_surrounding"
+
+///|
 extern "c" fn ip_init(mode : Int) -> Int = "ip_init"
 
 ///|
