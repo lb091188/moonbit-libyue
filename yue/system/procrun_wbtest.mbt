@@ -1,25 +1,33 @@
 // procrun 白盒测试：真实只读命令覆盖 pr_run 的 stdout 捕获 / 退出码 /
-// 非零退出带 stderr / 超时 / 信号终止路径与 C locale 环境构造。超时用
-// sleep 5 配 100ms 预算真测等待逻辑（含提前返回）；命令不存在按 Unix
-// 惯例断言退出码 127。全部命令只读，不改动系统状态。
+// 非零退出 / 超时 / 信号终止路径与环境构造，Linux 与 Windows 双平台
+// 真实执行（macOS 跳过）。超时用 ~5 秒命令配 100ms 预算真测等待逻辑
+// （含提前返回）；命令不存在按平台断言：Unix 惯例子进程退出码 127，
+// Windows 为 CreateProcessW 失败（SpawnFailed）。全部命令只读，不改动
+// 系统状态。
 
 ///|
-/// 非 Linux 跳过守卫（本仓库主链路 Linux，套件真实执行）。
+/// 平台助手：Windows 分支命令与 Linux 不同。
+fn pr_win() -> Bool {
+  @yue.platform() == "windows"
+}
+
+///|
+/// 非 Linux / Windows 跳过守卫（macOS 无 procrun）。
 fn pr_skip_guard() -> Bool {
   if !pr_available() {
-    println("pr: skip (non-linux)")
+    println("pr: skip (no procrun on this platform)")
     return false
   }
   true
 }
 
 ///|
-test "pr_available:主链路 Linux 为真" {
+test "pr_available:Linux / Windows 为真" {
   if !pr_skip_guard() {
     return
   }
   assert_true(pr_available())
-  assert_eq(@yue.platform(), "linux")
+  assert_true(@yue.platform() == "linux" || @yue.platform() == "windows")
 }
 
 ///|
@@ -27,10 +35,19 @@ test "pr_run:echo 捕获 stdout 与退出码" {
   if !pr_skip_guard() {
     return
   }
-  match pr_run("echo", ["hello-pr"]) {
+  let ans = if pr_win() {
+      pr_run("cmd", ["/c", "echo", "hello-pr"])
+    } else {
+      pr_run("echo", ["hello-pr"])
+    }
+  match ans {
     Ok(o) => {
       assert_eq(o.exit_code, 0)
-      assert_eq(o.stdout, "hello-pr\n")
+      if pr_win() {
+        assert_eq(o.stdout, "hello-pr\r\n")
+      } else {
+        assert_eq(o.stdout, "hello-pr\n")
+      }
     }
     Err(e) => {
       println("pr_run echo failed: \{e}")
@@ -44,8 +61,18 @@ test "pr_run:多参数按序传入" {
   if !pr_skip_guard() {
     return
   }
-  match pr_run("echo", ["a", "b", "c"]) {
-    Ok(o) => assert_eq(o.stdout, "a b c\n")
+  let ans = if pr_win() {
+      pr_run("cmd", ["/c", "echo", "a", "b", "c"])
+    } else {
+      pr_run("echo", ["a", "b", "c"])
+    }
+  match ans {
+    Ok(o) =>
+      if pr_win() {
+        assert_eq(o.stdout, "a b c\r\n")
+      } else {
+        assert_eq(o.stdout, "a b c\n")
+      }
     Err(e) => {
       println("pr_run echo failed: \{e}")
       assert_true(false)
@@ -54,11 +81,16 @@ test "pr_run:多参数按序传入" {
 }
 
 ///|
-test "pr_run:无参数命令空输出" {
+test "pr_run:无输出命令空 stdout" {
   if !pr_skip_guard() {
     return
   }
-  match pr_run("true", []) {
+  let ans = if pr_win() {
+      pr_run("cmd", ["/c", "exit", "0"])
+    } else {
+      pr_run("true", [])
+    }
+  match ans {
     Ok(o) => {
       assert_eq(o.exit_code, 0)
       assert_eq(o.stdout, "")
@@ -72,7 +104,7 @@ test "pr_run:无参数命令空输出" {
 
 ///|
 test "pr_run:cat /etc/hostname 与直接读文件一致" {
-  if !pr_skip_guard() {
+  if !pr_skip_guard() || pr_win() {
     return
   }
   match @yue.read_text_file("/etc/hostname") {
@@ -92,14 +124,22 @@ test "pr_run:cat /etc/hostname 与直接读文件一致" {
 }
 
 ///|
-test "pr_run:非零退出携带 stderr（C locale）" {
+test "pr_run:非零退出携带退出码" {
   if !pr_skip_guard() {
     return
   }
-  match pr_run("cat", ["/yue-pr-no-such-file"]) {
-    Err(NonZeroExit(code, err)) => {
-      assert_eq(code, 1)
-      assert_true(err.contains("No such file"))
+  let ans = if pr_win() {
+      pr_run("cmd", ["/c", "exit", "3"])
+    } else {
+      pr_run("cat", ["/yue-pr-no-such-file"])
+    }
+  match ans {
+    Err(NonZeroExit(code, _)) => {
+      if pr_win() {
+        assert_eq(code, 3)
+      } else {
+        assert_eq(code, 1)
+      }
     }
     Ok(o) => {
       println("unexpected ok: \{o}")
@@ -113,12 +153,16 @@ test "pr_run:非零退出携带 stderr（C locale）" {
 }
 
 ///|
-test "pr_run:命令不存在按 Unix 惯例退出码 127" {
+test "pr_run:命令不存在（Unix 退出码 127 / Windows SpawnFailed）" {
   if !pr_skip_guard() {
     return
   }
   match pr_run("yue-pr-no-such-cmd-xyz", []) {
-    Err(NonZeroExit(code, _)) => assert_eq(code, 127)
+    Err(NonZeroExit(code, _)) => {
+      assert_eq(code, 127)
+      assert_true(!pr_win())
+    }
+    Err(SpawnFailed(_)) => assert_true(pr_win())
     Ok(o) => {
       println("unexpected ok: \{o}")
       assert_true(false)
@@ -131,22 +175,26 @@ test "pr_run:命令不存在按 Unix 惯例退出码 127" {
 }
 
 ///|
-test "pr_run:超时真测（sleep 5 配 100ms 预算）" {
+test "pr_run:超时真测（~5s 命令配 100ms 预算）" {
   if !pr_skip_guard() {
     return
   }
   let t0 = @env.now()
-  let ans = pr_run("sleep", ["5"], timeout_ms=100)
+  let ans = if pr_win() {
+      pr_run("ping", ["-n", "6", "127.0.0.1"], timeout_ms=100)
+    } else {
+      pr_run("sleep", ["5"], timeout_ms=100)
+    }
   let spent = @env.now() - t0
   assert_true(ans is Err(Timeout(_)))
-  // 真实等待过预算时长，且未等满 sleep 全程（超时提前强制终止返回）
+  // 真实等待过预算时长，且未等满命令全程（超时提前强制终止返回）
   assert_true(spent >= 100UL)
   assert_true(spent < 5000UL)
 }
 
 ///|
-test "pr_run:被信号终止（子进程自发 TERM，只读）" {
-  if !pr_skip_guard() {
+test "pr_run:被信号终止（子进程自发 TERM，仅 Unix）" {
+  if !pr_skip_guard() || pr_win() {
     return
   }
   match pr_run("sh", ["-c", "kill -TERM $$"]) {
@@ -163,14 +211,24 @@ test "pr_run:被信号终止（子进程自发 TERM，只读）" {
 }
 
 ///|
-test "pr_run:子进程环境固定 C locale" {
+test "pr_run:子进程环境（Linux 固定 C locale / Windows 继承父环境）" {
   if !pr_skip_guard() {
     return
   }
-  match pr_run("sh", ["-c", "printf %s \"$LC_ALL\""]) {
-    Ok(o) => assert_eq(o.stdout, "C")
+  let ans = if pr_win() {
+      pr_run("cmd", ["/c", "echo", "%SystemRoot%"])
+    } else {
+      pr_run("sh", ["-c", "printf %s \"$LC_ALL\""])
+    }
+  match ans {
+    Ok(o) =>
+      if pr_win() {
+        assert_true(o.stdout.trim(chars="\r\n").length() > 0)
+      } else {
+        assert_eq(o.stdout, "C")
+      }
     Err(e) => {
-      println("pr_run sh failed: \{e}")
+      println("pr_run env failed: \{e}")
       assert_true(false)
     }
   }

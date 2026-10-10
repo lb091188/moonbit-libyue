@@ -4153,6 +4153,346 @@ extern "C" int32_t yue_mbt_win_reveal_file(const char *, int32_t *ok) {
 
 #endif  // 打开外部平台分支结束
 
+// ---------- 子进程执行（procrun：spawn → 限时回收） ----------
+//
+// 协议：args_blob 与 env_blob 均为「NUL 分隔条目 + 空条目收尾」的 UTF-8
+// 文本（即 "a\0b\0\0" 形态，遍历到空条目即结束，条目本身不为空串）；
+// out_path / err_path 空串 = 继承父进程对应句柄。spawn 返回 pid（<0 为
+// 错误码取负）；wait 的 status：0=正常退出（code=退出码）、1=超时已强杀、
+// 2=被信号终止（code=信号号，仅 POSIX）、-1=错误。
+
+#if defined(OS_LINUX)
+
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/wait.h>
+
+namespace {
+
+int mbt_proc_redirect(const char *path, int target_fd) {
+  int fd = ::open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
+  if (fd < 0) {
+    return -1;
+  }
+  if (::dup2(fd, target_fd) < 0) {
+    ::close(fd);
+    return -1;
+  }
+  ::close(fd);
+  return 0;
+}
+
+}  // namespace
+
+extern "C" int32_t yue_mbt_proc_spawn(const char *file, const char *args_blob,
+                                      const char *cwd, const char *out_path,
+                                      const char *err_path,
+                                      const char *env_blob) {
+  if (file == nullptr || file[0] == '\0') {
+    return -EINVAL;
+  }
+  // argv / envp 在 fork 前构建完毕（fork 后只做 async-signal-safe 调用）；
+  // 条目直接指向入参 blob 内部，无需拷贝
+  int argc = 1;
+  if (args_blob != nullptr) {
+    for (const char *p = args_blob; *p != '\0'; p += ::strlen(p) + 1) {
+      argc++;
+    }
+  }
+  char **argv = static_cast<char **>(raw_heap_malloc(sizeof(char *) * (argc + 1)));
+  argv[0] = const_cast<char *>(file);
+  if (args_blob != nullptr) {
+    int i = 1;
+    for (const char *p = args_blob; *p != '\0'; p += ::strlen(p) + 1) {
+      argv[i++] = const_cast<char *>(p);
+    }
+  }
+  argv[argc] = nullptr;
+  int envc = 0;
+  if (env_blob != nullptr && env_blob[0] != '\0') {
+    for (const char *p = env_blob; *p != '\0'; p += ::strlen(p) + 1) {
+      envc++;
+    }
+  }
+  char **envp = static_cast<char **>(raw_heap_malloc(sizeof(char *) * (envc + 1)));
+  int i = 0;
+  if (envc > 0) {
+    for (const char *p = env_blob; *p != '\0'; p += ::strlen(p) + 1) {
+      envp[i++] = const_cast<char *>(p);
+    }
+  }
+  envp[envc] = nullptr;
+
+  pid_t pid = ::fork();
+  if (pid < 0) {
+    int e = errno;
+    raw_heap_free(argv);
+    raw_heap_free(envp);
+    return -e;
+  }
+  if (pid == 0) {
+    // 子进程：独立会话自成进程组（超时可整组 SIGKILL）
+    ::setsid();
+    if (cwd != nullptr && cwd[0] != '\0' && ::chdir(cwd) != 0) {
+      ::_exit(126);
+    }
+    int devnull = ::open("/dev/null", O_RDONLY);
+    if (devnull >= 0) {
+      ::dup2(devnull, STDIN_FILENO);
+      ::close(devnull);
+    }
+    if (out_path != nullptr && out_path[0] != '\0' &&
+        mbt_proc_redirect(out_path, STDOUT_FILENO) != 0) {
+      ::_exit(126);
+    }
+    if (err_path != nullptr && err_path[0] != '\0' &&
+        mbt_proc_redirect(err_path, STDERR_FILENO) != 0) {
+      ::_exit(126);
+    }
+    ::execvpe(file, argv, envp);  // 裸命令名按 envp 的 PATH 解析
+    ::_exit(127);
+  }
+  raw_heap_free(argv);
+  raw_heap_free(envp);
+  return static_cast<int32_t>(pid);
+}
+
+extern "C" int32_t yue_mbt_proc_wait(int32_t pid, int32_t timeout_ms,
+                                     int32_t *status, int32_t *code) {
+  *status = -1;
+  *code = 0;
+  if (timeout_ms < 0) {
+    timeout_ms = 0;
+  }
+  // WNOHANG 轮询（10ms 一拍）：预算内退出即归位；超时对进程组 SIGKILL
+  // 后阻塞回收（setsid 下 pgid == pid），回收失败按错误返回
+  int64_t slept = 0;
+  for (;;) {
+    int w = 0;
+    pid_t r = ::waitpid(static_cast<pid_t>(pid), &w, WNOHANG);
+    if (r == static_cast<pid_t>(pid)) {
+      if (WIFEXITED(w)) {
+        *status = 0;
+        *code = WEXITSTATUS(w);
+      } else if (WIFSIGNALED(w)) {
+        *status = 2;
+        *code = WTERMSIG(w);
+      } else {
+        *status = 0;
+        *code = 0;
+      }
+      return 0;
+    }
+    if (r < 0) {
+      return -errno;
+    }
+    if (slept >= timeout_ms) {
+      ::kill(-static_cast<pid_t>(pid), SIGKILL);
+      ::kill(static_cast<pid_t>(pid), SIGKILL);
+      r = ::waitpid(static_cast<pid_t>(pid), &w, 0);
+      if (r < 0) {
+        return -errno;
+      }
+      *status = 1;
+      *code = 0;
+      return 0;
+    }
+    timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 10 * 1000 * 1000;
+    ::nanosleep(&ts, nullptr);
+    slept += 10;
+  }
+}
+
+extern "C" int32_t yue_mbt_proc_getpid(void) {
+  return static_cast<int32_t>(::getpid());
+}
+
+#elif defined(OS_WIN)
+
+#include <algorithm>
+
+namespace {
+
+// 含空白 / 引号的参数加引号转义（CommandLineToArgvW 兼容的简化版：
+// 处理引号转义与结尾反斜杠翻倍；procrun 的实参是路径与固定开关，
+// 不出现嵌套引号前的长反斜杠串）
+std::wstring mbt_quote_arg(const std::wstring &s) {
+  if (s.empty() ||
+      s.find_first_of(L" \t") == std::wstring::npos) {
+    return s;
+  }
+  std::wstring out = L"\"";
+  size_t backslashes = 0;
+  for (wchar_t c : s) {
+    if (c == L'\\') {
+      backslashes++;
+      continue;
+    }
+    if (c == L'"') {
+      out.append(backslashes * 2 + 1, L'\\');
+      out += L'\"';
+    } else {
+      out.append(backslashes, L'\\');
+      out += c;
+    }
+    backslashes = 0;
+  }
+  out.append(backslashes * 2, L'\\');
+  out += L"\"";
+  return out;
+}
+
+}  // namespace
+
+extern "C" int32_t yue_mbt_proc_spawn(const char *file, const char *args_blob,
+                                      const char *cwd, const char *out_path,
+                                      const char *err_path,
+                                      const char *env_blob) {
+  if (file == nullptr || file[0] == '\0') {
+    return -ERROR_INVALID_PARAMETER;
+  }
+  std::wstring cmd = mbt_quote_arg(base::SysUTF8ToWide(file));
+  if (args_blob != nullptr) {
+    for (const char *p = args_blob; *p != '\0'; p += ::strlen(p) + 1) {
+      cmd += L" ";
+      cmd += mbt_quote_arg(base::SysUTF8ToWide(p));
+    }
+  }
+  // 环境块：条目按名排序（Windows 环境块的规范要求），双 NUL(宽)收尾；
+  // blob 为空 = 继承父进程环境
+  std::vector<std::wstring> env_entries;
+  if (env_blob != nullptr && env_blob[0] != '\0') {
+    for (const char *p = env_blob; *p != '\0'; p += ::strlen(p) + 1) {
+      env_entries.push_back(base::SysUTF8ToWide(p));
+    }
+  }
+  std::wstring env_block;
+  void *env_param = nullptr;
+  if (!env_entries.empty()) {
+    std::sort(env_entries.begin(), env_entries.end());
+    for (const auto &e : env_entries) {
+      env_block += e;
+      env_block += L'\0';
+    }
+    env_block += L'\0';
+    env_param = &env_block[0];
+  }
+  STARTUPINFOW si;
+  ZeroMemory(&si, sizeof(si));
+  si.cb = sizeof(si);
+  si.dwFlags = STARTF_USESTDHANDLES;
+  SECURITY_ATTRIBUTES sa;
+  sa.nLength = sizeof(sa);
+  sa.lpSecurityDescriptor = nullptr;
+  sa.bInheritHandle = TRUE;
+  si.hStdInput = ::CreateFileW(L"NUL", GENERIC_READ,
+                               FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
+                               OPEN_EXISTING, 0, nullptr);
+  if (si.hStdInput == INVALID_HANDLE_VALUE) {
+    si.hStdInput = nullptr;
+  }
+  if (out_path != nullptr && out_path[0] != '\0') {
+    si.hStdOutput =
+        ::CreateFileW(base::SysUTF8ToWide(out_path).c_str(), GENERIC_WRITE,
+                      FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_ALWAYS, 0,
+                      nullptr);
+    if (si.hStdOutput != INVALID_HANDLE_VALUE) {
+      ::SetFilePointer(si.hStdOutput, 0, nullptr, FILE_END);
+    } else {
+      si.hStdOutput = nullptr;
+    }
+  }
+  if (err_path != nullptr && err_path[0] != '\0') {
+    si.hStdError =
+        ::CreateFileW(base::SysUTF8ToWide(err_path).c_str(), GENERIC_WRITE,
+                      FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_ALWAYS, 0,
+                      nullptr);
+    if (si.hStdError != INVALID_HANDLE_VALUE) {
+      ::SetFilePointer(si.hStdError, 0, nullptr, FILE_END);
+    } else {
+      si.hStdError = nullptr;
+    }
+  }
+  PROCESS_INFORMATION pi;
+  ZeroMemory(&pi, sizeof(pi));
+  std::wstring cwd_w =
+      (cwd != nullptr && cwd[0] != '\0') ? base::SysUTF8ToWide(cwd) : L"";
+  // 应用名传空、整命令行走 lpCommandLine：CreateProcessW 按「应用目录 →
+  // 当前目录 → 系统 32 → Windows → PATH」搜索可执行文件
+  BOOL ok = ::CreateProcessW(nullptr, &cmd[0], nullptr, nullptr, TRUE,
+                             CREATE_NO_WINDOW, env_param,
+                             cwd_w.empty() ? nullptr : cwd_w.c_str(), &si, &pi);
+  if (si.hStdInput != nullptr) {
+    ::CloseHandle(si.hStdInput);
+  }
+  if (si.hStdOutput != nullptr) {
+    ::CloseHandle(si.hStdOutput);
+  }
+  if (si.hStdError != nullptr) {
+    ::CloseHandle(si.hStdError);
+  }
+  if (!ok) {
+    return -static_cast<int32_t>(::GetLastError());
+  }
+  ::CloseHandle(pi.hThread);
+  ::CloseHandle(pi.hProcess);
+  return static_cast<int32_t>(pi.dwProcessId);
+}
+
+extern "C" int32_t yue_mbt_proc_wait(int32_t pid, int32_t timeout_ms,
+                                     int32_t *status, int32_t *code) {
+  *status = -1;
+  *code = 0;
+  if (timeout_ms < 0) {
+    timeout_ms = 0;
+  }
+  HANDLE h = ::OpenProcess(
+      SYNCHRONIZE | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION,
+      FALSE, static_cast<DWORD>(pid));
+  if (h == nullptr) {
+    return -static_cast<int32_t>(::GetLastError());
+  }
+  DWORD r = ::WaitForSingleObject(h, static_cast<DWORD>(timeout_ms));
+  int32_t rc = 0;
+  if (r == WAIT_OBJECT_0) {
+    DWORD ec = 0;
+    ::GetExitCodeProcess(h, &ec);
+    *status = 0;
+    *code = static_cast<int32_t>(ec);
+  } else if (r == WAIT_TIMEOUT) {
+    ::TerminateProcess(h, 1);
+    ::WaitForSingleObject(h, 5000);
+    *status = 1;
+    *code = 1;
+  } else {
+    rc = -static_cast<int32_t>(::GetLastError());
+  }
+  ::CloseHandle(h);
+  return rc;
+}
+
+extern "C" int32_t yue_mbt_proc_getpid(void) {
+  return static_cast<int32_t>(::GetCurrentProcessId());
+}
+
+#else  // macOS：桩（procrun Unsupported，MoonBit 侧平台门拦截）
+
+extern "C" int32_t yue_mbt_proc_spawn(const char *, const char *, const char *,
+                                      const char *, const char *,
+                                      const char *) {
+  return -1000;
+}
+
+extern "C" int32_t yue_mbt_proc_wait(int32_t, int32_t, int32_t *, int32_t *) {
+  return -1000;
+}
+
+extern "C" int32_t yue_mbt_proc_getpid(void) { return -1; }
+
+#endif  // 子进程执行平台分支结束
+
 // ---------- 屏幕常亮与用户空闲 ----------
 
 #if defined(OS_LINUX)

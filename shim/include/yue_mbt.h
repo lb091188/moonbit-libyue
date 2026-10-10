@@ -816,6 +816,23 @@ int32_t yue_mbt_setenv(const char *name, const char *value, int32_t overwrite,
 /* 删环境变量：本就不存在也记 ok=1（幂等）;0 成功 -1 失败 */
 int32_t yue_mbt_unsetenv(const char *name, int32_t *ok);
 
+/* ---------- 子进程执行（procrun） ---------- */
+
+/* spawn 并重定向 stdout/stderr 到指定文件。args_blob / env_blob 为
+ * 「NUL 分隔条目 + 空条目收尾」的 UTF-8 文本；out_path / err_path 空串 =
+ * 继承父进程；env_blob 空串 = Windows 继承父环境（Linux 侧恒传最小环境）。
+ * 返回 pid，<0 为错误码取负。 */
+int32_t yue_mbt_proc_spawn(const char *file, const char *args_blob,
+                           const char *cwd, const char *out_path,
+                           const char *err_path, const char *env_blob);
+/* 限时等待退出，超时强杀后回收。status：0=正常退出（code=退出码）、
+ * 1=超时已强杀、2=被信号终止（code=信号号，仅 POSIX）、-1=错误。
+ * 返回 0 成功 / 负数错误。 */
+int32_t yue_mbt_proc_wait(int32_t pid, int32_t timeout_ms, int32_t *status,
+                          int32_t *code);
+/* 当前进程 id */
+int32_t yue_mbt_proc_getpid(void);
+
 /* ---------- 系统总线基建与电源 ---------- */
 
 /* 撤销 fd 监视（与 yue_mbt_sys_watch_fd 配对） */

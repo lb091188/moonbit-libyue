@@ -4,6 +4,5 @@ import {
   "moonbitlang/core/env",
   "NoahLiu/moonbit-libyue/yue",
   "NoahLiu/moonbit-libyue/yue/traybus",
-  "chensuiyi/subproc",
   "prowk/moonsqlitefile",
 }

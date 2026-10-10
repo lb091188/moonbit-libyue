@@ -1812,6 +1812,39 @@ extern "c" fn ffi_set_env(
 #borrow(name, ok)
 extern "c" fn ffi_unset_env(name : Bytes, ok : Ref[Int]) -> Int = "yue_mbt_unsetenv"
 
+// ---------- 子进程执行（procrun：system 包） ----------
+
+///|
+/// spawn 子进程并重定向 stdout/stderr 到文件（Linux fork/execvpe+setsid、
+/// Windows CreateProcessW+CREATE_NO_WINDOW、macOS 桩 -1000）。
+/// args / env_blob 为「NUL 分隔条目 + 空条目收尾」文本；out/err 空串 =
+/// 继承父进程；env_blob 空串 = Windows 继承父环境。返回 pid，<0 为错误码取负。
+#borrow(file, args, cwd, out_path, err_path, env_blob)
+pub extern "c" fn ffi_proc_spawn(
+  file : Bytes,
+  args : Bytes,
+  cwd : Bytes,
+  out_path : Bytes,
+  err_path : Bytes,
+  env_blob : Bytes,
+) -> Int = "yue_mbt_proc_spawn"
+
+///|
+/// 限时等待退出，超时强杀后回收。status：0=正常退出（code=退出码）、
+/// 1=超时已强杀、2=被信号终止（code=信号号，仅 POSIX）、-1=错误。
+/// 返回 0 成功 / 负数错误。
+#borrow(status, code)
+pub extern "c" fn ffi_proc_wait(
+  pid : Int,
+  timeout_ms : Int,
+  status : Ref[Int],
+  code : Ref[Int],
+) -> Int = "yue_mbt_proc_wait"
+
+///|
+/// 当前进程 id（macOS 桩 -1）。
+pub extern "c" fn ffi_proc_getpid() -> Int = "yue_mbt_proc_getpid"
+
 // ---------- 打开外部（URL / 文件管理器选中） ----------
 
 ///|

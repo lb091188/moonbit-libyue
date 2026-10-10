@@ -860,6 +860,12 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - GDI+ 混合模式仅 Normal/Copy 生效:`PainterWin::SetBlendMode` 只把 Copy 映射为 `CompositingModeSourceCopy`,其余全部落 `SourceOver`——GDI+ `Graphics` 只有这两种合成模式,Multiply/Screen/Difference/Xor 等静默无效。离屏像素探针实测:Multiply 交叉区 (128,128,255) 与 SourceOver 逐位一致(数学期望 #8028FF)。平台能力缺口,不修库(换 D2D 才有完整混合);showcase 画布演示在 Windows 回显「此平台仅 Normal 生效」,`docs` 中 `Image::write_to_file` 平台口径同步修正(Windows GDI+ 编码器 png/jpeg 可用、mac 发行包未编译恒失败)。
 - 原生 Tab 添加首页即回调 `on_selected_page_change`(内部初始选中,非用户切换):回调登记先于加页时,挂载期会空触发(declarative `tab()` 曾因此让切换计数演示凭空起跳);登记挪到加页循环之后即避开。
 
+### 系统能力数据层 Windows 适配(system 子包,2026-10-10 起)
+
+- **procrun 的 subproc 依赖是 Windows 链接的结构性缺口**:`chensuiyi/subproc` 的 native.c 纯 POSIX(fork/waitpid/poll.h),MSVC 编译直接 C1083——只要 yue/system 还 import 它,Windows 上任何测试二进制 / 依赖方 exe 都编不出来(上游仓库已 404,无 Windows 版可期)。本批以 shim 自建子进程 ABI 取代:`yue_mbt_proc_spawn/wait/getpid` 三入口,Linux 走 fork+execvpe+setsid(独立进程组,超时可整组 SIGKILL)、Windows 走 CreateProcessW+CREATE_NO_WINDOW(不闪控制台)+STARTF_USESTDHANDLES 重定向、macOS 桩 -1000;moon.mod / yue/system 的 subproc 依赖随之移除。协议沿用 @subproc 时代形态:args/env 为「NUL 分隔条目 + 空条目收尾」文本(env 空串 = Windows 继承父环境),shim 不含 <moonbit.h>(与 glibc 的 memcpy 声明冲突,见 yue_mbt_internal.h 注释),故用双 NUL 协议规避「const char* 拿不到 Bytes 内嵌 NUL 后的总长」。
+- Windows 真机实测(本机 Win10 19045)五则:①`cmd /c echo` 重定向输出为 `\r\n` 行尾且按 OEM 代码页编码——procrun 消费方解析按 ASCII 输出设计,中文输出会按 GBK 落盘;②命令不存在是 CreateProcessW 直接失败(GetLastError=2),归一 `SpawnFailed` 而非 Unix 的「子进程退出码 127→NonZeroExit」,两平台语义都写进了 ProcError 文档;③超时强杀 `ping -n 6` 配 100ms 预算实测 ~100ms 返回(TerminateProcess+5s 兜底等待);④环境块按名排序是 Windows 环境块的规范要求(不排序个别程序读环境会错),宽字符双 NUL 收尾;⑤参数含空白/引号需 CommandLineToArgvW 兼容的引号转义(引号前反斜杠翻倍),procrun 的实参是路径与固定开关,简化实现够用。
+- Linux 侧行为等价替换(待 Ubuntu 主机全量 moon test 复验):env blob 仍是 PATH/XDG_RUNTIME_DIR/HOME/LC_ALL=C,临时文件仍走 TMPDIR;差异仅「wait 由 subproc 的 wait_child_timeout 换为 shim 内 WNOHANG 10ms 轮询 + 超时组杀」,对外语义(Timeout/Signaled/NonZeroExit 归一)不变。
+
 ## macOS(CI 构建链已验,GUI 待真机)
 
 - libyue v0.15.6 发行包含 ARC / no-ARC 双库:Darwin 链接参数 = 主库 + `-lyue_mbt_noarc`(no-ARC 符号被主库引用,须排其后)+ AppKit / Carbon / IOKit / Security / WebKit / OpenDirectory 框架 + `-lobjc -lc++ -lpthread -lbsm -Wl,-dead_strip`;prebuild Darwin 分支已按此预修。
