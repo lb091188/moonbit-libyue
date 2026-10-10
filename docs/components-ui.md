@@ -786,6 +786,176 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 @charts.scatter_t(pts, trend=true)
 ```
 
+The six extension charts below share the same rendering model as the charts above — Store-driven, canvas-only repaint, theme switch follows; full demos are in `NoahLiu/yue-examples/systemprobe`.
+
+### Radar chart radar_chart_t
+
+`radar_chart_t(indicators : Store[Array[RadarIndicator]], series : Store[Array[RadarSeries]], rings? = 4, show_legend? = true, fill? = false, style?, handle?)`
+
+Multi-dimensional comparison: an N-gon concentric grid plus axes and dimension labels; each series is a translucent filled polygon with a stroke (series overlay each other).
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| indicators | Store[Array[RadarIndicator]] | required | dimension definitions, `RadarIndicator::make(name, max)`, range 0..max |
+| series | Store[Array[RadarSeries]] | required | `RadarSeries::make(name, per-dimension values)`, same order as indicators |
+| width / height | Double | 460 / 340 | canvas size, set via `style` |
+| rings | Int | 4 | number of concentric grid rings |
+| show_legend | Bool | true | legend column on the right (swatch + series name) |
+
+Series colors cycle the four semantic theme colors; values beyond the range are clamped, missing values count as 0 (folded to the center), and a dimension with max ≤ 0 is always 0; fewer than 3 dimensions draws a "No data" placeholder. Vertex 0 sits at 12 o'clock and the rest are spread clockwise.
+
+```moonbit
+let ind : @yue.Store[Array[@charts.RadarIndicator]] = @yue.Store::new([
+  @charts.RadarIndicator::make("Render", 100.0),
+  @charts.RadarIndicator::make("IO", 100.0),
+  @charts.RadarIndicator::make("Memory", 100.0),
+])
+let ser : @yue.Store[Array[@charts.RadarSeries]] = @yue.Store::new([
+  @charts.RadarSeries::make("Ours", [88.0, 72.0, 80.0]),
+  @charts.RadarSeries::make("Baseline", [70.0, 90.0, 65.0]),
+])
+@charts.radar_chart_t(ind, ser, rings=5, style=[("width", 420.0), ("height", 320.0)])
+```
+
+### Heatmap heatmap_t
+
+`heatmap_t(data : Store[HeatGrid], low_color? = "", high_color? = "", gap? = 2.0, show_values? = false, fill? = false, style?, handle?)`
+
+A 2D numeric matrix colored cell by cell: the lowest value takes the start of the color ramp and the highest the end, mapped linearly.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| data | Store[HeatGrid] | required | `HeatGrid::make(col labels, row labels, row×col matrix)` (outer rows, inner cols) |
+| width / height | Double | 480 / 300 | canvas size, set via `style` |
+| low_color / high_color | String | theme | ramp endpoints ("#RRGGBB"); empty string = theme light primary → primary |
+| gap | Double | 2 | cell gap (px) |
+| show_values | Bool | false | center the value in a cell (drawn only when the cell is ≥30 wide and ≥14 tall) |
+
+The range is the matrix's actual min/max (both ends are always hit by data, no padding); when all values are equal the whole grid takes the ramp's midpoint color. Row labels are left-aligned and column labels sit at the bottom; crowded labels are thinned and truncated automatically, and an empty matrix draws "No data".
+
+```moonbit
+let heat : @yue.Store[@charts.HeatGrid] = @yue.Store::new(
+  @charts.HeatGrid::make(
+    ["Mon", "Tue", "Wed"],
+    ["AM", "PM"],
+    [[3.0, 5.0, 7.0], [6.0, 8.0, 9.0]],
+  ),
+)
+@charts.heatmap_t(heat, show_values=true, style=[("width", 420.0), ("height", 280.0)])
+@charts.heatmap_t(heat, low_color="#E3EDFA", high_color="#1E4FA3", gap=1.0)
+```
+
+### Candlestick chart candlestick_t
+
+`candlestick_t(candles : Store[Array[Candle]], y_range? = None, up_color? = "", down_color? = "", fill? = false, style?, handle?)`
+
+Candlestick chart: a wick (high-low vertical line) plus a body (open-close rectangle), spaced evenly along x.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| candles | Store[Array[Candle]] | required | `Candle::make(open, high, low, close)` |
+| width / height | Double | 560 / 280 | canvas size, set via `style` |
+| y_range | (Double, Double)? | auto | manual value range; default takes all lows/highs + 8% padding |
+| up_color / down_color | String | theme | up / down colors ("#RRGGBB"); empty string falls back to theme danger / success |
+
+An up bar is close ≥ open (a flat close counts as up); by default up is red and down is green (the Chinese convention); a flat body is clamped to 1px so it stays visible. Horizontal grid + ticks on the left.
+
+```moonbit
+let candles : @yue.Store[Array[@charts.Candle]] = @yue.Store::new([
+  @charts.Candle::make(100.0, 108.0, 98.0, 105.0),
+  @charts.Candle::make(105.0, 107.0, 99.0, 101.0),
+  @charts.Candle::make(101.0, 110.0, 100.0, 108.0),
+])
+@charts.candlestick_t(candles, style=[("width", 420.0), ("height", 260.0)])
+@charts.candlestick_t(candles, y_range=Some((90.0, 115.0)))
+```
+
+### Funnel chart funnel_t
+
+`funnel_t(data : Store[Array[BarItem]], alignment? = FunnelCenter, pct_of_total? = false, fill? = false, style?, handle?)`
+
+Conversion funnel: layers are ordered by descending value, each layer a trapezoid (width ∝ value), shading a single color family from dark at the top to light at the bottom.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| data | Store[Array[BarItem]] | required | reuses the bar chart's `BarItem::make(label, value)`; sorted stably by descending value internally |
+| width / height | Double | 560 / 280 | canvas size, set via `style` |
+| alignment | FunnelAlign | `FunnelCenter` | layer horizontal alignment: centered / `FunnelLeft` aligns the left edges |
+| pct_of_total | Bool | false | percentage base: false is relative to the first (largest) layer, i.e. a conversion rate; true is relative to the sum of all positive values |
+
+When the canvas is wide enough (≥100px after reserving the right-hand label column) each layer is labeled with name + value (percentage); too narrow drops the labels and draws only the trapezoids; layers with value ≤ 0 get a width clamped to 0.
+
+```moonbit
+let funnel : @yue.Store[Array[@charts.BarItem]] = @yue.Store::new([
+  @charts.BarItem::make("Visit", 1000.0),
+  @charts.BarItem::make("Cart", 420.0),
+  @charts.BarItem::make("Order", 260.0),
+  @charts.BarItem::make("Pay", 190.0),
+])
+@charts.funnel_t(funnel, style=[("width", 420.0), ("height", 260.0)])
+@charts.funnel_t(funnel, alignment=@charts.FunnelLeft, pct_of_total=true)
+```
+
+### Box plot boxplot_t
+
+`boxplot_t(groups : Store[Array[(String, Array[Double])]], y_range? = None, fill? = false, style?, handle?)`
+
+Side-by-side box plots: each group's five-number summary is computed automatically and drawn as a box + median line + whisker caps + outlier dots.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| groups | Store[Array[(String, Array[Double])]] | required | (group label, sample values); each group summarized independently |
+| width / height | Double | 560 / 280 | canvas size, set via `style` |
+| y_range | (Double, Double)? | auto | manual value range; default takes all samples' min/max (outliers included) + 8% padding |
+
+- Five-number summary per the 1.5×IQR rule: the box spans Q1-Q3 (each group cycles the four semantic colors, translucent fill + stroke), the median line is 3px, whiskers reach the farthest sample inside the fences (caps 60% of the box width), and samples outside the fences are danger-colored outlier dots.
+- Group labels sit centered on the bottom axis, thinned and truncated when crowded; an empty group draws only its label.
+- `boxp_summary(values) -> BoxSummary` (min/q1/median/q3/max/whisker_lo/whisker_hi/outliers) gives the summary independently of the component.
+
+```moonbit
+let boxp : @yue.Store[Array[(String, Array[Double])]] = @yue.Store::new([
+  ("Render", [12.0, 14.0, 15.0, 16.0, 18.0, 21.0, 25.0, 30.0]),
+  ("IO", [5.0, 6.0, 6.5, 7.0, 8.0, 9.0, 12.0]),
+])
+@charts.boxplot_t(boxp, style=[("width", 420.0), ("height", 260.0)])
+// summary alone: @charts.boxp_summary([1.0, 2.0, 3.0, 8.0]).median
+```
+
+### Sankey chart sankey_t
+
+`sankey_t(data : Store[SankeyData], show_labels? = true, fill? = false, style?, handle?)`
+
+Node-link flow diagram (static layered layout, not force-directed): nodes with no incoming links go to column 0, and nodes move right along the link topology; within a column the height is proportional to flow and centered vertically.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| data | Store[SankeyData] | required | `SankeyData::make(nodes, links)`, see below |
+| width / height | Double | 560 / 320 | canvas size, set via `style` |
+| show_labels | Bool | true | node name labels (column 0 draws them to the left of the rect, other columns to the right) |
+
+`SankeyNode::make(name)` creates a node; `SankeyLink::make(source index, target index, flow)` creates a link (only flow > 0 participates in the layout; node height and ribbon width share one scale).
+
+- A node rect's height ∝ flow, and a link draws a translucent Bézier ribbon from the source's right edge to the target's left edge (width ∝ flow; multiple links on one node are stacked vertically without overlap).
+- Node and ribbon colors cycle the four semantic colors by source node index.
+
+```moonbit
+let sankey : @yue.Store[@charts.SankeyData] = @yue.Store::new(
+  @charts.SankeyData::make(
+    [
+      @charts.SankeyNode::make("Visit"),
+      @charts.SankeyNode::make("Cart"),
+      @charts.SankeyNode::make("Pay"),
+    ],
+    [
+      @charts.SankeyLink::make(0, 1, 420.0),
+      @charts.SankeyLink::make(1, 2, 190.0),
+      @charts.SankeyLink::make(0, 2, 160.0),
+    ],
+  ),
+)
+@charts.sankey_t(sankey, style=[("width", 420.0), ("height", 300.0)])
+```
+
 The nine charts below and the interaction layer are likewise self-drawn in pure MoonBit and driven by `Store` data:
 
 - A set only calls schedule_paint on the canvas — no view-tree rebuild; colors are picked from the theme at draw time, so `theme_apply` switches follow immediately.
