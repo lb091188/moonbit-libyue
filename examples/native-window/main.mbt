@@ -46,11 +46,14 @@ fn draw_boxes(
     p.set_line_width(1.0)
     p.stroke_rect(b.x, b.y, b.w, b.h)
     let ty = b.y + (b.h - lh) / 2.0
+    // 文本走 yue/text 自己的会话，与 Painter 会话同缓冲交替绘制前刷一次
+    p.flush()
     let _ = @text.draw_to(p.bitmap, b.x + 4.0, ty, b.ed.get_text(), size, "#cdd6f4")
     // 组合串接在已提交文本之后，带下划线（与 GtkEntry 同观感）；它不进文本状态
     let pe = b.ed.preedit_text()
     if pe.length() > 0 {
       let px = b.x + 4.0 + prefix_width(b.ed, b.ed.caret_pos(), size)
+      p.flush()
       let _ = @text.draw_to(p.bitmap, px, ty, pe, size, "#f9e2af")
       let pw = match @text.measure(pe, size) {
         Some(m) => m.width.to_double()
@@ -87,19 +90,26 @@ fn draw(win : @win.Window, boxes : Array[Box], focused : Int?, blink : Bool, tic
     Some(f) => f.to_string()
     None => "-"
   }
+  // 渐变 + 混合：径向辉光垫在圆下、右上角乘算方块叠在渐变球上
+  let halo = @render.Gradient::radial(fw - 70.0, 90.0, 6.0, 40.0)
+  halo.add_stop(0.0, "#cba6f7")
+  halo.add_stop(1.0, "#00000000")
+  p.set_fill_gradient(halo)
+  p.begin_path()
+  p.arc(fw - 70.0, 90.0, 40.0, 0.0, 6.283185307179586)
+  p.fill()
+  p.set_fill_color("#cba6f7")
+  p.begin_path()
+  p.arc(fw - 70.0, 90.0, 26.0, 0.0, 6.283185307179586)
+  p.fill()
+  p.set_blend_mode(@render.Multiply)
+  p.set_fill_color("#808080")
+  p.fill_rect(fw - 96.0, 64.0, 52.0, 52.0)
+  p.set_blend_mode(@render.Normal)
   let note = "帧 \{tick} · 焦点 \{focus_text} · Tab 切换、点击可定位光标"
+  p.flush()
   let _ = @text.draw_to(bm, 24.0, 30.0, note, 12.0, "#a6adc8")
-  // Cairo 路径层：验抗锯齿曲线整条链路
-  match @render.Cairo::over(bm) {
-    Some(c) => {
-      c.set_fill_color("#cba6f7")
-      c.begin_path()
-      c.arc(fw - 70.0, 90.0, 26.0, 0.0, 6.283185307179586)
-      c.fill()
-      c.end()
-    }
-    None => ()
-  }
+  p.end()
   win.present(bm.data, bm.width, bm.height)
 }
 
