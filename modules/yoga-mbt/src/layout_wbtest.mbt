@@ -672,6 +672,122 @@ test "折行容器 auto 尺寸:主轴取最宽行、交叉轴累加行高" {
   assert_eq(y.layout().top, 30.0)
 }
 
+// ---- aspect-ratio（YG2c，比例语义为 border-box）----
+
+///|
+test "宽确定时按比例推高" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_align_items(FlexStart)
+  let c = Node::new()
+  c.set_measure(fn(_aw, _ah) { (0.0, 0.0) })
+  c.set_width(fixed(100.0))
+  c.set_aspect_ratio(Some(2.0))
+  root.append_child(c)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  assert_eq(c.layout().width, 100.0)
+  assert_eq(c.layout().height, 50.0)
+}
+
+///|
+test "高确定时按比例推宽" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_align_items(FlexStart)
+  let c = Node::new()
+  c.set_measure(fn(_aw, _ah) { (200.0, 20.0) })
+  c.set_height(fixed(40.0))
+  c.set_aspect_ratio(Some(2.0))
+  root.append_child(c)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  assert_eq(c.layout().width, 80.0)
+  assert_eq(c.layout().height, 40.0)
+}
+
+///|
+test "列容器按主轴高度推交叉轴宽度" {
+  let root = Node::new()
+  root.set_width(fixed(200.0))
+  root.set_height(fixed(300.0))
+  root.set_flex_direction(Column)
+  root.set_align_items(FlexStart)
+  let c = Node::new()
+  c.set_measure(fn(_aw, _ah) { (10.0, 10.0) })
+  c.set_height(fixed(60.0))
+  c.set_aspect_ratio(Some(2.0))
+  root.append_child(c)
+  calculate_layout(root, Some(200.0), Some(300.0))
+  assert_eq(c.layout().height, 60.0)
+  assert_eq(c.layout().width, 120.0)
+}
+
+///|
+test "容器自身按比例定尺寸" {
+  let root = Node::new()
+  root.set_width(fixed(320.0))
+  root.set_aspect_ratio(Some(2.0))
+  let c = leaf(100.0, 50.0)
+  root.append_child(c)
+  calculate_layout(root, Some(320.0), None)
+  // 高 = 320 / 2，压过内容推算的 50
+  assert_eq(root.layout().width, 320.0)
+  assert_eq(root.layout().height, 160.0)
+  // 子项无比例，交叉轴仍按默认 stretch 撑满
+  assert_eq(c.layout().height, 160.0)
+}
+
+///|
+test "stretch 优先于比例换算的交叉尺寸" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  let c = Node::new()
+  c.set_measure(fn(_aw, _ah) { (0.0, 0.0) })
+  c.set_width(fixed(100.0))
+  c.set_aspect_ratio(Some(2.0))
+  root.append_child(c)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  // 规范 §9.4 尾注：stretch 决定 used 交叉尺寸且不回灌主轴;
+  // 要保持比例需给 align-items / align-self 非 stretch 值
+  assert_eq(c.layout().height, 100.0)
+  c.set_align_self(Some(FlexStart))
+  calculate_layout(root, Some(300.0), Some(100.0))
+  assert_eq(c.layout().height, 50.0)
+}
+
+///|
+test "比例换算值给自动最小尺寸封顶" {
+  let root = Node::new()
+  root.set_width(fixed(100.0))
+  root.set_height(fixed(100.0))
+  root.set_align_items(FlexStart)
+  let c = Node::new()
+  c.set_measure(fn(_aw, _ah) { (200.0, 20.0) })
+  c.set_height(fixed(10.0))
+  c.set_aspect_ratio(Some(2.0))
+  root.append_child(c)
+  calculate_layout(root, Some(100.0), Some(100.0))
+  // 基准 = 10 × 2 = 20；min:auto 取内容(200)与换算值(20)的较小者
+  assert_eq(c.layout().width, 20.0)
+  assert_eq(c.layout().height, 10.0)
+}
+
+///|
+test "非正比例视同未设置" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_align_items(FlexStart)
+  let c = leaf(50.0, 30.0)
+  c.set_aspect_ratio(Some(0.0))
+  root.append_child(c)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  assert_eq(c.layout().width, 50.0)
+  assert_eq(c.layout().height, 30.0)
+}
+
 ///|
 test "column 容器不做基线对齐" {
   let root = Node::new()

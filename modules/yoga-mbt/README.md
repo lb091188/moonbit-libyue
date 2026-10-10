@@ -16,6 +16,8 @@
 - 纯 MoonBit 零 FFI，无 prebuild 无链接参数，所有 target 可用。
 - 宽高语义为 border-box（width/height 含自身 padding 与 border，与 Yoga
   一致）；百分比相对父容器内容区对应轴尺寸。
+- `aspect-ratio` 的比例同样按 **border-box** 计算（`ratio = 边框盒宽 /
+  边框盒高`），与 CSS 默认的 content-box 比例不同。
 
 ## 用法
 
@@ -44,6 +46,11 @@ let l = child.layout()   // left / top 相对父边框盒；width / height 边�
   返回**基线到内容盒顶部**的距离（不含自身 padding/border，引擎负责叠加），
   返回 `None` 表示该节点无基线。容器节点无需设置——它的基线由引擎按规范
   从内部项推出。
+- `set_aspect_ratio(Some(宽/高))` 给首选宽高比：只要有一轴尺寸确定（显式给出，
+  或由父级弹性解析钦定），另一轴就按比例换算，压过内容推算；`None` 或非正数
+  表示不设比例。默认的 `align-items: stretch` 会覆盖交叉轴上的比例结果，
+  要保持比例需给非 stretch 的对齐（`flex-start` / `center` / `flex-end`）
+  或显式交叉尺寸。
 - 根节点宽高是 `Option[Double]`，`None` 表示该方向不约束、按内容取尺寸；
   需要撑满可用空间时给根设置 `percent(100.0)`。
 - 布局结果 `node.layout()` 需在 `calculate_layout` 之后读取。
@@ -61,12 +68,14 @@ top/right/bottom/left：包含块为父容器 padding box，同轴两侧 inset �
 摆放）、baseline 对齐（`align-items / align-self: baseline`：仅主轴为行方向
 时生效；升距最大的项贴行交叉起端，其余项按共同基线定位；基线分组同时决定
 本行交叉尺寸。无基线的项按 flex-start 摆放，交叉轴有 auto margin 的项不做
-基线对齐。嵌套容器的基线取首行共同基线，否则取交叉轴起端最靠前的有基线项）。
+基线对齐。嵌套容器的基线取首行共同基线，否则取交叉轴起端最靠前的有基线项）、
+aspect-ratio（`set_aspect_ratio`，比例语义为 border-box：一轴确定 → 另一轴
+换算，容器自身尺寸同理；`min:auto` 不超过换算值）。
 
 ## 未实现（按批次补）
 
 - RTL（direction: rtl）
-- aspect-ratio
+- 绝对定位子项的 aspect-ratio 换算（该路径仍只按显式尺寸 / 两侧 inset / 内容定尺寸）
 - 测量缓存（Yoga 的 16 槽缓存）与像素网格取整
 - 容器内在尺寸（min-content / max-content）的精确语义（当前 fit-content
   近似）
