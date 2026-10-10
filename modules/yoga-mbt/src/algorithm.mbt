@@ -7,8 +7,8 @@
 //
 // 宽高语义为 border-box（与 Yoga 一致）：width/height 含自身的
 // padding 与 border；aspect-ratio 的比例同样按边框盒计算。
-// 尚未实现：RTL（direction）、测量缓存、像素网格取整、
-// 容器内在尺寸（min/max-content）精确语义、绝对定位项的比例换算。
+// 尚未实现：测量缓存、像素网格取整、容器内在尺寸（min/max-content）
+// 精确语义、绝对定位项的比例换算。
 
 ///|
 let max_dim : Double = 1000000000000000.0
@@ -143,7 +143,8 @@ fn resolve_edges(e : Edges, base_w : Option[Double]) -> Resolved {
 }
 
 ///|
-/// 主轴/交叉轴视角下的边距（含 auto 标记；reverse 时主轴起端随之翻转）。
+/// 主轴/交叉轴视角下的边距（含 auto 标记）：reverse 翻转主轴起端，
+/// 列容器的交叉轴起端随 cross_reverse 翻转（行容器交叉轴是块轴，不受方向影响）。
 priv struct AxisMargin {
   mut start : Double
   mut end : Double
@@ -156,7 +157,12 @@ priv struct AxisMargin {
 }
 
 ///|
-fn axis_margin(r : Resolved, main_is_row : Bool, reverse : Bool) -> AxisMargin {
+fn axis_margin(
+  r : Resolved,
+  main_is_row : Bool,
+  reverse : Bool,
+  cross_reverse : Bool,
+) -> AxisMargin {
   let (s, e, cs, ce, a_s, a_e, a_cs, a_ce) = if main_is_row {
     let (sv, asv) = if reverse {
       (r.right, r.auto_right)
@@ -180,7 +186,17 @@ fn axis_margin(r : Resolved, main_is_row : Bool, reverse : Bool) -> AxisMargin {
     } else {
       (r.bottom, r.auto_bottom)
     }
-    (sv, ev, r.left, r.right, asv, aev, r.auto_left, r.auto_right)
+    let (csv, acsv) = if cross_reverse {
+      (r.right, r.auto_right)
+    } else {
+      (r.left, r.auto_left)
+    }
+    let (cev, acev) = if cross_reverse {
+      (r.left, r.auto_left)
+    } else {
+      (r.right, r.auto_right)
+    }
+    (sv, ev, csv, cev, asv, aev, acsv, acev)
   }
   {
     start : s,
@@ -332,7 +348,14 @@ fn layout_into(
     return (w, h)
   }
   let main_is_row = is_row(s.flex_direction)
-  let reverse = is_reverse(s.flex_direction)
+  let rtl = match s.direction {
+    Rtl => true
+    Ltr => false
+  }
+  // 行容器：direction 与 row-reverse 各翻一次（XOR）；列容器：主轴是块轴，
+  // direction 只翻交叉轴（inline 轴）
+  let rev_main = is_reverse(s.flex_direction) != (rtl && main_is_row)
+  let rev_cross = rtl && !main_is_row
   // 自身尺寸（确定值）
   let own_w_def = first_some(pinned_w, definite_size(s.width, avail_w))
   let own_h_def = first_some(pinned_h, definite_size(s.height, avail_h))
@@ -400,7 +423,7 @@ fn layout_into(
       Relative => ()
     }
     let cm = resolve_edges(c.style.margin, child_pct_w)
-    let m = axis_margin(cm, main_is_row, reverse)
+    let m = axis_margin(cm, main_is_row, rev_main, rev_cross)
     let c_pb_main = if main_is_row {
       resolve_value(edge_value(c.style.padding, 0), child_pct_w) +
       resolve_value(edge_value(c.style.padding, 1), child_pct_w) +
@@ -830,6 +853,29 @@ fn layout_into(
   // ---- 逐项：交叉轴定尺寸与对齐 → 坐标映射 → 递归子树 ----
   let inner_w = own_w_def.map(fn(v) { (v - pad_border_w).max(0.0) })
   let inner_h = own_h_def.map(fn(v) { (v - pad_border_h).max(0.0) })
+  // 各行外沿主轴尺寸的最大值：既作容器内容推算的主轴尺寸，也作主轴
+  // 无确定尺寸时翻转定位的参照（否则 row-reverse 的 auto 宽容器会算出负偏移）
+  let line_main_of = fn(line : Array[Item]) -> Double {
+    line.iter().fold(init=0.0, fn(acc, it) {
+      acc + it.size_main + it.m.start + it.m.end
+    }) +
+    (main_gap * (line.length() - 1).to_double()).max(0.0)
+  }
+  let mut line_main_max = 0.0
+  for line in lines {
+    let v = line_main_of(line)
+    if v > line_main_max {
+      line_main_max = v
+    }
+  }
+  let flip_main_ref = match inner_main {
+    Some(v) => v
+    None => line_main_max
+  }
+  let flip_cross_ref = match inner_cross {
+    Some(v) => v
+    None => own_cross_content
+  }
   for li in 0..<nlines {
     let line = lines[li]
     let lc = line_crosses[li]
@@ -878,23 +924,18 @@ fn layout_into(
       it.pos_cross = loff + off + it.m.cross_start
       let c_w = if main_is_row { it.size_main } else { it.final_cross }
       let c_h = if main_is_row { it.final_cross } else { it.size_main }
-      let inner_main_dim = if main_is_row { inner_w } else { inner_h }
-      let x = if main_is_row {
-        if reverse {
-          inner_main_dim.unwrap_or(0.0) - it.pos_main - it.size_main
-        } else {
-          it.pos_main
-        }
-      } else {
-        it.pos_cross
-      }
-      let y = if main_is_row {
-        it.pos_cross
-      } else if reverse {
-        inner_main_dim.unwrap_or(0.0) - it.pos_main - it.size_main
+      let m_pos = if rev_main {
+        flip_main_ref - it.pos_main - it.size_main
       } else {
         it.pos_main
       }
+      let c_pos = if rev_cross {
+        flip_cross_ref - it.pos_cross - it.final_cross
+      } else {
+        it.pos_cross
+      }
+      let x = if main_is_row { m_pos } else { c_pos }
+      let y = if main_is_row { c_pos } else { m_pos }
       it.node.layout_left = own_border.left + own_pad.left + x
       it.node.layout_top = own_border.top + own_pad.top + y
       if it.node.children.length() > 0 {
@@ -932,22 +973,8 @@ fn layout_into(
       None
     }
   // ---- 自身尺寸 ----
-  let line_main = fn(line : Array[Item]) -> Double {
-    line.iter().fold(init=0.0, fn(acc, it) {
-      acc + it.size_main + it.m.start + it.m.end
-    }) +
-    (main_gap * (line.length() - 1).to_double()).max(0.0)
-  }
-  let mut content_main = 0.0
-  for line in lines {
-    let v = line_main(line)
-    if v > content_main {
-      content_main = v
-    }
-  }
-  // 内容推算出的自身尺寸要含自身 padding/border（宽高语义为 border-box）；
-  // 多行时主轴取各行外沿尺寸的最大值
-  let content_main_sum = content_main + pad_border_main
+  // 内容推算出的自身尺寸要含自身 padding/border（宽高语义为 border-box）
+  let content_main_sum = line_main_max + pad_border_main
   let own_main0 = match own_main_def {
     Some(v) => v
     None =>
@@ -996,6 +1023,9 @@ fn layout_into(
     let cb_h = (h - own_border.top - own_border.bottom).max(0.0)
     let cbw = Some(cb_w)
     let cbh = Some(cb_h)
+    // 静态位置随所属轴的翻转标志走（含 row/column-reverse 与 rtl）
+    let h_rev = if main_is_row { rev_main } else { rev_cross }
+    let v_rev = if main_is_row { rev_cross } else { rev_main }
     for c in abs_children {
       let cs = c.style
       let cm = resolve_edges(cs.margin, cbw)
@@ -1061,12 +1091,18 @@ fn layout_into(
         None =>
           match ins_r {
             Some(rv) => cb_w - rv - cm.right - aw
-            None =>
-              (if main_is_row {
+            None => {
+              let lead = (if main_is_row {
                 justify_leading(s.justify_content, cb_w - aw)
               } else {
                 align_offset(s.align_items, cb_w - aw)
-              }) + cm.left
+              }) + (if h_rev { cm.right } else { cm.left })
+              if h_rev {
+                cb_w - aw - lead
+              } else {
+                lead
+              }
+            }
           }
       }
       let y = match ins_t {
@@ -1074,12 +1110,18 @@ fn layout_into(
         None =>
           match ins_b {
             Some(bv) => cb_h - bv - cm.bottom - ah
-            None =>
-              (if main_is_row {
+            None => {
+              let lead = (if main_is_row {
                 align_offset(s.align_items, cb_h - ah)
               } else {
                 justify_leading(s.justify_content, cb_h - ah)
-              }) + cm.top
+              }) + (if v_rev { cm.bottom } else { cm.top })
+              if v_rev {
+                cb_h - ah - lead
+              } else {
+                lead
+              }
+            }
           }
       }
       c.layout_left = own_border.left + x

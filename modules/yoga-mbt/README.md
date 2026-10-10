@@ -51,6 +51,10 @@ let l = child.layout()   // left / top 相对父边框盒；width / height 边�
   表示不设比例。默认的 `align-items: stretch` 会覆盖交叉轴上的比例结果，
   要保持比例需给非 stretch 的对齐（`flex-start` / `center` / `flex-end`）
   或显式交叉尺寸。
+- `set_direction(Rtl)` 设本节点的书写方向：行容器主轴起端落到右侧、列容器
+  交叉轴起端落到右侧；与 `RowReverse` / `ColumnReverse` 叠加时按两次翻转走。
+  方向只管本节点排布子项，**不做 CSS 的 direction 继承**；`margin` 与
+  top/right/bottom/left 仍是物理边，其「起端 / 末端」含义随方向换算。
 - 根节点宽高是 `Option[Double]`，`None` 表示该方向不约束、按内容取尺寸；
   需要撑满可用空间时给根设置 `percent(100.0)`。
 - 布局结果 `node.layout()` 需在 `calculate_layout` 之后读取。
@@ -70,11 +74,12 @@ top/right/bottom/left：包含块为父容器 padding box，同轴两侧 inset �
 本行交叉尺寸。无基线的项按 flex-start 摆放，交叉轴有 auto margin 的项不做
 基线对齐。嵌套容器的基线取首行共同基线，否则取交叉轴起端最靠前的有基线项）、
 aspect-ratio（`set_aspect_ratio`，比例语义为 border-box：一轴确定 → 另一轴
-换算，容器自身尺寸同理；`min:auto` 不超过换算值）。
+换算，容器自身尺寸同理；`min:auto` 不超过换算值）、RTL
+（`set_direction(Rtl)`：主轴 / 交叉轴起端按方向翻转，margin、auto margin、
+绝对定位静态位置随之换算）。
 
 ## 未实现（按批次补）
 
-- RTL（direction: rtl）
 - 绝对定位子项的 aspect-ratio 换算（该路径仍只按显式尺寸 / 两侧 inset / 内容定尺寸）
 - 测量缓存（Yoga 的 16 槽缓存）与像素网格取整
 - 容器内在尺寸（min-content / max-content）的精确语义（当前 fit-content

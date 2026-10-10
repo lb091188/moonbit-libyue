@@ -58,6 +58,14 @@ pub fn Node::set_left(self : Node, v : Value) -> Unit {
 }
 
 ///|
+/// 设本节点的书写方向：`Rtl` 让行容器的主轴起端落在右侧、列容器的交叉轴
+/// 起端落在右侧（与 `RowReverse` 叠加时两番翻转回到左起端）。
+/// 只管本节点排布子项，不继承、不改变子项自身的内容方向。
+pub fn Node::set_direction(self : Node, v : Direction) -> Unit {
+  self.style.direction = v
+}
+
+///|
 pub fn Node::set_flex_direction(self : Node, v : FlexDirection) -> Unit {
   self.style.flex_direction = v
 }

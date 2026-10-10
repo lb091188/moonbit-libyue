@@ -806,3 +806,228 @@ test "column 容器不做基线对齐" {
   assert_eq(a.layout().width, 100.0)
   assert_eq(a.layout().height, 30.0)
 }
+
+// ---- 翻转定位参照（LTR 快照，YG2d 顺带修的既有缺陷）----
+
+///|
+test "row-reverse 容器 auto 主轴尺寸时子项无负偏移" {
+  let root = Node::new()
+  root.set_flex_direction(RowReverse)
+  let a = leaf(100.0, 50.0)
+  let b = leaf(100.0, 50.0)
+  root.append_child(a)
+  root.append_child(b)
+  calculate_layout(root, None, None)
+  // 参照取内容推算的行主轴尺寸 200（此前当成 0 → 子项偏移 -100 / -200）
+  assert_eq(a.layout().left, 100.0)
+  assert_eq(b.layout().left, 0.0)
+  assert_eq(root.layout().width, 200.0)
+}
+
+///|
+test "列容器交叉轴 margin 左参与定位" {
+  let root = Node::new()
+  root.set_width(fixed(200.0))
+  root.set_height(fixed(300.0))
+  root.set_flex_direction(Column)
+  root.set_align_items(FlexStart)
+  let c = leaf(100.0, 50.0)
+  c.set_margin_left(fixed(20.0))
+  root.append_child(c)
+  calculate_layout(root, Some(200.0), Some(300.0))
+  assert_eq(c.layout().left, 20.0)
+  assert_eq(c.layout().top, 0.0)
+}
+
+///|
+test "column-reverse 的绝对定位静态位置落主轴末端" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(200.0))
+  root.set_flex_direction(ColumnReverse)
+  root.set_align_items(FlexStart)
+  let b = leaf(0.0, 0.0)
+  b.set_position(Absolute)
+  b.set_width(fixed(40.0))
+  b.set_height(fixed(40.0))
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(200.0))
+  // 主轴起端在下方 → 双 auto 的静态位置贴底
+  assert_eq(b.layout().top, 160.0)
+  assert_eq(b.layout().left, 0.0)
+}
+
+// ---- RTL（YG2d）----
+
+///|
+test "rtl 行容器项从右向左排" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_direction(Rtl)
+  root.set_align_items(FlexStart)
+  let a = leaf(100.0, 50.0)
+  let b = leaf(100.0, 50.0)
+  root.append_child(a)
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  assert_eq(a.layout().left, 200.0)
+  assert_eq(b.layout().left, 100.0)
+}
+
+///|
+test "rtl 与 row-reverse 叠加回到左起端" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_flex_direction(RowReverse)
+  root.set_direction(Rtl)
+  root.set_align_items(FlexStart)
+  let a = leaf(100.0, 50.0)
+  let b = leaf(100.0, 50.0)
+  root.append_child(a)
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  assert_eq(a.layout().left, 0.0)
+  assert_eq(b.layout().left, 100.0)
+}
+
+///|
+test "rtl 列容器交叉轴起端在右" {
+  let root = Node::new()
+  root.set_width(fixed(200.0))
+  root.set_height(fixed(300.0))
+  root.set_flex_direction(Column)
+  root.set_direction(Rtl)
+  root.set_align_items(FlexStart)
+  let c = leaf(100.0, 50.0)
+  root.append_child(c)
+  calculate_layout(root, Some(200.0), Some(300.0))
+  assert_eq(c.layout().left, 100.0)
+  assert_eq(c.layout().top, 0.0)
+}
+
+///|
+test "rtl 列容器交叉轴起端取右边距" {
+  let root = Node::new()
+  root.set_width(fixed(200.0))
+  root.set_height(fixed(300.0))
+  root.set_flex_direction(Column)
+  root.set_direction(Rtl)
+  root.set_align_items(FlexStart)
+  let c = leaf(100.0, 50.0)
+  c.set_margin_right(fixed(20.0))
+  root.append_child(c)
+  calculate_layout(root, Some(200.0), Some(300.0))
+  // 交叉轴起端在右,margin-right 是起端 margin → 项自右边缘内缩 20
+  assert_eq(c.layout().left, 80.0)
+}
+
+///|
+test "rtl 行容器 justify flex-end 落到物理左端" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_direction(Rtl)
+  root.set_justify_content(FlexEnd)
+  root.set_align_items(FlexStart)
+  let a = leaf(100.0, 50.0)
+  root.append_child(a)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  assert_eq(a.layout().left, 0.0)
+}
+
+///|
+test "rtl 下 margin 左右仍按物理边参与主轴" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_direction(Rtl)
+  root.set_align_items(FlexStart)
+  let a = leaf(100.0, 50.0)
+  a.set_margin_left(fixed(20.0))
+  let b = leaf(100.0, 50.0)
+  root.append_child(a)
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  // rtl 主轴起端在右:a 贴右边缘,margin-left 是主轴末端 → 落在 a 左侧
+  assert_eq(a.layout().left, 200.0)
+  assert_eq(b.layout().left, 80.0)
+}
+
+///|
+test "rtl 行容器 margin auto 吸收剩余空间" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_direction(Rtl)
+  root.set_align_items(FlexStart)
+  let a = leaf(100.0, 50.0)
+  a.set_margin_left(auto())
+  root.append_child(a)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  // margin-left 在 rtl 行容器里是主轴末端 margin → 剩余空间给左侧,项贴右端
+  assert_eq(a.layout().left, 200.0)
+}
+
+///|
+test "rtl 绝对定位四向全 auto 静态位置靠右" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(200.0))
+  root.set_direction(Rtl)
+  root.set_align_items(FlexStart)
+  let b = leaf(0.0, 0.0)
+  b.set_position(Absolute)
+  b.set_width(fixed(40.0))
+  b.set_height(fixed(40.0))
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(200.0))
+  assert_eq(b.layout().left, 260.0)
+  assert_eq(b.layout().top, 0.0)
+}
+
+///|
+test "rtl 列容器绝对定位静态交叉位置在右" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(200.0))
+  root.set_flex_direction(Column)
+  root.set_direction(Rtl)
+  root.set_align_items(FlexStart)
+  let b = leaf(0.0, 0.0)
+  b.set_position(Absolute)
+  b.set_width(fixed(40.0))
+  b.set_height(fixed(40.0))
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(200.0))
+  assert_eq(b.layout().left, 260.0)
+  assert_eq(b.layout().top, 0.0)
+}
+
+///|
+test "rtl 列容器折行:首行靠右、次行在其左" {
+  let root = Node::new()
+  root.set_width(fixed(200.0))
+  root.set_height(fixed(300.0))
+  root.set_flex_direction(Column)
+  root.set_flex_wrap(Wrap)
+  root.set_direction(Rtl)
+  let a = leaf(100.0, 80.0)
+  let b = leaf(100.0, 80.0)
+  let c = leaf(100.0, 80.0)
+  let d = leaf(100.0, 80.0)
+  root.append_child(a)
+  root.append_child(b)
+  root.append_child(c)
+  root.append_child(d)
+  calculate_layout(root, Some(200.0), Some(300.0))
+  // 高 300 装三行(3×80=240,第四个折到第二列);主轴不受 direction 影响,
+  // 交叉轴起端在右 → 第一列 left=100,第二列 left=0
+  assert_eq(a.layout().left, 100.0)
+  assert_eq(a.layout().top, 0.0)
+  assert_eq(c.layout().left, 100.0)
+  assert_eq(c.layout().top, 160.0)
+  assert_eq(d.layout().left, 0.0)
+  assert_eq(d.layout().top, 0.0)
+}
