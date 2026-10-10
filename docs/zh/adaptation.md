@@ -215,6 +215,13 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **坑（既有坑的新面）**：改原生静态库后 `moon test` 的可执行文件**同样不重链**——此前记录只针对 `moon build` 的 exe，本次复现于 `_build/native/debug/test/<pkg>`：修好 SIGSEGV 之后测试仍崩，因为跑的是旧链接产物。排查时先用一个普通 main 目标复现（它是新目标、必然新链接），一致地「main 正常、测试崩」即指向产物过期；修复要连 `_build/native/debug/test/<pkg>` 一起删。
 - **验证**：删产物后 `moon test -p NoahLiu/moonbit-libyue/yue/text` 7/7；`moon check yue/{core,win,render,text}` 零警告；render 14/14、core 9/9、yoga-mbt 79/79 未掉。
 
+### MoonBit 原生 GUI 栈 G4 首批（编辑内核与键码）· 内核语义与工具链写法
+
+- **内核语义定案**：文本状态唯一权威在 `yue/input`，输入法只是它的客户端之一（不做「通道持有文本」那份双状态）。坐标一律 **UTF-8 字节下标**，caret/anchor 只落码点边界（续字节 0xC0..0xBF 回退），与 G0 探针同源；改成码点下标会同时断掉 Pango 量宽与 IME preedit 偏移口径。`get_text_in_range` 的对齐方向是**起点回退、终点前进**（宁可多含一个码点，也不返回半字）。内核不碰系统剪贴板：`cut/copy` 返回文本、`paste_text` 接收文本，故整块逻辑可在无显示环境下测。`Tab`/`Shift+Tab` 返回「未消费」交上层焦点栈；可打印键由 `keysym_to_text` 落地（Latin-1 与 UCS keysym 两条路），其余功能键留给 G5 的 IME 通道。
+- **坑（本工具链写法，均实测）**：① `fn helper(self : Editor, ..)` 这种隐式方法形式**不被识别**（报 unbound），私有辅助也要写 `fn Editor::helper(self : Editor, ..)`；② 顶层常量 `pub name : Int = v` 解析失败，要 `pub const NAME : Int = v`（大写）；③ `move` 是保留字（Warning 0035），方法改名 `move_caret`；④ `Int.to_char()` 返回 **`Char?`**，直接插值会报「Option does not have a meaningful string representation」，必须先 match 出 Char；⑤ `pub enum X derive(Eq, Show) { A B }` 的变体在别处不可构造，无载荷枚举要 `pub(all) enum`，本批进一步把二值枚举（Consumed/NotConsumed）直接换成 `Bool` 少一层语法面；⑥ `} else match ... {` 不合法，match 作分支体要裹 `{ }`。
+- **坑（越界）**：`floor_boundary` 允许 k == 缓冲长度（末尾是合法边界），循环里必须 `k < n` 短路后再取字符，否则 `Array::at` panic（实测 SIGABRT）。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/input` 10/10（中英混排 roundtrip、退格删整字不残留、选区替换、词跳转三个方向、shift 延长/折叠、copy 不动状态而 cut 删、undo/redo 往返、handle_key 路由与 Tab 归属、Ctrl+A/Ctrl+Z/Ctrl+左、区间对齐）；`moon check yue/{core,input}` 零警告；render 14/14、text 7/7、yoga-mbt 79/79 未掉。
+
 ## Linux
 
 ### 发行版
