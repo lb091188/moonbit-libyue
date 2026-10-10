@@ -162,6 +162,22 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 修复(批次顺序即循环依赖规避):①markdown 先搬——它调 components 的 code_view,晚搬则核心→components→核心成环;②components——前置手术是把 `hand()` 光标助手从 components.mbt 提入核心并 pub(charts_interactive 跨包引用它,charts 后搬),主题块约 17 个私有 getter 及 bind_fg/bind_entry_theme/entry_ctrl_height 被 20+ 文件跨包引用,按需 pub 化;③icons;④charts(charts_wbtest.mbt 自带 extern "C",moon.pkg 须 targets 声明 native-only);⑤declarative——前置手术两步:Node 协议(struct Node + attach)从 declarative.mbt 抽留核心 yue/node.mbt(否则 components/icons/markdown/charts 四包对 Node 的无前缀引用全要改),signals.mbt 末尾的 `bind()`(内部调 bind_label)随 bind_label 迁入 declarative 包;⑥system——打开外部 `open_url`(system.mbt)与托盘 tray.mbt 留核心(markdown 的链接点击依赖 open_url,procrun 随系统层走);⑦版本收口 0.5.11:moon.mod、yue/version.mbt、modules/yue-media 钉版三处同步(prebuild 构建期校验一致,不一致 moon build 直接失败)。
 - 验证方式与教训:每批 moon check 零警告 + moon test 全量 + moon build examples/showcase 与 sysmonitor;独立验收员只读审 git diff(符号逐位等价、moon.pkg 卫生、无夹带)。**教训:门控漏了 systemprobe**——批处理提交后,已推送的树 systemprobe 构建 15 处断链(导入适配留在工作区未随批提交),hello/hello-themed 不受影响故双示例门控无感;用 `git stash` 在已提交态实测才发现。拆包类改动的门控必须覆盖全部示例,提交范围须以 git status 逐批核对(并行工作流的未提交文件极易被整文件提交扫入)。
 
+### MoonBit 原生 GUI 栈 G1（绘制契约）· 本工具链的 MoonBit 语法形态与缓冲选型
+
+环境：Ubuntu 24.04 + X11 + XFCE，moon 0.1.20260920 / moonc v0.10.14。新增 `yue/render`（纯 MoonBit，零 FFI）。
+
+- **坑**：`pub method name(self : T, ...)` 直接解析失败——`method` 是保留字（Warning 0035 提示 reserved keyword）。**修复**：一律写 `pub fn T::name(self : T, ...)`。
+- **坑**：`match expr with { }` 报 `unexpected token with`（仓库现有代码里 `match ... with {` 出现 0 次）。**修复**：写 `match expr { }`；注意**记录更新** `{ s with tx: 1.0 }` 里的 `with` 仍合法，两处不同构。
+- **坑**：`Bytes` **只读**（无 `op_set`），且本版本**没有** `ByteArray` 类型（`The type/trait ByteArray is not found`）。**修复**：可变字节缓冲用 `FixedArray[Byte]`（`yue/png_rgba.mbt:12-19` 已在用），就地写入还不需要 `mut` 绑定。像素位图字段因此定为 `FixedArray[Byte]`，G2/G3 交给 Cairo/X11 时再取数据地址。
+- **坑**：`self.field[i] = v`（经字段下标赋值）会把整个方法提成要求 `T &mut`，调用点就得写 `mut p`；对要承接组件层一万行既有调用点的绘制器不可接受。**修复**：写像素前先取局部句柄 `let d = self.data` 再 `d[i] = v`；而状态重绑（`self.state = {...}`）同样要求 mut，故把可变字段放到**内层** `PainterState` 的 `mut` 字段上、外层 `state` 字段从不重绑（与 `yue/signals.mbt:247` 的 `self.node.dirty = false` 同构），`p.fill_rect(..)` 因此在不可变句柄上可用。
+- **坑**：结构体是引用语义，`save()` 把 `self.state` 直接入栈，`restore()` 拿回的是同一个对象，状态根本不会回退。**修复**：入栈逐字段拷贝快照（`snapshot`），出栈逐字段写回（`load_state`）；此行为已有单测覆盖（translate + restore 后两处像素分别断言）。
+- **坑**：带类型名的构造 `Color { r: ... }` 解析失败。**修复**：按上下文写裸 `{ r: .., g: .. }`（参照 `yue/view.mbt:513-521`）。
+- **坑**：跨 `moon.work` 成员的测试依赖只在 `moon.pkg.json` 的 `wbtest.import` 里声明会报 `Package ... not found`，且条目中的 `alias` 字段被静默忽略（默认别名取路径末段，故 bench 里是 `@src`）。**修复/取舍**：要让 `yue/render` 的测试用 yoga-mbt，得在根 `moon.mod` 声明该模块依赖，会改动发布依赖图；本批不动它，「布局树→像素」的定位断言顺延到真正接线 yoga 的批次（G2/G7）。
+- **口径分岔（记档待定夺）**：hex 8 位写法本栈按 CSS 的 `#RRGGBBAA`（透明度在尾）解析，而 libyue 的 `Color` 约定是 `#AARRGGBB`（`yue/color.mbt` 的 parse_hex 注释里写明混用表现为颜色漂移而非透明度变化）。新栈不沿用前者。
+- **坑（工具链副作用，勿再踩）**：仓库级 `moon fmt` 在当前版本会重排约 80 个与本批无关的文件（本仓并非 fmt-clean），并把 `moon.pkg.json` **迁移**为 `moon.pkg`——而新 DSL 不认 `warn_list`（见 `modules/yoga-mbt/HANDOFF.md` §6.11），`yoga-mbt/src` 里那条 `warn_list: -6` 会被静默搬走。**修复**：`moon fmt` 只点名本批新文件；跑后以 `git status` 核对，误改的一律 `git checkout -- <显式路径>` 回滚。
+
+- **验证**：`moon check` 零警告 + 全仓 `moon test` 748/748（`yue/render` 新增 8 条像素级断言：半开区间覆盖、source-over 混合、translate+restore、clip 只收紧、内侧描边一圈、窄矩形整块填满、100/3 等分共用边不留缝、非法 hex 与零尺寸位图保持原状）。
+
 ## Linux
 
 ### 发行版
