@@ -13,11 +13,21 @@
 /// - `Percent(p)`：相对父容器对应轴内容区尺寸的百分比（p 取 0~100）
 /// - `Auto`：自动（尺寸交给布局算法；margin 的 Auto 有特殊语义：
 ///   在主轴吸收剩余空间，优先级高于 justify-content）
+/// - `MinContent`：min-content（内容在该轴上「不溢出」的最小尺寸）
+/// - `MaxContent`：max-content（内容在该轴上的「理想」尺寸，不受约束）
+/// - `FitContent`：fit-content（`clamp(min-content, 可用空间, max-content)`；
+///   可用空间不受约束时退化为 max-content）
+///
+/// 内在关键词只用于尺寸类属性（width / height / min-* / max-* / flex-basis），
+/// 出现在 margin / padding / border / inset 上按未设置（0）处理。
 pub(all) enum Value {
   Undefined
   Fixed(Double)
   Percent(Double)
   Auto
+  MinContent
+  MaxContent
+  FitContent
 }
 
 ///|

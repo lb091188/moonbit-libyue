@@ -1,7 +1,7 @@
 # yoga-mbt 复刻工作交接
 
 > 交接时间：2026-10-10 10:45（GMT+8）· 交接方：本会话（WorkBuddy）· 接收方：同仓库协作方 / 后续会话
-> 修订：2026-10-10 11:10 合入 YG2b（baseline + 交叉轴 margin 定位修复）；11:40 合入 YG2b′（容器 auto 尺寸补 padding/border + 多行主轴尺寸）；12:10 合入 YG2c（aspect-ratio，比例语义 border-box）；12:50 合入 YG2d（RTL direction + 翻转定位两条既有缺陷）；13:10 合入 YG2e（绝对定位项的比例换算，YG2 标准面收尾）；13:40 合入 YG3a（枚举跨包可构造 `pub(all)` + 性能基线 bench）；14:10 合入 YG3b（测量缓存）；13:58 合入 YG3c（像素网格取整，YG3b 条的时间戳系撰写时笔误提前，以本条为准）——各批都同步更新了 §0/§3/§4/§5/§6/§7/§8/§9/§10/§11
+> 修订：2026-10-10 11:10 合入 YG2b（baseline + 交叉轴 margin 定位修复）；11:40 合入 YG2b′（容器 auto 尺寸补 padding/border + 多行主轴尺寸）；12:10 合入 YG2c（aspect-ratio，比例语义 border-box）；12:50 合入 YG2d（RTL direction + 翻转定位两条既有缺陷）；13:10 合入 YG2e（绝对定位项的比例换算，YG2 标准面收尾）；13:40 合入 YG3a（枚举跨包可构造 `pub(all)` + 性能基线 bench）；14:10 合入 YG3b（测量缓存）；13:58 合入 YG3c（像素网格取整，YG3b 条的时间戳系撰写时笔误提前，以本条为准）；14:40 合入 YG3d（内在尺寸 min/max/fit-content，§4.5 与 §9.2 改用真内在尺寸，YG3 收尾）——各批都同步更新了 §0/§3/§4/§5/§6/§7/§8/§9/§10/§11
 > 交接范围：`feature/yoga-mbt` 分支上的「纯 MoonBit Flexbox 布局引擎」复刻工作
 
 ---
@@ -9,9 +9,9 @@
 ## 0. 三十秒速览
 
 - **在做什么**：用纯 MoonBit 复刻 Yoga 布局引擎（`modules/yoga-mbt` 独立子包），作为 MoonBit 化 libyue 的布局层。
-- **当前进度**：YG1（骨架 + 核心算法）、YG2a（absolute 定位）、YG2b（baseline 对齐 + 交叉轴 margin 定位修复）、YG2b′（容器 auto 尺寸补 padding/border + 多行主轴尺寸）、YG2c（aspect-ratio）、YG2d（RTL direction）、YG2e（绝对定位项比例换算）已完成并推送——**YG2 标准面已收尾**；YG3 工程化已做三批：YG3a（发现并修掉「外部包无法构造枚举」的阻断级坑 + 性能基线）、YG3b（测量缓存，release 每轮 4.2→2.6ms）、YG3c（`set_pixel_grid` 像素网格取整，默认关闭）；全部提交在 `feature/yoga-mbt`（**分支最新提交以 `git log` 为准**）。
-- **门控现状**：`moon check` 零警告 + 全仓 `moon test` **730/730** 全绿；yoga-mbt 自身 69 条白盒断言。
-- **下一步**：YG3d 内在尺寸精确语义（min-content / max-content）→ YG4 与 libyue 集成（**YG4 依赖 libyue 复刻整体范围定案，不要自行开工**）。
+- **当前进度**：YG1（骨架 + 核心算法）、YG2a（absolute 定位）、YG2b（baseline 对齐 + 交叉轴 margin 定位修复）、YG2b′（容器 auto 尺寸补 padding/border + 多行主轴尺寸）、YG2c（aspect-ratio）、YG2d（RTL direction）、YG2e（绝对定位项比例换算）已完成并推送——**YG2 标准面已收尾**；YG3 工程化四批全部完成：YG3a（发现并修掉「外部包无法构造枚举」的阻断级坑 + 性能基线）、YG3b（测量缓存）、YG3c（`set_pixel_grid` 像素网格取整，默认关闭）、YG3d（内在尺寸 min/max/fit-content，撤掉两处 fit-content 近似）——**YG1/YG2/YG3 已收尾**；全部提交在 `feature/yoga-mbt`（**分支最新提交以 `git log` 为准**）。
+- **门控现状**：`moon check` 零警告 + 全仓 `moon test` **740/740** 全绿；yoga-mbt 自身 79 条白盒断言。
+- **下一步**：只剩 **YG4 与 libyue 集成**（**依赖 libyue 复刻整体范围定案，不要自行开工，先与用户对齐**），以及两件交付动作：`feature/yoga-mbt` 合回 `master`（要先剔掉两个已在 master 的【构建】提交，见 §1/§9）与 `yoga-mbt` 发 mooncakes（见 §9 第 5 条）。
 - **口径已定**：aspect-ratio 比例作用在 **border-box**（用户 2026-10-10 确认），与 CSS 默认的 content-box 不同，动这块代码前先读 §5 第 12 条。
 - **三条纪律**（最容易踩）：① 只对齐 **Web Flexbox 标准**，不做 Yoga 双默认值；② 提交前先 `git fetch` 且用 `git add <显式路径>`，**不要 `git add -A`**；③ 每批改动配套回写 `docs/zh/adaptation.md` 与 `TODO.md`，一批一提交一推送。
 
@@ -24,7 +24,7 @@
 | 路径 | 当前分支 / HEAD | 状态 | 说明 |
 |---|---|---|---|
 | `/home/lkyh/ownCode/moonbit-libyue` | `master` @ `a656873` | 有未提交改动（README 中英、moon.mod） | **原副本**，另一会话正在此活动（发布/文档线） |
-| `/home/lkyh/ownCode/moonbit-libyue-native` | `feature/yoga-mbt`（随 YG3c 持续前移） | 干净，与 origin 一致 | **本次新建副本**，yoga 复刻工作在这里继续 |
+| `/home/lkyh/ownCode/moonbit-libyue-native` | `feature/yoga-mbt`（随 YG3d 持续前移） | 干净，与 origin 一致 | **本次新建副本**，yoga 复刻工作在这里继续 |
 
 - 目录名原按用户口述照录为 `moonbit-libyue-navite`，经用户确认系 `native` 笔误，已 `mv` 为 `moonbit-libyue-native`（若你的 IDE 工作区仍指向旧名，重新打开新路径即可）。
 - 新副本的 `.workbuddy/memory/` 是从原副本复制过去的（未跟踪文件，`git clone` 不会带）。
@@ -62,16 +62,16 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 
 ---
 
-## 3. 代码地图（`modules/yoga-mbt`，合计约 3132 行，其中 src 3045）
+## 3. 代码地图（`modules/yoga-mbt`，合计约 3698 行，其中 src 3611）
 
 | 文件 | 行数 | 职责 |
 |---|---|---|
-| `src/types.mbt` | 107 | 九个枚举一律 `pub(all) enum`（`pub enum` 的变体对外只读，见 §6 第 18 条）；`Value`(Undefined/Fixed/Percent/Auto)、`Edges`、`Display`、`PositionType`、`FlexDirection`、`FlexWrap`、`JustifyContent`、`AlignItems`、`AlignContent` |
-| `src/style.mbt` | 113 | `Style`（web 默认值集中在此）+ `edge_value`/`resolve_value`/`definite_size` 三个解析原语 |
-| `src/node.mbt` | 113 | `Node` 树、`Layout`（left/top/width/height）、`set_measure`、`set_baseline`、`set_pixel_grid`、`append_child`、`layout()` |
-| `src/api.mbt` | 263 | 全部 setter、`fixed/percent/auto/undefined` 取值辅助、`calculate_layout` 入口 |
-| `src/algorithm.mbt` | 1228 | **核心算法**（见下） |
-| `src/layout_wbtest.mbt` | 1221 | 69 条白盒断言（手算预期值） |
+| `src/types.mbt` | 117 | 九个枚举一律 `pub(all) enum`（`pub enum` 的变体对外只读，见 §6 第 18 条）；`Value`(Undefined/Fixed/Percent/Auto/MinContent/MaxContent/FitContent，内在关键词只对尺寸类属性有意义)、`Edges`、`Display`、`PositionType`、`FlexDirection`、`FlexWrap`、`JustifyContent`、`AlignItems`、`AlignContent` |
+| `src/style.mbt` | 119 | `Style`（web 默认值集中在此）+ `edge_value`/`resolve_value`/`definite_size` 三个解析原语 |
+| `src/node.mbt` | 123 | `Node` 树、`Layout`（left/top/width/height）、`set_measure`、`set_baseline`、`set_pixel_grid`、`append_child`、`layout()` |
+| `src/api.mbt` | 283 | 全部 setter、`fixed/percent/auto/undefined/min_content/max_content/fit_content` 取值辅助、`calculate_layout` 入口 |
+| `src/algorithm.mbt` | 1516 | **核心算法**（见下） |
+| `src/layout_wbtest.mbt` | 1453 | 79 条白盒断言（手算预期值） |
 | `src/moon.pkg.json` | 3 | `{"warn_list": "-6"}`，关闭「枚举构造器包内未构造」的误报（仅面向消费方的 API） |
 | `README.md` | — | 用法 / 已实现 / 未实现清单（内容类文档，只写怎么用） |
 | `bench/main.mbt` | 87 | 性能基线（外部包，兼作「枚举可跨包构造」的常驻编译回归）：1121 节点树 × 500 轮布局 |
@@ -80,10 +80,11 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 
 - `avail_*` = 父内容盒给出的可用空间；`pinned_*` = 父级弹性解析后**钦定**的最终尺寸（覆盖自身 style/内容推算）；返回 border-box 尺寸。
 - 单节点流程（`algorithm.mbt` 内按序）：display 判定 → 自身 padding/border 解析 → **叶子路径**（measure 函数 + 基线函数）→ **flex 项构建**（同时把 `position: absolute` 的子项分流到 `abs_children`）→ **换行**（§9.3）→ 逐行 **§9.7 弹性解析**（§9.2 比例换算基准与 §4.5 自动最小尺寸在 flex 项构建阶段算好） → 主轴 auto margin / justify 定位（§9.5）→ 交叉轴内容测量 + **§9.4 基线分组**与行交叉尺寸（§9.6）→ align-content 整行分布（§9.4/§9.6）→ 逐项定尺寸/定位/递归子树 → **本节点基线定案**（§8.5）→ 自身尺寸定案（内容推算 = 各行最大 + 自身 padding/border，含 min/max 收顶）→ **绝对定位子项**布局。
-- 辅助函数：`clamp3`、`first_some`、`justify_leading`、`align_offset`、`resolved_align`（align-self 继承 align-items）、`is_baseline_item`（§9.4 收集条件）、`measure_content`（叶子走 measure，容器递归；两条路径都刷新节点基线）。
+- 辅助函数：`clamp3`、`first_some`、`justify_leading`、`align_offset`、`resolved_align`（align-self 继承 align-items）、`is_baseline_item`（§9.4 收集条件）、`opt_eq`（Option 尺寸逐项比较）、`measure_content`（叶子走 measure、容器递归布局，**两条路径都会刷新节点基线**——内在探询不走它，见下）。
 - 方向标志两枚（YG2d）：`rev_main = is_reverse(flex_direction) != (rtl && 主轴为行)`、`rev_cross = rtl && 主轴为列`；生效于 `axis_margin` 的起端取边、坐标映射的翻转、绝对定位静态位置。翻转参照必须用「容器确定的内轴尺寸，否则内容推算值」（`flip_main_ref` / `flip_cross_ref`），用 0 会让 reverse + auto 尺寸算出负偏移。
 - 比例接入点共四处：flex 项构建（换算主轴基准 + 给 `min:auto` 封顶）、交叉轴定尺寸（换算 `final_cross`）、容器自身 `inner_main` / `inner_cross`（换算结果当作确定尺寸）、叶子路径（宽高互推）、绝对定位子项（以「显式尺寸或两侧 inset 已定的一轴」为源换算另一轴）。
 - 测量缓存（YG3b）：`Node.measure_cache` 键 = (可用宽, 可用高)、值 = (宽, 高, 基线)，命中时连基线一起回灌；`calculate_layout` 入口 `clear_measure_cache` 整树清一次（引擎无脏标记，样式可在两次布局间被改）。`measure_content` 是带缓存的外壳，实际工作在同名 `_uncached`。
+- 内在尺寸（YG3d）：`intrinsic_size(node, want_row, kind, base_w, base_h)`（带缓存外壳）→ `intrinsic_border_size`（自身确定尺寸短路 / 叶子直接调 measure 探询 / 容器走 `container_intrinsic_size`）→ `axis_size(node, value, want_row, base_w, base_h)` 把 `min_content / max_content / fit_content` 关键词收口成一处，被 width / height / min-* / max-* / flex-basis 与绝对定位段调用。三条必须记住的约定：①**探询口径**——max-content 用「双轴 `None`」，min-content 用「请求轴 `Some(0.0)`、另一轴 `None`」（与 Yoga 的 `Undefined` / `AtMost 0` 同构，`set_measure` 签名不变）；②**探询不得刷新 `Node.baseline`**，所以叶子路径直接调测量函数而不是 `measure_content`；③容器合成做**换行感知**（可换行 + min-content：主轴取最宽单项、按该宽度贪心分行求交叉轴；不换行：单项之和含 gap），且只请求主轴时不算子项交叉贡献（热路径短路，见 §6 第 20 条）。§4.5 `min:auto` 与 §9.2 content 基准分别用 min-content 与 max-content。
 - 像素网格取整（YG3c）：`calculate_layout` 在 `layout_into` 之后、按 `root.pixel_grid > 0.0` 追加 `round_to_grid` 后处理（`algorithm.mbt` 末段，`snap` + 递归）。递归签名六参：`raw_*` 为父项**取整前**绝对起端（用来还原子项真实绝对边），`snap_*` 为父项**取整后**绝对起端（用来换算子项相对坐标）——只传 `snap_*` 会把父项自身的取整误差转嫁进子项宽度。后处理遍历 `node.children`（含绝对定位子项），故 `calculate_layout` 里 `root.layout_left/top = 0.0` 必须在该趟之前。
 - 关键内部结构：`Resolved`/`AxisMargin`（四边在主轴/交叉轴视角下的映射，含 auto 标记）、`Item`（单个 flex 项的全部中间量：base / inner_base / hyp_main / min-max / grow / shrink / size_main / final_cross / baseline / frozen / violation / pos）。`Node.baseline`（`Option[Double]`，到本节点边框盒顶部的距离）是节点间上抛基线的通道。
 
@@ -98,6 +99,7 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 | `f994a15` | 发布元数据（readme/keywords） | — |
 | YG2b | **baseline 对齐**：`set_baseline` 回调（基线到内容盒顶部）、§9.4 基线分组决定行交叉尺寸、§9.6 升距最大者贴行起端、§8.5 容器基线上抛；附带修复**交叉轴 margin 从不参与子项定位** | 10 条 |
 | YG2b′ | **容器 auto 尺寸**：主轴按各行外沿取最大（原写死 0）、主轴与交叉轴都补自身 padding/border | 4 条 |
+| YG3d | **内在尺寸**：`min_content/max_content/fit_content` 关键词（含 abspos 项）；叶子按 Yoga 口径探询、容器换行感知合成；§4.5 min:auto 改真 min-content、§9.2 content 基准改 max-content（撤掉两处 fit-content 近似） | 10 条 |
 | YG3c | **像素网格取整**：`set_pixel_grid` 根节点开关（默认关闭），按绝对边框取整后回推相对坐标；未做贴父末端回推补偿 | 4 条 |
 | YG3b | **测量缓存**：结果按可用空间缓存在节点上、入口整树清一次；debug 8.9→5.1ms/轮、release 4.2→2.6ms/轮 | 2 条 |
 | YG3a | **工程化首批**：枚举改 `pub(all)` 让外部包可构造（原 `pub enum` 下消费方一行样式都设不了）；新增 `bench` 外部包 + 性能基线（debug 8.9ms/轮、release 4.2ms/轮 @1121 节点） | — |
@@ -105,7 +107,7 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 | YG2d | **RTL**：`set_direction`（按节点、不继承）+ margin/auto margin/静态位置随之换算；修 row-reverse + auto 主轴尺寸负偏移、修绝对定位静态位置不随 reverse 翻转 | 13 条 |
 | YG2c | **aspect-ratio**：`set_aspect_ratio`（比例 = 边框盒宽/高），§9.2 换算基准、§4.5 换算值封顶 min:auto、§9.4 交叉轴换算、容器自身两轴按比例视作确定尺寸；`align-items: stretch` 覆盖交叉轴比例结果（规范直译）| 7 条 |
 
-门控基线：`moon check` 零警告 + 全仓 `moon test` **730/730**（其中 yoga-mbt 69 条，其余 661 条为仓库既有测试）。
+门控基线：`moon check` 零警告 + 全仓 `moon test` **740/740**（其中 yoga-mbt 79 条，其余 661 条为仓库既有测试）。
 
 ---
 
@@ -131,6 +133,7 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 13. **direction 按节点独立、不做继承**（YG2d 定案）：`layout_into` 只拿得到父给的可用尺寸，没有父链样式上下文；控件层（yue）自己按主题把方向设到需要的容器上。物理边不变——`margin-left/right`、`left/right` inset 永远是物理左右，只是「主轴/交叉轴起端」的含义随方向换算。行容器交叉轴是块轴 → rtl 与 baseline、垂直 align 完全无关；列容器主轴是块轴 → rtl 不翻主轴，只翻交叉轴。
 14. **未实现的能力不留半成品接口**：宁可没有 API，也不给会静默算错的参数。
 15. **像素网格取整默认关闭、按绝对边框取整**（YG3c）：开关只认布局根节点的 `pixel_grid`（子树上设了不生效，因为取整是整树一趟后处理，逐节点开合会造成父子口径不一致）；取整放在 `calculate_layout` 末尾而非算法内部，是为了让 §9.7 弹性解析、`min:auto`、基线分组全部继续跑在浮点上——中途取整会让「100/3 三等分」这类结果随冻结顺序漂移。共用边读同一绝对坐标故取整一致，相邻项不留缝；误差留在各条边上不累积。**不做** Yoga 的贴父末端回推补偿：尾部有 padding/border 时贴内缘尽头的项可差一个网格单位以内，等真机出现可见缝隙再补。
+16. **内在尺寸按 css-sizing-3 通用规则单套实现**（YG3d 定案，动这块先读 §10）：flex 容器自身的内在尺寸细则只存在于 css-flexbox-2 草案（还分 ideal / web-compatible 两套），css-flexbox-1 §9.9 把定义整体推给 css-sizing-3，本引擎不追 L2 的双算法，按「叶子探询 + 子项贡献合成 + 本轴 min/max 夹取」一套规则贯通 `min_content / max_content / fit_content`、§4.5 `min:auto`、§9.2 content 基准。三条取舍：①**Yoga 没有 min-content 关键词**（`Unit` 只有 MaxContent/FitContent/Stretch），它的 min-content 只作为 §4.5 内部量存在，且容器递归只看自身主轴、忽略 wrap 与 gap——本引擎按规范做换行感知（可换行容器 min-content 主轴 = 最宽单项，并按该宽度贪心分行求交叉轴），比 Yoga 更贴浏览器；②`stretch` 关键词不做（css-sizing-4，与 `auto` + `align-self: stretch` 语义重叠）；③内在递归里的百分比只在父容器该轴确定时可解析，父链回环那套（css-sizing-3 §5.2.1）不做。另：`width: min-content` 与 `min-width: min-content` 必须走不同路径——前者是确定尺寸（内容可溢出、不再被自身 min 夹），后者是下限，`intrinsic_border_size` 的「自身确定尺寸短路」就是为这条边界准备的。
 
 ---
 
@@ -155,6 +158,7 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 15. **YG2b 新增（工具链 0.1.20260920 / moonc 0.10.14）**：字符串插值是 `"..\{expr}.."`，**写 `${expr}` 不报错但原样输出**（探针第一版踩到，白跑一轮）；没有 `print`，只有 `println`。
 16. **测试通过时 stdout 不显示**：想看中间数值，要么把探针写成「断言一个不可能的值、读 diff」，要么让测试失败——`moon test` 只回显失败用例的输出。探针文件用完即删（`tmp_*` 别混进提交）。
 18. **`pub enum` 的变体跨包只读**（YG3a 实测，工具链 moon 0.1.20260920 / moonc 0.10.14）：外部包 `@pkg.Variant` 与 `@pkg.Type::Variant` 都报 `E4036 Cannot create values of the read-only type`；`pub(readonly) enum` 不支持、变体上单独写 `pub` 报「No individual visibility」。**要消费方构造枚举值就必须写 `pub(all) enum`**。这类坑同包单测永远测不出，需有**外部包**参与 `moon check`（本包用 `bench` 兼任）。
+20. **热路径别为「比对缓存键」构造键对象**（YG3d 实测）：`measure_content` 原本每次调用先 `let key = (avail_w, avail_h)` 再线性比对，命中也要分配；内在递归把每节点的探询次数从 2 抬到 4~6，`release` 500 轮从 1.30s 涨到 2.54s。逐步止损（`release` 500 轮实测：2.54 → 2.07 容器只求主轴就不算交叉贡献 → 1.93 键改逐项比较、只在写入时构造 → 1.81 叶子探询绕开 `measure_content` + 「显式尺寸已定就不探对应内在值」的短路）。**MoonBit 的元组/Option 是堆分配**，缓存命中率高的路径上键构造本身就是成本。另：`match` 的主语不能直接写 `if`（报「Using if expression in `match subject` directly is not allowed」），先 `let` 绑定。
 19. **空数组的类型标注写在绑定上、不写在字面量上**（YG3c 实测）：`let mut xs = [] : Array[Node]` 报 `Parse error, unexpected token ':'`，正确形态是 `let mut xs : Array[Node] = []`。
 17. `Option[Double]` 作返回类型的函数字段可以直接放（`mut baseline_fn : Option[(Option[Double], Option[Double]) -> Option[Double]]`），配合 setter 赋值不会触发 0015；枚举值判断本包统一用 `match`（含元组 `match`），未验证 `==` 对所有枚举自动可用。
 
@@ -165,8 +169,8 @@ git cherry-pick ab7c12a 105d3c7 <后续 yoga 提交>
 ```sh
 cd <副本>/modules/yoga-mbt
 ~/.moon/bin/moon check          # 必须零警告
-~/.moon/bin/moon test           # yoga-mbt 69 条
-cd <副本> && ~/.moon/bin/moon check && ~/.moon/bin/moon test    # 全仓门控：730/730
+~/.moon/bin/moon test           # yoga-mbt 79 条
+cd <副本> && ~/.moon/bin/moon check && ~/.moon/bin/moon test    # 全仓门控：740/740
 ```
 
 仓库硬性规则摘要（完整版见根目录 `AGENTS.md`）：
@@ -208,9 +212,9 @@ abspos 段的尺寸优先级改为：显式宽高 > 同轴两侧 inset 都设撑
 
 **YG3c 已完成**：`set_pixel_grid(interval)` 挂在 `Node` 上、`calculate_layout` 末尾 `round_to_grid` 后处理；按绝对边框取整再回推相对坐标（`raw_*` / `snap_*` 两组父起端缺一不可），等分 `100/3` 得 `33 / 34 / 33`、半像素网格得 `33.5 / 33 / 33.5`；默认关闭故不影响 bench 基线，关掉开关时 65 条既有断言零回归。
 
-- **内在尺寸精确语义（YG3d，下一批）**：min-content / max-content 的精确语义（§9.9a 与 css-sizing 的 min/max content contribution）。当前容器 content 尺寸与 `fit-content` 近似——要做的是：叶子 measure 需要能按「主轴可用 = min-content / max-content」两种约束被调用，容器的 min/max content 尺寸要按各行与各项的贡献精确合成（wrap 与 nowrap 下不同），再让 `min-width: min-content` 这类值走同一条路。做之前先读 README「未实现」与 §5 第 14 条（不留半成品接口）。
+**YG3d 已完成（YG3 收尾）**：`Value` 增 `MinContent / MaxContent / FitContent` 三变体 + `min_content() / max_content() / fit_content()` 辅助；`intrinsic_size` 带缓存做递归（叶子按 Yoga 口径探询、容器换行感知合成）；`axis_size` 收口关键词解析，接进 width/height/min-*/max-*/flex-basis 与绝对定位段；§4.5 `min:auto` 改用真 min-content、§9.2 content 基准改用 max-content（撤掉两处 fit-content 近似，79 条断言里 69 条既有值零回归）。成本：每轮 debug 4.9→7.3ms、release 2.4→3.4ms（止损过程见 §6 第 20 条）。
 
-### YG4 与 libyue 集成（需先与用户确认整体方案）
+### YG4 与 libyue 集成（唯一剩余批次，需先与用户确认整体方案）
 
 - 布局树 ↔ 控件树的映射（哪些控件是叶子 + measure 从哪来：原生控件尺寸、文本测量）、脏区增量重排（改样式只重排受影响子树）、与事件命中测试的坐标对齐。
 - 依赖 MoonBit 化 libyue 的**整体范围定案**（是复刻 libyue 全部控件还是分层替换），这块不要自行开工，先对齐。
@@ -222,11 +226,12 @@ abspos 段的尺寸优先级改为：显式宽高 > 同轴两侧 inset 都设撑
 1. **目录名**：原 `moonbit-libyue-navite` 系 `native` 笔误，已由用户确认并 `mv` 为 `moonbit-libyue-native`——若你手中文档还写旧名，以新名为准。
 2. **分支混入无关提交**：`feature/yoga-mbt` 上的 `b01d1dd`/`6830867` 内容已在 master（`cf43cd9`/`b4fddd5`），合并前应剔除（见 §1）。
 3. **多副本并发**：两个副本、两个会话共用同一远端；`git add -A` 会误提交他人半成品。
-4. **近似实现**（已在 README/adaptation 标注，别当 bug 修）：绝对定位静态位置忽略兄弟项与间距类 justify；容器内在尺寸用 fit-content 近似；像素网格取整不做贴父末端回推补偿（贴内缘尽头的项可差一个网格单位以内，见 §5 第 15 条）；基线分组**不收无基线的项**（规范对「合成基线在哪条边」本身有分歧，见 §5 第 9 条）。
+4. **近似实现**（已在 README/adaptation 标注，别当 bug 修）：绝对定位静态位置忽略兄弟项与间距类 justify；像素网格取整不做贴父末端回推补偿（贴内缘尽头的项可差一个网格单位以内，见 §5 第 15 条）；内在递归里的百分比只在父容器该轴确定时可解析（css-sizing-3 §5.2.1 的父链回环不做）、内在尺寸不吃 aspect-ratio（比例在 §9.2 / §4.5 主流程里单独处理）、flex 容器 ideal/web-compatible 双算法只取单套（见 §5 第 16 条）；基线分组**不收无基线的项**（规范对「合成基线在哪条边」本身有分歧，见 §5 第 9 条）。
 5. **发布未做**：`yoga-mbt` 尚未发 mooncakes（`license/description/repository/readme/keywords` 已备）。发布前注意仓库已有的教训：主包与 `yue-media` 曾有模块级循环依赖导致发布互等死锁，且 `mooncakes` 同版本不可重发。
 6. **基线依赖消费方给回调**：`set_baseline` 未设置的叶子一律不参与基线分组——libyue 集成时文本控件必须同时接 measure 与 baseline，否则文字混排会退化成顶部对齐。
 7. **direction 不继承**：rtl 语言环境里每个需要翻转的容器都要显式 `set_direction(Rtl)`，漏设的子树按 LTR 排布；文本/图标内容自身的 rtl 形状由 measure/baseline 回调负责，引擎不管。
-8. **比例项在默认 stretch 容器里交叉轴不按比例**（规范直译，见 §5 第 12 条）：集成方若要「等比方块」语义，得显式给 `align-self` 非 stretch 或直接给交叉尺寸；另外绝对定位子项不吃比例。
+8. **比例项在默认 stretch 容器里交叉轴不按比例**（规范直译，见 §5 第 12 条）：集成方若要「等比方块」语义，得显式给 `align-self` 非 stretch 或直接给交叉尺寸（绝对定位子项已按比例互推，见 YG2e）。
+9. **全树布局成本上升约 40%**（YG3d 的内在尺寸递归）：1121 节点 release 每轮 2.4→3.4ms，因为测量缓存与内在缓存都只在单次 `calculate_layout` 内有效、入口整树清空。真正的解法是 YG4 的脏区增量重排 + 缓存跨布局驻留（需要样式变更通知面），不要在集成前做局部微调式的过度优化。
 
 ---
 
@@ -239,7 +244,13 @@ abspos 段的尺寸优先级改为：显式宽高 > 同轴两侧 inset 都设撑
   cd yoga && git sparse-checkout set yoga/algorithm
   # 重点：yoga/algorithm/CalculateLayout.cpp、FlexLine.cpp
   ```
-- **历史本地副本**：`/tmp/yoga-ref/`（规范 HTML 与提取出的 `spec-sec9.txt` / `spec-sec97.txt`；临时目录，可能已被清理，清理后按上两条重现）。
+- **内在尺寸那条链**（YG3d 用到，别再凭记忆）：css-flexbox-1 §9.9 `#intrinsic-sizes`（三句话，整体推给 css-sizing-3）、§4.5 `#min-size-auto`（content / specified / transferred size suggestion 与非替换元素「取较大者、被 max 夹」的原文）；css-sizing-3 `https://drafts.csswg.org/css-sizing-3/` §2.1 `#auto-box-sizes`（四个自动盒尺寸定义）、§5.2 `#intrinsic-contributions`（贡献 = 零宽/无限宽包含块里的 auto 浮动，并明说「本规范不精确定义怎么算，交给对应 display 的规范」）；flex 容器内在尺寸细则在 `https://drafts.csswg.org/css-flexbox-2/` 的 `#intrinsic-main-sizes` / `#intrinsic-cross-sizes` / `#intrinsic-item-contributions`（ideal 与 web-compatible 两套，本引擎不追）。
+  - Yoga 侧核对点：`yoga/algorithm/CalculateLayout.cpp` 的 `computeMinContentMainSize`（叶子用 `AtMost 0` + 另一轴 `Undefined` 探询、容器递归只看自身主轴且忽略 wrap/gap）与 `measureNodeWithMeasureFunc`（`MaxContent` 模式把可用空间改 `YGUndefined`）、`yoga/algorithm/SizingMode.h`（注释自认缺 min-content）、`yoga/style/StyleSizeLength.h` + `yoga/enums/Unit.h`（关键词只有 MaxContent/FitContent/Stretch）。取法：
+    ```sh
+    cd /tmp && git clone --depth 1 --filter=blob:none --sparse git@github.com:facebook/yoga.git yoga2
+    cd yoga2 && git sparse-checkout set yoga/algorithm && git sparse-checkout add yoga/style yoga/enums
+    ```
+- **历史本地副本**：`/tmp/yoga-ref/`（css-flexbox 规范 HTML 与提取出的 §9 / §9.9 / §4.5 文本）与 `/tmp/yoga2/`（Yoga 稀疏克隆；都是临时目录，清理后按上面两条重现）。
 - **项目内记录**：`docs/zh/adaptation.md`「布局几何(Yoga flexbox)」节的 yoga-mbt 九条（首批取舍 + YG2a + YG2b + YG2b′ + YG2c + YG2d + YG2e + YG3a 枚举坑与基线 + YG3b + YG3c）、`TODO.md`「yoga-mbt」节的 YG1–YG4、`modules/yoga-mbt/README.md`。
 - **会话记忆**：`.workbuddy/memory/2026-10-10.md`（两个副本各有一份，内容已同步）。
 
@@ -248,7 +259,7 @@ abspos 段的尺寸优先级改为：显式宽高 > 同轴两侧 inset 都设撑
 ## 11. 接手后 10 分钟动作清单
 
 1. `cd /home/lkyh/ownCode/moonbit-libyue-native && git fetch && git status`——确认在 `feature/yoga-mbt` 且与 origin 一致、工作区干净。
-2. `~/.moon/bin/moon check && ~/.moon/bin/moon test`——确认基线 730/730（若数字不同，先查是不是另一会话又推了新提交）。
+2. `~/.moon/bin/moon check && ~/.moon/bin/moon test`——确认基线 740/740（若数字不同，先查是不是另一会话又推了新提交）。
 3. 读 `modules/yoga-mbt/README.md` + 本文 §3 / §5 / §6。
-4. 认领 §8 的 YG3d（内在尺寸 min-content / max-content 精确语义），这是 YG3 最后一项。再往后的提速（脏区增量重排）属于 YG4，**未定案前不要动**。
+4. YG1/YG2/YG3 已收尾，只剩 YG4（与 libyue 集成 + 脏区增量重排），**依赖 libyue 复刻整体范围定案，先问用户再动手**；可先行的交付动作是 §9 第 2 条（分支合回 master 前剔两个【构建】提交）与第 5 条（发 mooncakes），两件都要先打招呼。
 5. 发现本文与代码/事实不一致 → **以代码为准**，并顺手把本文改成正确的（本文也受「一批一提交」纪律约束）。

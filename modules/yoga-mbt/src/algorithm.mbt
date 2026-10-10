@@ -7,7 +7,8 @@
 //
 // 宽高语义为 border-box（与 Yoga 一致）：width/height 含自身的
 // padding 与 border；aspect-ratio 的比例同样按边框盒计算。
-// 尚未实现：像素网格取整、容器内在尺寸（min/max-content）精确语义。
+// 尚未实现：跨布局的增量重排与缓存驻留（脏区在集成层做）。
+// 内在尺寸（min/max/fit-content）的精确规则见 `intrinsic_border_size` 注释。
 
 ///|
 let max_dim : Double = 1000000000000000.0
@@ -235,25 +236,21 @@ priv struct Item {
 }
 
 ///|
-/// 缓存键是否同一可用空间组合（逐项比较，不依赖元组相等性派生）。
-fn same_avail(
-  a : (Option[Double], Option[Double]),
-  b : (Option[Double], Option[Double]),
-) -> Bool {
-  match (a.0, b.0, a.1, b.1) {
-    (None, None, None, None) => true
-    (Some(x), Some(y), None, None) => x == y
-    (None, None, Some(x), Some(y)) => x == y
-    (Some(x), Some(y), Some(u), Some(v)) => x == y && u == v
+/// 两个参照尺寸是否同一（逐项比较，避免为比较而构造键元组）。
+fn opt_eq(a : Option[Double], b : Option[Double]) -> Bool {
+  match (a, b) {
+    (None, None) => true
+    (Some(x), Some(y)) => x == y
     _ => false
   }
 }
 
 ///|
-/// 清空整棵树的测量缓存。样式没有脏标记、可能在两次布局之间被改，
-/// 所以缓存在单次 `calculate_layout` 内有效，入口整体清一次。
+/// 清空整棵树的测量缓存与内在尺寸缓存。样式没有脏标记、可能在两次布局之间
+/// 被改，所以两类缓存在单次 `calculate_layout` 内有效，入口整体清一次。
 fn clear_measure_cache(n : Node) -> Unit {
   n.measure_cache.clear()
+  n.intrinsic_cache.clear()
   for c in n.children {
     clear_measure_cache(c)
   }
@@ -303,15 +300,16 @@ fn measure_content(
   avail_w : Option[Double],
   avail_h : Option[Double],
 ) -> (Double, Double) {
-  let key = (avail_w, avail_h)
+  // 命中比较逐项做，避免每次调用都为构造键而分配
   for e in c.measure_cache {
-    if same_avail(e.0, key) {
+    let (kw, kh) = e.0
+    if opt_eq(kw, avail_w) && opt_eq(kh, avail_h) {
       c.baseline = e.1.2
       return (e.1.0, e.1.1)
     }
   }
   let result = measure_content_uncached(c, avail_w, avail_h)
-  c.measure_cache.push((key, (result.0, result.1, c.baseline)))
+  c.measure_cache.push(((avail_w, avail_h), (result.0, result.1, c.baseline)))
   result
 }
 
@@ -359,6 +357,256 @@ fn measure_content_uncached(
 }
 
 ///|
+/// 内在尺寸口径。
+priv enum IntrinsicKind {
+  Min
+  Max
+}
+
+///|
+/// 节点沿指定轴的内在尺寸（min-content / max-content），返回**边框盒**尺寸，
+/// 不含自身 margin。`base_w` / `base_h` 是本节点百分比尺寸的参照（包含块
+/// 内容盒），`want_row` 请求行轴（宽）还是块轴（高）。
+/// 带缓存：同一节点同一口径同一参照在一次布局内复用。
+fn intrinsic_size(
+  n : Node,
+  want_row : Bool,
+  kind : IntrinsicKind,
+  base_w : Option[Double],
+  base_h : Option[Double],
+) -> Double {
+  let is_min = match kind {
+    Min => true
+    Max => false
+  }
+  // 命中比较逐项做，避免每次调用都为构造键而分配
+  for e in n.intrinsic_cache {
+    let (flag, refs) = e.0
+    let (kw, kb) = flag
+    let (bw, bh) = refs
+    if kw == want_row && kb == is_min && opt_eq(bw, base_w) &&
+      opt_eq(bh, base_h) {
+      return e.1
+    }
+  }
+  let v = intrinsic_border_size(n, want_row, kind, base_w, base_h)
+  n.intrinsic_cache.push((((want_row, is_min), (base_w, base_h)), v))
+  v
+}
+
+///|
+/// 节点沿指定轴的内在尺寸（无缓存部分）。规则见
+/// `docs/zh/adaptation.md`「布局几何」节 YG3d 条：
+/// - 自身在该轴有确定尺寸（Fixed / 可解析 Percent）→ 直接采用（内容可溢出，
+///   这正是 `width: min-content` 与 `min-width: min-content` 的差别来源）；
+/// - 叶子 → measure 函数按内在探询约定返回的内容尺寸 + 自身 padding/border；
+/// - 容器 → in-flow 子项贡献合成（子项的确定尺寸 / min/max 夹取已在其
+///   `intrinsic_size` 内完成）：主轴不换行取总和含 gap、换行且求
+///   min-content 时取「最宽单项」并按该宽度贪心分行；交叉轴单行取最大项、
+///   换行 min-content 取分行之和；最后叠加自身 padding/border，再按本轴
+///   的 Fixed / Percent 型 min/max 夹取（关键词型 min/max 在此不夹取，
+///   否则自引用）。
+/// 不做 aspect-ratio 换算（比例在布局主流程与 §4.5 处单独处理）。
+fn intrinsic_border_size(
+  n : Node,
+  want_row : Bool,
+  kind : IntrinsicKind,
+  base_w : Option[Double],
+  base_h : Option[Double],
+) -> Double {
+  let s = n.style
+  let pb_w = resolve_value(edge_value(s.padding, 0), base_w) +
+    resolve_value(edge_value(s.padding, 1), base_w) +
+    resolve_value(edge_value(s.border, 0), base_w) +
+    resolve_value(edge_value(s.border, 1), base_w)
+  let pb_h = resolve_value(edge_value(s.padding, 2), base_w) +
+    resolve_value(edge_value(s.padding, 3), base_w) +
+    resolve_value(edge_value(s.border, 2), base_w) +
+    resolve_value(edge_value(s.border, 3), base_w)
+  let style_axis = if want_row { s.width } else { s.height }
+  let base_axis = if want_row { base_w } else { base_h }
+  let raw = match definite_size(style_axis, base_axis) {
+    Some(d) => d
+    None =>
+      if n.children.length() == 0 {
+        // 内在探询直接调测量函数：不走 measure_content，否则探询会把
+        // 节点基线覆盖成「不受约束那次测量」的值（基线属于真实布局）
+        let is_min = match kind {
+          Min => true
+          Max => false
+        }
+        let iw0 = if want_row && is_min {
+          Some(0.0)
+        } else {
+          None
+        }
+        let ih0 = if !want_row && is_min {
+          Some(0.0)
+        } else {
+          None
+        }
+        let iw = iw0.map(fn(v) { (v - pb_w).max(0.0) })
+        let ih = ih0.map(fn(v) { (v - pb_h).max(0.0) })
+        let (cw, ch) = match n.measure {
+          Some(f) => f(iw, ih)
+          None => (0.0, 0.0)
+        }
+        let content = if want_row { cw } else { ch }
+        let pb = if want_row { pb_w } else { pb_h }
+        content + pb
+      } else {
+        container_intrinsic_size(n, want_row, kind, pb_w, pb_h, base_w, base_h)
+      }
+  }
+  let lo =
+    definite_size(if want_row { s.min_width } else { s.min_height }, base_axis)
+      .unwrap_or(0.0)
+  let hi =
+    definite_size(if want_row { s.max_width } else { s.max_height }, base_axis)
+      .unwrap_or(max_dim)
+  clamp3(raw, lo, hi)
+}
+
+///|
+/// 容器的内在尺寸（内容盒部分，不含自身 padding/border）。
+fn container_intrinsic_size(
+  n : Node,
+  want_row : Bool,
+  kind : IntrinsicKind,
+  pb_w : Double,
+  pb_h : Double,
+  base_w : Option[Double],
+  base_h : Option[Double],
+) -> Double {
+  let s = n.style
+  let main_is_row = is_row(s.flex_direction)
+  let wrap_on = match s.flex_wrap {
+    NoWrap => false
+    _ => true
+  }
+  let main_gap = if main_is_row { s.column_gap } else { s.row_gap }
+  let cross_gap = if main_is_row { s.row_gap } else { s.column_gap }
+  // 子项百分比参照：本节点该轴确定尺寸的内容盒；不受约束时不解析
+  let cb_w = definite_size(s.width, base_w).map(fn(v) { (v - pb_w).max(0.0) })
+  let cb_h = definite_size(s.height, base_h).map(fn(v) { (v - pb_h).max(0.0) })
+  // 只要请求的是交叉轴才需要子项的交叉贡献；换行 + min-content 请求交叉轴时
+  // 还要按 min-content 主轴宽度分行，故保留逐项贡献。内在尺寸递归量大，
+  // 少算一半子项直接决定布局成本（bench 实测）。
+  let ask_main = want_row == main_is_row
+  let need_cross = !ask_main
+  let is_min = match kind {
+    Min => true
+    Max => false
+  }
+  let split_lines = need_cross && is_min && wrap_on
+  let contribs : Array[(Double, Double)] = []
+  let mut main_sum = 0.0
+  let mut main_max = 0.0
+  let mut cross_max = 0.0
+  let mut count = 0
+  for c in n.children {
+    match c.style.display {
+      None => continue
+      Flex => ()
+    }
+    match c.style.position {
+      Absolute => continue
+      Relative => ()
+    }
+    // 内在尺寸计算里 auto margin 按 0 处理（规范 §9.9）
+    let m = resolve_edges(c.style.margin, cb_w)
+    let (margin_main, margin_cross) = if main_is_row {
+      (m.left + m.right, m.top + m.bottom)
+    } else {
+      (m.top + m.bottom, m.left + m.right)
+    }
+    let cm = intrinsic_size(c, main_is_row, kind, cb_w, cb_h) + margin_main
+    main_sum = main_sum + cm
+    if cm > main_max {
+      main_max = cm
+    }
+    count = count + 1
+    if need_cross {
+      let cc = intrinsic_size(c, !main_is_row, kind, cb_w, cb_h) + margin_cross
+      if cc > cross_max {
+        cross_max = cc
+      }
+      if split_lines {
+        contribs.push((cm, cc))
+      }
+    }
+  }
+  if count == 0 {
+    return if want_row { pb_w } else { pb_h }
+  }
+  let one_main = main_sum + (main_gap * (count - 1).to_double()).max(0.0)
+  let cross_size = if split_lines {
+    // 换行容器在 min-content 主轴宽度下贪心分行：交叉轴为各行之和
+    let mut total_cross = 0.0
+    let mut line_count = 0
+    let mut lm = 0.0
+    let mut lc = 0.0
+    let mut has = false
+    for p in contribs {
+      if has && lm + main_gap + p.0 > main_max {
+        total_cross = total_cross + lc + (if line_count > 0 { cross_gap } else { 0.0 })
+        line_count = line_count + 1
+        lm = p.0
+        lc = p.1
+      } else {
+        if has {
+          lm = lm + main_gap
+        }
+        lm = lm + p.0
+        if !has || p.1 > lc {
+          lc = p.1
+        }
+        has = true
+      }
+    }
+    if has {
+      total_cross = total_cross + lc + (if line_count > 0 { cross_gap } else { 0.0 })
+    }
+    total_cross
+  } else {
+    cross_max
+  }
+  // 主轴：max-content 或 nowrap 时单项不折行全放一行；
+  // min-content 且可换行时只需装下最宽单项
+  let main_size = if is_min && wrap_on { main_max } else { one_main }
+  let axis = if ask_main { main_size } else { cross_size }
+  axis + (if want_row { pb_w } else { pb_h })
+}
+
+///|
+/// 带节点上下文的尺寸取值解析：`Fixed` / `Percent` 同 `definite_size`，
+/// 内在关键词按节点的内在尺寸给出确定值。`want_row` 决定取宽还是高，
+/// `base_w` / `base_h` 为百分比参照。
+fn axis_size(
+  n : Node,
+  v : Value,
+  want_row : Bool,
+  base_w : Option[Double],
+  base_h : Option[Double],
+) -> Option[Double] {
+  let base_axis = if want_row { base_w } else { base_h }
+  match v {
+    MinContent => Some(intrinsic_size(n, want_row, Min, base_w, base_h))
+    MaxContent => Some(intrinsic_size(n, want_row, Max, base_w, base_h))
+    FitContent =>
+      match base_axis {
+        Some(av) => {
+          let lo = intrinsic_size(n, want_row, Min, base_w, base_h)
+          let hi = intrinsic_size(n, want_row, Max, base_w, base_h)
+          Some(lo.max(av.min(hi)))
+        }
+        None => Some(intrinsic_size(n, want_row, Max, base_w, base_h))
+      }
+    other => definite_size(other, base_axis)
+  }
+}
+
+///|
 /// 对节点做布局：返回其 border-box (width, height)。
 /// avail_w/h 为父内容盒给到本节点的可用空间；pinned_w/h 由父级
 /// 弹性解析后钦定的最终尺寸（覆盖自身 style/内容推算）。
@@ -391,8 +639,8 @@ fn layout_into(
       Some(f) => f(iw, ih)
       None => (0.0, 0.0)
     }
-    let w0_ = first_some(pinned_w, definite_size(s.width, avail_w))
-    let h0_ = first_some(pinned_h, definite_size(s.height, avail_h))
+    let w0_ = first_some(pinned_w, axis_size(node, s.width, true, avail_w, avail_h))
+    let h0_ = first_some(pinned_h, axis_size(node, s.height, false, avail_w, avail_h))
     // 首选比例（border-box 语义：比例 = 宽/高）：一个轴确定 → 另一轴换算
     let w0 = match (w0_, h0_, s.aspect_ratio) {
       (None, Some(h), Some(r)) => Some(h * r)
@@ -404,13 +652,13 @@ fn layout_into(
     }
     let w = clamp3(
       w0.unwrap_or(cw + pad_border_w),
-      definite_size(s.min_width, avail_w).unwrap_or(0.0),
-      definite_size(s.max_width, avail_w).unwrap_or(max_dim),
+      axis_size(node, s.min_width, true, avail_w, avail_h).unwrap_or(0.0),
+      axis_size(node, s.max_width, true, avail_w, avail_h).unwrap_or(max_dim),
     )
     let h = clamp3(
       h0.unwrap_or(ch + pad_border_h),
-      definite_size(s.min_height, avail_h).unwrap_or(0.0),
-      definite_size(s.max_height, avail_h).unwrap_or(max_dim),
+      axis_size(node, s.min_height, false, avail_w, avail_h).unwrap_or(0.0),
+      axis_size(node, s.max_height, false, avail_w, avail_h).unwrap_or(max_dim),
     )
     node.layout_width = w
     node.layout_height = h
@@ -437,21 +685,13 @@ fn layout_into(
   let rev_main = is_reverse(s.flex_direction) != (rtl && main_is_row)
   let rev_cross = rtl && !main_is_row
   // 自身尺寸（确定值）
-  let own_w_def = first_some(pinned_w, definite_size(s.width, avail_w))
-  let own_h_def = first_some(pinned_h, definite_size(s.height, avail_h))
+  let own_w_def =
+    first_some(pinned_w, axis_size(node, s.width, true, avail_w, avail_h))
+  let own_h_def =
+    first_some(pinned_h, axis_size(node, s.height, false, avail_w, avail_h))
   // 子项百分比参照：本节点内容盒确定尺寸优先，退回可用空间
   let child_pct_w = first_some(own_w_def.map(fn(w) { (w - pad_border_w).max(0.0) }), avail_w)
   let child_pct_h = first_some(own_h_def.map(fn(h) { (h - pad_border_h).max(0.0) }), avail_h)
-  let pct_base_main = if main_is_row {
-    child_pct_w
-  } else {
-    child_pct_h
-  }
-  let pct_base_cross = if main_is_row {
-    child_pct_h
-  } else {
-    child_pct_w
-  }
   let avail_main = if main_is_row { avail_w } else { avail_h }
   let pad_border_main = if main_is_row { pad_border_w } else { pad_border_h }
   let pad_border_cross = if main_is_row { pad_border_h } else { pad_border_w }
@@ -517,9 +757,12 @@ fn layout_into(
     }
     let child_main_style = if main_is_row { c.style.width } else { c.style.height }
     let child_cross_style = if main_is_row { c.style.height } else { c.style.width }
-    let c_avail_main = first_some(definite_size(child_main_style, pct_base_main), wrap_limit)
+    let c_avail_main = first_some(
+      axis_size(c, child_main_style, main_is_row, child_pct_w, child_pct_h),
+      wrap_limit,
+    )
     let c_avail_cross = first_some(
-      definite_size(child_cross_style, pct_base_cross),
+      axis_size(c, child_cross_style, !main_is_row, child_pct_w, child_pct_h),
       first_some(own_cross_def.map(fn(v) { (v - pad_border_cross).max(0.0) }), None),
     )
     let content = if main_is_row {
@@ -528,34 +771,66 @@ fn layout_into(
       let (w, h) = measure_content(c, c_avail_cross, c_avail_main)
       (h, w)
     }
-    let content_main = content.0
     let content_cross0 = content.1
     let basis_val = match s.flex_basis {
       Auto => child_main_style
       v => v
     }
-    let cross_definite = definite_size(child_cross_style, pct_base_cross)
+    let cross_definite = axis_size(
+      c,
+      child_cross_style,
+      !main_is_row,
+      child_pct_w,
+      child_pct_h,
+    )
     // 规范 §9.2：有首选比例 + 基准为 content + 交叉轴尺寸确定 → 主轴基准由比例换算
     let ratio_main = match (c.style.aspect_ratio, cross_definite) {
       (Some(r), Some(cv)) => Some(if main_is_row { cv * r } else { cv / r })
       _ => None
     }
-    let base = first_some(definite_size(basis_val, pct_base_main), ratio_main)
-      .unwrap_or(content_main)
+    // 内在探询按需要做：基准已由显式尺寸 / 比例给出时不再探 max-content，
+    // 显式 min-* 已定时不再探 min-content（探到的值会被丢弃）。
+    // 递归到子树代价不低，这一层短路是热路径的主要止损点。
+    let basis_style =
+      first_some(
+        axis_size(c, basis_val, main_is_row, child_pct_w, child_pct_h),
+        ratio_main,
+      )
+    let base = basis_style.unwrap_or(intrinsic_size(
+      c,
+      main_is_row,
+      Max,
+      child_pct_w,
+      child_pct_h,
+    ))
     let min_v = if main_is_row { c.style.min_width } else { c.style.min_height }
-    // web 语义：主轴 min:auto → 内容下限（§4.5：有换算值时不超过它）；
-    // 显式 Fixed(0) 才是 0
-    let auto_min = match ratio_main {
-      Some(t) => content_main.min(t)
-      None => content_main
+    let min_style = axis_size(c, min_v, main_is_row, child_pct_w, child_pct_h)
+    // web 语义：主轴 min:auto → 规范 §4.5 的 content size suggestion，
+    // 即该项在主轴上的 **min-content 尺寸**（不再用「当前可用空间下的测量值」
+    // 近似，否则文本会被压到最长词以下）；有比例换算值时不超过它。
+    // 显式 Fixed(0) 才是 0。
+    let min_main = match min_style {
+      Some(v) => v
+      None => {
+        let mc =
+          intrinsic_size(c, main_is_row, Min, child_pct_w, child_pct_h)
+        match ratio_main {
+          Some(t) => mc.min(t)
+          None => mc
+        }
+      }
     }
-    let min_main = definite_size(min_v, pct_base_main).unwrap_or(auto_min)
     let max_v = if main_is_row { c.style.max_width } else { c.style.max_height }
-    let max_main = definite_size(max_v, pct_base_main).unwrap_or(max_dim)
+    let max_main = axis_size(c, max_v, main_is_row, child_pct_w, child_pct_h)
+      .unwrap_or(max_dim)
     let cmin_v = if main_is_row { c.style.min_height } else { c.style.min_width }
-    let min_cross = definite_size(cmin_v, pct_base_cross).unwrap_or(0.0)
+    let min_cross =
+      axis_size(c, cmin_v, !main_is_row, child_pct_w, child_pct_h)
+        .unwrap_or(0.0)
     let cmax_v = if main_is_row { c.style.max_height } else { c.style.max_width }
-    let max_cross = definite_size(cmax_v, pct_base_cross).unwrap_or(max_dim)
+    let max_cross =
+      axis_size(c, cmax_v, !main_is_row, child_pct_w, child_pct_h)
+        .unwrap_or(max_dim)
     items.push({
       node : c,
       m,
@@ -1073,23 +1348,35 @@ fn layout_into(
   }
   let own_main = clamp3(
     own_main0,
-    definite_size(
+    axis_size(
+      node,
       if main_is_row { s.min_width } else { s.min_height },
+      main_is_row,
       child_pct_w,
+      child_pct_h,
     ).unwrap_or(0.0),
-    definite_size(
+    axis_size(
+      node,
       if main_is_row { s.max_width } else { s.max_height },
+      main_is_row,
       child_pct_w,
+      child_pct_h,
     ).unwrap_or(max_dim),
   )
   let own_cross = clamp3(
     own_cross0,
-    definite_size(
+    axis_size(
+      node,
       if main_is_row { s.min_height } else { s.min_width },
+      !main_is_row,
+      child_pct_w,
       child_pct_h,
     ).unwrap_or(0.0),
-    definite_size(
+    axis_size(
+      node,
       if main_is_row { s.max_height } else { s.max_width },
+      !main_is_row,
+      child_pct_w,
       child_pct_h,
     ).unwrap_or(max_dim),
   )
@@ -1117,8 +1404,9 @@ fn layout_into(
       let ins_r = definite_size(cs.right, cbw)
       let ins_t = definite_size(cs.top, cbh)
       let ins_b = definite_size(cs.bottom, cbh)
-      // 尺寸：显式宽高优先；同轴两侧 inset 都设时由 inset 撑出；否则内容
-      let sized_w = match definite_size(cs.width, cbw) {
+      // 尺寸：显式宽高（含内在关键词）优先；同轴两侧 inset 都设时由 inset
+      // 撑出；否则内容
+      let sized_w = match axis_size(c, cs.width, true, cbw, cbh) {
         Some(v) => Some(v.max(cpb_w))
         None =>
           match (ins_l, ins_r) {
@@ -1126,7 +1414,7 @@ fn layout_into(
             _ => None
           }
       }
-      let sized_h = match definite_size(cs.height, cbh) {
+      let sized_h = match axis_size(c, cs.height, false, cbw, cbh) {
         Some(v) => Some(v.max(cpb_h))
         None =>
           match (ins_t, ins_b) {
@@ -1167,13 +1455,13 @@ fn layout_into(
       }
       let aw = clamp3(
         w0,
-        definite_size(cs.min_width, cbw).unwrap_or(0.0),
-        definite_size(cs.max_width, cbw).unwrap_or(max_dim),
+        axis_size(c, cs.min_width, true, cbw, cbh).unwrap_or(0.0),
+        axis_size(c, cs.max_width, true, cbw, cbh).unwrap_or(max_dim),
       )
       let ah = clamp3(
         h0,
-        definite_size(cs.min_height, cbh).unwrap_or(0.0),
-        definite_size(cs.max_height, cbh).unwrap_or(max_dim),
+        axis_size(c, cs.min_height, false, cbw, cbh).unwrap_or(0.0),
+        axis_size(c, cs.max_height, false, cbw, cbh).unwrap_or(max_dim),
       )
       // 定位：inset 优先；同轴双 auto 落静态位置（按容器对齐属性摆一个虚拟项）
       let x = match ins_l {
