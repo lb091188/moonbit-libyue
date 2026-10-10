@@ -79,6 +79,15 @@ set_cursor_rect(x, y, w, h)
 | **G7** | 组件与声明式层移植：`components`/`charts` 挂上新 `Painter`，`declarative` 的 mount 目标改 yoga-mbt 节点 | showcase 组件页与图表页在新栈渲染，与旧链路视觉逐页对照；**恢复全仓门禁** |
 | **G8** | 原生子表面消费者：browser 自研薄绑定（§4，引擎为系统三家）+ `modules/yue-media` 的 VideoPlayer 走同一 `mount_child_surface` 通道 | 契约沿用 `browser.mbt` 方法名、协议载荷改结构化返回；Linux 真机网页加载与自定义协议可打（清单交协作方） |
 
+**G0b 完成后的红点基线（实测，此后只减不增）**：
+
+- 全仓 `moon check`：**290 errors / 68 warnings**，中断在根 `yue` 包（下游 `components`/`charts`/`declarative`/`markdown`/`browser`、`examples/*`、`modules/yue-examples`、`modules/yue-media` 未展开，故实际红点数以此下限计）。
+- 根包剩余文件按「对已删类型（`View`/`Painter`/`RectF`/`Node`/`ffi_*`）的引用数」排优先级：`types.mbt` 62、`splitter.mbt` 43、`events.mbt` 34（内层键码表与 `KeyEvent` 结构体保留复用）、`geometry.mbt` 17、`signals.mbt` 15、`theme.mbt` 9、`clipboard.mbt` 7、`video_view.mbt` 6、`props.mbt` 3、`fsx.mbt` 3、`system.mbt` 2、`color.mbt` 1；零引用可独立编译的：`vscjson.mbt`、`store.mbt`、`png_rgba.mbt`、`version.mbt` 及各 `*_test.mbt`。
+- 已删除：`shim/`(308K)、`lib/`(70M 预构建静态库)、`scripts/prepare.py`、`scripts/vendor_native.py`、`scripts/make_webkit_stubs.py`、`yue/win_gui.c`，以及 `yue/ffi.mbt`(2455)、`yue/browser/ffi.mbt`(198)、`yue/{app,methods,widgets,view,painter}.mbt` 与 14 个 1:1 控件 wrapper。`vendor/` 与 `build/` 本就在 `.gitignore` 内，留在磁盘作只读参考，不进构建也不进提交。
+- `scripts/prebuild.py` 收缩为只服务输入法探针与新栈系统库参数（GTK3/Pango/X11 由 pkg-config 探测），不再下载或构建任何 libyue 产物。
+- 命令口径两条：workspace 下 `moon check`（无参数）会连根包一起查，因此绿色包用路径形式点名 `moon check yue/render modules/yoga-mbt/src`；`-p` 只对 `moon test` 有效（`moon check -p 包名` 会把包名当目录）。
+- 绿色基线复验：`moon test -p NoahLiu/yoga-mbt/src` **79/79**、`moon test -p NoahLiu/moonbit-libyue/yue/render` **8/8**，两者 `moon check` 均零警告。
+
 **布局侧遗留**：`/home/lkyh/ownCode/yue/patches/` 是真实 bug 语料，须转成 yoga-mbt 回归用例——首条 `93078300`（`display:none` 清零重显后 flex 简写派生的 basis-0 永久驻留，auto 高父容器下节点永久 0 高，即 MoonBit 层 tabs 切页塌陷根因）。yoga-mbt 与 libyue 复刻**同工程同批推进**：每个 G 阶段用到布局就顺带补该路径的 yoga 回归，不再分两条时间线。
 
 ## 6. 风险与过渡期
