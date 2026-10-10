@@ -37,6 +37,9 @@ typedef struct {
   int closing;     // 窗口管理器请求关闭
   int width;
   int height;
+  const unsigned char *pending; // 待贴的 RGBA 缓冲（所有权在 MoonBit）
+  int pending_w;
+  int pending_h;
   WmEv evs[64];
   WmEv last;
   int ev_head;
@@ -80,9 +83,20 @@ static void wm_mark_draw(WmWindow *w) {
 
 static gboolean wm_on_draw(GtkWidget *area, cairo_t *cr, gpointer data) {
   (void)area;
-  (void)cr;
   WmWindow *w = (WmWindow *)data;
-  w->need_draw = 1; // 内容由 MoonBit 侧 present 负责，这里只记「该画了」
+  w->need_draw = 1;
+  // 只在这里贴像素：GdkWindow 的生命周期由 GTK/WM 管，在 draw 之外拿它的
+  // cairo 画会在窗口被销毁后打到死窗口上（实测 X 错误 RenderBadPicture）
+  if (w->pending != NULL && w->pending_w > 0 && w->pending_h > 0) {
+    cairo_surface_t *surf = cairo_image_surface_create_for_data(
+        (unsigned char *)w->pending, CAIRO_FORMAT_ARGB32, w->pending_w,
+        w->pending_h, w->pending_w * 4);
+    if (cairo_surface_status(surf) == CAIRO_STATUS_SUCCESS) {
+      cairo_set_source_surface(cr, surf, 0, 0);
+      cairo_paint(cr);
+    }
+    cairo_surface_destroy(surf);
+  }
   return FALSE;
 }
 
@@ -163,6 +177,18 @@ static gboolean wm_on_scroll(GtkWidget *widget, GdkEventScroll *ev,
   return TRUE;
 }
 
+// 窗口被 WM/GTK 销毁时必须清空句柄：否则 present 会 queue_draw 到悬垂 widget
+// （实测刷一串 gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET' failed）
+static void wm_on_destroy(GtkWidget *widget, gpointer data) {
+  (void)widget;
+  WmWindow *w = (WmWindow *)data;
+  w->window = NULL;
+  w->area = NULL;
+  w->pending = NULL;
+  w->need_draw = 0;
+  w->closing = 1; // 窗口没了也等于该退出了
+}
+
 static gboolean wm_on_delete(GtkWidget *window, GdkEvent *event, gpointer data) {
   (void)window;
   (void)event;
@@ -207,6 +233,7 @@ int64_t wm_window_new(int width, int height, const char *title) {
   w->ev_count = 0;
   memset(&w->last, 0, sizeof(WmEv));
   g_signal_connect(w->window, "delete-event", G_CALLBACK(wm_on_delete), w);
+  g_signal_connect(w->window, "destroy", G_CALLBACK(wm_on_destroy), w);
   g_signal_connect(w->window, "key-press-event", G_CALLBACK(wm_on_key), w);
   g_signal_connect(w->window, "key-release-event", G_CALLBACK(wm_on_key), w);
   g_signal_connect(w->area, "button-press-event", G_CALLBACK(wm_on_button), w);
@@ -279,35 +306,15 @@ void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
     return;
   }
   WmWindow *w = &wm_windows[id];
-  if (w->window == NULL || width < 1 || height < 1) {
+  if (w->area == NULL || rgba == NULL || width < 1 || height < 1) {
     return;
   }
-  GdkWindow *gw = gtk_widget_get_window(w->area);
-  if (gw == NULL) {
-    return; // 还没 realized，等下一次 draw 事件再画
-  }
-  // 缓冲布局即 CAIRO_FORMAT_ARGB32（yue/render 的单一格式），直建 surface
-  // 即可，无需换序或拷贝；会话期间 MoonBit 侧持有该缓冲（#borrow）。
-  cairo_surface_t *surf =
-      cairo_image_surface_create_for_data((unsigned char *)rgba,
-                                          CAIRO_FORMAT_ARGB32, width, height,
-                                          width * 4);
-  if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
-    cairo_surface_destroy(surf);
-    return;
-  }
-  cairo_surface_flush(surf);
-  G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-  cairo_t *cr = gdk_cairo_create(gw);
-  G_GNUC_END_IGNORE_DEPRECATIONS
-  if (cr == NULL) {
-    cairo_surface_destroy(surf);
-    return;
-  }
-  cairo_set_source_surface(cr, surf, 0, 0);
-  cairo_paint(cr);
-  cairo_destroy(cr);
-  cairo_surface_destroy(surf);
+  // 缓冲所有权仍在 MoonBit（yue/render 的 Bitmap）；这里只记地址，
+  // 真正的贴像素发生在下一次 draw 回调里，那时窗口一定活着。
+  w->pending = rgba;
+  w->pending_w = width;
+  w->pending_h = height;
+  gtk_widget_queue_draw(w->area);
 }
 
 void wm_close(int64_t id) {
@@ -315,11 +322,13 @@ void wm_close(int64_t id) {
     return;
   }
   WmWindow *w = &wm_windows[id];
+  // 已被 WM 销毁过则 window 为 NULL，只清记录即可
   if (w->window != NULL) {
     gtk_widget_destroy(w->window);
     w->window = NULL;
     w->area = NULL;
   }
+  w->pending = NULL;
   memset(w, 0, sizeof(WmWindow));
 }
 
