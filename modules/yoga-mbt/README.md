@@ -60,6 +60,8 @@ let l = child.layout()   // left / top 相对父边框盒；width / height 边�
 - 样式枚举可直接传入：`node.set_flex_direction(@yoga.FlexDirection::Column)`
   或简写 `@yoga.Column`（枚举按 `pub(all)` 导出，外部包可构造）。
 - 布局结果 `node.layout()` 需在 `calculate_layout` 之后读取。
+- 改样式后直接再调一次 `calculate_layout` 即可：引擎内部有测量缓存，但每次
+  布局入口会自动整树清一次，不需要手动通知失效。
 
 ## 已实现
 

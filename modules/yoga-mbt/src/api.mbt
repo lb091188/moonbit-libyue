@@ -252,6 +252,8 @@ pub fn calculate_layout(
   width : Option[Double],
   height : Option[Double],
 ) -> Unit {
+  // 测量缓存只在单次布局内有效：入口先整体清一次
+  clear_measure_cache(root)
   let _ = layout_into(root, width, height, None, None)
   root.layout_left = 0.0
   root.layout_top = 0.0

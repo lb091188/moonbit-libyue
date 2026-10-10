@@ -7,7 +7,7 @@
 //
 // 宽高语义为 border-box（与 Yoga 一致）：width/height 含自身的
 // padding 与 border；aspect-ratio 的比例同样按边框盒计算。
-// 尚未实现：测量缓存、像素网格取整、容器内在尺寸（min/max-content）精确语义。
+// 尚未实现：像素网格取整、容器内在尺寸（min/max-content）精确语义。
 
 ///|
 let max_dim : Double = 1000000000000000.0
@@ -235,9 +235,55 @@ priv struct Item {
 }
 
 ///|
-/// 测量节点内容尺寸（border-box）：叶子走 measure 函数，容器递归布局。
-/// 两条路径都会同时刷新节点的基线。
+/// 缓存键是否同一可用空间组合（逐项比较，不依赖元组相等性派生）。
+fn same_avail(
+  a : (Option[Double], Option[Double]),
+  b : (Option[Double], Option[Double]),
+) -> Bool {
+  match (a.0, b.0, a.1, b.1) {
+    (None, None, None, None) => true
+    (Some(x), Some(y), None, None) => x == y
+    (None, None, Some(x), Some(y)) => x == y
+    (Some(x), Some(y), Some(u), Some(v)) => x == y && u == v
+    _ => false
+  }
+}
+
+///|
+/// 清空整棵树的测量缓存。样式没有脏标记、可能在两次布局之间被改，
+/// 所以缓存在单次 `calculate_layout` 内有效，入口整体清一次。
+fn clear_measure_cache(n : Node) -> Unit {
+  n.measure_cache.clear()
+  for c in n.children {
+    clear_measure_cache(c)
+  }
+}
+
+///|
+/// 测量节点内容尺寸（带缓存）。同一节点在同一次布局里会被父容器测两轮
+/// （base 测量与交叉轴重测），深层子树还会被逐层重复，命中时直接复用尺寸
+/// 与基线。
 fn measure_content(
+  c : Node,
+  avail_w : Option[Double],
+  avail_h : Option[Double],
+) -> (Double, Double) {
+  let key = (avail_w, avail_h)
+  for e in c.measure_cache {
+    if same_avail(e.0, key) {
+      c.baseline = e.1.2
+      return (e.1.0, e.1.1)
+    }
+  }
+  let result = measure_content_uncached(c, avail_w, avail_h)
+  c.measure_cache.push((key, (result.0, result.1, c.baseline)))
+  result
+}
+
+///|
+/// 测量的实际工作：叶子走 measure 函数，容器递归布局。
+/// 两条路径都会同时刷新节点的基线。
+fn measure_content_uncached(
   c : Node,
   avail_w : Option[Double],
   avail_h : Option[Double],

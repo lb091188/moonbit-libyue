@@ -1089,3 +1089,44 @@ test "绝对定位项两侧 inset 撑出宽后按比例推高" {
   assert_eq(b.layout().height, 70.0)
   assert_eq(b.layout().left, 10.0)
 }
+
+// ---- 测量缓存失效（YG3b）----
+
+///|
+test "改样式后重新布局不使用旧测量缓存" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_align_items(FlexStart)
+  let c = leaf(100.0, 50.0)
+  c.set_padding_left(fixed(10.0))
+  root.append_child(c)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  assert_eq(c.layout().width, 110.0)
+  // 同键 (可用宽, 可用高) 下样式变了 → 入口清缓存后必须重新测量
+  c.set_padding_left(fixed(50.0))
+  calculate_layout(root, Some(300.0), Some(100.0))
+  assert_eq(c.layout().width, 150.0)
+  assert_eq(c.layout().left, 0.0)
+}
+
+///|
+test "改基线后重新布局不使用旧缓存" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_align_items(Baseline)
+  let a = text(100.0, 20.0, 5.0)
+  let b = text(100.0, 20.0, 10.0)
+  root.append_child(a)
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  // 共同基线 = max(5, 10) = 10 → a 下移 5
+  assert_eq(a.layout().top, 5.0)
+  assert_eq(b.layout().top, 0.0)
+  b.set_baseline(fn(_aw, _ah) { Some(18.0) })
+  calculate_layout(root, Some(300.0), Some(100.0))
+  // 基线改到 18 → 共同基线 18,a 下移 13
+  assert_eq(a.layout().top, 13.0)
+  assert_eq(b.layout().top, 0.0)
+}
