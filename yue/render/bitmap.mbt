@@ -6,7 +6,7 @@
 // 负责反预乘，所以对外语义仍是普通的 RGBA 分量（0~255，独立于 alpha）。
 
 ///|
-pub struct Bitmap {
+pub(all) struct Bitmap {
   width : Int
   height : Int
   data : FixedArray[Byte]

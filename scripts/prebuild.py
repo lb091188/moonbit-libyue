@@ -27,11 +27,12 @@ BUILD_DIR = MODULE_ROOT / "build"
 
 # Linux 系统库清单：GTK3 是新栈锁定的后端（零新增运行期依赖，本仓此前已在用），
 # 探针与后续 yue/win 都从这里拿 cflags/libs。
-LINUX_PKG_CONFIG_LIBS = ["gtk+-3.0", "pangoft2", "fontconfig", "x11"]
+LINUX_PKG_CONFIG_LIBS = ["gtk+-3.0", "pangoft2", "pangocairo", "fontconfig", "x11"]
 
 IME_PROBE_PACKAGE = "NoahLiu/moonbit-libyue/experiment/ime_probe"
 WIN_PACKAGE = "NoahLiu/moonbit-libyue/yue/win"
 RENDER_PACKAGE = "NoahLiu/moonbit-libyue/yue/render"
+TEXT_PACKAGE = "NoahLiu/moonbit-libyue/yue/text"
 
 
 def pkg_config(args: list[str], flag: str) -> list[str] | None:
@@ -131,6 +132,15 @@ def link_configs() -> dict:
             entries.append({
                 "package": RENDER_PACKAGE,
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lrender_cairo_stub "
+                + " ".join([*libs, *sys_libs]),
+            })
+        text_lib = compile_stub(
+            MODULE_ROOT / "yue" / "text" / "pango_stub.c", "libyue_text_pango.a"
+        )
+        if text_lib:
+            entries.append({
+                "package": TEXT_PACKAGE,
+                "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_text_pango "
                 + " ".join([*libs, *sys_libs]),
             })
         stub = build_ime_probe_stub()

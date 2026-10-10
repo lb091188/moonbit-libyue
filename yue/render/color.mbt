@@ -5,7 +5,7 @@
 // 混用会表现为颜色漂移而不是透明度变化，属已知口径分岔。
 
 ///|
-pub struct Color {
+pub(all) struct Color {
   r : Int
   g : Int
   b : Int

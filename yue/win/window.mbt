@@ -12,7 +12,7 @@ pub(all) enum Event {
 }
 
 ///|
-pub struct Window {
+pub(all) struct Window {
   mut id : Int64
   mut width : Int
   mut height : Int

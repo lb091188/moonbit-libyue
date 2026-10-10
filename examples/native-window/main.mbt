@@ -48,6 +48,15 @@ fn paint(win : @win.Window, tick : Int) -> Unit {
     }
     None => ()
   }
+  // 文本层：先量后画，量到的盒高就是布局会拿到的尺寸（G7 接 measure 回调同源）
+  match @text.measure("MoonBit 原生窗口", 18.0) {
+    Some(m) => {
+      let _ = @text.draw_to(bm, 24.0, 28.0, "MoonBit 原生窗口", 18.0, "#cdd6f4")
+      let note = "行高 \{m.height} · 基线 \{m.baseline} · 宽 \{m.width}"
+      let _ = @text.draw_to(bm, 24.0, 54.0, note, 12.0, "#a6adc8")
+    }
+    None => ()
+  }
   win.present(bm.data, bm.width, bm.height)
 }
 

@@ -198,6 +198,15 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **不变量（已入单测）**：同一矩形、同一颜色（含 alpha）经「纯 MoonBit 矩形绘制器」与「Cairo」两条路径，**逐像素完全相等**（含 `#00000080` 叠白底 = 127,127,127,255 的情形）；斜边填充出现中间 alpha，证明确实走了抗锯齿。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/render` 14/14（新增 6 条 Cairo 断言：逐像素一致、三角形填充、抗锯齿中间 alpha、clip+translate、内侧描边两侧同语义、半透明混合一致）；`moon check yue/{core,win,render}` 零警告；`examples/native-window` 冒烟 52 帧、退出码 0（示例已加 Cairo 画的圆与贝塞尔弧，整条链路过一遍）。
 
+### MoonBit 原生 GUI 栈 G3 次批（Pango 文本层）· FFI 出参与跨包字段可见性
+
+- **坑（SIGSEGV，无测试输出）**：把 `Array[Int]` 当 C 的出参数组用（C 侧 `int32_t *out` 写 `out[0..2]`）会段错误——MoonBit 传给 C 的是**数组对象**，按 `out[0]` 写会踩坏它的长度头，之后任何一次使用都崩。仓库既有形态是逐个 `Ref[Int]` 出参（`yue/ffi.mbt:452` 的 `ok : Ref[Int]`），改成三个 `Ref[Int]` 后 7/7 通过。**规则**：C 回传多值一律用多个 `Ref[Int]`，不要用 `Array[Int]` 借指针。
+- **坑**：跨包构造/读取结构体字段要 `pub(all) struct`（`yue/geometry.mbt:20` 的 `RectF` 形态）。只写 `pub struct` 时报 `Cannot create values of the read-only type`，同一条也适用于 `pub(all) enum`。
+- **坑**：带默认值的参数必须是标签参数（`family? : String = ""`），写成 `family : String = ""` 报 `Only labelled arguments can have default value`。
+- **口径**：字号按**逻辑像素**取绝对尺寸（`pango_font_description_set_absolute_size(desc, px * PANGO_SCALE)`，不是磅）；`baseline` 是首行基线到布局盒顶部，与 yoga-mbt `set_baseline` 的定义一致，接线时不需要换算；ellipsize/wrap 语义照老师 `attributed_text_gtk.cc:82/128-132`。
+- **测试取向**：不断言具体像素宽/高（随机器字体配置变，G0 探针记的「14px 行高 17px」是本机值），只断单调性（文本更长更宽、字号更大更高）、约束性（`max_width` 下宽受钳、换行后高增长）与「确实落像素」的计数，保证换机不假红。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/text` 7/7；`moon check yue/{core,win,render,text}` 零警告；`examples/native-window` 冒烟 52 帧退出码 0（窗口内画中英混排文本）；全仓红点仍 290 errors 未增。
+
 ## Linux
 
 ### 发行版

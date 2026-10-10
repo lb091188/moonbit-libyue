@@ -1,0 +1,13 @@
+import {
+  "moonbitlang/core/encoding/utf8",
+  "NoahLiu/moonbit-libyue/yue/render",
+}
+
+supported_targets = "native"
+
+// Pango 端由 scripts/prebuild.py 编成静态库（link_configs 只有链接期字段、native-stub
+// 拿不到系统头，实测同 G0/G2/G3），这里只带非 Linux 占位实现保三平台链接。
+// 链接参数按 AGENTS 规则 1 全部由 prebuild 托管。
+options(
+  "native-stub": [ "pango_stub_portable.c" ],
+)
