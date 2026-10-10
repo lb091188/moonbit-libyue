@@ -651,31 +651,12 @@ extern "C" void *yue_mbt_prt_default(int32_t *ok) {
 }
 
 extern "C" void *yue_mbt_prt_queue(const char *printer, int32_t *ok) {
-  @autoreleasepool {
-    *ok = 0;
-    if (printer == nullptr || printer[0] == 0) {
-      return EmptyBytes();
-    }
-    // 新 CUPS 的 cupsGetJobs 返回数组本体（dest 为 NULL 的终结项收尾）
-    cups_job_t *jobs =
-        cupsGetJobs(CUPS_HTTP_DEFAULT, printer, 0, CUPS_WHICHJOBS_ACTIVE);
-    std::string out;
-    int n = 0;
-    if (jobs != nullptr) {
-      while (n < 4096 && jobs[n].dest != nullptr) {
-        n++;
-      }
-      for (int i = 0; i < n; i++) {
-        out += std::to_string(jobs[i].id);
-        out += '\t';
-        out += jobs[i].title != nullptr ? jobs[i].title : "";
-        out += '\n';
-      }
-      cupsFreeJobs(n, jobs);
-    }
-    *ok = 1;
-    return BytesFromString(out);
-  }
+  // 队列查询不走 CUPS API：cupsGetJobs 的 SDK 形态跨版本漂移（旧五参
+  // 出参/新四参返回），macOS SDK 实测两种签名都不匹配——MoonBit 侧
+  // mac 分支改走 lpstat -o（CUPS CLI 恒在），本 FFI 留哨兵保链接符号
+  (void)printer;
+  *ok = -1000;
+  return EmptyBytes();
 }
 
 extern "C" int32_t yue_mbt_prt_print(const char *path, int32_t *ok) {
@@ -905,9 +886,9 @@ extern "C" void *yue_mbt_assoc_query(const char *assoc, int32_t kind,
         CFStringRef bundle_id = LSCopyDefaultRoleHandlerForContentType(
             uti, kLSRolesAll);
         if (bundle_id != nullptr) {
-          app_url = [NSWorkspace sharedWorkspace]
-                        URLForApplicationWithBundleIdentifier:
-                            (__bridge NSString *)bundle_id];
+          NSWorkspace *ws = [NSWorkspace sharedWorkspace];
+          app_url = [ws URLForApplicationWithBundleIdentifier:
+                             (__bridge NSString *)bundle_id];
           CFRelease(bundle_id);
         }
         CFRelease(uti);
@@ -919,11 +900,8 @@ extern "C" void *yue_mbt_assoc_query(const char *assoc, int32_t kind,
                                : [a stringByAppendingString:@"://x"];
       NSURL *url = [NSURL URLWithString:probe];
       if (url != nil) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        app_url = (__bridge NSURL *)LSCopyDefaultApplicationURLForURL(
-            url, kLSRolesAll, nullptr);
-#pragma clang diagnostic pop
+        // URLForApplicationToOpenURL：非废弃的现代等价接口
+        app_url = [[NSWorkspace sharedWorkspace] URLForApplicationToOpenURL:url];
       }
     }
     if (app_url == nil || app_url.path == nil) {

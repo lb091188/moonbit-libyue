@@ -548,7 +548,7 @@ pub fn prt_queue(printer : String) -> Result[Array[PrinterJob], PrinterError] {
   if printer == "" {
     return Err(PrtInvalidParam("打印机名为空"))
   }
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
+  if @yue.platform() == "windows" {
     let ok = Ref(0)
     let text = @utf8.decode_lossy(
       @yue.ffi_prt_queue(@yue.utf8_bytes(printer), ok),
@@ -558,6 +558,7 @@ pub fn prt_queue(printer : String) -> Result[Array[PrinterJob], PrinterError] {
     }
     return Ok(prt_parse_win_queue(text))
   }
+  // mac 不走 FFI（cupsGetJobs SDK 形态漂移，FFI 留哨兵），直接用 lpstat
   match prt_lpstat(["-o", printer]) {
     Ok(out) => Ok(prt_parse_queue(out))
     Err(e) => Err(e)
