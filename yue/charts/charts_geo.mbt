@@ -513,15 +513,18 @@ fn geo_name_hash(s : String) -> Int {
 
 ///|
 /// 区域填充色：主题主色为底，按区域名哈希做 ±0.06 明度微调（同色系，
-/// 相邻区域可分辨）；无名区域（None）不微调。
+/// 相邻区域可分辨）；零微调与无名区域（None）原样返回主题主色，
+/// 不经 HSL 往返（hex6 输出小写，往返会把 #2D68C4 重写成 #2d68c4）。
 fn geo_region_color(name : String?) -> String {
+  let base = @yue.theme_primary()
   let d = match name {
     Some(n) if n != "" => (geo_name_hash(n) % 13).to_double() / 12.0
     _ => 0.5
   }
   let amount = d * 0.12 - 0.06
-  let base = @yue.theme_primary()
-  if amount >= 0.0 {
+  if amount == 0.0 {
+    base
+  } else if amount > 0.0 {
     @yue.lighten_hex(base, amount)
   } else {
     @yue.darken_hex(base, -amount)

@@ -72,6 +72,10 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
   - **定案:接受传递,不拆独立模块**(MD2 起 markdown_view 桥接 mizchi/markdown 随主模块走)。依据:闭包全为纯 MoonBit 源码包,无 native stub 无链接面,不碰 prebuild 托管,对消费方零 ABI / 平台矩阵 / 发布物体积风险,与 ffmpeg-mbt 因二进制矩阵 + 许可 + 体积拆独立模块的性质不同;降级路径预留——消费方依赖面反馈过重或上游 0.x API 波及时,再下沉独立模块(yue 主模块退回零 markdown 依赖,仿媒体三层拆分)。
   - 注意:模块内子包(如 yue/browser 模式)解决不了依赖面——mooncakes deps 是模块级声明,子包 import 一样进发布闭包;browser 模式隔离的是链接 flags 层,两者机理不同勿混用。
 
+### 测试顺序依赖:字符串相等断言遇上「序列化往返改大小写」(2026-10-10)
+
+- **单测共享可变全局(主题 theme_box)时,断言结果依赖执行顺序**:`geo_region_color(None)` 原走 `lighten_hex(base, 0.0)` 的 HSL 往返,`hex6` 输出小写,把主题色 `#2D68C4` 重写成 `#2d68c4`;本机因先前用例改过主题而「碰巧」相等,CI 调度顺序不同即挂(`"#2d68c4" != "#2D68C4"`)。修复:零微调原样返回主题色(语义本就是「不微调」),不经往返。教训:「字符串相等」断言遇到经序列化函数的值,先问大小写/格式是否稳定;同值异形的全局状态会让测试变成顺序彩票。
+
 ### macOS 新 API 的可用性门槛(两套构建系统部署目标不同)
 
 - **两套 mac 构建的部署目标不一致**:GN/ninja 构建(`scripts/create_source_dist.js`,即 `Create source distribution` 步骤)取 `third_party/build-gn/build/config/mac/mac_sdk.gni` 的 `mac_deployment_target = "10.15"`;CMake 预构建(`scripts/prebuilt/CMakeLists.txt`)取 `CMAKE_OSX_DEPLOYMENT_TARGET 11.0`。

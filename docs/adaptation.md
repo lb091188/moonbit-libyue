@@ -37,6 +37,11 @@ Methodology: Ubuntu 24.04 XFCE (X11), same machine and session; the startup delt
   - Fix: nightly version numbers are delisted the same day (the CLI server 403s any named historical version), so pinning via `MOONBIT_INSTALL_VERSION` is not viable — the only repair is rerunning `install/unix.sh` with no version to install the latest full bundle (binaries and core replaced in one pass), matching CI.
   - Verify: check that `moon version --all` and `~/.moon/lib/core/moon.mod` agree, then bump the version to force a full re-check — 133 tests green.
 
+### Test-order dependence: string-equality assertions meet a case-rewriting round-trip (2026-10-10)
+
+- **Unit tests share the mutable theme global (theme_box), so assertion results depended on execution order**: `geo_region_color(None)` used to go through `lighten_hex(base, 0.0)`, whose HSL round-trip emits lowercase via `hex6`, rewriting the theme color `#2D68C4` into `#2d68c4`; locally an earlier test had already swapped the theme so it "happened" to match, while CI's different scheduling failed with `"#2d68c4" != "#2D68C4"`.
+  - Fix: zero adjustment returns the theme color verbatim (that is what "no adjustment" means), skipping the round-trip. Lesson: for string-equality assertions on values passed through a serializer, first ask whether casing/format is stable; same-value-different-form global state turns tests into an order lottery.
+
 ### Availability gate for newer macOS APIs (two builds, two deployment targets)
 
 - **The two macOS builds disagree on the deployment target**: the GN/ninja build (`scripts/create_source_dist.js`, the `Create source distribution` step) uses `mac_deployment_target = "10.15"` from `third_party/build-gn/build/config/mac/mac_sdk.gni`, while the CMake prebuilt build (`scripts/prebuilt/CMakeLists.txt`) uses `CMAKE_OSX_DEPLOYMENT_TARGET 11.0`.
