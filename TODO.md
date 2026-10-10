@@ -21,6 +21,15 @@
 - [x] EX2 sysmonitor 进程数据正确性——nice 字段改 parse_i64 负值正确显示,新出现 pid 当拍 CPU% 置 0 不再钉满格,负值回归用例入 wbtest。验证:`moon check --deny-warn` 零警告 + `moon test` 644 全绿(sysproc_wbtest 新增 3 条:负 nice 真实样本 nice=-20/-1/19/裸负号兜底、ByNice 负值升降序、proc_tick_cpu_pct 无前样本当拍置 0);白盒对照暂存修复前代码跑 `moon test -p sysmonitor`,负 nice 用例精确失败(`0 != -20`)、旧语义下 tick 用例精确失败(`400 != 0`),恢复后 24/24 通过;根因(有符号字段用错解析器静默变 0、单调累计计数器「无前样本」混同「前样本为 0」)与验证方式入 docs/zh/adaptation.md「系统监控数据层」节 EX2 条
 - [x] CORE2 yue 核心健壮性批次——SNI 菜单路径随项派生且注销 / 注册失败对称清理,总线重连先检查按需重建连接防 fd 泄漏,Store 增 remove 与主题订阅可退订,carousel / video_view 挂载定时器获得回收通道,moon test 全绿,SNI 多项场景真实总线复验(验证:moon check 零警告 + moon test 655 全绿,新增 sni_wbtest 5 条真总线回归含双托盘项 GetLayout 路由互不覆盖与断线重连不另建连接,均以修复前代码精确失败对照;面板侧双图标目视复核待用户真机)
 
+## yoga-mbt:纯 MoonBit Flexbox 布局引擎(feature/yoga-mbt 分支)
+
+为 MoonBit 化 libyue 预置的布局层,独立子包(modules/yoga-mbt,纯 MoonBit 零 FFI),只对齐 Web Flexbox 标准(CSS Flexible Box Layout L1),不做 Yoga 双标准;弹性解析按规范 §9.7 逐条实现(与 Yoga 内核两遍法有意不同,见 adaptation.md「布局几何」节 yoga-mbt 条)。与内嵌 C++ Yoga 的「shrink 默认 0」定案互不冲突:那条管原生控件树,本引擎管未来 MoonBit 版 libyue。
+
+- [x] YG1 骨架 + 核心算法——types/style/node/api/algorithm 五文件,主轴/交叉轴、grow/shrink/basis(规范冻结算法)、justify 全系、align 系、wrap/wrap-reverse、margin auto 吸收、padding/border/margin、百分比、min/max(主轴 min:auto 内容下限)、gap、叶子 measure;19 条手算单测。验证:`moon check` 零警告 + `moon test -p NoahLiu/yoga-mbt/src` 19/19 全绿;对照材料:W3C css-flexbox-1 §9 全文 + Yoga 官方源码(CalculateLayout.cpp / FlexLine.cpp)逐条核对,差异与取舍入 adaptation.md「布局几何」节
+- [ ] YG2 标准剩余面——absolute 定位、baseline 对齐、aspect-ratio、RTL(direction);baseline 行交叉尺寸贡献与 static position 按 §9.6 补
+- [ ] YG3 工程化——测量缓存(Yoga 16 槽思路)、像素网格取整开关、容器内在尺寸(min-content/max-content)精确语义、性能基线(千节点树布局耗时)
+- [ ] YG4 集成预留——与 MoonBit 版 libyue 的对接层(布局树 ↔ 控件树映射、脏区增量重排),依赖 libyue 复刻整体方案定案
+
 ## 2026 年 10 月月度目标与 Q4 季度目标
 
 10 月(月度):完成现在规划的三大能力域收尾——系统接口、音频、视频渲染;Q4(季度):月度目标全部达成后,macOS 真机验证测试收尾 + 发布闭环。
