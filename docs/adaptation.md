@@ -55,6 +55,26 @@ Methodology: Ubuntu 24.04 XFCE (X11), same machine and session; the startup delt
 - Verification (Ubuntu 24.04 XFCE X11, source mode): sysmonitor (no browser import) has no webkit/javascriptcore in `ldd`, 0 webkit entries in the dynamic symbol table via `objdump -T` (symbol-level zero, not just missing DT_NEEDED), and survives startup; showcase links `libwebkit2gtk-4.1`/`libjavascriptcoregtk-4.1` and survives a Browser on the first screen (the WEBKIT_DISABLE_DMABUF_RENDERER guard still applies); `moon check` zero warnings, `moon test` 131/131.
   - In-page interaction (page loading / JS round-trip / bindings) still needs on-device confirmation.
 
+### Browser session profiles (shared within a profile, isolated across profiles — fork-side change, pending release)
+
+- Need: several accounts on the same site at once — N Browser instances signed into different accounts, with cookies / localStorage / cache kept apart, and each profile persisted (staying signed in across restarts).
+  - Before profiles, all three platforms used the process-wide default session: instance B opened the same site with A's login already attached, and after B signed in, A picked up B's session on the next load.
+- Entry point (fork commit `0d950ae7`): `Browser::Options.profile`; an empty string means the default session and behaves exactly as before.
+  - Linux: one `WebKitWebContext` per profile, data/cache under `<user data dir>/yue-profiles/<app>/<profile>/{data,cache}`, with the same profile reusing one context in-process (that is what makes two windows of one account share a session).
+  - macOS: one `WKWebsiteDataStore` per profile; Windows (WebView2): one `UserDataFolder` per profile.
+- **The "mutually exclusive constructors" blocker was false (disproved by probe this round; I had concluded "you cannot have both" from it)**: the four `webkit_web_view_new_with_*` constructors are exclusive, and `user-content-manager` is construct-only with **no setter** — the read API surface looks like "either isolation or the bridge".
+  - But both are construct-only **GObject properties**, so `g_object_new(WEBKIT_TYPE_WEB_VIEW, "web-context", ctx, "user-content-manager", ucm, nullptr)` sets both in one go, and WebKit handles them independently (`else if (!priv->context) … default` plus a separate `if (!priv->userContentManager) … new()`), with no warning and nothing dropped. Profile views therefore go through `g_object_new`.
+- Probe evidence (real X11 session on this machine, throwaway C probe): one view reports `ctx=adopted ucm=adopted`, its data dir under the profile directory, and two profiles each read back **only their own** `who=a` / `who=b` cookie.
+  - Two views of one context share the same cookie manager instance, and a document-start script plus `window.webkit.messageHandlers.yue.postMessage` reach the native side under a custom context (all three views hit).
+- Probe side findings: this WebKitGTK passes `WebKitJavascriptResult*` for `script-message-received` (matching the fork's `OnScriptMessage`), so `jsc_value_to_string(JSCValue*)` asserts and the JavaScriptCore C API is required.
+  - `webkit_uri_scheme_request_finish` takes a `GInputStream*`, not a bare string.
+- Protocol registration semantics changed: `RegisterProtocol`/`UnregisterProtocol` used to register on the default context only; with multiple contexts they now cover "default + every profile context".
+  - A new context catches up with the schemes registered so far; `GetCookiesForURL` already used `webkit_web_view_get_context(GetNative())` and follows the profile unchanged.
+- Boundaries: persistent profiles on macOS need 14+ **and** a bundle identifier — a bare executable gets an in-memory profile, since an identifier-based store has nowhere to land (the same root as issue #4's "bare Mach-O has no identity").
+  - The Windows IE backend has no notion of profiles and keeps the default session; profile directories are namespaced by application (`App::GetID()`, falling back to `g_get_prgname()`).
+- Follow-ups and real-machine checklist: the wrapper side (shim pass-through + `BrowserOptions.profile` + yue docs) must wait for the new prebuilt library and the `LIBYUE_VERSION` bump.
+  - Checklist: ① two account windows on one site do not disturb each other's login (switching windows switches accounts); ② both stay signed in after restarting the process (mac needs 14+ and a signed bundle); ③ localStorage is invisible across two profiles; ④ custom protocols still load in a profile window; ⑤ an empty `profile` behaves exactly as before (regression).
+
 ### MoonBit cfg(platform=)
 
 - moonc implements `#cfg(platform="windows"/"linux"/"macos")`, evaluated from the `-target` triple; but current released moon passes moonc an OS-less `native` target, so every condition is false. The condition lights up once `moon build -v` shows the full triple in the moonc command line.

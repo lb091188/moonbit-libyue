@@ -89,6 +89,18 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 平台状态：Linux 源码模式如上；Linux 预构建模式与 Windows（WebView2 无链接期符号，三条目 flags 一致即现状）行为不变——**fork 发行脚本侧的 jumbo 拆分（4a）完成并 `vendor-*` 重发后，预构建模式才获得同等按需化**，prepare 升版本后 stub 逻辑自然退役；macOS 暂不拆（本机无 Mach-O archive 工具链核验 `libyue_prebuilt(macos)` 的 WebKit 引用面，llvm-nm 读 universal archive 成员符号表不完整，拆错即 mac 全线断链且无真机兜底），Darwin 分支三条目 flags 保持与改造前一致。
 - 验证（Ubuntu 24.04 XFCE X11，源码模式）：sysmonitor（不 import browser）`ldd` 无 webkit/javascriptcore、`objdump -T` 动态符号表 webkit 计数 0（符号级清零，不只是无 DT_NEEDED）、启动存活；showcase `ldd` 有 `libwebkit2gtk-4.1`/`libjavascriptcoregtk-4.1`、首屏挂 Browser 不崩（WEBKIT_DISABLE_DMABUF_RENDERER 守护照旧生效）；`moon check` 零警告、`moon test` 131 全过。浏览器页交互（网页加载/JS 回传/binding）须真机确认。
 
+### Browser 会话 profile（同 profile 共享、跨 profile 隔离，fork 侧已改待出包）
+
+- 需求：同一站点多账号并存——N 个 Browser 实例各自登录不同账号，cookie / localStorage / 缓存互不串，且各自可持久化（重启保持登录）。加 profile 之前三平台全用「进程默认会话」：B 实例打开同站点直接带 A 的登录态，B 登录后 A 刷新也跟着变。
+- 入口（fork 提交 `0d950ae7`）：`Browser::Options.profile`，空串 = 进程默认会话，行为与加 profile 前完全一致。① Linux 每 profile 一个 `WebKitWebContext`，数据/缓存目录 = `<user data dir>/yue-profiles/<app>/<profile>/{data,cache}`，同 profile 在进程内复用同一 context（这才让同账号多窗共享登录）；② macOS 每 profile 一个 `WKWebsiteDataStore`；③ Windows(WebView2) 每 profile 一个 `UserDataFolder`。
+- **构造器互斥是伪障碍（本轮实测推翻，曾据此判断「两者不能同时满足」）**：四个 `webkit_web_view_new_with_*` 互斥、`user-content-manager` 是 construct-only 属性且**无 setter**，只读 API 面像「要么隔离、要么桥」。
+  - 但两者都是 construct-only 的 **GObject 属性**，`g_object_new(WEBKIT_TYPE_WEB_VIEW, "web-context", ctx, "user-content-manager", ucm, nullptr)` 一次给两个即可，WebKit 实现里二者各自独立处理（`else if (!priv->context) … default` 与另起的 `if (!priv->userContentManager) … new()`），不告警也不丢弃；带 profile 的建视图因此改走 `g_object_new`。
+- 探针实证（本机 X11 真会话，一次性 C 探针）：同一视图 `ctx=采纳 ucm=采纳`、data-dir 落在各自 profile 目录；两 profile 各写 `who=a` / `who=b` 后回读**各只见自己那条**；同 context 两视图的 cookie manager 是同一实例；document-start 注入脚本执行 + `window.webkit.messageHandlers.yue.postMessage` 在自定义 context 下正常回传原生（三条视图全命中）。
+- 探针副产物：本机 WebKitGTK 的 `script-message-received` 传 `WebKitJavascriptResult*`（与 fork 现有 `OnScriptMessage` 一致），用 `jsc_value_to_string(JSCValue*)` 会断言失败，须走 JavaScriptCore C API（`JSValueToStringCopy` + `JSStringGetUTF8CString`）；`webkit_uri_scheme_request_finish` 要 `GInputStream*` 而非裸字符串。
+- 协议注册语义变化：`RegisterProtocol`/`UnregisterProtocol` 原固定注册在默认 context 上，多 context 后改为「默认 + 全部 profile context」，新建 context 时补齐已注册 scheme；`GetCookiesForURL` 本就是 `webkit_web_view_get_context(GetNative())`，天然跟随 profile，未改。
+- 边界：macOS 持久化需 14+ **且**进程有 bundle identifier（裸可执行文件按内存隔离处理——用 identifier 建 store 无处落盘，与 issue #4 的「裸 Mach-O 无身份」同源）；Windows 的 IE 后端无 profile 概念仍用默认会话；profile 目录按应用名隔离（`App::GetID()`，空则回退 `g_get_prgname()`）。
+- 待办与真机验证：封装侧（shim 透传 + `BrowserOptions.profile` + yue 层文档）须等新预构建库与 `LIBYUE_VERSION` 升版后再落；真机清单：①同站点两账号窗口互不影响登录（切窗即切账号）②关闭重开进程后各自仍登录（mac 需 14+ 且签名 bundle）③两 profile 的 localStorage 互不可见 ④自定义协议在带 profile 的窗口里仍能加载 ⑤`profile` 留空时行为与改造前一致（回归）。
+
 ### MoonBit cfg(platform=)
 
 - moonc 已实现 `#cfg(platform="windows"/"linux"/"macos")`,按 `-target` 三元组求值;但当前发布版 moon 只给 moonc 传无 OS 信息的 `native`,所有条件恒 false。`moon build -v` 的 moonc 命令行出现完整三元组即条件可用。
