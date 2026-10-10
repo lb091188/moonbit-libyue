@@ -876,21 +876,29 @@ fn layout_into(
       None
     }
   // ---- 自身尺寸 ----
-  let content_main_sum = if nlines == 1 {
-    lines[0].iter().fold(init=0.0, fn(acc, it) {
+  let line_main = fn(line : Array[Item]) -> Double {
+    line.iter().fold(init=0.0, fn(acc, it) {
       acc + it.size_main + it.m.start + it.m.end
     }) +
-    (main_gap * (lines[0].length() - 1).to_double()).max(0.0)
-  } else {
-    0.0
+    (main_gap * (line.length() - 1).to_double()).max(0.0)
   }
+  let mut content_main = 0.0
+  for line in lines {
+    let v = line_main(line)
+    if v > content_main {
+      content_main = v
+    }
+  }
+  // 内容推算出的自身尺寸要含自身 padding/border（宽高语义为 border-box）；
+  // 多行时主轴取各行外沿尺寸的最大值
+  let content_main_sum = content_main + pad_border_main
   let own_main0 = match own_main_def {
     Some(v) => v
     None => content_main_sum
   }
   let own_cross0 = match own_cross_def {
     Some(v) => v
-    None => own_cross_content
+    None => own_cross_content + pad_border_cross
   }
   let own_main = clamp3(
     own_main0,

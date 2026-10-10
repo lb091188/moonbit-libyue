@@ -601,8 +601,75 @@ test "嵌套容器基线上抛给父容器" {
   // b 的基线 = padding-top 5 + 首项基线 20 = 25，比 a 的 10 大 → 共同基线 25
   assert_eq(b.layout().top, 0.0)
   assert_eq(a.layout().top, 15.0)
+  assert_eq(b.layout().height, 35.0)
   assert_eq(t.layout().top, 5.0)
   assert_eq(t.layout().width, 100.0)
+}
+
+// ---- 容器 auto 尺寸与自身 padding/border（YG2b′）----
+
+///|
+test "行容器 auto 尺寸含自身 padding" {
+  let root = Node::new()
+  root.set_padding_left(fixed(10.0))
+  root.set_padding_top(fixed(10.0))
+  let c = leaf(100.0, 50.0)
+  root.append_child(c)
+  calculate_layout(root, None, None)
+  assert_eq(root.layout().width, 110.0)
+  assert_eq(root.layout().height, 60.0)
+  assert_eq(c.layout().left, 10.0)
+  assert_eq(c.layout().top, 10.0)
+  assert_eq(c.layout().width, 100.0)
+  assert_eq(c.layout().height, 50.0)
+}
+
+///|
+test "列容器 auto 尺寸含自身 padding" {
+  let root = Node::new()
+  root.set_padding_left(fixed(10.0))
+  root.set_padding_top(fixed(10.0))
+  root.set_flex_direction(Column)
+  let c = leaf(100.0, 50.0)
+  root.append_child(c)
+  calculate_layout(root, None, None)
+  assert_eq(root.layout().width, 110.0)
+  assert_eq(root.layout().height, 60.0)
+  assert_eq(c.layout().left, 10.0)
+  assert_eq(c.layout().top, 10.0)
+  assert_eq(c.layout().width, 100.0)
+}
+
+///|
+test "容器 auto 尺寸含自身 border" {
+  let root = Node::new()
+  root.set_border_left(fixed(7.0))
+  root.set_border_top(fixed(3.0))
+  let c = leaf(40.0, 20.0)
+  root.append_child(c)
+  calculate_layout(root, None, None)
+  assert_eq(root.layout().width, 47.0)
+  assert_eq(root.layout().height, 23.0)
+  assert_eq(c.layout().left, 7.0)
+  assert_eq(c.layout().top, 3.0)
+}
+
+///|
+test "折行容器 auto 尺寸:主轴取最宽行、交叉轴累加行高" {
+  let root = Node::new()
+  root.set_padding_left(fixed(10.0))
+  root.set_padding_top(fixed(10.0))
+  root.set_flex_wrap(Wrap)
+  let x = leaf(80.0, 20.0)
+  let y = leaf(80.0, 20.0)
+  root.append_child(x)
+  root.append_child(y)
+  // 可用宽 100 − padding-left 10 = 90，两项各 80 → 只能一行一项
+  calculate_layout(root, Some(100.0), None)
+  assert_eq(root.layout().width, 90.0)
+  assert_eq(root.layout().height, 50.0)
+  assert_eq(x.layout().top, 10.0)
+  assert_eq(y.layout().top, 30.0)
 }
 
 ///|
