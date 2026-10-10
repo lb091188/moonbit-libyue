@@ -40,6 +40,10 @@ let l = child.layout()   // left / top 相对父边框盒；width / height 边�
 
 - 叶子节点（无子节点）通过 `set_measure` 提供内容测量；入参为可用宽高
   （`None` 表示该方向不受约束，可用于文本折行推算高度）。
+- 文本类叶子再通过 `set_baseline` 提供基线：入参与 `set_measure` 相同，
+  返回**基线到内容盒顶部**的距离（不含自身 padding/border，引擎负责叠加），
+  返回 `None` 表示该节点无基线。容器节点无需设置——它的基线由引擎按规范
+  从内部项推出。
 - 根节点宽高是 `Option[Double]`，`None` 表示该方向不约束、按内容取尺寸；
   需要撑满可用空间时给根设置 `percent(100.0)`。
 - 布局结果 `node.layout()` 需在 `calculate_layout` 之后读取。
@@ -49,15 +53,18 @@ let l = child.layout()   // left / top 相对父边框盒；width / height 边�
 主轴 / 交叉轴、grow / shrink / basis、justify-content 全系、
 align-items / self / content、wrap 与 wrap-reverse 换行、margin auto 吸收
 （主轴优先于 justify-content、交叉轴替代 align）、padding / border /
-margin、百分比、min / max（含主轴 min:auto 内容下限）、row / column gap、
-叶子测量函数、Row / RowReverse / Column / ColumnReverse、absolute 定位
-（`set_position(Absolute)` + top/right/bottom/left：包含块为父容器
-padding box，同轴两侧 inset 都设时撑出尺寸，四向全 auto 落静态位置并按
-父容器 justify-content / align-items 摆放）。
+margin（交叉轴 margin 同时计入项的定位与拉伸）、百分比、min / max（含主轴
+min:auto 内容下限）、row / column gap、叶子测量函数、Row / RowReverse /
+Column / ColumnReverse、absolute 定位（`set_position(Absolute)` +
+top/right/bottom/left：包含块为父容器 padding box，同轴两侧 inset 都设时
+撑出尺寸，四向全 auto 落静态位置并按父容器 justify-content / align-items
+摆放）、baseline 对齐（`align-items / align-self: baseline`：仅主轴为行方向
+时生效；升距最大的项贴行交叉起端，其余项按共同基线定位；基线分组同时决定
+本行交叉尺寸。无基线的项按 flex-start 摆放，交叉轴有 auto margin 的项不做
+基线对齐。嵌套容器的基线取首行共同基线，否则取交叉轴起端最靠前的有基线项）。
 
 ## 未实现（按批次补）
 
-- baseline 对齐（当前按 flex-start 处理）
 - RTL（direction: rtl）
 - aspect-ratio
 - 测量缓存（Yoga 的 16 槽缓存）与像素网格取整

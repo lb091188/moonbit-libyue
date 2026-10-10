@@ -74,7 +74,9 @@ pub enum JustifyContent {
 }
 
 ///|
-/// 交叉轴对齐。`Baseline` 当前按 `FlexStart` 处理（首版未实现基线对齐）。
+/// 交叉轴对齐。`Baseline` 只在主轴为行方向（`Row` / `RowReverse`）时生效
+/// （规范要求项的 inline 轴平行于主轴）；无基线的项按 `FlexStart` 处理。
+/// 基线由叶子节点的 `set_baseline` 提供，或由容器节点按规范从内部项推出。
 pub enum AlignItems {
   Stretch
   FlexStart

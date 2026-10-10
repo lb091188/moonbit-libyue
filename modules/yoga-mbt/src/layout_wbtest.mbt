@@ -429,3 +429,197 @@ test "absolute 百分比 inset 相对 padding box" {
   // padding box 宽 = 400（无 border，padding 含在 padding box 内）
   assert_eq(b.layout().left, 200.0)
 }
+
+// ---- 交叉轴 margin 定位 ----
+
+///|
+test "交叉轴 margin 参与定位与拉伸" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  let c = leaf(100.0, 20.0)
+  c.set_margin_top(fixed(30.0))
+  c.set_margin_bottom(fixed(10.0))
+  root.append_child(c)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  // margin box 起端贴行首 → 边框盒下移 30；stretch 高度 = 100 - 30 - 10
+  assert_eq(c.layout().top, 30.0)
+  assert_eq(c.layout().height, 60.0)
+}
+
+///|
+test "交叉轴 margin 与 flex-end 对齐" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(200.0))
+  root.set_align_items(FlexEnd)
+  let c = leaf(100.0, 50.0)
+  c.set_margin_top(fixed(20.0))
+  root.append_child(c)
+  calculate_layout(root, Some(300.0), Some(200.0))
+  // 外沿尺寸 70 → 剩余 130 给 flex-end → margin box 起端 130，边框盒再 +20
+  assert_eq(c.layout().top, 150.0)
+  assert_eq(c.layout().height, 50.0)
+}
+
+// ---- 基线对齐（YG2b）----
+
+///|
+/// 固定内容尺寸 + 基线的叶子（基线到内容盒顶部）。
+fn text(w : Double, h : Double, b : Double) -> Node {
+  let n = Node::new()
+  n.set_measure(fn(_aw, _ah) { (w, h) })
+  n.set_baseline(fn(_aw, _ah) { Some(b) })
+  n
+}
+
+///|
+test "两项按基线对齐" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_align_items(Baseline)
+  let a = text(100.0, 20.0, 10.0)
+  let b = text(100.0, 40.0, 30.0)
+  root.append_child(a)
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  // 升距最大者（b=30）贴行交叉起端，a 下移到同一基线：30 - 10
+  assert_eq(b.layout().top, 0.0)
+  assert_eq(a.layout().top, 20.0)
+  assert_eq(a.layout().height, 20.0)
+  assert_eq(b.layout().height, 40.0)
+  assert_eq(root.layout().height, 100.0)
+}
+
+///|
+test "基线决定行交叉尺寸（容器交叉轴不定）" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_align_items(Baseline)
+  let a = text(60.0, 30.0, 5.0)
+  let b = text(60.0, 30.0, 25.0)
+  root.append_child(a)
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), None)
+  // maxAscent 25 + maxDescent 25 = 50 > 单项最大外沿 30
+  assert_eq(root.layout().height, 50.0)
+  assert_eq(a.layout().top, 20.0)
+  assert_eq(b.layout().top, 0.0)
+}
+
+///|
+test "stretch 项不参与基线分组" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_align_items(Baseline)
+  let a = text(100.0, 30.0, 10.0)
+  let c = text(100.0, 30.0, 30.0)
+  c.set_align_self(Some(Stretch))
+  root.append_child(a)
+  root.append_child(c)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  // 分组只收 align-self: baseline 的项 → 共同基线仍为 a 的 10
+  assert_eq(a.layout().top, 0.0)
+  assert_eq(a.layout().height, 30.0)
+  assert_eq(c.layout().top, 0.0)
+  assert_eq(c.layout().height, 100.0)
+}
+
+///|
+test "无基线项按 flex-start 摆放" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_align_items(Baseline)
+  let a = text(100.0, 30.0, 30.0)
+  let c = leaf(100.0, 40.0)
+  root.append_child(a)
+  root.append_child(c)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  // c 无基线 → 不计入升距/降距，自身按交叉轴起端摆放
+  assert_eq(a.layout().top, 0.0)
+  assert_eq(c.layout().top, 0.0)
+  assert_eq(c.layout().height, 40.0)
+}
+
+///|
+test "margin-top 计入基线升距" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_align_items(Baseline)
+  let a = text(100.0, 20.0, 10.0)
+  a.set_margin_top(fixed(30.0))
+  let b = text(100.0, 20.0, 5.0)
+  root.append_child(a)
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  // 升距按外沿（含 margin）算：a=40 最大 → 基线在 40，b 下移到 35
+  assert_eq(a.layout().top, 30.0)
+  assert_eq(b.layout().top, 35.0)
+}
+
+///|
+test "多行时基线只在行内生效" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(200.0))
+  root.set_flex_wrap(Wrap)
+  root.set_align_items(Baseline)
+  let a = text(120.0, 20.0, 10.0)
+  let b = text(120.0, 20.0, 15.0)
+  let c = text(120.0, 20.0, 5.0)
+  root.append_child(a)
+  root.append_child(b)
+  root.append_child(c)
+  calculate_layout(root, Some(300.0), Some(200.0))
+  // 第一行基线尺寸 15+10=25，第二行 20；align-content: stretch 各补 77.5
+  assert_eq(a.layout().top, 5.0)
+  assert_eq(b.layout().top, 0.0)
+  assert_eq(c.layout().top, 102.5)
+  assert_eq(root.layout().height, 200.0)
+}
+
+///|
+test "嵌套容器基线上抛给父容器" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(100.0))
+  root.set_align_items(Baseline)
+  let a = text(100.0, 20.0, 10.0)
+  let b = Node::new()
+  b.set_width(fixed(100.0))
+  b.set_padding_top(fixed(5.0))
+  b.set_flex_direction(Column)
+  let t = text(80.0, 30.0, 20.0)
+  b.append_child(t)
+  root.append_child(a)
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(100.0))
+  // b 的基线 = padding-top 5 + 首项基线 20 = 25，比 a 的 10 大 → 共同基线 25
+  assert_eq(b.layout().top, 0.0)
+  assert_eq(a.layout().top, 15.0)
+  assert_eq(t.layout().top, 5.0)
+  assert_eq(t.layout().width, 100.0)
+}
+
+///|
+test "column 容器不做基线对齐" {
+  let root = Node::new()
+  root.set_width(fixed(200.0))
+  root.set_height(fixed(300.0))
+  root.set_flex_direction(Column)
+  root.set_align_items(Baseline)
+  let a = text(100.0, 30.0, 10.0)
+  let b = text(100.0, 30.0, 20.0)
+  root.append_child(a)
+  root.append_child(b)
+  calculate_layout(root, Some(200.0), Some(300.0))
+  // 主轴为列时项的 inline 轴不平行于主轴 → 按起端顺序排列，交叉轴不拉伸
+  assert_eq(a.layout().top, 0.0)
+  assert_eq(b.layout().top, 30.0)
+  assert_eq(a.layout().width, 100.0)
+  assert_eq(a.layout().height, 30.0)
+}

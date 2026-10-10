@@ -16,10 +16,15 @@ pub struct Layout {
 /// 叶子节点（无子节点）可通过 `set_measure` 提供内容尺寸测量函数：
 /// 入参为可用宽高（`None` 表示该方向不受约束），返回内容宽高
 /// （不含节点自身的 margin/padding/border，由引擎负责叠加）。
+/// 文本类叶子还可通过 `set_baseline` 提供基线位置，供父容器做
+/// `align-items / align-self: baseline` 对齐。
 pub struct Node {
   style : Style
   children : Array[Node]
   mut measure : Option[(Option[Double], Option[Double]) -> (Double, Double)]
+  mut baseline_fn : Option[(Option[Double], Option[Double]) -> Option[Double]]
+  // 本次布局算出的基线（到本节点边框盒顶部的距离），None = 无基线
+  mut baseline : Option[Double]
   mut layout_left : Double
   mut layout_top : Double
   mut layout_width : Double
@@ -32,6 +37,8 @@ pub fn Node::new() -> Node {
     style : Style::new(),
     children : [],
     measure : None,
+    baseline_fn : None,
+    baseline : None,
     layout_left : 0.0,
     layout_top : 0.0,
     layout_width : 0.0,
@@ -64,6 +71,18 @@ pub fn Node::set_measure(
   f : (Option[Double], Option[Double]) -> (Double, Double),
 ) -> Unit {
   self.measure = Some(f)
+}
+
+///|
+/// 设置叶子节点基线测量函数。入参与 `set_measure` 相同（可用宽高，
+/// `None` 表示该方向不约束），返回**基线到内容盒顶部**的距离
+/// （不含自身 padding/border，引擎负责叠加）；返回 `None` 表示无基线。
+/// 仅对叶子节点生效；容器节点的基线由引擎按规范从内部项推出。
+pub fn Node::set_baseline(
+  self : Node,
+  f : (Option[Double], Option[Double]) -> Option[Double],
+) -> Unit {
+  self.baseline_fn = Some(f)
 }
 
 ///|
