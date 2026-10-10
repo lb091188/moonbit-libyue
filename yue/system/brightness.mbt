@@ -259,13 +259,21 @@ pub fn brightness_supported() -> Bool {
 
 ///|
 /// 枚举屏幕亮度设备：Linux 按探测表读 /sys/class/backlight（列表序即
-/// 推荐序，空列表 = 无背光或设备名不在探测表）；Windows 枚举 DDC/CI
-/// 可控的物理监视器（name 为 \\.\DISPLAYn，subsystem 为 "ddc"，空列表
-/// = 无 DDC 监视器）。
+/// 推荐序，空列表 = 无背光或设备名不在探测表）；Windows 列 DDC/CI 可控
+/// 的物理监视器（外接显示器，subsystem "ddc"）与 WMI 内屏（笔记本，
+/// subsystem "wmi"），空列表 = 两者都无。
 pub fn brightness_devices() -> Result[Array[BrightnessDevice], BrightnessError] {
   match @yue.platform() {
     "linux" => Ok(bright_probe_devices("backlight", bright_backlight_names))
-    "windows" | "macos" => Ok(bright_win_devices())
+    "windows" => {
+      let out = bright_win_devices()
+      match bright_wmi_device() {
+        Some(d) => out.push(d)
+        None => ()
+      }
+      Ok(out)
+    }
+    "macos" => Ok(bright_win_devices())
     _ => Err(Unsupported)
   }
 }
@@ -299,6 +307,28 @@ fn bright_win_devices() -> Array[BrightnessDevice] {
     }
   }
   out
+}
+
+///|
+/// Windows 内屏亮度设备（WMI，subsystem "wmi"，max 恒 100——WMI 的
+/// CurrentBrightness 语义即 0-100 百分比）；无内屏 / WMI 不可用为 None。
+fn bright_wmi_device() -> BrightnessDevice? {
+  let ok = Ref(0)
+  let name = @utf8.decode_lossy(@yue.ffi_wmi_brightness_devices(ok))
+  if ok.val != 1 || name == "" {
+    return None
+  }
+  let cur = Ref(0)
+  let levels = Ref(0)
+  if @yue.ffi_wmi_brightness_get(cur, levels, ok) != 0 || ok.val != 1 {
+    return None
+  }
+  Some({
+    subsystem: "wmi",
+    name,
+    max: 100,
+    current: cur.val,
+  })
 }
 
 ///|
@@ -351,23 +381,56 @@ fn bright_win_set(
 }
 
 ///|
-/// 屏幕当前亮度百分比（0-100，实时读：Linux 读 sysfs，Windows 读 DDC）。
+/// Windows 内屏亮度读（WMI CurrentBrightness 即 0-100 百分比）。
+fn bright_wmi_get() -> Result[Int, BrightnessError] {
+  let cur = Ref(0)
+  let levels = Ref(0)
+  let ok = Ref(0)
+  if @yue.ffi_wmi_brightness_get(cur, levels, ok) != 0 || ok.val != 1 {
+    return Err(DeviceNotFound)
+  }
+  Ok(cur.val)
+}
+
+///|
+/// Windows 内屏亮度写（WMI WmiSetBrightness，percent 即 0-100）。
+fn bright_wmi_set(percent : Int) -> Result[Unit, BrightnessError] {
+  if percent < 0 || percent > 100 {
+    return Err(InvalidParam("百分比越界: \{percent}"))
+  }
+  let ok = Ref(0)
+  if @yue.ffi_wmi_brightness_set(percent, ok) != 0 || ok.val != 1 {
+    return Err(BusFailed("WmiSetBrightness 失败"))
+  }
+  Ok(())
+}
+
+///|
+/// 屏幕当前亮度百分比（0-100，实时读：Linux 读 sysfs，Windows 读 DDC
+/// 或 WMI 内屏）。
 pub fn brightness_get(dev : BrightnessDevice) -> Result[Int, BrightnessError] {
   if dev.subsystem == "ddc" {
     return bright_win_get(dev)
+  }
+  if dev.subsystem == "wmi" {
+    return bright_wmi_get()
   }
   bright_get_impl(dev, "backlight")
 }
 
 ///|
 /// 设置屏幕亮度百分比（0-100；Linux 写走 logind，logind 不在线返回
-/// Unsupported；Windows 走 DDC/CI，设备消失给 DeviceNotFound）。
+/// Unsupported；Windows 走 DDC/CI 或 WMI 内屏，设备消失给
+/// DeviceNotFound）。
 pub fn brightness_set_percent(
   dev : BrightnessDevice,
   percent : Int,
 ) -> Result[Unit, BrightnessError] {
   if dev.subsystem == "ddc" {
     return bright_win_set(dev, percent)
+  }
+  if dev.subsystem == "wmi" {
+    return bright_wmi_set(percent)
   }
   bright_set_impl(dev, "backlight", percent)
 }
@@ -383,6 +446,12 @@ pub fn brightness_step_percent(
     match bright_win_get(dev) {
       Err(e) => return Err(e)
       Ok(cur) => return bright_win_set(dev, cur + delta)
+    }
+  }
+  if dev.subsystem == "wmi" {
+    match bright_wmi_get() {
+      Err(e) => return Err(e)
+      Ok(cur) => return bright_wmi_set(cur + delta)
     }
   }
   bright_step_impl(dev, "backlight", delta)

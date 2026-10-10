@@ -1,6 +1,22 @@
 // ffmpeg 动态链 FFI 的薄 stub：只做句柄/字符串转换，无业务逻辑。
 // 依赖系统 libavformat/libavcodec/libswscale/libavutil（动态链，pkg-config
 // 提供头文件与链接参数，由主仓库 scripts/prebuild.py 注入）。
+//
+// 缺 ffmpeg 头的平台（如 Windows 无 dev 包）：整文件降级为哑实现——探测
+// 接口恒失败（vf_version=0、宽高/声道=0、解码=-1），MoonBit 层据此报
+// 「解码不可用」；与 prebuild 缺包降级（链接参数留空）同一哲学，真实缺件
+// 只在真用到时呈现。头文件出现（INCLUDE/CPATH 供 MSVC 或系统安装）即
+// 自动走真实现。
+
+#if defined(__has_include)
+#  if __has_include(<libavformat/avformat.h>)
+#    define VF_HAVE_FFMPEG 1
+#  endif
+#else
+#  define VF_HAVE_FFMPEG 1 /* 无 __has_include 的老工具链按可用处理 */
+#endif
+
+#ifdef VF_HAVE_FFMPEG
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
@@ -437,3 +453,94 @@ int32_t vf_aseek_s(VfADec *d, double t_s) {
     }
     return 0;
 }
+
+#else /* 无 ffmpeg 头：降级哑实现（返回值与真实现的失败路径同构） */
+
+#include <stdint.h>
+#include <stdlib.h>
+
+typedef struct VfFmt { char _; } VfFmt;
+typedef struct VfDec { char _; } VfDec;
+typedef struct VfADec { char _; } VfADec;
+
+int32_t vf_version(void) { return 0; }
+
+VfFmt *vf_open(const char *path) {
+    (void)path;
+    return (VfFmt *)malloc(sizeof(VfFmt));
+}
+
+int32_t vf_ok(VfFmt *f) { (void)f; return 0; }
+
+void vf_close(VfFmt *f) { free(f); }
+
+int32_t vf_video_stream(VfFmt *f) { (void)f; return -1; }
+
+int32_t vf_audio_stream(VfFmt *f) { (void)f; return -1; }
+
+VfDec *vf_no_decoder(void) { return NULL; }
+
+VfADec *vf_no_audio_decoder(void) { return NULL; }
+
+int32_t vf_stream_width(VfFmt *f) { (void)f; return 0; }
+
+int32_t vf_stream_height(VfFmt *f) { (void)f; return 0; }
+
+double vf_duration_s(VfFmt *f) { (void)f; return 0.0; }
+
+void vf_close_decoder(VfDec *d) { free(d); }
+
+/* 与真实现的失败路径同构：非 NULL 哑句柄 + 宽高 0（MoonBit 侧以宽高探测） */
+VfDec *vf_open_video_decoder(VfFmt *f, int32_t out_w, int32_t out_h) {
+    (void)f;
+    (void)out_w;
+    (void)out_h;
+    return (VfDec *)malloc(sizeof(VfDec));
+}
+
+int32_t vf_dec_width(VfDec *d) { (void)d; return 0; }
+
+int32_t vf_dec_height(VfDec *d) { (void)d; return 0; }
+
+int32_t vf_decode_next(VfDec *d, uint8_t *out, int32_t out_len) {
+    (void)d;
+    (void)out;
+    (void)out_len;
+    return -1;
+}
+
+double vf_frame_pts_s(VfDec *d) { (void)d; return -1.0; }
+
+double vf_stream_fps(VfFmt *f) { (void)f; return 0.0; }
+
+int32_t vf_seek_s(VfDec *d, double t_s) {
+    (void)d;
+    (void)t_s;
+    return -1;
+}
+
+void vf_close_audio_decoder(VfADec *d) { free(d); }
+
+VfADec *vf_open_audio_decoder(VfFmt *f) {
+    (void)f;
+    return NULL;
+}
+
+int32_t vf_adec_channels(VfADec *d) { (void)d; return 0; }
+
+int32_t vf_adec_rate(VfADec *d) { (void)d; return 0; }
+
+int32_t vf_decode_pcm(VfADec *d, uint8_t *out, int32_t out_len) {
+    (void)d;
+    (void)out;
+    (void)out_len;
+    return -1;
+}
+
+int32_t vf_aseek_s(VfADec *d, double t_s) {
+    (void)d;
+    (void)t_s;
+    return -1;
+}
+
+#endif /* VF_HAVE_FFMPEG */

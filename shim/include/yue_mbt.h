@@ -882,6 +882,13 @@ int32_t yue_mbt_brightness_get(int32_t index, int32_t *cur, int32_t *max_v,
                                int32_t *ok);
 /* 亮度设置（value 为设备量纲原始值，量纲语义随平台见 devices 注） */
 int32_t yue_mbt_brightness_set(int32_t index, int32_t value, int32_t *ok);
+/* 内屏亮度枚举（WMI，InstanceName '\n' 分行；空文本 = 无内屏/不可用） */
+void *yue_mbt_wmi_brightness_devices(int32_t *ok);
+/* 内屏亮度读（cur 0-100、levels 灰阶级数） */
+int32_t yue_mbt_wmi_brightness_get(int32_t *cur, int32_t *levels,
+                                   int32_t *ok);
+/* 内屏亮度写（percent 0-100） */
+int32_t yue_mbt_wmi_brightness_set(int32_t percent, int32_t *ok);
 /* 默认输出端点音量（level 0..1 标量，double 与 MoonBit Ref[Double] 同宽；
  * muted 0/1）。[win] IAudioEndpointVolume；[mac] Core Audio master element，
  * 设备无 mute 通道视为未静音、无音量通道返回失败 */

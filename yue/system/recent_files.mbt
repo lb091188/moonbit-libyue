@@ -835,10 +835,31 @@ fn rf_parse_xbel(xml : String) -> Result[Array[RfEntry], String] {
 
 ///|
 /// 解析条目 → 公开记录（href 转本地路径、应用计数）。
+fn rf_win_abs_path(s : String) -> Bool {
+  if s.has_prefix("\\\\") {
+    return true // UNC
+  }
+  let n = s.length()
+  if n < 3 {
+    return false
+  }
+  let c0 = s.unsafe_get(0).to_int()
+  let is_drive = (c0 >= 65 && c0 <= 90) || (c0 >= 97 && c0 <= 122)
+  is_drive && s.unsafe_get(1).to_int() == 58 &&
+  (s.unsafe_get(2).to_int() == 92 || s.unsafe_get(2).to_int() == 47)
+}
+
 fn rf_entry_to_item(e : RfEntry) -> RecentItem {
+  // Windows 装载器的 uri 就是 .lnk 目标本体（裸路径），非 file:// 形式；
+  // 只把「绝对路径形态」的 uri 直接当 path，URL 形态（http 等）仍留空
   let path = match rf_uri_to_path(e.uri) {
     Some(p) => p
-    None => ""
+    None =>
+      if @yue.platform() == "windows" && rf_win_abs_path(e.uri) {
+        e.uri
+      } else {
+        ""
+      }
   }
   {
     uri: e.uri,

@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#if defined(_WIN32)
+#include <windows.h> // QueryPerformanceCounter(单调时钟)
+#endif
 #include "moonbit.h"
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
@@ -231,9 +234,22 @@ void mbt_adev_close(MaPlayer *p) {
     free(p);
 }
 
-/* 单调墙钟（ms，CLOCK_MONOTONIC）：视频播放时钟的推进基准 */
+/* 单调墙钟（ms）：POSIX 用 CLOCK_MONOTONIC；Windows 用
+ * QueryPerformanceCounter（同单调、不受系统时间调整影响） */
 int64_t mbt_now_ms(void) {
+#if defined(_WIN32)
+    static LARGE_INTEGER freq;
+    static int have_freq = 0;
+    LARGE_INTEGER counter;
+    if (have_freq == 0) {
+        QueryPerformanceFrequency(&freq);
+        have_freq = 1;
+    }
+    QueryPerformanceCounter(&counter);
+    return (int64_t)(counter.QuadPart * 1000 / freq.QuadPart);
+#else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+#endif
 }

@@ -179,9 +179,9 @@ test "errno_text:Windows 错误码翻译表目标值(SYS2 语义归一)" {
 }
 
 ///|
-test "on_windows:平台探测(Linux 宿主恒 false)" {
-  // 编译期由 stub 定;Linux / macOS 宿主上恒 false
-  assert_eq(on_windows(), false)
+test "on_windows:平台探测(与运行平台一致)" {
+  // 编译期由 stub 定;Windows 宿主为 true,Linux / macOS 宿主为 false
+  assert_eq(on_windows(), @yue.platform() == "windows")
 }
 
 ///|
@@ -311,6 +311,10 @@ test "S3 ProcMonitor：真实 /proc 全量采样 + 二次差值(Linux)" {
         assert_true(p.name.length() > 0)
         assert_true(p.cmd.length() > 0)
         if p.pid == 1 {
+          has_init = true
+        }
+        // Windows 无 pid 1：System(pid 4) 等价 init/Secure System(72)
+        if on_windows() && (p.pid == 4 || p.pid == 72) {
           has_init = true
         }
       }

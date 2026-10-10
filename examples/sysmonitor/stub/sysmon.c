@@ -21,6 +21,11 @@
 #ifndef WINVER
 #define WINVER 0x0A00
 #endif
+/* ws2def 与 windows.h 自带的 winsock.h 互斥；本文件不用 winsock，
+   LEAN_AND_MEAN 掐掉 winsock.h 以便下方先引 ws2def/ws2ipdef。 */
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 
 #include <moonbit.h>
 #include <stdarg.h>
@@ -125,8 +130,19 @@ static moonbit_bytes_t sysmon_bytes_take(SysmonBuf *b) {
 
 #include <windows.h>
 #include <pdh.h>
+/* PDH_MORE_DATA 声明在 pdhmsg.h，pdh.h 不自动带（本文件按函数指针调
+   PDH，不走 pdh.lib，定义兜底即可） */
+#ifndef PDH_MORE_DATA
+#define PDH_MORE_DATA 0x800007D2L
+#endif
 #include <tlhelp32.h>
+#include <winioctl.h> /* IOCTL_DISK_PERFORMANCE（磁盘速率，不走 PDH） */
 #include <winreg.h>
+/* MIB_IF_TABLE2/MIB_IF_ROW2 在 netioapi.h 的 #ifdef _WS2IPDEF_ 分支里，
+   SDK 26100 的 iphlpapi.h 不再先引 ws2def/ws2ipdef——按 netioapi.h 自述
+   的包含顺序先给这两个头，再进 iphlpapi。 */
+#include <ws2def.h>
+#include <ws2ipdef.h>
 #include <iphlpapi.h>
 
 #define SYSMON_ERR_PENDING 0xC0000004UL /* STATUS_INFO_LENGTH_MISMATCH */
@@ -465,118 +481,88 @@ static int sysmon_pdh_ready(void) {
 
 /* PDH 通配计数器的实例值数组（PdhGetRawCounterArrayW 两段式取）。
    成功返回 malloc 数组，*count 为实例数；失败返回 NULL。 */
-static void *sysmon_pdh_raw_array(void *counter, DWORD *count) {
-  DWORD size = 0;
-  if (g_pdh.get_raw_array(counter, &size, NULL, NULL) != PDH_MORE_DATA ||
-      size == 0) {
-    return NULL;
-  }
-  void *buf = malloc(size);
-  if (buf == NULL) {
-    return NULL;
-  }
-  if (g_pdh.get_raw_array(counter, &size, count, buf) != 0) {
-    free(buf);
-    return NULL;
-  }
-  return buf;
-}
-
-/* PDH PhysicalDisk 实例名（如 "0 C: D:"）提取盘符名表：按空格分词，只收
-   形如 "C:" 的双字符 token（磁盘序号与 "_Total" 自然跳过）。返回个数，
-   名字逐个 malloc 写出到 names（调用方逐项 free）。 */
-#define SYSMON_MAX_DISK_NAMES 26
-
-static DWORD sysmon_pdh_disk_names(const wchar_t *instance, char **names,
-                                   DWORD cap) {
-  DWORD n = 0;
-  const wchar_t *p = instance;
-  while (*p != L'\0' && n < cap) {
-    while (*p == L' ') {
-      p++;
-    }
-    const wchar_t *tok = p;
-    while (*p != L'\0' && *p != L' ') {
-      p++;
-    }
-    size_t len = (size_t)(p - tok);
-    if (len != 2 || tok[1] != L':') {
-      continue;
-    }
-    wchar_t w[3] = {tok[0], L':', L'\0'};
-    char *s = sysmon_wide_to_utf8(w);
-    if (s != NULL) {
-      names[n++] = s;
-    }
-  }
-  return n;
-}
-
+/* 磁盘 IO：IOCTL_DISK_PERFORMANCE（\\.\X: 的累计读/写字节）。
+   不依赖性能计数器（PDH）：精简 / 计数器名表损坏的系统上 Perflib 的
+   PhysicalDisk 对象根本不存在，而 IOCTL 是存储栈直供。DISK_PERFORMANCE
+   布局按 SDK winioctl.h 逐字段镜像（ReadCount/WriteCount 是 DWORD，
+   不是 LONGLONG——镜像错一位全字段错位）。 */
 typedef struct {
-  DWORD count;
-  PDH_RAW_COUNTER_ITEM_W *items;
-} SysmonRawArray;
+  LARGE_INTEGER BytesRead;
+  LARGE_INTEGER BytesWritten;
+  LARGE_INTEGER ReadTime;
+  LARGE_INTEGER WriteTime;
+  LARGE_INTEGER IdleTime;
+  DWORD ReadCount;
+  DWORD WriteCount;
+  DWORD QueueDepth;
+  DWORD SplitCount;
+  LARGE_INTEGER QueryTime;
+  DWORD StorageDeviceNumber;
+  WCHAR StorageManagerName[8];
+} SysmonDiskPerf;
+
+/* 单卷累计字节；打不开 / IOCTL 不支持（光驱 / 无介质）返回 0 */
+static int sysmon_volume_io_bytes(wchar_t letter, ULONGLONG *read_bytes,
+                                  ULONGLONG *written_bytes) {
+  wchar_t path[7];
+  path[0] = L'\\';
+  path[1] = L'\\';
+  path[2] = L'.';
+  path[3] = L'\\';
+  path[4] = letter;
+  path[5] = L':';
+  path[6] = L'\0';
+  /* 访问权限 0 + 共享读写：查询类 IOCTL 不需要真实读权限 */
+  HANDLE h = CreateFileW(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                           OPEN_EXISTING, 0, NULL);
+  if (h == INVALID_HANDLE_VALUE) {
+    return 0;
+  }
+  SysmonDiskPerf dp;
+  memset(&dp, 0, sizeof(dp));
+  DWORD ret = 0;
+  BOOL ok = DeviceIoControl(h, IOCTL_DISK_PERFORMANCE, NULL, 0, &dp,
+                              sizeof(dp), &ret, NULL);
+  CloseHandle(h);
+  if (ok != TRUE) {
+    return 0;
+  }
+  *read_bytes = (ULONGLONG)dp.BytesRead.QuadPart;
+  *written_bytes = (ULONGLONG)dp.BytesWritten.QuadPart;
+  return 1;
+}
 
 static moonbit_bytes_t sysmon_read_diskstats(void) {
-  if (!sysmon_pdh_ready()) {
-    return NULL;
-  }
-  void *query = NULL;
-  if (g_pdh.open_query(NULL, 0, &query) != 0) {
-    return NULL;
-  }
-  void *cr = NULL;
-  void *cw = NULL;
-  moonbit_bytes_t out = NULL;
-  if (g_pdh.add_english(query, L"\\PhysicalDisk(*)\\Disk Read Bytes", 0,
-                        &cr) == 0 &&
-      g_pdh.add_english(query, L"\\PhysicalDisk(*)\\Disk Write Bytes", 0,
-                        &cw) == 0 &&
-      g_pdh.collect(query) == 0) {
-    SysmonRawArray ar = {0};
-    SysmonRawArray aw = {0};
-    ar.items = (PDH_RAW_COUNTER_ITEM_W *)sysmon_pdh_raw_array(cr, &ar.count);
-    aw.items = (PDH_RAW_COUNTER_ITEM_W *)sysmon_pdh_raw_array(cw, &aw.count);
-    if (ar.items != NULL && aw.items != NULL) {
-      SysmonBuf b = {0};
-      int ok = 1;
-      for (DWORD i = 0; ok && i < ar.count; i++) {
-        /* 对位同实例的写计数（实例数小，线性查找足够） */
-        LONGLONG written = 0;
-        int found = 0;
-        for (DWORD j = 0; j < aw.count; j++) {
-          if (wcscmp(ar.items[i].szName, aw.items[j].szName) == 0) {
-            written = aw.items[j].RawValue.FirstValue;
-            found = 1;
-            break;
-          }
-        }
-        if (!found) {
-          continue;
-        }
-        LONGLONG read_sectors = ar.items[i].RawValue.FirstValue;
-        /* PhysicalDisk 计数按物理盘计：盘上每个盘符各出一行同名同值，
-           使 /proc/mounts 侧每个分区行都能归属到所属物理盘 */
-        char *names[SYSMON_MAX_DISK_NAMES];
-        DWORD nn = sysmon_pdh_disk_names(ar.items[i].szName, names,
-                                         SYSMON_MAX_DISK_NAMES);
-        for (DWORD k = 0; k < nn; k++) {
-          ok = sysmon_buf_putf(&b, "8 0 %s 0 0 %lld 0 0 0 %lld 0 0 0 0 0\n",
-                               names[k], read_sectors / 512,
-                               written / 512);
-          free(names[k]);
-          if (!ok) {
-            break;
-          }
-        }
-      }
-      out = sysmon_bytes_take(&b);
+  DWORD mask = GetLogicalDrives();
+  SysmonBuf b = {0};
+  int ok = 1;
+  for (int i = 0; ok && i < 26; i++) {
+    if ((mask & (1u << i)) == 0) {
+      continue;
     }
-    free(ar.items);
-    free(aw.items);
+    ULONGLONG rd = 0, wr = 0;
+    if (!sysmon_volume_io_bytes((wchar_t)(L'A' + i), &rd, &wr)) {
+      continue; /* 打不开的卷（光驱 / 无介质）跳过 */
+    }
+    wchar_t name[3] = {(wchar_t)(L'A' + i), L':', L'\0'};
+    char *nm = sysmon_wide_to_utf8(name);
+    if (nm == NULL) {
+      continue;
+    }
+    /* Linux diskstats 同构文本：字段位 major minor name r_completed
+       r_merged sectors_read ms_reading w_completed w_merged
+       sectors_written ms_writing ios ms_doing weighted——字节换算扇区
+       数（512B），MoonBit 侧 byte_rate 按 512 还原 */
+    ok = sysmon_buf_putf(&b, "8 0 %s 0 0 %llu 0 0 0 %llu 0 0 0 0 0\n", nm,
+                         (unsigned long long)(rd / 512),
+                         (unsigned long long)(wr / 512));
+    free(nm);
   }
-  g_pdh.close_query(query);
-  return out;
+  if (!ok || b.len == 0) {
+    free(b.p);
+    return NULL;
+  }
+  return sysmon_bytes_take(&b);
 }
 
 /* ---------------- 磁盘：statvfs → GetDiskFreeSpaceExW ---------------- */
@@ -663,7 +649,7 @@ static moonbit_bytes_t sysmon_list_netifs(void) {
     if (r->Type == IF_TYPE_SOFTWARE_LOOPBACK) {
       name = sysmon_wide_to_utf8(L"lo");
     } else {
-      name = sysmon_wide_to_utf8(r->InterfaceAlias);
+      name = sysmon_wide_to_utf8(r->Alias);
     }
     if (name == NULL || name[0] == '\0') {
       free(name);
@@ -709,7 +695,7 @@ static moonbit_bytes_t sysmon_read_netif_bytes(const char *path) {
     const MIB_IF_ROW2 *r = &tab->Table[i];
     char *name = r->Type == IF_TYPE_SOFTWARE_LOOPBACK
                      ? sysmon_wide_to_utf8(L"lo")
-                     : sysmon_wide_to_utf8(r->InterfaceAlias);
+                     : sysmon_wide_to_utf8(r->Alias);
     int hit = name != NULL && strcmp(name, alias) == 0;
     free(name);
     if (hit) {
@@ -892,7 +878,9 @@ static int sysmon_snap_refresh(void) {
       }
       arr[n].pid = e.th32ProcessID;
       arr[n].ppid = e.th32ParentProcessID;
-      arr[n].threads = e.cntThreads;
+      /* cntThreads 对 VBS 的 Secure System（pid 72）会报 0——Linux 语义
+         里 num_threads>=1 是跨层契约不变量，虚拟层垫底维持同构 */
+      arr[n].threads = e.cntThreads != 0 ? e.cntThreads : 1;
       memset(arr[n].exe, 0, sizeof(arr[n].exe));
       for (int i = 0; i < MAX_PATH && e.szExeFile[i]; i++) {
         arr[n].exe[i] = e.szExeFile[i];
@@ -1026,6 +1014,12 @@ static moonbit_bytes_t sysmon_read_pid_cmdline(DWORD pid) {
 
 /* ---------------- GPU：DXGI 枚举 + PDH GPU Engine ---------------- */
 
+/* DXGI_ADAPTER_DESC1 逐字段镜像（dxgi1_4.h）：
+   WCHAR Description[128]; UINT VendorId; UINT DeviceId; UINT SubSysId;
+   UINT Revision; SIZE_T DedicatedVideoMemory; SIZE_T
+   DedicatedSystemMemory; SIZE_T SharedSystemMemory; LUID AdapterLuid;
+   UINT Flags;——DedicatedSystemMemory 不可省：漏一个 SIZE_T 会让
+   GetDesc1 写爆调用方结构（栈越界），且 AdapterLuid/Flags 全错位。 */
 typedef struct {
   wchar_t Description[128];
   unsigned int VendorId;
@@ -1033,6 +1027,7 @@ typedef struct {
   unsigned int SubSysId;
   unsigned int Revision;
   unsigned long long DedicatedVideoMemory;
+  unsigned long long DedicatedSystemMemory;
   unsigned long long SharedSystemMemory;
   struct {
     unsigned long LowPart;
@@ -1106,7 +1101,10 @@ typedef struct {
 #ifndef PDH_MORE_DATA
 #define PDH_MORE_DATA 0x800007D2L
 #endif
-#define SYSMON_DXGI_ADAPTER_FLAG_SOFTWARE 1u
+/* DXGI_ADAPTER_FLAG：REMOTE=1、SOFTWARE=2（dxgi.h 枚举值，写错常量会让
+   软件渲染适配器「Microsoft Basic Render Driver」混进 GPU 列表） */
+#define SYSMON_DXGI_ADAPTER_FLAG_SOFTWARE 2u
+#define SYSMON_DXGI_ADAPTER_FLAG_REMOTE 1u
 
 typedef struct {
   unsigned int vendor;
@@ -1150,8 +1148,11 @@ static void sysmon_gpu_enum(void) {
     SysmonAdapterVtbl *av = *(SysmonAdapterVtbl **)adapter;
     SysmonDxgiDesc1 desc;
     memset(&desc, 0, sizeof(desc));
+    /* 软件渲染 / 远程适配器不是真 GPU（Basic Render Driver / 远程会话
+       虚拟适配器），跳过 */
     if (av->GetDesc1(adapter, &desc) == 0 &&
-        !(desc.Flags & SYSMON_DXGI_ADAPTER_FLAG_SOFTWARE)) {
+        (desc.Flags & (SYSMON_DXGI_ADAPTER_FLAG_SOFTWARE |
+                       SYSMON_DXGI_ADAPTER_FLAG_REMOTE)) == 0) {
       SysmonGpuEntry *e = &g_gpus[g_gpu_n];
       memset(e, 0, sizeof(*e));
       e->vendor = desc.VendorId;
@@ -1181,7 +1182,7 @@ static SysmonGpuEntry *sysmon_gpu_by_addr(const char *addr) {
   return NULL;
 }
 
-/* /sys/bus/pci/devices/<addr>/{class,vendor,device} */
+/* /sys/bus/pci/devices/<addr>/{class,vendor,device,name} */
 static moonbit_bytes_t sysmon_read_gpu_id(const char *addr, const char *what) {
   sysmon_gpu_enum();
   SysmonGpuEntry *e = sysmon_gpu_by_addr(addr);
@@ -1195,6 +1196,15 @@ static moonbit_bytes_t sysmon_read_gpu_id(const char *addr, const char *what) {
     sysmon_buf_putf(&b, "0x%04x\n", e->vendor);
   } else if (strcmp(what, "device") == 0) {
     sysmon_buf_putf(&b, "0x%04x\n", e->device);
+  } else if (strcmp(what, "name") == 0) {
+    /* Windows 专有：DXGI Description（适配器友好名，如
+       "Intel(R) UHD Graphics 620"）——Linux sysfs 无对应文件，读不到
+       为 None，MoonBit 侧取名链顺序不变 */
+    if (e->name[0] == '\0' || !sysmon_buf_puts(&b, e->name) ||
+        !sysmon_buf_puts(&b, "\n")) {
+      free(b.p);
+      return NULL;
+    }
   } else {
     free(b.p);
     return NULL;
@@ -1699,7 +1709,7 @@ static moonbit_bytes_t sysmon_virtual_read(const char *p) {
       return sysmon_read_hwmon((int)idx, end + 1);
     }
   }
-  /* /sys/bus/pci/devices/<addr>/{class,vendor,device,gpu_busy_percent,
+  /* /sys/bus/pci/devices/<addr>/{class,vendor,device,name,gpu_busy_percent,
      mem_info_vram_used,mem_info_vram_total} */
   if (strncmp(p, "/sys/bus/pci/devices/", 21) == 0) {
     const char *addr = p + 21;
@@ -1712,7 +1722,7 @@ static moonbit_bytes_t sysmon_virtual_read(const char *p) {
         a[al] = '\0';
         const char *what = slash + 1;
         if (strcmp(what, "class") == 0 || strcmp(what, "vendor") == 0 ||
-            strcmp(what, "device") == 0) {
+            strcmp(what, "device") == 0 || strcmp(what, "name") == 0) {
           return sysmon_read_gpu_id(a, what);
         }
         if (strcmp(what, "gpu_busy_percent") == 0) {
