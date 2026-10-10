@@ -1,6 +1,6 @@
 # NoahLiu/yue-media
 
-[moonbit-libyue](https://mooncakes.io/docs/NoahLiu/moonbit-libyue) 的媒体扩展：在 yue GUI 之上提供开箱即用的音视频播放组件，解码基于 [NoahLiu/ffmpeg-mbt](https://mooncakes.io/docs/NoahLiu/ffmpeg-mbt)（链接系统 ffmpeg），音频输出基于内嵌 miniaudio。
+[moonbit-libyue](https://mooncakes.io/docs/NoahLiu/moonbit-libyue) 的媒体扩展：在 yue GUI 之上提供开箱即用的音视频播放组件，解码基于 [NoahLiu/ffmpeg-mbt](https://mooncakes.io/docs/NoahLiu/ffmpeg-mbt)（链接系统 ffmpeg），音频输出基于内嵌 miniaudio（单头文件，构建期由 `prebuild.py` 按钉版本 + sha256 取回，不入版本库）。
 
 ## 安装
 

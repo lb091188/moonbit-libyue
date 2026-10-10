@@ -16,3 +16,7 @@ import {
   "NoahLiu/moonbit-libyue@0.5.11",
   "NoahLiu/ffmpeg-mbt@0.1.0",
 }
+
+options(
+  "--moonbit-unstable-prebuild": "prebuild.py"
+)

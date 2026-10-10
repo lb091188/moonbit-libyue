@@ -1,6 +1,6 @@
 # 音频输出后端评估:内嵌 miniaudio 的下线方案
 
-> 状态:**评估稿(未实施)** · 写于 2026-10-10 · 结论见末节「推荐」
+> 状态:**B 方案已实施并验证(2026-10-10)** · 上方为评估过程,末三节为结论、取舍理由与实施结果
 
 ## 背景与动机
 
@@ -35,18 +35,26 @@
 | **D 换 SDL2 / PortAudio / RtAudio** | 同类替换 | 无(只是换一个依赖) | 中 | 普遍更重、依赖更多,单头零依赖优势尽失 |
 | **E 回 MoonBit miniaudio 包** | 重新 import `CorvusCinereus/miniaudio` | 仓库不含 C | 小 | **已否决**:错误语义有 bug(`load_sound` 复用 `engine->result`),且解码器仅 WAV/MP3/FLAC |
 
-## 推荐
+## 推荐与结论
 
-- **若动机是仓库体积 / 语言统计(最可能)→ 选 B。**
-  理由:runtime 一行不改、行为零变化,只把"随仓提交的头文件"换成"构建期拉取的依赖",与仓库既有的 libyue `vendor/` + sha256 模式**完全同构**,不引入新概念。
-  - 现成钩子:`scripts/prepare.py` 已有 `download(url, expected_sha256)`(钉版本 + 校验 + 缓存 + 重试);`scripts/prebuild.py` 每次 `moon build` 都会执行(`moon.mod` 的 `--moonbit-unstable-prebuild`),天然可挂"若缺则拉取"。
-  - 落地要点(实施期):①`miniaudio.h` 加进 `.gitignore`;②prebuild 里按 `MINIAUDIO_VERSION` + 钉死 sha256 下载到 `modules/yue-media/src/`(或缓存目录并给 native-stub 加 `-I`);③离线回退本地缓存;④版本常量与 sha256 集中一处。
-  - **实施期待验项**(尚未验证,勿当已成立):消费方首次 `moon build` 的联网行为;`moon publish` 在临时目录独立校验时 prebuild 能否先备好头文件。
+- **已采纳并实施 B(2026-10-10)**:动机是仓库体积 / 语言统计。runtime 一行不改、行为零变化,只把"随仓提交的头文件"换成"构建期按钉版本 + sha256 取回"。
+  - **实际落点**(与初稿设想不同,照仓内既有先例更省事):钩子挂在**模块级**——新增 `modules/yue-media/prebuild.py`,并在 `modules/yue-media/moon.mod` 写 `options("--moonbit-unstable-prebuild": "prebuild.py")`,与 `modules/ffmpeg-mbt/prebuild.py` 完全同一模式;**不必**改根 `scripts/prebuild.py` / `scripts/prepare.py`。
+  - 脚本行为:已存在且 sha256 相符 → 跳过(幂等、离线可预置);缺失或不符 → 下载 → 校验 → 原子替换;失败非零退出并给出手动放置路径。stdout 只出 JSON(`{"link_configs": []}`),进度与错误走 stderr。
+  - 代价(唯一新增):消费方首次构建需能访问 `raw.githubusercontent.com`。评估初稿低估了这点——libyue 的预构建库**随包分发**,消费方原本无需 GitHub;miniaudio 走构建期拉取则新增了一次 GitHub 依赖。
 - **若动机是供应链纯净(去第三方 C 库)→ 选 C**,但成本最高,且 Linux 侧引入 `libasound` 开发包,与本仓库"降低消费方依赖"的方向相反。
 - **若只是观感上不想看到 C → 选 A**,零风险。
 
-## 影响面(仅针对推荐的 B)
+## 为什么不做「预构建」
 
-- **改**:删 `modules/yue-media/src/miniaudio.h`;改 `.gitignore`;`scripts/prebuild.py`(+少量)、`scripts/prepare.py`(复用现有 `download`);文档提及处(`README`/`README_ZH`/`adaptation`)。
-- **不动**:`audio_stub.c`、`audio_player.mbt`、`modules/yue-media/src/moon.pkg`。
-- **门控**:`moon check` 零警告 + `moon test` 全绿 + `moon build examples/showcase` 重链零警告 + 无输出设备环境(CI/headless)静音降级仍成立。
+- miniaudio 是**单头文件**、**零链接依赖**——音频后端默认走运行期 `dlopen`(`miniaudio.h` 明确:只有开了 `-DMA_NO_RUNTIME_LINKING` 才需要链接),故它没有链接参数要托管,单翻译单元编译也极便宜。
+- 它的"编译"本就发生在 yue-media 自己的 native-stub 里(`audio_stub.c` 的 `#define MINIAUDIO_IMPLEMENTATION`),所以唯一缺的是"编译时头文件在场"。
+- 反过来做预构建,代价全在负面:①要另出**三份平台二进制**(且各平台后端本就是编译期选定,等于还是三套);②要把它拉进**链接参数托管**链路,违背仓库「库包不写链接参数、链接统一走 prebuild 传播」的硬性规则;③二进制把**编译器与 `MA_NO_*` 宏配置钉死**,而单头本地编译永远匹配本机工具链;④收益接近于零。
+- 对照:**libyue 必须预构建**,是因为它体量大且依赖 GTK3 / WebKit2GTK 等系统开发包(`scripts/prebuild.py` 的 `link_configs()` 只服务它)。一句话——libyue 预构建是为了"让消费方免装系统开发包";miniaudio 本来就免依赖、编译又便宜,预构建反而丢掉它最大的优势。
+
+## 实施结果(2026-10-10)
+
+- **改动**:新增 `modules/yue-media/prebuild.py`;`modules/yue-media/moon.mod` 加 prebuild 钩子;`git rm --cached modules/yue-media/src/miniaudio.h` 并写进 `.gitignore`;文档回写(`docs/zh/adaptation.md`、`TODO.md`、本页、`modules/yue-media/README.md`)。
+- **零改动**:`audio_stub.c`、`audio_player.mbt`、`modules/yue-media/src/moon.pkg`、根 `scripts/`。
+- **钉死**:版本 `0.11.25` + `sha256 ac7af4de748b7e26b777f37e01cee313a308a7296a3eb080e2906b320cc55c89`(与上游 tag **逐字节一致**,`cmp` 实测)。
+- **验证**:①脚本三场景实测——在场跳过 / 缺失取回 / sha256 不符重下,三次结果均与上游逐字节一致、无 `.partial` 残留;②删 `src/miniaudio.h` 后 `moon test modules/yue-media/src`,`prebuild.py` 被 moon 自动调用并取回头文件,11/11 通过;③全仓 `moon check` 零警告 + `moon test` 661/661。
+- **未覆盖**:受限网络下消费方的实际表现(有正确文件即跳过,可预置规避);`moon publish` 临时目录内的校验路径未实测。

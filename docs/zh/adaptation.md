@@ -868,12 +868,19 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 ### 音频 ffmpeg 全链路(miniaudio 降级为内嵌设备层)
 
 - 起因:用户真机载 MP3 报 `音频加载失败: Invalid file`(浏览器可播)。独立 C 程序直链同一份 miniaudio 0.11.25 实测:libmp3lame 标准 MP3、系统 MP3 全部解码 OK——miniaudio 上游没有坏,是 `CorvusCinereus/miniaudio` MoonBit 封装的错误语义脏(load_sound 复用 engine->result 传错误码,加载失败后引擎 result 被污染,后续所有 load 永远报 Invalid file)且解码器集合仅 WAV/MP3/FLAC(OGG 需 stb_vorbis、m4a/aac 无内置)。用户定案:音频也交给 ffmpeg(全格式、与视频同栈、音画同源)。
-- 架构:**ffmpeg 管解码,miniaudio 只管输出设备**。miniaudio.h(0.11.25 上游单头)vendored 进 `modules/yue-media/src/`,与 audio_stub.c 一起作为 native-stub 编译——miniaudio 从「MoonBit 依赖(mooncakes)」降级为「播放器的内部实现细节」,不再出现在任何 moon.mod import 里,不引入 yue-media 的人零感知。
+- 架构:**ffmpeg 管解码,miniaudio 只管输出设备**。miniaudio.h(0.11.25 上游单头)与 audio_stub.c 一起作为 native-stub 编译;头文件不再随仓库提交,构建期由 `modules/yue-media/prebuild.py` 按钉版本 + sha256 取回(见下条)——miniaudio 从「MoonBit 依赖(mooncakes)」降级为「播放器的内部实现细节」,不再出现在任何 moon.mod import 里,不引入 yue-media 的人零感知。
 - 设备层设计(audio_stub.c):ma_device(playback,s16,声道/采样率与 ffmpeg 解码输出一致零重采样)+ 互斥锁保护的 PCM chunk 链表;MoonBit 层 pump(50ms)把 decode_pcm 的字节 push 进队列(高水位 40KB≈0.3s),设备回调线程从队列取数混出、音量在回调内逐样本钳制乘。位置 = 设备累计消费字节(played_bytes)- seek 时记录的基准;自然播完 = demuxer EOF && 队列空。seek = 清队列 + 双 Demuxer 重定位 + 重填。
 - **无输出设备降级**:headless/CI 环境 ma_device_init 失败时返回哑设备句柄(has_device=0),push 静默丢弃、状态机照常(pump 按 tick×25ms 近似推进位置)——AudioPlayer 冒烟在无设备环境也能全断言跑通,不为环境写跳过分支。
 - AudioPlayer/VideoPlayer 共用这套设备层;组件(audio_player_t/video_player_t)50ms 时钟 pump+refresh,free 后凭 closed 标志停摆。
 - 踩坑:① C 侧 data_callback 里消费 chunk 后 queued_bytes 统计口径要统一 recount(半播块/整块消费混写递减会漏);② ma_device_init 是三参 (context,cfg,device),漏 context 编译错;③ MoonBit `guard` 是保留字(循环哨兵变量名撞上,Parse error);④ 自定义 Node 的 mount 闭包返回 View 不是 Node(结尾 `(row.mount)(parent)`);⑤ 换载 free 旧播放器后旧组件 50ms 时钟还在 pump 已释放的 FFI 句柄(悬垂)——free() 置 closed、时钟查 is_closed 返回 false 停摆,同理 VideoPlayer::duration 改用 make 时缓存的字段(free 后旧时钟的 refresh 曾会调 demuxer.duration_s() 解引用已释放的 fmt)。
 - 真机验证:AudioPlayer 冒烟 1 秒 MP3 从 play 到自然播完 17 tick(真实设备消费队列,非降级路径)+seek/循环重播/错误路径;VideoPlayer 双路(视频帧+音轨 PCM 队列)与无音轨静音路径;全仓 575 测全绿;systemprobe 冒烟进程存活。
+- **头文件移出版本库(2026-10-10)**:
+  - 现象/动机:miniaudio.h 曾随仓库提交(95,864 行 / 4.1MB),一个文件就把 GitHub 语言统计的 C 系拉到 10.8 万行(> MoonBit 8.35 万)、仓库源码多 4.1MB;这不是合规问题(单头许可 public domain 或 MIT-0)。
+  - 修复:新增 `modules/yue-media/prebuild.py` 并经 `modules/yue-media/moon.mod` 的 `options("--moonbit-unstable-prebuild": "prebuild.py")` 挂钩子(照 `modules/ffmpeg-mbt/prebuild.py` 的先例),在 native-stub 编译前确保 `src/miniaudio.h` 在场——**已存在且 sha256 相符则跳过**(幂等;离线环境可预先放好该文件,构建零网络),缺失或不符则从钉死 URL 下载 → 校验 → 原子替换,失败非零退出并提示手动放置路径;`.gitignore` 加该路径。**源码零改动**:`audio_stub.c` 的 `#define MINIAUDIO_IMPLEMENTATION` + `#include "miniaudio.h"` 与 `moon.pkg` 一行未动。
+  - 为什么走「构建期拉取」而不是「预构建」:miniaudio 是单头、**零链接依赖**(音频后端走运行期 `dlopen`,不需要 `-lasound` 之类),其"编译"本就发生在 yue-media 自己的 native-stub 翻译单元里;预构建要另出三份平台二进制、把它拉进链接参数托管链(违背「库包不写链接参数」的规则)、还会把编译器与 `MA_NO_*` 宏配置钉死,收益近零。对照:libyue **必须**预构建,是因为它体量大且依赖 GTK3/WebKit2GTK 等系统开发包(`scripts/prebuild.py` 的 link_configs 只服务它)。
+  - 代价与旁路:消费方首次构建需能访问 `raw.githubusercontent.com`(与 libyue 随包分发预构建库、消费方原本无需 GitHub 的形态相比,这是本方案唯一新增的依赖);已有正确文件即跳过下载,故离线/受限网络可预置规避。钉死版本 `0.11.25` + sha256 `ac7af4de748b7e26b777f37e01cee313a308a7296a3eb080e2906b320cc55c89`(与上游 tag 逐字节一致,cmp 实测)。
+  - 验证:①脚本三场景实测——在场跳过 / 缺失自动取回 / sha256 不符重下,三次结果均与上游逐字节一致、无 `.partial` 残留;②删除 `src/miniaudio.h` 后跑 `moon test modules/yue-media/src`,`prebuild.py` 被 moon 自动调用并把头文件取回,测试 11/11 通过;③全仓 `moon check` 零警告 + `moon test` 661/661。
+  - 评估与取舍全文见 `docs/zh/audio-output-backend.md`。
 
 ### 播放器组件换载崩溃与 seek 防抖风暴(2026-10 真机)
 

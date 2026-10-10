@@ -21,6 +21,8 @@
 - [x] EX2 sysmonitor 进程数据正确性——nice 字段改 parse_i64 负值正确显示,新出现 pid 当拍 CPU% 置 0 不再钉满格,负值回归用例入 wbtest。验证:`moon check --deny-warn` 零警告 + `moon test` 644 全绿(sysproc_wbtest 新增 3 条:负 nice 真实样本 nice=-20/-1/19/裸负号兜底、ByNice 负值升降序、proc_tick_cpu_pct 无前样本当拍置 0);白盒对照暂存修复前代码跑 `moon test -p sysmonitor`,负 nice 用例精确失败(`0 != -20`)、旧语义下 tick 用例精确失败(`400 != 0`),恢复后 24/24 通过;根因(有符号字段用错解析器静默变 0、单调累计计数器「无前样本」混同「前样本为 0」)与验证方式入 docs/zh/adaptation.md「系统监控数据层」节 EX2 条
 - [x] CORE2 yue 核心健壮性批次——SNI 菜单路径随项派生且注销 / 注册失败对称清理,总线重连先检查按需重建连接防 fd 泄漏,Store 增 remove 与主题订阅可退订,carousel / video_view 挂载定时器获得回收通道,moon test 全绿,SNI 多项场景真实总线复验(验证:moon check 零警告 + moon test 655 全绿,新增 sni_wbtest 5 条真总线回归含双托盘项 GetLayout 路由互不覆盖与断线重连不另建连接,均以修复前代码精确失败对照;面板侧双图标目视复核待用户真机)
 
+- [x] AUD1 内嵌 miniaudio 头文件移出版本库——miniaudio.h(95,864 行 / 4.1MB)原随仓库提交,一个文件就把 GitHub 语言统计的 C 系拉到 10.8 万行(> MoonBit 8.35 万)且仓库源码多 4.1MB;改为 `modules/yue-media/prebuild.py` 挂钩子(`--moonbit-unstable-prebuild`,照 `modules/ffmpeg-mbt` 先例)在编译 native-stub 前按钉版本 + sha256 取回(已存在且相符则跳过 → 幂等、离线可预置;缺失或不符则下载校验后原子替换),`audio_stub.c` 与 `moon.pkg` 零改动。选「构建期拉取」而非「预构建」:miniaudio 单头、零链接依赖(后端运行期 dlopen),预构建反而要另出三份平台二进制、拉进链接参数托管链并钉死编译器与 `MA_NO_*` 宏配置。代价:消费方首次构建需访问 raw.githubusercontent(已有文件即跳过,可预置规避)。验证:`moon check` 零警告 + `moon test` 661/661;脚本三场景实测(在场跳过 / 缺失取回 / sha256 不符重下,三次均与上游逐字节一致、无 .partial 残留);删 `src/miniaudio.h` 后 `moon test modules/yue-media/src` 由 moon 自动调用钩子取回且 11/11 通过;评估全文见 docs/zh/audio-output-backend.md
+
 ## 2026 年 10 月月度目标与 Q4 季度目标
 
 10 月(月度):完成现在规划的三大能力域收尾——系统接口、音频、视频渲染;Q4(季度):月度目标全部达成后,macOS 真机验证测试收尾 + 发布闭环。
