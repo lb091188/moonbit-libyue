@@ -1130,3 +1130,92 @@ test "改基线后重新布局不使用旧缓存" {
   assert_eq(a.layout().top, 13.0)
   assert_eq(b.layout().top, 0.0)
 }
+
+// ---- 像素网格取整（YG3c）----
+
+///|
+/// 三个等分主轴的容器（每份 100/3，天生带小数），根宽 100。
+fn three_grow() -> (Node, Node, Node, Node) {
+  let root = Node::new()
+  root.set_width(fixed(100.0))
+  root.set_height(fixed(50.0))
+  let a = leaf(0.0, 0.0)
+  let b = leaf(0.0, 0.0)
+  let c = leaf(0.0, 0.0)
+  a.set_flex(1.0, 1.0, fixed(0.0))
+  b.set_flex(1.0, 1.0, fixed(0.0))
+  c.set_flex(1.0, 1.0, fixed(0.0))
+  root.append_child(a)
+  root.append_child(b)
+  root.append_child(c)
+  (root, a, b, c)
+}
+
+///|
+test "整像素网格:等分边取整后无 1px 缝" {
+  let (root, a, b, c) = three_grow()
+  root.set_pixel_grid(1.0)
+  calculate_layout(root, Some(100.0), Some(50.0))
+  // 原始边 0 / 33.33 / 66.67 / 100 → 取整 0 / 33 / 67 / 100
+  assert_eq(a.layout().left, 0.0)
+  assert_eq(a.layout().width, 33.0)
+  assert_eq(b.layout().left, 33.0)
+  assert_eq(b.layout().width, 34.0)
+  assert_eq(c.layout().left, 67.0)
+  assert_eq(c.layout().width, 33.0)
+  assert_eq(root.layout().width, 100.0)
+}
+
+///|
+test "半像素网格取整" {
+  let (root, a, b, c) = three_grow()
+  root.set_pixel_grid(0.5)
+  calculate_layout(root, Some(100.0), Some(50.0))
+  assert_eq(a.layout().width, 33.5)
+  assert_eq(b.layout().left, 33.5)
+  assert_eq(b.layout().width, 33.0)
+  assert_eq(c.layout().left, 66.5)
+  assert_eq(c.layout().width, 33.5)
+}
+
+///|
+test "不设网格时保留小数值" {
+  let (root, _a, b, _c) = three_grow()
+  calculate_layout(root, Some(100.0), Some(50.0))
+  assert_eq(b.layout().left, 100.0 / 3.0)
+  assert_eq(b.layout().width, 100.0 / 3.0)
+}
+
+///|
+test "嵌套项取整按绝对坐标补偿" {
+  let root = Node::new()
+  root.set_width(fixed(100.0))
+  root.set_height(fixed(50.0))
+  root.set_pixel_grid(1.0)
+  let mut mid : Node = Node::new()
+  let mut inner : Array[Node] = []
+  for i in 0..<3 {
+    let g = Node::new()
+    g.set_flex(1.0, 1.0, fixed(0.0))
+    let x = leaf(0.0, 0.0)
+    let y = leaf(0.0, 0.0)
+    x.set_flex(1.0, 1.0, fixed(0.0))
+    y.set_flex(1.0, 1.0, fixed(0.0))
+    g.append_child(x)
+    g.append_child(y)
+    if i == 1 {
+      mid = g
+      inner = [x, y]
+    }
+    root.append_child(g)
+  }
+  calculate_layout(root, Some(100.0), Some(50.0))
+  // 中间容器绝对边 33.33 / 66.67 → 取整 33 / 67(宽 34)
+  assert_eq(mid.layout().left, 33.0)
+  assert_eq(mid.layout().width, 34.0)
+  // 内部两项绝对边 33.33 / 50 / 66.67 → 取整 33 / 50 / 67,相对父项 0 / 17
+  assert_eq(inner[0].layout().left, 0.0)
+  assert_eq(inner[0].layout().width, 17.0)
+  assert_eq(inner[1].layout().left, 17.0)
+  assert_eq(inner[1].layout().width, 17.0)
+}

@@ -25,6 +25,8 @@ pub struct Node {
   mut baseline_fn : Option[(Option[Double], Option[Double]) -> Option[Double]]
   // 本次布局算出的基线（到本节点边框盒顶部的距离），None = 无基线
   mut baseline : Option[Double]
+  // 像素网格取整间隔（0 = 关闭）；只有作为布局根节点的设置生效
+  mut pixel_grid : Double
   // 测量缓存：键 = (可用宽, 可用高)，值 = (宽, 高, 基线)。
   // 单次 calculate_layout 内有效，入口会整体清空（样式可能在两次布局间被改）
   measure_cache : Array[((Option[Double], Option[Double]), (Double, Double, Option[Double]))]
@@ -42,6 +44,7 @@ pub fn Node::new() -> Node {
     measure : None,
     baseline_fn : None,
     baseline : None,
+    pixel_grid : 0.0,
     measure_cache : [],
     layout_left : 0.0,
     layout_top : 0.0,
@@ -87,6 +90,15 @@ pub fn Node::set_baseline(
   f : (Option[Double], Option[Double]) -> Option[Double],
 ) -> Unit {
   self.baseline_fn = Some(f)
+}
+
+///|
+/// 设像素网格取整间隔：布局完成后，节点的绝对边框按该间隔取整再回推
+/// 相对坐标（相邻项共用边取整一致，不会出现 1px 缝）。
+/// `0.0`（默认）或负数 = 不取整，保留小数；只有作为布局根节点的设置生效，
+/// 间隔为 1.0 即整像素对齐，0.5 即半像素。
+pub fn Node::set_pixel_grid(self : Node, interval : Double) -> Unit {
+  self.pixel_grid = if interval > 0.0 { interval } else { 0.0 }
 }
 
 ///|

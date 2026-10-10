@@ -260,6 +260,41 @@ fn clear_measure_cache(n : Node) -> Unit {
 }
 
 ///|
+/// 贴到网格：按间隔取最近格点。
+fn snap(v : Double, interval : Double) -> Double {
+  (v / interval).round() * interval
+}
+
+///|
+/// 像素网格取整的后处理：按**绝对边框**取整，再回推相对父项的坐标。
+/// `raw_*` 是父项取整前的绝对起端（用来还原子项的真实绝对边框），
+/// `snap_*` 是父项取整后的绝对起端（用来换算子项的相对坐标）。
+/// 同一边被相邻两项共用时取整结果一致，故相邻项之间不会留缝；
+/// 取整误差落在各条边上，不会累积进子项宽度。
+fn round_to_grid(
+  n : Node,
+  interval : Double,
+  raw_l_parent : Double,
+  raw_t_parent : Double,
+  snap_l_parent : Double,
+  snap_t_parent : Double,
+) -> Unit {
+  let raw_l = raw_l_parent + n.layout_left
+  let raw_t = raw_t_parent + n.layout_top
+  let l = snap(raw_l, interval)
+  let t = snap(raw_t, interval)
+  let r = snap(raw_l + n.layout_width, interval)
+  let b = snap(raw_t + n.layout_height, interval)
+  n.layout_left = l - snap_l_parent
+  n.layout_top = t - snap_t_parent
+  n.layout_width = r - l
+  n.layout_height = b - t
+  for c in n.children {
+    round_to_grid(c, interval, raw_l, raw_t, l, t)
+  }
+}
+
+///|
 /// 测量节点内容尺寸（带缓存）。同一节点在同一次布局里会被父容器测两轮
 /// （base 测量与交叉轴重测），深层子树还会被逐层重复，命中时直接复用尺寸
 /// 与基线。
