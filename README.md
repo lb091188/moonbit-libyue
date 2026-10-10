@@ -119,8 +119,8 @@ The full process for adding widgets, native-layer releases, and more is in [AGEN
 ## License
 
 - `moonbit-libyue` is released under the [MIT License](LICENSE).
-- The wrapped [libyue](https://github.com/yue/libyue) is LGPL-2.1 upstream and bundles Apache-2.0 / MIT / BSD-3-Clause components; the complete notice ships with the package in [`vendor/libyue/LICENSE`](vendor/libyue/LICENSE).
-- All libyue patches used here are maintained as separate commits in the [lb091188/yue](https://github.com/lb091188/yue) fork; the prebuilt static libraries distributed with the package are built by GitHub Actions from the fork's `vendor-*` tag sources, so the corresponding source stays retrievable from the repository.
+- The wrapped [libyue](https://github.com/yue/libyue) is LGPL-2.1 upstream and bundles Apache-2.0 / MIT / BSD-3-Clause components; the complete notice ships with the package as [`third_party/libyue/LICENSE`](third_party/libyue/LICENSE) (the `vendor/` copy is a build product and is not tracked).
+- All libyue patches used here are maintained as separate commits in the [lb091188/yue](https://github.com/lb091188/yue) fork; the prebuilt static libraries are built by GitHub Actions from the fork's `vendor-*` tag sources, so the corresponding source stays retrievable. The in-repo `scripts/prepare.py` rebuilds them from source, so a modified libyue can be relinked.
 
 ## References
 

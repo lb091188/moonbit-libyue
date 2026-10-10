@@ -119,8 +119,8 @@ Windows 下 exe 自动为 GUI 子系统,双击无控制台黑框。
 ## 许可证
 
 - `moonbit-libyue` 以 [MIT](LICENSE) 发布。
-- 封装的 [libyue](https://github.com/yue/libyue) 上游为 LGPL-2.1,并捆绑 Apache-2.0 / MIT / BSD-3-Clause 三方组件;完整许可文本随包分发于 [`vendor/libyue/LICENSE`](vendor/libyue/LICENSE)。
-- 本仓库用到的全部 libyue 补丁以独立提交维护于 fork [lb091188/yue](https://github.com/lb091188/yue);随包分发的预构建静态库由 GitHub Actions 从 fork 的 `vendor-*` 标签源码构建,对应源码始终可从仓库标签取回。
+- 封装的 [libyue](https://github.com/yue/libyue) 上游为 LGPL-2.1,并捆绑 Apache-2.0 / MIT / BSD-3-Clause 三方组件;完整许可文本随包分发于 [`third_party/libyue/LICENSE`](third_party/libyue/LICENSE)(`vendor/` 下那份是构建产物,不受版本控制)。
+- 本仓库用到的全部 libyue 补丁以独立提交维护于 fork [lb091188/yue](https://github.com/lb091188/yue);随包分发的预构建静态库由 GitHub Actions 从 fork 的 `vendor-*` 标签源码构建,对应源码始终可取回。仓内 `scripts/prepare.py` 可从源码重建这些库,故修改过的 libyue 可重新构建并重链。
 
 ## 参考
 
