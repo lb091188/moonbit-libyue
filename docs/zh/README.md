@@ -74,7 +74,7 @@ showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 /
 | [autostart.md](autostart.md) | 开机自启动:Linux 写 XDG .desktop、Windows 写 HKCU Run 键,is_enabled / enable / disable 统一语义 |
 | [system-capabilities.md](system-capabilities.md) | 系统能力(包 `@system`,仅中文):屏幕亮度 / 键盘背光 / 系统音量(wpctl 优先 pactl 回退;输出设备枚举与逐应用播放流)/ 媒体控制(MPRIS,playerctl 回退)/ 夜间色温 / 壁纸 / 显示器配置 / 系统窗口管理 / 剪贴板监听 / 磁盘卷(udisks2 优先 lsblk 回退)/ 电源与登录会话 / 电源计划 / 系统信息 / 时区与本地语言 / 蓝牙 / 传感器 / 打印机 / 进程内环境变量与目录枚举 / 最近文件 / 浏览器书签与 Firefox 历史 / 应用查找 / VS Code 本地历史与最近工作区 / 浏览器历史与下载记录,统一 Result 语义;含子进程执行(procrun)与通用 D-Bus 调用层(traybus)两块共享基建 |
 | [plan-system-integration.md](plan-system-integration.md) | 系统集成扩容总体实施计划:P1-P12 与收口项 P14 的批次划分、验收门、共享基建决策与风险(定稿) |
-| [native-gui-plan.md](native-gui-plan.md) | MoonBit 原生 GUI 栈总体实施计划:自绘路线与 libyue 的角色边界、`modules/mbt-gui` 模块结构、三平台输入/输入法后端表、G0-G7 阶段与验收门、并存期风险(定稿) |
+| [native-gui-plan.md](native-gui-plan.md) | MoonBit 原生 GUI 栈总体实施计划:自绘路线与 libyue 的角色边界、新栈替代主包 `yue/` 的分包结构与绑定层摘除清单、三平台输入/输入法后端表、原生子表面(browser 与视频)设计、G0-G8 阶段与分包门禁口径、过渡期风险(定稿) |
 | [relink.md](relink.md) | 原生层(shim/vendor)变更后强制重链:判别与处理 |
 
 项目总览与快速开始入口见仓库根 [README_ZH.md](https://github.com/lb091188/moonbit-libyue/blob/master/README_ZH.md)。
