@@ -31,6 +31,9 @@ test "重复注册忽略，显式 focus 可跳转" {
   assert_eq(f.focus(8), true)
   assert_eq(f.current(), Some(8))
   assert_eq(f.focus(99), false)
+  // is_focused 只读：判定不改焦点（on_draw 里判高亮靠它）
+  assert_eq((f.is_focused(8), f.is_focused(7)), (true, false))
+  assert_eq(f.current(), Some(8))
 }
 
 test "注销当前项时焦点交给后继，注销空栈置空" {

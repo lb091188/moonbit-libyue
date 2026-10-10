@@ -85,6 +85,16 @@ pub fn FocusStack::focus(self : FocusStack, id : Int) -> Bool {
 }
 
 ///|
+/// 只读判定某个 id 是不是当前焦点。**绘制时判高亮要用这个**——`focus`
+/// 是设焦点，在 `on_draw` 里调它会把焦点抢给自己。
+pub fn FocusStack::is_focused(self : FocusStack, id : Int) -> Bool {
+  match self.current() {
+    Some(c) => c == id
+    None => false
+  }
+}
+
+///|
 /// Tab / Shift+Tab：返回跳转后的焦点 id（无项则 None）。
 pub fn FocusStack::move_focus(self : FocusStack, backward : Bool) -> Int? {
   let n = self.ids.length()

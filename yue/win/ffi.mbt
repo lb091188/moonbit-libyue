@@ -96,6 +96,9 @@ extern "c" fn wm_im_set_cursor(
 ) -> Unit = "wm_im_set_cursor"
 
 ///|
+extern "c" fn wm_im_reset(id : Int64) -> Unit = "wm_im_reset"
+
+///|
 extern "c" fn wm_im_commit_len(id : Int64) -> Int = "wm_im_commit_len"
 
 ///|

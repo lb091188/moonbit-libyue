@@ -76,6 +76,15 @@ pub(all) struct Widget {
   mut on_pointer : Option[(PointerEvent) -> Bool]
   mut on_key : Option[(KeyEvent) -> Bool]
   mut on_scroll : Option[(ScrollEvent) -> Bool]
+  /// 输入法提交文本到达本控件（宿主按焦点 id 路由）；返回是否消费。
+  mut on_commit : Option[(String) -> Bool]
+  /// 组合串更新（文本 + 串内字节光标）；宿主每拍投给焦点控件。
+  mut on_preedit : Option[(String, Int) -> Unit]
+  /// 输入法需要的上下文（已提交文本 + 字节光标）；给 None 表示本控件不吃
+  /// 输入法，宿主于是本轮不喂 surrounding、也不取 commit。
+  mut im_context : Option[() -> (String, Int)?]
+  /// 插入符矩形（窗口坐标），候选窗据此定位。
+  mut im_cursor : Option[() -> Rect?]
   /// 焦点栈里的 id（0 = 不参与键盘焦点）
   mut focus_id : Int
 }
@@ -96,6 +105,10 @@ pub fn Widget::new() -> Widget {
     on_pointer: None,
     on_key: None,
     on_scroll: None,
+    on_commit: None,
+    on_preedit: None,
+    im_context: None,
+    im_cursor: None,
     focus_id: 0,
   }
 }
@@ -235,6 +248,23 @@ fn path_to(w : Widget, px : Double, py : Double) -> Array[Widget] {
 }
 
 ///|
+/// 命中链上最近的可聚焦控件 id（从命中控件沿祖先链向上，第一个声明了
+/// `focus_id` 的算），整条链都没有则 None。宿主在按钮按下时用它把键盘
+/// 焦点交给控件——与 Web 同源（点表单控件即聚焦它），控件不必自己改焦点栈。
+pub fn Widget::focusable_at(self : Widget, x : Double, y : Double) -> Int? {
+  let path = self.hit_path(x, y)
+  let mut i = path.length()
+  while i > 0 {
+    i = i - 1
+    let id = path[i].focus_id
+    if id != 0 {
+      return Some(id)
+    }
+  }
+  None
+}
+
+///|
 /// 指针事件路由：命中控件起沿祖先链向上，第一个返回 true 的处理器消费掉事件。
 /// 交给处理器前把窗口坐标平移为该控件的本地坐标。返回是否被消费。
 pub fn Widget::dispatch_pointer(self : Widget, ev : PointerEvent) -> Bool {
@@ -337,6 +367,28 @@ pub fn Widget::find_by_focus_id(self : Widget, id : Int) -> Widget? {
 }
 
 ///|
+/// 纵向排列子控件（列容器）。
+pub fn Widget::set_column(self : Widget) -> Unit {
+  self.node.set_flex_direction(@yoga.Column)
+}
+
+///|
+/// 外边距（上/下/左/右），逻辑像素。
+pub fn Widget::set_margin(self : Widget, top : Double, bottom : Double, left : Double, right : Double) -> Unit {
+  self.node.set_margin_top(@yoga.fixed(top))
+  self.node.set_margin_bottom(@yoga.fixed(bottom))
+  self.node.set_margin_left(@yoga.fixed(left))
+  self.node.set_margin_right(@yoga.fixed(right))
+}
+
+///|
+/// 内边距（左/上），逻辑像素。
+pub fn Widget::set_padding(self : Widget, left : Double, top : Double) -> Unit {
+  self.node.set_padding_left(@yoga.fixed(left))
+  self.node.set_padding_top(@yoga.fixed(top))
+}
+
+///|
 /// 绘制遍历：逐层平移到控件原点并裁剪到控件矩形，先画自己再画子控件
 /// （后画的覆盖在前，与命中优先级同一口径）。整窗共用一个绘制器会话。
 pub fn Widget::paint(self : Widget, p : @render.Painter) -> Unit {
@@ -354,4 +406,73 @@ pub fn Widget::paint(self : Widget, p : @render.Painter) -> Unit {
     k.paint(p)
   }
   p.restore()
+}
+
+// ---- 输入法面（宿主按焦点 id 投递；只有焦点控件参与，不冒泡）----
+
+///|
+/// 提交文本路由给焦点控件（沿祖先链冒泡，同指针事件的规则）。
+pub fn Widget::dispatch_commit(
+  self : Widget,
+  focus_id : Int,
+  text : String,
+) -> Bool {
+  let path = path_to_id(self, focus_id, [])
+  let mut i = path.length()
+  let mut handled = false
+  while i > 0 && !handled {
+    i = i - 1
+    match path[i].on_commit {
+      Some(f) => handled = f(text)
+      None => ()
+    }
+  }
+  handled
+}
+
+///|
+/// 组合串投递给焦点控件（不冒泡：组合串属于正在编辑的那一个字段）。
+pub fn Widget::dispatch_preedit(
+  self : Widget,
+  focus_id : Int,
+  text : String,
+  caret : Int,
+) -> Unit {
+  match self.find_by_focus_id(focus_id) {
+    Some(w) =>
+      match w.on_preedit {
+        Some(f) => f(text, caret)
+        None => ()
+      }
+    None => ()
+  }
+}
+
+///|
+/// 焦点控件的输入法上下文（None = 本轮不需要喂输入法）。
+pub fn Widget::im_context_of(
+  self : Widget,
+  focus_id : Int,
+) -> (String, Int)? {
+  match self.find_by_focus_id(focus_id) {
+    Some(w) =>
+      match w.im_context {
+        Some(f) => f()
+        None => None
+      }
+    None => None
+  }
+}
+
+///|
+/// 焦点控件的插入符矩形（候选窗定位用）。
+pub fn Widget::im_cursor_of(self : Widget, focus_id : Int) -> Rect? {
+  match self.find_by_focus_id(focus_id) {
+    Some(w) =>
+      match w.im_cursor {
+        Some(f) => f()
+        None => None
+      }
+    None => None
+  }
 }

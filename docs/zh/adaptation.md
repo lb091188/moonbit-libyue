@@ -359,6 +359,16 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **覆盖顺序**：同类型属性按插入顺序生效（后设覆盖先设），用「整段染红 + 首字符改回黑」的像素包围盒验，而不是靠读 Pango 文档。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/text` 20/20（新增 6 条：颜色区间落在正确的字形上且其余保持基准色、多字节文本证明切的是**字节**不是字符、字号区间抬高包围盒、后设覆盖先设、越界/空区间/非法色不落像素也不炸、空文本与 `set_text` 后的区间保留）；`moon check yue/text --deny-warn` 零警告；示例标题把开头 `MoonBit` 7 字节换色上屏，冒烟 49 帧、退出码 0；全仓红点仍 287 errors / 68 warnings、yoga-mbt 81/81。
 
+### MoonBit 原生 GUI 栈 · App 宿主与 `TextEditorHost` 收口（`yue/core/app.mbt`）
+
+- **分层落点**：宿主放 `yue/core`（方案 §2 把 App/Window、脏区重绘划给 core），一处收齐「窗口 + `Loop` + 控件树 + 输入法通道 + 上屏」，示例与组件不再各自抄一遍循环。编辑器接缝做成**焦点控件上的五个回调**（`on_key` / `on_commit` / `on_preedit` / `im_context` / `im_cursor`）而不是一个 host 对象——因为 `yue/input` 已经依赖 `yue/core`，core 反向 import input 会成环；G5b 记档的四签名（`process_key`/`commit`/`preedit`/`set_cursor_rect`）逐一对应，只是宿主从「持有一个 host」换成「按焦点投回调」。
+- **原始事件口径**（`yue/win` 的 `code` 来自 C 侧 `WmEv`）：`0/1` = 键按下/抬起，`2/3` = 按钮按下/抬起，`4` = 指针移动，`5` = 滚轮。两个数据槽按 C 的 `dx/dy` 命名传到 MoonBit：按钮号走 `button`（dx），滚轮纵向走 `axis`（dy，正=上滚）；`dx` 在滚轮事件里是横向。翻译单独成 `raw_to_event` 是为了无头可测（宿主其余部分要真窗口）。
+- **点击接管焦点做成控件树函数**：`Widget::focusable_at(x,y)` 取命中链上从最深向上第一个声明了 `focus_id` 的控件，宿主在 `Down` 时据此改焦点栈（与 Web 同源：点表单控件即聚焦它），控件不必自己碰焦点栈；已在该控件上时**不做任何输入法动作**，否则在同一个框里点一下就把正在拼的字打断了。
+- **输入法两条实测（本批真机踩到，都是「串框」）**：① 一个窗口只有一个 `GtkIMContext`，逻辑焦点换控件时必须 `gtk_im_context_reset`，否则前一个框攒下的组合串会在后一个框 commit 出来（注入 `a b Tab c` 实测 `t2='第二个框岸边'`，`岸`/`边` 明明是在第一个框打的）。新增 `Window::im_reset()`（extern + 真实 stub + portable stub 三处同批）；只在**焦点真的换了**那一瞬调，每拍调等于一直打断组合（G5 那条「绝不调 reset」说的是每拍）。② 光 reset 不够：提交文本是在按键事件处理当期就落进 C 侧缓冲的，脚本连发键时 Tab 事件排在若干 commit 之后，晚一拍排空就会把旧控件的提交投给新控件。所以切换点必须先按**旧** id 排空 commit、清旧组合串、再 reset（`App::flush_ime_for_switch(prev)` 在改焦点栈**之前**调用）。修复后同一注入序列 → `t1='hello岸边' c1=11 t2='第二个框曾'`，各归各框。
+- **工具链四条**：① `loop` 是保留字（App 的调度字段叫 `sched`，`local` 上一批已记）；② `PointerKind` 带闭包字段派生不出 `Eq`，判定用 `match`；③ `FocusStack::focus(id)` 是**改**焦点的 setter，绘制里判高亮必须用新增的只读 `is_focused(id)`——示例原先在 `on_draw` 里调 `focus(id)`，每帧重绘都把焦点抢给最后画它的那个控件，退出行 `focus=3` 而第一个框永远收不到键，这类「查询/赋值歧义」靠命名与只读助手挡；④ 用脚本改文件时 `str.replace(...,1)` 不命中是**静默失败**（本批开工时那 8 个 `Widget has no field` 错误就是这么来的），必须断言命中次数。
+- **注入手法（沿用并补两条）**：键盘必须走 XTEST，即 `xdotool key` **不带** `--window`（带 `--window` 是 XSendEvent，GTK 直接丢弃，见本文「GUI 自动化」条）；鼠标则要写成一条原子命令 `xdotool mousemove --window <id> X Y click 1`——拆成 `mousemove --window` 后单独 `click 1` 本轮实测 `clicks=0`（与既有的「XFCE click-to-focus 拦合成点击」同源）。另：测「字母必须原样进框」的链路时要把 IM 桥摘掉（`env -u GTK_IM_MODULE -u XMODIFIERS`），否则本机 fcitx5 双拼会把 `a b` 变成中文；反过来验输入法串框问题时**保留**默认环境才是有效对照。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/core` 28/28（新增 6 条：原始事件翻译表、commit 沿祖先链冒泡且消费即停、preedit 只投焦点控件不冒泡、`im_context`/`im_cursor` 可达性与隐藏后不可达、无 `im_context` 声明的控件不参与输入法轮次、`focusable_at` 取命中链上最近可聚焦者且隐藏不可达）；八包（core/input/render/text/win/icons/theme/sys）`--deny-warn` 全零警告；yoga-mbt 81/81；全仓红点仍 287 errors / 68 warnings。新示例 `examples/native-app`（GUI 侧同类测试的累积页）：冒烟退出码 0、`frames=49`；注入回证 `a b Tab c` → `t1='helloab' c1=7 t2='第二个框c' focus=2`（打字 + Tab 环绕），点按钮中心 (116,128) → `clicks=1` 且焦点接管，持焦点回车 → `clicks=2`，点文本框最左端（窗口 x=17 → 控件本地 x=1）→ caret 归 0、再打 `z` 得 `t1='zhelloab' c1=1`——**「点击定位」这条此前只能靠肉眼的链路首次客观验通**。仍需用户目视：caret 闪烁观感、preedit 下划线、候选窗是否贴组合串末尾。
+
 ## Linux
 
 ### 发行版

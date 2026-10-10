@@ -35,6 +35,15 @@ pub fn Window::set_im_cursor(
 }
 
 ///|
+/// 丢掉输入法侧未完成的组合串。**逻辑焦点从一个输入控件切到另一个时必调**：
+/// 一个窗口只有一个 IM 上下文，不调的话前一个框攒下的拼音会在后一个框拿到
+/// 焦点后 commit 进去（真机实测到）。只在焦点真的换了时调，别每拍调——
+/// 每拍调等于一直打断组合（G5 记档的「绝不调 reset」说的是这个）。
+pub fn Window::im_reset(self : Window) -> Unit {
+  wm_im_reset(self.id)
+}
+
+///|
 /// 取一条已提交文本；没有则 None。取到即清后端缓冲（一次一条，循环调用排空）。
 pub fn Window::take_commit(self : Window) -> String? {
   let n = wm_im_commit_len(self.id)

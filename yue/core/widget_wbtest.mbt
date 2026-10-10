@@ -286,3 +286,30 @@ test "绘制遍历：逐层平移到控件原点，并裁剪到控件矩形" {
   assert_eq(color_of(bm2, 12, 12), (255, 0, 0, 255))
   child.set_visible(true)
 }
+
+///|
+test "点击接管焦点：命中链上最近的可聚焦控件（自身无则向上找）" {
+  let root = sized(Widget::new(), 100.0, 40.0)
+  let outer = sized(Widget::new(), 60.0, 40.0)
+  outer.focus_id = 5
+  let inner = sized(Widget::new(), 20.0, 40.0)
+  inner.focus_id = 7
+  outer.append_child(inner)
+  root.append_child(outer)
+  root.relayout(100.0, 40.0)
+  assert_eq((inner.rect.x, inner.rect.w), (0.0, 20.0))
+
+  // 命中链最深处优先
+  assert_eq(root.focusable_at(5.0, 10.0), Some(7))
+  // 深处不可聚焦时向上找：点 outer 自己那一段
+  assert_eq(root.focusable_at(40.0, 10.0), Some(5))
+  // 全链都没声明 focus_id（root 是 0）→ 不改焦点
+  assert_eq(root.focusable_at(80.0, 10.0), None)
+  // 出界同样无命中
+  assert_eq(root.focusable_at(5.0, 60.0), None)
+
+  // 隐藏的控件不在命中链上，焦点交给可见的祖先
+  inner.set_visible(false)
+  root.relayout(100.0, 40.0)
+  assert_eq(root.focusable_at(5.0, 10.0), Some(5))
+}

@@ -75,6 +75,7 @@ void wm_im_set_surrounding(int64_t id, const char *text, int caret) {
 void wm_im_set_cursor(int64_t id, int x, int y, int w, int h) {
   (void)id; (void)x; (void)y; (void)w; (void)h;
 }
+void wm_im_reset(int64_t id) { (void)id; }
 int wm_im_commit_len(int64_t id) { (void)id; return 0; }
 int wm_im_commit_byte(int64_t id, int index) { (void)id; (void)index; return 0; }
 void wm_im_commit_done(int64_t id) { (void)id; }

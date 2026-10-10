@@ -1,0 +1,11 @@
+import {
+  "NoahLiu/moonbit-libyue/yue/core",
+  "NoahLiu/moonbit-libyue/yue/input",
+  "NoahLiu/moonbit-libyue/yue/render",
+  "NoahLiu/moonbit-libyue/yue/text",
+  "NoahLiu/moonbit-libyue/yue/theme",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"

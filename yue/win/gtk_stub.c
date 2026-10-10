@@ -592,6 +592,23 @@ void wm_im_set_surrounding(int64_t id, const char *text, int caret) {
   gtk_im_context_set_surrounding(w->im, text, (gint)strlen(text), caret);
 }
 
+// 逻辑焦点从一个输入控件切到另一个时清掉输入法侧未完成的组合串：
+// 不清的话，前一个框攒下的拼音会在后一个框拿到焦点后 commit 进去。
+// 一并清本侧缓存——输入法在 reset 后不一定再推 preedit-changed，
+// 旧串留在缓存里就会被继续画出来。
+void wm_im_reset(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->im == NULL) {
+    return;
+  }
+  gtk_im_context_reset(w->im);
+  w->preedit_len = 0;
+  w->preedit[0] = '\0';
+}
+
 void wm_im_set_cursor(int64_t id, int x, int y, int w_, int h_) {
   if (id <= 0 || id >= WM_MAX_WINDOWS) {
     return;
