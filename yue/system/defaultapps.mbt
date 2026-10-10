@@ -201,8 +201,8 @@ fn da_str_has(arr : Array[String], s : String) -> Bool {
 ///|
 /// 是否有可用的查询命令（xdg-mime 在 PATH）。
 pub fn da_supported() -> Bool {
-  if @yue.platform() == "windows" {
-    return true // AssocQueryString 直连，无外部工具依赖
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
+    return true // Windows AssocQueryString / macOS LaunchServices 直连
   }
   match appfind_executable("xdg-mime") {
     Ok(_) => true
@@ -240,7 +240,9 @@ fn da_mimeapps_files() -> Array[String] {
 /// （"application/pdf" 形态）；Windows 无 MIME 层，给小写扩展名
 /// （".pdf" 形态——文件类型键即扩展名，形态差异由调用方消化）。
 pub fn da_file_type(path : String) -> Result[String, DefaultAppError] {
-  if @yue.platform() == "windows" {
+  // Windows 无 MIME 层给扩展名；macOS 走 LaunchServices 但键形态同取
+  // 扩展名（UTI 差异由 shim 吸收），两分支一致
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let dot = da_last_index_of(path, '.')
     let slash = da_max(
       da_last_index_of(path, '/'),
@@ -303,7 +305,7 @@ fn da_max(a : Int, b : Int) -> Int {
 /// AssocQueryString 查关联的可执行文件完整路径（mime 传扩展名
 /// （".pdf"）或协议（"http"），查不到给 NoDefault）。
 pub fn da_default_for(mime : String) -> Result[String, DefaultAppError] {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     if mime == "" {
       return Err(QueryFailed("类型/协议为空"))
     }
@@ -353,8 +355,8 @@ pub fn da_default_for(mime : String) -> Result[String, DefaultAppError] {
 /// 列出类型的全部关联应用：Linux 扫描三处 mimeapps.list（默认应用排
 /// 最前，去重）；Windows 无关联应用枚举接口，恒空列表。
 pub fn da_associations_for(mime : String) -> Array[String] {
-  if @yue.platform() == "windows" {
-    return []
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
+    return [] // Windows/macOS 均无关联应用枚举接口
   }
   let texts : Array[String] = []
   for file in da_mimeapps_files() {
@@ -376,8 +378,8 @@ pub fn da_associations_for(mime : String) -> Array[String] {
 /// 注册走 IApplicationAssociationRegistration（需 UI 授权流程），本包
 /// 未实现，返回 Unsupported。
 pub fn da_set_default(mime : String, desktop_id : String) -> Result[Unit, DefaultAppError] {
-  if @yue.platform() == "windows" {
-    return Err(Unsupported)
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
+    return Err(Unsupported) // 用户级默认应用注册需 UI 授权流程，未实现
   }
   if !desktop_id.has_suffix(".desktop") {
     return Err(QueryFailed("desktop_id 必须是 .desktop 文件名: \{desktop_id}"))

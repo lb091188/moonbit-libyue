@@ -101,9 +101,10 @@ fn cbw_first_line(s : String) -> String {
 ///|
 /// 读剪贴板当前文本（只读，文本原样返回，不做去空白）：Linux 走
 /// `xclip -selection clipboard -o`（xclip 缺失（退出码 127）或无 X 会话
-/// 时为对应 Err）；Windows 走 Win32 剪贴板（无文本时为 CommandFailed）。
+/// 时为对应 Err）；Windows 走 Win32 剪贴板、macOS 走 NSPasteboard（无
+/// 文本时为 CommandFailed）。
 pub fn cbw_get_text() -> Result[String, ClipboardError] {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let ok = Ref(0)
     let text = @utf8.decode_lossy(@yue.ffi_clipboard_text(ok))
     if ok.val != 1 {

@@ -458,7 +458,7 @@ fn prt_lpstat(
 /// 当前系统是否支持打印机查询（Linux 跑通只读的 lpstat -p；Windows
 /// winspool 枚举成功）。每次调用真实探测，高频场景请调用方自行缓存。
 pub fn prt_supported() -> Bool {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let ok = Ref(0)
     let _ = @yue.ffi_prt_list(ok)
     return ok.val == 1
@@ -474,11 +474,11 @@ pub fn prt_supported() -> Bool {
 /// 列出全部打印机（队列名 + 可用状态）；Linux 未装 CUPS →
 /// PrtUnsupported。顺序保持返回序；空数组表示未配置任何打印机。
 pub fn prt_list() -> Result[Array[PrinterInfo], PrinterError] {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let ok = Ref(0)
     let text = @utf8.decode_lossy(@yue.ffi_prt_list(ok))
     if ok.val != 1 {
-      return Err(PrtCommandFailed("EnumPrinters 失败"))
+      return Err(PrtCommandFailed("打印机枚举失败"))
     }
     return Ok(prt_parse_win_list(text))
   }
@@ -521,7 +521,7 @@ pub fn prt_parse_win_list(text : String) -> Array[PrinterInfo] {
 /// 读默认打印机名；Linux 未装 CUPS → PrtUnsupported；未设默认目标或无
 /// 输出 → PrtParseFailed。
 pub fn prt_default() -> Result[String, PrinterError] {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let ok = Ref(0)
     let name = prt_trim(@utf8.decode_lossy(@yue.ffi_prt_default(ok)))
     if ok.val != 1 || name == "" {
@@ -548,13 +548,13 @@ pub fn prt_queue(printer : String) -> Result[Array[PrinterJob], PrinterError] {
   if printer == "" {
     return Err(PrtInvalidParam("打印机名为空"))
   }
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let ok = Ref(0)
     let text = @utf8.decode_lossy(
       @yue.ffi_prt_queue(@yue.utf8_bytes(printer), ok),
     )
     if ok.val != 1 {
-      return Err(PrtCommandFailed("OpenPrinter/EnumJobs 失败"))
+      return Err(PrtCommandFailed("打印队列查询失败"))
     }
     return Ok(prt_parse_win_queue(text))
   }
@@ -596,14 +596,14 @@ pub fn prt_print(
   if copies < 1 {
     return Err(PrtInvalidParam("份数必须 ≥ 1：\{copies}"))
   }
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     match printer {
       Some(p) if p != "" =>
         match prt_default() {
           Ok(def) if def == p => ()
           _ =>
             return Err(
-              PrtInvalidParam("Windows 仅支持默认打印机提交（传入 \{p}）"),
+              PrtInvalidParam("仅支持默认打印机提交（传入 \{p}）"),
             )
         }
       _ => ()
@@ -611,7 +611,7 @@ pub fn prt_print(
     for i = 0; i < copies; i = i + 1 {
       let ok = Ref(0)
       if @yue.ffi_prt_print(@yue.utf8_bytes(path), ok) != 0 || ok.val != 1 {
-        return Err(PrtCommandFailed("print 动词提交失败"))
+        return Err(PrtCommandFailed("打印提交失败"))
       }
     }
     return Ok(())

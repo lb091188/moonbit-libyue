@@ -329,7 +329,7 @@ pub fn lc_timezone() -> Result[String, LocaleError] {
         Err(LcBusFailed(_)) => lc_timezone_cmd()
         Err(e) => Err(e)
       }
-    "windows" => {
+    "windows" | "macos" => {
       let ok = Ref(0)
       let tz = lc_trim(@utf8.decode_lossy(@yue.ffi_win_tz_name(ok)))
       if ok.val != 1 || tz == "" {
@@ -408,7 +408,7 @@ pub fn lc_set_timezone(tz : String) -> Result[Unit, LocaleError] {
 /// 给用户界面区域名（BCP-47 形态，如 "zh-CN"；未设置或为空 →
 /// LcUnsupported）。
 pub fn lc_lang() -> Result[String, LocaleError] {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let ok = Ref(0)
     let lang = lc_trim(@utf8.decode_lossy(@yue.ffi_win_lang(ok)))
     if ok.val != 1 || lang == "" {

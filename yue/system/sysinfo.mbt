@@ -259,10 +259,39 @@ fn si_parse_os_release(text : String) -> OsInfo? {
     }
   }
   if pretty == "" {
-    None
-  } else {
-    Some({ pretty_name: pretty, id, version_id, })
+    return None
   }
+  Some({ pretty_name: pretty, id, version_id, })
+}
+
+///|
+/// 明文 XML plist 取值：`<key>K</key>` 之后的第一个 `<string>V</string>`。
+/// 只覆盖 SystemVersion.plist 这类扁平结构；键缺失或值形态不符为 None。
+fn si_plist_value(text : String, key : String) -> String? {
+  let lines = si_split_lines(text)
+  let mut idx = -1
+  for i in 0..<lines.length() {
+    if si_trim(lines[i]) == "<key>\{key}</key>" {
+      idx = i
+      break
+    }
+  }
+  if idx < 0 {
+    return None
+  }
+  for j in (idx + 1)..<lines.length() {
+    let t = si_trim(lines[j])
+    if t == "" {
+      continue
+    }
+    if t.has_prefix("<string>") && t.has_suffix("</string>") &&
+      t.length() >= 17 {
+      // 剥掉成对标签：8 = "<string>" 长度，9 = "</string>" 长度
+      return Some(si_trim(t[8:t.length() - 9].to_owned()))
+    }
+    return None
+  }
+  None
 }
 
 ///|
@@ -531,6 +560,37 @@ pub fn si_os() -> Result[OsInfo, SysInfoError] {
       }
       Ok({ pretty_name: pretty, id: "windows", version_id: version })
     }
+    "macos" =>
+      // SystemVersion.plist 是明文 XML，纯 MoonBit 读取即可
+      //（键值对 "<key>K</key><string>V</string>" 相邻行形态）
+      match @yue.read_text_file(
+              "/System/Library/CoreServices/SystemVersion.plist",
+            ) {
+        None =>
+          Err(SiReadFailed(
+            "/System/Library/CoreServices/SystemVersion.plist",
+          ))
+        Some(text) => {
+          let name = match si_plist_value(text, "ProductName") {
+            Some(n) => n
+            None => "macOS"
+          }
+          let ver = match si_plist_value(text, "ProductUserVisibleVersion") {
+            Some(v) => v
+            None =>
+              match si_plist_value(text, "ProductVersion") {
+                Some(v) => v
+                None =>
+                  return Err(
+                    SiParseFailed(
+                      "SystemVersion.plist: 缺少 ProductVersion",
+                    ),
+                  )
+              }
+          }
+          Ok({ pretty_name: "\{name} \{ver}", id: "macos", version_id: ver })
+        }
+      }
     _ => Err(SiUnsupported)
   }
 }
@@ -595,6 +655,24 @@ pub fn si_machine() -> Result[MachineInfo, SysInfoError] {
       }
       Ok({ vendor, product, serial: "", })
     }
+    "macos" => {
+      // IORegistry 无制造商键，vendor 恒 "Apple Inc."（Apple 自产硬件）；
+      // serial 读不到给空字段（与 Windows 的恒空串口径同族）
+      let ok = Ref(0)
+      let text = @utf8.decode_lossy(@yue.ffi_mac_machine_info(ok))
+      if ok.val != 1 {
+        return Err(SiReadFailed("IOPlatformExpertDevice"))
+      }
+      let fields = sys_split_fields(text, '\t')
+      if fields.length() < 3 {
+        return Err(SiParseFailed("machine info 行字段不足"))
+      }
+      Ok({
+        vendor: fields[0],
+        product: fields[1],
+        serial: fields[2],
+      })
+    }
     _ => Err(SiUnsupported)
   }
 }
@@ -626,6 +704,17 @@ pub fn si_memory() -> Result[MemoryInfo, SysInfoError] {
         available_kb: avail.val.to_int(),
       })
     }
+    "macos" => {
+      let total = Ref(0L)
+      let avail = Ref(0L)
+      if @yue.ffi_win_memory(total, avail) != 1 {
+        return Err(SiReadFailed("host_statistics64"))
+      }
+      Ok({
+        total_kb: total.val.to_int(),
+        available_kb: avail.val.to_int(),
+      })
+    }
     _ => Err(SiUnsupported)
   }
 }
@@ -648,6 +737,13 @@ pub fn si_uptime() -> Result[Double, SysInfoError] {
       let ms = @yue.ffi_win_uptime_ms()
       if ms < 0L {
         return Err(SiReadFailed("GetTickCount64"))
+      }
+      Ok(ms.to_double() / 1000.0)
+    }
+    "macos" => {
+      let ms = @yue.ffi_win_uptime_ms()
+      if ms < 0L {
+        return Err(SiReadFailed("kern.boottime"))
       }
       Ok(ms.to_double() / 1000.0)
     }

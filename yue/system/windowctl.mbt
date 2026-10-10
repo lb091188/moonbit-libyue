@@ -343,7 +343,7 @@ fn win_probe(prog : String) -> Bool {
 /// 工具缺失是合法状态（返回 false，不是失败）。每次调用真实探测，高频
 /// 场景请调用方自行缓存结果。
 pub fn win_supported() -> Bool {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     return true
   }
   if !pr_available() {
@@ -355,13 +355,14 @@ pub fn win_supported() -> Bool {
 ///|
 /// 列出窗口：Linux 解析 wmctrl -l（需 X 会话，无会话时 wmctrl 以非零
 /// 退出呈现，返回 Err([WinError.CommandFailed])）；Windows 枚举全部
-/// 可见且有标题的顶层窗口。
+/// 可见且有标题的顶层窗口；macOS 走 CGWindowList（跨应用标题需屏幕
+/// 录制权限，未授权时只见本进程窗口）。
 pub fn win_list() -> Result[Array[WindowInfo], WinError] {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     let ok = Ref(0)
     let text = @utf8.decode_lossy(@yue.ffi_win_list_windows(ok))
     if ok.val != 1 {
-      return Err(CommandFailed("EnumWindows 失败"))
+      return Err(CommandFailed("窗口枚举失败"))
     }
     let host = match getenv_str("COMPUTERNAME") {
       Some(h) if h != "" => h
@@ -426,7 +427,7 @@ pub fn win_activate(id_or_title : String) -> Result[Unit, WinError] {
   if id_or_title == "" {
     return Err(InvalidParam("窗口 id 或标题为空"))
   }
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     return win_win_apply(
       id_or_title,
       fn(id, ok) { @yue.ffi_win_activate_window(@yue.utf8_bytes(id), ok) },
@@ -466,13 +467,14 @@ fn win_win_apply(
 
 ///|
 /// 关闭窗口：title 按标题子串匹配（不区分大小写），关闭首个匹配窗口
-/// （wmctrl -c 语义；Windows 同样只关首个匹配，经 WM_CLOSE 温和关闭）。
+/// （wmctrl -c 语义；Windows 同样只关首个匹配，经 WM_CLOSE 温和关闭；
+/// macOS 经 AXCloseButton 按钮 AXPress，需辅助功能权限，未授权恒失败）。
 /// 空参数返回 Err([WinError.InvalidParam])。
 pub fn win_close(title : String) -> Result[Unit, WinError] {
   if title == "" {
     return Err(InvalidParam("窗口标题为空"))
   }
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     return win_win_apply(
       title,
       fn(id, ok) { @yue.ffi_win_close_window(@yue.utf8_bytes(id), ok) },

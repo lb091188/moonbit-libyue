@@ -1870,6 +1870,12 @@ pub extern "c" fn ffi_win_memory(
 pub extern "c" fn ffi_win_uptime_ms() -> Int64 = "yue_mbt_win_uptime_ms"
 
 ///|
+/// macOS 机器标识 "vendor\tproduct\tserial"（vendor 恒 "Apple Inc."，
+/// product=hw.model，serial=IOPlatformSerialNumber）；win 哨兵。
+#borrow(ok)
+pub extern "c" fn ffi_mac_machine_info(ok : Ref[Int]) -> Bytes = "yue_mbt_mac_machine_info"
+
+///|
 /// 壁纸读（ok=0 未取得）。
 #borrow(ok)
 pub extern "c" fn ffi_wallpaper_get(ok : Ref[Int]) -> Bytes = "yue_mbt_wallpaper_get"

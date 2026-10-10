@@ -567,7 +567,7 @@ fn dsk_fs_action(path : String, action : String) -> Result[Unit, DiskError] {
 /// 当前系统是否支持磁盘卷管理：udisks2 在线（完整能力）或 lsblk 命令可用
 /// （仅枚举）。每次调用真实探测，高频场景请调用方自行缓存结果。
 pub fn dsk_supported() -> Bool {
-  if @yue.platform() == "windows" {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
     return true
   }
   dsk_probe() is Some(_)
@@ -587,6 +587,14 @@ pub fn dsk_volumes() -> Result[Array[DskVolume], DiskError] {
       return Err(CommandFailed("GetLogicalDrives 失败"))
     }
     return Ok(dsk_parse_win_volumes(text))
+  }
+  if @yue.platform() == "macos" {
+    let ok = Ref(0)
+    let text = @utf8.decode_lossy(@yue.ffi_dsk_volumes(ok))
+    if ok.val != 1 {
+      return Err(CommandFailed("挂载卷枚举失败"))
+    }
+    return Ok(dsk_parse_mac_volumes(text))
   }
   match dsk_probe() {
     None => Err(Unsupported)
@@ -613,6 +621,31 @@ pub fn dsk_parse_win_volumes(text : String) -> Array[DskVolume] {
       label: fields[1],
       mountpoint: Some(fields[0] + "\\"),
       size_bytes: sys_parse_i64(fields[2]),
+      removable: kind == 1 || kind == 2,
+      path: "",
+    })
+  }
+  out
+}
+
+///|
+/// 解析 macOS 直连文本（"dev|mount|label|total|free|kind" 行——比
+/// Windows 多一列挂载点；kind：0=固定 1=可移除 3=网络）。
+pub fn dsk_parse_mac_volumes(text : String) -> Array[DskVolume] {
+  let out : Array[DskVolume] = []
+  for line in text.split("\n") {
+    let fields = sys_split_fields(line.to_owned(), '|')
+    if fields.length() != 6 {
+      continue
+    }
+    let kind = try @string.parse_int(fields[5]) catch {
+      _ => 0
+    }
+    out.push({
+      device: fields[0],
+      label: fields[2],
+      mountpoint: Some(fields[1]),
+      size_bytes: sys_parse_i64(fields[3]),
       removable: kind == 1 || kind == 2,
       path: "",
     })
@@ -705,6 +738,17 @@ pub fn dsk_mount(volume : DskVolume) -> Result[Unit, DiskError] {
   if @yue.platform() == "windows" {
     return Err(AlreadyMounted(volume.device))
   }
+  if @yue.platform() == "macos" {
+    // mac 外置卷默认自动挂载；手动挂载走 diskutil（已挂载/设备不存在
+    // 由退出码以非零报出，不重复做本地探测）
+    return match pr_run("diskutil", ["mount", volume.device],
+                        timeout_ms=8000) {
+      Ok(_) => Ok(())
+      Err(NonZeroExit(_, err)) =>
+        Err(CommandFailed("diskutil mount: \{err}"))
+      Err(e) => Err(CommandFailed(e.to_string()))
+    }
+  }
   dsk_fs_apply(volume, "Mount")
 }
 
@@ -715,6 +759,18 @@ pub fn dsk_mount(volume : DskVolume) -> Result[Unit, DiskError] {
 pub fn dsk_unmount(volume : DskVolume) -> Result[Unit, DiskError] {
   if @yue.platform() == "windows" {
     return Err(Unsupported)
+  }
+  if @yue.platform() == "macos" {
+    let m = match volume.mountpoint {
+      Some(m) => m
+      None => return Err(NotMounted(volume.device))
+    }
+    return match pr_run("diskutil", ["unmount", m], timeout_ms=8000) {
+      Ok(_) => Ok(())
+      Err(NonZeroExit(_, err)) =>
+        Err(CommandFailed("diskutil unmount: \{err}"))
+      Err(e) => Err(CommandFailed(e.to_string()))
+    }
   }
   dsk_fs_apply(volume, "Unmount")
 }

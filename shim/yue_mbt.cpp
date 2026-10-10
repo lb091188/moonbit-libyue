@@ -5781,7 +5781,9 @@ extern "C" void *yue_mbt_dsk_volumes(int32_t *ok) {
   return BytesFromString(out);
 }
 
-#else  // 非 Windows：哨兵桩（MoonBit 层平台门拦截，macOS 暂缓）
+#else  // 非 Windows：哨兵桩（MoonBit 层平台门拦截；Linux 纯 MoonBit 路由
+       // 不经过这些符号，桩仅为链接期符号存在。macOS 直连实现见
+       // yue_system_mac.mm——同名符号由该 TU 提供，此处不编）
 
 extern "C" void *yue_mbt_win_reg_str(int32_t, const char *, const char *,
                                      int32_t *ok) {
@@ -5930,7 +5932,33 @@ extern "C" void *yue_mbt_dsk_volumes(int32_t *ok) {
   return moonbit_make_bytes(0, 0);
 }
 
+extern "C" void *yue_mbt_mac_machine_info(int32_t *ok) {
+  *ok = -1000;
+  return moonbit_make_bytes(0, 0);
+}
+
 #endif  // 系统能力 Windows 直连组平台分支结束
+        // （OS_WIN 实现 + 非 OS_MAC 哨兵桩；OS_MAC 在 yue_system_mac.mm）
+
+// WMI 内屏亮度三符号：Windows 专属实现，但 MoonBit 二进制在所有平台都
+// 含调用点（bright_wmi_get/set 按 subsystem=="wmi" 分派，编译期无法剔除），
+// mac/Linux 必须有链接符号——哨兵桩在平台分支之外无条件编译。
+// （Linux CI 连红根因：只加了 OS_WIN 实现，Linux 链接即 undefined。）
+extern "C" void *yue_mbt_wmi_brightness_devices(int32_t *ok) {
+  *ok = -1000;
+  return moonbit_make_bytes(0, 0);
+}
+
+extern "C" int32_t yue_mbt_wmi_brightness_get(int32_t *cur, int32_t *levels,
+                                              int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
+
+extern "C" int32_t yue_mbt_wmi_brightness_set(int32_t percent, int32_t *ok) {
+  *ok = 0;
+  return -1000;
+}
 
 
 
@@ -6104,7 +6132,8 @@ extern "C" int32_t yue_mbt_win_keep_awake_restore(int32_t *ok) {
   return 0;
 }
 
-#else  // macOS:暂缓
+#elif !defined(OS_MAC)  // macOS：IOPMAssertion / CGEventSource 在
+                        // yue_system_mac.mm
 
 extern "C" int32_t yue_mbt_idle_seconds_ms(int32_t *ok) {
   *ok = 0;
@@ -6147,7 +6176,8 @@ extern "C" int32_t yue_mbt_win_power_status(
   return 0;
 }
 
-#else  // Linux 电源查询走 DBus UPower（MoonBit 层），非 Windows 哨兵
+#elif !defined(OS_MAC)  // Linux 电源查询走 DBus UPower（MoonBit 层），非
+                        // Windows 哨兵；macOS IOPS 在 yue_system_mac.mm
 
 extern "C" int32_t yue_mbt_win_power_status(
     int32_t *ac_online, int32_t *percent, int32_t *charging,

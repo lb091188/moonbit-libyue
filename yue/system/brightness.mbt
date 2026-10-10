@@ -251,7 +251,8 @@ fn bright_check_dev(
 pub fn brightness_supported() -> Bool {
   match @yue.platform() {
     "linux" => @traybus.logind_available()
-    "windows" => brightness_devices() is Ok(devs) && devs.length() > 0
+    "windows" | "macos" =>
+      brightness_devices() is Ok(devs) && devs.length() > 0
     _ => false
   }
 }
@@ -272,6 +273,7 @@ pub fn brightness_devices() -> Result[Array[BrightnessDevice], BrightnessError] 
       }
       Ok(out)
     }
+    "macos" => Ok(bright_win_devices())
     _ => Err(Unsupported)
   }
 }

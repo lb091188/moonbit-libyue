@@ -833,42 +833,54 @@ int32_t yue_mbt_proc_wait(int32_t pid, int32_t timeout_ms, int32_t *status,
 /* 当前进程 id */
 int32_t yue_mbt_proc_getpid(void);
 
-/* ---------- 系统能力 Windows 直连组（sysinfo/wallpaper/locale/powerctl/
+/* ---------- 系统能力直连组（sysinfo/wallpaper/locale/powerctl/
  * powerprofile/brightness/volume/monitor/printer/clipboard/windowctl/
- * defaultapps/recent/disk；非 Windows 均为 -1000 哨兵） ---------- */
+ * defaultapps/recent/disk；符号名为历史 ABI 命名，非平台含义。
+ * OS_WIN 实现在 yue_mbt.cpp、OS_MAC 实现在 yue_system_mac.mm、
+ * 其余平台 -1000 哨兵桩；两平台语义差异见各函数注释与 docs） ---------- */
 
-/* 注册表 REG_SZ 读取（root: 0=HKLM 1=HKCU；REG_EXPAND_SZ 展开后） */
+/* [win] 注册表 REG_SZ 读取（root: 0=HKLM 1=HKCU；REG_EXPAND_SZ 展开后；
+ * mac 哨兵） */
 void *yue_mbt_win_reg_str(int32_t root, const char *path, const char *value,
                           int32_t *ok);
-/* 物理内存（kB）；返回 1 成功 0 失败 */
+/* 物理内存（kB）；返回 1 成功 0 失败。[mac] hw.memsize +
+ * host_statistics64（free+inactive+purgeable） */
 int32_t yue_mbt_win_memory(int64_t *total_kb, int64_t *avail_kb);
-/* 开机毫秒数；<0 错误 */
+/* 开机毫秒数；<0 错误。[mac] kern.boottime */
 int64_t yue_mbt_win_uptime_ms(void);
-/* 壁纸读（SPI_GETDESKWALLPAPER） */
+/* [win] 壁纸读；[mac] NSWorkspace 主屏桌面图路径 */
 void *yue_mbt_wallpaper_get(int32_t *ok);
-/* 壁纸写（SPI_SETDESKWALLPAPER，带 INI 刷新与广播） */
+/* [win] 壁纸写；[mac] NSWorkspace 主屏（多屏差异文档化） */
 int32_t yue_mbt_wallpaper_set(const char *path, int32_t *ok);
-/* 时区名（Windows 时区键名，如 "China Standard Time"，非 IANA 名） */
+/* 时区名。[win] Windows 时区键名（"China Standard Time"）；
+ * [mac] IANA 名（"Asia/Shanghai"）——语义差异由 MoonBit 层文档化 */
 void *yue_mbt_win_tz_name(int32_t *ok);
-/* 用户界面区域名（BCP-47，如 "zh-CN"） */
+/* 用户界面区域名（BCP-47）。[win] "zh-CN"；[mac] 首选语言首项
+ * （"zh-Hans-CN"） */
 void *yue_mbt_win_lang(int32_t *ok);
-/* W32Time（Windows 时间服务）是否在跑；返回 1/0，-1 错误 */
+/* [win] W32Time 是否在跑；返回 1/0，-1 错误；mac 哨兵 */
 int32_t yue_mbt_win_ntp_running(int32_t *ok);
-/* 关机/重启/注销（how: 0=关机 1=重启 2=注销当前用户；需关机特权） */
+/* 关机/重启/注销（how: 0=关机 1=重启 2=注销当前用户）。[win] ExitWindowsEx
+ * 需关机特权；[mac] loginwindow Apple Event（osascript 承载） */
 int32_t yue_mbt_win_shutdown(int32_t how, int32_t *ok);
-/* 当前电源计划 GUID（16 字节裸序） */
+/* [win] 当前电源计划 GUID（16 字节裸序）；mac 哨兵 */
 int32_t yue_mbt_power_active_guid(uint8_t *out16, int32_t *ok);
-/* 切换电源计划（16 字节裸序 GUID） */
+/* [win] 切换电源计划；mac 哨兵 */
 int32_t yue_mbt_power_set_guid(const uint8_t *guid16, int32_t *ok);
-/* 枚举电源计划 GUID（out 每项 16 字节，cap 为方案数上限）；返回方案数 */
+/* [win] 枚举电源计划 GUID（out 每项 16 字节，cap 为方案数上限）；返回方案
+ * 数；mac 哨兵 */
 int32_t yue_mbt_power_enumerate_guids(uint8_t *out, int32_t cap_guids,
                                       int32_t *ok);
-/* DDC 亮度设备枚举（'\n' 分行 "name\tmax\tcur"） */
+/* [mac] 机器标识 "vendor\tproduct\tserial"（vendor 恒 "Apple Inc."，
+ * product=hw.model，serial=IOPlatformSerialNumber）；win 哨兵 */
+void *yue_mbt_mac_machine_info(int32_t *ok);
+/* 亮度设备枚举（'\n' 分行 "name\tmax\tcur"）。[win] DDC 原始量纲；
+ * [mac] IODisplay 归一 0..100 量纲，name 为 "display<id>" */
 void *yue_mbt_brightness_devices(int32_t *ok);
-/* DDC 亮度当前值（index 与 devices 同序） */
+/* 亮度当前值（index 与 devices 同序） */
 int32_t yue_mbt_brightness_get(int32_t index, int32_t *cur, int32_t *max_v,
                                int32_t *ok);
-/* DDC 亮度设置（value 为设备量纲原始值） */
+/* 亮度设置（value 为设备量纲原始值，量纲语义随平台见 devices 注） */
 int32_t yue_mbt_brightness_set(int32_t index, int32_t value, int32_t *ok);
 /* 内屏亮度枚举（WMI，InstanceName '\n' 分行；空文本 = 无内屏/不可用） */
 void *yue_mbt_wmi_brightness_devices(int32_t *ok);
@@ -878,34 +890,42 @@ int32_t yue_mbt_wmi_brightness_get(int32_t *cur, int32_t *levels,
 /* 内屏亮度写（percent 0-100） */
 int32_t yue_mbt_wmi_brightness_set(int32_t percent, int32_t *ok);
 /* 默认输出端点音量（level 0..1 标量，double 与 MoonBit Ref[Double] 同宽；
- * muted 0/1） */
+ * muted 0/1）。[win] IAudioEndpointVolume；[mac] Core Audio master element，
+ * 设备无 mute 通道视为未静音、无音量通道返回失败 */
 int32_t yue_mbt_vol_master(double *level, int32_t *muted, int32_t *ok);
 int32_t yue_mbt_vol_set_master(double level, int32_t *ok);
 int32_t yue_mbt_vol_set_mute(int32_t mute, int32_t *ok);
-/* 显示器配置（H|.. 头行 + M|.. 模式行，物理毫米恒 0） */
+/* 显示器配置（H|.. 头行 + M|.. 模式行，物理毫米恒 0——ABI 无毫米字段，
+ * mac 亦然；preferred [win] 恒 0，[mac] 面板 native 模式标记） */
 void *yue_mbt_mon_list(int32_t *ok);
-/* 打印机列表（"name\tstatus_code" 行，code: 0 空闲 1 打印中 2 暂停 3 不可用）*/
+/* 打印机列表（"name\tstatus_code" 行，code: 0 空闲 1 打印中 2 暂停 3 不可
+ * 用）。[win] EnumPrinters；[mac] CUPS（stopped→3，暂停态无对应） */
 void *yue_mbt_prt_list(int32_t *ok);
 /* 默认打印机名 */
 void *yue_mbt_prt_default(int32_t *ok);
 /* 打印队列（"job_id\tdoc_name" 行） */
 void *yue_mbt_prt_queue(const char *printer, int32_t *ok);
-/* 提交打印（文件 "print" 动词，走默认打印机） */
+/* 提交打印。[win] ShellExecute "print" 动词；[mac] cupsPrintFile 默认打印机 */
 int32_t yue_mbt_prt_print(const char *path, int32_t *ok);
-/* 剪贴板文本读（CF_UNICODETEXT；无文本 ok=0） */
+/* 剪贴板文本读（[win] CF_UNICODETEXT；[mac] NSPasteboardTypeString；无文
+ * 本 ok=0） */
 void *yue_mbt_clipboard_text(int32_t *ok);
-/* 可见窗口列表（"0xHWND\t标题" 行） */
+/* 可见窗口列表（"0xID\t标题" 行）。[win] HWND；[mac] CGWindowNumber，跨应
+ * 用标题需屏幕录制权限，无权限仅见本进程 */
 void *yue_mbt_win_list_windows(int32_t *ok);
 /* 窗口置前（"0x" 前缀按句柄，否则按标题精确匹配） */
 int32_t yue_mbt_win_activate_window(const char *id_or_title, int32_t *ok);
-/* 按 "0x" 句柄或标题精确匹配关闭窗口（WM_CLOSE） */
+/* 按 "0x" 句柄或标题精确匹配关闭窗口。[win] WM_CLOSE；[mac] AX Close 按钮
+ * （需辅助功能权限，未授权返回 -99） */
 int32_t yue_mbt_win_close_window(const char *id_or_title, int32_t *ok);
-/* 文件关联查询（assoc 为扩展名或协议；kind: 0=可执行 1=命令行） */
+/* 文件关联查询（assoc 为扩展名或协议；kind: 0=可执行 1=命令行）。
+ * [mac] kind 恒返回应用路径（命令行形态无对应） */
 void *yue_mbt_assoc_query(const char *assoc, int32_t kind, int32_t *ok);
-/* .lnk 解析（"mtime_ms\t目标路径"，mtime 为 .lnk 自身修改时间） */
+/* [win] .lnk 解析（"mtime_ms\t目标路径"）；mac 哨兵 */
 void *yue_mbt_lnk_target(const char *path, int32_t *ok);
-/* 磁盘卷枚举（"C:|label|total|free|kind" 行，kind: 0 固定 1 可移除 2 光驱
- * 3 网络 4 虚拟盘） */
+/* 磁盘卷枚举（[win] "C:|label|total|free|kind" 行；[mac]
+ * "dev|mount|label|total|free|kind" 多一列挂载点，解析分平台。
+ * kind: 0 固定 1 可移除 2 光驱 3 网络 4 虚拟盘；[mac] 光驱/虚拟盘归 0） */
 void *yue_mbt_dsk_volumes(int32_t *ok);
 
 /* ---------- 系统总线基建与电源 ---------- */
