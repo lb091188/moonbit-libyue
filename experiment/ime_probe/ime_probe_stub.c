@@ -213,7 +213,38 @@ static void on_realize(GtkWidget *w, gpointer data) {
   (void)data;
   if (pr.im != NULL) {
     gtk_im_context_set_client_window(pr.im, gtk_widget_get_window(w));
+    // 关键：裸 GtkIMContext 不 focus_in 就一直处于失活态，GtkIMMulticontext
+    // 会落回内建 GtkIMContextSimple——表现就是"每键一次 commit、preedit 恒 0"，
+    // 输入法从不接管（实测 fcitx5 即此）。这一行不能少。
+    gtk_im_context_focus_in(pr.im);
+    note("im-focus", "in(realize)");
   }
+}
+
+// 顶层窗口进出焦点时同步 IM 上下文的激活态；失焦必须 focus_out，
+// 否则输入法侧会残留未完成的组合串（验收清单第 5 项）。
+static gboolean on_window_focus_in(GtkWidget *w, GdkEventFocus *ev,
+                                   gpointer data) {
+  (void)w;
+  (void)ev;
+  (void)data;
+  if (pr.im != NULL) {
+    gtk_im_context_focus_in(pr.im);
+    note("im-focus", "in");
+  }
+  return FALSE;
+}
+
+static gboolean on_window_focus_out(GtkWidget *w, GdkEventFocus *ev,
+                                    gpointer data) {
+  (void)w;
+  (void)ev;
+  (void)data;
+  if (pr.im != NULL) {
+    gtk_im_context_focus_out(pr.im);
+    note("im-focus", "out");
+  }
+  return FALSE;
 }
 
 static gboolean on_key_press(GtkWidget *w, GdkEventKey *ev, gpointer data) {
@@ -359,6 +390,10 @@ int ip_init(int mode) {
   } else {
     gtk_widget_set_can_focus(pr.area, TRUE);
     pr.im = gtk_im_multicontext_new();
+    // 自绘路线必须关掉输入法客户端的自带 preedit 绘制：默认 use_preedit=TRUE
+    // 时输入法会另画一份组合串浮窗，而本探针把 preedit 内联画在文本里，
+    // 同一段文字就会显示两份（实测 focus_in 激活输入法之后立刻可见）。
+    gtk_im_context_set_use_preedit(pr.im, FALSE);
     g_signal_connect(pr.im, "commit", G_CALLBACK(on_im_commit), NULL);
     g_signal_connect(pr.im, "preedit-start", G_CALLBACK(on_im_preedit_start),
                      NULL);
@@ -371,6 +406,10 @@ int ip_init(int mode) {
                    NULL);
   g_signal_connect(pr.window, "key-release-event", G_CALLBACK(on_key_release),
                    NULL);
+  g_signal_connect(pr.window, "focus-in-event", G_CALLBACK(on_window_focus_in),
+                   NULL);
+  g_signal_connect(pr.window, "focus-out-event",
+                   G_CALLBACK(on_window_focus_out), NULL);
   g_signal_connect(pr.window, "realize", G_CALLBACK(on_realize), NULL);
   g_signal_connect(pr.window, "destroy", G_CALLBACK(on_destroy), NULL);
 

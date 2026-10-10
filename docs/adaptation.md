@@ -187,6 +187,16 @@ Environment: Ubuntu 24.04 + X11 + XFCE, moon 0.1.20260920 / moonc v0.10.14, GTK3
 - **Caret placement**: hit-testing measures prefix widths code point by code point and picks the right-most boundary at or before the click; `Editor::boundary_after` was promoted from private to public so the upper layers advance the same way.
 - Verification: all five packages warning-free; core 14/14, input 10/10, render 14/14, text 7/7, yoga-mbt 79/79; `examples/native-window` smoke on this machine: 49 frames, exit code 0, both boxes' text intact. **Pending real-machine checks** (user): typing letters/digits, backspace and arrows, Tab/Shift+Tab wrapping between the two boxes, click-to-place caret, 500 ms caret blink, CJK punctuation and compose keys (IME is G5).
 
+### MoonBit native GUI stack G0 · real-machine evidence: `im_focus` is what makes the pure channel work; the preedit gap is in how the probe hooks it
+
+Environment: Ubuntu 24.04 + X11 + XFCE, `GTK_IM_MODULE=fcitx` (fcitx5). Run by the collaborator on real hardware (AGENTS rule 6).
+
+- **Symptom**: in mode B every keystroke landed as an immediate commit and preedit stayed 0 - the IME looked like it never took over. fcitx5 was fine; `GtkIMMulticontext` had silently fallen back to the built-in `GtkIMContextSimple` (Latin-1 only, no compose/candidates) because the context was never activated.
+- **Root cause**: the probe only called `gtk_im_context_set_client_window` and never `gtk_im_context_focus_in`, so the context stayed inactive and `filter_keypress` consumed nothing.
+- **Fix**: `gtk_im_context_focus_in` at realize, plus focus-in/out sync on the toplevel (losing focus must call `focus_out`, otherwise the IME keeps an unfinished compose string - checklist item 5). After this the **Chinese commit path works on real hardware**.
+- **Remaining gap**: inline preedit (drawing the compose string ourselves) still does not show, localized to the probe's own wiring rather than the IME. Mode C's visible `GtkEntry` preview behaves like Electron, which is a useful baseline for the fallback shape. G5 should be designed from these two facts (commit reachable; preedit must be self-drawn with focus sync) and stop re-verifying that commit is reachable at all.
+- Verification: `moon build experiment/ime_probe` and both modes exit 0 on this machine (assistant side); CJK typing itself was executed and reported by the collaborator per the README checklist.
+
 ## Linux
 
 ### Distributions
