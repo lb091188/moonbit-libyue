@@ -559,6 +559,27 @@ First full local-chain verification environment: Windows 10 19045 + VS BuildTool
   - ③ sysmonitor's S4 hardware-sampling test asserting "coretemp always has a Package sensor" — virtual-machine runners lack the hardware, so environmental gaps (no sensors / no DISPLAY) must skip, not assert.
   - Also: the CI native-layer cache key must include the shim source hash (with only prepare.py in the key, a shim change keeps the old key and the restored build/ cache holds a stale shim archive); and with no Actions log access, slicing the failing output into `::error` annotations (the check-runs annotations API is anonymously readable) is the only forensics channel.
 
+### Scroll cannot scroll without an explicit content size (macOS lacked the "content natural height" layer)
+
+- Environment: reporter's real machine, macOS 14.5 / arm64 (tracked as issue #1, every `examples/showcase` page including the side menu), fork v0.15.6-mbt.18 prebuilt library.
+  - This machine is Linux with no mac, so the bug was not reproduced here — the conclusions below come from reading the fork sources (the quoted code matches the local `nativeui/mac/scroll_mac.mm` verbatim).
+- Symptom: with a Scroll that only carries a `flex:1` outer box and no explicit content size, neither the wheel nor the scrollers move (the maximum scroll position stays 0) and everything beyond the viewport is clipped.
+  - An explicit `set_content_size` works around it but is useless for dynamic content; the same program is fine on Windows / Linux.
+- Root cause: `-[NUScroll resizeSubviewsWithOldSize:]` only uses `content_size_`, which is `{0,0}` when none was set — the two "never smaller than the viewport" lines clamp it to the viewport height before it reaches the document view.
+  - On macOS the scrollable range is exactly `documentView frame − clipBounds`, so a height equal to the viewport means a range of 0, and the content Container is laid out at the viewport height, squeezing and clipping its children.
+  - For comparison, Windows' `ScrollImpl::Layout()` falls back to `Container::GetPreferredSize()` and GTK carries it through the size request — the "no explicit size means the content's natural height" layer existed on macOS only, a platform-consistency gap in the fork's own enhancements (upstream lacks it on all three platforms).
+- Fix (fork commit `0df24ee3`): without an explicit size the document view frame now follows the content `Container`'s natural size.
+  - The width is the larger of the viewport width and the content's natural width (a wider content keeps its width and scrolls horizontally), and the height is measured with `GetPreferredHeightForWidth(that width)` so wrapping matches the final layout; an explicit `SetContentSize` keeps its behavior (new `content_size_explicit_` flag).
+  - Three entry points recompute it: viewport resize, content installation (`PlatformSetContentView` — the content can be set after layout), and the new macOS-only `Scroll::RefreshContentSize()`.
+- Verification for this batch: `nativeui/scroll.h` passes the fork's cpplint with zero warnings.
+  - This machine is Linux and cannot compile mac code, and the fork's `build.yml` was measured to have never been triggered by a push (0 runs), so the mac compile check can only come from the `v*-mbt*` tag-triggered prebuilt workflow (no tag was pushed for this batch); the real-machine behavior is the checklist below.
+- Follow-ups, in order (blocked by a cross-repo chain — do not skip a step):
+  - ① the shim's `yue_mbt_scroll_refresh_content_size` needs an `#if defined(OS_MAC)` branch calling `Scroll::RefreshContentSize()` (content that grows does not change the viewport size, so no automatic path sees it).
+    - That shim change must land **only after** the fork publishes a new prebuilt library and `prepare.py`'s `LIBYUE_VERSION` is bumped, otherwise this repo's macOS CI links against the old library and fails on an undefined symbol.
+  - ② The packaging half (.app skeleton) and the macOS notification migration are issue #4, assessed separately.
+- Real-machine checklist (run by the user): ① every showcase page (including the side menu) scrolls to the bottom; ② A/B control — the same 30 lines scrolls without a content size and also with an explicit 1200; ③ after shrinking the window to a very short height the content still scrolls and the thumb ratio looks right.
+  - ④ a page with a wide table scrolls horizontally rather than clipping columns; ⑤ a systemprobe report that grew via `set_text` scrolls to the bottom — this one depends on follow-up ① and is expected to stay stuck until it lands.
+
 ## Maintenance
 
 1. Add new conclusions to the matching section, recording only the pitfall and the fix; protocol-interop conclusions must come from the real bus and real panels — unit-test self-consistency does not count.

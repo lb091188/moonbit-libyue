@@ -649,7 +649,7 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **惰性挂载后滚动范围停在骨架高度(滚不动页第二根因,探针二分矩阵实证)**:GTK 下 ScrolledWindow 的滚动范围不来自内容测量——nativeui 的 nu_container 对 GTK preferred 恒报 0(不走 GTK 布局系统),viewport 的 adjustment upper 全靠 fork `Scroll::PlatformSetContentView` 在 **set_content 时刻**对内容自然高做的一次性快照(写成 size request);且重挂同内容时该函数先读旧快照(非 -1)即跳过重算、remove 清掉后 add 又写回旧值——内容在 set_content 之后才挂入(惰性挂载)或明显长高时,滚动范围永停在骨架高度,表现为「内容明明超高却滚不动、滚轮无声」。showcase 全部 111 段均为惰性挂载,图标库长段(9 行图标墙)最先暴露,实为全页共性。
 
   - 探针四列二分定案:常驻文本 / 图标墙 `max=428/518`(能滚)、惰性后挂文本 / 图标墙 `max=0`(holder 实测 1120 / 1210、GetPreferredSize 1164 / 1254 均正确)——与内容类型无关,纯挂载时序;重 set_content 无效(旧快照短路),显式 set_content_size 大值立即生效(adjustment 链路通,锁定 size request 快照不更新)。
-  - 修复:shim 增 `yue_mbt_scroll_refresh_content_size`(Linux 直写 `gtk_widget_set_size_request(宽保持现值, 高 = Container::GetPreferredSize() 即时跑 yoga)`,win / mac 空操作——Windows 的 `ScrollImpl::Layout` 本就每轮重查内容自然尺寸、macOS 由 documentView frame 决定范围,均无快照问题),yue 层 `Scroll::refresh_content_size()`;惰性挂载方在挂载完成后调用(showcase section_body 已接)。
+  - 修复:shim 增 `yue_mbt_scroll_refresh_content_size`(Linux 直写 `gtk_widget_set_size_request(宽保持现值, 高 = Container::GetPreferredSize() 即时跑 yoga)`,win 空操作——Windows 的 `ScrollImpl::Layout` 本就每轮重查内容自然尺寸),yue 层 `Scroll::refresh_content_size()`;惰性挂载方在挂载完成后调用(showcase section_body 已接)。**mac 原为空操作**(理由曾是「macOS 由 documentView frame 决定范围,无快照问题」),该前提已被 macOS Scroll 小节推翻——mac 的 documentView frame 未显式尺寸时原样跟着视口走,「动态增高要重算」同样成立,待新预构建库出来后在 shim 补 mac 分支。
   - 端到端探针:切页 / 切段 / 二轮显隐 / 切回后 `max_y` 恒为 `内容高 − 视口`(`598=1290−692`)精确恢复、视口变化亦动态正确。与「滚动范围跨轴 bug」(读侧)互补,本条是写侧,两修都在 shim 层。回归工具:`moon run examples/probe-iconscroll`(端到端四时序采样,长段 max_y 应恒 >0)。
   - 同一快照机制也咬**非惰性**场景:挂载后 `set_text` 长高(systemprobe 系统能力报告,几十行文本)与挂载后 `mount_into` 动态挂入新子树(视频播放器挂进占位容器)同样不更新滚动范围——表现为「读取结果出来后底部被截 / 滚不动、播放器挂载后滚不到底」。挂载方在内容变化完成后调 `refresh_content_size()` 即恢复;systemprobe 多页化重构的页面壳把刷新闭包注入正文构建函数,报告 set_text、播放器挂载、命令预览文本三处接上(2026-10 实测)。
 - **报告标签 set_text 后不长高(裁剪,滚动范围快照之外的第二半,2026-10 用户真机反馈 + 探针对照实证)**:systemprobe 系统能力页点「读取系统能力」,几十行报告只显示前 1-2 行(用户截图:音量节只剩 sink 行,「音量: 45% 静音: 否」及其后全部不可见)。
@@ -819,6 +819,16 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - shim 平台分支的 `#else` 兜底会误吞 macOS:borderless 须 `#elif defined(OS_WIN)`;CurrentDirForDrag 拆三支(mac 用 `getcwd`);`Window::SetSkipTaskbar` / `SetIcon` / `App::SetID` 在 mac 头文件无声明,调用补守卫空操作。
 - **AppleClang 17(macos-15 镜像更新后)把 `getRed:green:blue:alpha:` 返回值解析成 void**,`![...]` 一元取反编译错误;已判空且转 sRGB 后取分量必然成功,丢弃返回值写法对 BOOL/void 双解析都可编译(69136b7,曾被整树回退丢失又捡回——回退基线含带病文件时,后续修复会随回退消失,重推 vendor 前需对照该文件历史)。
 - **0.5.0 发布前的 CI 连红三根因(9-22 起,Linux/macOS 红、Windows 绿)**:① `yue_accent_mac.mm` 的 AppleClang 编译错误(见上)卡死 prepare;② extern "C" 缺失(见 ABI 小节)卡死链接;③ sysmonitor 的 S4 硬件采样测试断「coretemp 必有 Package 传感器」,虚机 runner 无此硬件即败——环境缺件(无传感器/无 DISPLAY)只跳过不硬断。另:CI 原生层缓存 key 必须含 shim 源码哈希(只含 prepare.py 时,shim 变更不换 key,恢复的 build/ 缓存里是旧 shim 库);无 Actions 日志权限时,把失败输出切片塞进 `::error` 注解(check-runs annotations API 匿名可读)是唯一取证通道。
+
+### Scroll 未显式内容尺寸时不可滚(macOS 缺「内容自然高度」这层)
+
+- 环境:报告方真机 macOS 14.5 / arm64(跟踪 issue #1,`examples/showcase` 全分页含侧边菜单),fork v0.15.6-mbt.18 预构建库;本机为 Linux、无 mac,未复现,以下结论来自 fork 源码逐行核对(引用代码与本地 `nativeui/mac/scroll_mac.mm` 逐字一致)。
+- 现象:Scroll 只给外框 `flex:1`、不显式设内容尺寸时,滚轮与滚动条都不动(最大滚动位置恒 0),超出视口的内容被直接裁掉;显式 `set_content_size` 可绕过,但动态高度内容不适用。同一程序 Win / Linux 正常。
+- 根因:`-[NUScroll resizeSubviewsWithOldSize:]` 只用 `content_size_`——未显式设置时该值是 `{0,0}`,被「不小于视口」两行钳成视口高再 `setFrameSize:` 给 documentView;而 macOS 的可滚范围正是 `documentView frame − clipBounds`,高度恒等视口即范围恒 0,同时内容 Container 被按视口高布局、子内容随之压缩裁剪。对照:Win `ScrollImpl::Layout()` 未显式时取 `Container::GetPreferredSize()`,GTK 侧由 size request 承载——「未显式尺寸取内容自然高度」这层只有 macOS 缺,属 fork 增强自身的平台一致性缺口(上游三平台同样没有此逻辑)。
+- 修复(fork 提交 `0df24ee3`):未显式设置时按内容 `Container` 的自然尺寸定 documentView frame——宽度取「视口宽 / 内容自然宽」较大者(内容更宽时保留其宽以支持横向滚动),高度用 `GetPreferredHeightForWidth(该宽)` 测量(先定宽再量高,换行与最终布局一致);显式 `SetContentSize` 行为不变(新增 `content_size_explicit_` 标记)。重算入口三处:视口尺寸变化(`resizeSubviewsWithOldSize:`)、内容挂入(`PlatformSetContentView`,内容可在布局之后再 `set_content`)、新增的 mac 专属 `Scroll::RefreshContentSize()`。
+- 本批验证:`nativeui/scroll.h` 过 fork 的 cpplint 零告警;本机为 Linux,无法编译 mac 代码,且 fork 的 `build.yml` 实测从未被 push 触发(该工作流运行数为 0),故 mac 编译验证只能落在打 `v*-mbt*` 标签触发的 prebuilt 工作流(本批尚未打标签);真机行为见下清单。
+- 待办与顺序(跨仓链路,勿跳步):① shim 的 `yue_mbt_scroll_refresh_content_size` 增 `#if defined(OS_MAC)` 分支调 `Scroll::RefreshContentSize()`(内容动态增高不改变视口尺寸,自动路径覆盖不到,须显式触发);该 shim 改动**必须等 fork 出新预构建库并升 `prepare.py` 的 `LIBYUE_VERSION` 之后再落**,否则本仓 mac CI 对旧库链接 undefined。② 本仓打包侧(.app 骨架)与 mac 通知迁移属 issue #4,另行评估。
+- 真机验证清单(用户执行):① showcase 各分页(含侧边菜单)可滚到底;② A/B 对照:同一 30 行文本,不设内容尺寸可滚、显式设 1200 同样可滚;③ 窗口压到很矮后内容仍可滚、滚动条 thumb 比例合理;④ 含宽表的页可横向滚(不裁列);⑤ systemprobe 报告 `set_text` 长高后可滚到底——本项依赖待办 ①,未接线前预期仍不动。
 
 ### ffmpeg CLI 视频解码路线(帧集整读 + 偏移切片)
 
