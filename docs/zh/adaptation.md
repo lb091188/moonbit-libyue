@@ -315,6 +315,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **坑（本工具链派生 trait 是弃用路径）**：`pub(all) enum X { .. } derive(Eq)` 触发 `implicit_impl_as_method` 弃用警告（`equal`/`not_equal` 被隐式提升为普通方法）；把 `derive(Eq)` 写在枚举名之后更是直接编译错（正确位置是 `}` 之后）。为守住零警告，本批不派生 trait，测试用包内 id 映射比较枚举（`align_id`/`weight_value`）。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/text` 14/14（新增 7 条：`wrap=false` 单行自然宽与 `wrap=true` 的高度对照、省略宽度受钳、粗体不窄于常规、盒内水平/垂直对齐落点与居中、`AttributedText` 属性面与包围盒、`new_with`/`format` 往返）；`moon check yue/text` 零警告；`examples/native-window` 冒烟 49 帧、退出码 0（示例新增居中粗体标题，把 Font/TextAlign/AttributedText 跑了一遍）。
 
+### yoga-mbt · 语料派生项结案：子项 flex-basis 被容器属性遮蔽（Chrome 对照）
+
+- **来源**：语料 `93078300` 派生待查——显式 `flex-basis: 0` + `min-height: 0` 在 auto 高列容器下引擎给 60，按 CSS 推导应为 0。
+- **Chrome 对照手法（可复用）**：本地 HTML + 浏览器 MCP 的 `getBoundingClientRect()` 读实高；规范正文用 drafts.csswg.org 页面内 DOM 抽取（`document.querySelector('#anchor')`）比 WebFetch 可靠（后者只拿到目录）。
+- **结论一（Blink 口径）**：auto 主轴尺寸 = **各子项假想主轴尺寸之和**（flex base 被 min/max 钳制），growth 完全不参与。证据行：`basis 100 / 内容 300 / grow 1` → **100**（规范 §9.9.1 的 Ideal 算法会按弹性因子放大、Web-compatible 取 max-content contribution 给 300，两者都不符，实现以 Blink 为准）；`basis 0 + min 0` → 0；`basis 0 + min:auto` → 60（内容下限）；`basis auto + max-height 30` → 30；`basis 40%`（容器主轴不定、无参照）→ 60（退回内容）。
+- **结论二（根因，一处笔误）**：弹性项构建时基准读成了**容器**的 `s.flex_basis`（应为 `c.style.flex_basis`），子项 flex-basis 于是在整条布局链路上从未生效——这也解释了为什么 basis 怎么设结果都一样。容器 auto 主轴尺寸同样不看子项基准，改由新的 `main_contribution` 承担：确定基准优先并按其确定的 min/max 钳制，auto / 无参照百分比退回内在尺寸；`min: auto` 的内容下限只在 §4.5 弹性解析里生效，不在容器推算里重复探内在尺寸（否则每次容器测宽/测高都多算一遍内在尺寸）。
+- **验证**：Chrome 矩阵 7 行（A/C/D/F/G/I/L）逐行一致，落成 `patches_regression_wbtest.mbt` 的常驻用例；yoga-mbt 81/81（含 `display:none` 语料用例与全部既有断言）；bench 无变化（1121 节点 × 500 轮 release：修复前 1.93s、修复后 1.95s，A/B 实测）。
+
 ## Linux
 
 ### 发行版

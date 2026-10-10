@@ -469,6 +469,40 @@ fn intrinsic_border_size(
 
 ///|
 /// 容器的内在尺寸（内容盒部分，不含自身 padding/border）。
+///|
+/// 子项对容器**主轴**尺寸的贡献（对照 Chrome 实测口径：auto 主轴尺寸 =
+/// 各子项假想主轴尺寸之和，growth 不参与）。基准确定（显式 flex-basis 可解析）
+/// 时用基准并按其确定的 min/max 钳制；基准 auto / 百分比无参照时退回内在尺寸
+/// （`intrinsic_size` 内部已做显式 min/max 夹取）。`min: auto` 的内容下限
+/// 只在弹性解析（§4.5）里体现，这里不重复探 min-content——否则每次容器
+/// 测宽/测高都要为每项多算一遍内在尺寸。
+fn main_contribution(
+  c : Node,
+  main_is_row : Bool,
+  kind : IntrinsicKind,
+  cb_w : Option[Double],
+  cb_h : Option[Double],
+) -> Double {
+  let basis = if main_is_row { c.style.flex_basis } else { c.style.flex_basis }
+  let base_axis = if main_is_row { cb_w } else { cb_h }
+  match definite_size(basis, base_axis) {
+    Some(b) => {
+      let lo =
+        definite_size(
+          if main_is_row { c.style.min_width } else { c.style.min_height },
+          base_axis,
+        ).unwrap_or(0.0)
+      let hi =
+        definite_size(
+          if main_is_row { c.style.max_width } else { c.style.max_height },
+          base_axis,
+        ).unwrap_or(max_dim)
+      clamp3(b, lo, hi)
+    }
+    None => intrinsic_size(c, main_is_row, kind, cb_w, cb_h)
+  }
+}
+
 fn container_intrinsic_size(
   n : Node,
   want_row : Bool,
@@ -520,7 +554,7 @@ fn container_intrinsic_size(
     } else {
       (m.top + m.bottom, m.left + m.right)
     }
-    let cm = intrinsic_size(c, main_is_row, kind, cb_w, cb_h) + margin_main
+    let cm = main_contribution(c, main_is_row, kind, cb_w, cb_h) + margin_main
     main_sum = main_sum + cm
     if cm > main_max {
       main_max = cm
@@ -772,7 +806,7 @@ fn layout_into(
       (h, w)
     }
     let content_cross0 = content.1
-    let basis_val = match s.flex_basis {
+    let basis_val = match c.style.flex_basis {
       Auto => child_main_style
       v => v
     }
