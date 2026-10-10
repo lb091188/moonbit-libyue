@@ -203,6 +203,16 @@ Environment: Ubuntu 24.04 + X11 + XFCE, `GTK_IM_MODULE=fcitx` (fcitx5). Run by t
 - **ibus not installed**: those two checklist rounds are marked "no ibus daemon in this environment, untested".
 - **Verification**: `moon build experiment/ime_probe` plus smoke runs in both modes (exit code 0, assistant side); real machine (fcitx5) confirmed by the collaborator: one inline underlined composition, `[preedit] changed` in the stream, `[commit] 中文` intact, candidate window hugging the end of the composition.
 
+### MoonBit native GUI stack G4 · why nothing could be typed: wrong handler layer, and NumLock read as Meta
+
+Symptom: after G4 landed, the self-drawn box accepted no characters at all, while Tab seemed to "sort of work" (focus really was moving), animation and repaint were normal, and nothing logged an error. Objective verification by injecting `xdotool key` into the example window and printing `code/keysym/mods/focus/byte-length` per event pinned two causes:
+
+- **(1) key handlers were on the toplevel window instead of the focus widget.** The G0 probe (`ec2849d`) had already settled this on real hardware: key handling belongs on the focused widget, because window-level wiring gets the ordering and the "consume the event" semantics wrong (fatal once an IME is involved). Now connected on `w->area`, same shape as GtkEntry.
+- **(2) `GDK_MOD2_MASK` was being treated as Meta - fatal and easy to misread.** `wm_mods()` set MOD_META when `state & (GDK_META_MASK | GDK_MOD2_MASK)` matched, but on X11 MOD2 *is* NumLock, which is normally on, so **every** key event arrived with `mods=8`; `handle_key` sees meta/alt set, treats it as a chord and inserts nothing, silently dropping every printable key. Fix: Meta only from `GDK_META_MASK | GDK_SUPER_MASK`; lock bits (NumLock/CapsLock) never map into this stack's modifier set.
+- **Technique worth keeping**: "did it reach C" - `fprintf(stderr, "[c] key ...")` in the C callback; "where did it die after MoonBit" - print `code/keysym/mods/focus/editor length` at the dispatch point. The single `mods=8` field settled cause (2); reasoning from behaviour alone kept pointing at "events never arrived".
+- **Disproved hypothesis, recorded so nobody re-chases it**: after fixing the mapping the example briefly did not auto-exit, and I suspected `Loop::advance` starving later timers by breaking on a non-due head. Written as a headless case it **passes** (core 15/15). The stall was cause (3) - painting the GdkWindow outside the draw callback (see the G2/G4 lifetime entry) - plus too short a wait in my own test loop, not the scheduler.
+- **Objective verification**: injecting `a b c Tab d e f` yields `NATIVE-WINDOW-OK ... a='helloabc' b='第二个框def'` - three keys into the first box, Tab moves focus, three into the second, with `mods=0`. All five packages warning-free; core 15/15, input 10/10, render 14/14, text 7/7, yoga-mbt 79/79; repo-wide red still 290 errors. **Still needs eyes**: click-to-place caret and the 500 ms blink appearance (xdotool can inject a click but cannot see the drawn caret).
+
 ## Linux
 
 ### Distributions

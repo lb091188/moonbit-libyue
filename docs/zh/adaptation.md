@@ -253,6 +253,16 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **仍未闭环**：修完映射后示例的 5 秒自动退出没触发（进程 0% CPU 阻塞在等待里）。已排除 `Loop::advance`「只看队首就 break」饿死后序定时器这一猜想——新增无头用例「自重排的短周期节拍不应饿死长周期定时器」通过（core 15/15）。下一步用 `xdotool` 向示例窗口注入按键与点击做客观验证（这条路本机已跑通，可替代肉眼来回）。
 - **验证**：`moon check yue/win` 零警告；五包测试 core 15/15、input 10/10、render 14/14、text 7/7 全绿。
 
+### MoonBit 原生 GUI 栈 G4 · 「完全打不进字」的两处真因：按键挂错层 与 NumLock 被当成 Meta
+
+现象：G4 接入后自绘框一个字符都进不去，但 Tab 看着"像在动"（焦点其实切了）、窗口动画与重绘正常、全程无报错。用 `xdotool key` 向示例窗口注入按键做客观验证（本机宿主、不依赖肉眼），逐条打印 `code/keysym/mods/focus/len` 后定位到两处：
+
+- **① 按键挂到了顶层窗口而不是焦点控件**：原 `g_signal_connect(w->window, "key-press-event", ...)`。G0 探针（`ec2849d`）已用真机定下挂法——按键处理要挂在**焦点控件**上，挂窗口层会让事件顺序与"消费后能否真正吃掉"都不对（接 IME 后尤其致命）。改为挂 `w->area`（drawing area），与 GtkEntry 的挂法同构。
+- **② `GDK_MOD2_MASK` 被当成 Meta 用（致命且极易误判）**：`wm_mods()` 里写了 `state & (GDK_META_MASK | GDK_MOD2_MASK)` 就置 MOD_META。MOD2 在 X11 上是 **NumLock**，正常桌面恒为亮，于是**每个**按键事件都带 mods=8；内核 `handle_key` 见 `alt/meta` 非零即判定为组合键、不插字符，于是所有可打印键被静默丢弃。修法：Meta 只认 `GDK_META_MASK | GDK_SUPER_MASK`，NumLock/CapsLock 这类锁定位不参与本栈修饰位。
+- **定位手法（值得复用）**：「事件到没到 C」在 C 回调里 `fprintf(stderr, "[c] key ...")`；「到了 MoonBit 之后丢在哪」在派发点打印 `code/keysym/mods/focus/编辑器字节数`。这次就是靠 `mods=8` 一个字段直接锁定第 ② 条的——只看现象会一路往"事件没送到"方向猜。
+- **反证的一条**：修完映射后示例一度不自动退出，我先怀疑 `Loop::advance`「只看队首就 break」会饿死后序定时器，写成无头用例后**通过**（core 15/15），猜想去掉；实际卡住是第 ③ 条（draw 之外画 GdkWindow 撞死窗口，见 G2/G4 时序条）与测试等待时长不够叠加造成，不是调度器问题。
+- **验证（客观）**：注入 `a b c Tab d e f` 后 `NATIVE-WINDOW-OK ... a='helloabc' b='第二个框def'`——前三键进第一框、Tab 切焦点、后三键进第二框；`mods=0`。五包 `moon check` 零警告，core 15/15、input 10/10、render 14/14、text 7/7、yoga-mbt 79/79，全仓红点仍 290 errors。**仍需肉眼确认**：点击定位光标与 caret 500ms 闪烁的观感（xdotool 能注入点击、但看不到画出来的 caret）。
+
 ## Linux
 
 ### 发行版
