@@ -109,3 +109,25 @@ test "quit 后停止派发但保留待办" {
   assert_eq(l.advance(20L), 0)
   assert_eq(fired, 0)
 }
+
+test "时基未建立时相对延时按 0 起算，start 之后按平台时钟起算" {
+  // 未 start：基准取 0，delay 相对 0，advance 到该刻度即到期（明确化的旧行为）
+  let l = Loop::new()
+  assert_eq(l.started(), false)
+  let mut early = 0
+  let _ = l.timer(100, fn() { early = early + 1 })
+  assert_eq(l.advance(99L), 0)
+  assert_eq(l.advance(120L), 1)
+  assert_eq(early, 1)
+  // start 之后：delay 相对平台时钟（CLOCK_MONOTONIC 是开机起算的大数，
+  // 若仍按 0 起算会立刻到期——实测骨架动画只跑一拍就是这么来的）
+  let l2 = Loop::new()
+  l2.start(20000000L)
+  assert_eq(l2.started(), true)
+  let mut late = 0
+  let _ = l2.timer(100, fn() { late = late + 1 })
+  assert_eq(l2.advance(20000000L), 0)
+  assert_eq(l2.advance(20000099L), 0)
+  assert_eq(l2.advance(20000100L), 1)
+  assert_eq(late, 1)
+}

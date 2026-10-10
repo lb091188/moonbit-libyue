@@ -1,0 +1,9 @@
+import {
+  "NoahLiu/moonbit-libyue/yue/core",
+  "NoahLiu/moonbit-libyue/yue/render",
+  "NoahLiu/moonbit-libyue/yue/win",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"
