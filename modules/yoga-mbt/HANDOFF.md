@@ -22,9 +22,9 @@
 | 路径 | 当前分支 / HEAD | 状态 | 说明 |
 |---|---|---|---|
 | `/home/lkyh/ownCode/moonbit-libyue` | `master` @ `a656873` | 有未提交改动（README 中英、moon.mod） | **原副本**，另一会话正在此活动（发布/文档线） |
-| `/home/lkyh/ownCode/moonbit-libyue-navite` | `feature/yoga-mbt`（快照 `f994a15`） | 干净，与 origin 一致 | **本次新建副本**，yoga 复刻工作在这里继续 |
+| `/home/lkyh/ownCode/moonbit-libyue-native` | `feature/yoga-mbt`（快照 `f994a15`） | 干净，与 origin 一致 | **本次新建副本**，yoga 复刻工作在这里继续 |
 
-- 目录名按用户口述照录为 `moonbit-libyue-navite`（疑为 `native` 笔误，**未擅自改名**；要改就 `mv` 后同步 IDE 工作区）。
+- 目录名原按用户口述照录为 `moonbit-libyue-navite`，经用户确认系 `native` 笔误，已 `mv` 为 `moonbit-libyue-native`（若你的 IDE 工作区仍指向旧名，重新打开新路径即可）。
 - 新副本的 `.workbuddy/memory/` 是从原副本复制过去的（未跟踪文件，`git clone` 不会带）。
 - 远端分支指向：`feature/yoga-mbt` = `f994a15`、`master` = `a656873`、`win/native-handle` = `45bdd9f`。
 
@@ -191,7 +191,7 @@ cd <副本> && ~/.moon/bin/moon check && ~/.moon/bin/moon test    # 全仓门控
 
 ## 9. 已知风险与待决问题
 
-1. **目录名**：`moonbit-libyue-navite` 疑为 `native` 笔误，等用户确认后 `mv`。
+1. **目录名**：原 `moonbit-libyue-navite` 系 `native` 笔误，已由用户确认并 `mv` 为 `moonbit-libyue-native`——若你手中文档还写旧名，以新名为准。
 2. **分支混入无关提交**：`feature/yoga-mbt` 上的 `b01d1dd`/`6830867` 内容已在 master（`cf43cd9`/`b4fddd5`），合并前应剔除（见 §1）。
 3. **多副本并发**：两个副本、两个会话共用同一远端；`git add -A` 会误提交他人半成品。
 4. **近似实现**（已在 README/adaptation 标注，别当 bug 修）：绝对定位静态位置忽略兄弟项与间距类 justify；容器内在尺寸用 fit-content 近似。
@@ -217,7 +217,7 @@ cd <副本> && ~/.moon/bin/moon check && ~/.moon/bin/moon test    # 全仓门控
 
 ## 11. 接手后 10 分钟动作清单
 
-1. `cd /home/lkyh/ownCode/moonbit-libyue-navite && git fetch && git status`——确认在 `feature/yoga-mbt` 且与 origin 一致、工作区干净。
+1. `cd /home/lkyh/ownCode/moonbit-libyue-native && git fetch && git status`——确认在 `feature/yoga-mbt` 且与 origin 一致、工作区干净。
 2. `~/.moon/bin/moon check && ~/.moon/bin/moon test`——确认基线 687/687（若数字不同，先查是不是另一会话又推了新提交）。
 3. 读 `modules/yoga-mbt/README.md` + 本文 §3 / §5 / §6。
 4. 认领 §8 的 YG2b（baseline），按「先写测试预期 → 改代码 → 三类检查 → 回写文档 → 提交推送」的节奏推进。
