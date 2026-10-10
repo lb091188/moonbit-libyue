@@ -87,7 +87,8 @@ def build_ime_probe_stub() -> str:
     cflags: list[str] = []
     for name in LINUX_PKG_CONFIG_LIBS:
         got = pkg_config([name], "--cflags")
-        if not got:
+        # 空输出是合法的（`--cflags x11` 就是空），只有 None 才是包不存在
+        if got is None:
             print(f"ime_probe: 缺少 {name} 开发包", file=sys.stderr)
             return ""
         cflags.extend(got)
