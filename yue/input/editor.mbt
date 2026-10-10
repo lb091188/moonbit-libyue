@@ -14,6 +14,8 @@ pub struct Editor {
   mut caret : Int
   mut anchor : Int?
   mut clip : String
+  // 未提交的组合串：只用于绘制，绝不并入 text —— 文本状态仍然只有一份
+  mut preedit : String
   undo : Array[(Array[Byte], Int, Int?)]
   redo : Array[(Array[Byte], Int, Int?)]
 }
@@ -30,7 +32,15 @@ fn is_word_byte(b : Byte) -> Bool {
 
 ///|
 pub fn Editor::new() -> Editor {
-  { chars: [], caret: 0, anchor: None, clip: "", undo: [], redo: [] }
+  {
+    chars: [],
+    caret: 0,
+    anchor: None,
+    clip: "",
+    preedit: "",
+    undo: [],
+    redo: [],
+  }
 }
 
 ///|
@@ -499,4 +509,22 @@ pub fn Editor::handle_key(
     }
   }
   handled
+}
+
+
+///|
+/// 设置/清空未提交组合串（`text` 为空即清空）。它只是显示层的东西，
+/// `get_text`/字节数都不含它。
+pub fn Editor::set_preedit(self : Editor, text : String) -> Unit {
+  self.preedit = text
+}
+
+///|
+pub fn Editor::preedit_text(self : Editor) -> String {
+  self.preedit
+}
+
+///|
+pub fn Editor::has_preedit(self : Editor) -> Bool {
+  self.preedit.length() > 0
 }

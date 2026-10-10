@@ -80,7 +80,7 @@ set_cursor_rect(x, y, w, h)
 | **G2** ✅ | GTK3 窗口地基：建窗、`g_main_context_iteration` 驱动循环（不用 `gtk_main`）、`g_main_context_wakeup` 留跨线程唤醒位、事件全排空、**`mount_child_surface` 接口形状定死**（§4，形状已冻结、实现随首个消费者落地） | 独立进程出图；`open→create→loop→close` 干净退出，无退出期崩溃 |
 | **G3** ✅ | 首批**已完成**：Cairo 光栅器（位图格式对齐 ARGB32 预乘、路径/贝塞尔/弧/变换/裁剪/内侧描边，与纯矩形绘制器逐像素一致，14/14 断言）。次批**已完成**：`yue/text`（Pango 测量与绘制，字号=逻辑像素绝对尺寸、baseline=到盒顶与 yoga-mbt 同定义、ellipsize/wrap 照老师口径；测量不断言具体像素只断单调与约束，避免换机假红）。图标路径数据出图**顺延 G7**：`yue/icons` 的 31 处 `@yue` 引用里只有 2 处是绘制、其余是声明式组件，单独为绘制拆这个 4297 行文件不划算，等声明式层一起接 | 首批：`moon test yue/render` 14/14。次批：`moon test -p yue/text` 7/7 + 示例窗口内中英混排文本、冒烟 52 帧退出码 0 |
 | **G4** | 焦点栈与键盘、自绘 caret/选区、剪贴板；`TextEditorHost` 抽象落地 | 英文/数字在自绘输入框可打字；Tab/Shift+Tab 焦点跳转可用 |
-| **G5** | 输入法接入（按第 3 节表逐平台） | Linux 真机中文输入（fcitx5 / ibus 两套）；Windows 逐 IME 验，不通者降 C |
+| **G5** ◐ | **Linux 纯通道首批已完成**（`yue/win/im.mbt` + GtkIMMulticontext 四条件、`Editor.set_preedit` 显示态不并入文本、示例自绘下划线与候选窗矩形）。四坑记档：realize 前设 client window 会静默不接管、commit 串不得 g_free（双释放崩）、喂 surrounding 时禁调 reset（打断组合）、preedit-changed 签名要 get_preedit_string。待补：ibus 一套、Windows/macOS 通道 | 本机 xdotool 注入 `nihao`+空格 → `a='hello你哈哦'`（字母零残留、未被消费键才进内核）；待肉眼：preedit 下划线观感与候选窗贴合 |
 | **G6** | 系统能力平移（`yue/system`、`yue/traybus`、图标数据）+ 图片解码补齐 | 既有 wbtest 随包平移全绿 |
 | **G7** | 组件与声明式层移植：`components`/`charts` 挂上新 `Painter`，`declarative` 的 mount 目标改 yoga-mbt 节点 | showcase 组件页与图表页在新栈渲染，与旧链路视觉逐页对照；**恢复全仓门禁** |
 | **G8** | 原生子表面消费者：browser 自研薄绑定（§4，引擎为系统三家）+ `modules/yue-media` 的 VideoPlayer 走同一 `mount_child_surface` 通道 | 契约沿用 `browser.mbt` 方法名、协议载荷改结构化返回；Linux 真机网页加载与自定义协议可打（清单交协作方） |

@@ -77,3 +77,41 @@ extern "c" fn wm_ev_axis(id : Int64) -> Int = "wm_ev_axis"
 
 ///|
 extern "c" fn wm_request_focus(id : Int64) -> Unit = "wm_request_focus"
+
+///|
+#borrow(text)
+extern "c" fn wm_im_set_surrounding(
+  id : Int64,
+  text : Bytes,
+  caret : Int,
+) -> Unit = "wm_im_set_surrounding"
+
+///|
+extern "c" fn wm_im_set_cursor(
+  id : Int64,
+  x : Int,
+  y : Int,
+  w : Int,
+  h : Int,
+) -> Unit = "wm_im_set_cursor"
+
+///|
+extern "c" fn wm_im_commit_len(id : Int64) -> Int = "wm_im_commit_len"
+
+///|
+extern "c" fn wm_im_commit_byte(id : Int64, index : Int) -> Int = "wm_im_commit_byte"
+
+///|
+extern "c" fn wm_im_commit_done(id : Int64) -> Unit = "wm_im_commit_done"
+
+///|
+extern "c" fn wm_im_preedit_len(id : Int64) -> Int = "wm_im_preedit_len"
+
+///|
+extern "c" fn wm_im_preedit_byte(id : Int64, index : Int) -> Int = "wm_im_preedit_byte"
+
+///|
+extern "c" fn wm_im_preedit_caret(id : Int64) -> Int = "wm_im_preedit_caret"
+
+///|
+extern "c" fn wm_im_preedit_active(id : Int64) -> Int = "wm_im_preedit_active"
