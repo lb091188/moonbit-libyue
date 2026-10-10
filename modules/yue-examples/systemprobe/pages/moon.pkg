@@ -1,14 +1,14 @@
 import {
   "NoahLiu/moonbit-libyue/yue",
+  "NoahLiu/moonbit-libyue/yue/system",
   "NoahLiu/moonbit-libyue/yue/declarative",
   "NoahLiu/moonbit-libyue/yue/components",
   "NoahLiu/moonbit-libyue/yue/declarative",
-  "NoahLiu/moonbit-libyue/yue/icons",
+  "NoahLiu/moonbit-libyue/yue/system",
   "NoahLiu/moonbit-libyue/yue/charts",
-  "NoahLiu/moonbit-libyue/examples/systemprobe/ui",
-  "NoahLiu/moonbit-libyue/examples/systemprobe/pages",
+  "NoahLiu/yue-media/src" @yuemedia,
+  "NoahLiu/ffmpeg-mbt/src" @ffmbt,
+  "NoahLiu/yue-examples/systemprobe/ui",
 }
-
-pkgtype(kind: "executable")
 
 supported_targets = "native"

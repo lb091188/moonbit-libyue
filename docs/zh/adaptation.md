@@ -302,7 +302,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - 亮度:设置走 logind 的 SetBrightness(系统总线 session/auto 对象,@traybus 层),枚举与当前值走 /sys/class/backlight sysfs 只读——logind 不在线时 set 报 Unsupported 而 devices/get 仍可用;键盘背光在 leds 子系统(设备名形如 `inputN::kbd_backlight`)。sysfs 值文本解析容忍首尾空白与尾换行。
 - 应用查找(appfind):desktop entries 无目录枚举原语,`appfind_installed_with` 由调用方注入列举函数,默认便捷入口因恒空已裁撤(名不副实);`appfind_executable` 命中判定为整文件可读(read_binary_file),大体积可执行文件全量读入仅判存在是已知取舍(修需新增原生 stat 原语,暂不动 shim)。
 - 默认应用查询(defaultapps,补清单遗漏):①查询走 `xdg-mime query filetype/default`,关联枚举直读三层 mimeapps.list(`~/.config` → `~/.local/share/applications` → `/usr/share/applications`,即 XDG mimeapps 规范优先级),不依赖命令的路径全用 read_text_file 薄解析;②**mimeapps.list 的同名键多行是候选列表,与 .desktop INI 的「首键生效」口径相反**——`[Default Applications]` 同一 MIME 写多行是「后写覆盖先写」的多候选登记,da_parse_mimeapps 因此不去重同键,da_default_for 回退路径取该 MIME 最后一个候选的段首值;③`xdg-mime query default` 对未登记类型**返回空串且退出码 0**(不是非零退出),「无默认」只能判空输出,不能靠退出码;④设置为「读-改-写回」~/.config/mimeapps.list 的 `[Default Applications]` 段:已有该行替换、无该行段内追加、无段文末补段,写文件用 write_text_file(同包 FFI,autostart 同款);⑤libyue 原生 Notification 无进度接口(vendor 头 notification.h 仅 title/body/info/silent/image/actions,shim 无对应 FFI),Linux 通知进度标准在 freedesktop hints 的 `value` 字段(走 traybus D-Bus 可实现)——本批确认原生通知能力已够用,未做进度条,后续若需要走 D-Bus Notify + a{sv} hints。
-- 浏览器历史 / VS Code 历史的真机验证入口:examples/systemprobe 示例(图表 + 系统能力一板),`moon run examples/systemprobe` 点「读取系统能力」按钮逐项呈现五模块真实结果。
+- 浏览器历史 / VS Code 历史的真机验证入口:NoahLiu/yue-examples/systemprobe 示例(图表 + 系统能力一板),`moon run NoahLiu/yue-examples/systemprobe` 点「读取系统能力」按钮逐项呈现五模块真实结果。
 
 #### 影音与桌面控制命令路线(pr_run 统一封装,含 MPRIS 总线回退)
 
