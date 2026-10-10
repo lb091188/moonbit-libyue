@@ -1,8 +1,12 @@
 # moonbit-libyue [![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
 
-> Thanks to [Cheng Zhao (zcbenz)](https://github.com/zcbenz) and his [Yue](https://github.com/yue/yue) framework, and to [MoonBit](https://github.com/moonbitlang). As it happens, both of these programming tools carry the character for "moon" — and I have grown fond of them both. [About me and `libyue`](docs/aboutlibyue.md)
+> Thanks to [Cheng Zhao (zcbenz)](https://github.com/zcbenz) and his [Yue](https://github.com/yue/yue) framework, and to [MoonBit](https://github.com/moonbitlang).
+>
+> As it happens, both of these programming tools carry the character for "moon" — and I have grown fond of them both. [About me and `libyue`](docs/aboutlibyue.md)
 
-A **native cross-platform desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — a full binding of [libyue](https://libyue.com/docs/latest/cpp/) (C++): one MoonBit codebase runs native windows on Windows ✅ / Linux ✅ / macOS 🟡, zero-config right after `moon add`. 📚 **Online docs**: <https://moonbit-libyue.pages.dev/> — every guide in this repo as a website, auto-deployed with the repo (中文版在 [/zh/](https://moonbit-libyue.pages.dev/zh/)).
+A **native cross-platform desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — a full binding of [libyue](https://libyue.com/docs/latest/cpp/) (C++): one MoonBit codebase runs native windows on Windows ✅ / Linux ✅ / macOS 🟡, zero-config right after `moon add`.
+
+📚 **Online docs**: <https://moonbit-libyue.pages.dev/> — the web version of every guide in this repo, auto-deployed with the repo; Chinese at [`/zh/`](https://moonbit-libyue.pages.dev/zh/).
 
 English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)
 
@@ -42,7 +46,7 @@ let text = @yue.Signal::computed(fn() { "Clicked \{clicks.get()} times" })  // d
 @declarative.bind(text, fn(s) { s }),
 ```
 
-**🖥 Desktop-grade system integration** — system tray · notifications · global shortcuts · clipboard · native menu bar · file dialogs · drag & drop · multiple monitors:
+**🖥 Desktop-grade system integration** — three families of native capabilities, no extra dependencies: tray & notifications, global shortcuts (background); native menu bar, file dialogs, multiple monitors (window integration); clipboard, drag & drop (data exchange).
 
 ```moonbit
 match @yue.Tray::new("icon.png") {
@@ -63,7 +67,7 @@ n.show()
 moon run examples/sysmonitor
 ```
 
-> 40 native widgets fully bound · 58 themed self-drawn components · 20 self-drawn charts (+3 interactive variants) · wrapper overhead [startup on par with C++, memory +0.8MB](docs/adaptation.md) · three-platform CI · published on [mooncakes](https://mooncakes.io/)
+> **Scale & overhead**: 40 native widgets fully bound · 58 themed self-drawn components · 20 self-drawn charts (+3 interactive variants); wrapper overhead [startup on par with C++, memory +0.8MB](docs/adaptation.md); three-platform CI; published on [mooncakes](https://mooncakes.io/).
 
 ## Quick start
 
@@ -79,13 +83,13 @@ Prerequisite: the MoonBit native toolchain, `moonc` ≥ 0.10.14 (`moon version -
 | Linux x64 (GTK3, on Ubuntu by default) | [`bin-linux-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-linux-x64.zip) |
 | macOS (Apple Silicon) 🟡 no real-machine test | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
 
-> **Since 0.5.11** the library is split into sub-packages — import only what you use (unused packages are not compiled into your binary). Core (native widgets, painting, `Store`/`Signal`, theme, tray) stays at `NoahLiu/moonbit-libyue/yue` (`@yue`); the declarative layer is `.../yue/declarative` (`@declarative`), themed components `.../yue/components` (`@components`), charts `.../yue/charts`, icons `.../yue/icons`, markdown `.../yue/markdown`, OS capabilities `.../yue/system`. Full table in [docs/README.md](docs/README.md#packages).
+> **Since 0.5.11** the module is split into sub-packages: `moon add` still gets you everything, but only imported packages enter your binary (MoonBit builds the import closure).
+
+> Core (`.../yue` → `@yue`): native widgets, painting, `Store`/`Signal`, theme, tray. Opt-in: `declarative` (render tree), `components` (themed widgets), `charts`, `icons`, `markdown`, `system` (OS capabilities). Full table: [docs/README.md](docs/README.md#packages).
 
 > **Upgrading to 0.5.0**: the `Browser` binding moved to a standalone package. Add `"NoahLiu/moonbit-libyue/yue/browser"` to your imports (`@browser.Browser` → `@browser.Browser`, API unchanged). Apps that don't import it are no longer linked against WebKit/WebView2.
 
 ## Documentation index
-
-📚 **Online docs**: <https://moonbit-libyue.pages.dev/> — the web version of every document below, auto-deployed with the repo. 中文版在 [`/zh/`](https://moonbit-libyue.pages.dev/zh/).
 
 | Document | Content |
 |---|---|
@@ -114,7 +118,9 @@ The full process for adding widgets, native-layer releases, and more is in [AGEN
 
 ## License
 
-`moonbit-libyue` is released under the [MIT License](LICENSE). It wraps [libyue](https://github.com/yue/libyue), whose upstream code is licensed LGPL-2.1 with bundled third-party components under Apache-2.0 / MIT / BSD-3-Clause — the complete notice ships in [`vendor/libyue/LICENSE`](vendor/libyue/LICENSE). All libyue patches used here are maintained as separate commits in the [lb091188/yue](https://github.com/lb091188/yue) fork, and the prebuilt static libraries distributed with the package are built from the fork's tagged sources by GitHub Actions (`vendor-*` tags), so the corresponding source stays retrievable from the repository.
+- `moonbit-libyue` is released under the [MIT License](LICENSE).
+- The wrapped [libyue](https://github.com/yue/libyue) is LGPL-2.1 upstream and bundles Apache-2.0 / MIT / BSD-3-Clause components; the complete notice ships with the package in [`vendor/libyue/LICENSE`](vendor/libyue/LICENSE).
+- All libyue patches used here are maintained as separate commits in the [lb091188/yue](https://github.com/lb091188/yue) fork; the prebuilt static libraries distributed with the package are built by GitHub Actions from the fork's `vendor-*` tag sources, so the corresponding source stays retrievable from the repository.
 
 ## References
 

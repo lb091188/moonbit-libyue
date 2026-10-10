@@ -1,8 +1,12 @@
 # moonbit-libyue [![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
 
-> 感谢 [赵成(zcbenz)](https://github.com/zcbenz) 和他的 [Yue](https://github.com/yue/yue) 框架，以及 [MoonBit](https://github.com/moonbitlang)。很凑巧，这两个编程工具都有 “月”，现在我也很喜欢它们。 [关于我和 `libyue`](docs/zh/aboutlibyue.md)
+> 感谢 [赵成(zcbenz)](https://github.com/zcbenz) 和他的 [Yue](https://github.com/yue/yue) 框架，以及 [MoonBit](https://github.com/moonbitlang)。
+>
+> 很凑巧，这两个编程工具都有 “月”，现在我也很喜欢它们。 [关于我和 `libyue`](docs/zh/aboutlibyue.md)
 
-[MoonBit](https://github.com/moonbitlang) 生态的**原生跨平台桌面 GUI 库**——对 [libyue](https://libyue.com/docs/latest/cpp/)(C++) 全量封装,一套 MoonBit 代码跑 Windows ✅ / Linux ✅ / macOS 🟡 原生窗口,`moon add` 后零配置直接运行。📚 **在线文档**:<https://moonbit-libyue.pages.dev/zh/> —— 本仓各文档的网页版,随仓库自动部署(English: <https://moonbit-libyue.pages.dev/>)。
+[MoonBit](https://github.com/moonbitlang) 生态的**原生跨平台桌面 GUI 库**——对 [libyue](https://libyue.com/docs/latest/cpp/)(C++) 全量封装,一套 MoonBit 代码跑 Windows ✅ / Linux ✅ / macOS 🟡 原生窗口,`moon add` 后零配置直接运行。
+
+📚 **在线文档**:<https://moonbit-libyue.pages.dev/zh/> —— 本仓各文档的网页版,随仓库自动部署;English: <https://moonbit-libyue.pages.dev/>。
 
 简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
 
@@ -42,7 +46,7 @@ let text = @yue.Signal::computed(fn() { "已点 \{clicks.get()} 次" })  // 依�
 @declarative.bind(text, fn(s) { s }),
 ```
 
-**🖥 桌面级系统能力** —— 系统托盘 · 通知 · 全局快捷键 · 剪贴板 · 原生菜单栏 · 文件对话框 · 拖放 · 多显示器：
+**🖥 桌面级系统能力** —— 三类原生能力开箱即用,无外部依赖:托盘与通知、全局快捷键(后台常驻);原生菜单栏、文件对话框、多显示器(窗口集成);剪贴板、拖放(数据交换)。
 
 ```moonbit
 match @yue.Tray::new("icon.png") {
@@ -63,7 +67,7 @@ n.show()
 moon run examples/sysmonitor
 ```
 
-> 40 个原生控件全量封装 · 58 个主题化自绘组件 · 20 个自绘图表（另 3 个交互变体） · 封装开销[启动持平 C++、内存 +0.8MB](docs/zh/adaptation.md) · 三平台 CI · [mooncakes](https://mooncakes.io/) 已发布
+> **规模与开销**:40 个原生控件全量封装 · 58 个主题化自绘组件 · 20 个自绘图表(另 3 个交互变体);封装开销[启动持平 C++、内存 +0.8MB](docs/zh/adaptation.md);三平台 CI,[mooncakes](https://mooncakes.io/) 已发布。
 
 ## 快速开始
 
@@ -71,7 +75,7 @@ moon run examples/sysmonitor
 
 前置要求:MoonBit native 工具链,`moonc` ≥ 0.10.14(`moon version --all` 可验证)。
 
-**预演示包**——解压即跑
+**预构建演示包**——解压即跑
 
 | 平台 | 下载 |
 |---|---|
@@ -79,13 +83,13 @@ moon run examples/sysmonitor
 | Linux x64(需 GTK3,Ubuntu 自带) | [`bin-linux-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-linux-x64.zip) |
 | macOS(Apple Silicon) 🟡 未真机验证 | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
 
-> **0.5.11 起**库拆成多个子包——按需 import,用不到的包不进二进制。核心(原生控件、绘制、`Store`/`Signal`、主题、托盘)仍是 `NoahLiu/moonbit-libyue/yue`(`@yue`);声明式层 `.../yue/declarative`(`@declarative`)、主题组件 `.../yue/components`(`@components`)、图表 `.../yue/charts`、图标 `.../yue/icons`、markdown `.../yue/markdown`、系统能力 `.../yue/system`。完整表见 [docs/zh/README.md](docs/zh/README.md#包结构)。
+> **0.5.11 起模块拆成多个子包**:`moon add` 仍一次拿全,但只有你 import 的包进二进制(MoonBit 按 import 闭包构建)。
+
+> 核心 `.../yue`(`@yue`):原生控件、绘制、`Store`/`Signal`、主题、托盘;按需引入 `declarative`(声明式渲染树)、`components`(主题组件)、`charts`(图表)、`icons`(图标)、`markdown`(渲染)、`system`(系统能力)。完整表见 [docs/zh/README.md](docs/zh/README.md#包结构)。
 
 > **升级到 0.5.0**：`Browser` 绑定拆分为独立包,import 路径改为 `NoahLiu/moonbit-libyue/yue/browser`(`@browser.Browser` → `@browser.Browser`,API 不变)。未 import 该包的程序不再链接 WebKit/WebView2 依赖。
 
 ## 文档索引
-
-📚 **在线文档**:<https://moonbit-libyue.pages.dev/zh/> —— 下表所有文档的网页版,随仓库自动部署。
 
 | 文档 | 内容 |
 |---|---|
@@ -114,7 +118,9 @@ Windows 下 exe 自动为 GUI 子系统,双击无控制台黑框。
 
 ## 许可证
 
-`moonbit-libyue` 以 [MIT](LICENSE) 发布。其封装的 [libyue](https://github.com/yue/libyue) 上游为 LGPL-2.1,并捆绑 Apache-2.0 / MIT / BSD-3-Clause 三方组件,完整许可文本随包分发于 [`vendor/libyue/LICENSE`](vendor/libyue/LICENSE)。本仓库用到的全部 libyue 补丁以独立提交维护于 fork [lb091188/yue](https://github.com/lb091188/yue),随包分发的预构建静态库由 GitHub Actions 从 fork 的 `vendor-*` 标签源码构建,对应源码始终可从仓库标签取回。
+- `moonbit-libyue` 以 [MIT](LICENSE) 发布。
+- 封装的 [libyue](https://github.com/yue/libyue) 上游为 LGPL-2.1,并捆绑 Apache-2.0 / MIT / BSD-3-Clause 三方组件;完整许可文本随包分发于 [`vendor/libyue/LICENSE`](vendor/libyue/LICENSE)。
+- 本仓库用到的全部 libyue 补丁以独立提交维护于 fork [lb091188/yue](https://github.com/lb091188/yue);随包分发的预构建静态库由 GitHub Actions 从 fork 的 `vendor-*` 标签源码构建,对应源码始终可从仓库标签取回。
 
 ## 参考
 
