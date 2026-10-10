@@ -8,7 +8,7 @@
 ## 0. 三十秒速览
 
 - **在做什么**：用纯 MoonBit 复刻 Yoga 布局引擎（`modules/yoga-mbt` 独立子包），作为 MoonBit 化 libyue 的布局层。
-- **当前进度**：YG1（骨架 + 核心算法）、YG2a（absolute 定位）已完成并推送；全部提交在 `feature/yoga-mbt`，HEAD = `f994a15`。
+- **当前进度**：YG1（骨架 + 核心算法）、YG2a（absolute 定位）已完成并推送；全部提交在 `feature/yoga-mbt`（本文撰写时 HEAD = `f994a15`，本文文档提交紧随其后——**分支最新提交以 `git log` 为准**）。
 - **门控现状**：`moon check` 零警告 + 全仓 `moon test` **687/687** 全绿；yoga-mbt 自身 26 条白盒断言。
 - **下一步**：YG2b baseline 对齐 → YG2c aspect-ratio → YG2d RTL → YG3 工程化 → YG4 与 libyue 集成（详见 §8）。
 - **三条纪律**（最容易踩）：① 只对齐 **Web Flexbox 标准**，不做 Yoga 双默认值；② 提交前先 `git fetch` 且用 `git add <显式路径>`，**不要 `git add -A`**；③ 每批改动配套回写 `docs/zh/adaptation.md` 与 `TODO.md`，一批一提交一推送。
@@ -22,7 +22,7 @@
 | 路径 | 当前分支 / HEAD | 状态 | 说明 |
 |---|---|---|---|
 | `/home/lkyh/ownCode/moonbit-libyue` | `master` @ `a656873` | 有未提交改动（README 中英、moon.mod） | **原副本**，另一会话正在此活动（发布/文档线） |
-| `/home/lkyh/ownCode/moonbit-libyue-navite` | `feature/yoga-mbt` @ `f994a15` | 干净，与 origin 一致 | **本次新建副本**，yoga 复刻工作在这里继续 |
+| `/home/lkyh/ownCode/moonbit-libyue-navite` | `feature/yoga-mbt`（快照 `f994a15`） | 干净，与 origin 一致 | **本次新建副本**，yoga 复刻工作在这里继续 |
 
 - 目录名按用户口述照录为 `moonbit-libyue-navite`（疑为 `native` 笔误，**未擅自改名**；要改就 `mv` 后同步 IDE 工作区）。
 - 新副本的 `.workbuddy/memory/` 是从原副本复制过去的（未跟踪文件，`git clone` 不会带）。
