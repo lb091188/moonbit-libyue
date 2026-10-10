@@ -62,7 +62,10 @@ static guint32 wm_mods(guint state) {
   if (state & GDK_MOD1_MASK) {
     m |= 4u;
   }
-  if (state & (GDK_META_MASK | GDK_MOD2_MASK)) {
+  // Meta/Super 只认这两个位；绝不能把 MOD2 当 Meta——MOD2 就是 NumLock，
+  // 平时恒为亮，会让每个按键都带上 Meta，内核据此判定为组合键而丢弃可打印键
+  // （实测 mods=8、字符全部打不进去）
+  if (state & (GDK_META_MASK | GDK_SUPER_MASK)) {
     m |= 8u;
   }
   return m;
@@ -234,8 +237,11 @@ int64_t wm_window_new(int width, int height, const char *title) {
   memset(&w->last, 0, sizeof(WmEv));
   g_signal_connect(w->window, "delete-event", G_CALLBACK(wm_on_delete), w);
   g_signal_connect(w->window, "destroy", G_CALLBACK(wm_on_destroy), w);
-  g_signal_connect(w->window, "key-press-event", G_CALLBACK(wm_on_key), w);
-  g_signal_connect(w->window, "key-release-event", G_CALLBACK(wm_on_key), w);
+  // 按键挂到「焦点控件」而不是顶层窗口：这是 G0 探针用真机定下来的挂法
+  // （见 docs/zh/adaptation.md「G0 输入法探针纯通道」条——挂窗口层会让事件顺序
+  // 与消费判定都不对，输入法接管后尤其明显）。失焦的 area 不接键。
+  g_signal_connect(w->area, "key-press-event", G_CALLBACK(wm_on_key), w);
+  g_signal_connect(w->area, "key-release-event", G_CALLBACK(wm_on_key), w);
   g_signal_connect(w->area, "button-press-event", G_CALLBACK(wm_on_button), w);
   g_signal_connect(w->area, "button-release-event", G_CALLBACK(wm_on_button),
                    w);

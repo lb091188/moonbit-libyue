@@ -146,6 +146,8 @@ fn main {
   let frames = Ref(0)
   let blink = Ref(true)
   let dirty = Ref(true)
+  let seen = Ref(0)
+  let queue_left = Ref(0)
 
   let ticker : Ref[() -> Unit] = Ref(fn() { () })
   ticker.val = fn() {
@@ -189,6 +191,7 @@ fn main {
         @win.Event::NeedsDraw => dirty.val = true
         @win.Event::Resized => dirty.val = true
         @win.Event::Input => {
+          seen.val = seen.val + 1
           match win.take_input() {
             Some(ev) => {
               if ev.code == 0 {
@@ -233,6 +236,7 @@ fn main {
         @win.Event::NoEvent => keep = false
       }
     }
+    queue_left.val = win.pending_input()
     if dirty.val {
       dirty.val = false
       draw(win, boxes, fs.current(), blink.val, frames.val)
@@ -240,6 +244,6 @@ fn main {
   }
   win.close()
   println(
-    "NATIVE-WINDOW-OK frames=\{frames.val} a='\{a.get_text()}' b='\{b.get_text()}'",
+    "NATIVE-WINDOW-OK frames=\{frames.val} seen=\{seen.val} queue=\{queue_left.val} a='\{a.get_text()}' b='\{b.get_text()}'",
   )
 }
