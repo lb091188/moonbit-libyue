@@ -1219,3 +1219,235 @@ test "嵌套项取整按绝对坐标补偿" {
   assert_eq(inner[1].layout().left, 17.0)
   assert_eq(inner[1].layout().width, 17.0)
 }
+
+///|
+/// 文本叶子（按词折行模拟）：`words` 为各词宽，行高 `line_h`。
+/// 可用宽 `None` → 不折行（max-content 探询）；`Some(w)` → 按词依次装行，
+/// 宽取最宽一行（词不拆分，故 `Some(0.0)` 即最长词宽 = min-content 探询），
+/// 高为行数 × 行高。
+fn text_wrap(words : Array[Double], line_h : Double) -> Node {
+  let n = Node::new()
+  n.set_measure(fn(avail_w, _avail_h) {
+    match avail_w {
+      None => (
+        words.iter().fold(init=0.0, fn(a, v) { a + v }),
+        line_h,
+      )
+      Some(av) => {
+        let mut line_w = 0.0
+        let mut max_w = 0.0
+        let mut lines = 1
+        for w0 in words {
+          if line_w > 0.0 && line_w + w0 > av {
+            lines = lines + 1
+            line_w = w0
+          } else {
+            line_w = line_w + w0
+          }
+          if line_w > max_w {
+            max_w = line_w
+          }
+        }
+        (max_w, lines.to_double() * line_h)
+      }
+    }
+  })
+  n
+}
+
+///|
+test "内在尺寸:width: max-content 不被可用空间压窄" {
+  let root = Node::new()
+  root.set_width(fixed(100.0))
+  root.set_height(fixed(200.0))
+  root.set_align_items(FlexStart)
+  let c = text_wrap([70.0, 60.0, 30.0], 20.0)
+  c.set_width(max_content())
+  // 参与收缩的话基准会被 §9.7 压回可用空间，这里只验尺寸解析
+  c.set_flex_shrink(0.0)
+  root.append_child(c)
+  calculate_layout(root, Some(100.0), Some(200.0))
+  // 词宽合计 160（不折行），超出可用 100 也不压窄
+  assert_eq(c.layout().width, 160.0)
+  assert_eq(c.layout().height, 20.0)
+}
+
+///|
+test "内在尺寸:width: min-content 等于最长词宽" {
+  let root = Node::new()
+  root.set_width(fixed(100.0))
+  root.set_height(fixed(200.0))
+  root.set_align_items(FlexStart)
+  let c = text_wrap([70.0, 60.0, 30.0], 20.0)
+  c.set_width(min_content())
+  root.append_child(c)
+  calculate_layout(root, Some(100.0), Some(200.0))
+  assert_eq(c.layout().width, 70.0)
+  // 70 宽下装行：70 / 60+30=90>70 → 三行
+  assert_eq(c.layout().height, 60.0)
+}
+
+///|
+test "内在尺寸:fit-content 夹在 min 与 max 之间" {
+  let mk = fn(box : Double) -> Node {
+    let root = Node::new()
+    root.set_width(fixed(box))
+    root.set_height(fixed(200.0))
+    root.set_align_items(FlexStart)
+    let c = text_wrap([70.0, 60.0, 30.0], 20.0)
+    c.set_width(fit_content())
+    root.append_child(c)
+    calculate_layout(root, Some(box), Some(200.0))
+    c
+  }
+  // clamp(70, 40, 160) = 70
+  assert_eq(mk(40.0).layout().width, 70.0)
+  // clamp(70, 100, 160) = 100
+  assert_eq(mk(100.0).layout().width, 100.0)
+  // clamp(70, 200, 160) = 160
+  assert_eq(mk(200.0).layout().width, 160.0)
+}
+
+///|
+test "内在尺寸:min-width: max-content 顶住收缩" {
+  let root = Node::new()
+  root.set_width(fixed(100.0))
+  root.set_height(fixed(200.0))
+  let c = text_wrap([70.0, 60.0, 30.0], 20.0)
+  c.set_min_width(max_content())
+  root.append_child(c)
+  calculate_layout(root, Some(100.0), Some(200.0))
+  assert_eq(c.layout().width, 160.0)
+}
+
+///|
+test "内在尺寸:flex-basis: max-content 作为基准参与 grow" {
+  let root = Node::new()
+  root.set_width(fixed(300.0))
+  root.set_height(fixed(60.0))
+  let a = text_wrap([70.0, 60.0, 30.0], 20.0)
+  a.set_flex_basis(max_content())
+  a.set_flex_grow(1.0)
+  let b = text_wrap([50.0, 40.0], 20.0)
+  b.set_flex_basis(max_content())
+  b.set_flex_grow(1.0)
+  root.append_child(a)
+  root.append_child(b)
+  calculate_layout(root, Some(300.0), Some(60.0))
+  // 基准 160 + 90 = 250，剩余 50 均分
+  assert_eq(a.layout().width, 185.0)
+  assert_eq(b.layout().width, 115.0)
+}
+
+///|
+test "内在尺寸:列容器的 min-content 宽取最宽子项" {
+  let root = Node::new()
+  root.set_width(fixed(1000.0))
+  root.set_height(fixed(400.0))
+  root.set_align_items(FlexStart)
+  let box1 = Node::new()
+  box1.set_flex_direction(Column)
+  box1.set_padding_left(fixed(10.0))
+  box1.set_padding_right(fixed(10.0))
+  box1.set_width(min_content())
+  let t1 = text_wrap([70.0, 60.0, 30.0], 20.0)
+  let t2 = text_wrap([40.0, 30.0], 20.0)
+  t2.set_margin_top(fixed(5.0))
+  t2.set_margin_bottom(fixed(5.0))
+  box1.append_child(t1)
+  box1.append_child(t2)
+  root.append_child(box1)
+  calculate_layout(root, Some(1000.0), Some(400.0))
+  // 列容器：交叉轴（宽）取最大子项 min-content = 70，再加两侧 padding 20
+  assert_eq(box1.layout().width, 90.0)
+  // max-content 宽 = max(160, 70) + 20
+  box1.set_width(max_content())
+  calculate_layout(root, Some(1000.0), Some(400.0))
+  assert_eq(box1.layout().width, 180.0)
+}
+
+///|
+test "内在尺寸:折行容器的基准为 max-content、下限为最宽单项" {
+  let mk = fn(box : Double) -> (Node, Node, Node, Node) {
+    let root = Node::new()
+    root.set_width(fixed(box))
+    root.set_height(fixed(200.0))
+    let inner = Node::new()
+    inner.set_flex_wrap(Wrap)
+    inner.set_align_items(FlexStart)
+    // 行盒按内容高紧排，便于直接比对 top（默认 stretch 会把行高摊成容器高）
+    inner.set_align_content(FlexStart)
+    let a = leaf(60.0, 20.0)
+    let b = leaf(50.0, 20.0)
+    let c = leaf(40.0, 20.0)
+    inner.append_child(a)
+    inner.append_child(b)
+    inner.append_child(c)
+    root.append_child(inner)
+    calculate_layout(root, Some(box), Some(200.0))
+    (inner, a, b, c)
+  }
+  // 基准 = max-content（单项不折行）= 150，收缩到可用 100 为止
+  let (inner1, _a1, b1, c1) = mk(100.0)
+  assert_eq(inner1.layout().width, 100.0)
+  assert_eq(b1.layout().top, 20.0)
+  assert_eq(c1.layout().top, 20.0)
+  // 可用 55 时收缩被 min:auto = min-content（最宽单项 60）顶住，
+  // 三项各占一行
+  let (inner2, _a2, b2, c2) = mk(55.0)
+  assert_eq(inner2.layout().width, 60.0)
+  assert_eq(b2.layout().top, 20.0)
+  assert_eq(c2.layout().top, 40.0)
+}
+
+///|
+test "内在尺寸:不换行容器的 min-content 主轴为子项之和" {
+  let root = Node::new()
+  root.set_width(fixed(100.0))
+  root.set_height(fixed(200.0))
+  let inner = Node::new()
+  inner.set_align_items(FlexStart)
+  inner.append_child(leaf(60.0, 20.0))
+  inner.append_child(leaf(50.0, 20.0))
+  root.append_child(inner)
+  calculate_layout(root, Some(100.0), Some(200.0))
+  // nowrap：min-content 主轴 = 60 + 50 = 110，收缩被下限顶住
+  assert_eq(inner.layout().width, 110.0)
+}
+
+///|
+test "内在尺寸:绝对定位项的 width: max-content" {
+  let root = Node::new()
+  root.set_width(fixed(100.0))
+  root.set_height(fixed(200.0))
+  let c = text_wrap([70.0, 60.0, 30.0], 20.0)
+  c.set_position(Absolute)
+  c.set_left(fixed(5.0))
+  c.set_top(fixed(5.0))
+  c.set_width(max_content())
+  root.append_child(c)
+  calculate_layout(root, Some(100.0), Some(200.0))
+  assert_eq(c.layout().width, 160.0)
+  assert_eq(c.layout().height, 20.0)
+  assert_eq(c.layout().left, 5.0)
+}
+
+///|
+test "内在尺寸缓存:改子项后重排不用旧内在尺寸" {
+  let root = Node::new()
+  root.set_width(fixed(100.0))
+  root.set_height(fixed(200.0))
+  let inner = Node::new()
+  inner.set_align_items(FlexStart)
+  let a = leaf(60.0, 20.0)
+  let b = leaf(50.0, 20.0)
+  inner.append_child(a)
+  inner.append_child(b)
+  root.append_child(inner)
+  calculate_layout(root, Some(100.0), Some(200.0))
+  assert_eq(inner.layout().width, 110.0)
+  // 子项改窄后 min-content 下限随之变小（内在缓存在入口被清）
+  b.set_width(fixed(20.0))
+  calculate_layout(root, Some(100.0), Some(200.0))
+  assert_eq(inner.layout().width, 80.0)
+}

@@ -42,6 +42,19 @@ let l = child.layout()   // left / top 相对父边框盒；width / height 边�
 
 - 叶子节点（无子节点）通过 `set_measure` 提供内容测量；入参为可用宽高
   （`None` 表示该方向不受约束，可用于文本折行推算高度）。
+  内在尺寸用同一函数探询：求 max-content 时两个入参都给 `None`，求
+  min-content 时请求的那一轴给 `Some(0.0)`、另一轴给 `None`——文本应回
+  最长词宽、图片应回不缩放的原始宽；忽略入参恒回固定尺寸的测量函数，
+  其 min-content 与 max-content 相同。
+- `min_content()` / `max_content()` / `fit_content()` 是取值辅助，可用于
+  `set_width` / `set_height` / `set_min_*` / `set_max_*` / `set_flex_basis`：
+  `width: max-content` 给内容不折行的尺寸（超出可用空间也不压窄，允许溢出），
+  `width: min-content` 给「不溢出」的最小尺寸，`fit-content` 按
+  `clamp(min-content, 可用空间, max-content)`。父容器该轴不受约束时
+  `fit-content` 退化为 max-content。主轴基准（`flex-basis: auto` 且主轴尺寸
+  也 auto）取 max-content，`min-width/height: auto` 取 min-content。
+  关键词用在 margin / padding / border / inset 上按未设置（0）处理；
+  `stretch` 关键词未实现。
 - 文本类叶子再通过 `set_baseline` 提供基线：入参与 `set_measure` 相同，
   返回**基线到内容盒顶部**的距离（不含自身 padding/border，引擎负责叠加），
   返回 `None` 表示该节点无基线。容器节点无需设置——它的基线由引擎按规范
@@ -87,14 +100,22 @@ aspect-ratio（`set_aspect_ratio`，比例语义为 border-box：一轴确定 �
 互推（显式尺寸或两侧 inset 撑出的一轴为源））、RTL
 （`set_direction(Rtl)`：主轴 / 交叉轴起端按方向翻转，margin、auto margin、
 绝对定位静态位置随之换算）、像素网格取整（`set_pixel_grid`，根节点开关，
-按绝对边框取整后回推相对坐标）。
+按绝对边框取整后回推相对坐标）、内在尺寸（`min_content()` / `max_content()` /
+`fit_content()` 关键词 + §4.5 `min:auto` 用 min-content、§9.2 content 基准用
+max-content；容器按 in-flow 子项贡献合成，可换行容器的 min-content 主轴取
+最宽单项并按该宽度分行算交叉轴，不换行容器取子项之和）。
 
 ## 未实现（按批次补）
 
-- 测量缓存的跨布局复用（当前缓存只在单次 `calculate_layout` 内有效，
-  入口整树清空；脏区增量重排留给与 libyue 集成那批）
-- 容器内在尺寸（min-content / max-content）的精确语义（当前 fit-content
-  近似）
+- 测量缓存与内在尺寸缓存的跨布局驻留（当前缓存只在单次
+  `calculate_layout` 内有效，入口整树清空；脏区增量重排留给集成层）
+- `stretch` 尺寸关键词（css-sizing-4，Yoga 有、Web 侧与 `auto` +
+  `align-self: stretch` 语义重叠，暂不做）
+- 内在尺寸递归中的百分比近似：子项的百分比尺寸只在父容器该轴尺寸确定时
+  可解析，父容器该轴 auto 时按不解析（走内容）处理；父链回环那套
+  css-sizing-3 §5.2.1 规则未实现
+- flex 容器内在尺寸的「ideal / web-compatible」双算法（细则只存在于
+  css-flexbox-2 草案，本引擎按 css-sizing-3 的通用内在尺寸规则单套实现）
 
 ## 开发
 

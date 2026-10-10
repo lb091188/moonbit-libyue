@@ -25,6 +25,26 @@ pub fn undefined() -> Value {
 }
 
 ///|
+/// min-content 取值：该轴上「内容不溢出」的最小尺寸。
+/// 只用于尺寸类属性（width / height / min-* / max-* / flex-basis）。
+pub fn min_content() -> Value {
+  MinContent
+}
+
+///|
+/// max-content 取值：该轴上不受约束时内容需要的尺寸。
+pub fn max_content() -> Value {
+  MaxContent
+}
+
+///|
+/// fit-content 取值：`clamp(min-content, 可用空间, max-content)`；
+/// 可用空间不受约束时退化为 max-content。
+pub fn fit_content() -> Value {
+  FitContent
+}
+
+///|
 pub fn Node::set_display(self : Node, v : Display) -> Unit {
   self.style.display = v
 }

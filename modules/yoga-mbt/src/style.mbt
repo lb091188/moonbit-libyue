@@ -84,11 +84,16 @@ fn edge_value(e : Edges, which : Int) -> Value {
 }
 
 ///|
-/// 按「参照尺寸」解析一个值；Undefined/Auto 与无参照的 Percent 均给 0。
+/// 按「参照尺寸」解析一个值；Undefined/Auto、内在关键词与无参照的 Percent
+/// 均给 0（关键词只在尺寸类属性上有意义，解析需要节点上下文，走
+/// `algorithm.mbt` 的 `axis_size`）。
 fn resolve_value(v : Value, owner : Option[Double]) -> Double {
   match v {
     Undefined => 0.0
     Auto => 0.0
+    MinContent => 0.0
+    MaxContent => 0.0
+    FitContent => 0.0
     Fixed(x) => x
     Percent(p) =>
       match owner {
@@ -99,7 +104,8 @@ fn resolve_value(v : Value, owner : Option[Double]) -> Double {
 }
 
 ///|
-/// 把尺寸类取值解析为确定值；不可确定（Undefined/Auto/无参照 Percent）给 None。
+/// 把尺寸类取值解析为确定值；不可确定（Undefined/Auto/内在关键词/无参照
+/// Percent）给 None。内在关键词由 `axis_size` 带节点上下文另行解析。
 fn definite_size(v : Value, owner : Option[Double]) -> Option[Double] {
   match v {
     Fixed(x) => Some(x)

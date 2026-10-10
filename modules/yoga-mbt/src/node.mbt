@@ -18,6 +18,12 @@ pub struct Layout {
 /// （不含节点自身的 margin/padding/border，由引擎负责叠加）。
 /// 文本类叶子还可通过 `set_baseline` 提供基线位置，供父容器做
 /// `align-items / align-self: baseline` 对齐。
+///
+/// 内在尺寸（min-content / max-content）用同一测量函数探询，约定：
+/// - max-content：两个入参都给 `None`（不受约束），返回内容不折行的宽高；
+/// - min-content：请求的那一轴给 `Some(0.0)`、另一轴给 `None`，
+///   测量函数应返回「该轴不溢出的最小尺寸」（文本即最长词宽、图片即原始宽）。
+/// 忽略入参、恒返回固定尺寸的测量函数，其 min-content 与 max-content 相同。
 pub struct Node {
   style : Style
   children : Array[Node]
@@ -30,6 +36,9 @@ pub struct Node {
   // 测量缓存：键 = (可用宽, 可用高)，值 = (宽, 高, 基线)。
   // 单次 calculate_layout 内有效，入口会整体清空（样式可能在两次布局间被改）
   measure_cache : Array[((Option[Double], Option[Double]), (Double, Double, Option[Double]))]
+  // 内在尺寸缓存：键 = ((请求行轴?, 求 min-content?), (宽参照, 高参照))，
+  // 值 = 边框盒尺寸。与测量缓存同一失效时机
+  intrinsic_cache : Array[(((Bool, Bool), (Option[Double], Option[Double])), Double)]
   mut layout_left : Double
   mut layout_top : Double
   mut layout_width : Double
@@ -46,6 +55,7 @@ pub fn Node::new() -> Node {
     baseline : None,
     pixel_grid : 0.0,
     measure_cache : [],
+    intrinsic_cache : [],
     layout_left : 0.0,
     layout_top : 0.0,
     layout_width : 0.0,
