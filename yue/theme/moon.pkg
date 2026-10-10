@@ -1,0 +1,6 @@
+import {
+  "NoahLiu/moonbit-libyue/yue/render",
+  "NoahLiu/moonbit-libyue/yue/text",
+}
+
+supported_targets = "native"

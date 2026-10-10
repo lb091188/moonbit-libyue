@@ -323,6 +323,15 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **结论二（根因，一处笔误）**：弹性项构建时基准读成了**容器**的 `s.flex_basis`（应为 `c.style.flex_basis`），子项 flex-basis 于是在整条布局链路上从未生效——这也解释了为什么 basis 怎么设结果都一样。容器 auto 主轴尺寸同样不看子项基准，改由新的 `main_contribution` 承担：确定基准优先并按其确定的 min/max 钳制，auto / 无参照百分比退回内在尺寸；`min: auto` 的内容下限只在 §4.5 弹性解析里生效，不在容器推算里重复探内在尺寸（否则每次容器测宽/测高都多算一遍内在尺寸）。
 - **验证**：Chrome 矩阵 7 行（A/C/D/F/G/I/L）逐行一致，落成 `patches_regression_wbtest.mbt` 的常驻用例；yoga-mbt 81/81（含 `display:none` 语料用例与全部既有断言）；bench 无变化（1121 节点 × 500 轮 release：修复前 1.93s、修复后 1.95s，A/B 实测）。
 
+### MoonBit 原生 GUI 栈 · 主题系统首批（色板派生公式 + 变更订阅）
+
+- **面**：`Theme`（20 字段色板）+ `default_theme`/`dark_theme` 预设 + `theme_from_accent`（EP 主题工作台公式：主色保色相、饱和度保底 0.45、明度按模式钳制（浅 0.34..0.52 / 深 0.55..0.72）、hover 浅 -0.09 深 +0.08、`*_light` 浅混白 12%/14%、深混面板底 30%/28%、语义色取固定色相轮 142/36/4/210 且饱和度假借主色（≥0.4）明度随模式、中性色不随主色偏移）+ `theme_current`/`on_theme_change`/`off_theme_change`/`theme_apply` + 20 个 getter + `control_height`（32）+ `entry_ctrl_height`。
+- **三处刻意不做（与旧链路的差）**：①原生控件 CSS 下发（旧 `apply_native_theme_css`）——新栈控件全自绘，色板是绘制时唯一来源，没有「原生观感跟系统主题」这回事；②`ffi_repaint_all` 整体重绘兜底——重绘责任随组件批次落到各控件的订阅路径；③`theme_from_system`（跟随系统深浅与主色）依赖系统集成层读取，未接。`sub_bag_begin/end` 批量退订随 relink 层接。
+- **色彩数学落点**：`yue/theme/palette.mbt`（hex 解析 / `rgb_to_hsl` / `hsl_to_rgb` / `mix_hex` / `lighten_hex` / `darken_hex`），其中 hex 解析复用 `@render.Color::parse`——即 CSS 口径「8 位透明度在尾」，与 libyue 的 `#AARRGGBB` 分岔已在 G1 条记档；主题串只用 6 位写法，不受影响。
+- **从 master 继承的一条实测坑**：`mix_hex(a, b, t)` 的 `t` 是取**前者**的比例，且端点（t=0/1）与非法输入要**原样返回输入串**，不经 `hex6` 往返——`hex6` 输出小写十六进制，会把主题里的 `#2D68C4` 改写成 `#2d68c4`，与原串比较不等。断言按小写写（`theme_from_accent("#FF0000").primary == "#ff0000"`）。
+- **测试取向**：不断言派生出的具体色值（换基准盘就整片红），只断**公式不变量**——灰 accent 饱和度被抬到保底、白 accent 明度被钳上限、深模式把暗 accent 抬到下限、hover 的明度方向、语义色色相轮 ±1°、浅底变体的混色方向、非法 accent 回落基准盘；订阅面断「通知走快照」（回调里新注册的不进本轮）、退订幂等、未知句柄空操作、`theme_apply` 后 getter 跟随。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/theme` 7/7；`moon check yue/theme --deny-warn` 零警告；全仓红点仍 287 errors / 68 warnings；其余包与 yoga-mbt 未动。
+
 ## Linux
 
 ### 发行版
