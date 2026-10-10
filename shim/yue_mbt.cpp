@@ -4512,6 +4512,7 @@ extern "C" int32_t yue_mbt_proc_getpid(void) { return -1; }
 #include <powrprof.h>
 #include <shlwapi.h>
 #include <string>
+#include <wbemidl.h> // WMI 内屏亮度（WmiMonitorBrightness）
 #include <winspool.h>
 
 // ---- sysinfo：注册表字符串 / 内存 / 开机时长 ----
@@ -4848,6 +4849,257 @@ extern "C" int32_t yue_mbt_brightness_set(int32_t index, int32_t value,
     ::DestroyPhysicalMonitors(got, mons);
   }
   return -1;
+}
+
+// ---- 亮度：笔记本内屏 WMI（WmiMonitorBrightness / WmiSetBrightness）----
+// DDC/CI 只覆盖外接显示器，内屏亮度走 WMI ROOT\WMI 命名空间。
+// CurrentBrightness 语义就是 0-100 百分比（Levels 为灰阶级数）。
+
+namespace {
+
+// 连接 ROOT\WMI；调用方 Release
+int mbt_wmi_services(IWbemServices **out_svc, bool *out_uninit) {
+  *out_uninit = false;
+  HRESULT hr = ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  if (SUCCEEDED(hr)) {
+    *out_uninit = true;
+  } else if (hr != RPC_E_CHANGED_MODE) {
+    return -1;
+  }
+  IWbemLocator *loc = nullptr;
+  hr = ::CoCreateInstance(__uuidof(WbemLocator), nullptr, CLSCTX_INPROC_SERVER,
+                          __uuidof(IWbemLocator),
+                          reinterpret_cast<void **>(&loc));
+  if (FAILED(hr) || loc == nullptr) {
+    if (*out_uninit) {
+      ::CoUninitialize();
+    }
+    return -1;
+  }
+  hr = loc->ConnectServer(
+      ::SysAllocString(L"ROOT\\WMI"), nullptr, nullptr, nullptr, 0, nullptr,
+      nullptr, out_svc);
+  loc->Release();
+  if (FAILED(hr) || *out_svc == nullptr) {
+    if (*out_uninit) {
+      ::CoUninitialize();
+    }
+    return -1;
+  }
+  // root\wmi 这类受保护命名空间必须显式设代理毯，否则 ExecQuery 得
+  // WBEM_E_ACCESS_DENIED（80041003）
+  hr = ::CoSetProxyBlanket(*out_svc, RPC_C_AUTHN_WINNT, RPC_C_AUTHN_NONE,
+                           nullptr, RPC_C_AUTHN_LEVEL_CALL,
+                           RPC_C_IMP_LEVEL_IMPERSONATE, nullptr, EOAC_NONE);
+  hr = ::CoSetProxyBlanket(*out_svc, RPC_C_AUTHN_WINNT, RPC_C_AUTHN_NONE,
+                           nullptr, RPC_C_AUTHN_LEVEL_CALL,
+                           RPC_C_IMP_LEVEL_IMPERSONATE, nullptr, EOAC_NONE);
+  if (FAILED(hr)) {
+    (*out_svc)->Release();
+    *out_svc = nullptr;
+    if (*out_uninit) {
+      ::CoUninitialize();
+    }
+    return -1;
+  }
+  return 0;
+}
+
+// 执行 WQL 查询并取首个对象；调用方 Release
+int mbt_wmi_query_one(IWbemServices *svc, const wchar_t *wql,
+                      IWbemClassObject **out_obj) {
+  IEnumWbemClassObject *en = nullptr;
+  BSTR lang = ::SysAllocString(L"WQL");
+  BSTR q = ::SysAllocString(wql);
+  HRESULT hr = svc->ExecQuery(lang, q, WBEM_FLAG_FORWARD_ONLY, nullptr, &en);
+  ::SysFreeString(lang);
+  ::SysFreeString(q);
+  if (FAILED(hr) || en == nullptr) {
+    return -1;
+  }
+  *out_obj = nullptr;
+  ULONG got = 0;
+  hr = en->Next(WBEM_INFINITE, 1, out_obj, &got);
+  en->Release();
+  if (FAILED(hr) || got == 0 || *out_obj == nullptr) {
+    return -1;
+  }
+  return 0;
+}
+
+// 读对象整型属性；缺属性 / 类型不符返回 0 并置 ok=0
+int32_t mbt_wmi_get_int(IWbemClassObject *obj, const wchar_t *prop,
+                        int32_t *ok) {
+  *ok = 0;
+  VARIANT v;
+  VariantInit(&v);
+  HRESULT hr = obj->Get(prop, 0, &v, nullptr, nullptr);
+  int32_t out = 0;
+  if (SUCCEEDED(hr) && (v.vt == VT_I4 || v.vt == VT_UI4 || v.vt == VT_I2 ||
+                        v.vt == VT_UI1)) {
+    out = static_cast<int32_t>(v.lVal);
+    *ok = 1;
+  }
+  VariantClear(&v);
+  return out;
+}
+
+}  // namespace
+
+// 内屏亮度枚举：查 WmiMonitorBrightness，输出 InstanceName（'\n' 分行，
+// 每行一个名字）；无内屏 / WMI 不可用为空文本。
+extern "C" void *yue_mbt_wmi_brightness_devices(int32_t *ok) {
+  *ok = 0;
+  bool uninit = false;
+  IWbemServices *svc = nullptr;
+  if (mbt_wmi_services(&svc, &uninit) != 0) {
+    if (uninit) {
+      ::CoUninitialize();
+    }
+    return BytesFromString("");
+  }
+  std::string out;
+  IWbemClassObject *obj = nullptr;
+  if (mbt_wmi_query_one(svc,
+                        L"SELECT InstanceName FROM WmiMonitorBrightness",
+                        &obj) == 0) {
+    VARIANT v;
+    VariantInit(&v);
+    HRESULT gr = obj->Get(L"InstanceName", 0, &v, nullptr, nullptr);
+    if (SUCCEEDED(gr) && v.vt == VT_BSTR && v.bstrVal != nullptr) {
+      out = base::SysWideToUTF8(v.bstrVal);
+    }
+    VariantClear(&v);
+    obj->Release();
+  }
+  svc->Release();
+  if (uninit) {
+    ::CoUninitialize();
+  }
+  *ok = 1;
+  return BytesFromString(out);
+}
+
+// 内屏亮度读：CurrentBrightness（0-100）与 Levels（灰阶级数）
+extern "C" int32_t yue_mbt_wmi_brightness_get(int32_t *cur, int32_t *levels,
+                                              int32_t *ok) {
+  *ok = 0;
+  bool uninit = false;
+  IWbemServices *svc = nullptr;
+  if (mbt_wmi_services(&svc, &uninit) != 0) {
+    if (uninit) {
+      ::CoUninitialize();
+    }
+    return -1;
+  }
+  int32_t rc = -1;
+  IWbemClassObject *obj = nullptr;
+  if (mbt_wmi_query_one(svc, L"SELECT CurrentBrightness, Levels FROM WmiMonitorBrightness",
+                        &obj) == 0) {
+    int32_t c_ok = 0, l_ok = 0;
+    int32_t c = mbt_wmi_get_int(obj, L"CurrentBrightness", &c_ok);
+    int32_t l = mbt_wmi_get_int(obj, L"Levels", &l_ok);
+    if (c_ok == 1) {
+      *cur = c;
+      *levels = l_ok == 1 ? l : 100;
+      *ok = 1;
+      rc = 0;
+    }
+    obj->Release();
+  }
+  svc->Release();
+  if (uninit) {
+    ::CoUninitialize();
+  }
+  return rc;
+}
+
+// 内屏亮度写：WmiMonitorBrightnessMethods 实例的 WmiSetBrightness(
+// Timeout, Brightness)（Brightness 语义即 0-100）
+extern "C" int32_t yue_mbt_wmi_brightness_set(int32_t percent, int32_t *ok) {
+  *ok = 0;
+  if (percent < 0) {
+    percent = 0;
+  }
+  if (percent > 100) {
+    percent = 100;
+  }
+  bool uninit = false;
+  IWbemServices *svc = nullptr;
+  if (mbt_wmi_services(&svc, &uninit) != 0) {
+    if (uninit) {
+      ::CoUninitialize();
+    }
+    return -1;
+  }
+  int32_t rc = -1;
+  do {
+    // 取 WmiMonitorBrightnessMethods 实例路径
+    IWbemClassObject *obj = nullptr;
+    if (mbt_wmi_query_one(
+            svc, L"SELECT __PATH FROM WmiMonitorBrightnessMethods",
+            &obj) != 0) {
+      break;
+    }
+    VARIANT pv;
+    VariantInit(&pv);
+    bool have_path =
+        obj->Get(L"__PATH", 0, &pv, nullptr, nullptr) == WBEM_S_NO_ERROR &&
+        pv.vt == VT_BSTR && pv.bstrVal != nullptr;
+    obj->Release();
+    if (!have_path) {
+      VariantClear(&pv);
+      break;
+    }
+    // 类对象 → 方法入参模板 → 实例 → 填参 → 执行
+    IWbemClassObject *cls = nullptr;
+    BSTR cls_name = ::SysAllocString(L"WmiMonitorBrightnessMethods");
+    HRESULT hr = svc->GetObject(cls_name, 0, nullptr, &cls, nullptr);
+    ::SysFreeString(cls_name);
+    if (FAILED(hr) || cls == nullptr) {
+      VariantClear(&pv);
+      break;
+    }
+    IWbemClassObject *in_def = nullptr;
+    BSTR m_name = ::SysAllocString(L"WmiSetBrightness");
+    hr = cls->GetMethod(m_name, 0, &in_def, nullptr);
+    cls->Release();
+    if (FAILED(hr) || in_def == nullptr) {
+      ::SysFreeString(m_name);
+      VariantClear(&pv);
+      break;
+    }
+    IWbemClassObject *in_inst = nullptr;
+    hr = in_def->SpawnInstance(0, &in_inst);
+    in_def->Release();
+    if (FAILED(hr) || in_inst == nullptr) {
+      ::SysFreeString(m_name);
+      VariantClear(&pv);
+      break;
+    }
+    VARIANT arg;
+    VariantInit(&arg);
+    arg.vt = VT_I4;
+    arg.lVal = 0;  // Timeout
+    in_inst->Put(L"Timeout", 0, &arg, 0);
+    arg.lVal = percent;  // Brightness
+    in_inst->Put(L"Brightness", 0, &arg, 0);
+    hr = svc->ExecMethod(pv.bstrVal, m_name, 0, nullptr, in_inst, nullptr,
+                         nullptr);
+    in_inst->Release();
+    ::SysFreeString(m_name);
+    VariantClear(&pv);
+    VariantClear(&arg);
+    if (SUCCEEDED(hr)) {
+      *ok = 1;
+      rc = 0;
+    }
+  } while (false);
+  svc->Release();
+  if (uninit) {
+    ::CoUninitialize();
+  }
+  return rc;
 }
 
 

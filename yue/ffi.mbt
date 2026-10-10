@@ -1953,6 +1953,28 @@ pub extern "c" fn ffi_brightness_set(
 ) -> Int = "yue_mbt_brightness_set"
 
 ///|
+/// 内屏亮度枚举（WMI，InstanceName '\n' 分行；空文本 = 无内屏/不可用）。
+#borrow(ok)
+pub extern "c" fn ffi_wmi_brightness_devices(ok : Ref[Int]) -> Bytes = "yue_mbt_wmi_brightness_devices"
+
+///|
+/// 内屏亮度读（cur 0-100、levels 灰阶级数）。
+#borrow(cur, levels, ok)
+pub extern "c" fn ffi_wmi_brightness_get(
+  cur : Ref[Int],
+  levels : Ref[Int],
+  ok : Ref[Int],
+) -> Int = "yue_mbt_wmi_brightness_get"
+
+///|
+/// 内屏亮度写（percent 0-100）。
+#borrow(ok)
+pub extern "c" fn ffi_wmi_brightness_set(
+  percent : Int,
+  ok : Ref[Int],
+) -> Int = "yue_mbt_wmi_brightness_set"
+
+///|
 /// 默认输出端点音量（level 0..1 标量；muted 0/1）。
 #borrow(level, muted, ok)
 pub extern "c" fn ffi_vol_master(
