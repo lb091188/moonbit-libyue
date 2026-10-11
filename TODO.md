@@ -48,7 +48,7 @@
   - [x] 首批：`Font`（族名/字号/9 档字重/斜体）+ `TextAlign`/`TextFormat`/`TextAttributes`/`SizeF` + `AttributedText` **整体属性**面（对齐/换行/省略/`get_bounds_for`）；顺带修正 `wrap=false` 未生效的语义（Pango 一设宽就折行）与 `draw_in_box` 盒内对齐；`yue/text` 14/14
   - [x] 次批：`set_font_for`/`set_color_for` **区间属性**（`yue/text` 走 C 端 `rt_*` 会话 + Pango attribute list，区间为 UTF-8 字节下标、后设覆盖先设、越界钳制）；`text` 20/20
   - [x] 第三批：字体枚举与回退 + 混排行高口径——C 侧一次性建进程内族表（`pango_font_map_list_families` 排序去重、`\n` 拼接，MoonBit 逐字节读）；`families`/`family_available`(大小写不敏感，通用族 serif/sans-serif/monospace 一律可用)/`resolve_family`(CSS 列表口径，全不可用退空族名)/`Font::resolve`；行高定案为**逐字体上抛、行盒 = max ascent + max descent**（`FontMetrics`/`font_metrics`/`line_height_multi`，`line_height_font`/`line_ascent_font` 改为其投影），`AttributedText::line_height()` 把基准与所有区间字体一起喂；`yue/text` 28/28（新增 8 条，含「行高盖得住 get_bounds_for 的绘制高度」）
-  - [ ] 绘制入口形态：旧契约的 `Painter::draw_text` 在组件接线（G7）时逐点改 `@text.draw_in_box(p.bitmap, …)`
+  - [x] 绘制入口形态：新 `Painter` 门面**不提供** `draw_text`，文本一律走 `yue/text`（`draw_at`/`draw_box_at`/`AttributedText::draw`，画在门面当前会话的 `cairo_t` 上，平移与裁剪才生效）；全仓新栈代码 grep 无一处 `p.draw_text(` 调用，旧契约入口随旧链路包一并消失，无需逐点改写
 
 ### 控件（一律自绘，不再引入原生控件皮肤；家族名对应 master `yue/components/` 九个源文件）
 - [~] 基础原语：`group`/`separator`/标签/图像/图标/按钮已落新包 **`yue/ui`**（首批 7 件，另附 `container`；文本 measure/baseline 首次回灌布局引擎，`on_pointer`/`on_draw` 首参为控件本身以免自捕获引用环；`type=` 因是保留字改 `kind : ButtonKind`；`yue/components` 属旧链路红点，按批替换）；表单族 15 件已全部落 `yue/ui/form.mbt` + `yue/ui/entry.mbt` + `yue/ui/textarea.mbt`；`tab` 已由 `yue/ui/nav.mbt` 的 `tabs_t` 承担（页签头行 + 预建页区显隐），`scroll` 已落 `yue/ui/scroll.mbt`（垂直滚动容器 + 自绘滚动条，平移用 yoga 新补的相对定位偏移），`splitter` 已落 `yue/ui/split.mbt`（`hsplit`/`vsplit`）
@@ -69,9 +69,9 @@
   - [ ] `theme_from_system`（跟随系统深浅与主色）随系统集成层
   - [ ] 组件 style 通道（`themed_container`/`set_panel_bg`/`bind_bg`/`bind_fg`/`bind_popover_bg`）与 `sub_bag` 批量退订随组件/relink 批次
   - 新栈刻意不做：原生控件 CSS 下发（全自绘后色板是唯一来源）
-- [~] 声明式层（`declarative/` 612 行、24 构造器）：地基已落（`Node{mount:(Widget)->Widget}`、`node_of`/`node_of_new`/`mount_children`/`App::mount`、`invalidate` 回路），L1 构造器全集随控件批次：L1 构造器全集（`vbox`/`hbox`/`label`/`button`/`checkbox`/`entry`/`text_edit`/`radio`/`slider`/`progress`/`picker`/`combo`/`group`/`scroll`/`separator`/`tab`/`date_picker`/`gif`/`container`…）+ `node_of`/`mount`/`mount_window` + `bind`/`bind_label`；`hover_group`/`cursor_group`；`overlay_scroll`
+- [~] 声明式层（`declarative/` 612 行、24 构造器）：地基已落（`Node{mount:(Widget)->Widget}`、`node_of`/`node_of_new`/`mount_children`/`App::mount`、`invalidate` 回路）；**L1 构造器全集落 `yue/ui/declarative.mbt`**——`vbox`/`hbox`/`text_edit`/`picker`/`scroll`/`tab`/`date_picker`（改名者，旧调用点原样跑在新栈上）+ `mount_window`（建宿主并挂载）+ `bind`/`bind_label`（Store/信号驱动的文本绑定），与组件**同名**的（`label`/`button`/`entry`/`checkbox`/`container`/`group`/`separator`/`image`/`icon`/`radio_group`/`slider`/`progress`）直接用组件、不再包第二层；`hover_group` 已落（本栈宿主悬停态是父链语义，旧链路那套全局指针轮询不需要）；`overlay_scroll` 即 `scroll_v`（滚动条一直是视口的绝对定位子控件）。剩：`cursor_group`（要窗口层光标通道 = 新增 FFI，单独一批）、`gif`（随图标/动画批）、`combo`（可编辑下拉，本栈无原生组合框语义）
 - [x] Store 与 signals：内核与 `Store` 自 master 逐行平移进 `yue/core/signal.mbt`/`store.mbt`（`Signal`/`Store` 9 方法、`computed`/`batch`/`sub_bag`、store↔signal 互转，公共名不改，19 条既有测试整段带过来）；`bind_node`/`swap_node` 换成新栈形态并落 `yue/core/node.mbt`，relink 定案=**原位替换**（引擎为此加 `insert_child`/`remove_child_at`，控件层加 `index_of`/`move_child`），旧链路 Windows 的 `post_task` 推迟一拍与 `refresh_layout` 两条规避在本栈不需要（命中矩形每帧从布局结果重取），重绘经进程级 `set_repaint_hook`/`invalidate` 回到 App 宿主
-- [ ] 组件库约 55 个声明式组件（家族划分见「控件」节；调用点应不变，只换实现）
+- [~] 组件库约 55 个声明式组件（家族划分见「控件」节；调用点应不变，只换实现）：九族里表单/显示/日期/导航/表格/浮层/容器滚动/基础原语/输入框已全部以 `@core.Node` 构造器形态落 `yue/ui`，剩 `code_view`（随 Markdown 批）、`combo` 与图表/Markdown 两族
 - [ ] 图表（`yue/charts/`）：共享算法层（`LineSeries`/`win_push`/`auto_y_range`/`nice_ticks`/`bar_hit`/`sector_angles`/`gauge_angle`/`linreg`…）+ 20 种图（5 通用 + 15 专项 + tooltip 支撑层）+ 交互层（`ci_zoom`/`ci_visual_map`/`ci_mark_line`/`ci_mark_area`/`ci_save`/`ci_legend_hit`/`ci_filter_visible`）+ 3 个交互变体 `charts_it`（line/bar/donut）
 - [ ] Markdown（`markdown/markdown.mbt`）：`markdown_view` 17 种 block 变体 → 新 AttributedText；GFM 渲染面（表格/任务列表/脚注/删除线/图片/可点击链接）
 - [ ] 富文本编辑（远期 WYSIWYG 块编辑器）

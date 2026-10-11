@@ -583,6 +583,53 @@ fn make_form_section(
 }
 
 ///|
+/// 声明式 L1 区块：vbox/hbox 排版 + bind_label 就地换文本 + hover_group 悬停组。
+/// 点一次按钮只改 Store（不重建任何子树），标签宽度跟着文本重测；整卡悬停换底色。
+fn make_decl_section(
+  n : @core.Store[Int],
+  card_slot : Ref[@core.Widget?],
+  label_slot : Ref[@core.Widget?],
+) -> @core.Node {
+  @ui.vbox(
+    [
+      @ui.label("声明式 L1：vbox/hbox 排版 + bind_label 就地换文本 + hover_group 悬停组", size=13.0),
+      @ui.hover_group(
+        [
+          @ui.hbox(
+            [
+              @ui.bind_label(
+                n,
+                fn(v : Int) -> String {
+                  "计数 " + v.to_string() + (if v > 0 { "（已点）" } else { "" })
+                },
+                handle=fn(w : @core.Widget) -> Unit { label_slot.val = Some(w) },
+              ),
+              @ui.button(
+                "加一",
+                on_click=fn() -> Unit { n.set(n.get() + 1) },
+                kind=@ui.Border,
+                min_width=64.0,
+              ),
+            ],
+            column_gap=10.0,
+          ),
+          @ui.label_t("整块卡片悬停换底色（靠宿主的父链悬停态，不轮询指针）", role=Secondary),
+        ],
+        width=340.0,
+        padding=10.0,
+        row_gap=6.0,
+        handle=fn(w : @core.Widget) -> Unit { card_slot.val = Some(w) },
+      ),
+    ],
+    row_gap=6.0,
+    padding=8.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 虚拟表格演示数据：200 行（几何验证页只挂可见的十来行）。
 fn make_virt_rows() -> Array[@ui.TableRow] {
   let out : Array[@ui.TableRow] = []
@@ -719,7 +766,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1400, 1760, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1400, 1900, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -924,6 +971,11 @@ fn main {
   app.mount([make_virt_section(vt_rows, vt_sel, vt_sort, vt_clicks, vt_w)])
   app.mount([make_sticky_section(sticky, sticky_w)])
   app.mount([make_split_section(spl_w)])
+  let dcl_n = @core.Store::new(0)
+  let dcl_card_w : Ref[@core.Widget?] = Ref(None)
+  let dcl_label_w : Ref[@core.Widget?] = Ref(None)
+  let dcl_w0_ref : Ref[Double] = Ref(-1.0)
+  app.mount([make_decl_section(dcl_n, dcl_card_w, dcl_label_w)])
   app.mount([
     make_form_section(
       frm_btn,
@@ -1281,6 +1333,16 @@ fn main {
       ctr.frames = ctr.frames + 1
       // 自转轮播的下标由宿主的延时通道推进：换了页就计一次
       // 浮层是瞬时的：退出时计数早已归零，故每拍记一次峰值（证明真窗口里确实开过层）
+      // 声明式文本绑定的初值宽度：只在第一拍记一次
+      if dcl_w0_ref.val < 0.0 {
+        match dcl_label_w.val {
+          Some(w) =>
+            if w.rect.w > 0.0 {
+              dcl_w0_ref.val = w.rect.w
+            }
+          None => ()
+        }
+      }
       let ov_now = @core.overlay_count()
       if ov_now > frm_ov_max.val {
         frm_ov_max.val = ov_now
@@ -1359,6 +1421,12 @@ fn main {
     Some(x) => x.format()
     None => "-"
   }
+  // bind_label 的宽度：挂载后首帧记一次初值，退出时再记一次（点过按钮就变宽）
+  let dcl_w0 = if dcl_w0_ref.val < 0.0 { 0.0 } else { dcl_w0_ref.val }
+  let dcl_w1 = match dcl_label_w.val {
+    Some(w) => w.rect.w
+    None => 0.0
+  }
   // 多行框的插入点字节下标（内核句柄不外露，走 im_context 那条接缝）
   let ta_caret = match frm_ta_w.val {
     Some(w) => match w.im_context {
@@ -1368,7 +1436,7 @@ fn main {
     None => -1
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val} ta='\{flat(frm_ta.get())}' tacur=\{ta_caret}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val} ta='\{flat(frm_ta.get())}' tacur=\{ta_caret} dcl=\{dcl_n.get()} lblw=\{dcl_w0.round().to_int()}/\{dcl_w1.round().to_int()}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -1495,6 +1563,12 @@ fn main {
     }
     None => "-"
   }
+  println(
+    "NATIVE-APP-DC card=" +
+    ov2_rect_of(dcl_card_w.val) +
+    " label=" +
+    ov2_rect_of(dcl_label_w.val),
+  )
   println(
     "NATIVE-APP-FORM btn=" +
     ov2_rect_of(frm_btn_w.val) +

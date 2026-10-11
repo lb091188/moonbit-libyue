@@ -592,6 +592,15 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **插入点跟随的观感**：光标落在「最后一行半」时整块上移（实测 16px），于是第一行被裁掉一半——这是 `ensure_visible` 的正常结果，不是绘制 bug（截图复核时别当问题报）。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/ui` **98/98**（新增 5 条：折行断点单位（空格/拉丁词/中日韩逐字分段与区间截断）；显示行布局（按换行符断行、空文本给一行、贪心折行且断行处不留行首空格、行间首尾相接、中文逐字断三行、超长单词不拆只溢出）；键入与回车、上下键按显示行移动并记住 x、Home/End 走行首尾、Shift+Home 扩选后替换、行首退格并行；点击定位到第几行（中文按字节算行首）、拖选跨行整删、只读不吃编辑键；内容超视口才出滚动条 + 滚轮到底后拇指与轨道换位 + 插入点滚进可视区后顶行像素变化）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 表单区块加多行框，几何行补 `ta=`，状态行补 `ta= tacur=`，示例内容改 8 行）：注入「点框内第 3 行（窗口 y=1644）」得 `tacur=12`（该行行首字节，与手算逐位一致）→ 注入 `Return` 得 `ta='行 1/行 2//行 3/…'`、`tacur=13`（多出一个空行）→ 滚轮上滚回顶，截图复核三行完整可见、右缘拇指回到顶部、插入点跟随造成的 16px 上移在中间帧可见。
 
+### MoonBit 原生 GUI 栈 · 声明式层 L1 构造器（`yue/ui/declarative.mbt`：vbox/hbox/bind_label/hover_group/mount_window…）
+
+- **`hover_group` 在新栈不需要任何轮询机制**：旧链路（`yue/declarative/hovergroup.mbt`）靠一个全局 100ms 指针轮询拍，因为 GTK 的指针事件不冒泡、子控件的 GdkWindow 会独占事件，祖先容器收不到 enter。本栈宿主的悬停态本来就是**父链语义**（指针在子项上时父项也算悬停，与 CSS `:hover` 同义，见 tooltip 那条），所以组件只读 `Widget.hovered` 即可——没有定时器、没有指针查询、也没有「组静止时不触发回调」这类优化要做。记成**机制差**而不是「已实现同款」。
+- **`bind_label` 的强制重排在本地栈里是免费的**：旧链路 `set_text` 只标脏不重排，标签变长就截断，必须补一次 `update_layout`；本栈改文本走 `relabel`（重设测量回调 → 节点标脏），下一帧布局自然跟着新文本走。真窗口回证：点一次按钮，标签从 36px 变 87px（`lblw=36/87`），期间没有重建任何子树。
+- **`mount_window` 不提供 `center` / `on_close`**：旧链路的窗口居中与关闭回调走的是原生窗口通道；本栈窗口位置由 WM 决定、关闭只是让 `App::run()` 返回，收尾写在调用方 `run()` 之后。少给两个参数比给两个假参数好。
+- **与组件同名的构造器不再包第二层**：`label`/`button`/`entry`/`checkbox`/`container`/`group`/`separator`/`image`/`icon`/`radio_group`/`slider`/`progress` 在 `yue/ui` 里已经是返回 `@core.Node` 的声明式构造器，再套一层同名函数只是多一处要维护的签名。本批只补三类：改名者（`vbox`/`hbox`/`text_edit`/`picker`/`scroll`/`tab`/`date_picker`）、地基入口（`mount_window`、`bind`/`bind_label`）、新能力（`hover_group`）。`overlay_scroll` 在本栈就是 `scroll_v`（滚动条一直是视口的绝对定位子控件），`gif` 随图标/动画批，`cursor_group` 要窗口层光标通道（新增 FFI），单列一批。
+- **三条工具链写法（本批实测）**：① `test "名字"` 与左花括号**必须同一行**——分行写时解析器把测试体当成独立的顶层块，报错现场跑到几十行外且语义完全不搭（`The value identifier tabs is unbound` + `Parse error, unexpected token id`）；② `Option::is_none()` 在本工具链已弃用（提示改用 `x is None`），别把它写进新代码；③ match 的守卫不是 `v when cond`，MoonBit 写 `| cond`——简单二分支直接退回 `if/else` 更省事。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/ui` **103/103**（新增 5 条：vbox/hbox 的方向与间距来自参数、bind_label 改值后就地换文本并重测宽 + 出像素、bind 走派生信号且订阅随回收袋退订、hover_group 子控件悬停即整组换底色且抬起出组不算点击、旧名构造器落到新组件上（picker 点开浮层并回填、scroll 出滚动条且 max>0、tab 按 Store 切页））。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 加「声明式 L1」区块，几何行补 `NATIVE-APP-DC`，状态行补 `dcl= lblw=`，页面又长一截故窗口 1760→1900）：注入「点卡片里的『加一』按钮」得 `dcl=1 lblw=36/87`（Store 一改，标签文本与宽度都跟着走）、`label=34,1377,87x19`，指针停在卡片空白处截图复核整块换悬停底色。
+
 ## Linux
 
 ### 发行版
