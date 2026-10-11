@@ -354,9 +354,11 @@ fn bt_win_parse_adapter(text : String) -> BtAdapter? {
 }
 
 ///|
-/// Windows 已知设备快照解析(五字段行,逐行;形状不符安全跳过)。
-/// name 空回退 address;trusted 映射 fRemembered(重连信任语义同源)。
-fn bt_win_parse_devices(text : String) -> Array[BtDevice] {
+/// Windows / macOS 共用的设备快照解析(五字段行,逐行;形状不符安全跳过)。
+/// 两侧 shim 输出同构:"name\tmac\tconnected\tremembered\tauthenticated"。
+/// name 空回退 address;trusted Windows 映射 fRemembered(重连信任语义
+/// 同源),macOS 侧 pairedDevices 里的设备一律可重连故恒 1。
+fn bt_native_parse_devices(text : String) -> Array[BtDevice] {
   let out : Array[BtDevice] = []
   for line in text.split("\n") {
     let f = sys_split_fields(line.to_owned(), '\t')
@@ -398,7 +400,50 @@ fn bt_win_devices() -> Result[Array[BtDevice], BtError] {
   if ok.val != 1 {
     return Err(BusFailed("BluetoothFindFirstDevice 失败(蓝牙服务未运行?)"))
   }
-  Ok(bt_win_parse_devices(text))
+  Ok(bt_native_parse_devices(text))
+}
+
+///|
+/// macOS 无线电快照解析("name\tmac\tpowered" 行):比 Windows 多一个真实
+/// 电源态字段;地址非法 / 无 radio 为 None。
+fn bt_mac_parse_adapter(text : String) -> BtAdapter? {
+  let fields = sys_split_fields(text, '\t')
+  if fields.length() != 3 || fields[1] == "" {
+    return None
+  }
+  Some({
+    path: "",
+    address: fields[1],
+    name: fields[0],
+    powered: fields[2] == "1",
+    discovering: false,
+  })
+}
+
+///|
+/// macOS 适配器快照(shim IOBluetoothHostController 只读查询)。
+fn bt_mac_adapter() -> Result[BtAdapter, BtError] {
+  let ok = Ref(0)
+  let text = @utf8.decode_lossy(@yue.ffi_bt_radio_info(ok))
+  if ok.val != 1 {
+    return Err(BusFailed("IOBluetoothHostController 查询失败"))
+  }
+  match bt_mac_parse_adapter(text) {
+    Some(a) => Ok(a)
+    None => Err(Unsupported)
+  }
+}
+
+///|
+/// macOS 已配对设备快照(shim IOBluetoothDevice.pairedDevices;只含已配对
+/// 设备——macOS 不向第三方暴露发现缓存,故不含未配对的扫描结果)。
+fn bt_mac_devices() -> Result[Array[BtDevice], BtError] {
+  let ok = Ref(0)
+  let text = @utf8.decode_lossy(@yue.ffi_bt_devices(ok))
+  if ok.val != 1 {
+    return Err(BusFailed("IOBluetoothDevice.pairedDevices 枚举失败"))
+  }
+  Ok(bt_native_parse_devices(text))
 }
 
 ///|
@@ -445,11 +490,13 @@ fn bt_device_action(
 
 ///|
 /// 当前系统是否支持蓝牙:Linux 为系统总线上 org.bluez 至少有一个
-/// Adapter1 对象;Windows 为经典 BluetoothAPIs 枚举到无线电;macOS 无实现,
-/// 恒 false。每次调用真实探测,高频场景请调用方自行缓存结果。
+/// Adapter1 对象;Windows 为经典 BluetoothAPIs 枚举到无线电;macOS 为
+/// IOBluetoothHostController 读到有效硬件地址。每次调用真实探测,高频场景
+/// 请调用方自行缓存结果。
 pub fn bt_supported() -> Bool {
   match @yue.platform() {
     "windows" => bt_win_adapter() is Ok(_)
+    "macos" => bt_mac_adapter() is Ok(_)
     "linux" => bt_supported_linux()
     _ => false
   }
@@ -465,10 +512,12 @@ fn bt_supported_linux() -> Bool {
 /// 适配器快照(首个 Adapter1 的 Powered/Discovering/Address/Name);无
 /// 蓝牙回复 Unsupported。Windows 为无线电快照:powered 是「枚举得到即
 /// 可打开」的近似、discovering 恒 false、path 恒空(语义见
-/// bt_win_parse_adapter)。macOS 无实现,恒 Unsupported。
+/// bt_win_parse_adapter)。macOS 为无线电快照:powered 是 IOBluetooth 读到
+/// 的真实电源态,其余同 Windows(语义见 [bt_mac_parse_adapter])。
 pub fn bt_adapter_info() -> Result[BtAdapter, BtError] {
   match @yue.platform() {
     "windows" => bt_win_adapter()
+    "macos" => bt_mac_adapter()
     "linux" => bt_adapter_info_linux()
     _ => Err(Unsupported)
   }
@@ -491,10 +540,12 @@ fn bt_adapter_info_linux() -> Result[BtAdapter, BtError] {
 /// 已发现设备列表(枚举全部 org.bluez.Device1 对象)。注意含历史扫描
 /// 残留对象(配对记录),以 paired/connected 区分;无蓝牙回复
 /// Unsupported。Windows 为已知设备快照(含配对记录与缓存发现的设备,
-/// 不触发扫描)。macOS 无实现,恒 Unsupported。
+/// 不触发扫描)。macOS 为已配对设备快照——macOS 不向第三方暴露发现缓存,
+/// 因此只含已配对设备,不含未配对的扫描结果。
 pub fn bt_devices() -> Result[Array[BtDevice], BtError] {
   match @yue.platform() {
     "windows" => bt_win_devices()
+    "macos" => bt_mac_devices()
     "linux" => bt_devices_linux()
     _ => Err(Unsupported)
   }
@@ -517,8 +568,9 @@ fn bt_devices_linux() -> Result[Array[BtDevice], BtError] {
 
 ///|
 /// 开 / 关适配器电源(写 Adapter1 的 Powered 属性)。Windows 不支持
-/// (经典 API 无电源开关,动作族待 WinRT 批次),恒 Unsupported;macOS 无
-/// 实现,同样走 Unsupported。
+/// (经典 API 无电源开关,动作族待 WinRT 批次),恒 Unsupported;macOS 的
+/// IOBluetoothHostController 只暴露只读电源态、无公开开关接口(系统与
+/// blueutil 走的都是非公开路径),同样走 Unsupported。
 pub fn bt_set_powered(on : Bool) -> Result[Unit, BtError] {
   match @yue.platform() {
     "linux" => bt_set_powered_linux(on)
@@ -549,8 +601,9 @@ fn bt_set_powered_linux(on : Bool) -> Result[Unit, BtError] {
 ///|
 /// 开始扫描(Adapter1.StartDiscovery;扫描到的设备经 bt_devices 查看,
 /// 事件未在事件循环派发)。Windows 不支持(经典 API 扫描是阻塞式查询
-/// 且无持续状态,动作族待 WinRT 批次),恒 Unsupported;macOS 无实现,同样
-/// 走 Unsupported。
+/// 且无持续状态,动作族待 WinRT 批次),恒 Unsupported;macOS 的扫描要走
+/// IOBluetoothDeviceInquiry 异步委托,且扫描结果不进入 pairedDevices 缓存
+/// (本批只做只读快照),同样走 Unsupported。
 pub fn bt_start_discovery() -> Result[Unit, BtError] {
   match @yue.platform() {
     "linux" => bt_start_discovery_linux()
@@ -566,7 +619,7 @@ fn bt_start_discovery_linux() -> Result[Unit, BtError] {
 
 ///|
 /// 停止扫描(Adapter1.StopDiscovery)。Windows 不支持,恒 Unsupported;
-/// macOS 无实现,同样走 Unsupported。
+/// macOS 同 [bt_start_discovery]:扫描动作需异步委托,同样走 Unsupported。
 pub fn bt_stop_discovery() -> Result[Unit, BtError] {
   match @yue.platform() {
     "linux" => bt_stop_discovery_linux()
@@ -582,8 +635,9 @@ fn bt_stop_discovery_linux() -> Result[Unit, BtError] {
 
 ///|
 /// 连接设备(Device1.Connect;未配对设备通常需先 bt_pair)。Windows
-/// 不支持(需系统 UI 或 WinRT,动作族待后续批次),恒 Unsupported;macOS 无
-/// 实现,同样走 Unsupported。
+/// 不支持(需系统 UI 或 WinRT,动作族待后续批次),恒 Unsupported;macOS 的
+/// openConnection 是异步回调式、成败不随调用返回(返回只表示发起成功),
+/// 本批只做只读快照,同样走 Unsupported。
 pub fn bt_connect(device : BtDevice) -> Result[Unit, BtError] {
   match @yue.platform() {
     "linux" => bt_connect_linux(device)
@@ -599,7 +653,7 @@ fn bt_connect_linux(device : BtDevice) -> Result[Unit, BtError] {
 
 ///|
 /// 断开设备(Device1.Disconnect)。Windows 不支持,恒 Unsupported;macOS
-/// 无实现,同样走 Unsupported。
+/// 同 [bt_connect]:连接动作需异步委托,同样走 Unsupported。
 pub fn bt_disconnect(device : BtDevice) -> Result[Unit, BtError] {
   match @yue.platform() {
     "linux" => bt_disconnect_linux(device)
@@ -616,7 +670,8 @@ fn bt_disconnect_linux(device : BtDevice) -> Result[Unit, BtError] {
 ///|
 /// 配对设备(Device1.Pair;配对需用户确认的授权码,过程可能持续数秒)。
 /// Windows 不支持(经典 API 配对要弹系统向导 UI,动作族待后续批次),
-/// 恒 Unsupported;macOS 无实现,同样走 Unsupported。
+/// 恒 Unsupported;macOS 的配对要弹系统授权 UI 并由 IOBluetoothDevicePair
+/// 异步回调收尾,本批只做只读快照,同样走 Unsupported。
 pub fn bt_pair(device : BtDevice) -> Result[Unit, BtError] {
   match @yue.platform() {
     "linux" => bt_pair_linux(device)

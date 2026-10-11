@@ -460,6 +460,9 @@ pub fn brightness_step_percent(
 ///|
 /// 键盘背光是否可用:Linux 看 logind 在线;有无键盘背光设备以
 /// kbd_brightness_devices 的空列表判。每次调用真实探测。
+///
+/// macOS 不支持:键盘背光由 HID 私有栈驱动,无公开读写接口(与屏幕亮度
+/// 的 IOKit IOGraphicsLib 不同源),故恒 false。
 pub fn kbd_brightness_supported() -> Bool {
   match @yue.platform() {
     "linux" => @traybus.logind_available()
@@ -469,7 +472,7 @@ pub fn kbd_brightness_supported() -> Bool {
 
 ///|
 /// 枚举键盘背光设备(探测 /sys/class/leds 下的 *::kbd_backlight 常见
-/// 名;空列表 = 无键盘背光)。
+/// 名;空列表 = 无键盘背光)。macOS 无公开接口,恒 Unsupported。
 pub fn kbd_brightness_devices() -> Result[
   Array[BrightnessDevice],
   BrightnessError,

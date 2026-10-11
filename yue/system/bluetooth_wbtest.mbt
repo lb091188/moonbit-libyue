@@ -264,8 +264,8 @@ test "bt_win_parse_adapter:单行两字段与空文本" {
 }
 
 ///|
-test "bt_win_parse_devices:五字段行/name 空回退 mac/形状不符跳过" {
-  let devs = bt_win_parse_devices(
+test "bt_native_parse_devices(Windows / macOS 共用):五字段行/name 空回退 mac/形状不符跳过" {
+  let devs = bt_native_parse_devices(
     "MX Master 3\tA0:1B:2C:3D:4E:5F\t1\t1\t1\n\n\tF0:E1:D2:C3:B4:A5\t0\t1\t0\nbroken-line",
   )
   assert_eq(devs.length(), 2)
@@ -300,4 +300,41 @@ test "bt:Windows 本机冒烟(有无线电才断言)" {
       }
     }
   }
+}
+
+///|
+/// macOS 路径的无线电快照解析（纯函数白盒，无 macOS 真机也能测）：比
+/// Windows 多一个真实电源态字段，故三字段才成立。
+test "bt_mac_parse_adapter:三字段含真实电源态" {
+  match bt_mac_parse_adapter("Apple USB Host Controller\tA0:1B:2C:3D:4E:5F\t1") {
+    Some(a) => {
+      assert_eq(a.name, "Apple USB Host Controller")
+      assert_eq(a.address, "A0:1B:2C:3D:4E:5F")
+      assert_eq(a.path, "")
+      assert_true(a.powered)
+      assert_true(!a.discovering)
+    }
+    None => assert_true(false)
+  }
+  // 无线电关闭：powered=false（Windows 侧是恒 true 的近似）
+  match bt_mac_parse_adapter("Apple USB Host Controller\tA0:1B:2C:3D:4E:5F\t0") {
+    Some(a) => assert_true(!a.powered)
+    None => assert_true(false)
+  }
+  // 无 radio（空文本）/ 字段数不符 / 地址空：None
+  assert_true(bt_mac_parse_adapter("") is None)
+  assert_true(bt_mac_parse_adapter("name\tA0:1B:2C:3D:4E:5F") is None)
+  assert_true(bt_mac_parse_adapter("name\t\t1") is None)
+}
+
+///|
+/// macOS 设备快照走与 Windows 相同的五字段协议，解析共用
+/// [bt_native_parse_devices]；macOS 侧只有已配对设备，后两列恒 1。
+test "bt_mac_devices 协议:已配对设备恒 paired/trusted" {
+  let devs = bt_native_parse_devices(
+    "Magic Keyboard\tA0:1B:2C:3D:4E:5F\t1\t1\t1\nAirPods\tF0:E1:D2:C3:B4:A5\t0\t1\t1",
+  )
+  assert_eq(devs.length(), 2)
+  assert_true(devs[0].connected && devs[0].paired && devs[0].trusted)
+  assert_true(!devs[1].connected && devs[1].paired && devs[1].trusted)
 }

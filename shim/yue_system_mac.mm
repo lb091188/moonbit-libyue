@@ -11,6 +11,10 @@
 //   - session watch / connectivity / netwin 轮询线程：Windows 批次能力，
 //     非本批范围，哨兵维持
 //
+// 蓝牙只做只读快照（IOBluetooth）：无线电的 name/address/powerState，
+// 以及 pairedDevices 的已配对设备。动作族（开关电源、扫描、连接、配对）
+// 依赖异步委托或非公开接口，保持哨兵，MoonBit 侧显式 Unsupported。
+//
 // 权限边界（macOS 10.15+）：
 //   - 窗口列表标题（kCGWindowName）与 AX 关窗需要"屏幕录制"/"辅助功能"
 //     权限；未授权时列表行退化为仅本进程窗口、关窗返回 -1，见 MoonBit 文档
@@ -27,6 +31,7 @@
 #import <IOKit/pwr_mgt/IOPMLib.h>
 #import <cups/cups.h>
 
+#import <IOBluetooth/IOBluetooth.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <Foundation/Foundation.h>
 
@@ -375,14 +380,60 @@ extern "C" int32_t yue_mbt_wmi_brightness_set(int32_t, int32_t *ok) {
   return -1000;
 }
 
+// ---- 蓝牙：IOBluetooth 只读快照 ----
+//
+// macOS 只提供「本机无线电 + 已配对设备」的只读视图：
+//   - 无线电：IOBluetoothHostController 的 nameAsString / addressAsString /
+//     powerState。协议比 Windows 多一个 powered 字段（Windows 侧是「枚举
+//     得到即可打开」的近似，macOS 能读到真实电源态）。
+//   - 设备：IOBluetoothDevice.pairedDevices，只有已配对设备（macOS 不向
+//     第三方暴露发现缓存），故 connected 之外两列恒为 1，与 Windows
+//     「只列已知设备缓存、不触发扫描」同口径。
+// 动作族（开关电源、扫描、连接、配对）需要异步委托或非公开接口，保持
+// 哨兵，MoonBit 侧显式 Unsupported。
+
 extern "C" void *yue_mbt_bt_radio_info(int32_t *ok) {
-  *ok = -1000;
-  return EmptyBytes();
+  *ok = 0;
+  IOBluetoothHostController *hc = [IOBluetoothHostController defaultController];
+  NSString *addr = hc == nil ? nil : [hc addressAsString];
+  // 蓝牙硬件缺席时控制器仍非 nil，但地址为空或全零
+  if (addr == nil || [addr length] == 0 ||
+      [addr isEqualToString:@"00:00:00:00:00:00"]) {
+    *ok = 1; // 无可用无线电：ok=1 空文本（与 Windows 同口径 → Unsupported）
+    return BytesFromString("");
+  }
+  NSString *name = [hc nameAsString];
+  std::string out = std::string(name == nil ? "" : [name UTF8String]);
+  out += '\t';
+  out += [addr UTF8String];
+  out += '\t';
+  out += ([hc powerState] == kBluetoothHCIPowerStateON) ? "1" : "0";
+  *ok = 1;
+  return BytesFromString(out);
 }
 
 extern "C" void *yue_mbt_bt_devices(int32_t *ok) {
-  *ok = -1000;
-  return EmptyBytes();
+  *ok = 0;
+  NSArray *paired = [IOBluetoothDevice pairedDevices];
+  std::string out;
+  for (IOBluetoothDevice *d in paired) {
+    NSString *name = [d name];
+    NSString *addr = [d addressString];
+    if (addr == nil) {
+      continue;
+    }
+    if (!out.empty()) {
+      out += '\n';
+    }
+    out += name == nil ? "" : [name UTF8String];
+    out += '\t';
+    out += [addr UTF8String];
+    out += '\t';
+    out += [d isConnected] ? "1" : "0";
+    out += "\t1\t1"; // pairedDevices 里的都是已配对、可重连（信任）设备
+  }
+  *ok = 1;
+  return BytesFromString(out);
 }
 
 // ---- 音量：Core Audio 默认输出设备（kAudioDevicePropertyVolumeScalar /

@@ -108,9 +108,10 @@ if(APPLE)
   find_library(OD OpenDirectory)
   find_library(COREAUDIO CoreAudio)
   find_library(CUPS cups)
+  find_library(IOBLUETOOTH IOBluetooth)
   target_link_libraries(yue_mbt PUBLIC
     ${APPKIT} ${CARBON} ${IOKIT} ${SECURITY} ${WEBKIT} ${OD}
-    ${COREAUDIO} ${CUPS})
+    ${COREAUDIO} ${CUPS} ${IOBLUETOOTH})
   target_compile_definitions(yue_mbt PUBLIC SYSTEM_NATIVE_UTF8)
   target_compile_options(yue_mbt PRIVATE
     -Wno-deprecated-declarations -Wno-unguarded-availability-new)

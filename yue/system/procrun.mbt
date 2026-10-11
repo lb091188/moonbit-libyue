@@ -68,8 +68,9 @@ pub extend ProcError with Show::{to_string, output}
 let pr_tmp_counter : Ref[Int] = Ref(0)
 
 ///|
-/// 临时输出文件路径（Linux 读 $TMPDIR 缺省 /tmp；Windows 读 %TEMP% 缺省
-/// 当前目录）。
+/// 临时输出文件路径（Linux / macOS 读 $TMPDIR 缺省 /tmp、分隔符 /；
+/// Windows 读 %TEMP% 缺省当前目录、分隔符 \）。三平台之外的路径走
+/// POSIX 兜底，但那些平台在 [pr_run] 入口已被 Unsupported 拦下。
 fn pr_tmp_path(tag : String) -> String {
   pr_tmp_counter.val = pr_tmp_counter.val + 1
   let env_name = match @yue.platform() {

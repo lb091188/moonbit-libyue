@@ -249,6 +249,224 @@ test "MediaWatcher：建/运行中/停止 语义" {
   inspect(w.is_running(), content="false")
 }
 
+// ---------------------------------------------------------------------------
+// macOS 路径白盒测试：osascript 脚本拼装与输出解析（纯函数，无 macOS
+// 真机也能测；不执行任何 osascript / pgrep 命令）
+// ---------------------------------------------------------------------------
+
+///|
+/// 取 osascript 参数表（测试辅助：无命令时给空表，后续下标断言即失败）。
+fn media_mac_test_args(app : String, c : MediaCmd) -> Array[String] {
+  match media_mac_as_args(app, c) {
+    Some(a) => a
+    None => []
+  }
+}
+
+///|
+test "media_mac_candidates：三款候选 App 与候选判定" {
+  let apps = media_mac_candidates()
+  inspect(apps.length(), content="3")
+  inspect(apps[0], content="Music")
+  inspect(apps[1], content="Spotify")
+  inspect(apps[2], content="iTunes")
+  for app in apps {
+    assert_true(media_mac_is_candidate(app))
+  }
+  // 非候选一律拒收（MPRIS 总线名 / 大小写不符 / 空串），避免拼进脚本
+  assert_true(!media_mac_is_candidate("org.mpris.MediaPlayer2.vlc"))
+  assert_true(!media_mac_is_candidate("music")) // 大小写敏感
+  assert_true(!media_mac_is_candidate("VLC"))
+  assert_true(!media_mac_is_candidate(""))
+}
+
+///|
+test "media_mac_state_args：三款 App 的状态查询脚本" {
+  for app in media_mac_candidates() {
+    let args = media_mac_state_args(app)
+    inspect(args.length(), content="2")
+    inspect(args[0], content="-e")
+    let script = args[1]
+    assert_true(script.contains("tell application \"\{app}\" to get "))
+    assert_true(script.contains("player state"))
+    assert_true(script.contains("name of current track"))
+    assert_true(script.contains("artist of current track"))
+    assert_true(script.contains("album of current track"))
+  }
+  inspect(
+    media_mac_state_args("Music")[1],
+    content="tell application \"Music\" to get {player state, name of current track, artist of current track, album of current track}",
+  )
+}
+
+///|
+test "media_mac_as_args：控制命令脚本表（Spotify 无 stop）" {
+  for app in ["Music", "iTunes"] {
+    assert_eq(
+      media_mac_test_args(app, MediaCmdPlay)[1],
+      "tell application \"\{app}\" to play",
+    )
+    assert_eq(
+      media_mac_test_args(app, MediaCmdPause)[1],
+      "tell application \"\{app}\" to pause",
+    )
+    assert_eq(
+      media_mac_test_args(app, MediaCmdPlayPause)[1],
+      "tell application \"\{app}\" to playpause",
+    )
+    assert_eq(
+      media_mac_test_args(app, MediaCmdNext)[1],
+      "tell application \"\{app}\" to next track",
+    )
+    assert_eq(
+      media_mac_test_args(app, MediaCmdPrevious)[1],
+      "tell application \"\{app}\" to previous track",
+    )
+    assert_eq(
+      media_mac_test_args(app, MediaCmdStop)[1],
+      "tell application \"\{app}\" to stop",
+    )
+    // 参数表恒为 [osascript 的 -e, 脚本]
+    inspect(media_mac_test_args(app, MediaCmdPlay)[0], content="-e")
+    inspect(media_mac_test_args(app, MediaCmdPlay).length(), content="2")
+  }
+  // Spotify 其余命令照常，唯独 stop 无命令（字典里没有，不退化成 pause）
+  inspect(
+    media_mac_test_args("Spotify", MediaCmdPlayPause)[1],
+    content="tell application \"Spotify\" to playpause",
+  )
+  inspect(
+    media_mac_test_args("Spotify", MediaCmdNext)[1],
+    content="tell application \"Spotify\" to next track",
+  )
+  assert_true(media_mac_as_args("Spotify", MediaCmdStop) is None)
+}
+
+///|
+test "media_mac_parse_status：状态输出解析（含曲名带逗号）" {
+  // 正常四段（AppleScript 列表转文本为「英文逗号 + 空格」分隔）
+  assert_eq(
+    media_mac_parse_status("playing, 晴天, 周杰伦, 叶惠美\n"),
+    Some(("playing", "晴天", "周杰伦", "叶惠美")),
+  )
+  // 曲名带逗号：从后往前取 album / artist，其余归 title
+  assert_eq(
+    media_mac_parse_status("playing, 你好, 再见, 周杰伦, 叶惠美"),
+    Some(("playing", "你好, 再见", "周杰伦", "叶惠美")),
+  )
+  // 曲名带逗号的另一种形态：逗号后无空格。
+  // 注意 AppleScript 列表转文本无法区分「字段内的逗号」与「分隔符」，
+  // 多段回拼时统一按 ", " 还原，故这里的 title 是 "A, B" 而非 "A,B"
+  // ——这是协议自带的信息损失，不是解析 bug。
+  assert_eq(
+    media_mac_parse_status("paused, A,B, 歌手, 专辑"),
+    Some(("paused", "A, B", "歌手", "专辑")),
+  )
+  // 只有 player state（无曲目信息）：曲目三字段留空
+  assert_eq(media_mac_parse_status("paused"), Some(("paused", "", "", "")))
+  assert_eq(media_mac_parse_status("stopped\n"), Some(("stopped", "", "", "")))
+  // 不足三段：按 title → artist → album 依次填入
+  assert_eq(
+    media_mac_parse_status("playing, 晴天, 周杰伦"),
+    Some(("playing", "晴天", "周杰伦", "")),
+  )
+  assert_eq(
+    media_mac_parse_status("playing, 晴天"),
+    Some(("playing", "晴天", "", "")),
+  )
+  // 空字段（曲目信息为空串）
+  assert_eq(
+    media_mac_parse_status("playing, , , "),
+    Some(("playing", "", "", "")),
+  )
+  // 空输出 → 不可解析
+  assert_true(media_mac_parse_status("") is None)
+  assert_true(media_mac_parse_status("   \n") is None)
+  // 无曲目时 AppleScript 报错，输出为错误文本（首段不是播放态）
+  assert_true(
+    media_mac_parse_status(
+      "execution error: Music got an error: Can't get name of current track. (-1728)",
+    ) is None,
+  )
+  // 错误文本里带逗号同样不可解析
+  assert_true(
+    media_mac_parse_status(
+      "execution error: Spotify got an error: Can't get player state, (-1728)",
+    ) is None,
+  )
+}
+
+///|
+test "media_mac_state_text：小写 player state 规范化后仍走 media_playback_of" {
+  inspect(media_mac_state_text("playing"), content="Playing")
+  inspect(media_mac_state_text("paused"), content="Paused")
+  inspect(media_mac_state_text("stopped"), content="Stopped")
+  // 容忍首尾空白；已是大写形态原样返回
+  inspect(media_mac_state_text(" playing\n"), content="Playing")
+  inspect(media_mac_state_text("Playing"), content="Playing")
+  // 未知文本 trim 后原样返回，交给 media_playback_of 收进 MediaUnknown
+  inspect(media_mac_state_text("rewinding"), content="rewinding")
+  inspect(media_mac_state_text(""), content="")
+  // 规范化后必须能被 media_playback_of 识别（不绕过该映射）
+  for raw in ["playing", "paused", "stopped"] {
+    match media_playback_of(media_mac_state_text(raw)) {
+      MediaUnknown(t) =>
+        assert_true(false, msg="\{raw} 规范化后不应是 MediaUnknown(\{t})")
+      _ => ()
+    }
+  }
+  inspect(
+    media_playback_of(media_mac_state_text("playing")),
+    content="MediaPlaying",
+  )
+  inspect(
+    media_playback_of(media_mac_state_text("paused")),
+    content="MediaPaused",
+  )
+  inspect(
+    media_playback_of(media_mac_state_text("stopped")),
+    content="MediaStopped",
+  )
+  // 未规范化的小写原文仍是 Unknown（说明规范化这一步不可或缺）
+  inspect(media_playback_of("playing"), content="MediaUnknown(playing)")
+}
+
+///|
+test "media_first_line：stderr 压单行截断" {
+  assert_eq(media_first_line("ok\n"), "ok")
+  assert_eq(media_first_line("line1\nline2\n"), "line1")
+  assert_eq(media_first_line(""), "")
+  let long = StringBuilder()
+  let mut i = 0
+  while i < 200 {
+    long.write_char('x')
+    i += 1
+  }
+  assert_eq(media_first_line(long.to_string()).length(), 120)
+}
+
+///|
+test "media macOS 真机只读冒烟：players 与 status（非 macOS 跳过）" {
+  if @yue.platform() != "macos" {
+    println("media mac: skip (非 macOS)")
+    return
+  }
+  println("media_supported: \{media_supported()}")
+  match media_players() {
+    Ok(players) =>
+      for p in players {
+        println("media player: \{p.identity} (\{p.name})")
+        match media_status(p.name) {
+          Ok(s) => println("media status: \{s}")
+          Err(e) => println("media_status(\{p.name}) failed: \{e}")
+        }
+      }
+    Err(NoPlayer) => println("media: 三款候选 App 都没在运行")
+    Err(Unsupported) => println("media: 平台不支持")
+    Err(e) => println("media_players failed: \{e}")
+  }
+}
+
 ///|
 test "media 真机冒烟：监视启动后立停不崩（无播放器环境跳过触发）" {
   if @yue.platform() != "linux" {
