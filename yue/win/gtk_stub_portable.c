@@ -72,6 +72,9 @@ void wm_request_focus(int64_t id) { (void)id; }
 void wm_im_set_surrounding(int64_t id, const char *text, int caret) {
   (void)id; (void)text; (void)caret;
 }
+int wm_sys_color_scheme(char *out, int cap) { (void)out; (void)cap; return 0; }
+int wm_sys_accent(char *out, int cap) { (void)out; (void)cap; return 0; }
+
 void wm_set_cursor(int64_t id, int kind) {
   (void)id; (void)kind;
 }

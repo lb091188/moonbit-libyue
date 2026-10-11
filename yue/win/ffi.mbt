@@ -90,6 +90,17 @@ extern "c" fn wm_im_set_surrounding(
 ) -> Unit = "wm_im_set_surrounding"
 
 ///|
+#borrow(out)
+extern "c" fn wm_sys_color_scheme(
+  out : Bytes,
+  cap : Int,
+) -> Int = "wm_sys_color_scheme"
+
+///|
+#borrow(out)
+extern "c" fn wm_sys_accent(out : Bytes, cap : Int) -> Int = "wm_sys_accent"
+
+///|
 extern "c" fn wm_set_cursor(id : Int64, kind : Int) -> Unit = "wm_set_cursor"
 
 ///|

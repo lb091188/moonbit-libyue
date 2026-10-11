@@ -4,7 +4,10 @@
 //   自绘，色板就是绘制时读取的唯一来源，深浅切换不需要重建原生控件样式；
 // - **没有 `ffi_repaint_all` 整体重绘兜底**——重绘由窗口层与各控件自己的
 //   订阅路径负责（随组件批次一起接）；
-// - `theme_from_system`（跟随系统深浅与主色）依赖系统集成层，本批未接。
+// - `theme_from_system` 不读原生控件的样式表，而是读桌面环境的深浅偏好与主色
+//   （Linux 走 `yue/win` 的 gsettings 探针），见本文件末尾；
+// - 系统偏好**轮询**（`theme_follow_system`）放在窗口层而不是本包：主题包不依赖
+//   平台后端与事件循环，反过来才会成环。
 
 ///|
 pub(all) struct Theme {
@@ -341,4 +344,41 @@ pub fn entry_ctrl_height(bordered : Bool) -> Double {
   let probe = @text.AttributedText::new("Ag", wrap=false)
   probe.set_font(@text.Font::new("Sans", 13.0))
   probe.get_bounds_for(10000.0, 1000.0).height + (if bordered { 2.0 } else { 0.0 })
+}
+
+///|
+/// 主题指纹（判断「要不要重刷」用）：主色与页面底色两档就够区分深浅与强调色。
+/// 公开给窗口层的跟随逻辑用（窗口层不读色板细节，只比对指纹）。
+pub fn theme_fingerprint_of(t : Theme) -> String {
+  t.primary + "/" + t.bg_page
+}
+
+///|
+/// 跟随系统的整套主题：深浅取 `sys_color_scheme`（"dark" 才算暗色，
+/// "light"/读不出都按亮色），主色取 `sys_accent`（系统没有主色概念时给空串，
+/// 回落预设的 primary）。
+pub fn theme_from_system(
+  sys_color_scheme : () -> String,
+  sys_accent : () -> String,
+) -> Theme {
+  let dark = sys_color_scheme() == "dark"
+  let accent = sys_accent()
+  if accent.length() > 0 {
+    theme_from_accent(accent, dark=dark)
+  } else if dark {
+    dark_theme()
+  } else {
+    default_theme()
+  }
+}
+
+///|
+/// 按系统偏好算一份主题并立即应用，返回算出的那份（便于调用方打日志）。
+pub fn theme_apply_system(
+  sys_color_scheme : () -> String,
+  sys_accent : () -> String,
+) -> Theme {
+  let t = theme_from_system(sys_color_scheme, sys_accent)
+  theme_apply(t)
+  t
 }

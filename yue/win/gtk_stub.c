@@ -736,6 +736,122 @@ int64_t wm_now_ms(void) {
   return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
+
+/* ---- 系统深浅偏好与主色（主题跟随系统用） ----
+ * 读 gsettings（GNOME 的 org.gnome.desktop.interface）：color-scheme 优先，
+ * 老版本退回 gtk-theme 名字里的 "-dark"。字符串写进调用方给的缓冲并返回长度，
+ * 0 表示读不到（非 GNOME 桌面、schema 不存在）——由 MoonBit 侧决定退路。
+ * GSettings 对象建一次常驻（每拍轮询新建/销毁会反复走 dconf）。 */
+typedef struct {
+  GSettings *s;
+  GSettingsSchema *schema;
+} GsHolder;
+
+static GsHolder gs_iface = { NULL, NULL };
+static GsHolder gs_prefs = { NULL, NULL };
+
+/* schema 存在才建 GSettings（非 GNOME 桌面上这些 schema 根本没有）；
+ * 建好就常驻，每拍轮询不重复走 dconf。 */
+static void gs_open(GsHolder *h, const char *name) {
+  if (h->schema != NULL) {
+    return;
+  }
+  GSettingsSchemaSource *src = g_settings_schema_source_get_default();
+  if (src == NULL) {
+    return;
+  }
+  h->schema = g_settings_schema_source_lookup(src, name, TRUE);
+  if (h->schema != NULL) {
+    h->s = g_settings_new(name);
+  }
+}
+
+static int gs_read(GsHolder *h, const char *key, char *out, int cap) {
+  if (out == NULL || cap < 1) {
+    return 0;
+  }
+  out[0] = '\0';
+  gs_open(h, h == &gs_iface ? "org.gnome.desktop.interface"
+                            : "org.gnome.desktop.wm.preferences");
+  if (h->s == NULL || !g_settings_schema_has_key(h->schema, key)) {
+    return 0;
+  }
+  gchar *v = g_settings_get_string(h->s, key);
+  if (v == NULL) {
+    return 0;
+  }
+  int n = (int)strlen(v);
+  if (n >= cap) {
+    n = cap - 1;
+  }
+  memcpy(out, v, (size_t)n);
+  out[n] = '\0';
+  g_free(v);
+  return n;
+}
+
+/* "dark" / "light" / ""（未知）。color-scheme 优先，老版本退回 gtk-theme 名。 */
+int wm_sys_color_scheme(char *out, int cap) {
+  if (out == NULL || cap < 1) {
+    return 0;
+  }
+  out[0] = '\0';
+  char buf[64];
+  if (gs_read(&gs_iface, "color-scheme", buf, (int)sizeof(buf)) > 0) {
+    if (strstr(buf, "dark") != NULL) {
+      return (int)strlen(strcpy(out, "dark"));
+    }
+    if (strstr(buf, "light") != NULL) {
+      return (int)strlen(strcpy(out, "light"));
+    }
+  }
+  if (gs_read(&gs_iface, "gtk-theme", buf, (int)sizeof(buf)) > 0) {
+    // 主题名里的 dark/light 大小写不一（Adwaita-dark、Orchis-Teal-Light-Compact）
+    for (int i = 0; buf[i] != '\0'; i++) {
+      buf[i] = (char)g_ascii_tolower(buf[i]);
+    }
+    if (strstr(buf, "dark") != NULL) {
+      return (int)strlen(strcpy(out, "dark"));
+    }
+    if (strstr(buf, "light") != NULL) {
+      return (int)strlen(strcpy(out, "light"));
+    }
+  }
+  return 0;
+}
+
+/* "#rrggbb" / ""（系统没有主色概念）。GNOME 的 accent-color 是**名字**
+ * （blue/teal…），查表转 hex；button-settings 里若直接写了十六进制就用它。 */
+int wm_sys_accent(char *out, int cap) {
+  if (out == NULL || cap < 1) {
+    return 0;
+  }
+  out[0] = '\0';
+  char buf[64];
+  int n = gs_read(&gs_prefs, "button-settings", buf, (int)sizeof(buf));
+  if (n > 0 && buf[0] == '#') {
+    return (int)strlen(strcpy(out, buf));
+  }
+  if (gs_read(&gs_iface, "accent-color", buf, (int)sizeof(buf)) > 0) {
+    struct Pair { const char *name; const char *hex; };
+    static const struct Pair table[] = {
+        { "blue", "#3584e4" },        { "teal", "#2190a4" },
+        { "green", "#3a944a" },       { "yellow", "#c88800" },
+        { "orange", "#ed5b00" },      { "red", "#da3450" },
+        { "pink", "#d56199" },        { "purple", "#9141ac" },
+        { "slate", "#6e7688" },       { "violet", "#7d6db8" },
+        { "summer-blue", "#6cb5d6" }, { "forest-green", "#6d8762" },
+        { "magenta", "#a1529c" },     { NULL, NULL },
+    };
+    for (int i = 0; table[i].name != NULL; i++) {
+      if (strcmp(buf, table[i].name) == 0) {
+        return (int)strlen(strcpy(out, table[i].hex));
+      }
+    }
+  }
+  return 0;
+}
+
 /* 本地时区的今天，打包成 年*10000 + 月*100 + 日（月/日 1 起始）。
  * 用日历时间 + localtime_r 走系统时区；失败返回 0，由 MoonBit 侧决定退路。 */
 int64_t wm_local_date(void) {

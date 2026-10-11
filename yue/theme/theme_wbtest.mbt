@@ -176,3 +176,31 @@ test "控件高度基准：常量与字体实测两路" {
   assert_eq(close(bordered - plain, 2.0, 0.001), true)
   assert_eq(plain >= 13.0, true)
 }
+
+///|
+test "theme_from_system：深浅与主色四态、指纹只在真变了时不同" {
+  let none = fn() -> String { "" }
+  let dark = fn() -> String { "dark" }
+  let light = fn() -> String { "light" }
+  let accent = fn() -> String { "#3584e4" }
+  let t_none = theme_from_system(none, none)
+  let t_dark = theme_from_system(dark, none)
+  let t_light = theme_from_system(light, none)
+  let t_accent = theme_from_system(dark, accent)
+  assert_eq(theme_fingerprint_of(t_none), theme_fingerprint_of(t_light))
+  assert_true(theme_fingerprint_of(t_dark) != theme_fingerprint_of(t_light))
+  // 主色非空即走派生公式：暗色底 + 强调色主色
+  assert_eq(t_accent.primary, theme_from_accent("#3584e4", dark=true).primary)
+  assert_eq(
+    theme_fingerprint_of(t_accent),
+    theme_fingerprint_of(theme_from_accent("#3584e4", dark=true)),
+  )
+  assert_true(theme_fingerprint_of(t_accent) != theme_fingerprint_of(t_dark))
+  // apply 之后 getter 与指纹都跟随新快照
+  let before = theme_primary()
+  let t = theme_apply_system(none, none)
+  assert_eq(theme_primary(), t.primary)
+  assert_eq(theme_fingerprint_of(theme_current()), theme_fingerprint_of(t))
+  theme_apply(default_theme())
+  assert_eq(theme_primary(), before)
+}

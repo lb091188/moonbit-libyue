@@ -39,6 +39,18 @@ pub(all) struct App {
 pub fn now_ms() -> Int64 { @win.now_ms() }
 
 ///|
+/// 系统深浅偏好（"dark" / "light" / ""）与系统主色（"#rrggbb" / ""）：
+/// 窗口层只读探针的转发（与 `local_ymd` 同理，示例与集成层不必引用平台包）。
+pub fn sys_color_scheme() -> String {
+  @win.sys_color_scheme()
+}
+
+///|
+pub fn sys_accent() -> String {
+  @win.sys_accent()
+}
+
+///|
 /// 本地时区的今天 (年, 月, 日)。平台给不出时返回 (0, 0, 0)——组件层据此退回
 /// 自己的兜底值，本层不猜日期。
 pub fn local_ymd() -> (Int, Int, Int) {
@@ -98,6 +110,35 @@ pub fn App::new(width : Int, height : Int, title : String) -> App? {
 ///|
 /// 把声明式节点树挂进根控件（内容入口）。挂载即建控件，之后信号驱动的
 /// 重挂走 `bind_node` 的原位替换；挂完标一次脏，下一帧就有内容。
+///|
+/// 跟随系统深浅/主色：每 `interval_ms` 读一次系统偏好，变了就 `theme_apply`
+/// （订阅了主题变更的组件即时重着色，不重建界面）。返回停表函数。
+///
+/// 放在窗口层而不是 `yue/theme`：主题包不该反过来依赖平台后端与事件循环。
+/// 桌面环境没有对应通道（非 GNOME、或 schema 缺键）时读出来是空串，
+/// 于是按亮色预设走，且此后每拍都不变、不会反复重刷。
+pub fn App::follow_system_theme(self : App, interval_ms? : Int = 1000) -> () -> Unit {
+  let running : Ref[Bool] = Ref(true)
+  let tick : Ref[() -> Unit] = Ref(fn() { () })
+  tick.val = fn() -> Unit {
+    if !running.val || !self.is_running() {
+      running.val = false
+      return
+    }
+    let t = @theme.theme_from_system(
+      fn() -> String { @win.sys_color_scheme() },
+      fn() -> String { @win.sys_accent() },
+    )
+    if @theme.theme_fingerprint_of(t) != @theme.theme_fingerprint_of(@theme.theme_current()) {
+      @theme.theme_apply(t)
+    }
+    let _ = self.timer(interval_ms, tick.val)
+  }
+  (tick.val)()
+  fn() -> Unit { running.val = false }
+}
+
+///|
 pub fn App::mount(self : App, children : Array[Node]) -> Unit {
   mount_children(self.root, children)
   // 新挂的内容会排在浮层图层之后，把图层挪回最后（浮层始终在上）

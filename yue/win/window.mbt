@@ -174,3 +174,27 @@ pub fn Window::close(self : Window) -> Unit {
   wm_close(self.id)
   self.id = -1L
 }
+
+///|
+/// 把 C 侧写进缓冲的短字符串读回来（空/读不到都给空串）。
+fn sys_read(f : (Bytes, Int) -> Int) -> String {
+  let buf = Bytes::new(64)
+  let n = f(buf, 64)
+  if n <= 0 {
+    ""
+  } else {
+    @utf8.decode_lossy(buf[0:n])
+  }
+}
+
+///|
+/// 系统深浅偏好："dark" / "light" / ""（读不出，例如非 GNOME 桌面或键不存在）。
+pub fn sys_color_scheme() -> String {
+  sys_read(wm_sys_color_scheme)
+}
+
+///|
+/// 系统主色（`#rrggbb`）；系统没有「主色」概念时给空串。
+pub fn sys_accent() -> String {
+  sys_read(wm_sys_accent)
+}
