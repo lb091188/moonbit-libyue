@@ -130,7 +130,16 @@
   - [x] prebuild 缺 webkit 开发包时编「无宏」占位分支（探测返回不可用）而不是链接失败；链接顺序 `-lyue_web` 在 `-lyue_win_stub` 前
   - [x] 回证：`yue/web` 无头 2/2（矩形取整与去重键、探测与构造一致且未挂载零句柄）、`yue/win`/`yue/web`/`examples/native-web` `--deny-warn` 零警告、全仓红点 287/68 未增；真窗口两种摆法 `NATIVE-WEB-GEO pane=262,71,848x605 sidebar=12,71,240x605`（分栏）→ `pane=12,71,1098x605 sidebar=12,71,0x0`（整页），`title='Example Domain' url='https://example.com/'` 证明真渲染，截图复核
   - [ ] 待使用者肉眼复验：网页内滚动与点链接、webview 聚焦时本栈纯通道 IME 是否让位（离开即恢复）
-- [ ] **批 C JS 桥 + DOM 抓取 + 导航面**：`evaluate_javascript`/`add_user_script`/双向通道（原生→网页 evaluate、网页→原生 invoke）/UA 改写 + cookie 读写 + 按 profile 分数据目录（**profile 挂 pane 级参数**，键 `<bundle-id>.<profile>`）/`browser_profile_persistence() -> Persistent | EphemeralOnly` 探测（降级不静默）/自定义协议**按 context 注册**/前进后退刷新与标题 URL 回调/`window.open` 策略/下载回调/权限默认拒绝可转原生提示/web 进程崩溃回调；契约沿用旧链 `yue/browser/browser.mbt` 的 22+6 方法名，协议载荷改**结构化返回**（CORE1 越界读教训）；抓取只要 DOM，不做网络响应层；**可见性开关接口预留但不实现**
+- [x] **批 C JS 桥 + DOM 抓取 + 导航面**：契约沿用旧链 `yue/browser/browser.mbt` 的 22+6 方法名，但协议载荷改结构化返回（不回旧 ABI 裸字节）
+  - [x] 双向通道：原生→网页 `execute_javascript` / `execute_javascript_with_result`（回包按请求序号配对）；网页→原生 `add_raw_binding(name)` 注入 shim 后页面直接调 `name(payload)`，载荷 JSON 化进 `on_invoke`
+  - [x] DOM 抓取四档（正文/链接/meta/结构）：`dom_script` + `dom_parse` 两只纯函数，回包 JSON 走 `@sys` 零依赖解析器折成 `DomSnapshot`；解析失败 `ok=false` 且 raw 留着（不静默）
+  - [x] 导航面：`load_url`/`load_html`/`reload`/`stop`/`go_back`/`go_forward`/`can_go_back`/`can_go_forward`/`is_loading`/`get_url`/`get_title` + 事件流（导航开始/提交/完成、标题、地址、加载失败）
+  - [x] 引擎原生开关：`set_user_agent`、`get_cookies_for_url`（异步回包 JSON）、profile 挂 pane 级（`WebviewOptions.profile` → website data manager）、`browser_profile_persistence() -> Persistent | EphemeralOnly`；`webview_signal_mask()` 报可选信号在位
+  - [x] 策略面：新窗（`window.open`）默认拦下并回报、可切「在当前 pane 导航」；权限**默认拒绝**并回报请求类名；下载默认放行可切拦下；web 进程终止回报 + `is_crashed()`
+  - [x] pane 级可见性开关 `set_visible`（爬虫后台要的「不可见」在窗口层那条留给后续）；`remove_binding`/`remove_all_user_scripts` 恒 false 并写明是引擎没有注销口
+  - [x] 异步事件形态定案：per-view 32 格环形队列 + `@core.set_timeout` 排期泵（**不挂绘制**），C 侧不回调 MoonBit
+  - [x] 回证：`yue/web` 无头 11/11（脚本配平、四档解析、失败不静默、未挂载全安全、kind→事件逐条、回包序号配对、invoke 双路、探测一致）、`--deny-warn` 零警告、全仓红点 287/68 未增；真窗口 `NATIVE-WEB-JS binding=1 evals=1 dom_ok=4 dom_bad=0 links=3 text_bytes=68 meta=1 headings=2 elements=14 invokes=1 navs=2 perms=1 wins=1 crashes=0 cookie_bytes=2`，合成截图见「已被原生改过」+ 三条事件流水（回话/权限拒绝/新窗拦下）
+  - [ ] 批 C 余项（随后续批按需接）：自定义协议流式回灌（`register_protocol`，旧链有、本栈未接）、`on_start|fail_navigation` 的细粒度 reason、跨窗共享的 cookie 同步
 - [ ] **批 D 媒体播放器**（可与 B/C 并行）：复用 `modules/ffmpeg-mbt`（零 libyue 依赖，已有 `decode_rgba`/`decode_pcm`/`seek`/`duration_s`/`video_fps`）+ `modules/yue-media` 内嵌的 miniaudio 设备层；**CPU 回灌 + 软解**（RGBA → `yue/render` 的 `Bitmap` → Painter 合成，本档位不做硬解与 GPU 合成）；新写播放器 UI（悬浮控制条/进度与音量/倍速/字幕叠加/seek 防抖）+ 音频时钟与同步；旧链坑照 adaptation.md 逐条验收（音画不同轴、seek 后进度从零重涨、换载崩溃）
 - [ ] **批 E 原生弹层窗口**：自绘 overlay 的「原生档」（`yue/win` 目前无 popup/transient API）——浮层（下拉/右键菜单/tooltip/toast/对话框）走原生窗口，不用自绘像素盖 webview
 - 积木原则：一个能力一个接口、可单独不用；能力之间不互相依赖（webview 不依赖媒体层，反之亦然，两者只依赖窗口/布局/事件层）；框架只给原语不给产品（爬虫框架、站点适配、内容解析、开发者面板、页面脚本库不进库）；每项能力给探测 + 语义化降级；新 API 一律走 `Painter`/`Bitmap` 门面

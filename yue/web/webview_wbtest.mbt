@@ -54,3 +54,122 @@ test "探测与构造一致：supported 决定 webview_new 给不给对象" {
     }
   }
 }
+
+///|
+test "未挂载时所有调用都是安全的空操作" {
+  let v = match webview_open(fake_app(), webview_options("https://e.x/")) {
+    None => return
+    Some(x) => x
+  }
+  let log : Array[String] = []
+  v.on_event = Some(fn(e : WebEvent) -> Unit {
+    match e {
+      TitleChanged(t) => log.push("title:" + t)
+      CloseRequested => log.push("close")
+      Unknown(k, _) => log.push("unknown:" + k.to_string())
+      _ => log.push("other")
+    }
+  })
+  v.load_url("https://e.x/b")
+  v.reload()
+  v.stop()
+  v.go_back()
+  v.go_forward()
+  v.set_user_agent("UA/1")
+  v.set_new_window_policy(true)
+  v.set_permission_mode(true)
+  v.set_download_mode(false)
+  v.set_visible(false)
+  v.get_cookies_for_url("https://e.x/")
+  v.execute_javascript("1+1")
+  assert_eq(v.can_go_back(), false)
+  assert_eq(v.can_go_forward(), false)
+  assert_eq(v.is_crashed(), false)
+  assert_eq(v.has_bindings(), false)
+  // 需要句柄的三条在未挂载时一律给 false / -1，而不是崩
+  assert_eq(v.add_user_script("x"), false)
+  assert_eq(v.add_raw_binding("native_echo"), false)
+  assert_eq(v.capture_dom(PageText, fn(_s : DomSnapshot) -> Unit { () }), false)
+  assert_eq(v.execute_javascript_with_result("1", fn(_r : String) -> Unit { () }), -1L)
+  // 地址是记下来的（挂载时才交给引擎）
+  assert_eq(v.url, "https://e.x/b")
+  assert_eq(log.length(), 0)
+}
+
+///|
+test "事件分派：kind 映射逐条对上，JS 回包按序号配对后出队" {
+  let v = match webview_new(fake_app(), "about:blank") {
+    None => return
+    Some(x) => x
+  }
+  let log : Array[String] = []
+  v.on_event = Some(fn(e : WebEvent) -> Unit {
+    match e {
+      TitleChanged(t) => log.push("title:" + t)
+      NavFinished(t) => log.push("finish:" + t)
+      Permission(t) => log.push("perm:" + t)
+      Download(t) => log.push("dl:" + t)
+      NewWindow(t) => log.push("win:" + t)
+      Cookies(t) => log.push("cookies:" + t)
+      ProcessTerminated(t) => log.push("crash:" + t)
+      CloseRequested => log.push("close")
+      Unknown(k, t) => log.push("unknown:" + k.to_string() + ":" + t)
+      _ => log.push("other")
+    }
+  })
+  v.dispatch(1, 0L, "标题")
+  v.dispatch(5, 0L, "https://e.x/")
+  v.dispatch(9, 0L, "GeolocationPermissionRequest")
+  v.dispatch(10, 0L, "https://e.x/f.zip")
+  v.dispatch(8, 0L, "https://e.x/open")
+  v.dispatch(13, 0L, "[]")
+  v.dispatch(11, 0L, "reason=1")
+  v.dispatch(12, 0L, "")
+  v.dispatch(77, 0L, "x")
+  assert_eq(
+    log,
+    [
+      "title:标题",
+      "finish:https://e.x/",
+      "perm:GeolocationPermissionRequest",
+      "dl:https://e.x/f.zip",
+      "win:https://e.x/open",
+      "cookies:[]",
+      "crash:reason=1",
+      "close",
+      "unknown:77:x",
+    ],
+  )
+  // JS 回包：命中等待者就回调一次并出队，没命中只当事件走旁路
+  let got : Array[String] = []
+  v.eval_waiters.push((4L, fn(r : String) -> Unit { got.push("4:" + r) }))
+  v.dispatch(7, 4L, "hello")
+  v.dispatch(7, 4L, "again")
+  assert_eq(got, ["4:hello"])
+  assert_eq(v.eval_waiters.length(), 0)
+}
+
+///|
+test "invoke 通道：页面载荷直达 on_invoke，旁路也看得到" {
+  let v = match webview_new(fake_app(), "about:blank") {
+    None => return
+    Some(x) => x
+  }
+  let hits : Array[String] = []
+  let seen : Array[Int] = []
+  v.on_invoke = Some(fn(p : String) -> Unit { hits.push(p) })
+  v.on_event = Some(fn(_e : WebEvent) -> Unit { seen.push(1) })
+  v.dispatch(6, 0L, "{\"msg\":\"hi\"}")
+  v.dispatch(6, 0L, "第二段")
+  assert_eq(hits, ["{\"msg\":\"hi\"}", "第二段"])
+  assert_eq(seen.length(), 2)
+}
+
+///|
+test "持久化探测与信号掩码：不可用引擎不会谎报可持久" {
+  match browser_profile_persistence() {
+    Persistent => assert_eq(webview_supported(), true)
+    EphemeralOnly => ()
+  }
+  assert_true(webview_signal_mask() >= 0)
+}
