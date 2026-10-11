@@ -527,6 +527,8 @@ pub fn App::step(self : App) -> Bool {
     if a.dirty {
       a.paint_frame()
     }
+    // 原生档浮层：首帧后按内容实测尺寸收框（最多三帧，见 overlay_native.mbt）
+    overlay_fit_pass(a)
   }
   self.is_running()
 }
@@ -543,6 +545,7 @@ fn App::drain_events(self : App) -> Unit {
       }
       @win.NeedsDraw => self.dirty = true
       @win.Resized => self.dirty = true
+      @win.LostFocus => overlay_on_lost_focus(self)
       @win.Input => {
         match self.window.take_input() {
           Some(ev) => self.route(ev)
@@ -588,6 +591,7 @@ pub fn App::shutdown(self : App) -> Unit {
     a.closed = true
     a.window.close()
   }
+  overlay_close_all_native()
   self.running = false
   if !self.closed {
     self.closed = true

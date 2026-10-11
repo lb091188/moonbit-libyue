@@ -299,6 +299,8 @@ fn main {
           l.quit()
           keep = false
         }
+        // 失焦（批 E 的浮层用它收起，本基准页只排空不动作）
+        @win.Event::LostFocus => ()
         @win.Event::NeedsDraw => dirty.val = true
         @win.Event::Resized => dirty.val = true
         @win.Event::Input => {

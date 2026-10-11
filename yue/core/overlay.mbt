@@ -99,10 +99,11 @@ fn overlay_host() -> OverlayHost? {
 ///|
 /// 已开浮层数（诊断与测试用）。
 pub fn overlay_count() -> Int {
-  match overlay_host() {
+  let layer_n = match overlay_host() {
     Some(h) => h.items.length()
     None => 0
   }
+  layer_n + overlay_native_count()
 }
 
 ///|
@@ -138,10 +139,12 @@ pub fn overlay_top_id() -> Int {
 ///|
 /// 图层当前是否可见（有浮层就该可见）。
 pub fn overlay_visible() -> Bool {
-  match overlay_host() {
+  let native = overlay_native_count() > 0
+  let layer = match overlay_host() {
     Some(h) => h.layer.visible
     None => false
   }
+  native || layer
 }
 
 ///|
@@ -151,6 +154,12 @@ pub fn overlay_show_at(content : Node, x : Double, y : Double) -> Int {
   match overlay_host() {
     None => 0
     Some(h) => {
+      let cid = overlay_cid()
+      if overlay_native_tier() && overlay_native_open(cid, content, x, y, 0.0, 0.0) {
+        // 原生档：所在窗有网页区，图层盖不住，改开真窗口（见 overlay_native.mbt）
+        invalidate()
+        return cid
+      }
       if h.items.length() == 0 {
         h.layer.set_visible(true)
       }
@@ -162,7 +171,6 @@ pub fn overlay_show_at(content : Node, x : Double, y : Double) -> Int {
       wrap.node.set_top(@yoga.fixed(y - h.layer.rect.y))
       let _ = content.mount_into(wrap)
       h.layer.append_child(wrap)
-      let cid = overlay_cid()
       h.items.push((cid, wrap))
       invalidate()
       cid
@@ -177,6 +185,28 @@ pub fn overlay_show_full(content : Node) -> Int {
   match overlay_host() {
     None => 0
     Some(h) => {
+      let cid = overlay_cid()
+      if overlay_native_tier() {
+        // 铺满档（对话框遮罩）在原生档下按 owner 的内容区大小开一扇窗
+        match host_active() {
+          None => return 0
+          Some(a) => {
+            let (sw, sh) = a.window.size()
+            if overlay_native_open(
+              cid,
+              content,
+              0.0,
+              0.0,
+              sw.to_double(),
+              sh.to_double(),
+            ) {
+              invalidate()
+              return cid
+            }
+            return 0
+          }
+        }
+      }
       if h.items.length() == 0 {
         h.layer.set_visible(true)
       }
@@ -189,7 +219,6 @@ pub fn overlay_show_full(content : Node) -> Int {
       wrap.node.set_bottom(@yoga.fixed(0.0))
       let _ = content.mount_into(wrap)
       h.layer.append_child(wrap)
-      let cid = overlay_cid()
       h.items.push((cid, wrap))
       invalidate()
       cid
@@ -200,6 +229,11 @@ pub fn overlay_show_full(content : Node) -> Int {
 ///|
 /// 关掉指定浮层（句柄 0 或不存在时空操作）；关完最后一层就收起图层。
 pub fn overlay_hide(id : Int) -> Unit {
+  if overlay_native_close(id) {
+    // 原生档：关掉那扇弹层窗就完事，不碰图层栈
+    invalidate()
+    return
+  }
   match overlay_host() {
     None => ()
     Some(h) => {
@@ -235,6 +269,7 @@ pub fn overlay_hide_top() -> Unit {
 ///|
 /// 关掉全部浮层。
 pub fn overlay_clear() -> Unit {
+  overlay_close_all_native()
   match overlay_host() {
     Some(h) => {
       for it in h.items {

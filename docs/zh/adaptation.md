@@ -751,6 +751,16 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **macOS 的 `kVK_*` 只覆盖特殊键**：Return/Tab/Space/退格/ForwardDelete/Home/End/PageUp/PageDown/方向/F1-F12/小键盘——字母与数字**故意不映射**（mac 的字符要由事件带的 Unicode 文本给，键盘布局由系统解析）。另外 mac 的 `kVK_Delete`(51) 其实是**退格**、`kVK_ForwardDelete`(117) 才是删除，这条最容易记反，断言里两条都钉了。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/core` **78/78**（新增 7 条：三平台修饰位含「GDK lock 位不算修饰键」「Windows 按钮位不混进修饰位」、Win VK 表（字母/数字/控制/功能/小键盘/未知给 0）、shift 折算（字母看 shift 异或 caps、数字符号查表、表外原样）、mac VK 表（退格与删除分别钉）、按钮号（Win `MK_*` 与 mac `buttonNumber` 都折成 1 左 2 中 3 右）、路由表六条规则、reset 与 surrounding 的触发条件）；`moon check yue/core` `--deny-warn` 零警告；全仓红点仍 287 errors / 68 warnings。本批**没有真机回证**（全是纯函数），后端接线随 Windows 地基与 mac 真机走。
 
+### MoonBit 原生 GUI 栈 · 浮层的原生档（批 E 余项：`yue/core/overlay_native.mbt`）
+
+- **档位只看一件事**：所在窗有没有已挂载的原生子件（`Window::has_child_surfaces()`，读 C 侧槽表 `wm_window_surface_count`）。有网页区就整层改走真窗口，没有就继续走图层——判据放在 C 侧的槽表而不是 MoonBit 记账，省掉一套会漏销的计数器。六件浮层（tooltip/下拉/右键菜单/对话框/轻提示/悬浮卡）都经 `overlay_show_at`/`overlay_show_full`，所以档位切换在一处生效。
+- **原生表不放进 `OverlayHost`**：宿主归 `App`，宿主再持 `App` 就是引用环；弹层表放进程级 `Map[句柄, App]`，`overlay_hide`/`overlay_clear`/退出清理都走它。
+- **「先开框、量完内容再收框」踩到两条 GTK 事实**：① 绘制区的 `gtk_widget_set_size_request` 是窗口的**最小内容尺寸**（建窗时按初始大小设的），不改它直接 `gtk_window_resize` 就缩不回初始以下——浮层量完内容会留一圈死边；② `set_resizable(FALSE)` 会让程序化 `gtk_window_resize` 被整个忽略（无边框窗用户本来就拖不动，所以设 TRUE 没有副作用）。两条都在 `wm_window_set_size` 里一起处理。
+- **「失焦即收起」在映射期会误触发，默认关**（对照实验）：开着时弹层约两秒自关，而内容里的「收起」从没被点过（`hides=0` 证明不是我们主动收的）；把开关关掉后同一序列弹层常驻。根因是 transient + keep-above 的窗口在映射期会连着来 focus-out。在没有「拿到过焦点才算」的判据之前，宁可让浮层常驻由内容自己收——「开一下就自己消失」比「点外不收起」更坏。开关 `overlay_set_dismiss_on_blur(on)` 留着，判据补上就能开。
+- **新增事件构造体会打到「冻结」的基准页**：`@win.Event` 加 `LostFocus` 之后全仓红点从 287 变 288——`examples/native-window`（G2–G5 基准，不再加特性）对事件做穷尽 match。判据是先看红点数变化再找是谁变多，加一条空分支即回到基线；**「冻结」不等于可以不跟着改口径**。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/core` **81/81**（新增 3 条：无子件时走图层档且 `overlay_show_at`/`hide`/`count` 照常、量尺只算可见子项的右/下边界、没有原生档浮层时失焦与收框两条路径都是空操作）；`moon check yue/core`/`yue/win`/四个示例 `--deny-warn` 零警告；ui 110/110、web 11/11、media 18/18 未掉；全仓红点回到 287 errors / 68 warnings。真窗口回证（在**带网页区的桥接窗**里点「浮层盖网页」）：`NATIVE-WEB-OVL opens=1 tier=1 native=1 layer=0`，截图见自绘内容（标题 + 「收起」按钮）压在 WebKit 渲染的正文之上——这条正是图层档做不到的。
+- **本批未做（不假装完成）**：点外收起的可用判据（上一条的开关默认关）、Esc 收起、弹层锚点跟随 owner 滚动/移动、六件组件各自的尺寸提示（现在靠三帧收框）。
+
 ### MoonBit 原生 GUI 栈 · 原生弹层窗口（批 E：`yue/win/popup.mbt` + `yue/core/popup.mbt`）
 
 - **为什么非要是真窗口**：自绘像素永远画在原生子件（webview 区）**之下**——z 序在原生侧，Painter 无法把它盖住。所以「下拉/右键菜单/tooltip/toast/对话框要能压住网页」这一条只有一条路：走窗口系统（方案 §4.5 的浮层纪律）。本批给的就是这条通道，而不是又一层自绘图层。

@@ -169,6 +169,14 @@ extern "c" fn wm_window_move(id : Int64, x : Int, y : Int) -> Unit =
   "wm_window_move"
 
 ///|
+extern "c" fn wm_window_set_size(id : Int64, w : Int, h : Int) -> Unit =
+  "wm_window_set_size"
+
+///|
+extern "c" fn wm_window_surface_count(id : Int64) -> Int =
+  "wm_window_surface_count"
+
+///|
 #borrow(out_x, out_y)
 extern "c" fn wm_window_origin(
   id : Int64,

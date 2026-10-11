@@ -749,6 +749,12 @@ void wm_window_move(int64_t id, int x, int y) { (void)id; (void)x; (void)y; }
 void wm_window_origin(int64_t id, int32_t *out_x, int32_t *out_y) {
   (void)id; (void)out_x; (void)out_y;
 }
+
+void wm_window_set_size(int64_t id, int w, int h) { (void)id; (void)w; (void)h; }
+int wm_window_surface_count(int64_t id) {
+  (void)id;
+  return 0;
+}
 void *wm_surface_container(int64_t surface_id) {
   (void)surface_id;
   return NULL;
@@ -789,6 +795,7 @@ typedef struct {
   int need_draw;   // 需要重绘（expose 或尺寸变化后置 1）
   int resized;     // 尺寸变了，本次取事件时回报新宽高
   int closing;     // 窗口管理器请求关闭
+  int focus_lost;  // 刚失去键盘焦点（原生浮层据此「点外收起」）
   int width;
   int height;
   const unsigned char *pending; // 待贴的 RGBA 缓冲（所有权在 MoonBit）
@@ -945,6 +952,9 @@ static gboolean wm_on_area_focus_out(GtkWidget *area, GdkEventFocus *ev,
     w->preedit_len = 0;
     w->preedit[0] = '\0';
   }
+  // 原生浮层的「点外收起」只能靠这条：点网页区时按钮事件被 webview 子窗吃掉，
+  // 只有焦点转移这件事会告诉我们「用户点了别处」
+  w->focus_lost = 1;
   return FALSE;
 }
 
@@ -1212,6 +1222,10 @@ int wm_event(int64_t id) {
     w->resized = 0;
     return 2;
   }
+  if (w->focus_lost) {
+    w->focus_lost = 0;
+    return 5; // 失去键盘焦点（浮层收起用）
+  }
   if (w->need_draw) {
     w->need_draw = 0;
     return 1;
@@ -1349,7 +1363,9 @@ void wm_window_set_popup(int64_t id, int64_t owner_id) {
       GTK_WINDOW(w->window), GDK_WINDOW_TYPE_HINT_POPUP_MENU);
   gtk_window_set_skip_taskbar_hint(GTK_WINDOW(w->window), TRUE);
   gtk_window_set_skip_pager_hint(GTK_WINDOW(w->window), TRUE);
-  gtk_window_set_resizable(GTK_WINDOW(w->window), FALSE);
+  // 不设 resizable(FALSE)：无边框窗用户本来就拖不动，而设了 FALSE 之后
+  // gtk_window_resize 会被忽略——浮层「先开框、量完内容再收框」就收不了。
+  gtk_window_set_resizable(GTK_WINDOW(w->window), TRUE);
   gtk_window_set_keep_above(GTK_WINDOW(w->window), TRUE);
   if (owner_id > 0 && owner_id < WM_MAX_WINDOWS &&
       wm_windows[owner_id].window != NULL) {
@@ -1393,6 +1409,40 @@ void wm_window_origin(int64_t id, int32_t *out_x, int32_t *out_y) {
   if (out_y != NULL) {
     *out_y = y;
   }
+}
+
+// 改窗口尺寸（原生浮层要先量内容再定框，避免开一个空框再撑大）
+void wm_window_set_size(int64_t id, int w, int h) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *win = &wm_windows[id];
+  if (win->window == NULL) {
+    return;
+  }
+  int ww = w > 1 ? w : 1;
+  int hh = h > 1 ? h : 1;
+  // 绘制区的 size_request 是窗口的**最小内容尺寸**（建窗时按初始大小设的），
+  // 不改它直接 resize，窗口缩不到初始大小以下——浮层量完内容收框就会留一圈死边
+  if (win->area != NULL) {
+    gtk_widget_set_size_request(win->area, ww, hh);
+  }
+  gtk_window_resize(GTK_WINDOW(win->window), ww, hh);
+}
+
+// 本窗已挂的原生子件数：>0 说明这扇窗里有网页这类「自绘像素盖不住」的东西，
+// 浮层就必须走真窗口（方案 §4.5 的浮层纪律）
+int wm_window_surface_count(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  int n = 0;
+  for (int i = 1; i < WM_MAX_SURFACES; i++) {
+    if (wm_surfaces[i].container != NULL && wm_surfaces[i].window_id == id) {
+      n++;
+    }
+  }
+  return n;
 }
 
 // 跑掉主上下文里已经就绪的事件；不阻塞。
@@ -2111,6 +2161,12 @@ void wm_window_set_popup(int64_t id, int64_t owner_id) { (void)id; (void)owner_i
 void wm_window_move(int64_t id, int x, int y) { (void)id; (void)x; (void)y; }
 void wm_window_origin(int64_t id, int32_t *out_x, int32_t *out_y) {
   (void)id; (void)out_x; (void)out_y;
+}
+
+void wm_window_set_size(int64_t id, int w, int h) { (void)id; (void)w; (void)h; }
+int wm_window_surface_count(int64_t id) {
+  (void)id;
+  return 0;
 }
 void *wm_surface_container(int64_t surface_id) {
   (void)surface_id;

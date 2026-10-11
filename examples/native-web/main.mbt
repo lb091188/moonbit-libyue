@@ -120,6 +120,11 @@ fn main {
   let js_binding = Ref(false)
   let js_last = Ref("")
   let bridge_log : Ref[Array[String]] = Ref([])
+  let ov_opens = Ref(0)
+  let ov_native = Ref(0)
+  let ov_hides = Ref(0)
+  let ov_layer = Ref(0)
+  let ov_tier = Ref(0)
   let bridge_lines_w : Ref[@core.Widget?] = Ref(None)
   let note = fn(t : String) -> Unit {
     let l = bridge_log.val
@@ -298,6 +303,62 @@ fn main {
                     "前进",
                     on_click=fn() { v.go_forward() },
                     min_width=64.0,
+                  ),
+                  @core.node_of(@core.Widget::new()),
+                  @ui.button(
+                    "浮层盖网页",
+                    on_click=fn() {
+                      ov_opens.val = ov_opens.val + 1
+                      ov_tier.val = if @core.overlay_native_tier() { 1 } else { 0 }
+                      let mine = Ref(0)
+                      let menu = @core.node_of_new(fn(parent : @core.Widget) -> @core.Widget {
+                        let box = @core.Widget::new()
+                        box.node.set_position(@yoga.Absolute)
+                        box.node.set_width(@yoga.fixed(180.0))
+                        box.set_padding(6.0, 6.0)
+                        box.node.set_flex_direction(@yoga.Column)
+                        box.on_draw = Some(fn(
+                          _b : @core.Widget,
+                          bp : @render.Painter,
+                          br : @core.Rect,
+                        ) -> Unit {
+                          bp.set_fill_color(@theme.theme_bg_panel())
+                          bp.fill_rect(0.0, 0.0, br.w, br.h)
+                          bp.set_stroke_color(@theme.theme_border())
+                          bp.set_line_width(1.0)
+                          bp.stroke_rect(0.0, 0.0, br.w - 1.0, br.h - 1.0)
+                        })
+                        let _ = @ui
+                          .container(
+                            [
+                              @ui.label("原生档浮层", size=12.0),
+                              @ui.button(
+                                "收起",
+                                on_click=fn() {
+                                  ov_hides.val = ov_hides.val + 1
+                                  @core.overlay_hide(mine.val)
+                                },
+                                min_width=150.0,
+                              ),
+                            ],
+                            direction=@yoga.Column,
+                            row_gap=6.0,
+                          )
+                          .mount_into(box)
+                        parent.append_child(box)
+                        box
+                      })
+                      let cid = @core.overlay_show_at(menu, 240.0, 120.0)
+                      mine.val = cid
+                      ov_native.val = @core.overlay_native_count()
+                      ov_layer.val = if cid > 0 && @core.overlay_native_count() == 0 {
+                        1
+                      } else {
+                        0
+                      }
+                      note("浮层 cid=" + cid.to_string() + " 原生档=" + (if @core.overlay_native_count() > 0 { "1" } else { "0" }))
+                    },
+                    min_width=110.0,
                   ),
                 ],
                 direction=@yoga.Row,
@@ -651,6 +712,18 @@ fn main {
       "'",
   )
   println("NATIVE-WEB-GEO pane=" + pane_rect + " sidebar=" + side_rect)
+  println(
+    "NATIVE-WEB-OVL opens=" +
+      ov_opens.val.to_string() +
+      " tier=" +
+      ov_tier.val.to_string() +
+      " native=" +
+      ov_native.val.to_string() +
+      " layer=" +
+      ov_layer.val.to_string() +
+      " hides=" +
+      ov_hides.val.to_string(),
+  )
   println(
     "NATIVE-WEB-POP opens=" +
       pop_opens.val.to_string() +

@@ -152,7 +152,10 @@
   - [x] 窗口层三件：`Window::set_popup(owner)`（无边框 + POPUP_MENU 类型 + transient_for + skip taskbar/pager + keep above + 不可调，**必须在 show 之前**）、`Window::move_to(x,y)`、`Window::origin()`（实测坑：`gtk_window_get_position` 在 WM reparent 下恒给 (0,0)，要 `gdk_window_get_origin` 才是屏幕原点）
   - [x] 宿主侧 `App::open_popup(x,y,w,h,screen_w?,screen_h?)` = 批 A 的附窗（共享循环与泵、`close_window` 只摘自己、`shutdown` 一起拆）+ 摆位纯函数 `popup_place`（越界翻到锚点另一侧、仍为负则钳 0、屏幕未知只钳不翻）
   - [x] 回证：core 71/71（新增摆位七边界）、`--deny-warn` 零警告、全仓红点 287/68 未增；真窗口 `NATIVE-WEB-POP opens=1 closed=1 choice='乙' wins=1 owner_origin=2,34`，弹层落在 (422,334) 与请求逐位一致、截图见无边框弹层压在 WebKit 网页文字之上、选项即自关而主窗仍在
-  - [ ] 余项：把 `yue/core/overlay.mbt` 六件浮层接成「所在窗有已挂载 pane 时才切原生窗口」的原生档（本批只给了通道与一份自绘弹层示例）
+  - [x] **浮层的原生档落 `yue/core/overlay_native.mbt`**：档位只看「所在窗有没有已挂载子件」（`Window::has_child_surfaces()` 读 C 侧槽表，不另记一套会漏销的账），有网页区就整层改走真窗口——六件浮层都经 `overlay_show_at`/`overlay_show_full`，一处生效；弹层表放进程级 `Map[句柄, App]`（宿主归 App，宿主再持 App 是引用环）；`overlay_count`/`visible`/`clear`/退出清理都算上原生档
+  - [x] 先开框、量完内容再收框（`overlay_fit_pass` 最多三帧 + `Window::set_size_pixels`）；两条 GTK 事实入档：绘制区的 `size_request` 是窗口最小内容尺寸（不改它缩不回去，会留死边）、`set_resizable(FALSE)` 会让程序化 resize 被整个忽略
+  - [x] 回证：core 81/81（新增 3 条档位/量尺/空表安全）、四示例 `--deny-warn` 零警告、真窗口在**带网页区的桥接窗**里点「浮层盖网页」得 `NATIVE-WEB-OVL opens=1 tier=1 native=1 layer=0`，截图见自绘内容压在 WebKit 正文之上（图层档做不到）
+  - [ ] 「点外收起」的可用判据：失焦自收在映射期会误触发（对照实验：开=约两秒自关且 `hides=0`；关=常驻），故 `overlay_set_dismiss_on_blur` **默认关**，等「拿到过焦点才算」的判据；另欠 Esc 收起、弹层锚点跟随 owner 滚动/移动、六件各自的尺寸提示
 - 积木原则：一个能力一个接口、可单独不用；能力之间不互相依赖（webview 不依赖媒体层，反之亦然，两者只依赖窗口/布局/事件层）；框架只给原语不给产品（爬虫框架、站点适配、内容解析、开发者面板、页面脚本库不进库）；每项能力给探测 + 语义化降级；新 API 一律走 `Painter`/`Bitmap` 门面
 - 明确不做（避免反复讨论）：网络拦截/改写、代理配置、一窗多 webview 并排、Linux 上把 webview 变纹理、首批硬解、首批 GPU 合成、网页内 `<video>` 与自绘播放器统一、macOS 13 及以下的持久化隔离（根因是 Apple API 边界：持久化 profile 需 macOS 14+ 且有 bundle id）
 - 平台后端（随各自真机，本轮不做）：Windows WebView2（两级异步 COM 创建、失败回退、就绪前排队、跨 HWND 焦点与滚轮转发），macOS WKWebView（自定义协议依赖私有 API，`dataStoreForIdentifier:` 才是真实 API 而非 `initWithIdentifier:`）

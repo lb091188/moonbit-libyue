@@ -11,6 +11,9 @@ pub(all) enum Event {
   Closing
   /// 有输入事件待取（用 take_input 排空）
   Input
+  /// 刚失去键盘焦点（原生浮层据此「点外收起」：点网页区时按钮事件被
+  /// webview 子窗吃掉，只有焦点转移能告诉我们用户点了别处）
+  LostFocus
 }
 
 ///|
@@ -80,6 +83,7 @@ pub fn Window::show(self : Window) -> Unit {
 /// 取一个待处理事件（消费式，一次一个）；尺寸变化时同步更新 `width`/`height`。
 pub fn Window::poll_event(self : Window) -> Event {
   match wm_event(self.id) {
+    5 => Event::LostFocus
     3 => Event::Closing
     2 => {
       let ow = Ref(0)
@@ -159,6 +163,22 @@ pub fn Window::take_input(self : Window) -> InputEvent? {
 /// 把焦点要给自己（Tab/点击后调用；无焦点时按键不会回来）。
 pub fn Window::request_focus(self : Window) -> Unit {
   wm_request_focus(self.id)
+}
+
+///|
+/// 改窗口尺寸（原生浮层先开框、量完内容再收到贴合的大小）。
+pub fn Window::set_size_pixels(self : Window, width : Int, height : Int) -> Unit {
+  if width < 1 || height < 1 {
+    return
+  }
+  wm_window_set_size(self.id, width, height)
+}
+
+///|
+/// 本窗已挂的原生子件数：>0 就说明这扇窗里有「自绘像素盖不住」的东西，
+/// 浮层必须改走真窗口（方案 §4.5）。
+pub fn Window::has_child_surfaces(self : Window) -> Bool {
+  wm_window_surface_count(self.id) > 0
 }
 
 ///|
