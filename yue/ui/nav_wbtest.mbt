@@ -244,3 +244,36 @@ test "页签：预建三页只显当前页，点页签与外部改 Store 都换�
   // 页签头行在最上，页区紧随其后
   assert_true(head.rect.y < kids[1].rect.y)
 }
+
+///|
+test "穿梭框：点行选中、箭头搬运、搬完清空选中、外部改数据整列重建" {
+  let left = @core.Store::new(["甲", "乙", "丙"])
+  let right : @core.Store[Array[String]] = @core.Store::new([])
+  let (root, tr) = mounted(transfer(left, right, width=120.0), 320.0, 120.0)
+  let kids = tr.children()
+  assert_eq(kids.length(), 4)
+  let lbox = kids[0]
+  let rbox = kids[3]
+  assert_eq([lbox.children().length(), rbox.children().length()], [3, 0])
+  // 选「甲」再搬过去
+  click_at(root, lbox.children()[0], 40.0, 10.0)
+  click_at(root, kids[1], 16.0, 14.0)
+  // 搬完是「整列重建」，新行要到下一次布局才有矩形（宿主每帧都会重排）
+  root.relayout(320.0, 120.0)
+  assert_eq([lbox.children().length(), rbox.children().length()], [2, 1])
+  // 选中已清空：再点右箭头不会继续搬
+  click_at(root, kids[1], 16.0, 14.0)
+  // 空搬运也会 set 两个 Store（值相同也算变更）→ 又重建一次，坐标仍要重取
+  root.relayout(320.0, 120.0)
+  assert_eq([lbox.children().length(), rbox.children().length()], [2, 1])
+  // 反向搬回
+  click_at(root, rbox.children()[0], 40.0, 10.0)
+  click_at(root, kids[2], 16.0, 14.0)
+  root.relayout(320.0, 120.0)
+  assert_eq([lbox.children().length(), rbox.children().length()], [3, 0])
+  // 外部改数据：订阅驱动整列重建（不是只重绘）
+  left.set(["只有一项"])
+  assert_eq(lbox.children().length(), 1)
+  right.set(["外", "部", "两", "项"])
+  assert_eq(rbox.children().length(), 4)
+}

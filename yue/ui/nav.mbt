@@ -933,3 +933,218 @@ pub fn tabs_t(
     w
   })
 }
+
+///|
+/// 穿梭框（EP Transfer）：左右两列，点行选中（方块标记），中间 `›`/`‹` 把选中项
+/// 在两列间移动。两列数据各由一个 `Store[Array[String]]` 驱动，外部改数据即整列
+/// 重建；重建式列表的行不持订阅（选中集合是自持的两张表），所以重建次数不会
+/// 累积死订阅。
+pub fn transfer(
+  left_items : @core.Store[Array[String]],
+  right_items : @core.Store[Array[String]],
+  width? : Double = 160.0,
+  item_height? : Double = 24.0,
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    w.node.set_flex_direction(@yoga.Row)
+    w.node.set_align_items(@yoga.AlignItems::Center)
+    w.node.set_gap(0.0, 6.0)
+    let font = @text.Font::new("", 13.0)
+    let left_sel : Ref[Array[String]] = Ref([])
+    let right_sel : Ref[Array[String]] = Ref([])
+    let left_box = @core.Widget::new()
+    let right_box = @core.Widget::new()
+    left_box.node.set_flex_direction(@yoga.Column)
+    right_box.node.set_flex_direction(@yoga.Column)
+    for box in [left_box, right_box] {
+      box.node.set_width(@yoga.fixed(width))
+      box.node.set_min_height(@yoga.fixed(60.0))
+      box.on_draw = Some(fn(
+        _self : @core.Widget,
+        p : @render.Painter,
+        r : @core.Rect,
+      ) -> Unit {
+        p.set_fill_color(@theme.theme_bg_panel())
+        p.fill_rect(0.0, 0.0, r.w, r.h)
+        p.set_stroke_color(@theme.theme_border())
+        p.set_line_width(1.0)
+        p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+      })
+    }
+
+    fn contains(arr : Array[String], s : String) -> Bool {
+      for x in arr {
+        if x == s {
+          return true
+        }
+      }
+      false
+    }
+
+    fn without(arr : Array[String], s : String) -> Array[String] {
+      let out : Array[String] = []
+      for x in arr {
+        if x != s {
+          out.push(x)
+        }
+      }
+      out
+    }
+
+    fn with_added(arr : Array[String], s : String) -> Array[String] {
+      let out = arr.copy()
+      out.push(s)
+      out
+    }
+
+    fn build_list(
+      box : @core.Widget,
+      items : @core.Store[Array[String]],
+      sel : Ref[Array[String]],
+    ) -> Unit {
+      for name in items.get() {
+        let mine = name
+        let row_w = @core.Widget::new()
+        row_w.node.set_width(@yoga.percent(100.0))
+        row_w.node.set_height(@yoga.fixed(item_height))
+        row_w.on_draw = Some(fn(
+          self : @core.Widget,
+          p : @render.Painter,
+          r : @core.Rect,
+        ) -> Unit {
+          let on = contains(sel.val, mine)
+          if self.hovered {
+            p.set_fill_color(@theme.theme_fill_hover())
+            p.fill_rect(0.0, 0.0, r.w, r.h)
+          }
+          p.set_fill_color(
+            if on {
+              @theme.theme_primary()
+            } else {
+              @theme.theme_border()
+            },
+          )
+          p.fill_rect(6.0, (r.h - 8.0) / 2.0, 8.0, 8.0)
+          let _ = @text.draw_box_at(
+            p,
+            20.0,
+            0.0,
+            (r.w - 20.0).max(1.0),
+            r.h,
+            mine,
+            font,
+            @theme.theme_text_regular(),
+            align=@text.Start,
+            valign=@text.Center,
+          )
+        })
+        row_w.on_pointer = Some(fn(
+          _self : @core.Widget,
+          ev : @core.PointerEvent,
+        ) -> Bool {
+          match ev.kind {
+            @core.Down => true
+            @core.Up => {
+              sel.val = if contains(sel.val, mine) {
+                without(sel.val, mine)
+              } else {
+                with_added(sel.val, mine)
+              }
+              @core.invalidate()
+              false
+            }
+            _ => false
+          }
+        })
+        box.append_child(row_w)
+      }
+    }
+
+    fn render_all() -> Unit {
+      left_box.clear_children()
+      right_box.clear_children()
+      build_list(left_box, left_items, left_sel)
+      build_list(right_box, right_items, right_sel)
+      @core.invalidate()
+    }
+
+    let sid_l = left_items.signal().subscribe(fn(_v : Array[String]) -> Unit {
+      render_all()
+    })
+    @core.sub_bag_register(fn() { left_items.signal().remove(sid_l) })
+    let sid_r = right_items.signal().subscribe(fn(_v : Array[String]) -> Unit {
+      render_all()
+    })
+    @core.sub_bag_register(fn() { right_items.signal().remove(sid_r) })
+
+    fn move_items(
+      from : @core.Store[Array[String]],
+      to : @core.Store[Array[String]],
+      sel : Ref[Array[String]],
+    ) -> Unit {
+      let moving = sel.val
+      let remain : Array[String] = []
+      for x in from.get() {
+        if !contains(moving, x) {
+          remain.push(x)
+        }
+      }
+      let merged = to.get().copy()
+      for x in moving {
+        merged.push(x)
+      }
+      from.set(remain)
+      to.set(merged)
+      sel.val = []
+    }
+
+    fn mid_btn(to_right : Bool) -> @core.Widget {
+      let b = @core.Widget::new()
+      b.node.set_width(@yoga.fixed(32.0))
+      b.node.set_height(@yoga.fixed(28.0))
+      b.on_draw = Some(fn(
+        self : @core.Widget,
+        p : @render.Painter,
+        r : @core.Rect,
+      ) -> Unit {
+        p.set_fill_color(
+          if self.hovered {
+            @theme.theme_primary_light()
+          } else {
+            @theme.theme_info_light()
+          },
+        )
+        p.fill_rect(0.0, 0.0, r.w, r.h)
+        draw_chevron(p, r.w / 2.0, r.h / 2.0, 4.0, to_right, @theme.theme_text_regular())
+      })
+      b.on_pointer = Some(fn(
+        _self : @core.Widget,
+        ev : @core.PointerEvent,
+      ) -> Bool {
+        match ev.kind {
+          @core.Down => true
+          @core.Up => {
+            if to_right {
+              move_items(left_items, right_items, left_sel)
+            } else {
+              move_items(right_items, left_items, right_sel)
+            }
+            false
+          }
+          _ => false
+        }
+      })
+      b
+    }
+
+    w.append_child(left_box)
+    w.append_child(mid_btn(true))
+    w.append_child(mid_btn(false))
+    w.append_child(right_box)
+    render_all()
+    handle(w)
+    w
+  })
+}
