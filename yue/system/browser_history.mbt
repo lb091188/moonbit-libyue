@@ -56,7 +56,7 @@ pub(all) struct DownloadItem {
 
 ///|
 pub(all) enum BrowserHistoryError {
-  /// 平台不支持（本文件仅实现 Linux 路径探测）
+  /// 平台不支持（路径探测实现了 Linux / Windows / macOS，其余平台不支持）
   BhUnsupported
   /// 定位配置目录失败（XDG_CONFIG_HOME / HOME 均未设置）
   BhNoConfigDir
@@ -298,6 +298,19 @@ pub fn bh_config_root(xdg_config_home : String?, home : String?) -> String? {
 }
 
 ///|
+/// 浏览器配置根（macOS 语义的纯函数）：$HOME/Library/Application Support。
+/// macOS 上 Chromium 系产品的 profile 与 Linux 完全同形（Default /
+/// Profile N 目录、目录内 History 是同一个 SQLite 结构），只是数据根从
+/// .config 换成 Application Support；HOME 未设置或为空给 None。纯函数，
+/// browser_history_wbtest.mbt 白盒覆盖。
+pub fn bh_mac_root(home : String?) -> String? {
+  match home {
+    Some(h) if h != "" => Some(h + "/Library/Application Support")
+    _ => None
+  }
+}
+
+///|
 /// 浏览器定义：(标识, 配置目录名, 目录内子目录)。
 /// Brave 的 profile 在 BraveSoftware/Brave-Browser 下一层。
 let bh_browser_defs : Array[(String, String, String)] = [
@@ -318,13 +331,25 @@ let bh_browser_defs_win : Array[(String, String, String)] = [
 ]
 
 ///|
+/// macOS 浏览器定义：profile 直接在 ~/Library/Application Support 下的
+/// <厂商>/<产品> 一层（与 Linux 同形，只是根目录换成 Application Support，
+/// 没有 Windows 那层 User Data；目录名大小写随安装器）。
+let bh_browser_defs_mac : Array[(String, String, String)] = [
+  ("google-chrome", "Google/Chrome", ""),
+  ("chromium", "Chromium", ""),
+  ("microsoft-edge", "Microsoft Edge", ""),
+  ("brave", "BraveSoftware/Brave-Browser", ""),
+]
+
+///|
 /// 当前平台的浏览器定义表。
 fn bh_defs() -> Array[(String, String, String)] {
   match @yue.platform() {
     "windows" => bh_browser_defs_win
     // Linux 配置根下的目录名（~/.config/<dir>）
     "linux" => bh_browser_defs
-    // macOS 未实现路径探测，不给定义表（上层已由 [bh_supported] 拦掉）
+    // macOS 数据根下的目录名（~/Library/Application Support/<dir>）
+    "macos" => bh_browser_defs_mac
     _ => []
   }
 }
@@ -374,12 +399,12 @@ fn bh_probe_profiles(root : String) -> Array[BrowserProfile] {
 }
 
 ///|
-/// 当前平台是否支持浏览器历史读取（Linux 与 Windows 已实现路径探测，
-/// macOS 未实现）。
+/// 当前平台是否支持浏览器历史读取（Linux / Windows / macOS 已实现路径
+/// 探测：Chromium 系在三个平台上都是「数据根/<厂商>/<产品>/<profile>/
+/// History」的同格式 SQLite 库，只是数据根不同）。
 pub fn bh_supported() -> Bool {
   match @yue.platform() {
-    "linux" | "windows" => true
-    // macOS 未实现路径探测
+    "linux" | "windows" | "macos" => true
     _ => false
   }
 }
@@ -403,13 +428,15 @@ pub fn bh_browsers() -> Result[Array[BrowserProfile], BrowserHistoryError] {
 }
 
 ///|
-/// 配置根定位（探测与取数的公共前置）：非 Linux / Windows 给
+/// 配置根定位（探测与取数的公共前置）：非 Linux / Windows / macOS 给
 /// [BhUnsupported]，Windows 取 %LOCALAPPDATA%（缺给 [BhNoConfigDir]），
-/// Linux 走 XDG_CONFIG_HOME / HOME。
+/// macOS 取 $HOME/Library/Application Support，Linux 走 XDG_CONFIG_HOME
+/// / HOME。
 fn bh_root_or_err() -> Result[String, BrowserHistoryError] {
   match @yue.platform() {
     "linux" => bh_root_linux()
     "windows" => bh_root_win()
+    "macos" => bh_root_mac()
     _ => Err(BhUnsupported)
   }
 }
@@ -419,6 +446,17 @@ fn bh_root_or_err() -> Result[String, BrowserHistoryError] {
 /// （[bh_config_root]）；两者都缺给 [BhNoConfigDir]。
 fn bh_root_linux() -> Result[String, BrowserHistoryError] {
   match bh_config_root(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME")) {
+    Some(r) => Ok(r)
+    None => Err(BhNoConfigDir)
+  }
+}
+
+///|
+/// macOS 配置根：$HOME/Library/Application Support（Chromium 系在 macOS
+/// 的数据根目录，profile 与 History 库的结构与 Linux 一致；HOME 缺失给
+/// [BhNoConfigDir]）。
+fn bh_root_mac() -> Result[String, BrowserHistoryError] {
+  match bh_mac_root(getenv_str("HOME")) {
     Some(r) => Ok(r)
     None => Err(BhNoConfigDir)
   }

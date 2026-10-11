@@ -218,3 +218,32 @@ test "ffx_history：本机 Firefox 端到端（存在才跑）" {
     Err(e) => fail("探测 Firefox profile 失败: \{e.to_string()}")
   }
 }
+
+///|
+/// profile 根三平台拼装（纯函数）：Linux 是 ~/.mozilla/firefox，macOS 是
+/// ~/Library/Application Support/Firefox，HOME 缺失给 None。两平台目录下
+/// 都是 profiles.ini + <profile>/places.sqlite 的同格式数据。
+test "ffx_linux_root / ffx_mac_root：profile 根拼装" {
+  assert_eq(ffx_linux_root(Some("/home/u")), Some("/home/u/.mozilla/firefox"))
+  assert_eq(ffx_linux_root(Some("")), None)
+  assert_eq(ffx_linux_root(None), None)
+  assert_eq(
+    ffx_mac_root(Some("/Users/u")),
+    Some("/Users/u/Library/Application Support/Firefox"),
+  )
+  assert_eq(ffx_mac_root(Some("")), None)
+  assert_eq(ffx_mac_root(None), None)
+  // macOS 根不带 Linux 的 .mozilla/firefox 后缀（不能复用 Linux 路径）
+  match ffx_mac_root(Some("/u")) {
+    Some(r) => assert_false(r.has_suffix(".mozilla/firefox"))
+    None => fail("macOS profile 根应解析成功")
+  }
+  // places.sqlite 拼装两平台同形（只是根不同）
+  assert_eq(
+    ffx_places_path(
+      "/Users/u/Library/Application Support/Firefox",
+      "abcd.default-release",
+    ),
+    "/Users/u/Library/Application Support/Firefox/abcd.default-release/places.sqlite",
+  )
+}

@@ -52,7 +52,7 @@ pub fn BookmarkNode::is_url(self : BookmarkNode) -> Bool {
 
 ///|
 pub(all) enum BookmarkError {
-  /// 平台不支持（本文件仅实现 Linux 路径探测）
+  /// 平台不支持（路径探测实现了 Linux / Windows / macOS，其余平台不支持）
   BmUnsupported
   /// 定位配置目录失败（XDG_CONFIG_HOME / HOME 均未设置）
   BmNoConfigDir
@@ -252,19 +252,21 @@ pub fn bm_bookmarks_path(
 // ---------------------------------------------------------------------------
 
 ///|
-/// 当前平台是否支持浏览器书签读取（Linux 与 Windows 已实现路径探测，
-/// macOS 未实现）。
+/// 当前平台是否支持浏览器书签读取（Linux / Windows / macOS 已实现路径
+/// 探测；三平台 Bookmarks 同为 JSON，只是数据根不同）。
 pub fn bm_supported() -> Bool {
   bh_supported()
 }
 
 ///|
 /// 配置根定位（书签侧与历史侧同源）：Windows 取 %LOCALAPPDATA%，Linux
-/// 走 XDG_CONFIG_HOME / HOME，其余平台 None。
+/// 走 XDG_CONFIG_HOME / HOME，macOS 取 $HOME/Library/Application Support，
+/// 其余平台 None。
 fn bm_root() -> String? {
   match @yue.platform() {
     "linux" => bm_root_linux()
     "windows" => bm_root_win()
+    "macos" => bm_root_mac()
     _ => None
   }
 }
@@ -274,6 +276,14 @@ fn bm_root() -> String? {
 /// （与历史侧 [bh_config_root] 同源）。
 fn bm_root_linux() -> String? {
   bh_config_root(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME"))
+}
+
+///|
+/// macOS 配置根：$HOME/Library/Application Support（Chromium 系在 macOS
+/// 的数据根目录；Bookmarks 是 JSON，目录内结构与 Linux 一致，与历史侧
+/// [bh_mac_root] 同源）。
+fn bm_root_mac() -> String? {
+  bh_mac_root(getenv_str("HOME"))
 }
 
 ///|
@@ -288,19 +298,19 @@ fn bm_root_win() -> String? {
 ///|
 /// 列出有可读 Bookmarks 文件的浏览器 profile：在配置根下按浏览器定义 ×
 /// profile 候选名（Default 与 Profile 1..24，见 [bh_profile_candidates]）
-/// 逐一探测；无可读文件给 [BmNoBrowser]，非 Linux / Windows 给
+/// 逐一探测；无可读文件给 [BmNoBrowser]，非 Linux / Windows / macOS 给
 /// [BmUnsupported]，配置目录定位失败给 [BmNoConfigDir]。
 pub fn bm_browsers() -> Result[Array[BookmarkProfile], BookmarkError] {
   match @yue.platform() {
-    // Linux / Windows 共用：配置根定位（[bm_root]）与浏览器定义表
-    // （[bh_defs]）各自在内部按平台分流，路径拼装两平台同形
-    "linux" | "windows" => bm_browsers_shared()
+    // Linux / Windows / macOS 共用：配置根定位（[bm_root]）与浏览器定义
+    // 表（[bh_defs]）各自在内部按平台分流，路径拼装三平台同形
+    "linux" | "windows" | "macos" => bm_browsers_shared()
     _ => Err(BmUnsupported)
   }
 }
 
 ///|
-/// Linux / Windows 共用路径列出书签 profile：在配置根下按浏览器定义 ×
+/// Linux / Windows / macOS 共用路径列出书签 profile：在配置根下按浏览器定义 ×
 /// profile 候选名探测 Bookmarks 文件；无可读文件给 [BmNoBrowser]，配置
 /// 目录定位失败给 [BmNoConfigDir]。
 fn bm_browsers_shared() -> Result[Array[BookmarkProfile], BookmarkError] {
@@ -332,15 +342,15 @@ fn bm_browsers_shared() -> Result[Array[BookmarkProfile], BookmarkError] {
 /// 失败给 [BmIoFailed]，该书签文件不存在给 [BmNoBrowser]。
 pub fn bm_bookmarks(browser : String) -> Result[BookmarkNode, BookmarkError] {
   match @yue.platform() {
-    // Linux / Windows 共用：配置根定位（[bm_root]）与浏览器定义表
-    // （[bh_defs]）各自在内部按平台分流，路径拼装两平台同形
-    "linux" | "windows" => bm_bookmarks_shared(browser)
+    // Linux / Windows / macOS 共用：配置根定位（[bm_root]）与浏览器定义
+    // 表（[bh_defs]）各自在内部按平台分流，路径拼装三平台同形
+    "linux" | "windows" | "macos" => bm_bookmarks_shared(browser)
     _ => Err(BmUnsupported)
   }
 }
 
 ///|
-/// Linux / Windows 共用路径取指定浏览器的书签树：按浏览器定义 × profile
+/// Linux / Windows / macOS 共用路径取指定浏览器的书签树：按浏览器定义 × profile
 /// 候选名找首个可读 Bookmarks 文件并解析；解析失败给 [BmIoFailed]，该
 /// 书签文件不存在给 [BmNoBrowser]。
 fn bm_bookmarks_shared(

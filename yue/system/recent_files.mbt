@@ -9,6 +9,14 @@
 // mime:mime-type 子节点属性，属性值做 XML 实体解码，href 的 file:// URI
 // 做百分号解码；时间戳 ISO 8601 → Unix 毫秒。解析 / 解码 / 排序均为
 // 纯函数，recent_files_wbtest.mbt 白盒覆盖。
+//
+// 平台口径：Linux 有 GTK 统一的 recently-used.xbel，Windows 有
+// %APPDATA%\Microsoft\Windows\Recent 的 .lnk 集合；macOS 没有等价的全局
+// 最近文件清单——系统侧的「最近项目」是 LSSharedFileList（存在
+// ~/Library/Application Support/com.apple.sharedfilelist 下的 per-app
+// 二进制 sfl），按应用隔离且不向第三方开放枚举，故 macOS 一律
+// RfUnsupported / false / None，不做「按目录列文件」式的近似替代（那样
+// 得到的是目录内容而非系统最近文件语义）。
 
 ///|
 /// 一条最近文件记录（recently-used.xbel 的一个 bookmark 节点）。
@@ -53,7 +61,9 @@ pub extend RecentItem with Show::{to_string, output}
 ///|
 /// 最近文件查询失败原因。
 pub(all) enum RecentError {
-  /// 平台不支持（recently-used.xbel 是 Linux/GTK 侧的数据）
+  /// 平台不支持（recently-used.xbel 是 Linux/GTK 侧的数据，Windows 侧是
+  /// Recent 目录的 .lnk；macOS 无全局最近文件清单：LSSharedFileList 是
+  /// per-app 的，第三方不可枚举）
   RfUnsupported
   /// 定位数据目录失败（XDG_DATA_HOME 与 HOME 均不可用）
   RfNoDataDir
@@ -869,6 +879,10 @@ fn rf_entry_to_item(e : RfEntry) -> RecentItem {
 ///|
 /// 非 file:// 形态的 href → 本地路径：仅 Windows 的裸绝对路径（盘符或
 /// UNC）直接当路径，其余平台为空串。
+///
+/// macOS 走不到这条分支（无数据源，[rf_load_entries] 先给 RfUnsupported）；
+/// 即便将来接上，POSIX 侧也没有「裸绝对路径当 uri」的写入方——macOS 的
+/// per-app 最近文件清单不向第三方开放，故不给 macOS 开口子。
 fn rf_fallback_path(uri : String) -> String {
   match @yue.platform() {
     "windows" => if rf_win_abs_path(uri) { uri } else { "" }
@@ -949,7 +963,8 @@ pub fn rf_data_dir(xdg_data_home : String?, home : String?) -> String? {
 ///|
 /// 本机最近文件数据源定位：Linux 为 XDG 数据目录的 recently-used.xbel；
 /// Windows 为 %APPDATA%\Microsoft\Windows\Recent（.lnk 集合）；其余平台
-/// None。
+/// None（macOS 无全局最近文件清单：系统侧最近项目是 per-app 的
+/// LSSharedFileList，第三方不可枚举，没有可定位的数据源）。
 fn rf_recent_source() -> String? {
   match @yue.platform() {
     "windows" => rf_recent_source_win()
@@ -979,11 +994,14 @@ fn rf_recent_source_linux() -> String? {
 
 ///|
 /// 读取并解析最近文件条目：Linux 读 recently-used.xbel；Windows 枚举
-/// Recent 目录 .lnk 并逐个解析目标路径与 mtime（每次调用真实读盘）。
+/// Recent 目录 .lnk 并逐个解析目标路径与 mtime（每次调用真实读盘）；
+/// macOS 给 RfUnsupported——没有可向第三方枚举的全局最近文件清单
+/// （LSSharedFileList 按应用隔离，且为二进制 sfl 格式）。
 fn rf_load_entries() -> Result[Array[RfEntry], RecentError] {
   match @yue.platform() {
     "windows" => rf_load_win()
     "linux" => rf_load_entries_linux()
+    // macOS：无等价数据源，保持 Unsupported（见文件头平台口径）
     _ => Err(RfUnsupported)
   }
 }
@@ -1053,11 +1071,14 @@ fn rf_load_win() -> Result[Array[RfEntry], RecentError] {
 
 ///|
 /// 本机是否可读最近文件（Linux 且 recently-used.xbel 可读；Windows 且
-/// Recent 目录可枚举）。每次调用真实探测，高频场景请调用方自行缓存。
+/// Recent 目录可枚举）。macOS 恒 false——系统侧最近项目只按应用存在
+/// （LSSharedFileList），没有第三方可读的全局清单，故不支持。每次调用
+/// 真实探测，高频场景请调用方自行缓存。
 pub fn rf_supported() -> Bool {
   match @yue.platform() {
     "windows" => rf_supported_win()
     "linux" => rf_supported_linux()
+    // macOS：无等价数据源，保持不支持（见文件头平台口径）
     _ => false
   }
 }
@@ -1083,7 +1104,8 @@ fn rf_supported_linux() -> Bool {
 
 ///|
 /// 最近文件列表：解析本机 recently-used.xbel，按 modified 倒序（并列按
-/// path 升序）取前 limit 项；limit 缺省 100，<= 0 取全部。
+/// path 升序）取前 limit 项；limit 缺省 100，<= 0 取全部。macOS 无数据源
+/// → RfUnsupported。
 pub fn rf_recent(limit? : Int = 100) -> Result[Array[RecentItem], RecentError] {
   match rf_load_entries() {
     Err(e) => Err(e)
@@ -1095,6 +1117,8 @@ pub fn rf_recent(limit? : Int = 100) -> Result[Array[RecentItem], RecentError] {
 ///|
 /// 按应用名过滤的最近文件：只收 bookmark:application name 精确匹配的
 /// 条目，同样按 modified 倒序取前 limit 项；limit 缺省 100，<= 0 取全部。
+/// macOS 无数据源 → RfUnsupported（macOS 的最近文件清单本身就是 per-app
+/// 的，但只对本 app 开放，第三方读不到）。
 pub fn rf_by_app(
   name : String,
   limit? : Int = 100,

@@ -435,3 +435,95 @@ test "appfind Windows .lnk 层收集与递归（注入枚举）" {
     }, acc0)
   inspect(acc0.length(), content="1")
 }
+
+///|
+/// macOS 分支的纯逻辑（无 macOS 真机也能测）：.app 条目名推导、包内可执行
+/// 文件推断路径、扫描目录拼装、查找目录拼装；一层收集用注入的 list_dir
+/// 断言「是目录才收、二进制存在才给 exec」。
+test "appfind mac:.app 名字推导与可执行文件推断" {
+  // 应用名 = 文件名去掉 .app 后缀
+  assert_true(appfind_mac_app_name("Safari.app") is Some("Safari"))
+  assert_true(
+    appfind_mac_app_name("Visual Studio Code.app") is Some("Visual Studio Code"),
+  )
+  assert_true(appfind_mac_app_name("中文应用.app") is Some("中文应用"))
+  // 非 .app 条目、裸 ".app"、大小写不符、空串一律 None
+  assert_true(appfind_mac_app_name("Safari") is None)
+  assert_true(appfind_mac_app_name(".app") is None)
+  assert_true(appfind_mac_app_name("Safari.App") is None)
+  assert_true(appfind_mac_app_name("Safari.appx") is None)
+  assert_true(appfind_mac_app_name("") is None)
+  // 可执行文件推断：<bundle>/Contents/MacOS/<应用名>
+  assert_eq(
+    appfind_mac_exec_path("/Applications/Safari.app", "Safari"),
+    "/Applications/Safari.app/Contents/MacOS/Safari",
+  )
+  assert_eq(
+    appfind_mac_exec_path("/Users/me/Applications/My App.app", "My App"),
+    "/Users/me/Applications/My App.app/Contents/MacOS/My App",
+  )
+}
+
+///|
+test "appfind mac:扫描目录(系统三处 + ~/Applications)与查找目录(PATH 优先)" {
+  // 扫描目录：系统三处在前，~/Applications 在后（用户级覆盖系统级）
+  assert_eq(
+    appfind_mac_scan_dirs(Some("/Users/me")),
+    [
+      "/Applications",
+      "/System/Applications",
+      "/System/Applications/Utilities",
+      "/Users/me/Applications",
+    ],
+  )
+  // HOME 未设置或为空：只扫系统三处
+  assert_eq(appfind_mac_scan_dirs(None).length(), 3)
+  assert_eq(appfind_mac_scan_dirs(Some("")).length(), 3)
+  // 查找目录：PATH 在前（':' 分隔、空段滤除），macOS 常用目录兜底
+  assert_eq(
+    appfind_mac_bin_dirs("/opt/homebrew/bin:/usr/bin"),
+    [
+      "/opt/homebrew/bin",
+      "/usr/bin",
+      "/usr/local/bin",
+      "/opt/homebrew/bin",
+      "/usr/bin",
+      "/bin",
+      "/usr/sbin",
+      "/sbin",
+    ],
+  )
+  // PATH 缺失：只剩兜底目录，首个是 /usr/local/bin
+  assert_eq(appfind_mac_bin_dirs("")[0], "/usr/local/bin")
+  assert_true(appfind_mac_bin_dirs("").contains("/opt/homebrew/bin"))
+  assert_true(appfind_mac_bin_dirs("").contains("/sbin"))
+}
+
+///|
+test "appfind mac:.app 一层收集(注入 list_dir)" {
+  let layer = appfind_mac_app_layer(
+    "/Applications",
+    ["Safari.app", "Notes.txt", ".app", "NoBinary.app", "Ghost.app"],
+    fn(d) {
+      if d == "/Applications/Safari.app/Contents/MacOS" {
+        Ok(["Safari"])
+      } else if d == "/Applications/NoBinary.app/Contents/MacOS" {
+        Ok(["helper"]) // 有 MacOS 目录但没有同名二进制
+      } else if d == "/Applications/Ghost.app" {
+        Err(@yue.OpenFailed(d)) // 名为 .app 的普通文件
+      } else {
+        Ok([]) // 其余 .app 都是目录
+      }
+    },
+  )
+  inspect(layer.length(), content="2")
+  assert_eq(layer[0].id, "Safari")
+  assert_eq(layer[0].name, "Safari")
+  assert_eq(layer[0].locale_name, "Safari")
+  assert_eq(layer[0].exec, "/Applications/Safari.app/Contents/MacOS/Safari")
+  // MacOS 目录里没有同名条目：exec 留空（存在才给）
+  assert_eq(layer[1].id, "NoBinary")
+  assert_eq(layer[1].exec, "")
+  assert_eq(layer[1].icon, "")
+  assert_eq(layer[1].categories.length(), 0)
+}

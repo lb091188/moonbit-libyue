@@ -171,3 +171,23 @@ test "本机 lc_lang:$LANG 环境变量读取（Windows 为 BCP-47 区域名）"
       }
   }
 }
+///|
+/// macOS 设置时区的 systemsetup 参数表（纯函数白盒，无 macOS 真机也能
+/// 测）：macOS 与 Linux 同为 IANA 时区标识，只是承载命令从 timedate1 换成
+/// systemsetup。
+test "lc_mac_settz_args:systemsetup -settimezone 参数表" {
+  assert_eq(
+    lc_mac_settz_args("Asia/Shanghai"),
+    ["-settimezone", "Asia/Shanghai"],
+  )
+  assert_eq(lc_mac_settz_args("UTC"), ["-settimezone", "UTC"])
+  assert_eq(
+    lc_mac_settz_args("America/Los_Angeles"),
+    ["-settimezone", "America/Los_Angeles"],
+  )
+  // 标识合法性校验与 Linux 共用（IANA 名不带 '..'、不以 '/' 开头）
+  assert_true(lc_valid_timezone("Asia/Shanghai"))
+  assert_false(lc_valid_timezone("/Asia/Shanghai"))
+  assert_false(lc_valid_timezone("Asia/../etc"))
+  assert_false(lc_valid_timezone(""))
+}

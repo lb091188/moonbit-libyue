@@ -214,3 +214,40 @@ test "bh_profile_candidates：Default 在前/连续编号/容量" {
   assert_eq(cands.length(), 1 + bh_profile_probe_max)
   assert_eq(cands[cands.length() - 1], "Profile \{bh_profile_probe_max}")
 }
+
+///|
+/// macOS 数据根：~/Library/Application Support（HOME 未设置给 None）。
+/// macOS 上 History 库与 Linux 同格式，只是数据根不同——本用例即钉住这个
+/// 根（无 macOS 真机也能验证）。
+test "bh_mac_root：macOS Application Support 根" {
+  assert_eq(
+    bh_mac_root(Some("/Users/u")),
+    Some("/Users/u/Library/Application Support"),
+  )
+  // HOME 为空串 / 未设置都给 None（上层 [bh_root_mac] 转成 BhNoConfigDir）
+  assert_eq(bh_mac_root(Some("")), None)
+  assert_eq(bh_mac_root(None), None)
+  // 与 Linux 根不同：Linux 走 XDG_CONFIG_HOME / $HOME/.config
+  assert_eq(bh_config_root(None, Some("/Users/u")), Some("/Users/u/.config"))
+}
+
+///|
+/// macOS 浏览器定义表：与 Linux 定义表同序同标识，只是数据根下的厂商
+/// 目录名不同（macOS 没有 Windows 那层 User Data）。
+test "bh_browser_defs_mac：macOS 浏览器目录名" {
+  let defs = bh_browser_defs_mac
+  assert_eq(defs.length(), bh_browser_defs.length())
+  assert_eq(defs[0].0, "google-chrome")
+  assert_eq(defs[0].1, "Google/Chrome")
+  assert_eq(defs[1].0, "chromium")
+  assert_eq(defs[1].1, "Chromium")
+  assert_eq(defs[2].0, "microsoft-edge")
+  assert_eq(defs[2].1, "Microsoft Edge")
+  assert_eq(defs[3].0, "brave")
+  assert_eq(defs[3].1, "BraveSoftware/Brave-Browser")
+  // 标识逐项与 Linux 对齐，目录名逐项不同（随数据根而变）
+  for i in 0..<defs.length() {
+    assert_eq(defs[i].0, bh_browser_defs[i].0)
+    assert_true(defs[i].1 != bh_browser_defs[i].1)
+  }
+}

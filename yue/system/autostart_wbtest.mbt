@@ -79,3 +79,44 @@ test "desktop_entry_content 往返" {
   // Exec 行按转义规则可还原出带空格路径（引号包裹形态）
   inspect(content.contains("Exec=\"/opt/my app/x\""), content="true")
 }
+
+///|
+/// macOS 路径的 LaunchAgent plist 生成与解析（纯函数白盒，无 macOS 真机
+/// 也能测）：plist 是 XML，路径里的 & < > 必须转义才不破坏结构。
+test "launch_agent_plist 往返" {
+  let content = launch_agent_plist("/opt/my app/a&b", "com.example.app")
+  inspect(launch_agent_enabled(content), content="true")
+  inspect(content.contains("<string>com.example.app</string>"), content="true")
+  // 路径按 XML 转义写入：& 变 &amp;，裸 & 不得出现
+  inspect(content.contains("/opt/my app/a&amp;b"), content="true")
+}
+
+///|
+test "launch_agent_enabled 解析" {
+  // RunAtLoad 后紧跟 <false/> 是 launchd 的常见禁用写法
+  let off =
+    #|<?xml version="1.0" encoding="UTF-8"?>
+    #|<plist version="1.0"><dict>
+    #|  <key>Label</key><string>com.example.app</string>
+    #|  <key>RunAtLoad</key>
+    #|  <false/>
+    #|</dict></plist>
+  inspect(launch_agent_enabled(off), content="false")
+  // 有其它键在 RunAtLoad 之前时不能被误判
+  let mixed =
+    #|<dict>
+    #|  <key>KeepAlive</key><true/>
+    #|  <key>RunAtLoad</key><false/>
+    #|</dict>
+  inspect(launch_agent_enabled(mixed), content="false")
+  // 没有 RunAtLoad 键 → 未启用
+  inspect(launch_agent_enabled("<dict><key>Label</key></dict>"), content="false")
+  inspect(launch_agent_enabled(""), content="false")
+}
+
+///|
+test "xml_escape 转义四个 XML 保留字符" {
+  inspect(xml_escape("a&b<c>d\"e"), content="a&amp;b&lt;c&gt;d&quot;e")
+  // 中文与空格不是 XML 保留字符，原样保留
+  inspect(xml_escape("/opt/中文 路径/x"), content="/opt/中文 路径/x")
+}

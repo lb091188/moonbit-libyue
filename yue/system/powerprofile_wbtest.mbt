@@ -121,3 +121,22 @@ test "本机探测:supported 真 ↔ current 可查(只读,不执行 set)" {
     assert_true(pp_current() is Err(_))
   }
 }
+
+///|
+/// macOS 路径的 `pmset -g` 解析（纯函数白盒，无 macOS 真机也能测）：低电量
+/// 模式开关只有 0 / 1 两值，输出里没有该字段即不支持。
+test "pp_parse_lowpowermode:pmset -g 输出解析" {
+  // 真实形态：多行系统设置里夹着一行 lowpowermode
+  let sample = "System-wide power settings:\nCurrently in use:\n standby              1\n lowpowermode         1\n"
+  assert_eq(pp_parse_lowpowermode(sample), Some(true))
+  let off = "System-wide power settings:\n lowpowermode         0\n"
+  assert_eq(pp_parse_lowpowermode(off), Some(false))
+  // 制表符 / 多空格分隔同样取到值
+  assert_eq(pp_parse_lowpowermode(" lowpowermode\t1\n"), Some(true))
+  assert_eq(pp_parse_lowpowermode("lowpowermode 0"), Some(false))
+  // 没有该字段 → 不支持（旧系统或机型不支持低电量模式）
+  assert_eq(pp_parse_lowpowermode("System-wide power settings:\n standby 1\n"), None)
+  assert_eq(pp_parse_lowpowermode(""), None)
+  // 只出现字段名但扫不到数字 → 按关处理
+  assert_eq(pp_parse_lowpowermode("lowpowermode"), Some(false))
+}

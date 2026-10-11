@@ -1,6 +1,7 @@
 // 电源:电量查询与交直流切换事件。Linux 走 UPower(系统总线),Windows
 // 走 GetSystemPowerStatus(查询;交直流事件随电源消息窗口批次接入);
-// macOS 暂缓。
+// macOS 查询同走 shim 直连(IOPowerSources,口径对齐 GetSystemPowerStatus),
+// 事件类(交直流切换 / 休眠唤醒)在 mac 上无事件源,保持不支持并写明原因。
 
 ///|
 /// 电量读数。充电中含"已充满仍接着电源";时间字段 None = 系统未给出。
@@ -12,7 +13,8 @@ pub struct BatteryInfo {
 }
 
 ///|
-/// 当前平台是否支持电量查询(macOS 暂缓;Linux 看 UPower 是否真实在线)。
+/// 当前平台是否支持电量查询(Linux 看 UPower 是否真实在线;Windows 与
+/// macOS 走 shim 直连,后者是 IOPowerSources 口径,恒可用)。
 pub fn battery_supported() -> Bool {
   match @yue.platform() {
     "linux" => @traybus.upower_available()
@@ -104,10 +106,17 @@ pub impl Show for PowerSource with fn output(self, logger) {
 pub extend PowerSource with Show::{to_string, output}
 
 ///|
-/// 交直流切换事件是否可用(Windows 事件接入随电源消息窗口批次)。
+/// 交直流切换事件是否可用(Windows 事件接入随电源消息窗口批次;macOS 保持
+/// 不支持:无事件源,原因见分支注释)。
 pub fn power_event_supported() -> Bool {
   match @yue.platform() {
     "linux" => @traybus.upower_available()
+    // macOS:不支持。Linux 侧的 UPower PropertiesChanged 在 mac 上没有
+    // 对应物,IOKit 电源源变更通知要经 shim 补回调蹦床(本批不改 shim);
+    // 用定时器周期性跑 `pmset -g ps` 只能算轮询替代(每次起子进程),不算
+    // 事件订阅,故保持 false——需要切换通知的调用方自行周期查
+    // power_source() 并比对。查询本身(电量 / 电源来源)在 mac 上可用。
+    "macos" => false
     _ => false
   }
 }
@@ -143,7 +152,8 @@ pub fn power_source() -> Result[PowerSource, @yue.PowerError] {
 ///|
 /// 注册交直流切换回调(可多次注册;不支持的平台静默忽略,先以
 /// power_event_supported 判定)。Linux 语义:UPower 顶层 OnBattery
-/// 属性变化即派发。
+/// 属性变化即派发;macOS 静默忽略(无事件源,见 power_event_supported
+/// 的 macOS 注释)。
 pub fn on_power_source_change(cb : (PowerSource) -> Unit) -> Unit {
   match @yue.platform() {
     "linux" => {
@@ -152,6 +162,7 @@ pub fn on_power_source_change(cb : (PowerSource) -> Unit) -> Unit {
       })
       ()
     }
+    "macos" => ()
     _ => ()
   }
 }
@@ -178,11 +189,16 @@ pub extend SleepEvent with Show::{to_string, output}
 
 ///|
 /// 休眠/唤醒事件是否可用。Linux 看 logind 是否在线;Windows 恒可用
-/// (电源广播);macOS 暂缓。
+/// (电源广播);macOS 保持不支持(无事件源,原因见分支注释)。
 pub fn suspend_resume_supported() -> Bool {
   match @yue.platform() {
     "linux" => @traybus.logind_available()
     "windows" => true
+    // macOS:不支持。`pmset -g` 里的 sleep 只是系统休眠「定时配置项」,
+    // 读它推不出「有没有休眠/唤醒事件」——它是分钟数不是事件源;真事件
+    // 要走 NSWorkspace 的 willSleep / didWake 通知,需 shim 补(本批不改
+    // shim)。休眠瞬间也无命令可观测的状态可轮询,故保持 false。
+    "macos" => false
     _ => false
   }
 }
@@ -233,7 +249,8 @@ fn win_watch_once() -> Unit {
 ///|
 /// 注册休眠/唤醒回调(可多次注册;不支持的平台静默忽略,先以
 /// suspend_resume_supported 判定)。快速挂起唤醒可能连收两条
-/// Resuming(库内不去抖)。
+/// Resuming(库内不去抖);macOS 静默忽略(无事件源,见
+/// suspend_resume_supported 的 macOS 注释)。
 pub fn on_suspend_resume(cb : (SleepEvent) -> Unit) -> Unit {
   match @yue.platform() {
     "linux" => {
@@ -246,6 +263,7 @@ pub fn on_suspend_resume(cb : (SleepEvent) -> Unit) -> Unit {
       g_win_sleep_cbs.push(cb)
       win_watch_once()
     }
+    "macos" => ()
     _ => ()
   }
 }

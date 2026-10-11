@@ -283,3 +283,31 @@ test "vsc_local_history / vsc_recent：真实环境端到端（无 VS Code 数�
     Err(_) => assert_true(false)
   }
 }
+
+///|
+/// 用户数据目录三平台拼装（纯函数）：macOS 为
+/// $HOME/Library/Application Support/Code，Linux 为 XDG_CONFIG_HOME/Code
+/// 或 $HOME/.config/Code，Windows 为 %APPDATA%\Code。三个平台 User/ 下的
+/// 结构（globalStorage/storage.json、History/<hash>/entries.json）一致。
+test "vsc_user_data_dir_linux/mac/win：三平台拼装" {
+  assert_eq(
+    vsc_user_data_dir_mac(Some("/Users/u")),
+    Some("/Users/u/Library/Application Support/Code"),
+  )
+  assert_eq(vsc_user_data_dir_mac(Some("")), None)
+  assert_eq(vsc_user_data_dir_mac(None), None)
+  assert_eq(
+    vsc_user_data_dir_linux(Some("/xdg"), Some("/home/u")),
+    Some("/xdg/Code"),
+  )
+  assert_eq(
+    vsc_user_data_dir_linux(Some(""), Some("/home/u")),
+    Some("/home/u/.config/Code"),
+  )
+  assert_eq(vsc_user_data_dir_linux(None, None), None)
+  assert_eq(
+    vsc_user_data_dir_win(Some("C:\\Users\\u\\AppData\\Roaming")),
+    Some("C:\\Users\\u\\AppData\\Roaming\\Code"),
+  )
+  assert_eq(vsc_user_data_dir_win(None), None)
+}

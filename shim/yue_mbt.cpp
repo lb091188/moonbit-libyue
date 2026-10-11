@@ -45,6 +45,9 @@
 #include <unistd.h> // CurrentDirForDrag 的 getcwd(macOS 分支)
 #include <dirent.h> // list_dir 的 opendir/readdir(Linux 与 macOS 同为 POSIX)
 #endif
+#if defined(OS_MAC)
+#include <mach-o/dyld.h> // exe_path 的 _NSGetExecutablePath(macOS 无 /proc)
+#endif
 #include <fstream>
 #include <new>
 #include <map>
@@ -3923,8 +3926,22 @@ extern "C" void *yue_mbt_exe_path(int32_t *ok) {
   }
   *ok = 1;
   return BytesFromString(std::string(path, static_cast<size_t>(n)));
+#elif defined(OS_MAC)
+  // _NSGetExecutablePath 返回的是调用时的路径（可能是相对路径），realpath
+  // 规整成绝对路径，LaunchAgent 的 ProgramArguments 才写得进绝对路径。
+  char raw[4096];
+  uint32_t size = sizeof(raw);
+  if (::_NSGetExecutablePath(raw, &size) != 0) {
+    return moonbit_make_bytes(0, 0);
+  }
+  char resolved[4096];
+  if (::realpath(raw, resolved) == nullptr) {
+    return moonbit_make_bytes(0, 0);
+  }
+  *ok = 1;
+  return BytesFromString(std::string(resolved));
 #else
-  return moonbit_make_bytes(0, 0);  // macOS:暂缓
+  return moonbit_make_bytes(0, 0);
 #endif
 }
 
@@ -4161,11 +4178,18 @@ extern "C" int32_t yue_mbt_win_reveal_file(const char *, int32_t *ok) {
 // 错误码取负）；wait 的 status：0=正常退出（code=退出码）、1=超时已强杀、
 // 2=被信号终止（code=信号号，仅 POSIX）、-1=错误。
 
-#if defined(OS_LINUX)
+// POSIX 分支：Linux 与 macOS 共用（macOS 曾在此为 -1000 桩，但它同为
+// POSIX，只有 setsid() 与 execvpe() 两处是 glibc 扩展，已按平台分流）。
+#if defined(OS_LINUX) || defined(OS_MAC)
 
 #include <cerrno>
+#include <ctime>
 #include <fcntl.h>
 #include <sys/wait.h>
+#if defined(OS_MAC)
+// macOS 没有全局 environ 的直接声明，取 environ 指针要经 _NSGetEnviron()
+#include <crt_externs.h>
+#endif
 
 namespace {
 
@@ -4231,8 +4255,14 @@ extern "C" int32_t yue_mbt_proc_spawn(const char *file, const char *args_blob,
     return -e;
   }
   if (pid == 0) {
-    // 子进程：独立会话自成进程组（超时可整组 SIGKILL）
+    // 子进程：独立会话自成进程组（超时可整组 SIGKILL）。macOS 没有
+    // setsid()，用 setpgid 自成进程组——pgid == pid，wait 里的
+    // kill(-pid, SIGKILL) 仍然成立
+#if defined(OS_MAC)
+    ::setpgid(0, 0);
+#else
     ::setsid();
+#endif
     if (cwd != nullptr && cwd[0] != '\0' && ::chdir(cwd) != 0) {
       ::_exit(126);
     }
@@ -4249,7 +4279,14 @@ extern "C" int32_t yue_mbt_proc_spawn(const char *file, const char *args_blob,
         mbt_proc_redirect(err_path, STDERR_FILENO) != 0) {
       ::_exit(126);
     }
-    ::execvpe(file, argv, envp);  // 裸命令名按 envp 的 PATH 解析
+    // 裸命令名按 PATH 解析：Linux 用 execvpe 直接吃 envp；macOS 没有
+    // execvpe，先把 envp 装进进程自己的 environ 再走 execvp
+#if defined(OS_MAC)
+    *_NSGetEnviron() = envp;
+    ::execvp(file, argv);
+#else
+    ::execvpe(file, argv, envp);
+#endif
     ::_exit(127);
   }
   raw_heap_free(argv);
@@ -4477,7 +4514,7 @@ extern "C" int32_t yue_mbt_proc_getpid(void) {
   return static_cast<int32_t>(::GetCurrentProcessId());
 }
 
-#else  // macOS：桩（procrun Unsupported，MoonBit 侧平台门拦截）
+#else  // 其余平台（macOS 已并入上面的 POSIX 分支）：桩，MoonBit 侧平台门拦截
 
 extern "C" int32_t yue_mbt_proc_spawn(const char *, const char *, const char *,
                                       const char *, const char *,

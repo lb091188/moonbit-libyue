@@ -1,7 +1,9 @@
 // 单实例（防多开）与二次启动唤起：跨平台统一 API。
 // 平台路由：Linux = traybus 声称应用专属总线名 + Wake 方法调用（纯 MoonBit）；
-// Windows = 命名互斥体 + message-only 窗口 WM_COPYDATA 透传命令行（shim）。
-// 语义归一在本层，使用方零平台感知；macOS 暂缓给结构化 Unsupported。
+// Windows = 命名互斥体 + message-only 窗口 WM_COPYDATA 透传命令行（shim）；
+// macOS = TMPDIR 下的 mkdir 排他锁目录 + pid 判活（纯 MoonBit，见
+// [acquire_mac]；无跨实例唤醒通道）。
+// 语义归一在本层，使用方零平台感知。
 //
 // 典型用法：
 //   match @system.SingleInstance::acquire("com.example.app") {
@@ -44,6 +46,7 @@ pub fn SingleInstance::acquire(
         Err(_) => Err(@yue.BackendUnavailable)
       }
     "windows" => acquire_windows(app_id)
+    "macos" => acquire_mac(app_id)
     _ => Err(@yue.Unsupported)
   }
 }
@@ -65,6 +68,9 @@ pub fn SingleInstance::on_activate(
           None => ()
         }
       })
+    // macOS 无跨实例唤醒通道（shim 的窗口消息与置前接口在 macOS 均为桩，
+    // 锁目录只能判「已有实例」、传不了命令行）：回调注册后不会被触发
+    "macos" => ()
     _ => ()
   }
 }
@@ -169,4 +175,136 @@ let g_window_title : Ref[String] = Ref("")
 ///|
 pub fn set_instance_window_title(title : String) -> Unit {
   g_window_title.val = title
+}
+
+// ---------------------------------------------------------------------------
+// macOS：TMPDIR 下的 mkdir 排他锁 + pid 判活（纯函数层白盒测试覆盖）
+//
+// macOS 既没有 D-Bus（Linux 的声称总线名不可用），shim 的命名互斥体与
+// 窗口消息在 macOS 也是桩，只能自己造锁：POSIX 的 mkdir 对已存在目录
+// 必然失败，是本包拿不到 O_EXCL / flock 时唯一可靠的原子互斥手段；锁里
+// 记 pid 是为了区分「真有实例在跑」与「上次崩溃留下的陈旧锁」。
+// TMPDIR 在 macOS 形如 /var/folders/xx/yy/T，天然按用户隔离（等价于
+// Windows 的会话命名空间，无需提升权限）。路径拼装与 pid 解析是纯函数，
+// singleinstance_wbtest.mbt 白盒覆盖（无 macOS 真机也能测）。
+// ---------------------------------------------------------------------------
+
+///|
+/// macOS 锁文件所在临时目录：TMPDIR（设且非空）优先，回退 /tmp。
+pub fn si_mac_tmp_dir(tmpdir : String?) -> String {
+  match tmpdir {
+    Some(d) if d != "" => d
+    _ => "/tmp"
+  }
+}
+
+///|
+/// macOS 单实例锁目录：临时目录下的 <应用标识>.lock（由 mkdir 排他创建
+/// 的空目录，持有即首实例）。
+pub fn si_mac_lock_dir(tmpdir : String?, app_id : String) -> String {
+  si_mac_tmp_dir(tmpdir) + "/" + instance_mutex_name(app_id) + ".lock"
+}
+
+///|
+/// macOS 单实例 pid 文件：锁目录同级的 <应用标识>.pid（首实例写入自己的
+/// pid，供后续实例判活与陈旧锁回收）。
+pub fn si_mac_pid_file(tmpdir : String?, app_id : String) -> String {
+  si_mac_tmp_dir(tmpdir) + "/" + instance_mutex_name(app_id) + ".pid"
+}
+
+///|
+/// pid 文件文本 → pid：取文本里的十进制数字拼成正数（空串 / 无数字 /
+/// 值为 0 给 None）。纯函数，singleinstance_wbtest.mbt 白盒覆盖。
+fn si_mac_parse_pid(text : String) -> Int? {
+  let digits : Array[Int] = []
+  for ch in text {
+    let c = ch.to_int()
+    if c >= 48 && c <= 57 {
+      digits.push(c - 48)
+    }
+  }
+  if digits.length() == 0 {
+    return None
+  }
+  let mut v = 0
+  for d in digits {
+    v = v * 10 + d
+  }
+  if v <= 0 {
+    None
+  } else {
+    Some(v)
+  }
+}
+
+///|
+/// ps 判活的参数表（`-p <pid>`）。纯函数，singleinstance_wbtest.mbt
+/// 白盒覆盖。
+fn si_mac_ps_args(pid : Int) -> Array[String] {
+  ["-p", pid.to_string()]
+}
+
+///|
+/// macOS 进程存活判定：`ps -p <pid>` 退出码 0 即存活（macOS 没有 /proc
+/// 可查，也不用 kill -0 探活以免跨用户权限误判）。
+fn si_mac_pid_alive(pid : Int) -> Bool {
+  match pr_run("ps", si_mac_ps_args(pid), timeout_ms=3000) {
+    Ok(_) => true
+    Err(_) => false
+  }
+}
+
+///|
+/// macOS 首实例判定：TMPDIR 下用 `mkdir` 排他建锁目录；建成者写 pid 后为
+/// 首实例（Ok(Some)），建不成者读 pid 判活——进程还在即让出（Ok(None)），
+/// pid 读不到或进程已退出视为陈旧锁，删锁重建一次（崩溃残留不该让应用
+/// 再也起不来），重建仍失败按「已有实例」让出；子进程不可用 →
+/// BackendUnavailable。
+///
+/// 与另两平台的差异：macOS 没有跨实例唤醒通道，第二实例只判「已有
+/// 实例」，不置前首实例窗口也不透传命令行，因此
+/// [SingleInstance::on_activate] 在 macOS 不会被触发。
+fn acquire_mac(
+  app_id : String,
+) -> Result[SingleInstance?, @yue.SingleInstanceError] {
+  if !pr_available() {
+    return Err(@yue.BackendUnavailable)
+  }
+  let tmp = @env.get_env_var("TMPDIR")
+  let lock_dir = si_mac_lock_dir(tmp, app_id)
+  let pid_file = si_mac_pid_file(tmp, app_id)
+  match pr_run("mkdir", [lock_dir], timeout_ms=4000) {
+    Ok(_) => Ok(si_mac_claim(pid_file, app_id))
+    Err(NonZeroExit(_, _)) => {
+      // 目录已存在：pid 还活着才让出，否则按陈旧锁回收重建
+      let alive = match @yue.read_text_file(pid_file) {
+        None => false
+        Some(text) =>
+          match si_mac_parse_pid(text) {
+            None => false
+            Some(pid) => pid != @yue.ffi_proc_getpid() && si_mac_pid_alive(pid)
+          }
+      }
+      if alive {
+        Ok(None)
+      } else {
+        let ok = Ref(0)
+        let _ = @yue.ffi_remove_file(@yue.utf8_bytes(pid_file), ok)
+        let _ = pr_run("rmdir", [lock_dir], timeout_ms=4000)
+        match pr_run("mkdir", [lock_dir], timeout_ms=4000) {
+          Ok(_) => Ok(si_mac_claim(pid_file, app_id))
+          Err(_) => Ok(None)
+        }
+      }
+    }
+    Err(_) => Err(@yue.BackendUnavailable)
+  }
+}
+
+///|
+/// 成为首实例：把本进程 pid 写进 pid 文件（供后续实例判活）后给出句柄。
+/// pid 文件写失败不影响首实例身份（锁目录已排他持有），只让判活降级。
+fn si_mac_claim(pid_file : String, app_id : String) -> SingleInstance? {
+  let _ = @yue.write_text_file(pid_file, @yue.ffi_proc_getpid().to_string())
+  Some({ app_id, activate: None, })
 }

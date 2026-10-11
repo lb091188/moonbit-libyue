@@ -104,15 +104,17 @@ fn pr_args_blob(args : Array[String]) -> Bytes {
 }
 
 ///|
-/// 传给子进程的环境编码（同上协议）。Linux 给最小环境：PATH（命令名解析）、
-/// XDG_RUNTIME_DIR（会话服务套接字定位）、HOME，并固定 C locale 使输出
-/// 语言恒定可解析；Windows 传空 blob（继承父进程环境，无 locale 语义）。
+/// 传给子进程的环境编码（同上协议）。Linux / macOS 给最小环境：PATH（命令
+/// 名解析）、HOME，Linux 额外带 XDG_RUNTIME_DIR（会话服务套接字定位），
+/// 并固定 C locale 使输出语言恒定可解析；Windows 传空 blob（继承父进程环
+/// 境，无 locale 语义）。
 fn pr_env_blob() -> Bytes {
   let buf = StringBuilder()
   match @yue.platform() {
-    "linux" =>
-      pr_env_blob_linux(buf)
-    // Windows / macOS 传空 blob（继承父进程环境，无 locale 语义）
+    "linux" => pr_env_blob_posix(buf, ["PATH", "XDG_RUNTIME_DIR", "HOME"])
+    // macOS 走 execvp 且 environ 被整体替换，必须自带 PATH 才能解析裸命令
+    // 名；没有 XDG_RUNTIME_DIR
+    "macos" => pr_env_blob_posix(buf, ["PATH", "HOME"])
     _ => ()
   }
   buf.write_char('\u{0}')
@@ -120,10 +122,10 @@ fn pr_env_blob() -> Bytes {
 }
 
 ///|
-/// Linux 最小环境：PATH（命令名解析）、XDG_RUNTIME_DIR（会话服务套接字
-/// 定位）、HOME，并固定 C locale 使输出语言恒定可解析。
-fn pr_env_blob_linux(buf : StringBuilder) -> Unit {
-  for name in ["PATH", "XDG_RUNTIME_DIR", "HOME"] {
+/// POSIX 最小环境：逐个转发名单内的变量，末尾固定追加 C locale 使输出
+/// 语言恒定可解析。
+fn pr_env_blob_posix(buf : StringBuilder, names : Array[String]) -> Unit {
+  for name in names {
     match @env.get_env_var(name) {
       Some(v) => {
         buf.write_string(name)
@@ -150,16 +152,15 @@ fn pr_slurp(path : String) -> String {
 // 平台分流约定：公开 API 只做 `match @yue.platform()` 调度，各平台实现拆成
 // 独立函数，未匹配到的平台一律 Unsupported。
 //
-// macOS 暂未启用：shim 的 yue_mbt_proc_spawn 在 macOS 目前是 -1000 桩（POSIX
-// 实现依赖 setsid() 与 execvpe()，两者 macOS 都没有），待适配后把 "macos"
-// 并进下面的分支即可，其余代码无需改动。
+// macOS 与 Linux 同走 shim 的 POSIX 分支（fork + exec），只是 setsid() 与
+// execvpe() 两处 glibc 扩展在 macOS 换成了 setpgid 与 execvp + environ。
 
 ///|
-/// 当前平台是否支持子进程执行（Linux / Windows）。基于 [pr_run] 的模块
-/// 可用它做平台门；每次调用真实判断，高频场景请调用方自行缓存结果。
+/// 当前平台是否支持子进程执行（Linux / macOS / Windows）。基于 [pr_run]
+/// 的模块可用它做平台门；每次调用真实判断，高频场景请调用方自行缓存结果。
 pub fn pr_available() -> Bool {
   match @yue.platform() {
-    "linux" | "windows" => true
+    "linux" | "macos" | "windows" => true
     _ => false
   }
 }
@@ -181,13 +182,13 @@ pub fn pr_run(
   timeout_ms? : Int = 5000,
 ) -> Result[ProcOutput, ProcError] {
   match @yue.platform() {
-    "linux" | "windows" => pr_run_spawn(cmd, args, timeout_ms~)
+    "linux" | "macos" | "windows" => pr_run_spawn(cmd, args, timeout_ms~)
     _ => Err(Unsupported)
   }
 }
 
 ///|
-/// Linux / Windows 子进程执行实现：spawn → wait → 读临时文件 → 清理。
+/// 三平台子进程执行实现：spawn → wait → 读临时文件 → 清理。
 fn pr_run_spawn(
   cmd : String,
   args : Array[String],

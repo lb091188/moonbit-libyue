@@ -1,7 +1,11 @@
 // 应用查找：已装应用清单与应用二进制查找。
 // Linux：XDG .desktop 条目扫描 + which 语义固定目录查找；
 // Windows：开始菜单 .lnk 递归扫描（全用户 %ProgramData% 与用户
-// %APPDATA% 两层，同名用户覆盖全用户）+ PATH/PATHEXT 语义查找。
+// %APPDATA% 两层，同名用户覆盖全用户）+ PATH/PATHEXT 语义查找；
+// macOS：/Applications、/System/Applications、
+// /System/Applications/Utilities、~/Applications 四处的 .app 包扫描
+// （可执行文件按 <bundle>/Contents/MacOS/<应用名> 推断，存在才给）+
+// PATH（':' 分隔）与 macOS 常用目录语义查找。
 // 文件读取复用 read_text_file；目录枚举与存在性判断走 fsx_list_dir
 // （只列条目名，不读文件内容），按"存在才扫、读不到静默跳过"处理，
 // 全部扫描目录都不存在时报 NoScanDir。
@@ -25,7 +29,8 @@ pub(all) struct AppEntry {
 
 ///|
 pub(all) enum AppFindError {
-  /// 平台不支持（macOS 无 XDG 桌面项体系与开始菜单体系）
+  /// 平台不支持（三平台外无应用清单数据源：Linux 的 XDG 桌面项、Windows
+  /// 的开始菜单 .lnk、macOS 的 .app 包目录）
   Unsupported
   /// 未找到该名称的可执行文件，带查找名
   NotFound(String)
@@ -381,12 +386,13 @@ fn appfind_installed_impl(
 }
 
 ///|
-/// 已装应用清单：真实扫描 /usr/share/applications、
+/// 已装应用清单：Linux 真实扫描 /usr/share/applications、
 /// /usr/local/share/applications、~/.local/share/applications（XDG
 /// 数据目录约定）下的 .desktop，按 desktop id 去重（用户目录覆盖系统
-/// 目录），结果按 name 排序；不存在的目录跳过，全部扫描目录都不存在
-/// 时报 NoScanDir；Linux / Windows 之外给 [Unsupported]（Windows 走
-/// 开始菜单 .lnk 扫描，见 [appfind_installed_win]）。
+/// 目录），结果按 name 排序；Windows 走开始菜单 .lnk 扫描（见
+/// [appfind_installed_win]）；macOS 走四处 .app 包目录扫描（见
+/// [appfind_installed_mac]）。不存在的目录跳过，全部扫描目录都不存在
+/// 时报 NoScanDir；三平台之外给 [Unsupported]。
 pub fn appfind_installed() -> Result[Array[AppEntry], AppFindError] {
   match @yue.platform() {
     "linux" =>
@@ -395,15 +401,16 @@ pub fn appfind_installed() -> Result[Array[AppEntry], AppFindError] {
         fn(path) { @yue.fsx_list_dir(path) },
       )
     "windows" => appfind_installed_win(fn(path) { @yue.fsx_list_dir(path) })
+    "macos" => appfind_installed_mac(fn(path) { @yue.fsx_list_dir(path) })
     _ => Err(Unsupported)
   }
 }
 
 ///|
 /// 已装应用清单（注入版）：与 [appfind_installed] 同流程，目录枚举由
-/// 调用方注入（收目录路径、返回该目录下文件名数组，.desktop / .lnk
-/// 之外的条目会被过滤），供无 fsx 层的调用方与测试使用；Linux /
-/// Windows 之外给 [Unsupported]。
+/// 调用方注入（收目录路径、返回该目录下文件名数组，.desktop / .lnk /
+/// .app 之外的条目会被过滤），供无 fsx 层的调用方与测试使用；Linux /
+/// Windows / macOS 之外给 [Unsupported]。
 pub fn appfind_installed_with(
   list_dir : (String) -> Array[String],
 ) -> Result[Array[AppEntry], AppFindError] {
@@ -417,6 +424,7 @@ pub fn appfind_installed_with(
       )
     "windows" =>
       appfind_installed_win(fn(path) { Ok(list_dir(path)) })
+    "macos" => appfind_installed_mac(fn(path) { Ok(list_dir(path)) })
     _ => Err(Unsupported)
   }
 }
@@ -425,7 +433,10 @@ pub fn appfind_installed_with(
 /// 应用二进制查找（which 语义）：Linux 在 ~/.local/bin、/usr/local/bin、
 /// /usr/bin、/bin、/usr/sbin、/sbin 中按序找名为 name 的条目；Windows
 /// 按 %PATH% 目录序找 name（无扩展名时依次试 %PATHEXT% 扩展，缺省
-/// .com/.exe/.bat/.cmd）。返回首个命中的完整路径；找不到给 NotFound。
+/// .com/.exe/.bat/.cmd）；macOS 按 PATH（':' 分隔）目录序找 name，再以
+/// /usr/local/bin、/opt/homebrew/bin、/usr/bin、/bin、/usr/sbin、/sbin
+/// 兜底（GUI 进程的 PATH 常只有 /usr/bin:/bin:/usr/sbin:/sbin）。
+/// 返回首个命中的完整路径；找不到给 NotFound。
 /// name 为空或含路径分隔符直接 NotFound。命中判定为目录枚举里有该名字
 /// 的条目（不读文件内容；本包不校验执行权限位）。
 pub fn appfind_executable(name : String) -> Result[String, AppFindError] {
@@ -461,6 +472,25 @@ pub fn appfind_executable(name : String) -> Result[String, AppFindError] {
               if appfind_names_hit(names, cand) {
                 return Ok(dir + "/" + cand)
               }
+            }
+          Err(_) => () // 目录打不开：当无此目录
+        }
+      }
+      Err(NotFound(name))
+    }
+    "macos" => {
+      if name == "" || name.contains("/") {
+        return Err(NotFound(name))
+      }
+      let path_env = match getenv_str("PATH") {
+        Some(p) => p
+        None => ""
+      }
+      for dir in appfind_mac_bin_dirs(path_env) {
+        match @yue.fsx_list_dir(dir) {
+          Ok(names) =>
+            if appfind_names_hit(names, name) {
+              return Ok(dir + "/" + name)
             }
           Err(_) => () // 目录打不开：当无此目录
         }
@@ -623,6 +653,143 @@ fn appfind_installed_win(
       scanned = true
     }
     layers.push(layer)
+  }
+  if !scanned {
+    return Err(NoScanDir)
+  }
+  Ok(appfind_merge_entries(layers))
+}
+
+// ---------------------------------------------------------------------------
+// macOS：.app 包扫描与 PATH 查找（纯函数层白盒测试覆盖）
+//
+// macOS 应用是 .app 包（目录），没有 XDG 桌面项也没有开始菜单快捷方式，
+// 只能按约定目录扫包：系统级三处 + 用户级 ~/Applications，每命中一个
+// *.app 目录即一条应用；可执行文件按 bundle 约定取
+// <bundle>/Contents/MacOS/<与 .app 同名的那支>，枚举不到就不给（exec
+// 留空，open(1) 仍可按 bundle 路径拉起）。名字推导与路径拼装是纯函数，
+// appfind_wbtest.mbt 白盒覆盖（无 macOS 真机也能测）。
+// ---------------------------------------------------------------------------
+
+///|
+/// 目录条目名 → 应用名：以 .app 结尾时给去掉后缀的名字（"Safari.app" →
+/// "Safari"）；非 .app 条目与裸 ".app"（去后缀后为空）给 None。
+pub fn appfind_mac_app_name(entry : String) -> String? {
+  if !entry.has_suffix(".app") {
+    return None
+  }
+  let name = entry[:entry.length() - 4].to_owned()
+  if name == "" {
+    None
+  } else {
+    Some(name)
+  }
+}
+
+///|
+/// .app 包内可执行文件的推断路径：bundle 约定为
+/// <bundle>/Contents/MacOS/<应用名>（与 .app 去掉后缀同名的那支二进制）。
+pub fn appfind_mac_exec_path(bundle : String, name : String) -> String {
+  bundle + "/Contents/MacOS/" + name
+}
+
+///|
+/// macOS 应用扫描目录（低 → 高优先级）：系统三处在前，~/Applications 在
+/// 后（同名 bundle 用户级覆盖系统级）；HOME 缺失或为空时只扫系统三处。
+pub fn appfind_mac_scan_dirs(home : String?) -> Array[String] {
+  let dirs : Array[String] = [
+    "/Applications",
+    "/System/Applications",
+    "/System/Applications/Utilities",
+  ]
+  match home {
+    Some(h) if h != "" => dirs.push(h + "/Applications")
+    _ => ()
+  }
+  dirs
+}
+
+///|
+/// macOS 可执行文件查找目录（按序）：PATH 的 ':' 分段在前（POSIX 与
+/// Linux 同语义），macOS 常用目录在后兜底——Homebrew 的
+/// /opt/homebrew/bin 不在 GUI 进程的默认 PATH 里，/usr/local/bin 同理。
+pub fn appfind_mac_bin_dirs(path_env : String) -> Array[String] {
+  let dirs : Array[String] = []
+  for part in path_env.split(":") {
+    let p = part.trim().to_owned()
+    if p != "" {
+      dirs.push(p)
+    }
+  }
+  dirs.push("/usr/local/bin")
+  dirs.push("/opt/homebrew/bin")
+  dirs.push("/usr/bin")
+  dirs.push("/bin")
+  dirs.push("/usr/sbin")
+  dirs.push("/sbin")
+  dirs
+}
+
+///|
+/// macOS 单层 .app 收集：names 为该目录下的条目名数组，非 .app 与裸
+/// ".app" 过滤；list_dir 打不开的条目（普通文件而非包目录）跳过；可
+/// 执行文件按 [appfind_mac_exec_path] 推断，Contents/MacOS 里没有同名
+/// 条目即留空。icon / categories 在 .app 扫描里无来源留空。
+fn appfind_mac_app_layer(
+  dir : String,
+  names : Array[String],
+  list_dir : (String) -> Result[Array[String], @yue.FsError],
+) -> Array[AppEntry] {
+  let layer : Array[AppEntry] = []
+  for fname in names {
+    let base = appfind_basename(fname)
+    let app_name = match appfind_mac_app_name(base) {
+      None => continue
+      Some(n) => n
+    }
+    let bundle = dir + "/" + base
+    if list_dir(bundle) is Err(_) {
+      continue // 不是目录（名为 X.app 的普通文件）：跳过
+    }
+    // 可执行文件存在性按目录枚举判定（list_dir 对普通文件与不存在的
+    // 路径都报错，只能枚举父目录看有没有同名条目）
+    let exec = match list_dir(bundle + "/Contents/MacOS") {
+      Ok(bins) =>
+        if appfind_names_hit(bins, app_name) {
+          appfind_mac_exec_path(bundle, app_name)
+        } else {
+          ""
+        }
+      Err(_) => ""
+    }
+    layer.push({
+      id: app_name,
+      name: app_name,
+      locale_name: app_name,
+      exec,
+      icon: "",
+      categories: [],
+    })
+  }
+  layer
+}
+
+///|
+/// macOS 已装应用清单公共实现：系统三处 + ~/Applications 各扫一层 .app，
+/// 按应用名（bundle 名）去重合并排序；四处都打不开报 NoScanDir。
+fn appfind_installed_mac(
+  list_dir : (String) -> Result[Array[String], @yue.FsError],
+) -> Result[Array[AppEntry], AppFindError] {
+  let layers : Array[Array[AppEntry]] = []
+  let mut scanned = false
+  for dir in appfind_mac_scan_dirs(getenv_str("HOME")) {
+    match list_dir(dir) {
+      Ok(names) => {
+        scanned = true
+        layers.push(appfind_mac_app_layer(dir, names, list_dir))
+      }
+      Err(_) => () // 存在才扫，读不到的目录静默跳过
+    }
   }
   if !scanned {
     return Err(NoScanDir)

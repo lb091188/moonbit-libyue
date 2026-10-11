@@ -1,4 +1,6 @@
-// Firefox 浏览历史读取（只读）：~/.mozilla/firefox/profiles.ini 枚举
+// Firefox 浏览历史读取（只读）：profile 根目录（Linux
+// ~/.mozilla/firefox、macOS ~/Library/Application Support/Firefox、
+// Windows %APPDATA%\Mozilla\Firefox）下的 profiles.ini 枚举
 // profile 目录，读取各 profile 的 places.sqlite（moz_places 表，
 // moonsqlitefile 纯 MoonBit 读取，不复制、不修改原库）。条目复用
 // browser_history.mbt 的 [HistoryItem]（字段结构与 Chrome 历史完全
@@ -208,20 +210,63 @@ fn ffx_parse_profiles_ini(text : String) -> Array[String] {
 }
 
 ///|
-/// Firefox profile 根目录：Linux/macOS 固定 $HOME/.mozilla/firefox，
-/// Windows 为 %APPDATA%\Mozilla\Firefox；HOME/APPDATA 未设置给 None。
+/// Firefox profile 根目录：Linux 为 $HOME/.mozilla/firefox，macOS 为
+/// $HOME/Library/Application Support/Firefox，Windows 为
+/// %APPDATA%\Mozilla\Firefox；其余平台为 None（三平台只是根目录不同，
+/// 目录下都是 profiles.ini + <profile>/places.sqlite 的同格式数据）。
 fn ffx_firefox_root() -> String? {
   match @yue.platform() {
-    "windows" =>
-      match getenv_str("APPDATA") {
-        Some(d) if d != "" => Some(d + "\\Mozilla\\Firefox")
-        _ => None
-      }
-    _ =>
-      match getenv_str("HOME") {
-        Some(h) if h != "" => Some(h + "/.mozilla/firefox")
-        _ => None
-      }
+    "windows" => ffx_root_win()
+    "linux" => ffx_root_linux()
+    "macos" => ffx_root_mac()
+    _ => None
+  }
+}
+
+///|
+/// Linux 路径 profile 根：$HOME/.mozilla/firefox。
+fn ffx_root_linux() -> String? {
+  ffx_linux_root(getenv_str("HOME"))
+}
+
+///|
+/// macOS 路径 profile 根：$HOME/Library/Application Support/Firefox
+/// （Linux 是 ~/.mozilla/firefox，macOS 把应用数据放到 Application
+/// Support；profiles.ini 与 places.sqlite 的表结构两平台一致）。
+fn ffx_root_mac() -> String? {
+  ffx_mac_root(getenv_str("HOME"))
+}
+
+///|
+/// Windows 路径 profile 根：%APPDATA%\Mozilla\Firefox。
+fn ffx_root_win() -> String? {
+  match getenv_str("APPDATA") {
+    Some(d) if d != "" => Some(d + "\\Mozilla\\Firefox")
+    _ => None
+  }
+}
+
+///|
+/// Linux 侧 profile 根（纯函数）：$HOME/.mozilla/firefox；HOME 未设置
+/// 或为空给 None。纯函数，firefox_history_wbtest.mbt 白盒覆盖。
+pub fn ffx_linux_root(home : String?) -> String? {
+  ffx_home_root(home, ".mozilla/firefox")
+}
+
+///|
+/// macOS 侧 profile 根（纯函数）：$HOME/Library/Application Support/Firefox；
+/// HOME 未设置或为空给 None。纯函数，firefox_history_wbtest.mbt 白盒覆盖。
+pub fn ffx_mac_root(home : String?) -> String? {
+  ffx_home_root(home, "Library/Application Support/Firefox")
+}
+
+///|
+/// HOME 下挂接固定相对目录（两平台 profile 根拼装的公共步）：
+/// HOME 缺失或为空给 None。
+fn ffx_home_root(home : String?, relative : String) -> String? {
+  match home {
+    Some(h) if h != "" => Some(h + "/" + relative)
+    _ => None
   }
 }
 

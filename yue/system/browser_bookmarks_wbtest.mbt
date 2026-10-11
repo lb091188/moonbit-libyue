@@ -321,3 +321,24 @@ test "bm_bookmarks：本机 Chrome 书签端到端（存在才跑）" {
     Err(e) => fail("探测书签文件失败: \{e.to_string()}")
   }
 }
+
+///|
+/// macOS 数据根下的 Bookmarks 路径拼装：~/Library/Application Support/
+/// <厂商>/<产品>/<profile>/Bookmarks，与 Linux 的拼装同形（Bookmarks 同为
+/// JSON，只是数据根不同）。无 macOS 真机也能验证。
+test "bm_bookmarks_path：macOS Application Support 根" {
+  let mac_root = "/Users/u/Library/Application Support"
+  assert_eq(
+    bm_bookmarks_path(mac_root, "Google/Chrome", "", "Default"),
+    "/Users/u/Library/Application Support/Google/Chrome/Default/Bookmarks",
+  )
+  assert_eq(
+    bm_bookmarks_path(mac_root, "Microsoft Edge", "", "Profile 2"),
+    "/Users/u/Library/Application Support/Microsoft Edge/Profile 2/Bookmarks",
+  )
+  // Brave 的 profile 仍在 BraveSoftware/Brave-Browser 下一层
+  assert_eq(
+    bm_bookmarks_path(mac_root, "BraveSoftware/Brave-Browser", "", "Default"),
+    "/Users/u/Library/Application Support/BraveSoftware/Brave-Browser/Default/Bookmarks",
+  )
+}

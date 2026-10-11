@@ -234,11 +234,11 @@ fn pwrc_session_call(
 
 ///|
 /// 当前系统是否支持电源控制（Linux 且 logind 在线；Windows 恒支持；
-/// macOS 无实现，恒 false）。每次调用真实探测，高频场景请调用方自行缓存
-/// 结果。
+/// macOS 恒支持，走 loginwindow Apple Event 无需 root）。每次调用真实探测，
+/// 高频场景请调用方自行缓存结果。
 pub fn pwrc_supported() -> Bool {
   match @yue.platform() {
-    "windows" => true
+    "windows" | "macos" => true
     "linux" => pwrc_supported_linux()
     _ => false
   }
@@ -275,11 +275,11 @@ pub fn pwrc_sessions() -> Result[Array[SessionInfo], PwrcError] {
 ///|
 /// 查询当前环境是否允许关机（Can* 结果为 yes/challenge 为允许）。logind
 /// 不在线时返回 Unsupported；其它查询失败为 BusFailed；Windows 恒允许
-/// （动作本身要 SE_SHUTDOWN_NAME 特权，由动作执行处开通）；macOS 无实现，
-/// 恒 Unsupported。
+/// （动作本身要 SE_SHUTDOWN_NAME 特权，由动作执行处开通）；macOS 恒允许
+/// （osascript 无特权门槛，但系统可能弹确认对话框）。
 pub fn pwrc_can_power_off() -> Result[Bool, PwrcError] {
   match @yue.platform() {
-    "windows" => Ok(true)
+    "windows" | "macos" => Ok(true)
     "linux" => pwrc_can_power_off_linux()
     _ => Err(Unsupported)
   }
@@ -297,10 +297,10 @@ fn pwrc_can_power_off_linux() -> Result[Bool, PwrcError] {
 
 ///|
 /// 查询当前环境是否允许重启（CanReboot）。语义同 [pwrc_can_power_off]
-/// （macOS 无实现，恒 Unsupported）。
+/// （Windows / macOS 恒允许）。
 pub fn pwrc_can_reboot() -> Result[Bool, PwrcError] {
   match @yue.platform() {
-    "windows" => Ok(true)
+    "windows" | "macos" => Ok(true)
     "linux" => pwrc_can_reboot_linux()
     _ => Err(Unsupported)
   }
@@ -320,10 +320,12 @@ fn pwrc_can_reboot_linux() -> Result[Bool, PwrcError] {
 /// 关机（有副作用）：Linux 走 logind PowerOff（interactive=true 允许
 /// polkit 交互授权，环境不允许时返回 NotAllowed）；Windows 走
 /// ExitWindowsEx(EWX_POWEROFF|EWX_FORCEIFHUNG)（进程内开通关机特权，
-/// 温和模式只杀挂起进程）。macOS 无实现，恒 Unsupported。
+/// 温和模式只杀挂起进程）；macOS 经 loginwindow Apple Event 请求关机
+/// （osascript，无需 root，系统可能弹确认对话框）。
 pub fn pwrc_power_off() -> Result[Unit, PwrcError] {
   match @yue.platform() {
     "windows" => pwrc_win_shutdown(0)
+    "macos" => pwrc_mac_shutdown(0)
     "linux" => pwrc_power_off_linux()
     _ => Err(Unsupported)
   }
@@ -348,11 +350,12 @@ fn pwrc_power_off_linux() -> Result[Unit, PwrcError] {
 
 ///|
 /// 重启（有副作用）：Linux 走 logind Reboot；Windows 走
-/// ExitWindowsEx(EWX_REBOOT|EWX_FORCEIFHUNG)。macOS 无实现，恒
-/// Unsupported。
+/// ExitWindowsEx(EWX_REBOOT|EWX_FORCEIFHUNG)；macOS 经 loginwindow Apple
+/// Event 请求重启。
 pub fn pwrc_reboot() -> Result[Unit, PwrcError] {
   match @yue.platform() {
     "windows" => pwrc_win_shutdown(1)
+    "macos" => pwrc_mac_shutdown(1)
     "linux" => pwrc_reboot_linux()
     _ => Err(Unsupported)
   }
@@ -376,15 +379,34 @@ fn pwrc_reboot_linux() -> Result[Unit, PwrcError] {
 }
 
 ///|
-/// Windows 关机类动作公共实现：shim 临时开通 SE_SHUTDOWN_NAME 特权后
-/// ExitWindowsEx；失败按 GetLastError 码给 NotAllowed。
-fn pwrc_win_shutdown(how : Int) -> Result[Unit, PwrcError] {
+/// Windows / macOS 关机类动作公共实现：how 0=关机 1=重启 2=注销，两侧共用
+/// 同一个 shim 入口（Windows 走 ExitWindowsEx、macOS 走 loginwindow Apple
+/// Event），只有错误文案不同。失败按错误码给 NotAllowed。
+fn pwrc_native_shutdown(
+  how : Int,
+  label : String,
+) -> Result[Unit, PwrcError] {
   let ok = Ref(0)
   let r = @yue.ffi_win_shutdown(how, ok)
   if r == 0 && ok.val == 1 {
     return Ok(())
   }
-  Err(NotAllowed("ExitWindowsEx 失败（错误码 \{r}）"))
+  Err(NotAllowed("\{label} 失败（错误码 \{r}）"))
+}
+
+///|
+/// Windows 路径关机类动作：shim 临时开通 SE_SHUTDOWN_NAME 特权后
+/// ExitWindowsEx；失败按 GetLastError 码给 NotAllowed。
+fn pwrc_win_shutdown(how : Int) -> Result[Unit, PwrcError] {
+  pwrc_native_shutdown(how, "ExitWindowsEx")
+}
+
+///|
+/// macOS 路径关机类动作：shim fork + execlp /usr/bin/osascript 发
+/// loginwindow Apple Event，无需 root；系统弹确认对话框被用户取消时
+/// osascript 非零退出，按 NotAllowed 返回。
+fn pwrc_mac_shutdown(how : Int) -> Result[Unit, PwrcError] {
+  pwrc_native_shutdown(how, "osascript loginwindow")
 }
 
 ///|
@@ -410,11 +432,12 @@ fn pwrc_logout_linux(session : SessionInfo) -> Result[Unit, PwrcError] {
 ///|
 /// 注销当前会话（有副作用）：Linux 取第一个非空 seat 的会话（多会话时
 /// 只退本座位的首个）；Windows 走 ExitWindowsEx(EWX_LOGOFF)（当前用户
-/// 全部会话）。无任何会话时返回 Unsupported；macOS 无实现，恒
-/// Unsupported。
+/// 全部会话）；macOS 经 loginwindow Apple Event 请求注销（同样作用于当前
+/// 用户全部会话）。无任何会话时返回 Unsupported。
 pub fn pwrc_logout_self() -> Result[Unit, PwrcError] {
   match @yue.platform() {
     "windows" => pwrc_win_shutdown(2)
+    "macos" => pwrc_mac_shutdown(2)
     "linux" => pwrc_logout_self_linux()
     _ => Err(Unsupported)
   }

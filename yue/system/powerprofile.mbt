@@ -278,12 +278,13 @@ fn pp_available() -> Bool {
 
 ///|
 /// 当前系统是否支持电源计划（Linux：powerprofilesctl 存在且可查询；
-/// Windows：电源计划 API 恒在；macOS 无实现，恒 false）。每次调用真实
-/// 探测，高频场景请调用方自行缓存结果。
+/// Windows：电源计划 API 恒在；macOS：`pmset -g` 可跑通即支持）。每次调用
+/// 真实探测，高频场景请调用方自行缓存结果。
 pub fn pp_supported() -> Bool {
   match @yue.platform() {
     "windows" => true
     "linux" => pp_supported_linux()
+    "macos" => pp_supported_mac()
     _ => false
   }
 }
@@ -296,13 +297,14 @@ fn pp_supported_linux() -> Bool {
 
 ///|
 /// 可用电源计划列表（Linux 按 `powerprofilesctl list` 输出序；Windows 枚举
-/// 系统电源方案，未知 GUID 的自定义方案跳过）。查询失败 →
-/// PpCommandFailed；解析不到任何已知计划 → PpParseFailed；macOS 无实现，
-/// 恒 PpUnsupported。
+/// 系统电源方案，未知 GUID 的自定义方案跳过；macOS 只有低电量模式开 / 关
+/// 两档，即 [PBalanced, PPowerSaver]）。查询失败 → PpCommandFailed；解析
+/// 不到任何已知计划 → PpParseFailed。
 pub fn pp_profiles() -> Result[Array[PowerProfile], PowerProfileError] {
   match @yue.platform() {
     "windows" => pp_win_profiles()
     "linux" => pp_profiles_linux()
+    "macos" => pp_profiles_mac()
     _ => Err(PpUnsupported)
   }
 }
@@ -328,12 +330,14 @@ fn pp_profiles_linux() -> Result[Array[PowerProfile], PowerProfileError] {
 
 ///|
 /// 当前电源计划（Linux：`powerprofilesctl get`；Windows 读活动方案 GUID
-/// 映射三档计划）。查询失败 → PpCommandFailed；活动方案是自定义方案 →
-/// PpParseFailed（带 GUID）；macOS 无实现，恒 PpUnsupported。
+/// 映射三档计划；macOS 读低电量模式开关，开 → PPowerSaver、关 →
+/// PBalanced）。查询失败 → PpCommandFailed；活动方案是自定义方案 →
+/// PpParseFailed（带 GUID）。
 pub fn pp_current() -> Result[PowerProfile, PowerProfileError] {
   match @yue.platform() {
     "windows" => pp_win_current()
     "linux" => pp_current_linux()
+    "macos" => pp_current_mac()
     _ => Err(PpUnsupported)
   }
 }
@@ -356,13 +360,15 @@ fn pp_current_linux() -> Result[PowerProfile, PowerProfileError] {
 }
 
 ///|
-/// 切换电源计划（`powerprofilesctl set <计划>`；有副作用，需要认证，
-/// 调用方自行走授权流程）。power-profiles-daemon 未安装 → PpUnsupported；
-/// 查询与执行失败 → PpCommandFailed；macOS 无实现，恒 PpUnsupported。
+/// 切换电源计划（Linux `powerprofilesctl set <计划>`；macOS 切低电量模式
+/// `pmset -a lowpowermode <0|1>`；有副作用，需要认证，调用方自行走授权
+/// 流程）。power-profiles-daemon 未安装 → PpUnsupported；查询与执行失败 →
+/// PpCommandFailed；macOS 请求 PPerformance → PpUnsupported（无对应档位）。
 pub fn pp_set(profile : PowerProfile) -> Result[Unit, PowerProfileError] {
   match @yue.platform() {
     "windows" => pp_win_set(profile)
     "linux" => pp_set_linux(profile)
+    "macos" => pp_set_mac(profile)
     _ => Err(PpUnsupported)
   }
 }
@@ -388,6 +394,154 @@ fn pp_set_linux(profile : PowerProfile) -> Result[Unit, PowerProfileError] {
       Err(PpCommandFailed("powerprofilesctl set: 被信号 \{sig} 终止"))
     Err(Unsupported) => Err(PpUnsupported)
   }
+}
+
+// ---------------------------------------------------------------------------
+// macOS 实现：低电量模式（`pmset -g` 读 / `pmset -a lowpowermode <0|1>` 写）
+//
+// macOS 没有 power-profiles-daemon 那样的三档计划，语义最近的是「低电量
+// 模式」这枚开关：开 → PPowerSaver、关 → PBalanced，性能档无对应（请求
+// PPerformance 返回 PpUnsupported）。写操作改的是系统级设置，通常需要
+// 管理员权限，失败按 PpCommandFailed 带回 pmset 的退出码；输出解析
+// [pp_parse_lowpowermode] 是纯函数，wbtest 白盒覆盖（无 macOS 真机也能测）。
+// ---------------------------------------------------------------------------
+
+///|
+/// macOS 路径支持性：`pmset -g` 可跑通即支持。
+fn pp_supported_mac() -> Bool {
+  if !pr_available() {
+    return false
+  }
+  match pp_mac_run(["-g"], timeout_ms=3000) {
+    Ok(_) => true
+    Err(_) => false
+  }
+}
+
+///|
+/// macOS 路径可用计划：低电量模式开 / 关两档（无性能档）。
+fn pp_profiles_mac() -> Result[Array[PowerProfile], PowerProfileError] {
+  if !pr_available() {
+    return Err(PpUnsupported)
+  }
+  match pp_mac_run(["-g"], timeout_ms=4000) {
+    Err(e) => Err(e)
+    Ok(out) =>
+      match pp_parse_lowpowermode(out) {
+        Some(_) => Ok([PBalanced, PPowerSaver])
+        None => Err(PpParseFailed("pmset -g: \{pp_first_line(out)}"))
+      }
+  }
+}
+
+///|
+/// macOS 路径当前计划：低电量模式开 → PPowerSaver，关 → PBalanced。
+fn pp_current_mac() -> Result[PowerProfile, PowerProfileError] {
+  if !pr_available() {
+    return Err(PpUnsupported)
+  }
+  match pp_mac_run(["-g"], timeout_ms=4000) {
+    Err(e) => Err(e)
+    Ok(out) =>
+      match pp_parse_lowpowermode(out) {
+        Some(true) => Ok(PPowerSaver)
+        Some(false) => Ok(PBalanced)
+        None => Err(PpParseFailed("pmset -g: \{pp_first_line(out)}"))
+      }
+  }
+}
+
+///|
+/// macOS 路径切换：低电量模式开关；PPerformance 无对应档位。
+fn pp_set_mac(profile : PowerProfile) -> Result[Unit, PowerProfileError] {
+  if !pr_available() {
+    return Err(PpUnsupported)
+  }
+  let flag = match profile {
+    PPowerSaver => "1"
+    PBalanced => "0"
+    PPerformance => return Err(PpUnsupported)
+  }
+  pp_mac_apply(["-a", "lowpowermode", flag])
+}
+
+///|
+/// 跑 pmset 并捕获标准输出（错误映射与 Linux 侧 [pp_run] 对齐）。
+fn pp_mac_run(
+  args : Array[String],
+  timeout_ms? : Int = 4000,
+) -> Result[String, PowerProfileError] {
+  match pr_run("pmset", args, timeout_ms~) {
+    Ok(o) => Ok(o.stdout)
+    Err(NonZeroExit(127, _)) => Err(PpUnsupported)
+    Err(NonZeroExit(code, err)) =>
+      Err(PpCommandFailed("pmset: 退出码 \{code}（\{pp_first_line(err)}）"))
+    Err(Timeout(m)) => Err(PpCommandFailed(m))
+    Err(SpawnFailed(m)) => Err(PpCommandFailed(m))
+    Err(Signaled(sig)) => Err(PpCommandFailed("pmset: 被信号 \{sig} 终止"))
+    Err(Unsupported) => Err(PpUnsupported)
+  }
+}
+
+///|
+/// 跑 pmset 写操作，只关心成败（有副作用）。
+fn pp_mac_apply(args : Array[String]) -> Result[Unit, PowerProfileError] {
+  match pp_mac_run(args) {
+    Ok(_) => Ok(())
+    Err(e) => Err(e)
+  }
+}
+
+///|
+/// 解析 `pmset -g` 输出里的低电量模式开关：定位 "lowpowermode" 取其后的第
+/// 一个数字，1 为开、0 为关；输出里没有该字段（旧版 macOS 或不支持该特性
+/// 的机型）返回 None。纯函数，powerprofile_wbtest.mbt 白盒覆盖。
+fn pp_parse_lowpowermode(out : String) -> Bool? {
+  let key = "lowpowermode"
+  let n = out.length()
+  if n < key.length() {
+    return None
+  }
+  let mut i = 0
+  while i + key.length() <= n {
+    if pp_slice_eq(out, i, key) {
+      return Some(pp_scan_flag(out, i + key.length()))
+    }
+    i = i + 1
+  }
+  None
+}
+
+///|
+/// 从 s 的 at 位置起逐字比对 key（调用方保证不越界）。
+fn pp_slice_eq(s : String, at : Int, key : String) -> Bool {
+  let mut k = 0
+  while k < key.length() {
+    if s.unsafe_get(at + k) != key.unsafe_get(k) {
+      return false
+    }
+    k = k + 1
+  }
+  true
+}
+
+///|
+/// 从 at 起取遇到的第一个数字：'1' 为开、'0' 为关，扫不到数字按关处理
+/// （pmset 该字段只写 0 / 1 两值）。
+fn pp_scan_flag(s : String, at : Int) -> Bool {
+  let mut i = at
+  let n = s.length()
+  while i < n {
+    let c = s.unsafe_get(i)
+    if c == '1' {
+      return true
+    }
+    if c == '0' {
+      return false
+    }
+    i = i + 1
+  }
+  false
 }
 
 // ---------------------------------------------------------------------------

@@ -345,6 +345,11 @@ pub fn lc_timezone() -> Result[String, LocaleError] {
 /// NTP 时间同步是否开启：Linux 优先 timedate1 的 NTP 属性（总线调用失败
 /// 自动回退 `timedatectl show`）；Windows 看 W32Time（Windows 时间）服务
 /// 是否在跑。两条路都不可用 → LcUnsupported。
+///
+/// macOS 无对应查询手段，走 `_ =>` 的 LcUnsupported：系统时间同步由
+/// timed 守护进程托管，没有用户态的开关查询接口；shim 的「NTP 服务」直连
+/// 哨兵在 macOS 即明示不支持，`systemsetup -getusingnetworktime` 需 root
+/// 且跨版本输出不稳，不作为实现依据。
 pub fn lc_ntp() -> Result[Bool, LocaleError] {
   match @yue.platform() {
     "linux" =>
@@ -369,7 +374,9 @@ pub fn lc_ntp() -> Result[Bool, LocaleError] {
 /// 设置系统时区（有副作用、需要管理员权限，调用方自行走授权流程）：
 /// Linux 写 timedate1 的 Timezone 属性（IANA 标识，标识非法先给
 /// LcInvalidTimezone，不发起总线调用）；Windows 经 `tzutil /s` 写系统
-/// 时区键名（非空即可，键名不存在由 tzutil 以非零退出报出）。
+/// 时区键名（非空即可，键名不存在由 tzutil 以非零退出报出）；macOS 经
+/// `systemsetup -settimezone` 写系统时区（同为 IANA 标识，见
+/// [lc_set_timezone_mac]）。
 pub fn lc_set_timezone(tz : String) -> Result[Unit, LocaleError] {
   match @yue.platform() {
     "linux" => {
@@ -399,8 +406,44 @@ pub fn lc_set_timezone(tz : String) -> Result[Unit, LocaleError] {
         Err(e) => Err(LcCommandFailed(e.to_string()))
       }
     }
+    "macos" => lc_set_timezone_mac(tz)
     _ => Err(LcUnsupported)
   }
+}
+
+///|
+/// macOS 路径设置时区：`systemsetup -settimezone <tz>`。macOS 的时区标识
+/// 同为 IANA 名（与 Linux 同语义，故合法性校验复用 [lc_valid_timezone]，
+/// 非法标识先给 LcInvalidTimezone 不发命令）；该命令改的是系统级设置，
+/// 需要管理员权限，非 root 时由 systemsetup 以非零退出报出 →
+/// LcCommandFailed。参数表构造是纯函数 [lc_mac_settz_args]，
+/// locale_sys_wbtest.mbt 白盒覆盖（无 macOS 真机也能测）。
+fn lc_set_timezone_mac(tz : String) -> Result[Unit, LocaleError] {
+  if !lc_valid_timezone(tz) {
+    return Err(LcInvalidTimezone(tz))
+  }
+  match pr_run("systemsetup", lc_mac_settz_args(lc_trim(tz)), timeout_ms=8000) {
+    Ok(_) => Ok(())
+    Err(NonZeroExit(127, _)) => Err(LcUnsupported)
+    Err(NonZeroExit(code, err)) =>
+      Err(
+        LcCommandFailed(
+          "systemsetup -settimezone: 退出码 \{code}（\{lc_first_line(err)}）",
+        ),
+      )
+    Err(Timeout(m)) => Err(LcCommandFailed(m))
+    Err(SpawnFailed(m)) => Err(LcCommandFailed(m))
+    Err(Signaled(sig)) =>
+      Err(LcCommandFailed("systemsetup: 被信号 \{sig} 终止"))
+    Err(Unsupported) => Err(LcUnsupported)
+  }
+}
+
+///|
+/// macOS 设置时区的 systemsetup 参数表（`-settimezone <tz>`）。纯函数，
+/// locale_sys_wbtest.mbt 白盒覆盖。
+fn lc_mac_settz_args(tz : String) -> Array[String] {
+  ["-settimezone", tz]
 }
 
 ///|

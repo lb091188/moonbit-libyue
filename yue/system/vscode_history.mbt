@@ -205,6 +205,8 @@ fn vsc_resource_uri(user_dir : String, file_path : String) -> String {
   }
   let p = match @yue.platform() {
     "windows" => vsc_win_uri_path(file_path)
+    // Linux / macOS 同为 POSIX 绝对路径，无盘符与反斜杠，原样进路径段编码
+    "linux" | "macos" => file_path
     _ => file_path
   }
   if p.has_prefix("//") {
@@ -341,6 +343,8 @@ fn vsc_uri_to_path(uri : String) -> String? {
     let full = if authority != "" { "//" + authority + path } else { path }
     let native = match @yue.platform() {
       "windows" => vsc_uri_path_win(full)
+      // Linux / macOS 还原结果即 POSIX 绝对路径本身
+      "linux" | "macos" => full
       _ => full
     }
     return Some(native)
@@ -441,28 +445,54 @@ pub fn VscHistoryEntry::timestamp_seconds(self : VscHistoryEntry) -> Int64 {
 
 ///|
 /// VS Code 用户数据目录：Linux 为 $XDG_CONFIG_HOME/Code（缺省 $HOME/.config/Code），
-/// macOS 为 $HOME/Library/Application Support/Code，Windows 为 %APPDATA%\Code。
+/// macOS 为 $HOME/Library/Application Support/Code，Windows 为 %APPDATA%\Code；
+/// 三个平台下 User/ 内的目录结构（globalStorage/storage.json、History/
+/// <hash>/entries.json）完全一致，只是数据根不同。
 fn vsc_user_data_dir() -> String? {
   match @yue.platform() {
     "linux" =>
-      match getenv_str("XDG_CONFIG_HOME") {
-        Some(d) if d != "" => Some(d + "/Code")
-        _ =>
-          match getenv_str("HOME") {
-            Some(h) if h != "" => Some(h + "/.config/Code")
-            _ => None
-          }
-      }
-    "macos" =>
-      match getenv_str("HOME") {
-        Some(h) if h != "" => Some(h + "/Library/Application Support/Code")
+      vsc_user_data_dir_linux(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME"))
+    "macos" => vsc_user_data_dir_mac(getenv_str("HOME"))
+    "windows" => vsc_user_data_dir_win(getenv_str("APPDATA"))
+    _ => None
+  }
+}
+
+///|
+/// Linux 侧用户数据目录（纯函数）：XDG_CONFIG_HOME（设且非空）优先，回退
+/// $HOME/.config/Code；两者都缺给 None。纯函数，
+/// vscode_history_wbtest.mbt 白盒覆盖。
+pub fn vsc_user_data_dir_linux(
+  xdg_config_home : String?,
+  home : String?,
+) -> String? {
+  match xdg_config_home {
+    Some(d) if d != "" => Some(d + "/Code")
+    _ =>
+      match home {
+        Some(h) if h != "" => Some(h + "/.config/Code")
         _ => None
       }
-    "windows" =>
-      match getenv_str("APPDATA") {
-        Some(d) if d != "" => Some(d + "\\Code")
-        _ => None
-      }
+  }
+}
+
+///|
+/// macOS 侧用户数据目录（纯函数）：$HOME/Library/Application Support/Code
+/// （Linux 是 $HOME/.config/Code；HOME 未设置或为空给 None）。纯函数，
+/// vscode_history_wbtest.mbt 白盒覆盖。
+pub fn vsc_user_data_dir_mac(home : String?) -> String? {
+  match home {
+    Some(h) if h != "" => Some(h + "/Library/Application Support/Code")
+    _ => None
+  }
+}
+
+///|
+/// Windows 侧用户数据目录（纯函数）：%APPDATA%\Code（未设置或为空给
+/// None）。纯函数，vscode_history_wbtest.mbt 白盒覆盖。
+pub fn vsc_user_data_dir_win(appdata : String?) -> String? {
+  match appdata {
+    Some(d) if d != "" => Some(d + "\\Code")
     _ => None
   }
 }
