@@ -370,6 +370,56 @@ fn make_band(ctr : Ctr) -> @core.Widget {
 }
 
 ///|
+/// 表格演示数据（6 行 4 列）。
+fn make_table_rows() -> Array[@ui.TableRow] {
+  let out : Array[@ui.TableRow] = []
+  for i = 1; i <= 6; i = i + 1 {
+    out.push(
+      @ui.TableRow::make([
+        "组件 " + i.to_string(),
+        (i * 12).to_string() + " 处",
+        if i % 3 == 0 { "待修" } else { "通过" },
+        "批次 " + (i % 2 + 1).to_string(),
+      ]),
+    )
+  }
+  out
+}
+
+///|
+/// 表格区块：表头可排序、行可点选（选择与排序都写 Store，示例在退出状态行报出来）。
+fn make_table_section(
+  rows : @core.Store[Array[@ui.TableRow]],
+  sel : @core.Store[Array[Int]],
+  sort : @core.Store[@ui.TableSort],
+  slot : Ref[@core.Widget?],
+) -> @core.Node {
+  @ui.container(
+    [
+      @ui.label("表格：点表头排序（新列升序 / 同列翻转 / 第三次取消）、点行选中", size=13.0),
+      @ui.table_t(
+        [
+          @ui.TableColumn::make("组件", 140.0),
+          @ui.TableColumn::make("规模", 100.0, align=@text.End),
+          @ui.TableColumn::make("状态", 100.0),
+          @ui.TableColumn::make("批次", 0.0, sortable=false),
+        ],
+        rows,
+        width=520.0,
+        selection=sel,
+        sort=sort,
+        handle=fn(w : @core.Widget) -> Unit { slot.val = Some(w) },
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 滚动容器里的 20 行内容（每行 22 高 → 内容 440，视口 120，可滚 320）。
 fn make_scroll_rows() -> Array[@core.Node] {
   let rows : Array[@core.Node] = []
@@ -575,6 +625,11 @@ fn main {
   let dpk_w : Ref[@core.Widget?] = Ref(None)
   let drg_w : Ref[@core.Widget?] = Ref(None)
   let trg_w : Ref[@core.Widget?] = Ref(None)
+  let tb_rows = @core.Store::new(make_table_rows())
+  let tb_sel : @core.Store[Array[Int]] = @core.Store::new([])
+  let tb_sort : @core.Store[@ui.TableSort] = @core.Store::new({ column: -1, asc: true })
+  let tb_w : Ref[@core.Widget?] = Ref(None)
+  app.mount([make_table_section(tb_rows, tb_sel, tb_sort, tb_w)])
   app.mount([
     @ui.container(
       [
@@ -975,7 +1030,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' drg='\{drg_str}' trg='\{trg_str}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} drg='\{drg_str}' trg='\{trg_str}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -1083,6 +1138,15 @@ fn main {
     Some(w) => rect_str(w.rect)
     None => "-"
   }
+  let tb_head0 = match tb_w.val {
+    Some(w) => rect_str(w.children()[0].children()[0].rect)
+    None => "-"
+  }
+  let tb_row1 = match tb_w.val {
+    Some(w) => rect_str(w.children()[1].children()[1].rect)
+    None => "-"
+  }
+  println("NATIVE-APP-TB head0=" + tb_head0 + " row1=" + tb_row1)
   let trg_rect = match trg_w.val {
     Some(w) => {
       let f = w.children()[0]
