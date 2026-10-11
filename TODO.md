@@ -55,7 +55,7 @@
 - [ ] 文本族 `components_text.mbt`：`label_t`、`code_view`＋`tokenize_lang`/`tokenize_moonbit`、`measure_text_height`
 - [~] 表单族 `components_form.mbt`（15）：`checkbox`/`radio_group`/`switch_t`/`slider_t`/`progress`/`stepper`(`input_number` 形态)已落 `yue/ui/form.mbt`（值走 `Store[T]`、订阅随回收袋退订、禁用态用 `Enabled` 单元、滑块拖动靠组件自持的 dragging）；剩 `entry_t`/`input_t`/`textarea_t`（随「输入框全语义」那条一起做）与 `button_t`/`form_item`/`form`/`link`/`select_t`/`rate_t`/`color_picker_t`
 - [~] 输入框全语义（`yue/ui/entry.mbt`，单行）：选区/双击选词/拖动插入点/Shift+箭头/undo-redo/Ctrl+A-C-V(内核内部剪贴板=记档降级)/placeholder/只读/密码遮罩/IME commit+preedit 内联全部落地，真窗口注入回证 `t3='组件框ab Q'`（点进框→打字→双击只选最后一个词→替换→Home+Shift+End+Delete+Ctrl+Z 撤销回来）；剩多行 `textarea_t`（要先做换行布局与垂直滚动）
-- [ ] 显示族 `components_display.mbt`（16）：`tag`/`tag_of_type`/`badge_count`/`badge_dot`/`avatar`/`timeline`/`descriptions`/`result`/`empty`/`statistic`/`progress_line`/`divider`/`card`/`alert`/`alert_closeable`/`carousel_t`
+- [~] 显示族 `components_display.mbt`（16）：`tag`/`tag_of_type`/`badge_count`/`badge_dot`/`avatar`/`statistic`/`progress_line`/`divider`/`alert`(含 closable 热区)/`card`/`descriptions`/`empty`/`result` 已落 `yue/ui/display.mbt`（13/16，CSS style 通道未接、只给类型化参数）；剩 `timeline`/`carousel_t`（轮播需动画驱动）
 - [ ] 日期族 `components_datetime.mbt`（5）：`calendar_t`/`date_picker_t`/`date_range_picker_t`/`time_range_picker_t`/`datetime_range_picker_t`
 - [ ] 导航族 `components_nav.mbt`（10）：`side_menu(_sections)`/`segmented`/`breadcrumb`/`pagination`/`steps`/`collapse`/`tree`/`transfer`/`tabs_t`
 - [ ] 表格 `components_table.mbt`：`table_t`/`table_v_t` + `TableColumn`/`TableRow` 模型 —— 虚拟滚动、列宽拖动、排序、搜索、行选择

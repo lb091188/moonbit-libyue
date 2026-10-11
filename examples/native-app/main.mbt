@@ -29,6 +29,8 @@ priv struct Ctr {
   mut moved : Int
   // 批次 5b：组件层按钮的点击数
   mut comp : Int
+  // 批次 6a：提示条关闭热区被点的次数
+  mut closed : Int
 }
 
 ///|
@@ -369,7 +371,7 @@ fn make_band(ctr : Ctr) -> @core.Widget {
 
 ///|
 fn main {
-  let app = match @core.App::new(560, 424, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(560, 600, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -387,6 +389,7 @@ fn main {
     up: 0,
     moved: 0,
     comp: 0,
+    closed: 0,
   }
   let root = app.root
   root.set_column()
@@ -458,6 +461,40 @@ fn main {
       border=@theme.theme_border(),
     ),
   ])
+  // 批次 6a（显示族首批）：标签 / 徽标 / 头像 / 分隔线 / 提示条 / 折线进度。
+  app.mount([
+    @ui.container(
+      [
+        @ui.container(
+          [
+            @ui.tag_of_type("主色", @ui.Primary),
+            @ui.tag_of_type("成功", @ui.Success),
+            @ui.tag("自定色", @theme.theme_danger()),
+            @ui.badge_count(7),
+            @ui.badge_count(150),
+            @ui.badge_dot(),
+            @ui.avatar("刘"),
+          ],
+          direction=@yoga.Row,
+          column_gap=6.0,
+          align_items=@yoga.AlignItems::Center,
+        ),
+        @ui.divider(text="或"),
+        @ui.alert(
+          "提示条",
+          description="关闭热区在右上角 24×24",
+          t=@ui.Warning,
+          closable=true,
+          on_close=fn() { ctr.closed = ctr.closed + 1 },
+        ),
+        @ui.progress_line(level, max=100.0, width=300.0),
+      ],
+      padding=8.0,
+      row_gap=8.0,
+      bg=@theme.theme_bg_page(),
+      border=@theme.theme_border(),
+    ),
+  ])
   // 批次 5d（输入框全语义）：整只框由 `@ui.entry` 提供——键入、选区、双击选词、
   // 拖动、undo、输入法提交与 preedit 都在组件里，宿主只按焦点投递。
   let t3 = @core.Store::new("组件框")
@@ -502,7 +539,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed}"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
