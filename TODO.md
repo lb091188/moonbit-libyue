@@ -78,7 +78,7 @@
   - [x] tooltip 支撑层 + 交互层（`ci_zoom` 窗口数学/`ci_visual_map` 色带/`ci_mark_line`/`ci_mark_area`/`ci_save` PNG 离屏导出（Linux 真落盘）/`ci_legend_hit`/`ci_filter_visible`）+ 3 个交互变体 `charts_it`（`line_chart_it`/`bar_chart_it`/`donut_chart_it`：hover 浮层 + 可点击图例显隐 + 滚轮缩放/拖拽平移；图例色改 `(名字, 索引)` + `color_at` 现取，主题切换免重建；`draw_donut` 拆 `draw_donut_core` 供交互版复用）；chart 37/37、真窗口像素采样回证（图例隐藏项变灰 + 扇区重分配 + tooltip 落位），滚轮注入因 XTest 对 GTK3(XI2) 无效留用户真机复验
   - [~] 15 种专项图按批平移（与 master 同源，一图一文件 + wbtest，组件挂载断言补充）
     - [x] 批 1：boxplot（五数概括/1.5×IQR 须端离群）/ funnel（降序分层梯形/占比标注）/ heatmap（矩阵量程/色带插值/格内数值）/ radar（N 边形网格/多系列叠加）——真窗口四图特征色采样齐全（离群红点/色带深浅/双系列）
-    - [ ] 批 2：kline / sankey / treemap / tree
+    - [x] 批 2：kline（涨红跌绿/影线实体）/ sankey（分层布局/贝塞尔色带）/ treemap（squarified 切分/兄弟明度梯度/hover 画卷命中）/ tree（肘线连线/两形态/深度渐变）——tree 的 orientation 字符串参数改 vertical 布尔（新栈类型化参数口径）；TreeItem 跨包构造用 make+push（字面量构造限定义包）
     - [ ] 批 3：sunburst / graph / parallel / pictorialbar
     - [ ] 批 4：effectscatter / themeriver / geo
 - [ ] Markdown（`markdown/markdown.mbt`）：`markdown_view` 17 种 block 变体 → 新 AttributedText；GFM 渲染面（表格/任务列表/脚注/删除线/图片/可点击链接）

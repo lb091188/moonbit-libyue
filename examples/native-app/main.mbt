@@ -750,7 +750,10 @@ fn make_chart_it_section(
 
 ///|
 /// 专项图区块：箱线/漏斗/热力/雷达四图并排（首批专项平移）。
-fn make_chart_special_section(sp_w : Ref[@core.Widget?]) -> @core.Node {
+fn make_chart_special_section(
+  sp_w : Ref[@core.Widget?],
+  sp2_w : Ref[@core.Widget?],
+) -> @core.Node {
   let box_groups = @core.Store::new([
     ("渲染", [12.0, 14.0, 15.0, 16.0, 18.0, 22.0, 48.0]),
     ("布局", [8.0, 10.0, 12.0, 13.0, 15.0, 17.0, 20.0]),
@@ -783,6 +786,38 @@ fn make_chart_special_section(sp_w : Ref[@core.Widget?]) -> @core.Node {
     @chart.RadarSeries::make("本栈", [78.0, 92.0, 70.0, 58.0]),
     @chart.RadarSeries::make("对标", [60.0, 74.0, 86.0, 90.0]),
   ])
+  let kline_data = @core.Store::new([
+    @chart.Candle::make(10.0, 12.0, 9.0, 11.5),
+    @chart.Candle::make(11.5, 13.2, 11.0, 12.8),
+    @chart.Candle::make(12.8, 13.5, 11.5, 11.2),
+    @chart.Candle::make(11.2, 11.9, 10.3, 11.7),
+    @chart.Candle::make(11.7, 12.4, 11.0, 12.1),
+    @chart.Candle::make(12.1, 12.6, 10.8, 11.0),
+  ])
+  let sankey_data = @core.Store::new(
+    @chart.SankeyData::make(
+      [
+        @chart.SankeyNode::make("浏览"),
+        @chart.SankeyNode::make("加购"),
+        @chart.SankeyNode::make("下单"),
+      ],
+      [
+        @chart.SankeyLink::make(0, 1, 100.0),
+        @chart.SankeyLink::make(1, 2, 55.0),
+      ],
+    ),
+  )
+  let tm_items = @core.Store::new([
+    @chart.TmItem::make("核心", value=52.0),
+    @chart.TmItem::make("组件", value=28.0),
+    @chart.TmItem::make("图表", value=12.0),
+    @chart.TmItem::make("示例", value=8.0),
+  ])
+  let tree_root_item = @chart.TreeItem::make("yue")
+  tree_root_item.children.push(@chart.TreeItem::make("core", value=Some(30.0)))
+  tree_root_item.children.push(@chart.TreeItem::make("ui", value=Some(40.0)))
+  tree_root_item.children.push(@chart.TreeItem::make("chart", value=Some(20.0)))
+  let tree_root = @core.Store::new(tree_root_item)
   @ui.container(
     [
       @ui.label("专项图：箱线/漏斗/热力/雷达（同源自 master，四图并排）", size=13.0),
@@ -798,6 +833,22 @@ fn make_chart_special_section(sp_w : Ref[@core.Widget?]) -> @core.Node {
             handle=fn(w : @core.Widget) -> Unit { sp_w.val = Some(w) },
           ),
           @chart.radar_chart_t(radar_inds, radar_sers, width=250.0, height=170.0),
+        ],
+        direction=@yoga.Row,
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::FlexStart,
+      ),
+      @ui.container(
+        [
+          @chart.candlestick_t(kline_data, width=300.0, height=150.0),
+          @chart.sankey_t(
+            sankey_data,
+            width=300.0,
+            height=150.0,
+            handle=fn(w : @core.Widget) -> Unit { sp2_w.val = Some(w) },
+          ),
+          @chart.tm_chart_t(tm_items, width=280.0, height=150.0),
+          @chart.tree_chart_t(tree_root, width=250.0, height=150.0),
         ],
         direction=@yoga.Row,
         column_gap=8.0,
@@ -1034,7 +1085,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1400, 2300, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1400, 2500, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -1267,7 +1318,8 @@ fn main {
     make_chart_it_section(it_lin, it_bars, it_rings, it_zoom, it_panel_w),
   ])
   let sp_w : Ref[@core.Widget?] = Ref(None)
-  app.mount([make_chart_special_section(sp_w)])
+  let sp2_w : Ref[@core.Widget?] = Ref(None)
+  app.mount([make_chart_special_section(sp_w, sp2_w)])
   app.mount([
     make_form_section(
       frm_btn,
@@ -1899,7 +1951,10 @@ fn main {
     it_zoom.end.round().to_int().to_string(),
   )
   println(
-    "NATIVE-APP-CHSP heat=" + ov2_rect_of(sp_w.val),
+    "NATIVE-APP-CHSP heat=" +
+      ov2_rect_of(sp_w.val) +
+      " sankey=" +
+      ov2_rect_of(sp2_w.val),
   )
   println(
     "NATIVE-APP-MEDIA gif=" +

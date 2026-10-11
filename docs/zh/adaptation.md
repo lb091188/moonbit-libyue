@@ -646,6 +646,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **四条工具链写法（本批实测）**：① `pub const` 的名字**必须大写**（`pub const pi` 直接报「Expected upper case identifier for name of const, found lower case. Did you mean let?」），小写常量用 `pub let`；② `for i = 1..<n { }` 不支持——range 只在 `for x in a..<b` 里合法，经典 for 要写 `for i = 1; i < n; i = i + 1`；③ `StringBuilder` 的写入方法是 `write_string`/`write_char`，没有 `add`/`append`；④ `Ordering` 类型在本工具链不可直接引用（写比较器函数会报「The type Ordering is undefined」），几个元素排序退回插入排序。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/chart` **11/11**（6 条纯函数：窗口丢最旧与越界无操作、值域退化与留白比例、1-2-5 步长与负区间起点、单位换挡 k/M/G、柱槽与两形态命中、扇区只累计正值且单扇区留 0.0002 弧度、仪表分段取色与折线段数、回归退化、8 位色串、标签截断；5 条组件：折线换数据与密集抽推出图、柱状悬停换底与离开复原、环形出图 + 命中四态、仪表盘 smooth 两路（直接跳到位 / 逐拍逼近）、散点带趋势线）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 加「图表」区块：折线+柱状一行、环形+仪表+散点+推点按钮一行，几何行补 `NATIVE-APP-CH`，状态行补 `ln=`/`chp=`）：注入「点三次推点按钮」得 `ln=27/23 chp=3`（窗口 24→27 点、末值 7→23，与手算 `pushes*7%29+2` 逐位一致）、退出码 0；截图复核五图齐备——折线带面积填充与右端最新值标注、柱状正负异色带类目、环形中心汇总 + 右侧图例带百分比、仪表 68% 弧与中心数字、散点带最小二乘趋势线。
 
+### MoonBit 原生 GUI 栈 · 专项图批 2（`yue/chart`：kline / sankey / treemap / tree）
+
+- **机械平移 + 手工段**：四个文件用转换脚本做依赖名替换（`@yue.*` → `@theme`/`@render`/`@core`/本包函数），「暂无数据」块、条件 align 的 `draw_text`、组件层 mount 块三处手工改写——`draw_text` 的 `align=` 允许任意表达式（`align=if first_col { @text.End } else { @text.Start }`），转换器按字面量枚举匹配会漏，这类段落一律手改。
+- **treemap 的 `RectF` 改本地 `TmRect`**：旧链路复用根包 `RectF`（x/y/width/height），新栈 core 的 `Rect` 字段名是 w/h 且语义是布局矩形——图表包自带同形 `TmRect`（15 处替换），不引跨语义依赖。`from_hsl` 在 `@theme.palette` 就位。
+- **`tree_chart_t` 的 `orientation : String` 改 `vertical : Bool`**：旧链路字符串参数（"horizontal"/"vertical"）是历史 API 形态，新栈组件参数一律类型化（对齐 `bar_chart_t` 的 `horizontal?`）。
+- **TreeItem/TmItem 跨包构造必须走 `make`**：`pub(all) struct` 的字面量构造在定义包之外报「There is no record definition with the fields」（native-app 里构造树数据踩到）——跨包构造统一 `TreeItem::make(name, value=…)` + `children.push(…)`（children 是数组字段，内容可变）。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/chart` **98/98**（新增 34：kline/sankey/treemap/tree 四份 wbtest 同源平移 29 条 + 组件挂载 5 条——K 线涨红跌绿两色都出像素、桑基出图换数据变、树图 hover 提亮与复原（flat 画卷与绘制同源）、树图两形态出像素）；包 `--deny-warn` 零警告、全仓红点仍 287/68。真窗口几何行确认布局（`NATIVE-APP-CHSP sankey=332,2190,300x150`），截图复核受限：窗口 2500 高已超 XFCE 允许的移动范围（`windowmove -1346` 被 WM 钳到 -1278，目标区块底部出屏且钳制路径下 GTK 丢失 expose、截到空 backing）——**视觉观感留用户真机复验**（native-app 专项图区块第二行）。
+
 ### MoonBit 原生 GUI 栈 · 专项图批 1（`yue/chart`：boxplot / funnel / heatmap / radar）
 
 - **一图一文件、同源平移**：master 的 `charts_boxplot.mbt`/`charts_funnel.mbt`/`charts_heatmap.mbt`/`charts_radar.mbt` 各平移为 `boxplot.mbt`/`funnel.mbt`/`heatmap.mbt`/`radar.mbt`（纯函数层原样 + 绘制层换 `@render.Painter`/`@text.draw_box_at`/`@theme` 现取色 + 组件层换 `node_of_new` 形态），wbtest 四份对应平移并各补一条**组件挂载出像素断言**（`ink_of > N` + 换数据 `diff_of > 50` + 空数据/维度不足不崩）——纯函数对而组件没接线的回归第一次就能被抓住。旧链路 `AttributedText`「暂无数据」统一换成 `@text.draw_box_at` 固定盒写法（与 `draw.mbt` 同款）。
