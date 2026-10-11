@@ -19,7 +19,7 @@
 - [x] **G5a** Linux 纯通道输入法接入（xdotool 注入验通中文提交）
 - [~] **G5b** 输入通道补齐
   - ibus 一套复验（探针侧归因 libpinyin display-style，待确认）
-  - Windows：`ImmAssociateContext` 优先、可见 `EDIT` 作可切换兜底（触发条件：只走 TSF 的 IME 在 legacy 通道打不出中文）
+  - [x] Windows 纯通道已落（W6）：`WM_IME_COMPOSITION` 读 `GCS_COMPSTR`→preedit（光标字符偏移换字节偏移）、`GCS_RESULTSTR`→commit，`ImmSetCompositionWindow`/`ImmSetCandidateWindow` 贴光标底边、`ImmNotifyIME(NI_COMPOSITIONSTR,CPS_CANCEL)` 复位并清本侧缓存，`WM_IME_SETCONTEXT` 滤掉系统组合窗（本栈 preedit 自绘）；探针 `experiment/ime_win_probe` 回证 API 通路，真实拼音端到端归 W7 注入（本机有微软拼音）。**兜底未启用**：`ImmAssociateContext` 优先 / 可见 `EDIT` 作可切换兜底，触发条件=只走 TSF 的 IME 在 legacy 通道打不出中文（本机未出现）
   - macOS：`NSTextInputClient`（前置：有 mac 真机）
   - 肉眼确认项：preedit 下划线观感、候选窗是否贴组合串末尾、caret 闪烁观感（点击定位已用 xdotool 客观验通：点控件最左端 caret 归 0、原位插字符）
   - [x] `TextEditorHost` 抽象收口：做成**焦点控件上的五个回调**（`on_key`/`on_commit`/`on_preedit`/`im_context`/`im_cursor`，input 已依赖 core 故不能反向持有 host），宿主按焦点投递；配套 `Window::im_reset()`——换焦点时先把排队的 commit 交还**旧**控件再 reset，实测修掉「A 框打的拼音 commit 进 B 框」

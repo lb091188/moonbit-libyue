@@ -38,11 +38,14 @@
 #endif
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <imm.h> // IME 纯通道（W6）：ImmGetContext/ImmSet*Window/ImmNotifyIME
 #include <stdint.h>
 #include <string.h>
 // 本分支用 snprintf 格式化注册表读出的主色（缺了它 MSVC 报 C4013 隐式声明，
-// 默认返回 int 并与 varargs 混用，是「能编过但口径不可信」的形态）
+// 默认返回 int 并与 varargs 混用，是「能编过但口径不可信」的形态）；
+// IME 段的宽串转 UTF-8 走 malloc/free，故 stdlib 也要
 #include <stdio.h>
+#include <stdlib.h>
 
 #define WM_MAX_WINDOWS 32
 
@@ -67,12 +70,18 @@ typedef struct {
   int pending_w;
   int pending_h;
   int cursor_kind;   // 0 默认/1 手/2 文本/3 横向/4 纵向
-  char commit[256];  // 已提交文本（UTF-8，W6 IME 线实装；当前恒空）
+  char commit[256];  // 已提交文本（UTF-8；WM_IME_COMPOSITION 的 GCS_RESULTSTR）
   int commit_len;
-  char preedit[256];
+  char preedit[256]; // 组合串（UTF-8；GCS_COMPSTR，仅供自绘，不进文本状态）
   int preedit_len;
   int preedit_caret;
   int preedit_active;
+  // 输入框光标的客户区矩形（wm_im_set_cursor 落点，IME 组合/候选窗按它摆）
+  int im_cx;
+  int im_cy;
+  int im_cw;
+  int im_ch;
+  int im_cursor_set;
   WmEv evs[64];
   WmEv last;
   int ev_head;
@@ -187,6 +196,116 @@ static void wm_push(WmWindow *w, const WmEv *ev) {
   int slot = (w->ev_head + w->ev_count) % 64;
   w->evs[slot] = *ev;
   w->ev_count++;
+}
+
+// ---------------------------------------------------------------------------
+// IME 纯通道（W6）：组合串与提交串都走自绘（preedit 下划线由 MoonBit 侧画），
+// 系统那份组合 UI 在 WM_IME_SETCONTEXT 里滤掉。缓冲口径与 GTK 分支逐条对齐：
+// commit/preedit 都是 UTF-8 字节流、preedit_caret 也是字节偏移、容量 255。
+// 平台差异（记档）：legacy IMM32 没有 surrounding-text 接口（那是 TSF 的），
+// wm_im_set_surrounding 只能空操作——Windows 的 IME 从自身组合状态取上下文。
+// ---------------------------------------------------------------------------
+
+// 宽串 → UTF-8 存进定长缓冲（超 255 字节截断，与 GTK 侧上限同口径）
+static void wm_store_wide(char *dst, int *dst_len, const wchar_t *src, int wlen) {
+  int need = WideCharToMultiByte(CP_UTF8, 0, src, wlen, NULL, 0, NULL, NULL);
+  if (need <= 0) {
+    dst[0] = '\0';
+    *dst_len = 0;
+    return;
+  }
+  char *tmp = (char *)malloc((size_t)need + 1);
+  if (tmp == NULL) {
+    dst[0] = '\0';
+    *dst_len = 0;
+    return;
+  }
+  WideCharToMultiByte(CP_UTF8, 0, src, wlen, tmp, need, NULL, NULL);
+  int n = need > 255 ? 255 : need;
+  memcpy(dst, tmp, (size_t)n);
+  dst[n] = '\0';
+  *dst_len = n;
+  free(tmp);
+}
+
+// 宽串前缀的 UTF-8 字节数（组合串的光标是字符偏移，MoonBit 侧口径是字节）
+static int wm_wide_prefix_bytes(const wchar_t *src, int wchars) {
+  if (wchars <= 0) {
+    return 0;
+  }
+  int n = WideCharToMultiByte(CP_UTF8, 0, src, wchars, NULL, 0, NULL, NULL);
+  return n > 0 ? n : 0;
+}
+
+// 把最近下发的输入框光标矩形喂给 IME：组合窗贴光标底边、候选窗同点
+static void wm_im_apply_cursor(WmWindow *w) {
+  HIMC himc = ImmGetContext(w->hwnd);
+  if (himc == NULL) {
+    return;
+  }
+  POINT pt;
+  pt.x = w->im_cx;
+  pt.y = w->im_cy + w->im_ch;
+  COMPOSITIONFORM cf;
+  cf.dwStyle = CFS_POINT;
+  cf.ptCurrentPos = pt;
+  ImmSetCompositionWindow(himc, &cf);
+  CANDIDATEFORM cand;
+  cand.dwIndex = 0;
+  cand.dwStyle = CFS_CANDIDATEPOS;
+  cand.ptCurrentPos = pt;
+  ImmSetCandidateWindow(himc, &cand);
+  ImmReleaseContext(w->hwnd, himc);
+}
+
+// WM_IME_COMPOSITION：GCS_RESULTSTR → commit（已提交，进文本状态）；
+// GCS_COMPSTR → preedit（仅供自绘，绝不进文本状态），光标由字符偏移换字节偏移
+static void wm_im_read_composition(WmWindow *w, LPARAM lp) {
+  HIMC himc = ImmGetContext(w->hwnd);
+  if (himc == NULL) {
+    return;
+  }
+  if ((lp & GCS_RESULTSTR) != 0) {
+    int n = ImmGetCompositionStringW(himc, GCS_RESULTSTR, NULL, 0);
+    if (n > 0) {
+      wchar_t *buf = (wchar_t *)malloc((size_t)n + sizeof(wchar_t));
+      if (buf != NULL) {
+        int got = ImmGetCompositionStringW(himc, GCS_RESULTSTR, buf, n);
+        if (got > 0) {
+          wm_store_wide(w->commit, &w->commit_len, buf,
+                        got / (int)sizeof(wchar_t));
+        }
+        free(buf);
+      }
+    }
+  }
+  if ((lp & GCS_COMPSTR) != 0) {
+    int n = ImmGetCompositionStringW(himc, GCS_COMPSTR, NULL, 0);
+    if (n > 0) {
+      wchar_t *buf = (wchar_t *)malloc((size_t)n + sizeof(wchar_t));
+      if (buf != NULL) {
+        int got = ImmGetCompositionStringW(himc, GCS_COMPSTR, buf, n);
+        int wlen = got > 0 ? got / (int)sizeof(wchar_t) : 0;
+        wm_store_wide(w->preedit, &w->preedit_len, buf, wlen);
+        int caret_chars = ImmGetCompositionStringW(himc, GCS_CURSORPOS, NULL, 0);
+        int caret_bytes = 0;
+        if (caret_chars > 0) {
+          caret_bytes = caret_chars > wlen ? w->preedit_len
+                                           : wm_wide_prefix_bytes(buf, caret_chars);
+        }
+        w->preedit_caret = caret_bytes > w->preedit_len ? w->preedit_len
+                                                        : caret_bytes;
+        w->preedit_active = w->preedit_len > 0 ? 1 : 0;
+        free(buf);
+      }
+    } else {
+      w->preedit_len = 0;
+      w->preedit[0] = '\0';
+      w->preedit_caret = 0;
+      w->preedit_active = 0;
+    }
+  }
+  ImmReleaseContext(w->hwnd, himc);
 }
 
 static WmWindow *wm_of(HWND hwnd) {
@@ -390,6 +509,36 @@ static LRESULT CALLBACK wm_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
       if (w != NULL && r != NULL) {
         SetWindowPos(hwnd, NULL, r->left, r->top, r->right - r->left,
                      r->bottom - r->top, SWP_NOZORDER | SWP_NOACTIVATE);
+      }
+      return 0;
+    }
+    case WM_IME_SETCONTEXT:
+      // 组合串与候选窗由本栈自绘（纯通道），别让系统再画一份：不滤掉
+      // ISC_SHOWUICOMPOSITIONWINDOW 就会在窗口上叠出输入法自带的组合窗
+      lp &= ~ISC_SHOWUICOMPOSITIONWINDOW;
+      return DefWindowProcW(hwnd, msg, wp, lp);
+    case WM_IME_STARTCOMPOSITION: {
+      // 组合开始：把最近下发的光标矩形再喂一次（有些 IME 只在这时读位置）
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL && w->im_cursor_set) {
+        wm_im_apply_cursor(w);
+      }
+      return 0;
+    }
+    case WM_IME_COMPOSITION: {
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL) {
+        wm_im_read_composition(w, (LPARAM)lp);
+      }
+      return 0;
+    }
+    case WM_IME_ENDCOMPOSITION: {
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL) {
+        w->preedit_active = 0;
+        w->preedit_len = 0;
+        w->preedit[0] = '\0';
+        w->preedit_caret = 0;
       }
       return 0;
     }
@@ -662,26 +811,105 @@ void wm_set_cursor(int64_t id, int kind) {
 // ---- IME（W6 线实装 ImmAssociateContext / WM_IME_*，当前为占位：缓冲恒空，
 // MoonBit 侧 pump_ime 读到空即无 preedit/commit，行为与非 Linux 占位一致）----
 
+// legacy IMM32 没有 surrounding-text 接口（那是 TSF 的），这条空操作：
+// Windows 的 IME 从自身组合状态取上下文；GTK 侧喂已提交文本是为了让
+// IM context 推断上下文，两平台语义在此分叉（记档）。
 void wm_im_set_surrounding(int64_t id, const char *text, int caret) {
   (void)id;
   (void)text;
   (void)caret;
 }
+
 void wm_im_set_cursor(int64_t id, int x, int y, int w, int h) {
-  (void)id;
-  (void)x;
-  (void)y;
-  (void)w;
-  (void)h;
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *wm = &wm_windows[id];
+  if (wm->hwnd == NULL) {
+    return;
+  }
+  wm->im_cx = x;
+  wm->im_cy = y;
+  wm->im_cw = w;
+  wm->im_ch = h;
+  wm->im_cursor_set = 1;
+  wm_im_apply_cursor(wm);
 }
-void wm_im_reset(int64_t id) { (void)id; }
-int wm_im_commit_len(int64_t id) { (void)id; return 0; }
-int wm_im_commit_byte(int64_t id, int index) { (void)id; (void)index; return 0; }
-void wm_im_commit_done(int64_t id) { (void)id; }
-int wm_im_preedit_len(int64_t id) { (void)id; return 0; }
-int wm_im_preedit_byte(int64_t id, int index) { (void)id; (void)index; return 0; }
-int wm_im_preedit_caret(int64_t id) { (void)id; return 0; }
-int wm_im_preedit_active(int64_t id) { (void)id; return 0; }
+
+// 逻辑焦点切换时清输入法侧未完成的组合串：不清的话前一个框攒下的拼音会在
+// 后一个框拿到焦点后 commit 进去（GTK 侧同一条教训）；本侧缓存一并清。
+void wm_im_reset(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *wm = &wm_windows[id];
+  if (wm->hwnd != NULL) {
+    HIMC himc = ImmGetContext(wm->hwnd);
+    if (himc != NULL) {
+      ImmNotifyIME(himc, NI_COMPOSITIONSTR, CPS_CANCEL, 0);
+      ImmReleaseContext(wm->hwnd, himc);
+    }
+  }
+  wm->preedit_active = 0;
+  wm->preedit_len = 0;
+  wm->preedit[0] = '\0';
+  wm->preedit_caret = 0;
+}
+
+// 取一条已提交文本：返回字节数并把内容留在原处供逐字节读，
+// 读完必须调 wm_im_commit_done 清零
+int wm_im_commit_len(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  return wm_windows[id].commit_len;
+}
+int wm_im_commit_byte(int64_t id, int index) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (index < 0 || index >= w->commit_len) {
+    return 0;
+  }
+  return (int)(unsigned char)w->commit[index];
+}
+void wm_im_commit_done(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  wm_windows[id].commit_len = 0;
+  wm_windows[id].commit[0] = '\0';
+}
+// preedit（组合串）状态：仅供自绘显示，绝不计入文本状态
+int wm_im_preedit_len(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  return wm_windows[id].preedit_len;
+}
+int wm_im_preedit_byte(int64_t id, int index) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (index < 0 || index >= w->preedit_len) {
+    return 0;
+  }
+  return (int)(unsigned char)w->preedit[index];
+}
+int wm_im_preedit_caret(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  return wm_windows[id].preedit_caret;
+}
+int wm_im_preedit_active(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  return wm_windows[id].preedit_active;
+}
 
 void wm_wakeup(void) {
   if (wm_waker != NULL) {

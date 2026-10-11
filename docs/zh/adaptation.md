@@ -106,6 +106,13 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **缺省字族按平台探进主题**：`@theme.default_font_family()` 探到 "Microsoft YaHei" 就用（进程级缓存），探不到交回引擎缺省（Linux fontconfig / macOS CoreText）；`yue/ui` 的 `role_font` 统一走它。
 - **验证**（Windows 本机）：text **29/29**（此前 8/29）、render 43、ui 110（20 条文字/解码探针自动转真跑）、chart 189、theme 8、mdview 26、core 70 全绿；native-app 启动冒烟读数行齐、退出码 0；逐包 `--deny-warn` 零警告；全仓红点 287/68 持平。**计划里「text 断言分结构性/数值两档」实测不必要**：29 条都是「与同平台自己的测量比」的自洽断言，两平台各自全绿（记档以免后人再改一遍）。
 
+### MoonBit 原生 GUI 栈 · Windows IME 纯通道（W6）
+
+- **协议面与 GTK 分支逐条对齐**：commit/preedit 都是 UTF-8 字节流（容量 255，超了截断）、`preedit_caret` 也是字节偏移、读完 commit 要 `commit_done` 清零；`WM_IME_COMPOSITION` 里 `GCS_RESULTSTR` → commit（进文本状态），`GCS_COMPSTR` → preedit（只供自绘，绝不进文本状态）。
+- **三条平台差异（都是实测/接口事实）**：① `WM_IME_SETCONTEXT` 必须滤掉 `ISC_SHOWUICOMPOSITIONWINDOW`——本栈 preedit 是自绘的，不滤掉系统会在窗口上再叠一份自己的组合窗（重影）；② 组合串光标 `GCS_CURSORPOS` 是**字符偏移**，而 MoonBit 侧口径（与 GTK 一致）是 UTF-8 **字节偏移**，要按前缀 `WideCharToMultiByte` 换算，不换则中文组合串的光标位置全错；③ legacy IMM32 **没有 surrounding-text 接口**（那是 TSF 的），`wm_im_set_surrounding` 只能空操作——GTK 侧喂「已提交文本」是为了让 IM context 推断上下文，Windows 的 IME 从自身组合状态取上下文，两平台语义在此分叉（记档，不在 MoonBit 层做假接口）。
+- **光标与候选窗**：`wm_im_set_cursor` 存矩形并在 `WM_IME_STARTCOMPOSITION` 时复喂一次（有些 IME 只在这时读位置）；`ImmSetCompositionWindow(CFS_POINT)` 与 `ImmSetCandidateWindow(CFS_CANDIDATEPOS)` 都贴光标**底边**（`y + h`），候选窗贴组合串末尾的惯例由此成立。`wm_im_reset` 走 `ImmNotifyIME(NI_COMPOSITIONSTR, CPS_CANCEL)` **并清本侧 preedit 缓存**——reset 后 IME 不一定再推组合消息，旧串留在缓存里会被继续画出来（GTK 侧同一条教训）。
+- **回证**：探针 `experiment/ime_win_probe`（建窗 → 报插入符矩形 → reset → 读 commit/preedit → 泵 30 轮消息 → 干净退出）读数如预期（commit=none、preedit 空）且零崩溃；`experiment/multiwin_probe` 与 `examples/native-app` 冒烟在 WndProc 加消息分支后仍全绿（退出码 0）。**真实拼音的端到端**（preedit 下划线观感、候选窗位置、commit 落进焦点框）需要注入键入，归 W7 的 SendInput 探针与使用者真机复验——本机已装微软拼音（zh-Hans-CN，唯一 IME），路径可行。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。
