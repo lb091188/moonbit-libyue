@@ -1186,7 +1186,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1400, 2920, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1400, 3120, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -1423,6 +1423,46 @@ fn main {
   let sp3_w : Ref[@core.Widget?] = Ref(None)
   let sp4_w : Ref[@core.Widget?] = Ref(None)
   app.mount([make_chart_special_section(sp_w, sp2_w, sp3_w, sp4_w)])
+  let cv_w : Ref[@core.Widget?] = Ref(None)
+  app.mount([
+    @ui.container(
+      [
+        @ui.label("代码高亮：tokenize 多语言 + code_view 深底自绘", size=13.0),
+        @ui.container(
+          [
+            @ui.code_view(
+              [
+                "fn chart_zoom(anchor : Double) -> Double {",
+                "  let frac = anchor / 100.0",
+                "  // 像素分数映射到窗口百分比",
+                "  frac * span()",
+                "}",
+              ],
+              lang="moonbit",
+              line_numbers=true,
+              handle=fn(w : @core.Widget) -> Unit { cv_w.val = Some(w) },
+            ),
+            @ui.code_view(
+              [
+                "def layout(node, depth):",
+                "    for child in node.children:",
+                "        yield measure(child, depth)",
+              ],
+              lang="python",
+            ),
+          ],
+          direction=@yoga.Row,
+          column_gap=8.0,
+          align_items=@yoga.AlignItems::FlexStart,
+        ),
+      ],
+      padding=8.0,
+      row_gap=6.0,
+      align_items=@yoga.AlignItems::FlexStart,
+      bg=@theme.theme_bg_page(),
+      border=@theme.theme_border(),
+    ),
+  ])
   app.mount([
     make_form_section(
       frm_btn,
@@ -2061,7 +2101,9 @@ fn main {
       " gph=" +
       ov2_rect_of(sp3_w.val) +
       " eff=" +
-      ov2_rect_of(sp4_w.val),
+      ov2_rect_of(sp4_w.val) +
+      " code=" +
+      ov2_rect_of(cv_w.val),
   )
   println(
     "NATIVE-APP-MEDIA gif=" +
