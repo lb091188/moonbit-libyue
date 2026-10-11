@@ -452,12 +452,15 @@ pub fn Raster::blit(
   let loy = sy.floor().to_int()
   let hix = (sx + ssw).ceil().to_int() - 1
   let hiy = (sy + ssh).ceil().to_int() - 1
-  // 设备 → 源位图坐标：total = CTM ∘ [缩放+平移]，采样用其逆
+  // 源位图 → 屏幕坐标：total = CTM ∘ mt（采样用其逆）。mt 必须建在**用户
+  // 空间**（e/f 取用户坐标 dx/dy）——rect_device 给的 tx/ty 已是设备坐标，
+  // 那份只用于扫描矩形（rx*/ry*），进了 mt 就等于把 CTM 计两次：实测带
+  // translate 的会话里 blit 一个像素都落不下来（源采样落到源矩形界外）。
   let mt = Mat2x3::identity()
-  mt.a = tw / ssw
-  mt.d = th / ssh
-  mt.e = tx
-  mt.f = ty
+  mt.a = dw / ssw
+  mt.d = dh / ssh
+  mt.e = dx
+  mt.f = dy
   let total = { a: self.m.a, b: self.m.b, c: self.m.c, d: self.m.d, e: self.m.e, f: self.m.f }
   total.mul(mt.a, mt.b, mt.c, mt.d, mt.e, mt.f)
   let bsrc = SrcPixels(src, total.inverse(), lox, loy, hix, hiy)

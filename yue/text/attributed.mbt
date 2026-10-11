@@ -438,10 +438,6 @@ pub fn AttributedText::draw_at(
   w : Double,
   h : Double,
 ) -> Bool {
-  let id = match p.cairo_id() {
-    Some(i) => i
-    None => return false
-  }
   let session = self.rt()
   if session == 0L {
     return false
@@ -455,9 +451,54 @@ pub fn AttributedText::draw_at(
     Some(c) => c
     None => { r: 0, g: 0, b: 0, a: 255 }
   }
-  let ok = rt_draw_cr(
-    id, session, x, y, w, h, base.r, base.g, base.b, base.a,
-  )
-  rt_free(session)
-  ok == 1
+  // 纯光栅器后端（Windows）：没有 cairo 会话就画进自有离屏位图，再经会话的
+  // blit 落位——平移/裁剪/混合由 blit 现算（与 draw_box_raster 同一条通道）
+  match p.cairo_id() {
+    Some(id) => {
+      let ok = rt_draw_cr(
+        id, session, x, y, w, h, base.r, base.g, base.b, base.a,
+      )
+      rt_free(session)
+      ok == 1
+    }
+    None => {
+      let raster = match p.raster() {
+        Some(r) => r
+        None => {
+          rt_free(session)
+          return false
+        }
+      }
+      let bm = self.get_bounds_for(w, h)
+      let ow = if w > 0.0 { w.ceil().to_int() } else { bm.width.ceil().to_int() }
+      let oh = if h > 0.0 { h.ceil().to_int() } else { bm.height.ceil().to_int() }
+      if ow < 1 || oh < 1 {
+        rt_free(session)
+        return false
+      }
+      let off = @render.Bitmap::new(ow, oh)
+      let ok = rt_draw(
+        session,
+        off.data,
+        ow,
+        oh,
+        0.0,
+        0.0,
+        w,
+        h,
+        base.r,
+        base.g,
+        base.b,
+        base.a,
+      )
+      rt_free(session)
+      if ok != 1 {
+        return false
+      }
+      let dw = ow.to_double()
+      let dh = oh.to_double()
+      raster.blit(off, 0.0, 0.0, dw, dh, x, y, dw, dh)
+      true
+    }
+  }
 }

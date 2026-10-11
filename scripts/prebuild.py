@@ -207,6 +207,15 @@ def link_configs() -> dict:
             "package": SYS_PACKAGE,
             "link_flags": "ole32.lib shell32.lib uuid.lib",
         })
+        # 文本层（yue/text/dwrite_text.cpp 的 Windows 分支）走系统 DirectWrite：
+        # dwrite.lib 供 DWriteCreateFactory、d2d1.lib 供 D2D 的 DC 渲染目标
+        # （文字画进 32bpp DIB 再合成），GUID 常量取头文件 extern 符号要
+        # uuid.lib，COM 初始化要 ole32。native-stub 侧由 moon 编 .cpp，此处只
+        # 下发链接输入。
+        entries.append({
+            "package": TEXT_PACKAGE,
+            "link_flags": "dwrite.lib d2d1.lib ole32.lib uuid.lib gdi32.lib",
+        })
     return {"link_configs": entries}
 
 

@@ -93,6 +93,19 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **回证方式(Windows 真机,本机装有 Chrome/Edge)**:`bh: profiles=2 items=5` 与 `bh: downloads=3` 是**真读到本机浏览器库**的读数(此前这条在 Windows 上被平台门恒跳过),`bm_bookmarks` 端到端解析同样从「skip」转真跑;`moon test -p yue/sys` 163/163、`moon check ./yue/sys --deny-warn` 与 `./examples/native-sys --deny-warn` 零警告。测试侧一条旧断言 `bm_supported() == (platform=="linux")` 随之改成三平台口径。
 - **口径提醒**:`fsx_list_dir`/`sys_read_text_file` 走的是本批刚补的宽字符路由,所以中文用户名目录(`C:\Users\张三\…`)下的浏览器库同样读得到——这条不是巧合,是 W14a 把 A 版 API 换成 W 版之后才成立的。
 
+### MoonBit 原生 GUI 栈 · DirectWrite 文本层（W5，Windows 文字落地）
+
+- **`dwrite.h` 在 C 里编不了，换 C++ TU 解**：`DWRITE_MAKE_OPENTYPE_TAG`/`DWRITE_MAKE_FONT_FEATURE_TAG` 用 `static_cast` 展开进枚举初值，C 模式直接一串 C2275/C2065（实测）；两条路——手工声明 COM 接口（vtable 顺序错一处就崩，弃）或换 C++ 编译单元。**moon 的 native-stub 认 `.cpp`**（探针实测：extern "C" 函数往返成功），于是平台分工定型：`stub.c` 的 Pango 分支（prebuild 带 `-DWM_STUB_PANGO`）+ `stub.c` 的占位分支（macOS 等）+ `dwrite_text.cpp`（Windows，native-stub 编，dwrite.h 直接可见）。链接输入由 prebuild 给 text 包下发 `dwrite.lib d2d1.lib ole32.lib uuid.lib gdi32.lib`。**非 Windows 侧这份 `.cpp` 编出空翻译单元**，故 Linux/mac 的构建链要有 C++ 前端（老链路 shim 就是 C++，本仓环境具备）。
+- **行盒取「单字布局的行度量」，不取字体设计度量**：实测 14px 缺省族 DWrite 的布局行高是 19（= 字体 ascent+descent+lineGap 按整像素），按设计度量自己算是 17；更坑的是族名空串时若从集合里取**首族**（不是系统缺省族）会差出两 px——而「行盒要盖得住绘制高度」的混排行高断言吃的就是这个数。修法：`pt_font_line_height` 现搭一份 `"M"` 的布局、读 `DWRITE_LINE_METRICS`（height/baseline），与 `measure()`、绘制三条路自洽（LH14=19 与 M14.h=19、基线 15 对齐）。
+- **族名表排序用字节序**：MoonBit 侧断言严格递增走 `lexical_compare`（字节序），而 DWrite 的集合顺序随装载变化——C 侧 qsort 用 `strcmp`（与 Pango 侧 `g_strcmp0` 同口径），相邻**完全相同**才去重；族名取 0 号 locale（en-us），故主题里钉的 Windows 族名用英文（"Microsoft YaHei"）。
+- **区间下标要换 UTF-16 码元**：MoonBit（与 Pango 分支）的区间口径是 **UTF-8 字节下标**，DWrite 的 `DWRITE_TEXT_RANGE` 吃宽字符下标——不换的话多字节文本的区间落到界外被静默吞掉（「字节下标：切在字节上」那条断言就是红的）。换算 = `MultiByteToWideChar` 数前缀长度。
+- **绘制 = D2D 的 DC 渲染目标 + 32bpp DIB + 预乘 over**：同一份 `IDWriteTextLayout` 先画进 DIB（`Clear` 成透明底、反锯齿固定灰度档——ClearType 是次像素渲染，落在透明底会出彩边），再按 `out = src + dst·(1−srcA)` 逐分量合进 MoonBit 缓冲（ARGB32 小端与 DIB 同布局，无需换序）。区间颜色必须在渲染目标上建画笔（D2D 画笔是设备相关对象）再 `SetDrawingEffect`，所以颜色只在绘制那一趟快照；盒内对齐照 Pango 的 `pt_render_box` 规则：有宽约束时宽与对齐交给布局，单行不省略时自己算 slack 偏移，垂直同理。
+- **纯后端没有 cairo 会话：文本走「离屏 + blit」**：`draw_box_at`/`AttributedText::draw_at` 在 `cairo_id()==None` 时把文本先画进自有离屏位图（`pt_draw_box`/`rt_draw` 的缓冲版），再经 `Raster::blit` 落位——平移/裁剪/混合模式都由 blit 现算。
+- **顺手修掉 `Raster::blit` 的一个真 bug**：它把 `rect_device` 给的「已是设备坐标」的矩形再乘进 `mt` 又复合 CTM → CTM 被计两次，带 `translate` 的会话里源采样落到源矩形界外，**一个像素都落不下来**（实测 ink=0，且无 transform 时正常所以一直没暴露）。修法：`mt` 建在用户空间（`e/f` 取用户 `dx/dy`），设备矩形只用于扫描窗。修后 render 43/ui 110/chart 189 全绿。
+- **行高 K 地板定案落地**：`line_height = max(引擎自然, ceil(size×K))`，**K=1.36** 实测自本机雅黑 12..32px 的自然比上界（1.29..1.36，最肥一档 14px→19）；混排行盒用行内最大字号取地板；升距（基线）不动，地板顶起的余量由绘制的盒内垂直居中吸收（观感即半行距）。两条按「纯自然行高」写的白盒断言（family_wbtest）随口径更新。
+- **缺省字族按平台探进主题**：`@theme.default_font_family()` 探到 "Microsoft YaHei" 就用（进程级缓存），探不到交回引擎缺省（Linux fontconfig / macOS CoreText）；`yue/ui` 的 `role_font` 统一走它。
+- **验证**（Windows 本机）：text **29/29**（此前 8/29）、render 43、ui 110（20 条文字/解码探针自动转真跑）、chart 189、theme 8、mdview 26、core 70 全绿；native-app 启动冒烟读数行齐、退出码 0；逐包 `--deny-warn` 零警告；全仓红点 287/68 持平。**计划里「text 断言分结构性/数值两档」实测不必要**：29 条都是「与同平台自己的测量比」的自洽断言，两平台各自全绿（记档以免后人再改一遍）。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。

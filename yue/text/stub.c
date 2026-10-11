@@ -769,6 +769,13 @@ int pt_family_available(const char *name, int len) {
   return 0;
 }
 
+#elif defined(_WIN32)
+
+// Windows 的 DirectWrite 实现住在同包的 dwrite_text.cpp：dwrite.h 在本 SDK 是
+// C++ 专属（DWRITE_MAKE_OPENTYPE_TAG 用了 static_cast，C TU 里编不过，实测
+// C2275/C2065），而 moon 的 native-stub 认 .cpp（实测）。本分支故意留空——
+// Windows 的 pt_*/rt_* 由那个 TU 提供，防双定义。
+
 #elif !defined(__linux__)
 
 // 非 Linux 的文本层：macOS 的 CoreText 待真机，现在是占位 no-op（探到占位

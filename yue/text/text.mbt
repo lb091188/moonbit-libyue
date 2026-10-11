@@ -145,7 +145,8 @@ pub fn line_height(size : Double, family? : String = "") -> Option[Int] {
   let oh = Ref(0)
   let oa = Ref(0)
   if pt_font_line_height(size, fb, 0, 0, oh, oa) == 1 {
-    Some(oh.val)
+    let floor = line_floor(size)
+    Some(if oh.val > floor { oh.val } else { floor })
   } else {
     None
   }
@@ -285,9 +286,27 @@ pub fn font_metrics(font : Font) -> FontMetrics? {
 }
 
 ///|
-/// 字体行高（ascent+descent，像素），字重/斜体参与度量。
+/// 行高 K 地板（平台矩阵定案：行高 = max(引擎自然行高, ceil(size×K))）。
+/// K 是实测常量：本机 Windows 10 + 微软雅黑 12..32px 的自然行高比落在
+/// 1.29..1.36（最肥一档是 14px→19），取 1.36 作地板——回退到瘦字体（等宽、
+/// 位图字）时行高不跟着缩水，行高成为 size 的纯函数；地板顶起来的多余空间
+/// 由绘制的盒内垂直居中吸收，观感即半行距。
+const LINE_HEIGHT_K : Double = 1.36
+
+///|
+/// 行高地板值（size 的纯函数）。
+fn line_floor(size : Double) -> Int {
+  (size * LINE_HEIGHT_K).ceil().to_int()
+}
+
+///|
+/// 字体行高（ascent+descent，像素；再套 K 地板），字重/斜体参与度量。
 pub fn line_height_font(font : Font) -> Option[Int] {
-  font_metrics(font).map(fn(m) { m.ascent + m.descent })
+  font_metrics(font).map(fn(m) {
+    let natural = m.ascent + m.descent
+    let floor = line_floor(font.size)
+    if natural > floor { natural } else { floor }
+  })
 }
 
 ///|
@@ -308,6 +327,7 @@ pub fn line_height_multi(fonts : Array[Font]) -> Option[Int] {
   }
   let mut up = 0
   let mut down = 0
+  let mut max_size = 0.0
   for f in fonts {
     match font_metrics(f) {
       None => return None
@@ -318,10 +338,16 @@ pub fn line_height_multi(fonts : Array[Font]) -> Option[Int] {
         if m.descent > down {
           down = m.descent
         }
+        if f.size > max_size {
+          max_size = f.size
+        }
       }
     }
   }
-  Some(up + down)
+  // 套 K 地板时用行内最大字号（行高是「最肥那档字号」的纯函数）
+  let natural = up + down
+  let floor = line_floor(max_size)
+  Some(if natural > floor { natural } else { floor })
 }
 
 ///|
@@ -350,6 +376,82 @@ pub fn draw_font(
     wrap=wrap,
     max_width=max_width,
   )
+}
+
+///|
+/// 无 Cairo 会话时的绘制通道（Windows 的纯光栅器后端走这条）：文本先画进
+/// 自有离屏位图，再经会话的 `blit` 落位——平移、裁剪与混合模式都由会话现算
+/// （画的这一趟不经会话，所以吃不到坐标变换，落位统一交给 blit）。
+fn draw_box_raster(
+  p : @render.Painter,
+  x : Double,
+  y : Double,
+  box_w : Double,
+  box_h : Double,
+  text : String,
+  font : Font,
+  color : String,
+  align : TextAlign,
+  valign : TextAlign,
+  ellipsize : Bool,
+  wrap : Bool,
+) -> Bool {
+  let raster = match p.raster() {
+    Some(r) => r
+    None => return false
+  }
+  // 离屏尺寸：盒给就按盒，没给就量出来（单行自然宽、包住墨迹即可）
+  let measured = if box_w > 0.0 && box_h > 0.0 {
+    None
+  } else {
+    measure_font(
+      text,
+      font,
+      max_width=if box_w > 0.0 { box_w.ceil().to_int() } else { 0 },
+      ellipsize=ellipsize,
+      wrap=wrap,
+    )
+  }
+  let ow = if box_w > 0.0 {
+    box_w.ceil().to_int()
+  } else {
+    match measured {
+      Some(m) => m.width
+      None => 0
+    }
+  }
+  let oh = if box_h > 0.0 {
+    box_h.ceil().to_int()
+  } else {
+    match measured {
+      Some(m) => m.height
+      None => 0
+    }
+  }
+  if ow < 1 || oh < 1 {
+    return false
+  }
+  let off = @render.Bitmap::new(ow, oh)
+  if !draw_in_box(
+    off,
+    0.0,
+    0.0,
+    box_w,
+    box_h,
+    text,
+    font,
+    color,
+    align=align,
+    valign=valign,
+    ellipsize=ellipsize,
+    wrap=wrap,
+  ) {
+    return false
+  }
+  let dw = ow.to_double()
+  let dh = oh.to_double()
+  raster.blit(off, 0.0, 0.0, dw, dh, x, y, dw, dh)
+  true
 }
 
 ///|
@@ -458,7 +560,22 @@ pub fn draw_box_at(
 ) -> Bool {
   let id = match p.cairo_id() {
     Some(i) => i
-    None => return false
+    // 纯光栅器后端没有 cairo 会话：走离屏 + blit 的等价通道
+    None =>
+      return draw_box_raster(
+        p,
+        x,
+        y,
+        box_w,
+        box_h,
+        text,
+        font,
+        color,
+        align,
+        valign,
+        ellipsize,
+        wrap,
+      )
   }
   let tb = @utf8.encode(text)
   if tb.length() == 0 {

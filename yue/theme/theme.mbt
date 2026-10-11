@@ -339,6 +339,30 @@ pub fn theme_focus_accent() -> String {
 pub let control_height : Double = 32.0
 
 ///|
+/// 缺省字族的进程级缓存（None = 还没探过）。
+let g_default_family : Ref[String?] = Ref(None)
+
+///|
+/// 缺省字族（平台矩阵定案：默认字体按平台显式编码进主题）：
+/// 探到「Microsoft YaHei」就用它（Windows 系统必备的雅黑，中文观感与字重
+/// 都稳），探不到交回引擎缺省（Linux 交 fontconfig 的 sans-serif、macOS 交
+/// CoreText）。探测结果进程级缓存——字体集合在进程内不变。
+pub fn default_font_family() -> String {
+  match g_default_family.val {
+    Some(f) => f
+    None => {
+      let f = if @text.family_available("Microsoft YaHei") {
+        "Microsoft YaHei"
+      } else {
+        ""
+      }
+      g_default_family.val = Some(f)
+      f
+    }
+  }
+}
+
+///|
 /// 输入类控件的行高基准：13px Sans 的「Ag」包围盒高 + 有边框时 2px 边框。
 pub fn entry_ctrl_height(bordered : Bool) -> Double {
   let probe = @text.AttributedText::new("Ag", wrap=false)
