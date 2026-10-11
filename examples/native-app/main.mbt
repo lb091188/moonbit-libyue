@@ -569,6 +569,12 @@ fn main {
   let ov2_ctx : Ref[@core.Widget?] = Ref(None)
   let ov2_toastbtn : Ref[@core.Widget?] = Ref(None)
   let toast_push = @ui.toast_layer(duration_ms=2000)
+  let dpk : @core.Store[@ui.DateYMD?] = @core.Store::new(None)
+  let drg : @core.Store[@ui.DateRange] = @core.Store::new({ start: None, end: None })
+  let trg : @core.Store[@ui.TimeRange] = @core.Store::new({ start: None, end: None })
+  let dpk_w : Ref[@core.Widget?] = Ref(None)
+  let drg_w : Ref[@core.Widget?] = Ref(None)
+  let trg_w : Ref[@core.Widget?] = Ref(None)
   app.mount([
     @ui.container(
       [
@@ -794,6 +800,34 @@ fn main {
         ),
         @ui.container(
           [
+            @ui.label("日期族选择器", size=13.0),
+            @ui.date_picker_t(
+              dpk,
+              today=@ui.today_date(),
+              width=180.0,
+              handle=fn(w : @core.Widget) -> Unit { dpk_w.val = Some(w) },
+            ),
+            @ui.date_range_picker_t(
+              drg,
+              today=@ui.today_date(),
+              width=220.0,
+              handle=fn(w : @core.Widget) -> Unit { drg_w.val = Some(w) },
+            ),
+            @ui.time_range_picker_t(
+              trg,
+              width=100.0,
+              handle=fn(w : @core.Widget) -> Unit { trg_w.val = Some(w) },
+            ),
+          ],
+          width=250.0,
+          row_gap=10.0,
+          padding=6.0,
+          align_items=@yoga.AlignItems::FlexStart,
+          bg=@theme.theme_bg_page(),
+          border=@theme.theme_border(),
+        ),
+        @ui.container(
+          [
             @ui.label("浮层次批", size=13.0),
             @ui.button(
               "弹窗",
@@ -906,6 +940,26 @@ fn main {
     Some(w) => (if w.children()[1].visible { "1" } else { "0" })
     None => "-"
   }
+  let dpk_str = match dpk.get() {
+    Some(x) => x.format()
+    None => "-"
+  }
+  let ymd_or = fn(x : @ui.DateYMD?) -> String {
+    match x {
+      Some(v) => v.format()
+      None => "-"
+    }
+  }
+
+  let hm_or = fn(x : @ui.TimeHM?) -> String {
+    match x {
+      Some(v) => v.format()
+      None => "-"
+    }
+  }
+
+  let drg_str = ymd_or(drg.get().start) + "~" + ymd_or(drg.get().end)
+  let trg_str = hm_or(trg.get().start)
   let fold_str = match nav_fold.val {
     Some(w) => {
       let blocks = w.children()
@@ -921,7 +975,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val}"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' drg='\{drg_str}' trg='\{trg_str}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -1021,6 +1075,23 @@ fn main {
     }
   }
 
+  let dpk_rect = match dpk_w.val {
+    Some(w) => rect_str(w.rect)
+    None => "-"
+  }
+  let drg_rect = match drg_w.val {
+    Some(w) => rect_str(w.rect)
+    None => "-"
+  }
+  let trg_rect = match trg_w.val {
+    Some(w) => {
+      let f = w.children()[0]
+      rect_str(f.rect)
+    }
+    None => "-"
+  }
+
+  println("NATIVE-APP-DP dpk=" + dpk_rect + " drg=" + drg_rect + " trg_start=" + trg_rect)
   println(
     "NATIVE-APP-OV2 dlgbtn=" +
       ov2_rect_of(ov2_dlgbtn.val) +
