@@ -73,6 +73,17 @@ int img_w(int64_t h) { (void)h; return 0; }
 int img_h(int64_t h) { (void)h; return 0; }
 int img_copy(int64_t h, unsigned char *out) { (void)h; (void)out; return 0; }
 void img_free(int64_t h) { (void)h; }
+
+// 动图（GIF）：非 Linux 平台没有 GdkPixbuf，一律「解不出动图」，组件退回静帧
+int64_t img_anim_decode_file(const char *path, int len) { (void)path; (void)len; return 0; }
+int img_anim_is_static(int64_t h) { (void)h; return 1; }
+int img_anim_w(int64_t h) { (void)h; return 0; }
+int img_anim_h(int64_t h) { (void)h; return 0; }
+int img_anim_delay_ms(int64_t h) { (void)h; return 0; }
+int img_anim_frame(int64_t h) { (void)h; return -1; }
+int img_anim_advance(int64_t h) { (void)h; return 0; }
+int img_anim_copy(int64_t h, unsigned char *out) { (void)h; (void)out; return 0; }
+void img_anim_free(int64_t h) { (void)h; }
 int fsw_write_file(const char *path, int plen, unsigned char *data, int dlen) {
   (void)path; (void)plen; (void)data; (void)dlen; return 0;
 }

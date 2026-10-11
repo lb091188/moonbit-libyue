@@ -618,6 +618,16 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **与 master 的一条差**：旧链路的 combo 是原生可编辑组合框（GTK `ComboBoxEntry`），本栈全自绘——浮层开在浮层图层上、点外面收起同样由图层负责。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/ui` **105/105**（新增 1 条：点字段开层给全量候选 → `dispatch_commit` 提交「甲」过滤成两行并自动开层 → 高亮行的浅底与勾出像素、下键把高亮挪到另一行 → 回车回填高亮项并收层并回调 → 再开层只剩一行、Esc 收层不改值 → 过滤到空集不开层）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 表单区块的下拉行里加 `combo`，几何行补 `cmb=`，状态行补 `cmb='…'`，焦点 id 25 补注册）：注入「点可编辑下拉字段 → 点第 3 项」得 `cmb='组件丙'`、退出码 0；另一轮四击「开层 → 点第 2 项 → 再点字段 → 点原第 3 行位置」停在 `cmb='组件乙'`——第二次开层时当前文本已是「组件乙」，过滤后只剩一行，点在旧第 3 行位置的点击自然落在浮层外，这正是「随输入过滤」的应有表现（不是丢点）。
 
+### MoonBit 原生 GUI 栈 · 缩放绘制修正与 GIF 动图（`cr_blit` 重写 + `Animation` + `gif`/`icon_button_t`）
+
+- **`cairo_pattern_set_matrix` 的缩放路径实测是错的（本批修掉的真 bug）**：旧写法把「源像素→设备像素」写进图案矩阵（`translate(d0,d1)` + `scale(k)`），Cairo 的语义与这个直觉相反——源 120×120 里 (20,20)-(99,99) 的方块缩到 72 时，图案矩阵路给出 (33,33)-(71,71)（推到目标矩形右下角并被裁掉），而 CTM 路（`identity` → `translate` → `scale` → `set_source_surface` → 以子矩形大小为填充范围）给出正确的 (12,12)-(59,59)。**等尺寸（目标=源大小）时两条路恰好一致**，所以这个错一直藏着：`draw_image`/`draw_canvas` 的缩放分支此前没有任何用例覆盖。诊断顺序值得照抄：先在 MoonBit 侧用**全不透明合成图**证明「能画出来」（2304 格全中），再换**带透明区的源**复现「画歪」，最后把整段 blit 搬进独立 C 程序对照三种写法（父表面+矩阵 / CTM 变换 / 子表面+矩阵），一次定位。
+- **改了桩库，`moon run` 的产物同样不会重链**（此前只记过测试 exe 这一条）：`build/librender_cairo_stub.a` 是 13:50，而 `native-app.exe` 还是 13:39——MoonBit 源码没动，moon 就认为产物最新，于是白盒测试全绿、真窗口里 GIF 依旧空白。要删 `_build/native/debug/build/NoahLiu/moonbit-libyue/examples/<示例名>`（注意 `moon run` 的可执行文件在 `build/` 子路径下，不在 `execbin/`）。**判据**：比对 `.a` 与 `.exe` 的 mtime，别看「刚跑过就是新的」。
+- **GdkPixbuf 动画迭代器是「懒起算 + 只认绝对时刻」**：`gdk_pixbuf_animation_iter_advance(iter, t)` 的第一次调用只把动画起点锚在 `t` 上、必回报「没换帧」；之后换不换完全由加载器按累计时间判定。所以本层的虚拟时钟**每拍只推「当前帧时长 +1ms」**（与真实时间同速），组件按 `delay_ms` 的节奏反复问——早期写成「一次调用里连推四拍」，动画就会比实际快四倍。
+- **本机 gif 加载器读不到 `tDelay`**（实测该选项为 NULL，与 PIL 报的 400ms 不符）→ 退回 100ms/拍的轮询；因为换帧时机由虚拟时钟与加载器共同决定，实际仍是每 400ms 换一帧（真窗口 12 秒 `gif=30` 帧 ≈ 2.5 帧/秒，与素材逐帧时长对得上）。
+- **`loop` 与 `static` 都是 MoonBit 保留字**：参数名 `loop~` 直接解析失败（改用 `looping~`），结构体字段 `static` 触发 `reserved_keyword` 警告（改 `is_static`）。
+- **图标按钮的悬停底色取样点**：圆角 4 的 `fill_round_rect` 会把贴角那格裁掉，像素断言要取上缘中点（`(w/2, 2)`），取 `(1,1)` 会读到「没变」。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/render` **42/42**（新增 1 条缩放回归：同一张源图在 120/72/48 三档目标下的不透明包围盒分别为 (20,20)-(99,99)/(12,12)-(59,59)/(8,8)-(39,39)，另含 `draw_image_from_rect` 的取样域不外溢）；`moon test -p .../yue/ui` **107/107**（新增 3 条：动图组件按帧自转/暂停断链/`play` 续上/静图不排自转，且 48×48 缩放后确实有墨；图标按钮尺寸、悬停换底、抬起出框不算点击、禁用不吃事件）；`yue/core` 62/62、`yoga-mbt` 96/96，九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 加「图标与动图」区块，几何行补 `NATIVE-APP-MEDIA`，状态行补 `gif=`/`ib=`）：注入「点图标按钮」得 `ib=1`、`gif=30`（自转换帧数）、退出码 0；截图复核图标随主题取色、✕ 图标按钮、48×48 的 GIF 圆点确实画在框内（此前是一片空白）。
+
 ## Linux
 
 ### 发行版

@@ -640,6 +640,45 @@ fn make_decl_section(
 }
 
 ///|
+/// 图标与动图区块：主题取色的图标 + 图标按钮 + GIF 自转（退出状态行报换帧数）。
+fn make_media_section(
+  gh : @ui.GifHandle,
+  ib : Ref[Int],
+  gif_slot : Ref[@core.Widget?],
+  ib_slot : Ref[@core.Widget?],
+) -> @core.Node {
+  @ui.container(
+    [
+      @ui.label("图标与动图：图标跟随主题取色，图标按钮悬停出底，GIF 按帧时长自转", size=13.0),
+      @ui.hbox(
+        [
+          @ui.icon(@icons.CheckCircleFill, size=20.0),
+          @ui.icon_button_t(
+            @icons.Close2,
+            on_click=fn() -> Unit { ib.val = ib.val + 1 },
+            handle=fn(w : @core.Widget) -> Unit { ib_slot.val = Some(w) },
+          ),
+          @ui.gif(
+            "examples/showcase/assets/dot.gif",
+            width=48.0,
+            height=48.0,
+            state=gh,
+            handle=fn(w : @core.Widget) -> Unit { gif_slot.val = Some(w) },
+          ),
+        ],
+        column_gap=10.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 虚拟表格演示数据：200 行（几何验证页只挂可见的十来行）。
 fn make_virt_rows() -> Array[@ui.TableRow] {
   let out : Array[@ui.TableRow] = []
@@ -990,6 +1029,11 @@ fn main {
   // 光标形状下发计数：手型 / 文本形 / 横向调整 / 纵向调整各被采到几拍
   let cur_seen : Ref[(Int, Int, Int, Int)] = Ref((0, 0, 0, 0))
   app.mount([make_decl_section(dcl_n, dcl_card_w, dcl_label_w)])
+  let gif_h = @ui.GifHandle::make()
+  let ib_hits = Ref(0)
+  let gif_w : Ref[@core.Widget?] = Ref(None)
+  let ib_w : Ref[@core.Widget?] = Ref(None)
+  app.mount([make_media_section(gif_h, ib_hits, gif_w, ib_w)])
   app.mount([
     make_form_section(
       frm_btn,
@@ -1467,7 +1511,7 @@ fn main {
     None => -1
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' cmb='\{frm_cmb.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val} ta='\{flat(frm_ta.get())}' tacur=\{ta_caret} dcl=\{dcl_n.get()} lblw=\{dcl_w0.round().to_int()}/\{dcl_w1.round().to_int()} cur=\{cur_seen.val.0}/\{cur_seen.val.1}/\{cur_seen.val.2}/\{cur_seen.val.3}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' cmb='\{frm_cmb.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val} ta='\{flat(frm_ta.get())}' tacur=\{ta_caret} dcl=\{dcl_n.get()} lblw=\{dcl_w0.round().to_int()}/\{dcl_w1.round().to_int()} cur=\{cur_seen.val.0}/\{cur_seen.val.1}/\{cur_seen.val.2}/\{cur_seen.val.3} gif=\{gif_h.frame_count()} ib=\{ib_hits.val}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -1594,6 +1638,12 @@ fn main {
     }
     None => "-"
   }
+  println(
+    "NATIVE-APP-MEDIA gif=" +
+    ov2_rect_of(gif_w.val) +
+    " ib=" +
+    ov2_rect_of(ib_w.val),
+  )
   println(
     "NATIVE-APP-DC card=" +
     ov2_rect_of(dcl_card_w.val) +

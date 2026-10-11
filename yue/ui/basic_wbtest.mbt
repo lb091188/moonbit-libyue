@@ -299,3 +299,133 @@ fn ink_in_box(bm : @render.Bitmap, x1 : Int, y1 : Int) -> Int {
   }
   n
 }
+
+///|
+test "图标按钮：尺寸固定、悬停换底色、点击在抬起且落在框内、禁用不吃事件" {
+  let mut hits = 0
+  let root = mount_root(
+    [icon_button_t(@icons.Close2, on_click=fn() { hits = hits + 1 }, box_size=24.0)],
+    120.0,
+    60.0,
+  )
+  let w = kid(root, 0)
+  assert_eq((w.rect.w, w.rect.h), (24.0, 24.0))
+  let (bm0, ox, oy) = shot(w)
+  // 图标本身出像素（中心附近有墨）
+  assert_true(color_of(bm0, ox + 12, oy + 12) != (0, 0, 0, 0))
+  root.set_hover(w.id)
+  let (bm1, _, _) = shot(w)
+  // 悬停多了圆角底：上缘中点从透明变成有底色（贴角那格被圆角裁掉，不能取）
+  assert_true(color_of(bm1, ox + 12, oy + 2) != color_of(bm0, ox + 12, oy + 2))
+  root.set_hover(0)
+  let _ = click(w, w.rect.x + 12.0, w.rect.y + 12.0)
+  assert_eq(hits, 1)
+  // 抬起在框外：不算一次点击
+  let _ = w.dispatch_pointer({ kind: @core.Down, x: 4.0, y: 4.0, button: 1, mods: 0, })
+  let _ = w.dispatch_pointer({
+    kind: @core.Up,
+    x: 4.0,
+    y: w.rect.y + 90.0,
+    button: 1,
+    mods: 0,
+  })
+  assert_eq(hits, 1)
+  let mut off_hits = 0
+  let root2 = mount_root(
+    [icon_button_t(@icons.Close2, on_click=fn() { off_hits = off_hits + 1 }, disabled=true)],
+    120.0,
+    60.0,
+  )
+  let w2 = kid(root2, 0)
+  let consumed = click(w2, w2.rect.x + 6.0, w2.rect.y + 6.0)
+  assert_false(consumed)
+  assert_eq(off_hits, 0)
+}
+
+///|
+test "动图组件：按帧时长自转换帧、暂停不再换帧、play 续上；静图不排自转" {
+  let queue : Ref[Array[() -> Unit]] = Ref([])
+  let delays : Ref[Array[Int]] = Ref([])
+  @core.set_timer_hooks(
+    fn(ms : Int, f : () -> Unit) -> Int {
+      delays.val.push(ms)
+      queue.val.push(f)
+      delays.val.length()
+    },
+    fn(_id : Int) -> Unit { () },
+  )
+  let h = GifHandle::make()
+  let (_r, w) = mounted(
+    gif("examples/showcase/assets/dot.gif", state=h),
+    160.0,
+    160.0,
+  )
+  // 尺寸取自动图本身（未显式给宽高的分支）
+  assert_eq((w.rect.w, w.rect.h), (120.0, 120.0))
+  assert_eq(delays.val.length(), 1)
+  assert_true(delays.val[0] > 0)
+  // 队空时是空操作（暂停断链之后就是空的，再 fire 不该崩）
+  let fire = fn() -> Unit {
+    let q = queue.val
+    if q.length() > 0 {
+      let f = q[q.length() - 1]
+      q.truncate(q.length() - 1)
+      f()
+    }
+  }
+  // 每拍只把虚拟时钟推「一帧时长 +1ms」，换不换帧由加载器判：连推 12 拍
+  // 应该走出若干帧（本素材每帧 400ms、每拍 101ms → 约 3 帧）
+  let before = h.frame_count()
+  let mut n = 0
+  while n < 12 {
+    fire()
+    n = n + 1
+  }
+  assert_true(h.frame_count() >= 2 && h.frame_count() <= 6)
+  let walked = h.frame_count()
+  h.pause()
+  fire()
+  fire()
+  // 暂停后待触发的那一拍跑完就断链，帧数不再前进
+  assert_eq((h.frame_count(), h.is_running()), (walked, false))
+  // play 当场续上一拍，之后按节奏继续走
+  h.play()
+  assert_true(delays.val.length() > 2)
+  let mut m = 0
+  while m < 8 {
+    fire()
+    m = m + 1
+  }
+  assert_true(h.frame_count() > walked)
+  ignore(before)
+  // 画得出东西：动图帧确实进了位图（不是一片空）
+  let (bm, _, _) = shot(w)
+  let mut ink = 0
+  for y = 0; y < 120; y = y + 1 {
+    for x = 0; x < 120; x = x + 1 {
+      if color_of(bm, x, y) != (0, 0, 0, 0) {
+        ink = ink + 1
+      }
+    }
+  }
+  assert_true(ink > 100)
+  // 缩到 48×48 也画得出来（目标尺寸与图幅不符时走缩放那条路）
+  let hg2 = GifHandle::make()
+  let (_r4, w4) = mounted(gif("examples/showcase/assets/dot.gif", width=48.0, height=48.0, state=hg2), 80.0, 80.0)
+  let (bm2, _, _) = shot(w4)
+  let mut ink2 = 0
+  for y = 0; y < 48; y = y + 1 {
+    for x = 0; x < 48; x = x + 1 {
+      if color_of(bm2, x, y) != (0, 0, 0, 0) {
+        ink2 = ink2 + 1
+      }
+    }
+  }
+  assert_eq((w4.rect.w, w4.rect.h), (48.0, 48.0))
+  assert_true(ink2 > 40)
+  // 静图：解得出图但没有下一帧，不排自转、也不换帧
+  let hs = GifHandle::make()
+  let (_r2, _w2) = mounted(gif("/tmp/definitely-missing-gif.png", state=hs), 80.0, 80.0)
+  assert_eq((hs.frame_count(), hs.is_running(), _w2.rect.w), (0, true, 0.0))
+  @core.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
+}

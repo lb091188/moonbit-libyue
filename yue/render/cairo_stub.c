@@ -438,39 +438,36 @@ void cr_blit(int64_t id, unsigned char *src, int sw, int sh, double sx,
     cairo_surface_destroy(s);
     return;
   }
-  cairo_pattern_t *pat = cairo_pattern_create_for_surface(sub);
-  // 缩小走双线性避免最近邻锯齿；PAD 让取整后的边缘采样不越界成透明缝
-  cairo_pattern_set_filter(pat, CAIRO_FILTER_BILINEAR);
-  cairo_pattern_set_extend(pat, CAIRO_EXTEND_PAD);
+  // 缩放映射走 CTM（translate + scale 后 set_source_surface），不走
+  // `cairo_pattern_set_matrix`：后者的语义实测与直觉相反，缩放下会把内容
+  // 推到目标矩形右下角并裁掉（C 层对照实验：源 120 的 (20,20)-(99,99) 方块
+  // 缩到 72 时，pattern-matrix 路给出 (33,33)-(71,71)，CTM 路给出正确的
+  // (12,12)-(59,59)）。子表面仍保留：它把双线性取样域收在源子矩形内。
   double d[4];
   int snapped = cr_rect_device(cr, dx, dy, dw, dh, d);
-  if (snapped && (d[2] <= d[0] || d[3] <= d[1])) {
+  double tx = snapped ? d[0] : dx;
+  double ty = snapped ? d[1] : dy;
+  double tw = snapped ? (d[2] - d[0]) : dw;
+  double th = snapped ? (d[3] - d[1]) : dh;
+  if (tw <= 0.0 || th <= 0.0) {
     // 取整后为空：什么都不画
-  } else if (snapped) {
-    // 图案矩阵在设备空间给出：源像素 (u,v) → 设备 (d0 + (u-sx)*kx, d1 + (v-sy)*ky)
-    cairo_matrix_t m;
-    cairo_matrix_init_identity(&m);
-    cairo_matrix_translate(&m, d[0], d[1]);
-    cairo_matrix_scale(&m, (d[2] - d[0]) / ssw, (d[3] - d[1]) / ssh);
-    cairo_pattern_set_matrix(pat, &m);
+  } else {
     cairo_save(cr);
-    cairo_identity_matrix(cr);
-    cairo_set_source(cr, pat);
-    cairo_rectangle(cr, d[0], d[1], d[2] - d[0], d[3] - d[1]);
+    if (snapped) {
+      cairo_identity_matrix(cr);
+    }
+    cairo_translate(cr, tx, ty);
+    cairo_scale(cr, tw / ssw, th / ssh);
+    cairo_set_source_surface(cr, sub, 0.0, 0.0);
+    cairo_pattern_t *pat = cairo_get_source(cr);
+    // 缩小走双线性避免最近邻锯齿；PAD 让边缘采样不越界成透明缝
+    cairo_pattern_set_filter(pat, CAIRO_FILTER_BILINEAR);
+    cairo_pattern_set_extend(pat, CAIRO_EXTEND_PAD);
+    cairo_rectangle(cr, 0.0, 0.0, ssw, ssh);
     cairo_fill(cr);
     cairo_restore(cr);
-  } else {
-    // 含旋转/斜切：不做取整，图案矩阵留在用户空间，交给抗锯齿
-    cairo_matrix_t m;
-    cairo_matrix_init_identity(&m);
-    cairo_matrix_translate(&m, dx, dy);
-    cairo_matrix_scale(&m, dw / ssw, dh / ssh);
-    cairo_pattern_set_matrix(pat, &m);
-    cairo_set_source(cr, pat);
-    cairo_rectangle(cr, dx, dy, dw, dh);
-    cairo_fill(cr);
   }
-  cairo_pattern_destroy(pat);
+  // 图案由 cr 持有（cairo_get_source），不单独销毁
   cairo_surface_destroy(sub);
   cairo_surface_destroy(s);
 }

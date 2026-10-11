@@ -120,3 +120,81 @@ test "非法 hex 与非法尺寸保持原状" {
   p.end()
   empty.end()
 }
+
+///|
+/// 造一张 120×120 的源图：(20,20)-(99,99) 一个不透明红方，其余全透明。
+fn dot_source() -> Image {
+  let src = Bitmap::new(120, 120)
+  for y = 20; y < 100; y = y + 1 {
+    for x = 20; x < 100; x = x + 1 {
+      let i = (y * 120 + x) * 4
+      src.data[i] = b'\xff'
+      src.data[i + 3] = b'\xff'
+    }
+  }
+  Image::from_bitmap(src)
+}
+
+///|
+/// 把源图缩到 `size` 画进位图，返回不透明像素的包围盒（空时给 (-1,-1,-1,-1)）。
+fn scaled_box(img : Image, size : Int) -> (Int, Int, Int, Int) {
+  let bm = Bitmap::new(size + 2, size + 2)
+  let p = Painter::new(bm)
+  p.draw_image(img, 0.0, 0.0, size.to_double(), size.to_double())
+  p.end()
+  let mut x0 = -1
+  let mut y0 = -1
+  let mut x1 = -1
+  let mut y1 = -1
+  for y = 0; y < size + 2; y = y + 1 {
+    for x = 0; x < size + 2; x = x + 1 {
+      if bm.pixel(x, y).a > 0 {
+        if x0 < 0 {
+          x0 = x
+          y0 = y
+          x1 = x
+          y1 = y
+        } else {
+          if x < x0 {
+            x0 = x
+          }
+          if y < y0 {
+            y0 = y
+          }
+          if x > x1 {
+            x1 = x
+          }
+          if y > y1 {
+            y1 = y
+          }
+        }
+      }
+    }
+  }
+  (x0, y0, x1, y1)
+}
+
+///|
+test "缩放绘制：源矩形按比例映到目标矩形（等比与缩小都对）" {
+  let img = dot_source()
+  // 1:1 时包围盒就是源方块本身
+  assert_eq(scaled_box(img, 120), (20, 20, 99, 99))
+  // 缩到 72：20×0.6=12、100×0.6=60
+  assert_eq(scaled_box(img, 72), (12, 12, 59, 59))
+  // 缩到 48：20×0.4=8、100×0.4=40
+  assert_eq(scaled_box(img, 48), (8, 8, 39, 39))
+  // 源子矩形 → 目标矩形：取样域收在子矩形内（不邻块串色）
+  let bm = Bitmap::new(40, 40)
+  let p = Painter::new(bm)
+  p.draw_image_from_rect(img, 20.0, 20.0, 80.0, 80.0, 0.0, 0.0, 40.0, 40.0)
+  p.end()
+  let mut ink = 0
+  for y = 0; y < 40; y = y + 1 {
+    for x = 0; x < 40; x = x + 1 {
+      if bm.pixel(x, y).a > 0 {
+        ink = ink + 1
+      }
+    }
+  }
+  assert_true(ink > 1500)
+}

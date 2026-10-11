@@ -3,7 +3,7 @@
 //
 // 尺寸语义照旧契约（libyue `image_gtk.cc:75-77`）：`get_width`/`get_height`
 // 返回**逻辑尺寸**（像素 / scale），`get_scale_factor` 返回记录的比例。
-// 已知缺口：旧链路的 Image 是 GdkPixbufAnimation（GIF 会动），本层只取首帧。
+// 动图（GIF）另走 `Animation`（本文件末尾）：静态解码仍只取首帧。
 
 ///|
 #borrow(data)
@@ -25,6 +25,38 @@ extern "c" fn img_copy(h : Int64, out : FixedArray[Byte]) -> Int = "img_copy"
 
 ///|
 extern "c" fn img_free(h : Int64) -> Unit = "img_free"
+
+///|
+#borrow(path)
+extern "c" fn img_anim_decode_file(
+  path : Bytes,
+  len : Int,
+) -> Int64 = "img_anim_decode_file"
+
+///|
+extern "c" fn img_anim_is_static(h : Int64) -> Int = "img_anim_is_static"
+
+///|
+extern "c" fn img_anim_w(h : Int64) -> Int = "img_anim_w"
+
+///|
+extern "c" fn img_anim_h(h : Int64) -> Int = "img_anim_h"
+
+///|
+extern "c" fn img_anim_delay_ms(h : Int64) -> Int = "img_anim_delay_ms"
+
+///|
+extern "c" fn img_anim_frame(h : Int64) -> Int = "img_anim_frame"
+
+///|
+extern "c" fn img_anim_advance(h : Int64) -> Int = "img_anim_advance"
+
+///|
+#borrow(out)
+extern "c" fn img_anim_copy(h : Int64, out : FixedArray[Byte]) -> Int = "img_anim_copy"
+
+///|
+extern "c" fn img_anim_free(h : Int64) -> Unit = "img_anim_free"
 
 ///|
 pub(all) struct Image {
@@ -161,4 +193,86 @@ pub fn ImageSlot::set(self : ImageSlot, img : Image?) -> Unit {
 ///|
 pub fn ImageSlot::get(self : ImageSlot) -> Image? {
   self.value
+}
+
+///|
+/// 动图（GIF）句柄：解码时留在第一帧，组件每拍 `advance` 一次再取当前帧。
+/// 槽位有限且不自动回收——不用了要 `close`（组件侧由挂载生命周期负责）。
+pub(all) struct Animation {
+  mut handle : Int64
+  width : Int
+  height : Int
+  is_static : Bool
+}
+
+///|
+/// 从文件解码动图。解不出图返回 `None`；静图（PNG/JPEG 或单帧 GIF）返回
+/// `is_static=true` 的句柄，`advance` 永远不换帧，组件按静帧画即可。
+pub fn Animation::new_from_file(path : String) -> Animation? {
+  let b = @utf8.encode(path)
+  let h = img_anim_decode_file(b, b.length())
+  if h == 0L {
+    None
+  } else {
+    Some({
+      handle: h,
+      width: img_anim_w(h),
+      height: img_anim_h(h),
+      is_static: img_anim_is_static(h) != 0,
+    })
+  }
+}
+
+///|
+pub fn Animation::is_valid(self : Animation) -> Bool {
+  self.handle > 0L && self.width > 0 && self.height > 0
+}
+
+///|
+/// 当前帧的停留时长（毫秒）；读不到时 C 侧退回 100。
+pub fn Animation::delay_ms(self : Animation) -> Int {
+  if self.handle == 0L {
+    0
+  } else {
+    img_anim_delay_ms(self.handle)
+  }
+}
+
+///|
+/// 当前帧序号（从 0 起，每次成功 `advance` 加一；归零即说明动画回绕了）。
+pub fn Animation::frame(self : Animation) -> Int {
+  if self.handle == 0L {
+    -1
+  } else {
+    img_anim_frame(self.handle)
+  }
+}
+
+///|
+/// 前进一帧，返回是否真的换了帧。
+pub fn Animation::advance(self : Animation) -> Bool {
+  self.handle != 0L && img_anim_advance(self.handle) != 0
+}
+
+///|
+/// 取当前帧为静态 `Image`（尺寸与整幅不符的帧会被跳过，返回空图）。
+pub fn Animation::current(self : Animation) -> Image {
+  if self.handle == 0L {
+    return { pixels: Bitmap::new(0, 0), scale: 1.0 }
+  }
+  let bm = Bitmap::new(self.width, self.height)
+  if img_anim_copy(self.handle, bm.data) == 0 {
+    { pixels: Bitmap::new(0, 0), scale: 1.0 }
+  } else {
+    { pixels: bm, scale: 1.0 }
+  }
+}
+
+///|
+/// 释放底层槽位（幂等；之后所有方法都是空操作）。
+pub fn Animation::close(self : Animation) -> Unit {
+  if self.handle != 0L {
+    img_anim_free(self.handle)
+    self.handle = 0L
+  }
 }

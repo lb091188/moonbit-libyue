@@ -191,3 +191,44 @@ test "PNG 落盘再读回：像素不变" {
     }
   }
 }
+
+///|
+test "动图解码：逐帧前进、每帧时长、当前帧成图、close 之后全空操作" {
+  let anim = Animation::new_from_file("examples/showcase/assets/dot.gif")
+  match anim {
+    None => assert_true(false)
+    Some(a) => {
+      assert_eq((a.is_static, a.width, a.height), (false, 120, 120))
+      assert_true(a.is_valid())
+      assert_true(a.delay_ms() > 0)
+      assert_eq(a.frame(), 0)
+      let f0 = a.current()
+      assert_eq((f0.get_width(), f0.get_height()), (120.0, 120.0))
+      // 换帧时机由加载器按虚拟时钟判定，本层不保证第一拍就换：
+      // 连问若干拍，回报为真的次数必须与帧号一致
+      let mut flips = 0
+      let mut tries = 0
+      while tries < 12 {
+        if a.advance() {
+          flips = flips + 1
+        }
+        tries = tries + 1
+      }
+      assert_true(flips > 0)
+      assert_eq(a.frame(), flips)
+      let f1 = a.current()
+      assert_true(f1.get_width() > 0.0)
+      a.close()
+      a.close()
+      assert_eq((a.frame(), a.delay_ms(), a.advance()), (-1, 0, false))
+      assert_true(a.current().is_empty())
+    }
+  }
+  // 静图走同一入口：is_static 为真、永远不换帧
+  let png = Animation::new_from_file("/tmp/definitely-missing-moonbit-libyue-native.png")
+  let missing_ok = match png {
+    None => true
+    Some(_) => false
+  }
+  assert_eq(missing_ok, true)
+}

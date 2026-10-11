@@ -351,3 +351,64 @@ pub fn button(
     w
   })
 }
+
+///|
+/// 图标按钮：只有图标的按钮（悬停浅底、按下更深、禁用不吃事件）。
+/// 需要文字提示时由调用方在外面包 `tooltip_t`（本组件不重复管提示）。
+pub fn icon_button_t(
+  kind : @icons.IconKind,
+  on_click? : () -> Unit = fn() -> Unit { () },
+  icon_size? : Double = 16.0,
+  box_size? : Double = 28.0,
+  color? : String = "",
+  disabled? : Bool = false,
+  enabled? : Enabled? = None,
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    let off = enabled_cell(enabled, disabled)
+    w.node.set_width(@yoga.fixed(box_size))
+    w.node.set_height(@yoga.fixed(box_size))
+    w.node.set_flex_shrink(0.0)
+    w.cursor = @core.CURSOR_HAND
+    w.on_draw = Some(fn(
+      self : @core.Widget,
+      p : @render.Painter,
+      r : @core.Rect,
+    ) -> Unit {
+      if !off.off && (self.hovered || self.pressed) {
+        p.set_fill_color(
+          if self.pressed { @theme.theme_primary_light() } else { @theme.theme_fill_hover() },
+        )
+        fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
+      }
+      let c = if color.length() > 0 {
+        color
+      } else if off.off {
+        @theme.theme_text_secondary()
+      } else {
+        @theme.theme_text_regular()
+      }
+      @icons.draw_icon(p, kind, r.w / 2.0, r.h / 2.0, icon_size, c)
+    })
+    w.on_pointer = Some(fn(
+      self : @core.Widget,
+      ev : @core.PointerEvent,
+    ) -> Bool {
+      match ev.kind {
+        @core.Down => !off.off
+        @core.Up => {
+          let inside = ev.x >= 0.0 && ev.x <= self.rect.w &&
+            ev.y >= 0.0 && ev.y <= self.rect.h
+          if !off.off && inside { on_click() }
+          false
+        }
+        @core.Move => !off.off
+        @core.Leave => false
+      }
+    })
+    handle(w)
+    w
+  })
+}
