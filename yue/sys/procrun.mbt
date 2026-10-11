@@ -75,11 +75,21 @@ fn pr_tmp_path(tag : String) -> String {
 
 ///|
 /// 传给子进程的环境（NUL 分隔的 "K=V" blob）：PATH（命令名解析）、
-/// XDG_RUNTIME_DIR（会话服务套接字定位）、HOME，并固定 C locale 使
-/// 输出语言恒定可解析。
+/// XDG_RUNTIME_DIR（会话服务套接字定位）、HOME，加上 X11/桌面会话与
+/// DBus 总线变量（DISPLAY/XAUTHORITY/WAYLAND_DISPLAY/
+/// DBUS_SESSION_BUS_ADDRESS——xrandr、xfconf-query、gsettings 这类桌面
+/// 侧命令没有它们就直接非零退出），并固定 C locale 使输出语言恒定可解析。
 fn pr_env_blob() -> Bytes {
   let buf = StringBuilder()
-  for name in ["PATH", "XDG_RUNTIME_DIR", "HOME"] {
+  for name in [
+    "PATH",
+    "XDG_RUNTIME_DIR",
+    "HOME",
+    "DISPLAY",
+    "XAUTHORITY",
+    "WAYLAND_DISPLAY",
+    "DBUS_SESSION_BUS_ADDRESS",
+  ] {
     match @env.get_env_var(name) {
       Some(v) => {
         buf.write_string(name)
