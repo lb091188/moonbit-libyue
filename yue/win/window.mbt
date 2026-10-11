@@ -162,6 +162,13 @@ pub fn Window::request_focus(self : Window) -> Unit {
 }
 
 ///|
+/// 设绘图区光标形状：0 默认箭头 / 1 手型 / 2 文本 I 形 / 3 横向调整 / 4 纵向调整。
+/// 全自绘栈没有原生控件，形状只能由宿主按命中路径下发（见 `Widget::cursor_at`）。
+pub fn Window::set_cursor(self : Window, kind : Int) -> Unit {
+  wm_set_cursor(self.id, kind)
+}
+
+///|
 /// 销毁窗口。必须在 Loop 已 `quit` 之后调用（先停派发、再拆对象）。
 pub fn Window::close(self : Window) -> Unit {
   wm_close(self.id)

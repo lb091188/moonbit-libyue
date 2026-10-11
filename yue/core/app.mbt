@@ -30,6 +30,8 @@ pub(all) struct App {
   /// 卡住按下态，拖选/拖动插入点才有依据
   mut hover_id : Int
   mut capture : Int
+  /// 已下发给窗口的光标形状（只在变了时再走一次 FFI）
+  mut cursor_kind : Int
 }
 
 ///|
@@ -72,6 +74,7 @@ pub fn App::new(width : Int, height : Int, title : String) -> App? {
         ime_focus: 0,
         hover_id: -1,
         capture: -1,
+        cursor_kind: 0,
       }
       window.show()
       window.request_focus()
@@ -241,6 +244,18 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
       let r = route_pointer(self.root, pev, self.hover_id, self.capture)
       self.hover_id = r.0
       self.capture = r.1
+      // 光标形状随悬停路径走（拖动期间被捕获，形状停在起手那档）
+      let wants_cursor = match pev.kind {
+        Move => true
+        _ => false
+      }
+      if wants_cursor {
+        let want = self.root.cursor_at(pev.x, pev.y)
+        if want != self.cursor_kind {
+          self.cursor_kind = want
+          self.window.set_cursor(want)
+        }
+      }
       match pev.kind {
         Down => {
           // 按下把键盘焦点交给命中的可聚焦控件（栈里没有该 id 时不改焦点）

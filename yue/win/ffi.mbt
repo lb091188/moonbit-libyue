@@ -90,6 +90,9 @@ extern "c" fn wm_im_set_surrounding(
 ) -> Unit = "wm_im_set_surrounding"
 
 ///|
+extern "c" fn wm_set_cursor(id : Int64, kind : Int) -> Unit = "wm_set_cursor"
+
+///|
 extern "c" fn wm_im_set_cursor(
   id : Int64,
   x : Int,

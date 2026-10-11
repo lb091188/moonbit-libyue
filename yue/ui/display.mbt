@@ -639,6 +639,7 @@ pub fn carousel_t(
           p.close_path()
           p.fill()
         })
+        a.cursor = @core.CURSOR_HAND
         a.on_pointer = Some(fn(
           _self : @core.Widget,
           ev : @core.PointerEvent,
@@ -686,6 +687,7 @@ pub fn carousel_t(
           )
           p.fill_rect(0.0, 0.0, r.w, r.h)
         })
+        dot.cursor = @core.CURSOR_HAND
         dot.on_pointer = Some(fn(
           _self : @core.Widget,
           ev : @core.PointerEvent,

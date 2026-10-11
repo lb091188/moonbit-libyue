@@ -119,6 +119,7 @@ pub fn entry(
     watch_theme()
     let off = enabled_cell(None, false)
     w.focus_id = focus_id
+    w.cursor = @core.CURSOR_TEXT
     w.node.set_height(@yoga.fixed(@theme.control_height))
     if width > 0.0 {
       w.node.set_width(@yoga.fixed(width))

@@ -136,3 +136,31 @@ test "旧名构造器落到新组件上：picker 点开浮层、scroll 出滚动
   click_at(_r3, head.children()[1], 10.0, 10.0)
   assert_eq(sel.get(), 1)
 }
+
+///|
+test "光标形状请求：按钮手型、输入框文本形、分隔把手横向/纵向、cursor_group 可覆盖" {
+  let (root, card) = mounted(
+    hover_group([label("卡片"), button("按", on_click=fn() -> Unit { () })]),
+    300.0,
+    160.0,
+  )
+  assert_eq(card.cursor, @core.CURSOR_HAND)
+  assert_eq(card.children()[1].cursor, @core.CURSOR_HAND)
+  // 悬停在卡片空白处也是手型（组的请求回退生效）
+  assert_eq(root.cursor_at(card.rect.x + 4.0, card.rect.y + 4.0), @core.CURSOR_HAND)
+  let (_r2, box1) = mounted(entry(@core.Store::new("x"), focus_id=1), 200.0, 60.0)
+  assert_eq(box1.cursor, @core.CURSOR_TEXT)
+  let (_r3, area) = mounted(textarea(@core.Store::new("y")), 260.0, 90.0)
+  assert_eq(area.cursor, @core.CURSOR_TEXT)
+  let (_r4, hs) = mounted(hsplit(label("甲"), label("乙")), 220.0, 80.0)
+  assert_eq(hs.children()[1].cursor, @core.CURSOR_RESIZE_H)
+  let (_r5, vs) = mounted(vsplit(label("甲"), label("乙")), 220.0, 120.0)
+  assert_eq(vs.children()[1].cursor, @core.CURSOR_RESIZE_V)
+  let (_r6, cg) = mounted(
+    cursor_group([label("缩放热区")], cursor=@core.CURSOR_RESIZE_V, width=120.0),
+    200.0,
+    60.0,
+  )
+  assert_eq(cg.cursor, @core.CURSOR_RESIZE_V)
+  assert_eq(cg.children()[0].cursor, @core.CURSOR_DEFAULT)
+}

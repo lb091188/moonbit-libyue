@@ -23,6 +23,7 @@ fn setup_picker_field(
   watch_theme()
   w.node.set_width(@yoga.fixed(width))
   w.node.set_height(@yoga.fixed(32.0))
+  w.cursor = @core.CURSOR_HAND
   w.on_draw = Some(fn(
     self : @core.Widget,
     p : @render.Painter,
@@ -172,6 +173,7 @@ fn time_popup(
               p.line_to(r.w - 10.0, r.h / 2.0)
               p.stroke()
             })
+            b.cursor = @core.CURSOR_HAND
             b.on_pointer = Some(fn(
               _s : @core.Widget,
               ev : @core.PointerEvent,
@@ -218,6 +220,7 @@ fn time_popup(
               p.line_to(r.w / 2.0, r.h - 8.0)
               p.stroke()
             })
+            b.cursor = @core.CURSOR_HAND
             b.on_pointer = Some(fn(
               _s : @core.Widget,
               ev : @core.PointerEvent,
@@ -286,6 +289,7 @@ fn time_popup(
               valign=@text.Center,
             )
           })
+          b.cursor = @core.CURSOR_HAND
           b.on_pointer = Some(fn(
             _s : @core.Widget,
             ev : @core.PointerEvent,
@@ -332,6 +336,7 @@ fn time_popup(
               valign=@text.Center,
             )
           })
+          b.cursor = @core.CURSOR_HAND
           b.on_pointer = Some(fn(
             _s : @core.Widget,
             ev : @core.PointerEvent,

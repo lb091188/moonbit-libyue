@@ -601,6 +601,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **三条工具链写法（本批实测）**：① `test "名字"` 与左花括号**必须同一行**——分行写时解析器把测试体当成独立的顶层块，报错现场跑到几十行外且语义完全不搭（`The value identifier tabs is unbound` + `Parse error, unexpected token id`）；② `Option::is_none()` 在本工具链已弃用（提示改用 `x is None`），别把它写进新代码；③ match 的守卫不是 `v when cond`，MoonBit 写 `| cond`——简单二分支直接退回 `if/else` 更省事。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/ui` **103/103**（新增 5 条：vbox/hbox 的方向与间距来自参数、bind_label 改值后就地换文本并重测宽 + 出像素、bind 走派生信号且订阅随回收袋退订、hover_group 子控件悬停即整组换底色且抬起出组不算点击、旧名构造器落到新组件上（picker 点开浮层并回填、scroll 出滚动条且 max>0、tab 按 Store 切页））。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 加「声明式 L1」区块，几何行补 `NATIVE-APP-DC`，状态行补 `dcl= lblw=`，页面又长一截故窗口 1760→1900）：注入「点卡片里的『加一』按钮」得 `dcl=1 lblw=36/87`（Store 一改，标签文本与宽度都跟着走）、`label=34,1377,87x19`，指针停在卡片空白处截图复核整块换悬停底色。
 
+### MoonBit 原生 GUI 栈 · 窗口层光标通道（`wm_set_cursor` + `Widget.cursor` + `cursor_group`）
+
+- **全自绘栈里光标是「窗口级的一层」**：没有原生控件就没有「每个控件自带光标」这回事，形状只能设在绘图区的 `GdkWindow` 上。所以链路是：组件在控件上声明**请求**（`Widget.cursor`，编号 `@core.CURSOR_*`：0 默认 / 1 手型 / 2 文本 I 形 / 3 横向调整 / 4 纵向调整）→ 宿主在 `Move` 时取「悬停路径上**最深的那个非零请求**」→ 与已下发的形状不同才走一次 FFI（`Window::set_cursor`）。取「最深非零」而不是「最深」，是为了让包住一整组的 `cursor_group` 自然回退：组内子件没提请求时用组的，提了则以子件为准。
+- **与 master 的一条机制差**：旧链路的 `cursor_group` 必须把光标**递归设进组根与全部子孙**——GTK 的光标按原生事件窗口生效，只设容器盖不住有独立窗口的子件。本栈只设组自己一处即可，代价是「组内某个子件想保留自己的形状」要靠它自己提请求（提了就赢）。
+- **C 侧两道守卫**：`gtk_widget_get_window(area)` 在未 realize 时是 NULL（此时设了也没窗口可挂，直接跳过，下一次悬停会再试）；`WmWindow.cursor_kind` 记着当前形状，同形状重复请求不再新建 `GdkCursor`（`gdk_cursor_new_from_name` 每次都要分配，悬停抖动会白烧）。名字取不到（主题缺字形）时退回 `default`。
+- **两条工具链写法**：① `pub(all) enum PointerKind` **不自动带 `Eq`**，`pev.kind == Move` 编译不过（`Type PointerKind does not implement trait Eq`），要写 `match pev.kind { Move => true _ => false }`；② `pub(all) struct Rect` 的字段同样是公开的，测试里 `w.rect.x` 直接可读，不必另开 getter。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/core` **62/62**（新增 1 条 `cursor_at`：组内回退到组、子件自己提了以子件为准、组外与空白无命中都回默认）；`moon test -p NoahLiu/moonbit-libyue/yue/ui` **104/104**（新增 1 条：按钮/主题化按钮/悬停组手型、`entry`/`textarea` 文本形、`hsplit`/`vsplit` 把手横向/纵向、`cursor_group` 可覆盖形状且子件保持默认）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 每拍采一次宿主已下发形状，状态行补 `cur=手/文本/横向/纵向`）：注入「依次停在实心按钮 → 多行框 → 分隔把手 → 空白处」得 `cur=8/8/8/0`（前三档各被采到 8 拍，纵向那档示例里没有 `vsplit` 故为 0）、退出码 0。**光标的实际形状观感（手型是不是常见的指针、文本形是否为 I 形）由用户在真机复验**——注入只能证明宿主确实按区域下发了不同编号。
+
 ## Linux
 
 ### 发行版

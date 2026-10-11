@@ -18,6 +18,20 @@ pub(all) struct Rect {
 }
 
 ///|
+/// 光标形状编号（`Widget.cursor` 与 `Window::set_cursor` 共用同一套码）。
+/// 全自绘栈没有原生控件，形状只能由宿主按悬停路径下发：取路径上**最深的那个
+/// 非零请求**，所以包住一整组的 `cursor_group` 会自然回退生效。
+pub const CURSOR_DEFAULT : Int = 0
+///|
+pub const CURSOR_HAND : Int = 1
+///|
+pub const CURSOR_TEXT : Int = 2
+///|
+pub const CURSOR_RESIZE_H : Int = 3
+///|
+pub const CURSOR_RESIZE_V : Int = 4
+
+///|
 /// 半开区间判定：`px ∈ [x, x+w)`、`py ∈ [y, y+h)`；零宽/零高矩形不命中。
 pub fn Rect::contains(self : Rect, px : Double, py : Double) -> Bool {
   self.w > 0.0 && self.h > 0.0 && px >= self.x && px < self.x + self.w && py >= self.y && py < self.y + self.h
@@ -104,6 +118,10 @@ pub(all) struct Widget {
   mut im_cursor : Option[(Widget) -> Rect?]
   /// 焦点栈里的 id（0 = 不参与键盘焦点）
   mut focus_id : Int
+  /// 光标形状请求（0 = 不请求，用默认箭头；1 手型 / 2 文本 I 形 / 3 横向调整 /
+  /// 4 纵向调整）。全自绘栈没有原生控件，形状由宿主按命中路径下发：取悬停路径上
+  /// **最深的那个非零请求**，所以包住一整组的 `cursor_group` 会自然回退生效。
+  mut cursor : Int
 }
 
 ///|
@@ -131,6 +149,7 @@ pub fn Widget::new() -> Widget {
     im_context: None,
     im_cursor: None,
     focus_id: 0,
+    cursor: 0,
   }
 }
 
@@ -418,6 +437,21 @@ pub fn Widget::dispatch_pointer(self : Widget, ev : PointerEvent) -> Bool {
 /// （与 Web 的 setPointerCapture 同义）。
 pub fn Widget::dispatch_pointer_to(self : Widget, widget_id : Int, ev : PointerEvent) -> Bool {
   dispatch_on_path(path_to_widget(self, widget_id, []), ev)
+}
+
+///|
+/// 命中路径上「最深的一个非零光标请求」；无人请求时返回 0（默认箭头）。
+pub fn Widget::cursor_at(self : Widget, x : Double, y : Double) -> Int {
+  let path = self.hit_path(x, y)
+  let mut i = path.length()
+  while i > 0 {
+    i = i - 1
+    let k = path[i].cursor
+    if k != 0 {
+      return k
+    }
+  }
+  0
 }
 
 ///|

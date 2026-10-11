@@ -41,6 +41,7 @@ typedef struct {
   int pending_w;
   int pending_h;
   GtkIMContext *im;
+  int cursor_kind;   // 当前光标形状（0 默认/1 手/2 文本/3 横向/4 纵向），-1 未设过
   char commit[256]; // 已提交文本（UTF-8），MoonBit 逐字节读走后清零
   int commit_len;
   char preedit[256]; // 未提交的组合串，仅用于自绘显示
@@ -607,6 +608,45 @@ void wm_im_reset(int64_t id) {
   gtk_im_context_reset(w->im);
   w->preedit_len = 0;
   w->preedit[0] = '\0';
+}
+
+// 设绘图区光标形状：0 默认箭头 / 1 手型 / 2 文本 I 形 / 3 横向调整 / 4 纵向调整。
+// 自绘栈没有原生控件，悬停在手型件上时形状只能由宿主按命中路径下发；
+// 未 realize（还没有 GdkWindow）或形状没变时什么都不做。
+void wm_set_cursor(int64_t id, int kind) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->area == NULL || w->cursor_kind == kind) {
+    return;
+  }
+  GdkWindow *gw = gtk_widget_get_window(w->area);
+  if (gw == NULL) {
+    return;
+  }
+  const char *name = "default";
+  if (kind == 1) {
+    name = "pointer";
+  } else if (kind == 2) {
+    name = "text";
+  } else if (kind == 3) {
+    name = "ew-resize";
+  } else if (kind == 4) {
+    name = "ns-resize";
+  }
+  GdkDisplay *dpy = gtk_widget_get_display(w->area);
+  GdkCursor *cur = gdk_cursor_new_from_name(dpy, name);
+  if (cur == NULL) {
+    cur = gdk_cursor_new_from_name(dpy, "default");
+  }
+  if (cur == NULL) {
+    return;
+  }
+  gdk_window_set_cursor(gw, cur);
+  g_object_unref(cur);
+  w->cursor_kind = kind;
+  gdk_display_flush(dpy);
 }
 
 void wm_im_set_cursor(int64_t id, int x, int y, int w_, int h_) {

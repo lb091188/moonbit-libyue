@@ -79,6 +79,7 @@ fn nav_item(
         valign=@text.Center,
       )
     })
+    w.cursor = @core.CURSOR_HAND
     w.on_pointer = Some(fn(
       self : @core.Widget,
       ev : @core.PointerEvent,
@@ -245,6 +246,7 @@ pub fn pagination(
           @theme.theme_text_regular(),
         )
       })
+      w.cursor = @core.CURSOR_HAND
       w.on_pointer = Some(fn(
         _self : @core.Widget,
         ev : @core.PointerEvent,
@@ -481,6 +483,7 @@ fn collapse_panel(
         @theme.theme_text_primary(),
       )
     })
+    head.cursor = @core.CURSOR_HAND
     head.on_pointer = Some(fn(
       _self : @core.Widget,
       ev : @core.PointerEvent,
@@ -586,6 +589,7 @@ fn menu_item(
         valign=@text.Center,
       )
     })
+    w.cursor = @core.CURSOR_HAND
     w.on_pointer = Some(fn(
       self : @core.Widget,
       ev : @core.PointerEvent,
@@ -695,6 +699,7 @@ pub fn side_menu_sections(
           fold_arrow(p, r.w - 10.0, r.h / 2.0, 3.5, open.val, @theme.theme_text_secondary())
         }
       })
+      w.cursor = @core.CURSOR_HAND
       w.on_pointer = Some(fn(
         _self : @core.Widget,
         ev : @core.PointerEvent,
@@ -787,6 +792,7 @@ fn build_tree_rows(
     if has_kids {
       build_tree_rows(kids, nd.children, level + 1)
     }
+    row.cursor = @core.CURSOR_HAND
     row.on_pointer = Some(fn(
       _self : @core.Widget,
       ev : @core.PointerEvent,
@@ -904,6 +910,7 @@ pub fn tabs_t(
           p.fill_rect(0.0, r.h - 2.0, r.w, 2.0)
         }
       })
+      tab.cursor = @core.CURSOR_HAND
       tab.on_pointer = Some(fn(
         _self : @core.Widget,
         ev : @core.PointerEvent,
@@ -1040,6 +1047,7 @@ pub fn transfer(
             valign=@text.Center,
           )
         })
+        row_w.cursor = @core.CURSOR_HAND
         row_w.on_pointer = Some(fn(
           _self : @core.Widget,
           ev : @core.PointerEvent,
@@ -1119,6 +1127,7 @@ pub fn transfer(
         p.fill_rect(0.0, 0.0, r.w, r.h)
         draw_chevron(p, r.w / 2.0, r.h / 2.0, 4.0, to_right, @theme.theme_text_regular())
       })
+      b.cursor = @core.CURSOR_HAND
       b.on_pointer = Some(fn(
         _self : @core.Widget,
         ev : @core.PointerEvent,

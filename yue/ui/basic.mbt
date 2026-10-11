@@ -284,6 +284,7 @@ pub fn button(
     w.node.set_padding_left(@yoga.fixed(12.0))
     w.node.set_padding_right(@yoga.fixed(12.0))
     attach_text_measure(w, src)
+    w.cursor = @core.CURSOR_HAND
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,

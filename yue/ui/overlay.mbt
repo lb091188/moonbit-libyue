@@ -105,6 +105,7 @@ fn menu_row(text : String, on_pick : () -> Unit) -> @core.Node {
     watch_theme()
     w.node.set_width(@yoga.percent(100.0))
     w.node.set_height(@yoga.fixed(28.0))
+    w.cursor = @core.CURSOR_HAND
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
@@ -160,6 +161,7 @@ pub fn dropdown_menu(
     let tw = text_width(trigger, font)
     w.node.set_width(@yoga.fixed(tw + 40.0))
     w.node.set_height(@yoga.fixed(30.0))
+    w.cursor = @core.CURSOR_HAND
     let open_id : Ref[Int] = Ref(0)
     w.on_draw = Some(fn(
       self : @core.Widget,
@@ -417,6 +419,7 @@ pub fn dialog_t(
       close_btn.node.set_right(@yoga.fixed(8.0))
       close_btn.node.set_width(@yoga.fixed(24.0))
       close_btn.node.set_height(@yoga.fixed(24.0))
+      close_btn.cursor = @core.CURSOR_HAND
       close_btn.on_draw = Some(fn(
         self : @core.Widget,
         p : @render.Painter,
@@ -467,6 +470,7 @@ pub fn dialog_t(
         let b = @core.Widget::new()
         b.node.set_width(@yoga.fixed(text_width(text, title_font) + 28.0))
         b.node.set_height(@yoga.fixed(28.0))
+        b.cursor = @core.CURSOR_HAND
         b.on_draw = Some(fn(
           self : @core.Widget,
           p : @render.Painter,

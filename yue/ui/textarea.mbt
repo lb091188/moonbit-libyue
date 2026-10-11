@@ -212,6 +212,7 @@ pub fn textarea(
     let anchor = Ref(0)
     let pref_x : Ref[Double] = Ref(-1.0)
     w.focus_id = focus_id
+    w.cursor = @core.CURSOR_TEXT
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(box_h))
     w.node.set_flex_shrink(0.0)

@@ -100,6 +100,8 @@ fn splitter_impl(
       bar.node.set_align_self(Some(@yoga.AlignItems::Stretch))
     }
     bar.node.set_flex_shrink(0.0)
+    // 横向分隔用左右箭头、纵向用上下箭头（宿主按命中路径下发）
+    bar.cursor = if horizontal { @core.CURSOR_RESIZE_H } else { @core.CURSOR_RESIZE_V }
     let dragging = Ref(false)
     let drag_start : Ref[Double] = Ref(0.0)
     let drag_first0 : Ref[Double] = Ref(0.0)

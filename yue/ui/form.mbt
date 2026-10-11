@@ -85,6 +85,7 @@ pub fn checkbox(
     row.node.set_column_gap(6.0)
     row.append_child(box)
     let _ = (label(text, size=size)).mount_into(row)
+    row.cursor = @core.CURSOR_HAND
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
     handle(row)
     row
@@ -200,6 +201,7 @@ pub fn switch_t(
     if txt.length() > 0 {
       let _ = (label(txt)).mount_into(row)
     }
+    row.cursor = @core.CURSOR_HAND
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
     row
   })
@@ -228,6 +230,7 @@ pub fn slider(
     let dragging = Ref(false)
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(@theme.control_height))
+    w.cursor = @core.CURSOR_HAND
     let set_from_x = fn(self : @core.Widget, x : Double) -> Unit {
       let track = (self.rect.w - 12.0).max(1.0)
       let ratio = ((x - 6.0) / track).clamp(min=0.0, max=1.0)
@@ -473,6 +476,7 @@ pub fn button_t(
     w.node.set_padding_left(@yoga.fixed(12.0))
     w.node.set_padding_right(@yoga.fixed(12.0))
     w.node.set_flex_shrink(0.0)
+    w.cursor = @core.CURSOR_HAND
     attach_text_measure(w, src)
     w.on_draw = Some(fn(
       self : @core.Widget,
@@ -551,6 +555,7 @@ pub fn link(
     w.node.set_width(@yoga.fixed(tw))
     w.node.set_height(@yoga.fixed(@text.line_height_font(font).unwrap_or(18).to_double()))
     w.node.set_flex_shrink(0.0)
+    w.cursor = @core.CURSOR_HAND
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
@@ -694,6 +699,7 @@ pub fn rate_t(
     w.node.set_width(@yoga.fixed(size * n.to_double() + gap * (n - 1).to_double()))
     w.node.set_height(@yoga.fixed(size))
     w.node.set_flex_shrink(0.0)
+    w.cursor = @core.CURSOR_HAND
     // 第几颗星（1 起，越界夹住）：星星间距的一半算在星内，边缘不空
     w.on_pointer = Some(fn(_self : @core.Widget, ev : @core.PointerEvent) -> Bool {
       let star_at = fn(x : Double) -> Int {
@@ -761,6 +767,7 @@ fn select_row(opt : String, selected : () -> Bool, on_pick : () -> Unit) -> @cor
     w.node.set_width(@yoga.percent(100.0))
     w.node.set_height(@yoga.fixed(28.0))
     w.node.set_flex_shrink(0.0)
+    w.cursor = @core.CURSOR_HAND
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
@@ -992,6 +999,7 @@ fn color_swatch(
     w.node.set_width(@yoga.fixed(size))
     w.node.set_height(@yoga.fixed(size))
     w.node.set_flex_shrink(0.0)
+    w.cursor = @core.CURSOR_HAND
     w.set_margin(0.0, 0.0, 0.0, gap)
     w.on_draw = Some(fn(
       _self : @core.Widget,

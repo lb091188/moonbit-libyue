@@ -275,6 +275,7 @@ fn table_header(
           }
         })
         if col.sortable {
+          cell.cursor = @core.CURSOR_HAND
           cell.on_pointer = Some(fn(
             self : @core.Widget,
             ev : @core.PointerEvent,
@@ -444,6 +445,7 @@ fn table_row_widget(
             })
             row_w.append_child(cell)
           }
+          row_w.cursor = @core.CURSOR_HAND
           row_w.on_pointer = Some(fn(
             _s : @core.Widget,
             ev : @core.PointerEvent,

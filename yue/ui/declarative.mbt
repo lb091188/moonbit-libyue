@@ -15,6 +15,9 @@
 //   （指针在子项上时父项也算悬停），所以这里没有定时器、没有轮询，读 `hovered` 即可。
 // - `overlay_scroll`（旧链路的悬浮滚动条）在本栈就是 `scroll_v`：滚动条一直是
 //   视口的绝对定位子控件、覆盖在内容之上，不需要第二套形态。
+// - `cursor_group` 在旧链路要把光标递归设到组根与**全部子孙**（GTK 光标按原生
+//   窗口生效，只设容器盖不住有独立窗口的子件）；本栈光标是窗口级的一层，宿主按
+//   悬停路径取「最深的那个请求」，所以组只设自己一处，子孙没提请求时自然回退到它。
 
 ///|
 /// 垂直布局容器（`container` 的 Column 形态）。
@@ -245,6 +248,7 @@ pub fn hover_group(
     if width > 0.0 {
       w.node.set_width(@yoga.fixed(width))
     }
+    w.cursor = @core.CURSOR_HAND
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
@@ -307,4 +311,33 @@ pub fn mount_window(
       Some(app)
     }
   }
+}
+
+///|
+/// 光标组：组内任意位置都用 `cursor` 指定的形状（默认手型）。
+/// 宿主取的是悬停路径上**最深的那个非零请求**，所以组内某个子件自己提了形状
+/// （比如卡片里那颗按钮）时以它为准，其余位置回退到组的形状——不需要像旧链路
+/// 那样把光标递归设进每个子孙。
+pub fn cursor_group(
+  children : Array[@core.Node],
+  direction? : @yoga.FlexDirection = @yoga.Column,
+  row_gap? : Double = 0.0,
+  column_gap? : Double = 0.0,
+  padding? : Double = 0.0,
+  width? : Double = 0.0,
+  cursor? : Int = @core.CURSOR_HAND,
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  container(
+    children,
+    direction=direction,
+    row_gap=row_gap,
+    column_gap=column_gap,
+    padding=padding,
+    width=width,
+    handle=fn(w : @core.Widget) -> Unit {
+      w.cursor = cursor
+      handle(w)
+    },
+  )
 }

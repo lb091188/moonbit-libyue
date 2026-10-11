@@ -219,3 +219,28 @@ test "悬停带父链语义（CSS :hover 同义），翻转时触发 on_hover_ch
   root.set_hover(0)
   assert_eq((root.hovered, sib.hovered), (false, false))
 }
+
+///|
+test "cursor_at：取悬停路径上最深的那个非零请求，无人请求回默认" {
+  let root = Widget::new()
+  root.set_column()
+  let group = sized(Widget::new(), 100.0, 40.0)
+  group.set_column()
+  group.cursor = CURSOR_HAND
+  let plain = sized(Widget::new(), 100.0, 20.0)
+  let own = sized(Widget::new(), 100.0, 20.0)
+  own.cursor = CURSOR_TEXT
+  group.append_child(plain)
+  group.append_child(own)
+  let spare = sized(Widget::new(), 100.0, 20.0)
+  root.append_child(group)
+  root.append_child(spare)
+  root.relayout(100.0, 60.0)
+  // 组内没提请求的子件 → 回退到组的手型（旧链路要把光标递归设进每个子孙）
+  assert_eq(root.cursor_at(10.0, 10.0), CURSOR_HAND)
+  // 子件自己提了形状 → 以它为准
+  assert_eq(root.cursor_at(10.0, 30.0), CURSOR_TEXT)
+  // 组外无人请求 / 空白处无命中 → 默认箭头
+  assert_eq(root.cursor_at(10.0, 50.0), CURSOR_DEFAULT)
+  assert_eq(root.cursor_at(10.0, 200.0), CURSOR_DEFAULT)
+}

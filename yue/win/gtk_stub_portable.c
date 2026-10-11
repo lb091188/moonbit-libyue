@@ -72,6 +72,9 @@ void wm_request_focus(int64_t id) { (void)id; }
 void wm_im_set_surrounding(int64_t id, const char *text, int caret) {
   (void)id; (void)text; (void)caret;
 }
+void wm_set_cursor(int64_t id, int kind) {
+  (void)id; (void)kind;
+}
 void wm_im_set_cursor(int64_t id, int x, int y, int w, int h) {
   (void)id; (void)x; (void)y; (void)w; (void)h;
 }
