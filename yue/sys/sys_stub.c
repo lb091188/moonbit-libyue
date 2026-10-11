@@ -16,6 +16,9 @@
 #include <windows.h>
 #else
 #include <dirent.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #endif
 
 // moon 运行时的字节构造（运行期符号，声明即链接）
@@ -224,4 +227,99 @@ int32_t yue_sys_write_text_file(const char *path, const char *data, int32_t *ok)
     return 0;
   }
   return -1;
+}
+
+// 当前工作目录（getcwd，失败 ok=0 返回空文本）。Windows 分支为占位
+// （_getcwd 属 M2 地基批），故 Windows 下恒 ok=0。
+void *yue_sys_getcwd(int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  return moonbit_make_bytes(0, 0);
+#else
+  char buf[4096];
+  if (getcwd(buf, sizeof(buf)) == NULL) {
+    return moonbit_make_bytes(0, 0);
+  }
+  size_t len = strlen(buf);
+  void *out = moonbit_make_bytes((int)len, 0);
+  if (len > 0) {
+    memcpy(out, buf, len);
+  }
+  *ok = 1;
+  return out;
+#endif
+}
+
+// 分离式启动：execvp 直传 argv（不经 shell，参数里无命令替换风险），子
+// 进程脱离会话与新进程组，标准输入输出全接 /dev/null。双 fork + 一根
+// CLOEXEC 管道：中间进程只读「真正子进程有没有 exec 成功」——exec 成功
+// 时管道写端被 exec 关掉（读到 EOF），失败时子进程写一个 'E'，所以调用
+// 方等中间进程退出即可拿到结果，既不会留下僵尸（中间进程由本函数回收，
+// 真孙进程过继给 init），也不会被 xdg-open 这类启动后仍驻留的程序拖住。
+int32_t yue_sys_spawn_detached(const char *file, const char *arg) {
+#if defined(_WIN32)
+  (void)file;
+  (void)arg;
+  return -1; // 占位：Windows 走 ShellExecuteW（M2 地基批）
+#else
+  if (file == NULL || file[0] == '\0') {
+    return -1;
+  }
+  int fds[2];
+  if (pipe(fds) != 0) {
+    return -1;
+  }
+  // 写端标 CLOEXEC：孙进程 exec 成功即自动关闭，中间进程据此判成败
+  fcntl(fds[1], F_SETFD, FD_CLOEXEC);
+  pid_t mid = fork();
+  if (mid < 0) {
+    close(fds[0]);
+    close(fds[1]);
+    return -1;
+  }
+  if (mid == 0) {
+    setsid();
+    pid_t gc = fork();
+    if (gc < 0) {
+      _exit(1);
+    }
+    if (gc == 0) {
+      close(fds[0]);
+      int devnull = open("/dev/null", O_RDWR);
+      if (devnull >= 0) {
+        dup2(devnull, STDIN_FILENO);
+        dup2(devnull, STDOUT_FILENO);
+        dup2(devnull, STDERR_FILENO);
+        if (devnull > 2) {
+          close(devnull);
+        }
+      }
+      char *argv[3];
+      argv[0] = (char *)file;
+      argv[1] = (arg != NULL && arg[0] != '\0') ? (char *)arg : NULL;
+      argv[2] = NULL;
+      execvp(file, argv);
+      // exec 失败才走到这里：写端仍在（CLOEXEC 只在 exec 成功时关掉）
+      ssize_t wrote = write(fds[1], "E", 1);
+      (void)wrote;
+      _exit(127);
+    }
+    // 中间进程：先派生完再交回写端，只等 exec 的成败信号
+    close(fds[1]);
+    char c = 0;
+    ssize_t n = read(fds[0], &c, 1);
+    close(fds[0]);
+    _exit(n == 1 ? 1 : 0);
+  }
+  close(fds[0]);
+  close(fds[1]);
+  int status = 0;
+  if (waitpid(mid, &status, 0) < 0) {
+    return -1;
+  }
+  if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+    return 0;
+  }
+  return -1;
+#endif
 }
