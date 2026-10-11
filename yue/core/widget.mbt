@@ -76,7 +76,9 @@ pub(all) struct Widget {
   /// **不要再把控件句柄捕获进闭包**——控件持有回调、回调又持有控件就是引用环，
   /// 本工具链的计数式回收断不掉环，动态换树（bind_node 重挂）会稳定泄漏。
   mut on_draw : Option[(Widget, @render.Painter, Rect) -> Unit]
-  mut on_pointer : Option[(PointerEvent) -> Bool]
+  /// 指针回调：首参是控件本身（要读 `rect` 判「松开是否在自己范围内」、
+  /// 拖动边界等，都由参数拿，不要把控件句柄捕获进闭包——见 `on_draw` 注）
+  mut on_pointer : Option[(Widget, PointerEvent) -> Bool]
   mut on_key : Option[(KeyEvent) -> Bool]
   mut on_scroll : Option[(ScrollEvent) -> Bool]
   /// 交互态（悬停 / 按下）：**由宿主按命中与捕获统一维护**，控件只在
@@ -372,7 +374,7 @@ fn dispatch_on_path(path : Array[Widget], ev : PointerEvent) -> Bool {
       mods: ev.mods,
     }
     match w.on_pointer {
-      Some(f) => handled = f(at_local)
+      Some(f) => handled = f(w, at_local)
       None => ()
     }
   }

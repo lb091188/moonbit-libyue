@@ -51,7 +51,7 @@
   - [ ] 绘制入口形态：旧契约的 `Painter::draw_text` 在组件接线（G7）时逐点改 `@text.draw_in_box(p.bitmap, …)`
 
 ### 控件（一律自绘，不再引入原生控件皮肤；家族名对应 master `yue/components/` 九个源文件）
-- [ ] 基础原语：`group`/`scroll`/`separator`/`splitter`/`tab`（yue 根）＋ 按钮 / 复选 / 单选 / 开关 / 滑块 / 进度 / 步进 / 标签 / 分隔线 / 图像 / 图标
+- [~] 基础原语：`group`/`separator`/标签/图像/图标/按钮已落新包 **`yue/ui`**（首批 7 件，另附 `container`；文本 measure/baseline 首次回灌布局引擎，`on_pointer`/`on_draw` 首参为控件本身以免自捕获引用环；`type=` 因是保留字改 `kind : ButtonKind`；`yue/components` 属旧链路红点，按批替换）；剩 `scroll`/`splitter`/`tab` ＋ 复选 / 单选 / 开关 / 滑块 / 进度 / 步进
 - [ ] 文本族 `components_text.mbt`：`label_t`、`code_view`＋`tokenize_lang`/`tokenize_moonbit`、`measure_text_height`
 - [ ] 表单族 `components_form.mbt`（15）：`button_t`/`entry_t`/`checkbox_t`/`radio_group`/`switch_t`/`input_t`/`input_number`/`form_item`/`form`/`link`/`textarea_t`/`slider_t`/`select_t`/`rate_t`/`color_picker_t`
 - [ ] 输入框全语义（跨文本/表单两族）：选区、双击选词、拖放插入点、Shift+箭头、undo/redo、placeholder、粘贴降级、只读、密码遮罩、IME 与 preedit 内联

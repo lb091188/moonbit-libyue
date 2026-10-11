@@ -1,10 +1,13 @@
 import {
+  "NoahLiu/yoga-mbt/src" @yoga,
   "moonbitlang/core/encoding/utf8",
   "NoahLiu/moonbit-libyue/yue/core",
   "NoahLiu/moonbit-libyue/yue/input",
   "NoahLiu/moonbit-libyue/yue/render",
   "NoahLiu/moonbit-libyue/yue/text",
   "NoahLiu/moonbit-libyue/yue/theme",
+  "NoahLiu/moonbit-libyue/yue/ui",
+  "NoahLiu/moonbit-libyue/yue/icons",
 }
 
 pkgtype(kind: "executable")

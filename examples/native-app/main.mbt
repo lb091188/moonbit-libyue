@@ -27,6 +27,8 @@ priv struct Ctr {
   mut down : Int
   mut up : Int
   mut moved : Int
+  // 批次 5b：组件层按钮的点击数
+  mut comp : Int
 }
 
 ///|
@@ -155,7 +157,7 @@ fn make_field(
       h: rect.h - 4.0,
     })
   })
-  w.on_pointer = Some(fn(ev : @core.PointerEvent) -> Bool {
+  w.on_pointer = Some(fn(_widget : @core.Widget, ev : @core.PointerEvent) -> Bool {
     match ev.kind {
       @core.Down => {
         place_caret(ed, ev.x)
@@ -192,7 +194,7 @@ fn make_button(app : @core.App, ctr : Ctr, id : Int, top : Double) -> @core.Widg
       if focused { "#ffffff" } else { @theme.theme_text_regular() },
     )
   })
-  w.on_pointer = Some(fn(ev : @core.PointerEvent) -> Bool {
+  w.on_pointer = Some(fn(_widget : @core.Widget, ev : @core.PointerEvent) -> Bool {
     match ev.kind {
       @core.Down => {
         ctr.clicks = ctr.clicks + 1
@@ -303,7 +305,7 @@ fn make_decl_row(store : @core.Store[Int]) -> @core.Node {
           @theme.theme_text_regular(),
         )
       })
-      w.on_pointer = Some(fn(ev : @core.PointerEvent) -> Bool {
+      w.on_pointer = Some(fn(_widget : @core.Widget, ev : @core.PointerEvent) -> Bool {
         match ev.kind {
           @core.Down => {
             store.update(fn(x : Int) -> Int { x + 1 })
@@ -345,7 +347,7 @@ fn make_band(ctr : Ctr) -> @core.Widget {
       "#ffffff",
     )
   })
-  w.on_pointer = Some(fn(ev : @core.PointerEvent) -> Bool {
+  w.on_pointer = Some(fn(_widget : @core.Widget, ev : @core.PointerEvent) -> Bool {
     match ev.kind {
       @core.Down => {
         ctr.down = ctr.down + 1
@@ -367,7 +369,7 @@ fn make_band(ctr : Ctr) -> @core.Widget {
 
 ///|
 fn main {
-  let app = match @core.App::new(420, 300, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(420, 372, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -384,6 +386,7 @@ fn main {
     down: 0,
     up: 0,
     moved: 0,
+    comp: 0,
   }
   let root = app.root
   root.set_column()
@@ -408,6 +411,30 @@ fn main {
   root.append_child(btn)
   root.append_child(make_font_row(ctr))
   root.append_child(make_band(ctr))
+  // 批次 5b（组件层首批）：一行全用 @ui 构造器，按钮经 store 计数。
+  app.mount([
+    @ui.container(
+      [
+        @ui.label("组件层", size=13.0),
+        @ui.separator(vertical=true),
+        @ui.icon(
+          @icons.IconKind::MediumCircleFill, size=18.0, color=@theme.theme_success(),
+        ),
+        @ui.button(
+          "加一",
+          on_click=fn() { ctr.comp = ctr.comp + 1 },
+          min_width=64.0,
+        ),
+        @ui.button("禁用", disabled=true),
+      ],
+      direction=@yoga.Row,
+      column_gap=8.0,
+      padding=6.0,
+      align_items=@yoga.AlignItems::Center,
+      bg=@theme.theme_bg_page(),
+      border=@theme.theme_border(),
+    ),
+  ])
   let decl = @core.Store::new(0)
   let decl_kids_before = root.children().length()
   app.mount([make_decl_row(decl)])
@@ -441,7 +468,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved}",
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp}",
   )
   app.shutdown()
 }

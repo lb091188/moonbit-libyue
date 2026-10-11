@@ -102,7 +102,7 @@ fn make_band(hits : Ref[Array[Int]]) -> @core.Widget {
       p.set_fill_color(colors[k])
       p.fill_rect(0.0, 0.0, r.w, r.h)
     })
-    cell.on_pointer = Some(fn(ev : @core.PointerEvent) -> Bool {
+    cell.on_pointer = Some(fn(_widget : @core.Widget, ev : @core.PointerEvent) -> Bool {
       // 只数按下：移动也路由到控件（真控件要它做 hover），计数得可解释
       match ev.kind {
         @core.Down => {

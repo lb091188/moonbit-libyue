@@ -65,7 +65,9 @@ fn sig_fresh_sub_id() -> Int {
 ///|
 /// 把一条订阅的退订闭包压入当前回收袋(无袋时忽略:常规挂载订阅
 /// 随应用存活,不进袋)。
-fn sub_bag_register(off : () -> Unit) -> Unit {
+/// 公开给跨包的组件用:任何「随这一代子树一起生、一起死」的资源(主题订阅、
+/// 自定义清理)都走这里,不必等 bind_node 重建才回收。
+pub fn sub_bag_register(off : () -> Unit) -> Unit {
   match sub_bags.val.last() {
     Some(bag) => bag.push(off)
     None => ()

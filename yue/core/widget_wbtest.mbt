@@ -103,16 +103,16 @@ test "指针事件：本地坐标换算 + 沿祖先链冒泡 + 消费即停" {
   root.relayout(100.0, 100.0)
 
   let order : Array[String] = []
-  leaf.on_pointer = Some(fn(ev : PointerEvent) -> Bool {
+  leaf.on_pointer = Some(fn(_widget : Widget, ev : PointerEvent) -> Bool {
     // 三棵树原点都在 (0,0)：本地坐标应与窗口坐标相同（有偏移的树见下一条用例）
     order.push("leaf@\{ev.x.to_string()},\{ev.y.to_string()}")
     false
   })
-  mid.on_pointer = Some(fn(ev : PointerEvent) -> Bool {
+  mid.on_pointer = Some(fn(_widget : Widget, ev : PointerEvent) -> Bool {
     order.push("mid@\{ev.x.to_string()},\{ev.y.to_string()}")
     false
   })
-  root.on_pointer = Some(fn(ev : PointerEvent) -> Bool {
+  root.on_pointer = Some(fn(_widget : Widget, ev : PointerEvent) -> Bool {
     order.push("root@\{ev.x.to_string()},\{ev.y.to_string()}")
     true
   })
@@ -132,11 +132,11 @@ test "指针事件：本地坐标换算 + 沿祖先链冒泡 + 消费即停" {
 
   // 消费即停：leaf 返回 true 时父层不见事件
   let order2 : Array[String] = []
-  leaf.on_pointer = Some(fn(_ev : PointerEvent) -> Bool {
+  leaf.on_pointer = Some(fn(_widget : Widget, _ev : PointerEvent) -> Bool {
     order2.push("leaf")
     true
   })
-  mid.on_pointer = Some(fn(_ev : PointerEvent) -> Bool {
+  mid.on_pointer = Some(fn(_widget : Widget, _ev : PointerEvent) -> Bool {
     order2.push("mid")
     true
   })
@@ -157,7 +157,7 @@ test "指针本地坐标随控件原点平移（有偏移的一棵树）" {
   assert_eq((box_.rect.x, box_.rect.y), (0.0, 30.0))
 
   let seen : Array[(Double, Double)] = []
-  box_.on_pointer = Some(fn(ev : PointerEvent) -> Bool {
+  box_.on_pointer = Some(fn(_widget : Widget, ev : PointerEvent) -> Bool {
     seen.push((ev.x, ev.y))
     true
   })

@@ -15,7 +15,7 @@ fn hover_tree(log : Array[String], tag : String) -> (Widget, Widget, Widget, Wid
   let a = sized(Widget::new(), 100.0, 20.0)
   let b = sized(Widget::new(), 100.0, 20.0)
   let c = sized(Widget::new(), 100.0, 20.0)
-  b.on_pointer = Some(fn(ev : PointerEvent) -> Bool {
+  b.on_pointer = Some(fn(_widget : Widget, ev : PointerEvent) -> Bool {
     let kind_str = match ev.kind {
       Down => "down"
       Up => "up"
@@ -30,7 +30,7 @@ fn hover_tree(log : Array[String], tag : String) -> (Widget, Widget, Widget, Wid
       _ => false
     }
   })
-  c.on_pointer = Some(fn(ev : PointerEvent) -> Bool {
+  c.on_pointer = Some(fn(_widget : Widget, ev : PointerEvent) -> Bool {
     let kind_str = match ev.kind {
       Down => "down"
       Up => "up"
@@ -114,7 +114,7 @@ test "点在空白处：命中根控件、没有处理器也不炸，且不进�
   let log : Array[String] = []
   let root = Widget::new()
   let child = sized(Widget::new(), 40.0, 20.0)
-  child.on_pointer = Some(fn(_ev : PointerEvent) -> Bool {
+  child.on_pointer = Some(fn(_widget : Widget, _ev : PointerEvent) -> Bool {
     log.push("child")
     true
   })

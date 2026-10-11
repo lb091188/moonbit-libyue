@@ -406,6 +406,16 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **注入手法补一条**：拖动序列写成 `xdotool mousemove --window <id> X Y mousedown 1` 原子按下，随后 `xdotool mousemove --window <id> X2 Y2` 移动、`xdotool mouseup 1` 松开（不带 `--window`，XTEST 在当前点位松开）。实测带内按下、带外松开，捕获带仍收到抬起。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/core` **59/59**（新增 6 条：悬停跟随与 `Leave` 补发、捕获期移动与抬起都投给按下者且悬停不动、点在空白处不进捕获也不炸、隐藏控件不参与悬停且兄弟上顶后命中跟着变、`by_id` 与 `dispatch_pointer_to` 按身份投递（坐标不参与判定）、滚轮沿用同一冒泡规则）；八包 `--deny-warn` 全零警告，yoga-mbt 92/92，全仓红点仍 287 errors / 68 warnings。真窗口回证（`examples/native-app` 新增「捕获带」，绘制态直接读 `w.pressed`/`w.hovered`）：带内按下 → 拖到 (200,245) → 拖到 (300,100) 松手 → `band=d1/u1/m3`（**在带外松手仍收到抬起**），同轮按钮 `clicks=1`、声明式行 `decl=2 kids=7/7` 照常，退出码 0。**待用户目视**：拖动过程中带子保持按下色（橙）、离开后恢复常态而悬停色不再跟着指针跑。
 
+### MoonBit 原生 GUI 栈 · 组件层首批（新包 `yue/ui`：文本测量回灌布局 + 容器/标签/分隔线/图像/图标/按钮）
+
+- **为什么不写进 `yue/components`**：那个目录是旧链路的组件实现（引用 `@yue` 根包与 `@declarative`，属全仓 287 个红点的主要来源）。新栈每批只把**要保留的语义**重做，若与旧文件同包，`moon check <包> --deny-warn` 这条分包门禁就永远无从执行（旧文件的错会一起报）。故新组件层另起 `yue/ui`，旧包按批替换/删除，G7 收口时一并结算。
+- **文本测量回灌布局引擎**（G7 欠的那块）：`attach_text_measure(w, src)` 给节点同时设 `set_measure`（尺寸来自 `measure_font`）与 `set_baseline`（`line_ascent_font`），于是文本第一次能参与 `align-items: baseline` 的真实排布，`label` 的宽高也就是 Pango 给的真尺寸。两条被实测纠正的断言：① **列容器默认 `align-items: stretch` 会把标签宽度拉到整行**——要看出测量给的真宽度，父项必须 `FlexStart` 或标签自带显式宽（我第一次直接断言测量宽，拿到的是 240 而不是 70）；② 基线对齐时**顶边差 = 两个 ascent 之差**（大字号更靠上），我把差写反过一次。min-content 探询（请求轴 `Some(0.0)`）暂按「不受约束」处理，属记档近似（等接进省略号自适应再细化）。
+- **指针回调也要收控件本身**：`on_pointer` 首参改成 `Widget`（与 `on_draw` 同一条引用环纪律）。按钮需要 `self.rect` 才能判「松开是否仍落在自己范围内」——捕获期保证按钮一定收得到在别处松手的那次 `Up`，但只有拿到自己的矩形才分得清内/外。
+- **两处与 master 的命名分岔**（记档，不做兼容层）：① `button(type="text")` 的 `type` 是 MoonBit **保留字**，作参数名直接语法错，换成 `kind : ButtonKind`（`Primary`/`Border`/`Text`）；② 禁用态配色暂用 `fill_hover` 底 + `text_secondary` 字，真正的 disabled 色板随主题批补进 `Theme`（现在 20 个字段里没有它）。
+- **主题跟随做成进程级单订阅**：组件挂载时调 `watch_theme()`（幂等），主题变化 → 一次 `invalidate()`。不做按控件订阅：`invalidate` 本就是全局的，逐控件订阅会让每次重挂都留下一条死订阅，换不来任何精度。颜色一律在 `on_draw` 里现取（不在建树时固化），主题切了下一帧就是新色。
+- **文本绑定的对应物**：`label_dyn(sig : Signal[String], ...)` 就是旧链路 `bind_label` 的位置——就地改文本 + 重设测量回调（节点标脏）+ 请求重绘，不重建子树；订阅退订经 `@core.sub_bag_register` 进本代回收袋（该函数为此从包内提到公开，组件层的清理都走它）。
+- **验证**：新包 `moon test -p NoahLiu/moonbit-libyue/yue/ui` 7/7（标签尺寸来自测量且随信号重测、两字号基线对齐的顶边差、按钮松开在内/在外两种结果、禁用态不消费也不回调、悬停态换色且文本仍落在盒内、容器/分组/分隔线几何与横线撑满、图标按尺寸占位并真出像素 + 图像缺文件不崩）；**九包**（core/input/render/text/win/icons/theme/sys/ui）`--deny-warn` 全零警告，core 59/input 10/render 40/text 28/icons 4/theme 7/sys 7/yoga-mbt 92 全绿，全仓红点仍 287 errors / 68 warnings。真窗口回证：`examples/native-app` 底部新增一行全用 `@ui` 构造器（label + 竖分隔线 + icon + `加一` 按钮 + `禁用` 按钮），窗口加高到 420×372；xdotool 注入 `mousemove --window 135 278 click 1` 两次 → `comp=2`，再点禁用按钮那一段 → 计数不涨且 `decl=0`（禁用态确实不消费事件），`kids=8/8` 根子项数在多次重挂后仍恒定，退出码 0；同轮既有回证（打字/Tab/点击定位/捕获带）未退化。**待用户目视**：组件行的悬停/按下色、竖分隔线是否真的撑满行高、图标与文本在同一行的基线观感。
+
 ## Linux
 
 ### 发行版
