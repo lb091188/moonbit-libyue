@@ -646,6 +646,13 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **四条工具链写法（本批实测）**：① `pub const` 的名字**必须大写**（`pub const pi` 直接报「Expected upper case identifier for name of const, found lower case. Did you mean let?」），小写常量用 `pub let`；② `for i = 1..<n { }` 不支持——range 只在 `for x in a..<b` 里合法，经典 for 要写 `for i = 1; i < n; i = i + 1`；③ `StringBuilder` 的写入方法是 `write_string`/`write_char`，没有 `add`/`append`；④ `Ordering` 类型在本工具链不可直接引用（写比较器函数会报「The type Ordering is undefined」），几个元素排序退回插入排序。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/chart` **11/11**（6 条纯函数：窗口丢最旧与越界无操作、值域退化与留白比例、1-2-5 步长与负区间起点、单位换挡 k/M/G、柱槽与两形态命中、扇区只累计正值且单扇区留 0.0002 弧度、仪表分段取色与折线段数、回归退化、8 位色串、标签截断；5 条组件：折线换数据与密集抽推出图、柱状悬停换底与离开复原、环形出图 + 命中四态、仪表盘 smooth 两路（直接跳到位 / 逐拍逼近）、散点带趋势线）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 加「图表」区块：折线+柱状一行、环形+仪表+散点+推点按钮一行，几何行补 `NATIVE-APP-CH`，状态行补 `ln=`/`chp=`）：注入「点三次推点按钮」得 `ln=27/23 chp=3`（窗口 24→27 点、末值 7→23，与手算 `pushes*7%29+2` 逐位一致）、退出码 0；截图复核五图齐备——折线带面积填充与右端最新值标注、柱状正负异色带类目、环形中心汇总 + 右侧图例带百分比、仪表 68% 弧与中心数字、散点带最小二乘趋势线。
 
+### MoonBit 原生 GUI 栈 · sys 批 3（硬件族六件：brightness / volume / nightlight / printer / powerprofile / monitor）
+
+- **依赖注入解 DBus 耦合**：brightness 的写路径（logind 在线探测 + SetBrightness）在 master 走 `@traybus`；新栈把两处改成**进程级注入槽**——`brightness_set_logind_probe(()->Bool)` 与 `brightness_set_action((subsystem,name,value)->String)`（空串成功、非空错误串），DBus 线接入后由 traybus 侧注入实做，读路径（设备枚举/当前值/最大值，纯 sysfs）不依赖槽。模式与 `ci_tooltip` 的回调反转同构：**语义层定义槽、平台层注入**。
+- **monitor 从会话族提前**：夜灯（nightlight）的显示器枚举依赖 monitor（xrandr），而 monitor 只依赖 platform + pr_run，无 DBus——按依赖序归入本批。
+- **挪 DBus 线的三件**：`sensor`（iio-sensor-proxy）/`bluetooth`（org.bluez）走 `@traybus` 通用 D-Bus 层属性读取；`disk`（UDisks2）50 处 `@traybus.gdbus_call_system`——它们的核心是总线调用而非命令行，本批不强拆。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/sys` **41/41**（新增 11：monitor 的 xrandr 解析矩阵 + 六文件的 pr_run 命令面/解析纯函数同源平移；brightness 注入槽未注入时 set 走 Unsupported、读路径本机真 sysfs）；`moon check yue/sys --deny-warn` 零警告、全仓红点仍 287/68。**真机复验**：volume 音量增减与静音、brightness 读当前值、powerprofile 列表与切换、printer 打印机枚举、nightlight 色温生效、monitor 分辨率列表。
+
 ### MoonBit 原生 GUI 栈 · sys 批 2（`yue/sys/dialog.mbt`：文件对话框）
 
 - **GTK 端归 win 桩、语义层归 sys 包**：`GtkFileChooserDialog` 的封装写进 `yue/win/gtk_stub.c`（`wm_file_*` 前缀，槽表与窗口桩同制——对话框要挂 GTK 父窗口、且该文件已由 prebuild 编进 GTK 链接单元）；`yue/sys/dialog.mbt` 只做语义薄封装（filters 字符串透传、选项位、run/取结果/销毁）。sys 包 **不 import yue/win**——`run_for_window` 的 parent 是纯句柄 id（Int64），MoonBit 层无符号依赖，但链接需要 `-lyue_win_stub`，由 `scripts/prebuild.py` 给 sys 包**单独下发** link_configs（GTK 库清单同 win 一套）。
