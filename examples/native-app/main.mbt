@@ -370,8 +370,20 @@ fn make_band(ctr : Ctr) -> @core.Widget {
 }
 
 ///|
+/// 矩形转字符串（几何行用，四舍五入到整像素）。
+fn rect_str(r : @core.Rect) -> String {
+  r.x.round().to_int().to_string() +
+    "," +
+    r.y.round().to_int().to_string() +
+    "," +
+    r.w.round().to_int().to_string() +
+    "x" +
+    r.h.round().to_int().to_string()
+}
+
+///|
 fn main {
-  let app = match @core.App::new(560, 600, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(560, 900, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -495,6 +507,66 @@ fn main {
       border=@theme.theme_border(),
     ),
   ])
+  // 批次 6b（显示族收尾）：时间线 + 轮播。手动轮播 `interval_ms=0`（切页只由
+  // 注入点击决定，退出状态才确定）；自转轮播走宿主的进程级延时通道，示例每帧
+  // 采样一次下标，退出时报「自动切了几页」。
+  let spin = @ui.CarouselHandle::make()
+  let auto = @ui.CarouselHandle::make()
+  let car_sample : Ref[(Int, Int)] = Ref((0, 0))
+  let car_w : Ref[@core.Widget?] = Ref(None)
+  let auto_w : Ref[@core.Widget?] = Ref(None)
+  app.mount([
+    @ui.container(
+      [
+        @ui.container(
+          [
+            @ui.label("显示族收尾", size=13.0),
+            @ui.timeline(
+              [
+                ("构建", "编译通过", @ui.Success),
+                ("打包", "静态库就位", @ui.Info),
+                ("发布", "已上线", @ui.Danger),
+              ],
+              item_height=44.0,
+            ),
+          ],
+          padding=8.0,
+          row_gap=6.0,
+          bg=@theme.theme_bg_panel(),
+          border=@theme.theme_border(),
+        ),
+        @ui.carousel_t(
+          [
+            @ui.label("轮播第一页：点右侧箭头或末指示点", size=13.0),
+            @ui.label("轮播第二页", size=13.0),
+            @ui.label("轮播第三页", size=13.0),
+            @ui.label("轮播第四页", size=13.0),
+          ],
+          width=340.0,
+          height=56.0,
+          interval_ms=0,
+          rotation=spin,
+          handle=fn(w : @core.Widget) -> Unit { car_w.val = Some(w) },
+        ),
+        @ui.carousel_t(
+          [
+            @ui.label("自转页 A", size=13.0),
+            @ui.label("自转页 B", size=13.0),
+            @ui.label("自转页 C", size=13.0),
+          ],
+          width=200.0,
+          height=36.0,
+          interval_ms=800,
+          rotation=auto,
+          handle=fn(w : @core.Widget) -> Unit { auto_w.val = Some(w) },
+        ),
+      ],
+      padding=8.0,
+      row_gap=6.0,
+      bg=@theme.theme_bg_page(),
+      border=@theme.theme_border(),
+    ),
+  ])
   // 批次 5d（输入框全语义）：整只框由 `@ui.entry` 提供——键入、选区、双击选词、
   // 拖动、undo、输入法提交与 preedit 都在组件里，宿主只按焦点投递。
   let t3 = @core.Store::new("组件框")
@@ -517,6 +589,12 @@ fn main {
   ticker.val = fn() {
     if app.is_running() {
       ctr.frames = ctr.frames + 1
+      // 自转轮播的下标由宿主的延时通道推进：换了页就计一次
+      let idx = auto.index()
+      let s0 = car_sample.val
+      if s0.0 != idx {
+        car_sample.val = (idx, s0.1 + 1)
+      }
       app.schedule_paint()
       let _ = app.timer(100, ticker.val)
     }
@@ -534,12 +612,15 @@ fn main {
   let _ = app.timer(5000, fn() { app.quit() })
 
   app.run()
+  // 卸载前停转（自排链不认识视图已移除；本例循环已 quit，这里是示范正确收尾）
+  @ui.carousel_stop(auto)
+  @ui.carousel_stop(spin)
   let focus_str = match app.focus.current() {
     Some(i) => i.to_string()
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed}"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1}"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -554,5 +635,28 @@ fn main {
     rects = rects + i.to_string() + ":" + rx + "," + ry + "," + rw + "x" + rh + " "
   }
   println("NATIVE-APP-RECTS " + rects)
+  // 轮播的箭头与指示点是根控件的孙辈，几何行按根子项打印拿不到，单独给一行
+  match car_w.val {
+    Some(w) => {
+      let stage_row = w.children()[0]
+      let dots = w.children()[1]
+      let dots_last = dots.children()[dots.children().length() - 1]
+      println(
+        "NATIVE-APP-CAR box=" +
+          rect_str(w.rect) +
+          " left=" +
+          rect_str(stage_row.children()[0].rect) +
+          " right=" +
+          rect_str(stage_row.children()[2].rect) +
+          " dot_last=" +
+          rect_str(dots_last.rect),
+      )
+    }
+    None => ()
+  }
+  match auto_w.val {
+    Some(w) => println("NATIVE-APP-AUTO " + rect_str(w.rect))
+    None => ()
+  }
   app.shutdown()
 }

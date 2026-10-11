@@ -195,3 +195,144 @@ test "折线进度：条与百分比两列，填充随 Store 变化" {
   assert_true(px(bm2, 100, 4) != mid)
   assert_eq(bar.rect.h, 8.0)
 }
+
+///|
+fn click_at(root : @core.Widget, w : @core.Widget, fx : Double, fy : Double) -> Unit {
+  let x = w.rect.x + fx
+  let y = w.rect.y + fy
+  let _ = root.dispatch_pointer({ kind: @core.Down, x, y, button: 1, mods: 0 })
+  let _ = root.dispatch_pointer({ kind: @core.Up, x, y, button: 1, mods: 0 })
+}
+
+///|
+test "时间线：逐行等高、首末行的贯通线只到点心" {
+  let items : Array[(String, String, SemanticType)] = [
+    ("创建", "2026-01-01 建档", Primary),
+    ("构建", "编译通过", Success),
+    ("发布", "已上线", Danger),
+  ]
+  let (root, tl) = mounted(timeline(items), 240.0, 220.0)
+  let rows = tl.children()
+  assert_eq(rows.length(), 3)
+  assert_eq(rows[0].children().length(), 2)
+  assert_eq(rows[0].rect.h, 56.0)
+  // 行间距 12：第二行落在 68，第三行落在 136
+  assert_eq((rows[1].rect.y, rows[2].rect.y), (68.0, 136.0))
+
+  let bm = @render.Bitmap::new(240, 220)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  // 首行（0..56，点在 23..33）：点上方无线、点下方有线
+  assert_eq(bm.pixel(10, 10).a, 0)
+  assert_true(bm.pixel(10, 40).a > 0)
+  // 末行（136..192，点心 164）：点上方有线、点下方无线
+  assert_true(bm.pixel(10, 150).a > 0)
+  assert_eq(bm.pixel(10, 180).a, 0)
+  // 点与线不同色（点是语义主色，线是边框色）
+  assert_true(px(bm, 10, 164) != px(bm, 10, 150))
+}
+
+///|
+test "轮播：面板预建只显示当前页，箭头与指示点切页、越界回绕" {
+  let h = CarouselHandle::make()
+  let pages : Array[@core.Node] = [
+    label("第一页", size=14.0),
+    label("第二页", size=14.0),
+    label("第三页", size=14.0),
+  ]
+  let (root, c) = mounted(
+    carousel_t(pages, width=200.0, height=80.0, interval_ms=0, rotation=h),
+    260.0,
+    160.0,
+  )
+  let stage_row = c.children()[0]
+  let stage = stage_row.children()[1]
+  let panels = stage.children()
+  assert_eq(panels.length(), 3)
+  assert_eq([panels[0].visible, panels[1].visible, panels[2].visible], [true, false, false])
+  assert_eq(stage.rect.h, 80.0)
+  // 舞台 = 左箭头 + 面板区 + 右箭头，两侧各 24px 热区
+  click_at(root, stage_row.children()[2], 12.0, 40.0)
+  assert_eq(h.index(), 1)
+  assert_eq([panels[0].visible, panels[1].visible], [false, true])
+  click_at(root, stage_row.children()[0], 12.0, 40.0)
+  assert_eq(h.index(), 0)
+
+  let dots_row = c.children()[1]
+  assert_eq(dots_row.children().length(), 3)
+  click_at(root, dots_row.children()[2], 4.0, 4.0)
+  assert_eq(h.index(), 2)
+
+  // 回绕：负数落到末页、超出落到首页
+  carousel_goto(h, -1)
+  assert_eq(h.index(), 2)
+  carousel_goto(h, 9)
+  assert_eq(h.index(), 0)
+}
+
+///|
+test "轮播自转走宿主延时通道：暂停不前进、stop 断链并取消待触发" {
+  let queue : Ref[Array[() -> Unit]] = Ref([])
+  let delays : Ref[Array[Int]] = Ref([])
+  let cancelled : Ref[Array[Int]] = Ref([])
+  @core.set_timer_hooks(
+    fn(ms : Int, f : () -> Unit) -> Int {
+      delays.val.push(ms)
+      queue.val.push(f)
+      delays.val.length()
+    },
+    fn(id : Int) -> Unit { cancelled.val.push(id) },
+  )
+  let h = CarouselHandle::make()
+  let _ = carousel_t(
+    [label("一"), label("二"), label("三")],
+    width=120.0,
+    height=60.0,
+    interval_ms=100,
+    rotation=h,
+  ).mount_into(@core.Widget::new())
+  assert_eq(delays.val.length(), 1)
+  assert_eq(delays.val[0], 100)
+
+  let fire = fn() -> Unit {
+    let q = queue.val
+    let f = q[q.length() - 1]
+    q.truncate(q.length() - 1)
+    f()
+  }
+
+  fire()
+  assert_eq(h.index(), 1)
+  assert_eq(delays.val.length(), 2)
+  carousel_pause(h, true)
+  fire()
+  // 暂停只压住切页，不压住下一拍
+  assert_eq(h.index(), 1)
+  assert_eq(delays.val.length(), 3)
+  carousel_pause(h, false)
+  fire()
+  assert_eq(h.index(), 2)
+  carousel_stop(h)
+  assert_eq(h.is_running(), false)
+  assert_eq(cancelled.val.length(), 1)
+  // 已经在队里的这一拍仍会被跑一次，但既不切页也不再排下一拍
+  fire()
+  assert_eq(h.index(), 2)
+  assert_eq(delays.val.length(), 4)
+  // 恢复成「无宿主」通道，别影响同包其余用例
+  @core.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
+}
+
+///|
+test "空条目：时间线零行、空轮播不出面板也不排自转" {
+  let (_, tl) = mounted(timeline([]), 200.0, 60.0)
+  assert_eq(tl.children().length(), 0)
+  let h = CarouselHandle::make()
+  let (_, c) = mounted(carousel_t([], width=100.0, height=40.0, rotation=h), 200.0, 80.0)
+  assert_eq(c.children().length(), 0)
+  carousel_goto(h, 1)
+  assert_eq(h.index(), 0)
+  carousel_stop(h)
+  assert_eq(h.is_running(), false)
+}

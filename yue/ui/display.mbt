@@ -434,3 +434,310 @@ pub fn progress_line(
     container([bar], align_items=@yoga.AlignItems::Center)
   }
 }
+
+///|
+/// 时间线一行：左列 20px 画色点与贯通竖线，右列标题 + 描述。
+fn timeline_row(
+  title : String,
+  desc : String,
+  t : SemanticType,
+  first : Bool,
+  last : Bool,
+  height : Double,
+) -> @core.Node {
+  let mark = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    w.node.set_width(@yoga.fixed(20.0))
+    w.node.set_height(@yoga.fixed(height))
+    w.on_draw = Some(fn(
+      _self : @core.Widget,
+      p : @render.Painter,
+      r : @core.Rect,
+    ) -> Unit {
+      let cy = r.h / 2.0
+      // 首行从点心起、末行到点心止，中间行整条贯通（点块在行高中间）
+      let top = if first { cy } else { 0.0 }
+      let bottom = if last { cy } else { r.h }
+      if bottom > top {
+        p.set_fill_color(@theme.theme_border())
+        p.fill_rect(9.0, top, 2.0, bottom - top)
+      }
+      p.set_fill_color(type_color(t))
+      p.fill_rect(5.0, cy - 5.0, 10.0, 10.0)
+    })
+    w
+  })
+  container(
+    [
+      mark,
+      container(
+        [
+          label(title, size=13.0, weight=@text.SemiBold, color=@theme.theme_text_primary()),
+          label(desc, size=12.0, color=@theme.theme_text_secondary()),
+        ],
+        grow=1.0,
+        handle=fn(w : @core.Widget) -> Unit { w.set_padding(8.0, 2.0) },
+      ),
+    ],
+    direction=@yoga.Row,
+    height=height,
+  )
+}
+
+///|
+/// 时间线（EP Timeline）：`items` 是 (标题, 描述, 语义色)，逐行等高排布。
+pub fn timeline(
+  items : Array[(String, String, SemanticType)],
+  item_height? : Double = 56.0,
+  gap? : Double = 12.0,
+) -> @core.Node {
+  let rows : Array[@core.Node] = []
+  let n = items.length()
+  for i = 0; i < n; i = i + 1 {
+    let entry = items[i]
+    rows.push(
+      timeline_row(entry.0, entry.1, entry.2, i == 0, i == n - 1, item_height),
+    )
+  }
+  container(rows, row_gap=gap)
+}
+
+///|
+/// 轮播句柄：自动轮播开关、待触发的延时句柄、当前页、悬停暂停标志与切换入口。
+/// `carousel_t` 挂载后会把 `switch` 接到真实切页函数，句柄因此可以在挂载前后
+/// 同一份用（调用方拿着它随时切页/停转，不必再找控件）。
+pub(all) struct CarouselHandle {
+  running : Ref[Bool]
+  timer : Ref[Int]
+  cur : Ref[Int]
+  paused : Ref[Bool]
+  switch : Ref[(Int) -> Unit]
+}
+
+///|
+/// 建轮播句柄（默认自动轮播中、停在第 0 页）。
+pub fn CarouselHandle::make() -> CarouselHandle {
+  {
+    running: Ref(true),
+    timer: Ref(0),
+    cur: Ref(0),
+    paused: Ref(false),
+    switch: Ref(fn(_i) { () }),
+  }
+}
+
+///|
+/// 是否还在自动轮播（手动切页与指示点不受这个开关影响）。
+pub fn CarouselHandle::is_running(self : CarouselHandle) -> Bool {
+  self.running.val
+}
+
+///|
+/// 当前页下标。
+pub fn CarouselHandle::index(self : CarouselHandle) -> Int {
+  self.cur.val
+}
+
+///|
+/// 切到第 `i` 页（越界回绕；挂载前的调用是空操作）。
+pub fn carousel_goto(handle : CarouselHandle, i : Int) -> Unit {
+  (handle.switch.val)(i)
+}
+
+///|
+/// 手动暂停/恢复自动轮播。页面内容自己吃掉了全部指针事件（连移动与离开都不冒泡
+/// 上来）时用这个自己控制，组件默认的悬停暂停见 `carousel_t`。
+pub fn carousel_pause(handle : CarouselHandle, v : Bool) -> Unit {
+  handle.paused.val = v
+}
+
+///|
+/// 停止自动轮播（不可恢复；手动切页仍可用）。卸载轮播前必须调：自排的延时链
+/// 不认识视图已移除，不退就会继续对销毁掉的子树空转。
+pub fn carousel_stop(handle : CarouselHandle) -> Unit {
+  handle.running.val = false
+  @core.clear_timeout(handle.timer.val)
+  handle.timer.val = 0
+}
+
+///|
+/// 轮播（EP Carousel）：面板序列 + 左右箭头 + 底部指示点。
+/// `interval_ms > 0` 且页数大于 1 时自动轮播（每 `interval_ms` 毫秒前进一页，
+/// 指针停在轮播上暂停、离开恢复）；面板全部预建，切页只翻显隐。
+pub fn carousel_t(
+  pages : Array[@core.Node],
+  width? : Double = 360.0,
+  height? : Double = 180.0,
+  interval_ms? : Int = 3000,
+  rotation? : CarouselHandle = CarouselHandle::make(),
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  let n = pages.length()
+  let cur = rotation.cur
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    w.node.set_flex_direction(@yoga.Column)
+    w.node.set_width(@yoga.fixed(width))
+    w.node.set_height(@yoga.fixed(height + 24.0))
+    if n > 0 {
+      let panels : Array[@core.Widget] = []
+      // 切页：越界回绕；面板只显示当前页（预建 + 显隐，不销毁子树）
+      fn do_switch(i : Int) -> Unit {
+        let idx = if i < 0 { n - 1 } else if i >= n { 0 } else { i }
+        if idx != cur.val {
+          panels[cur.val].set_visible(false)
+          panels[idx].set_visible(true)
+          cur.val = idx
+          @core.invalidate()
+        }
+      }
+
+      rotation.switch.val = fn(i : Int) -> Unit { do_switch(i) }
+      let stage = @core.Widget::new()
+      stage.node.set_flex_direction(@yoga.Column)
+      stage.node.set_flex_grow(1.0)
+      stage.node.set_min_width(@yoga.fixed(0.0))
+      stage.node.set_min_height(@yoga.fixed(0.0))
+      for i = 0; i < n; i = i + 1 {
+        let pc = @core.Widget::new()
+        pc.node.set_flex_direction(@yoga.Column)
+        // 面板撑满舞台：固定宽会让两侧箭头的热区被盖住
+        pc.node.set_flex_grow(1.0)
+        pc.node.set_min_height(@yoga.fixed(0.0))
+        pc.node.set_align_self(Some(@yoga.AlignItems::Stretch))
+        pc.set_visible(i == 0)
+        let _ = (pages[i].mount)(pc)
+        stage.append_child(pc)
+        panels.push(pc)
+      }
+
+      fn arrow(right : Bool) -> @core.Widget {
+        let a = @core.Widget::new()
+        a.node.set_width(@yoga.fixed(24.0))
+        a.node.set_height(@yoga.fixed(height))
+        a.on_draw = Some(fn(
+          self : @core.Widget,
+          p : @render.Painter,
+          r : @core.Rect,
+        ) -> Unit {
+          if self.hovered {
+            p.set_fill_color(@theme.theme_fill_hover())
+            p.fill_rect(0.0, 0.0, r.w, r.h)
+          }
+          let cx = r.w / 2.0
+          let cy = r.h / 2.0
+          p.set_fill_color(@theme.theme_text_regular())
+          p.begin_path()
+          if right {
+            p.move_to(cx - 4.0, cy - 5.0)
+            p.line_to(cx + 4.0, cy)
+            p.line_to(cx - 4.0, cy + 5.0)
+          } else {
+            p.move_to(cx + 4.0, cy - 5.0)
+            p.line_to(cx - 4.0, cy)
+            p.line_to(cx + 4.0, cy + 5.0)
+          }
+          p.close_path()
+          p.fill()
+        })
+        a.on_pointer = Some(fn(
+          _self : @core.Widget,
+          ev : @core.PointerEvent,
+        ) -> Bool {
+          match ev.kind {
+            @core.Down => {
+              do_switch(if right { cur.val + 1 } else { cur.val - 1 })
+              true
+            }
+            _ => false
+          }
+        })
+        a
+      }
+
+      let stage_row = @core.Widget::new()
+      stage_row.node.set_flex_direction(@yoga.Row)
+      stage_row.node.set_height(@yoga.fixed(height))
+      stage_row.append_child(arrow(false))
+      stage_row.append_child(stage)
+      stage_row.append_child(arrow(true))
+      w.append_child(stage_row)
+
+      let dots_row = @core.Widget::new()
+      dots_row.node.set_flex_direction(@yoga.Row)
+      dots_row.node.set_height(@yoga.fixed(24.0))
+      dots_row.node.set_justify_content(@yoga.JustifyContent::Center)
+      for i = 0; i < n; i = i + 1 {
+        let dot = @core.Widget::new()
+        dot.node.set_width(@yoga.fixed(8.0))
+        dot.node.set_height(@yoga.fixed(8.0))
+        dot.set_margin(8.0, 0.0, 4.0, 4.0)
+        let di = i
+        dot.on_draw = Some(fn(
+          _self : @core.Widget,
+          p : @render.Painter,
+          r : @core.Rect,
+        ) -> Unit {
+          p.set_fill_color(
+            if cur.val == di {
+              @theme.theme_primary()
+            } else {
+              @theme.theme_border()
+            },
+          )
+          p.fill_rect(0.0, 0.0, r.w, r.h)
+        })
+        dot.on_pointer = Some(fn(
+          _self : @core.Widget,
+          ev : @core.PointerEvent,
+        ) -> Bool {
+          match ev.kind {
+            @core.Down => {
+              do_switch(di)
+              true
+            }
+            _ => false
+          }
+        })
+        dots_row.append_child(dot)
+      }
+      w.append_child(dots_row)
+
+      // 悬停暂停：指针进到本控件（父链才会收到移动）即停，离开（宿主补发的
+      // Leave 沿同一条路径上来）即恢复
+      w.on_pointer = Some(fn(
+        _self : @core.Widget,
+        ev : @core.PointerEvent,
+      ) -> Bool {
+        match ev.kind {
+          @core.Move => {
+            rotation.paused.val = true
+            false
+          }
+          @core.Leave => {
+            rotation.paused.val = false
+            false
+          }
+          _ => false
+        }
+      })
+      if interval_ms > 0 && n > 1 {
+        // 一次性延时自排下一拍：句柄存进 rotation，停转时取消待触发那次
+        let tick : Ref[() -> Unit] = Ref(fn() { () })
+        tick.val = fn() {
+          rotation.timer.val = @core.set_timeout(interval_ms, fn() {
+            if rotation.running.val {
+              if !rotation.paused.val {
+                do_switch(cur.val + 1)
+              }
+              (tick.val)()
+            }
+          })
+        }
+        (tick.val)()
+      }
+    }
+    handle(w)
+    w
+  })
+}
+

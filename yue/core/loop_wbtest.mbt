@@ -156,3 +156,28 @@ test "自重排的短周期节拍不应饿死长周期定时器" {
   assert_eq(quit.val, true)
   assert_eq(ticks.val > 3, true)
 }
+
+///|
+test "进程级延时通道：无宿主时空操作，装通道后转派与取消成对" {
+  // 复位成「没有宿主」的默认通道，断言不依赖其他用例跑过的顺序
+  set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
+  let ran = Ref(false)
+  assert_eq(set_timeout(10, fn() { ran.val = true }), 0)
+  clear_timeout(3)
+  assert_eq(ran.val, false)
+
+  let log : Array[String] = []
+  set_timer_hooks(
+    fn(ms : Int, _f : () -> Unit) -> Int {
+      log.push("s:" + ms.to_string())
+      log.length()
+    },
+    fn(id : Int) -> Unit { log.push("c:" + id.to_string()) },
+  )
+  let id = set_timeout(250, fn() { () })
+  clear_timeout(id)
+  // 句柄 0 表示「没排上」，不该去转派取消
+  clear_timeout(0)
+  assert_eq(log, ["s:250", "c:1"])
+  set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
+}

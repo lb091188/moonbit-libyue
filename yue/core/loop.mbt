@@ -179,3 +179,36 @@ pub fn Loop::quit(self : Loop) -> Unit {
 pub fn Loop::is_running(self : Loop) -> Bool {
   self.running
 }
+
+// ---- 进程级延时通道 ----
+
+let timer_schedule : Ref[(Int, () -> Unit) -> Int] = Ref(fn(_ms, _f) { 0 })
+
+let timer_cancel : Ref[(Int) -> Unit] = Ref(fn(_id) { () })
+
+///|
+/// 安装延时任务的派发通道（`App::new` 把这两个转派到自己的 `Loop`）。
+/// 组件层要的是「过一会儿跑一次」，不该知道自己属于哪个宿主，所以与
+/// `set_repaint_hook` 同款进程级单槽（当前形态一进程一宿主）。
+pub fn set_timer_hooks(
+  schedule : (Int, () -> Unit) -> Int,
+  cancel : (Int) -> Unit,
+) -> Unit {
+  timer_schedule.val = schedule
+  timer_cancel.val = cancel
+}
+
+///|
+/// 相对延时 `ms` 毫秒跑一次 `f`，返回可取消句柄。没有宿主时是空操作并返回
+/// 0（组件照常工作，只是不会自动推进；无头测试可自行安装通道拿回调）。
+pub fn set_timeout(ms : Int, f : () -> Unit) -> Int {
+  (timer_schedule.val)(ms, f)
+}
+
+///|
+/// 取消尚未触发的延时任务（句柄 0 或已触发时空操作）。
+pub fn clear_timeout(id : Int) -> Unit {
+  if id != 0 {
+    (timer_cancel.val)(id)
+  }
+}

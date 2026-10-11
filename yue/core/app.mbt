@@ -64,6 +64,14 @@ pub fn App::new(width : Int, height : Int, title : String) -> App? {
       window.request_focus()
       // 声明式层的 invalidate() 从这里回到本宿主的脏标（见 node.mbt）
       set_repaint_hook(fn() { app.schedule_paint() })
+      // 组件层的延时任务（如轮播自转）从这里回到本宿主的定时器
+      set_timer_hooks(
+        fn(ms : Int, f : () -> Unit) -> Int { app.sched.timer(ms, f) },
+        fn(id : Int) -> Unit {
+          // 到期项已移除时 cancel 返回 false，不必上抛
+          let _ = app.sched.cancel(id)
+        },
+      )
       Some(app)
     }
   }
