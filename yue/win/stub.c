@@ -744,6 +744,11 @@ void wm_surface_set_rect(int64_t surface_id, int x, int y, int w, int h) {
   (void)surface_id; (void)x; (void)y; (void)w; (void)h;
 }
 void wm_surface_close(int64_t surface_id) { (void)surface_id; }
+void wm_window_set_popup(int64_t id, int64_t owner_id) { (void)id; (void)owner_id; }
+void wm_window_move(int64_t id, int x, int y) { (void)id; (void)x; (void)y; }
+void wm_window_origin(int64_t id, int32_t *out_x, int32_t *out_y) {
+  (void)id; (void)out_x; (void)out_y;
+}
 void *wm_surface_container(int64_t surface_id) {
   (void)surface_id;
   return NULL;
@@ -1323,6 +1328,69 @@ GtkWidget *wm_surface_container(int64_t surface_id) {
     return NULL;
   }
   return wm_surfaces[surface_id].container;
+}
+
+// ---- 原生弹层窗口（批 E）----
+// 浮层（下拉/右键菜单/tooltip/toast/对话框）要能盖住 webview 区，就只能是真的
+// 顶层窗口——自绘像素永远在原生子件之下（方案 §4.5 的浮层纪律）。
+// 必须在 show 之前调：类型提示与 transient 关系在映射时才生效。
+void wm_window_set_popup(int64_t id, int64_t owner_id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->window == NULL) {
+    return;
+  }
+  gtk_window_set_decorated(GTK_WINDOW(w->window), FALSE);
+  gtk_window_set_type_hint(
+      GTK_WINDOW(w->window), GDK_WINDOW_TYPE_HINT_POPUP_MENU);
+  gtk_window_set_skip_taskbar_hint(GTK_WINDOW(w->window), TRUE);
+  gtk_window_set_skip_pager_hint(GTK_WINDOW(w->window), TRUE);
+  gtk_window_set_resizable(GTK_WINDOW(w->window), FALSE);
+  gtk_window_set_keep_above(GTK_WINDOW(w->window), TRUE);
+  if (owner_id > 0 && owner_id < WM_MAX_WINDOWS &&
+      wm_windows[owner_id].window != NULL) {
+    gtk_window_set_transient_for(GTK_WINDOW(w->window),
+                                 GTK_WINDOW(wm_windows[owner_id].window));
+  }
+}
+
+void wm_window_move(int64_t id, int x, int y) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->window != NULL) {
+    gtk_window_move(GTK_WINDOW(w->window), x, y);
+  }
+}
+
+// 客户区在屏幕上的原点：弹层要按「owner 的原点 + 控件的窗口内矩形」摆位
+void wm_window_origin(int64_t id, int32_t *out_x, int32_t *out_y) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->window == NULL) {
+    return;
+  }
+  gint x = 0;
+  gint y = 0;
+  // gtk_window_get_position 给的是「相对父窗」的坐标，而窗口管理器会把顶层窗
+  // reparent 进装饰框架里，于是它恒返回 (0,0)。要屏幕原点必须问 GdkWindow。
+  GdkWindow *gw = gtk_widget_get_window(w->window);
+  if (gw != NULL) {
+    gdk_window_get_origin(gw, &x, &y);
+  } else {
+    gtk_window_get_position(GTK_WINDOW(w->window), &x, &y);
+  }
+  if (out_x != NULL) {
+    *out_x = x;
+  }
+  if (out_y != NULL) {
+    *out_y = y;
+  }
 }
 
 // 跑掉主上下文里已经就绪的事件；不阻塞。
@@ -2037,6 +2105,11 @@ void wm_surface_set_rect(int64_t surface_id, int x, int y, int w, int h) {
   (void)surface_id; (void)x; (void)y; (void)w; (void)h;
 }
 void wm_surface_close(int64_t surface_id) { (void)surface_id; }
+void wm_window_set_popup(int64_t id, int64_t owner_id) { (void)id; (void)owner_id; }
+void wm_window_move(int64_t id, int x, int y) { (void)id; (void)x; (void)y; }
+void wm_window_origin(int64_t id, int32_t *out_x, int32_t *out_y) {
+  (void)id; (void)out_x; (void)out_y;
+}
 void *wm_surface_container(int64_t surface_id) {
   (void)surface_id;
   return NULL;

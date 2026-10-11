@@ -147,7 +147,11 @@
   - [x] 分层与链接：UI 组件放 `yue/media` 而非 `yue/ui`（否则每个用按钮的都要链 ffmpeg+miniaudio）；引擎文件零 UI 依赖；prebuild 给 `yue/media` 下发 `-lpthread -ldl -lm -lstdc++ -latomic`；moon.mod 增 `NoahLiu/ffmpeg-mbt@0.1.0` 依赖
   - [x] 回证：`yue/media` 18/18（15 平移 + 3 新增）、`--deny-warn` 零警告、全仓红点 287/68 未增；真窗口「开一扇播放器窗」= 第三扇窗播 `av_1s.mp4` + 内联 SRT，`NATIVE-WEB-MEDIA frames=10 pos_ms=1000 playing=0 err=''`，截图见彩条不错位 + 白字字幕叠加 + 进度满格 `0:01 / 0:01`
   - [ ] 批 D 余项（下一批做，不假装完成）：**倍速**（音频侧要时间拉伸，只加快视频会破坏音画同步）、内嵌字幕轨（mov_text/ass）、全屏、音量条 UI（引擎已有 `set_volume`，控件未画）、逐帧步进、真出声复验
-- [ ] **批 E 原生弹层窗口**：自绘 overlay 的「原生档」（`yue/win` 目前无 popup/transient API）——浮层（下拉/右键菜单/tooltip/toast/对话框）走原生窗口，不用自绘像素盖 webview
+- [x] **批 E 原生弹层窗口**：自绘 overlay 的「原生档」（`yue/win` 的 popup/transient 通道）——浮层（下拉/右键菜单/tooltip/toast/对话框）走原生窗口，不用自绘像素盖 webview
+  - [x] 窗口层三件：`Window::set_popup(owner)`（无边框 + POPUP_MENU 类型 + transient_for + skip taskbar/pager + keep above + 不可调，**必须在 show 之前**）、`Window::move_to(x,y)`、`Window::origin()`（实测坑：`gtk_window_get_position` 在 WM reparent 下恒给 (0,0)，要 `gdk_window_get_origin` 才是屏幕原点）
+  - [x] 宿主侧 `App::open_popup(x,y,w,h,screen_w?,screen_h?)` = 批 A 的附窗（共享循环与泵、`close_window` 只摘自己、`shutdown` 一起拆）+ 摆位纯函数 `popup_place`（越界翻到锚点另一侧、仍为负则钳 0、屏幕未知只钳不翻）
+  - [x] 回证：core 71/71（新增摆位七边界）、`--deny-warn` 零警告、全仓红点 287/68 未增；真窗口 `NATIVE-WEB-POP opens=1 closed=1 choice='乙' wins=1 owner_origin=2,34`，弹层落在 (422,334) 与请求逐位一致、截图见无边框弹层压在 WebKit 网页文字之上、选项即自关而主窗仍在
+  - [ ] 余项：把 `yue/core/overlay.mbt` 六件浮层接成「所在窗有已挂载 pane 时才切原生窗口」的原生档（本批只给了通道与一份自绘弹层示例）
 - 积木原则：一个能力一个接口、可单独不用；能力之间不互相依赖（webview 不依赖媒体层，反之亦然，两者只依赖窗口/布局/事件层）；框架只给原语不给产品（爬虫框架、站点适配、内容解析、开发者面板、页面脚本库不进库）；每项能力给探测 + 语义化降级；新 API 一律走 `Painter`/`Bitmap` 门面
 - 明确不做（避免反复讨论）：网络拦截/改写、代理配置、一窗多 webview 并排、Linux 上把 webview 变纹理、首批硬解、首批 GPU 合成、网页内 `<video>` 与自绘播放器统一、macOS 13 及以下的持久化隔离（根因是 Apple API 边界：持久化 profile 需 macOS 14+ 且有 bundle id）
 - 平台后端（随各自真机，本轮不做）：Windows WebView2（两级异步 COM 创建、失败回退、就绪前排队、跨 HWND 焦点与滚轮转发），macOS WKWebView（自定义协议依赖私有 API，`dataStoreForIdentifier:` 才是真实 API 而非 `initWithIdentifier:`）

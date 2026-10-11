@@ -447,6 +447,72 @@ fn main {
     ),
   ])
 
+  // ---- 批 E：原生弹层窗口（浮层要盖住 webview，只能是真顶层窗）----
+  let pop_opens = Ref(0)
+  let pop_closed = Ref(0)
+  let pop_choice = Ref("")
+  let open_menu = fn(a : @core.App) -> Unit {
+    // 摆在页面区上方（窗口内 420,300 → 屏幕约 422,334），截图就能看出它压住了网页
+    match a.open_popup(420, 300, 240, 150) {
+      None => ()
+      Some(pop) => {
+        pop_opens.val = pop_opens.val + 1
+        pop.root.set_column()
+        pop.root.set_padding(8.0, 8.0)
+        pop.root.on_draw = Some(fn(
+          _w : @core.Widget,
+          p : @render.Painter,
+          r : @core.Rect,
+        ) -> Unit {
+          p.set_fill_color(@theme.theme_bg_panel())
+          p.fill_rect(0.0, 0.0, r.w, r.h)
+          p.set_stroke_color(@theme.theme_border())
+          p.set_line_width(1.0)
+          p.stroke_rect(0.0, 0.0, r.w - 1.0, r.h - 1.0)
+        })
+        pop.mount([
+          @ui.label("原生弹层：真窗口，能盖住网页区", size=12.0),
+          @ui.button(
+            "菜单项甲",
+            on_click=fn() {
+              pop_choice.val = "甲"
+              pop_closed.val = pop_closed.val + 1
+              pop.close_window()
+            },
+            min_width=200.0,
+          ),
+          @ui.button(
+            "菜单项乙",
+            on_click=fn() {
+              pop_choice.val = "乙"
+              pop_closed.val = pop_closed.val + 1
+              pop.close_window()
+            },
+            min_width=200.0,
+          ),
+        ])
+      }
+    }
+  }
+  app.mount([
+    @ui.container(
+      [
+        @ui.label("批 E：原生弹层（开在网页区之上，选完即关）", size=13.0),
+        @ui.button(
+          "开原生弹层菜单",
+          on_click=fn() { open_menu(app) },
+          min_width=140.0,
+        ),
+      ],
+      direction=@yoga.Row,
+      column_gap=10.0,
+      padding=6.0,
+      bg=@theme.theme_bg_panel(),
+      border=@theme.theme_border(),
+      align_items=@yoga.AlignItems::Center,
+    ),
+  ])
+
   match wv {
     None => {
       // 探测不到引擎：自绘一块说明板（降级不静默）
@@ -585,6 +651,26 @@ fn main {
       "'",
   )
   println("NATIVE-WEB-GEO pane=" + pane_rect + " sidebar=" + side_rect)
+  println(
+    "NATIVE-WEB-POP opens=" +
+      pop_opens.val.to_string() +
+      " closed=" +
+      pop_closed.val.to_string() +
+      " choice='" +
+      pop_choice.val +
+      "' wins=" +
+      app.window_count().to_string() +
+      " owner_origin=" +
+      (fn() -> String {
+        let o = app.window.origin()
+        o.0.to_string() + "," + o.1.to_string()
+      })() +
+      " win_size=" +
+      (fn() -> String {
+        let z = app.window.size()
+        z.0.to_string() + "x" + z.1.to_string()
+      })(),
+  )
   println(
     "NATIVE-WEB-MEDIA frames=" +
       md_frames.val.to_string() +

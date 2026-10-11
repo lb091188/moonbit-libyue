@@ -157,3 +157,21 @@ extern "c" fn wm_surface_set_rect(
 
 ///|
 extern "c" fn wm_surface_close(id : Int64) -> Unit = "wm_surface_close"
+
+///|
+extern "c" fn wm_window_set_popup(
+  id : Int64,
+  owner : Int64,
+) -> Unit = "wm_window_set_popup"
+
+///|
+extern "c" fn wm_window_move(id : Int64, x : Int, y : Int) -> Unit =
+  "wm_window_move"
+
+///|
+#borrow(out_x, out_y)
+extern "c" fn wm_window_origin(
+  id : Int64,
+  out_x : Ref[Int],
+  out_y : Ref[Int],
+) -> Unit = "wm_window_origin"

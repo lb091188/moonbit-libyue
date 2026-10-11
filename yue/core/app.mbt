@@ -96,7 +96,13 @@ fn install_host_hooks() -> Unit {
 ///|
 /// 建一扇窗并登记进注册表：注册表还空即主窗，否则是附窗（共用同一个 `Loop`
 /// 与平台泵）。平台后端与窗口都建起来才算成功，无显示服务返回 None。
-fn app_window(width : Int, height : Int, title : String) -> App? {
+fn app_window(
+  width : Int,
+  height : Int,
+  title : String,
+  popup_of : @win.Window?,
+  place : (Int, Int)?,
+) -> App? {
   if !@win.init_backend() {
     return None
   }
@@ -121,6 +127,15 @@ fn app_window(width : Int, height : Int, title : String) -> App? {
         capture: -1,
         cursor_kind: 0,
       }
+      // 弹层形态要在 show 之前定（类型提示与 transient 关系在映射时生效）
+      match popup_of {
+        None => ()
+        Some(o) => window.set_popup(Some(o))
+      }
+      match place {
+        None => ()
+        Some(p) => window.move_to(p.0, p.1)
+      }
       host_add(app, host_window_count() == 0)
       window.show()
       window.request_focus()
@@ -134,7 +149,7 @@ fn app_window(width : Int, height : Int, title : String) -> App? {
 /// 首个宿主入口（主窗）。再要一扇窗用 `App::open_window`，或在本表已空时
 /// 再调一次本函数（那扇又成主窗）。
 pub fn App::new(width : Int, height : Int, title : String) -> App? {
-  app_window(width, height, title)
+  app_window(width, height, title, None, None)
 }
 
 ///|
@@ -143,7 +158,7 @@ pub fn App::new(width : Int, height : Int, title : String) -> App? {
 /// `win.mount([...])`，事件路由与上屏在 `App::step` 里逐窗走。
 pub fn App::open_window(self : App, width : Int, height : Int, title : String) -> App? {
   let _ = self
-  app_window(width, height, title)
+  app_window(width, height, title, None, None)
 }
 
 ///|

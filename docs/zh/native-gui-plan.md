@@ -138,7 +138,7 @@ profile 挂在 **pane 级参数**上（不是旧链 Browser 实例级的 Options
 | **B** ✅ | pane 模型 + webview pane：把 §4.7 的 `mount_child_surface(kind, rect)` 落成「容器里放一个原生子件」；Linux 走 WebKitGTK | 整页（单 pane 铺满）与左右分栏（原生工具栏 + webview）两种摆法都出图 |
 | **C** ✅ | JS 桥 + DOM 抓取 + 导航面：`evaluate_javascript`/`add_user_script`/双向通道/UA+cookie+profile 与 persistence 探测/前进后退刷新与标题 URL 回调/`window.open` 策略/下载回调/权限默认拒绝可转原生提示/web 进程崩溃回调 | 契约沿用 22+6 方法名，协议载荷改结构化返回；真实站点由使用者复验 |
 | **D** ◐（可与 B/C 并行；首批已落，倍速/内嵌字幕轨/全屏余项见 TODO） | 媒体播放器：复用 `modules/ffmpeg-mbt`（零 libyue 依赖，已有 `decode_rgba`/`decode_pcm`/`seek`/`duration_s`/`video_fps`）+ miniaudio 设备层；新写播放器 UI、帧上屏、音频时钟与同步、seek 防抖、倍速、字幕叠加 | 旧链踩过的坑照 adaptation.md 逐条验收（音画不同轴、seek 后进度从零重涨、换载崩溃等） |
-| **E** | 原生弹层窗口：自绘 overlay 的「原生档」（`yue/win` 目前无 popup/transient API），供 §4.5 的浮层纪律落地 | 下拉/右键菜单/对话框能盖住 webview pane |
+| **E** ✅ | 原生弹层窗口：自绘 overlay 的「原生档」（`yue/win` 目前无 popup/transient API），供 §4.5 的浮层纪律落地 | 下拉/右键菜单/对话框能盖住 webview pane |
 | 交付面 | 示例迁移（`hello`/`hello-themed`/`showcase` 走新栈）、中英使用文档按新栈重写、README 新截图、CI 三平台脚本、发布链 | A/B 落地后接上 |
 | 输入通道另线 | 先落**平台无关**的键位/指针/修饰键/IME 触发条件映射层（纯函数 + wbtest）；Win32/Cocoa 后端随各自真机 | 不写不可验的代码 |
 
