@@ -1,12 +1,16 @@
 import {
   "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/math",
 }
 
-// GTK/Cairo 端不由 moon 编译（link_configs 只有链接期字段、native-stub 拿不到
-// 系统头），cairo_stub.c 由 scripts/prebuild.py 编成 build/librender_cairo_stub.a
-// 经 link_flags 传入；这里只带非 Linux 的占位实现保三平台链接。
+// stub.c 一个文件两条分支：WM_STUB_CAIRO 真实现（cairo 光栅 + GdkPixbuf 解码）
+// 仅由 scripts/prebuild.py 在 Linux 带 -DWM_STUB_CAIRO + pkg-config 头编成
+// build/librender_cairo_stub.a 经 link_flags 传入（native-stub 拿不到 cairo 头
+// 路径，实测同 G0 探针）；非 Linux（Windows/mac）走占位 no-op 保链接——Windows
+// 的真渲染是纯 MoonBit 光栅器（plan 矩阵定案），运行时探针（cr_begin 返回 0）
+// 探到占位即选纯路径。链接参数按 AGENTS 规则 1 全部由 prebuild 托管。
 supported_targets = "native"
 
 options(
-  "native-stub": [ "cairo_stub_portable.c" ],
+  "native-stub": [ "stub.c" ],
 )

@@ -155,11 +155,9 @@ def link_configs() -> dict:
                 + " ".join([*libs, *sys_libs]),
             })
         cairo_lib = compile_stub(
-            [
-                MODULE_ROOT / "yue" / "render" / "cairo_stub.c",
-                MODULE_ROOT / "yue" / "render" / "image_stub.c",
-            ],
+            MODULE_ROOT / "yue" / "render" / "stub.c",
             "librender_cairo_stub.a",
+            extra_cflags=["-DWM_STUB_CAIRO"],
         )
         if cairo_lib:
             entries.append({

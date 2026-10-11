@@ -9,7 +9,29 @@ fn fill_color(p : Painter, hex : String, n : Int) -> Unit {
 }
 
 ///|
+/// 解码后端可用性探针：自产 1×1 PNG 解得回即可用。Windows/mac 的占位桩
+/// （W9 换 WIC/各自动图线前）返回空图——解码依赖的测试据此跳过，
+/// 环境缺件只跳过不硬断（macOS CI 教训同款口径）。
+fn decode_available() -> Bool {
+  let bm = Bitmap::new(1, 1)
+  let p = Painter::new(bm)
+  p.set_fill_color("#ff0000")
+  p.fill_rect(0.0, 0.0, 1.0, 1.0)
+  p.end()
+  match png_encode_rgba(bm.to_rgba_bytes(), 1, 1) {
+    Ok(b) => {
+      let img = Image::new_from_png(b)
+      img.is_empty() == false
+    }
+    Err(_) => false
+  }
+}
+
+///|
 test "PNG 往返：自产 PNG 解码回同像素（不透明）" {
+  if decode_available() == false {
+    return
+  }
   let bm = Bitmap::new(3, 3)
   let p = Painter::new(bm)
   p.set_fill_color("#ff0000")
@@ -41,6 +63,9 @@ test "PNG 往返：自产 PNG 解码回同像素（不透明）" {
 
 ///|
 test "PNG 往返：半透明像素在预乘取整域稳定" {
+  if decode_available() == false {
+    return
+  }
   let bm = Bitmap::new(2, 2)
   let p = Painter::new(bm)
   fill_color(p, "#12345680", 2)
@@ -89,6 +114,9 @@ test "逻辑尺寸随 scale 折算，像素尺寸不变" {
 
 ///|
 test "Image::resize 放大后实心色保持" {
+  if decode_available() == false {
+    return
+  }
   let bm = Bitmap::new(2, 2)
   let p = Painter::new(bm)
   fill_color(p, "#3366cc", 2)
@@ -175,6 +203,9 @@ test "blit 尊重当前混合模式" {
 
 ///|
 test "PNG 落盘再读回：像素不变" {
+  if decode_available() == false {
+    return
+  }
   let cv = quad_canvas()
   let path = "/tmp/moonbit-native-render-wbtest.png"
   assert_eq(cv.write_to_file("png", path), true)
@@ -194,6 +225,9 @@ test "PNG 落盘再读回：像素不变" {
 
 ///|
 test "动图解码：逐帧前进、每帧时长、当前帧成图、close 之后全空操作" {
+  if decode_available() == false {
+    return
+  }
   let anim = Animation::new_from_file("examples/showcase/assets/dot.gif")
   match anim {
     None => assert_true(false)

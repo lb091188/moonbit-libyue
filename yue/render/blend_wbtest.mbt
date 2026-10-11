@@ -221,13 +221,13 @@ test "门面路径填充与抗锯齿（forward 到 Cairo）" {
 }
 
 ///|
-/// 会话槽只有 16 个：泄漏会让后续 Painter 静默退回降级实现，
-/// 这条守住「end 正确回收」与「连续开合不退化」。
+/// cairo 会话槽只有 16 个（纯光栅器无槽限）：泄漏会让后续 Painter 静默退化，
+/// 这条守住「end 正确回收」与「连续开合不退化」（两后端同跑）。
 test "会话槽回收：连续开合 20 个 Painter 仍持有会话" {
   for i = 0; i < 20; i = i + 1 {
     let bm = Bitmap::new(2, 2)
     let p = Painter::new(bm)
-    match p.session {
+    match p.backend {
       Some(_) => ()
       None => assert_eq(true, false)
     }

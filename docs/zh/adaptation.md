@@ -58,6 +58,15 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **Linux 红利**:cairo 与 MoonBit 光栅器可逐像素对拍,cairo 当标准答案验收自研引擎(渲染批 W4 的验收手段)。
 - **平台 C 桩组织**:单一 `stub.c` 多分支 + prebuild 宏(见「Windows 窗口地基 W2」小节的 yue/win/stub.c 先例);render/text 的桩合并照此办理,Windows 侧不引任何 C 渲染/文本库(仅 WIC 属系统组件)。
 
+### MoonBit 原生 GUI 栈 · 纯 MoonBit 光栅器(W4,Windows/mac 渲染后端)
+
+- **架构**:`yue/render` 拆出四个纯 MoonBit 文件——`raster_path.mbt`(路径命令/仿射矩阵/贝塞尔自适应展平/弧→贝塞尔 kappa)、`raster_fill.mbt`(4×4 超采样非零环绕扫描线填充 + miter 上限 10/butt cap 折线偏移描边)、`raster_blend.mbt`(25 混合模式:Porter-Duff 九式预乘闭式 + 16 个 W3C 公式非预乘域 + 渐变求值)、`raster.mbt`(`Raster` 会话,与 `Cairo` 方法面逐条镜像);`Painter` 门面改双后端枚举,**运行时探针**(`Cairo::over` 建不出会话即纯路径)选择,无编译指令(AGENTS 规则 11)。桩合并为 `render/stub.c`:cairo 真实现挂 `WM_STUB_CAIRO` 宏仅 prebuild(Linux)编,非 Linux 全占位保链接、探针探到占位即退纯路径。文本层经 `Painter::cairo_id()` 探测:cairo 后端画在会话上下文,纯后端返回 None(W5 据此走直接往 Bitmap 画的 DirectWrite 形态),`Painter::raster()` 取纯会话。
+- **覆盖量化的口径**:4×4 超采样、每像素 16 样本、覆盖 0..256(每样本 16)——与 cairo 解析覆盖的单像素差被「对拍容差带 ≤16(一个采样档)」吸收;满覆盖/零覆盖像素精确。跨点判定用半开区间 `(ay<=ys)!=(by2<=ys)` 防顶点重计;非零环绕扫描「非零区间收样」,开折线 fill 自动闭边(**末边就是环绕边,边数 = n 而非 n+1——写 n+1 会 pts[n] 越界,单测全是闭合路径测不出,真窗口 45 帧当场崩,教训:开放路径要有专项用例**)。
+- **预乘取整必须两步,不能合并**:源预乘是 255 域(`(v·a+127)/255`)、覆盖缩放是 256 域(`·cov/256`),合并成 65536 域一步会吞掉 255/256 的比例差(不透明满覆盖实测 254 而非 255,成片差一);合成侧 Normal 的 `s+(d·inv+127)/255` 与 Bitmap::paint 同式,矩形路径逐位一致。
+- **与 cairo 的已知口径差(容差带内)**:①AA 覆盖 16 级量化 vs cairo 解析覆盖;②blit 最近邻 vs cairo 双线性(1:1 与不透明像素逐位一致,缩放采样有差——采样域收口语义已镜像:恒落在源子矩形内防串色);③渐变 stop 非预乘插值(CSS/W3C 口径)vs cairo 预乘域(半透明 stop 中间色有差,不透明 stop 无差);④描边设备线宽 = 用户线宽×sqrt(|det|),非均匀缩放的笔帽近似;⑤斜矩阵 clip 取包围盒。25 混合模式的 W3C 公式值双平台同测同过(cairo 算子与手算公式在 8bit 域一致)。
+- **MoonBit 写法坑(本批新踩)**:`moonbitlang/core/math` 才有 sin/cos(`@math.sin`,Double 无此方法);`let 大写` 非法要用 `const`;科学计数法 `1e-9` 解析报错须写全 `0.000000001`(旧坑复踩,建议 grep `1e-` 自查);match 臂尾逗号非法;三元组 match 臂 `(a,b,c)` 后不能带 `,`。测试侧:`Cairo::over` 直连的测试改为「后端探测 + 结构档断言」跨平台共用;解码依赖测试加 `decode_available()` 探针守卫(环境缺件只跳过不硬断)。
+- **验证**(2026-10-11,Windows 本机):render 43/43(新增「路径/描边/弧两后端对拍(AA 容差)」)、icons 4/4(**803 条图标路径全量出像素**经纯光栅器)、core 62/input 10/mdview 26 复绿、theme 7/8(剩字体实测归 W5);native-window 冒烟 45 帧干净退出(真窗口逐帧全走纯光栅器);全仓 check 287/68 持平。Linux 侧 cairo 路径逐位不动(桩内容原样平移),对拍测试在 Linux 上即「cairo vs 纯实现」验收,待用户侧复跑。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。
