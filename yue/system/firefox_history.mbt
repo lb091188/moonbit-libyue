@@ -313,7 +313,10 @@ let ffx_fallback_profile_names : Array[String] = [
 /// 当前平台是否支持 Firefox 历史读取（profiles.ini 定位实现了
 /// Linux/macOS/Windows 三条路径）。
 pub fn ffx_supported() -> Bool {
-  @yue.platform() == "linux" || @yue.platform() == "macos" || @yue.platform() == "windows"
+  match @yue.platform() {
+    "linux" | "macos" | "windows" => true
+    _ => false
+  }
 }
 
 ///|

@@ -390,9 +390,14 @@ pub fn scroll(
       let holder = @yue.Container::new()
       ignore((content.mount)(@yue.ViewLike::view(holder)))
       s.set_content(holder)
-      let mounted : @yue.View = if overlay &&
-        policy is None &&
-        @yue.platform() == "windows" {
+      // 悬浮细条是 Windows 专有的自绘滚动条布局(style 挪给 host、Scroll
+      // 内撑满、自绘 thumb),其它平台走通用路径,故平台判定单独取一个
+      // 布尔,不塞进组合条件里
+      let overlay_win = match @yue.platform() {
+        "windows" => true
+        _ => false
+      }
+      let mounted : @yue.View = if overlay && policy is None && overlay_win {
         // Windows 悬浮细条:style 挪给 host(thumb 的 absolute 定位以
         // host 为基准,直接挂页面容器会被 padding/margin 带偏),Scroll
         // 在内撑满(flex 配 basis 0 即 CSS flex:1 1 0,高度只由 flex 分配

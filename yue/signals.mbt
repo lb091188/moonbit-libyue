@@ -319,9 +319,10 @@ pub fn[T] bind_node(sig : Signal[T], f : (T) -> Node) -> Node {
         // 停在脏值,鼠标 hit-test 恒命中它——点击窗口任意处都误触重挂
         // 前的控件(真机实测:深浅切换按钮重挂后,全窗点击都变成切换
         // 明暗,键盘焦点路径不受影响)。重挂后整窗布局重算+重绘兜底,
-        // 与 tabs 切页同款;Linux 的 GTK 布局自动覆盖新子树,无需此步
-        if platform() == "windows" {
-          refresh_layout(c)
+        // 与 tabs 切页同款;Linux / macOS 的布局自动覆盖新子树,无需此步
+        match platform() {
+          "windows" => refresh_layout(c)
+          _ => ()
         }
       }
 
@@ -331,11 +332,12 @@ pub fn[T] bind_node(sig : Signal[T], f : (T) -> Node) -> Node {
       // 的场景),Windows 的事件分发状态会永久错乱,真机探针实测点一次
       // 后全窗点击失效且不可逆;脱离触发上下文后重挂无害(点击子树外
       // 按钮触发别的 bind_node 重挂,同栈内执行也正常,同为探针实证)。
-      // Linux 的 GTK 布局同步安全,保持即时重挂
-      if platform() == "windows" {
-        ignore(sig.subscribe(fn(v) { post_task(fn() { rebuild(v) }) }))
-      } else {
-        ignore(sig.subscribe(fn(v) { rebuild(v) }))
+      // Linux / macOS 的布局同步安全,保持即时重挂
+      match platform() {
+        "windows" => {
+          ignore(sig.subscribe(fn(v) { post_task(fn() { rebuild(v) }) }))
+        }
+        _ => ignore(sig.subscribe(fn(v) { rebuild(v) }))
       }
       attach(parent, ViewLike::view(c))
       ViewLike::view(c)

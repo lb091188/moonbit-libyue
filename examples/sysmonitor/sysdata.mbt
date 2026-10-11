@@ -34,7 +34,10 @@ pub fn list_dir(path : String) -> Array[String]? {
 /// 走 stub 虚拟 /proc、/sys 无需分流；GPU（system_profiler JSON 解析）与
 /// 磁盘 IO 速率（无来源）在 syshw.mbt 按此开关走 macOS 特例。
 pub fn on_macos() -> Bool {
-  @yue.platform() == "macos"
+  match @yue.platform() {
+    "macos" => true
+    _ => false
+  }
 }
 
 // ---------------------------------------------------------------------------

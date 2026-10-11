@@ -506,28 +506,36 @@ fn apply_native_theme_css(t : Theme) -> Unit {
 /// Linux 端原生控件(输入框/多行/滚动条/窗口与弹层底)CSS 一并重建。
 /// 自绘组件的 draw 现取色重绘即生效;挂载期定死的色(容器底色/
 /// Label 文字色等)由组件经 on_theme_change 重设,无需重建界面。
+///
+/// 平台分流:只有 Linux / Windows 的原生层需要额外整体刷新,macOS 等
+/// 其它平台的自绘组件已由订阅者重着色,落 `_ =>` 什么都不做(不是
+/// Unsupported——主题本身三平台都生效,只是刷新手段不同)。
 pub fn theme_apply(t : Theme) -> Unit {
   theme_box.t = t
   let snapshot = theme_box.subs.copy()
   for entry in snapshot {
     (entry.1)()
   }
-  if platform() == "linux" {
-    apply_native_theme_css(t)
-    // 整体重绘兜底推迟一拍:按钮点击等输入事件回调里同步
-    // process_updates 会被 GTK 吞掉(定时器路径实测有效、点击路径实测
-    // 无效),脱离触发上下文后再逐窗口同步重绘;连刷两拍,第二拍兜住
-    // 第一拍漏掉的子窗口
-    post_task(fn() { ffi_repaint_all() })
-    post_delayed_task(60, fn() { ffi_repaint_all() })
-  } else if platform() == "windows" {
-    // Windows 端切主题只有订阅主题的视图会重绘,其余区域残留旧像素
-    // (深浅切换后"重影",鼠标划过局部失效才消失);整体失效+擦除,
-    // 连带原生子窗口(输入框背景等)一并刷新。保持同步:曾试与 Linux
-    // 同款推迟一拍,黑盒测试进程退出时延迟任务对已销毁窗口重绘直接
-    // 崩(exit -1,Windows CI 实证);点击劫持真凶是 bind_node 重挂的
-    // remove+add(探针定案),与重绘时机无关,勿再动此处
-    ffi_repaint_all()
+  match platform() {
+    "linux" => {
+      apply_native_theme_css(t)
+      // 整体重绘兜底推迟一拍:按钮点击等输入事件回调里同步
+      // process_updates 会被 GTK 吞掉(定时器路径实测有效、点击路径实测
+      // 无效),脱离触发上下文后再逐窗口同步重绘;连刷两拍,第二拍兜住
+      // 第一拍漏掉的子窗口
+      post_task(fn() { ffi_repaint_all() })
+      post_delayed_task(60, fn() { ffi_repaint_all() })
+    }
+    "windows" => {
+      // Windows 端切主题只有订阅主题的视图会重绘,其余区域残留旧像素
+      // (深浅切换后"重影",鼠标划过局部失效才消失);整体失效+擦除,
+      // 连带原生子窗口(输入框背景等)一并刷新。保持同步:曾试与 Linux
+      // 同款推迟一拍,黑盒测试进程退出时延迟任务对已销毁窗口重绘直接
+      // 崩(exit -1,Windows CI 实证);点击劫持真凶是 bind_node 重挂的
+      // remove+add(探针定案),与重绘时机无关,勿再动此处
+      ffi_repaint_all()
+    }
+    _ => ()
   }
 }
 
@@ -540,14 +548,19 @@ pub fn entry_ctrl_height(bordered : Bool) -> Double {
 }
 
 ///|
+/// 绑定 Entry 的主题重着色。Linux 的 Entry 主题由原生 CSS 接管(见
+/// [theme_apply] 的 apply_native_theme_css),无需逐控件绑定,落 `_ => ()`;
+/// 其余平台(Windows / macOS)按色板直接设前景/背景色。
 pub fn bind_entry_theme(e : Entry) -> Unit {
-  if platform() == "linux" {
-    return
-  }
-  fn apply() -> Unit {
-    e.set_colors(fg=theme_text_regular(), bg=theme_bg_panel())
-  }
+  match platform() {
+    "linux" => ()
+    _ => {
+      fn apply() -> Unit {
+        e.set_colors(fg=theme_text_regular(), bg=theme_bg_panel())
+      }
 
-  apply()
-  ignore(on_theme_change(apply))
+      apply()
+      ignore(on_theme_change(apply))
+    }
+  }
 }

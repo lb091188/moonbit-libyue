@@ -195,10 +195,13 @@ fn pr_run_spawn(
   args : Array[String],
   timeout_ms? : Int = 5000,
 ) -> Result[ProcOutput, ProcError] {
-  let platform = @yue.platform()
   let out_path = pr_tmp_path("out")
   let err_path = pr_tmp_path("err")
-  let cwd = if platform == "windows" { "" } else { "/" }
+  // Windows 用空 cwd 表示继承父进程工作目录;POSIX 显式给 "/"
+  let cwd = match @yue.platform() {
+    "windows" => ""
+    _ => "/"
+  }
   let pid = @yue.ffi_proc_spawn(
     @yue.utf8_bytes(cmd),
     pr_args_blob(args),

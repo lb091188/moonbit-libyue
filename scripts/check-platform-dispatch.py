@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""守卫：仓内 MoonBit 源码不得出现 #cfg 编译期条件编译。
+"""守卫：仓内 MoonBit 源码的平台分流必须统一为运行时 `match platform()`。
 
 背景
 ----
@@ -17,13 +17,26 @@ docs/zh/adaptation.md 的「MoonBit cfg(platform=)」小节。
 C/C++ shim 层不受此约束：那里是 `#if defined(OS_WIN)` / 独立平台 TU + CMake
 互斥挂载，本来就是编译期隔离，本脚本只扫 .mbt。
 
-做法
-----
-扫描本仓 MoonBit 源码目录，凡出现 `#cfg` 一律判失败并打印文件行号；同时统计
-运行时 `platform()` 判断的条数作为存量信息输出（不作为门禁）。
+三条规则
+--------
+1. 禁 `#cfg`——编译期条件在本仓构建链下恒假。
+2. 平台分流一律 `match platform() { "windows" => ...; _ => ... }`：
+   禁止 `if platform() == "..."` 与 `platform() == "..." || ...` 这类比较式。
+   比较式的 `else` 会隐含某个平台（历史上是 Linux），未知平台静默走 Linux
+   专用实现（读 /proc、调 systemctl/wpctl），属真实隐患；match 的 `_ =>`
+   把这种情况变成显式的「不支持」。
+3. 每个 `match platform()` 必须有 `_ =>` 兜底分支。
+
+例外（本脚本不检查）
+--------------------
+- 测试文件 `*_wbtest.mbt`：那里的平台判断是测试跳过守卫，属测试控制流。
+- `yue/app.mbt` 的 `pub fn platform()` 本身：它是平台查询入口，用
+  `match ffi_platform() { 0 => "linux"; ... }`，不是分流。
+- UI 层的布局特化（Windows 特化 vs 其它平台通用）同样写 `match`，只是
+  `_ =>` 走通用实现而非 Unsupported。
 
 用法：python3 scripts/check-platform-dispatch.py [--root DIR]
-退出码 0 通过，1 发现 #cfg。
+退出码 0 通过，1 有违规。
 """
 
 import argparse
@@ -39,6 +52,12 @@ SKIP_DIRS = {"_build", ".mooncakes", ".git", "node_modules", ".workbuddy"}
 
 CFG_RE = re.compile(r"#cfg")
 PLATFORM_RE = re.compile(r"platform\s*\(")
+# 禁止的比较式：platform() == / != ；前缀 (?<![A-Za-z0-9_]) 排除 ffi_platform()
+CMP_RE = re.compile(r"(?<![A-Za-z0-9_])platform\s*\(\s*\)\s*(?:==|!=)")
+# 禁止的 if 式：if platform( / if @yue.platform(
+IF_RE = re.compile(r"\bif\s+(?:@?yue\.)?platform\s*\(")
+# 合法的 match 开头
+MATCH_RE = re.compile(r"\bmatch\s+(?:@?yue\.)?platform\s*\(\s*\)\s*\{")
 
 
 def iter_mbt(root):
@@ -49,6 +68,29 @@ def iter_mbt(root):
                 yield os.path.join(dirpath, name)
 
 
+def strip_comment(line):
+    """去掉行内 // 注释，保留 `://`（URL 等）。"""
+    return re.split(r"(?<!:)//", line)[0]
+
+
+def check_match_has_fallback(src):
+    """返回缺 `_ =>` 兜底的 match platform 所在行号列表。"""
+    missing = []
+    for m in MATCH_RE.finditer(src):
+        i = m.end()
+        depth = 1
+        while i < len(src) and depth > 0:
+            if src[i] == "{":
+                depth += 1
+            elif src[i] == "}":
+                depth -= 1
+            i += 1
+        body = src[m.end():i]
+        if not re.search(r"^\s*_ =>", body, re.M):
+            missing.append(src[:m.start()].count("\n") + 1)
+    return missing
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=".", help="仓根目录")
@@ -57,6 +99,9 @@ def main():
     repo = os.path.abspath(args.root)
     scanned = 0
     cfg_hits = []
+    cmp_hits = []
+    if_hits = []
+    no_fb_hits = []
     runtime_hits = 0
 
     for rel in SOURCE_ROOTS:
@@ -64,28 +109,61 @@ def main():
         if not os.path.isdir(base):
             continue
         for path in iter_mbt(base):
+            relpath = os.path.relpath(path, repo)
+            is_test = relpath.endswith("_wbtest.mbt")
             scanned += 1
             with open(path, "r", encoding="utf-8", errors="replace") as f:
-                for lineno, line in enumerate(f, 1):
-                    if CFG_RE.search(line):
-                        cfg_hits.append((os.path.relpath(path, repo), lineno,
-                                         line.strip()))
-                    if PLATFORM_RE.search(line):
-                        runtime_hits += 1
+                src = f.read()
+            for lineno, line in enumerate(src.split("\n"), 1):
+                if CFG_RE.search(line):
+                    cfg_hits.append((relpath, lineno, line.strip()))
+                if PLATFORM_RE.search(line):
+                    runtime_hits += 1
+                if is_test:
+                    continue  # 测试文件的平台跳过守卫属控制流
+                code = strip_comment(line)
+                if CMP_RE.search(code):
+                    cmp_hits.append((relpath, lineno, line.strip()))
+                elif IF_RE.search(code):
+                    if_hits.append((relpath, lineno, line.strip()))
+            if not is_test:
+                for lineno in check_match_has_fallback(src):
+                    no_fb_hits.append((relpath, lineno, "match platform() 缺 _ 兜底"))
 
     print("扫描 {} 个 .mbt 文件，运行时 platform() 判断 {} 处".format(
         scanned, runtime_hits))
 
+    problems = []
     if cfg_hits:
-        print("\n发现 {} 处 #cfg 编译期条件编译（本仓平台分流统一走运行时判断）："
-              .format(len(cfg_hits)))
-        for path, lineno, text in cfg_hits:
-            print("  {}:{}: {}".format(path, lineno, text[:80]))
-        print("\n改为 @yue.platform() 的 if / match 运行时分支；"
-              "确需编译期条件时请先在 docs/zh/adaptation.md 记录理由再改本脚本白名单。")
+        problems.append(("发现 {} 处 #cfg 编译期条件编译".format(len(cfg_hits)),
+                         cfg_hits))
+    if cmp_hits:
+        problems.append((
+            "发现 {} 处 platform() 比较式（应改为 match）".format(len(cmp_hits)),
+            cmp_hits))
+    if if_hits:
+        problems.append((
+            "发现 {} 处 if platform(...) 式（应改为 match）".format(len(if_hits)),
+            if_hits))
+    if no_fb_hits:
+        problems.append((
+            "发现 {} 处 match platform() 缺 `_ =>` 兜底".format(len(no_fb_hits)),
+            no_fb_hits))
+
+    if problems:
+        for title, hits in problems:
+            print("\n" + title + "：")
+            for path, lineno, text in hits:
+                print("  {}:{}: {}".format(path, lineno, text[:90]))
+        print("\n统一写法：\n"
+              "  match @yue.platform() {\n"
+              '    "linux" => xxx_linux()\n'
+              '    "windows" | "macos" => xxx_direct()\n'
+              "    _ => Err(Unsupported)   // Bool 型给 false，数组/串按文件惯例\n"
+              "  }")
         return 1
 
-    print("通过：未发现 #cfg，平台分流全部为运行时 platform() 判断。")
+    print("通过：无 #cfg，平台分流全部为 match platform() 且有 _ 兜底。")
     return 0
 
 

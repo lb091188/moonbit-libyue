@@ -93,10 +93,11 @@ fn key_event(kind : EventType, code : Int, mods : Int, ts : Int) -> KeyEvent {
 /// 统一换算到本文件 VKEY_* 常量所用的表（keyboard_codes_gtk.h），消费方
 /// 用一套常量即可跨平台比较。macOS 键码表同样不同，尚未对齐（透传）。
 fn normalize_key_code(code : Int) -> Int {
-  if platform() == "windows" {
-    normalize_win_vk(code)
-  } else {
-    code
+  match platform() {
+    "windows" => normalize_win_vk(code)
+    // Linux 键码即本表常量（keyboard_codes_gtk.h），macOS 键码表尚未对齐
+    // （原样透传），两者都不需换算
+    _ => code
   }
 }
 

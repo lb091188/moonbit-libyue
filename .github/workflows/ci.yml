@@ -112,10 +112,10 @@ jobs:
           [ "$c1$c2$c3" = "000" ]
 
       # 平台分流统一走运行时 platform() 判断,不用 #cfg(platform=)——
-      # moon 构建层不给 moonc 传目标三元组,该条件恒为假(写了等于没写)。
-      # 本步只做守卫:仓内 MoonBit 源码一旦出现 #cfg 即失败。原理见
+      # 平台分流统一为运行时 match platform():禁 #cfg(该条件在 moon 构建下
+      # 恒假)、禁 if / 比较式写法、要求 match 必有 `_ =>` 兜底。原理见
       # docs/zh/adaptation.md 的「MoonBit cfg(platform=)」小节。
-      - name: 平台分流一致性守卫(禁止 #cfg 编译期条件编译)
+      - name: 平台分流一致性守卫(match platform() + 禁 #cfg / 比较式)
         run: python3 scripts/check-platform-dispatch.py
 
       - name: GUI 冒烟(hello 在虚拟显示下存活 20 秒即通过)

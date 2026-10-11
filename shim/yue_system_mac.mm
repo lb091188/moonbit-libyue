@@ -15,6 +15,10 @@
 // 以及 pairedDevices 的已配对设备。动作族（开关电源、扫描、连接、配对）
 // 依赖异步委托或非公开接口，保持哨兵，MoonBit 侧显式 Unsupported。
 //
+// 打开外部：URL 走 NSWorkspace openURL:、文件管理器选中走
+// activateFileViewerSelectingURLs:（等价 Windows 的 ShellExecuteW 与
+// explorer /select），实现见文末。
+//
 // 权限边界（macOS 10.15+）：
 //   - 窗口列表标题（kCGWindowName）与 AX 关窗需要"屏幕录制"/"辅助功能"
 //     权限；未授权时列表行退化为仅本进程窗口、关窗返回 -1，见 MoonBit 文档
@@ -1199,5 +1203,58 @@ extern "C" void *yue_mbt_mac_machine_info(int32_t *ok) {
     std::string out = "Apple Inc.\t" + product + "\t" + serial;
     *ok = 1;
     return BytesFromString(out);
+  }
+}
+
+// ---- 打开外部：URL 与文件管理器选中（NSWorkspace） ----
+// 与 Windows 侧（ShellExecuteW / explorer /select）同 ABI 与返回口径：
+// 返回 0 且 *ok=1 表示「已交给系统」。Linux 不走这里（traybus 的 glib 直
+// spawn）。符号名沿用 win_ 前缀（历史命名，非平台含义，见文件头对照说明）。
+
+extern "C" int32_t yue_mbt_open_url(const char *url, int32_t *ok) {
+  @autoreleasepool {
+    *ok = 0;
+    if (url == nullptr) {
+      return -1;
+    }
+    NSString *s = [NSString stringWithUTF8String:url];
+    NSURL *u = s == nil ? nil : [NSURL URLWithString:s];
+    if (u == nil) {
+      return -1;
+    }
+    // openURL: 同步判定成败（交给 LaunchServices 即算成功）
+    if ([[NSWorkspace sharedWorkspace] openURL:u]) {
+      *ok = 1;
+      return 0;
+    }
+    return -1;
+  }
+}
+
+extern "C" int32_t yue_mbt_win_reveal_file(const char *path, int32_t *ok) {
+  @autoreleasepool {
+    *ok = 0;
+    if (path == nullptr) {
+      return -1;
+    }
+    NSString *p = [NSString stringWithUTF8String:path];
+    if (p == nil) {
+      return -1;
+    }
+    // 相对路径按工作目录解析（与 Linux 侧拼绝对路径的语义对齐）
+    NSString *abs =
+        [p isAbsolutePath]
+            ? p
+            : [[[NSFileManager defaultManager] currentDirectoryPath]
+                  stringByAppendingPathComponent:p];
+    abs = [abs stringByStandardizingPath];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:abs]) {
+      return -1;  // 不存在的路径交给 Finder 只会静默失败，此处显式报错
+    }
+    NSURL *u = [NSURL fileURLWithPath:abs];
+    // activateFileViewerSelectingURLs: 无返回值，成功即在 Finder 中选中
+    [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs:@[ u ]];
+    *ok = 1;
+    return 0;
   }
 }

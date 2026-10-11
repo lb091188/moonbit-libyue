@@ -1,7 +1,9 @@
 // 打开外部：URL 与文件管理器选中，单入口 + 单错误枚举。
 // Linux:xdg-open(glib spawn 直传 argv 不经 shell)+ FileManager1.ShowItems
 // (服务不在线或调用失败回退打开父目录);Windows:ShellExecuteW 与
-// explorer /select。Ok 只表示「已交给系统」,系统侧能否打开由平台负责。
+// explorer /select;macOS:NSWorkspace openURL: 与
+// activateFileViewerSelectingURLs:(同走 shim 入口,shim 侧分平台)。
+// Ok 只表示「已交给系统」,系统侧能否打开由平台负责。
 
 ///|
 /// 打开 URL 交给系统默认处理(http/https/mailto 等一律透传,不做校验)。
@@ -12,7 +14,9 @@ pub fn open_url(url : String) -> Result[Unit, OpenUrlError] {
         Ok(_) => Ok(())
         Err(_) => Err(SpawnFailed)
       }
-    "windows" => {
+    // Windows 走 ShellExecuteW、macOS 走 NSWorkspace openURL:，同一 shim
+    // 入口由 shim 侧按平台分派
+    "windows" | "macos" => {
       let ok = Ref(0)
       let _ = ffi_open_url(utf8_bytes(url), ok)
       if ok.val == 1 {
@@ -48,7 +52,9 @@ pub fn reveal_in_file_manager(path : String) -> Result[Unit, FileManagerError] {
         Err(_) => Err(SpawnFailed)
       }
     }
-    "windows" => {
+    // Windows 走 explorer /select、macOS 走 NSWorkspace
+    // activateFileViewerSelectingURLs:，两者都在 shim 侧把相对路径归一化
+    "windows" | "macos" => {
       let ok = Ref(0)
       let _ = ffi_win_reveal_file(utf8_bytes(path), ok)
       if ok.val == 1 {

@@ -4156,7 +4156,8 @@ extern "C" int32_t yue_mbt_win_reveal_file(const char *path, int32_t *ok) {
   return -1;
 }
 
-#else  // 非 Windows:桩
+#elif !defined(OS_MAC)  // Linux:桩（MoonBit 层走 traybus 的 glib 直 spawn，
+                        // 不经过这里；macOS 实现见 yue_system_mac.mm）
 
 extern "C" int32_t yue_mbt_open_url(const char *, int32_t *ok) {
   *ok = 0;

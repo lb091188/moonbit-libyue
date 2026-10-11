@@ -3,7 +3,10 @@
 
 ///|
 pub fn is_linux() -> Bool {
-  @yue.platform() == "linux"
+  match @yue.platform() {
+    "linux" => true
+    _ => false
+  }
 }
 
 ///|
