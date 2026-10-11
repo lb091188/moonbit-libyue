@@ -42,7 +42,7 @@ pub fn type_light_color(t : SemanticType) -> String {
 
 ///|
 /// 一行文本的测量宽（组件按内容定宽时用，绕开容器拉伸）。
-fn text_width(text : String, font : @text.Font) -> Double {
+pub fn text_width(text : String, font : @text.Font) -> Double {
   match @text.measure_font(text, font) {
     Some(m) => m.width.to_double()
     None => 0.0

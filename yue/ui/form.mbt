@@ -10,7 +10,7 @@
 
 ///|
 /// 订阅一个 Store，只为请求重绘；退订随本代回收袋。
-fn[T] follow_store(s : @core.Store[T]) -> Unit {
+pub fn[T] follow_store(s : @core.Store[T]) -> Unit {
   let sig = s.signal()
   let sid = sig.subscribe(fn(_v : T) -> Unit { @core.invalidate() })
   @core.sub_bag_register(fn() { sig.remove(sid) })

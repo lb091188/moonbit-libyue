@@ -125,7 +125,7 @@ let theme_watch : Ref[Bool] = Ref(false)
 ///|
 /// 主题变化就请求重绘。这里**只订阅一次**（进程级）：`invalidate` 本就是全局
 /// 的，按控件逐个订阅会让每次重挂都留下一条死订阅，换不来任何精度。
-fn watch_theme() -> Unit {
+pub fn watch_theme() -> Unit {
   if !theme_watch.val {
     theme_watch.val = true
     let _ = @theme.on_theme_change(fn() { @core.invalidate() })

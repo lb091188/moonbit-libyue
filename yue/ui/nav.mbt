@@ -510,7 +510,7 @@ fn collapse_panel(
 ///|
 /// 圆角矩形填充（菜单与页签的 4px 圆角档）。Painter 门面没有原生圆角，
 /// 按「四段直线 + 四个 90° 弧」拼路径；弧角递增（逆时针参数在两层后端都不可用）。
-fn fill_round_rect(
+pub fn fill_round_rect(
   p : @render.Painter,
   x : Double,
   y : Double,

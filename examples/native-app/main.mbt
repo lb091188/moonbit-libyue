@@ -679,6 +679,91 @@ fn make_media_section(
 }
 
 ///|
+/// 图表区块：五种通用图并排 + 一颗「推点」按钮（点一次往折线序列推一个点，
+/// 退出状态行报窗口长度与末值，回证 Store 驱动的换数据只重绘不重建）。
+fn make_chart_section(
+  lin : @core.Store[Array[@chart.LineSeries]],
+  pushes : Ref[Int],
+  btn_slot : Ref[@core.Widget?],
+  line_slot : Ref[@core.Widget?],
+) -> @core.Node {
+  let vals : Array[Double] = []
+  for i = 0; i < 24; i = i + 1 {
+    vals.push(((i * 13) % 37).to_double() + 4.0)
+  }
+  lin.set([@chart.LineSeries::make("负载", max_points=40).with_points(vals)])
+  let bars = @core.Store::new([
+    @chart.BarItem::make("组件", 48.0),
+    @chart.BarItem::make("布局", 30.0),
+    @chart.BarItem::make("绘制", -12.0),
+    @chart.BarItem::make("输入", 22.0),
+  ])
+  let rings = @core.Store::new([
+    @chart.DonutSlice::make("已完成", 52.0),
+    @chart.DonutSlice::make("进行中", 31.0),
+    @chart.DonutSlice::make("待办", 17.0),
+  ])
+  let needle = @core.Store::new(0.68)
+  let dots = @core.Store::new([
+    (1.0, 2.0),
+    (2.0, 3.4),
+    (3.0, 4.1),
+    (4.0, 6.2),
+    (5.0, 5.3),
+    (6.0, 7.1),
+  ])
+  @ui.container(
+    [
+      @ui.label("图表：折线/柱状/环形/仪表/散点全自绘，数据走 Store（退出状态行报推点数）", size=13.0),
+      @ui.container(
+        [
+          @ui.container(
+            [
+              @chart.line_chart_t(lin, area=true, height=110.0, handle=fn(w : @core.Widget) -> Unit {
+                line_slot.val = Some(w)
+              }),
+              @chart.bar_chart_t(bars, width=250.0, height=110.0),
+            ],
+            direction=@yoga.Row,
+            column_gap=8.0,
+            align_items=@yoga.AlignItems::Stretch,
+            grow=1.0,
+          ),
+          @ui.container(
+            [
+              @chart.donut_chart_t(rings, width=360.0, height=130.0),
+              @chart.gauge_t(needle, width=150.0, height=120.0),
+              @chart.scatter_t(dots, trend=true, width=250.0, height=130.0),
+              @ui.button(
+                "推点",
+                on_click=fn() -> Unit {
+                  pushes.val = pushes.val + 1
+                  @chart.series_push(lin, 0, (pushes.val * 7 % 29).to_double() + 2.0)
+                },
+                kind=@ui.Border,
+                min_width=64.0,
+                handle=fn(w : @core.Widget) -> Unit { btn_slot.val = Some(w) },
+              ),
+            ],
+            direction=@yoga.Row,
+            column_gap=8.0,
+            align_items=@yoga.AlignItems::Center,
+          ),
+        ],
+        direction=@yoga.Column,
+        row_gap=8.0,
+        align_items=@yoga.AlignItems::Stretch,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 虚拟表格演示数据：200 行（几何验证页只挂可见的十来行）。
 fn make_virt_rows() -> Array[@ui.TableRow] {
   let out : Array[@ui.TableRow] = []
@@ -1034,6 +1119,11 @@ fn main {
   let gif_w : Ref[@core.Widget?] = Ref(None)
   let ib_w : Ref[@core.Widget?] = Ref(None)
   app.mount([make_media_section(gif_h, ib_hits, gif_w, ib_w)])
+  let ch_lin = @core.Store::new([])
+  let ch_pushes = Ref(0)
+  let ch_btn_w : Ref[@core.Widget?] = Ref(None)
+  let ch_line_w : Ref[@core.Widget?] = Ref(None)
+  app.mount([make_chart_section(ch_lin, ch_pushes, ch_btn_w, ch_line_w)])
   app.mount([
     make_form_section(
       frm_btn,
@@ -1515,7 +1605,7 @@ fn main {
     None => -1
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' cmb='\{frm_cmb.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val} ta='\{flat(frm_ta.get())}' tacur=\{ta_caret} dcl=\{dcl_n.get()} lblw=\{dcl_w0.round().to_int()}/\{dcl_w1.round().to_int()} cur=\{cur_seen.val.0}/\{cur_seen.val.1}/\{cur_seen.val.2}/\{cur_seen.val.3} gif=\{gif_h.frame_count()} ib=\{ib_hits.val} sys='\{@core.sys_color_scheme()}/\{@core.sys_accent()}' fing=\{@theme.theme_fingerprint_of(@theme.theme_current())}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' cmb='\{frm_cmb.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val} ta='\{flat(frm_ta.get())}' tacur=\{ta_caret} dcl=\{dcl_n.get()} lblw=\{dcl_w0.round().to_int()}/\{dcl_w1.round().to_int()} cur=\{cur_seen.val.0}/\{cur_seen.val.1}/\{cur_seen.val.2}/\{cur_seen.val.3} gif=\{gif_h.frame_count()} ib=\{ib_hits.val} sys='\{@core.sys_color_scheme()}/\{@core.sys_accent()}' fing=\{@theme.theme_fingerprint_of(@theme.theme_current())} ln=\{ch_lin.get()[0].points.length()}/\{ch_lin.get()[0].points[ch_lin.get()[0].points.length() - 1].round().to_int()} chp=\{ch_pushes.val}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -1642,6 +1732,12 @@ fn main {
     }
     None => "-"
   }
+  println(
+    "NATIVE-APP-CH line=" +
+    ov2_rect_of(ch_line_w.val) +
+    " btn=" +
+    ov2_rect_of(ch_btn_w.val),
+  )
   println(
     "NATIVE-APP-MEDIA gif=" +
     ov2_rect_of(gif_w.val) +

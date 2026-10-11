@@ -636,6 +636,16 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **style 通道定案：新栈不做 CSS 风格式样式表**。master 那五个助手（`themed_container`/`set_panel_bg`/`bind_bg`/`bind_fg`/`bind_popover_bg`）存在的前提是「原生控件的底色/字色是命令式设进去的固定值，主题换了不会自己变」；本栈组件在 `on_draw` 里现取主题色板，换主题时靠进程级的一次订阅整体重绘（`watch_theme`），这五个助手在新栈里**结构性不需要**。调用方要覆盖尺寸/间距/底色，走两条更直接的路：组件的类型化参数（`width=`/`bg=`/`padding=`…），或 `handle=fn(w){ ... }` 拿到底层控件自己设 yoga 样式——后者就是本栈的「样式逃生舱」，比维护一张字符串样式表更类型安全。`sub_bag` 批量退订早已在 `yue/core/signal.mbt` 落地并被组件批次反复覆盖（重建式列表整代退订）。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/theme` **8/8**（新增 1 条：深浅与主色四态的指纹关系——读不出与读到 light 同指纹、dark 与 light 不同、给了 accent 就走派生公式且与 `theme_from_accent` 一致、`theme_apply_system` 之后 getter 与指纹跟随新快照）；`yue/ui` 107/107、`yue/core` 62/62、`yue/render` 42/42、`yoga-mbt` 96/96，九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 起 `follow_system_theme(interval_ms=1000)` 并在 3 秒处停表验证停表函数归属）：状态行补 `sys='light/'` 与 `fing=#2D68C4/#F5F6F7`、`frames=118` 与其余读数不变、退出码 0。**系统主题真的切换时界面是否即时重着色**由用户在真机复验（可临时 `gsettings set org.gnome.desktop.interface color-scheme prefer-dark` 观察），助手侧不代改桌面设置。
 
+### MoonBit 原生 GUI 栈 · 图表首批（`yue/chart`：算法层 + 折线/柱状/环形/仪表/散点）
+
+- **另起新包而不是原地改 `yue/charts`**：旧目录引用 `@yue` 根包与旧 Painter 契约，属全仓红点积压；新栈要守「本包 `--deny-warn` 零警告」这条分包门禁，混在一起就无从谈起（与 `yue/components` → `yue/ui` 同一个理由）。新包三层：`algo.mbt`（纯函数，与 master 同源：滚动窗口/坐标换算/1-2-5 刻度/单位换挡/柱槽与命中/扇区角度/仪表弧度/最小二乘/值域留白/截断）、`draw.mbt`（绘制，只吃纯函数的结果）、`components.mbt`（`@core.Node` 组件）。
+- **像素断言的口径换了**：图表组件在 `on_draw` 里先铺一层面板底，于是「有墨像素数（alpha>0）」恒等于整块面积——本批 5 条用例第一次全假失败就是这个原因。改判据：**两张位图逐像素比差异**（`diff_of`），「换数据后画面变了」与「离开后复原」都用它（后者断言差异恰为 0）。这条对所有「先铺底再画内容」的组件都成立，不只是图表。
+- **密集折线的绘制成本与窗口大小脱钩**（沿用 master 定案）：按像素列抽稀，每列取 (x, y_min, y_max) 保极值；面积模式每列填一个到锚线的矩形（填充顶边即折线，不再另描），折线模式每列画 min..max 竖条。稀疏（点数 ≤ 列数）才走真折线 + 多边形面积。依据是软件光栅化下每段描边约 1.8µs，1000 点 × 4 序列全描边超 5ms 验收线。
+- **环形命中是新写的 `donut_hit`**（极坐标判扇区，圆心/半径公式与 `draw_donut` 同源，中心孔与圆外给 -1）；柱状命中仍用 master 的 `bar_hit`（与绘制共用槽宽公式，否则高亮与柱子错位）。
+- **复用 `yue/ui` 的地基而不是重抄**：`follow_store`/`watch_theme`/`text_width`/`fill_round_rect`/`default_handle` 从 `pub` 出去给图表包用。之前它们在 `yue/ui` 内是私有的，图表包若要同样的东西只能再抄一份订阅逻辑（`watch_theme` 的「进程级只订阅一次」正是不能复制的那条）。
+- **四条工具链写法（本批实测）**：① `pub const` 的名字**必须大写**（`pub const pi` 直接报「Expected upper case identifier for name of const, found lower case. Did you mean let?」），小写常量用 `pub let`；② `for i = 1..<n { }` 不支持——range 只在 `for x in a..<b` 里合法，经典 for 要写 `for i = 1; i < n; i = i + 1`；③ `StringBuilder` 的写入方法是 `write_string`/`write_char`，没有 `add`/`append`；④ `Ordering` 类型在本工具链不可直接引用（写比较器函数会报「The type Ordering is undefined」），几个元素排序退回插入排序。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/chart` **11/11**（6 条纯函数：窗口丢最旧与越界无操作、值域退化与留白比例、1-2-5 步长与负区间起点、单位换挡 k/M/G、柱槽与两形态命中、扇区只累计正值且单扇区留 0.0002 弧度、仪表分段取色与折线段数、回归退化、8 位色串、标签截断；5 条组件：折线换数据与密集抽推出图、柱状悬停换底与离开复原、环形出图 + 命中四态、仪表盘 smooth 两路（直接跳到位 / 逐拍逼近）、散点带趋势线）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 加「图表」区块：折线+柱状一行、环形+仪表+散点+推点按钮一行，几何行补 `NATIVE-APP-CH`，状态行补 `ln=`/`chp=`）：注入「点三次推点按钮」得 `ln=27/23 chp=3`（窗口 24→27 点、末值 7→23，与手算 `pushes*7%29+2` 逐位一致）、退出码 0；截图复核五图齐备——折线带面积填充与右端最新值标注、柱状正负异色带类目、环形中心汇总 + 右侧图例带百分比、仪表 68% 弧与中心数字、散点带最小二乘趋势线。
+
 ## Linux
 
 ### 发行版
