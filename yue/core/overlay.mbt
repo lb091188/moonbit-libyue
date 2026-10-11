@@ -119,6 +119,33 @@ pub fn overlay_show_at(content : Node, x : Double, y : Double) -> Int {
 }
 
 ///|
+/// 开一层**铺满窗口**的浮层（insets 全 0，内容自己决定怎么用这块地方）：
+/// 对话框的遮罩、整屏面板都用它。
+pub fn overlay_show_full(content : Node) -> Int {
+  match overlay_slot.val {
+    None => 0
+    Some(h) => {
+      if h.items.length() == 0 {
+        h.layer.set_visible(true)
+      }
+      h.root.relayout(h.root.rect.w, h.root.rect.h)
+      let wrap = Widget::new()
+      wrap.node.set_position(@yoga.Absolute)
+      wrap.node.set_top(@yoga.fixed(0.0))
+      wrap.node.set_left(@yoga.fixed(0.0))
+      wrap.node.set_right(@yoga.fixed(0.0))
+      wrap.node.set_bottom(@yoga.fixed(0.0))
+      let _ = content.mount_into(wrap)
+      h.layer.append_child(wrap)
+      h.next_id = h.next_id + 1
+      h.items.push((h.next_id, wrap))
+      invalidate()
+      h.next_id
+    }
+  }
+}
+
+///|
 /// 关掉指定浮层（句柄 0 或不存在时空操作）；关完最后一层就收起图层。
 pub fn overlay_hide(id : Int) -> Unit {
   match overlay_slot.val {

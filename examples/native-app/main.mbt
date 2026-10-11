@@ -561,6 +561,14 @@ fn main {
   let ov_dd : Ref[@core.Widget?] = Ref(None)
   let ov_pop : Ref[@core.Widget?] = Ref(None)
   let ov_tip : Ref[@core.Widget?] = Ref(None)
+  let dlg_open = @core.Store::new(false)
+  let dlg_ok = Ref(0)
+  let ctx_pick = Ref(0)
+  let toast_n = Ref(0)
+  let ov2_dlgbtn : Ref[@core.Widget?] = Ref(None)
+  let ov2_ctx : Ref[@core.Widget?] = Ref(None)
+  let ov2_toastbtn : Ref[@core.Widget?] = Ref(None)
+  let toast_push = @ui.toast_layer(duration_ms=2000)
   app.mount([
     @ui.container(
       [
@@ -784,6 +792,53 @@ fn main {
           bg=@theme.theme_bg_panel(),
           border=@theme.theme_border(),
         ),
+        @ui.container(
+          [
+            @ui.label("浮层次批", size=13.0),
+            @ui.button(
+              "弹窗",
+              on_click=fn() -> Unit { dlg_open.set(true) },
+              min_width=70.0,
+              handle=fn(w : @core.Widget) -> Unit { ov2_dlgbtn.val = Some(w) },
+            ),
+            @ui.dialog_t(
+              dlg_open,
+              "确认操作",
+              [@ui.label("对话框在浮层图层上开，遮罩铺满整窗", size=12.0)],
+              on_confirm=fn() -> Unit { dlg_ok.val = dlg_ok.val + 1 },
+            ),
+            @ui.context_menu_for(
+              @ui.container(
+                [@ui.label("右键我", size=13.0)],
+                padding=4.0,
+                bg=@theme.theme_bg_panel(),
+                height=28.0,
+              ),
+              [
+                ("复制", fn() -> Unit { ctx_pick.val = 1 }),
+                ("-", fn() -> Unit { () }),
+                ("删除", fn() -> Unit { ctx_pick.val = 3 }),
+              ],
+              width=120.0,
+              handle=fn(w : @core.Widget) -> Unit { ov2_ctx.val = Some(w) },
+            ),
+            @ui.button(
+              "提示",
+              on_click=fn() -> Unit {
+                toast_push("保存成功", @ui.Success)
+                toast_n.val = toast_n.val + 1
+              },
+              min_width=70.0,
+              handle=fn(w : @core.Widget) -> Unit { ov2_toastbtn.val = Some(w) },
+            ),
+          ],
+          width=220.0,
+          row_gap=8.0,
+          padding=6.0,
+          align_items=@yoga.AlignItems::FlexStart,
+          bg=@theme.theme_bg_page(),
+          border=@theme.theme_border(),
+        ),
       ],
       direction=@yoga.Row,
       column_gap=8.0,
@@ -866,7 +921,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val}"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val}"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -959,6 +1014,21 @@ fn main {
     Some(w) => rect_str(w.rect)
     None => "-"
   }
+  let ov2_rect_of = fn(x : @core.Widget?) -> String {
+    match x {
+      Some(w) => rect_str(w.rect)
+      None => "-"
+    }
+  }
+
+  println(
+    "NATIVE-APP-OV2 dlgbtn=" +
+      ov2_rect_of(ov2_dlgbtn.val) +
+      " ctx=" +
+      ov2_rect_of(ov2_ctx.val) +
+      " toastbtn=" +
+      ov2_rect_of(ov2_toastbtn.val),
+  )
   println(
     "NATIVE-APP-OV dd=" + ov_dd_rect + " pop=" + ov_pop_rect + " tip=" + ov_tip_rect,
   )

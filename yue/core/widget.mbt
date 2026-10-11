@@ -371,10 +371,24 @@ pub fn Widget::focusable_at(self : Widget, x : Double, y : Double) -> Int? {
 /// 沿给定路径投递指针事件：从最深往上，第一个返回 true 的处理器消费掉；
 /// 交给处理器前把窗口坐标平移为该控件的本地坐标。
 fn dispatch_on_path(path : Array[Widget], ev : PointerEvent) -> Bool {
-  let mut i = path.length()
+  // 右键（button 3）**祖先优先**：上下文菜单是容器级能力，包在内层控件外面的
+  // 包装层要能先拿到它——否则包住按钮时，按钮先把按下吃掉（本仓按钮的 Down 不分
+  // 按键一律消费），上下文菜单永远弹不出来。其余按键维持「最深优先」。
+  let ancestor_first = ev.button == 3
+  let mut i = if ancestor_first { 0 } else { path.length() }
   let mut handled = false
-  while i > 0 && !handled {
-    i = i - 1
+  while !handled {
+    if ancestor_first {
+      if i >= path.length() {
+        break
+      }
+      i = i + 1
+    } else {
+      if i <= 0 {
+        break
+      }
+      i = i - 1
+    }
     let w = path[i]
     let at_local = {
       kind: ev.kind,
