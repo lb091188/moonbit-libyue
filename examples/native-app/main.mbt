@@ -480,6 +480,8 @@ fn make_form_section(
   pick : Ref[String],
   ta : @core.Store[String],
   ta_slot : Ref[@core.Widget?],
+  cmb : @core.Store[String],
+  cmb_slot : Ref[@core.Widget?],
   sel_slot : Ref[@core.Widget?],
   col_slot : Ref[@core.Widget?],
 ) -> @core.Node {
@@ -540,6 +542,14 @@ fn make_form_section(
             width=160.0,
             focus_id=22,
             handle=fn(w : @core.Widget) -> Unit { sel_slot.val = Some(w) },
+          ),
+          @ui.combo(
+            ["组件甲", "组件乙", "组件丙"],
+            cmb,
+            placeholder="可输入过滤",
+            width=150.0,
+            focus_id=25,
+            handle=fn(w : @core.Widget) -> Unit { cmb_slot.val = Some(w) },
           ),
           @ui.color_picker_t(
             col,
@@ -965,6 +975,8 @@ fn main {
   let frm_col_w : Ref[@core.Widget?] = Ref(None)
   let frm_ov_max = Ref(0)
   let frm_pick = Ref("-")
+  let frm_cmb = @core.Store::new("")
+  let frm_cmb_w : Ref[@core.Widget?] = Ref(None)
   // 八行内容：76 高的框只放得下三行半，超出部分靠滚动（滚轮 / 滚动条）
   let frm_ta = @core.Store::new("行 1\n行 2\n行 3\n行 4\n行 5\n行 6\n行 7\n行 8")
   app.mount([make_table_section(tb_rows, tb_sel, tb_sort, tb_w)])
@@ -994,6 +1006,8 @@ fn main {
       frm_pick,
       frm_ta,
       frm_ta_w,
+      frm_cmb,
+      frm_cmb_w,
       frm_sel_w,
       frm_col_w,
     ),
@@ -1328,6 +1342,7 @@ fn main {
   let _ = app.focus.register(22)
   let _ = app.focus.register(23)
   let _ = app.focus.register(24)
+  let _ = app.focus.register(25)
 
   let ticker : Ref[() -> Unit] = Ref(fn() { () })
   ticker.val = fn() {
@@ -1452,7 +1467,7 @@ fn main {
     None => -1
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val} ta='\{flat(frm_ta.get())}' tacur=\{ta_caret} dcl=\{dcl_n.get()} lblw=\{dcl_w0.round().to_int()}/\{dcl_w1.round().to_int()} cur=\{cur_seen.val.0}/\{cur_seen.val.1}/\{cur_seen.val.2}/\{cur_seen.val.3}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' cmb='\{frm_cmb.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val} ta='\{flat(frm_ta.get())}' tacur=\{ta_caret} dcl=\{dcl_n.get()} lblw=\{dcl_w0.round().to_int()}/\{dcl_w1.round().to_int()} cur=\{cur_seen.val.0}/\{cur_seen.val.1}/\{cur_seen.val.2}/\{cur_seen.val.3}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -1598,6 +1613,8 @@ fn main {
     ov2_rect_of(frm_item_w.val) +
     " ta=" +
     ov2_rect_of(frm_ta_w.val) +
+    " cmb=" +
+    ov2_rect_of(frm_cmb_w.val) +
     " sel=" +
     ov2_rect_of(frm_sel_w.val) +
     " col=" +

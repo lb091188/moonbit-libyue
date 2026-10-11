@@ -508,3 +508,52 @@ test "取色器：字段点开色板网格、点色块写值并收起、选中�
   assert_eq((v.get(), @core.overlay_count()), ("#666666", 0))
   assert_eq(changes, ["#666666"])
 }
+
+///|
+test "可编辑下拉：点开全量候选、提交文本即过滤、上下键移高亮、回车回填、Esc 收层" {
+  let v = @core.Store::new("")
+  let changes : Array[String] = []
+  let (root, w) = mounted_with_overlay(
+    combo(
+      ["甲一", "甲二", "乙三"],
+      v,
+      on_change=fn(s : String) -> Unit { changes.push(s) },
+      width=140.0,
+      focus_id=1,
+    ),
+    420.0,
+    320.0,
+  )
+  assert_eq(w.rect.w, 140.0)
+  assert_eq(@core.overlay_count(), 0)
+  // 点字段：按下被里面的输入框消费，抬起冒泡到本组件才开层
+  click_at(root, w, 30.0, 16.0)
+  assert_eq(@core.overlay_count(), 1)
+  root.relayout(420.0, 320.0)
+  assert_eq(select_rows(1).length(), 3)
+  // 输入法提交「甲」→ 过滤成两行并自动开层
+  let _ = root.dispatch_commit(1, "甲")
+  root.relayout(420.0, 320.0)
+  assert_eq(@core.overlay_count(), 1)
+  assert_eq(select_rows(2).length(), 2)
+  // 下键移高亮：第 2 行亮起（浅底 + 勾），第 1 行不亮
+  let (bm_a, ax, ay) = shot(select_rows(2)[0])
+  let (bm_b, bx, by) = shot(select_rows(2)[1])
+  assert_true(color_of(bm_a, ax + 40, ay + 14) != color_of(bm_b, bx + 40, by + 14))
+  let _ = root.dispatch_key(1, { press: true, keysym: @core.KS_DOWN, mods: 0, })
+  let (bm_c, cx, cy) = shot(select_rows(2)[0])
+  assert_true(color_of(bm_c, cx + 40, cy + 14) != color_of(bm_a, ax + 40, ay + 14))
+  // 回车取高亮那一项
+  let _ = root.dispatch_key(1, { press: true, keysym: @core.KS_RETURN, mods: 0, })
+  assert_eq((v.get(), @core.overlay_count()), ("甲二", 0))
+  assert_eq(changes, ["甲二"])
+  // 再点开：过滤结果只剩一行；Esc 收层且不改值
+  click_at(root, w, 30.0, 16.0)
+  root.relayout(420.0, 320.0)
+  assert_eq(select_rows(3).length(), 1)
+  let _ = root.dispatch_key(1, { press: true, keysym: @core.KS_ESCAPE, mods: 0, })
+  assert_eq((@core.overlay_count(), v.get()), (0, "甲二"))
+  // 过滤到空集时不开层
+  let _ = root.dispatch_commit(1, "丙")
+  assert_eq(@core.overlay_count(), 0)
+}

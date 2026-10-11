@@ -822,6 +822,16 @@ fn select_row(opt : String, selected : () -> Bool, on_pick : () -> Unit) -> @cor
 }
 
 ///|
+/// 候选浮层：`n` 行 × 28 高 + 4×2 内边距，超过 300 高就套一层垂直滚动
+/// （选项再多也不会顶出窗口）。`select_t` 与 `combo` 共用。
+fn list_popup(rows : Array[@core.Node], n : Int, width : Double) -> @core.Node {
+  let want = n.to_double() * 28.0 + 8.0
+  let list_h = if want > 300.0 { 300.0 } else { want }
+  let st = ScrollState::new()
+  overlay_pane([scroll_v(rows, st, width=width, height=list_h)], width, list_h)
+}
+
+///|
 /// 下拉选择（EP Select，全自绘）：字段点开候选列表（开在浮层图层上），悬停高亮、
 /// 当前选中主色 + ✓，点选回填并收起；`clearable` 时字段悬停且有值显示 ✕，
 /// 点它清空（`value` 置空串并回调 `on_change("")`，与 master 同）。
@@ -882,15 +892,8 @@ pub fn select_t(
               }),
             )
           }
-          let want = opts.length().to_double() * 28.0 + 8.0
-          let list_h = if want > 300.0 { 300.0 } else { want }
-          let st = ScrollState::new()
           open_id.val = @core.overlay_show_at(
-            overlay_pane(
-              [scroll_v(rows, st, width=width, height=list_h)],
-              width,
-              list_h,
-            ),
+            list_popup(rows, opts.length(), width),
             w.rect.x,
             w.rect.y + w.rect.h + 2.0,
           )
@@ -1036,6 +1039,137 @@ fn color_swatch(
         _ => false
       }
     })
+    w
+  })
+}
+
+///|
+/// 可编辑下拉（EP Combobox 形态）：文本框 + 随输入过滤的候选浮层。
+/// 打字即过滤并开层，↑/↓ 移动高亮、回车取高亮、Esc 收层，点候选行直接回填；
+/// 编辑语义（选区/双击选词/undo/输入法）全在里面的 `entry`，本组件只加「候选」这一层。
+///
+/// 与 master 的一条差（记档）：旧链路的 combo 是原生可编辑组合框（GTK
+/// `ComboBoxEntry`），本栈全自绘——浮层开在浮层图层上，收层同样由图层负责。
+pub fn combo(
+  options : Array[String],
+  value : @core.Store[String],
+  on_change? : (String) -> Unit = fn(_s : String) -> Unit { () },
+  placeholder? : String = "",
+  width? : Double = 200.0,
+  focus_id? : Int = 0,
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  follow_store(value)
+  let opts = options
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    let open_id : Ref[Int] = Ref(0)
+    let hi : Ref[Int] = Ref(0)
+    let shown : Ref[Array[String]] = Ref([])
+    let close = fn() -> Unit {
+      if open_id.val != 0 {
+        @core.overlay_hide(open_id.val)
+        open_id.val = 0
+      }
+    }
+
+    let filtered = fn() -> Array[String] {
+      let t = value.get()
+      let out : Array[String] = []
+      if t.length() == 0 {
+        for o in opts {
+          out.push(o)
+        }
+      } else {
+        for o in opts {
+          if o.contains(t) {
+            out.push(o)
+          }
+        }
+      }
+      out
+    }
+    let pick = fn(s : String) -> Unit {
+      value.set(s)
+      on_change(s)
+      close()
+    }
+    let open = fn() -> Unit {
+      let cand = filtered()
+      if cand.length() == 0 {
+        close()
+        return
+      }
+      if hi.val >= cand.length() {
+        hi.val = 0
+      }
+      let rows : Array[@core.Node] = []
+      for i = 0; i < cand.length(); i = i + 1 {
+        let idx = i
+        let text = cand[i]
+        rows.push(
+          select_row(text, fn() -> Bool { hi.val == idx }, fn() -> Unit { pick(text) }),
+        )
+      }
+      shown.val = cand
+      close()
+      open_id.val = @core.overlay_show_at(
+        list_popup(rows, cand.length(), width),
+        w.rect.x,
+        w.rect.y + w.rect.h + 2.0,
+      )
+    }
+    let accept = fn() -> Unit {
+      let cand = shown.val
+      if cand.length() > 0 {
+        pick(cand[hi.val.clamp(min=0, max=cand.length() - 1)])
+      }
+    }
+
+    let box = entry(
+      value,
+      placeholder=placeholder,
+      width=width,
+      focus_id=focus_id,
+      on_change=fn(_t : String) -> Unit { open() },
+      on_enter=accept,
+    )
+    let _ = box.mount_into(w)
+    w.on_pointer = Some(fn(
+      _self : @core.Widget,
+      ev : @core.PointerEvent,
+    ) -> Bool {
+      match ev.kind {
+        // 字段里的抬起（选完词、点完插入点）顺手把候选开出来：
+        // 输入框自己消费了按下，这一击的抬起才冒泡到这里
+        @core.Up => {
+          open()
+          false
+        }
+        _ => false
+      }
+    })
+    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+      if !ev.press || !overlay_alive(open_id.val) {
+        return false
+      }
+      let n = shown.val.length()
+      if ev.keysym == @core.KS_ESCAPE {
+        close()
+        true
+      } else if n > 0 && ev.keysym == @core.KS_DOWN {
+        hi.val = (hi.val + 1) % n
+        @core.invalidate()
+        true
+      } else if n > 0 && ev.keysym == @core.KS_UP {
+        hi.val = (hi.val + n - 1) % n
+        @core.invalidate()
+        true
+      } else {
+        false
+      }
+    })
+    handle(w)
     w
   })
 }

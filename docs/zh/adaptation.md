@@ -609,6 +609,15 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **两条工具链写法**：① `pub(all) enum PointerKind` **不自动带 `Eq`**，`pev.kind == Move` 编译不过（`Type PointerKind does not implement trait Eq`），要写 `match pev.kind { Move => true _ => false }`；② `pub(all) struct Rect` 的字段同样是公开的，测试里 `w.rect.x` 直接可读，不必另开 getter。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/core` **62/62**（新增 1 条 `cursor_at`：组内回退到组、子件自己提了以子件为准、组外与空白无命中都回默认）；`moon test -p NoahLiu/moonbit-libyue/yue/ui` **104/104**（新增 1 条：按钮/主题化按钮/悬停组手型、`entry`/`textarea` 文本形、`hsplit`/`vsplit` 把手横向/纵向、`cursor_group` 可覆盖形状且子件保持默认）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 每拍采一次宿主已下发形状，状态行补 `cur=手/文本/横向/纵向`）：注入「依次停在实心按钮 → 多行框 → 分隔把手 → 空白处」得 `cur=8/8/8/0`（前三档各被采到 8 拍，纵向那档示例里没有 `vsplit` 故为 0）、退出码 0。**光标的实际形状观感（手型是不是常见的指针、文本形是否为 I 形）由用户在真机复验**——注入只能证明宿主确实按区域下发了不同编号。
 
+### MoonBit 原生 GUI 栈 · 可编辑下拉（`combo`，声明式 L1 收尾）
+
+- **组合方式：编辑语义全在里面那只 `entry`，本组件只加「候选」这一层**。过滤随输入走（`entry` 的 `on_change` 里重开浮层），回车取高亮用 `entry` 的 `on_enter` 钩子，而 ↑/↓/Esc 靠**按键沿祖先链冒泡**：`entry` 对这三个功能键不消费（内核 `handle_key` 走到 `keysym_to_text` 得 None → `handled=false` → 宿主继续往上问），包在外层的 `combo.on_key` 才拿到它们。这是本栈第一次把「同一次按键先问控件、再问祖先」用在真实分工上，值得记：组件想吃子控件不消费的键，不必给子控件加回调参数，父层的 `on_key` 就是那条通道。
+- **抬起才开层（与 popover/dropdown 同一套路）**：`entry` 消费了按下（要落插入点），同一击的抬起才冒泡到包装层，`combo` 在 `Up` 里开层——所以点字段任意位置都是「定位插入点 + 开候选」，不需要额外的下拉箭头热区。
+- **高亮不重建浮层**：候选行的选中态是闭包现取（`fn() { hi.val == idx }`），↑/↓ 只改 `hi` 再 `invalidate()`，浮层内容不重挂；过滤结果变了才重开（`close()` + `overlay_show_at`）。
+- **浮层 id 单调递增，测试里数错就崩**：每次 `overlay_show_at` 都换新 id（关层不回收编号），所以「第 N 次开层」的断言要按**开层次数**数而不是按当前层数——数错时 `overlay_root_of(不存在的 id)` 给 None，测试助手退回一个空控件，紧接着的 `children()[0]` 就越界，症状是测试驱动只报 `SIGABRT (core dumped)`（本批实测一次，栈里没有断言）。
+- **与 master 的一条差**：旧链路的 combo 是原生可编辑组合框（GTK `ComboBoxEntry`），本栈全自绘——浮层开在浮层图层上、点外面收起同样由图层负责。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/ui` **105/105**（新增 1 条：点字段开层给全量候选 → `dispatch_commit` 提交「甲」过滤成两行并自动开层 → 高亮行的浅底与勾出像素、下键把高亮挪到另一行 → 回车回填高亮项并收层并回调 → 再开层只剩一行、Esc 收层不改值 → 过滤到空集不开层）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 表单区块的下拉行里加 `combo`，几何行补 `cmb=`，状态行补 `cmb='…'`，焦点 id 25 补注册）：注入「点可编辑下拉字段 → 点第 3 项」得 `cmb='组件丙'`、退出码 0；另一轮四击「开层 → 点第 2 项 → 再点字段 → 点原第 3 行位置」停在 `cmb='组件乙'`——第二次开层时当前文本已是「组件乙」，过滤后只剩一行，点在旧第 3 行位置的点击自然落在浮层外，这正是「随输入过滤」的应有表现（不是丢点）。
+
 ## Linux
 
 ### 发行版
