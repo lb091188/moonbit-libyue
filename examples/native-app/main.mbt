@@ -749,6 +749,70 @@ fn make_chart_it_section(
 }
 
 ///|
+/// 专项图区块：箱线/漏斗/热力/雷达四图并排（首批专项平移）。
+fn make_chart_special_section(sp_w : Ref[@core.Widget?]) -> @core.Node {
+  let box_groups = @core.Store::new([
+    ("渲染", [12.0, 14.0, 15.0, 16.0, 18.0, 22.0, 48.0]),
+    ("布局", [8.0, 10.0, 12.0, 13.0, 15.0, 17.0, 20.0]),
+    ("输入", [20.0, 24.0, 26.0, 30.0, 33.0, 38.0, 90.0]),
+  ])
+  let funnel_data = @core.Store::new([
+    @chart.BarItem::make("构建", 1000.0),
+    @chart.BarItem::make("链接", 640.0),
+    @chart.BarItem::make("加载", 420.0),
+    @chart.BarItem::make("首帧", 180.0),
+  ])
+  let heat = @core.Store::new(
+    @chart.HeatGrid::make(
+      ["周一", "周二", "周三", "周四", "周五"],
+      ["编译", "测试", "冒烟"],
+      [
+        [30.0, 42.0, 38.0, 55.0, 20.0],
+        [12.0, 18.0, 15.0, 22.0, 8.0],
+        [6.0, 9.0, 7.0, 11.0, 4.0],
+      ],
+    ),
+  )
+  let radar_inds = @core.Store::new([
+    @chart.RadarIndicator::make("速度", 100.0),
+    @chart.RadarIndicator::make("精度", 100.0),
+    @chart.RadarIndicator::make("稳定", 100.0),
+    @chart.RadarIndicator::make("生态", 100.0),
+  ])
+  let radar_sers = @core.Store::new([
+    @chart.RadarSeries::make("本栈", [78.0, 92.0, 70.0, 58.0]),
+    @chart.RadarSeries::make("对标", [60.0, 74.0, 86.0, 90.0]),
+  ])
+  @ui.container(
+    [
+      @ui.label("专项图：箱线/漏斗/热力/雷达（同源自 master，四图并排）", size=13.0),
+      @ui.container(
+        [
+          @chart.boxplot_t(box_groups, width=320.0, height=150.0),
+          @chart.funnel_t(funnel_data, width=300.0, height=150.0),
+          @chart.heatmap_t(
+            heat,
+            show_values=true,
+            width=280.0,
+            height=150.0,
+            handle=fn(w : @core.Widget) -> Unit { sp_w.val = Some(w) },
+          ),
+          @chart.radar_chart_t(radar_inds, radar_sers, width=250.0, height=170.0),
+        ],
+        direction=@yoga.Row,
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::FlexStart,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 图表区块：五种通用图并排 + 一颗「推点」按钮（点一次往折线序列推一个点，
 /// 退出状态行报窗口长度与末值，回证 Store 驱动的换数据只重绘不重建）。
 fn make_chart_section(
@@ -970,7 +1034,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1400, 2080, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1400, 2300, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -1202,6 +1266,8 @@ fn main {
   app.mount([
     make_chart_it_section(it_lin, it_bars, it_rings, it_zoom, it_panel_w),
   ])
+  let sp_w : Ref[@core.Widget?] = Ref(None)
+  app.mount([make_chart_special_section(sp_w)])
   app.mount([
     make_form_section(
       frm_btn,
@@ -1831,6 +1897,9 @@ fn main {
     it_zoom.start.round().to_int().to_string() +
     "-" +
     it_zoom.end.round().to_int().to_string(),
+  )
+  println(
+    "NATIVE-APP-CHSP heat=" + ov2_rect_of(sp_w.val),
   )
   println(
     "NATIVE-APP-MEDIA gif=" +
