@@ -1062,6 +1062,16 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - GDI+ 混合模式仅 Normal/Copy 生效:`PainterWin::SetBlendMode` 只把 Copy 映射为 `CompositingModeSourceCopy`,其余全部落 `SourceOver`——GDI+ `Graphics` 只有这两种合成模式,Multiply/Screen/Difference/Xor 等静默无效。离屏像素探针实测:Multiply 交叉区 (128,128,255) 与 SourceOver 逐位一致(数学期望 #8028FF)。平台能力缺口,不修库(换 D2D 才有完整混合);showcase 画布演示在 Windows 回显「此平台仅 Normal 生效」,`docs` 中 `Image::write_to_file` 平台口径同步修正(Windows GDI+ 编码器 png/jpeg 可用、mac 发行包未编译恒失败)。
 - 原生 Tab 添加首页即回调 `on_selected_page_change`(内部初始选中,非用户切换):回调登记先于加页时,挂载期会空触发(declarative `tab()` 曾因此让切换计数演示凭空起跳);登记挪到加页循环之后即避开。
 
+### MoonBit 原生 GUI 栈 · Windows 构建基线(W0/W1,新栈 Windows 化首批)
+
+- **环境**:Windows 10 19045 + VS BuildTools 2022(MSVC 14.44)+ SDK 10.0.26100,moon 0.1.20260920;新栈特性分支 `feature/yoga-mbt`。目的:新栈完成项(TODO.md 全部 `[x]`)逐项在 Windows 验证,Windows 地基(Win32 后端)先行。
+- **moon native 在 Windows 开箱即用,不需要 vcvars**:普通 shell(Git Bash / CMD)直接 `moon test`,moon 自行定位 MSVC 工具链并编译链接(报错码是 cl/link 的 C2059/C1083、lib.exe 中文输出可佐证),与老栈时代「须在 Native Tools Command Prompt 执行」的记录不同——那条管的是老栈 prepare.py/cmake 链,新栈构建不适用。
+- **workspace 任一成员的 prebuild 硬失败会挡死全部 moon 命令**:`modules/ffmpeg-mbt/prebuild.py` 缺 pkg-config 即非零退出,`moon.work` 五成员里任何包跑 check/test 都先过它;而主 `scripts/prebuild.py` 非 Linux 本就优雅降级(空 link_configs)。修复:ffmpeg prebuild 补「非 Linux 输出空 link_configs 且 exit 0」分支(Linux 行为不变),与主脚本同口径;ffmpeg 消费方(yue-media)本就是过渡期红点,不在新栈验证路径上。
+- **非 Linux 占位桩的 GLib 类型在 MSVC 下语法错误**:`yue/win/gtk_stub_portable.c` 用 `gint32` 作占位函数返回类型——该文件整体包在 `#if !defined(__linux__)` 里,Linux 上从不编译故从未暴露;MSVC 下 6 处 C2059(无 glib.h,`gint32` 未定义)。改 `int32_t`(ABI 同为 32 位整型,extern 原型不变)。教训:占位桩也要按「能在 Windows 真编译」的标准写,MSVC 是占位桩的第一位真实读者。
+- **`chensuiyi/subproc` 的 C 桩用 POSIX `poll.h`,Windows 编译必炸**:`yue/sys` 的 `procrun.mbt` 基于 @subproc(自己注释就写着「仅 Linux」),sys 与依赖它的 chart 包全被连坐编译失败。Windows 子进程层(spawn→限时回收→输出捕获)归 W14 用 CreateProcess 重做,替换 MoonBit 侧的 @subproc 依赖;在此之前 sys/chart 在 Windows 不可验证。
+- **分包测试的连带编译问题 Windows 与 Linux 同款**:workspace 内 cd 进成员目录裸跑 `moon test` 会把主包红点一并编进来,须 `-p` 限定包/模块名(HANDOFF.md 已记,此处确认 Windows 一致)。
+- **验证**(2026-10-11,本机):`moon check` 287 errors / 68 warnings 与 Linux 基线**逐字持平**;纯 MoonBit 包全绿——yoga-mbt 96/96、core 62/62、input 10/10、mdview 26/26、theme 7/8(挂的「控件高度基准」一条依赖 Pango 字体实测,占位文本后端必挂,归文本后端批)、icons 2/4(挂的两条是「真画出像素」绘制断言,归渲染后端批);ui 因 `TextMetrics::unwrap` 空值 panic(同归文本批)、sys/chart 因 subproc 编译失败(归 W14)。
+
 ## macOS(CI 构建链已验,GUI 待真机)
 
 - libyue v0.15.6 发行包含 ARC / no-ARC 双库:Darwin 链接参数 = 主库 + `-lyue_mbt_noarc`(no-ARC 符号被主库引用,须排其后)+ AppKit / Carbon / IOKit / Security / WebKit / OpenDirectory 框架 + `-lobjc -lc++ -lpthread -lbsm -Wl,-dead_strip`;prebuild Darwin 分支已按此预修。

@@ -42,12 +42,12 @@ int wm_pending_events(int64_t id) {
   return 0;
 }
 
-gint32 wm_ev_keysym(int64_t id) { (void)id; return 0; }
-gint32 wm_ev_mods(int64_t id) { (void)id; return 0; }
-gint32 wm_ev_x(int64_t id) { (void)id; return 0; }
-gint32 wm_ev_y(int64_t id) { (void)id; return 0; }
-gint32 wm_ev_button(int64_t id) { (void)id; return 0; }
-gint32 wm_ev_axis(int64_t id) { (void)id; return 0; }
+int32_t wm_ev_keysym(int64_t id) { (void)id; return 0; }
+int32_t wm_ev_mods(int64_t id) { (void)id; return 0; }
+int32_t wm_ev_x(int64_t id) { (void)id; return 0; }
+int32_t wm_ev_y(int64_t id) { (void)id; return 0; }
+int32_t wm_ev_button(int64_t id) { (void)id; return 0; }
+int32_t wm_ev_axis(int64_t id) { (void)id; return 0; }
 
 void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
   (void)id;
