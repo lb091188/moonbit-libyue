@@ -100,7 +100,7 @@
   - [x] `appfind` 落 `yue/sys/appfind.mbt`（.desktop 扫描按 id 去重、按 name 码点序；which 语义的固定目录查找；注入枚举版留给无 fsx 层的调用方与测试）
   - [x] `wallpaper`（按 DE 分派 xfconf-query / gsettings / qdbus，属性选择与 `mon_list` 的已连接输出联动）/`defaultapps`（xdg-mime + mimeapps.list 三层配置，写路径段内替换/追加/补段）——顺带补 `pr_env_blob` 的 DISPLAY/XAUTHORITY/WAYLAND_DISPLAY/DBUS_SESSION_BUS_ADDRESS 透传（桌面侧命令此前在子进程里必失败，monitor 批只能 skip 的根因）
   - [x] `recent_files` 落 `yue/sys/recent_files.mbt`（只读解析 `$XDG_DATA_HOME/recently-used.xbel`：手写 XBEL 扫描器 + XML 实体/百分号解码/ISO 8601 毫秒三只纯函数；Windows 的 Recent Documents 分支随平台批）
-- [ ] A 类平移 · 历史族：`browser_history`（含下载）/`browser_bookmarks`/`firefox_history`/`vscode_history`
+- [x] A 类平移 · 历史族：`browser_history`（含下载）/`browser_bookmarks`/`firefox_history`/`vscode_history` 落 `yue/sys`（SQLite 直读磁盘文件走 `prowk/moonsqlitefile`、只读不写不复制原库；新增 `sys_read_bytes_file` 原始字节入口；profile 按固定候选名探测）
 - [ ] A 类平移 · 会话与状态：`power`/`session`/`powerctl`/`online`/`idle`/`keepawake`/`clipboard_watch`/`locale_sys`/`sysinfo`/`windowctl`（monitor 已随硬件族提前）
 - [ ] DBus 系在新事件循环下**重写/重验**：SNI 托盘（`traybus/sni.mbt`）、通知（新栈须重写 `org.freedesktop.Notifications`，含 `Notification::set_progress` 进度文本）、logind（`SetBrightness`/inhibit）、UPower、NetworkManager（`netmon`/`online`）、屏保 `screensaver`、媒体键 MPRIS（`media` 含状态监视轮询）
 - [ ] DBus 通用基建：`bus`/`gdbus`/`wire`（41 内部 fn 编解码）/信号注册表/断线重连/注销与注册对称清理（CORE2 教训）

@@ -174,6 +174,19 @@ pub fn sys_read_text_file(path : String) -> String? {
 }
 
 ///|
+/// 读文件原始字节（同 [sys_read_text_file] 的读盘路径，不做解码）：
+/// SQLite 库这类二进制文件要走这条入口——文本版遇 NUL 之后的内容虽保留，
+/// 但按码点重排过，字节序不可依赖。
+pub fn sys_read_bytes_file(path : String) -> Bytes? {
+  if path == "" {
+    return None
+  }
+  let ok = Ref(0)
+  let data = ffi_sys_read_text_file(@utf8.encode(path), ok)
+  if ok.val == 1 { Some(data) } else { None }
+}
+
+///|
 /// 删文件（幂等：本就不存在也算成功）。
 pub fn sys_remove_file(path : String) -> Bool {
   if path == "" {
