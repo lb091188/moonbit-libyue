@@ -200,17 +200,6 @@ fn appfind_str_cmp(a : String, b : String) -> Int {
 }
 
 ///|
-/// a 是否应排在 b 前（先比 name，同名比 id）。
-fn appfind_entry_less(a : AppEntry, b : AppEntry) -> Bool {
-  let by_name = appfind_str_cmp(a.name, b.name)
-  if by_name != 0 {
-    by_name < 0
-  } else {
-    appfind_str_cmp(a.id, b.id) < 0
-  }
-}
-
-///|
 /// 按 desktop id 去重合并：layers 按低→高优先级顺序传入，同 id 后者覆盖
 /// 前者（用户目录覆盖系统目录）；结果按 name 码点字典序排序（同名按 id）。
 pub fn appfind_merge_entries(
@@ -235,23 +224,17 @@ pub fn appfind_merge_entries(
       }
     }
   }
-  // 插入排序：稳定且比较器只依赖 appfind_str_cmp（本工具链的排序接口
-  // 需要 Ordering 类型，见 docs/zh/adaptation.md）
-  let out : Array[AppEntry] = []
-  for e in acc {
-    let mut i = out.length()
-    while i > 0 && appfind_entry_less(e, out[i - 1]) {
-      i = i - 1
+  acc
+  .mut_view()
+  .sort_by(fn(a, b) {
+    let by_name = appfind_str_cmp(a.name, b.name)
+    if by_name != 0 {
+      by_name
+    } else {
+      appfind_str_cmp(a.id, b.id)
     }
-    out.push(e)
-    let mut j = out.length() - 1
-    while j > i {
-      out[j] = out[j - 1]
-      j = j - 1
-    }
-    out[i] = e
-  }
-  out
+  })
+  acc
 }
 
 ///|

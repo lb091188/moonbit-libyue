@@ -94,12 +94,12 @@
 - [~] A 类平移 · 硬件族（六进 yue/sys；sensor/bluetooth 走 @traybus、disk 走 UDisks+@traybus，随 DBus 线）：
   - [x] `brightness`（读路径 sysfs 全套 + 写路径 logind 探针/SetBrightness 改注入槽 `brightness_set_logind_probe`/`brightness_set_action`，DBus 线接入后注入实做）/ `volume`（wpctl/pactl + volx 增强）/ `nightlight`（redshift + gamma 载体）/ `printer`（lpadmin/lp CUPS）/ `powerprofile`（powerprofilesctl）/ `monitor`（xrandr，从会话族提前——夜灯的显示器枚举依赖它）
   - [ ] `sensor`（iio-sensor-proxy）/ `bluetooth`（org.bluez）/ `disk`（UDisks2）随 DBus 线
-- [~] A 类平移 · 桌面集成族：`wallpaper`/`defaultapps`/`appfind`/`open_url`+`reveal`（文件管理器定位）/`recent_files`
+- [x] A 类平移 · 桌面集成族：`wallpaper`/`defaultapps`/`appfind`/`open_url`+`reveal`（文件管理器定位）/`recent_files`
   - [x] 桌面环境识别落 `yue/sys/desktop.mbt`（XDG_CURRENT_DESKTOP 冒号多值取首个可识别值）——不引旧链 `@traybus`（红点积压 + sys 反向供它用会成环），DBus 线接入后复用这一份
   - [x] `open_url`/`reveal` 落 `yue/sys/launcher.mbt`（xdg-open 走新的分离式启动桩 `yue_sys_spawn_detached`：fork→setsid→fork→execvp + CLOEXEC 管道回传 exec 成败，不阻塞、不留僵尸；`reveal` 的 FileManager1「打开并选中」随 DBus 线补，当前恒落「打开父目录」；Win/mac 分支随平台批）
   - [x] `appfind` 落 `yue/sys/appfind.mbt`（.desktop 扫描按 id 去重、按 name 码点序；which 语义的固定目录查找；注入枚举版留给无 fsx 层的调用方与测试）
   - [x] `wallpaper`（按 DE 分派 xfconf-query / gsettings / qdbus，属性选择与 `mon_list` 的已连接输出联动）/`defaultapps`（xdg-mime + mimeapps.list 三层配置，写路径段内替换/追加/补段）——顺带补 `pr_env_blob` 的 DISPLAY/XAUTHORITY/WAYLAND_DISPLAY/DBUS_SESSION_BUS_ADDRESS 透传（桌面侧命令此前在子进程里必失败，monitor 批只能 skip 的根因）
-  - [ ] `recent_files`（GTK recent-info / mimetype 缓存解析）
+  - [x] `recent_files` 落 `yue/sys/recent_files.mbt`（只读解析 `$XDG_DATA_HOME/recently-used.xbel`：手写 XBEL 扫描器 + XML 实体/百分号解码/ISO 8601 毫秒三只纯函数；Windows 的 Recent Documents 分支随平台批）
 - [ ] A 类平移 · 历史族：`browser_history`（含下载）/`browser_bookmarks`/`firefox_history`/`vscode_history`
 - [ ] A 类平移 · 会话与状态：`power`/`session`/`powerctl`/`online`/`idle`/`keepawake`/`clipboard_watch`/`locale_sys`/`sysinfo`/`windowctl`（monitor 已随硬件族提前）
 - [ ] DBus 系在新事件循环下**重写/重验**：SNI 托盘（`traybus/sni.mbt`）、通知（新栈须重写 `org.freedesktop.Notifications`，含 `Notification::set_progress` 进度文本）、logind（`SetBrightness`/inhibit）、UPower、NetworkManager（`netmon`/`online`）、屏保 `screensaver`、媒体键 MPRIS（`media` 含状态监视轮询）
