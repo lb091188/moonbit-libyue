@@ -185,6 +185,233 @@ fn draw_cell(
 }
 
 ///|
+/// 表头行：每列一个格（底色 + 底边线 + 标题按列对齐 + 排序指示）。
+/// `sort` 为 None 时不画箭头、点击无效；`table_t` 与 `table_v_t` 共用。
+fn table_header(
+  columns : Array[TableColumn],
+  cols_w : Array[Double],
+  sort : @core.Store[TableSort]?,
+  head_h : Double,
+) -> @core.Widget {
+  let head_font = @text.Font::new("", 13.0, weight=@text.SemiBold)
+      let head = @core.Widget::new()
+      head.node.set_flex_direction(@yoga.Row)
+      head.node.set_height(@yoga.fixed(head_h))
+      head.node.set_width(@yoga.percent(100.0))
+      for j = 0; j < columns.length(); j = j + 1 {
+        let col = columns[j]
+        let idx = j
+        let cell = @core.Widget::new()
+        cell.node.set_width(@yoga.fixed(cols_w[j]))
+        cell.node.set_height(@yoga.fixed(head_h))
+        cell.on_draw = Some(fn(
+          self : @core.Widget,
+          p : @render.Painter,
+          r : @core.Rect,
+        ) -> Unit {
+          p.set_fill_color(@theme.theme_fill_zebra())
+          p.fill_rect(0.0, 0.0, r.w, r.h)
+          p.set_fill_color(@theme.theme_border())
+          p.fill_rect(0.0, r.h - 1.0, r.w, 1.0)
+          let pad_r = if col.sortable { 22.0 } else { 12.0 }
+          let _ = @text.draw_box_at(
+            p,
+            10.0,
+            0.0,
+            (r.w - pad_r - 10.0).max(1.0),
+            r.h,
+            col.title,
+            head_font,
+            @theme.theme_text_primary(),
+            align=col.align,
+            valign=@text.Center,
+          )
+
+          if col.sortable {
+            match sort {
+              Some(s) => {
+                let st = s.get()
+                let cx = r.w - 14.0
+                let cy = r.h / 2.0
+                if st.column == idx {
+                  // 实心三角：升序朝上、降序朝下
+                  p.set_fill_color(@theme.theme_primary())
+                  p.begin_path()
+                  if st.asc {
+                    p.move_to(cx - 5.0, cy + 2.0)
+                    p.line_to(cx + 5.0, cy + 2.0)
+                    p.line_to(cx, cy - 4.0)
+                  } else {
+                    p.move_to(cx - 5.0, cy - 2.0)
+                    p.line_to(cx + 5.0, cy - 2.0)
+                    p.line_to(cx, cy + 4.0)
+                  }
+                  p.close_path()
+                  p.fill()
+                } else if self.hovered {
+                  // 灰色 ↕ 提示
+                  p.set_fill_color(@theme.theme_text_secondary())
+                  p.begin_path()
+                  p.move_to(cx - 4.0, cy - 1.0)
+                  p.line_to(cx + 4.0, cy - 1.0)
+                  p.line_to(cx, cy - 5.0)
+                  p.close_path()
+                  p.fill()
+                  p.begin_path()
+                  p.move_to(cx - 4.0, cy + 1.0)
+                  p.line_to(cx + 4.0, cy + 1.0)
+                  p.line_to(cx, cy + 5.0)
+                  p.close_path()
+                  p.fill()
+                }
+              }
+              None => ()
+            }
+          }
+        })
+        if col.sortable {
+          cell.on_pointer = Some(fn(
+            _s : @core.Widget,
+            ev : @core.PointerEvent,
+          ) -> Bool {
+            match ev.kind {
+              @core.Down => true
+              @core.Up => {
+                match sort {
+                  Some(s) => {
+                    let st = s.get()
+                    if st.column == idx {
+                      if st.asc {
+                        s.set({ column: idx, asc: false })
+                      } else {
+                        // 同列第三次：取消排序（使用方按 column < 0 恢复原始顺序）
+                        s.set({ column: -1, asc: true })
+                      }
+                    } else {
+                      s.set({ column: idx, asc: true })
+                    }
+                    @core.invalidate()
+                  }
+                  None => ()
+                }
+                false
+              }
+              _ => false
+            }
+          })
+        }
+        head.append_child(cell)
+      }
+
+  head
+}
+///|
+/// 数据行控件（共用构造，注释见函数体上方）
+///|
+/// 数据行控件：斑马纹 / 悬停 / 选中（选中行主题浅底 + 左缘强调条），
+/// 单元格按列宽排布，抬起且仍在本行内才切换选中并回调源下标。
+fn table_row_widget(
+  columns : Array[TableColumn],
+  cols_w : Array[Double],
+  row : TableRow,
+  src : Int,
+  row_height : Double,
+  selection : @core.Store[Array[Int]]?,
+  on_row_click : (Int, TableRow) -> Unit,
+) -> @core.Widget {
+  let font = @text.Font::new("", 13.0)
+  let small_font = @text.Font::new("", 12.0)
+          let row_w = @core.Widget::new()
+          row_w.node.set_flex_direction(@yoga.Row)
+          row_w.node.set_width(@yoga.percent(100.0))
+          row_w.node.set_height(@yoga.fixed(row_height))
+          row_w.on_draw = Some(fn(
+            self : @core.Widget,
+            p : @render.Painter,
+            r : @core.Rect,
+          ) -> Unit {
+            let mut bg = if src % 2 == 0 {
+              ""
+            } else {
+              @theme.theme_fill_zebra()
+            }
+            let mut selected = false
+            match selection {
+              Some(s) =>
+                for k in s.get() {
+                  if k == src {
+                    selected = true
+                  }
+                }
+              None => ()
+            }
+            if selected {
+              bg = @theme.theme_primary_light()
+            } else if self.hovered {
+              bg = @theme.theme_fill_hover()
+            }
+            if bg.length() > 0 {
+              p.set_fill_color(bg)
+              p.fill_rect(0.0, 0.0, r.w, r.h)
+            }
+            if selected {
+              p.set_fill_color(@theme.theme_primary())
+              p.fill_rect(0.0, 0.0, 3.0, r.h)
+            }
+            p.set_fill_color(@theme.theme_border())
+            p.fill_rect(0.0, r.h - 1.0, r.w, 1.0)
+          })
+          for j = 0; j < columns.length(); j = j + 1 {
+            let col = columns[j]
+            let cell = @core.Widget::new()
+            cell.node.set_width(@yoga.fixed(cols_w[j]))
+            cell.node.set_height(@yoga.fixed(row_height))
+            let content = cell_of(row, j)
+            cell.on_draw = Some(fn(
+              _s : @core.Widget,
+              p : @render.Painter,
+              r : @core.Rect,
+            ) -> Unit {
+              draw_cell(p, content, r, col.align, font, small_font)
+            })
+            row_w.append_child(cell)
+          }
+          row_w.on_pointer = Some(fn(
+            _s : @core.Widget,
+            ev : @core.PointerEvent,
+          ) -> Bool {
+            match ev.kind {
+              @core.Down => true
+              @core.Up => {
+                match selection {
+                  Some(s) => {
+                    let cur = s.get()
+                    let next : Array[Int] = []
+                    let mut found = false
+                    for k in cur {
+                      if k == src {
+                        found = true
+                      } else {
+                        next.push(k)
+                      }
+                    }
+                    if !found {
+                      next.push(src)
+                    }
+                    s.set(next)
+                  }
+                  None => ()
+                }
+                on_row_click(src, row)
+                @core.invalidate()
+                false
+              }
+              _ => false
+            }
+          })
+  row_w
+}
+///|
 /// 表格（EP Table）：表头（标题 + 排序指示，点击可排序列切「新列升序 / 同列升降
 /// 序反转 / 同列第三次取消」）+ 斑马纹数据行；`selection` 给定时行可点选（按下
 /// 抬起同一行才生效），选中行主题浅底 + 左缘强调条。
@@ -199,9 +426,6 @@ pub fn table_t(
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let head_h = 40.0
-  let font = @text.Font::new("", 13.0)
-  let head_font = @text.Font::new("", 13.0, weight=@text.SemiBold)
-  let small_font = @text.Font::new("", 12.0)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     match selection {
@@ -227,117 +451,8 @@ pub fn table_t(
       p.set_line_width(1.0)
       p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
     })
-    // ---- 表头 ----
-    let head = @core.Widget::new()
-    head.node.set_flex_direction(@yoga.Row)
-    head.node.set_height(@yoga.fixed(head_h))
-    head.node.set_width(@yoga.percent(100.0))
-    for j = 0; j < columns.length(); j = j + 1 {
-      let col = columns[j]
-      let idx = j
-      let cell = @core.Widget::new()
-      cell.node.set_width(@yoga.fixed(cols_w[j]))
-      cell.node.set_height(@yoga.fixed(head_h))
-      cell.on_draw = Some(fn(
-        self : @core.Widget,
-        p : @render.Painter,
-        r : @core.Rect,
-      ) -> Unit {
-        p.set_fill_color(@theme.theme_fill_zebra())
-        p.fill_rect(0.0, 0.0, r.w, r.h)
-        p.set_fill_color(@theme.theme_border())
-        p.fill_rect(0.0, r.h - 1.0, r.w, 1.0)
-        let pad_r = if col.sortable { 22.0 } else { 12.0 }
-        let _ = @text.draw_box_at(
-          p,
-          10.0,
-          0.0,
-          (r.w - pad_r - 10.0).max(1.0),
-          r.h,
-          col.title,
-          head_font,
-          @theme.theme_text_primary(),
-          align=col.align,
-          valign=@text.Center,
-        )
-
-        if col.sortable {
-          match sort {
-            Some(s) => {
-              let st = s.get()
-              let cx = r.w - 14.0
-              let cy = r.h / 2.0
-              if st.column == idx {
-                // 实心三角：升序朝上、降序朝下
-                p.set_fill_color(@theme.theme_primary())
-                p.begin_path()
-                if st.asc {
-                  p.move_to(cx - 5.0, cy + 2.0)
-                  p.line_to(cx + 5.0, cy + 2.0)
-                  p.line_to(cx, cy - 4.0)
-                } else {
-                  p.move_to(cx - 5.0, cy - 2.0)
-                  p.line_to(cx + 5.0, cy - 2.0)
-                  p.line_to(cx, cy + 4.0)
-                }
-                p.close_path()
-                p.fill()
-              } else if self.hovered {
-                // 灰色 ↕ 提示
-                p.set_fill_color(@theme.theme_text_secondary())
-                p.begin_path()
-                p.move_to(cx - 4.0, cy - 1.0)
-                p.line_to(cx + 4.0, cy - 1.0)
-                p.line_to(cx, cy - 5.0)
-                p.close_path()
-                p.fill()
-                p.begin_path()
-                p.move_to(cx - 4.0, cy + 1.0)
-                p.line_to(cx + 4.0, cy + 1.0)
-                p.line_to(cx, cy + 5.0)
-                p.close_path()
-                p.fill()
-              }
-            }
-            None => ()
-          }
-        }
-      })
-      if col.sortable {
-        cell.on_pointer = Some(fn(
-          _s : @core.Widget,
-          ev : @core.PointerEvent,
-        ) -> Bool {
-          match ev.kind {
-            @core.Down => true
-            @core.Up => {
-              match sort {
-                Some(s) => {
-                  let st = s.get()
-                  if st.column == idx {
-                    if st.asc {
-                      s.set({ column: idx, asc: false })
-                    } else {
-                      // 同列第三次：取消排序（使用方按 column < 0 恢复原始顺序）
-                      s.set({ column: -1, asc: true })
-                    }
-                  } else {
-                    s.set({ column: idx, asc: true })
-                  }
-                  @core.invalidate()
-                }
-                None => ()
-              }
-              false
-            }
-            _ => false
-          }
-        })
-      }
-      head.append_child(cell)
-    }
-
-    w.append_child(head)
+    // ---- 表头（共用构造） ----
+    w.append_child(table_header(columns, cols_w, sort, head_h))
     // ---- 数据行（重建式） ----
     let body = @core.Widget::new()
     body.node.set_flex_direction(@yoga.Column)
@@ -349,95 +464,7 @@ pub fn table_t(
       for i = 0; i < data.length(); i = i + 1 {
         let src = i
         let row = data[i]
-        let row_w = @core.Widget::new()
-        row_w.node.set_flex_direction(@yoga.Row)
-        row_w.node.set_width(@yoga.percent(100.0))
-        row_w.node.set_height(@yoga.fixed(row_height))
-        row_w.on_draw = Some(fn(
-          self : @core.Widget,
-          p : @render.Painter,
-          r : @core.Rect,
-        ) -> Unit {
-          let mut bg = if src % 2 == 0 {
-            ""
-          } else {
-            @theme.theme_fill_zebra()
-          }
-          let mut selected = false
-          match selection {
-            Some(s) =>
-              for k in s.get() {
-                if k == src {
-                  selected = true
-                }
-              }
-            None => ()
-          }
-          if selected {
-            bg = @theme.theme_primary_light()
-          } else if self.hovered {
-            bg = @theme.theme_fill_hover()
-          }
-          if bg.length() > 0 {
-            p.set_fill_color(bg)
-            p.fill_rect(0.0, 0.0, r.w, r.h)
-          }
-          if selected {
-            p.set_fill_color(@theme.theme_primary())
-            p.fill_rect(0.0, 0.0, 3.0, r.h)
-          }
-          p.set_fill_color(@theme.theme_border())
-          p.fill_rect(0.0, r.h - 1.0, r.w, 1.0)
-        })
-        for j = 0; j < columns.length(); j = j + 1 {
-          let col = columns[j]
-          let cell = @core.Widget::new()
-          cell.node.set_width(@yoga.fixed(cols_w[j]))
-          cell.node.set_height(@yoga.fixed(row_height))
-          let content = cell_of(row, j)
-          cell.on_draw = Some(fn(
-            _s : @core.Widget,
-            p : @render.Painter,
-            r : @core.Rect,
-          ) -> Unit {
-            draw_cell(p, content, r, col.align, font, small_font)
-          })
-          row_w.append_child(cell)
-        }
-        row_w.on_pointer = Some(fn(
-          _s : @core.Widget,
-          ev : @core.PointerEvent,
-        ) -> Bool {
-          match ev.kind {
-            @core.Down => true
-            @core.Up => {
-              match selection {
-                Some(s) => {
-                  let cur = s.get()
-                  let next : Array[Int] = []
-                  let mut found = false
-                  for k in cur {
-                    if k == src {
-                      found = true
-                    } else {
-                      next.push(k)
-                    }
-                  }
-                  if !found {
-                    next.push(src)
-                  }
-                  s.set(next)
-                }
-                None => ()
-              }
-              on_row_click(src, row)
-              @core.invalidate()
-              false
-            }
-            _ => false
-          }
-        })
-        body.append_child(row_w)
+        body.append_child(table_row_widget(columns, cols_w, row, src, row_height, selection, on_row_click))
       }
       @core.invalidate()
     }

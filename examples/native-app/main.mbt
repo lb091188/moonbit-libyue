@@ -370,6 +370,58 @@ fn make_band(ctr : Ctr) -> @core.Widget {
 }
 
 ///|
+/// 虚拟表格演示数据：200 行（几何验证页只挂可见的十来行）。
+fn make_virt_rows() -> Array[@ui.TableRow] {
+  let out : Array[@ui.TableRow] = []
+  for i = 0; i < 200; i = i + 1 {
+    out.push(
+      @ui.TableRow::make([
+        "虚拟行 " + i.to_string(),
+        (i * 7 % 100).to_string(),
+        if i % 2 == 0 { "就绪" } else { "排队" },
+      ]),
+    )
+  }
+  out
+}
+
+///|
+/// 虚拟表格区块：200 行只挂可见区间，滚轮/滚动条驱动同一份偏移。
+fn make_virt_section(
+  rows : @core.Store[Array[@ui.TableRow]],
+  sel : @core.Store[Array[Int]],
+  sort : @core.Store[@ui.TableSort],
+  clicks : Ref[Int],
+  slot : Ref[@core.Widget?],
+) -> @core.Node {
+  @ui.container(
+    [
+      @ui.label("虚拟表格：200 行只挂可见区间（滚轮 / 拖滚动条，退出状态行报挂载数）", size=13.0),
+      @ui.table_v_t(
+        [
+          @ui.TableColumn::make("名称", 160.0),
+          @ui.TableColumn::make("数值", 100.0, align=@text.End),
+          @ui.TableColumn::make("状态", 0.0, sortable=false),
+        ],
+        rows,
+        width=400.0,
+        height=210.0,
+        row_height=30.0,
+        selection=sel,
+        sort=sort,
+        on_row_click=fn(_i : Int, _r : @ui.TableRow) -> Unit { clicks.val = clicks.val + 1 },
+        handle=fn(w : @core.Widget) -> Unit { slot.val = Some(w) },
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 表格演示数据（6 行 4 列）。
 fn make_table_rows() -> Array[@ui.TableRow] {
   let out : Array[@ui.TableRow] = []
@@ -629,7 +681,13 @@ fn main {
   let tb_sel : @core.Store[Array[Int]] = @core.Store::new([])
   let tb_sort : @core.Store[@ui.TableSort] = @core.Store::new({ column: -1, asc: true })
   let tb_w : Ref[@core.Widget?] = Ref(None)
+  let vt_rows = @core.Store::new(make_virt_rows())
+  let vt_sel : @core.Store[Array[Int]] = @core.Store::new([])
+  let vt_sort : @core.Store[@ui.TableSort] = @core.Store::new({ column: -1, asc: true })
+  let vt_clicks = Ref(0)
+  let vt_w : Ref[@core.Widget?] = Ref(None)
   app.mount([make_table_section(tb_rows, tb_sel, tb_sort, tb_w)])
+  app.mount([make_virt_section(vt_rows, vt_sel, vt_sort, vt_clicks, vt_w)])
   app.mount([
     @ui.container(
       [
@@ -1030,7 +1088,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} drg='\{drg_str}' trg='\{trg_str}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} drg='\{drg_str}' trg='\{trg_str}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -1138,6 +1196,18 @@ fn main {
     Some(w) => rect_str(w.rect)
     None => "-"
   }
+  let vt_line = match vt_w.val {
+    Some(w) => {
+      let list = w.children()[1]
+      "NATIVE-APP-VT list=" +
+      rect_str(list.rect) +
+      " mounted=" +
+      list.children()[0].children().length().to_string() +
+      " total=200"
+    }
+    None => "NATIVE-APP-VT -"
+  }
+  println(vt_line)
   let tb_head0 = match tb_w.val {
     Some(w) => rect_str(w.children()[0].children()[0].rect)
     None => "-"

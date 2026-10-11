@@ -81,6 +81,75 @@ pub fn ScrollState::at_bottom(self : ScrollState) -> Bool {
 const SCROLL_BAR_W : Double = 8.0
 
 ///|
+/// 滚动条控件（贴在视口右缘、与视口同高）：轨道 + 拇指（长度按视口/内容比例、
+/// 下限 16px 便于抓），点轨道跳转、按住拖动（拇指中心跟随指针）、松手即止。
+/// `scroll_v` 与 `virt_list` 共用。
+fn scroll_bar(state : ScrollState) -> @core.Widget {
+  let bar = @core.Widget::new()
+  bar.node.set_position(@yoga.Absolute)
+  bar.node.set_top(@yoga.fixed(0.0))
+  bar.node.set_bottom(@yoga.fixed(0.0))
+  bar.node.set_right(@yoga.fixed(0.0))
+  bar.node.set_width(@yoga.fixed(SCROLL_BAR_W))
+  let dragging = Ref(false)
+  bar.on_draw = Some(fn(
+    _self : @core.Widget,
+    p : @render.Painter,
+    r : @core.Rect,
+  ) -> Unit {
+    let vh = state.view_h
+    let ch = state.content_h
+    // 只在真能滚的时候画（拇指长度按视口/内容比例）
+    if ch > vh && vh > 0.0 {
+      p.set_fill_color(@theme.theme_fill_zebra())
+      p.fill_rect(0.0, 0.0, r.w, r.h)
+      let thumb = (r.h * vh / ch).max(16.0)
+      let travel = (r.h - thumb).max(0.0)
+      let ratio = state.offset / (ch - vh)
+      p.set_fill_color(@theme.theme_border())
+      p.fill_rect(1.0, ratio * travel, r.w - 2.0, thumb)
+    }
+  })
+  bar.on_pointer = Some(fn(
+    self : @core.Widget,
+    ev : @core.PointerEvent,
+  ) -> Bool {
+    let vh = self.rect.h
+    let m = state.max()
+    let thumb = (vh * vh / state.content_h).max(16.0)
+    let travel = (vh - thumb).max(0.0)
+    // 把指针 y 换算成偏移：拇指中心跟随指针（写成闭包值，块中段不放裸 fn 声明）
+    let y_to_offset : (Double) -> Double = fn(y : Double) -> Double {
+      if travel <= 0.0 {
+        0.0
+      } else {
+        ((y - thumb / 2.0) / travel).clamp(min=0.0, max=1.0) * m
+      }
+    }
+
+    match ev.kind {
+      @core.Down => {
+        dragging.val = true
+        state.set_offset(y_to_offset(ev.y))
+        true
+      }
+      @core.Move => {
+        if dragging.val {
+          state.set_offset(y_to_offset(ev.y))
+        }
+        true
+      }
+      @core.Up => {
+        dragging.val = false
+        true
+      }
+      @core.Leave => false
+    }
+  })
+  bar
+}
+
+///|
 /// 垂直滚动容器：`height` 是视口高（0 = 由父容器给），内容按自然高度排布并可
 /// 超出视口；超出部分被裁剪，滚动条画在右缘。
 pub fn scroll_v(
@@ -113,68 +182,7 @@ pub fn scroll_v(
       @core.invalidate()
     }
 
-    let bar = @core.Widget::new()
-    bar.node.set_position(@yoga.Absolute)
-    bar.node.set_top(@yoga.fixed(0.0))
-    bar.node.set_bottom(@yoga.fixed(0.0))
-    bar.node.set_right(@yoga.fixed(0.0))
-    bar.node.set_width(@yoga.fixed(SCROLL_BAR_W))
-    let dragging = Ref(false)
-    bar.on_draw = Some(fn(
-      _self : @core.Widget,
-      p : @render.Painter,
-      r : @core.Rect,
-    ) -> Unit {
-      let vh = state.view_h
-      let ch = state.content_h
-      // 只在真能滚的时候画（拇指长度按视口/内容比例）
-      if ch > vh && vh > 0.0 {
-        p.set_fill_color(@theme.theme_fill_zebra())
-        p.fill_rect(0.0, 0.0, r.w, r.h)
-        let thumb = (r.h * vh / ch).max(16.0)
-        let travel = (r.h - thumb).max(0.0)
-        let ratio = state.offset / (ch - vh)
-        p.set_fill_color(@theme.theme_border())
-        p.fill_rect(1.0, ratio * travel, r.w - 2.0, thumb)
-      }
-    })
-    bar.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
-    ) -> Bool {
-      let vh = self.rect.h
-      let m = state.max()
-      let thumb = (vh * vh / state.content_h).max(16.0)
-      let travel = (vh - thumb).max(0.0)
-      // 把指针 y 换算成偏移：拇指中心跟随指针（写成闭包值，块中段不放裸 fn 声明）
-      let y_to_offset : (Double) -> Double = fn(y : Double) -> Double {
-        if travel <= 0.0 {
-          0.0
-        } else {
-          ((y - thumb / 2.0) / travel).clamp(min=0.0, max=1.0) * m
-        }
-      }
-
-      match ev.kind {
-        @core.Down => {
-          dragging.val = true
-          state.set_offset(y_to_offset(ev.y))
-          true
-        }
-        @core.Move => {
-          if dragging.val {
-            state.set_offset(y_to_offset(ev.y))
-          }
-          true
-        }
-        @core.Up => {
-          dragging.val = false
-          true
-        }
-        @core.Leave => false
-      }
-    })
-    viewport.append_child(bar)
+    viewport.append_child(scroll_bar(state))
     viewport.on_draw = Some(fn(
       _self : @core.Widget,
       p : @render.Painter,
