@@ -405,7 +405,7 @@ pub fn date_picker_t(
         if clear_hit(local_x, width, clearable, filled) {
           value.set(None)
           close_pop()
-        } else if open_id.val != 0 {
+        } else if overlay_alive(open_id.val) {
           close_pop()
         } else {
           open_id.val = @core.overlay_show_at(
@@ -494,7 +494,7 @@ pub fn date_range_picker_t(
         if clear_hit(local_x, width, clearable, filled) {
           value.set({ start: None, end: None })
           close_pop()
-        } else if open_id.val != 0 {
+        } else if overlay_alive(open_id.val) {
           close_pop()
         } else {
           open_id.val = @core.overlay_show_at(
@@ -560,7 +560,7 @@ fn time_field(
       },
       false,
       fn(_local_x : Double) -> Unit {
-        if open_id.val != 0 {
+        if overlay_alive(open_id.val) {
           close_pop()
         } else {
           let init = match get() {
@@ -670,7 +670,7 @@ pub fn datetime_range_picker_t(
           },
           false,
           fn(_local_x : Double) -> Unit {
-            if open_id.val != 0 {
+            if overlay_alive(open_id.val) {
               close_pop()
             } else {
               open_id.val = @core.overlay_show_at(

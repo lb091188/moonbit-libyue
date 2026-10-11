@@ -750,3 +750,284 @@ pub fn rate_t(
     w
   })
 }
+
+///|
+/// 下拉候选行（EP 样式）：当前选中浅蓝底 + 主色字 + 右侧 ✓，悬停灰底。
+/// 选中在**抬起**时触发（与浮层其它项同：按下被图层消费，抬起才派发）。
+fn select_row(opt : String, selected : () -> Bool, on_pick : () -> Unit) -> @core.Node {
+  let font = @text.Font::new("", 13.0)
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    w.node.set_width(@yoga.percent(100.0))
+    w.node.set_height(@yoga.fixed(28.0))
+    w.node.set_flex_shrink(0.0)
+    w.on_draw = Some(fn(
+      self : @core.Widget,
+      p : @render.Painter,
+      r : @core.Rect,
+    ) -> Unit {
+      let act = selected()
+      if act {
+        p.set_fill_color(@theme.theme_primary_light())
+        p.fill_rect(0.0, 0.0, r.w, r.h)
+      } else if self.hovered {
+        p.set_fill_color(@theme.theme_fill_hover())
+        p.fill_rect(0.0, 0.0, r.w, r.h)
+      }
+      let _ = @text.draw_box_at(
+        p,
+        8.0,
+        0.0,
+        (r.w - 26.0).max(1.0),
+        r.h,
+        opt,
+        font,
+        if act { @theme.theme_primary() } else { @theme.theme_text_regular() },
+        align=@text.Start,
+        valign=@text.Center,
+      )
+      if act {
+        // 矢量小勾（不依赖字体字形）
+        p.set_stroke_color(@theme.theme_primary())
+        p.set_line_width(1.3)
+        p.begin_path()
+        p.move_to(r.w - 18.0, r.h / 2.0)
+        p.line_to(r.w - 14.0, r.h / 2.0 + 4.0)
+        p.line_to(r.w - 8.0, r.h / 2.0 - 4.0)
+        p.stroke()
+      }
+    })
+    w.on_pointer = Some(fn(
+      _self : @core.Widget,
+      ev : @core.PointerEvent,
+    ) -> Bool {
+      match ev.kind {
+        @core.Down => true
+        @core.Up => {
+          on_pick()
+          false
+        }
+        _ => false
+      }
+    })
+    w
+  })
+}
+
+///|
+/// 下拉选择（EP Select，全自绘）：字段点开候选列表（开在浮层图层上），悬停高亮、
+/// 当前选中主色 + ✓，点选回填并收起；`clearable` 时字段悬停且有值显示 ✕，
+/// 点它清空（`value` 置空串并回调 `on_change("")`，与 master 同）。
+/// 列表超过 300 高时内部套一层垂直滚动（选项再多也不会顶出窗口）。
+///
+/// 与 master 的两条差（记档）：① 弹层是浮层图层上的自绘面板，不是原生 Popover，
+/// 「点外面收起」由图层负责，组件不再自己跟踪；② master 靠字段失焦收起，本栈
+/// 字段是否可聚焦由调用方给 `focus_id` 决定，收起只走「点外面 / 再点字段」两条路。
+pub fn select_t(
+  options : Array[String],
+  value : @core.Store[String],
+  on_change? : (String) -> Unit = fn(_s : String) -> Unit { () },
+  clearable? : Bool = false,
+  placeholder? : String = "",
+  width? : Double = 200.0,
+  focus_id? : Int = 0,
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  follow_store(value)
+  let opts = options
+  let ph = placeholder
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    let open_id : Ref[Int] = Ref(0)
+    w.focus_id = focus_id
+    let close_pop = fn() -> Unit {
+      if open_id.val != 0 {
+        @core.overlay_hide(open_id.val)
+        open_id.val = 0
+      }
+    }
+
+    setup_picker_field(
+      w,
+      width,
+      fn() -> String {
+        let v = value.get()
+        if v.length() > 0 { v } else { ph }
+      },
+      fn() -> Bool { value.get().length() > 0 },
+      clearable,
+      fn(local_x : Double) -> Unit {
+        if clear_hit(local_x, width, clearable, value.get().length() > 0) {
+          value.set("")
+          on_change("")
+          close_pop()
+        } else if overlay_alive(open_id.val) {
+          close_pop()
+        } else {
+          let rows : Array[@core.Node] = []
+          for i = 0; i < opts.length(); i = i + 1 {
+            let opt = opts[i]
+            rows.push(
+              select_row(opt, fn() -> Bool { value.get() == opt }, fn() -> Unit {
+                value.set(opt)
+                on_change(opt)
+                close_pop()
+              }),
+            )
+          }
+          let want = opts.length().to_double() * 28.0 + 8.0
+          let list_h = if want > 300.0 { 300.0 } else { want }
+          let st = ScrollState::new()
+          open_id.val = @core.overlay_show_at(
+            overlay_pane(
+              [scroll_v(rows, st, width=width, height=list_h)],
+              width,
+              list_h,
+            ),
+            w.rect.x,
+            w.rect.y + w.rect.h + 2.0,
+          )
+        }
+      },
+    )
+    handle(w)
+    w
+  })
+}
+
+///|
+/// 取色器（EP ColorPicker 下拉形态）：触发字段（当前色块 + hex + 箭头）点开
+/// 预设色板（每行 5 格，选中格主色描边 + 白勾），点色块写入 `value`（`#RRGGBB`）
+/// 并收起。字段与弹层同 `select_t`：开在浮层图层上，点外面由图层收起。
+pub fn color_picker_t(
+  value : @core.Store[String],
+  colors? : Array[String] = [
+    "#2D68C4", "#2E9E5B", "#D9822B", "#D64550", "#6B7480", "#1E4FA3", "#3F6E9E",
+    "#7A9E4E", "#B86E2B", "#9AA0A6", "#E8EAED", "#BDC1C6", "#4E5560", "#2A2F36",
+    "#F5F7FA",
+  ],
+  on_change? : (String) -> Unit = fn(_s : String) -> Unit { () },
+  width? : Double = 200.0,
+  focus_id? : Int = 0,
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  follow_store(value)
+  let cs = colors
+  let swatch = 26.0
+  let cell_gap = 6.0
+  let per_row = 5
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    let open_id : Ref[Int] = Ref(0)
+    w.focus_id = focus_id
+    let close_pop = fn() -> Unit {
+      if open_id.val != 0 {
+        @core.overlay_hide(open_id.val)
+        open_id.val = 0
+      }
+    }
+
+    setup_picker_field(
+      w,
+      width,
+      fn() -> String { value.get() },
+      fn() -> Bool { value.get().length() > 0 },
+      false,
+      fn(_local_x : Double) -> Unit {
+        if overlay_alive(open_id.val) {
+          close_pop()
+        } else {
+          let rows : Array[@core.Node] = []
+          let mut line : Array[@core.Node] = []
+          for i = 0; i < cs.length(); i = i + 1 {
+            let c = cs[i]
+            line.push(
+              color_swatch(c, swatch, cell_gap, fn() -> Bool { value.get() == c }, fn() -> Unit {
+                value.set(c)
+                on_change(c)
+                close_pop()
+              }),
+            )
+            if (i + 1) % per_row == 0 || i + 1 == cs.length() {
+              rows.push(
+                container(
+                  line,
+                  direction=@yoga.Row,
+                  height=swatch + cell_gap,
+                  align_items=@yoga.AlignItems::FlexStart,
+                ),
+              )
+              line = []
+            }
+          }
+          let rows_n = ((cs.length() + per_row - 1) / per_row).to_double()
+          open_id.val = @core.overlay_show_at(
+            overlay_pane(
+              [container(rows, direction=@yoga.Column, row_gap=0.0, padding=8.0)],
+              per_row.to_double() * (swatch + cell_gap) + 16.0,
+              16.0 + rows_n * (swatch + cell_gap),
+            ),
+            w.rect.x,
+            w.rect.y + w.rect.h + 2.0,
+          )
+        }
+      },
+    )
+    handle(w)
+    w
+  })
+}
+
+///|
+/// 色板一格：`size` 见方的色块 + 描边，选中时内圈主色 + 白勾。
+fn color_swatch(
+  c : String,
+  size : Double,
+  gap : Double,
+  selected : () -> Bool,
+  on_pick : () -> Unit,
+) -> @core.Node {
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    w.node.set_width(@yoga.fixed(size))
+    w.node.set_height(@yoga.fixed(size))
+    w.node.set_flex_shrink(0.0)
+    w.set_margin(0.0, 0.0, 0.0, gap)
+    w.on_draw = Some(fn(
+      _self : @core.Widget,
+      p : @render.Painter,
+      r : @core.Rect,
+    ) -> Unit {
+      p.set_fill_color(c)
+      p.fill_rect(0.0, 0.0, r.w, r.h)
+      p.set_stroke_color(@theme.theme_border())
+      p.set_line_width(1.0)
+      p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+      if selected() {
+        p.set_stroke_color(@theme.theme_primary())
+        p.stroke_rect(1.5, 1.5, r.w - 3.0, r.h - 3.0)
+        p.set_stroke_color("#ffffff")
+        p.set_line_width(1.4)
+        p.begin_path()
+        p.move_to(r.w / 2.0 - 5.0, r.h / 2.0)
+        p.line_to(r.w / 2.0 - 1.0, r.h / 2.0 + 4.0)
+        p.line_to(r.w / 2.0 + 6.0, r.h / 2.0 - 5.0)
+        p.stroke()
+      }
+    })
+    w.on_pointer = Some(fn(
+      _self : @core.Widget,
+      ev : @core.PointerEvent,
+    ) -> Bool {
+      match ev.kind {
+        @core.Down => true
+        @core.Up => {
+          on_pick()
+          false
+        }
+        _ => false
+      }
+    })
+    w
+  })
+}

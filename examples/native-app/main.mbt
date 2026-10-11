@@ -465,6 +465,11 @@ fn make_form_section(
   link_slot : Ref[@core.Widget?],
   rate_slot : Ref[@core.Widget?],
   item_slot : Ref[@core.Widget?],
+  sel : @core.Store[String],
+  col : @core.Store[String],
+  pick : Ref[String],
+  sel_slot : Ref[@core.Widget?],
+  col_slot : Ref[@core.Widget?],
 ) -> @core.Node {
   let hit = fn() -> Unit { btn.val = btn.val + 1 }
   let hit_err = fn() -> Unit {
@@ -507,6 +512,33 @@ fn make_form_section(
             handle=fn(w : @core.Widget) -> Unit { item_slot.val = Some(w) },
           ),
         ],
+      ),
+      @ui.container(
+        [
+          @ui.select_t(
+            ["选项甲", "选项乙", "选项丙"],
+            sel,
+            on_change=fn(v : String) -> Unit {
+              if v.length() > 0 {
+                pick.val = v
+              }
+            },
+            clearable=true,
+            placeholder="请选择",
+            width=160.0,
+            focus_id=22,
+            handle=fn(w : @core.Widget) -> Unit { sel_slot.val = Some(w) },
+          ),
+          @ui.color_picker_t(
+            col,
+            width=160.0,
+            focus_id=23,
+            handle=fn(w : @core.Widget) -> Unit { col_slot.val = Some(w) },
+          ),
+        ],
+        direction=@yoga.Row,
+        column_gap=10.0,
+        align_items=@yoga.AlignItems::Center,
       ),
       @ui.rate_t(
         rate,
@@ -851,6 +883,12 @@ fn main {
   let frm_link_w : Ref[@core.Widget?] = Ref(None)
   let frm_rate_w : Ref[@core.Widget?] = Ref(None)
   let frm_item_w : Ref[@core.Widget?] = Ref(None)
+  let frm_sel = @core.Store::new("")
+  let frm_col = @core.Store::new("")
+  let frm_sel_w : Ref[@core.Widget?] = Ref(None)
+  let frm_col_w : Ref[@core.Widget?] = Ref(None)
+  let frm_ov_max = Ref(0)
+  let frm_pick = Ref("-")
   app.mount([make_table_section(tb_rows, tb_sel, tb_sort, tb_w)])
   app.mount([make_virt_section(vt_rows, vt_sel, vt_sort, vt_clicks, vt_w)])
   app.mount([make_sticky_section(sticky, sticky_w)])
@@ -866,6 +904,11 @@ fn main {
       frm_link_w,
       frm_rate_w,
       frm_item_w,
+      frm_sel,
+      frm_col,
+      frm_pick,
+      frm_sel_w,
+      frm_col_w,
     ),
   ])
   app.mount([
@@ -1198,6 +1241,11 @@ fn main {
     if app.is_running() {
       ctr.frames = ctr.frames + 1
       // 自转轮播的下标由宿主的延时通道推进：换了页就计一次
+      // 浮层是瞬时的：退出时计数早已归零，故每拍记一次峰值（证明真窗口里确实开过层）
+      let ov_now = @core.overlay_count()
+      if ov_now > frm_ov_max.val {
+        frm_ov_max.val = ov_now
+      }
       let idx = auto.index()
       let s0 = car_sample.val
       if s0.0 != idx {
@@ -1273,7 +1321,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -1410,7 +1458,11 @@ fn main {
     " rate=" +
     ov2_rect_of(frm_rate_w.val) +
     " item=" +
-    ov2_rect_of(frm_item_w.val),
+    ov2_rect_of(frm_item_w.val) +
+    " sel=" +
+    ov2_rect_of(frm_sel_w.val) +
+    " col=" +
+    ov2_rect_of(frm_col_w.val),
   )
   match sticky.scroll.view_h {
     v =>

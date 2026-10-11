@@ -222,13 +222,15 @@ test "Store 订阅随回收袋退订：反复重挂不在 Store 上堆积订阅"
 }
 
 ///|
-/// 画一个控件并把位图与控件原点交出来（绘制按绝对落位平移，取样要用窗口坐标）。
+/// 单独画一个控件到贴合它的位图上：`paint_at(p, 自己的原点)` 把绝对落位抵消掉，
+/// 于是位图坐标=控件局部坐标（浮层里的控件绝对 y 在几十到几百，用 `paint` 会画到
+/// 位图外，取样永远读不到）。返回值仍是三元组，取样直接用局部坐标。
 fn shot(w : @core.Widget) -> (@render.Bitmap, Int, Int) {
   let bm = @render.Bitmap::new(w.rect.w.round().to_int() + 2, w.rect.h.round().to_int() + 2)
   let p = @render.Painter::new(bm)
-  w.paint(p)
+  w.paint_at(p, w.rect.x, w.rect.y)
   p.end()
-  (bm, w.rect.x.round().to_int(), w.rect.y.round().to_int())
+  (bm, 0, 0)
 }
 
 ///|
@@ -373,4 +375,136 @@ test "评分：星顶点几何、点击写值并回调、悬停只预亮不改�
   let _ = w.dispatch_pointer({ kind: @core.Leave, x: 0.0, y: 0.0, button: 0, mods: 0, })
   let (bm2, _, _) = shot(w)
   assert_eq(color_of(bm2, ox + 11, oy + 11), dim)
+}
+
+///|
+/// 取浮层里第 id 层的第 n 块子控件。
+fn overlay_kid(id : Int, n : Int) -> @core.Widget {
+  match @core.overlay_root_of(id) {
+    Some(w) => w.children()[n]
+    None => @core.Widget::new()
+  }
+}
+
+///|
+/// 下拉弹层的行列表（面板 → 滚动视口 → 内容）。
+fn select_rows(id : Int) -> Array[@core.Widget] {
+  overlay_kid(id, 0).children()[0].children()[0].children()
+}
+
+///|
+test "下拉选择：点开列表、点选项回填并收起、✕ 清空、选中行浅底出像素" {
+  let v = @core.Store::new("")
+  let changes : Array[String] = []
+  let (root, field) = mounted_with_overlay(
+    select_t(["甲", "乙", "丙"], v, on_change=fn(s : String) -> Unit { changes.push(s) }, clearable=true, width=160.0),
+    420.0,
+    300.0,
+  )
+  assert_eq(field.rect.w, 160.0)
+  assert_eq(@core.overlay_count(), 0)
+  click_at(root, field, 40.0, 16.0)
+  assert_eq(@core.overlay_count(), 1)
+  root.relayout(420.0, 300.0)
+  let rows = select_rows(1)
+  assert_eq(rows.length(), 3)
+  assert_eq(rows[0].rect.h, 28.0)
+  // 弹层落在字段下方 2px、与字段同宽
+  match @core.overlay_rect_of(1) {
+    Some(r) => assert_eq((r.x, r.y, r.w), (field.rect.x, field.rect.y + field.rect.h + 2.0, 160.0))
+    None => assert_true(false)
+  }
+  click_at(root, rows[1], 30.0, 14.0)
+  assert_eq((v.get(), @core.overlay_count()), ("乙", 0))
+  assert_eq(changes, ["乙"])
+  // 再点开：选中行（乙）有浅底，未选中行没有
+  click_at(root, field, 40.0, 16.0)
+  root.relayout(420.0, 300.0)
+  let rows2 = select_rows(2)
+  let (bm_a, ax, ay) = shot(rows2[0])
+  let (bm_b, bx, by) = shot(rows2[1])
+  let plain = color_of(bm_a, ax + 40, ay + 14)
+  let picked = color_of(bm_b, bx + 40, by + 14)
+  assert_true(plain != picked)
+  // 选中行右侧的勾也是实像素（该行最右 20px 内有非底色）
+  let mut ink = 0
+  for y = 0; y < 28; y = y + 1 {
+    for x = 138; x < 158; x = x + 1 {
+      if color_of(bm_b, bx + x, by + y) != picked {
+        ink = ink + 1
+      }
+    }
+  }
+  assert_true(ink > 0)
+  // ✕ 清空：悬停 + 有值时热区在箭头左侧，清空同样回调（与 master 同）
+  root.set_hover(field.id)
+  click_at(root, field, 130.0, 16.0)
+  assert_eq(v.get(), "")
+  assert_eq(changes, ["乙", ""])
+}
+
+///|
+test "下拉选择：点浮层外收起后，再点字段立刻能重开（句柄活性）" {
+  let v = @core.Store::new("甲")
+  let (root, field) = mounted_with_overlay(
+    select_t(["甲", "乙"], v, width=140.0),
+    420.0,
+    300.0,
+  )
+  click_at(root, field, 30.0, 16.0)
+  assert_eq(@core.overlay_count(), 1)
+  root.relayout(420.0, 300.0)
+  // 点浮层外：图层吃掉这一击并收起（组件的句柄就此失效）
+  let _ = root.dispatch_pointer({ kind: @core.Down, x: 380.0, y: 280.0, button: 1, mods: 0 })
+  let _ = root.dispatch_pointer({ kind: @core.Up, x: 380.0, y: 280.0, button: 1, mods: 0 })
+  assert_eq(@core.overlay_count(), 0)
+  // 第二次点字段应直接重开，而不是「先清旧句柄、要点两下」
+  click_at(root, field, 30.0, 16.0)
+  assert_eq(@core.overlay_count(), 1)
+}
+
+///|
+test "取色器：字段点开色板网格、点色块写值并收起、选中格描边出像素" {
+  let cs = ["#111111", "#222222", "#333333", "#444444", "#555555", "#666666"]
+  let v = @core.Store::new("#333333")
+  let changes : Array[String] = []
+  let (root, field) = mounted_with_overlay(
+    color_picker_t(v, colors=cs, on_change=fn(c : String) -> Unit { changes.push(c) }, width=180.0),
+    460.0,
+    320.0,
+  )
+  click_at(root, field, 40.0, 16.0)
+  assert_eq(@core.overlay_count(), 1)
+  root.relayout(460.0, 320.0)
+  // 面板 → 色板容器 → 两行（每行 5 格）
+  let grid = overlay_kid(1, 0).children()[0]
+  let lines = grid.children()
+  assert_eq(lines.length(), 2)
+  assert_eq(lines[0].children().length(), 5)
+  assert_eq(lines[1].children().length(), 1)
+  // 面板按公式定尺寸 176x80；内层容器的 padding 只给左/上（`set_padding(left, top)`
+  // 的口径），剩下的右下空带由面板自身的尺寸兜住
+  assert_eq((grid.rect.w, grid.rect.h), (176.0, 72.0))
+  match @core.overlay_rect_of(1) {
+    Some(r) => assert_eq((r.w, r.h), (176.0, 80.0))
+    None => assert_true(false)
+  }
+  // 选中格（第 3 格）比未选格多描边与白勾
+  let c3 = lines[0].children()[2]
+  let c4 = lines[0].children()[3]
+  let (bm3, x3, y3) = shot(c3)
+  let (bm4, x4, y4) = shot(c4)
+  let mut diff = 0
+  for y = 0; y < 26; y = y + 1 {
+    for x = 0; x < 26; x = x + 1 {
+      if color_of(bm3, x3 + x, y3 + y) != color_of(bm4, x4 + x, y4 + y) {
+        diff = diff + 1
+      }
+    }
+  }
+  assert_true(diff > 20)
+  // 点第 6 格（第二行那格）写值并收起
+  click_at(root, lines[1].children()[0], 12.0, 12.0)
+  assert_eq((v.get(), @core.overlay_count()), ("#666666", 0))
+  assert_eq(changes, ["#666666"])
 }

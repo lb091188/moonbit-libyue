@@ -48,6 +48,16 @@ test "日期选择器：字段显示占位、点开日历、点选回填并收�
   assert_eq(@core.overlay_count(), 1)
   click_at(root, field, 40.0, 16.0)
   assert_eq(@core.overlay_count(), 0)
+  // 点浮层外收起（图层代劳，组件句柄就此失效）后再点字段，一击即开
+  click_at(root, field, 40.0, 16.0)
+  assert_eq(@core.overlay_count(), 1)
+  root.relayout(400.0, 300.0)
+  let _ = root.dispatch_pointer({ kind: @core.Down, x: 380.0, y: 280.0, button: 1, mods: 0 })
+  let _ = root.dispatch_pointer({ kind: @core.Up, x: 380.0, y: 280.0, button: 1, mods: 0 })
+  assert_eq(@core.overlay_count(), 0)
+  click_at(root, field, 40.0, 16.0)
+  assert_eq(@core.overlay_count(), 1)
+  @core.overlay_clear()
   // ✕ 清空：悬停才有热区
   root.set_hover(field.id)
   click_at(root, field, 154.0, 16.0)
