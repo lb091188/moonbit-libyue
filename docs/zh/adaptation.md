@@ -141,11 +141,11 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 - moonc 已实现 `#cfg(platform="windows"/"linux"/"macos")`,按 `-target` 三元组求值;但当前发布版 moon 只给 moonc 传无 OS 信息的 `native`,所有条件恒 false。`moon build -v` 的 moonc 命令行出现完整三元组即条件可用。
 - **分层结论(0.1.20260920 实测,stable 与 dev 同版本号)**:语言层与 moonc 层都支持,moon 构建层没有传递通道。moonc 三元组直编实测:`-target x86_64-unknown-linux-gnu` 命中 linux 分支、`x86_64-pc-windows-msvc` 命中 windows、`aarch64-apple-darwin` 命中 macos、`native`(泛型)三个条件全部为假;而 moon 侧四条注入通道全部堵死——`--target` 只收 `wasm/wasm-gc/js/native/llvm/all` 不收三元组、`preferred_target` 填三元组报 `preferred-backend is not a valid backend`、`moon.pkg` 的 `targets` 解析不了 OS 条件(只认 backend + debug/release + and/or/not)、`moon.pkg` 与 `moon.mod` 都没有 `cfg` 字段。
-- **现行写法(双轨)**:三份平台实现(`#cfg(platform="linux")`、`#cfg(any(platform="windows", platform="macos"))`)加一份运行时兜底 `#cfg(all(target="native", not(platform="linux"), not(platform="windows"), not(platform="macos")))`。moon 驱动的构建恒走兜底,兜底内容与改造前的运行时 `platform()` 判断一致;哪天 moon 开始传三元组,才能删兜底。
-- 平台分支只写一行转发到共享实现函数(如 `vol_get_impl` → `vol_get_direct` / `vol_get_linux`),真实逻辑放在不带 `#cfg` 的共享函数里——分支不参与编译也不影响逻辑被类型检查,避免死代码腐烂。
-- 校验:`python3 scripts/check-cfg-platforms.py`(CI 的 Linux job 已挂)。脚本生成同构探针,对三个三元组 + 泛型 native 各直编一次并断言命中分支;其中泛型 native 那组是回归哨兵——它仍落兜底才说明仓内必须保留运行时分支。
-- 首个改造试点:`yue/system/volume.mbt` 的 5 个公开 API(vol_supported / vol_get / vol_set / vol_add / vol_set_mute),形态为「直连实现 + Linux 子进程实现 + 三份 #cfg 包装」。
-- 现行替代:运行时 `platform()` 判断,声明式树按条件组装节点,不满足就不创建控件。
+- **决定:不采用**——MoonBit 层的平台分流一律用运行时 `@yue.platform()` 判断,全仓统一(含新增的 `yue/system` 子包各模块,约 160 处)。理由:该条件在 moon 驱动的构建下恒为假,写了等于没写,而要让分支真正参与编译还得引入额外脚手架(如替换 `$MOON_HOME/bin/moonc` 注入三元组),收益不抵复杂度。触发重新评估的信号:`moon build -v` 的 moonc 命令行出现完整三元组。
+- **历史试点(已回退)**:`yue/system/volume.mbt` 的 5 个公开 API(vol_supported / vol_get / vol_set / vol_add / vol_set_mute)曾改为「直连实现 + Linux 子进程实现 + 三份 #cfg 包装 + 一份运行时兜底」的双轨形态,现已回退为运行时判断——双轨让同一份逻辑出现两处真源,而实际生效的恒为兜底那份,维护成本高于收益。
+- 守卫:`python3 scripts/check-platform-dispatch.py`(CI 的 Linux job 已挂)。扫描仓内 .mbt,出现任何 `#cfg` 即失败并打印文件行号,防止平台分流写法回潮;同时输出运行时 `platform()` 判断的存量条数。确需编译期条件时,先在此记录理由再改脚本白名单。
+- C/C++ shim 层不受此约束:`#if defined(OS_WIN)`、独立平台 TU(`yue_system_win.cpp` / `yue_system_linux.cpp` / `yue_system_mac.mm`)+ CMake 互斥挂载,本来就是编译期隔离——那里若改运行时判断,等于让 Windows 二进制去编 Linux 专用代码。
+- 现行做法:运行时 `platform()` 判断(`if @yue.platform() == "windows" || ...` 或 `match @yue.platform()),声明式树按条件组装节点,不满足就不创建控件。
 
 ### 声明式层与自绘组件
 
