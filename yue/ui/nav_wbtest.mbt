@@ -1,0 +1,134 @@
+// 导航族回归：分段/面包屑的选中写回、分页的页码与夹取、步骤条三态配色、
+// 折叠面板的独立开合。绘制断言只比「两处颜色是否不同」，不锁具体色值。
+
+///|
+test "分段控制器：点某段即写 Store，选中段底色与其余段不同" {
+  let sel = @core.Store::new("甲")
+  let (root, seg) = mounted(segmented(["甲", "乙", "很长的一段"], sel), 400.0, 60.0)
+  let items = seg.children()
+  assert_eq(items.length(), 3)
+  assert_true(items[2].rect.w > items[0].rect.w + 20.0)
+  click_at(root, items[1], 6.0, 6.0)
+  assert_eq(sel.get(), "乙")
+  let bm = @render.Bitmap::new(400, 60)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  let y = (items[0].rect.y + 2.0).round().to_int()
+  let plain = px(bm, (items[0].rect.x + 2.0).round().to_int(), y)
+  let act = px(bm, (items[1].rect.x + 2.0).round().to_int(), y)
+  assert_true(plain != act)
+  click_at(root, items[2], 6.0, 6.0)
+  assert_eq(sel.get(), "很长的一段")
+}
+
+///|
+test "面包屑：分隔符占位、点非末项写 Store、末项不改值" {
+  let sel = @core.Store::new("首页")
+  let (root, crumb) = mounted(
+    breadcrumb(["首页", "列表", "详情"], sel),
+    400.0,
+    40.0,
+  )
+  // 3 项 + 2 个 "/"
+  assert_eq(crumb.children().length(), 5)
+  click_at(root, crumb.children()[1], 1.0, 10.0)
+  assert_eq(sel.get(), "首页")
+  click_at(root, crumb.children()[2], 4.0, 10.0)
+  assert_eq(sel.get(), "列表")
+  // 末项（详情）是当前层，点它不改值
+  click_at(root, crumb.children()[4], 4.0, 10.0)
+  assert_eq(sel.get(), "列表")
+}
+
+///|
+test "分页：点页码直落、箭头步进、两端夹取不越界" {
+  let cur = @core.Store::new(1)
+  let (root, pg) = mounted(pagination(cur, 5), 400.0, 40.0)
+  // 左箭头 + 5 个页码 + 右箭头
+  let kids = pg.children()
+  assert_eq(kids.length(), 7)
+  click_at(root, kids[3], 14.0, 14.0)
+  assert_eq(cur.get(), 3)
+  click_at(root, kids[6], 14.0, 14.0)
+  assert_eq(cur.get(), 4)
+  click_at(root, kids[6], 14.0, 14.0)
+  assert_eq(cur.get(), 5)
+  // 已在末页再点右箭头不动
+  click_at(root, kids[6], 14.0, 14.0)
+  assert_eq(cur.get(), 5)
+  for _i = 0; _i < 8; _i = _i + 1 {
+    click_at(root, kids[0], 14.0, 14.0)
+  }
+  assert_eq(cur.get(), 1)
+  click_at(root, kids[0], 14.0, 14.0)
+  assert_eq(cur.get(), 1)
+}
+
+///|
+test "步骤条：已完成/当前/待办三态底色互不相同，连线随当前步着色" {
+  let cur = @core.Store::new(1)
+  let (root, st) = mounted(
+    steps(["下单", "付款", "发货", "签收"], cur),
+    500.0,
+    60.0,
+  )
+  // 4 方块 + 4 文字 + 3 连线
+  assert_eq(st.children().length(), 11)
+  let bm = @render.Bitmap::new(500, 60)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  // 交错排布：方块在 0/3/6/9，连线插在方块前（下标 2/5/8）
+  let done = st.children()[0]
+  let active = st.children()[3]
+  let todo = st.children()[6]
+  let y = (done.rect.y + 2.0).round().to_int()
+  let c_done = px(bm, (done.rect.x + 2.0).round().to_int(), y)
+  let c_active = px(bm, (active.rect.x + 2.0).round().to_int(), y)
+  let c_todo = px(bm, (todo.rect.x + 2.0).round().to_int(), y)
+  assert_true(c_done != c_active && c_active != c_todo && c_done != c_todo)
+  // 连线：当前步之前的那段已着色，之后的那段仍是边框色
+  let line1 = st.children()[2]
+  let line3 = st.children()[5]
+  let ly = (line1.rect.y + 1.0).round().to_int()
+  let l1 = px(bm, (line1.rect.x + 4.0).round().to_int(), ly)
+  let l3 = px(bm, (line3.rect.x + 4.0).round().to_int(), ly)
+  assert_true(l1 != l3)
+  cur.set(3)
+  let bm2 = @render.Bitmap::new(500, 60)
+  let p2 = @render.Painter::new(bm2)
+  root.paint(p2)
+  p2.end()
+  // 走到第 4 步后，原来「待办」的方块不再是待办色
+  assert_true(px(bm2, (todo.rect.x + 2.0).round().to_int(), y) != c_todo)
+}
+
+///|
+test "折叠面板：默认只开第一块，各块独立开合、收起即不占高" {
+  let (root, cl) = mounted(
+    collapse([
+      ("面板一", [label("内容一")]),
+      ("面板二", [label("内容二")]),
+      ("面板三", [label("内容三")]),
+    ]),
+    400.0,
+    240.0,
+  )
+  assert_eq(cl.children().length(), 3)
+  fn body(i : Int) -> @core.Widget { cl.children()[i].children()[1] }
+
+  assert_eq([body(0).visible, body(1).visible, body(2).visible], [true, false, false])
+  // 点第二块标题行：只开它自己
+  click_at(root, cl.children()[1].children()[0], 30.0, 10.0)
+  assert_eq([body(0).visible, body(1).visible], [true, true])
+  // 再点第一块标题行：关掉第一块，第二块不受影响
+  click_at(root, cl.children()[0].children()[0], 30.0, 10.0)
+  assert_eq([body(0).visible, body(1).visible], [false, true])
+  // 收起的面板不占高度：整块高度回落
+  root.relayout(400.0, 240.0)
+  let h_two = cl.rect.h
+  click_at(root, cl.children()[1].children()[0], 30.0, 10.0)
+  root.relayout(400.0, 240.0)
+  assert_true(cl.rect.h < h_two)
+}

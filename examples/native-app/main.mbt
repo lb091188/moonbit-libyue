@@ -5,8 +5,8 @@
 //
 // 批次 1（App 宿主 + TextEditorHost 收口）：整窗由 `@core.App` 驱动——循环、
 // 事件翻译、焦点栈、输入法四条件、脏标上屏都在宿主里，界面内容只是一棵
-// `@core.Widget` 树。跑法：moon run examples/native-app（需显示服务），5 秒后
-// 自动退出并打印状态行。
+// `@core.Widget` 树。跑法：moon run examples/native-app（需显示服务），9 秒后
+// 自动退出并打印状态行（注入点位多，留够一轮全交互的时间）。
 //
 // 批次 3（字体）：末尾一行演示「族名回退 + 混排行高」，两个盒子的盒高都来自
 // `@text.AttributedText::line_height`。
@@ -383,7 +383,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(900, 700, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1240, 840, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -518,6 +518,14 @@ fn main {
   let auto_w : Ref[@core.Widget?] = Ref(None)
   let picked_date : @core.Store[@ui.DateYMD?] = @core.Store::new(None)
   let cal_w : Ref[@core.Widget?] = Ref(None)
+  let nav_seg : Ref[@core.Widget?] = Ref(None)
+  let nav_crumb : Ref[@core.Widget?] = Ref(None)
+  let nav_page : Ref[@core.Widget?] = Ref(None)
+  let nav_fold : Ref[@core.Widget?] = Ref(None)
+  let seg_sel = @core.Store::new("分段甲")
+  let crumb_sel = @core.Store::new("首页")
+  let page_cur = @core.Store::new(1)
+  let step_cur = @core.Store::new(1)
   app.mount([
     @ui.container(
       [
@@ -599,6 +607,40 @@ fn main {
           bg=@theme.theme_bg_panel(),
           border=@theme.theme_border(),
         ),
+        @ui.container(
+          [
+            @ui.label("导航族首批", size=13.0),
+            @ui.segmented(
+              ["分段甲", "分段乙"],
+              seg_sel,
+              handle=fn(w : @core.Widget) -> Unit { nav_seg.val = Some(w) },
+            ),
+            @ui.breadcrumb(
+              ["首页", "列表", "详情"],
+              crumb_sel,
+              handle=fn(w : @core.Widget) -> Unit { nav_crumb.val = Some(w) },
+            ),
+            @ui.pagination(
+              page_cur,
+              4,
+              handle=fn(w : @core.Widget) -> Unit { nav_page.val = Some(w) },
+            ),
+            @ui.steps(["下单", "付款", "发货"], step_cur),
+            @ui.collapse(
+              [
+                ("折叠一", [@ui.label("第一块内容", size=12.0)]),
+                ("折叠二", [@ui.label("第二块内容", size=12.0)]),
+              ],
+              handle=fn(w : @core.Widget) -> Unit { nav_fold.val = Some(w) },
+            ),
+          ],
+          width=300.0,
+          row_gap=6.0,
+          padding=6.0,
+          align_items=@yoga.AlignItems::FlexStart,
+          bg=@theme.theme_bg_page(),
+          border=@theme.theme_border(),
+        ),
       ],
       direction=@yoga.Row,
       column_gap=8.0,
@@ -650,7 +692,9 @@ fn main {
   }
   let _ = app.timer(100, ticker.val)
   let _ = app.timer(500, blinker.val)
-  let _ = app.timer(5000, fn() { app.quit() })
+  // 累积验证页越排越宽，注入点位也跟着多——存活窗口给到 9 秒才够把全部
+  // 交互注完一轮（原来 5 秒时后几击会赶上退出）
+  let _ = app.timer(9000, fn() { app.quit() })
 
   app.run()
   // 卸载前停转（自排链不认识视图已移除；本例循环已 quit，这里是示范正确收尾）
@@ -660,12 +704,22 @@ fn main {
     Some(i) => i.to_string()
     None => "-"
   }
+  let fold_str = match nav_fold.val {
+    Some(w) => {
+      let blocks = w.children()
+      let b0 = blocks[0].children()[1].visible
+      let b1 = blocks[1].children()[1].visible
+      (if b0 { "1" } else { "0" }) + (if b1 { "1" } else { "0" })
+    }
+    None => "-"
+  }
+
   let date_str = match picked_date.get() {
     Some(x) => x.format()
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -703,6 +757,40 @@ fn main {
     Some(w) => println("NATIVE-APP-AUTO " + rect_str(w.rect))
     None => ()
   }
+  // 导航族四个注入点：分段第二段 / 面包屑第二段 / 第 3 页 / 第二块标题行
+  let mut nav_line = "NATIVE-APP-NAV"
+  let seg2 = match nav_seg.val {
+    Some(w) => Some(w.children()[1])
+    None => None
+  }
+
+  let crumb2 = match nav_crumb.val {
+    Some(w) => Some(w.children()[2])
+    None => None
+  }
+
+  let page3 = match nav_page.val {
+    Some(w) => Some(w.children()[3])
+    None => None
+  }
+
+  let fold2 = match nav_fold.val {
+    Some(w) => Some(w.children()[1].children()[0])
+    None => None
+  }
+  let nav_targets : Array[(String, @core.Widget?)] = [
+    ("seg2", seg2),
+    ("crumb2", crumb2),
+    ("page3", page3),
+    ("fold2", fold2),
+  ]
+  for kv in nav_targets {
+    match kv.1 {
+      Some(w) => nav_line = nav_line + " " + kv.0 + "=" + rect_str(w.rect)
+      None => ()
+    }
+  }
+  println(nav_line)
   match cal_w.val {
     Some(w) => {
       // 第 14 格（本月第 11 天）给注入用；跨月格与它同列不同色，坐标够用
