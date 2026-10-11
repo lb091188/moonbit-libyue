@@ -370,6 +370,46 @@ fn make_band(ctr : Ctr) -> @core.Widget {
 }
 
 ///|
+/// 分隔布局 + 文本族区块：左右两栏可拖动分隔，两栏里各放一个主题化标签。
+fn make_split_section(slot : Ref[@core.Widget?]) -> @core.Node {
+  let pane = fn(title : String, role : @ui.TextRole, bg : String) -> @core.Node {
+    @ui.container(
+      [
+        @ui.label_t(title, role=role, align=@text.Center, max_width=160.0),
+        @ui.label_t(
+          "标签按 max_width 折行；拖动中间把手改两栏宽度（退出状态行报首栏宽）",
+          role=Secondary,
+          max_width=160.0,
+        ),
+      ],
+      padding=6.0,
+      row_gap=4.0,
+      align_items=@yoga.AlignItems::Center,
+      bg=bg,
+    )
+  }
+
+  @ui.container(
+    [
+      @ui.label("分隔布局与文本族：把手常显点纹，悬停浅底、拖动主题色", size=13.0),
+      @ui.hsplit(
+        pane("左栏 Title", Title, @theme.theme_bg_panel()),
+        pane("右栏 Accent", Accent, @theme.theme_fill_zebra()),
+        ratio=0.5,
+        min_first=120.0,
+        min_second=120.0,
+        handle=fn(w : @core.Widget) -> Unit { slot.val = Some(w) },
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 粘性列表区块：三组各四行，滚动时顶部吸顶条显示当前组。
 fn make_sticky_section(st : @ui.StickyList, slot : Ref[@core.Widget?]) -> @core.Node {
   let rows_of = fn(prefix : String) -> Array[@core.Node] {
@@ -548,7 +588,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1400, 1260, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1400, 1500, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -730,9 +770,11 @@ fn main {
   let vt_w : Ref[@core.Widget?] = Ref(None)
   let sticky = @ui.StickyList::new()
   let sticky_w : Ref[@core.Widget?] = Ref(None)
+  let spl_w : Ref[@core.Widget?] = Ref(None)
   app.mount([make_table_section(tb_rows, tb_sel, tb_sort, tb_w)])
   app.mount([make_virt_section(vt_rows, vt_sel, vt_sort, vt_clicks, vt_w)])
   app.mount([make_sticky_section(sticky, sticky_w)])
+  app.mount([make_split_section(spl_w)])
   app.mount([
     @ui.container(
       [
@@ -1098,6 +1140,11 @@ fn main {
     Some(w) => (if w.children()[1].visible { "1" } else { "0" })
     None => "-"
   }
+  let split_first_w = match spl_w.val {
+    Some(w) => w.children()[0].rect.w
+    None => 0.0
+  }
+
   let dpk_str = match dpk.get() {
     Some(x) => x.format()
     None => "-"
@@ -1133,7 +1180,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' drg='\{drg_str}' trg='\{trg_str}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -1240,6 +1287,15 @@ fn main {
   let drg_rect = match drg_w.val {
     Some(w) => rect_str(w.rect)
     None => "-"
+  }
+  match spl_w.val {
+    Some(w) => println(
+      "NATIVE-APP-SPL first=" +
+      rect_str(w.children()[0].rect) +
+      " bar=" +
+      rect_str(w.children()[1].rect),
+    )
+    None => ()
   }
   match sticky.scroll.view_h {
     v =>
