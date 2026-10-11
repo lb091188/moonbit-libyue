@@ -106,7 +106,11 @@
   - [ ] `locale_sys` 的 `timedatectl` 半（可脱总线）+ `idle`（X11 ScreenSaver 扩展，走 `yue/win` 桩新增入口）
   - [ ] `power`（UPower）/`session`（logind 锁屏与休眠信号）/`online`（NetworkManager）/`keepawake`（logind inhibit）/`powerctl`（`gdbus_call_system` 挂起/休眠）/`locale_sys` 的 localed 半随 DBus 线（#21）
 - [x] 系统能力累积验证页 `examples/native-sys`：五个面板全是只读探测（系统与机器 / 桌面与硬件 / 应用与文件类型 / 窗口与剪贴板 / 最近与历史），三键里只有「重新探测」只读（注入回证点它），「打开链接」「打开目录」属设置类由使用者点；退出打 `NATIVE-SYS-GEO` 与 `NATIVE-SYS-STAT` 两行，字段与屏上读数一一对应（GUI 侧的累计页仍是 `examples/native-app`）
-- [ ] DBus 系在新事件循环下**重写/重验**：SNI 托盘（`traybus/sni.mbt`）、通知（新栈须重写 `org.freedesktop.Notifications`，含 `Notification::set_progress` 进度文本）、logind（`SetBrightness`/inhibit）、UPower、NetworkManager（`netmon`/`online`）、屏保 `screensaver`、媒体键 MPRIS（`media` 含状态监视轮询）
+- [~] DBus 系在新事件循环下**重写/重验**：SNI 托盘（`traybus/sni.mbt`）、通知（新栈须重写 `org.freedesktop.Notifications`，含 `Notification::set_progress` 进度文本）、logind（`SetBrightness`/inhibit）、UPower、NetworkManager（`netmon`/`online`）、屏保 `screensaver`、媒体键 MPRIS（`media` 含状态监视轮询）
+  - [x] 通用基建落新包 `yue/dbus`（`wire.mbt` 833 行 + `dbus.mbt` 419 行逐行平移，`bus.mbt` 剥掉 SNI/单实例语义后平移）：**不挂 glib fd 监视**——宿主周期调 `dbus_pump()`（缺省非阻塞）、断线自愈走 `dbus_set_post_delayed` 注入的通道，两者不注入时同步调用自带 `pump_until` 泵仍可用；socket 桩 `dbus_stub.c` 只用标准头、错误码与旧 shim 逐位一致；入站调用对外给 `CallReq`（`reply` 签名由参数值推导），线协议值类型不外泄。真总线回证 23/23（会话握手唯一名、ListNames、错误应答、AddMatch、系统总线 96 个名字）
+  - [ ] 能力模块：通知 + UPower/logind/NetworkManager/屏保/MPRIS 监视（总线侧本机真验，弹窗与媒体键观感留真机）
+  - [ ] SNI 托盘 + DBusMenu（含真实 XFCE 面板复验）
+  - [ ] 单实例（总线名字 + Wake）与 `brightness` 的 logind `SetBrightness` 注入实做
 - [ ] DBus 通用基建：`bus`/`gdbus`/`wire`（41 内部 fn 编解码）/信号注册表/断线重连/注销与注册对称清理（CORE2 教训）
 - [ ] 新建项（master 全仓无资产，属新做）：任务栏进度、dock 徽标、勿扰
 - [ ] Wayland 后端：`idle`（X11 屏保扩展）/`windowctl`（wmctrl）/`clipboard_watch`（xclip）/`monitor`（xrandr）逐项定替代或降级
