@@ -47,15 +47,18 @@ def pkg_config(args: list[str], flag: str) -> list[str] | None:
     return run.stdout.split()
 
 
-def compile_stub(src: Path | list[Path], lib_name: str) -> str:
+def compile_stub(
+    src: Path | list[Path], lib_name: str, extra_cflags: list[str] = []
+) -> str:
     """把需要系统头文件的 C 端编成静态库（moon 的 link_configs 只有链接期字段、
     c_flags 会被静默忽略，实测），返回库路径；缺依赖或编译失败返回空串。
-    可传多个源文件，编进同一个 .a（任一源更新即整体重编）。"""
+    可传多个源文件，编进同一个 .a（任一源更新即整体重编）。extra_cflags
+    用于给「多平台合一的桩」开对应分支（如 stub.c 的 -DWM_STUB_GTK）。"""
     srcs = [src] if isinstance(src, Path) else list(src)
     srcs = [s for s in srcs if s.exists()]
     if not srcs:
         return ""
-    cflags: list[str] = []
+    cflags: list[str] = list(extra_cflags)
     for name in LINUX_PKG_CONFIG_LIBS:
         got = pkg_config([name], "--cflags")
         if got is None:
@@ -120,7 +123,8 @@ def build_ime_probe_stub() -> str:
 
 def link_configs() -> dict:
     entries: list[dict] = []
-    if platform.system() == "Linux":
+    system = platform.system()
+    if system == "Linux":
         libs = []
         for name in LINUX_PKG_CONFIG_LIBS:
             got = pkg_config([name], "--libs")
@@ -131,7 +135,9 @@ def link_configs() -> dict:
         # 系统库不会被自动带上，显式补（与旧链路同一口径）。
         sys_libs = ["-lpthread", "-ldl", "-lm", "-lstdc++", "-latomic"]
         win_lib = compile_stub(
-            MODULE_ROOT / "yue" / "win" / "gtk_stub.c", "libyue_win_stub.a"
+            MODULE_ROOT / "yue" / "win" / "stub.c",
+            "libyue_win_stub.a",
+            extra_cflags=["-DWM_STUB_GTK"],
         )
         if win_lib:
             entries.append({
@@ -181,6 +187,16 @@ def link_configs() -> dict:
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lime_probe_stub "
                 + " ".join([*libs, *sys_libs]),
             })
+    elif system == "Windows":
+        # Win32 桩（yue/win/stub.c 的 _WIN32 分支）由 moon native-stub 自编
+        # （windows.h 走 MSVC 自带 SDK 路径，实测可达），这里只下发系统库：
+        # MSVC 口径的链接输入用位置参数直拼 .lib 名——GNU 的 -L/-l 会报
+        # D9002（docs/zh/adaptation.md「链接参数」节）。user32/gdi32 建窗贴屏，
+        # imm32 随 IME 线（W6）预留，advapi32 供深浅/主色注册表读。
+        entries.append({
+            "package": WIN_PACKAGE,
+            "link_flags": "user32.lib gdi32.lib imm32.lib advapi32.lib",
+        })
     return {"link_configs": entries}
 
 

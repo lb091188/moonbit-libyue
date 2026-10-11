@@ -1,13 +1,741 @@
-// MoonBit 原生 GUI 栈的平台后端（Linux = GTK3）。
+// MoonBit 原生 GUI 栈的平台后端桩：一个文件、三条平台分支，对外是 ffi.mbt
+// 那套 wm_* 统一 API（MoonBit 侧 window.mbt 平台无关，core 只认这一层）。
 //
-// 形态约束（都来自本仓实测）：
-// - 循环归 MoonBit：这里只提供「等一等」与「跑已就绪的事件」两个动作，不调
-//   gtk_main；等待用 GLib 主上下文的低层配方 prepare/query/poll/check，
-//   超时由 MoonBit 的 Loop::wait_budget 给（None 即无限等，靠 wakeup 位回来）。
+//   _WIN32        → Win32 真实现。由 moon 的 native-stub 自编（windows.h 走
+//                    MSVC 自带 SDK 路径，实测可达，探针记录见 adaptation），
+//                    系统库链接参数由 prebuild 的 Windows 分支下发。
+//   WM_STUB_GTK   → GTK3 真实现（Linux）。仅 scripts/prebuild.py 带
+//                    -DWM_STUB_GTK + pkg-config 头文件路径编译进
+//                    build/libyue_win_stub.a；moon 的 native-stub 拿不到
+//                    GTK 头路径（link_configs 只有链接期字段，G0 实测），
+//                    所以不带宏的那次编译必须落不进这个分支。
+//   其余（macOS） → 占位空实现，保证链接不断符号。
+//
+// 分支顺序有讲究：Linux 上 native-stub 也会编译本文件（不带宏），必须让
+// 它编出空翻译单元——否则 wm_* 会与 prebuild 的 .a 双定义。空 TU 在本链
+// 已验证可行（原 portable 文件在 Linux 上就是空编）。
+//
+// 形态约束（都来自本仓实测，docs/zh/adaptation.md）：
+// - 循环归 MoonBit：这里只提供「等一等」与「跑已就绪的事件」两个动作，不自带
+//   主循环；等待多久由 yue/core 的 Loop::wait_budget 给（负数即无限等，靠
+//   wakeup 位回来）。
 // - 不做 C→MoonBit 回调：事件以「每窗口标志位 + 消费式取事件」暴露，避开蹦床
 //   形参错位那一类坑（docs/zh/adaptation.md「MoonBit ↔ C ABI」）。
-// - 像素缓冲归 MoonBit：present 收到的就是 yue/render 的 RGBA 字节，本层做
-//   RGBA→BGRx 换序后用 Cairo 贴到窗口，窗口上的像素与离屏快照同源。
+// - 像素缓冲归 MoonBit：present 收到的就是 yue/render 的 Bitmap（ARGB32 预乘，
+//   小端字节序 B,G,R,A），本层只负责贴屏，与离屏快照同源。
+
+#if defined(_WIN32)
+
+// ---------------- Win32 后端 ----------------
+
+// 本 TU 全用 W 系 API：强制 UNICODE 让 IDC_* 等宏取宽字符变体（默认 ANSI
+// 变体是 LPSTR，与 LoadCursorW 的 LPCWSTR 形参类型不合，MSVC C4133）
+#ifndef UNICODE
+#define UNICODE
+#endif
+#ifndef _UNICODE
+#define _UNICODE
+#endif
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <stdint.h>
+#include <string.h>
+
+#define WM_MAX_WINDOWS 32
+
+typedef struct {
+  uint32_t keysym;
+  uint32_t code; // 0 键按下 1 键释放 2 按钮按下 3 按钮释放 4 指针移动 5 滚轮
+  int32_t x;
+  int32_t y;
+  int32_t dx;
+  int32_t dy;
+  uint32_t mods;
+} WmEv;
+
+typedef struct {
+  HWND hwnd;
+  int need_draw;     // 需要重绘（WM_PAINT 或尺寸变化后置 1）
+  int resized;       // 尺寸变了，本次取事件时回报新宽高
+  int closing;       // WM_CLOSE / WM_DESTROY（MoonBit 驱动销毁）
+  int width;         // 客户区物理像素（per-monitor v2，整栈物理像素口径）
+  int height;
+  const unsigned char *pending; // 待贴的 ARGB32 缓冲（所有权在 MoonBit）
+  int pending_w;
+  int pending_h;
+  int cursor_kind;   // 0 默认/1 手/2 文本/3 横向/4 纵向
+  char commit[256];  // 已提交文本（UTF-8，W6 IME 线实装；当前恒空）
+  int commit_len;
+  char preedit[256];
+  int preedit_len;
+  int preedit_caret;
+  int preedit_active;
+  WmEv evs[64];
+  WmEv last;
+  int ev_head;
+  int ev_count;
+} WmWindow;
+
+static WmWindow wm_windows[WM_MAX_WINDOWS]; // 槽 0 未用，句柄 = 槽号（1 起）
+static int wm_next_id = 1;
+static HWND wm_waker = NULL; // 仅消息窗口：wm_wakeup 的投递目标（跨线程叫醒）
+
+void wm_pump(void); // wm_show 里要先跑一轮就绪消息，实现在下方
+
+// 修饰位与 yue/core/keys.mbt 的 MOD_* 一致：1=shift 2=ctrl 4=alt 8=meta
+// （meta 取 Win 键，不碰 NumLock——GTK 桩同一条教训）。
+static uint32_t wm_mods(void) {
+  uint32_t m = 0;
+  if (GetKeyState(VK_SHIFT) & 0x8000) {
+    m |= 1u;
+  }
+  if (GetKeyState(VK_CONTROL) & 0x8000) {
+    m |= 2u;
+  }
+  if (GetKeyState(VK_MENU) & 0x8000) {
+    m |= 4u;
+  }
+  if ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & 0x8000) {
+    m |= 8u;
+  }
+  return m;
+}
+
+// VK → X11 keysym（GDK keyval 口径，与 yue/core/keys.mbt 的 KS_* 同源）。
+// 只列特殊键与字母数字基准面；可打印字符优先走 wm_char_keysym 的布局换算。
+static uint32_t wm_vk_keysym(WPARAM vk) {
+  switch (vk) {
+    case VK_BACK: return 0xff08;   // BackSpace
+    case VK_TAB: return 0xff09;    // Tab
+    case VK_RETURN: return 0xff0d; // Return
+    case VK_ESCAPE: return 0xff1b; // Escape
+    case VK_HOME: return 0xff50;
+    case VK_LEFT: return 0xff51;
+    case VK_UP: return 0xff52;
+    case VK_RIGHT: return 0xff53;
+    case VK_DOWN: return 0xff54;
+    case VK_PRIOR: return 0xff55;  // Page_Up
+    case VK_NEXT: return 0xff56;   // Page_Down
+    case VK_END: return 0xff57;
+    case VK_INSERT: return 0xff63;
+    case VK_DELETE: return 0xffff;
+    case VK_SHIFT: return 0xffe1;
+    case VK_CONTROL: return 0xffe5;
+    case VK_MENU: return 0xffe9;   // Alt_L
+    case VK_LWIN: return 0xffeb;   // Super_L
+    case VK_RWIN: return 0xffec;   // Super_R
+    case VK_NUMPAD0: return 0xffb0;
+    case VK_NUMPAD1: return 0xffb1;
+    case VK_NUMPAD2: return 0xffb2;
+    case VK_NUMPAD3: return 0xffb3;
+    case VK_NUMPAD4: return 0xffb4;
+    case VK_NUMPAD5: return 0xffb5;
+    case VK_NUMPAD6: return 0xffb6;
+    case VK_NUMPAD7: return 0xffb7;
+    case VK_NUMPAD8: return 0xffb8;
+    case VK_NUMPAD9: return 0xffb9;
+    case VK_MULTIPLY: return 0xffaa;
+    case VK_ADD: return 0xffab;
+    case VK_SEPARATOR: return 0xffac;
+    case VK_SUBTRACT: return 0xffad;
+    case VK_DECIMAL: return 0xffae;
+    case VK_DIVIDE: return 0xffaf;
+    default: break;
+  }
+  if (vk >= 'A' && vk <= 'Z') {
+    return (uint32_t)('a' + (vk - 'A'));
+  }
+  if (vk >= '0' && vk <= '9') {
+    return (uint32_t)('0' + (vk - '0'));
+  }
+  if (vk == VK_SPACE) {
+    return 0x20;
+  }
+  return 0;
+}
+
+// 按键的字符面：GDK keyval 同口径——ASCII/Latin-1 原值，其余 0x01000000|unicode
+// （keysym_is_printable / keysym_to_text 只认前两段，与 GDK 行为一致，更宽的
+// 语言字符走 IME 线）。死键（返回负）与多字符输出按无可打印字符处理，退回
+// VK 表；Ctrl 组合键把控制位从状态副本里摘掉再换算，取基准字符（GDK 的
+// Ctrl+A keyval 是 'a'，修饰走 mods，控制字符会让内核的 Ctrl+A 判定失效）。
+static uint32_t wm_char_keysym(WPARAM vk, LPARAM lp) {
+  BYTE ks[256];
+  if (GetKeyboardState(ks) == FALSE) {
+    return 0;
+  }
+  ks[VK_CONTROL] = 0;
+  wchar_t buf[8];
+  int n = ToUnicode((UINT)vk, (UINT)((lp >> 16) & 0xff), ks, buf, 8, 0);
+  if (n != 1) {
+    return 0;
+  }
+  uint32_t u = (uint32_t)buf[0];
+  if ((u >= 0x20 && u <= 0x7e) || (u >= 0xa0 && u <= 0xff)) {
+    return u;
+  }
+  return 0x01000000u | u;
+}
+
+static void wm_push(WmWindow *w, const WmEv *ev) {
+  if (w->ev_count >= 64) {
+    return; // 满了丢弃而不是覆盖：宁可丢一个事件，不能把 FIFO 打乱
+  }
+  int slot = (w->ev_head + w->ev_count) % 64;
+  w->evs[slot] = *ev;
+  w->ev_count++;
+}
+
+static WmWindow *wm_of(HWND hwnd) {
+  LONG_PTR slot = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+  if (slot <= 0 || slot >= WM_MAX_WINDOWS) {
+    return NULL;
+  }
+  return &wm_windows[slot];
+}
+
+static HCURSOR wm_load_cursor(int kind) {
+  LPCWSTR name = IDC_ARROW;
+  if (kind == 1) {
+    name = IDC_HAND;
+  } else if (kind == 2) {
+    name = IDC_IBEAM;
+  } else if (kind == 3) {
+    name = IDC_SIZEWE;
+  } else if (kind == 4) {
+    name = IDC_SIZENS;
+  }
+  return LoadCursorW(NULL, name);
+}
+
+// pending 缓冲直贴：Bitmap 布局 = cairo ARGB32（小端字节 B,G,R,A），GDI 的
+// 32bpp BI_RGB 顶底 DIB 字节口径完全一致，无需换序；负高 = 自上而下。
+static void wm_blit(HDC dc, WmWindow *w) {
+  if (w->pending == NULL || w->pending_w < 1 || w->pending_h < 1) {
+    return;
+  }
+  BITMAPINFO bi;
+  memset(&bi, 0, sizeof(bi));
+  bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+  bi.bmiHeader.biWidth = w->pending_w;
+  bi.bmiHeader.biHeight = -w->pending_h;
+  bi.bmiHeader.biPlanes = 1;
+  bi.bmiHeader.biBitCount = 32;
+  bi.bmiHeader.biCompression = BI_RGB;
+  StretchDIBits(dc, 0, 0, w->pending_w, w->pending_h, 0, 0, w->pending_w,
+                w->pending_h, w->pending, &bi, DIB_RGB_COLORS, SRCCOPY);
+}
+
+static LRESULT CALLBACK wm_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+  switch (msg) {
+    case WM_CREATE: {
+      // CreateWindowW 期间就会来 WM_SIZE：槽号经 CREATESTRUCT 先行落位
+      CREATESTRUCTW *cs = (CREATESTRUCTW *)lp;
+      SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)(intptr_t)cs->lpCreateParams);
+      return 0;
+    }
+    case WM_SIZE: {
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL && wp != SIZE_MINIMIZED) {
+        int cw = (int)(int16_t)LOWORD(lp);
+        int ch = (int)(int16_t)HIWORD(lp);
+        if (cw > 0 && ch > 0 && (cw != w->width || ch != w->height)) {
+          w->width = cw;
+          w->height = ch;
+          w->resized = 1;
+          w->need_draw = 1;
+        }
+      }
+      return 0;
+    }
+    case WM_PAINT: {
+      // 与 GTK 的 draw 回调同口径：expose 即标脏，交 MoonBit 重画；同时把
+      // 手里已有的缓冲贴出去（首帧前的那一下不至于黑屏闪没）
+      WmWindow *w = wm_of(hwnd);
+      PAINTSTRUCT ps;
+      HDC dc = BeginPaint(hwnd, &ps);
+      if (w != NULL) {
+        w->need_draw = 1;
+        if (w->pending != NULL) {
+          wm_blit(dc, w);
+        } else {
+          HBRUSH b = CreateSolidBrush(RGB(0, 0, 0));
+          FillRect(dc, &ps.rcPaint, b);
+          DeleteObject(b);
+        }
+      }
+      EndPaint(hwnd, &ps);
+      return 0;
+    }
+    case WM_ERASEBKGND:
+      return 1; // 全窗自绘，不擦底防闪
+    case WM_CLOSE: {
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL) {
+        w->closing = 1;
+      }
+      return 0; // 不在此处销毁：先停派发、再拆对象由 MoonBit 侧驱动
+    }
+    case WM_DESTROY: {
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL) {
+        w->hwnd = NULL;
+        w->pending = NULL;
+        w->need_draw = 0;
+        w->closing = 1; // 窗口没了也等于该退出了
+      }
+      return 0;
+    }
+    case WM_KEYDOWN:
+    case WM_SYSKEYDOWN:
+    case WM_KEYUP:
+    case WM_SYSKEYUP: {
+      // Alt+F4 放回系统：走默认派发生成 WM_CLOSE，与「窗口管理器请求关闭」
+      // 同语义；其余系统键全部自己吃（F10 菜单栏、Alt+空格系统菜单本栈没有）
+      if (msg == WM_SYSKEYDOWN && wp == VK_F4 && (GetKeyState(VK_MENU) & 0x8000)) {
+        break;
+      }
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL) {
+        uint32_t ks = wm_char_keysym(wp, lp);
+        if (ks == 0) {
+          ks = wm_vk_keysym(wp);
+        }
+        if (ks != 0) {
+          WmEv e;
+          memset(&e, 0, sizeof(e));
+          e.code = (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) ? 0u : 1u;
+          e.keysym = ks;
+          e.mods = wm_mods();
+          wm_push(w, &e);
+        }
+      }
+      return 0;
+    }
+    case WM_LBUTTONDOWN:
+    case WM_MBUTTONDOWN:
+    case WM_RBUTTONDOWN:
+    case WM_LBUTTONUP:
+    case WM_MBUTTONUP:
+    case WM_RBUTTONUP:
+    case WM_MOUSEMOVE: {
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL) {
+        WmEv e;
+        memset(&e, 0, sizeof(e));
+        if (msg == WM_MOUSEMOVE) {
+          e.code = 4u;
+        } else if (msg == WM_LBUTTONDOWN || msg == WM_MBUTTONDOWN ||
+                   msg == WM_RBUTTONDOWN) {
+          e.code = 2u;
+          SetCapture(hwnd); // 按住拖出窗沿仍收移动（GDK 按下期隐式抓取的等价物）
+        } else {
+          e.code = 3u;
+          if ((wp & (MK_LBUTTON | MK_MBUTTON | MK_RBUTTON)) == 0) {
+            ReleaseCapture();
+          }
+        }
+        e.x = (int16_t)LOWORD(lp);
+        e.y = (int16_t)HIWORD(lp);
+        // 按钮号与 GDK 一致：1 左 2 中 3 右
+        e.dx = (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP) ? 1
+             : (msg == WM_MBUTTONDOWN || msg == WM_MBUTTONUP) ? 2 : 3;
+        e.mods = wm_mods();
+        wm_push(w, &e);
+      }
+      return 0;
+    }
+    case WM_MOUSEWHEEL:
+    case WM_MOUSEHWHEEL: {
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL) {
+        WmEv e;
+        memset(&e, 0, sizeof(e));
+        e.code = 5u;
+        POINT pt;
+        pt.x = (int16_t)LOWORD(lp);
+        pt.y = (int16_t)HIWORD(lp);
+        ScreenToClient(hwnd, &pt); // 滚轮的 lParam 是屏幕坐标，其余是客户区
+        e.x = pt.x;
+        e.y = pt.y;
+        short delta = (short)HIWORD(wp);
+        // GTK 桩口径：上/左 = 1，下/右 = -1
+        if (msg == WM_MOUSEWHEEL) {
+          e.dy = delta > 0 ? 1 : -1;
+        } else {
+          e.dx = delta > 0 ? -1 : 1;
+        }
+        e.mods = wm_mods();
+        wm_push(w, &e);
+      }
+      return 0;
+    }
+    case WM_SETCURSOR: {
+      if (LOWORD(lp) == HTCLIENT) {
+        WmWindow *w = wm_of(hwnd);
+        if (w != NULL) {
+          SetCursor(wm_load_cursor(w->cursor_kind));
+          return 1;
+        }
+      }
+      break; // 非客户区走默认
+    }
+    case WM_DPICHANGED: {
+      // per-monitor v2：按系统建议矩形重摆，WM_SIZE 负责记账
+      WmWindow *w = wm_of(hwnd);
+      RECT *r = (RECT *)lp;
+      if (w != NULL && r != NULL) {
+        SetWindowPos(hwnd, NULL, r->left, r->top, r->right - r->left,
+                     r->bottom - r->top, SWP_NOZORDER | SWP_NOACTIVATE);
+      }
+      return 0;
+    }
+    case WM_APP + 1:
+      return 0; // wm_wakeup 的投递落点（仅 waker 窗口收）
+    default:
+      break;
+  }
+  return DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+int wm_init(void) {
+  HINSTANCE inst = GetModuleHandleW(NULL);
+  WNDCLASSEXW wc;
+  memset(&wc, 0, sizeof(wc));
+  wc.cbSize = sizeof(wc);
+  wc.style = CS_HREDRAW | CS_VREDRAW;
+  wc.lpfnWndProc = wm_wndproc;
+  wc.hInstance = inst;
+  wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
+  wc.lpszClassName = L"yue_wm_window";
+  if (RegisterClassExW(&wc) == 0) {
+    return 0;
+  }
+  WNDCLASSEXW wk = wc;
+  wk.lpfnWndProc = DefWindowProcW;
+  wk.lpszClassName = L"yue_wm_waker";
+  if (RegisterClassExW(&wk) == 0) {
+    return 0;
+  }
+  wm_waker = CreateWindowExW(0, L"yue_wm_waker", L"", 0, 0, 0, 0, 0,
+                             HWND_MESSAGE, NULL, inst, NULL);
+  if (wm_waker == NULL) {
+    return 0;
+  }
+  // 整栈自绘走物理像素：per-monitor v2；经 GetProcAddress 取，老系统缺导出
+  // 不至于加载失败（降级系统 DPI 一档，行为由 WM_DPICHANGED 之外的路径兜）
+  HMODULE user32 = GetModuleHandleW(L"user32.dll");
+  if (user32 != NULL) {
+    typedef BOOL(WINAPI * WmSetDpiCtx)(HANDLE);
+    WmSetDpiCtx set_ctx =
+        (WmSetDpiCtx)GetProcAddress(user32, "SetProcessDpiAwarenessContext");
+    if (set_ctx != NULL) {
+      set_ctx((HANDLE)(intptr_t)-4); // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+    }
+  }
+  return 1;
+}
+
+int64_t wm_window_new(int width, int height, const char *title) {
+  if (wm_next_id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  int id = wm_next_id++;
+  WmWindow *w = &wm_windows[id];
+  memset(w, 0, sizeof(*w));
+  w->width = width > 1 ? width : 1;
+  w->height = height > 1 ? height : 1;
+  wchar_t wtitle[256];
+  int tn = MultiByteToWideChar(CP_UTF8, 0, title ? title : "MoonBit", -1,
+                               wtitle, 256);
+  if (tn <= 0) {
+    wtitle[0] = L'\0';
+  }
+  DWORD style = WS_OVERLAPPEDWINDOW;
+  RECT r = {0, 0, w->width, w->height};
+  // 客户区口径：外框撑到客户区恰为 width×height（GTK 的 default size 同语义）
+  AdjustWindowRect(&r, style, FALSE);
+  HWND hwnd = CreateWindowExW(0, L"yue_wm_window", wtitle, style, CW_USEDEFAULT,
+                              CW_USEDEFAULT, r.right - r.left, r.bottom - r.top,
+                              NULL, NULL, GetModuleHandleW(NULL),
+                              (LPVOID)(intptr_t)id);
+  if (hwnd == NULL) {
+    memset(w, 0, sizeof(*w));
+    return 0;
+  }
+  w->hwnd = hwnd;
+  return (int64_t)id;
+}
+
+void wm_show(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd != NULL) {
+    ShowWindow(w->hwnd, SW_SHOW);
+    SetFocus(w->hwnd);
+    // 与 GTK 桩同口径：把 map 后已就绪的消息跑掉，再标首帧
+    wm_pump();
+    w->need_draw = 1;
+  }
+}
+
+void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (out_w != NULL) {
+    *out_w = w->width;
+  }
+  if (out_h != NULL) {
+    *out_h = w->height;
+  }
+}
+
+// 消费式取事件：1 = 需要重绘，2 = 尺寸变化（宽高已更新），3 = 请求关闭，
+// 4 = 有输入事件待取（wm_take_event），0 = 没有待处理事件。
+int wm_event(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->ev_count > 0) {
+    return 4;
+  }
+  if (w->closing) {
+    w->closing = 0;
+    return 3;
+  }
+  if (w->resized) {
+    w->resized = 0;
+    return 2;
+  }
+  if (w->need_draw) {
+    w->need_draw = 0;
+    return 1;
+  }
+  return 0;
+}
+
+void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL || rgba == NULL || width < 1 || height < 1) {
+    return;
+  }
+  // 缓冲所有权仍在 MoonBit（yue/render 的 Bitmap）；这里只记地址并请一次重画，
+  // 真正的贴像素发生在下一次 WM_PAINT 里，那时窗口一定活着。
+  w->pending = rgba;
+  w->pending_w = width;
+  w->pending_h = height;
+  InvalidateRect(w->hwnd, NULL, FALSE);
+}
+
+void wm_close(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd != NULL) {
+    HWND hwnd = w->hwnd;
+    w->hwnd = NULL; // WM_DESTROY 里还会再清一次；先摘钩防重入
+    DestroyWindow(hwnd);
+  }
+  memset(w, 0, sizeof(*w));
+}
+
+// 跑掉队列里已就绪的消息；不阻塞。WM_CHAR 不用（字符面在 WM_KEYDOWN 里
+// 经 ToUnicode 直取 keysym），故不做 TranslateMessage。
+void wm_pump(void) {
+  MSG msg;
+  while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
+    DispatchMessageW(&msg);
+  }
+}
+
+// timeout_ms < 0 表示无限等（MoonBit 侧无待办时用），必须有人 wm_wakeup 或
+// 消息到达才能回来；否则就是死锁，这是漏唤醒的代价。
+int wm_wait(int timeout_ms) {
+  DWORD t = timeout_ms < 0 ? INFINITE : (DWORD)timeout_ms;
+  DWORD r = MsgWaitForMultipleObjectsEx(0, NULL, t, QS_ALLINPUT,
+                                        MWMO_INPUTAVAILABLE);
+  return r == WAIT_OBJECT_0 ? 1 : 0;
+}
+
+// 取一个输入事件，返回其 code（0 键按下 1 键释放 2 按钮按下 3 按钮释放
+// 4 指针移动 5 滚轮），无事件返回 -1。字段随后用 wm_ev_* 读这一条——
+// 「取一条 + 逐字段读」而不是七个出参（MoonBit 不能给 C 传可写数组）。
+int wm_take_event(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return -1;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->ev_count == 0) {
+    return -1;
+  }
+  w->last = w->evs[w->ev_head];
+  w->ev_head = (w->ev_head + 1) % 64;
+  w->ev_count--;
+  return (int)w->last.code;
+}
+
+int32_t wm_ev_keysym(int64_t id) {
+  return id > 0 && id < WM_MAX_WINDOWS ? (int32_t)wm_windows[id].last.keysym : 0;
+}
+int32_t wm_ev_mods(int64_t id) {
+  return id > 0 && id < WM_MAX_WINDOWS ? (int32_t)wm_windows[id].last.mods : 0;
+}
+int32_t wm_ev_x(int64_t id) {
+  return id > 0 && id < WM_MAX_WINDOWS ? wm_windows[id].last.x : 0;
+}
+int32_t wm_ev_y(int64_t id) {
+  return id > 0 && id < WM_MAX_WINDOWS ? wm_windows[id].last.y : 0;
+}
+int32_t wm_ev_button(int64_t id) {
+  return id > 0 && id < WM_MAX_WINDOWS ? wm_windows[id].last.dx : 0;
+}
+int32_t wm_ev_axis(int64_t id) {
+  return id > 0 && id < WM_MAX_WINDOWS ? wm_windows[id].last.dy : 0;
+}
+
+int wm_pending_events(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  return wm_windows[id].ev_count;
+}
+
+void wm_request_focus(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd != NULL) {
+    SetFocus(w->hwnd);
+  }
+}
+
+// 设绘图区光标形状：0 默认箭头 / 1 手型 / 2 文本 I 形 / 3 横向调整 / 4 纵向调整。
+// 存下形状并立即生效一次，后续移动由 WM_SETCURSOR 按形状接管。
+void wm_set_cursor(int64_t id, int kind) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->cursor_kind == kind) {
+    return;
+  }
+  w->cursor_kind = kind;
+  if (w->hwnd != NULL) {
+    SetCursor(wm_load_cursor(kind));
+  }
+}
+
+// ---- IME（W6 线实装 ImmAssociateContext / WM_IME_*，当前为占位：缓冲恒空，
+// MoonBit 侧 pump_ime 读到空即无 preedit/commit，行为与非 Linux 占位一致）----
+
+void wm_im_set_surrounding(int64_t id, const char *text, int caret) {
+  (void)id;
+  (void)text;
+  (void)caret;
+}
+void wm_im_set_cursor(int64_t id, int x, int y, int w, int h) {
+  (void)id;
+  (void)x;
+  (void)y;
+  (void)w;
+  (void)h;
+}
+void wm_im_reset(int64_t id) { (void)id; }
+int wm_im_commit_len(int64_t id) { (void)id; return 0; }
+int wm_im_commit_byte(int64_t id, int index) { (void)id; (void)index; return 0; }
+void wm_im_commit_done(int64_t id) { (void)id; }
+int wm_im_preedit_len(int64_t id) { (void)id; return 0; }
+int wm_im_preedit_byte(int64_t id, int index) { (void)id; (void)index; return 0; }
+int wm_im_preedit_caret(int64_t id) { (void)id; return 0; }
+int wm_im_preedit_active(int64_t id) { (void)id; return 0; }
+
+void wm_wakeup(void) {
+  if (wm_waker != NULL) {
+    PostMessageW(wm_waker, WM_APP + 1, 0, 0);
+  }
+}
+
+int64_t wm_now_ms(void) {
+  return (int64_t)GetTickCount64(); // 开机起单调，与 CLOCK_MONOTONIC 同语义
+}
+
+/* ---- 系统深浅偏好与主色（主题跟随系统用，W13 的 Windows 读数先落这里）----
+ * 深浅读 AppsUseLightTheme（0 = dark）；主色读 DWM 的 AccentColor
+ * （0xAABBGGRR 口径），转 "#rrggbb"。读不到给空串，退路由 MoonBit 决定。 */
+int wm_sys_color_scheme(char *out, int cap) {
+  if (out == NULL || cap < 1) {
+    return 0;
+  }
+  out[0] = '\0';
+  HKEY key;
+  if (RegOpenKeyExW(HKEY_CURRENT_USER,
+                    L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                    0, KEY_READ, &key) != ERROR_SUCCESS) {
+    return 0;
+  }
+  DWORD v = 0;
+  DWORD size = sizeof(v);
+  DWORD type = 0;
+  LSTATUS r = RegQueryValueExW(key, L"AppsUseLightTheme", NULL, &type,
+                               (LPBYTE)&v, &size);
+  RegCloseKey(key);
+  if (r != ERROR_SUCCESS || type != REG_DWORD) {
+    return 0;
+  }
+  const char *s = v == 0 ? "dark" : "light";
+  int n = (int)strlen(s);
+  if (n >= cap) {
+    n = cap - 1;
+  }
+  memcpy(out, s, (size_t)n);
+  out[n] = '\0';
+  return n;
+}
+
+int wm_sys_accent(char *out, int cap) {
+  if (out == NULL || cap < 1) {
+    return 0;
+  }
+  out[0] = '\0';
+  HKEY key;
+  if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\DWM",
+                    0, KEY_READ, &key) != ERROR_SUCCESS) {
+    return 0;
+  }
+  DWORD v = 0;
+  DWORD size = sizeof(v);
+  DWORD type = 0;
+  LSTATUS r =
+      RegQueryValueExW(key, L"AccentColor", NULL, &type, (LPBYTE)&v, &size);
+  RegCloseKey(key);
+  if (r != ERROR_SUCCESS || type != REG_DWORD || cap < 8) {
+    return 0;
+  }
+  // 0xAABBGGRR：低三字节 B,G,R
+  snprintf(out, (size_t)cap, "#%02x%02x%02x", (unsigned)(v & 0xff),
+           (unsigned)((v >> 8) & 0xff), (unsigned)((v >> 16) & 0xff));
+  return 7; // "#rrggbb"
+}
+
+int64_t wm_local_date(void) {
+  SYSTEMTIME st;
+  GetLocalTime(&st);
+  return (int64_t)st.wYear * 10000 + (int64_t)st.wMonth * 100 + (int64_t)st.wDay;
+}
+
+#elif defined(WM_STUB_GTK)
+
+// ---------------- GTK3 后端（Linux，prebuild 专编） ----------------
 
 #include <gtk/gtk.h>
 #include <poll.h>
@@ -1053,3 +1781,109 @@ void *wm_file_dialog_get_result(int64_t id) {
 
 /* 关闭并释放对话框（run 之后调用；未 run 过也能安全释放）。 */
 void wm_file_dialog_destroy(int64_t id) { wm_dlg_free(id); }
+
+#elif !defined(__linux__)
+
+// ---------------- 其余平台（macOS 等）占位 ----------------
+// 保证 `moon build --target native` 的符号不断；真后端随各自窗口层落地补。
+
+#include <stdint.h>
+
+int wm_init(void) {
+  return 0;
+}
+
+int64_t wm_window_new(int width, int height, const char *title) {
+  (void)width;
+  (void)height;
+  (void)title;
+  return 0;
+}
+
+void wm_show(int64_t id) {
+  (void)id;
+}
+
+void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
+  (void)id;
+  (void)out_w;
+  (void)out_h;
+}
+
+int wm_event(int64_t id) {
+  (void)id;
+  return 0;
+}
+
+int wm_take_event(int64_t id) {
+  (void)id;
+  return -1;
+}
+
+int wm_pending_events(int64_t id) {
+  (void)id;
+  return 0;
+}
+
+int32_t wm_ev_keysym(int64_t id) { (void)id; return 0; }
+int32_t wm_ev_mods(int64_t id) { (void)id; return 0; }
+int32_t wm_ev_x(int64_t id) { (void)id; return 0; }
+int32_t wm_ev_y(int64_t id) { (void)id; return 0; }
+int32_t wm_ev_button(int64_t id) { (void)id; return 0; }
+int32_t wm_ev_axis(int64_t id) { (void)id; return 0; }
+
+void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
+  (void)id;
+  (void)rgba;
+  (void)width;
+  (void)height;
+}
+
+void wm_close(int64_t id) {
+  (void)id;
+}
+
+void wm_pump(void) {}
+
+int wm_wait(int timeout_ms) {
+  (void)timeout_ms;
+  return 0;
+}
+
+void wm_request_focus(int64_t id) { (void)id; }
+
+void wm_im_set_surrounding(int64_t id, const char *text, int caret) {
+  (void)id; (void)text; (void)caret;
+}
+int wm_sys_color_scheme(char *out, int cap) { (void)out; (void)cap; return 0; }
+int wm_sys_accent(char *out, int cap) { (void)out; (void)cap; return 0; }
+
+void wm_set_cursor(int64_t id, int kind) {
+  (void)id; (void)kind;
+}
+void wm_im_set_cursor(int64_t id, int x, int y, int w, int h) {
+  (void)id; (void)x; (void)y; (void)w; (void)h;
+}
+void wm_im_reset(int64_t id) { (void)id; }
+int wm_im_commit_len(int64_t id) { (void)id; return 0; }
+int wm_im_commit_byte(int64_t id, int index) { (void)id; (void)index; return 0; }
+void wm_im_commit_done(int64_t id) { (void)id; }
+int wm_im_preedit_len(int64_t id) { (void)id; return 0; }
+int wm_im_preedit_byte(int64_t id, int index) { (void)id; (void)index; return 0; }
+int wm_im_preedit_caret(int64_t id) { (void)id; return 0; }
+int wm_im_preedit_active(int64_t id) { (void)id; return 0; }
+
+void wm_wakeup(void) {}
+
+int64_t wm_now_ms(void) {
+  return 0;
+}
+
+int64_t wm_local_date(void) {
+  return 0;
+}
+
+#endif
+// Linux 上 native-stub 的那次编译（无 _WIN32、无 WM_STUB_GTK）落不进任何
+// 分支，编出空翻译单元——GTK 实现由 prebuild 的 libyue_win_stub.a 提供，
+// 这里绝不能再定义一份（双定义）。

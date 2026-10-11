@@ -1105,6 +1105,17 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **分包测试的连带编译问题 Windows 与 Linux 同款**:workspace 内 cd 进成员目录裸跑 `moon test` 会把主包红点一并编进来,须 `-p` 限定包/模块名(HANDOFF.md 已记,此处确认 Windows 一致)。
 - **验证**(2026-10-11,本机):`moon check` 287 errors / 68 warnings 与 Linux 基线**逐字持平**;纯 MoonBit 包全绿——yoga-mbt 96/96、core 62/62、input 10/10、mdview 26/26、theme 7/8(挂的「控件高度基准」一条依赖 Pango 字体实测,占位文本后端必挂,归文本后端批)、icons 2/4(挂的两条是「真画出像素」绘制断言,归渲染后端批);ui 因 `TextMetrics::unwrap` 空值 panic(同归文本批)、sys/chart 因 subproc 编译失败(归 W14)。
 
+### MoonBit 原生 GUI 栈 · Windows 窗口地基(W2,stub 合一 + Win32 后端)
+
+- **架构定案:平台桩合并为单一 `yue/win/stub.c` 三分支**——`_WIN32` 真 Win32 实现、`WM_STUB_GTK` 真 GTK 实现(prebuild 在 Linux 带 `-DWM_STUB_GTK` + pkg-config 头编进 `libyue_win_stub.a`)、其余平台占位;原先的 `gtk_stub.c`/`gtk_stub_portable.c` 两文件删除。合并的物理约束:moon 的 native-stub 会把 moon.pkg 里列的每个 .c 在**所有平台**各编一遍,而 GTK 头路径只有 prebuild 拿得到,所以装 GTK 的分支必须挂在「prebuild 独有的宏」下——Linux 上 native-stub 的那次编译(无宏)落不进任何分支,编出空 TU,避免与 .a 双定义;这正是原两文件结构的等价形态,只是收敛进一个文件。空 TU 在本链已验证可行(原 portable 文件在 Linux 就是空编)。
+- **moon native-stub 在 Windows 直接可见 `windows.h`**(探针包实编译链接验证):moon 自行定位 MSVC 工具链并设好 SDK 包含路径,Win32 桩可以直接走 native-stub,无需 prebuild 代编;prebuild 的 Windows 分支只下发系统库链接参数(`user32.lib gdi32.lib imm32.lib advapi32.lib`,MSVC 位置参数口径)。
+- **MSVC 的 `IDC_*` 光标宏默认走 ANSI 变体**:不定义 UNICODE 时 `IDC_ARROW` 是 `MAKEINTRESOURCEA` 形态(LPSTR),传给 `LoadCursorW` 的 `LPCWSTR` 形参报 C4133;桩文件顶部强制 `#define UNICODE`/`_UNICODE` 即全 W 化。
+- **按键映射口径与 GDK 对齐**:字符面在 `WM_KEYDOWN` 里用 `ToUnicode` 直取(ASCII/Latin-1 原值、其余 `0x01000000|unicode`,与 `gdk_unicode_to_keyval` 一致,`keysym_to_text` 两条 Latin-1/UCS 路都能吃);**Ctrl 组合键要把 `VK_CONTROL` 从 `GetKeyboardState` 的状态副本里摘掉再换算**——带控制位会吐控制字符(`\x01`),内核的 Ctrl+A(判 `keysym=='a'`)就失效了,摘掉后与 GDK 的「keyval 取基准字符、修饰走 mods」同语义;AltGr(Ctrl+Alt)因此拿不到特殊字符,留 IME/后续批次。死键(`ToUnicode` 返回负)不推事件,组合由布局状态自然发生在下一个键上。Alt+F4 放回 `DefWindowProc` 生成 `WM_CLOSE`(与「窗口管理器请求关闭」同语义),其余系统键(F10 菜单/Alt+空格)自己吃掉。
+- **贴屏无需换序**:`yue/render` 的 Bitmap 就是 cairo ARGB32(小端字节 B,G,R,A 预乘),GDI 的 32bpp `BI_RGB` 顶底 DIB(负 biHeight)字节口径完全一致,`StretchDIBits` 直贴;present 只记地址 + `InvalidateRect`,真贴在 `WM_PAINT` 里(与 GTK 桩「draw 回调才贴」同口径,避开死窗口期)。`WM_ERASEBKGND` 返回 1 防闪。
+- **循环配方**:等待用 `MsgWaitForMultipleObjectsEx(0,NULL,timeout,QS_ALLINPUT,MWMO_INPUTAVAILABLE)`(有未派发消息立即返回,负超时即 INFINITE);跨线程唤醒是 `HWND_MESSAGE` 仅消息窗口 + `PostMessageW(WM_APP+1)`;泵是 `PeekMessageW` 排空 + `DispatchMessageW`,**不做 TranslateMessage**(WM_CHAR 不消费,字符面在 WM_KEYDOWN 直取)。
+- **槽位与创建时序**:`WM_SIZE` 在 `CreateWindowW` 期间就会到达,槽号必须经 `CREATESTRUCT.lpCreateParams` 在 `WM_CREATE` 里先行落位(`GWLP_USERDATA` 建完再设会丢掉首条 WM_SIZE);客户区口径用 `AdjustWindowRect` 把外框撑到客户区恰为 width×height。DPI 用 `SetProcessDpiAwarenessContext` per-monitor v2(经 GetProcAddress 取,老系统缺导出不断链),整栈物理像素,`WM_DPICHANGED` 按建议矩形重摆、WM_SIZE 记账。
+- **验证**(2026-10-11,本机):`moon build examples/native-window` 全链链接成功;冒烟 `NATIVE-WINDOW-OK frames=45`(5s 定时退出,exit 0,45 帧上屏即 present→WM_PAINT→StretchDIBits 通);core.App 宿主形态用用完即删探针验 `WIN-SMOKE-OK`(App::new + 声明式挂载 + timer + 干净退出);core 62/62 复绿(测试不调 App::new,不会弹真窗),全仓 check 287/68 持平。band_h=0/0/0/0 属文本后端占位(W5)。
+
 ## macOS(CI 构建链已验,GUI 待真机)
 
 - libyue v0.15.6 发行包含 ARC / no-ARC 双库:Darwin 链接参数 = 主库 + `-lyue_mbt_noarc`(no-ARC 符号被主库引用,须排其后)+ AppKit / Carbon / IOKit / Security / WebKit / OpenDirectory 框架 + `-lobjc -lc++ -lpthread -lbsm -Wl,-dead_strip`;prebuild Darwin 分支已按此预修。

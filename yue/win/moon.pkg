@@ -4,10 +4,13 @@ import {
 
 supported_targets = "native"
 
-// GTK 端不由 moon 编译：link_configs 只有链接期字段，native-stub 拿不到系统头
-// （实测同 G0 探针），故 gtk_stub.c 由 scripts/prebuild.py 编成
-// build/libyue_win_stub.a 后经 link_flags 传入；这里只带非 Linux 的占位实现，
-// 保证三平台链接不断符号。链接参数按 AGENTS 规则 1 全部由 prebuild 托管。
+// stub.c 一个文件三条分支：_WIN32 真 Win32 实现（moon native-stub 自编，
+// windows.h 走 MSVC 自带 SDK 路径，实测可达）、WM_STUB_GTK 真 GTK 实现
+// （仅 scripts/prebuild.py 在 Linux 带 -DWM_STUB_GTK + pkg-config 头编成
+// build/libyue_win_stub.a 经 link_flags 传入；native-stub 拿不到 GTK 头路径，
+// 实测同 G0 探针）、其余平台占位。Linux 上 native-stub 的那次编译编出空 TU，
+// 防 wm_* 与 prebuild 的 .a 双定义。Windows 的系统库链接参数（user32 等）
+// 由 prebuild 的 Windows 分支下发；链接参数按 AGENTS 规则 1 全部由 prebuild 托管。
 options(
-  "native-stub": [ "gtk_stub_portable.c" ],
+  "native-stub": [ "stub.c" ],
 )
