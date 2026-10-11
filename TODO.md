@@ -54,7 +54,7 @@
 - [~] 基础原语：`group`/`separator`/标签/图像/图标/按钮已落新包 **`yue/ui`**（首批 7 件，另附 `container`；文本 measure/baseline 首次回灌布局引擎，`on_pointer`/`on_draw` 首参为控件本身以免自捕获引用环；`type=` 因是保留字改 `kind : ButtonKind`；`yue/components` 属旧链路红点，按批替换）；剩 `scroll`/`splitter`/`tab` ＋ 复选 / 单选 / 开关 / 滑块 / 进度 / 步进
 - [ ] 文本族 `components_text.mbt`：`label_t`、`code_view`＋`tokenize_lang`/`tokenize_moonbit`、`measure_text_height`
 - [~] 表单族 `components_form.mbt`（15）：`checkbox`/`radio_group`/`switch_t`/`slider_t`/`progress`/`stepper`(`input_number` 形态)已落 `yue/ui/form.mbt`（值走 `Store[T]`、订阅随回收袋退订、禁用态用 `Enabled` 单元、滑块拖动靠组件自持的 dragging）；剩 `entry_t`/`input_t`/`textarea_t`（随「输入框全语义」那条一起做）与 `button_t`/`form_item`/`form`/`link`/`select_t`/`rate_t`/`color_picker_t`
-- [ ] 输入框全语义（跨文本/表单两族）：选区、双击选词、拖放插入点、Shift+箭头、undo/redo、placeholder、粘贴降级、只读、密码遮罩、IME 与 preedit 内联
+- [~] 输入框全语义（`yue/ui/entry.mbt`，单行）：选区/双击选词/拖动插入点/Shift+箭头/undo-redo/Ctrl+A-C-V(内核内部剪贴板=记档降级)/placeholder/只读/密码遮罩/IME commit+preedit 内联全部落地，真窗口注入回证 `t3='组件框ab Q'`（点进框→打字→双击只选最后一个词→替换→Home+Shift+End+Delete+Ctrl+Z 撤销回来）；剩多行 `textarea_t`（要先做换行布局与垂直滚动）
 - [ ] 显示族 `components_display.mbt`（16）：`tag`/`tag_of_type`/`badge_count`/`badge_dot`/`avatar`/`timeline`/`descriptions`/`result`/`empty`/`statistic`/`progress_line`/`divider`/`card`/`alert`/`alert_closeable`/`carousel_t`
 - [ ] 日期族 `components_datetime.mbt`（5）：`calendar_t`/`date_picker_t`/`date_range_picker_t`/`time_range_picker_t`/`datetime_range_picker_t`
 - [ ] 导航族 `components_nav.mbt`（10）：`side_menu(_sections)`/`segmented`/`breadcrumb`/`pagination`/`steps`/`collapse`/`tree`/`transfer`/`tabs_t`

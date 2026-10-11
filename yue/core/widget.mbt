@@ -85,6 +85,9 @@ pub(all) struct Widget {
   /// `on_draw` 里读，不必自己处理 enter/leave（见 `set_hover`/`set_press`）
   mut hovered : Bool
   mut pressed : Bool
+  /// 键盘焦点标志：同样由宿主维护（焦点栈里只有 focus_id，控件画高亮时
+  /// 要知道「那个 id 是不是我」），组件不必自己去问焦点栈
+  mut focused : Bool
   /// 输入法提交文本到达本控件（宿主按焦点 id 路由）；返回是否消费。
   mut on_commit : Option[(String) -> Bool]
   /// 组合串更新（文本 + 串内字节光标）；宿主每拍投给焦点控件。
@@ -116,6 +119,7 @@ pub fn Widget::new() -> Widget {
     on_scroll: None,
     hovered: false,
     pressed: false,
+    focused: false,
     on_commit: None,
     on_preedit: None,
     im_context: None,
@@ -402,6 +406,16 @@ pub fn Widget::by_id(self : Widget, id : Int) -> Widget? {
   match path_to_widget(self, id, []) {
     [] => None
     path => Some(path[path.length() - 1])
+  }
+}
+
+///|
+/// 按**焦点栈 id** 重排 `focused` 标志（一次遍历，宿主每帧画之前同步一次）。
+/// 焦点栈只记 id，控件绘制要的是「我是不是那个被聚焦的」，这层换算归宿主。
+pub fn Widget::set_focused_by_focus(self : Widget, focus_id : Int) -> Unit {
+  self.focused = focus_id > 0 && self.focus_id == focus_id
+  for k in self.kids {
+    k.set_focused_by_focus(focus_id)
   }
 }
 

@@ -428,6 +428,17 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **工具链写法七条**：`match` 多主语必须写成元组 `match (a, b) { (Some(x), y) => ... }`；`Double::clamp` 要 labelled `min=/max=`；`Int::to_char()` 返回 `Char?`（要 `unsafe_to_char`，否则静默拼出 `"Some('x')"`）；`String.split` 给的是 `Iter[StringView]`、`StringView::to_string` 已弃用改 `to_owned`；`Array[Byte]` 没有 `freeze`/`to_fixed_array`，要递给 C 当 `Bytes` 就一开始用 `FixedArray::make`；`Option[(A, B) -> R]` 结尾的 `]` 丢了会报「unexpected token infix」这种莫名错；跨行续写不能把 `+`/`&&` 放行首（MoonBit 按行尾断句），`type` 是保留字不能作参数名。
 - **验证**：`moon test -p .../yue/ui` 15/15（新增 7 条：复选点击/再点/出界不触发/禁用不消费、单选组按项写值且点已选不改、开关尺寸固定且绘制跟随 Store 现值、滑块按下取值+出界拖动+步长吸附+禁用不消费、进度条按值填充、步进器夹取且边界自动禁用、Store 订阅随回收袋退订（重挂 5 次后 `sub_count=0`，不套袋则常驻 1 条）；另加两条渲染回归：文本随控件原点落位并被裁剪、富文本经会话绘制落位在平移后的盒内）、`yue/text` 29/29；九包 `--deny-warn` 全零警告，core 59/render 40/icons 4/theme 7/sys 7/yoga-mbt 92 全绿，全仓红点仍 287 errors / 68 warnings。真窗口注入（坐标取自 `NATIVE-APP-RECTS`）：`form=true/false/90/1`（复选切真、开关切假、滑块拖到 90 且按步长 5 吸附、步进 +1），`decl=3 kids=9/9`（声明式原位重挂未退化），`band=d3/u3/m3`（三次带外松手都收到抬起），`clicks=2 t1='zhelloab' c1=1`（打字/Tab/点击定位），退出码 0；截图复核：标题、两个输入框、计数按钮、混排行高盒、组件行与表单行全部落位正确。
 
+### MoonBit 原生 GUI 栈 · 输入框全语义（`yue/ui/entry.mbt`）
+
+- **形态**：文本状态的唯一权威仍是 `@input.Editor`，组件不另存一份；`Store[String]` 只是它的对外投影——编辑后回写 Store，Store 被外部 `set` 时经订阅回灌内核（`subscribe_id` + 回收袋退订，重挂不留死订阅）。与宿主的接缝就是地基那五个回调，输入法四条件由 `App::pump_ime` 统一满足，组件只提供 `im_context`（已提交文本 + 字节 caret）与 `im_cursor`（候选窗定位矩形）。
+- **焦点高亮改由宿主同步**：新增 `Widget.focused` 与 `Widget::set_focused_by_focus(focus_id)`，`App::paint_frame` 每帧画之前同步一次。原因与 `hovered`/`pressed` 同理——焦点栈只记 id，组件要的是「那个 id 是不是我」，让每个组件自己去问焦点栈既拿不到栈、又会把 `core` 的焦点结构漏进组件层。
+- **只读白名单要按 keysym 族来写**：第一版按「65288..65300 是导航」放行，结果**退格（65288）被当成导航放过**，只读框照旧删字（测试抓到）。真实口径：方向键/Home/End/PageUp-Down 在 **65360..65367**，退格 65288、删除 65535 属编辑键。定案为「带 Ctrl/Shift 的组合、65360..65367、Tab 放行；退格/删除/可打印字符一律不吃」。
+- **双击判定**：两次 `Down` 间隔 < 400ms 且位移 < 4px（时钟用 `@core.now_ms()`，是 `@win.now_ms()` 的转派）。**副作用要记档**：连续快速点击会被判成双击——无头用例里「按下-松开-再按下」验证拖动时，第二次按下实际走了选词分支，断言要按这个语义写。
+- **CJK 选词是当前近似的点**：`is_word_byte` 把 `>= 0x80` 全算词内（与内核同口径），所以中文里双击会把**连续的整段中文**选中（真窗口实测：`组件框ab` 末尾双击选中 `组件框ab` 整段，替换后剩 `Q`）。ASCII 侧正常（空格分词，`组件框ab c` 双击只选 `c`）。要不要按 Blink 的词典分词收敛，等布局那套 Blink 对照手法排到文本时一并测，先记档不猜。
+- **拖动选区**：按下记锚点，捕获期的 `Move` 用 `select_range(anchor, byte_at_x(x))` 扩选——指针拖出框外也连续（这是宿主捕获期的第二个消费者）；`Up` 结束拖动，之后再 `Move` 不跟手（用例断言 caret 不变）。
+- **观测通道的取巧处**：内核句柄不外露（文本权威在组件里），无头用例改从两条公开面观测——`w.im_context()` 给「文本 + caret」，以及「打字会替换选区」这一行为本身（选区对不对，看替换后的文本）。比为了测试开一堆 getter 干净。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/ui` **25/25**（新增 10 条输入框用例：键入回写 Store 与退格/undo、commit 落文本而 preedit 只进绘制、点击最左/最右定位、双击选词、拖动全选与松手不跟手、Shift+箭头扩选 + Ctrl+A/C/V 内部剪贴板、只读放行导航与复制、密码遮罩 Store 存原文、placeholder 有像素且 Store 为空、Store 外部改动回灌内核 + `focused` 由宿主同步）；九包 `--deny-warn` 全零警告，全仓红点回到 287 errors / **68** warnings（中途一度 69，是测试里一个未用变量）。真窗口注入（`examples/native-app` 新增 `@ui.entry` 行，`focus_id=4`）：点进框 → 打 `ab c` → 末尾双击 → 打 `Q` → `Home`+`Shift+End`+`Delete`+`Ctrl+Z` → 状态行 `t3='组件框ab Q'`、`focus=4`，退出码 0；截图复核组件框落位与描边正常。**待用户目视**：caret 闪烁（组件的 `caret_on?` 由调用方时钟驱动）、preedit 下划线、候选窗是否贴组合串末尾。
+
 ## Linux
 
 ### 发行版

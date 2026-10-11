@@ -344,7 +344,7 @@ fn make_band(ctr : Ctr) -> @core.Widget {
       3.0,
       "捕获带 d\{ctr.down} u\{ctr.up} m\{ctr.moved}",
       12.0,
-      "#ffffff",
+      @theme.theme_text_primary(),
     )
   })
   w.on_pointer = Some(fn(_widget : @core.Widget, ev : @core.PointerEvent) -> Bool {
@@ -458,12 +458,23 @@ fn main {
       border=@theme.theme_border(),
     ),
   ])
+  // 批次 5d（输入框全语义）：整只框由 `@ui.entry` 提供——键入、选区、双击选词、
+  // 拖动、undo、输入法提交与 preedit 都在组件里，宿主只按焦点投递。
+  let t3 = @core.Store::new("组件框")
+  let _ = (@ui.entry(
+    t3,
+    width=200.0,
+    focus_id=4,
+    placeholder="说点什么",
+    caret_on=fn() -> Bool { ctr.blink },
+  )).mount_into(root)
   let decl = @core.Store::new(0)
   let decl_kids_before = root.children().length()
   app.mount([make_decl_row(decl)])
   let _ = app.focus.register(1)
   let _ = app.focus.register(2)
   let _ = app.focus.register(3)
+  let _ = app.focus.register(4)
 
   let ticker : Ref[() -> Unit] = Ref(fn() { () })
   ticker.val = fn() {
@@ -491,7 +502,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()}",
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）

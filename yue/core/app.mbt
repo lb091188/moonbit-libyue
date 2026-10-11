@@ -33,6 +33,10 @@ pub(all) struct App {
 }
 
 ///|
+/// 单调时钟（毫秒）。声明式组件的双击判定等要它；无后端时返回 0。
+pub fn now_ms() -> Int64 { @win.now_ms() }
+
+///|
 /// 平台后端与窗口都建起来才算成功；无显示服务返回 None。
 pub fn App::new(width : Int, height : Int, title : String) -> App? {
   if !@win.init_backend() {
@@ -318,6 +322,11 @@ pub fn App::paint_frame(self : App) -> Unit {
   let (w, h) = self.window.size()
   if w < 1 || h < 1 {
     return ()
+  }
+  // 绘制前同步一次焦点标志：焦点栈、控件树、重挂都可能在上一拍改过
+  match self.focus.current() {
+    Some(id) => self.root.set_focused_by_focus(id)
+    None => self.root.set_focused_by_focus(0)
   }
   let bm = @render.Bitmap::new(w, h)
   let p = @render.Painter::new(bm)
