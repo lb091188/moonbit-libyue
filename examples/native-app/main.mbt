@@ -452,6 +452,77 @@ fn make_sticky_section(st : @ui.StickyList, slot : Ref[@core.Widget?]) -> @core.
 }
 
 ///|
+/// 表单族余项区块：四型主题化按钮 + 链接 + 表单（错误行）+ 评分。
+/// 按钮四型都记同一个点击数（点哪个都 +1），「危险」那颗另外把错误文案写进
+/// `form_item` 的错误 Store，用来回证「错误出现不引起布局跳动」。
+fn make_form_section(
+  btn : Ref[Int],
+  lnk : Ref[Int],
+  rate : @core.Store[Int],
+  err : @core.Store[String],
+  btn_slot : Ref[@core.Widget?],
+  row_slot : Ref[@core.Widget?],
+  link_slot : Ref[@core.Widget?],
+  rate_slot : Ref[@core.Widget?],
+  item_slot : Ref[@core.Widget?],
+) -> @core.Node {
+  let hit = fn() -> Unit { btn.val = btn.val + 1 }
+  let hit_err = fn() -> Unit {
+    btn.val = btn.val + 1
+    err.set("必填项不能为空")
+  }
+  @ui.container(
+    [
+      @ui.label("表单族余项：四型按钮 / 链接 / 表单项错误行 / 评分（退出状态行报点击与值）", size=13.0),
+      @ui.container(
+        [
+          @ui.button_t(
+            "实心提交",
+            on_click=hit,
+            variant=Solid,
+            focus_id=21,
+            handle=fn(w : @core.Widget) -> Unit { btn_slot.val = Some(w) },
+          ),
+          @ui.button_t("柔和", on_click=hit, variant=Soft),
+          @ui.button_t("文字", on_click=hit, variant=Text),
+          @ui.button_t("危险并报错", on_click=hit_err, variant=Danger),
+          @ui.link("查看详情", fn() -> Unit { lnk.val = lnk.val + 1 }, handle=fn(w : @core.Widget) -> Unit {
+            link_slot.val = Some(w)
+          }),
+        ],
+        direction=@yoga.Row,
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::Center,
+        handle=fn(w : @core.Widget) -> Unit { row_slot.val = Some(w) },
+      ),
+      @ui.form(
+        "表单分组",
+        [
+          @ui.form_item("昵称", @ui.label("（控件区）"), label_width=90.0),
+          @ui.form_item(
+            "备注",
+            @ui.label("（错误文案在下方红字）"),
+            label_width=90.0,
+            error=err,
+            handle=fn(w : @core.Widget) -> Unit { item_slot.val = Some(w) },
+          ),
+        ],
+      ),
+      @ui.rate_t(
+        rate,
+        max=5,
+        handle=fn(w : @core.Widget) -> Unit { rate_slot.val = Some(w) },
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 虚拟表格演示数据：200 行（几何验证页只挂可见的十来行）。
 fn make_virt_rows() -> Array[@ui.TableRow] {
   let out : Array[@ui.TableRow] = []
@@ -588,7 +659,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1400, 1500, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1400, 1660, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -771,10 +842,32 @@ fn main {
   let sticky = @ui.StickyList::new()
   let sticky_w : Ref[@core.Widget?] = Ref(None)
   let spl_w : Ref[@core.Widget?] = Ref(None)
+  let frm_btn = Ref(0)
+  let frm_lnk = Ref(0)
+  let frm_rate = @core.Store::new(0)
+  let frm_err = @core.Store::new("")
+  let frm_btn_w : Ref[@core.Widget?] = Ref(None)
+  let frm_row_w : Ref[@core.Widget?] = Ref(None)
+  let frm_link_w : Ref[@core.Widget?] = Ref(None)
+  let frm_rate_w : Ref[@core.Widget?] = Ref(None)
+  let frm_item_w : Ref[@core.Widget?] = Ref(None)
   app.mount([make_table_section(tb_rows, tb_sel, tb_sort, tb_w)])
   app.mount([make_virt_section(vt_rows, vt_sel, vt_sort, vt_clicks, vt_w)])
   app.mount([make_sticky_section(sticky, sticky_w)])
   app.mount([make_split_section(spl_w)])
+  app.mount([
+    make_form_section(
+      frm_btn,
+      frm_lnk,
+      frm_rate,
+      frm_err,
+      frm_btn_w,
+      frm_row_w,
+      frm_link_w,
+      frm_rate_w,
+      frm_item_w,
+    ),
+  ])
   app.mount([
     @ui.container(
       [
@@ -1180,7 +1273,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -1297,6 +1390,28 @@ fn main {
     )
     None => ()
   }
+  let frm_btns = match frm_row_w.val {
+    Some(w) => {
+      let mut acc = ""
+      for c in w.children() {
+        acc = acc + rect_str(c.rect) + " "
+      }
+      acc
+    }
+    None => "-"
+  }
+  println(
+    "NATIVE-APP-FORM btn=" +
+    ov2_rect_of(frm_btn_w.val) +
+    " btns=" +
+    frm_btns +
+    " link=" +
+    ov2_rect_of(frm_link_w.val) +
+    " rate=" +
+    ov2_rect_of(frm_rate_w.val) +
+    " item=" +
+    ov2_rect_of(frm_item_w.val),
+  )
   match sticky.scroll.view_h {
     v =>
       println(

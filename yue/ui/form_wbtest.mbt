@@ -220,3 +220,157 @@ test "Store 订阅随回收袋退订：反复重挂不在 Store 上堆积订阅"
   @core.mount_children(holder2, [checkbox("另一处", v)])
   assert_eq(v.signal().sub_count(), 1)
 }
+
+///|
+/// 画一个控件并把位图与控件原点交出来（绘制按绝对落位平移，取样要用窗口坐标）。
+fn shot(w : @core.Widget) -> (@render.Bitmap, Int, Int) {
+  let bm = @render.Bitmap::new(w.rect.w.round().to_int() + 2, w.rect.h.round().to_int() + 2)
+  let p = @render.Painter::new(bm)
+  w.paint(p)
+  p.end()
+  (bm, w.rect.x.round().to_int(), w.rect.y.round().to_int())
+}
+
+///|
+test "按钮配色求解：变体 + 悬停走预设，显式覆盖吃掉悬停" {
+  let s0 = button_skin(Solid, false, "", "")
+  assert_eq(s0.0, "#ffffff")
+  assert_eq(s0.1, @theme.theme_primary())
+  assert_eq((button_skin(Solid, true, "", "").1), @theme.theme_primary_hover())
+  // Soft：常态浅底主色字，悬停变实底白字
+  assert_eq(button_skin(Soft, false, "", ""), (@theme.theme_primary(), @theme.theme_primary_light()))
+  assert_eq(button_skin(Soft, true, "", ""), ("#ffffff", @theme.theme_primary()))
+  // Text：常态无底（空串 = 不画底）
+  let t0 = button_skin(Text, false, "", "")
+  assert_eq(t0.1, "")
+  assert_eq(button_skin(Text, true, "", "").1, @theme.theme_fill_hover())
+  assert_eq(button_skin(Danger, false, "", "").1, @theme.theme_danger())
+  assert_eq(button_skin(Danger, true, "", "").1, @theme.theme_danger_hover())
+  // 显式覆盖：所有状态一致，hover 不再变色
+  assert_eq(button_skin(Solid, true, "#111111", "#222222"), ("#111111", "#222222"))
+  assert_eq(button_skin(Solid, false, "#111111", "#222222"), ("#111111", "#222222"))
+}
+
+///|
+test "主题化按钮：宽度随文本、抬起落在框内才算点击、焦点环只在聚焦时画" {
+  let mut hits = 0
+  let store_hit = fn() -> Unit { hits = hits + 1 }
+  let root = mount_root([button_t("提交", on_click=store_hit, focus_id=7)], 300.0, 60.0)
+  let w = kid(root, 0)
+  let m = @text.measure("提交", 13.0).unwrap()
+  assert_eq(w.rect.w, m.width.to_double() + 24.0)
+  assert_eq(w.rect.h, @theme.control_height)
+  let _ = click(w, w.rect.x + w.rect.w / 2.0, w.rect.y + w.rect.h / 2.0)
+  assert_eq(hits, 1)
+  // 按下后拖出框外抬起：不算一次点击
+  let _ = w.dispatch_pointer({ kind: @core.Down, x: w.rect.x + 4.0, y: w.rect.y + 4.0, button: 1, mods: 0, })
+  let _ = w.dispatch_pointer({
+    kind: @core.Up,
+    x: w.rect.x + 4.0,
+    y: w.rect.y + w.rect.h + 20.0,
+    button: 1,
+    mods: 0,
+  })
+  assert_eq(hits, 1)
+
+  // 焦点环：未聚焦时整块是浅底，聚焦后 1px 环落在第二列（描边中心在 0.5）
+  let mid_y = (w.rect.h / 2.0).round().to_int()
+  let (bm0, ox, oy) = shot(w)
+  let edge0 = color_of(bm0, ox + 1, oy + mid_y)
+  let _ = root.set_focused_by_focus(7)
+  let (bm1, _, _) = shot(w)
+  let edge1 = color_of(bm1, ox + 1, oy + mid_y)
+  assert_true(edge0 != edge1)
+  // 禁用：不消费事件、不回调
+  let mut off_hits = 0
+  let root2 = mount_root([button_t("禁用", on_click=fn() { off_hits = off_hits + 1 }, disabled=true)], 200.0, 40.0)
+  let w2 = kid(root2, 0)
+  let consumed = click(w2, w2.rect.x + 6.0, w2.rect.y + 6.0)
+  assert_false(consumed)
+  assert_eq(off_hits, 0)
+}
+
+///|
+test "链接：宽度就是文字宽、悬停出下划线、抬起才回调" {
+  let mut n = 0
+  let font = @text.Font::new("", 13.0)
+  let root = mount_root([link("查看详情", fn() { n = n + 1 })], 300.0, 40.0)
+  let w = kid(root, 0)
+  assert_eq(w.rect.w, text_width("查看详情", font))
+  let _ = click(w, w.rect.x + 4.0, w.rect.y + 4.0)
+  assert_eq(n, 1)
+  // 下划线只在悬停时画（底行像素从空变有）
+  let (bm0, ox, oy) = shot(w)
+  let base_row = color_of(bm0, ox + 2, oy + w.rect.h.round().to_int() - 1)
+  root.set_hover(w.id)
+  let (bm1, _, _) = shot(w)
+  assert_true(color_of(bm1, ox + 2, oy + w.rect.h.round().to_int() - 1) != base_row)
+}
+
+///|
+test "表单项：标签定宽右对齐、错误行常驻预留 18 高、文案随 Store 变" {
+  let err = @core.Store::new("")
+  let root = mount_root(
+    [form_item("名称", label("控件区"), label_width=90.0, error=err)],
+    320.0,
+    120.0,
+  )
+  let outer = kid(root, 0)
+  assert_eq(outer.children().length(), 2)
+  let row = outer.children()[0]
+  let err_box = outer.children()[1]
+  assert_eq(err_box.rect.h, 18.0)
+  // 行 = 定宽标签盒 + 12 间距 + 控件
+  let label_box = row.children()[0]
+  assert_eq(label_box.rect.w, 90.0)
+  assert_eq(row.children()[1].rect.x, 90.0 + 12.0)
+  // 预留行不随文案消失：错误为空时整块高度与填了错误时一致
+  let h_empty = outer.rect.h
+  err.set("必填项")
+  let _ = root.relayout(320.0, 120.0)
+  assert_eq(outer.rect.h, h_empty)
+  // 空文案量出 0 宽，改文案后就地重测（relabel 只动这一条链）
+  let err_label = err_box.children()[0]
+  assert_true(err_label.rect.w > 0.0)
+}
+
+///|
+test "评分：星顶点几何、点击写值并回调、悬停只预亮不改值" {
+  let pts = star_points(0.0, 0.0, 10.0)
+  assert_eq(pts.length(), 10)
+  // 起点朝上（-90°），第二点是内半径 0.382R 在 -54°
+  assert_true(pts[0].0.abs() < 0.01 && (pts[0].1 + 10.0).abs() < 0.01)
+  assert_true((pts[1].0 - 2.2456).abs() < 0.01 && (pts[1].1 + 3.0918).abs() < 0.01)
+  // 外内半径交替
+  let r0 = (pts[0].0 * pts[0].0 + pts[0].1 * pts[0].1).sqrt()
+  let r1 = (pts[1].0 * pts[1].0 + pts[1].1 * pts[1].1).sqrt()
+  assert_true(r0 > r1)
+
+  let value = @core.Store::new(0)
+  let mut cb = -1
+  let root = mount_root([rate_t(value, max=5, on_change=fn(v) { cb = v })], 300.0, 60.0)
+  let w = kid(root, 0)
+  assert_eq((w.rect.w, w.rect.h), (22.0 * 5.0 + 4.0 * 4.0, 22.0))
+  // 第 2 颗星：x=48 → ((48+2)/26 取整)+1 = 2
+  let _ = click(w, w.rect.x + 48.0, w.rect.y + 10.0)
+  assert_eq((value.get(), cb), (2, 2))
+  // 最右一星的右缘仍夹在 1..max
+  let _ = click(w, w.rect.x + 120.0, w.rect.y + 10.0)
+  assert_eq((value.get(), cb), (5, 5))
+  // 悬停预亮：只换绘制，不动值（第 1 颗星心 11,11）
+  let (bm0, ox, oy) = shot(w)
+  let lit0 = color_of(bm0, ox + 11, oy + 11)
+  value.set(0)
+  let (bm_empty, _, _) = shot(w)
+  let dim = color_of(bm_empty, ox + 11, oy + 11)
+  assert_true(dim != lit0)
+  // 移到第 3 颗星（x=60 → 预亮 1..3），第 1 颗重新亮起，值仍是 0
+  let _ = w.dispatch_pointer({ kind: @core.Move, x: w.rect.x + 60.0, y: w.rect.y + 11.0, button: 0, mods: 0, })
+  assert_eq(value.get(), 0)
+  let (bm1, _, _) = shot(w)
+  assert_true(color_of(bm1, ox + 11, oy + 11) != dim)
+  // 离开后预亮清零
+  let _ = w.dispatch_pointer({ kind: @core.Leave, x: 0.0, y: 0.0, button: 0, mods: 0, })
+  let (bm2, _, _) = shot(w)
+  assert_eq(color_of(bm2, ox + 11, oy + 11), dim)
+}

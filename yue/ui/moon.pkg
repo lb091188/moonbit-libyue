@@ -9,6 +9,7 @@ supported_targets = "native"
 import {
   "NoahLiu/yoga-mbt/src" @yoga,
   "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/math",
   "NoahLiu/moonbit-libyue/yue/core",
   "NoahLiu/moonbit-libyue/yue/input",
   "NoahLiu/moonbit-libyue/yue/icons",

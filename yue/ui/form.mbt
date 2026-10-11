@@ -396,3 +396,357 @@ pub fn stepper(
     align_items=@yoga.AlignItems::Center,
   )
 }
+
+///|
+/// 按钮变体：Solid 主题色实底白字 / Soft 浅底主题色字 / Text 透明底主题色字 /
+/// Danger 红底白字。
+pub(all) enum ButtonVariant {
+  Solid
+  Soft
+  Text
+  Danger
+}
+
+///|
+/// 按钮配色求解（纯函数）：`color`/`background_color` 传非空即显式覆盖，
+/// 且**所有状态一致**（悬停不再变色）；未传按变体 + 悬停走预设。返回
+/// `(文字色, 底色)`，底色为空串表示不画底。
+pub fn button_skin(
+  variant : ButtonVariant,
+  lit : Bool,
+  color : String,
+  background_color : String,
+) -> (String, String) {
+  let fg = if color.length() > 0 {
+    color
+  } else {
+    match variant {
+      Solid | Danger => "#ffffff"
+      Soft => if lit { "#ffffff" } else { @theme.theme_primary() }
+      Text => @theme.theme_primary()
+    }
+  }
+  let bg = if background_color.length() > 0 {
+    background_color
+  } else {
+    match variant {
+      Solid => if lit { @theme.theme_primary_hover() } else { @theme.theme_primary() }
+      Soft => if lit { @theme.theme_primary() } else { @theme.theme_primary_light() }
+      Text => if lit { @theme.theme_fill_hover() } else { "" }
+      Danger => if lit { @theme.theme_danger_hover() } else { @theme.theme_danger() }
+    }
+  }
+  (fg, bg)
+}
+
+///|
+/// 主题化按钮：变体配色（悬停/按下都收敛在主题内）+ 焦点环。`focus_id` 传
+/// 正数才可 Tab 到；焦点环在实底变体上用白色（主题色环在其上不可见）。
+pub fn button_t(
+  text : String,
+  on_click? : () -> Unit = fn() -> Unit { () },
+  variant? : ButtonVariant = Soft,
+  color? : String = "",
+  background_color? : String = "",
+  size? : Double = 13.0,
+  min_width? : Double = 0.0,
+  focus_id? : Int = 0,
+  disabled? : Bool = false,
+  enabled? : Enabled? = None,
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  let src = text_source(text, size=size, align=@text.Center)
+  let v_id = match variant {
+    Solid => 0
+    Soft => 1
+    Text => 2
+    Danger => 3
+  }
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    let off = enabled_cell(enabled, disabled)
+    w.focus_id = focus_id
+    w.node.set_height(@yoga.fixed(@theme.control_height))
+    if min_width > 0.0 {
+      w.node.set_min_width(@yoga.fixed(min_width))
+    }
+    w.node.set_padding_left(@yoga.fixed(12.0))
+    w.node.set_padding_right(@yoga.fixed(12.0))
+    w.node.set_flex_shrink(0.0)
+    attach_text_measure(w, src)
+    w.on_draw = Some(fn(
+      self : @core.Widget,
+      p : @render.Painter,
+      r : @core.Rect,
+    ) -> Unit {
+      let (fg0, bg0) = button_skin(
+        variant,
+        self.hovered || self.pressed,
+        color,
+        background_color,
+      )
+      let fg = if off.off { @theme.theme_text_secondary() } else { fg0 }
+      let bg = if off.off { @theme.theme_fill_hover() } else { bg0 }
+      if bg.length() > 0 {
+        p.set_fill_color(bg)
+        p.fill_rect(0.0, 0.0, r.w, r.h)
+      }
+      let _ = @text.draw_box_at(
+        p,
+        12.0,
+        0.0,
+        (r.w - 24.0).max(1.0),
+        r.h,
+        src.text,
+        src.font,
+        fg,
+        align=@text.Center,
+        valign=@text.Center,
+        wrap=false,
+      )
+      if self.focused && v_id != 0 && v_id != 3 {
+        // 主题色环只在非实底上可见
+        p.set_stroke_color(@theme.theme_primary())
+        p.set_line_width(1.0)
+        p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+      } else if self.focused {
+        p.set_stroke_color("#ffffff")
+        p.set_line_width(1.0)
+        p.stroke_rect(1.5, 1.5, r.w - 3.0, r.h - 3.0)
+      }
+    })
+    w.on_pointer = Some(fn(
+      self : @core.Widget,
+      ev : @core.PointerEvent,
+    ) -> Bool {
+      match ev.kind {
+        @core.Down => !off.off
+        @core.Up => {
+          let inside = ev.x >= 0.0 && ev.x <= self.rect.w &&
+            ev.y >= 0.0 && ev.y <= self.rect.h
+          if !off.off && inside { on_click() }
+          false
+        }
+        @core.Move => !off.off
+        @core.Leave => false
+      }
+    })
+    handle(w)
+    w
+  })
+}
+
+///|
+/// 链接文字：主题色，悬停出下划线，点击回调（按下在抬起时才触发，与按钮同口径）。
+pub fn link(
+  text : String,
+  on_click : () -> Unit,
+  size? : Double = 13.0,
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  let font = @text.Font::new("", size)
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    let tw = text_width(text, font)
+    w.node.set_width(@yoga.fixed(tw))
+    w.node.set_height(@yoga.fixed(@text.line_height_font(font).unwrap_or(18).to_double()))
+    w.node.set_flex_shrink(0.0)
+    w.on_draw = Some(fn(
+      self : @core.Widget,
+      p : @render.Painter,
+      r : @core.Rect,
+    ) -> Unit {
+      let _ = @text.draw_at(p, 0.0, 0.0, text, font, @theme.theme_primary())
+      if self.hovered {
+        p.set_fill_color(@theme.theme_primary())
+        p.fill_rect(0.0, r.h - 1.0, r.w, 1.0)
+      }
+    })
+    w.on_pointer = Some(fn(
+      self : @core.Widget,
+      ev : @core.PointerEvent,
+    ) -> Bool {
+      match ev.kind {
+        @core.Down => true
+        @core.Up => {
+          let inside = ev.x >= 0.0 && ev.x <= self.rect.w &&
+            ev.y >= 0.0 && ev.y <= self.rect.h
+          if inside { on_click() }
+          false
+        }
+        _ => false
+      }
+    })
+    handle(w)
+    w
+  })
+}
+
+///|
+/// 表单项：左侧定宽右对齐标签 + 右侧控件；控件下方是错误文案行（`error` 非空
+/// 时显示 danger 红字）。行高固定预留，错误出现/消失不引起布局跳动。
+pub fn form_item(
+  label_text : String,
+  control : @core.Node,
+  label_width? : Double = 90.0,
+  error? : @core.Store[String] = @core.Store::new(""),
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  let err_store = error
+  container(
+    [
+      container(
+        [
+          container(
+            [
+              label(
+                label_text,
+                size=13.0,
+                color=@theme.theme_text_secondary(),
+                align=@text.End,
+              ),
+            ],
+            direction=@yoga.Row,
+            width=label_width,
+            align_items=@yoga.AlignItems::Center,
+            justify_content=@yoga.JustifyContent::FlexEnd,
+          ),
+          control,
+        ],
+        direction=@yoga.Row,
+        column_gap=12.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+      container(
+        [label_dyn(err_store.signal(), size=12.0, color=@theme.theme_danger(), wrap=false)],
+        direction=@yoga.Row,
+        height=18.0,
+        handle=fn(w : @core.Widget) -> Unit { w.set_margin(0.0, 0.0, label_width + 12.0, 0.0) },
+      ),
+    ],
+    direction=@yoga.Column,
+    row_gap=2.0,
+    handle=handle,
+  )
+}
+
+///|
+/// 表单：分组标题 + 一组表单项（纵向排布）。
+pub fn form(
+  title : String,
+  items : Array[@core.Node],
+  row_gap? : Double = 8.0,
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  let nodes : Array[@core.Node] = [label_t(title, role=Section)]
+  for it in items {
+    nodes.push(it)
+  }
+  container(nodes, direction=@yoga.Column, row_gap=row_gap, handle=handle)
+}
+
+///|
+/// 五角星顶点（纯几何，供绘制与测试共用）：`cx`/`cy` 星心，`r_out` 外半径，
+/// 内半径取 0.382R（正五角星比例），起点朝上，共 10 点（外内交替）。
+pub fn star_points(cx : Double, cy : Double, r_out : Double) -> Array[(Double, Double)] {
+  let r_in = r_out * 0.382
+  let pts : Array[(Double, Double)] = []
+  for k = 0; k < 10; k = k + 1 {
+    let rad = if k % 2 == 0 { r_out } else { r_in }
+    let ang = (-90.0 + k.to_double() * 36.0) * 3.141592653589793 / 180.0
+    pts.push((cx + rad * @math.cos(ang), cy + rad * @math.sin(ang)))
+  }
+  pts
+}
+
+///|
+/// 画一颗星（路径 + 上色由调用方决定：亮星填充、暗星描边）。
+fn star_path(p : @render.Painter, cx : Double, cy : Double, r_out : Double) -> Unit {
+  p.begin_path()
+  let pts = star_points(cx, cy, r_out)
+  for i = 0; i < pts.length(); i = i + 1 {
+    if i == 0 {
+      p.move_to(pts[i].0, pts[i].1)
+    } else {
+      p.line_to(pts[i].0, pts[i].1)
+    }
+  }
+  p.close_path()
+}
+
+///|
+/// 评分：`max` 颗五角星，选中实心主题色、未选中描边灰；悬停预亮到第 N 颗，
+/// 点击写入 `value`（1..max）并回调 `on_change`（外部写值不回调，与本栈其它
+/// 组件同口径）。
+pub fn rate_t(
+  value : @core.Store[Int],
+  max? : Int = 5,
+  on_change? : (Int) -> Unit = fn(_v : Int) -> Unit { () },
+  size? : Double = 22.0,
+  gap? : Double = 4.0,
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  follow_store(value)
+  let n = if max > 0 { max } else { 1 }
+  let hover_n : Ref[Int] = Ref(0)
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    w.node.set_width(@yoga.fixed(size * n.to_double() + gap * (n - 1).to_double()))
+    w.node.set_height(@yoga.fixed(size))
+    w.node.set_flex_shrink(0.0)
+    // 第几颗星（1 起，越界夹住）：星星间距的一半算在星内，边缘不空
+    w.on_pointer = Some(fn(_self : @core.Widget, ev : @core.PointerEvent) -> Bool {
+      let star_at = fn(x : Double) -> Int {
+        let idx = ((x + gap / 2.0) / (size + gap)).to_int() + 1
+        idx.clamp(min=1, max=n)
+      }
+      match ev.kind {
+        @core.Down => {
+          let v = star_at(ev.x)
+          value.set(v)
+          on_change(v)
+          true
+        }
+        @core.Move => {
+          let h = star_at(ev.x)
+          if h != hover_n.val {
+            hover_n.val = h
+            @core.invalidate()
+          }
+          true
+        }
+        @core.Leave => {
+          hover_n.val = 0
+          @core.invalidate()
+          false
+        }
+        @core.Up => false
+      }
+    })
+    w.on_draw = Some(fn(
+      _self : @core.Widget,
+      p : @render.Painter,
+      _r : @core.Rect,
+    ) -> Unit {
+      let cur = value.get()
+      for i = 1; i <= n; i = i + 1 {
+        let cx = (i - 1).to_double() * (size + gap) + size / 2.0
+        let cy = size / 2.0
+        // 悬停预亮优先于当前值（离开时 hover_n 归 0）
+        let lit = if hover_n.val > 0 { i <= hover_n.val } else { i <= cur }
+        if lit {
+          p.set_fill_color(@theme.theme_primary())
+          star_path(p, cx, cy, size / 2.0 - 1.0)
+          p.fill()
+        } else {
+          p.set_stroke_color(@theme.theme_border())
+          p.set_line_width(1.0)
+          star_path(p, cx, cy, size / 2.0 - 1.0)
+          p.stroke()
+        }
+      }
+    })
+    handle(w)
+    w
+  })
+}
