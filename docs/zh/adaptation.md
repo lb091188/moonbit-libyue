@@ -646,6 +646,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **四条工具链写法（本批实测）**：① `pub const` 的名字**必须大写**（`pub const pi` 直接报「Expected upper case identifier for name of const, found lower case. Did you mean let?」），小写常量用 `pub let`；② `for i = 1..<n { }` 不支持——range 只在 `for x in a..<b` 里合法，经典 for 要写 `for i = 1; i < n; i = i + 1`；③ `StringBuilder` 的写入方法是 `write_string`/`write_char`，没有 `add`/`append`；④ `Ordering` 类型在本工具链不可直接引用（写比较器函数会报「The type Ordering is undefined」），几个元素排序退回插入排序。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/chart` **11/11**（6 条纯函数：窗口丢最旧与越界无操作、值域退化与留白比例、1-2-5 步长与负区间起点、单位换挡 k/M/G、柱槽与两形态命中、扇区只累计正值且单扇区留 0.0002 弧度、仪表分段取色与折线段数、回归退化、8 位色串、标签截断；5 条组件：折线换数据与密集抽推出图、柱状悬停换底与离开复原、环形出图 + 命中四态、仪表盘 smooth 两路（直接跳到位 / 逐拍逼近）、散点带趋势线）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 加「图表」区块：折线+柱状一行、环形+仪表+散点+推点按钮一行，几何行补 `NATIVE-APP-CH`，状态行补 `ln=`/`chp=`）：注入「点三次推点按钮」得 `ln=27/23 chp=3`（窗口 24→27 点、末值 7→23，与手算 `pushes*7%29+2` 逐位一致）、退出码 0；截图复核五图齐备——折线带面积填充与右端最新值标注、柱状正负异色带类目、环形中心汇总 + 右侧图例带百分比、仪表 68% 弧与中心数字、散点带最小二乘趋势线。
 
+### MoonBit 原生 GUI 栈 · sys 批 2（`yue/sys/dialog.mbt`：文件对话框）
+
+- **GTK 端归 win 桩、语义层归 sys 包**：`GtkFileChooserDialog` 的封装写进 `yue/win/gtk_stub.c`（`wm_file_*` 前缀，槽表与窗口桩同制——对话框要挂 GTK 父窗口、且该文件已由 prebuild 编进 GTK 链接单元）；`yue/sys/dialog.mbt` 只做语义薄封装（filters 字符串透传、选项位、run/取结果/销毁）。sys 包 **不 import yue/win**——`run_for_window` 的 parent 是纯句柄 id（Int64），MoonBit 层无符号依赖，但链接需要 `-lyue_win_stub`，由 `scripts/prebuild.py` 给 sys 包**单独下发** link_configs（GTK 库清单同 win 一套）。
+- **未 run 的 chooser 查结果会段错误（本机实测）**：`gtk_file_chooser_get_uri` 在内部文件系统模型未初始化时直接 SIGSEGV——桩加 `wm_dlg_accepted` 标记，只在 `gtk_dialog_run` 返回 ACCEPT 后放行查询，其余一律空串。同因 GTK 断言：`set_current_name`（set_filename）只对 SAVE 动作合法，OPEN 对话框上调用打 Gtk-CRITICAL。
+- **无显示环境的退化路径**：`wm_file_dialog_new` 先 `gtk_init_check`，失败返回 0 句柄（wbtest 无 X 连接、CI 场景）——全接口对 0 句柄 no-op 不崩；有显示（本机）则真建对象，测试走双路径断言。
+- **「改桩不重链」的第三处案发现场**：改 gtk_stub.c 后 `moon test` 报 undefined reference——`build/libyue_win_stub.a` 的 mtime 比源码新（同批测试产物也没重链），判据是比对 `build/*.a` 与测试 exe 的 mtime，双删 `_build/native/debug/test/.../yue/sys` 与桩库强制重编。与 G 批次的桩教训同源，moon 的增量对「C 源码改动」不可靠是常态了。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/sys` **30/30**（新增 1：对话框建/配/释放双路径——有显示真建对象配置后销毁、无显示全接口 no-op；模态 run 与真选文件留真机复验）；`moon check yue/sys --deny-warn` 零警告、全仓红点仍 287/68。**真机复验清单**：应用内触发打开对话框 → 选文件 → 结果路径正确；保存对话框初始名生效；filters 下拉分组正确。
+
 ### MoonBit 原生 GUI 栈 · sys 批 1（`yue/sys`：fsx / envx / procrun）
 
 - **sys 桩直接走 native-stub**：目录枚举（dirent）/环境变量（setenv/unsetenv）/文本读写（fopen）/删文件只用标准头，**不需要** win/render/text 桩那套「prebuild 编静态库 + portable 占位」——那些是因为要 GTK 头（native-stub 拿不到 pkg-config 路径）。单文件 `sys_stub.c` 顶部 `#if` 分平台（Windows 分支占位，FindFirstFileW 宽字符路由待 M2），`moonbit_make_bytes` 以 `extern` 声明直接链运行时符号（ime_probe_stub 同款）。

@@ -30,6 +30,7 @@ BUILD_DIR = MODULE_ROOT / "build"
 LINUX_PKG_CONFIG_LIBS = ["gtk+-3.0", "pangoft2", "pangocairo", "fontconfig", "x11"]
 
 IME_PROBE_PACKAGE = "NoahLiu/moonbit-libyue/experiment/ime_probe"
+SYS_PACKAGE = "NoahLiu/moonbit-libyue/yue/sys"
 WIN_PACKAGE = "NoahLiu/moonbit-libyue/yue/win"
 RENDER_PACKAGE = "NoahLiu/moonbit-libyue/yue/render"
 TEXT_PACKAGE = "NoahLiu/moonbit-libyue/yue/text"
@@ -135,6 +136,15 @@ def link_configs() -> dict:
         if win_lib:
             entries.append({
                 "package": WIN_PACKAGE,
+                "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_win_stub "
+                + " ".join([*libs, *sys_libs]),
+            })
+        # sys 包的文件对话框（yue/sys/dialog.mbt）extern 直链 win 桩的
+        # wm_file_* 符号：MoonBit 层不引 yue/win（parent 是纯句柄 id），
+        # 链接由此处单独下发（GTK 库同 win 一套）。
+        if win_lib:
+            entries.append({
+                "package": SYS_PACKAGE,
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_win_stub "
                 + " ".join([*libs, *sys_libs]),
             })

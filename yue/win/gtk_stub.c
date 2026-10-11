@@ -863,3 +863,193 @@ int64_t wm_local_date(void) {
   return (int64_t)(tm_buf.tm_year + 1900) * 10000 +
          (int64_t)(tm_buf.tm_mon + 1) * 100 + (int64_t)tm_buf.tm_mday;
 }
+
+// ---------- 文件对话框（sys 线：yue/sys/dialog.mbt 的 GTK 端） ----------
+
+#define WM_DLG_MAX 8
+static GtkWidget *wm_dialogs[WM_DLG_MAX];
+static int wm_dlg_accepted[WM_DLG_MAX]; // run 后用户确认过才允许取结果
+
+static int64_t wm_dlg_put(GtkWidget *dlg) {
+  for (int i = 0; i < WM_DLG_MAX; i++) {
+    if (wm_dialogs[i] == NULL) {
+      // 槽位号 +1 作句柄（0 保留为无效）
+      wm_dialogs[i] = dlg;
+      return (int64_t)(i + 1);
+    }
+  }
+  gtk_widget_destroy(dlg);
+  return 0;
+}
+
+static GtkWidget *wm_dlg_of(int64_t id) {
+  if (id <= 0 || id > WM_DLG_MAX) {
+    return NULL;
+  }
+  return wm_dialogs[id - 1];
+}
+
+static void wm_dlg_free(int64_t id) {
+  if (id <= 0 || id > WM_DLG_MAX) {
+    return;
+  }
+  wm_dlg_accepted[id - 1] = 0;
+  if (wm_dialogs[id - 1] != NULL) {
+    gtk_widget_destroy(wm_dialogs[id - 1]);
+    wm_dialogs[id - 1] = NULL;
+  }
+}
+
+/* 建 GtkFileChooserDialog：save=0 打开（OPEN）/1 保存（SAVE）。
+ * 无显示连接（无头测试环境）时返回 0——句柄无效，各接口安全退化。 */
+static int64_t wm_file_dialog_new(int save) {
+  if (!gtk_init_check(NULL, NULL)) {
+    return 0;
+  }
+  GtkWidget *dlg = gtk_file_chooser_dialog_new(
+      save ? "保存文件" : "打开文件", NULL, save ? GTK_FILE_CHOOSER_ACTION_SAVE
+                                                        : GTK_FILE_CHOOSER_ACTION_OPEN,
+      "_取消", GTK_RESPONSE_CANCEL, save ? "_保存" : "_打开",
+      GTK_RESPONSE_ACCEPT, NULL);
+  if (dlg == NULL) {
+    return 0;
+  }
+  return wm_dlg_put(dlg);
+}
+
+int64_t wm_file_open_dialog_new(void) { return wm_file_dialog_new(0); }
+
+int64_t wm_file_save_dialog_new(void) { return wm_file_dialog_new(1); }
+
+/* 选项位：1<<0 选文件夹 1<<1 多选 1<<2 显示隐藏。 */
+void wm_file_dialog_set_options(int64_t id, int32_t options) {
+  GtkFileChooser *fc = GTK_FILE_CHOOSER(wm_dlg_of(id));
+  if (fc == NULL) {
+    return;
+  }
+  if (options & 1) {
+    gtk_file_chooser_set_action(fc, GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
+  }
+  gtk_file_chooser_set_select_multiple(fc, (options & 2) != 0);
+  gtk_file_chooser_set_show_hidden(fc, (options & 4) != 0);
+}
+
+/* filters 打包："描述:扩展1,扩展2|描述2:扩展3"（'*' 匹配全部）。 */
+void wm_file_dialog_set_filters(int64_t id, const char *filters) {
+  GtkFileChooser *fc = GTK_FILE_CHOOSER(wm_dlg_of(id));
+  if (fc == NULL || filters == NULL) {
+    return;
+  }
+  // 清旧过滤器（GTK 无清空 API，逐个 remove）
+  GSList *old = gtk_file_chooser_list_filters(fc);
+  for (GSList *p = old; p != NULL; p = p->next) {
+    gtk_file_chooser_remove_filter(fc, GTK_FILE_FILTER(p->data));
+  }
+  if (old != NULL) {
+    g_slist_free(old);
+  }
+  const char *pos = filters;
+  while (*pos != '\0') {
+    const char *bar = strchr(pos, '|');
+    size_t glen = bar != NULL ? (size_t)(bar - pos) : strlen(pos);
+    char group[256];
+    if (glen >= sizeof(group)) {
+      glen = sizeof(group) - 1;
+    }
+    memcpy(group, pos, glen);
+    group[glen] = '\0';
+    const char *colon = strchr(group, ':');
+    if (colon != NULL) {
+      GtkFileFilter *f = gtk_file_filter_new();
+      char desc[128];
+      size_t dl = (size_t)(colon - group);
+      if (dl >= sizeof(desc)) {
+        dl = sizeof(desc) - 1;
+      }
+      memcpy(desc, group, dl);
+      desc[dl] = '\0';
+      gtk_file_filter_set_name(f, desc);
+      const char *ep = colon + 1;
+      while (*ep != '\0') {
+        const char *comma = strchr(ep, ',');
+        size_t el = comma != NULL ? (size_t)(comma - ep) : strlen(ep);
+        char pat[64];
+        if (el >= sizeof(pat)) {
+          el = sizeof(pat) - 1;
+        }
+        memcpy(pat, ep, el);
+        pat[el] = '\0';
+        if (strcmp(pat, "*") == 0) {
+          gtk_file_filter_add_pattern(f, "*");
+        } else {
+          char dotpat[68];
+          snprintf(dotpat, sizeof(dotpat), "*.%s", pat);
+          gtk_file_filter_add_pattern(f, dotpat);
+        }
+        ep = comma != NULL ? comma + 1 : ep + el;
+      }
+      gtk_file_chooser_add_filter(fc, f);
+    }
+    pos = bar != NULL ? bar + 1 : pos + glen;
+  }
+}
+
+void wm_file_dialog_set_folder(int64_t id, const char *folder) {
+  GtkFileChooser *fc = GTK_FILE_CHOOSER(wm_dlg_of(id));
+  if (fc != NULL && folder != NULL) {
+    gtk_file_chooser_set_current_folder_uri(fc, folder);
+  }
+}
+
+void wm_file_dialog_set_filename(int64_t id, const char *filename) {
+  GtkFileChooser *fc = GTK_FILE_CHOOSER(wm_dlg_of(id));
+  if (fc != NULL && filename != NULL) {
+    gtk_file_chooser_set_current_name(fc, filename);
+  }
+}
+
+/* 模态运行：parent_id 是 wm 窗口槽 id（0 = 无父窗口）。返回 1=确认。 */
+int32_t wm_file_dialog_run_for_window(int64_t id, int64_t parent_id) {
+  GtkWidget *dlg = wm_dlg_of(id);
+  if (dlg == NULL) {
+    return 0;
+  }
+  GtkWidget *parent = parent_id > 0 && parent_id <= WM_MAX_WINDOWS
+                          ? wm_windows[(int)parent_id - 1].window
+                          : NULL;
+  if (parent != NULL) {
+    gtk_window_set_transient_for(GTK_WINDOW(dlg), GTK_WINDOW(parent));
+  }
+  gint resp = gtk_dialog_run(GTK_DIALOG(dlg));
+  wm_dlg_accepted[id - 1] = resp == GTK_RESPONSE_ACCEPT;
+  return resp == GTK_RESPONSE_ACCEPT ? 1 : 0;
+}
+
+/* 用户选中的路径（未确认/多选时取首个；空串 = 无）。
+ * 只在 run 后用户确认过才查——未 run 的 chooser 内部文件系统模型
+ * 未初始化，get_uri 会段错误（本机实测），提前返回空串。 */
+void *wm_file_dialog_get_result(int64_t id) {
+  GtkFileChooser *fc = GTK_FILE_CHOOSER(wm_dlg_of(id));
+  if (fc == NULL || !wm_dlg_accepted[id - 1]) {
+    return moonbit_make_bytes(0, 0);
+  }
+  gchar *uri = gtk_file_chooser_get_uri(fc);
+  if (uri == NULL) {
+    return moonbit_make_bytes(0, 0);
+  }
+  // file:// 前缀剥除（与 master 的 FilePath 语义一致，返回本地路径）
+  const char *p = uri;
+  if (g_str_has_prefix(p, "file://")) {
+    p += 7;
+  }
+  size_t len = strlen(p);
+  void *out = moonbit_make_bytes((int)len, 0);
+  if (len > 0) {
+    memcpy(out, p, len);
+  }
+  g_free(uri);
+  return out;
+}
+
+/* 关闭并释放对话框（run 之后调用；未 run 过也能安全释放）。 */
+void wm_file_dialog_destroy(int64_t id) { wm_dlg_free(id); }
