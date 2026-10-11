@@ -143,3 +143,55 @@ test "虚拟表格：表头固定不滚、行只挂可见区间、点选与 tabl
   root.relayout(320.0, 240.0)
   assert_eq(head.rect.y, head_y)
 }
+
+///|
+test "粘性列表：滚动跨过组边界时吸顶标题换文字，组内行照常滚走" {
+  let st = StickyList::new()
+  let rows_of = fn(prefix : String) -> Array[@core.Node] {
+    let out : Array[@core.Node] = []
+    for i = 1; i <= 4; i = i + 1 {
+      out.push(container([label(prefix + i.to_string(), size=12.0)], height=20.0))
+    }
+    out
+  }
+
+  let (root, vp) = mounted(
+    sticky_list(
+      [("组一", rows_of("甲")), ("组二", rows_of("乙")), ("组三", rows_of("丙"))],
+      st,
+      width=240.0,
+      height=100.0,
+      head_h=28.0,
+    ),
+    300.0,
+    160.0,
+  )
+  // 先画一帧：当前组与内容高都在布局之后才读得到
+  let bm = @render.Bitmap::new(300, 160)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  assert_eq(st.cur_group, "组一")
+  // 每组 = 头 28 + 四行 80 = 108；视口 100 → 可滚 324 − 100 = 224
+  assert_eq(st.scroll.max(), 324.0 - 100.0)
+  // 滚到组二内部（偏移 120 > 108）
+  st.scroll.set_offset(120.0)
+  root.relayout(300.0, 160.0)
+  let bm2 = @render.Bitmap::new(300, 160)
+  let p2 = @render.Painter::new(bm2)
+  root.paint(p2)
+  p2.end()
+  assert_eq(st.cur_group, "组二")
+  assert_eq(st.cur_start, 108.0)
+  // 内容整块上移：内容块原点 = 视口 y − 偏移
+  let content = vp.children()[0]
+  assert_eq(content.rect.y, vp.rect.y - 120.0)
+  // 滚到最后一组
+  st.scroll.set_offset(220.0)
+  root.relayout(300.0, 160.0)
+  let bm3 = @render.Bitmap::new(300, 160)
+  let p3 = @render.Painter::new(bm3)
+  root.paint(p3)
+  p3.end()
+  assert_eq(st.cur_group, "组三")
+}

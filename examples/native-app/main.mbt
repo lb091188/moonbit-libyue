@@ -370,6 +370,48 @@ fn make_band(ctr : Ctr) -> @core.Widget {
 }
 
 ///|
+/// 粘性列表区块：三组各四行，滚动时顶部吸顶条显示当前组。
+fn make_sticky_section(st : @ui.StickyList, slot : Ref[@core.Widget?]) -> @core.Node {
+  let rows_of = fn(prefix : String) -> Array[@core.Node] {
+    let out : Array[@core.Node] = []
+    for i = 1; i <= 4; i = i + 1 {
+      out.push(
+        @ui.container(
+          [@ui.label(prefix + " 行 " + i.to_string(), size=12.0)],
+          height=22.0,
+          padding=4.0,
+          bg=if i % 2 == 0 {
+            @theme.theme_fill_zebra()
+          } else {
+            @theme.theme_bg_panel()
+          },
+        ),
+      )
+    }
+    out
+  }
+
+  @ui.container(
+    [
+      @ui.label("粘性列表：滚过组边界时顶部吸顶条换组名（退出状态行报当前组）", size=13.0),
+      @ui.sticky_list(
+        [("组一", rows_of("甲")), ("组二", rows_of("乙")), ("组三", rows_of("丙"))],
+        st,
+        width=240.0,
+        height=110.0,
+        head_h=28.0,
+        handle=fn(w : @core.Widget) -> Unit { slot.val = Some(w) },
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 虚拟表格演示数据：200 行（几何验证页只挂可见的十来行）。
 fn make_virt_rows() -> Array[@ui.TableRow] {
   let out : Array[@ui.TableRow] = []
@@ -686,8 +728,11 @@ fn main {
   let vt_sort : @core.Store[@ui.TableSort] = @core.Store::new({ column: -1, asc: true })
   let vt_clicks = Ref(0)
   let vt_w : Ref[@core.Widget?] = Ref(None)
+  let sticky = @ui.StickyList::new()
+  let sticky_w : Ref[@core.Widget?] = Ref(None)
   app.mount([make_table_section(tb_rows, tb_sel, tb_sort, tb_w)])
   app.mount([make_virt_section(vt_rows, vt_sel, vt_sort, vt_clicks, vt_w)])
+  app.mount([make_sticky_section(sticky, sticky_w)])
   app.mount([
     @ui.container(
       [
@@ -1088,7 +1133,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} drg='\{drg_str}' trg='\{trg_str}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' drg='\{drg_str}' trg='\{trg_str}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -1195,6 +1240,19 @@ fn main {
   let drg_rect = match drg_w.val {
     Some(w) => rect_str(w.rect)
     None => "-"
+  }
+  match sticky.scroll.view_h {
+    v =>
+      println(
+        "NATIVE-APP-STK box=" +
+        (match sticky_w.val {
+          Some(w) => rect_str(w.rect)
+          None => "-"
+        }) +
+        " view=" + v.round().to_int().to_string() + " max=" +
+        sticky.scroll.max().round().to_int().to_string() + " group=" +
+        sticky.cur_group,
+      )
   }
   let vt_line = match vt_w.val {
     Some(w) => {

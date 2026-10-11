@@ -157,3 +157,76 @@ test "表格：单元格类型（标签 / 色块 / 多行）都出像素，数�
   rows.set(table_rows([["一"], ["二"], ["三"], ["四"]]))
   assert_eq(body.children().length(), 4)
 }
+
+///|
+test "表格：表头边界拖动改列宽，相邻两列此消彼长且有最小列宽" {
+  let rows = @core.Store::new(table_rows([["甲", "1"], ["乙", "2"]]))
+  let (root, tb) = mounted(
+    table_t(
+      [
+        // 可排序列：单元格会消费按下，边界那 3px 必须让给表头才拖得动
+        TableColumn::make("名", 120.0),
+        TableColumn::make("值", 100.0),
+        TableColumn::make("备注", 0.0),
+      ],
+      rows,
+      width=320.0,
+    ),
+    400.0,
+    300.0,
+  )
+  let head = tb.children()[0]
+  let body = tb.children()[1]
+  assert_eq(head.children()[0].rect.w, 120.0)
+  // 第一列右缘在 head.x+120：按下命中边界
+  let boundary_x = head.rect.x + 120.0
+  let _ = root.dispatch_pointer({
+    kind: @core.Down,
+    x: boundary_x,
+    y: head.rect.y + 20.0,
+    button: 1,
+    mods: 0,
+  })
+  // 往右拖 40：第一列 160、第二列 60（被拖的两列此消彼长）
+  let _ = root.dispatch_pointer_to(head.id, {
+    kind: @core.Move,
+    x: boundary_x + 40.0,
+    y: head.rect.y + 20.0,
+    button: 1,
+    mods: 0,
+  })
+  root.relayout(400.0, 300.0)
+  assert_eq(head.children()[0].rect.w, 160.0)
+  assert_eq(head.children()[1].rect.w, 60.0)
+  // 数据行的单元格跟着改宽（不重建树）
+  assert_eq(body.children()[0].children()[0].rect.w, 160.0)
+  assert_eq(body.children()[0].children()[1].rect.w, 60.0)
+  // 继续往右拖到越界：第二列夹在最小列宽 40
+  let _ = root.dispatch_pointer_to(head.id, {
+    kind: @core.Move,
+    x: boundary_x + 500.0,
+    y: head.rect.y + 20.0,
+    button: 1,
+    mods: 0,
+  })
+  root.relayout(400.0, 300.0)
+  assert_eq(head.children()[1].rect.w, 40.0)
+  assert_eq(head.children()[0].rect.w, 180.0)
+  // 松手后再移动不再改
+  let _ = root.dispatch_pointer_to(head.id, {
+    kind: @core.Up,
+    x: boundary_x + 500.0,
+    y: head.rect.y + 20.0,
+    button: 1,
+    mods: 0,
+  })
+  let _ = root.dispatch_pointer_to(head.id, {
+    kind: @core.Move,
+    x: boundary_x + 120.0,
+    y: head.rect.y + 20.0,
+    button: 1,
+    mods: 0,
+  })
+  root.relayout(400.0, 300.0)
+  assert_eq(head.children()[0].rect.w, 180.0)
+}

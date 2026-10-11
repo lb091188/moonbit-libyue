@@ -62,6 +62,10 @@ pub fn TableRow::make(cells : Array[String]) -> TableRow {
 }
 
 ///|
+/// 列宽拖动时的最小列宽。
+const MIN_COL_W : Double = 40.0
+
+///|
 /// 按列定义把总宽分给各列：固定列按声明宽，弹性列（`<= 0`）均分剩余宽；
 /// 剩余为负时弹性列取下限 0（总宽不够就溢出，不压缩固定列）。
 fn table_widths(columns : Array[TableColumn], total : Double) -> Array[Double] {
@@ -189,9 +193,10 @@ fn draw_cell(
 /// `sort` 为 None 时不画箭头、点击无效；`table_t` 与 `table_v_t` 共用。
 fn table_header(
   columns : Array[TableColumn],
-  cols_w : Array[Double],
+  widths : Ref[Array[Double]],
   sort : @core.Store[TableSort]?,
   head_h : Double,
+  on_resize? : ((Int, Double) -> Unit)? = None,
 ) -> @core.Widget {
   let head_font = @text.Font::new("", 13.0, weight=@text.SemiBold)
       let head = @core.Widget::new()
@@ -202,7 +207,7 @@ fn table_header(
         let col = columns[j]
         let idx = j
         let cell = @core.Widget::new()
-        cell.node.set_width(@yoga.fixed(cols_w[j]))
+        cell.node.set_width(@yoga.fixed(widths.val[j]))
         cell.node.set_height(@yoga.fixed(head_h))
         cell.on_draw = Some(fn(
           self : @core.Widget,
@@ -271,11 +276,15 @@ fn table_header(
         })
         if col.sortable {
           cell.on_pointer = Some(fn(
-            _s : @core.Widget,
+            self : @core.Widget,
             ev : @core.PointerEvent,
           ) -> Bool {
             match ev.kind {
-              @core.Down => true
+              // 贴列边界那 3px 的按下让给表头（列宽拖动）：单元格自己吃下按下就
+              // 轮不到父控件，可排序列的边界拖动会整个失效（真窗口实测）
+              @core.Down =>
+                !((idx > 0 && ev.x <= 3.0) ||
+                  (idx < columns.length() - 1 && ev.x >= self.rect.w - 3.0))
               @core.Up => {
                 match sort {
                   Some(s) => {
@@ -302,6 +311,65 @@ fn table_header(
         }
         head.append_child(cell)
       }
+  // ---- 列宽拖动：表头边界 ±3px 命中，按住拖动让相邻两列此消彼长 ----
+  let drag : Ref[Int] = Ref(-1)
+  let drag_start_x : Ref[Double] = Ref(0.0)
+  let drag_left0 : Ref[Double] = Ref(0.0)
+  let drag_right0 : Ref[Double] = Ref(0.0)
+  head.on_pointer = Some(fn(
+    self : @core.Widget,
+    ev : @core.PointerEvent,
+  ) -> Bool {
+    match ev.kind {
+      @core.Down => {
+        let mut acc = 0.0
+        let mut hit = -1
+        for j = 0; j < widths.val.length() - 1; j = j + 1 {
+          acc = acc + widths.val[j]
+          if (ev.x - acc).abs() <= 3.0 {
+            hit = j
+          }
+        }
+        if hit >= 0 {
+          drag.val = hit
+          drag_start_x.val = ev.x
+          drag_left0.val = widths.val[hit]
+          drag_right0.val = widths.val[hit + 1]
+          true
+        } else {
+          false
+        }
+      }
+      @core.Move => {
+        if drag.val >= 0 {
+          let dx = ev.x - drag_start_x.val
+          let total = drag_left0.val + drag_right0.val
+          let nw = (drag_left0.val + dx).clamp(min=MIN_COL_W, max=total - MIN_COL_W)
+          widths.val[drag.val] = nw
+          widths.val[drag.val + 1] = total - nw
+          self.kids[drag.val].node.set_width(@yoga.fixed(nw))
+          self.kids[drag.val + 1].node.set_width(@yoga.fixed(total - nw))
+          match on_resize {
+            Some(f) => f(drag.val, nw)
+            None => ()
+          }
+          @core.invalidate()
+          true
+        } else {
+          false
+        }
+      }
+      @core.Up => {
+        if drag.val >= 0 {
+          drag.val = -1
+          true
+        } else {
+          false
+        }
+      }
+      @core.Leave => false
+    }
+  })
 
   head
 }
@@ -439,7 +507,9 @@ pub fn table_t(
 
     w.node.set_flex_direction(@yoga.Column)
     w.node.set_width(@yoga.fixed(width))
-    let cols_w = table_widths(columns, width - 2.0)
+    // 列宽是活的：表头拖动时改它，行内单元格跟着改宽（不重建树）
+    let widths : Ref[Array[Double]] = Ref(table_widths(columns, width - 2.0))
+    let body_cells : Ref[Array[Array[@core.Widget]]] = Ref([])
     w.on_draw = Some(fn(
       _s : @core.Widget,
       p : @render.Painter,
@@ -452,7 +522,22 @@ pub fn table_t(
       p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
     })
     // ---- 表头（共用构造） ----
-    w.append_child(table_header(columns, cols_w, sort, head_h))
+    w.append_child(
+      table_header(
+        columns,
+        widths,
+        sort,
+        head_h,
+        on_resize=Some(fn(j : Int, nw : Double) -> Unit {
+          for row_cells in body_cells.val {
+            if j + 1 < row_cells.length() {
+              row_cells[j].node.set_width(@yoga.fixed(nw))
+              row_cells[j + 1].node.set_width(@yoga.fixed(widths.val[j + 1]))
+            }
+          }
+        }),
+      ),
+    )
     // ---- 数据行（重建式） ----
     let body = @core.Widget::new()
     body.node.set_flex_direction(@yoga.Column)
@@ -460,11 +545,23 @@ pub fn table_t(
     w.append_child(body)
     let render_all = fn() -> Unit {
       body.clear_children()
+      body_cells.val = []
       let data = rows.get()
       for i = 0; i < data.length(); i = i + 1 {
         let src = i
         let row = data[i]
-        body.append_child(table_row_widget(columns, cols_w, row, src, row_height, selection, on_row_click))
+        let row_w = table_row_widget(
+          columns,
+          widths.val,
+          row,
+          src,
+          row_height,
+          selection,
+          on_row_click,
+        )
+
+        body.append_child(row_w)
+        body_cells.val.push(row_w.children())
       }
       @core.invalidate()
     }
