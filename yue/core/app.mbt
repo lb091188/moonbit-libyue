@@ -51,9 +51,19 @@ pub fn App::new(width : Int, height : Int, title : String) -> App? {
       }
       window.show()
       window.request_focus()
+      // 声明式层的 invalidate() 从这里回到本宿主的脏标（见 node.mbt）
+      set_repaint_hook(fn() { app.schedule_paint() })
       Some(app)
     }
   }
+}
+
+///|
+/// 把声明式节点树挂进根控件（内容入口）。挂载即建控件，之后信号驱动的
+/// 重挂走 `bind_node` 的原位替换；挂完标一次脏，下一帧就有内容。
+pub fn App::mount(self : App, children : Array[Node]) -> Unit {
+  mount_children(self.root, children)
+  self.schedule_paint()
 }
 
 ///|

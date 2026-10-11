@@ -2,6 +2,8 @@
 // 平台泵（G2 的 yue/win）负责等事件并把单调时钟读数交给 advance。
 // widget.mbt 是自绘控件宿主：布局树映射、命中测试、事件路由与绘制遍历。
 // app.mbt 是窗口宿主：窗口 + 循环 + 控件树 + 输入法通道 + 脏标上屏在一处。
+// node.mbt 是声明式地基：Node{mount:(Widget)->Widget}、bind_node 原位重挂、
+// signal.mbt/store.mbt 是从 master 平移的响应式内核（零平台依赖）。
 
 supported_targets = "native"
 

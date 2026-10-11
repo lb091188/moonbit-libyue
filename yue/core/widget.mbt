@@ -129,6 +129,68 @@ pub fn Widget::clear_children(self : Widget) -> Unit {
 }
 
 ///|
+/// 在 `index` 处插入子控件（布局树同位插入，越界按首/尾钳制）。
+/// 声明式层的就地重挂必须走这个而不是「清空再追加」——兄弟项的排布
+/// 顺序与坐标才不会被换掉的那一项影响。
+pub fn Widget::insert_child(self : Widget, index : Int, child : Widget) -> Unit {
+  let n = self.kids.length()
+  let at = if index < 0 { 0 } else if index > n { n } else { index }
+  self.kids.insert(at, child)
+  self.node.insert_child(at, child.node)
+}
+
+///|
+/// 摘除一个子控件（按控件身份找位置）。不是本控件的直接子项返回 false。
+pub fn Widget::remove_child(self : Widget, child : Widget) -> Bool {
+  let mut i = 0
+  let mut found = -1
+  for k in self.kids {
+    if k.id == child.id {
+      found = i
+    }
+    i = i + 1
+  }
+  if found < 0 {
+    return false
+  }
+  let _ = self.kids.remove(found)
+  let _ = self.node.remove_child_at(found)
+  true
+}
+
+///|
+/// 直接子控件的位置（按控件身份找）；不是本控件的子项给 -1。
+pub fn Widget::index_of(self : Widget, child : Widget) -> Int {
+  let mut i = 0
+  for k in self.kids {
+    if k.id == child.id {
+      return i
+    }
+    i = i + 1
+  }
+  -1
+}
+
+///|
+/// 把第 `from` 个子控件挪到第 `to` 位（两端都越界即钳制）。
+/// 声明式层的原位重挂用它：新一代先挂到尾部，再挪回旧一代原先的位置。
+pub fn Widget::move_child(self : Widget, from : Int, to : Int) -> Unit {
+  let n = self.kids.length()
+  if n == 0 {
+    return ()
+  }
+  let f = if from < 0 { 0 } else if from >= n { n - 1 } else { from }
+  let t = if to < 0 { 0 } else if to >= n { n - 1 } else { to }
+  if f == t {
+    return ()
+  }
+  let moved = self.kids.remove(f)
+  self.kids.insert(t, moved)
+  let _ = self.node.remove_child_at(f)
+  self.node.insert_child(t, moved.node)
+}
+
+///|
 /// 子控件快照。
 pub fn Widget::children(self : Widget) -> Array[Widget] {
   self.kids.copy()

@@ -29,7 +29,7 @@
   - [x] 控件宿主（`yue/core/widget.mbt`）：布局树 ↔ 控件树映射、绝对矩形只在 `collect_abs` 一处折算、命中（最深+后画优先）、指针/滚轮/按键沿祖先链冒泡、绘制逐层 translate+clip；yoga-mbt 首次进主包依赖；真窗口用 xdotool 点击四格回证 `band_h=1/1/1/1`（core 22/22）
   - [x] `patches/` 的 yoga bug 语料转回归用例：首条 `93078300` 已落成 `modules/yoga-mbt/src/patches_regression_wbtest.mbt`（守的是可观察契约——auto 高列容器下的弹性项隐藏/重显一轮后高度仍来自内容测量；本引擎无 Yoga 那条 computedFlexBasis 驻留路径）
   - [x] 语料派生结案：Chrome 实测口径 = auto 主轴尺寸取各子项**假想主轴尺寸之和**（growth 不参与）；根因是引擎把子项基准读成了容器的 `flex_basis`（子项 flex-basis 全程失效），已修并落 7 行 Chrome 矩阵回归（`patches_regression_wbtest.mbt`）
-- [ ] **G7** 声明式层与组件宿主接线（`mount` 目标从 `View` 换 yoga-mbt 节点；恢复全仓门禁。宿主已就位：`@core.App` + `@core.Widget` 树，验证页 `examples/native-app`）
+- [~] **G7** 声明式层与组件宿主接线（`mount` 目标从 `View` 换 yoga-mbt 节点；恢复全仓门禁。宿主与声明式地基已就位：`@core.App` + `@core.Widget` 树 + `@core.Node`/`bind_node`/`swap_node`/`Store`/`Signal`，验证页 `examples/native-app`；剩组件与图表挂新 Painter）
 - [ ] **G8** 原生子表面通道与其消费者（见 §4「浏览器」「视频」）
 
 ## 2. 框架能力域 — 全部待在新栈重做
@@ -69,8 +69,8 @@
   - [ ] `theme_from_system`（跟随系统深浅与主色）随系统集成层
   - [ ] 组件 style 通道（`themed_container`/`set_panel_bg`/`bind_bg`/`bind_fg`/`bind_popover_bg`）与 `sub_bag` 批量退订随组件/relink 批次
   - 新栈刻意不做：原生控件 CSS 下发（全自绘后色板是唯一来源）
-- [ ] 声明式层（`declarative/` 612 行、24 构造器）：L1 构造器全集（`vbox`/`hbox`/`label`/`button`/`checkbox`/`entry`/`text_edit`/`radio`/`slider`/`progress`/`picker`/`combo`/`group`/`scroll`/`separator`/`tab`/`date_picker`/`gif`/`container`…）+ `node_of`/`mount`/`mount_window` + `bind`/`bind_label`；`hover_group`/`cursor_group`；`overlay_scroll`
-- [ ] Store 与 signals：`Store` 9 方法、`computed`/`batch`/`sub_bag`、store↔signal 双向绑定、`bind_node`/`swap_node`、relink 语义
+- [~] 声明式层（`declarative/` 612 行、24 构造器）：地基已落（`Node{mount:(Widget)->Widget}`、`node_of`/`node_of_new`/`mount_children`/`App::mount`、`invalidate` 回路），L1 构造器全集随控件批次：L1 构造器全集（`vbox`/`hbox`/`label`/`button`/`checkbox`/`entry`/`text_edit`/`radio`/`slider`/`progress`/`picker`/`combo`/`group`/`scroll`/`separator`/`tab`/`date_picker`/`gif`/`container`…）+ `node_of`/`mount`/`mount_window` + `bind`/`bind_label`；`hover_group`/`cursor_group`；`overlay_scroll`
+- [x] Store 与 signals：内核与 `Store` 自 master 逐行平移进 `yue/core/signal.mbt`/`store.mbt`（`Signal`/`Store` 9 方法、`computed`/`batch`/`sub_bag`、store↔signal 互转，公共名不改，19 条既有测试整段带过来）；`bind_node`/`swap_node` 换成新栈形态并落 `yue/core/node.mbt`，relink 定案=**原位替换**（引擎为此加 `insert_child`/`remove_child_at`，控件层加 `index_of`/`move_child`），旧链路 Windows 的 `post_task` 推迟一拍与 `refresh_layout` 两条规避在本栈不需要（命中矩形每帧从布局结果重取），重绘经进程级 `set_repaint_hook`/`invalidate` 回到 App 宿主
 - [ ] 组件库约 55 个声明式组件（家族划分见「控件」节；调用点应不变，只换实现）
 - [ ] 图表（`yue/charts/`）：共享算法层（`LineSeries`/`win_push`/`auto_y_range`/`nice_ticks`/`bar_hit`/`sector_angles`/`gauge_angle`/`linreg`…）+ 20 种图（5 通用 + 15 专项 + tooltip 支撑层）+ 交互层（`ci_zoom`/`ci_visual_map`/`ci_mark_line`/`ci_mark_area`/`ci_save`/`ci_legend_hit`/`ci_filter_visible`）+ 3 个交互变体 `charts_it`（line/bar/donut）
 - [ ] Markdown（`markdown/markdown.mbt`）：`markdown_view` 17 种 block 变体 → 新 AttributedText；GFM 渲染面（表格/任务列表/脚注/删除线/图片/可点击链接）

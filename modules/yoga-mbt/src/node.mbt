@@ -114,6 +114,29 @@ pub fn Node::clear_children(self : Node) -> Unit {
 }
 
 ///|
+/// 在 `index` 处插入子节点（`index` 越界时按首/尾钳制）。
+/// 与 `append_child` 的区别只在于**位置**：声明式层的就地替换
+/// （bind_node 重挂）要在原位换节点，才能让兄弟项的排布与坐标不变。
+pub fn Node::insert_child(self : Node, index : Int, child : Node) -> Unit {
+  let n = self.children.length()
+  let at = if index < 0 { 0 } else if index > n { n } else { index }
+  self.children.insert(at, child)
+  self.mark_changed()
+}
+
+///|
+/// 移除 `index` 处的子节点并返回它；下标越界返回 None（不做任何改动）。
+pub fn Node::remove_child_at(self : Node, index : Int) -> Node? {
+  let n = self.children.length()
+  if index < 0 || index >= n {
+    return None
+  }
+  let removed = self.children.remove(index)
+  self.mark_changed()
+  Some(removed)
+}
+
+///|
 /// 子节点快照。
 pub fn Node::children(self : Node) -> Array[Node] {
   self.children.copy()

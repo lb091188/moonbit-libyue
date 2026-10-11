@@ -289,3 +289,67 @@ test "可用宽连续变化（越过缓存槽位上限）：每轮都等于同�
   // 每个新宽度都得真测（缓存丢旧不丢新，测量次数只增不减）
   assert_true(calls.val >= 17)
 }
+
+///|
+test "原位增删子节点：insert_child / remove_child_at 与参考树一致" {
+  let a = Node::new()
+  a.set_height(fixed(10.0))
+  let b = Node::new()
+  b.set_height(fixed(20.0))
+  let c = Node::new()
+  c.set_height(fixed(30.0))
+  let root = Node::new()
+  root.set_width(fixed(100.0))
+  root.set_flex_direction(FlexDirection::Column)
+  root.append_child(a)
+  root.append_child(b)
+  root.append_child(c)
+  calculate_layout(root, Some(100.0), None)
+  assert_eq(root.layout().height, 60.0)
+
+  // 摘掉中间项，再原位插回
+  let removed = root.remove_child_at(1)
+  assert_true(removed is Some(_))
+  calculate_layout(root, Some(100.0), None)
+  assert_eq(root.layout().height, 40.0)
+  assert_eq((a.layout().top, c.layout().top), (0.0, 10.0))
+  root.insert_child(1, b)
+  calculate_layout(root, Some(100.0), None)
+  let got : Array[(Double, Double, Double, Double)] = []
+  snapshot(root, got)
+
+  let (ref_root, ra, rb, rc) = three_rows()
+  calculate_layout(ref_root, Some(100.0), None)
+  let want : Array[(Double, Double, Double, Double)] = []
+  snapshot(ref_root, want)
+  assert_eq(got, want)
+  assert_eq((ra.layout().height, rb.layout().height, rc.layout().height),
+            (10.0, 20.0, 30.0))
+
+  // 越界：删除不动树，插入按尾钳制
+  assert_true(root.remove_child_at(9) is None)
+  assert_eq(root.children().length(), 3)
+  let d = Node::new()
+  d.set_height(fixed(5.0))
+  root.insert_child(99, d)
+  assert_eq(root.children().length(), 4)
+  assert_eq(root.children()[3].layout().height, 0.0)
+}
+
+///|
+/// 与上面同一形态的参考树（a/b/c 三行）。
+fn three_rows() -> (Node, Node, Node, Node) {
+  let a = Node::new()
+  a.set_height(fixed(10.0))
+  let b = Node::new()
+  b.set_height(fixed(20.0))
+  let c = Node::new()
+  c.set_height(fixed(30.0))
+  let root = Node::new()
+  root.set_width(fixed(100.0))
+  root.set_flex_direction(FlexDirection::Column)
+  root.append_child(a)
+  root.append_child(b)
+  root.append_child(c)
+  (root, a, b, c)
+}

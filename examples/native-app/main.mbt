@@ -275,6 +275,46 @@ fn make_font_row(ctr : Ctr) -> @core.Widget {
 }
 
 ///|
+/// 批次 4（声明式地基）：一个 `Store` 驱动的 `bind_node`——点一下就把整棵子树
+/// **原位**重挂（兄弟项位置不动、根控件的子项数不变），旧代订阅随重建退场。
+/// 状态行的 `decl=` 是 store 的值，`kids=` 是根控件的直接子项数（应当恒定）。
+fn make_decl_row(store : @core.Store[Int]) -> @core.Node {
+  @core.bind_node(store.signal(), fn(v : Int) -> @core.Node {
+    @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+      w.set_size(388.0, 30.0)
+      w.set_margin(10.0, 0.0, 0.0, 0.0)
+      w.on_draw = Some(fn(p : @render.Painter, r : @core.Rect) -> Unit {
+        p.set_fill_color(if v % 2 == 0 {
+          @theme.theme_fill_hover()
+        } else {
+          @theme.theme_bg_panel()
+        })
+        p.fill_rect(0.0, 0.0, r.w, r.h)
+        p.flush()
+        let _ = @text.draw_to(
+          p.bitmap,
+          6.0,
+          6.0,
+          "声明式：第 \{v} 次点击（原位重挂，底色随奇偶换）",
+          FONT,
+          @theme.theme_text_regular(),
+        )
+      })
+      w.on_pointer = Some(fn(ev : @core.PointerEvent) -> Bool {
+        match ev.kind {
+          @core.Down => {
+            store.update(fn(x : Int) -> Int { x + 1 })
+            true
+          }
+          _ => false
+        }
+      })
+      w
+    })
+  })
+}
+
+///|
 fn main {
   let app = match @core.App::new(420, 300, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
@@ -313,6 +353,9 @@ fn main {
   root.append_child(f2.w)
   root.append_child(btn)
   root.append_child(make_font_row(ctr))
+  let decl = @core.Store::new(0)
+  let decl_kids_before = root.children().length()
+  app.mount([make_decl_row(decl)])
   let _ = app.focus.register(1)
   let _ = app.focus.register(2)
   let _ = app.focus.register(3)
@@ -343,7 +386,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed}",
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1}",
   )
   app.shutdown()
 }
