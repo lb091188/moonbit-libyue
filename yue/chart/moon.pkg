@@ -13,5 +13,6 @@ import {
   "NoahLiu/moonbit-libyue/yue/render",
   "NoahLiu/moonbit-libyue/yue/text",
   "NoahLiu/moonbit-libyue/yue/theme",
+  "NoahLiu/moonbit-libyue/yue/sys",
   "NoahLiu/moonbit-libyue/yue/ui",
 }

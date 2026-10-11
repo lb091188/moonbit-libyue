@@ -754,6 +754,7 @@ fn make_chart_special_section(
   sp_w : Ref[@core.Widget?],
   sp2_w : Ref[@core.Widget?],
   sp3_w : Ref[@core.Widget?],
+  sp4_w : Ref[@core.Widget?],
 ) -> @core.Node {
   let box_groups = @core.Store::new([
     ("渲染", [12.0, 14.0, 15.0, 16.0, 18.0, 22.0, 48.0]),
@@ -842,6 +843,24 @@ fn make_chart_special_section(
     [20.0, 3.0, 55.0],
     [15.0, 8.0, 35.0],
   ])
+  let eff_points = @core.Store::new([
+    @chart.EffPoint::make(1.0, 2.0, size=10.0),
+    @chart.EffPoint::make(3.0, 5.0, size=16.0),
+    @chart.EffPoint::make(5.0, 3.0, size=8.0),
+    @chart.EffPoint::make(7.0, 8.0, size=12.0),
+  ])
+  let trv_names = @core.Store::new(["构建", "测试", "冒烟"])
+  let trv_values = @core.Store::new([
+    [4.0, 6.0, 5.0, 8.0, 7.0, 9.0],
+    [2.0, 3.0, 5.0, 4.0, 6.0, 5.0],
+    [1.0, 2.0, 2.0, 3.0, 2.0, 4.0],
+  ])
+  let geo_regions = match @chart.geojson_parse(
+      "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"properties\":{\"name\":\"示例区\"},\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[100,25],[112,25],[112,36],[100,36]]]}}]}",
+    ) {
+    Ok(rs) => @core.Store::new(rs)
+    Err(_) => @core.Store::new([])
+  }
   let pb_data = @core.Store::new([
     @chart.BarItem::make("甲", 24.0),
     @chart.BarItem::make("乙", 15.0),
@@ -904,6 +923,32 @@ fn make_chart_special_section(
             show_values=true,
             width=250.0,
             height=190.0,
+          ),
+        ],
+        direction=@yoga.Row,
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::FlexStart,
+      ),
+      @ui.container(
+        [
+          @chart.eff_chart_t(
+            eff_points,
+            period_ms=1800,
+            width=300.0,
+            height=170.0,
+            handle=fn(w : @core.Widget) -> Unit { sp4_w.val = Some(w) },
+          ),
+          @chart.trv_chart_t(
+            trv_names,
+            trv_values,
+            width=300.0,
+            height=170.0,
+          ),
+          @chart.geo_map_t(
+            geo_regions,
+            flights=[@chart.GeoFlight::make((105.0, 30.0), (120.0, 25.0))],
+            width=260.0,
+            height=170.0,
           ),
         ],
         direction=@yoga.Row,
@@ -1141,7 +1186,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1400, 2720, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1400, 2920, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -1376,7 +1421,8 @@ fn main {
   let sp_w : Ref[@core.Widget?] = Ref(None)
   let sp2_w : Ref[@core.Widget?] = Ref(None)
   let sp3_w : Ref[@core.Widget?] = Ref(None)
-  app.mount([make_chart_special_section(sp_w, sp2_w, sp3_w)])
+  let sp4_w : Ref[@core.Widget?] = Ref(None)
+  app.mount([make_chart_special_section(sp_w, sp2_w, sp3_w, sp4_w)])
   app.mount([
     make_form_section(
       frm_btn,
@@ -2013,7 +2059,9 @@ fn main {
       " sankey=" +
       ov2_rect_of(sp2_w.val) +
       " gph=" +
-      ov2_rect_of(sp3_w.val),
+      ov2_rect_of(sp3_w.val) +
+      " eff=" +
+      ov2_rect_of(sp4_w.val),
   )
   println(
     "NATIVE-APP-MEDIA gif=" +

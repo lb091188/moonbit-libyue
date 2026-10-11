@@ -646,6 +646,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **四条工具链写法（本批实测）**：① `pub const` 的名字**必须大写**（`pub const pi` 直接报「Expected upper case identifier for name of const, found lower case. Did you mean let?」），小写常量用 `pub let`；② `for i = 1..<n { }` 不支持——range 只在 `for x in a..<b` 里合法，经典 for 要写 `for i = 1; i < n; i = i + 1`；③ `StringBuilder` 的写入方法是 `write_string`/`write_char`，没有 `add`/`append`；④ `Ordering` 类型在本工具链不可直接引用（写比较器函数会报「The type Ordering is undefined」），几个元素排序退回插入排序。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/chart` **11/11**（6 条纯函数：窗口丢最旧与越界无操作、值域退化与留白比例、1-2-5 步长与负区间起点、单位换挡 k/M/G、柱槽与两形态命中、扇区只累计正值且单扇区留 0.0002 弧度、仪表分段取色与折线段数、回归退化、8 位色串、标签截断；5 条组件：折线换数据与密集抽推出图、柱状悬停换底与离开复原、环形出图 + 命中四态、仪表盘 smooth 两路（直接跳到位 / 逐拍逼近）、散点带趋势线）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 加「图表」区块：折线+柱状一行、环形+仪表+散点+推点按钮一行，几何行补 `NATIVE-APP-CH`，状态行补 `ln=`/`chp=`）：注入「点三次推点按钮」得 `ln=27/23 chp=3`（窗口 24→27 点、末值 7→23，与手算 `pushes*7%29+2` 逐位一致）、退出码 0；截图复核五图齐备——折线带面积填充与右端最新值标注、柱状正负异色带类目、环形中心汇总 + 右侧图例带百分比、仪表 68% 弧与中心数字、散点带最小二乘趋势线。
 
+### MoonBit 原生 GUI 栈 · 专项图批 4（`yue/chart`：effectscatter / themeriver / geo，图表线收口）
+
+- **8 位色串的两种语义冲突（本批实测）**：旧链路图表约定 `#AARRGGBB`（alpha 在前，见「yue 色值与绘制三坑」），而新栈 `@render.Color::parse` 的 8 位语义是 **RGBA（alpha 在后）**。`eff_alpha_color` 直接把 8 位输入喂 `@theme.parse_hex` 会把 alpha 位当红色（`#ff009688` 解析出 r=255——`"#ffff0096" != "#ff009688"` 的根因）；修复：**8 位输入先剥前两位 alpha、取后 6 位解析**（旧链路「RGB 不被改写」语义），新 alpha 由参数重新合成。
+- **涟漪动画从「回调返 false 注销」改成真句柄**：旧链路 `set_timer` 无取消 id，停止靠回调返回 false；新栈 `@core.set_timeout`/`clear_timeout` 有真句柄——`EffAnim` 持 `running + timer`，`eff_stop` 即时取消待触发回调（carousel 自转同款续排模式：回调里再 `set_timeout` 下一拍）。
+- **GeoJSON 的 JSON 解析走 `@sys`**（`vsc_json_parse` 已平移在 yue/sys），`RectF` 改本地 `GeoRect`（与 treemap 的 `TmRect` 同形各自定义）；`argb_hex` 旧链路在根包红点里，图表包本地实现（`Int::unsafe_to_char` 拼 hex，注意 `Char::from_int` 已弃用）。
+- **三条测试教训（本批踩全）**：① `ink_of` 对「铺面板底」的组件恒等于整块面积（首批图表的坑，无头默认主题 bg_panel 还是**纯白** `#FFFFFF`，白底也算墨）——断言内容用**特征色采样**或 `diff_of`；② themeriver 图例预留 240px，画布须 >298 才有绘制区（组件默认宽 560），窄画布测试会整幅早退且无任何报错；③ **测试里手写的 JSON 要用外部验证器过一遍**——本批坐标数组多写一个 `]`，解析器如实返回 None，一度误判为解析器 bug（分段二分全过、完整串挂时优先怀疑字符串本身）。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/chart` **189/189**（新增 43：三份 wbtest 同源平移 40 + 组件挂载 3——涟漪换数据变与 eff_stop 后 is_running=false、河流换序列变（画布 560）、地图解析+区域飞线出像素+清空变）；包 `--deny-warn` 零警告、全仓红点仍 287/68。真窗口几何行确认布局（`eff=24,2542,300x170`），视觉观感留用户真机复验。**至此图表线 15 种专项图 + 五种通用图 + 交互层全部收口**。
+
 ### MoonBit 原生 GUI 栈 · 专项图批 3（`yue/chart`：sunburst / graph / parallel / pictorialbar）
 
 - **与批 2 同一套路**：转换脚本做依赖名替换，手工段三类——「暂无数据」块、条件对齐的 `draw_text`（pictorialbar 的 4 处省略 `wrap=` 参数，正则要求 wrap 才匹配故漏，这类「省默认参数」的调用形态也要手改）、组件层 mount 块。旭日图中心汇总（20px SemiBold + 「总计」caption）与 `draw_donut_core` 同款 `@text.draw_box_at` 写法。
