@@ -753,6 +753,7 @@ fn make_chart_it_section(
 fn make_chart_special_section(
   sp_w : Ref[@core.Widget?],
   sp2_w : Ref[@core.Widget?],
+  sp3_w : Ref[@core.Widget?],
 ) -> @core.Node {
   let box_groups = @core.Store::new([
     ("渲染", [12.0, 14.0, 15.0, 16.0, 18.0, 22.0, 48.0]),
@@ -813,6 +814,39 @@ fn make_chart_special_section(
     @chart.TmItem::make("图表", value=12.0),
     @chart.TmItem::make("示例", value=8.0),
   ])
+  let sun_root_item = @chart.SunItem::make("分布")
+  sun_root_item.children.push(@chart.SunItem::make("核心", value=Some(40.0)))
+  sun_root_item.children.push(@chart.SunItem::make("组件", value=Some(30.0)))
+  sun_root_item.children.push(@chart.SunItem::make("图表", value=Some(20.0)))
+  let sun_root = @core.Store::new(sun_root_item)
+  let gph_data = @core.Store::new(
+    @chart.GraphData::make(
+      [
+        @chart.GraphNode::make("core", value=30.0),
+        @chart.GraphNode::make("ui", value=26.0),
+        @chart.GraphNode::make("chart", value=18.0),
+      ],
+      [
+        @chart.GraphEdge::make(0, 1, weight=5.0),
+        @chart.GraphEdge::make(1, 2, weight=3.0),
+      ],
+    ),
+  )
+  let par_axes = @core.Store::new([
+    @chart.ParAxis::make("吞吐"),
+    @chart.ParAxis::make("延迟"),
+    @chart.ParAxis::make("内存"),
+  ])
+  let par_rows = @core.Store::new([
+    [10.0, 5.0, 40.0],
+    [20.0, 3.0, 55.0],
+    [15.0, 8.0, 35.0],
+  ])
+  let pb_data = @core.Store::new([
+    @chart.BarItem::make("甲", 24.0),
+    @chart.BarItem::make("乙", 15.0),
+    @chart.BarItem::make("丙", -9.0),
+  ])
   let tree_root_item = @chart.TreeItem::make("yue")
   tree_root_item.children.push(@chart.TreeItem::make("core", value=Some(30.0)))
   tree_root_item.children.push(@chart.TreeItem::make("ui", value=Some(40.0)))
@@ -849,6 +883,28 @@ fn make_chart_special_section(
           ),
           @chart.tm_chart_t(tm_items, width=280.0, height=150.0),
           @chart.tree_chart_t(tree_root, width=250.0, height=150.0),
+        ],
+        direction=@yoga.Row,
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::FlexStart,
+      ),
+      @ui.container(
+        [
+          @chart.sun_chart_t(sun_root, width=250.0, height=190.0),
+          @chart.gph_chart_t(
+            gph_data,
+            width=260.0,
+            height=190.0,
+            handle=fn(w : @core.Widget) -> Unit { sp3_w.val = Some(w) },
+          ),
+          @chart.par_chart_t(par_axes, par_rows, width=280.0, height=190.0),
+          @chart.pb_chart_t(
+            pb_data,
+            symbol=@chart.PbCircle,
+            show_values=true,
+            width=250.0,
+            height=190.0,
+          ),
         ],
         direction=@yoga.Row,
         column_gap=8.0,
@@ -1085,7 +1141,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1400, 2500, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1400, 2720, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -1319,7 +1375,8 @@ fn main {
   ])
   let sp_w : Ref[@core.Widget?] = Ref(None)
   let sp2_w : Ref[@core.Widget?] = Ref(None)
-  app.mount([make_chart_special_section(sp_w, sp2_w)])
+  let sp3_w : Ref[@core.Widget?] = Ref(None)
+  app.mount([make_chart_special_section(sp_w, sp2_w, sp3_w)])
   app.mount([
     make_form_section(
       frm_btn,
@@ -1954,7 +2011,9 @@ fn main {
     "NATIVE-APP-CHSP heat=" +
       ov2_rect_of(sp_w.val) +
       " sankey=" +
-      ov2_rect_of(sp2_w.val),
+      ov2_rect_of(sp2_w.val) +
+      " gph=" +
+      ov2_rect_of(sp3_w.val),
   )
   println(
     "NATIVE-APP-MEDIA gif=" +

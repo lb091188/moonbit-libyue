@@ -646,6 +646,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **四条工具链写法（本批实测）**：① `pub const` 的名字**必须大写**（`pub const pi` 直接报「Expected upper case identifier for name of const, found lower case. Did you mean let?」），小写常量用 `pub let`；② `for i = 1..<n { }` 不支持——range 只在 `for x in a..<b` 里合法，经典 for 要写 `for i = 1; i < n; i = i + 1`；③ `StringBuilder` 的写入方法是 `write_string`/`write_char`，没有 `add`/`append`；④ `Ordering` 类型在本工具链不可直接引用（写比较器函数会报「The type Ordering is undefined」），几个元素排序退回插入排序。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/chart` **11/11**（6 条纯函数：窗口丢最旧与越界无操作、值域退化与留白比例、1-2-5 步长与负区间起点、单位换挡 k/M/G、柱槽与两形态命中、扇区只累计正值且单扇区留 0.0002 弧度、仪表分段取色与折线段数、回归退化、8 位色串、标签截断；5 条组件：折线换数据与密集抽推出图、柱状悬停换底与离开复原、环形出图 + 命中四态、仪表盘 smooth 两路（直接跳到位 / 逐拍逼近）、散点带趋势线）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 加「图表」区块：折线+柱状一行、环形+仪表+散点+推点按钮一行，几何行补 `NATIVE-APP-CH`，状态行补 `ln=`/`chp=`）：注入「点三次推点按钮」得 `ln=27/23 chp=3`（窗口 24→27 点、末值 7→23，与手算 `pushes*7%29+2` 逐位一致）、退出码 0；截图复核五图齐备——折线带面积填充与右端最新值标注、柱状正负异色带类目、环形中心汇总 + 右侧图例带百分比、仪表 68% 弧与中心数字、散点带最小二乘趋势线。
 
+### MoonBit 原生 GUI 栈 · 专项图批 3（`yue/chart`：sunburst / graph / parallel / pictorialbar）
+
+- **与批 2 同一套路**：转换脚本做依赖名替换，手工段三类——「暂无数据」块、条件对齐的 `draw_text`（pictorialbar 的 4 处省略 `wrap=` 参数，正则要求 wrap 才匹配故漏，这类「省默认参数」的调用形态也要手改）、组件层 mount 块。旭日图中心汇总（20px SemiBold + 「总计」caption）与 `draw_donut_core` 同款 `@text.draw_box_at` 写法。
+- **`SunItem`/`TreeItem`/`TmItem` 同字段结构在包内字面量构造会「Mutiple possible record types」**：三个 `{name, value, children}` 形状相同，字面量无法消歧——统一走 `make` + `children.push`（数组字段内容可变），跨包同理（批 2 的坑在此复现并定案为通用口径）。
+- **可选参数的位置传参限制**：`GraphNode::make(name, value? : Double)` 与 `GraphEdge::make(s, t, weight? : Double)` 的可选参数**不能按位置传**（`make("甲", 30.0)` 报 requires 1 positional arguments）——一律 `value=30.0`/`weight=5.0` 命名传参。`SunItem::make` 的 `value? : Double?` 是双层 Option，数值要包 `Some(v)`。
+- **graph 的布局缓存改挂回收袋**：旧链路 `subscribe` 里清缓存 + `schedule_paint`；新栈 `follow_store` 只管重绘，缓存失效单独 `subscribe_id` + `sub_bag_register` 退订（与 gauge_t 同模式）。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/chart` **146/146**（新增 48：四份 wbtest 同源平移 44 + 组件挂载 4——旭日换数据变、关系图数据变更后布局缓存失效画面变、平行坐标换行变、象形柱两形态出像素）；包 `--deny-warn` 零警告、全仓红点仍 287/68。真窗口几何行确认布局（`gph=282,2346,260x190`），视觉观感留用户真机复验。
+
 ### MoonBit 原生 GUI 栈 · 专项图批 2（`yue/chart`：kline / sankey / treemap / tree）
 
 - **机械平移 + 手工段**：四个文件用转换脚本做依赖名替换（`@yue.*` → `@theme`/`@render`/`@core`/本包函数），「暂无数据」块、条件 align 的 `draw_text`、组件层 mount 块三处手工改写——`draw_text` 的 `align=` 允许任意表达式（`align=if first_col { @text.End } else { @text.Start }`），转换器按字面量枚举匹配会漏，这类段落一律手改。
