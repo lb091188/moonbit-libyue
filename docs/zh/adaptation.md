@@ -51,6 +51,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 - moonc 已实现 `#cfg(platform="windows"/"linux"/"macos")`,按 `-target` 三元组求值;但当前发布版 moon 只给 moonc 传无 OS 信息的 `native`,所有条件恒 false。`moon build -v` 的 moonc 命令行出现完整三元组即条件可用。
 - 现行替代:运行时 `platform()` 判断,声明式树按条件组装节点,不满足就不创建控件。
+- **定案(2026-10-11):平台分派弃用 cfg,即便日后工具链修好也不翻案**——MoonBit 侧跨平台选择一律「运行时探测 + 模式匹配」,探测形态照 render 包既有的降级探针(画一笔验像素、会话句柄非零),已入 AGENTS.md 硬性规则。
+
+### 原生渲染/文本矩阵与文字三层差异(新栈定案,2026-10-11)
+
+- **平台矩阵**:Linux=GTK3 窗口 + cairo 光栅 + Pango 文本(系统库动态链,LGPL 无义务);Windows=纯 MoonBit 软件光栅器 + DirectWrite 文本 + WIC 图片解码(全部系统组件,零第三方依赖);macOS=CoreGraphics + CoreText(待真机)。曾评估 vcpkg 静态链 cairo/pango,因依赖重(glib/fontconfig/harfbuzz 全家)+ LGPL 静态链「提供重链接途径」义务,与本库「原生、轻量、无负担」定位相悖而弃。
+- **文字三层差异与对策**:①**高度**——行高统一为 `max(引擎自然行高, ceil(size×K))`,K 实测三平台覆盖最肥字体(微软雅黑)后定为常量,行高成为 size 的纯函数,回退字体不再影响行高,多出空间半行距上下居中、取整写死;异字体超地板时行高就地长高(优雅退化不裁字形)。②**宽度**——折行/截断/省略全部是 MoonBit 组件层决策(平台只供测量),textarea 的 wrap_units/layout_lines 纯函数不动;CJK advance≈em 实际无差,拉丁差一个词(折行/省略点边界),内容不丢失。③**像素**——矢量层(矩形/路径/AA/25 混合模式/渐变)由 MoonBit 光栅器三平台同一实现、逐位一致,断言跨平台共用;文字度量/像素分平台固有(旧栈即 Pango/DirectWrite/CoreText 三引擎),断言分「结构性(共用)/数值(平台基线目录)」两档,默认字体按平台显式编码进主题(Windows 钉雅黑系,Linux 跟 fontconfig)。
+- **Linux 红利**:cairo 与 MoonBit 光栅器可逐像素对拍,cairo 当标准答案验收自研引擎(渲染批 W4 的验收手段)。
+- **平台 C 桩组织**:单一 `stub.c` 多分支 + prebuild 宏(见「Windows 窗口地基 W2」小节的 yue/win/stub.c 先例);render/text 的桩合并照此办理,Windows 侧不引任何 C 渲染/文本库(仅 WIC 属系统组件)。
 
 ### 声明式层与自绘组件
 

@@ -8,7 +8,15 @@
 - **libyue 的角色**：**老师，不是运行时依赖**。新栈不含 libyue 一行代码；它的价值是行为语义参考、可平移的纯 MoonBit 上层资产、以及 `patches/` 里的真实 bug 语料。需要纯系统能力时按需调用，不作为渲染或布局后端。
 - **布局层**：`modules/yoga-mbt`（纯 MoonBit Flexbox，只对齐 Web 标准），YG1–YG3 已完成。
 - **Linux 后端锁定 GTK3**（`gtk+-3.0` 3.24.x）。理由两条：`scripts/prebuild.py` 现有依赖清单已含 `gtk+-3.0`/`pangoft2`/`fontconfig`/`x11`，用 GTK **零新增运行期依赖**；输入法的系统客户端（`GtkIMContext`）与 Wayland 后端都挂在这条链上。**裸 X11 自研窗口后端方案已删除**，不保留备选。
-- **绘制**：`nu::Painter` 在 libyue 里只是 Cairo 的薄封装，因此它是**待移植的绘制库**而非后端。新栈直链 `cairo`/`pango`，`Painter` 的方法签名照抄当契约。
+- **绘制与文本的平台矩阵（2026-10-11 改定，替代早先「直链 cairo/pango」的定案）**：
+  - Linux = **GTK3 窗口 + cairo 光栅 + Pango 文本**，全部随系统库动态链，零打包负担、LGPL 无义务，G2–G5 已跑通的地基不动。
+  - Windows = **纯 MoonBit 软件光栅器 + DirectWrite 文本**，渲染与文本零第三方依赖；图片解码走 WIC（系统组件，与 user32 同级）。
+  - macOS = **CoreGraphics + CoreText**（取得设备后），同样零第三方依赖。
+  - 取舍理由：曾评估 vcpkg 静态链 cairo/pango——依赖重（glib/fontconfig/harfbuzz 全家），且 LGPL 静态链进发行物有「提供重链接途径」义务，与本库「原生、轻量、无负担」定位相悖，弃。矢量渲染层（矩形/路径/AA/25 混合模式/渐变）由 MoonBit 光栅器**三平台同一实现**，像素断言跨平台通用；Linux 上保留 cairo 作**对拍标准答案**验收自研引擎。
+  - **像素真值分两层**：矢量层跨平台逐位一致（断言共用）；文字的度量/宽度/像素字节分平台是固有的（旧栈即 Pango/DirectWrite/CoreText 三引擎），对策＝断言分「结构性（跨平台共用）/数值（平台基线目录）」两档，默认字体按平台显式编码进主题（Windows 钉雅黑系，Linux 跟 fontconfig）。
+  - **行高 K 公式**（W5 第一条定案）：行高 = max(引擎自然行高, ceil(size×K))，K 实测三平台覆盖最肥字体（微软雅黑）后定为常量——行高成为 size 的纯函数，回退字体不再影响行高，多出空间半行距上下居中；异字体超地板时行高就地长高（优雅退化不裁字形）。
+  - **跨平台分派机制**：一律**运行时探测 + 模式匹配**（render 包既有的「探针画一笔验像素、cairo 不可用退纯路径」形态），**禁用 `#cfg(platform=)` 编译指令**（moon 现传无 OS 的 `native` 目标恒 false；即便工具链日后修好也不用，本条为定案不随工具链演进翻案）。
+- `nu::Painter` 在 libyue 里只是 Cairo 的薄封装，因此它是**待移植的绘制库**而非后端；`Painter` 的方法签名照抄当契约。
 - **版本纪律**：不试 GTK4——`nu::*` 的可比语义（焦点、编辑器、主题）全部是 GTK3 行为。
 - **分支纪律**（2026-10-10 追加）：本特性分支**不保留老的 libyue 绑定，完全重来**——`shim/`、`lib/<平台>/`、`vendor/libyue` 与新栈不同进程共存，按 §2 清单摘除；**不设包内双轨开关**。因此允许「新栈起来之前全仓门禁为红」，红点即工作队列，口径见 §5。布局层（yoga-mbt）与 libyue 复刻**合算一个工程、一起推进**，不再分成两条时间线。
 
@@ -19,9 +27,9 @@
 | 包 | 内容 | 来源 |
 |---|---|---|
 | `yue/win` | 平台窗口后端：建窗、事件、DPI、焦点栈、**原生子表面挂载**（§4）；Linux=GTK3，Windows=Win32，macOS=Cocoa | 新写 |
-| `yue/core` | 事件循环（`g_main_context_iteration` 单步泵 + `wakeup`）、App/Window、脏区重绘、yoga-mbt 接线、命中测试、**哑视图（可吃键盘焦点）**、自绘组件宿主 | 新写 |
-| `yue/render` | `Painter` 契约 + Cairo 实现 + `Bitmap`（自有 RGBA 缓冲，离屏与上屏同源） | 契约照抄 `yue/painter.mbt` 58 法 |
-| `yue/text` | `Text`/`Font`/`AttributedText` 语义层（先委托 Pango，后按需要自研栅格化）；测量与基线回灌 `set_measure`/`set_baseline` | 参考 `nativeui/gfx/` |
+| `yue/core` | 事件循环（平台单步泵 + `wakeup`：Linux=`g_main_context_iteration`、Windows=`MsgWaitForMultipleObjectsEx`）、App/Window、脏区重绘、yoga-mbt 接线、命中测试、**哑视图（可吃键盘焦点）**、自绘组件宿主 | 新写 |
+| `yue/render` | `Painter` 契约 + 双后端 `Bitmap`（自有 RGBA 缓冲，离屏与上屏同源）：Linux=Cairo 桩（prebuild 带宏编译），Windows/mac=**纯 MoonBit 光栅器**（运行时探测选择，Linux 上与 cairo 对拍验收）；图片解码 Linux=GdkPixbuf、Windows=WIC | 契约照抄 `yue/painter.mbt` 58 法 |
+| `yue/text` | `Text`/`Font`/`AttributedText` 语义层（Linux 委托 Pango；Windows=DirectWrite、mac=CoreText，`rt_*` 桩按平台换实现，语义层不动）；测量与基线回灌 `set_measure`/`set_baseline` | 参考 `nativeui/gfx/` |
 | `yue/input` | 编辑器内核（文档 / 选区 / 编辑操作 / caret）+ `TextEditorHost` 后端抽象 | 新写 |
 | `yue/sys` | 系统能力 | 平移 `yue/system`（559 fn）、`yue/traybus`（175 fn）、`yue/icons`（803 个图标路径数据） |
 
