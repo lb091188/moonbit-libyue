@@ -51,7 +51,7 @@
   - [ ] 绘制入口形态：旧契约的 `Painter::draw_text` 在组件接线（G7）时逐点改 `@text.draw_in_box(p.bitmap, …)`
 
 ### 控件（一律自绘，不再引入原生控件皮肤；家族名对应 master `yue/components/` 九个源文件）
-- [~] 基础原语：`group`/`separator`/标签/图像/图标/按钮已落新包 **`yue/ui`**（首批 7 件，另附 `container`；文本 measure/baseline 首次回灌布局引擎，`on_pointer`/`on_draw` 首参为控件本身以免自捕获引用环；`type=` 因是保留字改 `kind : ButtonKind`；`yue/components` 属旧链路红点，按批替换）；`tab` 已由 `yue/ui/nav.mbt` 的 `tabs_t` 承担（页签头行 + 预建页区显隐），剩 `scroll`/`splitter`（随批次 7 的滚动与虚拟列表一起做）与表单族剩余项
+- [~] 基础原语：`group`/`separator`/标签/图像/图标/按钮已落新包 **`yue/ui`**（首批 7 件，另附 `container`；文本 measure/baseline 首次回灌布局引擎，`on_pointer`/`on_draw` 首参为控件本身以免自捕获引用环；`type=` 因是保留字改 `kind : ButtonKind`；`yue/components` 属旧链路红点，按批替换）；`tab` 已由 `yue/ui/nav.mbt` 的 `tabs_t` 承担（页签头行 + 预建页区显隐），`scroll` 已落 `yue/ui/scroll.mbt`（垂直滚动容器 + 自绘滚动条，平移用 yoga 新补的相对定位偏移），剩 `splitter` 与表单族剩余项
 - [ ] 文本族 `components_text.mbt`：`label_t`、`code_view`＋`tokenize_lang`/`tokenize_moonbit`、`measure_text_height`
 - [~] 表单族 `components_form.mbt`（15）：`checkbox`/`radio_group`/`switch_t`/`slider_t`/`progress`/`stepper`(`input_number` 形态)已落 `yue/ui/form.mbt`（值走 `Store[T]`、订阅随回收袋退订、禁用态用 `Enabled` 单元、滑块拖动靠组件自持的 dragging）；剩 `entry_t`/`input_t`/`textarea_t`（随「输入框全语义」那条一起做）与 `button_t`/`form_item`/`form`/`link`/`select_t`/`rate_t`/`color_picker_t`
 - [~] 输入框全语义（`yue/ui/entry.mbt`，单行）：选区/双击选词/拖动插入点/Shift+箭头/undo-redo/Ctrl+A-C-V(内核内部剪贴板=记档降级)/placeholder/只读/密码遮罩/IME commit+preedit 内联全部落地，真窗口注入回证 `t3='组件框ab Q'`（点进框→打字→双击只选最后一个词→替换→Home+Shift+End+Delete+Ctrl+Z 撤销回来）；剩多行 `textarea_t`（要先做换行布局与垂直滚动）

@@ -143,6 +143,40 @@ fn resolve_edges(e : Edges, base_w : Option[Double]) -> Resolved {
 }
 
 ///|
+/// 相对定位偏移（CSS2 §9.3.7）：`top`/`left` 把盒子从静态位置推开，同轴两端
+/// 都给值时 `top`/`left` 胜（另一端忽略），`auto`/未设即不偏移；百分比按父内容盒
+/// 解（与把子项递归下去的包含块同一参照）。偏移只改落位、不参与常规流占位，
+/// 也不改本节点为绝对子项算出的包含块（滚动与浮层都只需要 fixed 语义）。
+fn relative_offset(c : Node, base_w : Option[Double], base_h : Option[Double]) -> (
+  Double,
+  Double,
+) {
+  match c.style.position {
+    Absolute => (0.0, 0.0)
+    Relative => {
+      let cs = c.style
+      let dx = match cs.left {
+        Undefined | Auto =>
+          match cs.right {
+            Undefined | Auto => 0.0
+            v => 0.0 - resolve_value(v, base_w)
+          }
+        v => resolve_value(v, base_w)
+      }
+      let dy = match cs.top {
+        Undefined | Auto =>
+          match cs.bottom {
+            Undefined | Auto => 0.0
+            v => 0.0 - resolve_value(v, base_h)
+          }
+        v => resolve_value(v, base_h)
+      }
+      (dx, dy)
+    }
+  }
+}
+
+///|
 /// 主轴/交叉轴视角下的边距（含 auto 标记）：reverse 翻转主轴起端，
 /// 列容器的交叉轴起端随 cross_reverse 翻转（行容器交叉轴是块轴，不受方向影响）。
 priv struct AxisMargin {
@@ -1383,8 +1417,9 @@ fn layout_into_impl(
       }
       let x = if main_is_row { m_pos } else { c_pos }
       let y = if main_is_row { c_pos } else { m_pos }
-      it.node.layout_left = own_border.left + own_pad.left + x
-      it.node.layout_top = own_border.top + own_pad.top + y
+      let (rdx, rdy) = relative_offset(it.node, inner_w, inner_h)
+      it.node.layout_left = own_border.left + own_pad.left + x + rdx
+      it.node.layout_top = own_border.top + own_pad.top + y + rdy
       if it.node.children.length() > 0 {
         let _ = layout_into(it.node, inner_w, inner_h, Some(c_w), Some(c_h))
       } else {

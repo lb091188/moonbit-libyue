@@ -370,6 +370,27 @@ fn make_band(ctr : Ctr) -> @core.Widget {
 }
 
 ///|
+/// 滚动容器里的 20 行内容（每行 22 高 → 内容 440，视口 120，可滚 320）。
+fn make_scroll_rows() -> Array[@core.Node] {
+  let rows : Array[@core.Node] = []
+  for i = 0; i < 20; i = i + 1 {
+    rows.push(
+      @ui.container(
+        [@ui.label("滚动行 " + i.to_string(), size=12.0)],
+        height=22.0,
+        padding=4.0,
+        bg=if i % 2 == 0 {
+          @theme.theme_bg_panel()
+        } else {
+          @theme.theme_fill_zebra()
+        },
+      ),
+    )
+  }
+  rows
+}
+
+///|
 /// 矩形转字符串（几何行用，四舍五入到整像素）。
 fn rect_str(r : @core.Rect) -> String {
   r.x.round().to_int().to_string() +
@@ -534,6 +555,8 @@ fn main {
   let xfer_left = @core.Store::new(["甲", "乙", "丙"])
   let xfer_right : @core.Store[Array[String]] = @core.Store::new(["丁"])
   let nav2_xfer : Ref[@core.Widget?] = Ref(None)
+  let scr = @ui.ScrollState::new()
+  let scr_w : Ref[@core.Widget?] = Ref(None)
   app.mount([
     @ui.container(
       [
@@ -643,6 +666,25 @@ fn main {
             ),
           ],
           width=300.0,
+          row_gap=6.0,
+          padding=6.0,
+          align_items=@yoga.AlignItems::FlexStart,
+          bg=@theme.theme_bg_page(),
+          border=@theme.theme_border(),
+        ),
+        @ui.container(
+          [
+            @ui.label("滚动容器", size=13.0),
+            @ui.scroll_v(
+              make_scroll_rows(),
+              scr,
+              width=190.0,
+              height=120.0,
+              handle=fn(w : @core.Widget) -> Unit { scr_w.val = Some(w) },
+            ),
+            @ui.label("滚轮 / 拖滚动条都改偏移（退出状态行报 scr=偏移/上限）", size=12.0),
+          ],
+          width=210.0,
           row_gap=6.0,
           padding=6.0,
           align_items=@yoga.AlignItems::FlexStart,
@@ -776,7 +818,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()}"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()}"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -891,6 +933,19 @@ fn main {
     }
   }
   println(nav_line)
+  match scr_w.val {
+    Some(w) => {
+      println(
+        "NATIVE-APP-SCR box=" +
+          rect_str(w.rect) +
+          " bar=" +
+          rect_str(w.children()[1].rect) +
+          " row0=" +
+          rect_str(w.children()[0].children()[0].rect),
+      )
+    }
+    None => ()
+  }
   match cal_w.val {
     Some(w) => {
       // 第 14 格（本月第 11 天）给注入用；跨月格与它同列不同色，坐标够用
