@@ -360,6 +360,25 @@ fn probe_windows(counts : Ref[Counts]) -> Array[(String, String)] {
     }
     Err(e) => rows.push(("剪贴板", e.to_string()))
   }
+  // D-Bus：会话唯一名（真连一次）、通知能力条数、系统总线在线与否
+  match @dbus.dbus_ensure_session() {
+    Ok(_) => rows.push(("会话总线", @dbus.dbus_unique_name()))
+    Err(e) => rows.push(("会话总线", e))
+  }
+  match @dbus.notify_caps() {
+    Ok(caps) => rows.push(("通知能力", "\{caps.raw.length()} 条"))
+    Err(e) => rows.push(("通知能力", e.to_string()))
+  }
+  rows.push(
+    (
+      "系统总线",
+      if @dbus.dbus_system_alive() {
+        "已连接"
+      } else {
+        "未连接（首次调用时按需连接）"
+      },
+    ),
+  )
   rows
 }
 
@@ -429,6 +448,9 @@ fn main {
   let btn_probe : Ref[@core.Widget?] = Ref(None)
   let btn_open : Ref[@core.Widget?] = Ref(None)
   let btn_reveal : Ref[@core.Widget?] = Ref(None)
+  let btn_notify : Ref[@core.Widget?] = Ref(None)
+  let notify_hits = @core.Store::new(0)
+  let notify_state = @core.Store::new("通知：未发送")
   let sys_store = @core.Store::new(join_lines(probe_system(counts)))
   let desk_store = @core.Store::new(join_lines(probe_desktop(counts)))
   let apps_store = @core.Store::new(join_lines(probe_apps(counts)))
@@ -445,6 +467,15 @@ fn main {
     app.schedule_paint()
   }
 
+  // D-Bus 接线：排期通道与周期泵都由宿主给（yue/dbus 不引 GUI 核心层）
+  @dbus.dbus_set_post_delayed(fn(ms : Int, f : () -> Unit) -> Unit {
+    let _ = app.timer(ms, f)
+  })
+  fn pump_loop() -> Unit {
+    @dbus.dbus_pump()
+    let _ = app.timer(200, pump_loop)
+  }
+  let _ = app.timer(200, pump_loop)
   // 剪贴板监听：排期通道由宿主注入（yue/sys 不引 GUI 核心层）
   let watcher = @sys.cbw_start_watch(
     fn(ms : Int, f : () -> Unit) -> Unit {
@@ -469,7 +500,7 @@ fn main {
           weight=@text.SemiBold,
         ),
         @ui.label(
-          "「重新探测」也是只读；「打开链接 / 打开目录」会把动作交给系统，点了才有窗口弹出",
+          "「重新探测」也是只读；「打开链接 / 打开目录 / 发通知」会把动作交给系统，点了才有反应",
           size=12.0,
           color=@theme.theme_text_secondary(),
         ),
@@ -491,7 +522,7 @@ fn main {
     @ui.container(
       [
         panel("应用与文件类型", apps_store.signal(), 380.0),
-        panel("窗口与剪贴板", wins_store.signal(), 380.0),
+        panel("窗口 / 剪贴板 / D-Bus", wins_store.signal(), 380.0),
         panel("最近与历史", hist_store.signal(), 380.0),
       ],
       direction=@yoga.Row,
@@ -539,6 +570,33 @@ fn main {
           ),
           size=12.0,
         ),
+        @ui.button(
+          "发通知(带进度)",
+          on_click=fn() -> Unit {
+            let n = notify_hits.get()
+            let pct = if n >= 3 { 90 } else { 30 * (n + 1) }
+            match
+              @dbus.notify_send(
+                "MoonBit native-sys",
+                "系统能力验证页",
+                "第 " + (n + 1).to_string() + " 击，进度 " + pct.to_string() + "%",
+                progress=pct,
+              ) {
+              Ok(id) => {
+                notify_state.set(
+                  "通知 id=" + id.to_string() + " 进度 " + pct.to_string() + "%",
+                )
+                notify_hits.update(fn(k : Int) -> Int { k + 1 })
+              }
+              Err(e) => notify_state.set("发送失败：" + e.to_string())
+            }
+            app.schedule_paint()
+          },
+          kind=@ui.Border,
+          min_width=130.0,
+          handle=fn(w : @core.Widget) -> Unit { btn_notify.val = Some(w) },
+        ),
+        @ui.label_dyn(notify_state.signal(), size=12.0),
         @ui.label_dyn(clip_view.signal(), size=12.0),
       ],
       direction=@yoga.Row,
@@ -552,7 +610,12 @@ fn main {
   app.run()
   @sys.cbw_stop(watcher)
   let mut geo = "NATIVE-SYS-GEO"
-  for kv in [("probe", btn_probe), ("open", btn_open), ("reveal", btn_reveal)] {
+  for kv in [
+    ("probe", btn_probe),
+    ("open", btn_open),
+    ("reveal", btn_reveal),
+    ("notify", btn_notify),
+  ] {
     match kv.1.val {
       Some(w) => geo = geo + " " + kv.0 + "=" + rect_str(w.rect)
       None => geo = geo + " " + kv.0 + "=-"
@@ -567,7 +630,8 @@ fn main {
       "hist=\{c.hist} dl=\{c.downloads} bm=\{c.bookmarks} ffx=\{c.firefox} " +
       "vsc=\{c.vscode} wins=\{c.windows} clip=\{c.clipboard} " +
       "probes=\{probes.get()} opens=\{opens.get()} reveals=\{reveals.get()} " +
-      "changes=\{clip_changes.get()}",
+      "changes=\{clip_changes.get()} ntf=\{notify_hits.get()} " +
+      "pool=\{@dbus.dbus_unique_name()}",
   )
   app.shutdown()
 }

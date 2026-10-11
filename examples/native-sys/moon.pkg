@@ -5,6 +5,7 @@ import {
   "NoahLiu/moonbit-libyue/yue/theme",
   "NoahLiu/moonbit-libyue/yue/ui",
   "NoahLiu/moonbit-libyue/yue/sys",
+  "NoahLiu/moonbit-libyue/yue/dbus",
 }
 
 pkgtype(kind: "executable")
