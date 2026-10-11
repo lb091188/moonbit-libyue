@@ -89,7 +89,7 @@ fn ime_tree(
   mid.append_child(field)
   field.focus_id = 5
   field.im_context = Some(fn() -> (String, Int)? { Some(("已提交", 6)) })
-  field.im_cursor = Some(fn() -> Rect? {
+  field.im_cursor = Some(fn(_w : Widget) -> Rect? {
     Some({ x: 12.0, y: 3.0, w: 1.0, h: 16.0 })
   })
   field.on_commit = Some(fn(t : String) -> Bool {

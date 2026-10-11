@@ -25,6 +25,11 @@ pub(all) struct App {
   mut last_preedit : (String, Int)
   /// 上一轮输入法服务的控件焦点 id（0 = 无）；换焦点时用来清掉旧控件的组合串
   mut ime_focus : Int
+  /// 悬停归属与按下捕获（控件 id，-1 = 无）。按下后到松手之前，移动与抬起
+  /// 都投给被按下的控件（`Widget::dispatch_pointer_to`），指针离开它也不会
+  /// 卡住按下态，拖选/拖动插入点才有依据
+  mut hover_id : Int
+  mut capture : Int
 }
 
 ///|
@@ -48,6 +53,8 @@ pub fn App::new(width : Int, height : Int, title : String) -> App? {
         running: true,
         last_preedit: ("", 0),
         ime_focus: 0,
+        hover_id: -1,
+        capture: -1,
       }
       window.show()
       window.request_focus()
@@ -202,9 +209,12 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
   ) {
     Ignored => ()
     Pointer(pev) => {
+      let r = route_pointer(self.root, pev, self.hover_id, self.capture)
+      self.hover_id = r.0
+      self.capture = r.1
       match pev.kind {
         Down => {
-          // 按下先把键盘焦点交给命中的可聚焦控件（栈里没有该 id 时不改焦点）
+          // 按下把键盘焦点交给命中的可聚焦控件（栈里没有该 id 时不改焦点）
           match self.root.focusable_at(pev.x, pev.y) {
             Some(id) =>
               if !self.focus.is_focused(id) {
@@ -212,7 +222,6 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
                 if self.focus.focus(id) {
                   self.flush_ime_for_switch(prev)
                   self.window.request_focus()
-                  self.schedule_paint()
                 }
               }
             None => ()
@@ -220,7 +229,7 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
         }
         _ => ()
       }
-      if self.root.dispatch_pointer(pev) {
+      if r.2 || r.3 {
         self.schedule_paint()
       }
     }

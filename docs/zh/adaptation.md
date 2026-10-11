@@ -397,6 +397,15 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **两条写法坑**：① 同包多个 `_wbtest.mbt` **共享顶层助手名**，重复定义不报 `declared twice` 而是让**先定义的那个变成 unused**（我在 `node_wbtest.mbt` 里重写了 `sized`，`widget_wbtest.mbt` 那份立刻报 `Unused function 'sized'`）——写测试前先 grep 同包已有助手，别造第二个。② `node_of_new` 的配置回调若声明成返回 `Unit`，闭包体里用 `sized(w, ..)` 这类返回控件的助手会直接类型不匹配；返回 `Widget` 既省掉 `let _ =`，又允许回调里再建子树。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/core` **53/53**（28 既有 + 19 平移信号/Store + 6 条声明式：`mount_children` 顺序与坐标、`bind_node` 原位换棵且兄弟项坐标跟随、旧代订阅整袋退订（重建 5 次源上仍只有 1 条）、重挂后 parent 里始终只有一棵不留半棵、`swap_node` 预建两棵只改显隐且隐藏那棵矩形清零、无钩子时 `invalidate` 空操作）；yoga-mbt **92/92**（新增原位增删：摘中间项再插回与参考树逐节点一致、越界不改动树）；八包 `--deny-warn` 全零警告，全仓红点仍 287 errors / 68 warnings。真窗口回证（`examples/native-app` 新增声明式行，点击即 `Store.update` → 原位重挂）：`decl=3 kids=6/6`（根子项数恒定，说明没有泄漏也没有重复挂），同轮 `clicks=1`（重挂三次后按钮命中照常）、`t1='hellox' c1=6`（Tab 环绕与打字照常），退出码 0。**待用户目视**：声明式行底色随点击奇偶切换（证明确实换了一棵新树，而不是只改文本）。
 
+### MoonBit 原生 GUI 栈 · 控件交互地基（悬停/按下归属、指针捕获、回调不得自捕获）
+
+- **状态归宿主，控件只读**：`Widget` 加 `hovered`/`pressed` 两个字段，由宿主在每次指针事件里按命中与捕获统一维护（`set_hover(id)` / `set_press(id)`，只在归属**变化**时各走一趟树），控件在 `on_draw` 里直接读。旧链路的 `hover_group` 是轮询式（libyue 不给 move 事件，只能定时问鼠标在哪），本栈有完整路由，所以进入与离开都是事件：悬停者换了就给上一个补发 `Leave`——「只有进入没有退出」的悬浮提示形态在这里不成立。
+- **按下即进入捕获期**：分发决策做成纯函数 `route_pointer(root, ev, hover_id, capture) -> (新悬停, 新捕获, 是否消费, 是否变了)`，`App` 只保存并写回两个状态。规则：`Down` 的命中者标 pressed 并成为捕获者，之后 `Move`/`Up` 一律投给捕获者（沿它到根的路径投递，本地坐标照常折算）；`Up` 清按下态、解除捕获，并**按抬起位置**重判悬停；捕获期悬停不动。为什么必须做：不做捕获，指针一离开控件就再也收不到 `Up`——按下态卡死只是 mild 症状（实测表现是控件常驻高亮），拖选与「拖动插入点」这两条输入框语义直接没有依据。等价于 Web 的 `setPointerCapture`。
+- **回调不得捕获控件自身（引用环纪律）**：`on_draw` 首参改成 `Widget`、`im_cursor` 改成收 `Widget`，控件读自己的 `rect`/`hovered`/`pressed` 由参数拿，句柄不再进闭包。原因是本栈控件**持有**自己的回调表，闭包再捕获控件就是引用环，计数式回收断不掉环；一次性示例看不出来，`bind_node` 每重挂一次漏一棵树就是稳定泄漏。示例与测试的全部绘制回调随签名改完。
+- **一条被实测纠正的预期**：`display:none` 的兄弟项会**上顶**（列容器 auto 高按可见项算），所以「隐藏项原来占的那片区域」命中的是顶上来的兄弟而不是父容器——我第一版按「命中父控件」下断言，`route_pointer` 直接给了兄弟的 id。含义是组件层不必为隐藏项额外清理悬停态，位置自然被活着的那一项拿走。
+- **注入手法补一条**：拖动序列写成 `xdotool mousemove --window <id> X Y mousedown 1` 原子按下，随后 `xdotool mousemove --window <id> X2 Y2` 移动、`xdotool mouseup 1` 松开（不带 `--window`，XTEST 在当前点位松开）。实测带内按下、带外松开，捕获带仍收到抬起。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/core` **59/59**（新增 6 条：悬停跟随与 `Leave` 补发、捕获期移动与抬起都投给按下者且悬停不动、点在空白处不进捕获也不炸、隐藏控件不参与悬停且兄弟上顶后命中跟着变、`by_id` 与 `dispatch_pointer_to` 按身份投递（坐标不参与判定）、滚轮沿用同一冒泡规则）；八包 `--deny-warn` 全零警告，yoga-mbt 92/92，全仓红点仍 287 errors / 68 warnings。真窗口回证（`examples/native-app` 新增「捕获带」，绘制态直接读 `w.pressed`/`w.hovered`）：带内按下 → 拖到 (200,245) → 拖到 (300,100) 松手 → `band=d1/u1/m3`（**在带外松手仍收到抬起**），同轮按钮 `clicks=1`、声明式行 `decl=2 kids=7/7` 照常，退出码 0。**待用户目视**：拖动过程中带子保持按下色（橙）、离开后恢复常态而悬停色不再跟着指针跑。
+
 ## Linux
 
 ### 发行版

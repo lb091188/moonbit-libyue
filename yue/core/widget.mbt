@@ -72,10 +72,17 @@ pub(all) struct Widget {
   mut visible : Bool
   /// 绘制回调：入参是**已平移到本控件原点、已裁剪到本控件矩形**的绘制器，
   /// 以及本控件的绝对矩形（取宽高用；坐标请一律按本地写）。
-  mut on_draw : Option[(@render.Painter, Rect) -> Unit]
+  /// 绘制回调：第一个参数是控件本身（读 `hovered`/`pressed`/`rect` 等状态用），
+  /// **不要再把控件句柄捕获进闭包**——控件持有回调、回调又持有控件就是引用环，
+  /// 本工具链的计数式回收断不掉环，动态换树（bind_node 重挂）会稳定泄漏。
+  mut on_draw : Option[(Widget, @render.Painter, Rect) -> Unit]
   mut on_pointer : Option[(PointerEvent) -> Bool]
   mut on_key : Option[(KeyEvent) -> Bool]
   mut on_scroll : Option[(ScrollEvent) -> Bool]
+  /// 交互态（悬停 / 按下）：**由宿主按命中与捕获统一维护**，控件只在
+  /// `on_draw` 里读，不必自己处理 enter/leave（见 `set_hover`/`set_press`）
+  mut hovered : Bool
+  mut pressed : Bool
   /// 输入法提交文本到达本控件（宿主按焦点 id 路由）；返回是否消费。
   mut on_commit : Option[(String) -> Bool]
   /// 组合串更新（文本 + 串内字节光标）；宿主每拍投给焦点控件。
@@ -84,7 +91,7 @@ pub(all) struct Widget {
   /// 输入法，宿主于是本轮不喂 surrounding、也不取 commit。
   mut im_context : Option[() -> (String, Int)?]
   /// 插入符矩形（窗口坐标），候选窗据此定位。
-  mut im_cursor : Option[() -> Rect?]
+  mut im_cursor : Option[(Widget) -> Rect?]
   /// 焦点栈里的 id（0 = 不参与键盘焦点）
   mut focus_id : Int
 }
@@ -105,6 +112,8 @@ pub fn Widget::new() -> Widget {
     on_pointer: None,
     on_key: None,
     on_scroll: None,
+    hovered: false,
+    pressed: false,
     on_commit: None,
     on_preedit: None,
     im_context: None,
@@ -310,6 +319,26 @@ fn path_to(w : Widget, px : Double, py : Double) -> Array[Widget] {
 }
 
 ///|
+/// 自根到指定控件 id 的路径（含两端）；控件隐藏或不在树里给空表。
+fn path_to_widget(w : Widget, id : Int, acc : Array[Widget]) -> Array[Widget] {
+  if !w.visible {
+    return []
+  }
+  let here : Array[Widget] = acc.copy()
+  here.push(w)
+  if w.id == id {
+    return here
+  }
+  for k in w.kids {
+    let sub = path_to_widget(k, id, here)
+    if sub.length() > 0 {
+      return sub
+    }
+  }
+  []
+}
+
+///|
 /// 命中链上最近的可聚焦控件 id（从命中控件沿祖先链向上，第一个声明了
 /// `focus_id` 的算），整条链都没有则 None。宿主在按钮按下时用它把键盘
 /// 焦点交给控件——与 Web 同源（点表单控件即聚焦它），控件不必自己改焦点栈。
@@ -327,10 +356,9 @@ pub fn Widget::focusable_at(self : Widget, x : Double, y : Double) -> Int? {
 }
 
 ///|
-/// 指针事件路由：命中控件起沿祖先链向上，第一个返回 true 的处理器消费掉事件。
-/// 交给处理器前把窗口坐标平移为该控件的本地坐标。返回是否被消费。
-pub fn Widget::dispatch_pointer(self : Widget, ev : PointerEvent) -> Bool {
-  let path = self.hit_path(ev.x, ev.y)
+/// 沿给定路径投递指针事件：从最深往上，第一个返回 true 的处理器消费掉；
+/// 交给处理器前把窗口坐标平移为该控件的本地坐标。
+fn dispatch_on_path(path : Array[Widget], ev : PointerEvent) -> Bool {
   let mut i = path.length()
   let mut handled = false
   while i > 0 && !handled {
@@ -349,6 +377,113 @@ pub fn Widget::dispatch_pointer(self : Widget, ev : PointerEvent) -> Bool {
     }
   }
   handled
+}
+
+///|
+/// 指针事件路由（按坐标命中）。
+pub fn Widget::dispatch_pointer(self : Widget, ev : PointerEvent) -> Bool {
+  dispatch_on_path(self.hit_path(ev.x, ev.y), ev)
+}
+
+///|
+/// 沿「指定控件到根」的路径投递指针事件（传播规则同坐标命中）。
+/// 用于按下后的捕获期：拖动与松手要交给**被按下**的那个控件，而不是当前
+/// 坐标底下的控件——否则指针一离开控件就收不到 Up，按下态卡死、拖选也做不了
+/// （与 Web 的 setPointerCapture 同义）。
+pub fn Widget::dispatch_pointer_to(self : Widget, widget_id : Int, ev : PointerEvent) -> Bool {
+  dispatch_on_path(path_to_widget(self, widget_id, []), ev)
+}
+
+///|
+/// 按控件身份找控件（不在树里给 None）。
+pub fn Widget::by_id(self : Widget, id : Int) -> Widget? {
+  match path_to_widget(self, id, []) {
+    [] => None
+    path => Some(path[path.length() - 1])
+  }
+}
+
+///|
+/// 把悬停态交给 id 对应的控件（`id` 为 0 或负数表示全部清掉）。
+/// 只有一趟遍历，且只在悬停者**变化**时由宿主调用。
+pub fn Widget::set_hover(self : Widget, id : Int) -> Unit {
+  self.hovered = self.id == id
+  for k in self.kids {
+    k.set_hover(id)
+  }
+}
+
+///|
+/// 把按下态交给 id 对应的控件（`id` 为 0 或负数表示全部清掉）。
+pub fn Widget::set_press(self : Widget, id : Int) -> Unit {
+  self.pressed = self.id == id
+  for k in self.kids {
+    k.set_press(id)
+  }
+}
+
+///|
+/// 指针事件在控件树上的分发决策：悬停归属、按下捕获、事件投递。
+/// 独立成纯函数是为了无头可测——`App` 只保存 `hover_id`/`capture` 两个状态
+/// 并把返回值写回，另在 `Down` 时做焦点接管（那要碰窗口与焦点栈）。
+/// 规则：
+/// - `Down`：命中者标 pressed 并成为捕获者；此后 `Move`/`Up` 都投给它
+///   （指针离开也不丢抬起，按下态不会卡死，拖选与拖动插入点才有依据）；
+/// - 捕获期悬停不动，`Up` 之后按抬起位置重新判定悬停者；
+/// - 悬停者换了就给上一个补一次 `Leave`（窗口坐标）。
+pub fn route_pointer(
+  root : Widget,
+  ev : PointerEvent,
+  hover_id : Int,
+  capture : Int,
+) -> (Int, Int, Bool, Bool) {
+  let hit = match root.hit_test(ev.x, ev.y) {
+    Some(w) => w.id
+    None => -1
+  }
+  let mut hover = hover_id
+  let mut cap = capture
+  let mut changed = false
+  match ev.kind {
+    Down => {
+      root.set_press(hit)
+      cap = hit
+      changed = true
+    }
+    Up => changed = true
+    Move => {
+      if cap < 0 && hit != hover {
+        if hover >= 0 {
+          let _ = root.dispatch_pointer_to(
+            hover,
+            { kind: Leave, x: ev.x, y: ev.y, button: ev.button, mods: ev.mods, },
+          )
+        }
+        root.set_hover(hit)
+        hover = hit
+        changed = true
+      }
+    }
+    Leave => ()
+  }
+  let consumed = if cap >= 0 {
+    root.dispatch_pointer_to(cap, ev)
+  } else {
+    root.dispatch_pointer(ev)
+  }
+  match ev.kind {
+    Up => {
+      root.set_press(-1)
+      cap = -1
+      if hit != hover {
+        root.set_hover(hit)
+        hover = hit
+      }
+      changed = true
+    }
+    _ => ()
+  }
+  (hover, cap, consumed, changed)
 }
 
 ///|
@@ -461,7 +596,7 @@ pub fn Widget::paint(self : Widget, p : @render.Painter) -> Unit {
   p.translate(self.rect.x, self.rect.y)
   p.clip_rect(0.0, 0.0, self.rect.w, self.rect.h)
   match self.on_draw {
-    Some(f) => f(p, self.rect)
+    Some(f) => f(self, p, self.rect)
     None => ()
   }
   for k in self.kids {
@@ -532,7 +667,7 @@ pub fn Widget::im_cursor_of(self : Widget, focus_id : Int) -> Rect? {
   match self.find_by_focus_id(focus_id) {
     Some(w) =>
       match w.im_cursor {
-        Some(f) => f()
+        Some(f) => f(w)
         None => None
       }
     None => None

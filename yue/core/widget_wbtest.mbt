@@ -254,11 +254,11 @@ test "绘制遍历：逐层平移到控件原点，并裁剪到控件矩形" {
   root.relayout(40.0, 40.0)
   assert_eq((child.rect.x, child.rect.y), (10.0, 10.0))
 
-  root.on_draw = Some(fn(p : @render.Painter, r : Rect) -> Unit {
+  root.on_draw = Some(fn(_w : Widget, p : @render.Painter, r : Rect) -> Unit {
     p.set_fill_color("#ff0000")
     p.fill_rect(0.0, 0.0, r.w, r.h)
   })
-  child.on_draw = Some(fn(p : @render.Painter, _r : Rect) -> Unit {
+  child.on_draw = Some(fn(_w : Widget, p : @render.Painter, _r : Rect) -> Unit {
     p.set_fill_color("#0000ff")
     // 故意画出自己的盒子：局部 (-5,-5) 起、30×30 → 设备 (5,5)-(35,35)
     // 被宿主的 clip_rect(0,0,20,20) 裁回 (10,10)-(30,30)

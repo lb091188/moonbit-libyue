@@ -98,7 +98,7 @@ fn make_band(hits : Ref[Array[Int]]) -> @core.Widget {
     let cell = @core.Widget::new()
     cell.set_size(50.0, 28.0)
     let k = i
-    cell.on_draw = Some(fn(p : @render.Painter, r : @core.Rect) -> Unit {
+    cell.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
       p.set_fill_color(colors[k])
       p.fill_rect(0.0, 0.0, r.w, r.h)
     })

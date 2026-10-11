@@ -23,6 +23,10 @@ priv struct Ctr {
   mut fam_count : Int
   mut use_family : String
   mut lh_mixed : Int
+  // 批次 5a：捕获带的三类事件计数
+  mut down : Int
+  mut up : Int
+  mut moved : Int
 }
 
 ///|
@@ -77,8 +81,7 @@ fn make_field(
   w.focus_id = id
   w.set_size(240.0, 26.0)
   w.set_margin(top, 0.0, 0.0, 0.0)
-  let self_rect = w
-  w.on_draw = Some(fn(p : @render.Painter, r : @core.Rect) -> Unit {
+  w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
     let focused = app.focus.is_focused(id)
     p.set_fill_color(@theme.theme_bg_panel())
     p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -143,7 +146,7 @@ fn make_field(
   w.im_context = Some(fn() -> (String, Int)? {
     Some((ed.get_text(), ed.caret_pos()))
   })
-  w.im_cursor = Some(fn() -> @core.Rect? {
+  w.im_cursor = Some(fn(self_rect : @core.Widget) -> @core.Rect? {
     let rect = self_rect.rect
     Some({
       x: rect.x + 4.0 + prefix_width(ed, ed.caret_pos()),
@@ -171,7 +174,7 @@ fn make_button(app : @core.App, ctr : Ctr, id : Int, top : Double) -> @core.Widg
   w.focus_id = id
   w.set_size(200.0, 28.0)
   w.set_margin(top, 0.0, 0.0, 0.0)
-  w.on_draw = Some(fn(p : @render.Painter, r : @core.Rect) -> Unit {
+  w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
     let focused = app.focus.is_focused(id)
     p.set_fill_color(if focused {
       @theme.theme_primary()
@@ -219,7 +222,7 @@ fn text_line(
   let w = @core.Widget::new()
   w.set_size(360.0, height)
   w.set_margin(top, 0.0, 0.0, 0.0)
-  w.on_draw = Some(fn(p : @render.Painter, _r : @core.Rect) -> Unit {
+  w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, _r : @core.Rect) -> Unit {
     p.flush()
     let _ = @text.draw_to(p.bitmap, 0.0, 0.0, text, FONT, color)
   })
@@ -235,7 +238,7 @@ fn make_font_row(ctr : Ctr) -> @core.Widget {
   let w = @core.Widget::new()
   w.set_size(388.0, 72.0)
   w.set_margin(12.0, 0.0, 0.0, 0.0)
-  w.on_draw = Some(fn(p : @render.Painter, r : @core.Rect) -> Unit {
+  w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
     p.set_fill_color(@theme.theme_bg_panel())
     p.fill_rect(0.0, 0.0, r.w, r.h)
     let base = @text.AttributedText::new("基准 Base 28")
@@ -283,7 +286,7 @@ fn make_decl_row(store : @core.Store[Int]) -> @core.Node {
     @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
       w.set_size(388.0, 30.0)
       w.set_margin(10.0, 0.0, 0.0, 0.0)
-      w.on_draw = Some(fn(p : @render.Painter, r : @core.Rect) -> Unit {
+      w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
         p.set_fill_color(if v % 2 == 0 {
           @theme.theme_fill_hover()
         } else {
@@ -315,6 +318,54 @@ fn make_decl_row(store : @core.Store[Int]) -> @core.Node {
 }
 
 ///|
+/// 批次 5a（交互地基）的观测件：一条「捕获带」把按下/移动/抬起的次数记下来。
+/// 宿主在按下后进入捕获期——指针离开这条带、在别处松手，抬起仍投给带本身
+/// （`u` 照样 +1），这就是拖选/拖动插入点能成立的前提。
+fn make_band(ctr : Ctr) -> @core.Widget {
+  let w = @core.Widget::new()
+  w.set_size(120.0, 22.0)
+  w.set_margin(8.0, 0.0, 0.0, 0.0)
+  w.on_draw = Some(fn(w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
+    // 悬停/按下态由宿主统一维护，控件只读
+    p.set_fill_color(if w.pressed {
+      @theme.theme_warning()
+    } else if w.hovered {
+      @theme.theme_primary()
+    } else {
+      @theme.theme_fill_hover()
+    })
+    p.fill_rect(0.0, 0.0, r.w, r.h)
+    p.flush()
+    let _ = @text.draw_to(
+      p.bitmap,
+      4.0,
+      3.0,
+      "捕获带 d\{ctr.down} u\{ctr.up} m\{ctr.moved}",
+      12.0,
+      "#ffffff",
+    )
+  })
+  w.on_pointer = Some(fn(ev : @core.PointerEvent) -> Bool {
+    match ev.kind {
+      @core.Down => {
+        ctr.down = ctr.down + 1
+        true
+      }
+      @core.Up => {
+        ctr.up = ctr.up + 1
+        true
+      }
+      @core.Move => {
+        ctr.moved = ctr.moved + 1
+        false
+      }
+      @core.Leave => false
+    }
+  })
+  w
+}
+
+///|
 fn main {
   let app = match @core.App::new(420, 300, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
@@ -330,6 +381,9 @@ fn main {
     fam_count: 0,
     use_family: "",
     lh_mixed: 0,
+    down: 0,
+    up: 0,
+    moved: 0,
   }
   let root = app.root
   root.set_column()
@@ -339,7 +393,7 @@ fn main {
   }
   ctr.use_family = @text.resolve_family(["绝对没有的族 Qzz", "monospace"])
   root.set_padding(16.0, 12.0)
-  root.on_draw = Some(fn(p : @render.Painter, r : @core.Rect) -> Unit {
+  root.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
     p.set_fill_color(@theme.theme_bg_page())
     p.fill_rect(0.0, 0.0, r.w, r.h)
   })
@@ -353,6 +407,7 @@ fn main {
   root.append_child(f2.w)
   root.append_child(btn)
   root.append_child(make_font_row(ctr))
+  root.append_child(make_band(ctr))
   let decl = @core.Store::new(0)
   let decl_kids_before = root.children().length()
   app.mount([make_decl_row(decl)])
@@ -386,7 +441,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1}",
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved}",
   )
   app.shutdown()
 }
