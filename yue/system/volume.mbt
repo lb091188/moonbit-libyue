@@ -476,18 +476,48 @@ fn vol_backend() -> VolBackend? {
 // ---------------------------------------------------------------------------
 
 ///|
-/// 当前系统是否支持音量控制（Linux：wpctl 或 pactl 任一可用；Windows：
-/// 默认输出端点可打开）。每次调用真实探测，高频场景请调用方自行缓存。
-pub fn vol_supported() -> Bool {
+/// 直连路径（Windows / macOS）：默认输出端点可打开即视为支持。
+fn vol_supported_direct() -> Bool {
+  let level = Ref(0.0)
+  let muted = Ref(0)
+  let ok = Ref(0)
+  let _ = @yue.ffi_vol_master(level, muted, ok)
+  ok.val == 1
+}
+
+///|
+/// Linux 路径：wpctl 或 pactl 任一可跑通即视为支持。
+fn vol_supported_linux() -> Bool {
+  vol_backend() is Some(_)
+}
+
+// 平台实现编译期分流：三元组目标下按 platform 直选一份实现；泛型
+// native（moon 默认构建）三个 platform 条件都不成立，落到运行时兜底。
+#cfg(any(platform = "windows", platform = "macos"))
+fn vol_supported_impl() -> Bool {
+  vol_supported_direct()
+}
+
+#cfg(platform = "linux")
+fn vol_supported_impl() -> Bool {
+  vol_supported_linux()
+}
+
+#cfg(all(target = "native", not(platform = "linux"), not(platform = "windows"), not(platform = "macos")))
+fn vol_supported_impl() -> Bool {
   if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let level = Ref(0.0)
-    let muted = Ref(0)
-    let ok = Ref(0)
-    let _ = @yue.ffi_vol_master(level, muted, ok)
-    ok.val == 1
+    vol_supported_direct()
   } else {
-    vol_backend() is Some(_)
+    vol_supported_linux()
   }
+}
+
+///|
+/// 当前系统是否支持音量控制（Linux：wpctl 或 pactl 任一可用；Windows /
+/// macOS：默认输出端点可打开）。每次调用真实探测，高频场景请调用方自行
+/// 缓存。
+pub fn vol_supported() -> Bool {
+  vol_supported_impl()
 }
 
 ///|
@@ -496,23 +526,59 @@ pub fn vol_supported() -> Bool {
 /// 查询（get-default-sink + get-sink-volume + get-sink-mute）；sink 名
 /// 为次要信息，取不到置空串不影响音量与静音。Windows 走默认输出端点
 /// （Core Audio 标量音量 0..1 换算百分比，sink 名无对应置空串）。
-pub fn vol_get() -> Result[VolumeInfo, VolumeError] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let level = Ref(0.0)
-    let muted = Ref(0)
-    let ok = Ref(0)
-    if @yue.ffi_vol_master(level, muted, ok) != 0 || ok.val != 1 {
-      return Err(CommandFailed("Core Audio 默认输出端点不可用"))
-    }
-    // 0..1 标量 → 百分比（四舍五入，与 wpctl 路径同口径）
-    let volume = (level.val * 100.0 + 0.5) |> Double::to_int |> vol_clamp_percent
-    return Ok({ sink: "", volume, muted: muted.val == 1, })
+///|
+/// 直连路径读取（Windows / macOS Core Audio 默认输出端点）。
+fn vol_get_direct() -> Result[VolumeInfo, VolumeError] {
+  let level = Ref(0.0)
+  let muted = Ref(0)
+  let ok = Ref(0)
+  if @yue.ffi_vol_master(level, muted, ok) != 0 || ok.val != 1 {
+    return Err(CommandFailed("Core Audio 默认输出端点不可用"))
   }
+  // 0..1 标量 → 百分比（四舍五入，与 wpctl 路径同口径）
+  let volume = (level.val * 100.0 + 0.5) |> Double::to_int |> vol_clamp_percent
+  Ok({ sink: "", volume, muted: muted.val == 1, })
+}
+
+///|
+/// Linux 路径读取（wpctl / pactl 择一）。
+fn vol_get_linux() -> Result[VolumeInfo, VolumeError] {
   match vol_backend() {
     None => Err(Unsupported)
     Some(Wpctl) => vol_get_wpctl()
     Some(Pactl) => vol_get_pactl()
   }
+}
+
+// 平台实现编译期分流：三元组目标下按 platform 直选一份实现；泛型
+// native（moon 默认构建）三个 platform 条件都不成立，落到运行时兜底。
+#cfg(any(platform = "windows", platform = "macos"))
+fn vol_get_impl() -> Result[VolumeInfo, VolumeError] {
+  vol_get_direct()
+}
+
+#cfg(platform = "linux")
+fn vol_get_impl() -> Result[VolumeInfo, VolumeError] {
+  vol_get_linux()
+}
+
+#cfg(all(target = "native", not(platform = "linux"), not(platform = "windows"), not(platform = "macos")))
+fn vol_get_impl() -> Result[VolumeInfo, VolumeError] {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
+    vol_get_direct()
+  } else {
+    vol_get_linux()
+  }
+}
+
+///|
+/// 读默认输出音量快照（sink 名 / 音量 0-100 / 是否静音）。Linux 的
+/// wpctl 路径两次查询（get-volume + status 取显示名），pactl 路径三次
+/// 查询（get-default-sink + get-sink-volume + get-sink-mute）；sink 名
+/// 为次要信息，取不到置空串不影响音量与静音。Windows / macOS 走默认
+/// 输出端点（Core Audio 标量音量 0..1 换算百分比，sink 名无对应置空串）。
+pub fn vol_get() -> Result[VolumeInfo, VolumeError] {
+  vol_get_impl()
 }
 
 ///|
@@ -590,20 +656,51 @@ fn vol_apply(prog : String, args : Array[String]) -> Result[Unit, VolumeError] {
 }
 
 ///|
-/// 设绝对音量（0-100，出界钳制），作用于默认 sink / 默认输出端点。
-pub fn vol_set(percent : Int) -> Result[Unit, VolumeError] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    return vol_win_apply(vol_clamp_percent(percent).to_double() / 100.0, None)
-  }
+/// 直连路径设绝对音量（Windows / macOS）。
+fn vol_set_direct(percent : Int) -> Result[Unit, VolumeError] {
+  vol_direct_apply(vol_clamp_percent(percent).to_double() / 100.0, None)
+}
+
+///|
+/// Linux 路径设绝对音量（wpctl / pactl 择一）。
+fn vol_set_linux(percent : Int) -> Result[Unit, VolumeError] {
   match vol_backend() {
     None => Err(Unsupported)
     Some(b) => vol_apply(vol_prog(b), vol_set_args(b, percent))
   }
 }
 
+// 平台实现编译期分流：三元组目标下按 platform 直选一份实现；泛型
+// native（moon 默认构建）三个 platform 条件都不成立，落到运行时兜底。
+#cfg(any(platform = "windows", platform = "macos"))
+fn vol_set_impl(percent : Int) -> Result[Unit, VolumeError] {
+  vol_set_direct(percent)
+}
+
+#cfg(platform = "linux")
+fn vol_set_impl(percent : Int) -> Result[Unit, VolumeError] {
+  vol_set_linux(percent)
+}
+
+#cfg(all(target = "native", not(platform = "linux"), not(platform = "windows"), not(platform = "macos")))
+fn vol_set_impl(percent : Int) -> Result[Unit, VolumeError] {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
+    vol_set_direct(percent)
+  } else {
+    vol_set_linux(percent)
+  }
+}
+
 ///|
-/// Windows 写操作公共实现：level 为标量音量，mute 为 None 表示不改静音。
-fn vol_win_apply(
+/// 设绝对音量（0-100，出界钳制），作用于默认 sink / 默认输出端点。
+pub fn vol_set(percent : Int) -> Result[Unit, VolumeError] {
+  vol_set_impl(percent)
+}
+
+///|
+/// 直连路径（Windows / macOS）写操作公共实现：level 为标量音量，mute 为
+/// None 表示不改静音。
+fn vol_direct_apply(
   level : Double,
   mute : Bool?,
 ) -> Result[Unit, VolumeError] {
@@ -619,33 +716,93 @@ fn vol_win_apply(
 }
 
 ///|
-/// 相对增减音量（delta 为正增、为负减，作用于默认 sink / 默认输出端点；
-/// Linux 每步量取绝对值交给工具的相对语法执行，Windows 先读当前值加
-/// delta 钳制后设置，最终音量均由后端钳制）。
-pub fn vol_add(delta : Int) -> Result[Unit, VolumeError] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let cur = match vol_get() {
-      Ok(info) => info.volume
-      Err(e) => return Err(e)
-    }
-    return vol_win_apply(vol_clamp_percent(cur + delta).to_double() / 100.0, None)
+/// 直连路径相对增减（Windows / macOS：先读当前值再加 delta 钳制）。
+fn vol_add_direct(delta : Int) -> Result[Unit, VolumeError] {
+  let cur = match vol_get() {
+    Ok(info) => info.volume
+    Err(e) => return Err(e)
   }
+  vol_direct_apply(vol_clamp_percent(cur + delta).to_double() / 100.0, None)
+}
+
+///|
+/// Linux 路径相对增减（每步量取绝对值交给工具的相对语法执行）。
+fn vol_add_linux(delta : Int) -> Result[Unit, VolumeError] {
   match vol_backend() {
     None => Err(Unsupported)
     Some(b) => vol_apply(vol_prog(b), vol_add_args(b, delta))
   }
 }
 
-///|
-/// 设 / 取消默认 sink / 默认输出端点静音。
-pub fn vol_set_mute(mute : Bool) -> Result[Unit, VolumeError] {
+// 平台实现编译期分流：三元组目标下按 platform 直选一份实现；泛型
+// native（moon 默认构建）三个 platform 条件都不成立，落到运行时兜底。
+#cfg(any(platform = "windows", platform = "macos"))
+fn vol_add_impl(delta : Int) -> Result[Unit, VolumeError] {
+  vol_add_direct(delta)
+}
+
+#cfg(platform = "linux")
+fn vol_add_impl(delta : Int) -> Result[Unit, VolumeError] {
+  vol_add_linux(delta)
+}
+
+#cfg(all(target = "native", not(platform = "linux"), not(platform = "windows"), not(platform = "macos")))
+fn vol_add_impl(delta : Int) -> Result[Unit, VolumeError] {
   if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    return vol_win_apply(0.0, Some(mute))
+    vol_add_direct(delta)
+  } else {
+    vol_add_linux(delta)
   }
+}
+
+///|
+/// 相对增减音量（delta 为正增、为负减，作用于默认 sink / 默认输出端点；
+/// Linux 每步量取绝对值交给工具的相对语法执行，Windows / macOS 先读当前
+/// 值加 delta 钳制后设置，最终音量均由后端钳制）。
+pub fn vol_add(delta : Int) -> Result[Unit, VolumeError] {
+  vol_add_impl(delta)
+}
+
+///|
+/// 直连路径设静音（Windows / macOS）。
+fn vol_set_mute_direct(mute : Bool) -> Result[Unit, VolumeError] {
+  vol_direct_apply(0.0, Some(mute))
+}
+
+///|
+/// Linux 路径设静音（wpctl / pactl 择一）。
+fn vol_set_mute_linux(mute : Bool) -> Result[Unit, VolumeError] {
   match vol_backend() {
     None => Err(Unsupported)
     Some(b) => vol_apply(vol_prog(b), vol_mute_args(b, mute))
   }
+}
+
+// 平台实现编译期分流：三元组目标下按 platform 直选一份实现；泛型
+// native（moon 默认构建）三个 platform 条件都不成立，落到运行时兜底。
+#cfg(any(platform = "windows", platform = "macos"))
+fn vol_set_mute_impl(mute : Bool) -> Result[Unit, VolumeError] {
+  vol_set_mute_direct(mute)
+}
+
+#cfg(platform = "linux")
+fn vol_set_mute_impl(mute : Bool) -> Result[Unit, VolumeError] {
+  vol_set_mute_linux(mute)
+}
+
+#cfg(all(target = "native", not(platform = "linux"), not(platform = "windows"), not(platform = "macos")))
+fn vol_set_mute_impl(mute : Bool) -> Result[Unit, VolumeError] {
+  if @yue.platform() == "windows" || @yue.platform() == "macos" {
+    vol_set_mute_direct(mute)
+  } else {
+    vol_set_mute_linux(mute)
+  }
+}
+
+///|
+/// 设 / 取消默认 sink / 默认输出端点静音。
+pub fn vol_set_mute(mute : Bool) -> Result[Unit, VolumeError] {
+  vol_set_mute_impl(mute)
 }
 
 // ---------------------------------------------------------------------------

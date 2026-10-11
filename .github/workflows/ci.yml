@@ -111,6 +111,14 @@ jobs:
           fi
           [ "$c1$c2$c3" = "000" ]
 
+      # #cfg(platform=) 的分支在常规 moon 构建下不参与编译(moon 传给
+      # moonc 的是泛型 backend「native」,不含目标三元组,platform 恒不成立),
+      # 只能靠 moonc 三元组直编证明分支写得对、能被正确选取;其中
+      # native 那组是回归哨兵——它仍落兜底才说明仓内的运行时分支必须保留。
+      # 原理与结论见 docs/zh/adaptation.md 的「#cfg 平台条件编译」小节。
+      - name: platform 条件编译分支校验(moonc 三元组直编)
+        run: python3 scripts/check-cfg-platforms.py
+
       - name: GUI 冒烟(hello 在虚拟显示下存活 20 秒即通过)
         run: |
           set +e
