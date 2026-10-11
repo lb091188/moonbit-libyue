@@ -695,3 +695,15 @@ int64_t wm_now_ms(void) {
   clock_gettime(CLOCK_MONOTONIC, &ts);
   return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
+
+/* 本地时区的今天，打包成 年*10000 + 月*100 + 日（月/日 1 起始）。
+ * 用日历时间 + localtime_r 走系统时区；失败返回 0，由 MoonBit 侧决定退路。 */
+int64_t wm_local_date(void) {
+  time_t now = time(NULL);
+  struct tm tm_buf;
+  if (now == (time_t)-1 || localtime_r(&now, &tm_buf) == NULL) {
+    return 0;
+  }
+  return (int64_t)(tm_buf.tm_year + 1900) * 10000 +
+         (int64_t)(tm_buf.tm_mon + 1) * 100 + (int64_t)tm_buf.tm_mday;
+}

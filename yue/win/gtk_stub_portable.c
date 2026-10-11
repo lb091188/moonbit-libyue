@@ -90,4 +90,8 @@ int64_t wm_now_ms(void) {
   return 0;
 }
 
+int64_t wm_local_date(void) {
+  return 0;
+}
+
 #endif

@@ -383,7 +383,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(560, 900, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(900, 700, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -507,14 +507,17 @@ fn main {
       border=@theme.theme_border(),
     ),
   ])
-  // 批次 6b（显示族收尾）：时间线 + 轮播。手动轮播 `interval_ms=0`（切页只由
-  // 注入点击决定，退出状态才确定）；自转轮播走宿主的进程级延时通道，示例每帧
-  // 采样一次下标，退出时报「自动切了几页」。
+  // 批次 6b（显示族收尾）+ 6c（日期族首批）：三列并排——时间线一列、两条轮播
+  // 一列、日历一列（并排是为了把整页压回一屏高，注入坐标仍按几何行取）。
+  // 手动轮播 `interval_ms=0`（切页只由注入点击决定，退出状态才确定）；自转轮播
+  // `interval_ms=800` 走宿主的进程级延时通道，示例每帧采样下标计次。
   let spin = @ui.CarouselHandle::make()
   let auto = @ui.CarouselHandle::make()
   let car_sample : Ref[(Int, Int)] = Ref((0, 0))
   let car_w : Ref[@core.Widget?] = Ref(None)
   let auto_w : Ref[@core.Widget?] = Ref(None)
+  let picked_date : @core.Store[@ui.DateYMD?] = @core.Store::new(None)
+  let cal_w : Ref[@core.Widget?] = Ref(None)
   app.mount([
     @ui.container(
       [
@@ -530,39 +533,77 @@ fn main {
               item_height=44.0,
             ),
           ],
-          padding=8.0,
+          width=180.0,
           row_gap=6.0,
+          padding=6.0,
           bg=@theme.theme_bg_panel(),
           border=@theme.theme_border(),
         ),
-        @ui.carousel_t(
+        @ui.container(
           [
-            @ui.label("轮播第一页：点右侧箭头或末指示点", size=13.0),
-            @ui.label("轮播第二页", size=13.0),
-            @ui.label("轮播第三页", size=13.0),
-            @ui.label("轮播第四页", size=13.0),
+            @ui.carousel_t(
+              [
+                @ui.label("轮播第一页：点右侧箭头或末指示点", size=13.0),
+                @ui.label("轮播第二页", size=13.0),
+                @ui.label("轮播第三页", size=13.0),
+                @ui.label("轮播第四页", size=13.0),
+              ],
+              width=340.0,
+              height=56.0,
+              interval_ms=0,
+              rotation=spin,
+              handle=fn(w : @core.Widget) -> Unit { car_w.val = Some(w) },
+            ),
+            @ui.carousel_t(
+              [
+                @ui.label("自转页 A", size=13.0),
+                @ui.label("自转页 B", size=13.0),
+                @ui.label("自转页 C", size=13.0),
+              ],
+              width=200.0,
+              height=36.0,
+              interval_ms=800,
+              rotation=auto,
+              handle=fn(w : @core.Widget) -> Unit { auto_w.val = Some(w) },
+            ),
           ],
-          width=340.0,
-          height=56.0,
-          interval_ms=0,
-          rotation=spin,
-          handle=fn(w : @core.Widget) -> Unit { car_w.val = Some(w) },
+          width=356.0,
+          row_gap=6.0,
+          padding=6.0,
+          align_items=@yoga.AlignItems::FlexStart,
+          bg=@theme.theme_bg_page(),
+          border=@theme.theme_border(),
         ),
-        @ui.carousel_t(
+        @ui.container(
           [
-            @ui.label("自转页 A", size=13.0),
-            @ui.label("自转页 B", size=13.0),
-            @ui.label("自转页 C", size=13.0),
+            @ui.label("日期族首批", size=13.0),
+            @ui.label_dyn(
+              picked_date.signal().map(fn(v : @ui.DateYMD?) -> String {
+                match v {
+                  Some(x) => "已选 " + x.format()
+                  None => "未选"
+                }
+              }),
+              size=13.0,
+            ),
+            @ui.calendar_t(
+              value=picked_date,
+              today=@ui.today_date(),
+              handle=fn(w : @core.Widget) -> Unit { cal_w.val = Some(w) },
+            ),
           ],
-          width=200.0,
-          height=36.0,
-          interval_ms=800,
-          rotation=auto,
-          handle=fn(w : @core.Widget) -> Unit { auto_w.val = Some(w) },
+          width=284.0,
+          row_gap=6.0,
+          padding=6.0,
+          align_items=@yoga.AlignItems::FlexStart,
+          bg=@theme.theme_bg_panel(),
+          border=@theme.theme_border(),
         ),
       ],
+      direction=@yoga.Row,
+      column_gap=8.0,
       padding=8.0,
-      row_gap=6.0,
+      align_items=@yoga.AlignItems::FlexStart,
       bg=@theme.theme_bg_page(),
       border=@theme.theme_border(),
     ),
@@ -619,8 +660,12 @@ fn main {
     Some(i) => i.to_string()
     None => "-"
   }
+  let date_str = match picked_date.get() {
+    Some(x) => x.format()
+    None => "-"
+  }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1}"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -656,6 +701,15 @@ fn main {
   }
   match auto_w.val {
     Some(w) => println("NATIVE-APP-AUTO " + rect_str(w.rect))
+    None => ()
+  }
+  match cal_w.val {
+    Some(w) => {
+      // 第 14 格（本月第 11 天）给注入用；跨月格与它同列不同色，坐标够用
+      let grid = w.children()[2]
+      let c14 = grid.children()[2].children()[0]
+      println("NATIVE-APP-CAL box=" + rect_str(w.rect) + " cell=" + rect_str(c14.rect))
+    }
     None => ()
   }
   app.shutdown()

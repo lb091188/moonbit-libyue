@@ -37,6 +37,19 @@ pub(all) struct App {
 pub fn now_ms() -> Int64 { @win.now_ms() }
 
 ///|
+/// 本地时区的今天 (年, 月, 日)。平台给不出时返回 (0, 0, 0)——组件层据此退回
+/// 自己的兜底值，本层不猜日期。
+pub fn local_ymd() -> (Int, Int, Int) {
+  let v = @win.local_date()
+  if v <= 0L {
+    (0, 0, 0)
+  } else {
+    let iv = v.to_int()
+    (iv / 10000, iv % 10000 / 100, iv % 100)
+  }
+}
+
+///|
 /// 平台后端与窗口都建起来才算成功；无显示服务返回 None。
 pub fn App::new(width : Int, height : Int, title : String) -> App? {
   if !@win.init_backend() {
