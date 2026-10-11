@@ -44,8 +44,6 @@ Methodology: Ubuntu 24.04 XFCE (X11), same machine and session; the startup delt
 
 ### MoonBit cfg(platform=)
 
-- moonc implements `#cfg(platform="windows"/"linux"/"macos")`, evaluated from the `-target` triple; but current released moon passes moonc an OS-less `native` target, so every condition is false. The condition lights up once `moon build -v` shows the full triple in the moonc command line.
-- Current substitute: runtime `platform()` checks — declarative trees assemble nodes conditionally and simply skip creation when unmet.
 - **Decision (2026-10-11): platform dispatch drops cfg for good, even if the toolchain later fixes it** — MoonBit-side cross-platform selection is always "runtime probe + pattern matching", probed in the shape of render's existing degradation probe (paint a stroke and verify pixels, non-zero session handle); now a hard rule in AGENTS.md.
 
 ### Native render/text matrix and the three-layer text divergence (new-stack decision, 2026-10-11)

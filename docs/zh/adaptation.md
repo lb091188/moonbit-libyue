@@ -49,8 +49,6 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 
 ### MoonBit cfg(platform=)
 
-- moonc 已实现 `#cfg(platform="windows"/"linux"/"macos")`,按 `-target` 三元组求值;但当前发布版 moon 只给 moonc 传无 OS 信息的 `native`,所有条件恒 false。`moon build -v` 的 moonc 命令行出现完整三元组即条件可用。
-- 现行替代:运行时 `platform()` 判断,声明式树按条件组装节点,不满足就不创建控件。
 - **定案(2026-10-11):平台分派弃用 cfg,即便日后工具链修好也不翻案**——MoonBit 侧跨平台选择一律「运行时探测 + 模式匹配」,探测形态照 render 包既有的降级探针(画一笔验像素、会话句柄非零),已入 AGENTS.md 硬性规则。
 
 ### 原生渲染/文本矩阵与文字三层差异(新栈定案,2026-10-11)
