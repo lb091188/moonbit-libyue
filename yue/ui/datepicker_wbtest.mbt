@@ -30,12 +30,12 @@ test "日期选择器：字段显示占位、点开日历、点选回填并收�
   assert_eq(@core.overlay_count(), 1)
   root.relayout(400.0, 300.0)
   // 弹层挂在字段下方 2px
-  match @core.overlay_rect_of(1) {
+  match @core.overlay_rect_of(@core.overlay_top_id()) {
     Some(r) => assert_eq((r.x, r.y), (field.rect.x, field.rect.y + field.rect.h + 2.0))
     None => assert_true(false)
   }
   // 点第 14 格（10 月 11 日，first_wd=4）
-  let panel = picker_panel(1)
+  let panel = picker_panel(@core.overlay_top_id())
   click_at(root, cell_at(panel, 14), 18.0, 15.0)
   assert_eq(changes, ["2026-10-11"])
   match v.get() {
@@ -91,7 +91,7 @@ test "日期区间选择器：先点起点再点终点，写回整段并收起" 
   )
   click_at(root, field, 40.0, 16.0)
   root.relayout(400.0, 300.0)
-  let panel = picker_panel(1)
+  let panel = picker_panel(@core.overlay_top_id())
   // 起点 = 10 月 3 日（第 6 格），终点 = 10 月 7 日（第 10 格）
   click_at(root, cell_at(panel, 6), 18.0, 15.0)
   assert_eq(changes.length(), 0)
@@ -130,7 +130,7 @@ test "时间区间：步进器改值、确定写回、取消不改" {
   click_at(root, start_field, 40.0, 16.0)
   assert_eq(@core.overlay_count(), 1)
   root.relayout(400.0, 300.0)
-  let panel = picker_panel(1)
+  let panel = picker_panel(@core.overlay_top_id())
   // 面板：标题 28 + 时步进 32 + 分步进 32 + 按钮行 32（子项顺序 = 追加顺序）
   let hour_row = panel.children()[0]
   let plus_hour = hour_row.children()[2]
@@ -147,7 +147,7 @@ test "时间区间：步进器改值、确定写回、取消不改" {
   // 取消路径：改完不确认，Store 不变
   click_at(root, start_field, 40.0, 16.0)
   root.relayout(400.0, 300.0)
-  let panel2 = picker_panel(2)
+  let panel2 = picker_panel(@core.overlay_top_id())
   click_at(root, panel2.children()[0].children()[2], 15.0, 14.0)
   click_at(root, panel2.children()[2].children()[0], 30.0, 14.0)
   assert_eq(changes.length(), 1)
@@ -177,7 +177,7 @@ test "日期时间区间：日期走日历、时间走步进，两侧各写各�
   let start_date = row.children()[0]
   click_at(root, start_date, 30.0, 16.0)
   root.relayout(500.0, 300.0)
-  click_at(root, cell_at(picker_panel(1), 14), 18.0, 15.0)
+  click_at(root, cell_at(picker_panel(@core.overlay_top_id()), 14), 18.0, 15.0)
   match v.get().start {
     Some(p) => {
       assert_eq(p.0.format(), "2026-10-11")
@@ -190,7 +190,7 @@ test "日期时间区间：日期走日历、时间走步进，两侧各写各�
   let start_time = row.children()[1]
   click_at(root, start_time, 30.0, 16.0)
   root.relayout(500.0, 300.0)
-  let panel = picker_panel(2)
+  let panel = picker_panel(@core.overlay_top_id())
   click_at(root, panel.children()[0].children()[2], 15.0, 14.0)
   click_at(root, panel.children()[2].children()[1], 30.0, 14.0)
   match v.get().start {

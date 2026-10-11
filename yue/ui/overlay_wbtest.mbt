@@ -69,7 +69,7 @@ test "空图层不挡内容；点触发件开层、再点收起" {
   // 浮层是刚挂上的子控件：矩形要等下一次布局（真窗口里宿主每帧都会重排）
   root.relayout(300.0, 200.0)
   // 浮层挂在触发件下方（距下沿 2px）
-  match @core.overlay_rect_of(1) {
+  match @core.overlay_rect_of(@core.overlay_top_id()) {
     Some(r) => {
       assert_eq((r.x, r.y), (trigger.rect.x, trigger.rect.y + trigger.rect.h + 2.0))
       assert_eq((r.w, r.h), (120.0, 40.0))
@@ -133,7 +133,7 @@ test "下拉菜单：'-' 画分隔线、选中回调序号并收起" {
   assert_eq(@core.overlay_count(), 1)
   root.relayout(300.0, 200.0)
   // 4 项里有一项是分隔线（面板子项数仍是 4：分隔线也占一项）
-  let rows = match @core.overlay_root_of(1) {
+  let rows = match @core.overlay_root_of(@core.overlay_top_id()) {
     Some(w) => w.children()[0].children()
     None => []
   }
@@ -177,7 +177,7 @@ test "悬浮提示：延时到点才出现、离开即收、延时未到就离�
   (queue.val[1])()
   assert_eq(@core.overlay_count(), 1)
   root.relayout(300.0, 200.0)
-  match @core.overlay_rect_of(1) {
+  match @core.overlay_rect_of(@core.overlay_top_id()) {
     Some(r) => assert_eq((r.x, r.y), (anchor.rect.x, anchor.rect.y + anchor.rect.h + 4.0))
     None => assert_true(false)
   }
@@ -206,7 +206,7 @@ test "对话框：Store 驱动弹收，确定/取消/✕ 都先收起再回调" 
   vis.set(true)
   assert_eq(@core.overlay_count(), 1)
   root.relayout(400.0, 300.0)
-  let scrim = match @core.overlay_root_of(1) {
+  let scrim = match @core.overlay_root_of(@core.overlay_top_id()) {
     Some(w) => w.children()[0]
     None => @core.Widget::new()
   }
@@ -228,7 +228,7 @@ test "对话框：Store 驱动弹收，确定/取消/✕ 都先收起再回调" 
   // 再开一次，点确定
   vis.set(true)
   root.relayout(400.0, 300.0)
-  let scrim2 = match @core.overlay_root_of(2) {
+  let scrim2 = match @core.overlay_root_of(@core.overlay_top_id()) {
     Some(w) => w.children()[0]
     None => @core.Widget::new()
   }
@@ -248,7 +248,7 @@ test "对话框：✕ 收起、遮罩点击按 close_on_mask 决定收不收" {
   )
   assert_eq(@core.overlay_count(), 1)
   root.relayout(400.0, 300.0)
-  let scrim = match @core.overlay_root_of(1) {
+  let scrim = match @core.overlay_root_of(@core.overlay_top_id()) {
     Some(w) => w.children()[0]
     None => @core.Widget::new()
   }
@@ -265,7 +265,7 @@ test "对话框：✕ 收起、遮罩点击按 close_on_mask 决定收不收" {
   )
   assert_eq(@core.overlay_count(), 1)
   root3.relayout(400.0, 300.0)
-  let top = match @core.overlay_root_of(1) {
+  let top = match @core.overlay_root_of(@core.overlay_top_id()) {
     Some(w) => w.children()[0]
     None => @core.Widget::new()
   }
@@ -291,7 +291,7 @@ test "轻提示层：推送后挂一条、到点自动撤、宽度随文本" {
   push("保存成功", Success)
   assert_eq(@core.overlay_count(), 1)
   root.relayout(400.0, 200.0)
-  let strip = match @core.overlay_root_of(1) {
+  let strip = match @core.overlay_root_of(@core.overlay_top_id()) {
     Some(w) => w.children()[0]
     None => @core.Widget::new()
   }
@@ -337,11 +337,11 @@ test "右键上下文菜单：在指针处弹出、点项回调并收起" {
   assert_eq(@core.overlay_count(), 1)
   root.relayout(400.0, 300.0)
   // 弹在指针处（窗口坐标）
-  match @core.overlay_rect_of(1) {
+  match @core.overlay_rect_of(@core.overlay_top_id()) {
     Some(r) => assert_eq((r.x, r.y), (wrap.rect.x + 30.0, wrap.rect.y + 10.0))
     None => assert_true(false)
   }
-  let rows = match @core.overlay_root_of(1) {
+  let rows = match @core.overlay_root_of(@core.overlay_top_id()) {
     Some(w) => w.children()[0].children()
     None => []
   }
@@ -362,20 +362,18 @@ test "轻提示开在对话框之上（图层条目后开者在上）" {
   let push = toast_layer(duration_ms=5000)
   vis.set(true)
   assert_eq(@core.overlay_count(), 1)
-  let dlg_id = 1
   push("对话框开着时的提示", Success)
   assert_eq(@core.overlay_count(), 2)
-  // 后开的条目排在后面 = 画在上层
-  let ids : Array[Int] = []
-  match @core.overlay_rect_of(dlg_id) {
-    Some(_) => ids.push(dlg_id)
-    None => ()
-  }
-  match @core.overlay_rect_of(dlg_id + 1) {
-    Some(_) => ids.push(dlg_id + 1)
-    None => ()
-  }
-
-  assert_eq(ids, [dlg_id, dlg_id + 1])
+  // 句柄表按开层先后排列：排在后面的画在上层（句柄是进程级递增的，别写死数字）
+  let ids = @core.overlay_ids()
+  assert_eq(ids.length(), 2)
+  assert_eq(@core.overlay_top_id(), ids[1])
+  assert_eq(
+    match @core.overlay_rect_of(ids[0]) {
+      Some(_) => true
+      None => false
+    },
+    true,
+  )
   @core.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
 }

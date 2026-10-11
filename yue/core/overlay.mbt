@@ -13,11 +13,20 @@
 // 所以「窗口坐标 → 图层坐标」只差一个图层原点。
 
 ///|
+/// 浮层句柄取号：进程级递增。多窗形态每窗一套浮层栈，若各自从 1 数起，
+/// 「a 窗的 1 号」与「b 窗的 1 号」会在诊断与跨窗排查里撞号。
+let overlay_next_cid : Ref[Int] = Ref(0)
+
+fn overlay_cid() -> Int {
+  overlay_next_cid.val = overlay_next_cid.val + 1
+  overlay_next_cid.val
+}
+
+///|
 /// 浮层宿主：持有根控件（开层时要立刻重排）与图层、已开浮层栈。
 pub(all) struct OverlayHost {
   root : Widget
   layer : Widget
-  mut next_id : Int
   mut items : Array[(Int, Widget)]
 }
 
@@ -32,7 +41,7 @@ pub fn make_overlay_host(root : Widget) -> OverlayHost {
   layer.node.set_bottom(@yoga.fixed(0.0))
   layer.set_visible(false)
   root.append_child(layer)
-  let host : OverlayHost = { root, layer, next_id: 0, items: [] }
+  let host : OverlayHost = { root, layer, items: [] }
   layer.on_pointer = Some(fn(
     self : Widget,
     ev : PointerEvent,
@@ -65,20 +74,63 @@ pub fn make_overlay_host(root : Widget) -> OverlayHost {
 }
 
 ///|
-/// 进程级单槽（与 `set_repaint_hook` 同款：当前形态一进程一宿主）。
-let overlay_slot : Ref[OverlayHost?] = Ref(None)
+/// 浮层宿主的取用通道。单窗形态直接给一个宿主（`set_overlay_host`）；多窗形态
+/// 由宿主层装成「取当前窗的宿主」（`set_overlay_provider`）——浮层开在用户正在
+/// 操作的那扇窗上，而不是固定第一扇。
+let overlay_slot : Ref[() -> OverlayHost?] = Ref(fn() { None })
 
 ///|
 /// 安装浮层宿主（`App::new` 调用；无宿主时所有浮层 API 都是空操作）。
 pub fn set_overlay_host(h : OverlayHost) -> Unit {
-  overlay_slot.val = Some(h)
+  overlay_slot.val = fn() -> OverlayHost? { Some(h) }
+}
+
+///|
+/// 安装浮层宿主的取用函数（多窗宿主用；调用方自己保证返回当前窗的宿主）。
+pub fn set_overlay_provider(f : () -> OverlayHost?) -> Unit {
+  overlay_slot.val = f
+}
+
+///|
+fn overlay_host() -> OverlayHost? {
+  (overlay_slot.val)()
 }
 
 ///|
 /// 已开浮层数（诊断与测试用）。
 pub fn overlay_count() -> Int {
-  match overlay_slot.val {
+  match overlay_host() {
     Some(h) => h.items.length()
+    None => 0
+  }
+}
+
+///|
+/// 当前窗已开浮层的句柄，按开层先后排列（排在后的画在上）。句柄是**进程级**
+/// 递增的（多窗各自从 1 数起会撞号），所以调用方拿返回值、不要把数字写死。
+pub fn overlay_ids() -> Array[Int] {
+  match overlay_host() {
+    Some(h) => {
+      let out : Array[Int] = []
+      for it in h.items {
+        out.push(it.0)
+      }
+      out
+    }
+    None => []
+  }
+}
+
+///|
+/// 最上面一层的句柄（没有浮层给 0，与「查不到」的返回值同形）。
+pub fn overlay_top_id() -> Int {
+  match overlay_host() {
+    Some(h) =>
+      if h.items.length() > 0 {
+        h.items[h.items.length() - 1].0
+      } else {
+        0
+      }
     None => 0
   }
 }
@@ -86,7 +138,7 @@ pub fn overlay_count() -> Int {
 ///|
 /// 图层当前是否可见（有浮层就该可见）。
 pub fn overlay_visible() -> Bool {
-  match overlay_slot.val {
+  match overlay_host() {
     Some(h) => h.layer.visible
     None => false
   }
@@ -96,7 +148,7 @@ pub fn overlay_visible() -> Bool {
 /// 在窗口坐标 `(x, y)` 处开一层浮层，内容挂在图层里的一个绝对定位包裹控件上。
 /// 返回句柄；没有宿主时返回 0（浮层不出现）。
 pub fn overlay_show_at(content : Node, x : Double, y : Double) -> Int {
-  match overlay_slot.val {
+  match overlay_host() {
     None => 0
     Some(h) => {
       if h.items.length() == 0 {
@@ -110,10 +162,10 @@ pub fn overlay_show_at(content : Node, x : Double, y : Double) -> Int {
       wrap.node.set_top(@yoga.fixed(y - h.layer.rect.y))
       let _ = content.mount_into(wrap)
       h.layer.append_child(wrap)
-      h.next_id = h.next_id + 1
-      h.items.push((h.next_id, wrap))
+      let cid = overlay_cid()
+      h.items.push((cid, wrap))
       invalidate()
-      h.next_id
+      cid
     }
   }
 }
@@ -122,7 +174,7 @@ pub fn overlay_show_at(content : Node, x : Double, y : Double) -> Int {
 /// 开一层**铺满窗口**的浮层（insets 全 0，内容自己决定怎么用这块地方）：
 /// 对话框的遮罩、整屏面板都用它。
 pub fn overlay_show_full(content : Node) -> Int {
-  match overlay_slot.val {
+  match overlay_host() {
     None => 0
     Some(h) => {
       if h.items.length() == 0 {
@@ -137,10 +189,10 @@ pub fn overlay_show_full(content : Node) -> Int {
       wrap.node.set_bottom(@yoga.fixed(0.0))
       let _ = content.mount_into(wrap)
       h.layer.append_child(wrap)
-      h.next_id = h.next_id + 1
-      h.items.push((h.next_id, wrap))
+      let cid = overlay_cid()
+      h.items.push((cid, wrap))
       invalidate()
-      h.next_id
+      cid
     }
   }
 }
@@ -148,7 +200,7 @@ pub fn overlay_show_full(content : Node) -> Int {
 ///|
 /// 关掉指定浮层（句柄 0 或不存在时空操作）；关完最后一层就收起图层。
 pub fn overlay_hide(id : Int) -> Unit {
-  match overlay_slot.val {
+  match overlay_host() {
     None => ()
     Some(h) => {
       let kept : Array[(Int, Widget)] = []
@@ -171,7 +223,7 @@ pub fn overlay_hide(id : Int) -> Unit {
 ///|
 /// 关掉最上面一层（点浮层外收起用）。
 pub fn overlay_hide_top() -> Unit {
-  match overlay_slot.val {
+  match overlay_host() {
     Some(h) =>
       if h.items.length() > 0 {
         overlay_hide(h.items[h.items.length() - 1].0)
@@ -183,7 +235,7 @@ pub fn overlay_hide_top() -> Unit {
 ///|
 /// 关掉全部浮层。
 pub fn overlay_clear() -> Unit {
-  match overlay_slot.val {
+  match overlay_host() {
     Some(h) => {
       for it in h.items {
         let _ = h.layer.remove_child(it.1)
@@ -197,17 +249,22 @@ pub fn overlay_clear() -> Unit {
 }
 
 ///|
-/// 把图层挪回最后一个子控件（内容挂载后调用）：后画的覆盖在前、命中也最先，
-/// 浮层必须始终压在内容之上。
+/// 把本宿主的图层挪回最后一个子控件（后画的覆盖在前、命中也最先，浮层必须始终
+/// 压在内容之上）。多窗形态每窗有自己的图层，挂完内容要升的是**自己**那层的。
+/// 名字不叫 `raise`：那是 MoonBit 的关键字，`Type::raise` 直接解析不过去。
+pub fn OverlayHost::raise_layer(self : OverlayHost) -> Unit {
+  let idx = self.root.index_of(self.layer)
+  let n = self.root.children().length()
+  if idx >= 0 && idx < n - 1 {
+    self.root.move_child(idx, n - 1)
+  }
+}
+
+///|
+/// 把**当前窗**的图层挪回最后（`App::mount` 之后调用）。
 pub fn overlay_raise() -> Unit {
-  match overlay_slot.val {
-    Some(h) => {
-      let idx = h.root.index_of(h.layer)
-      let n = h.root.children().length()
-      if idx >= 0 && idx < n - 1 {
-        h.root.move_child(idx, n - 1)
-      }
-    }
+  match overlay_host() {
+    Some(h) => h.raise_layer()
     None => ()
   }
 }
@@ -215,7 +272,7 @@ pub fn overlay_raise() -> Unit {
 ///|
 /// 指定浮层的包裹控件（诊断与测试用：浮层内容挂在它的子控件里）。
 pub fn overlay_root_of(id : Int) -> Widget? {
-  match overlay_slot.val {
+  match overlay_host() {
     Some(h) => {
       for it in h.items {
         if it.0 == id {
@@ -231,7 +288,7 @@ pub fn overlay_root_of(id : Int) -> Widget? {
 ///|
 /// 指定浮层在窗口坐标里的矩形（诊断与测试用）。
 pub fn overlay_rect_of(id : Int) -> Rect? {
-  match overlay_slot.val {
+  match overlay_host() {
     Some(h) => {
       for it in h.items {
         if it.0 == id {

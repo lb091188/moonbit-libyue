@@ -1041,10 +1041,21 @@ int wm_init(void) {
 }
 
 int64_t wm_window_new(int width, int height, const char *title) {
-  if (wm_next_id >= WM_MAX_WINDOWS) {
+  // 槽位复用：窗口多开多关（附窗反复开合）不能把 32 个槽吃光。判据是 area 为空
+  // ——建窗时必设、wm_close 里 memset 清零，于是拆过的槽与从没用过的槽同样可取。
+  int id = 0;
+  for (int i = 1; i < WM_MAX_WINDOWS; i++) {
+    if (wm_windows[i].area == NULL) {
+      id = i;
+      break;
+    }
+  }
+  if (id == 0) {
     return 0;
   }
-  int id = wm_next_id++;
+  if (id >= wm_next_id) {
+    wm_next_id = id + 1;
+  }
   WmWindow *w = &wm_windows[id];
   w->width = width > 1 ? width : 1;
   w->height = height > 1 ? height : 1;

@@ -406,11 +406,11 @@ test "下拉选择：点开列表、点选项回填并收起、✕ 清空、选�
   click_at(root, field, 40.0, 16.0)
   assert_eq(@core.overlay_count(), 1)
   root.relayout(420.0, 300.0)
-  let rows = select_rows(1)
+  let rows = select_rows(@core.overlay_top_id())
   assert_eq(rows.length(), 3)
   assert_eq(rows[0].rect.h, 28.0)
   // 弹层落在字段下方 2px、与字段同宽
-  match @core.overlay_rect_of(1) {
+  match @core.overlay_rect_of(@core.overlay_top_id()) {
     Some(r) => assert_eq((r.x, r.y, r.w), (field.rect.x, field.rect.y + field.rect.h + 2.0, 160.0))
     None => assert_true(false)
   }
@@ -420,7 +420,7 @@ test "下拉选择：点开列表、点选项回填并收起、✕ 清空、选�
   // 再点开：选中行（乙）有浅底，未选中行没有
   click_at(root, field, 40.0, 16.0)
   root.relayout(420.0, 300.0)
-  let rows2 = select_rows(2)
+  let rows2 = select_rows(@core.overlay_top_id())
   let (bm_a, ax, ay) = shot(rows2[0])
   let (bm_b, bx, by) = shot(rows2[1])
   let plain = color_of(bm_a, ax + 40, ay + 14)
@@ -477,7 +477,7 @@ test "取色器：字段点开色板网格、点色块写值并收起、选中�
   assert_eq(@core.overlay_count(), 1)
   root.relayout(460.0, 320.0)
   // 面板 → 色板容器 → 两行（每行 5 格）
-  let grid = overlay_kid(1, 0).children()[0]
+  let grid = overlay_kid(@core.overlay_top_id(), 0).children()[0]
   let lines = grid.children()
   assert_eq(lines.length(), 2)
   assert_eq(lines[0].children().length(), 5)
@@ -485,7 +485,7 @@ test "取色器：字段点开色板网格、点色块写值并收起、选中�
   // 面板按公式定尺寸 176x80；内层容器的 padding 只给左/上（`set_padding(left, top)`
   // 的口径），剩下的右下空带由面板自身的尺寸兜住
   assert_eq((grid.rect.w, grid.rect.h), (176.0, 72.0))
-  match @core.overlay_rect_of(1) {
+  match @core.overlay_rect_of(@core.overlay_top_id()) {
     Some(r) => assert_eq((r.w, r.h), (176.0, 80.0))
     None => assert_true(false)
   }
@@ -530,18 +530,18 @@ test "可编辑下拉：点开全量候选、提交文本即过滤、上下键�
   click_at(root, w, 30.0, 16.0)
   assert_eq(@core.overlay_count(), 1)
   root.relayout(420.0, 320.0)
-  assert_eq(select_rows(1).length(), 3)
+  assert_eq(select_rows(@core.overlay_top_id()).length(), 3)
   // 输入法提交「甲」→ 过滤成两行并自动开层
   let _ = root.dispatch_commit(1, "甲")
   root.relayout(420.0, 320.0)
   assert_eq(@core.overlay_count(), 1)
-  assert_eq(select_rows(2).length(), 2)
+  assert_eq(select_rows(@core.overlay_top_id()).length(), 2)
   // 下键移高亮：第 2 行亮起（浅底 + 勾），第 1 行不亮
-  let (bm_a, ax, ay) = shot(select_rows(2)[0])
-  let (bm_b, bx, by) = shot(select_rows(2)[1])
+  let (bm_a, ax, ay) = shot(select_rows(@core.overlay_top_id())[0])
+  let (bm_b, bx, by) = shot(select_rows(@core.overlay_top_id())[1])
   assert_true(color_of(bm_a, ax + 40, ay + 14) != color_of(bm_b, bx + 40, by + 14))
   let _ = root.dispatch_key(1, { press: true, keysym: @core.KS_DOWN, mods: 0, })
-  let (bm_c, cx, cy) = shot(select_rows(2)[0])
+  let (bm_c, cx, cy) = shot(select_rows(@core.overlay_top_id())[0])
   assert_true(color_of(bm_c, cx + 40, cy + 14) != color_of(bm_a, ax + 40, ay + 14))
   // 回车取高亮那一项
   let _ = root.dispatch_key(1, { press: true, keysym: @core.KS_RETURN, mods: 0, })
@@ -550,7 +550,7 @@ test "可编辑下拉：点开全量候选、提交文本即过滤、上下键�
   // 再点开：过滤结果只剩一行；Esc 收层且不改值
   click_at(root, w, 30.0, 16.0)
   root.relayout(420.0, 320.0)
-  assert_eq(select_rows(3).length(), 1)
+  assert_eq(select_rows(@core.overlay_top_id()).length(), 1)
   let _ = root.dispatch_key(1, { press: true, keysym: @core.KS_ESCAPE, mods: 0, })
   assert_eq((@core.overlay_count(), v.get()), (0, "甲二"))
   // 过滤到空集时不开层

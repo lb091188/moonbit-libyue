@@ -109,7 +109,7 @@ test "旧名构造器落到新组件上：picker 点开浮层、scroll 出滚动
   click_at(root, field, 30.0, 16.0)
   assert_eq(@core.overlay_count(), 1)
   root.relayout(400.0, 300.0)
-  let rows = select_rows(1)
+  let rows = select_rows(@core.overlay_top_id())
   assert_eq(rows.length(), 2)
   click_at(root, rows[0], 20.0, 14.0)
   assert_eq((v.get(), @core.overlay_count()), ("甲", 0))

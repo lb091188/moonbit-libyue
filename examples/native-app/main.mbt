@@ -234,6 +234,25 @@ fn text_line(
 }
 
 ///|
+/// 每帧现读的一行状态字（多窗对照用：计数在闭包里读，画的是当下值）。
+fn live_counter(text_of : () -> String, width? : Double = 560.0) -> @core.Widget {
+  let w = @core.Widget::new()
+  w.set_size(width, 22.0)
+  w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, _r : @core.Rect) -> Unit {
+    p.flush()
+    let _ = @text.draw_text_at(
+      p,
+      0.0,
+      0.0,
+      text_of(),
+      FONT,
+      @theme.theme_text_primary(),
+    )
+  })
+  w
+}
+
+///|
 /// 批次 3（字体枚举与回退 + 混排行高）：同一段文字画两次——左边只用基准字体，
 /// 右边把末尾的「28」换成 28px。两个盒子的**盒高都取 `line_height()`**，
 /// 混排那盒必须被抬起来，否则大字会被裁；族名走 `resolve_family`
@@ -1229,6 +1248,121 @@ fn main {
   root.append_child(btn)
   root.append_child(make_font_row(ctr))
   root.append_child(make_band(ctr))
+  // 批 A（多窗口宿主）：一宿主管 N 窗——每窗一棵控件树、一套焦点栈与输入法
+  // 状态，共用同一个 Loop 与平台泵。开一扇「关于」窗：窗里的按钮只加**那扇窗**
+  // 的计数、输入框只进那扇窗的焦点栈；关掉它主窗照旧活着。
+  let mw_opened : Ref[Int] = Ref(0)
+  let mw_closes : Ref[Int] = Ref(0)
+  let mw_sub_clicks : Ref[Int] = Ref(0)
+  let mw_main_clicks : Ref[Int] = Ref(0)
+  let mw_sub_btn : Ref[@core.Widget?] = Ref(None)
+  let mw_sub_close : Ref[@core.Widget?] = Ref(None)
+  let mw_sub_entry : Ref[@core.Widget?] = Ref(None)
+  let mw_sub_entry_max : Ref[Int] = Ref(0)
+  let mw_open_btn : Ref[@core.Widget?] = Ref(None)
+  let mw_sub_win : Ref[@core.App?] = Ref(None)
+  let mw_sub_text : Ref[@core.Store[String]] = Ref(@core.Store::new(""))
+  let open_about = fn(a : @core.App) -> Unit {
+    match a.open_window(480, 300, "关于（第二窗）") {
+      None => ()
+      Some(win) => {
+        mw_opened.val = mw_opened.val + 1
+        mw_sub_win.val = Some(win)
+        let mine : Ref[Int] = Ref(0)
+        // 每窗自己的状态：两扇关于窗各持一份文本，不共用一个 Store
+        let sub_text = @core.Store::new("")
+        mw_sub_text.val = sub_text
+        win.root.set_column()
+        win.root.set_padding(16.0, 12.0)
+        win.root.on_draw = Some(fn(
+          _w : @core.Widget,
+          p : @render.Painter,
+          r : @core.Rect,
+        ) -> Unit {
+          p.set_fill_color(@theme.theme_bg_page())
+          p.fill_rect(0.0, 0.0, r.w, r.h)
+        })
+        // 本窗自己的焦点栈：101 只登记在这扇窗上
+        let _ = win.focus.register(101)
+        win.mount([
+          @ui.label("关于窗：自己的控件树与焦点栈，共用宿主的循环与泵", size=13.0),
+          @core.node_of(live_counter(fn() -> String {
+            "本窗点击 " +
+            mine.val.to_string() +
+            " / 在窗 " +
+            a.window_count().to_string() +
+            " / 主窗点击 " +
+            mw_main_clicks.val.to_string()
+          }, width=440.0)),
+          @ui.button(
+            "点我计数（只加本窗）",
+            on_click=fn() {
+              mine.val = mine.val + 1
+              mw_sub_clicks.val = mw_sub_clicks.val + 1
+            },
+            min_width=180.0,
+            handle=fn(w : @core.Widget) -> Unit { mw_sub_btn.val = Some(w) },
+          ),
+          @ui.entry(
+            sub_text,
+            placeholder="字打进这扇窗的栈里",
+            focus_id=101,
+            width=280.0,
+            on_change=fn(t : String) -> Unit {
+              if t.length() > mw_sub_entry_max.val {
+                mw_sub_entry_max.val = t.length()
+              }
+            },
+            handle=fn(w : @core.Widget) -> Unit { mw_sub_entry.val = Some(w) },
+          ),
+          @ui.button(
+            "关闭这扇窗（主窗继续活着）",
+            on_click=fn() {
+              mw_closes.val = mw_closes.val + 1
+              win.close_window()
+            },
+            min_width=180.0,
+            handle=fn(w : @core.Widget) -> Unit { mw_sub_close.val = Some(w) },
+          ),
+        ])
+      }
+    }
+  }
+  app.mount([
+    @ui.container(
+      [
+        @ui.label("多窗口（批 A）", size=13.0),
+        @core.node_of(live_counter(fn() -> String {
+          "在窗 " +
+          app.window_count().to_string() +
+          " / 开过 " +
+          mw_opened.val.to_string() +
+          " / 已关 " +
+          mw_closes.val.to_string() +
+          " / 主窗点击 " +
+          mw_main_clicks.val.to_string() +
+          " / 关于窗点击 " +
+          mw_sub_clicks.val.to_string()
+        })),
+        @ui.button(
+          "开一扇关于窗",
+          on_click=fn() { open_about(app) },
+          min_width=160.0,
+          handle=fn(w : @core.Widget) -> Unit { mw_open_btn.val = Some(w) },
+        ),
+        @ui.button(
+          "主窗计数（对照）",
+          on_click=fn() { mw_main_clicks.val = mw_main_clicks.val + 1 },
+          min_width=160.0,
+        ),
+      ],
+      direction=@yoga.Row,
+      column_gap=8.0,
+      padding=6.0,
+      bg=@theme.theme_bg_panel(),
+      border=@theme.theme_border(),
+    ),
+  ])
   // 批次 5b（组件层首批）：一行全用 @ui 构造器，按钮经 store 计数。
   app.mount([
     @ui.container(
@@ -1901,7 +2035,9 @@ fn main {
   let _ = app.timer(3000, fn() -> Unit { stop_follow() })
   // 累积验证页越排越宽，注入点位也跟着多——存活窗口给到 9 秒才够把全部
   // 交互注完一轮（原来 5 秒时后几击会赶上退出）
-  let _ = app.timer(12000, fn() { app.quit() })
+  // 冒烟自杀点：多窗形态要按「开窗 → 在第二窗里点与打字 → 关窗」多步注入，
+  // 12 秒走不完一轮，故放宽到 25 秒（仍是无人值守冒烟，不需要人关窗）
+  let _ = app.timer(25000, fn() { app.quit() })
 
   app.run()
   // 卸载前停转（自排链不认识视图已移除；本例循环已 quit，这里是示范正确收尾）
@@ -2273,6 +2409,50 @@ fn main {
       println("NATIVE-APP-CAL box=" + rect_str(w.rect) + " cell=" + rect_str(c14.rect))
     }
     None => ()
+  }
+  // 批 A（多窗口）回证：在窗数、开过/关过几扇、两窗各自的点击数，以及关于窗
+  // 输入框的字数与那扇窗的焦点 id——焦点栈按窗独立，主窗的框不会被牵连。
+  let sub_focus = match mw_sub_win.val {
+    Some(win) =>
+      match win.focus.current() {
+        Some(id) => id.to_string()
+        None => "0"
+      }
+    None => "-"
+  }
+  println(
+    "NATIVE-APP-MW wins=" +
+      app.window_count().to_string() +
+      " opened=" +
+      mw_opened.val.to_string() +
+      " closes=" +
+      mw_closes.val.to_string() +
+      " main_clicks=" +
+      mw_main_clicks.val.to_string() +
+      " sub_clicks=" +
+      mw_sub_clicks.val.to_string() +
+      " sub_entry_bytes=" +
+      mw_sub_entry_max.val.to_string() +
+      " sub_focus=" +
+      sub_focus,
+  )
+  match mw_open_btn.val {
+    Some(w) => {
+      // 关于窗的矩形是**那扇窗自己的**窗内坐标，注入前先 xwininfo 拿它的绝对位置
+      let mut line = "NATIVE-APP-MW-GEO open=" + rect_str(w.rect)
+      for kv in [
+        ("sub_btn", mw_sub_btn),
+        ("sub_entry", mw_sub_entry),
+        ("sub_close", mw_sub_close),
+      ] {
+        match kv.1.val {
+          Some(b) => line = line + " " + kv.0 + "=" + rect_str(b.rect)
+          None => ()
+        }
+      }
+      println(line)
+    }
+    None => println("NATIVE-APP-MW-GEO -")
   }
   app.shutdown()
 }

@@ -1,9 +1,9 @@
 // 循环归 MoonBit（不用 gtk_main）：本包只做「什么时候干什么」的调度，
 // 平台泵（G2 的 yue/win）负责等事件并把单调时钟读数交给 advance。
 // widget.mbt 是自绘控件宿主：布局树映射、命中测试、事件路由与绘制遍历。
-// app.mbt 是窗口宿主：窗口 + 循环 + 控件树 + 输入法通道 + 脏标上屏在一处。
-// node.mbt 是声明式地基：Node{mount:(Widget)->Widget}、bind_node 原位重挂、
-// signal.mbt/store.mbt 是从 master 平移的响应式内核（零平台依赖）。
+// app.mbt 是单窗宿主（一扇窗一棵树），host.mbt 是窗口注册表（一宿主管 N 窗、
+// 共用一个 Loop 与泵）；node.mbt 是声明式地基：Node{mount:(Widget)->Widget}、
+// bind_node 原位重挂、signal.mbt/store.mbt 是从 master 平移的响应式内核（零平台依赖）。
 
 supported_targets = "native"
 

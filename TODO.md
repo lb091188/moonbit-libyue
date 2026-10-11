@@ -119,7 +119,11 @@
 
 窗口内容 = 1..N 个互不重叠的矩形区（pane），每区声明 owner（自绘 = Painter / webview = 原生子件），矩形由 yoga 布局给；Tauri-like、爬虫内容获取页、原生多窗口三种形态同源。**本轮只做 Linux 闭环**，Windows/macOS 后端归输入通道另线与平台批。
 
-- [ ] **批 A 多窗口宿主**：`yue/core/app.mbt` 的 `App::new` 从「只建一窗」改成「一宿主管 N 窗，每窗一棵控件树、共用一个 `Loop`」；纯自绘即可验（开一个「关于」窗），两窗各自收到注入点击、关单窗不影响宿主
+- [x] **批 A 多窗口宿主**：`yue/core/app.mbt` 的 `App::new` 从「只建一窗」改成「一宿主管 N 窗，每窗一棵控件树、共用一个 `Loop`」；纯自绘即可验（开一个「关于」窗），两窗各自收到注入点击、关单窗不影响宿主
+  - [x] 注册表落 `yue/core/host.mbt`：主窗=注册表第一扇（关掉它或关掉最后一扇才整体退出，`host_close_action` 纯函数钉住）；`App::step` 逐窗排空事件/喂输入法/脏窗上屏；`App::open_window` 开附窗、`App::close_window` 幂等关窗、`App::shutdown` 拆所有窗
+  - [x] 两条进程级单槽随多窗升级：`invalidate()` 改**广播**置脏；浮层宿主改**取用函数**（浮层开在当前窗，句柄改进程级递增并加 `overlay_ids()`/`overlay_top_id()`——原先按宿主从 1 数起会跨窗撞号，`yue/ui` 里写死句柄的测试直接 `Array::at` 越界崩）
+  - [x] GTK 桩窗口槽复用（扫 `area == NULL`），否则附窗反复开合吃光 32 槽；示例冒烟自杀点 12s→25s 给多步注入留空间
+  - [x] 回证：core 70/70（新增 8 条无头注册表）、十包全绿、两示例 `--deny-warn` 零警告、全仓红点 287/68 未增；真窗口 `NATIVE-APP-MW wins=1 opened=1 closes=1 main_clicks=1 sub_clicks=2 sub_focus=101` + 几何行四字段，注入「点开→第二窗点两下与打字→主窗对照→关第二窗→再开」期间主窗始终活着；**待用户目视**：两窗互相遮挡/拖动时的重绘、关于窗里 preedit 下划线观感
 - [ ] **批 B pane 模型 + webview pane**：`mount_child_surface(kind : ChildKind, rect : (Double,Double,Double,Double)) -> ChildSurface`（`set_rect`/`unmount`/`handle`）的 C 端实现，语义是「容器里放一个原生子件」（Linux = `gtk_container_add` 进 GtkOverlay/GtkFixed，不需要 XEmbed 与像素合成）；WebKitGTK **只能动态链**，`scripts/prebuild.py` 增 `webkit2gtk-4.1` 探测项（本机实测 2.52.6 在位）；验整页与左右分栏两种摆法
 - [ ] **批 C JS 桥 + DOM 抓取 + 导航面**：`evaluate_javascript`/`add_user_script`/双向通道（原生→网页 evaluate、网页→原生 invoke）/UA 改写 + cookie 读写 + 按 profile 分数据目录（**profile 挂 pane 级参数**，键 `<bundle-id>.<profile>`）/`browser_profile_persistence() -> Persistent | EphemeralOnly` 探测（降级不静默）/自定义协议**按 context 注册**/前进后退刷新与标题 URL 回调/`window.open` 策略/下载回调/权限默认拒绝可转原生提示/web 进程崩溃回调；契约沿用旧链 `yue/browser/browser.mbt` 的 22+6 方法名，协议载荷改**结构化返回**（CORE1 越界读教训）；抓取只要 DOM，不做网络响应层；**可见性开关接口预留但不实现**
 - [ ] **批 D 媒体播放器**（可与 B/C 并行）：复用 `modules/ffmpeg-mbt`（零 libyue 依赖，已有 `decode_rgba`/`decode_pcm`/`seek`/`duration_s`/`video_fps`）+ `modules/yue-media` 内嵌的 miniaudio 设备层；**CPU 回灌 + 软解**（RGBA → `yue/render` 的 `Bitmap` → Painter 合成，本档位不做硬解与 GPU 合成）；新写播放器 UI（悬浮控制条/进度与音量/倍速/字幕叠加/seek 防抖）+ 音频时钟与同步；旧链坑照 adaptation.md 逐条验收（音画不同轴、seek 后进度从零重涨、换载崩溃）

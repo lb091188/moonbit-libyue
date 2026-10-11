@@ -19,6 +19,14 @@ pub(all) struct App {
   sched : Loop
   root : Widget
   focus : FocusStack
+  /// 本窗的浮层宿主（图层挂在 root 上；多窗时浮层开在当前窗的那层）
+  host : OverlayHost
+  /// 注册表里的窗号（见 host.mbt）
+  mut wid : Int
+  /// 主窗：注册表里的第一扇，关掉它即整体退出
+  mut primary : Bool
+  /// 已拆过窗（close_window/shutdown 幂等）
+  mut closed : Bool
   mut dirty : Bool
   mut running : Bool
   /// 上一次投递给焦点控件的组合串（相同内容不重复投递，避免每拍置脏）
@@ -64,22 +72,47 @@ pub fn local_ymd() -> (Int, Int, Int) {
 }
 
 ///|
-/// 平台后端与窗口都建起来才算成功；无显示服务返回 None。
-pub fn App::new(width : Int, height : Int, title : String) -> App? {
+/// 装进程级挂钩（多窗形态只有一套）：重绘请求广播给所有在窗、浮层按当前窗取
+/// 宿主、延时定时器走共用的 `Loop`。每建一扇窗都装一遍，装的是同一组闭包，
+/// 重复安装没有副作用（无头测试自装的静态宿主会在下一扇窗建好时被接管）。
+fn install_host_hooks() -> Unit {
+  set_repaint_hook(fn() { host_repaint_all() })
+  set_overlay_provider(fn() -> OverlayHost? {
+    match host_active() {
+      Some(a) => Some(a.host)
+      None => None
+    }
+  })
+  let l = host_loop()
+  set_timer_hooks(
+    fn(ms : Int, f : () -> Unit) -> Int { l.timer(ms, f) },
+    fn(id : Int) -> Unit {
+      // 到期项已移除时 cancel 返回 false，不必上抛
+      let _ = l.cancel(id)
+    },
+  )
+}
+
+///|
+/// 建一扇窗并登记进注册表：注册表还空即主窗，否则是附窗（共用同一个 `Loop`
+/// 与平台泵）。平台后端与窗口都建起来才算成功，无显示服务返回 None。
+fn app_window(width : Int, height : Int, title : String) -> App? {
   if !@win.init_backend() {
     return None
   }
   match @win.Window::new(width, height, title) {
     None => None
     Some(window) => {
-      let sched = Loop::new()
-      sched.start(@win.now_ms())
       let root = Widget::new()
-      let app = {
+      let app : App = {
         window,
-        sched,
+        sched: host_loop(),
         root,
         focus: FocusStack::new(),
+        host: make_overlay_host(root),
+        wid: host_new_wid(),
+        primary: false,
+        closed: false,
         dirty: true,
         running: true,
         last_preedit: ("", 0),
@@ -88,28 +121,55 @@ pub fn App::new(width : Int, height : Int, title : String) -> App? {
         capture: -1,
         cursor_kind: 0,
       }
+      host_add(app, host_window_count() == 0)
       window.show()
       window.request_focus()
-      // 声明式层的 invalidate() 从这里回到本宿主的脏标（见 node.mbt）
-      set_repaint_hook(fn() { app.schedule_paint() })
-      // 浮层图层：挂在根控件最后、默认不可见（见 overlay.mbt）
-      set_overlay_host(make_overlay_host(app.root))
-      // 组件层的延时任务（如轮播自转）从这里回到本宿主的定时器
-      set_timer_hooks(
-        fn(ms : Int, f : () -> Unit) -> Int { app.sched.timer(ms, f) },
-        fn(id : Int) -> Unit {
-          // 到期项已移除时 cancel 返回 false，不必上抛
-          let _ = app.sched.cancel(id)
-        },
-      )
+      install_host_hooks()
       Some(app)
     }
   }
 }
 
 ///|
-/// 把声明式节点树挂进根控件（内容入口）。挂载即建控件，之后信号驱动的
-/// 重挂走 `bind_node` 的原位替换；挂完标一次脏，下一帧就有内容。
+/// 首个宿主入口（主窗）。再要一扇窗用 `App::open_window`，或在本表已空时
+/// 再调一次本函数（那扇又成主窗）。
+pub fn App::new(width : Int, height : Int, title : String) -> App? {
+  app_window(width, height, title)
+}
+
+///|
+/// 再开一扇窗：每窗一棵控件树、一套焦点栈与输入法状态，**共用**宿主的循环与泵。
+/// 关掉它不影响宿主存活（只有主窗或最后一扇被关才整体退出）；内容照挂
+/// `win.mount([...])`，事件路由与上屏在 `App::step` 里逐窗走。
+pub fn App::open_window(self : App, width : Int, height : Int, title : String) -> App? {
+  let _ = self
+  app_window(width, height, title)
+}
+
+///|
+/// 在窗数与当前窗（诊断与测试用）。注册表是进程级的，`self` 只作调用点锚。
+pub fn App::window_count(self : App) -> Int {
+  let _ = self
+  host_window_count()
+}
+
+///|
+pub fn App::active_window(self : App) -> App? {
+  let _ = self
+  host_active()
+}
+
+///|
+/// 本窗窗号与是否主窗。
+pub fn App::wid(self : App) -> Int {
+  self.wid
+}
+
+///|
+pub fn App::is_primary(self : App) -> Bool {
+  self.primary
+}
+
 ///|
 /// 跟随系统深浅/主色：每 `interval_ms` 读一次系统偏好，变了就 `theme_apply`
 /// （订阅了主题变更的组件即时重着色，不重建界面）。返回停表函数。
@@ -139,10 +199,13 @@ pub fn App::follow_system_theme(self : App, interval_ms? : Int = 1000) -> () -> 
 }
 
 ///|
+/// 把声明式节点树挂进根控件（内容入口）。挂载即建控件，之后信号驱动的
+/// 重挂走 `bind_node` 的原位替换；挂完标一次脏，下一帧就有内容。
+/// 多窗时每窗挂自己那棵，浮层图层升回自己那层的最后。
 pub fn App::mount(self : App, children : Array[Node]) -> Unit {
   mount_children(self.root, children)
-  // 新挂的内容会排在浮层图层之后，把图层挪回最后（浮层始终在上）
-  overlay_raise()
+  // 新挂的内容会排在浮层图层之后，把**本窗**的图层挪回最后
+  self.host.raise_layer()
   self.schedule_paint()
 }
 
@@ -166,7 +229,8 @@ pub fn App::task(self : App, work : () -> Unit) -> Unit {
 }
 
 ///|
-/// 退出：只停派发，不拆对象（拆除由调用方在 `run` 返回后做）。
+/// 退出：只停派发，不拆对象（拆除由调用方在 `run` 返回后做）。`Loop` 是各窗
+/// 共用的，所以任一窗调它即整体退出。
 pub fn App::quit(self : App) -> Unit {
   self.sched.quit()
   self.running = false
@@ -271,6 +335,8 @@ pub fn raw_to_event(
 
 ///|
 fn App::route(self : App, ev : @win.InputEvent) -> Unit {
+  // 谁被操作谁就是当前窗（浮层与工具提示跟着它，见 host.mbt）
+  host_mark_active(self)
   match raw_to_event(
     ev.code,
     ev.keysym,
@@ -419,8 +485,9 @@ pub fn App::paint_frame(self : App) -> Unit {
 }
 
 ///|
-/// 走一圈：等事件 → 跑到期任务 → 排空事件 → 喂输入法 → 脏则上屏。
-/// 返回是否继续（false = 已退出）。
+/// 走一圈：等事件 → 跑到期任务 → **逐窗**排空事件 → 逐窗喂输入法 → 脏窗上屏。
+/// 返回是否继续（false = 已退出）。一扇窗被关（用户点关闭、或内容里调
+/// `App::close_window`）只摘掉它自己，主窗或最后一扇被关才整体退出。
 pub fn App::step(self : App) -> Bool {
   if !self.is_running() {
     return false
@@ -433,11 +500,30 @@ pub fn App::step(self : App) -> Bool {
     },
   )
   let _ = self.sched.advance(@win.now_ms())
+  // 遍历一律走快照：排空途中关窗会改注册表
+  for a in host_windows() {
+    a.drain_events()
+  }
+  if !self.is_running() {
+    return false
+  }
+  for a in host_windows() {
+    a.pump_ime()
+    if a.dirty {
+      a.paint_frame()
+    }
+  }
+  self.is_running()
+}
+
+///|
+/// 排空本窗的平台事件。
+fn App::drain_events(self : App) -> Unit {
   let mut keep = true
   while keep && self.is_running() {
     match self.window.poll_event() {
       @win.Closing => {
-        self.quit()
+        self.close_window()
         keep = false
       }
       @win.NeedsDraw => self.dirty = true
@@ -451,13 +537,25 @@ pub fn App::step(self : App) -> Bool {
       @win.NoEvent => keep = false
     }
   }
-  if self.is_running() {
-    self.pump_ime()
-    if self.dirty {
-      self.paint_frame()
-    }
+}
+
+///|
+/// 关一扇窗：停派发 → 摘表 → 拆平台窗口（顺序是「先停派发、再拆对象」），
+/// 再按 `host_close_action` 决定整体退出还是继续跑剩下的窗。
+/// 幂等：重复调用（用户点关闭 + 内容里自己调）只生效一次。
+pub fn App::close_window(self : App) -> Unit {
+  if self.closed {
+    return
   }
-  self.is_running()
+  self.closed = true
+  self.running = false
+  let remaining = host_window_count() - 1
+  host_deregister(self)
+  self.window.close()
+  if host_close_action(self.primary, remaining) {
+    self.sched.quit()
+    @win.wake()
+  }
 }
 
 ///|
@@ -467,7 +565,18 @@ pub fn App::run(self : App) -> Unit {
 }
 
 ///|
-/// 关闭窗口并释放平台资源。
+/// 关闭窗口并释放平台资源：把**所有**还在的窗一起拆掉（附窗可能还开着），
+/// 注册表随之复位。已拆过的窗句柄是 -1，`wm_close` 幂等，重复调无害。
 pub fn App::shutdown(self : App) -> Unit {
-  self.window.close()
+  for a in host_windows() {
+    a.running = false
+    a.closed = true
+    a.window.close()
+  }
+  self.running = false
+  if !self.closed {
+    self.closed = true
+    self.window.close()
+  }
+  host_reset()
 }

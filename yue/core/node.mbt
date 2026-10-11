@@ -56,10 +56,10 @@ pub fn mount_children(parent : Widget, children : Array[Node]) -> Unit {
 let repaint_hook : Ref[(() -> Unit)] = Ref(fn() { () })
 
 ///|
-/// 安装「请求重绘」回调。`App::new` 建窗时装自己的 `schedule_paint`，
-/// 于是信号回调里的 `invalidate()` 就是「置脏 + 唤醒平台泵」。
-/// 进程级单槽（当前形态一进程一宿主）；多窗口各自路由要到宿主层做
-/// 「按控件找所属 App」时才需要升级。
+/// 安装「请求重绘」回调。宿主装的是 `host_repaint_all`，于是信号回调里的
+/// `invalidate()` 就是「所有在窗置脏 + 唤醒平台泵」：一个 Store/信号同时影响
+/// 两扇窗时两边都重画，被多余置脏的那扇只多一帧，不会画错。
+/// 无宿主（无头测试）时是空操作。
 pub fn set_repaint_hook(f : () -> Unit) -> Unit {
   repaint_hook.val = f
 }
