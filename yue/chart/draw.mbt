@@ -562,12 +562,15 @@ pub fn fill_ring(
 }
 
 ///|
-/// 环形图绘制（扇区 + 中心汇总 + 图例；hover 扇区外扩 4px）。
-pub fn draw_donut(
+/// 环形核心绘制（扇区 + 中心汇总，无图例；hover 扇区外扩 4px）。色由
+/// color_at 现取：独立版直接给 donut_color，交互版按原始序号取（显隐
+/// 切换后不串色）。
+pub fn draw_donut_core(
   p : @render.Painter,
   w : Double,
   h : Double,
   data : Array[DonutSlice],
+  color_at : (Int) -> String,
   thickness : Double,
   center : String,
   hover : Int,
@@ -593,7 +596,7 @@ pub fn draw_donut(
           continue
         }
         let ro = if hover == i { r_out + 4.0 } else { r_out }
-        p.set_fill_color(donut_color(i))
+        p.set_fill_color(color_at(i))
         fill_ring(p, cx, cy, ro, r_in, a0, a1)
       }
     }
@@ -634,6 +637,43 @@ pub fn draw_donut(
     valign=@text.Center,
     wrap=false,
   )
+}
+
+///|
+/// 环形图绘制（扇区 + 中心汇总 + 图例；hover 扇区外扩 4px）。
+pub fn draw_donut(
+  p : @render.Painter,
+  w : Double,
+  h : Double,
+  data : Array[DonutSlice],
+  thickness : Double,
+  center : String,
+  hover : Int,
+) -> Unit {
+  let n = data.length()
+  if n == 0 || w <= 0.0 || h <= 0.0 {
+    return
+  }
+  draw_donut_core(
+    p,
+    w,
+    h,
+    data,
+    fn(i) { donut_color(i) },
+    thickness,
+    center,
+    hover,
+  )
+  let d = h - 16.0
+  let total = {
+    let mut t = 0.0
+    for s in data {
+      if s.value > 0.0 {
+        t = t + s.value
+      }
+    }
+    t
+  }
   // 图例（右侧）：色块 + 标签 + 值(百分比)
   let legend_x = 8.0 + d + 20.0
   if legend_x + 60.0 < w {

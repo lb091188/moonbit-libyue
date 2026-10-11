@@ -679,6 +679,76 @@ fn make_media_section(
 }
 
 ///|
+/// 交互图表区块：折线/柱状/环形三个交互版并排——hover 浮层、图例点击显隐、
+/// 滚轮缩放（折线与柱状共用调用方持有的 CiZoom，退出状态行报窗口读数；
+/// 环形无缩放）。
+fn make_chart_it_section(
+  lin : @core.Store[Array[@chart.LineSeries]],
+  bars : @core.Store[Array[@chart.BarItem]],
+  rings : @core.Store[Array[@chart.DonutSlice]],
+  zoom : @chart.CiZoom,
+  panel_w : Ref[@core.Widget?],
+) -> @core.Node {
+  let vals : Array[Double] = []
+  for i = 0; i < 60; i = i + 1 {
+    vals.push(((i * 17) % 41).to_double() + 3.0)
+  }
+  lin.set([
+    @chart.LineSeries::make("负载", max_points=80).with_points(vals),
+    @chart.LineSeries::make("延迟", max_points=80).with_points(
+      vals.map(fn(v) { v * 0.6 }),
+    ),
+  ])
+  let bar_items : Array[@chart.BarItem] = []
+  for i = 0; i < 18; i = i + 1 {
+    bar_items.push(
+      @chart.BarItem::make("c\{i}", ((i * 13) % 29).to_double() - 4.0),
+    )
+  }
+  bars.set(bar_items)
+  rings.set([
+    @chart.DonutSlice::make("已完成", 46.0),
+    @chart.DonutSlice::make("进行中", 33.0),
+    @chart.DonutSlice::make("待办", 21.0),
+  ])
+  @ui.container(
+    [
+      @ui.label(
+        "交互图表：hover 浮层 + 图例点击显隐 + 滚轮缩放（退出状态行报缩放窗）",
+        size=13.0,
+      ),
+      @ui.container(
+        [
+          @chart.line_chart_it(
+            lin,
+            area=true,
+            width=330.0,
+            height=130.0,
+            zoom_state=Some(zoom),
+            handle=fn(w : @core.Widget) -> Unit { panel_w.val = Some(w) },
+          ),
+          @chart.bar_chart_it(
+            bars,
+            width=330.0,
+            height=130.0,
+            zoom_state=Some(zoom),
+          ),
+          @chart.donut_chart_it(rings, width=210.0, height=130.0),
+        ],
+        direction=@yoga.Row,
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::FlexStart,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 图表区块：五种通用图并排 + 一颗「推点」按钮（点一次往折线序列推一个点，
 /// 退出状态行报窗口长度与末值，回证 Store 驱动的换数据只重绘不重建）。
 fn make_chart_section(
@@ -900,7 +970,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1400, 1900, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1400, 2080, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -1124,6 +1194,14 @@ fn main {
   let ch_btn_w : Ref[@core.Widget?] = Ref(None)
   let ch_line_w : Ref[@core.Widget?] = Ref(None)
   app.mount([make_chart_section(ch_lin, ch_pushes, ch_btn_w, ch_line_w)])
+  let it_lin = @core.Store::new([])
+  let it_bars = @core.Store::new([])
+  let it_rings = @core.Store::new([])
+  let it_zoom = @chart.ci_zoom_make()
+  let it_panel_w : Ref[@core.Widget?] = Ref(None)
+  app.mount([
+    make_chart_it_section(it_lin, it_bars, it_rings, it_zoom, it_panel_w),
+  ])
   app.mount([
     make_form_section(
       frm_btn,
@@ -1737,6 +1815,22 @@ fn main {
     ov2_rect_of(ch_line_w.val) +
     " btn=" +
     ov2_rect_of(ch_btn_w.val),
+  )
+  // 交互图表：折线面板（vbox）与画布 rect 给注入坐标依据；zoom 窗读数
+  // 回证滚轮缩放真生效（全窗 0-100，注入上滚一格后应收窄到 10-90）
+  let it_canvas = match it_panel_w.val {
+    Some(w) => rect_str(w.children()[1].rect)
+    None => "-"
+  }
+  println(
+    "NATIVE-APP-CHIT panel=" +
+    ov2_rect_of(it_panel_w.val) +
+    " canvas=" +
+    it_canvas +
+    " zoom=" +
+    it_zoom.start.round().to_int().to_string() +
+    "-" +
+    it_zoom.end.round().to_int().to_string(),
   )
   println(
     "NATIVE-APP-MEDIA gif=" +
