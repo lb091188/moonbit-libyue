@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #if defined(_WIN32)
 #include <windows.h>
 #else
@@ -138,6 +137,10 @@ int32_t yue_sys_unsetenv(const char *name, int32_t *ok) {
 }
 
 // 读文本文件全文（二进制读整段；打不开/读失败 ok=0 返回空）。
+// 长度**不能只靠 fseek(END)/ftell**：/proc 与 /sys 下的伪文件报告 0 字节，
+// 内容只在真正读的时候才出现（按定长分配就会拿到空串）。这里以 ftell
+// 作提示、按块循环 fread 到 EOF，普通文件与大文件（数十 MB 的 SQLite 库）
+// 同一条路径。
 void *yue_sys_read_text_file(const char *path, int32_t *ok) {
   *ok = 0;
   if (path == NULL) {
@@ -147,22 +150,52 @@ void *yue_sys_read_text_file(const char *path, int32_t *ok) {
   if (f == NULL) {
     return moonbit_make_bytes(0, 0);
   }
-  if (fseek(f, 0, SEEK_END) != 0) {
+  size_t cap = 65536;
+  if (fseek(f, 0, SEEK_END) == 0) {
+    long hint = ftell(f);
+    if (hint > 0) {
+      cap = (size_t)hint + 1;
+    }
+    rewind(f);
+  }
+  char *buf = (char *)malloc(cap);
+  if (buf == NULL) {
     fclose(f);
     return moonbit_make_bytes(0, 0);
   }
-  long sz = ftell(f);
-  if (sz < 0) {
-    fclose(f);
-    return moonbit_make_bytes(0, 0);
+  size_t len = 0;
+  int failed = 0;
+  for (;;) {
+    if (len + 1 >= cap) {
+      if (cap > (size_t)INT32_MAX / 2) {
+        failed = 1; // 超过 moonbit_make_bytes 的 int 长度上限
+        break;
+      }
+      cap *= 2;
+      char *nb = (char *)realloc(buf, cap);
+      if (nb == NULL) {
+        failed = 1;
+        break;
+      }
+      buf = nb;
+    }
+    size_t n = fread(buf + len, 1, cap - len - 1, f);
+    len += n;
+    if (n == 0) {
+      break;
+    }
   }
-  rewind(f);
-  void *out = moonbit_make_bytes((int)sz, 0);
-  if (sz > 0 && fread(out, 1, (size_t)sz, f) != (size_t)sz) {
+  if (failed || (ferror(f) && !feof(f))) {
+    free(buf);
     fclose(f);
     return moonbit_make_bytes(0, 0);
   }
   fclose(f);
+  void *out = moonbit_make_bytes((int)len, 0);
+  if (len > 0) {
+    memcpy(out, buf, len);
+  }
+  free(buf);
   *ok = 1;
   return out;
 }
