@@ -583,3 +583,13 @@ pub fn Painter::stroke(self : Painter) -> Unit {
     None => ()
   }
 }
+
+///|
+/// 当前 Cairo 会话号。文本层拿它在**本上下文**上画字，平移与裁剪才会生效
+/// （自己拿 bitmap 画是另一条路径，会无视控件原点）。无 Cairo 后端返回 None。
+pub fn Painter::cairo_id(self : Painter) -> Int64? {
+  match self.session {
+    Some(c) => Some(c.id)
+    None => None
+  }
+}

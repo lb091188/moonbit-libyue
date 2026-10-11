@@ -412,3 +412,109 @@ pub fn draw_in_box(
     if wrap { 1 } else { 0 },
   ) == 1
 }
+
+///|
+#borrow(text, family)
+extern "c" fn pt_draw_box_cr(
+  cr_id : Int64,
+  x : Double,
+  y : Double,
+  box_w : Double,
+  box_h : Double,
+  text : Bytes,
+  len : Int,
+  size : Double,
+  family : Bytes,
+  weight : Int,
+  italic : Int,
+  r : Int,
+  g : Int,
+  b : Int,
+  a : Int,
+  align : Int,
+  valign : Int,
+  ellipsize : Int,
+  wrap : Int,
+) -> Int = "pt_draw_box_cr"
+
+///|
+/// 把文本画在**调用方 Painter 的 Cairo 会话**上：控件原点（宿主的 translate）
+/// 与裁剪都生效，所以组件里的文字落在自己盒内、也不会画到邻居身上。
+/// 语义与 `draw_in_box` 一致（(x,y) 相对当前坐标系，盒内对齐）。
+/// 无 Cairo 会话（纯矩形降级路径）返回 false，由调用方决定退不退。
+pub fn draw_box_at(
+  p : @render.Painter,
+  x : Double,
+  y : Double,
+  box_w : Double,
+  box_h : Double,
+  text : String,
+  font : Font,
+  color : String,
+  align? : TextAlign = Start,
+  valign? : TextAlign = Start,
+  ellipsize? : Bool = false,
+  wrap? : Bool = true,
+) -> Bool {
+  let id = match p.cairo_id() {
+    Some(i) => i
+    None => return false
+  }
+  let tb = @utf8.encode(text)
+  if tb.length() == 0 {
+    return true
+  }
+  let fb = @utf8.encode(font.name)
+  let c = match @render.Color::parse(color) {
+    Some(c) => c
+    None => { r: 0, g: 0, b: 0, a: 255 }
+  }
+  pt_draw_box_cr(
+    id,
+    x,
+    y,
+    box_w,
+    box_h,
+    tb,
+    tb.length(),
+    font.size,
+    fb,
+    weight_value(font.weight),
+    style_id(font.style),
+    c.r,
+    c.g,
+    c.b,
+    c.a,
+    align_id(align),
+    align_id(valign),
+    if ellipsize { 1 } else { 0 },
+    if wrap { 1 } else { 0 },
+  ) == 1
+}
+
+///|
+/// 单行绘制（不铺盒、不对齐），是 `draw_box_at` 的简化入口。
+pub fn draw_at(
+  p : @render.Painter,
+  x : Double,
+  y : Double,
+  text : String,
+  font : Font,
+  color : String,
+) -> Bool {
+  draw_box_at(p, x, y, 0.0, 0.0, text, font, color, wrap=false)
+}
+
+///|
+/// 按字号绘制（不铺盒），给「只想画一行字」的调用方用。
+pub fn draw_text_at(
+  p : @render.Painter,
+  x : Double,
+  y : Double,
+  text : String,
+  size : Double,
+  color : String,
+  family? : String = "",
+) -> Bool {
+  draw_at(p, x, y, text, Font::new(family, size), color)
+}

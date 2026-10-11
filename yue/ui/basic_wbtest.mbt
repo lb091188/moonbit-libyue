@@ -215,3 +215,87 @@ test "图标按尺寸占位并真的画出像素；图像缺文件时不崩、�
   }
   assert_true(red > 20)
 }
+
+///|
+/// 回归：文本必须随控件原点落位、并被控件矩形裁住。
+/// 曾经的缺陷是文本层自建 surface 画字，无视宿主的 translate/clip——
+/// 真窗口截图上整屏文字全挤在左上角（见 adaptation 的组件层首批条）。
+test "文本随控件原点落位并被裁剪（画在 Painter 会话上）" {
+  let top = label("AAAA", size=20.0)
+  let bottom = label("BBBB", size=20.0)
+  let root = @core.Widget::new()
+  root.set_size(200.0, 200.0)
+  root.set_column()
+  let a = @core.Widget::new()
+  a.set_size(200.0, 100.0)
+  let b = @core.Widget::new()
+  b.set_size(200.0, 100.0)
+  root.append_child(a)
+  root.append_child(b)
+  let _ = top.mount_into(a)
+  let _ = bottom.mount_into(b)
+  root.relayout(200.0, 200.0)
+  assert_true(b.rect.y >= 100.0)
+
+  let bm = @render.Bitmap::new(200, 200)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  let ink_in = fn(y0 : Int, y1 : Int) -> Int {
+    let mut n = 0
+    for y = y0; y < y1; y = y + 1 {
+      for x = 0; x < 200; x = x + 1 {
+        if color_of(bm, x, y) != (0, 0, 0, 0) {
+          n = n + 1
+        }
+      }
+    }
+    n
+  }
+  // 两段各自有字：下半段没落位就是 0
+  assert_true(ink_in(0, 100) > 20)
+  assert_true(ink_in(100, 200) > 20)
+
+  // 裁剪：窄盒里的长文本不得画到盒外
+  let narrow = @core.Widget::new()
+  narrow.set_size(24.0, 24.0)
+  let src = text_source("WWWWWWWWWWWWWWWWWW", size=20.0, wrap=false)
+  narrow.on_draw = Some(fn(
+    self : @core.Widget,
+    pp : @render.Painter,
+    _r : @core.Rect,
+  ) -> Unit {
+      let _ = draw_text_in(self, pp, src)
+    })
+  let holder = @core.Widget::new()
+  holder.set_size(200.0, 200.0)
+  holder.append_child(narrow)
+  holder.relayout(200.0, 200.0)
+  let bm2 = @render.Bitmap::new(200, 200)
+  let p2 = @render.Painter::new(bm2)
+  holder.paint(p2)
+  p2.end()
+  // 24px 之外不该有字（盒外的 W 会被 clip 掉）
+  assert_eq(ink_at(bm2, 40, 60), (0, 0, 0, 0))
+  assert_eq(ink_at(bm2, 120, 10), (0, 0, 0, 0))
+  // 盒内有字
+  assert_true(ink_in_box(bm2, 24, 24) > 4)
+}
+
+///|
+fn ink_at(bm : @render.Bitmap, x : Int, y : Int) -> (Int, Int, Int, Int) {
+  color_of(bm, x, y)
+}
+
+///|
+fn ink_in_box(bm : @render.Bitmap, x1 : Int, y1 : Int) -> Int {
+  let mut n = 0
+  for y = 0; y < y1; y = y + 1 {
+    for x = 0; x < x1; x = x + 1 {
+      if color_of(bm, x, y) != (0, 0, 0, 0) {
+        n = n + 1
+      }
+    }
+  }
+  n
+}

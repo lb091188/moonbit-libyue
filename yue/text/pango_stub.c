@@ -192,25 +192,17 @@ int pt_measure_font(const char *text, int len, double size, const char *family,
 // align/valign：0=start 1=center 2=end。水平对齐用 Pango 的布局宽度 +
 // pango_layout_set_alignment；垂直对齐按布局量得的高度做偏移。省略/换行
 // 语义与 pt_draw 相同，宽度约束取 box_w（>0 时）。
-int pt_draw_box(unsigned char *data, int buf_w, int buf_h, double x, double y,
-                double box_w, double box_h, const char *text, int len,
-                double size, const char *family, int weight, int italic, int r,
-                int g, int b, int a, int align, int valign, int ellipsize,
-                int wrap) {
-  if (data == NULL || text == NULL || buf_w < 1 || buf_h < 1) {
+// 在给定 cairo_t 上画盒内文本（对齐/换行/省略口径见 pt_render_box）。
+static int pt_render_box(cairo_t *cr, double x, double y, double box_w,
+                         double box_h, const char *text, int len, double size,
+                         const char *family, int weight, int italic, int r,
+                         int g, int b, int a, int align, int valign,
+                         int ellipsize, int wrap) {
+  if (cr == NULL || text == NULL) {
     return 0;
   }
-  cairo_surface_t *surf = cairo_image_surface_create_for_data(
-      data, CAIRO_FORMAT_ARGB32, buf_w, buf_h, buf_w * 4);
-  if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
-    cairo_surface_destroy(surf);
-    return 0;
-  }
-  cairo_t *cr = cairo_create(surf);
   PangoLayout *layout = pt_make_layout(text, len, size, family, weight, italic);
   if (layout == NULL) {
-    cairo_destroy(cr);
-    cairo_surface_destroy(surf);
     return 0;
   }
   int wrapped_axis = 0;
@@ -253,10 +245,50 @@ int pt_draw_box(unsigned char *data, int buf_w, int buf_h, double x, double y,
   cairo_move_to(cr, x + dx, y + dy);
   pango_cairo_show_layout(cr, layout);
   g_object_unref(layout);
+  return 1;
+}
+
+int pt_draw_box(unsigned char *data, int buf_w, int buf_h, double x, double y,
+                double box_w, double box_h, const char *text, int len,
+                double size, const char *family, int weight, int italic, int r,
+                int g, int b, int a, int align, int valign, int ellipsize,
+                int wrap) {
+  if (data == NULL || buf_w < 1 || buf_h < 1) {
+    return 0;
+  }
+  cairo_surface_t *surf = cairo_image_surface_create_for_data(
+      data, CAIRO_FORMAT_ARGB32, buf_w, buf_h, buf_w * 4);
+  if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
+    cairo_surface_destroy(surf);
+    return 0;
+  }
+  cairo_t *cr = cairo_create(surf);
+  int ok = pt_render_box(cr, x, y, box_w, box_h, text, len, size, family, weight,
+                         italic, r, g, b, a, align, valign, ellipsize, wrap);
   cairo_destroy(cr);
   cairo_surface_flush(surf);
   cairo_surface_destroy(surf);
-  return 1;
+  return ok;
+}
+
+// 画在**调用方的 Cairo 会话**上：平移与裁剪由那侧的上下文带着走，控件里的
+// 文本因此落在自己盒内、也不会画到邻居身上。会话号即 Painter 的 session id。
+extern void *cr_session_context(int64_t id);
+
+int pt_draw_box_cr(int64_t cr_id, double x, double y, double box_w,
+                   double box_h, const char *text, int len, double size,
+                   const char *family, int weight, int italic, int r, int g,
+                   int b, int a, int align, int valign, int ellipsize,
+                   int wrap) {
+  cairo_t *cr = (cairo_t *)cr_session_context(cr_id);
+  if (cr == NULL) {
+    return 0;
+  }
+  cairo_save(cr);
+  int ok = pt_render_box(cr, x, y, box_w, box_h, text, len, size, family, weight,
+                         italic, r, g, b, a, align, valign, ellipsize, wrap);
+  cairo_restore(cr);
+  return ok;
 }
 
 // ---- 富文本会话（AttributedText 的 C 端）----
@@ -542,24 +574,14 @@ int rt_draw(int64_t h, unsigned char *data, int buf_w, int buf_h, double x,
             double y, double box_w, double box_h, int r0, int g0, int b0,
             int a0);
 
-int rt_draw(int64_t h, unsigned char *data, int buf_w, int buf_h, double x,
-            double y, double box_w, double box_h, int r0, int g0, int b0,
-            int a0) {
-  Rt *r = rt_of(h);
-  if (!r || data == NULL || buf_w < 1 || buf_h < 1) {
+// 富文本画在给定 cairo_t 上（对齐/换行/省略口径同 rt_draw）。
+static int rt_render(Rt *r, cairo_t *cr, double x, double y, double box_w,
+                     double box_h, int r0, int g0, int b0, int a0) {
+  if (r == NULL || cr == NULL) {
     return 0;
   }
-  cairo_surface_t *surf = cairo_image_surface_create_for_data(
-      data, CAIRO_FORMAT_ARGB32, buf_w, buf_h, buf_w * 4);
-  if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
-    cairo_surface_destroy(surf);
-    return 0;
-  }
-  cairo_t *cr = cairo_create(surf);
   PangoLayout *layout = rt_build(r);
   if (layout == NULL) {
-    cairo_destroy(cr);
-    cairo_surface_destroy(surf);
     return 0;
   }
   int wrapped_axis = 0;
@@ -600,10 +622,47 @@ int rt_draw(int64_t h, unsigned char *data, int buf_w, int buf_h, double x,
   cairo_move_to(cr, x + dx, y + dy);
   pango_cairo_show_layout(cr, layout);
   g_object_unref(layout);
+  return 1;
+}
+
+int rt_draw(int64_t h, unsigned char *data, int buf_w, int buf_h, double x,
+            double y, double box_w, double box_h, int r0, int g0, int b0,
+            int a0) {
+  Rt *r = rt_of(h);
+  if (!r || data == NULL || buf_w < 1 || buf_h < 1) {
+    return 0;
+  }
+  cairo_surface_t *surf = cairo_image_surface_create_for_data(
+      data, CAIRO_FORMAT_ARGB32, buf_w, buf_h, buf_w * 4);
+  if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
+    cairo_surface_destroy(surf);
+    return 0;
+  }
+  cairo_t *cr = cairo_create(surf);
+  int ok = rt_render(r, cr, x, y, box_w, box_h, r0, g0, b0, a0);
   cairo_destroy(cr);
   cairo_surface_flush(surf);
   cairo_surface_destroy(surf);
-  return 1;
+  return ok;
+}
+
+// 富文本画在**调用方的 Cairo 会话**上：控件原点与裁剪生效（组件里的富文本
+// 标题、Markdown 段落都走这条，否则文字会跑到窗口左上角）。
+int rt_draw_cr(int64_t cr_id, int64_t h, double x, double y, double box_w,
+               double box_h, int r0, int g0, int b0, int a0) {
+  extern void *cr_session_context(int64_t id);
+  cairo_t *cr = (cairo_t *)cr_session_context(cr_id);
+  if (cr == NULL) {
+    return 0;
+  }
+  Rt *r = rt_of(h);
+  if (!r) {
+    return 0;
+  }
+  cairo_save(cr);
+  int ok = rt_render(r, cr, x, y, box_w, box_h, r0, g0, b0, a0);
+  cairo_restore(cr);
+  return ok;
 }
 
 // ---- 字体族枚举与可用性 ----

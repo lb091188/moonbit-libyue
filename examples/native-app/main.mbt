@@ -101,8 +101,8 @@ fn make_field(
     let ty = (r.h - lh) / 2.0
     // 文本走 yue/text 自己的 Cairo 会话，与 Painter 会话交替前刷一次
     p.flush()
-    let _ = @text.draw_to(
-      p.bitmap,
+    let _ = @text.draw_text_at(
+      p,
       4.0,
       ty,
       ed.get_text(),
@@ -113,7 +113,7 @@ fn make_field(
     if pe.length() > 0 {
       let px = 4.0 + prefix_width(ed, ed.caret_pos())
       p.flush()
-      let _ = @text.draw_to(p.bitmap, px, ty, pe, FONT, @theme.theme_warning())
+      let _ = @text.draw_text_at(p, px, ty, pe, FONT, @theme.theme_warning())
       let pw = match @text.measure(pe, FONT) {
         Some(m) => m.width.to_double()
         None => 0.0
@@ -185,8 +185,8 @@ fn make_button(app : @core.App, ctr : Ctr, id : Int, top : Double) -> @core.Widg
     })
     p.fill_rect(0.0, 0.0, r.w, r.h)
     p.flush()
-    let _ = @text.draw_to(
-      p.bitmap,
+    let _ = @text.draw_text_at(
+      p,
       10.0,
       5.0,
       "计数 \{ctr.clicks}（点击或回车）",
@@ -226,7 +226,7 @@ fn text_line(
   w.set_margin(top, 0.0, 0.0, 0.0)
   w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, _r : @core.Rect) -> Unit {
     p.flush()
-    let _ = @text.draw_to(p.bitmap, 0.0, 0.0, text, FONT, color)
+    let _ = @text.draw_text_at(p, 0.0, 0.0, text, FONT, color)
   })
   w
 }
@@ -264,11 +264,11 @@ fn make_font_row(ctr : Ctr) -> @core.Widget {
     p.stroke_rect(0.0, 0.0, 190.0, lh_base)
     p.stroke_rect(198.0, 0.0, 190.0, lh_mixed.to_double())
     p.flush()
-    let _ = base.draw(p.bitmap, 4.0, 0.0, 186.0, lh_base)
-    let _ = mixed.draw(p.bitmap, 202.0, 0.0, 186.0, lh_mixed.to_double())
+    let _ = base.draw_at(p, 4.0, 0.0, 186.0, lh_base)
+    let _ = mixed.draw_at(p, 202.0, 0.0, 186.0, lh_mixed.to_double())
     let fam = @text.resolve_family(["绝对没有的族 Qzz", "monospace"])
-    let _ = @text.draw_font(
-      p.bitmap,
+    let _ = @text.draw_at(
+      p,
       4.0,
       52.0,
       "回退族名：" + fam + " 可用族 " + ctr.fam_count.to_string(),
@@ -296,8 +296,8 @@ fn make_decl_row(store : @core.Store[Int]) -> @core.Node {
         })
         p.fill_rect(0.0, 0.0, r.w, r.h)
         p.flush()
-        let _ = @text.draw_to(
-          p.bitmap,
+        let _ = @text.draw_text_at(
+          p,
           6.0,
           6.0,
           "声明式：第 \{v} 次点击（原位重挂，底色随奇偶换）",
@@ -338,8 +338,8 @@ fn make_band(ctr : Ctr) -> @core.Widget {
     })
     p.fill_rect(0.0, 0.0, r.w, r.h)
     p.flush()
-    let _ = @text.draw_to(
-      p.bitmap,
+    let _ = @text.draw_text_at(
+      p,
       4.0,
       3.0,
       "捕获带 d\{ctr.down} u\{ctr.up} m\{ctr.moved}",
@@ -369,7 +369,7 @@ fn make_band(ctr : Ctr) -> @core.Widget {
 
 ///|
 fn main {
-  let app = match @core.App::new(420, 372, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(560, 424, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -435,6 +435,29 @@ fn main {
       border=@theme.theme_border(),
     ),
   ])
+  // 批次 5c（表单控件）：一行组件化表单——复选 / 开关 / 滑块 / 步进 / 进度。
+  // 状态都在 Store 里，滑块拖动同时驱动进度条（两个组件共享一个 Store）。
+  let agreed = @core.Store::new(false)
+  let sound = @core.Store::new(true)
+  let level = @core.Store::new(25.0)
+  let count = @core.Store::new(0)
+  app.mount([
+    @ui.container(
+      [
+        @ui.checkbox("同意", agreed),
+        @ui.switch_t(sound, on_text="开", off_text="关"),
+        @ui.slider(level, width=120.0, step=5.0),
+        @ui.stepper(count, min=0, max=3),
+        @ui.progress(level, width=80.0, max=100.0),
+      ],
+      direction=@yoga.Row,
+      column_gap=10.0,
+      padding=6.0,
+      align_items=@yoga.AlignItems::Center,
+      bg=@theme.theme_bg_panel(),
+      border=@theme.theme_border(),
+    ),
+  ])
   let decl = @core.Store::new(0)
   let decl_kids_before = root.children().length()
   app.mount([make_decl_row(decl)])
@@ -468,7 +491,20 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp}",
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()}",
   )
+  // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
+  // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
+  let mut rects = ""
+  let kids = app.root.children()
+  for i = 0; i < kids.length(); i = i + 1 {
+    let r = kids[i].rect
+    let rx = r.x.round().to_int().to_string()
+    let ry = r.y.round().to_int().to_string()
+    let rw = r.w.round().to_int().to_string()
+    let rh = r.h.round().to_int().to_string()
+    rects = rects + i.to_string() + ":" + rx + "," + ry + "," + rw + "x" + rh + " "
+  }
+  println("NATIVE-APP-RECTS " + rects)
   app.shutdown()
 }

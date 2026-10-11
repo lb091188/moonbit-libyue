@@ -474,3 +474,10 @@ void cr_blit(int64_t id, unsigned char *src, int sw, int sh, double sx,
   cairo_surface_destroy(sub);
   cairo_surface_destroy(s);
 }
+
+// 把会话的 cairo_t 交给文本层复用：Pango 画在**调用方的上下文**上，Painter 的
+// 平移与裁剪才会生效（自建 surface 画字会无视控件原点，整屏文字全跑到窗口左上角
+// ——本仓真窗口截图实测）。跨静态库引用：pango_stub.c 里声明同名符号。
+void *cr_session_context(int64_t id) {
+  return (void *)CR_OF(id);
+}

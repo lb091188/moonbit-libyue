@@ -155,9 +155,12 @@ def link_configs() -> dict:
             MODULE_ROOT / "yue" / "text" / "pango_stub.c", "libyue_text_pango.a"
         )
         if text_lib:
+            # 文本层要复用 Painter 的 Cairo 会话（cr_session_context 定义在
+            # render 的桩库里），所以 text 的链接行也要带上 render 的归档。
             entries.append({
                 "package": TEXT_PACKAGE,
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_text_pango "
+                "-lrender_cairo_stub "
                 + " ".join([*libs, *sys_libs]),
             })
         stub = build_ime_probe_stub()

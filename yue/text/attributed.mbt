@@ -411,3 +411,53 @@ pub fn AttributedText::draw(
   rt_free(session)
   ok == 1
 }
+
+///|
+extern "c" fn rt_draw_cr(
+  cr_id : Int64,
+  h : Int64,
+  x : Double,
+  y : Double,
+  box_w : Double,
+  box_h : Double,
+  r0 : Int,
+  g0 : Int,
+  b0 : Int,
+  a0 : Int,
+) -> Int = "rt_draw_cr"
+
+///|
+/// 画在**调用方 Painter 的 Cairo 会话**上：控件原点与裁剪都生效。
+/// 与 `draw` 的差别只在目标上下文——`draw` 自建 surface，画在控件里会无视原点，
+/// 整段富文本会跑到窗口左上角（本仓真窗口截图实测）。
+pub fn AttributedText::draw_at(
+  self : AttributedText,
+  p : @render.Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+) -> Bool {
+  let id = match p.cairo_id() {
+    Some(i) => i
+    None => return false
+  }
+  let session = self.rt()
+  if session == 0L {
+    return false
+  }
+  let base = match @render.Color::parse(
+    match self.color {
+      Some(c) => c
+      None => "#000"
+    },
+  ) {
+    Some(c) => c
+    None => { r: 0, g: 0, b: 0, a: 255 }
+  }
+  let ok = rt_draw_cr(
+    id, session, x, y, w, h, base.r, base.g, base.b, base.a,
+  )
+  rt_free(session)
+  ok == 1
+}

@@ -92,4 +92,25 @@ int pt_family_available(const char *name, int len) {
   (void)name; (void)len; return 0;
 }
 
+
+int pt_draw_box_cr(int64_t cr_id, double x, double y, double box_w,
+                   double box_h, const char *text, int len, double size,
+                   const char *family, int weight, int italic, int r, int g,
+                   int b, int a, int align, int valign, int ellipsize,
+                   int wrap) {
+  (void)cr_id; (void)x; (void)y; (void)box_w; (void)box_h; (void)text;
+  (void)len; (void)size; (void)family; (void)weight; (void)italic;
+  (void)r; (void)g; (void)b; (void)a; (void)align; (void)valign;
+  (void)ellipsize; (void)wrap;
+  return 0;
+}
+
+
+int rt_draw_cr(int64_t cr_id, int64_t h, double x, double y, double box_w,
+               double box_h, int r0, int g0, int b0, int a0) {
+  (void)cr_id; (void)h; (void)x; (void)y; (void)box_w; (void)box_h;
+  (void)r0; (void)g0; (void)b0; (void)a0;
+  return 0;
+}
+
 #endif

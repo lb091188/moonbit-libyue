@@ -98,14 +98,15 @@ fn attach_text_measure(w : @core.Widget, src : TextSource) -> Unit {
 
 ///|
 /// 按文本状态在控件盒内绘制（对齐/换行/省略都按 `src`，垂直居中）。
-fn draw_text_in(w : @core.Widget, p : @render.Painter, src : TextSource) -> Unit {
+fn draw_text_in(w : @core.Widget, p : @render.Painter, src : TextSource) -> Bool {
   let r = w.rect
-  p.flush()
-  let _ = @text.draw_in_box(
-    p.bitmap,
+  // 盒宽取「控件宽与声明的 max_width 的较小者」：draw_box_at 的宽度约束就是盒宽
+  let box_w = if src.max_width > 0.0 { src.max_width.min(r.w) } else { r.w }
+  @text.draw_box_at(
+    p,
     0.0,
     0.0,
-    r.w,
+    box_w,
     r.h,
     src.text,
     src.font,
@@ -114,7 +115,6 @@ fn draw_text_in(w : @core.Widget, p : @render.Painter, src : TextSource) -> Unit
     valign=@text.Center,
     ellipsize=src.ellipsis,
     wrap=src.wrap,
-    max_width=if src.max_width > 0.0 { src.max_width.floor().to_int() } else { 0 },
   )
 }
 

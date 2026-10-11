@@ -160,3 +160,38 @@ test "区间不改变无颜色时的绘制语义（空文本、空盒）" {
   let bm2 = @render.Bitmap::new(60, 20)
   assert_eq(at.draw(bm2, 1.0, 1.0, 0.0, 20.0), true)
 }
+
+///|
+/// 回归：富文本必须画在**调用方 Painter 的会话**上——随平移落位、被裁剪挡住。
+/// 旧路径自建 surface，控件里的富文本会无视宿主原点画到窗口左上角。
+test "富文本经会话绘制：随平移落位且被裁剪" {
+  let t = AttributedText::new("标题 Title")
+  t.set_font_for(Font::new("", 22.0), 0, 6)
+  let bm = @render.Bitmap::new(200, 200)
+  let p = @render.Painter::new(bm)
+  p.save()
+  p.translate(0.0, 100.0)
+  p.clip_rect(0.0, 0.0, 40.0, 30.0)
+  let ok = t.draw_at(p, 0.0, 0.0, 40.0, 30.0)
+  p.restore()
+  p.end()
+  assert_true(ok)
+  let mut x0 = 999
+  let mut y0 = 999
+  let mut x1 = -1
+  let mut y1 = -1
+  for y = 0; y < 200; y = y + 1 {
+    for x = 0; x < 200; x = x + 1 {
+      if bm.pixel(x, y).a > 0 {
+        if x < x0 { x0 = x }
+        if y < y0 { y0 = y }
+        if x > x1 { x1 = x }
+        if y > y1 { y1 = y }
+      }
+    }
+  }
+  assert_true(x1 >= 0)
+  // 落位在平移后的盒内：y 从 100 起，且不越出 40×30 的裁剪框
+  assert_true(y0 >= 100 && y1 < 130)
+  assert_true(x0 >= 0 && x1 < 40)
+}

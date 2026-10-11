@@ -591,18 +591,26 @@ pub fn Widget::set_padding(self : Widget, left : Double, top : Double) -> Unit {
 /// 绘制遍历：逐层平移到控件原点并裁剪到控件矩形，先画自己再画子控件
 /// （后画的覆盖在前，与命中优先级同一口径）。整窗共用一个绘制器会话。
 pub fn Widget::paint(self : Widget, p : @render.Painter) -> Unit {
+  self.paint_at(p, 0.0, 0.0)
+}
+
+///|
+/// 带「已平移原点」的绘制：`ox/oy` 是**父控件**的绝对原点，本控件只平移
+/// 自己那一段差值。直接按绝对矩形逐层 translate 会把祖先的偏移重复累加
+/// （嵌套一层就偏一层，第二行的文字会掉到窗口外）。
+pub fn Widget::paint_at(self : Widget, p : @render.Painter, ox : Double, oy : Double) -> Unit {
   if !self.visible {
     return ()
   }
   p.save()
-  p.translate(self.rect.x, self.rect.y)
+  p.translate(self.rect.x - ox, self.rect.y - oy)
   p.clip_rect(0.0, 0.0, self.rect.w, self.rect.h)
   match self.on_draw {
     Some(f) => f(self, p, self.rect)
     None => ()
   }
   for k in self.kids {
-    k.paint(p)
+    k.paint_at(p, self.rect.x, self.rect.y)
   }
   p.restore()
 }

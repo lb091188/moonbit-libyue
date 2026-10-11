@@ -77,4 +77,10 @@ int fsw_write_file(const char *path, int plen, unsigned char *data, int dlen) {
   (void)path; (void)plen; (void)data; (void)dlen; return 0;
 }
 
+
+void *cr_session_context(int64_t id) {
+  (void)id;
+  return 0;
+}
+
 #endif

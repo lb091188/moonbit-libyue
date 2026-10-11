@@ -271,6 +271,13 @@ pub fn[T] Signal::subscribe(self : Signal[T], f : (T) -> Unit) -> Int {
 }
 
 ///|
+/// 当前订阅条数。组件层的「不随重挂堆积死订阅」这类回归要有可观测的量,
+/// 否则只能靠人肉数回调次数。
+pub fn[T] Signal::sub_count(self : Signal[T]) -> Int {
+  self.node.subs.length()
+}
+
+///|
 /// 退订:摘除 subscribe 返回的 id 对应的回调(幂等,其余订阅不受
 /// 影响;已随视图销毁的订阅应及时退订,否则主题/Signal 变更时仍
 /// 会对死视图空跑)。

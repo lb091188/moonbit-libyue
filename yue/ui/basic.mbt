@@ -154,7 +154,9 @@ pub fn label_dyn(
       self : @core.Widget,
       p : @render.Painter,
       _r : @core.Rect,
-    ) -> Unit { draw_text_in(self, p, src) })
+    ) -> Unit {
+      let _ = draw_text_in(self, p, src)
+    })
     let sid = sig.subscribe(fn(v : String) -> Unit { relabel(w, src, v) })
     @core.sub_bag_register(fn() { sig.remove(sid) })
     handle(w)
@@ -265,13 +267,16 @@ pub fn button(
   size? : Double = 13.0,
   min_width? : Double = 0.0,
   disabled? : Bool = false,
+  enabled? : Enabled? = None,
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let src = text_source(text, size=size, align=@text.Center)
-  let off = disabled
   let shape = kind_id(kind)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
+    // 禁用态是单元：布尔若在建树时固化，边界态一改就失效（见 state.mbt）
+    let off = enabled_cell(enabled, disabled)
+    let is_off = fn() -> Bool { off.off }
     w.node.set_height(@yoga.fixed(@theme.control_height))
     if min_width > 0.0 {
       w.node.set_min_width(@yoga.fixed(min_width))
@@ -286,7 +291,7 @@ pub fn button(
     ) -> Unit {
       let lit = self.hovered || self.pressed
       let skin : (String, String, String) =
-        if off {
+        if is_off() {
           (@theme.theme_text_secondary(), @theme.theme_fill_hover(), @theme.theme_border())
         } else if shape == 1 {
           (@theme.theme_primary(), @theme.theme_bg_panel(), @theme.theme_border())
@@ -310,17 +315,16 @@ pub fn button(
         p.set_line_width(1.0)
         p.stroke_rect(0.0, 0.0, r.w, r.h)
       }
-      p.flush()
-      // 左右内边距 12；盒内垂直居中交给 draw_in_box
-      let _ = @text.draw_in_box(
-        p.bitmap,
+      // 左右内边距 12；盒内垂直居中交给 draw_box_at（画在会话上，平移裁剪生效）
+      let _ = @text.draw_box_at(
+        p,
         12.0,
         0.0,
         (r.w - 24.0).max(1.0),
         r.h,
         src.text,
         src.font,
-        if off { @theme.theme_text_secondary() } else { skin.0 },
+        if is_off() { @theme.theme_text_secondary() } else { skin.0 },
         align=@text.Center,
         valign=@text.Center,
         wrap=false,
@@ -331,14 +335,14 @@ pub fn button(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => !off
+        @core.Down => !is_off()
         @core.Up => {
           let inside_x = ev.x >= 0.0 && ev.x <= self.rect.w
           let inside_y = ev.y >= 0.0 && ev.y <= self.rect.h
-          if !off && inside_x && inside_y { on_click() }
+          if !is_off() && inside_x && inside_y { on_click() }
           false
         }
-        @core.Move => !off
+        @core.Move => !is_off()
         @core.Leave => false
       }
     })
