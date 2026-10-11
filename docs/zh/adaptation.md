@@ -646,6 +646,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **四条工具链写法（本批实测）**：① `pub const` 的名字**必须大写**（`pub const pi` 直接报「Expected upper case identifier for name of const, found lower case. Did you mean let?」），小写常量用 `pub let`；② `for i = 1..<n { }` 不支持——range 只在 `for x in a..<b` 里合法，经典 for 要写 `for i = 1; i < n; i = i + 1`；③ `StringBuilder` 的写入方法是 `write_string`/`write_char`，没有 `add`/`append`；④ `Ordering` 类型在本工具链不可直接引用（写比较器函数会报「The type Ordering is undefined」），几个元素排序退回插入排序。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/chart` **11/11**（6 条纯函数：窗口丢最旧与越界无操作、值域退化与留白比例、1-2-5 步长与负区间起点、单位换挡 k/M/G、柱槽与两形态命中、扇区只累计正值且单扇区留 0.0002 弧度、仪表分段取色与折线段数、回归退化、8 位色串、标签截断；5 条组件：折线换数据与密集抽推出图、柱状悬停换底与离开复原、环形出图 + 命中四态、仪表盘 smooth 两路（直接跳到位 / 逐拍逼近）、散点带趋势线）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 加「图表」区块：折线+柱状一行、环形+仪表+散点+推点按钮一行，几何行补 `NATIVE-APP-CH`，状态行补 `ln=`/`chp=`）：注入「点三次推点按钮」得 `ln=27/23 chp=3`（窗口 24→27 点、末值 7→23，与手算 `pushes*7%29+2` 逐位一致）、退出码 0；截图复核五图齐备——折线带面积填充与右端最新值标注、柱状正负异色带类目、环形中心汇总 + 右侧图例带百分比、仪表 68% 弧与中心数字、散点带最小二乘趋势线。
 
+### MoonBit 原生 GUI 栈 · sys 批 1（`yue/sys`：fsx / envx / procrun）
+
+- **sys 桩直接走 native-stub**：目录枚举（dirent）/环境变量（setenv/unsetenv）/文本读写（fopen）/删文件只用标准头，**不需要** win/render/text 桩那套「prebuild 编静态库 + portable 占位」——那些是因为要 GTK 头（native-stub 拿不到 pkg-config 路径）。单文件 `sys_stub.c` 顶部 `#if` 分平台（Windows 分支占位，FindFirstFileW 宽字符路由待 M2），`moonbit_make_bytes` 以 `extern` 声明直接链运行时符号（ime_probe_stub 同款）。
+- **`sys_getenv` 走 C 层 getenv 而非 core/env**：进程内 setenv 后要「立即可读」（master 的测试口径），core/env 的环境表在部分实现是启动快照——需要实时语义的读走桩，纯读取场景仍可用 core/env。桩上顺带落了 `sys_read/write_text_file`、`sys_remove_file`（幂等）、`sys_platform()`（编译期 `#if` 判定，master 的 `@yue.platform()` 等价）。
+- **procrun 只换依赖面**：`@yue.read_text_file/ffi_remove_file/platform` → 本包 `sys_*` 三件；`@subproc`（chensuiyi/subproc）本就在主模块依赖，`pr_run` 的 spawn → 限时回收 → 临时文件捕获 → C locale 全套原样。
+- **平移坑**：旧 wbtest 的 `utf8_bytes/from_utf8_bytes`（根包 helper）→ `@utf8.encode/decode_lossy`；`ffi_getenv_bytes` 的出参 `ok` Ref 断言模式换成返回 `Option` 的 `sys_getenv` 后，旁边残行的 `inspect(ok.val)` 要一并清（改签名不清断言是编译期炸）。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/sys` **29/29**（fsx：真实目录枚举含临时文件/`..` 排除/打不开分支、扁平文本解码、进程内写读改删回环含 overwrite=false 保持/幂等删/`a=b` 拒绝；envx：单点读与 core/env 对照、common 集合存在才收/XDG_* 全扫、错误分支；procrun：`pr_available`/`pr_run` 真子进程回环——`echo`/非零退出 stderr 捕获/超时强杀、`/bin/sh` 脚本路）。`moon check yue/sys --deny-warn` 零警告、全仓红点仍 287/68。
+
 ### MoonBit 原生 GUI 栈 · Markdown 视图（新包 `yue/mdview`，组件库收口）
 
 - **新包不复用旧目录**：master 的 `yue/markdown` 依赖 `@yue` 根包（红点区），新栈按「一文件夹一包」惯例落 `yue/mdview`（`mizchi/markdown@0.8.3` 已在主模块依赖里，新包 import 即用）。纯函数层（展平/区间计量/脚注扫描/切行）与 master 零差异平移；渲染层换组件面（`@ui.hbox/vbox/label/separator/checkbox/code_view`、`@render.Image`、`@text.AttributedText`）。

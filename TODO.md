@@ -88,7 +88,8 @@
 ### 系统集成（master 参考面：`yue/system` 31 源文件 + `yue/traybus` 16 源文件，属可平移资产）
 - [~] A 类平移 · 环境/文件原语
   - [x] `vscjson` → 新包 `yue/sys/json.mbt`（零依赖 JSON，公共名不变、只换包前缀），并按「每包自建 wbtest」补 7 条覆盖
-  - [ ] `envx`/`fsx`（目录枚举与环境变量写删要 C 层）与 `dialog`/`procrun`/`singleinstance` 随各自的 sys stub 批次进来
+  - [x] `envx`/`fsx`/`procrun` 落 `yue/sys`（桩 `sys_stub.c` 纯标准头直走 native-stub——区别于要 GTK 头的 win/render/text 桩走 prebuild 静态库：目录枚举 dirent、环境变量写删 setenv/unsetenv、文本读写 fopen、删文件幂等、平台标识 `sys_platform`；`sys_getenv` 走 C 层 getenv 保证 setenv 后立即可读——core/env 的表在部分实现是启动快照）；`pr_run` 复用 @subproc（限时回收 + 临时文件捕获 + C locale）
+  - [ ] `dialog`（gtk file chooser 桩）与 `singleinstance`（Linux 路依赖 traybus 总线声称，随 DBus 线）
 - [ ] A 类平移 · 硬件族：`brightness`（含键盘背光）/`volume`（含 volx 音量增强）/`nightlight`/`sensor`/`bluetooth`/`printer`/`disk`/`powerprofile`
 - [ ] A 类平移 · 桌面集成族：`wallpaper`/`defaultapps`/`appfind`/`open_url`+`reveal`（文件管理器定位）/`recent_files`
 - [ ] A 类平移 · 历史族：`browser_history`（含下载）/`browser_bookmarks`/`firefox_history`/`vscode_history`
