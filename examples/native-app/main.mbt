@@ -383,7 +383,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1240, 840, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1620, 840, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -526,6 +526,11 @@ fn main {
   let crumb_sel = @core.Store::new("首页")
   let page_cur = @core.Store::new(1)
   let step_cur = @core.Store::new(1)
+  let menu_sel = @core.Store::new("首页")
+  let tab_sel = @core.Store::new(0)
+  let nav2_menu : Ref[@core.Widget?] = Ref(None)
+  let nav2_tree : Ref[@core.Widget?] = Ref(None)
+  let nav2_tabs : Ref[@core.Widget?] = Ref(None)
   app.mount([
     @ui.container(
       [
@@ -641,6 +646,45 @@ fn main {
           bg=@theme.theme_bg_page(),
           border=@theme.theme_border(),
         ),
+        @ui.container(
+          [
+            @ui.label("导航族次批", size=13.0),
+            @ui.side_menu(
+              ["首页", "报表", "设置"],
+              menu_sel,
+              icons=[("报表", @icons.IconKind::Box)],
+              width=190.0,
+              handle=fn(w : @core.Widget) -> Unit { nav2_menu.val = Some(w) },
+            ),
+            @ui.tree(
+              [
+                {
+                  label: "构建产物",
+                  children: [
+                    { label: "libyue 静态库", children: [] },
+                    { label: "桩与 prebuild", children: [] },
+                  ],
+                },
+                { label: "只读叶子", children: [] },
+              ],
+              handle=fn(w : @core.Widget) -> Unit { nav2_tree.val = Some(w) },
+            ),
+            @ui.tabs_t(
+              [
+                ("页一", @ui.label("页一内容：随页签切换显隐", size=12.0)),
+                ("页二", @ui.label("页二内容", size=12.0)),
+              ],
+              selected=tab_sel,
+              handle=fn(w : @core.Widget) -> Unit { nav2_tabs.val = Some(w) },
+            ),
+          ],
+          width=210.0,
+          row_gap=6.0,
+          padding=6.0,
+          align_items=@yoga.AlignItems::FlexStart,
+          bg=@theme.theme_bg_panel(),
+          border=@theme.theme_border(),
+        ),
       ],
       direction=@yoga.Row,
       column_gap=8.0,
@@ -704,6 +748,10 @@ fn main {
     Some(i) => i.to_string()
     None => "-"
   }
+  let tree_str = match nav2_tree.val {
+    Some(w) => (if w.children()[1].visible { "1" } else { "0" })
+    None => "-"
+  }
   let fold_str = match nav_fold.val {
     Some(w) => {
       let blocks = w.children()
@@ -719,7 +767,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str}"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -757,6 +805,37 @@ fn main {
     Some(w) => println("NATIVE-APP-AUTO " + rect_str(w.rect))
     None => ()
   }
+  // 导航族次批注入点：菜单第二项 / 树父行 / 页签第二页
+  let menu2 = match nav2_menu.val {
+    Some(w) => Some(w.children()[1])
+    None => None
+  }
+
+  let tree0 = match nav2_tree.val {
+    Some(w) => Some(w.children()[0])
+    None => None
+  }
+
+  let tab2 = match nav2_tabs.val {
+    Some(w) => Some(w.children()[0].children()[1])
+    None => None
+  }
+  let n2_menu2 = match menu2 {
+    Some(w) => rect_str(w.rect)
+    None => "-"
+  }
+
+  let n2_tree0 = match tree0 {
+    Some(w) => rect_str(w.rect)
+    None => "-"
+  }
+
+  let n2_tab2 = match tab2 {
+    Some(w) => rect_str(w.rect)
+    None => "-"
+  }
+
+  println("NATIVE-APP-NAV2 menu2=" + n2_menu2 + " tree0=" + n2_tree0 + " tab2=" + n2_tab2)
   // 导航族四个注入点：分段第二段 / 面包屑第二段 / 第 3 页 / 第二块标题行
   let mut nav_line = "NATIVE-APP-NAV"
   let seg2 = match nav_seg.val {

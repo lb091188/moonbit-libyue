@@ -501,3 +501,435 @@ fn collapse_panel(
     w
   })
 }
+
+// ---- 导航族次批：侧边菜单 / 分组侧边菜单 / 树 / 页签 ----
+
+///|
+/// 圆角矩形填充（菜单与页签的 4px 圆角档）。Painter 门面没有原生圆角，
+/// 按「四段直线 + 四个 90° 弧」拼路径；弧角递增（逆时针参数在两层后端都不可用）。
+fn fill_round_rect(
+  p : @render.Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+  r : Double,
+) -> Unit {
+  let q = 1.5707963267948966
+  p.begin_path()
+  p.move_to(x + r, y)
+  p.line_to(x + w - r, y)
+  p.arc(x + w - r, y + r, r, 3.0 * q, 4.0 * q)
+  p.line_to(x + w, y + h - r)
+  p.arc(x + w - r, y + h - r, r, 0.0, q)
+  p.line_to(x + r, y + h)
+  p.arc(x + r, y + h - r, r, q, 2.0 * q)
+  p.line_to(x, y + r)
+  p.arc(x + r, y + r, r, 2.0 * q, 3.0 * q)
+  p.close_path()
+  p.fill()
+}
+
+///|
+/// 侧边菜单一项：40 高、文字左对齐、可选图标、选中态带左缘 3px 强调条。
+fn menu_item(
+  text : String,
+  width : Double,
+  selected : @core.Store[String],
+  icon : @icons.IconKind?,
+) -> @core.Node {
+  let font = @text.Font::new("", 13.0)
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    w.node.set_width(@yoga.fixed(width))
+    w.node.set_height(@yoga.fixed(40.0))
+    w.on_draw = Some(fn(
+      self : @core.Widget,
+      p : @render.Painter,
+      r : @core.Rect,
+    ) -> Unit {
+      let act = selected.get() == text
+      let fg = if act {
+        @theme.theme_primary()
+      } else {
+        @theme.theme_text_primary()
+      }
+      if act {
+        p.set_fill_color(@theme.theme_primary_light())
+        fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
+      } else if self.hovered {
+        p.set_fill_color(@theme.theme_fill_hover())
+        fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
+      }
+      if act {
+        p.set_fill_color(fg)
+        p.fill_rect(0.0, 8.0, 3.0, r.h - 16.0)
+      }
+      let mut tx = 20.0
+      match icon {
+        Some(k) => {
+          @icons.draw_icon(p, k, 22.0, r.h / 2.0, 6.72, fg)
+          tx = 44.0
+        }
+        None => ()
+      }
+      let _ = @text.draw_box_at(
+        p,
+        tx,
+        0.0,
+        (r.w - tx).max(1.0),
+        r.h,
+        text,
+        font,
+        fg,
+        align=@text.Start,
+        valign=@text.Center,
+      )
+    })
+    w.on_pointer = Some(fn(
+      self : @core.Widget,
+      ev : @core.PointerEvent,
+    ) -> Bool {
+      match ev.kind {
+        @core.Down => true
+        @core.Up => {
+          let inside = ev.x >= 0.0 && ev.x <= self.rect.w && ev.y >= 0.0 && ev.y <= self.rect.h
+          if inside {
+            selected.set(text)
+            @core.invalidate()
+          }
+          false
+        }
+        _ => false
+      }
+    })
+    w
+  })
+}
+
+fn icon_for(icons : Array[(String, @icons.IconKind)], name : String) -> @icons.IconKind? {
+  for kv in icons {
+    if kv.0 == name {
+      return Some(kv.1)
+    }
+  }
+  None
+}
+
+///|
+/// 侧边导航菜单（EP Menu）：悬停浅灰、选中主题浅底 + 主题色文字 + 左缘强调条。
+/// `selected` 是共享状态，主区可以订阅同一个 Store 做页面联动。
+pub fn side_menu(
+  items : Array[String],
+  selected : @core.Store[String],
+  icons? : Array[(String, @icons.IconKind)] = [],
+  width? : Double = 180.0,
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  follow_store(selected)
+  let nodes : Array[@core.Node] = []
+  for it in items {
+    nodes.push(menu_item(it, width - 12.0, selected, icon_for(icons, it)))
+  }
+  container(
+    nodes,
+    width=width,
+    row_gap=2.0,
+    padding=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    handle=handle,
+  )
+}
+
+///|
+/// 分组侧边菜单：组标题行（次要色小字 + 折叠箭头）+ 组内菜单项。
+/// `foldable=true` 时点标题收起/展开组内项（默认全展开）。
+pub fn side_menu_sections(
+  sections : Array[(String, Array[String])],
+  selected : @core.Store[String],
+  icons? : Array[(String, @icons.IconKind)] = [],
+  foldable? : Bool = true,
+  width? : Double = 180.0,
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  follow_store(selected)
+  let blocks : Array[@core.Node] = []
+  for sec in sections {
+    let title = sec.0
+    let items = sec.1
+    let nodes : Array[@core.Node] = []
+    for it in items {
+      nodes.push(menu_item(it, width - 12.0, selected, icon_for(icons, it)))
+    }
+    let open = Ref(true)
+    let head_font = @text.Font::new("", 12.0)
+    // 组内项直接建控件（不是 Node）：标题行的收起回调要拿得到它
+    let body = @core.Widget::new()
+    body.node.set_flex_direction(@yoga.Column)
+    body.node.set_gap(2.0, 0.0)
+    body.node.set_align_items(@yoga.AlignItems::FlexStart)
+    @core.mount_children(body, nodes)
+    let head = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+      watch_theme()
+      w.node.set_width(@yoga.fixed(width - 12.0))
+      w.node.set_height(@yoga.fixed(24.0))
+      w.on_draw = Some(fn(
+        _self : @core.Widget,
+        p : @render.Painter,
+        r : @core.Rect,
+      ) -> Unit {
+        let _ = @text.draw_box_at(
+          p,
+          4.0,
+          0.0,
+          r.w,
+          r.h,
+          title,
+          head_font,
+          @theme.theme_text_secondary(),
+          align=@text.Start,
+          valign=@text.Center,
+        )
+
+        if foldable {
+          fold_arrow(p, r.w - 10.0, r.h / 2.0, 3.5, open.val, @theme.theme_text_secondary())
+        }
+      })
+      w.on_pointer = Some(fn(
+        _self : @core.Widget,
+        ev : @core.PointerEvent,
+      ) -> Bool {
+        match ev.kind {
+          @core.Down => foldable
+          @core.Up => {
+            if foldable {
+              open.val = !open.val
+              body.set_visible(open.val)
+              @core.invalidate()
+            }
+            false
+          }
+          _ => false
+        }
+      })
+      w
+    })
+    blocks.push(head)
+    blocks.push(@core.node_of(body))
+  }
+  container(blocks, row_gap=2.0, padding=6.0, width=width, handle=handle)
+}
+
+///|
+/// 树节点（自引用：子节点表可为空）。
+pub(all) struct TreeNode {
+  label : String
+  children : Array[TreeNode]
+}
+
+///|
+/// 树形控件（EP Tree）：缩进层级 + 点击展开/收起（有子节点才画箭头）。
+fn build_tree_rows(
+  into : @core.Widget,
+  nodes : Array[TreeNode],
+  level : Int,
+) -> Unit {
+  let font = @text.Font::new("", 13.0)
+  for nd in nodes {
+    let has_kids = nd.children.length() > 0
+    let open = Ref(false)
+    let row = @core.Widget::new()
+    row.node.set_flex_direction(@yoga.Row)
+    row.node.set_width(@yoga.fixed(260.0))
+    row.node.set_height(@yoga.fixed(32.0))
+    row.set_margin(0.0, 0.0, level.to_double() * 18.0, 0.0)
+    row.on_draw = Some(fn(
+      self : @core.Widget,
+      p : @render.Painter,
+      r : @core.Rect,
+    ) -> Unit {
+      if self.hovered && has_kids {
+        p.set_fill_color(@theme.theme_fill_hover())
+        p.fill_rect(0.0, 0.0, r.w, r.h)
+      }
+      if has_kids {
+        // 实心小三角：展开朝下、收起朝右
+        p.set_fill_color(@theme.theme_text_secondary())
+        p.begin_path()
+        if open.val {
+          p.move_to(2.0, 12.0)
+          p.line_to(10.0, 12.0)
+          p.line_to(6.0, 18.0)
+        } else {
+          p.move_to(4.0, 11.0)
+          p.line_to(10.0, 16.0)
+          p.line_to(4.0, 21.0)
+        }
+        p.close_path()
+        p.fill()
+      }
+      let _ = @text.draw_box_at(
+        p,
+        14.0,
+        0.0,
+        (r.w - 14.0).max(1.0),
+        r.h,
+        nd.label,
+        font,
+        @theme.theme_text_primary(),
+        align=@text.Start,
+        valign=@text.Center,
+      )
+    })
+    let kids = @core.Widget::new()
+    kids.node.set_flex_direction(@yoga.Column)
+    kids.set_visible(false)
+    if has_kids {
+      build_tree_rows(kids, nd.children, level + 1)
+    }
+    row.on_pointer = Some(fn(
+      _self : @core.Widget,
+      ev : @core.PointerEvent,
+    ) -> Bool {
+      match ev.kind {
+        @core.Down => has_kids
+        @core.Up => {
+          if has_kids {
+            open.val = !open.val
+            kids.set_visible(open.val)
+            @core.invalidate()
+          }
+          false
+        }
+        _ => false
+      }
+    })
+    into.append_child(row)
+    into.append_child(kids)
+  }
+}
+
+///|
+/// 树形控件：`root` 是顶层节点表，逐层缩进，点有子节点的行展开/收起。
+pub fn tree(
+  root : Array[TreeNode],
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    w.node.set_flex_direction(@yoga.Column)
+    w.node.set_width(@yoga.percent(100.0))
+    build_tree_rows(w, root, 0)
+    handle(w)
+    w
+  })
+}
+
+///|
+/// 页签（EP Tabs，顶部形态）：页签头行（选中主题色文字 + 底部 2px 指示条，
+/// 悬停变深）+ 内容区预建、靠显隐切换。`selected` 是页序号 Store（0 起始），
+/// 不传则内部建一个。
+pub fn tabs_t(
+  pages : Array[(String, @core.Node)],
+  selected? : @core.Store[Int],
+  handle? : (@core.Widget) -> Unit = default_handle,
+) -> @core.Node {
+  let n = pages.length()
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    let sel = match selected {
+      Some(s) => s
+      None => @core.Store::new(0)
+    }
+    follow_store(sel)
+    w.node.set_flex_direction(@yoga.Column)
+    w.node.set_width(@yoga.percent(100.0))
+    let font = @text.Font::new("", 13.0)
+    let head = @core.Widget::new()
+    head.node.set_flex_direction(@yoga.Row)
+    head.node.set_height(@yoga.fixed(36.0))
+    head.node.set_width(@yoga.percent(100.0))
+    let panels : Array[@core.Widget] = []
+    w.append_child(head)
+    fn show(i : Int) -> Unit {
+      // 先显示新页再隐藏旧页：反序会让「新页未显示、旧页已隐藏」的
+      // 中间态把外层容器按 0 内容算高
+      if i >= 0 && i < n {
+        panels[i].set_visible(true)
+      }
+      for j = 0; j < n; j = j + 1 {
+        if j != i {
+          panels[j].set_visible(false)
+        }
+      }
+      @core.invalidate()
+    }
+
+    for i = 0; i < n; i = i + 1 {
+      let idx = i
+      let title = pages[i].0
+      let tw = text_width(title, font)
+      let tab = @core.Widget::new()
+      tab.node.set_width(@yoga.fixed(tw + 28.0))
+      tab.node.set_height(@yoga.fixed(36.0))
+      tab.set_margin(0.0, 0.0, 0.0, 8.0)
+      tab.on_draw = Some(fn(
+        self : @core.Widget,
+        p : @render.Painter,
+        r : @core.Rect,
+      ) -> Unit {
+        let act = sel.get() == idx
+        let color = if act {
+          @theme.theme_primary()
+        } else if self.hovered {
+          @theme.theme_text_regular()
+        } else {
+          @theme.theme_text_secondary()
+        }
+        let _ = @text.draw_box_at(
+          p,
+          14.0,
+          0.0,
+          (r.w - 14.0).max(1.0),
+          r.h,
+          title,
+          font,
+          color,
+          align=@text.Start,
+          valign=@text.Center,
+        )
+
+        if act {
+          p.set_fill_color(@theme.theme_primary())
+          p.fill_rect(0.0, r.h - 2.0, r.w, 2.0)
+        }
+      })
+      tab.on_pointer = Some(fn(
+        _self : @core.Widget,
+        ev : @core.PointerEvent,
+      ) -> Bool {
+        match ev.kind {
+          @core.Down => true
+          @core.Up => {
+            sel.set(idx)
+            false
+          }
+          _ => false
+        }
+      })
+      head.append_child(tab)
+      let page = @core.Widget::new()
+      page.node.set_flex_direction(@yoga.Column)
+      page.node.set_width(@yoga.percent(100.0))
+      page.set_padding(6.0, 6.0)
+      let _ = (pages[i].1.mount)(page)
+      page.set_visible(sel.get() == idx)
+      w.append_child(page)
+      panels.push(page)
+    }
+    let sid = sel.signal().subscribe(fn(i : Int) -> Unit { show(i) })
+    @core.sub_bag_register(fn() { sel.signal().remove(sid) })
+    handle(w)
+    w
+  })
+}

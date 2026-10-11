@@ -132,3 +132,115 @@ test "折叠面板：默认只开第一块，各块独立开合、收起即不�
   root.relayout(400.0, 240.0)
   assert_true(cl.rect.h < h_two)
 }
+
+///|
+test "侧边菜单：项宽跟随容器、点项写 Store、选中项底色与未选不同" {
+  let sel = @core.Store::new("首页")
+  let (root, menu) = mounted(
+    side_menu(["首页", "报表", "设置"], sel, icons=[("报表", @icons.IconKind::Box)]),
+    300.0,
+    200.0,
+  )
+  let kids = menu.children()
+  assert_eq(kids.length(), 3)
+  assert_eq(kids[0].rect.w, 168.0)
+  assert_eq(kids[0].rect.h, 40.0)
+  let bm = @render.Bitmap::new(300, 200)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  let bg = px(bm, (menu.rect.x + 2.0).round().to_int(), (menu.rect.y + 2.0).round().to_int())
+  // 两列同宽同 x，取样必须各按自己行的 y（按第一行的 y 取会落进选中行里）
+  let y0 = (kids[0].rect.y + 4.0).round().to_int()
+  let y1 = (kids[1].rect.y + 4.0).round().to_int()
+  assert_true(px(bm, (kids[0].rect.x + 4.0).round().to_int(), y0) != bg)
+  assert_eq(px(bm, (kids[1].rect.x + 4.0).round().to_int(), y1), bg)
+  click_at(root, kids[1], 30.0, 20.0)
+  assert_eq(sel.get(), "报表")
+}
+
+///|
+test "分组侧边菜单：标题行收起/展开只影响本组" {
+  let sel = @core.Store::new("甲一")
+  let (root, menu) = mounted(
+    side_menu_sections([
+      ("组一", ["甲一", "甲二"]),
+      ("组二", ["乙一", "乙二"]),
+    ], sel),
+    300.0,
+    300.0,
+  )
+  // 每组「标题 + 组内项表」两块
+  let kids = menu.children()
+  assert_eq(kids.length(), 4)
+  assert_eq([kids[1].visible, kids[3].visible], [true, true])
+  click_at(root, kids[0], 30.0, 10.0)
+  root.relayout(300.0, 300.0)
+  assert_eq([kids[1].visible, kids[3].visible], [false, true])
+  // 收起组二（组一收起后整列上移，标题坐标必须从刷新后的 rect 取）
+  click_at(root, kids[2], 30.0, 10.0)
+  root.relayout(300.0, 300.0)
+  assert_eq([kids[1].visible, kids[3].visible], [false, false])
+  // 再点一次组二标题展开，组内项即可选
+  click_at(root, kids[2], 30.0, 10.0)
+  root.relayout(300.0, 300.0)
+  assert_eq(kids[3].visible, true)
+  click_at(root, kids[3].children()[1], 30.0, 20.0)
+  assert_eq(sel.get(), "乙二")
+}
+
+///|
+test "树：子层预建即收起，点父行展开、点叶子行不动作" {
+  let root_nodes : Array[TreeNode] = [
+    {
+      label: "根一",
+      children: [
+        { label: "子一", children: [] },
+        { label: "子二", children: [] },
+      ],
+    },
+    { label: "叶子", children: [] },
+  ]
+  let (root, tr) = mounted(tree(root_nodes), 320.0, 240.0)
+  // 每个节点贡献「行 + 子层容器」两块
+  let kids = tr.children()
+  assert_eq(kids.length(), 4)
+  assert_eq([kids[1].visible, kids[3].visible], [false, false])
+  assert_eq(kids[1].children().length(), 4)
+  // 点「根一」行：子层展开
+  click_at(root, kids[0], 40.0, 16.0)
+  assert_eq(kids[1].visible, true)
+  // 点叶子行：它没有子层，容器仍收起
+  click_at(root, kids[2], 40.0, 16.0)
+  assert_eq(kids[3].visible, false)
+  assert_eq(kids[1].visible, true)
+  // 再点一次父行：收起
+  click_at(root, kids[0], 40.0, 16.0)
+  assert_eq(kids[1].visible, false)
+}
+
+///|
+test "页签：预建三页只显当前页，点页签与外部改 Store 都换页" {
+  let sel = @core.Store::new(0)
+  let (root, tabs) = mounted(
+    tabs_t(
+      [("概览", label("概览页")), ("明细", label("明细页")), ("设置", label("设置页"))],
+      selected=sel,
+    ),
+    320.0,
+    200.0,
+  )
+  let kids = tabs.children()
+  assert_eq(kids.length(), 4)
+  let head = kids[0]
+  assert_eq(head.children().length(), 3)
+  assert_eq([kids[1].visible, kids[2].visible, kids[3].visible], [true, false, false])
+  click_at(root, head.children()[1], 10.0, 18.0)
+  assert_eq(sel.get(), 1)
+  assert_eq([kids[1].visible, kids[2].visible], [false, true])
+  // 外部改 Store 也换页（订阅走 show，不只是重绘）
+  sel.set(2)
+  assert_eq([kids[1].visible, kids[2].visible, kids[3].visible], [false, false, true])
+  // 页签头行在最上，页区紧随其后
+  assert_true(head.rect.y < kids[1].rect.y)
+}
