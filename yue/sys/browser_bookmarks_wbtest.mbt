@@ -281,14 +281,19 @@ test "bm_bookmarks_path：子目录拼装" {
 
 ///|
 test "bm_supported：与平台一致的探测口径" {
-  assert_eq(bm_supported(), sys_platform() == "linux")
+  // 三平台的 Bookmarks 同为 JSON、只差数据根，探测口径与历史侧同源
+  assert_eq(
+    bm_supported(),
+    sys_platform() == "linux" || sys_platform() == "windows" ||
+      sys_platform() == "macos",
+  )
 }
 
 ///|
 /// 端到端探测与解析：仅在本机存在 Chrome 书签文件时执行。
 test "bm_bookmarks：本机 Chrome 书签端到端（存在才跑）" {
-  // 本分支的书签侧目前只实现 Linux 的配置根探测（XDG/HOME）；Windows 的
-  // %LOCALAPPDATA% 与 macOS 的 Library/Application Support 数据根随平台批补
+  // 数据根按平台分流：Linux=XDG_CONFIG_HOME/HOME、Windows=%LOCALAPPDATA%、
+  // macOS=Library/Application Support（与历史侧同源）；三平台之外才跳过
   if !bm_supported() {
     println("bm: skip (本机平台未实现路径探测)")
     return

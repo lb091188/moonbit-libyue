@@ -86,6 +86,13 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **回证方式(探针包 `experiment/multiwin_probe`)**:①建-拆 40 轮(> 桩的 `WM_MAX_WINDOWS=32` 上限)仍建得出,`opened=40 failed=0`;探针**只建不 show**,于是 40 次建拆不在桌面闪窗。②两轮「开附窗→泵 60ms→关掉它」,打印 `sub_wid/primary/active_is_sub/count` 与 `before/after/main_running`,证明多窗宿主在真有两个 HWND 时派发仍然成立:新窗即当前窗(`active_is_sub=true`)、`primary=false`、关附窗后主窗 `running=true` 且在窗数回落。③收尾 `MULTIWIN-DONE` 行 + 退出码 0。跑法 `moon run experiment/multiwin_probe`;无显示服务打印 `MULTIWIN SKIP`。真窗观感(两窗互相遮挡/拖动重绘、附窗里的 preedit)仍按 AGENTS 规则 6 留使用者复验;`examples/native-app` 在 Windows 的启动冒烟回证 `NATIVE-APP-MW wins=1 ... ` 与退出码 0(按钮点击需要注入,归 W7)。
 - **顺带补的口径**:`_WIN32` 分支调用 `snprintf` 却没引 `<stdio.h>`,MSVC 只给 `C4013 隐式声明;假定外部返回 int`——与「UCRT 无 `_getwcwd`」同形的静默坑,补头后本桩单编零警告。
 
+### MoonBit 原生 GUI 栈 · 历史族的三平台数据根（W14e，平移 master 现成分支）
+
+- **不新写,从 master 平移**:浏览器历史/书签/SQLite 侧的 Windows 数据根分支在 `origin/master` 是现成的(`bh_browser_defs_win`/`bh_mac_root`/`bh_root_win`),本分支当年平移时只带了 Linux 的那一份,于是 `bh_supported`/`bm_supported` 被写成「仅 Linux」。做法与 W14b 同:先查主分支有没有,有就搬。
+- **三平台只差数据根与目录名,逻辑共用**:Linux=`XDG_CONFIG_HOME` 否则 `$HOME/.config`;Windows=`%LOCALAPPDATA%`,且 Chromium 系的 profile 在其下 `<厂商>/<产品>/User Data` 再下一层(比 Linux 多 `User Data` 这一层,目录名大小写随安装器,如 `Google/Chrome/User Data`、`Microsoft/Edge/User Data`);macOS=`$HOME/Library/Application Support/<厂商>/<产品>`(没有 Windows 那层 User Data)。profile 候选名(`Default` 与 `Profile 1..24`)、目录枚举查 `History`/`Bookmarks` 条目、SQLite/JSON 解析三平台同一条路径,所以只有定义表 `bh_defs()` 与根定位按平台分流。
+- **回证方式(Windows 真机,本机装有 Chrome/Edge)**:`bh: profiles=2 items=5` 与 `bh: downloads=3` 是**真读到本机浏览器库**的读数(此前这条在 Windows 上被平台门恒跳过),`bm_bookmarks` 端到端解析同样从「skip」转真跑;`moon test -p yue/sys` 163/163、`moon check ./yue/sys --deny-warn` 与 `./examples/native-sys --deny-warn` 零警告。测试侧一条旧断言 `bm_supported() == (platform=="linux")` 随之改成三平台口径。
+- **口径提醒**:`fsx_list_dir`/`sys_read_text_file` 走的是本批刚补的宽字符路由,所以中文用户名目录(`C:\Users\张三\…`)下的浏览器库同样读得到——这条不是巧合,是 W14a 把 A 版 API 换成 W 版之后才成立的。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。
