@@ -6,7 +6,7 @@
 - **本分支不保留老 libyue 绑定**：`shim/`、`lib/` 预构建库、`scripts/prepare.py` 已删除；libyue 只作**老师**（行为参考、可平移资产来源、`patches/` 的真实 bug 语料）。
 - **旧链路的完成项与实测结论不在本文件重述**：代码在 `master`（`shim + libyue`，0.5.x 与 `bin-*`/`vendor-*` 发布照旧），踩坑与验收细节在 [docs/zh/adaptation.md](docs/zh/adaptation.md) 与 `git log`。**凡旧栈做过、新栈尚未重做的能力，本文件一律记为未完成。**
 - **门禁口径（本分支例外）**：全仓 `moon check` 允许为红（红点=工作队列，只减不增，当前基线 **287 errors / 68 warnings**（2026-10-11 实测），明细见方案 §5）；逐批验收改分包：`yoga-mbt` 基线不掉 + 新栈各包 `moon check` 零警告且各自测试全绿；组件与声明式层接线完成的那一批恢复全仓门禁。
-- **验证示例归口**：GUI 侧的同类测试集中累积进 **`examples/native-app`**（宿主/控件/主题/图表/Markdown 各一页，不为单个特性新开示例）；系统能力与子表面侧集中进 **`examples/native-sys`**（待建）；`examples/native-window` 冻结为 G2–G5 的历史冒烟基准，不再往里加新特性。
+- **验证示例归口**：GUI 侧的同类测试集中累积进 **`examples/native-app`**（宿主/控件/主题/图表/Markdown 各一页，不为单个特性新开示例）；系统能力侧集中进 **`examples/native-sys`**（已建）；webview 与媒体侧集中进 **`examples/native-web`**（批 B 起建，整页/分栏/桥接/播放器各一页）；`examples/native-window` 冻结为 G2–G5 的历史冒烟基准，不再往里加新特性。
 
 ## 1. 地基（新栈自身进度）
 
@@ -90,7 +90,7 @@
   - [x] `vscjson` → 新包 `yue/sys/json.mbt`（零依赖 JSON，公共名不变、只换包前缀），并按「每包自建 wbtest」补 7 条覆盖
   - [x] `envx`/`fsx`/`procrun` 落 `yue/sys`（桩 `sys_stub.c` 纯标准头直走 native-stub——区别于要 GTK 头的 win/render/text 桩走 prebuild 静态库：目录枚举 dirent、环境变量写删 setenv/unsetenv、文本读写 fopen、删文件幂等、平台标识 `sys_platform`；`sys_getenv` 走 C 层 getenv 保证 setenv 后立即可读——core/env 的表在部分实现是启动快照）；`pr_run` 复用 @subproc（限时回收 + 临时文件捕获 + C locale）
   - [x] `dialog` 落 `yue/sys/dialog.mbt`（GTK 端 `wm_file_*` 在 yue/win/gtk_stub.c：GtkFileChooserDialog 槽表、filters 解析、选项位、run 后才可取结果——未确认的 chooser 查 uri 会段错误桩侧拦下；sys 包不引 yue/win（parent 是纯句柄 id），链接由 prebuild 单独给 sys 下发 `-lyue_win_stub`）；模态 run 与真选文件留真机复验
-  - [ ] `singleinstance`（Linux 路依赖 traybus 总线声称，随 DBus 线）
+  - [x] `singleinstance` 落 `yue/dbus/instance.mbt`（总线名字声称 `RequestName(app_id, DO_NOT_QUEUE)` + 入站 `Wake`；二次启动唤起首实例后自行退出，示例回证）
 - [~] A 类平移 · 硬件族（六进 yue/sys；sensor/bluetooth 走 @traybus、disk 走 UDisks+@traybus，随 DBus 线）：
   - [x] `brightness`（读路径 sysfs 全套 + 写路径 logind 探针/SetBrightness 改注入槽 `brightness_set_logind_probe`/`brightness_set_action`，DBus 线接入后注入实做）/ `volume`（wpctl/pactl + volx 增强）/ `nightlight`（redshift + gamma 载体）/ `printer`（lpadmin/lp CUPS）/ `powerprofile`（powerprofilesctl）/ `monitor`（xrandr，从会话族提前——夜灯的显示器枚举依赖它）
   - [ ] `sensor`（iio-sensor-proxy）/ `bluetooth`（org.bluez）/ `disk`（UDisks2）随 DBus 线
@@ -104,25 +104,31 @@
 - [~] A 类平移 · 会话与状态：`power`/`session`/`powerctl`/`online`/`idle`/`keepawake`/`clipboard_watch`/`locale_sys`/`sysinfo`/`windowctl`（monitor 已随硬件族提前）
   - [x] `sysinfo`（/etc/os-release + /proc/meminfo + /proc/uptime + /sys/class/dmi/id 纯文本读；桩改成「以 ftell 作提示、按块 fread 到 EOF」，否则伪文件读到成功但空串）/ `windowctl`（`wmctrl -l -p` 列、`-i -a` 激活、`-c` 关闭；设置类动作只在调用方触发）/ `clipboard_watch`（`xclip -o` 只读轮询；排期能力作参数注入，sys 不引 GUI 核心层，GUI 层给 `@core.set_timeout`）
   - [ ] `locale_sys` 的 `timedatectl` 半（可脱总线）+ `idle`（X11 ScreenSaver 扩展，走 `yue/win` 桩新增入口）
-  - [ ] `power`（UPower）/`session`（logind 锁屏与休眠信号）/`online`（NetworkManager）/`keepawake`（logind inhibit）/`powerctl`（`gdbus_call_system` 挂起/休眠）/`locale_sys` 的 localed 半随 DBus 线（#21）
+  - [~] `power`/`session`/`online`/`keepawake`/`powerctl` 的**总线能力已在 `yue/dbus`**（`upower.mbt`/`logind.mbt`/`netmon.mbt`/`inhibit.mbt`，真总线回证）；`yue/sys` 侧与旧链同名的语义化包装（电量读数、挂起/休眠动作、在线判定、抑制睡眠）待随各能力线补
 - [x] 系统能力累积验证页 `examples/native-sys`：五个面板全是只读探测（系统与机器 / 桌面与硬件 / 应用与文件类型 / 窗口与剪贴板 / 最近与历史），三键里只有「重新探测」只读（注入回证点它），「打开链接」「打开目录」属设置类由使用者点；退出打 `NATIVE-SYS-GEO` 与 `NATIVE-SYS-STAT` 两行，字段与屏上读数一一对应（GUI 侧的累计页仍是 `examples/native-app`）
 - [~] DBus 系在新事件循环下**重写/重验**：SNI 托盘（`traybus/sni.mbt`）、通知（新栈须重写 `org.freedesktop.Notifications`，含 `Notification::set_progress` 进度文本）、logind（`SetBrightness`/inhibit）、UPower、NetworkManager（`netmon`/`online`）、屏保 `screensaver`、媒体键 MPRIS（`media` 含状态监视轮询）
   - [x] 通用基建落新包 `yue/dbus`（`wire.mbt` 833 行 + `dbus.mbt` 419 行逐行平移，`bus.mbt` 剥掉 SNI/单实例语义后平移）：**不挂 glib fd 监视**——宿主周期调 `dbus_pump()`（缺省非阻塞）、断线自愈走 `dbus_set_post_delayed` 注入的通道，两者不注入时同步调用自带 `pump_until` 泵仍可用；socket 桩 `dbus_stub.c` 只用标准头、错误码与旧 shim 逐位一致；入站调用对外给 `CallReq`（`reply` 签名由参数值推导），线协议值类型不外泄。真总线回证 23/23（会话握手唯一名、ListNames、错误应答、AddMatch、系统总线 96 个名字）
   - [x] 能力模块首批（`yue/dbus`）：UPower / logind / netmon / screensaver / inhibit / MPRIS 逐行平移（测试同批平移并把旧 wbtest 的 inspect 换成 assert），MPRIS 轮询改排期通道注入；通知为新做（`GetCapabilities` 能力探测 + `Notify`/`CloseNotification`，进度 = `replaces_id` 重发 + 标准 hint `value`）；示例加 D-Bus 面板与「发通知(带进度)」按钮 + 宿主泵（`dbus_set_post_delayed` + 每 200ms `dbus_pump`），真窗口回证 `pool=:1.434`、通知能力 7 条
   - [x] SNI 托盘 + DBusMenu 落 `yue/dbus`（sni/icon/instance/filemanager 平移，bus 的托盘挂钩同批接回）；协议侧真总线回证：点示例「托盘图标」后 watcher 的 `RegisteredStatusNotifierItems` 9→10、退出对称注销；面板观感（图标出现/右键菜单/点击计数）留用户真机复验
   - [x] 单实例（总线名字 + Wake，示例回证二次启动唤起首实例后退出）与 `brightness` 的 logind 注入实做（`yue/dbus/bridge.mbt` 把探针与动作注进 `yue/sys` 的槽，注入后 `brightness_supported` 由假变真）
-- [ ] DBus 通用基建：`bus`/`gdbus`/`wire`（41 内部 fn 编解码）/信号注册表/断线重连/注销与注册对称清理（CORE2 教训）
 - [ ] 新建项（master 全仓无资产，属新做）：任务栏进度、dock 徽标、勿扰
 - [ ] Wayland 后端：`idle`（X11 屏保扩展）/`windowctl`（wmctrl）/`clipboard_watch`（xclip）/`monitor`（xrandr）逐项定替代或降级
 - [ ] 平台分派随各能力同批（master 有 Win32 直连族与 mac ObjC++ 族可参照）；真机清单见 `docs/zh/plan-system-integration.md` B8
 
-### 浏览器与视频（原生子表面）
-- [ ] `mount_child_surface(handle, rect)` 的 C 端实现（形状已在方案 §4 冻结）
-- [ ] 浏览器自研薄绑定：Linux WebKitGTK（自定义 scheme 注册 + `GInputStream` 流式回灌 + 拒绝路径），Windows WebView2（两级异步 COM 创建、失败回退、就绪前排队、跨 HWND 焦点与滚轮转发），macOS WKWebView（自定义协议依赖私有 API，列为 mac 线风险）；协议载荷改**结构化返回**（CORE1 越界读教训）
-- [ ] 视频：`modules/ffmpeg-mbt` 与解码链路可沿用（不依赖 libyue），但 VideoPlayer 的 UI（悬浮控制条、全屏、进度与音量交互）需按新自绘组件重写，画面走子表面通道
-- [ ] 音频：`AudioPlayer` 在新栈下的设备与时钟复验；精确音画同步（音频光标回读）
+### webview 与媒体（角色区 pane 模型；已锁决策与批次验收见方案 §4）
 
-### 交付面
+窗口内容 = 1..N 个互不重叠的矩形区（pane），每区声明 owner（自绘 = Painter / webview = 原生子件），矩形由 yoga 布局给；Tauri-like、爬虫内容获取页、原生多窗口三种形态同源。**本轮只做 Linux 闭环**，Windows/macOS 后端归输入通道另线与平台批。
+
+- [ ] **批 A 多窗口宿主**：`yue/core/app.mbt` 的 `App::new` 从「只建一窗」改成「一宿主管 N 窗，每窗一棵控件树、共用一个 `Loop`」；纯自绘即可验（开一个「关于」窗），两窗各自收到注入点击、关单窗不影响宿主
+- [ ] **批 B pane 模型 + webview pane**：`mount_child_surface(kind : ChildKind, rect : (Double,Double,Double,Double)) -> ChildSurface`（`set_rect`/`unmount`/`handle`）的 C 端实现，语义是「容器里放一个原生子件」（Linux = `gtk_container_add` 进 GtkOverlay/GtkFixed，不需要 XEmbed 与像素合成）；WebKitGTK **只能动态链**，`scripts/prebuild.py` 增 `webkit2gtk-4.1` 探测项（本机实测 2.52.6 在位）；验整页与左右分栏两种摆法
+- [ ] **批 C JS 桥 + DOM 抓取 + 导航面**：`evaluate_javascript`/`add_user_script`/双向通道（原生→网页 evaluate、网页→原生 invoke）/UA 改写 + cookie 读写 + 按 profile 分数据目录（**profile 挂 pane 级参数**，键 `<bundle-id>.<profile>`）/`browser_profile_persistence() -> Persistent | EphemeralOnly` 探测（降级不静默）/自定义协议**按 context 注册**/前进后退刷新与标题 URL 回调/`window.open` 策略/下载回调/权限默认拒绝可转原生提示/web 进程崩溃回调；契约沿用旧链 `yue/browser/browser.mbt` 的 22+6 方法名，协议载荷改**结构化返回**（CORE1 越界读教训）；抓取只要 DOM，不做网络响应层；**可见性开关接口预留但不实现**
+- [ ] **批 D 媒体播放器**（可与 B/C 并行）：复用 `modules/ffmpeg-mbt`（零 libyue 依赖，已有 `decode_rgba`/`decode_pcm`/`seek`/`duration_s`/`video_fps`）+ `modules/yue-media` 内嵌的 miniaudio 设备层；**CPU 回灌 + 软解**（RGBA → `yue/render` 的 `Bitmap` → Painter 合成，本档位不做硬解与 GPU 合成）；新写播放器 UI（悬浮控制条/进度与音量/倍速/字幕叠加/seek 防抖）+ 音频时钟与同步；旧链坑照 adaptation.md 逐条验收（音画不同轴、seek 后进度从零重涨、换载崩溃）
+- [ ] **批 E 原生弹层窗口**：自绘 overlay 的「原生档」（`yue/win` 目前无 popup/transient API）——浮层（下拉/右键菜单/tooltip/toast/对话框）走原生窗口，不用自绘像素盖 webview
+- 积木原则：一个能力一个接口、可单独不用；能力之间不互相依赖（webview 不依赖媒体层，反之亦然，两者只依赖窗口/布局/事件层）；框架只给原语不给产品（爬虫框架、站点适配、内容解析、开发者面板、页面脚本库不进库）；每项能力给探测 + 语义化降级；新 API 一律走 `Painter`/`Bitmap` 门面
+- 明确不做（避免反复讨论）：网络拦截/改写、代理配置、一窗多 webview 并排、Linux 上把 webview 变纹理、首批硬解、首批 GPU 合成、网页内 `<video>` 与自绘播放器统一、macOS 13 及以下的持久化隔离（根因是 Apple API 边界：持久化 profile 需 macOS 14+ 且有 bundle id）
+- 平台后端（随各自真机，本轮不做）：Windows WebView2（两级异步 COM 创建、失败回退、就绪前排队、跨 HWND 焦点与滚轮转发），macOS WKWebView（自定义协议依赖私有 API，`dataStoreForIdentifier:` 才是真实 API 而非 `initWithIdentifier:`）
+
+### 交付面（webview 批 A/B 落地后接上）
 - [ ] 示例迁移：`hello` / `hello-themed` / `showcase`（全功能演示板，15 页）/ `sysmonitor`（6 页）/ `systemprobe`（8 页，`modules/yue-examples`）/ `yue-examples`
 - [ ] 文档：中英使用文档按新栈重写（`components`/`components-ui`/`declarative`/`layout`/`relink`/`system-capabilities`/`tutorial`），README 挂新截图
 - [ ] 发布：mooncakes 新版本；旧 `bin-*`/`vendor-*` 预构建发布链退役

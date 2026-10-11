@@ -18,6 +18,7 @@
   - **跨平台分派机制**：一律**运行时探测 + 模式匹配**（render 包既有的「探针画一笔验像素、cairo 不可用退纯路径」形态），**禁用 `#cfg(platform=)` 编译指令**（即便工具链条件编译可用也不用，本条为定案不随工具链演进翻案）。
 - `nu::Painter` 在 libyue 里只是 Cairo 的薄封装，因此它是**待移植的绘制库**而非后端；`Painter` 的方法签名照抄当契约。
 - **版本纪律**：不试 GTK4——`nu::*` 的可比语义（焦点、编辑器、主题）全部是 GTK3 行为。
+- **webview 与媒体的形态**（2026-10-11 定案，详见 §4）：窗口内容是 1..N 个**互不重叠的角色区（pane）**，每区 owner 要么自绘（Painter）要么挂原生子件（webview），矩形由 yoga 布局给；能力四档已锁（双向消息通道 / 只抓 DOM / CPU 回灌+软解 / 不做代理与拦截改写）。**本轮只做 Linux 闭环**，Windows/macOS 后端归平台线。
 - **分支纪律**（2026-10-10 追加）：本特性分支**不保留老的 libyue 绑定，完全重来**——`shim/`、`lib/<平台>/`、`vendor/libyue` 与新栈不同进程共存，按 §2 清单摘除；**不设包内双轨开关**。因此允许「新栈起来之前全仓门禁为红」，红点即工作队列，口径见 §5。布局层（yoga-mbt）与 libyue 复刻**合算一个工程、一起推进**，不再分成两条时间线。
 
 ## 2. 包结构（替代主包 `yue/`）
@@ -60,21 +61,88 @@ set_cursor_rect(x, y, w, h)
 
 **为什么 mac 不先做 B**：`NSTextInputClient` 十余个方法必须互相自洽；`NSRange` 以 UTF-16 code unit 计（与 MoonBit 的 UTF-8 字节需逐区间换算，参照 `TODO.md` MD2 已踩过的同类坑）；且 `acceptsFirstResponder`/`keyDown:`/`inputContext` 活在 ObjC 消息派发里，MoonBit 的 native FFI 只能调 C 函数，需要自带 `.mm` 的 NSView 子类。三笔成本叠加，而 mac 当前无真机可验（`TODO.md` O4 前置即「获得 mac 真机」），故整块延后。
 
-## 4. 原生子表面（browser 与视频）
+## 4. 角色区（pane）与原生控件嵌入
 
-有些东西不可能自绘：网页渲染（WebKit/WebView2/WKWebView）与视频显示（`modules/yue-media` 的 VideoPlayer 现在也是原生 view）。这不是 browser 专用补丁，而是窗口层的一条**通用能力**，必须在 G2 就把接口形状定死（`mount_child_surface(handle, rect)`，rect 由 yoga-mbt 给），事后补等于重做窗口层。
+### 4.1 架构模型：角色区（pane）
 
-- **Linux 最轻**：`nu::Canvas`/`nu::Image` 在 libyue 里就是 Cairo/GdkPixbuf，而 `WebKitWebView` 本身就是带 GdkWindow 的 GtkWidget，libyue 直接把它挂进容器（`nativeui/gtk/browser_gtk.cc:296-306`）。我们拥有 GtkWindow 之后，这就是一次普通 `gtk_container_add` 摆到布局算出的矩形上——**不需要 XEmbed、不需要 GtkPlug/GtkSocket、不需要像素合成**（这是「Linux 锁 GTK3」换来的实际红利，裸 X11 方案在这里要多写一整套嵌入协议）。协议面照 libyue 的机制移植：`webkit_web_context_register_uri_scheme` + 自定义 `GInputStream` 流式回灌（`nu_protocol_stream.cc:31-36`）+ `finish_error` 拒绝 + 无注销 API 时用错误 handler 顶替（`browser_gtk.cc:483-493`）。
+窗口内容 = **1..N 个互不重叠的矩形区**，每区声明 owner（自绘 = Painter / webview = 原生子件），矩形由 yoga 布局给。三种产品形态同源，不是三套机制：
+
+| 形态 | pane 数 | owner | 说明 |
+|---|---|---|---|
+| Tauri-like | 1 | webview | 铺满整窗 |
+| 爬虫 / 内容获取页 | 2 | 原生 + webview | 工具栏/地址栏/控制区与页面区并排，互不重叠 |
+| 原生多窗口 | 每窗 1..N | 自绘为主 | 每个窗口各套同一条规则 |
+
+「子表面」这个词只保留**原生控件嵌入**这一条语义（能力型例外，逐条登记评审），不当通用子表面宣传：网页渲染（WebKit/WebView2/WKWebView）与真原生控件本质上不可能自绘，这是窗口层的一条能力，不是像素合成通道。
+
+### 4.2 已锁能力档位（2026-10-11 定案，不再重开选型）
+
+1. **消息通道：双向**。原生 → 网页 `evaluate_javascript`；网页 → 原生 `invoke`。
+2. **抓取层次：只要 DOM**。注入 JS + evaluate 取渲染后结构；**不做网络响应层**。
+3. **媒体：CPU 回灌 + 软解**。ffmpeg 出 RGBA → `yue/render` 的 `Bitmap` → Painter 合成；音频走 `modules/yue-media` 内嵌的 miniaudio 设备层。硬解与 GPU 合成必须成对考虑，本档位下**不做硬解**。
+4. **网络面：不做代理、不做请求/响应拦截改写**（那是外部工具的活，框架不为此臃肿）。保留引擎原生开关：UA 改写、cookie 读写、按 profile 分数据目录。
+
+### 4.3 积木原则（产品形态要求，不是风格偏好）
+
+- **一个能力一个接口**，接口可单独调用、可单独不用；能力之间不得互相依赖——webview 不依赖媒体层，媒体层不依赖 webview，两者都只依赖窗口/布局/事件层。
+- **框架只给原语，不给产品**：爬虫框架、站点适配、内容解析、开发者面板、页面脚本库一律不进库，上层自己组合。
+- 每项能力都要有**探测 + 语义化降级**入口（沿用 `yue/sys` 既有范式），不许静默降级。
+- 新增 API 一律走 `Painter`/`Bitmap` 门面，不新增绑死 Cairo 的接口（为 GPU 后端留路）。
+
+### 4.4 cookie 与会话隔离
+
+根因是 **Apple 的 API 边界**，不是实现缺陷：macOS 的持久化 profile 需要 **macOS 14+ 且有 bundle identifier（`.app` 包）**；任一不满足只能 `nonPersistentDataStore`（隔离成立、重启掉登录）。macOS 13 及以下视为不可抹平差异，**不进本包**（归后续分包）。
+
+自研薄绑定能解掉的四点：
+
+1. context / data store 由我们创建，不存在「库没暴露就绕不过去」；
+2. mac 产物默认按 `.app` 打包，把「没有 bundle id」这半个原因消掉；
+3. 降级不静默——提供 `browser_profile_persistence() -> Persistent | EphemeralOnly`，调用方可在 UI 上提示「重启会掉登录」；
+4. 自定义协议**按 context 注册**（旧链是进程级静态注册，多 context 后语义不清）。
+
+profile 挂在 **pane 级参数**上（不是旧链 Browser 实例级的 Options）：「多账号」= 多 pane / 多窗 + 各自 profile。profile 键用可读规范 `<bundle-id>.<profile>`，不用 MD5 转 UUID。
+
+写 mac 后端时的硬事实：`[[WKWebsiteDataStore alloc] initWithIdentifier:]` 这个 API **不存在**，真实的是 `dataStoreForIdentifier:`（14+）；fork 已为此修过一次编译硬错。
+
+### 4.5 纪律（越线即返工）
+
+- pane 之间**不重叠**；浮层（下拉/右键菜单/tooltip/toast/对话框）走**原生窗口**，不用自绘像素盖 webview。
+- webview 区**不吃 `clip_rect`**，圆角/透明/被覆盖不作为承诺。
+- 子表面只保留「原生控件嵌入」语义，§4 措辞照此，不叫通用子表面。
+- webview 聚焦时本栈的**纯通道 IME 让位**，离开即恢复。
+- 接口预留**窗口可见性开关**（爬虫后台要「不可见 webview」），首批不实现但不写死。
+
+### 4.6 明确不做（避免反复讨论）
+
+网络拦截/改写、代理配置、一窗多 webview 并排（Tauri 自己也在 unstable）、Linux 上把 webview 变纹理、首批硬解、首批 GPU 合成、网页内 `<video>` 与自绘播放器统一、macOS 13 及以下的持久化隔离（归后续分包）、Windows/macOS 后端实现（归输入通道另线）。
+
+### 4.7 原生控件嵌入的接口形状（G2 冻结，实现随首个消费者）
+
+- MoonBit 面：`win.mount_child_surface(kind : ChildKind, rect : (Double, Double, Double, Double)) -> ChildSurface`、`ChildSurface::set_rect(..)`、`ChildSurface::unmount()`、`ChildSurface::handle() -> Int64`（能力层拿它去挂真控件）。
+- 语义：子表面**不被 Painter 绘制**，z 序在原生侧、恒覆盖在自绘像素之上；**不能用 `clip_rect` 裁剪**，超出窗口的部分由窗口系统裁掉；`rect` 由 yoga-mbt 布局给出，DPI 换算在后端。
+- 实现落点：Linux 把窗口内容改成「绘制区 + 可定位子件」的容器（GtkOverlay/GtkFixed），在批 B 的首个消费者（webview pane）落地时一并做——无消费者时先把形状冻结，不写猜测性实现。
+
+### 4.8 平台落地要点
+
+- **Linux 最轻**：`nu::Canvas`/`nu::Image` 在 libyue 里就是 Cairo/GdkPixbuf，而 `WebKitWebView` 本身就是带 GdkWindow 的 GtkWidget，libyue 直接把它挂进容器（`nativeui/gtk/browser_gtk.cc:296-306`）。我们拥有 GtkWindow 之后，这就是一次普通 `gtk_container_add` 摆到布局算出的矩形上——**不需要 XEmbed、不需要 GtkPlug/GtkSocket、不需要像素合成**（这是「Linux 锁 GTK3」换来的实际红利，裸 X11 方案在这里要多写一整套嵌入协议）。**只能动态链**：运行期依赖发行版 `webkit2gtk-4.1`（本机实测 2.52.6 在位），已知并接受，`scripts/prebuild.py` 增加该 pkg-config 探测项。协议面照 libyue 的机制移植：`webkit_web_context_register_uri_scheme` + 自定义 `GInputStream` 流式回灌（`nu_protocol_stream.cc:31-36`）+ `finish_error` 拒绝 + 无注销 API 时用错误 handler 顶替（`browser_gtk.cc:483-493`）。
 - **Windows 是真成本**：WebView2 需要子 HWND，且是**两级异步 COM 创建**（环境 → controller，`webview2/browser_impl_webview2.cc:113-122,516-529`），创建期失败同步回退 IE、就绪前 `LoadURL` 要排队（`browser_win.cc:56-72,199-214`），跨 HWND 的焦点与滚轮要转发（`:103-152`）。
 - **macOS 已知风险**：`NUWebView : WKWebView` 是 NSView，本体简单；但自定义协议靠私有 API `WKBrowsingContextController registerSchemeForCustomProtocol:`（`nu_custom_protocol.mm:45-52`），新系统不可靠——挂到 mac 线遗留清单，不当等价能力规划。
 - **不找第三方绑定**：渲染引擎必然是系统那三家，第三方也绕不开，真正的选择题只是绑定层谁写。MoonBit 生态内没有可靠的现成 webview 封装（待查证），C 层的通用 webview 库其同步模型不覆盖 custom scheme 流式与 JS binding 面，省不了工作量。结论：**自研薄绑定，libyue 当语义参考**。
 - **契约沿用**：`yue/browser/browser.mbt` 的 22+6 个方法名（`load_url`/`go_back`/`execute_javascript`/`on_update_title`…）平台中立，直接作为新栈 browser 契约。三个绑死点要重做：协议载荷那套 `[ok][mime_len][mime][content_len][content]` 小端裸字节 ABI（`browser.mbt:252-292`，CORE1 越界读教训即出于此，见 `adaptation.md:133`）改**结构化返回值**；`(f, closure)` 蹦床随新 shim 重设计；内嵌 `@yue.View` 并 extend 40+ ViewLike（`types.mbt:7-13`）换成新宿主类型。现有面还缺 `on_close`/`on_start|fail_navigation`/`AddUserScript`/高级 binding，新栈补齐。
 
-**`mount_child_surface` 接口形状（G2 冻结，实现随首个消费者）**：
+### 4.9 批次计划（本轮只做 Linux 闭环）
 
-- MoonBit 面：`win.mount_child_surface(kind : ChildKind, rect : (Double, Double, Double, Double)) -> ChildSurface`、`ChildSurface::set_rect(..)`、`ChildSurface::unmount()`、`ChildSurface::handle() -> Int64`（能力层拿它去挂真控件）。
-- 语义：子表面**不被 Painter 绘制**，z 序在原生侧、恒覆盖在自绘像素之上；**不能用 `clip_rect` 裁剪**，超出窗口的部分由窗口系统裁掉；`rect` 由 yoga-mbt 布局给出，DPI 换算在后端。
-- 实现落点：Linux 把窗口内容改成「绘制区 + 可定位子件」的容器（GtkOverlay/GtkFixed），在 G8 的首个消费者（browser 或 `yue-media` 的 VideoPlayer）落地时一并做——无消费者时先把形状冻结，不写猜测性实现。
+| 批 | 内容 | 验收 |
+|---|---|---|
+| **A** | 多窗口宿主：`yue/core/app.mbt` 的 `App::new` 从「只建一窗」改成「一宿主管 N 窗，每窗一棵控件树、共用一个 `Loop`」 | 纯自绘即可验：开一个「关于」窗；两窗各自收到注入的点击，关单窗不影响宿主 |
+| **B** | pane 模型 + webview pane：把 §4.7 的 `mount_child_surface(kind, rect)` 落成「容器里放一个原生子件」；Linux 走 WebKitGTK | 整页（单 pane 铺满）与左右分栏（原生工具栏 + webview）两种摆法都出图 |
+| **C** | JS 桥 + DOM 抓取 + 导航面：`evaluate_javascript`/`add_user_script`/双向通道/UA+cookie+profile 与 persistence 探测/前进后退刷新与标题 URL 回调/`window.open` 策略/下载回调/权限默认拒绝可转原生提示/web 进程崩溃回调 | 契约沿用 22+6 方法名，协议载荷改结构化返回；真实站点由使用者复验 |
+| **D**（可与 B/C 并行） | 媒体播放器：复用 `modules/ffmpeg-mbt`（零 libyue 依赖，已有 `decode_rgba`/`decode_pcm`/`seek`/`duration_s`/`video_fps`）+ miniaudio 设备层；新写播放器 UI、帧上屏、音频时钟与同步、seek 防抖、倍速、字幕叠加 | 旧链踩过的坑照 adaptation.md 逐条验收（音画不同轴、seek 后进度从零重涨、换载崩溃等） |
+| **E** | 原生弹层窗口：自绘 overlay 的「原生档」（`yue/win` 目前无 popup/transient API），供 §4.5 的浮层纪律落地 | 下拉/右键菜单/对话框能盖住 webview pane |
+| 交付面 | 示例迁移（`hello`/`hello-themed`/`showcase` 走新栈）、中英使用文档按新栈重写、README 新截图、CI 三平台脚本、发布链 | A/B 落地后接上 |
+| 输入通道另线 | 先落**平台无关**的键位/指针/修饰键/IME 触发条件映射层（纯函数 + wbtest）；Win32/Cocoa 后端随各自真机 | 不写不可验的代码 |
+
+**验证示例归口**：webview 与媒体侧的同类验证集中累积进 **`examples/native-web`**（批 B 起建：整页摆法、左右分栏、JS 桥与抓取、播放器各占一页），不为单个特性再开新示例；GUI 侧累计页仍是 `examples/native-app`，系统能力侧是 `examples/native-sys`。
 
 ## 5. 阶段划分与每批验收
 
@@ -91,7 +159,7 @@ set_cursor_rect(x, y, w, h)
 | **G5** ◐ | **Linux 纯通道首批已完成**（`yue/win/im.mbt` + GtkIMMulticontext 四条件、`Editor.set_preedit` 显示态不并入文本、示例自绘下划线与候选窗矩形）。四坑记档：realize 前设 client window 会静默不接管、commit 串不得 g_free（双释放崩）、喂 surrounding 时禁调 reset（打断组合）、preedit-changed 签名要 get_preedit_string。待补：ibus 一套、Windows/macOS 通道 | 本机 xdotool 注入 `nihao`+空格 → `a='hello你哈哦'`（字母零残留、未被消费键才进内核）；待肉眼：preedit 下划线观感与候选窗贴合 |
 | **G6** | 系统能力平移（`yue/system`、`yue/traybus`、图标数据）+ 图片解码补齐 | 既有 wbtest 随包平移全绿 |
 | **G7** | 组件与声明式层移植：`components`/`charts` 挂上新 `Painter`，`declarative` 的 mount 目标改 yoga-mbt 节点 | showcase 组件页与图表页在新栈渲染，与旧链路视觉逐页对照；**恢复全仓门禁** |
-| **G8** | 原生子表面消费者：browser 自研薄绑定（§4，引擎为系统三家）+ `modules/yue-media` 的 VideoPlayer 走同一 `mount_child_surface` 通道 | 契约沿用 `browser.mbt` 方法名、协议载荷改结构化返回；Linux 真机网页加载与自定义协议可打（清单交协作方） |
+| **G8** | 原生控件嵌入消费者：按 §4.9 的批 A→E 推进（多窗口宿主 → pane 模型与 webview pane → JS 桥与 DOM 抓取 → 媒体播放器 → 原生弹层窗口）。browser 自研薄绑定（§4.8，引擎为系统三家），媒体走 CPU 回灌自绘（§4.2 第 3 条），**不再**共用「子表面」这一说法 | 契约沿用 `browser.mbt` 方法名、协议载荷改结构化返回；Linux 真机网页加载与自定义协议可打（清单交协作方）；每批分包门禁 + 一批一提交 |
 
 **G0b 完成后的红点基线（实测，此后只减不增）**：
 
