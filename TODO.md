@@ -71,7 +71,7 @@
   - 新栈刻意不做：原生控件 CSS 下发（全自绘后色板是唯一来源）
 - [~] 声明式层（`declarative/` 612 行、24 构造器）：地基已落（`Node{mount:(Widget)->Widget}`、`node_of`/`node_of_new`/`mount_children`/`App::mount`、`invalidate` 回路）；**L1 构造器全集落 `yue/ui/declarative.mbt`**——`vbox`/`hbox`/`text_edit`/`picker`/`scroll`/`tab`/`date_picker`（改名者，旧调用点原样跑在新栈上）+ `mount_window`（建宿主并挂载）+ `bind`/`bind_label`（Store/信号驱动的文本绑定），与组件**同名**的（`label`/`button`/`entry`/`checkbox`/`container`/`group`/`separator`/`image`/`icon`/`radio_group`/`slider`/`progress`）直接用组件、不再包第二层；`hover_group` 已落（本栈宿主悬停态是父链语义，旧链路那套全局指针轮询不需要）；`overlay_scroll` 即 `scroll_v`（滚动条一直是视口的绝对定位子控件）。`cursor_group` 已落（配套新增窗口层光标通道：`wm_set_cursor` FFI + `Widget.cursor` 请求 + 宿主按悬停路径取「最深非零」下发）；`combo`（可编辑下拉：`entry` + 随输入过滤的候选浮层，↑↓/回车/Esc 走按键沿祖先链冒泡）已落 `yue/ui/form.mbt`；`gif`（动图组件，走 `@render.Animation` 的逐帧迭代 + 进程级延时通道）已落 `yue/ui/gif.mbt`。**L1 构造器全集到此收口**（旧 24 个里除 `mount`（即 `App::mount`）与同名组件外都已到位）。
 - [x] Store 与 signals：内核与 `Store` 自 master 逐行平移进 `yue/core/signal.mbt`/`store.mbt`（`Signal`/`Store` 9 方法、`computed`/`batch`/`sub_bag`、store↔signal 互转，公共名不改，19 条既有测试整段带过来）；`bind_node`/`swap_node` 换成新栈形态并落 `yue/core/node.mbt`，relink 定案=**原位替换**（引擎为此加 `insert_child`/`remove_child_at`，控件层加 `index_of`/`move_child`），旧链路 Windows 的 `post_task` 推迟一拍与 `refresh_layout` 两条规避在本栈不需要（命中矩形每帧从布局结果重取），重绘经进程级 `set_repaint_hook`/`invalidate` 回到 App 宿主
-- [~] 组件库约 55 个声明式组件（家族划分见「控件」节；调用点应不变，只换实现）：十族全部以 `@core.Node` 构造器形态落 `yue/ui`（文本族含 code_view），剩 Markdown 一族
+- [x] 组件库约 55 个声明式组件（家族划分见「控件」节）：十族 + Markdown 族全部以 `@core.Node` 构造器形态落 `yue/ui` / `yue/mdview`（文本族含 code_view）——**组件库收口**
 - [~] 图表（新栈落 **`yue/chart/`**，旧 `yue/charts/` 属红点按批替换）：
   - [x] 共享算法层（`LineSeries`/`win_push`/`series_push`/`auto_y_range`/`map_y`/`map_xv`/`map_idx`/`nice_step`/`nice_ticks`/`fmt_axis`/`bar_range`/`bar_slot`/`bar_hit`/`sector_angles`/`gauge_angle`/`linreg`/`point_range`/`truncate_to`/`with_alpha`）与 master 同源平移，11 条白盒直接钉住
   - [x] 五种通用图（`line_chart_t` 折线/面积（像素列抽稀 + 末端值标注）、`bar_chart_t` 柱/条（正负基线 + 悬停高亮）、`donut_chart_t` 环形（中心汇总 + 图例百分比 + `donut_hit`）、`gauge_t` 仪表（阈值分段 + 定时器插值平滑）、`scatter_t` 散点（最小二乘趋势线）），真窗口回证五图齐备
@@ -81,7 +81,7 @@
     - [x] 批 2：kline（涨红跌绿/影线实体）/ sankey（分层布局/贝塞尔色带）/ treemap（squarified 切分/兄弟明度梯度/hover 画卷命中）/ tree（肘线连线/两形态/深度渐变）——tree 的 orientation 字符串参数改 vertical 布尔（新栈类型化参数口径）；TreeItem 跨包构造用 make+push（字面量构造限定义包）
     - [x] 批 3：sunburst（逐级同心环/中心汇总 20px SemiBold）/ graph（力导向模拟/布局缓存随数据与画布失效）/ parallel（逐轴独立量程/条件对齐标签）/ pictorialbar（符号平铺拉伸/两形态/正负分色）
     - [x] 批 4：effectscatter（涟漪定时器改 @core.set_timeout 句柄 + EffAnim 持真取消 / 8 位 AARRGGBB 输入跳 alpha 位兼容新栈 RGBA 解析）/ themeriver（图例预留 240px、画布 <298 无绘制区）/ geo（VscJson 走 @sys / GeoRect 本地化 / 世界投影下小跨度区域像素占比小）
-- [ ] Markdown（`markdown/markdown.mbt`）：`markdown_view` 17 种 block 变体 → 新 AttributedText；GFM 渲染面（表格/任务列表/脚注/删除线/图片/可点击链接）
+- [x] Markdown（新包 `yue/mdview`）：`markdown_view` 17 种 block 变体 + GFM 渲染面（表格对齐/任务列表/脚注编号/删除线/块级图片/可点击链接）与 master 同源平移；链接点击改 `on_link` 回调（open_url 属系统能力线，接入后由调用方转接默认浏览器）；富文本行按主题指纹缓存重建（不每帧重建）；表格列宽 percent、块间距交外层 row_gap
 - [ ] 富文本编辑（远期 WYSIWYG 块编辑器）
 - [ ] 代码高亮、终端模拟器、WebGL 画布（旧栈即无，列为待评估）
 

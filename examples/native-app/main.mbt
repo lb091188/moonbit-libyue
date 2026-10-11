@@ -1186,7 +1186,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1400, 3120, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1400, 3520, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -1424,6 +1424,31 @@ fn main {
   let sp4_w : Ref[@core.Widget?] = Ref(None)
   app.mount([make_chart_special_section(sp_w, sp2_w, sp3_w, sp4_w)])
   let cv_w : Ref[@core.Widget?] = Ref(None)
+  let md_w : Ref[@core.Widget?] = Ref(None)
+  app.mount([
+    @ui.container(
+      [
+        @ui.label("Markdown：17 种 block + GFM（代码块复用 code_view、链接走 on_link 回调）", size=13.0),
+        @ui.container(
+          [
+            @mdview.markdown_view(
+              "# 原生 GUI 栈\n\n段落含 **粗体**、*斜体*、~~删除线~~、`行内码` 与 [链接](https://moonbit-libyue.pages.dev)。\n\n- 无序项\n- [ ] 待办\n- [x] 已办\n\n1. 第一\n2. 第二\n\n> 引用块一行\n\n```moonbit\nfn main {\n  println(\"hi\")\n}\n```\n\n| 列甲 | 列乙 |\n| --- | ---: |\n| a | 1 |\n\n---\n\n术语\n: 定义\n\n脚注引用[^n1]。\n\n[^n1]: 脚注定义一行",
+              width=420.0,
+              handle=fn(w : @core.Widget) -> Unit { md_w.val = Some(w) },
+            ),
+          ],
+          direction=@yoga.Row,
+          column_gap=8.0,
+          align_items=@yoga.AlignItems::FlexStart,
+        ),
+      ],
+      padding=8.0,
+      row_gap=6.0,
+      align_items=@yoga.AlignItems::FlexStart,
+      bg=@theme.theme_bg_page(),
+      border=@theme.theme_border(),
+    ),
+  ])
   app.mount([
     @ui.container(
       [
@@ -2103,7 +2128,9 @@ fn main {
       " eff=" +
       ov2_rect_of(sp4_w.val) +
       " code=" +
-      ov2_rect_of(cv_w.val),
+      ov2_rect_of(cv_w.val) +
+      " md=" +
+      ov2_rect_of(md_w.val),
   )
   println(
     "NATIVE-APP-MEDIA gif=" +

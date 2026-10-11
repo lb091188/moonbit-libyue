@@ -8,6 +8,7 @@ import {
   "NoahLiu/moonbit-libyue/yue/theme",
   "NoahLiu/moonbit-libyue/yue/ui",
   "NoahLiu/moonbit-libyue/yue/chart",
+  "NoahLiu/moonbit-libyue/yue/mdview",
   "NoahLiu/moonbit-libyue/yue/icons",
 }
 

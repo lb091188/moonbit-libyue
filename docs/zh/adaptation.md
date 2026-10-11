@@ -646,6 +646,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **四条工具链写法（本批实测）**：① `pub const` 的名字**必须大写**（`pub const pi` 直接报「Expected upper case identifier for name of const, found lower case. Did you mean let?」），小写常量用 `pub let`；② `for i = 1..<n { }` 不支持——range 只在 `for x in a..<b` 里合法，经典 for 要写 `for i = 1; i < n; i = i + 1`；③ `StringBuilder` 的写入方法是 `write_string`/`write_char`，没有 `add`/`append`；④ `Ordering` 类型在本工具链不可直接引用（写比较器函数会报「The type Ordering is undefined」），几个元素排序退回插入排序。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/chart` **11/11**（6 条纯函数：窗口丢最旧与越界无操作、值域退化与留白比例、1-2-5 步长与负区间起点、单位换挡 k/M/G、柱槽与两形态命中、扇区只累计正值且单扇区留 0.0002 弧度、仪表分段取色与折线段数、回归退化、8 位色串、标签截断；5 条组件：折线换数据与密集抽推出图、柱状悬停换底与离开复原、环形出图 + 命中四态、仪表盘 smooth 两路（直接跳到位 / 逐拍逼近）、散点带趋势线）。九包 `--deny-warn` 全零警告、全仓红点仍 287 errors / 68 warnings 未增。真窗口回证（`examples/native-app` 加「图表」区块：折线+柱状一行、环形+仪表+散点+推点按钮一行，几何行补 `NATIVE-APP-CH`，状态行补 `ln=`/`chp=`）：注入「点三次推点按钮」得 `ln=27/23 chp=3`（窗口 24→27 点、末值 7→23，与手算 `pushes*7%29+2` 逐位一致）、退出码 0；截图复核五图齐备——折线带面积填充与右端最新值标注、柱状正负异色带类目、环形中心汇总 + 右侧图例带百分比、仪表 68% 弧与中心数字、散点带最小二乘趋势线。
 
+### MoonBit 原生 GUI 栈 · Markdown 视图（新包 `yue/mdview`，组件库收口）
+
+- **新包不复用旧目录**：master 的 `yue/markdown` 依赖 `@yue` 根包（红点区），新栈按「一文件夹一包」惯例落 `yue/mdview`（`mizchi/markdown@0.8.3` 已在主模块依赖里，新包 import 即用）。纯函数层（展平/区间计量/脚注扫描/切行）与 master 零差异平移；渲染层换组件面（`@ui.hbox/vbox/label/separator/checkbox/code_view`、`@render.Image`、`@text.AttributedText`）。
+- **链接打开改 `on_link` 回调**：master 的富文本行点击直接 `@yue.open_url`；新栈 open_url 属系统能力线（桌面集成族待平移），`markdown_view` 增 `on_link? : (String) -> Unit` 参数、经 `MDCtx` 链传进富文本行闭包——**初版用进程级单槽转发，因多实例互相覆盖改为 ctx 链传**（结构体函数字段按函数应用要写 `(ctx.on_link)(u)`，直接 `ctx.on_link(u)` 报「has no method」）。
+- **富文本行的主题跟随按指纹缓存**：AttributedText 重建不能放 on_draw 每帧做（动画帧会反复重建），也不能只在构造期做一次（链接/代码色不随主题）——`on_draw` 里比对 `@theme.theme_fingerprint_of(theme_current())`，指纹变了才重建。
+- **块间距策略换了**：master 各块自带 marginBottom（style 串）；新栈 `@ui.hbox/vbox` 只有四边 padding、无 padding_bottom 参数——块间距统一交最外层 `vbox` 的 `row_gap`，个别块的底部留白走 `node.set_margin_bottom(@yoga.fixed(...))`。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/mdview` **26/26**（24 条纯函数/展平/区间/GFM 断言同源平移——UTF-16 计量/emoji、脚注编号顺序、引用式链接定义、删除线/上标区间、fence info 首词、切行、图片路径剥 `file://`、表格对齐映射改 `is` 模式断言（yoga 枚举未实现 Eq）；2 条组件挂载——GFM 全要素文档（标题/粗斜删/链接/任务列表/有序/引用/代码块/表格/分隔线/定义列表/脚注）子树 >5 节点且高度按内容长出、链接点击回调不崩）；`moon check yue/mdview --deny-warn` 零警告、全仓红点仍 287/68。真窗口几何行确认布局（`md=24,2745,420x403`），观感留用户真机复验。**至此组件库十族 + Markdown 全部收口**。
+
 ### MoonBit 原生 GUI 栈 · code_view 代码高亮（`yue/ui/codeview.mbt`）
 
 - **分词器原样平移、组件换形态**：`Token`/`lang_keywords`（8 语言关键字表）/`tokenize_lang`/`classify_word` 与 master 的 `components_text.mbt` 同源零改动（工具链写法本就是新口径）；`code_view` 从「AttributedText 预排版 + draw_attributed_text」换成「构造期逐 token `@ui.text_width` 测宽 → on_draw 逐段 `@text.draw_box_at`」——旧链路为绕 Windows AttributedText 区间色缺陷的整段设色手法在新栈结构性不需要（自绘直出），行高取 `@text.line_height_font`。
