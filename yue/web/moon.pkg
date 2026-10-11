@@ -1,0 +1,25 @@
+// webview 能力（批 B 首批）：把网页渲染放进窗口层的原生子件槽里。
+//
+// 三条纪律（方案 §4）：
+// ① **一个能力一个接口**：本包只依赖窗口/布局/事件层，不依赖媒体层，也不被它依赖；
+// ② **探测 + 语义化降级**：`webview_supported()` 说清「这台机器有没有引擎」，
+//    不可用时 `webview_new` 给 None，由调用方决定摆什么替代品——不静默降级；
+// ③ 子件**不被 Painter 绘制、不吃 clip_rect**，所以本包不做圆角/透明/被覆盖的承诺，
+//    pane 之间也不重叠（重叠区归谁由窗口系统决定，不是我们决定的）。
+//
+// 契约方法名沿用旧链 `yue/browser/browser.mbt`（`load_url`/`go_back`/`get_title`…），
+// 包名让位给新栈的 `yue/web`；导航面与 JS 桥在批 C 补齐。
+
+supported_targets = "native"
+
+import {
+  "moonbitlang/core/encoding/utf8",
+  "NoahLiu/yoga-mbt/src" @yoga,
+  "NoahLiu/moonbit-libyue/yue/core",
+  "NoahLiu/moonbit-libyue/yue/win",
+  "NoahLiu/moonbit-libyue/yue/render",
+}
+
+options(
+  "native-stub": [ "webkit_stub.c" ],
+)

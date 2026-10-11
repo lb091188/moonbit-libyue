@@ -733,6 +733,22 @@ int64_t wm_local_date(void) {
   return (int64_t)st.wYear * 10000 + (int64_t)st.wMonth * 100 + (int64_t)st.wDay;
 }
 
+// 原生子件通道的占位实现：符号必须存在（yue/win 的 MoonBit 层各平台同一份声明，
+// 缺符号会让 Windows 构建在链接期就断），真实现（WebView2 子 HWND）随平台批。
+int64_t wm_surface_new(int64_t window_id, int kind, int x, int y, int w,
+                       int h) {
+  (void)window_id; (void)kind; (void)x; (void)y; (void)w; (void)h;
+  return 0;
+}
+void wm_surface_set_rect(int64_t surface_id, int x, int y, int w, int h) {
+  (void)surface_id; (void)x; (void)y; (void)w; (void)h;
+}
+void wm_surface_close(int64_t surface_id) { (void)surface_id; }
+void *wm_surface_container(int64_t surface_id) {
+  (void)surface_id;
+  return NULL;
+}
+
 #elif defined(WM_STUB_GTK)
 
 // ---------------- GTK3 后端（Linux，prebuild 专编） ----------------
@@ -760,6 +776,11 @@ typedef struct {
 typedef struct {
   GtkWidget *window;
   GtkWidget *area;
+  // 内容容器：GtkFixed。绘制区固定在 (0,0) 并跟随窗口尺寸，原生子件（webview
+  // 等不可自绘的东西）作为同级的可定位子件挂进来（方案 §4.7 的「容器里放一个
+  // 原生子件」）。用 Fixed 而不是 Overlay 是为了事件路由不用做手脚：Fixed 是普通
+  // 容器，指针落在子件上归子件、落在别处归绘制区，没有 Overlay 的 pass-through 语义。
+  GtkWidget *fixed;
   int need_draw;   // 需要重绘（expose 或尺寸变化后置 1）
   int resized;     // 尺寸变了，本次取事件时回报新宽高
   int closing;     // 窗口管理器请求关闭
@@ -784,6 +805,19 @@ typedef struct {
 
 static WmWindow wm_windows[WM_MAX_WINDOWS];
 static int wm_next_id = 1;
+
+// 原生子件槽：一个 GtkFixed 容器，能力层（yue/browser 的 webkit 桩等）通过
+// wm_surface_container() 拿到它把自己的控件 put 进去。句柄 = 槽号（1 起）。
+#define WM_MAX_SURFACES 64
+typedef struct {
+  GtkWidget *container;
+  int64_t window_id;  // 归属窗口：窗口关闭时这些槽一起清
+  int kind;
+  int x, y, w, h;
+} WmSurface;
+
+static WmSurface wm_surfaces[WM_MAX_SURFACES];
+static int wm_surface_next_id = 1;
 
 // 修饰位必须与 MoonBit 侧 yue/core/keys.mbt 的 MOD_* 一致：
 // 1=shift 2=ctrl 4=alt 8=meta（GTK 自身位值是 1/4/8/16，故显式重映射）
@@ -940,6 +974,18 @@ static void wm_on_size_allocate(GtkWidget *area, GdkRectangle *alloc,
   w->need_draw = 1;
 }
 
+// 内容容器（GtkFixed）尺寸变了就把绘制区的尺寸请求跟上去。加「只有变了才设」
+// 的闸门：set_size_request 会再触发一轮分配，无条件设会自激。
+static void wm_on_fixed_allocate(GtkWidget *fixed, GdkRectangle *alloc,
+                                 gpointer data) {
+  WmWindow *w = (WmWindow *)data;
+  if (w->area == NULL ||
+      (w->width == alloc->width && w->height == alloc->height)) {
+    return;
+  }
+  gtk_widget_set_size_request(w->area, alloc->width, alloc->height);
+}
+
 static gboolean wm_on_key(GtkWidget *widget, GdkEventKey *ev, gpointer data) {
   (void)widget;
   WmWindow *w = (WmWindow *)data;
@@ -1071,8 +1117,13 @@ int64_t wm_window_new(int width, int height, const char *title) {
                                    GDK_BUTTON_RELEASE_MASK |
                                    GDK_POINTER_MOTION_MASK |
                                    GDK_SCROLL_MASK);
-  gtk_container_add(GTK_CONTAINER(w->window), w->area);
+  w->fixed = gtk_fixed_new();
+  gtk_container_add(GTK_CONTAINER(w->window), w->fixed);
+  gtk_fixed_put(GTK_FIXED(w->fixed), w->area, 0, 0);
+  gtk_widget_set_size_request(w->area, w->width, w->height);
   g_signal_connect(w->area, "realize", G_CALLBACK(wm_on_realize), w);
+  g_signal_connect(w->fixed, "size-allocate",
+                   G_CALLBACK(wm_on_fixed_allocate), w);
   g_signal_connect(w->area, "focus-in-event", G_CALLBACK(wm_on_area_focus_in), w);
   g_signal_connect(w->area, "focus-out-event",
                    G_CALLBACK(wm_on_area_focus_out), w);
@@ -1182,6 +1233,13 @@ void wm_close(int64_t id) {
     return;
   }
   WmWindow *w = &wm_windows[id];
+  // 归属本窗的原生子件槽一起清：容器随窗口销毁，槽位必须空出来，
+  // 否则能力层拿着悬垂的 GtkWidget 指针继续画就是段错误
+  for (int i = 1; i < WM_MAX_SURFACES; i++) {
+    if (wm_surfaces[i].container != NULL && wm_surfaces[i].window_id == id) {
+      memset(&wm_surfaces[i], 0, sizeof(WmSurface));
+    }
+  }
   // 已被 WM 销毁过则 window 为 NULL，只清记录即可
   if (w->window != NULL) {
     gtk_widget_destroy(w->window);
@@ -1190,6 +1248,81 @@ void wm_close(int64_t id) {
   }
   w->pending = NULL;
   memset(w, 0, sizeof(WmWindow));
+}
+
+// ---- 原生子件通道（方案 §4.7）----
+// 语义：子件不被 Painter 绘制、恒覆盖在自绘像素之上、不吃 clip_rect；
+// 矩形由 yoga 布局算出后按窗口内容坐标给过来，DPI 换算在后端。
+
+int64_t wm_surface_new(int64_t window_id, int kind, int x, int y, int w,
+                       int h) {
+  if (window_id <= 0 || window_id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  WmWindow *win = &wm_windows[window_id];
+  if (win->fixed == NULL) {
+    return 0;
+  }
+  int sid = 0;
+  for (int i = 1; i < WM_MAX_SURFACES; i++) {
+    if (wm_surfaces[i].container == NULL) {
+      sid = i;
+      break;
+    }
+  }
+  if (sid == 0) {
+    return 0;
+  }
+  GtkWidget *c = gtk_fixed_new();
+  gtk_fixed_put(GTK_FIXED(win->fixed), c, x, y);
+  gtk_widget_set_size_request(c, w > 1 ? w : 1, h > 1 ? h : 1);
+  gtk_widget_show_all(c);
+  wm_surfaces[sid].container = c;
+  wm_surfaces[sid].window_id = window_id;
+  wm_surfaces[sid].kind = kind;
+  wm_surfaces[sid].x = x;
+  wm_surfaces[sid].y = y;
+  wm_surfaces[sid].w = w;
+  wm_surfaces[sid].h = h;
+  return (int64_t)sid;
+}
+
+void wm_surface_set_rect(int64_t surface_id, int x, int y, int w, int h) {
+  if (surface_id <= 0 || surface_id >= WM_MAX_SURFACES) {
+    return;
+  }
+  WmSurface *s = &wm_surfaces[surface_id];
+  if (s->container == NULL) {
+    return;
+  }
+  if (s->x == x && s->y == y && s->w == w && s->h == h) {
+    return; // 每帧都同步，位置没动就不重排
+  }
+  s->x = x;
+  s->y = y;
+  s->w = w;
+  s->h = h;
+  gtk_fixed_move(GTK_FIXED(wm_windows[s->window_id].fixed), s->container, x, y);
+  gtk_widget_set_size_request(s->container, w > 1 ? w : 1, h > 1 ? h : 1);
+}
+
+void wm_surface_close(int64_t surface_id) {
+  if (surface_id <= 0 || surface_id >= WM_MAX_SURFACES) {
+    return;
+  }
+  WmSurface *s = &wm_surfaces[surface_id];
+  if (s->container != NULL) {
+    gtk_widget_destroy(s->container);
+  }
+  memset(s, 0, sizeof(WmSurface));
+}
+
+// 给能力层的桩用（yue/browser 的 webkit 桩把 WebKitWebView 放进这个容器）。
+GtkWidget *wm_surface_container(int64_t surface_id) {
+  if (surface_id <= 0 || surface_id >= WM_MAX_SURFACES) {
+    return NULL;
+  }
+  return wm_surfaces[surface_id].container;
 }
 
 // 跑掉主上下文里已经就绪的事件；不阻塞。
@@ -1892,6 +2025,21 @@ int64_t wm_now_ms(void) {
 
 int64_t wm_local_date(void) {
   return 0;
+}
+
+// 原生子件通道占位（同上：符号必须在，实现随平台批）
+int64_t wm_surface_new(int64_t window_id, int kind, int x, int y, int w,
+                       int h) {
+  (void)window_id; (void)kind; (void)x; (void)y; (void)w; (void)h;
+  return 0;
+}
+void wm_surface_set_rect(int64_t surface_id, int x, int y, int w, int h) {
+  (void)surface_id; (void)x; (void)y; (void)w; (void)h;
+}
+void wm_surface_close(int64_t surface_id) { (void)surface_id; }
+void *wm_surface_container(int64_t surface_id) {
+  (void)surface_id;
+  return NULL;
 }
 
 #endif

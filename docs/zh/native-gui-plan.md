@@ -120,7 +120,7 @@ profile 挂在 **pane 级参数**上（不是旧链 Browser 实例级的 Options
 
 - MoonBit 面：`win.mount_child_surface(kind : ChildKind, rect : (Double, Double, Double, Double)) -> ChildSurface`、`ChildSurface::set_rect(..)`、`ChildSurface::unmount()`、`ChildSurface::handle() -> Int64`（能力层拿它去挂真控件）。
 - 语义：子表面**不被 Painter 绘制**，z 序在原生侧、恒覆盖在自绘像素之上；**不能用 `clip_rect` 裁剪**，超出窗口的部分由窗口系统裁掉；`rect` 由 yoga-mbt 布局给出，DPI 换算在后端。
-- 实现落点：Linux 把窗口内容改成「绘制区 + 可定位子件」的容器（GtkOverlay/GtkFixed），在批 B 的首个消费者（webview pane）落地时一并做——无消费者时先把形状冻结，不写猜测性实现。
+- 实现落点（批 B 已落）：窗口内容 = 「绘制区 + 可定位子件」的 **`GtkFixed`**（不用 `GtkOverlay`：带子件的容器其 `pass_through` 事件归属不可靠，Fixed 是普通容器、指针落在子件归子件、落在别处归绘制区，零额外机制）；`ChildKind` 登记制，目前只有 `Webview = 1`。子件槽表记归属窗口，窗口拆除时连带清理。
 
 ### 4.8 平台落地要点
 
@@ -135,7 +135,7 @@ profile 挂在 **pane 级参数**上（不是旧链 Browser 实例级的 Options
 | 批 | 内容 | 验收 |
 |---|---|---|
 | **A** ✅ | 多窗口宿主：`yue/core/app.mbt` 的 `App::new` 从「只建一窗」改成「一宿主管 N 窗，每窗一棵控件树、共用一个 `Loop`」（注册表在 `yue/core/host.mbt`） | 纯自绘即可验：开一个「关于」窗；两窗各自收到注入的点击，关单窗不影响宿主 |
-| **B** | pane 模型 + webview pane：把 §4.7 的 `mount_child_surface(kind, rect)` 落成「容器里放一个原生子件」；Linux 走 WebKitGTK | 整页（单 pane 铺满）与左右分栏（原生工具栏 + webview）两种摆法都出图 |
+| **B** ✅ | pane 模型 + webview pane：把 §4.7 的 `mount_child_surface(kind, rect)` 落成「容器里放一个原生子件」；Linux 走 WebKitGTK | 整页（单 pane 铺满）与左右分栏（原生工具栏 + webview）两种摆法都出图 |
 | **C** | JS 桥 + DOM 抓取 + 导航面：`evaluate_javascript`/`add_user_script`/双向通道/UA+cookie+profile 与 persistence 探测/前进后退刷新与标题 URL 回调/`window.open` 策略/下载回调/权限默认拒绝可转原生提示/web 进程崩溃回调 | 契约沿用 22+6 方法名，协议载荷改结构化返回；真实站点由使用者复验 |
 | **D**（可与 B/C 并行） | 媒体播放器：复用 `modules/ffmpeg-mbt`（零 libyue 依赖，已有 `decode_rgba`/`decode_pcm`/`seek`/`duration_s`/`video_fps`）+ miniaudio 设备层；新写播放器 UI、帧上屏、音频时钟与同步、seek 防抖、倍速、字幕叠加 | 旧链踩过的坑照 adaptation.md 逐条验收（音画不同轴、seek 后进度从零重涨、换载崩溃等） |
 | **E** | 原生弹层窗口：自绘 overlay 的「原生档」（`yue/win` 目前无 popup/transient API），供 §4.5 的浮层纪律落地 | 下拉/右键菜单/对话框能盖住 webview pane |

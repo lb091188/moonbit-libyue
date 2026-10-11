@@ -135,3 +135,25 @@ extern "c" fn wm_im_preedit_caret(id : Int64) -> Int = "wm_im_preedit_caret"
 
 ///|
 extern "c" fn wm_im_preedit_active(id : Int64) -> Int = "wm_im_preedit_active"
+
+///|
+extern "c" fn wm_surface_new(
+  window_id : Int64,
+  kind : Int,
+  x : Int,
+  y : Int,
+  w : Int,
+  h : Int,
+) -> Int64 = "wm_surface_new"
+
+///|
+extern "c" fn wm_surface_set_rect(
+  id : Int64,
+  x : Int,
+  y : Int,
+  w : Int,
+  h : Int,
+) -> Unit = "wm_surface_set_rect"
+
+///|
+extern "c" fn wm_surface_close(id : Int64) -> Unit = "wm_surface_close"

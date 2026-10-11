@@ -34,6 +34,10 @@ SYS_PACKAGE = "NoahLiu/moonbit-libyue/yue/sys"
 WIN_PACKAGE = "NoahLiu/moonbit-libyue/yue/win"
 RENDER_PACKAGE = "NoahLiu/moonbit-libyue/yue/render"
 TEXT_PACKAGE = "NoahLiu/moonbit-libyue/yue/text"
+WEB_PACKAGE = "NoahLiu/moonbit-libyue/yue/web"
+# webview 引擎只能动态链（方案 §4.8：WebKitGTK 无静态库），运行期依赖发行版包。
+# 缺包不算错：桩改编「无宏」的占位分支，wb_* 符号仍在、探测返回不可用。
+WEBKIT_PKG_CONFIG = "webkit2gtk-4.1"
 
 
 def pkg_config(args: list[str], flag: str) -> list[str] | None:
@@ -154,6 +158,34 @@ def link_configs() -> dict:
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_win_stub "
                 + " ".join([*libs, *sys_libs]),
             })
+        # webview（yue/web）：WebKitGTK 只能动态链。缺开发包时不报错——编「无宏」
+        # 的占位分支（wb_available() 返回 0），于是 MoonBit 层按探测降级，
+        # 而不是链接期缺一堆符号。顺序上 -lyue_web 在前：它引用 win 桩的
+        # wm_surface_container。
+        webkit_cflags = pkg_config([WEBKIT_PKG_CONFIG], "--cflags")
+        webkit_libs = pkg_config([WEBKIT_PKG_CONFIG], "--libs")
+        if webkit_cflags is None or webkit_libs is None:
+            print(
+                f"prebuild: 缺 {WEBKIT_PKG_CONFIG}，webview 走占位实现（探测返回不可用）",
+                file=sys.stderr,
+            )
+            webkit_cflags = []
+            webkit_libs = []
+        if win_lib:
+            web_lib = compile_stub(
+                MODULE_ROOT / "yue" / "web" / "webkit_stub.c",
+                "libyue_web.a",
+                extra_cflags=[
+                    *(["-DWB_HAVE_WEBKIT"] if webkit_cflags else []),
+                    *webkit_cflags,
+                ],
+            )
+            if web_lib:
+                entries.append({
+                    "package": WEB_PACKAGE,
+                    "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_web -lyue_win_stub "
+                    + " ".join([*libs, *webkit_libs, *sys_libs]),
+                })
         cairo_lib = compile_stub(
             MODULE_ROOT / "yue" / "render" / "stub.c",
             "librender_cairo_stub.a",
