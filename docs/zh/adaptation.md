@@ -79,6 +79,13 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **没有文字层时自绘控件塌成 0 尺寸**:纯光栅器平台上 `@text.measure` 给 `None`,`attach_text_measure` 的退化值是 `(0.0, 0.0)`,于是「宽度随文本」的按钮/标签/链接既测不出宽也点不中——`yue/ui` 有 20 条断言是这一类。处理口径:测试层加**运行时探针**(`ui_text_guard()` 试测 `"Ag"`、`ui_decode_guard()` 试解一张 GIF),探不到就打印跳过、其余断言照跑,等 W5(DirectWrite)/W9(WIC)落地自动复绿;`theme` 的「控件高度基准」同一处理。不在库里塞估算宽度:那是静默假数据,与「探测 + 语义化降级」的定案相悖。
 - **验证方式**(Windows 10 19045 + MSVC 14.44 + SDK 10.0.26100,moon 0.1.20260920):`moon test -p yue/sys` **163/163**(subproc 摘除后该包在 Windows 首次可编可跑)、chart 189/189、ui 110/110(20 条按探针跳过)、theme 8/8、core 70、render 43、input 10、mdview 26、icons 4 全绿;逐包 `moon check --deny-warn` 零警告、`moon check ./examples/native-app --deny-warn` 通过(此前被 subproc 挡在依赖阶段)、全仓红点 287 errors/68 warnings 与基线持平;`yue/text` 在 Windows 仍红,属 W5 范围(断言分「结构性共用/数值平台基线」两档改造随那一批做)。真窗口下的文件对话框观感(IFileDialog 的过滤项/多选/初始目录)留使用者复验。
 
+### MoonBit 原生 GUI 栈 · 批 A 多窗宿主的 Windows 跟进（W15：槽位复用 + wm_init 幂等）
+
+- **批 A 只修了 GTK 分支,同一条缺陷在 Windows 还在**:d1fb1e8 把 `yue/win/stub.c` 的 GTK 分支 `wm_window_new` 改成扫 `area == NULL` 复用槽位,`_WIN32` 分支(同一函数的另一条路)仍是 `wm_next_id++`——附窗反复开合会吃光 32 槽并让 `open_window` 静默返回 `None`。修法照 GTK 逐字对齐,判据换成 `hwnd == NULL`(建窗成功必设、`wm_close` 里 memset 清零,拆过的槽与没用过的槽同样可取)。
+- **真正拦住多窗的是 `wm_init` 不幂等**:`app_window()` 每开一扇窗都调一次 `@win.init_backend()`,而 Win32 的 `RegisterClassExW` **同名类重复注册返回 0**(`ERROR_CLASS_ALREADY_EXISTS`)——于是第一次成功、第二次起就返回「后端不可用」,`App::open_window` 在 Windows 上永远给 `None`(主窗反而是第一次调用,所以单窗示例一直正常)。修成「waker 窗口已在则整段直接返回 1」并把 `ERROR_CLASS_ALREADY_EXISTS` 视为成功。GTK 分支用 `gtk_init_check`,它本来就幂等,所以这条只在 Windows 露出来——**「一条路径两次调用」是批 A 引入的新形状,单窗时代的所有冒烟都测不到它**。
+- **回证方式(探针包 `experiment/multiwin_probe`)**:①建-拆 40 轮(> 桩的 `WM_MAX_WINDOWS=32` 上限)仍建得出,`opened=40 failed=0`;探针**只建不 show**,于是 40 次建拆不在桌面闪窗。②两轮「开附窗→泵 60ms→关掉它」,打印 `sub_wid/primary/active_is_sub/count` 与 `before/after/main_running`,证明多窗宿主在真有两个 HWND 时派发仍然成立:新窗即当前窗(`active_is_sub=true`)、`primary=false`、关附窗后主窗 `running=true` 且在窗数回落。③收尾 `MULTIWIN-DONE` 行 + 退出码 0。跑法 `moon run experiment/multiwin_probe`;无显示服务打印 `MULTIWIN SKIP`。真窗观感(两窗互相遮挡/拖动重绘、附窗里的 preedit)仍按 AGENTS 规则 6 留使用者复验;`examples/native-app` 在 Windows 的启动冒烟回证 `NATIVE-APP-MW wins=1 ... ` 与退出码 0(按钮点击需要注入,归 W7)。
+- **顺带补的口径**:`_WIN32` 分支调用 `snprintf` 却没引 `<stdio.h>`,MSVC 只给 `C4013 隐式声明;假定外部返回 int`——与「UCRT 无 `_getwcwd`」同形的静默坑,补头后本桩单编零警告。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。

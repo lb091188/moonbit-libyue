@@ -40,6 +40,9 @@
 #include <windows.h>
 #include <stdint.h>
 #include <string.h>
+// 本分支用 snprintf 格式化注册表读出的主色（缺了它 MSVC 报 C4013 隐式声明，
+// 默认返回 int 并与 varargs 混用，是「能编过但口径不可信」的形态）
+#include <stdio.h>
 
 #define WM_MAX_WINDOWS 32
 
@@ -399,6 +402,13 @@ static LRESULT CALLBACK wm_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 }
 
 int wm_init(void) {
+  // 幂等：批 A 的多窗宿主每开一扇都调一次后端初始化，而 Win32 的窗口类**同名
+  // 重复注册会失败**（ERROR_CLASS_ALREADY_EXISTS）——第一次成功之后就整段复用。
+  // 不这么做的话第二扇窗永远开不出（本机实测 App::open_window 返回 None，
+  // GTK 分支的 gtk_init_check 本来就幂等所以只在 Windows 露出来）。
+  if (wm_waker != NULL) {
+    return 1;
+  }
   HINSTANCE inst = GetModuleHandleW(NULL);
   WNDCLASSEXW wc;
   memset(&wc, 0, sizeof(wc));
@@ -408,13 +418,15 @@ int wm_init(void) {
   wc.hInstance = inst;
   wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
   wc.lpszClassName = L"yue_wm_window";
-  if (RegisterClassExW(&wc) == 0) {
+  if (RegisterClassExW(&wc) == 0 &&
+      GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
     return 0;
   }
   WNDCLASSEXW wk = wc;
   wk.lpfnWndProc = DefWindowProcW;
   wk.lpszClassName = L"yue_wm_waker";
-  if (RegisterClassExW(&wk) == 0) {
+  if (RegisterClassExW(&wk) == 0 &&
+      GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
     return 0;
   }
   wm_waker = CreateWindowExW(0, L"yue_wm_waker", L"", 0, 0, 0, 0, 0,
@@ -437,10 +449,22 @@ int wm_init(void) {
 }
 
 int64_t wm_window_new(int width, int height, const char *title) {
-  if (wm_next_id >= WM_MAX_WINDOWS) {
+  // 槽位复用（与 GTK 桩同一条修法）：多窗口宿主下附窗反复开合不能把 32 个槽
+  // 吃光，否则 open_window 静默返回 None。判据取 hwnd——建窗成功必设、wm_close
+  // 里 memset 清零，于是拆过的槽与没用过的槽同样可取。
+  int id = 0;
+  for (int i = 1; i < WM_MAX_WINDOWS; i++) {
+    if (wm_windows[i].hwnd == NULL) {
+      id = i;
+      break;
+    }
+  }
+  if (id == 0) {
     return 0;
   }
-  int id = wm_next_id++;
+  if (id >= wm_next_id) {
+    wm_next_id = id + 1;
+  }
   WmWindow *w = &wm_windows[id];
   memset(w, 0, sizeof(*w));
   w->width = width > 1 ? width : 1;
