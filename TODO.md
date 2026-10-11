@@ -61,7 +61,7 @@
 - [x] 表格 `components_table.mbt`（2/2）：`TableColumn`/`TableSort`/`TableCell`/`TableRow` 模型 + `table_t`（表头排序指示与状态机、斑马纹、悬停、行选择存源下标、四型单元格、`table_widths` 纯函数分列宽、表头边界拖动调列宽）落 `yue/ui/table.mbt`；`table_v_t`（万行级虚拟滚动，固定表头 + `virt_list`，与 `table_t` 共用 `table_header`/`table_row_widget`）落 `yue/ui/virtlist.mbt`。两条记档：排序状态归组件、排序口径归使用方（组件不替调用方排序）；列宽是活的（拖动只改样式不重建树；虚拟表靠 `rev` Store 整窗重挂）
 - [x] 浮层族 `components_overlay.mbt` + `overlays.mbt`（6/6）：浮层基座 `yue/core/overlay.mbt`（整窗图层、空则不可见、点外收起在抬起、临开临建、`overlay_show_full` 铺满档）与六件 `yue/ui/overlay.mbt`（`tooltip_t`/`popover_t`/`dropdown_menu`/`dialog_t`/`toast_layer`/`context_menu_for`）。三条记档：tooltip 因自绘栈没有原生 tooltip 通道改为「悬停延时 + 自绘气泡」（走宿主新加的 `on_hover_change` 与父链悬停语义）；dialog 从 master 的「页面内绝对定位遮罩」改为开在浮层图层上；toast 从「调用方挂层 + 推送函数」改为「推送时开在图层上、最后一条撤下即收」，入口只剩推送函数；右键走「祖先优先」派发（上下文菜单是容器级能力）
 - [x] 容器与滚动补充：垂直滚动条 `yue/ui/scroll.mbt`（滚轮 / 拖拇指 / 点轨道）+ 虚拟列表与粘性列表 `yue/ui/virtlist.mbt`（只挂可见区间 ±overscan、固定行高；粘性列表的「当前组」由每帧读各组矩形反推，吸顶条是视口里的绝对定位悬浮条）
-- [ ] 托盘：SNI 后端 + DBusMenu 协议（按规则 5 上真实总线 + 真实面板复验）
+- [x] 托盘：SNI 后端 + DBusMenu 协议（真实总线已验，真实面板观感由用户复验；见 `yue/dbus`）
 
 ### 主题、声明式与应用层
 - [~] 主题系统
@@ -109,7 +109,7 @@
 - [~] DBus 系在新事件循环下**重写/重验**：SNI 托盘（`traybus/sni.mbt`）、通知（新栈须重写 `org.freedesktop.Notifications`，含 `Notification::set_progress` 进度文本）、logind（`SetBrightness`/inhibit）、UPower、NetworkManager（`netmon`/`online`）、屏保 `screensaver`、媒体键 MPRIS（`media` 含状态监视轮询）
   - [x] 通用基建落新包 `yue/dbus`（`wire.mbt` 833 行 + `dbus.mbt` 419 行逐行平移，`bus.mbt` 剥掉 SNI/单实例语义后平移）：**不挂 glib fd 监视**——宿主周期调 `dbus_pump()`（缺省非阻塞）、断线自愈走 `dbus_set_post_delayed` 注入的通道，两者不注入时同步调用自带 `pump_until` 泵仍可用；socket 桩 `dbus_stub.c` 只用标准头、错误码与旧 shim 逐位一致；入站调用对外给 `CallReq`（`reply` 签名由参数值推导），线协议值类型不外泄。真总线回证 23/23（会话握手唯一名、ListNames、错误应答、AddMatch、系统总线 96 个名字）
   - [x] 能力模块首批（`yue/dbus`）：UPower / logind / netmon / screensaver / inhibit / MPRIS 逐行平移（测试同批平移并把旧 wbtest 的 inspect 换成 assert），MPRIS 轮询改排期通道注入；通知为新做（`GetCapabilities` 能力探测 + `Notify`/`CloseNotification`，进度 = `replaces_id` 重发 + 标准 hint `value`）；示例加 D-Bus 面板与「发通知(带进度)」按钮 + 宿主泵（`dbus_set_post_delayed` + 每 200ms `dbus_pump`），真窗口回证 `pool=:1.434`、通知能力 7 条
-  - [ ] SNI 托盘 + DBusMenu（含真实 XFCE 面板复验）
+  - [x] SNI 托盘 + DBusMenu 落 `yue/dbus`（sni/icon/instance/filemanager 平移，bus 的托盘挂钩同批接回）；协议侧真总线回证：点示例「托盘图标」后 watcher 的 `RegisteredStatusNotifierItems` 9→10、退出对称注销；面板观感（图标出现/右键菜单/点击计数）留用户真机复验
   - [ ] 单实例（总线名字 + Wake）与 `brightness` 的 logind `SetBrightness` 注入实做
 - [ ] DBus 通用基建：`bus`/`gdbus`/`wire`（41 内部 fn 编解码）/信号注册表/断线重连/注销与注册对称清理（CORE2 教训）
 - [ ] 新建项（master 全仓无资产，属新做）：任务栏进度、dock 徽标、勿扰

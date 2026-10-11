@@ -449,7 +449,11 @@ fn main {
   let btn_open : Ref[@core.Widget?] = Ref(None)
   let btn_reveal : Ref[@core.Widget?] = Ref(None)
   let btn_notify : Ref[@core.Widget?] = Ref(None)
+  let btn_tray : Ref[@core.Widget?] = Ref(None)
   let notify_hits = @core.Store::new(0)
+  let tray_item : Ref[@dbus.Item?] = Ref(None)
+  let tray_clicks = @core.Store::new(0)
+  let tray_state = @core.Store::new("托盘：未注册")
   let notify_state = @core.Store::new("通知：未发送")
   let sys_store = @core.Store::new(join_lines(probe_system(counts)))
   let desk_store = @core.Store::new(join_lines(probe_desktop(counts)))
@@ -596,6 +600,46 @@ fn main {
           min_width=130.0,
           handle=fn(w : @core.Widget) -> Unit { btn_notify.val = Some(w) },
         ),
+        @ui.button(
+          "托盘图标",
+          on_click=fn() -> Unit {
+            match tray_item.val {
+              Some(it) => {
+                it.unregister()
+                tray_item.val = None
+                tray_state.set("托盘：已移除")
+              }
+              None => {
+                match @dbus.Item::create("native-sys", "") {
+                  Ok(it) => {
+                    it.set_title("MoonBit 系统能力页")
+                    it.set_tooltip("MoonBit", "点一下计数（窗口里看）")
+                    it.add_menu_entry("刷新探测", true, fn() -> Unit { reprobe() })
+                    it.add_menu_entry("退出", true, fn() -> Unit { app.quit() })
+                    it.set_click_handler(fn() -> Unit {
+                      tray_clicks.update(fn(k : Int) -> Int { k + 1 })
+                      app.schedule_paint()
+                    })
+                    tray_item.val = Some(it)
+                    tray_state.set("托盘：已注册（面板里应出现图标）")
+                  }
+                  Err(e) => tray_state.set("托盘注册失败：" + e)
+                }
+              }
+            }
+            app.schedule_paint()
+          },
+          kind=@ui.Border,
+          min_width=110.0,
+          handle=fn(w : @core.Widget) -> Unit { btn_tray.val = Some(w) },
+        ),
+        @ui.label_dyn(tray_state.signal(), size=12.0),
+        @ui.label_dyn(
+          tray_clicks.signal().map(fn(k : Int) -> String {
+            "托盘点击 " + k.to_string() + " 次"
+          }),
+          size=12.0,
+        ),
         @ui.label_dyn(notify_state.signal(), size=12.0),
         @ui.label_dyn(clip_view.signal(), size=12.0),
       ],
@@ -609,12 +653,17 @@ fn main {
   let _ = app.timer(12000, fn() -> Unit { app.quit() })
   app.run()
   @sys.cbw_stop(watcher)
+  match tray_item.val {
+    Some(it) => it.unregister()
+    None => ()
+  }
   let mut geo = "NATIVE-SYS-GEO"
   for kv in [
     ("probe", btn_probe),
     ("open", btn_open),
     ("reveal", btn_reveal),
     ("notify", btn_notify),
+    ("tray", btn_tray),
   ] {
     match kv.1.val {
       Some(w) => geo = geo + " " + kv.0 + "=" + rect_str(w.rect)
@@ -631,6 +680,7 @@ fn main {
       "vsc=\{c.vscode} wins=\{c.windows} clip=\{c.clipboard} " +
       "probes=\{probes.get()} opens=\{opens.get()} reveals=\{reveals.get()} " +
       "changes=\{clip_changes.get()} ntf=\{notify_hits.get()} " +
+      "tray=\{tray_clicks.get()} " +
       "pool=\{@dbus.dbus_unique_name()}",
   )
   app.shutdown()

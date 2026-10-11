@@ -15,6 +15,8 @@ fn fake_conn() -> Conn {
     pending: (Map([]) : Map[Int, (Msg) -> Unit]),
     subs: (Map([]) : Map[String, Array[(Msg) -> Unit]]),
     match_rules: [],
+    items: (Map([]) : Map[String, Item]),
+    menus: (Map([]) : Map[String, Item]),
   }
 }
 

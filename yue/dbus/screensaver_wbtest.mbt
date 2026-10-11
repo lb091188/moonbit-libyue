@@ -37,6 +37,8 @@ test "订阅表按 服务名.ActiveChanged 分发" {
     pending: (Map([]) : Map[Int, (Msg) -> Unit]),
     subs: (Map([]) : Map[String, Array[(Msg) -> Unit]]),
     match_rules: [],
+    items: (Map([]) : Map[String, Item]),
+    menus: (Map([]) : Map[String, Item]),
   }
   let got = Ref("")
   c.subs.set("org.xfce.ScreenSaver.ActiveChanged", [

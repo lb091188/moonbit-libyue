@@ -19,6 +19,8 @@ priv struct Conn {
   pending : Map[Int, (Msg) -> Unit] // 串号 → 应答处理
   subs : Map[String, Array[(Msg) -> Unit]] // "接口.成员" → 信号回调
   match_rules : Array[String] // AddMatch 规则（断线重连后重放）
+  items : Map[String, Item] // 对象路径 → 托盘项
+  menus : Map[String, Item] // 菜单对象路径 → 托盘项（DBusMenu）
 }
 
 ///|
@@ -313,9 +315,71 @@ fn Conn::adopt_saved(self : Conn, bus : Int) -> Unit {
       for rule in old.match_rules {
         self.add_match(rule)
       }
+      if bus == 0 {
+        // 托盘项迁移；重新注册投回宿主通道（register_item_path 内部要
+        // call_sync 泵总线，在回调现场同步泵会让入站调用重入派发）
+        let paths : Array[String] = []
+        for k, it in old.items {
+          if !self.items.contains(k) {
+            self.items.set(k, it)
+            paths.push(k)
+          }
+        }
+        for k, it in old.menus {
+          if !self.menus.contains(k) {
+            self.menus.set(k, it)
+          }
+        }
+        if paths.length() > 0 {
+          post_delayed(0, fn() {
+            for p in paths {
+              if self.items.contains(p) {
+                let _ = self.register_item_path(p)
+              }
+            }
+          })
+        }
+      }
       let _ = g_saved.remove(bus)
     }
     None => ()
+  }
+}
+
+///|
+/// 从当前连接与断线暂存的旧连接里一并摘除托盘项（注销用）：连接已断时
+/// 当前表里没有，但暂存连接还持着本项，只清一边会让它重连后复活。
+fn sni_drop_item(path : String, menu_path : String) -> Unit {
+  match g_conn.val {
+    Some(c) => {
+      let _ = c.items.remove(path)
+      let _ = c.menus.remove(menu_path)
+    }
+    None => ()
+  }
+  match g_saved.get(0) {
+    Some(c) => {
+      let _ = c.items.remove(path)
+      let _ = c.menus.remove(menu_path)
+    }
+    None => ()
+  }
+}
+
+///|
+/// SNI 后端是否可用：能连上会话总线即视为候选；watcher 是否存在由
+/// Item::create 时的 NameHasOwner 确认。
+pub fn sni_available() -> Bool {
+  match g_conn.val {
+    Some(c) => c.alive
+    None =>
+      match connect_session() {
+        Ok(c) => {
+          g_conn.val = Some(c)
+          true
+        }
+        Err(_) => false
+      }
   }
 }
 
@@ -407,6 +471,8 @@ fn connect_unix(path : String, bus : Int) -> Result[Conn, String] {
     pending: (Map([]) : Map[Int, (Msg) -> Unit]),
     subs: (Map([]) : Map[String, Array[(Msg) -> Unit]]),
     match_rules: [],
+    items: (Map([]) : Map[String, Item]),
+    menus: (Map([]) : Map[String, Item]),
   }
   // SASL EXTERNAL：凭据是十六进制编码的 uid 字符串
   let uid = ffi_getuid()
@@ -772,6 +838,28 @@ fn Conn::handle(self : Conn, msg : Msg) -> Unit {
     return
   }
   if msg.kind == 4 {
+    // watcher 重启后按唯一名清掉旧注册，这里按新主人重注册全部托盘项
+    if msg.action == "NameOwnerChanged" && msg.body.length() >= 3 {
+      match dstr(msg.body[0]) {
+        Some(watched) =>
+          if watched == "org.kde.StatusNotifierWatcher" {
+            match dstr(msg.body[2]) {
+              Some(owner) =>
+                if owner != "" {
+                  let paths : Array[String] = []
+                  for k, _ in self.items {
+                    paths.push(k)
+                  }
+                  for p in paths {
+                    let _ = self.register_item_path(p)
+                  }
+                }
+              None => ()
+            }
+          }
+        None => ()
+      }
+    }
     // 信号：总线主动断开先判死
     if msg.action == "Disconnected" {
       self.mark_dead()
@@ -790,16 +878,24 @@ fn Conn::handle(self : Conn, msg : Msg) -> Unit {
     return
   }
   if msg.kind == 1 {
-    // 入站方法调用交给能力模块（托盘 SNI / 单实例唤醒等）；没登记处理者
-    // 时回 UnknownMethod，不能让对端干等
-    match g_on_call.val {
-      Some(f) => f(self, msg)
-      None =>
-        self.reply_error(
-          msg,
-          "org.freedesktop.DBus.Error.UnknownMethod",
-          "本进程未注册入站调用处理者",
-        )
+    // 入站调用三路：单实例 Wake（先应答后触发——第二实例的 call_sync 有时限，
+    // 回调里恢复窗口可能耗时）→ 托盘 SNI 的项与菜单调用 → 调用方登记的处理者；
+    // 都没接住时回 UnknownMethod，不能让对端干等
+    if is_wake_call(msg) {
+      self.reply(msg, "", [])
+      fire_wake(msg)
+    } else if self.items.contains(msg.path) || self.menus.contains(msg.path) {
+      self.handle_call(msg)
+    } else {
+      match g_on_call.val {
+        Some(f) => f(self, msg)
+        None =>
+          self.reply_error(
+            msg,
+            "org.freedesktop.DBus.Error.UnknownMethod",
+            "本进程未注册入站调用处理者",
+          )
+      }
     }
   }
 }
