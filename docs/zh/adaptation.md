@@ -113,6 +113,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **光标与候选窗**：`wm_im_set_cursor` 存矩形并在 `WM_IME_STARTCOMPOSITION` 时复喂一次（有些 IME 只在这时读位置）；`ImmSetCompositionWindow(CFS_POINT)` 与 `ImmSetCandidateWindow(CFS_CANDIDATEPOS)` 都贴光标**底边**（`y + h`），候选窗贴组合串末尾的惯例由此成立。`wm_im_reset` 走 `ImmNotifyIME(NI_COMPOSITIONSTR, CPS_CANCEL)` **并清本侧 preedit 缓存**——reset 后 IME 不一定再推组合消息，旧串留在缓存里会被继续画出来（GTK 侧同一条教训）。
 - **回证**：探针 `experiment/ime_win_probe`（建窗 → 报插入符矩形 → reset → 读 commit/preedit → 泵 30 轮消息 → 干净退出）读数如预期（commit=none、preedit 空）且零崩溃；`experiment/multiwin_probe` 与 `examples/native-app` 冒烟在 WndProc 加消息分支后仍全绿（退出码 0）。**真实拼音的端到端**（preedit 下划线观感、候选窗位置、commit 落进焦点框）需要注入键入，归 W7 的 SendInput 探针与使用者真机复验——本机已装微软拼音（zh-Hans-CN，唯一 IME），路径可行。
 
+### MoonBit 原生 GUI 栈 · 系统剪贴板（W16）
+
+- **能力落 `yue/sys`（新 `clipboard.mbt` + `sys_stub.c` 的 `_WIN32` 分支）**：Windows 走 `CF_UNICODETEXT`（`OpenClipboard`/`GetClipboardData`/`GlobalLock` 读，`GlobalAlloc(GMEM_MOVEABLE)`+`SetClipboardData` 写——**成功后所有权归系统，绝不能 `GlobalFree`**，这是 Win32 剪贴板的经典坑）；Linux/mac 走命令线（`xclip -selection clipboard` / `pbcopy`·`pbpaste`）。中文内容必须走宽串（`win_utf8_wide`）+ 宽→UTF-8，A 版 API 按 ANSI 代码页会把内容搅乱（同 W14 的环境变量一条）。
+- **命令线传文本要绕开引号地狱**：`pr_run` 不做 shell 解析，所以显式 `sh -c 'printf %s "$1" | xclip -selection clipboard' sh <文本>`——文本走 **argv 的第 4 个位置**（脚本里的 `$1`），不拼进脚本体，引号、换行、中文都无需转义。
+- **链接面漏过一处**：剪贴板 API 在 **user32.lib**，而 sys 包原先的 Windows 链接参数只有 `ole32.lib shell32.lib uuid.lib`——漏了就是 `LNK2019: __imp_SetClipboardData` 一串，已补（记档：Windows 侧每引一组新 API 都要核对它在哪个 .lib 里）。
+- **接线走「内核槽」而不是内核直连平台**：`yue/input` 的 `Editor::set_clipboard(get, set)` 给内核留外部剪贴板槽——`copy`/`cut` 顺手写出去、`Ctrl+V` 现取（取不到回退内置 `clip`），内核本身仍不依赖任何平台层（无头可测）。**默认不装**：`yue/ui` 的 `use_system_clipboard(true)` 由应用显式打开（`examples/native-app` 里一行）——测试里的 Ctrl+X 不该动使用者的剪贴板；探测不可用（Linux 没装 xclip）时自动保持内部剪贴板，属语义化降级。
+- **测试**：sys 新增回环用例（中文 + 换行的 `set → get`），**写入前把原内容存档、断言完还原**（探针不在使用者的剪贴板里留痕）；Windows 本机 `moon test -p yue/sys` **165/165**（新增 2 条），ui 110/110、input 10/10 无回归。真跨程序粘贴（复制出去、粘到记事本再粘回来）留使用者复验。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。

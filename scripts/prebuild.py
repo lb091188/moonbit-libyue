@@ -205,7 +205,7 @@ def link_configs() -> dict:
         # ShellExecuteW 在 shell32，子进程与文件函数属 kernel32（默认已链）。
         entries.append({
             "package": SYS_PACKAGE,
-            "link_flags": "ole32.lib shell32.lib uuid.lib",
+            "link_flags": "ole32.lib shell32.lib uuid.lib user32.lib",
         })
         # 文本层（yue/text/dwrite_text.cpp 的 Windows 分支）走系统 DirectWrite：
         # dwrite.lib 供 DWriteCreateFactory、d2d1.lib 供 D2D 的 DC 渲染目标

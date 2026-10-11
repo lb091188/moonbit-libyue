@@ -1074,6 +1074,81 @@ int32_t yue_sys_proc_getpid(void) { return (int32_t)getpid(); }
 #endif
 
 // ---------------------------------------------------------------------------
+// 系统剪贴板（W16）：Windows 走 Win32 的 CF_UNICODETEXT（读回 UTF-8 文本）；
+// POSIX 侧不经本桩（Linux/mac 的 xclip/pbpaste 走 pr_run 的命令线，见
+// yue/sys/clipboard.mbt）。个别时刻剪贴板被别的进程占着时 OpenClipboard
+// 会失败——按「拿不到」返回，调用方回退，不重试不等待。
+// ---------------------------------------------------------------------------
+
+void *yue_sys_clipboard_get_text(int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  if (!OpenClipboard(NULL)) {
+    return moonbit_make_bytes(0, 0);
+  }
+  HANDLE h = GetClipboardData(CF_UNICODETEXT);
+  if (h == NULL) {
+    CloseClipboard();
+    return moonbit_make_bytes(0, 0);
+  }
+  wchar_t *w = (wchar_t *)GlobalLock(h);
+  if (w == NULL) {
+    CloseClipboard();
+    return moonbit_make_bytes(0, 0);
+  }
+  void *out = win_wide_bytes(w);
+  GlobalUnlock(h);
+  CloseClipboard();
+  *ok = 1;
+  return out;
+#else
+  return moonbit_make_bytes(0, 0);
+#endif
+}
+
+int32_t yue_sys_clipboard_set_text(const char *text) {
+#if defined(_WIN32)
+  if (text == NULL) {
+    return -1;
+  }
+  // 宽字符路由：剪贴板是 UTF-16 的（CF_UNICODETEXT），中文内容必须走宽串
+  wchar_t *w = win_utf8_wide(text, 0);
+  if (w == NULL) {
+    return -1;
+  }
+  size_t bytes = (wcslen(w) + 1) * sizeof(wchar_t);
+  if (!OpenClipboard(NULL)) {
+    free(w);
+    return -1;
+  }
+  int rc = -1;
+  if (EmptyClipboard()) {
+    HGLOBAL h = GlobalAlloc(GMEM_MOVEABLE, bytes);
+    if (h != NULL) {
+      void *dst = GlobalLock(h);
+      if (dst != NULL) {
+        memcpy(dst, w, bytes);
+        GlobalUnlock(h);
+        if (SetClipboardData(CF_UNICODETEXT, h) != NULL) {
+          rc = 0; // 成功后所有权归系统：绝不能再 GlobalFree
+          h = NULL;
+        }
+      }
+      if (h != NULL) {
+        GlobalFree(h);
+      }
+    }
+  }
+  CloseClipboard();
+  free(w);
+  return rc;
+#else
+  (void)text;
+  return -1;
+#endif
+}
+
+// ---------------------------------------------------------------------------
 // 文件对话框（wm_file_* 符号）
 //
 // Linux 端这些符号在 yue/win/stub.c 的 WM_STUB_GTK 分支（GtkFileChooserDialog

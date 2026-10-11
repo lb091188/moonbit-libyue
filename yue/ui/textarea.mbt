@@ -181,6 +181,7 @@ pub fn textarea(
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let ed = @input.Editor::new()
+  attach_system_clipboard(ed)
   let _ = ed.insert_text(store.get())
   let font = @text.Font::new(family, size)
   let pad = 4.0

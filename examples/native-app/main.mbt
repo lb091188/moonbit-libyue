@@ -1205,6 +1205,9 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
+  // 输入框的 Ctrl+C/X/V 接系统剪贴板（默认关：测试里的 Ctrl+X 不该动使用者
+  // 的剪贴板）；探测不可用（Linux 无 xclip 等）时自动保持内部剪贴板
+  @ui.use_system_clipboard(true)
   let app = match @core.App::new(1400, 3520, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
