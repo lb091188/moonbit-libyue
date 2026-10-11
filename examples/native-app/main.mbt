@@ -5,7 +5,7 @@
 //
 // 批次 1（App 宿主 + TextEditorHost 收口）：整窗由 `@core.App` 驱动——循环、
 // 事件翻译、焦点栈、输入法四条件、脏标上屏都在宿主里，界面内容只是一棵
-// `@core.Widget` 树。跑法：moon run examples/native-app（需显示服务），9 秒后
+// `@core.Widget` 树。跑法：moon run examples/native-app（需显示服务），12 秒后
 // 自动退出并打印状态行（注入点位多，留够一轮全交互的时间）。
 //
 // 批次 3（字体）：末尾一行演示「族名回退 + 混排行高」，两个盒子的盒高都来自
@@ -404,7 +404,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1620, 900, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1400, 1260, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -557,6 +557,10 @@ fn main {
   let nav2_xfer : Ref[@core.Widget?] = Ref(None)
   let scr = @ui.ScrollState::new()
   let scr_w : Ref[@core.Widget?] = Ref(None)
+  let ov_pick = Ref(0)
+  let ov_dd : Ref[@core.Widget?] = Ref(None)
+  let ov_pop : Ref[@core.Widget?] = Ref(None)
+  let ov_tip : Ref[@core.Widget?] = Ref(None)
   app.mount([
     @ui.container(
       [
@@ -667,6 +671,50 @@ fn main {
           ],
           width=300.0,
           row_gap=6.0,
+          padding=6.0,
+          align_items=@yoga.AlignItems::FlexStart,
+          bg=@theme.theme_bg_page(),
+          border=@theme.theme_border(),
+        ),
+      ],
+      direction=@yoga.Row,
+      column_gap=8.0,
+      padding=8.0,
+      align_items=@yoga.AlignItems::FlexStart,
+      bg=@theme.theme_bg_page(),
+      border=@theme.theme_border(),
+    ),
+    // 第二排：浮层 / 滚动 / 导航族次批（竖屏 1440 宽放不下七列）
+    @ui.container(
+      [
+        @ui.container(
+          [
+            @ui.label("浮层首批", size=13.0),
+            @ui.dropdown_menu(
+              "操作",
+              ["重命名", "复制", "-", "删除"],
+              on_select=fn(i : Int) -> Unit { ov_pick.val = i + 1 },
+              handle=fn(w : @core.Widget) -> Unit { ov_dd.val = Some(w) },
+            ),
+            @ui.popover_t(
+              @ui.button("气泡", min_width=70.0),
+              @ui.container(
+                [@ui.label("气泡内容", size=12.0), @ui.label("点外面收起", size=11.0)],
+                padding=6.0,
+                row_gap=4.0,
+              ),
+              width=130.0,
+              handle=fn(w : @core.Widget) -> Unit { ov_pop.val = Some(w) },
+            ),
+            @ui.tooltip_t(
+              @ui.button("悬我", min_width=70.0),
+              "延时 500ms 的自绘气泡",
+              delay_ms=300,
+              handle=fn(w : @core.Widget) -> Unit { ov_tip.val = Some(w) },
+            ),
+          ],
+          width=180.0,
+          row_gap=8.0,
           padding=6.0,
           align_items=@yoga.AlignItems::FlexStart,
           bg=@theme.theme_bg_page(),
@@ -789,7 +837,7 @@ fn main {
   let _ = app.timer(500, blinker.val)
   // 累积验证页越排越宽，注入点位也跟着多——存活窗口给到 9 秒才够把全部
   // 交互注完一轮（原来 5 秒时后几击会赶上退出）
-  let _ = app.timer(9000, fn() { app.quit() })
+  let _ = app.timer(12000, fn() { app.quit() })
 
   app.run()
   // 卸载前停转（自排链不认识视图已移除；本例循环已 quit，这里是示范正确收尾）
@@ -818,7 +866,7 @@ fn main {
     None => "-"
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()}"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val}"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -899,6 +947,21 @@ fn main {
   }
 
   println("NATIVE-APP-NAV2 menu2=" + n2_menu2 + " tree0=" + n2_tree0 + " tab2=" + n2_tab2 + " xrow=" + n2_xfer_row + " xbtn=" + n2_xfer_btn)
+  let ov_dd_rect = match ov_dd.val {
+    Some(w) => rect_str(w.rect)
+    None => "-"
+  }
+  let ov_pop_rect = match ov_pop.val {
+    Some(w) => rect_str(w.rect)
+    None => "-"
+  }
+  let ov_tip_rect = match ov_tip.val {
+    Some(w) => rect_str(w.rect)
+    None => "-"
+  }
+  println(
+    "NATIVE-APP-OV dd=" + ov_dd_rect + " pop=" + ov_pop_rect + " tip=" + ov_tip_rect,
+  )
   // 导航族四个注入点：分段第二段 / 面包屑第二段 / 第 3 页 / 第二块标题行
   let mut nav_line = "NATIVE-APP-NAV"
   let seg2 = match nav_seg.val {

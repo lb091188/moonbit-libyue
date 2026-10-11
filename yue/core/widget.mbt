@@ -88,6 +88,11 @@ pub(all) struct Widget {
   /// 键盘焦点标志：同样由宿主维护（焦点栈里只有 focus_id，控件画高亮时
   /// 要知道「那个 id 是不是我」），组件不必自己去问焦点栈
   mut focused : Bool
+  /// 悬停状态变化回调（入参是本控件与新的悬停值）：给「要按悬停起停定时器」的
+  /// 组件用（悬浮提示）。宿主只在悬停归属变化时调用，且父链上的控件同样算悬停
+  /// （与 CSS `:hover` 同义），所以包住别人的组件也能收到——不必依赖子控件把
+  /// 移动事件冒泡上来（子控件可能自己消费掉移动）。
+  mut on_hover_change : Option[(Widget, Bool) -> Unit]
   /// 输入法提交文本到达本控件（宿主按焦点 id 路由）；返回是否消费。
   mut on_commit : Option[(String) -> Bool]
   /// 组合串更新（文本 + 串内字节光标）；宿主每拍投给焦点控件。
@@ -120,6 +125,7 @@ pub fn Widget::new() -> Widget {
     hovered: false,
     pressed: false,
     focused: false,
+    on_hover_change: None,
     on_commit: None,
     on_preedit: None,
     im_context: None,
@@ -420,12 +426,36 @@ pub fn Widget::set_focused_by_focus(self : Widget, focus_id : Int) -> Unit {
 }
 
 ///|
-/// 把悬停态交给 id 对应的控件（`id` 为 0 或负数表示全部清掉）。
-/// 只有一趟遍历，且只在悬停者**变化**时由宿主调用。
+/// 把悬停态交给 id 对应的控件**及其祖先链**（与 CSS `:hover` 同义：指针在子项上
+/// 时父项也算悬停），`id` 为 0 或负数表示全部清掉。只有一趟遍历，且只在悬停者
+/// 变化时由宿主调用；状态翻转时按控件触发 `on_hover_change`。
 pub fn Widget::set_hover(self : Widget, id : Int) -> Unit {
-  self.hovered = self.id == id
+  let path = if id > 0 {
+    path_to_widget(self, id, [])
+  } else {
+    let empty : Array[Widget] = []
+    empty
+  }
+  self.apply_hover_path(path)
+}
+
+///|
+fn Widget::apply_hover_path(self : Widget, path : Array[Widget]) -> Unit {
+  let mut on = false
+  for w in path {
+    if w.id == self.id {
+      on = true
+    }
+  }
+  if self.hovered != on {
+    self.hovered = on
+    match self.on_hover_change {
+      Some(f) => f(self, on)
+      None => ()
+    }
+  }
   for k in self.kids {
-    k.set_hover(id)
+    k.apply_hover_path(path)
   }
 }
 

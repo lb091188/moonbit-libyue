@@ -181,3 +181,41 @@ test "滚轮沿用同一传播规则（命中控件起向上冒泡到容器）" 
   assert_true(handled)
   assert_eq(log, ["child", "root"])
 }
+
+///|
+test "悬停带父链语义（CSS :hover 同义），翻转时触发 on_hover_change" {
+  let root = Widget::new()
+  root.set_size(200.0, 100.0)
+  root.set_column()
+  let outer = Widget::new()
+  outer.set_size(120.0, 60.0)
+  let leaf = Widget::new()
+  leaf.set_size(40.0, 20.0)
+  let sib = Widget::new()
+  sib.set_size(40.0, 20.0)
+  outer.append_child(leaf)
+  root.append_child(outer)
+  root.append_child(sib)
+  root.relayout(200.0, 100.0)
+  let fired : Array[(Int, Bool)] = []
+  outer.on_hover_change = Some(fn(w : Widget, on : Bool) -> Unit {
+    fired.push((w.id, on))
+  })
+
+  root.set_hover(leaf.id)
+  // 命中链上的三层都算悬停，兄弟不算
+  assert_eq((root.hovered, outer.hovered, leaf.hovered, sib.hovered), (true, true, true, false))
+  assert_eq(fired.length(), 1)
+  assert_eq(fired[0], (outer.id, true))
+  // 同一状态重复设置不重复回调
+  root.set_hover(leaf.id)
+  assert_eq(fired.length(), 1)
+  // 换到兄弟：父链整体翻掉
+  root.set_hover(sib.id)
+  assert_eq((outer.hovered, leaf.hovered, sib.hovered), (false, false, true))
+  assert_eq(fired.length(), 2)
+  assert_eq(fired[1], (outer.id, false))
+  // 清空
+  root.set_hover(0)
+  assert_eq((root.hovered, sib.hovered), (false, false))
+}

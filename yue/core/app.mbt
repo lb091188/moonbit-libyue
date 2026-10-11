@@ -77,6 +77,8 @@ pub fn App::new(width : Int, height : Int, title : String) -> App? {
       window.request_focus()
       // 声明式层的 invalidate() 从这里回到本宿主的脏标（见 node.mbt）
       set_repaint_hook(fn() { app.schedule_paint() })
+      // 浮层图层：挂在根控件最后、默认不可见（见 overlay.mbt）
+      set_overlay_host(make_overlay_host(app.root))
       // 组件层的延时任务（如轮播自转）从这里回到本宿主的定时器
       set_timer_hooks(
         fn(ms : Int, f : () -> Unit) -> Int { app.sched.timer(ms, f) },
@@ -95,6 +97,8 @@ pub fn App::new(width : Int, height : Int, title : String) -> App? {
 /// 重挂走 `bind_node` 的原位替换；挂完标一次脏，下一帧就有内容。
 pub fn App::mount(self : App, children : Array[Node]) -> Unit {
   mount_children(self.root, children)
+  // 新挂的内容会排在浮层图层之后，把图层挪回最后（浮层始终在上）
+  overlay_raise()
   self.schedule_paint()
 }
 
