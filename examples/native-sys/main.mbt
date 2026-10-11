@@ -1,0 +1,573 @@
+// examples/native-sys —— 系统能力（`yue/sys`）的**累积**验证示例：每落地一族
+// 就把读数接进本页，同族不另开示例（GUI 侧的累计页是 `examples/native-app`）。
+//
+// 跑法：`moon run examples/native-sys`（需显示服务），12 秒后自动退出并打印
+// 状态行。屏上每行一个**只读**探测；「重新探测」按钮也是只读（注入回证用它），
+// 「打开链接」「打开目录」是设置类——点了才交给系统，观感由使用者复验。
+
+///|
+priv struct Counts {
+  mut os_id : String
+  mut desktop : String
+  mut monitors : Int
+  mut wallpaper : String
+  mut volume : Int
+  mut profile : String
+  mut mime : String
+  mut default_app : String
+  mut apps : Int
+  mut recent : Int
+  mut hist : Int
+  mut downloads : Int
+  mut bookmarks : Int
+  mut firefox : Int
+  mut vscode : Int
+  mut windows : Int
+  mut clipboard : Int
+}
+
+///|
+fn empty_counts() -> Counts {
+  {
+    os_id: "-",
+    desktop: "-",
+    monitors: 0,
+    wallpaper: "-",
+    volume: -1,
+    profile: "-",
+    mime: "-",
+    default_app: "-",
+    apps: 0,
+    recent: 0,
+    hist: 0,
+    downloads: 0,
+    bookmarks: 0,
+    firefox: 0,
+    vscode: 0,
+    windows: 0,
+    clipboard: -1,
+  }
+}
+
+///|
+/// 用分隔符拼接字符串表（不依赖 core/string 的包别名）。
+fn join_with(items : Array[String], sep : String) -> String {
+  let buf = StringBuilder()
+  let mut first = true
+  for x in items {
+    if !first {
+      buf.write_string(sep)
+    }
+    buf.write_string(x)
+    first = false
+  }
+  buf.to_string()
+}
+
+///|
+/// 首行 + 按码点截断（读数可能多行、含非 ASCII，直接切片会踩码点边界）。
+fn one_line(s : String, max : Int) -> String {
+  let buf = StringBuilder()
+  let mut n = 0
+  for ch in s {
+    if ch == '\n' || n >= max {
+      break
+    }
+    buf.write_char(ch)
+    n = n + 1
+  }
+  buf.to_string()
+}
+
+///|
+/// 秒 → 人读时长（天/小时/分）。
+fn fmt_uptime(secs : Double) -> String {
+  let total = secs.to_int()
+  let d = total / 86400
+  let h = (total % 86400) / 3600
+  let m = (total % 3600) / 60
+  if d > 0 {
+    "\{d} 天 \{h} 时 \{m} 分"
+  } else if h > 0 {
+    "\{h} 时 \{m} 分"
+  } else {
+    "\{m} 分"
+  }
+}
+
+///|
+/// kB → GB（一位小数）。
+fn fmt_gb(kb : Int) -> String {
+  let gb = kb.to_double() / 1024.0 / 1024.0
+  gb.round().to_int().to_string() + " GB"
+}
+
+// ---------------------------------------------------------------------------
+// 各段只读探测（返回键值行，同时回填计数供退出状态行使用）
+// ---------------------------------------------------------------------------
+
+///|
+fn probe_system(counts : Ref[Counts]) -> Array[(String, String)] {
+  let rows : Array[(String, String)] = []
+  match @sys.si_os() {
+    Ok(os) => {
+      counts.val.os_id = os.id
+      rows.push(("发行版", os.pretty_name))
+      rows.push(("id / 版本", os.id + " / " + os.version_id))
+    }
+    Err(e) => rows.push(("发行版", "读不到：" + e.to_string()))
+  }
+  match @sys.si_machine() {
+    Ok(m) =>
+      rows.push((
+        "机器",
+        one_line(m.vendor + " / " + m.product + " / " + m.serial, 60),
+      ))
+    Err(e) =>
+      // 序列号在多数发行版上仅 root 可读，读不到就报状态而不是糊成空串
+      rows.push(("机器", "读不到：" + e.to_string()))
+  }
+  match @sys.si_memory() {
+    Ok(mem) =>
+      rows.push((
+        "内存",
+        "总 " +
+          fmt_gb(mem.total_kb) + " / 可用 " + fmt_gb(mem.available_kb),
+      ))
+    Err(e) => rows.push(("内存", "读不到：" + e.to_string()))
+  }
+  match @sys.si_uptime() {
+    Ok(secs) => rows.push(("开机时长", fmt_uptime(secs)))
+    Err(e) => rows.push(("开机时长", "读不到：" + e.to_string()))
+  }
+  counts.val.desktop = @sys.desktop_name()
+  rows.push(("桌面环境", @sys.desktop_name() + "（" + @sys.sys_platform() + "）"))
+  rows.push(("常用环境变量", "\{@sys.envx_common().length()} 项"))
+  rows
+}
+
+///|
+fn probe_desktop(counts : Ref[Counts]) -> Array[(String, String)] {
+  let rows : Array[(String, String)] = []
+  match @sys.mon_list() {
+    Ok(list) => {
+      counts.val.monitors = list.length()
+      let names : Array[String] = []
+      for m in list {
+        if m.connected {
+          names.push(m.name + (if m.primary { "*" } else { "" }))
+        }
+      }
+      rows.push(("显示器", "\{list.length()} 个，已连接：" + join_with(names, ",")))
+    }
+    Err(e) => rows.push(("显示器", "读不到：" + e.to_string()))
+  }
+  match @sys.wp_get() {
+    Ok(path) => {
+      counts.val.wallpaper = "ok"
+      rows.push(("壁纸", one_line(path, 60)))
+    }
+    Err(e) => {
+      counts.val.wallpaper = "err"
+      rows.push(("壁纸", e.to_string()))
+    }
+  }
+  match @sys.vol_get() {
+    Ok(v) => {
+      counts.val.volume = v.volume
+      rows.push((
+        "音量",
+        "\{v.volume}%（\{v.sink}\{if v.muted { " 静音" } else { "" }}）",
+      ))
+    }
+    Err(e) => rows.push(("音量", e.to_string()))
+  }
+  match @sys.pp_current() {
+    Ok(p) => {
+      counts.val.profile = p.to_string()
+      rows.push(("电源计划", p.to_string()))
+    }
+    Err(e) => rows.push(("电源计划", e.to_string()))
+  }
+  rows.push(
+    (
+      "亮度",
+      if @sys.brightness_supported() {
+        match @sys.brightness_devices() {
+          Ok(list) => "设备 " + (list.length()).to_string() + " 个"
+          Err(e) => e.to_string()
+        }
+      } else {
+        "无 backlight 设备"
+      },
+    ),
+  )
+  rows.push(("夜灯", if @sys.nl_supported() { "可用（redshift/gamma 在）" } else { "不可用" }))
+  rows.push(
+    (
+      "打印机",
+      match @sys.prt_default() {
+        Ok(name) => "默认：" + name
+        Err(_) =>
+          if @sys.prt_supported() { "有 CUPS，无默认机" } else { "无 lp 命令" }
+      },
+    ),
+  )
+  rows
+}
+
+///|
+fn probe_apps(counts : Ref[Counts]) -> Array[(String, String)] {
+  let rows : Array[(String, String)] = []
+  match @sys.appfind_installed() {
+    Ok(list) => {
+      counts.val.apps = list.length()
+      let first : Array[String] = []
+      for i in 0..<list.length() {
+        if i >= 3 {
+          break
+        }
+        first.push(list[i].name)
+      }
+      rows.push(
+        ("已装应用", "\{list.length()} 个，例如：" + join_with(first, "、")),
+      )
+    }
+    Err(e) => rows.push(("已装应用", e.to_string()))
+  }
+  if @sys.da_supported() {
+    match @sys.da_file_type("/etc/hostname") {
+      Ok(mime) => {
+        counts.val.mime = mime
+        rows.push(
+          ("文件类型（/etc/hostname）", mime),
+        )
+      }
+      Err(e) => rows.push(("文件类型（/etc/hostname）", e.to_string()))
+    }
+    match @sys.da_default_for("text/plain") {
+      Ok(name) => {
+        counts.val.default_app = name
+        rows.push(("text/plain 默认应用", name))
+      }
+      Err(e) => rows.push(("text/plain 默认应用", e.to_string()))
+    }
+  } else {
+    rows.push(("xdg-mime", "不在 PATH"))
+  }
+  rows
+}
+
+///|
+fn probe_history(counts : Ref[Counts]) -> Array[(String, String)] {
+  let rows : Array[(String, String)] = []
+  match @sys.rf_recent(limit=0) {
+    Ok(items) => {
+      counts.val.recent = items.length()
+      let first = if items.length() > 0 {
+        one_line(items[0].path, 48)
+      } else {
+        "-"
+      }
+      rows.push(("最近文件", "\{items.length()} 条，首条：" + first))
+    }
+    Err(e) => rows.push(("最近文件", e.to_string()))
+  }
+  match @sys.bh_browsers() {
+    Ok(profiles) => {
+      rows.push(("浏览器 profile", "\{profiles.length()} 个有 History 库"))
+      match @sys.bh_history(limit=5) {
+        Ok(items) => {
+          counts.val.hist = items.length()
+          let first = if items.length() > 0 {
+            one_line(items[0].url, 48)
+          } else {
+            "-"
+          }
+          rows.push(("浏览历史样本", "\{items.length()} 条，最新：" + first))
+        }
+        Err(e) => rows.push(("浏览历史样本", e.to_string()))
+      }
+      match @sys.bh_downloads(limit=5) {
+        Ok(list) => {
+          counts.val.downloads = list.length()
+          rows.push(("下载样本", "\{list.length()} 条"))
+        }
+        Err(e) => rows.push(("下载样本", e.to_string()))
+      }
+    }
+    Err(e) => rows.push(("浏览器历史", e.to_string()))
+  }
+  match @sys.bm_browsers() {
+    Ok(list) =>
+      if list.length() > 0 {
+        let p = list[0]
+        match @sys.bm_bookmarks(p.browser) {
+          Ok(root) => {
+            let n = @sys.bm_flatten(root).length()
+            counts.val.bookmarks = n
+            rows.push(("书签", "\{p.browser}/\{p.profile}：\{n} 条"))
+          }
+          Err(e) => rows.push(("书签", e.to_string()))
+        }
+      }
+    Err(e) => rows.push(("书签", e.to_string()))
+  }
+  if @sys.ffx_supported() {
+    match @sys.ffx_profiles() {
+      Ok(list) => {
+        counts.val.firefox = list.length()
+        rows.push(("Firefox profile", "\{list.length()} 个"))
+      }
+      Err(e) => rows.push(("Firefox profile", e.to_string()))
+    }
+  } else {
+    rows.push(("Firefox", "本机无 profiles.ini / places.sqlite"))
+  }
+  if @sys.vsc_supported() {
+    match @sys.vsc_recent() {
+      Ok(list) => {
+        counts.val.vscode = list.length()
+        rows.push(("VS Code 最近", "\{list.length()} 项"))
+      }
+      Err(e) => rows.push(("VS Code 最近", e.to_string()))
+    }
+  } else {
+    rows.push(("VS Code", "本机无用户数据目录"))
+  }
+  rows
+}
+
+///|
+fn probe_windows(counts : Ref[Counts]) -> Array[(String, String)] {
+  let rows : Array[(String, String)] = []
+  match @sys.win_list() {
+    Ok(list) => {
+      counts.val.windows = list.length()
+      let first = if list.length() > 0 {
+        one_line(list[0].title, 44)
+      } else {
+        "-"
+      }
+      rows.push(("窗口（wmctrl）", "\{list.length()} 个，首个：" + first))
+    }
+    Err(e) => rows.push(("窗口（wmctrl）", e.to_string()))
+  }
+  match @sys.cbw_get_text() {
+    Ok(t) => {
+      counts.val.clipboard = t.length()
+      rows.push(("剪贴板", "\{t.length()} 字符：" + one_line(t, 44)))
+    }
+    Err(e) => rows.push(("剪贴板", e.to_string()))
+  }
+  rows
+}
+
+///|
+/// 一列面板：标题 + 多行读数（整块一个标签，换行由文本自身带）。
+fn panel(
+  title : String,
+  lines : @core.Signal[String],
+  width : Double,
+) -> @core.Node {
+  @ui.container(
+    [
+      @ui.label(title, size=13.0, weight=@text.SemiBold),
+      @ui.label_dyn(lines, size=12.0, wrap=true, max_width=width - 20.0),
+    ],
+    width=width,
+    row_gap=4.0,
+    padding=8.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_panel(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
+fn join_lines(rows : Array[(String, String)]) -> String {
+  let buf = StringBuilder()
+  let mut first = true
+  for r in rows {
+    if !first {
+      buf.write_char('\n')
+    }
+    buf.write_string(r.0)
+    buf.write_string("：")
+    buf.write_string(r.1)
+    first = false
+  }
+  buf.to_string()
+}
+
+///|
+fn rect_str(r : @core.Rect) -> String {
+  r.x.round().to_int().to_string() +
+    "," +
+    r.y.round().to_int().to_string() +
+    "," +
+    r.w.round().to_int().to_string() +
+    "x" +
+    r.h.round().to_int().to_string()
+}
+
+///|
+fn main {
+  let app = match @core.App::new(1200, 1180, "MoonBit 系统能力 (native-sys)") {
+    Some(a) => a
+    None => {
+      println("NATIVE-SYS-SKIP: 本平台无窗口后端或没有显示服务")
+      return
+    }
+  }
+  let counts : Ref[Counts] = Ref(empty_counts())
+  let probes = @core.Store::new(0)
+  let opens = @core.Store::new(0)
+  let reveals = @core.Store::new(0)
+  let clip_changes = @core.Store::new(0)
+  let clip_view = @core.Store::new("剪贴板监听：启动时以当前内容作基线，变化才派发")
+  let btn_probe : Ref[@core.Widget?] = Ref(None)
+  let btn_open : Ref[@core.Widget?] = Ref(None)
+  let btn_reveal : Ref[@core.Widget?] = Ref(None)
+  let sys_store = @core.Store::new(join_lines(probe_system(counts)))
+  let desk_store = @core.Store::new(join_lines(probe_desktop(counts)))
+  let apps_store = @core.Store::new(join_lines(probe_apps(counts)))
+  let hist_store = @core.Store::new(join_lines(probe_history(counts)))
+  let wins_store = @core.Store::new(join_lines(probe_windows(counts)))
+
+  fn reprobe() -> Unit {
+    sys_store.set(join_lines(probe_system(counts)))
+    desk_store.set(join_lines(probe_desktop(counts)))
+    apps_store.set(join_lines(probe_apps(counts)))
+    hist_store.set(join_lines(probe_history(counts)))
+    wins_store.set(join_lines(probe_windows(counts)))
+    probes.update(fn(n : Int) -> Int { n + 1 })
+    app.schedule_paint()
+  }
+
+  // 剪贴板监听：排期通道由宿主注入（yue/sys 不引 GUI 核心层）
+  let watcher = @sys.cbw_start_watch(
+    fn(ms : Int, f : () -> Unit) -> Unit {
+      let _ = app.timer(ms, f)
+    },
+    fn(text : String) -> Unit {
+      clip_changes.update(fn(n : Int) -> Int { n + 1 })
+      clip_view.set("剪贴板变化 " + (clip_changes.get()).to_string() + " 次：" + one_line(text, 40))
+      app.schedule_paint()
+    },
+    interval_ms=1000,
+  )
+
+  let root = app.root
+  root.set_column()
+  app.mount([
+    @ui.container(
+      [
+        @ui.label(
+          "系统能力（yue/sys）：只读探测在一屏，设置类只给按钮",
+          size=15.0,
+          weight=@text.SemiBold,
+        ),
+        @ui.label(
+          "「重新探测」也是只读；「打开链接 / 打开目录」会把动作交给系统，点了才有窗口弹出",
+          size=12.0,
+          color=@theme.theme_text_secondary(),
+        ),
+      ],
+      row_gap=2.0,
+      padding=8.0,
+      align_items=@yoga.AlignItems::FlexStart,
+    ),
+    @ui.container(
+      [
+        panel("系统与机器", sys_store.signal(), 580.0),
+        panel("桌面与硬件", desk_store.signal(), 580.0),
+      ],
+      direction=@yoga.Row,
+      column_gap=10.0,
+      row_gap=0.0,
+      align_items=@yoga.AlignItems::FlexStart,
+    ),
+    @ui.container(
+      [
+        panel("应用与文件类型", apps_store.signal(), 380.0),
+        panel("窗口与剪贴板", wins_store.signal(), 380.0),
+        panel("最近与历史", hist_store.signal(), 380.0),
+      ],
+      direction=@yoga.Row,
+      column_gap=10.0,
+      align_items=@yoga.AlignItems::FlexStart,
+    ),
+    @ui.container(
+      [
+        @ui.button(
+          "重新探测",
+          on_click=reprobe,
+          min_width=110.0,
+          handle=fn(w : @core.Widget) -> Unit { btn_probe.val = Some(w) },
+        ),
+        @ui.button(
+          "打开链接",
+          on_click=fn() -> Unit {
+            let _ = @sys.open_url("https://libyue.com")
+            opens.update(fn(n : Int) -> Int { n + 1 })
+            app.schedule_paint()
+          },
+          kind=@ui.Border,
+          min_width=110.0,
+          handle=fn(w : @core.Widget) -> Unit { btn_open.val = Some(w) },
+        ),
+        @ui.button(
+          "打开目录",
+          on_click=fn() -> Unit {
+            let _ = @sys.reveal_in_file_manager("/tmp")
+            reveals.update(fn(n : Int) -> Int { n + 1 })
+            app.schedule_paint()
+          },
+          kind=@ui.Border,
+          min_width=110.0,
+          handle=fn(w : @core.Widget) -> Unit { btn_reveal.val = Some(w) },
+        ),
+        @ui.label_dyn(
+          probes.signal().map(
+            fn(n : Int) -> String {
+              "重新探测 " + n.to_string() + " 次 / 打开链接 " +
+                (opens.get()).to_string() +
+                " 次 / 打开目录 " +
+                (reveals.get()).to_string() + " 次"
+            },
+          ),
+          size=12.0,
+        ),
+        @ui.label_dyn(clip_view.signal(), size=12.0),
+      ],
+      direction=@yoga.Row,
+      column_gap=8.0,
+      row_gap=4.0,
+      padding=8.0,
+      align_items=@yoga.AlignItems::FlexStart,
+    ),
+  ])
+  let _ = app.timer(12000, fn() -> Unit { app.quit() })
+  app.run()
+  @sys.cbw_stop(watcher)
+  let mut geo = "NATIVE-SYS-GEO"
+  for kv in [("probe", btn_probe), ("open", btn_open), ("reveal", btn_reveal)] {
+    match kv.1.val {
+      Some(w) => geo = geo + " " + kv.0 + "=" + rect_str(w.rect)
+      None => geo = geo + " " + kv.0 + "=-"
+    }
+  }
+  println(geo)
+  let c = counts.val
+  println(
+    "NATIVE-SYS-STAT os=\{c.os_id} de=\{c.desktop} mon=\{c.monitors} " +
+      "wp=\{c.wallpaper} vol=\{c.volume} prof=\{c.profile} mime=\{c.mime} " +
+      "def=\{c.default_app} apps=\{c.apps} recent=\{c.recent} " +
+      "hist=\{c.hist} dl=\{c.downloads} bm=\{c.bookmarks} ffx=\{c.firefox} " +
+      "vsc=\{c.vscode} wins=\{c.windows} clip=\{c.clipboard} " +
+      "probes=\{probes.get()} opens=\{opens.get()} reveals=\{reveals.get()} " +
+      "changes=\{clip_changes.get()}",
+  )
+  app.shutdown()
+}
