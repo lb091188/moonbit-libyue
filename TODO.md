@@ -140,7 +140,13 @@
   - [x] 异步事件形态定案：per-view 32 格环形队列 + `@core.set_timeout` 排期泵（**不挂绘制**），C 侧不回调 MoonBit
   - [x] 回证：`yue/web` 无头 11/11（脚本配平、四档解析、失败不静默、未挂载全安全、kind→事件逐条、回包序号配对、invoke 双路、探测一致）、`--deny-warn` 零警告、全仓红点 287/68 未增；真窗口 `NATIVE-WEB-JS binding=1 evals=1 dom_ok=4 dom_bad=0 links=3 text_bytes=68 meta=1 headings=2 elements=14 invokes=1 navs=2 perms=1 wins=1 crashes=0 cookie_bytes=2`，合成截图见「已被原生改过」+ 三条事件流水（回话/权限拒绝/新窗拦下）
   - [ ] 批 C 余项（随后续批按需接）：自定义协议流式回灌（`register_protocol`，旧链有、本栈未接）、`on_start|fail_navigation` 的细粒度 reason、跨窗共享的 cookie 同步
-- [ ] **批 D 媒体播放器**（可与 B/C 并行）：复用 `modules/ffmpeg-mbt`（零 libyue 依赖，已有 `decode_rgba`/`decode_pcm`/`seek`/`duration_s`/`video_fps`）+ `modules/yue-media` 内嵌的 miniaudio 设备层；**CPU 回灌 + 软解**（RGBA → `yue/render` 的 `Bitmap` → Painter 合成，本档位不做硬解与 GPU 合成）；新写播放器 UI（悬浮控制条/进度与音量/倍速/字幕叠加/seek 防抖）+ 音频时钟与同步；旧链坑照 adaptation.md 逐条验收（音画不同轴、seek 后进度从零重涨、换载崩溃）
+- [~] **批 D 媒体播放器**（可与 B/C 并行）：复用 `modules/ffmpeg-mbt`（零 libyue 依赖，已有 `decode_rgba`/`decode_pcm`/`seek`/`duration_s`/`video_fps`）+ `modules/yue-media` 内嵌的 miniaudio 设备层；**CPU 回灌 + 软解**（RGBA → `yue/render` 的 `Bitmap` → Painter 合成，本档位不做硬解与 GPU 合成）；新写播放器 UI（悬浮控制条/进度与音量/倍速/字幕叠加/seek 防抖）+ 音频时钟与同步；旧链坑照 adaptation.md 逐条验收（音画不同轴、seek 后进度从零重涨、换载崩溃）
+  - [x] 新包 `yue/media`：引擎 `audio.mbt`(416 行) + `video.mbt`(476 行) 从 `modules/yue-media` **零 @yue 依赖整段平移**（含 15 条既有回归，旧链的坑随测试一起接住），`vp_tick` 开成公开口 `tick()` + 新增 `frames_decoded()`
+  - [x] 字幕层 `subtitle.mbt`：SRT/VTT 同一套解析（时间戳两种写法、编号行/`WEBVTT` 头/`NOTE` 段跳过、`<c.*>`/`{\an8}` 标记剥离）+ `subtitle_at` 命中查询，全纯函数
+  - [x] 播放器组件 `player.mbt`：`rgba_to_bitmap`（RGBA→Cairo BGRA，逐字节钉）+ 等比居中适配 + 字幕叠加 + 控制条（播放/暂停、进度轨、时间文字）+ `player_bar_hit` 分区纯函数实现 **seek 防抖（拖动只挪显示位置、抬手才真 seek）** + `on_tick`/`on_error` 观测与降级口
+  - [x] 分层与链接：UI 组件放 `yue/media` 而非 `yue/ui`（否则每个用按钮的都要链 ffmpeg+miniaudio）；引擎文件零 UI 依赖；prebuild 给 `yue/media` 下发 `-lpthread -ldl -lm -lstdc++ -latomic`；moon.mod 增 `NoahLiu/ffmpeg-mbt@0.1.0` 依赖
+  - [x] 回证：`yue/media` 18/18（15 平移 + 3 新增）、`--deny-warn` 零警告、全仓红点 287/68 未增；真窗口「开一扇播放器窗」= 第三扇窗播 `av_1s.mp4` + 内联 SRT，`NATIVE-WEB-MEDIA frames=10 pos_ms=1000 playing=0 err=''`，截图见彩条不错位 + 白字字幕叠加 + 进度满格 `0:01 / 0:01`
+  - [ ] 批 D 余项（下一批做，不假装完成）：**倍速**（音频侧要时间拉伸，只加快视频会破坏音画同步）、内嵌字幕轨（mov_text/ass）、全屏、音量条 UI（引擎已有 `set_volume`，控件未画）、逐帧步进、真出声复验
 - [ ] **批 E 原生弹层窗口**：自绘 overlay 的「原生档」（`yue/win` 目前无 popup/transient API）——浮层（下拉/右键菜单/tooltip/toast/对话框）走原生窗口，不用自绘像素盖 webview
 - 积木原则：一个能力一个接口、可单独不用；能力之间不互相依赖（webview 不依赖媒体层，反之亦然，两者只依赖窗口/布局/事件层）；框架只给原语不给产品（爬虫框架、站点适配、内容解析、开发者面板、页面脚本库不进库）；每项能力给探测 + 语义化降级；新 API 一律走 `Painter`/`Bitmap` 门面
 - 明确不做（避免反复讨论）：网络拦截/改写、代理配置、一窗多 webview 并排、Linux 上把 webview 变纹理、首批硬解、首批 GPU 合成、网页内 `<video>` 与自绘播放器统一、macOS 13 及以下的持久化隔离（根因是 Apple API 边界：持久化 profile 需 macOS 14+ 且有 bundle id）
@@ -152,6 +158,7 @@
 - [ ] 发布：mooncakes 新版本；旧 `bin-*`/`vendor-*` 预构建发布链退役
 - [ ] CI：三平台构建与测试脚本随新栈调整（当前分支构建预期为红）
 - [ ] 真机验证矩阵：Ubuntu GNOME / KDE / XFCE；Windows 10 / 11；macOS（前置：取得设备）
+- [ ] 旧链 `modules/yue-media` 下线：`yue/media` 已自带 miniaudio（4.1 MB 单头文件目前是两份拷贝），旧包删除后这份拷贝归一
 - [ ] 本仓 `docs/zh/{adaptation,system-capabilities,components-ui}.md` 落后于 master 参考副本（742/1066、797/833、1425/1458 行），按新栈重写前先以参考副本为准查证
 
 ## 3. 里程碑

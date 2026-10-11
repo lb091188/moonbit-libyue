@@ -35,6 +35,7 @@ WIN_PACKAGE = "NoahLiu/moonbit-libyue/yue/win"
 RENDER_PACKAGE = "NoahLiu/moonbit-libyue/yue/render"
 TEXT_PACKAGE = "NoahLiu/moonbit-libyue/yue/text"
 WEB_PACKAGE = "NoahLiu/moonbit-libyue/yue/web"
+MEDIA_PACKAGE = "NoahLiu/moonbit-libyue/yue/media"
 # webview 引擎只能动态链（方案 §4.8：WebKitGTK 无静态库），运行期依赖发行版包。
 # 缺包不算错：桩改编「无宏」的占位分支，wb_* 符号仍在、探测返回不可用。
 WEBKIT_PKG_CONFIG = "webkit2gtk-4.1"
@@ -186,6 +187,13 @@ def link_configs() -> dict:
                     "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_web -lyue_win_stub "
                     + " ".join([*libs, *webkit_libs, *sys_libs]),
                 })
+        # 媒体引擎（yue/media）：miniaudio 的设备线程与 dlopen 后端要系统库；
+        # 桩本体由 moon 的 native-stub 编，这里只下发链接参数。
+        if win_lib:
+            entries.append({
+                "package": MEDIA_PACKAGE,
+                "link_flags": " ".join(sys_libs),
+            })
         cairo_lib = compile_stub(
             MODULE_ROOT / "yue" / "render" / "stub.c",
             "librender_cairo_stub.a",

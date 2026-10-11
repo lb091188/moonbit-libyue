@@ -383,6 +383,70 @@ fn main {
       align_items=@yoga.AlignItems::Center,
     ),
   ])
+  // ---- 批 D：播放器（CPU 回灌 + 软解，帧走 Painter 合成）----
+  let md_frames = Ref(0)
+  let md_pos = Ref(0.0)
+  let md_playing = Ref(0)
+  let md_err = Ref("")
+  let md_subs =
+    "1\n00:00:00,200 --> 00:00:00,600\n第一条字幕（0.2~0.6 秒）\n\n" +
+    "2\n00:00:00,600 --> 00:00:01,000\n第二条字幕（0.6~1.0 秒）\n"
+  let open_player = fn(a : @core.App) -> Unit {
+    match a.open_window(720, 480, "播放器（批 D）") {
+      None => ()
+      Some(win) => {
+        win.root.set_column()
+        win.root.set_padding(12.0, 10.0)
+        win.root.on_draw = Some(fn(
+          _w : @core.Widget,
+          p : @render.Painter,
+          r : @core.Rect,
+        ) -> Unit {
+          p.set_fill_color(@theme.theme_bg_page())
+          p.fill_rect(0.0, 0.0, r.w, r.h)
+        })
+        win.mount([
+          @ui.label("播放器：ffmpeg 软解出 RGBA → Bitmap → Painter 合成", size=13.0),
+          @media.player_t(
+            "modules/ffmpeg-mbt/src/testdata/av_1s.mp4",
+            subtitle=md_subs,
+            width=680.0,
+            height=380.0,
+            auto_play=true,
+            on_tick=fn(t : Double, frames : Int, playing : Bool) -> Unit {
+              if frames > md_frames.val {
+                md_frames.val = frames
+              }
+              if t > md_pos.val {
+                md_pos.val = t
+              }
+              md_playing.val = if playing { 1 } else { 0 }
+            },
+            on_error=fn(e : String) -> Unit { md_err.val = e },
+          ),
+        ])
+      }
+    }
+  }
+  app.mount([
+    @ui.container(
+      [
+        @ui.label("批 D：媒体播放器（另开一窗，播 ffmpeg 测试片 + 字幕叠加）", size=13.0),
+        @ui.button(
+          "开一扇播放器窗",
+          on_click=fn() { open_player(app) },
+          min_width=140.0,
+        ),
+      ],
+      direction=@yoga.Row,
+      column_gap=10.0,
+      padding=6.0,
+      bg=@theme.theme_bg_panel(),
+      border=@theme.theme_border(),
+      align_items=@yoga.AlignItems::Center,
+    ),
+  ])
+
   match wv {
     None => {
       // 探测不到引擎：自绘一块说明板（降级不静默）
@@ -521,6 +585,17 @@ fn main {
       "'",
   )
   println("NATIVE-WEB-GEO pane=" + pane_rect + " sidebar=" + side_rect)
+  println(
+    "NATIVE-WEB-MEDIA frames=" +
+      md_frames.val.to_string() +
+      " pos_ms=" +
+      (md_pos.val * 1000.0).round().to_int().to_string() +
+      " playing=" +
+      md_playing.val.to_string() +
+      " err='" +
+      md_err.val +
+      "'",
+  )
   println(
     "NATIVE-WEB-JS binding=" +
       (if js_binding.val { "1" } else { "0" }) +
