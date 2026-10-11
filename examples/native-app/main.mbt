@@ -452,6 +452,16 @@ fn make_sticky_section(st : @ui.StickyList, slot : Ref[@core.Widget?]) -> @core.
 }
 
 ///|
+/// 把多行文本折平成一行打印（换行写成 `/`，插入点所在行写成序号）。
+fn flat(text : String) -> String {
+  let mut out = ""
+  for ch in text.to_array() {
+    out = out + (if ch == '\n' { "/" } else { ch.to_string() })
+  }
+  out
+}
+
+///|
 /// 表单族余项区块：四型主题化按钮 + 链接 + 表单（错误行）+ 评分。
 /// 按钮四型都记同一个点击数（点哪个都 +1），「危险」那颗另外把错误文案写进
 /// `form_item` 的错误 Store，用来回证「错误出现不引起布局跳动」。
@@ -468,6 +478,8 @@ fn make_form_section(
   sel : @core.Store[String],
   col : @core.Store[String],
   pick : Ref[String],
+  ta : @core.Store[String],
+  ta_slot : Ref[@core.Widget?],
   sel_slot : Ref[@core.Widget?],
   col_slot : Ref[@core.Widget?],
 ) -> @core.Node {
@@ -539,6 +551,22 @@ fn make_form_section(
         direction=@yoga.Row,
         column_gap=10.0,
         align_items=@yoga.AlignItems::Center,
+      ),
+      @ui.container(
+        [
+          @ui.label_t("多行输入框：回车换行、上下键按显示行走、超出出滚动条", role=Secondary),
+          @ui.textarea(
+            ta,
+            placeholder="写点什么",
+            width=300.0,
+            height=76.0,
+            focus_id=24,
+            handle=fn(w : @core.Widget) -> Unit { ta_slot.val = Some(w) },
+          ),
+        ],
+        direction=@yoga.Column,
+        row_gap=4.0,
+        align_items=@yoga.AlignItems::FlexStart,
       ),
       @ui.rate_t(
         rate,
@@ -691,7 +719,7 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
-  let app = match @core.App::new(1400, 1660, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(1400, 1760, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -885,10 +913,13 @@ fn main {
   let frm_item_w : Ref[@core.Widget?] = Ref(None)
   let frm_sel = @core.Store::new("")
   let frm_col = @core.Store::new("")
+  let frm_ta_w : Ref[@core.Widget?] = Ref(None)
   let frm_sel_w : Ref[@core.Widget?] = Ref(None)
   let frm_col_w : Ref[@core.Widget?] = Ref(None)
   let frm_ov_max = Ref(0)
   let frm_pick = Ref("-")
+  // 八行内容：76 高的框只放得下三行半，超出部分靠滚动（滚轮 / 滚动条）
+  let frm_ta = @core.Store::new("行 1\n行 2\n行 3\n行 4\n行 5\n行 6\n行 7\n行 8")
   app.mount([make_table_section(tb_rows, tb_sel, tb_sort, tb_w)])
   app.mount([make_virt_section(vt_rows, vt_sel, vt_sort, vt_clicks, vt_w)])
   app.mount([make_sticky_section(sticky, sticky_w)])
@@ -907,6 +938,8 @@ fn main {
       frm_sel,
       frm_col,
       frm_pick,
+      frm_ta,
+      frm_ta_w,
       frm_sel_w,
       frm_col_w,
     ),
@@ -1235,6 +1268,12 @@ fn main {
   let _ = app.focus.register(2)
   let _ = app.focus.register(3)
   let _ = app.focus.register(4)
+  // 焦点栈只认注册过的 id（没注册时按下不改焦点，打字就进不去）：
+  // 21=实心按钮、22=下拉、23=取色器、24=多行框
+  let _ = app.focus.register(21)
+  let _ = app.focus.register(22)
+  let _ = app.focus.register(23)
+  let _ = app.focus.register(24)
 
   let ticker : Ref[() -> Unit] = Ref(fn() { () })
   ticker.val = fn() {
@@ -1320,8 +1359,16 @@ fn main {
     Some(x) => x.format()
     None => "-"
   }
+  // 多行框的插入点字节下标（内核句柄不外露，走 im_context 那条接缝）
+  let ta_caret = match frm_ta_w.val {
+    Some(w) => match w.im_context {
+      Some(f) => f().unwrap_or(("", -1)).1
+      None => -1
+    }
+    None => -1
+  }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val} ta='\{flat(frm_ta.get())}' tacur=\{ta_caret}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
@@ -1459,6 +1506,8 @@ fn main {
     ov2_rect_of(frm_rate_w.val) +
     " item=" +
     ov2_rect_of(frm_item_w.val) +
+    " ta=" +
+    ov2_rect_of(frm_ta_w.val) +
     " sel=" +
     ov2_rect_of(frm_sel_w.val) +
     " col=" +
