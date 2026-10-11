@@ -52,6 +52,8 @@
 
 统一抽象（`src/input`）——上层自绘控件只见这四个签名，后端可逐平台替换：
 
+**平台无关的映射表已落 `yue/core/input_map.mbt`**（纯函数 + 回归）：三平台修饰位折算、Win32/macOS 键码表、shift/caps 折算、按钮号、以及「这颗键先交给谁」的路由判定（`ime_route`）。后端只负责取原始值并调表，不再各自决定语义；Linux 的 `wm_mods` 与表逐位对齐。
+
 ```
 process_key(keysym, modifiers, is_press) -> Consumed | NotConsumed
 commit(text)

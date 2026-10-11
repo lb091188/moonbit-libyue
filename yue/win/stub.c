@@ -825,7 +825,9 @@ static WmSurface wm_surfaces[WM_MAX_SURFACES];
 static int wm_surface_next_id = 1;
 
 // 修饰位必须与 MoonBit 侧 yue/core/keys.mbt 的 MOD_* 一致：
-// 1=shift 2=ctrl 4=alt 8=meta（GTK 自身位值是 1/4/8/16，故显式重映射）
+// 1=shift 2=ctrl 4=alt 8=meta（GTK 自身位值是 1/4/8/16，故显式重映射）。
+// 这张表的**权威版本**在 yue/core/input_map.mbt 的 gtk_mods_to_mods（纯函数、有
+// 回归钉住），改这里必须同批改那里——Windows/macOS 后端直接调那份表。
 static guint32 wm_mods(guint state) {
   guint32 m = 0;
   if (state & GDK_SHIFT_MASK) {

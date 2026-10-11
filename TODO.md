@@ -22,6 +22,7 @@
   - Windows：`ImmAssociateContext` 优先、可见 `EDIT` 作可切换兜底（触发条件：只走 TSF 的 IME 在 legacy 通道打不出中文）
   - macOS：`NSTextInputClient`（前置：有 mac 真机）
   - 肉眼确认项：preedit 下划线观感、候选窗是否贴组合串末尾、caret 闪烁观感（点击定位已用 xdotool 客观验通：点控件最左端 caret 归 0、原位插字符）
+  - [x] **平台无关输入映射层落 `yue/core/input_map.mbt`**（另线 #19 首批，纯函数 + 7 条回归）：三平台修饰位折算（`gtk_mods_to_mods`/`win_mods_to_mods`/`mac_mods_to_mods`）、两套键码表（`win_vk_to_keysym`/`mac_vk_to_keysym`，字母数字给未加 shift 的基码、`win_apply_shift` 补 shift/caps、OEM 符号键不硬编布局表而走 WM_CHAR/Unicode）、按钮号（`win_button_to_index`/`mac_button_to_index`）、按键路由 `ime_route`（组合中 → 光标键(带 Ctrl 也算、带 Alt 不算) → Tab → 快捷键 → 可打印 → 其余）与 `ime_should_reset`/`ime_should_feed_surrounding`；Win/mac 后端在 MoonBit 侧直接调这张表，Linux 的 `wm_mods` 与 `gtk_mods_to_mods` 逐位一致（两边注释互点名）
   - [x] `TextEditorHost` 抽象收口：做成**焦点控件上的五个回调**（`on_key`/`on_commit`/`on_preedit`/`im_context`/`im_cursor`，input 已依赖 core 故不能反向持有 host），宿主按焦点投递；配套 `Window::im_reset()`——换焦点时先把排队的 commit 交还**旧**控件再 reset，实测修掉「A 框打的拼音 commit 进 B 框」
 - [x] **G6** 布局层承接
   - [x] 脏区增量重排 + 测量/内在缓存跨布局驻留（YG3e）：39 个 setter 与结构/回调变更一律 `mark_changed`（全局时钟 + 节点 `rev`），入口 `scan_subtree_rev` 算子树版本（**不用父指针**——会与 children 成引用环、回收处理不了），`layout_into` 按「子树版本 + 入参指纹」跳过干净子树，两份缓存改按 `cache_rev` 作废并加 16 槽上限。同机 A/B（release µs/轮 @1121 节点）steady 3652→4、one_leaf 3656→78、全量路径 3664→3602 无回归，三场景校验值改前改后逐位相同；yoga-mbt 91/91（新增 10 条一律与「同状态从零全量布局」逐节点比对）。`App::paint_frame` 每帧 relayout 走的就是这条跳过路径，G7 接文本 measure 后 one_leaf 即实际形态
