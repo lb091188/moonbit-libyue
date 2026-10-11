@@ -1,3 +1,17 @@
+// MoonBit 原生 GUI 栈文本层的平台桩：一个文件、按平台分支，对外是 `pt_*` /
+// `rt_*` 那一套测量与绘制 API（会话句柄归 MoonBit 侧持有）。
+//
+//   WM_STUB_PANGO → Pango + Cairo 真实现（Linux）。仅 scripts/prebuild.py 带
+//                   -DWM_STUB_PANGO + pkg-config 头路径编进
+//                   build/libyue_text_pango.a；moon 的 native-stub 拿不到 pango
+//                   头（link_configs 只有链接期字段，实测同 render/G0），所以宏
+//                   不传的那次编译必须落进别的分支，防与 .a 双定义。
+//   其余平台      → Windows 走 DirectWrite（系统 SDK 头 dwrite.h，native-stub
+//                   直接可见，不需要 prebuild）；macOS 的 CoreText 待真机，
+//                   现在是占位 no-op。运行时探测选择（AGENTS 规则 11）：探到
+//                   占位即退降级，不用编译指令。
+
+#if defined(WM_STUB_PANGO)
 // Pango 文本层：测量与绘制都走 Pango（老师 libyue 在 GTK 上同样是 Pango，
 // 见 nativeui/gfx/gtk/attributed_text_gtk.cc:82/128-132 的 ellipsize /
 // set_width / get_pixel_size 用法）。字号按**逻辑像素**取绝对尺寸，
@@ -754,3 +768,125 @@ int pt_family_available(const char *name, int len) {
   }
   return 0;
 }
+
+#elif !defined(__linux__)
+
+// 非 Linux 的文本层：macOS 的 CoreText 待真机，现在是占位 no-op（探到占位
+// 即退降级）；Windows 分支见上面的 _WIN32 段。占位只保链接符号不断。
+#include <stdint.h>
+
+int pt_measure(const char *text, int len, double size, const char *family,
+               int max_width, int ellipsize, int wrap, int32_t *out_w,
+               int32_t *out_h, int32_t *out_baseline) {
+  (void)text; (void)len; (void)size; (void)family; (void)max_width;
+  (void)ellipsize; (void)wrap; (void)out_w; (void)out_h; (void)out_baseline;
+  return 0;
+}
+
+int pt_font_line_height(double size, const char *family, int weight,
+                        int italic, int32_t *out_h, int32_t *out_ascent) {
+  (void)size; (void)family; (void)weight; (void)italic; (void)out_h;
+  (void)out_ascent;
+  return 0;
+}
+
+int pt_draw(unsigned char *data, int buf_w, int buf_h, double x, double y,
+            const char *text, int len, double size, const char *family,
+            int r, int g, int b, int a, int max_width, int ellipsize,
+            int wrap) {
+  (void)data; (void)buf_w; (void)buf_h; (void)x; (void)y; (void)text;
+  (void)len; (void)size; (void)family; (void)r; (void)g; (void)b; (void)a;
+  (void)max_width; (void)ellipsize; (void)wrap;
+  return 0;
+}
+
+int pt_measure_font(const char *text, int len, double size, const char *family,
+                    int weight, int italic, int max_width, int ellipsize,
+                    int wrap, int32_t *out_w, int32_t *out_h,
+                    int32_t *out_baseline) {
+  (void)text; (void)len; (void)size; (void)family; (void)weight; (void)italic;
+  (void)max_width; (void)ellipsize; (void)wrap; (void)out_w; (void)out_h;
+  (void)out_baseline;
+  return 0;
+}
+
+int pt_draw_box(unsigned char *data, int buf_w, int buf_h, double x, double y,
+                double box_w, double box_h, const char *text, int len,
+                double size, const char *family, int weight, int italic, int r,
+                int g, int b, int a, int align, int valign, int ellipsize,
+                int wrap) {
+  (void)data; (void)buf_w; (void)buf_h; (void)x; (void)y; (void)box_w;
+  (void)box_h; (void)text; (void)len; (void)size; (void)family; (void)weight;
+  (void)italic; (void)r; (void)g; (void)b; (void)a; (void)align; (void)valign;
+  (void)ellipsize; (void)wrap;
+  return 0;
+}
+
+
+// 富文本会话占位（非 Linux 平台）
+int64_t rt_new(const char *text, int tlen, double size, const char *family,
+               int flen, int weight, int italic) {
+  (void)text; (void)tlen; (void)size; (void)family; (void)flen; (void)weight;
+  (void)italic; return 0;
+}
+void rt_free(int64_t h) { (void)h; }
+void rt_set_text(int64_t h, const char *text, int len) { (void)h; (void)text; (void)len; }
+void rt_set_font(int64_t h, const char *family, int flen, double size,
+                 int weight, int italic) {
+  (void)h; (void)family; (void)flen; (void)size; (void)weight; (void)italic;
+}
+void rt_set_format(int64_t h, int align, int valign, int wrap, int ellipsize) {
+  (void)h; (void)align; (void)valign; (void)wrap; (void)ellipsize;
+}
+void rt_add_color(int64_t h, int start, int end, int r, int g, int b, int a) {
+  (void)h; (void)start; (void)end; (void)r; (void)g; (void)b; (void)a;
+}
+void rt_add_font(int64_t h, int start, int end, const char *family, int flen,
+                 double size, int weight, int italic) {
+  (void)h; (void)start; (void)end; (void)family; (void)flen; (void)size;
+  (void)weight; (void)italic;
+}
+int rt_measure(int64_t h, double box_w, int32_t *out_w, int32_t *out_h,
+               int32_t *out_baseline) {
+  (void)h; (void)box_w; (void)out_w; (void)out_h; (void)out_baseline;
+  return 0;
+}
+int rt_draw(int64_t h, unsigned char *data, int buf_w, int buf_h, double x,
+            double y, double box_w, double box_h, int r0, int g0, int b0,
+            int a0) {
+  (void)h; (void)data; (void)buf_w; (void)buf_h; (void)x; (void)y;
+  (void)box_w; (void)box_h; (void)r0; (void)g0; (void)b0; (void)a0;
+  return 0;
+}
+
+int pt_families_len(void) { return 0; }
+int pt_families_byte(int index) { (void)index; return 0; }
+int pt_family_available(const char *name, int len) {
+  (void)name; (void)len; return 0;
+}
+
+
+int pt_draw_box_cr(int64_t cr_id, double x, double y, double box_w,
+                   double box_h, const char *text, int len, double size,
+                   const char *family, int weight, int italic, int r, int g,
+                   int b, int a, int align, int valign, int ellipsize,
+                   int wrap) {
+  (void)cr_id; (void)x; (void)y; (void)box_w; (void)box_h; (void)text;
+  (void)len; (void)size; (void)family; (void)weight; (void)italic;
+  (void)r; (void)g; (void)b; (void)a; (void)align; (void)valign;
+  (void)ellipsize; (void)wrap;
+  return 0;
+}
+
+
+int rt_draw_cr(int64_t cr_id, int64_t h, double x, double y, double box_w,
+               double box_h, int r0, int g0, int b0, int a0) {
+  (void)cr_id; (void)h; (void)x; (void)y; (void)box_w; (void)box_h;
+  (void)r0; (void)g0; (void)b0; (void)a0;
+  return 0;
+}
+
+
+#endif
+// Linux 上 native-stub 的那次编译（无 WM_STUB_PANGO、且 __linux__ 成立）落不进任何分支，
+// 编出空翻译单元——真实现由 prebuild 的归档提供，这里绝不能再定义一份（双定义）。

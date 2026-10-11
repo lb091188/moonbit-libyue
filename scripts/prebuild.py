@@ -166,7 +166,9 @@ def link_configs() -> dict:
                 + " ".join([*libs, *sys_libs]),
             })
         text_lib = compile_stub(
-            MODULE_ROOT / "yue" / "text" / "pango_stub.c", "libyue_text_pango.a"
+            MODULE_ROOT / "yue" / "text" / "stub.c",
+            "libyue_text_pango.a",
+            extra_cflags=["-DWM_STUB_PANGO"],
         )
         if text_lib:
             # 文本层要复用 Painter 的 Cairo 会话（cr_session_context 定义在

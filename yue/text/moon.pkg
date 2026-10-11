@@ -5,9 +5,11 @@ import {
 
 supported_targets = "native"
 
-// Pango 端由 scripts/prebuild.py 编成静态库（link_configs 只有链接期字段、native-stub
-// 拿不到系统头，实测同 G0/G2/G3），这里只带非 Linux 占位实现保三平台链接。
-// 链接参数按 AGENTS 规则 1 全部由 prebuild 托管。
+// 文本层按「单一 stub.c 多分支 + prebuild 宏」组织（与 render/win 同例）：
+// Pango 端由 scripts/prebuild.py 带 -DWM_STUB_PANGO 编成静态库（link_configs
+// 只有链接期字段、native-stub 拿不到 pango 头，实测同 G0/G3），本处只带
+// native-stub 那次编译看到的同一份文件——宏不传时落进占位/DirectWrite 分支，
+// 保证三平台链接不断符号。链接参数按 AGENTS 规则 1 全部由 prebuild 托管。
 options(
-  "native-stub": [ "pango_stub_portable.c" ],
+  "native-stub": [ "stub.c" ],
 )
