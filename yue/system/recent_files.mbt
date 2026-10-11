@@ -854,12 +854,7 @@ fn rf_entry_to_item(e : RfEntry) -> RecentItem {
   // 只把「绝对路径形态」的 uri 直接当 path，URL 形态（http 等）仍留空
   let path = match rf_uri_to_path(e.uri) {
     Some(p) => p
-    None =>
-      if @yue.platform() == "windows" && rf_win_abs_path(e.uri) {
-        e.uri
-      } else {
-        ""
-      }
+    None => rf_fallback_path(e.uri)
   }
   {
     uri: e.uri,
@@ -868,6 +863,16 @@ fn rf_entry_to_item(e : RfEntry) -> RecentItem {
     added: e.added,
     modified: e.modified,
     app_count: e.apps.length(),
+  }
+}
+
+///|
+/// 非 file:// 形态的 href → 本地路径：仅 Windows 的裸绝对路径（盘符或
+/// UNC）直接当路径，其余平台为空串。
+fn rf_fallback_path(uri : String) -> String {
+  match @yue.platform() {
+    "windows" => if rf_win_abs_path(uri) { uri } else { "" }
+    _ => ""
   }
 }
 
@@ -946,15 +951,26 @@ pub fn rf_data_dir(xdg_data_home : String?, home : String?) -> String? {
 /// Windows 为 %APPDATA%\Microsoft\Windows\Recent（.lnk 集合）；其余平台
 /// None。
 fn rf_recent_source() -> String? {
-  if @yue.platform() == "windows" {
-    return match getenv_str("APPDATA") {
-      Some(d) if d != "" => Some(d + "/Microsoft/Windows/Recent")
-      _ => None
-    }
+  match @yue.platform() {
+    "windows" => rf_recent_source_win()
+    "linux" => rf_recent_source_linux()
+    _ => None
   }
-  if @yue.platform() != "linux" {
-    return None
+}
+
+///|
+/// Windows 路径定位数据源：%APPDATA%\Microsoft\Windows\Recent
+/// （.lnk 集合）。
+fn rf_recent_source_win() -> String? {
+  match getenv_str("APPDATA") {
+    Some(d) if d != "" => Some(d + "/Microsoft/Windows/Recent")
+    _ => None
   }
+}
+
+///|
+/// Linux 路径定位数据源：XDG 数据目录下的 recently-used.xbel。
+fn rf_recent_source_linux() -> String? {
   match rf_data_dir(getenv_str("XDG_DATA_HOME"), getenv_str("HOME")) {
     Some(d) => Some(d + "/recently-used.xbel")
     None => None
@@ -965,12 +981,17 @@ fn rf_recent_source() -> String? {
 /// 读取并解析最近文件条目：Linux 读 recently-used.xbel；Windows 枚举
 /// Recent 目录 .lnk 并逐个解析目标路径与 mtime（每次调用真实读盘）。
 fn rf_load_entries() -> Result[Array[RfEntry], RecentError] {
-  if @yue.platform() == "windows" {
-    return rf_load_win()
+  match @yue.platform() {
+    "windows" => rf_load_win()
+    "linux" => rf_load_entries_linux()
+    _ => Err(RfUnsupported)
   }
-  if @yue.platform() != "linux" {
-    return Err(RfUnsupported)
-  }
+}
+
+///|
+/// Linux 路径读最近文件：解析 XDG 数据目录下的 recently-used.xbel
+/// （每次调用真实读盘）。
+fn rf_load_entries_linux() -> Result[Array[RfEntry], RecentError] {
   let path = match rf_recent_source() {
     Some(p) => p
     None => return Err(RfNoDataDir)
@@ -1034,13 +1055,26 @@ fn rf_load_win() -> Result[Array[RfEntry], RecentError] {
 /// 本机是否可读最近文件（Linux 且 recently-used.xbel 可读；Windows 且
 /// Recent 目录可枚举）。每次调用真实探测，高频场景请调用方自行缓存。
 pub fn rf_supported() -> Bool {
-  if @yue.platform() == "windows" {
-    let dir = match rf_recent_source() {
-      Some(d) => d
-      None => return false
-    }
-    return @yue.fsx_list_dir(dir) is Ok(_)
+  match @yue.platform() {
+    "windows" => rf_supported_win()
+    "linux" => rf_supported_linux()
+    _ => false
   }
+}
+
+///|
+/// Windows 路径探测：Recent 目录可枚举即可读。
+fn rf_supported_win() -> Bool {
+  let dir = match rf_recent_source() {
+    Some(d) => d
+    None => return false
+  }
+  @yue.fsx_list_dir(dir) is Ok(_)
+}
+
+///|
+/// Linux 路径探测：recently-used.xbel 可读即可。
+fn rf_supported_linux() -> Bool {
   match rf_recent_source() {
     Some(p) => @yue.read_text_file(p) is Some(_)
     None => false

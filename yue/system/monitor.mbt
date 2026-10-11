@@ -647,21 +647,34 @@ fn mon_current_from(infos : Array[MonitorInfo]) -> Array[CurrentOutput] {
 /// 激活两级（连接未点亮 = 仅头行，preferred 取面板 native 标志）。
 /// 物理毫米尺寸 ABI 无字段，三平台恒 0。
 pub fn mon_list() -> Result[Array[MonitorInfo], MonitorError] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let ok = Ref(0)
-    let text = @utf8.decode_lossy(@yue.ffi_mon_list(ok))
-    if ok.val != 1 {
-      return Err(CommandFailed("显示器枚举失败"))
-    }
-    let infos = mon_parse_win(text)
-    if infos.length() == 0 {
-      return Err(ParseFailed("无任何显示输出"))
-    }
-    return Ok(infos)
+  match @yue.platform() {
+    "linux" => mon_list_linux()
+    // Windows / macOS 共用：shim 已把 EnumDisplayDevices /
+    // EnumDisplaySettingsEx 与 CGDisplay 输出成同构文本
+    "windows" | "macos" => mon_list_shared()
+    _ => Err(Unsupported)
   }
-  if @yue.platform() != "linux" {
-    return Err(Unsupported)
+}
+
+///|
+/// Windows / macOS 共用路径枚举输出：shim 直连文本（H| 头行 + M| 模式行）
+/// 走 [mon_parse_win] 解析；无任何输出给 ParseFailed。
+fn mon_list_shared() -> Result[Array[MonitorInfo], MonitorError] {
+  let ok = Ref(0)
+  let text = @utf8.decode_lossy(@yue.ffi_mon_list(ok))
+  if ok.val != 1 {
+    return Err(CommandFailed("显示器枚举失败"))
   }
+  let infos = mon_parse_win(text)
+  if infos.length() == 0 {
+    return Err(ParseFailed("无任何显示输出"))
+  }
+  Ok(infos)
+}
+
+///|
+/// Linux 路径枚举输出：解析 xrandr --query 的输出。
+fn mon_list_linux() -> Result[Array[MonitorInfo], MonitorError] {
   match pr_run("xrandr", ["--query"], timeout_ms=5000) {
     Err(Timeout(m)) => Err(CommandFailed(m))
     Err(SpawnFailed(m)) => Err(CommandFailed(m))

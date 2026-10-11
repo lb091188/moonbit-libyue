@@ -269,27 +269,47 @@ fn pp_available() -> Bool {
 
 // ---------------------------------------------------------------------------
 // 公开 API
+//
+// 平台分流约定：公开 API 只做 `match @yue.platform()` 调度，各平台实现拆成
+// 独立函数（Linux 走 `_linux`、Windows 走 `pp_win_*` 的 powrprof 直连），
+// 未匹配到的平台一律 PpUnsupported / false——不做「未知平台当 Linux」的
+// 兜底。
 // ---------------------------------------------------------------------------
 
 ///|
 /// 当前系统是否支持电源计划（Linux：powerprofilesctl 存在且可查询；
-/// Windows：电源计划 API 恒在）。每次调用真实探测，高频场景请调用方
-/// 自行缓存结果。
+/// Windows：电源计划 API 恒在；macOS 无实现，恒 false）。每次调用真实
+/// 探测，高频场景请调用方自行缓存结果。
 pub fn pp_supported() -> Bool {
-  if @yue.platform() == "windows" {
-    return true
+  match @yue.platform() {
+    "windows" => true
+    "linux" => pp_supported_linux()
+    _ => false
   }
+}
+
+///|
+/// Linux 路径支持性：powerprofilesctl 存在且可查询。
+fn pp_supported_linux() -> Bool {
   pp_available()
 }
 
 ///|
 /// 可用电源计划列表（Linux 按 `powerprofilesctl list` 输出序；Windows 枚举
 /// 系统电源方案，未知 GUID 的自定义方案跳过）。查询失败 →
-/// PpCommandFailed；解析不到任何已知计划 → PpParseFailed。
+/// PpCommandFailed；解析不到任何已知计划 → PpParseFailed；macOS 无实现，
+/// 恒 PpUnsupported。
 pub fn pp_profiles() -> Result[Array[PowerProfile], PowerProfileError] {
-  if @yue.platform() == "windows" {
-    return pp_win_profiles()
+  match @yue.platform() {
+    "windows" => pp_win_profiles()
+    "linux" => pp_profiles_linux()
+    _ => Err(PpUnsupported)
   }
+}
+
+///|
+/// Linux 路径列表：`powerprofilesctl list` 输出序即返回序。
+fn pp_profiles_linux() -> Result[Array[PowerProfile], PowerProfileError] {
   if !pr_available() {
     return Err(PpUnsupported)
   }
@@ -309,11 +329,18 @@ pub fn pp_profiles() -> Result[Array[PowerProfile], PowerProfileError] {
 ///|
 /// 当前电源计划（Linux：`powerprofilesctl get`；Windows 读活动方案 GUID
 /// 映射三档计划）。查询失败 → PpCommandFailed；活动方案是自定义方案 →
-/// PpParseFailed（带 GUID）。
+/// PpParseFailed（带 GUID）；macOS 无实现，恒 PpUnsupported。
 pub fn pp_current() -> Result[PowerProfile, PowerProfileError] {
-  if @yue.platform() == "windows" {
-    return pp_win_current()
+  match @yue.platform() {
+    "windows" => pp_win_current()
+    "linux" => pp_current_linux()
+    _ => Err(PpUnsupported)
   }
+}
+
+///|
+/// Linux 路径当前计划：`powerprofilesctl get`。
+fn pp_current_linux() -> Result[PowerProfile, PowerProfileError] {
   if !pr_available() {
     return Err(PpUnsupported)
   }
@@ -331,11 +358,18 @@ pub fn pp_current() -> Result[PowerProfile, PowerProfileError] {
 ///|
 /// 切换电源计划（`powerprofilesctl set <计划>`；有副作用，需要认证，
 /// 调用方自行走授权流程）。power-profiles-daemon 未安装 → PpUnsupported；
-/// 查询与执行失败 → PpCommandFailed。
+/// 查询与执行失败 → PpCommandFailed；macOS 无实现，恒 PpUnsupported。
 pub fn pp_set(profile : PowerProfile) -> Result[Unit, PowerProfileError] {
-  if @yue.platform() == "windows" {
-    return pp_win_set(profile)
+  match @yue.platform() {
+    "windows" => pp_win_set(profile)
+    "linux" => pp_set_linux(profile)
+    _ => Err(PpUnsupported)
   }
+}
+
+///|
+/// Linux 路径切换：`powerprofilesctl set <计划>`。
+fn pp_set_linux(profile : PowerProfile) -> Result[Unit, PowerProfileError] {
   if !pr_available() {
     return Err(PpUnsupported)
   }

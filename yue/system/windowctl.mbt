@@ -339,13 +339,20 @@ fn win_probe(prog : String) -> Bool {
 // ---------------------------------------------------------------------------
 
 ///|
-/// 当前系统是否支持窗口管理：Linux 且 wmctrl / xdotool 任一存在。
-/// 工具缺失是合法状态（返回 false，不是失败）。每次调用真实探测，高频
-/// 场景请调用方自行缓存结果。
+/// 当前系统是否支持窗口管理：Linux 且 wmctrl / xdotool 任一存在，Windows
+/// / macOS 走 shim 直连（恒支持）。工具缺失是合法状态（返回 false，不是
+/// 失败）。每次调用真实探测，高频场景请调用方自行缓存结果。
 pub fn win_supported() -> Bool {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    return true
+  match @yue.platform() {
+    "linux" => win_supported_linux()
+    "windows" | "macos" => win_supported_direct()
+    _ => false
   }
+}
+
+///|
+/// Linux 路径探测：子进程可用且 wmctrl / xdotool 任一存在。
+fn win_supported_linux() -> Bool {
   if !pr_available() {
     return false
   }
@@ -353,27 +360,49 @@ pub fn win_supported() -> Bool {
 }
 
 ///|
+/// Windows / macOS 路径探测：窗口枚举由 shim 直连提供，两平台共用同一份
+/// 判定（恒支持）。
+fn win_supported_direct() -> Bool {
+  true
+}
+
+///|
 /// 列出窗口：Linux 解析 wmctrl -l（需 X 会话，无会话时 wmctrl 以非零
 /// 退出呈现，返回 Err([WinError.CommandFailed])）；Windows 枚举全部
 /// 可见且有标题的顶层窗口；macOS 走 CGWindowList（跨应用标题需屏幕
-/// 录制权限，未授权时只见本进程窗口）。
+/// 录制权限，未授权时只见本进程窗口），与 Windows 共用 shim 枚举路线。
+/// 其余平台 Unsupported。
 pub fn win_list() -> Result[Array[WindowInfo], WinError] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let ok = Ref(0)
-    let text = @utf8.decode_lossy(@yue.ffi_win_list_windows(ok))
-    if ok.val != 1 {
-      return Err(CommandFailed("窗口枚举失败"))
-    }
-    let host = match getenv_str("COMPUTERNAME") {
-      Some(h) if h != "" => h
-      _ => ""
-    }
-    return win_parse_win_list(text, host)
+  match @yue.platform() {
+    "linux" => win_list_linux()
+    "windows" | "macos" => win_list_direct()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径列窗口：wmctrl -l 输出解析。
+fn win_list_linux() -> Result[Array[WindowInfo], WinError] {
   match pr_run("wmctrl", ["-l"], timeout_ms=4000) {
     Ok(o) => win_parse_list(o.stdout)
     Err(e) => Err(win_map_err("wmctrl -l", e))
   }
+}
+
+///|
+/// Windows / macOS 路径列窗口：shim 枚举文本解析，两平台共用同一份实现
+/// （host 取 %COMPUTERNAME%）。
+fn win_list_direct() -> Result[Array[WindowInfo], WinError] {
+  let ok = Ref(0)
+  let text = @utf8.decode_lossy(@yue.ffi_win_list_windows(ok))
+  if ok.val != 1 {
+    return Err(CommandFailed("窗口枚举失败"))
+  }
+  let host = match getenv_str("COMPUTERNAME") {
+    Some(h) if h != "" => h
+    _ => ""
+  }
+  win_parse_win_list(text, host)
 }
 
 ///|
@@ -421,20 +450,34 @@ fn win_find_by_title(
 ///|
 /// 激活窗口：id_or_title 为 [WindowInfo.id]（"0x" 十六进制）时按 id
 /// 激活，否则按标题子串匹配（不区分大小写）。Linux 会切换桌面并置顶
-/// 目标窗口；Windows 置前目标窗口（最小化先恢复）。空参数返回
-/// Err([WinError.InvalidParam])。
+/// 目标窗口；Windows 置前目标窗口（最小化先恢复）；macOS 与 Windows 共用
+/// shim 动作路线。空参数返回 Err([WinError.InvalidParam])；其余平台
+/// Unsupported。
 pub fn win_activate(id_or_title : String) -> Result[Unit, WinError] {
   if id_or_title == "" {
     return Err(InvalidParam("窗口 id 或标题为空"))
   }
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    return win_win_apply(
-      id_or_title,
-      fn(id, ok) { @yue.ffi_win_activate_window(@yue.utf8_bytes(id), ok) },
-      "置前",
-    )
+  match @yue.platform() {
+    "linux" => win_activate_linux(id_or_title)
+    "windows" | "macos" => win_activate_direct(id_or_title)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径激活窗口：wmctrl -a（按 id 带 -i）。
+fn win_activate_linux(id_or_title : String) -> Result[Unit, WinError] {
   win_apply(win_activate_args(id_or_title))
+}
+
+///|
+/// Windows / macOS 路径激活窗口：shim 置前动作，两平台共用同一份实现。
+fn win_activate_direct(id_or_title : String) -> Result[Unit, WinError] {
+  win_win_apply(
+    id_or_title,
+    fn(id, ok) { @yue.ffi_win_activate_window(@yue.utf8_bytes(id), ok) },
+    "置前",
+  )
 }
 
 ///|
@@ -469,17 +512,30 @@ fn win_win_apply(
 /// 关闭窗口：title 按标题子串匹配（不区分大小写），关闭首个匹配窗口
 /// （wmctrl -c 语义；Windows 同样只关首个匹配，经 WM_CLOSE 温和关闭；
 /// macOS 经 AXCloseButton 按钮 AXPress，需辅助功能权限，未授权恒失败）。
-/// 空参数返回 Err([WinError.InvalidParam])。
+/// 空参数返回 Err([WinError.InvalidParam])；其余平台 Unsupported。
 pub fn win_close(title : String) -> Result[Unit, WinError] {
   if title == "" {
     return Err(InvalidParam("窗口标题为空"))
   }
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    return win_win_apply(
-      title,
-      fn(id, ok) { @yue.ffi_win_close_window(@yue.utf8_bytes(id), ok) },
-      "关闭",
-    )
+  match @yue.platform() {
+    "linux" => win_close_linux(title)
+    "windows" | "macos" => win_close_direct(title)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径关闭窗口：wmctrl -c 按标题子串匹配。
+fn win_close_linux(title : String) -> Result[Unit, WinError] {
   win_apply(win_close_args(title))
+}
+
+///|
+/// Windows / macOS 路径关闭窗口：shim 关闭动作，两平台共用同一份实现。
+fn win_close_direct(title : String) -> Result[Unit, WinError] {
+  win_win_apply(
+    title,
+    fn(id, ok) { @yue.ffi_win_close_window(@yue.utf8_bytes(id), ok) },
+    "关闭",
+  )
 }

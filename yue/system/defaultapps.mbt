@@ -201,9 +201,17 @@ fn da_str_has(arr : Array[String], s : String) -> Bool {
 ///|
 /// 是否有可用的查询命令（xdg-mime 在 PATH）。
 pub fn da_supported() -> Bool {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    return true // Windows AssocQueryString / macOS LaunchServices 直连
+  match @yue.platform() {
+    "linux" => da_supported_linux()
+    // Windows AssocQueryString / macOS LaunchServices 直连
+    "windows" | "macos" => true
+    _ => false
   }
+}
+
+///|
+/// Linux 路径的可用性探测：xdg-mime 是否在 PATH。
+fn da_supported_linux() -> Bool {
   match appfind_executable("xdg-mime") {
     Ok(_) => true
     Err(_) => false
@@ -240,19 +248,34 @@ fn da_mimeapps_files() -> Array[String] {
 /// （"application/pdf" 形态）；Windows 无 MIME 层，给小写扩展名
 /// （".pdf" 形态——文件类型键即扩展名，形态差异由调用方消化）。
 pub fn da_file_type(path : String) -> Result[String, DefaultAppError] {
-  // Windows 无 MIME 层给扩展名；macOS 走 LaunchServices 但键形态同取
-  // 扩展名（UTI 差异由 shim 吸收），两分支一致
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let dot = da_last_index_of(path, '.')
-    let slash = da_max(
-      da_last_index_of(path, '/'),
-      da_last_index_of(path, '\\'),
-    )
-    if dot < 0 || dot < slash || dot == path.length() - 1 {
-      return Err(QueryFailed("无扩展名: \{path}"))
-    }
-    return Ok(path[dot:].to_owned().to_lower())
+  match @yue.platform() {
+    "linux" => da_file_type_linux(path)
+    // Windows 无 MIME 层给扩展名；macOS 走 LaunchServices 但键形态同取
+    // 扩展名（UTI 差异由 shim 吸收），两平台共用一份实现
+    "windows" | "macos" => da_file_type_shared(path)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Windows / macOS 共用路径推断文件类型：取路径末尾的小写扩展名
+/// （含 '.'；无扩展名给 QueryFailed）。
+fn da_file_type_shared(path : String) -> Result[String, DefaultAppError] {
+  let dot = da_last_index_of(path, '.')
+  let slash = da_max(
+    da_last_index_of(path, '/'),
+    da_last_index_of(path, '\\'),
+  )
+  if dot < 0 || dot < slash || dot == path.length() - 1 {
+    return Err(QueryFailed("无扩展名: \{path}"))
+  }
+  Ok(path[dot:].to_owned().to_lower())
+}
+
+///|
+/// Linux 路径推断文件类型：经 xdg-mime query filetype 给 MIME 类型
+/// （"application/pdf" 形态）。
+fn da_file_type_linux(path : String) -> Result[String, DefaultAppError] {
   if !da_supported() {
     return Err(Unsupported)
   }
@@ -305,19 +328,36 @@ fn da_max(a : Int, b : Int) -> Int {
 /// AssocQueryString 查关联的可执行文件完整路径（mime 传扩展名
 /// （".pdf"）或协议（"http"），查不到给 NoDefault）。
 pub fn da_default_for(mime : String) -> Result[String, DefaultAppError] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    if mime == "" {
-      return Err(QueryFailed("类型/协议为空"))
-    }
-    let ok = Ref(0)
-    let exe = @utf8.decode_lossy(
-      @yue.ffi_assoc_query(@yue.utf8_bytes(mime), 0, ok),
-    )
-    if ok.val != 1 || exe == "" {
-      return Err(NoDefault(mime))
-    }
-    return Ok(exe)
+  match @yue.platform() {
+    "linux" => da_default_for_linux(mime)
+    // Windows / macOS 共用：两者都经 shim 的 AssocQueryString /
+    // LaunchServices 查关联的可执行文件完整路径
+    "windows" | "macos" => da_default_for_shared(mime)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Windows / macOS 共用路径查默认应用：AssocQueryString 查关联的可执行
+/// 文件完整路径（mime 传扩展名（".pdf"）或协议（"http"））。
+fn da_default_for_shared(mime : String) -> Result[String, DefaultAppError] {
+  if mime == "" {
+    return Err(QueryFailed("类型/协议为空"))
+  }
+  let ok = Ref(0)
+  let exe = @utf8.decode_lossy(
+    @yue.ffi_assoc_query(@yue.utf8_bytes(mime), 0, ok),
+  )
+  if ok.val != 1 || exe == "" {
+    return Err(NoDefault(mime))
+  }
+  Ok(exe)
+}
+
+///|
+/// Linux 路径查默认应用：优先 xdg-mime query default（.desktop 名），
+/// 回退解析 mimeapps.list 的 [Default Applications] 段。
+fn da_default_for_linux(mime : String) -> Result[String, DefaultAppError] {
   if da_supported() {
     match pr_run("xdg-mime", ["query", "default", mime]) {
       Ok(out) => {
@@ -355,9 +395,17 @@ pub fn da_default_for(mime : String) -> Result[String, DefaultAppError] {
 /// 列出类型的全部关联应用：Linux 扫描三处 mimeapps.list（默认应用排
 /// 最前，去重）；Windows 无关联应用枚举接口，恒空列表。
 pub fn da_associations_for(mime : String) -> Array[String] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    return [] // Windows/macOS 均无关联应用枚举接口
+  match @yue.platform() {
+    "linux" => da_associations_for_linux(mime)
+    // Windows / macOS 均无关联应用枚举接口，恒空列表
+    "windows" | "macos" => []
+    _ => []
   }
+}
+
+///|
+/// Linux 路径列关联应用：扫描三处 mimeapps.list（默认应用排最前，去重）。
+fn da_associations_for_linux(mime : String) -> Array[String] {
   let texts : Array[String] = []
   for file in da_mimeapps_files() {
     match @yue.read_text_file(file) {
@@ -377,10 +425,25 @@ pub fn da_associations_for(mime : String) -> Array[String] {
 /// 该 mime 行则替换，否则段内追加/新建段）；Windows 的用户级默认应用
 /// 注册走 IApplicationAssociationRegistration（需 UI 授权流程），本包
 /// 未实现，返回 Unsupported。
-pub fn da_set_default(mime : String, desktop_id : String) -> Result[Unit, DefaultAppError] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    return Err(Unsupported) // 用户级默认应用注册需 UI 授权流程，未实现
+pub fn da_set_default(
+  mime : String,
+  desktop_id : String,
+) -> Result[Unit, DefaultAppError] {
+  match @yue.platform() {
+    "linux" => da_set_default_linux(mime, desktop_id)
+    // Windows / macOS 的用户级默认应用注册需 UI 授权流程，未实现
+    "windows" | "macos" => Err(Unsupported)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径设置默认应用：把 mime=desktop_id 写入用户 mimeapps.list 的
+/// [Default Applications] 段（已有该 mime 行则替换，否则段内追加/新建段）。
+fn da_set_default_linux(
+  mime : String,
+  desktop_id : String,
+) -> Result[Unit, DefaultAppError] {
   if !desktop_id.has_suffix(".desktop") {
     return Err(QueryFailed("desktop_id 必须是 .desktop 文件名: \{desktop_id}"))
   }

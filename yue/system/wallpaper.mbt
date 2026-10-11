@@ -381,19 +381,20 @@ fn wp_kde_prog() -> String? {
 /// 读当前壁纸路径（按 DE 分派）。XFCE 取 workspace0 的 last-image 属性
 /// （存在多个显示器时优先已连接输出）；GNOME 取 picture-uri，未设置时
 /// 回退 picture-uri-dark；KDE 走 plasmashell evaluateScript。不认识的
-/// DE / 工具缺失为语义化 Err。
+/// DE / 工具缺失为语义化 Err。Windows / macOS 走 shim 直读；其余平台
+/// Unsupported。
 pub fn wp_get() -> Result[String, WallpaperError] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let ok = Ref(0)
-    let path = wp_trim(@utf8.decode_lossy(@yue.ffi_wallpaper_get(ok)))
-    if ok.val != 1 {
-      return Err(CommandFailed("壁纸读失败"))
-    }
-    if path == "" {
-      return Err(ParseFailed("壁纸未设置"))
-    }
-    return Ok(path)
+  match @yue.platform() {
+    "linux" => wp_get_linux()
+    "windows" | "macos" => wp_get_direct()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径读壁纸：按 DE 分派（XFCE / GNOME / KDE），子进程不可用为
+/// Unsupported，不认识的 DE 为 UnknownDesktop。
+fn wp_get_linux() -> Result[String, WallpaperError] {
   if !pr_available() {
     return Err(Unsupported)
   }
@@ -406,21 +407,40 @@ pub fn wp_get() -> Result[String, WallpaperError] {
 }
 
 ///|
+/// Windows / macOS 路径读壁纸：shim 的 SystemParametersInfo 直读，两平台
+/// 共用同一份实现。
+fn wp_get_direct() -> Result[String, WallpaperError] {
+  let ok = Ref(0)
+  let path = wp_trim(@utf8.decode_lossy(@yue.ffi_wallpaper_get(ok)))
+  if ok.val != 1 {
+    return Err(CommandFailed("壁纸读失败"))
+  }
+  if path == "" {
+    return Err(ParseFailed("壁纸未设置"))
+  }
+  Ok(path)
+}
+
+///|
 /// 设置当前壁纸（按 DE 分派）。XFCE 写 workspace0 对应输出的 last-image
 /// 属性（不存在则创建）；GNOME 写 picture-uri；KDE 走 plasmashell
 /// evaluateScript。仅在明确知道环境后才可调用，会改变桌面外观。
+/// Windows / macOS 走 shim 直写；其余平台 Unsupported。
 pub fn wp_set(path : String) -> Result[Unit, WallpaperError] {
   if wp_trim(path) == "" {
     return Err(InvalidParam("壁纸路径为空"))
   }
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let ok = Ref(0)
-    let _ = @yue.ffi_wallpaper_set(@yue.utf8_bytes(path), ok)
-    if ok.val != 1 {
-      return Err(CommandFailed("壁纸写失败（路径不存在或被系统拒绝）"))
-    }
-    return Ok(())
+  match @yue.platform() {
+    "linux" => wp_set_linux(path)
+    "windows" | "macos" => wp_set_direct(path)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径写壁纸：按 DE 分派（XFCE / GNOME / KDE），子进程不可用或
+/// KDE 的 qdbus 不在为 Unsupported，不认识的 DE 为 UnknownDesktop。
+fn wp_set_linux(path : String) -> Result[Unit, WallpaperError] {
   if !pr_available() {
     return Err(Unsupported)
   }
@@ -440,6 +460,18 @@ pub fn wp_set(path : String) -> Result[Unit, WallpaperError] {
       }
     _ => Err(UnknownDesktop(@traybus.desktop_name()))
   }
+}
+
+///|
+/// Windows / macOS 路径写壁纸：shim 的 SystemParametersInfo 直写，两平台
+/// 共用同一份实现。
+fn wp_set_direct(path : String) -> Result[Unit, WallpaperError] {
+  let ok = Ref(0)
+  let _ = @yue.ffi_wallpaper_set(@yue.utf8_bytes(path), ok)
+  if ok.val != 1 {
+    return Err(CommandFailed("壁纸写失败（路径不存在或被系统拒绝）"))
+  }
+  Ok(())
 }
 
 // ---------------------------------------------------------------------------

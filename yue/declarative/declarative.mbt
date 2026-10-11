@@ -143,33 +143,36 @@ pub fn entry(
       // Windows 上 height 不直接落到原生控件(文字贴顶),拆出包进
       // 外壳容器(值原样应用,百分比也支持),挂载后一帧读外壳实际
       // 高做 entry_vcenter 垂直居中
-      let (make_style, height_kv) = if @yue.platform() == "windows" {
-        take_style_height(style)
-      } else {
-        (style, None)
+      let (make_style, height_kv) = match @yue.platform() {
+        "windows" => take_style_height(style)
+        _ => (style, None)
       }
       let e = @yue.Entry::make(
         text~,
         entry_type=if password { @yue.Password } else { @yue.Normal },
         style=make_style,
       )
-      let target : @yue.View = if @yue.platform() == "windows" {
-        // 与 entry_t 一致:字体先设(行高测量吻合),控件收窄到行高,
-        // height 键值原样包进外壳容器 justifyContent=center 垂直居中
-        @yue.ViewLike::set_font(e, @yue.Font::new("Sans", 13.0))
-        @yue.ViewLike::set_style(e, "height", @yue.entry_ctrl_height(true))
-        let shell_style : Array[(String, &@yue.StyVal)] = match height_kv {
-          Some(kv) => [kv]
-          None => [("height", @yue.control_height)]
+      let target : @yue.View = match @yue.platform() {
+        "windows" =>
+          // 与 entry_t 一致:字体先设(行高测量吻合),控件收窄到行高,
+          // height 键值原样包进外壳容器 justifyContent=center 垂直居中
+          {
+            @yue.ViewLike::set_font(e, @yue.Font::new("Sans", 13.0))
+            @yue.ViewLike::set_style(e, "height", @yue.entry_ctrl_height(true))
+            let shell_style : Array[(String, &@yue.StyVal)] = match height_kv {
+              Some(kv) => [kv]
+              None => [("height", @yue.control_height)]
+            }
+            shell_style.push(("justifyContent", "center"))
+            let shell = @yue.themed_container(style=shell_style)
+            @yue.attach(@yue.ViewLike::view(shell), @yue.ViewLike::view(e))
+            @yue.bind_entry_theme(e)
+            @yue.ViewLike::view(shell)
+          }
+        _ => {
+          @yue.bind_entry_theme(e)
+          @yue.ViewLike::view(e)
         }
-        shell_style.push(("justifyContent", "center"))
-        let shell = @yue.themed_container(style=shell_style)
-        @yue.attach(@yue.ViewLike::view(shell), @yue.ViewLike::view(e))
-        @yue.bind_entry_theme(e)
-        @yue.ViewLike::view(shell)
-      } else {
-        @yue.bind_entry_theme(e)
-        @yue.ViewLike::view(e)
       }
       e.on_activate(fn() { on_enter(e.get_text()) })
       e.on_text_change(fn() { on_input(e.get_text()) })
@@ -412,11 +415,13 @@ pub fn scroll(
         @yue.attach(parent, @yue.ViewLike::view(s))
         @yue.ViewLike::view(s)
       }
-      if @yue.platform() == "windows" {
-        s.on_scroll(fn() {
-          @yue.ViewLike::update_layout(holder)
-          false
-        })
+      match @yue.platform() {
+        "windows" =>
+          s.on_scroll(fn() {
+            @yue.ViewLike::update_layout(holder)
+            false
+          })
+        _ => ()
       }
       mounted
     },

@@ -226,18 +226,27 @@ fn pwrc_session_call(
 
 // ---------------------------------------------------------------------------
 // 公开 API
+//
+// 平台分流约定：公开 API 只做 `match @yue.platform()` 调度，各平台实现拆成
+// 独立函数（Linux 走 `_linux`、Windows 关机类走 [pwrc_win_shutdown]），
+// 未匹配到的平台一律 Unsupported / false——不做「未知平台当 Linux」的兜底。
 // ---------------------------------------------------------------------------
 
 ///|
-/// 当前系统是否支持电源控制（Linux 且 logind 在线；Windows 恒支持）。
-/// 每次调用真实探测，高频场景请调用方自行缓存结果。
+/// 当前系统是否支持电源控制（Linux 且 logind 在线；Windows 恒支持；
+/// macOS 无实现，恒 false）。每次调用真实探测，高频场景请调用方自行缓存
+/// 结果。
 pub fn pwrc_supported() -> Bool {
-  if @yue.platform() == "windows" {
-    return true
+  match @yue.platform() {
+    "windows" => true
+    "linux" => pwrc_supported_linux()
+    _ => false
   }
-  if @yue.platform() != "linux" {
-    return false
-  }
+}
+
+///|
+/// Linux 路径支持性：logind Manager 的 CanPowerOff 只读查询可跑通即支持。
+fn pwrc_supported_linux() -> Bool {
   match
     @traybus.gdbus_call_system(
       pwrc_logind,
@@ -266,11 +275,19 @@ pub fn pwrc_sessions() -> Result[Array[SessionInfo], PwrcError] {
 ///|
 /// 查询当前环境是否允许关机（Can* 结果为 yes/challenge 为允许）。logind
 /// 不在线时返回 Unsupported；其它查询失败为 BusFailed；Windows 恒允许
-/// （动作本身要 SE_SHUTDOWN_NAME 特权，由动作执行处开通）。
+/// （动作本身要 SE_SHUTDOWN_NAME 特权，由动作执行处开通）；macOS 无实现，
+/// 恒 Unsupported。
 pub fn pwrc_can_power_off() -> Result[Bool, PwrcError] {
-  if @yue.platform() == "windows" {
-    return Ok(true)
+  match @yue.platform() {
+    "windows" => Ok(true)
+    "linux" => pwrc_can_power_off_linux()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径查询：logind CanPowerOff，yes/challenge 视为允许。
+fn pwrc_can_power_off_linux() -> Result[Bool, PwrcError] {
   match pwrc_manager_call("CanPowerOff") {
     Err(e) => Err(e)
     Ok(@traybus.GVString(s)) => Ok(pwrc_can_parse(s))
@@ -279,11 +296,19 @@ pub fn pwrc_can_power_off() -> Result[Bool, PwrcError] {
 }
 
 ///|
-/// 查询当前环境是否允许重启（CanReboot）。语义同 [pwrc_can_power_off]。
+/// 查询当前环境是否允许重启（CanReboot）。语义同 [pwrc_can_power_off]
+/// （macOS 无实现，恒 Unsupported）。
 pub fn pwrc_can_reboot() -> Result[Bool, PwrcError] {
-  if @yue.platform() == "windows" {
-    return Ok(true)
+  match @yue.platform() {
+    "windows" => Ok(true)
+    "linux" => pwrc_can_reboot_linux()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径查询：logind CanReboot，yes/challenge 视为允许。
+fn pwrc_can_reboot_linux() -> Result[Bool, PwrcError] {
   match pwrc_manager_call("CanReboot") {
     Err(e) => Err(e)
     Ok(@traybus.GVString(s)) => Ok(pwrc_can_parse(s))
@@ -295,11 +320,19 @@ pub fn pwrc_can_reboot() -> Result[Bool, PwrcError] {
 /// 关机（有副作用）：Linux 走 logind PowerOff（interactive=true 允许
 /// polkit 交互授权，环境不允许时返回 NotAllowed）；Windows 走
 /// ExitWindowsEx(EWX_POWEROFF|EWX_FORCEIFHUNG)（进程内开通关机特权，
-/// 温和模式只杀挂起进程）。
+/// 温和模式只杀挂起进程）。macOS 无实现，恒 Unsupported。
 pub fn pwrc_power_off() -> Result[Unit, PwrcError] {
-  if @yue.platform() == "windows" {
-    return pwrc_win_shutdown(0)
+  match @yue.platform() {
+    "windows" => pwrc_win_shutdown(0)
+    "linux" => pwrc_power_off_linux()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径关机：logind PowerOff（interactive=true 允许 polkit 交互授权，
+/// 环境不允许时返回 NotAllowed）。
+fn pwrc_power_off_linux() -> Result[Unit, PwrcError] {
   match
     @traybus.gdbus_call_system(
       pwrc_logind,
@@ -315,11 +348,20 @@ pub fn pwrc_power_off() -> Result[Unit, PwrcError] {
 
 ///|
 /// 重启（有副作用）：Linux 走 logind Reboot；Windows 走
-/// ExitWindowsEx(EWX_REBOOT|EWX_FORCEIFHUNG)。
+/// ExitWindowsEx(EWX_REBOOT|EWX_FORCEIFHUNG)。macOS 无实现，恒
+/// Unsupported。
 pub fn pwrc_reboot() -> Result[Unit, PwrcError] {
-  if @yue.platform() == "windows" {
-    return pwrc_win_shutdown(1)
+  match @yue.platform() {
+    "windows" => pwrc_win_shutdown(1)
+    "linux" => pwrc_reboot_linux()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径重启：logind Reboot（interactive=true 允许 polkit 交互授权，
+/// 环境不允许时返回 NotAllowed）。
+fn pwrc_reboot_linux() -> Result[Unit, PwrcError] {
   match
     @traybus.gdbus_call_system(
       pwrc_logind,
@@ -348,25 +390,40 @@ fn pwrc_win_shutdown(how : Int) -> Result[Unit, PwrcError] {
 ///|
 /// 注销指定会话（logind 会话对象的 Terminate；传入 [pwrc_sessions] 枚举
 /// 所得的会话）。仅终止该会话自身，不影响其它用户。Windows 无逐会话
-/// 终断对应（会话表结构不同），返回 Unsupported。
+/// 终断对应（会话表结构不同）、macOS 无实现，均返回 Unsupported。
 pub fn pwrc_logout(session : SessionInfo) -> Result[Unit, PwrcError] {
   if session.path == "" {
     return Err(BusFailed("会话对象路径为空"))
   }
-  if @yue.platform() == "windows" {
-    return Err(Unsupported)
+  match @yue.platform() {
+    "linux" => pwrc_logout_linux(session)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径注销：logind 会话对象的 Terminate。
+fn pwrc_logout_linux(session : SessionInfo) -> Result[Unit, PwrcError] {
   pwrc_session_call(session.path, "Terminate")
 }
 
 ///|
 /// 注销当前会话（有副作用）：Linux 取第一个非空 seat 的会话（多会话时
 /// 只退本座位的首个）；Windows 走 ExitWindowsEx(EWX_LOGOFF)（当前用户
-/// 全部会话）。无任何会话时返回 Unsupported。
+/// 全部会话）。无任何会话时返回 Unsupported；macOS 无实现，恒
+/// Unsupported。
 pub fn pwrc_logout_self() -> Result[Unit, PwrcError] {
-  if @yue.platform() == "windows" {
-    return pwrc_win_shutdown(2)
+  match @yue.platform() {
+    "windows" => pwrc_win_shutdown(2)
+    "linux" => pwrc_logout_self_linux()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径注销当前会话：取第一个非空 seat 的会话（多会话时只退本座位
+/// 的首个），无任何会话返回 Unsupported。
+fn pwrc_logout_self_linux() -> Result[Unit, PwrcError] {
   match pwrc_sessions() {
     Err(e) => Err(e)
     Ok(sessions) => {

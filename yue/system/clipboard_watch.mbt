@@ -104,14 +104,16 @@ fn cbw_first_line(s : String) -> String {
 /// 时为对应 Err）；Windows 走 Win32 剪贴板、macOS 走 NSPasteboard（无
 /// 文本时为 CommandFailed）。
 pub fn cbw_get_text() -> Result[String, ClipboardError] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let ok = Ref(0)
-    let text = @utf8.decode_lossy(@yue.ffi_clipboard_text(ok))
-    if ok.val != 1 {
-      return Err(CommandFailed("剪贴板无文本或打开失败"))
-    }
-    return Ok(text)
+  match @yue.platform() {
+    "linux" => cbw_get_text_linux()
+    "windows" | "macos" => cbw_get_text_direct()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径读剪贴板（`xclip -selection clipboard -o`）。
+fn cbw_get_text_linux() -> Result[String, ClipboardError] {
   match pr_run("xclip", ["-selection", "clipboard", "-o"], timeout_ms=2000) {
     Ok(o) => Ok(o.stdout)
     Err(NonZeroExit(127, _)) => Err(Unsupported)
@@ -122,6 +124,17 @@ pub fn cbw_get_text() -> Result[String, ClipboardError] {
     Err(Signaled(sig)) => Err(CommandFailed("xclip: 被信号 \{sig} 终止"))
     Err(Unsupported) => Err(Unsupported)
   }
+}
+
+///|
+/// Windows / macOS 路径读剪贴板（Win32 剪贴板 / NSPasteboard 直连）。
+fn cbw_get_text_direct() -> Result[String, ClipboardError] {
+  let ok = Ref(0)
+  let text = @utf8.decode_lossy(@yue.ffi_clipboard_text(ok))
+  if ok.val != 1 {
+    return Err(CommandFailed("剪贴板无文本或打开失败"))
+  }
+  Ok(text)
 }
 
 ///|

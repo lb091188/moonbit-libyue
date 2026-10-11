@@ -437,16 +437,27 @@ fn bt_device_action(
 
 // ---------------------------------------------------------------------------
 // 公开 API
+//
+// 平台分流约定:公开 API 只做 `match @yue.platform()` 调度,各平台实现拆成
+// 独立函数(Linux 路径走 `_linux` 后缀),未匹配到的平台一律 Unsupported
+// 或 false,不做「未知平台当 Linux」的兜底。
 // ---------------------------------------------------------------------------
 
 ///|
 /// 当前系统是否支持蓝牙:Linux 为系统总线上 org.bluez 至少有一个
-/// Adapter1 对象;Windows 为经典 BluetoothAPIs 枚举到无线电。
-/// 每次调用真实探测,高频场景请调用方自行缓存结果。
+/// Adapter1 对象;Windows 为经典 BluetoothAPIs 枚举到无线电;macOS 无实现,
+/// 恒 false。每次调用真实探测,高频场景请调用方自行缓存结果。
 pub fn bt_supported() -> Bool {
-  if @yue.platform() == "windows" {
-    return bt_win_adapter() is Ok(_)
+  match @yue.platform() {
+    "windows" => bt_win_adapter() is Ok(_)
+    "linux" => bt_supported_linux()
+    _ => false
   }
+}
+
+///|
+/// Linux 路径支持性:系统总线上 org.bluez 至少有一个 Adapter1 对象。
+fn bt_supported_linux() -> Bool {
   bt_adapter_path() is Ok(_)
 }
 
@@ -454,11 +465,18 @@ pub fn bt_supported() -> Bool {
 /// 适配器快照(首个 Adapter1 的 Powered/Discovering/Address/Name);无
 /// 蓝牙回复 Unsupported。Windows 为无线电快照:powered 是「枚举得到即
 /// 可打开」的近似、discovering 恒 false、path 恒空(语义见
-/// bt_win_parse_adapter)。
+/// bt_win_parse_adapter)。macOS 无实现,恒 Unsupported。
 pub fn bt_adapter_info() -> Result[BtAdapter, BtError] {
-  if @yue.platform() == "windows" {
-    return bt_win_adapter()
+  match @yue.platform() {
+    "windows" => bt_win_adapter()
+    "linux" => bt_adapter_info_linux()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径:定位首个 Adapter1 后读取其全部属性。
+fn bt_adapter_info_linux() -> Result[BtAdapter, BtError] {
   match bt_adapter_path() {
     Err(e) => Err(e)
     Ok(path) =>
@@ -473,11 +491,18 @@ pub fn bt_adapter_info() -> Result[BtAdapter, BtError] {
 /// 已发现设备列表(枚举全部 org.bluez.Device1 对象)。注意含历史扫描
 /// 残留对象(配对记录),以 paired/connected 区分;无蓝牙回复
 /// Unsupported。Windows 为已知设备快照(含配对记录与缓存发现的设备,
-/// 不触发扫描)。
+/// 不触发扫描)。macOS 无实现,恒 Unsupported。
 pub fn bt_devices() -> Result[Array[BtDevice], BtError] {
-  if @yue.platform() == "windows" {
-    return bt_win_devices()
+  match @yue.platform() {
+    "windows" => bt_win_devices()
+    "linux" => bt_devices_linux()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径:枚举全部 org.bluez.Device1 对象。
+fn bt_devices_linux() -> Result[Array[BtDevice], BtError] {
   match bt_managed_objects() {
     Err(e) => Err(e)
     Ok(v) => {
@@ -492,11 +517,18 @@ pub fn bt_devices() -> Result[Array[BtDevice], BtError] {
 
 ///|
 /// 开 / 关适配器电源(写 Adapter1 的 Powered 属性)。Windows 不支持
-/// (经典 API 无电源开关,动作族待 WinRT 批次),恒 Unsupported。
+/// (经典 API 无电源开关,动作族待 WinRT 批次),恒 Unsupported;macOS 无
+/// 实现,同样走 Unsupported。
 pub fn bt_set_powered(on : Bool) -> Result[Unit, BtError] {
-  if @yue.platform() == "windows" {
-    return Err(Unsupported)
+  match @yue.platform() {
+    "linux" => bt_set_powered_linux(on)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径:写首个 Adapter1 的 Powered 属性。
+fn bt_set_powered_linux(on : Bool) -> Result[Unit, BtError] {
   match bt_adapter_path() {
     Err(e) => Err(e)
     Ok(path) =>
@@ -517,49 +549,83 @@ pub fn bt_set_powered(on : Bool) -> Result[Unit, BtError] {
 ///|
 /// 开始扫描(Adapter1.StartDiscovery;扫描到的设备经 bt_devices 查看,
 /// 事件未在事件循环派发)。Windows 不支持(经典 API 扫描是阻塞式查询
-/// 且无持续状态,动作族待 WinRT 批次),恒 Unsupported。
+/// 且无持续状态,动作族待 WinRT 批次),恒 Unsupported;macOS 无实现,同样
+/// 走 Unsupported。
 pub fn bt_start_discovery() -> Result[Unit, BtError] {
-  if @yue.platform() == "windows" {
-    return Err(Unsupported)
+  match @yue.platform() {
+    "linux" => bt_start_discovery_linux()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径:Adapter1.StartDiscovery。
+fn bt_start_discovery_linux() -> Result[Unit, BtError] {
   bt_adapter_action("StartDiscovery")
 }
 
 ///|
-/// 停止扫描(Adapter1.StopDiscovery)。Windows 不支持,恒 Unsupported。
+/// 停止扫描(Adapter1.StopDiscovery)。Windows 不支持,恒 Unsupported;
+/// macOS 无实现,同样走 Unsupported。
 pub fn bt_stop_discovery() -> Result[Unit, BtError] {
-  if @yue.platform() == "windows" {
-    return Err(Unsupported)
+  match @yue.platform() {
+    "linux" => bt_stop_discovery_linux()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径:Adapter1.StopDiscovery。
+fn bt_stop_discovery_linux() -> Result[Unit, BtError] {
   bt_adapter_action("StopDiscovery")
 }
 
 ///|
 /// 连接设备(Device1.Connect;未配对设备通常需先 bt_pair)。Windows
-/// 不支持(需系统 UI 或 WinRT,动作族待后续批次),恒 Unsupported。
+/// 不支持(需系统 UI 或 WinRT,动作族待后续批次),恒 Unsupported;macOS 无
+/// 实现,同样走 Unsupported。
 pub fn bt_connect(device : BtDevice) -> Result[Unit, BtError] {
-  if @yue.platform() == "windows" {
-    return Err(Unsupported)
+  match @yue.platform() {
+    "linux" => bt_connect_linux(device)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径:Device1.Connect。
+fn bt_connect_linux(device : BtDevice) -> Result[Unit, BtError] {
   bt_device_action(device, "Connect")
 }
 
 ///|
-/// 断开设备(Device1.Disconnect)。Windows 不支持,恒 Unsupported。
+/// 断开设备(Device1.Disconnect)。Windows 不支持,恒 Unsupported;macOS
+/// 无实现,同样走 Unsupported。
 pub fn bt_disconnect(device : BtDevice) -> Result[Unit, BtError] {
-  if @yue.platform() == "windows" {
-    return Err(Unsupported)
+  match @yue.platform() {
+    "linux" => bt_disconnect_linux(device)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径:Device1.Disconnect。
+fn bt_disconnect_linux(device : BtDevice) -> Result[Unit, BtError] {
   bt_device_action(device, "Disconnect")
 }
 
 ///|
 /// 配对设备(Device1.Pair;配对需用户确认的授权码,过程可能持续数秒)。
 /// Windows 不支持(经典 API 配对要弹系统向导 UI,动作族待后续批次),
-/// 恒 Unsupported。
+/// 恒 Unsupported;macOS 无实现,同样走 Unsupported。
 pub fn bt_pair(device : BtDevice) -> Result[Unit, BtError] {
-  if @yue.platform() == "windows" {
-    return Err(Unsupported)
+  match @yue.platform() {
+    "linux" => bt_pair_linux(device)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径:Device1.Pair。
+fn bt_pair_linux(device : BtDevice) -> Result[Unit, BtError] {
   bt_device_action(device, "Pair")
 }

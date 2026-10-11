@@ -262,13 +262,27 @@ pub fn bm_supported() -> Bool {
 /// 配置根定位（书签侧与历史侧同源）：Windows 取 %LOCALAPPDATA%，Linux
 /// 走 XDG_CONFIG_HOME / HOME，其余平台 None。
 fn bm_root() -> String? {
-  if @yue.platform() == "windows" {
-    return match getenv_str("LOCALAPPDATA") {
-      Some(d) if d != "" => Some(d)
-      _ => None
-    }
+  match @yue.platform() {
+    "linux" => bm_root_linux()
+    "windows" => bm_root_win()
+    _ => None
   }
+}
+
+///|
+/// Linux 配置根：XDG_CONFIG_HOME（设且非空）优先，回退 $HOME/.config
+/// （与历史侧 [bh_config_root] 同源）。
+fn bm_root_linux() -> String? {
   bh_config_root(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME"))
+}
+
+///|
+/// Windows 配置根：%LOCALAPPDATA%（缺失给 None）。
+fn bm_root_win() -> String? {
+  match getenv_str("LOCALAPPDATA") {
+    Some(d) if d != "" => Some(d)
+    _ => None
+  }
 }
 
 ///|
@@ -277,9 +291,19 @@ fn bm_root() -> String? {
 /// 逐一探测；无可读文件给 [BmNoBrowser]，非 Linux / Windows 给
 /// [BmUnsupported]，配置目录定位失败给 [BmNoConfigDir]。
 pub fn bm_browsers() -> Result[Array[BookmarkProfile], BookmarkError] {
-  if !bm_supported() {
-    return Err(BmUnsupported)
+  match @yue.platform() {
+    // Linux / Windows 共用：配置根定位（[bm_root]）与浏览器定义表
+    // （[bh_defs]）各自在内部按平台分流，路径拼装两平台同形
+    "linux" | "windows" => bm_browsers_shared()
+    _ => Err(BmUnsupported)
   }
+}
+
+///|
+/// Linux / Windows 共用路径列出书签 profile：在配置根下按浏览器定义 ×
+/// profile 候选名探测 Bookmarks 文件；无可读文件给 [BmNoBrowser]，配置
+/// 目录定位失败给 [BmNoConfigDir]。
+fn bm_browsers_shared() -> Result[Array[BookmarkProfile], BookmarkError] {
   let root = match bm_root() {
     Some(r) => r
     None => return Err(BmNoConfigDir)
@@ -307,9 +331,21 @@ pub fn bm_browsers() -> Result[Array[BookmarkProfile], BookmarkError] {
 /// 返回虚拟根树（名称 "<浏览器>/<profile>"，children 为三根），解析
 /// 失败给 [BmIoFailed]，该书签文件不存在给 [BmNoBrowser]。
 pub fn bm_bookmarks(browser : String) -> Result[BookmarkNode, BookmarkError] {
-  if !bm_supported() {
-    return Err(BmUnsupported)
+  match @yue.platform() {
+    // Linux / Windows 共用：配置根定位（[bm_root]）与浏览器定义表
+    // （[bh_defs]）各自在内部按平台分流，路径拼装两平台同形
+    "linux" | "windows" => bm_bookmarks_shared(browser)
+    _ => Err(BmUnsupported)
   }
+}
+
+///|
+/// Linux / Windows 共用路径取指定浏览器的书签树：按浏览器定义 × profile
+/// 候选名找首个可读 Bookmarks 文件并解析；解析失败给 [BmIoFailed]，该
+/// 书签文件不存在给 [BmNoBrowser]。
+fn bm_bookmarks_shared(
+  browser : String,
+) -> Result[BookmarkNode, BookmarkError] {
   let root = match bm_root() {
     Some(r) => r
     None => return Err(BmNoConfigDir)

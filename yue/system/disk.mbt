@@ -153,9 +153,16 @@ let dsk_bus_daemon_path : String = "/org/freedesktop/DBus"
 /// udisks2 是否在系统总线上在线（系统总线守护的 NameHasOwner 真实探测，
 /// 被查名是 udisks2）。每次调用真实探测，高频场景请调用方自行缓存结果。
 fn dsk_udisks_available() -> Bool {
-  if @yue.platform() != "linux" {
-    return false
+  match @yue.platform() {
+    "linux" => dsk_udisks_available_linux()
+    _ => false
   }
+}
+
+///|
+/// Linux 路径探测 udisks2（udisks2 只在 Linux 的系统总线上）：系统总线
+/// 守护的 NameHasOwner 真实探测，被查名是 udisks2。
+fn dsk_udisks_available_linux() -> Bool {
   match
     @traybus.gdbus_call_system(
       dsk_bus_daemon,
@@ -565,42 +572,74 @@ fn dsk_fs_action(path : String, action : String) -> Result[Unit, DiskError] {
 
 ///|
 /// 当前系统是否支持磁盘卷管理：udisks2 在线（完整能力）或 lsblk 命令可用
-/// （仅枚举）。每次调用真实探测，高频场景请调用方自行缓存结果。
+/// （仅枚举）；Windows / macOS 走 shim 直连枚举。每次调用真实探测，高频
+/// 场景请调用方自行缓存结果。
 pub fn dsk_supported() -> Bool {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    return true
+  match @yue.platform() {
+    "linux" => dsk_supported_linux()
+    "windows" | "macos" => dsk_supported_direct()
+    _ => false
   }
+}
+
+///|
+/// Linux 路径：udisks2 在线或 lsblk 可用即支持。
+fn dsk_supported_linux() -> Bool {
   dsk_probe() is Some(_)
+}
+
+///|
+/// Windows / macOS 路径：卷枚举由 shim 直连提供，两平台共用同一份判定。
+fn dsk_supported_direct() -> Bool {
+  true
 }
 
 ///|
 /// 枚举卷（device/label/mountpoint/size_bytes/removable）。Linux 探测
 /// 优先级：udisks2 D-Bus 通 → 用 D-Bus；否则回退 lsblk 输出解析；Windows
 /// 走 GetLogicalDrives/GetVolumeInformation 直连（盘符即 device，根路径
-/// 即挂载点——Windows 卷恒处于挂载态）。系统无任何卷（台式机）返回
-/// Ok(空列表)。
+/// 即挂载点——Windows 卷恒处于挂载态）；macOS 走 shim 挂载卷枚举。
+/// 系统无任何卷（台式机）返回 Ok(空列表)；其余平台 Unsupported。
 pub fn dsk_volumes() -> Result[Array[DskVolume], DiskError] {
-  if @yue.platform() == "windows" {
-    let ok = Ref(0)
-    let text = @utf8.decode_lossy(@yue.ffi_dsk_volumes(ok))
-    if ok.val != 1 {
-      return Err(CommandFailed("GetLogicalDrives 失败"))
-    }
-    return Ok(dsk_parse_win_volumes(text))
+  match @yue.platform() {
+    "linux" => dsk_volumes_linux()
+    "windows" => dsk_volumes_win()
+    "macos" => dsk_volumes_mac()
+    _ => Err(Unsupported)
   }
-  if @yue.platform() == "macos" {
-    let ok = Ref(0)
-    let text = @utf8.decode_lossy(@yue.ffi_dsk_volumes(ok))
-    if ok.val != 1 {
-      return Err(CommandFailed("挂载卷枚举失败"))
-    }
-    return Ok(dsk_parse_mac_volumes(text))
-  }
+}
+
+///|
+/// Linux 路径枚举卷：udisks2 在线走 D-Bus，否则回退 lsblk 输出解析，
+/// 两者都没有为 Unsupported。
+fn dsk_volumes_linux() -> Result[Array[DskVolume], DiskError] {
   match dsk_probe() {
     None => Err(Unsupported)
     Some(Udisks) => dsk_volumes_udisks()
     Some(Lsblk) => dsk_volumes_lsblk()
   }
+}
+
+///|
+/// Windows 路径枚举卷：GetLogicalDrives / GetVolumeInformation 直连。
+fn dsk_volumes_win() -> Result[Array[DskVolume], DiskError] {
+  let ok = Ref(0)
+  let text = @utf8.decode_lossy(@yue.ffi_dsk_volumes(ok))
+  if ok.val != 1 {
+    return Err(CommandFailed("GetLogicalDrives 失败"))
+  }
+  Ok(dsk_parse_win_volumes(text))
+}
+
+///|
+/// macOS 路径枚举卷：shim 直连挂载卷枚举（失败文案与 Windows 不同）。
+fn dsk_volumes_mac() -> Result[Array[DskVolume], DiskError] {
+  let ok = Ref(0)
+  let text = @utf8.decode_lossy(@yue.ffi_dsk_volumes(ok))
+  if ok.val != 1 {
+    return Err(CommandFailed("挂载卷枚举失败"))
+  }
+  Ok(dsk_parse_mac_volumes(text))
 }
 
 ///|
@@ -733,44 +772,74 @@ fn dsk_fs_apply(volume : DskVolume, action : String) -> Result[Unit, DiskError] 
 ///|
 /// 挂载卷（Linux：udisks2 在系统总线上 Filesystem.Mount，不可用时返回
 /// Unsupported，已挂载返回 AlreadyMounted；Windows：卷恒处于挂载态，
-/// 恒返回 AlreadyMounted）。
+/// 恒返回 AlreadyMounted；macOS：diskutil mount）。其余平台 Unsupported。
 pub fn dsk_mount(volume : DskVolume) -> Result[Unit, DiskError] {
-  if @yue.platform() == "windows" {
-    return Err(AlreadyMounted(volume.device))
+  match @yue.platform() {
+    "linux" => dsk_mount_linux(volume)
+    "windows" => dsk_mount_win(volume)
+    "macos" => dsk_mount_mac(volume)
+    _ => Err(Unsupported)
   }
-  if @yue.platform() == "macos" {
-    // mac 外置卷默认自动挂载；手动挂载走 diskutil（已挂载/设备不存在
-    // 由退出码以非零报出，不重复做本地探测）
-    return match pr_run("diskutil", ["mount", volume.device],
-                        timeout_ms=8000) {
-      Ok(_) => Ok(())
-      Err(NonZeroExit(_, err)) =>
-        Err(CommandFailed("diskutil mount: \{err}"))
-      Err(e) => Err(CommandFailed(e.to_string()))
-    }
-  }
+}
+
+///|
+/// Linux 路径挂载卷：udisks2 Filesystem.Mount。
+fn dsk_mount_linux(volume : DskVolume) -> Result[Unit, DiskError] {
   dsk_fs_apply(volume, "Mount")
+}
+
+///|
+/// Windows 路径挂载卷：卷恒处于挂载态，恒返回 AlreadyMounted。
+fn dsk_mount_win(volume : DskVolume) -> Result[Unit, DiskError] {
+  Err(AlreadyMounted(volume.device))
+}
+
+///|
+/// macOS 路径挂载卷：diskutil mount（mac 外置卷默认自动挂载；已挂载/
+/// 设备不存在由退出码以非零报出，不重复做本地探测）。
+fn dsk_mount_mac(volume : DskVolume) -> Result[Unit, DiskError] {
+  match pr_run("diskutil", ["mount", volume.device], timeout_ms=8000) {
+    Ok(_) => Ok(())
+    Err(NonZeroExit(_, err)) => Err(CommandFailed("diskutil mount: \{err}"))
+    Err(e) => Err(CommandFailed(e.to_string()))
+  }
 }
 
 ///|
 /// 卸载卷（Linux：Filesystem.Unmount，未挂载返回 NotMounted；Windows：
 /// 弹出介质（CM_RequestDeviceEject 安全移除）不在本批，返回
-/// Unsupported）。
+/// Unsupported；macOS：diskutil unmount）。其余平台 Unsupported。
 pub fn dsk_unmount(volume : DskVolume) -> Result[Unit, DiskError] {
-  if @yue.platform() == "windows" {
-    return Err(Unsupported)
+  match @yue.platform() {
+    "linux" => dsk_unmount_linux(volume)
+    "windows" => dsk_unmount_win(volume)
+    "macos" => dsk_unmount_mac(volume)
+    _ => Err(Unsupported)
   }
-  if @yue.platform() == "macos" {
-    let m = match volume.mountpoint {
-      Some(m) => m
-      None => return Err(NotMounted(volume.device))
-    }
-    return match pr_run("diskutil", ["unmount", m], timeout_ms=8000) {
-      Ok(_) => Ok(())
-      Err(NonZeroExit(_, err)) =>
-        Err(CommandFailed("diskutil unmount: \{err}"))
-      Err(e) => Err(CommandFailed(e.to_string()))
-    }
-  }
+}
+
+///|
+/// Linux 路径卸载卷：udisks2 Filesystem.Unmount，未挂载返回 NotMounted。
+fn dsk_unmount_linux(volume : DskVolume) -> Result[Unit, DiskError] {
   dsk_fs_apply(volume, "Unmount")
+}
+
+///|
+/// Windows 路径卸载卷：弹出介质不在本批，返回 Unsupported。
+fn dsk_unmount_win(_volume : DskVolume) -> Result[Unit, DiskError] {
+  Err(Unsupported)
+}
+
+///|
+/// macOS 路径卸载卷：diskutil unmount 挂载点（未挂载返回 NotMounted）。
+fn dsk_unmount_mac(volume : DskVolume) -> Result[Unit, DiskError] {
+  let m = match volume.mountpoint {
+    Some(m) => m
+    None => return Err(NotMounted(volume.device))
+  }
+  match pr_run("diskutil", ["unmount", m], timeout_ms=8000) {
+    Ok(_) => Ok(())
+    Err(NonZeroExit(_, err)) => Err(CommandFailed("diskutil unmount: \{err}"))
+    Err(e) => Err(CommandFailed(e.to_string()))
+  }
 }

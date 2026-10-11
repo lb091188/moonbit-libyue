@@ -408,14 +408,29 @@ pub fn lc_set_timezone(tz : String) -> Result[Unit, LocaleError] {
 /// 给用户界面区域名（BCP-47 形态，如 "zh-CN"；未设置或为空 →
 /// LcUnsupported）。
 pub fn lc_lang() -> Result[String, LocaleError] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let ok = Ref(0)
-    let lang = lc_trim(@utf8.decode_lossy(@yue.ffi_win_lang(ok)))
-    if ok.val != 1 || lang == "" {
-      return Err(LcUnsupported)
-    }
-    return Ok(lang)
+  match @yue.platform() {
+    "linux" => lc_lang_linux()
+    // Windows / macOS 共用：两者都经 shim 读用户界面区域名
+    "windows" | "macos" => lc_lang_shared()
+    _ => Err(LcUnsupported)
   }
+}
+
+///|
+/// Windows / macOS 共用路径读本地语言：shim 给用户界面区域名（BCP-47
+/// 形态，如 "zh-CN"；未设置或为空 → LcUnsupported）。
+fn lc_lang_shared() -> Result[String, LocaleError] {
+  let ok = Ref(0)
+  let lang = lc_trim(@utf8.decode_lossy(@yue.ffi_win_lang(ok)))
+  if ok.val != 1 || lang == "" {
+    return Err(LcUnsupported)
+  }
+  Ok(lang)
+}
+
+///|
+/// Linux 路径读本地语言：读 $LANG 环境变量（如 "zh_CN.UTF-8"）。
+fn lc_lang_linux() -> Result[String, LocaleError] {
   match @env.get_env_var("LANG") {
     None => Err(LcUnsupported)
     Some(v) => {

@@ -178,11 +178,13 @@ pub fn overlay_scroll(
       ignore((content.mount)(@yue.ViewLike::view(holder)))
       s.set_content(holder)
       // Windows 原生子控件 HWND 滚动后需强制重摆(与 declarative scroll 同)
-      if @yue.platform() == "windows" {
-        s.on_scroll(fn() {
-          @yue.ViewLike::update_layout(holder)
-          false
-        })
+      match @yue.platform() {
+        "windows" =>
+          s.on_scroll(fn() {
+            @yue.ViewLike::update_layout(holder)
+            false
+          })
+        _ => ()
       }
       attach_overlay_thumb(@yue.ViewLike::view(host), s)
       @yue.ViewLike::view(host)

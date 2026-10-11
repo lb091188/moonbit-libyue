@@ -455,14 +455,20 @@ fn prt_lpstat(
 // ---------------------------------------------------------------------------
 
 ///|
-/// 当前系统是否支持打印机查询（Linux 跑通只读的 lpstat -p；Windows
-/// winspool 枚举成功）。每次调用真实探测，高频场景请调用方自行缓存。
+/// 当前系统是否支持打印机查询（Linux 跑通只读的 lpstat -p；Windows /
+/// macOS 走 winspool 枚举）。每次调用真实探测，高频场景请调用方自行缓存。
 pub fn prt_supported() -> Bool {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let ok = Ref(0)
-    let _ = @yue.ffi_prt_list(ok)
-    return ok.val == 1
+  match @yue.platform() {
+    "linux" => prt_supported_linux()
+    "windows" | "macos" => prt_supported_direct()
+    _ => false
   }
+}
+
+///|
+/// Linux 路径探测：跑通只读的 lpstat -p（工具存在即算支持，配置/服务
+/// 异常不算缺失）。
+fn prt_supported_linux() -> Bool {
   match prt_lpstat(["-p"], timeout_ms=3000) {
     Ok(_) => true
     Err(PrtUnsupported) => false
@@ -471,21 +477,45 @@ pub fn prt_supported() -> Bool {
 }
 
 ///|
+/// Windows / macOS 路径探测：shim 的打印机枚举成功即支持，两平台共用
+/// 同一份判定。
+fn prt_supported_direct() -> Bool {
+  let ok = Ref(0)
+  let _ = @yue.ffi_prt_list(ok)
+  ok.val == 1
+}
+
+///|
 /// 列出全部打印机（队列名 + 可用状态）；Linux 未装 CUPS →
 /// PrtUnsupported。顺序保持返回序；空数组表示未配置任何打印机。
+/// Windows / macOS 走 shim 枚举；其余平台 PrtUnsupported。
 pub fn prt_list() -> Result[Array[PrinterInfo], PrinterError] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let ok = Ref(0)
-    let text = @utf8.decode_lossy(@yue.ffi_prt_list(ok))
-    if ok.val != 1 {
-      return Err(PrtCommandFailed("打印机枚举失败"))
-    }
-    return Ok(prt_parse_win_list(text))
+  match @yue.platform() {
+    "linux" => prt_list_linux()
+    "windows" | "macos" => prt_list_direct()
+    _ => Err(PrtUnsupported)
   }
+}
+
+///|
+/// Linux 路径列打印机：lpstat -p 输出解析。
+fn prt_list_linux() -> Result[Array[PrinterInfo], PrinterError] {
   match prt_lpstat(["-p"]) {
     Ok(out) => Ok(prt_parse_printer_list(out))
     Err(e) => Err(e)
   }
+}
+
+///|
+/// Windows / macOS 路径列打印机：shim 枚举文本解析，两平台共用同一份
+/// 实现（shim 已把状态码归并为同一套）。
+fn prt_list_direct() -> Result[Array[PrinterInfo], PrinterError] {
+  let ok = Ref(0)
+  let text = @utf8.decode_lossy(@yue.ffi_prt_list(ok))
+  if ok.val != 1 {
+    return Err(PrtCommandFailed("打印机枚举失败"))
+  }
+  Ok(prt_parse_win_list(text))
 }
 
 ///|
@@ -519,16 +549,19 @@ pub fn prt_parse_win_list(text : String) -> Array[PrinterInfo] {
 
 ///|
 /// 读默认打印机名；Linux 未装 CUPS → PrtUnsupported；未设默认目标或无
-/// 输出 → PrtParseFailed。
+/// 输出 → PrtParseFailed。Windows / macOS 走 shim 直读；其余平台
+/// PrtUnsupported。
 pub fn prt_default() -> Result[String, PrinterError] {
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    let ok = Ref(0)
-    let name = prt_trim(@utf8.decode_lossy(@yue.ffi_prt_default(ok)))
-    if ok.val != 1 || name == "" {
-      return Err(PrtParseFailed("无默认打印机"))
-    }
-    return Ok(name)
+  match @yue.platform() {
+    "linux" => prt_default_linux()
+    "windows" | "macos" => prt_default_direct()
+    _ => Err(PrtUnsupported)
   }
+}
+
+///|
+/// Linux 路径读默认打印机：lpstat -d 输出解析。
+fn prt_default_linux() -> Result[String, PrinterError] {
   match prt_lpstat(["-d"]) {
     Err(e) => Err(e)
     Ok(out) =>
@@ -540,29 +573,54 @@ pub fn prt_default() -> Result[String, PrinterError] {
 }
 
 ///|
+/// Windows / macOS 路径读默认打印机：shim 直读，两平台共用同一份实现。
+fn prt_default_direct() -> Result[String, PrinterError] {
+  let ok = Ref(0)
+  let name = prt_trim(@utf8.decode_lossy(@yue.ffi_prt_default(ok)))
+  if ok.val != 1 || name == "" {
+    return Err(PrtParseFailed("无默认打印机"))
+  }
+  Ok(name)
+}
+
+///|
 /// 列出指定打印机队列上的任务（作业名 + 编号）；printer 为空串
 /// → PrtInvalidParam；Linux 未装 CUPS → PrtUnsupported；目标不存在等
 /// 非零退出 → PrtCommandFailed；空数组表示队列为空。Windows 的任务名
-/// 为文档名（CUPS 的 "目标名-编号" 形态无对应）。
+/// 为文档名（CUPS 的 "目标名-编号" 形态无对应）；macOS 不走 FFI
+/// （cupsGetJobs SDK 形态漂移），与 Linux 共用 lpstat 路线。
 pub fn prt_queue(printer : String) -> Result[Array[PrinterJob], PrinterError] {
   if printer == "" {
     return Err(PrtInvalidParam("打印机名为空"))
   }
-  if @yue.platform() == "windows" {
-    let ok = Ref(0)
-    let text = @utf8.decode_lossy(
-      @yue.ffi_prt_queue(@yue.utf8_bytes(printer), ok),
-    )
-    if ok.val != 1 {
-      return Err(PrtCommandFailed("打印队列查询失败"))
-    }
-    return Ok(prt_parse_win_queue(text))
+  match @yue.platform() {
+    "linux" | "macos" => prt_queue_lpstat(printer)
+    "windows" => prt_queue_win(printer)
+    _ => Err(PrtUnsupported)
   }
-  // mac 不走 FFI（cupsGetJobs SDK 形态漂移，FFI 留哨兵），直接用 lpstat
+}
+
+///|
+/// Linux 与 macOS 共用路径查队列：lpstat -o <打印机> 输出解析（mac 不走
+/// FFI——cupsGetJobs 的 SDK 形态漂移，FFI 只留哨兵）。
+fn prt_queue_lpstat(printer : String) -> Result[Array[PrinterJob], PrinterError] {
   match prt_lpstat(["-o", printer]) {
     Ok(out) => Ok(prt_parse_queue(out))
     Err(e) => Err(e)
   }
+}
+
+///|
+/// Windows 路径查队列：shim 的打印队列查询文本解析。
+fn prt_queue_win(printer : String) -> Result[Array[PrinterJob], PrinterError] {
+  let ok = Ref(0)
+  let text = @utf8.decode_lossy(
+    @yue.ffi_prt_queue(@yue.utf8_bytes(printer), ok),
+  )
+  if ok.val != 1 {
+    return Err(PrtCommandFailed("打印队列查询失败"))
+  }
+  Ok(prt_parse_win_queue(text))
 }
 
 ///|
@@ -585,7 +643,7 @@ pub fn prt_parse_win_queue(text : String) -> Array[PrinterJob] {
 /// 提交打印任务（真实排队打印，有副作用，调用方自行确认时机）：Linux
 /// 走 `lp [-d 打印机] -n 份数 文件`；Windows 用文件的 "print" 动词走
 /// 默认打印机（显式 printer 必须与默认打印机一致，份数按动作次数实现）。
-/// path 空串 / copies < 1 → PrtInvalidParam。
+/// path 空串 / copies < 1 → PrtInvalidParam；其余平台 PrtUnsupported。
 pub fn prt_print(
   printer? : String,
   path : String,
@@ -597,29 +655,49 @@ pub fn prt_print(
   if copies < 1 {
     return Err(PrtInvalidParam("份数必须 ≥ 1：\{copies}"))
   }
-  if @yue.platform() == "windows" || @yue.platform() == "macos" {
-    match printer {
-      Some(p) if p != "" =>
-        match prt_default() {
-          Ok(def) if def == p => ()
-          _ =>
-            return Err(
-              PrtInvalidParam("仅支持默认打印机提交（传入 \{p}）"),
-            )
-        }
-      _ => ()
-    }
-    for i = 0; i < copies; i = i + 1 {
-      let ok = Ref(0)
-      if @yue.ffi_prt_print(@yue.utf8_bytes(path), ok) != 0 || ok.val != 1 {
-        return Err(PrtCommandFailed("打印提交失败"))
-      }
-    }
-    return Ok(())
+  match @yue.platform() {
+    "linux" => prt_print_linux(printer, path, copies)
+    "windows" | "macos" => prt_print_direct(printer, path, copies)
+    _ => Err(PrtUnsupported)
   }
+}
+
+///|
+/// Linux 路径提交打印：lp [-d 打印机] -n 份数 文件。
+fn prt_print_linux(
+  printer : String?,
+  path : String,
+  copies : Int,
+) -> Result[Unit, PrinterError] {
   match
     prt_run_tool("lp", prt_print_args(printer, path, copies), timeout_ms=10000) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
+}
+
+///|
+/// Windows / macOS 路径提交打印：用文件的 "print" 动词走默认打印机，两
+/// 平台共用同一份实现（显式 printer 必须与默认打印机一致，份数按动作
+/// 次数实现）。
+fn prt_print_direct(
+  printer : String?,
+  path : String,
+  copies : Int,
+) -> Result[Unit, PrinterError] {
+  match printer {
+    Some(p) if p != "" =>
+      match prt_default() {
+        Ok(def) if def == p => ()
+        _ => return Err(PrtInvalidParam("仅支持默认打印机提交（传入 \{p}）"))
+      }
+    _ => ()
+  }
+  for i = 0; i < copies; i = i + 1 {
+    let ok = Ref(0)
+    if @yue.ffi_prt_print(@yue.utf8_bytes(path), ok) != 0 || ok.val != 1 {
+      return Err(PrtCommandFailed("打印提交失败"))
+    }
+  }
+  Ok(())
 }

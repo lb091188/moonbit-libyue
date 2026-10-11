@@ -320,10 +320,12 @@ let bh_browser_defs_win : Array[(String, String, String)] = [
 ///|
 /// 当前平台的浏览器定义表。
 fn bh_defs() -> Array[(String, String, String)] {
-  if @yue.platform() == "windows" {
-    bh_browser_defs_win
-  } else {
-    bh_browser_defs
+  match @yue.platform() {
+    "windows" => bh_browser_defs_win
+    // Linux 配置根下的目录名（~/.config/<dir>）
+    "linux" => bh_browser_defs
+    // macOS 未实现路径探测，不给定义表（上层已由 [bh_supported] 拦掉）
+    _ => []
   }
 }
 
@@ -375,8 +377,11 @@ fn bh_probe_profiles(root : String) -> Array[BrowserProfile] {
 /// 当前平台是否支持浏览器历史读取（Linux 与 Windows 已实现路径探测，
 /// macOS 未实现）。
 pub fn bh_supported() -> Bool {
-  let p = @yue.platform()
-  p == "linux" || p == "windows"
+  match @yue.platform() {
+    "linux" | "windows" => true
+    // macOS 未实现路径探测
+    _ => false
+  }
 }
 
 ///|
@@ -402,18 +407,29 @@ pub fn bh_browsers() -> Result[Array[BrowserProfile], BrowserHistoryError] {
 /// [BhUnsupported]，Windows 取 %LOCALAPPDATA%（缺给 [BhNoConfigDir]），
 /// Linux 走 XDG_CONFIG_HOME / HOME。
 fn bh_root_or_err() -> Result[String, BrowserHistoryError] {
-  if !bh_supported() {
-    return Err(BhUnsupported)
+  match @yue.platform() {
+    "linux" => bh_root_linux()
+    "windows" => bh_root_win()
+    _ => Err(BhUnsupported)
   }
-  if @yue.platform() == "windows" {
-    return match getenv_str("LOCALAPPDATA") {
-      Some(d) if d != "" => Ok(d)
-      _ => Err(BhNoConfigDir)
-    }
-  }
+}
+
+///|
+/// Linux 配置根：XDG_CONFIG_HOME（设且非空）优先，回退 $HOME/.config
+/// （[bh_config_root]）；两者都缺给 [BhNoConfigDir]。
+fn bh_root_linux() -> Result[String, BrowserHistoryError] {
   match bh_config_root(getenv_str("XDG_CONFIG_HOME"), getenv_str("HOME")) {
     Some(r) => Ok(r)
     None => Err(BhNoConfigDir)
+  }
+}
+
+///|
+/// Windows 配置根：%LOCALAPPDATA%（缺失给 [BhNoConfigDir]）。
+fn bh_root_win() -> Result[String, BrowserHistoryError] {
+  match getenv_str("LOCALAPPDATA") {
+    Some(d) if d != "" => Ok(d)
+    _ => Err(BhNoConfigDir)
   }
 }
 

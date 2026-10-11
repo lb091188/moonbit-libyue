@@ -497,9 +497,16 @@ fn media_status_playerctl(player : String) -> Result[MediaStatus, MediaError] {
 /// 媒体控制是否可用：Linux 且会话总线可列名（ListNames 成功），或
 /// playerctl 可用（命令回退路径）。每次调用真实探测。
 pub fn media_supported() -> Bool {
-  if @yue.platform() != "linux" {
-    return false
+  match @yue.platform() {
+    "linux" => media_supported_linux()
+    _ => false
   }
+}
+
+///|
+/// Linux 路径的可用性探测：会话总线可列名（ListNames 成功），或
+/// playerctl 可用（命令回退路径）。每次调用真实探测。
+fn media_supported_linux() -> Bool {
   match
     @traybus.gdbus_call_session(
       media_dbus_name,
@@ -520,9 +527,16 @@ pub fn media_supported() -> Bool {
 /// [Unsupported]；总线不可用给 [BusFailed]；实例一个都没有给
 /// [NoPlayer]（无播放器 ≠ 不可用，可稍后再试）。
 pub fn media_players() -> Result[Array[MediaPlayerInfo], MediaError] {
-  if @yue.platform() != "linux" {
-    return Err(Unsupported)
+  match @yue.platform() {
+    "linux" => media_players_linux()
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径枚举播放器实例：会话总线的 MPRIS 实例（保持 ListNames
+/// 应答序）；一个都没有给 [NoPlayer]。
+fn media_players_linux() -> Result[Array[MediaPlayerInfo], MediaError] {
   match media_players_dbus() {
     Ok(players) => if players.is_empty() { Err(NoPlayer) } else { Ok(players) }
     Err(e) => Err(e)
@@ -534,9 +548,16 @@ pub fn media_players() -> Result[Array[MediaPlayerInfo], MediaError] {
 /// 失败且 playerctl 可用时回退 playerctl 只读查询；两种路径都失败给
 /// 对应错误（总线错误名或 playerctl 退出原因）。
 pub fn media_status(player : String) -> Result[MediaStatus, MediaError] {
-  if @yue.platform() != "linux" {
-    return Err(Unsupported)
+  match @yue.platform() {
+    "linux" => media_status_linux(player)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径读播放状态：总线失败且 playerctl 可用时回退 playerctl
+/// 只读查询。
+fn media_status_linux(player : String) -> Result[MediaStatus, MediaError] {
   match media_status_dbus(player) {
     Ok(s) => Ok(s)
     Err(e) =>
@@ -553,9 +574,19 @@ pub fn media_status(player : String) -> Result[MediaStatus, MediaError] {
 /// 且 playerctl 可用时回退 playerctl 子命令。属设置类操作，只在调用
 /// 方显式调用时执行，探测与查询路径不会触发。
 fn media_control(player : String, c : MediaCmd) -> Result[Unit, MediaError] {
-  if @yue.platform() != "linux" {
-    return Err(Unsupported)
+  match @yue.platform() {
+    "linux" => media_control_linux(player, c)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux 路径的播放控制实现：优先 MPRIS Player 方法（会话总线）；总线
+/// 调用失败且 playerctl 可用时回退 playerctl 子命令。
+fn media_control_linux(
+  player : String,
+  c : MediaCmd,
+) -> Result[Unit, MediaError] {
   match
     @traybus.gdbus_call_session(
       player,

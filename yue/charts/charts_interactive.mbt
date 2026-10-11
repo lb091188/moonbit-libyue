@@ -524,10 +524,9 @@ pub fn ci_save(
   if canvas.write_to_file(format, path) {
     Ok(())
   } else {
-    let hint = if @yue.platform() == "windows" {
-      ""
-    } else {
-      "(本平台位图导出不可用:libyue 未暴露跨平台导出 API)"
+    let hint = match @yue.platform() {
+      "windows" => ""
+      _ => "(本平台位图导出不可用:libyue 未暴露跨平台导出 API)"
     }
     Err(WriteFailed("写入 \{format} 失败: \{path}\{hint}"))
   }

@@ -962,14 +962,15 @@ pub fn tabs_t(
         // 可见页从未隐藏、不落 mbt.19 重显保护——初始页 0 高,切换一
         // 轮才恢复(实测);单写与 outer 同款两栖语义
         let page_c = @yue.themed_container(
-          style=if @yue.platform() == "windows" {
-            [("flex", 1.0), ("flexbasis", 0.0), ("flexDirection", "column")]
-          } else {
-            [
-              ("flexgrow", 1.0),
-              ("flexshrink", 1.0),
-              ("flexDirection", "column"),
-            ]
+          style=match @yue.platform() {
+            "windows" =>
+              [("flex", 1.0), ("flexbasis", 0.0), ("flexDirection", "column")]
+            _ =>
+              [
+                ("flexgrow", 1.0),
+                ("flexshrink", 1.0),
+                ("flexDirection", "column"),
+              ]
           },
         )
         @yue.ViewLike::set_visible(page_c, cur.val == idx)

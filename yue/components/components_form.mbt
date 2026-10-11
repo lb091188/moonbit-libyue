@@ -193,18 +193,22 @@ pub fn entry_t(
       for kv in style {
         base.push(kv)
       }
-      let target : @yue.View = if @yue.platform() == "windows" {
-        // Linux 端 Entry 尺寸已归一化(min-height:0),补显式高度维持观感;
-        // Windows 收窄控件到行高 + 外包居中容器(布局语义,适配任意高度)
-        @yue.ViewLike::set_style(e, "height", @yue.entry_ctrl_height(true))
-        let shell_style = base.copy()
-        shell_style.push(("justifyContent", "center"))
-        let shell = @yue.themed_container(style=shell_style)
-        @yue.attach(@yue.ViewLike::view(shell), @yue.ViewLike::view(e))
-        @yue.ViewLike::view(shell)
-      } else {
-        @yue.apply_style(e, style=base)
-        @yue.ViewLike::view(e)
+      let target : @yue.View = match @yue.platform() {
+        "windows" =>
+          // Linux 端 Entry 尺寸已归一化(min-height:0),补显式高度维持观感;
+          // Windows 收窄控件到行高 + 外包居中容器(布局语义,适配任意高度)
+          {
+            @yue.ViewLike::set_style(e, "height", @yue.entry_ctrl_height(true))
+            let shell_style = base.copy()
+            shell_style.push(("justifyContent", "center"))
+            let shell = @yue.themed_container(style=shell_style)
+            @yue.attach(@yue.ViewLike::view(shell), @yue.ViewLike::view(e))
+            @yue.ViewLike::view(shell)
+          }
+        _ => {
+          @yue.apply_style(e, style=base)
+          @yue.ViewLike::view(e)
+        }
       }
       @yue.bind_entry_theme(e)
       e.on_text_change(fn() { on_input(e.get_text()) })
@@ -614,15 +618,21 @@ pub fn input_t(
           10.0
         },
       )
-      if @yue.platform() == "windows" {
-        // 文字贴顶:控件收窄到行高,外层 justifyContent=center 垂直居中
-        @yue.ViewLike::set_style(entry, "height", @yue.entry_ctrl_height(false))
-        @yue.ViewLike::set_style_str(outer, "justifyContent", "center")
-      } else {
+      match @yue.platform() {
+        "windows" =>
+          // 文字贴顶:控件收窄到行高,外层 justifyContent=center 垂直居中
+          {
+            @yue.ViewLike::set_style(
+              entry, "height", @yue.entry_ctrl_height(false),
+            )
+            @yue.ViewLike::set_style_str(outer, "justifyContent", "center")
+          }
         // 高度撑满 + 原生子窗口绘制在自绘之上:上下留 2 让出边框线
-        @yue.ViewLike::set_style(entry, "flex", 1.0)
-        @yue.ViewLike::set_style(entry, "marginTop", 2.0)
-        @yue.ViewLike::set_style(entry, "marginBottom", 2.0)
+        _ => {
+          @yue.ViewLike::set_style(entry, "flex", 1.0)
+          @yue.ViewLike::set_style(entry, "marginTop", 2.0)
+          @yue.ViewLike::set_style(entry, "marginBottom", 2.0)
+        }
       }
       @yue.bind_entry_theme(entry)
       @yue.ViewLike::on_focus_in(entry, fn() {

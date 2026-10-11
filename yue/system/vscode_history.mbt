@@ -203,9 +203,9 @@ fn vsc_resource_uri(user_dir : String, file_path : String) -> String {
   if file_path.has_prefix(user_prefix) {
     return "vscode-userdata:" + vsc_uri_encode_path(file_path)
   }
-  let mut p = file_path
-  if @yue.platform() == "windows" {
-    p = vsc_win_uri_path(p)
+  let p = match @yue.platform() {
+    "windows" => vsc_win_uri_path(file_path)
+    _ => file_path
   }
   if p.has_prefix("//") {
     // //host/rest → file://host/rest（host 小写）
@@ -296,6 +296,32 @@ fn vsc_win_uri_path(p : String) -> String {
 }
 
 ///|
+/// Windows 平台把 URI 路径还原为本地路径："/c:/x" → "c:\x"（'/' 转
+/// '\'）；非盘符形态原样返回。
+fn vsc_uri_path_win(full : String) -> String {
+  if full.has_prefix("/") &&
+    full.length() >= 3 &&
+    full.unsafe_get(2).to_int() == 58 {
+    let sb = StringBuilder()
+    sb.write_char(full.unsafe_get(1).to_int().unsafe_to_char())
+    sb.write_char(':')
+    let mut j = 3
+    while j < full.length() {
+      let c = full.unsafe_get(j).to_int()
+      if c == 47 {
+        sb.write_char('\\')
+      } else {
+        sb.write_char(c.unsafe_to_char())
+      }
+      j += 1
+    }
+    sb.to_string()
+  } else {
+    full
+  }
+}
+
+///|
 /// 资源 URI → 本地路径：file:///path 直取；file://host/path 还原为
 /// //host/path；vscode-userdata:<路径> 直取；Windows 下 /c:/x → c:\x。
 /// 非 file/vscode-userdata 方案返回 None。
@@ -312,27 +338,12 @@ fn vsc_uri_to_path(uri : String) -> String? {
       authority = vsc_uri_percent_decode(uri, start, i)
     }
     let path = vsc_uri_percent_decode(uri, i, n)
-    let mut full = if authority != "" { "//" + authority + path } else { path }
-    if @yue.platform() == "windows" &&
-      full.has_prefix("/") &&
-      full.length() >= 3 &&
-      full.unsafe_get(2).to_int() == 58 {
-      let sb = StringBuilder()
-      sb.write_char(full.unsafe_get(1).to_int().unsafe_to_char())
-      sb.write_char(':')
-      let mut j = 3
-      while j < full.length() {
-        let c = full.unsafe_get(j).to_int()
-        if c == 47 {
-          sb.write_char('\\')
-        } else {
-          sb.write_char(c.unsafe_to_char())
-        }
-        j += 1
-      }
-      full = sb.to_string()
+    let full = if authority != "" { "//" + authority + path } else { path }
+    let native = match @yue.platform() {
+      "windows" => vsc_uri_path_win(full)
+      _ => full
     }
-    return Some(full)
+    return Some(native)
   }
   if uri.has_prefix("vscode-userdata:") {
     return Some(vsc_uri_percent_decode(uri, 16, n))

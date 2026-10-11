@@ -72,13 +72,22 @@ let pr_tmp_counter : Ref[Int] = Ref(0)
 /// 当前目录）。
 fn pr_tmp_path(tag : String) -> String {
   pr_tmp_counter.val = pr_tmp_counter.val + 1
-  let env_name = if @yue.platform() == "windows" { "TEMP" } else { "TMPDIR" }
-  let fallback = if @yue.platform() == "windows" { "." } else { "/tmp" }
+  let env_name = match @yue.platform() {
+    "windows" => "TEMP"
+    _ => "TMPDIR"
+  }
+  let fallback = match @yue.platform() {
+    "windows" => "."
+    _ => "/tmp"
+  }
   let dir = match @env.get_env_var(env_name) {
     Some(d) => if d != "" { d } else { fallback }
     None => fallback
   }
-  let sep = if @yue.platform() == "windows" { "\\" } else { "/" }
+  let sep = match @yue.platform() {
+    "windows" => "\\"
+    _ => "/"
+  }
   "\{dir}\{sep}yue-pr-\{@yue.ffi_proc_getpid()}-\{pr_tmp_counter.val}.\{tag}"
 }
 
@@ -100,23 +109,33 @@ fn pr_args_blob(args : Array[String]) -> Bytes {
 /// 语言恒定可解析；Windows 传空 blob（继承父进程环境，无 locale 语义）。
 fn pr_env_blob() -> Bytes {
   let buf = StringBuilder()
-  if @yue.platform() == "linux" {
-    for name in ["PATH", "XDG_RUNTIME_DIR", "HOME"] {
-      match @env.get_env_var(name) {
-        Some(v) => {
-          buf.write_string(name)
-          buf.write_char('=')
-          buf.write_string(v)
-          buf.write_char('\u{0}')
-        }
-        None => ()
-      }
-    }
-    buf.write_string("LC_ALL=C")
-    buf.write_char('\u{0}')
+  match @yue.platform() {
+    "linux" =>
+      pr_env_blob_linux(buf)
+    // Windows / macOS 传空 blob（继承父进程环境，无 locale 语义）
+    _ => ()
   }
   buf.write_char('\u{0}')
   @utf8.encode(buf.to_string())
+}
+
+///|
+/// Linux 最小环境：PATH（命令名解析）、XDG_RUNTIME_DIR（会话服务套接字
+/// 定位）、HOME，并固定 C locale 使输出语言恒定可解析。
+fn pr_env_blob_linux(buf : StringBuilder) -> Unit {
+  for name in ["PATH", "XDG_RUNTIME_DIR", "HOME"] {
+    match @env.get_env_var(name) {
+      Some(v) => {
+        buf.write_string(name)
+        buf.write_char('=')
+        buf.write_string(v)
+        buf.write_char('\u{0}')
+      }
+      None => ()
+    }
+  }
+  buf.write_string("LC_ALL=C")
+  buf.write_char('\u{0}')
 }
 
 ///|
@@ -128,12 +147,21 @@ fn pr_slurp(path : String) -> String {
   }
 }
 
+// 平台分流约定：公开 API 只做 `match @yue.platform()` 调度，各平台实现拆成
+// 独立函数，未匹配到的平台一律 Unsupported。
+//
+// macOS 暂未启用：shim 的 yue_mbt_proc_spawn 在 macOS 目前是 -1000 桩（POSIX
+// 实现依赖 setsid() 与 execvpe()，两者 macOS 都没有），待适配后把 "macos"
+// 并进下面的分支即可，其余代码无需改动。
+
 ///|
 /// 当前平台是否支持子进程执行（Linux / Windows）。基于 [pr_run] 的模块
 /// 可用它做平台门；每次调用真实判断，高频场景请调用方自行缓存结果。
 pub fn pr_available() -> Bool {
-  let p = @yue.platform()
-  p == "linux" || p == "windows"
+  match @yue.platform() {
+    "linux" | "windows" => true
+    _ => false
+  }
 }
 
 ///|
@@ -152,10 +180,20 @@ pub fn pr_run(
   args : Array[String],
   timeout_ms? : Int = 5000,
 ) -> Result[ProcOutput, ProcError] {
-  let platform = @yue.platform()
-  if platform != "linux" && platform != "windows" {
-    return Err(Unsupported)
+  match @yue.platform() {
+    "linux" | "windows" => pr_run_spawn(cmd, args, timeout_ms~)
+    _ => Err(Unsupported)
   }
+}
+
+///|
+/// Linux / Windows 子进程执行实现：spawn → wait → 读临时文件 → 清理。
+fn pr_run_spawn(
+  cmd : String,
+  args : Array[String],
+  timeout_ms? : Int = 5000,
+) -> Result[ProcOutput, ProcError] {
+  let platform = @yue.platform()
   let out_path = pr_tmp_path("out")
   let err_path = pr_tmp_path("err")
   let cwd = if platform == "windows" { "" } else { "/" }
