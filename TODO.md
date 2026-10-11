@@ -110,7 +110,7 @@
   - [x] 通用基建落新包 `yue/dbus`（`wire.mbt` 833 行 + `dbus.mbt` 419 行逐行平移，`bus.mbt` 剥掉 SNI/单实例语义后平移）：**不挂 glib fd 监视**——宿主周期调 `dbus_pump()`（缺省非阻塞）、断线自愈走 `dbus_set_post_delayed` 注入的通道，两者不注入时同步调用自带 `pump_until` 泵仍可用；socket 桩 `dbus_stub.c` 只用标准头、错误码与旧 shim 逐位一致；入站调用对外给 `CallReq`（`reply` 签名由参数值推导），线协议值类型不外泄。真总线回证 23/23（会话握手唯一名、ListNames、错误应答、AddMatch、系统总线 96 个名字）
   - [x] 能力模块首批（`yue/dbus`）：UPower / logind / netmon / screensaver / inhibit / MPRIS 逐行平移（测试同批平移并把旧 wbtest 的 inspect 换成 assert），MPRIS 轮询改排期通道注入；通知为新做（`GetCapabilities` 能力探测 + `Notify`/`CloseNotification`，进度 = `replaces_id` 重发 + 标准 hint `value`）；示例加 D-Bus 面板与「发通知(带进度)」按钮 + 宿主泵（`dbus_set_post_delayed` + 每 200ms `dbus_pump`），真窗口回证 `pool=:1.434`、通知能力 7 条
   - [x] SNI 托盘 + DBusMenu 落 `yue/dbus`（sni/icon/instance/filemanager 平移，bus 的托盘挂钩同批接回）；协议侧真总线回证：点示例「托盘图标」后 watcher 的 `RegisteredStatusNotifierItems` 9→10、退出对称注销；面板观感（图标出现/右键菜单/点击计数）留用户真机复验
-  - [ ] 单实例（总线名字 + Wake）与 `brightness` 的 logind `SetBrightness` 注入实做
+  - [x] 单实例（总线名字 + Wake，示例回证二次启动唤起首实例后退出）与 `brightness` 的 logind 注入实做（`yue/dbus/bridge.mbt` 把探针与动作注进 `yue/sys` 的槽，注入后 `brightness_supported` 由假变真）
 - [ ] DBus 通用基建：`bus`/`gdbus`/`wire`（41 内部 fn 编解码）/信号注册表/断线重连/注销与注册对称清理（CORE2 教训）
 - [ ] 新建项（master 全仓无资产，属新做）：任务栏进度、dock 徽标、勿扰
 - [ ] Wayland 后端：`idle`（X11 屏保扩展）/`windowctl`（wmctrl）/`clipboard_watch`（xclip）/`monitor`（xrandr）逐项定替代或降级

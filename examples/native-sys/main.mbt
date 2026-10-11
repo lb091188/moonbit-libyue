@@ -432,6 +432,22 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
+  // 单实例：先声称总线名字；已有实例就唤起它并退出（无总线时降级为不做）
+  let app_id = "com.example.moonbitsys"
+  match @dbus.claim_name(app_id) {
+    Ok(PrimaryOwner) | Ok(AlreadyOwner) =>
+      @dbus.on_wake(fn(_args : Array[String]) -> Unit {
+        println("NATIVE-SYS-INST: 收到第二实例的唤起")
+      })
+    Ok(AlreadyExists) | Ok(InQueue) => {
+      match @dbus.wake_existing(app_id, []) {
+        Ok(_) => println("NATIVE-SYS-INST: 已有实例，已唤起并退出")
+        Err(e) => println("NATIVE-SYS-INST: 唤起失败(\{e})，退出")
+      }
+      return
+    }
+    Err(e) => println("NATIVE-SYS-INST: 单实例降级（\{e}）")
+  }
   let app = match @core.App::new(1200, 1180, "MoonBit 系统能力 (native-sys)") {
     Some(a) => a
     None => {
@@ -439,6 +455,8 @@ fn main {
       return
     }
   }
+  // 把 logind 的亮度写能力装进 yue/sys 的注入槽（sys 不引 D-Bus）
+  @dbus.install_logind_brightness()
   let counts : Ref[Counts] = Ref(empty_counts())
   let probes = @core.Store::new(0)
   let opens = @core.Store::new(0)
