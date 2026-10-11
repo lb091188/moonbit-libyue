@@ -195,6 +195,16 @@ def link_configs() -> dict:
             "package": WIN_PACKAGE,
             "link_flags": "user32.lib gdi32.lib imm32.lib advapi32.lib",
         })
+        # sys 桩（yue/sys/sys_stub.c 的 _WIN32 分支）要 COM：文件对话框走
+        # IFileDialog（ole32 的 CoCreateInstance + shell32 的
+        # SHCreateItemFromParsingName），GUID 常量 CLSID_FileOpenDialog /
+        # IID_IFileDialog / IID_IShellItem 全在 uuid.lib——C 模式用不了
+        # __uuidof，只能链库取 extern 符号（记档于 docs/zh/adaptation.md）。
+        # ShellExecuteW 在 shell32，子进程与文件函数属 kernel32（默认已链）。
+        entries.append({
+            "package": SYS_PACKAGE,
+            "link_flags": "ole32.lib shell32.lib uuid.lib",
+        })
     return {"link_configs": entries}
 
 

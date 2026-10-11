@@ -92,8 +92,11 @@ test "da 关联合并：默认应用排最前 + 分号拆分去重 + 多文件�
 
 ///|
 test "da_set_default：XDG_CONFIG_HOME 指到临时目录真写读回" {
-  if !pr_available() {
-    println("da: skip (not linux)")
+  // 这段真写的是 XDG 的 mimeapps.list，POSIX 侧才有该配置根（Windows 的
+  // 默认程序注册走注册表，属硬件/桌面集成族 Windows 语义那条线）
+  if !pr_available() ||
+    (sys_platform() != "linux" && sys_platform() != "macos") {
+    println("da: skip (posix-only)")
     return
   }
   let saved = envx_get("XDG_CONFIG_HOME")

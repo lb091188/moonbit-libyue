@@ -90,6 +90,9 @@ test "空图层不挡内容；点触发件开层、再点收起" {
 
 ///|
 test "点浮层外收起最上面那层（不打扰被点的内容）" {
+  if !ui_text_guard() {
+    return
+  }
   let clicks = Ref(0)
   let (root, wrap) = mounted(
     container(
@@ -189,6 +192,9 @@ test "悬浮提示：延时到点才出现、离开即收、延时未到就离�
 
 ///|
 test "对话框：Store 驱动弹收，确定/取消/✕ 都先收起再回调" {
+  if !ui_text_guard() {
+    return
+  }
   let vis = @core.Store::new(false)
   let acts : Array[String] = []
   let (root, _anchor) = mounted_with_overlay(
@@ -276,6 +282,9 @@ test "对话框：✕ 收起、遮罩点击按 close_on_mask 决定收不收" {
 
 ///|
 test "轻提示层：推送后挂一条、到点自动撤、宽度随文本" {
+  if !ui_text_guard() {
+    return
+  }
   let queue : Ref[Array[() -> Unit]] = Ref([])
   @core.set_timer_hooks(
     fn(_ms : Int, f : () -> Unit) -> Int {

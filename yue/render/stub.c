@@ -17,6 +17,12 @@
 // CAIRO_FORMAT_ARGB32 一致），本层不拥有内存、不 free 数据；PNG 编解码本体
 // 在 yue/render/png.mbt（纯 MoonBit），不经本层。
 
+#if defined(_WIN32)
+// 占位分支用 fopen/memcpy 等标准名（MSVC 的「安全版」后缀只是告警不改语义），
+// 必须在任何标准头之前定义才生效
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #if defined(WM_STUB_CAIRO)
 
 // Cairo 光栅器桥：在调用方的像素缓冲上建 image surface，转调 cairo 的路径/变换/
@@ -846,8 +852,14 @@ int fsw_write_file(const char *path, int plen, unsigned char *data, int dlen) {
 
 // 其余平台的后端随各自窗口层落地时补。
 
-
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h> // fsw_write_file 的宽字符路径路由
+#endif
 
 int64_t cr_begin(unsigned char *data, int width, int height) {
   (void)data; (void)width; (void)height; return 0;
@@ -928,8 +940,42 @@ int img_anim_frame(int64_t h) { (void)h; return -1; }
 int img_anim_advance(int64_t h) { (void)h; return 0; }
 int img_anim_copy(int64_t h, unsigned char *out) { (void)h; (void)out; return 0; }
 void img_anim_free(int64_t h) { (void)h; }
+// 落盘（PNG 导出用）：把内存里的字节写进 path（UTF-8 字节串）。这条路径
+// 不依赖任何图形后端——纯 MoonBit 的 png.mbt 出字节，本函数只管写字节，
+// 所以占位分支也要真实现（写死 return 0 会让图表导出在 Windows 上恒失败）。
 int fsw_write_file(const char *path, int plen, unsigned char *data, int dlen) {
-  (void)path; (void)plen; (void)data; (void)dlen; return 0;
+  if (path == NULL || plen < 1 || dlen < 0) {
+    return 0;
+  }
+  char buf[4096];
+  if (plen >= (int)sizeof(buf)) {
+    return 0;
+  }
+  memcpy(buf, path, (size_t)plen);
+  buf[plen] = '\0';
+  FILE *f;
+#if defined(_WIN32)
+  // 宽字符路由：A 版按 ANSI 代码页解路径，中文用户名目录（%TEMP% 常见）
+  // 会写到错的地方甚至失败
+  int n = MultiByteToWideChar(CP_UTF8, 0, buf, -1, NULL, 0);
+  if (n <= 0) {
+    return 0;
+  }
+  wchar_t *wp = (wchar_t *)malloc(sizeof(wchar_t) * (size_t)n);
+  if (wp == NULL) {
+    return 0;
+  }
+  MultiByteToWideChar(CP_UTF8, 0, buf, -1, wp, n);
+  f = _wfopen(wp, L"wb");
+  free(wp);
+#else
+  f = fopen(buf, "wb");
+#endif
+  if (f == NULL) {
+    return 0;
+  }
+  size_t written = dlen > 0 ? fwrite(data, 1, (size_t)dlen, f) : 0;
+  return (fclose(f) == 0 && written == (size_t)dlen) ? 1 : 0;
 }
 
 

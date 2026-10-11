@@ -28,7 +28,37 @@ fn kid(root : @core.Widget, i : Int) -> @core.Widget {
 }
 
 ///|
+/// 文本测量后端的守卫：本平台的文字层还没接上时（Windows 走 DirectWrite，
+/// 见 TODO 的 W5），measure/line_ascent 给 None，「尺寸来自测量」这类断言
+/// 无从比较——打印跳过，其余不依赖文本的断言照常跑。
+fn ui_text_guard() -> Bool {
+  match @text.measure("Ag", 13.0) {
+    Some(_) => true
+    None => {
+      println("ui: skip (无文本测量后端)")
+      false
+    }
+  }
+}
+
+///|
+/// 图片解码后端的守卫：Windows/mac 的解码桩要到 W9（WIC）才实装，解不出
+/// 图时组件退成 0 尺寸，动图断言无从谈起——打印跳过。
+fn ui_decode_guard() -> Bool {
+  let img = @render.Image::new_from_file("examples/showcase/assets/dot.gif")
+  if img.get_width() > 0.0 {
+    true
+  } else {
+    println("ui: skip (无图片解码后端)")
+    false
+  }
+}
+
+///|
 test "标签尺寸来自 Pango 测量；文本随信号变化就重测" {
+  if !ui_text_guard() {
+    return
+  }
   let src_text = @core.Signal::new("Hello 基线")
   let n = label_dyn(src_text, size=14.0)
   // 交叉轴不 stretch（列容器默认会把宽度拉到整行），才看得出测量给的真尺寸
@@ -49,6 +79,9 @@ test "标签尺寸来自 Pango 测量；文本随信号变化就重测" {
 
 ///|
 test "两个字号混排按基线对齐（文本测量回灌布局的直接结果）" {
+  if !ui_text_guard() {
+    return
+  }
   let row = container(
     [label("Ag", size=13.0), label("Ag", size=26.0)],
     direction=@yoga.Row,
@@ -138,6 +171,9 @@ test "按钮：禁用态不消费事件、也不响应点击" {
 
 ///|
 test "按钮：悬停与按下态由宿主置位，配色随状态变化" {
+  if !ui_text_guard() {
+    return
+  }
   let idle = @render.Bitmap::new(120, 40)
   let hovered = @render.Bitmap::new(120, 40)
   let bp = button("按住我", min_width=100.0)
@@ -221,6 +257,9 @@ test "图标按尺寸占位并真的画出像素；图像缺文件时不崩、�
 /// 曾经的缺陷是文本层自建 surface 画字，无视宿主的 translate/clip——
 /// 真窗口截图上整屏文字全挤在左上角（见 adaptation 的组件层首批条）。
 test "文本随控件原点落位并被裁剪（画在 Painter 会话上）" {
+  if !ui_text_guard() {
+    return
+  }
   let top = label("AAAA", size=20.0)
   let bottom = label("BBBB", size=20.0)
   let root = @core.Widget::new()
@@ -344,6 +383,9 @@ test "图标按钮：尺寸固定、悬停换底色、点击在抬起且落在�
 
 ///|
 test "动图组件：按帧时长自转换帧、暂停不再换帧、play 续上；静图不排自转" {
+  if !ui_decode_guard() {
+    return
+  }
   let queue : Ref[Array[() -> Unit]] = Ref([])
   let delays : Ref[Array[Int]] = Ref([])
   @core.set_timer_hooks(

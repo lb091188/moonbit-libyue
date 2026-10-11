@@ -3,6 +3,9 @@
 
 ///|
 test "按宽量高：给宽换行后更高、角色字号越大行越高" {
+  if !ui_text_guard() {
+    return
+  }
   let long = "这是一段足够长的文字，用来验证按盒宽折行之后量到的高度会明显变高，而不是永远按一行算。"
   let one_line = measure_text_height(long)
   let wrapped = measure_text_height(long, width=120.0)
@@ -25,6 +28,9 @@ test "文字角色：字号与颜色随角色，Accent 用主色" {
 
 ///|
 test "主题化标签：按 max_width 折行（高度随之变高），固定色覆盖角色色" {
+  if !ui_text_guard() {
+    return
+  }
   let long = "标签文字很长很长很长很长很长很长很长很长很长很长很长很长"
   let (_, narrow) = mounted(
     label_t(long, max_width=80.0),

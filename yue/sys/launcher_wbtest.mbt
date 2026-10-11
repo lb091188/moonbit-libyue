@@ -19,27 +19,49 @@ test {
 
 ///|
 test {
-  // 当前工作目录：真实读得到且是绝对路径
+  // 当前工作目录：真实读得到且是绝对路径。Windows 的绝对路径形如
+  // "D:\code\…"（盘符 + 冒号）或 UNC "\\<主机>\共享"，POSIX 以 / 起。
   let cwd = current_dir()
   assert_true(cwd != "")
-  assert_true(cwd.has_prefix("/"))
+  if sys_platform() == "windows" {
+    // 形如 "D:\…"：下标 0 是盘符、1 是冒号（0-based，别把冒号当成第 2 位）
+    let drive_abs =
+      cwd.length() > 2 &&
+      cwd[1].to_int() == 58 && // ':'
+      ((cwd[0].to_int() >= 65 && cwd[0].to_int() <= 90) ||
+        (cwd[0].to_int() >= 97 && cwd[0].to_int() <= 122))
+    assert_true(drive_abs || cwd.has_prefix("\\\\"), msg="非绝对路径: \{cwd}")
+  } else {
+    assert_true(cwd.has_prefix("/"))
+  }
 }
 
 ///|
 test {
-  // 分离式启动：命令名为空与命令不存在都失败，`true` 交得出去
+  // 分离式启动：命令名为空与命令不存在都失败，`true` 交得出去。
+  // Windows 侧正例走 ShellExecuteW，成功即真的拉起一个进程（`true.exe` 在
+  // PATH 里不一定存在，取决于是否从 Git Bash 起），故只断负例；正例与
+  // 「不阻塞」由 examples/native-sys 的按钮在真机回证（设置类动作归使用者）。
   assert_true(spawn_detached("", "x") is Err(_))
   assert_true(spawn_detached("launcher_no_such_bin_zzz", "x") is Err(_))
-  assert_true(spawn_detached("true", "") is Ok(_))
+  if sys_platform() == "windows" {
+    println("launcher: skip (posix-only 正例与不阻塞)")
+  } else {
+    assert_true(spawn_detached("true", "") is Ok(_))
+  }
 }
 
 ///|
 test {
   // 不阻塞：`sleep 3` 交给系统后立即返回（等它退出才是这层要排除的行为）
-  let started = @env.now()
-  assert_true(spawn_detached("sleep", "3") is Ok(_))
-  let spent = (@env.now() - started).to_int()
-  assert_true(spent < 500)
+  if sys_platform() == "windows" {
+    println("launcher: skip (posix-only 不阻塞)")
+  } else {
+    let started = @env.now()
+    assert_true(spawn_detached("sleep", "3") is Ok(_))
+    let spent = (@env.now() - started).to_int()
+    assert_true(spent < 500)
+  }
 }
 
 ///|

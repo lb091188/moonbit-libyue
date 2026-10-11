@@ -287,6 +287,12 @@ test "bm_supported：与平台一致的探测口径" {
 ///|
 /// 端到端探测与解析：仅在本机存在 Chrome 书签文件时执行。
 test "bm_bookmarks：本机 Chrome 书签端到端（存在才跑）" {
+  // 本分支的书签侧目前只实现 Linux 的配置根探测（XDG/HOME）；Windows 的
+  // %LOCALAPPDATA% 与 macOS 的 Library/Application Support 数据根随平台批补
+  if !bm_supported() {
+    println("bm: skip (本机平台未实现路径探测)")
+    return
+  }
   match bm_browsers() {
     Ok(profiles) => {
       assert_true(profiles.length() > 0)

@@ -184,6 +184,9 @@ test "只读：编辑键不吃，导航与复制照旧" {
 
 ///|
 test "密码遮罩：Store 存原文，显示串按码点打点" {
+  if !ui_text_guard() {
+    return
+  }
   assert_eq(mask_of("ab中"), "•••")
   let (root, w, store) = mounted_entry("密钥", 200.0, password=true)
   key(root, w, 'x'.to_int(), 0)

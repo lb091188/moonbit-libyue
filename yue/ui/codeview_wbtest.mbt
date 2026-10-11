@@ -69,6 +69,9 @@ test "tokenize_lang / tokenize_moonbit：分词与着色规则" {
 
 ///|
 test "code_view 组件：深底出像素、多色 token、行号列、高度按行数" {
+  if !ui_text_guard() {
+    return
+  }
   let code = [
     "fn main {",
     "  let s = \"你好\"",
