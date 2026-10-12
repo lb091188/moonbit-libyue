@@ -28,6 +28,10 @@ extern "c" fn wm_size(
 extern "c" fn wm_event(id : Int64) -> Int = "wm_event"
 
 ///|
+/// 键盘焦点在谁身上：0 本窗无焦点 / 1 绘制区 / 2 本窗内的原生子件（webview）
+extern "c" fn wm_focus_owner(id : Int64) -> Int = "wm_focus_owner"
+
+///|
 #borrow(rgba)
 extern "c" fn wm_present(
   id : Int64,

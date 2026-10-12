@@ -17,6 +17,18 @@ pub(all) enum Event {
 }
 
 ///|
+/// 键盘焦点此刻落在哪里。`LostFocus` 一条事件分不出两种来源，靠这个区分：
+/// 让位给本窗子件（用户点了网页）与整窗被切走（用户点了别的应用）。
+pub(all) enum FocusOwner {
+  /// 本窗没有焦点（整窗失焦）
+  NoFocus
+  /// 在绘制区，即自绘控件这一侧
+  Area
+  /// 在本窗内的某个原生子件里（点进了 webview）
+  ChildSurface
+}
+
+///|
 pub(all) struct Window {
   mut id : Int64
   mut width : Int
@@ -81,6 +93,18 @@ pub fn Window::new(width : Int, height : Int, title : String) -> Window? {
 ///|
 pub fn Window::show(self : Window) -> Unit {
   wm_show(self.id)
+}
+
+///|
+/// 焦点归属（见 `FocusOwner`）：上层据此决定「让位给本窗子件要不要清自绘控件
+/// 的焦点栈」。GTK 分支真判；Win32 分支目前固定报 `Area`（= 行为与本改动之前
+/// 一致，失焦只交还输入法不清栈），真正的判定随 W 线接；macOS 分支待平台批。
+pub fn Window::focus_owner(self : Window) -> FocusOwner {
+  match wm_focus_owner(self.id) {
+    1 => Area
+    2 => ChildSurface
+    _ => NoFocus
+  }
 }
 
 ///|

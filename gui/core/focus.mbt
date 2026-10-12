@@ -113,6 +113,14 @@ pub fn FocusStack::move_focus(self : FocusStack, backward : Bool) -> Int? {
 }
 
 ///|
+/// 只放掉「当前焦点」，**保留注册表**。用于焦点让给本窗外的东西（原生子件、
+/// 别的窗）：控件的高亮与光标该消失，但注册项必须在——用户点回来时
+/// `focus(id)` 才找得到项。与 `clear` 的区别就在这里，`clear` 是拆对象用的。
+pub fn FocusStack::drop_current(self : FocusStack) -> Unit {
+  self.cur = -1
+}
+
+///|
 /// 清空焦点（拆对象前调用，避免指向已注销项）。
 pub fn FocusStack::clear(self : FocusStack) -> Unit {
   self.cur = -1

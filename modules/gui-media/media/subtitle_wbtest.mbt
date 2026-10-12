@@ -67,7 +67,7 @@ test "内嵌轨转 Cue：搬运并对齐外部字幕的清洗口径" {
 /// 转成本层 Cue，再按位置查——0.3s 命中第一条、0.9s 不命中。这条钉的是
 /// 「解码器 → 搬运 → 查表」整条链，任何一环字段错位都会在这里露出来。
 test "内嵌字幕端到端：解码转 Cue 后按位置命中" {
-  let path = "modules/ffmpeg-mbt/src/testdata/av_1s_subs.mp4"
+  let path = "../ffmpeg-mbt/src/testdata/av_1s_subs.mp4"
   let cues = match @ffmbt.subtitle_cues(path) {
     Err(e) => fail("内嵌字幕读取失败：\{e}")
     Ok(list) => subtitle_from_embedded(list)

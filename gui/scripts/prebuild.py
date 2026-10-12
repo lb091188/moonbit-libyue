@@ -60,6 +60,11 @@ def compile_stub(
     可传多个源文件，编进同一个 .a（任一源更新即整体重编）。extra_cflags
     用于给「多平台合一的桩」开对应分支（如 stub.c 的 -DWM_STUB_GTK）。"""
     srcs = [src] if isinstance(src, Path) else list(src)
+    missing = [s for s in srcs if not s.exists()]
+    for s in missing:
+        # 包搬家后忘了改路径时，这里必须出声：静默返回空串等于「链接参数整条没
+        # 有」，症状是测试与可执行文件链接期缺一堆符号，离根因很远
+        print(f"stub: 源文件不存在，跳过该库：{s}", file=sys.stderr)
     srcs = [s for s in srcs if s.exists()]
     if not srcs:
         return ""

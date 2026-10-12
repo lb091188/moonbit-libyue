@@ -17,7 +17,7 @@ test "播放数学：帧索引/钳制/进度/时间文本" {
 /// 真机冒烟（内置 1 秒带音轨 mp4：make 双 Demuxer → 元信息 → 状态机
 /// seek/play/tick 推帧/pause/stop/free）。
 test "VideoPlayer 真机冒烟：FFI 双路状态机" {
-  let path = "modules/ffmpeg-mbt/src/testdata/av_1s.mp4"
+  let path = "../ffmpeg-mbt/src/testdata/av_1s.mp4"
   let player = match VideoPlayer::make(path, fps=12) {
     Ok(p) => p
     Err(e) => fail("make 失败：\{e}")
@@ -80,7 +80,7 @@ test "VideoPlayer 真机冒烟：FFI 双路状态机" {
 /// 无音轨视频（内置 testsrc avi）：静音路径（无音频 Demuxer/设备），
 /// 纯视频状态机照常。
 test "VideoPlayer 无音轨：静音播放路径" {
-  let path = "modules/ffmpeg-mbt/src/testdata/testsrc_1s.avi"
+  let path = "../ffmpeg-mbt/src/testdata/testsrc_1s.avi"
   let player = match VideoPlayer::make(path, fps=12) {
     Ok(p) => p
     Err(e) => fail("make 失败：\{e}")
@@ -102,7 +102,7 @@ test "VideoPlayer 无音轨：静音播放路径" {
 /// 按帧时间戳推进（与 duration 同轴），且 EOF 后位置钉在时长（进度
 /// 满格）。白盒回拨墙钟基准模拟时间流逝。
 test "VideoPlayer 时钟同轴：回退 fps 不影响时间轴" {
-  let path = "modules/ffmpeg-mbt/src/testdata/av_1s.mp4"
+  let path = "../ffmpeg-mbt/src/testdata/av_1s.mp4"
   let player = match VideoPlayer::make(path, fps=5) {
     Ok(p) => p
     Err(e) => fail("make 失败：\{e}")
@@ -149,7 +149,7 @@ fn vp_force_eof(player : VideoPlayer) -> Unit {
 /// 播放、位置归零、视频/音频都能从头再解（AudioPlayer 循环测试的对称
 /// 缺口，此前视频侧无循环回归）。
 test "VideoPlayer 循环：EOF 自动回起点重播" {
-  let path = "modules/ffmpeg-mbt/src/testdata/av_1s.mp4"
+  let path = "../ffmpeg-mbt/src/testdata/av_1s.mp4"
   let player = match VideoPlayer::make(path, fps=12, looping=true) {
     Ok(p) => p
     Err(e) => fail("make 失败：\{e}")
@@ -182,7 +182,7 @@ test "VideoPlayer 循环：EOF 自动回起点重播" {
 /// 播完后再点播放：双 demuxer 回起点从头重播（修复前停在 EOF——位置
 /// 钉时长、画面钉末帧、音频队列全空，再点播放毫无变化）。
 test "VideoPlayer 播完后再 play：回起点重播" {
-  let path = "modules/ffmpeg-mbt/src/testdata/av_1s.mp4"
+  let path = "../ffmpeg-mbt/src/testdata/av_1s.mp4"
   let player = match VideoPlayer::make(path, fps=12) {
     Ok(p) => p
     Err(e) => fail("make 失败：\{e}")
@@ -229,7 +229,7 @@ test "VideoPlayer 播完后再 play：回起点重播" {
 /// 播完态拖进度：seek 离开 ended 态，再 play 从落点续播而非回起点
 /// （重播语义只属于「停在末尾直接再 play」）。
 test "VideoPlayer 播完态 seek 后再 play：从落点续播" {
-  let path = "modules/ffmpeg-mbt/src/testdata/av_1s.mp4"
+  let path = "../ffmpeg-mbt/src/testdata/av_1s.mp4"
   let player = match VideoPlayer::make(path, fps=12) {
     Ok(p) => p
     Err(e) => fail("make 失败：\{e}")
@@ -258,7 +258,7 @@ test "VideoPlayer 播完态 seek 后再 play：从落点续播" {
 /// seek 视频 demuxer，音轨停在 EOF——vp_fill_audio 全程解不出 PCM，
 /// 有声画面全程静音）。
 test "VideoPlayer stop 后再 play：重播有声" {
-  let path = "modules/ffmpeg-mbt/src/testdata/av_1s.mp4"
+  let path = "../ffmpeg-mbt/src/testdata/av_1s.mp4"
   let player = match VideoPlayer::make(path, fps=12) {
     Ok(p) => p
     Err(e) => fail("make 失败：\{e}")
@@ -309,7 +309,7 @@ test "音量钳制：media_clamp_volume 与 set_volume" {
   inspect(media_clamp_volume(2.0), content="1")
   inspect(media_clamp_volume(0.0 / 0.0), content="0")
   // VideoPlayer::set_volume 钳制后落 volume 字段（并透传设备）
-  let path = "modules/ffmpeg-mbt/src/testdata/av_1s.mp4"
+  let path = "../ffmpeg-mbt/src/testdata/av_1s.mp4"
   let player = match VideoPlayer::make(path, fps=12) {
     Ok(p) => p
     Err(e) => fail("make 失败：\{e}")
@@ -329,7 +329,7 @@ test "音量钳制：media_clamp_volume 与 set_volume" {
 /// 走而不是按墙钟走；③ 画面立刻有帧（旧形态是 seek 清帧后等下一 tick，
 /// 暂停时 tick 直接返回，画面会停在黑帧上）。
 test "逐帧步进：暂停中挪一帧并立刻出画面" {
-  let path = "modules/ffmpeg-mbt/src/testdata/av_1s.mp4"
+  let path = "../ffmpeg-mbt/src/testdata/av_1s.mp4"
   let player = match VideoPlayer::make(path, fps=12) {
     Ok(p) => p
     Err(e) => fail("make 失败：\{e}")
