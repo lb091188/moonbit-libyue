@@ -2318,22 +2318,19 @@ fn main {
   app.mount([make_media_section(gif_h, ib_hits, gif_w, ib_w)])
   // W20b（全局快捷键）：注册两个组合（较冷门，避免与系统/别的程序冲突）。
   // 注册失败（被占用/后端不支持）也照挂区块，退出状态行如实报 id=0。
+  // W22 起改走 `@core.hotkey_*` 跨平台门面（回查表在门面里，状态行直接问它）。
   let hotkey_hits = Ref(0)
   let hotkey_last : Ref[String] = Ref("-")
   let hotkey_ids : Ref[(Int, Int)] = Ref((0, 0))
   for kv in [("Ctrl+Alt+F9", 0), ("Ctrl+Alt+F10", 1)] {
-    match @win.parse_accelerator(kv.0, false) {
-      Some(hk) =>
-        match @win.register_global_shortcut(hk.mods, hk.vk) {
-          Some(id) =>
-            if kv.1 == 0 {
-              hotkey_ids.val = (id, hotkey_ids.val.1)
-            } else {
-              hotkey_ids.val = (hotkey_ids.val.0, id)
-            }
-          None => ()
+    match @core.hotkey_register(kv.0) {
+      Ok(hk) =>
+        if kv.1 == 0 {
+          hotkey_ids.val = (hk.id, hotkey_ids.val.1)
+        } else {
+          hotkey_ids.val = (hotkey_ids.val.0, hk.id)
         }
-      None => ()
+      Err(_) => ()
     }
   }
   app.mount([make_hotkey_section(hotkey_hits, hotkey_last)])
@@ -2907,17 +2904,16 @@ fn main {
       if s0.0 != idx {
         car_sample.val = (idx, s0.1 + 1)
       }
-      // W20b：抽已触发的全局快捷键（Win32 的 WM_HOTKEY 进线程队列，靠泵抽）
-      match @win.poll_global_shortcut() {
-        Some(id) => {
+      // W20b：抽已触发的全局快捷键（Win32 的 WM_HOTKEY 进线程队列，靠泵抽）。
+      // W22 起走 `@core.hotkey_poll`——命中即给 id + 加速串（回查表在门面里）。
+      match @core.hotkey_poll() {
+        Some(hk) => {
           hotkey_hits.val = hotkey_hits.val + 1
           hotkey_last.val =
-            if id == hotkey_ids.val.0 {
-              "F9"
-            } else if id == hotkey_ids.val.1 {
-              "F10"
+            if hk.spec != "" {
+              hk.spec
             } else {
-              "id=" + id.to_string()
+              "id=" + hk.id.to_string()
             }
         }
         None => ()

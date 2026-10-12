@@ -304,6 +304,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$MSVC/bin/Hostx64/x64/cl.exe" \
 - ~~**W21d `autostart`**（Windows 注册表 Run 键 / Linux `.desktop`；门面在 `sys/autostart.mbt`）~~ ✅ 已交付（见 §6.2 与 `experiment/autostart_probe`）
 - ~~**W21e `idle`**（Windows `GetLastInputInfo` / Linux X11 XScreenSaver（运行期 dlopen）/ macOS 留桩；门面在 `sys/idle.mbt`）~~ ✅ 已交付（见 §6.2 与 `experiment/idle_probe`）
 - 交汇处托盘/通知/热键门面统一归 **W22**
+  - [x] **W22 全局快捷键跨平台门面**（`core/hotkey.mbt`，2026-10-13 交付）：热键是三族里唯一没有跨平台门面的一族（W20b 只落在 win 包），本批补上——形态对齐 tray/notify：`hotkey_supported()` 探测 + `HotkeyError{Unsupported, Failed(String)}` 结构化错误 + `hotkey_poll()` 泵钩子；注册收加速串（解析委托 win 纯函数）、轮询命中给 `Hotkey{id, spec}`（id→加速串回查表门面自持，进程级）。后端：Windows 真实现（W20b 已验）；Linux `XGrabKey` / macOS Carbon **未接**，一律 `Err(Unsupported)`（「没做」与「失败」分两档）。**验证**：`core/hotkey_wbtest.mbt` 2 条（含「连上了才硬断言」——空加速串必须走 `Err(Failed)`）；`moon test ./gui/core` **118/118**；`examples/native-app` 热键区块从直调 `@win.*` 切到 `@core.hotkey_*`，`--deny-warn` 零警告、冒烟 100 秒无 panic。**明确不做**：重构 tray/notify 既有 API（纯破坏性改动，调用方零收益）。详见中英 `adaptation.md`「W22」节。
 
 #### 落盘文件清单（均未提交）
 
