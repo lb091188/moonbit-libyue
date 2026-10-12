@@ -10,6 +10,7 @@ import {
   "NoahLiu/moonbit-libyue/yue/chart",
   "NoahLiu/moonbit-libyue/yue/mdview",
   "NoahLiu/moonbit-libyue/yue/icons",
+  "NoahLiu/moonbit-libyue/yue/win",
 }
 
 pkgtype(kind: "executable")

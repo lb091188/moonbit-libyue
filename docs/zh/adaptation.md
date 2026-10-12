@@ -135,6 +135,45 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **WIC 画布两条陷阱**：①**不能**用 `CreateBitmapFromMemory` 包外部缓冲再让 D2D 画——那走 WIC 内部缓存，读不回你的缓冲（现象：ink=0 而返回值成功），要自持位图 + 绘制后 `Lock(WICBitmapLockRead)` 读回；②用「全透明笔 `FillRectangle`」清画布是**空操作**（源覆盖语义），必须 `Clear`——它吃轴对齐裁剪，所以能只清本次区域（缓存画布比本次大时正好用上）。
 - **回证方式**：`experiment/key_probe`（建窗→泵→打印键码，配 PowerShell `AppActivate`+`SendKeys`）验键盘通路；`experiment/text_bench` 守文字路径性能；截图核对窗口内容（本机用 PowerShell 抓屏 PNG 看图判色）；`App::step`/`paint_frame` 的临时分段计时（PAINT-PROF/STEP-PROF）定位过瓶颈，已撤。全绿复核：core 70 / input 10 / ui 110 / render 43 / text 29 / chart 189 / theme 8 / mdview 26 / sys 165，全仓红点 287/68 持平。
 
+### MoonBit 原生 GUI 栈 · Windows 基础能力首批（W20a 菜单栏 / W20b 全局快捷键 / W20d 消息框）
+
+- **环境与绕开工具链的验证路径**：Windows 10 19045 + VS BuildTools 2022（MSVC **14.44.35207**，在 `C:\Program Files (x86)\Microsoft Visual Studio\...`；`C:\Program Files\...` 是空目录、会白找）+ SDK 10.0.26100。`vcvars64.bat` 被 reg.exe 策略挡住，手工编纯 C 探针要自己设 `INCLUDE`/`LIB`，且必须用 Windows 风格路径（`/c/...` 会被 cl 当源文件）：
+  ```bash
+  MSVC='C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207'
+  SDK='C:\Program Files (x86)\Windows Kits\10'
+  export INCLUDE="$MSVC\include;$SDK\Include\10.0.26100.0\ucrt;$SDK\Include\10.0.26100.0\shared;$SDK\Include\10.0.26100.0\um;$SDK\Include\10.0.26100.0\winrt"
+  export LIB="$MSVC\lib\x64;$SDK\Lib\10.0.26100.0\ucrt\x64;$SDK\Lib\10.0.26100.0\um\x64"
+  MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$MSVC/bin/Hostx64/x64/cl.exe" \
+    /nologo /W4 /utf-8 /O2 /DWIN32 /D_WINDOWS /DUNICODE /D_UNICODE <探针>.c \
+    /Fe:<探针>.exe user32.lib gdi32.lib imm32.lib advapi32.lib
+  ```
+  纯 C 探针 `experiment/menu_probe/menu_backend_probe.c` 直接 `#include "../../yue/win/stub.c"`——因为 `wm_menu_bar_new` 返回的是**句柄表下标**（1..31）而非真 `HMENU`，反读菜单结构必须同 TU 拿静态表 `wm_menus[]`（第一版拿下标当 `HMENU` 传给 `GetMenuItemCount`，满屏 `-1`）。
+- **纯 C 探针的 include 编译必须显式 `-DUNICODE`/`-D_UNICODE`**：不带时 `IDC_ARROW` 等是 `MAKEINTRESOURCEA` 形态（`LPSTR`），传给 `...W` 形参报 **C4133**（`stub.c:388-396`、`646`）；带上后零新增告警（`stub.c` 自身 `wcsncpy`/`wcsncat` 的 C4996 是既有告警）。`moon` 的 native-stub 本就定义 UNICODE（W2 小节已记），故生产链吃不到这两条 C4133。
+- **`AppendMenuW` 单菜单项数上限实测 ≈1168**（本机 bulk 循环第 1169 项起返回 0），**远低于命令 id 池 2048**。由此定两条：①**命令 id 必须「挂载成功后才推进游标」**——原实现先 `cmd = next++` 再 `AppendMenuW`，失败照样吃掉一个 id；反复失败（菜单超限）会让配额提前耗尽，进而与其他菜单在用的 id 相撞（`WM_COMMAND` 只带 id，撞了就把点击派给错项）。修正为 `cmd = next`，`AppendMenuW` 成功后再 `next = cmd + 1`（到池尾归位 `BASE`）。②`WM_MENU_CMD_MAX=2048` 要**刻意大于单菜单上限**：池 ≥ 单菜单上限才保证「只填一个菜单绝不回绕」、菜单自身 id 不自相撞；把池收紧到「实测上限」反而让满菜单撞上回绕。探针据此重写回绕用例——跨菜单填满 2048 个 id 后再在**有空间的新菜单**上加一项，验证它拿到归位后的 1000（单菜单永远耗不尽池子，第一版断言不可达）。
+- **`\t` 拼进标签即加速键提示**：`AppendMenuW` 会把 `\t` 之后的部分右对齐显示（探针用 `GetMenuItemInfoW` 读回，校验中文 UTF-8→UTF-16 往返 + `\tCtrl+Alt+Q` 提示串存在）。真正的加速键表（`TranslateAccelerator`）未接，菜单打开后的键盘导航/快捷键暂靠 W20b 全局热键。
+- **消息框（W20d）是栈内第二种 FFI 形态——「阻塞式」**：`MessageBoxW` 一次调用即显示并**模态阻塞**到用户点按钮、返回按钮编号，没有回调也没有窗口槽；`uType` 的四段位组合（图标 + 按钮）由 MoonBit 侧纯函数算好传进来（探针真机跑出 `icon=64 btn=0 raw=327744`）。与菜单/热键那种「寄存 + 泵里抽」的异步形态正交。
+- **全局快捷键（W20b）挂在**线程**消息队列而非窗口**：`RegisterHotKey` 的 `WM_HOTKEY` 进的是注册线程队列，WndProc 收不到——与菜单同制，桩侧 `wm_hotkey_poll` 在 MoonBit 泵里主动抽。加速键串解析（`"CmdOrCtrl+Shift+M"` → 修饰位 + 虚拟键码）抽成三平台同源纯函数（`CmdOrCtrl` 在 Win 映射 Ctrl、mac 映射 Cmd），10/10。
+- **回证**：`experiment/menu_probe/menu_backend_probe.c` 纯 C 探针 `MENU-BACKEND-OK`（菜单条/子菜单/命令 id/分隔线/勾选/嵌套/中文标签/非法父句柄/句柄表用尽/id 回绕全过）；`experiment/menu_probe` 的 MoonBit 侧验模型树 `MENU-OK`；`yue/core/menu_wbtest.mbt` 10/10、`yue/win/hotkey_wbtest.mbt` 10/10、`yue/win/message_box_wbtest.mbt` 8/8 真跑通过。
+
+### MoonBit 原生 GUI 栈 · Windows 图标加载（W20f：.ico 原生 + PNG 走 WIC）
+
+- **三条来源各有各的入口**：`.ico`/`.bmp` 走 `LoadImageW(LR_LOADFROMFILE)`（Win32 原生图标格式，不必解码）；PNG/JPEG/GIF **没有原生入口**，只能 WIC 从内存解码（`CreateStream`→`InitializeFromMemory`→`CreateDecoderFromStream`→`CreateFormatConverter` 到 `GUID_WICPixelFormat32bppBGRA`→`CopyPixels`）；已是像素的走 32bpp 自顶向下 DIB + `CreateIconIndirect`。`wm_icon_load_file` 按扩展名分派，两条都失败给 0。
+- **32bpp HICON 的 alpha 必须预乘，而 `yue/render` 的 Bitmap 正是这个口径**（小端 B,G,R,A 预乘）——`CreateIconIndirect` 的颜色位图用 alpha 做混合，预乘才不出光环；两者天然对齐，像素可逐字节 `memcpy` 进 DIB。验证法：`GetObject` 对 DIB section 的 `bmBits` **不保证可读**（实测拿到不可用指针、memcmp 必挂），要反读像素得用 `GetDIBits`（`biHeight` 给负数＝请求自顶向下，与输入行序一致）。
+- **`CLSID_WICImagingFactory` 是宏、会指向 Win8 才有的 Factory2**：`wincodec.h` 在 `_WIN32_WINNT >= 0x0602` 时 `#define CLSID_WICImagingFactory CLSID_WICImagingFactory2`；要兼容旧系统就显式取 **`CLSID_WICImagingFactory1`**（vtable 前缀一致，`IID_IWICImagingFactory` 仍用 v1）。
+- **GUID 常量全在 `windowscodecs.lib` 里导出**（`dumpbin /linkermember` 实测：`CLSID_WICImagingFactory1`、`IID_IWICImagingFactory`、`GUID_WICPixelFormat32bppBGRA` 都有），故 yue/win 的 Windows 链接行只加 `windowscodecs.lib ole32.lib`，不必再链 `uuid.lib`（C 模式仍用不了 `__uuidof`，与 W14 文件对话框同条坑）。
+- **C4013 隐式声明同样会在这条路上出现**：`wm_icon_load_file` 的 WIC 回退要调定义在其后的 `wm_icon_from_png`，独立编 stub.c 时 MSVC 给 `C4013: 未定义；假定外部返回 int`——**能编过但口径不可信**（与主色那节的坑同族），加前置声明即消。教训：内部互相调用的静态/全局函数，先想清定义次序或直接前置声明，别靠隐式声明兜。
+- **回证**：纯 C 探针 `experiment/icon_probe/icon_backend_probe.c`（`#include stub.c` 直喂 `wm_icon_*`，再用 `GetIconInfo`/`GetDIBits` 反读）末行 `ICON-BACKEND-OK`：BGRA→HICON 的尺寸/位深/像素往返、`.ico` 磁盘加载、PNG 走 WIC（8×8 RGBA 半透明红解出 32bpp）、句柄表 31 槽用尽归 0、释放幂等全过。PNG 素材由 `experiment/icon_probe/make_png.py` 用标准库 zlib 手写生成（不依赖 Pillow）。`moon test ./yue/win` 24/24（新增 6 条纯函数：扩展名判定/格式分派/句柄 0 语义/尺寸校验）。
+
+### MoonBit 原生 GUI 栈 · Windows 窗口增强（W20e：改标题 / 窗口图标 / 最小尺寸 / 无边框拖拽区）
+
+- **`WM_GETMINMAXINFO` 的 `ptMinTrackSize` 要的是整窗尺寸，不是客户区**：MoonBit 侧传的是**最小客户区**（`set_min_size(w,h)`），C 侧按当前样式 `AdjustWindowRectEx(&r, st, FALSE, ex)` 把非客户区（边框 + 标题栏）外扩后再填 `ptMinTrackSize`。探针实测：客户区最小宽 400、WS_OVERLAPPEDWINDOW 下外框 416（左右各 8px），`AdjustWindowRectEx` 口径与 `WM_GETMINMAXINFO` 一致。
+- **某轴为 0 必须显式归零**：`set_min_size` 允许单轴不限（`0` = 该轴不限制）。但**不能**把 `0` 直接塞进 `AdjustWindowRectEx` 的矩形——那会算出「零客户区也占 2×边框宽」的假最小宽。实现写成 `mmi->ptMinTrackSize.x = w->min_w > 0 ? (r.right - r.left) : 0;`，两轴都判一次；`wm_set_min_size` 入口也先把负数夹成 `0`。只设一轴时另一轴必须回落到 0，否则窗口在该轴被卡住。
+- **`WM_NCHITTEST` 用 `break` 而非 `return 0`**：自绘标题栏拖拽区命中时 `return HTCAPTION`（把拖窗交给系统），**不在区内必须 `break` 落回默认处理**——`WM_NCHITTEST` 的默认返回值含客户区 `HTCLIENT` / 边框缩放角 `HTBOTTOMRIGHT` 等语义，`return 0` 会把它们一并吞掉：实测表现为边框再也拽不动、客户区鼠标行为异常。命中判定用 `ScreenToClient` 把 `lParam` 的**屏幕坐标**转客户区坐标再比矩形（`lParam` 打包的是屏幕坐标，不是客户区，容易看走眼）；区间取左下闭右上开（`>= x && < x+w`）。注意 `lParam` 的坐标是 **16 位有符号**（`(int16_t)LOWORD/HIWORD`），多显示器负坐标也能还原。
+- **`WM_GETICON` 反读校验窗口图标**：`wm_set_icon(id, icon_slot, which)` 的 `which` 0/1/2 分别对应 `ICON_BIG` / `ICON_SMALL` / 两者，直接 `SendMessageW(hwnd, WM_SETICON, …)`。探针用 `WM_GETICON(ICON_BIG)` 反读，拿到同一个 `HICON` 句柄即证明写入生效。**图标句柄表归调用方**（W20f 的槽表），窗口只是「用」这个 `HICON`：C 侧注释与门面文档都写明「调用方须保证图标在窗口显示期间不被 `free`」，否则窗口引用悬空句柄。传入 `icon_slot=0` 即清空图标。
+- **无边框 = 改样式后按客户区重算外框 + `SWP_FRAMECHANGED`**：ON 时去掉 `WS_CAPTION|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX|WS_SYSMENU|WS_BORDER|WS_DLGFRAME`、换 `WS_POPUP`（保留 `WS_MINIMIZEBOX` 以便仍能最小化），OFF 时还原 `WS_OVERLAPPEDWINDOW`。**关键两步**：①先 `GetClientRect` 拿当前客户区尺寸，改完样式后用新样式 `AdjustWindowRectEx` 重算外框，再 `SetWindowPos(..., SWP_NOMOVE|SWP_NOZORDER|SWP_FRAMECHANGED)`——少了 `SWP_FRAMECHANGED` 非客户区不重算，窗口尺寸会跳；②幂等判据用 `w->borderless`，重复设同值直接返回（否则每次调用都 `SetWindowPos`，无谓重排）。探针验：无边框后 `GWL_STYLE` 里没有 `WS_CAPTION`、客户区宽度仍是 640（不变）。
+- **运行中改标题走 `SetWindowTextW`**：`wm_set_title` 把 UTF-8 转 UTF-16 后 `SetWindowTextW`；探针用 `GetWindowTextW` 反读中文标题校验 UTF-8→UTF-16 往返。
+- **回证**：纯 C 探针 `experiment/window_probe/window_enhance_probe.c`（`#include` stub.c，建真窗口后 `SendMessageW(WM_GETMINMAXINFO/WM_NCHITTEST)` 直读、`GetWindowTextW`/`WM_GETICON`/`GWL_STYLE` 反读）末行 `WIN-ENHANCE-OK`（40 条断言全过）：`SetWindowTextW` 生效（中文）、`ptMinTrackSize.x == 416`（客户区 400 + 边框）、多显示器负坐标命中/边界开区间、区内回 `HTCAPTION` 区外回 `HTCLIENT`、`WM_GETICON(ICON_BIG)` 等于传入图标、无边框后无 `WS_CAPTION` 且客户区宽不变、越界 id 不崩且不写缓冲。示例接线：`examples/native-app` 新增窗口增强区（改标题 / 自绘图标 / 无边框开关 / 拖拽带开关）与退出状态行 `NATIVE-APP-WIN title='…' min=… drag=… bl=… icon=…`，`moon build` 产出 `native-app.exe`。`moon test ./yue/win` 24/24、`moon check ./yue/win ./examples/native-app --deny-warn` 零警告、C 后端 MSVC `/W4` 干净。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。

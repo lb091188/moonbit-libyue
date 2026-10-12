@@ -46,6 +46,12 @@
 // IME 段的宽串转 UTF-8 走 malloc/free，故 stdlib 也要
 #include <stdio.h>
 #include <stdlib.h>
+#include <wchar.h> // 菜单标签拼接用 wcsncpy/wcslen/wcsncat（W20a）
+// 图标加载（W20f）：PNG 无原生 Win32 入口，只能走 WIC 从内存解码；COM 初始化
+// 与 CoCreateInstance 在 objbase.h。GUID 常量由 wincodec.h 声明、链接期取
+// windowscodecs.lib / uuid.lib（C 模式用不了 __uuidof，与 W14 文件对话框同条坑）。
+#include <objbase.h>
+#include <wincodec.h>
 
 #define WM_MAX_WINDOWS 32
 
@@ -87,6 +93,16 @@ typedef struct {
   int im_cw;
   int im_ch;
   int im_cursor_set;
+  // 窗口增强（W20e）：最小客户区尺寸（0 = 该轴不限制，WM_GETMINMAXINFO 拦）；
+  // 自绘标题栏拖拽区（客户区像素矩形，w/h<=0 = 无，WM_NCHITTEST 内返回
+  // HTCAPTION 交系统拖窗）；无边框开关（自绘标题栏形态）。
+  int min_w;
+  int min_h;
+  int drag_x;
+  int drag_y;
+  int drag_w;
+  int drag_h;
+  int borderless;
   WmEv evs[64];
   WmEv last;
   int ev_head;
@@ -96,6 +112,58 @@ typedef struct {
 static WmWindow wm_windows[WM_MAX_WINDOWS]; // 槽 0 未用，句柄 = 槽号（1 起）
 static int wm_next_id = 1;
 static HWND wm_waker = NULL; // 仅消息窗口：wm_wakeup 的投递目标（跨线程叫醒）
+
+/* 前置声明：UTF-8 → UTF-16 的公共转换（定义在文件后半），窗口增强（W20e）
+ * 的改标题等入口在它之前定义。 */
+static WCHAR *wm_utf8_to_wide(const char *s);
+/* 前置声明：图标表取句柄（W20f 的图标表定义在窗口增强之后）。 */
+static HICON wm_icon_get(int slot);
+
+/* 菜单句柄表（W20a）：下标即对外句柄（1 起）。每个槽存一个 HMENU——菜单条或
+ * 子菜单都占一个槽；子菜单的 HMENU 由 CreatePopupMenu 建、AppendMenuW(MF_POPUP)
+ * 挂进父。槽 0 未用。命令 id 表与「可点击项前序序号」对齐，供回调对表。 */
+#define WM_MAX_MENUS 32
+static HMENU wm_menus[WM_MAX_MENUS];
+static int wm_menus_next = 1;
+
+/* ---- 全局快捷键（W20b）---------------------------------------------------
+ * RegisterHotKey 注册的热键以 WM_HOTKEY 投给**线程消息队列**（hwnd 传 NULL
+ * 时），所以不需要窗口槽：本文件另起一张进程级表，槽号即对外 id。命中时
+ * WndProc 收不到（消息进的是注册线程队列），改由 wm_hotkey_poll 在 MoonBit
+ * 的泵里主动抽——与 DBus 线「宿主周期 pump」同一形态，避免 C→MoonBit 回调。
+ * 注册 id 与窗口无关（旧栈 register_global_shortcut 同语义）。
+ * 表声明必须在 wm_pump 之前（pump 里要截 WM_HOTKEY 置位）。 */
+#define WM_MAX_HOTKEYS 32
+static int wm_hotkeys[WM_MAX_HOTKEYS]; // 1 = 已注册；下标即对外 id
+static int wm_hotkey_fired[WM_MAX_HOTKEYS]; // 1 = 本轮已触发待取
+static int wm_hotkey_fired_count = 0;
+
+/* ---- 原生菜单（W20a）-----------------------------------------------------
+ * 菜单是**每窗口一份**（HMENU 挂 SetMenu），菜单项点击经 WM_COMMAND 回来。
+ * 与热键同一形态：C 侧不回调 MoonBit，命中时把「命令 id」压进进程级队列，
+ * MoonBit 侧 `wm_menu_poll` 在泵里抽；回调（MenuItem::on_click）由模型层按
+ * native_id 持表（见 yue/core/menu.mbt 与其翻译层）。
+ * 句柄用「进程级表下标」表示（与窗口槽同制）：建菜单树是逐节点 FFI，节点句柄
+ * 就是表下标，MoonBit 侧拿着它继续往下加子项。命令 id 从 1000 起递增分配，
+ * 与「可点击项」一一对应。表要在 wm_pump/wm_wndproc 之前声明（两处都要用）。 */
+#define WM_MENU_CMD_BASE 1000
+// id 池大小。实测 Win32 单菜单项数上限约 1168（见 menu_backend_probe.c），池
+// 取 2048 保证 > 单菜单上限 ⇒ 只填一个菜单绝不会回绕、也就不会自相撞 id。
+#define WM_MENU_CMD_MAX 2048
+static int wm_menu_cmd_next = WM_MENU_CMD_BASE; // 下一个待分配命令 id（成功才推进）
+// 已触发待取的命令 id 队列（环形；满了丢最旧）
+static int wm_menu_fired[64];
+static int wm_menu_fired_head = 0;
+static int wm_menu_fired_count = 0;
+
+static void wm_menu_push(int cmd) {
+  if (wm_menu_fired_count >= 64) {
+    wm_menu_fired_head = (wm_menu_fired_head + 1) % 64;
+    wm_menu_fired_count--;
+  }
+  wm_menu_fired[(wm_menu_fired_head + wm_menu_fired_count) % 64] = cmd;
+  wm_menu_fired_count++;
+}
 
 void wm_pump(void); // wm_show 里要先跑一轮就绪消息，实现在下方
 
@@ -414,6 +482,47 @@ static LRESULT CALLBACK wm_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     }
     case WM_ERASEBKGND:
       return 1; // 全窗自绘，不擦底防闪
+    case WM_GETMINMAXINFO: {
+      // 最小尺寸（W20e）：ptMinTrackSize 要的是**整窗**尺寸，按当前样式的
+      // 非客户区把客户区最小尺寸外扩；某轴为 0 即该轴不限制（显式归 0，
+      // 否则 AdjustWindowRect 会把零宽也算出 2×边框宽）。
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL && (w->min_w > 0 || w->min_h > 0)) {
+        MINMAXINFO *mmi = (MINMAXINFO *)lp;
+        DWORD st = (DWORD)GetWindowLongPtrW(hwnd, GWL_STYLE);
+        DWORD ex = (DWORD)GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        RECT r = {0, 0, w->min_w > 0 ? w->min_w : 0, w->min_h > 0 ? w->min_h : 0};
+        AdjustWindowRectEx(&r, st, FALSE, ex);
+        mmi->ptMinTrackSize.x = w->min_w > 0 ? (r.right - r.left) : 0;
+        mmi->ptMinTrackSize.y = w->min_h > 0 ? (r.bottom - r.top) : 0;
+      }
+      return 0;
+    }
+    case WM_NCHITTEST: {
+      // 自绘标题栏拖拽区（W20e）：命中即回 HTCAPTION，把拖窗交给系统；
+      // 不在区内走默认（客户区/边框各自的原生语义）。
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL && w->drag_w > 0 && w->drag_h > 0) {
+        POINT p;
+        p.x = (LONG)(int16_t)LOWORD(lp);
+        p.y = (LONG)(int16_t)HIWORD(lp);
+        ScreenToClient(hwnd, &p);
+        if (p.x >= w->drag_x && p.x < w->drag_x + w->drag_w &&
+            p.y >= w->drag_y && p.y < w->drag_y + w->drag_h) {
+          return HTCAPTION;
+        }
+      }
+      break;
+    }
+    case WM_COMMAND: {
+      // 菜单/加速键命令：LOWORD(wp) 是命令 id，HIWORD(wp) 为 0（菜单选择）
+      // 或 1（加速键）。不论来源都压进队列，MoonBit 侧按 id 找回调。
+      int cmd = (int)LOWORD(wp);
+      if (cmd >= WM_MENU_CMD_BASE && cmd < WM_MENU_CMD_BASE + WM_MENU_CMD_MAX) {
+        wm_menu_push(cmd);
+      }
+      return 0;
+    }
     case WM_CLOSE: {
       WmWindow *w = wm_of(hwnd);
       if (w != NULL) {
@@ -753,6 +862,13 @@ void wm_close(int64_t id) {
     w->hwnd = NULL; // WM_DESTROY 里还会再清一次；先摘钩防重入
     DestroyWindow(hwnd);
   }
+  // 拆掉本次会话建的所有菜单（W20a）：HMENU 归桩所有，随窗口销毁一起放
+  for (int i = 1; i < WM_MAX_MENUS; i++) {
+    if (wm_menus[i] != NULL) {
+      DestroyMenu(wm_menus[i]);
+      wm_menus[i] = NULL;
+    }
+  }
   // 帧拷贝归桩所有，拆窗前先放掉（memset 之后就拿不到指针了）
   free(w->frame);
   w->frame = NULL;
@@ -765,6 +881,19 @@ void wm_close(int64_t id) {
 void wm_pump(void) {
   MSG msg;
   while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
+    // 全局快捷键（W20b）：RegisterHotKey(NULL,...) 的 WM_HOTKEY 投的是线程
+    // 队列，msg.hwnd 为 NULL，DispatchMessageW 会把它丢掉——必须在派发前
+    // 截住置位，等 MoonBit 侧 wm_hotkey_poll 来取。
+    if (msg.message == WM_HOTKEY) {
+      int hid = (int)msg.wParam;
+      if (hid > 0 && hid < WM_MAX_HOTKEYS && wm_hotkeys[hid]) {
+        if (!wm_hotkey_fired[hid]) {
+          wm_hotkey_fired[hid] = 1;
+          wm_hotkey_fired_count++;
+        }
+      }
+      continue;
+    }
     // TranslateMessage 不能省：INPUT 法（IMM32）的组合处理就挂在这条路上——
     // 缺了它只会收到裸键，WM_IME_STARTCOMPOSITION/WM_IME_COMPOSITION 一条都
     // 收不到（实测：只来 WM_IME_SETCONTEXT，拼音永远组合不起来）
@@ -853,6 +982,161 @@ void wm_set_cursor(int64_t id, int kind) {
   if (w->hwnd != NULL) {
     SetCursor(wm_load_cursor(kind));
   }
+}
+
+/* ---- 窗口增强（W20e）-----------------------------------------------------
+ * 自绘栈下窗口外壳要能被 MoonBit 改：运行中改标题、设窗口图标（走 W20f 的
+ * HICON）、最小尺寸、自绘标题栏拖拽区、无边框开关。均为常规 Win32 消息，逐条
+ * 可探针验（SendMessageW(WM_GETMINMAXINFO/WM_NCHITTEST) 直接反读）。 */
+
+/* 运行中改标题（SetWindowTextW）。 */
+void wm_set_title(int64_t id, const char *title) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL || title == NULL) {
+    return;
+  }
+  WCHAR *wt = wm_utf8_to_wide(title);
+  if (wt != NULL) {
+    SetWindowTextW(w->hwnd, wt);
+    free(wt);
+  }
+}
+
+/* 设窗口图标。`which`：0 = 大图标（Alt+Tab）、1 = 小图标（标题栏），
+ * 2 = 两者。`icon_slot` 是 W20f 的图标句柄（0 = 清空图标）。句柄表归调用方，
+ * 窗口只是「用」这个 HICON——调用方须保证图标在窗口显示期间不被 free。 */
+void wm_set_icon(int64_t id, int icon_slot, int which) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL) {
+    return;
+  }
+  HICON ic = wm_icon_get(icon_slot);
+  if (which == 0 || which == 2) {
+    SendMessageW(w->hwnd, WM_SETICON, ICON_BIG, (LPARAM)ic);
+  }
+  if (which == 1 || which == 2) {
+    SendMessageW(w->hwnd, WM_SETICON, ICON_SMALL, (LPARAM)ic);
+  }
+}
+
+/* 设最小客户区尺寸（像素；0 = 该轴不限制）。WM_GETMINMAXINFO 按此拦。 */
+void wm_set_min_size(int64_t id, int wmin, int hmin) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  wm_windows[id].min_w = wmin > 0 ? wmin : 0;
+  wm_windows[id].min_h = hmin > 0 ? hmin : 0;
+}
+
+/* 设自绘标题栏拖拽区（客户区像素矩形；w/h<=0 清空）。命中交系统拖窗。 */
+void wm_set_drag_rect(int64_t id, int x, int y, int w, int h) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *win = &wm_windows[id];
+  win->drag_x = x;
+  win->drag_y = y;
+  win->drag_w = w > 0 ? w : 0;
+  win->drag_h = h > 0 ? h : 0;
+}
+
+/* 无边框开关：ON 去掉标题栏/边框并换 WS_POPUP（自绘标题栏形态），OFF 还原
+ * WS_OVERLAPPEDWINDOW。**保持客户区尺寸不变**——改样式后按当前客户区重算外框，
+ * 再 SWP_FRAMECHANGED 让非客户区重算（否则窗口尺寸会跳）。 */
+void wm_set_borderless(int64_t id, int on) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL || (w->borderless ? 1 : 0) == (on ? 1 : 0)) {
+    return;
+  }
+  LONG_PTR style = GetWindowLongPtrW(w->hwnd, GWL_STYLE);
+  if (on) {
+    style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX |
+               WS_SYSMENU | WS_BORDER | WS_DLGFRAME);
+    style |= WS_POPUP | WS_MINIMIZEBOX; // 仍允许最小化
+  } else {
+    style &= ~WS_POPUP;
+    style |= WS_OVERLAPPEDWINDOW;
+  }
+  RECT cr;
+  GetClientRect(w->hwnd, &cr);
+  RECT r = {0, 0, cr.right - cr.left, cr.bottom - cr.top};
+  LONG_PTR ex = GetWindowLongPtrW(w->hwnd, GWL_EXSTYLE);
+  AdjustWindowRectEx(&r, (DWORD)style, FALSE, (DWORD)ex);
+  SetWindowLongPtrW(w->hwnd, GWL_STYLE, style);
+  SetWindowPos(w->hwnd, NULL, 0, 0, r.right - r.left, r.bottom - r.top,
+               SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  w->borderless = on ? 1 : 0;
+}
+
+/* 反读：当前最小尺寸（探针/测试用）。 */
+void wm_get_min_size(int64_t id, int32_t *out_w, int32_t *out_h) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  if (out_w != NULL) {
+    *out_w = wm_windows[id].min_w;
+  }
+  if (out_h != NULL) {
+    *out_h = wm_windows[id].min_h;
+  }
+}
+
+/* 反读：当前拖拽区（探针/测试用）。 */
+void wm_get_drag_rect(int64_t id, int32_t *x, int32_t *y, int32_t *w,
+                      int32_t *h) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *win = &wm_windows[id];
+  if (x != NULL) {
+    *x = win->drag_x;
+  }
+  if (y != NULL) {
+    *y = win->drag_y;
+  }
+  if (w != NULL) {
+    *w = win->drag_w;
+  }
+  if (h != NULL) {
+    *h = win->drag_h;
+  }
+}
+
+/* 反读：无边框开关（探针/测试用）。 */
+int wm_is_borderless(int64_t id) {
+  return id > 0 && id < WM_MAX_WINDOWS ? wm_windows[id].borderless : 0;
+}
+
+/* 反读：当前窗口标题写进调用方缓冲（UTF-8，返回字节数；读不到给 0）。 */
+int wm_window_title(int64_t id, char *out, int cap) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS || out == NULL || cap <= 1) {
+    return 0;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL) {
+    return 0;
+  }
+  WCHAR wbuf[512];
+  int n = GetWindowTextW(w->hwnd, wbuf, 512);
+  if (n <= 0) {
+    out[0] = '\0';
+    return 0;
+  }
+  int got = WideCharToMultiByte(CP_UTF8, 0, wbuf, n, out, cap - 1, NULL, NULL);
+  if (got < 0) {
+    got = 0;
+  }
+  out[got] = '\0';
+  return got;
 }
 
 // ---- IME（W6 线实装 ImmAssociateContext / WM_IME_*，当前为占位：缓冲恒空，
@@ -962,6 +1246,566 @@ void wm_wakeup(void) {
   if (wm_waker != NULL) {
     PostMessageW(wm_waker, WM_APP + 1, 0, 0);
   }
+}
+
+/* ---- 全局快捷键（W20b）实装在下方：表声明在文件头（pump 要用），这里只放
+ * 注册/注销/抽取三个入口。 */
+/* 注册全局快捷键：mods 用内核 MOD_* 位（1 shift/2 ctrl/4 alt/8 meta），
+ * vk 是 Win32 虚拟键码。返回 id（>=1）或 0 失败（组合键被系统/别的程序占用、
+ * 或表满）。RegisterHotKey 用 NULL hwnd = 线程队列。 */
+int wm_hotkey_register(int mods, int vk) {
+  int slot = -1;
+  for (int i = 1; i < WM_MAX_HOTKEYS; i++) {
+    if (!wm_hotkeys[i]) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    return 0;
+  }
+  UINT m = 0;
+  if (mods & 1) {
+    m |= MOD_SHIFT;
+  }
+  if (mods & 2) {
+    m |= MOD_CONTROL;
+  }
+  if (mods & 4) {
+    m |= MOD_ALT;
+  }
+  if (mods & 8) {
+    m |= MOD_WIN;
+  }
+  // 无修饰键的裸键 RegisterHotKey 会失败（系统拒绝），显式判掉给调用方
+  if (m == 0) {
+    return 0;
+  }
+  if (!RegisterHotKey(NULL, slot, m | MOD_NOREPEAT, (UINT)vk)) {
+    return 0;
+  }
+  wm_hotkeys[slot] = 1;
+  wm_hotkey_fired[slot] = 0;
+  return slot;
+}
+
+/* 注销：幂等。 */
+void wm_hotkey_unregister(int id) {
+  if (id <= 0 || id >= WM_MAX_HOTKEYS || !wm_hotkeys[id]) {
+    return;
+  }
+  UnregisterHotKey(NULL, id);
+  wm_hotkeys[id] = 0;
+  wm_hotkey_fired[id] = 0;
+}
+
+/* 取一个已触发的热键 id（无则 0）。每注册一个 WM_HOTKEY 只置位一次。 */
+int wm_hotkey_poll(void) {
+  if (wm_hotkey_fired_count < 1) {
+    return 0;
+  }
+  for (int i = 1; i < WM_MAX_HOTKEYS; i++) {
+    if (wm_hotkey_fired[i]) {
+      wm_hotkey_fired[i] = 0;
+      wm_hotkey_fired_count--;
+      return i;
+    }
+  }
+  return 0;
+}
+
+/* UTF-8 → UTF-16（W 系 API 用）；失败/空给 NULL，调用方自己兜空白串。 */
+static WCHAR *wm_utf8_to_wide(const char *s) {
+  if (s == NULL) {
+    return NULL;
+  }
+  int n = MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
+  if (n <= 0) {
+    return NULL;
+  }
+  WCHAR *w = (WCHAR *)malloc((size_t)n * sizeof(WCHAR));
+  if (w == NULL) {
+    return NULL;
+  }
+  MultiByteToWideChar(CP_UTF8, 0, s, -1, w, n);
+  return w;
+}
+
+/* ---- 原生菜单（W20a）实装 -------------------------------------------------
+ * 逐节点 FFI：MoonBit 侧持「菜单句柄」（本表下标），按模型树自顶向下建。
+ *  - wm_menu_bar_new()            建菜单条 → 返回句柄
+ *  - wm_menu_new_sub(parent,title) 在 parent 下加子菜单 → 返回子菜单句柄
+ *  - wm_menu_add_item(parent,label,kind,role,acc,checked) 加项 → 返回命令 id（0=分隔线）
+ * 命令 id 由本侧递增分配、回填给 MoonBit（模型侧 MenuItem.native_id）；点击经
+ * WM_COMMAND → 队列 → wm_menu_poll 取回，MoonBit 用 native_id 找回调。
+ * 挂窗用 wm_menu_apply(window_id, menu_handle)。 */
+int wm_menu_bar_new(void) {
+  int slot = -1;
+  for (int i = 1; i < WM_MAX_MENUS; i++) {
+    if (wm_menus[i] == NULL) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    return 0;
+  }
+  HMENU h = CreateMenu();
+  if (h == NULL) {
+    return 0;
+  }
+  wm_menus[slot] = h;
+  return slot;
+}
+
+/* 在父菜单下加子菜单；返回子菜单句柄（0=失败）。 */
+int wm_menu_new_sub(int parent, const char *title) {
+  if (parent <= 0 || parent >= WM_MAX_MENUS || wm_menus[parent] == NULL) {
+    return 0;
+  }
+  int slot = -1;
+  for (int i = 1; i < WM_MAX_MENUS; i++) {
+    if (wm_menus[i] == NULL) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    return 0;
+  }
+  HMENU sub = CreatePopupMenu();
+  if (sub == NULL) {
+    return 0;
+  }
+  WCHAR *w = wm_utf8_to_wide(title);
+  UINT f = MF_POPUP | MF_STRING;
+  if (!AppendMenuW(wm_menus[parent], f, (UINT_PTR)sub,
+                   w != NULL ? w : L"")) {
+    DestroyMenu(sub);
+    free(w);
+    return 0;
+  }
+  free(w);
+  wm_menus[slot] = sub;
+  return slot;
+}
+
+/* 在父菜单下加一项。kind: 0 command / 1 check / 2 radio / 3 separator。
+ * role: -1 non-role（Win32 无 role，忽略）；acc 是加速键描述串（"" 或无）。
+ * checked: check/radio 初值。返回命令 id（>=1000）；分隔线返回 0。 */
+int wm_menu_add_item(int parent, const char *label, int kind, int role,
+                     const char *acc, int checked) {
+  if (parent <= 0 || parent >= WM_MAX_MENUS || wm_menus[parent] == NULL) {
+    return 0;
+  }
+  (void)role; // Win32 无 role 概念：角色项按普通项建，行为由 MoonBit 回调给
+  if (kind == 3) {
+    AppendMenuW(wm_menus[parent], MF_SEPARATOR, 0, NULL);
+    return 0;
+  }
+  // 先算出待分配的 id，但**成功挂上后才推进游标**：AppendMenuW 有单菜单项数
+  // 上限（实测本机 ~1168，见 menu_backend_probe.c），失败还吃 id 会让配额提前
+  // 耗尽并与其他菜单的在用 id 相撞。
+  int cmd = wm_menu_cmd_next;
+  UINT f = MF_STRING;
+  if (kind == 1) { // check
+    if (checked) {
+      f |= MF_CHECKED;
+    }
+  } else if (kind == 2) { // radio
+    if (checked) {
+      f |= MF_CHECKED;
+    }
+  }
+  // 标签 + 可选「\t加速键提示」：AppendMenuW 把 '\t' 后的部分右对齐显示
+  WCHAR item_label[256];
+  item_label[0] = L'\0';
+  WCHAR *w = wm_utf8_to_wide(label);
+  if (w != NULL) {
+    wcsncpy(item_label, w, 200);
+    item_label[200] = L'\0';
+    free(w);
+  }
+  if (acc != NULL && acc[0] != '\0' && item_label[0] != L'\0') {
+    // 直接当提示串（Win32 上真正生效的加速键表将来另行 RegisterAccelerator）
+    size_t cur = wcslen(item_label);
+    if (cur < 240) {
+      item_label[cur] = L'\t';
+      item_label[cur + 1] = L'\0';
+      WCHAR *wa = wm_utf8_to_wide(acc);
+      if (wa != NULL) {
+        wcsncat(item_label, wa, 240 - (int)cur - 1);
+        free(wa);
+      }
+    }
+  }
+  if (!AppendMenuW(wm_menus[parent], f, (UINT_PTR)cmd, item_label)) {
+    return 0;
+  }
+  // 挂载成功，推进 id 游标；到池尾归位到 BASE（池大小 2048 > 单菜单上限，
+  // 故单个菜单不可能自相撞 id）。
+  wm_menu_cmd_next = cmd + 1;
+  if (wm_menu_cmd_next >= WM_MENU_CMD_BASE + WM_MENU_CMD_MAX) {
+    wm_menu_cmd_next = WM_MENU_CMD_BASE;
+  }
+  return cmd;
+}
+
+/* 把菜单条挂到窗口（SetMenu + DrawMenuBar）；bar=0 表示拆掉当前菜单。 */
+void wm_menu_apply(int64_t id, int bar) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL) {
+    return;
+  }
+  HMENU h = (bar > 0 && bar < WM_MAX_MENUS) ? wm_menus[bar] : NULL;
+  SetMenu(w->hwnd, h);
+  DrawMenuBar(w->hwnd);
+}
+
+/* 抽一个菜单命令 id（无则 0）。入队在 WM_COMMAND 里做。 */
+int wm_menu_poll(void) {
+  if (wm_menu_fired_count < 1) {
+    return 0;
+  }
+  int cmd = wm_menu_fired[wm_menu_fired_head];
+  wm_menu_fired_head = (wm_menu_fired_head + 1) % 64;
+  wm_menu_fired_count--;
+  return cmd;
+}
+
+/* ---- 图标加载（W20f）-----------------------------------------------------
+ * 托盘 / 窗口 / 菜单三处的共同前置：把「磁盘图标文件」或「已在内存的像素」变成
+ * 一个 HICON。三种入口覆盖三来源：
+ *  - wm_icon_load_file(path, size) —— 按扩展名分派：`.ico`/`.bmp` 走
+ *    `LoadImageW(LR_LOADFROMFILE)`（Win32 原生图标格式，不必解码），其余
+ *    （PNG/JPEG/GIF…）读文件字节走 WIC；size>0 按该边长加载。
+ *  - wm_icon_from_png(bytes, len) —— WIC 从**内存**解码 PNG/JPEG/GIF/BMP 到
+ *    32bpp BGRA（PNG 没有原生 Win32 入口，只能走 WIC）。
+ *  - wm_icon_from_bgra(px, w, h) —— 已是 BGRA（预乘）的像素直接建 icon；`yue/render`
+ *    的 Bitmap 正是这个口径（小端 B,G,R,A 预乘），CreateIconIndirect 需要预乘
+ *    alpha，两者天然对齐、逐字节直拷。
+ * 句柄用进程级表下标（1 起，0 = 失败），与窗口/菜单同制；wm_icon_free 释放
+ * HICON 与自建的位图，未释放的随进程退出由系统回收。
+ * 表要在 wm_wndproc（WM_SETICON 用）/托盘批之前声明。 */
+#define WM_MAX_ICONS 32
+typedef struct {
+  HICON hicon;
+  HBITMAP color; // 自建的 32bpp 位图（LoadImageW 路径为 NULL，由 HICON 自持）
+  HBITMAP mask;
+} WmIcon;
+static WmIcon wm_icons[WM_MAX_ICONS];
+
+/* 前置声明：wm_icon_load_file 的 WIC 回退路径要调它（定义在其后）。 */
+int wm_icon_from_png(const unsigned char *data, int len);
+
+static int wm_icon_slot(void) {
+  for (int i = 1; i < WM_MAX_ICONS; i++) {
+    if (wm_icons[i].hicon == NULL) {
+      return i;
+    }
+  }
+  return 0;
+}
+
+/* 取槽里的真 HICON（越界/空槽给 NULL）。窗口增强（W20e）的 set_icon 也走它。 */
+static HICON wm_icon_get(int slot) {
+  if (slot <= 0 || slot >= WM_MAX_ICONS) {
+    return NULL;
+  }
+  return wm_icons[slot].hicon;
+}
+
+static int wm_icon_store(HICON ic, HBITMAP color, HBITMAP mask) {
+  if (ic == NULL) {
+    return 0;
+  }
+  int slot = wm_icon_slot();
+  if (slot == 0) {
+    return 0; // 表满：不销毁，交调用方决定（此处调用方会自清）
+  }
+  wm_icons[slot].hicon = ic;
+  wm_icons[slot].color = color;
+  wm_icons[slot].mask = mask;
+  return slot;
+}
+
+/* 32bpp BGRA（自顶向下）→ HICON。mask 用全 0 单色位图；CreateIconIndirect 在
+ * 32bpp 颜色位图上认 alpha 通道做混合，故像素必须是**预乘** alpha（与 Bitmap 同）。 */
+int wm_icon_from_bgra(const unsigned char *px, int w, int h) {
+  if (px == NULL || w <= 0 || h <= 0) {
+    return 0;
+  }
+  BITMAPV5HEADER bi;
+  memset(&bi, 0, sizeof(bi));
+  bi.bV5Size = sizeof(bi);
+  bi.bV5Width = w;
+  bi.bV5Height = -h; // 负高 = 自顶向下，与 Bitmap 行序一致
+  bi.bV5Planes = 1;
+  bi.bV5BitCount = 32;
+  bi.bV5Compression = BI_BITFIELDS;
+  bi.bV5RedMask = 0x00FF0000u;
+  bi.bV5GreenMask = 0x0000FF00u;
+  bi.bV5BlueMask = 0x000000FFu;
+  bi.bV5AlphaMask = 0xFF000000u;
+  HDC hdc = GetDC(NULL);
+  void *bits = NULL;
+  HBITMAP color =
+      CreateDIBSection(hdc, (BITMAPINFO *)&bi, DIB_RGB_COLORS, &bits, NULL, 0);
+  ReleaseDC(NULL, hdc);
+  if (color == NULL || bits == NULL) {
+    if (color != NULL) {
+      DeleteObject(color);
+    }
+    return 0;
+  }
+  memcpy(bits, px, (size_t)w * (size_t)h * 4u);
+  HBITMAP mask = CreateBitmap(w, h, 1, 1, NULL);
+  ICONINFO ii;
+  memset(&ii, 0, sizeof(ii));
+  ii.fIcon = TRUE;
+  ii.hbmColor = color;
+  ii.hbmMask = mask;
+  HICON ic = CreateIconIndirect(&ii);
+  if (ic == NULL) {
+    DeleteObject(color);
+    if (mask != NULL) {
+      DeleteObject(mask);
+    }
+    return 0;
+  }
+  int slot = wm_icon_store(ic, color, mask);
+  if (slot == 0) {
+    DestroyIcon(ic);
+    DeleteObject(color);
+    if (mask != NULL) {
+      DeleteObject(mask);
+    }
+  }
+  return slot;
+}
+
+/* 把整个文件读进 malloc 缓冲（returned 长度经 out_len）。读不到给 NULL。 */
+static unsigned char *wm_read_file_all(const char *path, int *out_len) {
+  FILE *f = fopen(path, "rb");
+  if (f == NULL) {
+    return NULL;
+  }
+  if (fseek(f, 0, SEEK_END) != 0) {
+    fclose(f);
+    return NULL;
+  }
+  long n = ftell(f);
+  if (n <= 0 || n > (long)(64 * 1024 * 1024)) { // 64MB 上限防呆
+    fclose(f);
+    return NULL;
+  }
+  rewind(f);
+  unsigned char *buf = (unsigned char *)malloc((size_t)n);
+  if (buf == NULL) {
+    fclose(f);
+    return NULL;
+  }
+  size_t got = fread(buf, 1, (size_t)n, f);
+  fclose(f);
+  if (got != (size_t)n) {
+    free(buf);
+    return NULL;
+  }
+  *out_len = (int)n;
+  return buf;
+}
+
+/* 路径扩展名是否为 ico/bmp（Win32 原生可加载的图标格式）。 */
+static int wm_path_is_native_icon(const char *path) {
+  const char *dot = strrchr(path, '.');
+  if (dot == NULL) {
+    return 0;
+  }
+  char ext[8];
+  size_t n = strlen(dot + 1);
+  if (n >= sizeof(ext)) {
+    return 0;
+  }
+  for (size_t i = 0; i < n; i++) {
+    char c = dot[1 + i];
+    if (c >= 'A' && c <= 'Z') {
+      c = (char)(c - 'A' + 'a');
+    }
+    ext[i] = c;
+  }
+  ext[n] = '\0';
+  return strcmp(ext, "ico") == 0 || strcmp(ext, "bmp") == 0;
+}
+
+/* 磁盘图标：`.ico`/`.bmp` 走 LoadImageW（原生、最准）；其余（PNG/JPEG/GIF…）
+ * 读文件字节走 WIC 解码。两条都失败给 0。size<=0 用系统默认大小。 */
+int wm_icon_load_file(const char *path, int size) {
+  if (path == NULL || path[0] == '\0') {
+    return 0;
+  }
+  if (wm_path_is_native_icon(path)) {
+    WCHAR *wp = wm_utf8_to_wide(path);
+    if (wp != NULL) {
+      UINT flags = LR_LOADFROMFILE;
+      if (size <= 0) {
+        flags |= LR_DEFAULTSIZE;
+      }
+      HICON ic =
+          (HICON)LoadImageW(NULL, wp, IMAGE_ICON, size, size, flags);
+      free(wp);
+      if (ic != NULL) {
+        int slot = wm_icon_store(ic, NULL, NULL);
+        if (slot == 0) {
+          DestroyIcon(ic);
+        }
+        return slot;
+      }
+    }
+    // 落到 WIC 再试（例如把 PNG 命名成 .bmp 的怪文件）
+  }
+  int len = 0;
+  unsigned char *buf = wm_read_file_all(path, &len);
+  if (buf == NULL) {
+    return 0;
+  }
+  int slot = wm_icon_from_png(buf, len);
+  free(buf);
+  return slot;
+}
+
+/* WIC 从内存解码 PNG/JPEG/GIF/BMP → 32bpp BGRA → HICON。COM 已初始化则复用
+ * （RPC_E_CHANGED_MODE 说明别的套间先初始化过，WIC 仍可用）。 */
+int wm_icon_from_png(const unsigned char *data, int len) {
+  if (data == NULL || len <= 0) {
+    return 0;
+  }
+  HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+  if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
+    return 0;
+  }
+  IWICImagingFactory *factory = NULL;
+  IWICStream *stream = NULL;
+  IWICBitmapDecoder *decoder = NULL;
+  IWICBitmapFrameDecode *frame = NULL;
+  IWICFormatConverter *conv = NULL;
+  int slot = 0;
+  unsigned char *px = NULL;
+  // 用 CLSID_WICImagingFactory1（Vista 起的 WIC 工厂）：头文件在
+  // _WIN32_WINNT>=0x0602 时把 CLSID_WICImagingFactory 宏别名到 Win8 才有的
+  // Factory2，显式取 1 号可兼容旧系统（vtable 前缀一致，IID 仍用 v1）。
+  hr = CoCreateInstance(&CLSID_WICImagingFactory1, NULL, CLSCTX_INPROC_SERVER,
+                        &IID_IWICImagingFactory, (void **)&factory);
+  if (SUCCEEDED(hr)) {
+    hr = factory->lpVtbl->CreateStream(factory, &stream);
+  }
+  if (SUCCEEDED(hr)) {
+    hr = stream->lpVtbl->InitializeFromMemory(stream, (BYTE *)data, (DWORD)len);
+  }
+  if (SUCCEEDED(hr)) {
+    hr = factory->lpVtbl->CreateDecoderFromStream(
+        factory, (IStream *)stream, NULL, WICDecodeMetadataCacheOnDemand,
+        &decoder);
+  }
+  if (SUCCEEDED(hr)) {
+    hr = decoder->lpVtbl->GetFrame(decoder, 0, &frame);
+  }
+  if (SUCCEEDED(hr)) {
+    hr = factory->lpVtbl->CreateFormatConverter(factory, &conv);
+  }
+  if (SUCCEEDED(hr)) {
+    hr = conv->lpVtbl->Initialize(
+        conv, (IWICBitmapSource *)frame, &GUID_WICPixelFormat32bppBGRA,
+        WICBitmapDitherTypeNone, NULL, 0.0, WICBitmapPaletteTypeCustom);
+  }
+  if (SUCCEEDED(hr)) {
+    UINT w = 0, h = 0;
+    hr = conv->lpVtbl->GetSize(conv, &w, &h);
+    if (SUCCEEDED(hr) && w > 0 && h > 0) {
+      UINT stride = w * 4u;
+      px = (unsigned char *)malloc((size_t)stride * h);
+      if (px != NULL) {
+        hr = conv->lpVtbl->CopyPixels(conv, NULL, stride, stride * h, px);
+        if (SUCCEEDED(hr)) {
+          slot = wm_icon_from_bgra(px, (int)w, (int)h);
+        }
+      } else {
+        hr = E_OUTOFMEMORY;
+      }
+    }
+  }
+  if (px != NULL) {
+    free(px);
+  }
+  if (conv != NULL) {
+    conv->lpVtbl->Release(conv);
+  }
+  if (frame != NULL) {
+    frame->lpVtbl->Release(frame);
+  }
+  if (decoder != NULL) {
+    decoder->lpVtbl->Release(decoder);
+  }
+  if (stream != NULL) {
+    stream->lpVtbl->Release(stream);
+  }
+  if (factory != NULL) {
+    factory->lpVtbl->Release(factory);
+  }
+  return slot;
+}
+
+/* 释放一个图标句柄（幂等）。 */
+void wm_icon_free(int slot) {
+  if (slot <= 0 || slot >= WM_MAX_ICONS) {
+    return;
+  }
+  if (wm_icons[slot].hicon != NULL) {
+    DestroyIcon(wm_icons[slot].hicon);
+  }
+  if (wm_icons[slot].color != NULL) {
+    DeleteObject(wm_icons[slot].color);
+  }
+  if (wm_icons[slot].mask != NULL) {
+    DeleteObject(wm_icons[slot].mask);
+  }
+  memset(&wm_icons[slot], 0, sizeof(wm_icons[slot]));
+}
+
+/* 当前存活图标数（探针/测试用）。 */
+int wm_icon_alive(void) {
+  int n = 0;
+  for (int i = 1; i < WM_MAX_ICONS; i++) {
+    if (wm_icons[i].hicon != NULL) {
+      n++;
+    }
+  }
+  return n;
+}
+
+/* 取槽里的真 HICON（探针反读用；越界/空槽给 NULL）。 */
+void *wm_icon_handle(int slot) {
+  return (void *)wm_icon_get(slot);
+}
+
+/* ---- 原生消息框（W20d）---------------------------------------------------
+ * MessageBoxW 一次调用就把框显示并**模态阻塞**到用户点按钮，返回按钮编号——
+ * 没有回调、没有窗口槽，是最适合「阻塞式 FFI」的一条（与热键那种「寄存器 +
+ * 泵里抽」不同）。uType 的四段位组合由 MoonBit 侧纯函数算好传进来（见
+ * yue/win/message_box.mbt），这里只做宽串转换与调用。
+ * hwnd 传 NULL：消息框为进程级（不隶属某窗口），与旧栈 MessageBox::show 同形；
+ * show_for_window 的挂窗形态留待需要时补（传具体 HWND）。
+ * 文本是 UTF-8 Bytes（#borrow），这里转 UTF-16 交给 W 系 API。 */
+int wm_message_box(const char *title, const char *text, int utype) {
+  WCHAR *wt = wm_utf8_to_wide(title);
+  WCHAR *wx = wm_utf8_to_wide(text);
+  int r = (int)MessageBoxW(NULL, wx != NULL ? wx : L"", wt != NULL ? wt : L"",
+                           (UINT)utype);
+  free(wt);
+  free(wx);
+  return r;
 }
 
 int64_t wm_now_ms(void) {
@@ -2065,6 +2909,203 @@ void wm_wakeup(void) {
   g_main_context_wakeup(g_main_context_default());
 }
 
+/* ---- 全局快捷键（W20b）GTK 分支占位：X11 用 XGrabKey 排他注册、Xkb 映射
+ * 加速键串，属 Linux 后端内部事务（按新口径不进路线图）；先给可编译的失败
+ * 桩，让 MoonBit 层走「注册失败」语义化路径（返回 -1）。 */
+int wm_hotkey_register(int mods, int vk) {
+  (void)mods;
+  (void)vk;
+  return 0;
+}
+
+void wm_hotkey_unregister(int id) { (void)id; }
+
+int wm_hotkey_poll(void) { return 0; }
+
+/* ---- 原生菜单（W20a）GTK 分支占位：GTK 端的 GtkMenuBar 属 Linux 后端内部
+ * 事务（按新口径不进路线图）；这里给可编译的失败桩，让 MoonBit 侧走「建菜单
+ * 失败」语义化路径（句柄 0）。真 GTK 实现将来在 prebuild 的 -DWM_STUB_GTK 侧补。 */
+int wm_menu_bar_new(void) { return 0; }
+int wm_menu_new_sub(int parent, const char *title) {
+  (void)parent;
+  (void)title;
+  return 0;
+}
+int wm_menu_add_item(int parent, const char *label, int kind, int role,
+                     const char *acc, int checked) {
+  (void)parent;
+  (void)label;
+  (void)kind;
+  (void)role;
+  (void)acc;
+  (void)checked;
+  return 0;
+}
+void wm_menu_apply(int64_t id, int bar) {
+  (void)id;
+  (void)bar;
+}
+int wm_menu_poll(void) { return 0; }
+
+/* ---- 图标加载（W20f）GTK 分支占位：HICON 是 Win32 概念，托盘在 Linux 走 SNI
+ * 的图标名/像素通道（yue/dbus/sni.mbt），不需要本层转换；给可编译的失败桩，
+ * MoonBit 侧走「图标不可用」语义化路径（句柄 0）。 */
+int wm_icon_from_bgra(const unsigned char *px, int w, int h) {
+  (void)px;
+  (void)w;
+  (void)h;
+  return 0;
+}
+int wm_icon_load_file(const char *path, int size) {
+  (void)path;
+  (void)size;
+  return 0;
+}
+int wm_icon_from_png(const unsigned char *data, int len) {
+  (void)data;
+  (void)len;
+  return 0;
+}
+void wm_icon_free(int slot) { (void)slot; }
+int wm_icon_alive(void) { return 0; }
+void *wm_icon_handle(int slot) {
+  (void)slot;
+  return NULL;
+}
+
+/* ---- 窗口增强（W20e）GTK 分支占位：GTK 侧对应 gtk_window_set_title /
+ * gtk_window_set_icon / gtk_window_set_geometry_hints（最小尺寸）/
+ * gtk_window_begin_move_drag（自绘标题栏拖拽）/ gtk_window_set_decorated
+ * （无边框），属 Linux 后端内部事务（按新口径不进路线图）；先给可编译的
+ * 空实现，MoonBit 侧调用无害、反读恒 0/false。 */
+void wm_set_title(int64_t id, const char *title) {
+  (void)id;
+  (void)title;
+}
+void wm_set_icon(int64_t id, int icon_slot, int which) {
+  (void)id;
+  (void)icon_slot;
+  (void)which;
+}
+void wm_set_min_size(int64_t id, int wmin, int hmin) {
+  (void)id;
+  (void)wmin;
+  (void)hmin;
+}
+void wm_set_drag_rect(int64_t id, int x, int y, int w, int h) {
+  (void)id;
+  (void)x;
+  (void)y;
+  (void)w;
+  (void)h;
+}
+void wm_set_borderless(int64_t id, int on) {
+  (void)id;
+  (void)on;
+}
+void wm_get_min_size(int64_t id, int32_t *out_w, int32_t *out_h) {
+  (void)id;
+  if (out_w != NULL) {
+    *out_w = 0;
+  }
+  if (out_h != NULL) {
+    *out_h = 0;
+  }
+}
+void wm_get_drag_rect(int64_t id, int32_t *x, int32_t *y, int32_t *w,
+                      int32_t *h) {
+  (void)id;
+  if (x != NULL) {
+    *x = 0;
+  }
+  if (y != NULL) {
+    *y = 0;
+  }
+  if (w != NULL) {
+    *w = 0;
+  }
+  if (h != NULL) {
+    *h = 0;
+  }
+}
+int wm_is_borderless(int64_t id) {
+  (void)id;
+  return 0;
+}
+int wm_window_title(int64_t id, char *out, int cap) {
+  (void)id;
+  if (out != NULL && cap > 0) {
+    out[0] = '\0';
+  }
+  return 0;
+}
+
+/* ---- 原生消息框（W20d）GTK 分支：GtkMessageDialog 跑模态 run()，返回
+ * GtkResponseType；MoonBit 侧返回值编号口径与 Win32 对齐（1 OK/2 CANCEL/
+ * 3 ABORT/4 RETRY/5 IGNORE/6 YES/7 NO）。uType 里的图标/按钮段由 MoonBit 纯
+ * 函数给出，这里反解成 GtkMessageType 与按钮集——各平台映射同一套语义常量，
+ * 故两端的「错误 + 是/否/取消」落到各自的等价控件。 */
+int wm_message_box(const char *title, const char *text, int utype) {
+  GtkMessageType mt = GTK_MESSAGE_INFO;
+  switch (utype & 0xF0) {
+    case 0x10:
+      mt = GTK_MESSAGE_ERROR;
+      break;
+    case 0x20:
+      mt = GTK_MESSAGE_QUESTION;
+      break;
+    case 0x30:
+      mt = GTK_MESSAGE_WARNING;
+      break;
+    default:
+      mt = GTK_MESSAGE_INFO;
+      break;
+  }
+  GtkButtonsType bt = GTK_BUTTONS_OK;
+  switch (utype & 0xF) {
+    case 0x1:
+      bt = GTK_BUTTONS_OK_CANCEL;
+      break;
+    case 0x2:
+      bt = GTK_BUTTONS_NONE; // 中止/重试/忽略：GTK 无常量表，自加按钮
+      break;
+    case 0x3:
+      bt = GTK_BUTTONS_NONE; // 是/否/取消
+      break;
+    case 0x4:
+      bt = GTK_BUTTONS_YES_NO;
+      break;
+    case 0x5:
+      bt = GTK_BUTTONS_NONE; // 重试/取消
+      break;
+    default:
+      bt = GTK_BUTTONS_OK;
+      break;
+  }
+  GtkWidget *dlg =
+      gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, mt, bt, "%s",
+                             text != NULL ? text : "");
+  if (title != NULL) {
+    gtk_window_set_title(GTK_WINDOW(dlg), title);
+  }
+  // GTK_BUTTONS_NONE 的三组手工补按钮（response 用 Win32 编号语义）
+  if ((utype & 0xF) == 0x2) {
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Abort", 3);
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Retry", 4);
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Ignore", 5);
+  } else if ((utype & 0xF) == 0x3) {
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Yes", 6);
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_No", 7);
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Cancel", 2);
+  } else if ((utype & 0xF) == 0x5) {
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Retry", 4);
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Cancel", 2);
+  }
+  gint r = gtk_dialog_run(GTK_DIALOG(dlg));
+  gtk_widget_destroy(dlg);
+  return (int)r;
+}
+
 int64_t wm_now_ms(void) {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -2481,6 +3522,136 @@ int wm_im_preedit_caret(int64_t id) { (void)id; return 0; }
 int wm_im_preedit_active(int64_t id) { (void)id; return 0; }
 
 void wm_wakeup(void) {}
+
+int wm_hotkey_register(int mods, int vk) {
+  (void)mods;
+  (void)vk;
+  return 0;
+}
+
+void wm_hotkey_unregister(int id) { (void)id; }
+
+int wm_hotkey_poll(void) { return 0; }
+
+/* W20a 菜单占位（macOS 等）：句柄 0 = 建失败，MoonBit 层走语义化降级。
+ * macOS 原生档是 NSMenu（ObjectC++ 单独 TU，将来随 mac 平台批补）。*/
+int wm_menu_bar_new(void) { return 0; }
+int wm_menu_new_sub(int parent, const char *title) {
+  (void)parent;
+  (void)title;
+  return 0;
+}
+int wm_menu_add_item(int parent, const char *label, int kind, int role,
+                     const char *acc, int checked) {
+  (void)parent;
+  (void)label;
+  (void)kind;
+  (void)role;
+  (void)acc;
+  (void)checked;
+  return 0;
+}
+void wm_menu_apply(int64_t id, int bar) {
+  (void)id;
+  (void)bar;
+}
+int wm_menu_poll(void) { return 0; }
+
+/* W20f 图标加载占位（macOS 等）：HICON 是 Win32 概念，句柄 0 = 不可用。 */
+int wm_icon_from_bgra(const unsigned char *px, int w, int h) {
+  (void)px;
+  (void)w;
+  (void)h;
+  return 0;
+}
+int wm_icon_load_file(const char *path, int size) {
+  (void)path;
+  (void)size;
+  return 0;
+}
+int wm_icon_from_png(const unsigned char *data, int len) {
+  (void)data;
+  (void)len;
+  return 0;
+}
+void wm_icon_free(int slot) { (void)slot; }
+int wm_icon_alive(void) { return 0; }
+void *wm_icon_handle(int slot) {
+  (void)slot;
+  return NULL;
+}
+
+/* W20e 窗口增强占位（macOS 等）：空实现 + 反读恒 0。 */
+void wm_set_title(int64_t id, const char *title) {
+  (void)id;
+  (void)title;
+}
+void wm_set_icon(int64_t id, int icon_slot, int which) {
+  (void)id;
+  (void)icon_slot;
+  (void)which;
+}
+void wm_set_min_size(int64_t id, int wmin, int hmin) {
+  (void)id;
+  (void)wmin;
+  (void)hmin;
+}
+void wm_set_drag_rect(int64_t id, int x, int y, int w, int h) {
+  (void)id;
+  (void)x;
+  (void)y;
+  (void)w;
+  (void)h;
+}
+void wm_set_borderless(int64_t id, int on) {
+  (void)id;
+  (void)on;
+}
+void wm_get_min_size(int64_t id, int32_t *out_w, int32_t *out_h) {
+  (void)id;
+  if (out_w != NULL) {
+    *out_w = 0;
+  }
+  if (out_h != NULL) {
+    *out_h = 0;
+  }
+}
+void wm_get_drag_rect(int64_t id, int32_t *x, int32_t *y, int32_t *w,
+                      int32_t *h) {
+  (void)id;
+  if (x != NULL) {
+    *x = 0;
+  }
+  if (y != NULL) {
+    *y = 0;
+  }
+  if (w != NULL) {
+    *w = 0;
+  }
+  if (h != NULL) {
+    *h = 0;
+  }
+}
+int wm_is_borderless(int64_t id) {
+  (void)id;
+  return 0;
+}
+int wm_window_title(int64_t id, char *out, int cap) {
+  (void)id;
+  if (out != NULL && cap > 0) {
+    out[0] = '\0';
+  }
+  return 0;
+}
+
+/* W20d 消息框占位（macOS 等）：返回 0 = 失败，MoonBit 层走语义化降级。
+ * macOS 原生档是 NSAlert（ObjectC++ 单独 TU，将来随 mac 平台批补）。*/
+int wm_message_box(const char *title, const char *text, int utype) {
+  (void)title;
+  (void)text;
+  (void)utype;
+  return 0;
+}
 
 int64_t wm_now_ms(void) {
   return 0;

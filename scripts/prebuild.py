@@ -233,9 +233,14 @@ def link_configs() -> dict:
         # MSVC 口径的链接输入用位置参数直拼 .lib 名——GNU 的 -L/-l 会报
         # D9002（docs/zh/adaptation.md「链接参数」节）。user32/gdi32 建窗贴屏，
         # imm32 随 IME 线（W6）预留，advapi32 供深浅/主色注册表读。
+        # W20f 图标加载要 WIC（PNG 只能走它解码，windowscodecs.lib 里同时导出
+        # CLSID_WICImagingFactory1 / IID_IWICImagingFactory /
+        # GUID_WICPixelFormat32bppBGRA 三个 GUID 常量，故不必再链 uuid.lib）
+        # 与 COM 初始化（ole32）。
         entries.append({
             "package": WIN_PACKAGE,
-            "link_flags": "user32.lib gdi32.lib imm32.lib advapi32.lib",
+            "link_flags": "user32.lib gdi32.lib imm32.lib advapi32.lib "
+            "windowscodecs.lib ole32.lib",
         })
         # sys 桩（yue/sys/sys_stub.c 的 _WIN32 分支）要 COM：文件对话框走
         # IFileDialog（ole32 的 CoCreateInstance + shell32 的
