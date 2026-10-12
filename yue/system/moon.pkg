@@ -2,8 +2,8 @@ import {
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
   "moonbitlang/core/env",
-  "NoahLiu/moonbit-libyue/yue",
-  "NoahLiu/moonbit-libyue/yue/traybus",
+  "NoahLiu/native-gui/yue",
+  "NoahLiu/native-gui/yue/traybus",
   "chensuiyi/subproc",
   "prowk/moonsqlitefile",
 }

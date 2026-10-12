@@ -1,6 +1,6 @@
 // MoonBit 原生 GUI 栈 G2-G4 的最小驱动：自建窗口 + 自有像素缓冲 + 循环归
 // MoonBit + 两个自绘输入框（焦点栈、Tab 环绕、点击定位光标、caret 闪烁）。
-// 每个矩形都由 yue/render 算出并经 yue/win 上屏，与离屏快照同一份字节。
+// 每个矩形都由 render 算出并经 win 上屏，与离屏快照同一份字节。
 //
 // 跑法：moon run examples/native-window（需 X11/显示服务；无显示时打印 SKIP）
 // 5 秒后自动退出并打印状态，便于本机冒烟。
@@ -46,7 +46,7 @@ fn draw_boxes(
     p.set_line_width(1.0)
     p.stroke_rect(b.x, b.y, b.w, b.h)
     let ty = b.y + (b.h - lh) / 2.0
-    // 文本走 yue/text 自己的会话，与 Painter 会话同缓冲交替绘制前刷一次
+    // 文本走 text 自己的会话，与 Painter 会话同缓冲交替绘制前刷一次
     p.flush()
     let _ = @text.draw_text_at(p, b.x + 4.0, ty, b.ed.get_text(), size, "#cdd6f4")
     // 组合串接在已提交文本之后，带下划线（与 GtkEntry 同观感）；它不进文本状态

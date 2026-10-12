@@ -465,7 +465,7 @@ g.set_animating(true)
 ## 浏览器 Browser
 
 ```moonbit
-// Browser 在独立包 yue/browser(moon.pkg import "NoahLiu/moonbit-libyue/yue/browser")
+// Browser 在独立包 yue/browser(moon.pkg import "NoahLiu/native-gui/yue/browser")
 let b = @browser.Browser::make(url="https://example.com")   // 或 html="<h1>本地</h1>"
 ```
 
@@ -490,7 +490,7 @@ let b = @browser.Browser::make(url="https://example.com")   // 或 html="<h1>本
 
 定制选项用 `Browser::new_with_options(BrowserOptions)`。
 
-> 0.5.0 起 Browser 迁入独立包 `NoahLiu/moonbit-libyue/yue/browser`(API 不变,`@browser.Browser` 改 `@browser.Browser`);未 import 该包的程序不再链接 WebKit/WebView2。
+> 0.5.0 起 Browser 迁入独立包 `NoahLiu/native-gui/yue/browser`(API 不变,`@browser.Browser` 改 `@browser.Browser`);未 import 该包的程序不再链接 WebKit/WebView2。
 
 ## 剪贴板 Clipboard
 
@@ -523,7 +523,7 @@ n.show()
 | close() | 关闭 |
 | NotificationCenter::get() + add(n) | 经通知中心发送 |
 
-> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21a）：上表是旧链 `@yue.Notification` / `NotificationCenter`（GTK/libnotify 系）。新栈的跨平台门面是 **`yue/core/notify.mbt`**，改用无对象、无单例的自由函数：
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21a）：上表是旧链 `@yue.Notification` / `NotificationCenter`（GTK/libnotify 系）。新栈的跨平台门面是 **`core/notify.mbt`**，改用无对象、无单例的自由函数：
 >
 > | 旧链 | 新栈 | 说明 |
 > | --- | --- | --- |
@@ -534,11 +534,11 @@ n.show()
 > | `close()` | `notify_close(id)` | 按 id 关闭（Win32 无「关闭全部」语义，id 必须 > 0） |
 > | `NotificationCenter::get()` + `add(n)` | —— | 无通知中心单例；后端选择由门面内部按平台定 |
 >
-> - **后端选择**：Linux freedesktop D-Bus（`yue/dbus/notify.mbt`）优先 → Windows 托盘气泡（`NIF_INFO`，与 W20c 同源共槽）→ 皆无给 `Err(NotifyError::Unsupported)`（结构化报错，**不静默失效**）。
+> - **后端选择**：Linux freedesktop D-Bus（`dbus/notify.mbt`）优先 → Windows 托盘气泡（`NIF_INFO`，与 W20c 同源共槽）→ 皆无给 `Err(NotifyError::Unsupported)`（结构化报错，**不静默失效**）。
 > - **能力探测**：`notify_supported()` / `notify_backend_name()` / `notify_caps()`（Linux 取服务端 `GetCapabilities`；Win32 合成一份，只有 body 能力）。
 > - **进度**：`notify_progress(id, …, pct)` 或 `notify_send(…, progress=…)`；Linux 走 freedesktop `value` hint，Win32 无对应物、门面把百分比拼进正文（**可见降级**）。
 > - **平台差异**：`timeout_ms` 在 Win32 自 Vista 起被系统忽略；`kind`（0 信息/1 警告/2 错误）Win32 映射 `NIIF_*`、Linux 无此概念（用 `icon` 主题图标名区分）。
-> - **验证**：后端由纯 C 探针 `experiment/notify_probe` 回证（末行 `NOTIFY-BACKEND-OK`）；门面由 `yue/core/notify_wbtest.mbt` 的纯函数 + 生命周期用例（无通知后端的机器自动跳过）。**真机观感（气泡是否弹出、驻留时长）归人工测试清单。** 详见 [docs/zh/adaptation.md](adaptation.md) 的 W21a 节。
+> - **验证**：后端由纯 C 探针 `experiment/notify_probe` 回证（末行 `NOTIFY-BACKEND-OK`）；门面由 `core/notify_wbtest.mbt` 的纯函数 + 生命周期用例（无通知后端的机器自动跳过）。**真机观感（气泡是否弹出、驻留时长）归人工测试清单。** 详见 [docs/zh/adaptation.md](adaptation.md) 的 W21a 节。
 
 ## 消息框 MessageBox
 
@@ -567,7 +567,7 @@ box.show_for_window(win)
 > - **响应编号**：自绘档的编号由调用方给（`buttons` 是 `(文案, 编号)`），**不借用**原生档 `MessageBoxResult` 的 1..7 口径。
 > - **✕ / Esc / 点遮罩**：自绘档收起到 `on_dismiss`（不给编号；`close_on_mask` 默认 false）；**Enter = 第一个按钮**（默认钮）。
 > - `informative` 对应旧链 `set_informative_text`（次要色副行）。
-> - **验证**：自绘档由 `yue/ui/message_box_wbtest.mbt` 的无头运行时用例回证（弹收/编号/✕/Esc/Enter/遮罩两态）。详见 [docs/zh/adaptation.md](adaptation.md) 的 W21b 节。
+> - **验证**：自绘档由 `ui/message_box_wbtest.mbt` 的无头运行时用例回证（弹收/编号/✕/Esc/Enter/遮罩两态）。详见 [docs/zh/adaptation.md](adaptation.md) 的 W21b 节。
 
 ## 文件对话框 FileDialog
 
@@ -682,7 +682,7 @@ auto.disable()    // 取消（幂等）
 Linux 写 `$XDG_CONFIG_HOME/autostart` 的 .desktop（exe 路径取
 `/proc/self/exe`），Windows 写 HKCU Run 键。
 
-> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21d）：上表是旧链 `@system.Autostart` 的句柄形态。新栈在 **`yue/sys/autostart.mbt`**，改用无对象、无单例的自由函数（app_id 直给）：
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21d）：上表是旧链 `@system.Autostart` 的句柄形态。新栈在 **`sys/autostart.mbt`**，改用无对象、无单例的自由函数（app_id 直给）：
 >
 > | 旧链 | 新栈 | 说明 |
 > |---|---|---|
@@ -727,7 +727,7 @@ match @system.idle_seconds() {
 | keep_awake_active() | 当前是否持有常亮 |
 | idle_supported() / idle_seconds() -> Result[Double, IdleError] | 用户空闲秒数（Linux X11;Wayland 会话显式 Unsupported） |
 
-> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21e）：上表末行是旧链 `@system` 形态。新栈在 **`yue/sys/idle.mbt`**，同样是无对象、无单例的自由函数，语义逐条对齐：
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21e）：上表末行是旧链 `@system` 形态。新栈在 **`sys/idle.mbt`**，同样是无对象、无单例的自由函数，语义逐条对齐：
 >
 > | 旧链 | 新栈 | 说明 |
 > |---|---|---|
@@ -807,7 +807,7 @@ pop.show_relative_to(anchor_view)
 | set_style(k, v) / set_style_str(k, v) | 布局样式（运行期底层原语） |
 | 拖拽注册与拖放回调 | 拖放（接收方必须注册 handle_drag_update 返回允许的操作位，缺省一律拒绝；发起方 do_drag_file_paths / do_drag_data_full 须在 on_mouse_down 回调内调用才生效；演示见 components「窗口」页） |
 
-> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21c）：上表最后一行是旧链的平台级拖放（GTK `gtk_drag_*` / Win32 `IDropTarget`，enter/update/leave 三回调 + 操作位协商）。新栈的**应用内**拖放不碰平台接口，改用 `yue/core/drag.mbt` 的会话模型 + `yue/ui/drag.mbt` 的两个声明式钩子：
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21c）：上表最后一行是旧链的平台级拖放（GTK `gtk_drag_*` / Win32 `IDropTarget`，enter/update/leave 三回调 + 操作位协商）。新栈的**应用内**拖放不碰平台接口，改用 `core/drag.mbt` 的会话模型 + `ui/drag.mbt` 的两个声明式钩子：
 >
 > | 旧链 | 新栈 | 说明 |
 > |---|---|---|

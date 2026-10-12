@@ -1,5 +1,0 @@
-import {
-  "NoahLiu/moonbit-libyue/yue/render",
-}
-
-supported_targets = "native"

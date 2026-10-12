@@ -1,0 +1,5 @@
+import {
+  "NoahLiu/native-gui/render",
+}
+
+supported_targets = "native"

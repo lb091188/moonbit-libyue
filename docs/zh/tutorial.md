@@ -47,7 +47,7 @@ Start-Process -FilePath 'C:\Program Files (x86)\Microsoft Visual Studio\Installe
 ```sh
 moon new my_app
 cd my_app
-moon add NoahLiu/moonbit-libyue
+moon add NoahLiu/native-gui
 ```
 
 `moon new` 生成的工程需要三处手工调整:
@@ -60,8 +60,8 @@ moon add NoahLiu/moonbit-libyue
 
   ```
   import {
-    "NoahLiu/moonbit-libyue/yue",
-    "NoahLiu/moonbit-libyue/yue/declarative",
+    "NoahLiu/native-gui/yue",
+    "NoahLiu/native-gui/yue/declarative",
   }
 
   options(

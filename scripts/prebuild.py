@@ -8,7 +8,7 @@
    没有编译期字段，`c_flags` 会被静默忽略，故必须在脚本里编译，实测记录见
    docs/zh/adaptation.md「跨平台通用」节的 G1/G0 条）。
 2. 输出 link_configs，按当前系统给出 pkg-config 探到的 GTK3/Pango/X11 参数。
-   新栈自己的平台后端（yue/win）落地后，链接参数继续从这里传播。
+   新栈自己的平台后端（win）落地后，链接参数继续从这里传播。
 
 约束：stdout 只允许输出 JSON，进度信息走 stderr。
 """
@@ -26,15 +26,15 @@ MODULE_ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = MODULE_ROOT / "build"
 
 # Linux 系统库清单：GTK3 是新栈锁定的后端（零新增运行期依赖，本仓此前已在用），
-# 探针与后续 yue/win 都从这里拿 cflags/libs。
+# 探针与后续 win 都从这里拿 cflags/libs。
 LINUX_PKG_CONFIG_LIBS = ["gtk+-3.0", "pangoft2", "pangocairo", "fontconfig", "x11"]
 
-IME_PROBE_PACKAGE = "NoahLiu/moonbit-libyue/experiment/ime_probe"
-SYS_PACKAGE = "NoahLiu/moonbit-libyue/yue/sys"
-WIN_PACKAGE = "NoahLiu/moonbit-libyue/yue/win"
-RENDER_PACKAGE = "NoahLiu/moonbit-libyue/yue/render"
-TEXT_PACKAGE = "NoahLiu/moonbit-libyue/yue/text"
-WEB_PACKAGE = "NoahLiu/moonbit-libyue/yue/web"
+IME_PROBE_PACKAGE = "NoahLiu/native-gui/experiment/ime_probe"
+SYS_PACKAGE = "NoahLiu/native-gui/sys"
+WIN_PACKAGE = "NoahLiu/native-gui/win"
+RENDER_PACKAGE = "NoahLiu/native-gui/render"
+TEXT_PACKAGE = "NoahLiu/native-gui/text"
+WEB_PACKAGE = "NoahLiu/native-gui/web"
 # webview 引擎只能动态链（方案 §4.8：WebKitGTK 无静态库），运行期依赖发行版包。
 # 缺包不算错：桩改编「无宏」的占位分支，wb_* 符号仍在、探测返回不可用。
 WEBKIT_PKG_CONFIG = "webkit2gtk-4.1"
@@ -149,8 +149,8 @@ def link_configs() -> dict:
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_win_stub "
                 + " ".join([*libs, *sys_libs]),
             })
-        # sys 包的文件对话框（yue/sys/dialog.mbt）extern 直链 win 桩的
-        # wm_file_* 符号：MoonBit 层不引 yue/win（parent 是纯句柄 id），
+        # sys 包的文件对话框（sys/dialog.mbt）extern 直链 win 桩的
+        # wm_file_* 符号：MoonBit 层不引 win（parent 是纯句柄 id），
         # 链接由此处单独下发（GTK 库同 win 一套）。
         if win_lib:
             entries.append({
@@ -158,7 +158,7 @@ def link_configs() -> dict:
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_win_stub "
                 + " ".join([*libs, *sys_libs]),
             })
-        # webview（yue/web）：WebKitGTK 只能动态链。缺开发包时不报错——编「无宏」
+        # webview（web）：WebKitGTK 只能动态链。缺开发包时不报错——编「无宏」
         # 的占位分支（wb_available() 返回 0），于是 MoonBit 层按探测降级，
         # 而不是链接期缺一堆符号。顺序上 -lyue_web 在前：它引用 win 桩的
         # wm_surface_container。
@@ -186,9 +186,9 @@ def link_configs() -> dict:
                     "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_web -lyue_win_stub "
                     + " ".join([*libs, *webkit_libs, *sys_libs]),
                 })
-        # 媒体引擎已迁出主模块（本仓 `modules/yue-media/media`）：它要的
+        # 媒体引擎已迁出主模块（本仓 `modules/gui-media/media`）：它要的
         # 系统库链接参数（miniaudio 的设备线程与 dlopen 后端）不再由这里下发，
-        # 改由该模块自己的 prebuild 按包名 `NoahLiu/yue-media/media` 下发。
+        # 改由该模块自己的 prebuild 按包名 `NoahLiu/gui-media/media` 下发。
         # 这样主模块的依赖闭包里不再有 ffmpeg-mbt——媒体对主模块消费者
         # 回到「模块级可选」。
         cairo_lib = compile_stub(
@@ -225,7 +225,7 @@ def link_configs() -> dict:
                 + " ".join([*libs, *sys_libs]),
             })
     elif system == "Windows":
-        # Win32 桩（yue/win/stub.c 的 _WIN32 分支）由 moon native-stub 自编
+        # Win32 桩（win/stub.c 的 _WIN32 分支）由 moon native-stub 自编
         # （windows.h 走 MSVC 自带 SDK 路径，实测可达），这里只下发系统库：
         # MSVC 口径的链接输入用位置参数直拼 .lib 名——GNU 的 -L/-l 会报
         # D9002（docs/zh/adaptation.md「链接参数」节）。user32/gdi32 建窗贴屏，
@@ -239,7 +239,7 @@ def link_configs() -> dict:
             "link_flags": "user32.lib gdi32.lib imm32.lib advapi32.lib "
             "windowscodecs.lib ole32.lib shell32.lib",
         })
-        # sys 桩（yue/sys/sys_stub.c 的 _WIN32 分支）要 COM：文件对话框走
+        # sys 桩（sys/sys_stub.c 的 _WIN32 分支）要 COM：文件对话框走
         # IFileDialog（ole32 的 CoCreateInstance + shell32 的
         # SHCreateItemFromParsingName），GUID 常量 CLSID_FileOpenDialog /
         # IID_IFileDialog / IID_IShellItem 全在 uuid.lib——C 模式用不了
@@ -250,7 +250,7 @@ def link_configs() -> dict:
             "package": SYS_PACKAGE,
             "link_flags": "ole32.lib shell32.lib uuid.lib user32.lib advapi32.lib",
         })
-        # 文本层（yue/text/dwrite_text.cpp 的 Windows 分支）走系统 DirectWrite：
+        # 文本层（text/dwrite_text.cpp 的 Windows 分支）走系统 DirectWrite：
         # dwrite.lib 供 DWriteCreateFactory、d2d1.lib 供 D2D 的 DC 渲染目标
         # （文字画进 32bpp DIB 再合成），GUID 常量取头文件 extern 符号要
         # uuid.lib，COM 初始化要 ole32。native-stub 侧由 moon 编 .cpp，此处只

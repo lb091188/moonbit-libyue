@@ -1,7 +1,7 @@
 import {
   "moonbitlang/core/encoding/utf8",
-  "NoahLiu/moonbit-libyue/yue",
-  "NoahLiu/moonbit-libyue/yue/declarative",
+  "NoahLiu/native-gui/yue",
+  "NoahLiu/native-gui/yue/declarative",
 }
 
 options(

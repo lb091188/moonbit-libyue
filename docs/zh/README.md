@@ -8,23 +8,23 @@
 
 ## 包结构
 
-0.5.11 起模块拆成多个子包——`moon add NoahLiu/moonbit-libyue` 一次拿全，但只编译只链接你 import 的那些(MoonBit 按 import 闭包构建，没 import 的包不进二进制)：
+0.5.11 起模块拆成多个子包——`moon add NoahLiu/native-gui` 一次拿全，但只编译只链接你 import 的那些(MoonBit 按 import 闭包构建，没 import 的包不进二进制)：
 
 | `moon.pkg` 里的导入 | 别名 | 内容 |
 |---|---|---|
-| `NoahLiu/moonbit-libyue/yue` | `@yue` | 核心：FFI、原生控件(Window / View / Label / Button / Entry / Table / Tab / Menu / 对话框…)、Painter、事件、`Store`/`Signal`、主题、托盘、文件/环境助手 |
+| `NoahLiu/native-gui/yue` | `@yue` | 核心：FFI、原生控件(Window / View / Label / Button / Entry / Table / Tab / Menu / 对话框…)、Painter、事件、`Store`/`Signal`、主题、托盘、文件/环境助手 |
 | `.../yue/declarative` | `@declarative` | 声明式层:`Node`/`mount` 渲染树、各节点构造器、`bind_label`/`bind`、hover 组、悬浮滚动 |
 | `.../yue/components` | `@components` | 主题组件库:按钮 / 输入 / 选择 / 表单 / 导航 / 布局 / 数据展示 / 反馈 / 浮层 |
 | `.../yue/charts` | `@charts` | 20+ 图表类型与图表交互层 |
 | `.../yue/icons` | `@icons` | 矢量图标系统(`draw_icon` 与图标视图/按钮) |
 | `.../yue/markdown` | `@markdown` | `markdown_view` 渲染(该包带入 mizchi/markdown 依赖) |
 
-较重的可选能力放在**独立模块**里，而不是主模块的子包——`moon add NoahLiu/moonbit-libyue` 不会把它们拉进来：
+较重的可选能力放在**独立模块**里，而不是主模块的子包——`moon add NoahLiu/native-gui` 不会把它们拉进来：
 
 | 模块 | 内容 |
 |---|---|
-| `NoahLiu/yue-media` | 音视频引擎（ffmpeg 解码 + miniaudio 输出）与播放器组件。Linux 上需要系统 ffmpeg 开发包。 |
-| `NoahLiu/yue-examples` | 独立示例模块（systemprobe、native-web），依赖 `yue-media`。 |
+| `NoahLiu/gui-media` | 音视频引擎（ffmpeg 解码 + miniaudio 输出）与播放器组件。Linux 上需要系统 ffmpeg 开发包。 |
+| `NoahLiu/gui-examples` | 独立示例模块（systemprobe、native-web），依赖 `gui-media`。 |
 
 **两种「可选」不要混**：没 import 的**子包**不进二进制（`moon.pkg` 的 import 是编译/链接边界）；没依赖的**模块**连解析与 prebuild 都不会发生（`moon.mod` 的 import 定义依赖闭包）。能力要做到后者，就必须住在自己的模块里。
 | `.../yue/system` | `@system` | 系统能力:自启动 / 单实例 / 电源与会话 / 音量 / 亮度 / 媒体按键 / 壁纸 / 蓝牙 / 打印机 / 磁盘卷 / 浏览器历史…(带入 subproc / sqlite 依赖) |
@@ -41,7 +41,7 @@ moon run examples/hello         # 原版控件最小窗口
 moon run examples/hello-themed  # 主题组件库最小示例（theme_apply + button_t/input_t/label_t）
 moon run examples/showcase      # 全功能演示板：14 页三组侧栏，组件库 + 系统能力全集
 moon run examples/sysmonitor    # 旗舰应用：Ubuntu 进程管理与硬件信息查看（千行进程表 + 实时曲线）
-moon run NoahLiu/yue-examples/systemprobe   # 系统能力 + 扩展图表演示板（音量/亮度/浏览器历史/VS Code/应用查找 + 雷达/热力/K 线/漏斗/箱线/桑基）
+moon run NoahLiu/gui-examples/systemprobe   # 系统能力 + 扩展图表演示板（音量/亮度/浏览器历史/VS Code/应用查找 + 雷达/热力/K 线/漏斗/箱线/桑基）
 ```
 
 showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 / 反馈 / 代码与文档 / 事件与布局 / Store 对照 + 画布与富文本 + 系统集成 / 窗口 / 浏览器；左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。每页源码独立成文件（`examples/showcase/pages/*.mbt`），是最好的复制粘贴素材库；组件库各组件的截图：

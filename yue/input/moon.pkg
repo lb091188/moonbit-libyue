@@ -1,6 +1,0 @@
-supported_targets = "native"
-
-import {
-  "moonbitlang/core/encoding/utf8",
-  "NoahLiu/moonbit-libyue/yue/core",
-}

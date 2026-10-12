@@ -11,7 +11,7 @@
 - **在做什么**：用纯 MoonBit 复刻 Yoga 布局引擎（`modules/yoga-mbt` 独立子包），作为 MoonBit 化 libyue 的布局层。
 - **当前进度**：YG1（骨架 + 核心算法）、YG2a（absolute 定位）、YG2b（baseline 对齐 + 交叉轴 margin 定位修复）、YG2b′（容器 auto 尺寸补 padding/border + 多行主轴尺寸）、YG2c（aspect-ratio）、YG2d（RTL direction）、YG2e（绝对定位项比例换算）已完成并推送——**YG2 标准面已收尾**；YG3 工程化四批全部完成：YG3a（发现并修掉「外部包无法构造枚举」的阻断级坑 + 性能基线）、YG3b（测量缓存）、YG3c（`set_pixel_grid` 像素网格取整，默认关闭）、YG3d（内在尺寸 min/max/fit-content，撤掉两处 fit-content 近似）——**YG1/YG2/YG3 已收尾**；全部提交在 `feature/yoga-mbt`（**分支最新提交以 `git log` 为准**）。
 - **门控现状**（2026-10-11 校准）：yoga-mbt `moon test -p NoahLiu/yoga-mbt` **91/91**（79 条白盒 + 12 条语料/增量，`src` 包 `--deny-warn` 零警告）。主包新栈各包**分包门禁**（core 28 / input 10 / render 40 / text 20 / icons 4 / theme 7 / sys 7，全部 `--deny-warn` 零警告），全仓 `moon check` 处于过渡期红点基线 **287 errors / 68 warnings**（只减不增，口径见根目录 `TODO.md`；老链路 740 条那条门已在 G0b 摘除绑定层时作废）。
-- **下一步**：YG4 的三块里，「布局树 ↔ 控件树映射」与「脏区增量重排」都已落地（主包 `yue/core/widget.mbt` 控件宿主 + `app.mbt` App 宿主，见 §8 YG3e 与根 `TODO.md` §1 G6）；剩「文本 measure/baseline 接线到声明式层」随 G7。另有两件交付动作：`feature/yoga-mbt` 合回 `master`（要先剔掉两个已在 master 的【构建】提交，见 §1/§9）与 `yoga-mbt` 发 mooncakes（见 §9 第 5 条）。
+- **下一步**：YG4 的三块里，「布局树 ↔ 控件树映射」与「脏区增量重排」都已落地（主包 `core/widget.mbt` 控件宿主 + `app.mbt` App 宿主，见 §8 YG3e 与根 `TODO.md` §1 G6）；剩「文本 measure/baseline 接线到声明式层」随 G7。另有两件交付动作：`feature/yoga-mbt` 合回 `master`（要先剔掉两个已在 master 的【构建】提交，见 §1/§9）与 `yoga-mbt` 发 mooncakes（见 §9 第 5 条）。
 - **口径已定**：aspect-ratio 比例作用在 **border-box**（用户 2026-10-10 确认），与 CSS 默认的 content-box 不同，动这块代码前先读 §5 第 12 条。
 - **三条纪律**（最容易踩）：① 只对齐 **Web Flexbox 标准**，不做 Yoga 双默认值；② 提交前先 `git fetch` 且用 `git add <显式路径>`，**不要 `git add -A`**；③ 每批改动配套回写 `docs/zh/adaptation.md` 与 `TODO.md`，一批一提交一推送。
 
@@ -35,8 +35,8 @@
 ```
 105d3c7  【新增】yoga-mbt absolute 定位（YG2a）        ← yoga 工作
 f994a15  【构建】yoga-mbt 发布元数据（readme/keywords）
-6830867  【构建】发布元数据补全（ffmpeg-mbt/yue-media）  ← 已在 master（b4fddd5）
-b01d1dd  【构建】示例拆分（systemprobe → yue-examples）   ← 已在 master（cf43cd9）
+6830867  【构建】发布元数据补全（ffmpeg-mbt/gui-media）  ← 已在 master（b4fddd5）
+b01d1dd  【构建】示例拆分（systemprobe → gui-examples）   ← 已在 master（cf43cd9）
 ab7c12a  【新增】yoga-mbt 子包首批（YG1）               ← yoga 工作
 206dc97  【重构】systemprobe 命令预览页改版             ← 与 master 的分叉点
 ```
@@ -243,8 +243,8 @@ debug 同步量：7622→14 / 7570→176 / 7572→5940。**三场景校验值（
 
 ### YG4 与 libyue 集成（部分完成，随主包新栈推进）
 
-- **已落地**：布局树 ↔ 控件树映射、事件命中测试的坐标对齐、脏区增量重排（本包 YG3e）——分别在主包 `yue/core/widget.mbt`（绝对矩形只在 `collect_abs` 一处折算、命中取最深+后画、沿祖先链冒泡）与 `yue/core/app.mbt`（App 宿主每帧 `relayout` 走的就是跳过路径）。
-- **未落地**：文本 measure/baseline 从 `yue/text` 接到控件叶子（`set_measure` + `set_baseline` 的供数），随声明式层 G7 一起做；原生控件尺寸作为叶子的情形在全自绘方案下不存在。
+- **已落地**：布局树 ↔ 控件树映射、事件命中测试的坐标对齐、脏区增量重排（本包 YG3e）——分别在主包 `core/widget.mbt`（绝对矩形只在 `collect_abs` 一处折算、命中取最深+后画、沿祖先链冒泡）与 `core/app.mbt`（App 宿主每帧 `relayout` 走的就是跳过路径）。
+- **未落地**：文本 measure/baseline 从 `text` 接到控件叶子（`set_measure` + `set_baseline` 的供数），随声明式层 G7 一起做；原生控件尺寸作为叶子的情形在全自绘方案下不存在。
 
 ---
 
@@ -254,7 +254,7 @@ debug 同步量：7622→14 / 7570→176 / 7572→5940。**三场景校验值（
 2. **分支混入无关提交**：`feature/yoga-mbt` 上的 `b01d1dd`/`6830867` 内容已在 master（`cf43cd9`/`b4fddd5`），合并前应剔除（见 §1）。
 3. **多副本并发**：两个副本、两个会话共用同一远端；`git add -A` 会误提交他人半成品。
 4. **近似实现**（已在 README/adaptation 标注，别当 bug 修）：绝对定位静态位置忽略兄弟项与间距类 justify；像素网格取整不做贴父末端回推补偿（贴内缘尽头的项可差一个网格单位以内，见 §5 第 15 条）；内在递归里的百分比只在父容器该轴确定时可解析（css-sizing-3 §5.2.1 的父链回环不做）、内在尺寸不吃 aspect-ratio（比例在 §9.2 / §4.5 主流程里单独处理）、flex 容器 ideal/web-compatible 双算法只取单套（见 §5 第 16 条）；基线分组**不收无基线的项**（规范对「合成基线在哪条边」本身有分歧，见 §5 第 9 条）。
-5. **发布未做**：`yoga-mbt` 尚未发 mooncakes（`license/description/repository/readme/keywords` 已备）。发布前注意仓库已有的教训：主包与 `yue-media` 曾有模块级循环依赖导致发布互等死锁，且 `mooncakes` 同版本不可重发。
+5. **发布未做**：`yoga-mbt` 尚未发 mooncakes（`license/description/repository/readme/keywords` 已备）。发布前注意仓库已有的教训：主包与 `gui-media` 曾有模块级循环依赖导致发布互等死锁，且 `mooncakes` 同版本不可重发。
 6. **基线依赖消费方给回调**：`set_baseline` 未设置的叶子一律不参与基线分组——libyue 集成时文本控件必须同时接 measure 与 baseline，否则文字混排会退化成顶部对齐。
 7. **direction 不继承**：rtl 语言环境里每个需要翻转的容器都要显式 `set_direction(Rtl)`，漏设的子树按 LTR 排布；文本/图标内容自身的 rtl 形状由 measure/baseline 回调负责，引擎不管。
 8. **比例项在默认 stretch 容器里交叉轴不按比例**（规范直译，见 §5 第 12 条）：集成方若要「等比方块」语义，得显式给 `align-self` 非 stretch 或直接给交叉尺寸（绝对定位子项已按比例互推，见 YG2e）。

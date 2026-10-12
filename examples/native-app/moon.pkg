@@ -1,16 +1,16 @@
 import {
   "NoahLiu/yoga-mbt/src" @yoga,
   "moonbitlang/core/encoding/utf8",
-  "NoahLiu/moonbit-libyue/yue/core",
-  "NoahLiu/moonbit-libyue/yue/input",
-  "NoahLiu/moonbit-libyue/yue/render",
-  "NoahLiu/moonbit-libyue/yue/text",
-  "NoahLiu/moonbit-libyue/yue/theme",
-  "NoahLiu/moonbit-libyue/yue/ui",
-  "NoahLiu/moonbit-libyue/yue/chart",
-  "NoahLiu/moonbit-libyue/yue/mdview",
-  "NoahLiu/moonbit-libyue/yue/icons",
-  "NoahLiu/moonbit-libyue/yue/win",
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/input",
+  "NoahLiu/native-gui/render",
+  "NoahLiu/native-gui/text",
+  "NoahLiu/native-gui/theme",
+  "NoahLiu/native-gui/ui",
+  "NoahLiu/native-gui/chart",
+  "NoahLiu/native-gui/mdview",
+  "NoahLiu/native-gui/icons",
+  "NoahLiu/native-gui/win",
 }
 
 pkgtype(kind: "executable")

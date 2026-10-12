@@ -2,7 +2,7 @@
 
 系统能力族 API：屏幕亮度、键盘背光、系统音量（含输出设备与逐应用音量）、媒体播放控制、夜间色温、壁纸、显示器配置、系统窗口管理、剪贴板监听、子进程执行、磁盘卷、电源与登录会话、电源计划、系统信息、时区与本地语言、蓝牙、传感器、打印机、环境变量、目录枚举、最近文件、浏览器书签与 Firefox 历史、媒体状态监视与通知进度文本、音频播放、视频帧渲染。全部只读或经系统服务授权写入，统一返回 `Result`，不支持的环境给对应错误值而不是崩溃；`*_supported()` 每次调用真实探测当前环境。
 
-完整演示见 `moon run NoahLiu/yue-examples/systemprobe`——点「读取系统能力」逐项呈现本机真实结果，不支持的能力显示对应错误文本。各能力在不同发行版 / 桌面环境的实测结论与原理（logind 路径、wpctl/pactl 差异、SQLite 库直读等）见 [adaptation.md](adaptation.md)。
+完整演示见 `moon run NoahLiu/gui-examples/systemprobe`——点「读取系统能力」逐项呈现本机真实结果，不支持的能力显示对应错误文本。各能力在不同发行版 / 桌面环境的实测结论与原理（logind 路径、wpctl/pactl 差异、SQLite 库直读等）见 [adaptation.md](adaptation.md)。
 
 ## 屏幕亮度
 
@@ -328,13 +328,13 @@ match @system.wp_get() {
 let _ = @system.wp_set("/home/me/Pictures/wall.png")
 ```
 
-## 音频/视频播放（yue-media 可选层）
+## 音频/视频播放（gui-media 可选层）
 
-媒体播放不在 yue 核心包里（不引入 ffmpeg 依赖的人零成本），在可选模块 `NoahLiu/yue-media`（依赖 `NoahLiu/ffmpeg-mbt` 的 FFI 绑定）：
+媒体播放不在 yue 核心包里（不引入 ffmpeg 依赖的人零成本），在可选模块 `NoahLiu/gui-media`（依赖 `NoahLiu/ffmpeg-mbt` 的 FFI 绑定）：
 
 ```moonbit
-// moon.mod import: "NoahLiu/yue-media@0.1.0"
-// moon.pkg import: "NoahLiu/yue-media/src" @yuemedia
+// moon.mod import: "NoahLiu/gui-media@0.1.0"
+// moon.pkg import: "NoahLiu/gui-media/src" @yuemedia
 ```
 
 解码走 ffmpeg FFI（进程内动态链，格式随系统 ffmpeg：MP3/OGG/M4A/AAC/FLAC/WAV…），输出设备由内嵌 miniaudio 设备层直出（s16 PCM 队列，零重采样）。无输出设备环境（CI/headless）自动静音降级，状态机照常。

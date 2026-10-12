@@ -101,7 +101,7 @@ fn make_field(
       None => FONT * 1.5
     }
     let ty = (r.h - lh) / 2.0
-    // 文本走 yue/text 自己的 Cairo 会话，与 Painter 会话交替前刷一次
+    // 文本走 text 自己的 Cairo 会话，与 Painter 会话交替前刷一次
     p.flush()
     let _ = @text.draw_text_at(
       p,
@@ -888,7 +888,7 @@ fn make_drawn_message_box_section(
 ///|
 /// W20a 原生菜单栏区块：把 MenuBar 模型翻译成 Win32 原生菜单（CreateMenu +
 /// SetMenu），点菜单项经 WM_COMMAND 回收并派发到模型回调。跨平台模型在
-/// `yue/core/menu.mbt`，这里只做展示与状态行回证。
+/// `core/menu.mbt`，这里只做展示与状态行回证。
 fn make_menu_section(
   hits : Ref[Int],
   last : Ref[String],
@@ -958,7 +958,7 @@ fn build_demo_menu_bar(
 }
 
 ///|
-/// W20e 演示图标像素（BGRA 小端、**预乘** alpha，与 `yue/render` 的 Bitmap 同
+/// W20e 演示图标像素（BGRA 小端、**预乘** alpha，与 `render` 的 Bitmap 同
 /// 口径）：四象限各一色 + 中心实心圆。用来演示「像素直建窗口图标」（W20f 的
 /// 像素通道），不依赖任何外部素材。
 fn demo_icon_pixels(n : Int) -> FixedArray[Byte] {
@@ -1340,7 +1340,7 @@ fn make_drag_section(
     }
   }
   // 拖源/落点的可见内容用「带底色的小盒 + 文案」——拖源里放展示件即可，别放按钮
-  // （按钮会先把按下吃掉，拖不动它，见 `yue/ui/drag.mbt` 的约束）
+  // （按钮会先把按下吃掉，拖不动它，见 `ui/drag.mbt` 的约束）
   let chip = fn(text : String, bgv : String) -> @core.Node {
     @ui.container(
       [@ui.label(text, size=12.0)],

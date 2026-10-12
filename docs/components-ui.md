@@ -1,6 +1,6 @@
 # Themed Component Library Quick Reference
 
-Themed component library quick reference: a full set of Element-Plus-style UI components (buttons / input / selection / forms / navigation / layout / data display / icons / feedback / overlays). Every function is called via `@components` (add `"NoahLiu/moonbit-libyue/yue/components"` to your `moon.pkg` imports; the `Node` type and `mount` come from `@declarative`, i.e. also import `"NoahLiu/moonbit-libyue/yue/declarative"`) and returns a `Node` that goes straight into the UI tree. Optional parameters (marked `?` in the signatures below) must be passed by name, e.g. `date_picker_t(value=day)`; parameters without `?` are positional. Reactive `Store` / `Signal` parameters are covered in [declarative.md](declarative.md); native controls (Window / Label / Button / Entry, etc.) are in [components.md](components.md).
+Themed component library quick reference: a full set of Element-Plus-style UI components (buttons / input / selection / forms / navigation / layout / data display / icons / feedback / overlays). Every function is called via `@components` (add `"NoahLiu/native-gui/yue/components"` to your `moon.pkg` imports; the `Node` type and `mount` come from `@declarative`, i.e. also import `"NoahLiu/native-gui/yue/declarative"`) and returns a `Node` that goes straight into the UI tree. Optional parameters (marked `?` in the signatures below) must be passed by name, e.g. `date_picker_t(value=day)`; parameters without `?` are positional. Reactive `Store` / `Signal` parameters are covered in [declarative.md](declarative.md); native controls (Window / Label / Button / Entry, etc.) are in [components.md](components.md).
 
 Full demo: `examples/showcase`.
 
@@ -1139,7 +1139,7 @@ let series = @yue.Store::new([
 | `draw_icon(p : Painter, kind, cx, cy, s, color)` | unified self-drawing entry (center coordinates + edge length) |
 | `all_icons()` / `icon_name(kind)` | full list / name lookup |
 
-Quick reference by group (full enum in `yue/icons/icons.mbt` `IconKind`; live wall on the showcase icons page):
+Quick reference by group (full enum in `icons/icons.mbt` `IconKind`; live wall on the showcase icons page):
 
 | Group | Icons |
 |---|---|

@@ -1,10 +1,10 @@
-# AGENTS.md — moonbit-libyue AI 协作规则(ZCode 读取仓库根 AGENTS.md)
+# AGENTS.md — native-gui AI 协作规则(ZCode 读取仓库根 AGENTS.md)
 
-libyue(libyue.com)的 MoonBit 封装,跨平台原生桌面 GUI。
+native-gui(`NoahLiu/native-gui`,2026-10-12 前名 moonbit-libyue):MoonBit **自绘**跨平台桌面 GUI 库——窗口/像素/事件循环/布局全自有,控件一律自绘,**不依赖 libyue**。
 当前主链路:**Ubuntu 24.04 + X11 + XFCE**(其余平台状态见适配经验文档)。
 
-三层架构: `examples/*`(纯 MoonBit,零平台代码)→ `yue/`(统一 API,平台探测与降级在此消化)→ `shim/ + libyue`(最薄 C ABI + 平台库)。libyue 来自 fork(lb091188/yue,补丁以独立提交进 fork 源码),预构建静态库随 mooncakes 包分发(`lib/<平台>/`),prepare.py 仅服务开发/回退链路。
-分层原则: 能用 MoonBit 解决的不进 C/C++;shim 只做 ABI 翻译无业务逻辑;libyue 没暴露的能力由 shim 补探测接口,MoonBit 层统一成语义化结果。
+包布局(2026-10-12 改名): 新栈 13 包住模块根(`core`/`ui`/`render`/`text`/`theme`/`icons`/`sys`/`input`/`win`/`dbus`/`chart`/`mdview`/`web`);旧链残留包(根包 + components/declarative/charts/browser/markdown/system/traybus)仍在 `yue/`,属红点积压,随收口删除;媒体扩展独立模块 `modules/gui-media`(模块级可选),扩展示例模块 `modules/gui-examples`。libyue 只作**老师**(行为参考、可平移资产来源、`patches/` 的真实 bug 语料)。
+分层原则: 能用 MoonBit 解决的不进 C/C++;平台 C 桩按「单一 stub.c 多分支 + prebuild 宏」组织(先例 `win/stub.c`);链接参数由 prebuild 全权托管。
 
 ## 硬性规则
 
@@ -18,7 +18,7 @@ libyue(libyue.com)的 MoonBit 封装,跨平台原生桌面 GUI。
 8. **与用户交流必须全部使用中文**——所有回复、说明、总结、提问一律用中文书写,不夹杂英文段落(代码、命令、路径、专有名词除外)。
 9. **每完成一个批次的需求就提交到仓库**——一个批次=一组内聚的改动(一个功能/一次修复/一批文档),完成即 `git commit` 并推送 origin,不积压到工作区;单批改动过大时按内聚单元拆成多批(一批一个主题,代码权责清晰),逐批提交,避免多主题挤进一条;提交信息沿用「【标签】范围:说明」中文格式(【新增】/【修复】/【文档】/【构建】),主题行控制在百字上下:改动内容一句 + 验证结果一句,原理/根因/实测过程以专门文档为准,不在提交信息里复述。发布:二进制产物推 `bin-*` 标签、原生层变更推 `vendor-*` 标签,均由 GitHub Actions 自动构建。
 10. **代码注释与使用文档只说内容**——注释、README、docs 使用类文档(components/declarative/layout/relink)只写「是什么/怎么用/怎么做」;原理、根因、实测过程一律写进专门文档(`docs/zh/adaptation.md`、`docs/tray.md`),不在内容文档与注释里重复展开。
-11. **MoonBit 侧跨平台分派一律运行时探测 + 模式匹配,禁用 `#cfg(platform=)` 等编译指令**——即便工具链条件编译可用也维持运行时探测口径,三平台同构优先(2026-10-11 定案);探测形态照 `yue/render` 既有的降级探针(画一笔验像素、会话句柄非零)。平台 C 桩按「单一 stub.c 多分支 + prebuild 宏」组织(先例 `yue/win/stub.c`)。
+11. **MoonBit 侧跨平台分派一律运行时探测 + 模式匹配,禁用 `#cfg(platform=)` 等编译指令**——即便工具链条件编译可用也维持运行时探测口径,三平台同构优先(2026-10-11 定案);探测形态照 `render` 既有的降级探针(画一笔验像素、会话句柄非零)。平台 C 桩按「单一 stub.c 多分支 + prebuild 宏」组织(先例 `win/stub.c`)。
 
 ## 常用命令
 

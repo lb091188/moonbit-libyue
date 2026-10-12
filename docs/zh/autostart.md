@@ -41,7 +41,7 @@ match @system.Autostart::new("com.example.app") {
 
 ## 新栈（MoonBit 原生 GUI 栈）口径
 
-上面是旧链 `@system.Autostart`（句柄形态）。新栈在 **`yue/sys/autostart.mbt`**，是**自由函数**（无对象、无单例，app_id 每次传入）：
+上面是旧链 `@system.Autostart`（句柄形态）。新栈在 **`sys/autostart.mbt`**，是**自由函数**（无对象、无单例，app_id 每次传入）：
 
 ```moonbit
 match @sys.autostart_enable("com.example.MyApp") {

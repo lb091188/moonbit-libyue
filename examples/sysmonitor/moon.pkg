@@ -1,9 +1,9 @@
 import {
-  "NoahLiu/moonbit-libyue/yue",
-  "NoahLiu/moonbit-libyue/yue/declarative",
-  "NoahLiu/moonbit-libyue/yue/components",
-  "NoahLiu/moonbit-libyue/yue/icons",
-  "NoahLiu/moonbit-libyue/yue/charts",
+  "NoahLiu/native-gui/yue",
+  "NoahLiu/native-gui/yue/declarative",
+  "NoahLiu/native-gui/yue/components",
+  "NoahLiu/native-gui/icons",
+  "NoahLiu/native-gui/yue/charts",
   "moonbitlang/core/encoding/utf8",
 }
 

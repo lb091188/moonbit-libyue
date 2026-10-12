@@ -465,7 +465,7 @@ g.set_animating(true)
 ## Browser
 
 ```moonbit
-// Browser lives in the standalone yue/browser package (moon.pkg import "NoahLiu/moonbit-libyue/yue/browser")
+// Browser lives in the standalone yue/browser package (moon.pkg import "NoahLiu/native-gui/yue/browser")
 let b = @browser.Browser::make(url="https://example.com")   // or html="<h1>本地</h1>"
 ```
 
@@ -490,7 +490,7 @@ let b = @browser.Browser::make(url="https://example.com")   // or html="<h1>本�
 
 For customization options, use `Browser::new_with_options(BrowserOptions)`.
 
-> Since 0.5.0 Browser lives in the standalone package `NoahLiu/moonbit-libyue/yue/browser` (API unchanged; `@browser.Browser` becomes `@browser.Browser`); apps that don't import it no longer link WebKit/WebView2.
+> Since 0.5.0 Browser lives in the standalone package `NoahLiu/native-gui/yue/browser` (API unchanged; `@browser.Browser` becomes `@browser.Browser`); apps that don't import it no longer link WebKit/WebView2.
 
 ## Clipboard
 
@@ -523,7 +523,7 @@ n.show()
 | close() | Close |
 | NotificationCenter::get() + add(n) | Send via the notification center |
 
-> **New-stack (MoonBit native GUI stack) mapping** (since W21a): the table above is the old chain `@yue.Notification` / `NotificationCenter` (GTK/libnotify). The new stack's cross-platform facade is **`yue/core/notify.mbt`**, using free functions with no objects and no singleton:
+> **New-stack (MoonBit native GUI stack) mapping** (since W21a): the table above is the old chain `@yue.Notification` / `NotificationCenter` (GTK/libnotify). The new stack's cross-platform facade is **`core/notify.mbt`**, using free functions with no objects and no singleton:
 >
 > | Old chain | New stack | Notes |
 > | --- | --- | --- |
@@ -534,11 +534,11 @@ n.show()
 > | `close()` | `notify_close(id)` | Close by id (Win32 has no "close all" semantics, so id must be > 0) |
 > | `NotificationCenter::get()` + `add(n)` | — | No notification-center singleton; backend selection is decided inside the facade per platform |
 >
-> - **Backend selection**: Linux freedesktop D-Bus (`yue/dbus/notify.mbt`) first → Windows tray balloon (`NIF_INFO`, same source and slot table as W20c) → `Err(NotifyError::Unsupported)` if neither (structured errors, **never a silent failure**).
+> - **Backend selection**: Linux freedesktop D-Bus (`dbus/notify.mbt`) first → Windows tray balloon (`NIF_INFO`, same source and slot table as W20c) → `Err(NotifyError::Unsupported)` if neither (structured errors, **never a silent failure**).
 > - **Capability probing**: `notify_supported()` / `notify_backend_name()` / `notify_caps()` (Linux takes the server's `GetCapabilities`; Win32 synthesises one with only the body capability).
 > - **Progress**: `notify_progress(id, …, pct)` or `notify_send(…, progress=…)`; Linux goes through the freedesktop `value` hint while Win32 has no counterpart, so the facade pastes the percentage into the body (a **visible degradation**).
 > - **Platform differences**: `timeout_ms` is ignored by the system on Win32 since Vista; `kind` (0 info / 1 warning / 2 error) maps to `NIIF_*` on Win32 and has no Linux equivalent (where `icon` theme names distinguish instead).
-> - **Verification**: the backend is proven by the pure-C probe `experiment/notify_probe` (last line `NOTIFY-BACKEND-OK`); the facade by the pure-function and lifecycle cases in `yue/core/notify_wbtest.mbt` (auto-skipping on machines with no notification backend). **Real-machine look and feel (whether the balloon pops, how long it dwells) belongs to the manual test checklist.** See the W21a section in [docs/adaptation.md](adaptation.md).
+> - **Verification**: the backend is proven by the pure-C probe `experiment/notify_probe` (last line `NOTIFY-BACKEND-OK`); the facade by the pure-function and lifecycle cases in `core/notify_wbtest.mbt` (auto-skipping on machines with no notification backend). **Real-machine look and feel (whether the balloon pops, how long it dwells) belongs to the manual test checklist.** See the W21a section in [docs/adaptation.md](adaptation.md).
 
 ## MessageBox
 
@@ -567,7 +567,7 @@ box.show_for_window(win)
 > - **Response codes**: the self-drawn tier takes codes from the caller (`buttons` is a list of `(label, code)`) and does **not** borrow the native tier's `MessageBoxResult` 1..7 convention.
 > - **✕ / Esc / clicking the mask**: the self-drawn tier dismisses to `on_dismiss` (no code; `close_on_mask` defaults to false); **Enter = the first button** (the default).
 > - `informative` corresponds to the old chain's `set_informative_text` (a secondary-colour sub-line).
-> - **Verification**: the self-drawn tier is proven by the headless runtime cases in `yue/ui/message_box_wbtest.mbt` (open/close, codes, ✕/Esc/Enter, both mask states). See the W21b section in [docs/adaptation.md](adaptation.md).
+> - **Verification**: the self-drawn tier is proven by the headless runtime cases in `ui/message_box_wbtest.mbt` (open/close, codes, ✕/Esc/Enter, both mask states). See the W21b section in [docs/adaptation.md](adaptation.md).
 
 ## FileDialog
 
@@ -685,7 +685,7 @@ auto.disable()    // cancel (idempotent)
 Linux writes a .desktop into `$XDG_CONFIG_HOME/autostart` (exe path resolved
 via `/proc/self/exe`); Windows writes the HKCU Run key.
 
-> **New-stack (MoonBit native GUI stack) mapping** (since W21d): the table above is the old stack's `@system.Autostart` handle form. The new stack lives in **`yue/sys/autostart.mbt`** and switches to free functions with no object and no singleton (the app_id is passed in):
+> **New-stack (MoonBit native GUI stack) mapping** (since W21d): the table above is the old stack's `@system.Autostart` handle form. The new stack lives in **`sys/autostart.mbt`** and switches to free functions with no object and no singleton (the app_id is passed in):
 >
 > | Old stack | New stack | Notes |
 > |---|---|---|
@@ -731,7 +731,7 @@ match @system.idle_seconds() {
 | keep_awake_active() | Whether keep-awake is currently held |
 | idle_supported() / idle_seconds() -> Result[Double, IdleError] | User idle seconds (Linux X11; Wayland sessions report Unsupported explicitly) |
 
-> **New-stack (MoonBit native GUI stack) mapping** (since W21e): the last row above is the old-chain `@system` form. The new stack lives in **`yue/sys/idle.mbt`**, also object-free, singleton-free free functions, mapped item by item:
+> **New-stack (MoonBit native GUI stack) mapping** (since W21e): the last row above is the old-chain `@system` form. The new stack lives in **`sys/idle.mbt`**, also object-free, singleton-free free functions, mapped item by item:
 >
 > | Old stack | New stack | Notes |
 > |---|---|---|
@@ -813,7 +813,7 @@ All widgets (`ViewLike`) support:
 | set_style(k, v) / set_style_str(k, v) | Layout styles (runtime primitives) |
 | Drag registration and drop callbacks | Drag and drop (receivers must also register handle_drag_update returning allowed operations; without it every drag is rejected; the initiator's do_drag_file_paths / do_drag_data_full must be called inside the on_mouse_down callback to take effect; demo in the components example, "Windows & Web" page) |
 
-> **New-stack (MoonBit native GUI stack) mapping** (since W21c): the last row above is the old stack's platform-level drag and drop (GTK `gtk_drag_*` / Win32 `IDropTarget`, an enter/update/leave trio plus operation-bit negotiation). The new stack's **in-app** drag and drop touches no platform interface, using the session model in `yue/core/drag.mbt` plus the two declarative hooks in `yue/ui/drag.mbt`:
+> **New-stack (MoonBit native GUI stack) mapping** (since W21c): the last row above is the old stack's platform-level drag and drop (GTK `gtk_drag_*` / Win32 `IDropTarget`, an enter/update/leave trio plus operation-bit negotiation). The new stack's **in-app** drag and drop touches no platform interface, using the session model in `core/drag.mbt` plus the two declarative hooks in `ui/drag.mbt`:
 >
 > | Old stack | New stack | Notes |
 > |---|---|---|

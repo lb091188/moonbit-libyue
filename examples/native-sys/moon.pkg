@@ -1,11 +1,11 @@
 import {
   "NoahLiu/yoga-mbt/src" @yoga,
-  "NoahLiu/moonbit-libyue/yue/core",
-  "NoahLiu/moonbit-libyue/yue/text",
-  "NoahLiu/moonbit-libyue/yue/theme",
-  "NoahLiu/moonbit-libyue/yue/ui",
-  "NoahLiu/moonbit-libyue/yue/sys",
-  "NoahLiu/moonbit-libyue/yue/dbus",
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/text",
+  "NoahLiu/native-gui/theme",
+  "NoahLiu/native-gui/ui",
+  "NoahLiu/native-gui/sys",
+  "NoahLiu/native-gui/dbus",
 }
 
 pkgtype(kind: "executable")

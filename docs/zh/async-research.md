@@ -1,7 +1,7 @@
 # MoonBit 官方异步生态与 yue 消息循环共存调研
 
 > 调研日期:2026-10-02。调研环境:Ubuntu 24.04 + X11 + XFCE,moon 0.1.20260920 (914d7da)。
-> 本文只调研不改主链路;实验代码在 `experiment/async_coexist/`,实验均在临时目录完成、不依赖本地主仓改动(依赖取 mooncakes 线上 `NoahLiu/moonbit-libyue@0.5.9`)。
+> 本文只调研不改主链路;实验代码在 `experiment/async_coexist/`,实验均在临时目录完成、不依赖本地主仓改动(依赖取 mooncakes 线上 `NoahLiu/native-gui@0.5.9`)。
 > 配套实验记录见 `experiment/async_coexist/README.md`。
 
 ## 1. 结论速览(TL;DR)
@@ -257,7 +257,7 @@ poll 每轮固定 busy 200ms(模拟 GUI 事件处理慢),观察 `sleep(100*i)`:
 ### 批次 3:`yue/async` 子包 —— 形态校准
 
 - **内容**:`YueLoop`(实现 `ExternalEventLoop`,三方法直通 shim 三接口)+ `install()`(GUI 初始化 + `@async.set_external_event_loop`,**必须在 `async fn main` 开头、任何实际 async 代码之前调用**——官方 abort 红线)+ 桥接糖(官方建议的 GUI 事件 → `CondVar`/`Queue` 封装,如 `on_click_async`)+ 退出惯例(如「全部窗口关闭 → task group 返回」的 helper)。
-- **依赖隔离(新增注意点)**:mooncakes 依赖是**模块级**的——`yue` 模块一旦 import `moonbitlang/async`,只用 GUI 的用户也会拉取并解析该依赖。两个候选:①主模块不依赖 async,`yue/async` 做成**独立发布的小模块**(如 `NoahLiu/moonbit-libyue-async`,依赖主模块,单向箭头);②接受模块级依赖、靠链接裁剪。**①更符合「最薄依赖」原则,但发布流程翻倍;此决策留给批次 3 落地时定,需实测 moon 对未使用依赖的链接裁剪行为**(已列入待验证清单)。
+- **依赖隔离(新增注意点)**:mooncakes 依赖是**模块级**的——`yue` 模块一旦 import `moonbitlang/async`,只用 GUI 的用户也会拉取并解析该依赖。两个候选:①主模块不依赖 async,`yue/async` 做成**独立发布的小模块**(如 `NoahLiu/native-gui-async`,依赖主模块,单向箭头);②接受模块级依赖、靠链接裁剪。**①更符合「最薄依赖」原则,但发布流程翻倍;此决策留给批次 3 落地时定,需实测 moon 对未使用依赖的链接裁剪行为**(已列入待验证清单)。
 - **quit 语义翻转要写进文档**:`run()` 退场,程序生命周期 = async main 返回;`quit()` 语义变为「请求主循环停止迭代」由 `terminate` 收尾。
 - 版本约束:`moonbitlang/async >= 0.21.0`(external_loop_integration 引入线),建议同时声明上限 `< 0.23`(API experimental,一年 79 版)。
 
@@ -292,4 +292,4 @@ poll 每轮固定 busy 200ms(模拟 GUI 事件处理慢),观察 `sleep(100*i)`:
 - 官方源码:moonbitlang/async 0.22.4(本地解包于实验时;关键文件 `src/external_loop_integration/external_loop.mbt`、`src/internal/event_loop/event_loop.mbt`、`src/integration.mbt`、`src/pkg.generated.mbti`、`examples/tcp_ping_pong/main.mbt`);GitHub https://github.com/moonbitlang/async
 - libyue fork 消息循环:`nativeui/gtk/message_loop_gtk.cc`、`nativeui/mac/message_loop_mac.mm`、`nativeui/win/message_loop_win.cc`(lb091188/yue@master);主仓 `vendor/libyue/include/nativeui/message_loop.h`、`shim/yue_mbt.cpp:250,3519-3541`
 - mooncakes registry:版本索引 `~/.moon/registry/index/user/moonbitlang/async.index`;搜索 API `mooncakes.io/api/v0/search`
-- 实验:全部在 `/tmp` 临时模块完成(moon add moonbitlang/async@0.22.4 + NoahLiu/moonbit-libyue@0.5.9),沉淀于本仓 `experiment/async_coexist/`(复现命令见其 README)
+- 实验:全部在 `/tmp` 临时模块完成(moon add moonbitlang/async@0.22.4 + NoahLiu/native-gui@0.5.9),沉淀于本仓 `experiment/async_coexist/`(复现命令见其 README)

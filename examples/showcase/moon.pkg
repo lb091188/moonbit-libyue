@@ -1,15 +1,15 @@
-// G7 示例迁移：演示板改走新栈（`yue/core` + `yue/ui`）。
+// G7 示例迁移：演示板改走新栈（`core` + `ui`）。
 // 本包只做装配：侧栏导航 + 页切换 + 主题跟随；共享层在 `shared/`，
 // 各页内容在 `pages/`。
 import {
   "NoahLiu/yoga-mbt/src" @yoga,
-  "NoahLiu/moonbit-libyue/yue/core",
-  "NoahLiu/moonbit-libyue/yue/ui",
-  "NoahLiu/moonbit-libyue/yue/theme",
-  "NoahLiu/moonbit-libyue/yue/icons",
-  "NoahLiu/moonbit-libyue/yue/win",
-  "NoahLiu/moonbit-libyue/examples/showcase/shared",
-  "NoahLiu/moonbit-libyue/examples/showcase/pages",
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/ui",
+  "NoahLiu/native-gui/theme",
+  "NoahLiu/native-gui/icons",
+  "NoahLiu/native-gui/win",
+  "NoahLiu/native-gui/examples/showcase/shared",
+  "NoahLiu/native-gui/examples/showcase/pages",
 }
 
 pkgtype(kind: "executable")

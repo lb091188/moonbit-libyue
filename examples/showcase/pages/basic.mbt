@@ -12,7 +12,7 @@
 //    在本栈已内建：悬停态本就是父链语义、光标取悬停路径最深请求、
 //    底色/描边由组件自己画，调用点不再传；
 // ④ `@components.*` → `@ui.*`、`@declarative.*` → `@ui.*`（同一个包：
-//    新栈声明式层就住在 `yue/ui/declarative.mbt`）。
+//    新栈声明式层就住在 `ui/declarative.mbt`）。
 
 ///|
 pub fn page_basic(app : @shared.App) -> @core.Node {

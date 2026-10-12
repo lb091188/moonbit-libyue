@@ -1,0 +1,20 @@
+// D-Bus 通用基建（方案 §2 的 `dbus`）：线路格式编解码 + 会话/系统总线
+// 连接 + 通用方法调用与属性读写。后续批次的能力模块（托盘 SNI、通知、
+// UPower/logind/NetworkManager 监视、单实例）作为同包文件接进来。
+//
+// 与旧链 traybus 的一条分层差：本包不挂 glib fd 监视、也不依赖 GUI 层，
+// 入站数据由宿主周期调 `dbus_pump` 取走，断线自愈的延迟重连走
+// `dbus_set_post_delayed` 注入的通道。
+
+supported_targets = "native"
+
+import {
+  "moonbitlang/core/encoding/utf8",
+  "NoahLiu/native-gui/sys",
+}
+
+// 桩只用标准头，直接走 native-stub；链接参数按 AGENTS 规则 1 由
+// scripts/prebuild.py 托管（本包无新增）。
+options(
+  "native-stub": [ "dbus_stub.c" ],
+)

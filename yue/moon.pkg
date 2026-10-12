@@ -1,7 +1,7 @@
 import {
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
-  "NoahLiu/moonbit-libyue/yue/traybus",
+  "NoahLiu/native-gui/yue/traybus",
 }
 
 // 本栈不写 native-stub 与链接参数：平台后端的 C 端在 G2 起由新 stub 提供，

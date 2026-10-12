@@ -127,12 +127,12 @@ XFCE 的 libdbusmenu 客户端只发批量版 `EventGroup` / `AboutToShowGroup`,
 
 | 旧链 | 新栈 | 说明 |
 | --- | --- | --- |
-| `yue/tray.mbt` 门面 | `yue/core/tray.mbt` | `Tray::is_supported()` / `TrayBackend` / `TrayError` 同语义（结构化错误，不静默失效） |
-| `yue/traybus/`（SNI 协议栈） | `yue/dbus/sni.mbt` | 会话总线直连 watcher，零 AppIndicator 依赖；可用性判据 `sni_watcher_present()`（`NameHasOwner`，比只看连得上总线的 `sni_available()` 强） |
-| `NativeTray`（nativeui AppIndicator 回退） | `yue/win/tray.mbt` + `stub.c` 的 `Shell_NotifyIconW` | Windows 原生托盘。**Linux 端不再回退 AppIndicator**（GNOME 装 AppIndicator 扩展后 SNI 即可用） |
+| `yue/tray.mbt` 门面 | `core/tray.mbt` | `Tray::is_supported()` / `TrayBackend` / `TrayError` 同语义（结构化错误，不静默失效） |
+| `yue/traybus/`（SNI 协议栈） | `dbus/sni.mbt` | 会话总线直连 watcher，零 AppIndicator 依赖；可用性判据 `sni_watcher_present()`（`NameHasOwner`，比只看连得上总线的 `sni_available()` 强） |
+| `NativeTray`（nativeui AppIndicator 回退） | `win/tray.mbt` + `stub.c` 的 `Shell_NotifyIconW` | Windows 原生托盘。**Linux 端不再回退 AppIndicator**（GNOME 装 AppIndicator 扩展后 SNI 即可用） |
 
 - 后端选择：`sni_watcher_present()` 优先 → 否则 `@win.tray_supported()` → 皆无给 `Err(TrayError::Unsupported)`。
 - 回调：Win32 侧左键/右键经进程级队列，宿主每拍调 `dispatch_tray_event()` 抽（Win32 上右键无回调时**自动弹已挂的菜单**）；SNI 侧由 DBus 信号直达回调，不经队列。
-- 菜单：`Tray::set_menu(Menu)` 复用 `yue/core/menu.mbt` 的同一套模型——Win32 走 W20a 的 HMENU（`TrackPopupMenuEx` + `TPM_RETURNCMD`，选中项回到同一条菜单派发链）；SNI 走 DBusMenu。**SNI 侧本实现是平铺一级菜单，子菜单被展平**（前置一条分隔线）。
+- 菜单：`Tray::set_menu(Menu)` 复用 `core/menu.mbt` 的同一套模型——Win32 走 W20a 的 HMENU（`TrackPopupMenuEx` + `TPM_RETURNCMD`，选中项回到同一条菜单派发链）；SNI 走 DBusMenu。**SNI 侧本实现是平铺一级菜单，子菜单被展平**（前置一条分隔线）。
 - 图标：Win32 侧走 W20f 的 `Icon`（`.ico` 原生 / PNG 走 WIC / 像素直建）；SNI 侧走面板主题图标名（`set_icon_name`）或程序内置位图，任意 PNG 像素解码未内置。
-- 验证：后端由纯 C 探针 `experiment/tray_probe`（末行 `TRAY-BACKEND-OK`）回证；门面由 `yue/core/tray_wbtest.mbt` 的纯函数 + 生命周期用例（无托盘后端的机器自动跳过而非造假）回证。**真面板观感（图标是否显示、菜单弹出位置、左键行为）仍归人工测试清单。**
+- 验证：后端由纯 C 探针 `experiment/tray_probe`（末行 `TRAY-BACKEND-OK`）回证；门面由 `core/tray_wbtest.mbt` 的纯函数 + 生命周期用例（无托盘后端的机器自动跳过而非造假）回证。**真面板观感（图标是否显示、菜单弹出位置、左键行为）仍归人工测试清单。**

@@ -1,4 +1,4 @@
-// examples/native-sys —— 系统能力（`yue/sys`）的**累积**验证示例：每落地一族
+// examples/native-sys —— 系统能力（`sys`）的**累积**验证示例：每落地一族
 // 就把读数接进本页，同族不另开示例（GUI 侧的累计页是 `examples/native-app`）。
 //
 // 跑法：`moon run examples/native-sys`（需显示服务），12 秒后自动退出并打印
@@ -466,7 +466,7 @@ fn main {
       return
     }
   }
-  // 把 logind 的亮度写能力装进 yue/sys 的注入槽（sys 不引 D-Bus）
+  // 把 logind 的亮度写能力装进 sys 的注入槽（sys 不引 D-Bus）
   @dbus.install_logind_brightness()
   let counts : Ref[Counts] = Ref(empty_counts())
   let probes = @core.Store::new(0)
@@ -521,7 +521,7 @@ fn main {
     app.schedule_paint()
   }
 
-  // D-Bus 接线：排期通道与周期泵都由宿主给（yue/dbus 不引 GUI 核心层）
+  // D-Bus 接线：排期通道与周期泵都由宿主给（dbus 不引 GUI 核心层）
   @dbus.dbus_set_post_delayed(fn(ms : Int, f : () -> Unit) -> Unit {
     let _ = app.timer(ms, f)
   })
@@ -530,7 +530,7 @@ fn main {
     let _ = app.timer(200, pump_loop)
   }
   let _ = app.timer(200, pump_loop)
-  // 剪贴板监听：排期通道由宿主注入（yue/sys 不引 GUI 核心层）
+  // 剪贴板监听：排期通道由宿主注入（sys 不引 GUI 核心层）
   let watcher = @sys.cbw_start_watch(
     fn(ms : Int, f : () -> Unit) -> Unit {
       let _ = app.timer(ms, f)
@@ -549,7 +549,7 @@ fn main {
     @ui.container(
       [
         @ui.label(
-          "系统能力（yue/sys）：只读探测在一屏，设置类只给按钮",
+          "系统能力（sys）：只读探测在一屏，设置类只给按钮",
           size=15.0,
           weight=@text.SemiBold,
         ),

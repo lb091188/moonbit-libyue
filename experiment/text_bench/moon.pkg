@@ -1,7 +1,7 @@
 import {
   "moonbitlang/core/env",
-  "NoahLiu/moonbit-libyue/yue/text",
-  "NoahLiu/moonbit-libyue/yue/render",
+  "NoahLiu/native-gui/text",
+  "NoahLiu/native-gui/render",
 }
 
 pkgtype(kind: "executable")
