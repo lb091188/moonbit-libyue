@@ -2019,7 +2019,7 @@ fn main {
         car_sample.val = (idx, s0.1 + 1)
       }
       app.schedule_paint()
-      let _ = app.timer(100, ticker.val)
+      let _ = app.timer(500, ticker.val)
     }
   }
   let blinker : Ref[() -> Unit] = Ref(fn() { () })
@@ -2030,7 +2030,10 @@ fn main {
       let _ = app.timer(500, blinker.val)
     }
   }
-  let _ = app.timer(100, ticker.val)
+  // 节拍 500ms（原 100ms）：纯光栅器后端上一帧整树重画是百毫秒级，100ms 的
+  // 节拍会让消息泵持续饥饿（真机表现为窗口「未响应」）；500ms 下阻塞窗口远
+  // 小于系统的判超时，读数行照样在退出时打齐
+  let _ = app.timer(500, ticker.val)
   let _ = app.timer(500, blinker.val)
   // 跟随系统深浅/主色：每拍读一次，变了才 theme_apply（本机读不出主色时按亮色走）
   let stop_follow = app.follow_system_theme(interval_ms=1000)

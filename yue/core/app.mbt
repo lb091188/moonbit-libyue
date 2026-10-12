@@ -390,8 +390,14 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
       }
     }
     Key(kev) => {
+      // 抬起事件不投给控件：编辑内核的 handle_key 只吃 keysym、不区分按下/
+      // 抬起，放行抬起就等于「松手再插一个字符」（实测：Tab 抬起被当可打印
+      // 字符插成 '\t'；Windows 侧此前收不到键，这条一直没暴露）
+      if !kev.press {
+        return ()
+      }
       // Tab / Shift+Tab 由宿主消费并驱动焦点栈（GTK 可能给 ISO_Left_Tab）
-      if kev.press && (kev.keysym == KS_TAB || kev.keysym == KS_ISO_LEFT_TAB) {
+      if kev.keysym == KS_TAB || kev.keysym == KS_ISO_LEFT_TAB {
         self.move_focus(
           kev.keysym == KS_ISO_LEFT_TAB || (kev.mods & MOD_SHIFT) != 0,
         )

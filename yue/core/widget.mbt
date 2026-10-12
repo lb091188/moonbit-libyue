@@ -694,6 +694,24 @@ pub fn Widget::paint_at(self : Widget, p : @render.Painter, ox : Double, oy : Do
   if !self.visible {
     return ()
   }
+  // 视口剔除（纯光栅器后端）：整块落在当前裁剪外的控件直接跳过遍历——累积
+  // 验证页一屏叠十几页，整树重画实测 550ms/帧（真机「窗口未响应」的主因之一），
+  // 剔除后只画屏内那部分。判交必须用**相对当前原点的本地矩形**（rect 减去父
+  // 原点 ox/oy）：CTM 的原点就在父内容原点，直接拿绝对矩形去过 CTM 会把父
+  // 原点计两次（实测：oy≠0 的子树全被误剔，下半屏整片空白）。裁剪与 CTM 在
+  // 会话里是设备空间的真值（滚动的平移也在 CTM 里），所以这层判交天然把滚动
+  // 视口算对。cairo 后端不查（那边没有可查的设备裁剪且本来快）；旋转矩阵下
+  // 用两角包围盒近似（本栈的控件绘制只用平移，够用）。
+  match widget_cull_skip(
+    p,
+    self.rect.x - ox,
+    self.rect.y - oy,
+    self.rect.w,
+    self.rect.h,
+  ) {
+    true => return ()
+    false => ()
+  }
   p.save()
   p.translate(self.rect.x - ox, self.rect.y - oy)
   p.clip_rect(0.0, 0.0, self.rect.w, self.rect.h)
@@ -705,6 +723,33 @@ pub fn Widget::paint_at(self : Widget, p : @render.Painter, ox : Double, oy : Do
     k.paint_at(p, self.rect.x, self.rect.y)
   }
   p.restore()
+}
+
+///|
+/// 控件矩形（内容坐标）与当前设备裁剪不相交则为 true（可跳过）。
+fn widget_cull_skip(
+  p : @render.Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+) -> Bool {
+  match p.raster() {
+    None => false
+    Some(r) => {
+      let (cx0, cy0, cx1, cy1) = r.clip_bounds()
+      let (ax, ay) = r.map_point(x, y)
+      let (bx, by) = r.map_point(x + w, y + h)
+      let x0 = ax.min(bx)
+      let x1 = ax.max(bx)
+      let y0 = ay.min(by)
+      let y1 = ay.max(by)
+      x1 <= cx0.to_double() ||
+      x0 >= cx1.to_double() ||
+      y1 <= cy0.to_double() ||
+      y0 >= cy1.to_double()
+    }
+  }
 }
 
 // ---- 输入法面（宿主按焦点 id 投递；只有焦点控件参与，不冒泡）----

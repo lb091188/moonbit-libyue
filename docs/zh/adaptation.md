@@ -121,6 +121,17 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **接线走「内核槽」而不是内核直连平台**：`yue/input` 的 `Editor::set_clipboard(get, set)` 给内核留外部剪贴板槽——`copy`/`cut` 顺手写出去、`Ctrl+V` 现取（取不到回退内置 `clip`），内核本身仍不依赖任何平台层（无头可测）。**默认不装**：`yue/ui` 的 `use_system_clipboard(true)` 由应用显式打开（`examples/native-app` 里一行）——测试里的 Ctrl+X 不该动使用者的剪贴板；探测不可用（Linux 没装 xclip）时自动保持内部剪贴板，属语义化降级。
 - **测试**：sys 新增回环用例（中文 + 换行的 `set → get`），**写入前把原内容存档、断言完还原**（探针不在使用者的剪贴板里留痕）；Windows 本机 `moon test -p yue/sys` **165/165**（新增 2 条），ui 110/110、input 10/10 无回归。真跨程序粘贴（复制出去、粘到记事本再粘回来）留使用者复验。
 
+### MoonBit 原生 GUI 栈 · Windows 窗口「黑屏 + 未响应」复盘（W17a，五处根因与性能批）
+
+- **根因一：`wm_wait` 等完不派发**。Win32 分支 `MsgWaitForMultipleObjectsEx` 之后**没调 `wm_pump`**（GTK 分支 poll 完会调）——没人派发消息 → WndProc 永不执行 → 输入、WM_CLOSE、WM_PAINT 全部收不到。判据：窗口被系统标「未响应」、优雅关窗要等自杀计时器（实测 15.9s；修后 **0.9s**）、发 SendKeys 完全没反应。修法：等完即 `wm_pump()`。
+- **根因二：`wm_present` 只存指针**。它把 MoonBit 的像素指针记账，等 WM_PAINT 时才去贴——而那是 `paint_frame` 里的**局部** Bitmap，函数一返回就是 GC 的猎物，贴出来是悬垂内存（整窗纯黑）。判据：截图整片黑、而绘制读数与几何行一切正常。修法：桩持帧拷贝（`WmWindow.frame`，按尺寸增长的缓冲），`wm_close` 释放。
+- **根因三：键码口径不一致**。Win32 桩把控制字符按 GDK 约定给 `0x01000000|u`，而内核的 `KS_*` 是 X11 口径（Tab=0xFF09、回车=0xFF0D、退格=0xFF08、Esc=0xFF1B、Del=0xFFFF）→ 宿主认不出 Tab/回车（实测 Tab 被当可打印字符插进输入框、回车提交失灵）。修法：控制字符按 X11 keysym 出，可打印（含中文）直接用 Unicode 码点。
+- **根因四：抬起事件投给控件**。内核 `Editor::handle_key` 只有 `(keysym, mods)`、分不出按下/抬起，宿主若放行抬起就等于「松手再插一个字符」（现象与根因三叠加）。修法：`App::route` 只把按下投给控件（Tab/焦点栈的宿主处理同样只看按下）。
+- **根因五（同批回归自查抓到）**：视口剔除用**绝对矩形**去过 CTM，父原点被计两次 → `oy≠0` 的子树整片误剔（判据：ui 掉到 102/110、控件场景探针「下半屏 0 墨」）。修法：判交用相对当前原点的**本地矩形**（`rect - (ox,oy)`）——CTM 的原点就在父内容原点。
+- **性能（同批）**：文字路径 **9.4ms → 0.35ms/段**（三件：①D2D 渲染目标从 DC 换 **WIC 位图**——DC 目标逐调用 `BindDC` 就要 0.4ms，总账 1.8ms/段；②画布/画笔进程级缓存，尺寸只增不减；③`Raster::blit` 加「整数平移 + 1:1 全幅 + Normal」快路径，源字节先过 256×256 查表复刻通用路的「解除预乘→乘回」，**逐位一致**才没把像素断言打红）。整树重画 550ms → ~300ms（视口剔除）；示例节拍 100ms → 500ms（真机每个重绘周期阻塞消息泵的时间随之落回安全区）。整窗重绘仍是数百毫秒级（图表页最重），列为后续性能批。
+- **WIC 画布两条陷阱**：①**不能**用 `CreateBitmapFromMemory` 包外部缓冲再让 D2D 画——那走 WIC 内部缓存，读不回你的缓冲（现象：ink=0 而返回值成功），要自持位图 + 绘制后 `Lock(WICBitmapLockRead)` 读回；②用「全透明笔 `FillRectangle`」清画布是**空操作**（源覆盖语义），必须 `Clear`——它吃轴对齐裁剪，所以能只清本次区域（缓存画布比本次大时正好用上）。
+- **回证方式**：`experiment/key_probe`（建窗→泵→打印键码，配 PowerShell `AppActivate`+`SendKeys`）验键盘通路；`experiment/text_bench` 守文字路径性能；截图核对窗口内容（本机用 PowerShell 抓屏 PNG 看图判色）；`App::step`/`paint_frame` 的临时分段计时（PAINT-PROF/STEP-PROF）定位过瓶颈，已撤。全绿复核：core 70 / input 10 / ui 110 / render 43 / text 29 / chart 189 / theme 8 / mdview 26 / sys 165，全仓红点 287/68 持平。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。

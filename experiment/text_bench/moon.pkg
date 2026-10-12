@@ -1,0 +1,9 @@
+import {
+  "moonbitlang/core/env",
+  "NoahLiu/moonbit-libyue/yue/text",
+  "NoahLiu/moonbit-libyue/yue/render",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"

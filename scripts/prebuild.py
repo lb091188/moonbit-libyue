@@ -214,7 +214,7 @@ def link_configs() -> dict:
         # 下发链接输入。
         entries.append({
             "package": TEXT_PACKAGE,
-            "link_flags": "dwrite.lib d2d1.lib ole32.lib uuid.lib gdi32.lib",
+            "link_flags": "dwrite.lib d2d1.lib windowscodecs.lib ole32.lib uuid.lib gdi32.lib",
         })
     return {"link_configs": entries}
 

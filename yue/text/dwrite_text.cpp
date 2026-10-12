@@ -23,6 +23,7 @@
 #include <d2d1.h>
 #include <d2d1helper.h> // D2D1::ColorF/Point2F/RenderTargetProperties（C++ 头）
 #include <dwrite.h>
+#include <wincodec.h> // WIC 位图渲染目标（比 DC 目标快：绑一次、不逐调用重绑）
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -452,6 +453,105 @@ UINT32 ptw_widx(const char *text, int byte_off) {
   return 0;
 }
 
+// 进程级画布缓存：WIC 位图 + D2D 渲染目标 + 两支画笔各建一次（尺寸只增不减）。
+// 实测背景：每调用新建一套资源是 ~2.6ms/段文本，DC 渲染目标逐调用 BindDC 还要
+// 再花 ~0.4ms——一帧几十段文字会把窗口拖成「未响应」（真机反馈）。
+// 陷阱：WIC 位图**不能**用 CreateBitmapFromMemory 包外部缓冲——那会走 WIC 的
+// 内部缓存，D2D 画完读不回外部缓冲（实测 ink=0、返回还是成功）；改用自持位图
+// 并在绘制后 Lock(WICBitmapLockRead) 读回像素。
+struct PtwCanvas {
+  int w;
+  int h;
+  IWICBitmap *wic;
+  ID2D1RenderTarget *rt;
+  ID2D1SolidColorBrush *brush; // 文本色（逐调用 SetColor）
+};
+
+PtwCanvas g_canvas = {0, 0, nullptr, nullptr, nullptr};
+
+void ptw_canvas_reset() {
+  if (g_canvas.brush != nullptr) {
+    g_canvas.brush->Release();
+    g_canvas.brush = nullptr;
+  }
+  if (g_canvas.rt != nullptr) {
+    g_canvas.rt->Release();
+    g_canvas.rt = nullptr;
+  }
+  if (g_canvas.wic != nullptr) {
+    g_canvas.wic->Release();
+    g_canvas.wic = nullptr;
+  }
+  g_canvas.w = 0;
+  g_canvas.h = 0;
+}
+
+IWICImagingFactory *ptw_wic_factory() {
+  static IWICImagingFactory *factory = nullptr;
+  static int tried = 0;
+  if (tried) {
+    return factory;
+  }
+  tried = 1;
+  HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
+    return nullptr;
+  }
+  IWICImagingFactory *f = nullptr;
+  if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr,
+                              CLSCTX_INPROC_SERVER, __uuidof(IWICImagingFactory),
+                              reinterpret_cast<void **>(&f)))) {
+    return nullptr;
+  }
+  factory = f;
+  return factory;
+}
+
+bool ptw_canvas_ensure(int w, int h) {
+  if (g_canvas.rt != nullptr && g_canvas.w >= w && g_canvas.h >= h) {
+    return true;
+  }
+  const int nw = w > g_canvas.w ? w : g_canvas.w;
+  const int nh = h > g_canvas.h ? h : g_canvas.h;
+  ptw_canvas_reset();
+  ID2D1Factory *d2d = ptw_d2d_factory();
+  IWICImagingFactory *wic = ptw_wic_factory();
+  if (d2d == nullptr || wic == nullptr) {
+    return false;
+  }
+  // 自持位图（WICBitmapCacheOnLoad）：不用 CreateBitmapFromMemory 包外部
+  // 缓冲——那条路 D2D 画完读不回外部缓冲（实测 ink=0 且返回值是成功）
+  IWICBitmap *wicbmp = nullptr;
+  if (FAILED(wic->CreateBitmap(UINT(nw), UINT(nh),
+                               GUID_WICPixelFormat32bppPBGRA,
+                               WICBitmapCacheOnLoad, &wicbmp))) {
+    return false;
+  }
+  D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
+      D2D1_RENDER_TARGET_TYPE_SOFTWARE,
+      D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,
+                        D2D1_ALPHA_MODE_PREMULTIPLIED),
+      96.0f, 96.0f);
+  ID2D1RenderTarget *rt = nullptr;
+  if (FAILED(d2d->CreateWicBitmapRenderTarget(wicbmp, &props, &rt))) {
+    wicbmp->Release();
+    return false;
+  }
+  ID2D1SolidColorBrush *brush = nullptr;
+  if (FAILED(rt->CreateSolidColorBrush(D2D1::ColorF(0.0f, 0.0f, 0.0f, 1.0f),
+                                       &brush))) {
+    rt->Release();
+    wicbmp->Release();
+    return false;
+  }
+  g_canvas.w = nw;
+  g_canvas.h = nh;
+  g_canvas.wic = wicbmp;
+  g_canvas.rt = rt;
+  g_canvas.brush = brush;
+  return true;
+}
+
 // 把 layout 画进 dst（预乘 BGRA，buf_w×buf_h）；区间颜色在渲染目标上建画笔
 int ptw_render(IDWriteTextLayout *layout, float ox, float oy,
                unsigned char *data, int buf_w, int buf_h, int r, int g, int b,
@@ -460,111 +560,91 @@ int ptw_render(IDWriteTextLayout *layout, float ox, float oy,
   if (layout == nullptr || data == nullptr || buf_w < 1 || buf_h < 1) {
     return 0;
   }
-  ID2D1Factory *d2d = ptw_d2d_factory();
-  if (d2d == nullptr) {
+  if (!ptw_canvas_ensure(buf_w, buf_h)) {
     return 0;
   }
-  BITMAPINFO bi;
-  ZeroMemory(&bi, sizeof(bi));
-  bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-  bi.bmiHeader.biWidth = buf_w;
-  bi.bmiHeader.biHeight = -buf_h; // top-down（与 MoonBit 缓冲同向）
-  bi.bmiHeader.biPlanes = 1;
-  bi.bmiHeader.biBitCount = 32;
-  bi.bmiHeader.biCompression = BI_RGB;
-  HDC dc = CreateCompatibleDC(nullptr);
-  if (dc == nullptr) {
-    return 0;
-  }
-  void *bits = nullptr;
-  HBITMAP bmp = CreateDIBSection(dc, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
-  if (bmp == nullptr || bits == nullptr) {
-    DeleteDC(dc);
-    return 0;
-  }
-  HGDIOBJ old_bmp = SelectObject(dc, bmp);
-
-  ID2D1DCRenderTarget *rt = nullptr;
-  D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
-      D2D1_RENDER_TARGET_TYPE_DEFAULT,
-      D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,
-                        D2D1_ALPHA_MODE_PREMULTIPLIED),
-      96.0f, 96.0f);
-  HRESULT hr = d2d->CreateDCRenderTarget(&props, &rt);
-  RECT rc = {0, 0, buf_w, buf_h};
-  if (SUCCEEDED(hr)) {
-    hr = rt->BindDC(dc, &rc);
-  }
-  ID2D1SolidColorBrush *brush = nullptr;
-  if (SUCCEEDED(hr)) {
-    hr = rt->CreateSolidColorBrush(
-        D2D1::ColorF(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f), &brush);
-  }
-  if (SUCCEEDED(hr)) {
-    // 区间字体（后设覆盖先设由 DWrite 的范围语义保证）
-    for (int i = 0; i < nf; i++) {
-      DWRITE_TEXT_RANGE range = ptw_range(franges[i].start, franges[i].end);
-      if (franges[i].family != nullptr && franges[i].family[0] != L'\0') {
-        layout->SetFontFamilyName(franges[i].family, range);
-      }
-      if (franges[i].size > 0.0) {
-        layout->SetFontSize(static_cast<FLOAT>(franges[i].size), range);
-      }
-      layout->SetFontWeight(ptw_weight(franges[i].weight), range);
-      layout->SetFontStyle(ptw_style(franges[i].italic), range);
+  const D2D1_RECT_F box =
+      D2D1::RectF(0.0f, 0.0f, static_cast<FLOAT>(buf_w),
+                  static_cast<FLOAT>(buf_h));
+  HRESULT hr = S_OK;
+  g_canvas.brush->SetColor(
+      D2D1::ColorF(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f));
+  // 区间字体（后设覆盖先设由 DWrite 的范围语义保证）
+  for (int i = 0; i < nf; i++) {
+    DWRITE_TEXT_RANGE range = ptw_range(franges[i].start, franges[i].end);
+    if (franges[i].family != nullptr && franges[i].family[0] != L'\0') {
+      layout->SetFontFamilyName(franges[i].family, range);
     }
-    // 区间颜色：D2D 画笔是设备相关对象，必须在渲染目标上建、画完再放
-    ID2D1SolidColorBrush *cbrushes[32];
-    int nb = 0;
-    for (int i = 0; i < nc && nb < 32; i++) {
-      ID2D1SolidColorBrush *cb = nullptr;
-      if (SUCCEEDED(rt->CreateSolidColorBrush(
-              D2D1::ColorF(cranges[i].r / 255.0f, cranges[i].g / 255.0f,
-                           cranges[i].b / 255.0f, cranges[i].a / 255.0f),
-              &cb))) {
-        layout->SetDrawingEffect(cb, ptw_range(cranges[i].start, cranges[i].end));
-        cbrushes[nb++] = cb;
-      }
+    if (franges[i].size > 0.0) {
+      layout->SetFontSize(static_cast<FLOAT>(franges[i].size), range);
     }
-    rt->BeginDraw();
-    rt->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
-    rt->Clear(D2D1::ColorF(0.0f, 0.0f)); // 全透明底
-    rt->DrawTextLayout(D2D1::Point2F(ox, oy), layout, brush,
-                       D2D1_DRAW_TEXT_OPTIONS_NONE);
-    hr = rt->EndDraw();
-    for (int i = 0; i < nb; i++) {
-      cbrushes[i]->Release();
+    layout->SetFontWeight(ptw_weight(franges[i].weight), range);
+    layout->SetFontStyle(ptw_style(franges[i].italic), range);
+  }
+  // 区间颜色：D2D 画笔是设备相关对象，必须在渲染目标上建、画完再放
+  ID2D1SolidColorBrush *cbrushes[32];
+  int nb = 0;
+  for (int i = 0; i < nc && nb < 32; i++) {
+    ID2D1SolidColorBrush *cb = nullptr;
+    if (SUCCEEDED(g_canvas.rt->CreateSolidColorBrush(
+            D2D1::ColorF(cranges[i].r / 255.0f, cranges[i].g / 255.0f,
+                         cranges[i].b / 255.0f, cranges[i].a / 255.0f),
+            &cb))) {
+      layout->SetDrawingEffect(cb, ptw_range(cranges[i].start, cranges[i].end));
+      cbrushes[nb++] = cb;
     }
+  }
+  g_canvas.rt->BeginDraw();
+  // 清本次要用的那块：**必须用 Clear**——「透明色 FillRectangle」在源覆盖语义
+  // 下是空操作（实测：缓存画布上旧内容累积，Center/End 对齐的墨迹从 x=0 起）。
+  // 画布可能比这次大，靠轴对齐裁剪把 Clear 限制在本次区域内（Clear 吃裁剪）。
+  g_canvas.rt->PushAxisAlignedClip(box, D2D1_ANTIALIAS_MODE_ALIASED);
+  g_canvas.rt->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+  g_canvas.rt->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+  g_canvas.rt->DrawTextLayout(D2D1::Point2F(ox, oy), layout, g_canvas.brush,
+                              D2D1_DRAW_TEXT_OPTIONS_NONE);
+  g_canvas.rt->PopAxisAlignedClip();
+  hr = g_canvas.rt->EndDraw();
+  for (int i = 0; i < nb; i++) {
+    cbrushes[i]->Release();
   }
   const int ok = SUCCEEDED(hr) ? 1 : 0;
   if (ok) {
+    // 读回 WIC 位图（绘制后必须走 Lock；自持位图的内容就在这里）并做
     // 预乘 BGRA over：out = src + dst·(1 − srcA)（两缓冲同为预乘域）
-    const unsigned char *sp = static_cast<const unsigned char *>(bits);
-    for (int i = 0; i < buf_w * buf_h; i++) {
-      const unsigned sa = sp[i * 4 + 3];
-      if (sa == 0) {
-        continue;
+    WICRect wr = {0, 0, buf_w, buf_h};
+    IWICBitmapLock *lock = nullptr;
+    if (SUCCEEDED(g_canvas.wic->Lock(&wr, WICBitmapLockRead, &lock))) {
+      UINT stride = 0;
+      UINT cb = 0;
+      BYTE *pixels = nullptr;
+      if (SUCCEEDED(lock->GetStride(&stride)) &&
+          SUCCEEDED(lock->GetDataPointer(&cb, &pixels)) && pixels != nullptr) {
+        for (int y = 0; y < buf_h; y++) {
+          const unsigned char *srow = pixels + size_t(y) * stride;
+          unsigned char *drow = data + size_t(y) * size_t(buf_w) * 4;
+          for (int x = 0; x < buf_w; x++) {
+            const unsigned sa = srow[x * 4 + 3];
+            if (sa == 0) {
+              continue;
+            }
+            const unsigned inv = 255u - sa;
+            drow[x * 4 + 0] = static_cast<unsigned char>(
+                srow[x * 4 + 0] + (unsigned(drow[x * 4 + 0]) * inv + 127) / 255);
+            drow[x * 4 + 1] = static_cast<unsigned char>(
+                srow[x * 4 + 1] + (unsigned(drow[x * 4 + 1]) * inv + 127) / 255);
+            drow[x * 4 + 2] = static_cast<unsigned char>(
+                srow[x * 4 + 2] + (unsigned(drow[x * 4 + 2]) * inv + 127) / 255);
+            drow[x * 4 + 3] = static_cast<unsigned char>(
+                sa + (unsigned(drow[x * 4 + 3]) * inv + 127) / 255);
+          }
+        }
       }
-      const unsigned inv = 255u - sa;
-      data[i * 4 + 0] = static_cast<unsigned char>(
-          sp[i * 4 + 0] + (unsigned(data[i * 4 + 0]) * inv + 127) / 255);
-      data[i * 4 + 1] = static_cast<unsigned char>(
-          sp[i * 4 + 1] + (unsigned(data[i * 4 + 1]) * inv + 127) / 255);
-      data[i * 4 + 2] = static_cast<unsigned char>(
-          sp[i * 4 + 2] + (unsigned(data[i * 4 + 2]) * inv + 127) / 255);
-      data[i * 4 + 3] = static_cast<unsigned char>(
-          sa + (unsigned(data[i * 4 + 3]) * inv + 127) / 255);
+      lock->Release();
+    } else {
+      return 0;
     }
   }
-  if (brush != nullptr) {
-    brush->Release();
-  }
-  if (rt != nullptr) {
-    rt->Release();
-  }
-  SelectObject(dc, old_bmp);
-  DeleteObject(bmp);
-  DeleteDC(dc);
   return ok;
 }
 

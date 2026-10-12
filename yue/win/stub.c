@@ -66,9 +66,14 @@ typedef struct {
   int closing;       // WM_CLOSE / WM_DESTROY（MoonBit 驱动销毁）
   int width;         // 客户区物理像素（per-monitor v2，整栈物理像素口径）
   int height;
-  const unsigned char *pending; // 待贴的 ARGB32 缓冲（所有权在 MoonBit）
   int pending_w;
   int pending_h;
+  // 帧拷贝：present 时把像素复制进来。**不能只存 MoonBit 的指针**——那是
+  // paint_frame 里的局部 Bitmap，函数一返回就成了 GC 的猎物，WM_PAINT 晚些
+  // 时候去贴读到的就是悬垂内存（实测：窗口内容整片纯黑，而绘制过程一切正常）。
+  // 本缓冲归桩所有，按尺寸增长复用。
+  unsigned char *frame;
+  int frame_cap;
   int cursor_kind;   // 0 默认/1 手/2 文本/3 横向/4 纵向
   char commit[256];  // 已提交文本（UTF-8；WM_IME_COMPOSITION 的 GCS_RESULTSTR）
   int commit_len;
@@ -183,10 +188,28 @@ static uint32_t wm_char_keysym(WPARAM vk, LPARAM lp) {
     return 0;
   }
   uint32_t u = (uint32_t)buf[0];
-  if ((u >= 0x20 && u <= 0x7e) || (u >= 0xa0 && u <= 0xff)) {
-    return u;
+  if (u >= 0x20) {
+    return u; // 可打印（含中文）：Unicode 码点即内核口径
   }
-  return 0x01000000u | u;
+  // 控制字符按 X11 口径给关键 keysym——内核的 KS_* 就是这一套（Tab=0xFF09、
+  // Return=0xFF0D、Backspace=0xFF08、Escape=0xFF1B、Delete=0xFFFF）。早先按
+  // GDK 约定给 0x01000000|u，宿主认不出 Tab/回车（实测：Tab 被当可打印字符
+  // 插进输入框、回车提交失灵）
+  switch (u) {
+    case 0x08:
+      return 0xff08;
+    case 0x09:
+      return 0xff09;
+    case 0x0d:
+      return 0xff0d;
+    case 0x1b:
+      return 0xff1b;
+    case 0x7f:
+      return 0xffff;
+    default:
+      break;
+  }
+  return 0;
 }
 
 static void wm_push(WmWindow *w, const WmEv *ev) {
@@ -333,7 +356,7 @@ static HCURSOR wm_load_cursor(int kind) {
 // pending 缓冲直贴：Bitmap 布局 = cairo ARGB32（小端字节 B,G,R,A），GDI 的
 // 32bpp BI_RGB 顶底 DIB 字节口径完全一致，无需换序；负高 = 自上而下。
 static void wm_blit(HDC dc, WmWindow *w) {
-  if (w->pending == NULL || w->pending_w < 1 || w->pending_h < 1) {
+  if (w->frame == NULL || w->pending_w < 1 || w->pending_h < 1) {
     return;
   }
   BITMAPINFO bi;
@@ -345,7 +368,7 @@ static void wm_blit(HDC dc, WmWindow *w) {
   bi.bmiHeader.biBitCount = 32;
   bi.bmiHeader.biCompression = BI_RGB;
   StretchDIBits(dc, 0, 0, w->pending_w, w->pending_h, 0, 0, w->pending_w,
-                w->pending_h, w->pending, &bi, DIB_RGB_COLORS, SRCCOPY);
+                w->pending_h, w->frame, &bi, DIB_RGB_COLORS, SRCCOPY);
 }
 
 static LRESULT CALLBACK wm_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -378,7 +401,7 @@ static LRESULT CALLBACK wm_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
       HDC dc = BeginPaint(hwnd, &ps);
       if (w != NULL) {
         w->need_draw = 1;
-        if (w->pending != NULL) {
+        if (w->frame != NULL && w->pending_w > 0 && w->pending_h > 0) {
           wm_blit(dc, w);
         } else {
           HBRUSH b = CreateSolidBrush(RGB(0, 0, 0));
@@ -402,7 +425,8 @@ static LRESULT CALLBACK wm_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
       WmWindow *w = wm_of(hwnd);
       if (w != NULL) {
         w->hwnd = NULL;
-        w->pending = NULL;
+        w->pending_w = 0;
+        w->pending_h = 0;
         w->need_draw = 0;
         w->closing = 1; // 窗口没了也等于该退出了
       }
@@ -700,9 +724,18 @@ void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
   if (w->hwnd == NULL || rgba == NULL || width < 1 || height < 1) {
     return;
   }
-  // 缓冲所有权仍在 MoonBit（yue/render 的 Bitmap）；这里只记地址并请一次重画，
-  // 真正的贴像素发生在下一次 WM_PAINT 里，那时窗口一定活着。
-  w->pending = rgba;
+  // 复制进桩持有的帧缓冲（理由见 WmWindow.frame 的注释），再请一次重画；
+  // 真正的贴像素发生在下一次 WM_PAINT 里，那时窗口一定活着
+  size_t need = (size_t)width * (size_t)height * 4;
+  if (w->frame == NULL || (size_t)w->frame_cap < need) {
+    unsigned char *nb = (unsigned char *)realloc(w->frame, need);
+    if (nb == NULL) {
+      return; // 分配失败就当这次没贴，下一帧再来
+    }
+    w->frame = nb;
+    w->frame_cap = (int)need;
+  }
+  memcpy(w->frame, rgba, need);
   w->pending_w = width;
   w->pending_h = height;
   InvalidateRect(w->hwnd, NULL, FALSE);
@@ -718,6 +751,10 @@ void wm_close(int64_t id) {
     w->hwnd = NULL; // WM_DESTROY 里还会再清一次；先摘钩防重入
     DestroyWindow(hwnd);
   }
+  // 帧拷贝归桩所有，拆窗前先放掉（memset 之后就拿不到指针了）
+  free(w->frame);
+  w->frame = NULL;
+  w->frame_cap = 0;
   memset(w, 0, sizeof(*w));
 }
 
@@ -736,6 +773,10 @@ int wm_wait(int timeout_ms) {
   DWORD t = timeout_ms < 0 ? INFINITE : (DWORD)timeout_ms;
   DWORD r = MsgWaitForMultipleObjectsEx(0, NULL, t, QS_ALLINPUT,
                                         MWMO_INPUTAVAILABLE);
+  // 等完必须把排队消息派发掉（与 GTK 分支 poll 完调 wm_pump 同口径）：
+  // 不派发就没人调 WndProc——输入、WM_CLOSE、WM_PAINT 全部收不到，真机表现
+  // 是「窗口未响应、点了没反应」（实测：优雅关窗拖到自杀计时器才退出）
+  wm_pump();
   return r == WAIT_OBJECT_0 ? 1 : 0;
 }
 
