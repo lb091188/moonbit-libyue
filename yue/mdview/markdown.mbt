@@ -389,6 +389,16 @@ fn md_item_content(children : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.N
 fn md_marker(text : String, w : Double) -> @core.Node {
   @core.node_of_new(fn(mk : @core.Widget) -> @core.Widget {
     mk.node.set_width(@yoga.fixed(w))
+    // 行盒高度必须注册测量：这个格子只有绘制、没有子件，不注册就是**零高度**，
+    // 而 hbox 默认 align_items=Center——0 高的格子被摆到行的中点，序号整个
+    // 掉到文字基线上（实测 rect=(0,111,18,0) 而正文在 102..120，数字中心正好
+    // 压在基线上）。测一次自己的文本，拿到与正文同源的行盒高。
+    mk.node.set_measure(fn(_aw : Double?, _ah : Double?) -> (Double, Double) {
+      match @text.measure(text, 13.0) {
+        Some(m) => (m.width.to_double(), m.height.to_double())
+        None => (w, 18.0)
+      }
+    })
     mk.on_draw = Some(fn(
       _self : @core.Widget,
       p : @render.Painter,
@@ -404,7 +414,9 @@ fn md_marker(text : String, w : Double) -> @core.Node {
         @text.Font::new("", 13.0),
         @theme.theme_text_regular(),
         align=@text.Start,
-        valign=@text.Center,
+        // 贴**首行**顶对齐（不是整盒居中）：列表项盒子常有一行多高，居中会把
+        // 序号摆到中间——数字的中心正好压在首行基线上，看着像掉到基线下面
+        valign=@text.Start,
         wrap=false,
       )
     })

@@ -498,3 +498,56 @@ test "markdown_view 组件:链接点击走 on_link 回调、手型光标" {
     mods: 0,
   })
 }
+
+///|
+/// 序号与正文同基线：有序列表的行盒里，标记格必须注册了测量（否则零高度，
+/// hbox 的居中把序号摆到行的中点——数字中心正好压在正文基线上，实测
+/// rect=(0,111,18,0) 而正文在 102..120）。
+test "有序列表：序号与正文落在同一条基线上" {
+  let node = markdown_view("1. 第一\n2. 第二", width=300.0)
+  let root = @core.Widget::new()
+  root.set_size(300.0, 200.0)
+  root.set_column()
+  root.node.set_align_items(@yoga.AlignItems::FlexStart)
+  let _ = node.mount_into(root)
+  root.relayout(300.0, 200.0)
+  let bm = @render.Bitmap::new(300, 200)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  // 层级：根 → 视图列 → 第一个列表项（hbox 行）→ [标记格, 内容格]
+  let col = root.children()[0]
+  let row = col.children()[0]
+  let cells = row.children()
+  assert_eq(cells.length(), 2)
+  let marker = cells[0]
+  assert_true(marker.rect.h > 0.0, msg="标记格高度为 0（未注册测量）")
+  // 两格都非空墨，且底边（基线附近）相差不超过 2px
+  let ink_of = fn(w : @core.Widget) -> (Int, Int) {
+    let x0 = w.rect.x.round().to_int()
+    let y0 = w.rect.y.round().to_int()
+    let x1 = (w.rect.x + w.rect.w).round().to_int()
+    let y1 = (w.rect.y + w.rect.h).round().to_int()
+    let mut top = 9999
+    let mut bot = -1
+    for y = y0; y < y1; y = y + 1 {
+      for x = x0; x < x1; x = x + 1 {
+        if bm.pixel(x, y).a > 0 {
+          if y < top {
+            top = y
+          }
+          if y > bot {
+            bot = y
+          }
+        }
+      }
+    }
+    (top, bot)
+  }
+  let (mt, mb) = ink_of(marker)
+  let (ct, cb) = ink_of(cells[1])
+  assert_true(mt <= 9999, msg="序号没有落墨")
+  assert_true(ct <= 9999, msg="正文没有落墨")
+  let db = mb - cb
+  assert_true(db <= 2 && db >= -2, msg="序号与正文基线差 \{db}px")
+}

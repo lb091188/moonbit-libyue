@@ -763,6 +763,10 @@ void wm_close(int64_t id) {
 void wm_pump(void) {
   MSG msg;
   while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
+    // TranslateMessage 不能省：INPUT 法（IMM32）的组合处理就挂在这条路上——
+    // 缺了它只会收到裸键，WM_IME_STARTCOMPOSITION/WM_IME_COMPOSITION 一条都
+    // 收不到（实测：只来 WM_IME_SETCONTEXT，拼音永远组合不起来）
+    TranslateMessage(&msg);
     DispatchMessageW(&msg);
   }
 }
