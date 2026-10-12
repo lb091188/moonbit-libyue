@@ -11,7 +11,7 @@ license = "MIT"
 repository = "https://github.com/lb091188/moonbit-libyue"
 
 import {
-  "NoahLiu/native-gui@0.6.0",
+  "NoahLiu/native-gui@0.1.0",
   "NoahLiu/gui-media@0.1.0",
   "NoahLiu/ffmpeg-mbt@0.1.0",
   "NoahLiu/yoga-mbt@0.1.0",

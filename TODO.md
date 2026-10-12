@@ -3,7 +3,7 @@
 记号：`[x]` 完成 · `[~]` 部分（缺口写在子条目）· `[ ]` 未开始。
 
 - **唯一主线**：自绘栈（新栈拥有窗口/像素/事件循环/布局，控件全部基于 Painter 自绘 + 自定义主题，不提供独立原生控件）。方案见 [docs/zh/native-gui-plan.md](docs/zh/native-gui-plan.md)。
-- **更名（2026-10-12）**：主模块 `NoahLiu/moonbit-libyue` → **`NoahLiu/native-gui`**（0.6.0 起，mooncakes 上是新包名）；子模块 `NoahLiu/yue-media` → `NoahLiu/gui-media`、`NoahLiu/yue-examples` → `NoahLiu/gui-examples`；新栈 13 包从 `yue/` **上移到模块根**（`NoahLiu/native-gui/core` 等，import 默认别名取路径最后一段故全部不变）；旧链残留包（根包 + components/declarative/charts/browser/markdown/system/traybus）留在 `yue/` 随收口删除。GitHub 仓库名暂未改（`moonbit-libyue`），另批处理。
+- **更名（2026-10-12）**：主模块 `NoahLiu/moonbit-libyue` → **`NoahLiu/native-gui`**（mooncakes 新包名，首版 0.1.0 占位；待自绘栈稳定后将 `NoahLiu/moonbit-libyue` 标记废弃）；子模块 `NoahLiu/yue-media` → `NoahLiu/gui-media`、`NoahLiu/yue-examples` → `NoahLiu/gui-examples`；新栈 13 包从 `yue/` **上移到模块根**（`NoahLiu/native-gui/core` 等，import 默认别名取路径最后一段故全部不变）；旧链残留包（根包 + components/declarative/charts/browser/markdown/system/traybus）留在 `yue/` 随收口删除。GitHub 仓库名**保持 `moonbit-libyue` 不改**（2026-10-12 定案：留作这个库来时的路）。
 - **本分支不保留老 libyue 绑定**：`shim/`、`lib/` 预构建库、`scripts/prepare.py` 已删除；libyue 只作**老师**（行为参考、可平移资产来源、`patches/` 的真实 bug 语料）。
 - **旧链路的完成项与实测结论不在本文件重述**：代码在 `master`（`shim + libyue`，0.5.x 与 `bin-*`/`vendor-*` 发布照旧），踩坑与验收细节在 [docs/zh/adaptation.md](docs/zh/adaptation.md) 与 `git log`。**凡旧栈做过、新栈尚未重做的能力，本文件一律记为未完成。**
 - **门禁口径（本分支例外）**：全仓 `moon check` 允许为红（红点=工作队列，只减不增，当前基线 **287 errors / 68 warnings**（2026-10-11 实测），明细见方案 §5）；逐批验收改分包：`yoga-mbt` 基线不掉 + 新栈各包 `moon check` 零警告且各自测试全绿；组件与声明式层接线完成的那一批恢复全仓门禁。

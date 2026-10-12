@@ -1,6 +1,6 @@
 # moonbit-libyue [![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
 
-> **⚠ 0.6.0 起更名**——mooncakes 包名改为 **`NoahLiu/native-gui`**（原名 `NoahLiu/moonbit-libyue`）；子模块 `NoahLiu/yue-media` → **`NoahLiu/gui-media`**、`NoahLiu/yue-examples` → **`NoahLiu/gui-examples`**。本分支主线为**自绘 GUI 栈**（不依赖 libyue：窗口/像素/事件循环/布局/控件全纯 MoonBit 自绘），方案见 [docs/zh/native-gui-plan.md](docs/zh/native-gui-plan.md)。下方正文仍描述 `master` 上的 0.5.x libyue 绑定 API。
+> **⚠ 已更名**——mooncakes 包名改为 **`NoahLiu/native-gui`**（原名 `NoahLiu/moonbit-libyue`；新包首版 0.1.0 占位上架，待自绘栈稳定后将旧包标记废弃）；子模块 `NoahLiu/yue-media` → **`NoahLiu/gui-media`**、`NoahLiu/yue-examples` → **`NoahLiu/gui-examples`**。本分支主线为**自绘 GUI 栈**（不依赖 libyue：窗口/像素/事件循环/布局/控件全纯 MoonBit 自绘），方案见 [docs/zh/native-gui-plan.md](docs/zh/native-gui-plan.md)。下方正文仍描述 `master` 上的 0.5.x libyue 绑定 API。
 
 > 感谢 [赵成(zcbenz)](https://github.com/zcbenz) 和他的 [Yue](https://github.com/yue/yue) 框架，以及 [MoonBit](https://github.com/moonbitlang)。很凑巧，这两个编程工具都有 “月”，现在我也很喜欢它们。 [关于我和 `libyue`](docs/zh/aboutlibyue.md)
 
