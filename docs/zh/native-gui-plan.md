@@ -128,7 +128,18 @@ profile 挂在 **pane 级参数**上（不是旧链 Browser 实例级的 Options
 
 - **Linux 最轻**：`nu::Canvas`/`nu::Image` 在 libyue 里就是 Cairo/GdkPixbuf，而 `WebKitWebView` 本身就是带 GdkWindow 的 GtkWidget，libyue 直接把它挂进容器（`nativeui/gtk/browser_gtk.cc:296-306`）。我们拥有 GtkWindow 之后，这就是一次普通 `gtk_container_add` 摆到布局算出的矩形上——**不需要 XEmbed、不需要 GtkPlug/GtkSocket、不需要像素合成**（这是「Linux 锁 GTK3」换来的实际红利，裸 X11 方案在这里要多写一整套嵌入协议）。**只能动态链**：运行期依赖发行版 `webkit2gtk-4.1`（本机实测 2.52.6 在位），已知并接受，`scripts/prebuild.py` 增加该 pkg-config 探测项。协议面照 libyue 的机制移植：`webkit_web_context_register_uri_scheme` + 自定义 `GInputStream` 流式回灌（`nu_protocol_stream.cc:31-36`）+ `finish_error` 拒绝 + 无注销 API 时用错误 handler 顶替（`browser_gtk.cc:483-493`）。
 - **Windows 是真成本**：WebView2 需要子 HWND，且是**两级异步 COM 创建**（环境 → controller，`webview2/browser_impl_webview2.cc:113-122,516-529`），创建期失败同步回退 IE、就绪前 `LoadURL` 要排队（`browser_win.cc:56-72,199-214`），跨 HWND 的焦点与滚轮要转发（`:103-152`）。
-- **macOS 已知风险**：`NUWebView : WKWebView` 是 NSView，本体简单；但自定义协议靠私有 API `WKBrowsingContextController registerSchemeForCustomProtocol:`（`nu_custom_protocol.mm:45-52`），新系统不可靠——挂到 mac 线遗留清单，不当等价能力规划。
+- **自定义协议（本地内容通道）：公开面只给「名字先预声明」**（2026-10-12 定案，三平台取严）。三家的入口与时机都不一样：
+
+  | | Linux WebKitGTK | Windows WebView2 | macOS WKWebView |
+  |---|---|---|---|
+  | 注册入口 | `webkit_web_context_register_uri_scheme` | `ICoreWebView2CustomSchemeRegistration`（环境选项）+ `WebResourceRequested` | `WKURLSchemeHandler`（`setURLSchemeHandler:forURLScheme:`，macOS 10.13 / iOS 11 起） |
+  | 最晚定名时机 | 随时（按 context） | **建 environment 之前**（一进程一次、全视图共用） | **建该视图之前**（挂在它的 configuration 上） |
+  | 响应形态 | 回调里同步给流 | 事件驱动，可 deferral | 异步 `didReceive response/data/finish` |
+  | 禁止注册的 scheme | — | — | `http/https/file`（Apple 拒绝；先 `handlesURLScheme:` 探） |
+
+  因此契约定为：**`webview_predeclare_schemes([...])`（建第一扇 webview 之前）→ `register_protocol(scheme, root)` 只能用在已声明的名字上，根目录随时可换、`unregister_protocol` 顶替成错误 handler**。空名单封版时补缺省名 `app`（零配置可用）。Linux 那份「随时注册新名字」的动态能力仍在桩里，但**不对外**——暴露它等于写一份在 Windows/mac 上会失效的代码。
+- **Windows 侧还有一条更省的路（后端实现时二选一，调用方不必知道）**：`SetVirtualHostNameToFolderMapping`（主机名 → 本地目录，子资源在 WebView2 **进程内**解析、算安全上下文）。代价是 URL 形状变成 `https://<host>/...` 而非 `scheme://`。若调用方能接受 https 主机名，这条比「预注册 scheme + 逐请求回包」又快又正；坚持自定义 scheme 形状的就走预注册那条。**另记一条实测事实**：WebView2 的 `NavigateToString` 在微软自己的对比表里「其他网络资源」一栏是 ❌（相对路径子资源根本不去取），与我们在 Linux 上测到的 `load_html` 不入历史同属「别用它做本地 App」的证据——本地页一律走协议/虚拟主机 URL。
+- **macOS 已知风险（2026-10-12 修正范围）**：`NUWebView : WKWebView` 是 NSView，本体简单；**自定义协议现在有公开入口**（`WKURLSchemeHandler`，macOS 10.13+），libyue 当年走的 `WKBrowsingContextController registerSchemeForCustomProtocol:` 私有 API 是更老的路线。要验的是「公开入口够不够用」：自定义 scheme 默认**非标准**（origin/localStorage/cookie 行为要另配）、以及旧系统上 POST body 丢失那类坑。连同 `loadHTMLString:baseURL:` 的历史语义一起，随 mac 真机清单验。
 - **不找第三方绑定**：渲染引擎必然是系统那三家，第三方也绕不开，真正的选择题只是绑定层谁写。MoonBit 生态内没有可靠的现成 webview 封装（待查证），C 层的通用 webview 库其同步模型不覆盖 custom scheme 流式与 JS binding 面，省不了工作量。结论：**自研薄绑定，libyue 当语义参考**。
 - **契约沿用**：`yue/browser/browser.mbt` 的 22+6 个方法名（`load_url`/`go_back`/`execute_javascript`/`on_update_title`…）平台中立，直接作为新栈 browser 契约。三个绑死点要重做：协议载荷那套 `[ok][mime_len][mime][content_len][content]` 小端裸字节 ABI（`browser.mbt:252-292`，CORE1 越界读教训即出于此，见 `adaptation.md:133`）改**结构化返回值**；`(f, closure)` 蹦床随新 shim 重设计；内嵌 `@yue.View` 并 extend 40+ ViewLike（`types.mbt:7-13`）换成新宿主类型。现有面还缺 `on_close`/`on_start|fail_navigation`/`AddUserScript`/高级 binding，新栈补齐。
 

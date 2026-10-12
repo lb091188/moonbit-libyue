@@ -30,6 +30,9 @@ fn main {
     p.fill_rect(0.0, 0.0, r.w, r.h)
   })
   let supported = @web.webview_supported()
+  // 本地内容通道的 scheme 名要在建第一扇 webview 之前声明（三平台取严：
+  // Windows 的名单挂在 environment 上、mac 挂在建视图前的 configuration 上）
+  let _ = @web.webview_predeclare_schemes(["yuedemo"])
   let wv = if supported { @web.webview_new(app, "https://example.com/") } else { None }
   // 导航失败的细粒度原因（批 C 余项）：把 load-failed 载荷拆成结构再记账。
   // 「注销协议后重载同一 URL」就是这条通道的回证，所以两个计数分开——

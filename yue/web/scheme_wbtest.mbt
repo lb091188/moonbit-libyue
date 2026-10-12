@@ -48,8 +48,30 @@ test "未挂载时注册/注销协议都给 false，不碰引擎" {
     None => return
     Some(x) => x
   }
-  assert_eq(v.register_protocol("yuedemo", "/tmp"), false)
-  assert_eq(v.unregister_protocol("yuedemo"), false)
+  // 用「app」而不是随手起的名字：建视图那一刻名单已封，没声明过的名字
+  // 会被门挡在注册之前（那条另有测试），这里要钉的是「未挂载不碰引擎」
+  assert_eq(v.register_protocol("app", "/tmp"), false)
+  assert_eq(v.unregister_protocol("app"), false)
+}
+
+///|
+/// scheme 名单：建第一扇视图即封版；没声明的名字注册不了。
+/// 这条测试不依赖执行顺序——它自己先把封版触发掉。
+test "scheme 名单预声明：封版后不再接受新名字，未声明的注册被挡" {
+  let v = match webview_new(fake_app(), "about:blank") {
+    None => return
+    Some(x) => x
+  }
+  // 名单为空时封版补一个缺省名，零配置也能用这条通道
+  assert_true(webview_scheme_declared("app"))
+  assert_true(webview_declared_schemes().length() >= 1)
+  assert_false(webview_scheme_declared("nope-zz"))
+  // 已封版：再声明返回 false，且名单不变
+  let before = webview_declared_schemes().length()
+  assert_false(webview_predeclare_schemes(["late-zz"]))
+  assert_eq(webview_declared_schemes().length(), before)
+  // 未声明的名字即使句柄有效也进不去（这里句柄为 0，门在 FFI 之前）
+  assert_false(v.register_protocol("nope-zz", "/tmp"))
 }
 
 ///|

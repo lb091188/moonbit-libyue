@@ -124,6 +124,9 @@ pub fn webview_open(app : @core.App, opts : WebviewOptions) -> Webview? {
   if !webview_supported() {
     return None
   }
+  // 建视图之前是 scheme 名单最后的声明机会（Windows 的 environment、mac 的
+  // configuration 都只认这一步之前的名单），此处封版
+  webview_seal_schemes()
   Some({
     app,
     surface: None,
