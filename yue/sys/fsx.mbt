@@ -237,3 +237,21 @@ pub fn sys_write_text_file(path : String, text : String) -> Bool {
   let _ = ffi_sys_write_text_file(@utf8.encode(path), @utf8.encode(text), ok)
   ok.val == 1
 }
+
+///|
+/// 逐级创建目录（已存在的每一层都算成功）。`sys_write_text_file` 不会顺手
+/// 建父目录，所以要先建目录再写；少了这一步时症状是「写的文件根本不在」，
+/// 而不是「目录不存在」。
+///
+/// 纯 MoonBit 实现：调系统 `mkdir -p` 子进程（见 `pr_run`），所以只在
+/// `pr_available()` 为真的平台上可能成功；调用方要区分「建不了」与
+/// 「本平台没有子进程通道」时先探测。
+pub fn sys_make_dirs(path : String) -> Bool {
+  if path == "" {
+    return false
+  }
+  match pr_run("mkdir", ["-p", path]) {
+    Ok(_) => true
+    Err(_) => false
+  }
+}

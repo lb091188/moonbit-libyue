@@ -60,9 +60,11 @@ typedef struct {
   int closing;       // WM_CLOSE / WM_DESTROY（MoonBit 驱动销毁）
   int width;         // 客户区物理像素（per-monitor v2，整栈物理像素口径）
   int height;
-  const unsigned char *pending; // 待贴的 ARGB32 缓冲（所有权在 MoonBit）
+  const unsigned char *pending; // 待贴的 ARGB32 缓冲（指向下面的 backing）
   int pending_w;
   int pending_h;
+  unsigned char *backing; // 后端自己拥有的帧缓冲（跨到下一次 WM_PAINT 仍有效）
+  size_t backing_cap;
   int cursor_kind;   // 0 默认/1 手/2 文本/3 横向/4 纵向
   char commit[256];  // 已提交文本（UTF-8，W6 IME 线实装；当前恒空）
   int commit_len;
@@ -519,6 +521,29 @@ int wm_event(int64_t id) {
   return 0;
 }
 
+// 与 GTK 分支同一条修复：pending 不能直接指 MoonBit 的 Bitmap——贴像素在
+// 下一次 WM_PAINT 里，那之间 Bitmap 可能已被 GC 回收。Windows 侧本机跑不了
+// （改动只经代码审查），但与 Linux 保持同一形态，免得两条后端两套语义。
+static void wm_store_frame(WmWindow *w, const unsigned char *rgba, int width,
+                           int height) {
+  size_t need = (size_t)width * (size_t)height * (size_t)4;
+  if (need == 0) {
+    return;
+  }
+  if (w->backing_cap < need) {
+    unsigned char *nb = (unsigned char *)realloc(w->backing, need);
+    if (nb == NULL) {
+      return;
+    }
+    w->backing = nb;
+    w->backing_cap = need;
+  }
+  memcpy(w->backing, rgba, need);
+  w->pending = w->backing;
+  w->pending_w = width;
+  w->pending_h = height;
+}
+
 void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
   if (id <= 0 || id >= WM_MAX_WINDOWS) {
     return;
@@ -527,11 +552,8 @@ void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
   if (w->hwnd == NULL || rgba == NULL || width < 1 || height < 1) {
     return;
   }
-  // 缓冲所有权仍在 MoonBit（yue/render 的 Bitmap）；这里只记地址并请一次重画，
-  // 真正的贴像素发生在下一次 WM_PAINT 里，那时窗口一定活着。
-  w->pending = rgba;
-  w->pending_w = width;
-  w->pending_h = height;
+  // 拷进后端缓冲再请重画：真正的贴像素在下一次 WM_PAINT 里。
+  wm_store_frame(w, rgba, width, height);
   InvalidateRect(w->hwnd, NULL, FALSE);
 }
 
@@ -545,6 +567,7 @@ void wm_close(int64_t id) {
     w->hwnd = NULL; // WM_DESTROY 里还会再清一次；先摘钩防重入
     DestroyWindow(hwnd);
   }
+  free(w->backing); // 槽位复用前还掉帧缓冲（memset 只会把指针清没）
   memset(w, 0, sizeof(*w));
 }
 
@@ -751,6 +774,7 @@ void wm_window_origin(int64_t id, int32_t *out_x, int32_t *out_y) {
 }
 
 void wm_window_set_size(int64_t id, int w, int h) { (void)id; (void)w; (void)h; }
+void wm_window_set_fullscreen(int64_t id, int on) { (void)id; (void)on; }
 int wm_window_surface_count(int64_t id) {
   (void)id;
   return 0;
@@ -798,9 +822,11 @@ typedef struct {
   int focus_lost;  // 刚失去键盘焦点（原生浮层据此「点外收起」）
   int width;
   int height;
-  const unsigned char *pending; // 待贴的 RGBA 缓冲（所有权在 MoonBit）
+  const unsigned char *pending; // 待贴的 ARGB32 缓冲（指向下面的 backing）
   int pending_w;
   int pending_h;
+  unsigned char *backing; // 后端自己拥有的帧缓冲（跨到下一次 draw 回调仍有效）
+  size_t backing_cap;
   GtkIMContext *im;
   int cursor_kind;   // 当前光标形状（0 默认/1 手/2 文本/3 横向/4 纵向），-1 未设过
   char commit[256]; // 已提交文本（UTF-8），MoonBit 逐字节读走后清零
@@ -1233,6 +1259,30 @@ int wm_event(int64_t id) {
   return 0;
 }
 
+// 把这一帧拷进后端自己的缓冲。原先 pending 直接指 MoonBit 的 Bitmap，
+// 而贴像素发生在**下一次** draw 回调里——那之间 Bitmap 已经没人引用，
+// GC 一收就是读已释放内存（症状正是使用者报的：多开一扇大窗/动起来的窗
+// 时花屏、自绘区闪烁；expose 每次都会重读那个悬垂指针）。
+static void wm_store_frame(WmWindow *w, const unsigned char *rgba, int width,
+                           int height) {
+  size_t need = (size_t)width * (size_t)height * (size_t)4;
+  if (need == 0) {
+    return;
+  }
+  if (w->backing_cap < need) {
+    unsigned char *nb = (unsigned char *)realloc(w->backing, need);
+    if (nb == NULL) {
+      return;
+    }
+    w->backing = nb;
+    w->backing_cap = need;
+  }
+  memcpy(w->backing, rgba, need);
+  w->pending = w->backing;
+  w->pending_w = width;
+  w->pending_h = height;
+}
+
 void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
   if (id <= 0 || id >= WM_MAX_WINDOWS) {
     return;
@@ -1241,11 +1291,9 @@ void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
   if (w->area == NULL || rgba == NULL || width < 1 || height < 1) {
     return;
   }
-  // 缓冲所有权仍在 MoonBit（yue/render 的 Bitmap）；这里只记地址，
-  // 真正的贴像素发生在下一次 draw 回调里，那时窗口一定活着。
-  w->pending = rgba;
-  w->pending_w = width;
-  w->pending_h = height;
+  // 拷进后端缓冲后再请重画：真正的贴像素在下一次 draw 回调里，
+  // 那时窗口一定活着、数据也一定还活着。
+  wm_store_frame(w, rgba, width, height);
   gtk_widget_queue_draw(w->area);
 }
 
@@ -1268,6 +1316,9 @@ void wm_close(int64_t id) {
     w->area = NULL;
   }
   w->pending = NULL;
+  // 帧缓冲是后端 malloc 的，槽位复用前必须还掉（memset 只会把指针清没、
+  // 留下泄漏，下一扇窗复用同一槽时 cap 也一起归零）
+  free(w->backing);
   memset(w, 0, sizeof(WmWindow));
 }
 
@@ -1428,6 +1479,22 @@ void wm_window_set_size(int64_t id, int w, int h) {
     gtk_widget_set_size_request(win->area, ww, hh);
   }
   gtk_window_resize(GTK_WINDOW(win->window), ww, hh);
+}
+
+// 全屏开关（播放器要的「铺满整屏」是窗口级动作，不是把控件尺寸改大）
+void wm_window_set_fullscreen(int64_t id, int on) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *win = &wm_windows[id];
+  if (win->window == NULL) {
+    return;
+  }
+  if (on) {
+    gtk_window_fullscreen(GTK_WINDOW(win->window));
+  } else {
+    gtk_window_unfullscreen(GTK_WINDOW(win->window));
+  }
 }
 
 // 本窗已挂的原生子件数：>0 说明这扇窗里有网页这类「自绘像素盖不住」的东西，
@@ -2164,6 +2231,7 @@ void wm_window_origin(int64_t id, int32_t *out_x, int32_t *out_y) {
 }
 
 void wm_window_set_size(int64_t id, int w, int h) { (void)id; (void)w; (void)h; }
+void wm_window_set_fullscreen(int64_t id, int on) { (void)id; (void)on; }
 int wm_window_surface_count(int64_t id) {
   (void)id;
   return 0;

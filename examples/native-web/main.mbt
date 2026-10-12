@@ -31,6 +31,33 @@ fn main {
   })
   let supported = @web.webview_supported()
   let wv = if supported { @web.webview_new(app, "https://example.com/") } else { None }
+  // 导航失败的细粒度原因（批 C 余项）：把 load-failed 载荷拆成结构再记账。
+  // 「注销协议后重载同一 URL」就是这条通道的回证，所以两个计数分开——
+  // 拆不出结构（sc_raw）与真的失败（sc_fail）不能混成一个数。
+  let sc_fail = Ref(0)
+  let sc_raw = Ref(0)
+  let sc_fail_code = Ref(0)
+  let sc_fail_domain = Ref("")
+  let sc_fail_uri = Ref("")
+  match wv {
+    None => ()
+    Some(v) =>
+      v.on_event = Some(fn(e : @web.WebEvent) -> Unit {
+        match e {
+          @web.LoadFailed(raw) =>
+            match @web.nav_error_parse(raw) {
+              None => sc_raw.val = sc_raw.val + 1
+              Some(ne) => {
+                sc_fail.val = sc_fail.val + 1
+                sc_fail_code.val = ne.code
+                sc_fail_domain.val = ne.domain
+                sc_fail_uri.val = ne.uri
+              }
+            }
+          _ => ()
+        }
+      })
+  }
   let addr = @core.Store::new("https://example.com/")
   let loads = Ref(0)
   let clicks = Ref(0)
@@ -449,6 +476,8 @@ fn main {
   let md_pos = Ref(0.0)
   let md_playing = Ref(0)
   let md_err = Ref("")
+  let md_full = Ref(false)
+  let md_speed = Ref(1.0)
   let md_subs =
     "1\n00:00:00,200 --> 00:00:00,600\n第一条字幕（0.2~0.6 秒）\n\n" +
     "2\n00:00:00,600 --> 00:00:01,000\n第二条字幕（0.6~1.0 秒）\n"
@@ -484,6 +513,24 @@ fn main {
               md_playing.val = if playing { 1 } else { 0 }
             },
             on_error=fn(e : String) -> Unit { md_err.val = e },
+            on_speed=fn(v : Double) -> Unit { md_speed.val = v },
+          ),
+          // 全屏是窗口级动作：控件层拿不到窗口，由宿主把请求转给 App。
+          // 逐帧与音量在控制条里（|< 与 >| 两个键、右侧音量条）。
+          @ui.container(
+            [
+              @ui.button(
+                "全屏 / 退出全屏",
+                on_click=fn() {
+                  md_full.val = !md_full.val
+                  win.set_fullscreen(md_full.val)
+                },
+                min_width=150.0,
+              ),
+            ],
+            direction=@yoga.Row,
+            column_gap=10.0,
+            padding=6.0,
           ),
         ])
       }
@@ -497,6 +544,88 @@ fn main {
           "开一扇播放器窗",
           on_click=fn() { open_player(app) },
           min_width=140.0,
+        ),
+      ],
+      direction=@yoga.Row,
+      column_gap=10.0,
+      padding=6.0,
+      bg=@theme.theme_bg_panel(),
+      border=@theme.theme_border(),
+      align_items=@yoga.AlignItems::Center,
+    ),
+  ])
+
+  // ---- 批 D 长素材：本机真视频（存在才开，不存在只报「没素材」不假装能播）----
+  // 1 秒测试片只证明得了「链路通」，证明不了连续解码不漂、深跳 seek 追关键帧、
+  // 倍速下音画同轴——那些要一支真片子（使用者给的 23 分钟素材）。
+  let lv_dir = "/home/lkyh/下载"
+  let lv_name = "001.mp4"
+  let lv_path = lv_dir + "/" + lv_name
+  let lv_present = match @sys.fsx_list_dir(lv_dir) {
+    Ok(names) => {
+      let mut hit = false
+      for n in names {
+        if n == lv_name {
+          hit = true
+        }
+      }
+      hit
+    }
+    Err(_) => false
+  }
+  let lv_frames = Ref(0)
+  let lv_pos = Ref(0.0)
+  let lv_speed = Ref(1.0)
+  let lv_err = Ref("")
+  let open_local = fn(a : @core.App) -> Unit {
+    match a.open_window(1000, 620, "本地视频（长素材）") {
+      None => ()
+      Some(win) => {
+        win.root.set_column()
+        win.root.set_padding(12.0, 10.0)
+        win.root.on_draw = Some(fn(
+          _w : @core.Widget,
+          p : @render.Painter,
+          r : @core.Rect,
+        ) -> Unit {
+          p.set_fill_color(@theme.theme_bg_page())
+          p.fill_rect(0.0, 0.0, r.w, r.h)
+        })
+        win.mount([
+          @ui.label("长素材回证：真片子看连续解码 / 深跳 seek / 倍速同轴", size=13.0),
+          @media.player_t(
+            lv_path,
+            width=960.0,
+            height=500.0,
+            auto_play=true,
+            on_tick=fn(t : Double, frames : Int, _playing : Bool) -> Unit {
+              if frames > lv_frames.val {
+                lv_frames.val = frames
+              }
+              if t > lv_pos.val {
+                lv_pos.val = t
+              }
+            },
+            on_speed=fn(v : Double) -> Unit { lv_speed.val = v },
+            on_error=fn(e : String) -> Unit { lv_err.val = e },
+          ),
+        ])
+      }
+    }
+  }
+  app.mount([
+    @ui.container(
+      [
+        @ui.label(
+          if lv_present { "批 D 长素材：/home/lkyh/下载/001.mp4（23 分钟）" } else {
+            "批 D 长素材：这台机器没有 /home/lkyh/下载/001.mp4"
+          },
+          size=13.0,
+        ),
+        @ui.button(
+          "开一扇本地视频窗",
+          on_click=fn() { open_local(app) },
+          min_width=150.0,
         ),
       ],
       direction=@yoga.Row,
@@ -563,6 +692,73 @@ fn main {
           "开原生弹层菜单",
           on_click=fn() { open_menu(app) },
           min_width=140.0,
+        ),
+      ],
+      direction=@yoga.Row,
+      column_gap=10.0,
+      padding=6.0,
+      bg=@theme.theme_bg_panel(),
+      border=@theme.theme_border(),
+      align_items=@yoga.AlignItems::Center,
+    ),
+  ])
+
+  // ---- 批 C 余项：本地内容通道（自定义协议按 context 注册）----
+  // 往临时目录写一份真文件，注册成 yuedemo:// 后让页面区直接加载它——
+  // 「本地内容不经磁盘缓存、不经网络层」这条能力就完整了。
+  let sc_root = "/tmp/native-web-scheme"
+  let sc_index =
+    "<!doctype html><html><head><meta charset=\"utf-8\">" +
+    "<title>本地协议页</title><link rel=\"stylesheet\" href=\"style.css\">" +
+    "</head><body><h1 id=\"h\">来自 yuedemo:// 的标题</h1>" +
+    "<p class=\"styled\">这一段若带蓝色底色，说明 style.css 也是走协议取到的。</p>" +
+    "</body></html>"
+  let sc_css = ".styled { background: #cde; padding: 6px; } h1 { font-size: 20px; }"
+  let sc_reg = Ref(0)
+  let sc_loads = Ref(0)
+  let sc_unreg = Ref(0)
+  let sc_files = Ref(0)
+  let load_local_page = fn() -> Unit {
+    // 写文件不会顺手建父目录：目录不在时两份写都失败，页面那边只回一句
+    // not found，看着像协议没通。先建目录，再把「文件到底在不在」报出来。
+    let _ = @sys.sys_make_dirs(sc_root)
+    let a = @sys.sys_write_text_file(sc_root + "/index.html", sc_index)
+    let b = @sys.sys_write_text_file(sc_root + "/style.css", sc_css)
+    if a && b {
+      sc_files.val = 2
+    }
+    match wv {
+      None => ()
+      Some(v) => {
+        if v.register_protocol("yuedemo", sc_root) {
+          sc_reg.val = 1
+          v.load_url("yuedemo://local/index.html")
+          sc_loads.val = sc_loads.val + 1
+        }
+      }
+    }
+  }
+  app.mount([
+    @ui.container(
+      [
+        @ui.label("批 C 余项：本地协议（yuedemo:// 读临时目录里的真文件）", size=13.0),
+        @ui.button(
+          "加载本地协议页",
+          on_click=fn() { load_local_page() },
+          min_width=150.0,
+        ),
+        @ui.button(
+          "注销该协议",
+          on_click=fn() {
+            match wv {
+              None => ()
+              Some(v) =>
+                if v.unregister_protocol("yuedemo") {
+                  sc_unreg.val = 1
+                }
+            }
+          },
+          min_width=120.0,
         ),
       ],
       direction=@yoga.Row,
@@ -674,8 +870,9 @@ fn main {
   }
   let _ = app.timer(120, ticker.val)
   // 冒烟自杀点：批 C 要开第二窗、等绑定注册、再逐条按抓取/回话/权限/新窗，
-  // 20 秒走不完一轮，放宽到 45 秒（仍是无人值守冒烟）
-  let _ = app.timer(45000, fn() { app.quit() })
+  // 20 秒走不完一轮；批 D 长素材还要开窗播一段、深跳 seek 再切倍速，
+  // 于是放宽到 75 秒（仍是无人值守冒烟，不靠人点）
+  let _ = app.timer(75000, fn() { app.quit() })
   app.run()
 
   let pane_rect = match pane_w.val {
@@ -712,6 +909,31 @@ fn main {
       "'",
   )
   println("NATIVE-WEB-GEO pane=" + pane_rect + " sidebar=" + side_rect)
+  // close 之后 get_title 回空串，所以标题复用上面关闭前读到的那一份
+  let sc_title = title
+  println(
+    "NATIVE-WEB-SCHEME reg=" +
+      sc_reg.val.to_string() +
+      " loads=" +
+      sc_loads.val.to_string() +
+      " files=" +
+      sc_files.val.to_string() +
+      " unreg=" +
+      sc_unreg.val.to_string() +
+      " fails=" +
+      sc_fail.val.to_string() +
+      " raw=" +
+      sc_raw.val.to_string() +
+      " fail='" +
+      sc_fail_domain.val +
+      "/" +
+      sc_fail_code.val.to_string() +
+      " " +
+      sc_fail_uri.val +
+      "' title='" +
+      sc_title +
+      "'",
+  )
   println(
     "NATIVE-WEB-OVL opens=" +
       ov_opens.val.to_string() +
@@ -751,8 +973,23 @@ fn main {
       (md_pos.val * 1000.0).round().to_int().to_string() +
       " playing=" +
       md_playing.val.to_string() +
+      " speed=" +
+      @media.vp_fmt_speed(md_speed.val) +
       " err='" +
       md_err.val +
+      "'",
+  )
+  println(
+    "NATIVE-WEB-LOCAL present=" +
+      (if lv_present { "1" } else { "0" }) +
+      " frames=" +
+      lv_frames.val.to_string() +
+      " pos_ms=" +
+      (lv_pos.val * 1000.0).round().to_int().to_string() +
+      " speed=" +
+      @media.vp_fmt_speed(lv_speed.val) +
+      " err='" +
+      lv_err.val +
       "'",
   )
   println(

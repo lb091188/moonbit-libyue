@@ -173,6 +173,10 @@ extern "c" fn wm_window_set_size(id : Int64, w : Int, h : Int) -> Unit =
   "wm_window_set_size"
 
 ///|
+extern "c" fn wm_window_set_fullscreen(id : Int64, on : Int) -> Unit =
+  "wm_window_set_fullscreen"
+
+///|
 extern "c" fn wm_window_surface_count(id : Int64) -> Int =
   "wm_window_surface_count"
 

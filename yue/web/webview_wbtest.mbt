@@ -107,6 +107,11 @@ test "事件分派：kind 映射逐条对上，JS 回包按序号配对后出队
     match e {
       TitleChanged(t) => log.push("title:" + t)
       NavFinished(t) => log.push("finish:" + t)
+      UrlChanged(t) => log.push("url:" + t)
+      NavStarted(t) => log.push("start:" + t)
+      NavCommitted(t) => log.push("commit:" + t)
+      NavRedirected(t) => log.push("redirect:" + t)
+      LoadFailed(t) => log.push("fail:" + t)
       Permission(t) => log.push("perm:" + t)
       Download(t) => log.push("dl:" + t)
       NewWindow(t) => log.push("win:" + t)
@@ -119,6 +124,11 @@ test "事件分派：kind 映射逐条对上，JS 回包按序号配对后出队
   })
   v.dispatch(1, 0L, "标题")
   v.dispatch(5, 0L, "https://e.x/")
+  v.dispatch(2, 0L, "https://e.x/")
+  v.dispatch(3, 0L, "https://e.x/")
+  v.dispatch(4, 0L, "https://e.x/")
+  v.dispatch(15, 0L, "https://e.x/2")
+  v.dispatch(14, 0L, "https://e.x/2|WebKitNetworkError|-1|boom")
   v.dispatch(9, 0L, "GeolocationPermissionRequest")
   v.dispatch(10, 0L, "https://e.x/f.zip")
   v.dispatch(8, 0L, "https://e.x/open")
@@ -131,6 +141,11 @@ test "事件分派：kind 映射逐条对上，JS 回包按序号配对后出队
     [
       "title:标题",
       "finish:https://e.x/",
+      "url:https://e.x/",
+      "start:https://e.x/",
+      "commit:https://e.x/",
+      "redirect:https://e.x/2",
+      "fail:https://e.x/2|WebKitNetworkError|-1|boom",
       "perm:GeolocationPermissionRequest",
       "dl:https://e.x/f.zip",
       "win:https://e.x/open",

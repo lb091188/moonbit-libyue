@@ -322,3 +322,50 @@ test "音量钳制：media_clamp_volume 与 set_volume" {
   inspect(player.volume.val, content="0.5")
   player.free()
 }
+
+///|
+/// 逐帧步进：先暂停、按帧率挪位置、**当场解到落点那一帧**。
+/// 钉三件事：① 步进不进入播放态（暂停中步进还是暂停）；② 位置按 1/fps
+/// 走而不是按墙钟走；③ 画面立刻有帧（旧形态是 seek 清帧后等下一 tick，
+/// 暂停时 tick 直接返回，画面会停在黑帧上）。
+test "逐帧步进：暂停中挪一帧并立刻出画面" {
+  let path = "modules/ffmpeg-mbt/src/testdata/av_1s.mp4"
+  let player = match VideoPlayer::make(path, fps=12) {
+    Ok(p) => p
+    Err(e) => fail("make 失败：\{e}")
+  }
+  let f0 = player.frames_decoded()
+  let t0 = player.current()
+  // n=0 什么都不动
+  player.step(0)
+  assert_eq(player.frames_decoded(), f0)
+  assert_eq(player.current(), t0)
+  player.step(1)
+  assert_eq(player.is_playing(), false)
+  assert_true(player.frames_decoded() > f0)
+  assert_true(player.current() > t0)
+  match player.current_frame() {
+    None => fail("步进后必须已有帧（不能等下一 tick）")
+    Some(b) => assert_true(b.length() > 0)
+  }
+  // 回退到起点以下钳在 0，不产生负位置
+  player.step(-50)
+  assert_true(player.current() >= 0.0)
+  // 前进过头钳到时长（不越过结尾继续解）
+  player.step(5000)
+  assert_true(player.current() <= player.duration() + 0.001)
+  // 音量读口与控制条同源：set 之后 get 给钳制值
+  player.set_volume(0.4)
+  assert_eq(player.get_volume(), 0.4)
+  player.set_volume(3.0)
+  assert_eq(player.get_volume(), 1.0)
+  // 倍速：钳制后落引擎，位置基准重钉不跳秒（步进与倍速共用同一份 pos）
+  assert_eq(player.get_speed(), 1.0)
+  player.set_speed(9.0)
+  assert_eq(player.get_speed(), 4.0)
+  player.set_speed(0.0)
+  assert_eq(player.get_speed(), 0.25)
+  player.set_speed(2.0)
+  assert_eq(player.get_speed(), 2.0)
+  player.free()
+}

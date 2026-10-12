@@ -784,6 +784,46 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **本批未做（记在 TODO，不假装完成）**：倍速（音频侧要时间拉伸，只做视频侧会破坏音画同步——正是本档反复警告的那条）、内嵌字幕轨（mov_text/ass，本批只吃外挂 SRT/VTT 文本）、全屏、音量条 UI（引擎有 `set_volume`，控件没画）、逐帧步进。
 - **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/media` **18/18**（15 条平移：音频播放/pump/seek/循环、视频解码/时钟/时长/帧尺寸/无音轨静音推进；新增 3 条：字幕四段（时间戳两种写法、SRT/VTT 通吃、行内标记剥离、命中边界含起止与多条拼接）、帧回灌字节序与短包尾像素、控制条分区）；`moon check yue/media`/`./examples/native-web` `--deny-warn` 零警告；core 70/70、ui 110/110、web 11/11、render 43/43、text 29/29 未掉；全仓红点仍 287 errors / 68 warnings。真窗口回证（`examples/native-web` 的「开一扇播放器窗」= 第三扇窗播 `av_1s.mp4` + 内联 SRT）：`NATIVE-WEB-MEDIA frames=10 pos_ms=1000 playing=0 err=''`（1 秒片解满 10 帧、时钟走到 1000ms、播完自动停、无降级），截图见彩条画面颜色不错位 + 白字「第二条字幕（0.6~1.0 秒）」叠在画面上 + 控制条进度满格与 `0:01 / 0:01`。**待使用者肉眼复验**：有声播放是否真出声（本机有 miniaudio 设备）、拖动进度条的 seek 手感、长片倍速与逐帧（本批未做）。
 
+### MoonBit 原生 GUI 栈 · 上屏缓冲的所有权（修复：多开大窗花屏 / 自绘区闪烁）
+
+- **症状（使用者真机报）**：开「桥接窗」或「本地视频窗」这类第二扇窗时花屏、自绘区域闪烁；主窗单开时看不出来。
+- **根因**：`wm_present` 把 `w->pending` **直接指向 MoonBit 侧的 `Bitmap` 缓冲**，而真正的贴像素在**下一次** draw 回调里做（GTK 只能在 draw 回调里拿 GdkWindow 的 cairo，绕不开）。回调排上之后，那块 Bitmap 在 MoonBit 侧已经没人引用了——`App::paint_frame` 里它是局部量，下一帧就换一个——GC 什么时候收全看压力。收掉之后 expose 再读那个地址就是**已释放内存**，于是花屏；每次 expose 重读一次，看起来就像「一闪一闪」。
+- **为什么偏偏是多开大窗**：单窗小画面时那块缓冲往往还没被回收就又被贴一次；多一扇 1000x620 的动画窗，每秒多几十次分配，GC 压力上来了，窗口就落在「已回收但还要被 expose」的窗口期里。覆盖再移开（强制 expose 旧区域）最容易复现。
+- **修复**：后端**自己拥有**帧缓冲——`WmWindow` 加 `backing/backing_cap`，`wm_present` 走 `wm_store_frame`（按需 realloc + 一次 memcpy），`pending` 指向自己的缓冲；`wm_close` 释放（槽位会被下一扇窗复用，只 memset 就是既漏又错）。GTK 与 Win32 两条分支同形改，避免两套语义（Windows 侧本机跑不了，只经代码审查，随 W 线真机复验）。
+- **一条口径**：跨 FFI 边界「留到下一次回调」的缓冲必须由**被回调的一侧**拥有。只写注释（原先就写着「所有权在 MoonBit」）不解决问题——所有权写清楚了，可没人负责让它活到那一刻。同类形态在 `yue/web` 的 JS 回包、`yue/media` 的帧回灌里都检查过一遍：那两处都是 C 侧自己 `malloc`/`g_free`，没有这条隐患。
+- **验证**：改后 `moon build ./examples/native-web` 重链（`build/libyue_win_stub.a` 重编），真窗口跑「开本地视频窗 → 截图 → 用主窗盖住再移开逼一次 expose → 再截图」：23 分钟真片连解 `NATIVE-WEB-LOCAL present=1 frames=1369 pos_ms=56397 speed=1.25x err=''`（一扇 1000x620 的动画窗每秒几十次分配，正是原先最容易落进「已回收但仍要 expose」的形态），日志里 X 错误 0 条，两帧截图内容与视频一致、无条纹脏区；**使用者已在真机复验：桥接窗与本地视频窗不再花屏、自绘区不再闪**。全仓红点仍 287 errors / 68 warnings。
+
+### MoonBit 原生 GUI 栈 · 播放器倍速（批 D2b：纯 MoonBit 重采样 + 时钟同轴）
+
+- **零 C 做到的倍速**：音频侧不需要新桩——解码出的 s16 交错 PCM 在推给设备前按 `1/speed` 做线性重采样（`media_resample_s16`，纯 MoonBit），设备仍按原采样率消费，于是样本少一倍、走完就快一倍。代价是**音高随动**（这是"变速"而不是"变速不变调"，后者要相位声码器）。视频侧时钟只改一处：`vp_target_pts(base, elapsed_ms, speed) = base + elapsed × speed`，两边同轴，所以不会出现「画面快、声音慢」——那正是旧链反复警告过的失同步形态。
+- **一条被倍速逼出来的既有缺陷**：tick 原先是"每 tick 至少解一帧"（解一帧后才比 `pts >= target`），于是低帧率视频与**任何慢速**都会跑在时钟前面（画面 30 帧/秒地走、时钟按 0.5 倍速走）。修法是把闸门提到解码**之前**：先看已解帧的 pts，已在时钟前面就不再解。这条同时兑现了 tick 注释里早就写着的「低帧率视频画面跨 tick 保持」。
+- **换速要把时钟基准重钉一次**：`set_speed` 先读当前位置、再改倍速、然后把 `base_pts/pos_base` 设成这个位置、`wall0/played_base` 设成当下——不重钉的话位置会按新旧倍速差跳一下。音频位置口径跟着变：队列里是重采样后的样本，所以「消费 N 个样本 = 走过 N×speed 个源样本」，`AudioPlayer::current()` 里那一项要乘 speed。
+- **无时间戳的流不假装支持**：回退路径（每 tick 一帧、按流帧率步进）没有 pts 可追，倍速只影响时钟不影响画面，这一点写在 `tick` 的注释里而不是藏在代码里。
+- **档位取自表而不是就地加减**：`bar_speeds = [1.0, 1.25, 1.5, 2.0, 0.75]`，点击只推进下标（`player_speed_at(i)`，含负数与回绕），所以不存在 `+= 0.25` 累加漂出档位的可能；钳制在引擎侧（`media_clamp_speed`，[0.25,4.0]，NaN 回 1.0 而不是最快/最慢档）。控制条多出第六个分区（`speed`），轨道起点随之从 114px 挪到 154px，音量条让位阈值从 400 抬到 440——**绘制与命中读同一组常量**这条判据在这批第二次发挥作用。
+- **观测口而不是猜**：`player_t` 加 `on_speed(v)`（与既有 `on_tick`/`on_error` 同构），示例把档位写进退出行 `NATIVE-WEB-MEDIA ... speed=1.5x`，回证不必去读引擎内部状态。
+- **本批未做（不假装完成）**：内嵌字幕轨（mov_text/ass 要 `ffmpeg-mbt` 先暴露字幕流）、真出声与听感复验（倍速下是否仍同步、音高随动是否可接受）。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/media` **22/22**（新增 3 条：倍速档位表含回绕与负下标 + 标签短写法、`media_clamp_speed` 与 `vp_target_pts` 三条算式、`media_resample_s16` 的 2 倍/0.5 倍样本数与插值中点与双声道不串位及三种原样返回情形；另在真机解码那条里加 `get_speed` 钳制回环；控制条分区测试改到六段）；`moon check yue/media`/`./examples/native-web` `--deny-warn` 零警告。真窗口回证（`examples/native-web`「开一扇播放器窗」→ 在控制条倍速区连点两下：1x→1.25x→1.5x）：`NATIVE-WEB-MEDIA frames=10 pos_ms=1000 playing=0 speed=1.5x err=''`——档位由 `on_speed` 观测口报出（不是读引擎内部），1 秒片在 1.5 倍速下仍解满 10 帧并走到 1000ms 后自停、无降级；截图见控制条 `▶ |< >| 1.5x` + 进度满格 + 音量条 + `0:01 / 0:01`。**待使用者肉眼复验**：倍速下音画是否仍同步、音高随动是否可接受、以及 0.75x 慢速下画面的保持感。
+
+### MoonBit 原生 GUI 栈 · 播放器控制面补齐（批 D2a：逐帧步进、音量条、全屏）
+
+- **逐帧步进必须「当场解到落点那一帧」**：`seek` 会把当前帧清成 `None` 等下一 tick，而**暂停时 `tick()` 直接返回**——于是步进后画面停在黑帧，看起来像「按了没反应」。修法是把 tick 里那段「从解码点向前解到目标时刻（上限 8 帧）」抽成 `vp_settle`，步进 = 先暂停 → 按 `1/fps` 挪位置 → `seek` → `settle`。判据全在无头那条里：步进后 `frames_decoded()` 增加、`current()` 前进、`current_frame()` 非空、`is_playing()` 仍为假（步进不许把播放态带起来）。
+- **控制条从三段分区变五段**（播放 / 上一帧 / 下一帧 / 进度轨 / 音量 / 时间文字），绘制与命中读**同一组** `BAR_*` 常量——分区写在两处迟早会对不上。另加一条「窄条让位」判据：`w < 400` 时音量条整个不画也不响应（轨道右端改按时间文字算），否则会出现「看得见却点不着」或反过来。轨道两端仍是**钳制**而不是越界（114px 处 =0.0、354px 处 >0.99）。
+- **音量与 seek 的防抖方向相反**：seek 抬手才真做（每次真 seek 要回关键帧，代价高），音量**每步都生效**（边拖边听才是预期，且它不触发解码）。音量条画的是 `engine.get_volume()`（引擎里那份钳制值）而不是组件本地副本——本地副本在 set 被钳制时会与显示不一致。为此给 `VideoPlayer` 补了 `get_volume`（`AudioPlayer` 早有，两边口径对齐）。
+- **全屏是窗口级动作**：控件层拿不到窗口，所以链路是 `Window::set_fullscreen` → `App::set_fullscreen`，由宿主（示例）挂按钮请求；C 侧只有 `gtk_window_fullscreen`/`unfullscreen` 两行（ABI-only，判据见「C 桩按需且 minimal」那条口径）。切换后尺寸变化照常走 allocate 事件，宿主不需要自己算新矩形。
+- **本批未做（不假装完成）**：倍速（音频侧要么时间拉伸、要么走 miniaudio 的 pitch，两者都要改设备线程那条路，另批做并写清音高随动的代价）、内嵌字幕轨（mov_text/ass 要 `ffmpeg-mbt` 先暴露字幕流）、真出声复验。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/media` **19/19**（新增 1 条逐帧步进：`n=0` 不动、步进后帧数/位置/有帧/仍暂停四条都成立、两端钳制、`get_volume` 给钳制值；控制条分区测试改到五段 + 窄条让位）；`moon check yue/win`/`yue/core`/`yue/media`/`./examples/native-web` `--deny-warn` 零警告。真窗口回证（`examples/native-web`「开一扇播放器窗」→ 注入 `>| ×2`、`|< ×1`、音量条中段、全屏按钮）：`NATIVE-WEB-MEDIA frames=21 pos_ms=1000 playing=0 err=''`（1 秒片正常播完 10 帧后再被步进解到 21 帧，说明步进真在解码；`err=''` 即无降级），点全屏后 `xdotool getwindowgeometry` 给 `Position: 2560,0 Geometry: 2560x1440`（附窗真的铺满第二块屏），截图见控制条 `▶ |< >|` + 进度轨 + **音量条**（拖到中段后填充可见）+ `0:00 / 0:01`。**待使用者肉眼复验**：逐帧步进的画面跳动观感、音量条拖动手感与是否真变响、全屏下字幕与控件的位置。
+
+### MoonBit 原生 GUI 栈 · 本地内容通道与导航细粒度原因（批 C 余项：`yue/web/scheme.mbt`）
+
+- **协议按 context 注册，不按视图**：`webkit_web_context_register_uri_scheme` 的回调签名是 `(WebKitURISchemeRequest*, gpointer)`——**没有 view 参数**，所以协议归属天然是 context 级；旧链那种进程级静态注册在多 profile（profile 挂 pane 级）之后语义就不清了。本批的槽表按 `(context, scheme)` 去重：同一 context 下同名协议只向引擎注册一次，再注册只换根目录。
+- **「注销」是顶替而不是撤销**：WebKit 没有 unregister-uri-scheme。注销 = 把这条 scheme 的根目录清空，回调从此一律走 `webkit_uri_scheme_request_finish_error`，页面拿到「协议在、内容取不到」。这比留着旧目录安全（切了 profile 还能读到上一个 profile 的文件），也比「假装能撤销注册」诚实——返回值只表示顶替成功。
+- **只做根目录下的静态文件，路径穿越在桩侧拦**：请求 path 含 `..` 直接回错误，不做绝对化、不跟符号链接逃逸；MIME 按扩展名查表（html/htm/css/js/mjs/json/svg/png/jpg/jpeg/gif/woff2/txt），其余 `application/octet-stream`。
+- **一条口径（2026-10-12 定案）**：C 桩**按需且 minimal**——只在 MoonBit 够不着的地方写（GTK3 窗口层、Cairo、Pango、WebKitGTK、miniaudio/ffmpeg、dirent/getenv/spawn、socket），C 里只做 ABI 翻译与槽表，判断/解析/降级语义一律留在 MoonBit；加函数前先查「已有的 MoonBit 通道能不能组合出来」。本批就是一次实际取舍：目录创建没有新增 C，`sys_make_dirs` 用既有的子进程通道组合（`pr_run("mkdir", ["-p", path])`，仓库里 `defaultapps_wbtest` 已有同样先例），代价是它只在 `pr_available()` 为真的平台上成立，所以函数文档写明「探测即口径」，而不是让调用方以为处处可用。
+- **写文件不会顺手建父目录，而症状出现在别处**（本批真窗口踩到）：页面区只显示一句 `not found`，看着像协议没通，实际是根目录 `/tmp/native-web-scheme` 压根不存在、两份 `sys_write_text_file` 全失败。修法是 `sys_make_dirs`，但**判据要先拆开**：示例的退出行加了 `files=` 计数（注册成功 / 加载发出 / 文件真在不在），少了这一段就得靠猜是哪条链断的。
+- **导航细粒度原因两条**：① `WEBKIT_LOAD_REDIRECTED` 出 kind 15——调用方要能区分「换了地址」与「重新加载」；② load-failed 的载荷结构化成 `uri|domain|code|message`（`domain` 用 `g_quark_to_string` 给名字），MoonBit 侧 `nav_error_parse` 拆成 `NavError`；错误文本里可能有 `|`，所以前三段按位置取、剩下的全归 message，段数不足给 `None` 而不是猜字段。
+- **一条只有真窗口能抓到的接缝缺陷**：`WebEvent` 里**有** `LoadFailed`，而 `Webview::dispatch` 的 kind 表里**没写 14**，于是每次失败都落成 `Unknown(14, raw)`，调用方永远读不到原因。无头套件当时号称「kind→事件逐条映射」却漏了它——因为被走查的那张表本身就跳过了 14：**两半各自有测试，中间那道映射没有**。现在 2/3/4/14/15 全钉进那条测试，另加一条端到端（dispatch 14 → `LoadFailed` → `nav_error_parse` 拆出四段）。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/web` **15/15**（新增 4 条无头：`nav_error_parse` 的四段与「message 里带 `|`」与段数不足、`nav_parse_int` 的负号与非数字即停、未挂载时 `register_protocol`/`unregister_protocol` 一律 false 且不动句柄、上面那条 kind 14 接缝）；`moon test -p NoahLiu/moonbit-libyue/yue/sys` **164/164**（新增 1 条 `sys_make_dirs`：逐级建目录→写→读回、幂等、空串拒绝、父目录缺失时写失败）；`moon check yue/sys`/`yue/web`/`./examples/native-web` `--deny-warn` 零警告。真窗口回证（`examples/native-web` 的「批 C 余项」一行，两段判据分开跑）：① 加载协议页 `NATIVE-WEB-SCHEME reg=1 loads=1 files=2 unreg=0 title='本地协议页'` + `NATIVE-WEB-STAT ... title='本地协议页' url='yuedemo://local/index.html'`，截图两条硬证据——页面标题是协议页的 `<title>`、正文段落带蓝底（`style.css` 也是走 `yuedemo://` 取到的，不是内联）；② 注销后重载同一 URL `unreg=1 fails=1 raw=0 fail='WebKitNetworkError/399 yuedemo://local/index.html' title=''`，页面区把 `finish_error` 里给的文本原样画出来（屏幕上就是 `scheme unregistered` 一行），证明「注销=顶替成错误 handler」真的生效、且失败原因是**结构**而不是字符串。顺带一条枚举事实：`WEBKIT_NETWORK_ERROR_FAILED = 399`（不是直觉的 -1）。**待使用者肉眼复验**：错误页与协议页的观感、注销后再点「加载本地协议页」（会重新注册同一根目录）是否符合预期。
+
 ### MoonBit 原生 GUI 栈 · JS 桥 / DOM 抓取 / 导航面（批 C：`yue/web` 的 webkit 桩与契约面）
 
 - **异步事件一律「C 排队 + MoonBit 消费式取」，不写 C→MoonBit 蹦床**：WebKit 的导航、标题、JS 回包、页面 `invoke`、权限、下载、进程终止都是引擎侧异步信号，若每个都做闭包蹦床，就要替 12 个回调各自管生命周期与线程归属。本批的形态是 per-view 一条 32 格环形队列（`wb_next_event` 取 kind、`wb_event_num`/`wb_event_text` 读载荷），队列满**丢最旧**——事件是提示不是账本，堵死会把主循环拖住。

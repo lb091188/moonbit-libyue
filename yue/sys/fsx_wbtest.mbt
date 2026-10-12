@@ -106,6 +106,29 @@ test "fsx_set_env / fsx_unset_env：进程内写读改删回环" {
 }
 
 ///|
+test "sys_make_dirs：逐级建目录后写文件才有着落" {
+  if !pr_available() {
+    // 没有子进程通道的平台上这条能力就是探不到（探测即口径），跳过而非造假
+  } else {
+    let root = "/tmp/sys_make_dirs_wbtest"
+    let nested = root + "/a/b/c"
+    let f = nested + "/note.txt"
+    ignore(pr_run("rm", ["-rf", root]))
+    assert_true(sys_make_dirs(nested))
+    assert_true(sys_write_text_file(f, "内容在里层"))
+    assert_eq(sys_read_text_file(f), Some("内容在里层"))
+    // 目录已存在仍算成功（幂等）
+    assert_true(sys_make_dirs(nested))
+    assert_true(sys_make_dirs(root))
+    // 空串拒绝
+    assert_false(sys_make_dirs(""))
+    // 父目录不存在时写文件失败：这条正是 make_dirs 要挡住的坑
+    assert_false(sys_write_text_file(root + "/gone/deep/x.txt", "x"))
+    ignore(pr_run("rm", ["-rf", root]))
+  }
+}
+
+///|
 test "FileDialog：建/配/释放（run 与取结果留真机）" {
   // 本机有显示：桩侧 gtk_init_check 初始化后真建对象（不显示、不模态）；
   // 无显示环境（CI）同一入口返回 0 句柄、全接口退化不崩。

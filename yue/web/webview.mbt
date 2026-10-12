@@ -56,6 +56,8 @@ pub(all) enum WebEvent {
   NavStarted(String)
   NavCommitted(String)
   NavFinished(String)
+  /// 被服务端重定向（细粒度：与「重新加载」区分开）
+  NavRedirected(String)
   LoadFailed(String)
   Invoke(String)
   EvalResult(Int64, String)
@@ -292,6 +294,8 @@ fn Webview::dispatch(self : Webview, kind : Int, num : Int64, text : String) -> 
     3 => NavStarted(text)
     4 => NavCommitted(text)
     5 => NavFinished(text)
+    15 => NavRedirected(text)
+    14 => LoadFailed(text)
     6 => Invoke(text)
     7 => EvalResult(num, text)
     8 => NewWindow(text)

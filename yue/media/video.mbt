@@ -79,6 +79,8 @@ pub(all) struct VideoPlayer {
   width : Int
   height : Int
   volume : Ref[Double]
+  speed : Ref[Double]
+  audio_ch : Int
   looping : Ref[Bool]
   state : Ref[VpState]
   closed : Ref[Bool]
@@ -156,6 +158,33 @@ pub fn VideoPlayer::set_volume(self : VideoPlayer, v : Double) -> Unit {
     Some(d) => mbt_adev_set_volume(d, Float::from_double(vol))
     None => ()
   }
+}
+
+///|
+/// 倍速（0.25..4.0；钳制）。时钟按 `流逝 × speed` 走，音频队列走
+/// `media_resample_s16`（样本数缩到 1/speed），两边同轴所以**不会**出现
+/// 「画面快、声音慢」；代价是音高随动（本栈不做时间拉伸）。换速时把时钟
+/// 基准重钉一次（当前位置 + 当前墙钟），否则位置会跳一下。
+pub fn VideoPlayer::set_speed(self : VideoPlayer, v : Double) -> Unit {
+  if self.closed.val {
+    return
+  }
+  let cur = self.pos.val
+  self.speed.val = media_clamp_speed(v)
+  self.base_pts.val = cur
+  self.wall0.val = mbt_now_ms()
+}
+
+///|
+/// 当前倍速。
+pub fn VideoPlayer::get_speed(self : VideoPlayer) -> Double {
+  self.speed.val
+}
+
+///|
+/// 当前音量（0..1；控制条画音量条要用它，不然拖动后显示与实际各说各话）。
+pub fn VideoPlayer::get_volume(self : VideoPlayer) -> Double {
+  self.volume.val
 }
 
 ///|
@@ -260,6 +289,53 @@ pub fn VideoPlayer::seek(self : VideoPlayer, t : Double) -> Unit {
 }
 
 ///|
+/// 逐帧步进（`n` 帧，负数回退）：先暂停再把位置挪 n 帧，并**当场解到落点
+/// 的那一帧**——步进必须立刻看到画面，不能等下一次 tick（暂停时 tick 直接
+/// 返回，画面会停在黑帧上）。帧率未知（既无流帧率也无 make 参数）时不动。
+pub fn VideoPlayer::step(self : VideoPlayer, n : Int) -> Unit {
+  if self.closed.val || n == 0 {
+    return
+  }
+  self.pause()
+  if self.state.val is VpIdle {
+    self.state.val = VpPaused
+  }
+  let f =
+    if self.fps_real > 0.0 {
+      self.fps_real
+    } else {
+      self.fps.to_double()
+    }
+  if f <= 0.0 {
+    return
+  }
+  let target = vp_clamp_t(self.pos.val + (n.to_double() / f), self.duration_s)
+  self.seek(target)
+  self.vp_settle(target)
+}
+
+///|
+/// 从当前解码点向前解到 `target`（上限 8 帧）：seek 落在关键帧上，
+/// 目标帧通常还要再往前解几张；无时间戳的流解一帧即停。
+fn VideoPlayer::vp_settle(self : VideoPlayer, target : Double) -> Unit {
+  let mut i = 0
+  while i < 8 {
+    i = i + 1
+    match self.demuxer.decode_rgba() {
+      Some(rgba) => {
+        self.frame.val = Some(rgba)
+        self.frame_no.val = self.frame_no.val + 1
+        let pts = self.demuxer.last_frame_pts()
+        if pts < 0.0 || pts >= target {
+          return
+        }
+      }
+      None => return
+    }
+  }
+}
+
+///|
 /// 释放（停设备、关双 Demuxer；之后不可再用，组件时钟凭 is_closed
 /// 停摆）。
 pub fn VideoPlayer::free(self : VideoPlayer) -> Unit {
@@ -284,21 +360,34 @@ pub fn VideoPlayer::free(self : VideoPlayer) -> Unit {
 // ---------------------------------------------------------------------------
 
 ///|
+/// 目标时刻：基准位置 + 自基准以来真实流逝 × 倍速（纯函数，倍速语义只在这一处）。
+pub fn vp_target_pts(base : Double, elapsed_ms : Int64, speed : Double) -> Double {
+  base + elapsed_ms.to_double() / 1000.0 * speed
+}
+
+///|
 /// 推进一步播放（组件定时器每 tick 调用）：按墙钟算目标时刻（基准
-/// 位置 + 起播以来真实流逝），解码推进到目标时刻的帧——高帧率视频
-/// 跳帧追时钟、低帧率视频画面跨 tick 保持，速率恒为 1 倍速，位置与
-/// duration 同轴。流无时间戳时回退每 tick 一帧、按流帧率步进。追帧
-/// 每 tick 上限 8 帧（seek 后关键帧距离长也不卡 UI 一整拍）。
+/// 位置 + 起播以来真实流逝 × 倍速），解码推进到目标时刻的帧——高帧率视频
+/// 跳帧追时钟、低帧率视频画面跨 tick 保持，位置与 duration 同轴。
+/// 「画面跨 tick 保持」靠的是**先看已解帧的 pts 再决定要不要再解**：
+/// 没有这道闸门时每 tick 至少解一帧，慢速与低帧率都会跑在时钟前面。
+/// 流无时间戳时回退每 tick 一帧、按流帧率步进（此时倍速只影响时钟不影响
+/// 画面——不假装支持）。追帧每 tick 上限 8 帧（seek 后关键帧距离长也不卡
+/// UI 一整拍）。
 ///|（引擎的时钟推进口：调用方的定时器每 tick 调一次）
 pub fn VideoPlayer::tick(self : VideoPlayer) -> Unit {
   if self.closed.val || !(self.state.val is VpPlaying) {
     return
   }
   let now = mbt_now_ms()
-  let target = self.base_pts.val + (now - self.wall0.val).to_double() / 1000.0
+  let target =
+    vp_target_pts(self.base_pts.val, now - self.wall0.val, self.speed.val)
   let mut eof = false
   let mut pts_seen = false
   for i = 0; i < 8; i = i + 1 {
+    if pts_seen && self.demuxer.last_frame_pts() >= target {
+      break // 画面已在时钟前面：这一 tick 不再解帧
+    }
     match self.demuxer.decode_rgba() {
       Some(rgba) => {
         self.frame.val = Some(rgba)
@@ -308,9 +397,6 @@ pub fn VideoPlayer::tick(self : VideoPlayer) -> Unit {
           break // 无时间戳流：回退每 tick 一帧
         }
         pts_seen = true
-        if pts >= target {
-          break
-        }
       }
       None => {
         eof = true
@@ -376,14 +462,16 @@ fn VideoPlayer::vp_restart(self : VideoPlayer, now : Int64) -> Unit {
 }
 
 ///|
-/// 补音频队列到高水位（有音轨时）。
+/// 补音频队列到高水位（有音轨时）。倍速走与 AudioPlayer 同一条重采样路径：
+/// 声道数未知（无音轨）时原样推。
 fn VideoPlayer::vp_fill_audio(self : VideoPlayer) -> Unit {
   match (self.audio.val, self.dev.val) {
     (Some(a), Some(d)) =>
       while mbt_adev_queued_bytes(d) < ap_high_water.to_int64() {
         match a.decode_pcm() {
           Some(pcm) => {
-            let _ = mbt_adev_push(d, pcm, pcm.length())
+            let out = media_resample_s16(pcm, self.audio_ch, self.speed.val)
+            let _ = mbt_adev_push(d, out, out.length())
             ()
           }
           None => break
@@ -438,6 +526,7 @@ pub fn VideoPlayer::make(
   // 无音轨或解码器不可用时静音播放
   let audio : Ref[@ffmbt.Demuxer?] = Ref(None)
   let dev : Ref[MbtAdev?] = Ref(None)
+  let mut a_ch = 0
   if demuxer.has_audio() {
     match @ffmbt.Demuxer::open(path) {
       Ok(ad) =>
@@ -449,6 +538,7 @@ pub fn VideoPlayer::make(
               let boxed : AdevBox = { h: mbt_adev_open(ch, rate), }
               dev.val = Some(boxed.h)
               audio.val = Some(ad)
+              a_ch = ch
             } else {
               ad.close()
             }
@@ -468,6 +558,8 @@ pub fn VideoPlayer::make(
     width: w,
     height: h,
     volume: Ref(media_clamp_volume(volume)),
+    speed: Ref(1.0),
+    audio_ch: a_ch,
     looping: Ref(looping),
     state: Ref(VpIdle),
     closed: Ref(false),

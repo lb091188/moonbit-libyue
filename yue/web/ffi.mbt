@@ -82,6 +82,19 @@ extern "c" fn wb_add_user_script(id : Int64, source : Bytes) -> Unit =
 extern "c" fn wb_add_binding(id : Int64, name : Bytes) -> Int = "wb_add_binding"
 
 ///|
+#borrow(scheme, root)
+extern "c" fn wb_register_scheme(
+  id : Int64,
+  scheme : Bytes,
+  root : Bytes,
+) -> Int = "wb_register_scheme"
+
+///|
+#borrow(scheme)
+extern "c" fn wb_unregister_scheme(id : Int64, scheme : Bytes) -> Int =
+  "wb_unregister_scheme"
+
+///|
 extern "c" fn wb_next_event(id : Int64) -> Int = "wb_next_event"
 
 ///|

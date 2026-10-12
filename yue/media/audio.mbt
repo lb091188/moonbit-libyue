@@ -32,6 +32,82 @@ fn media_clamp_volume(v : Double) -> Double {
 }
 
 ///|
+/// 倍速钳制：有效区间 [0.25, 4.0]；NaN 退回 1.0（「没设倍速」而不是最快/最慢档）。
+fn media_clamp_speed(v : Double) -> Double {
+  let x = if v != v {
+    1.0
+  } else if v < 0.25 {
+    0.25
+  } else if v > 4.0 {
+    4.0
+  } else {
+    v
+  }
+  x
+}
+
+///|
+/// 读第 i 个 s16 样本（小端、交错按帧内声道偏移算好）。
+fn media_s16_at(src : Bytes, i : Int) -> Int {
+  let lo = src[i * 2].to_int()
+  let hi = src[i * 2 + 1].to_int()
+  let v = (hi << 8) | lo
+  if v >= 0x8000 { v - 0x10000 } else { v }
+}
+
+///|
+/// s16 交错 PCM 按倍速重采样（线性插值）：`speed=2` 给一半样本数，设备照常
+/// 按原采样率消费，于是媒体时间轴走得快一倍、**音高随动**——本栈不做时间
+/// 拉伸（那要相位声码器），代价写在 adaptation 文档里。
+/// 声道数非法 / `speed==1` / 太短都原样返回（不制造新对象）。
+fn media_resample_s16(
+  src : Bytes,
+  channels : Int,
+  speed : Double,
+) -> Bytes {
+  if channels <= 0 || speed == 1.0 || src.length() < channels * 4 {
+    src
+  } else {
+    let frames = (src.length() / 2) / channels
+    let n = (frames.to_double() / speed).floor().to_int()
+    if n <= 0 {
+      src
+    } else if n == frames {
+      src
+    } else {
+      let buf = FixedArray::make(n * channels * 2, b'\x00')
+      let mut j = 0
+      while j < n {
+        let pos = j.to_double() * speed
+        let i0 = pos.floor().to_int()
+        let frac = pos - i0.to_double()
+        let i1 = if i0 + 1 < frames { i0 + 1 } else { i0 }
+        let mut c = 0
+        while c < channels {
+          let s0 = media_s16_at(src, i0 * channels + c)
+          let s1 = media_s16_at(src, i1 * channels + c)
+          let mut v = (
+            s0.to_double() + (s1 - s0).to_double() * frac
+          ).round().to_int()
+          if v > 32767 {
+            v = 32767
+          } else if v < -32768 {
+            v = -32768
+          }
+          let u = if v < 0 { v + 0x10000 } else { v }
+          let k = (j * channels + c) * 2
+          buf[k] = (u & 0xff).to_byte()
+          buf[k + 1] = ((u >> 8) & 0xff).to_byte()
+          c = c + 1
+        }
+        j = j + 1
+      }
+      Bytes::from_array(buf)
+    }
+  }
+}
+
+///|
 /// FFI 句柄的 GC 隔离包装（防裸值被 drop）。
 pub(all) struct AdevBox {
   h : MbtAdev
@@ -47,6 +123,7 @@ pub(all) struct AudioPlayer {
   rate : Int
   duration_s : Double
   volume : Ref[Double]
+  speed : Ref[Double]
   looping : Ref[Bool]
   state : Ref[ApState]
   eof : Ref[Bool]
@@ -77,7 +154,9 @@ pub fn AudioPlayer::current(self : AudioPlayer) -> Double {
       if mbt_adev_has_device(d) == 1 {
         let consumed = mbt_adev_played_bytes(d) - self.played_base.val
         let frames = consumed.to_double() / (self.channels * 2).to_double()
-        let t = self.pos_base.val + frames / self.rate.to_double()
+        // 队列里是重采样后的样本：消费 N 个样本 = 走过 N*speed 个源样本
+        let t =
+          self.pos_base.val + frames * self.speed.val / self.rate.to_double()
         if t < 0.0 {
           0.0
         } else if self.duration_s > 0.0 && t > self.duration_s {
@@ -87,7 +166,8 @@ pub fn AudioPlayer::current(self : AudioPlayer) -> Double {
         }
       } else {
         // 哑设备：每 tick 解一帧（一帧 ≈ 25ms）近似推进
-        self.pos_base.val + self.muted_ticks.val.to_double() * 0.025
+        self.pos_base.val + self.muted_ticks.val.to_double() * 0.025 *
+          self.speed.val
       }
     None => 0.0
   }
@@ -118,6 +198,31 @@ pub fn AudioPlayer::is_muted(self : AudioPlayer) -> Bool {
     Some(d) => mbt_adev_has_device(d) != 1
     None => true
   }
+}
+
+///|
+/// 倍速（0.25..4.0；钳制）。音频走 `media_resample_s16` 的线性重采样：
+/// 样本数按 1/speed 缩，设备仍按原采样率消费，于是媒体时间轴快一倍、
+/// **音高随动**——本栈不做时间拉伸（那要相位声码器），代价写在文档里。
+/// 换速时把位置基准重钉一次（`played_base`/`pos_base`），否则时钟会跳一下。
+pub fn AudioPlayer::set_speed(self : AudioPlayer, v : Double) -> Unit {
+  if self.closed.val {
+    return
+  }
+  let cur = self.current()
+  self.speed.val = media_clamp_speed(v)
+  match self.dev.val {
+    Some(d) => self.played_base.val = mbt_adev_played_bytes(d)
+    None => ()
+  }
+  self.pos_base.val = cur
+  self.muted_ticks.val = 0
+}
+
+///|
+/// 当前倍速。
+pub fn AudioPlayer::get_speed(self : AudioPlayer) -> Double {
+  self.speed.val
 }
 
 ///|
@@ -283,7 +388,8 @@ fn AudioPlayer::ap_fill(self : AudioPlayer) -> Unit {
       while mbt_adev_queued_bytes(d) < ap_high_water.to_int64() {
         match self.demuxer.decode_pcm() {
           Some(pcm) => {
-            let _ = mbt_adev_push(d, pcm, pcm.length())
+            let out = media_resample_s16(pcm, self.channels, self.speed.val)
+            let _ = mbt_adev_push(d, out, out.length())
             ()
           }
           None => {
@@ -362,6 +468,7 @@ pub fn AudioPlayer::make(
     rate,
     duration_s: demuxer.duration_s(),
     volume: Ref(media_clamp_volume(volume)),
+    speed: Ref(1.0),
     looping: Ref(looping),
     state: Ref(ApIdle),
     eof: Ref(false),

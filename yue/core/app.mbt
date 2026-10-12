@@ -186,6 +186,16 @@ pub fn App::is_primary(self : App) -> Bool {
 }
 
 ///|
+/// 本窗全屏开关（播放器「铺满整屏」这类窗口级动作）。控件层拿不到窗口，
+/// 所以由宿主把请求转到这里；尺寸变化照常走 allocate，调用方不用自己重算。
+pub fn App::set_fullscreen(self : App, on : Bool) -> Unit {
+  if self.closed {
+    return
+  }
+  self.window.set_fullscreen(on)
+}
+
+///|
 /// 跟随系统深浅/主色：每 `interval_ms` 读一次系统偏好，变了就 `theme_apply`
 /// （订阅了主题变更的组件即时重着色，不重建界面）。返回停表函数。
 ///

@@ -182,6 +182,13 @@ pub fn Window::has_child_surfaces(self : Window) -> Bool {
 }
 
 ///|
+/// 全屏开关（播放器「铺满整屏」是窗口级动作）。切换由窗口管理器完成，
+/// 尺寸变化会照常走 allocate 事件，宿主不需要自己算新矩形。
+pub fn Window::set_fullscreen(self : Window, on : Bool) -> Unit {
+  wm_window_set_fullscreen(self.id, if on { 1 } else { 0 })
+}
+
+///|
 /// 设绘图区光标形状：0 默认箭头 / 1 手型 / 2 文本 I 形 / 3 横向调整 / 4 纵向调整。
 /// 全自绘栈没有原生控件，形状只能由宿主按命中路径下发（见 `Widget::cursor_at`）。
 pub fn Window::set_cursor(self : Window, kind : Int) -> Unit {

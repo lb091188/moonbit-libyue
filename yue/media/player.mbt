@@ -33,7 +33,74 @@ pub fn rgba_to_bitmap(
 }
 
 ///|
-/// 控制条的命中分区：返回 ("pause"|"seek"|"" , 进度比例 0..1)。
+/// 控制条分区常量：绘制与命中都读这一组，改一处不会漏另一处。
+const BAR_PAUSE_W = 34.0
+const BAR_STEP_W = 36.0
+const BAR_SPEED_W = 40.0
+const BAR_TRACK_X = 154.0
+const BAR_VOL_W = 80.0
+const BAR_TIME_W = 150.0
+const BAR_GAP = 8.0
+
+///|
+/// 倍速档位（点一次走一档，转回 1x）。放在表里而不是就地加减，
+/// 是为了让「浮点累加会不会漂出档位」这个问题不存在。
+let bar_speeds : ReadOnlyArray[Double] = [1.0, 1.25, 1.5, 2.0, 0.75]
+
+///|
+/// 第 i 次点击对应的档位（i 可任意增长，含负数）。
+pub fn player_speed_at(i : Int) -> Double {
+  let n = bar_speeds.length()
+  let k = i % n
+  bar_speeds[if k < 0 { k + n } else { k }]
+}
+
+///|
+/// 倍速标签（档位表里给短写法，表外一律两位小数加 x）。
+pub fn vp_fmt_speed(v : Double) -> String {
+  if v == 1.0 {
+    "1x"
+  } else if v == 1.25 {
+    "1.25x"
+  } else if v == 1.5 {
+    "1.5x"
+  } else if v == 2.0 {
+    "2x"
+  } else if v == 0.75 {
+    "0.75x"
+  } else {
+    v.to_string() + "x"
+  }
+}
+
+///|
+/// 音量条左端（贴着右侧时间文字，倒着排以免窄条时互相压住）。
+fn bar_vol_x(w : Double) -> Double { w - BAR_TIME_W - BAR_VOL_W - BAR_GAP }
+
+///|
+/// 窄到放不下「轨道 + 音量 + 时间」三件时，音量条整个让位（绘制与命中
+/// 同一条判据，否则会出现「看得见却点不着」或反过来）。
+fn bar_has_volume(w : Double) -> Bool { w >= 440.0 }
+
+///|
+/// 进度轨宽度（窄到 40px 以下就不再缩，否则拖动没有分辨率可言）。
+fn bar_track_w(w : Double) -> Double {
+  let right = if bar_has_volume(w) {
+    bar_vol_x(w) - BAR_GAP
+  } else {
+    w - BAR_TIME_W - BAR_GAP
+  }
+  let t = right - BAR_TRACK_X
+  if t < 40.0 { 40.0 } else { t }
+}
+
+fn bar_clamp01(f : Double) -> Double {
+  if f < 0.0 { 0.0 } else if f > 1.0 { 1.0 } else { f }
+}
+
+///|
+/// 控制条的命中分区：返回 (分区名, 比例 0..1)。分区名是
+/// `"pause"|"step_back"|"step_fwd"|"speed"|"seek"|"volume"|""`（空串=不响应区）。
 /// 纯函数，独立于绘制与事件投递，方便无头断言。
 pub fn player_bar_hit(
   x : Double,
@@ -43,15 +110,20 @@ pub fn player_bar_hit(
 ) -> (String, Double) {
   if h <= 0.0 || w <= 0.0 {
     ("", 0.0)
-  } else if x < 34.0 {
+  } else if x < BAR_PAUSE_W {
     ("pause", 0.0)
-  } else if x > w - 150.0 {
+  } else if x < BAR_PAUSE_W + BAR_STEP_W {
+    ("step_back", 0.0)
+  } else if x < BAR_PAUSE_W + BAR_STEP_W * 2.0 {
+    ("step_fwd", 0.0)
+  } else if x < BAR_PAUSE_W + BAR_STEP_W * 2.0 + BAR_SPEED_W {
+    ("speed", 0.0)
+  } else if x > w - BAR_TIME_W {
     ("", 0.0)
+  } else if bar_has_volume(w) && x >= bar_vol_x(w) {
+    ("volume", bar_clamp01((x - bar_vol_x(w)) / BAR_VOL_W))
   } else {
-    let track_w = if w - 190.0 < 40.0 { 40.0 } else { w - 190.0 }
-    let frac = (x - 42.0) / track_w
-    let clamped = if frac < 0.0 { 0.0 } else if frac > 1.0 { 1.0 } else { frac }
-    ("seek", clamped)
+    ("seek", bar_clamp01((x - BAR_TRACK_X) / bar_track_w(w)))
   }
 }
 
@@ -71,6 +143,9 @@ pub fn player_t(
     _frames : Int,
     _playing : Bool,
   ) -> Unit { () },
+  /// 倍速档位变化的观测口（控制条点倍速键时回调）：调用方要把它显示到
+  /// 界面或写进回证时不必去猜引擎状态。
+  on_speed? : (Double) -> Unit = fn(_v : Double) -> Unit { () },
   on_error? : (String) -> Unit = fn(_s : String) -> Unit { () },
   handle? : (@core.Widget) -> Unit = fn(_w : @core.Widget) -> Unit { () },
 ) -> @core.Node {
@@ -106,6 +181,8 @@ pub fn player_t(
   let image : Ref[@render.Image?] = Ref(None)
   let dragging : Ref[Bool] = Ref(false)
   let drag_frac : Ref[Double] = Ref(0.0)
+  let vol_drag : Ref[Bool] = Ref(false)
+  let speed_i = Ref(0)
   let bar_w : Ref[Double] = Ref(0.0)
   if auto_play {
     engine.play()
@@ -177,9 +254,17 @@ pub fn player_t(
     }
     let frac = vp_pct(t, dur)
     p.set_fill_color(@theme.theme_border())
-    p.fill_rect(42.0, 15.0, r.w - 190.0, 4.0)
+    p.fill_rect(BAR_TRACK_X, 15.0, bar_track_w(r.w), 4.0)
     p.set_fill_color(@theme.theme_primary())
-    p.fill_rect(42.0, 15.0, (r.w - 190.0) * frac, 4.0)
+    p.fill_rect(BAR_TRACK_X, 15.0, bar_track_w(r.w) * frac, 4.0)
+    // 音量条：画的是引擎里的实际音量，不是本地副本（否则拖动与静音会各说各话）
+    if bar_has_volume(r.w) {
+      let vol = engine.get_volume()
+      p.set_fill_color(@theme.theme_border())
+      p.fill_rect(bar_vol_x(r.w), 15.0, BAR_VOL_W, 4.0)
+      p.set_fill_color(@theme.theme_text_secondary())
+      p.fill_rect(bar_vol_x(r.w), 15.0, BAR_VOL_W * vol, 4.0)
+    }
     p.flush()
     let _ = @text.draw_text_at(
       p,
@@ -188,6 +273,30 @@ pub fn player_t(
       if engine.is_playing() { "❚❚" } else { "▶" },
       13.0,
       @theme.theme_text_primary(),
+    )
+    let _ = @text.draw_text_at(
+      p,
+      38.0,
+      9.0,
+      "|<",
+      12.0,
+      @theme.theme_text_secondary(),
+    )
+    let _ = @text.draw_text_at(
+      p,
+      74.0,
+      9.0,
+      ">|",
+      12.0,
+      @theme.theme_text_secondary(),
+    )
+    let _ = @text.draw_text_at(
+      p,
+      110.0,
+      9.0,
+      vp_fmt_speed(engine.get_speed()),
+      12.0,
+      @theme.theme_text_secondary(),
     )
     let _ = @text.draw_text_at(
       p,
@@ -212,9 +321,23 @@ pub fn player_t(
             engine.play()
           }
           @core.invalidate()
+        } else if hit.0 == "step_back" || hit.0 == "step_fwd" {
+          // 逐帧：引擎自己先暂停再解到落点，组件不碰时钟
+          engine.step(if hit.0 == "step_back" { -1 } else { 1 })
+          @core.invalidate()
+        } else if hit.0 == "speed" {
+          speed_i.val = speed_i.val + 1
+          let v = player_speed_at(speed_i.val)
+          engine.set_speed(v)
+          on_speed(v)
+          @core.invalidate()
         } else if hit.0 == "seek" {
           dragging.val = true
           drag_frac.val = hit.1
+          @core.invalidate()
+        } else if hit.0 == "volume" {
+          vol_drag.val = true
+          engine.set_volume(hit.1)
           @core.invalidate()
         }
         true
@@ -224,19 +347,25 @@ pub fn player_t(
           let hit = player_bar_hit(ev.x, ev.y, bar_w.val, 34.0)
           drag_frac.val = hit.1
           @core.invalidate()
+        } else if vol_drag.val {
+          let hit = player_bar_hit(ev.x, ev.y, bar_w.val, 34.0)
+          engine.set_volume(hit.1)
+          @core.invalidate()
         }
-        dragging.val
+        dragging.val || vol_drag.val
       }
       @core.Up => {
         if dragging.val {
-          // 抬手才真 seek（防抖）：拖动期间只挪显示位置
+          // 抬手才真 seek（防抖）：拖动期间只挪显示位置。音量相反——
+          // 每步都生效才是「边拖边听」，且它不触发解码，没有关键帧代价。
           dragging.val = false
           engine.seek(drag_frac.val * engine.duration())
           @core.invalidate()
         }
+        vol_drag.val = false
         true
       }
-      @core.Leave => dragging.val
+      @core.Leave => dragging.val || vol_drag.val
     }
   })
   let root = @core.Widget::new()

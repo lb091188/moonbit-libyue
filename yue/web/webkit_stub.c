@@ -17,8 +17,10 @@
 
 #if defined(WB_HAVE_WEBKIT)
 
+#include <fcntl.h>
 #include <gtk/gtk.h>
 #include <libsoup/soup-cookie.h>
+#include <sys/stat.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,6 +120,8 @@ static void wb_on_load_changed(WebKitWebView *w, WebKitLoadEvent ev,
     kind = 4;
   } else if (ev == WEBKIT_LOAD_FINISHED) {
     kind = 5;
+  } else if (ev == WEBKIT_LOAD_REDIRECTED) {
+    kind = 15; // 重定向（细粒度 reason：调用方要能区分「换了地址」与「重新加载」）
   }
   wb_push(v, kind, 0, wb_view_uri(v));
 }
@@ -258,8 +262,11 @@ static void wb_on_load_failed(WebKitWebView *w, WebKitLoadEvent ev,
   (void)w;
   (void)ev;
   WbView *v = (WbView *)data;
+  // 载荷口径：uri|domain|code|message（三段定长、其余全归 message——错误文本里
+  // 可能有 '|'）。MoonBit 侧 nav_error_parse 按这个拆成结构。
   char buf[WB_EV_TEXT];
-  snprintf(buf, sizeof(buf), "%s | %s", uri ? uri : "",
+  snprintf(buf, sizeof(buf), "%s|%s|%d|%s", uri ? uri : "",
+           err ? g_quark_to_string(err->domain) : "", err ? err->code : 0,
            err && err->message ? err->message : "");
   wb_push(v, 14, 0, buf);
 }
@@ -306,6 +313,157 @@ static void wb_on_cookies(GObject *src, GAsyncResult *res, gpointer data) {
   wb_push(v, 13, req->seq, out);
   g_list_free_full(list, (GDestroyNotify)soup_cookie_free);
   g_free(req);
+}
+
+// ---- 自定义协议（本地内容流式回灌）----
+// 三条口径：① **按 context 注册**（旧链是进程级静态注册，多 profile 之后语义不清）；
+// ② 引擎**没有注销口**，所以「注销」= 把这条 scheme 的根目录清空，handler 从此
+//    一律回 finish_error——比留着旧目录更安全，也比「假装能注销」诚实；
+// ③ 只做「根目录下的静态文件」：路径里出现 ".." 直接拒，绝对化与逃逸都不给机会。
+
+#define WB_MAX_SCHEMES 16
+typedef struct {
+  WebKitWebContext *ctx;
+  char scheme[32];
+  char root[512];
+  int used;
+} WbScheme;
+
+static WbScheme wb_schemes[WB_MAX_SCHEMES];
+
+static const char *wb_mime_of(const char *path) {
+  const char *dot = strrchr(path, '.');
+  if (dot == NULL) {
+    return "application/octet-stream";
+  }
+  if (g_ascii_strcasecmp(dot, ".html") == 0 || g_ascii_strcasecmp(dot, ".htm") == 0) {
+    return "text/html";
+  }
+  if (g_ascii_strcasecmp(dot, ".css") == 0) {
+    return "text/css";
+  }
+  if (g_ascii_strcasecmp(dot, ".js") == 0 || g_ascii_strcasecmp(dot, ".mjs") == 0) {
+    return "application/javascript";
+  }
+  if (g_ascii_strcasecmp(dot, ".json") == 0) {
+    return "application/json";
+  }
+  if (g_ascii_strcasecmp(dot, ".svg") == 0) {
+    return "image/svg+xml";
+  }
+  if (g_ascii_strcasecmp(dot, ".png") == 0) {
+    return "image/png";
+  }
+  if (g_ascii_strcasecmp(dot, ".jpg") == 0 || g_ascii_strcasecmp(dot, ".jpeg") == 0) {
+    return "image/jpeg";
+  }
+  if (g_ascii_strcasecmp(dot, ".gif") == 0) {
+    return "image/gif";
+  }
+  if (g_ascii_strcasecmp(dot, ".woff2") == 0) {
+    return "font/woff2";
+  }
+  if (g_ascii_strcasecmp(dot, ".txt") == 0) {
+    return "text/plain";
+  }
+  return "application/octet-stream";
+}
+
+static void wb_scheme_finish_error(WebKitURISchemeRequest *req, const char *msg) {
+  GError *err = g_error_new_literal(WEBKIT_NETWORK_ERROR,
+                                    WEBKIT_NETWORK_ERROR_FAILED, msg);
+  webkit_uri_scheme_request_finish_error(req, err);
+  g_error_free(err);
+}
+
+static void wb_scheme_cb(WebKitURISchemeRequest *req, gpointer user_data) {
+  WbScheme *sc = (WbScheme *)user_data;
+  if (sc->root[0] == '\0') {
+    wb_scheme_finish_error(req, "scheme unregistered");
+    return;
+  }
+  const char *path = webkit_uri_scheme_request_get_path(req);
+  if (path == NULL) {
+    path = "/";
+  }
+  if (strstr(path, "..") != NULL) {
+    wb_scheme_finish_error(req, "path traversal denied");
+    return;
+  }
+  char full[1100];
+  snprintf(full, sizeof(full), "%s/%s", sc->root, path[0] == '/' ? path + 1 : path);
+  gchar *data = NULL;
+  gsize len = 0;
+  GError *read_err = NULL;
+  if (!g_file_get_contents(full, &data, &len, &read_err)) {
+    if (read_err != NULL) {
+      g_error_free(read_err);
+    }
+    wb_scheme_finish_error(req, "not found");
+    return;
+  }
+  GInputStream *in = g_memory_input_stream_new_from_data(data, (gssize)len, g_free);
+  webkit_uri_scheme_request_finish(req, in, (gssize)len, wb_mime_of(full));
+  g_object_unref(in);
+}
+
+// 注册（或换根目录）。同一个 (context, scheme) 只向引擎注册一次。
+int wb_register_scheme(int64_t id, const char *scheme, const char *root) {
+  WbView *v = wb_get(id);
+  if (v == NULL || scheme == NULL || scheme[0] == '\0') {
+    return 0;
+  }
+  WebKitWebContext *ctx = webkit_web_view_get_context(v->view);
+  WbScheme *slot = NULL;
+  for (int i = 0; i < WB_MAX_SCHEMES; i++) {
+    if (wb_schemes[i].used && wb_schemes[i].ctx == ctx &&
+        g_ascii_strcasecmp(wb_schemes[i].scheme, scheme) == 0) {
+      slot = &wb_schemes[i];
+      break;
+    }
+  }
+  if (slot == NULL) {
+    for (int i = 0; i < WB_MAX_SCHEMES; i++) {
+      if (!wb_schemes[i].used) {
+        slot = &wb_schemes[i];
+        slot->used = 1;
+        slot->ctx = ctx;
+        strncpy(slot->scheme, scheme, sizeof(slot->scheme) - 1);
+        slot->scheme[sizeof(slot->scheme) - 1] = '\0';
+        slot->root[0] = '\0';
+        webkit_web_context_register_uri_scheme(ctx, slot->scheme, wb_scheme_cb,
+                                               slot, NULL);
+        break;
+      }
+    }
+  }
+  if (slot == NULL) {
+    return 0;
+  }
+  if (root != NULL) {
+    strncpy(slot->root, root, sizeof(slot->root) - 1);
+    slot->root[sizeof(slot->root) - 1] = '\0';
+  } else {
+    slot->root[0] = '\0';
+  }
+  return 1;
+}
+
+// 「注销」= 清空根目录，之后这条 scheme 的请求一律回错误（引擎没有真注销口）
+int wb_unregister_scheme(int64_t id, const char *scheme) {
+  WbView *v = wb_get(id);
+  if (v == NULL || scheme == NULL) {
+    return 0;
+  }
+  WebKitWebContext *ctx = webkit_web_view_get_context(v->view);
+  for (int i = 0; i < WB_MAX_SCHEMES; i++) {
+    if (wb_schemes[i].used && wb_schemes[i].ctx == ctx &&
+        g_ascii_strcasecmp(wb_schemes[i].scheme, scheme) == 0) {
+      wb_schemes[i].root[0] = '\0';
+      return 1;
+    }
+  }
+  return 0;
 }
 
 // ---- 对外面（MoonBit 只搬 int64 与字节缓冲）----
@@ -693,6 +851,14 @@ int wb_title(int64_t id, char *out, int cap) {
 int64_t wb_evaluate(int64_t id, const char *script) {
   (void)id; (void)script;
   return -1;
+}
+int wb_register_scheme(int64_t id, const char *scheme, const char *root) {
+  (void)id; (void)scheme; (void)root;
+  return 0;
+}
+int wb_unregister_scheme(int64_t id, const char *scheme) {
+  (void)id; (void)scheme;
+  return 0;
 }
 void wb_add_user_script(int64_t id, const char *source) { (void)id; (void)source; }
 int wb_add_binding(int64_t id, const char *name) { (void)id; (void)name; return 0; }
