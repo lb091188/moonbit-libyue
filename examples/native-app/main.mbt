@@ -1125,6 +1125,123 @@ fn make_tray_section(
 }
 
 ///|
+/// W21a 通知区块：发信息/警告/错误气泡、更新进度、关闭。状态行报后端、已发数、
+/// 当前通知 id 与最后一次动作。后端不支持时（macOS 占位）给结构化错误，如实显示。
+/// 通知图标句柄由 Ref 持住——气泡在用期间不能 free。
+fn make_notify_section(
+  nid : Ref[Int],
+  sends : Ref[Int],
+  note : Ref[String],
+  icon_holder : Ref[@win.Icon?],
+) -> @core.Node {
+  // 通知图标按需现建（像素 32px），建好后挂进 Ref 直到进程退出
+  let pick_icon = fn() -> Int {
+    match icon_holder.val {
+      Some(ic) => ic.handle
+      None =>
+        match @win.icon_from_bgra(demo_icon_pixels(32), 32, 32) {
+          Some(ic) => {
+            icon_holder.val = Some(ic)
+            ic.handle
+          }
+          None => 0
+        }
+    }
+  }
+  let do_send = fn(kind : Int, title : String, body : String) -> Unit {
+    match
+      @core.notify_send(
+        "libyue 演示",
+        title,
+        body,
+        kind=kind,
+        icon_handle=pick_icon(),
+      ) {
+      Ok(id) => {
+        nid.val = id
+        sends.val = sends.val + 1
+        note.val = "已发#" + id.to_string()
+      }
+      Err(e) => note.val = "失败: " + e.to_string()
+    }
+  }
+  let info = fn() -> Unit {
+    do_send(0, "构建完成", "3 个目标已产出")
+  }
+  let warn = fn() -> Unit {
+    do_send(1, "构建告警", "2 个目标有告警")
+  }
+  let err = fn() -> Unit {
+    do_send(2, "构建失败", "3 个目标失败")
+  }
+  let progress = fn() -> Unit {
+    if nid.val <= 0 {
+      note.val = "先发一张"
+    } else {
+      match @core.notify_progress(nid.val, "libyue 演示", "构建中", "正在编译", 60) {
+        Ok(pid) => {
+          nid.val = pid
+          note.val = "进度 60%"
+        }
+        Err(e) => note.val = "失败: " + e.to_string()
+      }
+    }
+  }
+  let close = fn() -> Unit {
+    if nid.val <= 0 {
+      note.val = "先发一张"
+    } else {
+      match @core.notify_close(nid.val) {
+        Ok(_) => {
+          nid.val = 0
+          note.val = "已关闭"
+        }
+        Err(e) => note.val = "失败: " + e.to_string()
+      }
+    }
+  }
+  @ui.container(
+    [
+      @ui.label(
+        "桌面通知（W21a）：发信息/警告/错误气泡 · 更新进度 · 关闭（Win32 托盘气泡；Linux 走 freedesktop）",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [
+          @ui.button_t("发信息", on_click=info),
+          @ui.button_t("发警告", on_click=warn),
+          @ui.button_t("发错误", on_click=err),
+          @ui.button_t("进度 60%", on_click=progress),
+          @ui.button_t("关闭", on_click=close),
+          @core.node_of(live_counter(
+            fn() -> String {
+              "supported=" +
+              (if @core.notify_supported() { "1" } else { "0" }) +
+              " backend=" +
+              @core.notify_backend_name() +
+              " sends=" +
+              sends.val.to_string() +
+              " id=" +
+              nid.val.to_string() +
+              " note=" +
+              note.val
+            },
+            width=460.0,
+          )),
+        ],
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 交互图表区块：折线/柱状/环形三个交互版并排——hover 浮层、图例点击显隐、
 /// 滚轮缩放（折线与柱状共用调用方持有的 CiZoom，退出状态行报窗口读数；
 /// 环形无缩放）。
@@ -2022,6 +2139,16 @@ fn main {
   let tray_clicks = Ref(0)
   let tray_icon : Ref[@win.Icon?] = Ref(None)
   app.mount([make_tray_section(tray, tray_note, tray_clicks, tray_icon)])
+  // W21a（桌面通知）：Win32 走托盘气泡（NIF_INFO），Linux 走 freedesktop 通知。
+  // 通知 id 是后端内不透明的（Win32 = 托盘槽号、Linux = 服务端 u32），由 Ref 持住
+  // 供「改进度 / 关闭」复用；`notify_snap` 每拍快照后端侧在用数（关窗后槽表清空，
+  // 退出时读不到真值）。图标句柄同样 Ref 持住——气泡在用期间不能 free。
+  let nid = Ref(0)
+  let notify_sends = Ref(0)
+  let notify_note : Ref[String] = Ref("-")
+  let notify_icon : Ref[@win.Icon?] = Ref(None)
+  let notify_snap : Ref[String] = Ref("-")
+  app.mount([make_notify_section(nid, notify_sends, notify_note, notify_icon)])
   let ch_lin = @core.Store::new([])
   let ch_pushes = Ref(0)
   let ch_btn_w : Ref[@core.Widget?] = Ref(None)
@@ -2543,6 +2670,8 @@ fn main {
       // W20c：派发托盘左键/右键（Win32 的 WM_TRAY_CB 经后端进队列；右键无回调时
       // 自动弹已挂的菜单）。SNI 后端点击由 DBus 信号直达回调，不经此队列。
       let _ignored_tray = @core.dispatch_tray_event()
+      // W21a：每拍快照后端侧在用通知数（关窗后槽表清空，退出时读不到真值）
+      notify_snap.val = "count=" + @win.notify_count().to_string()
       app.schedule_paint()
       let _ = app.timer(500, ticker.val)
     }
@@ -3042,6 +3171,30 @@ fn main {
   // 退出前显式收掉托盘图标（进程退出系统也会清，但显式更干净、也让 count 归 0）
   match tray.val {
     Some(t) => t.remove()
+    None => ()
+  }
+  // W21a（桌面通知）回证：后端可用性/后端名、已发数、当前通知 id 与关闭前的
+  // 后端侧在用数快照。（发气泡/改进度/关闭需人工点按钮；不支持时如实报 supported=0。）
+  println(
+    "NATIVE-APP-NOTIFY supported=" +
+    (if @core.notify_supported() { "1" } else { "0" }) +
+    " backend=" +
+    @core.notify_backend_name() +
+    " sends=" +
+    notify_sends.val.to_string() +
+    " id=" +
+    nid.val.to_string() +
+    " " +
+    notify_snap.val +
+    " note=" +
+    notify_note.val,
+  )
+  // 退出前显式收起还开着的气泡（Win32 无独立 dismiss，走 NIF_INFO 空正文 + NIM_DELETE）
+  if nid.val > 0 {
+    let _ = @core.notify_close(nid.val)
+  }
+  match notify_icon.val {
+    Some(ic) => ic.free()
     None => ()
   }
   app.shutdown()

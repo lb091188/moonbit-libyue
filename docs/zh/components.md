@@ -523,6 +523,23 @@ n.show()
 | close() | 关闭 |
 | NotificationCenter::get() + add(n) | 经通知中心发送 |
 
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21a）：上表是旧链 `@yue.Notification` / `NotificationCenter`（GTK/libnotify 系）。新栈的跨平台门面是 **`yue/core/notify.mbt`**，改用无对象、无单例的自由函数：
+>
+> | 旧链 | 新栈 | 说明 |
+> | --- | --- | --- |
+> | `Notification::new()` + `set_title`/`set_body` | `notify_send(app_name, summary, body, …)` | 无 builder，参数直给；返回通知 id（`Result[Int, NotifyError]`） |
+> | `set_silent` | —— | 未提供（新栈不以静默为门面参数） |
+> | `set_actions` | —— | 未提供（Win32 气泡不支持动作按钮；Linux 侧亦未接） |
+> | `show()` | 同 `notify_send` | 新栈一次调用即发送，无「先建后 show」两段式 |
+> | `close()` | `notify_close(id)` | 按 id 关闭（Win32 无「关闭全部」语义，id 必须 > 0） |
+> | `NotificationCenter::get()` + `add(n)` | —— | 无通知中心单例；后端选择由门面内部按平台定 |
+>
+> - **后端选择**：Linux freedesktop D-Bus（`yue/dbus/notify.mbt`）优先 → Windows 托盘气泡（`NIF_INFO`，与 W20c 同源共槽）→ 皆无给 `Err(NotifyError::Unsupported)`（结构化报错，**不静默失效**）。
+> - **能力探测**：`notify_supported()` / `notify_backend_name()` / `notify_caps()`（Linux 取服务端 `GetCapabilities`；Win32 合成一份，只有 body 能力）。
+> - **进度**：`notify_progress(id, …, pct)` 或 `notify_send(…, progress=…)`；Linux 走 freedesktop `value` hint，Win32 无对应物、门面把百分比拼进正文（**可见降级**）。
+> - **平台差异**：`timeout_ms` 在 Win32 自 Vista 起被系统忽略；`kind`（0 信息/1 警告/2 错误）Win32 映射 `NIIF_*`、Linux 无此概念（用 `icon` 主题图标名区分）。
+> - **验证**：后端由纯 C 探针 `experiment/notify_probe` 回证（末行 `NOTIFY-BACKEND-OK`）；门面由 `yue/core/notify_wbtest.mbt` 的纯函数 + 生命周期用例（无通知后端的机器自动跳过）。**真机观感（气泡是否弹出、驻留时长）归人工测试清单。** 详见 [docs/zh/adaptation.md](adaptation.md) 的 W21a 节。
+
 ## 消息框 MessageBox
 
 ```moonbit

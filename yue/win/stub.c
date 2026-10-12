@@ -1161,9 +1161,11 @@ int wm_window_title(int64_t id, char *out, int cap) {
 
 typedef struct {
   int used;
+  int kind;        // 0 = 托盘图标（收点击）；1 = 通知气泡（只弹、不收点击）
   HICON icon;      // 当前图标（引用 W20f 句柄表的 HICON，本侧不释放）
   HMENU menu;      // 右键菜单（wm_menus 表里的 HMENU，NULL = 无）
   WCHAR tip[128];  // tooltip（反读用）
+  WCHAR ntitle[64];// 通知气泡标题（反读用；仅 kind 1）
 } WmTray;
 
 static WmTray wm_trays[WM_MAX_TRAYS]; // 槽 0 未用，句柄 = 槽号（1 起）
@@ -1187,7 +1189,9 @@ static LRESULT CALLBACK wm_tray_wndproc(HWND hwnd, UINT msg, WPARAM wp,
   if (msg == WM_TRAY_CB) {
     int slot = (int)wp;
     int m = (int)lp;
-    if (slot > 0 && slot < WM_MAX_TRAYS && wm_trays[slot].used) {
+    // 通知槽（kind 1）不收点击：它的存在只为弹气泡，点击语义未定义
+    if (slot > 0 && slot < WM_MAX_TRAYS && wm_trays[slot].used &&
+        wm_trays[slot].kind == 0) {
       if (m == WM_LBUTTONUP || m == WM_LBUTTONDBLCLK) {
         wm_tray_push(slot, 0);
       } else if (m == WM_RBUTTONUP) {
@@ -1232,9 +1236,10 @@ static int wm_tray_ensure(void) {
 /* 托盘后端是否可用（Win32 上 Shell_NotifyIcon 恒在，实质是「消息窗建得出否」）。 */
 int wm_tray_supported(void) { return wm_tray_ensure(); }
 
-/* 建托盘图标：icon_slot 是 W20f 的图标句柄（0 = 无图标），tip 为 UTF-8。
- * 返回槽号（>=1）或 0（表满/NIM_ADD 失败）。NIM_ADD 失败不占槽。 */
-int wm_tray_new(int icon_slot, const char *tip) {
+/* 内部：分配一个托盘槽并 NIM_ADD。kind 0 = 托盘图标（收点击）、1 = 通知气泡
+ * （只弹气泡、不收点击，见 W21a）。返回槽号（>=1）或 0（表满/NIM_ADD 失败），
+ * 失败不占槽。 */
+static int wm_tray_alloc(int kind, int icon_slot, const char *tip) {
   if (!wm_tray_ensure()) {
     return 0;
   }
@@ -1265,10 +1270,16 @@ int wm_tray_new(int icon_slot, const char *tip) {
     return 0;
   }
   wm_trays[slot].used = 1;
+  wm_trays[slot].kind = kind;
   wm_trays[slot].icon = nid.hIcon;
   wm_trays[slot].menu = NULL;
   memcpy(wm_trays[slot].tip, nid.szTip, sizeof(nid.szTip));
   return slot;
+}
+
+/* 建托盘图标：icon_slot 是 W20f 的图标句柄（0 = 无图标），tip 为 UTF-8。 */
+int wm_tray_new(int icon_slot, const char *tip) {
+  return wm_tray_alloc(0, icon_slot, tip);
 }
 
 /* 改 tooltip（NIM_MODIFY）。 */
@@ -1388,11 +1399,22 @@ int wm_tray_poll(int32_t *out_slot, int32_t *out_kind) {
   return 1;
 }
 
-/* 反读：在用托盘槽数（探针/测试用）。 */
+/* 反读：在用**托盘图标**槽数（通知槽不计，探针/测试用）。 */
 int wm_tray_count(void) {
   int n = 0;
   for (int i = 1; i < WM_MAX_TRAYS; i++) {
-    if (wm_trays[i].used) {
+    if (wm_trays[i].used && wm_trays[i].kind == 0) {
+      n++;
+    }
+  }
+  return n;
+}
+
+/* 反读：在用**通知气泡**槽数（探针/测试用）。 */
+int wm_notify_count(void) {
+  int n = 0;
+  for (int i = 1; i < WM_MAX_TRAYS; i++) {
+    if (wm_trays[i].used && wm_trays[i].kind == 1) {
       n++;
     }
   }
@@ -1413,6 +1435,109 @@ int wm_tray_tooltip(int slot, char *out, int cap) {
   }
   out[n] = '\0';
   return n - 1; // 不计结尾 NUL
+}
+
+/* ---- 桌面通知（W21a）Win32 后端：托盘气泡（NIF_INFO）---------------------
+ * Windows 的「通知」挂在托盘图标上：先 NIM_ADD 建托盘项，再 NIM_MODIFY 带
+ * NIF_INFO 与 szInfoTitle / szInfo 弹气泡（Vista 起这些气泡被系统转成 toast）。
+ * 因此本段复用 W20c 的托盘槽表与消息窗，用 `kind == 1` 的槽区分「通知气泡」
+ * （只弹、不收点击；点击语义未定义，wm_tray_wndproc 对 kind 1 不入队）。
+ *
+ * 两条平台差异（写进文档、不假装对齐）：
+ *  - `uTimeout` 自 Vista 起被系统忽略：气泡时长由系统（辅助功能设置）定，故
+ *    `timeout_ms` 只用于与 Linux 侧同签名，本侧不生效。
+ *  - 没有「进度 hint」：Linux 的 `value` hint 传百分比，桌面端画进度条；Win32
+ *    气泡无对应物，`progress` 由门面把百分比拼进正文（可见降级，不静默丢弃）。
+ *
+ * 关闭：Windows 没有「撤下气泡」的独立 API；官方约定的收起形态是再发一次
+ * `NIF_INFO` 且 `szInfo` 置空——本侧先这么收，再 NIM_DELETE 摘掉托盘项。 */
+
+/* 通知后端是否可用（同托盘：能建出消息窗即可）。 */
+int wm_notify_supported(void) { return wm_tray_ensure(); }
+
+/* 前置声明：wm_notify_send 在建项后要立刻用更新去填气泡（定义在其后）。 */
+int wm_notify_update(int slot, const char *title, const char *text, int kind);
+
+/* 弹一张气泡通知：icon_slot 是 W20f 图标句柄（0 = 用状态图标），kind 0/1/2
+ * = 信息/警告/错误。返回通知 id（>=1，即所属托盘槽号）或 0（表满/失败）。 */
+int wm_notify_send(int icon_slot, const char *title, const char *text,
+                   int kind) {
+  int slot = wm_tray_alloc(1, icon_slot, "");
+  if (slot <= 0) {
+    return 0;
+  }
+  if (!wm_notify_update(slot, title, text, kind)) {
+    wm_tray_remove(slot); // 弹不出就还槽，别占着
+    return 0;
+  }
+  return slot;
+}
+
+/* 更新（或替换）一张气泡通知：同一槽再发 NIF_INFO，系统即替换原气泡。 */
+int wm_notify_update(int slot, const char *title, const char *text, int kind) {
+  if (slot <= 0 || slot >= WM_MAX_TRAYS || !wm_trays[slot].used ||
+      wm_trays[slot].kind != 1 || wm_tray_hwnd == NULL) {
+    return 0;
+  }
+  NOTIFYICONDATAW nid;
+  memset(&nid, 0, sizeof(nid));
+  nid.cbSize = sizeof(nid);
+  nid.hWnd = wm_tray_hwnd;
+  nid.uID = (UINT)slot;
+  nid.uFlags = NIF_INFO;
+  nid.dwInfoFlags = kind == 2 ? NIIF_ERROR : (kind == 1 ? NIIF_WARNING : NIIF_INFO);
+  WCHAR *wt = wm_utf8_to_wide(title);
+  if (wt != NULL) {
+    wcsncpy_s(nid.szInfoTitle, 64, wt, _TRUNCATE);
+    free(wt);
+  }
+  WCHAR *wtxt = wm_utf8_to_wide(text);
+  if (wtxt != NULL) {
+    wcsncpy_s(nid.szInfo, 256, wtxt, _TRUNCATE);
+    free(wtxt);
+  }
+  if (!Shell_NotifyIconW(NIM_MODIFY, &nid)) {
+    return 0;
+  }
+  memcpy(wm_trays[slot].ntitle, nid.szInfoTitle, sizeof(nid.szInfoTitle));
+  return 1;
+}
+
+/* 收起气泡并摘掉该通知的托盘项（幂等）。 */
+void wm_notify_close(int slot) {
+  if (slot <= 0 || slot >= WM_MAX_TRAYS || !wm_trays[slot].used ||
+      wm_trays[slot].kind != 1) {
+    return;
+  }
+  if (wm_tray_hwnd != NULL) {
+    // 官方收气泡形态：NIF_INFO + 空 szInfo（没有独立的 dismiss API）
+    NOTIFYICONDATAW nid;
+    memset(&nid, 0, sizeof(nid));
+    nid.cbSize = sizeof(nid);
+    nid.hWnd = wm_tray_hwnd;
+    nid.uID = (UINT)slot;
+    nid.uFlags = NIF_INFO;
+    nid.szInfo[0] = L'\0';
+    nid.szInfoTitle[0] = L'\0';
+    Shell_NotifyIconW(NIM_MODIFY, &nid);
+  }
+  wm_tray_remove(slot);
+}
+
+/* 反读：某通知槽当前的气泡标题（UTF-8，返回字节数；0 = 读不到）。 */
+int wm_notify_title(int slot, char *out, int cap) {
+  if (slot <= 0 || slot >= WM_MAX_TRAYS || !wm_trays[slot].used ||
+      wm_trays[slot].kind != 1 || out == NULL || cap <= 1) {
+    return 0;
+  }
+  int n = WideCharToMultiByte(CP_UTF8, 0, wm_trays[slot].ntitle, -1, out,
+                              cap - 1, NULL, NULL);
+  if (n <= 0) {
+    out[0] = '\0';
+    return 0;
+  }
+  out[n] = '\0';
+  return n - 1;
 }
 
 // ---- IME（W6 线实装 ImmAssociateContext / WM_IME_*，当前为占位：缓冲恒空，
@@ -3379,6 +3504,35 @@ int wm_tray_tooltip(int slot, char *out, int cap) {
 }
 int wm_menu_popup_new(void) { return 0; }
 
+/* ---- 桌面通知（W21a）GTK 分支占位：Linux 的通知走纯 MoonBit 的
+ * org.freedesktop.Notifications（yue/dbus/notify.mbt），不经 GTK；
+ * 可编译的失败桩让门面走 DBus 分支（supported 恒 0）。 */
+int wm_notify_supported(void) { return 0; }
+int wm_notify_send(int icon_slot, const char *title, const char *text,
+                   int kind) {
+  (void)icon_slot;
+  (void)title;
+  (void)text;
+  (void)kind;
+  return 0;
+}
+int wm_notify_update(int slot, const char *title, const char *text, int kind) {
+  (void)slot;
+  (void)title;
+  (void)text;
+  (void)kind;
+  return 0;
+}
+void wm_notify_close(int slot) { (void)slot; }
+int wm_notify_count(void) { return 0; }
+int wm_notify_title(int slot, char *out, int cap) {
+  (void)slot;
+  if (out != NULL && cap > 0) {
+    out[0] = '\0';
+  }
+  return 0;
+}
+
 /* ---- 原生消息框（W20d）GTK 分支：GtkMessageDialog 跑模态 run()，返回
  * GtkResponseType；MoonBit 侧返回值编号口径与 Win32 对齐（1 OK/2 CANCEL/
  * 3 ABORT/4 RETRY/5 IGNORE/6 YES/7 NO）。uType 里的图标/按钮段由 MoonBit 纯
@@ -4023,6 +4177,35 @@ int wm_tray_tooltip(int slot, char *out, int cap) {
   return 0;
 }
 int wm_menu_popup_new(void) { return 0; }
+
+/* W21a 通知占位（macOS 等）：supported 恒 0、发/更新恒 0 = 不可用，MoonBit 层
+ * 走语义化降级（macOS 原生档是 NSUserNotification/UNUserNotificationCenter，
+ * 将来随 mac 平台批补）。 */
+int wm_notify_supported(void) { return 0; }
+int wm_notify_send(int icon_slot, const char *title, const char *text,
+                   int kind) {
+  (void)icon_slot;
+  (void)title;
+  (void)text;
+  (void)kind;
+  return 0;
+}
+int wm_notify_update(int slot, const char *title, const char *text, int kind) {
+  (void)slot;
+  (void)title;
+  (void)text;
+  (void)kind;
+  return 0;
+}
+void wm_notify_close(int slot) { (void)slot; }
+int wm_notify_count(void) { return 0; }
+int wm_notify_title(int slot, char *out, int cap) {
+  (void)slot;
+  if (out != NULL && cap > 0) {
+    out[0] = '\0';
+  }
+  return 0;
+}
 
 /* W20d 消息框占位（macOS 等）：返回 0 = 失败，MoonBit 层走语义化降级。
  * macOS 原生档是 NSAlert（ObjectC++ 单独 TU，将来随 mac 平台批补）。*/

@@ -333,3 +333,35 @@ extern "c" fn wm_tray_tooltip(slot : Int, out : Bytes, cap : Int) -> Int =
 
 ///|
 extern "c" fn wm_menu_popup_new() -> Int = "wm_menu_popup_new"
+
+///|
+extern "c" fn wm_notify_supported() -> Int = "wm_notify_supported"
+
+///|
+#borrow(title, text)
+extern "c" fn wm_notify_send(
+  icon_slot : Int,
+  title : Bytes,
+  text : Bytes,
+  kind : Int,
+) -> Int = "wm_notify_send"
+
+///|
+#borrow(title, text)
+extern "c" fn wm_notify_update(
+  slot : Int,
+  title : Bytes,
+  text : Bytes,
+  kind : Int,
+) -> Int = "wm_notify_update"
+
+///|
+extern "c" fn wm_notify_close(slot : Int) -> Unit = "wm_notify_close"
+
+///|
+extern "c" fn wm_notify_count() -> Int = "wm_notify_count"
+
+///|
+#borrow(out)
+extern "c" fn wm_notify_title(slot : Int, out : Bytes, cap : Int) -> Int =
+  "wm_notify_title"

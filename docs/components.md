@@ -523,6 +523,23 @@ n.show()
 | close() | Close |
 | NotificationCenter::get() + add(n) | Send via the notification center |
 
+> **New-stack (MoonBit native GUI stack) mapping** (since W21a): the table above is the old chain `@yue.Notification` / `NotificationCenter` (GTK/libnotify). The new stack's cross-platform facade is **`yue/core/notify.mbt`**, using free functions with no objects and no singleton:
+>
+> | Old chain | New stack | Notes |
+> | --- | --- | --- |
+> | `Notification::new()` + `set_title`/`set_body` | `notify_send(app_name, summary, body, …)` | No builder — arguments are passed directly; returns a notification id (`Result[Int, NotifyError]`) |
+> | `set_silent` | — | Not provided (the new facade does not expose silence as a parameter) |
+> | `set_actions` | — | Not provided (Win32 balloons have no action buttons; the Linux side is not wired either) |
+> | `show()` | same as `notify_send` | The new stack sends in one call — no "build then show" two-step |
+> | `close()` | `notify_close(id)` | Close by id (Win32 has no "close all" semantics, so id must be > 0) |
+> | `NotificationCenter::get()` + `add(n)` | — | No notification-center singleton; backend selection is decided inside the facade per platform |
+>
+> - **Backend selection**: Linux freedesktop D-Bus (`yue/dbus/notify.mbt`) first → Windows tray balloon (`NIF_INFO`, same source and slot table as W20c) → `Err(NotifyError::Unsupported)` if neither (structured errors, **never a silent failure**).
+> - **Capability probing**: `notify_supported()` / `notify_backend_name()` / `notify_caps()` (Linux takes the server's `GetCapabilities`; Win32 synthesises one with only the body capability).
+> - **Progress**: `notify_progress(id, …, pct)` or `notify_send(…, progress=…)`; Linux goes through the freedesktop `value` hint while Win32 has no counterpart, so the facade pastes the percentage into the body (a **visible degradation**).
+> - **Platform differences**: `timeout_ms` is ignored by the system on Win32 since Vista; `kind` (0 info / 1 warning / 2 error) maps to `NIIF_*` on Win32 and has no Linux equivalent (where `icon` theme names distinguish instead).
+> - **Verification**: the backend is proven by the pure-C probe `experiment/notify_probe` (last line `NOTIFY-BACKEND-OK`); the facade by the pure-function and lifecycle cases in `yue/core/notify_wbtest.mbt` (auto-skipping on machines with no notification backend). **Real-machine look and feel (whether the balloon pops, how long it dwells) belongs to the manual test checklist.** See the W21a section in [docs/adaptation.md](adaptation.md).
+
 ## MessageBox
 
 ```moonbit
