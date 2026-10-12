@@ -265,6 +265,7 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **一手实测补记**：`miniaudio.h`（4.2MB 单头）**在 MSVC 下能编**——除其自身第 80532 行一处 `ma_uint64 → ma_uint32`（C4244）外无告警。这说明音频后端在 Windows 上是有落地路径的，缺的只是时钟这一处。
 - **一条必须说清的边界**：改后 `audio_stub.c` 在 Windows 上**编得过、跑得起来**（探针即为证），但 `moon test ./modules/yue-media/media` **仍跑不起来**——测试可执行文件会把 `ffmpeg_stub.c` 一并链进来，而它要 `libavformat/avformat.h`（`ffmpeg-mbt` 那条线在非 Linux 上未接）。所以本批的 Windows 收益是**音频后端可编译可运行**，不是「媒体包能在 Windows 上用了」。Linux 分支代码逐字节未动，行为不变（本机跑不了 Linux，此为代码级判断而非实测）。
 - **本批未做且不假装完成**：`ffmpeg-mbt` 的 Windows/macOS 后端（要接系统解码器或自带 DLL，是另一条独立的线）；媒体包在非 Linux 上因此仍不能整体构建与整体测试；macOS 分支（`mach_absolute_time`）无法在本机回证，只做了代码级正确性论证；真机听得见的声音与 seek 手感仍归 `_人工测试清单.md`。
+- **顺带一条实测结论（免得后人「修」错地方）**：媒体 prebuild 的「非 Linux → 空 link_configs」是**对的**，不要往里加 `ole32.lib`/`uuid.lib`，也不要加 macOS 的 framework。①**Windows**：把 `audio_stub.c`（`#include` 了 miniaudio）拿去做实验——**不加任何额外库**直接链接即可通过（实测 `/Fe:probe_nolibs.exe` 零库链接成功且运行照样过 48 条断言），因为 miniaudio 默认走**运行期 `LoadLibrary`**（`MA_NO_RUNTIME_LINKING` 未定义），不产生链接期符号（此前那批探针带 `ole32.lib uuid.lib` 能过，是它们**不必要**而非必要）。②**macOS**：miniaudio 自述「the macOS build should compile cleanly without the need to download any dependencies nor link to any libraries or frameworks」——默认同为运行期框架链接（只有显式 `-DMA_NO_RUNTIME_LINKING` 才要求 `-framework CoreFoundation -framework CoreAudio -framework AudioToolbox`，且该宏的自动置位出现在 **DOS** 分支、不在 Apple 分支），命令行只需 `-lpthread -lm`，而这两者在 macOS 上由 libSystem 默认带上。所以三平台里**只有 Linux 需要显式系统库**（`-lpthread -ldl -lm -lstdc++ -latomic`）。
 
 ### 声明式层与自绘组件
 
