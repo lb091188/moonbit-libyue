@@ -682,6 +682,21 @@ auto.disable()    // 取消（幂等）
 Linux 写 `$XDG_CONFIG_HOME/autostart` 的 .desktop（exe 路径取
 `/proc/self/exe`），Windows 写 HKCU Run 键。
 
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21d）：上表是旧链 `@system.Autostart` 的句柄形态。新栈在 **`yue/sys/autostart.mbt`**，改用无对象、无单例的自由函数（app_id 直给）：
+>
+> | 旧链 | 新栈 | 说明 |
+> |---|---|---|
+> | `Autostart::new(app_id) -> Result[Autostart, …]` | ——（无句柄） | 自由函数每次传 app_id，没有要持有 / 释放的对象 |
+> | `is_supported()` | `autostart_supported()` | 运行时探测（macOS 本批 false） |
+> | `handle.is_enabled()` | `autostart_is_enabled(app_id)` | Linux 读 `.desktop` 并认 `Hidden` / `X-GNOME-Autostart-enabled`；Windows 看 Run 值在不在 |
+> | `handle.enable()` / `disable()` | `autostart_enable(app_id)` / `autostart_disable(app_id)` | 都幂等（重复 enable 覆盖、disable 对「本就不在」也算成功） |
+> | `handle.path()` | `autostart_path(app_id)` | 落点（Linux = `.desktop` 全路径；Windows = `HKCU\…\Run\<app_id>` 描述） |
+> | （无） | `autostart_exe_path()` | 当前进程可执行文件全路径（enable 用的就是它；也供排查） |
+>
+> **纯函数**（可单测）：`autostart_dir_of(xdg, home)`、`autostart_escape_exec(path)`、`autostart_desktop_entry(exe, app_id)`、`autostart_desktop_enabled(content)`、`autostart_run_value(exe)` / `autostart_run_value_exe(value)`、`autostart_valid_app_id(app_id)`。
+> **错误**：`AutostartError{Unsupported, InvalidAppId, NoExecutablePath, IoFailed(String)}`（不支持与失败分开，不静默）。
+> **注意**：`exec` 路径会按平台惯例加引号（`.desktop` 的 Exec 与 Windows 的 REG_SZ 都是整串双引号包裹），别自己再拼一层。
+
 ### 打开外部
 
 | API | 用途 |

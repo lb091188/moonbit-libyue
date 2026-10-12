@@ -685,6 +685,21 @@ auto.disable()    // cancel (idempotent)
 Linux writes a .desktop into `$XDG_CONFIG_HOME/autostart` (exe path resolved
 via `/proc/self/exe`); Windows writes the HKCU Run key.
 
+> **New-stack (MoonBit native GUI stack) mapping** (since W21d): the table above is the old stack's `@system.Autostart` handle form. The new stack lives in **`yue/sys/autostart.mbt`** and switches to free functions with no object and no singleton (the app_id is passed in):
+>
+> | Old stack | New stack | Notes |
+> |---|---|---|
+> | `Autostart::new(app_id) -> Result[Autostart, …]` | — (no handle) | Free functions take the app_id each call; there is no object to hold or release |
+> | `is_supported()` | `autostart_supported()` | Runtime probe (false on macOS this batch) |
+> | `handle.is_enabled()` | `autostart_is_enabled(app_id)` | Linux reads the `.desktop` and honours `Hidden` / `X-GNOME-Autostart-enabled`; Windows checks whether the Run value exists |
+> | `handle.enable()` / `disable()` | `autostart_enable(app_id)` / `autostart_disable(app_id)` | Both idempotent (a repeated enable overwrites; disable also succeeds when it was never there) |
+> | `handle.path()` | `autostart_path(app_id)` | Destination (Linux = full `.desktop` path; Windows = `HKCU\…\Run\<app_id>` description) |
+> | (none) | `autostart_exe_path()` | Full path of the current process's executable (what enable uses; also handy for diagnostics) |
+>
+> **Pure functions** (unit-testable): `autostart_dir_of(xdg, home)`, `autostart_escape_exec(path)`, `autostart_desktop_entry(exe, app_id)`, `autostart_desktop_enabled(content)`, `autostart_run_value(exe)` / `autostart_run_value_exe(value)`, `autostart_valid_app_id(app_id)`.
+> **Errors**: `AutostartError{Unsupported, InvalidAppId, NoExecutablePath, IoFailed(String)}` (unsupported and failure are kept separate; nothing fails silently).
+> **Note**: the exec path is quoted per platform convention (both a `.desktop` Exec and a Windows REG_SZ are wrapped in double quotes as a whole) — do not add another layer yourself.
+
 ### Opening External Things
 
 | API | Purpose |

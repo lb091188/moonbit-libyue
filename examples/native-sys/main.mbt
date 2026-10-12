@@ -468,6 +468,8 @@ fn main {
   let btn_reveal : Ref[@core.Widget?] = Ref(None)
   let btn_notify : Ref[@core.Widget?] = Ref(None)
   let btn_tray : Ref[@core.Widget?] = Ref(None)
+  let btn_auto_on : Ref[@core.Widget?] = Ref(None)
+  let btn_auto_off : Ref[@core.Widget?] = Ref(None)
   let notify_hits = @core.Store::new(0)
   let tray_item : Ref[@dbus.Item?] = Ref(None)
   let tray_clicks = @core.Store::new(0)
@@ -478,6 +480,15 @@ fn main {
   let apps_store = @core.Store::new(join_lines(probe_apps(counts)))
   let hist_store = @core.Store::new(join_lines(probe_history(counts)))
   let wins_store = @core.Store::new(join_lines(probe_windows(counts)))
+  // W21d 开机自启：设置类（写盘 / 写注册表），只给按钮；初值只做只读定位
+  let auto_id = "com.moonbit.libyue.nativesys"
+  let auto_on_hits = @core.Store::new(0)
+  let auto_state = @core.Store::new(
+    match @sys.autostart_path(auto_id) {
+      Ok(p) => "自启动：未启用（落点 " + p + "）"
+      Err(e) => "自启动：不可用（" + e.to_string() + "）"
+    },
+  )
 
   fn reprobe() -> Unit {
     sys_store.set(join_lines(probe_system(counts)))
@@ -652,6 +663,42 @@ fn main {
           handle=fn(w : @core.Widget) -> Unit { btn_tray.val = Some(w) },
         ),
         @ui.label_dyn(tray_state.signal(), size=12.0),
+        @ui.button(
+          "启用自启",
+          on_click=fn() -> Unit {
+            match @sys.autostart_enable(auto_id) {
+              Ok(_) => {
+                auto_on_hits.update(fn(n : Int) -> Int { n + 1 })
+                let loc = match @sys.autostart_path(auto_id) {
+                  Ok(p) => p
+                  Err(_) => "-"
+                }
+                auto_state.set(
+                  "自启动：已启用（重新登录 / 重启后拉起；落点 " + loc + "）",
+                )
+              }
+              Err(e) => auto_state.set("启用自启失败：" + e.to_string())
+            }
+            app.schedule_paint()
+          },
+          kind=@ui.Border,
+          min_width=110.0,
+          handle=fn(w : @core.Widget) -> Unit { btn_auto_on.val = Some(w) },
+        ),
+        @ui.button(
+          "取消自启",
+          on_click=fn() -> Unit {
+            match @sys.autostart_disable(auto_id) {
+              Ok(_) => auto_state.set("自启动：已取消（幂等，本就不在也算成功）")
+              Err(e) => auto_state.set("取消自启失败：" + e.to_string())
+            }
+            app.schedule_paint()
+          },
+          kind=@ui.Border,
+          min_width=110.0,
+          handle=fn(w : @core.Widget) -> Unit { btn_auto_off.val = Some(w) },
+        ),
+        @ui.label_dyn(auto_state.signal(), size=12.0),
         @ui.label_dyn(
           tray_clicks.signal().map(fn(k : Int) -> String {
             "托盘点击 " + k.to_string() + " 次"
@@ -682,6 +729,8 @@ fn main {
     ("reveal", btn_reveal),
     ("notify", btn_notify),
     ("tray", btn_tray),
+    ("auto_on", btn_auto_on),
+    ("auto_off", btn_auto_off),
   ] {
     match kv.1.val {
       Some(w) => geo = geo + " " + kv.0 + "=" + rect_str(w.rect)
@@ -700,6 +749,29 @@ fn main {
       "changes=\{clip_changes.get()} ntf=\{notify_hits.get()} " +
       "tray=\{tray_clicks.get()} " +
       "pool=\{@dbus.dbus_unique_name()}",
+  )
+  // W21d 自启动回证：支持性 / 当前启用态 / 当前 exe / 落点 / 按钮命中数。
+  // is_enabled 是即时读盘 / 读注册表，关窗后照读（与窗口读数不同）。
+  println(
+    "NATIVE-SYS-AUTOSTART supported=" +
+    (if @sys.autostart_supported() { "1" } else { "0" }) +
+    " enabled=" +
+    (match @sys.autostart_is_enabled(auto_id) {
+      Ok(true) => "1"
+      Ok(false) => "0"
+      Err(_) => "-"
+    }) +
+    " id=" +
+    auto_id +
+    " exe=" +
+    (match @sys.autostart_exe_path() {
+      Some(p) => p
+      None => "-"
+    }) +
+    " on_hits=" +
+    auto_on_hits.get().to_string() +
+    " note=" +
+    auto_state.get(),
   )
   app.shutdown()
 }

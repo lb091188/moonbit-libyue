@@ -248,9 +248,10 @@ def link_configs() -> dict:
         # IID_IFileDialog / IID_IShellItem 全在 uuid.lib——C 模式用不了
         # __uuidof，只能链库取 extern 符号（记档于 docs/zh/adaptation.md）。
         # ShellExecuteW 在 shell32，子进程与文件函数属 kernel32（默认已链）。
+        # W21d 自启动写 HKCU Run 键要 advapi32（Reg* 一组）。
         entries.append({
             "package": SYS_PACKAGE,
-            "link_flags": "ole32.lib shell32.lib uuid.lib user32.lib",
+            "link_flags": "ole32.lib shell32.lib uuid.lib user32.lib advapi32.lib",
         })
         # 文本层（yue/text/dwrite_text.cpp 的 Windows 分支）走系统 DirectWrite：
         # dwrite.lib 供 DWriteCreateFactory、d2d1.lib 供 D2D 的 DC 渲染目标

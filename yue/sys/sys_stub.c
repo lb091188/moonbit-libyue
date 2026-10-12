@@ -38,6 +38,9 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h> // _NSGetExecutablePath（可执行文件路径，W21d）
+#endif
 #endif
 
 // moon 运行时的字节构造（运行期符号，声明即链接）
@@ -1429,3 +1432,264 @@ void *wm_file_dialog_get_result(int64_t id) {
 void wm_file_dialog_destroy(int64_t id) { sys_dlg_free(id); }
 
 #endif
+
+// ---------------------------------------------------------------------------
+// 开机自启动（W21d）+ 可执行文件路径
+//
+// 分工：**跨平台的面在 MoonBit**（`yue/sys/autostart.mbt`）——Linux/macOS 拼
+// `$XDG_CONFIG_HOME/autostart/<app_id>.desktop`（纯字符串 + 既有文本文件读写
+// 入口，不经本桩）；**只有 Windows 的注册表写入需要 C**（HKCU 的 Run 键）。
+//
+// Windows 条目：值名 = app_id，值 = 当前 exe 全路径（REG_SZ）。按桌面惯例整串
+// 双引号包裹（路径含空格时未加引号会被截断成第一个词）——引号由 MoonBit 侧
+// `autostart_run_value` 拼，本桩**原样写、原样读**，不做二次加工。
+//
+// 返回约定（与既有的 ok 0/1 口径一致，另加一档错误）：
+//   get:    *ok = 1 值存在 / 0 不存在 / -1 后端失败
+//   set:    rc 0 成功(*ok=1) / -1000 本平台不支持 / -1 失败
+//   remove: rc 0 成功(*ok=1，含「本就不在」的幂等成功) / -1000 / -1
+//   exe_path: *ok = 1 成功（非 Windows 由本桩自己实现，无 unsupported 档）
+// ---------------------------------------------------------------------------
+
+#if defined(_WIN32)
+#include <wchar.h>
+// HKCU 下的登录自启动键（桌面约定的固定路径）
+#define WIN_AUTOSTART_RUN L"Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+#endif
+
+// 当前进程可执行文件全路径（UTF-8）：
+//   Windows  GetModuleFileNameW，按返回值判截断（n == cap 即缓冲不够，翻倍重试）
+//   Linux    /proc/self/exe（readlink 不补 NUL，按返回长度切）
+//   macOS    _NSGetExecutablePath + realpath（前者可能给带 .. 的路径）
+// 三平台都能拿到，故无 unsupported 档；失败一律 ok=0。
+void *yue_sys_exe_path(int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  DWORD cap = 512;
+  wchar_t *buf = NULL;
+  for (;;) {
+    wchar_t *nb = (wchar_t *)realloc(buf, sizeof(wchar_t) * (size_t)cap);
+    if (nb == NULL) {
+      free(buf);
+      return moonbit_make_bytes(0, 0);
+    }
+    buf = nb;
+    DWORD n = GetModuleFileNameW(NULL, buf, cap);
+    if (n == 0) {
+      free(buf);
+      return moonbit_make_bytes(0, 0);
+    }
+    if (n < cap - 1) { // 未截断（n == cap 才是「不够」）
+      void *out = win_wide_bytes(buf);
+      free(buf);
+      *ok = 1;
+      return out;
+    }
+    if (cap > 32768) {
+      free(buf);
+      return moonbit_make_bytes(0, 0);
+    }
+    cap *= 2;
+  }
+#elif defined(__APPLE__)
+  uint32_t cap = 1024;
+  char *buf = NULL;
+  for (;;) {
+    char *nb = (char *)realloc(buf, cap);
+    if (nb == NULL) {
+      free(buf);
+      return moonbit_make_bytes(0, 0);
+    }
+    buf = nb;
+    uint32_t sz = cap;
+    if (_NSGetExecutablePath(buf, &sz) == 0) {
+      char resolved[4096];
+      const char *final = buf;
+      if (realpath(buf, resolved) != NULL) {
+        final = resolved;
+      }
+      size_t n = strlen(final);
+      void *out = moonbit_make_bytes((int)n, 0);
+      memcpy(out, final, n);
+      free(buf);
+      *ok = 1;
+      return out;
+    }
+    if (cap > 65536) {
+      free(buf);
+      return moonbit_make_bytes(0, 0);
+    }
+    cap *= 2;
+  }
+#else
+  size_t cap = 1024;
+  char *buf = NULL;
+  for (;;) {
+    char *nb = (char *)realloc(buf, cap);
+    if (nb == NULL) {
+      free(buf);
+      return moonbit_make_bytes(0, 0);
+    }
+    buf = nb;
+    ssize_t n = readlink("/proc/self/exe", buf, cap);
+    if (n < 0) {
+      free(buf);
+      return moonbit_make_bytes(0, 0);
+    }
+    if ((size_t)n < cap) {
+      void *out = moonbit_make_bytes((int)n, 0);
+      if (n > 0) {
+        memcpy(out, buf, (size_t)n);
+      }
+      free(buf);
+      *ok = 1;
+      return out;
+    }
+    if (cap > 65536) {
+      free(buf);
+      return moonbit_make_bytes(0, 0);
+    }
+    cap *= 2;
+  }
+#endif
+}
+
+// 读 Run 键值（原样返回写入时的串，含引号）。*ok 见文件末节约定。
+void *yue_sys_autostart_get(const char *app_id, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  if (app_id == NULL) {
+    *ok = -1;
+    return moonbit_make_bytes(0, 0);
+  }
+  wchar_t *w = win_utf8_wide(app_id, 0);
+  if (w == NULL) {
+    *ok = -1;
+    return moonbit_make_bytes(0, 0);
+  }
+  HKEY key = NULL;
+  LSTATUS r = RegOpenKeyExW(HKEY_CURRENT_USER, WIN_AUTOSTART_RUN, 0,
+                            KEY_QUERY_VALUE, &key);
+  if (r == ERROR_FILE_NOT_FOUND) { // 键都不在 = 值必然不在
+    free(w);
+    return moonbit_make_bytes(0, 0);
+  }
+  if (r != ERROR_SUCCESS) {
+    free(w);
+    *ok = -1;
+    return moonbit_make_bytes(0, 0);
+  }
+  DWORD type = 0;
+  DWORD sz = 0;
+  r = RegQueryValueExW(key, w, NULL, &type, NULL, &sz);
+  if (r == ERROR_FILE_NOT_FOUND) {
+    RegCloseKey(key);
+    free(w);
+    return moonbit_make_bytes(0, 0);
+  }
+  if (r != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ) ||
+      sz < sizeof(wchar_t)) {
+    RegCloseKey(key);
+    free(w);
+    *ok = -1;
+    return moonbit_make_bytes(0, 0);
+  }
+  // sz 含结尾 NUL；多留一格并显式补 NUL，防「未终止」的写入方
+  wchar_t *buf = (wchar_t *)malloc((size_t)sz + sizeof(wchar_t));
+  if (buf == NULL) {
+    RegCloseKey(key);
+    free(w);
+    *ok = -1;
+    return moonbit_make_bytes(0, 0);
+  }
+  r = RegQueryValueExW(key, w, NULL, &type, (LPBYTE)buf, &sz);
+  RegCloseKey(key);
+  free(w);
+  if (r != ERROR_SUCCESS) {
+    free(buf);
+    *ok = -1;
+    return moonbit_make_bytes(0, 0);
+  }
+  buf[sz / sizeof(wchar_t)] = L'\0';
+  void *out = win_wide_bytes(buf);
+  free(buf);
+  *ok = 1;
+  return out;
+#else
+  (void)app_id;
+  return moonbit_make_bytes(0, 0); // 非 Windows 不经本入口（面在 MoonBit）
+#endif
+}
+
+// 写 Run 键值（键不存在则建；重复写即覆盖，幂等）。
+int32_t yue_sys_autostart_set(const char *app_id, const char *value,
+                              int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  if (app_id == NULL || value == NULL) {
+    return -1;
+  }
+  wchar_t *w = win_utf8_wide(app_id, 0);
+  wchar_t *v = win_utf8_wide(value, 0);
+  if (w == NULL || v == NULL) {
+    free(w);
+    free(v);
+    return -1;
+  }
+  HKEY key = NULL;
+  LSTATUS r = RegCreateKeyExW(HKEY_CURRENT_USER, WIN_AUTOSTART_RUN, 0, NULL, 0,
+                              KEY_SET_VALUE, NULL, &key, NULL);
+  if (r != ERROR_SUCCESS) {
+    free(w);
+    free(v);
+    return -1;
+  }
+  DWORD bytes = (DWORD)((wcslen(v) + 1) * sizeof(wchar_t));
+  r = RegSetValueExW(key, w, 0, REG_SZ, (const BYTE *)v, bytes);
+  RegCloseKey(key);
+  free(w);
+  free(v);
+  if (r != ERROR_SUCCESS) {
+    return -1;
+  }
+  *ok = 1;
+  return 0;
+#else
+  (void)app_id;
+  (void)value;
+  return -1000;
+#endif
+}
+
+// 删 Run 键值（幂等：键不在 / 值不在都算成功）。
+int32_t yue_sys_autostart_remove(const char *app_id, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  if (app_id == NULL) {
+    return -1;
+  }
+  wchar_t *w = win_utf8_wide(app_id, 0);
+  if (w == NULL) {
+    return -1;
+  }
+  HKEY key = NULL;
+  LSTATUS r = RegOpenKeyExW(HKEY_CURRENT_USER, WIN_AUTOSTART_RUN, 0,
+                            KEY_SET_VALUE, &key);
+  if (r != ERROR_SUCCESS) {
+    free(w);
+    *ok = 1; // 键都不在 = 目标本就不在，幂等成功
+    return 0;
+  }
+  r = RegDeleteValueW(key, w);
+  RegCloseKey(key);
+  free(w);
+  if (r != ERROR_SUCCESS && r != ERROR_FILE_NOT_FOUND) {
+    return -1;
+  }
+  *ok = 1;
+  return 0;
+#else
+  (void)app_id;
+  return -1000;
+#endif
+}
