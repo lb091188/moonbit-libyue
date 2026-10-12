@@ -131,8 +131,12 @@ fn main {
   ])
 
   // ---- 批 C：JS 桥 + DOM 抓取 + 导航面 ----
-  // 另开一窗装一份**本地页**（load_html，不依赖网络），页面上有链接、新窗链接、
+  // 另开一窗装一份**本地页**（走自定义协议，不依赖网络）：页面上有链接、新窗链接、
   // 权限请求、页面回话四类触发点；原生侧一排按钮逐条按。计数在退出行里回证。
+  // 本地页给它一条**真 URL**（协议页入历史），前进/后退才有意义——`load_html`
+  // 装的页面不入历史，那时「后退」按钮只能是空操作（真机踩过）。
+  // 协议根目录两处共用（桥接页 + 下面「批 C 余项」那行），所以定义放在这里。
+  let sc_root = "/tmp/native-web-scheme"
   let js_evals = Ref(0)
   let js_dom_ok = Ref(0)
   let js_dom_bad = Ref(0)
@@ -168,6 +172,7 @@ fn main {
   }
   let bridge_html =
     "<!doctype html><html><head>" +
+    "<meta charset=\"utf-8\">" +
     "<meta name=\"description\" content=\"本地桥接页\">" +
     "<title>本地桥接页</title></head><body>" +
     "<h1>桥接页大标题</h1><h2>二级标题</h2>" +
@@ -440,7 +445,16 @@ fn main {
                 border=@theme.theme_border(),
               ),
             ])
-            v.load_html(bridge_html, base_uri="https://local.test/")
+            let _ = @sys.sys_make_dirs(sc_root)
+            let _ = @sys.sys_write_text_file(sc_root + "/bridge.html", bridge_html)
+            if v.register_protocol("yuedemo", sc_root) {
+              v.load_url("yuedemo://local/bridge.html")
+            } else {
+              // 协议没就绪（名字没预声明 / 引擎不在位）：明确降级并写在事件区，
+              // 不静默——这条页面上「后退」会退不动，原因得看得见
+              note("协议未就绪，退回 load_html（此页不入历史）")
+              v.load_html(bridge_html, base_uri="https://local.test/")
+            }
             // 绑定与策略要有句柄才生效（挂载发生在第一次绘制），排期重试
             let tries = Ref(0)
             let tick : Ref[() -> Unit] = Ref(fn() { () })
@@ -745,7 +759,6 @@ fn main {
   // ---- 批 C 余项：本地内容通道（自定义协议按 context 注册）----
   // 往临时目录写一份真文件，注册成 yuedemo:// 后让页面区直接加载它——
   // 「本地内容不经磁盘缓存、不经网络层」这条能力就完整了。
-  let sc_root = "/tmp/native-web-scheme"
   let sc_index =
     "<!doctype html><html><head><meta charset=\"utf-8\">" +
     "<title>本地协议页</title><link rel=\"stylesheet\" href=\"style.css\">" +

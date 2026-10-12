@@ -43,15 +43,18 @@ test "导航失败载荷：四段拆结构，message 里带竖线不再切坏" {
 }
 
 ///|
-test "未挂载时注册/注销协议都给 false，不碰引擎" {
+/// 未挂载时的登记：受理（挂载即应用），注销能把待应用的登记撤掉；
+/// 都没登记过时注销给 false——「未挂载」不等于「随便成功」。
+test "未挂载时注册受理、注销可撤，双重注销 false" {
   let v = match webview_new(fake_app(), "about:blank") {
     None => return
     Some(x) => x
   }
   // 用「app」而不是随手起的名字：建视图那一刻名单已封，没声明过的名字
-  // 会被门挡在注册之前（那条另有测试），这里要钉的是「未挂载不碰引擎」
-  assert_eq(v.register_protocol("app", "/tmp"), false)
-  assert_eq(v.unregister_protocol("app"), false)
+  // 会被门挡在注册之前（那条另有测试）
+  assert_eq(v.register_protocol("app", "/tmp"), true) // 受理，等挂载应用
+  assert_eq(v.unregister_protocol("app"), true) // 撤掉待应用的登记
+  assert_eq(v.unregister_protocol("app"), false) // 没得撤了
 }
 
 ///|

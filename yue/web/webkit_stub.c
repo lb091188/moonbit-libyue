@@ -336,17 +336,22 @@ static const char *wb_mime_of(const char *path) {
   if (dot == NULL) {
     return "application/octet-stream";
   }
+  // 文本类一律钉 utf-8：协议通道只给 MIME，WebKit 没有别的口径可猜，
+  // 裸 "text/html" 会按 ISO-8859-1 解，中文页直接成乱码。
   if (g_ascii_strcasecmp(dot, ".html") == 0 || g_ascii_strcasecmp(dot, ".htm") == 0) {
-    return "text/html";
+    return "text/html; charset=utf-8";
   }
   if (g_ascii_strcasecmp(dot, ".css") == 0) {
-    return "text/css";
+    return "text/css; charset=utf-8";
   }
   if (g_ascii_strcasecmp(dot, ".js") == 0 || g_ascii_strcasecmp(dot, ".mjs") == 0) {
-    return "application/javascript";
+    return "application/javascript; charset=utf-8";
   }
   if (g_ascii_strcasecmp(dot, ".json") == 0) {
-    return "application/json";
+    return "application/json; charset=utf-8";
+  }
+  if (g_ascii_strcasecmp(dot, ".txt") == 0) {
+    return "text/plain; charset=utf-8";
   }
   if (g_ascii_strcasecmp(dot, ".svg") == 0) {
     return "image/svg+xml";

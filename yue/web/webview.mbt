@@ -105,6 +105,8 @@ pub(all) struct Webview {
   mut eval_waiters : Array[(Int64, (String) -> Unit)]
   /// 挂载前排的 HTML（load_html 在未挂载时记下，挂载即应用；空串 = 没有）
   mut pending_html : (String, String)
+  /// 挂载前排的协议登记（(scheme, root)；挂载即向引擎注册）
+  mut pending_protos : Array[(String, String)]
   /// 泵是否在跑（close 之后不再排期）
   mut pumping : Bool
   /// 已注册的页面→原生通道数（引擎没有注销口，计数只增）
@@ -138,6 +140,7 @@ pub fn webview_open(app : @core.App, opts : WebviewOptions) -> Webview? {
     on_event: None,
     eval_waiters: [],
     pending_html: ("", ""),
+    pending_protos: [],
     pumping: false,
     binding_count: 0,
   })
@@ -237,6 +240,17 @@ fn Webview::mount_at(self : Webview, rect : (Double, Double, Double, Double)) ->
       if ph.0.length() > 0 {
         self.pending_html = ("", "")
         wb_load_html(self.handle, @utf8.encode(ph.0), @utf8.encode(ph.1))
+      }
+      // 挂载前排下的协议登记在这里生效（视图是第一次拿到真实矩形那一帧才建的，
+      // 调用方不必自己等挂载——与 pending_html 同源）
+      let protos = self.pending_protos
+      self.pending_protos = []
+      for pr in protos {
+        let _ = wb_register_scheme(
+          self.handle,
+          @utf8.encode(pr.0),
+          @utf8.encode(pr.1),
+        )
       }
       self.start_pump()
     }

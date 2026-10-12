@@ -97,6 +97,8 @@ fn schemes_has(list : Array[String], s : String) -> Bool {
   }
   hit
 }
+
+///|
 let g_sealed : Ref[Bool] = Ref(false)
 
 ///|
@@ -142,9 +144,10 @@ pub fn webview_scheme_declared(scheme : String) -> Bool {
 
 ///|
 /// 注册一条自定义协议，把 `scheme://<路径>` 映射到 `root` 目录下的文件。
-/// 未挂载（没有 webkit 视图）返回 false；**名字没预声明同样返回 false**
-/// （见 `webview_predeclare_schemes`，三平台取严的结果）；
-/// 根目录里的路径含 `..` 会被拒（C 侧）。
+/// **名字没预声明返回 false**（见 `webview_predeclare_schemes`，三平台取严的结果）；
+/// 视图还没挂载时照样受理，登记排队、挂载即应用（返回 true）。
+/// 根目录里的路径含 `..` 会被拒（C 侧）；文本类响应的 MIME 带回 `charset=utf-8`
+/// ——协议通道只给 MIME，不钉编码的话中文页会按 ISO-8859-1 解成乱码。
 pub fn Webview::register_protocol(
   self : Webview,
   scheme : String,
@@ -153,7 +156,12 @@ pub fn Webview::register_protocol(
   if !webview_scheme_declared(scheme) {
     return false
   }
-  self.handle != 0L &&
+  if self.handle == 0L {
+    // 还没挂载（视图在第一次拿到真实矩形那一帧才建）：记下来、挂载即应用，
+    // 与 load_html 的 pending 同源——调用方不必自己等挂载
+    self.pending_protos.push((scheme, root))
+    return true
+  }
   wb_register_scheme(self.handle, @utf8.encode(scheme), @utf8.encode(root)) == 1
 }
 
@@ -161,6 +169,19 @@ pub fn Webview::register_protocol(
 /// 「注销」= 顶替成错误 handler（引擎没有真注销口，见文件头）。返回 false 只
 /// 表示这条 scheme 本来就没注册过。
 pub fn Webview::unregister_protocol(self : Webview, scheme : String) -> Bool {
-  self.handle != 0L &&
+  // 先撤掉「待挂载应用」的登记：撤到过就算登记过（返回 true）
+  let kept : Array[(String, String)] = []
+  let mut had = false
+  for pr in self.pending_protos {
+    if pr.0 == scheme {
+      had = true
+    } else {
+      kept.push(pr)
+    }
+  }
+  self.pending_protos = kept
+  if self.handle == 0L {
+    return had
+  }
   wb_unregister_scheme(self.handle, @utf8.encode(scheme)) == 1
 }
