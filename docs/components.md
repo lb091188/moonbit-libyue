@@ -557,6 +557,18 @@ box.show_for_window(win)
 | on_response(fn(response)) | Button response (response is the button number) |
 | show() / show_for_window(win) / close() | Show (modal) / close |
 
+> **New-stack (MoonBit native GUI stack) mapping** (since W20d/W21b): the table above is the old chain's `@yue.MessageBox`. The new stack ships **two coexisting tiers**; callers pick per need:
+>
+> | Tier | Entry point | Characteristics |
+> | --- | --- | --- |
+> | Native (W20d) | `@win.show_message_box(title, text, kind, buttons)` | Goes through Win32 `MessageBoxW`: system look, system modality, a **blocking** `MessageBoxResult` (`Ok`/`Cancel`/`Yes`/`No`/…). **Win32 only** (stub on macOS) |
+> | Self-drawn (W21b) | `@ui.message_box_t(visible, title, text, kind?, informative?, buttons?, on_response?, on_dismiss?, close_on_mask?)` | Fully self-drawn, honours the theme, **non-blocking** (`on_response(code)` calls back with a code), one code path across all three platforms |
+>
+> - **Response codes**: the self-drawn tier takes codes from the caller (`buttons` is a list of `(label, code)`) and does **not** borrow the native tier's `MessageBoxResult` 1..7 convention.
+> - **✕ / Esc / clicking the mask**: the self-drawn tier dismisses to `on_dismiss` (no code; `close_on_mask` defaults to false); **Enter = the first button** (the default).
+> - `informative` corresponds to the old chain's `set_informative_text` (a secondary-colour sub-line).
+> - **Verification**: the self-drawn tier is proven by the headless runtime cases in `yue/ui/message_box_wbtest.mbt` (open/close, codes, ✕/Esc/Enter, both mask states). See the W21b section in [docs/adaptation.md](adaptation.md).
+
 ## FileDialog
 
 ```moonbit

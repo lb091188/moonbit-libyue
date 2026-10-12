@@ -557,6 +557,18 @@ box.show_for_window(win)
 | on_response(fn(response)) | 按钮响应（response 为按钮编号） |
 | show() / show_for_window(win) / close() | 弹出（模态）/ 关闭 |
 
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W20d/W21b）：上表是旧链 `@yue.MessageBox`。新栈**两档并存**，调用方按需选：
+>
+> | 档 | 入口 | 特点 |
+> | --- | --- | --- |
+> | 原生档（W20d） | `@win.show_message_box(title, text, kind, buttons)` | 走 Win32 `MessageBoxW`：系统外观、系统模态、**阻塞**返回 `MessageBoxResult`（`Ok`/`Cancel`/`Yes`/`No`/…）。**只有 Win32 有**（macOS 留桩） |
+> | 自绘档（W21b） | `@ui.message_box_t(visible, title, text, kind?, informative?, buttons?, on_response?, on_dismiss?, close_on_mask?)` | 纯自绘、吃主题、**非阻塞**（`on_response(code)` 回调编号），三平台同构 |
+>
+> - **响应编号**：自绘档的编号由调用方给（`buttons` 是 `(文案, 编号)`），**不借用**原生档 `MessageBoxResult` 的 1..7 口径。
+> - **✕ / Esc / 点遮罩**：自绘档收起到 `on_dismiss`（不给编号；`close_on_mask` 默认 false）；**Enter = 第一个按钮**（默认钮）。
+> - `informative` 对应旧链 `set_informative_text`（次要色副行）。
+> - **验证**：自绘档由 `yue/ui/message_box_wbtest.mbt` 的无头运行时用例回证（弹收/编号/✕/Esc/Enter/遮罩两态）。详见 [docs/zh/adaptation.md](adaptation.md) 的 W21b 节。
+
 ## 文件对话框 FileDialog
 
 ```moonbit

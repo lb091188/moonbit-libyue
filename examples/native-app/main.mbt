@@ -806,6 +806,86 @@ fn msgbox_result_label(r : @win.MessageBoxResult) -> String {
 }
 
 ///|
+/// W21b 自绘消息框区块：三个按钮各弹一个不同种类/按钮集的**自绘**消息框——纯自绘
+/// （不开原生 `MessageBoxW`），因此三平台同构；Esc 收起、Enter 走默认钮。响应编号
+/// 落状态行（自绘档的编号由调用方给，与 W20d 原生档的 1..7 是两套口径）。
+fn make_drawn_message_box_section(
+  vis_info : @core.Store[Bool],
+  vis_warn : @core.Store[Bool],
+  vis_err : @core.Store[Bool],
+  last : Ref[String],
+  shots : Ref[Int],
+) -> @core.Node {
+  let respond = fn(code : Int) -> Unit {
+    shots.val = shots.val + 1
+    last.val = "编号 " + code.to_string()
+  }
+  let dismiss = fn() -> Unit {
+    shots.val = shots.val + 1
+    last.val = "关闭(✕/Esc)"
+  }
+  @ui.container(
+    [
+      @ui.label(
+        "自绘消息框（W21b）：纯自绘、不吃原生 MessageBoxW，三平台同构；Esc 收起 / Enter 走默认钮",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [
+          @ui.button_t("信息 确定", on_click=fn() -> Unit { vis_info.set(true) }),
+          @ui.button_t("警告 三钮", on_click=fn() -> Unit { vis_warn.set(true) }),
+          @ui.button_t(
+            "错误 是/否",
+            variant=@ui.Danger,
+            on_click=fn() -> Unit { vis_err.set(true) },
+          ),
+          @core.node_of(live_counter(
+            fn() -> String { "弹框次数 " + shots.val.to_string() + "  最近 " + last.val },
+            width=260.0,
+          )),
+        ],
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+      @ui.message_box_t(
+        vis_info,
+        "构建完成",
+        "3 个目标已产出。",
+        kind=@ui.Information,
+        buttons=[("确定", 1)],
+        on_response=respond,
+        on_dismiss=dismiss,
+      ),
+      @ui.message_box_t(
+        vis_warn,
+        "构建告警",
+        "2 个目标有告警。",
+        kind=@ui.Warning,
+        informative="其中 1 个是缓存未命中，可忽略。",
+        buttons=[("重试", 1), ("跳过", 2), ("取消", 3)],
+        on_response=respond,
+        on_dismiss=dismiss,
+        width=460.0,
+      ),
+      @ui.message_box_t(
+        vis_err,
+        "构建失败",
+        "3 个目标失败，是否继续？",
+        kind=@ui.Error,
+        buttons=[("是", 6), ("否", 7)],
+        on_response=respond,
+        on_dismiss=dismiss,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// W20a 原生菜单栏区块：把 MenuBar 模型翻译成 Win32 原生菜单（CreateMenu +
 /// SetMenu），点菜单项经 WM_COMMAND 回收并派发到模型回调。跨平台模型在
 /// `yue/core/menu.mbt`，这里只做展示与状态行回证。
@@ -2111,6 +2191,23 @@ fn main {
   let msgbow_shots = Ref(0)
   let msgbow_last : Ref[String] = Ref("-")
   app.mount([make_message_box_section(msgbow_last, msgbow_shots)])
+  // W21b（自绘消息框）：三个 Store 各驱动一个自绘消息框；响应编号落状态行。
+  // 另快照运行中的浮层数（关窗后浮层栈已清，退出时读不到真值，见 W20c 的坑）。
+  let mb_shots = Ref(0)
+  let mb_last : Ref[String] = Ref("-")
+  let mb_vis_info = @core.Store::new(false)
+  let mb_vis_warn = @core.Store::new(false)
+  let mb_vis_err = @core.Store::new(false)
+  let mb_ovl_snap : Ref[Int] = Ref(0)
+  app.mount([
+    make_drawn_message_box_section(
+      mb_vis_info,
+      mb_vis_warn,
+      mb_vis_err,
+      mb_last,
+      mb_shots,
+    ),
+  ])
   // W20a（原生菜单栏）：MenuBar 模型翻译成 Win32 原生菜单挂到主窗。菜单点击经
   // WM_COMMAND 回收，宿主每拍调 `dispatch_menu_command` 派发到模型回调。
   // 后端不支持时 apply 返回 false，区块照挂（状态行如实报「未挂载」）。
@@ -2672,6 +2769,8 @@ fn main {
       let _ignored_tray = @core.dispatch_tray_event()
       // W21a：每拍快照后端侧在用通知数（关窗后槽表清空，退出时读不到真值）
       notify_snap.val = "count=" + @win.notify_count().to_string()
+      // W21b：每拍快照运行中的浮层数（自绘消息框开在浮层图层上）
+      mb_ovl_snap.val = @core.overlay_count()
       app.schedule_paint()
       let _ = app.timer(500, ticker.val)
     }
@@ -3134,6 +3233,18 @@ fn main {
       msgbow_shots.val.to_string() +
       " last=" +
       msgbow_last.val,
+  )
+  // W21b（自绘消息框）回证：弹框次数与最近一次的响应编号（自绘档编号由调用方给）；
+  // ovl= 是运行中浮层数的末次快照（关窗后浮层栈已清，退出时读不到真值）。
+  println(
+    "NATIVE-APP-MSGBOX2 shots=" +
+    mb_shots.val.to_string() +
+    " last=" +
+    mb_last.val +
+    " ovl=" +
+    mb_ovl_snap.val.to_string() +
+    " native_ovl=" +
+    @core.overlay_count().to_string(),
   )
   // W20a（原生菜单栏）回证：菜单是否挂上、菜单项被点几次、最近一项标签。
   println(
