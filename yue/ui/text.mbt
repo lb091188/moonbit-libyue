@@ -16,12 +16,15 @@ pub(all) enum TextRole {
 ///|
 /// 角色字号（逻辑像素）。
 pub fn role_font(role : TextRole) -> @text.Font {
+  // 缺省字族按平台探（Windows 钉雅黑；探不到交引擎缺省），见
+  // @theme.default_font_family 的注释
+  let fam = @theme.default_font_family()
   match role {
-    Title => @text.Font::new("", 18.0, weight=@text.SemiBold)
-    Section => @text.Font::new("", 14.0, weight=@text.SemiBold)
-    Body => @text.Font::new("", 13.0)
-    Secondary => @text.Font::new("", 12.0)
-    Accent => @text.Font::new("", 13.0, weight=@text.SemiBold)
+    Title => @text.Font::new(fam, 18.0, weight=@text.SemiBold)
+    Section => @text.Font::new(fam, 14.0, weight=@text.SemiBold)
+    Body => @text.Font::new(fam, 13.0)
+    Secondary => @text.Font::new(fam, 12.0)
+    Accent => @text.Font::new(fam, 13.0, weight=@text.SemiBold)
   }
 }
 

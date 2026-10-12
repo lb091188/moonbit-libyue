@@ -52,6 +52,9 @@ test "语义色五档互不相同且都是合法 hex" {
 
 ///|
 test "标签与徽标按内容定宽，超上限显示 99+" {
+  if !ui_text_guard() {
+    return
+  }
   let (_, short_tag) = mounted(tag_of_type("新", Primary), 200.0, 60.0)
   let (_, long_tag) = mounted(tag_of_type("很长的一段标签文字", Primary), 300.0, 60.0)
   assert_eq(short_tag.rect.h, 24.0)
@@ -66,6 +69,9 @@ test "标签与徽标按内容定宽，超上限显示 99+" {
 
 ///|
 test "头像取首字符、统计块按内容定宽" {
+  if !ui_text_guard() {
+    return
+  }
   let (_, av) = mounted(avatar("刘斌"), 60.0, 60.0)
   assert_eq((av.rect.w, av.rect.h), (32.0, 32.0))
   let bm = @render.Bitmap::new(60, 60)

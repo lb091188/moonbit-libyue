@@ -207,15 +207,30 @@ test "ci_slice_range：闭区间切片/越界收窄/空区间" {
 }
 
 ///|
+/// 临时输出文件路径：POSIX 走 $TMPDIR（回退 /tmp）、Windows 走 %TEMP%
+/// （回退当前目录），分隔符随平台。写盘用例不能写死 "/tmp"——Windows 的
+/// CRT 会把它当「当前盘根目录下的 tmp」，目录不存在就写失败。
+fn ci_tmp_path(tag : String) -> String {
+  let win = @sys.sys_platform() == "windows"
+  let (name, fallback) = if win { ("TEMP", ".") } else { ("TMPDIR", "/tmp") }
+  let dir = match @sys.sys_getenv(name) {
+    Some(d) => if d != "" { d } else { fallback }
+    None => fallback
+  }
+  let sep = if win { "\\" } else { "/" }
+  "\{dir}\{sep}\{tag}"
+}
+
+///|
 test "ci_save_chart：格式/尺寸校验先行（不触盘）+ PNG 真落盘" {
   let draw = fn(_p : @render.Painter, _w : Double, _h : Double) -> Unit { () }
   // 尺寸非法
-  let r1 = ci_save_chart(draw, 0.0, 100.0, "/tmp/x.png")
+  let r1 = ci_save_chart(draw, 0.0, 100.0, ci_tmp_path("x.png"))
   assert_true(r1 is Err(WriteFailed(_)))
   // 格式不支持
-  let r2 = ci_save_chart(draw, 100.0, 100.0, "/tmp/x.bmp", format="bmp")
+  let r2 = ci_save_chart(draw, 100.0, 100.0, ci_tmp_path("x.bmp"), format="bmp")
   assert_true(r2 is Err(UnsupportedFormat("bmp")))
-  // 真落盘：新栈 PNG 编码不依赖平台（yue/render/png.mbt），Linux 可用；
+  // 真落盘：新栈 PNG 编码不依赖平台（yue/render/png.mbt），三平台可用；
   // 写盘成功的判定就是 write_to_file 回 true（编码细节由 render 包的
   // png_wbtest 覆盖），此处不再回读文件
   let r3 = ci_save_chart(
@@ -225,7 +240,7 @@ test "ci_save_chart：格式/尺寸校验先行（不触盘）+ PNG 真落盘" {
     },
     40.0,
     30.0,
-    "/tmp/yue_chart_ci_save_test.png",
+    ci_tmp_path("yue_chart_ci_save_test.png"),
   )
   match r3 {
     Ok(_) => ()

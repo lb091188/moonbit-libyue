@@ -110,7 +110,14 @@ test "font_metrics：ascent/descent 与既有行高、基线两个口径同源" 
     Some(m) => {
       assert_true(m.ascent > 0)
       assert_true(m.descent >= 0)
-      assert_eq(line_height_font(f), Some(m.ascent + m.descent))
+      // 行高套 K 地板（max(自然, ceil(size×K))，见 text.mbt 的 LINE_HEIGHT_K）；
+      // 度量本身（ascent/descent）仍是引擎原值，地板只作用于行高投影
+      let natural = m.ascent + m.descent
+      let floor = (f.size * 1.36).ceil().to_int()
+      assert_eq(
+        line_height_font(f),
+        Some(if natural > floor { natural } else { floor }),
+      )
       assert_eq(line_ascent_font(f), Some(m.ascent))
       // 字号抬高度量：同一族 28px 的升距一定大于 13px
       let small = Font::new("", 13.0)
@@ -132,7 +139,11 @@ test "line_height_multi：混排行盒 = 升距最大 + 降距最大" {
   assert_eq(line_height_multi([base]), line_height_font(base))
   match (font_metrics(base), font_metrics(big)) {
     (Some(m1), Some(m2)) => {
-      let want = m1.ascent.max(m2.ascent) + m1.descent.max(m2.descent)
+      // 混排行盒 = 自然（升距最大+降距最大）再套 K 地板（用行内最大字号，
+      // 与 line_height_multi 同口径）
+      let natural = m1.ascent.max(m2.ascent) + m1.descent.max(m2.descent)
+      let floor = (big.size * 1.36).ceil().to_int()
+      let want = if natural > floor { natural } else { floor }
       let got = line_height_multi([base, big])
       assert_eq(got, Some(want))
       // 混排行盒 ≥ 任何单份的行高（这是「盒会不会裁字」的判据）

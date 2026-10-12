@@ -41,6 +41,18 @@ pub struct Raster {
 }
 
 ///|
+/// 当前裁剪框（设备空间；右/下为开区间）——控件绘制遍历做视口剔除时用来判交。
+pub fn Raster::clip_bounds(self : Raster) -> (Int, Int, Int, Int) {
+  (self.clip_x0, self.clip_y0, self.clip_x1, self.clip_y1)
+}
+
+///|
+/// 内容坐标 → 设备坐标（当前 CTM）。
+pub fn Raster::map_point(self : Raster, x : Double, y : Double) -> (Double, Double) {
+  self.m.apply(x, y)
+}
+
+///|
 /// 在位图上开光栅会话；空位图返回 None（与 Cairo::over 同形）。
 pub fn Raster::over(bitmap : Bitmap) -> Raster? {
   if bitmap.width < 1 || bitmap.height < 1 {
@@ -422,6 +434,30 @@ pub fn Raster::set_blend_mode(self : Raster, mode : BlendMode) -> Unit {
 /// 源位图子矩形 → 目标矩形（最近邻采样；cr_blit 的采样域收口同语义：
 /// 采样恒落在源子矩形内，精灵图/子表面不串色）。目标矩形设备空间取整，
 /// 算子与裁剪沿用当前状态；不要把某位图画到它自己。采样映射经
+///|
+/// 预乘字节的「通用路径等价值」查表（256×256，首次用时建）：
+/// 通用路经 `Bitmap::pixel` 解除预乘、再 `premul_bytes` 乘回，值会与存量字节
+/// 差 ±1；快路径要逐位一致就得复刻这一趟，而每像素三次除法太贵——查表省掉。
+let g_rtt : FixedArray[Int] = FixedArray::make(65536, 0)
+
+///|
+let g_rtt_ready : Ref[Bool] = Ref(false)
+
+///|
+fn rtt_of(p : Int, a : Int) -> Int {
+  if !g_rtt_ready.val {
+    g_rtt_ready.val = true
+    for a2 = 0; a2 < 256; a2 = a2 + 1 {
+      for p2 = 0; p2 < 256; p2 = p2 + 1 {
+        let straight = if a2 == 0 { 0 } else { (p2 * 255 + a2 / 2) / a2 }
+        g_rtt[p2 * 256 + a2] = (straight * a2 + 127) / 255
+      }
+    }
+  }
+  g_rtt[p * 256 + a]
+}
+
+///|
 /// 「CTM ∘ 平移缩放」的逆矩阵（斜矩阵下与 cairo 同为广义映射）。
 pub fn Raster::blit(
   self : Raster,
@@ -452,12 +488,15 @@ pub fn Raster::blit(
   let loy = sy.floor().to_int()
   let hix = (sx + ssw).ceil().to_int() - 1
   let hiy = (sy + ssh).ceil().to_int() - 1
-  // 设备 → 源位图坐标：total = CTM ∘ [缩放+平移]，采样用其逆
+  // 设备 → 源位图坐标：total = CTM ∘ mt，采样用其逆。mt 必须建在**用户
+  // 空间**（e/f 取用户坐标 dx/dy）——rect_device 给的 tx/ty 已是设备坐标，
+  // 那份只用于扫描矩形（rx*/ry*），进了 mt 就等于把 CTM 计两次：实测带
+  // translate 的会话里 blit 一个像素都落不下来（源采样落到源矩形界外）。
   let mt = Mat2x3::identity()
-  mt.a = tw / ssw
-  mt.d = th / ssh
-  mt.e = tx
-  mt.f = ty
+  mt.a = dw / ssw
+  mt.d = dh / ssh
+  mt.e = dx
+  mt.f = dy
   let total = { a: self.m.a, b: self.m.b, c: self.m.c, d: self.m.d, e: self.m.e, f: self.m.f }
   total.mul(mt.a, mt.b, mt.c, mt.d, mt.e, mt.f)
   let bsrc = SrcPixels(src, total.inverse(), lox, loy, hix, hiy)
@@ -466,6 +505,58 @@ pub fn Raster::blit(
   let ry0 = raster_max_i(ty.to_int(), self.clip_y0)
   let ry1 = raster_min_i((ty + th).to_int(), self.clip_y1)
   if rx1 <= rx0 || ry1 <= ry0 {
+    return
+  }
+  // 快路径：纯整数平移 + 1:1 全幅拷贝 + Normal 混合——文字离屏合成走的就是
+  // 这条（每帧几十段；走通用路的逐像素逆矩阵 + 解除预乘实测 5ms/次，一帧能把
+  // 窗口拖卡）。门必须同时卡住「无缩放」与「源矩形就是整幅位图」，否则会拿
+  // 缩放/子矩形当 1:1 拷（实测踩过：取左上象限铺 4×4 那条当场红）。
+  // 两边缓冲都是预乘 BGRA，按字节直接做 Normal over 即可，与 composite_span
+  // 的公式同式（cov = 256 满覆盖档）；源字节先过 rtt_of 换成通用路径的等价值。
+  if blend_mode_id(self.op) == 0 && self.m.axis_aligned() &&
+    self.m.a == 1.0 && self.m.d == 1.0 && self.m.b == 0.0 && self.m.c == 0.0 &&
+    tx == tx.floor() && ty == ty.floor() && sx == 0.0 && sy == 0.0 &&
+    dw == ssw && dh == ssh && ssw == src.width.to_double() &&
+    ssh == src.height.to_double() {
+    let sox = lox - tx.to_int()
+    let soy = loy - ty.to_int()
+    let sdata = src.data
+    let ddata = self.bitmap.data
+    let sw = src.width
+    let dw_width = self.bitmap.width
+    for y = ry0; y < ry1; y = y + 1 {
+      let syy = y + soy
+      if syy < loy || syy > hiy {
+        continue
+      }
+      let srow = syy * sw * 4
+      let drow = y * dw_width * 4
+      for x = rx0; x < rx1; x = x + 1 {
+        let sxx = x + sox
+        if sxx < lox || sxx > hix {
+          continue
+        }
+        let si = srow + sxx * 4
+        let sa = sdata[si + 3].to_int()
+        if sa == 0 {
+          continue
+        }
+        let inv = 255 - sa
+        let di = drow + x * 4
+        ddata[di] = (
+          rtt_of(sdata[si].to_int(), sa) + (ddata[di].to_int() * inv + 127) / 255
+        ).to_byte()
+        ddata[di + 1] = (
+          rtt_of(sdata[si + 1].to_int(), sa) +
+          (ddata[di + 1].to_int() * inv + 127) / 255
+        ).to_byte()
+        ddata[di + 2] = (
+          rtt_of(sdata[si + 2].to_int(), sa) +
+          (ddata[di + 2].to_int() * inv + 127) / 255
+        ).to_byte()
+        ddata[di + 3] = (sa + (ddata[di + 3].to_int() * inv + 127) / 255).to_byte()
+      }
+    }
     return
   }
   let cov : FixedArray[Int] = FixedArray::make(self.bitmap.width, 0)

@@ -58,6 +58,9 @@ test "折行断点单位：空格成段、拉丁词成段、中日韩逐字成�
 
 ///|
 test "显示行布局：按换行符断行、按盒宽贪心折行、空文本仍给一行" {
+  if !ui_text_guard() {
+    return
+  }
   let f = area_font()
   // 逻辑行
   let ls = layout_lines("a\nbb\nccc", 200.0, f)
@@ -129,6 +132,9 @@ test "多行框：回车插入换行、上下键按显示行移动并记住 x、
 
 ///|
 test "多行框：点击定位到第几行、拖选跨行、只读不吃编辑键" {
+  if !ui_text_guard() {
+    return
+  }
   let (root, w, store) = mounted_area("第一行内容\n第二行内容\n第三行内容", 220.0, 90.0)
   let lh = (@text.line_height_font(area_font()).unwrap_or(18).to_double() + 2.0).max(14.0)
   // 点第二行最左：插入点落在第二行行首（每字 3 字节 → 15 + 换行 1 = 16）
@@ -170,6 +176,9 @@ test "多行框：点击定位到第几行、拖选跨行、只读不吃编辑�
 
 ///|
 test "多行框：内容超视口才出滚动条，滚轮下滚后拇指下移、插入点滚进可视区" {
+  if !ui_text_guard() {
+    return
+  }
   let mut text = ""
   for i = 0; i < 12; i = i + 1 {
     if i > 0 {

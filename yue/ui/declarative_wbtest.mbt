@@ -27,6 +27,9 @@ test "vbox / hbox：方向与间距来自参数，交叉轴按 align_items" {
 
 ///|
 test "bind_label：Store 一改就就地换文本并重测宽（不重建子树）" {
+  if !ui_text_guard() {
+    return
+  }
   let n = @core.Store::new(1)
   let (root, w) = mounted(
     bind_label(n, fn(v : Int) -> String { "计数 " + v.to_string() }),

@@ -259,8 +259,12 @@ test "主题化按钮：宽度随文本、抬起落在框内才算点击、焦�
   let store_hit = fn() -> Unit { hits = hits + 1 }
   let root = mount_root([button_t("提交", on_click=store_hit, focus_id=7)], 300.0, 60.0)
   let w = kid(root, 0)
-  let m = @text.measure("提交", 13.0).unwrap()
-  assert_eq(w.rect.w, m.width.to_double() + 24.0)
+  // 「宽度随文本」需要文字层给测量值；本平台还没接上时（Windows 的
+  // DirectWrite 在 TODO 的 W5）跳过这一条，点击与焦点环的断言照跑
+  match @text.measure("提交", 13.0) {
+    Some(m) => assert_eq(w.rect.w, m.width.to_double() + 24.0)
+    None => println("form: skip (宽度随文本——无测量后端)")
+  }
   assert_eq(w.rect.h, @theme.control_height)
   let _ = click(w, w.rect.x + w.rect.w / 2.0, w.rect.y + w.rect.h / 2.0)
   assert_eq(hits, 1)
@@ -294,6 +298,9 @@ test "主题化按钮：宽度随文本、抬起落在框内才算点击、焦�
 
 ///|
 test "链接：宽度就是文字宽、悬停出下划线、抬起才回调" {
+  if !ui_text_guard() {
+    return
+  }
   let mut n = 0
   let font = @text.Font::new("", 13.0)
   let root = mount_root([link("查看详情", fn() { n = n + 1 })], 300.0, 40.0)
@@ -311,6 +318,9 @@ test "链接：宽度就是文字宽、悬停出下划线、抬起才回调" {
 
 ///|
 test "表单项：标签定宽右对齐、错误行常驻预留 18 高、文案随 Store 变" {
+  if !ui_text_guard() {
+    return
+  }
   let err = @core.Store::new("")
   let root = mount_root(
     [form_item("名称", label("控件区"), label_width=90.0, error=err)],

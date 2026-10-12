@@ -14,6 +14,7 @@ import {
   "NoahLiu/moonbit-libyue/yue/input",
   "NoahLiu/moonbit-libyue/yue/icons",
   "NoahLiu/moonbit-libyue/yue/render",
+  "NoahLiu/moonbit-libyue/yue/sys",
   "NoahLiu/moonbit-libyue/yue/text",
   "NoahLiu/moonbit-libyue/yue/theme",
 }

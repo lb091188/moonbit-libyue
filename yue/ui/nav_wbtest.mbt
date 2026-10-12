@@ -3,6 +3,9 @@
 
 ///|
 test "分段控制器：点某段即写 Store，选中段底色与其余段不同" {
+  if !ui_text_guard() {
+    return
+  }
   let sel = @core.Store::new("甲")
   let (root, seg) = mounted(segmented(["甲", "乙", "很长的一段"], sel), 400.0, 60.0)
   let items = seg.children()
@@ -106,6 +109,9 @@ test "步骤条：已完成/当前/待办三态底色互不相同，连线随当
 
 ///|
 test "折叠面板：默认只开第一块，各块独立开合、收起即不占高" {
+  if !ui_text_guard() {
+    return
+  }
   let (root, cl) = mounted(
     collapse([
       ("面板一", [label("内容一")]),

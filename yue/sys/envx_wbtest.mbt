@@ -26,9 +26,15 @@ test "envx_get：真实环境读常用变量" {
 
 ///|
 test "envx_get：空串值与存在性是两回事" {
-  // 本进程写入空串值：存在（Some("")）而非 None
+  // POSIX：写入空串值 → 存在（Some("")）而非 None。
+  // Windows：环境块没有「存在但值为空」这一档——空值即删除（_wputenv_s 的
+  // 固有语义，记档于 docs/zh/adaptation.md），所以同一动作在这里断言 None。
   assert_true(envx_set(envx_probe_name, "") is Ok(_))
-  assert_eq(envx_get(envx_probe_name), Some(""))
+  if sys_platform() == "windows" {
+    assert_true(envx_get(envx_probe_name) is None)
+  } else {
+    assert_eq(envx_get(envx_probe_name), Some(""))
+  }
   assert_true(envx_unset(envx_probe_name) is Ok(_))
   assert_true(envx_get(envx_probe_name) is None)
 }

@@ -206,7 +206,9 @@ def link_configs() -> dict:
                 + " ".join([*libs, *sys_libs]),
             })
         text_lib = compile_stub(
-            MODULE_ROOT / "yue" / "text" / "pango_stub.c", "libyue_text_pango.a"
+            MODULE_ROOT / "yue" / "text" / "stub.c",
+            "libyue_text_pango.a",
+            extra_cflags=["-DWM_STUB_PANGO"],
         )
         if text_lib:
             # 文本层要复用 Painter 的 Cairo 会话（cr_session_context 定义在
@@ -234,6 +236,25 @@ def link_configs() -> dict:
         entries.append({
             "package": WIN_PACKAGE,
             "link_flags": "user32.lib gdi32.lib imm32.lib advapi32.lib",
+        })
+        # sys 桩（yue/sys/sys_stub.c 的 _WIN32 分支）要 COM：文件对话框走
+        # IFileDialog（ole32 的 CoCreateInstance + shell32 的
+        # SHCreateItemFromParsingName），GUID 常量 CLSID_FileOpenDialog /
+        # IID_IFileDialog / IID_IShellItem 全在 uuid.lib——C 模式用不了
+        # __uuidof，只能链库取 extern 符号（记档于 docs/zh/adaptation.md）。
+        # ShellExecuteW 在 shell32，子进程与文件函数属 kernel32（默认已链）。
+        entries.append({
+            "package": SYS_PACKAGE,
+            "link_flags": "ole32.lib shell32.lib uuid.lib user32.lib",
+        })
+        # 文本层（yue/text/dwrite_text.cpp 的 Windows 分支）走系统 DirectWrite：
+        # dwrite.lib 供 DWriteCreateFactory、d2d1.lib 供 D2D 的 DC 渲染目标
+        # （文字画进 32bpp DIB 再合成），GUID 常量取头文件 extern 符号要
+        # uuid.lib，COM 初始化要 ole32。native-stub 侧由 moon 编 .cpp，此处只
+        # 下发链接输入。
+        entries.append({
+            "package": TEXT_PACKAGE,
+            "link_flags": "dwrite.lib d2d1.lib windowscodecs.lib ole32.lib uuid.lib gdi32.lib",
         })
     return {"link_configs": entries}
 

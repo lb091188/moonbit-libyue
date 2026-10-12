@@ -1205,6 +1205,9 @@ fn rect_str(r : @core.Rect) -> String {
 
 ///|
 fn main {
+  // 输入框的 Ctrl+C/X/V 接系统剪贴板（默认关：测试里的 Ctrl+X 不该动使用者
+  // 的剪贴板）；探测不可用（Linux 无 xclip 等）时自动保持内部剪贴板
+  @ui.use_system_clipboard(true)
   let app = match @core.App::new(1400, 3520, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
@@ -2016,7 +2019,7 @@ fn main {
         car_sample.val = (idx, s0.1 + 1)
       }
       app.schedule_paint()
-      let _ = app.timer(100, ticker.val)
+      let _ = app.timer(500, ticker.val)
     }
   }
   let blinker : Ref[() -> Unit] = Ref(fn() { () })
@@ -2027,7 +2030,10 @@ fn main {
       let _ = app.timer(500, blinker.val)
     }
   }
-  let _ = app.timer(100, ticker.val)
+  // 节拍 500ms（原 100ms）：纯光栅器后端上一帧整树重画是百毫秒级，100ms 的
+  // 节拍会让消息泵持续饥饿（真机表现为窗口「未响应」）；500ms 下阻塞窗口远
+  // 小于系统的判超时，读数行照样在退出时打齐
+  let _ = app.timer(500, ticker.val)
   let _ = app.timer(500, blinker.val)
   // 跟随系统深浅/主色：每拍读一次，变了才 theme_apply（本机读不出主色时按亮色走）
   let stop_follow = app.follow_system_theme(interval_ms=1000)
@@ -2035,9 +2041,12 @@ fn main {
   let _ = app.timer(3000, fn() -> Unit { stop_follow() })
   // 累积验证页越排越宽，注入点位也跟着多——存活窗口给到 9 秒才够把全部
   // 交互注完一轮（原来 5 秒时后几击会赶上退出）
-  // 冒烟自杀点：多窗形态要按「开窗 → 在第二窗里点与打字 → 关窗」多步注入，
-  // 12 秒走不完一轮，故放宽到 25 秒（仍是无人值守冒烟，不需要人关窗）
-  let _ = app.timer(25000, fn() { app.quit() })
+  // 自杀点：无人值守冒烟用（十分钟——人工按清单逐项验收够用；自动化跑法一律
+  // 带超时/直接 kill 或优雅关窗，不等这一拍）
+  let _ = app.timer(600000, fn() { app.quit() })
+  // 全部页面已挂完：整页内容（数千像素高）搬进滚动视口——屏幕只有 1080p 时
+  // 下面的表单/图表/日历/浮层页够不着，滚轮滚到哪测到哪
+  app.enable_root_scroll()
 
   app.run()
   // 卸载前停转（自排链不认识视图已移除；本例循环已 quit，这里是示范正确收尾）

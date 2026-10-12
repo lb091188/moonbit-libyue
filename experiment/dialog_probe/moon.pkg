@@ -1,0 +1,7 @@
+import {
+  "NoahLiu/moonbit-libyue/yue/sys",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"

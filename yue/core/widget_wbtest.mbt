@@ -313,3 +313,44 @@ test "点击接管焦点：命中链上最近的可聚焦控件（自身无则�
   root.relayout(100.0, 40.0)
   assert_eq(root.focusable_at(5.0, 10.0), Some(5))
 }
+
+///|
+test "右键祖先优先：走完路径不越界，顺序根→叶" {
+  let root = Widget::new()
+  let mid = Widget::new()
+  let leaf = Widget::new()
+  root.append_child(mid)
+  mid.append_child(leaf)
+  root.set_size(100.0, 100.0)
+  mid.set_size(100.0, 100.0)
+  leaf.set_size(100.0, 100.0)
+  root.relayout(100.0, 100.0)
+  let order : Array[String] = []
+  leaf.on_pointer = Some(fn(_w : Widget, _ev : PointerEvent) -> Bool {
+    order.push("leaf")
+    false
+  })
+  mid.on_pointer = Some(fn(_w : Widget, _ev : PointerEvent) -> Bool {
+    order.push("mid")
+    false
+  })
+  root.on_pointer = Some(fn(_w : Widget, _ev : PointerEvent) -> Bool {
+    order.push("root")
+    false
+  })
+  // 祖先优先：根先收；无人消费要能走完路径并返回 false
+  // （早先取下标前自增：走完末项 i 恰好等于长度，path[i] 越界，真机右键必崩）
+  assert_eq(
+    root.dispatch_pointer({ kind: Down, x: 50.0, y: 50.0, button: 3, mods: 0 }),
+    false,
+  )
+  assert_eq(order, ["root", "mid", "leaf"])
+  // 只有根这一层的路径同样不能越界
+  let solo = Widget::new()
+  solo.set_size(50.0, 50.0)
+  solo.relayout(50.0, 50.0)
+  assert_eq(
+    solo.dispatch_pointer({ kind: Down, x: 10.0, y: 10.0, button: 3, mods: 0 }),
+    false,
+  )
+}

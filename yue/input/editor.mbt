@@ -16,6 +16,10 @@ pub struct Editor {
   mut clip : String
   // 未提交的组合串：只用于绘制，绝不并入 text —— 文本状态仍然只有一份
   mut preedit : String
+  // 外部剪贴板槽（W16）：装了之后 copy/cut 顺手写出去、Ctrl+V 现取回来；
+  // 没装就走内置 clip（无头测试与无剪贴板环境的行为与从前一致）
+  mut clip_ext_get : (() -> String?)?
+  mut clip_ext_set : ((String) -> Unit)?
   undo : Array[(Array[Byte], Int, Int?)]
   redo : Array[(Array[Byte], Int, Int?)]
 }
@@ -38,8 +42,49 @@ pub fn Editor::new() -> Editor {
     anchor: None,
     clip: "",
     preedit: "",
+    clip_ext_get: None,
+    clip_ext_set: None,
     undo: [],
     redo: [],
+  }
+}
+
+///|
+/// 装外部剪贴板（W16）：`get` 取系统剪贴板文本（拿不到给 None = 回退内置
+/// clip）、`set` 把复制的文本写出去。宿主在确有系统剪贴板时装（见
+/// `yue/ui` 的 use_system_clipboard——测试默认不装，Ctrl+X 不该动使用者
+/// 的剪贴板）。内核自身不依赖任何平台层。
+pub fn Editor::set_clipboard(
+  self : Editor,
+  get : () -> String?,
+  set : (String) -> Unit,
+) -> Unit {
+  self.clip_ext_get = Some(get)
+  self.clip_ext_set = Some(set)
+}
+
+///|
+/// 复制/剪切的公共落点：内置 clip 与外部剪贴板一起写（外部写失败不影响内置）。
+fn Editor::clip_publish(self : Editor, text : String) -> Unit {
+  self.clip = text
+  if text.length() > 0 {
+    match self.clip_ext_set {
+      Some(f) => f(text)
+      None => ()
+    }
+  }
+}
+
+///|
+/// 粘贴的取数落点：装了外部剪贴板就现取（空/失败回退内置 clip）。
+fn Editor::clip_fetch(self : Editor) -> String {
+  match self.clip_ext_get {
+    Some(g) =>
+      match g() {
+        Some(s) => s
+        None => self.clip
+      }
+    None => self.clip
   }
 }
 
@@ -343,7 +388,7 @@ pub fn Editor::cut(self : Editor) -> String {
     None => ""
     Some((s, e)) => {
       let t = self.get_text_in_range(s, e)
-      self.clip = t
+      self.clip_publish(t)
       let _ = self.delete_selection()
       t
     }
@@ -356,7 +401,7 @@ pub fn Editor::copy(self : Editor) -> String {
   match self.selection() {
     Some((s, e)) => {
       let t = self.get_text_in_range(s, e)
-      self.clip = t
+      self.clip_publish(t)
       t
     }
     None => ""
@@ -485,13 +530,13 @@ pub fn Editor::handle_key(
     let _ = self.redo()
     handled = true
   } else if ctrl && keysym == 'x'.to_int() {
-    self.clip = self.cut()
+    let _ = self.cut()
     handled = true
   } else if ctrl && keysym == 'c'.to_int() {
-    self.clip = self.copy()
+    let _ = self.copy()
     handled = true
   } else if ctrl && keysym == 'v'.to_int() {
-    let t = self.clip
+    let t = self.clip_fetch()
     if t.length() > 0 {
       self.paste_text(t)
     }

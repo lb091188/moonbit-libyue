@@ -283,7 +283,9 @@ pub fn bh_profile_candidates() -> Array[String] {
 }
 
 ///|
-/// 浏览器配置根：XDG_CONFIG_HOME（设且非空）优先，回退 $HOME/.config。
+/// 浏览器配置根（Linux 语义的纯函数）：XDG_CONFIG_HOME（设且非空）优先，
+/// 回退 $HOME/.config。Windows 走 [bh_root_or_err] 的 LOCALAPPDATA 分支，
+/// 不经过本函数。
 pub fn bh_config_root(xdg_config_home : String?, home : String?) -> String? {
   match xdg_config_home {
     Some(d) if d != "" => Some(d)
@@ -296,7 +298,19 @@ pub fn bh_config_root(xdg_config_home : String?, home : String?) -> String? {
 }
 
 ///|
-/// 浏览器定义：(标识, 配置目录名, 目录内子目录)。
+/// 浏览器配置根（macOS 语义的纯函数）：$HOME/Library/Application Support。
+/// Chromium 系在 macOS 的 profile 与 Linux 完全同形（Default / Profile N，
+/// 库内结构同一个 SQLite），只是数据根从 .config 换成 Application Support；
+/// HOME 未设置或为空给 None。
+pub fn bh_mac_root(home : String?) -> String? {
+  match home {
+    Some(h) if h != "" => Some(h + "/Library/Application Support")
+    _ => None
+  }
+}
+
+///|
+/// 浏览器定义（Linux）：(标识, 配置目录名, 目录内子目录)。
 /// Brave 的 profile 在 BraveSoftware/Brave-Browser 下一层。
 let bh_browser_defs : Array[(String, String, String)] = [
   ("google-chrome", "google-chrome", ""),
@@ -304,6 +318,38 @@ let bh_browser_defs : Array[(String, String, String)] = [
   ("microsoft-edge", "microsoft-edge", ""),
   ("brave", "BraveSoftware", "Brave-Browser"),
 ]
+
+///|
+/// Windows 浏览器定义：profile 在 %LOCALAPPDATA% 下的 <厂商>/<产品>/
+/// User Data 一层（与 Linux 相比多一层 User Data，目录名大小写随安装器）。
+let bh_browser_defs_win : Array[(String, String, String)] = [
+  ("google-chrome", "Google/Chrome/User Data", ""),
+  ("chromium", "Chromium/User Data", ""),
+  ("microsoft-edge", "Microsoft/Edge/User Data", ""),
+  ("brave", "BraveSoftware/Brave-Browser/User Data", ""),
+]
+
+///|
+/// macOS 浏览器定义：profile 直接在 ~/Library/Application Support 下的
+/// <厂商>/<产品> 一层（没有 Windows 那层 User Data；目录名大小写随安装器）。
+let bh_browser_defs_mac : Array[(String, String, String)] = [
+  ("google-chrome", "Google/Chrome", ""),
+  ("chromium", "Chromium", ""),
+  ("microsoft-edge", "Microsoft Edge", ""),
+  ("brave", "BraveSoftware/Brave-Browser", ""),
+]
+
+///|
+/// 当前平台的浏览器定义表（三平台的 profile 候选名与库格式同源，只差数据根
+/// 与目录名，所以探测逻辑共用、只有这张表和根目录按平台分流）。
+fn bh_defs() -> Array[(String, String, String)] {
+  match sys_platform() {
+    "windows" => bh_browser_defs_win
+    "linux" => bh_browser_defs
+    "macos" => bh_browser_defs_mac
+    _ => []
+  }
+}
 
 ///|
 /// 目录条目名里是否含 History（存在性判断的纯逻辑：只比条目名，不看
@@ -324,7 +370,7 @@ fn bh_names_hit_history(names : Array[String]) -> Bool {
 /// 浏览器内按 profile 候选顺序（Default 在前）排列。
 fn bh_probe_profiles(root : String) -> Array[BrowserProfile] {
   let out : Array[BrowserProfile] = []
-  for def in bh_browser_defs {
+  for def in bh_defs() {
     let (id, dir, subdir) = def
     let base = if subdir != "" {
       root + "/" + dir + "/" + subdir
@@ -350,15 +396,20 @@ fn bh_probe_profiles(root : String) -> Array[BrowserProfile] {
 }
 
 ///|
-/// 当前平台是否支持浏览器历史读取（本文件仅实现 Linux 路径探测）。
+/// 当前平台是否支持浏览器历史读取（Linux / Windows / macOS 都已实现路径
+/// 探测：Chromium 系在三平台上都是「数据根/<厂商>/<产品>/<profile>/History」
+/// 的同格式 SQLite 库，只是数据根与目录名不同）。
 pub fn bh_supported() -> Bool {
-  sys_platform() == "linux"
+  match sys_platform() {
+    "linux" | "windows" | "macos" => true
+    _ => false
+  }
 }
 
 ///|
 /// 列出有 History 库的浏览器 profile：按浏览器定义 × profile 候选名
 /// 探测（目录枚举查 History 条目，不读库内容）；无可命中 profile 给
-/// [BhNoBrowser]，非 Linux 给 [BhUnsupported]。
+/// [BhNoBrowser]，三平台之外给 [BhUnsupported]。
 pub fn bh_browsers() -> Result[Array[BrowserProfile], BrowserHistoryError] {
   match bh_root_or_err() {
     Err(e) => Err(e)
@@ -374,15 +425,28 @@ pub fn bh_browsers() -> Result[Array[BrowserProfile], BrowserHistoryError] {
 }
 
 ///|
-/// 配置根定位（探测与取数的公共前置）：非 Linux 给 [BhUnsupported]，
-/// XDG_CONFIG_HOME / HOME 都定位不到给 [BhNoConfigDir]。
+/// 配置根定位（探测与取数的公共前置）：三平台之外给 [BhUnsupported]，
+/// Windows 取 %LOCALAPPDATA%、macOS 取 $HOME/Library/Application Support、
+/// Linux 走 XDG_CONFIG_HOME / HOME，定位不到给 [BhNoConfigDir]。
 fn bh_root_or_err() -> Result[String, BrowserHistoryError] {
-  if sys_platform() != "linux" {
-    return Err(BhUnsupported)
-  }
-  match bh_config_root(envx_get("XDG_CONFIG_HOME"), envx_get("HOME")) {
-    Some(r) => Ok(r)
-    None => Err(BhNoConfigDir)
+  match sys_platform() {
+    "linux" =>
+      match bh_config_root(envx_get("XDG_CONFIG_HOME"), envx_get("HOME")) {
+        Some(r) => Ok(r)
+        None => Err(BhNoConfigDir)
+      }
+    // Windows 的数据根：LOCALAPPDATA 由登录会话注入进程环境，缺失即定位不到
+    "windows" =>
+      match envx_get("LOCALAPPDATA") {
+        Some(d) if d != "" => Ok(d)
+        _ => Err(BhNoConfigDir)
+      }
+    "macos" =>
+      match bh_mac_root(envx_get("HOME")) {
+        Some(r) => Ok(r)
+        None => Err(BhNoConfigDir)
+      }
+    _ => Err(BhUnsupported)
   }
 }
 
