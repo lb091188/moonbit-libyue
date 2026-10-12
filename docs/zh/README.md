@@ -57,6 +57,7 @@ moon run examples/showcase       # 完整演示板：组件库 + 系统能力
 
 | 文档 | 内容 |
 |---|---|
+| [design.md](design.md) | 前端化设计口径：CSS 子集与 class 样式集合、组件前端化命名映射、响应式补强、模板引擎的分期与边界 |
 | [adaptation.md](adaptation.md) | 平台适配经验：各平台实测坑、根因与验证结论（持续更新） |
 | [autostart.md](autostart.md) | 开机自启动：Linux 写 XDG .desktop、Windows 写 HKCU Run 键，is_enabled / enable / disable 统一语义 |
 | [tray.md](tray.md) | Linux 托盘方案：SNI 协议栈设计、架构、后端降级、桌面兼容性 |
