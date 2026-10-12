@@ -144,6 +144,10 @@ extern "c" fn ffi_sys_read_text_file(path : Bytes, ok : Ref[Int]) -> Bytes = "yu
 #borrow(path, ok)
 extern "c" fn ffi_sys_remove_file(path : Bytes, ok : Ref[Int]) -> Int = "yue_sys_remove_file"
 
+///|
+#borrow(path)
+extern "c" fn ffi_sys_make_dirs(path : Bytes) -> Int = "yue_sys_make_dirs"
+
 extern "c" fn ffi_sys_platform() -> Int = "yue_sys_platform"
 
 ///|
@@ -239,19 +243,18 @@ pub fn sys_write_text_file(path : String, text : String) -> Bool {
 }
 
 ///|
-/// 逐级创建目录（已存在的每一层都算成功）。`sys_write_text_file` 不会顺手
-/// 建父目录，所以要先建目录再写；少了这一步时症状是「写的文件根本不在」，
+/// 逐级创建目录（已存在的每一层都算成功，幂等）。`sys_write_text_file` 不会
+/// 顺手建父目录，所以要先建目录再写；少了这一步时症状是「写的文件根本不在」，
 /// 而不是「目录不存在」。
 ///
-/// 纯 MoonBit 实现：调系统 `mkdir -p` 子进程（见 `pr_run`），所以只在
-/// `pr_available()` 为真的平台上可能成功；调用方要区分「建不了」与
-/// 「本平台没有子进程通道」时先探测。
+/// 与 `sys_read_text_file` / `sys_remove_file` / `fsx_list_dir` 同族，都是
+/// 文件系统原语的薄 FFI（桩：`sys_stub.c` 的 `yue_sys_make_dirs`）：Windows
+/// 逐级 `CreateDirectoryW`，POSIX 逐级 `mkdir(2)`。**不依赖子进程通道**
+/// （不走 `pr_run("mkdir", ["-p", …])`），所以 Windows 上与 POSIX 上同样成立，
+/// 也不需要调用方先探 `pr_available()`。
 pub fn sys_make_dirs(path : String) -> Bool {
   if path == "" {
     return false
   }
-  match pr_run("mkdir", ["-p", path]) {
-    Ok(_) => true
-    Err(_) => false
-  }
+  ffi_sys_make_dirs(@utf8.encode(path)) == 1
 }

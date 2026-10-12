@@ -1,5 +1,6 @@
 // 文件系统与环境变量白盒测试：扁平文本解码为纯函数断言；目录枚举与
-// 环境变量写删按真实环境断言（临时文件建在 /tmp；环境变量写的是测试
+// 环境变量写删按真实环境断言（临时文件建在平台临时目录：POSIX 的
+// $TMPDIR、Windows 的 %TEMP%，清理命令按平台选；环境变量写的是测试
 // 进程自身环境，随进程退出即逝，不触碰系统配置）。
 
 ///|
@@ -106,26 +107,64 @@ test "fsx_set_env / fsx_unset_env：进程内写读改删回环" {
 }
 
 ///|
-test "sys_make_dirs：逐级建目录后写文件才有着落" {
-  if !pr_available() {
-    // 没有子进程通道的平台上这条能力就是探不到（探测即口径），跳过而非造假
+/// 平台临时目录根：Windows 读 %TEMP%/%TMP%（回退当前目录，分隔符 `\`），
+/// 其余读 $TMPDIR（回退 /tmp，分隔符 `/`）。口径与 `procrun.mbt` 的
+/// `pr_tmp_path` 一致，但按平台取变量名而不是依次回退——Windows 上
+/// `TMPDIR` 可能被 POSIX 侧工具设成 `/tmp` 这类非本机路径。
+fn fsx_tmp_root() -> String {
+  if sys_platform() == "windows" {
+    for name in ["TEMP", "TMP"] {
+      match sys_getenv(name) {
+        Some(v) => if v.length() > 0 { return v }
+        None => ()
+      }
+    }
+    "."
   } else {
-    let root = "/tmp/sys_make_dirs_wbtest"
-    let nested = root + "/a/b/c"
-    let f = nested + "/note.txt"
-    ignore(pr_run("rm", ["-rf", root]))
-    assert_true(sys_make_dirs(nested))
-    assert_true(sys_write_text_file(f, "内容在里层"))
-    assert_eq(sys_read_text_file(f), Some("内容在里层"))
-    // 目录已存在仍算成功（幂等）
-    assert_true(sys_make_dirs(nested))
-    assert_true(sys_make_dirs(root))
-    // 空串拒绝
-    assert_false(sys_make_dirs(""))
-    // 父目录不存在时写文件失败：这条正是 make_dirs 要挡住的坑
-    assert_false(sys_write_text_file(root + "/gone/deep/x.txt", "x"))
+    match sys_getenv("TMPDIR") {
+      Some(v) => if v.length() > 0 { return v }
+      None => ()
+    }
+    "/tmp"
+  }
+}
+
+///|
+/// 递归删树的跨平台清理（用例自建自清）：POSIX 用 `rm -rf`，Windows 用
+/// `cmd /c rmdir /s /q`（参数由 proc_spawn 逐个 quoting，路径含空格安全）。
+/// 失败（例如本就不存在）忽略——清理不是断言目标。
+fn fsx_remove_tree(root : String) -> Unit {
+  if sys_platform() == "windows" {
+    ignore(pr_run("cmd", ["/c", "rmdir", "/s", "/q", root]))
+  } else {
     ignore(pr_run("rm", ["-rf", root]))
   }
+}
+
+///|
+test "sys_make_dirs：逐级建目录后写文件才有着落" {
+  let sep = if sys_platform() == "windows" { "\\" } else { "/" }
+  let root = fsx_tmp_root() + sep + "sys_make_dirs_wbtest"
+  let nested = "\{root}\{sep}a\{sep}b\{sep}c"
+  let f = "\{nested}\{sep}note.txt"
+  // 清理要子进程通道（rm / rmdir）；没有通道的平台这条用例整体跳过。
+  // 注意被测能力本身**不再**依赖子进程通道——`sys_make_dirs` 已是 C 薄 FFI。
+  if !pr_available() {
+    println("sys_make_dirs: skip (无子进程通道，清理不便)")
+    return
+  }
+  fsx_remove_tree(root)
+  assert_true(sys_make_dirs(nested))
+  assert_true(sys_write_text_file(f, "内容在里层"))
+  assert_eq(sys_read_text_file(f), Some("内容在里层"))
+  // 目录已存在仍算成功（幂等）
+  assert_true(sys_make_dirs(nested))
+  assert_true(sys_make_dirs(root))
+  // 空串拒绝
+  assert_false(sys_make_dirs(""))
+  // 父目录不存在时写文件失败：这条正是 make_dirs 要挡住的坑
+  assert_false(sys_write_text_file("\{root}\{sep}gone\{sep}deep\{sep}x.txt", "x"))
+  fsx_remove_tree(root)
 }
 
 ///|

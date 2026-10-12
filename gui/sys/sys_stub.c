@@ -36,7 +36,9 @@
 #else
 #include <dirent.h>
 #include <dlfcn.h> // 空闲查询的 X11/XSS 运行期取符号（W21e）
+#include <errno.h> // 逐级建目录判 EEXIST（mkdir -p 语义）
 #include <fcntl.h>
+#include <sys/stat.h> // mkdir(2)
 #include <sys/wait.h>
 #include <unistd.h>
 #if defined(__APPLE__)
@@ -391,6 +393,83 @@ int32_t yue_sys_remove_file(const char *path, int32_t *ok) {
     return 0;
   }
   return -1;
+#endif
+}
+
+// 逐级创建目录（已存在的每一层都算成功，幂等）。纯 C 递归，不依赖外部
+// mkdir 可执行文件、也不依赖子进程通道：Windows 逐级 CreateDirectoryW，
+// POSIX 逐级 mkdir(2)。返回 1 成功 / 0 失败。
+int32_t yue_sys_make_dirs(const char *path) {
+  if (path == NULL || path[0] == '\0') {
+    return 0;
+  }
+#if defined(_WIN32)
+  wchar_t *w = win_utf8_wide(path, 0);
+  if (w == NULL) {
+    return 0;
+  }
+  size_t n = 0;
+  while (w[n] != L'\0') {
+    n++;
+  }
+  wchar_t *buf = (wchar_t *)malloc(sizeof(wchar_t) * (n + 1));
+  if (buf == NULL) {
+    free(w);
+    return 0;
+  }
+  memcpy(buf, w, sizeof(wchar_t) * (n + 1));
+  int32_t rc = 1;
+  for (size_t i = 1; i <= n; i++) {
+    if (buf[i] != L'\\' && buf[i] != L'/' && buf[i] != L'\0') {
+      continue;
+    }
+    wchar_t saved = buf[i];
+    buf[i] = L'\0';
+    // 先探在不在：在（含盘根 "C:"、"\\" 这类前缀段）就跳过。不能只看
+    // CreateDirectoryW 的错误码——它对 drive-relative 的 "C:" 回的是
+    // ERROR_ACCESS_DENIED(5) 而不是 ERROR_ALREADY_EXISTS(183)，只认 183
+    // 会把盘根误判成失败。创建期竞态仍容 ALREADY_EXISTS。
+    if (GetFileAttributesW(buf) == INVALID_FILE_ATTRIBUTES &&
+        !CreateDirectoryW(buf, NULL) && GetLastError() != ERROR_ALREADY_EXISTS) {
+      rc = 0;
+      buf[i] = saved;
+      break;
+    }
+    buf[i] = saved;
+    if (saved == L'\0') {
+      break;
+    }
+  }
+  free(buf);
+  free(w);
+  return rc;
+#else
+  size_t n = strlen(path);
+  char *buf = (char *)malloc(n + 1);
+  if (buf == NULL) {
+    return 0;
+  }
+  memcpy(buf, path, n + 1);
+  int32_t rc = 1;
+  for (size_t i = 1; i <= n; i++) {
+    if (buf[i] != '/' && buf[i] != '\0') {
+      continue;
+    }
+    char saved = buf[i];
+    buf[i] = '\0';
+    // mkdir -p 语义：已存在（EEXIST）算成功
+    if (mkdir(buf, 0777) != 0 && errno != EEXIST) {
+      rc = 0;
+      free(buf);
+      return rc;
+    }
+    buf[i] = saved;
+    if (saved == '\0') {
+      break;
+    }
+  }
+  free(buf);
+  return rc;
 #endif
 }
 
