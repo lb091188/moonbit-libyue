@@ -270,10 +270,27 @@ fn Webview::start_pump(self : Webview) -> Unit {
     if !self.pumping {
       return
     }
+    if self.retire_if_dead() {
+      return
+    }
     self.pump()
     let _ = @core.set_timeout(30, tick.val)
   }
   let _ = @core.set_timeout(30, tick.val)
+}
+
+///|
+/// 视图已经不在（窗口被宿主拆掉、没走 `close`）时把本地状态就地收口：停泵、句柄
+/// 作废、丢掉等回包的求值。返回 true 表示「这一拍别再碰引擎了」——留着泵就是拿
+/// 悬垂句柄去查引擎，日志会被一片 GTK/WebKit 断言刷满。
+fn Webview::retire_if_dead(self : Webview) -> Bool {
+  if self.is_alive() {
+    return false
+  }
+  self.pumping = false
+  self.handle = 0L
+  self.eval_waiters = []
+  true
 }
 
 ///|
@@ -582,6 +599,13 @@ pub fn Webview::set_visible(self : Webview, visible : Bool) -> Unit {
   if self.handle != 0L {
     wb_set_visible(self.handle, if visible { 1 } else { 0 })
   }
+}
+
+///|
+/// 引擎侧视图是否还在。窗口被宿主拆掉（没走 `close`）时给 false——此后查询都是
+/// 空值、导航与求值不再有效果，调用方按「这条能力此刻不可用」降级而不是猜。
+pub fn Webview::is_alive(self : Webview) -> Bool {
+  self.handle != 0L && wb_alive(self.handle) == 1
 }
 
 ///|

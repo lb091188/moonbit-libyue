@@ -6,6 +6,10 @@
 extern "c" fn wb_available() -> Int = "wb_available"
 
 ///|
+/// 这个句柄的视图还在不在（窗口拆掉后一律 0）
+extern "c" fn wb_alive(id : Int64) -> Int = "wb_alive"
+
+///|
 /// 持久化 profile 能不能用（Linux 恒可，macOS 有 14+ 与 bundle id 那道边界）
 extern "c" fn wb_persistence() -> Int = "wb_persistence"
 

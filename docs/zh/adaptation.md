@@ -872,6 +872,14 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **一条口径**：跨 FFI 边界「留到下一次回调」的缓冲必须由**被回调的一侧**拥有。只写注释（原先就写着「所有权在 MoonBit」）不解决问题——所有权写清楚了，可没人负责让它活到那一刻。同类形态在 `yue/web` 的 JS 回包、`yue/media` 的帧回灌里都检查过一遍：那两处都是 C 侧自己 `malloc`/`g_free`，没有这条隐患。
 - **验证**：改后 `moon build ./examples/native-web` 重链（`build/libyue_win_stub.a` 重编），真窗口跑「开本地视频窗 → 截图 → 用主窗盖住再移开逼一次 expose → 再截图」：23 分钟真片连解 `NATIVE-WEB-LOCAL present=1 frames=1369 pos_ms=56397 speed=1.25x err=''`（一扇 1000x620 的动画窗每秒几十次分配，正是原先最容易落进「已回收但仍要 expose」的形态），日志里 X 错误 0 条，两帧截图内容与视频一致、无条纹脏区；**使用者已在真机复验：桥接窗与本地视频窗不再花屏、自绘区不再闪**。全仓红点仍 287 errors / 68 warnings。
 
+### MoonBit 原生 GUI 栈 · 跨 FFI 句柄的活期（修复：关窗后日志刷满 GTK/WebKit 断言）
+
+- **症状（对照实验定位，不是猜）**：同一份示例，**只关桥接窗**日志干净，**关主窗**（网页区挂着的那个）退出时固定 5 行 CRITICAL——`webkit_web_view_get_title/get_uri` 报 `WEBKIT_IS_WEB_VIEW(webView)` 断言失败，紧跟 `gtk_widget_get_parent`/`gtk_widget_destroy` 报 `GTK_IS_WIDGET` 失败。断言不崩进程，所以之前一直没被当回事。
+- **根因**：窗口拆除走的是窗口层的 `wm_close`，它把归属本窗的原生子件槽整格清零并销毁那棵 GtkWidget 树（WebKitWebView 是它的孙子，一起没了）——但**没人通知能力层**。于是 `Webview` 的 `handle` 仍是旧槽号、`pumping` 仍为真：排期泵与示例的状态轮询继续拿这个句柄调 `wb_get_title/wb_is_loading`，而桩里 `wb_get(id)` 只看「槽位有没有 view」，看不出「那个 view 已经随窗口销毁」，就把悬垂指针交出去。最后 `wb_destroy`（退出时 `close`）再拿它 `gtk_widget_get_parent`/`destroy` 一次，就是那两行 `GTK_IS_WIDGET`。
+- **修复（一处收口，两条分支同形）**：把「活期」的判据放到**知道拆除时刻的那一侧**——桩里 `wb_view_alive(v)` = 槽位有 view **且** `wm_surface_container(v->surface_id) != NULL`（容器是 yue/win 的槽表给的，窗口一拆就是 NULL，这是唯一可靠的存活信号）。`wb_get` 一律过这道闸，于是**所有**引擎查询与动作在视图死后自动变空操作，不必逐个函数补判据；`wb_destroy` 也走同一条判据——容器没了就只 `g_free` + `memset` 还资源，不再碰那个指针。MoonBit 侧加公开口 `Webview::is_alive()`，泵的那一拍发现视图不在就 `pumping=false`、`handle=0L`、丢掉 `eval_waiters`（停掉排期，而不是继续空转）。
+- **一条口径（与「上屏缓冲的所有权」同族）**：跨 FFI 的**句柄**和跨 FFI 的**缓冲**是同一类问题——「什么时候没了」只有拆除的那一侧知道，所以作废判据必须由它给出。MoonBit 侧看 `handle != 0L` 只能说明「建过」，永远说明不了「还在」；把存活判据写进桩里的统一取回函数（`wb_get`），比在 20 个方法前各写一遍可靠得多。同类形态自查：`yue/win` 的 `WmWindow` 槽位是后端自己 memset 的，`yue/media` 的解码器句柄由 MoonBit 自己 `close`，都没有这条缝。
+- **验证**：`moon test -p NoahLiu/moonbit-libyue/yue/web` **17/17**（新增 1 条：句柄非零但视图不在时 `is_alive()` 给假、`retire_if_dead` 收口后 `handle=0`/`pumping=false`/`eval_waiters` 清空）；`yue/web` 与示例 `--deny-warn` 零警告；全仓红点仍 287 errors / 68 warnings。真窗口判据（同一条对照实验重跑）：开桥接窗 → 关桥接窗 → 关主窗，日志 **CRITICAL 0 条**（修复前 5 条）、进程自退（`alive=0`）、退出行读数照常（`last='标题 本地桥接页'`）。回归两条确认存活判据没把活视图一起挡掉：桥接页照常从协议装载并读出中文标题；主窗协议行 `reg=1 loads=1 files=2 unreg=1 fails=1 fail='WebKitNetworkError/399 yuedemo://local/index.html'`，与修复前逐字段一致。
+
 ### MoonBit 原生 GUI 栈 · 播放器倍速（批 D2b：纯 MoonBit 重采样 + 时钟同轴）
 
 - **零 C 做到的倍速**：音频侧不需要新桩——解码出的 s16 交错 PCM 在推给设备前按 `1/speed` 做线性重采样（`media_resample_s16`，纯 MoonBit），设备仍按原采样率消费，于是样本少一倍、走完就快一倍。代价是**音高随动**（这是"变速"而不是"变速不变调"，后者要相位声码器）。视频侧时钟只改一处：`vp_target_pts(base, elapsed_ms, speed) = base + elapsed × speed`，两边同轴，所以不会出现「画面快、声音慢」——那正是旧链反复警告过的失同步形态。

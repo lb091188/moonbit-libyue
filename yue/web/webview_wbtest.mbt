@@ -188,3 +188,25 @@ test "持久化探测与信号掩码：不可用引擎不会谎报可持久" {
   }
   assert_true(webview_signal_mask() >= 0)
 }
+
+///|
+/// 窗口被宿主拆掉时没人来调 `close`：泵下一拍必须自己收口（停泵、句柄作废、
+/// 丢掉等回包的求值），而不是继续拿这个句柄去查引擎。
+test "视图没了就地收口：句柄作废、泵停、待回求值丢掉" {
+  let v = match webview_open(fake_app(), webview_options("about:blank")) {
+    None => return
+    Some(x) => x
+  }
+  // 摆成「曾经挂上过」：句柄非零、泵在跑、还压着一条等回包的求值。
+  // 900 号窗越界，桩里建不出真视图，所以这个句柄对应的视图本来就「不在」
+  v.handle = 9L
+  v.pumping = true
+  v.eval_waiters.push((1L, fn(_r : String) -> Unit { () }))
+  assert_eq(v.is_alive(), false)
+  assert_eq(v.retire_if_dead(), true)
+  assert_eq(v.handle, 0L)
+  assert_eq(v.pumping, false)
+  assert_eq(v.eval_waiters.length(), 0)
+  // 收口之后泵那一拍直接返回，不会再排下一次定时器，也不会去碰引擎
+  v.pump()
+}

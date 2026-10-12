@@ -66,11 +66,20 @@ typedef struct {
 static WbView wb_pool[WB_MAX_VIEWS];
 static int wb_next_id = 1;
 
+// 视图是否还在：槽里有 view 只说明「我们建过它」。窗口拆掉时 yue/win 的 wm_close
+// 会把归属本窗的子件槽整格清零、连同那棵 GtkWidget 树一起销毁，此时 v->view 是
+// 悬垂指针，任何 webkit/GTK 调用都打 CRITICAL（真机：关主窗后日志 5 行）。
+static int wb_view_alive(WbView *v) {
+  return v != NULL && v->view != NULL &&
+         wm_surface_container(v->surface_id) != NULL;
+}
+
 static WbView *wb_get(int64_t id) {
-  if (id <= 0 || id >= WB_MAX_VIEWS || wb_pool[id].view == NULL) {
+  if (id <= 0 || id >= WB_MAX_VIEWS) {
     return NULL;
   }
-  return &wb_pool[id];
+  WbView *v = &wb_pool[id];
+  return wb_view_alive(v) ? v : NULL;
 }
 
 static void wb_push(WbView *v, int kind, int64_t num, const char *text) {
@@ -474,6 +483,9 @@ int wb_unregister_scheme(int64_t id, const char *scheme) {
 // ---- 对外面（MoonBit 只搬 int64 与字节缓冲）----
 int wb_available(void) { return 1; }
 
+// 这个句柄的视图还在不在（窗口拆掉后一律 0）：调用方据此停泵、清待办
+int wb_alive(int64_t id) { return wb_get(id) != NULL ? 1 : 0; }
+
 // 可选信号在位掩码：1 下载 2 进程终止 4 权限 8 新窗（缺哪条就少哪条回证）
 int wb_signal_mask(void) {
   int m = 0;
@@ -801,14 +813,18 @@ void wb_destroy(int64_t id) {
     return;
   }
   WbView *v = &wb_pool[id];
-  GtkWidget *w = GTK_WIDGET(v->view);
-  GtkWidget *parent = gtk_widget_get_parent(w);
-  // 先摘出容器再销毁：容器可能已随窗口拆掉（父为空时 remove 会告警）
-  if (parent != NULL) {
-    gtk_container_remove(GTK_CONTAINER(parent), w);
-  } else {
-    gtk_widget_destroy(w);
+  if (wb_view_alive(v)) {
+    GtkWidget *w = GTK_WIDGET(v->view);
+    GtkWidget *parent = gtk_widget_get_parent(w);
+    // 先摘出容器再销毁：容器可能已随窗口拆掉（父为空时 remove 会告警）
+    if (parent != NULL) {
+      gtk_container_remove(GTK_CONTAINER(parent), w);
+    } else {
+      gtk_widget_destroy(w);
+    }
   }
+  // 容器没了就说明视图已经随那棵窗口树一起销毁，只还自己 alloc 的东西，
+  // 不再碰那个悬垂指针
   g_free(v->data_dir);
   memset(v, 0, sizeof(WbView));
 }
@@ -819,6 +835,7 @@ void wb_destroy(int64_t id) {
 #include <stdint.h>
 
 int wb_available(void) { return 0; }
+int wb_alive(int64_t id) { (void)id; return 0; }
 int wb_persistence(void) { return 0; }
 int wb_signal_mask(void) { return 0; }
 int64_t wb_create(int64_t surface_id, int w, int h, const char *uri,
