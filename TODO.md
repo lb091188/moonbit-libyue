@@ -2,8 +2,8 @@
 
 记号：`[x]` 完成 · `[~]` 部分（缺口写在子条目）· `[ ]` 未开始。
 
-- **唯一主线**：自绘栈（新栈拥有窗口/像素/事件循环/布局，控件全部基于 Painter 自绘 + 自定义主题，不提供独立原生控件）。方案见 [docs/zh/native-gui-plan.md](docs/zh/native-gui-plan.md)。
-- **更名（2026-10-12）**：主模块 `NoahLiu/moonbit-libyue` → **`NoahLiu/native-gui`**（mooncakes 新包名，首版 0.1.0 占位；待自绘栈稳定后将 `NoahLiu/moonbit-libyue` 标记废弃）；子模块 `NoahLiu/yue-media` → `NoahLiu/gui-media`、`NoahLiu/yue-examples` → `NoahLiu/gui-examples`；新栈 13 包从 `yue/` **上移到模块根**（`NoahLiu/native-gui/core` 等，import 默认别名取路径最后一段故全部不变）；旧链残留包（根包 + components/declarative/charts/browser/markdown/system/traybus）留在 `yue/` 随收口删除。GitHub 仓库名**保持 `moonbit-libyue` 不改**（2026-10-12 定案：留作这个库来时的路）。
+- **唯一主线**：自绘栈（新栈拥有窗口/像素/事件循环/布局，控件全部基于 Painter 自绘 + 自定义主题，不提供独立原生控件）。
+- **更名与目录定案（2026-10-12）**：主模块 `NoahLiu/moonbit-libyue` → **`NoahLiu/native-gui`**（mooncakes 新包名，首版 0.1.0 占位；待自绘栈稳定后将 `NoahLiu/moonbit-libyue` 标记废弃）；子模块 `NoahLiu/yue-media` → `NoahLiu/gui-media`、`NoahLiu/yue-examples` → `NoahLiu/gui-examples`；**库模块根落在 `gui/`**：13 个库包（`gui/core` … `gui/web`）与 `moon.mod` 都在其下，模块名不变故 mooncakes 包路径 `NoahLiu/native-gui/<包>` 与既有 import 全部不变；`examples/`、`experiment/` 拆为**独立模块**（`NoahLiu/native-gui-examples` / `NoahLiu/native-gui-experiment`），经 `moon.work` 本地解析依赖库模块，构建/测试不再牵连库门禁；旧链 `yue/` 已删除。GitHub 仓库名**保持 `moonbit-libyue` 不改**（2026-10-12 定案：留作这个库来时的路）。
 - **本分支不保留老 libyue 绑定**：`shim/`、`lib/` 预构建库、`scripts/prepare.py` 已删除；libyue 只作**老师**（行为参考、可平移资产来源、`patches/` 的真实 bug 语料）。
 - **旧链路的完成项与实测结论不在本文件重述**：代码在 `master`（`shim + libyue`，0.5.x 与 `bin-*`/`vendor-*` 发布照旧），踩坑与验收细节在 [docs/zh/adaptation.md](docs/zh/adaptation.md) 与 `git log`。**凡旧栈做过、新栈尚未重做的能力，本文件一律记为未完成。**
 - **门禁口径（本分支例外）**：全仓 `moon check` 允许为红（红点=工作队列，只减不增，当前基线 **287 errors / 68 warnings**（2026-10-11 实测），明细见方案 §5）；逐批验收改分包：`yoga-mbt` 基线不掉 + 新栈各包 `moon check` 零警告且各自测试全绿；组件与声明式层接线完成的那一批恢复全仓门禁。
@@ -122,7 +122,7 @@
   - **非 Linux 后端**：D-Bus 线本身是 Linux-only（`dbus_stub.c` 在 `_WIN32`/`__APPLE__` 为失败桩），但 **SNI 托盘 / 通知 / MPRIS 的跨平台面**已按新口径收进 §6（W20c 托盘、W21a 通知）；其余（logind/UPower/NetworkManager/屏保/inhibit）**无跨平台对应面，不再跟踪**
 - [ ] 新建项（master 全仓无资产，属新做）：**任务栏进度 / dock 徽标** 已收进 §6.3（W20 批，三平台各有原生面）；**勿扰** 随 W21a 通知门面
 - [x] Wayland 后端（`idle`/`windowctl`/`clipboard_watch`/`monitor` 的替代或降级）——**按新口径从路线图移除**：属 Linux 发行版内部事务，随各能力批按需处理，不进 TODO
-- [ ] 平台分派：**跨平台能力的各平台后端按 §6 批次推进**（Win 基础能力 W20 / MBT 通用门面 W21）；master 有 Win32 直连族与 mac ObjC++ 族可参照；真机清单见 `docs/zh/plan-system-integration.md` B8
+- [ ] 平台分派：**跨平台能力的各平台后端按 §6 批次推进**（Win 基础能力 W20 / MBT 通用门面 W21）；master 有 Win32 直连族与 mac ObjC++ 族可参照
 
 ### webview 与媒体（角色区 pane 模型；已锁决策与批次验收见方案 §4）
 
@@ -154,6 +154,7 @@
   - [x] 导航细粒度 reason：`WEBKIT_LOAD_REDIRECTED` → kind 15（`NavRedirected`，与「重新加载」分开）；load-failed 载荷结构化成 `uri|domain|code|message`，MoonBit 侧 `nav_error_parse` 拆 `NavError`（message 里可带 `|`，前三段按位取）
   - [x] 一条真窗口才抓到的接缝缺陷：`WebEvent` 有 `LoadFailed` 而 `dispatch` 的 kind 表**漏了 14**，失败一律落成 `Unknown(14, raw)`；两半各有测试、中间映射没有。现补 `14 => LoadFailed` 并把 2/3/4/14/15 全钉进映射测试 + 一条端到端
   - [x] `sys` 不再往 C 桩加函数：新增 `sys_make_dirs` 用**纯 MoonBit** 组合既有子进程通道（`pr_run("mkdir", ["-p", path])`）。同批真窗口坑：`sys_write_text_file` 不建父目录，目录不在时症状跑到别处（页面只显示 `not found`），故示例退出行加 `files=` 把「注册/加载/文件真在不在」三段判据拆开
+  - [x] **回访并修正上面那条取舍（2026-10-12 晚）**：口径是「能力等价才组合，不等价加 C」，不是「`sys` 不许有 C」。实测发现 `sys_make_dirs` 的组合写法只在 POSIX 成立——Windows 的 PATH 上没有 `mkdir`，`fsx_wbtest.mbt:109` 从上线起在 Windows 上就是红的（**那条测试本身是对的，坏的是能力**）。改为薄 FFI `yue_sys_make_dirs`（`gui/sys/sys_stub.c`：Windows 逐级 `CreateDirectoryW`、POSIX 逐级 `mkdir(2)`，不依赖子进程通道、不用 `pr_available()`），与本来就是 C 的 `sys_read_text_file`/`sys_remove_file`/`fsx_list_dir` 同族；用例的临时根与清理同步平台化（`%TEMP%`/`$TMPDIR` + `rmdir /s /q`/`rm -rf`）。踩到的 Windows 坑已记进 `docs/adaptation.md`（中英）：**`CreateDirectoryW("C:")` 回 `ERROR_ACCESS_DENIED(5)` 而不是 `ERROR_ALREADY_EXISTS(183)`**，逐级建目录必须**先探再建**（`GetFileAttributesW` 有效即跳过）。顺带修 `dbus/bus_wbtest.mbt` 的 4 条红：原写法在 `Err` 分支打印「skip」却 `assert_true(false)`，改成「连不上打印跳过并 `return`、连上之后仍是硬断言」——与同包 `dbus_wbtest.mbt` 真总线冒烟、`media_wbtest.mbt`「非 Linux 跳过」同一口径。回证：`sys` **178/178**、库门禁 `core ui render text theme icons sys input win dbus chart mdview web` **830/830**（此前 5 红）、`cd gui && moon check` 干净、`moon check`（全仓 workspace）干净、`%TEMP%` 无测试残渣
   - [ ] 批 C 余项（仍待接）：跨窗共享的 cookie 同步（`get_cookies_for_url` 是 per-view 回包，多 pane 同 profile 时的同步策略没定）
   - [x] 回证：`web` 无头 15/15、`sys` 164/164、三包 `--deny-warn` 零警告；真窗口两段分开跑——加载协议页 `NATIVE-WEB-SCHEME reg=1 loads=1 files=2 unreg=0 title='本地协议页'`（截图见正文蓝底，`style.css` 也走协议），注销后重载 `unreg=1 fails=1 raw=0 fail='WebKitNetworkError/399 yuedemo://local/index.html'`（页面区原样画出 `scheme unregistered`）
   - [x] **桥接窗改走协议 + 两条挂载接缝**：桥接页原先由 `load_html` 装入，而 `load_html` 不入历史（本轮实测口径），那一排的「后退/前进」在这页上注定是空操作——改成写进协议根目录再 `load_url("yuedemo://local/bridge.html")`，给它一条真 URL，历史才有意义；协议没就绪时明确退回 `load_html` 并把原因写进事件区（不静默）。改的过程抓到两条同形接缝：① `register_protocol` 在视图挂载前（`handle == 0L`）一律 false，调用方得自己等挂载——现补 `pending_protos`，与 `pending_html` 同源，挂载即应用，`unregister_protocol` 能把待应用的登记撤掉（撤到过算 true，没登记过仍 false，「未挂载」不等于「随便成功」）；② 协议通道只回一个 MIME，裸 `text/html` 会被按 ISO-8859-1 解，中文页整屏乱码——文本类扩展名一律钉 `charset=utf-8`（html/css/js/json/txt），页面自身也补 `<meta charset="utf-8">`
@@ -320,7 +321,6 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$MSVC/bin/Hostx64/x64/cl.exe" \
 
 ## 5. 随手可查
 
-- 方案与阶段：[docs/zh/native-gui-plan.md](docs/zh/native-gui-plan.md)
 - 平台实测坑：[docs/zh/adaptation.md](docs/zh/adaptation.md)（中英两份）
 - 布局引擎交接与决策：[modules/yoga-mbt/HANDOFF.md](modules/yoga-mbt/HANDOFF.md)
 - libyue 源码（只读老师）：`/home/lkyh/ownCode/yue`，含 `patches/` bug 语料

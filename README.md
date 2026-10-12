@@ -1,12 +1,12 @@
 # moonbit-libyue [![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
 
-> **⚠ Renamed** — the mooncakes package is now **`NoahLiu/native-gui`** (formerly `NoahLiu/moonbit-libyue`; first release 0.1.0 as a placeholder, the old package will be marked deprecated once the new stack stabilizes); sub-modules `NoahLiu/yue-media` → **`NoahLiu/gui-media`**, `NoahLiu/yue-examples` → **`NoahLiu/gui-examples`**. The self-drawn GUI stack (no libyue dependency; windows, pixels, event loop, layout and widgets all in pure MoonBit) is the mainline on this branch — plan: [docs/zh/native-gui-plan.md](docs/zh/native-gui-plan.md). The README body below still describes the 0.5.x libyue-binding API kept on `master`.
+> **⚠ Renamed** — the mooncakes package is now **`NoahLiu/native-gui`** (formerly `NoahLiu/moonbit-libyue`; the old name will be marked deprecated once the stack stabilizes); sub-modules `NoahLiu/yue-media` → **`NoahLiu/gui-media`**, `NoahLiu/yue-examples` → **`NoahLiu/gui-examples`**. 
 
-> Thanks to [Cheng Zhao (zcbenz)](https://github.com/zcbenz) and his [Yue](https://github.com/yue/yue) framework, and to [MoonBit](https://github.com/moonbitlang). As it happens, both of these programming tools carry the character for "moon" — and I have grown fond of them both. [About me and `libyue`](docs/aboutlibyue.md)
+> **On origins** — this library started life as a MoonBit binding of [Cheng Zhao (zcbenz)](https://github.com/zcbenz)'s [Yue / libyue](https://github.com/yue/yue), with [Yoga](https://github.com/facebook/yoga)'s flexbox for layout. The stack is self-drawn now and depends on neither — what stays with us is what we learned from them. Thanks also to [MoonBit](https://github.com/moonbitlang).
 
-A **native cross-platform desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — a full binding of [libyue](https://libyue.com/docs/latest/cpp/) (C++): one MoonBit codebase runs native windows on Windows ✅ / Linux ✅ / macOS 🟡, zero-config right after `moon add`.
+A **native cross-platform desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — windows, pixels, the event loop, layout and widgets are all written in pure MoonBit. One codebase runs native windows on Windows ✅ / Linux ✅, macOS backend not yet developed; zero config after `moon add`.
 
-English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/master/README_ZH.md)
+English | [简体中文](https://github.com/lb091188/moonbit-libyue/blob/master/README_ZH.md)
 
 ![Component showcase](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-main.png)
 
@@ -16,110 +16,116 @@ English | [简体中文](https://gitee.com/noahliu0911/moonbit-libyue/blob/maste
 
 ## Core highlights
 
-**🎨 Modern theme** — visually consistent across platforms; follows the system accent color and light/dark mode by default, and `theme_apply` reskins in one line:
+**🎨 Self-drawn widgets, one theme everywhere** — widgets are drawn by the library's own rasterizer, so they look the same on every platform. Light/dark and the system accent colour are followed by default, and the theme is a plain value you can override.
+
+**📝 Declarative UI** — describe the interface as a tree and let the library drive it:
 
 ```moonbit
-@yue.theme_apply({ ..@yue.theme_from_system(), primary: "#1E4FA3" })
-```
-
-**📝 Declarative** — describe the UI as a node tree:
-
-```moonbit
-let window = @declarative.mount_window(
-  [
-    @declarative.label("Hello, MoonBit + libyue!", style=[("margin", 20.0)]),
-    @declarative.button("Quit", on_click=fn() { @yue.quit() }),
-  ],
-  title="Hello", size=Some((420.0, 160.0)), center=true, on_close=fn(_w) { @yue.quit() },
-)
-```
-
-**⚡ Signal reactivity** — keep state in `Signal` / `Store`; bound spots refresh automatically:
-
-```moonbit
-let clicks = @yue.Signal::new(0)
-let text = @yue.Signal::computed(fn() { "Clicked \{clicks.get()} times" })  // dependencies auto-collected
-
-@declarative.button("Click me", on_click=fn() { clicks.update(fn(n) { n + 1 }) }),
-@declarative.bind(text, fn(s) { s }),
-```
-
-**🖥 Desktop-grade system integration** — system tray · notifications · global shortcuts · clipboard · native menu bar · file dialogs · drag & drop · multiple monitors:
-
-```moonbit
-match @yue.Tray::new("icon.png") {
-  Ok(t) => t.on_click(fn() { window.show() })
-  Err(_e) => ()
+fn main {
+  let app = match @ui.mount_window(
+    [@ui.label("Hello, MoonBit!", size=18.0)],
+    title="Hello, MoonBit!",
+    width=400,
+    height=300,
+  ) {
+    None => {
+      // no window backend or no display service on this host
+      return
+    }
+    Some(a) => a
+  }
+  app.run()
 }
-
-let n = @yue.Notification::new()
-n.set_title("Build finished")
-n.show()
 ```
 
-**📊 Flagship app — Linux process manager & hardware monitor**:
+**⚡ Reactive state** — keep state in `Store` / `Signal` (from `@core`); bound spots refresh themselves when the data changes.
 
-![Processes](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/sys.png)
+**🖥 Desktop-grade system integration** — tray, notifications, global shortcuts, clipboard, native menus, file dialogs, drag & drop, autostart, media keys, and OS queries (volume, brightness, power, browser history, installed apps…) sit behind one `@sys` API.
 
-```moonbit
-moon run examples/sysmonitor
-```
+**📊 Self-drawn charts & rich content** — charts (line / bar / pie / gauge / scatter plus radar, heatmap, candlestick, funnel, boxplot, sankey, tree, treemap, sunburst, map and more, with a cross-cutting interactive layer) and a Markdown view, drawn by the same rasterizer.
 
-> 40 native widgets fully bound · 58 themed self-drawn components · 20 self-drawn charts (+3 interactive variants) · wrapper overhead [startup on par with C++, memory +0.8MB](docs/adaptation.md) · three-platform CI · published on [mooncakes](https://mooncakes.io/)
+> `moon run examples/showcase` — the full demo board: component library + system capabilities.
+
+## Packages
+
+`moon add NoahLiu/native-gui` brings the whole module, but MoonBit compiles and links only the packages you import — an unused package costs nothing in your binary:
+
+| Import in `moon.pkg` | Alias | Contents |
+|---|---|---|
+| `NoahLiu/native-gui/core` | `@core` | App host, event loop, focus / keys / pointer, menus, notifications, tray, overlays, drag & drop, `Store` / `Signal` |
+| `.../native-gui/ui` | `@ui` | Self-drawn widgets and the component library: window mount, labels / buttons, forms, display, navigation, date, tables & virtual lists, entries, scroll, overlays, code view, declarative layer |
+| `.../native-gui/render` | `@render` | Rasterizer — a pure-MoonBit software raster (path / fill / blend / gradient) plus a Cairo backend; bitmaps, canvas, images, PNG |
+| `.../native-gui/text` | `@text` | Text layer: font families, fonts, attributed text and range attributes (Pango / DirectWrite) |
+| `.../native-gui/theme` | `@theme` | Theme system: palette derivation + change subscription |
+| `.../native-gui/icons` | `@icons` | Vector icon system |
+| `.../native-gui/sys` | `@sys` | OS capabilities: autostart, idle, subprocess, env, files, JSON, dialogs, browser history / bookmarks, recent files, wallpaper, volume, brightness, power, printers, monitors, window control, app lookup… |
+| `.../native-gui/input` | `@input` | Editing core and key codes |
+| `.../native-gui/win` | `@win` | Platform window backend (Win32 / GTK3 C stubs): hotkeys, icons, IME, message boxes, notifications, trays, surfaces |
+| `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge (tray SNI, notifications, brightness, logind / upower, media, network, screensaver…) |
+| `.../native-gui/chart` | `@chart` | Charts, plus the cross-cutting interactive layer |
+| `.../native-gui/mdview` | `@mdview` | Markdown rendering view |
+| `.../native-gui/web` | `@web` | Embedded WebView |
+
+Heavier optional capabilities live in **separate modules**, so a plain `moon add` never drags them in:
+
+| Module | Contents |
+|---|---|
+| `NoahLiu/gui-media` | Audio/video engine (ffmpeg decode + miniaudio output) and the player component. |
+| `NoahLiu/gui-examples` | Standalone example module (systemprobe, native-web) that depends on `gui-media`. |
+
+**Two layers of "optional"** — a sub-package you do not import costs nothing in your binary (the `moon.pkg` import is the compile/link boundary); a module you do not depend on is not even resolved or prebuilt (the `moon.mod` import defines the dependency closure).
 
 ## Quick start
 
-Don't know MoonBit? The [five-minute tutorial](docs/tutorial.md) takes you from `moon new` to your first window.
+New to MoonBit? The [documentation site](https://moonbit-libyue.pages.dev/) covers the toolchain and your first window.
 
-Prerequisite: the MoonBit native toolchain, `moonc` ≥ 0.10.14 (`moon version --all` to verify).
+Prerequisite: the MoonBit native toolchain.
 
-**Prebuilt demos** — unzip and run:
+```sh
+moon add NoahLiu/native-gui
+```
 
-| Platform | Package |
-|---|---|
-| Windows 10/11 x64 | [`bin-windows-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-windows-x64.zip) |
-| Linux x64 (GTK3, on Ubuntu by default) | [`bin-linux-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-linux-x64.zip) |
-| macOS (Apple Silicon) 🟡 no real-machine test | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
+Then run one of the bundled examples:
 
-> **Since 0.5.11** the library is split into sub-packages — import only what you use (unused packages are not compiled into your binary). Core (native widgets, painting, `Store`/`Signal`, theme, tray) stays at `NoahLiu/native-gui/yue` (`@yue`); the declarative layer is `.../yue/declarative` (`@declarative`), themed components `.../yue/components` (`@components`), charts `.../yue/charts`, icons `.../yue/icons`, markdown `.../yue/markdown`, OS capabilities `.../yue/system`. Full table in [docs/README.md](docs/README.md#packages).
-
-> **Upgrading to 0.5.0**: the `Browser` binding moved to a standalone package. Add `"NoahLiu/native-gui/yue/browser"` to your imports (`@browser.Browser` → `@browser.Browser`, API unchanged). Apps that don't import it are no longer linked against WebKit/WebView2.
-
-## Documentation index
-
-📚 **Online docs**: <https://moonbit-libyue.pages.dev/> — the web version of every document below, auto-deployed with the repo. 中文版在 [`/zh/`](https://moonbit-libyue.pages.dev/zh/).
-
-| Document | Content |
-|---|---|
-| [tutorial.md](docs/tutorial.md) | Five-minute quick start: from `moon new` to a running window, avoiding the three newcomer pitfalls |
-| [declarative.md](docs/declarative.md) | Declarative `Node`/`mount` render tree + `Store` reactive bindings |
-| [layout.md](docs/layout.md) | Layout style key quick reference: all style keys + common-combination examples |
-| [components-ui.md](docs/components-ui.md) | Themed component library quick reference: per-API signatures + parameter tables, including theme customization / light-dark switching |
-| [components.md](docs/components.md) | Widget API quick reference: both the classic setter and `X::make` props styles |
-| [Troubleshooting & topics](docs/README.md) | Platform adaptation notes · Linux tray · native-layer relink (three standalone documents) |
+```sh
+moon run examples/hello          # a minimal window
+moon run examples/hello-themed   # the themed widget set
+moon run examples/showcase       # full demo board: components + system capabilities
+```
 
 ## Platform support
 
-Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🟡 builds pass (CI, no real machine)
+Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🚧 backend not yet developed
 
-Exes built on Windows run as a GUI subsystem — no console window on double-click.
+On Windows, exes are built as a GUI-subsystem binary — no console window on double-click.
+
+## Documentation index
+
+📚 **Online docs**: <https://moonbit-libyue.pages.dev/> — 中文版在 [`/zh/`](https://moonbit-libyue.pages.dev/zh/).
+
+| Document | Content |
+|---|---|
+| [docs/README.md](docs/README.md) | Documentation index and package overview |
+| [docs/adaptation.md](docs/adaptation.md) | Platform adaptation notes: field-tested pitfalls and fixes, per platform |
+| [docs/autostart.md](docs/autostart.md) | Cross-platform autostart |
+| [docs/tray.md](docs/tray.md) | Linux tray: SNI protocol-stack design |
+| [docs/zh/system-capabilities.md](docs/zh/system-capabilities.md) | System capabilities overview (Chinese) |
 
 ## Contributing
 
-Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — macOS real-machine testing is especially appreciated. A few basic requirements:
+Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — the macOS backend is the largest open gap (not yet developed; it needs an Apple Silicon machine). A few basic requirements:
 
 - **Commit gate**: `moon check && moon test` zero errors and zero warnings repo-wide
 - **Experience on record**: write field-tested pitfalls together with their fixes into [adaptation.md](docs/adaptation.md) — not only in commit messages
 - **Small batches**: one cohesive change per commit, short commit messages
 
-The full process for adding widgets, native-layer releases, and more is in [AGENTS.md](AGENTS.md).
+The full process for adding widgets, CI and releases is in [AGENTS.md](AGENTS.md).
 
 ## License
 
-`moonbit-libyue` is released under the [MIT License](LICENSE). It wraps [libyue](https://github.com/yue/libyue), whose upstream code is licensed LGPL-2.1 with bundled third-party components under Apache-2.0 / MIT / BSD-3-Clause — the complete notice ships in [`vendor/libyue/LICENSE`](vendor/libyue/LICENSE). All libyue patches used here are maintained as separate commits in the [lb091188/yue](https://github.com/lb091188/yue) fork, and the prebuilt static libraries distributed with the package are built from the fork's tagged sources by GitHub Actions (`vendor-*` tags), so the corresponding source stays retrievable from the repository.
+`moonbit-libyue` is released under the [MIT License](LICENSE).
 
 ## References
 
-- [libyue docs](https://libyue.com/docs/latest/cpp/guides/getting_started.html)
-
 - [MoonBit docs](https://docs.moonbitlang.cn/)
+- Ideas this library learned from: [Yue / libyue](https://github.com/yue/yue) · [Yoga](https://github.com/facebook/yoga)

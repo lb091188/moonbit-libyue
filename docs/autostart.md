@@ -1,67 +1,43 @@
-# 开机自启动（Autostart）
+# Autostart
 
-`@system.Autostart` 提供跨平台的开机自启动查询 / 设置 / 取消，语义归一在 MoonBit 层，使用方零平台感知。
+`@sys.autostart_*` provides cross-platform query / enable / disable of "launch at login", with the semantics unified in the MoonBit layer — the caller stays platform-agnostic.
 
-## 平台路由
+## Platform routing
 
-| 平台 | 机制 | 条目位置 |
+| Platform | Mechanism | Entry location |
 |---|---|---|
-| Linux | XDG 自启动目录写 `<app_id>.desktop` | `$XDG_CONFIG_HOME/autostart/`，未设回退 `$HOME/.config/autostart/` |
-| Windows | HKCU `Software\Microsoft\Windows\CurrentVersion\Run` 写值 | 值名 = app_id，值为引号包裹的可执行文件路径 |
-| macOS | 暂缓 | `is_supported()` 为 false，操作返回 `AutostartError::Unsupported` |
+| Linux | XDG autostart directory, writing `<app_id>.desktop` | `$XDG_CONFIG_HOME/autostart/`, falling back to `$HOME/.config/autostart/` |
+| Windows | HKCU `Software\Microsoft\Windows\CurrentVersion\Run`, writing a value | value name = app_id, value = a quoted executable path |
+| macOS | not yet developed | `autostart_supported()` is false; operations return `AutostartError::Unsupported` |
 
 ## API
 
-| 函数 | 说明 |
+| Function | Description |
 |---|---|
-| `Autostart::new(app_id) -> Result[Autostart, AutostartError]` | 创建句柄；app_id 走 DBus 知名名校验（≥2 点分元素、元素以字母/下划线开头） |
-| `Autostart::is_supported() -> Bool` | 当前平台是否支持 |
-| `Autostart::is_enabled() -> Result[Bool, AutostartError]` | 查询；Linux 兼容系统侧禁用位（`Hidden=true`、`X-GNOME-Autostart-enabled=false` 判未启用） |
-| `Autostart::enable() -> Result[Unit, AutostartError]` | 启用；幂等（覆盖旧值）。可执行文件路径自动取本进程自身 |
-| `Autostart::disable() -> Result[Unit, AutostartError]` | 禁用；幂等（目标本就不在也是成功） |
-| `Autostart::path() -> Result[String, AutostartError]` | 条目位置（Linux 为 .desktop 完整路径；Windows 为 Run 键值描述），排查用 |
+| `autostart_supported() -> Bool` | runtime probe (false on macOS in this batch) |
+| `autostart_is_enabled(app_id) -> Result[Bool, AutostartError]` | query (Linux honours the system-side disable bits `Hidden` / `X-GNOME-Autostart-enabled`) |
+| `autostart_enable(app_id)` / `autostart_disable(app_id) -> Result[Unit, AutostartError]` | enable / disable; both idempotent (re-enabling overwrites, disabling something absent still succeeds) |
+| `autostart_path(app_id) -> Result[String, AutostartError]` | entry location (Linux = full `.desktop` path; Windows = `HKCU\…\Run\<app_id>` description), for diagnostics |
+| `autostart_exe_path() -> String?` | full path of the current executable (what `enable` uses) |
+| `autostart_valid_app_id(app_id) -> Bool` | app_id validation (DBus well-known-name rules: ≥2 dot-separated elements, each starting with a letter / underscore) |
+| `autostart_dir_of(xdg, home)` / `autostart_escape_exec(path)` / `autostart_desktop_entry(exe, app_id)` / `autostart_desktop_enabled(content)` / `autostart_run_value(exe)` / `autostart_run_value_exe(value)` | pure functions (autostart-dir resolution / Exec escaping / `.desktop` content and parsing / Windows Run value and reverse-parsing) |
 
-## 用法
-
-```moonbit
-match @system.Autostart::new("com.example.app") {
-  Ok(a) =>
-    match a.enable() {
-      Ok(_) => println("已启用，重新登录后拉起")
-      Err(e) => println("失败：\{e}")
-    }
-  Err(e) => println("app_id 非法：\{e}")
-}
-```
-
-## 边界
-
-- enable 的自启动目标取本进程可执行文件绝对路径：AppImage / 便携解压目录等临时位置下，应用更新或挪动目录后旧条目失效，需要重新 enable。
-- Linux 自启动目录可能被清理工具清空；Windows Run 键可被组策略禁用（条目在但不执行）——两类均为环境侧行为，库不做探测。
-
-## 新栈（MoonBit 原生 GUI 栈）口径
-
-上面是旧链 `@system.Autostart`（句柄形态）。新栈在 **`sys/autostart.mbt`**，是**自由函数**（无对象、无单例，app_id 每次传入）：
+## Usage
 
 ```moonbit
 match @sys.autostart_enable("com.example.MyApp") {
-  Ok(_) => ()      // 重新登录 / 重启即拉起（落点见 autostart_path）
+  Ok(_) => ()      // launched on next login / reboot (see autostart_path for the location)
   Err(e) => println(e.to_string())
 }
 match @sys.autostart_is_enabled("com.example.MyApp") { ... }
-match @sys.autostart_disable("com.example.MyApp") { ... }   // 幂等
+match @sys.autostart_disable("com.example.MyApp") { ... }   // idempotent
 ```
 
-| 函数 | 说明 |
-|---|---|
-| `autostart_supported() -> Bool` | 运行时探测（macOS 本批 false） |
-| `autostart_is_enabled(app_id) -> Result[Bool, AutostartError]` | 查询（Linux 认 `Hidden` / `X-GNOME-Autostart-enabled` 系统侧禁用位） |
-| `autostart_enable(app_id)` / `autostart_disable(app_id) -> Result[Unit, AutostartError]` | 设置 / 取消；都幂等：重复 enable 覆盖、disable 对「本就不在」也算成功 |
-| `autostart_path(app_id) -> Result[String, AutostartError]` | 落点（Linux = `.desktop` 全路径；Windows = `HKCU\…\Run\<app_id>` 描述），排查用 |
-| `autostart_exe_path() -> String?` | 当前进程可执行文件全路径（enable 用的就是它） |
-| `autostart_valid_app_id(app_id) -> Bool` | app_id 校验（DBus 知名名规则：≥2 点分元素、元素以字母/下划线开头） |
-| `autostart_dir_of(xdg, home)` / `autostart_escape_exec(path)` / `autostart_desktop_entry(exe, app_id)` / `autostart_desktop_enabled(content)` / `autostart_run_value(exe)` / `autostart_run_value_exe(value)` | 纯函数（自启动目录解析 / Exec 转义 / `.desktop` 内容与解析 / Windows Run 值形态与反解） |
+Errors are `AutostartError{Unsupported, InvalidAppId, NoExecutablePath, IoFailed(String)}` — unsupported and failure stay distinct, nothing fails silently. **The library adds the exec-path quotes per platform convention** (both the `.desktop` Exec and the Windows REG_SZ are wrapped in one pair of double quotes); callers must not add another layer.
 
-错误是 `AutostartError{Unsupported, InvalidAppId, NoExecutablePath, IoFailed(String)}`——不支持与失败分开，不静默。**exec 路径的引号按平台惯例由库加**（`.desktop` 的 Exec 与 Windows REG_SZ 都是整串双引号包裹），调用方不要再拼一层。
+## Bounds
+
+- `enable` targets the absolute path of the current process's executable: under AppImage / portable unpacked directories (temp locations), updating or moving the app invalidates the old entry — re-run `enable`.
+- The Linux autostart directory may be emptied by cleanup tools; the Windows Run key may be disabled by group policy (entry present but never run) — both are environment-side behaviours the library does not probe.
 
 [中文文档](/zh/autostart.md)

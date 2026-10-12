@@ -2,22 +2,22 @@
 layout: home
 hero:
   name: moonbit-libyue
-  text: libyue bindings for MoonBit
-  tagline: One MoonBit codebase, native desktop windows on Windows / Linux / macOS — zero config after moon add.
+  text: Native desktop GUI for MoonBit
+  tagline: One MoonBit codebase, native windows on Windows / Linux — widgets, layout and the event loop all self-drawn. Zero config after moon add.
   actions:
     - theme: brand
-      text: Five-minute tutorial
-      link: /tutorial
-    - theme: alt
       text: Package structure
       link: /README
+    - theme: alt
+      text: GitHub
+      link: https://github.com/lb091188/moonbit-libyue
 features:
-  - title: Native, windows in a flash
-    details: A full binding of libyue (C++) — real native windows and widgets, ~7 MB binaries, ~80 ms startup.
+  - title: Self-drawn, one theme everywhere
+    details: Windows, pixels, the event loop, layout and widgets are all pure MoonBit, so widgets look the same on every platform and follow the system accent colour and light / dark mode.
   - title: Import only what you use
-    details: Core, declarative, themed components, charts, icons, markdown and OS capabilities are separate packages; unused ones never enter your binary.
+    details: Core, UI, render, text, theme, icons, sys, input, win, dbus, chart, mdview and web are separate packages; unused ones never enter your binary.
   - title: Platform differences absorbed
-    details: Tray, autostart, power, volume, media keys and more share one API; the library takes care of Linux / Windows / macOS differences.
+    details: Tray, autostart, power, volume, media keys and more share one API; the library takes care of the Linux / Windows differences.
 ---
 
 ## Quick start
@@ -28,19 +28,20 @@ moon add NoahLiu/native-gui
 
 ```moonbit
 fn main {
-  if !@yue.initialize() {
-    return
+  let app = match @ui.mount_window(
+    [@ui.label("Hello, MoonBit!", size=18.0)],
+    title="Hello, MoonBit!",
+    width=400,
+    height=300,
+  ) {
+    None => {
+      // no window backend or no display service on this host
+      return
+    }
+    Some(a) => a
   }
-  let _ = @declarative.mount_window(
-    [
-      @declarative.label("Hello, MoonBit + libyue!"),
-      @declarative.button("Quit", on_click=fn() { @yue.quit() }),
-    ],
-    title="Hello",
-    center=true,
-  )
-  @yue.run()
+  app.run()
 }
 ```
 
-Remember to import `NoahLiu/native-gui/yue/declarative` for `@declarative.*` — the full package table is in the [doc index](/README).
+`@ui.*` comes from `NoahLiu/native-gui/ui` — the full package table is in the [doc index](/README).

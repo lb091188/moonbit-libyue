@@ -19,9 +19,9 @@
 `BrightnessDevice{ subsystem, name, max, current }`：subsystem 为 `"backlight"`（屏幕）、name 为 sysfs 设备名、max 为量程上限、current 为枚举时快照（实时值用 `brightness_get`）。设备名不在探测表时可手工构造 `BrightnessDevice` 访问。错误 `BrightnessError`：`Unsupported`（非 Linux 或系统服务不在线）/ `BusFailed(String)` / `DeviceNotFound` / `InvalidParam(String)`。
 
 ```moonbit
-match @system.brightness_devices() {
+match @sys.brightness_devices() {
   Ok(devs) if devs.length() > 0 =>
-    match @system.brightness_set_percent(devs[0], 50) {
+    match @sys.brightness_set_percent(devs[0], 50) {
       Ok(_) => println("已设为半亮")
       Err(e) => println("失败：\{e}")
     }
@@ -43,10 +43,10 @@ match @system.brightness_devices() {
 | `kbd_brightness_step_percent(dev, delta) -> Result[Unit, BrightnessError]` | 按百分比步进 |
 
 ```moonbit
-match @system.kbd_brightness_devices() {
+match @sys.kbd_brightness_devices() {
   Ok(devs) if devs.length() > 0 => {
-    let _ = @system.kbd_brightness_set_percent(devs[0], 80)
-    let _ = @system.kbd_brightness_step_percent(devs[0], -10) // 步进减 10%
+    let _ = @sys.kbd_brightness_set_percent(devs[0], 80)
+    let _ = @sys.kbd_brightness_step_percent(devs[0], -10) // 步进减 10%
   }
   _ => println("无键盘背光")
 }
@@ -67,16 +67,16 @@ match @system.kbd_brightness_devices() {
 错误 `VolumeError`：`Unsupported`（无可用音量工具）/ `CommandFailed(String)`（执行失败、超时等）/ `ParseFailed(String)`（输出解析失败，带原文）。
 
 ```moonbit
-match @system.vol_get() {
+match @sys.vol_get() {
   Ok(v) =>
     println(
       "sink=\{v.sink} 音量=\{v.volume}% 静音=\{if v.muted { "是" } else { "否" }}",
     )
   Err(e) => println("不可用：\{e}")
 }
-let _ = @system.vol_set(42)
-let _ = @system.vol_add(-5)
-let _ = @system.vol_set_mute(false)
+let _ = @sys.vol_set(42)
+let _ = @sys.vol_add(-5)
+let _ = @sys.vol_set_mute(false)
 ```
 
 ### 音量增强（输出设备与逐应用音量 volx_）
@@ -94,13 +94,13 @@ let _ = @system.vol_set_mute(false)
 `AudioDevice{ name, description, is_default }`（name 为 pactl 节点名，是 `volx_set_default` 的入参；description 为人类可读名）；`AppStream{ index, app_name, volume, muted }`（app_name 取 `application.name` 属性，缺省回落 `node.name`，再缺省 `"unknown"`；volume 为 0-100，各声道不一致取最响）。错误沿用 `VolumeError`。
 
 ```moonbit
-match @system.volx_devices() {
+match @sys.volx_devices() {
   Ok(devs) => for d in devs {
       println("\{d.description}（\{d.name}）\{if d.is_default { " ←默认" } else { "" }}")
     }
   Err(e) => println("不可用：\{e}")
 }
-match @system.volx_app_streams() {
+match @sys.volx_app_streams() {
   Ok(streams) => for s in streams {
       println("\{s.app_name}  音量=\{s.volume}%")
     }
@@ -121,16 +121,16 @@ match @system.volx_app_streams() {
 
 ```moonbit
 // 已装清单:注入目录列举函数(如自有的 readdir 封装)
-match @system.appfind_installed_with(fn(dir) { my_list_dir(dir) }) {
+match @sys.appfind_installed_with(fn(dir) { my_list_dir(dir) }) {
   Ok(apps) => for a in apps {
       println("\{a.locale_name}  \{a.exec}")
     }
   Err(e) => println("不可用：\{e}")
 }
 // 二进制查找
-match @system.appfind_executable("code") {
+match @sys.appfind_executable("code") {
   Ok(path) => println("code 位于 \{path}")
-  Err(@system.AppFindError::NotFound(_)) => println("未安装")
+  Err(@sys.AppFindError::NotFound(_)) => println("未安装")
   Err(_) => println("平台不支持")
 }
 ```
@@ -151,10 +151,10 @@ match @system.appfind_executable("code") {
 
 ```moonbit
 // 文件类型与默认应用
-match @system.da_file_type("/home/me/report.pdf") {
+match @sys.da_file_type("/home/me/report.pdf") {
   Ok(mime) => {
     println("类型：\{mime}")
-    match @system.da_default_for(mime) {
+    match @sys.da_default_for(mime) {
       Ok(desktop) => println("默认应用：\{desktop}")
       Err(_) => println("没有默认应用")
     }
@@ -162,8 +162,8 @@ match @system.da_file_type("/home/me/report.pdf") {
   Err(e) => println("查询失败：\{e}")
 }
 // 枚举关联应用、设置默认（set 是改变系统状态的操作，由用户显式触发）
-let apps = @system.da_associations_for("text/html")
-@system.da_set_default("text/html", "firefox.desktop")
+let apps = @sys.da_associations_for("text/html")
+@sys.da_set_default("text/html", "firefox.desktop")
 ```
 
 ## VS Code 本地历史与最近工作区
@@ -179,13 +179,13 @@ let apps = @system.da_associations_for("text/html")
 `VscHistoryEntry{ path, timestamp }`：path 为快照文件绝对路径（内容即该时刻文件全文），timestamp 为 Unix 毫秒，`timestamp_seconds()` 换算秒。错误 `VscodeError`：`Unsupported`（无法定位用户数据目录）/ `StorageUnavailable`（VS Code 从未在本机运行过）/ `StorageCorrupted(String)` / `HistoryCorrupted(String)`。
 
 ```moonbit
-match @system.vsc_local_history("/home/me/proj/src/main.mbt") {
+match @sys.vsc_local_history("/home/me/proj/src/main.mbt") {
   Ok(snaps) => for s in snaps {
       println("\{s.timestamp_seconds()}  \{s.path}")
     }
   Err(e) => println("不可用：\{e}")
 }
-match @system.vsc_recent() {
+match @sys.vsc_recent() {
   Ok(paths) => if paths.length() > 0 {
       println("最近工作区：\{paths[0]}")
     }
@@ -209,20 +209,20 @@ match @system.vsc_recent() {
 `BrowserProfile{ browser, profile, history_path }`：browser 为 google-chrome / chromium / microsoft-edge / brave，profile 为目录名（Default 或 Profile N）。`HistoryItem{ url, title, visit_count, last_visit_time }`（时间为 Unix 毫秒，未知为 0）；`DownloadItem{ target_path, received_bytes, total_bytes, start_time, end_time, state }`。错误 `BrowserHistoryError`：`BhUnsupported` / `BhNoConfigDir` / `BhNoBrowser` / `BhIoFailed(String)`（单 profile 读失败跳过，全部失败才报错）。
 
 ```moonbit
-match @system.bh_history(limit=6) {
+match @sys.bh_history(limit=6) {
   Ok(items) => for it in items {
       let title = if it.title == "" { "(无标题)" } else { it.title }
       println("[\{it.visit_count}次] \{title}\n  \{it.url}")
     }
   Err(e) => println("不可用：\{e}")
 }
-match @system.bh_downloads(limit=3) {
+match @sys.bh_downloads(limit=3) {
   Ok(ds) => for d in ds {
-      println("\{d.target_path}  \{@system.bh_download_state_name(d.state)}")
+      println("\{d.target_path}  \{@sys.bh_download_state_name(d.state)}")
     }
   Err(_) => ()
 }
-let _ = @system.bh_search("moonbit", limit=10)
+let _ = @sys.bh_search("moonbit", limit=10)
 ```
 
 ## 媒体控制（MPRIS）
@@ -241,16 +241,16 @@ let _ = @system.bh_search("moonbit", limit=10)
 播放控制属设置类操作，只在调用方显式调用时执行，探测与查询路径不会触发。
 
 ```moonbit
-match @system.media_players() {
+match @sys.media_players() {
   Ok(players) if players.length() > 0 => {
     let p = players[0].name
-    match @system.media_status(p) {
+    match @sys.media_status(p) {
       Ok(s) => println("\{s.title} - \{s.artist}（\{s.playback}）")
       Err(e) => println("读状态失败：\{e}")
     }
-    let _ = @system.media_play_pause(p)
+    let _ = @sys.media_play_pause(p)
   }
-  Err(@system.MediaError::NoPlayer) => println("无播放器")
+  Err(@sys.MediaError::NoPlayer) => println("无播放器")
   Err(e) => println("不可用：\{e}")
 }
 ```
@@ -269,11 +269,11 @@ MPRIS 不提供统一的信号回调通路（总线可订阅 `PropertiesChanged`
 `on_change` 回调抛异常会中断该定时器（先保证自身不抛）；组件销毁前调用 `media_watch_stop` 显式停止。
 
 ```moonbit
-let w = @system.media_watch_status(interval_ms=1000, fn(s : @system.MediaStatus) {
+let w = @sys.media_watch_status(interval_ms=1000, fn(s : @sys.MediaStatus) {
   println("现在播放：\{s.title} - \{s.artist}")
 })
 // 不再关心时
-@system.media_watch_stop(w)
+@sys.media_watch_stop(w)
 ```
 
 ### 通知进度
@@ -286,7 +286,7 @@ let w = @system.media_watch_status(interval_ms=1000, fn(s : @system.MediaStatus)
 | `Notification::set_progress(body : String, percent : Double, width? : Int = 10) -> Unit` | 设通知正文：首行原文 + 第二行进度 |
 
 ```moonbit
-let n = @yue.Notification::new()
+let n = @core.Notification::new()
 n.set_title("导出中")
 n.set_progress("正在导出 3/8 个文件", 37.5, width=4)
 n.show()
@@ -305,8 +305,8 @@ n.show()
 错误 `NightlightError`：`Unsupported`（非 Linux，或 redshift 与 xrandr 均不可用、xrandr 无已连接输出）/ `CommandFailed(String)`。xrandr 路径的输出从当前主输出取，无主输出取首个已连接输出。
 
 ```moonbit
-let _ = @system.nl_set_temperature(30) // 偏暖
-let _ = @system.nl_reset()
+let _ = @sys.nl_set_temperature(30) // 偏暖
+let _ = @sys.nl_reset()
 ```
 
 ## 壁纸
@@ -321,11 +321,11 @@ let _ = @system.nl_reset()
 错误 `WallpaperError`：`Unsupported`（非 Linux、子进程不可用、KDE 的 qdbus 不在）/ `UnknownDesktop(String)`（非 XFCE/GNOME/KDE，带 `XDG_CURRENT_DESKTOP` 原文）/ `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)`。XFCE 写入时属性不存在会创建。
 
 ```moonbit
-match @system.wp_get() {
+match @sys.wp_get() {
   Ok(p) => println("当前壁纸：\{p}")
   Err(e) => println("读不到：\{e}")
 }
-let _ = @system.wp_set("/home/me/Pictures/wall.png")
+let _ = @sys.wp_set("/home/me/Pictures/wall.png")
 ```
 
 ## 音频/视频播放（gui-media 可选层）
@@ -358,7 +358,7 @@ let view = @yuemedia.audio_player_t(player)  // 播放/暂停/进度/时间/音�
 
 ### 视频帧源视图（yue 核心，零依赖）
 
-视频帧渲染走「帧源回调产出 RGBA 字节 → `pngr_encode_rgba` 内存编码为 PNG → `Image::new_from_png` 解码 → `Painter::draw_image` 铺满」：libyue 的 Image 没有裸像素构造入口（只有 Buffer/FilePath/NativeImage 三种构造），PNG 内存编码是纯 MoonBit 的中转通道（stored 压缩，合法 zlib 流，小分辨率够用）。解码器与本组件解耦——任何帧源（未来的 moonav1 / 平台解码器）按帧号提供 RGBA 即可接入。
+视频帧渲染走「帧源回调产出 RGBA 字节 → `pngr_encode_rgba` 内存编码为 PNG → `Image::new_from_png` 解码 → `Painter::draw_image` 铺满」：把内存里的 RGBA 经 PNG 编码再解码，是纯 MoonBit 的中转通道（stored 压缩，合法 zlib 流，小分辨率够用）。解码器与本组件解耦——任何帧源（未来的 moonav1 / 平台解码器）按帧号提供 RGBA 即可接入。
 
 | 函数 | 说明 |
 |---|---|
@@ -374,7 +374,7 @@ fn source(i : Int) -> Bytes? {
   let px = FixedArray::make(320 * 240 * 4, (i * 7 % 255).to_byte())
   Some(Bytes::from_array(px))
 }
-let view = @yue.video_view_t(320, 240, 120, source, fps=30)
+let view = @yuemedia.video_view_t(320, 240, 120, source, fps=30)
 ```
 
 ### VideoPlayer（对标浏览器 `<video>`）
@@ -411,7 +411,7 @@ systemprobe 启动即自动载入演示播放器，播放/暂停/拖进度/音�
 `MonitorInfo{ name, connected, primary, width, height, refresh_centi, pos_x, pos_y, mm_width, mm_height, modes }`；`MonitorMode{ width, height, refresh_centi, preferred, current }`；`CurrentOutput{ name, width, height, refresh_centi, pos_x, pos_y }`。错误 `MonitorError`：`Unsupported`（非 Linux 或 xrandr 不可用）/ `CommandFailed(String)` / `ParseFailed(String)`（无任何输出条目）。
 
 ```moonbit
-match @system.mon_current() {
+match @sys.mon_current() {
   Ok(outs) => for o in outs {
       println("\{o.name}  \{o.width}x\{o.height}@\{o.refresh_centi / 100}Hz")
     }
@@ -421,7 +421,7 @@ match @system.mon_current() {
 
 ## 系统窗口管理（X11）
 
-解析 `wmctrl -l` 的窗口列表（窗口 id / 桌面 / 主机 / 标题），并按 id 或标题激活、按标题关闭窗口。不依赖 libyue GUI 应用环境，普通 MoonBit 进程即可使用（命令经 `pr_run` 执行）。
+解析 `wmctrl -l` 的窗口列表（窗口 id / 桌面 / 主机 / 标题），并按 id 或标题激活、按标题关闭窗口。不依赖 GUI 应用环境，普通 MoonBit 进程即可使用（命令经 `pr_run` 执行）。
 
 | 函数 | 说明 |
 |---|---|
@@ -435,17 +435,17 @@ match @system.mon_current() {
 激活与关闭会改变真实窗口状态（设置类）：接口完整实现，应用层只在用户操作时调用。
 
 ```moonbit
-match @system.win_list() {
+match @sys.win_list() {
   Ok(wins) => for w in wins { println("\{w.id}  \{w.title}") }
   Err(e) => println("不可用：\{e}")
 }
-let _ = @system.win_activate("ZCode")   // 按标题
-let _ = @system.win_close("ZCode")
+let _ = @sys.win_activate("ZCode")   // 按标题
+let _ = @sys.win_close("ZCode")
 ```
 
 ## 剪贴板监听
 
-经 `xclip` 只读轮询系统剪贴板（X11 CLIPBOARD 选区），文本内容变化时回调派发新文本。与 `methods.mbt` 里 libyue 原生 Clipboard 的 `start_watching` / `on_change` 分工：后者由 GUI 事件循环驱动（需 initialize 的应用环境），本模块是纯轮询实现，任意 MoonBit 进程可用、回调落在调用方上下文。
+经 `xclip` 只读轮询系统剪贴板（X11 CLIPBOARD 选区），文本内容变化时回调派发新文本。本模块是纯轮询实现，任意 MoonBit 进程可用、回调落在调用方上下文。
 
 | 函数 | 说明 |
 |---|---|
@@ -453,14 +453,14 @@ let _ = @system.win_close("ZCode")
 | `cbw_start_watch(interval_ms? = 800, cb) -> ClipboardWatcher` | 启动监听（轮询间隔钳 100..60000；基线取启动瞬间内容，初始内容不触发回调） |
 | `cbw_stop(watcher)` | 停止监听（置停靠标志，至多再跑一拍自行终止；幂等） |
 
-错误 `ClipboardError`：`Unsupported`（非 Linux 或 xclip 不存在）/ `CommandFailed(String)`。读失败静默跳过该拍，不触发回调。轮询挂在 libyue 定时器上，需在 GUI 消息循环运行后才实际派发。
+错误 `ClipboardError`：`Unsupported`（非 Linux 或 xclip 不存在）/ `CommandFailed(String)`。读失败静默跳过该拍，不触发回调。轮询挂在 GUI 定时器上，需在消息循环运行后才实际派发。
 
 ```moonbit
-let w = @system.cbw_start_watch(interval_ms=500, fn(text) {
+let w = @sys.cbw_start_watch(interval_ms=500, fn(text) {
   println("剪贴板新内容：\{text}")
 })
 // ……需要时
-@system.cbw_stop(w)
+@sys.cbw_stop(w)
 ```
 
 ## 磁盘卷管理
@@ -477,10 +477,10 @@ let w = @system.cbw_start_watch(interval_ms=500, fn(text) {
 `DskVolume{ device, label, mountpoint, size_bytes, removable, path }`：device 为块设备文件（`/dev/sda1`）、label 为卷标（无卷标空串）、mountpoint 为已挂载路径（未挂载 None）、size_bytes 为字节、removable 指示可移动介质、path 为 udisks2 对象路径（lsblk 路线取不到为空串，供挂载卸载内部定位）。错误 `DiskError`：`Unsupported` / `BusFailed(String)` / `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)` / `NotMounted(String)` / `AlreadyMounted(String)`。
 
 ```moonbit
-match @system.dsk_volumes() {
+match @sys.dsk_volumes() {
   Ok(vols) =>
     for v in vols if v.removable && v.mountpoint is None {
-      match @system.dsk_mount(v) {
+      match @sys.dsk_mount(v) {
         Ok(_) => println("已挂载 \{v.device}")
         Err(e) => println("挂载失败：\{e}")
       }
@@ -505,13 +505,13 @@ match @system.dsk_volumes() {
 `SessionInfo{ id, uid, user, seat, path }`：seat 本地为 "seat0"，远程 / 无 seat 的会话为空串。错误 `PwrcError`：`Unsupported`（非 Linux 或 logind 不在线 / 总线不可达）/ `NotAllowed(String)`（Can* 返回 no/na、polkit 授权被拒）/ `BusFailed(String)`。
 
 ```moonbit
-if @system.pwrc_supported() {
-  match @system.pwrc_can_power_off() {
+if @sys.pwrc_supported() {
+  match @sys.pwrc_can_power_off() {
     Ok(true) => {
-      let _ = @system.pwrc_power_off() // 真机执行：弹 polkit 授权并关机
+      let _ = @sys.pwrc_power_off() // 真机执行：弹 polkit 授权并关机
     }
     _ => {
-      let _ = @system.pwrc_logout_self()
+      let _ = @sys.pwrc_logout_self()
     }
   }
 }
@@ -531,9 +531,9 @@ if @system.pwrc_supported() {
 `PowerProfile`：`PPerformance`（性能）/ `PBalanced`（均衡）/ `PPowerSaver`（省电）。错误 `PowerProfileError`：`PpUnsupported` / `PpCommandFailed(String)` / `PpParseFailed(String)`。
 
 ```moonbit
-match @system.pp_profiles() {
-  Ok(profiles) if profiles.contains(@system.PBalanced) => {
-    let _ = @system.pp_set(@system.PBalanced)
+match @sys.pp_profiles() {
+  Ok(profiles) if profiles.contains(@sys.PBalanced) => {
+    let _ = @sys.pp_set(@sys.PBalanced)
   }
   _ => ()
 }
@@ -553,9 +553,9 @@ match @system.pp_profiles() {
 错误 `SysInfoError`：`SiUnsupported`（非 Linux）/ `SiReadFailed(String)`（带路径）/ `SiParseFailed(String)`。
 
 ```moonbit
-let os = @system.si_os() // Ok({ pretty_name: "Ubuntu 24.04.5 LTS", id: "ubuntu", .. })
-let mem = @system.si_memory()
-let up = @system.si_uptime() // Ok(84088.08)
+let os = @sys.si_os() // Ok({ pretty_name: "Ubuntu 24.04.5 LTS", id: "ubuntu", .. })
+let mem = @sys.si_memory()
+let up = @sys.si_uptime() // Ok(84088.08)
 ```
 
 ## 时区与本地语言
@@ -572,9 +572,9 @@ let up = @system.si_uptime() // Ok(84088.08)
 错误 `LocaleError`：`LcUnsupported` / `LcBusFailed(String)` / `LcCommandFailed(String)` / `LcParseFailed(String)` / `LcInvalidTimezone(String)`（空串 / 含空白 / 以 '/' 开头 / 含 '..'）。
 
 ```moonbit
-let tz = @system.lc_timezone()
-let ntp = @system.lc_ntp()
-let _ = @system.lc_set_timezone("Asia/Tokyo") // 需要认证
+let tz = @sys.lc_timezone()
+let ntp = @sys.lc_ntp()
+let _ = @sys.lc_set_timezone("Asia/Tokyo") // 需要认证
 ```
 
 ## 蓝牙
@@ -593,16 +593,16 @@ let _ = @system.lc_set_timezone("Asia/Tokyo") // 需要认证
 `BtAdapter{ path, address, name, powered, discovering }`；`BtDevice{ path, address, name, paired, connected, trusted }`（name 取 Name 属性，空则回退 Alias，仍空回退 MAC）。错误 `BtError`：`Unsupported`（无适配器或服务不在线）/ `BusFailed(String)`。
 
 ```moonbit
-if @system.bt_supported() {
-  match @system.bt_adapter_info() {
+if @sys.bt_supported() {
+  match @sys.bt_adapter_info() {
     Ok(a) if !a.powered => {
-      let _ = @system.bt_set_powered(true)
+      let _ = @sys.bt_set_powered(true)
     }
     _ => ()
   }
-  let _ = @system.bt_start_discovery()
-  match @system.bt_devices() {
-    Ok(devs) => for d in devs if !d.paired { let _ = @system.bt_pair(d) }
+  let _ = @sys.bt_start_discovery()
+  match @sys.bt_devices() {
+    Ok(devs) => for d in devs if !d.paired { let _ = @sys.bt_pair(d) }
     Err(_) => ()
   }
 }
@@ -622,8 +622,8 @@ if @system.bt_supported() {
 错误 `SensorError`：`Unsupported`（无服务 / 无对应传感器，含运行中传感器被拔出 / 服务退出）/ `BusFailed(String)`。
 
 ```moonbit
-if @system.sns_supported() && @system.sns_has_ambient_light() {
-  match @system.sns_ambient_light() {
+if @sys.sns_supported() && @sys.sns_has_ambient_light() {
+  match @sys.sns_ambient_light() {
     Ok(lux) => println("环境光：\{lux} lx")
     Err(e) => println("读不到：\{e}")
   }
@@ -645,9 +645,9 @@ if @system.sns_supported() && @system.sns_has_ambient_light() {
 `PrinterStatus`：`Idle` / `Printing` / `Paused`（暂停接新任务）/ `Disabled`；`prt_status_available(status)` 判是否可用接任务。`PrinterInfo{ name, status }`；`PrinterJob{ name, id }`（name 为 "目标名-编号" 形态，如 `Gprinter-GP-9034T-12`）。错误 `PrinterError`：`PrtUnsupported` / `PrtCommandFailed(String)` / `PrtParseFailed(String)` / `PrtInvalidParam(String)`（打印机名 / 文件路径为空、份数 < 1）。
 
 ```moonbit
-match @system.prt_default() {
+match @sys.prt_default() {
   Ok(name) => {
-    let _ = @system.prt_print(printer=name, path="/tmp/doc.pdf")
+    let _ = @sys.prt_print(printer=name, path="/tmp/doc.pdf")
   }
   Err(e) => println("无默认打印机：\{e}")
 }
@@ -670,10 +670,10 @@ match @system.prt_default() {
 语义为「进程内生效」——写只改当前进程环境，不触碰系统持久配置，也不影响父进程。错误：`EnvxError::ExInvalidParam(String)`（变量名空串）/ `ExFailed(String)`（C 层拒绝，如名含 '='）；`FsError::InvalidParam(String)` / `OpenFailed(String)`（目录打不开，带路径）/ `EnvFailed(String)`。`fsx_list_dir` 的已知边界：子项名本身含 '\n' 的极端文件名会被拆开（扁平文本编码）。
 
 ```moonbit
-let path = @yue.envx_get("PATH")
-let _ = @yue.envx_set("MY_FLAG", "1")
-let _ = @yue.envx_unset("MY_FLAG")
-match @yue.fsx_list_dir("/usr/share/applications") {
+let path = @sys.envx_get("PATH")
+let _ = @sys.envx_set("MY_FLAG", "1")
+let _ = @sys.envx_unset("MY_FLAG")
+match @sys.fsx_list_dir("/usr/share/applications") {
   Ok(names) => for n in names if n.ends_with(".desktop") { println(n) }
   Err(e) => println("打不开：\{e}")
 }
@@ -692,7 +692,7 @@ match @yue.fsx_list_dir("/usr/share/applications") {
 `RecentItem{ uri, path, mime, added, modified, app_count }`：path 为 href 去 `file://` 前缀并百分号解码后的本地路径（非 file:// 方案给空串）、mime 为 MIME 类型（该 bookmark 无此节点给 None）、added / modified 为 Unix 毫秒（缺失或非法为 0）、app_count 为记录过该文件的应用个数。错误 `RecentError`：`RfUnsupported` / `RfNoDataDir` / `RfNoFile`（从未记录过）/ `RfParseFailed(String)`。解码与换算纯函数：`rf_xml_unescape` / `rf_percent_decode` / `rf_uri_to_path` / `rf_iso_to_unix_ms` / `rf_sort_recent`。
 
 ```moonbit
-match @system.rf_recent(limit=8) {
+match @sys.rf_recent(limit=8) {
   Ok(items) => for it in items { println("\{it.path}  (\{it.modified})") }
   Err(e) => println("读不到：\{e}")
 }
@@ -711,9 +711,9 @@ match @system.rf_recent(limit=8) {
 `BookmarkProfile{ browser, profile, bookmarks_path }`；`BookmarkNode{ name, url?, children, added, root }`（added 为 Unix 毫秒、root 标注所属根 bookmark_bar / other / synced）——返回虚拟根树（名称 `"<浏览器>/<profile>"`，children 为三根合并），`BookmarkNode::is_folder()` / `is_url()` 分类，`bm_flatten(node)` 给先序扁平 url 书签列表。错误 `BookmarkError`：`BmUnsupported` / `BmNoConfigDir` / `BmNoBrowser` / `BmIoFailed(String)`。
 
 ```moonbit
-match @system.bm_bookmarks("google-chrome") {
+match @sys.bm_bookmarks("google-chrome") {
   Ok(root) =>
-    for n in @system.bm_flatten(root) {
+    for n in @sys.bm_flatten(root) {
       println("\{n.name}  →  \{n.url}")
     }
   Err(e) => println("读不到：\{e}")
@@ -733,7 +733,7 @@ match @system.bm_bookmarks("google-chrome") {
 `FirefoxProfile{ profile, places_path }`（profile 为 profiles.ini 的 `Path=` 目录名，绝对路径取末段）。hidden 条目（书签等）已滤除；单 profile 读失败跳过、全部失败给 `FfxIoFailed`。错误 `FirefoxHistoryError`：`FfxUnsupported` / `FfxNoProfile`（未安装或从未启动 Firefox）/ `FfxIoFailed(String)`。profiles.ini 缺失时回退固定候选名（default / default-release / default-esr / default-nightly / dev-edition-default），随机前缀命名的 profile 目录收不到。
 
 ```moonbit
-match @system.ffx_history(limit=10) {
+match @sys.ffx_history(limit=10) {
   Ok(items) => for it in items { println("\{it.title}  \{it.url}") }
   Err(e) => println("读不到：\{e}")
 }
@@ -753,9 +753,9 @@ match @system.ffx_history(limit=10) {
 命令缺失与「存在但失败」是两种语义：前者在该模块自身通常归一为 `*Supported == false` 或 `Unsupported`（如 `PpUnsupported`、`PrtUnsupported`），后者是 `CommandFailed`——调用方按错误值分类处理即可。
 
 ```moonbit
-match @system.pr_run("wpctl", ["get-volume", "@DEFAULT_SINK@"]) {
+match @sys.pr_run("wpctl", ["get-volume", "@DEFAULT_SINK@"]) {
   Ok(out) => println(out.stdout)
-  Err(@system.ProcError::NonZeroExit(_, err)) => println("失败：\{err}")
+  Err(@sys.ProcError::NonZeroExit(_, err)) => println("失败：\{err}")
   Err(e) => println(e)
 }
 ```
@@ -794,4 +794,4 @@ match
 - `appfind_executable` 的命中判定为文件可打开读取，不校验执行权限位。
 - 音量 / 亮度设置依赖对应系统服务在线（PipeWire/Pulse、logind），服务缺席时读接口可能仍可用而写接口返回 `Unsupported`，按错误值逐项处理即可。
 - 关机 / 重启 / 设时区 / 切电源计划 / 蓝牙配对 / 打印 / 挂载都是会改变系统真实状态的操作，且多数需要 polkit 授权：接口完整实现，但只在用户显式操作时调用，不要在探测或查询路径里代为触发。
-- 剪贴板监听与涟漪动画的定时器都由 libyue 消息循环驱动且无取消 id（`set_timer`）：停止的途径是让回调返回 false，故句柄类 API（`cbw_stop` / `eff_stop`）应在组件卸载前显式调用。
+- 剪贴板监听与涟漪动画的定时器都由消息循环驱动且无取消 id（`set_timer`）：停止的途径是让回调返回 false，故句柄类 API（`cbw_stop` / `eff_stop`）应在组件卸载前显式调用。

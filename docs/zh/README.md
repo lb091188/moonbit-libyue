@@ -1,50 +1,47 @@
 # 文档索引
 
-## 引入
-
-本目录是 moonbit-libyue 的使用文档。组件 API 有两种写法、语义完全一致：**逐个 setter 的经典写法**（`X::new()` + `set_xxx()`），或 **props 风格一步到位**（`X::make(...)`，只是 setter 的打包）；所有类型经 `@yue` 引用，控件 API 速查（入参 / 方法表）见 [components.md](components.md)。
-
-完全没接触过 MoonBit？从[五分钟上手教程](tutorial.md)开始——学 MoonBit、装依赖、建出第一个桌面应用。
+本目录是 **moonbit-libyue** 的使用文档——[MoonBit](https://github.com/moonbitlang) 生态的原生跨平台桌面 GUI 库：窗口、像素、事件循环、布局与控件全部纯 MoonBit 实现，mooncakes 包名为 `NoahLiu/native-gui`。
 
 ## 包结构
 
-0.5.11 起模块拆成多个子包——`moon add NoahLiu/native-gui` 一次拿全，但只编译只链接你 import 的那些(MoonBit 按 import 闭包构建，没 import 的包不进二进制)：
+`moon add NoahLiu/native-gui` 一次拿全整个模块，但 MoonBit 只编译只链接你 import 的那些（没 import 的包不进二进制）：
 
 | `moon.pkg` 里的导入 | 别名 | 内容 |
 |---|---|---|
-| `NoahLiu/native-gui/yue` | `@yue` | 核心：FFI、原生控件(Window / View / Label / Button / Entry / Table / Tab / Menu / 对话框…)、Painter、事件、`Store`/`Signal`、主题、托盘、文件/环境助手 |
-| `.../yue/declarative` | `@declarative` | 声明式层:`Node`/`mount` 渲染树、各节点构造器、`bind_label`/`bind`、hover 组、悬浮滚动 |
-| `.../yue/components` | `@components` | 主题组件库:按钮 / 输入 / 选择 / 表单 / 导航 / 布局 / 数据展示 / 反馈 / 浮层 |
-| `.../yue/charts` | `@charts` | 20+ 图表类型与图表交互层 |
-| `.../yue/icons` | `@icons` | 矢量图标系统(`draw_icon` 与图标视图/按钮) |
-| `.../yue/markdown` | `@markdown` | `markdown_view` 渲染(该包带入 mizchi/markdown 依赖) |
+| `NoahLiu/native-gui/core` | `@core` | 应用宿主、事件循环、焦点 / 键 / 指针、菜单、通知、托盘、浮层、拖放、`Store` / `Signal` |
+| `.../native-gui/ui` | `@ui` | 自绘控件与组件库：窗口挂载、标签 / 按钮、表单、显示、导航、日期、表格与虚拟列表、输入框、滚动、浮层、代码视图、声明式层 |
+| `.../native-gui/render` | `@render` | 光栅器——纯 MoonBit 软件光栅（路径 / 填充 / 混合 / 渐变）加 Cairo 后端；位图、画布、图像、PNG |
+| `.../native-gui/text` | `@text` | 文本层：字体族、字体、富文本与区间属性（Pango / DirectWrite） |
+| `.../native-gui/theme` | `@theme` | 主题系统：色板派生 + 变更订阅 |
+| `.../native-gui/icons` | `@icons` | 矢量图标系统 |
+| `.../native-gui/sys` | `@sys` | 系统能力：自启动、空闲、子进程、环境、文件、JSON、对话框、浏览器历史 / 书签、最近文件、壁纸、音量、亮度、电源、打印机、显示器、窗口控制、应用查找… |
+| `.../native-gui/input` | `@input` | 编辑内核与键码 |
+| `.../native-gui/win` | `@win` | 平台窗口后端（Win32 / GTK3 的 C 桩）：快捷键、图标、输入法、消息框、通知、托盘、surface |
+| `.../native-gui/dbus` | `@dbus` | Linux D-Bus 桥（托盘 SNI、通知、亮度、logind / upower、媒体、网络、屏保…） |
+| `.../native-gui/chart` | `@chart` | 图表 + 横切交互层 |
+| `.../native-gui/mdview` | `@mdview` | Markdown 渲染视图 |
+| `.../native-gui/web` | `@web` | 内嵌 WebView |
 
 较重的可选能力放在**独立模块**里，而不是主模块的子包——`moon add NoahLiu/native-gui` 不会把它们拉进来：
 
 | 模块 | 内容 |
 |---|---|
-| `NoahLiu/gui-media` | 音视频引擎（ffmpeg 解码 + miniaudio 输出）与播放器组件。Linux 上需要系统 ffmpeg 开发包。 |
+| `NoahLiu/gui-media` | 音视频引擎（ffmpeg 解码 + miniaudio 输出）与播放器组件。 |
 | `NoahLiu/gui-examples` | 独立示例模块（systemprobe、native-web），依赖 `gui-media`。 |
 
 **两种「可选」不要混**：没 import 的**子包**不进二进制（`moon.pkg` 的 import 是编译/链接边界）；没依赖的**模块**连解析与 prebuild 都不会发生（`moon.mod` 的 import 定义依赖闭包）。能力要做到后者，就必须住在自己的模块里。
-| `.../yue/system` | `@system` | 系统能力:自启动 / 单实例 / 电源与会话 / 音量 / 亮度 / 媒体按键 / 壁纸 / 蓝牙 / 打印机 / 磁盘卷 / 浏览器历史…(带入 sqlite 依赖) |
-| `.../yue/browser` | `@browser` | 网页视图控件——只有真需要时才 import(唯一链接 WebKit/WebView2 的包) |
-
-教程导入的是 核心 + declarative;主题组件库及其上层按需引入。
 
 ## 演示
 
-五个示例，由浅入深：
+示例由浅入深：
 
 ```sh
-moon run examples/hello         # 原版控件最小窗口
-moon run examples/hello-themed  # 主题组件库最小示例（theme_apply + button_t/input_t/label_t）
-moon run examples/showcase      # 全功能演示板：14 页三组侧栏，组件库 + 系统能力全集
-moon run examples/sysmonitor    # 旗舰应用：Ubuntu 进程管理与硬件信息查看（千行进程表 + 实时曲线）
-moon run NoahLiu/gui-examples/systemprobe   # 系统能力 + 扩展图表演示板（音量/亮度/浏览器历史/VS Code/应用查找 + 雷达/热力/K 线/漏斗/箱线/桑基）
+moon run examples/hello          # 最小窗口
+moon run examples/hello-themed   # 主题控件集
+moon run examples/showcase       # 完整演示板：组件库 + 系统能力
 ```
 
-showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 / 反馈 / 代码与文档 / 事件与布局 / Store 对照 + 画布与富文本 + 系统集成 / 窗口 / 浏览器；左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。每页源码独立成文件（`examples/showcase/pages/*.mbt`），是最好的复制粘贴素材库；组件库各组件的截图：
+`examples/showcase` 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 / 反馈 / 代码与文档 / 事件与布局 / Store 对照 + 画布与富文本 + 系统集成；左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。每页源码独立成文件（`examples/showcase/pages/*.mbt`），是最好的复制粘贴素材库；组件库各组件的截图：
 
 ![基础组件](/images/showcase-basic.png)
 
@@ -56,34 +53,13 @@ showcase 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 /
 
 ![系统集成](/images/showcase-system.png)
 
-### sysmonitor：进程管理与硬件信息查看
-
-库「表现力 + 性能」的旗舰应用：数据层纯 MoonBit 读 /proc、/sys（CPU 两次差值、内存、千行进程、hwmon 温度、磁盘 IO 与容量、PCI 显卡、网卡速率），唯一的系统调用经应用自有 native-stub；五页 tabs（概览 / 进程 / 传感器 / 磁盘 / 网络），1Hz 单定时器驱动全部采样，曲线与数值卡只重绘画布不重建视图树，主题深浅跟随系统。
-
-进程页：虚拟表格千行级，搜索过滤、六列排序、选中 kill（SIGTERM 失败转 SIGKILL）/ renice，errno 语义化为中文提示；实测 1053 进程全量采样 14.94ms/次、稳态 1Hz CPU 2-3%（数据见 [adaptation.md](adaptation.md)）。
-
-![概览](/images/sysmonitor-overview.png)
-
-![进程页](/images/sysmonitor-process.png)
-
-![深色主题](/images/sysmonitor-dark.png)
-
 ## 分流
 
 | 文档 | 内容 |
 |---|---|
-| [tutorial.md](tutorial.md) | 五分钟上手教程(面向 MoonBit 新手):从 `moon new` 到窗口跑起来,三个新手坑逐一避开;附官方 MoonBit 教程与 Tour 链接 |
-| [aboutlibyue.md](aboutlibyue.md) | 关于我和 `libyue`:作者与这个库的相识经过、封装来龙去脉 |
-| [declarative.md](declarative.md) | 声明式 UI(包 `@declarative`):`Node`/`mount` 渲染树 + `Store`/`Signal` 响应式绑定(信号 computed 自动依赖收集 + batch) |
-| [layout.md](layout.md) | 布局样式键速查:Yoga flexbox 全部样式键(枚举/数值/边缘/特殊)+ 常用组合示例 |
-| [components-ui.md](components-ui.md) | 组件库速查(包 `@components`):Element Plus 风格主题化组件(按钮/输入/选择/表单/导航/布局/数据展示/图表/图标/反馈/浮层),逐 API 签名 + 参数表 + 示例;图表含折线/柱状/环形/仪表/散点与扩展图表(雷达/热力/K 线/漏斗/箱线/桑基),以及第二批层级/地理/力导向/时间流图表(树图/矩形树图/旭日图/地图与飞线/力导向关系图/平行坐标/主题河流/涟漪散点/象形柱)与横切交互层(hover 浮层与命中、可点击图例、DataZoom 缩放平移、阈值线与高亮域、色带映射、导出) |
-| [components.md](components.md) | 组件 API 速查:经典 setter 与 `X::make` props 两种写法,含上游坑 |
-| [adaptation.md](adaptation.md) | 平台适配经验:各平台实测坑、根因与验证结论(持续更新) |
-| [tray.md](tray.md) | Linux 托盘方案:SNI 协议栈设计、架构、后端降级、桌面兼容性 |
-| [autostart.md](autostart.md) | 开机自启动:Linux 写 XDG .desktop、Windows 写 HKCU Run 键,is_enabled / enable / disable 统一语义 |
-| [system-capabilities.md](system-capabilities.md) | 系统能力(包 `@system`,仅中文):屏幕亮度 / 键盘背光 / 系统音量(wpctl 优先 pactl 回退;输出设备枚举与逐应用播放流)/ 媒体控制(MPRIS,playerctl 回退)/ 夜间色温 / 壁纸 / 显示器配置 / 系统窗口管理 / 剪贴板监听 / 磁盘卷(udisks2 优先 lsblk 回退)/ 电源与登录会话 / 电源计划 / 系统信息 / 时区与本地语言 / 蓝牙 / 传感器 / 打印机 / 进程内环境变量与目录枚举 / 最近文件 / 浏览器书签与 Firefox 历史 / 应用查找 / VS Code 本地历史与最近工作区 / 浏览器历史与下载记录,统一 Result 语义;含子进程执行(procrun)与通用 D-Bus 调用层(traybus)两块共享基建 |
-| [plan-system-integration.md](plan-system-integration.md) | 系统集成扩容总体实施计划:P1-P12 与收口项 P14 的批次划分、验收门、共享基建决策与风险(定稿) |
-| [native-gui-plan.md](native-gui-plan.md) | MoonBit 原生 GUI 栈总体实施计划:自绘路线与 libyue 的角色边界、新栈替代主包 `yue/` 的分包结构与绑定层摘除清单、三平台输入/输入法后端表、原生子表面(browser 与视频)设计、G0-G8 阶段与分包门禁口径、过渡期风险(定稿) |
-| [relink.md](relink.md) | 原生层(shim/vendor)变更后强制重链:判别与处理 |
+| [adaptation.md](adaptation.md) | 平台适配经验：各平台实测坑、根因与验证结论（持续更新） |
+| [autostart.md](autostart.md) | 开机自启动：Linux 写 XDG .desktop、Windows 写 HKCU Run 键，is_enabled / enable / disable 统一语义 |
+| [tray.md](tray.md) | Linux 托盘方案：SNI 协议栈设计、架构、后端降级、桌面兼容性 |
+| [system-capabilities.md](system-capabilities.md) | 系统能力（包 `@sys`）：屏幕亮度 / 键盘背光 / 系统音量 / 媒体控制 / 夜间色温 / 壁纸 / 显示器配置 / 系统窗口管理 / 剪贴板监听 / 磁盘卷 / 电源与登录会话 / 系统信息 / 蓝牙 / 传感器 / 打印机 / 进程内环境变量与目录枚举 / 最近文件 / 浏览器书签与历史 / 应用查找 / VS Code 历史…，统一 Result 语义；含子进程执行（procrun）与通用 D-Bus 调用层两块共享基建 |
 
 项目总览与快速开始入口见仓库根 [README_ZH.md](https://github.com/lb091188/moonbit-libyue/blob/master/README_ZH.md)。
