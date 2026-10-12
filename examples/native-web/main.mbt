@@ -447,6 +447,8 @@ fn main {
             ])
             let _ = @sys.sys_make_dirs(sc_root)
             let _ = @sys.sys_write_text_file(sc_root + "/bridge.html", bridge_html)
+            // 协议按 context 生效：两扇窗没各给数据目录时共用同一个 context，
+            // 主窗那行「注销该协议」会把这里的根目录一并清空（重新注册即恢复）
             if v.register_protocol("yuedemo", sc_root) {
               v.load_url("yuedemo://local/bridge.html")
             } else {
