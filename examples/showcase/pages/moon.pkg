@@ -1,6 +1,7 @@
 // 演示板各页内容（G7 新栈）。每页一个文件；页内私有状态留在页函数体内，
 // 跨页共享状态从 `shared` 的 `App` 取。
 import {
+  "NoahLiu/yoga-mbt/src" @yoga,
   "NoahLiu/native-gui/core",
   "NoahLiu/native-gui/ui",
   "NoahLiu/native-gui/examples/showcase/shared",

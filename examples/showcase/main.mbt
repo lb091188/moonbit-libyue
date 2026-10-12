@@ -15,8 +15,9 @@
 //     （与 `App::follow_system_theme` 内部同一来源，示例要能手动覆盖故自己开表）。
 //   - 菜单栏 / 托盘 / 单实例 / 对话框尚未迁入（它们各自随「系统集成」「窗口」
 //     两页进来，或在 `examples/native-app` 已有对照演示）。
-//   - 待迁页：图标库 / 表单 / 事件与布局 / 导航 / 数据展示 / 图表 / 代码与文档 /
-//     反馈 / Store 对照 / 系统集成 / 窗口 / 浏览器 / 画布与富文本（见 TODO.md）。
+//   - 待迁页：导航 / 数据展示 / 图表 / 代码与文档 / Store 对照 / 事件与布局 /
+//     系统集成 / 窗口 / 图标库 / 画布与富文本 / 浏览器（见 TODO.md；
+//     表单组件页 2026-10-12 已迁）。
 
 ///|
 /// 窗口标题
@@ -26,7 +27,7 @@ const SHOWCASE_TITLE : String = "组件库演示板"
 /// 侧栏底部的版本号。旧链路读 `@yue.VERSION`（主包常量，`scripts/prebuild.py`
 /// 在构建期校验它与 `moon.mod` 一致）；新栈示例不再 import 主包，故本地留一份
 /// ——它只用于显示，权威值仍是 `moon.mod` 与 `yue/version.mbt`。
-const SHOWCASE_VERSION : String = "0.5.11"
+const SHOWCASE_VERSION : String = "0.1.0"
 
 ///|
 /// 主题应用：主色空串用内置基准盘，非空按 HSL 公式派生；深浅随 `dark`。
@@ -104,10 +105,11 @@ fn main {
               @ui.scroll_v(
                 [
                   @ui.side_menu_sections(
-                    [("组件", ["基础组件", "反馈组件"])],
+                    [("组件", ["基础组件", "表单组件", "反馈组件"])],
                     selected,
                     icons=[
                       ("基础组件", @icons.Appstore),
+                      ("表单组件", @icons.Edit1),
                       ("反馈组件", @icons.ChatRound),
                     ],
                     width=180.0,
@@ -131,6 +133,7 @@ fn main {
           @ui.vbox(
             [
               @shared.nav_page("基础组件", selected, @pages.page_basic(app)),
+              @shared.nav_page("表单组件", selected, @pages.page_form(app)),
               @shared.nav_page("反馈组件", selected, @pages.page_feedback(app)),
               // 对话框挂窗口根：锚点自己是 0 尺寸占位，可见性只由 Store 驱动
               @ui.dialog_t(
@@ -193,7 +196,7 @@ fn main {
       return
     }
     Some(host) => {
-      println("SHOWCASE-READY title=\{SHOWCASE_TITLE} pages=2 follow=1")
+      println("SHOWCASE-READY title=\{SHOWCASE_TITLE} pages=3 follow=1")
       host.run()
     }
   }
