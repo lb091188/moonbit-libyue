@@ -11,6 +11,10 @@ supported_targets = "native"
 // 实测同 G0 探针）、其余平台占位。Linux 上 native-stub 的那次编译编出空 TU，
 // 防 wm_* 与 prebuild 的 .a 双定义。Windows 的系统库链接参数（user32 等）
 // 由 prebuild 的 Windows 分支下发；链接参数按 AGENTS 规则 1 全部由 prebuild 托管。
+//
+// win_gui.c 只有一段 MSVC 链接 pragma（GUI 子系统 + 入口点）与一个 marker
+// 符号，无平台实现；与 stub.c 同编进包归档 libwin.lib，被 window.mbt 的
+// init_backend 引用后其 .drectve 才会被链接器读到（细则见文件头）。
 options(
-  "native-stub": [ "stub.c" ],
+  "native-stub": [ "stub.c", "win_gui.c" ],
 )

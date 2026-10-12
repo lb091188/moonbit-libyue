@@ -365,3 +365,9 @@ extern "c" fn wm_notify_count() -> Int = "wm_notify_count"
 #borrow(out)
 extern "c" fn wm_notify_title(slot : Int, out : Bytes, cap : Int) -> Int =
   "wm_notify_title"
+
+///|
+/// 实现在 win_gui.c（该文件带 GUI 子系统链接 pragma）：由 `init_backend()`
+/// 引用，保证那份归档成员被链接器抽取、pragma 才会生效——纯 pragma 的 TU
+/// 没有符号引用就会被整体忽略。返回值无意义，只作「被引用」的锚点。
+extern "c" fn wm_win_gui_marker() -> Int = "wm_win_gui_marker"

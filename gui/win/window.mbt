@@ -25,7 +25,12 @@ pub(all) struct Window {
 
 ///|
 /// 后端可用性探测：无显示服务时返回 false，调用方据此降级（CI 与远程 shell 即此形态）。
+///
+/// 顺带 `ignore(wm_win_gui_marker())`：`win_gui.c` 的 GUI 子系统链接 pragma 长在
+/// 该文件的归档成员里，而链接器只读被抽取成员的 `.drectve`——这一引用就是让
+/// 成员进链接的锚点（少了它，双击 exe 会先弹控制台黑框）。返回值恒 42，与探测无关。
 pub fn init_backend() -> Bool {
+  ignore(wm_win_gui_marker())
   wm_init() == 1
 }
 ///|
