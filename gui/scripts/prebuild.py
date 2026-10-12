@@ -240,10 +240,13 @@ def link_configs() -> dict:
         # CLSID_WICImagingFactory1 / IID_IWICImagingFactory /
         # GUID_WICPixelFormat32bppBGRA 三个 GUID 常量，故不必再链 uuid.lib）
         # 与 COM 初始化（ole32）；W20c 托盘要 Shell_NotifyIconW（shell32）。
+        # 任务栏进度（§6.3）要 CLSID_TaskbarList / IID_ITaskbarList3 两个 GUID
+        # 常量：C 模式用不了 __uuidof，链接期从 uuid.lib 取符号（同 W20f 图标
+        # 加载走 windowscodecs.lib 的坑；ole32 只导 COM 基础 GUID，这两个不在）
         entries.append({
-            "package": WIN_PACKAGE,
-            "link_flags": "user32.lib gdi32.lib imm32.lib advapi32.lib "
-            "windowscodecs.lib ole32.lib shell32.lib",
+          "package": WIN_PACKAGE,
+          "link_flags": "user32.lib gdi32.lib imm32.lib advapi32.lib "
+          "windowscodecs.lib ole32.lib shell32.lib uuid.lib",
         })
         # sys 桩（sys/sys_stub.c 的 _WIN32 分支）要 COM：文件对话框走
         # IFileDialog（ole32 的 CoCreateInstance + shell32 的

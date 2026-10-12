@@ -55,6 +55,9 @@
 // windowscodecs.lib / uuid.lib（C 模式用不了 __uuidof，与 W14 文件对话框同条坑）。
 #include <objbase.h>
 #include <wincodec.h>
+// 任务栏进度（§6.3）：ITaskbarList3 与 TBPF_* 在 shobjidl.h；GUID 常量
+// （CLSID_TaskbarList / IID_ITaskbarList3）经 uuid.lib 链接期取符号
+#include <shobjidl.h>
 
 #define WM_MAX_WINDOWS 32
 
@@ -1546,6 +1549,108 @@ int wm_notify_title(int slot, char *out, int cap) {
   }
   out[n] = '\0';
   return n - 1;
+}
+
+/* ---- 任务栏进度（§6.3 接缝项：任务栏进度 / dock 徽标）-----------------------
+ * ITaskbarList3 的 SetProgressValue / SetProgressState：任务栏按钮上的进度条
+ * 与四种状态（无进度 / 正常 / 错误 / 暂停 / 不确定）。COM 实例进程级单例——
+ * 接口本身与窗口无关，目标窗口按 hwnd 区分（句柄从窗口槽拿，与其它 wm_* 同口径
+ * 的越界检查：id 越界或窗口未建给 0，不崩不写）。
+ * 两条口径：① Win32 无 getter，TBPF_* 状态**不可反读**（与 notify 的 kind→NIIF_*
+ * 映射同款），所以只给写入口；探测只报「COM 起没起来」。② GUID 常量
+ * （CLSID_TaskbarList / IID_ITaskbarList3）走 uuid.lib 链接期取符号——C 模式
+ * 用不了 __uuidof（同 W14 文件对话框、W20f 图标加载两条坑）。
+ * Linux 的任务栏进度另有 Unity LauncherEntry（DBus）路径，归跨平台门面批；
+ * 本段只管 Windows，其余平台走同族占位（supported 恒 0）。 */
+static ITaskbarList3 *wm_taskbar = NULL; // 进程级单例
+static int wm_taskbar_tried = 0;         // 探测过一次就不再重试
+
+static int wm_taskbar_ensure(void) {
+  if (wm_taskbar != NULL) {
+    return 1;
+  }
+  if (wm_taskbar_tried) {
+    return 0;
+  }
+  wm_taskbar_tried = 1;
+  // 已被别的模式初始化过（RPC_E_CHANGED_MODE）不算失败：退回默认再试一次。
+  // S_FALSE（本线程已初始化过）同样当成功——进程级单例，反复 CoInitialize
+  // 没有副作用，退出时不 Uninitialize（COM 对象随进程收尾）。
+  HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+  if (hr == RPC_E_CHANGED_MODE) {
+    hr = CoInitialize(NULL);
+  }
+  if (FAILED(hr)) {
+    return 0;
+  }
+  ITaskbarList3 *ptl = NULL;
+  hr = CoCreateInstance(&CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER,
+                        &IID_ITaskbarList3, (void **)&ptl);
+  if (FAILED(hr) || ptl == NULL) {
+    return 0;
+  }
+  if (FAILED(ptl->lpVtbl->HrInit(ptl))) {
+    ptl->lpVtbl->Release(ptl);
+    return 0;
+  }
+  wm_taskbar = ptl;
+  return 1;
+}
+
+int wm_taskbar_supported(void) { return wm_taskbar_ensure(); }
+
+int wm_taskbar_set_progress(int64_t id, int64_t value, int64_t total) {
+  if (!wm_taskbar_ensure()) {
+    return 0;
+  }
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  HWND h = wm_windows[id].hwnd;
+  if (h == NULL) {
+    return 0;
+  }
+  return SUCCEEDED(wm_taskbar->lpVtbl->SetProgressValue(
+             wm_taskbar, h, (ULONGLONG)value, (ULONGLONG)total))
+             ? 1
+             : 0;
+}
+
+int wm_taskbar_set_state(int64_t id, int state) {
+  if (!wm_taskbar_ensure()) {
+    return 0;
+  }
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  HWND h = wm_windows[id].hwnd;
+  if (h == NULL) {
+    return 0;
+  }
+  TBPFLAG flag;
+  switch (state) {
+    case 0:
+      flag = TBPF_NOPROGRESS;
+      break;
+    case 1:
+      flag = TBPF_NORMAL;
+      break;
+    case 2:
+      flag = TBPF_ERROR;
+      break;
+    case 3:
+      flag = TBPF_PAUSED;
+      break;
+    case 4:
+      flag = TBPF_INDETERMINATE;
+      break;
+    default:
+      return 0;
+  }
+  return SUCCEEDED(
+             wm_taskbar->lpVtbl->SetProgressState(wm_taskbar, h, flag))
+             ? 1
+             : 0;
 }
 
 // ---- IME（W6 线实装 ImmAssociateContext / WM_IME_*，当前为占位：缓冲恒空，
@@ -3544,6 +3649,21 @@ int wm_notify_send(int icon_slot, const char *title, const char *text,
   (void)kind;
   return 0;
 }
+/* 任务栏进度（§6.3）占位：Linux 的任务栏进度另有 Unity LauncherEntry（DBus）
+ * 路径、macOS 是 dock 徽标（NSDockTile），都归跨平台门面批；这里的失败桩让
+ * 门面走 unsupported 降级，不断链接符号。 */
+int wm_taskbar_supported(void) { return 0; }
+int wm_taskbar_set_progress(int64_t id, int64_t value, int64_t total) {
+  (void)id;
+  (void)value;
+  (void)total;
+  return 0;
+}
+int wm_taskbar_set_state(int64_t id, int state) {
+  (void)id;
+  (void)state;
+  return 0;
+}
 int wm_notify_update(int slot, const char *title, const char *text, int kind) {
   (void)slot;
   (void)title;
@@ -4222,6 +4342,21 @@ int wm_notify_send(int icon_slot, const char *title, const char *text,
   (void)title;
   (void)text;
   (void)kind;
+  return 0;
+}
+/* 任务栏进度（§6.3）占位：Linux 的任务栏进度另有 Unity LauncherEntry（DBus）
+ * 路径、macOS 是 dock 徽标（NSDockTile），都归跨平台门面批；这里的失败桩让
+ * 门面走 unsupported 降级，不断链接符号。 */
+int wm_taskbar_supported(void) { return 0; }
+int wm_taskbar_set_progress(int64_t id, int64_t value, int64_t total) {
+  (void)id;
+  (void)value;
+  (void)total;
+  return 0;
+}
+int wm_taskbar_set_state(int64_t id, int state) {
+  (void)id;
+  (void)state;
   return 0;
 }
 int wm_notify_update(int slot, const char *title, const char *text, int kind) {

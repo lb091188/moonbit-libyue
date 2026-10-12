@@ -237,6 +237,7 @@
 
 - **§2「系统集成」里已有的跨平台能力**（剪贴板、文件对话框、`open_url`/`reveal`、浏览器历史/书签、`sysinfo`、主题跟随系统）**Windows 后端已落**（W14/W14e/W16），无需重开；**只差真机观感复验**（见 6.4）。
 - **§2「新建项」**（任务栏进度、dock 徽标、勿扰）与本节的「Win 基础能力」有重叠面——**任务栏进度**（Win32 `ITaskbarList3::SetProgressValue`）与 **dock 徽标**（macOS `NSDockTile`）建议**收进 W20 批一并做**（三平台各有原生面，符合跨平台口径）。
+  - [x] **W20g 任务栏进度**（Windows 半边，2026-10-13 交付）：`win/stub.c` 的 `ITaskbarList3` 段（`CoCreateInstance(CLSID_TaskbarList)` 进程级单例 + `SetProgressValue`/`SetProgressState` 写入口，TBPF_* 五态：无进度/正常/错误/暂停/不确定）+ `win/taskbar.mbt` 门面（`TaskbarState` 枚举 + 编号纯函数 + `taskbar_supported` + `Window::set_taskbar_progress/set_taskbar_state/clear_taskbar_progress`）+ `win/ffi.mbt` 3 条 extern + `taskbar_wbtest.mbt` 4 条。**两条口径**：① Win32 无 getter，进度状态**不可反读**，只给写入口（与 notify 的 kind→NIIF_* 同款）；② GUID 常量（CLSID_TaskbarList / IID_ITaskbarList3）在 uuid.lib（ole32 只导 COM 基础 GUID），prebuild 的 win 链接行已补。**验证**：纯 C 探针 `experiment/taskbar_probe` 末行 `TASKBAR-BACKEND-OK`（20 条：单例建成、五态写路径、4GB-1/8GB 大值、越界/未建/非法 state 守卫全给 0、关窗后给 0）；`moon test ./gui/win` 28/28；`examples/native-app` 接线（七个写入口按钮 + `NATIVE-APP-TASKBAR` 状态行）`--deny-warn` 零警告、冒烟进程存活。**未做**：Linux 的 Unity LauncherEntry（DBus）与 macOS dock 徽标（NSDockTile）归跨平台门面批；任务栏按钮真观感归 `_人工测试清单.md` O 节。详见中英 `adaptation.md`「任务栏进度（W20g）」节。
 - **`monitor`/`brightness`/`wallpaper`/`nightlight`/`volume`/`printer`/`powerprofile`/`windowctl`/`locale_sys` 等**——按新口径**不再在 TODO 逐条跟踪**（Linux 实现已是既有事实、非 Linux 无对应面或属各自平台批内部事务）；如后续启用平台批，按「各自能力批的内部事务」处理，不占路线图。
 
 ### 6.4 真机验证（用户执行，助手只给步骤）

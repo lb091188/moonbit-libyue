@@ -371,6 +371,26 @@ extern "c" fn wm_notify_title(slot : Int, out : Bytes, cap : Int) -> Int =
   "wm_notify_title"
 
 ///|
+/// 任务栏进度后端可用性（§6.3）：Windows 恒 1（COM 起不来才 0），
+/// 其余平台 0。
+extern "c" fn wm_taskbar_supported() -> Int = "wm_taskbar_supported"
+
+///|
+/// 设任务栏按钮进度：`value`/`total` 原样透传（Win32 侧 ULONGLONG）。
+/// 返回 1 成功；后端不可用 / 窗口句柄无效给 0。
+extern "c" fn wm_taskbar_set_progress(
+  id : Int64,
+  value : Int64,
+  total : Int64,
+) -> Int = "wm_taskbar_set_progress"
+
+///|
+/// 设任务栏按钮状态：`state` 编号见 taskbar.mbt 的 `taskbar_state_id`
+/// （0 无进度 / 1 正常 / 2 错误 / 3 暂停 / 4 不确定）。返回 1 成功。
+extern "c" fn wm_taskbar_set_state(id : Int64, state : Int) -> Int =
+  "wm_taskbar_set_state"
+
+///|
 /// 实现在 win_gui.c（该文件带 GUI 子系统链接 pragma）：由 `init_backend()`
 /// 引用，保证那份归档成员被链接器抽取、pragma 才会生效——纯 pragma 的 TU
 /// 没有符号引用就会被整体忽略。返回值无意义，只作「被引用」的锚点。

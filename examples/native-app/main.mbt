@@ -1069,6 +1069,64 @@ fn make_window_section(
 }
 
 ///|
+/// §6.3 任务栏进度区块：七个按钮各驱动一次写入口（10%/50%/100%/错误/暂停/
+/// 不确定/清除），末行 live_counter 现读最近一次操作的结果标签。
+/// 真观感（任务栏按钮变绿条/红条/黄条）只能人看，归 `_人工测试清单.md`；
+/// 后端不可用时按钮照旧可点（写失败会写进标签，不静默）。
+fn make_taskbar_section(
+  app : @core.App,
+  last : Ref[String],
+) -> @core.Node {
+  let pct = fn(v : Int64, t : Int64, tag : String) -> Unit {
+    last.val =
+      if app.window.set_taskbar_progress(v, t) { tag } else { tag + " 写失败" }
+  }
+  let st = fn(s : @win.TaskbarState, tag : String) -> Unit {
+    last.val =
+      if app.window.set_taskbar_state(s) { tag } else { tag + " 写失败" }
+  }
+  @ui.container(
+    [
+      @ui.label(
+        "任务栏进度（§6.3）：写任务栏按钮的进度条与状态（Win32 ITaskbarList3，只写不读）",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [
+          @ui.button_t("10%", on_click=fn() { pct(1, 10, "10%") }),
+          @ui.button_t("50%", on_click=fn() { pct(5, 10, "50%") }),
+          @ui.button_t("100%", on_click=fn() { pct(10, 10, "100%") }),
+          @ui.button_t(
+            "错误",
+            on_click=fn() { st(@win.TaskbarState::Error, "error") },
+          ),
+          @ui.button_t(
+            "暂停",
+            on_click=fn() { st(@win.TaskbarState::Paused, "paused") },
+          ),
+          @ui.button_t(
+            "不确定",
+            on_click=fn() { st(@win.TaskbarState::Indeterminate, "indeterminate") },
+          ),
+          @ui.button_t(
+            "清除",
+            on_click=fn() { st(@win.TaskbarState::NoProgress, "clear") },
+          ),
+        ],
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+      @core.node_of(live_counter(fn() -> String { "最近 " + last.val }, width=260.0)),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// W20c 托盘区块：建托盘（像素现建图标）/ 改提示 / 挂右键菜单 / 弹菜单 / 移除。
 /// 左键与菜单项计数落在状态行——证明 `dispatch_tray_event` 与菜单派发链都通。
 /// 后端不支持时（Linux 无 watcher、macOS 占位）建项给结构化错误，如实显示。
@@ -2279,6 +2337,9 @@ fn main {
     }
   }
   app.mount([make_hotkey_section(hotkey_hits, hotkey_last)])
+  // §6.3（任务栏进度）：七个写入口按钮 + 退出状态行报后端可用性与最近一次操作。
+  let taskbar_last : Ref[String] = Ref("-")
+  app.mount([make_taskbar_section(app, taskbar_last)])
   // W20d（原生消息框）：按钮触发，退出状态行报弹框次数与最近一次的返回标签。
   let msgbow_shots = Ref(0)
   let msgbow_last : Ref[String] = Ref("-")
@@ -3325,6 +3386,14 @@ fn main {
       hotkey_hits.val.to_string() +
       " last=" +
       hotkey_last.val,
+  )
+  // §6.3（任务栏进度）回证：后端可用性与最近一次写入口的结果标签
+  // （真观感——任务栏按钮的绿/红/黄条——需人工点按钮后看任务栏）。
+  println(
+    "NATIVE-APP-TASKBAR supported=" +
+      (if @win.taskbar_supported() { "1" } else { "0" }) +
+      " last=" +
+      taskbar_last.val,
   )
   // W20d（原生消息框）回证：弹框次数与最近一次的返回标签（真弹框需人工点按钮）。
   println(
