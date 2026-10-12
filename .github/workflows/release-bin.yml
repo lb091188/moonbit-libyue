@@ -1,16 +1,18 @@
-# 三平台二进制发布：推 bin-* 标签(如 bin-v0.1.0)触发，三平台矩阵各自
-# 编译 release 可执行文件(hello / hello-themed / showcase 三件套)，
-# 打包为 bin-<平台>.zip 汇聚到 GitHub Release 资产。
+# 二进制发布:推 bin-* 标签(如 bin-v0.1.0)触发,各平台矩阵各自编译 release
+# 可执行文件(hello / hello-themed / showcase 三件套),打包为 bin-<平台>.zip
+# 汇聚到 GitHub Release 资产。
 #
-# 与 CI 的分工:CI 每次 push 验证「可编译可链接」，本工作流产出「可分发
-# 的二进制」。交叉编译不可行(MoonBit native 后端调本机 C 工具链链本机
-# 静态库，且各平台库格式与系统依赖 GTK3/WebView2/Cocoa 互不可移植)，
-# 必须三平台各自构建——与 vendor-native.yml 同构。
+# 与 CI 的分工:CI 每次 push 验证「可检查可测试可链接」,本工作流产出「可分发
+# 的二进制」。交叉编译不可行(MoonBit native 后端调本机 C 工具链链本机静态库,
+# 且各平台库格式与系统依赖(GTK3/X11 与 Win32/系统 DLL)互不可移植),必须各平台自建。
+#
+# 平台:Windows ✅ / Linux ✅ / macOS 🚧 后端暂未开发(win/stub.c 的 macOS
+# 分支是占位空实现,建不出窗口,故不发 macOS 产物;口径与 README 平台表一致)。
 #
 # 运行时依赖(release 说明里同步):
-# - Linux: 目标机需 GTK3/WebKit2gtk 运行库(Ubuntu 24.04 自带)
-# - Windows: exe 旁需 WebView2Loader.dll(已打进包)
-# - macOS: Apple Silicon(arm64)原生
+# - Linux: 目标机需 GTK3 / Pango / X11 / WebKit2gtk 运行库(Ubuntu 24.04 自带)
+# - Windows: Windows 10/11 x64;自绘栈无 WebView 依赖,无需附加 DLL;
+#   产物为 GUI 子系统(双击运行不弹控制台黑框,机制见 gui/win/win_gui.c)
 name: release-bin
 
 
@@ -22,6 +24,10 @@ on:
 permissions:
   contents: write
 
+# 三件套的包路径(仓库根 workspace 口径,见 moon.work)
+env:
+  BIN_PKGS: examples/hello examples/hello-themed examples/showcase
+
 jobs:
   build:
     strategy:
@@ -29,7 +35,6 @@ jobs:
       matrix:
         include:
           - { plat: linux-x64, os: ubuntu-latest }
-          - { plat: macos-arm64, os: macos-15 }
           - { plat: windows-x64, os: windows-latest }
 
     runs-on: ${{ matrix.os }}
@@ -39,12 +44,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: 安装 Linux 依赖
+      - name: 安装 Linux 依赖(GTK3/Pango/X11/WebKit 开发包)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake pkg-config \
+            build-essential pkg-config \
             libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev \
             libwebkit2gtk-4.1-dev
 
@@ -52,67 +57,71 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
-          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
-      - name: 安装 moon 工具链 + python3 别名
+      - name: 安装 moon 工具链
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           iwr https://cli.moonbitlang.com/install/powershell.ps1 -useb | iex
           echo "$env:USERPROFILE\.moon\bin" >> $env:GITHUB_PATH
+
+      # gui/scripts/prebuild.py 由 gui/moon.mod 的 prebuild 钩子执行,命令名是
+      # python3;Windows runner 只有 python.exe——复制一份改名放进已入 PATH 的
+      # ~/.moon/bin 即可解析。
+      - name: 提供 python3 命令别名
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
           $py = (Get-Command python).Source
           Copy-Item $py "$env:USERPROFILE\.moon\bin\python3.exe"
 
-      # YUE_MBT_KEEP_MANIFEST=1:发布 exe 嵌入应用清单(Common-Controls v6
-      # 与 supportedOS);moon build 的 main 包对每份 link_flags 只拼一遍,
-      # 恰好一份清单(全仓 moon test 不能设此开关,blackbox 测试目标会
-      # 双拼同份 flags 导致 CVT1100,见 docs/zh/adaptation.md)
+      # 构建三件套(release + strip)。产物统一带 .exe 后缀(含 Linux),
+      # 打包时仅在 Windows 保留。链接参数由库模块的 prebuild 按平台下发,
+      # 示例模块构建时自动继承(见 ci.yml 说明),此处无需任何链接配置。
       - name: 构建(MSVC 环境)
         if: runner.os == 'Windows'
         shell: cmd
-        env:
-          YUE_MBT_KEEP_MANIFEST: '1'
         run: >-
           for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath')
           do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
-          && python scripts\prepare.py
-          && moon build --target native --release --strip
+          && moon build %BIN_PKGS% --target native --release --strip
 
-      # 去 Windows 黑框:正规路线是 yue 包 win_gui.c 的链接 pragma
-      # (消费方自建 exe 同样受益);本步骤降级为兜底——产物仍为
-      # CONSOLE(3) 时把 PE 头 OptionalHeader.Subsystem 改写为 GUI(2)
-      # (等价 editbin /SUBSYSTEM:WINDOWS),已是 GUI(2) 则跳过
-      - name: PE 子系统改 GUI(兜底)
+      - name: 构建
+        if: runner.os != 'Windows'
+        run: moon build $BIN_PKGS --target native --release --strip
+
+      # 去 Windows 黑框走库内正规机制:gui/win/win_gui.c 的 MSVC 链接 pragma
+      # (/SUBSYSTEM:WINDOWS + /ENTRY:mainCRTStartup)。它随 stub.c 一起编进包
+      # 归档 libwin.lib,再由 window.mbt 的 init_backend() 引用 marker 符号,
+      # 保证该归档成员被抽取、pragma 被链接器读到——依赖方零配置。
+      # 此处只**校验**机制生效:不是 GUI(2) 就红,机制回归必须立刻可见,而不是
+      # 在发布侧被悄悄改写掉(2026-10-12 本机实测三件套全 GUI(2))。
+      - name: 校验 PE 子系统为 GUI(去黑框)
         if: runner.os == 'Windows'
         shell: python
         run: |
-          import struct, sys
+          import struct, os, sys
           for stream in (sys.stdout, sys.stderr):
               try:
                   stream.reconfigure(encoding="utf-8", errors="replace")
               except (AttributeError, OSError):
                   pass
-          for name in ["hello", "hello-themed", "showcase"]:
-              p = f"_build/native/release/build/examples/{name}/{name}.exe"
-              data = bytearray(open(p, "rb").read())
+          names = ["hello", "hello-themed", "showcase"]
+          for name in names:
+              p = f"_build/native/release/build/NoahLiu/native-gui-examples/{name}/{name}.exe"
+              if not os.path.exists(p):
+                  raise SystemExit(f"产物缺失: {p}")
+              data = open(p, "rb").read()
               pe = struct.unpack_from("<I", data, 0x3C)[0]
               opt = pe + 4 + 20
-              assert struct.unpack_from("<H", data, opt)[0] in (0x10B, 0x20B)
-              off = opt + 68
-              cur = struct.unpack_from("<H", data, off)[0]
-              if cur == 2:
-                  print(f"{name}.exe: 已是 GUI(2)(win_gui.c pragma 生效),跳过")
-                  continue
-              assert cur == 3, f"{p}: 预期 CONSOLE(3) 或 GUI(2), 实为 {cur}"
-              struct.pack_into("<H", data, off, 2)
-              open(p, "wb").write(data)
-              print(f"{name}.exe: Subsystem CONSOLE(3) -> GUI(2)(pragma 未覆盖,PE 兜底)")
-
-      - name: 构建
-        if: runner.os != 'Windows'
-        run: |
-          python3 scripts/prepare.py
-          moon build --target native --release --strip
+              assert struct.unpack_from("<H", data, opt)[0] in (0x10B, 0x20B), f"{p}: 非 PE32/PE32+"
+              cur = struct.unpack_from("<H", data, opt + 68)[0]
+              if cur != 2:
+                  raise SystemExit(
+                      f"{p}: 子系统 {cur}，期望 GUI(2) —— win_gui.c 的链接 pragma 未生效"
+                  )
+              print(f"{name}.exe: Subsystem GUI(2)")
 
       - name: 收集三件套打包
         shell: python
@@ -125,22 +134,18 @@ jobs:
                   stream.reconfigure(encoding="utf-8", errors="replace")
               except (AttributeError, OSError):
                   pass
-          # MoonBit native 后端三平台产物统一带 .exe 后缀(含 Linux/mac),
+          # MoonBit native 后端各平台产物统一带 .exe 后缀(含 Linux),
           # 仅 Windows 包内保留后缀,其余平台重命名去掉
-          exes = ["hello", "hello-themed", "showcase"]
+          names = ["hello", "hello-themed", "showcase"]
           stage = "staging"
           os.makedirs(stage, exist_ok=True)
-          for name in exes:
-              src = f"_build/native/release/build/examples/{name}/{name}.exe"
+          for name in names:
+              src = f"_build/native/release/build/NoahLiu/native-gui-examples/{name}/{name}.exe"
               if not os.path.exists(src):
                   raise SystemExit(f"产物缺失: {src}")
               dst = name + (".exe" if sys.platform == "win32" else "")
               shutil.copy2(src, os.path.join(stage, dst))
               print(f"打包: {dst} ({os.path.getsize(src)} bytes)")
-          if sys.platform == "win32":
-              # prebuild 已把 loader 复制到工程根;exe 旁必须有它才能起 WebView
-              shutil.copy2("WebView2Loader.dll", os.path.join(stage, "WebView2Loader.dll"))
-              print("打包: WebView2Loader.dll")
           shutil.make_archive(f"bin-{os.environ['BIN_PLAT']}", "zip", stage)
           print(f"完成: bin-{os.environ['BIN_PLAT']}.zip")
 
@@ -158,19 +163,18 @@ jobs:
         with:
           merge-multiple: true
 
-      - name: 发布三平台二进制到 Release
+      - name: 发布二进制到 Release
         uses: softprops/action-gh-release@v2
         with:
           draft: false
           name: Binaries ${{ github.ref_name }}
           body: |
-            三平台可执行包(hello / hello-themed / showcase 各三件):
+            可执行包(hello / hello-themed / showcase 三件套):
 
             | 包 | 运行要求 |
             |---|---|
-            | bin-linux-x64.zip | x64 Linux,需 GTK3 / WebKit2gtk 运行库(Ubuntu 24.04 自带) |
-            | bin-windows-x64.zip | Windows 10/11 x64,需 WebView2 运行时(系统自带);包内已含 WebView2Loader.dll,解压即用 |
-            | bin-macos-arm64.zip | Apple Silicon(macOS 14+) |
+            | bin-linux-x64.zip | x64 Linux,需 GTK3 / Pango / X11 / WebKit2gtk 运行库(Ubuntu 24.04 自带) |
+            | bin-windows-x64.zip | Windows 10/11 x64;解压即用(无附加 DLL,双击不弹控制台黑框) |
 
             解压后直接运行对应可执行文件;源码方式 `moon run examples/showcase` 见 README。
           files: 'bin-*.zip'
