@@ -533,11 +533,26 @@ fn main {
   let md_err = Ref("")
   let md_full = Ref(false)
   let md_speed = Ref(1.0)
+  let md_subs_n = Ref(0)
+  let md_subs_emb = Ref(0)
+  let lv_subs_n = Ref(0)
   let md_subs =
     "1\n00:00:00,200 --> 00:00:00,600\n第一条字幕（0.2~0.6 秒）\n\n" +
     "2\n00:00:00,600 --> 00:00:01,000\n第二条字幕（0.6~1.0 秒）\n"
-  let open_player = fn(a : @core.App) -> Unit {
-    match a.open_window(720, 480, "播放器（批 D）") {
+  // `embedded=false` 走外挂字幕文本（调用方喂 SRT）；`embedded=true` 什么都不喂，
+  // 组件自己去容器里读内嵌轨——两扇窗同一条渲染路，只差字幕来源
+  let open_player = fn(a : @core.App, embedded : Bool) -> Unit {
+    let md_path =
+      if embedded {
+        "modules/ffmpeg-mbt/src/testdata/av_1s_subs.mp4"
+      } else {
+        "modules/ffmpeg-mbt/src/testdata/av_1s.mp4"
+      }
+    match a.open_window(720, 480, if embedded {
+      "播放器：内嵌字幕轨（批 D2c）"
+    } else {
+      "播放器（批 D）"
+    }) {
       None => ()
       Some(win) => {
         win.root.set_column()
@@ -551,10 +566,15 @@ fn main {
           p.fill_rect(0.0, 0.0, r.w, r.h)
         })
         win.mount([
-          @ui.label("播放器：ffmpeg 软解出 RGBA → Bitmap → Painter 合成", size=13.0),
+          @ui.label(
+            "播放器：ffmpeg 软解出 RGBA → Bitmap → Painter 合成（字幕来源：" +
+              (if embedded { "内嵌轨" } else { "外挂文本" }) +
+              "）",
+            size=13.0,
+          ),
           @media.player_t(
-            "modules/ffmpeg-mbt/src/testdata/av_1s.mp4",
-            subtitle=md_subs,
+            md_path,
+            subtitle=if embedded { "" } else { md_subs },
             width=680.0,
             height=380.0,
             auto_play=true,
@@ -569,6 +589,10 @@ fn main {
             },
             on_error=fn(e : String) -> Unit { md_err.val = e },
             on_speed=fn(v : Double) -> Unit { md_speed.val = v },
+            on_subtitle=fn(n : Int, emb : Bool) -> Unit {
+              md_subs_n.val = n
+              md_subs_emb.val = if emb { 1 } else { 0 }
+            },
           ),
           // 全屏是窗口级动作：控件层拿不到窗口，由宿主把请求转给 App。
           // 逐帧与音量在控制条里（|< 与 >| 两个键、右侧音量条）。
@@ -597,8 +621,13 @@ fn main {
         @ui.label("批 D：媒体播放器（另开一窗，播 ffmpeg 测试片 + 字幕叠加）", size=13.0),
         @ui.button(
           "开一扇播放器窗",
-          on_click=fn() { open_player(app) },
+          on_click=fn() { open_player(app, false) },
           min_width=140.0,
+        ),
+        @ui.button(
+          "开一扇内嵌字幕窗",
+          on_click=fn() { open_player(app, true) },
+          min_width=150.0,
         ),
       ],
       direction=@yoga.Row,
@@ -663,6 +692,7 @@ fn main {
             },
             on_speed=fn(v : Double) -> Unit { lv_speed.val = v },
             on_error=fn(e : String) -> Unit { lv_err.val = e },
+            on_subtitle=fn(n : Int, _emb : Bool) -> Unit { lv_subs_n.val = n },
           ),
         ])
       }
@@ -1027,6 +1057,10 @@ fn main {
       md_playing.val.to_string() +
       " speed=" +
       @media.vp_fmt_speed(md_speed.val) +
+      " subs=" +
+      md_subs_n.val.to_string() +
+      " emb=" +
+      md_subs_emb.val.to_string() +
       " err='" +
       md_err.val +
       "'",
@@ -1040,6 +1074,8 @@ fn main {
       (lv_pos.val * 1000.0).round().to_int().to_string() +
       " speed=" +
       @media.vp_fmt_speed(lv_speed.val) +
+      " subs=" +
+      lv_subs_n.val.to_string() +
       " err='" +
       lv_err.val +
       "'",

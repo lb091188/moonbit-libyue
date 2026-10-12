@@ -145,3 +145,76 @@ test "ffmpeg FFI 视频解码：RGBA 逐帧 + pts/帧率 + seek" {
     "ffmpeg 视频解码冒烟 \{w}x\{h} 共 \{frames} 帧（fps=\{fps}，末帧 pts=\{last_pts}）",
   )
 }
+
+///|
+/// ASS 对话行前缀剥离的判据：只在「前八字段是数字/空」时剥，正文里的逗号不动。
+test "字幕文本归一化：剥 ASS 整行前缀，普通逗号不误伤" {
+  assert_eq(
+    subtitle_ass_text("0,0,Default,,0,0,0,,第一条字幕"),
+    "第一条字幕",
+  )
+  assert_eq(subtitle_ass_text("你好, 世界"), "你好, 世界")
+  assert_eq(subtitle_ass_text("正文里,有,很多,逗号,但前缀不是数字"), "正文里,有,很多,逗号,但前缀不是数字")
+  assert_eq(subtitle_ass_text(""), "")
+  // 字段数不足八段的一律原样（宁可不剥，也不把正文切一半）
+  assert_eq(subtitle_ass_text("0,0,Default,,0,0,0,短行"), "0,0,Default,,0,0,0,短行")
+}
+
+///|
+/// 内嵌字幕轨：`av_1s_subs.mp4` 是 h264 + aac + mov_text 三流，两条字幕分别落在
+/// 0.2s 与 0.6s。四条判据：① 容器报有字幕流；② 整条读出的条数/时间戳/中文文本
+/// 对得上（mov_text 解码器只给 ASS 整行，前缀必须已被剥掉）；③ 读字幕**不搅动**
+/// 同一路径上视频解码器的读位置（另开一份容器这条设计的全部理由）；
+/// ④ 「没有这条轨」与「文件打不开」分开报。
+test "ffmpeg FFI 内嵌字幕：整条读出、剥前缀、不搅动主时间轴" {
+  let path = "src/testdata/av_1s_subs.mp4"
+  let dm = match Demuxer::open(path) {
+    Ok(d) => d
+    Err(e) => fail("打开失败：\{e}")
+  }
+  assert_eq(dm.has_subtitle(), true)
+  assert_eq(dm.open_video_decoder(width=96, height=64) is Ok(_), true)
+  let f1 = dm.decode_rgba()
+  assert_eq(f1 is Some(_), true)
+  let p1 = dm.last_frame_pts()
+  dm.close()
+  // ④ 先读字幕：另开容器，不该动上面那份的读位置
+  let cues = match subtitle_cues(path) {
+    Err(e) => fail("字幕读取失败：\{e}")
+    Ok(c) => c
+  }
+  assert_eq(cues.length(), 2)
+  assert_true(cues[0].start_s > 0.15 && cues[0].start_s < 0.25)
+  assert_eq(cues[0].text, "第一条字幕")
+  assert_true(cues[0].end_s > cues[0].start_s)
+  assert_true(cues[1].start_s > 0.55 && cues[1].start_s < 0.65)
+  assert_eq(cues[1].text, "第二条带标记")
+  // ③ 再开一份继续解：第一帧之后仍能解出更晚的帧（读位置没被字幕 drain 掉）
+  let dm2 = match Demuxer::open(path) {
+    Ok(d) => d
+    Err(e) => fail("二次打开失败：\{e}")
+  }
+  assert_eq(dm2.open_video_decoder(width=96, height=64) is Ok(_), true)
+  let mut seen = 0
+  let mut last_pts = p1
+  while seen < 3 {
+    seen = seen + 1
+    match dm2.decode_rgba() {
+      Some(_) => last_pts = dm2.last_frame_pts()
+      None => break
+    }
+  }
+  assert_true(seen >= 2)
+  assert_true(last_pts > p1)
+  dm2.close()
+  // ④ 没有字幕流的文件：Ok([])；打不开的文件：Err(OpenFailed)
+  match subtitle_cues("src/testdata/sine_1s.m4a") {
+    Ok(c) => assert_eq(c.length(), 0)
+    Err(e) => fail("无字幕流应是 Ok([])，实际 \{e}")
+  }
+  match subtitle_cues("/nonexistent/no.mp4") {
+    Err(OpenFailed(_)) => ()
+    Err(e) => fail("应是 OpenFailed，实际 \{e}")
+    Ok(c) => fail("不存在的文件不该成功，实际 \{c.length()} 条")
+  }
+}

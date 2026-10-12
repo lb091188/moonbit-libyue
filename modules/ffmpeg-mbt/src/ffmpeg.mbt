@@ -74,6 +74,12 @@ pub(all) struct VfADecBox {
 }
 
 ///|
+/// FFI 句柄的 GC 隔离包装（防裸值被 drop）。
+pub(all) struct VfSDecBox {
+  h : VfSDec
+}
+
+///|
 /// 打开媒体文件（视频 AVI/MP4/MKV/WebM、音频 MP3/OGG/FLAC/M4A…
 /// 随 ffmpeg 解码器覆盖）。容器无任何可解媒体流时 Err。视频/音频
 /// 解码器随后按需 open_video_decoder / open_audio_decoder。
@@ -86,7 +92,10 @@ pub fn Demuxer::open(path : String) -> Result[Demuxer, VfError] {
     vf_close(fmt.h)
     return Err(OpenFailed(path))
   }
-  if vf_video_stream(fmt.h) < 0 && vf_audio_stream(fmt.h) < 0 {
+  let no_media =
+    vf_video_stream(fmt.h) < 0 &&
+      vf_audio_stream(fmt.h) < 0 && vf_subtitle_stream(fmt.h) < 0
+  if no_media {
     vf_close(fmt.h)
     return Err(NoMediaStream)
   }
@@ -103,6 +112,12 @@ pub fn Demuxer::has_video(self : Demuxer) -> Bool {
 /// 是否含音频流。
 pub fn Demuxer::has_audio(self : Demuxer) -> Bool {
   vf_audio_stream(self.fmt) >= 0
+}
+
+///|
+/// 是否含字幕流（内嵌轨；mkv/mp4 常见 mov_text/ass，srt/vtt 单独成文件时也走这条）。
+pub fn Demuxer::has_subtitle(self : Demuxer) -> Bool {
+  vf_subtitle_stream(self.fmt) >= 0
 }
 
 ///|
@@ -270,6 +285,124 @@ pub fn Demuxer::close(self : Demuxer) -> Unit {
 }
 
 ///|
+/// 剥掉 ASS 对话行的前缀，只留给人看的文本。
+///
+/// 为什么在 FFI 层做：部分文本字幕解码器（mov_text 即其一）不填 `rect->text`、
+/// 只给整行 ASS 对话 `ReadOrder,Layer,Style,Name,MarL,MarR,MarV,Effect,文本`，
+/// 那是**解码器输出的形状**而不是字幕内容，归一化是搬运的一部分。
+/// 判据保守：至少八个逗号，且 `ReadOrder` 是非空数字、三个边距字段是数字或空
+/// 才剥（样式名/人名/特效是自由文本，不能当判据），否则整行原样返回——
+/// 所以正文里带逗号的普通字幕（「你好, 世界」）不会被切掉半句。
+pub fn subtitle_ass_text(line : String) -> String {
+  let bs = @utf8.encode(line)
+  // @utf8.encode 末尾可能带一个 NUL（FFI 约定），按实际字节长度算
+  let n =
+    if bs.length() > 0 && bs[bs.length() - 1] == b'\x00' {
+      bs.length() - 1
+    } else {
+      bs.length()
+    }
+  let marks : Array[Int] = []
+  let mut i = 0
+  while i < n {
+    if bs[i] == b',' {
+      marks.push(i)
+    }
+    i = i + 1
+  }
+  if marks.length() < 8 {
+    return line
+  }
+  // 字段 [a,b) 是否「空或全数字」
+  let numeric = fn(a : Int, b : Int) -> Bool {
+    let mut j = a
+    while j < b {
+      let c = bs[j]
+      if c < b'0' || c > b'9' {
+        return false
+      }
+      j = j + 1
+    }
+    true
+  }
+  // ReadOrder 必须是非空数字；三个边距字段允许空。样式名/人名/特效是自由文本，
+  // 所以不能拿它们当判据——少了这条，正文里恰好有八个逗号的字幕会被切掉半句
+  let shaped =
+    marks[0] > 0 && numeric(0, marks[0]) && numeric(marks[3] + 1, marks[4]) &&
+      numeric(marks[4] + 1, marks[5]) && numeric(marks[5] + 1, marks[6])
+  if !shaped {
+    return line
+  }
+  @utf8.decode_lossy(bs[marks[7] + 1:n])
+}
+
+///|
+/// 一条内嵌字幕：起止秒 + 文本。
+pub(all) struct SubCue {
+  start_s : Double
+  end_s : Double
+  text : String
+}
+
+///|
+/// 内嵌字幕：把容器里的字幕流整条读成 `SubCue` 列表。
+///
+/// 三条口径：① **另开一份容器读**，不碰视频/音频解码器的读位置，所以播放中途
+/// 也能调；② 文本按字幕 rect 拼接（多条以 `\n` 分隔）并过一遍
+/// `subtitle_ass_text`（解码器只给 ASS 整行时剥掉前缀），但 ASS 的 `{\an8}`、
+/// `<c.xxx>` 这类**排版标记不在这里清洗**——那归上层（`yue/media` 的字幕层已有
+/// 同一套剥离规则）；③ 时间戳取条目自身的起止（不填时长的流按两秒兜底）；
+/// ④ 「没有这条轨」给 `Ok([])` 而不是错误，但**有轨而解不开**
+/// （缺字幕解码器）给 `Err`——「没字幕」与「读失败」不能混。
+pub fn subtitle_cues(path : String) -> Result[Array[SubCue], VfError] {
+  match Demuxer::open(path) {
+    Err(e) => Err(e)
+    Ok(dm) => {
+      let has = dm.has_subtitle()
+      dm.close()
+      if !has {
+        return Ok([])
+      }
+      let sbox : VfSDecBox = { h: vf_sub_open(@utf8.encode(path)), }
+      if vf_sub_ok(sbox.h) != 1 {
+        return Err(DecodeFailed("字幕解码器不可用"))
+      }
+      let cues : Array[SubCue] = []
+      let cap = 4096
+      // 上限是护栏不是语义：字幕稀疏，两万条已经是异常流形（比如把视频帧当字幕包）
+      let mut rounds = 0
+      while rounds < 20000 {
+        rounds = rounds + 1
+        let raw = FixedArray::make(cap, b'\x00')
+        let buf = Bytes::from_array(raw)
+        let n = vf_sub_next(sbox.h, buf, cap)
+        if n <= 0 {
+          break
+        }
+        let keep = if n > cap - 1 { cap - 1 } else { n }
+        let raw_text = @utf8.decode_lossy(buf[0:keep])
+        // 一个条目可能含多个 rect（C 侧以 '\n' 拼在一起）：逐行剥 ASS 前缀
+        let parts : Array[String] = []
+        for ln in raw_text.split("\n") {
+          parts.push(subtitle_ass_text(ln.to_owned()))
+        }
+        let st = vf_sub_pts_s(sbox.h)
+        let en = vf_sub_end_s(sbox.h)
+        cues.push({
+          start_s: st,
+          // 少数流不填 end_display_time（算出来与起始同刻），给两秒兜底而不是让
+          // 这条字幕一闪而过
+          end_s: if en > st { en } else { st + 2.0 },
+          text: parts.join("\n"),
+        })
+      }
+      vf_sub_close(sbox.h)
+      Ok(cues)
+    }
+  }
+}
+
+///|
 extern "c" fn vf_version() -> Int = "vf_version"
 
 ///|
@@ -371,6 +504,34 @@ extern "c" fn vf_decode_pcm(d : VfADec, out : Bytes, out_len : Int) -> Int = "vf
 extern "c" fn vf_aseek_s(d : VfADec, t_s : Double) -> Int = "vf_aseek_s"
 
 ///|
+#borrow(f)
+extern "c" fn vf_subtitle_stream(f : VfFmt) -> Int = "vf_subtitle_stream"
+
+///|
+#borrow(path)
+extern "c" fn vf_sub_open(path : Bytes) -> VfSDec = "vf_sub_open"
+
+///|
+#borrow(d)
+extern "c" fn vf_sub_ok(d : VfSDec) -> Int = "vf_sub_ok"
+
+///|
+#borrow(d, out)
+extern "c" fn vf_sub_next(d : VfSDec, out : Bytes, out_len : Int) -> Int = "vf_sub_next"
+
+///|
+#borrow(d)
+extern "c" fn vf_sub_pts_s(d : VfSDec) -> Double = "vf_sub_pts_s"
+
+///|
+#borrow(d)
+extern "c" fn vf_sub_end_s(d : VfSDec) -> Double = "vf_sub_end_s"
+
+///|
+#borrow(d)
+extern "c" fn vf_sub_close(d : VfSDec) -> Unit = "vf_sub_close"
+
+///|
 #external
 pub type VfFmt
 
@@ -381,3 +542,7 @@ pub type VfDec
 ///|
 #external
 pub type VfADec
+
+///|
+#external
+pub type VfSDec

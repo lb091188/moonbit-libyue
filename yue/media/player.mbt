@@ -128,8 +128,10 @@ pub fn player_bar_hit(
 }
 
 ///|
-/// 播放器控件。`subtitle` 传**已读好的字幕文本**（SRT/VTT，读取交调用方，本组件不做 IO）；
-/// 打不开媒体时不抛异常——画一块说明板并把原因经 `on_error` 交出去（探测 + 降级不静默）。
+/// 播放器控件。`subtitle` 传**已读好的字幕文本**（SRT/VTT，外部文件的读取归调用方，
+/// 本组件不碰使用者的磁盘路径）；留空时组件会试一次**容器内嵌轨**（那是媒体文件
+/// 自己的内容，走解码器不是走 IO）。打不开媒体时不抛异常——画一块说明板并把原因
+/// 经 `on_error` 交出去（探测 + 降级不静默）。
 pub fn player_t(
   path : String,
   subtitle? : String = "",
@@ -146,6 +148,11 @@ pub fn player_t(
   /// 倍速档位变化的观测口（控制条点倍速键时回调）：调用方要把它显示到
   /// 界面或写进回证时不必去猜引擎状态。
   on_speed? : (Double) -> Unit = fn(_v : Double) -> Unit { () },
+  /// 字幕来源的观测口（条数 + 是否来自内嵌轨），打开时回调一次：外部文本与
+  /// 内嵌轨在界面上是同一排字，调用方要区分得从这里取，而不是猜文件旁边有没有 .srt。
+  on_subtitle? : (Int, Bool) -> Unit = fn(_n : Int, _embedded : Bool) -> Unit {
+    ()
+  },
   on_error? : (String) -> Unit = fn(_s : String) -> Unit { () },
   handle? : (@core.Widget) -> Unit = fn(_w : @core.Widget) -> Unit { () },
 ) -> @core.Node {
@@ -176,7 +183,25 @@ pub fn player_t(
       return @core.node_of(w)
     }
   }
-  let cues = subtitle_parse(subtitle)
+  // 字幕两条来源：调用方给的外部文本优先（那是明确意图）；没给才试容器的内嵌轨。
+  // 内嵌轨只在打开时整条读一次（字幕稀疏，一次读完比逐帧查解码器便宜，也不碰主
+  // 时间轴的读位置），之后照常按位置查表。读失败不阻断播放，但原因照 `on_error`
+  // 交出去——「这条片没字幕」与「字幕轨解不开」不能混成同一个空表。
+  let none_cue : Array[Cue] = []
+  let from_embedded = subtitle.length() == 0
+  let cues =
+    if !from_embedded {
+      subtitle_parse(subtitle)
+    } else {
+      match @ffmbt.subtitle_cues(path) {
+        Ok(list) => subtitle_from_embedded(list)
+        Err(e) => {
+          on_error("内嵌字幕读取失败：" + e.to_string())
+          none_cue
+        }
+      }
+    }
+  on_subtitle(cues.length(), from_embedded && cues.length() > 0)
   let frame_no : Ref[Int] = Ref(-1)
   let image : Ref[@render.Image?] = Ref(None)
   let dragging : Ref[Bool] = Ref(false)

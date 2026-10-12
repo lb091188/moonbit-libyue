@@ -7,12 +7,15 @@
 #include <libswscale/swscale.h>
 #include <libswresample/swresample.h>
 #include <libavutil/imgutils.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "moonbit.h"
 
 typedef struct VfFmt {
     AVFormatContext *fmt;
     int vstream; // 视频流索引，-1 无
     int astream; // 音频流索引，-1 无
+    int sstream; // 字幕流索引，-1 无
 } VfFmt;
 
 typedef struct VfDec {
@@ -39,6 +42,17 @@ typedef struct VfADec {
     int out_rate;
 } VfADec;
 
+/* 字幕解码器：整条读成「起始秒 + 文本」，文本按 rect 原样拼接 */
+typedef struct VfSDec {
+    AVFormatContext *fmt;
+    AVCodecContext *codec;
+    AVSubtitle sub;
+    AVPacket *pkt;
+    int sstream;
+    double last_pts; // 最近一条的起始秒；-1=未知
+    double last_end; // 最近一条的结束秒（起始 + end_display_time）
+} VfSDec;
+
 /* 版本（构建期链接确认 + 运行时探测） */
 int32_t vf_version(void) {
     return (int32_t)avformat_version();
@@ -50,11 +64,13 @@ VfFmt *vf_open(const char *path) {
     VfFmt *f = (VfFmt *)malloc(sizeof(VfFmt));
     f->vstream = -1;
     f->astream = -1;
+    f->sstream = -1;
     f->fmt = NULL;
     if (avformat_open_input(&f->fmt, path, NULL, NULL) == 0) {
         if (avformat_find_stream_info(f->fmt, NULL) >= 0) {
             f->vstream = av_find_best_stream(f->fmt, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
             f->astream = av_find_best_stream(f->fmt, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
+            f->sstream = av_find_best_stream(f->fmt, AVMEDIA_TYPE_SUBTITLE, -1, -1, NULL, 0);
         }
     }
     return f;
@@ -79,6 +95,11 @@ int32_t vf_video_stream(VfFmt *f) {
 /* 音频流索引（-1 无） */
 int32_t vf_audio_stream(VfFmt *f) {
     return f ? f->astream : -1;
+}
+
+/* 字幕流索引（-1 无） */
+int32_t vf_subtitle_stream(VfFmt *f) {
+    return f ? f->sstream : -1;
 }
 
 /* 未开解码器的哑句柄（NULL）：惰性开解码器时作 Demuxer 字段占位 */
@@ -436,4 +457,156 @@ int32_t vf_aseek_s(VfADec *d, double t_s) {
         swr_init(d->swr);
     }
     return 0;
+}
+
+/* -------------------------------------------------------------------------
+ * 字幕解码（把整条字幕流读成「起始秒 + 文本」列表）
+ *
+ * 三条口径：
+ * ① **另开一份容器读**——与视频/音频解码器共用 AVFormatContext 会互相推进读
+ *    位置，把主时间轴搅乱；字幕是稀疏的、一次读完，重开一份最省事也最安全。
+ * ② 文本按 rect 原样拼接（多条以 '\n' 分隔），**不清洗** ASS 的 {\an8} 与
+ *    <c.xxx> 这类标记——语义处理归 MoonBit 层，C 只做搬运。
+ * ③ 图形字幕（无 text 的 rect）与空条目直接跳过，不报成一条空字幕。
+ * ------------------------------------------------------------------------- */
+
+void vf_sub_close(VfSDec *d) {
+    if (d) {
+        avsubtitle_free(&d->sub);
+        if (d->pkt) {
+            av_packet_free(&d->pkt);
+        }
+        if (d->codec) {
+            avcodec_free_context(&d->codec);
+        }
+        if (d->fmt) {
+            avformat_close_input(&d->fmt);
+        }
+        free(d);
+    }
+}
+
+/* 另开一份容器并定位字幕流、开解码器。没有字幕流或打不开时 NULL。 */
+VfSDec *vf_sub_open(const char *path) {
+    AVFormatContext *fmt = NULL;
+    if (avformat_open_input(&fmt, path, NULL, NULL) < 0) {
+        return NULL;
+    }
+    if (avformat_find_stream_info(fmt, NULL) < 0) {
+        avformat_close_input(&fmt);
+        return NULL;
+    }
+    int sstream = av_find_best_stream(fmt, AVMEDIA_TYPE_SUBTITLE, -1, -1, NULL, 0);
+    if (sstream < 0) {
+        avformat_close_input(&fmt);
+        return NULL;
+    }
+    AVStream *st = fmt->streams[sstream];
+    const AVCodec *codec = avcodec_find_decoder(st->codecpar->codec_id);
+    if (!codec) {
+        avformat_close_input(&fmt);
+        return NULL;
+    }
+    VfSDec *d = (VfSDec *)calloc(1, sizeof(VfSDec));
+    d->fmt = fmt;
+    d->sstream = sstream;
+    d->pkt = av_packet_alloc();
+    d->last_pts = -1.0;
+    d->last_end = -1.0;
+    d->codec = avcodec_alloc_context3(codec);
+    if (!d->pkt || !d->codec ||
+        avcodec_parameters_to_context(d->codec, st->codecpar) < 0 ||
+        avcodec_open2(d->codec, codec, NULL) < 0) {
+        vf_sub_close(d);
+        return NULL;
+    }
+    return d;
+}
+
+/* 打开是否成功（NULL = 没有字幕流 / 解码器缺失 / 文件打不开） */
+int32_t vf_sub_ok(VfSDec *d) {
+    return d ? 1 : 0;
+}
+
+/* 解下一条字幕：文本写进 out（UTF-8，带尾零），返回写出的字节数（不含尾零）；
+ * 0 = 流结束；-1 = 错误。起始秒随后用 vf_sub_pts_s 取（与 vf_frame_pts_s 同形）。 */
+int32_t vf_sub_next(VfSDec *d, char *out, int32_t out_len) {
+    if (!d || !d->codec || out == NULL || out_len < 1) {
+        return -1;
+    }
+    out[0] = '\0';
+    while (1) {
+        int ret = av_read_frame(d->fmt, d->pkt);
+        if (ret == AVERROR_EOF) {
+            return 0;
+        }
+        if (ret < 0) {
+            return -1;
+        }
+        if (d->pkt->stream_index != d->sstream) {
+            av_packet_unref(d->pkt);
+            continue;
+        }
+        AVStream *st = d->fmt->streams[d->sstream];
+        double base = d->pkt->pts == AV_NOPTS_VALUE
+                          ? 0.0
+                          : (double)d->pkt->pts * av_q2d(st->time_base);
+        // 包时长要在 unref 之前取（unref 会把 duration 清掉）
+        double dur_pkt = d->pkt->duration > 0
+                             ? (double)d->pkt->duration * av_q2d(st->time_base)
+                             : 0.0;
+        int got = 0;
+        ret = avcodec_decode_subtitle2(d->codec, &d->sub, &got, d->pkt);
+        av_packet_unref(d->pkt);
+        if (ret < 0) {
+            return -1;
+        }
+        if (!got) {
+            continue;
+        }
+        int at = 0;
+        for (int i = 0; i < d->sub.num_rects; i++) {
+            AVSubtitleRect *r = d->sub.rects[i];
+            // 有些文本字幕解码器（mov_text 即其一）只填 ass 字段、text 留空；
+            // ass 是整行 ASS 对话（前九个逗号字段 + 文本），原样带出去，
+            // 剥前缀与清洗标记归 MoonBit 层
+            const char *txt = (r != NULL && r->text != NULL && r->text[0] != '\0')
+                                  ? r->text
+                                  : (r != NULL ? r->ass : NULL);
+            if (txt == NULL || txt[0] == '\0') {
+                continue;
+            }
+            int n = snprintf(out + at, out_len - at, at == 0 ? "%s" : "\n%s",
+                             txt);
+            if (n < 0 || n >= out_len - at) {
+                break;
+            }
+            at += n;
+        }
+        // 起止时间 = 包 pts + 该条目的 start_display_time；时长取「包时长」与
+        // 「end_display_time」里较短的那个——部分解码器（mov_text 即其一）不填
+        // 条目时长、恒给 2000ms 默认值，照它读会让一条字幕压住下一条。
+        d->last_pts = base + (double)d->sub.start_display_time / 1000.0;
+        double dur_sub = (double)d->sub.end_display_time / 1000.0;
+        double dur = dur_sub;
+        if (dur_pkt > 0.0 && (dur_sub <= 0.0 || dur_pkt < dur_sub)) {
+            dur = dur_pkt;
+        }
+        d->last_end = d->last_pts + (dur > 0.0 ? dur : 0.0);
+        avsubtitle_free(&d->sub);
+        if (at == 0) {
+            continue; // 图形字幕或被截断成空的条目不算一条
+        }
+        return at;
+    }
+}
+
+/* 最近一条字幕的起始秒；未读/未知 -1 */
+double vf_sub_pts_s(VfSDec *d) {
+    return d ? d->last_pts : -1.0;
+}
+
+/* 最近一条字幕的结束秒；未读/未知 -1（个别流不填时长，此时与起始同刻） */
+double vf_sub_end_s(VfSDec *d) {
+    return d ? d->last_end : -1.0;
 }

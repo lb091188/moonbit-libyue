@@ -1,7 +1,9 @@
 // 字幕叠加（批 D）：SRT 与 WebVTT 共用的时间轴解析，纯函数、无 IO。
 //
-// 只做「读一份字幕文件 → 按当前播放位置给出要画的那几行」这一件事；
-// 内嵌字幕轨（mov_text/ass）与样式渲染不在本批，理由记在 TODO。
+// 只做「一份字幕 → 按当前播放位置给出要画的那几行」这一件事。两条来源：
+// 外部文本（调用方读好喂进来，本层不做 IO）与容器里的**内嵌轨**
+// （`@ffmbt.subtitle_cues` 解出来，经 `subtitle_from_embedded` 搬成本层的 `Cue`）。
+// 样式渲染（ASS 颜色/定位）不在本层，只剥排版标记。
 
 ///|
 /// 一条字幕：起止秒 + 文本（多行已用 `\n` 连好）。
@@ -9,6 +11,18 @@ pub(all) struct Cue {
   start : Double
   end : Double
   text : String
+}
+
+///|
+/// 内嵌字幕轨 → 本层 `Cue` 表。字段同名同义，这里只做搬运：解码器给的文本
+/// 已剥过 ASS 对话前缀，但排版标记（`{\an8}`、`<c.xxx>`）与外部字幕同一条路
+/// 处理，所以两种来源在渲染侧完全同形。
+pub fn subtitle_from_embedded(list : Array[@ffmbt.SubCue]) -> Array[Cue] {
+  let out : Array[Cue] = []
+  for c in list {
+    out.push({ start: c.start_s, end: c.end_s, text: strip_cue_tags(c.text), })
+  }
+  out
 }
 
 ///|

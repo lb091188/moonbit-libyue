@@ -46,3 +46,37 @@ test "命中查询：起止都含、无命中给空、多条命中按行拼" {
   assert_eq(subtitle_at(cues, 9.0), "")
   assert_eq(subtitle_at([], 1.0), "")
 }
+
+///|
+/// 内嵌轨搬运：字段对齐、排版标记与外部字幕同一条清洗路（`{\an8}`、`<c.xxx>` 剥掉）。
+test "内嵌轨转 Cue：搬运并对齐外部字幕的清洗口径" {
+  let cues = subtitle_from_embedded([
+    { start_s: 1.0, end_s: 2.5, text: "{\\an8}<i>斜体一行</i>", },
+    { start_s: 3.0, end_s: 4.0, text: "第二行", },
+  ])
+  assert_eq(cues.length(), 2)
+  assert_eq(cues[0].start, 1.0)
+  assert_eq(cues[0].end, 2.5)
+  assert_eq(cues[0].text, "斜体一行")
+  assert_eq(cues[1].text, "第二行")
+  assert_eq(subtitle_from_embedded([]).length(), 0)
+}
+
+///|
+/// 端到端（无头，不开窗口）：真容器 `av_1s_subs.mp4` 的内嵌 mov_text 轨解出来
+/// 转成本层 Cue，再按位置查——0.3s 命中第一条、0.9s 不命中。这条钉的是
+/// 「解码器 → 搬运 → 查表」整条链，任何一环字段错位都会在这里露出来。
+test "内嵌字幕端到端：解码转 Cue 后按位置命中" {
+  let path = "modules/ffmpeg-mbt/src/testdata/av_1s_subs.mp4"
+  let cues = match @ffmbt.subtitle_cues(path) {
+    Err(e) => fail("内嵌字幕读取失败：\{e}")
+    Ok(list) => subtitle_from_embedded(list)
+  }
+  assert_eq(cues.length(), 2)
+  // 时间轴按包时长落回素材本意（0.2..0.6 / 0.6..1.0），不是解码器那个恒 2 秒的默认值
+  assert_true(cues[0].end > 0.55 && cues[0].end < 0.65)
+  assert_true(cues[1].end > 0.95)
+  assert_eq(subtitle_at(cues, 0.3), "第一条字幕")
+  assert_eq(subtitle_at(cues, 0.7), "第二条带标记")
+  assert_eq(subtitle_at(cues, 1.2), "")
+}
