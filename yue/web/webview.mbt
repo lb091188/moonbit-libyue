@@ -342,6 +342,13 @@ pub fn Webview::load_url(self : Webview, url : String) -> Unit {
 
 ///|
 /// 直接加载一段 HTML（本地内容、离线页、注入测试页都用它，不必落盘）。
+///
+/// **跨平台口径：这一段 HTML 不进前进/后退历史。** Linux 实测 `load_html` 之后
+/// `can_go_back()` 仍为 false；Windows 的 WebView2 文档对 `NavigateToString` 明写
+/// 「the back or forward history will not be modified」，两家一致。macOS 的
+/// `loadHTMLString:baseURL:` Apple 未作承诺，待真机验。
+/// 要给本地页一条**真历史**（能后退、能被链接跳走再退回来），走
+/// `register_protocol` 给它一个真 URL 再 `load_url`，而不是 `load_html`。
 pub fn Webview::load_html(
   self : Webview,
   html : String,
