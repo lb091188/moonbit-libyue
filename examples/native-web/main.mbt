@@ -139,6 +139,8 @@ fn main {
   let js_perms = Ref(0)
   let js_wins = Ref(0)
   let js_crashes = Ref(0)
+  let js_fails = Ref(0)
+  let js_fail_last = Ref("")
   let js_cookie_bytes = Ref(0)
   let js_text_bytes = Ref(0)
   let js_meta = Ref(0)
@@ -210,6 +212,26 @@ fn main {
                   note("新窗请求已拦下 " + u)
                 }
                 @web.Download(u) => note("下载 " + u)
+                // 失败要给结构化原因（不是只让网页画一张错误页）：点测试页里
+                // 指向 a.example / b.example 的链接就会走这条——.example 是保留
+                // 域名，DNS 必然失败，正好当这条通道的回证。
+                @web.LoadFailed(raw) =>
+                  match @web.nav_error_parse(raw) {
+                    None => note("加载失败 " + raw)
+                    Some(ne) => {
+                      js_fails.val = js_fails.val + 1
+                      js_fail_last.val =
+                        ne.domain + "/" + ne.code.to_string() + " " + ne.uri
+                      note(
+                        "加载失败 " +
+                        ne.domain +
+                        "/" +
+                        ne.code.to_string() +
+                        " " +
+                        ne.uri,
+                      )
+                    }
+                  }
                 @web.ProcessTerminated(why) => {
                   js_crashes.val = js_crashes.val + 1
                   note("web 进程终止 " + why)
@@ -1019,7 +1041,11 @@ fn main {
       js_wins.val.to_string() +
       " crashes=" +
       js_crashes.val.to_string() +
-      " cookie_bytes=" +
+      " fails=" +
+      js_fails.val.to_string() +
+      " fail_last='" +
+      js_fail_last.val +
+      "' cookie_bytes=" +
       js_cookie_bytes.val.to_string() +
       " last='" +
       js_last.val +
