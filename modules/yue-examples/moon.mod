@@ -14,4 +14,5 @@ import {
   "NoahLiu/moonbit-libyue@0.5.11",
   "NoahLiu/yue-media@0.1.0",
   "NoahLiu/ffmpeg-mbt@0.1.0",
+  "NoahLiu/yoga-mbt@0.1.0",
 }

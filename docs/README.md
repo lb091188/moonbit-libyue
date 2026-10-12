@@ -18,6 +18,15 @@ Since 0.5.11 the module is split into sub-packages — `moon add NoahLiu/moonbit
 | `.../yue/charts` | `@charts` | 20+ chart types plus the cross-cutting interactive layer |
 | `.../yue/icons` | `@icons` | Vector icon system (`draw_icon` and the icon views/buttons) |
 | `.../yue/markdown` | `@markdown` | `markdown_view` rendering (this package pulls in the mizchi/markdown dependency) |
+
+Heavier optional capabilities live in **separate modules**, not in sub-packages, so `moon add NoahLiu/moonbit-libyue` never drags them in:
+
+| Module | Contents |
+|---|---|
+| `NoahLiu/yue-media` | Audio/video engine (ffmpeg decode + miniaudio output) and the player component. Needs the system ffmpeg dev packages on Linux. |
+| `NoahLiu/yue-examples` | The standalone example module (systemprobe, native-web) that depends on `yue-media`. |
+
+**Two different layers of "optional" — keep them apart**: a **sub-package** you do not import costs nothing in your binary (the `moon.pkg` import is the compile/link boundary); a **module** you do not depend on is not even resolved or prebuilt (the `moon.mod` import defines the dependency closure). A capability can only reach the second layer by living in its own module.
 | `.../yue/system` | `@system` | OS capabilities: autostart, single instance, power & sessions, volume, brightness, media keys, wallpaper, Bluetooth, printers, disk volumes, browser history… (pulls in subproc / sqlite) |
 | `.../yue/browser` | `@browser` | Webview widget — import only if you need it (it is the only package that links WebKit/WebView2) |
 

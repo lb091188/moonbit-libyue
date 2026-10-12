@@ -1,5 +1,5 @@
 // 播放器组件的无头回归：帧字节转换（R/B 交换 + alpha 置不透明 + 短包不越界）
-// 与控制条命中分区（播放键区 / 进度轨 / 时间文字区）。真播放由 examples/native-web 回证。
+// 与控制条命中分区（播放键区 / 进度轨 / 时间文字区）。真播放由 modules/yue-examples/native-web 回证。
 
 ///|
 /// 本工具链的 Bytes 构造：FixedArray::make + 按下标写（没有 of_list/freeze）。

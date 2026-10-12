@@ -1,5 +1,5 @@
 // yue/web 的无头回归：探测与构造的一致性、矩形同步的取整与去重规则。
-// 真页面渲染与两种摆法由 examples/native-web 冒烟 + 使用者目视负责（AGENTS 规则 6）。
+// 真页面渲染与两种摆法由 modules/yue-examples/native-web 冒烟 + 使用者目视负责（AGENTS 规则 6）。
 
 ///|
 /// 假宿主：窗口句柄取 900 这类越界值，桩里所有 wm_*/wb_* 对越界句柄早退，

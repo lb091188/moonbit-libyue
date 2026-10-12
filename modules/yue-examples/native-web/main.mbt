@@ -1,6 +1,6 @@
-// examples/native-web —— webview 与媒体的**累积**验证示例（批 B 起建，同族不另开页）。
+// modules/yue-examples/native-web —— webview 与媒体的**累积**验证示例（批 B 起建，同族不另开页）。
 //
-// 跑法：`moon run examples/native-web`（需显示服务）。45 秒后自动退出并打印
+// 跑法：`moon run modules/yue-examples/native-web`（需显示服务）。45 秒后自动退出并打印
 // `NATIVE-WEB-STAT` / `NATIVE-WEB-GEO` 两行，字段与屏上读数一一对应。
 //
 // 本批验的是**两种摆法同源**：整页（Tauri-like，单 pane 铺满）与左右分栏（原生

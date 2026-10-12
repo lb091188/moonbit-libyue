@@ -1,4 +1,4 @@
-// 导航失败解析与本地内容通道的无头回归。真协议回灌由 examples/native-web 回证。
+// 导航失败解析与本地内容通道的无头回归。真协议回灌由 modules/yue-examples/native-web 回证。
 
 ///|
 test "导航失败载荷：四段拆结构，message 里带竖线不再切坏" {

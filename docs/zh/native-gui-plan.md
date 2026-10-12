@@ -156,7 +156,7 @@ profile 挂在 **pane 级参数**上（不是旧链 Browser 实例级的 Options
 | 交付面 | 示例迁移（`hello`/`hello-themed`/`showcase` 走新栈）、中英使用文档按新栈重写、README 新截图、CI 三平台脚本、发布链 | A/B 落地后接上 |
 | 输入通道另线 | 先落**平台无关**的键位/指针/修饰键/IME 触发条件映射层（纯函数 + wbtest）；Win32/Cocoa 后端随各自真机 | 不写不可验的代码 |
 
-**验证示例归口**：webview 与媒体侧的同类验证集中累积进 **`examples/native-web`**（批 B 起建：整页摆法、左右分栏、JS 桥与抓取、播放器各占一页），不为单个特性再开新示例；GUI 侧累计页仍是 `examples/native-app`，系统能力侧是 `examples/native-sys`。
+**验证示例归口**：webview 与媒体侧的同类验证集中累积进 **`modules/yue-examples/native-web`**（批 B 起建：整页摆法、左右分栏、JS 桥与抓取、播放器各占一页；2026-10-12 从 `examples/` 整包迁到独立示例模块——媒体包归 `NoahLiu/yue-media`，主模块不能再反向依赖它），不为单个特性再开新示例；GUI 侧累计页仍是 `examples/native-app`，系统能力侧是 `examples/native-sys`。
 
 ## 5. 阶段划分与每批验收
 

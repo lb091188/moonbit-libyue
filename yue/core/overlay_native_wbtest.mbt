@@ -1,5 +1,5 @@
 // 浮层原生档的无头回归：档位判定、内容量尺、收框与清理路径。
-// 「弹层真能盖住网页」由 examples/native-web 的桥接窗回证（AGENTS 规则 6）。
+// 「弹层真能盖住网页」由 modules/yue-examples/native-web 的桥接窗回证（AGENTS 规则 6）。
 
 ///|
 fn fake_host_app() -> App {

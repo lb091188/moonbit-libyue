@@ -6,7 +6,7 @@ import {
   "NoahLiu/moonbit-libyue/yue/theme",
   "NoahLiu/moonbit-libyue/yue/ui",
   "NoahLiu/moonbit-libyue/yue/web",
-  "NoahLiu/moonbit-libyue/yue/media",
+  "NoahLiu/yue-media/media",
   "NoahLiu/moonbit-libyue/yue/sys",
 }
 

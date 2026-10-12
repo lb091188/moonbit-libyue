@@ -4,6 +4,11 @@
 //
 // 依赖纪律：不依赖 webview、不依赖 UI 层——媒体层与网页层各自只依赖窗口/布局/
 // 事件层，所以两批可以并行推进、互不阻塞。
+//
+// 归属：本包自 2026-10-12 起住在**独立模块** `NoahLiu/yue-media`（原先在主模块的
+// `yue/media`）——只有这样才能让主模块的依赖闭包里不出现 `ffmpeg-mbt`，媒体对
+// 主模块消费者保持「模块级可选」。本包的系统库链接参数由本模块自己的
+// `modules/yue-media/prebuild.py` 按包名 `NoahLiu/yue-media/media` 下发。
 
 supported_targets = "native"
 

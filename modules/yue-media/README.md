@@ -2,6 +2,19 @@
 
 [moonbit-libyue](https://mooncakes.io/docs/NoahLiu/moonbit-libyue) 的媒体扩展：在 yue GUI 之上提供开箱即用的音视频播放组件，解码基于 [NoahLiu/ffmpeg-mbt](https://mooncakes.io/docs/NoahLiu/ffmpeg-mbt)（链接系统 ffmpeg），音频输出基于内嵌 miniaudio。
 
+## 为什么是独立模块
+
+媒体要链 ffmpeg 与 miniaudio，而 GUI 应用大多不需要。把它放在**独立模块**（而不是主模块的一个子包）是为了让主模块的**依赖闭包**里根本不出现 `ffmpeg-mbt`——只要你不 `moon add NoahLiu/yue-media`，就不会被拉上，连它的 prebuild 都不会跑。
+
+（另一层「按需」是**子包边界**：`moon.pkg` 里没 import 的包不进二进制。两者不是一回事：子包边界管编译/链接，模块边界管依赖解析。）
+
+## 包布局
+
+| 包 | 内容 | 状态 |
+|---|---|---|
+| `NoahLiu/yue-media/media` | **新栈引擎**：ffmpeg 解码 + miniaudio 设备直出，帧以 RGBA 字节交出；含 `player_t` 播放器组件与字幕层 | 现行 |
+| `NoahLiu/yue-media/src` | 旧链声明式播放器组件（`AudioPlayer`/`VideoPlayer`/`*_player_t`），挂在 0.5.11 旧链上 | 待 `systemprobe` 媒体页迁移后下线（见 `TODO.md`） |
+
 ## 安装
 
 ```sh

@@ -1,5 +1,5 @@
 // DOM 抓取的无头回归：脚本形态（四档都返回 JSON、都带 title/url 头）与结构化解析
-// （字段各归各位、解析失败不静默）。真页面抓取由 examples/native-web 回证。
+// （字段各归各位、解析失败不静默）。真页面抓取由 modules/yue-examples/native-web 回证。
 
 ///|
 test "抓取脚本：四档都 stringify 且都带 title/url 头" {

@@ -6,7 +6,7 @@
 - **本分支不保留老 libyue 绑定**：`shim/`、`lib/` 预构建库、`scripts/prepare.py` 已删除；libyue 只作**老师**（行为参考、可平移资产来源、`patches/` 的真实 bug 语料）。
 - **旧链路的完成项与实测结论不在本文件重述**：代码在 `master`（`shim + libyue`，0.5.x 与 `bin-*`/`vendor-*` 发布照旧），踩坑与验收细节在 [docs/zh/adaptation.md](docs/zh/adaptation.md) 与 `git log`。**凡旧栈做过、新栈尚未重做的能力，本文件一律记为未完成。**
 - **门禁口径（本分支例外）**：全仓 `moon check` 允许为红（红点=工作队列，只减不增，当前基线 **287 errors / 68 warnings**（2026-10-11 实测），明细见方案 §5）；逐批验收改分包：`yoga-mbt` 基线不掉 + 新栈各包 `moon check` 零警告且各自测试全绿；组件与声明式层接线完成的那一批恢复全仓门禁。
-- **验证示例归口**：GUI 侧的同类测试集中累积进 **`examples/native-app`**（宿主/控件/主题/图表/Markdown 各一页，不为单个特性新开示例）；系统能力侧集中进 **`examples/native-sys`**（已建）；webview 与媒体侧集中进 **`examples/native-web`**（批 B 起建，整页/分栏/桥接/播放器各一页）；`examples/native-window` 冻结为 G2–G5 的历史冒烟基准，不再往里加新特性。
+- **验证示例归口**：GUI 侧的同类测试集中累积进 **`examples/native-app`**（宿主/控件/主题/图表/Markdown 各一页，不为单个特性新开示例）；系统能力侧集中进 **`examples/native-sys`**（已建）；webview 与媒体侧集中进 **`modules/yue-examples/native-web`**（批 B 起建，整页/分栏/桥接/播放器各一页；2026-10-12 从 `examples/` **整包迁到独立示例模块**——媒体包归 `NoahLiu/yue-media`，主模块不能再反向依赖它，否则重现发布环）；`examples/native-window` 冻结为 G2–G5 的历史冒烟基准，不再往里加新特性。
 - **跟踪口径（2026-10-12 定）**：本文件**只跟踪跨平台能力**（三平台同构的 API 面、或「一个门面 + 各平台后端」的形态）。**纯 Linux 依赖的实现细节不再列为待办**——xrandr / wmctrl / xclip / sysfs / wpctl / pactl / CUPS / redshift / xfconf / gsettings / xdg-* / D-Bus 等命令线与总线面的适配，属「Linux 后端内部事务」，随各自能力批处理时按需实现，不进路线图。判据：一个条目若只在一个平台有意义（换个平台没有对应 API 可做）→ 不进 TODO；若换个平台有对应 API（tray/hotkey/通知/剪贴板/文件对话框/菜单栏…）→ 进 TODO，且**以「门面定形态 + 各平台后端」记账**。
 
 
@@ -191,7 +191,8 @@
 - [ ] 发布：mooncakes 新版本；旧 `bin-*`/`vendor-*` 预构建发布链退役
 - [ ] CI：三平台构建与测试脚本随新栈调整（当前分支构建预期为红）
 - [ ] 真机验证矩阵：Ubuntu GNOME / KDE / XFCE；Windows 10 / 11；macOS（前置：取得设备）
-- [ ] 旧链 `modules/yue-media` 下线：`yue/media` 已自带 miniaudio（4.1 MB 单头文件目前是两份拷贝），旧包删除后这份拷贝归一
+- [x] **媒体回到独立模块（2026-10-12）**：`yue/media` → `modules/yue-media/media`（媒体因此对主模块消费者恢复「**模块级可选**」），`examples/native-web` → `modules/yue-examples/native-web`，根 `moon.mod` 摘掉 `NoahLiu/ffmpeg-mbt@0.1.0`，miniaudio 系统库链接参数搬到 `modules/yue-media/prebuild.py`。回证：`moon tree` 根闭包不再列 ffmpeg-mbt、全仓红点 287/68 未变（详见中英 adaptation.md「媒体回到独立模块」节）
+- [ ] 旧链 `modules/yue-media/src`（声明式 `AudioPlayer`/`VideoPlayer` + 内嵌 miniaudio 拷贝）下线：**前置**是把 `systemprobe` 的媒体页从 `@yuemedia` 旧 API 迁到 `NoahLiu/yue-media/media`（示例迁移项）。迁完旧包删除，`miniaudio.h` 两份拷贝归一（当前 `src/miniaudio.h` 与 `media/miniaudio.h` 同 md5）。**ffmpeg 解码后端不变**——新栈媒体仍依赖 `NoahLiu/ffmpeg-mbt`
 - [ ] 本仓 `docs/zh/{adaptation,system-capabilities,components-ui}.md` 落后于 master 参考副本（742/1066、797/833、1425/1458 行），按新栈重写前先以参考副本为准查证
 
 ## 3. 里程碑
