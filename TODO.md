@@ -192,6 +192,7 @@
 - [ ] CI：三平台构建与测试脚本随新栈调整（当前分支构建预期为红）
 - [ ] 真机验证矩阵：Ubuntu GNOME / KDE / XFCE；Windows 10 / 11；macOS（前置：取得设备）
 - [x] **媒体回到独立模块（2026-10-12）**：`yue/media` → `modules/yue-media/media`（媒体因此对主模块消费者恢复「**模块级可选**」），`examples/native-web` → `modules/yue-examples/native-web`，根 `moon.mod` 摘掉 `NoahLiu/ffmpeg-mbt@0.1.0`，miniaudio 系统库链接参数搬到 `modules/yue-media/prebuild.py`。回证：`moon tree` 根闭包不再列 ffmpeg-mbt、全仓红点 287/68 未变（详见中英 adaptation.md「媒体回到独立模块」节）
+- [x] **媒体音频后端跨平台化：单调时钟三平台（2026-10-12）**：`audio_stub.c` 的 `mbt_now_ms` 从 POSIX 专有的 `CLOCK_MONOTONIC` 改为三平台分支（`_WIN32` 走 QueryPerformanceCounter / `__APPLE__` 走 mach_absolute_time / 其余 POSIX 原样），`media/` 与 `src/` 两份逐字节同步改。回证：纯 C 探针 `experiment/media_probe/audio_backend_probe.c` 末行 `AUDIO-BACKEND-OK`（48 条断言，含真设备分支实测 `played_bytes=35280`）；另实测 `miniaudio.h` 在 MSVC 下可编（除其自身一处 C4244）。**边界**：`audio_stub.c` 在 Windows 上可编可跑，但 `moon test ./modules/yue-media/media` 仍跑不起来——测试可执行文件会链 `ffmpeg_stub.c`，它要 libavformat 头（`ffmpeg-mbt` 非 Linux 后端未接）
 - [ ] 旧链 `modules/yue-media/src`（声明式 `AudioPlayer`/`VideoPlayer` + 内嵌 miniaudio 拷贝）下线：**前置**是把 `systemprobe` 的媒体页从 `@yuemedia` 旧 API 迁到 `NoahLiu/yue-media/media`（示例迁移项）。迁完旧包删除，`miniaudio.h` 两份拷贝归一（当前 `src/miniaudio.h` 与 `media/miniaudio.h` 同 md5）。**ffmpeg 解码后端不变**——新栈媒体仍依赖 `NoahLiu/ffmpeg-mbt`
 - [ ] 本仓 `docs/zh/{adaptation,system-capabilities,components-ui}.md` 落后于 master 参考副本（742/1066、797/833、1425/1458 行），按新栈重写前先以参考副本为准查证
 

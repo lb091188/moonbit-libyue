@@ -254,6 +254,18 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **本批未做且不假装完成**：miniaudio 单头文件**仍是两份拷贝**（`modules/yue-media/src/miniaudio.h` 与 `modules/yue-media/media/miniaudio.h`，同 md5 `8d5bf2a0b46efa835bde4d0eac5a0cd8`）——归一仍卡在旧链 `modules/yue-media/src` 下线，前置是 `systemprobe` 媒体页迁移；媒体包在 Windows/macOS 仍不可用（POSIX 时钟 + ffmpeg 后端未接）；媒体在 Linux 的真机行为（是否真出声、seek 手感）本机无法回证，归人工清单。
 - **本批未做且不假装完成**：macOS（要走 `CGEventSourceSecondsSinceLastEventType` / IOKit HID，留 Unsupported）、Wayland 原生会话的 idle（要走 `org.freedesktop.ScreenSaver` 或 `ext-idle-notify-v1`，本批只给「不支持」）、「屏幕常亮」的置位侧（`XScreenSaverSuspend` / `SetThreadExecutionState`——本批只做**读**空闲，不拦休眠）、空闲阈值变化的通知机制、真机观感（归 `_人工测试清单.md`）。
 
+### 媒体音频后端跨平台化：单调时钟三平台（2026-10-12）
+
+- **引子**：上一批把媒体包挪进独立模块时，把「媒体在 Windows 上构建不了」的根因概括成「POSIX 时钟 + ffmpeg 未接」。本批把其中**属于我们自己的那一半**做掉——`audio_stub.c` 是媒体的音频后端（miniaudio 设备层 + PCM 队列），**零 ffmpeg 依赖**，它能不能编、编出来能不能跑，可以单独钉死，不必等 ffmpeg 那条线。
+- **现象（MSVC 实测）**：`audio_stub.c` 报 `error C2065: "CLOCK_MONOTONIC": 未声明的标识符`，并附一条 `warning C4013: "clock_gettime" 未定义`——`CLOCK_MONOTONIC` 是 POSIX 专有常量，MSVC 的 `<time.h>` 不提供（`clock_gettime` 也只在 UCRT 的部分版本里有）。
+- **修复（单一 stub.c 多分支 + 平台宏，先例 `yue/win/stub.c`；AGENTS 规则 11）**：`mbt_now_ms` 按平台三分支——`_WIN32` 走 `QueryPerformanceCounter` / `QueryPerformanceFrequency`（QPC 是 Windows 的单调高精度计数器；**不用 `GetTickCount`**：粒度粗 ~15.6ms，且会被系统时间调整带偏）；`__APPLE__` 走 `mach_absolute_time` + `mach_timebase_info`（不用 `clock_gettime`：`CLOCK_MONOTONIC` 在 macOS 要 10.12+，mach 更保守且同为单调计数）；其余 POSIX 保持 `clock_gettime(CLOCK_MONOTONIC)` **原样不变**。三支都返回「自任意固定起点的毫秒数」，只用于差分（`elapsed = now - wall0`），绝对值无意义——所以起点因平台而异不影响播放时钟。
+- **两处溢出防线**：①Windows 分支拆成 `(ticks / freq) * 1000 + ((ticks % freq) * 1000) / freq`，避免 `ticks * 1000` 在 64 位溢出（QPC 计数自开机起累计，10MHz 下一年 ≈ 3.15e14，乘 1000 后仍有量级余量，但拆开更稳）；②macOS 分支用 `__uint128_t` 过渡 `t * numer / denom`，防 Apple Silicon 上 numer/denom 非 1:1 时中间乘积溢出。
+- **两份拷贝同步改**：`media/audio_stub.c` 与 `src/audio_stub.c` 此前逐字节相同（md5 `2b807752…`）。改时一度只在 `src/` 多写一句注释，结果两份**不再**逐字节相同——当场回退那行，两份恢复一致（改后 md5 均为 `856a4c98e3879e77aa5108f7bb4dcfd8`）。理由：旧链下线时的「归一」要能直接取一份，两份静默漂移会让这件事没法机械判断。
+- **回证（纯 C 探针 `experiment/media_probe/audio_backend_probe.c`，直接 `#include` 平台后端）**：末行 **`AUDIO-BACKEND-OK`**、**48 条断言全过**、0 失败——①**时钟**：连续/五连读单调非减、为正、`Sleep(60)` 后推进 61ms（落在 [40,400] 区间）；②**设备开参数**：`channels ∈ [1,8]` 且 `rate > 0` 才收，`0`/`9`/`-1`/`rate=0`/负 rate 一律回 NULL；③**队列与音量语义**（与设备是否存在无关）：push 追加、`queued_bytes` 累计 400→600、非法 push 不改队列、`clear` 清零且二次幂等、`played_bytes` 非负、volume 钳到 [0,1]（0.5/1/0.25 读回一致、-1→0、2→1）；④**设备生命周期两分支都跑**（不假设环境）：本机有真设备 → `start=0`/`is_started=1`/二次 start=-1/`played_bytes` 真的推进（实测 35280 字节）/pause=0/二次 pause=-1；无设备（CI/headless）→ start=-1 且状态恒 0；⑤**NULL 参数防御全档**（该给失败档给失败档、不该崩的不崩）。探针另**直读 `QueryPerformanceFrequency` 报出 10000000 Hz**，证明走的是 QPC 高精度分支而非粗粒度回退。编法见探针头注释（`-I <moon>/include` 供 `moonbit.h`；补 `ole32.lib uuid.lib` 供 miniaudio 的 WASAPI 后端；`#pragma warning(disable:4244)` 只压 miniaudio 单头内部那一处赋值窄化，不压自家告警——探针本体 /W4 零告警）。
+- **一手实测补记**：`miniaudio.h`（4.2MB 单头）**在 MSVC 下能编**——除其自身第 80532 行一处 `ma_uint64 → ma_uint32`（C4244）外无告警。这说明音频后端在 Windows 上是有落地路径的，缺的只是时钟这一处。
+- **一条必须说清的边界**：改后 `audio_stub.c` 在 Windows 上**编得过、跑得起来**（探针即为证），但 `moon test ./modules/yue-media/media` **仍跑不起来**——测试可执行文件会把 `ffmpeg_stub.c` 一并链进来，而它要 `libavformat/avformat.h`（`ffmpeg-mbt` 那条线在非 Linux 上未接）。所以本批的 Windows 收益是**音频后端可编译可运行**，不是「媒体包能在 Windows 上用了」。Linux 分支代码逐字节未动，行为不变（本机跑不了 Linux，此为代码级判断而非实测）。
+- **本批未做且不假装完成**：`ffmpeg-mbt` 的 Windows/macOS 后端（要接系统解码器或自带 DLL，是另一条独立的线）；媒体包在非 Linux 上因此仍不能整体构建与整体测试；macOS 分支（`mach_absolute_time`）无法在本机回证，只做了代码级正确性论证；真机听得见的声音与 seek 手感仍归 `_人工测试清单.md`。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。

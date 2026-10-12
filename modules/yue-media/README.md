@@ -23,6 +23,16 @@ moon add NoahLiu/yue-media
 
 需要系统已安装 ffmpeg 开发包（Ubuntu: `sudo apt install -y libavformat-dev libavcodec-dev libswscale-dev libswresample-dev libavutil-dev`）。
 
+## 平台现状
+
+| 平台 | 音频后端（miniaudio 设备层，零 ffmpeg 依赖） | ffmpeg 解码后端 |
+|---|---|---|
+| Linux | ✅ | ✅ |
+| Windows | ✅ 可编译可运行（单调时钟走 `QueryPerformanceCounter`） | ⬜ 未接（`ffmpeg-mbt` 要 `libavformat/*` 头） |
+| macOS | ⬜ 时钟分支已写（`mach_absolute_time`），未真机回证 | ⬜ 未接 |
+
+**媒体包整体目前只能在 Linux 上构建与测试。** 音频后端的 C 部分已跨平台（Windows 下由纯 C 探针 `experiment/media_probe/audio_backend_probe.c` 回证），但本包 import `ffmpeg-mbt`，测试可执行文件会把它一并链进来，所以非 Linux 上仍然编不过。
+
 ## 快速上手
 
 音频播放：

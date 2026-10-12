@@ -231,9 +231,63 @@ void mbt_adev_close(MaPlayer *p) {
     free(p);
 }
 
-/* 单调墙钟（ms，CLOCK_MONOTONIC）：视频播放时钟的推进基准 */
+/* 单调墙钟（ms）：视频播放时钟的推进基准。
+ *
+ * 分平台（单一 stub.c 多分支 + 平台宏，先例 yue/win/stub.c；AGENTS 规则 11）：
+ *   _WIN32    → QueryPerformanceCounter / QueryPerformanceFrequency。QPC 是
+ *               Windows 的单调高精度计数器；GetTickCount 粒度粗（~15.6ms）
+ *               且会被系统时间调整带偏，这里不用。
+ *   __APPLE__ → mach_absolute_time + mach_timebase_info。不用 clock_gettime：
+ *               CLOCK_MONOTONIC 在 macOS 要 10.12+，mach 更保守且同为单调计数。
+ *   其余(POSIX) → clock_gettime(CLOCK_MONOTONIC)。
+ *
+ * 三支都返回「自任意固定起点的毫秒数」——只用于差分（elapsed = now - wall0），
+ * 绝对值无意义，所以起点因平台而异不影响播放时钟。 */
+#if defined(_WIN32)
+
+#include <windows.h>
+
+int64_t mbt_now_ms(void) {
+    static int64_t freq = 0;
+    LARGE_INTEGER c;
+    if (freq == 0) {
+        LARGE_INTEGER f;
+        QueryPerformanceFrequency(&f);
+        freq = f.QuadPart > 0 ? (int64_t)f.QuadPart : 1;
+    }
+    QueryPerformanceCounter(&c);
+    /* 拆整数部分 + 余数部分，避免 (ticks * 1000) 在 64 位溢出 */
+    return (c.QuadPart / freq) * 1000 + ((c.QuadPart % freq) * 1000) / freq;
+}
+
+#elif defined(__APPLE__)
+
+#include <mach/mach_time.h>
+#include <stdint.h>
+
+int64_t mbt_now_ms(void) {
+    static mach_timebase_info_data_t tb = { 0, 0 };
+    uint64_t t;
+    if (tb.denom == 0) {
+        mach_timebase_info(&tb);
+        if (tb.denom == 0) {
+            tb.numer = 1;
+            tb.denom = 1;
+        }
+    }
+    t = mach_absolute_time();
+    /* ns = t * numer / denom，ms = ns / 1e6；用 128 位过渡防中间乘积溢出 */
+    return (int64_t)(((__uint128_t)t * tb.numer) / tb.denom / 1000000ULL);
+}
+
+#else
+
+#include <time.h>
+
 int64_t mbt_now_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
+
+#endif
