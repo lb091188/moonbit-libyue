@@ -343,14 +343,28 @@ fn main {
                   @ui.button(
                     "后退",
                     on_click=fn() {
-                      note("can_go_back=" + (if v.can_go_back() { "1" } else { "0" }))
-                      v.go_back()
+                      // 如实说话：load_html 装进来的页面**不入历史**，失败导航
+                      // 也不入历史，所以桥接页上 can_go_back 恒 0——这时
+                      // go_back() 是空操作。不写清原因，按钮看着就像坏了。
+                      if v.can_go_back() {
+                        v.go_back()
+                        note("后退 → " + v.current_url())
+                      } else {
+                        note("后退：无处可退（can_go_back=0；load_html 不入历史）")
+                      }
                     },
                     min_width=64.0,
                   ),
                   @ui.button(
                     "前进",
-                    on_click=fn() { v.go_forward() },
+                    on_click=fn() {
+                      if v.can_go_forward() {
+                        v.go_forward()
+                        note("前进 → " + v.current_url())
+                      } else {
+                        note("前进：无可前进项（can_go_forward=0）")
+                      }
+                    },
                     min_width=64.0,
                   ),
                   @core.node_of(@core.Widget::new()),
