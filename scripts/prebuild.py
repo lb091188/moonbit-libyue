@@ -59,6 +59,11 @@ def compile_stub(
     可传多个源文件，编进同一个 .a（任一源更新即整体重编）。extra_cflags
     用于给「多平台合一的桩」开对应分支（如 stub.c 的 -DWM_STUB_GTK）。"""
     srcs = [src] if isinstance(src, Path) else list(src)
+    missing = [s for s in srcs if not s.exists()]
+    for s in missing:
+        # 包搬家后忘了改路径时，这里必须出声：静默返回空串等于「链接参数整条没
+        # 有」，症状是测试与可执行文件链接期缺一堆符号，离根因很远
+        print(f"stub: 源文件不存在，跳过该库：{s}", file=sys.stderr)
     srcs = [s for s in srcs if s.exists()]
     if not srcs:
         return ""
@@ -139,7 +144,7 @@ def link_configs() -> dict:
         # 系统库不会被自动带上，显式补（与旧链路同一口径）。
         sys_libs = ["-lpthread", "-ldl", "-lm", "-lstdc++", "-latomic"]
         win_lib = compile_stub(
-            MODULE_ROOT / "yue" / "win" / "stub.c",
+            MODULE_ROOT / "win" / "stub.c",
             "libyue_win_stub.a",
             extra_cflags=["-DWM_STUB_GTK"],
         )
@@ -173,7 +178,7 @@ def link_configs() -> dict:
             webkit_libs = []
         if win_lib:
             web_lib = compile_stub(
-                MODULE_ROOT / "yue" / "web" / "webkit_stub.c",
+                MODULE_ROOT / "web" / "webkit_stub.c",
                 "libyue_web.a",
                 extra_cflags=[
                     *(["-DWB_HAVE_WEBKIT"] if webkit_cflags else []),
@@ -192,7 +197,7 @@ def link_configs() -> dict:
         # 这样主模块的依赖闭包里不再有 ffmpeg-mbt——媒体对主模块消费者
         # 回到「模块级可选」。
         cairo_lib = compile_stub(
-            MODULE_ROOT / "yue" / "render" / "stub.c",
+            MODULE_ROOT / "render" / "stub.c",
             "librender_cairo_stub.a",
             extra_cflags=["-DWM_STUB_CAIRO"],
         )
@@ -203,7 +208,7 @@ def link_configs() -> dict:
                 + " ".join([*libs, *sys_libs]),
             })
         text_lib = compile_stub(
-            MODULE_ROOT / "yue" / "text" / "stub.c",
+            MODULE_ROOT / "text" / "stub.c",
             "libyue_text_pango.a",
             extra_cflags=["-DWM_STUB_PANGO"],
         )

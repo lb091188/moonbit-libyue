@@ -15,7 +15,7 @@ fn ap_wait_ms(ms : Int) -> Unit {
 /// （设备实际消费 PCM），并断言播放中队列有 PCM 在途（「只有拖动
 /// 时才有一下声音」的回归断言）。
 test "AudioPlayer 冒烟：播放/pump/seek/循环" {
-  let p = match AudioPlayer::make("modules/ffmpeg-mbt/src/testdata/sine_1s.mp3") {
+  let p = match AudioPlayer::make("../ffmpeg-mbt/src/testdata/sine_1s.mp3") {
     Ok(p) => p
     Err(e) => fail("make 失败：\{e}")
   }
@@ -99,7 +99,7 @@ test "AudioPlayer 错误路径" {
     }
   }
   // testsrc_1s.avi 只有视频流：开音频解码器应失败
-  match AudioPlayer::make("modules/ffmpeg-mbt/src/testdata/testsrc_1s.avi") {
+  match AudioPlayer::make("../ffmpeg-mbt/src/testdata/testsrc_1s.avi") {
     Err(_) => ()
     Ok(p) => {
       p.free()
