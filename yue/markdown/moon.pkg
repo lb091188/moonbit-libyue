@@ -1,6 +1,0 @@
-import {
-  "NoahLiu/native-gui/yue",
-  "NoahLiu/native-gui/yue/declarative",
-  "NoahLiu/native-gui/yue/components",
-  "mizchi/markdown" @mdast,
-}

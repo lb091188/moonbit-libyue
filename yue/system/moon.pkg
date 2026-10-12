@@ -1,9 +1,0 @@
-import {
-  "moonbitlang/core/encoding/utf8",
-  "moonbitlang/core/json",
-  "moonbitlang/core/env",
-  "NoahLiu/native-gui/yue",
-  "NoahLiu/native-gui/yue/traybus",
-  "chensuiyi/subproc",
-  "prowk/moonsqlitefile",
-}

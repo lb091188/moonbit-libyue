@@ -1,5 +1,0 @@
-import {
-  "NoahLiu/native-gui/yue",
-}
-
-pkgtype(kind: "executable")
