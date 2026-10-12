@@ -1,1 +1,9 @@
-members = ["", "modules/ffmpeg-mbt", "modules/yoga-mbt", "modules/gui-examples", "modules/gui-media"]
+members = [
+  "gui",
+  "examples",
+  "experiment",
+  "modules/ffmpeg-mbt",
+  "modules/yoga-mbt",
+  "modules/gui-examples",
+  "modules/gui-media",
+]

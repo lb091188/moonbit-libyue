@@ -22,14 +22,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-MODULE_ROOT = Path(__file__).resolve().parent.parent
+MODULE_ROOT = Path(__file__).resolve().parent.parent  # gui/（库模块根）
+REPO_ROOT = MODULE_ROOT.parent  # 仓库根：跨模块资产（experiment 的探针桩）在这里
 BUILD_DIR = MODULE_ROOT / "build"
 
 # Linux 系统库清单：GTK3 是新栈锁定的后端（零新增运行期依赖，本仓此前已在用），
 # 探针与后续 win 都从这里拿 cflags/libs。
 LINUX_PKG_CONFIG_LIBS = ["gtk+-3.0", "pangoft2", "pangocairo", "fontconfig", "x11"]
 
-IME_PROBE_PACKAGE = "NoahLiu/native-gui/experiment/ime_probe"
+IME_PROBE_PACKAGE = "NoahLiu/native-gui-experiment/ime_probe"
 SYS_PACKAGE = "NoahLiu/native-gui/sys"
 WIN_PACKAGE = "NoahLiu/native-gui/win"
 RENDER_PACKAGE = "NoahLiu/native-gui/render"
@@ -97,7 +98,7 @@ def compile_stub(
 
 def build_ime_probe_stub() -> str:
     """G0 输入法探针（MoonBit 原生 GUI 栈首个 spike）的 C 端编译。"""
-    src = MODULE_ROOT / "experiment" / "ime_probe" / "ime_probe_stub.c"
+    src = REPO_ROOT / "experiment" / "ime_probe" / "ime_probe_stub.c"
     if not src.exists():
         return ""
     obj = BUILD_DIR / "ime_probe_stub.o"
@@ -139,7 +140,7 @@ def link_configs() -> dict:
         # 系统库不会被自动带上，显式补（与旧链路同一口径）。
         sys_libs = ["-lpthread", "-ldl", "-lm", "-lstdc++", "-latomic"]
         win_lib = compile_stub(
-            MODULE_ROOT / "yue" / "win" / "stub.c",
+            MODULE_ROOT / "win" / "stub.c",
             "libyue_win_stub.a",
             extra_cflags=["-DWM_STUB_GTK"],
         )
@@ -173,7 +174,7 @@ def link_configs() -> dict:
             webkit_libs = []
         if win_lib:
             web_lib = compile_stub(
-                MODULE_ROOT / "yue" / "web" / "webkit_stub.c",
+                MODULE_ROOT / "web" / "webkit_stub.c",
                 "libyue_web.a",
                 extra_cflags=[
                     *(["-DWB_HAVE_WEBKIT"] if webkit_cflags else []),
@@ -192,7 +193,7 @@ def link_configs() -> dict:
         # 这样主模块的依赖闭包里不再有 ffmpeg-mbt——媒体对主模块消费者
         # 回到「模块级可选」。
         cairo_lib = compile_stub(
-            MODULE_ROOT / "yue" / "render" / "stub.c",
+            MODULE_ROOT / "render" / "stub.c",
             "librender_cairo_stub.a",
             extra_cflags=["-DWM_STUB_CAIRO"],
         )
@@ -203,7 +204,7 @@ def link_configs() -> dict:
                 + " ".join([*libs, *sys_libs]),
             })
         text_lib = compile_stub(
-            MODULE_ROOT / "yue" / "text" / "stub.c",
+            MODULE_ROOT / "text" / "stub.c",
             "libyue_text_pango.a",
             extra_cflags=["-DWM_STUB_PANGO"],
         )

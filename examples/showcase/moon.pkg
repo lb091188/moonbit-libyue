@@ -8,8 +8,8 @@ import {
   "NoahLiu/native-gui/theme",
   "NoahLiu/native-gui/icons",
   "NoahLiu/native-gui/win",
-  "NoahLiu/native-gui/examples/showcase/shared",
-  "NoahLiu/native-gui/examples/showcase/pages",
+  "NoahLiu/native-gui-examples/showcase/shared",
+  "NoahLiu/native-gui-examples/showcase/pages",
 }
 
 pkgtype(kind: "executable")
