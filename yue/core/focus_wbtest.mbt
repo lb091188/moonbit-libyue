@@ -68,3 +68,23 @@ test "空栈 move_focus 返回 None 且 clear 复位" {
   assert_eq(f.register(9), true)
   assert_eq(f.current(), Some(9))
 }
+
+///|
+/// `drop_current` 与 `clear` 的分界：让位给原生子件（点进网页）只该放掉当前焦点，
+/// 注册表必须留着——清掉的话用户点回来时 `focus(id)` 找不到项，控件再也聚不上焦
+/// （真机踩过：输入框失去高亮后无法重新输入，只有双击选中还有效）。
+test "drop_current 只放焦点、保留注册可再聚焦" {
+  let f = FocusStack::new()
+  assert_eq(f.register(1), true)
+  assert_eq(f.register(2), true)
+  assert_eq(f.current(), Some(1))
+  f.drop_current()
+  assert_eq(f.current(), None)
+  assert_eq(f.count(), 2)
+  assert_eq(f.is_focused(1), false)
+  // 点回来：注册项还在，能重新聚焦
+  assert_eq(f.focus(2), true)
+  assert_eq(f.current(), Some(2))
+  // Tab 环绕也不该因为放掉焦点而失效
+  assert_eq(f.move_focus(false), Some(1))
+}

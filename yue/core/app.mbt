@@ -622,6 +622,17 @@ fn App::drain_events(self : App) -> Unit {
         // 落进那个旧组合。
         self.flush_ime_for_switch(self.focus.current())
         overlay_on_lost_focus(self)
+        // 但「让位给本窗内的原生子件」不属于上面那种情况，那是用户点了别处：
+        // 必须把自绘控件的焦点清掉，否则输入框继续亮边框、闪光标，看着像还能
+        // 往里打字，而键其实全进了网页。整窗失焦（切到别的应用/别的窗）不清，
+        // 回到本窗时焦点照旧——这一档是使用者认过的行为。
+        match self.window.focus_owner() {
+          @win.ChildSurface => {
+            self.focus.drop_current()
+            self.dirty = true
+          }
+          _ => ()
+        }
       }
       @win.Input => {
         match self.window.take_input() {

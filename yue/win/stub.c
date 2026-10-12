@@ -825,6 +825,14 @@ int wm_event(int64_t id) {
   return 0;
 }
 
+// 焦点在谁身上（口径见 GTK 分支）。Windows 侧保守报 1 = 「焦点仍在绘制区」，
+// 也就是维持本改动之前的行为（失焦只交还输入法、不清控件焦点栈）；
+// 真正的判定（GetFocus 与绘制区 hwnd 比较、webview 子 HWND 算 2）随 W 线接。
+int wm_focus_owner(int64_t id) {
+  (void)id;
+  return 1;
+}
+
 // 与 GTK 分支同一条修复：present 的像素必须拷进桩自己的缓冲——贴像素在
 // 下一次 WM_PAINT 里，那之间 MoonBit 侧那块局部 Bitmap 可能已被 GC 回收。
 void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
@@ -2137,18 +2145,6 @@ static void wm_on_size_allocate(GtkWidget *area, GdkRectangle *alloc,
   w->need_draw = 1;
 }
 
-// 内容容器（GtkFixed）尺寸变了就把绘制区的尺寸请求跟上去。加「只有变了才设」
-// 的闸门：set_size_request 会再触发一轮分配，无条件设会自激。
-static void wm_on_fixed_allocate(GtkWidget *fixed, GdkRectangle *alloc,
-                                 gpointer data) {
-  WmWindow *w = (WmWindow *)data;
-  if (w->area == NULL ||
-      (w->width == alloc->width && w->height == alloc->height)) {
-    return;
-  }
-  gtk_widget_set_size_request(w->area, alloc->width, alloc->height);
-}
-
 static gboolean wm_on_key(GtkWidget *widget, GdkEventKey *ev, gpointer data) {
   (void)widget;
   WmWindow *w = (WmWindow *)data;
@@ -2280,13 +2276,28 @@ int64_t wm_window_new(int width, int height, const char *title) {
                                    GDK_BUTTON_RELEASE_MASK |
                                    GDK_POINTER_MOTION_MASK |
                                    GDK_SCROLL_MASK);
+  // 结构：窗口 → GtkOverlay →{ 主件=绘制区，覆盖件=摆原生子件的 GtkFixed }。
+  // 为什么不用「窗口→GtkFixed→绘制区」：Fixed 不拉伸子件，只能把绘制区的
+  // size_request 顶到窗口大小，而那是**最小尺寸**，会顺着 Fixed→Window 传回 WM
+  // 再把窗撑大一点——拖着右边沿放大时自激，每轮比上一轮宽，松手也不停；
+  // libyue 在 window_gtk.cc 里正是靠「清掉 size_request 否则窗口会有最小尺寸」
+  // 躲这件事，而它的内容件是 GtkBox 拉伸的，本栈要绝对摆位所以用 Overlay。
+  // 绘制区是主件，GtkBin 一定给它整窗尺寸，于是全树不再有任何 size_request。
+  GtkWidget *ov = gtk_overlay_new();
+  gtk_container_add(GTK_CONTAINER(w->window), ov);
+  gtk_container_add(GTK_CONTAINER(ov), w->area);
   w->fixed = gtk_fixed_new();
-  gtk_container_add(GTK_CONTAINER(w->window), w->fixed);
-  gtk_fixed_put(GTK_FIXED(w->fixed), w->area, 0, 0);
-  gtk_widget_set_size_request(w->area, w->width, w->height);
+  // 覆盖件要铺满整窗才裁不掉里面的原生子件：FILL + expand 是 GtkOverlay 的口径
+  gtk_widget_set_halign(w->fixed, GTK_ALIGN_FILL);
+  gtk_widget_set_valign(w->fixed, GTK_ALIGN_FILL);
+  gtk_widget_set_hexpand(w->fixed, TRUE);
+  gtk_widget_set_vexpand(w->fixed, TRUE);
+  gtk_overlay_add_overlay(GTK_OVERLAY(ov), w->fixed);
+  // **必须穿透**：GtkOverlay 默认把落在覆盖件区域的输入路由给覆盖件本身，铺满
+  // 整窗就等于把自绘区的点击与滚轮全截了（实测：native-app 里按钮点不动、滚轮
+  // 不滚）。TRUE = 事件落到主件；webview 自己有 GdkWindow，照常收它那块的事件。
+  gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(ov), w->fixed, TRUE);
   g_signal_connect(w->area, "realize", G_CALLBACK(wm_on_realize), w);
-  g_signal_connect(w->fixed, "size-allocate",
-                   G_CALLBACK(wm_on_fixed_allocate), w);
   g_signal_connect(w->area, "focus-in-event", G_CALLBACK(wm_on_area_focus_in), w);
   g_signal_connect(w->area, "focus-out-event",
                    G_CALLBACK(wm_on_area_focus_out), w);
@@ -2348,6 +2359,25 @@ void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
   if (out_h != NULL) {
     *out_h = w->height;
   }
+}
+
+// 键盘焦点现在在谁身上：0 = 本窗没有焦点（整窗失焦，切到别的应用/别的窗），
+// 1 = 在绘制区，2 = 在本窗内的某个原生子件（webview）。
+// 上层要这条是为了把两种「focus-out」分开：让位给本窗子件 = 用户点了别处，
+// 该清掉自绘控件的焦点；整窗失焦 = 不该清，回到本窗时焦点照旧。
+int wm_focus_owner(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->window == NULL) {
+    return 0;
+  }
+  GtkWidget *f = gtk_window_get_focus(GTK_WINDOW(w->window));
+  if (f == NULL) {
+    return 0;
+  }
+  return f == w->area ? 1 : 2;
 }
 
 // 消费式取事件：1 = 需要重绘，2 = 尺寸变化（宽高已更新），3 = 请求关闭，
@@ -2593,11 +2623,9 @@ void wm_window_set_size(int64_t id, int w, int h) {
   }
   int ww = w > 1 ? w : 1;
   int hh = h > 1 ? h : 1;
-  // 绘制区的 size_request 是窗口的**最小内容尺寸**（建窗时按初始大小设的），
-  // 不改它直接 resize，窗口缩不到初始大小以下——浮层量完内容收框就会留一圈死边
-  if (win->area != NULL) {
-    gtk_widget_set_size_request(win->area, ww, hh);
-  }
+  // 只 resize 窗口：绘制区是 overlay 的主件，尺寸恒等于窗口，没有要跟着改的请求。
+  // （旧结构必须连绘制区的 size_request 一起改，那既是拖窗自增的回路源头，
+  //  也是「浮层量完内容收框后缩不回初始大小、留一圈死边」的原因——两个坑同源）
   gtk_window_resize(GTK_WINDOW(win->window), ww, hh);
 }
 
@@ -3459,6 +3487,12 @@ void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
 }
 
 int wm_event(int64_t id) {
+  (void)id;
+  return 0;
+}
+
+// 占位分支没有窗口，也就没有焦点可言：一律 0（= 整窗无焦点，上层不清焦点栈）
+int wm_focus_owner(int64_t id) {
   (void)id;
   return 0;
 }
