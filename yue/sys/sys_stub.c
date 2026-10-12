@@ -35,6 +35,7 @@
 #include <shellapi.h>
 #else
 #include <dirent.h>
+#include <dlfcn.h> // 空闲查询的 X11/XSS 运行期取符号（W21e）
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -1691,5 +1692,147 @@ int32_t yue_sys_autostart_remove(const char *app_id, int32_t *ok) {
 #else
   (void)app_id;
   return -1000;
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// 用户空闲秒数（W21e）
+//
+// 跨平台的面在 MoonBit（`yue/sys/idle.mbt`）；这里只做平台取数：
+//   Windows  GetLastInputInfo + GetTickCount（**差值按 DWORD 取模，天然扛
+//            ~49.7 天回绕**——不要先转 int64 再相减，那样回绕会变负数）
+//   Linux    X11 的 XScreenSaver 扩展（XSS）：**运行期 dlopen**，因为 sys 的
+//            Linux 链接行只有 pthread/dl/m/stdc++，headless 消费者不该被 X
+//            库绑住；符号取不到 / 没有 DISPLAY（Wayland 会话）一律 ok=0
+//   macOS    本批不实现（空探测给 0，门面转 Unsupported）
+//
+// 返回：`*ok = 1` 成功（毫秒，非负）；`*ok = 0` 本平台/本会话取不到。
+// `yue_sys_idle_supported` 是运行期能力探测（Windows 恒 1；Linux 要
+// DISPLAY 非空且 X11+XSS 都 dlopen 得到）。
+// ---------------------------------------------------------------------------
+
+#if defined(__linux__)
+// XScreenSaverInfo 的最小布局（sys 桩不引 X11 头，故本地声明；字段顺序与
+// X11/extensions/scrnsaver.h 一致：Window / state / kind / til_or_since /
+// idle / event_mask）。Window 与 Time 都是 XID / unsigned long。
+typedef struct {
+  unsigned long window;
+  int state;
+  int kind;
+  unsigned long til_or_since;
+  unsigned long idle;
+  unsigned long event_mask;
+} sys_xss_info_t;
+
+typedef struct {
+  int tried;
+  int ok;
+  void *hx11;
+  void *hxss;
+  void *(*open_display)(const char *);
+  unsigned long (*default_root)(void *);
+  sys_xss_info_t *(*alloc_info)(void);
+  int (*query_info)(void *, unsigned long, sys_xss_info_t *);
+  int (*xfree)(void *);
+  int (*close_display)(void *);
+} sys_idle_x11_t;
+
+static sys_idle_x11_t g_idle_x11 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+// 取符号到函数指针：经 void* 中转（memcpy），避开 -Wcast-function-type。
+static void sys_load_sym(void *dst, void *handle, const char *name) {
+  void *p = dlsym(handle, name);
+  memcpy(dst, &p, sizeof(p));
+}
+
+static void sys_idle_x11_init(void) {
+  if (g_idle_x11.tried) {
+    return;
+  }
+  g_idle_x11.tried = 1;
+  // soname 两个候选都试：有的发行版只装 .so.1，有的开发包才给 .so
+  g_idle_x11.hx11 = dlopen("libX11.so.6", RTLD_LAZY);
+  if (g_idle_x11.hx11 == NULL) {
+    g_idle_x11.hx11 = dlopen("libX11.so", RTLD_LAZY);
+  }
+  g_idle_x11.hxss = dlopen("libXss.so.1", RTLD_LAZY);
+  if (g_idle_x11.hxss == NULL) {
+    g_idle_x11.hxss = dlopen("libXss.so", RTLD_LAZY);
+  }
+  if (g_idle_x11.hx11 == NULL || g_idle_x11.hxss == NULL) {
+    return;
+  }
+  sys_load_sym(&g_idle_x11.open_display, g_idle_x11.hx11, "XOpenDisplay");
+  sys_load_sym(&g_idle_x11.default_root, g_idle_x11.hx11,
+               "XDefaultRootWindow");
+  sys_load_sym(&g_idle_x11.xfree, g_idle_x11.hx11, "XFree");
+  sys_load_sym(&g_idle_x11.close_display, g_idle_x11.hx11, "XCloseDisplay");
+  sys_load_sym(&g_idle_x11.alloc_info, g_idle_x11.hxss,
+               "XScreenSaverAllocInfo");
+  sys_load_sym(&g_idle_x11.query_info, g_idle_x11.hxss,
+               "XScreenSaverQueryInfo");
+  if (g_idle_x11.open_display == NULL || g_idle_x11.default_root == NULL ||
+      g_idle_x11.xfree == NULL || g_idle_x11.close_display == NULL ||
+      g_idle_x11.alloc_info == NULL || g_idle_x11.query_info == NULL) {
+    return;
+  }
+  g_idle_x11.ok = 1;
+}
+#endif
+
+// 运行期能力探测：1 = 本平台/本会话能查空闲。
+int32_t yue_sys_idle_supported(void) {
+#if defined(_WIN32)
+  return 1;
+#elif defined(__linux__)
+  const char *dpy = getenv("DISPLAY");
+  if (dpy == NULL || dpy[0] == '\0') {
+    return 0; // 无 X 服务端（Wayland 原生会话走这里）
+  }
+  sys_idle_x11_init();
+  return g_idle_x11.ok ? 1 : 0;
+#else
+  return 0;
+#endif
+}
+
+int64_t yue_sys_idle_seconds_ms(int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  LASTINPUTINFO li;
+  li.cbSize = sizeof(LASTINPUTINFO);
+  li.dwTime = 0;
+  if (!GetLastInputInfo(&li)) {
+    return 0;
+  }
+  // DWORD 相减按模 2^32 求值，跨越 GetTickCount 的回绕点也是对的
+  DWORD elapsed = GetTickCount() - li.dwTime;
+  *ok = 1;
+  return (int64_t)elapsed;
+#elif defined(__linux__)
+  sys_idle_x11_init();
+  if (!g_idle_x11.ok) {
+    return 0;
+  }
+  void *dpy = g_idle_x11.open_display(NULL);
+  if (dpy == NULL) {
+    return 0;
+  }
+  sys_xss_info_t *info = g_idle_x11.alloc_info();
+  if (info == NULL) {
+    g_idle_x11.close_display(dpy);
+    return 0;
+  }
+  int r = g_idle_x11.query_info(dpy, g_idle_x11.default_root(dpy), info);
+  int64_t ms = (int64_t)info->idle;
+  g_idle_x11.xfree(info);
+  g_idle_x11.close_display(dpy);
+  if (r == 0) {
+    return 0;
+  }
+  *ok = 1;
+  return ms;
+#else
+  return 0;
 #endif
 }

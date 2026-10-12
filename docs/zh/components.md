@@ -727,6 +727,17 @@ match @system.idle_seconds() {
 | keep_awake_active() | 当前是否持有常亮 |
 | idle_supported() / idle_seconds() -> Result[Double, IdleError] | 用户空闲秒数（Linux X11;Wayland 会话显式 Unsupported） |
 
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21e）：上表末行是旧链 `@system` 形态。新栈在 **`yue/sys/idle.mbt`**，同样是无对象、无单例的自由函数，语义逐条对齐：
+>
+> | 旧链 | 新栈 | 说明 |
+> |---|---|---|
+> | `idle_supported()` | `idle_supported()` | 运行时探测；Linux 要 `DISPLAY` 非空且 X11 + XSS 都能 dlopen（不引入链接依赖） |
+> | `idle_seconds() -> Result[Double, IdleError]` | `idle_seconds() -> Result[Double, IdleError]` | 自最后一次输入起的秒数；**阈值判定交给调用方**（不设 active/idle 二值） |
+>
+> **纯函数**（可单测）：`idle_clamp_ms(ms)`（负数归零）、`idle_ms_to_seconds(ms)`（毫秒换秒，已夹负）。
+> **错误**：`IdleError{Unsupported, Failed(String)}`——「本平台/本会话没这能力」与「这次查询失败」分开，不静默。
+> **注意**：**只读不写**——本 API 只回报空闲了多久，不拦休眠、不设阈值；要「保持屏幕常亮」走上面的 `KeepAwake`（两件事刻意分开）。
+
 ### 电量与电源事件
 
 | API | 用途 |

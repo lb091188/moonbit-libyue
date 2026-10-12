@@ -731,6 +731,17 @@ match @system.idle_seconds() {
 | keep_awake_active() | Whether keep-awake is currently held |
 | idle_supported() / idle_seconds() -> Result[Double, IdleError] | User idle seconds (Linux X11; Wayland sessions report Unsupported explicitly) |
 
+> **New-stack (MoonBit native GUI stack) mapping** (since W21e): the last row above is the old-chain `@system` form. The new stack lives in **`yue/sys/idle.mbt`**, also object-free, singleton-free free functions, mapped item by item:
+>
+> | Old stack | New stack | Notes |
+> |---|---|---|
+> | `idle_supported()` | `idle_supported()` | Runtime probe; Linux needs a non-empty `DISPLAY` and both X11 + XSS dlopen-able (no link dependency) |
+> | `idle_seconds() -> Result[Double, IdleError]` | `idle_seconds() -> Result[Double, IdleError]` | Seconds since the last input; **the threshold is the caller's** (no active/idle binary) |
+>
+> **Pure functions** (unit-testable): `idle_clamp_ms(ms)` (negatives to zero), `idle_ms_to_seconds(ms)` (ms → seconds, already clamped).
+> **Errors**: `IdleError{Unsupported, Failed(String)}` — "this platform/session lacks the capability" and "this query failed" are kept apart, not silent.
+> **Note**: **read-only** — this API only reports how long the user has been idle; it does not inhibit sleep or set a threshold. For "keep the screen awake" use `KeepAwake` above (the two are deliberately separate).
+
 ### Battery & Power Events
 
 | API | Purpose |

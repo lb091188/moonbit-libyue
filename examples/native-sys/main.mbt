@@ -102,6 +102,17 @@ fn fmt_gb(kb : Int) -> String {
   gb.round().to_int().to_string() + " GB"
 }
 
+///|
+/// 空闲秒数 → 人类可读（不足 60 秒给「N.N 秒」，超过给「M 分 K 秒」）。
+fn fmt_idle(secs : Double) -> String {
+  if secs < 60.0 {
+    ((secs * 10.0).round() / 10.0).to_string() + " 秒"
+  } else {
+    let total = secs.to_int()
+    (total / 60).to_string() + " 分 " + (total % 60).to_string() + " 秒"
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 各段只读探测（返回键值行，同时回填计数供退出状态行使用）
 // ---------------------------------------------------------------------------
@@ -489,6 +500,16 @@ fn main {
       Err(e) => "自启动：不可用（" + e.to_string() + "）"
     },
   )
+  // W21e 空闲检测：只读读数（自最后一次输入起的秒数），阈值判定交给调用方
+  let btn_idle : Ref[@core.Widget?] = Ref(None)
+  let idle_hits = @core.Store::new(0)
+  let idle_state = @core.Store::new(
+    if @sys.idle_supported() {
+      "空闲：支持（点一下读当前秒数）"
+    } else {
+      "空闲：本平台 / 本会话不支持（macOS 或 Wayland 无 X 服务端）"
+    },
+  )
 
   fn reprobe() -> Unit {
     sys_store.set(join_lines(probe_system(counts)))
@@ -699,6 +720,25 @@ fn main {
           handle=fn(w : @core.Widget) -> Unit { btn_auto_off.val = Some(w) },
         ),
         @ui.label_dyn(auto_state.signal(), size=12.0),
+        @ui.button(
+          "读空闲",
+          on_click=fn() -> Unit {
+            match @sys.idle_seconds() {
+              Ok(sec) => {
+                idle_hits.update(fn(n : Int) -> Int { n + 1 })
+                idle_state.set(
+                  "空闲：" + fmt_idle(sec) + "（自最后一次输入起）",
+                )
+              }
+              Err(e) => idle_state.set("读空闲失败：" + e.to_string())
+            }
+            app.schedule_paint()
+          },
+          kind=@ui.Border,
+          min_width=110.0,
+          handle=fn(w : @core.Widget) -> Unit { btn_idle.val = Some(w) },
+        ),
+        @ui.label_dyn(idle_state.signal(), size=12.0),
         @ui.label_dyn(
           tray_clicks.signal().map(fn(k : Int) -> String {
             "托盘点击 " + k.to_string() + " 次"
@@ -731,6 +771,7 @@ fn main {
     ("tray", btn_tray),
     ("auto_on", btn_auto_on),
     ("auto_off", btn_auto_off),
+    ("idle", btn_idle),
   ] {
     match kv.1.val {
       Some(w) => geo = geo + " " + kv.0 + "=" + rect_str(w.rect)
@@ -772,6 +813,20 @@ fn main {
     auto_on_hits.get().to_string() +
     " note=" +
     auto_state.get(),
+  )
+  // W21e 空闲回证：支持性 / 当次读数（关窗后照读）/ 按钮命中数 / 状态行。
+  println(
+    "NATIVE-SYS-IDLE supported=" +
+    (if @sys.idle_supported() { "1" } else { "0" }) +
+    " seconds=" +
+    (match @sys.idle_seconds() {
+      Ok(sec) => sec.to_string()
+      Err(e) => e.to_string()
+    }) +
+    " hits=" +
+    idle_hits.get().to_string() +
+    " note=" +
+    idle_state.get(),
   )
   app.shutdown()
 }
