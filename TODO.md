@@ -214,7 +214,7 @@
 - [ ] **W20c 托盘**（`Tray` 门面）——Win32 `Shell_NotifyIconW`（NIM_ADD/NIM_MODIFY/NIM_DELETE）+ 右键菜单（复用 W20a 的菜单模型）+ 左键回调（`WM_APP+1` 自定义消息 + 托盘回调消息 `NIF_MESSAGE`）；图标走 `.ico`/位图（桩侧 `LoadImageW`）；对应旧栈 `Tray`（`new`/`set_title`/`set_icon`/`set_icon_name`/`set_tooltip`/`on_click`/`set_menu`/`remove`）；**门面 `yue/core/tray.mbt` 先定**（后端探测函数 `Tray::is_supported()` + `TrayBackend` 枚举），Linux 端接已有 SNI（`yue/dbus/sni.mbt`），Windows 端接本批桩
 - [x] **W20d 原生对话框 MessageBox**（`show_message_box(...)`）——Win32 `MessageBoxW`（含图标类型 + 按钮组合 + 返回值）；对应旧栈 `MessageBox`（`new`/`set_title`/`set_text`/`set_informative_text`/`add_button`/`on_response`/`show`/`show_for_window`/`close`）；**纯函数**：`MessageBoxType`/按钮集合 → Win32 `uType` 位组合映射。**状态：已交付并验证（纯函数 8/8、探针真机跑出正确 `uType`、示例接线）**
 - [ ] **W20e 窗口增强**——`Window::set_title`（`SetWindowTextW`，运行中改标题）/ `Window::set_icon`（`WM_SETICON` + `LoadImageW`）/ 最小尺寸（`WM_GETMINMAXINFO` 拦）/ 无边框拖拽区（`WM_NCHITTEST` 返回 `HTCAPTION` 的自绘标题栏支持）；均为 Win32 常规消息，逐条可探针验
-- [ ] **W20f 托盘/热键/菜单共用的图标加载**（`.ico` / PNG 位图 → `HICON`/`HBITMAP`）——与既有 WIC 解码路径（W5 落的 `dwrite_text.cpp` 旁）合流
+- [x] **W20f 托盘/热键/菜单共用的图标加载**（`.ico` / PNG 位图 → `HICON`/`HBITMAP`）——**状态：已交付并验证**。`yue/win/stub.c` 图标段（`wm_icon_load_file` 按扩展名分派：`.ico`/`.bmp` 走 `LoadImageW`、其余读文件字节走 WIC 内存解码；`wm_icon_from_png` WIC 解码；`wm_icon_from_bgra` 32bpp DIB + `CreateIconIndirect`；`wm_icon_free`/`wm_icon_alive`/`wm_icon_handle`）+ `yue/win/icon.mbt` 门面（`IconFormat`/`icon_format_of`/`load_icon_file`/`load_icon_bytes`/`icon_from_bgra`/`Icon::free`）+ `icon_wbtest.mbt` 6 条纯函数；prebuild 的 yue/win 链接行加 `windowscodecs.lib ole32.lib`。纯 C 探针 `experiment/icon_probe/icon_backend_probe.c` 末行 `ICON-BACKEND-OK`（BGRA 往返/`.ico`/PNG 走 WIC/句柄表用尽/释放幂等）。`moon test ./yue/win` 24/24、`moon check ./yue/win --deny-warn` 零警告、C 后端 MSVC `/W4` 干净。示例接线随 W20e（窗口图标）与 W20c（托盘）落地。
 
 ### 6.2 W21 · MBT 通用能力（跨平台同构，不依赖平台）
 
@@ -287,7 +287,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$MSVC/bin/Hostx64/x64/cl.exe" \
 
 - **W20c 托盘**（`Shell_NotifyIconW` + 复用 W20a 菜单模型做右键菜单；`yue/core/tray.mbt` 门面先定，含 `Tray::is_supported()`）
 - **W20e 窗口增强**（`set_title`/`set_icon`/最小尺寸/无边框拖拽区）
-- **W20f 图标加载**（`.ico`/PNG → `HICON`/`HBITMAP`，托盘与菜单共用）
+- ~~**W20f 图标加载**（`.ico`/PNG → `HICON`/`HBITMAP`）~~ ✅ 已交付（见 §6.1 与 `experiment/icon_probe`）
 - **W21a 通知门面**（Windows 走 `Shell_NotifyIcon` 气泡 `NIF_INFO`；Linux 接已有 `yue/dbus/notify.mbt`）
 - **W21b MessageBox 自绘档**（`@ui` 模态对话框组件，与 W20d 原生档并存）
 - **W21c 拖放门面**（`DragData` 模型先定形态）

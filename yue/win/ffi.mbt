@@ -228,3 +228,21 @@ extern "c" fn wm_menu_apply(id : Int64, bar : Int) -> Unit = "wm_menu_apply"
 
 ///|
 extern "c" fn wm_menu_poll() -> Int = "wm_menu_poll"
+
+///|
+#borrow(px)
+extern "c" fn wm_icon_from_bgra(px : FixedArray[Byte], w : Int, h : Int) -> Int = "wm_icon_from_bgra"
+
+///|
+#borrow(path)
+extern "c" fn wm_icon_load_file(path : Bytes, size : Int) -> Int = "wm_icon_load_file"
+
+///|
+#borrow(data)
+extern "c" fn wm_icon_from_png(data : Bytes, len : Int) -> Int = "wm_icon_from_png"
+
+///|
+extern "c" fn wm_icon_free(slot : Int) -> Unit = "wm_icon_free"
+
+///|
+extern "c" fn wm_icon_alive() -> Int = "wm_icon_alive"

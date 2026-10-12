@@ -155,6 +155,15 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **全局快捷键（W20b）挂在**线程**消息队列而非窗口**：`RegisterHotKey` 的 `WM_HOTKEY` 进的是注册线程队列，WndProc 收不到——与菜单同制，桩侧 `wm_hotkey_poll` 在 MoonBit 泵里主动抽。加速键串解析（`"CmdOrCtrl+Shift+M"` → 修饰位 + 虚拟键码）抽成三平台同源纯函数（`CmdOrCtrl` 在 Win 映射 Ctrl、mac 映射 Cmd），10/10。
 - **回证**：`experiment/menu_probe/menu_backend_probe.c` 纯 C 探针 `MENU-BACKEND-OK`（菜单条/子菜单/命令 id/分隔线/勾选/嵌套/中文标签/非法父句柄/句柄表用尽/id 回绕全过）；`experiment/menu_probe` 的 MoonBit 侧验模型树 `MENU-OK`；`yue/core/menu_wbtest.mbt` 10/10、`yue/win/hotkey_wbtest.mbt` 10/10、`yue/win/message_box_wbtest.mbt` 8/8 真跑通过。
 
+### MoonBit 原生 GUI 栈 · Windows 图标加载（W20f：.ico 原生 + PNG 走 WIC）
+
+- **三条来源各有各的入口**：`.ico`/`.bmp` 走 `LoadImageW(LR_LOADFROMFILE)`（Win32 原生图标格式，不必解码）；PNG/JPEG/GIF **没有原生入口**，只能 WIC 从内存解码（`CreateStream`→`InitializeFromMemory`→`CreateDecoderFromStream`→`CreateFormatConverter` 到 `GUID_WICPixelFormat32bppBGRA`→`CopyPixels`）；已是像素的走 32bpp 自顶向下 DIB + `CreateIconIndirect`。`wm_icon_load_file` 按扩展名分派，两条都失败给 0。
+- **32bpp HICON 的 alpha 必须预乘，而 `yue/render` 的 Bitmap 正是这个口径**（小端 B,G,R,A 预乘）——`CreateIconIndirect` 的颜色位图用 alpha 做混合，预乘才不出光环；两者天然对齐，像素可逐字节 `memcpy` 进 DIB。验证法：`GetObject` 对 DIB section 的 `bmBits` **不保证可读**（实测拿到不可用指针、memcmp 必挂），要反读像素得用 `GetDIBits`（`biHeight` 给负数＝请求自顶向下，与输入行序一致）。
+- **`CLSID_WICImagingFactory` 是宏、会指向 Win8 才有的 Factory2**：`wincodec.h` 在 `_WIN32_WINNT >= 0x0602` 时 `#define CLSID_WICImagingFactory CLSID_WICImagingFactory2`；要兼容旧系统就显式取 **`CLSID_WICImagingFactory1`**（vtable 前缀一致，`IID_IWICImagingFactory` 仍用 v1）。
+- **GUID 常量全在 `windowscodecs.lib` 里导出**（`dumpbin /linkermember` 实测：`CLSID_WICImagingFactory1`、`IID_IWICImagingFactory`、`GUID_WICPixelFormat32bppBGRA` 都有），故 yue/win 的 Windows 链接行只加 `windowscodecs.lib ole32.lib`，不必再链 `uuid.lib`（C 模式仍用不了 `__uuidof`，与 W14 文件对话框同条坑）。
+- **C4013 隐式声明同样会在这条路上出现**：`wm_icon_load_file` 的 WIC 回退要调定义在其后的 `wm_icon_from_png`，独立编 stub.c 时 MSVC 给 `C4013: 未定义；假定外部返回 int`——**能编过但口径不可信**（与主色那节的坑同族），加前置声明即消。教训：内部互相调用的静态/全局函数，先想清定义次序或直接前置声明，别靠隐式声明兜。
+- **回证**：纯 C 探针 `experiment/icon_probe/icon_backend_probe.c`（`#include stub.c` 直喂 `wm_icon_*`，再用 `GetIconInfo`/`GetDIBits` 反读）末行 `ICON-BACKEND-OK`：BGRA→HICON 的尺寸/位深/像素往返、`.ico` 磁盘加载、PNG 走 WIC（8×8 RGBA 半透明红解出 32bpp）、句柄表 31 槽用尽归 0、释放幂等全过。PNG 素材由 `experiment/icon_probe/make_png.py` 用标准库 zlib 手写生成（不依赖 Pillow）。`moon test ./yue/win` 24/24（新增 6 条纯函数：扩展名判定/格式分派/句柄 0 语义/尺寸校验）。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。

@@ -47,6 +47,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <wchar.h> // 菜单标签拼接用 wcsncpy/wcslen/wcsncat（W20a）
+// 图标加载（W20f）：PNG 无原生 Win32 入口，只能走 WIC 从内存解码；COM 初始化
+// 与 CoCreateInstance 在 objbase.h。GUID 常量由 wincodec.h 声明、链接期取
+// windowscodecs.lib / uuid.lib（C 模式用不了 __uuidof，与 W14 文件对话框同条坑）。
+#include <objbase.h>
+#include <wincodec.h>
 
 #define WM_MAX_WINDOWS 32
 
@@ -1268,6 +1273,315 @@ int wm_menu_poll(void) {
   return cmd;
 }
 
+/* ---- 图标加载（W20f）-----------------------------------------------------
+ * 托盘 / 窗口 / 菜单三处的共同前置：把「磁盘图标文件」或「已在内存的像素」变成
+ * 一个 HICON。三种入口覆盖三来源：
+ *  - wm_icon_load_file(path, size) —— 按扩展名分派：`.ico`/`.bmp` 走
+ *    `LoadImageW(LR_LOADFROMFILE)`（Win32 原生图标格式，不必解码），其余
+ *    （PNG/JPEG/GIF…）读文件字节走 WIC；size>0 按该边长加载。
+ *  - wm_icon_from_png(bytes, len) —— WIC 从**内存**解码 PNG/JPEG/GIF/BMP 到
+ *    32bpp BGRA（PNG 没有原生 Win32 入口，只能走 WIC）。
+ *  - wm_icon_from_bgra(px, w, h) —— 已是 BGRA（预乘）的像素直接建 icon；`yue/render`
+ *    的 Bitmap 正是这个口径（小端 B,G,R,A 预乘），CreateIconIndirect 需要预乘
+ *    alpha，两者天然对齐、逐字节直拷。
+ * 句柄用进程级表下标（1 起，0 = 失败），与窗口/菜单同制；wm_icon_free 释放
+ * HICON 与自建的位图，未释放的随进程退出由系统回收。
+ * 表要在 wm_wndproc（WM_SETICON 用）/托盘批之前声明。 */
+#define WM_MAX_ICONS 32
+typedef struct {
+  HICON hicon;
+  HBITMAP color; // 自建的 32bpp 位图（LoadImageW 路径为 NULL，由 HICON 自持）
+  HBITMAP mask;
+} WmIcon;
+static WmIcon wm_icons[WM_MAX_ICONS];
+
+/* 前置声明：wm_icon_load_file 的 WIC 回退路径要调它（定义在其后）。 */
+int wm_icon_from_png(const unsigned char *data, int len);
+
+static int wm_icon_slot(void) {
+  for (int i = 1; i < WM_MAX_ICONS; i++) {
+    if (wm_icons[i].hicon == NULL) {
+      return i;
+    }
+  }
+  return 0;
+}
+
+static int wm_icon_store(HICON ic, HBITMAP color, HBITMAP mask) {
+  if (ic == NULL) {
+    return 0;
+  }
+  int slot = wm_icon_slot();
+  if (slot == 0) {
+    return 0; // 表满：不销毁，交调用方决定（此处调用方会自清）
+  }
+  wm_icons[slot].hicon = ic;
+  wm_icons[slot].color = color;
+  wm_icons[slot].mask = mask;
+  return slot;
+}
+
+/* 32bpp BGRA（自顶向下）→ HICON。mask 用全 0 单色位图；CreateIconIndirect 在
+ * 32bpp 颜色位图上认 alpha 通道做混合，故像素必须是**预乘** alpha（与 Bitmap 同）。 */
+int wm_icon_from_bgra(const unsigned char *px, int w, int h) {
+  if (px == NULL || w <= 0 || h <= 0) {
+    return 0;
+  }
+  BITMAPV5HEADER bi;
+  memset(&bi, 0, sizeof(bi));
+  bi.bV5Size = sizeof(bi);
+  bi.bV5Width = w;
+  bi.bV5Height = -h; // 负高 = 自顶向下，与 Bitmap 行序一致
+  bi.bV5Planes = 1;
+  bi.bV5BitCount = 32;
+  bi.bV5Compression = BI_BITFIELDS;
+  bi.bV5RedMask = 0x00FF0000u;
+  bi.bV5GreenMask = 0x0000FF00u;
+  bi.bV5BlueMask = 0x000000FFu;
+  bi.bV5AlphaMask = 0xFF000000u;
+  HDC hdc = GetDC(NULL);
+  void *bits = NULL;
+  HBITMAP color =
+      CreateDIBSection(hdc, (BITMAPINFO *)&bi, DIB_RGB_COLORS, &bits, NULL, 0);
+  ReleaseDC(NULL, hdc);
+  if (color == NULL || bits == NULL) {
+    if (color != NULL) {
+      DeleteObject(color);
+    }
+    return 0;
+  }
+  memcpy(bits, px, (size_t)w * (size_t)h * 4u);
+  HBITMAP mask = CreateBitmap(w, h, 1, 1, NULL);
+  ICONINFO ii;
+  memset(&ii, 0, sizeof(ii));
+  ii.fIcon = TRUE;
+  ii.hbmColor = color;
+  ii.hbmMask = mask;
+  HICON ic = CreateIconIndirect(&ii);
+  if (ic == NULL) {
+    DeleteObject(color);
+    if (mask != NULL) {
+      DeleteObject(mask);
+    }
+    return 0;
+  }
+  int slot = wm_icon_store(ic, color, mask);
+  if (slot == 0) {
+    DestroyIcon(ic);
+    DeleteObject(color);
+    if (mask != NULL) {
+      DeleteObject(mask);
+    }
+  }
+  return slot;
+}
+
+/* 把整个文件读进 malloc 缓冲（returned 长度经 out_len）。读不到给 NULL。 */
+static unsigned char *wm_read_file_all(const char *path, int *out_len) {
+  FILE *f = fopen(path, "rb");
+  if (f == NULL) {
+    return NULL;
+  }
+  if (fseek(f, 0, SEEK_END) != 0) {
+    fclose(f);
+    return NULL;
+  }
+  long n = ftell(f);
+  if (n <= 0 || n > (long)(64 * 1024 * 1024)) { // 64MB 上限防呆
+    fclose(f);
+    return NULL;
+  }
+  rewind(f);
+  unsigned char *buf = (unsigned char *)malloc((size_t)n);
+  if (buf == NULL) {
+    fclose(f);
+    return NULL;
+  }
+  size_t got = fread(buf, 1, (size_t)n, f);
+  fclose(f);
+  if (got != (size_t)n) {
+    free(buf);
+    return NULL;
+  }
+  *out_len = (int)n;
+  return buf;
+}
+
+/* 路径扩展名是否为 ico/bmp（Win32 原生可加载的图标格式）。 */
+static int wm_path_is_native_icon(const char *path) {
+  const char *dot = strrchr(path, '.');
+  if (dot == NULL) {
+    return 0;
+  }
+  char ext[8];
+  size_t n = strlen(dot + 1);
+  if (n >= sizeof(ext)) {
+    return 0;
+  }
+  for (size_t i = 0; i < n; i++) {
+    char c = dot[1 + i];
+    if (c >= 'A' && c <= 'Z') {
+      c = (char)(c - 'A' + 'a');
+    }
+    ext[i] = c;
+  }
+  ext[n] = '\0';
+  return strcmp(ext, "ico") == 0 || strcmp(ext, "bmp") == 0;
+}
+
+/* 磁盘图标：`.ico`/`.bmp` 走 LoadImageW（原生、最准）；其余（PNG/JPEG/GIF…）
+ * 读文件字节走 WIC 解码。两条都失败给 0。size<=0 用系统默认大小。 */
+int wm_icon_load_file(const char *path, int size) {
+  if (path == NULL || path[0] == '\0') {
+    return 0;
+  }
+  if (wm_path_is_native_icon(path)) {
+    WCHAR *wp = wm_utf8_to_wide(path);
+    if (wp != NULL) {
+      UINT flags = LR_LOADFROMFILE;
+      if (size <= 0) {
+        flags |= LR_DEFAULTSIZE;
+      }
+      HICON ic =
+          (HICON)LoadImageW(NULL, wp, IMAGE_ICON, size, size, flags);
+      free(wp);
+      if (ic != NULL) {
+        int slot = wm_icon_store(ic, NULL, NULL);
+        if (slot == 0) {
+          DestroyIcon(ic);
+        }
+        return slot;
+      }
+    }
+    // 落到 WIC 再试（例如把 PNG 命名成 .bmp 的怪文件）
+  }
+  int len = 0;
+  unsigned char *buf = wm_read_file_all(path, &len);
+  if (buf == NULL) {
+    return 0;
+  }
+  int slot = wm_icon_from_png(buf, len);
+  free(buf);
+  return slot;
+}
+
+/* WIC 从内存解码 PNG/JPEG/GIF/BMP → 32bpp BGRA → HICON。COM 已初始化则复用
+ * （RPC_E_CHANGED_MODE 说明别的套间先初始化过，WIC 仍可用）。 */
+int wm_icon_from_png(const unsigned char *data, int len) {
+  if (data == NULL || len <= 0) {
+    return 0;
+  }
+  HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+  if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
+    return 0;
+  }
+  IWICImagingFactory *factory = NULL;
+  IWICStream *stream = NULL;
+  IWICBitmapDecoder *decoder = NULL;
+  IWICBitmapFrameDecode *frame = NULL;
+  IWICFormatConverter *conv = NULL;
+  int slot = 0;
+  unsigned char *px = NULL;
+  // 用 CLSID_WICImagingFactory1（Vista 起的 WIC 工厂）：头文件在
+  // _WIN32_WINNT>=0x0602 时把 CLSID_WICImagingFactory 宏别名到 Win8 才有的
+  // Factory2，显式取 1 号可兼容旧系统（vtable 前缀一致，IID 仍用 v1）。
+  hr = CoCreateInstance(&CLSID_WICImagingFactory1, NULL, CLSCTX_INPROC_SERVER,
+                        &IID_IWICImagingFactory, (void **)&factory);
+  if (SUCCEEDED(hr)) {
+    hr = factory->lpVtbl->CreateStream(factory, &stream);
+  }
+  if (SUCCEEDED(hr)) {
+    hr = stream->lpVtbl->InitializeFromMemory(stream, (BYTE *)data, (DWORD)len);
+  }
+  if (SUCCEEDED(hr)) {
+    hr = factory->lpVtbl->CreateDecoderFromStream(
+        factory, (IStream *)stream, NULL, WICDecodeMetadataCacheOnDemand,
+        &decoder);
+  }
+  if (SUCCEEDED(hr)) {
+    hr = decoder->lpVtbl->GetFrame(decoder, 0, &frame);
+  }
+  if (SUCCEEDED(hr)) {
+    hr = factory->lpVtbl->CreateFormatConverter(factory, &conv);
+  }
+  if (SUCCEEDED(hr)) {
+    hr = conv->lpVtbl->Initialize(
+        conv, (IWICBitmapSource *)frame, &GUID_WICPixelFormat32bppBGRA,
+        WICBitmapDitherTypeNone, NULL, 0.0, WICBitmapPaletteTypeCustom);
+  }
+  if (SUCCEEDED(hr)) {
+    UINT w = 0, h = 0;
+    hr = conv->lpVtbl->GetSize(conv, &w, &h);
+    if (SUCCEEDED(hr) && w > 0 && h > 0) {
+      UINT stride = w * 4u;
+      px = (unsigned char *)malloc((size_t)stride * h);
+      if (px != NULL) {
+        hr = conv->lpVtbl->CopyPixels(conv, NULL, stride, stride * h, px);
+        if (SUCCEEDED(hr)) {
+          slot = wm_icon_from_bgra(px, (int)w, (int)h);
+        }
+      } else {
+        hr = E_OUTOFMEMORY;
+      }
+    }
+  }
+  if (px != NULL) {
+    free(px);
+  }
+  if (conv != NULL) {
+    conv->lpVtbl->Release(conv);
+  }
+  if (frame != NULL) {
+    frame->lpVtbl->Release(frame);
+  }
+  if (decoder != NULL) {
+    decoder->lpVtbl->Release(decoder);
+  }
+  if (stream != NULL) {
+    stream->lpVtbl->Release(stream);
+  }
+  if (factory != NULL) {
+    factory->lpVtbl->Release(factory);
+  }
+  return slot;
+}
+
+/* 释放一个图标句柄（幂等）。 */
+void wm_icon_free(int slot) {
+  if (slot <= 0 || slot >= WM_MAX_ICONS) {
+    return;
+  }
+  if (wm_icons[slot].hicon != NULL) {
+    DestroyIcon(wm_icons[slot].hicon);
+  }
+  if (wm_icons[slot].color != NULL) {
+    DeleteObject(wm_icons[slot].color);
+  }
+  if (wm_icons[slot].mask != NULL) {
+    DeleteObject(wm_icons[slot].mask);
+  }
+  memset(&wm_icons[slot], 0, sizeof(wm_icons[slot]));
+}
+
+/* 当前存活图标数（探针/测试用）。 */
+int wm_icon_alive(void) {
+  int n = 0;
+  for (int i = 1; i < WM_MAX_ICONS; i++) {
+    if (wm_icons[i].hicon != NULL) {
+      n++;
+    }
+  }
+  return n;
+}
+
+/* 取槽里的真 HICON（探针反读用；越界/空槽给 NULL）。 */
+void *wm_icon_handle(int slot) {
+  if (slot <= 0 || slot >= WM_MAX_ICONS) {
+    return NULL;
+  }
+  return (void *)wm_icons[slot].hicon;
+}
+
 /* ---- 原生消息框（W20d）---------------------------------------------------
  * MessageBoxW 一次调用就把框显示并**模态阻塞**到用户点按钮，返回按钮编号——
  * 没有回调、没有窗口槽，是最适合「阻塞式 FFI」的一条（与热键那种「寄存器 +
@@ -2425,6 +2739,32 @@ void wm_menu_apply(int64_t id, int bar) {
 }
 int wm_menu_poll(void) { return 0; }
 
+/* ---- 图标加载（W20f）GTK 分支占位：HICON 是 Win32 概念，托盘在 Linux 走 SNI
+ * 的图标名/像素通道（yue/dbus/sni.mbt），不需要本层转换；给可编译的失败桩，
+ * MoonBit 侧走「图标不可用」语义化路径（句柄 0）。 */
+int wm_icon_from_bgra(const unsigned char *px, int w, int h) {
+  (void)px;
+  (void)w;
+  (void)h;
+  return 0;
+}
+int wm_icon_load_file(const char *path, int size) {
+  (void)path;
+  (void)size;
+  return 0;
+}
+int wm_icon_from_png(const unsigned char *data, int len) {
+  (void)data;
+  (void)len;
+  return 0;
+}
+void wm_icon_free(int slot) { (void)slot; }
+int wm_icon_alive(void) { return 0; }
+void *wm_icon_handle(int slot) {
+  (void)slot;
+  return NULL;
+}
+
 /* ---- 原生消息框（W20d）GTK 分支：GtkMessageDialog 跑模态 run()，返回
  * GtkResponseType；MoonBit 侧返回值编号口径与 Win32 对齐（1 OK/2 CANCEL/
  * 3 ABORT/4 RETRY/5 IGNORE/6 YES/7 NO）。uType 里的图标/按钮段由 MoonBit 纯
@@ -2941,6 +3281,30 @@ void wm_menu_apply(int64_t id, int bar) {
   (void)bar;
 }
 int wm_menu_poll(void) { return 0; }
+
+/* W20f 图标加载占位（macOS 等）：HICON 是 Win32 概念，句柄 0 = 不可用。 */
+int wm_icon_from_bgra(const unsigned char *px, int w, int h) {
+  (void)px;
+  (void)w;
+  (void)h;
+  return 0;
+}
+int wm_icon_load_file(const char *path, int size) {
+  (void)path;
+  (void)size;
+  return 0;
+}
+int wm_icon_from_png(const unsigned char *data, int len) {
+  (void)data;
+  (void)len;
+  return 0;
+}
+void wm_icon_free(int slot) { (void)slot; }
+int wm_icon_alive(void) { return 0; }
+void *wm_icon_handle(int slot) {
+  (void)slot;
+  return NULL;
+}
 
 /* W20d 消息框占位（macOS 等）：返回 0 = 失败，MoonBit 层走语义化降级。
  * macOS 原生档是 NSAlert（ObjectC++ 单独 TU，将来随 mac 平台批补）。*/
