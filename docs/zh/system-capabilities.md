@@ -745,10 +745,10 @@ match @system.ffx_history(limit=10) {
 
 | 函数 | 说明 |
 |---|---|
-| `pr_available() -> Bool` | 当前平台是否支持子进程执行（仅 Linux，基于 `@subproc`） |
+| `pr_available() -> Bool` | 当前平台是否支持子进程执行（Linux / macOS / Windows 三主平台为真，基于 sys 包自有 C 桩） |
 | `pr_run(cmd, args, timeout_ms? = 5000) -> Result[ProcOutput, ProcError]` | 运行命令并归一结果（超时进程会被强制终止） |
 
-`ProcOutput{ stdout, exit_code }`；错误 `ProcError`：`Unsupported`（非 Linux）/ `SpawnFailed(String)`（命令不存在按 Unix 惯例由子进程以退出码 127 呈现，归入非零退出）/ `Timeout(String)` / `NonZeroExit(Int, String)` / `Signaled(Int)`。
+`ProcOutput{ stdout, exit_code }`；错误 `ProcError`：`Unsupported`（非 Linux / macOS / Windows 主平台）/ `SpawnFailed(String)`（命令不存在按 Unix 惯例由子进程以退出码 127 呈现，归入非零退出）/ `Timeout(String)` / `NonZeroExit(Int, String)` / `Signaled(Int)`。
 
 命令缺失与「存在但失败」是两种语义：前者在该模块自身通常归一为 `*Supported == false` 或 `Unsupported`（如 `PpUnsupported`、`PrtUnsupported`），后者是 `CommandFailed`——调用方按错误值分类处理即可。
 

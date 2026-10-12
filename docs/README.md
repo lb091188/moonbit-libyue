@@ -27,7 +27,7 @@ Heavier optional capabilities live in **separate modules**, not in sub-packages,
 | `NoahLiu/gui-examples` | The standalone example module (systemprobe, native-web) that depends on `gui-media`. |
 
 **Two different layers of "optional" — keep them apart**: a **sub-package** you do not import costs nothing in your binary (the `moon.pkg` import is the compile/link boundary); a **module** you do not depend on is not even resolved or prebuilt (the `moon.mod` import defines the dependency closure). A capability can only reach the second layer by living in its own module.
-| `.../yue/system` | `@system` | OS capabilities: autostart, single instance, power & sessions, volume, brightness, media keys, wallpaper, Bluetooth, printers, disk volumes, browser history… (pulls in subproc / sqlite) |
+| `.../yue/system` | `@system` | OS capabilities: autostart, single instance, power & sessions, volume, brightness, media keys, wallpaper, Bluetooth, printers, disk volumes, browser history… (pulls in sqlite) |
 | `.../yue/browser` | `@browser` | Webview widget — import only if you need it (it is the only package that links WebKit/WebView2) |
 
 The tutorial imports core + declarative; the themed component library and everything above it is opt-in.

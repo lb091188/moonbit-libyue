@@ -27,7 +27,7 @@
 | `NoahLiu/gui-examples` | 独立示例模块（systemprobe、native-web），依赖 `gui-media`。 |
 
 **两种「可选」不要混**：没 import 的**子包**不进二进制（`moon.pkg` 的 import 是编译/链接边界）；没依赖的**模块**连解析与 prebuild 都不会发生（`moon.mod` 的 import 定义依赖闭包）。能力要做到后者，就必须住在自己的模块里。
-| `.../yue/system` | `@system` | 系统能力:自启动 / 单实例 / 电源与会话 / 音量 / 亮度 / 媒体按键 / 壁纸 / 蓝牙 / 打印机 / 磁盘卷 / 浏览器历史…(带入 subproc / sqlite 依赖) |
+| `.../yue/system` | `@system` | 系统能力:自启动 / 单实例 / 电源与会话 / 音量 / 亮度 / 媒体按键 / 壁纸 / 蓝牙 / 打印机 / 磁盘卷 / 浏览器历史…(带入 sqlite 依赖) |
 | `.../yue/browser` | `@browser` | 网页视图控件——只有真需要时才 import(唯一链接 WebKit/WebView2 的包) |
 
 教程导入的是 核心 + declarative;主题组件库及其上层按需引入。

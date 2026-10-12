@@ -5,6 +5,8 @@ import {
   "NoahLiu/native-gui/core",
   "NoahLiu/native-gui/text" @text,
   "NoahLiu/native-gui/ui",
+  "NoahLiu/native-gui/chart" @charts,
+  "NoahLiu/native-gui/theme",
   "NoahLiu/native-gui/examples/showcase/shared",
 }
 
