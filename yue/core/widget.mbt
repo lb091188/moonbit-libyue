@@ -401,7 +401,6 @@ fn dispatch_on_path(path : Array[Widget], ev : PointerEvent) -> Bool {
       if i >= path.length() {
         break
       }
-      i = i + 1
     } else {
       if i <= 0 {
         break
@@ -419,6 +418,12 @@ fn dispatch_on_path(path : Array[Widget], ev : PointerEvent) -> Bool {
     match w.on_pointer {
       Some(f) => handled = f(w, at_local)
       None => ()
+    }
+    // 祖先优先是**先取后进**：这里自增，正好在路径末项之后退出循环
+    // （早先写成取下标前自增——路径只有一项时 path[1] 直接越界，实测右键点击
+    // 必崩：PanicError at dispatch_on_path）
+    if ancestor_first {
+      i = i + 1
     }
   }
   handled
