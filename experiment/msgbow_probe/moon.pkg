@@ -1,0 +1,8 @@
+import {
+  "moonbitlang/core/env",
+  "NoahLiu/moonbit-libyue/yue/win",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"

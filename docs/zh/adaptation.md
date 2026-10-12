@@ -135,6 +135,26 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **WIC 画布两条陷阱**：①**不能**用 `CreateBitmapFromMemory` 包外部缓冲再让 D2D 画——那走 WIC 内部缓存，读不回你的缓冲（现象：ink=0 而返回值成功），要自持位图 + 绘制后 `Lock(WICBitmapLockRead)` 读回；②用「全透明笔 `FillRectangle`」清画布是**空操作**（源覆盖语义），必须 `Clear`——它吃轴对齐裁剪，所以能只清本次区域（缓存画布比本次大时正好用上）。
 - **回证方式**：`experiment/key_probe`（建窗→泵→打印键码，配 PowerShell `AppActivate`+`SendKeys`）验键盘通路；`experiment/text_bench` 守文字路径性能；截图核对窗口内容（本机用 PowerShell 抓屏 PNG 看图判色）；`App::step`/`paint_frame` 的临时分段计时（PAINT-PROF/STEP-PROF）定位过瓶颈，已撤。全绿复核：core 70 / input 10 / ui 110 / render 43 / text 29 / chart 189 / theme 8 / mdview 26 / sys 165，全仓红点 287/68 持平。
 
+### MoonBit 原生 GUI 栈 · Windows 基础能力首批（W20a 菜单栏 / W20b 全局快捷键 / W20d 消息框）
+
+- **环境与绕开工具链的验证路径**：Windows 10 19045 + VS BuildTools 2022（MSVC **14.44.35207**，在 `C:\Program Files (x86)\Microsoft Visual Studio\...`；`C:\Program Files\...` 是空目录、会白找）+ SDK 10.0.26100。`vcvars64.bat` 被 reg.exe 策略挡住，手工编纯 C 探针要自己设 `INCLUDE`/`LIB`，且必须用 Windows 风格路径（`/c/...` 会被 cl 当源文件）：
+  ```bash
+  MSVC='C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207'
+  SDK='C:\Program Files (x86)\Windows Kits\10'
+  export INCLUDE="$MSVC\include;$SDK\Include\10.0.26100.0\ucrt;$SDK\Include\10.0.26100.0\shared;$SDK\Include\10.0.26100.0\um;$SDK\Include\10.0.26100.0\winrt"
+  export LIB="$MSVC\lib\x64;$SDK\Lib\10.0.26100.0\ucrt\x64;$SDK\Lib\10.0.26100.0\um\x64"
+  MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$MSVC/bin/Hostx64/x64/cl.exe" \
+    /nologo /W4 /utf-8 /O2 /DWIN32 /D_WINDOWS /DUNICODE /D_UNICODE <探针>.c \
+    /Fe:<探针>.exe user32.lib gdi32.lib imm32.lib advapi32.lib
+  ```
+  纯 C 探针 `experiment/menu_probe/menu_backend_probe.c` 直接 `#include "../../yue/win/stub.c"`——因为 `wm_menu_bar_new` 返回的是**句柄表下标**（1..31）而非真 `HMENU`，反读菜单结构必须同 TU 拿静态表 `wm_menus[]`（第一版拿下标当 `HMENU` 传给 `GetMenuItemCount`，满屏 `-1`）。
+- **纯 C 探针的 include 编译必须显式 `-DUNICODE`/`-D_UNICODE`**：不带时 `IDC_ARROW` 等是 `MAKEINTRESOURCEA` 形态（`LPSTR`），传给 `...W` 形参报 **C4133**（`stub.c:388-396`、`646`）；带上后零新增告警（`stub.c` 自身 `wcsncpy`/`wcsncat` 的 C4996 是既有告警）。`moon` 的 native-stub 本就定义 UNICODE（W2 小节已记），故生产链吃不到这两条 C4133。
+- **`AppendMenuW` 单菜单项数上限实测 ≈1168**（本机 bulk 循环第 1169 项起返回 0），**远低于命令 id 池 2048**。由此定两条：①**命令 id 必须「挂载成功后才推进游标」**——原实现先 `cmd = next++` 再 `AppendMenuW`，失败照样吃掉一个 id；反复失败（菜单超限）会让配额提前耗尽，进而与其他菜单在用的 id 相撞（`WM_COMMAND` 只带 id，撞了就把点击派给错项）。修正为 `cmd = next`，`AppendMenuW` 成功后再 `next = cmd + 1`（到池尾归位 `BASE`）。②`WM_MENU_CMD_MAX=2048` 要**刻意大于单菜单上限**：池 ≥ 单菜单上限才保证「只填一个菜单绝不回绕」、菜单自身 id 不自相撞；把池收紧到「实测上限」反而让满菜单撞上回绕。探针据此重写回绕用例——跨菜单填满 2048 个 id 后再在**有空间的新菜单**上加一项，验证它拿到归位后的 1000（单菜单永远耗不尽池子，第一版断言不可达）。
+- **`\t` 拼进标签即加速键提示**：`AppendMenuW` 会把 `\t` 之后的部分右对齐显示（探针用 `GetMenuItemInfoW` 读回，校验中文 UTF-8→UTF-16 往返 + `\tCtrl+Alt+Q` 提示串存在）。真正的加速键表（`TranslateAccelerator`）未接，菜单打开后的键盘导航/快捷键暂靠 W20b 全局热键。
+- **消息框（W20d）是栈内第二种 FFI 形态——「阻塞式」**：`MessageBoxW` 一次调用即显示并**模态阻塞**到用户点按钮、返回按钮编号，没有回调也没有窗口槽；`uType` 的四段位组合（图标 + 按钮）由 MoonBit 侧纯函数算好传进来（探针真机跑出 `icon=64 btn=0 raw=327744`）。与菜单/热键那种「寄存 + 泵里抽」的异步形态正交。
+- **全局快捷键（W20b）挂在**线程**消息队列而非窗口**：`RegisterHotKey` 的 `WM_HOTKEY` 进的是注册线程队列，WndProc 收不到——与菜单同制，桩侧 `wm_hotkey_poll` 在 MoonBit 泵里主动抽。加速键串解析（`"CmdOrCtrl+Shift+M"` → 修饰位 + 虚拟键码）抽成三平台同源纯函数（`CmdOrCtrl` 在 Win 映射 Ctrl、mac 映射 Cmd），10/10。
+- **回证**：`experiment/menu_probe/menu_backend_probe.c` 纯 C 探针 `MENU-BACKEND-OK`（菜单条/子菜单/命令 id/分隔线/勾选/嵌套/中文标签/非法父句柄/句柄表用尽/id 回绕全过）；`experiment/menu_probe` 的 MoonBit 侧验模型树 `MENU-OK`；`yue/core/menu_wbtest.mbt` 10/10、`yue/win/hotkey_wbtest.mbt` 10/10、`yue/win/message_box_wbtest.mbt` 8/8 真跑通过。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。

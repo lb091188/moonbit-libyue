@@ -28,7 +28,6 @@ pub(all) struct Window {
 pub fn init_backend() -> Bool {
   wm_init() == 1
 }
-
 ///|
 /// 单调时钟毫秒读数，供 Loop 的定时器与 `wait` 预算使用。
 pub fn now_ms() -> Int64 {
@@ -224,4 +223,111 @@ pub fn sys_color_scheme() -> String {
 /// 系统主色（`#rrggbb`）；系统没有「主色」概念时给空串。
 pub fn sys_accent() -> String {
   sys_read(wm_sys_accent)
+}
+
+///|
+/// 注册一个全局快捷键（进程级，与窗口无关）。`mods` 用内核 MOD_* 位
+/// （1 shift / 2 ctrl / 4 alt / 8 meta）、`vk` 是 Win32 虚拟键码（非
+/// Windows 后端忽略）。返回注册 id（>=1）——`None` 表示注册失败：组合键
+/// 被系统或别的程序占用（X11 下 XGrabKey 排他；Win32 的 RegisterHotKey
+/// 同样会失败）、表满、或后端不支持（占位分支恒 None）。
+pub fn register_global_shortcut(mods : Int, vk : Int) -> Int? {
+  let id = wm_hotkey_register(mods, vk)
+  if id <= 0 {
+    None
+  } else {
+    Some(id)
+  }
+}
+
+///|
+/// 注销全局快捷键（幂等）。
+pub fn unregister_global_shortcut(id : Int) -> Unit {
+  wm_hotkey_unregister(id)
+}
+
+///|
+/// 取一个已触发的快捷键 id；没有则 None。宿主每帧/每拍调用（Win32 的
+/// WM_HOTKEY 进线程队列，靠泵里抽；Linux 后端同形）。
+pub fn poll_global_shortcut() -> Int? {
+  let id = wm_hotkey_poll()
+  if id <= 0 {
+    None
+  } else {
+    Some(id)
+  }
+}
+
+///|
+/// 弹一个原生模态消息框，阻塞到用户点按钮，返回语义化结果。
+/// `kind` 定图标、`buttons` 定按钮集（两者由 `message_box_utype` 合成 Win32
+/// `uType`）；`default_index` 是默认聚焦的按钮序号（0 起，越界当 0）。后端不可
+/// 用（macOS 占位 / 无显示服务）或内存不足时返回 `Failed`——调用方据
+/// `message_box_result_is_affirmative` 判「继续/取消」即可。
+pub fn show_message_box(
+  title : String,
+  text : String,
+  kind : MessageBoxKind,
+  buttons : MessageBoxButtons,
+  default_index? : Int = 0,
+) -> MessageBoxResult {
+  let utype = message_box_utype(kind, buttons, default_index~)
+  message_box_result_of(
+    wm_message_box(@utf8.encode(title), @utf8.encode(text), utype),
+  )
+}
+
+///|
+/// 建一个空的原生菜单条，返回其句柄（0 = 后端不支持/表满）。句柄归平台后端
+/// 所有，`Menu::apply` 时把它交给窗口；窗口销毁时后端一并释放。
+/// 供 `yue/core/menu.mbt` 的翻译层使用——调用方一般用模型层，不直接碰这个。
+pub fn menu_bar_new() -> Int {
+  wm_menu_bar_new()
+}
+
+///|
+/// 在父菜单（句柄）下加一个子菜单，返回子菜单句柄（0 = 失败）。
+pub fn menu_new_sub(parent : Int, title : String) -> Int {
+  wm_menu_new_sub(parent, @utf8.encode(title))
+}
+
+///|
+/// 在父菜单（句柄）下加一项，返回命令 id（>=1000；分隔线返回 0，失败也 0）。
+/// `kind`：0 command / 1 check / 2 radio / 3 separator；`role`：-1 普通、
+/// 0..6 见 `yue/core/menu.mbt` 的 `menu_role_id`（Win32 无 role，暂忽略）；
+/// `acc` 为加速键描述串（"" 表示无）；`checked` 给复选/单选初值。
+pub fn menu_add_item(
+  parent : Int,
+  label : String,
+  kind : Int,
+  role : Int,
+  acc : String,
+  checked : Bool,
+) -> Int {
+  wm_menu_add_item(
+    parent,
+    @utf8.encode(label),
+    kind,
+    role,
+    @utf8.encode(acc),
+    if checked { 1 } else { 0 },
+  )
+}
+
+///|
+/// 把菜单条（句柄，0 = 拆掉当前菜单）挂到窗口。
+pub fn menu_apply(id : Int64, bar : Int) -> Unit {
+  wm_menu_apply(id, bar)
+}
+
+///|
+/// 取一个已触发的菜单命令 id；没有则 None。宿主每帧/每拍调用（Win32 的
+/// WM_COMMAND 进窗口消息队列，靠泵里抽）。
+pub fn poll_menu_command() -> Int? {
+  let cmd = wm_menu_poll()
+  if cmd <= 0 {
+    None
+  } else {
+    Some(cmd)
+  }
 }

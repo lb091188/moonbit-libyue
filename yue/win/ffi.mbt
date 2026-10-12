@@ -187,3 +187,44 @@ extern "c" fn wm_window_origin(
   out_x : Ref[Int],
   out_y : Ref[Int],
 ) -> Unit = "wm_window_origin"
+
+///|
+extern "c" fn wm_hotkey_register(mods : Int, vk : Int) -> Int = "wm_hotkey_register"
+
+///|
+extern "c" fn wm_hotkey_unregister(id : Int) -> Unit = "wm_hotkey_unregister"
+
+///|
+extern "c" fn wm_hotkey_poll() -> Int = "wm_hotkey_poll"
+
+///|
+#borrow(title, text)
+extern "c" fn wm_message_box(
+  title : Bytes,
+  text : Bytes,
+  utype : Int,
+) -> Int = "wm_message_box"
+
+///|
+extern "c" fn wm_menu_bar_new() -> Int = "wm_menu_bar_new"
+
+///|
+#borrow(title)
+extern "c" fn wm_menu_new_sub(parent : Int, title : Bytes) -> Int = "wm_menu_new_sub"
+
+///|
+#borrow(label, acc)
+extern "c" fn wm_menu_add_item(
+  parent : Int,
+  label : Bytes,
+  kind : Int,
+  role : Int,
+  acc : Bytes,
+  checked : Int,
+) -> Int = "wm_menu_add_item"
+
+///|
+extern "c" fn wm_menu_apply(id : Int64, bar : Int) -> Unit = "wm_menu_apply"
+
+///|
+extern "c" fn wm_menu_poll() -> Int = "wm_menu_poll"

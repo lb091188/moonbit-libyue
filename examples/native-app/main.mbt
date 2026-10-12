@@ -698,6 +698,186 @@ fn make_media_section(
 }
 
 ///|
+/// W20b 全局快捷键区块：注册/注销计数 + 最近触发次数与键名。
+/// 真按键触发需人工（切到别的程序按 Ctrl+Alt+F9）——宿主每拍经
+/// `@win.poll_global_shortcut` 抽取，命中即累加。
+fn make_hotkey_section(
+  hits : Ref[Int],
+  last : Ref[String],
+) -> @core.Node {
+  @ui.container(
+    [
+      @ui.label(
+        "全局快捷键（W20b）：注册 Ctrl+Alt+F9 / Ctrl+Alt+F10，切到别的程序按下应计数",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [
+          @core.node_of(live_counter(
+            fn() -> String {
+              "触发次数 " +
+              hits.val.to_string() +
+              "  最近 " +
+              last.val
+            },
+            width=260.0,
+          )),
+        ],
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
+/// W20d 原生消息框区块：点按钮弹 Win32 `MessageBoxW`（模态，阻塞到点按），
+/// 返回值编号与语义写进状态行。按钮组合走图表式切换（是/否/取消 与 错误图标）。
+/// 真弹框是人触发（不是开机自弹）——避免冒烟期阻塞。
+fn make_message_box_section(
+  last : Ref[String],
+  shots : Ref[Int],
+) -> @core.Node {
+  let on_confirm = fn() -> Unit {
+    shots.val = shots.val + 1
+    let r = @win.show_message_box(
+      "libyue W20d",
+      "原生 MessageBoxW：点「是」或「否」看状态行编号。",
+      Information,
+      YesNo,
+    )
+    last.val = msgbox_result_label(r)
+  }
+  let on_error = fn() -> Unit {
+    shots.val = shots.val + 1
+    let r = @win.show_message_box(
+      "libyue W20d",
+      "错误档 + 是/否/取消：三个按钮都能收回编号。",
+      Error,
+      YesNoCancel,
+    )
+    last.val = msgbox_result_label(r)
+  }
+  @ui.container(
+    [
+      @ui.label(
+        "原生消息框（W20d）：点按钮弹 Win32 MessageBoxW，关掉后状态行报返回编号",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [
+          @ui.button_t("信息 是/否", on_click=on_confirm, variant=Solid),
+          @ui.button_t("错误 是/否/取消", on_click=on_error, variant=Danger),
+          @core.node_of(live_counter(
+            fn() -> String { "弹框次数 " + shots.val.to_string() + "  最近 " + last.val },
+            width=260.0,
+          )),
+        ],
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
+/// MessageBoxResult → 状态行可读标签（含编号，便于与 Win32 口径对照）。
+fn msgbox_result_label(r : @win.MessageBoxResult) -> String {
+  match r {
+    Ok => "OK(1)"
+    Cancel => "CANCEL(2)"
+    Abort => "ABORT(3)"
+    Retry => "RETRY(4)"
+    Ignore => "IGNORE(5)"
+    Yes => "YES(6)"
+    No => "NO(7)"
+    Failed => "FAILED(0)"
+  }
+}
+
+///|
+/// W20a 原生菜单栏区块：把 MenuBar 模型翻译成 Win32 原生菜单（CreateMenu +
+/// SetMenu），点菜单项经 WM_COMMAND 回收并派发到模型回调。跨平台模型在
+/// `yue/core/menu.mbt`，这里只做展示与状态行回证。
+fn make_menu_section(
+  hits : Ref[Int],
+  last : Ref[String],
+  applied : Ref[Bool],
+) -> @core.Node {
+  @ui.container(
+    [
+      @ui.label(
+        "原生菜单栏（W20a）：菜单模型 → Win32 原生菜单，点「文件/编辑/查看」下的项应计数",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [
+          @core.node_of(live_counter(
+            fn() -> String {
+              (if applied.val { "已挂载" } else { "未挂载" }) +
+              "  点击 " +
+              hits.val.to_string() +
+              "  最近 " +
+              last.val
+            },
+            width=320.0,
+          )),
+        ],
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
+/// 构建演示用菜单条：文件（新建/打开/保存 + 分隔 + 退出角色项）、
+/// 编辑（复制/剪切/粘贴/全选角色项）、查看（自动换行勾选项 + 主题单选组）。
+/// 点中任一项把标签写进状态行——证明 WM_COMMAND 已回收到模型回调。
+fn build_demo_menu_bar(
+  hits : Ref[Int],
+  last : Ref[String],
+) -> @core.MenuBar {
+  let note = fn(label : String) -> Unit {
+    hits.val = hits.val + 1
+    last.val = label
+  }
+  let bar = @core.MenuBar::new()
+  let file = bar.add_menu("文件")
+  let _ = file.add_item("新建").set_on_click(fn() { note("文件/新建") })
+  let _ = file.add_item("打开").set_on_click(fn() { note("文件/打开") })
+  let _ = file.add_item("保存").set_on_click(fn() { note("文件/保存") })
+  let _ = file.add_separator()
+  let _ = file.add_role_item(@core.Quit).set_on_click(fn() { note("文件/退出") })
+  let edit = bar.add_menu("编辑")
+  let _ = edit.add_role_item(@core.Copy).set_on_click(fn() { note("编辑/复制") })
+  let _ = edit.add_role_item(@core.Cut).set_on_click(fn() { note("编辑/剪切") })
+  let _ = edit.add_role_item(@core.Paste).set_on_click(fn() { note("编辑/粘贴") })
+  let _ = edit.add_role_item(@core.SelectAll).set_on_click(fn() { note("编辑/全选") })
+  let view = bar.add_menu("查看")
+  let wrap = view.add_check_item("自动换行")
+  wrap.set_on_click(fn() { note("查看/自动换行") })
+  let _ = view.add_radio_item("浅色主题").set_on_click(fn() { note("查看/浅色") })
+  let _ = view.add_radio_item("深色主题").set_on_click(fn() { note("查看/深色") })
+  bar
+}
+
+///|
 /// 交互图表区块：折线/柱状/环形三个交互版并排——hover 浮层、图例点击显隐、
 /// 滚轮缩放（折线与柱状共用调用方持有的 CiZoom，退出状态行报窗口读数；
 /// 环形无缩放）。
@@ -1542,6 +1722,43 @@ fn main {
   let gif_w : Ref[@core.Widget?] = Ref(None)
   let ib_w : Ref[@core.Widget?] = Ref(None)
   app.mount([make_media_section(gif_h, ib_hits, gif_w, ib_w)])
+  // W20b（全局快捷键）：注册两个组合（较冷门，避免与系统/别的程序冲突）。
+  // 注册失败（被占用/后端不支持）也照挂区块，退出状态行如实报 id=0。
+  let hotkey_hits = Ref(0)
+  let hotkey_last : Ref[String] = Ref("-")
+  let hotkey_ids : Ref[(Int, Int)] = Ref((0, 0))
+  for kv in [("Ctrl+Alt+F9", 0), ("Ctrl+Alt+F10", 1)] {
+    match @win.parse_accelerator(kv.0, false) {
+      Some(hk) =>
+        match @win.register_global_shortcut(hk.mods, hk.vk) {
+          Some(id) =>
+            if kv.1 == 0 {
+              hotkey_ids.val = (id, hotkey_ids.val.1)
+            } else {
+              hotkey_ids.val = (hotkey_ids.val.0, id)
+            }
+          None => ()
+        }
+      None => ()
+    }
+  }
+  app.mount([make_hotkey_section(hotkey_hits, hotkey_last)])
+  // W20d（原生消息框）：按钮触发，退出状态行报弹框次数与最近一次的返回标签。
+  let msgbow_shots = Ref(0)
+  let msgbow_last : Ref[String] = Ref("-")
+  app.mount([make_message_box_section(msgbow_last, msgbow_shots)])
+  // W20a（原生菜单栏）：MenuBar 模型翻译成 Win32 原生菜单挂到主窗。菜单点击经
+  // WM_COMMAND 回收，宿主每拍调 `dispatch_menu_command` 派发到模型回调。
+  // 后端不支持时 apply 返回 false，区块照挂（状态行如实报「未挂载」）。
+  let menu_hits = Ref(0)
+  let menu_last : Ref[String] = Ref("-")
+  let menu_bar = build_demo_menu_bar(menu_hits, menu_last)
+  let menu_applied = Ref(false)
+  // 菜单挂到 App 持有的那扇原生窗（App.window 是只读公开字段）
+  if menu_bar.apply_to(app.window) {
+    menu_applied.val = true
+  }
+  app.mount([make_menu_section(menu_hits, menu_last, menu_applied)])
   let ch_lin = @core.Store::new([])
   let ch_pushes = Ref(0)
   let ch_btn_w : Ref[@core.Widget?] = Ref(None)
@@ -2018,6 +2235,23 @@ fn main {
       if s0.0 != idx {
         car_sample.val = (idx, s0.1 + 1)
       }
+      // W20b：抽已触发的全局快捷键（Win32 的 WM_HOTKEY 进线程队列，靠泵抽）
+      match @win.poll_global_shortcut() {
+        Some(id) => {
+          hotkey_hits.val = hotkey_hits.val + 1
+          hotkey_last.val =
+            if id == hotkey_ids.val.0 {
+              "F9"
+            } else if id == hotkey_ids.val.1 {
+              "F10"
+            } else {
+              "id=" + id.to_string()
+            }
+        }
+        None => ()
+      }
+      // W20a：派发菜单命令（Win32 的 WM_COMMAND 经后端进队列，这里按 id 找回调执行）
+      let _ignored_hit = @core.dispatch_menu_command()
       app.schedule_paint()
       let _ = app.timer(500, ticker.val)
     }
@@ -2463,5 +2697,36 @@ fn main {
     }
     None => println("NATIVE-APP-MW-GEO -")
   }
+  // W20b（全局快捷键）回证：两个注册 id 与累计触发次数（真按键需人工）。
+  println(
+    "NATIVE-APP-HOTKEY id1=" +
+      hotkey_ids.val.0.to_string() +
+      " id2=" +
+      hotkey_ids.val.1.to_string() +
+      " hits=" +
+      hotkey_hits.val.to_string() +
+      " last=" +
+      hotkey_last.val,
+  )
+  // W20d（原生消息框）回证：弹框次数与最近一次的返回标签（真弹框需人工点按钮）。
+  println(
+    "NATIVE-APP-MSGBOX shots=" +
+      msgbow_shots.val.to_string() +
+      " last=" +
+      msgbow_last.val,
+  )
+  // W20a（原生菜单栏）回证：菜单是否挂上、菜单项被点几次、最近一项标签。
+  println(
+    "NATIVE-APP-MENU applied=" +
+      (if menu_applied.val { "1" } else { "0" }) +
+      " menus=" +
+      menu_bar.menu_count().to_string() +
+      " items=" +
+      menu_bar.total_item_count().to_string() +
+      " hits=" +
+      menu_hits.val.to_string() +
+      " last=" +
+      menu_last.val,
+  )
   app.shutdown()
 }

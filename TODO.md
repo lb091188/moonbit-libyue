@@ -7,6 +7,8 @@
 - **旧链路的完成项与实测结论不在本文件重述**：代码在 `master`（`shim + libyue`，0.5.x 与 `bin-*`/`vendor-*` 发布照旧），踩坑与验收细节在 [docs/zh/adaptation.md](docs/zh/adaptation.md) 与 `git log`。**凡旧栈做过、新栈尚未重做的能力，本文件一律记为未完成。**
 - **门禁口径（本分支例外）**：全仓 `moon check` 允许为红（红点=工作队列，只减不增，当前基线 **287 errors / 68 warnings**（2026-10-11 实测），明细见方案 §5）；逐批验收改分包：`yoga-mbt` 基线不掉 + 新栈各包 `moon check` 零警告且各自测试全绿；组件与声明式层接线完成的那一批恢复全仓门禁。
 - **验证示例归口**：GUI 侧的同类测试集中累积进 **`examples/native-app`**（宿主/控件/主题/图表/Markdown 各一页，不为单个特性新开示例）；系统能力侧集中进 **`examples/native-sys`**（已建）；webview 与媒体侧集中进 **`examples/native-web`**（批 B 起建，整页/分栏/桥接/播放器各一页）；`examples/native-window` 冻结为 G2–G5 的历史冒烟基准，不再往里加新特性。
+- **跟踪口径（2026-10-12 定）**：本文件**只跟踪跨平台能力**（三平台同构的 API 面、或「一个门面 + 各平台后端」的形态）。**纯 Linux 依赖的实现细节不再列为待办**——xrandr / wmctrl / xclip / sysfs / wpctl / pactl / CUPS / redshift / xfconf / gsettings / xdg-* / D-Bus 等命令线与总线面的适配，属「Linux 后端内部事务」，随各自能力批处理时按需实现，不进路线图。判据：一个条目若只在一个平台有意义（换个平台没有对应 API 可做）→ 不进 TODO；若换个平台有对应 API（tray/hotkey/通知/剪贴板/文件对话框/菜单栏…）→ 进 TODO，且**以「门面定形态 + 各平台后端」记账**。
+
 
 ## 1. 地基（新栈自身进度）
 
@@ -97,8 +99,8 @@
   - [x] `dialog` 落 `yue/sys/dialog.mbt`（GTK 端 `wm_file_*` 在 yue/win/gtk_stub.c：GtkFileChooserDialog 槽表、filters 解析、选项位、run 后才可取结果——未确认的 chooser 查 uri 会段错误桩侧拦下；sys 包不引 yue/win（parent 是纯句柄 id），链接由 prebuild 单独给 sys 下发 `-lyue_win_stub`）；**Windows 端同名实装在 `sys_stub.c` 的 `_WIN32` 分支**（W14）：IFileDialog（`CoInitializeEx` 幂等 + `CoCreateInstance(&CLSID_FileOpenDialog,…,&IID_IFileDialog,…)`——C 模式用不了 `__uuidof`，GUID 取头文件 extern 常量并链 `uuid.lib ole32.lib shell32.lib`），槽表容量 8 与 GTK 同制、三个选项位各有对应项（`FOS_PICKFOLDERS`/`FOS_ALLOWMULTISELECT`/`FOS_FORCESHOWHIDDEN`）、filters 拆 `COMDLG_FILTERSPEC`（同组多扩展并 `*.a;*.b`）、结果取 `GetDisplayName(SIGDN_FILESYSPATH)`；差异是父窗（HWND 属 yue/win 私有表，跨桩拿不到）故 `Show(NULL)`，自带模态消息泵。模态 run 与真选文件留真机复验
   - [x] `singleinstance` 落 `yue/dbus/instance.mbt`（总线名字声称 `RequestName(app_id, DO_NOT_QUEUE)` + 入站 `Wake`；二次启动唤起首实例后自行退出，示例回证）
 - [~] A 类平移 · 硬件族（六进 yue/sys；sensor/bluetooth 走 @traybus、disk 走 UDisks+@traybus，随 DBus 线）：
-  - [x] `brightness`（读路径 sysfs 全套 + 写路径 logind 探针/SetBrightness 改注入槽 `brightness_set_logind_probe`/`brightness_set_action`，DBus 线接入后注入实做）/ `volume`（wpctl/pactl + volx 增强）/ `nightlight`（redshift + gamma 载体）/ `printer`（lpadmin/lp CUPS）/ `powerprofile`（powerprofilesctl）/ `monitor`（xrandr，从会话族提前——夜灯的显示器枚举依赖它）
-  - [ ] `sensor`（iio-sensor-proxy）/ `bluetooth`（org.bluez）/ `disk`（UDisks2）随 DBus 线
+  - [x] `brightness`（读路径 sysfs 全套 + 写路径 logind 探针/SetBrightness 改注入槽 `brightness_set_logind_probe`/`brightness_set_action`，DBus 线接入后注入实做）/ `volume`（wpctl/pactl + volx 增强）/ `nightlight`（redshift + gamma 载体）/ `printer`（lpadmin/lp CUPS）/ `powerprofile`（powerprofilesctl）/ `monitor`（xrandr，从会话族提前——夜灯的显示器枚举依赖它）——**以上实现均为 Linux 命令线，按新口径不再跟踪非 Linux 后端**（非 Linux 无对应面或属各平台批内部事务）
+  - [ ] `sensor`（iio-sensor-proxy）/ `bluetooth`（org.bluez）/ `disk`（UDisks2）随 DBus 线（**仅 Linux 有对应面，按新口径不进路线图**；如需启用另立 Linux 侧文档）
 - [x] A 类平移 · 桌面集成族：`wallpaper`/`defaultapps`/`appfind`/`open_url`+`reveal`（文件管理器定位）/`recent_files`
   - [x] 桌面环境识别落 `yue/sys/desktop.mbt`（XDG_CURRENT_DESKTOP 冒号多值取首个可识别值）——不引旧链 `@traybus`（红点积压 + sys 反向供它用会成环），DBus 线接入后复用这一份
   - [x] `open_url`/`reveal` 落 `yue/sys/launcher.mbt`（xdg-open 走新的分离式启动桩 `yue_sys_spawn_detached`：fork→setsid→fork→execvp + CLOEXEC 管道回传 exec 成败，不阻塞、不留僵尸；`reveal` 的 FileManager1「打开并选中」随 DBus 线补，当前恒落「打开父目录」；Win/mac 分支随平台批）
@@ -107,18 +109,19 @@
   - [x] `recent_files` 落 `yue/sys/recent_files.mbt`（只读解析 `$XDG_DATA_HOME/recently-used.xbel`：手写 XBEL 扫描器 + XML 实体/百分号解码/ISO 8601 毫秒三只纯函数；Windows 的 Recent Documents 分支随平台批）
 - [x] A 类平移 · 历史族：`browser_history`（含下载）/`browser_bookmarks`/`firefox_history`/`vscode_history` 落 `yue/sys`（SQLite 直读磁盘文件走 `prowk/moonsqlitefile`、只读不写不复制原库；新增 `sys_read_bytes_file` 原始字节入口；profile 按固定候选名探测）。**三平台数据根已同步（W14e，平移 master 现成分支）**：Linux=`XDG_CONFIG_HOME`/`$HOME/.config`、Windows=`%LOCALAPPDATA%` 下的 `<厂商>/<产品>/User Data`（比 Linux 多一层 User Data）、macOS=`$HOME/Library/Application Support/<厂商>/<产品>`；定义表按平台分流（`bh_defs`），`bh_supported`/`bm_supported` 三平台为真，探测与解析逻辑共用
 - [~] A 类平移 · 会话与状态：`power`/`session`/`powerctl`/`online`/`idle`/`keepawake`/`clipboard_watch`/`locale_sys`/`sysinfo`/`windowctl`（monitor 已随硬件族提前）
-  - [x] `sysinfo`（/etc/os-release + /proc/meminfo + /proc/uptime + /sys/class/dmi/id 纯文本读；桩改成「以 ftell 作提示、按块 fread 到 EOF」，否则伪文件读到成功但空串）/ `windowctl`（`wmctrl -l -p` 列、`-i -a` 激活、`-c` 关闭；设置类动作只在调用方触发）/ `clipboard_watch`（`xclip -o` 只读轮询；排期能力作参数注入，sys 不引 GUI 核心层，GUI 层给 `@core.set_timeout`）
-  - [ ] `locale_sys` 的 `timedatectl` 半（可脱总线）+ `idle`（X11 ScreenSaver 扩展，走 `yue/win` 桩新增入口）
-  - [~] `power`/`session`/`online`/`keepawake`/`powerctl` 的**总线能力已在 `yue/dbus`**（`upower.mbt`/`logind.mbt`/`netmon.mbt`/`inhibit.mbt`，真总线回证）；`yue/sys` 侧与旧链同名的语义化包装（电量读数、挂起/休眠动作、在线判定、抑制睡眠）待随各能力线补
+  - [x] `sysinfo`（/etc/os-release + /proc/meminfo + /proc/uptime + /sys/class/dmi/id 纯文本读；桩改成「以 ftell 作提示、按块 fread 到 EOF」，否则伪文件读到成功但空串）/ `windowctl`（`wmctrl -l -p` 列、`-i -a` 激活、`-c` 关闭；设置类动作只在调用方触发）/ `clipboard_watch`（`xclip -o` 只读轮询；排期能力作参数注入，sys 不引 GUI 核心层，GUI 层给 `@core.set_timeout`）——`windowctl`/`clipboard_watch` 为 Linux 命令线，按新口径不再跟踪非 Linux 后端；`sysinfo` 的 `/proc`、`/etc` 读法属 Linux 后端细节
+  - [x] `locale_sys` 的 `timedatectl` 半（可脱总线）已落；`idle` 见 §6.2 **W21e**（跨平台门面）
+  - [~] `power`/`session`/`online`/`keepawake`/`powerctl` 的**总线能力已在 `yue/dbus`**（`upower.mbt`/`logind.mbt`/`netmon.mbt`/`inhibit.mbt`，真总线回证）；`yue/sys` 侧与旧链同名的语义化包装（电量读数、挂起/休眠动作、在线判定、抑制睡眠）待随各能力线补——**总线面为 Linux-only，按新口径不进路线图**；如需在非 Linux 提供同类能力，走 §6 的跨平台门面（如 W21a 通知）
 - [x] 系统能力累积验证页 `examples/native-sys`：五个面板全是只读探测（系统与机器 / 桌面与硬件 / 应用与文件类型 / 窗口与剪贴板 / 最近与历史），三键里只有「重新探测」只读（注入回证点它），「打开链接」「打开目录」属设置类由使用者点；退出打 `NATIVE-SYS-GEO` 与 `NATIVE-SYS-STAT` 两行，字段与屏上读数一一对应（GUI 侧的累计页仍是 `examples/native-app`）
 - [~] DBus 系在新事件循环下**重写/重验**：SNI 托盘（`traybus/sni.mbt`）、通知（新栈须重写 `org.freedesktop.Notifications`，含 `Notification::set_progress` 进度文本）、logind（`SetBrightness`/inhibit）、UPower、NetworkManager（`netmon`/`online`）、屏保 `screensaver`、媒体键 MPRIS（`media` 含状态监视轮询）
   - [x] 通用基建落新包 `yue/dbus`（`wire.mbt` 833 行 + `dbus.mbt` 419 行逐行平移，`bus.mbt` 剥掉 SNI/单实例语义后平移）：**不挂 glib fd 监视**——宿主周期调 `dbus_pump()`（缺省非阻塞）、断线自愈走 `dbus_set_post_delayed` 注入的通道，两者不注入时同步调用自带 `pump_until` 泵仍可用；socket 桩 `dbus_stub.c` 只用标准头、错误码与旧 shim 逐位一致；入站调用对外给 `CallReq`（`reply` 签名由参数值推导），线协议值类型不外泄。真总线回证 23/23（会话握手唯一名、ListNames、错误应答、AddMatch、系统总线 96 个名字）
   - [x] 能力模块首批（`yue/dbus`）：UPower / logind / netmon / screensaver / inhibit / MPRIS 逐行平移（测试同批平移并把旧 wbtest 的 inspect 换成 assert），MPRIS 轮询改排期通道注入；通知为新做（`GetCapabilities` 能力探测 + `Notify`/`CloseNotification`，进度 = `replaces_id` 重发 + 标准 hint `value`）；示例加 D-Bus 面板与「发通知(带进度)」按钮 + 宿主泵（`dbus_set_post_delayed` + 每 200ms `dbus_pump`），真窗口回证 `pool=:1.434`、通知能力 7 条
   - [x] SNI 托盘 + DBusMenu 落 `yue/dbus`（sni/icon/instance/filemanager 平移，bus 的托盘挂钩同批接回）；协议侧真总线回证：点示例「托盘图标」后 watcher 的 `RegisteredStatusNotifierItems` 9→10、退出对称注销；面板观感（图标出现/右键菜单/点击计数）留用户真机复验
   - [x] 单实例（总线名字 + Wake，示例回证二次启动唤起首实例后退出）与 `brightness` 的 logind 注入实做（`yue/dbus/bridge.mbt` 把探针与动作注进 `yue/sys` 的槽，注入后 `brightness_supported` 由假变真）
-- [ ] 新建项（master 全仓无资产，属新做）：任务栏进度、dock 徽标、勿扰
-- [ ] Wayland 后端：`idle`（X11 屏保扩展）/`windowctl`（wmctrl）/`clipboard_watch`（xclip）/`monitor`（xrandr）逐项定替代或降级
-- [ ] 平台分派随各能力同批（master 有 Win32 直连族与 mac ObjC++ 族可参照）；真机清单见 `docs/zh/plan-system-integration.md` B8
+  - **非 Linux 后端**：D-Bus 线本身是 Linux-only（`dbus_stub.c` 在 `_WIN32`/`__APPLE__` 为失败桩），但 **SNI 托盘 / 通知 / MPRIS 的跨平台面**已按新口径收进 §6（W20c 托盘、W21a 通知）；其余（logind/UPower/NetworkManager/屏保/inhibit）**无跨平台对应面，不再跟踪**
+- [ ] 新建项（master 全仓无资产，属新做）：**任务栏进度 / dock 徽标** 已收进 §6.3（W20 批，三平台各有原生面）；**勿扰** 随 W21a 通知门面
+- [x] Wayland 后端（`idle`/`windowctl`/`clipboard_watch`/`monitor` 的替代或降级）——**按新口径从路线图移除**：属 Linux 发行版内部事务，随各能力批按需处理，不进 TODO
+- [ ] 平台分派：**跨平台能力的各平台后端按 §6 批次推进**（Win 基础能力 W20 / MBT 通用门面 W21）；master 有 Win32 直连族与 mac ObjC++ 族可参照；真机清单见 `docs/zh/plan-system-integration.md` B8
 
 ### webview 与媒体（角色区 pane 模型；已锁决策与批次验收见方案 §4）
 
@@ -192,9 +195,111 @@
 ## 3. 里程碑
 
 - **M1** 新栈跑通一个完整 `showcase`（组件 + 图表 + 系统集成页），与旧链路逐页视觉对照 → 同时恢复全仓门禁
-- **M2** Windows 地基与输入通道
+- **M2** Windows 地基与输入通道（W1–W16 已落）＋ Win 基础能力（W20 批，§6）
 - **M3** macOS 地基（取得设备后）
 - **M4** 发布新版本并冻结旧 `shim + libyue` 链路
+
+## 6. 跨平台能力面（Win 基础能力 + MBT 通用能力）
+
+> **本节口径**（2026-10-12 定）：只记跨平台能力——即「换个平台有对应原生 API 可做」的能力，一律记成**「MBT 门面定形态 + 各平台后端」**；纯 Linux 依赖的实现细节（xrandr/wmctrl/xclip/sysfs/wpctl/CUPS/D-Bus…）不再列为待办。清单来源＝旧栈资产面（`yue/tray.mbt`/`menu.mbt`/`misc.mbt`/`widgets.mbt` 的 `Notification`/`register_global_shortcut`/`Tray`/`MenuBar`/`MessageBox`，见本仓实验区 vendored 副本 `experiment/async_coexist/lab/.mooncakes/NoahLiu/moonbit-libyue/yue/`）逐文件比对，剔除 Linux-only 后重排。
+>
+> **执行顺序**：W20 批（Win 基础能力，桩层 `yue/win/stub.c` 的 `_WIN32` 分支 + `yue/win/window.mbt` FFI）→ W21 批（MBT 通用门面，跨平台同构）→ 两者交汇处（托盘/通知/热键的门面统一）归 W22。每批独立可交付、独立提交。
+
+### 6.1 W20 · Win 基础能力（Windows 桩层，按现有范式）
+
+> 范式：`yue/win/stub.c` 的 `_WIN32` 分支加真实现 → `include` 或 `ffi.mbt` 声明 extern → `yue/win/window.mbt` 加 `Window::*` 方法 → 纯函数/探针可测的抽成纯函数 → `examples/native-app` 累积验证页加一节 → 真机项进人工清单。
+
+- [x] **W20a 原生菜单栏**（`Window::set_menu_bar`）——Win32 `CreateMenu`/`CreatePopupMenu`/`AppendMenuW`/`SetMenu`，菜单项点击走 `WM_COMMAND` 派发回 MoonBit 回调（桩侧另起「菜单项 id → 回调槽」表，与窗口槽同制）；对应旧栈 `MenuBar`/`Menu`/`MenuItem`（20 个公开方法）的跨平台形态。**MoonBit 侧模型 `yue/core/menu.mbt` 先定**（`MenuBar`/`Menu`/`MenuItem`/`MenuRole` 类型 + 纯函数树结构），平台后端只做「模型 → 原生菜单」翻译。**状态：已交付并验证**——纯 C 探针 `menu_backend_probe.c` 绕开 MoonBit 运行时直喂 `wm_menu_*` 并用 Win32 反读结构，`MENU-BACKEND-OK`（含实测发现并修的「失败也吃命令 id」缺陷与 id 池/单菜单上限关系）；`yue/core/menu_wbtest.mbt` 10/10、模型探针 `MENU-OK`、`moon check --deny-warn` 全绿、C 后端 MSVC `/W4` 干净
+- [x] **W20b 全局快捷键**（`register_global_shortcut(accelerator, cb) -> Int` / `unregister_global_shortcut(id)`）——Win32 `RegisterHotKey`/`UnregisterHotKey` + `WM_HOTKEY` 派发；加速键串解析（`"CmdOrCtrl+Shift+M"` → 修饰位 + 虚拟键码）抽成**纯函数**（三平台同源，`CmdOrCtrl` 在 Win 映射 Ctrl、mac 映射 Cmd）；注册 id 由桩侧递增分配、与窗口无关；对应旧栈 `register_global_shortcut`（返回 -1 表失败）。**状态：已交付并验证（纯函数 10/10、示例接线、退出状态行）**
+- [ ] **W20c 托盘**（`Tray` 门面）——Win32 `Shell_NotifyIconW`（NIM_ADD/NIM_MODIFY/NIM_DELETE）+ 右键菜单（复用 W20a 的菜单模型）+ 左键回调（`WM_APP+1` 自定义消息 + 托盘回调消息 `NIF_MESSAGE`）；图标走 `.ico`/位图（桩侧 `LoadImageW`）；对应旧栈 `Tray`（`new`/`set_title`/`set_icon`/`set_icon_name`/`set_tooltip`/`on_click`/`set_menu`/`remove`）；**门面 `yue/core/tray.mbt` 先定**（后端探测函数 `Tray::is_supported()` + `TrayBackend` 枚举），Linux 端接已有 SNI（`yue/dbus/sni.mbt`），Windows 端接本批桩
+- [x] **W20d 原生对话框 MessageBox**（`show_message_box(...)`）——Win32 `MessageBoxW`（含图标类型 + 按钮组合 + 返回值）；对应旧栈 `MessageBox`（`new`/`set_title`/`set_text`/`set_informative_text`/`add_button`/`on_response`/`show`/`show_for_window`/`close`）；**纯函数**：`MessageBoxType`/按钮集合 → Win32 `uType` 位组合映射。**状态：已交付并验证（纯函数 8/8、探针真机跑出正确 `uType`、示例接线）**
+- [ ] **W20e 窗口增强**——`Window::set_title`（`SetWindowTextW`，运行中改标题）/ `Window::set_icon`（`WM_SETICON` + `LoadImageW`）/ 最小尺寸（`WM_GETMINMAXINFO` 拦）/ 无边框拖拽区（`WM_NCHITTEST` 返回 `HTCAPTION` 的自绘标题栏支持）；均为 Win32 常规消息，逐条可探针验
+- [ ] **W20f 托盘/热键/菜单共用的图标加载**（`.ico` / PNG 位图 → `HICON`/`HBITMAP`）——与既有 WIC 解码路径（W5 落的 `dwrite_text.cpp` 旁）合流
+
+### 6.2 W21 · MBT 通用能力（跨平台同构，不依赖平台）
+
+- [ ] **W21a 通知门面**（`yue/core/notify.mbt` 或收口到 `yue/sys`）——统一 `notify_send`/`notify_close`/进度（`value` hint）的跨平台门面：Linux 接已有 `yue/dbus/notify.mbt`，Windows 接 Win32 通知（`Shell_NotifyIcon` 气泡 `NIF_INFO`，W20c 落地后同源），macOS 待真机；能力探测 `notify_supported()` + 语义化降级（不静默失败）
+- [ ] **W21b MessageBox 的自绘档**（`@ui` 模态对话框组件）——不依赖原生 `MessageBoxW` 的纯自绘版（标题/正文/按钮/返回值/模态遮罩），跨三平台同构；与 W20d 的原生档并存，调用方按需选（对应 §2 浮层族 `dialog_t` 已有基础，本批补 `MessageBox` 语义面：`informative_text`/多按钮/响应回调）
+- [ ] **W21c 拖放门面**（`DragData`）——数据模型 `DragData`（text/uri/image 等 `DataKind`）+ 控件钩子（拖源 `set_draggable` / 拖入 `on_drop`）；**接口先定形态、各平台后端随平台批**（旧栈 `yue/view.mbt` 的 `DragData` + `misc.mbt` 的 `Clipboard::get_data` 是参照面）；Linux 端建议先接 GTK 拖放（`gtk_drag_*`，与现有 GTK 桩同库），Windows 端 `IDropTarget`/`DoDragDrop` 随平台批
+- [ ] **W21d `autostart`**（开机自启门面）——三平台差异大但**面是跨平台的**：Windows 注册表 `Run` 键 / 启动文件夹、macOS LaunchAgents、Linux `.desktop`（`$XDG_CONFIG_HOME/autostart`）；旧栈 `yue/autostart.mbt` + `yue/system/autostart.mbt` 有资产可平移；本批先落 Windows + Linux 两端、macOS 留桩
+- [ ] **W21e `idle`**（空闲检测门面）——旧栈纯 Linux（X11 ScreenSaver）；本批定跨平台门面 `idle_seconds()`，Windows 接 `GetLastInputInfo`、macOS 接 `CGEventSourceSecondsSinceLastEventType`、Linux 接 X11 扩展（借 `yue/win` 桩新增入口）
+
+### 6.3 与既有 §1/§2 的接缝（不改口径，仅指向）
+
+- **§2「系统集成」里已有的跨平台能力**（剪贴板、文件对话框、`open_url`/`reveal`、浏览器历史/书签、`sysinfo`、主题跟随系统）**Windows 后端已落**（W14/W14e/W16），无需重开；**只差真机观感复验**（见 6.4）。
+- **§2「新建项」**（任务栏进度、dock 徽标、勿扰）与本节的「Win 基础能力」有重叠面——**任务栏进度**（Win32 `ITaskbarList3::SetProgressValue`）与 **dock 徽标**（macOS `NSDockTile`）建议**收进 W20 批一并做**（三平台各有原生面，符合跨平台口径）。
+- **`monitor`/`brightness`/`wallpaper`/`nightlight`/`volume`/`printer`/`powerprofile`/`windowctl`/`locale_sys` 等**——按新口径**不再在 TODO 逐条跟踪**（Linux 实现已是既有事实、非 Linux 无对应面或属各自平台批内部事务）；如后续启用平台批，按「各自能力批的内部事务」处理，不占路线图。
+
+### 6.4 真机验证（用户执行，助手只给步骤）
+
+- [ ] **W7 真实注入验证**：微软拼音端到端（preedit 下划线/候选窗位置/commit 落框）、两窗互相遮挡与拖动重绘、跨程序剪贴板（复制→记事本→粘回）、文件对话框模态 run 与真选文件、主题跟随系统深浅/强调色——归 `examples/native-app` 人工清单（`_人工测试清单.md`）
+- [ ] **W20 批观感复验**：原生菜单栏（下拉/快捷键提示/勾选项）、全局快捷键（切到别的程序仍能触发）、托盘（图标出现/右键菜单/左键计数）、MessageBox（图标/按钮/返回值）、窗口标题与图标
+- [ ] **三平台真机矩阵**：Windows 10/11 本机冒烟已通（`NATIVE-APP-MW`/`NATIVE-SYS-*` 退出码 0）；macOS 无设备（M3 前置）
+
+
+### 6.5 交接状态（2026-10-12 停手点）
+
+> 本批工作按用户要求**中途交接**。以下为可无缝接管的精确状态：哪些已验、哪些只写了、下一步第一件事是什么。
+> 全部改动**未提交**（`git status` 见下），在 `feature/yoga-mbt` 分支上。
+
+#### 环境前置（接手先读）
+
+**本机 `moon` 的 prebuild 子进程 spawn 曾一度恒失败**（`os error 231 所有的管道范例都在使用中`），届时 `moon build`/`moon run`/`moon test` 一律跑不通（连 5 行最小工程也复现，与仓库代码无关；`moon check` 用缓存、不受影响）。**2026-10-12 续接时已恢复正常**，`moon test ./yue/core`、`moon test ./yue/win` 等可直跑；下表的手工路径仅在 prebuild 再出问题时备用：
+
+| 想验什么 | 命令 |
+| --- | --- |
+| 编译/告警 | `moon check ./yue/core --deny-warn`（逐包，同 `yue/win`、`experiment/menu_probe`、`examples/native-app`） |
+| C 后端 `/W4` | 见下「MSVC 手工编法」 |
+| 纯 MoonBit 模型真机行为 | `scripts/wbrun.sh build ./experiment/menu_probe`（拿产物后同法手工链接；**目前无人跑通过的 GUI 包**，见「待收口」） |
+
+`scripts/wbtest.sh` / `scripts/wbrun.sh` 的原理是临时摘掉 `moon.mod` 的 prebuild 行再 `trap` 还原。**注意：摘掉 prebuild 会连带丢掉 `prebuild.py` 下发的 Windows 系统库链接参数**（`user32.lib gdi32.lib imm32.lib advapi32.lib`），所以凡是链接 `yue/win` 的包都只能拿到编译产物、**链不出 exe**——这正是「C 后端运行时回证」卡住的根因。
+
+**MSVC 手工编法**（`vcvars64.bat` 被 reg.exe 策略挡住，需手设 `INCLUDE`/`LIB`；且必须用 Windows 风格路径，`/c/...` 会被当成源文件）：
+
+```bash
+MSVC='C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207'
+SDK='C:\Program Files (x86)\Windows Kits\10'
+export INCLUDE="$MSVC\include;$SDK\Include\10.0.26100.0\ucrt;$SDK\Include\10.0.26100.0\shared;$SDK\Include\10.0.26100.0\um;$SDK\Include\10.0.26100.0\winrt"
+export LIB="$MSVC\lib\x64;$SDK\Lib\10.0.26100.0\ucrt\x64;$SDK\Lib\10.0.26100.0\um\x64"
+MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$MSVC/bin/Hostx64/x64/cl.exe" \
+  /nologo /W4 /utf-8 /O2 /DWIN32 /D_WINDOWS yue/win/stub.c /c /Fo:x.obj
+```
+
+（`MSVC` 在 `C:\Program Files (x86)\...`，**不是** `C:\Program Files\...`——后者是空目录，会白找半天。）
+
+#### 已完成并验证
+
+- **W20b 全局快捷键**：`yue/win/hotkey.mbt`（加速键串解析纯函数）+ `hotkey_wbtest.mbt` 10/10；`yue/win/stub.c` `RegisterHotKey`/`WM_HOTKEY` + 线程队列；`yue/win/window.mbt` `register_global_shortcut`/`unregister_global_shortcut`/`poll_global_shortcut`；`examples/native-app` 接线 + `NATIVE-APP-HOTKEY` 状态行。`moon check ./yue/win --deny-warn` 绿。
+- **W20d 原生 MessageBox**：`yue/win/message_box.mbt`（`MessageBoxKind`/`MessageBoxButtons`/`message_box_utype`/`message_box_result_of` 等纯函数）+ `message_box_wbtest.mbt` 8/8；`stub.c` `wm_message_box`（`MessageBoxW`）；`yue/win/window.mbt` `show_message_box`；`experiment/msgbow_probe`（**已真机手工链接跑通**，`uType` 数值正确，如 `icon=64 btn=0 raw=327744`）；示例接线 + `NATIVE-APP-MSGBOX` 状态行。
+- **W20a 模型侧（MoonBit 部分齐）**：
+  - `yue/core/menu.mbt` —— 跨平台菜单模型 + 翻译层。公开面：`MenuBar::new/add_menu/menu_count/total_item_count`、`Menu::new/add_item/add_role_item/add_check_item/add_radio_item/add_separator/add_submenu/item_count/walk`、`MenuItem::set_label/set_accelerator/set_checked/is_checked/set_on_click/is_separator`、`MenuRole`（Normal/Copy/Cut/Paste/SelectAll/Undo/Redo/Quit）、`MenuItemKind`、`menu_role_default_label/_accelerator/menu_role_id/menu_item_kind_id`，以及平台层 `MenuBar::apply_to(window) -> Bool` / `dispatch_menu_command() -> Bool`。
+  - `yue/core/menu_wbtest.mbt` 10 个用例，已登记进 `__whitebox_test_info.json`；`moon check ./yue/core --deny-warn` 绿（**注：因 prebuild 卡住，这批测试没能真跑起来，只是编译/登记过了**）。
+  - `experiment/menu_probe/main.mbt` —— **已真机跑通**（`scripts/wbrun.sh build` + 手工链接），输出 `bar_menus=2`/`kinds=0,1,2,3`/`walk depth1=5 depth2=2`/`role copy label=复制 acc=CmdOrCtrl+C id=0`/`bar2 total=5`/`click_hits=1`/`MENU-OK`。
+- **W20a C 后端 + 接线**：`yue/win/stub.c` `_WIN32` 分支的 `wm_menu_bar_new`/`wm_menu_new_sub`/`wm_menu_add_item`/`wm_menu_apply`/`wm_menu_poll`（含 `WM_COMMAND` 拦截入队、`wm_menus[32]` 句柄表、命令 id 从 `WM_MENU_CMD_BASE=1000` 起递增、`\t` 加速键提示拼标签）；`yue/win/ffi.mbt` 5 条 extern；`yue/win/window.mbt` 对应 5 个 API + `show_message_box`；`examples/native-app/main.mbt` 接线（`make_menu_section`/`build_demo_menu_bar`/主循环每拍 `@core.dispatch_menu_command()`/`NATIVE-APP-MENU` 状态行），`moon check ./examples/native-app --deny-warn` 绿。
+
+#### 已收口（2026-10-12 续接）
+
+1. ✅ **跑 `experiment/menu_probe/menu_backend_probe.c`** —— 纯 C 探针末行 `MENU-BACKEND-OK`。修了两处：① 探针 ⑪ 期望值写错（bar1 只挂一个顶级菜单，应为 1 而非 2）；② **真实缺陷**——`wm_menu_add_item` 原来先 `cmd = next++` 再 `AppendMenuW`，失败也吃 id，改为「`AppendMenuW` 成功后才推进游标」。顺带看清 **id 池与单菜单上限的关系**：`AppendMenuW` 单菜单上限实测 ≈1168 < id 池 2048，故池要**刻意大于**单菜单上限（只填一个菜单绝不回绕、菜单自身 id 不自相撞），回绕只在跨菜单填满池时发生；探针 ⑬ 已按此重写（跨菜单填满池 → 新菜单首项回到 1000）。**`-DUNICODE` 结论**：include 版那 6 条 `C4133` 的根因就是探针编译未定义 UNICODE（`moon` 的 native-stub 本就定义），补上后零新增告警。细节已回写中英 `adaptation.md`。
+2. ✅ **`yue/core/menu_wbtest.mbt` 真跑** —— 本机 prebuild 恢复正常，`moon test ./yue/core` **81/81**（含 menu 10 条全绿）；`yue/win` 18/18、`moon check ./yue/{core,win} --deny-warn` 零警告。
+3. 【仍待用户真机】**观感项**：菜单下拉 / 快捷键提示 / 勾选项显隐 / 嵌套子菜单；归 `_人工测试清单.md`（`NATIVE-APP-MENU` 行即验收锚点）。
+
+#### 未动的 TODO（按 §6.1/§6.2 原样排着）
+
+- **W20c 托盘**（`Shell_NotifyIconW` + 复用 W20a 菜单模型做右键菜单；`yue/core/tray.mbt` 门面先定，含 `Tray::is_supported()`）
+- **W20e 窗口增强**（`set_title`/`set_icon`/最小尺寸/无边框拖拽区）
+- **W20f 图标加载**（`.ico`/PNG → `HICON`/`HBITMAP`，托盘与菜单共用）
+- **W21a 通知门面**（Windows 走 `Shell_NotifyIcon` 气泡 `NIF_INFO`；Linux 接已有 `yue/dbus/notify.mbt`）
+- **W21b MessageBox 自绘档**（`@ui` 模态对话框组件，与 W20d 原生档并存）
+- **W21c 拖放门面**（`DragData` 模型先定形态）
+- **W21d `autostart`**、**W21e `idle`**（Windows `GetLastInputInfo`）
+- 交汇处托盘/通知/热键门面统一归 **W22**
+
+#### 落盘文件清单（均未提交）
+
+改：`TODO.md`、`examples/native-app/main.mbt`、`examples/native-app/moon.pkg`、`yue/win/ffi.mbt`、`yue/win/stub.c`、`yue/win/window.mbt`
+增：`yue/core/menu.mbt`、`yue/core/menu_wbtest.mbt`、`yue/win/hotkey.mbt`、`yue/win/hotkey_wbtest.mbt`、`yue/win/message_box.mbt`、`yue/win/message_box_wbtest.mbt`、`experiment/menu_probe/{main.mbt,moon.pkg,menu_backend_probe.c}`、`experiment/msgbow_probe/{main.mbt,moon.pkg}`、`experiment/hotkey_probe/`、`scripts/wbtest.sh`、`scripts/wbrun.sh`
+
+> 提交口径沿用仓库规则：每批完成即提交推送（见 §4「例外扩散警戒」），故 W20b/W20d 可各自独立成Commit；W20a 建议等 §6.5「待收口」第 1、2 项补齐后连同探针一起提交。
 
 ## 4. 已知边界与风险
 
@@ -212,3 +317,6 @@
 - libyue 源码（只读老师）：`/home/lkyh/ownCode/yue`，含 `patches/` bug 语料
 - master 线参考副本（代码权威）：`/home/lkyh/ownCode/moonbit-libyue`（比本仓 origin/master 新，Windows/mac 批次在此；本仓文档落后量见「交付面」）
 - FFI 规范与坑：`.agents/skills/moonbit-c-binding/`（同步自 [moonbitlang/skills](https://github.com/moonbitlang/skills)，`~/.agents/skills/` 同版）
+- **跨平台能力批次表（Win 基础能力 + MBT 通用门面）：本文件 §6**（2026-10-12 定；只跟踪跨平台能力，Linux-only 细节不再入表）
+- 旧栈 API 参照面（可平移资产）：`experiment/async_coexist/lab/.mooncakes/NoahLiu/moonbit-libyue/yue/`（`tray.mbt`/`menu.mbt`/`misc.mbt`/`widgets.mbt`，本机离线可用）
+- 人工复验清单：`_人工测试清单.md`（跑 `moon run examples/native-app`）

@@ -46,6 +46,7 @@
 // IME 段的宽串转 UTF-8 走 malloc/free，故 stdlib 也要
 #include <stdio.h>
 #include <stdlib.h>
+#include <wchar.h> // 菜单标签拼接用 wcsncpy/wcslen/wcsncat（W20a）
 
 #define WM_MAX_WINDOWS 32
 
@@ -96,6 +97,52 @@ typedef struct {
 static WmWindow wm_windows[WM_MAX_WINDOWS]; // 槽 0 未用，句柄 = 槽号（1 起）
 static int wm_next_id = 1;
 static HWND wm_waker = NULL; // 仅消息窗口：wm_wakeup 的投递目标（跨线程叫醒）
+
+/* 菜单句柄表（W20a）：下标即对外句柄（1 起）。每个槽存一个 HMENU——菜单条或
+ * 子菜单都占一个槽；子菜单的 HMENU 由 CreatePopupMenu 建、AppendMenuW(MF_POPUP)
+ * 挂进父。槽 0 未用。命令 id 表与「可点击项前序序号」对齐，供回调对表。 */
+#define WM_MAX_MENUS 32
+static HMENU wm_menus[WM_MAX_MENUS];
+static int wm_menus_next = 1;
+
+/* ---- 全局快捷键（W20b）---------------------------------------------------
+ * RegisterHotKey 注册的热键以 WM_HOTKEY 投给**线程消息队列**（hwnd 传 NULL
+ * 时），所以不需要窗口槽：本文件另起一张进程级表，槽号即对外 id。命中时
+ * WndProc 收不到（消息进的是注册线程队列），改由 wm_hotkey_poll 在 MoonBit
+ * 的泵里主动抽——与 DBus 线「宿主周期 pump」同一形态，避免 C→MoonBit 回调。
+ * 注册 id 与窗口无关（旧栈 register_global_shortcut 同语义）。
+ * 表声明必须在 wm_pump 之前（pump 里要截 WM_HOTKEY 置位）。 */
+#define WM_MAX_HOTKEYS 32
+static int wm_hotkeys[WM_MAX_HOTKEYS]; // 1 = 已注册；下标即对外 id
+static int wm_hotkey_fired[WM_MAX_HOTKEYS]; // 1 = 本轮已触发待取
+static int wm_hotkey_fired_count = 0;
+
+/* ---- 原生菜单（W20a）-----------------------------------------------------
+ * 菜单是**每窗口一份**（HMENU 挂 SetMenu），菜单项点击经 WM_COMMAND 回来。
+ * 与热键同一形态：C 侧不回调 MoonBit，命中时把「命令 id」压进进程级队列，
+ * MoonBit 侧 `wm_menu_poll` 在泵里抽；回调（MenuItem::on_click）由模型层按
+ * native_id 持表（见 yue/core/menu.mbt 与其翻译层）。
+ * 句柄用「进程级表下标」表示（与窗口槽同制）：建菜单树是逐节点 FFI，节点句柄
+ * 就是表下标，MoonBit 侧拿着它继续往下加子项。命令 id 从 1000 起递增分配，
+ * 与「可点击项」一一对应。表要在 wm_pump/wm_wndproc 之前声明（两处都要用）。 */
+#define WM_MENU_CMD_BASE 1000
+// id 池大小。实测 Win32 单菜单项数上限约 1168（见 menu_backend_probe.c），池
+// 取 2048 保证 > 单菜单上限 ⇒ 只填一个菜单绝不会回绕、也就不会自相撞 id。
+#define WM_MENU_CMD_MAX 2048
+static int wm_menu_cmd_next = WM_MENU_CMD_BASE; // 下一个待分配命令 id（成功才推进）
+// 已触发待取的命令 id 队列（环形；满了丢最旧）
+static int wm_menu_fired[64];
+static int wm_menu_fired_head = 0;
+static int wm_menu_fired_count = 0;
+
+static void wm_menu_push(int cmd) {
+  if (wm_menu_fired_count >= 64) {
+    wm_menu_fired_head = (wm_menu_fired_head + 1) % 64;
+    wm_menu_fired_count--;
+  }
+  wm_menu_fired[(wm_menu_fired_head + wm_menu_fired_count) % 64] = cmd;
+  wm_menu_fired_count++;
+}
 
 void wm_pump(void); // wm_show 里要先跑一轮就绪消息，实现在下方
 
@@ -414,6 +461,15 @@ static LRESULT CALLBACK wm_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     }
     case WM_ERASEBKGND:
       return 1; // 全窗自绘，不擦底防闪
+    case WM_COMMAND: {
+      // 菜单/加速键命令：LOWORD(wp) 是命令 id，HIWORD(wp) 为 0（菜单选择）
+      // 或 1（加速键）。不论来源都压进队列，MoonBit 侧按 id 找回调。
+      int cmd = (int)LOWORD(wp);
+      if (cmd >= WM_MENU_CMD_BASE && cmd < WM_MENU_CMD_BASE + WM_MENU_CMD_MAX) {
+        wm_menu_push(cmd);
+      }
+      return 0;
+    }
     case WM_CLOSE: {
       WmWindow *w = wm_of(hwnd);
       if (w != NULL) {
@@ -753,6 +809,13 @@ void wm_close(int64_t id) {
     w->hwnd = NULL; // WM_DESTROY 里还会再清一次；先摘钩防重入
     DestroyWindow(hwnd);
   }
+  // 拆掉本次会话建的所有菜单（W20a）：HMENU 归桩所有，随窗口销毁一起放
+  for (int i = 1; i < WM_MAX_MENUS; i++) {
+    if (wm_menus[i] != NULL) {
+      DestroyMenu(wm_menus[i]);
+      wm_menus[i] = NULL;
+    }
+  }
   // 帧拷贝归桩所有，拆窗前先放掉（memset 之后就拿不到指针了）
   free(w->frame);
   w->frame = NULL;
@@ -765,6 +828,19 @@ void wm_close(int64_t id) {
 void wm_pump(void) {
   MSG msg;
   while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
+    // 全局快捷键（W20b）：RegisterHotKey(NULL,...) 的 WM_HOTKEY 投的是线程
+    // 队列，msg.hwnd 为 NULL，DispatchMessageW 会把它丢掉——必须在派发前
+    // 截住置位，等 MoonBit 侧 wm_hotkey_poll 来取。
+    if (msg.message == WM_HOTKEY) {
+      int hid = (int)msg.wParam;
+      if (hid > 0 && hid < WM_MAX_HOTKEYS && wm_hotkeys[hid]) {
+        if (!wm_hotkey_fired[hid]) {
+          wm_hotkey_fired[hid] = 1;
+          wm_hotkey_fired_count++;
+        }
+      }
+      continue;
+    }
     // TranslateMessage 不能省：INPUT 法（IMM32）的组合处理就挂在这条路上——
     // 缺了它只会收到裸键，WM_IME_STARTCOMPOSITION/WM_IME_COMPOSITION 一条都
     // 收不到（实测：只来 WM_IME_SETCONTEXT，拼音永远组合不起来）
@@ -962,6 +1038,252 @@ void wm_wakeup(void) {
   if (wm_waker != NULL) {
     PostMessageW(wm_waker, WM_APP + 1, 0, 0);
   }
+}
+
+/* ---- 全局快捷键（W20b）实装在下方：表声明在文件头（pump 要用），这里只放
+ * 注册/注销/抽取三个入口。 */
+/* 注册全局快捷键：mods 用内核 MOD_* 位（1 shift/2 ctrl/4 alt/8 meta），
+ * vk 是 Win32 虚拟键码。返回 id（>=1）或 0 失败（组合键被系统/别的程序占用、
+ * 或表满）。RegisterHotKey 用 NULL hwnd = 线程队列。 */
+int wm_hotkey_register(int mods, int vk) {
+  int slot = -1;
+  for (int i = 1; i < WM_MAX_HOTKEYS; i++) {
+    if (!wm_hotkeys[i]) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    return 0;
+  }
+  UINT m = 0;
+  if (mods & 1) {
+    m |= MOD_SHIFT;
+  }
+  if (mods & 2) {
+    m |= MOD_CONTROL;
+  }
+  if (mods & 4) {
+    m |= MOD_ALT;
+  }
+  if (mods & 8) {
+    m |= MOD_WIN;
+  }
+  // 无修饰键的裸键 RegisterHotKey 会失败（系统拒绝），显式判掉给调用方
+  if (m == 0) {
+    return 0;
+  }
+  if (!RegisterHotKey(NULL, slot, m | MOD_NOREPEAT, (UINT)vk)) {
+    return 0;
+  }
+  wm_hotkeys[slot] = 1;
+  wm_hotkey_fired[slot] = 0;
+  return slot;
+}
+
+/* 注销：幂等。 */
+void wm_hotkey_unregister(int id) {
+  if (id <= 0 || id >= WM_MAX_HOTKEYS || !wm_hotkeys[id]) {
+    return;
+  }
+  UnregisterHotKey(NULL, id);
+  wm_hotkeys[id] = 0;
+  wm_hotkey_fired[id] = 0;
+}
+
+/* 取一个已触发的热键 id（无则 0）。每注册一个 WM_HOTKEY 只置位一次。 */
+int wm_hotkey_poll(void) {
+  if (wm_hotkey_fired_count < 1) {
+    return 0;
+  }
+  for (int i = 1; i < WM_MAX_HOTKEYS; i++) {
+    if (wm_hotkey_fired[i]) {
+      wm_hotkey_fired[i] = 0;
+      wm_hotkey_fired_count--;
+      return i;
+    }
+  }
+  return 0;
+}
+
+/* UTF-8 → UTF-16（W 系 API 用）；失败/空给 NULL，调用方自己兜空白串。 */
+static WCHAR *wm_utf8_to_wide(const char *s) {
+  if (s == NULL) {
+    return NULL;
+  }
+  int n = MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
+  if (n <= 0) {
+    return NULL;
+  }
+  WCHAR *w = (WCHAR *)malloc((size_t)n * sizeof(WCHAR));
+  if (w == NULL) {
+    return NULL;
+  }
+  MultiByteToWideChar(CP_UTF8, 0, s, -1, w, n);
+  return w;
+}
+
+/* ---- 原生菜单（W20a）实装 -------------------------------------------------
+ * 逐节点 FFI：MoonBit 侧持「菜单句柄」（本表下标），按模型树自顶向下建。
+ *  - wm_menu_bar_new()            建菜单条 → 返回句柄
+ *  - wm_menu_new_sub(parent,title) 在 parent 下加子菜单 → 返回子菜单句柄
+ *  - wm_menu_add_item(parent,label,kind,role,acc,checked) 加项 → 返回命令 id（0=分隔线）
+ * 命令 id 由本侧递增分配、回填给 MoonBit（模型侧 MenuItem.native_id）；点击经
+ * WM_COMMAND → 队列 → wm_menu_poll 取回，MoonBit 用 native_id 找回调。
+ * 挂窗用 wm_menu_apply(window_id, menu_handle)。 */
+int wm_menu_bar_new(void) {
+  int slot = -1;
+  for (int i = 1; i < WM_MAX_MENUS; i++) {
+    if (wm_menus[i] == NULL) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    return 0;
+  }
+  HMENU h = CreateMenu();
+  if (h == NULL) {
+    return 0;
+  }
+  wm_menus[slot] = h;
+  return slot;
+}
+
+/* 在父菜单下加子菜单；返回子菜单句柄（0=失败）。 */
+int wm_menu_new_sub(int parent, const char *title) {
+  if (parent <= 0 || parent >= WM_MAX_MENUS || wm_menus[parent] == NULL) {
+    return 0;
+  }
+  int slot = -1;
+  for (int i = 1; i < WM_MAX_MENUS; i++) {
+    if (wm_menus[i] == NULL) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    return 0;
+  }
+  HMENU sub = CreatePopupMenu();
+  if (sub == NULL) {
+    return 0;
+  }
+  WCHAR *w = wm_utf8_to_wide(title);
+  UINT f = MF_POPUP | MF_STRING;
+  if (!AppendMenuW(wm_menus[parent], f, (UINT_PTR)sub,
+                   w != NULL ? w : L"")) {
+    DestroyMenu(sub);
+    free(w);
+    return 0;
+  }
+  free(w);
+  wm_menus[slot] = sub;
+  return slot;
+}
+
+/* 在父菜单下加一项。kind: 0 command / 1 check / 2 radio / 3 separator。
+ * role: -1 non-role（Win32 无 role，忽略）；acc 是加速键描述串（"" 或无）。
+ * checked: check/radio 初值。返回命令 id（>=1000）；分隔线返回 0。 */
+int wm_menu_add_item(int parent, const char *label, int kind, int role,
+                     const char *acc, int checked) {
+  if (parent <= 0 || parent >= WM_MAX_MENUS || wm_menus[parent] == NULL) {
+    return 0;
+  }
+  (void)role; // Win32 无 role 概念：角色项按普通项建，行为由 MoonBit 回调给
+  if (kind == 3) {
+    AppendMenuW(wm_menus[parent], MF_SEPARATOR, 0, NULL);
+    return 0;
+  }
+  // 先算出待分配的 id，但**成功挂上后才推进游标**：AppendMenuW 有单菜单项数
+  // 上限（实测本机 ~1168，见 menu_backend_probe.c），失败还吃 id 会让配额提前
+  // 耗尽并与其他菜单的在用 id 相撞。
+  int cmd = wm_menu_cmd_next;
+  UINT f = MF_STRING;
+  if (kind == 1) { // check
+    if (checked) {
+      f |= MF_CHECKED;
+    }
+  } else if (kind == 2) { // radio
+    if (checked) {
+      f |= MF_CHECKED;
+    }
+  }
+  // 标签 + 可选「\t加速键提示」：AppendMenuW 把 '\t' 后的部分右对齐显示
+  WCHAR item_label[256];
+  item_label[0] = L'\0';
+  WCHAR *w = wm_utf8_to_wide(label);
+  if (w != NULL) {
+    wcsncpy(item_label, w, 200);
+    item_label[200] = L'\0';
+    free(w);
+  }
+  if (acc != NULL && acc[0] != '\0' && item_label[0] != L'\0') {
+    // 直接当提示串（Win32 上真正生效的加速键表将来另行 RegisterAccelerator）
+    size_t cur = wcslen(item_label);
+    if (cur < 240) {
+      item_label[cur] = L'\t';
+      item_label[cur + 1] = L'\0';
+      WCHAR *wa = wm_utf8_to_wide(acc);
+      if (wa != NULL) {
+        wcsncat(item_label, wa, 240 - (int)cur - 1);
+        free(wa);
+      }
+    }
+  }
+  if (!AppendMenuW(wm_menus[parent], f, (UINT_PTR)cmd, item_label)) {
+    return 0;
+  }
+  // 挂载成功，推进 id 游标；到池尾归位到 BASE（池大小 2048 > 单菜单上限，
+  // 故单个菜单不可能自相撞 id）。
+  wm_menu_cmd_next = cmd + 1;
+  if (wm_menu_cmd_next >= WM_MENU_CMD_BASE + WM_MENU_CMD_MAX) {
+    wm_menu_cmd_next = WM_MENU_CMD_BASE;
+  }
+  return cmd;
+}
+
+/* 把菜单条挂到窗口（SetMenu + DrawMenuBar）；bar=0 表示拆掉当前菜单。 */
+void wm_menu_apply(int64_t id, int bar) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL) {
+    return;
+  }
+  HMENU h = (bar > 0 && bar < WM_MAX_MENUS) ? wm_menus[bar] : NULL;
+  SetMenu(w->hwnd, h);
+  DrawMenuBar(w->hwnd);
+}
+
+/* 抽一个菜单命令 id（无则 0）。入队在 WM_COMMAND 里做。 */
+int wm_menu_poll(void) {
+  if (wm_menu_fired_count < 1) {
+    return 0;
+  }
+  int cmd = wm_menu_fired[wm_menu_fired_head];
+  wm_menu_fired_head = (wm_menu_fired_head + 1) % 64;
+  wm_menu_fired_count--;
+  return cmd;
+}
+
+/* ---- 原生消息框（W20d）---------------------------------------------------
+ * MessageBoxW 一次调用就把框显示并**模态阻塞**到用户点按钮，返回按钮编号——
+ * 没有回调、没有窗口槽，是最适合「阻塞式 FFI」的一条（与热键那种「寄存器 +
+ * 泵里抽」不同）。uType 的四段位组合由 MoonBit 侧纯函数算好传进来（见
+ * yue/win/message_box.mbt），这里只做宽串转换与调用。
+ * hwnd 传 NULL：消息框为进程级（不隶属某窗口），与旧栈 MessageBox::show 同形；
+ * show_for_window 的挂窗形态留待需要时补（传具体 HWND）。
+ * 文本是 UTF-8 Bytes（#borrow），这里转 UTF-16 交给 W 系 API。 */
+int wm_message_box(const char *title, const char *text, int utype) {
+  WCHAR *wt = wm_utf8_to_wide(title);
+  WCHAR *wx = wm_utf8_to_wide(text);
+  int r = (int)MessageBoxW(NULL, wx != NULL ? wx : L"", wt != NULL ? wt : L"",
+                           (UINT)utype);
+  free(wt);
+  free(wx);
+  return r;
 }
 
 int64_t wm_now_ms(void) {
@@ -2065,6 +2387,110 @@ void wm_wakeup(void) {
   g_main_context_wakeup(g_main_context_default());
 }
 
+/* ---- 全局快捷键（W20b）GTK 分支占位：X11 用 XGrabKey 排他注册、Xkb 映射
+ * 加速键串，属 Linux 后端内部事务（按新口径不进路线图）；先给可编译的失败
+ * 桩，让 MoonBit 层走「注册失败」语义化路径（返回 -1）。 */
+int wm_hotkey_register(int mods, int vk) {
+  (void)mods;
+  (void)vk;
+  return 0;
+}
+
+void wm_hotkey_unregister(int id) { (void)id; }
+
+int wm_hotkey_poll(void) { return 0; }
+
+/* ---- 原生菜单（W20a）GTK 分支占位：GTK 端的 GtkMenuBar 属 Linux 后端内部
+ * 事务（按新口径不进路线图）；这里给可编译的失败桩，让 MoonBit 侧走「建菜单
+ * 失败」语义化路径（句柄 0）。真 GTK 实现将来在 prebuild 的 -DWM_STUB_GTK 侧补。 */
+int wm_menu_bar_new(void) { return 0; }
+int wm_menu_new_sub(int parent, const char *title) {
+  (void)parent;
+  (void)title;
+  return 0;
+}
+int wm_menu_add_item(int parent, const char *label, int kind, int role,
+                     const char *acc, int checked) {
+  (void)parent;
+  (void)label;
+  (void)kind;
+  (void)role;
+  (void)acc;
+  (void)checked;
+  return 0;
+}
+void wm_menu_apply(int64_t id, int bar) {
+  (void)id;
+  (void)bar;
+}
+int wm_menu_poll(void) { return 0; }
+
+/* ---- 原生消息框（W20d）GTK 分支：GtkMessageDialog 跑模态 run()，返回
+ * GtkResponseType；MoonBit 侧返回值编号口径与 Win32 对齐（1 OK/2 CANCEL/
+ * 3 ABORT/4 RETRY/5 IGNORE/6 YES/7 NO）。uType 里的图标/按钮段由 MoonBit 纯
+ * 函数给出，这里反解成 GtkMessageType 与按钮集——各平台映射同一套语义常量，
+ * 故两端的「错误 + 是/否/取消」落到各自的等价控件。 */
+int wm_message_box(const char *title, const char *text, int utype) {
+  GtkMessageType mt = GTK_MESSAGE_INFO;
+  switch (utype & 0xF0) {
+    case 0x10:
+      mt = GTK_MESSAGE_ERROR;
+      break;
+    case 0x20:
+      mt = GTK_MESSAGE_QUESTION;
+      break;
+    case 0x30:
+      mt = GTK_MESSAGE_WARNING;
+      break;
+    default:
+      mt = GTK_MESSAGE_INFO;
+      break;
+  }
+  GtkButtonsType bt = GTK_BUTTONS_OK;
+  switch (utype & 0xF) {
+    case 0x1:
+      bt = GTK_BUTTONS_OK_CANCEL;
+      break;
+    case 0x2:
+      bt = GTK_BUTTONS_NONE; // 中止/重试/忽略：GTK 无常量表，自加按钮
+      break;
+    case 0x3:
+      bt = GTK_BUTTONS_NONE; // 是/否/取消
+      break;
+    case 0x4:
+      bt = GTK_BUTTONS_YES_NO;
+      break;
+    case 0x5:
+      bt = GTK_BUTTONS_NONE; // 重试/取消
+      break;
+    default:
+      bt = GTK_BUTTONS_OK;
+      break;
+  }
+  GtkWidget *dlg =
+      gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, mt, bt, "%s",
+                             text != NULL ? text : "");
+  if (title != NULL) {
+    gtk_window_set_title(GTK_WINDOW(dlg), title);
+  }
+  // GTK_BUTTONS_NONE 的三组手工补按钮（response 用 Win32 编号语义）
+  if ((utype & 0xF) == 0x2) {
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Abort", 3);
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Retry", 4);
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Ignore", 5);
+  } else if ((utype & 0xF) == 0x3) {
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Yes", 6);
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_No", 7);
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Cancel", 2);
+  } else if ((utype & 0xF) == 0x5) {
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Retry", 4);
+    gtk_dialog_add_button(GTK_DIALOG(dlg), "_Cancel", 2);
+  }
+  gint r = gtk_dialog_run(GTK_DIALOG(dlg));
+  gtk_widget_destroy(dlg);
+  return (int)r;
+}
+
 int64_t wm_now_ms(void) {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -2481,6 +2907,49 @@ int wm_im_preedit_caret(int64_t id) { (void)id; return 0; }
 int wm_im_preedit_active(int64_t id) { (void)id; return 0; }
 
 void wm_wakeup(void) {}
+
+int wm_hotkey_register(int mods, int vk) {
+  (void)mods;
+  (void)vk;
+  return 0;
+}
+
+void wm_hotkey_unregister(int id) { (void)id; }
+
+int wm_hotkey_poll(void) { return 0; }
+
+/* W20a 菜单占位（macOS 等）：句柄 0 = 建失败，MoonBit 层走语义化降级。
+ * macOS 原生档是 NSMenu（ObjectC++ 单独 TU，将来随 mac 平台批补）。*/
+int wm_menu_bar_new(void) { return 0; }
+int wm_menu_new_sub(int parent, const char *title) {
+  (void)parent;
+  (void)title;
+  return 0;
+}
+int wm_menu_add_item(int parent, const char *label, int kind, int role,
+                     const char *acc, int checked) {
+  (void)parent;
+  (void)label;
+  (void)kind;
+  (void)role;
+  (void)acc;
+  (void)checked;
+  return 0;
+}
+void wm_menu_apply(int64_t id, int bar) {
+  (void)id;
+  (void)bar;
+}
+int wm_menu_poll(void) { return 0; }
+
+/* W20d 消息框占位（macOS 等）：返回 0 = 失败，MoonBit 层走语义化降级。
+ * macOS 原生档是 NSAlert（ObjectC++ 单独 TU，将来随 mac 平台批补）。*/
+int wm_message_box(const char *title, const char *text, int utype) {
+  (void)title;
+  (void)text;
+  (void)utype;
+  return 0;
+}
 
 int64_t wm_now_ms(void) {
   return 0;
