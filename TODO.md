@@ -181,7 +181,7 @@
 - 平台后端（随各自真机，本轮不做）：Windows WebView2（两级异步 COM 创建、失败回退、就绪前排队、跨 HWND 焦点与滚轮转发；**本地内容通道二选一**——预注册 scheme + `WebResourceRequested` 回包，或 `SetVirtualHostNameToFolderMapping`（URL 变 `https://<host>/…`，子资源在进程内解析、算安全上下文，更快更正），两条都由后端内部决定、调用方接口不变），macOS WKWebView（自定义协议走**公开**的 `WKURLSchemeHandler`（macOS 10.13+），libyue 当年那条 `WKBrowsingContextController registerSchemeForCustomProtocol:` 是更老的私有路线；要验的是公开入口够不够用：自定义 scheme 默认非标准、origin/localStorage 行为要另配；**另需真机验一条**：`loadHTMLString:baseURL:` 是否入前进/后退历史——Apple 无文档承诺，而 Linux 实测 `load_html` 不入历史、WebView2 文档明写 `NavigateToString` 不改历史，若 mac 相反就要在 `yue/web` 里抹平或写进契约）
 
 ### 交付面（webview 批 A/B 落地后接上）
-- [ ] 示例迁移：`hello` / `hello-themed` / `showcase`（全功能演示板，15 页）/ `sysmonitor`（6 页）/ `systemprobe`（8 页，`modules/yue-examples`）/ `yue-examples`
+- [ ] 示例迁移：`hello` ✅ / `hello-themed` ✅（2026-10-12 换到新栈：`@ui.mount_window` + `label`/`label_t`/`entry`/`button_t`/`bind_label` + `App::follow_system_theme`，两包 `--deny-warn` 零警告、core 82/82 与 ui 110/110 未掉；顺带补一条宿主缺省——`app_window` 给根控件铺一层主题页面色，最小示例不必自己写 `on_draw` 才有背景，调用方照常覆盖）；`showcase`（全功能演示板，18 文件 5299 行）/ `sysmonitor`（6 页）/ `systemprobe`（8 页，`modules/yue-examples`）/ `yue-examples` 待迁
 - [ ] 文档：中英使用文档按新栈重写（`components`/`components-ui`/`declarative`/`layout`/`relink`/`system-capabilities`/`tutorial`），README 挂新截图
 - [ ] 发布：mooncakes 新版本；旧 `bin-*`/`vendor-*` 预构建发布链退役
 - [ ] CI：三平台构建与测试脚本随新栈调整（当前分支构建预期为红）

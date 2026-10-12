@@ -1,16 +1,20 @@
 // 使用者视角：只有 MoonBit 类型和回调，没有任何平台相关代码。
+//
+// 跑法：moon run examples/hello（需要显示服务；没有时打印一行提示后退出）
 
 ///|
 fn main {
-  if !@yue.initialize() {
-    println("GUI 初始化失败")
-    return
+  let app = match @ui.mount_window(
+    [@ui.label("Hello, MoonBit!", size=18.0)],
+    title="Hello, MoonBit!",
+    width=400,
+    height=300,
+  ) {
+    None => {
+      println("HELLO-SKIP: 本平台没有窗口后端或没有显示服务")
+      return
+    }
+    Some(a) => a
   }
-  let window = @yue.Window::new()
-  window.set_content(@yue.Label::new("Hello, MoonBit + libyue!"))
-  window.set_content_size(400.0, 300.0)
-  window.center()
-  window.on_close(fn(_window) { @yue.quit() })
-  window.activate()
-  @yue.run()
+  app.run()
 }

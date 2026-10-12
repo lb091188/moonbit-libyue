@@ -1,5 +1,7 @@
 import {
-  "NoahLiu/moonbit-libyue/yue",
+  "NoahLiu/moonbit-libyue/yue/ui",
 }
 
 pkgtype(kind: "executable")
+
+supported_targets = "native"

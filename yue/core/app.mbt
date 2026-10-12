@@ -110,6 +110,12 @@ fn app_window(
     None => None
     Some(window) => {
       let root = Widget::new()
+      // 缺省底色：宿主先铺一层主题页面色，最小示例不必自己写 on_draw 才有背景
+      // （要别的底色/图案照常覆盖 root.on_draw 即可）
+      root.on_draw = Some(fn(_w : Widget, p : @render.Painter, r : Rect) -> Unit {
+        p.set_fill_color(@theme.theme_bg_page())
+        p.fill_rect(0.0, 0.0, r.w, r.h)
+      })
       let app : App = {
         window,
         sched: host_loop(),

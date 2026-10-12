@@ -1,46 +1,46 @@
-// 主题组件库版 hello：theme_apply 生效后全部用主题化组件(button_t/label_t
-// /input_t)搭建,不碰任何原生控件外观;窗口底色与文字色随主题走。
-// 与 examples/hello 对照:那边是 libyue 原生控件裸用,系统默认外观。
+// 主题组件库版 hello：跟随系统深浅/主色之后，界面全部用主题化组件
+// （label_t / entry / button_t / bind_label）搭建，不碰任何原生控件外观；
+// 窗口底色与文字色随主题走。与 examples/hello 对照：那边只放一行文字。
+//
+// 跑法：moon run examples/hello-themed（需要显示服务；没有时打印一行提示后退出）
 
 ///|
 fn main {
-  if !@yue.initialize() {
-    println("GUI 初始化失败")
-    return
+  let name : @core.Store[String] = @core.Store::new("MoonBit")
+  let greet : @core.Store[String] = @core.Store::new("(点「问候」)")
+  let app = match @ui.mount_window(
+    [
+      @ui.vbox(
+        [
+          @ui.label_t("Hello, 主题组件库!", role=@ui.Title),
+          @ui.label_t(
+            "输入名字点问候，按钮/输入框/文字全是主题化形态。",
+            role=@ui.Secondary,
+          ),
+          @ui.entry(name, width=240.0),
+          @ui.button_t("问候", variant=@ui.Solid, on_click=fn() {
+            greet.set("你好,\{name.get()}!")
+          }),
+          @ui.bind_label(greet, fn(s : String) -> String { s }),
+        ],
+        padding=24.0,
+        row_gap=12.0,
+      ),
+    ],
+    title="hello-themed",
+    width=360,
+    height=260,
+    handle=fn(a : @core.App) -> Unit {
+      // 启动即按系统偏好上色，之后每 2 秒看一次系统有没有切换；
+      // 返回的停表函数在本栈里由宿主收尾，不必自己持有
+      let _ = a.follow_system_theme(interval_ms=2000)
+    },
+  ) {
+    None => {
+      println("HELLO-THEMED-SKIP: 本平台没有窗口后端或没有显示服务")
+      return
+    }
+    Some(a) => a
   }
-  // 启动跟随系统:深浅取 system_prefers_dark,主色取 system_accent
-  // (系统无主色概念时回落内置);可换 default_theme()/dark_theme() 固定内置盘
-  @yue.theme_apply(@yue.theme_from_system())
-  let name : @yue.Store[String] = @yue.Store::new("MoonBit")
-  let greet : @yue.Store[String] = @yue.Store::new("(点「问候」)")
-  ignore(
-    @declarative.mount_window(
-      [
-        @declarative.vbox(
-          [
-            @components.label_t("Hello, 主题组件库!", role=@components.Title),
-            @components.label_t(
-              "输入名字点问候,按钮/输入框/文字全是主题化形态。",
-              role=@components.Secondary,
-            ),
-            @components.input_t(text=name.get(), style=[("width", 240.0)], on_input=fn(
-              t,
-            ) {
-              name.set(t)
-            }),
-            @components.button_t("问候", variant=@components.Solid, on_click=fn() {
-              greet.set("你好,\{name.get()}!")
-            }),
-            @declarative.bind_label(greet, fn(s) { s }),
-          ],
-          style=[("padding", 24.0), ("gap", 12.0)],
-        ),
-      ],
-      title="hello-themed",
-      size=Some((360.0, 260.0)),
-      center=true,
-      on_close=fn(_w) { @yue.quit() },
-    ),
-  )
-  @yue.run()
+  app.run()
 }
