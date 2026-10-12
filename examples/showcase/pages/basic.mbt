@@ -1,208 +1,208 @@
-// 基础组件页:Signal 驱动的主题组件演示。共享状态(counter 计数、
-// picked_lang 最近操作)在 App;页内状态用源信号,展示端用 bind 直连,
-// 无手动 subscribe 接线。勾选类在表单组件页,右键菜单在导航组件页。
+// 基础组件页：Store/Signal 驱动的主题组件演示。共享状态（counter 计数、
+// picked_lang 最近操作）在 App；页内状态用页内 Store，展示端用
+// `@ui.bind` 直连，无手动 subscribe 接线。勾选类在表单组件页，右键菜单
+// 在导航组件页。
+//
+// G7 迁移记档（旧链路 → 本栈的四处机械差）：
+// ① `style=[("marginTop", n)]` 一律删——段正文容器已带 `row_gap`，间距是
+//    布局容器的属性而不是控件自己的；
+// ② `input_t`（无状态文本框）在本栈没有对应物，语义上就是 `entry`（Store
+//    是文本状态的唯一权威），故「组内输入框」各配一个页内 Store；
+// ③ `hover_group`/`cursor_group` 的 `on_change`（手动设光标）与 `radius`
+//    在本栈已内建：悬停态本就是父链语义、光标取悬停路径最深请求、
+//    底色/描边由组件自己画，调用点不再传；
+// ④ `@components.*` → `@ui.*`、`@declarative.*` → `@ui.*`（同一个包：
+//    新栈声明式层就住在 `yue/ui/declarative.mbt`）。
 
 ///|
-pub fn page_basic(app : @ui.App) -> @yue.Node {
-  @ui.page([
-    @ui.section(
+pub fn page_basic(app : @shared.App) -> @core.Node {
+  // 两个悬停/光标组各配一个文本框状态
+  let box_a : @core.Store[String] = @core.Store::new("组内输入框")
+  let box_b : @core.Store[String] = @core.Store::new("组内输入框")
+  @shared.page([
+    @shared.section(
       "主题",
       "主题色板",
-      "选一个主色,整套色板(hover/浅底/语义色)按 HSL 公式即时派生,切换深浅沿用当前主色;「跟随系统」读系统主色调,读不到回落内置。",
+      "选一个主色，整套色板（hover/浅底/语义色）按 HSL 公式即时派生，切换深浅沿用当前主色；「跟随系统」读系统主色调，读不到回落内置。手动选色会先关掉跟随开关（否则下一次轮询就把它盖回去）。",
       [
-        @declarative.hbox(
+        @ui.hbox(
           [
-            @components.button_t("跟随系统", variant=@components.Solid, on_click=fn() {
-              app.accent.set(@yue.system_accent())
+            @ui.button_t("跟随系统", variant=@ui.Solid, on_click=fn() {
+              app.follow.set(true)
             }),
-            @components.button_t("默认蓝", on_click=fn() { app.accent.set("") }),
-            @components.button_t("青", on_click=fn() { app.accent.set("#009688") }),
-            @components.button_t("绿", on_click=fn() { app.accent.set("#2E9E5B") }),
-            @components.button_t("紫", on_click=fn() { app.accent.set("#9141AC") }),
-            @components.button_t("红", on_click=fn() { app.accent.set("#D64550") }),
+            @ui.button_t("默认蓝", on_click=fn() {
+              app.follow.set(false)
+              app.accent.set("")
+            }),
+            @ui.button_t("青", on_click=fn() {
+              app.follow.set(false)
+              app.accent.set("#009688")
+            }),
+            @ui.button_t("绿", on_click=fn() {
+              app.follow.set(false)
+              app.accent.set("#2E9E5B")
+            }),
+            @ui.button_t("紫", on_click=fn() {
+              app.follow.set(false)
+              app.accent.set("#9141AC")
+            }),
+            @ui.button_t("红", on_click=fn() {
+              app.follow.set(false)
+              app.accent.set("#D64550")
+            }),
           ],
-          style=[("alignItems", "center")],
+          column_gap=8.0,
         ),
-        @declarative.bind(
-          app.accent.signal(),
-          fn(s) {
-            if s == "" {
-              "当前主色:内置默认"
-            } else {
-              "当前主色:\{s}"
-            }
-          },
-          style=[("marginTop", 8.0)],
-        ),
+        @ui.bind(app.accent.signal(), fn(s) {
+          if s == "" {
+            "当前主色：内置默认"
+          } else {
+            "当前主色：\{s}"
+          }
+        }),
       ],
       code=[
-        "let dark = @yue.system_prefers_dark()", "let accent = @yue.system_accent()",
-        "if accent != \"\" {", "  @yue.theme_apply(@yue.theme_from_accent(accent, dark~))",
-        "} else {", "  @yue.theme_apply(if dark { @yue.dark_theme() } else { @yue.default_theme() })",
+        "let dark = @win.sys_color_scheme() == \"dark\"",
+        "let accent = @win.sys_accent()",
+        "if accent != \"\" {",
+        "  @theme.theme_apply(@theme.theme_from_accent(accent, dark=dark))",
+        "} else {",
+        "  @theme.theme_apply(if dark { @theme.dark_theme() } else { @theme.default_theme() })",
         "}",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "按钮",
       "Button 按钮",
-      "四变体;「主要操作」联动数据页访问量/进度条(信号)。",
+      "四变体；「主要操作」联动数据页访问量/进度条（信号）。",
       [
-        @declarative.hbox(
+        @ui.hbox(
           [
-            @components.button_t(
-              "主要操作",
-              on_click=fn() { app.counter.update(fn(n) { n + 1 }) },
-              variant=@components.Solid,
-            ),
-            @components.button_t("次要操作", variant=@components.Soft),
-            @components.button_t("文字按钮", variant=@components.Text),
-            @components.button_t("危险操作", variant=@components.Danger),
+            @ui.button_t("主要操作", variant=@ui.Solid, on_click=fn() {
+              app.counter.update(fn(n) { n + 1 })
+            }),
+            @ui.button_t("次要操作", variant=@ui.Soft),
+            @ui.button_t("文字按钮", variant=@ui.Text),
+            @ui.button_t("危险操作", variant=@ui.Danger),
           ],
-          style=[("alignItems", "center")],
+          column_gap=8.0,
         ),
       ],
       code=[
-        "@declarative.hbox([", "  @components.button_t(\"主要操作\", variant=@components.Solid, on_click=fn() { }),",
-        "  @components.button_t(\"次要操作\", variant=@components.Soft),", "  @components.button_t(\"文字按钮\", variant=@components.Text),",
-        "  @components.button_t(\"危险操作\", variant=@components.Danger),", "])",
+        "@ui.hbox([",
+        "  @ui.button_t(\"主要操作\", variant=@ui.Solid, on_click=fn() { }),",
+        "  @ui.button_t(\"次要操作\", variant=@ui.Soft),",
+        "  @ui.button_t(\"文字按钮\", variant=@ui.Text),",
+        "  @ui.button_t(\"危险操作\", variant=@ui.Danger),",
+        "], column_gap=8.0)",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "文字链接",
       "Label 与 Link",
-      "五级排版角色,字号颜色随角色;Link 主题色文字悬停下划线,最近点击信号回显。",
+      "五级排版角色，字号颜色随角色；Link 主题色文字悬停下划线，最近点击信号回显。",
       [
-        @components.label_t("标题文字(Title)", role=@components.Title, style=[
-          ("marginTop", 8.0),
-        ]),
-        @components.label_t("小节标题(Section)", role=@components.Section, style=[
-          ("marginTop", 8.0),
-        ]),
-        @components.label_t("正文文字(Body)", role=@components.Body, style=[
-          ("marginTop", 8.0),
-        ]),
-        @components.label_t("辅助文字(Secondary)", role=@components.Secondary, style=[
-          ("marginTop", 8.0),
-        ]),
-        @components.label_t("强调文字(Accent)", role=@components.Accent, style=[
-          ("marginTop", 8.0),
-        ]),
-        @declarative.hbox(
+        @ui.label_t("标题文字（Title）", role=@ui.Title),
+        @ui.label_t("小节标题（Section）", role=@ui.Section),
+        @ui.label_t("正文文字（Body）", role=@ui.Body),
+        @ui.label_t("辅助文字（Secondary）", role=@ui.Secondary),
+        @ui.label_t("强调文字（Accent）", role=@ui.Accent),
+        @ui.hbox(
           [
-            @components.link("打开文档", fn() { app.picked_lang.set("docs") }),
-            @declarative.label("   "),
-            @components.link("帮助中心", fn() { app.picked_lang.set("help") }),
-            @components.label_t("最近点击:", role=@components.Body),
-            @declarative.bind(app.picked_lang, fn(s) { s }),
+            @ui.link("打开文档", fn() { app.picked_lang.set("docs") }),
+            @ui.link("帮助中心", fn() { app.picked_lang.set("help") }),
+            @ui.label_t("最近点击：", role=@ui.Body),
+            @ui.bind(app.picked_lang, fn(s) { s }),
           ],
-          style=[("marginTop", 8.0), ("alignItems", "center")],
+          column_gap=10.0,
         ),
       ],
       code=[
-        "@components.label_t(\"标题文字\", role=@components.Title)", "@components.label_t(\"小节标题\", role=@components.Section)",
-        "@components.label_t(\"正文文字\", role=@components.Body)", "@components.label_t(\"辅助文字\", role=@components.Secondary)",
-        "@components.label_t(\"强调文字\", role=@components.Accent)", "@components.link(\"打开文档\", fn() { println(\"link clicked\") })",
+        "@ui.label_t(\"标题文字\", role=@ui.Title)",
+        "@ui.label_t(\"小节标题\", role=@ui.Section)",
+        "@ui.label_t(\"正文文字\", role=@ui.Body)",
+        "@ui.label_t(\"辅助文字\", role=@ui.Secondary)",
+        "@ui.label_t(\"强调文字\", role=@ui.Accent)",
+        "@ui.link(\"打开文档\", fn() { app.picked_lang.set(\"docs\") })",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "分隔提示",
       "Divider 与 Tooltip",
-      "水平(默认)/竖直 1px 主题边框色;tooltip_t 给任意节点包原生悬浮提示(系统样式,主题化气泡见反馈页 Popover)。",
+      "水平（默认）/竖直 1px 主题边框色；tooltip_t 给任意节点包原生悬浮提示（系统样式，主题化气泡见反馈页 Popover）。",
       [
-        @components.label_t("上方内容"),
-        @components.divider(style=[("marginTop", 6.0), ("marginBottom", 6.0)]),
-        @components.label_t("下方内容"),
-        @declarative.hbox(
+        @ui.label_t("上方内容"),
+        @ui.divider(),
+        @ui.label_t("下方内容"),
+        @ui.hbox(
           [
-            @components.tooltip_t(
-              @components.button_t("悬停看提示"),
-              "原生 tooltip:系统样式",
-            ),
-            @components.tooltip_t(
-              @components.button_t("再来一个", variant=@components.Soft),
-              "第二个提示",
-            ),
+            @ui.tooltip_t(@ui.button_t("悬停看提示"), "原生 tooltip：系统样式"),
+            @ui.tooltip_t(@ui.button_t("再来一个", variant=@ui.Soft), "第二个提示"),
           ],
-          style=[("marginTop", 10.0), ("alignItems", "center")],
+          column_gap=10.0,
         ),
       ],
       code=[
-        "@components.divider()", "@components.divider(vertical=true)", "@components.tooltip_t(@components.button_t(\"悬停看提示\"), \"原生 tooltip:系统样式\")",
+        "@ui.divider()",
+        "@ui.separator(vertical=true)",
+        "@ui.tooltip_t(@ui.button_t(\"悬停看提示\"), \"原生 tooltip：系统样式\")",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "悬停组",
       "HoverGroup 悬停组",
-      "组内任意位置(含子控件)悬停即整组进入 hover 态:把指针移到卡片里的按钮或输入框上,整张卡片同样高亮且光标变手型——GTK 下子控件的事件窗口会独占指针事件,组件用指针位置轮询判定,不依赖 enter/leave,不闪烁。",
+      "组内任意位置（含子控件）悬停即整组进入 hover 态：把指针移到卡片里的按钮或输入框上，整张卡片同样高亮且光标变手型。旧链路要全局轮询指针才做得到（GTK 下子控件事件窗口独占，祖先收不到 enter）；本栈的悬停态本来就是父链语义，所以既不排定时器也不查指针。",
       [
-        @declarative.hover_group(
-          @declarative.vbox(
-            [
-              @components.label_t(
-                "组标题:悬停我,或下面的子控件",
-                role=@components.Section,
-              ),
-              @declarative.hbox(
-                [
-                  @components.input_t(text="组内输入框", style=[("width", 200.0)]),
-                  @components.button_t("组内按钮"),
-                ],
-                style=[("marginTop", 10.0), ("alignItems", "center")],
-              ),
-              @components.label_t(
-                "子控件触发的事件同样改变组的样式",
-                role=@components.Secondary,
-                style=[("marginTop", 8.0)],
-              ),
-            ],
-            style=[("padding", 14.0)],
-          ),
-          radius=8.0,
-          on_change=fn(h, host) {
-            @yue.View::set_cursor(
-              host,
-              @yue.Cursor::new(if h { @yue.Hand } else { @yue.Default }),
-            )
-          },
+        @ui.hover_group(
+          [
+            @ui.label_t("组标题：悬停我，或下面的子控件", role=@ui.Section),
+            @ui.hbox(
+              [@ui.entry(box_a, width=200.0), @ui.button_t("组内按钮")],
+              column_gap=10.0,
+            ),
+            @ui.label_t("子控件触发的事件同样改变组的样式", role=@ui.Secondary),
+          ],
+          padding=14.0,
+          row_gap=8.0,
         ),
       ],
       code=[
-        "@declarative.hover_group(", "  @declarative.vbox(", "    [", "      @components.label_t(\"组标题\", role=@components.Section),",
-        "      @components.button_t(\"组内按钮\"),", "    ],", "    style=[(\"padding\", 14.0)],",
-        "  ),", "  radius=8.0,", "  on_change=fn(hover, host) {", "    @yue.View::set_cursor(",
-        "      host,", "      @yue.Cursor::new(if hover { @yue.Hand } else { @yue.Default }),",
-        "    )", "  },", ")",
+        "@ui.hover_group(",
+        "  [",
+        "    @ui.label_t(\"组标题\", role=@ui.Section),",
+        "    @ui.hbox([@ui.entry(box, width=200.0), @ui.button_t(\"组内按钮\")], column_gap=10.0),",
+        "  ],",
+        "  padding=14.0,",
+        "  row_gap=8.0,",
+        ")",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "光标组",
       "CursorGroup 光标组",
-      "父设子随:指针落在组内任意位置(含输入框、按钮等有独立窗口的子控件)都保持手型,移出恢复默认——与 hover_group 同机制的指针位置轮询,递归对组根+全部子孙设置。",
+      "父设子随：指针落在组内任意位置（含输入框、按钮等子控件）都保持手型，移出恢复默认。旧链路要把光标递归设到组根与全部子孙（GTK 光标按原生窗口生效，只设容器盖不住有独立窗口的子件）；本栈光标是窗口级的一层，宿主按悬停路径取「最深的那个请求」，所以组只设自己一处即可。",
       [
-        @declarative.cursor_group(
-          @declarative.vbox(
-            [
-              @components.label_t(
-                "整组都是手型:移入试试,或移到子控件上",
-                role=@components.Section,
-              ),
-              @declarative.hbox(
-                [
-                  @components.input_t(text="组内输入框", style=[("width", 200.0)]),
-                  @components.button_t("组内按钮"),
-                ],
-                style=[("marginTop", 10.0), ("alignItems", "center")],
-              ),
-            ],
-            style=[("padding", 14.0)],
-          ),
+        @ui.cursor_group(
+          [
+            @ui.label_t("整组都是手型：移入试试，或移到子控件上", role=@ui.Section),
+            @ui.hbox(
+              [@ui.entry(box_b, width=200.0), @ui.button_t("组内按钮")],
+              column_gap=10.0,
+            ),
+          ],
+          padding=14.0,
+          row_gap=8.0,
         ),
       ],
       code=[
-        "@declarative.cursor_group(", "  @declarative.vbox(", "    [", "      @components.label_t(\"整组都是手型\", role=@components.Section),",
-        "      @components.input_t(text=\"组内输入框\", style=[(\"width\", 200.0)]),",
-        "      @components.button_t(\"组内按钮\"),", "    ],", "    style=[(\"padding\", 14.0)],",
-        "  ),", ")",
+        "@ui.cursor_group(",
+        "  [",
+        "    @ui.label_t(\"整组都是手型\", role=@ui.Section),",
+        "    @ui.entry(box, width=200.0),",
+        "    @ui.button_t(\"组内按钮\"),",
+        "  ],",
+        "  padding=14.0,",
+        ")",
       ],
     ),
   ])

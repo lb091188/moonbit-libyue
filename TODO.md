@@ -186,7 +186,10 @@
 - 平台后端（随各自真机，本轮不做）：Windows WebView2（两级异步 COM 创建、失败回退、就绪前排队、跨 HWND 焦点与滚轮转发；**本地内容通道二选一**——预注册 scheme + `WebResourceRequested` 回包，或 `SetVirtualHostNameToFolderMapping`（URL 变 `https://<host>/…`，子资源在进程内解析、算安全上下文，更快更正），两条都由后端内部决定、调用方接口不变），macOS WKWebView（自定义协议走**公开**的 `WKURLSchemeHandler`（macOS 10.13+），libyue 当年那条 `WKBrowsingContextController registerSchemeForCustomProtocol:` 是更老的私有路线；要验的是公开入口够不够用：自定义 scheme 默认非标准、origin/localStorage 行为要另配；**另需真机验一条**：`loadHTMLString:baseURL:` 是否入前进/后退历史——Apple 无文档承诺，而 Linux 实测 `load_html` 不入历史、WebView2 文档明写 `NavigateToString` 不改历史，若 mac 相反就要在 `yue/web` 里抹平或写进契约）
 
 ### 交付面（webview 批 A/B 落地后接上）
-- [ ] 示例迁移：`hello` ✅ / `hello-themed` ✅（2026-10-12 换到新栈：`@ui.mount_window` + `label`/`label_t`/`entry`/`button_t`/`bind_label` + `App::follow_system_theme`，两包 `--deny-warn` 零警告、core 82/82 与 ui 110/110 未掉；顺带补一条宿主缺省——`app_window` 给根控件铺一层主题页面色，最小示例不必自己写 `on_draw` 才有背景，调用方照常覆盖）；`showcase`（全功能演示板，18 文件 5299 行）/ `sysmonitor`（6 页）/ `systemprobe`（8 页，`modules/yue-examples`）/ `yue-examples` 待迁
+- [ ] 示例迁移：`hello` ✅ / `hello-themed` ✅（2026-10-12 换到新栈：`@ui.mount_window` + `label`/`label_t`/`entry`/`button_t`/`bind_label` + `App::follow_system_theme`，两包 `--deny-warn` 零警告、core 82/82 与 ui 110/110 未掉；顺带补一条宿主缺省——`app_window` 给根控件铺一层主题页面色，最小示例不必自己写 `on_draw` 才有背景，调用方照常覆盖）
+  - **`showcase`（进行中，2026-10-12 首批）**：骨架 + **基础组件页** + **反馈组件页**已换到新栈（`yue/core` 的 `Node` 层 + `yue/ui` + `yue/theme`）；本地共享层目录 `ui/` → `shared/`（新栈组件库本身就是 `yue/ui`，两个包都派生成 `@ui` 会歧义）。三包 `--deny-warn` 零警告、全仓红点 287/68 未变、真机冒烟 `exit 0`（`SHOWCASE-READY pages=2` / `SHOWCASE-DONE`）。四处机械差与三个坑（`style` 改容器参数 / 显隐挂载换到 Widget 层 / `flexgrow` 要在 `handle` 里对滚动视口置 / `nav_page` 要自己写；本地包名歧义、`popover_t` 宽高是命名参数、`@yue.VERSION` 在主包里不可用）见中英 `adaptation.md`「示例迁移首批」节
+  - **`showcase` 待迁页（按「先基础、后重控件」排序；旧源码在 `91204ca` 之前的历史里，`git show <commit>:examples/showcase/pages/<页>.mbt` 取回）**：表单组件 → 导航组件 → 数据展示 → 图表 → 代码与文档 → Store 对照 → 事件与布局 → 窗口 → 系统集成 → 图标库 → 画布与富文本 → 浏览器；另欠菜单栏 / 托盘 / 单实例的接线（对话框已挂窗口根）
+  - `sysmonitor`（6 页）/ `systemprobe`（8 页，`modules/yue-examples`）/ `yue-examples` 待迁
 - [ ] 文档：中英使用文档按新栈重写（`components`/`components-ui`/`declarative`/`layout`/`relink`/`system-capabilities`/`tutorial`），README 挂新截图
 - [ ] 发布：mooncakes 新版本；旧 `bin-*`/`vendor-*` 预构建发布链退役
 - [ ] CI：三平台构建与测试脚本随新栈调整（当前分支构建预期为红）

@@ -267,6 +267,22 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **本批未做且不假装完成**：`ffmpeg-mbt` 的 Windows/macOS 后端（要接系统解码器或自带 DLL，是另一条独立的线）；媒体包在非 Linux 上因此仍不能整体构建与整体测试；macOS 分支（`mach_absolute_time`）无法在本机回证，只做了代码级正确性论证；真机听得见的声音与 seek 手感仍归 `_人工测试清单.md`。
 - **顺带一条实测结论（免得后人「修」错地方）**：媒体 prebuild 的「非 Linux → 空 link_configs」是**对的**，不要往里加 `ole32.lib`/`uuid.lib`，也不要加 macOS 的 framework。①**Windows**：把 `audio_stub.c`（`#include` 了 miniaudio）拿去做实验——**不加任何额外库**直接链接即可通过（实测 `/Fe:probe_nolibs.exe` 零库链接成功且运行照样过 48 条断言），因为 miniaudio 默认走**运行期 `LoadLibrary`**（`MA_NO_RUNTIME_LINKING` 未定义），不产生链接期符号（此前那批探针带 `ole32.lib uuid.lib` 能过，是它们**不必要**而非必要）。②**macOS**：miniaudio 自述「the macOS build should compile cleanly without the need to download any dependencies nor link to any libraries or frameworks」——默认同为运行期框架链接（只有显式 `-DMA_NO_RUNTIME_LINKING` 才要求 `-framework CoreFoundation -framework CoreAudio -framework AudioToolbox`，且该宏的自动置位出现在 **DOS** 分支、不在 Apple 分支），命令行只需 `-lpthread -lm`，而这两者在 macOS 上由 libSystem 默认带上。所以三平台里**只有 Linux 需要显式系统库**（`-lpthread -ldl -lm -lstdc++ -latomic`）。
 
+### 示例迁移首批：showcase 骨架 + 基础/反馈两页（G7，2026-10-12）
+
+- **本批范围**：`examples/showcase` 从旧链路（`@yue` 根包 + `@declarative` + `@components`）改到新栈（`yue/core` 的 `Node` 层 + `yue/ui` + `yue/theme`），先落**骨架 + 基础组件页 + 反馈组件页**。旧链路的 15 页里其余 13 页（图标库/表单/事件与布局/导航/数据展示/图表/代码与文档/Store 对照/系统集成/窗口/浏览器/画布与富文本）**已从工作区删除**（`git rm`，源码在 `91204ca` 之前的历史里可随时取回），按「先基础、后重控件」逐批迁入——浏览器页含 WebKit 重控件、图标墙页要建 803 个图标控件，都不适合先动。
+- **四处机械差（旧链路 → 本栈，写在这里免得每页重踩）**：
+  ① **`style=[...]` 不存在**。新栈组件只接显式参数（`padding`/`row_gap`/`width`…），间距是**布局容器的属性**而不是控件自己的；旧代码里成片的 `style=[("marginTop", 8.0)]` 一律删，改由父容器 `row_gap` 表达。
+  ② **显隐与惰性挂载换层**：`View::set_visible` → `Widget::set_visible`（内部落 `display:none` 的 yoga 安全路径），`Node::mount_into(View)` → `Node::mount_into(Widget)`；`Node.mount` 的闭包签名也从「返回 View」变成「返回 Widget」，语义不变。
+  ③ **「撑满剩余高度」不能写在控件上**：旧链路写 `style=[("flexgrow", 1.0)]`；新栈滚动容器（`scroll_v`）**不接** `grow` 参数，要在 `handle` 回调里对**视口控件**置 `node.set_flex_grow(1.0)`（`handle` 拿到的就是视口本身）。
+  ④ **导航页要自己写**：旧链路 `nav_page` 本就是示例本地件（`examples/showcase/ui/section.mbt`），本栈同样没有对应物，照原机理重写成 `shared/section.mbt` 的 `nav_page`——`set_visible` 切显隐、**首次选中才 `mount_into`**（15 页全量挂载的启动开销不可行，这条机制必须保留）。
+- **坑一：本地共享层不能叫 `ui/`**。旧链路里组件库叫 `@components`、示例自己的共享层叫 `@ui`，所以不冲；新栈组件库**就是** `yue/ui`，两个包都派生成 `@ui` 直接歧义。改法：目录 `examples/showcase/ui/` → `examples/showcase/shared/`（包名派生成 `@shared`），顺带把 `@ui.App`/`@ui.page`/`@ui.section` 的调用点一并改准。**不要靠 `moon.pkg` 里给组件库另起别名绕过**——那样示例读起来会长期名实不符。
+- **坑二：`popover_t` 的宽高是命名参数**。旧链路 `popover_t(trigger, content, 180.0, 60.0)` 位置传参；新栈签名是 `popover_t(trigger, content, width?, height?, handle?)`，位置传两个 `Double` 直接编译报 **4080**（`which requires 2 positional arguments, but is given 4`）。凡新栈签名多出可选参数，都要先确认它是命名参数——照旧调用点抄最容易踩这一类。
+- **坑三：旧链路的 `@yue.VERSION` 不可用**。它在**主包**（旧链路根包，正是全仓 287 个红点的所在地），示例 import 它会把整个红包拖进依赖闭包。示例本地留一份 `SHOWCASE_VERSION` 常量，并注明权威值仍是 `moon.mod` + `yue/version.mbt`（后者的构建期一致性校验由 `scripts/prebuild.py` 负责）。
+- **两条组件层收并（迁移时按新形状写，别找旧函数）**：`alert_closeable` 已并入 `alert(closable=true, on_close=)`；`result` 只吃 `(标题, 副标题, 语义类型)`，**不再**吃操作区数组——操作区由调用方在旁边摆（「组件只给形状、内容是调用方的」是本栈组件层的通用取向）。
+- **一条顺带的接口澄清**：`toast_layer` 在本栈**只返回推送函数**，不再返回「层节点 + 推送函数」——提示带子开在**浮层图层**上（第一条推送才开、撤完就收），所以页面里不必再常驻一棵空树，提示也永远压在对话框与其它浮层之上。迁移时旧代码里那个 `@components.toast_layer()` 解出来的 `toast_node` 要**整条删掉**，别往树里挂。
+- **验证**：`moon check ./examples/showcase ./examples/showcase/shared ./examples/showcase/pages --deny-warn` **零警告**；全仓 `moon check` 红点 **287/68 未变**（删掉的 14 个旧页本就在红点里）；真机冒烟 `exit 0`，控制台 `SHOWCASE-READY title=组件库演示板 pages=2 follow=1` 与 `SHOWCASE-DONE page=基础组件`，窗口标题正确、响应正常、`CloseMainWindow` 干净退出。退出时那条 `libpng warning: iCCP: cHRM chunk does not match sRGB` 是**既有**的（`examples/native-app` 同样打），与本批无关。
+- **本批未做且不假装完成**：其余 13 页；菜单栏 / 托盘 / 单实例的接线（两个 `dialog_t` 已挂窗口根并可由反馈页打开，菜单栏、托盘、单实例按「各自随系统集成页/窗口页进来」处理，`examples/native-app` 已有对照演示）；真机观感（侧栏悬停、切段后滚动位置保留、跟随/手动主题切换的手感）归 `_人工测试清单.md`。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。

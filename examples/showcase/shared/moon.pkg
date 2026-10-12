@@ -1,0 +1,9 @@
+// 演示板共享层（G7 新栈）：跨页状态 App + 页面「段」装配。
+// 原先叫 `ui/`，与组件库包名冲（新栈组件库就是 `yue/ui`），改为 `shared/`。
+import {
+  "NoahLiu/moonbit-libyue/yue/core",
+  "NoahLiu/moonbit-libyue/yue/ui",
+  "NoahLiu/moonbit-libyue/yue/sys",
+}
+
+supported_targets = "native"
