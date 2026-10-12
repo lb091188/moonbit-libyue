@@ -1,132 +1,171 @@
-// 反馈组件页:Signal 驱动。对话框可见性挂窗口根(状态在 App),
-// 反馈页的按钮只是触发方;Toast 推送函数经 App 传入。
+// 反馈组件页：Store/Signal 驱动。两个对话框的可见性挂窗口根（状态在 App，
+// 由 main.mbt 把 `dialog_t` 挂进窗口根），反馈页的按钮只是触发方；
+// Toast 推送函数经 App 传入（新栈的 toast 自己开在浮层图层上，页面里不必
+// 再常驻一棵空树，与 master 的一条差）。
+//
+// G7 迁移记档：
+// ① `alert_closeable` 在本栈并入 `alert`（`closable=true`），不再另出一个函数；
+// ② `result` 在本栈只吃（标题, 副标题, 语义类型），操作区由调用方在旁边摆
+//    ——旧链路把它作为数组参数传，本栈按「组件只给形状、操作区是内容」拆开；
+// ③ `input_t` → `entry`（Store 驱动）。
 
 ///|
-pub fn page_feedback(app : @ui.App) -> @yue.Node {
-  @ui.page([
-    @ui.section(
+pub fn page_feedback(app : @shared.App) -> @core.Node {
+  @shared.page([
+    @shared.section(
       "横幅",
       "Alert 提示横幅",
-      "四种语义类型:左侧色条 + 类型浅底 + 同族深字,文字垂直居中。",
+      "四种语义类型：左侧色条 + 类型浅底 + 同族深字，文字垂直居中。",
       [
-        @components.alert("成功提示:配置已保存。", @components.Success),
-        @components.alert("信息提示:有新版本可用。", @components.Info),
-        @components.alert("警告提示:磁盘剩余空间不足。", @components.Warning),
-        @components.alert("错误提示:网络连接已断开。", @components.Danger),
+        @ui.alert("成功提示：配置已保存。", t=@ui.Success),
+        @ui.alert("信息提示：有新版本可用。", t=@ui.Info),
+        @ui.alert("警告提示：磁盘剩余空间不足。", t=@ui.Warning),
+        @ui.alert("错误提示：网络连接已断开。", t=@ui.Danger),
       ],
       code=[
-        "@components.alert(\"成功提示:配置已保存。\", @components.Success)", "@components.alert(\"信息提示:有新版本可用。\", @components.Info)",
-        "@components.alert(\"警告提示:磁盘剩余空间不足。\", @components.Warning)",
-        "@components.alert(\"错误提示:网络连接已断开。\", @components.Danger)",
+        "@ui.alert(\"成功提示：配置已保存。\", t=@ui.Success)",
+        "@ui.alert(\"信息提示：有新版本可用。\", t=@ui.Info)",
+        "@ui.alert(\"警告提示：磁盘剩余空间不足。\", t=@ui.Warning)",
+        "@ui.alert(\"错误提示：网络连接已断开。\", t=@ui.Danger)",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "可关闭",
       "Alert 可关闭",
-      "点击右侧 ✕ 关闭整条横幅。",
+      "点击右侧 ✕ 关闭整条横幅；`alert` 的 `closable` 开关，不需要另一个函数。",
       [
-        @components.alert_closeable(
-          "可关闭横幅:点我右侧的 ✕ 试试。",
-          @components.Warning,
+        @ui.alert(
+          "可关闭横幅：点我右侧的 ✕ 试试。",
+          description="关闭回调可选，这里留默认（只收起）。",
+          t=@ui.Warning,
+          closable=true,
         ),
       ],
       code=[
-        "@components.alert_closeable(\"可关闭横幅:点我右侧的 ✕ 试试。\", @components.Warning)",
+        "@ui.alert(\"可关闭横幅：点我右侧的 ✕ 试试。\", t=@ui.Warning, closable=true)",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "结果页",
       "Result 结果页",
-      "大色块符号 + 标题 + 描述 + 操作区;四种语义类型。",
+      "大色块符号 + 标题 + 描述；四种语义类型。操作区由调用方摆在旁边（组件只给形状）。",
       [
-        @declarative.hbox([
-          @components.result(
-            @components.Success,
-            "操作成功",
-            "配置已写入并生效。",
-            [@components.button_t("返回首页")],
-          ),
-          @components.result(
-            @components.Danger,
-            "操作失败",
-            "网络异常,请稍后重试。",
-            [@components.button_t("重新加载", variant=@components.Soft)],
-          ),
-        ]),
-      ],
-      code=[
-        "@components.result(", "  @components.Success,", "  \"操作成功\",", "  \"配置已写入并生效。\",",
-        "  [@components.button_t(\"返回首页\")],", ")",
-      ],
-    ),
-    @ui.section(
-      "气泡",
-      "Popover 气泡弹层",
-      "popover_t 给任意节点包点击弹层:内容为任意 Node,再次点击收起。",
-      [
-        @components.popover_t(
-          @components.button_t("打开气泡"),
-          @components.label_t("气泡内容:任意 Node。", role=@components.Body),
-          180.0,
-          60.0,
+        @ui.hbox(
+          [
+            @ui.vbox(
+              [
+                @ui.result("操作成功", subtitle="配置已写入并生效。", t=@ui.Success),
+                @ui.hbox([@ui.button_t("返回首页")], column_gap=8.0),
+              ],
+              row_gap=10.0,
+            ),
+            @ui.vbox(
+              [
+                @ui.result("操作失败", subtitle="网络异常，请稍后重试。", t=@ui.Danger),
+                @ui.hbox(
+                  [@ui.button_t("重新加载", variant=@ui.Soft)],
+                  column_gap=8.0,
+                ),
+              ],
+              row_gap=10.0,
+            ),
+          ],
+          column_gap=40.0,
         ),
       ],
       code=[
-        "@components.popover_t(", "  @components.button_t(\"打开气泡\"),", "  @components.label_t(\"气泡内容:任意 Node。\", role=@components.Body),",
-        "  180.0,", "  60.0,", ")",
+        "@ui.result(\"操作成功\", subtitle=\"配置已写入并生效。\", t=@ui.Success)",
+        "@ui.result(\"操作失败\", subtitle=\"网络异常，请稍后重试。\", t=@ui.Danger)",
       ],
     ),
-    @ui.section(
+    @shared.section(
+      "气泡",
+      "Popover 气泡弹层",
+      "popover_t 给任意节点包点击弹层：内容为任意 Node，再次点击收起。",
+      [
+        @ui.popover_t(
+          @ui.button_t("打开气泡"),
+          @ui.label_t("气泡内容：任意 Node。", role=@ui.Body),
+          width=180.0,
+          height=60.0,
+        ),
+      ],
+      code=[
+        "@ui.popover_t(",
+        "  @ui.button_t(\"打开气泡\"),",
+        "  @ui.label_t(\"气泡内容：任意 Node。\", role=@ui.Body),",
+        "  180.0,",
+        "  60.0,",
+        ")",
+      ],
+    ),
+    @shared.section(
       "轻提示",
       "Toast 轻提示",
-      "操作反馈瞬态提示:推送后顶部居中出现,2.6 秒自动消失,多条堆叠;层挂在窗口根(absolute 顶部,不占布局)。",
+      "操作反馈瞬态提示：推送后顶部居中出现，2.6 秒自动消失，多条堆叠。新栈里这条带子开在浮层图层上（第一条推送才开），所以页面里不必挂一个「提示层」节点，提示也永远压在对话框之上。",
       [
-        @declarative.hbox([
-          @components.button_t("成功", on_click=fn() {
-            app.toast_push("保存成功", @components.Success)
-          }),
-          @components.button_t("警告", on_click=fn() {
-            app.toast_push("连接超时,已重试", @components.Warning)
-          }),
-          @components.button_t("错误", on_click=fn() {
-            app.toast_push("提交失败:网络不可达", @components.Danger)
-          }),
-          @components.button_t("普通", variant=@components.Solid, on_click=fn() {
-            app.toast_push("已加入下载队列", @components.Info)
-          }),
-        ]),
+        @ui.hbox(
+          [
+            @ui.button_t("成功", on_click=fn() {
+              app.toast_push("保存成功", @ui.Success)
+            }),
+            @ui.button_t("警告", on_click=fn() {
+              app.toast_push("连接超时，已重试", @ui.Warning)
+            }),
+            @ui.button_t("错误", on_click=fn() {
+              app.toast_push("提交失败：网络不可达", @ui.Danger)
+            }),
+            @ui.button_t("普通", variant=@ui.Solid, on_click=fn() {
+              app.toast_push("已加入下载队列", @ui.Info)
+            }),
+          ],
+          column_gap=8.0,
+        ),
       ],
       code=[
-        "let (toast_node, toast_push) = @components.toast_layer()", "// toast_node 加入 mount_window 根节点数组,之后任意位置推送:",
-        "toast_push(\"保存成功\", @components.Success)", "toast_push(\"连接超时,已重试\", @components.Warning)",
+        "let toast_push = @ui.toast_layer(duration_ms=2600)",
+        "// 不必再挂层节点，直接推：",
+        "toast_push(\"保存成功\", @ui.Success)",
+        "toast_push(\"连接超时，已重试\", @ui.Warning)",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "对话框",
       "Dialog 对话框",
-      "同窗遮罩 + 居中面板;回调后自动收起,visible 由 Store 驱动。",
+      "同窗遮罩 + 居中面板；回调后自动收起，visible 由 Store 驱动。两个对话框由 main 挂在窗口根，本页只负责触发。",
       [
-        @declarative.hbox([
-          @components.button_t("基础对话框", on_click=fn() {
-            app.dlg_basic.set(true)
-          }),
-          @components.button_t("表单对话框", variant=@components.Solid, on_click=fn() {
-            app.dlg_form.set(true)
-          }),
-          @declarative.bind(app.dlg_name.signal(), fn(n) {
-            if n == "" {
-              "尚未提交"
-            } else {
-              "提交了:\\{n}"
-            }
-          }),
-        ]),
+        @ui.hbox(
+          [
+            @ui.button_t("基础对话框", on_click=fn() {
+              app.dlg_basic.set(true)
+            }),
+            @ui.button_t("表单对话框", variant=@ui.Solid, on_click=fn() {
+              app.dlg_form.set(true)
+            }),
+            @ui.label_t("最近确认：", role=@ui.Body),
+            @ui.bind(app.dlg_result.signal(), fn(n) {
+              if n == "" {
+                "（尚未提交）"
+              } else {
+                n
+              }
+            }),
+          ],
+          column_gap=8.0,
+        ),
       ],
       code=[
-        "let visible = @yue.Store::new(false)", "let name = @yue.Store::new(\"\")",
-        "@components.dialog_t(", "  visible,", "  \"新建连接\",", "  [", "    @components.label_t(\"名称\", role=@components.Body),",
-        "    @components.input_t(text=\"\", style=[(\"width\", 320.0)], on_input=fn(t) { name.set(t) }),",
-        "  ],", "  style=[(\"width\", 380.0)],", ")", "visible.set(true)",
+        "let visible : @core.Store[Bool] = @core.Store::new(false)",
+        "let name : @core.Store[String] = @core.Store::new(\"\")",
+        "@ui.dialog_t(",
+        "  visible,",
+        "  \"新建连接\",",
+        "  [",
+        "    @ui.label_t(\"名称\", role=@ui.Body),",
+        "    @ui.entry(name, placeholder=\"例如：开发库\", width=320.0),",
+        "  ],",
+        ")",
+        "visible.set(true)",
       ],
     ),
   ])

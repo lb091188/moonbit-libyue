@@ -1,6 +1,6 @@
 # async 共存调研实验(async_coexist)
 
-`docs/zh/async-research.md` 的配套可复现实验。**调研产物,不属于主链路**:`lab/` 是独立 moonbit 模块(依赖取 mooncakes 线上 `moonbitlang/async@0.22.4` 与 `NoahLiu/moonbit-libyue@0.5.9`),主仓构建/测试不受影响。
+`docs/zh/async-research.md` 的配套可复现实验。**调研产物,不属于主链路**:`lab/` 是独立 moonbit 模块(依赖取 mooncakes 线上 `moonbitlang/async@0.22.4` 与 `NoahLiu/native-gui@0.5.9`),主仓构建/测试不受影响。
 
 复现环境:Ubuntu 24.04 + X11 + XFCE,moon 0.1.20260920 (914d7da)。
 

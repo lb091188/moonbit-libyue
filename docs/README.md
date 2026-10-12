@@ -8,17 +8,26 @@ Never touched MoonBit? Start from the [five-minute tutorial](tutorial.md) — le
 
 ## Packages
 
-Since 0.5.11 the module is split into sub-packages — `moon add NoahLiu/moonbit-libyue` gets you all of them, but you only compile and link what you import (MoonBit builds the import closure; an unused package costs nothing in your binary):
+Since 0.5.11 the module is split into sub-packages — `moon add NoahLiu/native-gui` gets you all of them, but you only compile and link what you import (MoonBit builds the import closure; an unused package costs nothing in your binary):
 
 | Import in `moon.pkg` | Alias | Contents |
 |---|---|---|
-| `NoahLiu/moonbit-libyue/yue` | `@yue` | Core: FFI, native widgets (Window / View / Label / Button / Entry / Table / Tab / Menu / dialog…), Painter, events, `Store`/`Signal`, theme, tray, file/env helpers |
+| `NoahLiu/native-gui/yue` | `@yue` | Core: FFI, native widgets (Window / View / Label / Button / Entry / Table / Tab / Menu / dialog…), Painter, events, `Store`/`Signal`, theme, tray, file/env helpers |
 | `.../yue/declarative` | `@declarative` | Declarative layer: `Node`/`mount` render tree, node constructors, `bind_label`/`bind`, hover group, overlay scroll |
 | `.../yue/components` | `@components` | Themed component library: buttons / inputs / selection / forms / navigation / layout / data display / feedback / overlays |
 | `.../yue/charts` | `@charts` | 20+ chart types plus the cross-cutting interactive layer |
 | `.../yue/icons` | `@icons` | Vector icon system (`draw_icon` and the icon views/buttons) |
 | `.../yue/markdown` | `@markdown` | `markdown_view` rendering (this package pulls in the mizchi/markdown dependency) |
-| `.../yue/system` | `@system` | OS capabilities: autostart, single instance, power & sessions, volume, brightness, media keys, wallpaper, Bluetooth, printers, disk volumes, browser history… (pulls in subproc / sqlite) |
+
+Heavier optional capabilities live in **separate modules**, not in sub-packages, so `moon add NoahLiu/native-gui` never drags them in:
+
+| Module | Contents |
+|---|---|
+| `NoahLiu/gui-media` | Audio/video engine (ffmpeg decode + miniaudio output) and the player component. Needs the system ffmpeg dev packages on Linux. |
+| `NoahLiu/gui-examples` | The standalone example module (systemprobe, native-web) that depends on `gui-media`. |
+
+**Two different layers of "optional" — keep them apart**: a **sub-package** you do not import costs nothing in your binary (the `moon.pkg` import is the compile/link boundary); a **module** you do not depend on is not even resolved or prebuilt (the `moon.mod` import defines the dependency closure). A capability can only reach the second layer by living in its own module.
+| `.../yue/system` | `@system` | OS capabilities: autostart, single instance, power & sessions, volume, brightness, media keys, wallpaper, Bluetooth, printers, disk volumes, browser history… (pulls in sqlite) |
 | `.../yue/browser` | `@browser` | Webview widget — import only if you need it (it is the only package that links WebKit/WebView2) |
 
 The tutorial imports core + declarative; the themed component library and everything above it is opt-in.
@@ -32,7 +41,7 @@ moon run examples/hello         # minimal window with the original widgets
 moon run examples/hello-themed  # minimal example of the themed component library (theme_apply + button_t/input_t/label_t)
 moon run examples/showcase      # full-capability demo board: 14 pages, three grouped sidebars, component library + system capabilities
 moon run examples/sysmonitor    # flagship app: Ubuntu process manager & hardware monitor (1000-row process table + live curves)
-moon run NoahLiu/yue-examples/systemprobe   # system capabilities + extended charts demo (volume/brightness/browser & VS Code history/app lookup + radar/heatmap/candlestick/funnel/boxplot/sankey)
+moon run NoahLiu/gui-examples/systemprobe   # system capabilities + extended charts demo (volume/brightness/browser & VS Code history/app lookup + radar/heatmap/candlestick/funnel/boxplot/sankey)
 ```
 
 The showcase covers: Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store comparison + Canvas & rich text + System Integration / Window / Browser, with a collapsible grouped side menu and the package version pinned at the bottom (kept in sync with moon.mod). Each page's source is its own file (`examples/showcase/pages/*.mbt`) — the best copy-paste material library; screenshots of the component library:

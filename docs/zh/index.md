@@ -23,7 +23,7 @@ features:
 ## 快速开始
 
 ```sh
-moon add NoahLiu/moonbit-libyue
+moon add NoahLiu/native-gui
 ```
 
 ```moonbit
@@ -43,4 +43,4 @@ fn main {
 }
 ```
 
-`@declarative.*` 需要额外 import `NoahLiu/moonbit-libyue/yue/declarative`——完整包表见[文档索引](/zh/README)。
+`@declarative.*` 需要额外 import `NoahLiu/native-gui/yue/declarative`——完整包表见[文档索引](/zh/README)。

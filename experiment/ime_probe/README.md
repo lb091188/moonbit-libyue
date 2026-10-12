@@ -27,7 +27,7 @@ GTK_IM_MODULE=ibus ~/.moon/bin/moon run experiment/ime_probe
 改过 `ime_probe_stub.c` 后**必须删产物强制重链**（`moon` 不感知 `-l` 静态库变化）：
 
 ```sh
-rm -f build/libime_probe_stub.a _build/native/debug/build/NoahLiu/moonbit-libyue/experiment/ime_probe/ime_probe.exe
+rm -f build/libime_probe_stub.a _build/native/debug/build/NoahLiu/native-gui/experiment/ime_probe/ime_probe.exe
 ```
 
 窗口里蓝色描边框 = 探针给输入区定的 240×22 盒子；绿色状态行实时显示 `commit / preedit / 输入法消费与放行 / 转给 MoonBit 的按键 / 文本字节数`；`Esc` 退出并在终端打印汇总（含事件流水最近 40 条）。

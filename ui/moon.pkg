@@ -1,0 +1,20 @@
+// 新栈组件层（自绘，一律返回声明式 `@core.Node`）。
+//
+// 为什么不是 `yue/components`：那个目录是旧链路的组件实现（引用 `@yue` 根包与
+// `@declarative`，属全仓红点积压），新栈每批只把**要保留的语义**实现进来；
+// 混在一个包里会让「本包 --deny-warn 零警告」这条分包门禁无从谈起。旧包按批
+// 替换或删除，G7 收口时一并结算。
+supported_targets = "native"
+
+import {
+  "NoahLiu/yoga-mbt/src" @yoga,
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/math",
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/input",
+  "NoahLiu/native-gui/icons",
+  "NoahLiu/native-gui/render",
+  "NoahLiu/native-gui/sys",
+  "NoahLiu/native-gui/text",
+  "NoahLiu/native-gui/theme",
+}

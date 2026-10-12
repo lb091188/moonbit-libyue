@@ -1,0 +1,18 @@
+// 新栈图表层：共享算法层（纯函数）+ 五种通用图（自绘组件）。
+//
+// 为什么不是原地改 `yue/charts`：那个目录是旧链路的图表实现（引用 `@yue` 根包
+// 与旧 Painter 契约，属全仓红点积压），新栈按批把**要保留的语义**实现进来，
+// 混在一个包里会让「本包 --deny-warn 零警告」这条分包门禁无从谈起。
+// 纯函数层（数据窗口/坐标换算/刻度/扇区/回归）与 master 同源，测试一并平移。
+supported_targets = "native"
+
+import {
+  "NoahLiu/yoga-mbt/src" @yoga,
+  "moonbitlang/core/math",
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/render",
+  "NoahLiu/native-gui/text",
+  "NoahLiu/native-gui/theme",
+  "NoahLiu/native-gui/sys",
+  "NoahLiu/native-gui/ui",
+}

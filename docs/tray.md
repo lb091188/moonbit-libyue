@@ -83,3 +83,19 @@ After real-machine testing of each, write version numbers and differences back i
 
 - For protocol interop issues, the first choice is `dbus-monitor` captures on the **real session bus**: criteria and cases (batch-version signals, `Notify` notification not sent, etc.) are in the "DBus wire protocol pitfalls" and "Desktop environments" sections of adaptation.md.
 - Unit tests only prove encode/decode self-consistency (alignment, signatures, length prefixes and other wire-level rules have independent tests); **interop conclusions must come from a real bus and a real panel** — this is a repository-level verification rule, not an optional requirement of this module.
+
+## New-stack (MoonBit native GUI stack) mapping
+
+The sections above describe the old chain (`yue/tray.mbt` + `yue/traybus/`). Since W20c the tray maps onto the new stack as follows:
+
+| Old chain | New stack | Notes |
+| --- | --- | --- |
+| `yue/tray.mbt` facade | `core/tray.mbt` | Same semantics for `Tray::is_supported()` / `TrayBackend` / `TrayError` (structured errors, never a silent failure) |
+| `yue/traybus/` (SNI protocol stack) | `dbus/sni.mbt` | Talks to the watcher directly over the session bus with zero AppIndicator dependency; availability is `sni_watcher_present()` (`NameHasOwner`), stronger than `sni_available()` which only checks that the bus is reachable |
+| `NativeTray` (nativeui AppIndicator fallback) | `win/tray.mbt` + `Shell_NotifyIconW` in `stub.c` | The Windows native tray. **Linux no longer falls back to AppIndicator** (with the AppIndicator extension installed, SNI works on GNOME) |
+
+- Backend selection: `sni_watcher_present()` first → otherwise `@win.tray_supported()` → `Err(TrayError::Unsupported)` if neither.
+- Callbacks: on Win32 left/right clicks go through a process-level queue drained by the host each tick via `dispatch_tray_event()` (on Win32 a right click with no callback **automatically pops the attached menu**); on SNI, clicks reach the callback directly via D-Bus signals and bypass the queue.
+- Menu: `Tray::set_menu(Menu)` reuses the same model from `core/menu.mbt` — Win32 goes through W20a's HMENU (`TrackPopupMenuEx` + `TPM_RETURNCMD`, with the selected item rejoining the same menu dispatch chain); SNI goes through DBusMenu. **On SNI this implementation is a flat one-level menu, so submenus are flattened** (preceded by a separator).
+- Icons: on Win32 through W20f's `Icon` (native `.ico` / PNG via WIC / pixels built directly); on SNI through panel theme icon names (`set_icon_name`) or a built-in pixmap — arbitrary PNG pixel decoding is not built in.
+- Verification: the backend is proven by the pure-C probe `experiment/tray_probe` (last line `TRAY-BACKEND-OK`); the facade by the pure-function and lifecycle cases in `core/tray_wbtest.mbt` (which auto-skip on machines with no tray backend instead of faking). **Real-panel look and feel (whether the icon shows, where the menu pops up, left-click behavior) still belongs to the manual test checklist.**

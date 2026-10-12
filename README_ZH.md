@@ -1,5 +1,7 @@
 # moonbit-libyue [![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
 
+> **⚠ 已更名**——mooncakes 包名改为 **`NoahLiu/native-gui`**（原名 `NoahLiu/moonbit-libyue`；新包首版 0.1.0 占位上架，待自绘栈稳定后将旧包标记废弃）；子模块 `NoahLiu/yue-media` → **`NoahLiu/gui-media`**、`NoahLiu/yue-examples` → **`NoahLiu/gui-examples`**。本分支主线为**自绘 GUI 栈**（不依赖 libyue：窗口/像素/事件循环/布局/控件全纯 MoonBit 自绘），方案见 [docs/zh/native-gui-plan.md](docs/zh/native-gui-plan.md)。下方正文仍描述 `master` 上的 0.5.x libyue 绑定 API。
+
 > 感谢 [赵成(zcbenz)](https://github.com/zcbenz) 和他的 [Yue](https://github.com/yue/yue) 框架，以及 [MoonBit](https://github.com/moonbitlang)。很凑巧，这两个编程工具都有 “月”，现在我也很喜欢它们。 [关于我和 `libyue`](docs/zh/aboutlibyue.md)
 
 [MoonBit](https://github.com/moonbitlang) 生态的**原生跨平台桌面 GUI 库**——对 [libyue](https://libyue.com/docs/latest/cpp/)(C++) 全量封装,一套 MoonBit 代码跑 Windows ✅ / Linux ✅ / macOS 🟡 原生窗口,`moon add` 后零配置直接运行。
@@ -79,9 +81,9 @@ moon run examples/sysmonitor
 | Linux x64(需 GTK3,Ubuntu 自带) | [`bin-linux-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-linux-x64.zip) |
 | macOS(Apple Silicon) 🟡 未真机验证 | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
 
-> **0.5.11 起**库拆成多个子包——按需 import,用不到的包不进二进制。核心(原生控件、绘制、`Store`/`Signal`、主题、托盘)仍是 `NoahLiu/moonbit-libyue/yue`(`@yue`);声明式层 `.../yue/declarative`(`@declarative`)、主题组件 `.../yue/components`(`@components`)、图表 `.../yue/charts`、图标 `.../yue/icons`、markdown `.../yue/markdown`、系统能力 `.../yue/system`。完整表见 [docs/zh/README.md](docs/zh/README.md#包结构)。
+> **0.5.11 起**库拆成多个子包——按需 import,用不到的包不进二进制。核心(原生控件、绘制、`Store`/`Signal`、主题、托盘)仍是 `NoahLiu/native-gui/yue`(`@yue`);声明式层 `.../yue/declarative`(`@declarative`)、主题组件 `.../yue/components`(`@components`)、图表 `.../yue/charts`、图标 `.../yue/icons`、markdown `.../yue/markdown`、系统能力 `.../yue/system`。完整表见 [docs/zh/README.md](docs/zh/README.md#包结构)。
 
-> **升级到 0.5.0**：`Browser` 绑定拆分为独立包,import 路径改为 `NoahLiu/moonbit-libyue/yue/browser`(`@browser.Browser` → `@browser.Browser`,API 不变)。未 import 该包的程序不再链接 WebKit/WebView2 依赖。
+> **升级到 0.5.0**：`Browser` 绑定拆分为独立包,import 路径改为 `NoahLiu/native-gui/yue/browser`(`@browser.Browser` → `@browser.Browser`,API 不变)。未 import 该包的程序不再链接 WebKit/WebView2 依赖。
 
 ## 文档索引
 

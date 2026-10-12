@@ -2,7 +2,7 @@
 """重写 examples/showcase/pages/icons.mbt:按主题组铺全量图标墙。
 
 用法: python3 scripts/gen_showcase_icons.py
-读取 yue/icons/icons.mbt 的生成标记区(变体+中文名),按 GROUPS 分组输出,
+读取 icons/icons.mbt 的生成标记区(变体+中文名),按 GROUPS 分组输出,
 未分组的落入「其他」。页面结构(icon_grid/icon_group_code/@ui.page)
 与原页一致,只换图标清单与分组。
 """

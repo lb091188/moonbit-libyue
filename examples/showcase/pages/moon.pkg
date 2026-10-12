@@ -1,11 +1,14 @@
+// 演示板各页内容（G7 新栈）。每页一个文件；页内私有状态留在页函数体内，
+// 跨页共享状态从 `shared` 的 `App` 取。
 import {
-  "NoahLiu/moonbit-libyue/yue",
-  "NoahLiu/moonbit-libyue/yue/system",
-  "NoahLiu/moonbit-libyue/yue/declarative",
-  "NoahLiu/moonbit-libyue/yue/components",
-  "NoahLiu/moonbit-libyue/yue/icons",
-  "NoahLiu/moonbit-libyue/yue/browser",
-  "NoahLiu/moonbit-libyue/yue/markdown",
-  "NoahLiu/moonbit-libyue/yue/charts",
-  "NoahLiu/moonbit-libyue/examples/showcase/ui",
+  "NoahLiu/yoga-mbt/src" @yoga,
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/text" @text,
+  "NoahLiu/native-gui/ui",
+  "NoahLiu/native-gui/chart" @charts,
+  "NoahLiu/native-gui/theme",
+  "NoahLiu/native-gui/mdview",
+  "NoahLiu/native-gui/examples/showcase/shared",
 }
+
+supported_targets = "native"

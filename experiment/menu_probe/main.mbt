@@ -1,5 +1,5 @@
 // W20a 菜单模型探针：纯数据结构的构建与遍历读数（零 FFI、零后端）。
-// 与 yue/core/menu_wbtest.mbt 的断言同源，这里打印成可肉眼对照的读数——
+// 与 core/menu_wbtest.mbt 的断言同源，这里打印成可肉眼对照的读数——
 // 用于「本机 moon 起不来时也能验证模型正确」的环境限制兜底（见 memory 记录）。
 //
 // 跑法：moon run experiment/menu_probe

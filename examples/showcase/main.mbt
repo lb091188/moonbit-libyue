@@ -1,363 +1,214 @@
-// 组件库演示板:侧边导航切换分页。目录结构:
-//   ui/    共享层(App 跨页状态、scroll_page 段装配、复制回显钩子)
-//   pages/ 各页内容(每页一个文件)+ 独立表格窗口
-//   assets/ 图片资源(icon.png / dot.gif)
-// 响应式分层演示:
-//   主题五页(基础/表单/导航/数据/反馈)用 Signal 自动依赖收集;
-//   「Store 对照」页保留 Store 手动接线模式,可与信号页对照;
-//   事件/系统/窗口/画布页维持 Store 手动模式。
+// 组件库演示板：侧边导航切换分页。目录结构：
+//   shared/ 共享层（App 跨页状态、page/section 段装配、复制回显钩子）
+//   pages/  各页内容（每页一个文件）
+//   assets/ 图片资源
+//
+// 响应式分层演示：主题五页（基础/表单/导航/数据/反馈）与各组件页用
+// Store/Signal 直连，展示端不写手动 subscribe。
+//
+// G7 示例迁移（本批 = 骨架 + 第一页）：
+//   - 旧链路的 `@yue.initialize()` + `@yue.run()` 换成 `@ui.mount_window` +
+//     `App::run`；窗口居中交给 WM（本栈不提供 `center`，与 master 的一条差）。
+//   - 主题跟随不再走 `@yue.on_system_theme_change`（旧链路的平台事件通道），
+//     改为「跟随开关 + 每 2 秒读一次系统偏好」：手动选色/切深浅先把开关关掉，
+//     否则下一拍就被盖回去。系统偏好读数用 `@win.sys_color_scheme/sys_accent`
+//     （与 `App::follow_system_theme` 内部同一来源，示例要能手动覆盖故自己开表）。
+//   - 菜单栏 / 托盘 / 单实例 / 对话框尚未迁入（它们各自随「系统集成」「窗口」
+//     两页进来，或在 `examples/native-app` 已有对照演示）。
+//   - 待迁页：导航 / 数据展示 / 图表 / 代码与文档 / Store 对照 / 事件与布局 /
+//     系统集成 / 窗口 / 图标库 / 画布与富文本 / 浏览器（见 TODO.md；
+//     表单组件页 2026-10-12 已迁）。
+
 ///|
-/// 窗口标题:单实例 Windows 兜底路径按标题查找首实例窗口,两个实例须一致
+/// 窗口标题
 const SHOWCASE_TITLE : String = "组件库演示板"
 
 ///|
-fn main {
-  if !@yue.initialize() {
-    return
+/// 侧栏底部的版本号。旧链路读 `@yue.VERSION`（主包常量，`scripts/prebuild.py`
+/// 在构建期校验它与 `moon.mod` 一致）；新栈示例不再 import 主包，故本地留一份
+/// ——它只用于显示，权威值仍是 `moon.mod` 与 `yue/version.mbt`。
+const SHOWCASE_VERSION : String = "0.1.0"
+
+///|
+/// 主题应用：主色空串用内置基准盘，非空按 HSL 公式派生；深浅随 `dark`。
+fn apply_theme(app : @shared.App) -> Unit {
+  let dark = app.dark_mode.get()
+  let accent = app.accent.get()
+  if accent.length() == 0 {
+    @theme.theme_apply(if dark {
+      @theme.dark_theme()
+    } else {
+      @theme.default_theme()
+    })
+  } else {
+    @theme.theme_apply(@theme.theme_from_accent(accent, dark=dark))
   }
-  let selected : @yue.Store[String] = @yue.Store::new("基础组件")
-  let (toast_node, toast_push) = @components.toast_layer()
-  // 章节「复制」按钮的回显走同一 toast 层(见 ui/section.mbt)
-  @ui.code_toast.val = Some(toast_push)
-  let counter = @yue.Signal::new(0)
-  let app : @ui.App = {
+}
+
+///|
+/// 侧栏里的深/浅切换按钮：手动改即视为「不跟随系统」。
+fn theme_toggle_button(app : @shared.App) -> @core.Node {
+  @ui.icon_button_t(
+    @icons.Moon,
+    on_click=fn() {
+      app.follow.set(false)
+      app.dark_mode.update(fn(v) { !v })
+    },
+  )
+}
+
+///|
+fn main {
+  let selected : @core.Store[String] = @core.Store::new("基础组件")
+  let toast_push = @ui.toast_layer(duration_ms=2600)
+  // 代码区「复制」的回显走同一 toast 层
+  @shared.code_toast.val = Some(toast_push)
+  let counter = @core.Signal::new(0)
+  let app : @shared.App = {
     selected,
     toast: toast_push,
-    win_ref: Ref(None),
-    tray_ref: Ref(None),
-    close_veto: Ref(false),
-    veto_info: @yue.Store::new("(未开启拦截)"),
-    dark_mode: @yue.Store::new(@yue.system_prefers_dark()),
-    // 启动即跟随系统主色调(系统无主色概念时回落内置 primary)
-    accent: @yue.Store::new(@yue.system_accent()),
-    tray_clicks: @yue.Store::new(0),
-    dlg_basic: @yue.Store::new(false),
-    dlg_form: @yue.Store::new(false),
-    dlg_name: @yue.Store::new(""),
-    key_info: @yue.Store::new("(无)"),
+    dark_mode: @core.Store::new(@win.sys_color_scheme() == "dark"),
+    // 启动即跟随系统主色调（系统无主色概念时回落内置 primary）
+    accent: @core.Store::new(@win.sys_accent()),
+    follow: @core.Store::new(true),
     counter,
-    visits: counter.map(fn(n) { (n * 1601 + 12804).to_string() }),
-    ratio: counter.map(fn(n) {
-      let r = 0.25 + n.to_double() * 0.1
+    // visits/ratio 由 counter 派生（computed 自动收集依赖，不写手动接线）
+    visits: @core.Signal::computed(fn() {
+      (counter.get() * 1601 + 12804).to_string()
+    }),
+    ratio: @core.Signal::computed(fn() {
+      let r = 0.25 + counter.get().to_double() * 0.1
       if r > 1.0 {
         1.0
       } else {
         r
       }
     }),
-    picked_lang: @yue.Signal::new(""),
-    si_role: @yue.Store::new("(探测中)"),
-    si_wake: @yue.Store::new("(未收到唤起)"),
+    picked_lang: @core.Signal::new(""),
+    dlg_basic: @core.Store::new(false),
+    dlg_form: @core.Store::new(false),
+    dlg_name: @core.Store::new(""),
+    dlg_result: @core.Store::new(""),
   }
-  // 深浅主题:启动跟随系统,系统切换时实时联动;「切换深浅」按钮手动覆盖。
-  // 主色(accent)非空时改走公式派生色板,深浅切换沿用当前主色
-  fn apply_theme() -> Unit {
-    let dark = app.dark_mode.get()
-    let accent = app.accent.get()
-    if accent == "" {
-      @yue.theme_apply(
-        if dark {
-          @yue.dark_theme()
-        } else {
-          @yue.default_theme()
-        },
-      )
-    } else {
-      @yue.theme_apply(@yue.theme_from_accent(accent, dark~))
-    }
-  }
-
-  app.dark_mode.subscribe(fn(_v) { apply_theme() })
-  app.accent.subscribe(fn(_a) { apply_theme() })
-  @yue.on_system_theme_change(fn() {
-    app.dark_mode.set(@yue.system_prefers_dark())
-  })
-  // 初始应用一次(subscribe 注册不回调):系统深浅 + 系统主色
-  apply_theme()
-
-  // 单实例:首实例持有应用专属身份并监听唤起;第二实例唤醒首实例后直接
-  // 退出(不建窗口)。Windows 兜底路径按标题查找,故标题固定并登记
-  match @system.SingleInstance::acquire("org.moonbitlibyue.Showcase") {
-    Ok(Some(si)) => {
-      app.si_role.set("首实例:已持有 org.moonbitlibyue.Showcase")
-      @system.set_instance_window_title(SHOWCASE_TITLE)
-      si.on_activate(fn(args) {
-        app.si_wake.set(
-          "收到唤起:参数 \{args.length()} 个 [\{args.join(" ")}]",
-        )
-        app.toast_push("第二实例唤起了本窗口", @components.Info)
-        match app.win_ref.val {
-          Some(w) => {
-            if w.is_minimized() {
-              w.restore()
-            }
-            w.activate()
-          }
-          None => ()
-        }
-      })
-    }
-    Ok(None) => {
-      // 已有实例且已向它发唤醒:本实例使命完成,不进消息循环
-      app.si_role.set("第二实例:已唤起首实例,本实例退出")
-      return
-    }
-    Err(e) => app.si_role.set("单实例不可用:\{e}(降级继续运行)")
-  }
-
-  let window = @declarative.mount_window(
+  // 深浅/主色任一变化即整体换主题；subscribe 注册不回调，故先应用一次
+  app.dark_mode.subscribe(fn(_v) { apply_theme(app) })
+  app.accent.subscribe(fn(_a) { apply_theme(app) })
+  apply_theme(app)
+  let slot : Ref[@core.App?] = Ref(None)
+  let mounted = @ui.mount_window(
     [
-      @declarative.hbox(style=[("flex", 1.0), ("alignItems", "stretch")], [
-        // 侧栏:菜单(可滚动,窗口矮时滚到底部项) + 底部钉住包版本号
-        // (与 moon.mod 同步,scripts/prebuild.py 构建期校验)
-        @declarative.vbox(
-          [
-            @declarative.scroll(
-              @declarative.vbox(
+      @ui.hbox(
+        [
+          // 侧栏：可滚动的分组菜单（窗口矮时滚到底部项）+ 底部主题切换 + 版本号
+          @ui.vbox(
+            [
+              @ui.scroll_v(
                 [
-                  @components.side_menu_sections(
-                    [
-                      (
-                        "组件",
-                        [
-                          "基础组件", "图标库", "表单组件", "导航组件",
-                          "数据展示", "图表", "反馈组件", "代码与文档",
-                          "事件与布局", "Store 对照",
-                        ],
-                      ),
-                      (
-                        "系统能力",
-                        ["系统集成", "窗口", "浏览器", "画布与富文本"],
-                      ),
-                    ],
+                  @ui.side_menu_sections(
+                    [("组件", ["基础组件", "表单组件", "导航组件", "数据展示", "图表", "代码文档", "Store", "反馈组件"])],
                     selected,
                     icons=[
                       ("基础组件", @icons.Appstore),
-                      ("图标库", @icons.StarFill),
                       ("表单组件", @icons.Edit1),
-                      ("导航组件", @icons.MenuIcon),
-                      ("数据展示", @icons.Barchart),
-                      ("图表", @icons.PieChart),
+                      ("导航组件", @icons.Compass),
+                      ("数据展示", @icons.Chart),
+                      ("图表", @icons.DataLine),
+                      ("代码文档", @icons.Document),
+                      ("Store", @icons.Database),
                       ("反馈组件", @icons.ChatRound),
-                      ("代码与文档", @icons.Code),
-                      ("事件与布局", @icons.Thunderbolt),
-                      ("Store 对照", @icons.Reload),
-                      ("画布与富文本", @icons.Image1),
-                      ("系统集成", @icons.Setting1),
-                      ("窗口", @icons.Fullscreen),
-                      ("浏览器", @icons.Earth),
                     ],
+                    width=180.0,
                   ),
                 ],
-                style=[("width", 180.0)],
+                @ui.ScrollState::new(),
+                handle=fn(v) { v.node.set_flex_grow(1.0) },
               ),
-              style=[("flex", 1.0), ("width", 180.0)],
-            ),
-            @declarative.hbox(
-              [
-                @components.label_t("V\{@yue.VERSION}", role=@components.Secondary),
-                // 图标随状态切换:swap_node 双预建显隐(bind_node 的
-                // Windows 安全替代——重挂的 remove+add 会令 hit-test
-                // 错乱,真机实证;显隐走 display:none 安全路径)
-                @yue.swap_node(
-                  app.dark_mode.signal(),
-                  @icons.icon_button_t(
-                    @icons.Moon,
-                    on_click=fn() { app.dark_mode.update(fn(v) { !v }) },
-                    tip="切换到深色",
-                    size=30.0,
-                    style=[("marginLeft", 20.0)],
+              @ui.hbox(
+                [
+                  @ui.label_t("V" + SHOWCASE_VERSION, role=@ui.Secondary),
+                  theme_toggle_button(app),
+                ],
+                padding=10.0,
+                column_gap=8.0,
+              ),
+            ],
+            width=180.0,
+          ),
+          // 主区：按导航状态切换的页（惰性挂载，首次选中才建控件）
+          @ui.vbox(
+            [
+              @shared.nav_page("基础组件", selected, @pages.page_basic(app)),
+              @shared.nav_page("表单组件", selected, @pages.page_form(app)),
+              @shared.nav_page("导航组件", selected, @pages.page_nav(app)),
+              @shared.nav_page("数据展示", selected, @pages.page_data(app)),
+              @shared.nav_page("图表", selected, @pages.page_charts(app)),
+              @shared.nav_page("代码文档", selected, @pages.page_code(app)),
+              @shared.nav_page("Store", selected, @pages.page_store_demo(app)),
+              @shared.nav_page("反馈组件", selected, @pages.page_feedback(app)),
+              // 对话框挂窗口根：锚点自己是 0 尺寸占位，可见性只由 Store 驱动
+              @ui.dialog_t(
+                app.dlg_basic,
+                "删除确认",
+                [
+                  @ui.alert(
+                    "此操作不可撤销，请确认。",
+                    t=@ui.Warning,
+                    closable=true,
                   ),
-                  @icons.icon_button_t(
-                    @icons.Sunny,
-                    on_click=fn() { app.dark_mode.update(fn(v) { !v }) },
-                    tip="切换到浅色",
-                    size=30.0,
-                    style=[("marginLeft", 20.0)],
-                  ),
-                ),
-              ],
-              style=[
-                ("marginLeft", 20.0),
-                ("paddingLeft", 20.0),
-                ("paddingTop", 6.0),
-                ("paddingBottom", 10.0),
-              ],
-            ),
-          ],
-          style=[("width", 180.0)],
-          handle=fn(c) {
-            fn apply() -> Unit {
-              c.set_background_color(@yue.theme_current().bg_panel)
-            }
-
-            apply()
-            ignore(@yue.on_theme_change(apply))
-          },
-        ),
-        @declarative.vbox(
-          [
-            @ui.nav_page("基础组件", selected, @pages.page_basic(app)),
-            @ui.nav_page("图标库", selected, @pages.page_icons(app)),
-            @ui.nav_page("表单组件", selected, @pages.page_form(app)),
-            @ui.nav_page("事件与布局", selected, @pages.page_events(app)),
-            @ui.nav_page("导航组件", selected, @pages.page_nav(app)),
-            @ui.nav_page("数据展示", selected, @pages.page_data(app)),
-            @ui.nav_page("图表", selected, @pages.page_charts(app)),
-            @ui.nav_page("代码与文档", selected, @pages.page_code(app)),
-            @ui.nav_page("反馈组件", selected, @pages.page_feedback(app)),
-            @ui.nav_page("Store 对照", selected, @pages.page_store_demo(app)),
-            @ui.nav_page("系统集成", selected, @pages.page_system(app)),
-            @ui.nav_page("窗口", selected, @pages.page_window(app)),
-            @ui.nav_page("浏览器", selected, @pages.page_browser(app)),
-            @ui.nav_page(
-              "画布与富文本",
-              selected,
-              @pages.page_canvas(app),
-            ),
-          ],
-          style=[("flex", 1.0)],
-          handle=fn(c) {
-            fn apply() -> Unit {
-              c.set_background_color(@yue.theme_current().bg_page)
-            }
-
-            apply()
-            ignore(@yue.on_theme_change(apply))
-          },
-        ),
-        // 轻提示层挂窗口根:absolute 顶部横条,不占布局
-        toast_node,
-        // 对话框挂窗口根:absolute 遮罩相对挂载容器,盖全窗
-        @components.dialog_t(
-          app.dlg_basic,
-          "删除确认",
-          [
-            @components.alert_closeable(
-              "此操作不可撤销,请确认。",
-              @components.Warning,
-            ),
-            @components.label_t(
-              "确定要删除「示例项目」吗?",
-              role=@components.Body,
-            ),
-          ],
-          confirm_text="删除",
-          cancel_text="取消",
-          on_confirm=fn() { app.dlg_name.set("(确认删除)") },
-          close_on_mask=true,
-        ),
-        @components.dialog_t(
-          app.dlg_form,
-          "新建连接",
-          [
-            @components.label_t("名称", role=@components.Body),
-            @components.input_t(text="例如:开发库", style=[("width", 320.0)], on_input=fn(
-              t,
-            ) {
-              app.dlg_name.set(t)
-            }),
-            @components.label_t("地址", role=@components.Body),
-            @components.input_t(text="host:port", style=[("width", 320.0)]),
-          ],
-          style=[("width", 380.0)],
-        ),
-      ]),
+                  @ui.label_t("确定要删除「示例项目」吗？", role=@ui.Body),
+                ],
+                confirm_text="删除",
+                cancel_text="取消",
+                on_confirm=fn() { app.dlg_result.set("已确认删除") },
+                close_on_mask=true,
+              ),
+              @ui.dialog_t(
+                app.dlg_form,
+                "新建连接",
+                [
+                  @ui.label_t("名称", role=@ui.Body),
+                  @ui.entry(app.dlg_name, placeholder="例如：开发库", width=320.0),
+                  @ui.label_t("地址", role=@ui.Body),
+                  @ui.entry(@core.Store::new(""), placeholder="host:port", width=320.0),
+                ],
+                on_confirm=fn() { app.dlg_result.set(app.dlg_name.get()) },
+                width=380.0,
+              ),
+            ],
+            grow=1.0,
+          ),
+        ],
+        grow=1.0,
+        align_items=@yoga.AlignItems::Stretch,
+      ),
     ],
     title=SHOWCASE_TITLE,
-    size=Some((1280.0, 720.0)),
-    center=true,
-    on_close=fn(_w) { @yue.quit() },
-    handle=fn(w) {
-      app.win_ref.val = Some(w)
-      // 演示板固定画布 1280×720,不提供拖角调整
-      w.set_resizable(false)
-      // 菜单栏(原生 MenuBar):关于 + 退出 + 编辑角色项
-      let bar = @yue.MenuBar::new()
-      let file = bar.add_menu("文件")
-      let about = file.add_label_item("关于本演示")
-      about.set_accelerator("CmdOrCtrl+I")
-      about.on_click(fn() {
-        match app.win_ref.val {
-          Some(w) => {
-            let box = @yue.MessageBox::new(@yue.Information)
-            box.set_title("关于")
-            box.set_text("moonbit-libyue 组件库演示板")
-            box.set_informative_text(
-              "平台 \{@yue.platform()} ｜ 桌面 \{@yue.desktop_environment()} ｜ 区域 \{@yue.locale()}",
-            )
-            box.show_for_window(w)
-          }
-          None => ()
+    width=1280,
+    height=720,
+    handle=fn(a : @core.App) {
+      slot.val = Some(a)
+      // 「跟随系统」轮询：开关打开时每 2 秒读一次系统深浅与主色，
+      // 变了就写进 App（App 的 subscribe 再落成 theme_apply）
+      let tick : Ref[() -> Unit] = Ref(fn() { () })
+      tick.val = fn() -> Unit {
+        if app.follow.get() {
+          app.dark_mode.set(@win.sys_color_scheme() == "dark")
+          app.accent.set(@win.sys_accent())
         }
-      })
-      let _ = file.add_separator()
-      let quit = file.add_label_item("退出")
-      quit.set_accelerator("CmdOrCtrl+Q")
-      quit.on_click(fn() { @yue.quit() })
-      let edit = bar.add_menu("编辑")
-      let _c = edit.add_role_item(@yue.Copy)
-      let _x = edit.add_role_item(@yue.Cut)
-      let _p = edit.add_role_item(@yue.Paste)
-      let _s = edit.add_role_item(@yue.SelectAll)
-      let demo = bar.add_menu("演示")
-      let table_item = demo.add_label_item("表格(独立窗口)")
-      table_item.on_click(fn() { @pages.open_table_window() })
-      let traverse = demo.add_label_item("遍历本菜单结构")
-      traverse.on_click(fn() {
-        let mut text = "「演示」菜单共 \{demo.item_count()} 项:"
-        for i in 0..<demo.item_count() {
-          text = text + " [\{i}]\{demo.item_at(i).get_label()}"
-        }
-        app.toast_push(text, @components.Info)
-      })
-      w.set_menubar(bar)
-      // 关闭拦截:系统集成页勾选后,点窗口关闭被 set_should_close 拦下
-      w.set_should_close(fn() {
-        if app.close_veto.val {
-          app.veto_info.set(
-            "关闭请求被 set_should_close 拦截(回「系统集成」页解除)",
-          )
-          return false
-        }
-        true
-      })
-      // 系统托盘:Linux SNI / 其他平台原生;点击计数联动系统集成页
-      if @yue.Tray::is_supported() {
-        match @yue.Tray::new("examples/showcase/assets/icon.png") {
-          Ok(tray) => {
-            app.tray_ref.val = Some(tray)
-            tray.set_title("components")
-            tray.set_tooltip(
-              "moonbit-libyue 组件库演示板", "左键计数,右键菜单",
-            )
-            let menu = @yue.Menu::new()
-            let show_item = menu.add_label_item("显示主窗口")
-            show_item.on_click(fn() { w.activate() })
-            let _ = menu.add_separator()
-            let quit_item = menu.add_label_item("退出")
-            quit_item.on_click(fn() { @yue.quit() })
-            tray.set_menu(menu)
-            tray.on_click(fn() {
-              app.tray_clicks.update(fn(n) { n + 1 })
-              let n = @yue.Notification::new()
-              n.set_title("components")
-              n.set_body("第 \{app.tray_clicks.get()} 次点击托盘图标")
-              n.show()
-            })
-          }
-          Err(_e) => ()
-        }
+        let _ = a.timer(2000, tick.val)
       }
-      // 窗口级键盘钩子(环境页显示;describe 输出如 Ctrl+A)
-      w.on_key_down(fn(e) {
-        app.key_info.set(
-          "\{e.describe()}(键码 \{e.code},Esc=\{@yue.VKEY_ESCAPE} A=\{@yue.VKEY_A})",
-        )
-        false
-      })
+      (tick.val)()
     },
   )
-  window.activate()
-  @yue.run()
+  match mounted {
+    None => {
+      println("SHOWCASE-SKIP: 本平台没有窗口后端或没有显示服务")
+      return
+    }
+    Some(host) => {
+      println("SHOWCASE-READY title=\{SHOWCASE_TITLE} pages=8 follow=1")
+      host.run()
+    }
+  }
+  println("SHOWCASE-DONE page=\{selected.get()}")
 }

@@ -1,6 +1,6 @@
 # 主题组件库速查
 
-主题组件库速查：Element Plus 风格的成套界面组件（按钮 / 输入 / 选择 / 表单 / 导航 / 布局 / 数据展示 / 图标 / 反馈 / 浮层），全部经 `@components` 调用(moon.pkg 的 import 加 `"NoahLiu/moonbit-libyue/yue/components"`;`Node` 类型与 `mount` 来自 `@declarative`,即还要 import `"NoahLiu/moonbit-libyue/yue/declarative"`)、返回 `Node` 直接进界面树。签名中带 `?` 的可选参数必须具名传值（如 `date_picker_t(value=day)`），不带 `?` 的位置参数按序传。响应式 `Store` / `Signal` 参数见 [declarative.md](declarative.md)；原生控件（Window / Label / Button / Entry 等）见 [components.md](components.md)。
+主题组件库速查：Element Plus 风格的成套界面组件（按钮 / 输入 / 选择 / 表单 / 导航 / 布局 / 数据展示 / 图标 / 反馈 / 浮层），全部经 `@components` 调用(moon.pkg 的 import 加 `"NoahLiu/native-gui/yue/components"`;`Node` 类型与 `mount` 来自 `@declarative`,即还要 import `"NoahLiu/native-gui/yue/declarative"`)、返回 `Node` 直接进界面树。签名中带 `?` 的可选参数必须具名传值（如 `date_picker_t(value=day)`），不带 `?` 的位置参数按序传。响应式 `Store` / `Signal` 参数见 [declarative.md](declarative.md)；原生控件（Window / Label / Button / Entry 等）见 [components.md](components.md)。
 
 完整演示见 `examples/showcase`。
 
@@ -741,7 +741,7 @@ let pts = @yue.Store::new([(0.0, 1.0), (1.0, 3.0), (2.0, 5.0)])
 @charts.scatter_t(pts, trend=true)
 ```
 
-以下六个扩展图表与上述同渲染模型（Store 驱动、只重绘画布、主题切换跟随），完整演示见 `NoahLiu/yue-examples/systemprobe`。其后九个层级 / 地理 / 力导向 / 时间流图表与图表交互层为后续批次，同样纯 MoonBit 自绘、Store 驱动。
+以下六个扩展图表与上述同渲染模型（Store 驱动、只重绘画布、主题切换跟随），完整演示见 `NoahLiu/gui-examples/systemprobe`。其后九个层级 / 地理 / 力导向 / 时间流图表与图表交互层为后续批次，同样纯 MoonBit 自绘、Store 驱动。
 
 ### 雷达图 radar_chart_t
 
@@ -1305,7 +1305,7 @@ let series = @yue.Store::new([
 | `draw_icon(p : Painter, kind, cx, cy, s, color)` | 统一自绘入口（中心坐标 + 边长） |
 | `all_icons()` / `icon_name(kind)` | 全清单 / 取名 |
 
-常用图标按组速查(全部枚举见 `yue/icons/icons.mbt` 的 `IconKind` 与 showcase 图标库页):
+常用图标按组速查(全部枚举见 `icons/icons.mbt` 的 `IconKind` 与 showcase 图标库页):
 
 | 组 | 图标 |
 |---|---|

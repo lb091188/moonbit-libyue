@@ -1,237 +1,213 @@
-// 表单组件页:Signal 驱动。表单值是可写源信号,组件参数经 .store()
-// 视图接入(组件写回即信号变化),展示端 bind 直连派生。
-
-///|
-pub fn page_form(app : @ui.App) -> @yue.Node {
-  let qty = @yue.Signal::new(3.0)
-  let qty2 = @yue.Signal::new(1.0)
-  let slider_val = @yue.Signal::new(30.0)
-  let rate_val = @yue.Signal::new(3)
-  let picked_color = @yue.Signal::new("#2D68C4")
-  let dp_val : @yue.Signal[@components.DateYMD?] = @yue.Signal::new(None)
-  let sync = @yue.Signal::new(false)
-  let notify = @yue.Signal::new(true)
-  let theme_mode = @yue.Signal::new("深色")
-  let radio_disabled = @yue.Signal::new("选项一")
-  let wifi_on = @yue.Signal::new(true)
-  let locked = @yue.Signal::new(false)
-  let dtr : @yue.Store[@components.DateTimeRange] = @yue.Store::new({
-    start: None,
-    end: None,
-  })
-  @ui.page([
-    @ui.section(
+// 表单组件页：Store/Signal 驱动。表单值是可写源 Store（组件直接吃 Store，
+// 组件写回即状态变化），展示端 bind_label/bind 直连派生。
+//
+// G7 迁移记档（与 master 的差异）：
+// ① `input_t` → `entry`（Store 驱动，`clearable` 未迁，清空走全选+删除）；
+// ② `input_number`（Double）→ `stepper`（Int 步进器——自绘栈无原生输入框语义）；
+// ③ `radio_group` 的值从「选项字符串」换成「索引 Store[Int]」；
+// ④ `checkbox` 从「on_change 写回信号」换成「Store 即状态源」，语义等价；
+// ⑤ `style=[("width",…)]` 一类 CSS 通道不存在，宽高/间距全走命名参数。
+pub fn page_form(_app : @shared.App) -> @core.Node {
+  let qty : @core.Store[Int] = @core.Store::new(3)
+  let qty2 : @core.Store[Int] = @core.Store::new(1)
+  let slider_val : @core.Store[Double] = @core.Store::new(30.0)
+  let rate_val : @core.Store[Int] = @core.Store::new(3)
+  let picked_color : @core.Store[String] = @core.Store::new("#2D68C4")
+  let dp_val : @core.Store[@ui.DateYMD?] = @core.Store::new(None)
+  let sync : @core.Store[Bool] = @core.Store::new(false)
+  let notify : @core.Store[Bool] = @core.Store::new(true)
+  let theme_idx : @core.Store[Int] = @core.Store::new(1)
+  let radio_idx : @core.Store[Int] = @core.Store::new(0)
+  let wifi_on : @core.Store[Bool] = @core.Store::new(true)
+  let locked : @core.Store[Bool] = @core.Store::new(false)
+  let dtr : @core.Store[@ui.DateTimeRange] = @core.Store::new({ start: None, end: None })
+  @shared.page([
+    @shared.section(
       "输入",
-      "Input 与 Textarea",
-      "自绘 1px 边框(聚焦变中性灰)+ 白底;clearable 悬停非空时 ✕ 清空;多行内容超出按平台滚动。",
+      "输入框与多行",
+      "单行 entry（Store 驱动，密码态逐字符遮罩）+ 多行 textarea（自动折行、超宽滚动）。",
       [
-        @declarative.vbox([
-          @components.input_t(text="输入点什么…", clearable=true),
-          @components.input_t(text="密码框", password=true, clearable=true, style=[
-            ("marginTop", 10.0),
-            ("marginBottom", 10.0),
-          ]),
-          @components.textarea_t(
-            text="多行文本输入演示。\n第二行内容。",
-            style=[("height", 90.0), ("width", 300.0)],
-            clearable=true,
-          ),
-        ]),
+        @ui.vbox(
+          [
+            @ui.entry(@core.Store::new(""), placeholder="输入点什么…", width=300.0),
+            @ui.entry(
+              @core.Store::new(""),
+              placeholder="密码框",
+              password=true,
+              width=300.0,
+            ),
+            @ui.textarea(
+              @core.Store::new("多行文本输入演示。\n第二行内容。"),
+              rows=3,
+              width=300.0,
+            ),
+          ],
+          row_gap=10.0,
+          align_items=@yoga.AlignItems::FlexStart,
+        ),
       ],
       code=[
-        "@components.input_t(text=\"输入点什么…\")", "@components.input_t(text=\"密码框\", password=true)",
-        "@components.input_t(text=\"悬停出现 ✕,点击清空\", clearable=true)", "@components.textarea_t(",
-        "  text=\"多行文本输入演示。\\n第二行内容。\",", "  style=[(\"height\", 90.0), (\"width\", 300.0)],",
-        "  clearable=true,", ")",
+        "@ui.entry(@core.Store::new(\"\"), placeholder=\"输入点什么…\", width=300.0)",
+        "@ui.entry(@core.Store::new(\"\"), placeholder=\"密码框\", password=true, width=300.0)",
+        "@ui.textarea(@core.Store::new(\"多行文本输入演示。\\n第二行内容。\"), rows=3, width=300.0)",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "数值",
-      "InputNumber / Slider / Rate",
-      "步进器 0..10 钳制;滑杆自绘轨道 + thumb(拖拽 step 5 量化);评分五角星 hover 预亮,值均响应式。",
+      "步进器 / 滑杆 / 评分",
+      "stepper 步进器 0..10 钳制；slider 自绘轨道 + thumb（拖拽 step 5 量化）；rate 五角星 hover 预亮——值都住 Store，展示端 bind 直连。",
       [
-        @components.input_number(qty.store(), min=0.0, max=10.0, step=1.0),
-        @declarative.bind(qty, fn(v) { "当前数量:\{v.round()}" }, style=[
-          ("marginTop", 6.0),
-        ]),
-        @components.slider_t(slider_val.store(), min=0.0, max=100.0, step=5.0),
-        @declarative.bind(slider_val, fn(v) { "当前值:\{v.round()}" }),
-        @components.rate_t(rate_val.store(), on_change=fn(v) { ignore(v) }),
-        @declarative.bind(rate_val, fn(v) { "评分:\{v} 星" }),
+        @ui.stepper(qty, min=0, max=10, step=1),
+        @ui.bind_label(qty, fn(v) { "当前数量：\{v}" }),
+        @ui.slider(slider_val, min=0.0, max=100.0, step=5.0, width=200.0),
+        @ui.bind_label(slider_val, fn(v) { "当前值：\{v.round()}" }),
+        @ui.rate_t(rate_val),
+        @ui.bind_label(rate_val, fn(v) { "评分：\{v} 星" }),
       ],
       code=[
-        "let qty = @yue.Signal::new(3.0)", "@components.input_number(qty.store(), min=0.0, max=10.0, step=1.0)",
-        "@declarative.bind(qty, fn(v) { \"当前数量:\\{v.round()}\" })", "let slider_val = @yue.Signal::new(30.0)",
-        "@components.slider_t(slider_val.store(), min=0.0, max=100.0, step=5.0)", "let rate_val = @yue.Signal::new(3)",
-        "@components.rate_t(rate_val.store())",
+        "let qty : @core.Store[Int] = @core.Store::new(3)",
+        "@ui.stepper(qty, min=0, max=10, step=1)",
+        "@ui.bind_label(qty, fn(v) { \"当前数量：\\{v}\" })",
+        "let slider_val : @core.Store[Double] = @core.Store::new(30.0)",
+        "@ui.slider(slider_val, min=0.0, max=100.0, step=5.0, width=200.0)",
+        "let rate_val : @core.Store[Int] = @core.Store::new(3)",
+        "@ui.rate_t(rate_val)",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "选择",
       "Select 与 ColorPicker",
-      "下拉点字段弹候选(悬停高亮/选中 ✓),clearable ✕ 清空;取色器预设色板点击选色,hex 值响应式。",
+      "下拉点字段弹候选（悬停高亮 / 选中 ✓），clearable ✕ 清空；取色器预设色板点击选色，hex 值住 Store。",
       [
-        @declarative.vbox(
+        @ui.vbox(
           [
-            @components.select_t(
+            @ui.select_t(
               ["杭州", "北京", "上海", "深圳", "广州"],
-              app.picked_lang.store(),
-              style=[("width", 170.0), ("marginBottom", 10.0)],
+              @core.Store::new(""),
               clearable=true,
+              width=170.0,
             ),
-            @components.color_picker_t(picked_color.store()),
-            @declarative.bind(picked_color, fn(c) { c }),
+            @ui.color_picker_t(picked_color),
+            @ui.bind_label(picked_color, fn(c) { c }),
           ],
-          style=[("alignItems", "flex-start")],
+          row_gap=10.0,
+          align_items=@yoga.AlignItems::FlexStart,
         ),
       ],
       code=[
-        "let city = @yue.Signal::new(\"\")", "@components.select_t(", "  [\"杭州\", \"北京\", \"上海\", \"深圳\", \"广州\"],",
-        "  city.store(),", "  style=[(\"width\", 170.0)],", "  clearable=true,",
-        ")", "let color = @yue.Signal::new(\"#2D68C4\")", "@components.color_picker_t(color.store())",
-        "@declarative.bind(color, fn(c) { c })",
+        "@ui.select_t([\"杭州\", \"北京\", \"上海\", \"深圳\", \"广州\"], city, clearable=true, width=170.0)",
+        "@ui.color_picker_t(color)",
+        "@ui.bind_label(color, fn(c) { c })",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "开关",
       "Checkbox / Radio / Switch",
-      "勾选经 on_change 写回信号即时回显;单选组整行悬停、点击互斥(第二组禁用);开关开=主题蓝靠右,含禁用态。",
+      "勾选与开关的值就是 Store 本身（展示端直连）；单选组点击互斥（第二组禁用）；开关开=主题蓝靠右。",
       [
-        @declarative.vbox([
-          @components.checkbox_t("启用自动同步", on_change=fn(v) { sync.set(v) }),
-          @components.checkbox_t("接收通知", checked=true, on_change=fn(v) {
-            notify.set(v)
-          }),
-          @declarative.hbox(
-            [
-              @declarative.bind(sync, fn(v) {
-                if v {
-                  "同步:开"
-                } else {
-                  "同步:关"
-                }
-              }),
-              @declarative.label("   "),
-              @declarative.bind(notify, fn(v) {
-                if v {
-                  "通知:开"
-                } else {
-                  "通知:关"
-                }
-              }),
-            ],
-            style=[("marginTop", 8.0)],
-          ),
-        ]),
-        @declarative.hbox(
+        @ui.vbox(
           [
-            @components.radio_group(
-              ["浅色", "深色", "跟随系统"],
-              theme_mode.store(),
+            @ui.checkbox("启用自动同步", sync),
+            @ui.checkbox("接收通知", notify),
+            @ui.hbox(
+              [
+                @ui.bind_label(sync, fn(v) { if v { "同步：开" } else { "同步：关" } }),
+                @ui.bind_label(notify, fn(v) { if v { "通知：开" } else { "通知：关" } }),
+              ],
+              column_gap=24.0,
             ),
-            @declarative.label("        "),
-            @components.radio_group(
-              ["选项一", "选项二"],
-              radio_disabled.store(),
-              disabled=true,
+            @ui.hbox(
+              [
+                @ui.radio_group(["浅色", "深色", "跟随系统"], theme_idx),
+                @ui.radio_group(["选项一", "选项二"], radio_idx, disabled=true),
+              ],
+              column_gap=40.0,
+            ),
+            @ui.hbox(
+              [
+                @ui.switch_t(wifi_on),
+                @ui.bind_label(wifi_on, fn(v) { if v { "已开启" } else { "已关闭" } }),
+                @ui.switch_t(locked, disabled=true),
+                @ui.label_t("禁用", role=@ui.Body),
+              ],
+              column_gap=12.0,
             ),
           ],
-          style=[("marginTop", 10.0)],
-        ),
-        @declarative.hbox(
-          [
-            @components.switch_t(wifi_on.store()),
-            @declarative.bind(wifi_on, fn(v) {
-              if v {
-                "已开启"
-              } else {
-                "已关闭"
-              }
-            }),
-            @declarative.label("     "),
-            @components.switch_t(locked.store(), disabled=true),
-            @components.label_t("禁用", role=@components.Body),
-          ],
-          style=[("marginTop", 10.0), ("alignItems", "center")],
+          row_gap=10.0,
+          align_items=@yoga.AlignItems::FlexStart,
         ),
       ],
       code=[
-        "let sync = @yue.Signal::new(false)", "@components.checkbox_t(\"启用自动同步\", on_change=fn(v) { sync.set(v) })",
-        "@declarative.bind(sync, fn(v) { if v { \"同步:开\" } else { \"同步:关\" } })",
-        "let mode = @yue.Signal::new(\"深色\")", "@components.radio_group([\"浅色\", \"深色\", \"跟随系统\"], mode.store())",
-        "let wifi_on = @yue.Signal::new(true)", "@components.switch_t(wifi_on.store())",
-        "@components.switch_t(@yue.Signal::new(false).store(), disabled=true)",
+        "let sync : @core.Store[Bool] = @core.Store::new(false)",
+        "@ui.checkbox(\"启用自动同步\", sync)",
+        "@ui.bind_label(sync, fn(v) { if v { \"同步：开\" } else { \"同步：关\" } })",
+        "let theme_idx : @core.Store[Int] = @core.Store::new(1)",
+        "@ui.radio_group([\"浅色\", \"深色\", \"跟随系统\"], theme_idx)",
+        "let wifi_on : @core.Store[Bool] = @core.Store::new(true)",
+        "@ui.switch_t(wifi_on)",
+        "@ui.switch_t(@core.Store::new(false), disabled=true)",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "日期",
       "日期与时间选择",
-      "全自绘月历(‹/› 切月)+ 内联 calendar_t;日期/时间/日期时间三区间选择器,选中值响应式。",
+      "全自绘月历（‹/› 切月）+ 内联 calendar_t；日期区间与日期时间区间选择器，选中值住 Store。",
       [
-        @declarative.vbox(
+        @ui.vbox(
           [
-            @components.date_picker_t(
-              value=dp_val.store(),
-              style=[("width", 170.0)],
-              clearable=true,
+            @ui.date_picker_t(dp_val, clearable=true, width=170.0),
+            @ui.hbox(
+              [
+                @ui.label_t("选中：", role=@ui.Body),
+                @ui.bind(dp_val.signal(), fn(d) {
+                  match d {
+                    Some(v) => v.format()
+                    None => "未选"
+                  }
+                }),
+              ],
+              column_gap=6.0,
             ),
-            @declarative.hbox([
-              @components.label_t("选中:", role=@components.Body),
-              @declarative.bind(dp_val, fn(d) {
-                match d {
-                  Some(v) => v.format()
-                  None => "未选"
-                }
-              }),
-            ]),
           ],
-          style=[("alignItems", "flex-start"), ("marginBottom", 10.0)],
+          row_gap=10.0,
+          align_items=@yoga.AlignItems::FlexStart,
         ),
-        @components.calendar_t(style=[("marginBottom", 10.0)]),
-        @declarative.vbox([
-          @components.datetime_range_picker_t(value=dtr),
-          @declarative.bind_label(dtr, fn(r) {
+        @ui.calendar_t(),
+        @ui.vbox([
+          @ui.datetime_range_picker_t(dtr),
+          @ui.bind_label(dtr, fn(r) {
             match (r.start, r.end) {
               (Some((sd, st)), Some((ed, et))) =>
-                "日期时间区间:\{sd.format()} \{st.format()} ~ \{ed.format()} \{et.format()}"
-              _ => "日期时间区间:未完成选择"
+                "日期时间区间：\{sd.format()} \{st.format()} ~ \{ed.format()} \{et.format()}"
+              _ => "日期时间区间：未完成选择"
             }
           }),
         ]),
       ],
       code=[
-        "let dp : @yue.Signal[@components.DateYMD?] = @yue.Signal::new(None)", "@components.date_picker_t(value=dp.store(), style=[(\"width\", 170.0)], clearable=true)",
-        "@declarative.bind(dp, fn(d) {", "  match d {", "    Some(v) => v.format()", "    None => \"未选\"",
-        "  }", "})", "@components.calendar_t()", "let dr : @yue.Store[@components.DateRange] =",
-        "  @yue.Store::new({ start: None, end: None })", "@components.date_range_picker_t(value=dr)",
-        "let tr : @yue.Store[@components.TimeRange] =", "  @yue.Store::new({ start: None, end: None })",
-        "@components.time_range_picker_t(value=tr)", "let dtr : @yue.Store[@components.DateTimeRange] =",
-        "  @yue.Store::new({ start: None, end: None })", "@components.datetime_range_picker_t(value=dtr)",
+        "let dp : @core.Store[@ui.DateYMD?] = @core.Store::new(None)",
+        "@ui.date_picker_t(dp, clearable=true, width=170.0)",
+        "@ui.bind(dp.signal(), fn(d) { match d { Some(v) => v.format()  None -> \"未选\" } })",
+        "@ui.calendar_t()",
+        "let dtr : @core.Store[@ui.DateTimeRange] = @core.Store::new({ start: None, end: None })",
+        "@ui.datetime_range_picker_t(dtr)",
       ],
     ),
-    @ui.section(
+    @shared.section(
       "表单",
       "Form 表单",
-      "form_item 行布局(标签右对齐 + 控件区)+ form 分组标题。",
+      "form_item 行布局（标签右对齐 + 控件区）+ form 分组标题。",
       [
-        @components.form("用户设置", [
-          @components.form_item(
-            "用户名",
-            @components.input_t(text="moonbit", style=[("width", 200.0)]),
-          ),
-          @components.form_item(
-            "城市",
-            @components.input_t(text="杭州", style=[("width", 200.0)]),
-          ),
-          @components.form_item(
-            "数量",
-            @components.input_number(qty2.store(), min=1.0, max=9.0),
-          ),
+        @ui.form("用户设置", [
+          @ui.form_item("用户名", @ui.entry(@core.Store::new("moonbit"), width=200.0)),
+          @ui.form_item("城市", @ui.entry(@core.Store::new("杭州"), width=200.0)),
+          @ui.form_item("数量", @ui.stepper(qty2, min=1, max=9)),
         ]),
       ],
       code=[
-        "let qty = @yue.Signal::new(1.0)", "@components.form(\"用户设置\", [", "  @components.form_item(\"用户名\", @components.input_t(text=\"moonbit\", style=[(\"width\", 200.0)])),",
-        "  @components.form_item(\"数量\", @components.input_number(qty.store(), min=1.0, max=9.0)),",
+        "@ui.form(\"用户设置\", [",
+        "  @ui.form_item(\"用户名\", @ui.entry(@core.Store::new(\"moonbit\"), width=200.0)),",
+        "  @ui.form_item(\"数量\", @ui.stepper(qty2, min=1, max=9)),",
         "])",
       ],
     ),

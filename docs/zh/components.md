@@ -465,7 +465,7 @@ g.set_animating(true)
 ## 浏览器 Browser
 
 ```moonbit
-// Browser 在独立包 yue/browser(moon.pkg import "NoahLiu/moonbit-libyue/yue/browser")
+// Browser 在独立包 yue/browser(moon.pkg import "NoahLiu/native-gui/yue/browser")
 let b = @browser.Browser::make(url="https://example.com")   // 或 html="<h1>本地</h1>"
 ```
 
@@ -490,7 +490,7 @@ let b = @browser.Browser::make(url="https://example.com")   // 或 html="<h1>本
 
 定制选项用 `Browser::new_with_options(BrowserOptions)`。
 
-> 0.5.0 起 Browser 迁入独立包 `NoahLiu/moonbit-libyue/yue/browser`(API 不变,`@browser.Browser` 改 `@browser.Browser`);未 import 该包的程序不再链接 WebKit/WebView2。
+> 0.5.0 起 Browser 迁入独立包 `NoahLiu/native-gui/yue/browser`(API 不变,`@browser.Browser` 改 `@browser.Browser`);未 import 该包的程序不再链接 WebKit/WebView2。
 
 ## 剪贴板 Clipboard
 
@@ -523,6 +523,23 @@ n.show()
 | close() | 关闭 |
 | NotificationCenter::get() + add(n) | 经通知中心发送 |
 
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21a）：上表是旧链 `@yue.Notification` / `NotificationCenter`（GTK/libnotify 系）。新栈的跨平台门面是 **`core/notify.mbt`**，改用无对象、无单例的自由函数：
+>
+> | 旧链 | 新栈 | 说明 |
+> | --- | --- | --- |
+> | `Notification::new()` + `set_title`/`set_body` | `notify_send(app_name, summary, body, …)` | 无 builder，参数直给；返回通知 id（`Result[Int, NotifyError]`） |
+> | `set_silent` | —— | 未提供（新栈不以静默为门面参数） |
+> | `set_actions` | —— | 未提供（Win32 气泡不支持动作按钮；Linux 侧亦未接） |
+> | `show()` | 同 `notify_send` | 新栈一次调用即发送，无「先建后 show」两段式 |
+> | `close()` | `notify_close(id)` | 按 id 关闭（Win32 无「关闭全部」语义，id 必须 > 0） |
+> | `NotificationCenter::get()` + `add(n)` | —— | 无通知中心单例；后端选择由门面内部按平台定 |
+>
+> - **后端选择**：Linux freedesktop D-Bus（`dbus/notify.mbt`）优先 → Windows 托盘气泡（`NIF_INFO`，与 W20c 同源共槽）→ 皆无给 `Err(NotifyError::Unsupported)`（结构化报错，**不静默失效**）。
+> - **能力探测**：`notify_supported()` / `notify_backend_name()` / `notify_caps()`（Linux 取服务端 `GetCapabilities`；Win32 合成一份，只有 body 能力）。
+> - **进度**：`notify_progress(id, …, pct)` 或 `notify_send(…, progress=…)`；Linux 走 freedesktop `value` hint，Win32 无对应物、门面把百分比拼进正文（**可见降级**）。
+> - **平台差异**：`timeout_ms` 在 Win32 自 Vista 起被系统忽略；`kind`（0 信息/1 警告/2 错误）Win32 映射 `NIIF_*`、Linux 无此概念（用 `icon` 主题图标名区分）。
+> - **验证**：后端由纯 C 探针 `experiment/notify_probe` 回证（末行 `NOTIFY-BACKEND-OK`）；门面由 `core/notify_wbtest.mbt` 的纯函数 + 生命周期用例（无通知后端的机器自动跳过）。**真机观感（气泡是否弹出、驻留时长）归人工测试清单。** 详见 [docs/zh/adaptation.md](adaptation.md) 的 W21a 节。
+
 ## 消息框 MessageBox
 
 ```moonbit
@@ -539,6 +556,18 @@ box.show_for_window(win)
 | add_button(title, response) | 自定义按钮 |
 | on_response(fn(response)) | 按钮响应（response 为按钮编号） |
 | show() / show_for_window(win) / close() | 弹出（模态）/ 关闭 |
+
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W20d/W21b）：上表是旧链 `@yue.MessageBox`。新栈**两档并存**，调用方按需选：
+>
+> | 档 | 入口 | 特点 |
+> | --- | --- | --- |
+> | 原生档（W20d） | `@win.show_message_box(title, text, kind, buttons)` | 走 Win32 `MessageBoxW`：系统外观、系统模态、**阻塞**返回 `MessageBoxResult`（`Ok`/`Cancel`/`Yes`/`No`/…）。**只有 Win32 有**（macOS 留桩） |
+> | 自绘档（W21b） | `@ui.message_box_t(visible, title, text, kind?, informative?, buttons?, on_response?, on_dismiss?, close_on_mask?)` | 纯自绘、吃主题、**非阻塞**（`on_response(code)` 回调编号），三平台同构 |
+>
+> - **响应编号**：自绘档的编号由调用方给（`buttons` 是 `(文案, 编号)`），**不借用**原生档 `MessageBoxResult` 的 1..7 口径。
+> - **✕ / Esc / 点遮罩**：自绘档收起到 `on_dismiss`（不给编号；`close_on_mask` 默认 false）；**Enter = 第一个按钮**（默认钮）。
+> - `informative` 对应旧链 `set_informative_text`（次要色副行）。
+> - **验证**：自绘档由 `ui/message_box_wbtest.mbt` 的无头运行时用例回证（弹收/编号/✕/Esc/Enter/遮罩两态）。详见 [docs/zh/adaptation.md](adaptation.md) 的 W21b 节。
 
 ## 文件对话框 FileDialog
 
@@ -653,6 +682,21 @@ auto.disable()    // 取消（幂等）
 Linux 写 `$XDG_CONFIG_HOME/autostart` 的 .desktop（exe 路径取
 `/proc/self/exe`），Windows 写 HKCU Run 键。
 
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21d）：上表是旧链 `@system.Autostart` 的句柄形态。新栈在 **`sys/autostart.mbt`**，改用无对象、无单例的自由函数（app_id 直给）：
+>
+> | 旧链 | 新栈 | 说明 |
+> |---|---|---|
+> | `Autostart::new(app_id) -> Result[Autostart, …]` | ——（无句柄） | 自由函数每次传 app_id，没有要持有 / 释放的对象 |
+> | `is_supported()` | `autostart_supported()` | 运行时探测（macOS 本批 false） |
+> | `handle.is_enabled()` | `autostart_is_enabled(app_id)` | Linux 读 `.desktop` 并认 `Hidden` / `X-GNOME-Autostart-enabled`；Windows 看 Run 值在不在 |
+> | `handle.enable()` / `disable()` | `autostart_enable(app_id)` / `autostart_disable(app_id)` | 都幂等（重复 enable 覆盖、disable 对「本就不在」也算成功） |
+> | `handle.path()` | `autostart_path(app_id)` | 落点（Linux = `.desktop` 全路径；Windows = `HKCU\…\Run\<app_id>` 描述） |
+> | （无） | `autostart_exe_path()` | 当前进程可执行文件全路径（enable 用的就是它；也供排查） |
+>
+> **纯函数**（可单测）：`autostart_dir_of(xdg, home)`、`autostart_escape_exec(path)`、`autostart_desktop_entry(exe, app_id)`、`autostart_desktop_enabled(content)`、`autostart_run_value(exe)` / `autostart_run_value_exe(value)`、`autostart_valid_app_id(app_id)`。
+> **错误**：`AutostartError{Unsupported, InvalidAppId, NoExecutablePath, IoFailed(String)}`（不支持与失败分开，不静默）。
+> **注意**：`exec` 路径会按平台惯例加引号（`.desktop` 的 Exec 与 Windows 的 REG_SZ 都是整串双引号包裹），别自己再拼一层。
+
 ### 打开外部
 
 | API | 用途 |
@@ -682,6 +726,17 @@ match @system.idle_seconds() {
 | handle.release() | 解除（幂等） |
 | keep_awake_active() | 当前是否持有常亮 |
 | idle_supported() / idle_seconds() -> Result[Double, IdleError] | 用户空闲秒数（Linux X11;Wayland 会话显式 Unsupported） |
+
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21e）：上表末行是旧链 `@system` 形态。新栈在 **`sys/idle.mbt`**，同样是无对象、无单例的自由函数，语义逐条对齐：
+>
+> | 旧链 | 新栈 | 说明 |
+> |---|---|---|
+> | `idle_supported()` | `idle_supported()` | 运行时探测；Linux 要 `DISPLAY` 非空且 X11 + XSS 都能 dlopen（不引入链接依赖） |
+> | `idle_seconds() -> Result[Double, IdleError]` | `idle_seconds() -> Result[Double, IdleError]` | 自最后一次输入起的秒数；**阈值判定交给调用方**（不设 active/idle 二值） |
+>
+> **纯函数**（可单测）：`idle_clamp_ms(ms)`（负数归零）、`idle_ms_to_seconds(ms)`（毫秒换秒，已夹负）。
+> **错误**：`IdleError{Unsupported, Failed(String)}`——「本平台/本会话没这能力」与「这次查询失败」分开，不静默。
+> **注意**：**只读不写**——本 API 只回报空闲了多久，不拦休眠、不设阈值；要「保持屏幕常亮」走上面的 `KeepAwake`（两件事刻意分开）。
 
 ### 电量与电源事件
 
@@ -751,6 +806,17 @@ pop.show_relative_to(anchor_view)
 | set_capture() / release_capture() / has_capture() | 鼠标捕获 |
 | set_style(k, v) / set_style_str(k, v) | 布局样式（运行期底层原语） |
 | 拖拽注册与拖放回调 | 拖放（接收方必须注册 handle_drag_update 返回允许的操作位，缺省一律拒绝；发起方 do_drag_file_paths / do_drag_data_full 须在 on_mouse_down 回调内调用才生效；演示见 components「窗口」页） |
+
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21c）：上表最后一行是旧链的平台级拖放（GTK `gtk_drag_*` / Win32 `IDropTarget`，enter/update/leave 三回调 + 操作位协商）。新栈的**应用内**拖放不碰平台接口，改用 `core/drag.mbt` 的会话模型 + `ui/drag.mbt` 的两个声明式钩子：
+>
+> | 旧链 | 新栈 | 说明 |
+> |---|---|---|
+> | `do_drag_file_paths` / `do_drag_data_full`（须在 on_mouse_down 内） | `drag_source(content, payload=f)` | 包住内容即为拖源；按下后拖过阈值（默认 4px）才调 `payload()` 取数据；`payload()` 返 `None` 则该拖不成立（当普通点击） |
+> | `handle_drag_update`（返回允许操作位） | `drop_target(content, accept=f, on_drop=f)` | 包住内容即为落点；`accept` 判收不收（默认全收），收则调 `on_drop(data, x, y)` |
+> | drag-enter / drag-update / drag-leave 三回调 | `@core.drag_hover()` | 悬停高亮由绘制方读会话态自判——三回调收成一个，无「离开回调漏发」的态 |
+> | `DragData`（平台数据类型） | `@core.DragData{Text,Html,Paths,Img}` | 自有载荷类型（`Img` 存原始 PNG 字节，不带平台图像类型）；`drag_encode`/`drag_decode` 是可跨进程/跨后端的稳定 ABI |
+>
+> **两条使用约束**：①拖源内容里**别放按钮**（指针事件最深优先，交互控件会先把按下吃掉，拖不动它）；②应用内拖放的落点按**窗口坐标**算，拖源/落点在同一窗口内。**跨应用**系统级拖放仍随平台批。
 
 事件载荷字段：
 

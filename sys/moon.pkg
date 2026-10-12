@@ -1,0 +1,17 @@
+// 系统能力包（方案 §2 的 `sys`）：从 master 线 `yue/system`/`yue/traybus`
+// 按族平移的纯 MoonBit 能力住这里；需要 C 的部分（环境变量写删、目录枚举、
+// 子进程）随各自的 stub 批次进来，链接参数仍由 scripts/prebuild.py 托管。
+
+import {
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/env",
+  "prowk/moonsqlitefile" @moonsqlitefile,
+}
+
+supported_targets = "native"
+
+// sys 桩只用标准头，直接走 native-stub（要 GTK 头的桩才走 prebuild
+// 静态库）；链接参数按 AGENTS 规则 1 由 prebuild 托管（本包无新增）。
+options(
+  "native-stub": [ "sys_stub.c" ],
+)

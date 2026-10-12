@@ -1,5 +1,5 @@
 import {
-  "NoahLiu/moonbit-libyue/yue/core",
+  "NoahLiu/native-gui/core",
 }
 
 pkgtype(kind: "executable")

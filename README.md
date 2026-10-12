@@ -1,5 +1,7 @@
 # moonbit-libyue [![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
 
+> **⚠ Renamed** — the mooncakes package is now **`NoahLiu/native-gui`** (formerly `NoahLiu/moonbit-libyue`; first release 0.1.0 as a placeholder, the old package will be marked deprecated once the new stack stabilizes); sub-modules `NoahLiu/yue-media` → **`NoahLiu/gui-media`**, `NoahLiu/yue-examples` → **`NoahLiu/gui-examples`**. The self-drawn GUI stack (no libyue dependency; windows, pixels, event loop, layout and widgets all in pure MoonBit) is the mainline on this branch — plan: [docs/zh/native-gui-plan.md](docs/zh/native-gui-plan.md). The README body below still describes the 0.5.x libyue-binding API kept on `master`.
+
 > Thanks to [Cheng Zhao (zcbenz)](https://github.com/zcbenz) and his [Yue](https://github.com/yue/yue) framework, and to [MoonBit](https://github.com/moonbitlang). As it happens, both of these programming tools carry the character for "moon" — and I have grown fond of them both. [About me and `libyue`](docs/aboutlibyue.md)
 
 A **native cross-platform desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — a full binding of [libyue](https://libyue.com/docs/latest/cpp/) (C++): one MoonBit codebase runs native windows on Windows ✅ / Linux ✅ / macOS 🟡, zero-config right after `moon add`.
@@ -79,9 +81,9 @@ Prerequisite: the MoonBit native toolchain, `moonc` ≥ 0.10.14 (`moon version -
 | Linux x64 (GTK3, on Ubuntu by default) | [`bin-linux-x64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-linux-x64.zip) |
 | macOS (Apple Silicon) 🟡 no real-machine test | [`bin-macos-arm64.zip`](https://github.com/lb091188/moonbit-libyue/releases/latest/download/bin-macos-arm64.zip) |
 
-> **Since 0.5.11** the library is split into sub-packages — import only what you use (unused packages are not compiled into your binary). Core (native widgets, painting, `Store`/`Signal`, theme, tray) stays at `NoahLiu/moonbit-libyue/yue` (`@yue`); the declarative layer is `.../yue/declarative` (`@declarative`), themed components `.../yue/components` (`@components`), charts `.../yue/charts`, icons `.../yue/icons`, markdown `.../yue/markdown`, OS capabilities `.../yue/system`. Full table in [docs/README.md](docs/README.md#packages).
+> **Since 0.5.11** the library is split into sub-packages — import only what you use (unused packages are not compiled into your binary). Core (native widgets, painting, `Store`/`Signal`, theme, tray) stays at `NoahLiu/native-gui/yue` (`@yue`); the declarative layer is `.../yue/declarative` (`@declarative`), themed components `.../yue/components` (`@components`), charts `.../yue/charts`, icons `.../yue/icons`, markdown `.../yue/markdown`, OS capabilities `.../yue/system`. Full table in [docs/README.md](docs/README.md#packages).
 
-> **Upgrading to 0.5.0**: the `Browser` binding moved to a standalone package. Add `"NoahLiu/moonbit-libyue/yue/browser"` to your imports (`@browser.Browser` → `@browser.Browser`, API unchanged). Apps that don't import it are no longer linked against WebKit/WebView2.
+> **Upgrading to 0.5.0**: the `Browser` binding moved to a standalone package. Add `"NoahLiu/native-gui/yue/browser"` to your imports (`@browser.Browser` → `@browser.Browser`, API unchanged). Apps that don't import it are no longer linked against WebKit/WebView2.
 
 ## Documentation index
 

@@ -465,7 +465,7 @@ g.set_animating(true)
 ## Browser
 
 ```moonbit
-// Browser lives in the standalone yue/browser package (moon.pkg import "NoahLiu/moonbit-libyue/yue/browser")
+// Browser lives in the standalone yue/browser package (moon.pkg import "NoahLiu/native-gui/yue/browser")
 let b = @browser.Browser::make(url="https://example.com")   // or html="<h1>本地</h1>"
 ```
 
@@ -490,7 +490,7 @@ let b = @browser.Browser::make(url="https://example.com")   // or html="<h1>本�
 
 For customization options, use `Browser::new_with_options(BrowserOptions)`.
 
-> Since 0.5.0 Browser lives in the standalone package `NoahLiu/moonbit-libyue/yue/browser` (API unchanged; `@browser.Browser` becomes `@browser.Browser`); apps that don't import it no longer link WebKit/WebView2.
+> Since 0.5.0 Browser lives in the standalone package `NoahLiu/native-gui/yue/browser` (API unchanged; `@browser.Browser` becomes `@browser.Browser`); apps that don't import it no longer link WebKit/WebView2.
 
 ## Clipboard
 
@@ -523,6 +523,23 @@ n.show()
 | close() | Close |
 | NotificationCenter::get() + add(n) | Send via the notification center |
 
+> **New-stack (MoonBit native GUI stack) mapping** (since W21a): the table above is the old chain `@yue.Notification` / `NotificationCenter` (GTK/libnotify). The new stack's cross-platform facade is **`core/notify.mbt`**, using free functions with no objects and no singleton:
+>
+> | Old chain | New stack | Notes |
+> | --- | --- | --- |
+> | `Notification::new()` + `set_title`/`set_body` | `notify_send(app_name, summary, body, …)` | No builder — arguments are passed directly; returns a notification id (`Result[Int, NotifyError]`) |
+> | `set_silent` | — | Not provided (the new facade does not expose silence as a parameter) |
+> | `set_actions` | — | Not provided (Win32 balloons have no action buttons; the Linux side is not wired either) |
+> | `show()` | same as `notify_send` | The new stack sends in one call — no "build then show" two-step |
+> | `close()` | `notify_close(id)` | Close by id (Win32 has no "close all" semantics, so id must be > 0) |
+> | `NotificationCenter::get()` + `add(n)` | — | No notification-center singleton; backend selection is decided inside the facade per platform |
+>
+> - **Backend selection**: Linux freedesktop D-Bus (`dbus/notify.mbt`) first → Windows tray balloon (`NIF_INFO`, same source and slot table as W20c) → `Err(NotifyError::Unsupported)` if neither (structured errors, **never a silent failure**).
+> - **Capability probing**: `notify_supported()` / `notify_backend_name()` / `notify_caps()` (Linux takes the server's `GetCapabilities`; Win32 synthesises one with only the body capability).
+> - **Progress**: `notify_progress(id, …, pct)` or `notify_send(…, progress=…)`; Linux goes through the freedesktop `value` hint while Win32 has no counterpart, so the facade pastes the percentage into the body (a **visible degradation**).
+> - **Platform differences**: `timeout_ms` is ignored by the system on Win32 since Vista; `kind` (0 info / 1 warning / 2 error) maps to `NIIF_*` on Win32 and has no Linux equivalent (where `icon` theme names distinguish instead).
+> - **Verification**: the backend is proven by the pure-C probe `experiment/notify_probe` (last line `NOTIFY-BACKEND-OK`); the facade by the pure-function and lifecycle cases in `core/notify_wbtest.mbt` (auto-skipping on machines with no notification backend). **Real-machine look and feel (whether the balloon pops, how long it dwells) belongs to the manual test checklist.** See the W21a section in [docs/adaptation.md](adaptation.md).
+
 ## MessageBox
 
 ```moonbit
@@ -539,6 +556,18 @@ box.show_for_window(win)
 | add_button(title, response) | Custom buttons |
 | on_response(fn(response)) | Button response (response is the button number) |
 | show() / show_for_window(win) / close() | Show (modal) / close |
+
+> **New-stack (MoonBit native GUI stack) mapping** (since W20d/W21b): the table above is the old chain's `@yue.MessageBox`. The new stack ships **two coexisting tiers**; callers pick per need:
+>
+> | Tier | Entry point | Characteristics |
+> | --- | --- | --- |
+> | Native (W20d) | `@win.show_message_box(title, text, kind, buttons)` | Goes through Win32 `MessageBoxW`: system look, system modality, a **blocking** `MessageBoxResult` (`Ok`/`Cancel`/`Yes`/`No`/…). **Win32 only** (stub on macOS) |
+> | Self-drawn (W21b) | `@ui.message_box_t(visible, title, text, kind?, informative?, buttons?, on_response?, on_dismiss?, close_on_mask?)` | Fully self-drawn, honours the theme, **non-blocking** (`on_response(code)` calls back with a code), one code path across all three platforms |
+>
+> - **Response codes**: the self-drawn tier takes codes from the caller (`buttons` is a list of `(label, code)`) and does **not** borrow the native tier's `MessageBoxResult` 1..7 convention.
+> - **✕ / Esc / clicking the mask**: the self-drawn tier dismisses to `on_dismiss` (no code; `close_on_mask` defaults to false); **Enter = the first button** (the default).
+> - `informative` corresponds to the old chain's `set_informative_text` (a secondary-colour sub-line).
+> - **Verification**: the self-drawn tier is proven by the headless runtime cases in `ui/message_box_wbtest.mbt` (open/close, codes, ✕/Esc/Enter, both mask states). See the W21b section in [docs/adaptation.md](adaptation.md).
 
 ## FileDialog
 
@@ -656,6 +685,21 @@ auto.disable()    // cancel (idempotent)
 Linux writes a .desktop into `$XDG_CONFIG_HOME/autostart` (exe path resolved
 via `/proc/self/exe`); Windows writes the HKCU Run key.
 
+> **New-stack (MoonBit native GUI stack) mapping** (since W21d): the table above is the old stack's `@system.Autostart` handle form. The new stack lives in **`sys/autostart.mbt`** and switches to free functions with no object and no singleton (the app_id is passed in):
+>
+> | Old stack | New stack | Notes |
+> |---|---|---|
+> | `Autostart::new(app_id) -> Result[Autostart, …]` | — (no handle) | Free functions take the app_id each call; there is no object to hold or release |
+> | `is_supported()` | `autostart_supported()` | Runtime probe (false on macOS this batch) |
+> | `handle.is_enabled()` | `autostart_is_enabled(app_id)` | Linux reads the `.desktop` and honours `Hidden` / `X-GNOME-Autostart-enabled`; Windows checks whether the Run value exists |
+> | `handle.enable()` / `disable()` | `autostart_enable(app_id)` / `autostart_disable(app_id)` | Both idempotent (a repeated enable overwrites; disable also succeeds when it was never there) |
+> | `handle.path()` | `autostart_path(app_id)` | Destination (Linux = full `.desktop` path; Windows = `HKCU\…\Run\<app_id>` description) |
+> | (none) | `autostart_exe_path()` | Full path of the current process's executable (what enable uses; also handy for diagnostics) |
+>
+> **Pure functions** (unit-testable): `autostart_dir_of(xdg, home)`, `autostart_escape_exec(path)`, `autostart_desktop_entry(exe, app_id)`, `autostart_desktop_enabled(content)`, `autostart_run_value(exe)` / `autostart_run_value_exe(value)`, `autostart_valid_app_id(app_id)`.
+> **Errors**: `AutostartError{Unsupported, InvalidAppId, NoExecutablePath, IoFailed(String)}` (unsupported and failure are kept separate; nothing fails silently).
+> **Note**: the exec path is quoted per platform convention (both a `.desktop` Exec and a Windows REG_SZ are wrapped in double quotes as a whole) — do not add another layer yourself.
+
 ### Opening External Things
 
 | API | Purpose |
@@ -686,6 +730,17 @@ match @system.idle_seconds() {
 | handle.release() | Release (idempotent) |
 | keep_awake_active() | Whether keep-awake is currently held |
 | idle_supported() / idle_seconds() -> Result[Double, IdleError] | User idle seconds (Linux X11; Wayland sessions report Unsupported explicitly) |
+
+> **New-stack (MoonBit native GUI stack) mapping** (since W21e): the last row above is the old-chain `@system` form. The new stack lives in **`sys/idle.mbt`**, also object-free, singleton-free free functions, mapped item by item:
+>
+> | Old stack | New stack | Notes |
+> |---|---|---|
+> | `idle_supported()` | `idle_supported()` | Runtime probe; Linux needs a non-empty `DISPLAY` and both X11 + XSS dlopen-able (no link dependency) |
+> | `idle_seconds() -> Result[Double, IdleError]` | `idle_seconds() -> Result[Double, IdleError]` | Seconds since the last input; **the threshold is the caller's** (no active/idle binary) |
+>
+> **Pure functions** (unit-testable): `idle_clamp_ms(ms)` (negatives to zero), `idle_ms_to_seconds(ms)` (ms → seconds, already clamped).
+> **Errors**: `IdleError{Unsupported, Failed(String)}` — "this platform/session lacks the capability" and "this query failed" are kept apart, not silent.
+> **Note**: **read-only** — this API only reports how long the user has been idle; it does not inhibit sleep or set a threshold. For "keep the screen awake" use `KeepAwake` above (the two are deliberately separate).
 
 ### Battery & Power Events
 
@@ -757,6 +812,17 @@ All widgets (`ViewLike`) support:
 | set_capture() / release_capture() / has_capture() | Mouse capture |
 | set_style(k, v) / set_style_str(k, v) | Layout styles (runtime primitives) |
 | Drag registration and drop callbacks | Drag and drop (receivers must also register handle_drag_update returning allowed operations; without it every drag is rejected; the initiator's do_drag_file_paths / do_drag_data_full must be called inside the on_mouse_down callback to take effect; demo in the components example, "Windows & Web" page) |
+
+> **New-stack (MoonBit native GUI stack) mapping** (since W21c): the last row above is the old stack's platform-level drag and drop (GTK `gtk_drag_*` / Win32 `IDropTarget`, an enter/update/leave trio plus operation-bit negotiation). The new stack's **in-app** drag and drop touches no platform interface, using the session model in `core/drag.mbt` plus the two declarative hooks in `ui/drag.mbt`:
+>
+> | Old stack | New stack | Notes |
+> |---|---|---|
+> | `do_drag_file_paths` / `do_drag_data_full` (must be inside on_mouse_down) | `drag_source(content, payload=f)` | Wrapping content makes it a drag source; `payload()` is called only after the threshold (4px by default) is crossed; returning `None` cancels the drag (treated as an ordinary click) |
+> | `handle_drag_update` (returns allowed operation bits) | `drop_target(content, accept=f, on_drop=f)` | Wrapping content makes it a drop target; `accept` decides whether to accept (all by default) and, if so, `on_drop(data, x, y)` runs |
+> | drag-enter / drag-update / drag-leave trio | `@core.drag_hover()` | The hover highlight is drawn by reading the session state — three callbacks collapse into one, with no "missed leave callback" state |
+> | `DragData` (platform data type) | `@core.DragData{Text,Html,Paths,Img}` | Our own payload type (`Img` holds raw PNG bytes, no platform image type); `drag_encode`/`drag_decode` are a stable cross-process/cross-backend ABI |
+>
+> **Two usage constraints**: (1) do **not** put buttons inside a drag source (pointer events go deepest-first, so an interactive child swallows the press and it will not drag); (2) in-app drop targets are resolved in **window coordinates**, so source and target share one window. **Cross-application** system-level drag still ships with the platform batch.
 
 Event payload fields:
 

@@ -101,7 +101,7 @@ fn make_field(
       None => FONT * 1.5
     }
     let ty = (r.h - lh) / 2.0
-    // 文本走 yue/text 自己的 Cairo 会话，与 Painter 会话交替前刷一次
+    // 文本走 text 自己的 Cairo 会话，与 Painter 会话交替前刷一次
     p.flush()
     let _ = @text.draw_text_at(
       p,
@@ -806,9 +806,89 @@ fn msgbox_result_label(r : @win.MessageBoxResult) -> String {
 }
 
 ///|
+/// W21b 自绘消息框区块：三个按钮各弹一个不同种类/按钮集的**自绘**消息框——纯自绘
+/// （不开原生 `MessageBoxW`），因此三平台同构；Esc 收起、Enter 走默认钮。响应编号
+/// 落状态行（自绘档的编号由调用方给，与 W20d 原生档的 1..7 是两套口径）。
+fn make_drawn_message_box_section(
+  vis_info : @core.Store[Bool],
+  vis_warn : @core.Store[Bool],
+  vis_err : @core.Store[Bool],
+  last : Ref[String],
+  shots : Ref[Int],
+) -> @core.Node {
+  let respond = fn(code : Int) -> Unit {
+    shots.val = shots.val + 1
+    last.val = "编号 " + code.to_string()
+  }
+  let dismiss = fn() -> Unit {
+    shots.val = shots.val + 1
+    last.val = "关闭(✕/Esc)"
+  }
+  @ui.container(
+    [
+      @ui.label(
+        "自绘消息框（W21b）：纯自绘、不吃原生 MessageBoxW，三平台同构；Esc 收起 / Enter 走默认钮",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [
+          @ui.button_t("信息 确定", on_click=fn() -> Unit { vis_info.set(true) }),
+          @ui.button_t("警告 三钮", on_click=fn() -> Unit { vis_warn.set(true) }),
+          @ui.button_t(
+            "错误 是/否",
+            variant=@ui.Danger,
+            on_click=fn() -> Unit { vis_err.set(true) },
+          ),
+          @core.node_of(live_counter(
+            fn() -> String { "弹框次数 " + shots.val.to_string() + "  最近 " + last.val },
+            width=260.0,
+          )),
+        ],
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+      @ui.message_box_t(
+        vis_info,
+        "构建完成",
+        "3 个目标已产出。",
+        kind=@ui.Information,
+        buttons=[("确定", 1)],
+        on_response=respond,
+        on_dismiss=dismiss,
+      ),
+      @ui.message_box_t(
+        vis_warn,
+        "构建告警",
+        "2 个目标有告警。",
+        kind=@ui.Warning,
+        informative="其中 1 个是缓存未命中，可忽略。",
+        buttons=[("重试", 1), ("跳过", 2), ("取消", 3)],
+        on_response=respond,
+        on_dismiss=dismiss,
+        width=460.0,
+      ),
+      @ui.message_box_t(
+        vis_err,
+        "构建失败",
+        "3 个目标失败，是否继续？",
+        kind=@ui.Error,
+        buttons=[("是", 6), ("否", 7)],
+        on_response=respond,
+        on_dismiss=dismiss,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// W20a 原生菜单栏区块：把 MenuBar 模型翻译成 Win32 原生菜单（CreateMenu +
 /// SetMenu），点菜单项经 WM_COMMAND 回收并派发到模型回调。跨平台模型在
-/// `yue/core/menu.mbt`，这里只做展示与状态行回证。
+/// `core/menu.mbt`，这里只做展示与状态行回证。
 fn make_menu_section(
   hits : Ref[Int],
   last : Ref[String],
@@ -878,7 +958,7 @@ fn build_demo_menu_bar(
 }
 
 ///|
-/// W20e 演示图标像素（BGRA 小端、**预乘** alpha，与 `yue/render` 的 Bitmap 同
+/// W20e 演示图标像素（BGRA 小端、**预乘** alpha，与 `render` 的 Bitmap 同
 /// 口径）：四象限各一色 + 中心实心圆。用来演示「像素直建窗口图标」（W20f 的
 /// 像素通道），不依赖任何外部素材。
 fn demo_icon_pixels(n : Int) -> FixedArray[Byte] {
@@ -979,6 +1059,351 @@ fn make_window_section(
         column_gap=8.0,
         align_items=@yoga.AlignItems::Center,
       ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
+/// W20c 托盘区块：建托盘（像素现建图标）/ 改提示 / 挂右键菜单 / 弹菜单 / 移除。
+/// 左键与菜单项计数落在状态行——证明 `dispatch_tray_event` 与菜单派发链都通。
+/// 后端不支持时（Linux 无 watcher、macOS 占位）建项给结构化错误，如实显示。
+fn make_tray_section(
+  tray : Ref[@core.Tray?],
+  note : Ref[String],
+  clicks : Ref[Int],
+  icon_holder : Ref[@win.Icon?],
+) -> @core.Node {
+  let build_menu_and_run = fn() -> Unit {
+    match tray.val {
+      Some(t) => {
+        let menu = @core.Menu::new()
+        let _ = menu.add_item("打开主窗").set_on_click(fn() {
+          clicks.val = clicks.val + 1
+          note.val = "菜单/打开主窗"
+        })
+        let _ = menu.add_separator()
+        let _ = menu.add_item("关于").set_on_click(fn() {
+          clicks.val = clicks.val + 1
+          note.val = "菜单/关于"
+        })
+        t.set_menu(menu)
+        note.val = "已挂菜单"
+      }
+      None => note.val = "先建托盘"
+    }
+  }
+  let create = fn() -> Unit {
+    match @win.icon_from_bgra(demo_icon_pixels(32), 32, 32) {
+      Some(ic) => {
+        match @core.Tray::new("libyue-demo-tray", icon=Some(ic)) {
+          Ok(t) => {
+            t.set_tooltip("libyue", "W20c 托盘演示")
+            t.on_click(fn() {
+              clicks.val = clicks.val + 1
+              note.val = "左键"
+            })
+            tray.val = Some(t)
+            icon_holder.val = Some(ic)
+            note.val = "已建(" + t.backend_name() + ")"
+          }
+          Err(@core.Unsupported) => {
+            note.val = "后端不可用"
+            ic.free()
+          }
+          Err(@core.IconLoadFailed) => {
+            note.val = "图标加载失败"
+            ic.free()
+          }
+          Err(@core.Backend(msg)) => {
+            note.val = "后端失败: " + msg
+            ic.free()
+          }
+        }
+      }
+      None => note.val = "建图标失败"
+    }
+  }
+  let retip = fn() -> Unit {
+    match tray.val {
+      Some(t) => {
+        t.set_tooltip("libyue", "改过的提示 · W20c")
+        note.val = "已改提示"
+      }
+      None => note.val = "先建托盘"
+    }
+  }
+  let popup = fn() -> Unit {
+    match tray.val {
+      Some(t) => {
+        let picked = t.popup_menu()
+        note.val = if picked { "菜单选中" } else { "菜单取消/无菜单" }
+      }
+      None => note.val = "先建托盘"
+    }
+  }
+  let drop = fn() -> Unit {
+    match tray.val {
+      Some(t) => {
+        t.remove()
+        tray.val = None
+        match icon_holder.val {
+          Some(ic) => ic.free()
+          None => ()
+        }
+        icon_holder.val = None
+        note.val = "已移除"
+      }
+      None => note.val = "先建托盘"
+    }
+  }
+  @ui.container(
+    [
+      @ui.label(
+        "系统托盘（W20c）：建/提示/菜单/弹出/移除；左键与菜单项计数（图标 32px 由像素现建）",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [
+          @ui.button_t("建托盘", on_click=create),
+          @ui.button_t("改提示", on_click=retip),
+          @ui.button_t("挂菜单", on_click=build_menu_and_run),
+          @ui.button_t("弹菜单", on_click=popup),
+          @ui.button_t("移除", on_click=drop),
+          @core.node_of(live_counter(
+            fn() -> String {
+              let state = match tray.val {
+                Some(t) => t.backend_name()
+                None => "-"
+              }
+              "supported=" +
+              (if @core.Tray::is_supported() { "1" } else { "0" }) +
+              " slot=" +
+              state +
+              " clicks=" +
+              clicks.val.to_string() +
+              " note=" +
+              note.val
+            },
+            width=460.0,
+          )),
+        ],
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
+/// W21a 通知区块：发信息/警告/错误气泡、更新进度、关闭。状态行报后端、已发数、
+/// 当前通知 id 与最后一次动作。后端不支持时（macOS 占位）给结构化错误，如实显示。
+/// 通知图标句柄由 Ref 持住——气泡在用期间不能 free。
+fn make_notify_section(
+  nid : Ref[Int],
+  sends : Ref[Int],
+  note : Ref[String],
+  icon_holder : Ref[@win.Icon?],
+) -> @core.Node {
+  // 通知图标按需现建（像素 32px），建好后挂进 Ref 直到进程退出
+  let pick_icon = fn() -> Int {
+    match icon_holder.val {
+      Some(ic) => ic.handle
+      None =>
+        match @win.icon_from_bgra(demo_icon_pixels(32), 32, 32) {
+          Some(ic) => {
+            icon_holder.val = Some(ic)
+            ic.handle
+          }
+          None => 0
+        }
+    }
+  }
+  let do_send = fn(kind : Int, title : String, body : String) -> Unit {
+    match
+      @core.notify_send(
+        "libyue 演示",
+        title,
+        body,
+        kind=kind,
+        icon_handle=pick_icon(),
+      ) {
+      Ok(id) => {
+        nid.val = id
+        sends.val = sends.val + 1
+        note.val = "已发#" + id.to_string()
+      }
+      Err(e) => note.val = "失败: " + e.to_string()
+    }
+  }
+  let info = fn() -> Unit {
+    do_send(0, "构建完成", "3 个目标已产出")
+  }
+  let warn = fn() -> Unit {
+    do_send(1, "构建告警", "2 个目标有告警")
+  }
+  let err = fn() -> Unit {
+    do_send(2, "构建失败", "3 个目标失败")
+  }
+  let progress = fn() -> Unit {
+    if nid.val <= 0 {
+      note.val = "先发一张"
+    } else {
+      match @core.notify_progress(nid.val, "libyue 演示", "构建中", "正在编译", 60) {
+        Ok(pid) => {
+          nid.val = pid
+          note.val = "进度 60%"
+        }
+        Err(e) => note.val = "失败: " + e.to_string()
+      }
+    }
+  }
+  let close = fn() -> Unit {
+    if nid.val <= 0 {
+      note.val = "先发一张"
+    } else {
+      match @core.notify_close(nid.val) {
+        Ok(_) => {
+          nid.val = 0
+          note.val = "已关闭"
+        }
+        Err(e) => note.val = "失败: " + e.to_string()
+      }
+    }
+  }
+  @ui.container(
+    [
+      @ui.label(
+        "桌面通知（W21a）：发信息/警告/错误气泡 · 更新进度 · 关闭（Win32 托盘气泡；Linux 走 freedesktop）",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [
+          @ui.button_t("发信息", on_click=info),
+          @ui.button_t("发警告", on_click=warn),
+          @ui.button_t("发错误", on_click=err),
+          @ui.button_t("进度 60%", on_click=progress),
+          @ui.button_t("关闭", on_click=close),
+          @core.node_of(live_counter(
+            fn() -> String {
+              "supported=" +
+              (if @core.notify_supported() { "1" } else { "0" }) +
+              " backend=" +
+              @core.notify_backend_name() +
+              " sends=" +
+              sends.val.to_string() +
+              " id=" +
+              nid.val.to_string() +
+              " note=" +
+              note.val
+            },
+            width=460.0,
+          )),
+        ],
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
+/// W21c 拖放区块：两个拖源（文本载荷 / 路径载荷）＋两个落点（全收 / 只收路径）。
+/// 全自绘、**应用内**拖放，不碰任何平台接口——按下后拖过 4px 阈值才算拖，悬停
+/// 时落点描主题主色，松手投递给落点；`accept` 判为拒的落点回调不跑。退出状态行
+/// 报起的拖拽次数、投中次数与最近一次投递的载荷描述（真人交互时才对得上数）。
+fn make_drag_section(
+  drags : Ref[Int],
+  drops : Ref[Int],
+  last : Ref[String],
+) -> @core.Node {
+  let describe = fn(d : @core.DragData) -> String {
+    match d {
+      @core.DragData::Text(t) => "文本(" + t + ")"
+      @core.DragData::Html(_) => "HTML"
+      @core.DragData::Paths(ps) => "路径×" + ps.length().to_string()
+      @core.DragData::Img(bs) => "图片 " + bs.length().to_string() + "B"
+    }
+  }
+  // 拖源/落点的可见内容用「带底色的小盒 + 文案」——拖源里放展示件即可，别放按钮
+  // （按钮会先把按下吃掉，拖不动它，见 `ui/drag.mbt` 的约束）
+  let chip = fn(text : String, bgv : String) -> @core.Node {
+    @ui.container(
+      [@ui.label(text, size=12.0)],
+      padding=8.0,
+      bg=bgv,
+      border=@theme.theme_border(),
+    )
+  }
+  let src_text = @ui.drag_source(
+    chip("拖我（文本载荷）", @theme.theme_bg_panel()),
+    payload=fn() -> @core.DragData? {
+      drags.val = drags.val + 1
+      Some(@core.DragData::Text("拖源文本"))
+    },
+  )
+  let src_paths = @ui.drag_source(
+    chip("拖我（路径载荷）", @theme.theme_bg_panel()),
+    payload=fn() -> @core.DragData? {
+      drags.val = drags.val + 1
+      Some(@core.DragData::Paths(["C:/tmp/a.txt", "C:/tmp/b.txt"]))
+    },
+  )
+  let tgt_all = @ui.drop_target(
+    chip("投这里（全收）", @theme.theme_bg_page()),
+    on_drop=fn(d : @core.DragData, _x : Double, _y : Double) -> Unit {
+      drops.val = drops.val + 1
+      last.val = "全收 ← " + describe(d)
+    },
+  )
+  let tgt_paths = @ui.drop_target(
+    chip("投这里（只收路径）", @theme.theme_bg_page()),
+    accept=fn(d : @core.DragData) -> Bool { d.kind() == @core.FilePaths },
+    on_drop=fn(d : @core.DragData, _x : Double, _y : Double) -> Unit {
+      drops.val = drops.val + 1
+      last.val = "只收路径 ← " + describe(d)
+    },
+  )
+  @ui.container(
+    [
+      @ui.label(
+        "拖放（W21c）：应用内拖放全自绘、三平台同构；拖过 4px 才开拖，悬停落点描主色，松手投递（「只收路径」的落点会拒文本）",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [src_text, src_paths, tgt_all, tgt_paths],
+        column_gap=12.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+      @core.node_of(live_counter(
+        fn() -> String {
+          "起拖=" +
+          drags.val.to_string() +
+          " 投中=" +
+          drops.val.to_string() +
+          " 拖拽中=" +
+          (if @core.drag_active() { "1" } else { "0" }) +
+          " 悬停=" +
+          @core.drag_hover().to_string() +
+          " 最近=" +
+          last.val
+        },
+        width=460.0,
+      )),
     ],
     padding=8.0,
     row_gap=6.0,
@@ -1858,6 +2283,23 @@ fn main {
   let msgbow_shots = Ref(0)
   let msgbow_last : Ref[String] = Ref("-")
   app.mount([make_message_box_section(msgbow_last, msgbow_shots)])
+  // W21b（自绘消息框）：三个 Store 各驱动一个自绘消息框；响应编号落状态行。
+  // 另快照运行中的浮层数（关窗后浮层栈已清，退出时读不到真值，见 W20c 的坑）。
+  let mb_shots = Ref(0)
+  let mb_last : Ref[String] = Ref("-")
+  let mb_vis_info = @core.Store::new(false)
+  let mb_vis_warn = @core.Store::new(false)
+  let mb_vis_err = @core.Store::new(false)
+  let mb_ovl_snap : Ref[Int] = Ref(0)
+  app.mount([
+    make_drawn_message_box_section(
+      mb_vis_info,
+      mb_vis_warn,
+      mb_vis_err,
+      mb_last,
+      mb_shots,
+    ),
+  ])
   // W20a（原生菜单栏）：MenuBar 模型翻译成 Win32 原生菜单挂到主窗。菜单点击经
   // WM_COMMAND 回收，宿主每拍调 `dispatch_menu_command` 派发到模型回调。
   // 后端不支持时 apply 返回 false，区块照挂（状态行如实报「未挂载」）。
@@ -1873,8 +2315,36 @@ fn main {
   // W20e（窗口增强）：最小尺寸挂载时设好（不挡点击点位），标题/图标/无边框/
   // 拖拽带由区块按钮触发；图标句柄由 Ref 持住（窗口显示期间不能 free）。
   let win_icon : Ref[@win.Icon?] = Ref(None)
+  // 退出状态行在窗口关闭后才打印，那时后端槽已清空、现场读数全是 0。故每拍把
+  // 窗口增强的现场读数快照进这个串，退出时打印最后一份「活着时的」读数。
+  let win_snap : Ref[String] = Ref("-")
   app.window.set_min_size(900, 600)
   app.mount([make_window_section(app, win_icon)])
+  // W20c（系统托盘）：Win32 走 Shell_NotifyIconW，Linux 走 SNI。左键/菜单项由
+  // 主循环每拍 `dispatch_tray_event` 抽（与菜单命令同制）。托盘图标句柄由
+  // Ref 持住——托盘在用期间不能 free。
+  let tray : Ref[@core.Tray?] = Ref(None)
+  let tray_note : Ref[String] = Ref("-")
+  let tray_clicks = Ref(0)
+  let tray_icon : Ref[@win.Icon?] = Ref(None)
+  app.mount([make_tray_section(tray, tray_note, tray_clicks, tray_icon)])
+  // W21a（桌面通知）：Win32 走托盘气泡（NIF_INFO），Linux 走 freedesktop 通知。
+  // 通知 id 是后端内不透明的（Win32 = 托盘槽号、Linux = 服务端 u32），由 Ref 持住
+  // 供「改进度 / 关闭」复用；`notify_snap` 每拍快照后端侧在用数（关窗后槽表清空，
+  // 退出时读不到真值）。图标句柄同样 Ref 持住——气泡在用期间不能 free。
+  let nid = Ref(0)
+  let notify_sends = Ref(0)
+  let notify_note : Ref[String] = Ref("-")
+  let notify_icon : Ref[@win.Icon?] = Ref(None)
+  let notify_snap : Ref[String] = Ref("-")
+  app.mount([make_notify_section(nid, notify_sends, notify_note, notify_icon)])
+  // W21c（拖放）：两个拖源 + 两个落点。全自绘、应用内拖放，拖源/落点都只是普通
+  // 控件树节点，指针路由由宿主一并处理——不需要任何平台接口（跨应用系统级拖放
+  // 随平台批，接口形状已定）。
+  let drag_drags = Ref(0)
+  let drag_drops = Ref(0)
+  let drag_last : Ref[String] = Ref("-")
+  app.mount([make_drag_section(drag_drags, drag_drops, drag_last)])
   let ch_lin = @core.Store::new([])
   let ch_pushes = Ref(0)
   let ch_btn_w : Ref[@core.Widget?] = Ref(None)
@@ -2316,6 +2786,31 @@ fn main {
   ticker.val = fn() {
     if app.is_running() {
       ctr.frames = ctr.frames + 1
+      // W20e：现场窗口增强读数快照（关窗后后端槽清空，退出时读不到真值）
+      let (sw, sh) = app.window.min_size()
+      let (sx, sy, sdw, sdh) = app.window.drag_rect()
+      win_snap.val =
+        "title='" +
+        app.window.title() +
+        "' min=" +
+        sw.to_string() +
+        "x" +
+        sh.to_string() +
+        " drag=" +
+        sx.to_string() +
+        "," +
+        sy.to_string() +
+        "," +
+        sdw.to_string() +
+        "x" +
+        sdh.to_string() +
+        " bl=" +
+        (if app.window.is_borderless() { "1" } else { "0" }) +
+        " icon=" +
+        (match win_icon.val {
+          Some(_) => "1"
+          None => "0"
+        })
       // 自转轮播的下标由宿主的延时通道推进：换了页就计一次
       // 浮层是瞬时的：退出时计数早已归零，故每拍记一次峰值（证明真窗口里确实开过层）
       let ck = app.cursor_kind
@@ -2368,6 +2863,13 @@ fn main {
       }
       // W20a：派发菜单命令（Win32 的 WM_COMMAND 经后端进队列，这里按 id 找回调执行）
       let _ignored_hit = @core.dispatch_menu_command()
+      // W20c：派发托盘左键/右键（Win32 的 WM_TRAY_CB 经后端进队列；右键无回调时
+      // 自动弹已挂的菜单）。SNI 后端点击由 DBus 信号直达回调，不经此队列。
+      let _ignored_tray = @core.dispatch_tray_event()
+      // W21a：每拍快照后端侧在用通知数（关窗后槽表清空，退出时读不到真值）
+      notify_snap.val = "count=" + @win.notify_count().to_string()
+      // W21b：每拍快照运行中的浮层数（自绘消息框开在浮层图层上）
+      mb_ovl_snap.val = @core.overlay_count()
       app.schedule_paint()
       let _ = app.timer(500, ticker.val)
     }
@@ -2831,6 +3333,18 @@ fn main {
       " last=" +
       msgbow_last.val,
   )
+  // W21b（自绘消息框）回证：弹框次数与最近一次的响应编号（自绘档编号由调用方给）；
+  // ovl= 是运行中浮层数的末次快照（关窗后浮层栈已清，退出时读不到真值）。
+  println(
+    "NATIVE-APP-MSGBOX2 shots=" +
+    mb_shots.val.to_string() +
+    " last=" +
+    mb_last.val +
+    " ovl=" +
+    mb_ovl_snap.val.to_string() +
+    " native_ovl=" +
+    @core.overlay_count().to_string(),
+  )
   // W20a（原生菜单栏）回证：菜单是否挂上、菜单项被点几次、最近一项标签。
   println(
     "NATIVE-APP-MENU applied=" +
@@ -2844,32 +3358,66 @@ fn main {
       " last=" +
       menu_last.val,
   )
-  // W20e（窗口增强）回证：系统侧读回的标题/最小尺寸/拖拽区/无边框开关
-  // （改标题、设图标、开无边框需人工点按钮）。
-  let (wmin_w, wmin_h) = app.window.min_size()
-  let (wdr_x, wdr_y, wdr_w, wdr_h) = app.window.drag_rect()
+  // W20e（窗口增强）回证：最后一帧仍活着时快照的系统侧读数（标题/最小尺寸/
+  // 拖拽区/无边框/图标；改标题、设图标、开无边框需人工点按钮）。
+  println("NATIVE-APP-WIN " + win_snap.val)
+  // W20c（系统托盘）回证：后端可用性、当前后端、在用槽数、左键/菜单项计数。
+  // （建托盘/挂菜单/弹菜单需人工点按钮；不支持时如实报 supported=0。）
   println(
-    "NATIVE-APP-WIN title='" +
-    app.window.title() +
-    "' min=" +
-    wmin_w.to_string() +
-    "x" +
-    wmin_h.to_string() +
-    " drag=" +
-    wdr_x.to_string() +
-    "," +
-    wdr_y.to_string() +
-    "," +
-    wdr_w.to_string() +
-    "x" +
-    wdr_h.to_string() +
-    " bl=" +
-    (if app.window.is_borderless() { "1" } else { "0" }) +
-    " icon=" +
-    (match win_icon.val {
-      Some(_) => "1"
-      None => "0"
-    }),
+    "NATIVE-APP-TRAY supported=" +
+    (if @core.Tray::is_supported() { "1" } else { "0" }) +
+    " backend=" +
+    (match tray.val {
+      Some(t) => t.backend_name()
+      None => "-"
+    }) +
+    " count=" +
+    @win.tray_count().to_string() +
+    " clicks=" +
+    tray_clicks.val.to_string() +
+    " note=" +
+    tray_note.val,
+  )
+  // 退出前显式收掉托盘图标（进程退出系统也会清，但显式更干净、也让 count 归 0）
+  match tray.val {
+    Some(t) => t.remove()
+    None => ()
+  }
+  // W21a（桌面通知）回证：后端可用性/后端名、已发数、当前通知 id 与关闭前的
+  // 后端侧在用数快照。（发气泡/改进度/关闭需人工点按钮；不支持时如实报 supported=0。）
+  println(
+    "NATIVE-APP-NOTIFY supported=" +
+    (if @core.notify_supported() { "1" } else { "0" }) +
+    " backend=" +
+    @core.notify_backend_name() +
+    " sends=" +
+    notify_sends.val.to_string() +
+    " id=" +
+    nid.val.to_string() +
+    " " +
+    notify_snap.val +
+    " note=" +
+    notify_note.val,
+  )
+  // 退出前显式收起还开着的气泡（Win32 无独立 dismiss，走 NIF_INFO 空正文 + NIM_DELETE）
+  if nid.val > 0 {
+    let _ = @core.notify_close(nid.val)
+  }
+  match notify_icon.val {
+    Some(ic) => ic.free()
+    None => ()
+  }
+  // W21c（拖放）回证：起的拖拽次数、投中次数、退出时是否还有拖拽在跑、最近一次
+  // 投递的载荷描述（应用内拖放全自绘，真人拖一把数才对得上）。
+  println(
+    "NATIVE-APP-DRAG drags=" +
+    drag_drags.val.to_string() +
+    " drops=" +
+    drag_drops.val.to_string() +
+    " active=" +
+    (if @core.drag_active() { "1" } else { "0" }) +
+    " last=" +
+    drag_last.val,
   )
   app.shutdown()
 }

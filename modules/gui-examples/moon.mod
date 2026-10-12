@@ -1,0 +1,18 @@
+name = "NoahLiu/gui-examples"
+version = "0.1.0"
+preferred_target = "native"
+
+description = "native-gui 的独立示例模块：systemprobe 系统能力 + 扩展图表演示板（依赖 gui-media 媒体扩展）"
+
+readme = "README.md"
+
+license = "MIT"
+
+repository = "https://github.com/lb091188/moonbit-libyue"
+
+import {
+  "NoahLiu/native-gui@0.1.0",
+  "NoahLiu/gui-media@0.1.0",
+  "NoahLiu/ffmpeg-mbt@0.1.0",
+  "NoahLiu/yoga-mbt@0.1.0",
+}

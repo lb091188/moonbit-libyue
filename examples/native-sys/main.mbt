@@ -1,4 +1,4 @@
-// examples/native-sys —— 系统能力（`yue/sys`）的**累积**验证示例：每落地一族
+// examples/native-sys —— 系统能力（`sys`）的**累积**验证示例：每落地一族
 // 就把读数接进本页，同族不另开示例（GUI 侧的累计页是 `examples/native-app`）。
 //
 // 跑法：`moon run examples/native-sys`（需显示服务），12 秒后自动退出并打印
@@ -100,6 +100,17 @@ fn fmt_uptime(secs : Double) -> String {
 fn fmt_gb(kb : Int) -> String {
   let gb = kb.to_double() / 1024.0 / 1024.0
   gb.round().to_int().to_string() + " GB"
+}
+
+///|
+/// 空闲秒数 → 人类可读（不足 60 秒给「N.N 秒」，超过给「M 分 K 秒」）。
+fn fmt_idle(secs : Double) -> String {
+  if secs < 60.0 {
+    ((secs * 10.0).round() / 10.0).to_string() + " 秒"
+  } else {
+    let total = secs.to_int()
+    (total / 60).to_string() + " 分 " + (total % 60).to_string() + " 秒"
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -455,7 +466,7 @@ fn main {
       return
     }
   }
-  // 把 logind 的亮度写能力装进 yue/sys 的注入槽（sys 不引 D-Bus）
+  // 把 logind 的亮度写能力装进 sys 的注入槽（sys 不引 D-Bus）
   @dbus.install_logind_brightness()
   let counts : Ref[Counts] = Ref(empty_counts())
   let probes = @core.Store::new(0)
@@ -468,6 +479,8 @@ fn main {
   let btn_reveal : Ref[@core.Widget?] = Ref(None)
   let btn_notify : Ref[@core.Widget?] = Ref(None)
   let btn_tray : Ref[@core.Widget?] = Ref(None)
+  let btn_auto_on : Ref[@core.Widget?] = Ref(None)
+  let btn_auto_off : Ref[@core.Widget?] = Ref(None)
   let notify_hits = @core.Store::new(0)
   let tray_item : Ref[@dbus.Item?] = Ref(None)
   let tray_clicks = @core.Store::new(0)
@@ -478,6 +491,25 @@ fn main {
   let apps_store = @core.Store::new(join_lines(probe_apps(counts)))
   let hist_store = @core.Store::new(join_lines(probe_history(counts)))
   let wins_store = @core.Store::new(join_lines(probe_windows(counts)))
+  // W21d 开机自启：设置类（写盘 / 写注册表），只给按钮；初值只做只读定位
+  let auto_id = "com.moonbit.libyue.nativesys"
+  let auto_on_hits = @core.Store::new(0)
+  let auto_state = @core.Store::new(
+    match @sys.autostart_path(auto_id) {
+      Ok(p) => "自启动：未启用（落点 " + p + "）"
+      Err(e) => "自启动：不可用（" + e.to_string() + "）"
+    },
+  )
+  // W21e 空闲检测：只读读数（自最后一次输入起的秒数），阈值判定交给调用方
+  let btn_idle : Ref[@core.Widget?] = Ref(None)
+  let idle_hits = @core.Store::new(0)
+  let idle_state = @core.Store::new(
+    if @sys.idle_supported() {
+      "空闲：支持（点一下读当前秒数）"
+    } else {
+      "空闲：本平台 / 本会话不支持（macOS 或 Wayland 无 X 服务端）"
+    },
+  )
 
   fn reprobe() -> Unit {
     sys_store.set(join_lines(probe_system(counts)))
@@ -489,7 +521,7 @@ fn main {
     app.schedule_paint()
   }
 
-  // D-Bus 接线：排期通道与周期泵都由宿主给（yue/dbus 不引 GUI 核心层）
+  // D-Bus 接线：排期通道与周期泵都由宿主给（dbus 不引 GUI 核心层）
   @dbus.dbus_set_post_delayed(fn(ms : Int, f : () -> Unit) -> Unit {
     let _ = app.timer(ms, f)
   })
@@ -498,7 +530,7 @@ fn main {
     let _ = app.timer(200, pump_loop)
   }
   let _ = app.timer(200, pump_loop)
-  // 剪贴板监听：排期通道由宿主注入（yue/sys 不引 GUI 核心层）
+  // 剪贴板监听：排期通道由宿主注入（sys 不引 GUI 核心层）
   let watcher = @sys.cbw_start_watch(
     fn(ms : Int, f : () -> Unit) -> Unit {
       let _ = app.timer(ms, f)
@@ -517,7 +549,7 @@ fn main {
     @ui.container(
       [
         @ui.label(
-          "系统能力（yue/sys）：只读探测在一屏，设置类只给按钮",
+          "系统能力（sys）：只读探测在一屏，设置类只给按钮",
           size=15.0,
           weight=@text.SemiBold,
         ),
@@ -652,6 +684,61 @@ fn main {
           handle=fn(w : @core.Widget) -> Unit { btn_tray.val = Some(w) },
         ),
         @ui.label_dyn(tray_state.signal(), size=12.0),
+        @ui.button(
+          "启用自启",
+          on_click=fn() -> Unit {
+            match @sys.autostart_enable(auto_id) {
+              Ok(_) => {
+                auto_on_hits.update(fn(n : Int) -> Int { n + 1 })
+                let loc = match @sys.autostart_path(auto_id) {
+                  Ok(p) => p
+                  Err(_) => "-"
+                }
+                auto_state.set(
+                  "自启动：已启用（重新登录 / 重启后拉起；落点 " + loc + "）",
+                )
+              }
+              Err(e) => auto_state.set("启用自启失败：" + e.to_string())
+            }
+            app.schedule_paint()
+          },
+          kind=@ui.Border,
+          min_width=110.0,
+          handle=fn(w : @core.Widget) -> Unit { btn_auto_on.val = Some(w) },
+        ),
+        @ui.button(
+          "取消自启",
+          on_click=fn() -> Unit {
+            match @sys.autostart_disable(auto_id) {
+              Ok(_) => auto_state.set("自启动：已取消（幂等，本就不在也算成功）")
+              Err(e) => auto_state.set("取消自启失败：" + e.to_string())
+            }
+            app.schedule_paint()
+          },
+          kind=@ui.Border,
+          min_width=110.0,
+          handle=fn(w : @core.Widget) -> Unit { btn_auto_off.val = Some(w) },
+        ),
+        @ui.label_dyn(auto_state.signal(), size=12.0),
+        @ui.button(
+          "读空闲",
+          on_click=fn() -> Unit {
+            match @sys.idle_seconds() {
+              Ok(sec) => {
+                idle_hits.update(fn(n : Int) -> Int { n + 1 })
+                idle_state.set(
+                  "空闲：" + fmt_idle(sec) + "（自最后一次输入起）",
+                )
+              }
+              Err(e) => idle_state.set("读空闲失败：" + e.to_string())
+            }
+            app.schedule_paint()
+          },
+          kind=@ui.Border,
+          min_width=110.0,
+          handle=fn(w : @core.Widget) -> Unit { btn_idle.val = Some(w) },
+        ),
+        @ui.label_dyn(idle_state.signal(), size=12.0),
         @ui.label_dyn(
           tray_clicks.signal().map(fn(k : Int) -> String {
             "托盘点击 " + k.to_string() + " 次"
@@ -682,6 +769,9 @@ fn main {
     ("reveal", btn_reveal),
     ("notify", btn_notify),
     ("tray", btn_tray),
+    ("auto_on", btn_auto_on),
+    ("auto_off", btn_auto_off),
+    ("idle", btn_idle),
   ] {
     match kv.1.val {
       Some(w) => geo = geo + " " + kv.0 + "=" + rect_str(w.rect)
@@ -700,6 +790,43 @@ fn main {
       "changes=\{clip_changes.get()} ntf=\{notify_hits.get()} " +
       "tray=\{tray_clicks.get()} " +
       "pool=\{@dbus.dbus_unique_name()}",
+  )
+  // W21d 自启动回证：支持性 / 当前启用态 / 当前 exe / 落点 / 按钮命中数。
+  // is_enabled 是即时读盘 / 读注册表，关窗后照读（与窗口读数不同）。
+  println(
+    "NATIVE-SYS-AUTOSTART supported=" +
+    (if @sys.autostart_supported() { "1" } else { "0" }) +
+    " enabled=" +
+    (match @sys.autostart_is_enabled(auto_id) {
+      Ok(true) => "1"
+      Ok(false) => "0"
+      Err(_) => "-"
+    }) +
+    " id=" +
+    auto_id +
+    " exe=" +
+    (match @sys.autostart_exe_path() {
+      Some(p) => p
+      None => "-"
+    }) +
+    " on_hits=" +
+    auto_on_hits.get().to_string() +
+    " note=" +
+    auto_state.get(),
+  )
+  // W21e 空闲回证：支持性 / 当次读数（关窗后照读）/ 按钮命中数 / 状态行。
+  println(
+    "NATIVE-SYS-IDLE supported=" +
+    (if @sys.idle_supported() { "1" } else { "0" }) +
+    " seconds=" +
+    (match @sys.idle_seconds() {
+      Ok(sec) => sec.to_string()
+      Err(e) => e.to_string()
+    }) +
+    " hits=" +
+    idle_hits.get().to_string() +
+    " note=" +
+    idle_state.get(),
   )
   app.shutdown()
 }

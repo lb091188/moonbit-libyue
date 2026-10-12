@@ -1,9 +1,0 @@
-import {
-  "NoahLiu/moonbit-libyue/yue",
-  "NoahLiu/moonbit-libyue/yue/declarative",
-  "moonbitlang/core/math",
-}
-
-options(
-  targets: { "charts_wbtest.mbt": [ "native" ] },
-)
