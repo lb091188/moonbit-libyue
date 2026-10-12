@@ -30,6 +30,7 @@
   - [x] 控件宿主（`yue/core/widget.mbt`）：布局树 ↔ 控件树映射、绝对矩形只在 `collect_abs` 一处折算、命中（最深+后画优先）、指针/滚轮/按键沿祖先链冒泡、绘制逐层 translate+clip；yoga-mbt 首次进主包依赖；真窗口用 xdotool 点击四格回证 `band_h=1/1/1/1`（core 22/22）
   - [x] `patches/` 的 yoga bug 语料转回归用例：首条 `93078300` 已落成 `modules/yoga-mbt/src/patches_regression_wbtest.mbt`（守的是可观察契约——auto 高列容器下的弹性项隐藏/重显一轮后高度仍来自内容测量；本引擎无 Yoga 那条 computedFlexBasis 驻留路径）
   - [x] 语料派生结案：Chrome 实测口径 = auto 主轴尺寸取各子项**假想主轴尺寸之和**（growth 不参与）；根因是引擎把子项基准读成了容器的 `flex_basis`（子项 flex-basis 全程失效），已修并落 7 行 Chrome 矩阵回归（`patches_regression_wbtest.mbt`）
+- [ ] **自绘控件宿主的缺陷：命中区与渲染位置错位**（2026-10-12 真机注入抓到）：桥接窗按钮行里点「后退」的渲染中心 (712,24) 触发的是「前进」的处理，同一行更靠左的按钮（x=100/300/500/600）命中都正确——偏移从「后退」附近开始累积、越靠右偏得越多（此前还出现过点 700/760 打开「浮层盖网页」）。命中矩形与绘制都出自同一份 `collect_abs` 结果，理论上不该错开；候选根因：① 按钮宽=测量文字宽+padding，而测量值小于实际渲染宽（含空格/中英混排的「读 cookie」最可疑），标签画进邻居地盘、看着右移；② 行内某件的 flex 基准与实画不一致；③ 内容宽在两轮布局之间变过。判据做法：在按钮处理里临时打「自己的 abs rect + 事件坐标」，一行扫描即可量出偏移曲线。**影响面是所有自绘行的点击定位**，不止这个示例。。
 - [~] **G7** 声明式层与组件宿主接线（`mount` 目标从 `View` 换 yoga-mbt 节点；恢复全仓门禁。宿主与声明式地基已就位：`@core.App` + `@core.Widget` 树 + `@core.Node`/`bind_node`/`swap_node`/`Store`/`Signal`，验证页 `examples/native-app`；剩组件与图表挂新 Painter）
 - [ ] **G8** 原生子表面通道与其消费者（见 §4「浏览器」「视频」）
 
