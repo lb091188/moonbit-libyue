@@ -433,14 +433,18 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
       }
       match pev.kind {
         Down => {
-          // 按下把键盘焦点交给命中的可聚焦控件（栈里没有该 id 时不改焦点）
+          // 本窗自绘区被点，键盘焦点必须回到本窗：GTK 不会替 GtkDrawingArea
+          // 做这件事，而焦点一旦被网页子件拿走就再也不回来——真机实测症状是
+          // 「点进网页再点回输入框，打字毫无反应」（键全被 webview 收走，
+          // 连 Ctrl+Z 这类快捷键也进网页）。无条件要一次，代价只是重复 grab 同一个控件。
+          self.window.request_focus()
+          // 命中可聚焦控件时切焦点栈（栈里没有该 id 时不改焦点栈）
           match self.root.focusable_at(pev.x, pev.y) {
             Some(id) =>
               if !self.focus.is_focused(id) {
                 let prev = self.focus.current()
                 if self.focus.focus(id) {
                   self.flush_ime_for_switch(prev)
-                  self.window.request_focus()
                 }
               }
             None => ()
@@ -604,7 +608,15 @@ fn App::drain_events(self : App) -> Unit {
       }
       @win.NeedsDraw => self.dirty = true
       @win.Resized => self.dirty = true
-      @win.LostFocus => overlay_on_lost_focus(self)
+      @win.LostFocus => {
+        // 键盘焦点被拿走（点进网页子件、浮层或别的窗口接管）：把输入法这一会话
+        // 交还给系统——在途 commit 归当前控件、清掉组合串显示、打断引擎侧未完成的
+        // 组合、复位去重缓存。焦点栈不动（回到本窗时控件焦点照旧）。
+        // 少了这一步，网页里打字期间旧框还挂着半截组合串，回来后的第一键也可能
+        // 落进那个旧组合。
+        self.flush_ime_for_switch(self.focus.current())
+        overlay_on_lost_focus(self)
+      }
       @win.Input => {
         match self.window.take_input() {
           Some(ev) => self.route(ev)

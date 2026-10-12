@@ -134,6 +134,7 @@
   - [x] prebuild 缺 webkit 开发包时编「无宏」占位分支（探测返回不可用）而不是链接失败；链接顺序 `-lyue_web` 在 `-lyue_win_stub` 前
   - [x] 回证：`yue/web` 无头 2/2（矩形取整与去重键、探测与构造一致且未挂载零句柄）、`yue/win`/`yue/web`/`examples/native-web` `--deny-warn` 零警告、全仓红点 287/68 未增；真窗口两种摆法 `NATIVE-WEB-GEO pane=262,71,848x605 sidebar=12,71,240x605`（分栏）→ `pane=12,71,1098x605 sidebar=12,71,0x0`（整页），`title='Example Domain' url='https://example.com/'` 证明真渲染，截图复核
   - [ ] 待使用者肉眼复验：网页内滚动与点链接、webview 聚焦时本栈纯通道 IME 是否让位（离开即恢复）
+  - [x] **修复使用者报的「点进网页后原生输入框打不进字」**（两处独立根因）：① 绘制区把 GTK 键盘焦点要回来过就再没要过——`GtkDrawingArea` 不会因为被点就把焦点还给自己，WebKit 子件拿走之后键全进网页（连 Ctrl+Z 都是），修法是宿主在指针按下时无条件 `request_focus()`；② `yue/ui/entry.mbt` 空框（显示 placeholder）时**不画组合串**（if/else 把组合串那支跳过了），拼音在正常走而屏幕什么都不出现。顺带：`LostFocus` 时把输入法会话交还系统（在途 commit 归当前控件、清组合串、`im_reset`）。回证：探针见 `[focus] in` 与 `[key]` 在点回后恢复（修复前两条都没有），空框打字截图见组合串「爱」、完整往返流程见「阿宝」；core 82/ui 110/input 10/web 15 全绿、全仓 287/68 未增
 - [x] **批 C JS 桥 + DOM 抓取 + 导航面**：契约沿用旧链 `yue/browser/browser.mbt` 的 22+6 方法名，但协议载荷改结构化返回（不回旧 ABI 裸字节）
   - [x] 双向通道：原生→网页 `execute_javascript` / `execute_javascript_with_result`（回包按请求序号配对）；网页→原生 `add_raw_binding(name)` 注入 shim 后页面直接调 `name(payload)`，载荷 JSON 化进 `on_invoke`
   - [x] DOM 抓取四档（正文/链接/meta/结构）：`dom_script` + `dom_parse` 两只纯函数，回包 JSON 走 `@sys` 零依赖解析器折成 `DomSnapshot`；解析失败 `ok=false` 且 raw 留着（不静默）

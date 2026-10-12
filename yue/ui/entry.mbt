@@ -153,15 +153,19 @@ pub fn entry(
       p.set_line_width(1.0)
       p.stroke_rect(0.0, 0.0, r.w, r.h)
       let txt = show_text()
-      if txt.length() == 0 && ph.length() > 0 {
+      let pe = ed.preedit_text()
+      // 占位符只在「没文本且没组合串」时画：少了组合串这一条，空框里打拼音
+      // 屏幕上什么都不出现（组合照常在走），看起来就是「打不进字」——真机踩到。
+      if txt.length() == 0 && ph.length() > 0 && pe.length() == 0 {
         let _ = @text.draw_at(p, pad, ty, ph, font, @theme.theme_text_secondary())
       } else {
-        let _ = @text.draw_at(p, pad, ty, txt, font, if off.off {
-          @theme.theme_text_secondary()
-        } else {
-          @theme.theme_text_regular()
-        })
-        let pe = ed.preedit_text()
+        if txt.length() > 0 {
+          let _ = @text.draw_at(p, pad, ty, txt, font, if off.off {
+            @theme.theme_text_secondary()
+          } else {
+            @theme.theme_text_regular()
+          })
+        }
         if pe.length() > 0 {
           // 组合串画在 caret 处并加下划线，且只此一份（内核不并入文本）
           let px = caret_x()
