@@ -210,6 +210,49 @@ pub fn App::mount(self : App, children : Array[Node]) -> Unit {
 }
 
 ///|
+/// 把「除浮层图层外」的已挂内容整体搬进一个滚动视口（滚轮平移、视口裁剪）。
+/// 用途：累积验证页把十几页叠成一根数千像素高的长柱，屏幕低于内容高时下面的
+/// 页根本够不着（人工验收无从下手）——**全部页面挂完**之后调一次本函数即可。
+/// 搬运保持内容顺序与绝对坐标（视口在顶、内容相对顶对齐），读几何的读数行不
+/// 受影响；浮层宿主留在视口外（它是覆盖层，不该跟着内容滚）。滚轮先经内容里
+/// 的子级滚动容器（虚拟列表/粘性列表等）消费，没人要才落到本视口。
+pub fn App::enable_root_scroll(self : App) -> Unit {
+  let root = self.root
+  let vp = Widget::new()
+  vp.node.set_flex_direction(@yoga.Column)
+  vp.node.set_width(@yoga.percent(100.0))
+  vp.node.set_height(@yoga.percent(100.0))
+  let content = Widget::new()
+  content.node.set_flex_direction(@yoga.Column)
+  content.node.set_width(@yoga.percent(100.0))
+  content.node.set_position(@yoga.Relative)
+  let kept : Array[Widget] = []
+  for kid in root.children() {
+    if kid.id != self.host.layer.id {
+      kept.push(kid)
+    }
+  }
+  for kid in kept {
+    let _ = root.remove_child(kid)
+    content.append_child(kid)
+  }
+  vp.append_child(content)
+  root.insert_child(0, vp)
+  let off : Ref[Double] = Ref(0.0)
+  vp.on_scroll = Some(fn(ev : ScrollEvent) -> Bool {
+    let maxoff = (content.rect.h - vp.rect.h).max(0.0)
+    let next = (off.val - ev.dy * 48.0).max(0.0).min(maxoff)
+    if next != off.val {
+      off.val = next
+      content.node.set_top(@yoga.fixed(-next))
+      self.schedule_paint()
+    }
+    true
+  })
+  self.schedule_paint()
+}
+
+///|
 /// 标脏并唤醒等待中的平台泵（供控件回调与定时器使用）。
 pub fn App::schedule_paint(self : App) -> Unit {
   self.dirty = true
