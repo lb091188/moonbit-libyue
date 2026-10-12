@@ -878,6 +878,117 @@ fn build_demo_menu_bar(
 }
 
 ///|
+/// W20e 演示图标像素（BGRA 小端、**预乘** alpha，与 `yue/render` 的 Bitmap 同
+/// 口径）：四象限各一色 + 中心实心圆。用来演示「像素直建窗口图标」（W20f 的
+/// 像素通道），不依赖任何外部素材。
+fn demo_icon_pixels(n : Int) -> FixedArray[Byte] {
+  let px : FixedArray[Byte] = FixedArray::make(n * n * 4, b'\x00')
+  let c = n / 2
+  for y = 0; y < n; y = y + 1 {
+    for x = 0; x < n; x = x + 1 {
+      let off = (y * n + x) * 4
+      let dx = x - c
+      let dy = y - c
+      let inside = dx * dx + dy * dy < c * c
+      let (b, g, r) : (Int, Int, Int) = if inside {
+        (230, 100, 40) // 中心圆：琥珀
+      } else if x < c && y < c {
+        (200, 120, 40)
+      } else if x >= c && y < c {
+        (120, 200, 60)
+      } else if x < c {
+        (200, 200, 60)
+      } else {
+        (200, 60, 160)
+      }
+      px[off] = b.to_byte()
+      px[off + 1] = g.to_byte()
+      px[off + 2] = r.to_byte()
+      px[off + 3] = (255).to_byte() // 不透明（预乘即原色）
+    }
+  }
+  px
+}
+
+///|
+/// W20e 窗口增强区块：运行中改标题 / 用像素现建窗口图标（W20f）/ 无边框开关 /
+/// 自绘标题栏拖拽区。最小尺寸在挂载时设定（不影响点击点位）；拖拽区与无边框
+/// 由按钮触发（拖拽区会吃掉该区的点击，装出来会干扰注入验证）。
+fn make_window_section(
+  app : @core.App,
+  icon_holder : Ref[@win.Icon?],
+) -> @core.Node {
+  let retitle = fn() -> Unit {
+    app.window.set_title("libyue · 窗口增强(W20e)")
+  }
+  let apply_icon = fn() -> Unit {
+    match @win.icon_from_bgra(demo_icon_pixels(16), 16, 16) {
+      Some(ic) => {
+        // 先设上新图标再释放旧的：窗口显示期间不能持悬垂 HICON
+        app.window.set_icon(Some(ic))
+        match icon_holder.val {
+          Some(old) => old.free()
+          None => ()
+        }
+        icon_holder.val = Some(ic)
+      }
+      None => ()
+    }
+  }
+  let bl_on = fn() -> Unit { app.window.set_borderless(true) }
+  let bl_off = fn() -> Unit { app.window.set_borderless(false) }
+  // 顶部 24px 作为自绘标题栏拖拽带（按下即拖窗，该带内不再派发点击）
+  let dr_on = fn() -> Unit { app.window.set_drag_rect(0, 0, 1400, 24) }
+  let dr_off = fn() -> Unit { app.window.set_drag_rect(0, 0, 0, 0) }
+  @ui.container(
+    [
+      @ui.label(
+        "窗口增强（W20e）：改标题 / 像素现建窗口图标 / 无边框开关 / 顶部拖拽带",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [
+          @ui.button_t("改标题", on_click=retitle),
+          @ui.button_t("自绘图标", on_click=apply_icon),
+          @ui.button_t("无边框 开", on_click=bl_on),
+          @ui.button_t("无边框 关", on_click=bl_off),
+          @ui.button_t("拖拽带 开", on_click=dr_on),
+          @ui.button_t("拖拽带 关", on_click=dr_off),
+          @core.node_of(live_counter(
+            fn() -> String {
+              let (mw, mh) = app.window.min_size()
+              let (dx, dy, dw, dh) = app.window.drag_rect()
+              "min=" +
+              mw.to_string() +
+              "x" +
+              mh.to_string() +
+              " drag=" +
+              dx.to_string() +
+              "," +
+              dy.to_string() +
+              "," +
+              dw.to_string() +
+              "x" +
+              dh.to_string() +
+              " bl=" +
+              (if app.window.is_borderless() { "1" } else { "0" })
+            },
+            width=420.0,
+          )),
+        ],
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 交互图表区块：折线/柱状/环形三个交互版并排——hover 浮层、图例点击显隐、
 /// 滚轮缩放（折线与柱状共用调用方持有的 CiZoom，退出状态行报窗口读数；
 /// 环形无缩放）。
@@ -1759,6 +1870,11 @@ fn main {
     menu_applied.val = true
   }
   app.mount([make_menu_section(menu_hits, menu_last, menu_applied)])
+  // W20e（窗口增强）：最小尺寸挂载时设好（不挡点击点位），标题/图标/无边框/
+  // 拖拽带由区块按钮触发；图标句柄由 Ref 持住（窗口显示期间不能 free）。
+  let win_icon : Ref[@win.Icon?] = Ref(None)
+  app.window.set_min_size(900, 600)
+  app.mount([make_window_section(app, win_icon)])
   let ch_lin = @core.Store::new([])
   let ch_pushes = Ref(0)
   let ch_btn_w : Ref[@core.Widget?] = Ref(None)
@@ -2727,6 +2843,33 @@ fn main {
       menu_hits.val.to_string() +
       " last=" +
       menu_last.val,
+  )
+  // W20e（窗口增强）回证：系统侧读回的标题/最小尺寸/拖拽区/无边框开关
+  // （改标题、设图标、开无边框需人工点按钮）。
+  let (wmin_w, wmin_h) = app.window.min_size()
+  let (wdr_x, wdr_y, wdr_w, wdr_h) = app.window.drag_rect()
+  println(
+    "NATIVE-APP-WIN title='" +
+    app.window.title() +
+    "' min=" +
+    wmin_w.to_string() +
+    "x" +
+    wmin_h.to_string() +
+    " drag=" +
+    wdr_x.to_string() +
+    "," +
+    wdr_y.to_string() +
+    "," +
+    wdr_w.to_string() +
+    "x" +
+    wdr_h.to_string() +
+    " bl=" +
+    (if app.window.is_borderless() { "1" } else { "0" }) +
+    " icon=" +
+    (match win_icon.val {
+      Some(_) => "1"
+      None => "0"
+    }),
   )
   app.shutdown()
 }

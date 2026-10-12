@@ -201,6 +201,111 @@ pub fn Window::close(self : Window) -> Unit {
   self.id = -1L
 }
 
+// ---------------------- 窗口增强（W20e）------------------------------------
+// 自绘栈下窗口外壳要能被应用改：运行中改标题、设窗口图标（走 W20f 的图标
+// 句柄）、最小尺寸、自绘标题栏拖拽区、无边框开关。非 Windows 后端是空实现，
+// 故新增状态在那些平台上读回为 0/false——调用方按语义降级（不静默失败）。
+
+///|
+/// 窗口图标的落点：大图标（任务栏/Alt+Tab）/ 小图标（标题栏）/ 两者。
+pub(all) enum IconTarget {
+  IconBig
+  IconSmall
+  IconBoth
+}
+
+///|
+/// 运行中改窗口标题（Win32 `SetWindowTextW`；非 Windows 后端空实现）。
+pub fn Window::set_title(self : Window, title : String) -> Unit {
+  wm_set_title(self.id, @utf8.encode(title))
+}
+
+///|
+/// 设窗口图标。`icon` 传 `None` 表示清空窗口图标；图标句柄归调用方所有，
+/// 窗口显示期间须保持其存活（先 free 会让窗口持一个悬垂 HICON）。
+pub fn Window::set_icon(
+  self : Window,
+  icon : Icon?,
+  target? : IconTarget = IconBoth,
+) -> Unit {
+  let which = match target {
+    IconBig => 0
+    IconSmall => 1
+    IconBoth => 2
+  }
+  let slot = match icon {
+    Some(ic) => ic.handle
+    None => 0
+  }
+  wm_set_icon(self.id, slot, which)
+}
+
+///|
+/// 设最小客户区尺寸（像素；某轴传 0 即该轴不限制）。改的是**客户区**下限，
+/// 后端按当前样式外扩成整窗下限（Win32 `WM_GETMINMAXINFO` 拦）。
+pub fn Window::set_min_size(self : Window, width : Int, height : Int) -> Unit {
+  wm_set_min_size(self.id, width, height)
+}
+
+///|
+/// 设自绘标题栏的拖拽区（客户区像素矩形；宽或高 <= 0 即清空）。命中区内的
+/// 按下交给系统当作「拖动窗口」，应用在该区收不到点击事件——这是自绘标题栏
+/// 的代价，区域要画得与「可拖」的视觉一致。
+pub fn Window::set_drag_rect(
+  self : Window,
+  x : Int,
+  y : Int,
+  width : Int,
+  height : Int,
+) -> Unit {
+  wm_set_drag_rect(self.id, x, y, width, height)
+}
+
+///|
+/// 无边框开关（自绘标题栏形态）：去掉系统标题栏与边框、保留最小化，
+/// **客户区尺寸保持不变**（后端按新样式重算外框）。
+pub fn Window::set_borderless(self : Window, on : Bool) -> Unit {
+  wm_set_borderless(self.id, if on { 1 } else { 0 })
+}
+
+///|
+/// 读回最小尺寸（非 Windows 后端恒 (0, 0)）。
+pub fn Window::min_size(self : Window) -> (Int, Int) {
+  let w = Ref(0)
+  let h = Ref(0)
+  wm_get_min_size(self.id, w, h)
+  (w.val, h.val)
+}
+
+///|
+/// 读回拖拽区（非 Windows 后端恒全 0）。
+pub fn Window::drag_rect(self : Window) -> (Int, Int, Int, Int) {
+  let x = Ref(0)
+  let y = Ref(0)
+  let w = Ref(0)
+  let h = Ref(0)
+  wm_get_drag_rect(self.id, x, y, w, h)
+  (x.val, y.val, w.val, h.val)
+}
+
+///|
+/// 读回无边框开关（非 Windows 后端恒 false）。
+pub fn Window::is_borderless(self : Window) -> Bool {
+  wm_is_borderless(self.id) != 0
+}
+
+///|
+/// 读回系统侧当前窗口标题（空串表示读不到；非 Windows 后端空实现）。
+pub fn Window::title(self : Window) -> String {
+  let buf = Bytes::new(256)
+  let n = wm_window_title(self.id, buf, 256)
+  if n <= 0 {
+    ""
+  } else {
+    @utf8.decode_lossy(buf[0:n])
+  }
+}
+
 ///|
 /// 把 C 侧写进缓冲的短字符串读回来（空/读不到都给空串）。
 fn sys_read(f : (Bytes, Int) -> Int) -> String {

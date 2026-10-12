@@ -93,6 +93,16 @@ typedef struct {
   int im_cw;
   int im_ch;
   int im_cursor_set;
+  // 窗口增强（W20e）：最小客户区尺寸（0 = 该轴不限制，WM_GETMINMAXINFO 拦）；
+  // 自绘标题栏拖拽区（客户区像素矩形，w/h<=0 = 无，WM_NCHITTEST 内返回
+  // HTCAPTION 交系统拖窗）；无边框开关（自绘标题栏形态）。
+  int min_w;
+  int min_h;
+  int drag_x;
+  int drag_y;
+  int drag_w;
+  int drag_h;
+  int borderless;
   WmEv evs[64];
   WmEv last;
   int ev_head;
@@ -102,6 +112,12 @@ typedef struct {
 static WmWindow wm_windows[WM_MAX_WINDOWS]; // 槽 0 未用，句柄 = 槽号（1 起）
 static int wm_next_id = 1;
 static HWND wm_waker = NULL; // 仅消息窗口：wm_wakeup 的投递目标（跨线程叫醒）
+
+/* 前置声明：UTF-8 → UTF-16 的公共转换（定义在文件后半），窗口增强（W20e）
+ * 的改标题等入口在它之前定义。 */
+static WCHAR *wm_utf8_to_wide(const char *s);
+/* 前置声明：图标表取句柄（W20f 的图标表定义在窗口增强之后）。 */
+static HICON wm_icon_get(int slot);
 
 /* 菜单句柄表（W20a）：下标即对外句柄（1 起）。每个槽存一个 HMENU——菜单条或
  * 子菜单都占一个槽；子菜单的 HMENU 由 CreatePopupMenu 建、AppendMenuW(MF_POPUP)
@@ -466,6 +482,38 @@ static LRESULT CALLBACK wm_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     }
     case WM_ERASEBKGND:
       return 1; // 全窗自绘，不擦底防闪
+    case WM_GETMINMAXINFO: {
+      // 最小尺寸（W20e）：ptMinTrackSize 要的是**整窗**尺寸，按当前样式的
+      // 非客户区把客户区最小尺寸外扩；某轴为 0 即该轴不限制（显式归 0，
+      // 否则 AdjustWindowRect 会把零宽也算出 2×边框宽）。
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL && (w->min_w > 0 || w->min_h > 0)) {
+        MINMAXINFO *mmi = (MINMAXINFO *)lp;
+        DWORD st = (DWORD)GetWindowLongPtrW(hwnd, GWL_STYLE);
+        DWORD ex = (DWORD)GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        RECT r = {0, 0, w->min_w > 0 ? w->min_w : 0, w->min_h > 0 ? w->min_h : 0};
+        AdjustWindowRectEx(&r, st, FALSE, ex);
+        mmi->ptMinTrackSize.x = w->min_w > 0 ? (r.right - r.left) : 0;
+        mmi->ptMinTrackSize.y = w->min_h > 0 ? (r.bottom - r.top) : 0;
+      }
+      return 0;
+    }
+    case WM_NCHITTEST: {
+      // 自绘标题栏拖拽区（W20e）：命中即回 HTCAPTION，把拖窗交给系统；
+      // 不在区内走默认（客户区/边框各自的原生语义）。
+      WmWindow *w = wm_of(hwnd);
+      if (w != NULL && w->drag_w > 0 && w->drag_h > 0) {
+        POINT p;
+        p.x = (LONG)(int16_t)LOWORD(lp);
+        p.y = (LONG)(int16_t)HIWORD(lp);
+        ScreenToClient(hwnd, &p);
+        if (p.x >= w->drag_x && p.x < w->drag_x + w->drag_w &&
+            p.y >= w->drag_y && p.y < w->drag_y + w->drag_h) {
+          return HTCAPTION;
+        }
+      }
+      break;
+    }
     case WM_COMMAND: {
       // 菜单/加速键命令：LOWORD(wp) 是命令 id，HIWORD(wp) 为 0（菜单选择）
       // 或 1（加速键）。不论来源都压进队列，MoonBit 侧按 id 找回调。
@@ -936,6 +984,161 @@ void wm_set_cursor(int64_t id, int kind) {
   }
 }
 
+/* ---- 窗口增强（W20e）-----------------------------------------------------
+ * 自绘栈下窗口外壳要能被 MoonBit 改：运行中改标题、设窗口图标（走 W20f 的
+ * HICON）、最小尺寸、自绘标题栏拖拽区、无边框开关。均为常规 Win32 消息，逐条
+ * 可探针验（SendMessageW(WM_GETMINMAXINFO/WM_NCHITTEST) 直接反读）。 */
+
+/* 运行中改标题（SetWindowTextW）。 */
+void wm_set_title(int64_t id, const char *title) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL || title == NULL) {
+    return;
+  }
+  WCHAR *wt = wm_utf8_to_wide(title);
+  if (wt != NULL) {
+    SetWindowTextW(w->hwnd, wt);
+    free(wt);
+  }
+}
+
+/* 设窗口图标。`which`：0 = 大图标（Alt+Tab）、1 = 小图标（标题栏），
+ * 2 = 两者。`icon_slot` 是 W20f 的图标句柄（0 = 清空图标）。句柄表归调用方，
+ * 窗口只是「用」这个 HICON——调用方须保证图标在窗口显示期间不被 free。 */
+void wm_set_icon(int64_t id, int icon_slot, int which) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL) {
+    return;
+  }
+  HICON ic = wm_icon_get(icon_slot);
+  if (which == 0 || which == 2) {
+    SendMessageW(w->hwnd, WM_SETICON, ICON_BIG, (LPARAM)ic);
+  }
+  if (which == 1 || which == 2) {
+    SendMessageW(w->hwnd, WM_SETICON, ICON_SMALL, (LPARAM)ic);
+  }
+}
+
+/* 设最小客户区尺寸（像素；0 = 该轴不限制）。WM_GETMINMAXINFO 按此拦。 */
+void wm_set_min_size(int64_t id, int wmin, int hmin) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  wm_windows[id].min_w = wmin > 0 ? wmin : 0;
+  wm_windows[id].min_h = hmin > 0 ? hmin : 0;
+}
+
+/* 设自绘标题栏拖拽区（客户区像素矩形；w/h<=0 清空）。命中交系统拖窗。 */
+void wm_set_drag_rect(int64_t id, int x, int y, int w, int h) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *win = &wm_windows[id];
+  win->drag_x = x;
+  win->drag_y = y;
+  win->drag_w = w > 0 ? w : 0;
+  win->drag_h = h > 0 ? h : 0;
+}
+
+/* 无边框开关：ON 去掉标题栏/边框并换 WS_POPUP（自绘标题栏形态），OFF 还原
+ * WS_OVERLAPPEDWINDOW。**保持客户区尺寸不变**——改样式后按当前客户区重算外框，
+ * 再 SWP_FRAMECHANGED 让非客户区重算（否则窗口尺寸会跳）。 */
+void wm_set_borderless(int64_t id, int on) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL || (w->borderless ? 1 : 0) == (on ? 1 : 0)) {
+    return;
+  }
+  LONG_PTR style = GetWindowLongPtrW(w->hwnd, GWL_STYLE);
+  if (on) {
+    style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX |
+               WS_SYSMENU | WS_BORDER | WS_DLGFRAME);
+    style |= WS_POPUP | WS_MINIMIZEBOX; // 仍允许最小化
+  } else {
+    style &= ~WS_POPUP;
+    style |= WS_OVERLAPPEDWINDOW;
+  }
+  RECT cr;
+  GetClientRect(w->hwnd, &cr);
+  RECT r = {0, 0, cr.right - cr.left, cr.bottom - cr.top};
+  LONG_PTR ex = GetWindowLongPtrW(w->hwnd, GWL_EXSTYLE);
+  AdjustWindowRectEx(&r, (DWORD)style, FALSE, (DWORD)ex);
+  SetWindowLongPtrW(w->hwnd, GWL_STYLE, style);
+  SetWindowPos(w->hwnd, NULL, 0, 0, r.right - r.left, r.bottom - r.top,
+               SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  w->borderless = on ? 1 : 0;
+}
+
+/* 反读：当前最小尺寸（探针/测试用）。 */
+void wm_get_min_size(int64_t id, int32_t *out_w, int32_t *out_h) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  if (out_w != NULL) {
+    *out_w = wm_windows[id].min_w;
+  }
+  if (out_h != NULL) {
+    *out_h = wm_windows[id].min_h;
+  }
+}
+
+/* 反读：当前拖拽区（探针/测试用）。 */
+void wm_get_drag_rect(int64_t id, int32_t *x, int32_t *y, int32_t *w,
+                      int32_t *h) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *win = &wm_windows[id];
+  if (x != NULL) {
+    *x = win->drag_x;
+  }
+  if (y != NULL) {
+    *y = win->drag_y;
+  }
+  if (w != NULL) {
+    *w = win->drag_w;
+  }
+  if (h != NULL) {
+    *h = win->drag_h;
+  }
+}
+
+/* 反读：无边框开关（探针/测试用）。 */
+int wm_is_borderless(int64_t id) {
+  return id > 0 && id < WM_MAX_WINDOWS ? wm_windows[id].borderless : 0;
+}
+
+/* 反读：当前窗口标题写进调用方缓冲（UTF-8，返回字节数；读不到给 0）。 */
+int wm_window_title(int64_t id, char *out, int cap) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS || out == NULL || cap <= 1) {
+    return 0;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL) {
+    return 0;
+  }
+  WCHAR wbuf[512];
+  int n = GetWindowTextW(w->hwnd, wbuf, 512);
+  if (n <= 0) {
+    out[0] = '\0';
+    return 0;
+  }
+  int got = WideCharToMultiByte(CP_UTF8, 0, wbuf, n, out, cap - 1, NULL, NULL);
+  if (got < 0) {
+    got = 0;
+  }
+  out[got] = '\0';
+  return got;
+}
+
 // ---- IME（W6 线实装 ImmAssociateContext / WM_IME_*，当前为占位：缓冲恒空，
 // MoonBit 侧 pump_ime 读到空即无 preedit/commit，行为与非 Linux 占位一致）----
 
@@ -1307,6 +1510,14 @@ static int wm_icon_slot(void) {
   return 0;
 }
 
+/* 取槽里的真 HICON（越界/空槽给 NULL）。窗口增强（W20e）的 set_icon 也走它。 */
+static HICON wm_icon_get(int slot) {
+  if (slot <= 0 || slot >= WM_MAX_ICONS) {
+    return NULL;
+  }
+  return wm_icons[slot].hicon;
+}
+
 static int wm_icon_store(HICON ic, HBITMAP color, HBITMAP mask) {
   if (ic == NULL) {
     return 0;
@@ -1576,10 +1787,7 @@ int wm_icon_alive(void) {
 
 /* 取槽里的真 HICON（探针反读用；越界/空槽给 NULL）。 */
 void *wm_icon_handle(int slot) {
-  if (slot <= 0 || slot >= WM_MAX_ICONS) {
-    return NULL;
-  }
-  return (void *)wm_icons[slot].hicon;
+  return (void *)wm_icon_get(slot);
 }
 
 /* ---- 原生消息框（W20d）---------------------------------------------------
@@ -2765,6 +2973,73 @@ void *wm_icon_handle(int slot) {
   return NULL;
 }
 
+/* ---- 窗口增强（W20e）GTK 分支占位：GTK 侧对应 gtk_window_set_title /
+ * gtk_window_set_icon / gtk_window_set_geometry_hints（最小尺寸）/
+ * gtk_window_begin_move_drag（自绘标题栏拖拽）/ gtk_window_set_decorated
+ * （无边框），属 Linux 后端内部事务（按新口径不进路线图）；先给可编译的
+ * 空实现，MoonBit 侧调用无害、反读恒 0/false。 */
+void wm_set_title(int64_t id, const char *title) {
+  (void)id;
+  (void)title;
+}
+void wm_set_icon(int64_t id, int icon_slot, int which) {
+  (void)id;
+  (void)icon_slot;
+  (void)which;
+}
+void wm_set_min_size(int64_t id, int wmin, int hmin) {
+  (void)id;
+  (void)wmin;
+  (void)hmin;
+}
+void wm_set_drag_rect(int64_t id, int x, int y, int w, int h) {
+  (void)id;
+  (void)x;
+  (void)y;
+  (void)w;
+  (void)h;
+}
+void wm_set_borderless(int64_t id, int on) {
+  (void)id;
+  (void)on;
+}
+void wm_get_min_size(int64_t id, int32_t *out_w, int32_t *out_h) {
+  (void)id;
+  if (out_w != NULL) {
+    *out_w = 0;
+  }
+  if (out_h != NULL) {
+    *out_h = 0;
+  }
+}
+void wm_get_drag_rect(int64_t id, int32_t *x, int32_t *y, int32_t *w,
+                      int32_t *h) {
+  (void)id;
+  if (x != NULL) {
+    *x = 0;
+  }
+  if (y != NULL) {
+    *y = 0;
+  }
+  if (w != NULL) {
+    *w = 0;
+  }
+  if (h != NULL) {
+    *h = 0;
+  }
+}
+int wm_is_borderless(int64_t id) {
+  (void)id;
+  return 0;
+}
+int wm_window_title(int64_t id, char *out, int cap) {
+  (void)id;
+  if (out != NULL && cap > 0) {
+    out[0] = '\0';
+  }
+  return 0;
+}
+
 /* ---- 原生消息框（W20d）GTK 分支：GtkMessageDialog 跑模态 run()，返回
  * GtkResponseType；MoonBit 侧返回值编号口径与 Win32 对齐（1 OK/2 CANCEL/
  * 3 ABORT/4 RETRY/5 IGNORE/6 YES/7 NO）。uType 里的图标/按钮段由 MoonBit 纯
@@ -3304,6 +3579,69 @@ int wm_icon_alive(void) { return 0; }
 void *wm_icon_handle(int slot) {
   (void)slot;
   return NULL;
+}
+
+/* W20e 窗口增强占位（macOS 等）：空实现 + 反读恒 0。 */
+void wm_set_title(int64_t id, const char *title) {
+  (void)id;
+  (void)title;
+}
+void wm_set_icon(int64_t id, int icon_slot, int which) {
+  (void)id;
+  (void)icon_slot;
+  (void)which;
+}
+void wm_set_min_size(int64_t id, int wmin, int hmin) {
+  (void)id;
+  (void)wmin;
+  (void)hmin;
+}
+void wm_set_drag_rect(int64_t id, int x, int y, int w, int h) {
+  (void)id;
+  (void)x;
+  (void)y;
+  (void)w;
+  (void)h;
+}
+void wm_set_borderless(int64_t id, int on) {
+  (void)id;
+  (void)on;
+}
+void wm_get_min_size(int64_t id, int32_t *out_w, int32_t *out_h) {
+  (void)id;
+  if (out_w != NULL) {
+    *out_w = 0;
+  }
+  if (out_h != NULL) {
+    *out_h = 0;
+  }
+}
+void wm_get_drag_rect(int64_t id, int32_t *x, int32_t *y, int32_t *w,
+                      int32_t *h) {
+  (void)id;
+  if (x != NULL) {
+    *x = 0;
+  }
+  if (y != NULL) {
+    *y = 0;
+  }
+  if (w != NULL) {
+    *w = 0;
+  }
+  if (h != NULL) {
+    *h = 0;
+  }
+}
+int wm_is_borderless(int64_t id) {
+  (void)id;
+  return 0;
+}
+int wm_window_title(int64_t id, char *out, int cap) {
+  (void)id;
+  if (out != NULL && cap > 0) {
+    out[0] = '\0';
+  }
+  return 0;
 }
 
 /* W20d 消息框占位（macOS 等）：返回 0 = 失败，MoonBit 层走语义化降级。

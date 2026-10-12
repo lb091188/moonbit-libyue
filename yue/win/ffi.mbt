@@ -246,3 +246,46 @@ extern "c" fn wm_icon_free(slot : Int) -> Unit = "wm_icon_free"
 
 ///|
 extern "c" fn wm_icon_alive() -> Int = "wm_icon_alive"
+
+///|
+#borrow(title)
+extern "c" fn wm_set_title(id : Int64, title : Bytes) -> Unit = "wm_set_title"
+
+///|
+extern "c" fn wm_set_icon(id : Int64, icon_slot : Int, which : Int) -> Unit = "wm_set_icon"
+
+///|
+extern "c" fn wm_set_min_size(id : Int64, w : Int, h : Int) -> Unit = "wm_set_min_size"
+
+///|
+extern "c" fn wm_set_drag_rect(
+  id : Int64,
+  x : Int,
+  y : Int,
+  w : Int,
+  h : Int,
+) -> Unit = "wm_set_drag_rect"
+
+///|
+extern "c" fn wm_set_borderless(id : Int64, on : Int) -> Unit = "wm_set_borderless"
+
+///|
+#borrow(out_w, out_h)
+extern "c" fn wm_get_min_size(id : Int64, out_w : Ref[Int], out_h : Ref[Int]) -> Unit = "wm_get_min_size"
+
+///|
+#borrow(out_x, out_y, out_w, out_h)
+extern "c" fn wm_get_drag_rect(
+  id : Int64,
+  out_x : Ref[Int],
+  out_y : Ref[Int],
+  out_w : Ref[Int],
+  out_h : Ref[Int],
+) -> Unit = "wm_get_drag_rect"
+
+///|
+extern "c" fn wm_is_borderless(id : Int64) -> Int = "wm_is_borderless"
+
+///|
+#borrow(out)
+extern "c" fn wm_window_title(id : Int64, out : Bytes, cap : Int) -> Int = "wm_window_title"

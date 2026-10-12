@@ -22,3 +22,7 @@ __pycache__/
 # 发布包排除(文件已在版本库,gitignore 只影响未跟踪文件,git 照常跟踪)
 /AGENTS.md
 /TODO.md
+
+# AI 助手工作区记忆(非构建产物,不入库)
+/.workbuddy/
+/.workbuddy-ai/
