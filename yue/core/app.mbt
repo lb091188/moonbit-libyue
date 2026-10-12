@@ -83,6 +83,13 @@ fn install_host_hooks() -> Unit {
       None => None
     }
   })
+  // 拖拽落点在**当前窗**的控件树里找（多窗各自一棵树，投错窗就白投）
+  set_drag_root_provider(fn() -> Widget? {
+    match host_active() {
+      Some(a) => Some(a.root)
+      None => None
+    }
+  })
   let l = host_loop()
   set_timer_hooks(
     fn(ms : Int, f : () -> Unit) -> Int { l.timer(ms, f) },

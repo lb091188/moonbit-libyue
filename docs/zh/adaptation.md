@@ -208,6 +208,19 @@ MoonBit 全链路(shim + MoonBit 运行时)相对 C++ 原生的开销:examples/h
 - **与 `dialog_t` 的关系**：两者共用 `yue/core/overlay.mbt` 的同一套浮层机制（铺满遮罩 / 居中 / 点外收起 / 开层即重排），差在语义面——`dialog_t` 是「内容对话框」（任意内容树 + 确定/取消两个出口），`message_box_t` 是「消息框」（按种类取图标 + informative 副行 + 任意多按钮各带编号）。要做纯内容对话框仍走 `dialog_t`，本批**没有**把两者合并。
 - **回证**：`yue/ui/message_box_wbtest.mbt` 新增 **8 条**（3 条纯函数：五种种类的图标名/取色互异/默认钮编号；5 条运行时：Store 驱动弹收 + 面板居中 + 四区结构 + 按钮回调编号与收起 + ✕/Esc 走 dismiss 而 Enter 走默认钮 + `close_on_mask` 两态 + informative 空则不留副行 + 空文案按钮跳过），用无头控件树 + 手动装的浮层宿主（同 `overlay_wbtest`），**不需要真窗口**。`moon test ./yue/ui` **118/118**（原 110）。示例 `examples/native-app` 新增自绘消息框区块（信息/警告/错误三个按钮各驱动一个消息框）与退出状态行 `NATIVE-APP-MSGBOX2 shots=… last=… ovl=…`（`ovl=` 是运行中浮层数的末次快照，理由同 W20c 的退出读数坑）；真机冒烟 `exit 0`、`NATIVE-APP-MSGBOX2 shots=0 last=- ovl=0 native_ovl=0`（未点按钮故未弹）。`moon check ./yue/ui ./examples/native-app --deny-warn` 零警告，全仓红点 **287/68** 持平。
 
+### MoonBit 原生 GUI 栈 · 拖放门面（W21c：`yue/core/drag.mbt` 会话模型 + `@ui.drag_source`/`drop_target`）
+
+- **应用内拖放全自绘、三平台同构**：旧链路的拖源/投放是**平台回调**（GTK `gtk_drag_*` / Win32 `IDropTarget`），还要分别注册 enter/update/leave 三件；本栈的**应用内**拖放不碰任何平台接口——会话模型在 `yue/core/drag.mbt`（进程级），声明式两个钩子在 `yue/ui/drag.mbt`。**跨应用**的系统级拖放（拖出窗口 / 接系统文件）仍随平台批，门面接口形状已定，后端接上后 UI 侧不用改。
+- **载荷是自有类型，不是平台图像类型**：`DragData{Text,Html,Paths,Img}`；`Img` 存**原始 PNG 字节**而非平台图像句柄——模型层不带平台类型，才能跨后端/跨进程传。`DataKind{Text,Html,Image,FilePaths}` 各给一个稳定编号（1/2/3/4），`drag_encode`/`drag_decode` 编成 `[kind:i32 LE][payload]`（`Paths` 用 `\n` 连接）——这是将来跨进程/跨后端传载荷的稳定 ABI。
+- **会话是进程级单例，落点按窗口坐标算**：同一时刻只允许一个拖拽在跑（`drag_current`）。落点由 `Widget::drop_target_at` 从后往前找**最深**带 `on_drop` 的可见控件；悬停高亮由绘制方读 `@core.drag_hover()` 自判——**省掉 enter/update/leave 三个回调**，也就没有「离开回调漏发」的态同步问题（旧链路的老毛病）。
+- **按下捕获的语义差异（本批踩到，务必分清）**：`route_pointer` 在 `Down` 记下的 captured id 是命中链上**最深**的控件（与 Web `pointerdown` 的 target 同义）；拖源包装层的 `on_pointer` 是靠**冒泡**收到事件的（内容件自己不处理指针，就往上传）。因此 `@core.drag_source()` 记的是**包装层** id，而捕获 id 是**内容控件** id——测试断言要按这个区分（曾误写成断言等于包装层 id）。
+- **拖源内容里别放按钮**：指针事件**最深优先**，内容里的交互控件会先把按下吃掉，那样就拖不动它。拖源里放展示件（文本/图标/缩略图）即可。**这是使用约束，不是 bug**。
+- **`payload()` 惰性求值**：只有**过了阈值**（默认 4px）才调 `payload()` 取数据开拖；没过阈值按普通点击放行——内容里的选择/点击不受影响。`payload()` 返回 `None` 时这一拖不成立，也退回普通按下。
+- **给值类型 `derive(Eq)` 会触发 `implicit_impl_as_method` 告警**（本批的编译期坑）：正确形态是手写 `pub impl Eq for DataKind with fn equal(self, other) -> Bool` + `pub extend DataKind with Eq::{not_equal, equal}`。注意实现函数名是 **`fn equal`**（首次写成 `op_equal` 编译器报 `no method op_equal in trait Eq`）。`DragData` 因含 `Bytes`/`Array` 没有走 `Eq`（也没实现 `Debug`），测试观测一律走字符串/编号。
+- 另一个实现坑（记档）：`Bytes` 没有 `op_set`，`raw[4:...]` 给的是 `BytesView` 不能直接切——拼字节用 `FixedArray::make` + `Bytes::from_array`；`split("\n")` 得 `Iter[StringView]`，要 `.map(fn(s){ s.to_owned() })` 才是 `Array[String]`。
+- **回证**：`yue/core/drag_wbtest.mbt` **6 条**（编号往返、`DragData::kind`/`as_text`、编解码往返与坏输入、`drop_target_at` 最深命中、会话 `begin→move→drop`、无落点/拒绝/`cancel`、无根时落点恒无）；`yue/ui/drag_wbtest.mbt` **4 条**（按下→过阈值开拖→移到目标→松手投递、没过阈值当普通点击/投空白处不投递、`accept` 拒绝时回调不跑、`payload` 给 `None` 不产生会话），全走宿主的 `@core.route_pointer`（含按下捕获），**不需要真窗口**。`moon test ./yue/core` **115/115**、`moon test ./yue/ui` **122/122**。示例 `examples/native-app` 新增拖放区块（两个拖源「文本载荷 / 路径载荷」+ 两个落点「全收 / 只收路径」）与退出状态行 `NATIVE-APP-DRAG drags=… drops=… active=… last=…`；真机冒烟 `exit 0`、`NATIVE-APP-DRAG drags=0 drops=0 active=0 last=-`（未拖故计数为 0）。`moon check ./yue/core ./yue/ui ./examples/native-app --deny-warn` 零警告，全仓红点 **287/68** 持平。
+- **本批未做且不假装完成**：跨应用系统级拖放（拖出窗口/接系统文件，随平台批）、拖拽视觉反馈（跟随指针的 ghost 缩略图——现在只描落点高亮）、macOS 后端、拖拽的真机观感（归 `_人工测试清单.md`）。
+
 ### 声明式层与自绘组件
 
 - mouse 回调内禁止 `set_background_color`:运行期 CSS 改写会吞掉紧随的首次 press(「点两次才生效」)。交互态(hover / 按下)一律 on_draw 表达;set_background_color 只用于挂载期与主题订阅回调。

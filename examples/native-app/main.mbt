@@ -1322,6 +1322,98 @@ fn make_notify_section(
 }
 
 ///|
+/// W21c 拖放区块：两个拖源（文本载荷 / 路径载荷）＋两个落点（全收 / 只收路径）。
+/// 全自绘、**应用内**拖放，不碰任何平台接口——按下后拖过 4px 阈值才算拖，悬停
+/// 时落点描主题主色，松手投递给落点；`accept` 判为拒的落点回调不跑。退出状态行
+/// 报起的拖拽次数、投中次数与最近一次投递的载荷描述（真人交互时才对得上数）。
+fn make_drag_section(
+  drags : Ref[Int],
+  drops : Ref[Int],
+  last : Ref[String],
+) -> @core.Node {
+  let describe = fn(d : @core.DragData) -> String {
+    match d {
+      @core.DragData::Text(t) => "文本(" + t + ")"
+      @core.DragData::Html(_) => "HTML"
+      @core.DragData::Paths(ps) => "路径×" + ps.length().to_string()
+      @core.DragData::Img(bs) => "图片 " + bs.length().to_string() + "B"
+    }
+  }
+  // 拖源/落点的可见内容用「带底色的小盒 + 文案」——拖源里放展示件即可，别放按钮
+  // （按钮会先把按下吃掉，拖不动它，见 `yue/ui/drag.mbt` 的约束）
+  let chip = fn(text : String, bgv : String) -> @core.Node {
+    @ui.container(
+      [@ui.label(text, size=12.0)],
+      padding=8.0,
+      bg=bgv,
+      border=@theme.theme_border(),
+    )
+  }
+  let src_text = @ui.drag_source(
+    chip("拖我（文本载荷）", @theme.theme_bg_panel()),
+    payload=fn() -> @core.DragData? {
+      drags.val = drags.val + 1
+      Some(@core.DragData::Text("拖源文本"))
+    },
+  )
+  let src_paths = @ui.drag_source(
+    chip("拖我（路径载荷）", @theme.theme_bg_panel()),
+    payload=fn() -> @core.DragData? {
+      drags.val = drags.val + 1
+      Some(@core.DragData::Paths(["C:/tmp/a.txt", "C:/tmp/b.txt"]))
+    },
+  )
+  let tgt_all = @ui.drop_target(
+    chip("投这里（全收）", @theme.theme_bg_page()),
+    on_drop=fn(d : @core.DragData, _x : Double, _y : Double) -> Unit {
+      drops.val = drops.val + 1
+      last.val = "全收 ← " + describe(d)
+    },
+  )
+  let tgt_paths = @ui.drop_target(
+    chip("投这里（只收路径）", @theme.theme_bg_page()),
+    accept=fn(d : @core.DragData) -> Bool { d.kind() == @core.FilePaths },
+    on_drop=fn(d : @core.DragData, _x : Double, _y : Double) -> Unit {
+      drops.val = drops.val + 1
+      last.val = "只收路径 ← " + describe(d)
+    },
+  )
+  @ui.container(
+    [
+      @ui.label(
+        "拖放（W21c）：应用内拖放全自绘、三平台同构；拖过 4px 才开拖，悬停落点描主色，松手投递（「只收路径」的落点会拒文本）",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [src_text, src_paths, tgt_all, tgt_paths],
+        column_gap=12.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+      @core.node_of(live_counter(
+        fn() -> String {
+          "起拖=" +
+          drags.val.to_string() +
+          " 投中=" +
+          drops.val.to_string() +
+          " 拖拽中=" +
+          (if @core.drag_active() { "1" } else { "0" }) +
+          " 悬停=" +
+          @core.drag_hover().to_string() +
+          " 最近=" +
+          last.val
+        },
+        width=460.0,
+      )),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 交互图表区块：折线/柱状/环形三个交互版并排——hover 浮层、图例点击显隐、
 /// 滚轮缩放（折线与柱状共用调用方持有的 CiZoom，退出状态行报窗口读数；
 /// 环形无缩放）。
@@ -2246,6 +2338,13 @@ fn main {
   let notify_icon : Ref[@win.Icon?] = Ref(None)
   let notify_snap : Ref[String] = Ref("-")
   app.mount([make_notify_section(nid, notify_sends, notify_note, notify_icon)])
+  // W21c（拖放）：两个拖源 + 两个落点。全自绘、应用内拖放，拖源/落点都只是普通
+  // 控件树节点，指针路由由宿主一并处理——不需要任何平台接口（跨应用系统级拖放
+  // 随平台批，接口形状已定）。
+  let drag_drags = Ref(0)
+  let drag_drops = Ref(0)
+  let drag_last : Ref[String] = Ref("-")
+  app.mount([make_drag_section(drag_drags, drag_drops, drag_last)])
   let ch_lin = @core.Store::new([])
   let ch_pushes = Ref(0)
   let ch_btn_w : Ref[@core.Widget?] = Ref(None)
@@ -3308,5 +3407,17 @@ fn main {
     Some(ic) => ic.free()
     None => ()
   }
+  // W21c（拖放）回证：起的拖拽次数、投中次数、退出时是否还有拖拽在跑、最近一次
+  // 投递的载荷描述（应用内拖放全自绘，真人拖一把数才对得上）。
+  println(
+    "NATIVE-APP-DRAG drags=" +
+    drag_drags.val.to_string() +
+    " drops=" +
+    drag_drops.val.to_string() +
+    " active=" +
+    (if @core.drag_active() { "1" } else { "0" }) +
+    " last=" +
+    drag_last.val,
+  )
   app.shutdown()
 }

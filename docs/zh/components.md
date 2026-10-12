@@ -781,6 +781,17 @@ pop.show_relative_to(anchor_view)
 | set_style(k, v) / set_style_str(k, v) | 布局样式（运行期底层原语） |
 | 拖拽注册与拖放回调 | 拖放（接收方必须注册 handle_drag_update 返回允许的操作位，缺省一律拒绝；发起方 do_drag_file_paths / do_drag_data_full 须在 on_mouse_down 回调内调用才生效；演示见 components「窗口」页） |
 
+> **新栈（MoonBit 原生 GUI 栈）口径**（自 W21c）：上表最后一行是旧链的平台级拖放（GTK `gtk_drag_*` / Win32 `IDropTarget`，enter/update/leave 三回调 + 操作位协商）。新栈的**应用内**拖放不碰平台接口，改用 `yue/core/drag.mbt` 的会话模型 + `yue/ui/drag.mbt` 的两个声明式钩子：
+>
+> | 旧链 | 新栈 | 说明 |
+> |---|---|---|
+> | `do_drag_file_paths` / `do_drag_data_full`（须在 on_mouse_down 内） | `drag_source(content, payload=f)` | 包住内容即为拖源；按下后拖过阈值（默认 4px）才调 `payload()` 取数据；`payload()` 返 `None` 则该拖不成立（当普通点击） |
+> | `handle_drag_update`（返回允许操作位） | `drop_target(content, accept=f, on_drop=f)` | 包住内容即为落点；`accept` 判收不收（默认全收），收则调 `on_drop(data, x, y)` |
+> | drag-enter / drag-update / drag-leave 三回调 | `@core.drag_hover()` | 悬停高亮由绘制方读会话态自判——三回调收成一个，无「离开回调漏发」的态 |
+> | `DragData`（平台数据类型） | `@core.DragData{Text,Html,Paths,Img}` | 自有载荷类型（`Img` 存原始 PNG 字节，不带平台图像类型）；`drag_encode`/`drag_decode` 是可跨进程/跨后端的稳定 ABI |
+>
+> **两条使用约束**：①拖源内容里**别放按钮**（指针事件最深优先，交互控件会先把按下吃掉，拖不动它）；②应用内拖放的落点按**窗口坐标**算，拖源/落点在同一窗口内。**跨应用**系统级拖放仍随平台批。
+
 事件载荷字段：
 
 | 结构 | 字段 |

@@ -122,6 +122,12 @@ pub(all) struct Widget {
   /// 4 纵向调整）。全自绘栈没有原生控件，形状由宿主按命中路径下发：取悬停路径上
   /// **最深的那个非零请求**，所以包住一整组的 `cursor_group` 会自然回退生效。
   mut cursor : Int
+  /// 拖源载荷（W21c）：给 Some 即「本控件可拖出」，按下拖过阈值后调它取数据；
+  /// 给 None（返回 None 同理）表示这一拖不成立。
+  mut drag_payload : Option[() -> DragData?]
+  /// 投放回调（W21c）：拖拽松手且本控件是**最深命中者**时调用，返回是否接受。
+  /// 悬停高亮不靠回调：绘制方读 `@core.drag_hover() == self.id` 自判（见 drag.mbt）。
+  mut on_drop : Option[(DragData, Double, Double) -> Bool]
 }
 
 ///|
@@ -150,6 +156,8 @@ pub fn Widget::new() -> Widget {
     im_cursor: None,
     focus_id: 0,
     cursor: 0,
+    drag_payload: None,
+    on_drop: None,
   }
 }
 

@@ -787,6 +787,17 @@ All widgets (`ViewLike`) support:
 | set_style(k, v) / set_style_str(k, v) | Layout styles (runtime primitives) |
 | Drag registration and drop callbacks | Drag and drop (receivers must also register handle_drag_update returning allowed operations; without it every drag is rejected; the initiator's do_drag_file_paths / do_drag_data_full must be called inside the on_mouse_down callback to take effect; demo in the components example, "Windows & Web" page) |
 
+> **New-stack (MoonBit native GUI stack) mapping** (since W21c): the last row above is the old stack's platform-level drag and drop (GTK `gtk_drag_*` / Win32 `IDropTarget`, an enter/update/leave trio plus operation-bit negotiation). The new stack's **in-app** drag and drop touches no platform interface, using the session model in `yue/core/drag.mbt` plus the two declarative hooks in `yue/ui/drag.mbt`:
+>
+> | Old stack | New stack | Notes |
+> |---|---|---|
+> | `do_drag_file_paths` / `do_drag_data_full` (must be inside on_mouse_down) | `drag_source(content, payload=f)` | Wrapping content makes it a drag source; `payload()` is called only after the threshold (4px by default) is crossed; returning `None` cancels the drag (treated as an ordinary click) |
+> | `handle_drag_update` (returns allowed operation bits) | `drop_target(content, accept=f, on_drop=f)` | Wrapping content makes it a drop target; `accept` decides whether to accept (all by default) and, if so, `on_drop(data, x, y)` runs |
+> | drag-enter / drag-update / drag-leave trio | `@core.drag_hover()` | The hover highlight is drawn by reading the session state — three callbacks collapse into one, with no "missed leave callback" state |
+> | `DragData` (platform data type) | `@core.DragData{Text,Html,Paths,Img}` | Our own payload type (`Img` holds raw PNG bytes, no platform image type); `drag_encode`/`drag_decode` are a stable cross-process/cross-backend ABI |
+>
+> **Two usage constraints**: (1) do **not** put buttons inside a drag source (pointer events go deepest-first, so an interactive child swallows the press and it will not drag); (2) in-app drop targets are resolved in **window coordinates**, so source and target share one window. **Cross-application** system-level drag still ships with the platform batch.
+
 Event payload fields:
 
 | Struct | Fields |
