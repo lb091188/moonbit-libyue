@@ -105,12 +105,13 @@ fn main {
               @ui.scroll_v(
                 [
                   @ui.side_menu_sections(
-                    [("组件", ["基础组件", "表单组件", "导航组件", "反馈组件"])],
+                    [("组件", ["基础组件", "表单组件", "导航组件", "数据展示", "反馈组件"])],
                     selected,
                     icons=[
                       ("基础组件", @icons.Appstore),
                       ("表单组件", @icons.Edit1),
                       ("导航组件", @icons.Compass),
+                      ("数据展示", @icons.Chart),
                       ("反馈组件", @icons.ChatRound),
                     ],
                     width=180.0,
@@ -136,6 +137,7 @@ fn main {
               @shared.nav_page("基础组件", selected, @pages.page_basic(app)),
               @shared.nav_page("表单组件", selected, @pages.page_form(app)),
               @shared.nav_page("导航组件", selected, @pages.page_nav(app)),
+              @shared.nav_page("数据展示", selected, @pages.page_data(app)),
               @shared.nav_page("反馈组件", selected, @pages.page_feedback(app)),
               // 对话框挂窗口根：锚点自己是 0 尺寸占位，可见性只由 Store 驱动
               @ui.dialog_t(
@@ -198,7 +200,7 @@ fn main {
       return
     }
     Some(host) => {
-      println("SHOWCASE-READY title=\{SHOWCASE_TITLE} pages=4 follow=1")
+      println("SHOWCASE-READY title=\{SHOWCASE_TITLE} pages=5 follow=1")
       host.run()
     }
   }

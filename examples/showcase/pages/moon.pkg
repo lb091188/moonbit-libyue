@@ -3,6 +3,7 @@
 import {
   "NoahLiu/yoga-mbt/src" @yoga,
   "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/text" @text,
   "NoahLiu/native-gui/ui",
   "NoahLiu/native-gui/examples/showcase/shared",
 }
