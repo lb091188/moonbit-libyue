@@ -38,6 +38,9 @@
 #endif
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+// WIN32_LEAN_AND_MEAN 会把 shellapi.h 一并裁掉，而托盘（W20c）要的
+// Shell_NotifyIconW / NOTIFYICONDATAW / NIM_* / NIF_* 全在它里面，必须显式引。
+#include <shellapi.h>
 #include <imm.h> // IME 纯通道（W6）：ImmGetContext/ImmSet*Window/ImmNotifyIME
 #include <stdint.h>
 #include <string.h>
@@ -1139,6 +1142,279 @@ int wm_window_title(int64_t id, char *out, int cap) {
   return got;
 }
 
+/* ---- 系统托盘（W20c）-----------------------------------------------------
+ * 托盘 = Shell 通知图标，形态是「一个 HWND + 一个 uID」。本侧自建隐藏消息窗
+ * wm_tray_hwnd 承接回调：Shell_NotifyIconW 把鼠标消息投给该窗的
+ * uCallbackMessage（WM_TRAY_CB），wParam=uID（= 本表槽号）、lParam=鼠标消息。
+ * 与菜单/热键同制：C 不回调 MoonBit，命中压进程级队列，MoonBit 泵里
+ * wm_tray_poll 抽。右键菜单复用 W20a 的 HMENU 句柄表（wm_menu_popup_new 建
+ * 弹出菜单根），弹出走 wm_tray_popup：TrackPopupMenuEx 带 TPM_RETURNCMD，
+ * 选中项直接拿到命令 id 压进 wm_menu_push——于是 yue/core 的菜单回调表照常
+ * 生效，托盘菜单与窗口菜单共用同一套回调派发。
+ * 图标句柄归 W20f 的表（wm_icon_get），本表只引用，不释放。 */
+
+#define WM_MAX_TRAYS 8
+#define WM_TRAY_CB (WM_APP + 2) // 托盘回调消息（waker 占 WM_APP+1）
+// 托盘事件队列容量（环形；满了丢最旧）。事件编码 slot*4+kind。
+// kind：0 = 左键单击、1 = 右键单击。
+#define WM_TRAY_EV_MAX 32
+
+typedef struct {
+  int used;
+  HICON icon;      // 当前图标（引用 W20f 句柄表的 HICON，本侧不释放）
+  HMENU menu;      // 右键菜单（wm_menus 表里的 HMENU，NULL = 无）
+  WCHAR tip[128];  // tooltip（反读用）
+} WmTray;
+
+static WmTray wm_trays[WM_MAX_TRAYS]; // 槽 0 未用，句柄 = 槽号（1 起）
+static HWND wm_tray_hwnd = NULL;
+static int wm_tray_events[WM_TRAY_EV_MAX];
+static int wm_tray_ev_head = 0;
+static int wm_tray_ev_count = 0;
+
+static void wm_tray_push(int slot, int kind) {
+  if (wm_tray_ev_count >= WM_TRAY_EV_MAX) {
+    wm_tray_ev_head = (wm_tray_ev_head + 1) % WM_TRAY_EV_MAX;
+    wm_tray_ev_count--;
+  }
+  wm_tray_events[(wm_tray_ev_head + wm_tray_ev_count) % WM_TRAY_EV_MAX] =
+      slot * 4 + kind;
+  wm_tray_ev_count++;
+}
+
+static LRESULT CALLBACK wm_tray_wndproc(HWND hwnd, UINT msg, WPARAM wp,
+                                        LPARAM lp) {
+  if (msg == WM_TRAY_CB) {
+    int slot = (int)wp;
+    int m = (int)lp;
+    if (slot > 0 && slot < WM_MAX_TRAYS && wm_trays[slot].used) {
+      if (m == WM_LBUTTONUP || m == WM_LBUTTONDBLCLK) {
+        wm_tray_push(slot, 0);
+      } else if (m == WM_RBUTTONUP) {
+        wm_tray_push(slot, 1);
+      }
+    }
+    return 0;
+  }
+  if (msg == WM_COMMAND) {
+    // 菜单命令（含 TrackPopupMenuEx 未用 TPM_RETURNCMD 时的回退路径）：
+    // 转发进菜单队列，与窗口菜单同一条派发链。
+    int cmd = (int)LOWORD(wp);
+    if (cmd >= WM_MENU_CMD_BASE && cmd < WM_MENU_CMD_BASE + WM_MENU_CMD_MAX) {
+      wm_menu_push(cmd);
+    }
+    return 0;
+  }
+  return DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+/* 惰性建托盘消息窗 + 注册其窗口类（幂等；wm_init 之后调用）。 */
+static int wm_tray_ensure(void) {
+  if (wm_tray_hwnd != NULL) {
+    return 1;
+  }
+  HINSTANCE inst = GetModuleHandleW(NULL);
+  WNDCLASSEXW wc;
+  memset(&wc, 0, sizeof(wc));
+  wc.cbSize = sizeof(wc);
+  wc.lpfnWndProc = wm_tray_wndproc;
+  wc.hInstance = inst;
+  wc.lpszClassName = L"yue_wm_tray";
+  if (RegisterClassExW(&wc) == 0 &&
+      GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+    return 0;
+  }
+  wm_tray_hwnd = CreateWindowExW(0, L"yue_wm_tray", L"", 0, 0, 0, 0, 0,
+                                 HWND_MESSAGE, NULL, inst, NULL);
+  return wm_tray_hwnd != NULL;
+}
+
+/* 托盘后端是否可用（Win32 上 Shell_NotifyIcon 恒在，实质是「消息窗建得出否」）。 */
+int wm_tray_supported(void) { return wm_tray_ensure(); }
+
+/* 建托盘图标：icon_slot 是 W20f 的图标句柄（0 = 无图标），tip 为 UTF-8。
+ * 返回槽号（>=1）或 0（表满/NIM_ADD 失败）。NIM_ADD 失败不占槽。 */
+int wm_tray_new(int icon_slot, const char *tip) {
+  if (!wm_tray_ensure()) {
+    return 0;
+  }
+  int slot = -1;
+  for (int i = 1; i < WM_MAX_TRAYS; i++) {
+    if (!wm_trays[i].used) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    return 0;
+  }
+  NOTIFYICONDATAW nid;
+  memset(&nid, 0, sizeof(nid));
+  nid.cbSize = sizeof(nid);
+  nid.hWnd = wm_tray_hwnd;
+  nid.uID = (UINT)slot;
+  nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+  nid.uCallbackMessage = WM_TRAY_CB;
+  nid.hIcon = wm_icon_get(icon_slot);
+  WCHAR *wtip = wm_utf8_to_wide(tip);
+  if (wtip != NULL) {
+    wcsncpy_s(nid.szTip, 128, wtip, _TRUNCATE);
+    free(wtip);
+  }
+  if (!Shell_NotifyIconW(NIM_ADD, &nid)) {
+    return 0;
+  }
+  wm_trays[slot].used = 1;
+  wm_trays[slot].icon = nid.hIcon;
+  wm_trays[slot].menu = NULL;
+  memcpy(wm_trays[slot].tip, nid.szTip, sizeof(nid.szTip));
+  return slot;
+}
+
+/* 改 tooltip（NIM_MODIFY）。 */
+void wm_tray_set_tooltip(int slot, const char *tip) {
+  if (slot <= 0 || slot >= WM_MAX_TRAYS || !wm_trays[slot].used ||
+      wm_tray_hwnd == NULL) {
+    return;
+  }
+  NOTIFYICONDATAW nid;
+  memset(&nid, 0, sizeof(nid));
+  nid.cbSize = sizeof(nid);
+  nid.hWnd = wm_tray_hwnd;
+  nid.uID = (UINT)slot;
+  nid.uFlags = NIF_TIP;
+  WCHAR *wtip = wm_utf8_to_wide(tip);
+  if (wtip != NULL) {
+    wcsncpy_s(nid.szTip, 128, wtip, _TRUNCATE);
+    free(wtip);
+  }
+  if (Shell_NotifyIconW(NIM_MODIFY, &nid)) {
+    memcpy(wm_trays[slot].tip, nid.szTip, sizeof(nid.szTip));
+  }
+}
+
+/* 换图标（NIM_MODIFY；icon_slot 是 W20f 句柄，0 = 清空图标）。 */
+void wm_tray_set_icon(int slot, int icon_slot) {
+  if (slot <= 0 || slot >= WM_MAX_TRAYS || !wm_trays[slot].used ||
+      wm_tray_hwnd == NULL) {
+    return;
+  }
+  HICON ic = wm_icon_get(icon_slot);
+  NOTIFYICONDATAW nid;
+  memset(&nid, 0, sizeof(nid));
+  nid.cbSize = sizeof(nid);
+  nid.hWnd = wm_tray_hwnd;
+  nid.uID = (UINT)slot;
+  nid.uFlags = NIF_ICON;
+  nid.hIcon = ic;
+  if (Shell_NotifyIconW(NIM_MODIFY, &nid)) {
+    wm_trays[slot].icon = ic;
+  }
+}
+
+/* 挂右键菜单：menu_handle 是 W20a 句柄表下标（wm_menu_popup_new 建的弹出根）。 */
+void wm_tray_set_menu(int slot, int menu_handle) {
+  if (slot <= 0 || slot >= WM_MAX_TRAYS || !wm_trays[slot].used) {
+    return;
+  }
+  HMENU m = NULL;
+  if (menu_handle > 0 && menu_handle < WM_MAX_MENUS) {
+    m = wm_menus[menu_handle];
+  }
+  wm_trays[slot].menu = m;
+}
+
+/* 在光标处弹出右键菜单（TrackPopupMenuEx 阻塞到选中/取消）。选中项的命令 id
+ * 压进 wm_menu_push 并返回 1；取消/无菜单返回 0。 */
+int wm_tray_popup(int slot) {
+  if (slot <= 0 || slot >= WM_MAX_TRAYS || !wm_trays[slot].used ||
+      wm_tray_hwnd == NULL) {
+    return 0;
+  }
+  HMENU m = wm_trays[slot].menu;
+  if (m == NULL) {
+    return 0;
+  }
+  POINT p;
+  GetCursorPos(&p);
+  // 微软约定：弹菜单前把 owner 设前台，弹完 PostMessage(WM_NULL) 收尾，
+  // 否则菜单可能不消失（焦点不还给别的窗口）。
+  SetForegroundWindow(wm_tray_hwnd);
+  int cmd = (int)TrackPopupMenuEx(
+      m, TPM_RIGHTBUTTON | TPM_RETURNCMD | TPM_NONOTIFY, p.x, p.y,
+      wm_tray_hwnd, NULL);
+  PostMessageW(wm_tray_hwnd, WM_NULL, 0, 0);
+  if (cmd >= WM_MENU_CMD_BASE && cmd < WM_MENU_CMD_BASE + WM_MENU_CMD_MAX) {
+    wm_menu_push(cmd);
+    return 1;
+  }
+  return 0;
+}
+
+/* 移除托盘图标（NIM_DELETE，幂等）。 */
+void wm_tray_remove(int slot) {
+  if (slot <= 0 || slot >= WM_MAX_TRAYS || !wm_trays[slot].used) {
+    return;
+  }
+  if (wm_tray_hwnd != NULL) {
+    NOTIFYICONDATAW nid;
+    memset(&nid, 0, sizeof(nid));
+    nid.cbSize = sizeof(nid);
+    nid.hWnd = wm_tray_hwnd;
+    nid.uID = (UINT)slot;
+    Shell_NotifyIconW(NIM_DELETE, &nid);
+  }
+  wm_trays[slot].used = 0;
+  wm_trays[slot].icon = NULL;
+  wm_trays[slot].menu = NULL;
+  wm_trays[slot].tip[0] = L'\0';
+}
+
+/* 取一个待处理托盘事件：out_slot 收槽号、out_kind 收 0 左键 / 1 右键，
+ * 返回 1 = 取到、0 = 队列空。宿主每拍调一次。 */
+int wm_tray_poll(int32_t *out_slot, int32_t *out_kind) {
+  if (wm_tray_ev_count <= 0) {
+    return 0;
+  }
+  int ev = wm_tray_events[wm_tray_ev_head];
+  wm_tray_ev_head = (wm_tray_ev_head + 1) % WM_TRAY_EV_MAX;
+  wm_tray_ev_count--;
+  if (out_slot != NULL) {
+    *out_slot = ev / 4;
+  }
+  if (out_kind != NULL) {
+    *out_kind = ev % 4;
+  }
+  return 1;
+}
+
+/* 反读：在用托盘槽数（探针/测试用）。 */
+int wm_tray_count(void) {
+  int n = 0;
+  for (int i = 1; i < WM_MAX_TRAYS; i++) {
+    if (wm_trays[i].used) {
+      n++;
+    }
+  }
+  return n;
+}
+
+/* 反读：托盘 tooltip 写进调用方缓冲（UTF-8，返回字节数）。 */
+int wm_tray_tooltip(int slot, char *out, int cap) {
+  if (slot <= 0 || slot >= WM_MAX_TRAYS || !wm_trays[slot].used ||
+      out == NULL || cap <= 1) {
+    return 0;
+  }
+  int n = WideCharToMultiByte(CP_UTF8, 0, wm_trays[slot].tip, -1, out, cap - 1,
+                              NULL, NULL);
+  if (n <= 0) {
+    out[0] = '\0';
+    return 0;
+  }
+  out[n] = '\0';
+  return n - 1; // 不计结尾 NUL
+}
+
 // ---- IME（W6 线实装 ImmAssociateContext / WM_IME_*，当前为占位：缓冲恒空，
 // MoonBit 侧 pump_ime 读到空即无 preedit/commit，行为与非 Linux 占位一致）----
 
@@ -1351,6 +1627,27 @@ int wm_menu_bar_new(void) {
     return 0;
   }
   HMENU h = CreateMenu();
+  if (h == NULL) {
+    return 0;
+  }
+  wm_menus[slot] = h;
+  return slot;
+}
+
+/* 建一个弹出菜单根（W20c 托盘右键菜单用；与菜单条同表、同句柄口径）。
+ * 与 wm_menu_bar_new 的唯一差别是 CreatePopupMenu 而非 CreateMenu。 */
+int wm_menu_popup_new(void) {
+  int slot = -1;
+  for (int i = 1; i < WM_MAX_MENUS; i++) {
+    if (wm_menus[i] == NULL) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    return 0;
+  }
+  HMENU h = CreatePopupMenu();
   if (h == NULL) {
     return 0;
   }
@@ -3040,6 +3337,48 @@ int wm_window_title(int64_t id, char *out, int cap) {
   return 0;
 }
 
+/* ---- 系统托盘（W20c）GTK 分支占位：Linux 的托盘走纯 MoonBit 的 SNI 协议栈
+ * （yue/dbus/sni.mbt，会话总线直连面板），不经 GTK 的 GtkStatusIcon（GTK3 里
+ * 已弃用且面板不认）。这里给可编译的失败桩：supported 恒 0、建项恒 0，让
+ * 门面走「SNI 优先、回退原生」里的原生分支判不可用，最终 user 拿到 SNI。 */
+int wm_tray_supported(void) { return 0; }
+int wm_tray_new(int icon_slot, const char *tip) {
+  (void)icon_slot;
+  (void)tip;
+  return 0;
+}
+void wm_tray_set_tooltip(int slot, const char *tip) {
+  (void)slot;
+  (void)tip;
+}
+void wm_tray_set_icon(int slot, int icon_slot) {
+  (void)slot;
+  (void)icon_slot;
+}
+void wm_tray_set_menu(int slot, int menu_handle) {
+  (void)slot;
+  (void)menu_handle;
+}
+int wm_tray_popup(int slot) {
+  (void)slot;
+  return 0;
+}
+void wm_tray_remove(int slot) { (void)slot; }
+int wm_tray_poll(int32_t *out_slot, int32_t *out_kind) {
+  (void)out_slot;
+  (void)out_kind;
+  return 0;
+}
+int wm_tray_count(void) { return 0; }
+int wm_tray_tooltip(int slot, char *out, int cap) {
+  (void)slot;
+  if (out != NULL && cap > 0) {
+    out[0] = '\0';
+  }
+  return 0;
+}
+int wm_menu_popup_new(void) { return 0; }
+
 /* ---- 原生消息框（W20d）GTK 分支：GtkMessageDialog 跑模态 run()，返回
  * GtkResponseType；MoonBit 侧返回值编号口径与 Win32 对齐（1 OK/2 CANCEL/
  * 3 ABORT/4 RETRY/5 IGNORE/6 YES/7 NO）。uType 里的图标/按钮段由 MoonBit 纯
@@ -3643,6 +3982,47 @@ int wm_window_title(int64_t id, char *out, int cap) {
   }
   return 0;
 }
+
+/* W20c 托盘占位（macOS 等）：supported 恒 0、建项恒 0 = 不可用，MoonBit 层
+ * 走语义化降级（macOS 原生档是 NSStatusItem，ObjectC++ 单独 TU，将来随 mac
+ * 平台批补）。 */
+int wm_tray_supported(void) { return 0; }
+int wm_tray_new(int icon_slot, const char *tip) {
+  (void)icon_slot;
+  (void)tip;
+  return 0;
+}
+void wm_tray_set_tooltip(int slot, const char *tip) {
+  (void)slot;
+  (void)tip;
+}
+void wm_tray_set_icon(int slot, int icon_slot) {
+  (void)slot;
+  (void)icon_slot;
+}
+void wm_tray_set_menu(int slot, int menu_handle) {
+  (void)slot;
+  (void)menu_handle;
+}
+int wm_tray_popup(int slot) {
+  (void)slot;
+  return 0;
+}
+void wm_tray_remove(int slot) { (void)slot; }
+int wm_tray_poll(int32_t *out_slot, int32_t *out_kind) {
+  (void)out_slot;
+  (void)out_kind;
+  return 0;
+}
+int wm_tray_count(void) { return 0; }
+int wm_tray_tooltip(int slot, char *out, int cap) {
+  (void)slot;
+  if (out != NULL && cap > 0) {
+    out[0] = '\0';
+  }
+  return 0;
+}
+int wm_menu_popup_new(void) { return 0; }
 
 /* W20d 消息框占位（macOS 等）：返回 0 = 失败，MoonBit 层走语义化降级。
  * macOS 原生档是 NSAlert（ObjectC++ 单独 TU，将来随 mac 平台批补）。*/

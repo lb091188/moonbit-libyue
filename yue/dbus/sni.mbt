@@ -47,6 +47,46 @@ fn Item::emit_context_menu(self : Item, x : Double, y : Double) -> Unit {
 }
 
 ///|
+/// SNI 托盘后端是否**真正可用**：会话总线可连 **且** 面板侧的
+/// org.kde.StatusNotifierWatcher 在线（`NameHasOwner`）。与 `sni_available()`
+/// 的差别是后者只看「连得上总线」这个候选条件；本函数是托盘门面
+/// `yue/core/tray.mbt` 的 `Tray::is_supported()` 用的判据——纯净 GNOME 未装
+/// AppIndicator 扩展时总线连得上但 watcher 不在线，托盘实际不可用。非 Linux
+/// 平台 dbus 桩全失败，恒 false。探到即把会话连接缓存进 `g_conn`。
+pub fn sni_watcher_present() -> Bool {
+  let c = match g_conn.val {
+    Some(c) => c
+    None =>
+      match connect_session() {
+        Ok(c) => {
+          g_conn.val = Some(c)
+          c
+        }
+        Err(_) => return false
+      }
+  }
+  if !c.alive {
+    return false
+  }
+  match
+    c.call_sync(
+      "org.freedesktop.DBus",
+      "/org/freedesktop/DBus",
+      "org.freedesktop.DBus",
+      "NameHasOwner",
+      "s",
+      [VString(watcher_name)],
+    ) {
+    Ok(m) =>
+      match m.body.get(0) {
+        Some(VBool(true)) => true
+        _ => false
+      }
+    Err(_) => false
+  }
+}
+
+///|
 /// 托盘菜单条目（一级；DBusMenu id = 数组下标 + 1，0 是根）。
 pub struct MenuEntry {
   id : Int
@@ -292,6 +332,18 @@ pub fn Item::add_menu_separator(self : Item) -> Unit {
     enabled: true,
     on_click: fn() { () },
   })
+  self.menu_revision += 1
+  self.emit_layout_updated()
+}
+
+///|
+/// 清空全部菜单项（重新 set_menu 时先清后建，保证替换语义）。清空后 revision
+/// 自增并广播 LayoutUpdated，面板随之收起旧菜单。
+pub fn Item::clear_menu_entries(self : Item) -> Unit {
+  if self.menu_items.length() == 0 {
+    return
+  }
+  self.menu_items.clear()
   self.menu_revision += 1
   self.emit_layout_updated()
 }

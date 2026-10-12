@@ -12,4 +12,6 @@ import {
   "NoahLiu/moonbit-libyue/yue/render",
   "NoahLiu/moonbit-libyue/yue/theme",
   "NoahLiu/moonbit-libyue/yue/win",
+  "NoahLiu/moonbit-libyue/yue/sys" @sys,
+  "NoahLiu/moonbit-libyue/yue/dbus" @dbus,
 }

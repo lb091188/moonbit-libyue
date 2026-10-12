@@ -989,6 +989,142 @@ fn make_window_section(
 }
 
 ///|
+/// W20c 托盘区块：建托盘（像素现建图标）/ 改提示 / 挂右键菜单 / 弹菜单 / 移除。
+/// 左键与菜单项计数落在状态行——证明 `dispatch_tray_event` 与菜单派发链都通。
+/// 后端不支持时（Linux 无 watcher、macOS 占位）建项给结构化错误，如实显示。
+fn make_tray_section(
+  tray : Ref[@core.Tray?],
+  note : Ref[String],
+  clicks : Ref[Int],
+  icon_holder : Ref[@win.Icon?],
+) -> @core.Node {
+  let build_menu_and_run = fn() -> Unit {
+    match tray.val {
+      Some(t) => {
+        let menu = @core.Menu::new()
+        let _ = menu.add_item("打开主窗").set_on_click(fn() {
+          clicks.val = clicks.val + 1
+          note.val = "菜单/打开主窗"
+        })
+        let _ = menu.add_separator()
+        let _ = menu.add_item("关于").set_on_click(fn() {
+          clicks.val = clicks.val + 1
+          note.val = "菜单/关于"
+        })
+        t.set_menu(menu)
+        note.val = "已挂菜单"
+      }
+      None => note.val = "先建托盘"
+    }
+  }
+  let create = fn() -> Unit {
+    match @win.icon_from_bgra(demo_icon_pixels(32), 32, 32) {
+      Some(ic) => {
+        match @core.Tray::new("libyue-demo-tray", icon=Some(ic)) {
+          Ok(t) => {
+            t.set_tooltip("libyue", "W20c 托盘演示")
+            t.on_click(fn() {
+              clicks.val = clicks.val + 1
+              note.val = "左键"
+            })
+            tray.val = Some(t)
+            icon_holder.val = Some(ic)
+            note.val = "已建(" + t.backend_name() + ")"
+          }
+          Err(@core.Unsupported) => {
+            note.val = "后端不可用"
+            ic.free()
+          }
+          Err(@core.IconLoadFailed) => {
+            note.val = "图标加载失败"
+            ic.free()
+          }
+          Err(@core.Backend(msg)) => {
+            note.val = "后端失败: " + msg
+            ic.free()
+          }
+        }
+      }
+      None => note.val = "建图标失败"
+    }
+  }
+  let retip = fn() -> Unit {
+    match tray.val {
+      Some(t) => {
+        t.set_tooltip("libyue", "改过的提示 · W20c")
+        note.val = "已改提示"
+      }
+      None => note.val = "先建托盘"
+    }
+  }
+  let popup = fn() -> Unit {
+    match tray.val {
+      Some(t) => {
+        let picked = t.popup_menu()
+        note.val = if picked { "菜单选中" } else { "菜单取消/无菜单" }
+      }
+      None => note.val = "先建托盘"
+    }
+  }
+  let drop = fn() -> Unit {
+    match tray.val {
+      Some(t) => {
+        t.remove()
+        tray.val = None
+        match icon_holder.val {
+          Some(ic) => ic.free()
+          None => ()
+        }
+        icon_holder.val = None
+        note.val = "已移除"
+      }
+      None => note.val = "先建托盘"
+    }
+  }
+  @ui.container(
+    [
+      @ui.label(
+        "系统托盘（W20c）：建/提示/菜单/弹出/移除；左键与菜单项计数（图标 32px 由像素现建）",
+        size=13.0,
+      ),
+      @ui.hbox(
+        [
+          @ui.button_t("建托盘", on_click=create),
+          @ui.button_t("改提示", on_click=retip),
+          @ui.button_t("挂菜单", on_click=build_menu_and_run),
+          @ui.button_t("弹菜单", on_click=popup),
+          @ui.button_t("移除", on_click=drop),
+          @core.node_of(live_counter(
+            fn() -> String {
+              let state = match tray.val {
+                Some(t) => t.backend_name()
+                None => "-"
+              }
+              "supported=" +
+              (if @core.Tray::is_supported() { "1" } else { "0" }) +
+              " slot=" +
+              state +
+              " clicks=" +
+              clicks.val.to_string() +
+              " note=" +
+              note.val
+            },
+            width=460.0,
+          )),
+        ],
+        column_gap=8.0,
+        align_items=@yoga.AlignItems::Center,
+      ),
+    ],
+    padding=8.0,
+    row_gap=6.0,
+    align_items=@yoga.AlignItems::FlexStart,
+    bg=@theme.theme_bg_page(),
+    border=@theme.theme_border(),
+  )
+}
+
+///|
 /// 交互图表区块：折线/柱状/环形三个交互版并排——hover 浮层、图例点击显隐、
 /// 滚轮缩放（折线与柱状共用调用方持有的 CiZoom，退出状态行报窗口读数；
 /// 环形无缩放）。
@@ -1873,8 +2009,19 @@ fn main {
   // W20e（窗口增强）：最小尺寸挂载时设好（不挡点击点位），标题/图标/无边框/
   // 拖拽带由区块按钮触发；图标句柄由 Ref 持住（窗口显示期间不能 free）。
   let win_icon : Ref[@win.Icon?] = Ref(None)
+  // 退出状态行在窗口关闭后才打印，那时后端槽已清空、现场读数全是 0。故每拍把
+  // 窗口增强的现场读数快照进这个串，退出时打印最后一份「活着时的」读数。
+  let win_snap : Ref[String] = Ref("-")
   app.window.set_min_size(900, 600)
   app.mount([make_window_section(app, win_icon)])
+  // W20c（系统托盘）：Win32 走 Shell_NotifyIconW，Linux 走 SNI。左键/菜单项由
+  // 主循环每拍 `dispatch_tray_event` 抽（与菜单命令同制）。托盘图标句柄由
+  // Ref 持住——托盘在用期间不能 free。
+  let tray : Ref[@core.Tray?] = Ref(None)
+  let tray_note : Ref[String] = Ref("-")
+  let tray_clicks = Ref(0)
+  let tray_icon : Ref[@win.Icon?] = Ref(None)
+  app.mount([make_tray_section(tray, tray_note, tray_clicks, tray_icon)])
   let ch_lin = @core.Store::new([])
   let ch_pushes = Ref(0)
   let ch_btn_w : Ref[@core.Widget?] = Ref(None)
@@ -2316,6 +2463,31 @@ fn main {
   ticker.val = fn() {
     if app.is_running() {
       ctr.frames = ctr.frames + 1
+      // W20e：现场窗口增强读数快照（关窗后后端槽清空，退出时读不到真值）
+      let (sw, sh) = app.window.min_size()
+      let (sx, sy, sdw, sdh) = app.window.drag_rect()
+      win_snap.val =
+        "title='" +
+        app.window.title() +
+        "' min=" +
+        sw.to_string() +
+        "x" +
+        sh.to_string() +
+        " drag=" +
+        sx.to_string() +
+        "," +
+        sy.to_string() +
+        "," +
+        sdw.to_string() +
+        "x" +
+        sdh.to_string() +
+        " bl=" +
+        (if app.window.is_borderless() { "1" } else { "0" }) +
+        " icon=" +
+        (match win_icon.val {
+          Some(_) => "1"
+          None => "0"
+        })
       // 自转轮播的下标由宿主的延时通道推进：换了页就计一次
       // 浮层是瞬时的：退出时计数早已归零，故每拍记一次峰值（证明真窗口里确实开过层）
       let ck = app.cursor_kind
@@ -2368,6 +2540,9 @@ fn main {
       }
       // W20a：派发菜单命令（Win32 的 WM_COMMAND 经后端进队列，这里按 id 找回调执行）
       let _ignored_hit = @core.dispatch_menu_command()
+      // W20c：派发托盘左键/右键（Win32 的 WM_TRAY_CB 经后端进队列；右键无回调时
+      // 自动弹已挂的菜单）。SNI 后端点击由 DBus 信号直达回调，不经此队列。
+      let _ignored_tray = @core.dispatch_tray_event()
       app.schedule_paint()
       let _ = app.timer(500, ticker.val)
     }
@@ -2844,32 +3019,30 @@ fn main {
       " last=" +
       menu_last.val,
   )
-  // W20e（窗口增强）回证：系统侧读回的标题/最小尺寸/拖拽区/无边框开关
-  // （改标题、设图标、开无边框需人工点按钮）。
-  let (wmin_w, wmin_h) = app.window.min_size()
-  let (wdr_x, wdr_y, wdr_w, wdr_h) = app.window.drag_rect()
+  // W20e（窗口增强）回证：最后一帧仍活着时快照的系统侧读数（标题/最小尺寸/
+  // 拖拽区/无边框/图标；改标题、设图标、开无边框需人工点按钮）。
+  println("NATIVE-APP-WIN " + win_snap.val)
+  // W20c（系统托盘）回证：后端可用性、当前后端、在用槽数、左键/菜单项计数。
+  // （建托盘/挂菜单/弹菜单需人工点按钮；不支持时如实报 supported=0。）
   println(
-    "NATIVE-APP-WIN title='" +
-    app.window.title() +
-    "' min=" +
-    wmin_w.to_string() +
-    "x" +
-    wmin_h.to_string() +
-    " drag=" +
-    wdr_x.to_string() +
-    "," +
-    wdr_y.to_string() +
-    "," +
-    wdr_w.to_string() +
-    "x" +
-    wdr_h.to_string() +
-    " bl=" +
-    (if app.window.is_borderless() { "1" } else { "0" }) +
-    " icon=" +
-    (match win_icon.val {
-      Some(_) => "1"
-      None => "0"
-    }),
+    "NATIVE-APP-TRAY supported=" +
+    (if @core.Tray::is_supported() { "1" } else { "0" }) +
+    " backend=" +
+    (match tray.val {
+      Some(t) => t.backend_name()
+      None => "-"
+    }) +
+    " count=" +
+    @win.tray_count().to_string() +
+    " clicks=" +
+    tray_clicks.val.to_string() +
+    " note=" +
+    tray_note.val,
   )
+  // 退出前显式收掉托盘图标（进程退出系统也会清，但显式更干净、也让 count 归 0）
+  match tray.val {
+    Some(t) => t.remove()
+    None => ()
+  }
   app.shutdown()
 }

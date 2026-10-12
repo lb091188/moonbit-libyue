@@ -289,3 +289,47 @@ extern "c" fn wm_is_borderless(id : Int64) -> Int = "wm_is_borderless"
 ///|
 #borrow(out)
 extern "c" fn wm_window_title(id : Int64, out : Bytes, cap : Int) -> Int = "wm_window_title"
+
+///|
+extern "c" fn wm_tray_supported() -> Int = "wm_tray_supported"
+
+///|
+#borrow(tip)
+extern "c" fn wm_tray_new(icon_slot : Int, tip : Bytes) -> Int = "wm_tray_new"
+
+///|
+#borrow(tip)
+extern "c" fn wm_tray_set_tooltip(slot : Int, tip : Bytes) -> Unit =
+  "wm_tray_set_tooltip"
+
+///|
+extern "c" fn wm_tray_set_icon(slot : Int, icon_slot : Int) -> Unit =
+  "wm_tray_set_icon"
+
+///|
+extern "c" fn wm_tray_set_menu(slot : Int, menu_handle : Int) -> Unit =
+  "wm_tray_set_menu"
+
+///|
+extern "c" fn wm_tray_popup(slot : Int) -> Int = "wm_tray_popup"
+
+///|
+extern "c" fn wm_tray_remove(slot : Int) -> Unit = "wm_tray_remove"
+
+///|
+#borrow(out_slot, out_kind)
+extern "c" fn wm_tray_poll(
+  out_slot : Ref[Int],
+  out_kind : Ref[Int],
+) -> Int = "wm_tray_poll"
+
+///|
+extern "c" fn wm_tray_count() -> Int = "wm_tray_count"
+
+///|
+#borrow(out)
+extern "c" fn wm_tray_tooltip(slot : Int, out : Bytes, cap : Int) -> Int =
+  "wm_tray_tooltip"
+
+///|
+extern "c" fn wm_menu_popup_new() -> Int = "wm_menu_popup_new"
