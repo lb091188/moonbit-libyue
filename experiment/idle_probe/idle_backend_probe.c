@@ -1,6 +1,6 @@
 /* W21e 用户空闲检测后端探针（纯 C，直接 #include sys_stub.c）。
  *
- * 动机：空闲的面在 MoonBit（`yue/sys/idle.mbt`），C 桩只做平台取数。要钉死
+ * 动机：空闲的面在 MoonBit（`gui/sys/idle.mbt`），C 桩只做平台取数。要钉死
  * 三件事：
  *  1. **支持性**：Windows 恒 1（`GetLastInputInfo` 是 Win2000 起就有的稳定接口）；
  *  2. **取数口径**：返回值就是「自最后一次输入起的毫秒」——与独立重算一遍
@@ -11,7 +11,7 @@
  *     里用合成值把模减语义钉死（桩里的表达式同此口径）。
  *
  * 本探针只读系统状态、不写任何东西；平台限 Windows（其余平台桩走对应分支，
- * 由 yue/sys 的白盒测试覆盖「不支持」档）。
+ * 由 gui/sys 的白盒测试覆盖「不支持」档）。
  *
  * 编法（vcvars 被 reg 策略挡，手设 INCLUDE/LIB；/Fe 须 Windows 风格绝对路径）：
  *   cl /nologo /W4 /utf-8 /O2 /DWIN32 /D_WINDOWS /DUNICODE /D_UNICODE \
@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../../yue/sys/sys_stub.c"
+#include "../../gui/sys/sys_stub.c"
 
 /* 探针自带 moonbit_make_bytes：sys_stub.c 的其它导出函数在链接期会引用它
  * （本探针不直接调那些函数，但同翻译单元里它们的函数体要能被链接）。布局只需

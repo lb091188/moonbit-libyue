@@ -29,7 +29,7 @@ let seen_preedit : Ref[Int] = Ref(0)
 let seen_key : Ref[Int] = Ref(0)
 
 // 回调闭包保活：C 侧存的是函数指针 + 闭包指针，注册表按签名分表常驻
-// （同 yue/view.mbt 的做法，进程级保活、不随窗口回收）
+// （探针自定的保活口径；库侧新栈不做 C→MoonBit 回调，见 gui/win/stub.c 头注释）
 
 ///|
 let keep_key : Ref[Array[(Int, Int, Int, Int) -> Unit]] = Ref([])

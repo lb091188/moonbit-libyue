@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../../yue/win/stub.c"
+#include "../../gui/win/stub.c"
 
 static int g_fail = 0;
 

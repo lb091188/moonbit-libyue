@@ -19,7 +19,7 @@
 
 /* stub.c 一个文件三条分支：_WIN32 真 Win32 实现 / WM_STUB_GTK / 其余占位。
  * 本探针只验 _WIN32 分支，故直接 include（拿静态句柄表）。 */
-#include "../../yue/win/stub.c"
+#include "../../gui/win/stub.c"
 
 static int g_fail = 0;
 

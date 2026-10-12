@@ -13,9 +13,8 @@
 #include <string.h>
 #include <time.h>
 
-// MoonBit 运行时入口：不 include moonbit.h（其 memcpy 声明与 glibc 冲突，
-// 见 shim/include/yue_mbt_internal.h 文件头同样的说明），签名照抄
-// ~/.moon/include/moonbit.h。
+// MoonBit 运行时入口：故意不 include moonbit.h（其 extern "C" 的 memcpy 声明
+// 与 glibc 冲突），签名照抄 ~/.moon/include/moonbit.h。
 extern void *moonbit_make_bytes(int size, int value);  // 第二参是填充值
 
 enum { MODE_CHANNEL = 0, MODE_ENTRY = 1 };

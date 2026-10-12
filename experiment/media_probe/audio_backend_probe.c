@@ -23,7 +23,7 @@
  *      audio_backend_probe.c /Fe:audio_backend_probe.exe
  * 刻意**不加任何额外库**：miniaudio 默认走运行期 LoadLibrary
  * （MA_NO_RUNTIME_LINKING 未定义），不产生链接期符号——实测零库即可链接并运行。
- * 所以 modules/yue-media/prebuild.py 的「非 Linux → 空 link_configs」是对的，
+ * 所以 modules/gui-media/prebuild.py 的「非 Linux → 空 link_configs」是对的，
  * 别去补 ole32/uuid（详见 docs/zh/adaptation.md 本批小节）。
  *
  * 期望输出末行 AUDIO-BACKEND-OK。
@@ -36,7 +36,7 @@
  * 非本仓代码；只压这一条，别把自家告警一起压掉。 */
 #pragma warning(push)
 #pragma warning(disable : 4244)
-#include "../../modules/yue-media/media/audio_stub.c"
+#include "../../modules/gui-media/media/audio_stub.c"
 #pragma warning(pop)
 
 static int g_fail = 0;

@@ -11,7 +11,7 @@
  *  4. 幂等与防御：覆盖写、删除幂等（本就不在也算成功）、NULL 参数回失败档。
  *
  * 本探针**会真的写用户注册表**（这是它的意义），但起手与收尾都删自己的专属值
- * `com.moonbit.libyue.autostart_cprobe`；无论中途成败都会清场。
+ * `com.moonbit.native-gui.autostart_cprobe`；无论中途成败都会清场。
  *
  * 编法（vcvars 被 reg 策略挡，手设 INCLUDE/LIB；/Fo 与 /Fe 须 Windows 风格绝对路径）：
  *   cl /nologo /W4 /utf-8 /O2 /DWIN32 /D_WINDOWS /DUNICODE /D_UNICODE \
@@ -25,11 +25,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../../yue/sys/sys_stub.c"
+#include "../../gui/sys/sys_stub.c"
 
 /* 探针自带 moonbit_make_bytes：真实运行时里它是链接期符号，纯 C 探针自带一份
  * 就不必链 moon 运行时。布局只需**自洽**（本探针自己写、自己读；sys_stub.c 只
- * 把它当「能存 size 字节的缓冲」用，真 ABI 交互由 yue/sys 的白盒测试覆盖）。
+ * 把它当「能存 size 字节的缓冲」用，真 ABI 交互由 gui/sys 的白盒测试覆盖）。
  * 长度存在数据指针**前 4 字节**，与真运行的 moonbit_object 头口径同构。 */
 void *moonbit_make_bytes(int size, int value) {
   int n = size < 0 ? 0 : size;
@@ -51,9 +51,9 @@ static int mb_eq(const void *p, const char *expect) {
   return n == (int)strlen(expect) && n >= 0 && memcmp((const char *)p, expect, (size_t)n) == 0;
 }
 
-#define PROBE_ID "com.moonbit.libyue.autostart_cprobe"
+#define PROBE_ID "com.moonbit.native-gui.autostart_cprobe"
 #define RUN_PATH L"Software\\Microsoft\\Windows\\CurrentVersion\\Run"
-#define RUN_NAME L"com.moonbit.libyue.autostart_cprobe"
+#define RUN_NAME L"com.moonbit.native-gui.autostart_cprobe"
 
 static int g_fail = 0;
 

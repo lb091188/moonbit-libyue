@@ -20,7 +20,7 @@
 #include <string.h>
 
 /* stub.c 三条分支：_WIN32 真实现 / WM_STUB_GTK / 其余占位。本探针只验 _WIN32。 */
-#include "../../yue/win/stub.c"
+#include "../../gui/win/stub.c"
 
 static int g_fail = 0;
 
