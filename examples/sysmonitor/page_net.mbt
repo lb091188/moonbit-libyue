@@ -1,0 +1,182 @@
+// 网络页（U4）：网卡 rx/tx 曲线。上方非 lo 汇总收发 2 分钟曲线，
+// 下方每块网卡一行（名称 · 累计 · 迷你曲线（rx/tx 叠加）· 瞬时速率）。
+// 数据来自 main.mbt 的 1Hz sample_once；行历史按网卡名保序，
+// win_push 定长窗口。单容器 on_draw，1Hz 刷新只进程级 invalidate。
+
+///|
+/// 网卡行（含 rx/tx 迷你曲线历史窗口）。
+struct NetRow {
+  name : String
+  rx_bytes : Int64
+  tx_bytes : Int64
+  rx_bps : Double
+  tx_bps : Double
+  rx_hist : Array[Double]
+  tx_hist : Array[Double]
+}
+
+///|
+/// 页面状态：网卡行 + 行历史。
+struct NetPage {
+  rows : @core.Store[Array[NetRow]]
+  hist : Map[String, (Array[Double], Array[Double])]
+}
+
+///|
+fn NetPage::rebuild(self : NetPage, nets : Array[NetInfo]) -> Unit {
+  let out : Array[NetRow] = []
+  for n in nets {
+    let (rx_old, tx_old) = self.hist.get(n.name).unwrap_or(([], []))
+    let rx_h = @charts.win_push(rx_old, 120, n.rx_bps)
+    let tx_h = @charts.win_push(tx_old, 120, n.tx_bps)
+    self.hist.set(n.name, (rx_h, tx_h))
+    out.push({
+      name: n.name,
+      rx_bytes: n.rx_bytes,
+      tx_bytes: n.tx_bytes,
+      rx_bps: n.rx_bps,
+      tx_bps: n.tx_bps,
+      rx_hist: rx_h,
+      tx_hist: tx_h,
+    })
+  }
+  self.rows.set(out)
+}
+
+///|
+/// 历史窗口峰值（迷你曲线值域上限，保底 1MB/s 防全零时除零）。
+fn hist_peak(hist : Array[Double]) -> Double {
+  let mut peak = 1048576.0
+  for v in hist {
+    if v > peak {
+      peak = v
+    }
+  }
+  peak
+}
+
+///|
+/// 网卡行自绘。
+fn draw_net_rows(p : @render.Painter, w : Double, rows : Array[NetRow]) -> Unit {
+  let t = @theme.theme_current()
+  let font = @text.Font::new("", 13.0)
+  for i, n in rows {
+    let y = i.to_double() * row_h()
+    if zebra_bg(i) {
+      p.set_fill_color(t.fill_zebra)
+      p.fill_rect(0.0, y, w, row_h())
+    }
+    p.flush()
+    let _ = @text.draw_box_at(
+      p,
+      12.0,
+      y,
+      130.0,
+      row_h(),
+      n.name,
+      font,
+      t.text_regular,
+      valign=@text.Center,
+    )
+    let _ = @text.draw_box_at(
+      p,
+      148.0,
+      y,
+      280.0,
+      row_h(),
+      "累计 ↓\{fmt_bytes(n.rx_bytes)} ↑\{fmt_bytes(n.tx_bytes)}",
+      font,
+      t.text_secondary,
+      valign=@text.Center,
+    )
+    // 迷你曲线：rx / tx 同窗叠加（值域取两者峰值较大者）
+    let peak = hist_peak(n.rx_hist).max(hist_peak(n.tx_hist))
+    let sx = w - 450.0
+    let sw = 220.0
+    draw_sparkline(
+      p,
+      sx,
+      y + 7.0,
+      sw,
+      row_h() - 14.0,
+      n.rx_hist,
+      0.0,
+      peak,
+      t.primary,
+    )
+    draw_sparkline(
+      p,
+      sx,
+      y + 7.0,
+      sw,
+      row_h() - 14.0,
+      n.tx_hist,
+      0.0,
+      peak,
+      t.warning,
+    )
+    let _ = @text.draw_box_at(
+      p,
+      w - 218.0,
+      y,
+      100.0,
+      row_h(),
+      "↓\{fmt_rate(n.rx_bps)}",
+      font,
+      t.primary,
+      align=@text.End,
+      valign=@text.Center,
+    )
+    let _ = @text.draw_box_at(
+      p,
+      w - 108.0,
+      y,
+      96.0,
+      row_h(),
+      "↑\{fmt_rate(n.tx_bps)}",
+      font,
+      t.warning,
+      align=@text.End,
+      valign=@text.Center,
+    )
+  }
+}
+
+///|
+fn page_net(app : App) -> @core.Node {
+  let page : NetPage = { rows: @core.Store::new([]), hist: Map([]), }
+  page.rebuild(app.nets.get())
+  app.nets.subscribe(fn(nets) { page.rebuild(nets) })
+  let net_n : @core.Store[Int] = @core.Store::new(page.rows.get().length())
+  page.rows.subscribe(fn(r) { net_n.set(r.length()) })
+  // 非 lo 汇总收发曲线（两序列，120 点窗口）
+  let total : @core.Store[Array[@charts.LineSeries]] = @core.Store::new([
+    @charts.LineSeries::make("接收", max_points=120),
+    @charts.LineSeries::make("发送", max_points=120),
+  ])
+  let push_total = fn(ns : Array[NetInfo]) -> Unit {
+    let mut rx = 0.0
+    let mut tx = 0.0
+    for n in ns {
+      if n.name != "lo" {
+        rx += n.rx_bps
+        tx += n.tx_bps
+      }
+    }
+    @charts.series_push(total, 0, rx)
+    @charts.series_push(total, 1, tx)
+  }
+
+  push_total(app.nets.get())
+  app.nets.subscribe(push_total)
+  @ui.vbox(
+    [
+      @ui.label_t("收发速率（不含 lo）", role=@ui.Section),
+      @charts.line_chart_t(total, height=220.0, area=true),
+      @ui.separator(),
+      draw_rows(net_n, fn(p, w) { draw_net_rows(p, w, page.rows.get()) }),
+    ],
+    padding=12.0,
+    row_gap=6.0,
+  )
+}

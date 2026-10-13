@@ -1,0 +1,24 @@
+// 系统监视器（sysmonitor，G7 新栈版）：Mission Center 式双栏布局，
+// 数据层纯 MoonBit 读 /proc、/sys（sysdata/sysproc/syshw），唯一的系统
+// 调用经应用自有 native-stub（stub/sysmon.c + sysffi.mbt）——Windows /
+// macOS 侧 stub 把 Win32 / Mach 数据源虚拟成同构文本，解析层零平台分支。
+import {
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "NoahLiu/yoga-mbt/src" @yoga,
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/ui",
+  "NoahLiu/native-gui/theme" @theme,
+  "NoahLiu/native-gui/render" @render,
+  "NoahLiu/native-gui/text" @text,
+  "NoahLiu/native-gui/sys" @sys,
+  "NoahLiu/native-gui/icons",
+  "NoahLiu/native-gui/chart" @charts,
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"
+
+options(
+  "native-stub": [ "stub/sysmon.c" ],
+)
