@@ -409,8 +409,8 @@ fn panel(
     row_gap=4.0,
     padding=8.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_panel(),
-    border_color=@theme.theme_border(),
+    background_color="bg_panel",
+    border_color="border",
   )
 }
 
@@ -556,7 +556,7 @@ fn main {
         @ui.text(
           "「重新探测」也是只读；「打开链接 / 打开目录 / 发通知」会把动作交给系统，点了才有反应",
           size=12.0,
-          color=@theme.theme_text_secondary(),
+          color="text_secondary",
         ),
       ],
       row_gap=2.0,

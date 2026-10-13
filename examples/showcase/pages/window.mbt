@@ -192,8 +192,8 @@ pub fn page_window(app : @shared.App) -> @core.Node {
             @ui.drag_source(
               @ui.view(
                 [@ui.text("拖我", role=@ui.Body)],
-                background_color=@theme.theme_primary_light(),
-                border_color=@theme.theme_primary(),
+                background_color="primary_light",
+                border_color="primary",
                 width=120.0,
                 height=64.0,
                 padding=8.0,
@@ -204,8 +204,8 @@ pub fn page_window(app : @shared.App) -> @core.Node {
             @ui.drop_target(
               @ui.view(
                 [@ui.text("投放区（松手成交）", role=@ui.Secondary)],
-                background_color=@theme.theme_bg_panel(),
-                border_color=@theme.theme_border(),
+                background_color="bg_panel",
+                border_color="border",
                 width=220.0,
                 height=64.0,
                 padding=8.0,

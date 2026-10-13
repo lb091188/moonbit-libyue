@@ -423,8 +423,8 @@ fn make_split_section(slot : Ref[@core.Widget?]) -> @core.Node {
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -465,8 +465,8 @@ fn make_sticky_section(st : @ui.StickyList, slot : Ref[@core.Widget?]) -> @core.
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -607,8 +607,8 @@ fn make_form_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -654,8 +654,8 @@ fn make_decl_section(
     row_gap=6.0,
     padding=8.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -693,8 +693,8 @@ fn make_media_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -731,8 +731,8 @@ fn make_hotkey_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -786,8 +786,8 @@ fn make_message_box_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -881,8 +881,8 @@ fn make_drawn_message_box_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -921,8 +921,8 @@ fn make_menu_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -1064,8 +1064,8 @@ fn make_window_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -1122,8 +1122,8 @@ fn make_taskbar_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -1258,8 +1258,8 @@ fn make_tray_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -1375,8 +1375,8 @@ fn make_notify_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -1405,7 +1405,7 @@ fn make_drag_section(
       [@ui.text(text, size=12.0)],
       padding=8.0,
       background_color=bgv,
-      border_color=@theme.theme_border(),
+      border_color="border",
     )
   }
   let src_text = @ui.drag_source(
@@ -1467,8 +1467,8 @@ fn make_drag_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -1537,8 +1537,8 @@ fn make_chart_it_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -1753,8 +1753,8 @@ fn make_chart_special_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -1838,8 +1838,8 @@ fn make_chart_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -1890,8 +1890,8 @@ fn make_virt_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -1940,8 +1940,8 @@ fn make_table_section(
     padding=8.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::FlexStart,
-    background_color=@theme.theme_bg_page(),
-    border_color=@theme.theme_border(),
+    background_color="bg_page",
+    border_color="border",
   )
 }
 
@@ -2147,8 +2147,8 @@ fn main {
       direction=@yoga.Row,
       column_gap=8.0,
       padding=6.0,
-      background_color=@theme.theme_bg_panel(),
-      border_color=@theme.theme_border(),
+      background_color="bg_panel",
+      border_color="border",
     ),
   ])
   // 批次 5b（组件层首批）：一行全用 @ui 构造器，按钮经 store 计数。
@@ -2158,7 +2158,7 @@ fn main {
         @ui.text("组件层", size=13.0),
         @ui.divider(vertical=true),
         @ui.icon(
-          @icons.IconKind::MediumCircleFill, size=18.0, color=@theme.theme_success(),
+          @icons.IconKind::MediumCircleFill, size=18.0, color="success",
         ),
         @ui.button(
           "加一",
@@ -2171,8 +2171,8 @@ fn main {
       column_gap=8.0,
       padding=6.0,
       align_items=@yoga.AlignItems::Center,
-      background_color=@theme.theme_bg_page(),
-      border_color=@theme.theme_border(),
+      background_color="bg_page",
+      border_color="border",
     ),
   ])
   // 批次 5c（表单控件）：一行组件化表单——复选 / 开关 / 滑块 / 步进 / 进度。
@@ -2194,8 +2194,8 @@ fn main {
       column_gap=10.0,
       padding=6.0,
       align_items=@yoga.AlignItems::Center,
-      background_color=@theme.theme_bg_panel(),
-      border_color=@theme.theme_border(),
+      background_color="bg_panel",
+      border_color="border",
     ),
   ])
   // 批次 6a（显示族首批）：标签 / 徽标 / 头像 / 分隔线 / 提示条 / 折线进度。
@@ -2228,8 +2228,8 @@ fn main {
       ],
       padding=8.0,
       row_gap=8.0,
-      background_color=@theme.theme_bg_page(),
-      border_color=@theme.theme_border(),
+      background_color="bg_page",
+      border_color="border",
     ),
   ])
   // 批次 6b（显示族收尾）+ 6c（日期族首批）：三列并排——时间线一列、两条轮播
@@ -2466,8 +2466,8 @@ fn main {
       padding=8.0,
       row_gap=6.0,
       align_items=@yoga.AlignItems::FlexStart,
-      background_color=@theme.theme_bg_page(),
-      border_color=@theme.theme_border(),
+      background_color="bg_page",
+      border_color="border",
     ),
   ])
   app.mount([
@@ -2505,8 +2505,8 @@ fn main {
       padding=8.0,
       row_gap=6.0,
       align_items=@yoga.AlignItems::FlexStart,
-      background_color=@theme.theme_bg_page(),
-      border_color=@theme.theme_border(),
+      background_color="bg_page",
+      border_color="border",
     ),
   ])
   app.mount([
@@ -2549,8 +2549,8 @@ fn main {
           width=180.0,
           row_gap=6.0,
           padding=6.0,
-          background_color=@theme.theme_bg_panel(),
-          border_color=@theme.theme_border(),
+          background_color="bg_panel",
+          border_color="border",
         ),
         @ui.view(
           [
@@ -2584,8 +2584,8 @@ fn main {
           row_gap=6.0,
           padding=6.0,
           align_items=@yoga.AlignItems::FlexStart,
-          background_color=@theme.theme_bg_page(),
-          border_color=@theme.theme_border(),
+          background_color="bg_page",
+          border_color="border",
         ),
         @ui.view(
           [
@@ -2609,8 +2609,8 @@ fn main {
           row_gap=6.0,
           padding=6.0,
           align_items=@yoga.AlignItems::FlexStart,
-          background_color=@theme.theme_bg_panel(),
-          border_color=@theme.theme_border(),
+          background_color="bg_panel",
+          border_color="border",
         ),
         @ui.view(
           [
@@ -2643,16 +2643,16 @@ fn main {
           row_gap=6.0,
           padding=6.0,
           align_items=@yoga.AlignItems::FlexStart,
-          background_color=@theme.theme_bg_page(),
-          border_color=@theme.theme_border(),
+          background_color="bg_page",
+          border_color="border",
         ),
       ],
       direction=@yoga.Row,
       column_gap=8.0,
       padding=8.0,
       align_items=@yoga.AlignItems::FlexStart,
-      background_color=@theme.theme_bg_page(),
-      border_color=@theme.theme_border(),
+      background_color="bg_page",
+      border_color="border",
     ),
     // 第二排：浮层 / 滚动 / 导航族次批（竖屏 1440 宽放不下七列）
     @ui.view(
@@ -2687,8 +2687,8 @@ fn main {
           row_gap=8.0,
           padding=6.0,
           align_items=@yoga.AlignItems::FlexStart,
-          background_color=@theme.theme_bg_page(),
-          border_color=@theme.theme_border(),
+          background_color="bg_page",
+          border_color="border",
         ),
         @ui.view(
           [
@@ -2706,8 +2706,8 @@ fn main {
           row_gap=6.0,
           padding=6.0,
           align_items=@yoga.AlignItems::FlexStart,
-          background_color=@theme.theme_bg_page(),
-          border_color=@theme.theme_border(),
+          background_color="bg_page",
+          border_color="border",
         ),
         @ui.view(
           [
@@ -2751,8 +2751,8 @@ fn main {
           row_gap=6.0,
           padding=6.0,
           align_items=@yoga.AlignItems::FlexStart,
-          background_color=@theme.theme_bg_panel(),
-          border_color=@theme.theme_border(),
+          background_color="bg_panel",
+          border_color="border",
         ),
         @ui.view(
           [
@@ -2779,8 +2779,8 @@ fn main {
           row_gap=10.0,
           padding=6.0,
           align_items=@yoga.AlignItems::FlexStart,
-          background_color=@theme.theme_bg_page(),
-          border_color=@theme.theme_border(),
+          background_color="bg_page",
+          border_color="border",
         ),
         @ui.view(
           [
@@ -2801,7 +2801,7 @@ fn main {
               @ui.view(
                 [@ui.text("右键我", size=13.0)],
                 padding=4.0,
-                background_color=@theme.theme_bg_panel(),
+                background_color="bg_panel",
                 height=28.0,
               ),
               [
@@ -2826,16 +2826,16 @@ fn main {
           row_gap=8.0,
           padding=6.0,
           align_items=@yoga.AlignItems::FlexStart,
-          background_color=@theme.theme_bg_page(),
-          border_color=@theme.theme_border(),
+          background_color="bg_page",
+          border_color="border",
         ),
       ],
       direction=@yoga.Row,
       column_gap=8.0,
       padding=8.0,
       align_items=@yoga.AlignItems::FlexStart,
-      background_color=@theme.theme_bg_page(),
-      border_color=@theme.theme_border(),
+      background_color="bg_page",
+      border_color="border",
     ),
   ])
   // 批次 5d（输入框全语义）：整只框由 `@ui.input` 提供——键入、选区、双击选词、

@@ -633,7 +633,7 @@ pub fn form_item(
               text(
                 label_text,
                 size=13.0,
-                color=@theme.theme_text_secondary(),
+                color="text_secondary",
                 align=@text.End,
               ),
             ],
@@ -649,7 +649,7 @@ pub fn form_item(
         align_items=@yoga.AlignItems::Center,
       ),
       view(
-        [text_dyn(err_store.signal(), size=12.0, color=@theme.theme_danger(), wrap=false)],
+        [text_dyn(err_store.signal(), size=12.0, color="danger", wrap=false)],
         direction=@yoga.Row,
         height=18.0,
         handle=fn(w : @core.Widget) -> Unit { w.set_margin(left=label_width + 12.0) },

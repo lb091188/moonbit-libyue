@@ -150,7 +150,7 @@ pub fn segmented(
     column_gap=4.0,
     padding=2.0,
     align_items=@yoga.AlignItems::Center,
-    background_color=@theme.theme_border(),
+    background_color="border",
     class=class,
     handle=handle,
   )

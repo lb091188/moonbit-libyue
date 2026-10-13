@@ -127,7 +127,7 @@ fn page_sensors(app : App) -> @core.Node {
   let nodes : Array[@core.Node] = []
   if app.gpu_busy_hists.length() == 0 {
     nodes.push(
-      @ui.text("未检测到显卡", color=@theme.theme_text_secondary(), role=Body),
+      @ui.text("未检测到显卡", color="text_secondary", role=Body),
     )
   }
   for i in 0..<app.gpu_busy_hists.length() {
@@ -151,7 +151,7 @@ fn page_sensors(app : App) -> @core.Node {
   // 合法状态,给一行说明而不是空白
   nodes.push(
     @ui.view(
-      [@ui.text("暂无可用温度来源", color=@theme.theme_text_secondary())],
+      [@ui.text("暂无可用温度来源", color="text_secondary")],
       handle=fn(l) {
         l.set_visible(page.rows.get().length() == 0)
         page.rows.subscribe(fn(r) {

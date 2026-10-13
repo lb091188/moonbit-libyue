@@ -276,7 +276,7 @@ pub fn card(
   let body : Array[@core.Node] = []
   if title.length() > 0 {
     body.push(
-      text(title, size=14.0, weight=@text.SemiBold, color=@theme.theme_text_primary()),
+      text(title, size=14.0, weight=@text.SemiBold, color="text_primary"),
     )
     body.push(divider())
   }
@@ -287,8 +287,8 @@ pub fn card(
     body,
     padding=padding,
     row_gap=row_gap,
-    background_color=@theme.theme_bg_panel(),
-    border_color=@theme.theme_border(),
+    background_color="bg_panel",
+    border_color="border",
   )
 }
 
@@ -307,7 +307,7 @@ pub fn descriptions(
     rows.push(
       view(
         [
-          text(kv.0, size=12.0, color=@theme.theme_text_secondary()),
+          text(kv.0, size=12.0, color="text_secondary"),
           text(
             kv.1,
             size=12.0,
@@ -329,8 +329,8 @@ pub fn descriptions(
 pub fn empty(description? : String = "暂无数据") -> @core.Node {
   view(
     [
-      icon(@icons.IconKind::Box, size=42.0, color=@theme.theme_border()),
-      text(description, size=12.0, color=@theme.theme_text_secondary(), align=@text.Center),
+      icon(@icons.IconKind::Box, size=42.0, color="border"),
+      text(description, size=12.0, color="text_secondary", align=@text.Center),
     ],
     padding=16.0,
     row_gap=8.0,
@@ -355,7 +355,7 @@ pub fn result(title : String, subtitle? : String = "", t? : SemanticType = Succe
       text(
         subtitle,
         size=12.0,
-        color=@theme.theme_text_secondary(),
+        color="text_secondary",
         align=@text.Center,
       ),
     ],
@@ -436,8 +436,8 @@ fn timeline_row(
       mark,
       view(
         [
-          text(title, size=13.0, weight=@text.SemiBold, color=@theme.theme_text_primary()),
-          text(desc, size=12.0, color=@theme.theme_text_secondary()),
+          text(title, size=13.0, weight=@text.SemiBold, color="text_primary"),
+          text(desc, size=12.0, color="text_secondary"),
         ],
         grow=1.0,
         handle=fn(w : @core.Widget) -> Unit { w.set_padding(top=2.0, left=8.0) },

@@ -98,7 +98,7 @@ pub fn panel(
   row_gap? : Double = 6.0,
   width? : Double = 0.0,
 ) -> @core.Node {
-  let body : Array[@core.Node] = [text(title, size=12.0, color=@theme.theme_text_secondary())]
+  let body : Array[@core.Node] = [text(title, size=12.0, color="text_secondary")]
   for c in children {
     body.push(c)
   }
@@ -107,8 +107,8 @@ pub fn panel(
     padding=padding,
     row_gap=row_gap,
     width=width,
-    background_color=@theme.theme_bg_panel(),
-    border_color=@theme.theme_border(),
+    background_color="bg_panel",
+    border_color="border",
   )
 }
 
@@ -152,6 +152,8 @@ pub fn text_dyn(
   wrap? : Bool = false,
   ellipsis? : Bool = false,
   shrink_by_role? : Bool = false,
+  anon? : @style.Style = @style.empty_style(),
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let src = text_source(
@@ -168,6 +170,7 @@ pub fn text_dyn(
   )
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
+    fold_style(w, anon, class)
     attach_text_measure(w, src)
     w.on_draw = Some(fn(
       self : @core.Widget,
@@ -205,6 +208,7 @@ pub fn text(
   max_width? : Double = 0.0,
   wrap? : Bool = false,
   ellipsis? : Bool = false,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let f = role_font(role)
@@ -219,6 +223,10 @@ pub fn text(
       weight
     }
   let eff_wrap = if wrap { true } else { role is Body }
+  let anon = match fg_block(color) {
+    Some(b) => b
+    None => @style.empty_style()
+  }
   text_dyn(
     @core.Signal::new(content),
     role=role,
@@ -231,6 +239,8 @@ pub fn text(
     wrap=eff_wrap,
     ellipsis=ellipsis,
     shrink_by_role=has_role(role),
+    anon=anon,
+    class=class,
     handle=handle,
   )
 }

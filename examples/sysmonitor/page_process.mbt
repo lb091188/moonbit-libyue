@@ -302,7 +302,7 @@ fn page_process(app : App) -> @core.Node {
   let query_store : @core.Store[String] = @core.Store::new("")
   let nice_store : @core.Store[String] = @core.Store::new("10")
   let tools : Array[@core.Node] = [
-    @ui.text("搜索", color=@theme.theme_text_secondary(), role=Body),
+    @ui.text("搜索", color="text_secondary", role=Body),
     // 搜索框：文本经 store 双向投影，on_change 里重建派生数据
     @ui.input(
       query_store,
@@ -361,7 +361,7 @@ fn page_process(app : App) -> @core.Node {
       @ui.row(tools, column_gap=8.0),
       @ui.text_dyn(
         page.msg.signal(),
-        color=@theme.theme_text_secondary(),
+        color="text_secondary",
       ),
       @ui.table_v(
         columns,
@@ -374,7 +374,7 @@ fn page_process(app : App) -> @core.Node {
       ),
       @ui.text_dyn(
         page.status.signal(),
-        color=@theme.theme_text_secondary(),
+        color="text_secondary",
       ),
     ],
     padding=12.0,

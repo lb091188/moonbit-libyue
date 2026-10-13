@@ -102,7 +102,7 @@ fn res_card(
             value.signal(),
             size=14.0,
             weight=@text.SemiBold,
-            color=@theme.theme_text_primary(),
+            color="text_primary",
             align=@text.End,
             handle=fn(w) { w.node.set_flex_grow(1.0) },
           ),

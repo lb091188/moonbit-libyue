@@ -117,8 +117,8 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                       ],
                       padding=12.0,
                       grow=1.0,
-                      background_color=@theme.theme_bg_panel(),
-                      border_color=@theme.theme_border(),
+                      background_color="bg_panel",
+                      border_color="border",
                     )
                     .mount_into(holder)
                 }

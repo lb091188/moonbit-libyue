@@ -278,7 +278,7 @@ pub fn message_box(
         let _ = text(
           content,
           size=13.0,
-          color=@theme.theme_text_regular(),
+          color="text_regular",
           wrap=true,
           max_width=inner_w,
         ).mount_into(col)
@@ -286,7 +286,7 @@ pub fn message_box(
           let _ = text(
             informative,
             size=12.0,
-            color=@theme.theme_text_secondary(),
+            color="text_secondary",
             wrap=true,
             max_width=inner_w,
           ).mount_into(col)

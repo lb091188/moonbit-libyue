@@ -164,6 +164,31 @@ fn draw_text_in(w : @core.Widget, p : @render.Painter, src : TextSource) -> Bool
   let r = w.rect
   // 盒宽取「控件宽与声明的 max_width 的较小者」：draw_box_at 的宽度约束就是盒宽
   let box_w = if src.max_width > 0.0 { src.max_width.min(r.w) } else { r.w }
+  // 文字属性按状态选桶读（design.md §1.3：绘制期读 `self`）：散参数已折进
+  // resolved Style，`class` 覆盖散参数由解析顺序保证；桶里没写的一律回落 src。
+  let st = @style.style_for(w)
+  let fg1 = match st.color {
+    Some(c) => @style.resolve_color(c)
+    None => src.fg()
+  }
+  let font1 = match (st.font_size, st.font_weight, st.font_family) {
+    (fs, fw, ff) => {
+      let f0 = src.font
+      let fam = match ff {
+        Some(v) => v
+        None => f0.name
+      }
+      let sz = match fs {
+        Some(v) => v
+        None => f0.size
+      }
+      let wt = match fw {
+        Some(v) => v
+        None => f0.weight
+      }
+      @text.Font::new(fam, sz, weight=wt, style=f0.style)
+    }
+  }
   @text.draw_box_at(
     p,
     0.0,
@@ -171,8 +196,8 @@ fn draw_text_in(w : @core.Widget, p : @render.Painter, src : TextSource) -> Bool
     box_w,
     r.h,
     src.text,
-    src.font,
-    src.fg(),
+    font1,
+    fg1,
     align=src.align,
     valign=@text.Center,
     ellipsize=src.ellipsis,
