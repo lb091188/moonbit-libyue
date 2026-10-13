@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
+#include <unordered_map>
 
 namespace {
 
@@ -179,6 +181,75 @@ IDWriteTextLayout *ptw_layout(IDWriteTextFormat *fmt, const char *text, int len,
   return layout;
 }
 
+// ---------------------------------------------------------------------------
+// 布局缓存：CreateTextLayout（含整段 shaping）是画布资源缓存之后的剩余大头，
+// 同参数的调用每帧重复。键 = 路径标记 + 文本 + 字体四要素 + 宽约束/换行/省略/
+// 对齐——同键布局配置完全一致；复用只读（ptw_render 无区间时不改布局，区间
+// 字体/颜色只属于富文本 rt_* 路径，不走这里）。上限 1024，超限整表清空（与
+// MoonBit 侧度量缓存同口径：键访问有强局部性，整清比逐条 LRU 便宜）。单线程
+// UI 循环内使用，无锁。
+// ---------------------------------------------------------------------------
+static std::unordered_map<std::string, IDWriteTextLayout *> g_layout_cache;
+static int g_layout_cache_count = 0;
+
+static std::string ptw_cache_key(const char *path, const char *text, int len,
+                                 double size, const char *family, int weight,
+                                 int italic, int width_int, int wrap,
+                                 int ellipsize, int align) {
+  char head[160];
+  snprintf(head, sizeof(head), "%s|%g|%s|%d|%d|%d|%d|%d|%d|", path, size,
+           family != nullptr ? family : "", weight, italic, width_int, wrap,
+           ellipsize, align);
+  std::string key(head);
+  if (text != nullptr && len > 0) {
+    key.append(text, static_cast<size_t>(len));
+  }
+  return key;
+}
+
+// 命中直接返回（缓存持有引用，调用方不 Release）；未命中建好配置入库。
+// width_int 已按 wrapped_axis 归一化（<=0 = 不约束）；align 只在 width_int>0
+// 时参与布局（与 Pango 分支 pt_render_box 同口径）。
+static IDWriteTextLayout *ptw_cached_layout(const char *path, const char *text,
+                                            int len, double size,
+                                            const char *family, int weight,
+                                            int italic, int width_int,
+                                            int wrap, int ellipsize,
+                                            int align) {
+  const std::string key = ptw_cache_key(path, text, len, size, family, weight,
+                                        italic, width_int, wrap, ellipsize,
+                                        align);
+  auto it = g_layout_cache.find(key);
+  if (it != g_layout_cache.end()) {
+    return it->second;
+  }
+  IDWriteTextFormat *fmt = ptw_format(family, size, weight, italic);
+  if (fmt == nullptr) {
+    return nullptr;
+  }
+  IDWriteTextLayout *layout =
+      ptw_layout(fmt, text, len, width_int, ellipsize, wrap);
+  fmt->Release();
+  if (layout == nullptr) {
+    return nullptr;
+  }
+  if (width_int > 0 && align != 0) {
+    layout->SetTextAlignment(align == 1   ? DWRITE_TEXT_ALIGNMENT_CENTER
+                             : align == 2 ? DWRITE_TEXT_ALIGNMENT_TRAILING
+                                          : DWRITE_TEXT_ALIGNMENT_LEADING);
+  }
+  if (g_layout_cache_count >= 1024) {
+    for (auto &kv : g_layout_cache) {
+      kv.second->Release();
+    }
+    g_layout_cache.clear();
+    g_layout_cache_count = 0;
+  }
+  g_layout_cache.emplace(key, layout);
+  g_layout_cache_count++;
+  return layout;
+}
+
 } // namespace
 
 extern "C" int pt_measure_font(const char *text, int len, double size,
@@ -204,19 +275,14 @@ extern "C" int pt_measure_font(const char *text, int len, double size,
       out_baseline == nullptr) {
     return 0;
   }
-  IDWriteTextFormat *fmt = ptw_format(family, size, weight, italic);
-  if (fmt == nullptr) {
-    return 0;
-  }
-  IDWriteTextLayout *layout =
-      ptw_layout(fmt, text, len, max_width, ellipsize, wrap);
-  fmt->Release();
+  IDWriteTextLayout *layout = ptw_cached_layout("m", text, len, size, family,
+                                                weight, italic, max_width,
+                                                wrap, ellipsize, 0);
   if (layout == nullptr) {
     return 0;
   }
   DWRITE_TEXT_METRICS tm;
   if (FAILED(layout->GetMetrics(&tm))) {
-    layout->Release();
     return 0;
   }
   FLOAT baseline = 0.0f;
@@ -225,7 +291,6 @@ extern "C" int pt_measure_font(const char *text, int len, double size,
   if (SUCCEEDED(layout->GetLineMetrics(&lm, 1, &got)) && got >= 1) {
     baseline = lm.baseline;
   }
-  layout->Release();
   *out_w = static_cast<int32_t>(tm.width + 0.5f);
   *out_h = static_cast<int32_t>(tm.height + 0.5f);
   *out_baseline = static_cast<int32_t>(baseline + 0.5f);
@@ -684,21 +749,14 @@ extern "C" int pt_draw(unsigned char *data, int buf_w, int buf_h, double x,
   if (data == nullptr || text == nullptr || buf_w < 1 || buf_h < 1) {
     return 0;
   }
-  IDWriteTextFormat *fmt = ptw_format(family, size, 400, 0);
-  if (fmt == nullptr) {
-    return 0;
-  }
-  IDWriteTextLayout *layout =
-      ptw_layout(fmt, text, len, max_width, ellipsize, wrap);
-  fmt->Release();
+  IDWriteTextLayout *layout = ptw_cached_layout("m", text, len, size, family,
+                                                400, 0, max_width, wrap,
+                                                ellipsize, 0);
   if (layout == nullptr) {
     return 0;
   }
-  const int ok = ptw_render(layout, static_cast<float>(x),
-                            static_cast<float>(y), data, buf_w, buf_h, r, g, b,
-                            a, nullptr, 0, nullptr, 0);
-  layout->Release();
-  return ok;
+  return ptw_render(layout, static_cast<float>(x), static_cast<float>(y), data,
+                    buf_w, buf_h, r, g, b, a, nullptr, 0, nullptr, 0);
 }
 
 extern "C" int pt_draw_box(unsigned char *data, int buf_w, int buf_h, double x,
@@ -710,32 +768,20 @@ extern "C" int pt_draw_box(unsigned char *data, int buf_w, int buf_h, double x,
   if (data == nullptr || text == nullptr || buf_w < 1 || buf_h < 1) {
     return 0;
   }
-  IDWriteTextFormat *fmt = ptw_format(family, size, weight, italic);
-  if (fmt == nullptr) {
-    return 0;
-  }
   const int wrapped_axis = box_w > 0.0 && (wrap != 0 || ellipsize != 0);
-  IDWriteTextLayout *layout =
-      ptw_layout(fmt, text, len, wrapped_axis ? static_cast<int>(box_w) : 0,
-                 ellipsize, wrap);
-  fmt->Release();
+  IDWriteTextLayout *layout = ptw_cached_layout(
+      "b", text, len, size, family, weight, italic,
+      wrapped_axis ? static_cast<int>(box_w) : 0, wrap, ellipsize,
+      wrapped_axis ? align : 0);
   if (layout == nullptr) {
     return 0;
-  }
-  if (wrapped_axis) {
-    // 有宽约束时对齐交给布局（与 Pango 设 PANGO_ALIGN_* 同口径）
-    layout->SetTextAlignment(align == 1   ? DWRITE_TEXT_ALIGNMENT_CENTER
-                             : align == 2 ? DWRITE_TEXT_ALIGNMENT_TRAILING
-                                          : DWRITE_TEXT_ALIGNMENT_LEADING);
   }
   double dx = 0.0;
   double dy = 0.0;
   ptw_box_offsets(layout, align, valign, box_w, box_h, wrapped_axis, &dx, &dy);
-  const int ok = ptw_render(layout, static_cast<float>(x + dx),
-                            static_cast<float>(y + dy), data, buf_w, buf_h, r,
-                            g, b, a, nullptr, 0, nullptr, 0);
-  layout->Release();
-  return ok;
+  return ptw_render(layout, static_cast<float>(x + dx),
+                    static_cast<float>(y + dy), data, buf_w, buf_h, r, g, b, a,
+                    nullptr, 0, nullptr, 0);
 }
 
 extern "C" int pt_draw_box_cr(int64_t cr_id, double x, double y, double box_w,

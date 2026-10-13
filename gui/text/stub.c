@@ -72,6 +72,132 @@ static void pt_apply_width(PangoLayout *layout, int max_width, int wrap,
   }
 }
 
+// ---------------------------------------------------------------------------
+// 布局缓存：pt_make_layout（itemize + shaping + 字体解析）是逐帧逐段的最大头，
+// 而同参数的调用每帧重复。键 = 路径标记 + 文本 + 字体四要素 + 宽约束/换行/
+// 省略/对齐——同键的布局配置完全一致、复用只读（颜色在 cairo 上设、几何偏移
+// 逐调用现算，都不碰布局）。上限 768，超限整表清空：与 MoonBit 侧度量缓存同
+// 口径（键访问有强局部性，整清比逐条 LRU 便宜），清空只发生在内容域异常膨胀
+// 的场景。单线程 UI 循环内使用，无锁。
+// ---------------------------------------------------------------------------
+
+#define PT_CACHE_SLOTS 1024 /* 2 的幂 */
+#define PT_CACHE_LIMIT 768
+
+typedef struct {
+  char *key;
+  PangoLayout *layout; /* 缓存持满引用 */
+} PtEntry;
+
+static PtEntry pt_cache[PT_CACHE_SLOTS];
+static int pt_cache_count = 0;
+
+static unsigned pt_key_hash(const char *s) {
+  unsigned h = 5381u;
+  while (*s != '\0') {
+    h = h * 33u + (unsigned char)*s;
+    s++;
+  }
+  return h;
+}
+
+static PangoLayout *pt_cache_get(const char *key) {
+  unsigned i = pt_key_hash(key) & (PT_CACHE_SLOTS - 1);
+  for (int k = 0; k < PT_CACHE_SLOTS; k++) {
+    if (pt_cache[i].key == NULL) {
+      return NULL; /* 线性探测撞到空槽即不存在 */
+    }
+    if (strcmp(pt_cache[i].key, key) == 0) {
+      return pt_cache[i].layout;
+    }
+    i = (i + 1) & (PT_CACHE_SLOTS - 1);
+  }
+  return NULL;
+}
+
+static void pt_cache_clear(void) {
+  for (int i = 0; i < PT_CACHE_SLOTS; i++) {
+    if (pt_cache[i].key != NULL) {
+      free(pt_cache[i].key);
+      g_object_unref(pt_cache[i].layout);
+      pt_cache[i].key = NULL;
+      pt_cache[i].layout = NULL;
+    }
+  }
+  pt_cache_count = 0;
+}
+
+/* 拿走 layout 的满引用；同键已存在时丢掉多余布局。 */
+static void pt_cache_put(const char *key, PangoLayout *layout) {
+  if (pt_cache_count >= PT_CACHE_LIMIT) {
+    pt_cache_clear();
+  }
+  unsigned i = pt_key_hash(key) & (PT_CACHE_SLOTS - 1);
+  for (int k = 0; k < PT_CACHE_SLOTS; k++) {
+    if (pt_cache[i].key == NULL) {
+      pt_cache[i].key = g_strdup(key);
+      pt_cache[i].layout = layout;
+      pt_cache_count++;
+      return;
+    }
+    if (strcmp(pt_cache[i].key, key) == 0) {
+      g_object_unref(layout);
+      return;
+    }
+    i = (i + 1) & (PT_CACHE_SLOTS - 1);
+  }
+}
+
+/* 键 = 头部参数段 + 全量文本字节（动态分配，调用方 free）。path 区分测量("m")
+ * 与盒绘制("b")两条配置路径，避免头部参数撞车。 */
+static char *pt_cache_key(const char *path, const char *text, int len,
+                          double size, const char *family, int weight,
+                          int italic, int width_int, int wrap, int ellipsize,
+                          int align) {
+  char head[160];
+  snprintf(head, sizeof(head), "%s|%g|%s|%d|%d|%d|%d|%d|%d|", path, size,
+           family != NULL ? family : "", weight, italic, width_int, wrap,
+           ellipsize, align);
+  if (len < 0) {
+    len = text != NULL ? (int)strlen(text) : 0;
+  }
+  if (len < 0 || text == NULL) {
+    len = 0;
+  }
+  size_t hl = strlen(head);
+  char *key = (char *)malloc(hl + (size_t)len + 1);
+  if (key == NULL) {
+    return NULL;
+  }
+  memcpy(key, head, hl);
+  if (len > 0) {
+    memcpy(key + hl, text, (size_t)len);
+  }
+  key[hl + (size_t)len] = '\0';
+  return key;
+}
+
+/* 测量与 pt_draw 共用的「无盒」取布局：命中直接用，未命中建好入库。 */
+static PangoLayout *pt_plain_layout(const char *text, int len, double size,
+                                    const char *family, int weight, int italic,
+                                    int max_width, int wrap, int ellipsize) {
+  char *key = pt_cache_key("m", text, len, size, family, weight, italic,
+                           max_width, wrap, ellipsize, 0);
+  if (key == NULL) {
+    return NULL;
+  }
+  PangoLayout *layout = pt_cache_get(key);
+  if (layout == NULL) {
+    layout = pt_make_layout(text, len, size, family, weight, italic);
+    if (layout != NULL) {
+      pt_apply_width(layout, max_width, wrap, ellipsize);
+      pt_cache_put(key, layout);
+    }
+  }
+  free(key);
+  return layout;
+}
+
 // 测量：out = [width, height, baseline]（像素）。max_width <= 0 不约束；
 // ellipsize != 0 尾端省略；wrap != 0 按词断行。
 int pt_measure(const char *text, int len, double size, const char *family,
@@ -80,15 +206,15 @@ int pt_measure(const char *text, int len, double size, const char *family,
   if (text == NULL || out_w == NULL || out_h == NULL || out_baseline == NULL) {
     return 0;
   }
-  PangoLayout *layout = pt_make_layout(text, len, size, family, 400, 0);
+  PangoLayout *layout =
+      pt_plain_layout(text, len, size, family, 400, 0, max_width, wrap,
+                      ellipsize);
   if (layout == NULL) {
     return 0;
   }
-  pt_apply_width(layout, max_width, wrap, ellipsize);
   int w = 0, h = 0;
   pango_layout_get_pixel_size(layout, &w, &h);
   int baseline = pango_layout_get_baseline(layout);
-  g_object_unref(layout);
   *out_w = w;
   *out_h = h;
   // Pango 基线是 Pango units，四舍五入到整像素
@@ -156,17 +282,17 @@ int pt_draw(unsigned char *data, int buf_w, int buf_h, double x, double y,
     return 0;
   }
   cairo_t *cr = cairo_create(surf);
-  PangoLayout *layout = pt_make_layout(text, len, size, family, 400, 0);
+  PangoLayout *layout =
+      pt_plain_layout(text, len, size, family, 400, 0, max_width, wrap,
+                      ellipsize);
   if (layout == NULL) {
     cairo_destroy(cr);
     cairo_surface_destroy(surf);
     return 0;
   }
-  pt_apply_width(layout, max_width, wrap, ellipsize);
   cairo_set_source_rgba(cr, r / 255.0, g / 255.0, b / 255.0, a / 255.0);
   cairo_move_to(cr, x, y);
   pango_cairo_show_layout(cr, layout);
-  g_object_unref(layout);
   cairo_destroy(cr);
   cairo_surface_flush(surf);
   cairo_surface_destroy(surf);
@@ -183,15 +309,15 @@ int pt_measure_font(const char *text, int len, double size, const char *family,
   if (text == NULL || out_w == NULL || out_h == NULL || out_baseline == NULL) {
     return 0;
   }
-  PangoLayout *layout = pt_make_layout(text, len, size, family, weight, italic);
+  PangoLayout *layout =
+      pt_plain_layout(text, len, size, family, weight, italic, max_width, wrap,
+                      ellipsize);
   if (layout == NULL) {
     return 0;
   }
-  pt_apply_width(layout, max_width, wrap, ellipsize);
   int w = 0, h = 0;
   pango_layout_get_pixel_size(layout, &w, &h);
   int baseline = pango_layout_get_baseline(layout);
-  g_object_unref(layout);
   *out_w = w;
   *out_h = h;
   int bl = baseline / PANGO_SCALE;
@@ -215,29 +341,43 @@ static int pt_render_box(cairo_t *cr, double x, double y, double box_w,
   if (cr == NULL || text == NULL) {
     return 0;
   }
-  PangoLayout *layout = pt_make_layout(text, len, size, family, weight, italic);
-  if (layout == NULL) {
+  // 宽约束/对齐是否交给布局由 wrapped_axis 决定，键里用同一归一化——同键的
+  // 缓存布局配置必然与本次要设的一致
+  int wrapped_axis = box_w > 0.0 && (wrap != 0 || ellipsize != 0);
+  int width_int = wrapped_axis ? (int)(box_w + 0.5) : 0;
+  int align_eff = wrapped_axis ? align : 0;
+  char *key = pt_cache_key("b", text, len, size, family, weight, italic,
+                           width_int, wrap, ellipsize, align_eff);
+  if (key == NULL) {
     return 0;
   }
-  int wrapped_axis = 0;
-  if (box_w > 0.0 && (wrap != 0 || ellipsize != 0)) {
-    // 有宽度约束：换行/省略交给 Pango，水平对齐用布局对齐
-    wrapped_axis = 1;
-    pango_layout_set_width(layout, (int)(box_w * PANGO_SCALE + 0.5));
-    if (wrap != 0) {
-      pango_layout_set_wrap(layout, PANGO_WRAP_WORD_CHAR);
+  PangoLayout *layout = pt_cache_get(key);
+  if (layout == NULL) {
+    layout = pt_make_layout(text, len, size, family, weight, italic);
+    if (layout == NULL) {
+      free(key);
+      return 0;
     }
-    PangoAlignment pa = PANGO_ALIGN_LEFT;
-    if (align == 1) {
-      pa = PANGO_ALIGN_CENTER;
-    } else if (align == 2) {
-      pa = PANGO_ALIGN_RIGHT;
+    if (wrapped_axis) {
+      // 有宽度约束：换行/省略交给 Pango，水平对齐用布局对齐
+      pango_layout_set_width(layout, (int)(box_w * PANGO_SCALE + 0.5));
+      if (wrap != 0) {
+        pango_layout_set_wrap(layout, PANGO_WRAP_WORD_CHAR);
+      }
+      PangoAlignment pa = PANGO_ALIGN_LEFT;
+      if (align == 1) {
+        pa = PANGO_ALIGN_CENTER;
+      } else if (align == 2) {
+        pa = PANGO_ALIGN_RIGHT;
+      }
+      pango_layout_set_alignment(layout, pa);
     }
-    pango_layout_set_alignment(layout, pa);
+    if (ellipsize != 0) {
+      pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_END);
+    }
+    pt_cache_put(key, layout);
   }
-  if (ellipsize != 0) {
-    pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_END);
-  }
+  free(key);
   int lw = 0, lh = 0;
   pango_layout_get_pixel_size(layout, &lw, &lh);
   double dx = 0.0;
@@ -258,7 +398,6 @@ static int pt_render_box(cairo_t *cr, double x, double y, double box_w,
   cairo_set_source_rgba(cr, r / 255.0, g / 255.0, b / 255.0, a / 255.0);
   cairo_move_to(cr, x + dx, y + dy);
   pango_cairo_show_layout(cr, layout);
-  g_object_unref(layout);
   return 1;
 }
 

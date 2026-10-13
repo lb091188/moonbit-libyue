@@ -1584,6 +1584,15 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **验证**:纯 C 探针 `experiment/img_probe/img_backend_probe.c`(独立于 moon 工具链,`cl /W4 /utf-8` 直编,include 进 `render/stub.c` 直喂 `img_*` 入口)末行 **`IMG-BACKEND-OK`**,60 条断言全过:PNG 文件/内存两入口尺寸一致且预乘不越界、坏图/NULL/零长/越界句柄/不存在文件全给 0、`dot.gif` 静态首帧 120×120、动图 4 帧 + 延时 400ms + 逐帧前进帧号单调 + 不同帧像素确实不同 + 回绕后显示帧与首帧逐字节一致、释放幂等且释放后全空操作、PNG 经动图入口 `is_static=1` 且 `advance` 恒 0、**子矩形帧合成**(`experiment/img_probe/assets/subrect.gif` 第二帧 12×12@(14,14):画布仍是 40×40、(0,0) 保留第 0 帧的黑、框内偏红)。跑法:先 `cl` 编出 exe 再在仓库根执行 `experiment/img_probe/img_backend_probe.exe .`(资产重建脚本 `make_asset.py` 用 ffmpeg 现场生成 subrect.gif)。`moon check` 库模块零警告。
 - **本批未做且不假装完成**:macOS 后端(仍是占位);`looping=false` 的「帧号归零」语义(跨平台既有行为,要改得同时动 `ui/gif.mbt` 与 `image_wbtest` 断言);JPEG/BMP/TIFF 未逐格式单独验(走同一条 `CreateDecoderFromFilename` 嗅探路径,PNG/GIF 已实证);真机观感(showcase 卡片/媒体页的图片区、动图是否在动)归 `_人工测试清单.md`。
 
+### 文本布局对象 C 侧缓存(Pango / DirectWrite,2026-10-14,实测数据驱动)
+
+- **背景与实测依据**:帧耗时分段账本(`gui/core/prof.mbt`)在 native-app 真机读数 `frames=190 layout=220ms paint=34487ms present=78ms total=34785ms`——**paint 占 99.1%,layout 只占 0.6%**(yoga 内部缓存有效,「每帧全树 relayout」不是瓶颈),瓶颈是每帧全窗重画时屏内每个文本控件都在 C 侧重建布局对象(Pango `PangoLayout` / DirectWrite `IDWriteTextLayout`,itemize+shaping+字体解析全重算)。
+- **修法(两分支同构)**:布局对象按键缓存,键 = 路径标记(`"m"` 测量/无盒绘制、`"b"` 盒内绘制)+ 全量文本字节 + 字体四要素(族/号/重/形)+ 宽约束/换行/省略/对齐——同键的布局配置完全一致,复用是只读的。上限 1024(Pango)/1024(DWrite),超限整表清空(与 MoonBit 侧度量缓存同口径)。测量与无盒绘制共用 `"m"` 键(配置路径相同);盒内绘制走 `"b"`(宽约束按 wrapped_axis 归一化,对齐只在有宽约束时参与布局)。
+- **复用只读的前提(两平台各自成立)**:Pango 侧颜色在 `cairo_set_source_rgba` 设、几何偏移逐调用现算,都不碰布局;DWrite 侧 `ptw_render` 无区间时不改布局(区间字体/颜色只属于富文本 rt_* 路径,rt_* 仍现搭布局不走缓存),文字色在共享画笔上 `SetColor`。
+- **Windows 侧的免费前提**:`img_anim_advance`(WIC)是「一拍一帧」、组件按 `delay_ms` 节奏问一次,布局对象天然按拍复用;画布资源(WIC 位图 + D2D 渲染目标)此前已进程级缓存,本次补的正是 `CreateTextLayout`(含整段 shaping)这块剩余大头。
+- **实测**:`experiment/anim_cost_bench`(30 行「按钮+输入框+文本」典型页,1400×900,Windows 纯光栅后端)全窗重绘 **21ms/帧**、90×32 小脏区一帧 **0.8ms**、relayout 0ms——P5 闸门判据「局部变化一帧 <16ms」达标。native-app 全页的 after 读数以复跑 `NATIVE-APP-PROF` 为准(账本已落盘 `native-app-prof.txt`)。
+- **未做且不假装完成**:富文本 rt_*(AttributedText)仍逐次现搭布局(演示页用量小,收益另估);测量路径在 MoonBit 侧缓存命中时根本不会到 C 侧,这层 C 缓存主要服务绘制路径与 MoonBit 缓存清空后的冷启动。
+
 ### 自维持重绘环:present 与 expose 互相点火(2026-10-13 真机反馈)
 
 - **现象**:`examples/native-app` 真机「整体卡顿,滚动/点击/悬浮都有 300–500ms 延迟」,同时「图表推点按钮点了没反应、表格点表头不排序、虚拟表格滚不动」。看代码像三个不相干的 bug,实际是**一个根因 + 一处示例漏接线**。
