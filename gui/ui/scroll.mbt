@@ -184,8 +184,12 @@ pub fn scroll_view(
     }
 
     viewport.append_child(scroll_bar(state))
+    @style.apply(
+      viewport,
+      @style.style(border_color="border", border_width=1.0)
+    )
     viewport.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
@@ -193,8 +197,9 @@ pub fn scroll_view(
       state.view_h = r.h
       state.content_h = content.rect.h
       if state.content_h > state.view_h {
-        p.set_stroke_color(@theme.theme_border())
-        p.set_line_width(1.0)
+        let st = @style.style_for(self)
+        p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+        p.set_line_width(@style.number_of(st.border_width, 1.0))
         p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
       }
     })

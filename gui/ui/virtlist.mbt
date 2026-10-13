@@ -16,6 +16,7 @@ pub fn[T] virt_list(
   width? : Double = 0.0,
   overscan? : Int = 2,
   rev? : @core.Store[Int],
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let rh = if row_height > 0.0 { row_height } else { 1.0 }
@@ -81,8 +82,15 @@ pub fn[T] virt_list(
     }
 
     state.apply.val = fn() -> Unit { render_window(false) }
+    @style.apply(
+      viewport,
+      @style.merge_all([
+        @style.style(border_color="border", border_width=1.0),
+        paint_subset(class),
+      ]),
+    )
     viewport.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
@@ -90,8 +98,9 @@ pub fn[T] virt_list(
       state.view_h = r.h
       state.content_h = total.val.to_double() * rh
       if state.content_h > state.view_h {
-        p.set_stroke_color(@theme.theme_border())
-        p.set_line_width(1.0)
+        let st = @style.style_for(self)
+        p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+        p.set_line_width(@style.number_of(st.border_width, 1.0))
         p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
       }
     })
@@ -139,6 +148,7 @@ pub fn table_v(
   selection? : @core.Store[Array[Int]],
   sort? : @core.Store[TableSort],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i : Int, _r : TableRow) -> Unit { () },
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let head_h = 40.0
@@ -158,15 +168,23 @@ pub fn table_v(
     w.node.set_width(@yoga.fixed(width))
     let widths : Ref[Array[Double]] = Ref(table_widths(columns, width - 10.0))
     let rev = @core.Store::new(0)
+    @style.apply(
+      w,
+      @style.merge_all([
+        @style.style(background_color="bg_panel", border_color="border", border_width=1.0),
+        paint_subset(class),
+      ]),
+    )
     w.on_draw = Some(fn(
-      _s : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(@theme.theme_bg_panel())
+      let st = @style.style_for(self)
+      p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
       p.fill_rect(0.0, 0.0, r.w, r.h)
-      p.set_stroke_color(@theme.theme_border())
-      p.set_line_width(1.0)
+      p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+      p.set_line_width(@style.number_of(st.border_width, 1.0))
       p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
     })
     let head = table_header(
@@ -174,6 +192,7 @@ pub fn table_v(
       widths,
       sort,
       head_h,
+      skin=paint_subset(class),
       on_resize=Some(fn(_j : Int, _nw : Double) -> Unit {
         // 虚拟表只管表头两格；数据行靠 rev 整窗重挂（可见行才十来个，重建便宜）
         rev.set(rev.get() + 1)
@@ -194,10 +213,12 @@ pub fn table_v(
           row_height,
           selection,
           on_row_click,
+          skin=paint_subset(class),
         ))
       },
       width=width - 2.0,
       rev=rev,
+      class=class,
     )
     let _ = list.mount_into(w)
     handle(w)
@@ -233,6 +254,7 @@ pub fn sticky_list(
   width? : Double = 0.0,
   height? : Double = 0.0,
   head_h? : Double = 28.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let state = st.scroll
@@ -264,12 +286,20 @@ pub fn sticky_list(
       let head = @core.Widget::new()
       head.node.set_height(@yoga.fixed(hh))
       head.node.set_width(@yoga.percent(100.0))
+      @style.apply(
+        head,
+        @style.merge_all([
+          @style.style(background_color="fill_zebra", color="text_secondary"),
+          paint_subset(class),
+        ]),
+      )
       head.on_draw = Some(fn(
-        _s : @core.Widget,
+        self : @core.Widget,
         p : @render.Painter,
         r : @core.Rect,
       ) -> Unit {
-        p.set_fill_color(@theme.theme_fill_zebra())
+        let hs = @style.style_for(self)
+        p.set_fill_color(@style.color_of(hs.background_color, @theme.theme_fill_zebra()))
         p.fill_rect(0.0, 0.0, r.w, r.h)
         let f = @text.Font::new("", 12.0, weight=@text.SemiBold)
         let _ = @text.draw_box_at(
@@ -280,7 +310,7 @@ pub fn sticky_list(
           r.h,
           title,
           f,
-          @theme.theme_text_secondary(),
+          @style.color_of(hs.color, @theme.theme_text_secondary()),
           align=@text.Start,
           valign=@text.Center,
         )
@@ -298,14 +328,22 @@ pub fn sticky_list(
     sticky_bar.node.set_left(@yoga.fixed(0.0))
     sticky_bar.node.set_right(@yoga.fixed(0.0))
     sticky_bar.node.set_height(@yoga.fixed(hh))
+    @style.apply(
+      sticky_bar,
+      @style.merge_all([
+        @style.style(background_color="bg_panel", border_color="border", color="text_primary"),
+        paint_subset(class),
+      ]),
+    )
     sticky_bar.on_draw = Some(fn(
-      _s : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(@theme.theme_bg_panel())
+      let bs = @style.style_for(self)
+      p.set_fill_color(@style.color_of(bs.background_color, @theme.theme_bg_panel()))
       p.fill_rect(0.0, 0.0, r.w, r.h)
-      p.set_fill_color(@theme.theme_border())
+      p.set_fill_color(@style.color_of(bs.border_color, @theme.theme_border()))
       p.fill_rect(0.0, r.h - 1.0, r.w, 1.0)
       let f = @text.Font::new("", 12.0, weight=@text.SemiBold)
       let _ = @text.draw_box_at(
@@ -316,7 +354,7 @@ pub fn sticky_list(
         r.h,
         st.cur_group,
         f,
-        @theme.theme_text_primary(),
+        @style.color_of(bs.color, @theme.theme_text_primary()),
         align=@text.Start,
         valign=@text.Center,
       )

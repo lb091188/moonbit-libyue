@@ -242,6 +242,7 @@ fn draw_cell(
   align : @text.TextAlign,
   font : @text.Font,
   small_font : @text.Font,
+  fg : String,
 ) -> Unit {
   match cell {
     CellText(t) =>
@@ -254,7 +255,7 @@ fn draw_cell(
           r.h,
           t,
           font,
-          @theme.theme_text_regular(),
+          fg,
           align=align,
           valign=@text.Center,
         )
@@ -295,7 +296,7 @@ fn draw_cell(
         r.h,
         label,
         font,
-        @theme.theme_text_regular(),
+        fg,
         align=@text.Start,
         valign=@text.Center,
       )
@@ -312,7 +313,7 @@ fn draw_cell(
           lh,
           lines[i],
           small_font,
-          @theme.theme_text_regular(),
+          fg,
           align=@text.Start,
           valign=@text.Center,
         )
@@ -330,6 +331,7 @@ fn table_header(
   sort : @core.Store[TableSort]?,
   head_h : Double,
   on_resize? : ((Int, Double) -> Unit)? = None,
+  skin~ : @style.Style = @style.empty_style(),
 ) -> @core.Widget {
   let head_font = @text.Font::new("", 13.0, weight=@text.SemiBold)
       let head = @core.Widget::new()
@@ -342,14 +344,22 @@ fn table_header(
         let cell = @core.Widget::new()
         cell.node.set_width(@yoga.fixed(widths.val[j]))
         cell.node.set_height(@yoga.fixed(head_h))
+        @style.apply(
+          cell,
+          @style.merge_all([
+            @style.style(background_color="fill_zebra", border_color="border", color="text_primary"),
+            skin,
+          ]),
+        )
         cell.on_draw = Some(fn(
           self : @core.Widget,
           p : @render.Painter,
           r : @core.Rect,
         ) -> Unit {
-          p.set_fill_color(@theme.theme_fill_zebra())
+          let st = @style.style_for(self)
+          p.set_fill_color(@style.color_of(st.background_color, @theme.theme_fill_zebra()))
           p.fill_rect(0.0, 0.0, r.w, r.h)
-          p.set_fill_color(@theme.theme_border())
+          p.set_fill_color(@style.color_of(st.border_color, @theme.theme_border()))
           p.fill_rect(0.0, r.h - 1.0, r.w, 1.0)
           let pad_r = if col.sortable { 22.0 } else { 12.0 }
           let _ = @text.draw_box_at(
@@ -360,7 +370,7 @@ fn table_header(
             r.h,
             col.title,
             head_font,
-            @theme.theme_text_primary(),
+            @style.color_of(st.color, @theme.theme_text_primary()),
             align=col.align,
             valign=@text.Center,
           )
@@ -520,6 +530,7 @@ fn table_row_widget(
   row_height : Double,
   selection : @core.Store[Array[Int]]?,
   on_row_click : (Int, TableRow) -> Unit,
+  skin~ : @style.Style = @style.empty_style(),
 ) -> @core.Widget {
   let font = @text.Font::new("", 13.0)
   let small_font = @text.Font::new("", 12.0)
@@ -527,16 +538,28 @@ fn table_row_widget(
           row_w.node.set_flex_direction(@yoga.Row)
           row_w.node.set_width(@yoga.percent(100.0))
           row_w.node.set_height(@yoga.fixed(row_height))
+          // 斑马纹在建树时就定（行号固定），折进基块；悬停底走 hover 桶；
+          // 选中态（底色 + 左缘强调条）是数据态，留内置配色
+          let zebra = if src % 2 == 0 {
+            @style.empty_style()
+          } else {
+            @style.style(background_color="fill_zebra")
+          }
+          @style.apply(
+            row_w,
+            @style.merge_all([
+              zebra,
+              @style.style(border_color="border").hover(background_color="fill_hover"),
+              skin,
+            ]),
+          )
           row_w.on_draw = Some(fn(
             self : @core.Widget,
             p : @render.Painter,
             r : @core.Rect,
           ) -> Unit {
-            let mut bg = if src % 2 == 0 {
-              ""
-            } else {
-              @theme.theme_fill_zebra()
-            }
+            let st = @style.style_for(self)
+            let mut bg = @style.color_of(st.background_color, "")
             let mut selected = false
             match selection {
               Some(s) =>
@@ -549,8 +572,6 @@ fn table_row_widget(
             }
             if selected {
               bg = @theme.theme_primary_light()
-            } else if self.hovered {
-              bg = @theme.theme_fill_hover()
             }
             if bg.length() > 0 {
               p.set_fill_color(bg)
@@ -560,7 +581,7 @@ fn table_row_widget(
               p.set_fill_color(@theme.theme_primary())
               p.fill_rect(0.0, 0.0, 3.0, r.h)
             }
-            p.set_fill_color(@theme.theme_border())
+            p.set_fill_color(@style.color_of(st.border_color, @theme.theme_border()))
             p.fill_rect(0.0, r.h - 1.0, r.w, 1.0)
           })
           for j = 0; j < columns.length(); j = j + 1 {
@@ -569,12 +590,22 @@ fn table_row_widget(
             cell.node.set_width(@yoga.fixed(cols_w[j]))
             cell.node.set_height(@yoga.fixed(row_height))
             let content = cell_of(row, j)
+            @style.apply(cell, skin)
             cell.on_draw = Some(fn(
-              _s : @core.Widget,
+              self : @core.Widget,
               p : @render.Painter,
               r : @core.Rect,
             ) -> Unit {
-              draw_cell(p, content, r, col.align, font, small_font)
+              let st = @style.style_for(self)
+              draw_cell(
+                p,
+                content,
+                r,
+                col.align,
+                font,
+                small_font,
+                @style.color_of(st.color, @theme.theme_text_regular()),
+              )
             })
             row_w.append_child(cell)
           }
@@ -646,15 +677,17 @@ pub fn table(
     // 列宽是活的：表头拖动时改它，行内单元格跟着改宽（不重建树）
     let widths : Ref[Array[Double]] = Ref(table_widths(columns, width - 2.0))
     let body_cells : Ref[Array[Array[@core.Widget]]] = Ref([])
+    @style.apply(w, @style.style(background_color="bg_panel", border_color="border", border_width=1.0))
     w.on_draw = Some(fn(
-      _s : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(@theme.theme_bg_panel())
+      let st = @style.style_for(self)
+      p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
       p.fill_rect(0.0, 0.0, r.w, r.h)
-      p.set_stroke_color(@theme.theme_border())
-      p.set_line_width(1.0)
+      p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+      p.set_line_width(@style.number_of(st.border_width, 1.0))
       p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
     })
     // ---- 表头（共用构造） ----
@@ -664,6 +697,7 @@ pub fn table(
         widths,
         sort,
         head_h,
+        skin=paint_subset(class),
         on_resize=Some(fn(j : Int, nw : Double) -> Unit {
           for row_cells in body_cells.val {
             if j + 1 < row_cells.length() {
@@ -694,6 +728,7 @@ pub fn table(
           row_height,
           selection,
           on_row_click,
+          skin=paint_subset(class),
         )
 
         body.append_child(row_w)

@@ -258,3 +258,88 @@ test "缺陷钉桩：滚动后可见行必须落在视口内（非整行偏移�
   }
   assert_eq(visible, 5)
 }
+
+///|
+/// P2-e 口径：虚拟列表/粘性列表/滚动容器的视口框与分组条都只读样式槽
+/// （内置 border/bg 先折进槽，class 的同名属性覆盖）。
+test "虚拟列表与滚动族只读样式槽：class 覆盖视口描边与分组条底色" {
+  if !ui_text_guard() {
+    return
+  }
+  let red_count = fn(node : @core.Node, w : Double, h : Double) -> Int {
+    let root = @core.Widget::new()
+    root.set_size(w, h)
+    root.set_column()
+    let _ = node.mount_into(root)
+    root.relayout(w, h)
+    let bm = @render.Bitmap::new(w.to_int(), h.to_int())
+    let p = @render.Painter::new(bm)
+    root.paint(p)
+    p.end()
+    let mut n = 0
+    for y = 0; y < h.to_int(); y = y + 1 {
+      for x = 0; x < w.to_int(); x = x + 1 {
+        let c = bm.pixel(x, y)
+        if c.r > 128 && c.g < 64 && c.b < 64 {
+          n = n + 1
+        }
+      }
+    }
+    n
+  }
+  let row_of = fn(i : Int, _x : Int) -> @core.Node {
+    view([text("行 " + i.to_string())], height=30.0)
+  }
+  let plain = red_count(
+    virt_list(virt_items(200), 90.0, 30.0, row_of, width=200.0),
+    220.0,
+    110.0,
+  )
+  let framed = red_count(
+    virt_list(
+      virt_items(200),
+      90.0,
+      30.0,
+      row_of,
+      width=200.0,
+      class=[@style.style(border_color="#ff0000", border_width=3.0)],
+    ),
+    220.0,
+    110.0,
+  )
+  // 内置形态的框是主题描边灰（个别抗锯齿像素不算），class 的红要把量级拉开
+  assert_true(framed > 100 && framed > plain * 50)
+
+  // 粘性列表：分组标题条的底色与文字色吃 class
+  let st = StickyList::new()
+  let rows_of = fn() -> Array[@core.Node] {
+    [text("一行"), text("两行")]
+  }
+  let sticky_classed = red_count(
+    sticky_list(
+      [("组一", rows_of()), ("组二", rows_of())],
+      st,
+      width=200.0,
+      height=120.0,
+      class=[@style.style(background_color="#ff0000")],
+    ),
+    220.0,
+    140.0,
+  )
+  assert_true(sticky_classed > 100)
+
+  // 滚动容器：内容超出视口才画框，框色吃 class
+  let sc = ScrollState::new()
+  let many : Array[@core.Node] = []
+  for i = 0; i < 20; i = i + 1 {
+    let _ = many.push(text("内容行 " + i.to_string()))
+  }
+  let scrolled = red_count(
+    scroll_view(many, sc, width=200.0, height=80.0, class=[
+      @style.style(border_color="#ff0000"),
+    ]),
+    220.0,
+    100.0,
+  )
+  assert_true(scrolled > 20)
+}

@@ -278,3 +278,55 @@ test "排序稳定性：同键保持原相对顺序" {
   assert_eq(names(sort_rows(rows, { column: 1, asc: true })), ["甲", "丙", "乙", "丁"])
   assert_eq(names(sort_rows(rows, { column: 1, asc: false })), ["乙", "丁", "甲", "丙"])
 }
+
+///|
+/// P2-e 口径：表格的表头格、数据行、单元格与整表框都只读样式槽——
+/// 斑马纹在建树时折进基块，悬停底走 hover 桶，选中态（数据态）留内置配色。
+test "表格只读样式槽：class 覆盖表头底/行底线/单元格文字色" {
+  if !ui_text_guard() {
+    return
+  }
+  let cols = [TableColumn::make("名称", 120.0), TableColumn::make("说明", 120.0)]
+  let rows = @core.Store::new(table_rows([["甲", "一"], ["乙", "二"], ["丙", "三"]]))
+  let count = fn(node : @core.Node) -> Int {
+    let (root, _t) = mounted(node, 260.0, 200.0)
+    let bm = @render.Bitmap::new(260, 200)
+    let p = @render.Painter::new(bm)
+    root.paint(p)
+    p.end()
+    let mut n = 0
+    for y = 0; y < 200; y = y + 1 {
+      for x = 0; x < 260; x = x + 1 {
+        let c = bm.pixel(x, y)
+        if c.r > 128 && c.g < 64 && c.b < 64 {
+          n = n + 1
+        }
+      }
+    }
+    n
+  }
+  // 内置形态没有任何红色通道
+  assert_true(count(table(cols, rows, width=250.0)) == 0)
+  // class 的底色盖过整表的 bg_panel 与表头 fill_zebra
+  assert_true(
+    count(
+      table(
+        cols,
+        rows,
+        width=250.0,
+        class=[@style.style(background_color="#ff0000")],
+      ),
+    ) > 200,
+  )
+  // class 的文字色盖过单元格内置的 text_regular（表头是 text_primary，同样被盖）
+  assert_true(
+    count(
+      table(
+        cols,
+        rows,
+        width=250.0,
+        class=[@style.style(color="#ff0000")],
+      ),
+    ) > 4,
+  )
+}
