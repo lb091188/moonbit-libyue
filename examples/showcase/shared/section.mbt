@@ -144,7 +144,7 @@ fn code_copy_row(lines : Array[String]) -> @core.Node {
       @ui.text("", role=@ui.Secondary, handle=fn(w) {
         w.node.set_flex_grow(1.0)
       }),
-      @ui.button_t("复制", variant=@ui.Text, on_click=fn() {
+      @ui.button("复制", variant=@ui.Text, on_click=fn() {
         let _ = @sys.clipboard_set_text(lines.join("\n"))
         match code_toast.val {
           Some(push) => push("代码已复制 ✓", @ui.Success)

@@ -78,7 +78,7 @@ pub let divider_base : Style = style(border_color="border", border_width=1.0)
 // ---- 按钮族 ----
 
 ///|
-/// 主按钮 solid 档（现状 `button` Primary 与 `button_t` Solid：主色底 + 白字 +
+/// 主按钮 solid 档（现状 `button`(Primary) 与 `button_t`(Solid)：主色底 + 白字 +
 /// 左右 12 + 亮档 `primary_hover`；焦点环现状实底按钮走白描边）。
 pub let button_solid : Style = style(
   background_color="primary",
@@ -93,7 +93,7 @@ pub let button_solid : Style = style(
 .focus(border_width=1.0, border_color="#fff")
 
 ///|
-/// 按钮默认档 soft（**现状 `button_t` 的默认 variant 是 Soft 不是 Solid**：
+/// 按钮默认档 soft（**现状组件库默认档是 Soft 不是 Solid**：
 /// 浅主色底 + 主色字，亮档翻主色底白字）。
 pub let button_base : Style = style(
   background_color="primary_light",

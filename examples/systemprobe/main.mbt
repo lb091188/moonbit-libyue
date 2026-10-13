@@ -598,7 +598,7 @@ fn main {
             opens.update(fn(n : Int) -> Int { n + 1 })
             app.schedule_paint()
           },
-          kind=@ui.Border,
+          variant=@ui.Border,
           min_width=110.0,
           handle=fn(w : @core.Widget) -> Unit { btn_open.val = Some(w) },
         ),
@@ -609,7 +609,7 @@ fn main {
             reveals.update(fn(n : Int) -> Int { n + 1 })
             app.schedule_paint()
           },
-          kind=@ui.Border,
+          variant=@ui.Border,
           min_width=110.0,
           handle=fn(w : @core.Widget) -> Unit { btn_reveal.val = Some(w) },
         ),
@@ -646,7 +646,7 @@ fn main {
             }
             app.schedule_paint()
           },
-          kind=@ui.Border,
+          variant=@ui.Border,
           min_width=130.0,
           handle=fn(w : @core.Widget) -> Unit { btn_notify.val = Some(w) },
         ),
@@ -679,7 +679,7 @@ fn main {
             }
             app.schedule_paint()
           },
-          kind=@ui.Border,
+          variant=@ui.Border,
           min_width=110.0,
           handle=fn(w : @core.Widget) -> Unit { btn_tray.val = Some(w) },
         ),
@@ -702,7 +702,7 @@ fn main {
             }
             app.schedule_paint()
           },
-          kind=@ui.Border,
+          variant=@ui.Border,
           min_width=110.0,
           handle=fn(w : @core.Widget) -> Unit { btn_auto_on.val = Some(w) },
         ),
@@ -715,7 +715,7 @@ fn main {
             }
             app.schedule_paint()
           },
-          kind=@ui.Border,
+          variant=@ui.Border,
           min_width=110.0,
           handle=fn(w : @core.Widget) -> Unit { btn_auto_off.val = Some(w) },
         ),
@@ -734,7 +734,7 @@ fn main {
             }
             app.schedule_paint()
           },
-          kind=@ui.Border,
+          variant=@ui.Border,
           min_width=110.0,
           handle=fn(w : @core.Widget) -> Unit { btn_idle.val = Some(w) },
         ),

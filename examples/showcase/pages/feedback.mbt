@@ -55,7 +55,7 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
             @ui.col(
               [
                 @ui.result("操作成功", subtitle="配置已写入并生效。", t=@ui.Success),
-                @ui.row([@ui.button_t("返回首页")], column_gap=8.0),
+                @ui.row([@ui.button("返回首页")], column_gap=8.0),
               ],
               row_gap=10.0,
             ),
@@ -63,7 +63,7 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
               [
                 @ui.result("操作失败", subtitle="网络异常，请稍后重试。", t=@ui.Danger),
                 @ui.row(
-                  [@ui.button_t("重新加载", variant=@ui.Soft)],
+                  [@ui.button("重新加载", variant=@ui.Soft)],
                   column_gap=8.0,
                 ),
               ],
@@ -84,7 +84,7 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
       "popover 给任意节点包点击弹层：内容为任意 Node，再次点击收起。",
       [
         @ui.popover(
-          @ui.button_t("打开气泡"),
+          @ui.button("打开气泡"),
           @ui.text("气泡内容：任意 Node。", role=@ui.Body),
           width=180.0,
           height=60.0,
@@ -92,7 +92,7 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
       ],
       code=[
         "@ui.popover(",
-        "  @ui.button_t(\"打开气泡\"),",
+        "  @ui.button(\"打开气泡\"),",
         "  @ui.text(\"气泡内容：任意 Node。\", role=@ui.Body),",
         "  180.0,",
         "  60.0,",
@@ -106,16 +106,16 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("成功", on_click=fn() {
+            @ui.button("成功", on_click=fn() {
               app.toast_push("保存成功", @ui.Success)
             }),
-            @ui.button_t("警告", on_click=fn() {
+            @ui.button("警告", on_click=fn() {
               app.toast_push("连接超时，已重试", @ui.Warning)
             }),
-            @ui.button_t("错误", on_click=fn() {
+            @ui.button("错误", on_click=fn() {
               app.toast_push("提交失败：网络不可达", @ui.Danger)
             }),
-            @ui.button_t("普通", variant=@ui.Solid, on_click=fn() {
+            @ui.button("普通", variant=@ui.Solid, on_click=fn() {
               app.toast_push("已加入下载队列", @ui.Info)
             }),
           ],
@@ -136,10 +136,10 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("基础对话框", on_click=fn() {
+            @ui.button("基础对话框", on_click=fn() {
               app.dlg_basic.set(true)
             }),
-            @ui.button_t("表单对话框", variant=@ui.Solid, on_click=fn() {
+            @ui.button("表单对话框", variant=@ui.Solid, on_click=fn() {
               app.dlg_form.set(true)
             }),
             @ui.text("最近确认：", role=@ui.Body),

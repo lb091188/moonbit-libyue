@@ -358,7 +358,7 @@ pub fn page_sysinfo(_app : @shared.ProbeApp) -> @core.Node {
       "系统能力",
       "读取本机真实数据，结果因机而异；不支持的能力显示对应错误文本，不影响其余部分。设置类操作见「命令与状态」页（只展示命令文本，不真实执行）。",
       [
-        @ui.button_t("读取系统能力", variant=@ui.Solid, on_click=fn() {
+        @ui.button("读取系统能力", variant=@ui.Solid, on_click=fn() {
           report.set(sysprobe_collect())
         }),
         @ui.bind_label(report, fn(s) { s }),

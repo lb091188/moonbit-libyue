@@ -320,7 +320,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
             @ui.text("悬停秒表：把鼠标放进这块面板（或点上面那颗按钮都算）", role=@ui.Body),
             @ui.row(
               [
-                @ui.button_t("组内按钮", variant=@ui.Solid, on_click=fn() {
+                @ui.button("组内按钮", variant=@ui.Solid, on_click=fn() {
                   app.toast_push("悬停组里的按钮被点了", @ui.Success)
                 }),
                 @ui.bind_label(watch_secs, fn(n) {
@@ -397,19 +397,19 @@ pub fn page_events(app : @shared.App) -> @core.Node {
         ),
         @ui.row(
           [
-            @ui.button_t("手型", on_click=fn() {
+            @ui.button("手型", on_click=fn() {
               apply_cursor(@core.CURSOR_HAND, "Hand")
             }),
-            @ui.button_t("文本", on_click=fn() {
+            @ui.button("文本", on_click=fn() {
               apply_cursor(@core.CURSOR_TEXT, "Text")
             }),
-            @ui.button_t("横向调整", on_click=fn() {
+            @ui.button("横向调整", on_click=fn() {
               apply_cursor(@core.CURSOR_RESIZE_H, "ResizeH")
             }),
-            @ui.button_t("纵向调整", on_click=fn() {
+            @ui.button("纵向调整", on_click=fn() {
               apply_cursor(@core.CURSOR_RESIZE_V, "ResizeV")
             }),
-            @ui.button_t("默认", on_click=fn() {
+            @ui.button("默认", on_click=fn() {
               apply_cursor(@core.CURSOR_DEFAULT, "Default")
             }),
           ],
@@ -424,7 +424,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
         @ui.cursor_group(
           [
             @ui.text("组内文本（回退到组的横向调整）", role=@ui.Body),
-            @ui.button_t("组内按钮（自己的手型）", variant=@ui.Soft, on_click=fn() { () }),
+            @ui.button("组内按钮（自己的手型）", variant=@ui.Soft, on_click=fn() { () }),
           ],
           direction=@yoga.Row,
           column_gap=12.0,

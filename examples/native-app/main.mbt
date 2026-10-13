@@ -514,16 +514,16 @@ fn make_form_section(
       @ui.text("表单族余项：四型按钮 / 链接 / 表单项错误行 / 评分（退出状态行报点击与值）", size=13.0),
       @ui.view(
         [
-          @ui.button_t(
+          @ui.button(
             "实心提交",
             on_click=hit,
             variant=Solid,
             focus_id=21,
             handle=fn(w : @core.Widget) -> Unit { btn_slot.val = Some(w) },
           ),
-          @ui.button_t("柔和", on_click=hit, variant=Soft),
-          @ui.button_t("文字", on_click=hit, variant=Text),
-          @ui.button_t("危险并报错", on_click=hit_err, variant=Danger),
+          @ui.button("柔和", on_click=hit, variant=Soft),
+          @ui.button("文字", on_click=hit, variant=Text),
+          @ui.button("危险并报错", on_click=hit_err, variant=Danger),
           @ui.link("查看详情", fn() -> Unit { lnk.val = lnk.val + 1 }, handle=fn(w : @core.Widget) -> Unit {
             link_slot.val = Some(w)
           }),
@@ -636,7 +636,7 @@ fn make_decl_section(
               @ui.button(
                 "加一",
                 on_click=fn() -> Unit { n.set(n.get() + 1) },
-                kind=@ui.Border,
+                variant=@ui.Border,
                 min_width=64.0,
               ),
             ],
@@ -771,8 +771,8 @@ fn make_message_box_section(
       ),
       @ui.row(
         [
-          @ui.button_t("信息 是/否", on_click=on_confirm, variant=Solid),
-          @ui.button_t("错误 是/否/取消", on_click=on_error, variant=Danger),
+          @ui.button("信息 是/否", on_click=on_confirm, variant=Solid),
+          @ui.button("错误 是/否/取消", on_click=on_error, variant=Danger),
           @core.node_of(live_counter(
             fn() -> String { "弹框次数 " + shots.val.to_string() + "  最近 " + last.val },
             width=260.0,
@@ -832,9 +832,9 @@ fn make_drawn_message_box_section(
       ),
       @ui.row(
         [
-          @ui.button_t("信息 确定", on_click=fn() -> Unit { vis_info.set(true) }),
-          @ui.button_t("警告 三钮", on_click=fn() -> Unit { vis_warn.set(true) }),
-          @ui.button_t(
+          @ui.button("信息 确定", on_click=fn() -> Unit { vis_info.set(true) }),
+          @ui.button("警告 三钮", on_click=fn() -> Unit { vis_warn.set(true) }),
+          @ui.button(
             "错误 是/否",
             variant=@ui.Danger,
             on_click=fn() -> Unit { vis_err.set(true) },
@@ -1028,12 +1028,12 @@ fn make_window_section(
       ),
       @ui.row(
         [
-          @ui.button_t("改标题", on_click=retitle),
-          @ui.button_t("自绘图标", on_click=apply_icon),
-          @ui.button_t("无边框 开", on_click=bl_on),
-          @ui.button_t("无边框 关", on_click=bl_off),
-          @ui.button_t("拖拽带 开", on_click=dr_on),
-          @ui.button_t("拖拽带 关", on_click=dr_off),
+          @ui.button("改标题", on_click=retitle),
+          @ui.button("自绘图标", on_click=apply_icon),
+          @ui.button("无边框 开", on_click=bl_on),
+          @ui.button("无边框 关", on_click=bl_off),
+          @ui.button("拖拽带 开", on_click=dr_on),
+          @ui.button("拖拽带 关", on_click=dr_off),
           @core.node_of(live_counter(
             fn() -> String {
               let (mw, mh) = app.window.min_size()
@@ -1093,22 +1093,22 @@ fn make_taskbar_section(
       ),
       @ui.row(
         [
-          @ui.button_t("10%", on_click=fn() { pct(1, 10, "10%") }),
-          @ui.button_t("50%", on_click=fn() { pct(5, 10, "50%") }),
-          @ui.button_t("100%", on_click=fn() { pct(10, 10, "100%") }),
-          @ui.button_t(
+          @ui.button("10%", on_click=fn() { pct(1, 10, "10%") }),
+          @ui.button("50%", on_click=fn() { pct(5, 10, "50%") }),
+          @ui.button("100%", on_click=fn() { pct(10, 10, "100%") }),
+          @ui.button(
             "错误",
             on_click=fn() { st(@win.TaskbarState::Error, "error") },
           ),
-          @ui.button_t(
+          @ui.button(
             "暂停",
             on_click=fn() { st(@win.TaskbarState::Paused, "paused") },
           ),
-          @ui.button_t(
+          @ui.button(
             "不确定",
             on_click=fn() { st(@win.TaskbarState::Indeterminate, "indeterminate") },
           ),
-          @ui.button_t(
+          @ui.button(
             "清除",
             on_click=fn() { st(@win.TaskbarState::NoProgress, "clear") },
           ),
@@ -1227,11 +1227,11 @@ fn make_tray_section(
       ),
       @ui.row(
         [
-          @ui.button_t("建托盘", on_click=create),
-          @ui.button_t("改提示", on_click=retip),
-          @ui.button_t("挂菜单", on_click=build_menu_and_run),
-          @ui.button_t("弹菜单", on_click=popup),
-          @ui.button_t("移除", on_click=drop),
+          @ui.button("建托盘", on_click=create),
+          @ui.button("改提示", on_click=retip),
+          @ui.button("挂菜单", on_click=build_menu_and_run),
+          @ui.button("弹菜单", on_click=popup),
+          @ui.button("移除", on_click=drop),
           @core.node_of(live_counter(
             fn() -> String {
               let state = match tray.val {
@@ -1346,11 +1346,11 @@ fn make_notify_section(
       ),
       @ui.row(
         [
-          @ui.button_t("发信息", on_click=info),
-          @ui.button_t("发警告", on_click=warn),
-          @ui.button_t("发错误", on_click=err),
-          @ui.button_t("进度 60%", on_click=progress),
-          @ui.button_t("关闭", on_click=close),
+          @ui.button("发信息", on_click=info),
+          @ui.button("发警告", on_click=warn),
+          @ui.button("发错误", on_click=err),
+          @ui.button("进度 60%", on_click=progress),
+          @ui.button("关闭", on_click=close),
           @core.node_of(live_counter(
             fn() -> String {
               "supported=" +
@@ -1819,7 +1819,7 @@ fn make_chart_section(
                   pushes.val = pushes.val + 1
                   @chart.series_push(lin, 0, (pushes.val * 7 % 29).to_double() + 2.0)
                 },
-                kind=@ui.Border,
+                variant=@ui.Border,
                 min_width=64.0,
                 handle=fn(w : @core.Widget) -> Unit { btn_slot.val = Some(w) },
               ),

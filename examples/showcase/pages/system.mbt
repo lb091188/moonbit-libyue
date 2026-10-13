@@ -158,7 +158,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("打开文件…", on_click=fn() {
+            @ui.button("打开文件…", on_click=fn() {
               match app.host.val {
                 Some(a) => {
                   let dlg = @sys.FileDialog::new_open()
@@ -178,7 +178,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("保存文件…", variant=@ui.Soft, on_click=fn() {
+            @ui.button("保存文件…", variant=@ui.Soft, on_click=fn() {
               match app.host.val {
                 Some(a) => {
                   let dlg = @sys.FileDialog::new_save()
@@ -224,7 +224,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("信息 是/否", on_click=fn() {
+            @ui.button("信息 是/否", on_click=fn() {
               let r = @win.show_message_box(
                 "libyue 演示板",
                 "原生消息框：点「是」或「否」看回显。",
@@ -233,7 +233,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
               )
               mb_out.set("信息档 → \{msgbox_result_label(r)}")
             }),
-            @ui.button_t("错误 是/否/取消", variant=@ui.Danger, on_click=fn() {
+            @ui.button("错误 是/否/取消", variant=@ui.Danger, on_click=fn() {
               let r = @win.show_message_box(
                 "libyue 演示板",
                 "错误档：三个按钮都能收回语义。",
@@ -264,13 +264,13 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("普通通知", on_click=fn() {
+            @ui.button("普通通知", on_click=fn() {
               match @core.notify_send("libyue 演示板", "构建完成", "3 个目标已产出") {
                 Ok(id) => nt_out.set("已发送 #\{id}")
                 Err(e) => nt_out.set("发送失败：\{e}")
               }
             }),
-            @ui.button_t("带进度 60%", variant=@ui.Soft, on_click=fn() {
+            @ui.button("带进度 60%", variant=@ui.Soft, on_click=fn() {
               match
                 @core.notify_send(
                   "libyue 演示板",
@@ -312,7 +312,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("写入文本", on_click=fn() {
+            @ui.button("写入文本", on_click=fn() {
               cb_out.set(
                 if @sys.clipboard_set_text("libyue 演示板 · 剪贴板写入") {
                   "已写入（去别处粘贴试试）"
@@ -321,7 +321,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
                 },
               )
             }),
-            @ui.button_t("读取剪贴板", variant=@ui.Soft, on_click=fn() {
+            @ui.button("读取剪贴板", variant=@ui.Soft, on_click=fn() {
               match @sys.clipboard_get_text() {
                 Some(t) => cb_out.set("读到：\{t}")
                 None => cb_out.set("读不到（空或不可用）")
@@ -347,7 +347,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("1.5 秒后提示", on_click=fn() {
+            @ui.button("1.5 秒后提示", on_click=fn() {
               ignore(
                 @core.set_timeout(1500, fn() {
                   app.toast_push("延时任务触发", @ui.Success)
@@ -355,7 +355,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
               )
               timer_out.set("已排 1.5s 单次")
             }),
-            @ui.button_t("起周期表(1s)", variant=@ui.Soft, on_click=fn() {
+            @ui.button("起周期表(1s)", variant=@ui.Soft, on_click=fn() {
               if tick_id.val != 0 {
                 timer_out.set("表已经在跑")
               } else {
@@ -373,7 +373,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
                 }
               }
             }),
-            @ui.button_t("停表", variant=@ui.Text, on_click=fn() {
+            @ui.button("停表", variant=@ui.Text, on_click=fn() {
               match app.host.val {
                 Some(a) =>
                   if tick_id.val != 0 {
@@ -433,7 +433,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
         }),
         @ui.row(
           [
-            @ui.button_t("改提示", variant=@ui.Soft, on_click=fn() {
+            @ui.button("改提示", variant=@ui.Soft, on_click=fn() {
               match tray_holder.val {
                 Some(t) => {
                   t.set_tooltip("libyue 演示板", "提示已改 · \{tray_clicks.get()} 次左键")
@@ -444,7 +444,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
             }),
             // 右键菜单：复用 W20a 菜单模型（Tray::set_menu）；菜单项点击
             // 经同一条 dispatch_menu_command 派发链回到回调（main 挂了表）
-            @ui.button_t("挂菜单", variant=@ui.Soft, on_click=fn() {
+            @ui.button("挂菜单", variant=@ui.Soft, on_click=fn() {
               match tray_holder.val {
                 Some(t) => {
                   let menu = @core.Menu::new(title="托盘")
@@ -521,13 +521,13 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("打开 libyue.com", on_click=fn() {
+            @ui.button("打开 libyue.com", on_click=fn() {
               match @sys.open_url("https://libyue.com") {
                 Ok(_) => ext_out.set("已交给默认浏览器")
                 Err(e) => ext_out.set("打开失败：\{e}")
               }
             }),
-            @ui.button_t("在文件管理器显示 TODO.md", variant=@ui.Soft, on_click=fn() {
+            @ui.button("在文件管理器显示 TODO.md", variant=@ui.Soft, on_click=fn() {
               match @sys.reveal_in_file_manager("TODO.md") {
                 Ok(_) => ext_out.set("已交给文件管理器")
                 Err(e) => ext_out.set("显示失败：\{e}")
@@ -553,7 +553,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("刷新", on_click=fn() {
+            @ui.button("刷新", on_click=fn() {
               si_out.set(read_sysinfo())
             }),
           ],
@@ -576,19 +576,19 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("读取", on_click=fn() {
+            @ui.button("读取", on_click=fn() {
               match @sys.vol_get() {
                 Ok(v) => vol_out.set("音量 \{v.volume}% 静音=\{v.muted}（\{v.sink}）")
                 Err(e) => vol_out.set("读取失败：\{e}")
               }
             }),
-            @ui.button_t("设为 50%", variant=@ui.Soft, on_click=fn() {
+            @ui.button("设为 50%", variant=@ui.Soft, on_click=fn() {
               match @sys.vol_set(50) {
                 Ok(_) => vol_out.set("已设为 50%")
                 Err(e) => vol_out.set("设置失败：\{e}")
               }
             }),
-            @ui.button_t("静音切换", variant=@ui.Text, on_click=fn() {
+            @ui.button("静音切换", variant=@ui.Text, on_click=fn() {
               match @sys.vol_get() {
                 Ok(v) =>
                   match @sys.vol_set_mute(!v.muted) {

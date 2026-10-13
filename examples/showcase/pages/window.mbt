@@ -56,7 +56,7 @@ fn win_button(
   act : (@win.Window) -> Unit,
   variant? : @ui.ButtonVariant = @ui.Soft,
 ) -> @core.Node {
-  @ui.button_t(text, variant=variant, on_click=fn() {
+  @ui.button(text, variant=variant, on_click=fn() {
     match app.host.val {
       Some(a) => {
         act(a.window())
@@ -140,7 +140,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         }),
         @ui.row(
           [
-            @ui.button_t("注册 Ctrl+Alt+C", on_click=fn() {
+            @ui.button("注册 Ctrl+Alt+C", on_click=fn() {
               match @core.hotkey_register("Ctrl+Alt+C") {
                 Ok(hk) => {
                   hotkeys.val.push(hk)
@@ -149,7 +149,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
                 Err(e) => hk_status.set(hotkey_err_text(e))
               }
             }),
-            @ui.button_t("注销全部", variant=@ui.Soft, on_click=fn() {
+            @ui.button("注销全部", variant=@ui.Soft, on_click=fn() {
               for hk in hotkeys.val {
                 ignore(@core.hotkey_unregister(hk))
               }

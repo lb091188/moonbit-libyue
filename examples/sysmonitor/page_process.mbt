@@ -318,19 +318,19 @@ fn page_process(app : App) -> @core.Node {
     None =>
       // Windows：一律立即终止，单按钮
       tools.push(
-        @ui.button_t(end_label, variant=@ui.Danger, on_click=fn() {
+        @ui.button(end_label, variant=@ui.Danger, on_click=fn() {
           page.signal_selected(SIGKILL, "强制结束")
         }),
       )
     Some(fl) => {
       // Linux：温和结束（SIGTERM）+ 强制结束（SIGKILL 兜底）两档
       tools.push(
-        @ui.button_t(end_label, variant=@ui.Soft, on_click=fn() {
+        @ui.button(end_label, variant=@ui.Soft, on_click=fn() {
           page.signal_selected(SIGTERM, "结束")
         }),
       )
       tools.push(
-        @ui.button_t(fl, variant=@ui.Danger, on_click=fn() {
+        @ui.button(fl, variant=@ui.Danger, on_click=fn() {
           page.signal_selected(SIGKILL, "强制结束")
         }),
       )
@@ -340,7 +340,7 @@ fn page_process(app : App) -> @core.Node {
     @ui.input(nice_store, width=72.0, on_change=fn(s) { page.nice_text = s }),
   )
   tools.push(
-    @ui.button_t(prio_btn, variant=@ui.Soft, on_click=fn() {
+    @ui.button(prio_btn, variant=@ui.Soft, on_click=fn() {
       page.renice_selected(platform)
     }),
   )

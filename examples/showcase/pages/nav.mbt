@@ -155,7 +155,7 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
         @ui.steps(["填写", "确认", "完成"], step),
         @ui.row(
           [
-            @ui.button_t("上一步", variant=@ui.Soft, on_click=fn() {
+            @ui.button("上一步", variant=@ui.Soft, on_click=fn() {
               step.update(fn(n) {
                 let m = n - 1
                 if m < 0 {
@@ -165,7 +165,7 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
                 }
               })
             }),
-            @ui.button_t("下一步", variant=@ui.Solid, on_click=fn() {
+            @ui.button("下一步", variant=@ui.Solid, on_click=fn() {
               step.update(fn(n) {
                 let m = n + 2
                 if m > 2 {
@@ -183,7 +183,7 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
       code=[
         "let step : @core.Store[Int] = @core.Store::new(1)",
         "@ui.steps([\"填写\", \"确认\", \"完成\"], step)",
-        "@ui.button_t(\"下一步\", variant=@ui.Solid, on_click=fn() { step.update(fn(n) { if n + 1 > 2 { 2 } else { n + 1 } }) })",
+        "@ui.button(\"下一步\", variant=@ui.Solid, on_click=fn() { step.update(fn(n) { if n + 1 > 2 { 2 } else { n + 1 } }) })",
       ],
     ),
   ])

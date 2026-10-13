@@ -257,7 +257,7 @@ test "按钮配色求解：变体 + 悬停走预设，显式覆盖吃掉悬停" 
 test "主题化按钮：宽度随文本、抬起落在框内才算点击、焦点环只在聚焦时画" {
   let mut hits = 0
   let store_hit = fn() -> Unit { hits = hits + 1 }
-  let root = mount_root([button_t("提交", on_click=store_hit, focus_id=7)], 300.0, 60.0)
+  let root = mount_root([button("提交", on_click=store_hit, focus_id=7)], 300.0, 60.0)
   let w = kid(root, 0)
   // 「宽度随文本」需要文字层给测量值；本平台还没接上时（Windows 的
   // DirectWrite 在 TODO 的 W5）跳过这一条，点击与焦点环的断言照跑
@@ -289,7 +289,7 @@ test "主题化按钮：宽度随文本、抬起落在框内才算点击、焦�
   assert_true(edge0 != edge1)
   // 禁用：不消费事件、不回调
   let mut off_hits = 0
-  let root2 = mount_root([button_t("禁用", on_click=fn() { off_hits = off_hits + 1 }, disabled=true)], 200.0, 40.0)
+  let root2 = mount_root([button("禁用", on_click=fn() { off_hits = off_hits + 1 }, disabled=true)], 200.0, 40.0)
   let w2 = kid(root2, 0)
   let consumed = click(w2, w2.rect.x + 6.0, w2.rect.y + 6.0)
   assert_false(consumed)

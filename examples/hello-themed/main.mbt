@@ -1,5 +1,5 @@
 // 主题组件库版 hello：跟随系统深浅/主色之后，界面全部用主题化组件
-// （label_t / input / button_t / bind_label）搭建，不碰任何原生控件外观；
+// （label_t / input / button / bind_label）搭建，不碰任何原生控件外观；
 // 窗口底色与文字色随主题走。与 examples/hello 对照：那边只放一行文字。
 //
 // 跑法：moon run examples/hello-themed（需要显示服务；没有时打印一行提示后退出）
@@ -18,7 +18,7 @@ fn main {
             role=@ui.Secondary,
           ),
           @ui.input(name, width=240.0),
-          @ui.button_t("问候", variant=@ui.Solid, on_click=fn() {
+          @ui.button("问候", variant=@ui.Solid, on_click=fn() {
             greet.set("你好,\{name.get()}!")
           }),
           @ui.bind_label(greet, fn(s : String) -> String { s }),

@@ -93,11 +93,11 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
         }),
         @ui.row(
           [
-            @ui.button_t("旋转色相", on_click=fn() {
+            @ui.button("旋转色相", on_click=fn() {
               hue.val = (hue.val + 1) % 3
               @core.invalidate()
             }),
-            @ui.button_t("渐变开关", variant=@ui.Soft, on_click=fn() {
+            @ui.button("渐变开关", variant=@ui.Soft, on_click=fn() {
               grad_on.val = !grad_on.val
               @core.invalidate()
             }),
@@ -151,7 +151,7 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
         }),
         @ui.row(
           [
-            @ui.button_t("换行开关", on_click=fn() {
+            @ui.button("换行开关", on_click=fn() {
               rt_wrap.val = !rt_wrap.val
               rt.set_format({
                 align: @text.Start,
@@ -161,7 +161,7 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
               })
               @core.invalidate()
             }),
-            @ui.button_t("省略号开关", variant=@ui.Soft, on_click=fn() {
+            @ui.button("省略号开关", variant=@ui.Soft, on_click=fn() {
               rt_ellipsis.val = !rt_ellipsis.val
               rt.set_format({
                 align: @text.Start,
@@ -171,7 +171,7 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
               })
               @core.invalidate()
             }),
-            @ui.button_t("改写文本", variant=@ui.Solid, on_click=fn() {
+            @ui.button("改写文本", variant=@ui.Solid, on_click=fn() {
               rt.set_text("文本已替换 ✓（范围属性保留）")
               @core.invalidate()
             }),

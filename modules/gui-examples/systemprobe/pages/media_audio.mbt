@@ -21,7 +21,7 @@ pub fn page_audio(app : @shared.ProbeApp) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("载入演示音频", variant=@ui.Solid, on_click=fn() {
+            @ui.button("载入演示音频", variant=@ui.Solid, on_click=fn() {
               let mp3 = probe_tmp_dir() + "/yue-probe-demo.mp3"
               match
                 @sys.pr_run(
@@ -48,7 +48,7 @@ pub fn page_audio(app : @shared.ProbeApp) -> @core.Node {
                 None => state.set("页面还没挂载，稍后再试")
               }
             }),
-            @ui.button_t("选择本地音频…", on_click=fn() {
+            @ui.button("选择本地音频…", on_click=fn() {
               match app.host.val {
                 Some(a) => {
                   let dlg = @sys.FileDialog::new_open()

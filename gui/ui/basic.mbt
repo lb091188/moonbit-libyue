@@ -1,19 +1,9 @@
-// 基础原语与第一个交互控件：容器 / 分组 / 分隔线 / 标签 / 图像 / 图标 / 按钮。
+// 基础原语：容器 / 面板 / 分隔线 / 文本 / 图像 / 图标（§2 前端化命名后）。
 // 一律返回 `@core.Node`（建树不实例化），颜色在 `on_draw` 里现取主题值。
 //
-// 与 master 的两处命名差（都记进 adaptation）：
-// ① `type=` 换成 `kind=ButtonKind`——本工具链把 `type` 列为保留字，作参数名
-//    直接语法错；
-// ② 禁用态配色暂用「fill_hover 底 + text_secondary 字」，真正的 disabled
-//    色板随主题批补进 `Theme`。
+// 与 master 的一条差仍成立：禁用态配色暂用「fill_hover 底 + text_secondary
+// 字」，真正的 disabled 色板随主题批补进 `Theme`。
 
-///|
-/// 按钮形态。
-pub(all) enum ButtonKind {
-  Primary
-  Border
-  Text
-}
 
 ///|
 /// 通用容器：方向、两个轴的间距、内边距、尺寸、底色与描边。
@@ -275,109 +265,8 @@ pub fn icon(
 }
 
 ///|
-/// 按钮形态编号（同包内 match 用裸构造器，跨包引用要写 `@ui.Primary`）。
-fn kind_id(k : ButtonKind) -> Int {
-  match k {
-    Primary => 0
-    Border => 1
-    Text => 2
-  }
-}
-
-///|
-/// 按钮：悬停/按下态读宿主维护的 `hovered`/`pressed`；点击在**松开仍落在按钮
-/// 内**时触发（捕获期保证指针离开也能收到抬起）。禁用态不消费事件、不换强调色。
-pub fn button(
-  text : String,
-  on_click? : () -> Unit = fn() { () },
-  kind? : ButtonKind = Primary,
-  size? : Double = 13.0,
-  min_width? : Double = 0.0,
-  disabled? : Bool = false,
-  enabled? : Enabled? = None,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  let src = text_source(text, size=size, align=@text.Center)
-  let shape = kind_id(kind)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
-    watch_theme()
-    // 禁用态是单元：布尔若在建树时固化，边界态一改就失效（见 state.mbt）
-    let off = enabled_cell(enabled, disabled)
-    let is_off = fn() -> Bool { off.off }
-    w.node.set_height(@yoga.fixed(@theme.control_height))
-    if min_width > 0.0 {
-      w.node.set_min_width(@yoga.fixed(min_width))
-    }
-    w.node.set_padding_left(@yoga.fixed(12.0))
-    w.node.set_padding_right(@yoga.fixed(12.0))
-    attach_text_measure(w, src)
-    w.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
-    w.on_draw = Some(fn(
-      self : @core.Widget,
-      p : @render.Painter,
-      r : @core.Rect,
-    ) -> Unit {
-      let lit = self.hovered || self.pressed
-      let skin : (String, String, String) =
-        if is_off() {
-          (@theme.theme_text_secondary(), @theme.theme_fill_hover(), @theme.theme_border())
-        } else if shape == 1 {
-          (@theme.theme_primary(), @theme.theme_bg_panel(), @theme.theme_border())
-        } else if shape == 2 {
-          if lit {
-            (@theme.theme_primary(), @theme.theme_fill_hover(), "")
-          } else {
-            (@theme.theme_primary(), "", "")
-          }
-        } else if lit {
-          ("#ffffff", @theme.theme_primary_hover(), "")
-        } else {
-          ("#ffffff", @theme.theme_primary(), "")
-        }
-      if skin.1.length() > 0 {
-        p.set_fill_color(skin.1)
-        p.fill_rect(0.0, 0.0, r.w, r.h)
-      }
-      if skin.2.length() > 0 {
-        p.set_stroke_color(skin.2)
-        p.set_line_width(1.0)
-        p.stroke_rect(0.0, 0.0, r.w, r.h)
-      }
-      // 左右内边距 12；盒内垂直居中交给 draw_box_at（画在会话上，平移裁剪生效）
-      let _ = @text.draw_box_at(
-        p,
-        12.0,
-        0.0,
-        (r.w - 24.0).max(1.0),
-        r.h,
-        src.text,
-        src.font,
-        if is_off() { @theme.theme_text_secondary() } else { skin.0 },
-        align=@text.Center,
-        valign=@text.Center,
-        wrap=false,
-      )
-    })
-    w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
-    ) -> Bool {
-      match ev.kind {
-        @core.Down => !is_off()
-        @core.Up => {
-          let inside_x = ev.x >= 0.0 && ev.x <= self.rect.w
-          let inside_y = ev.y >= 0.0 && ev.y <= self.rect.h
-          if !is_off() && inside_x && inside_y { on_click() }
-          false
-        }
-        @core.Move => !is_off()
-        @core.Leave => false
-      }
-    })
-    handle(w)
-    w
-  })
-}
+/// §2 合并：按钮唯一入口在 `ui/form.mbt` 的 `button`（原 `button`，
+/// `variant = solid / soft / border / text / danger`）；本文件的旧 `button` 已删。
 
 ///|
 /// 图标按钮：只有图标的按钮（悬停浅底、按下更深、禁用不吃事件）。

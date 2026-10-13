@@ -130,7 +130,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
         }),
         @ui.row(
           [
-            @ui.button_t("加载 example.com", on_click=fn() {
+            @ui.button("加载 example.com", on_click=fn() {
               match wv.val {
                 Some(v) => {
                   v.load_url("https://example.com")
@@ -139,7 +139,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("本地 HTML", variant=@ui.Soft, on_click=fn() {
+            @ui.button("本地 HTML", variant=@ui.Soft, on_click=fn() {
               match wv.val {
                 Some(v) => {
                   v.load_html(LOCAL_HTML)
@@ -148,7 +148,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("协议页", variant=@ui.Solid, on_click=fn() {
+            @ui.button("协议页", variant=@ui.Solid, on_click=fn() {
               match wv.val {
                 Some(v) => {
                   let root = scheme_root()
@@ -165,7 +165,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("拒绝路径", variant=@ui.Danger, on_click=fn() {
+            @ui.button("拒绝路径", variant=@ui.Danger, on_click=fn() {
               match wv.val {
                 Some(v) => {
                   let _ = v.unregister_protocol("yuedemo")
@@ -207,7 +207,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("← 后退", on_click=fn() {
+            @ui.button("← 后退", on_click=fn() {
               match wv.val {
                 Some(v) =>
                   if v.can_go_back() {
@@ -219,7 +219,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("前进 →", variant=@ui.Soft, on_click=fn() {
+            @ui.button("前进 →", variant=@ui.Soft, on_click=fn() {
               match wv.val {
                 Some(v) =>
                   if v.can_go_forward() {
@@ -231,19 +231,19 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("刷新", on_click=fn() {
+            @ui.button("刷新", on_click=fn() {
               match wv.val {
                 Some(v) => v.reload()
                 None => ()
               }
             }),
-            @ui.button_t("停止", variant=@ui.Text, on_click=fn() {
+            @ui.button("停止", variant=@ui.Text, on_click=fn() {
               match wv.val {
                 Some(v) => v.stop()
                 None => ()
               }
             }),
-            @ui.button_t("能力查询", variant=@ui.Soft, on_click=fn() {
+            @ui.button("能力查询", variant=@ui.Soft, on_click=fn() {
               match wv.val {
                 Some(v) =>
                   nav_state.set(
@@ -274,7 +274,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("取结果 1+41", on_click=fn() {
+            @ui.button("取结果 1+41", on_click=fn() {
               match wv.val {
                 Some(v) =>
                   ignore(
@@ -285,7 +285,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("读 document.title", variant=@ui.Soft, on_click=fn() {
+            @ui.button("读 document.title", variant=@ui.Soft, on_click=fn() {
               match wv.val {
                 Some(v) =>
                   ignore(
@@ -297,7 +297,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("改页面标题", variant=@ui.Solid, on_click=fn() {
+            @ui.button("改页面标题", variant=@ui.Solid, on_click=fn() {
               match wv.val {
                 Some(v) => {
                   v.execute_javascript("document.title='由原生 JS 设置 ✓'")
@@ -325,7 +325,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("重新注册绑定", on_click=fn() {
+            @ui.button("重新注册绑定", on_click=fn() {
               match wv.val {
                 Some(v) =>
                   bind_state.set(
@@ -338,7 +338,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("移除绑定", variant=@ui.Danger, on_click=fn() {
+            @ui.button("移除绑定", variant=@ui.Danger, on_click=fn() {
               match wv.val {
                 Some(v) =>
                   bind_state.set(
@@ -373,7 +373,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("查当前 URL", on_click=fn() {
+            @ui.button("查当前 URL", on_click=fn() {
               match wv.val {
                 Some(v) => {
                   v.get_cookies_for_url(v.current_url())
@@ -382,7 +382,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("查 example.com", variant=@ui.Soft, on_click=fn() {
+            @ui.button("查 example.com", variant=@ui.Soft, on_click=fn() {
               match wv.val {
                 Some(v) => {
                   v.get_cookies_for_url("https://example.com")
@@ -409,7 +409,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("抓正文", on_click=fn() {
+            @ui.button("抓正文", on_click=fn() {
               match wv.val {
                 Some(v) =>
                   ignore(
@@ -422,7 +422,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("抓链接", variant=@ui.Soft, on_click=fn() {
+            @ui.button("抓链接", variant=@ui.Soft, on_click=fn() {
               match wv.val {
                 Some(v) =>
                   ignore(
@@ -433,7 +433,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("抓 meta", variant=@ui.Soft, on_click=fn() {
+            @ui.button("抓 meta", variant=@ui.Soft, on_click=fn() {
               match wv.val {
                 Some(v) =>
                   ignore(
@@ -444,7 +444,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => ()
               }
             }),
-            @ui.button_t("抓结构", variant=@ui.Text, on_click=fn() {
+            @ui.button("抓结构", variant=@ui.Text, on_click=fn() {
               match wv.val {
                 Some(v) =>
                   ignore(

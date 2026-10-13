@@ -379,7 +379,7 @@ pub fn stepper(
           state.set((state.get() - inc).clamp(min=lo, max=hi))
           sync()
         },
-        kind=Border,
+        variant=Border,
         min_width=32.0,
         enabled=Some(minus_off),
       ),
@@ -390,7 +390,7 @@ pub fn stepper(
           state.set((state.get() + inc).clamp(min=lo, max=hi))
           sync()
         },
-        kind=Border,
+        variant=Border,
         min_width=32.0,
         enabled=Some(plus_off),
       ),
@@ -406,6 +406,7 @@ pub fn stepper(
 pub(all) enum ButtonVariant {
   Solid
   Soft
+  Border
   Text
   Danger
 }
@@ -426,7 +427,7 @@ pub fn button_skin(
     match variant {
       Solid | Danger => "#ffffff"
       Soft => if lit { "#ffffff" } else { @theme.theme_primary() }
-      Text => @theme.theme_primary()
+      Border | Text => @theme.theme_primary()
     }
   }
   let bg = if background_color.length() > 0 {
@@ -435,6 +436,7 @@ pub fn button_skin(
     match variant {
       Solid => if lit { @theme.theme_primary_hover() } else { @theme.theme_primary() }
       Soft => if lit { @theme.theme_primary() } else { @theme.theme_primary_light() }
+      Border => @theme.theme_bg_panel()
       Text => if lit { @theme.theme_fill_hover() } else { "" }
       Danger => if lit { @theme.theme_danger_hover() } else { @theme.theme_danger() }
     }
@@ -443,9 +445,11 @@ pub fn button_skin(
 }
 
 ///|
-/// 主题化按钮：变体配色（悬停/按下都收敛在主题内）+ 焦点环。`focus_id` 传
-/// 正数才可 Tab 到；焦点环在实底变体上用白色（主题色环在其上不可见）。
-pub fn button_t(
+/// 按钮（§2 唯一入口，原 `button` + `button` 合并）：`variant = solid / soft /
+/// border / text / danger`，变体配色（悬停/按下都收敛在主题内）+ 焦点环。
+/// `focus_id` 传正数才可 Tab 到；焦点环在实底变体上用白色（主题色环在其上不可见）。
+/// 边框档（Border）另描 1px `border` 色边，其余档无描边。
+pub fn button(
   text : String,
   on_click? : () -> Unit = fn() -> Unit { () },
   variant? : ButtonVariant = Soft,
@@ -459,12 +463,6 @@ pub fn button_t(
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let src = text_source(text, size=size, align=@text.Center)
-  let v_id = match variant {
-    Solid => 0
-    Soft => 1
-    Text => 2
-    Danger => 3
-  }
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     let off = enabled_cell(enabled, disabled)
@@ -508,15 +506,33 @@ pub fn button_t(
         valign=@text.Center,
         wrap=false,
       )
-      if self.focused && v_id != 0 && v_id != 3 {
-        // 主题色环只在非实底上可见
-        p.set_stroke_color(@theme.theme_primary())
-        p.set_line_width(1.0)
-        p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
-      } else if self.focused {
-        p.set_stroke_color("#ffffff")
-        p.set_line_width(1.0)
-        p.stroke_rect(1.5, 1.5, r.w - 3.0, r.h - 3.0)
+      match variant {
+        Border => {
+          // 边框档常描 1px border 色(内缩 0.5 同浮层口径)
+          p.set_stroke_color(if off.off {
+            @theme.theme_border()
+          } else {
+            @theme.theme_border()
+          })
+          p.set_line_width(1.0)
+          p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+        }
+        _ => ()
+      }
+      if self.focused {
+        match variant {
+          // 主题色环只在非实底上可见
+          Solid | Danger => {
+            p.set_stroke_color("#ffffff")
+            p.set_line_width(1.0)
+            p.stroke_rect(1.5, 1.5, r.w - 3.0, r.h - 3.0)
+          }
+          _ => {
+            p.set_stroke_color(@theme.theme_primary())
+            p.set_line_width(1.0)
+            p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+          }
+        }
       }
     })
     w.on_pointer = Some(fn(

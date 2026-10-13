@@ -56,7 +56,7 @@ pub fn page_video(app : @shared.ProbeApp) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("载入演示视频", variant=@ui.Solid, on_click=fn() {
+            @ui.button("载入演示视频", variant=@ui.Solid, on_click=fn() {
               let avi = probe_tmp_dir() + "/yue-probe-demo.avi"
               match
                 @sys.pr_run(
@@ -84,7 +84,7 @@ pub fn page_video(app : @shared.ProbeApp) -> @core.Node {
                 None => state.set("页面还没挂载，稍后再试")
               }
             }),
-            @ui.button_t("选择本地视频…", on_click=fn() {
+            @ui.button("选择本地视频…", on_click=fn() {
               match app.host.val {
                 Some(a) => {
                   let dlg = @sys.FileDialog::new_open()

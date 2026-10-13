@@ -19,7 +19,7 @@ pub fn page_store_demo(_app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.button_t("计数 +1", variant=@ui.Solid, on_click=fn() {
+            @ui.button("计数 +1", variant=@ui.Solid, on_click=fn() {
               counter.update(fn(n) { n + 1 })
               // ↑ 动作本体；若 doubled 不靠 subscribe，这里就得再写
               //   doubled.set(counter.get() * 2)——信号版无此负担
@@ -31,7 +31,7 @@ pub fn page_store_demo(_app : @shared.App) -> @core.Node {
       ],
       code=[
         "let counter = @core.Store::new(0)",
-        "@ui.button_t(\"计数 +1\", variant=@ui.Solid, on_click=fn() {",
+        "@ui.button(\"计数 +1\", variant=@ui.Solid, on_click=fn() {",
         "  counter.update(fn(n) { n + 1 })",
         "})",
         "@ui.bind_label(counter, fn(n) { \"计数：\\{n}\" })",

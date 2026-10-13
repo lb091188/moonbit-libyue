@@ -241,7 +241,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
         ),
         @ui.row(
           [
-            @ui.button_t("刷新访问量", variant=@ui.Solid, on_click=fn() {
+            @ui.button("刷新访问量", variant=@ui.Solid, on_click=fn() {
               app.counter.update(fn(n) { n + 1 })
             }),
             @ui.progress_line(app.ratio.store()),
@@ -332,7 +332,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
             ),
             @ui.row(
               [
-                @ui.button_t("添加一行", on_click=fn() {
+                @ui.button("添加一行", on_click=fn() {
                   let n = lang_base.length() + 1
                   lang_base.push(
                     @ui.TableRow::make(["新语言 \{n}", "2026", "演示 Store 驱动"]),
