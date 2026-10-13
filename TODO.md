@@ -68,7 +68,7 @@
   - [ ] 观感逐页比对不回退（真机由用户复验，`examples/hello`、`hello-themed`、`showcase`、`native-app`、`sysmonitor`）。
 - [ ] **P3 响应式补强**：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` / `mount_window` 补 `render` 槽（动工前先定 design.md §6 唯一待定：`Store` 去重与否）。
 - [ ] **P4 绘制能力**：`Painter` 全局 alpha（opacity 全路径）+ `box_shadow` 硬阴影档。
-- [ ] **P5 动画**：`transition`（状态桶属性插值 + 帧驱动，复用 gif 虚拟时钟）。
+- [ ] **P5 动画（已改排到性能批之后，2026-10-14 定）**：`transition` 本质是连续置脏重绘，纯软件光栅路径上「没有脏矩形 = 每帧一次全窗重绘」；先做 §6.6「脏矩形重绘 + 文本布局缓存」，量出局部变化一帧 < 16ms 再开工（判据见 design.md §5 末与 adaptation）。P4 的 opacity/box_shadow 是静态属性，不受此闸门影响，已先行落地。
 
 ### 控件（一律自绘，不再引入原生控件皮肤；家族名对应 master `yue/components/` 九个源文件）
 - [~] 基础原语：`group`/`separator`/标签/图像/图标/按钮已落新包 **`ui`**（首批 7 件，另附 `container`；文本 measure/baseline 首次回灌布局引擎，`on_pointer`/`on_draw` 首参为控件本身以免自捕获引用环；`type=` 因是保留字改 `kind : ButtonKind`；`yue/components` 属旧链路红点，按批替换）；表单族 15 件已全部落 `ui/form.mbt` + `ui/entry.mbt` + `ui/textarea.mbt`；`tab` 已由 `ui/nav.mbt` 的 `tabs_t` 承担（页签头行 + 预建页区显隐），`scroll` 已落 `ui/scroll.mbt`（垂直滚动容器 + 自绘滚动条，平移用 yoga 新补的相对定位偏移），`splitter` 已落 `ui/split.mbt`（`hsplit`/`vsplit`）、`combo` 已落 `ui/form.mbt`
@@ -337,7 +337,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$MSVC/bin/Hostx64/x64/cl.exe" \
 - [x] **自维持重绘环**（2026-10-13 已修，Win + GTK 两分支）：`wm_present` 每帧都 `InvalidateRect` / `gtk_widget_queue_draw`，而 `WM_PAINT` / `draw` 回调又置 `need_draw` —— 构成「present → expose → 置脏 → MoonBit 全帧重画 → present」的永动环，**应用永不空闲**：输入只能排在一帧（真机 300–500ms）之后（悬浮/点击/滚轮的延迟就是这个），且一帧里攒下的上百条鼠标移动把 64 槽事件队列塞满，随后的**抬起与滚轮被整批丢掉**（表现正是「按钮点了没反应、表头点了不排序、滚轮不滚」）。修法：expose/draw 只贴缓存帧、**不再请求重绘**（只在还没有帧可贴时请求一次）；另在 `wm_push` 里**合并连续移动事件**（位置是状态不是流水），队列任何时刻最多一条移动。重绘请求一律由 MoonBit 侧 `schedule_paint`（`@core.invalidate`）发起。
 - [x] **native-app 窗口高 3520 → 900**（2026-10-13）：视口剔除（`widget_cull_skip`）只画屏内那部分，**窗口高直接决定每帧像素量**（1400×3520 ≈ 490 万 → 1400×900 ≈ 126 万）。`enable_root_scroll` 落地后长柱本来就能滚到，3520 只剩代价没有收益（改成 `APP_WIN_H` 常量，要「一屏看全」改回 3520 即可）。
 - [x] **表格排序不生效 = 示例漏接线**（2026-10-13）：表头点击只切 `TableSort` Store（组件**不替使用方排序**，口径见 `ui/table.mbt`），示例没订阅它把行序写回去，于是「箭头动、行不动」。补 `@ui.sort_rows`（前导数字优先比数值 + 稳定排序，纯函数）作参考口径，示例两三行订阅即可；两条回归落 `table_wbtest.mbt`。
-- [ ] **脏矩形重绘**（未做）：`@core.invalidate()` 无参 = 全窗脏；悬停/点击其实知道受影响的控件矩形（`route_pointer` 的 hover 变更点、按下的捕获者），做成 damage rect 后悬浮反馈可从「一帧」降到毫秒级（**滚动仍要全视口重画**，收益在悬停与点击）。前置：`App` 复用帧 Bitmap（现在每帧 `Bitmap::new` 一张 1400×900×4 ≈ 5MB）。
+- [ ] **脏矩形重绘**（未做；**现在是 P5 动画的开工闸门**，见 §「前端化批次」与 design.md §5 末）：`@core.invalidate()` 无参 = 全窗脏；悬停/点击其实知道受影响的控件矩形（`route_pointer` 的 hover 变更点、按下的捕获者），做成 damage rect 后悬浮反馈可从「一帧」降到毫秒级（**滚动仍要全视口重画**，收益在悬停与点击）。前置：`App` 复用帧 Bitmap（现在每帧 `Bitmap::new` 一张 1400×900×4 ≈ 5MB）。
 - [ ] **光栅微优化**（未做）：`raster.mbt` / `raster_fill.mbt` 每次 fill/stroke 都新分配一条 width 长的 `cov` 数组（每帧数百次）；不透明实心填充可走「无覆盖率」快路径；`raster.mbt` 里根背景那 126 万像素的全窗填充占单帧成本的可观一份。
 - [ ] **文本布局缓存**（未做，单帧成本里最重的一块）：`text/dwrite_text.cpp` 的 `ptw_session_layout` 每次 `rt_measure` / `rt_draw` 都新建 `IDWriteTextFormat` + `IDWriteTextLayout`（**同一条文本一帧建两次**），`AttributedText::rt()` 每个文本节点每帧开两个会话，且 `rt_new`/`rt_free` 每帧重来、无跨帧缓存；`ui` 的 label/button/表格单元格一律走这条路。布局（yoga）每帧还会为**全树**文本节点各测一次，屏外的也照测。
 - [ ] **量出来再优化**：上面三条都还没在真机上分档计时（`experiment/text_bench` 已有先例可扩展）。建议先做一个「单帧成本分解」探针（根背景填充 / 控件绘制 / 文本 / memcpy+StretchDIBits 各占多少），再决定动哪一块。

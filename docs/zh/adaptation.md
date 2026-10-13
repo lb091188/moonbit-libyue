@@ -1747,6 +1747,14 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - 坑③：图表数据窗口（`Array[LineSeries]`、`TreeItem`、`GeoRect` 等）元素无 Eq 且整窗比较代价高于收益——chart 与示例一律 `set_always`，共 33 处调用点由编译器逐点钉出。
 - 验证：core 121/121（新增去重回归 1 条：同值不发/异值发一次/`set_always` 强发/`update` 走同口径）；全仓 `moon check --deny-warn` 零错零警；库测试 861 条 859 过（2 条红为 W9/排序既有基线）。
 
+### 动画开工判据:纯软件光栅下 transition = 每帧全窗重绘(2026-10-14,决定 P5 排期)
+
+- 问题:P4 之后要不要马上做 P5(`transition` 状态桶属性插值 + 帧驱动)。判据不能靠感觉,量了一版:`experiment/anim_cost_bench`(30 行「按钮+输入框+文本」的典型页,1400×900,`page.paint` 20 帧)本机读数 `full=16ms/20帧`、`relayout=0ms/20帧`、局部 90×32 圆角填充 `<1ms/帧`。
+- **但这台是 Linux,`Painter::new` 探针选中的是 cairo 后端**(见 `render/painter.mbt` 后端选择与 `Cairo::over` 优先),这 0.8ms/帧是**交给系统 cairo/X 的宿主侧提交成本**,不代表 CPU 光栅的每帧代价;真正的纯光栅代价在 Windows/mac 那条 `PureBackend(Raster)` 路径上(§6.6 性能批的真机读数:全窗一帧 300–500ms,修复后仍待分档计时;`text_bench` 在 Win 上单次盒内绘制约 0.35ms,而一次全窗重绘要为**屏内每个文本节点**各付一次布局+落墨)。
+- 结论与口径:**动画的本质是连续置脏重绘**,在没有脏矩形之前,Windows 上「一个 150ms 的 hover 过渡」= 约 9 次全窗重绘,反馈会明显掉帧,还会把「输入只重绘那一格」的粒度承诺反噬掉。故 **P5 改排到 §6.6「脏矩形重绘 + 文本布局缓存」之后**,开工判据:局部变化(悬停一颗按钮)一帧 < 16ms。P4 的 `opacity`/`box_shadow` 是**静态属性**(画一帧就够),不受该闸门影响,已先行落地。
+- 顺手一条工具链坑:`local` 是**保留字**(实测 `[0035] The word 'local' is reserved`),`let local = ...` 直接撞;探针变量改名 `part`。写新代码遇到 `alias`/`abbrev`/`local` 一类词先当保留字看待(与 §1.6 表同源)。
+- 下一步要的真机数(用户执行,一条命令):Windows 上 `moon run examples/native-app` 跑起来后退出,读 `NATIVE-APP-PROF` 行(布局/绘制/上屏三段累加 + 最长帧,由 `core/prof.mbt` 常开统计)——用它定「脏矩形收益有多大」并作为 P5 的开工判据。
+
 ### 前端化 P4:Painter 全局 alpha 与硬阴影(2026-10-13)
 
 - 全局 alpha 收在**门面状态机**(`PainterState.global_alpha`,save/restore 随栈):填充/描边(含渐变 stop)在 `apply_fill/apply_stroke` 折算色 alpha;文本经 `Painter::paint_color`(画期把串解析→乘系数→回写 hex);图片/画布在 `global_alpha < 1` 时走 `dim_bitmap` 逐像素降 alpha 再 blit。两后端(cairo/纯光栅)零改动即全路径生效——门面是唯一入口。

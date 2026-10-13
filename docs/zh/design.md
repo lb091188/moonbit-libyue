@@ -488,9 +488,15 @@ fn render(ctx : Ctx) -> @core.Node {
 | P2 | 组件改名（按 §2 映射表，含 `_t` 合并）+ `on_*` 统一 + 散参数改名并折算成匿名 `Style`（排解析序列最前）+ 展示类组件补 `_dyn` 信号版（§3 第 5 条通则）+ **逐组件把 `on_draw` 从「读捕获的散参数」改成「读 `self` 上的样式并按状态选桶」** | 全仓 `moon check` 零错零警，910 处调用点全切完，观感逐页比对不回退 |
 | P3 | 响应式补强：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` / `mount_window` 补 `render` 槽（挂载时调用一次建首帧，§4.0；与节点数组二选一） | 分包测试 + 现有 Store 用例不回归 + `hello-themed`/`sysmonitor` 静态挂载形态不回归 |
 | P4 | 绘制能力补齐：**`Painter` 全局 alpha**（`opacity`：alpha 进绘制状态机，铺满填充 / 描边 / 文本 / 图片全路径，`Style` 开 `opacity` 字段——颜色级 alpha 已有，本批补整层）+ `box_shadow`（硬阴影档：偏移多层圆角矩形先行，模糊档随 blur 能力再评估） | 各自用例（opacity 含全路径覆盖验证）+ 回写 `docs/zh/adaptation.md` |
-| P5 | 动画：`transition`（状态桶属性插值 + 帧驱动，复用 gif 的虚拟时钟与 `invalidate` 回路） | 各自用例 + 回写 `docs/zh/adaptation.md` |
+| P5 | 动画：`transition`（状态桶属性插值 + 帧驱动，复用 gif 的虚拟时钟与 `invalidate` 回路）——**开工闸门见本表下方注** | 各自用例 + 回写 `docs/zh/adaptation.md` |
 
 `on_*` 与散参数改名都在 P2 的改名范围内，合批做，P1 之前不加批。
+
+**P5 的开工闸门是性能，不是设计。** `transition` 的本质是「连续置脏重绘」，而本栈
+Windows/mac 走纯软件光栅：没有脏矩形之前，动画每一帧都是一次全窗重绘（§6.6 性能批
+的实测形态）。P4 的 `opacity` / `box_shadow` 是**静态属性**（画一帧就够），可以先行；
+P5 排在 §6.6「脏矩形重绘 + 文本布局缓存」落地并量出「局部变化一帧 < 16ms」之后。
+判据与读数写在 `docs/zh/adaptation.md` 与 TODO §6.6，不在此重复。
 
 每批单独提交；实测坑按 `AGENTS.md` 规则 7 回写 `docs/zh/adaptation.md`；使用类说明写进
 `docs/zh/` 下的使用文档，不写进本文件。
