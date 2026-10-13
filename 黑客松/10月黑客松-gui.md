@@ -11,7 +11,7 @@
 
 ## 项目简介
 
-native-gui 是为 MoonBit 生态打造的**原生跨平台桌面 GUI 库**——窗口、像素、事件循环、布局与控件**全部用纯 MoonBit 自绘实现**，一套代码在 Windows ✅ / Linux ✅ 原生运行。`moon add NoahLiu/native-gui` 后零配置直接 `moon run`。项目从 Yue / libyue 的 MoonBit 绑定起步，一路长成了今天的纯 MoonBit 自绘框架——来时的路还留在仓库名里。
+native-gui 是为 MoonBit 生态打造的**原生跨平台桌面 GUI 库**——窗口、像素、事件循环、布局与控件**全部用纯 MoonBit 自绘实现**，一套代码在 Windows ✅ / Linux ✅ 原生运行。`moon add NoahLiu/native-gui` 后零配置直接 `moon run`。项目从 Yue / libyue 的 MoonBit 绑定起步，现在以他们为老师，用纯 MoonBit 重新完成了原生化——为的是把框架的开发体验做得更好。
 
 - **全栈自绘**：观感跨平台一致、不依赖平台皮肤，深浅色与系统强调色默认跟随，主题是普通值可整体覆盖；平台差异收敛在窗口与文字两处薄层，其余全部纯 MoonBit
 - **响应式与声明式**：状态放 `Store` / `Signal`，绑定点随数据自动刷新；界面以树描述、`mount_window` 一步挂载（写法见下）
