@@ -15,6 +15,10 @@ fn ap_wait_ms(ms : Int) -> Unit {
 /// （设备实际消费 PCM），并断言播放中队列有 PCM 在途（「只有拖动
 /// 时才有一下声音」的回归断言）。
 test "AudioPlayer 冒烟：播放/pump/seek/循环" {
+  if !@ffmbt.ffmpeg_supported() {
+    println("skip: 本平台无 ffmpeg 后端（Windows 媒体线未接，降级口径）")
+    return
+  }
   let p = match AudioPlayer::make("../ffmpeg-mbt/src/testdata/sine_1s.mp3") {
     Ok(p) => p
     Err(e) => fail("make 失败：\{e}")

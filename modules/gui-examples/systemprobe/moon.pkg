@@ -1,0 +1,13 @@
+// systemprobe 主程序（G7 新栈）：装配层见 shared/，各页内容见 pages/。
+import {
+  "NoahLiu/yoga-mbt/src" @yoga,
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/ui",
+  "NoahLiu/native-gui/icons",
+  "NoahLiu/gui-examples/systemprobe/shared",
+  "NoahLiu/gui-examples/systemprobe/pages",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"
