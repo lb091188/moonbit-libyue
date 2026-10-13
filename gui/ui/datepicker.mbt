@@ -118,7 +118,7 @@ fn time_popup(
     let font = @text.Font::new("", 14.0)
     panel.node.set_flex_direction(@yoga.Column)
     panel.node.set_width(@yoga.fixed(180.0))
-    panel.set_padding(10.0, 10.0)
+    panel.set_padding(top=10.0, left=10.0)
     panel.on_draw = Some(fn(
       _s : @core.Widget,
       p : @render.Painter,

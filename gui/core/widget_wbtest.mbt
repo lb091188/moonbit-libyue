@@ -2,6 +2,32 @@
 // 按键按焦点 id 定位、绘制遍历的平移与裁剪。全程无头（位图在内存里）。
 
 ///|
+test "内边距四边独立：上/右/下/左各自进子控件坐标与内容尺寸" {
+  let root = column(sized(Widget::new(), 200.0, 100.0))
+  let kid = sized(Widget::new(), 100.0, 40.0)
+  root.append_child(kid)
+  root.set_padding(top=6.0, right=2.0, bottom=3.0, left=10.0)
+  root.relayout(200.0, 100.0)
+  assert_eq((kid.rect.x, kid.rect.y), (10.0, 6.0))
+
+  // 没给的边按 0：只给 left 时 y 不偏移
+  let flat = column(sized(Widget::new(), 200.0, 100.0))
+  let flat_kid = sized(Widget::new(), 100.0, 40.0)
+  flat.append_child(flat_kid)
+  flat.set_padding(left=12.0)
+  flat.relayout(200.0, 100.0)
+  assert_eq((flat_kid.rect.x, flat_kid.rect.y), (12.0, 0.0))
+
+  // 四边同值简写与逐边写法等价
+  let all = column(sized(Widget::new(), 200.0, 100.0))
+  let all_kid = sized(Widget::new(), 100.0, 40.0)
+  all.append_child(all_kid)
+  all.set_padding_all(5.0)
+  all.relayout(200.0, 100.0)
+  assert_eq((all_kid.rect.x, all_kid.rect.y), (5.0, 5.0))
+}
+
+///|
 fn sized(w : Widget, width : Double, height : Double) -> Widget {
   w.node.set_width(@yoga.fixed(width))
   w.node.set_height(@yoga.fixed(height))

@@ -492,9 +492,9 @@ test "取色器：字段点开色板网格、点色块写值并收起、选中�
   assert_eq(lines.length(), 2)
   assert_eq(lines[0].children().length(), 5)
   assert_eq(lines[1].children().length(), 1)
-  // 面板按公式定尺寸 176x80；内层容器的 padding 只给左/上（`set_padding(left, top)`
-  // 的口径），剩下的右下空带由面板自身的尺寸兜住
-  assert_eq((grid.rect.w, grid.rect.h), (176.0, 72.0))
+  // 面板按公式定尺寸 176x80；`set_padding` 改四边可选参数（没给的边按 0）
+  // 后，色板容器不再有旧口径「只给左/上」留下的右下空带，网格占满面板
+  assert_eq((grid.rect.w, grid.rect.h), (176.0, 80.0))
   match @core.overlay_rect_of(@core.overlay_top_id()) {
     Some(r) => assert_eq((r.w, r.h), (176.0, 80.0))
     None => assert_true(false)

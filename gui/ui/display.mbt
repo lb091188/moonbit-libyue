@@ -475,7 +475,7 @@ fn timeline_row(
           label(desc, size=12.0, color=@theme.theme_text_secondary()),
         ],
         grow=1.0,
-        handle=fn(w : @core.Widget) -> Unit { w.set_padding(8.0, 2.0) },
+        handle=fn(w : @core.Widget) -> Unit { w.set_padding(top=2.0, left=8.0) },
       ),
     ],
     direction=@yoga.Row,

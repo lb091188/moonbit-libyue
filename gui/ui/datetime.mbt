@@ -268,7 +268,7 @@ fn build_calendar(
   panel.node.set_height(
     @yoga.fixed(16.0 + head_h + 4.0 + week_h + 6.0 * cell_h),
   )
-  panel.set_padding(8.0, 8.0)
+  panel.set_padding(top=8.0, left=8.0)
   panel.on_draw = Some(fn(
     _self : @core.Widget,
     p : @render.Painter,

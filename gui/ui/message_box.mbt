@@ -194,7 +194,7 @@ pub fn message_box_t(
         title_bar.node.set_flex_direction(@yoga.Row)
         title_bar.node.set_height(@yoga.fixed(40.0))
         title_bar.node.set_align_items(@yoga.AlignItems::Center)
-        title_bar.set_padding(16.0, 0.0)
+        title_bar.set_padding(left=16.0)
         title_bar.on_draw = Some(fn(
           _s : @core.Widget,
           p : @render.Painter,
@@ -255,7 +255,7 @@ pub fn message_box_t(
         let body = @core.Widget::new()
         body.node.set_flex_direction(@yoga.Row)
         body.node.set_width(@yoga.percent(100.0))
-        body.set_padding(16.0, 14.0)
+        body.set_padding(top=14.0, left=16.0)
         body.node.set_gap(0.0, 12.0)
         body.node.set_align_items(@yoga.AlignItems::FlexStart)
         let icon_w = @core.Widget::new()
@@ -299,7 +299,7 @@ pub fn message_box_t(
         footer.node.set_justify_content(@yoga.JustifyContent::FlexEnd)
         footer.node.set_align_items(@yoga.AlignItems::Center)
         footer.node.set_gap(0.0, 8.0)
-        footer.set_padding(16.0, 0.0)
+        footer.set_padding(left=16.0)
         for i = 0; i < buttons.length(); i = i + 1 {
           let entry = buttons[i]
           let code = entry.1

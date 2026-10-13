@@ -394,7 +394,7 @@ pub fn dialog_t(
       title_bar.node.set_flex_direction(@yoga.Row)
       title_bar.node.set_height(@yoga.fixed(40.0))
       title_bar.node.set_align_items(@yoga.AlignItems::Center)
-      title_bar.set_padding(12.0, 0.0)
+      title_bar.set_padding(left=12.0)
       title_bar.on_draw = Some(fn(
         _s : @core.Widget,
         p : @render.Painter,
@@ -454,7 +454,7 @@ pub fn dialog_t(
       let body = @core.Widget::new()
       body.node.set_flex_direction(@yoga.Column)
       body.node.set_width(@yoga.percent(100.0))
-      body.set_padding(14.0, 0.0)
+      body.set_padding(left=14.0)
       @core.mount_children(body, children)
       let footer = @core.Widget::new()
       footer.node.set_flex_direction(@yoga.Row)
@@ -462,7 +462,7 @@ pub fn dialog_t(
       footer.node.set_justify_content(@yoga.JustifyContent::FlexEnd)
       footer.node.set_align_items(@yoga.AlignItems::Center)
       footer.node.set_gap(0.0, 8.0)
-      footer.set_padding(12.0, 0.0)
+      footer.set_padding(left=12.0)
       fn footer_btn(text : String, primary : Bool, act : () -> Unit) -> Unit {
         if text.length() == 0 {
           return
@@ -527,7 +527,7 @@ pub fn dialog_t(
       footer_btn(confirm_text, true, on_confirm)
       panel.node.set_flex_direction(@yoga.Column)
       panel.node.set_width(@yoga.fixed(panel_w))
-      panel.set_padding(0.0, 0.0)
+      panel.set_padding_all(0.0)
       panel.on_draw = Some(fn(
         _s : @core.Widget,
         p : @render.Painter,
@@ -591,7 +591,7 @@ pub fn toast_layer(
   strip_w.node.set_right(@yoga.fixed(0.0))
   strip_w.node.set_flex_direction(@yoga.Column)
   strip_w.node.set_align_items(@yoga.AlignItems::Center)
-  strip_w.set_padding(0.0, 8.0)
+  strip_w.set_padding(top=8.0)
   strip.val = Some(strip_w)
   let push : (String, SemanticType) -> Unit = fn(text : String, t : SemanticType) -> Unit {
     match strip.val {

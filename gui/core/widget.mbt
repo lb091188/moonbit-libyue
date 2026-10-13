@@ -686,10 +686,28 @@ pub fn Widget::set_margin(self : Widget, top : Double, bottom : Double, left : D
 }
 
 ///|
-/// 内边距（左/上），逻辑像素。
-pub fn Widget::set_padding(self : Widget, left : Double, top : Double) -> Unit {
-  self.node.set_padding_left(@yoga.fixed(left))
+/// 内边距（上/右/下/左），逻辑像素；没给的边按 0 处理。
+/// 四边同值用 [Widget::set_padding_all]（对应 CSS `padding: 14px` 的一值简写）。
+pub fn Widget::set_padding(
+  self : Widget,
+  top? : Double = 0.0,
+  right? : Double = 0.0,
+  bottom? : Double = 0.0,
+  left? : Double = 0.0,
+) -> Unit {
   self.node.set_padding_top(@yoga.fixed(top))
+  self.node.set_padding_right(@yoga.fixed(right))
+  self.node.set_padding_bottom(@yoga.fixed(bottom))
+  self.node.set_padding_left(@yoga.fixed(left))
+}
+
+///|
+/// 内边距四边同值，逻辑像素。
+pub fn Widget::set_padding_all(self : Widget, v : Double) -> Unit {
+  self.node.set_padding_top(@yoga.fixed(v))
+  self.node.set_padding_right(@yoga.fixed(v))
+  self.node.set_padding_bottom(@yoga.fixed(v))
+  self.node.set_padding_left(@yoga.fixed(v))
 }
 
 ///|

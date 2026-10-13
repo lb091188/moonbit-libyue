@@ -42,7 +42,7 @@ pub fn container(
       w.node.set_gap(row_gap, column_gap)
     }
     if padding > 0.0 {
-      w.set_padding(padding, padding)
+      w.set_padding_all(padding)
     }
     if width > 0.0 {
       w.node.set_width(@yoga.fixed(width))

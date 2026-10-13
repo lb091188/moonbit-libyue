@@ -2009,7 +2009,7 @@ fn main {
     None => 0
   }
   ctr.use_family = @text.resolve_family(["绝对没有的族 Qzz", "monospace"])
-  root.set_padding(16.0, 12.0)
+  root.set_padding(top=12.0, left=16.0)
   root.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
     p.set_fill_color(@theme.theme_bg_page())
     p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -2050,7 +2050,7 @@ fn main {
         let sub_text = @core.Store::new("")
         mw_sub_text.val = sub_text
         win.root.set_column()
-        win.root.set_padding(16.0, 12.0)
+        win.root.set_padding(top=12.0, left=16.0)
         win.root.on_draw = Some(fn(
           _w : @core.Widget,
           p : @render.Painter,

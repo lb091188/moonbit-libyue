@@ -24,7 +24,7 @@ fn main {
   }
   let root = app.root
   root.set_column()
-  root.set_padding(12.0, 10.0)
+  root.set_padding(top=10.0, left=12.0)
   root.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
     p.set_fill_color(@theme.theme_bg_page())
     p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -190,7 +190,7 @@ fn main {
       None => ()
       Some(win) => {
         win.root.set_column()
-        win.root.set_padding(12.0, 10.0)
+        win.root.set_padding(top=10.0, left=12.0)
         win.root.on_draw = Some(fn(
           _w : @core.Widget,
           p : @render.Painter,
@@ -386,7 +386,7 @@ fn main {
                         let box = @core.Widget::new()
                         box.node.set_position(@yoga.Absolute)
                         box.node.set_width(@yoga.fixed(180.0))
-                        box.set_padding(6.0, 6.0)
+                        box.set_padding(top=6.0, left=6.0)
                         box.node.set_flex_direction(@yoga.Column)
                         box.on_draw = Some(fn(
                           _b : @core.Widget,
@@ -556,7 +556,7 @@ fn main {
       None => ()
       Some(win) => {
         win.root.set_column()
-        win.root.set_padding(12.0, 10.0)
+        win.root.set_padding(top=10.0, left=12.0)
         win.root.on_draw = Some(fn(
           _w : @core.Widget,
           p : @render.Painter,
@@ -666,7 +666,7 @@ fn main {
       None => ()
       Some(win) => {
         win.root.set_column()
-        win.root.set_padding(12.0, 10.0)
+        win.root.set_padding(top=10.0, left=12.0)
         win.root.on_draw = Some(fn(
           _w : @core.Widget,
           p : @render.Painter,
@@ -733,7 +733,7 @@ fn main {
       Some(pop) => {
         pop_opens.val = pop_opens.val + 1
         pop.root.set_column()
-        pop.root.set_padding(8.0, 8.0)
+        pop.root.set_padding(top=8.0, left=8.0)
         pop.root.on_draw = Some(fn(
           _w : @core.Widget,
           p : @render.Painter,
