@@ -20,10 +20,11 @@
 样式落在**新包 `NoahLiu/native-gui/style`**（`gui/style`），theme 只管色板 token，
 ui 只管组件，三包职责不混。
 
-**样式只有一种形态：MoonBit 值。** 一条规则块 = 一个 `Style` 的链式构造，一个 class = 一个具名
-`Style` 常量。属性名既是字段名也是 setter 名，因此同时进补全和编译期检查。不提供 `.css`
-文本入口——同一批属性只有一套名字。旧 `.css` 资产按 §1.1 的字段名人工对照搬迁，认不出的
-名字丢掉。记录字面量要写满全部字段，所以构造形态是链式 setter（逐条读数见 §1.6）。
+**样式只有一种形态：MoonBit 值。** 一个规则块 = 一次 `style(...)` 调用，一个 class = 一个具名
+`Style` 常量。属性名即参数名，因此同时进补全和编译期检查。不提供 `.css`
+文本入口——同一批属性只有一套名字。旧 `.css` 资产按 §1.1 的参数名人工对照搬迁，认不出的
+名字丢掉。记录字面量要写满全部字段，所以不走字面量，构造形态是 kwargs 工厂 + 状态方法
+（逐条读数见 §1.6）。
 
 ### 1.1 属性集合（字段名 = CSS 属性名，连字符写下划线）
 
@@ -84,15 +85,16 @@ ui 只管组件，三包职责不混。
   不是整块互换。承载优先级的只有调用点的数组顺序：常量彼此的定义先后不承载优先级。
 - **样式表粒度**：**App 级一份**，与 `theme` 同为进程级单份（参照 `theme/theme.mbt` 的
   `theme_box`），不提供每窗各叠一份。`class` 是值、随调用点传，不需要注册表。
-- **状态**：`hover` / `active` / `focus` 三个状态桶，**构造端唯一入口是规则块工厂**
-  `@style.style(base, hover?=, active?=, focus?=)`——照搬 W3C 规则模型：状态长在块
-  （选择器）上，不长在属性名上；前端对照一个类的两条规则（`.primary { … }` 与
-  `.primary:hover { … }`）。Tailwind 式 `hover_` 前缀糖已评估不采：属性名上叠状态前缀要
-  为每个属性 × 每个状态各开一个 setter，API 面徒增 70+ 个机械方法；工厂用参数名装下同一
-  信息，零增量。存储端是三个嵌套 `Style` 字段，绘制期按 `Widget` 已有的 `hovered` /
-  `pressed` / `focused`（`core/widget.mbt:100-104`）选桶——组件的 `on_draw` 本来就在读
-  `self.hovered`（`ui/declarative.mbt:257`），因此没有伪类字符串、没有状态机、也不依赖
-  事件传播。三桶可同时命中（对应 CSS 的层叠），合并/覆盖按桶内逐属性递归（上条）。
+- **状态**：`hover` / `active` / `focus` 三个状态桶，**状态长在块上，不长在属性名上**
+  （W3C 规则模型）。两条入口分工明确：工厂的状态参数收**整块**（`hover=@style.card_hover`，
+  复用具名块）；状态方法 `.hover(...)` / `.active(...)` / `.focus(...)` 收**属性参数**现场
+  开块——且签名里只有绘制期属性，布局参数不在其列，布局值进状态块连编译都过不了（hover
+  改布局需要布局期也选桶，随 P3 帧末 relayout 再评估）。Tailwind 式 `hover_` 前缀糖已评估
+  不采：属性名上叠状态前缀要为每个属性 × 每个状态各开一个 setter，API 面徒增 70+ 个机械
+  方法。存储端是三个嵌套 `Style` 字段，绘制期按 `Widget` 已有的 `hovered` / `pressed` /
+  `focused`（`core/widget.mbt:100-104`）选桶——组件的 `on_draw` 本来就在读 `self.hovered`
+  （`ui/declarative.mbt:257`），因此没有伪类字符串、没有状态机、也不依赖事件传播。三桶
+  可同时命中（对应 CSS 的层叠），合并/覆盖按桶内逐属性递归（上条）。
 - **元素级基调**：没有「元素选择器」这个机制；同名基调就是一个常量
   （`pub let button_base : Style = ...`），组件在自己的默认值里引用它，使用者传 `class`
   即覆盖——效果与 CSS 的元素选择器一致，但可跳转、可补全。
@@ -106,22 +108,21 @@ ui 只管组件，三包职责不混。
 // class=[card, primary]：数组尾赢，逐属性取并集
 @ui.button("保存", class=[@style.card, @style.primary], on_click=on_save)
 
-// 规则块工厂：状态长在块上（W3C 规则模型）。前端对照两条规则：
+// 规则块 = kwargs 调用：属性名即参数名。前端对照：
 // .primary       { background-color: primary; color: #fff }
 // .primary:hover { background-color: primary_hover }
 pub let primary : Style = @style.style(
-  Style::new()
-    .background_color("primary")   // token 名；`#` 开头按 hex、命名色按 named（§1.4）
-    .color("#fff")
-    .border_radius(4.0)
-    .cursor(@core.CURSOR_HAND),    // 基态块
-  hover=Style::new().background_color("primary_hover"),  // :hover 块；active= / focus= 同形
+  background_color="primary",   // token 名；`#` 开头按 hex、命名色按 named（§1.4）
+  color="#fff",
+  border_radius=4.0,
+  cursor=@core.CURSOR_HAND,
 )
+.hover(background_color="primary_hover")   // 状态方法现场开块；active(...) / focus(...) 同形
 
-// 具名子样式复用：块就是普通 Style 值，随取随传
-pub let card_hover : Style = Style::new().background_color("primary_hover")
+// 具名块复用：工厂的状态参数收整块（W3C 的「预定义规则」）
+pub let card_hover : Style = @style.style(background_color="primary_hover")
 pub let primary_v2 : Style = @style.style(
-  Style::new().background_color("primary"),
+  background_color="primary",
   hover=@style.card_hover,
 )
 ```
@@ -145,8 +146,9 @@ token 名单**不另设一套**，就是 `Theme` 的 20 个颜色字段加一个
 
 > 形态：字段是 Option（`merge` 靠「非空才覆盖」、`apply` 靠「`None` 不动」），但**调用点不出现
 > `Some`、也不出现值类型构造名**——属性名 = CSS 属性名（连字符写下划线），值 = 基元，`Some`、
-> 单位、四边展开都关在 `style` 包里。构造走链式 setter：记录字面量要写满全部字段，
-> `with .. { }` 记录覆写与「裸 `T` 自动升成 `T?`」都不支持，逐条读数见 §1.6。
+> 单位、四边展开都关在 `style` 包里。构造走 kwargs：可选 labelled 参数（`width? : Double`）
+> 在调用点自动包 `Some`（§1.6 实测），所以属性名即参数名、值就是基元；记录字面量要写满
+> 全部字段，`with .. { }` 覆写与「裸 `T` 传显式 `T?` 参数」都不支持，逐条读数见 §1.6。
 
 ```moonbit
 pub enum Color { Hex(String) Named(String) Var(String) }
@@ -165,26 +167,36 @@ pub struct Style {
   mut padding_bottom : Double?
   mut cursor : Int?
   mut visibility : Visibility?
-  // 状态桶（构造端走规则块工厂 @style.style，§1.3）
+  // 状态桶（构造端：工厂状态参数收整块 + 三个状态方法收属性参数，§1.3）
   mut hover : Style?
   mut active : Style?
   mut focus : Style?
 }
 
+// 工厂：全部属性是可选 labelled 参数（属性名即参数名），末尾三个状态参数收整块
+pub fn style(width? : Double, /* …其余布局与外观属性… */
+             color? : String, background_color? : String, /* … */
+             hover? : Style, active? : Style, focus? : Style) -> Style
+
+// 状态方法：只收绘制期属性（布局参数不在签名里），非 None 写进对应状态桶
+pub fn Style::hover(self : Style, color? : String, background_color? : String,
+                    /* …绘制期属性… */) -> Style
+
 // 样式表 = 一组具名常量：内置一份（gui/style/tokens.mbt），使用者可叠自己的一份
-pub let card : Style = Style::new()
-  .padding(14.0)                    // 四边同值，setter 内展开成四个字段
-  .gap(10.0)
-  .background_color("bg_panel")     // # 开头按 hex、命名色命中按 named、否则当 theme token 名
-  .border_radius(8.0)
-  .hover(Style::new().border_color("primary"))
+pub let card : Style = style(
+  padding=14.0,                     // 四边同值，包内展开成四个字段
+  gap=10.0,
+  background_color="bg_panel",      // # 开头按 hex、命名色命中按 named、否则当 theme token 名
+  border_radius=8.0,
+  hover=style(border_color="primary"),
+)
 
-pub let card_flat : Style = Style::merge(card, Style::new().border_width(0.0))
+pub let card_flat : Style = merge(card, style(border_width=0.0))
 
-pub fn Style::merge(base : Style, over : Style) -> Style   // 逐属性并集，后者赢；状态桶递归
-pub fn apply(w : @core.Widget, s : Style) -> Unit          // 布局字段走 Yoga；外观字段存进
-                                                            // widget 的 Style 槽，绘制期读
-                                                            // self 并按状态选桶
+pub fn merge(base : Style, over : Style) -> Style           // 逐属性并集，后者赢；状态桶递归
+pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Yoga；外观字段存进
+                                                             // widget 的 Style 槽，绘制期读
+                                                             // self 并按状态选桶
 ```
 
 九条实现口径：
@@ -193,14 +205,15 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit          // 布局字段走 Yo
 - **`merge` 递归进状态桶**：两条都带 `hover` 时逐属性覆盖，不是整块 `hover` 互换——整块换会
   抹掉前者 `hover` 里没写的那些边。
 - 组件侧统一一个参数：`class? : Array[Style] = []`。没有字符串内联通道——一次性微调写
-  `class=[@style.card, Style::new().padding(4.0)]`（数组尾赢）。
+  `class=[@style.card, @style.style(padding=4.0)]`（数组尾赢）。
 - 散参数（`font_size=` / `background_color=` 那批）是糖，只有一条去向：折成一个匿名 `Style`
   排在解析序列**最前**，`class` 在后，于是「`class` > 散参数」由数组顺序直接成立，不需要第二
   条优先级规则；组件内部也只有「读 resolved Style」一条路径。改名对齐 CSS 属性名并进 §2 那批。
-- **状态块只有一个构造入口**：`@style.style(base, hover?=, active?=, focus?=)`（§1.3），
-  不再另开逐属性的状态 setter。块里只放绘制期读的属性——状态桶是绘制期消费的，布局属性
-  混进去会把「画的时候」和「量的时候」搅在一起。
-- **不挂运算符**：组合只写 `Style::merge(a, b)` 或链式。
+- **状态块两条入口，分工不同**：工厂状态参数收**整块**（`hover=@style.card_hover`，具名块
+  复用），状态方法 `.hover(...)` 收**属性参数**（现场开块）；状态方法签名里只有绘制期属性
+  ——布局参数不在签名中，布局值进状态块编译都过不了。状态桶是绘制期消费的，布局属性混
+  进去会把「画的时候」和「量的时候」搅在一起。
+- **不挂运算符**：组合只写 `@style.merge(a, b)`。
 - **`Widget` 需要一个存放 resolved `Style` 的位置**：现有 `Widget` 只有 `node` / `kids` /
   `rect` / `visible` / 各回调 / `hovered` / `pressed` / `focused` / `cursor` / `focus_id`，
   外观散落在每个组件 `on_draw` 捕获的参数里（`core/widget.mbt`）。P1 加这个位置，P2 把每个
@@ -212,7 +225,7 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit          // 布局字段走 Yo
   的类型全是 `Double`，错序编译期查不出；两套形态也会让样式层写两份四边展开的翻译。改法机械，
   但须整批一次改完并逐处核对，靠既有布局用例兜。
 - **`Edges` / `Size` 两个值类型不设**：padding 只有两档（四边同值 / 逐边单给），一个
-  `padding(v)` setter 够；长度默认 px，百分比另开 `width_percent`，fixed / percent 的分派
+  `padding` 参数够；长度默认 px，百分比另开 `width_percent`，fixed / percent 的分派
   留在包内。
 - 颜色字符串的判定在 setter 内做；**token 名不认识时在应用启动一次性出声报错并列出可用
   token**，不留到绘制期静默回退——值形态没有 CSS 的编译期拼写检查，这条是兜底。
@@ -226,14 +239,16 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit          // 布局字段走 Yo
 | 记录字面量省略字段 `T::{ color: Some("x") }` | ✗ | `[4044] Record fields padding, radius are undefined for type T`——字面量要写满全部字段 |
 | 字面量里 `..base` 填充剩余字段 | ✗ | `[3002] Parse error, unexpected token ..` |
 | `base with .. { f: v }` / `base with f: v` 记录覆写 | ✗ | `[3002] Parse error, unexpected token with` |
-| 裸 `T` 传给 `T?` 型 labelled 参数（指望自动包 `Some`） | ✗ | `[4014] has type: String / wanted: String?`——没有隐式提升，所以「参数收 `T?`」等于把 `Some` 摊回调用点 |
-| 链式 setter（方法收 `self`、就地写字段、返回自身） | ✓ | `Finished`，零警告 |
-| **方法名与字段名同名**（`Style` 有字段 `padding`，同时有方法 `Style::padding`） | ✓ | 这是「属性名即方法名」那条形态的地基 |
+| 裸 `T` 传给 `T?` 型 labelled 参数（指望自动包 `Some`） | ✗ | `[4014] has type: String / wanted: String?`——没有隐式提升，所以「参数收 `T?`」等于把 `Some` 摊回调用点（这是**显式 `T?` 类型**形态；可选 labelled 形态见下条，勿混） |
+| 可选 labelled 参数（`fn f(x? : Int)`），调用点给裸值 `f(x=1)` | ✓ | 自动包 `Some`（实测链 `S::new(width=100.0).hover(width=110.0)` 零警告、运行 `w=100 hover_w=110`，全省略得 `None`）——**kwargs 工厂形态的地基** |
+| 以类型名当构造函数调用 `S(w=None)` | ✗ | `[4021] Value S not found in package`——struct 没有函数式构造语法，工厂只能是自己定义的包级函数（`style(...)`） |
+| 链式 setter（方法收 `self`、就地写字段、返回自身） | ✓ | `Finished`，零警告（工具链事实存档；构造已改走 kwargs 工厂，调用点不出现 setter 链） |
+| **方法名与字段名同名**（`Style` 有字段 `padding`，同时有方法 `Style::padding`） | ✓ | kwargs 形态下属性名转移到参数名上（见下两条） |
 | 方法返回值当语句用（`s.set_x(v)` 单独一行） | ✗ | `[4139] its value cannot be implicitly ignored`——只能写成链，包内 setter 体固定为「赋值 + 返回 self」 |
 | 字段有 `mut` 但没有对应 setter | 警告 | `[0015] The mutability of field 'padding' is never used`——零警告门禁逼着字段与属性一一对应，留不下死字段 |
 
-待验一条（动 P1 前补探针）：`@style.new()` 这类包级短构造或 `pub alias` 是否可用——决定调用点
-要不要写全 `@style.Style::new()`。
+已实测：跨包 `S::new(...)` 与包级函数调用都可用（见上两行探针），调用点写 `@style.style(...)`。
+待验一条（动 P1 前补探针）：`pub alias` 能否给工厂再起一个更短的调用名。
 
 ## 2. 组件层：前端化命名
 
@@ -391,7 +406,7 @@ fn render(ctx : Ctx) -> @core.Node {
 
 | 批 | 内容 | 收口条件 |
 | --- | --- | --- |
-| P1 | 新建 `gui/style` 包：`Style` 字段集（含定位组 `position` / `top` / `right` / `bottom` / `left`——底层 yoga 现成，含百分比 inset 的能力后补入口）+ `Color` + 链式 setter（属性名即方法名）+ 状态块工厂 `style(base, hover?=, active?=, focus?=)`（§1.3，W3C 规则模型）+ `merge`（逐属性并集、状态桶递归）+ **全量**内置常量表（§2 每个组件的基调，`tokens.mbt`）+ `Widget` 上存 resolved `Style` 的位置 + `apply`；**yoga-mbt 补 `z_index`**（`set_z_index` + 布局输出按 z_index 稳定排序，Yoga 上游同构；gui 侧绘制按 resolved 值重排 kids，`Style` 同步开 `z_index` 字段）；顺带 `Widget::set_margin` labelled 化（同形统一） | 新包测试 + `Widget` 样式槽用例 + 定位字段落到 yoga 的布局用例 + yoga-mbt 模块 z_index 用例（正序/负值/并列稳定）+ `cd gui && moon check` 零错零警 |
+| P1 | 新建 `gui/style` 包：`Style` 字段集（含定位组 `position` / `top` / `right` / `bottom` / `left`——底层 yoga 现成，含百分比 inset 的能力后补入口）+ `Color` + kwargs 构造（`style(...)` 工厂属性名即参数名 + `.hover(...)` / `.active(...)` / `.focus(...)` 状态方法，§1.3，W3C 规则模型）+ `merge`（逐属性并集、状态桶递归）+ **全量**内置常量表（§2 每个组件的基调，`tokens.mbt`）+ `Widget` 上存 resolved `Style` 的位置 + `apply`；**yoga-mbt 补 `z_index`**（`set_z_index` + 布局输出按 z_index 稳定排序，Yoga 上游同构；gui 侧绘制按 resolved 值重排 kids，`Style` 同步开 `z_index` 字段）；顺带 `Widget::set_margin` labelled 化（同形统一） | 新包测试 + `Widget` 样式槽用例 + 定位字段落到 yoga 的布局用例 + yoga-mbt 模块 z_index 用例（正序/负值/并列稳定）+ `cd gui && moon check` 零错零警 |
 | P2 | 组件改名（按 §2 映射表，含 `_t` 合并）+ `on_*` 统一 + 散参数改名并折算成匿名 `Style`（排解析序列最前）+ **逐组件把 `on_draw` 从「读捕获的散参数」改成「读 `self` 上的样式并按状态选桶」** | 全仓 `moon check` 零错零警，910 处调用点全切完，观感逐页比对不回退 |
 | P3 | 响应式补强：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` | 分包测试 + 现有 Store 用例不回归 |
 | P4 | 绘制能力补齐：**`Painter` 全局 alpha 完整落地**（`opacity`：alpha 进绘制状态机，铺满填充 / 描边 / 文本 / 图片全路径，`Style` 开 `opacity` 字段——颜色级 alpha 已有，这次补的是整层）+ `box_shadow`（硬阴影档：偏移多层圆角矩形先行，模糊档随 blur 能力再评估） | 各自用例（opacity 含全路径覆盖验证）+ 回写 `docs/zh/adaptation.md` |
