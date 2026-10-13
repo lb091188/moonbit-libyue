@@ -10,6 +10,7 @@ import {
   "NoahLiu/native-gui/chart",
   "NoahLiu/native-gui/mdview",
   "NoahLiu/native-gui/icons",
+  "NoahLiu/native-gui/sys",
   "NoahLiu/native-gui/win",
 }
 

@@ -2982,8 +2982,18 @@ fn main {
   app.enable_root_scroll()
 
   app.run()
-  // 帧耗时分段账本：布局/绘制/上屏的实测占比（性能诊断，见 gui/core/prof.mbt）
-  println("NATIVE-APP-PROF " + @core.paint_profile_summary())
+  // 帧耗时分段账本：布局/绘制/上屏的实测占比（性能诊断，见 gui/core/prof.mbt）。
+  // Windows 的 GUI 子系统进程 stdout 到不了 moon run 的捕获（本机实测关窗后
+  // 终端无输出），落一份文件兜底：绝对路径（cwd = 运行目录）
+  let prof = @core.paint_profile_summary()
+  println("NATIVE-APP-PROF " + prof)
+  let body = "NATIVE-APP-PROF " + prof + "\n"
+  let cwd = @sys.current_dir()
+  let _ = if cwd == "" {
+    @sys.sys_write_text_file("native-app-prof.txt", body)
+  } else {
+    @sys.sys_write_text_file(cwd + "/native-app-prof.txt", body)
+  }
   // 卸载前停转（自排链不认识视图已移除；本例循环已 quit，这里是示范正确收尾）
   @ui.carousel_stop(auto)
   @ui.carousel_stop(spin)
