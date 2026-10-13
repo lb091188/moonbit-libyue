@@ -104,6 +104,7 @@ pub(all) struct TextMetrics {
 
 ///|
 /// 量一段文本。后端不可用（非 Linux 或无字体服务）返回 None。
+/// 度量是纯函数，按输入键走缓存（见 cache.mbt）：布局期每帧都会问它。
 pub fn measure(
   text : String,
   size : Double,
@@ -111,6 +112,18 @@ pub fn measure(
   max_width? : Int = 0,
   ellipsize? : Bool = false,
   wrap? : Bool = false,
+) -> TextMetrics? {
+  measure_cached(text, size, family, max_width, ellipsize, wrap)
+}
+
+///|
+fn measure_uncached(
+  text : String,
+  size : Double,
+  family : String,
+  max_width : Int,
+  ellipsize : Bool,
+  wrap : Bool,
 ) -> TextMetrics? {
   let tb = @utf8.encode(text)
   let fb = @utf8.encode(family)
@@ -140,7 +153,13 @@ pub fn measure(
 /// 单行行高：字体 ascent+descent（像素），**与样例文本无关**——绑文本会把
 /// 有无下伸部（g/y）当成行高差，布局盒高会随内容抖。探针记的「14px 量得
 /// 17」是文本 "M" 的盒高（等于首行基线），不是行高，两者在这里分开。
+/// 按 (size, family) 走缓存（见 cache.mbt）。
 pub fn line_height(size : Double, family? : String = "") -> Option[Int] {
+  line_cached(Height, size, family)
+}
+
+///|
+fn line_height_uncached(size : Double, family : String) -> Option[Int] {
   let fb = @utf8.encode(family)
   let oh = Ref(0)
   let oa = Ref(0)
@@ -154,7 +173,13 @@ pub fn line_height(size : Double, family? : String = "") -> Option[Int] {
 
 ///|
 /// 首行基线（ascent，像素），给自绘 caret 与文本垂直居中使用。
+/// 按 (size, family) 走缓存（见 cache.mbt）。
 pub fn line_ascent(size : Double, family? : String = "") -> Option[Int] {
+  line_cached(Ascent, size, family)
+}
+
+///|
+fn line_ascent_uncached(size : Double, family : String) -> Option[Int] {
   let fb = @utf8.encode(family)
   let oh = Ref(0)
   let oa = Ref(0)
@@ -222,13 +247,25 @@ fn align_id(a : TextAlign) -> Int {
 }
 
 ///|
-/// 按字体量一段文本（字重/斜体参与度量）。
+/// 按字体量一段文本（字重/斜体参与度量）。度量是纯函数，按输入键走缓存
+/// （见 cache.mbt）：布局期每个文本控件每帧都会经测量回调问它。
 pub fn measure_font(
   text : String,
   font : Font,
   max_width? : Int = 0,
   ellipsize? : Bool = false,
   wrap? : Bool = false,
+) -> TextMetrics? {
+  measure_font_cached(text, font, max_width, ellipsize, wrap)
+}
+
+///|
+fn measure_font_uncached(
+  text : String,
+  font : Font,
+  max_width : Int,
+  ellipsize : Bool,
+  wrap : Bool,
 ) -> TextMetrics? {
   let tb = @utf8.encode(text)
   let fb = @utf8.encode(font.name)
@@ -265,8 +302,14 @@ pub(all) struct FontMetrics {
 }
 
 ///|
-/// 字体度量。后端不可用返回 None。
+/// 字体度量。后端不可用返回 None。按字体四要素走缓存（见 cache.mbt）：
+/// 行高/基线回调每帧都会问它。
 pub fn font_metrics(font : Font) -> FontMetrics? {
+  font_metrics_cached(font)
+}
+
+///|
+fn font_metrics_uncached(font : Font) -> FontMetrics? {
   let fb = @utf8.encode(font.name)
   let oh = Ref(0)
   let oa = Ref(0)
