@@ -1,0 +1,15 @@
+// 样式层：样式表写在 MoonBit 里（design.md §1）。
+//
+// 职责边界：theme 只管色板 token，ui 只管组件，本包只管「属性名 → 值」的
+// 规则块（`Style`）。属性名 = CSS 属性名（连字符写下划线），值 = 基元；
+// `Some`、单位、四边展开都关在本包内（§1.5）。
+supported_targets = "native"
+
+import {
+  "NoahLiu/yoga-mbt/src" @yoga,
+  "moonbitlang/core/abort",
+  "NoahLiu/native-gui/text" @text,
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/theme",
+}
+

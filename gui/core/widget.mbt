@@ -133,6 +133,11 @@ pub(all) struct Widget {
   /// 投放回调（W21c）：拖拽松手且本控件是**最深命中者**时调用，返回是否接受。
   /// 悬停高亮不靠回调：绘制方读 `@core.drag_hover() == self.id` 自判（见 drag.mbt）。
   mut on_drop : Option[(DragData, Double, Double) -> Bool]
+  /// resolved `Style` 本体不进 core（core 依赖 style 会成环）：由 `@style` 包的
+  /// 进程级侧表按控件 id 持有，绘制期 `@style.resolved(self)` 读取。
+  /// 绘制层序键（resolved `z_index` 的落点，design.md §5 P1）：`@style.apply`
+  /// 写入，绘制遍历按它**稳定重排** kids（同值保持数组序，尾赢），默认 0.0。
+  mut z_index_paint : Double
 }
 
 ///|
@@ -164,6 +169,7 @@ pub fn Widget::new() -> Widget {
     cursor_fn: None,
     drag_payload: None,
     on_drop: None,
+    z_index_paint: 0.0,
   }
 }
 
@@ -767,12 +773,40 @@ pub fn Widget::paint_at(self : Widget, p : @render.Painter, ox : Double, oy : Do
     Some(f) => f(self, p, self.rect)
     None => ()
   }
-  for k in self.kids {
+  // 层序:按 resolved z_index **稳定**重排(同值保持 kids 数组序=尾画者赢,
+  // design.md §1.2「层序按 kids 数组序」的过渡口径被 z_index 取代);未应用过
+  // 样式的树全部 0.0,排序恒等,现有示例逐帧不变。
+  for k in widget_paint_order(self.kids) {
     k.paint_at(p, self.rect.x, self.rect.y)
   }
   p.restore()
 }
 
+///|
+/// 绘制层序：按 `z_index_paint` 升序**稳定**排序（同值保持原数组序，于是后加的
+/// 子件仍画在前，与「kids 数组序即层序」的旧口径兼容）。插入排序——一屏兄弟
+/// 数量级小，且必须稳定（`Array::sort` 不保证）。
+fn widget_paint_order(kids : Array[Widget]) -> Array[Widget] {
+  let out : Array[Widget] = []
+  for k in kids {
+    let mut i = out.length()
+    while i > 0 && out[i - 1].z_index_paint > k.z_index_paint {
+      i = i - 1
+    }
+    out.push(k)
+    if i < out.length() - 1 {
+      let mut j = out.length() - 1
+      while j > i {
+        out[j] = out[j - 1]
+        j = j - 1
+      }
+      out[i] = k
+    }
+  }
+  out
+}
+
+///|
 ///|
 /// 控件矩形（内容坐标）与当前设备裁剪不相交则为 true（可跳过）。
 fn widget_cull_skip(

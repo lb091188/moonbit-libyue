@@ -27,3 +27,6 @@ __pycache__/
 # AI 助手工作区记忆(非构建产物,不入库)
 /.workbuddy/
 /.workbuddy-ai/
+
+# prebuild 产物（gui 模块内构建目录）
+/gui/build/

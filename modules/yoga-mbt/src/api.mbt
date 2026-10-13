@@ -306,6 +306,44 @@ pub fn Node::set_column_gap(self : Node, v : Double) -> Unit {
 }
 
 ///|
+/// 层序键（z-index）：默认 0。布局几何与它无关（不调 `mark_changed`），
+/// 只在绘制期经 [Node::paint_order] 消费。
+pub fn Node::set_z_index(self : Node, v : Int) -> Unit {
+  self.style.z_index = v
+}
+
+///|
+pub fn Node::z_index(self : Node) -> Int {
+  self.style.z_index
+}
+
+///|
+/// 绘制层序投影：按 `z_index` 升序**稳定**排列的子下标（同值保持 children
+/// 原数组序，即后添加者仍画在前）。引擎不物理重排 children——增量布局按
+/// 下标缓存，重排会搅乱缓存；消费者拿这份下标序去安排绘制即可。
+pub fn Node::paint_order(self : Node) -> Array[Int] {
+  let out : Array[Int] = []
+  let n = self.children.length()
+  let mut i = 0
+  while i < n {
+    let z = self.children[i].style.z_index
+    let mut j = out.length()
+    while j > 0 && self.children[out[j - 1]].style.z_index > z {
+      j = j - 1
+    }
+    out.push(i)
+    let mut k = out.length() - 1
+    while k > j {
+      out[k] = out[k - 1]
+      out[k - 1] = i
+      k = k - 1
+    }
+    i += 1
+  }
+  out
+}
+
+///|
 /// 对整棵树做一次布局。width/height 为根节点可用空间（None 表示该方向
 /// 不约束，根按内容取尺寸）；需要撑满可用空间时给根设置
 /// `set_width(percent(100.0))` / `set_height(percent(100.0))`。

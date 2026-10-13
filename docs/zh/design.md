@@ -216,11 +216,17 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 | 以类型名当构造函数调用 `S(w=None)` | ✗ | `[4021] Value S not found in package`——struct 没有函数式构造语法，工厂只能是自己定义的包级函数（`style(...)`） |
 | 数组展开字面量 `[..xs, y]` | ✓ | 追加/过滤重建的惯用形态（`items.update(fn(ts) { [..ts, t] })`）；`Array::filter` 返回**新数组**可直接作表达式 |
 | 链式 setter（方法收 `self`、就地写字段、返回自身） | ✓ | 可用；kwargs 工厂形态下调用点不出现 setter 链 |
+| `pub alias` 给工厂起短调用名（`pub alias g = f`） | ✗ | `[3002]` 解析失败 + `[0035] The word 'alias' is reserved`——**本工具链没有 alias 语法**，`alias` 是保留字；类型别名走 `pub abbrev`，函数没有对应设施 |
+| `pub let g = f` 绑函数值再以 `g(width=1.0)` 调用 | ✗ | `[4117] Function with labelled arguments can only be applied directly`——带 labelled 参数的函数**不能间接调用**；转发改成显式 `f(width=width)` 又撞 `[4014] has type: Double? / wanted: Double`（体内可选参数是 `T?`，无自动 unwrap），`f(width!)` / `f(width=width?)` / `f(...)` 三种透传写法全部 `[3002]` 不解析 |
+| `pub abbrev t = S` 类型别名当工厂调用名 | ✗ | 别名只能当类型用；构造调用仍撞 [4021]（类型名不是函数），给不了工厂短名 |
+| `moon.pkg` 里给依赖包配短名（`"…/style": "st"` 键值形态） | ✗ | moon 直接报 `Parsing error: unexpected token :`——import 只收字符串数组，消费端 `@style.style(...)` 的包名缩不了 |
+
+**探针结论（2026-10-13 补测，工具链同上）**：工厂调用点定死 `@style.style(...)`，没有任何给函数起短名的通道。使用者若嫌重复，可在自己模块里手写收拢函数（如 `pub fn card_style(width? : Double) -> Style { @style.style(width=width?, padding=14.0, …) }`——显式逐参传，无 `...` 透传可用），库侧不提供这种糖。
 | **方法名与字段名同名**（`Style` 有字段 `padding`，同时有方法 `Style::padding`） | ✓ | kwargs 形态下属性名转移到参数名上（见下两条） |
 | 方法返回值当语句用（`s.set_x(v)` 单独一行） | ✗ | `[4139] its value cannot be implicitly ignored`——只能写成链，包内 setter 体固定为「赋值 + 返回 self」 |
 | 字段有 `mut` 但没有对应 setter | 警告 | `[0015] The mutability of field 'padding' is never used`——零警告门禁逼着字段与属性一一对应，留不下死字段 |
 
-调用点写 `@style.style(...)`；`pub alias` 能否给工厂起更短的调用名，P1 动手前补探针定。
+调用点写 `@style.style(...)`：短名通道全部不存在（alias 是保留字、labelled 函数不可间接调用、`moon.pkg` 不支持 import 配名），P1 直接按此形态实现。
 
 ## 2. 组件层：前端化命名
 

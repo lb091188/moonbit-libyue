@@ -30,6 +30,9 @@ pub struct Style {
   border : Edges
   mut row_gap : Double
   mut column_gap : Double
+  /// 层序键：只在绘制期消费（布局几何与它无关）。引擎**不重排 children**——
+  /// 增量布局按下标缓存，物理重排会搅乱缓存；层序投影走 `Node::paint_order`。
+  mut z_index : Int
 }
 
 ///|
@@ -65,6 +68,7 @@ pub fn Style::new() -> Style {
     border : Edges::zero(),
     row_gap : 0.0,
     column_gap : 0.0,
+    z_index : 0,
   }
 }
 
