@@ -60,6 +60,12 @@ void ip_set_cursor_rect(int x, int y, int w, int h) {
   (void)h;
 }
 
+void ip_set_surrounding(const char *text, int len, int cursor_bytes) {
+  (void)text;
+  (void)len;
+  (void)cursor_bytes;
+}
+
 double ip_measure(void *text, int len) {
   (void)text;
   (void)len;

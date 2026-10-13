@@ -119,11 +119,46 @@ jobs:
       # vcvars64 用 vswhere 定位(不依赖 VS 具体版本/Edition 路径):moon 的
       # native-stub 与 --target native 都要 cl.exe/链接器在 PATH 里。
       #
+      # ffmpeg 运行库:gui-media / ffmpeg-mbt 的测试在 Windows 上做真解码
+      # (vendor 进仓库的只有头文件与导入库,运行期 dll 不进仓库)。dll 从
+      # BtbN lgpl-shared 构建取,与本地开发口径一致(见 docs/zh/adaptation.md);
+      # 解出 bin 目录放进 PATH,moon test 的测试进程继承环境即能加载。
+      # latest 标签的 n9.0 资产随上游滚动重建,内容键固定 9.0——缓存到重建
+      # 之间上游若有 minor 变更,以首次缓存为准(可接受:测试只依赖 ABI 稳定的 9.x)。
+      - name: 缓存 ffmpeg 运行库
+        id: cache-ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ffmpeg-bin
+          key: ffmpeg-lgpl-shared-9.0-win64
+
+      - name: 下载 ffmpeg 运行库
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $zip = "$env:RUNNER_TEMP\ffmpeg-lgpl.zip"
+          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-win64-lgpl-shared-9.0.zip" -OutFile $zip
+          Expand-Archive $zip "$env:RUNNER_TEMP\ffmpeg-x"
+          $bin = Get-ChildItem "$env:RUNNER_TEMP\ffmpeg-x" -Recurse -Directory -Filter bin |
+            Where-Object { (Get-ChildItem $_.FullName -Filter "avcodec-*.dll").Count -gt 0 } |
+            Select-Object -First 1
+          if ($null -eq $bin) { throw "ffmpeg bin 目录未找到" }
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\ffmpeg-bin" | Out-Null
+          Copy-Item "$($bin.FullName)\*.dll" "$env:RUNNER_TEMP\ffmpeg-bin\"
+          Remove-Item -Recurse -Force "$env:RUNNER_TEMP\ffmpeg-x", $zip
+
+      - name: ffmpeg 运行库进 PATH
+        shell: pwsh
+        run: echo "$env:RUNNER_TEMP\ffmpeg-bin" >> $env:GITHUB_PATH
+
       # 测试清单的两处平台排除(既有 Windows 缺口,非库缺陷):
       #   dbus —— D-Bus 是 Linux 桌面基建,Windows 无会话总线,4 条总线用例必失败;
       #   sys  —— sys_make_dirs 走 `mkdir -p` 子进程(POSIX 语义),Windows 上不可用。
       # 这两包在 Linux job 里全量跑;此处按平台能力排除,恢复覆盖需专项批
       # (dbus 侧加平台跳过、sys 侧把 make_dirs 换成跨平台实现)。
+      #
+      # 媒体线(gui-media / ffmpeg-mbt)是真解码测试:exe 依赖 ffmpeg 运行库
+      # dll(上一节放 PATH);非 Linux 平台的占位/跳过口径见各模块 prebuild。
       - name: 配置 MSVC 环境并检查/测试/构建
         shell: cmd
         run: >-
@@ -133,5 +168,9 @@ jobs:
           && moon check
           && moon test core ui render text theme icons input win chart mdview web
           && moon build --target native
-          && cd ..
+          && cd ..\modules\ffmpeg-mbt
+          && moon test src
+          && cd ..\gui-media
+          && moon test media
+          && cd ..\..
           && moon build examples/hello --target native
