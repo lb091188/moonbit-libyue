@@ -122,6 +122,11 @@ pub(all) struct Widget {
   /// 4 纵向调整）。全自绘栈没有原生控件，形状由宿主按命中路径下发：取悬停路径上
   /// **最深的那个非零请求**，所以包住一整组的 `cursor_group` 会自然回退生效。
   mut cursor : Int
+  /// 动态光标请求：给 Some 时**优先于 `cursor`**，且每次命中查询现算——`cursor`
+  /// 是建树时定死的一次性值，禁用态这类会随单元变化的请求要用它。入参是控件本身，
+  /// 同 `on_draw` 注：不要把控件句柄捕获进闭包（引用环）。返回 0 表示本控件不请求，
+  /// 查询继续往祖先走（`cursor_group` 的组请求仍然生效）。
+  mut cursor_fn : Option[(Widget) -> Int]
   /// 拖源载荷（W21c）：给 Some 即「本控件可拖出」，按下拖过阈值后调它取数据；
   /// 给 None（返回 None 同理）表示这一拖不成立。
   mut drag_payload : Option[() -> DragData?]
@@ -156,6 +161,7 @@ pub fn Widget::new() -> Widget {
     im_cursor: None,
     focus_id: 0,
     cursor: 0,
+    cursor_fn: None,
     drag_payload: None,
     on_drop: None,
   }
@@ -453,13 +459,24 @@ pub fn Widget::dispatch_pointer_to(self : Widget, widget_id : Int, ev : PointerE
 }
 
 ///|
+/// 本控件**自己**的光标请求（0 = 不请求）：`cursor_fn` 存在时以它现算的结果为准，
+/// 否则取静态 `cursor`。
+pub fn Widget::cursor_request(self : Widget) -> Int {
+  match self.cursor_fn {
+    Some(f) => f(self)
+    None => self.cursor
+  }
+}
+
+///|
 /// 命中路径上「最深的一个非零光标请求」；无人请求时返回 0（默认箭头）。
+/// 控件带 `cursor_fn` 时以它现算的结果为准（禁用态等动态请求）。
 pub fn Widget::cursor_at(self : Widget, x : Double, y : Double) -> Int {
   let path = self.hit_path(x, y)
   let mut i = path.length()
   while i > 0 {
     i = i - 1
-    let k = path[i].cursor
+    let k = path[i].cursor_request()
     if k != 0 {
       return k
     }

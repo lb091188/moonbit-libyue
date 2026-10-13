@@ -148,7 +148,8 @@ test "光标形状请求：按钮手型、输入框文本形、分隔把手横�
     160.0,
   )
   assert_eq(card.cursor, @core.CURSOR_HAND)
-  assert_eq(card.children()[1].cursor, @core.CURSOR_HAND)
+  // 按钮的请求是**动态**的（`cursor_fn`，按命中查询现算），所以查它自己的请求函数
+  assert_eq(card.children()[1].cursor_request(), @core.CURSOR_HAND)
   // 悬停在卡片空白处也是手型（组的请求回退生效）
   assert_eq(root.cursor_at(card.rect.x + 4.0, card.rect.y + 4.0), @core.CURSOR_HAND)
   let (_r2, box1) = mounted(entry(@core.Store::new("x"), focus_id=1), 200.0, 60.0)

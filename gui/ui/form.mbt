@@ -85,7 +85,7 @@ pub fn checkbox(
     row.node.set_column_gap(6.0)
     row.append_child(box)
     let _ = (label(text, size=size)).mount_into(row)
-    row.cursor = @core.CURSOR_HAND
+    row.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
     handle(row)
     row
@@ -201,7 +201,7 @@ pub fn switch_t(
     if txt.length() > 0 {
       let _ = (label(txt)).mount_into(row)
     }
-    row.cursor = @core.CURSOR_HAND
+    row.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
     row
   })
@@ -230,7 +230,7 @@ pub fn slider(
     let dragging = Ref(false)
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(@theme.control_height))
-    w.cursor = @core.CURSOR_HAND
+    w.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
     let set_from_x = fn(self : @core.Widget, x : Double) -> Unit {
       let track = (self.rect.w - 12.0).max(1.0)
       let ratio = ((x - 6.0) / track).clamp(min=0.0, max=1.0)
@@ -476,7 +476,7 @@ pub fn button_t(
     w.node.set_padding_left(@yoga.fixed(12.0))
     w.node.set_padding_right(@yoga.fixed(12.0))
     w.node.set_flex_shrink(0.0)
-    w.cursor = @core.CURSOR_HAND
+    w.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
     attach_text_measure(w, src)
     w.on_draw = Some(fn(
       self : @core.Widget,

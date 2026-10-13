@@ -244,3 +244,31 @@ test "cursor_at：取悬停路径上最深的那个非零请求，无人请求�
   assert_eq(root.cursor_at(10.0, 50.0), CURSOR_DEFAULT)
   assert_eq(root.cursor_at(10.0, 200.0), CURSOR_DEFAULT)
 }
+
+///|
+test "cursor_at：控件带 cursor_fn 时以现算结果为准（压过静态 cursor）" {
+  let root = Widget::new()
+  root.set_column()
+  let w = sized(Widget::new(), 100.0, 40.0)
+  let live = Ref(false)
+  // 两个都设上：cursor_fn 存在时静态 cursor 不参与（禁用态这类要现算的请求走它）
+  w.cursor = CURSOR_TEXT
+  w.cursor_fn = Some(fn(_self : Widget) -> Int {
+    if live.val {
+      CURSOR_HAND
+    } else {
+      CURSOR_DEFAULT
+    }
+  })
+  root.append_child(w)
+  root.relayout(100.0, 40.0)
+  // 现算为 0 = 本控件不请求（不是回退到静态 CURSOR_TEXT），无人请求即默认箭头
+  assert_eq(w.cursor_request(), CURSOR_DEFAULT)
+  assert_eq(root.cursor_at(10.0, 10.0), CURSOR_DEFAULT)
+  // 同一棵树改状态，下一次查询立刻生效（不需要重建控件）
+  live.val = true
+  assert_eq(w.cursor_request(), CURSOR_HAND)
+  assert_eq(root.cursor_at(10.0, 10.0), CURSOR_HAND)
+  live.val = false
+  assert_eq(root.cursor_at(10.0, 10.0), CURSOR_DEFAULT)
+}

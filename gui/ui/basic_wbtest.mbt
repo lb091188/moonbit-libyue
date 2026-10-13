@@ -170,6 +170,23 @@ test "按钮：禁用态不消费事件、也不响应点击" {
 }
 
 ///|
+test "按钮：光标请求跟着禁用单元走（禁用不请求手型，改回可用立刻恢复）" {
+  let cell = Enabled::new(true)
+  let b = button("禁用", enabled=Some(cell), min_width=80.0)
+  let root = mount_root([b], 200.0, 60.0)
+  let w = kid(root, 0)
+  let cx = w.rect.x + w.rect.w / 2.0
+  let cy = w.rect.y + w.rect.h / 2.0
+  // 禁用：本控件不提请求 → 默认箭头（光标请求是命中查询时现算的）
+  assert_eq(root.cursor_at(cx, cy), @core.CURSOR_DEFAULT)
+  // 同一个单元改回可用：下一次查询就是手型，不必重建控件
+  set_disabled(cell, false)
+  assert_eq(root.cursor_at(cx, cy), @core.CURSOR_HAND)
+  set_disabled(cell, true)
+  assert_eq(root.cursor_at(cx, cy), @core.CURSOR_DEFAULT)
+}
+
+///|
 test "按钮：悬停与按下态由宿主置位，配色随状态变化" {
   if !ui_text_guard() {
     return
