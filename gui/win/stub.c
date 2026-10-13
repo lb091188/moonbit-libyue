@@ -295,6 +295,14 @@ static uint32_t wm_char_keysym(WPARAM vk, LPARAM lp) {
   return 0;
 }
 
+// 滚轮跨 HWND 探针槽：web 能力桩（WebView2）在 create 时注册
+// 「屏幕坐标是否落在网页上，是则返回该处理的引擎窗口」。函数指针而非
+// 直接 extern 调 wb_*——不用 web 包的 app 链接不到那些符号。
+static int64_t (*wm_wheel_probe)(int64_t sx, int64_t sy) = NULL;
+void wm_set_wheel_probe(int64_t (*fn)(int64_t sx, int64_t sy)) {
+  wm_wheel_probe = fn;
+}
+
 static void wm_push(WmWindow *w, const WmEv *ev) {
   if (w->ev_count >= 64) {
     return; // 满了丢弃而不是覆盖：宁可丢一个事件，不能把 FIFO 打乱
@@ -617,6 +625,15 @@ static LRESULT CALLBACK wm_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     }
     case WM_MOUSEWHEEL:
     case WM_MOUSEHWHEEL: {
+      // 悬停在网页上时轮子归网页（GTK「悬停即滚」观感）：probe 说该点是
+      // 引擎窗口就原样转过去。lp 是屏幕坐标，两边的分支各自做客户区换算。
+      if (wm_wheel_probe != NULL) {
+        int64_t target =
+            wm_wheel_probe((int16_t)LOWORD(lp), (int16_t)HIWORD(lp));
+        if (target != 0) {
+          return SendMessageW((HWND)(intptr_t)target, msg, wp, lp);
+        }
+      }
       WmWindow *w = wm_of(hwnd);
       if (w != NULL) {
         WmEv e;

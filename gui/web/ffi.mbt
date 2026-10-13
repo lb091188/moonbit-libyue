@@ -50,6 +50,9 @@ extern "c" fn wb_load_html(
 extern "c" fn wb_reload(id : Int64) -> Unit = "wb_reload"
 
 ///|
+extern "c" fn wb_focus(id : Int64) -> Unit = "wb_focus"
+
+///|
 extern "c" fn wb_stop(id : Int64) -> Unit = "wb_stop"
 
 ///|

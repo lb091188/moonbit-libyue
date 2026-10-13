@@ -44,6 +44,8 @@ extern void *wm_surface_container(int64_t surface_id);
 // kind：1 标题 2 地址 3 导航开始 4 导航提交 5 导航完成 6 页面调用原生
 //       7 JS 求值回包 8 弹窗/新窗请求 9 权限请求 10 下载 11 web 进程终止
 //       12 视图请求关闭 13 cookie 回包 14 加载失败（15 重定向 WebView2 无此事件）
+//       16 焦点进入 17 焦点离开（WebView2 独有：跨 HWND 焦点账本，
+//       WebKitGTK 是同树 widget、宿主天然可感知，不发）
 #define WB_EVQ 32
 #define WB_EV_TEXT 768
 
@@ -95,8 +97,15 @@ struct WbView {
   WbEv evs[WB_EVQ];
   int head, count;
   WbEv last;
+  // 焦点/滚轮跨 HWND 转发：引擎在面板 HWND 之下建自己的输入窗
+  // （Chrome_WidgetWin_1）。滚轮规则按焦点窗口投递，两端各修一半：
+  // ① 本桩 subclass 它——焦点在网页但鼠标不在其上时把滚轮还给宿主；
+  // ② 宿主 WM_MOUSEWHEEL 分支经 wheel probe 问「该点是否在网页上」，
+  //    在则转给 Chrome 窗（对齐 GTK「悬停即滚」观感）。
+  HWND chrome;         // subclass 过的引擎输入窗（没找到为 NULL）
+  WNDPROC chrome_orig; // 原 WndProc（还原用）
   // per-view 事件 handler（多 webview 各持各的，互不覆盖）
-  void *hnd[12];
+  void *hnd[14];
   // 就绪前后都可登记的 scheme（filter 在就绪时补挂）
   struct {
     char scheme[32];
@@ -353,6 +362,74 @@ WB_EVT_HANDLER(DlStart, ICoreWebView2DownloadStartingEventHandler, ICoreWebView2
 WB_EVT_HANDLER(ProcFail, ICoreWebView2ProcessFailedEventHandler, ICoreWebView2ProcessFailedEventArgs)
 WB_EVT_HANDLER(WinClose, ICoreWebView2WindowCloseRequestedEventHandler, IUnknown)
 WB_EVT_HANDLER(ResReq, ICoreWebView2WebResourceRequestedEventHandler, ICoreWebView2WebResourceRequestedEventArgs)
+
+// GotFocus/LostFocus 不走宏：两个坑——事件挂在 **Controller** 上（不是
+// ICoreWebView2），且 Invoke 的 sender 是 ICoreWebView2Controller*（宏写死
+// ICoreWebView2*，C4113 在 x64 下不止是警告）。
+
+struct WbHnd_FocusGot {
+  ICoreWebView2FocusChangedEventHandler itf;
+  WbView *v;
+};
+static HRESULT STDMETHODCALLTYPE WbHnd_FocusGot_qi(
+    ICoreWebView2FocusChangedEventHandler *self, REFIID riid, void **out) {
+  return wb_hnd_qi((IUnknown *)self, riid, out,
+                   &IID_ICoreWebView2FocusChangedEventHandler);
+}
+static ULONG STDMETHODCALLTYPE WbHnd_FocusGot_ref(
+    ICoreWebView2FocusChangedEventHandler *self) {
+  (void)self;
+  return 1;
+}
+static ULONG STDMETHODCALLTYPE WbHnd_FocusGot_rel(
+    ICoreWebView2FocusChangedEventHandler *self) {
+  (void)self;
+  return 1;
+}
+static HRESULT STDMETHODCALLTYPE WbHnd_FocusGot_inv(
+    ICoreWebView2FocusChangedEventHandler *self,
+    ICoreWebView2Controller *sender, IUnknown *args) {
+  (void)sender;
+  (void)args;
+  wb_push(((struct WbHnd_FocusGot *)self)->v, 16, 0, NULL);
+  return S_OK;
+}
+static const ICoreWebView2FocusChangedEventHandlerVtbl WbHnd_FocusGot_vt = {
+    WbHnd_FocusGot_qi, WbHnd_FocusGot_ref, WbHnd_FocusGot_rel,
+    WbHnd_FocusGot_inv,
+};
+
+struct WbHnd_FocusLost {
+  ICoreWebView2FocusChangedEventHandler itf;
+  WbView *v;
+};
+static HRESULT STDMETHODCALLTYPE WbHnd_FocusLost_qi(
+    ICoreWebView2FocusChangedEventHandler *self, REFIID riid, void **out) {
+  return wb_hnd_qi((IUnknown *)self, riid, out,
+                   &IID_ICoreWebView2FocusChangedEventHandler);
+}
+static ULONG STDMETHODCALLTYPE WbHnd_FocusLost_ref(
+    ICoreWebView2FocusChangedEventHandler *self) {
+  (void)self;
+  return 1;
+}
+static ULONG STDMETHODCALLTYPE WbHnd_FocusLost_rel(
+    ICoreWebView2FocusChangedEventHandler *self) {
+  (void)self;
+  return 1;
+}
+static HRESULT STDMETHODCALLTYPE WbHnd_FocusLost_inv(
+    ICoreWebView2FocusChangedEventHandler *self,
+    ICoreWebView2Controller *sender, IUnknown *args) {
+  (void)sender;
+  (void)args;
+  wb_push(((struct WbHnd_FocusLost *)self)->v, 17, 0, NULL);
+  return S_OK;
+}
+static const ICoreWebView2FocusChangedEventHandlerVtbl WbHnd_FocusLost_vt = {
+    WbHnd_FocusLost_qi, WbHnd_FocusLost_ref, WbHnd_FocusLost_rel,
+    WbHnd_FocusLost_inv,
+};
 
 static HRESULT STDMETHODCALLTYPE WbHnd_NavStart_inv(
     ICoreWebView2NavigationStartingEventHandler *self, ICoreWebView2 *sender,
@@ -746,6 +823,106 @@ static const ICoreWebView2CreateCoreWebView2ControllerCompletedHandlerVtbl
     wb_ctrl_req_vt = {WbCtrlReq_qi, WbCtrlReq_ref, WbCtrlReq_rel,
                       WbCtrlReq_inv};
 
+// ---- 焦点/滚轮跨 HWND 转发 ----
+// Windows 滚轮投递给**焦点窗口**，与鼠标位置无关；WebView2 拿焦点后宿主
+// 的滚动区就断了轮。双向各修一半：
+// ① chrome proc（subclass 引擎输入窗）：焦点在网页、鼠标不在网页上时，
+//    把滚轮消息转回宿主主窗（GTK 按 hover 路由的观感等价物）；
+// ② wb_wheel_target（宿主经 wheel probe 调）：滚轮到达宿主且鼠标悬在
+//    网页上时，宿主把消息转进 Chrome 窗让网页滚。
+static int wb_under_chrome(HWND h, HWND chrome) {
+  for (HWND p = h; p != NULL; p = GetAncestor(p, GA_PARENT)) {
+    if (p == chrome) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static LRESULT CALLBACK wb_chrome_proc(HWND hwnd, UINT msg, WPARAM wp,
+                                       LPARAM lp) {
+  if (msg == WM_MOUSEWHEEL || msg == WM_MOUSEHWHEEL) {
+    POINT pt;
+    pt.x = (short)LOWORD(lp); // 滚轮的 lParam 是屏幕坐标
+    pt.y = (short)HIWORD(lp);
+    HWND chrome = (HWND)GetPropW(hwnd, L"wb_chrome_self");
+    if (chrome != NULL) {
+      HWND under = WindowFromPoint(pt);
+      if (under == NULL || !wb_under_chrome(under, chrome)) {
+        // 鼠标不在本 webview 层级内：交还宿主主窗（其滚轮分支生成滚动事件）
+        HWND host = GetAncestor(chrome, GA_ROOT);
+        if (host != NULL) {
+          return SendMessageW(host, msg, wp, lp);
+        }
+      }
+    }
+  }
+  WNDPROC orig = (WNDPROC)GetPropW(hwnd, L"wb_chrome_orig");
+  return orig != NULL ? CallWindowProcW(orig, hwnd, msg, wp, lp)
+                      : DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+// 在面板 HWND 下找引擎输入窗（Chrome_WidgetWin_1；找不到不算错——
+// 类名是引擎实现细节，找不到只是少一半转发）
+static HWND wb_find_chrome(HWND parent) {
+  HWND it = NULL;
+  while ((it = FindWindowExW(parent, it, NULL, NULL)) != NULL) {
+    wchar_t cls[64];
+    if (GetClassNameW(it, cls, 64) > 0 &&
+        lstrcmpW(cls, L"Chrome_WidgetWin_1") == 0) {
+      return it;
+    }
+  }
+  return NULL;
+}
+
+static void wb_subclass_chrome(WbView *v) {
+  HWND chrome = wb_find_chrome(v->parent);
+  if (chrome == NULL || GetPropW(chrome, L"wb_chrome_orig") != NULL) {
+    return; // 没找到，或已 subclass 过（重复 create 同一面板的防重）
+  }
+  WNDPROC orig =
+      (WNDPROC)SetWindowLongPtrW(chrome, GWLP_WNDPROC, (LONG_PTR)wb_chrome_proc);
+  if (orig != NULL) {
+    SetPropW(chrome, L"wb_chrome_orig", (HANDLE)orig);
+    SetPropW(chrome, L"wb_chrome_self", (HANDLE)chrome);
+    v->chrome = chrome;
+    v->chrome_orig = orig;
+  }
+}
+
+static void wb_unsubclass_chrome(WbView *v) {
+  if (v->chrome != NULL && IsWindow(v->chrome) && v->chrome_orig != NULL) {
+    SetWindowLongPtrW(v->chrome, GWLP_WNDPROC, (LONG_PTR)v->chrome_orig);
+    RemovePropW(v->chrome, L"wb_chrome_orig");
+    RemovePropW(v->chrome, L"wb_chrome_self");
+  }
+  v->chrome = NULL;
+  v->chrome_orig = NULL;
+}
+
+// 宿主滚轮分支的探针：给定屏幕坐标，返回该点应处理的 Chrome 窗
+// （0 = 不在网页上，宿主自己处理）。经 win 桩的函数指针槽注册，
+// 避免 win→web 反向符号依赖（不用 web 包的 app 链接不到 wb_* 符号）。
+static int64_t wb_wheel_target(int64_t sx, int64_t sy) {
+  POINT pt;
+  pt.x = (LONG)sx;
+  pt.y = (LONG)sy;
+  HWND under = WindowFromPoint(pt);
+  if (under == NULL) {
+    return 0;
+  }
+  for (int i = 1; i < WB_MAX_VIEWS; i++) {
+    WbView *v = &wb_pool[i];
+    if (v->chrome != NULL && wb_under_chrome(under, v->chrome)) {
+      return (int64_t)(intptr_t)v->chrome;
+    }
+  }
+  return 0;
+}
+
+extern void wm_set_wheel_probe(int64_t (*fn)(int64_t sx, int64_t sy));
+
 // 就绪：挂全部事件、补挂 scheme filter、应用缓存的 UA、可见 + bounds、导航首页
 static void wb_on_ready(WbView *v) {
   ICoreWebView2 *w = v->web;
@@ -769,6 +946,9 @@ static void wb_on_ready(WbView *v) {
   w->lpVtbl->add_ProcessFailed(w, (ICoreWebView2ProcessFailedEventHandler *)v->hnd[9], &tok);
   w->lpVtbl->add_WindowCloseRequested(w, (ICoreWebView2WindowCloseRequestedEventHandler *)v->hnd[10], &tok);
   w->lpVtbl->add_WebResourceRequested(w, (ICoreWebView2WebResourceRequestedEventHandler *)v->hnd[11], &tok);
+  // 焦点事件在 Controller 上（ICoreWebView2 没有 add_GotFocus/LostFocus）
+  v->ctrl->lpVtbl->add_GotFocus(v->ctrl, (ICoreWebView2FocusChangedEventHandler *)v->hnd[12], &tok);
+  v->ctrl->lpVtbl->add_LostFocus(v->ctrl, (ICoreWebView2FocusChangedEventHandler *)v->hnd[13], &tok);
 
   for (int i = 0; i < WB_MAX_SCHEMES; i++) {
     if (v->schemes[i].scheme[0] != '\0' && !v->schemes[i].filter_added) {
@@ -801,6 +981,7 @@ static void wb_on_ready(WbView *v) {
   RECT rc;
   GetClientRect(v->parent, &rc);
   v->ctrl->lpVtbl->put_Bounds(v->ctrl, rc);
+  wb_subclass_chrome(v); // 引擎输入窗此时已在（controller 创建同步完成）
   v->ready = 1;
   if (v->pending_html != NULL) {
     w->lpVtbl->NavigateToString(w, v->pending_html);
@@ -1222,7 +1403,11 @@ int64_t wb_create(int64_t surface_id, int w, int h, const char *uri,
   WB_NEW_HND(ProcFail, 9);
   WB_NEW_HND(WinClose, 10);
   WB_NEW_HND(ResReq, 11);
+  WB_NEW_HND(FocusGot, 12);
+  WB_NEW_HND(FocusLost, 13);
 #undef WB_NEW_HND
+  // 宿主滚轮探针只挂一次（函数指针槽，覆盖无害——多个 view 共用同一实现）
+  wm_set_wheel_probe(wb_wheel_target);
 
   if (data_dir != NULL && data_dir[0] != '\0') {
     v->data_dir = wb_utf8_to_wide(data_dir);
@@ -1770,6 +1955,14 @@ void wb_get_cookies(int64_t id, const char *uri) {
   w2->lpVtbl->Release(w2);
 }
 
+void wb_focus(int64_t id) {
+  WbView *v = wb_get(id);
+  if (v == NULL || v->ctrl == NULL) {
+    return;
+  }
+  v->ctrl->lpVtbl->MoveFocus(v->ctrl, COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
+}
+
 void wb_set_user_agent(int64_t id, const char *ua) {
   WbView *v = wb_get(id);
   if (v == NULL || ua == NULL) {
@@ -1815,6 +2008,7 @@ void wb_destroy(int64_t id) {
     return;
   }
   WbView *v = &wb_pool[id];
+  wb_unsubclass_chrome(v); // 先还原 WndProc（Close 摘子窗前后都安全）
   if (v->ctrl != NULL) {
     v->ctrl->lpVtbl->Close(v->ctrl); // 从 parent HWND 摘掉并停引擎
     v->ctrl->lpVtbl->Release(v->ctrl);
@@ -1830,7 +2024,7 @@ void wb_destroy(int64_t id) {
   }
   // 事件 handler 实例归桩所有（已挂进引擎的 token 不摘——Close 之后再挂的
   // 引擎侧引用随引擎释放；handler 结构本身现在 free 是安全的，引擎已停）
-  for (int i = 0; i < 12; i++) {
+  for (int i = 0; i < 14; i++) {
     free(v->hnd[i]);
     v->hnd[i] = NULL;
   }

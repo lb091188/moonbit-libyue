@@ -795,6 +795,15 @@ void wb_set_user_agent(int64_t id, const char *ua) {
   }
 }
 
+// 焦点主动交给网页（WebView2 分支是 MoveFocus(PROGRAMMATIC)）。GTK 同树
+// widget，grab_focus 即等效；焦点变化无事件透出（宿主天然可感知）。
+void wb_focus(int64_t id) {
+  WbView *v = wb_get(id);
+  if (v != NULL) {
+    gtk_widget_grab_focus(GTK_WIDGET(v->view));
+  }
+}
+
 // pane 级可见性（爬虫后台要的「不可见 webview」在窗口层，本条只管这一区）
 void wb_set_visible(int64_t id, int visible) {
   WbView *v = wb_get(id);
@@ -905,6 +914,7 @@ int wb_has_download_signal(int64_t id) { (void)id; return 0; }
 int wb_has_create_signal(int64_t id) { (void)id; return 0; }
 void wb_get_cookies(int64_t id, const char *uri) { (void)id; (void)uri; }
 void wb_set_user_agent(int64_t id, const char *ua) { (void)id; (void)ua; }
+void wb_focus(int64_t id) { (void)id; }
 void wb_set_visible(int64_t id, int visible) { (void)id; (void)visible; }
 void wb_set_size(int64_t id, int w, int h) { (void)id; (void)w; (void)h; }
 void wb_destroy(int64_t id) { (void)id; }

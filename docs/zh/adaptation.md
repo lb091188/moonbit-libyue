@@ -1555,6 +1555,14 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **miniaudio 在 Windows 零额外链接库**:WASAPI/COM/dsound/winmm 全走运行期 LoadLibrary,`gui-media/prebuild.py` 空 link_configs 即正确形态(非降级)。gui-media 24/24 全过含 AudioPlayer 冒烟(pump 33 拍播完 1 秒素材,WASAPI 设备链真出声);ffmpeg-mbt 6/6(ogg/m4a/wav + 视频真解码)。
 - **GUI 子系统示例的无人值守收尾**:`native-web` 不设自杀点(人工验收要逐项点过去),自动化跑法须 `taskkill /IM`(发 WM_CLOSE,app.run() 正常返回后统计才 flush)——`kill -9` 会连 stdout 缓冲一起丢。
 
+### WebView2 跨 HWND 焦点与滚轮转发(焦点批,2026-10-13)
+
+- **GotFocus/LostFocus 挂在 Controller 上,不在 ICoreWebView2 上**:`add_GotFocus/add_LostFocus` 是 `ICoreWebView2Controller` 的方法;且这对事件的 `Invoke` sender 参数是 `ICoreWebView2Controller*`(事件 handler 宏写死 sender 为 `ICoreWebView2*`,x64 下 C4113 之外会真崩)——这对 handler 手写、不走宏。
+- **滚轮投递规则是「发给焦点窗口」,与鼠标位置无关**,WebView2 拿焦点后宿主滚动区断轮。修法双向各一半:① 本桩 subclass 引擎输入窗(`Chrome_WidgetWin_1`,controller 创建同步完成后在面板 HWND 下按类名 FindWindowEx 找;找不到只少一半转发、不算错)——焦点在网页、鼠标不在其上时把滚轮 SendMessage 回宿主主窗;② 宿主 `WM_MOUSEWHEEL` 分支先经 wheel probe(web 桩 create 时经 `wm_set_wheel_probe` 函数指针槽注册,避免 win→web 反向符号依赖)问「该屏幕坐标是否落在网页上」,在则原样转给 Chrome 窗。两半合起来等价 GTK「悬停即滚」观感。subclass 用 SetProp 存原 proc 与自身 HWND,destroy 时还原+RemoveProp。
+- **宿主主动给网页焦点**:`MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC)`(WebKit 分支是 `gtk_widget_grab_focus`),随后 GotFocus 事件照发,宿主可做状态联动。
+- **焦点事件透出为 kind 16/17(WebView2 独有)**:WebKitGTK 是同树 widget、宿主天然可感知,不发。
+- **调试插曲(教训)**:`python -c` 单行脚本对已存在大文件 `io.open(p,'w')` 传错 newline 值,ValueError 在 TextIOWrapper 初始化时抛出——但文件已按 'w' 截空,几百行改动全丢(git checkout 恢复后用 Edit 工具重做)。改大文件永远用 Edit 工具或先写脚本文件再跑,不用内联 python 单行写整文件。
+
 ## macOS(CI 构建链已验,GUI 待真机)
 
 - libyue v0.15.6 发行包含 ARC / no-ARC 双库:Darwin 链接参数 = 主库 + `-lyue_mbt_noarc`(no-ARC 符号被主库引用,须排其后)+ AppKit / Carbon / IOKit / Security / WebKit / OpenDirectory 框架 + `-lobjc -lc++ -lpthread -lbsm -Wl,-dead_strip`;prebuild Darwin 分支已按此预修。

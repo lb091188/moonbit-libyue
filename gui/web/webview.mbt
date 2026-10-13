@@ -67,6 +67,11 @@ pub(all) enum WebEvent {
   ProcessTerminated(String)
   CloseRequested
   Cookies(String)
+  /// 网页拿到键盘焦点（WebView2 独有；WebKitGTK 是同树 widget、宿主天然
+  /// 可感知，不发）。宿主可据此更新状态（如地址栏焦点圈、快捷键开关）。
+  FocusGained
+  /// 网页交回键盘焦点
+  FocusLost
   Unknown(Int, String)
 }
 
@@ -338,6 +343,8 @@ fn Webview::dispatch(self : Webview, kind : Int, num : Int64, text : String) -> 
     11 => ProcessTerminated(text)
     12 => CloseRequested
     13 => Cookies(text)
+    16 => FocusGained
+    17 => FocusLost
     _ => Unknown(kind, text)
   }
   match ev {
@@ -400,6 +407,15 @@ pub fn Webview::load_html(
 pub fn Webview::reload(self : Webview) -> Unit {
   if self.handle != 0L {
     wb_reload(self.handle)
+  }
+}
+
+///|
+/// 把键盘焦点交给网页（宿主主动；网页内点击后引擎自动拿焦点不需要调这条）。
+/// WebView2 走 `MoveFocus(PROGRAMMATIC)`；随后 `FocusGained` 事件照发。
+pub fn Webview::focus(self : Webview) -> Unit {
+  if self.handle != 0L {
+    wb_focus(self.handle)
   }
 }
 
