@@ -58,7 +58,7 @@ def main() -> int:
                 "ffmpeg 后端降级——请按 README 恢复 vendor/",
                 file=sys.stderr,
             )
-            emit({"vars": {"FFMPEG_INC": "."}, "link_configs": []})
+            emit({"vars": {"FFMPEG_INC": ".", "FFMPEG_STUB_CC": "/utf-8"}, "link_configs": []})
             return 0
         # 路径一律正斜杠（cl 对两种都接受，还免去 JSON 转义）
         inc_norm = inc.replace("\\", "/")
@@ -71,7 +71,7 @@ def main() -> int:
         )
         emit(
             {
-                "vars": {"FFMPEG_INC": inc_norm},
+                "vars": {"FFMPEG_INC": inc_norm, "FFMPEG_STUB_CC": "/utf-8"},
                 "link_configs": [{"package": PKG, "link_flags": link_flags}],
             }
         )
@@ -82,7 +82,7 @@ def main() -> int:
             "ffmpeg(prebuild): 非 Linux/Windows 平台降级为空 link_configs（媒体线随平台落地再接）",
             file=sys.stderr,
         )
-        emit({"vars": {"FFMPEG_INC": "."}, "link_configs": []})
+        emit({"vars": {"FFMPEG_INC": ".", "FFMPEG_STUB_CC": "-finput-charset=UTF-8"}, "link_configs": []})
         return 0
 
     if shutil.which("pkg-config") is None:
@@ -103,7 +103,11 @@ def main() -> int:
         flags.extend(probe.stdout.split())
     emit(
         {
-            "vars": {"FFMPEG_INC": "/usr/include"},
+            "vars": {
+                "FFMPEG_INC": "/usr/include",
+                # gcc/clang 默认按 UTF-8 读源，显式声明与 Windows 的 /utf-8 同义
+                "FFMPEG_STUB_CC": "-finput-charset=UTF-8",
+            },
             "link_configs": [{"package": PKG, "link_flags": " ".join(flags)}],
         }
     )
