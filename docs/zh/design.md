@@ -46,29 +46,9 @@ ui 只管组件，三包职责不混。
 
 ### 1.2 没有的属性（写不出来，而不是运行时报错）
 
-`grid` 相关（`grid_template_*`、`grid_area`）、`@media`（设计决策：**不做**，见下表）、
-后代/子代/兄弟选择器、id 与属性选择器、通配符、
-`!important`、CSS 的**自动继承**。
-
-`Style` 里没有对应字段，setter 也没有同名方法，调用点写不出来。这些属性分两类：**已排进
-§5 计划的**见下面引注，落地后就能写；**永远没有的**按下表替换：
-
-> 定位、层序、阴影、透明、动画在计划内：`position` / `top` / `right` / `bottom` / `left` 并入
-> P1 字段集（底层 `set_position` / `set_top` … 现成，框架内部滚动条 / 吸顶条 / 关闭按钮 /
-> 覆盖层已在用）；`z_index` 由 yoga-mbt 随 P1 补齐（落地前层序按 kids 数组序，后者盖上）；
-> `box_shadow` 进 P4；`opacity` 进 P4；`transition` 进 P5（落地前状态变化是直接切换，
-> §1.3 状态桶）。
-
-| 写不出来的东西 | 替代写法 |
-| --- | --- |
-| `grid_template_*` / `grid_area` | `col` / `row` + `gap`；等分用 `flex`（grow） |
-| `@media` | **不做**（设计决策）：断点由使用者自己读窗口尺寸，落到不同的 `Style` 常量 |
-| 后代/子代/兄弟选择器、id 与属性选择器、通配符 | 具名 `Style` 常量 + `class=[...]` 组合 |
-| `!important` | 靠数组顺序（§1.3 覆盖顺序），后写的赢 |
-| CSS 的自动继承 | 显式传 `class`，或在父组件里算好再传下去 |
-
-> `opacity` 的口径：颜色级 alpha 已支持（hex 含 alpha 分量），P4 补**整层** global alpha，
-> 铺满填充 / 描边 / 文本 / 图片全路径，落地即开 `Style.opacity` 字段。
+`grid` 相关（`grid_template_*`、`grid_area`）、`@media`、后代/子代/兄弟选择器、id 与属性
+选择器、通配符、`!important`、CSS 的**自动继承**——`Style` 里没有对应字段，setter 也没有
+同名方法，调用点写不出来。
 
 ### 1.3 组合、状态与优先级
 
@@ -295,8 +275,7 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 ## 3. 响应式：内核已有，补四件
 
 **现状**：`core/signal.mbt` 的 `Signal::computed` 在求值期**自动收集依赖**（不是手工接线），
-另有 `batch()` 合并通知、`sub_bag_*` 订阅回收袋防泄漏。这三点已覆盖 san.js 的核心
-（显式 `set` + 依赖驱动增量更新）。所以**不重写内核**，只补上层：
+另有 `batch()` 合并通知、`sub_bag_*` 订阅回收袋防泄漏。**不重写内核**，只补上层：
 
 1. **`ListStore[T]` + keyed 差分**（Vue `v-for :key` 的对应物）：现在 table / virt_list /
    transfer 各造各的轮子；抽成通用列表容器后，`push` / `remove` / `update` / `splice` 只
@@ -341,24 +320,10 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
    结构级整棵换内容走 `bind_node`（`core/node.mbt:77-113`）显式重建。**不做全树 patch**
    ——列表项里改一格只重绘那一格，粒度由数据层（字段各自是 `Store`）承载。
 
-**不做**：san 的 `data.set("a.b", v)` 字符串路径。MoonBit 无反射，路径读写必须类型擦除，
-换来的是编译期查不出错的运行时失败。替代口径是：数据就是普通 struct，字段各自是
+**没有字符串路径**（`data.set("a.b", v)` 那类）：MoonBit 无反射，路径读写必须类型擦除，
+换来的是编译期查不出错的运行时失败。口径是：数据就是普通 struct，字段各自是
 `Store`，调用点在 `render` 里直接写字段访问（`ctx.form.name.get()`）——类型安全，
-同时保留 san 的更新粒度。
-
-**对照 Vue 一次盘完没列的**（有定论的定，没定论的标明去处）：
-
-- **v-model 双向绑定**：不用新增——input 类组件第一参数收可写 `Store[T]` 是现状口径
-  （ui 里约 48 处），`ctx.draft` 即是。
-- **动态 class**（`:class="{ active: x }"`）：就是第 5 条的 `_dyn` 通则，P2 改名时一并落，
-  不单开机制。
-- **生命周期钩子**（mounted / unmounted）：「随子树一起退订」的实质已被订阅回收袋
-  （`sub_bag_*`）覆盖；要不要暴露显式钩子，等真实需求再进 P3。
-- **provide / inject**：不做——theme 是进程级单份、其余数据显式传参，值形态没有跨层
-  隐式通道的位置。
-- **动态组件**（`<component :is>`）：不做新机制——分支就是 `when` / `bind_node`。
-- **keep-alive**：不用做——`when` 双支常驻切显隐天然保态，就是 keep-alive 的语义。
-- **teleport**：`@core.overlay` 已是那条通道（弹窗/悬浮提示）。
+更新粒度不变。
 
 ## 4. 视图层：`render` 函数就是最终形态
 
@@ -492,20 +457,7 @@ fn render(ctx : Ctx) -> @core.Node {
 > 传信号才响应（§3 第 5 条）。`ctx.add` / `ctx.remove` 里只写 Store，往后的差分、显隐、
 > 帧末合并重绘全是框架的事：这就是「写起来像改数据，动起来像改了那一块 UI」的整个设计。
 
-### 4.1 模板的卖点，逐个看还剩什么
-
-| 模板的卖点 | 本栈的拿法 | 还剩什么 |
-| --- | --- | --- |
-| `{{ }}` / `:prop` 里的表达式要类型检查 | 本来就是 MoonBit 表达式（`ctx.has_items`、`fn(t) { t.id }`），moon 直接查 | 无 |
-| `<style>` 与视图同处编辑 | `@style.*` 具名常量（§1）：可跳转、可补全、可复用 | 无（甚至更好） |
-| `v-for` / `v-if` | `@ui.for_list` / `@ui.when`（§3 第 4 项） | 无 |
-| 事件写成 `@click="on_save"` | `on_click=ctx.on_save`（§2 已统一 `on_*`） | 无 |
-| 标记观感（尖括号、闭合标签） | 拿不到 | **唯一拿不到的一项** |
-
-拿不到的那一项要付的是解析器 + 行号回映射 + `.gui` 文件里没有 LSP 补全与跳转；补全与跳转
-是日常开发的主力，标记观感换不掉它们。
-
-### 4.2 工具链边界（`moon 0.1.20260920 / moonc v0.10.14`）
+### 4.1 工具链边界（`moon 0.1.20260920 / moonc v0.10.14`）
 
 没有编译期语法扩展的可用通道（读数随工具链版本，升级要重测）：
 
@@ -514,18 +466,12 @@ fn render(ctx : Ctx) -> @core.Node {
 - `moon ide doc '@moonbit'` → `package moonbit not found in workspace`，即当前工具链里
   没有 `ins` 自定义中缀语法可用（想给 DSL 加 `->`、`?=` 一类新语法这条路暂时不通）。
 - `moon ide doc '*include*'` → 无结果，没有编译期嵌文件能力，所以 `.css` / `.gui` 文本
-  进不了类型检查（这是 §1 采值形态、本节放弃模板的共同前提）。
+  进不了类型检查（§1 值形态的前提）。
 - 仓内唯一被验证可用的「构建期外部脚本」通道是 `--moonbit-unstable-prebuild`
   （`gui/moon.mod`，实做 `gui/scripts/prebuild.py`），而它只能给**本模块内**的包下发配置，
   看不见使用者模块里的 `.gui` 文件——真要上 codegen，每个 app 自己配一遍。
 
 表达式层已经是 MoonBit，树的外壳不必换成另一种语法。
-
-### 4.3 重新开启的条件
-
-出现真实用户明确只要「写法像 HTML」，**且** §1/§2/§3 已稳定到能给生成器定死契约（`class`
-数组形态、`on_*` 全集、`for_list`/`when` 签名）。届时只做**薄翻译**——标记树 → 现有 MoonBit
-调用，`<style>` → `@style.*` 常量；不设计第二套表达式语言，不引入第二套属性名。
 
 ## 5. 分期与门禁
 
@@ -537,8 +483,7 @@ fn render(ctx : Ctx) -> @core.Node {
 | P4 | 绘制能力补齐：**`Painter` 全局 alpha**（`opacity`：alpha 进绘制状态机，铺满填充 / 描边 / 文本 / 图片全路径，`Style` 开 `opacity` 字段——颜色级 alpha 已有，本批补整层）+ `box_shadow`（硬阴影档：偏移多层圆角矩形先行，模糊档随 blur 能力再评估） | 各自用例（opacity 含全路径覆盖验证）+ 回写 `docs/zh/adaptation.md` |
 | P5 | 动画：`transition`（状态桶属性插值 + 帧驱动，复用 gif 的虚拟时钟与 `invalidate` 回路） | 各自用例 + 回写 `docs/zh/adaptation.md` |
 
-没有模板批，也没有 CSS 解析批（见 §1、§4）。`on_*` 与散参数改名都在 P2 的改名范围内，合批
-做，P1 之前不加批。
+`on_*` 与散参数改名都在 P2 的改名范围内，合批做，P1 之前不加批。
 
 每批单独提交；实测坑按 `AGENTS.md` 规则 7 回写 `docs/zh/adaptation.md`；使用类说明写进
 `docs/zh/` 下的使用文档，不写进本文件。
