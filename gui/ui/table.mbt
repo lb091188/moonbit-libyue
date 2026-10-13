@@ -144,52 +144,54 @@ pub fn cell_text(row : TableRow, i : Int) -> String {
 }
 
 ///|
-/// 摘出字符串开头的（可带负号的）十进制整数；没有数字给 `None`。
-fn leading_int(c : String) -> Int? {
-  let cs = c.to_array()
-  let n = cs.length()
-  let mut i = 0
-  let mut neg = false
-  if n > 0 && cs[0] == '-' {
-    neg = true
-    i = 1
-  }
+/// 从 cs[i] 起读一段十进制数字，返回 (数值, 数字段结束下标)。
+fn digit_run(cs : Array[Char], i : Int) -> (Int, Int) {
   let mut v = 0
-  let mut any = false
-  while i < n && cs[i] >= '0' && cs[i] <= '9' {
-    v = v * 10 + (cs[i].to_int() - 48)
-    any = true
-    i = i + 1
+  let mut k = i
+  while k < cs.length() && cs[k] >= '0' && cs[k] <= '9' {
+    v = v * 10 + (cs[k].to_int() - 48)
+    k = k + 1
   }
-  if !any {
-    None
-  } else if neg {
-    Some(0 - v)
-  } else {
-    Some(v)
-  }
+  (v, k)
 }
 
 ///|
-/// 两格文本比较：**都能摘出前导整数就按数值比**，否则按字典序（数值相等也回落
-/// 字典序，保证全序）。演示数据是「数字 + 单位」混排（`12 处` / `6 处`、
-/// `虚拟行 3`），纯字典序会把 `12` 排在 `6` 前面、看着像没排序，故先试数值。
+/// 两格文本比较：**自然序**——逐字符走，两侧同处数字段时整段按数值比
+/// （`12 处` 排在 `6 处` 后面、`虚拟行 12` 排在 `虚拟行 3` 后面），其余字符按
+/// 码位比；数字段数值相等视同相等继续走，先耗尽者排前（全序）。演示数据是
+/// 「数字 + 单位」混排，纯字典序会把 `12` 排在 `6` 前面、看着像没排序。
 pub fn compare_cells(a : String, b : String) -> Int {
-  let c = match (leading_int(a), leading_int(b)) {
-    (Some(x), Some(y)) =>
-      if x < y {
-        -1
-      } else if x > y {
-        1
-      } else {
-        0
+  let ac = a.to_array()
+  let bc = b.to_array()
+  let mut i = 0
+  let mut j = 0
+  while i < ac.length() && j < bc.length() {
+    let da = ac[i] >= '0' && ac[i] <= '9'
+    let db = bc[j] >= '0' && bc[j] <= '9'
+    if da && db {
+      let ra = digit_run(ac, i)
+      let rb = digit_run(bc, j)
+      if ra.0 != rb.0 {
+        return if ra.0 < rb.0 { -1 } else { 1 }
       }
-    _ => 0
+      i = ra.1
+      j = rb.1
+    } else {
+      if ac[i] != bc[j] {
+        return if ac[i] < bc[j] { -1 } else { 1 }
+      }
+      i = i + 1
+      j = j + 1
+    }
   }
-  if c != 0 {
-    c
+  let ra = ac.length() - i
+  let rb = bc.length() - j
+  if ra == rb {
+    0
+  } else if ra < rb {
+    -1
   } else {
-    a.lexical_compare(b)
+    1
   }
 }
 

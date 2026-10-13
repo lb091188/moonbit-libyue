@@ -128,6 +128,8 @@ pub fn Image::get_height(self : Image) -> Double {
 
 ///|
 /// 缩放为新图片（原图不变）；目标像素尺寸 = 逻辑尺寸 × scale（照旧契约）。
+/// 经 `Painter::draw_image` 画到目标位图：Cairo 与纯光栅两个后端都支持
+/// 拉伸 blit——原实现只开 Cairo 会话，Windows 无 Cairo 后端时整帧返回空图。
 pub fn Image::resize(
   self : Image,
   width : Double,
@@ -141,23 +143,9 @@ pub fn Image::resize(
   if self.is_empty() || dst.width == 0 || dst.height == 0 {
     return { pixels: dst, scale: s }
   }
-  match Cairo::over(dst) {
-    Some(c) => {
-      c.blit(
-        self.pixels,
-        0.0,
-        0.0,
-        self.pixels.width.to_double(),
-        self.pixels.height.to_double(),
-        0.0,
-        0.0,
-        dst.width.to_double(),
-        dst.height.to_double(),
-      )
-      c.end()
-    }
-    None => ()
-  }
+  let p = Painter::new(dst)
+  p.draw_image(self, 0.0, 0.0, dst.width.to_double(), dst.height.to_double())
+  p.end()
   { pixels: dst, scale: s }
 }
 

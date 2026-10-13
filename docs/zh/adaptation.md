@@ -1592,6 +1592,16 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **教训**:「永不空闲」类 bug 在真机上表现为**一堆互不相干的功能失效**,而不像性能问题。下次见到「点了没反应 + 卡 + 滚不动」同时出现,先看事件队列的**入队速率与消费速率**,再看有没有自维持的重绘环——两者都会造成「事件被静默丢弃」,而丢弃是没有任何日志的。
 - **验证**:`moon check --deny-warn` 库模块与 `examples` 模块零警告(两处注入式探针确认门禁确实覆盖这两个模块);`gui/win/stub.c` 用 MSVC(`cl /c /W4 /utf-8`)单编通过、警告数与改动前逐字持平(仅 2 条既有 C4996);新增 `table_wbtest.mbt` 2 条(排序口径 + 稳定性)。**真机行为(延迟是否真的降到「一帧」、点击是否不再丢)归 `_Windows真机测试清单.md` 复验**。
 
+### Windows 本机库测试三红收口(2026-10-13,W9/排序批跟进)
+
+W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test` 合并跑在本机还会偶发超时,**分包跑**才稳定)。逐条根因与修法:
+
+- **`moon test` 的测试进程 cwd 是模块根(`gui/`),与调用目录无关**(探针 `yue_sys_getcwd` 实证:从仓根调 `moon test gui/sys` 与从 `gui/` 调 `moon test sys`,进程 cwd 都是 `gui/`)。于是 wbtest 里按仓根写的相对路径 `examples/showcase/assets/dot.gif` 在测试里**永远不存在**,动图解码用例 `None => assert_true(false)` 恒红;`ui_decode_guard()` 也因此探不到图,ui 的动图组件断言一直在静默跳过。修法:测试侧路径改「两候选探测」(`examples/...` 与 `../examples/...` 哪个解得出图用哪个,`image_wbtest` 的 `test_asset` 与 `basic_wbtest` 的 `gif_asset` 同口径),守卫与组件测试从此在 Windows 真跑。
+- **`Image::resize` 只开 Cairo 会话,Windows 无 Cairo 后端整帧空图**——放大后取像素得 `(0,0,0,0)`。`Cairo::over` 在无后端平台返回 `None`,原实现直接放弃填充。修法:改走 `Painter::draw_image`(Cairo / 纯光栅两后端都实装的拉伸 blit),平台无关。
+- **`compare_cells` 只摘串首数字,不是自然序**——`"虚拟行 3"` 首字符非数字即回落字典序,`"虚拟行 12"` 反而排前面(平台无关的真 bug,Linux 同样该红,只是该用例落库后没赶上过一次绿 CI)。修法:重写为**自然序**(逐字符走,两侧同处数字段时整段按数值比,数值相等视同相等继续,先耗尽者排前),`leading_int` 删除。
+- **动图换帧节奏的平台差异(测试口径)**:Windows(WIC)的 `img_anim_advance` 是**一拍一帧**(组件按 `delay_ms` 节奏问一次进一帧,无内部时钟);Linux(io-gif)按虚拟时钟锚定,每拍推进的帧数不同。`basic_wbtest` 的「12 拍 2..6 帧」上限是按 Linux 标定的,改成平台无关不变量「12 拍至少走 2 帧、至多 12 帧(一拍至多一帧的失控护栏)」。
+- **验证**:Windows 本机分包全绿——core 132、ui 125、render 43、text/theme/icons 41、sys/input/win/dbus 280、chart/mdview/web 233,**854/854**;`moon check` 零警告。合并跑偶发 SIGTERM 超时为本机现象,CI(Linux)与分包口径不受影响。
+
 ## macOS(CI 构建链已验,GUI 待真机)
 
 - libyue v0.15.6 发行包含 ARC / no-ARC 双库:Darwin 链接参数 = 主库 + `-lyue_mbt_noarc`(no-ARC 符号被主库引用,须排其后)+ AppKit / Carbon / IOKit / Security / WebKit / OpenDirectory 框架 + `-lobjc -lc++ -lpthread -lbsm -Wl,-dead_strip`;prebuild Darwin 分支已按此预修。

@@ -44,14 +44,29 @@ fn ui_text_guard() -> Bool {
 ///|
 /// 图片解码后端的守卫：Linux 走 GdkPixbuf、Windows 走 WIC（W9），macOS 的解码桩
 /// 还没实装；解不出图时组件退成 0 尺寸，动图断言无从谈起——打印跳过。
+/// moon test 的测试进程 cwd 是模块根（`gui/`），示例资源在仓根 `examples/` 下，
+/// 两个候选都试（同 `render` 包 image_wbtest 的 test_asset 口径）。
 fn ui_decode_guard() -> Bool {
-  let img = @render.Image::new_from_file("examples/showcase/assets/dot.gif")
-  if img.get_width() > 0.0 {
+  if @render.Image::new_from_file(gif_asset()).get_width() > 0.0 {
     true
   } else {
     println("ui: skip (无图片解码后端)")
     false
   }
+}
+
+///|
+/// 动图资源路径：moon test 的测试进程 cwd 是模块根（`gui/`），示例资源在仓根
+/// `examples/` 下——两个候选都试，哪个解得出图用哪个（同 render 包 test_asset）。
+fn gif_asset() -> String {
+  for rel in [
+    "examples/showcase/assets/dot.gif", "../examples/showcase/assets/dot.gif",
+  ] {
+    if @render.Image::new_from_file(rel).get_width() > 0.0 {
+      return rel
+    }
+  }
+  "examples/showcase/assets/dot.gif"
 }
 
 ///|
@@ -415,7 +430,7 @@ test "动图组件：按帧时长自转换帧、暂停不再换帧、play 续上
   )
   let h = GifHandle::make()
   let (_r, w) = mounted(
-    gif("examples/showcase/assets/dot.gif", state=h),
+    gif(gif_asset(), state=h),
     160.0,
     160.0,
   )
@@ -440,7 +455,10 @@ test "动图组件：按帧时长自转换帧、暂停不再换帧、play 续上
     fire()
     n = n + 1
   }
-  assert_true(h.frame_count() >= 2 && h.frame_count() <= 6)
+  // 换帧节奏由加载器定：Windows(WIC) 一拍一帧（组件按 delay_ms 节奏问一次进
+  // 一帧）、Linux(io-gif) 按虚拟时钟锚定锚点——每拍推进几帧各平台不同，平台
+  // 无关的口径是「12 拍确实在走、且没失控一拍多帧」（12 拍至多 12 帧）
+  assert_true(h.frame_count() >= 2 && h.frame_count() <= 12)
   let walked = h.frame_count()
   h.pause()
   fire()
@@ -470,7 +488,7 @@ test "动图组件：按帧时长自转换帧、暂停不再换帧、play 续上
   assert_true(ink > 100)
   // 缩到 48×48 也画得出来（目标尺寸与图幅不符时走缩放那条路）
   let hg2 = GifHandle::make()
-  let (_r4, w4) = mounted(gif("examples/showcase/assets/dot.gif", width=48.0, height=48.0, state=hg2), 80.0, 80.0)
+  let (_r4, w4) = mounted(gif(gif_asset(), width=48.0, height=48.0, state=hg2), 80.0, 80.0)
   let (bm2, _, _) = shot(w4)
   let mut ink2 = 0
   for y = 0; y < 48; y = y + 1 {

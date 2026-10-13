@@ -224,11 +224,26 @@ test "PNG 落盘再读回：像素不变" {
 }
 
 ///|
+/// 测试资源路径：moon test 的测试进程 cwd 是模块根（`gui/`），示例资源在仓根
+/// `examples/` 下——两个候选都试，哪个解得出图用哪个（后端解不开即不存在）。
+fn test_asset(rel : String) -> String? {
+  for p in [rel, "../" + rel] {
+    if Image::new_from_file(p).get_width() > 0.0 {
+      return Some(p)
+    }
+  }
+  None
+}
+
+///|
 test "动图解码：逐帧前进、每帧时长、当前帧成图、close 之后全空操作" {
   if decode_available() == false {
     return
   }
-  let anim = Animation::new_from_file("examples/showcase/assets/dot.gif")
+  let anim = match test_asset("examples/showcase/assets/dot.gif") {
+    Some(p) => Animation::new_from_file(p)
+    None => None
+  }
   match anim {
     None => assert_true(false)
     Some(a) => {
