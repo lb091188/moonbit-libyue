@@ -347,17 +347,6 @@ fn Signal::rerun_effect(self : Signal[Unit]) -> Unit {
   }
 }
 ///|
-/// 手动发一轮通知(只跑订阅回调,不改值也不标脏):`effect` 的「建立时跑一遍」
-/// 靠它——computed 构造已经求值过一次,再 get 会重跑第二遍,副作用类闭包
-/// 必须恰好一次/轮。
-fn[T] Signal::fire_subs(self : Signal[T]) -> Unit {
-  let snapshot = self.node.subs.copy()
-  for input in snapshot {
-    (input.1)()
-  }
-}
-
-///|
 /// 派生只读信号(等价 computed 闭包里只读一个源):源变化自动跟随。
 pub fn[A, B] Signal::map(self : Signal[A], f : (A) -> B) -> Signal[B] {
   Signal::computed(fn() { f(self.get()) })
