@@ -243,3 +243,73 @@ pub fn[T, K : Eq] ListStore::subscribe_diff(
   sub_bag_register(fn() -> Unit { self.store.remove(id) })
   id
 }
+
+///|
+/// 按键对齐的通用差分（对任意平行数组）：ui 层「键 → 行控件」的记账直接吃它，
+/// 不再对另一套元素做第二次 diff。语义与 [keyed_diff] 一致（重复键以新为准、
+/// 新表同键第二条按新增落位）。
+pub fn[T, K : Eq] keyed_align(
+  old_items : Array[T],
+  new_items : Array[T],
+  key : (T) -> K,
+  eq : (T, T) -> Bool,
+) -> KeyDiff[T] {
+  let removed : Array[T] = []
+  let changed : Array[(T, T)] = []
+  let added : Array[(Int, T)] = []
+  let kept : Array[(Int, T)] = []
+  let old_index : Array[(K, T)] = []
+  for i in 0..<old_items.length() {
+    let k = key(old_items[i])
+    let mut placed = false
+    for j in 0..<old_index.length() {
+      if old_index[j].0 == k {
+        old_index[j] = (k, old_items[i])
+        placed = true
+      }
+    }
+    if !placed {
+      let _ = old_index.push((k, old_items[i]))
+    }
+  }
+  let seen : Array[K] = []
+  for i in 0..<new_items.length() {
+    let t = new_items[i]
+    let k = key(t)
+    if seen.contains(k) {
+      let _ = added.push((i, t))
+      continue
+    }
+    let _ = seen.push(k)
+    let mut found : T? = None
+    for pair in old_index {
+      if pair.0 == k {
+        found = Some(pair.1)
+      }
+    }
+    match found {
+      None => {
+        let _ = added.push((i, t))
+      }
+      Some(prev) => {
+        let _ = kept.push((i, t))
+        if !eq(prev, t) {
+          let _ = changed.push((prev, t))
+        }
+      }
+    }
+  }
+  for t in old_items {
+    if !seen.contains(key(t)) {
+      let _ = removed.push(t)
+    }
+  }
+  { removed, changed, added, kept }
+}
+
+///|
+/// 下标对齐档的「内容是否同值」缺省判据：拿不出 `Eq` 判据的元素一律按「变了」
+/// 处理（重挂该行），与 Vue 无 `:key` 时按下标全量刷新一致。
+pub fn[T] index_same(_a : T, _b : T) -> Bool {
+  false
+}
