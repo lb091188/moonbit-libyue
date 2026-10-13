@@ -57,6 +57,19 @@
   - [x] 绘制入口形态：新 `Painter` 门面**不提供** `draw_text`，文本一律走 `text`（`draw_at`/`draw_box_at`/`AttributedText::draw`，cairo 后端画在门面当前会话的 `cairo_t` 上、纯光栅器后端走「离屏位图 + `Raster::blit`」等价通道，平移与裁剪同样生效）；全仓新栈代码 grep 无一处 `p.draw_text(` 调用，旧契约入口随旧链路包一并消失，无需逐点改写
   - [x] **Windows 文字落地（W5）**：`dwrite_text.cpp`（C++ TU——dwrite.h 在 C 模式编不了，moon 的 native-stub 认 .cpp 实测）承载 DirectWrite 实现：测量/行高走 `IDWriteTextLayout`（行盒取 `DWRITE_LINE_METRICS`，与 measure 自洽）、绘制走 D2D 的 DC 渲染目标 + 32bpp DIB + 预乘 over、区间属性把 UTF-8 字节下标换成 UTF-16 码元、族表按字节序排序去重；**行高 K 地板定案落地**（`max(引擎自然, ceil(size×K))`，K=1.36 实测自雅黑 12..32px）与**缺省字族按平台探**（`@theme.default_font_family()`，Windows 钉雅黑）；text 29/29、ui 20 条探针转真跑，缺口只剩 macOS 的 CoreText（待真机）
 
+### 前端化批次（design.md §5 的 P1–P5，2026-10-13 起）
+
+- [x] **P1 样式层收口**：新包 `gui/style`（`Style` 全字段集含定位组与 `z_index`、`Color` 三形态、kwargs 工厂 `style(...)`、`.hover/.active/.focus` 状态方法、`merge` 逐属性并集+状态桶递归、`merge_all`、`apply`、全量基调表 `tokens.mbt`）；`Widget` resolved Style 走进程级侧表 + `z_index_paint` 层序键；yoga-mbt 补 `set_z_index`/`paint_order`；`Widget::set_margin` labelled 化（14 处调用点整批）。
+- [~] **P2 组件层**：
+  - [x] §2 改名与 `_t` 合并全部完成（`view/row/col/text/input/textarea/select(switch editable)/switch/tabs/table/table_v/dialog/tooltip/popover/dropdown/menu/scroll_view/split(direction)/divider/panel/icon_button/rate/color_picker/date_picker/calendar/carousel/message_box/button(variant)`），全仓旧名调用点清零、不留别名；
+  - [x] 事件参数统一 `on_*` 审计（组件库事件回调已全部 `on_*`；`handle?` 是句柄逃生舱非事件）；
+  - [~] 散参数改名（`bg→background_color`、`fg→color`、`border→border_color` 已落；`size→font_size` 与 nav 回调形态 `bg?/fg?:(Widget)->String` 随 P2-e 收进 resolved Style）+ 34 个组件收 `class? : Array[Style]` 并在挂载点 fold；
+  - [ ] **P2-e 逐组件 on_draw 改读 resolved Style 并按状态选桶**（现状：只有 `view` 的底色/描边走 `@style.resolved`；其余组件仍读捕获的散参数；nav 回调色、`text` 的 `src` 色、button 皮肤等待改造）；
+  - [ ] 观感逐页比对不回退（真机由用户复验，`examples/hello`、`hello-themed`、`showcase`、`native-app`、`sysmonitor`）。
+- [ ] **P3 响应式补强**：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` / `mount_window` 补 `render` 槽（动工前先定 design.md §6 唯一待定：`Store` 去重与否）。
+- [ ] **P4 绘制能力**：`Painter` 全局 alpha（opacity 全路径）+ `box_shadow` 硬阴影档。
+- [ ] **P5 动画**：`transition`（状态桶属性插值 + 帧驱动，复用 gif 虚拟时钟）。
+
 ### 控件（一律自绘，不再引入原生控件皮肤；家族名对应 master `yue/components/` 九个源文件）
 - [~] 基础原语：`group`/`separator`/标签/图像/图标/按钮已落新包 **`ui`**（首批 7 件，另附 `container`；文本 measure/baseline 首次回灌布局引擎，`on_pointer`/`on_draw` 首参为控件本身以免自捕获引用环；`type=` 因是保留字改 `kind : ButtonKind`；`yue/components` 属旧链路红点，按批替换）；表单族 15 件已全部落 `ui/form.mbt` + `ui/entry.mbt` + `ui/textarea.mbt`；`tab` 已由 `ui/nav.mbt` 的 `tabs_t` 承担（页签头行 + 预建页区显隐），`scroll` 已落 `ui/scroll.mbt`（垂直滚动容器 + 自绘滚动条，平移用 yoga 新补的相对定位偏移），`splitter` 已落 `ui/split.mbt`（`hsplit`/`vsplit`）、`combo` 已落 `ui/form.mbt`
 - [x] 文本族 `components_text.mbt`（3/3）：`TextRole`/`role_font`/`role_color`、`label_t`、`measure_text_height` 已落 `ui/text.mbt`；`code_view` + `tokenize_lang`/`tokenize_moonbit`（8 语言关键字表 + 词分类着色 + 深底代码块组件）落 `ui/codeview.mbt`——构造期逐 token 测宽预排版、on_draw 现画（One Dark 恒深底不随主题）
