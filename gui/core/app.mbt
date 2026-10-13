@@ -40,6 +40,9 @@ pub(all) struct App {
   mut capture : Int
   /// 已下发给窗口的光标形状（只在变了时再走一次 FFI）
   mut cursor_kind : Int
+  /// 按窗复用的帧位图：尺寸没变就不重新分配（每帧 new 是 MB 级分配+清零；
+  /// 平台桩在 present 时同步拷贝像素，MoonBit 侧缓冲无延迟读，复用安全）
+  mut canvas : @render.Bitmap?
 }
 
 ///|
@@ -139,6 +142,7 @@ fn app_window(
         hover_id: -1,
         capture: -1,
         cursor_kind: 0,
+        canvas: None,
       }
       // 弹层形态要在 show 之前定（类型提示与 transient 关系在映射时生效）
       match popup_of {
@@ -586,8 +590,18 @@ pub fn App::paint_frame(self : App) -> Unit {
     Some(id) => self.root.set_focused_by_focus(id)
     None => self.root.set_focused_by_focus(0)
   }
+  // 分段账本从帧起算：位图分配（仅变尺寸时发生）计入 total 不计入单段，
+  // 避免把「分配」混进「布局」
   let t0 = @win.now_ms()
-  let bm = @render.Bitmap::new(w, h)
+  // 位图按窗复用：尺寸不变直接续用上一帧的缓冲，只有变尺寸才重建
+  let bm = match self.canvas {
+    Some(b) if b.width == w && b.height == h => b
+    _ => {
+      let b = @render.Bitmap::new(w, h)
+      self.canvas = Some(b)
+      b
+    }
+  }
   let p = @render.Painter::new(bm)
   self.root.set_size(w.to_double(), h.to_double())
   self.root.relayout(w.to_double(), h.to_double())
@@ -598,8 +612,7 @@ pub fn App::paint_frame(self : App) -> Unit {
   self.window.present(bm.data, bm.width, bm.height)
   let t3 = @win.now_ms()
   // 分段账本：位图分配计入 total 不计入单段，避免把「分配」混进「布局」
-  prof_record(t1 - t0, t2 - t1, t3 - t2, t3 - t0)
-}
+  prof_record(t1 - t0, t2 - t1, t3 - t2, t3 - t0)}
 
 ///|
 /// 走一圈：等事件 → 跑到期任务 → **逐窗**排空事件 → 逐窗喂输入法 → 脏窗上屏。

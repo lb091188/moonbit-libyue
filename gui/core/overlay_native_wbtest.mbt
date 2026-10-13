@@ -21,6 +21,7 @@ fn fake_host_app() -> App {
     hover_id: -1,
     capture: -1,
     cursor_kind: 0,
+    canvas: None,
   }
 }
 

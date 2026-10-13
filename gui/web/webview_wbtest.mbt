@@ -23,6 +23,7 @@ fn fake_app() -> @core.App {
     hover_id: -1,
     capture: -1,
     cursor_kind: 0,
+    canvas: None,
   }
 }
 
