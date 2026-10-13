@@ -313,6 +313,17 @@ pub fn App::timer(self : App, delay_ms : Int, work : () -> Unit) -> Int {
 }
 
 ///|
+/// 停掉一个周期/延时表（`timer` 返回的句柄）。幂等：没这个句柄（已响完 /
+/// 已停 / 号不存在）都算成功。`timer` 的语义是「句柄可停」，没有取消口子
+/// 的话上层只能让回调自己判flag——那留着一个每拍空转的表，故这里补上。
+pub fn App::cancel_timer(self : App, id : Int) -> Bool {
+  if self.closed {
+    return false
+  }
+  self.sched.cancel(id)
+}
+
+///|
 /// 推迟一拍执行（回调里不做重活的旧链路纪律）。
 pub fn App::task(self : App, work : () -> Unit) -> Unit {
   self.sched.post_task(work)

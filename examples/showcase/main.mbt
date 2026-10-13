@@ -15,8 +15,8 @@
 //     （与 `App::follow_system_theme` 内部同一来源，示例要能手动覆盖故自己开表）。
 //   - 菜单栏 / 托盘 / 单实例尚未迁入（它们各自随「系统集成」页进来，
 //     或在 `examples/native-app` 已有对照演示）。
-//   - 待迁页：系统集成 / 图标库 / 画布与富文本 / 浏览器（见 TODO.md；
-//     表单组件页 2026-10-12 已迁，事件与布局页、窗口页 2026-10-13 已迁）。
+//   - 待迁页：图标库 / 画布与富文本 / 浏览器（见 TODO.md；
+//     表单组件页 2026-10-12 已迁，事件与布局/窗口/系统集成三页 2026-10-13 已迁）。
 
 ///|
 /// 窗口标题
@@ -106,7 +106,7 @@ fn main {
               @ui.scroll_v(
                 [
                   @ui.side_menu_sections(
-                    [("组件", ["基础组件", "表单组件", "导航组件", "数据展示", "图表", "代码文档", "Store", "反馈组件", "事件与布局", "窗口"])],
+                    [("组件", ["基础组件", "表单组件", "导航组件", "数据展示", "图表", "代码文档", "Store", "反馈组件", "事件与布局", "窗口", "系统集成"])],
                     selected,
                     icons=[
                       ("基础组件", @icons.Appstore),
@@ -119,6 +119,7 @@ fn main {
                       ("反馈组件", @icons.ChatRound),
                       ("事件与布局", @icons.Mouse),
                       ("窗口", @icons.Windows),
+                      ("系统集成", @icons.Cpu),
                     ],
                     width=180.0,
                   ),
@@ -150,6 +151,7 @@ fn main {
               @shared.nav_page("反馈组件", selected, @pages.page_feedback(app)),
               @shared.nav_page("事件与布局", selected, @pages.page_events(app)),
               @shared.nav_page("窗口", selected, @pages.page_window(app)),
+              @shared.nav_page("系统集成", selected, @pages.page_system(app)),
               // 对话框挂窗口根：锚点自己是 0 尺寸占位，可见性只由 Store 驱动
               @ui.dialog_t(
                 app.dlg_basic,
@@ -213,7 +215,7 @@ fn main {
       return
     }
     Some(host) => {
-      println("SHOWCASE-READY title=\{SHOWCASE_TITLE} pages=10 follow=1")
+      println("SHOWCASE-READY title=\{SHOWCASE_TITLE} pages=11 follow=1")
       host.run()
     }
   }
