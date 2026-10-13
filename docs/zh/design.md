@@ -8,8 +8,8 @@
 1. **简单优先，向前端直觉靠。** 命名一律取前端最泛的那套写法（`view` / `row` / `col`、
    `color` / `background_color`、`class=@style.card`），不沿用 desktop GUI 的历史叫法
    （`container` / `vbox` / `picker` / `fg` / `bg`）。
-2. **平台原生做不到的不强推。** CSS 是参照系不是目标：布局只有 flex（底层是 Yoga），
-   做不到的东西在类型里根本不存在——不支持的属性名连字符串都不出现，见 §1.2。
+2. **平台原生做不到的不强推。** CSS 是参照系不是目标：布局是 flex + `absolute` / `relative`
+   定位（底层是 Yoga），做不到的东西在类型里根本不存在——不支持的属性名连字符串都不出现，见 §1.2。
 3. **能在编译期查的就不放到运行时。** MoonBit 无 Proxy、无反射、无 eval，也没有宏/插件
    编译与编译期嵌文件能力（实测见 §4），所以视图写 MoonBit 函数、样式写 MoonBit 值、
    响应式走显式信号——类型错误与拼错名字都由 moon 报，不自己实现任何运行时求值或
@@ -29,7 +29,7 @@ ui 只管组件，三包职责不混。
 
 值：
 - 长度：`Double`，单位是逻辑像素（`px` 即默认单位）；百分比不引入值类型，只在 `width` /
-  `height` 上各开一条 `*_percent` 入口（§1.5）。
+  `height` 上各开一条 `*_percent` 入口（定位组 inset 需要时同此形态，§1.5）。
 - 颜色：一个字符串参数搞定，`#` 开头按 hex、命名色按 named、其余按 theme token 名（§1.4），
   三种来源在包内分别是 `Color::Hex` / `Named` / `Var`。
 
@@ -40,30 +40,37 @@ ui 只管组件，三包职责不混。
 | 内外边距 | `padding`（**只表示四边同值**）、`padding_left/right/top/bottom`、`margin`、`margin_*` | Yoga（`set_padding` / `set_margin`）。**不做 CSS 的 2/3 值简写**（`padding: 8px 16px` 那种按边数变语义的写法）：要么四边同值，要么逐边单给，档位就这两档 |
 | 边框圆角 | `border_width`、`border_color`、`border_radius` | 绘制阶段；圆角矩形复用 `ui/basic.mbt` 的 `fill_round_rect` |
 | flex 布局 | `display`（`flex` / `none`）、`flex_direction`、`justify_content`、`align_items`、`align_self`、`flex`（grow）、`gap`、`row_gap`、`column_gap` | Yoga |
+| 定位 | `position`（`relative` / `absolute`）、`top`、`right`、`bottom`、`left`、`z_index` | Yoga（`set_position` / `set_top` …底层现成，含百分比 inset；`z_index` 由 yoga-mbt 随 P1 补齐，见 §5）。Style 首批只开逻辑像素值，百分比入口同 `width_percent` 形态另开 |
 | 状态 | `hover`、`active`、`focus`（各是一个嵌套 `Style`） | 绘制期按控件状态选桶，见 §1.3 |
 | 其它 | `visibility`、`cursor` | 宿主 `Widget`（`set_visible` / `cursor`） |
 
 ### 1.2 没有的属性（写不出来，而不是运行时报错）
 
-`grid` 相关（`grid_template_*`、`grid_area`）、`position` / `top` / `z-index`（无通用绝对
-定位布局）、`box-shadow`、`transition` / `animation`、`@media`、后代/子代/兄弟选择器、
-id 与属性选择器、通配符、`!important`、CSS 的**自动继承**。
+`grid` 相关（`grid_template_*`、`grid_area`）、`@media`（设计决策：**不做**，见下表）、
+后代/子代/兄弟选择器、id 与属性选择器、通配符、
+`!important`、CSS 的**自动继承**。
 
 `Style` 里没有对应字段，setter 也没有同名方法，调用点写不出来。搬迁旧 `.css` 或对照前端
 经验时按下表替换：
 
+> 定位、层序、阴影、透明、动画**能做、已排进 §5 计划**：`position` / `top` / `right` /
+> `bottom` / `left` 并入 P1 字段集（底层 `set_position` / `set_top` … 现成，框架内部滚动条 /
+> 吸顶条 / 关闭按钮 / 覆盖层已在用）；`z_index` 由 yoga-mbt 随 P1 补齐（上游有据可依）；
+> `box_shadow` 进 P4；`opacity` 进 P4 且**完整落地**（整层 global alpha 铺满绘制全路径，
+> 落地即开 `Style.opacity` 字段，不做只支持部分绘制路径的半成品）；`transition` 进 P5。
+
 | 写不出来的东西 | 替代写法 |
 | --- | --- |
 | `grid_template_*` / `grid_area` | `col` / `row` + `gap`；等分用 `flex`（grow） |
-| `position` / `top` / `z_index` | 浮层走 `@core.overlay`（弹窗/悬浮提示那条既有通道） |
-| `box_shadow` | `border_*` + 分层背景色 |
-| `transition` / `animation` | 暂无：状态变化是直接切换（`hover`/`active`/`focus` 桶，§1.3） |
-| `@media` | 断点由使用者自己读窗口尺寸，落到不同的 `Style` 常量 |
+| `z_index` | P1 落地：yoga-mbt 补 `set_z_index` + 子项层序稳定排序（上游同构），gui 绘制按 resolved 值重排 kids；落地前层序就是 kids 数组序（后者盖上，滚动条 / 吸顶条即此形态），跨层浮层走 `@core.overlay`（弹窗/悬浮提示那条既有通道） |
+| `transition` / `animation` | 随 P5 动画批（帧驱动复用 gif 的虚拟时钟与 `invalidate` 回路）；落地前状态变化是直接切换（`hover`/`active`/`focus` 桶，§1.3） |
+| `@media` | **不做**（设计决策）：断点由使用者自己读窗口尺寸，落到不同的 `Style` 常量 |
 | 后代/子代/兄弟选择器、id 与属性选择器、通配符 | 具名 `Style` 常量 + `class=[...]` 组合 |
 | `!important` | 靠数组顺序（§1.3 覆盖顺序），后写的赢 |
 | CSS 的自动继承 | 显式传 `class`，或在父组件里算好再传下去 |
 
-> `opacity` 待补：`Painter` 暂无 alpha 通道，补完前 `Style` 不开这个字段。
+> `opacity`（P4 **完整落地**，不拖）：颜色级 alpha 已支持（hex 含 alpha 分量），P4 把**整层**
+> global alpha 铺满绘制全路径（填充 / 描边 / 文本 / 图片），落地即开 `Style.opacity` 字段。
 > 四边内距的入口形态：`Widget::set_padding` 收 labelled 四边（`top` / `right` / `bottom` /
 > `left`，未给按 0），`set_padding_all(v)` 是一值简写；`set_margin` 收位置参数，随 P1 改成
 > 同形（§1.5）。`Style.padding` 字段按四边展开落进这两条 setter。
@@ -365,10 +372,11 @@ fn render(ctx : Ctx) -> @core.Node {
 
 | 批 | 内容 | 收口条件 |
 | --- | --- | --- |
-| P1 | 新建 `gui/style` 包：`Style` 字段集 + `Color` + 链式 setter（属性名即方法名）+ `merge`（逐属性并集、状态桶递归）+ **全量**内置常量表（§2 每个组件的基调，`tokens.mbt`）+ `Widget` 上存 resolved `Style` 的位置 + `apply`；顺带 `Widget::set_margin` labelled 化（同形统一） | 新包测试 + `Widget` 样式槽用例 + `cd gui && moon check` 零错零警 |
+| P1 | 新建 `gui/style` 包：`Style` 字段集（含定位组 `position` / `top` / `right` / `bottom` / `left`——底层 yoga 现成，含百分比 inset 的能力后补入口）+ `Color` + 链式 setter（属性名即方法名）+ `merge`（逐属性并集、状态桶递归）+ **全量**内置常量表（§2 每个组件的基调，`tokens.mbt`）+ `Widget` 上存 resolved `Style` 的位置 + `apply`；**yoga-mbt 补 `z_index`**（`set_z_index` + 布局输出按 z_index 稳定排序，Yoga 上游同构；gui 侧绘制按 resolved 值重排 kids，`Style` 同步开 `z_index` 字段）；顺带 `Widget::set_margin` labelled 化（同形统一） | 新包测试 + `Widget` 样式槽用例 + 定位字段落到 yoga 的布局用例 + yoga-mbt 模块 z_index 用例（正序/负值/并列稳定）+ `cd gui && moon check` 零错零警 |
 | P2 | 组件改名（按 §2 映射表，含 `_t` 合并）+ `on_*` 统一 + 散参数改名并折算成匿名 `Style`（排解析序列最前）+ **逐组件把 `on_draw` 从「读捕获的散参数」改成「读 `self` 上的样式并按状态选桶」** | 全仓 `moon check` 零错零警，910 处调用点全切完，观感逐页比对不回退 |
 | P3 | 响应式补强：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` | 分包测试 + 现有 Store 用例不回归 |
-| P4 | 待补能力：`Painter` alpha（`opacity`） | 各自用例 + 回写 `docs/zh/adaptation.md` |
+| P4 | 绘制能力补齐：**`Painter` 全局 alpha 完整落地**（`opacity`：alpha 进绘制状态机，铺满填充 / 描边 / 文本 / 图片全路径，`Style` 开 `opacity` 字段——颜色级 alpha 已有，这次补的是整层）+ `box_shadow`（硬阴影档：偏移多层圆角矩形先行，模糊档随 blur 能力再评估） | 各自用例（opacity 含全路径覆盖验证）+ 回写 `docs/zh/adaptation.md` |
+| P5 | 动画：`transition`（状态桶属性插值 + 帧驱动，复用 gif 的虚拟时钟与 `invalidate` 回路） | 各自用例 + 回写 `docs/zh/adaptation.md` |
 
 没有模板批，也没有 CSS 解析批（见 §1、§4）。`on_*` 与散参数改名都在 P2 的改名范围内，合批
 做，P1 之前不加批。
