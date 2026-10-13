@@ -21,6 +21,9 @@ import {
   "NoahLiu/native-gui/sys",
 }
 
+// webkit_stub.c：WebKitGTK 分支（Linux，prebuild 专编真实现）+ 其余平台占位；
+// webview2_stub.c：WebView2 分支（Windows，native-stub 自编，MIT vendor 头相对
+// 路径自取）。两文件在各平台上都只有一个落分支、一份 wb_* 符号。
 options(
-  "native-stub": [ "webkit_stub.c" ],
+  "native-stub": [ "webkit_stub.c", "webview2_stub.c" ],
 )

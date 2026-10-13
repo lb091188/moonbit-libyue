@@ -1544,6 +1544,17 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **槽位与创建时序**:`WM_SIZE` 在 `CreateWindowW` 期间就会到达,槽号必须经 `CREATESTRUCT.lpCreateParams` 在 `WM_CREATE` 里先行落位(`GWLP_USERDATA` 建完再设会丢掉首条 WM_SIZE);客户区口径用 `AdjustWindowRect` 把外框撑到客户区恰为 width×height。DPI 用 `SetProcessDpiAwarenessContext` per-monitor v2(经 GetProcAddress 取,老系统缺导出不断链),整栈物理像素,`WM_DPICHANGED` 按建议矩形重摆、WM_SIZE 记账。
 - **验证**(2026-10-11,本机):`moon build examples/native-window` 全链链接成功;冒烟 `NATIVE-WINDOW-OK frames=45`(5s 定时退出,exit 0,45 帧上屏即 present→WM_PAINT→StretchDIBits 通);core.App 宿主形态用用完即删探针验 `WIN-SMOKE-OK`(App::new + 声明式挂载 + timer + 干净退出);core 62/62 复绿(测试不调 App::new,不会弹真窗),全仓 check 287/68 持平。band_h=0/0/0/0 属文本后端占位(W5)。
 
+### WebView2 webview 桩与 ffmpeg Windows 真链接(平台批,2026-10-13)
+
+- **WebView2 自定义 scheme 必须在 Environment 创建时预注册**:没经 `ICoreWebView2EnvironmentOptions4::SetCustomSchemeRegistrations` 注册的自定义 scheme,导航直接失败(真机实测失败码 9,换 8)。MoonBit 层 `webview_predeclare_schemes` 名单经新 extern 流到 C 桩全局名单,`wb_create` 传手写 `WbOptions`(四子接口嵌套 COM)由引擎在 Environment 创建时取名单。
+- **COM propget/propput 手写实现少写 `self` 参数会在 x64 上静默写坏 vtable**:`get_bool(BOOL *value)` 按单参声明,引擎按 COM 约定传 `(self, &value)` 两参——x64 下第一参数 RCX=self 被当成 value,`*value = FALSE` 实际把对象首 8 字节(lpVtbl!)写成 0,之后任何对该接口的调用 = 调 NULL vtable = segfault。put_str/put_bool 同病(少读 this,x64 恰好不炸)。**C 无函数签名检查,vtable 指针赋值只有 C4113 警告**——每个手写 COM 方法的参数表都要逐个对着头文件数。
+- **`GetCustomSchemeRegistrations` 返回的数组必须 `CoTaskMemAlloc`**:契约是调用方(loader)用 `CoTaskMemFree` 释放——把静态数组指针交出去,loader 对它 free 直接触发 `0xC0000374`(堆损坏),且崩溃点在引擎内部、get_regs 返回之后,栈上完全看不出与 registration 有关。排查用了 AddVectoredExceptionHandler(打印异常码/地址/所属模块)+ HeapWalk 全遍历堆校验(stderr 无缓冲,segfault 下 stdout 缓冲会丢)。
+- **MSVC 默认按系统代码页(GBK)读无 BOM 的 UTF-8 源文件**(C4819):中文注释与 ffmpeg 头的 UTF-8 字节序列被 GBK 误读吞行——注释行末字节恰与换行组成 GBK 双字节时,下一行被并进注释,级联出几百条「非法存储类/未定义标识符」。修法:`stub-cc-flags` 加 `/utf-8`(ffmpeg-mbt 的 vendor 头同样中招,rational.h 也报 C4819)。
+- **moon prebuild 的 `vars` + moon.pkg `${build.VAR}` 替换可用**(0.1.20260920 实测):prebuild 输出 `{"vars": {"FFMPEG_INC": "..."}, "link_configs": [...]}`,moon.pkg 写 `link: { "native": { "stub-cc-flags": "/utf-8 -I${build.FFMPEG_INC}" } }`——vendor 头路径不经静态写死即可注入 stub 编译;`stub-cc-flags` 只对 native-stub 编译生效。未下发变量的平台给占位值(`/usr/include` 或 `.`)避免 `${...}` 落空。
+- **ffmpeg dev 内容 vendor 口径**:BtbN `ffmpeg-n9.0-latest-win64-lgpl-shared-9.0` 的 include 头 + 7 个导入库 + LGPLv3 LICENSE 共 2.5MB 进 `modules/ffmpeg-mbt/vendor/`(**选 lgpl-shared 不选 gpl-shared**——动态链接场景 LGPL 义务最小);运行期 dll(150MB)不进仓库,与 exe 同目录或放 PATH。`ffmpeg_stub.c` 删 `_WIN32` 全错误降级分支,三平台实现同源(ffmpeg API 本身跨平台,原 Linux 分支无 POSIX 特有调用,原样可移)。
+- **miniaudio 在 Windows 零额外链接库**:WASAPI/COM/dsound/winmm 全走运行期 LoadLibrary,`gui-media/prebuild.py` 空 link_configs 即正确形态(非降级)。gui-media 24/24 全过含 AudioPlayer 冒烟(pump 33 拍播完 1 秒素材,WASAPI 设备链真出声);ffmpeg-mbt 6/6(ogg/m4a/wav + 视频真解码)。
+- **GUI 子系统示例的无人值守收尾**:`native-web` 不设自杀点(人工验收要逐项点过去),自动化跑法须 `taskkill /IM`(发 WM_CLOSE,app.run() 正常返回后统计才 flush)——`kill -9` 会连 stdout 缓冲一起丢。
+
 ## macOS(CI 构建链已验,GUI 待真机)
 
 - libyue v0.15.6 发行包含 ARC / no-ARC 双库:Darwin 链接参数 = 主库 + `-lyue_mbt_noarc`(no-ARC 符号被主库引用,须排其后)+ AppKit / Carbon / IOKit / Security / WebKit / OpenDirectory 框架 + `-lobjc -lc++ -lpthread -lbsm -Wl,-dead_strip`;prebuild Darwin 分支已按此预修。

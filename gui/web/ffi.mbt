@@ -6,6 +6,12 @@
 extern "c" fn wb_available() -> Int = "wb_available"
 
 ///|
+/// WebView2 侧的 scheme 预注册名单（其他平台桩 no-op）
+#borrow(scheme)
+extern "c" fn wb_predeclare_scheme(scheme : Bytes) -> Unit =
+  "wb_predeclare_scheme"
+
+///|
 /// 这个句柄的视图还在不在（窗口拆掉后一律 0）
 extern "c" fn wb_alive(id : Int64) -> Int = "wb_alive"
 

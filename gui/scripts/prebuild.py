@@ -268,6 +268,25 @@ def link_configs() -> dict:
             "package": TEXT_PACKAGE,
             "link_flags": "dwrite.lib d2d1.lib windowscodecs.lib ole32.lib uuid.lib gdi32.lib",
         })
+        # webview（web）Windows：WebView2（平台批）。头文件与静态 Loader 是
+        # MIT 的 Microsoft.Web.WebView2 SDK（1.0.4258.31）vendor 进
+        # web/include/ 与 web/lib/（许可全文见 web/include/SDK-LICENSE.txt）：
+        # 头由 native-stub 相对源文件路径自取（native-stub 拿不到外部 include
+        # 路径，同 win 桩 GTK 的教训），所以这里只下发链接输入——静态 Loader
+        # 免运行期分发 DLL（Evergreen Runtime 本机已有，探测在 C 桩里做）。
+        # 静态 Loader 的系统库依赖按官方 CMake 清单补（shlwapi 等）。
+        wv2_lib = MODULE_ROOT / "web" / "lib" / "WebView2LoaderStatic.lib"
+        if wv2_lib.exists():
+            entries.append({
+                "package": WEB_PACKAGE,
+                "link_flags": f"{wv2_lib.as_posix()} shlwapi.lib ole32.lib "
+                "oleaut32.lib uuid.lib user32.lib gdi32.lib advapi32.lib",
+            })
+        else:
+            print(
+                "prebuild: 缺 web/lib/WebView2LoaderStatic.lib，webview 走占位实现（探测返回不可用）",
+                file=sys.stderr,
+            )
     return {"link_configs": entries}
 
 

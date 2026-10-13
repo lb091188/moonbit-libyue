@@ -112,6 +112,10 @@ pub fn webview_predeclare_schemes(schemes : Array[String]) -> Bool {
   for s in schemes {
     if s.length() > 0 && !schemes_has(g_schemes.val, s) {
       g_schemes.val.push(s)
+      // WebView2 侧：自定义 scheme 必须在 Environment 创建时经
+      // EnvironmentOptions4 预注册，否则导航直接失败（真机实测失败码 9）。
+      // 其他平台桩是 no-op，无脑透传。
+      wb_predeclare_scheme(@utf8.encode(s))
     }
   }
   true

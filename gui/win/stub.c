@@ -115,6 +115,15 @@ typedef struct {
   int ev_count;
 } WmWindow;
 
+#define WM_MAX_SURFACES 64
+typedef struct {
+  HWND hwnd; // 面板子窗；非 NULL 即槽在用。窗随父销毁（Win32 父子关系），槽位由 wm_close 清
+  int64_t window_id;
+  int kind;
+  int x, y, w, h;
+} WmSurface;
+static WmSurface wm_surfaces[WM_MAX_SURFACES]; // 槽 0 未用，句柄 = 槽号（1 起）
+
 static WmWindow wm_windows[WM_MAX_WINDOWS]; // 槽 0 未用，句柄 = 槽号（1 起）
 static int wm_next_id = 1;
 static HWND wm_waker = NULL; // 仅消息窗口：wm_wakeup 的投递目标（跨线程叫醒）
@@ -717,6 +726,18 @@ int wm_init(void) {
       GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
     return 0;
   }
+  // 原生子件面板类（平台批）：DefWindowProc 即可——它只是 WebView2 等原生
+  // 引擎的承载矩形，自绘不走它。背景刷 NULL 免建窗到首帧之间的闪白。
+  WNDCLASSEXW wsf;
+  memset(&wsf, 0, sizeof(wsf));
+  wsf.cbSize = sizeof(wsf);
+  wsf.lpfnWndProc = DefWindowProcW;
+  wsf.hInstance = inst;
+  wsf.lpszClassName = L"yue_wm_surface";
+  if (RegisterClassExW(&wsf) == 0 &&
+      GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+    return 0;
+  }
   wm_waker = CreateWindowExW(0, L"yue_wm_waker", L"", 0, 0, 0, 0, 0,
                              HWND_MESSAGE, NULL, inst, NULL);
   if (wm_waker == NULL) {
@@ -871,6 +892,13 @@ void wm_close(int64_t id) {
     return;
   }
   WmWindow *w = &wm_windows[id];
+  // 归属本窗的原生子件槽一起清：子 HWND 随 DestroyWindow 的 Win32 父子关系
+  // 自动销毁，槽位必须空出来，否则能力层拿着悬垂 HWND 继续用就是未定义
+  for (int i = 1; i < WM_MAX_SURFACES; i++) {
+    if (wm_surfaces[i].hwnd != NULL && wm_surfaces[i].window_id == id) {
+      memset(&wm_surfaces[i], 0, sizeof(WmSurface));
+    }
+  }
   if (w->hwnd != NULL) {
     HWND hwnd = w->hwnd;
     w->hwnd = NULL; // WM_DESTROY 里还会再清一次；先摘钩防重入
@@ -2411,17 +2439,84 @@ int64_t wm_local_date(void) {
   return (int64_t)st.wYear * 10000 + (int64_t)st.wMonth * 100 + (int64_t)st.wDay;
 }
 
-// 原生子件通道的占位实现：符号必须存在（yue/win 的 MoonBit 层各平台同一份声明，
-// 缺符号会让 Windows 构建在链接期就断），真实现（WebView2 子 HWND）随平台批。
+// ---- 原生子件通道（方案 §4.7）——Windows 真实现（平台批）----
+// 语义对齐 GTK 桩：surface = 一个 WS_CHILD 面板 HWND（父 = 宿主窗口），WebView2
+// 等原生引擎以它为 parent；容器指针经 wm_surface_container() 交给能力层桩
+// （C 之间传指针，MoonBit 只搬 int64）。矩形按窗口内容坐标给——整栈物理像素
+// 口径（per-monitor v2），客户区坐标即物理像素，无需再换算。
 int64_t wm_surface_new(int64_t window_id, int kind, int x, int y, int w,
                        int h) {
-  (void)window_id; (void)kind; (void)x; (void)y; (void)w; (void)h;
-  return 0;
+  if (window_id <= 0 || window_id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  WmWindow *win = &wm_windows[window_id];
+  if (win->hwnd == NULL) {
+    return 0;
+  }
+  int sid = 0;
+  for (int i = 1; i < WM_MAX_SURFACES; i++) {
+    if (wm_surfaces[i].hwnd == NULL) {
+      sid = i;
+      break;
+    }
+  }
+  if (sid == 0) {
+    return 0;
+  }
+  // 背景刷 NULL：原生引擎（WebView2）自己盖满，避免建窗到首帧之间的闪白；
+  // 光标不设——页面内的手型/文本等由引擎自管，与 GTK 桩的容器同语义。
+  HWND hwnd = CreateWindowExW(0, L"yue_wm_surface", L"", WS_CHILD | WS_VISIBLE,
+                              x, y, w > 1 ? w : 1, h > 1 ? h : 1, win->hwnd,
+                              NULL, GetModuleHandleW(NULL), NULL);
+  if (hwnd == NULL) {
+    return 0;
+  }
+  wm_surfaces[sid].hwnd = hwnd;
+  wm_surfaces[sid].window_id = window_id;
+  wm_surfaces[sid].kind = kind;
+  wm_surfaces[sid].x = x;
+  wm_surfaces[sid].y = y;
+  wm_surfaces[sid].w = w;
+  wm_surfaces[sid].h = h;
+  return (int64_t)sid;
 }
+
 void wm_surface_set_rect(int64_t surface_id, int x, int y, int w, int h) {
-  (void)surface_id; (void)x; (void)y; (void)w; (void)h;
+  if (surface_id <= 0 || surface_id >= WM_MAX_SURFACES) {
+    return;
+  }
+  WmSurface *s = &wm_surfaces[surface_id];
+  if (s->hwnd == NULL) {
+    return;
+  }
+  if (s->x == x && s->y == y && s->w == w && s->h == h) {
+    return; // 每帧都同步，位置没动就不重排
+  }
+  s->x = x;
+  s->y = y;
+  s->w = w;
+  s->h = h;
+  MoveWindow(s->hwnd, x, y, w > 1 ? w : 1, h > 1 ? h : 1, TRUE);
 }
-void wm_surface_close(int64_t surface_id) { (void)surface_id; }
+
+void wm_surface_close(int64_t surface_id) {
+  if (surface_id <= 0 || surface_id >= WM_MAX_SURFACES) {
+    return;
+  }
+  WmSurface *s = &wm_surfaces[surface_id];
+  if (s->hwnd != NULL) {
+    DestroyWindow(s->hwnd);
+  }
+  memset(s, 0, sizeof(WmSurface));
+}
+
+// 给能力层的桩用（web 的 WebView2 桩把它转 HWND 当 parentHWND）。
+void *wm_surface_container(int64_t surface_id) {
+  if (surface_id <= 0 || surface_id >= WM_MAX_SURFACES) {
+    return NULL;
+  }
+  return (void *)wm_surfaces[surface_id].hwnd;
+}
 void wm_window_set_popup(int64_t id, int64_t owner_id) { (void)id; (void)owner_id; }
 void wm_window_move(int64_t id, int x, int y) { (void)id; (void)x; (void)y; }
 void wm_window_origin(int64_t id, int32_t *out_x, int32_t *out_y) {
@@ -2433,10 +2528,6 @@ void wm_window_set_fullscreen(int64_t id, int on) { (void)id; (void)on; }
 int wm_window_surface_count(int64_t id) {
   (void)id;
   return 0;
-}
-void *wm_surface_container(int64_t surface_id) {
-  (void)surface_id;
-  return NULL;
 }
 
 #elif defined(WM_STUB_GTK)

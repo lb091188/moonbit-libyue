@@ -11,8 +11,9 @@ miniaudio 的设备线程与运行期 dlopen 后端要 pthread/dl/m/lstdc++/atom
 `NoahLiu/ffmpeg-mbt/src` 下发，本脚本不重复。
 
 约束：stdout 只能是 JSON；进度信息走 stderr。
-非 Linux：媒体后端随各自平台落地，这里优雅降级为空 link_configs 保可构建
-（与 ffmpeg-mbt、主 prebuild 的非 Linux 口径一致）。
+非 Linux：Windows 实测 miniaudio 的 WASAPI/COM 全走运行期加载（LoadLibrary
+ole32 等），零额外链接库——空 link_configs 即正确形态，不是降级；macOS
+（CoreAudio）待 macOS 线落地时再核对口径。
 """
 
 from __future__ import annotations

@@ -480,6 +480,9 @@ int wb_unregister_scheme(int64_t id, const char *scheme) {
   return 0;
 }
 
+// WebView2 侧才需要的 scheme 预注册（WebKit 按 context 注册，无需预处理）
+void wb_predeclare_scheme(const char *scheme) { (void)scheme; }
+
 // ---- 对外面（MoonBit 只搬 int64 与字节缓冲）----
 int wb_available(void) { return 1; }
 
@@ -829,11 +832,13 @@ void wb_destroy(int64_t id) {
   memset(v, 0, sizeof(WbView));
 }
 
-#elif !defined(__linux__)
+#elif !defined(__linux__) && !defined(_WIN32)
 
-// 非 Linux 占位（Windows/macOS 后端随平台批）：符号必须在，能力探测返回不可用。
+// 其余平台占位（macOS 等后端随平台批）：符号必须在，能力探测返回不可用。
+// （Windows 的真实现在本包 webview2_stub.c——符号只有一份，这里必须空出。）
 #include <stdint.h>
 
+void wb_predeclare_scheme(const char *scheme) { (void)scheme; }
 int wb_available(void) { return 0; }
 int wb_alive(int64_t id) { (void)id; return 0; }
 int wb_persistence(void) { return 0; }

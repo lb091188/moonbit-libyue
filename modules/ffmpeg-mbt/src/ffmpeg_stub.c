@@ -1,203 +1,20 @@
 // ffmpeg 动态链 FFI 的薄 stub：只做句柄/字符串转换，无业务逻辑。
-// 依赖系统 libavformat/libavcodec/libswscale/libavutil（动态链，pkg-config
-// 提供头文件与链接参数，由主仓库 scripts/prebuild.py 注入）。
+// 依赖 libavformat/libavcodec/libswscale/libswresample/libavutil（动态链）。
 //
-// Windows 分支：ffmpeg 后端随各自媒体线落地时再接（与 prebuild 的
-// 非 Linux 降级口径一致）。这里给「全错误降级实现」——全部 FFI 符号
-// 在场（链接不断），语义上恒失败：vf_open 恒不成功、解码器恒 NULL，
-// MoonBit 侧据此报「FFI 打开失败」，调用方（gui-media player_t）走
-// on_error 语义化降级。
+// 平台口径（由本模块 prebuild.py 下发参数）：
+// - Linux：pkg-config 探测系统 dev 包，头与链接参数随构建注入；
+// - Windows：dev 内容 vendor 进仓库（vendor/include + vendor/*.lib，
+//   BtbN win64-lgpl-shared 构建），头文件路径经 moon.pkg 的
+//   stub-cc-flags `-I${build.FFMPEG_INC}` 注入，导入库走 link_flags；
+//   运行期 dll 不进仓库，与 exe 同目录或放 PATH。
+// 三个平台的实现同源（ffmpeg 的 API 本身跨平台），本文件不再有
+// 平台条件编译。
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "moonbit.h"
 
-#ifdef _WIN32
-
-/* Windows：ffmpeg 后端未接。句柄结构只保留探测所需字段。 */
-typedef struct VfFmt {
-    int ok;      // 恒 0：没有媒体后端
-    int vstream;
-    int astream;
-    int sstream;
-} VfFmt;
-
-typedef struct VfDec {
-    int width;
-    int height;
-    double last_pts;
-} VfDec;
-
-typedef struct VfADec {
-    int out_ch;
-    int out_rate;
-} VfADec;
-
-typedef struct VfSDec {
-    double last_pts;
-    double last_end;
-} VfSDec;
-
-int32_t vf_version(void) {
-    return 0;
-}
-
-VfFmt *vf_open(const char *path) {
-    (void)path;
-    VfFmt *f = (VfFmt *)malloc(sizeof(VfFmt));
-    f->ok = 0;
-    f->vstream = -1;
-    f->astream = -1;
-    f->sstream = -1;
-    return f;
-}
-
-int32_t vf_ok(VfFmt *f) {
-    return f && f->ok ? 1 : 0;
-}
-
-void vf_close(VfFmt *f) {
-    free(f);
-}
-
-int32_t vf_video_stream(VfFmt *f) {
-    return f ? f->vstream : -1;
-}
-
-int32_t vf_audio_stream(VfFmt *f) {
-    return f ? f->astream : -1;
-}
-
-int32_t vf_subtitle_stream(VfFmt *f) {
-    return f ? f->sstream : -1;
-}
-
-VfDec *vf_no_decoder(void) {
-    return NULL;
-}
-
-VfADec *vf_no_audio_decoder(void) {
-    return NULL;
-}
-
-int32_t vf_stream_width(VfFmt *f) {
-    (void)f;
-    return 0;
-}
-
-int32_t vf_stream_height(VfFmt *f) {
-    (void)f;
-    return 0;
-}
-
-double vf_duration_s(VfFmt *f) {
-    (void)f;
-    return 0.0;
-}
-
-VfDec *vf_open_video_decoder(VfFmt *f, int32_t out_w, int32_t out_h) {
-    (void)f;
-    (void)out_w;
-    (void)out_h;
-    return NULL;
-}
-
-void vf_close_decoder(VfDec *d) {
-    free(d);
-}
-
-int32_t vf_dec_width(VfDec *d) {
-    return d ? d->width : 0;
-}
-
-int32_t vf_dec_height(VfDec *d) {
-    return d ? d->height : 0;
-}
-
-int32_t vf_decode_next(VfDec *d, uint8_t *out, int32_t out_len) {
-    (void)d;
-    (void)out;
-    (void)out_len;
-    return -1;
-}
-
-double vf_frame_pts_s(VfDec *d) {
-    return d ? d->last_pts : -1.0;
-}
-
-double vf_stream_fps(VfFmt *f) {
-    (void)f;
-    return 0.0;
-}
-
-int32_t vf_seek_s(VfDec *d, double t_s) {
-    (void)d;
-    (void)t_s;
-    return -1;
-}
-
-void vf_close_audio_decoder(VfADec *d) {
-    free(d);
-}
-
-VfADec *vf_open_audio_decoder(VfFmt *f) {
-    (void)f;
-    return NULL;
-}
-
-int32_t vf_adec_channels(VfADec *d) {
-    return d ? d->out_ch : 0;
-}
-
-int32_t vf_adec_rate(VfADec *d) {
-    return d ? d->out_rate : 0;
-}
-
-int32_t vf_decode_pcm(VfADec *d, uint8_t *out, int32_t out_len) {
-    (void)d;
-    (void)out;
-    (void)out_len;
-    return -1;
-}
-
-int32_t vf_aseek_s(VfADec *d, double t_s) {
-    (void)d;
-    (void)t_s;
-    return -1;
-}
-
-void vf_sub_close(VfSDec *d) {
-    free(d);
-}
-
-VfSDec *vf_sub_open(const char *path) {
-    (void)path;
-    return NULL;
-}
-
-int32_t vf_sub_ok(VfSDec *d) {
-    return d ? 1 : 0;
-}
-
-int32_t vf_sub_next(VfSDec *d, char *out, int32_t out_len) {
-    (void)d;
-    if (out == NULL || out_len < 1) {
-        return -1;
-    }
-    out[0] = '\0';
-    return 0;
-}
-
-double vf_sub_pts_s(VfSDec *d) {
-    return d ? d->last_pts : -1.0;
-}
-
-double vf_sub_end_s(VfSDec *d) {
-    return d ? d->last_end : -1.0;
-}
-
-#else /* _WIN32 */
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
@@ -807,5 +624,3 @@ double vf_sub_pts_s(VfSDec *d) {
 double vf_sub_end_s(VfSDec *d) {
     return d ? d->last_end : -1.0;
 }
-
-#endif /* _WIN32 */

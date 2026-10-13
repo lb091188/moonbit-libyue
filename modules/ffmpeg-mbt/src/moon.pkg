@@ -4,8 +4,18 @@ import {
 
 supported_targets = "native"
 
+// ${build.FFMPEG_INC} 由本模块 prebuild.py 下发（Windows=vendor/include，
+// Linux=/usr/include 占位——系统头本来就在默认搜索路径上）。只对 stub 编译
+// 生效，不影响 MoonBit 生成代码的编译。
 options(
     "native-stub": [
         "ffmpeg_stub.c"
-    ]
+    ],
+    link: {
+        "native": {
+            // /utf-8：MSVC 默认按系统代码页(GBK)读无 BOM 源文件，中文注释与
+            // ffmpeg 头的 UTF-8 字节序列会被误读吞行（C4819 → 级联语法错误）
+            "stub-cc-flags": "/utf-8 -I${build.FFMPEG_INC}"
+        }
+    }
 )
