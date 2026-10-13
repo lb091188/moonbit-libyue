@@ -170,6 +170,17 @@ pub fn[T] Signal::new(value : T) -> Signal[T] {
 }
 
 ///|
+/// 副作用信号：闭包每次「被求值」都真跑一遍（不像 computed 那样脏了才重算），
+/// 依赖收集与 observer 接线同 computed。`effect` 走这条，不借 computed 的
+/// 缓存语义（computed 构造期先跑再重算，副作用会被放大成两遍）。
+pub fn Signal::effect(f : () -> Unit) -> Signal[Unit] {
+  // 建节点但不跑:「第一遍」由 effect 层的 fire_subs 触发,每轮恰好一次
+  let s = sig_make((), Some(f))
+  s.node.dirty = true
+  s
+}
+
+///|
 /// 派生信号:闭包内读到的每个信号自动成为依赖;任一依赖变化后本信号
 /// 失效,下一次 get() 重算。闭包不应读写自身(会无限递归);依赖分
 /// 支(条件读)自动跟随最新一次求值实际读到的信号。
@@ -281,6 +292,16 @@ pub fn[T] Signal::subscribe(self : Signal[T], f : (T) -> Unit) -> Int {
 }
 
 ///|
+/// 副作用专用订阅：回调**原样**入队（不像 [Signal::subscribe] 的包装会再 `get`
+/// 一次，那会把 effect 的一轮跑成两遍）。退订进回收袋，口径与 subscribe 一致。
+fn Signal::subscribe_raw(self : Signal[Unit], f : () -> Unit) -> Int {
+  let sid = sig_fresh_sub_id()
+  self.node.subs.push((sid, f))
+  sub_bag_register(fn() { self.remove(sid) })
+  sid
+}
+
+///|
 /// 当前订阅条数。组件层的「不随重挂堆积死订阅」这类回归要有可观测的量,
 /// 否则只能靠人肉数回调次数。
 pub fn[T] Signal::sub_count(self : Signal[T]) -> Int {
@@ -293,6 +314,47 @@ pub fn[T] Signal::sub_count(self : Signal[T]) -> Int {
 /// 会对死视图空跑)。
 pub fn[T] Signal::remove(self : Signal[T], sid : Int) -> Unit {
   self.node.subs = self.node.subs.filter(fn(e) { e.0 != sid })
+}
+
+
+///|
+/// 副作用节点重跑:断开旧依赖 → 收集期执行闭包 → 接回新依赖 → 清脏。
+/// 与 [Signal::recompute] 同一条收集链,差别只在**每次通知都真跑一遍**
+/// （computed 是「脏了才重算」,副作用闭包不能靠缓存）。
+fn Signal::rerun_effect(self : Signal[Unit]) -> Unit {
+  match self.comp {
+    Some(f) => {
+      for d in self.node.deps {
+        d.observers = d.observers.filter(fn(x) { x.id != self.node.id })
+      }
+      self.node.deps = []
+      let saved = sig_collector.val
+      let buf : Array[SigNode] = []
+      sig_collector.val = Some((self.node, buf))
+      let _ = f()
+      sig_collector.val = saved
+      for d in buf {
+        if d.id != self.node.id && !sig_has(self.node.deps, d) {
+          self.node.deps.push(d)
+          if !sig_has(d.observers, self.node) {
+            d.observers.push(self.node)
+          }
+        }
+      }
+      self.node.dirty = false
+    }
+    None => ()
+  }
+}
+///|
+/// 手动发一轮通知(只跑订阅回调,不改值也不标脏):`effect` 的「建立时跑一遍」
+/// 靠它——computed 构造已经求值过一次,再 get 会重跑第二遍,副作用类闭包
+/// 必须恰好一次/轮。
+fn[T] Signal::fire_subs(self : Signal[T]) -> Unit {
+  let snapshot = self.node.subs.copy()
+  for input in snapshot {
+    (input.1)()
+  }
 }
 
 ///|
