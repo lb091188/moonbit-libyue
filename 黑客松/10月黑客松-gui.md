@@ -11,9 +11,9 @@
 
 ## 项目简介
 
-native-gui 是为 MoonBit 生态打造的**原生跨平台桌面 GUI 库**——窗口、像素、事件循环、布局与控件**全部用纯 MoonBit 自绘实现**，一套代码在 Windows ✅ / Linux ✅ 原生运行。`moon add NoahLiu/native-gui` 后零配置直接 `moon run`。项目从 Yue / libyue 的 MoonBit 绑定起步，现在以他们为老师，用纯 MoonBit 重新完成了原生化——为的是把框架的开发体验做得更好。
+native-gui 是为 MoonBit 生态打造的**原生跨平台桌面 GUI 库**——绘制、布局、控件这套自绘核心**全部用纯 MoonBit 实现**，一套代码在 Windows ✅ / Linux ✅ 原生运行。`moon add NoahLiu/native-gui` 后零配置直接 `moon run`。项目从 Yue / libyue 的 MoonBit 绑定起步，现在以他们为老师，把框架主体用纯 MoonBit 重写——为的是把框架的开发体验做得更好。
 
-- **全栈自绘**：观感跨平台一致、不依赖平台皮肤，深浅色与系统强调色默认跟随，主题是普通值可整体覆盖；平台差异收敛在窗口与文字两处薄层，其余全部纯 MoonBit
+- **全栈自绘**：观感跨平台一致、不依赖平台皮肤，深浅色与系统强调色默认跟随，主题是普通值可整体覆盖；平台与三方引擎收敛在窗口、文字、WebView、媒体几处 C 薄层，框架主体全部纯 MoonBit
 - **响应式与声明式**：状态放 `Store` / `Signal`，绑定点随数据自动刷新；界面以树描述、`mount_window` 一步挂载（写法见下）
 - **开箱能力齐全**：组件库、图表族、Markdown 视图、内嵌 WebView、音视频引擎与系统能力门面（托盘 / 通知 / 快捷键 / OS 查询等），全部只暴露跨平台抽象 API，能力探测 + 语义化降级
 - **按需取用**：功能各自成包、不 import 不进二进制；媒体等重能力拆独立模块、不进默认依赖闭包
@@ -49,9 +49,9 @@ let count : @core.Store[Int] = @core.Store::new(0)
 ], title="hello")
 ```
 
-## 10 月开发计划
+## <span style="background-color:rgb(243, 245, 247)">10 月工作</span>
 
-- **全面原生化**：删除 libyue 绑定包、vendored libyue（52MB）与全部旧链示例，模块更名 `NoahLiu/native-gui`；窗口、事件循环、布局（Flexbox）、控件、光栅化全部 MoonBit 自绘
+- **全面原生化**：删除 libyue 绑定包、vendored libyue（52MB）与全部旧链示例，模块更名 `NoahLiu/native-gui`；布局（Flexbox）、控件、光栅化等框架主体 MoonBit 自绘，窗口与文字平台层为自写 C 桩
 - **库按功能分层**：应用宿主与事件循环、控件与组件库、光栅化绘制、文字排印、主题与图标、系统能力、平台桥接、图表、Markdown 富文本视图、内嵌 WebView 各自成包、按需取用——不 import 的包不进二进制；媒体引擎、FFmpeg 解码绑定、Flexbox 布局引擎等重能力拆独立模块、不进默认依赖闭包
 - **跨平台系统集成**：系统托盘、桌面通知、原生菜单栏、全局快捷键、消息框、窗口图标、运行中改标题 / 最小尺寸 / 无边框拖拽、应用内拖放、用户空闲检测、开机自启
 - **内嵌 WebView**：布局树内嵌与自绘控件同树混排、导航与历史、JS 互操作（执行取回结果 / 脚本注入 / 双向绑定）、DOM 内容抓取、Cookie 与 profile 持久化、新窗 / 权限 / 下载策略（默认拦下并回报、可切换）、崩溃回报、自定义协议本地站点、能力探测与语义化降级
