@@ -318,23 +318,49 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
    就靠这两个入口。
 
    ```moonbit
-   @ui.for_list(app.items, fn(item) {                    // 走 ListStore 的 keyed 差分
-     @ui.row([@ui.text(item.name)], class=[@style.item])
-   })
-   @ui.when(app.busy.get(), @ui.text("保存中…"))          // 走显隐，不重建子树
+   // v-for 对应物：keyed 差分，改一条只重挂一条；回调拿 (item, index)，
+   // key 由 key 提取器给（不给就按位置，等价无 :key）
+   @ui.for_list(ctx.items, fn(t, i) {
+     @ui.row([@ui.text(t.title)], class=[@style.item])
+   }, key=fn(t) { t.id })
+
+   // v-if / v-else 对应物：收 Signal，两支都常驻、切显隐（状态不丢）
+   @ui.when(ctx.has_items,
+            then=@ui.for_list(ctx.items, fn(t, i) { /* …行… */ }, key=fn(t) { t.id }),
+            else=@ui.empty("暂无任务"))
+
+   // 单支：假时隐藏不重建
+   @ui.when(ctx.busy, @ui.text("保存中…"))
    ```
 
-   上面 `app.busy.get()` 把值传进去，`when` 就不响应；这两个入口收值还是收 `Signal`，
-   见 §6 未决 3。
-
-   现有替代形态是 `bind_node`（整棵子树销毁重建 + 原位替换，`core/node.mbt:77-113`）和
-   `swap_node`（两态常驻，`:119`）：列表一改就全重建，或每个分支都得预建两棵。这两个入口
-   把 keyed 差分和显隐收成一行，`render` 函数里也就不需要任何语法糖了。
+   **`when` 就是 if/else**：`else=?` 可选——不给是单支（假时显隐），给了是双支常驻切显隐
+   （`swap_node` 落地，`core/node.mbt:119`）；要**销毁重建**的场合（大子树省内存、重置内部
+   状态如输入光标）仍走 `bind_node`（`:77-113`），两个原语原样保留，`when` 是它们上面的糖。
+   **入参收 `Signal`，不收 `.get()`**——上面示例的 `busy` / `has_items` 直接传信号，落
+   §6 未决 3 取向 ①。
+   **`for_list` 与「对象属性」**：JS 的 `v-for` 能枚举对象属性，MoonBit 无反射、struct 字段
+   是静态的（与下条不做字符串路径同一原因），没有「动态对象」可枚举；字典数据就是
+   `Map[K, V]`，`entries()` 转条目列表进 `for_list`（条目是 `(K, V)` 值），不为对象单独开
+   入口。下标就是回调第二参 `i`，写 `fn(t, _)` 即可忽略。
 
 **不做**：san 的 `data.set("a.b", v)` 字符串路径。MoonBit 无反射，路径读写必须类型擦除，
 换来的是编译期查不出错的运行时失败。替代口径是：数据就是普通 struct，字段各自是
 `Store`，调用点在 `render` 里直接写字段访问（`ctx.form.name.get()`）——类型安全，
 同时保留 san 的更新粒度。
+
+**对照 Vue 一次盘完没列的**（有定论的定，没定论的标明去处）：
+
+- **v-model 双向绑定**：不用新增——input 类组件第一参数收可写 `Store[T]` 是现状口径
+  （ui 里约 48 处），`ctx.draft` 即是。
+- **动态 class**（`:class="{ active: x }"`）：随 §6 未决 3 的 `_dyn` 通则一起定，是 P2
+  改名表「每个展示组件补不补 `_dyn` 列」的同一件事，不单开机制。
+- **生命周期钩子**（mounted / unmounted）：「随子树一起退订」的实质已被订阅回收袋
+  （`sub_bag_*`）覆盖；要不要暴露显式钩子，等真实需求再进 P3。
+- **provide / inject**：不做——theme 是进程级单份、其余数据显式传参，值形态没有跨层
+  隐式通道的位置。
+- **动态组件**（`<component :is>`）：不做新机制——分支就是 `when` / `bind_node`。
+- **keep-alive**：不用做——`when` 双支常驻切显隐天然保态，就是 keep-alive 的语义。
+- **teleport**：`@core.overlay` 已是那条通道（弹窗/悬浮提示）。
 
 ## 4. 视图层：`render` 函数就是最终形态
 
@@ -342,36 +368,58 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 那段代码，形态同构、能力齐全，中间多放一个编译器只增加成本不增加能力。最终形态：
 
 ```moonbit
+// 目标形态：一个「任务页」——P1–P3 落地后可编译、可响应
 fn render(ctx : Ctx) -> @core.Node {
   @ui.col(
     [
+      // 工具栏：input 直接收 Store（v-model 对应物，现状能力），
+      // 每敲一个字只重绘输入框本身，不碰列表
       @ui.row(
         [
-          @ui.text(ctx.title.get(), class=[@style.title]),
-          @ui.button("保存", class=[@style.primary], on_click=ctx.on_save),
+          @ui.input(value=ctx.draft, placeholder="新任务…", on_submit=ctx.add),
+          @ui.button("添加", class=[@style.primary], on_click=ctx.add),
         ],
         class=[@style.toolbar],
       ),
-      @ui.for_list(ctx.items, fn(item) {
-        @ui.text(item.name, class=[@style.item])
-      }),
-      @ui.when(ctx.saving.get(), @ui.text("保存中…")),
+      // v-if / v-else：收 Signal，两支常驻切显隐；列表走 keyed 差分，
+      // 勾选一条只重绘那一行，其余行的焦点/滚动状态原样保留
+      @ui.when(
+        ctx.has_items,                       // Signal[Bool]，computed 依赖自动收集
+        then=@ui.for_list(
+          ctx.items,
+          fn(t, i) {
+            @ui.row(
+              [
+                @ui.checkbox(checked=t.done),
+                @ui.text(t.title, class=[@style.item_title]),
+                @ui.icon_button(kind=@icons.trash, on_click=fn() { ctx.remove(t.id) }),
+              ],
+              class=[@style.item],
+            )
+          },
+          key=fn(t) { t.id },
+        ),
+        else=@ui.empty("暂无任务，先添加一条"),
+      ),
+      // 单支 when：busy 为假时隐藏，状态不丢；保存中的转圈动画是 P5 的 transition
+      @ui.when(ctx.busy, @ui.text("保存中…", class=[@style.hint])),
     ],
     class=[@style.page],
   )
 }
 ```
 
-> 这段是 P1/P2/P3 落地后的**目标形态**：`class` 参数来自 P1+P2，`for_list` / `when` 来自 P3，
-> 今天写出来还编译不过。其中 `ctx.title.get()` / `ctx.saving.get()` 传的是值（对照
-> `ui/basic.mbt:170` 的 `label(text : String)`），`set` 之后这行字不会动——调用点传值还是传
-> 信号是 §6 未决 3，定之前这段只说明「没有第二套语法」，不说明会响应。
+> 这段是 P1/P2/P3 落地后的**目标形态**：kwargs 样式与 `class` 来自 P1+P2，`for_list` /
+> `when` 来自 P3，今天写出来还编译不过。`ctx.draft` 是 `Store[String]`（输入类组件现状
+> 口径），`ctx.has_items` / `ctx.busy` 是 `Signal[Bool]`（`computed` 现成），传信号才响应
+> ——§6 未决 3 取向 ①。`ctx.add` / `ctx.remove` 里只写 Store，往后的差分、显隐、帧末合并
+> 重绘全是框架的事：这就是「写起来像改数据，动起来像改了那一块 UI」的整个设计。
 
 ### 4.1 模板的卖点，逐个看还剩什么
 
 | 模板的卖点 | 本栈的拿法 | 还剩什么 |
 | --- | --- | --- |
-| `{{ }}` / `:prop` 里的表达式要类型检查 | 本来就是 MoonBit 表达式（`ctx.title.get()`），moon 直接查 | 无 |
+| `{{ }}` / `:prop` 里的表达式要类型检查 | 本来就是 MoonBit 表达式（`ctx.has_items`、`fn(t) { t.id }`），moon 直接查 | 无 |
 | `<style>` 与视图同处编辑 | `@style.*` 具名常量（§1）：可跳转、可补全、可复用 | 无（甚至更好） |
 | `v-for` / `v-if` | `@ui.for_list` / `@ui.when`（§3 第 4 项） | 无 |
 | 事件写成 `@click="on_save"` | `on_click=ctx.on_save`（§2 已统一 `on_*`） | 无 |
@@ -425,16 +473,17 @@ fn render(ctx : Ctx) -> @core.Node {
 2. **`Store` 要不要去重**（挡 P3 第 1 项）：去重要 `T: Eq` 约束，会顺着签名传播到所有组件
    （`core/store.mbt:26` 现状明确不去重）；备选是加一个要求 `Eq` 的 `set_if_changed`，内核不动。
 3. **调用点的绑定语义：传值还是传信号**（挡 P2 的改名表，也挡 §4 那段成果到底会不会响应）。
-   §4 的 `@ui.text(ctx.title.get(), ...)` 传的是 `String`，`set` 之后这行字不会动；今天要让
+   §4 的 `for_list` / `when` 已按取向 ① 写成收 `Signal`；但展示类文本今天传的是值
+   （`label(text : String)`），`set` 之后这行字不会动；要让
    文本跟着变，走的是另外三条入口之一：`label_dyn(sig : Signal[String])`（`ui/basic.mbt:127`，
    **全仓只有这一条 `_dyn`**）、`bind_label` / `bind`（`ui/declarative.mbt:176`、`:194`）、
    `bind_node` 整棵重挂。也就是说现状是三种约定并存：输入类组件第一参数收可写的 `Store[T]`
    （ui 里约 48 处参数）、展示类「值版 + `_dyn` 信号版」只有一条、结构类靠整棵重建。三条候选：
 
    - **① 把 `_dyn` 升成通则**：展示类组件一律「`x` 收值 + `x_dyn` 收 `Signal[T]`」，
-     `for_list` / `when` 的入参收 `Signal` 而不是值（于是 §4 那段的
-     `@ui.when(ctx.saving.get(), ...)` 要写成 `@ui.when(ctx.saving, ...)`——否则 `when`
-     退化成一个 `if`）。零新机制、与两条现有先例同向，且和 §3「字段各自是 `Store`」天然一对：
+     `for_list` / `when` 的入参收 `Signal` 而不是值（§4 那段已按此口径写：
+     `@ui.when(ctx.busy, ...)` 收信号——收值的话 `when` 退化成一个 `if`）。零新机制、
+     与两条现有先例同向，且和 §3「字段各自是 `Store`」天然一对：
      列表项里改一格只重绘那一格。代价是公开 API 数量翻倍 + 文档要解释后缀。
    - **② 一个入口同时收值或信号**（`enum` 包一层或 trait）。最干净，但要先实测 MoonBit 能否
      给外部类型实现 trait、labelled 参数有无隐式提升——§1.6 已测出「裸 `T` 自动升 `T?`」**不可
