@@ -210,7 +210,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
 
   fn cap_area(tag : String) -> @core.Node {
     @ui.col(
-      [@ui.label_t("\{tag} 区", role=@ui.Body)],
+      [@ui.text("\{tag} 区", role=@ui.Body)],
       width=150.0,
       height=80.0,
       handle=fn(w : @core.Widget) -> Unit {
@@ -259,7 +259,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
       "五类指针事件（Down/Up/Move/Leave）走控件同一个 `on_pointer` 回调；坐标在交给处理器前已换算成**本地坐标**（Leave 保持窗口坐标），button 与修饰键位掩码随事件下发——修饰键不再需要轮询。双击判定 400ms + 4px，与输入框的「双击选词」同一口径。",
       [
         @ui.col(
-          [@ui.label_t("鼠标操作区", role=@ui.Body)],
+          [@ui.text("鼠标操作区", role=@ui.Body)],
           height=96.0,
           handle=fn(w : @core.Widget) -> Unit {
             skin_panel(w)
@@ -297,7 +297,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
       ],
       code=[
         "let evt : @core.Store[String] = @core.Store::new(\"(移入操作区操作)\")",
-        "@ui.col([@ui.label_t(\"鼠标操作区\", role=@ui.Body)], height=96.0, handle=fn(w) {",
+        "@ui.col([@ui.text(\"鼠标操作区\", role=@ui.Body)], height=96.0, handle=fn(w) {",
         "  w.on_pointer = Some(fn(_self, ev : @core.PointerEvent) -> Bool {",
         "    match ev.kind {",
         "      @core.Down => { evt.set(\"down btn=\\{ev.button}\"); true }",
@@ -317,7 +317,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
       [
         @ui.col(
           [
-            @ui.label_t("悬停秒表：把鼠标放进这块面板（或点上面那颗按钮都算）", role=@ui.Body),
+            @ui.text("悬停秒表：把鼠标放进这块面板（或点上面那颗按钮都算）", role=@ui.Body),
             @ui.row(
               [
                 @ui.button_t("组内按钮", variant=@ui.Solid, on_click=fn() {
@@ -388,7 +388,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
       "`w.cursor` 是控件上的形状请求（0 默认 / 1 手型 / 2 文本 / 3 横向调整 / 4 纵向调整）；宿主每次移动按悬停路径取「**最深的非零请求**」下发——包住一整组的 `cursor_group` 会自然回退，组内子件自己提了形状以它为准（旧链路要把光标递归设进每个子孙）。Crosshair/NotAllowed 平台没有，本栈不强推。",
       [
         @ui.col(
-          [@ui.label_t("光标预览区（把鼠标放上来，再点下面按钮换形状）", role=@ui.Body)],
+          [@ui.text("光标预览区（把鼠标放上来，再点下面按钮换形状）", role=@ui.Body)],
           height=56.0,
           handle=fn(w : @core.Widget) -> Unit {
             skin_panel(w)
@@ -416,14 +416,14 @@ pub fn page_events(app : @shared.App) -> @core.Node {
           column_gap=8.0,
         ),
         @ui.bind_label(cur_now, fn(s) { "预览区当前光标：\{s}" }),
-        @ui.label_t(
+        @ui.text(
           "组回退：下面一组的 cursor = ResizeH；组内文本没提请求 → 用组的形状，按钮自己请求了手型 → 以它为准。",
           role=@ui.Secondary,
           max_width=640.0,
         ),
         @ui.cursor_group(
           [
-            @ui.label_t("组内文本（回退到组的横向调整）", role=@ui.Body),
+            @ui.text("组内文本（回退到组的横向调整）", role=@ui.Body),
             @ui.button_t("组内按钮（自己的手型）", variant=@ui.Soft, on_click=fn() { () }),
           ],
           direction=@yoga.Row,
@@ -487,7 +487,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
                 },
               ]),
               @ui.col(
-                [@ui.label_t("右侧详情区：拖动中间把手调整占比", role=@ui.Body)],
+                [@ui.text("右侧详情区：拖动中间把手调整占比", role=@ui.Body)],
                 padding=12.0,
               ),
               min_first=120.0,
@@ -499,7 +499,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
         @ui.row(
           [
             @ui.view(
-              [@ui.label_t("固定 80", color="#ffffff")],
+              [@ui.text("固定 80", color="#ffffff")],
               direction=@yoga.Row,
               width=80.0,
               height=40.0,
@@ -508,7 +508,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
               justify_content=@yoga.JustifyContent::Center,
             ),
             @ui.view(
-              [@ui.label_t("50%", color="#ffffff")],
+              [@ui.text("50%", color="#ffffff")],
               direction=@yoga.Row,
               height=40.0,
               bg="#8A3A5F",
@@ -519,7 +519,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
               },
             ),
             @ui.view(
-              [@ui.label_t("flex 1", color="#ffffff")],
+              [@ui.text("flex 1", color="#ffffff")],
               direction=@yoga.Row,
               height=40.0,
               grow=1.0,

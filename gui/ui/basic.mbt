@@ -86,7 +86,7 @@ pub fn group(
   row_gap? : Double = 6.0,
   width? : Double = 0.0,
 ) -> @core.Node {
-  let body : Array[@core.Node] = [label(title, size=12.0, color=@theme.theme_text_secondary())]
+  let body : Array[@core.Node] = [text(title, size=12.0, color=@theme.theme_text_secondary())]
   for c in children {
     body.push(c)
   }
@@ -121,11 +121,13 @@ pub fn separator(vertical? : Bool = false, color? : String = "") -> @core.Node {
 }
 
 ///|
-/// 随信号更新的文本标签：文本变化 → 改状态 → 重设测量回调（标脏节点）→
+/// 随信号更新的文本：文本变化 → 改状态 → 重设测量回调（标脏节点）→
 /// 请求重绘，布局只重算这一条链。订阅退订随本代回收袋，重挂不留死订阅。
-/// 这也是旧链路 `bind_label` 的对应物（就地改文本，不重建子树）。
-pub fn label_dyn(
+/// 这也是旧链路 `bind_label` 的对应物（就地改文本，不重建子树），§3 通则里
+/// 展示类 `*_dyn` 信号版的原型。
+pub fn text_dyn(
   sig : @core.Signal[String],
+  role? : TextRole = Plain,
   size? : Double = 13.0,
   color? : String = "",
   weight? : @text.FontWeight = @text.Normal,
@@ -134,10 +136,12 @@ pub fn label_dyn(
   max_width? : Double = 0.0,
   wrap? : Bool = false,
   ellipsis? : Bool = false,
+  shrink_by_role? : Bool = false,
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let src = text_source(
     sig.get(),
+    role=role,
     size=size,
     color=color,
     weight=weight,
@@ -157,6 +161,10 @@ pub fn label_dyn(
     ) -> Unit {
       let _ = draw_text_in(self, p, src)
     })
+    // 角色形态沿用 `label_t` 现状:不参与收缩,文本按自然宽占位
+    if shrink_by_role {
+      w.node.set_flex_shrink(0.0)
+    }
     let sid = sig.subscribe(fn(v : String) -> Unit { relabel(w, src, v) })
     @core.sub_bag_register(fn() { sig.remove(sid) })
     handle(w)
@@ -165,10 +173,15 @@ pub fn label_dyn(
 }
 
 ///|
-/// 文本标签：尺寸来自 Pango 测量（measure 与 baseline 都接进布局引擎，
-/// 所以文本能参与基线对齐）。
-pub fn label(
-  text : String,
+/// 文本（§2 合并入口：原 `label` + `label_t` 一台）：`role` 给了就按角色取字号
+/// 字重与主题色（`role_font` / `role_color`，现状 `label_t` 的排版体系），
+/// 不给走显式 `size` / `weight` / `family`。尺寸来自 Pango 测量（measure 与
+/// baseline 都接进布局引擎，所以文本能参与基线对齐）。
+/// 两条现状差按调用点保持：角色形态默认折行且 `flex_shrink=0`（`label_t` 原样），
+/// 无角色形态不折行（`label` 原样）；散参数改名与 class 接线随后续批。
+pub fn text(
+  content : String,
+  role? : TextRole = Plain,
   size? : Double = 13.0,
   color? : String = "",
   weight? : @text.FontWeight = @text.Normal,
@@ -179,16 +192,30 @@ pub fn label(
   ellipsis? : Bool = false,
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
-  label_dyn(
-    @core.Signal::new(text),
-    size=size,
+  let f = role_font(role)
+  let eff_size = if has_role(role) { f.size } else { size }
+  let eff_weight =
+    if has_role(role) {
+      match role {
+        Title | Section | Accent => @text.SemiBold
+        _ => @text.Normal
+      }
+    } else {
+      weight
+    }
+  let eff_wrap = if wrap { true } else { role is Body }
+  text_dyn(
+    @core.Signal::new(content),
+    role=role,
+    size=eff_size,
     color=color,
-    weight=weight,
+    weight=eff_weight,
     family=family,
     align=align,
     max_width=max_width,
-    wrap=wrap,
+    wrap=eff_wrap,
     ellipsis=ellipsis,
+    shrink_by_role=has_role(role),
     handle=handle,
   )
 }

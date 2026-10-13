@@ -5,7 +5,7 @@
 ///|
 fn main {
   let app = match @ui.mount_window(
-    [@ui.label("Hello, MoonBit!", size=18.0)],
+    [@ui.text("Hello, MoonBit!", size=18.0)],
     title="Hello, MoonBit!",
     width=400,
     height=300,

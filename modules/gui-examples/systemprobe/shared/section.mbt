@@ -104,10 +104,10 @@ fn section_body(s : Section, selected : @core.Store[String]) -> @core.Node {
     selected.subscribe(ensure)
   })
   let inner : Array[@core.Node] = [
-    @ui.label_t(s.title, role=@ui.Section),
+    @ui.text(s.title, role=@ui.Section),
   ]
   if s.desc.length() > 0 {
-    inner.push(@ui.label_t(s.desc, role=@ui.Secondary, max_width=900.0))
+    inner.push(@ui.text(s.desc, role=@ui.Secondary, max_width=900.0))
   }
   inner.push(holder)
   if s.code.length() > 0 {
@@ -140,8 +140,8 @@ fn section_body(s : Section, selected : @core.Store[String]) -> @core.Node {
 fn code_copy_row(lines : Array[String]) -> @core.Node {
   @ui.row(
     [
-      @ui.label_t("代码", role=@ui.Secondary),
-      @ui.label_t("", role=@ui.Secondary, handle=fn(w) {
+      @ui.text("代码", role=@ui.Secondary),
+      @ui.text("", role=@ui.Secondary, handle=fn(w) {
         w.node.set_flex_grow(1.0)
       }),
       @ui.button_t("复制", variant=@ui.Text, on_click=fn() {

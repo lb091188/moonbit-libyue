@@ -53,7 +53,7 @@ fn counter_box(n : Ref[Int], w : Double, h : Double) -> @core.Node {
 test "空图层不挡内容；点触发件开层、再点收起" {
   let clicks = Ref(0)
   let (root, wrap) = mounted(
-    popover_t(counter_box(clicks, 80.0, 24.0), label("弹层内容"), width=120.0, height=40.0),
+    popover_t(counter_box(clicks, 80.0, 24.0), text("弹层内容"), width=120.0, height=40.0),
     300.0,
     200.0,
   )
@@ -97,7 +97,7 @@ test "点浮层外收起最上面那层（不打扰被点的内容）" {
   let (root, wrap) = mounted(
     view(
       [
-        popover_t(label("触发"), label("第一层"), width=100.0, height=30.0),
+        popover_t(text("触发"), text("第一层"), width=100.0, height=30.0),
         counter_box(clicks, 60.0, 20.0),
       ],
       row_gap=30.0,
@@ -201,7 +201,7 @@ test "对话框：Store 驱动弹收，确定/取消/✕ 都先收起再回调" 
     dialog_t(
       vis,
       "确认操作",
-      [label("要删掉这一条吗？", size=12.0)],
+      [text("要删掉这一条吗？", size=12.0)],
       on_confirm=fn() -> Unit { acts.push("ok") },
       on_cancel=fn() -> Unit { acts.push("cancel") },
     ),
@@ -248,7 +248,7 @@ test "对话框：Store 驱动弹收，确定/取消/✕ 都先收起再回调" 
 test "对话框：✕ 收起、遮罩点击按 close_on_mask 决定收不收" {
   let vis = @core.Store::new(true)
   let (root, _a) = mounted_with_overlay(
-    dialog_t(vis, "标题", [label("内容")], close_on_mask=true),
+    dialog_t(vis, "标题", [text("内容")], close_on_mask=true),
     400.0,
     300.0,
   )
@@ -265,7 +265,7 @@ test "对话框：✕ 收起、遮罩点击按 close_on_mask 决定收不收" {
   // 换 close_on_mask=false 的形态：点遮罩角落不收
   let vis3 = @core.Store::new(true)
   let (root3, _b) = mounted_with_overlay(
-    dialog_t(vis3, "标题", [label("内容")], close_on_mask=false),
+    dialog_t(vis3, "标题", [text("内容")], close_on_mask=false),
     400.0,
     300.0,
   )
@@ -294,7 +294,7 @@ test "轻提示层：推送后挂一条、到点自动撤、宽度随文本" {
     fn(_id : Int) -> Unit { () },
   )
   let push = toast_layer(duration_ms=1000)
-  let (root, _host) = mounted(view([label("宿主页")]), 400.0, 200.0)
+  let (root, _host) = mounted(view([text("宿主页")]), 400.0, 200.0)
   with_overlay(root)
   // 提示带子开在浮层图层上：推送后才开层
   push("保存成功", Success)
@@ -364,7 +364,7 @@ test "右键上下文菜单：在指针处弹出、点项回调并收起" {
 test "轻提示开在对话框之上（图层条目后开者在上）" {
   let vis = @core.Store::new(false)
   let (_root, _a) = mounted_with_overlay(
-    dialog_t(vis, "标题", [label("内容")]),
+    dialog_t(vis, "标题", [text("内容")]),
     400.0,
     300.0,
   )

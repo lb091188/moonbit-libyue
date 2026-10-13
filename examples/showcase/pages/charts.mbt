@@ -109,7 +109,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
         @ui.row(
           [
             @ui.checkbox("暂停推点", line_running),
-            @ui.label_t("窗口容量 120，推点频率 2Hz；暂停只断数据流，自排通道继续。", role=@ui.Secondary),
+            @ui.text("窗口容量 120，推点频率 2Hz；暂停只断数据流，自排通道继续。", role=@ui.Secondary),
           ],
           column_gap=12.0,
         ),
@@ -171,7 +171,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
             @charts.gauge_t(gauge_manual, thresholds=gauge_thresholds, width=240.0, height=180.0),
             @ui.col(
               [
-                @ui.label_t("手动值", role=@ui.Body),
+                @ui.text("手动值", role=@ui.Body),
                 @ui.slider(gauge_manual, min=0.0, max=1.0, step=0.01, width=160.0),
               ],
               row_gap=8.0,

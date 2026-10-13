@@ -171,7 +171,7 @@ fn page_net(app : App) -> @core.Node {
   app.nets.subscribe(push_total)
   @ui.col(
     [
-      @ui.label_t("收发速率（不含 lo）", role=@ui.Section),
+      @ui.text("收发速率（不含 lo）", role=@ui.Section),
       @charts.line_chart_t(total, height=220.0, area=true),
       @ui.separator(),
       draw_rows(net_n, fn(p, w) { draw_net_rows(p, w, page.rows.get()) }),

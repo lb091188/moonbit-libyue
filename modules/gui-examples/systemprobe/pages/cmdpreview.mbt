@@ -58,12 +58,12 @@ pub fn page_cmdpreview(_app : @shared.ProbeApp) -> @core.Node {
     }
   }
   let body : Array[@core.Node] = []
-  body.push(@ui.label_t("可执行 · 仅展示命令文本", role=@ui.Section))
+  body.push(@ui.text("可执行 · 仅展示命令文本", role=@ui.Section))
   for it in exec_items {
     body.push(
       @ui.row(
         [
-          @ui.label_t(it.0, handle=fn(w) { w.node.set_flex_grow(1.0) }),
+          @ui.text(it.0, handle=fn(w) { w.node.set_flex_grow(1.0) }, role=Body),
           @ui.tag_of_type(it.2, it.1),
         ],
         column_gap=8.0,
@@ -71,7 +71,7 @@ pub fn page_cmdpreview(_app : @shared.ProbeApp) -> @core.Node {
       ),
     )
   }
-  body.push(@ui.label_t("只读状态 · 真实读取当前值", role=@ui.Section))
+  body.push(@ui.text("只读状态 · 真实读取当前值", role=@ui.Section))
   body.push(
     @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
       read_pp()
@@ -91,7 +91,7 @@ pub fn page_cmdpreview(_app : @shared.ProbeApp) -> @core.Node {
     }),
   )
   body.push(
-    @ui.label_t(
+    @ui.text(
       "蓝牙适配器 / NTP 时间同步 / 当前时区：本栈尚未平移这三族只读探针（旧链 Linux 专属），以说明替代。",
       role=@ui.Secondary,
     ),
@@ -104,7 +104,7 @@ pub fn page_cmdpreview(_app : @shared.ProbeApp) -> @core.Node {
       body,
       code=[
         "// 可执行组：label + tag，点击不执行",
-        "@ui.row([@ui.label_t(cmd), @ui.tag_of_type(note, @ui.Warning)])",
+        "@ui.row([@ui.text(cmd), @ui.tag_of_type(note, @ui.Warning)])",
         "// 只读组：挂载时真调一次",
         "match @sys.pp_current() {",
         "  Ok(p) => pp_idx.set(match p { @sys.PBalanced => 1 ... })",

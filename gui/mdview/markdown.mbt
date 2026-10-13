@@ -578,7 +578,7 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.No
         nodes.push(md_quoted(md_render_blocks(children, ctx)))
       Alert(kind~, children~, ..) => {
         let content : Array[@core.Node] = [
-          @ui.label(md_alert_title(kind), weight=@text.SemiBold),
+          @ui.text(md_alert_title(kind), weight=@text.SemiBold),
         ]
         for n in md_render_blocks(children, ctx) {
           content.push(n)

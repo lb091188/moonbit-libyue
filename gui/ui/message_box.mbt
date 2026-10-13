@@ -95,7 +95,7 @@ fn msgbox_alloc_focus_id() -> Int {
 pub fn message_box_t(
   visible : @core.Store[Bool],
   title : String,
-  text : String,
+  content : String,
   kind? : MsgBoxKind = Information,
   informative? : String = "",
   buttons? : Array[(String, Int)] = [("确定", 1)],
@@ -274,15 +274,15 @@ pub fn message_box_t(
         col.node.set_flex_direction(@yoga.Column)
         col.node.set_width(@yoga.fixed(inner_w))
         col.node.set_gap(6.0, 0.0)
-        let _ = label(
-          text,
+        let _ = text(
+          content,
           size=13.0,
           color=@theme.theme_text_regular(),
           wrap=true,
           max_width=inner_w,
         ).mount_into(col)
         if informative != "" {
-          let _ = label(
+          let _ = text(
             informative,
             size=12.0,
             color=@theme.theme_text_secondary(),

@@ -128,7 +128,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
                 @ui.switch_t(wifi_on),
                 @ui.bind_label(wifi_on, fn(v) { if v { "已开启" } else { "已关闭" } }),
                 @ui.switch_t(locked, disabled=true),
-                @ui.label_t("禁用", role=@ui.Body),
+                @ui.text("禁用", role=@ui.Body),
               ],
               column_gap=12.0,
             ),
@@ -158,7 +158,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
             @ui.date_picker_t(dp_val, clearable=true, width=170.0),
             @ui.row(
               [
-                @ui.label_t("选中：", role=@ui.Body),
+                @ui.text("选中：", role=@ui.Body),
                 @ui.bind(dp_val.signal(), fn(d) {
                   match d {
                     Some(v) => v.format()

@@ -148,7 +148,7 @@ test "提示条：有描述时更高，关闭热区只在右上角" {
 
 ///|
 test "卡片与描述列表：标题会多占一行，条目数按传入算" {
-  let body = [label("内容一"), label("内容二")]
+  let body = [text("内容一"), text("内容二")]
   let (_, plain) = mounted(card(body, title=""), 240.0, 200.0)
   assert_eq(plain.children().length(), 2)
   let (_, titled) = mounted(card(body, title="标题"), 240.0, 200.0)
@@ -243,9 +243,9 @@ test "时间线：逐行等高、首末行的贯通线只到点心" {
 test "轮播：面板预建只显示当前页，箭头与指示点切页、越界回绕" {
   let h = CarouselHandle::make()
   let pages : Array[@core.Node] = [
-    label("第一页", size=14.0),
-    label("第二页", size=14.0),
-    label("第三页", size=14.0),
+    text("第一页", size=14.0),
+    text("第二页", size=14.0),
+    text("第三页", size=14.0),
   ]
   let (root, c) = mounted(
     carousel_t(pages, width=200.0, height=80.0, interval_ms=0, rotation=h),
@@ -292,7 +292,7 @@ test "轮播自转走宿主延时通道：暂停不前进、stop 断链并取消
   )
   let h = CarouselHandle::make()
   let _ = carousel_t(
-    [label("一"), label("二"), label("三")],
+    [text("一"), text("二"), text("三")],
     width=120.0,
     height=60.0,
     interval_ms=100,

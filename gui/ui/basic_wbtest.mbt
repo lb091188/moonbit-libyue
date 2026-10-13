@@ -60,7 +60,7 @@ test "标签尺寸来自 Pango 测量；文本随信号变化就重测" {
     return
   }
   let src_text = @core.Signal::new("Hello 基线")
-  let n = label_dyn(src_text, size=14.0)
+  let n = text_dyn(src_text, size=14.0)
   // 交叉轴不 stretch（列容器默认会把宽度拉到整行），才看得出测量给的真尺寸
   let root = mount_root([n], 240.0, 60.0)
   let w = kid(root, 0)
@@ -83,7 +83,7 @@ test "两个字号混排按基线对齐（文本测量回灌布局的直接结�
     return
   }
   let row = view(
-    [label("Ag", size=13.0), label("Ag", size=26.0)],
+    [text("Ag", size=13.0), text("Ag", size=26.0)],
     direction=@yoga.Row,
     align_items=@yoga.AlignItems::Baseline,
     height=48.0,
@@ -226,8 +226,8 @@ test "按钮：悬停与按下态由宿主置位，配色随状态变化" {
 ///|
 test "容器 / 分组 / 分隔线：几何与主题取色都按建树口径" {
   let line = separator()
-  let inner = view([label("内容")], padding=4.0, bg=@theme.theme_bg_page())
-  let g = group("标题", [label("一行"), label("两行")], width=160.0)
+  let inner = view([text("内容")], padding=4.0, bg=@theme.theme_bg_page())
+  let g = group("标题", [text("一行"), text("两行")], width=160.0)
   let root = mount_root([g, line, inner], 200.0, 300.0)
   let grp = kid(root, 0)
   // 分组的第一项是标题，其后是传入的两项
@@ -277,8 +277,8 @@ test "文本随控件原点落位并被裁剪（画在 Painter 会话上）" {
   if !ui_text_guard() {
     return
   }
-  let top = label("AAAA", size=20.0)
-  let bottom = label("BBBB", size=20.0)
+  let top = text("AAAA", size=20.0)
+  let bottom = text("BBBB", size=20.0)
   let root = @core.Widget::new()
   root.set_size(200.0, 200.0)
   root.set_column()

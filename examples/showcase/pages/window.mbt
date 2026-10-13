@@ -108,7 +108,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         ),
         @ui.row(
           [
-            @ui.label_t("最近操作：", role=@ui.Secondary),
+            @ui.text("最近操作：", role=@ui.Secondary),
             @ui.bind_label(last_op, fn(s) { s }),
           ],
           column_gap=6.0,
@@ -161,7 +161,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         ),
         @ui.row(
           [
-            @ui.label_t("状态：", role=@ui.Secondary),
+            @ui.text("状态：", role=@ui.Secondary),
             @ui.bind_label(hk_status, fn(s) { s }),
             @ui.bind_label(hk_hits, fn(n) { "命中 \{n} 次" }),
           ],
@@ -191,7 +191,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
           [
             @ui.drag_source(
               @ui.view(
-                [@ui.label_t("拖我", role=@ui.Body)],
+                [@ui.text("拖我", role=@ui.Body)],
                 bg=@theme.theme_primary_light(),
                 border=@theme.theme_primary(),
                 width=120.0,
@@ -200,10 +200,10 @@ pub fn page_window(app : @shared.App) -> @core.Node {
               ),
               payload=fn() { Some(@core.DragData::Text("窗口页的拖放演示")) },
             ),
-            @ui.label_t("拖到右边 →", role=@ui.Secondary),
+            @ui.text("拖到右边 →", role=@ui.Secondary),
             @ui.drop_target(
               @ui.view(
-                [@ui.label_t("投放区（松手成交）", role=@ui.Secondary)],
+                [@ui.text("投放区（松手成交）", role=@ui.Secondary)],
                 bg=@theme.theme_bg_panel(),
                 border=@theme.theme_border(),
                 width=220.0,
@@ -223,7 +223,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         ),
         @ui.row(
           [
-            @ui.label_t("投放回显：", role=@ui.Secondary),
+            @ui.text("投放回显：", role=@ui.Secondary),
             @ui.bind_label(dnd, fn(s) { s }),
           ],
           column_gap=6.0,

@@ -101,7 +101,7 @@ fn page_disk(app : App) -> @core.Node {
   app.disks.subscribe(push_io)
   @ui.col(
     [
-      @ui.label_t("根分区读写", role=@ui.Section),
+      @ui.text("根分区读写", role=@ui.Section),
       @charts.line_chart_t(io, height=220.0, area=true),
       @ui.separator(),
       draw_rows(disk_n, fn(p, w) { draw_disk_rows(p, w, app.disks.get()) }),

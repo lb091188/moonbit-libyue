@@ -85,7 +85,7 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
       [
         @ui.popover_t(
           @ui.button_t("打开气泡"),
-          @ui.label_t("气泡内容：任意 Node。", role=@ui.Body),
+          @ui.text("气泡内容：任意 Node。", role=@ui.Body),
           width=180.0,
           height=60.0,
         ),
@@ -93,7 +93,7 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
       code=[
         "@ui.popover_t(",
         "  @ui.button_t(\"打开气泡\"),",
-        "  @ui.label_t(\"气泡内容：任意 Node。\", role=@ui.Body),",
+        "  @ui.text(\"气泡内容：任意 Node。\", role=@ui.Body),",
         "  180.0,",
         "  60.0,",
         ")",
@@ -142,7 +142,7 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
             @ui.button_t("表单对话框", variant=@ui.Solid, on_click=fn() {
               app.dlg_form.set(true)
             }),
-            @ui.label_t("最近确认：", role=@ui.Body),
+            @ui.text("最近确认：", role=@ui.Body),
             @ui.bind(app.dlg_result.signal(), fn(n) {
               if n == "" {
                 "（尚未提交）"
@@ -161,7 +161,7 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
         "  visible,",
         "  \"新建连接\",",
         "  [",
-        "    @ui.label_t(\"名称\", role=@ui.Body),",
+        "    @ui.text(\"名称\", role=@ui.Body),",
         "    @ui.entry(name, placeholder=\"例如：开发库\", width=320.0),",
         "  ],",
         ")",

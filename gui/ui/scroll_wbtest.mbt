@@ -7,7 +7,7 @@
 fn scroll_rows(n : Int, h : Double, bg : String) -> Array[@core.Node] {
   let rows : Array[@core.Node] = []
   for i = 0; i < n; i = i + 1 {
-    rows.push(view([label("行 " + i.to_string(), size=12.0)], height=h, bg=bg))
+    rows.push(view([text("行 " + i.to_string(), size=12.0)], height=h, bg=bg))
   }
   rows
 }

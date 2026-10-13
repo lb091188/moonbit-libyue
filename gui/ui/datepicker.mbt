@@ -190,7 +190,7 @@ fn time_popup(
             })
             b
           }),
-          label(label_text, size=12.0),
+          text(label_text, size=12.0),
           @core.node_of_new(fn(b : @core.Widget) -> @core.Widget {
             watch_theme()
             b.node.set_width(@yoga.fixed(30.0))
@@ -614,7 +614,7 @@ pub fn time_range_picker_t(
         on_change(value.get())
       },
     ).mount_into(w)
-    let _ = label("~", size=13.0).mount_into(w)
+    let _ = text("~", size=13.0).mount_into(w)
     let _ = time_field(
       width,
       fn() -> TimeHM? { value.get().end },
@@ -735,7 +735,7 @@ pub fn datetime_range_picker_t(
         on_change(value.get())
       },
     ).mount_into(w)
-    let _ = label("~", size=13.0).mount_into(w)
+    let _ = text("~", size=13.0).mount_into(w)
     let _ = date_field(false).mount_into(w)
     let _ = time_field(
       time_width,

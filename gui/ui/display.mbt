@@ -311,7 +311,7 @@ pub fn card(
   let body : Array[@core.Node] = []
   if title.length() > 0 {
     body.push(
-      label(title, size=14.0, weight=@text.SemiBold, color=@theme.theme_text_primary()),
+      text(title, size=14.0, weight=@text.SemiBold, color=@theme.theme_text_primary()),
     )
     body.push(separator())
   }
@@ -336,14 +336,14 @@ pub fn descriptions(
 ) -> @core.Node {
   let rows : Array[@core.Node] = []
   if title.length() > 0 {
-    rows.push(label(title, size=14.0, weight=@text.SemiBold))
+    rows.push(text(title, size=14.0, weight=@text.SemiBold))
   }
   for kv in items {
     rows.push(
       view(
         [
-          label(kv.0, size=12.0, color=@theme.theme_text_secondary()),
-          label(
+          text(kv.0, size=12.0, color=@theme.theme_text_secondary()),
+          text(
             kv.1,
             size=12.0,
             handle=fn(w : @core.Widget) -> Unit {
@@ -365,7 +365,7 @@ pub fn empty(description? : String = "暂无数据") -> @core.Node {
   view(
     [
       icon(@icons.IconKind::Box, size=42.0, color=@theme.theme_border()),
-      label(description, size=12.0, color=@theme.theme_text_secondary(), align=@text.Center),
+      text(description, size=12.0, color=@theme.theme_text_secondary(), align=@text.Center),
     ],
     padding=16.0,
     row_gap=8.0,
@@ -386,8 +386,8 @@ pub fn result(title : String, subtitle? : String = "", t? : SemanticType = Succe
   view(
     [
       icon(kind, size=40.0, color=type_color(t)),
-      label(title, size=16.0, weight=@text.SemiBold, align=@text.Center),
-      label(
+      text(title, size=16.0, weight=@text.SemiBold, align=@text.Center),
+      text(
         subtitle,
         size=12.0,
         color=@theme.theme_text_secondary(),
@@ -471,8 +471,8 @@ fn timeline_row(
       mark,
       view(
         [
-          label(title, size=13.0, weight=@text.SemiBold, color=@theme.theme_text_primary()),
-          label(desc, size=12.0, color=@theme.theme_text_secondary()),
+          text(title, size=13.0, weight=@text.SemiBold, color=@theme.theme_text_primary()),
+          text(desc, size=12.0, color=@theme.theme_text_secondary()),
         ],
         grow=1.0,
         handle=fn(w : @core.Widget) -> Unit { w.set_padding(top=2.0, left=8.0) },

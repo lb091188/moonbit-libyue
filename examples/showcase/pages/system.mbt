@@ -287,7 +287,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
           column_gap=8.0,
         ),
         @ui.bind_label(nt_out, fn(s) { s }),
-        @ui.label_t(
+        @ui.text(
           if @core.notify_supported() {
             "通知后端可用"
           } else {

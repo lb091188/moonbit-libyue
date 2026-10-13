@@ -188,7 +188,7 @@ fn main {
               ),
               @ui.row(
                 [
-                  @ui.label_t("V" + SHOWCASE_VERSION, role=@ui.Secondary),
+                  @ui.text("V" + SHOWCASE_VERSION, role=@ui.Secondary),
                   theme_toggle_button(app),
                 ],
                 padding=10.0,
@@ -224,7 +224,7 @@ fn main {
                     t=@ui.Warning,
                     closable=true,
                   ),
-                  @ui.label_t("确定要删除「示例项目」吗？", role=@ui.Body),
+                  @ui.text("确定要删除「示例项目」吗？", role=@ui.Body),
                 ],
                 confirm_text="删除",
                 cancel_text="取消",
@@ -235,9 +235,9 @@ fn main {
                 app.dlg_form,
                 "新建连接",
                 [
-                  @ui.label_t("名称", role=@ui.Body),
+                  @ui.text("名称", role=@ui.Body),
                   @ui.entry(app.dlg_name, placeholder="例如：开发库", width=320.0),
-                  @ui.label_t("地址", role=@ui.Body),
+                  @ui.text("地址", role=@ui.Body),
                   @ui.entry(@core.Store::new(""), placeholder="host:port", width=320.0),
                 ],
                 on_confirm=fn() { app.dlg_result.set(app.dlg_name.get()) },

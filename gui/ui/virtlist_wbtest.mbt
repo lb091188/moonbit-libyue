@@ -21,7 +21,7 @@ test "虚拟列表：千行只挂可见区间，滚动后窗口平移、占位�
       20.0,
       fn(i : Int, _x : Int) -> @core.Node {
         seen.push(i)
-        view([label("行")], height=20.0)
+        view([text("行")], height=20.0)
       },
       width=300.0,
     ),
@@ -60,7 +60,7 @@ test "虚拟列表：拖滚动条改偏移、数据变短偏移夹回上界" {
       200.0,
       20.0,
       fn(_i : Int, _x : Int) -> @core.Node {
-        view([label("行")], height=20.0)
+        view([text("行")], height=20.0)
       },
       width=300.0,
     ),
@@ -150,7 +150,7 @@ test "粘性列表：滚动跨过组边界时吸顶标题换文字，组内行�
   let rows_of = fn(prefix : String) -> Array[@core.Node] {
     let out : Array[@core.Node] = []
     for i = 1; i <= 4; i = i + 1 {
-      out.push(view([label(prefix + i.to_string(), size=12.0)], height=20.0))
+      out.push(view([text(prefix + i.to_string(), size=12.0)], height=20.0))
     }
     out
   }

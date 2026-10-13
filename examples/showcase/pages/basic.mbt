@@ -102,27 +102,27 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
       "Label 与 Link",
       "五级排版角色，字号颜色随角色；Link 主题色文字悬停下划线，最近点击信号回显。",
       [
-        @ui.label_t("标题文字（Title）", role=@ui.Title),
-        @ui.label_t("小节标题（Section）", role=@ui.Section),
-        @ui.label_t("正文文字（Body）", role=@ui.Body),
-        @ui.label_t("辅助文字（Secondary）", role=@ui.Secondary),
-        @ui.label_t("强调文字（Accent）", role=@ui.Accent),
+        @ui.text("标题文字（Title）", role=@ui.Title),
+        @ui.text("小节标题（Section）", role=@ui.Section),
+        @ui.text("正文文字（Body）", role=@ui.Body),
+        @ui.text("辅助文字（Secondary）", role=@ui.Secondary),
+        @ui.text("强调文字（Accent）", role=@ui.Accent),
         @ui.row(
           [
             @ui.link("打开文档", fn() { app.picked_lang.set("docs") }),
             @ui.link("帮助中心", fn() { app.picked_lang.set("help") }),
-            @ui.label_t("最近点击：", role=@ui.Body),
+            @ui.text("最近点击：", role=@ui.Body),
             @ui.bind(app.picked_lang, fn(s) { s }),
           ],
           column_gap=10.0,
         ),
       ],
       code=[
-        "@ui.label_t(\"标题文字\", role=@ui.Title)",
-        "@ui.label_t(\"小节标题\", role=@ui.Section)",
-        "@ui.label_t(\"正文文字\", role=@ui.Body)",
-        "@ui.label_t(\"辅助文字\", role=@ui.Secondary)",
-        "@ui.label_t(\"强调文字\", role=@ui.Accent)",
+        "@ui.text(\"标题文字\", role=@ui.Title)",
+        "@ui.text(\"小节标题\", role=@ui.Section)",
+        "@ui.text(\"正文文字\", role=@ui.Body)",
+        "@ui.text(\"辅助文字\", role=@ui.Secondary)",
+        "@ui.text(\"强调文字\", role=@ui.Accent)",
         "@ui.link(\"打开文档\", fn() { app.picked_lang.set(\"docs\") })",
       ],
     ),
@@ -131,9 +131,9 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
       "Divider 与 Tooltip",
       "水平（默认）/竖直 1px 主题边框色；tooltip_t 给任意节点包原生悬浮提示（系统样式，主题化气泡见反馈页 Popover）。",
       [
-        @ui.label_t("上方内容"),
+        @ui.text("上方内容", role=Body),
         @ui.divider(),
-        @ui.label_t("下方内容"),
+        @ui.text("下方内容", role=Body),
         @ui.row(
           [
             @ui.tooltip_t(@ui.button_t("悬停看提示"), "原生 tooltip：系统样式"),
@@ -155,12 +155,12 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
       [
         @ui.hover_group(
           [
-            @ui.label_t("组标题：悬停我，或下面的子控件", role=@ui.Section),
+            @ui.text("组标题：悬停我，或下面的子控件", role=@ui.Section),
             @ui.row(
               [@ui.entry(box_a, width=200.0), @ui.button_t("组内按钮")],
               column_gap=10.0,
             ),
-            @ui.label_t("子控件触发的事件同样改变组的样式", role=@ui.Secondary),
+            @ui.text("子控件触发的事件同样改变组的样式", role=@ui.Secondary),
           ],
           padding=14.0,
           row_gap=8.0,
@@ -169,7 +169,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
       code=[
         "@ui.hover_group(",
         "  [",
-        "    @ui.label_t(\"组标题\", role=@ui.Section),",
+        "    @ui.text(\"组标题\", role=@ui.Section),",
         "    @ui.row([@ui.entry(box, width=200.0), @ui.button_t(\"组内按钮\")], column_gap=10.0),",
         "  ],",
         "  padding=14.0,",
@@ -184,7 +184,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
       [
         @ui.cursor_group(
           [
-            @ui.label_t("整组都是手型：移入试试，或移到子控件上", role=@ui.Section),
+            @ui.text("整组都是手型：移入试试，或移到子控件上", role=@ui.Section),
             @ui.row(
               [@ui.entry(box_b, width=200.0), @ui.button_t("组内按钮")],
               column_gap=10.0,
@@ -197,7 +197,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
       code=[
         "@ui.cursor_group(",
         "  [",
-        "    @ui.label_t(\"整组都是手型\", role=@ui.Section),",
+        "    @ui.text(\"整组都是手型\", role=@ui.Section),",
         "    @ui.entry(box, width=200.0),",
         "    @ui.button_t(\"组内按钮\"),",
         "  ],",

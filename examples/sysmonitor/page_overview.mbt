@@ -95,10 +95,10 @@ fn res_card(
       @ui.row(
         [
           @ui.icon(icon, size=16.0),
-          @ui.label_t(title, role=@ui.Section),
+          @ui.text(title, role=@ui.Section),
           // 值行：吃掉标题行剩余宽度（grow），文本右对齐——空间全部
           // 给数值，比标题小两档，固定右缘不随文本回流换行
-          @ui.label_dyn(
+          @ui.text_dyn(
             value.signal(),
             size=14.0,
             weight=@text.SemiBold,
@@ -273,14 +273,14 @@ fn view_area(app : App, view : @core.Store[ViewId]) -> @core.Node {
 fn page_cpu_detail(app : App) -> @core.Node {
   @ui.col(
     [
-      @ui.label_t("总占用（%）", role=@ui.Section),
+      @ui.text("总占用（%）", role=@ui.Section),
       @charts.line_chart_t(
         app.cpu_hist,
         height=250.0,
         y_range=Some((0.0, 100.0)),
         area=true,
       ),
-      @ui.label_t("各逻辑核（%）", role=@ui.Section),
+      @ui.text("各逻辑核（%）", role=@ui.Section),
       @charts.bar_chart_t(
         app.core_bars,
         height=250.0,
@@ -297,9 +297,9 @@ fn page_cpu_detail(app : App) -> @core.Node {
 fn page_mem_detail(app : App) -> @core.Node {
   @ui.col(
     [
-      @ui.label_t("内存（GB）", role=@ui.Section),
+      @ui.text("内存（GB）", role=@ui.Section),
       @charts.line_chart_t(app.mem_hist, height=250.0, area=true),
-      @ui.label_t("swap（GB）", role=@ui.Section),
+      @ui.text("swap（GB）", role=@ui.Section),
       @charts.line_chart_t(app.swap_hist, height=250.0, area=true),
     ],
     padding=12.0,

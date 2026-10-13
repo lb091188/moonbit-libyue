@@ -211,9 +211,9 @@ pub fn page_data(app : @shared.App) -> @core.Node {
           [
             @ui.badge_count(9),
             @ui.badge_count(128),
-            @ui.label_t("消息", role=@ui.Body),
+            @ui.text("消息", role=@ui.Body),
             @ui.badge_dot(),
-            @ui.label_t("在线", role=@ui.Body),
+            @ui.text("在线", role=@ui.Body),
           ],
           column_gap=16.0,
         ),
@@ -232,7 +232,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
             @ui.col(
               [
                 @ui.bind(app.visits, fn(s) { "访问量 \{s}" }),
-                @ui.label_t("由基础页与下方按钮联动", role=@ui.Secondary),
+                @ui.text("由基础页与下方按钮联动", role=@ui.Secondary),
               ],
               row_gap=2.0,
             ),
@@ -263,20 +263,20 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       [
         @ui.col(
           [
-            @ui.card([@ui.label_t("卡片内容：组件库全部用 theme_* 主题色着色。")], title="卡片标题"),
+            @ui.card([@ui.text("卡片内容：组件库全部用 theme_* 主题色着色。", role=Body)], title="卡片标题"),
             @ui.collapse([
-              ("如何使用组件库？", [@ui.label_t("moon add NoahLiu/native-gui 后即可用 @ui.* 访问。")]),
-              ("支持哪些平台？", [@ui.label_t("Linux (X11) / Windows；macOS 进行中。")]),
+              ("如何使用组件库？", [@ui.text("moon add NoahLiu/native-gui 后即可用 @ui.* 访问。", role=Body)]),
+              ("支持哪些平台？", [@ui.text("Linux (X11) / Windows；macOS 进行中。", role=Body)]),
             ]),
           ],
           row_gap=10.0,
         ),
       ],
       code=[
-        "@ui.card([@ui.label_t(\"卡片内容\")], title=\"卡片标题\")",
+        "@ui.card([@ui.text(\"卡片内容\")], title=\"卡片标题\")",
         "@ui.collapse([",
-        "  (\"如何使用组件库？\", [@ui.label_t(\"moon add 后即可用 @ui.*\")]),",
-        "  (\"支持哪些平台？\", [@ui.label_t(\"Linux / Windows\")]),",
+        "  (\"如何使用组件库？\", [@ui.text(\"moon add 后即可用 @ui.*\")]),",
+        "  (\"支持哪些平台？\", [@ui.text(\"Linux / Windows\")]),",
         "])",
       ],
     ),
@@ -452,9 +452,9 @@ pub fn page_data(app : @shared.App) -> @core.Node {
             @ui.transfer(transfer_left, transfer_right),
             @ui.carousel_t(
               [
-                @ui.label_t("第一屏：轮播内容可为任意 Node。", role=@ui.Body),
-                @ui.label_t("第二屏：自动轮播 3s 一切。", role=@ui.Body),
-                @ui.label_t("第三屏：悬停暂停，箭头/圆点手动切。", role=@ui.Body),
+                @ui.text("第一屏：轮播内容可为任意 Node。", role=@ui.Body),
+                @ui.text("第二屏：自动轮播 3s 一切。", role=@ui.Body),
+                @ui.text("第三屏：悬停暂停，箭头/圆点手动切。", role=@ui.Body),
               ],
               width=320.0,
               height=80.0,
@@ -468,7 +468,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
         "let left = @core.Store::new([\"北京\", \"上海\", \"广州\"])",
         "let right = @core.Store::new([\"深圳\"])",
         "@ui.transfer(left, right)",
-        "@ui.carousel_t([@ui.label_t(\"第一屏\")], width=320.0, height=80.0)",
+        "@ui.carousel_t([@ui.text(\"第一屏\")], width=320.0, height=80.0)",
       ],
     ),
     @shared.section(

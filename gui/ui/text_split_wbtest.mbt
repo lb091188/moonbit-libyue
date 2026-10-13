@@ -33,16 +33,16 @@ test "主题化标签：按 max_width 折行（高度随之变高），固定色
   }
   let long = "标签文字很长很长很长很长很长很长很长很长很长很长很长很长"
   let (_, narrow) = mounted(
-    label_t(long, max_width=80.0),
+    text(long, max_width=80.0, role=Body),
     200.0,
     300.0,
   )
-  let (_, wide) = mounted(label_t(long, max_width=0.0), 200.0, 300.0)
+  let (_, wide) = mounted(text(long, max_width=0.0, role=Body), 200.0, 300.0)
   assert_true(narrow.rect.h > wide.rect.h)
   assert_true(wide.rect.w > 100.0)
   // 固定色：绘制像素取色（Accent 是主色，这里给死灰色）
   let (root, fixed) = mounted(
-    label_t("固定色", color="#888888", wrap=false),
+    text("固定色", color="#888888", wrap=false, role=Body),
     160.0,
     40.0,
   )
@@ -66,8 +66,8 @@ test "主题化标签：按 max_width 折行（高度随之变高），固定色
 test "水平分隔：把手拖动改首栏宽，两端按最小尺寸夹取" {
   let (root, sp) = mounted(
     hsplit(
-      view([label("左")], bg=@theme.theme_bg_panel()),
-      view([label("右")], bg=@theme.theme_fill_zebra()),
+      view([text("左")], bg=@theme.theme_bg_panel()),
+      view([text("右")], bg=@theme.theme_fill_zebra()),
       ratio=0.5,
       min_first=80.0,
       min_second=80.0,
@@ -140,8 +140,8 @@ test "水平分隔：把手拖动改首栏宽，两端按最小尺寸夹取" {
 test "垂直分隔：把手上下拖动改首栏高，按最小高度夹取" {
   let (root, sp) = mounted(
     vsplit(
-      view([label("上")], bg=@theme.theme_bg_panel()),
-      view([label("下")], bg=@theme.theme_fill_zebra()),
+      view([text("上")], bg=@theme.theme_bg_panel()),
+      view([text("下")], bg=@theme.theme_fill_zebra()),
       ratio=0.5,
       min_first=50.0,
       min_second=50.0,

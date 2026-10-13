@@ -12,10 +12,70 @@
 /// `handle?` 的默认值：不需要句柄时不必写空闭包。
 pub fn default_handle(_w : @core.Widget) -> Unit { () }
 
+
+///|
+/// 文字角色（主题排版体系）：字号与颜色随角色统一。§2 合并后 `text` 的排版入口。
+pub(all) enum TextRole {
+  Plain
+  Title
+  Section
+  Body
+  Secondary
+  Accent
+}
+
+///|
+/// 给了角色没有（`Plain` = 无角色形态，走 `text` 的显式 size/weight 原语义）。
+/// 哨兵不叫 `None`：包内所有 `Store::new(None)` 会撞过来按 TextRole 推断
+/// （W21b 同款坑，见 adaptation）。
+pub fn has_role(r : TextRole) -> Bool {
+  match r {
+    Plain => false
+    _ => true
+  }
+}
+
+///|
+/// 角色字号（逻辑像素）与字重（`Title` / `Section` / `Accent` 走 SemiBold）。
+/// 缺省字族按平台探（Windows 钉雅黑；探不到交引擎缺省），见
+/// @theme.default_font_family 的注释。
+pub fn role_font(role : TextRole) -> @text.Font {
+  let fam = @theme.default_font_family()
+  match role {
+    Plain => @text.Font::new(fam, 13.0)
+    Title => @text.Font::new(fam, 18.0, weight=@text.SemiBold)
+    Section => @text.Font::new(fam, 14.0, weight=@text.SemiBold)
+    Body => @text.Font::new(fam, 13.0)
+    Secondary => @text.Font::new(fam, 12.0)
+    Accent => @text.Font::new(fam, 13.0, weight=@text.SemiBold)
+  }
+}
+
+///|
+/// 角色颜色键：`Var(token)` 形态，落色发生在绘制期（[TextSource.fg] 经
+/// `@style.resolve_color` 现取主题），主题切换随重绘生效、不固化快照。
+fn role_token(role : TextRole) -> String {
+  match role {
+    Plain => "text_regular"
+    Title | Section => "text_primary"
+    Body => "text_regular"
+    Secondary => "text_secondary"
+    Accent => "primary"
+  }
+}
+
+///|
+/// 角色颜色（现取主题，画一期一个读数；供需要字符串的调用方）。
+pub fn role_color(role : TextRole) -> String {
+  @style.resolve_color(@style.Var(role_token(role)))
+}
+
 ///|
 /// 一份文本状态（引用语义：字段 mut，测量与绘制回调共用同一份）。
 pub(all) struct TextSource {
   mut text : String
+  /// 排版角色：`color` 空串时按角色现取主题色（§2 `text` 合并入口用它）
+  mut role : TextRole
   mut font : @text.Font
   mut color : String
   mut align : @text.TextAlign
@@ -29,6 +89,7 @@ pub(all) struct TextSource {
 /// 建一份文本状态（字号是逻辑像素，不是磅）。
 pub fn text_source(
   text : String,
+  role? : TextRole = Plain,
   size? : Double = 13.0,
   color? : String = "",
   weight? : @text.FontWeight = @text.Normal,
@@ -41,6 +102,7 @@ pub fn text_source(
 ) -> TextSource {
   {
     text,
+    role,
     font: @text.Font::new(family, size, weight=weight, style=style),
     color,
     align,
@@ -54,7 +116,7 @@ pub fn text_source(
 /// 生效颜色：空串走主题正文色（主题切换后现取，不固化）。
 pub fn TextSource::fg(self : TextSource) -> String {
   if self.color.length() == 0 {
-    @theme.theme_text_regular()
+    role_color(self.role)
   } else {
     self.color
   }

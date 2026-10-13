@@ -4,7 +4,7 @@
 ///|
 test "vbox / hbox：方向与间距来自参数，交叉轴按 align_items" {
   let (root, col) = mounted(
-    col([label("甲"), label("乙")], row_gap=10.0, padding=4.0),
+    col([text("甲"), text("乙")], row_gap=10.0, padding=4.0),
     300.0,
     200.0,
   )
@@ -14,7 +14,7 @@ test "vbox / hbox：方向与间距来自参数，交叉轴按 align_items" {
   assert_eq(k1.rect.y - (k0.rect.y + k0.rect.h), 10.0)
   assert_eq(k0.rect.x, 4.0)
   assert_true(k1.rect.y > k0.rect.y)
-  let (_r2, row) = mounted(row([label("丙"), label("丁")], column_gap=12.0), 300.0, 120.0)
+  let (_r2, row) = mounted(row([text("丙"), text("丁")], column_gap=12.0), 300.0, 120.0)
   let h0 = row.children()[0]
   let h1 = row.children()[1]
   assert_eq(h1.rect.x - (h0.rect.x + h0.rect.w), 12.0)
@@ -65,7 +65,7 @@ test "hover_group：子控件悬停即整组换底色，松开在组内才算一
   let mut hits = 0
   let (root, g) = mounted(
     hover_group(
-      [label("卡片标题"), label("卡片正文")],
+      [text("卡片标题"), text("卡片正文")],
       on_click=fn() -> Unit { hits = hits + 1 },
       width=180.0,
       padding=8.0,
@@ -120,7 +120,7 @@ test "旧名构造器落到新组件上：picker 点开浮层、scroll 出滚动
   let st = ScrollState::new()
   let rows_in : Array[@core.Node] = []
   for i = 0; i < 20; i = i + 1 {
-    rows_in.push(view([label("行 " + i.to_string())], height=22.0))
+    rows_in.push(view([text("行 " + i.to_string())], height=22.0))
   }
   let (_r2, view) = mounted(scroll(rows_in, st, width=160.0, height=80.0), 220.0, 200.0)
   let (bm, _, _) = shot(view)
@@ -131,7 +131,7 @@ test "旧名构造器落到新组件上：picker 点开浮层、scroll 出滚动
 
   let sel = @core.Store::new(0)
   let (_r3, tabs) = mounted(
-    tab([("页一", label("第一页内容")), ("页二", label("第二页内容"))], selected=sel),
+    tab([("页一", text("第一页内容")), ("页二", text("第二页内容"))], selected=sel),
     300.0,
     160.0,
   )
@@ -143,7 +143,7 @@ test "旧名构造器落到新组件上：picker 点开浮层、scroll 出滚动
 ///|
 test "光标形状请求：按钮手型、输入框文本形、分隔把手横向/纵向、cursor_group 可覆盖" {
   let (root, card) = mounted(
-    hover_group([label("卡片"), button("按", on_click=fn() -> Unit { () })]),
+    hover_group([text("卡片"), button("按", on_click=fn() -> Unit { () })]),
     300.0,
     160.0,
   )
@@ -156,12 +156,12 @@ test "光标形状请求：按钮手型、输入框文本形、分隔把手横�
   assert_eq(box1.cursor, @core.CURSOR_TEXT)
   let (_r3, area) = mounted(textarea(@core.Store::new("y")), 260.0, 90.0)
   assert_eq(area.cursor, @core.CURSOR_TEXT)
-  let (_r4, hs) = mounted(hsplit(label("甲"), label("乙")), 220.0, 80.0)
+  let (_r4, hs) = mounted(hsplit(text("甲"), text("乙")), 220.0, 80.0)
   assert_eq(hs.children()[1].cursor, @core.CURSOR_RESIZE_H)
-  let (_r5, vs) = mounted(vsplit(label("甲"), label("乙")), 220.0, 120.0)
+  let (_r5, vs) = mounted(vsplit(text("甲"), text("乙")), 220.0, 120.0)
   assert_eq(vs.children()[1].cursor, @core.CURSOR_RESIZE_V)
   let (_r6, cg) = mounted(
-    cursor_group([label("缩放热区")], cursor=@core.CURSOR_RESIZE_V, width=120.0),
+    cursor_group([text("缩放热区")], cursor=@core.CURSOR_RESIZE_V, width=120.0),
     200.0,
     60.0,
   )

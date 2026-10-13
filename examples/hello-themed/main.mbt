@@ -12,8 +12,8 @@ fn main {
     [
       @ui.col(
         [
-          @ui.label_t("Hello, 主题组件库!", role=@ui.Title),
-          @ui.label_t(
+          @ui.text("Hello, 主题组件库!", role=@ui.Title),
+          @ui.text(
             "输入名字点问候，按钮/输入框/文字全是主题化形态。",
             role=@ui.Secondary,
           ),

@@ -394,8 +394,8 @@ fn make_split_section(slot : Ref[@core.Widget?]) -> @core.Node {
   let pane = fn(title : String, role : @ui.TextRole, bg : String) -> @core.Node {
     @ui.view(
       [
-        @ui.label_t(title, role=role, align=@text.Center, max_width=160.0),
-        @ui.label_t(
+        @ui.text(title, role=role, align=@text.Center, max_width=160.0),
+        @ui.text(
           "标签按 max_width 折行；拖动中间把手改两栏宽度（退出状态行报首栏宽）",
           role=Secondary,
           max_width=160.0,
@@ -410,7 +410,7 @@ fn make_split_section(slot : Ref[@core.Widget?]) -> @core.Node {
 
   @ui.view(
     [
-      @ui.label("分隔布局与文本族：把手常显点纹，悬停浅底、拖动主题色", size=13.0),
+      @ui.text("分隔布局与文本族：把手常显点纹，悬停浅底、拖动主题色", size=13.0),
       @ui.hsplit(
         pane("左栏 Title", Title, @theme.theme_bg_panel()),
         pane("右栏 Accent", Accent, @theme.theme_fill_zebra()),
@@ -436,7 +436,7 @@ fn make_sticky_section(st : @ui.StickyList, slot : Ref[@core.Widget?]) -> @core.
     for i = 1; i <= 4; i = i + 1 {
       out.push(
         @ui.view(
-          [@ui.label(prefix + " 行 " + i.to_string(), size=12.0)],
+          [@ui.text(prefix + " 行 " + i.to_string(), size=12.0)],
           height=22.0,
           padding=4.0,
           bg=if i % 2 == 0 {
@@ -452,7 +452,7 @@ fn make_sticky_section(st : @ui.StickyList, slot : Ref[@core.Widget?]) -> @core.
 
   @ui.view(
     [
-      @ui.label("粘性列表：滚过组边界时顶部吸顶条换组名（退出状态行报当前组）", size=13.0),
+      @ui.text("粘性列表：滚过组边界时顶部吸顶条换组名（退出状态行报当前组）", size=13.0),
       @ui.sticky_list(
         [("组一", rows_of("甲")), ("组二", rows_of("乙")), ("组三", rows_of("丙"))],
         st,
@@ -511,7 +511,7 @@ fn make_form_section(
   }
   @ui.view(
     [
-      @ui.label("表单族余项：四型按钮 / 链接 / 表单项错误行 / 评分（退出状态行报点击与值）", size=13.0),
+      @ui.text("表单族余项：四型按钮 / 链接 / 表单项错误行 / 评分（退出状态行报点击与值）", size=13.0),
       @ui.view(
         [
           @ui.button_t(
@@ -536,10 +536,10 @@ fn make_form_section(
       @ui.form(
         "表单分组",
         [
-          @ui.form_item("昵称", @ui.label("（控件区）"), label_width=90.0),
+          @ui.form_item("昵称", @ui.text("（控件区）"), label_width=90.0),
           @ui.form_item(
             "备注",
-            @ui.label("（错误文案在下方红字）"),
+            @ui.text("（错误文案在下方红字）"),
             label_width=90.0,
             error=err,
             handle=fn(w : @core.Widget) -> Unit { item_slot.val = Some(w) },
@@ -583,7 +583,7 @@ fn make_form_section(
       ),
       @ui.view(
         [
-          @ui.label_t("多行输入框：回车换行、上下键按显示行走、超出出滚动条", role=Secondary),
+          @ui.text("多行输入框：回车换行、上下键按显示行走、超出出滚动条", role=Secondary),
           @ui.textarea(
             ta,
             placeholder="写点什么",
@@ -621,7 +621,7 @@ fn make_decl_section(
 ) -> @core.Node {
   @ui.col(
     [
-      @ui.label("声明式 L1：vbox/hbox 排版 + bind_label 就地换文本 + hover_group 悬停组", size=13.0),
+      @ui.text("声明式 L1：vbox/hbox 排版 + bind_label 就地换文本 + hover_group 悬停组", size=13.0),
       @ui.hover_group(
         [
           @ui.row(
@@ -642,7 +642,7 @@ fn make_decl_section(
             ],
             column_gap=10.0,
           ),
-          @ui.label_t("整块卡片悬停换底色（靠宿主的父链悬停态，不轮询指针）", role=Secondary),
+          @ui.text("整块卡片悬停换底色（靠宿主的父链悬停态，不轮询指针）", role=Secondary),
         ],
         width=340.0,
         padding=10.0,
@@ -668,7 +668,7 @@ fn make_media_section(
 ) -> @core.Node {
   @ui.view(
     [
-      @ui.label("图标与动图：图标跟随主题取色，图标按钮悬停出底，GIF 按帧时长自转", size=13.0),
+      @ui.text("图标与动图：图标跟随主题取色，图标按钮悬停出底，GIF 按帧时长自转", size=13.0),
       @ui.row(
         [
           @ui.icon(@icons.CheckCircleFill, size=20.0),
@@ -707,7 +707,7 @@ fn make_hotkey_section(
 ) -> @core.Node {
   @ui.view(
     [
-      @ui.label(
+      @ui.text(
         "全局快捷键（W20b）：注册 Ctrl+Alt+F9 / Ctrl+Alt+F10，切到别的程序按下应计数",
         size=13.0,
       ),
@@ -765,7 +765,7 @@ fn make_message_box_section(
   }
   @ui.view(
     [
-      @ui.label(
+      @ui.text(
         "原生消息框（W20d）：点按钮弹 Win32 MessageBoxW，关掉后状态行报返回编号",
         size=13.0,
       ),
@@ -826,7 +826,7 @@ fn make_drawn_message_box_section(
   }
   @ui.view(
     [
-      @ui.label(
+      @ui.text(
         "自绘消息框（W21b）：纯自绘、不吃原生 MessageBoxW，三平台同构；Esc 收起 / Enter 走默认钮",
         size=13.0,
       ),
@@ -896,7 +896,7 @@ fn make_menu_section(
 ) -> @core.Node {
   @ui.view(
     [
-      @ui.label(
+      @ui.text(
         "原生菜单栏（W20a）：菜单模型 → Win32 原生菜单，点「文件/编辑/查看」下的项应计数",
         size=13.0,
       ),
@@ -1022,7 +1022,7 @@ fn make_window_section(
   let dr_off = fn() -> Unit { app.window.set_drag_rect(0, 0, 0, 0) }
   @ui.view(
     [
-      @ui.label(
+      @ui.text(
         "窗口增强（W20e）：改标题 / 像素现建窗口图标 / 无边框开关 / 顶部拖拽带",
         size=13.0,
       ),
@@ -1087,7 +1087,7 @@ fn make_taskbar_section(
   }
   @ui.view(
     [
-      @ui.label(
+      @ui.text(
         "任务栏进度（§6.3）：写任务栏按钮的进度条与状态（Win32 ITaskbarList3，只写不读）",
         size=13.0,
       ),
@@ -1221,7 +1221,7 @@ fn make_tray_section(
   }
   @ui.view(
     [
-      @ui.label(
+      @ui.text(
         "系统托盘（W20c）：建/提示/菜单/弹出/移除；左键与菜单项计数（图标 32px 由像素现建）",
         size=13.0,
       ),
@@ -1340,7 +1340,7 @@ fn make_notify_section(
   }
   @ui.view(
     [
-      @ui.label(
+      @ui.text(
         "桌面通知（W21a）：发信息/警告/错误气泡 · 更新进度 · 关闭（Win32 托盘气泡；Linux 走 freedesktop）",
         size=13.0,
       ),
@@ -1401,7 +1401,7 @@ fn make_drag_section(
   // （按钮会先把按下吃掉，拖不动它，见 `ui/drag.mbt` 的约束）
   let chip = fn(text : String, bgv : String) -> @core.Node {
     @ui.view(
-      [@ui.label(text, size=12.0)],
+      [@ui.text(text, size=12.0)],
       padding=8.0,
       bg=bgv,
       border=@theme.theme_border(),
@@ -1438,7 +1438,7 @@ fn make_drag_section(
   )
   @ui.view(
     [
-      @ui.label(
+      @ui.text(
         "拖放（W21c）：应用内拖放全自绘、三平台同构；拖过 4px 才开拖，悬停落点描主色，松手投递（「只收路径」的落点会拒文本）",
         size=13.0,
       ),
@@ -1506,7 +1506,7 @@ fn make_chart_it_section(
   ])
   @ui.view(
     [
-      @ui.label(
+      @ui.text(
         "交互图表：hover 浮层 + 图例点击显隐 + 滚轮缩放（退出状态行报缩放窗）",
         size=13.0,
       ),
@@ -1666,7 +1666,7 @@ fn make_chart_special_section(
   let tree_root = @core.Store::new(tree_root_item)
   @ui.view(
     [
-      @ui.label("专项图：箱线/漏斗/热力/雷达（同源自 master，四图并排）", size=13.0),
+      @ui.text("专项图：箱线/漏斗/热力/雷达（同源自 master，四图并排）", size=13.0),
       @ui.view(
         [
           @chart.boxplot_t(box_groups, width=320.0, height=150.0),
@@ -1793,7 +1793,7 @@ fn make_chart_section(
   ])
   @ui.view(
     [
-      @ui.label("图表：折线/柱状/环形/仪表/散点全自绘，数据走 Store（退出状态行报推点数）", size=13.0),
+      @ui.text("图表：折线/柱状/环形/仪表/散点全自绘，数据走 Store（退出状态行报推点数）", size=13.0),
       @ui.view(
         [
           @ui.view(
@@ -1869,7 +1869,7 @@ fn make_virt_section(
 ) -> @core.Node {
   @ui.view(
     [
-      @ui.label("虚拟表格：200 行只挂可见区间（滚轮 / 拖滚动条，退出状态行报挂载数）", size=13.0),
+      @ui.text("虚拟表格：200 行只挂可见区间（滚轮 / 拖滚动条，退出状态行报挂载数）", size=13.0),
       @ui.table_v_t(
         [
           @ui.TableColumn::make("名称", 160.0),
@@ -1921,7 +1921,7 @@ fn make_table_section(
 ) -> @core.Node {
   @ui.view(
     [
-      @ui.label("表格：点表头排序（新列升序 / 同列翻转 / 第三次取消）、点行选中", size=13.0),
+      @ui.text("表格：点表头排序（新列升序 / 同列翻转 / 第三次取消）、点行选中", size=13.0),
       @ui.table_t(
         [
           @ui.TableColumn::make("组件", 140.0),
@@ -1951,7 +1951,7 @@ fn make_scroll_rows() -> Array[@core.Node] {
   for i = 0; i < 20; i = i + 1 {
     rows.push(
       @ui.view(
-        [@ui.label("滚动行 " + i.to_string(), size=12.0)],
+        [@ui.text("滚动行 " + i.to_string(), size=12.0)],
         height=22.0,
         padding=4.0,
         bg=if i % 2 == 0 {
@@ -2072,7 +2072,7 @@ fn main {
         // 本窗自己的焦点栈：101 只登记在这扇窗上
         let _ = win.focus.register(101)
         win.mount([
-          @ui.label("关于窗：自己的控件树与焦点栈，共用宿主的循环与泵", size=13.0),
+          @ui.text("关于窗：自己的控件树与焦点栈，共用宿主的循环与泵", size=13.0),
           @core.node_of(live_counter(fn() -> String {
             "本窗点击 " +
             mine.val.to_string() +
@@ -2118,7 +2118,7 @@ fn main {
   app.mount([
     @ui.view(
       [
-        @ui.label("多窗口（批 A）", size=13.0),
+        @ui.text("多窗口（批 A）", size=13.0),
         @core.node_of(live_counter(fn() -> String {
           "在窗 " +
           app.window_count().to_string() +
@@ -2154,7 +2154,7 @@ fn main {
   app.mount([
     @ui.view(
       [
-        @ui.label("组件层", size=13.0),
+        @ui.text("组件层", size=13.0),
         @ui.separator(vertical=true),
         @ui.icon(
           @icons.IconKind::MediumCircleFill, size=18.0, color=@theme.theme_success(),
@@ -2448,7 +2448,7 @@ fn main {
   app.mount([
     @ui.view(
       [
-        @ui.label("Markdown：17 种 block + GFM（代码块复用 code_view、链接走 on_link 回调）", size=13.0),
+        @ui.text("Markdown：17 种 block + GFM（代码块复用 code_view、链接走 on_link 回调）", size=13.0),
         @ui.view(
           [
             @mdview.markdown_view(
@@ -2472,7 +2472,7 @@ fn main {
   app.mount([
     @ui.view(
       [
-        @ui.label("代码高亮：tokenize 多语言 + code_view 深底自绘", size=13.0),
+        @ui.text("代码高亮：tokenize 多语言 + code_view 深底自绘", size=13.0),
         @ui.view(
           [
             @ui.code_view(
@@ -2535,7 +2535,7 @@ fn main {
       [
         @ui.view(
           [
-            @ui.label("显示族收尾", size=13.0),
+            @ui.text("显示族收尾", size=13.0),
             @ui.timeline(
               [
                 ("构建", "编译通过", @ui.Success),
@@ -2555,10 +2555,10 @@ fn main {
           [
             @ui.carousel_t(
               [
-                @ui.label("轮播第一页：点右侧箭头或末指示点", size=13.0),
-                @ui.label("轮播第二页", size=13.0),
-                @ui.label("轮播第三页", size=13.0),
-                @ui.label("轮播第四页", size=13.0),
+                @ui.text("轮播第一页：点右侧箭头或末指示点", size=13.0),
+                @ui.text("轮播第二页", size=13.0),
+                @ui.text("轮播第三页", size=13.0),
+                @ui.text("轮播第四页", size=13.0),
               ],
               width=340.0,
               height=56.0,
@@ -2568,9 +2568,9 @@ fn main {
             ),
             @ui.carousel_t(
               [
-                @ui.label("自转页 A", size=13.0),
-                @ui.label("自转页 B", size=13.0),
-                @ui.label("自转页 C", size=13.0),
+                @ui.text("自转页 A", size=13.0),
+                @ui.text("自转页 B", size=13.0),
+                @ui.text("自转页 C", size=13.0),
               ],
               width=200.0,
               height=36.0,
@@ -2588,8 +2588,8 @@ fn main {
         ),
         @ui.view(
           [
-            @ui.label("日期族首批", size=13.0),
-            @ui.label_dyn(
+            @ui.text("日期族首批", size=13.0),
+            @ui.text_dyn(
               picked_date.signal().map(fn(v : @ui.DateYMD?) -> String {
                 match v {
                   Some(x) => "已选 " + x.format()
@@ -2613,7 +2613,7 @@ fn main {
         ),
         @ui.view(
           [
-            @ui.label("导航族首批", size=13.0),
+            @ui.text("导航族首批", size=13.0),
             @ui.segmented(
               ["分段甲", "分段乙"],
               seg_sel,
@@ -2632,8 +2632,8 @@ fn main {
             @ui.steps(["下单", "付款", "发货"], step_cur),
             @ui.collapse(
               [
-                ("折叠一", [@ui.label("第一块内容", size=12.0)]),
-                ("折叠二", [@ui.label("第二块内容", size=12.0)]),
+                ("折叠一", [@ui.text("第一块内容", size=12.0)]),
+                ("折叠二", [@ui.text("第二块内容", size=12.0)]),
               ],
               handle=fn(w : @core.Widget) -> Unit { nav_fold.val = Some(w) },
             ),
@@ -2658,7 +2658,7 @@ fn main {
       [
         @ui.view(
           [
-            @ui.label("浮层首批", size=13.0),
+            @ui.text("浮层首批", size=13.0),
             @ui.dropdown_menu(
               "操作",
               ["重命名", "复制", "-", "删除"],
@@ -2668,7 +2668,7 @@ fn main {
             @ui.popover_t(
               @ui.button("气泡", min_width=70.0),
               @ui.view(
-                [@ui.label("气泡内容", size=12.0), @ui.label("点外面收起", size=11.0)],
+                [@ui.text("气泡内容", size=12.0), @ui.text("点外面收起", size=11.0)],
                 padding=6.0,
                 row_gap=4.0,
               ),
@@ -2691,7 +2691,7 @@ fn main {
         ),
         @ui.view(
           [
-            @ui.label("滚动容器", size=13.0),
+            @ui.text("滚动容器", size=13.0),
             @ui.scroll_v(
               make_scroll_rows(),
               scr,
@@ -2699,7 +2699,7 @@ fn main {
               height=120.0,
               handle=fn(w : @core.Widget) -> Unit { scr_w.val = Some(w) },
             ),
-            @ui.label("滚轮 / 拖滚动条都改偏移（退出状态行报 scr=偏移/上限）", size=12.0),
+            @ui.text("滚轮 / 拖滚动条都改偏移（退出状态行报 scr=偏移/上限）", size=12.0),
           ],
           width=210.0,
           row_gap=6.0,
@@ -2710,7 +2710,7 @@ fn main {
         ),
         @ui.view(
           [
-            @ui.label("导航族次批", size=13.0),
+            @ui.text("导航族次批", size=13.0),
             @ui.side_menu(
               ["首页", "报表", "设置"],
               menu_sel,
@@ -2739,8 +2739,8 @@ fn main {
             ),
             @ui.tabs_t(
               [
-                ("页一", @ui.label("页一内容：随页签切换显隐", size=12.0)),
-                ("页二", @ui.label("页二内容", size=12.0)),
+                ("页一", @ui.text("页一内容：随页签切换显隐", size=12.0)),
+                ("页二", @ui.text("页二内容", size=12.0)),
               ],
               selected=tab_sel,
               handle=fn(w : @core.Widget) -> Unit { nav2_tabs.val = Some(w) },
@@ -2755,7 +2755,7 @@ fn main {
         ),
         @ui.view(
           [
-            @ui.label("日期族选择器", size=13.0),
+            @ui.text("日期族选择器", size=13.0),
             @ui.date_picker_t(
               dpk,
               today=@ui.today_date(),
@@ -2783,7 +2783,7 @@ fn main {
         ),
         @ui.view(
           [
-            @ui.label("浮层次批", size=13.0),
+            @ui.text("浮层次批", size=13.0),
             @ui.button(
               "弹窗",
               on_click=fn() -> Unit { dlg_open.set(true) },
@@ -2793,12 +2793,12 @@ fn main {
             @ui.dialog_t(
               dlg_open,
               "确认操作",
-              [@ui.label("对话框在浮层图层上开，遮罩铺满整窗", size=12.0)],
+              [@ui.text("对话框在浮层图层上开，遮罩铺满整窗", size=12.0)],
               on_confirm=fn() -> Unit { dlg_ok.val = dlg_ok.val + 1 },
             ),
             @ui.context_menu_for(
               @ui.view(
-                [@ui.label("右键我", size=13.0)],
+                [@ui.text("右键我", size=13.0)],
                 padding=4.0,
                 bg=@theme.theme_bg_panel(),
                 height=28.0,

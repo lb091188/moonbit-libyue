@@ -127,11 +127,11 @@ fn page_sensors(app : App) -> @core.Node {
   let nodes : Array[@core.Node] = []
   if app.gpu_busy_hists.length() == 0 {
     nodes.push(
-      @ui.label_t("未检测到显卡", color=@theme.theme_text_secondary()),
+      @ui.text("未检测到显卡", color=@theme.theme_text_secondary(), role=Body),
     )
   }
   for i in 0..<app.gpu_busy_hists.length() {
-    nodes.push(@ui.label_t(gpu_label(i, "使用率（%）"), role=@ui.Section))
+    nodes.push(@ui.text(gpu_label(i, "使用率（%）"), role=@ui.Section))
     nodes.push(
       @charts.line_chart_t(
         app.gpu_busy_hists[i],
@@ -140,18 +140,18 @@ fn page_sensors(app : App) -> @core.Node {
         area=true,
       ),
     )
-    nodes.push(@ui.label_t(gpu_label(i, "显存（GB）"), role=@ui.Section))
+    nodes.push(@ui.text(gpu_label(i, "显存（GB）"), role=@ui.Section))
     nodes.push(
       @charts.line_chart_t(app.gpu_vram_hists[i], height=220.0, area=true),
     )
   }
   nodes.push(@ui.separator())
-  nodes.push(@ui.label_t("温度传感器", role=@ui.Section))
+  nodes.push(@ui.text("温度传感器", role=@ui.Section))
   // 空态:无可用温度来源(非 N 卡无厂商 SDK / 机器无 hwmon 节点)是
   // 合法状态,给一行说明而不是空白
   nodes.push(
     @ui.view(
-      [@ui.label_t("暂无可用温度来源", color=@theme.theme_text_secondary())],
+      [@ui.text("暂无可用温度来源", color=@theme.theme_text_secondary())],
       handle=fn(l) {
         l.set_visible(page.rows.get().length() == 0)
         page.rows.subscribe(fn(r) {

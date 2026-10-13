@@ -41,7 +41,7 @@ fn attach_toggle(
 ///|
 /// 复选框 + 文本标签（点标签同样生效，整行是点击区）。
 pub fn checkbox(
-  text : String,
+  content : String,
   state : @core.Store[Bool],
   disabled? : Bool = false,
   enabled? : Enabled? = None,
@@ -84,7 +84,7 @@ pub fn checkbox(
     row.node.set_align_items(@yoga.AlignItems::Center)
     row.node.set_column_gap(6.0)
     row.append_child(box)
-    let _ = (label(text, size=size)).mount_into(row)
+    let _ = (text(content, size=size)).mount_into(row)
     row.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
     handle(row)
@@ -142,7 +142,7 @@ pub fn radio_group(
     })
     items.push(
       view(
-        [dot, label(options[i])],
+        [dot, text(options[i])],
         direction=@yoga.Row,
         column_gap=6.0,
         align_items=@yoga.AlignItems::Center,
@@ -199,7 +199,7 @@ pub fn switch_t(
     row.append_child(pill)
     let txt = if state.get() { on_text } else { off_text }
     if txt.length() > 0 {
-      let _ = (label(txt)).mount_into(row)
+      let _ = (text(txt)).mount_into(row)
     }
     row.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
@@ -604,7 +604,7 @@ pub fn form_item(
         [
           view(
             [
-              label(
+              text(
                 label_text,
                 size=13.0,
                 color=@theme.theme_text_secondary(),
@@ -623,7 +623,7 @@ pub fn form_item(
         align_items=@yoga.AlignItems::Center,
       ),
       view(
-        [label_dyn(err_store.signal(), size=12.0, color=@theme.theme_danger(), wrap=false)],
+        [text_dyn(err_store.signal(), size=12.0, color=@theme.theme_danger(), wrap=false)],
         direction=@yoga.Row,
         height=18.0,
         handle=fn(w : @core.Widget) -> Unit { w.set_margin(left=label_width + 12.0) },
@@ -643,7 +643,7 @@ pub fn form(
   row_gap? : Double = 8.0,
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
-  let nodes : Array[@core.Node] = [label_t(title, role=Section)]
+  let nodes : Array[@core.Node] = [text(title, role=Section)]
   for it in items {
     nodes.push(it)
   }

@@ -59,7 +59,7 @@ fn main {
                 @ui.ScrollState::new(),
                 handle=fn(v) { v.node.set_flex_grow(1.0) },
               ),
-              @ui.label_t(
+              @ui.text(
                 "系统能力真读本机\n图表为演示数据",
                 role=@ui.Secondary,
               ),

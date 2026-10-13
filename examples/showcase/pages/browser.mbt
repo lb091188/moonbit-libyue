@@ -109,8 +109,8 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                   let _ = @ui
                     .view(
                       [
-                        @ui.label_t("webview 引擎不在位", role=@ui.Body),
-                        @ui.label_t(
+                        @ui.text("webview 引擎不在位", role=@ui.Body),
+                        @ui.text(
                           "本机缺 WebView2 运行时 / webkit2gtk-4.1。装上后本页自动走 webview 分支。",
                           role=@ui.Secondary,
                         ),

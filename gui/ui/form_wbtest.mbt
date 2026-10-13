@@ -323,7 +323,7 @@ test "表单项：标签定宽右对齐、错误行常驻预留 18 高、文案�
   }
   let err = @core.Store::new("")
   let root = mount_root(
-    [form_item("名称", label("控件区"), label_width=90.0, error=err)],
+    [form_item("名称", text("控件区"), label_width=90.0, error=err)],
     320.0,
     120.0,
   )
