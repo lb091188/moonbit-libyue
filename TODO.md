@@ -65,7 +65,8 @@
   - [x] 事件参数统一 `on_*` 审计（组件库事件回调已全部 `on_*`；`handle?` 是句柄逃生舱非事件）；
   - [~] 散参数改名（`bg→background_color`、`fg→color`、`border→border_color` 已落；`size→font_size` 与 nav 回调形态 `bg?/fg?:(Widget)->String` 随 P2-e 收进 resolved Style）+ 34 个组件收 `class? : Array[Style]` 并在挂载点 fold；
   - [x] 展示类组件 `_dyn` 信号版（§3 第 5 条通则落地）：`tag_dyn` / `tag_of_type_dyn` / `badge_count_dyn` / `avatar_dyn` / `statistic_dyn` 补齐（`text_dyn` 原型同款——值变就地改字、按内容重算宽度、退订随本代回收袋；`chip`/`statistic`/`avatar` 抽成收 `bind?` 钩子的内核，静态与信号两条入口共用一份画法）；容器类收子节点数组、内容变化走 `for_list`/`when`/`bind_node`，`progress` 一族本就直读 `Store`，都不再叠 `_dyn`；
-  - [ ] **P2-e 逐组件 on_draw 改读 resolved Style 并按状态选桶**（现状：只有 `view` 的底色/描边走 `@style.resolved`；其余组件仍读捕获的散参数；nav 回调色、`text` 的 `src` 色、button 皮肤等待改造）；
+  - [~] **P2-e 逐组件 on_draw 改读 resolved Style 并按状态选桶**：基础族（`view` 底色/描边/圆角/边框宽每帧读样式槽、`separator` 两档、`icon`、`icon_button` 内置皮肤改写成基块+状态桶、`divider` 补 `class?`）与展示族（`chip` 内核 + `tag`/`tag_of_type`/`badge_count`/`badge_dot`/`avatar`/`statistic`/`alert`/`timeline_row`，`card`/`descriptions`/`empty`/`result`/`timeline`/`progress_line` 把 `class?` 透传给外层容器）已落地；语义色改存 **token 名**（`type_token`/`type_light_token`），所以标签/提示条/时间线随主题切换现取色（旧形态建树时就定死）。`style` 包补绘制期取值助手 `color_of`/`number_of`/`string_of`，`style_for` 并桶次序定为 hover < focus < active。**待改**：`form`(11)、`nav`(12)、`overlay`(9)、`table`(4)、`virtlist`(5)、`datepicker`(6)、`message_box`(5)、`datetime`(5)、`entry`/`textarea`/`scroll`/`split`/`codeview`/`gif`/`drag` 各 1~2 处；
+  - [ ] P2-e 记档两条边界（本批只迁样式通道，不改画法）：`badge_dot` 名叫圆点实际画方角 `fill_rect`（要圆角得给 `border_radius` 并走圆角填充，属观感变更，单独一批定）；`chip` 的 `class` 只吃颜色与显式宽度——字号在挂载期参与测量宽，class 改字号不会跟着改宽，真要改字号请调用方给 `width=`/`class=[style(width=…)]`；
   - [ ] 观感逐页比对不回退（真机由用户复验，`examples/hello`、`hello-themed`、`showcase`、`native-app`、`sysmonitor`）。
 - [ ] **P3 响应式补强**：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` / `mount_window` 补 `render` 槽（动工前先定 design.md §6 唯一待定：`Store` 去重与否）。
 - [ ] **P4 绘制能力**：`Painter` 全局 alpha（opacity 全路径）+ `box_shadow` 硬阴影档。

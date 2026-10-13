@@ -387,3 +387,88 @@ test "展示族 *_dyn：值变就地改字、按内容重算宽度" {
   p.end()
   assert_true(ink_count(bm, 60, 60) > 20)
 }
+
+///|
+/// P2-e 口径：展示族绘制期只读样式槽——语义色存 token 名（随主题现取），
+/// `class` 的属性真的覆盖内置皮肤。
+test "展示族只读样式槽：token 落色等于主题取色、class 覆盖语义底" {
+  if !ui_text_guard() {
+    return
+  }
+  let light_hex = type_light_color(Primary)
+  // 参照物：同一个色以 hex 走散参数（P2-e 前的形态）
+  let (root_ref, _hex_tag) = mounted(
+    view([], width=60.0, height=24.0, background_color=light_hex),
+    120.0,
+    40.0,
+  )
+  let bm_ref = @render.Bitmap::new(120, 40)
+  let p_ref = @render.Painter::new(bm_ref)
+  root_ref.paint(p_ref)
+  p_ref.end()
+  let hex_px = px(bm_ref, 4, 4)
+  assert_true(hex_px != (0, 0, 0, 0))
+
+  // token 形态：语义标签的底与参照物逐位相同
+  let (root_tg, tg) = mounted(tag_of_type("新", Primary), 120.0, 40.0)
+  assert_true(tg.rect.w > 8.0)
+  let bm_tg = @render.Bitmap::new(120, 40)
+  let p_tg = @render.Painter::new(bm_tg)
+  root_tg.paint(p_tg)
+  p_tg.end()
+  assert_eq(px(bm_tg, 2, 2), hex_px)
+
+  // 换主题：token 形态现取新主题（旧形态在建树时就把色定死了）
+  @theme.theme_apply(@theme.dark_theme())
+  let bm_dark = @render.Bitmap::new(120, 40)
+  let p_dark = @render.Painter::new(bm_dark)
+  root_tg.paint(p_dark)
+  p_dark.end()
+  let dark_px = px(bm_dark, 2, 2)
+  assert_true(dark_px != hex_px)
+  @theme.theme_apply(@theme.default_theme())
+
+  // class 覆盖内置皮肤：标签底改成红
+  let (root_c, tc) = mounted(
+    tag_of_type("长文字", Primary, class=[@style.style(background_color="#ff0000")]),
+    160.0,
+    40.0,
+  )
+  assert_true(tc.rect.w > 20.0)
+  let bm_c = @render.Bitmap::new(160, 40)
+  let p_c = @render.Painter::new(bm_c)
+  root_c.paint(p_c)
+  p_c.end()
+  let mut red = 0
+  for y = 0; y < 24; y = y + 1 {
+    for x = 0; x < 40; x = x + 1 {
+      let c = px(bm_c, x, y)
+      if c.0 > 128 && c.1 < 64 && c.2 < 64 {
+        red = red + 1
+      }
+    }
+  }
+  assert_true(red > 40)
+
+  // 容器型入口的 class 透传：卡片底被改色
+  let (root_card, cd) = mounted(
+    card([], title="标题", class=[@style.style(background_color="#00ff00")]),
+    200.0,
+    80.0,
+  )
+  assert_true(cd.rect.h > 20.0)
+  let bm_card = @render.Bitmap::new(200, 80)
+  let p_card = @render.Painter::new(bm_card)
+  root_card.paint(p_card)
+  p_card.end()
+  let mut green = 0
+  for y = 0; y < 80; y = y + 1 {
+    for x = 0; x < 200; x = x + 1 {
+      let c = px(bm_card, x, y)
+      if c.1 > 128 && c.0 < 64 && c.2 < 64 {
+        green = green + 1
+      }
+    }
+  }
+  assert_true(green > 100)
+}

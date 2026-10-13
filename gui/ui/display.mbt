@@ -52,6 +52,32 @@ pub fn type_light_color(t : SemanticType) -> String {
 }
 
 ///|
+/// 语义档的 **token 名**（§1.4：token 名单就是 theme 的那 20 个颜色字段，不另设一套）。
+/// 组件把语义色折进样式时用它——存的是 token 名而非某一刻的色值，换主题后绘制期
+/// 现取（`type_color` / `type_light_color` 是「现在就色」的取色入口，两条各有用处）。
+fn type_token(t : SemanticType) -> String {
+  match t {
+    Primary => "primary"
+    Success => "success"
+    Warning => "warning"
+    Danger => "danger"
+    Info => "info"
+  }
+}
+
+///|
+/// 语义档浅底的 token 名（对应 `type_light_color`）。
+fn type_light_token(t : SemanticType) -> String {
+  match t {
+    Primary => "primary_light"
+    Success => "success_light"
+    Warning => "warning_light"
+    Danger => "danger_light"
+    Info => "info_light"
+  }
+}
+
+///|
 /// 一行文本的测量宽（组件按内容定宽时用，绕开容器拉伸）。
 pub fn text_width(text : String, font : @text.Font) -> Double {
   match @text.measure_font(text, font) {
@@ -89,23 +115,46 @@ fn chip(
   on_click : () -> Unit,
   clickable : Bool,
   bind? : ((String) -> Unit) -> Unit = fn(_set : (String) -> Unit) -> Unit { () },
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   let font = @text.Font::new("", size)
+  let blocks : Array[@style.Style] = [
+    match bg_block(bg) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+    match fg_block(fg) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+  ]
+  // 显式宽度折进匿名块（class 给宽度时按数组顺序覆盖）；没给就走测量宽
+  let anon = if width > 0.0 {
+    @style.merge_all(blocks + [@style.style(width=width)])
+  } else {
+    @style.merge_all(blocks)
+  }
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
+    fold_style(w, anon, class)
     let txt : Ref[String] = Ref(text)
     let tw : Ref[Double] = Ref(text_width(text, font))
     let sync_width : () -> Unit = fn() -> Unit {
-      w.node.set_width(@yoga.fixed(if width > 0.0 { width } else { tw.val + h_pad * 2.0 }))
+      // 样式里给了宽度（散参数或 class）就不越权改写测量宽
+      let s = @style.resolved(w)
+      if s.width is None && s.width_percent is None {
+        w.node.set_width(@yoga.fixed(tw.val + h_pad * 2.0))
+      }
     }
     sync_width()
     w.node.set_height(@yoga.fixed(height))
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(bg)
+      let s = @style.style_for(self)
+      p.set_fill_color(@style.color_of(s.background_color, ""))
       p.fill_rect(0.0, 0.0, r.w, r.h)
       let _ = @text.draw_at(
         p,
@@ -113,7 +162,7 @@ fn chip(
         ((r.h - font.size * 1.5) / 2.0).max(0.0),
         txt.val,
         font,
-        fg,
+        @style.color_of(s.color, "#000000"),
       )
     })
     if clickable {
@@ -144,9 +193,25 @@ fn chip(
 }
 
 ///|
-/// 语义色标签（浅底 + 主色字）。
-pub fn tag_of_type(text : String, t : SemanticType, size? : Double = 12.0) -> @core.Node {
-  chip(text, type_color(t), type_light_color(t), 24.0, size, 8.0, 0.0, fn() { () }, false)
+/// 语义色标签（浅底 + 主色字）。语义色按 token 名折进样式，换主题后现取。
+pub fn tag_of_type(
+  text : String,
+  t : SemanticType,
+  size? : Double = 12.0,
+  class? : Array[@style.Style] = [],
+) -> @core.Node {
+  chip(
+    text,
+    type_token(t),
+    type_light_token(t),
+    24.0,
+    size,
+    8.0,
+    0.0,
+    fn() { () },
+    false,
+    class=class,
+  )
 }
 
 ///|
@@ -156,11 +221,12 @@ pub fn tag_of_type_dyn(
   text : @core.Signal[String],
   t : SemanticType,
   size? : Double = 12.0,
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   chip(
     text.get(),
-    type_color(t),
-    type_light_color(t),
+    type_token(t),
+    type_light_token(t),
     24.0,
     size,
     8.0,
@@ -168,18 +234,29 @@ pub fn tag_of_type_dyn(
     fn() { () },
     false,
     bind=fn(set : (String) -> Unit) -> Unit { bind_text(text, set) },
+    class=class,
   )
 }
 
 ///|
 /// 自定色标签（实底 + 白字）。
-pub fn tag(text : String, color : String, size? : Double = 12.0) -> @core.Node {
-  chip(text, "#ffffff", color, 24.0, size, 8.0, 0.0, fn() { () }, false)
+pub fn tag(
+  text : String,
+  color : String,
+  size? : Double = 12.0,
+  class? : Array[@style.Style] = [],
+) -> @core.Node {
+  chip(text, "#ffffff", color, 24.0, size, 8.0, 0.0, fn() { () }, false, class=class)
 }
 
 ///|
 /// 自定色标签的信号版：用法同 [tag_of_type_dyn]。
-pub fn tag_dyn(text : @core.Signal[String], color : String, size? : Double = 12.0) -> @core.Node {
+pub fn tag_dyn(
+  text : @core.Signal[String],
+  color : String,
+  size? : Double = 12.0,
+  class? : Array[@style.Style] = [],
+) -> @core.Node {
   chip(
     text.get(),
     "#ffffff",
@@ -191,6 +268,7 @@ pub fn tag_dyn(text : @core.Signal[String], color : String, size? : Double = 12.
     fn() { () },
     false,
     bind=fn(set : (String) -> Unit) -> Unit { bind_text(text, set) },
+    class=class,
   )
 }
 
@@ -201,13 +279,25 @@ fn badge_text(value : Int, max : Int) -> String {
 }
 
 ///|
-/// 数字徽标：超过 `max` 显示「max+」。
-pub fn badge_count(value : Int, max? : Int = 99, color? : String = "") -> @core.Node {
-  chip(badge_text(value, max), "#ffffff", if color.length() > 0 {
-    color
-  } else {
-    @theme.theme_danger()
-  }, 18.0, 11.0, 5.0, 0.0, fn() { () }, false)
+/// 数字徽标：超过 `max` 显示「max+」，底色默认危险色（token `danger`）。
+pub fn badge_count(
+  value : Int,
+  max? : Int = 99,
+  color? : String = "",
+  class? : Array[@style.Style] = [],
+) -> @core.Node {
+  chip(
+    badge_text(value, max),
+    "#ffffff",
+    if color.length() > 0 { color } else { "danger" },
+    18.0,
+    11.0,
+    5.0,
+    0.0,
+    fn() { () },
+    false,
+    class=class,
+  )
 }
 
 ///|
@@ -216,11 +306,12 @@ pub fn badge_count_dyn(
   value : @core.Signal[Int],
   max? : Int = 99,
   color? : String = "",
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   chip(
     badge_text(value.get(), max),
     "#ffffff",
-    if color.length() > 0 { color } else { @theme.theme_danger() },
+    if color.length() > 0 { color } else { "danger" },
     18.0,
     11.0,
     5.0,
@@ -230,24 +321,35 @@ pub fn badge_count_dyn(
     bind=fn(set : (String) -> Unit) -> Unit {
       bind_value(value, fn(v : Int) -> String { badge_text(v, max) }, set)
     },
+    class=class,
   )
 }
 
 ///|
 /// 圆点徽标（无数字，只提示「有新东西」）。
-pub fn badge_dot(size? : Double = 8.0, color? : String = "") -> @core.Node {
+pub fn badge_dot(
+  size? : Double = 8.0,
+  color? : String = "",
+  class? : Array[@style.Style] = [],
+) -> @core.Node {
   let d = size
-  let c = if color.length() > 0 { color } else { @theme.theme_danger() }
+  let bg = if color.length() > 0 { color } else { "danger" }
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     w.node.set_width(@yoga.fixed(d))
     w.node.set_height(@yoga.fixed(d))
+    let anon = match bg_block(bg) {
+      Some(b) => b
+      None => @style.empty_style()
+    }
+    fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(c)
+      let s = @style.style_for(self)
+      p.set_fill_color(@style.color_of(s.background_color, ""))
       p.fill_rect(0.0, 0.0, r.w, r.h)
     })
     w
@@ -269,24 +371,38 @@ fn avatar_of(
   size : Double,
   background_color : String,
   bind? : ((String) -> Unit) -> Unit = fn(_set : (String) -> Unit) -> Unit { () },
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   let d = size
   let font = @text.Font::new("", size * 0.45)
+  let blocks : Array[@style.Style] = [
+    match bg_block(if background_color.length() > 0 { background_color } else { "info_light" }) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+    match fg_block("text_regular") {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+  ]
+  let anon = @style.merge_all(blocks)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     let ch : Ref[String] = Ref(one)
     w.node.set_width(@yoga.fixed(d))
     w.node.set_height(@yoga.fixed(d))
+    fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(if background_color.length() > 0 { background_color } else { @theme.theme_info_light() })
+      let s = @style.style_for(self)
+      p.set_fill_color(@style.color_of(s.background_color, ""))
       p.fill_rect(0.0, 0.0, r.w, r.h)
       let tw = text_width(ch.val, font)
       let th = @text.line_height_font(font).unwrap_or(14).to_double()
-      let _ = @text.draw_at(p, (r.w - tw) / 2.0, (r.h - th) / 2.0, ch.val, font, @theme.theme_text_regular())
+      let _ = @text.draw_at(p, (r.w - tw) / 2.0, (r.h - th) / 2.0, ch.val, font, @style.color_of(s.color, ""))
     })
     bind(fn(v : String) -> Unit {
       ch.val = v
@@ -298,8 +414,13 @@ fn avatar_of(
 
 ///|
 /// 头像：取文本首字符居中（无图时的占位形态）。
-pub fn avatar(text : String, size? : Double = 32.0, background_color? : String = "") -> @core.Node {
-  avatar_of(first_char(text), size, background_color)
+pub fn avatar(
+  text : String,
+  size? : Double = 32.0,
+  background_color? : String = "",
+  class? : Array[@style.Style] = [],
+) -> @core.Node {
+  avatar_of(first_char(text), size, background_color, class=class)
 }
 
 ///|
@@ -308,6 +429,7 @@ pub fn avatar_dyn(
   text : @core.Signal[String],
   size? : Double = 32.0,
   background_color? : String = "",
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   avatar_of(
     first_char(text.get()),
@@ -316,19 +438,31 @@ pub fn avatar_dyn(
     bind=fn(set : (String) -> Unit) -> Unit {
       bind_value(text, fn(v : String) -> String { first_char(v) }, set)
     },
+    class=class,
   )
 }
 
 ///|
 /// 统计数字内核：数值行的文本与宽度放 `Ref`（`*_dyn` 版由订阅改写并跟着重算宽度）。
+/// 绘制期只读样式槽：数值行的色就是 `color`（散参数 `precision_color` 折进来，
+/// 默认 token `text_primary`），小标题走内置次要文字色。
 fn statistic_of(
   title : String,
   line : String,
   precision_color : String,
   bind? : ((String) -> Unit) -> Unit = fn(_set : (String) -> Unit) -> Unit { () },
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   let vfont = @text.Font::new("", 22.0)
   let tfont = @text.Font::new("", 12.0)
+  let anon = match fg_block(if precision_color.length() > 0 {
+    precision_color
+  } else {
+    "text_primary"
+  }) {
+    Some(b) => b
+    None => @style.empty_style()
+  }
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     let txt : Ref[String] = Ref(line)
@@ -340,20 +474,15 @@ fn statistic_of(
     }
     sync_width()
     w.node.set_height(@yoga.fixed(56.0))
+    fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       _r : @core.Rect,
     ) -> Unit {
+      let s = @style.style_for(self)
       let _ = @text.draw_at(p, 0.0, 2.0, title, tfont, @theme.theme_text_secondary())
-      let _ = @text.draw_at(
-        p,
-        0.0,
-        22.0,
-        txt.val,
-        vfont,
-        if precision_color.length() > 0 { precision_color } else { @theme.theme_text_primary() },
-      )
+      let _ = @text.draw_at(p, 0.0, 22.0, txt.val, vfont, @style.color_of(s.color, ""))
     })
     bind(fn(v : String) -> Unit {
       txt.val = v
@@ -372,8 +501,9 @@ pub fn statistic(
   value : String,
   precision_color? : String = "",
   prefix? : String = "",
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
-  statistic_of(title, prefix + value, precision_color)
+  statistic_of(title, prefix + value, precision_color, class=class)
 }
 
 ///|
@@ -384,6 +514,7 @@ pub fn statistic_dyn(
   value : @core.Signal[String],
   precision_color? : String = "",
   prefix? : String = "",
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   statistic_of(
     title,
@@ -392,6 +523,7 @@ pub fn statistic_dyn(
     bind=fn(set : (String) -> Unit) -> Unit {
       bind_value(value, fn(v : String) -> String { prefix + v }, set)
     },
+    class=class,
   )
 }
 
@@ -399,30 +531,47 @@ pub fn statistic_dyn(
 /// §2 合并：带字分隔线并入 `ui/basic.mbt` 的 `divider`（`text=` 即本档）。
 
 ///|
-/// 提示条：语义色浅底 + 主色标题与描述。
+/// 提示条：语义色浅底 + 主色标题与描述。浅底折进 `background_color`、主色（标题与
+/// 左缘 3px 强调条）折进 `color`，都存 token 名，所以换主题后现取；`class` 可覆盖。
 pub fn alert(
   title : String,
   description? : String = "",
   t? : SemanticType = Info,
   closable? : Bool = false,
   on_close? : () -> Unit = fn() { () },
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   let tf = @text.Font::new("", 13.0, weight=@text.SemiBold)
   let df = @text.Font::new("", 12.0)
+  let blocks : Array[@style.Style] = [
+    match bg_block(type_light_token(t)) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+    match fg_block(type_token(t)) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+  ]
+  let anon = @style.merge_all(blocks)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     w.node.set_height(@yoga.fixed(if description.length() > 0 { 56.0 } else { 36.0 }))
     w.node.set_width(@yoga.percent(100.0))
+    fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(type_light_color(t))
+      let s = @style.style_for(self)
+      let light = @style.color_of(s.background_color, "")
+      let main = @style.color_of(s.color, "")
+      p.set_fill_color(light)
       p.fill_rect(0.0, 0.0, r.w, r.h)
-      p.set_fill_color(type_color(t))
+      p.set_fill_color(main)
       p.fill_rect(0.0, 0.0, 3.0, r.h)
-      let _ = @text.draw_at(p, 12.0, 6.0, title, tf, type_color(t))
+      let _ = @text.draw_at(p, 12.0, 6.0, title, tf, main)
       if description.length() > 0 {
         let _ = @text.draw_at(p, 12.0, 28.0, description, df, @theme.theme_text_regular())
       }
@@ -448,12 +597,13 @@ pub fn alert(
 }
 
 ///|
-/// 卡片：可选标题栏 + 内容区，面板底 + 描边。
+/// 卡片：可选标题栏 + 内容区，面板底 + 描边（`class` 交给外层容器）。
 pub fn card(
   children : Array[@core.Node],
   title? : String = "",
   padding? : Double = 12.0,
   row_gap? : Double = 6.0,
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   let body : Array[@core.Node] = []
   if title.length() > 0 {
@@ -471,6 +621,7 @@ pub fn card(
     row_gap=row_gap,
     background_color="bg_panel",
     border_color="border",
+    class=class,
   )
 }
 
@@ -480,6 +631,7 @@ pub fn descriptions(
   items : Array[(String, String)],
   title? : String = "",
   label_width? : Double = 96.0,
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   let rows : Array[@core.Node] = []
   if title.length() > 0 {
@@ -503,12 +655,15 @@ pub fn descriptions(
       ),
     )
   }
-  view(rows, row_gap=4.0)
+  view(rows, row_gap=4.0, class=class)
 }
 
 ///|
 /// 空状态：图标 + 描述，居中。
-pub fn empty(description? : String = "暂无数据") -> @core.Node {
+pub fn empty(
+  description? : String = "暂无数据",
+  class? : Array[@style.Style] = [],
+) -> @core.Node {
   view(
     [
       icon(@icons.IconKind::Box, size=42.0, color="border"),
@@ -517,12 +672,18 @@ pub fn empty(description? : String = "暂无数据") -> @core.Node {
     padding=16.0,
     row_gap=8.0,
     align_items=@yoga.AlignItems::Center,
+    class=class,
   )
 }
 
 ///|
-/// 结果页：语义图标 + 标题 + 副标题。
-pub fn result(title : String, subtitle? : String = "", t? : SemanticType = Success) -> @core.Node {
+/// 结果页：语义图标 + 标题 + 副标题（图标色存 token 名，换主题现取）。
+pub fn result(
+  title : String,
+  subtitle? : String = "",
+  t? : SemanticType = Success,
+  class? : Array[@style.Style] = [],
+) -> @core.Node {
   let kind = match t {
     Success => @icons.IconKind::Finished
     Danger => @icons.IconKind::CircleClose
@@ -532,7 +693,7 @@ pub fn result(title : String, subtitle? : String = "", t? : SemanticType = Succe
   }
   view(
     [
-      icon(kind, size=40.0, color=type_color(t)),
+      icon(kind, size=40.0, color=type_token(t)),
       text(title, size=16.0, weight=@text.SemiBold, align=@text.Center),
       text(
         subtitle,
@@ -544,6 +705,7 @@ pub fn result(title : String, subtitle? : String = "", t? : SemanticType = Succe
     padding=16.0,
     row_gap=6.0,
     align_items=@yoga.AlignItems::Center,
+    class=class,
   )
 }
 
@@ -554,6 +716,7 @@ pub fn progress_line(
   max? : Double = 1.0,
   width? : Double = 200.0,
   label_side? : Bool = true,
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   follow_store(state)
   let hi = if max > 0.0 { max } else { 1.0 }
@@ -576,9 +739,15 @@ pub fn progress_line(
       })
       w
     })
-    view([bar, pct], direction=@yoga.Row, column_gap=4.0, align_items=@yoga.AlignItems::Center)
+    view(
+      [bar, pct],
+      direction=@yoga.Row,
+      column_gap=4.0,
+      align_items=@yoga.AlignItems::Center,
+      class=class,
+    )
   } else {
-    view([bar], align_items=@yoga.AlignItems::Center)
+    view([bar], align_items=@yoga.AlignItems::Center, class=class)
   }
 }
 
@@ -592,23 +761,36 @@ fn timeline_row(
   last : Bool,
   height : Double,
 ) -> @core.Node {
+  let blocks : Array[@style.Style] = [
+    match bg_block(type_token(t)) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+    match border_block("border") {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+  ]
+  let anon = @style.merge_all(blocks)
   let mark = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     w.node.set_width(@yoga.fixed(20.0))
     w.node.set_height(@yoga.fixed(height))
+    fold_style(w, anon, [])
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
+      let s = @style.style_for(self)
       let cy = r.h / 2.0
       // 首行从点心起、末行到点心止，中间行整条贯通（点块在行高中间）
       let top = if first { cy } else { 0.0 }
       let bottom = if last { cy } else { r.h }
       if bottom > top {
-        p.set_fill_color(@theme.theme_border())
+        p.set_fill_color(@style.color_of(s.border_color, @theme.theme_border()))
         p.fill_rect(9.0, top, 2.0, bottom - top)
       }
-      p.set_fill_color(type_color(t))
+      p.set_fill_color(@style.color_of(s.background_color, ""))
       p.fill_rect(5.0, cy - 5.0, 10.0, 10.0)
     })
     w
@@ -636,6 +818,7 @@ pub fn timeline(
   items : Array[(String, String, SemanticType)],
   item_height? : Double = 56.0,
   gap? : Double = 12.0,
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   let rows : Array[@core.Node] = []
   let n = items.length()
@@ -645,7 +828,7 @@ pub fn timeline(
       timeline_row(input.0, input.1, input.2, i == 0, i == n - 1, item_height),
     )
   }
-  view(rows, row_gap=gap)
+  view(rows, row_gap=gap, class=class)
 }
 
 ///|
