@@ -25,7 +25,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
       "主题色板",
       "选一个主色，整套色板（hover/浅底/语义色）按 HSL 公式即时派生，切换深浅沿用当前主色；「跟随系统」读系统主色调，读不到回落内置。手动选色会先关掉跟随开关（否则下一次轮询就把它盖回去）。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("跟随系统", variant=@ui.Solid, on_click=fn() {
               app.follow.set(true)
@@ -76,7 +76,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
       "Button 按钮",
       "四变体；「主要操作」联动数据页访问量/进度条（信号）。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("主要操作", variant=@ui.Solid, on_click=fn() {
               app.counter.update(fn(n) { n + 1 })
@@ -89,7 +89,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "@ui.hbox([",
+        "@ui.row([",
         "  @ui.button_t(\"主要操作\", variant=@ui.Solid, on_click=fn() { }),",
         "  @ui.button_t(\"次要操作\", variant=@ui.Soft),",
         "  @ui.button_t(\"文字按钮\", variant=@ui.Text),",
@@ -107,7 +107,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
         @ui.label_t("正文文字（Body）", role=@ui.Body),
         @ui.label_t("辅助文字（Secondary）", role=@ui.Secondary),
         @ui.label_t("强调文字（Accent）", role=@ui.Accent),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.link("打开文档", fn() { app.picked_lang.set("docs") }),
             @ui.link("帮助中心", fn() { app.picked_lang.set("help") }),
@@ -134,7 +134,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
         @ui.label_t("上方内容"),
         @ui.divider(),
         @ui.label_t("下方内容"),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.tooltip_t(@ui.button_t("悬停看提示"), "原生 tooltip：系统样式"),
             @ui.tooltip_t(@ui.button_t("再来一个", variant=@ui.Soft), "第二个提示"),
@@ -156,7 +156,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
         @ui.hover_group(
           [
             @ui.label_t("组标题：悬停我，或下面的子控件", role=@ui.Section),
-            @ui.hbox(
+            @ui.row(
               [@ui.entry(box_a, width=200.0), @ui.button_t("组内按钮")],
               column_gap=10.0,
             ),
@@ -170,7 +170,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
         "@ui.hover_group(",
         "  [",
         "    @ui.label_t(\"组标题\", role=@ui.Section),",
-        "    @ui.hbox([@ui.entry(box, width=200.0), @ui.button_t(\"组内按钮\")], column_gap=10.0),",
+        "    @ui.row([@ui.entry(box, width=200.0), @ui.button_t(\"组内按钮\")], column_gap=10.0),",
         "  ],",
         "  padding=14.0,",
         "  row_gap=8.0,",
@@ -185,7 +185,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
         @ui.cursor_group(
           [
             @ui.label_t("整组都是手型：移入试试，或移到子控件上", role=@ui.Section),
-            @ui.hbox(
+            @ui.row(
               [@ui.entry(box_b, width=200.0), @ui.button_t("组内按钮")],
               column_gap=10.0,
             ),

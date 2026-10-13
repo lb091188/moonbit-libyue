@@ -441,7 +441,7 @@ fn md_quoted(content : Array[@core.Node]) -> @core.Node {
     })
     b
   })
-  @ui.hbox([bar, @ui.vbox(content)], column_gap=10.0)
+  @ui.row([bar, @ui.col(content)], column_gap=10.0)
 }
 
 ///|
@@ -506,7 +506,7 @@ fn md_table(
         None => @yoga.AlignItems::FlexStart
       }
       cells.push(
-        @ui.container(
+        @ui.view(
           [md_rich_label(md_table_cell_spans(cell, head, ctx), 13.0, ctx)],
           align_items=al,
           handle=fn(cw : @core.Widget) -> Unit {
@@ -517,12 +517,12 @@ fn md_table(
     }
     cells
   }
-  let nodes : Array[@core.Node] = [@ui.hbox(cells_of(header, true))]
+  let nodes : Array[@core.Node] = [@ui.row(cells_of(header, true))]
   nodes.push(@ui.separator())
   for row in rows {
-    nodes.push(@ui.hbox(cells_of(row, false)))
+    nodes.push(@ui.row(cells_of(row, false)))
   }
-  @ui.vbox(nodes)
+  @ui.col(nodes)
 }
 
 ///|
@@ -534,7 +534,7 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.No
     match block {
       Heading(level~, children~, ..) =>
         nodes.push(
-          @ui.vbox([
+          @ui.col([
           md_rich_label(
             md_flatten_inline(children, ctx),
             md_heading_size(level),
@@ -561,7 +561,7 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.No
           nodes.push(md_image(img.0, img.1, ctx))
         } else {
           nodes.push(
-          @ui.vbox([md_rich_label(md_flatten_inline(children, ctx), 13.0, ctx)]),
+          @ui.col([md_rich_label(md_flatten_inline(children, ctx), 13.0, ctx)]),
         )
         }
       }
@@ -591,16 +591,16 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.No
             // GFM 任务列表:真复选框(可勾选),内容并排
             Some(ck) =>
               nodes.push(
-                @ui.hbox([
+                @ui.row([
                   @ui.checkbox("", @core.Store::new(ck)),
-                  @ui.vbox(md_item_content(item.children, ctx)),
+                  @ui.col(md_item_content(item.children, ctx)),
                 ]),
               )
             None =>
               nodes.push(
-                @ui.hbox([
+                @ui.row([
                   md_marker(md_list_marker("•"), 18.0),
-                  @ui.vbox(md_item_content(item.children, ctx)),
+                  @ui.col(md_item_content(item.children, ctx)),
                 ]),
               )
           }
@@ -609,9 +609,9 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.No
         let mut no = start
         for item in items {
           nodes.push(
-            @ui.hbox([
+            @ui.row([
               md_marker("\{no}.", 18.0),
-              @ui.vbox(md_item_content(item.children, ctx)),
+              @ui.col(md_item_content(item.children, ctx)),
             ]),
           )
           no += 1
@@ -621,11 +621,11 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.No
       DefinitionList(items~, ..) =>
         for item in items {
           nodes.push(
-            @ui.vbox([md_rich_label(md_flatten_inline(item.term, ctx), 13.0, ctx)]),
+            @ui.col([md_rich_label(md_flatten_inline(item.term, ctx), 13.0, ctx)]),
           )
           for def in item.definitions {
             nodes.push(
-              @ui.hbox([
+              @ui.row([
                 md_marker("·", 18.0),
                 md_rich_label(md_flatten_inline(def, ctx), 13.0, ctx),
               ]),
@@ -851,9 +851,9 @@ pub fn markdown_view(
               None => 0
             }
             nodes.push(
-              @ui.hbox([
+              @ui.row([
                 md_marker("\{num}.", 24.0),
-                @ui.vbox(md_item_content(children, ctx)),
+                @ui.col(md_item_content(children, ctx)),
               ]),
             )
           }
@@ -862,5 +862,5 @@ pub fn markdown_view(
       }
     }
   }
-  @ui.vbox(nodes, width=width, handle~)
+  @ui.col(nodes, width=width, handle~)
 }

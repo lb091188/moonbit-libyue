@@ -209,7 +209,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
   let cap_log : @core.Store[String] = @core.Store::new("(在 A 区按下，拖到 B 区上再松手)")
 
   fn cap_area(tag : String) -> @core.Node {
-    @ui.vbox(
+    @ui.col(
       [@ui.label_t("\{tag} 区", role=@ui.Body)],
       width=150.0,
       height=80.0,
@@ -258,7 +258,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
       "指针事件 PointerEvent",
       "五类指针事件（Down/Up/Move/Leave）走控件同一个 `on_pointer` 回调；坐标在交给处理器前已换算成**本地坐标**（Leave 保持窗口坐标），button 与修饰键位掩码随事件下发——修饰键不再需要轮询。双击判定 400ms + 4px，与输入框的「双击选词」同一口径。",
       [
-        @ui.vbox(
+        @ui.col(
           [@ui.label_t("鼠标操作区", role=@ui.Body)],
           height=96.0,
           handle=fn(w : @core.Widget) -> Unit {
@@ -297,7 +297,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
       ],
       code=[
         "let evt : @core.Store[String] = @core.Store::new(\"(移入操作区操作)\")",
-        "@ui.vbox([@ui.label_t(\"鼠标操作区\", role=@ui.Body)], height=96.0, handle=fn(w) {",
+        "@ui.col([@ui.label_t(\"鼠标操作区\", role=@ui.Body)], height=96.0, handle=fn(w) {",
         "  w.on_pointer = Some(fn(_self, ev : @core.PointerEvent) -> Bool {",
         "    match ev.kind {",
         "      @core.Down => { evt.set(\"down btn=\\{ev.button}\"); true }",
@@ -315,10 +315,10 @@ pub fn page_events(app : @shared.App) -> @core.Node {
       "悬停态与 on_hover_change",
       "悬停由宿主维护（命中测试 + set_hover），控件读 `hovered` 字段即可，不写 enter/leave。悬停带**父链语义**（CSS :hover 同义）：组内任意子件悬停，组也算悬停——所以包住按钮的面板能收到 `on_hover_change`，用它按悬停起停定时器（本页即一座悬停秒表）。",
       [
-        @ui.vbox(
+        @ui.col(
           [
             @ui.label_t("悬停秒表：把鼠标放进这块面板（或点上面那颗按钮都算）", role=@ui.Body),
-            @ui.hbox(
+            @ui.row(
               [
                 @ui.button_t("组内按钮", variant=@ui.Solid, on_click=fn() {
                   app.toast_push("悬停组里的按钮被点了", @ui.Success)
@@ -352,7 +352,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
       ],
       code=[
         "let secs : @core.Store[Int] = @core.Store::new(0)",
-        "@ui.vbox([...], handle=fn(w) {",
+        "@ui.col([...], handle=fn(w) {",
         "  w.on_hover_change = Some(fn(_w, on : Bool) -> Unit {",
         "    if on { (tick.val)() } else { stop() }  // 悬停起停定时器",
         "  })",
@@ -367,7 +367,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
       "按下捕获（宿主内置规则）",
       "旧链路的 set_capture / has_capture / release_capture / on_capture_lost 四件套在本栈没有了：**任何一次按下（命中控件即成为捕获者）到松手之间**，Move/Up 全投给被按下的控件——指针移出它的矩形也不丢抬起（本地坐标为负），再按另一处即夺走捕获。拖选、拖动插入点都靠这条规则。",
       [
-        @ui.hbox([cap_area("A"), cap_area("B")], column_gap=12.0),
+        @ui.row([cap_area("A"), cap_area("B")], column_gap=12.0),
         @ui.bind_label(cap_log, fn(s) { s }),
       ],
       code=[
@@ -387,7 +387,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
       "光标形状 Cursor",
       "`w.cursor` 是控件上的形状请求（0 默认 / 1 手型 / 2 文本 / 3 横向调整 / 4 纵向调整）；宿主每次移动按悬停路径取「**最深的非零请求**」下发——包住一整组的 `cursor_group` 会自然回退，组内子件自己提了形状以它为准（旧链路要把光标递归设进每个子孙）。Crosshair/NotAllowed 平台没有，本栈不强推。",
       [
-        @ui.vbox(
+        @ui.col(
           [@ui.label_t("光标预览区（把鼠标放上来，再点下面按钮换形状）", role=@ui.Body)],
           height=56.0,
           handle=fn(w : @core.Widget) -> Unit {
@@ -395,7 +395,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
             cur_area.val = Some(w)
           },
         ),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("手型", on_click=fn() {
               apply_cursor(@core.CURSOR_HAND, "Hand")
@@ -465,7 +465,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
       "嵌套布局与三种宽度",
       "固定 / 百分比 / flex 三种宽度模型；8px 把手可拖动调整占比（hsplit，首栏最小 120、次栏最小 80，拖动期靠宿主的按下捕获不丢事件）。全集见 docs/zh/layout.md。",
       [
-        @ui.vbox(
+        @ui.col(
           [
             @ui.hsplit(
               @ui.tree([
@@ -486,7 +486,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
                   ],
                 },
               ]),
-              @ui.vbox(
+              @ui.col(
                 [@ui.label_t("右侧详情区：拖动中间把手调整占比", role=@ui.Body)],
                 padding=12.0,
               ),
@@ -496,9 +496,9 @@ pub fn page_events(app : @shared.App) -> @core.Node {
           height=200.0,
           width=520.0,
         ),
-        @ui.hbox(
+        @ui.row(
           [
-            @ui.container(
+            @ui.view(
               [@ui.label_t("固定 80", color="#ffffff")],
               direction=@yoga.Row,
               width=80.0,
@@ -507,7 +507,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
               align_items=@yoga.AlignItems::Center,
               justify_content=@yoga.JustifyContent::Center,
             ),
-            @ui.container(
+            @ui.view(
               [@ui.label_t("50%", color="#ffffff")],
               direction=@yoga.Row,
               height=40.0,
@@ -518,7 +518,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
                 w.node.set_width(@yoga.percent(50.0))
               },
             ),
-            @ui.container(
+            @ui.view(
               [@ui.label_t("flex 1", color="#ffffff")],
               direction=@yoga.Row,
               height=40.0,
@@ -533,10 +533,10 @@ pub fn page_events(app : @shared.App) -> @core.Node {
       ],
       code=[
         "@ui.hsplit(@ui.tree(root), detail, min_first=120.0)  // 拖动 8px 把手改占比",
-        "@ui.container([...], width=80.0, height=40.0)        // 固定",
+        "@ui.view([...], width=80.0, height=40.0)        // 固定",
         "// 百分比：容器没接这个参数，handle 里对布局节点写",
         "handle=fn(w) { w.node.set_width(@yoga.percent(50.0)) }",
-        "@ui.container([...], grow=1.0)                       // flex",
+        "@ui.view([...], grow=1.0)                       // flex",
       ],
     ),
   ])

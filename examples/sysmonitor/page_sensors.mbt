@@ -150,7 +150,7 @@ fn page_sensors(app : App) -> @core.Node {
   // 空态:无可用温度来源(非 N 卡无厂商 SDK / 机器无 hwmon 节点)是
   // 合法状态,给一行说明而不是空白
   nodes.push(
-    @ui.container(
+    @ui.view(
       [@ui.label_t("暂无可用温度来源", color=@theme.theme_text_secondary())],
       handle=fn(l) {
         l.set_visible(page.rows.get().length() == 0)
@@ -165,5 +165,5 @@ fn page_sensors(app : App) -> @core.Node {
     draw_rows(sensor_n, fn(p, w) { draw_sensor_rows(p, w, page.rows.get()) }),
   )
 
-  @ui.vbox(nodes, padding=12.0, row_gap=6.0)
+  @ui.col(nodes, padding=12.0, row_gap=6.0)
 }

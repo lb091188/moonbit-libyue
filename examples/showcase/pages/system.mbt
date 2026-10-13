@@ -156,7 +156,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       "文件对话框",
       "原生模态文件对话框：打开回显所选路径；保存把一行文本写进你选的文件。对话框挂在本窗口上（parent = 宿主窗口 id）。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("打开文件…", on_click=fn() {
               match app.host.val {
@@ -222,7 +222,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       "原生消息框",
       "模态消息框（Win32 MessageBoxW / GTK 对话框）：信息档 × 是/否，错误档 × 是/否/取消。返回值归一成语义枚举，不记编号。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("信息 是/否", on_click=fn() {
               let r = @win.show_message_box(
@@ -262,7 +262,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       "系统通知",
       "系统通知中心：普通通知与带进度条通知。后端不可用（无 dbus 会话等）时明说失败，不假装成功。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("普通通知", on_click=fn() {
               match @core.notify_send("libyue 演示板", "构建完成", "3 个目标已产出") {
@@ -310,7 +310,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       "剪贴板",
       "读写系统剪贴板文本。写入后点「读取」验证（也可以直接粘到别的程序里）。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("写入文本", on_click=fn() {
               cb_out.set(
@@ -345,7 +345,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       "定时器与延时任务",
       "宿主 `timer` 周期表（句柄可停）+ `set_timeout` 进程级单次延时。两族都自重排，不需要外部循环配合。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("1.5 秒后提示", on_click=fn() {
               ignore(
@@ -431,7 +431,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
           }
           w
         }),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("改提示", variant=@ui.Soft, on_click=fn() {
               match tray_holder.val {
@@ -494,7 +494,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       "开机自启动",
       "开关直连真实自启动状态（Linux 写 ~/.config/autostart，Windows 写 Run 键）。重新登录后生效；关闭即撤销。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.switch_t(auto_on, on_text="开启自启", off_text="关闭自启"),
             @ui.bind_label(auto_state, fn(s) { s }),
@@ -519,7 +519,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       "打开外部",
       "把 URL 交给默认浏览器、把路径交给文件管理器。Ok 只表示已交给系统，之后归操作系统。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("打开 libyue.com", on_click=fn() {
               match @sys.open_url("https://libyue.com") {
@@ -551,7 +551,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       "系统信息",
       "发行版 / 机器 / 内存 / 开机时长 + 桌面环境。替代旧页「电量网络」——电源与网络事件本栈未接（平台批）。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("刷新", on_click=fn() {
               si_out.set(read_sysinfo())
@@ -574,7 +574,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       "系统音量",
       "读当前音量/静音、设百分比、切静音（Linux pactl / Windows CoreAudio）。后端不可用（无会话等）时按钮明说。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("读取", on_click=fn() {
               match @sys.vol_get() {

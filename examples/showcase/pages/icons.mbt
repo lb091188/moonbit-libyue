@@ -21,9 +21,9 @@ fn icon_grid(kinds : Array[@icons.IconKind], per_row : Int) -> @core.Node {
         )
       }
     }
-    rows.push(@ui.hbox(items, column_gap=10.0))
+    rows.push(@ui.row(items, column_gap=10.0))
   }
-  @ui.vbox(rows, row_gap=8.0)
+  @ui.col(rows, row_gap=8.0)
 }
 
 ///|

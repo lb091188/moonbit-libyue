@@ -355,10 +355,10 @@ fn page_process(app : App) -> @core.Node {
     @ui.TableColumn::make("线程", 56.0, align=@text.End),
     @ui.TableColumn::make("命令行", 0.0, sortable=false),
   ]
-  @ui.vbox(
+  @ui.col(
     [
       // 工具栏：搜索 + 操作 + 消息
-      @ui.hbox(tools, column_gap=8.0),
+      @ui.row(tools, column_gap=8.0),
       @ui.label_dyn(
         page.msg.signal(),
         color=@theme.theme_text_secondary(),

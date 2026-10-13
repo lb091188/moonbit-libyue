@@ -64,7 +64,7 @@ test "应用内拖放：按下 → 过阈值开拖 → 移到目标 → 松手�
     }
   })
   let (root, wrap) = mounted(
-    container([src, tgt], row_gap=40.0, align_items=@yoga.AlignItems::FlexStart),
+    view([src, tgt], row_gap=40.0, align_items=@yoga.AlignItems::FlexStart),
     320.0,
     200.0,
   )
@@ -122,7 +122,7 @@ test "拖放：没过阈值当普通点击（不开会话）、投到空白处�
     got.val = "投中了"
   })
   let (root, wrap) = mounted(
-    container([src, tgt], row_gap=40.0, align_items=@yoga.AlignItems::FlexStart),
+    view([src, tgt], row_gap=40.0, align_items=@yoga.AlignItems::FlexStart),
     320.0,
     200.0,
   )
@@ -161,7 +161,7 @@ test "拖放：accept 判收不收——拒绝时回调不跑、返回不被接�
     },
   )
   let (root, wrap) = mounted(
-    container([src, tgt], row_gap=40.0, align_items=@yoga.AlignItems::FlexStart),
+    view([src, tgt], row_gap=40.0, align_items=@yoga.AlignItems::FlexStart),
     320.0,
     200.0,
   )

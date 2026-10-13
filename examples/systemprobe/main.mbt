@@ -400,7 +400,7 @@ fn panel(
   lines : @core.Signal[String],
   width : Double,
 ) -> @core.Node {
-  @ui.container(
+  @ui.view(
     [
       @ui.label(title, size=13.0, weight=@text.SemiBold),
       @ui.label_dyn(lines, size=12.0, wrap=true, max_width=width - 20.0),
@@ -546,7 +546,7 @@ fn main {
   let root = app.root
   root.set_column()
   app.mount([
-    @ui.container(
+    @ui.view(
       [
         @ui.label(
           "系统能力（sys）：只读探测在一屏，设置类只给按钮",
@@ -563,7 +563,7 @@ fn main {
       padding=8.0,
       align_items=@yoga.AlignItems::FlexStart,
     ),
-    @ui.container(
+    @ui.view(
       [
         panel("系统与机器", sys_store.signal(), 580.0),
         panel("桌面与硬件", desk_store.signal(), 580.0),
@@ -573,7 +573,7 @@ fn main {
       row_gap=0.0,
       align_items=@yoga.AlignItems::FlexStart,
     ),
-    @ui.container(
+    @ui.view(
       [
         panel("应用与文件类型", apps_store.signal(), 380.0),
         panel("窗口 / 剪贴板 / D-Bus", wins_store.signal(), 380.0),
@@ -583,7 +583,7 @@ fn main {
       column_gap=10.0,
       align_items=@yoga.AlignItems::FlexStart,
     ),
-    @ui.container(
+    @ui.view(
       [
         @ui.button(
           "重新探测",

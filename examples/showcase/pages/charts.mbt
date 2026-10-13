@@ -98,7 +98,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
       "Line 折线图",
       "定长滚动窗口（max_points=120，超出丢最旧），500ms 定时推点；多序列主题色循环，y 轴自适应 + 网格 + 最新值右端标注。左为折线形态，右为面积形态（半透明填充）。推点只重绘画布，不重建视图树。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @charts.line_chart_t(line_series, width=320.0, height=240.0),
             @charts.line_chart_t(line_series, area=true, width=320.0, height=240.0),
@@ -106,7 +106,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
           column_gap=16.0,
           align_items=@yoga.AlignItems::FlexStart,
         ),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.checkbox("暂停推点", line_running),
             @ui.label_t("窗口容量 120，推点频率 2Hz；暂停只断数据流，自排通道继续。", role=@ui.Secondary),
@@ -133,7 +133,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
       "Bar 柱状图 / 条形图",
       "纵向柱（默认）以 0 为基线支持正负值（正主题色、负红色）；横向条（horizontal）适配长类目名。悬停高亮 + 行内数值标注。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @charts.bar_chart_t(bar_data, width=320.0, height=240.0),
             @charts.bar_chart_t(bar_h_data, horizontal=true, width=320.0, height=240.0),
@@ -165,11 +165,11 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
       "Gauge 仪表盘",
       "单值百分比环 + 中心大数字，阈值分段着色（≤60% 绿 / ≤85% 橙 / 红）。左：2Hz 三角波自动更新，组件内置插值平滑无跳变；右：滑杆手动驱动。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @charts.gauge_t(gauge_auto, thresholds=gauge_thresholds, width=240.0, height=180.0),
             @charts.gauge_t(gauge_manual, thresholds=gauge_thresholds, width=240.0, height=180.0),
-            @ui.vbox(
+            @ui.col(
               [
                 @ui.label_t("手动值", role=@ui.Body),
                 @ui.slider(gauge_manual, min=0.0, max=1.0, step=0.01, width=160.0),
@@ -198,7 +198,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
       "Scatter 散点图",
       "2000 点 x/y 点列（小方点），双轴自适应刻度 + 网格；右侧叠加最小二乘趋势线。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @charts.scatter_t(scatter_pts, width=320.0, height=260.0),
             @charts.scatter_t(scatter_pts, trend=true, width=320.0, height=260.0),

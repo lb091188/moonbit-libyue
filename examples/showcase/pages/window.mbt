@@ -87,7 +87,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
       "窗口 API",
       "运行期操作窗口：改标题 / 全屏 / 还原尺寸 / 无边框。「最大化/还原」「置顶」本栈未接（Win32 段没写 SC_MAXIMIZE / TOPMOST），按钮就不放——平台没有的能力不强推。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             win_button(app, last_op, "改标题", fn(w : @win.Window) -> Unit {
               w.set_title("组件库演示板 · 标题已改")
@@ -106,7 +106,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
           ],
           column_gap=8.0,
         ),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.label_t("最近操作：", role=@ui.Secondary),
             @ui.bind_label(last_op, fn(s) { s }),
@@ -138,7 +138,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
           hotkey_poll_loop(app, hk_hits)
           w
         }),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("注册 Ctrl+Alt+C", on_click=fn() {
               match @core.hotkey_register("Ctrl+Alt+C") {
@@ -159,7 +159,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
           ],
           column_gap=8.0,
         ),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.label_t("状态：", role=@ui.Secondary),
             @ui.bind_label(hk_status, fn(s) { s }),
@@ -187,10 +187,10 @@ pub fn page_window(app : @shared.App) -> @core.Node {
       "应用内拖放",
       "按住左边色块拖出 4px 即开拖，拖到右边面板上会描主色边，松手成交。本栈口径：**应用内**拖放三平台同构；**跨应用**系统级拖放（Win32 IDropTarget/DoDragDrop）接口形状已定、随平台批，接上后调用方不用改。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.drag_source(
-              @ui.container(
+              @ui.view(
                 [@ui.label_t("拖我", role=@ui.Body)],
                 bg=@theme.theme_primary_light(),
                 border=@theme.theme_primary(),
@@ -202,7 +202,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
             ),
             @ui.label_t("拖到右边 →", role=@ui.Secondary),
             @ui.drop_target(
-              @ui.container(
+              @ui.view(
                 [@ui.label_t("投放区（松手成交）", role=@ui.Secondary)],
                 bg=@theme.theme_bg_panel(),
                 border=@theme.theme_border(),
@@ -221,7 +221,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
           column_gap=12.0,
           align_items=@yoga.AlignItems::Center,
         ),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.label_t("投放回显：", role=@ui.Secondary),
             @ui.bind_label(dnd, fn(s) { s }),

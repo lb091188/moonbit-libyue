@@ -3,7 +3,7 @@
 //
 // G7 迁移记档（与 master 的差异）：
 // ① `tag("右键我", "#2D68C4", style=[...])` 的 CSS 宽高换命名参数（本栈 `tag`
-//    只有 `size` 字号参数，定宽包一层 `@ui.container`）；
+//    只有 `size` 字号参数，定宽包一层 `@ui.view`）；
 // ② 「原生弹出菜单」段跳过——本栈 `Menu` 尚无 `popup_at` 右键弹出形态
 //    （菜单栏形态已在 `examples/native-app` 演示，弹出形态随窗口页接线批补）；
 // ③ `radio_group` 同页级 Store 的口径与 master 一致：菜单项/面包屑写**存在**
@@ -39,10 +39,10 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
       "右键菜单与下拉菜单",
       "context_menu_for 包右键弹出主题化菜单（悬停高亮 + 点击）；dropdown_menu 点字段顶部展开候选——两套用途不同：前者右键显隐，后者顶部展开。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.context_menu_for(
-              @ui.container([@ui.tag("右键我", "#2D68C4")], width=140.0, height=32.0, align_items=@yoga.AlignItems::Center),
+              @ui.view([@ui.tag("右键我", "#2D68C4")], width=140.0, height=32.0, align_items=@yoga.AlignItems::Center),
               [
                 ("复制", fn() { last_op.set("已复制") }),
                 ("重命名", fn() { last_op.set("重命名") }),
@@ -153,7 +153,7 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
       "完成/当前/待办三态：浅蓝、实底白字、灰；点按钮推进或回退。",
       [
         @ui.steps(["填写", "确认", "完成"], step),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("上一步", variant=@ui.Soft, on_click=fn() {
               step.update(fn(n) {

@@ -17,7 +17,7 @@ pub fn page_store_demo(_app : @shared.App) -> @core.Node {
       "手动计数器",
       "Store::update 改源，bind_label 回显——「改值」与「刷新界面」已自动，但派生值全要手动接。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("计数 +1", variant=@ui.Solid, on_click=fn() {
               counter.update(fn(n) { n + 1 })
@@ -54,7 +54,7 @@ pub fn page_store_demo(_app : @shared.App) -> @core.Node {
       "手动派生：Store::map",
       "一对一映射有现成糖（map 派生只读 Store），但两个以上源合成仍要 subscribe 手动同步。",
       [
-        @ui.vbox(
+        @ui.col(
           [
             @ui.bind_label(text, fn(s) { s }),
             @ui.bind_label(merged, fn(s) { s }),

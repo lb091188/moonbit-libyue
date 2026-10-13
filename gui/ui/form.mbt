@@ -141,7 +141,7 @@ pub fn radio_group(
       w
     })
     items.push(
-      container(
+      view(
         [dot, label(options[i])],
         direction=@yoga.Row,
         column_gap=6.0,
@@ -152,7 +152,7 @@ pub fn radio_group(
       ),
     )
   }
-  container(
+  view(
     items,
     direction=direction,
     row_gap=if is_row { 0.0 } else { gap },
@@ -371,7 +371,7 @@ pub fn stepper(
     })
     w
   })
-  container(
+  view(
     [
       button(
         "-",
@@ -598,11 +598,11 @@ pub fn form_item(
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let err_store = error
-  container(
+  view(
     [
-      container(
+      view(
         [
-          container(
+          view(
             [
               label(
                 label_text,
@@ -622,7 +622,7 @@ pub fn form_item(
         column_gap=12.0,
         align_items=@yoga.AlignItems::Center,
       ),
-      container(
+      view(
         [label_dyn(err_store.signal(), size=12.0, color=@theme.theme_danger(), wrap=false)],
         direction=@yoga.Row,
         height=18.0,
@@ -647,7 +647,7 @@ pub fn form(
   for it in items {
     nodes.push(it)
   }
-  container(nodes, direction=@yoga.Column, row_gap=row_gap, handle=handle)
+  view(nodes, direction=@yoga.Column, row_gap=row_gap, handle=handle)
 }
 
 ///|
@@ -960,7 +960,7 @@ pub fn color_picker_t(
             )
             if (i + 1) % per_row == 0 || i + 1 == cs.length() {
               rows.push(
-                container(
+                view(
                   line,
                   direction=@yoga.Row,
                   height=swatch + cell_gap,
@@ -973,7 +973,7 @@ pub fn color_picker_t(
           let rows_n = ((cs.length() + per_row - 1) / per_row).to_double()
           open_id.val = @core.overlay_show_at(
             overlay_pane(
-              [container(rows, direction=@yoga.Column, row_gap=0.0, padding=8.0)],
+              [view(rows, direction=@yoga.Column, row_gap=0.0, padding=8.0)],
               per_row.to_double() * (swatch + cell_gap) + 16.0,
               16.0 + rows_n * (swatch + cell_gap),
             ),

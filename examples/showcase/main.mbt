@@ -154,10 +154,10 @@ fn main {
   let slot : Ref[@core.App?] = Ref(None)
   let mounted = @ui.mount_window(
     [
-      @ui.hbox(
+      @ui.row(
         [
           // 侧栏：可滚动的分组菜单（窗口矮时滚到底部项）+ 底部主题切换 + 版本号
-          @ui.vbox(
+          @ui.col(
             [
               @ui.scroll_v(
                 [
@@ -186,7 +186,7 @@ fn main {
                 @ui.ScrollState::new(),
                 handle=fn(v) { v.node.set_flex_grow(1.0) },
               ),
-              @ui.hbox(
+              @ui.row(
                 [
                   @ui.label_t("V" + SHOWCASE_VERSION, role=@ui.Secondary),
                   theme_toggle_button(app),
@@ -198,7 +198,7 @@ fn main {
             width=180.0,
           ),
           // 主区：按导航状态切换的页（惰性挂载，首次选中才建控件）
-          @ui.vbox(
+          @ui.col(
             [
               @shared.nav_page("基础组件", selected, @pages.page_basic(app)),
               @shared.nav_page("表单组件", selected, @pages.page_form(app)),

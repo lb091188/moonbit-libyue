@@ -49,12 +49,12 @@ pub fn page(secs : Array[Section]) -> @core.Node {
   for s in secs {
     names.push(s.name)
   }
-  let strip = @ui.hbox([@ui.segmented(names, selected)], padding=10.0)
+  let strip = @ui.row([@ui.segmented(names, selected)], padding=10.0)
   let bodies : Array[@core.Node] = []
   for s in secs {
     bodies.push(section_body(s, selected))
   }
-  @ui.vbox([strip, @ui.vbox(bodies, grow=1.0)], grow=1.0)
+  @ui.col([strip, @ui.col(bodies, grow=1.0)], grow=1.0)
 }
 
 ///|
@@ -68,7 +68,7 @@ pub fn nav_page(
   content : @core.Node,
 ) -> @core.Node {
   let mounted : Ref[Bool] = Ref(false)
-  @ui.vbox([], grow=1.0, handle=fn(c) {
+  @ui.col([], grow=1.0, handle=fn(c) {
     fn ensure(s : String) -> Unit {
       if !mounted.val && s == name {
         mounted.val = true
@@ -90,7 +90,7 @@ pub fn nav_page(
 /// 挂过之后保形，显隐/滚动位置语义不变。
 fn section_body(s : Section, selected : @core.Store[String]) -> @core.Node {
   let mounted : Ref[Bool] = Ref(false)
-  let holder = @ui.vbox([], row_gap=8.0, handle=fn(h) {
+  let holder = @ui.col([], row_gap=8.0, handle=fn(h) {
     fn ensure(name : String) -> Unit {
       if !mounted.val && name == s.name {
         mounted.val = true
@@ -115,10 +115,10 @@ fn section_body(s : Section, selected : @core.Store[String]) -> @core.Node {
     inner.push(@ui.code_view(s.code, lang="moonbit", line_numbers=true))
   }
   // 本容器是显隐切换对象；滚动视口在 handle 里撑满剩余高度
-  @ui.vbox(
+  @ui.col(
     [
       @ui.scroll_v(
-        [@ui.vbox(inner, row_gap=6.0, padding=14.0)],
+        [@ui.col(inner, row_gap=6.0, padding=14.0)],
         @ui.ScrollState::new(),
         handle=fn(v) { v.node.set_flex_grow(1.0) },
       ),
@@ -138,7 +138,7 @@ fn section_body(s : Section, selected : @core.Store[String]) -> @core.Node {
 ///|
 /// 代码区顶行：左「代码」小标，右「复制」按钮（toast 回显）。
 fn code_copy_row(lines : Array[String]) -> @core.Node {
-  @ui.hbox(
+  @ui.row(
     [
       @ui.label_t("代码", role=@ui.Secondary),
       @ui.label_t("", role=@ui.Secondary, handle=fn(w) {

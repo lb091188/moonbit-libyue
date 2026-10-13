@@ -252,7 +252,7 @@ pub fn line_chart_it(
     Some(("第 \{gidx + 1} 点", rows))
   }
 
-  @ui.vbox(
+  @ui.col(
     [
       ci_legend(
         items~,
@@ -381,7 +381,7 @@ pub fn bar_chart_it(
     fn(mx, _my, w, h) { ci_bar_plot(false)(w, h).frac(mx) * 100.0 }
   }
 
-  @ui.vbox(
+  @ui.col(
     [
       ci_legend(
         items~,
@@ -517,7 +517,7 @@ pub fn donut_chart_it(
     )
   }
 
-  @ui.vbox(
+  @ui.col(
     [
       ci_legend(
         items~,

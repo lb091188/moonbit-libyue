@@ -314,7 +314,7 @@ fn main {
   // 首帧立即采一次（第二帧起差值速率才有值）；定时与主题跟随在挂载后接
   sample_once(app)
   let mounted = @ui.mount_window(
-    [@ui.hbox([app_shell(app)], grow=1.0, padding=6.0)],
+    [@ui.row([app_shell(app)], grow=1.0, padding=6.0)],
     title=MON_TITLE,
     width=1240,
     height=840,

@@ -50,19 +50,19 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
       "Result 结果页",
       "大色块符号 + 标题 + 描述；四种语义类型。操作区由调用方摆在旁边（组件只给形状）。",
       [
-        @ui.hbox(
+        @ui.row(
           [
-            @ui.vbox(
+            @ui.col(
               [
                 @ui.result("操作成功", subtitle="配置已写入并生效。", t=@ui.Success),
-                @ui.hbox([@ui.button_t("返回首页")], column_gap=8.0),
+                @ui.row([@ui.button_t("返回首页")], column_gap=8.0),
               ],
               row_gap=10.0,
             ),
-            @ui.vbox(
+            @ui.col(
               [
                 @ui.result("操作失败", subtitle="网络异常，请稍后重试。", t=@ui.Danger),
-                @ui.hbox(
+                @ui.row(
                   [@ui.button_t("重新加载", variant=@ui.Soft)],
                   column_gap=8.0,
                 ),
@@ -104,7 +104,7 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
       "Toast 轻提示",
       "操作反馈瞬态提示：推送后顶部居中出现，2.6 秒自动消失，多条堆叠。新栈里这条带子开在浮层图层上（第一条推送才开），所以页面里不必挂一个「提示层」节点，提示也永远压在对话框之上。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("成功", on_click=fn() {
               app.toast_push("保存成功", @ui.Success)
@@ -134,7 +134,7 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
       "Dialog 对话框",
       "同窗遮罩 + 居中面板；回调后自动收起，visible 由 Store 驱动。两个对话框由 main 挂在窗口根，本页只负责触发。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("基础对话框", on_click=fn() {
               app.dlg_basic.set(true)

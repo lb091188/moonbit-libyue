@@ -99,7 +99,7 @@ fn page_disk(app : App) -> @core.Node {
 
   push_io(app.disks.get())
   app.disks.subscribe(push_io)
-  @ui.vbox(
+  @ui.col(
     [
       @ui.label_t("根分区读写", role=@ui.Section),
       @charts.line_chart_t(io, height=220.0, area=true),

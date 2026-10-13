@@ -72,7 +72,7 @@ fn main {
   // 顶部工具条（原生区）：地址 + 载入/重载/停止 + 摆法切换
   app.mount([
     @ui.label("webview pane（批 B）：一窗多区，每区一个 owner", size=15.0),
-    @ui.container(
+    @ui.view(
       [
         @ui.entry(addr, placeholder="地址", focus_id=31, width=420.0),
         @ui.button(
@@ -294,7 +294,7 @@ fn main {
               })
             }
             win.mount([
-              @ui.container(
+              @ui.view(
                 [
                   @ui.button(
                     "抓正文",
@@ -400,7 +400,7 @@ fn main {
                           bp.stroke_rect(0.0, 0.0, br.w - 1.0, br.h - 1.0)
                         })
                         let _ = @ui
-                          .container(
+                          .view(
                             [
                               @ui.label("原生档浮层", size=12.0),
                               @ui.button(
@@ -438,7 +438,7 @@ fn main {
                 bg=@theme.theme_bg_panel(),
                 border=@theme.theme_border(),
               ),
-              @ui.container(
+              @ui.view(
                 [v.node(grow=1.0)],
                 grow=1.0,
                 bg=@theme.theme_bg_panel(),
@@ -509,7 +509,7 @@ fn main {
     }
   }
   app.mount([
-    @ui.container(
+    @ui.view(
       [
         @ui.label("批 C：JS 桥 / DOM 抓取 / 导航面（另开一窗，装本地页）", size=13.0),
         @ui.button(
@@ -596,7 +596,7 @@ fn main {
           ),
           // 全屏是窗口级动作：控件层拿不到窗口，由宿主把请求转给 App。
           // 逐帧与音量在控制条里（|< 与 >| 两个键、右侧音量条）。
-          @ui.container(
+          @ui.view(
             [
               @ui.button(
                 "全屏 / 退出全屏",
@@ -616,7 +616,7 @@ fn main {
     }
   }
   app.mount([
-    @ui.container(
+    @ui.view(
       [
         @ui.label("批 D：媒体播放器（另开一窗，播 ffmpeg 测试片 + 字幕叠加）", size=13.0),
         @ui.button(
@@ -699,7 +699,7 @@ fn main {
     }
   }
   app.mount([
-    @ui.container(
+    @ui.view(
       [
         @ui.label(
           if lv_present { "批 D 长素材：/home/lkyh/下载/001.mp4（23 分钟）" } else {
@@ -770,7 +770,7 @@ fn main {
     }
   }
   app.mount([
-    @ui.container(
+    @ui.view(
       [
         @ui.label("批 E：原生弹层（开在网页区之上，选完即关）", size=13.0),
         @ui.button(
@@ -823,7 +823,7 @@ fn main {
     }
   }
   app.mount([
-    @ui.container(
+    @ui.view(
       [
         @ui.label("批 C 余项：本地协议（yuedemo:// 读临时目录里的真文件）", size=13.0),
         @ui.button(
@@ -858,7 +858,7 @@ fn main {
     None => {
       // 探测不到引擎：自绘一块说明板（降级不静默）
       app.mount([
-        @ui.container(
+        @ui.view(
           [
             @ui.label("webview 引擎不在位", size=14.0),
             @ui.label(
@@ -876,9 +876,9 @@ fn main {
     }
     Some(v) => {
       app.mount([
-        @ui.container(
+        @ui.view(
           [
-            @ui.container(
+            @ui.view(
               [
                 @ui.label("原生侧栏", size=13.0),
                 @ui.label("owner = 自绘 Painter", size=12.0),
@@ -891,7 +891,7 @@ fn main {
               border=@theme.theme_border(),
               handle=fn(w : @core.Widget) -> Unit { sidebar_w.val = Some(w) },
             ),
-            @ui.container(
+            @ui.view(
               [v.node(grow=1.0)],
               grow=1.0,
               padding=0.0,

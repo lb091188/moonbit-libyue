@@ -19,7 +19,7 @@ pub fn page_audio(app : @shared.ProbeApp) -> @core.Node {
       "音频播放",
       "ffmpeg 解码 + 设备直出（gui-media player_t，音视频一体）：可解码 MP3/OGG/M4A/AAC/FLAC/WAV 等常见格式；演示音频由 ffmpeg lavfi 现场生成（3 秒 440Hz 正弦），本地文件走文件对话框。旧页的 AudioPlayer 手动 pump 与状态轮询已并入组件。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("载入演示音频", variant=@ui.Solid, on_click=fn() {
               let mp3 = probe_tmp_dir() + "/yue-probe-demo.mp3"

@@ -82,7 +82,7 @@ test "两个字号混排按基线对齐（文本测量回灌布局的直接结�
   if !ui_text_guard() {
     return
   }
-  let row = container(
+  let row = view(
     [label("Ag", size=13.0), label("Ag", size=26.0)],
     direction=@yoga.Row,
     align_items=@yoga.AlignItems::Baseline,
@@ -226,7 +226,7 @@ test "按钮：悬停与按下态由宿主置位，配色随状态变化" {
 ///|
 test "容器 / 分组 / 分隔线：几何与主题取色都按建树口径" {
   let line = separator()
-  let inner = container([label("内容")], padding=4.0, bg=@theme.theme_bg_page())
+  let inner = view([label("内容")], padding=4.0, bg=@theme.theme_bg_page())
   let g = group("标题", [label("一行"), label("两行")], width=160.0)
   let root = mount_root([g, line, inner], 200.0, 300.0)
   let grp = kid(root, 0)

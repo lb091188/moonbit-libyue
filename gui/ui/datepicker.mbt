@@ -144,7 +144,7 @@ fn time_popup(
     })
     // 步进行：[−] 标签 [+]
     fn stepper(label_text : String, step : (Int) -> TimeHM) -> @core.Node {
-      container(
+      view(
         [
           @core.node_of_new(fn(b : @core.Widget) -> @core.Widget {
             watch_theme()
@@ -253,7 +253,7 @@ fn time_popup(
       let m = cur.val.m + d * 5
       time_clamp(cur.val.h, if m < 0 { 55 } else if m > 59 { 0 } else { m })
     }).mount_into(panel)
-    let _ = container(
+    let _ = view(
       [
         @core.node_of_new(fn(b : @core.Widget) -> @core.Widget {
           watch_theme()

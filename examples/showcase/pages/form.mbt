@@ -27,7 +27,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
       "输入框与多行",
       "单行 entry（Store 驱动，密码态逐字符遮罩）+ 多行 textarea（自动折行、超宽滚动）。",
       [
-        @ui.vbox(
+        @ui.col(
           [
             @ui.entry(@core.Store::new(""), placeholder="输入点什么…", width=300.0),
             @ui.entry(
@@ -79,7 +79,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
       "Select 与 ColorPicker",
       "下拉点字段弹候选（悬停高亮 / 选中 ✓），clearable ✕ 清空；取色器预设色板点击选色，hex 值住 Store。",
       [
-        @ui.vbox(
+        @ui.col(
           [
             @ui.select_t(
               ["杭州", "北京", "上海", "深圳", "广州"],
@@ -105,25 +105,25 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
       "Checkbox / Radio / Switch",
       "勾选与开关的值就是 Store 本身（展示端直连）；单选组点击互斥（第二组禁用）；开关开=主题蓝靠右。",
       [
-        @ui.vbox(
+        @ui.col(
           [
             @ui.checkbox("启用自动同步", sync),
             @ui.checkbox("接收通知", notify),
-            @ui.hbox(
+            @ui.row(
               [
                 @ui.bind_label(sync, fn(v) { if v { "同步：开" } else { "同步：关" } }),
                 @ui.bind_label(notify, fn(v) { if v { "通知：开" } else { "通知：关" } }),
               ],
               column_gap=24.0,
             ),
-            @ui.hbox(
+            @ui.row(
               [
                 @ui.radio_group(["浅色", "深色", "跟随系统"], theme_idx),
                 @ui.radio_group(["选项一", "选项二"], radio_idx, disabled=true),
               ],
               column_gap=40.0,
             ),
-            @ui.hbox(
+            @ui.row(
               [
                 @ui.switch_t(wifi_on),
                 @ui.bind_label(wifi_on, fn(v) { if v { "已开启" } else { "已关闭" } }),
@@ -153,10 +153,10 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
       "日期与时间选择",
       "全自绘月历（‹/› 切月）+ 内联 calendar_t；日期区间与日期时间区间选择器，选中值住 Store。",
       [
-        @ui.vbox(
+        @ui.col(
           [
             @ui.date_picker_t(dp_val, clearable=true, width=170.0),
-            @ui.hbox(
+            @ui.row(
               [
                 @ui.label_t("选中：", role=@ui.Body),
                 @ui.bind(dp_val.signal(), fn(d) {
@@ -173,7 +173,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
           align_items=@yoga.AlignItems::FlexStart,
         ),
         @ui.calendar_t(),
-        @ui.vbox([
+        @ui.col([
           @ui.datetime_range_picker_t(dtr),
           @ui.bind_label(dtr, fn(r) {
             match (r.start, r.end) {

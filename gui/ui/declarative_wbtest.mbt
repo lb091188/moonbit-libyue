@@ -4,7 +4,7 @@
 ///|
 test "vbox / hbox：方向与间距来自参数，交叉轴按 align_items" {
   let (root, col) = mounted(
-    vbox([label("甲"), label("乙")], row_gap=10.0, padding=4.0),
+    col([label("甲"), label("乙")], row_gap=10.0, padding=4.0),
     300.0,
     200.0,
   )
@@ -14,7 +14,7 @@ test "vbox / hbox：方向与间距来自参数，交叉轴按 align_items" {
   assert_eq(k1.rect.y - (k0.rect.y + k0.rect.h), 10.0)
   assert_eq(k0.rect.x, 4.0)
   assert_true(k1.rect.y > k0.rect.y)
-  let (_r2, row) = mounted(hbox([label("丙"), label("丁")], column_gap=12.0), 300.0, 120.0)
+  let (_r2, row) = mounted(row([label("丙"), label("丁")], column_gap=12.0), 300.0, 120.0)
   let h0 = row.children()[0]
   let h1 = row.children()[1]
   assert_eq(h1.rect.x - (h0.rect.x + h0.rect.w), 12.0)
@@ -120,7 +120,7 @@ test "旧名构造器落到新组件上：picker 点开浮层、scroll 出滚动
   let st = ScrollState::new()
   let rows_in : Array[@core.Node] = []
   for i = 0; i < 20; i = i + 1 {
-    rows_in.push(container([label("行 " + i.to_string())], height=22.0))
+    rows_in.push(view([label("行 " + i.to_string())], height=22.0))
   }
   let (_r2, view) = mounted(scroll(rows_in, st, width=160.0, height=80.0), 220.0, 200.0)
   let (bm, _, _) = shot(view)

@@ -90,9 +90,9 @@ fn res_card(
     None => []
     Some(h) => [sparkline_box(h, y_range, floor)]
   }
-  @ui.container(
+  @ui.view(
     [
-      @ui.hbox(
+      @ui.row(
         [
           @ui.icon(icon, size=16.0),
           @ui.label_t(title, role=@ui.Section),
@@ -220,7 +220,7 @@ fn left_pane(app : App, view : @core.Store[ViewId]) -> @core.Node {
   // 确定宽度，左栏一旦也 grow 就会和右栏平分剩余空间，左栏被拉宽、右栏被挤窄。
   // 竖直方向靠父 hbox 的 `align_items: Stretch` 撑满，本组件不需要额外处理。
   @ui.scroll(
-    [@ui.vbox(cards, padding=10.0, row_gap=10.0)],
+    [@ui.col(cards, padding=10.0, row_gap=10.0)],
     @ui.ScrollState::new(),
     width=292.0,
   )
@@ -238,7 +238,7 @@ fn view_area(app : App, view : @core.Store[ViewId]) -> @core.Node {
     (VGpu, page_sensors(app)),
     (VProc, page_process(app)),
   ]
-  @ui.container(
+  @ui.view(
     [],
     grow=1.0,
     handle=fn(area) {
@@ -271,7 +271,7 @@ fn view_area(app : App, view : @core.Store[ViewId]) -> @core.Node {
 /// 处理器详情：总占用曲线（0-100 固定轴）+ 各核占用柱状（0-100，
 /// 自动量程会让 5% 看起来像满格）。
 fn page_cpu_detail(app : App) -> @core.Node {
-  @ui.vbox(
+  @ui.col(
     [
       @ui.label_t("总占用（%）", role=@ui.Section),
       @charts.line_chart_t(
@@ -295,7 +295,7 @@ fn page_cpu_detail(app : App) -> @core.Node {
 ///|
 /// 内存详情：已用曲线 + swap 曲线（自适应轴看细节）。
 fn page_mem_detail(app : App) -> @core.Node {
-  @ui.vbox(
+  @ui.col(
     [
       @ui.label_t("内存（GB）", role=@ui.Section),
       @charts.line_chart_t(app.mem_hist, height=250.0, area=true),
@@ -320,7 +320,7 @@ fn app_shell(app : App) -> @core.Node {
   // 「sysmonitor 样式错乱」的根因）。主轴靠 `flex_grow`、交叉轴靠 `align_self`。
   @ui.cursor_group(
     [
-      @ui.hbox(
+      @ui.row(
         [left_pane(app, view), view_area(app, view)],
         grow=1.0,
         align_items=@yoga.AlignItems::Stretch,

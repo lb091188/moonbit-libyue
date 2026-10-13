@@ -95,7 +95,7 @@ test "点浮层外收起最上面那层（不打扰被点的内容）" {
   }
   let clicks = Ref(0)
   let (root, wrap) = mounted(
-    container(
+    view(
       [
         popover_t(label("触发"), label("第一层"), width=100.0, height=30.0),
         counter_box(clicks, 60.0, 20.0),
@@ -294,7 +294,7 @@ test "轻提示层：推送后挂一条、到点自动撤、宽度随文本" {
     fn(_id : Int) -> Unit { () },
   )
   let push = toast_layer(duration_ms=1000)
-  let (root, _host) = mounted(container([label("宿主页")]), 400.0, 200.0)
+  let (root, _host) = mounted(view([label("宿主页")]), 400.0, 200.0)
   with_overlay(root)
   // 提示带子开在浮层图层上：推送后才开层
   push("保存成功", Success)

@@ -169,7 +169,7 @@ fn page_net(app : App) -> @core.Node {
 
   push_total(app.nets.get())
   app.nets.subscribe(push_total)
-  @ui.vbox(
+  @ui.col(
     [
       @ui.label_t("收发速率（不含 lo）", role=@ui.Section),
       @charts.line_chart_t(total, height=220.0, area=true),

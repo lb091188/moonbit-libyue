@@ -54,7 +54,7 @@ pub fn page_video(app : @shared.ProbeApp) -> @core.Node {
       "视频播放",
       "ffmpeg 流式解码的播放器组件（gui-media player_t，音视频一体）：播放/暂停、拖进度、时间、音量、倍速、循环、全屏都在控制条里；演示视频由 ffmpeg lavfi 现场生成（2 秒测试片），本地文件走文件对话框真解码。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("载入演示视频", variant=@ui.Solid, on_click=fn() {
               let avi = probe_tmp_dir() + "/yue-probe-demo.avi"

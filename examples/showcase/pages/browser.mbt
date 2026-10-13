@@ -107,7 +107,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
                 None => {
                   // 探测不到引擎：降级不静默
                   let _ = @ui
-                    .container(
+                    .view(
                       [
                         @ui.label_t("webview 引擎不在位", role=@ui.Body),
                         @ui.label_t(
@@ -128,7 +128,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
           }
           holder
         }),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("加载 example.com", on_click=fn() {
               match wv.val {
@@ -205,7 +205,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
       "导航与能力查询",
       "四导航按钮 + can_go_back/can_go_forward/is_loading 能力查询。注意：load_html 装的页面不入历史，此时后退是空操作（如实回显，不装坏）。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("← 后退", on_click=fn() {
               match wv.val {
@@ -272,7 +272,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
       "执行 JavaScript",
       "execute_javascript 改页面（无结果）；execute_javascript_with_result 异步取回结果（请求序号门面自持配对，回包只剩结果串）。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("取结果 1+41", on_click=fn() {
               match wv.val {
@@ -323,7 +323,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
       "JS ↔ 原生绑定",
       "注册 demoBinding（加载段里的网页按钮调它）/ 移除 / has_bindings 查询。页面调用经 on_invoke 回原生。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("重新注册绑定", on_click=fn() {
               match wv.val {
@@ -371,7 +371,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
       "Cookie 查询",
       "异步查询 URL 的 Cookie：请求发出后结果以 Cookies(json) 事件回包（旧链路的回调参数形态没有了）。先访问个带 cookie 的站点再查。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("查当前 URL", on_click=fn() {
               match wv.val {
@@ -407,7 +407,7 @@ pub fn page_browser(app : @shared.App) -> @core.Node {
       "DOM 抓取",
       "capture_dom 四档快照（正文/链接/meta/结构）：执行内建脚本取回 JSON，解析成 DomSnapshot。旧页没有这一段。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("抓正文", on_click=fn() {
               match wv.val {

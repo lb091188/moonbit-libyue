@@ -92,7 +92,7 @@ pub fn page_code(_app : @shared.App) -> @core.Node {
       "CodeView 代码高亮",
       "逐 token 测宽自绘，全平台一致；lang 关键字集（moonbit/js/ts/python/rust/c/go/bash/sql）+ 行号。",
       [
-        @ui.vbox(
+        @ui.col(
           [
             @ui.code_view(
               [

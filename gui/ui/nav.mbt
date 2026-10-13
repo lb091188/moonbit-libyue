@@ -143,7 +143,7 @@ pub fn segmented(
       ),
     )
   }
-  container(
+  view(
     items,
     direction=@yoga.Row,
     column_gap=4.0,
@@ -203,7 +203,7 @@ pub fn breadcrumb(
       ),
     )
   }
-  container(
+  view(
     nodes,
     direction=@yoga.Row,
     align_items=@yoga.AlignItems::Center,
@@ -301,7 +301,7 @@ pub fn pagination(
     )
   }
   items.push(step(1))
-  container(
+  view(
     items,
     direction=@yoga.Row,
     column_gap=4.0,
@@ -411,7 +411,7 @@ pub fn steps(
       }),
     )
   }
-  container(
+  view(
     nodes,
     direction=@yoga.Row,
     column_gap=6.0,
@@ -434,7 +434,7 @@ pub fn collapse(
     let entry = panels[i]
     blocks.push(collapse_panel(entry.0, entry.1, i == 0))
   }
-  container(blocks, row_gap=2.0, handle=handle)
+  view(blocks, row_gap=2.0, handle=handle)
 }
 
 ///|
@@ -635,7 +635,7 @@ pub fn side_menu(
   for it in items {
     nodes.push(menu_item(it, width - 12.0, selected, icon_for(icons, it)))
   }
-  container(
+  view(
     nodes,
     width=width,
     row_gap=2.0,
@@ -722,7 +722,7 @@ pub fn side_menu_sections(
     blocks.push(head)
     blocks.push(@core.node_of(body))
   }
-  container(blocks, row_gap=2.0, padding=6.0, width=width, handle=handle)
+  view(blocks, row_gap=2.0, padding=6.0, width=width, handle=handle)
 }
 
 ///|

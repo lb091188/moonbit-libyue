@@ -21,7 +21,7 @@
 
 ///|
 /// 垂直布局容器（`container` 的 Column 形态）。
-pub fn vbox(
+pub fn col(
   children : Array[@core.Node],
   row_gap? : Double = 0.0,
   padding? : Double = 0.0,
@@ -33,7 +33,7 @@ pub fn vbox(
   align_items? : @yoga.AlignItems = @yoga.AlignItems::Stretch,
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
-  container(
+  view(
     children,
     direction=@yoga.Column,
     row_gap=row_gap,
@@ -50,7 +50,7 @@ pub fn vbox(
 
 ///|
 /// 水平布局容器（`container` 的 Row 形态）。
-pub fn hbox(
+pub fn row(
   children : Array[@core.Node],
   column_gap? : Double = 0.0,
   padding? : Double = 0.0,
@@ -62,7 +62,7 @@ pub fn hbox(
   align_items? : @yoga.AlignItems = @yoga.AlignItems::Center,
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
-  container(
+  view(
     children,
     direction=@yoga.Row,
     column_gap=column_gap,
@@ -328,7 +328,7 @@ pub fn cursor_group(
   cursor? : Int = @core.CURSOR_HAND,
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
-  container(
+  view(
     children,
     direction=direction,
     row_gap=row_gap,

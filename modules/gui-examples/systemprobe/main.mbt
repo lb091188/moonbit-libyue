@@ -30,10 +30,10 @@ fn main {
   let app : @shared.ProbeApp = { selected, toast: toast_push, host: Ref(None) }
   let mounted = @ui.mount_window(
     [
-      @ui.hbox(
+      @ui.row(
         [
           // 侧栏：分组菜单 + 说明
-          @ui.vbox(
+          @ui.col(
             [
               @ui.scroll_v(
                 [
@@ -69,7 +69,7 @@ fn main {
             row_gap=8.0,
           ),
           // 主区：按导航状态切换的页（惰性挂载，首次选中才建控件）
-          @ui.vbox(
+          @ui.col(
             [
               @shared.nav_page("系统能力", selected, @pages.page_sysinfo(app)),
               @shared.nav_page("视频播放", selected, @pages.page_video(app)),

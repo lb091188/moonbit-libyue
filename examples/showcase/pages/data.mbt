@@ -174,7 +174,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       "Tag 标签与 Avatar 头像",
       "五种语义 Tag（浅底深字）+ 自定义实底色；Avatar 方形实底 + 白色字母，四种尺寸。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.tag_of_type("Primary", @ui.Primary),
             @ui.tag_of_type("Success", @ui.Success),
@@ -186,7 +186,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
           ],
           column_gap=6.0,
         ),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.avatar("M", size=44.0, bg="#2D68C4"),
             @ui.avatar("N", size=36.0, bg="#2E9E5B"),
@@ -207,7 +207,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       "Badge 徽标",
       "数字角标（红底白字，99+ 封顶）与圆点两种形态。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.badge_count(9),
             @ui.badge_count(128),
@@ -225,11 +225,11 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       "Statistic 数值统计与 Progress 进度条",
       "statistic 是静态快照形态（联动展示走 bind_label）；进度条主题色填充 + 浅灰轨道，与基础页按钮同源联动。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.statistic("任务数", "36"),
             @ui.statistic("版本", "0.1.0"),
-            @ui.vbox(
+            @ui.col(
               [
                 @ui.bind(app.visits, fn(s) { "访问量 \{s}" }),
                 @ui.label_t("由基础页与下方按钮联动", role=@ui.Secondary),
@@ -239,7 +239,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
           ],
           column_gap=40.0,
         ),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("刷新访问量", variant=@ui.Solid, on_click=fn() {
               app.counter.update(fn(n) { n + 1 })
@@ -261,7 +261,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       "Card 卡片与 Collapse 折叠面板",
       "标题栏 + 底部分隔线 + 边框；折叠面板点击标题展开/收起，各面板独立，初始第一个展开。",
       [
-        @ui.vbox(
+        @ui.col(
           [
             @ui.card([@ui.label_t("卡片内容：组件库全部用 theme_* 主题色着色。")], title="卡片标题"),
             @ui.collapse([
@@ -285,7 +285,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       "Descriptions 与 Timeline",
       "键灰值深的键值网格；左侧色点 + 竖线，节点颜色跟随语义类型，末项无连线。",
       [
-        @ui.vbox(
+        @ui.col(
           [
             @ui.descriptions([
               ("框架", "native-gui"),
@@ -311,7 +311,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       "Table 表格（单选）",
       "表头 + 斑马纹 + 悬停底色，点击行单选；点击表头排序（升降序箭头，新列默认升序），拖动列边界调整列宽；Store 驱动「添加一行」整表重建，选中行回显。",
       [
-        @ui.vbox(
+        @ui.col(
           [
             @ui.table_t(
               [
@@ -330,7 +330,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
                 table_picked.set("第 \{i + 1} 行：\{name}")
               },
             ),
-            @ui.hbox(
+            @ui.row(
               [
                 @ui.button_t("添加一行", on_click=fn() {
                   let n = lang_base.length() + 1
@@ -369,7 +369,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       "Table 表格（多选）",
       "复选框列：行点击勾选，表头全选/清空（部分选中画横条）；「语言」列可点排序，拖动列边界调宽。",
       [
-        @ui.vbox(
+        @ui.col(
           [
             @ui.table_t(
               [
@@ -447,7 +447,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       "Transfer 穿梭框与 Carousel 轮播",
       "穿梭框：点击行选中，中间 ›/‹ 移对侧；轮播：箭头/圆点手动切，3 秒自动切换（悬停暂停）。",
       [
-        @ui.hbox(
+        @ui.row(
           [
             @ui.transfer(transfer_left, transfer_right),
             @ui.carousel_t(

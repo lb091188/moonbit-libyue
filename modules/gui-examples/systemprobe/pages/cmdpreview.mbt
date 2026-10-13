@@ -61,7 +61,7 @@ pub fn page_cmdpreview(_app : @shared.ProbeApp) -> @core.Node {
   body.push(@ui.label_t("可执行 · 仅展示命令文本", role=@ui.Section))
   for it in exec_items {
     body.push(
-      @ui.hbox(
+      @ui.row(
         [
           @ui.label_t(it.0, handle=fn(w) { w.node.set_flex_grow(1.0) }),
           @ui.tag_of_type(it.2, it.1),
@@ -104,7 +104,7 @@ pub fn page_cmdpreview(_app : @shared.ProbeApp) -> @core.Node {
       body,
       code=[
         "// 可执行组：label + tag，点击不执行",
-        "@ui.hbox([@ui.label_t(cmd), @ui.tag_of_type(note, @ui.Warning)])",
+        "@ui.row([@ui.label_t(cmd), @ui.tag_of_type(note, @ui.Warning)])",
         "// 只读组：挂载时真调一次",
         "match @sys.pp_current() {",
         "  Ok(p) => pp_idx.set(match p { @sys.PBalanced => 1 ... })",

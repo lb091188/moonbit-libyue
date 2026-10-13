@@ -10,7 +10,7 @@ fn main {
   let greet : @core.Store[String] = @core.Store::new("(点「问候」)")
   let app = match @ui.mount_window(
     [
-      @ui.vbox(
+      @ui.col(
         [
           @ui.label_t("Hello, 主题组件库!", role=@ui.Title),
           @ui.label_t(

@@ -1,7 +1,7 @@
 // 画布与富文本页：Painter 自绘 × AttributedText 富文本。
 //
 // G7 迁移记档（与 master 旧页的差）：
-// ① 旧链路 `@declarative.container(on_draw=…, style=[("height",…)])` 换成
+// ① 旧链路 `@declarative.view(on_draw=…, style=[("height",…)])` 换成
 //    `@core.node_of_new` 自挂 on_draw + yoga 尺寸参数（样式字符串在本栈不存在）；
 // ② 重绘从「容器 schedule_paint」换成进程级 `@core.invalidate()`（宿主装的
 //    是 host_repaint_all：所有在窗置脏 + 唤醒平台泵）；
@@ -91,7 +91,7 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
           })
           w
         }),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("旋转色相", on_click=fn() {
               hue.val = (hue.val + 1) % 3
@@ -149,7 +149,7 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
           })
           w
         }),
-        @ui.hbox(
+        @ui.row(
           [
             @ui.button_t("换行开关", on_click=fn() {
               rt_wrap.val = !rt_wrap.val
@@ -180,7 +180,7 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
         ),
         // 系统读数走共享状态：dark_mode 的来源是 sys_color_scheme、
         // accent 的来源是 sys_accent（跟随开关开时每 2 秒被 main 的 tick 刷新）
-        @ui.hbox(
+        @ui.row(
           [
             @ui.bind_label(app.dark_mode, fn(d) {
               if d {

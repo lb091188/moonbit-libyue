@@ -318,7 +318,7 @@ pub fn card(
   for c in children {
     body.push(c)
   }
-  container(
+  view(
     body,
     padding=padding,
     row_gap=row_gap,
@@ -340,7 +340,7 @@ pub fn descriptions(
   }
   for kv in items {
     rows.push(
-      container(
+      view(
         [
           label(kv.0, size=12.0, color=@theme.theme_text_secondary()),
           label(
@@ -356,13 +356,13 @@ pub fn descriptions(
       ),
     )
   }
-  container(rows, row_gap=4.0)
+  view(rows, row_gap=4.0)
 }
 
 ///|
 /// 空状态：图标 + 描述，居中。
 pub fn empty(description? : String = "暂无数据") -> @core.Node {
-  container(
+  view(
     [
       icon(@icons.IconKind::Box, size=42.0, color=@theme.theme_border()),
       label(description, size=12.0, color=@theme.theme_text_secondary(), align=@text.Center),
@@ -383,7 +383,7 @@ pub fn result(title : String, subtitle? : String = "", t? : SemanticType = Succe
     Info => @icons.IconKind::Info
     Primary => @icons.IconKind::Check
   }
-  container(
+  view(
     [
       icon(kind, size=40.0, color=type_color(t)),
       label(title, size=16.0, weight=@text.SemiBold, align=@text.Center),
@@ -429,9 +429,9 @@ pub fn progress_line(
       })
       w
     })
-    container([bar, pct], direction=@yoga.Row, column_gap=4.0, align_items=@yoga.AlignItems::Center)
+    view([bar, pct], direction=@yoga.Row, column_gap=4.0, align_items=@yoga.AlignItems::Center)
   } else {
-    container([bar], align_items=@yoga.AlignItems::Center)
+    view([bar], align_items=@yoga.AlignItems::Center)
   }
 }
 
@@ -466,10 +466,10 @@ fn timeline_row(
     })
     w
   })
-  container(
+  view(
     [
       mark,
-      container(
+      view(
         [
           label(title, size=13.0, weight=@text.SemiBold, color=@theme.theme_text_primary()),
           label(desc, size=12.0, color=@theme.theme_text_secondary()),
@@ -498,7 +498,7 @@ pub fn timeline(
       timeline_row(entry.0, entry.1, entry.2, i == 0, i == n - 1, item_height),
     )
   }
-  container(rows, row_gap=gap)
+  view(rows, row_gap=gap)
 }
 
 ///|

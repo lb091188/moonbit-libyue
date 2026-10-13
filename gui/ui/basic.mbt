@@ -18,7 +18,7 @@ pub(all) enum ButtonKind {
 ///|
 /// 通用容器：方向、两个轴的间距、内边距、尺寸、底色与描边。
 /// 尺寸给 0 表示按内容；要撑满剩余空间用 `grow=1.0`。
-pub fn container(
+pub fn view(
   children : Array[@core.Node],
   direction? : @yoga.FlexDirection = @yoga.Column,
   row_gap? : Double = 0.0,
@@ -90,7 +90,7 @@ pub fn group(
   for c in children {
     body.push(c)
   }
-  container(
+  view(
     body,
     padding=padding,
     row_gap=row_gap,
