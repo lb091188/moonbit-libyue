@@ -23,8 +23,7 @@ ui 只管组件，三包职责不混。
 **样式只有一种形态：MoonBit 值。** 一个规则块 = 一次 `style(...)` 调用，一个 class = 一个具名
 `Style` 常量。属性名即参数名，因此同时进补全和编译期检查。不提供 `.css`
 文本入口——同一批属性只有一套名字。旧 `.css` 资产按 §1.1 的参数名人工对照搬迁，认不出的
-名字丢掉。记录字面量要写满全部字段，所以不走字面量，构造形态是 kwargs 工厂 + 状态方法
-（逐条读数见 §1.6）。
+名字丢掉。构造形态是 kwargs 工厂 + 状态方法（工具链依据见 §1.6）。
 
 ### 1.1 属性集合（字段名 = CSS 属性名，连字符写下划线）
 
@@ -54,13 +53,11 @@ ui 只管组件，三包职责不混。
 `Style` 里没有对应字段，setter 也没有同名方法，调用点写不出来。这些属性分两类：**已排进
 §5 计划的**见下面引注，落地后就能写；**永远没有的**按下表替换：
 
-> 定位、层序、阴影、透明、动画**能做、已排进 §5 计划**（不在下表——下表只收永远没有的）：
-> `position` / `top` / `right` / `bottom` / `left` 并入 P1 字段集（底层 `set_position` /
-> `set_top` … 现成，框架内部滚动条 / 吸顶条 / 关闭按钮 / 覆盖层已在用）；`z_index` 由
-> yoga-mbt 随 P1 补齐（上游有据可依，落地前层序按 kids 数组序，后者盖上）；`box_shadow` 进
-> P4；`opacity` 进 P4 且**完整落地**（整层 global alpha 铺满绘制全路径，落地即开
-> `Style.opacity` 字段，不做只支持部分绘制路径的半成品）；`transition` 进 P5（落地前状态
-> 变化是直接切换，§1.3 状态桶）。
+> 定位、层序、阴影、透明、动画在计划内：`position` / `top` / `right` / `bottom` / `left` 并入
+> P1 字段集（底层 `set_position` / `set_top` … 现成，框架内部滚动条 / 吸顶条 / 关闭按钮 /
+> 覆盖层已在用）；`z_index` 由 yoga-mbt 随 P1 补齐（落地前层序按 kids 数组序，后者盖上）；
+> `box_shadow` 进 P4；`opacity` 进 P4；`transition` 进 P5（落地前状态变化是直接切换，
+> §1.3 状态桶）。
 
 | 写不出来的东西 | 替代写法 |
 | --- | --- |
@@ -70,11 +67,8 @@ ui 只管组件，三包职责不混。
 | `!important` | 靠数组顺序（§1.3 覆盖顺序），后写的赢 |
 | CSS 的自动继承 | 显式传 `class`，或在父组件里算好再传下去 |
 
-> `opacity`（P4 **完整落地**，不拖）：颜色级 alpha 已支持（hex 含 alpha 分量），P4 把**整层**
-> global alpha 铺满绘制全路径（填充 / 描边 / 文本 / 图片），落地即开 `Style.opacity` 字段。
-> 四边内距的入口形态：`Widget::set_padding` 收 labelled 四边（`top` / `right` / `bottom` /
-> `left`，未给按 0），`set_padding_all(v)` 是一值简写；`set_margin` 收位置参数，随 P1 改成
-> 同形（§1.5）。`Style.padding` 字段按四边展开落进这两条 setter。
+> `opacity` 的口径：颜色级 alpha 已支持（hex 含 alpha 分量），P4 补**整层** global alpha，
+> 铺满填充 / 描边 / 文本 / 图片全路径，落地即开 `Style.opacity` 字段。
 
 ### 1.3 组合、状态与优先级
 
@@ -89,12 +83,10 @@ ui 只管组件，三包职责不混。
   （W3C 规则模型）。两条入口分工明确：工厂的状态参数收**整块**（`hover=@style.card_hover`，
   复用具名块）；状态方法 `.hover(...)` / `.active(...)` / `.focus(...)` 收**属性参数**现场
   开块——且签名里只有绘制期属性，布局参数不在其列，布局值进状态块连编译都过不了（hover
-  改布局需要布局期也选桶，随 P3 帧末 relayout 再评估）。Tailwind 式 `hover_` 前缀糖已评估
-  不采：属性名上叠状态前缀要为每个属性 × 每个状态各开一个 setter，API 面徒增 70+ 个机械
-  方法。存储端是三个嵌套 `Style` 字段，绘制期按 `Widget` 已有的 `hovered` / `pressed` /
-  `focused`（`core/widget.mbt:100-104`）选桶——组件的 `on_draw` 本来就在读 `self.hovered`
-  （`ui/declarative.mbt:257`），因此没有伪类字符串、没有状态机、也不依赖事件传播。三桶
-  可同时命中（对应 CSS 的层叠），合并/覆盖按桶内逐属性递归（上条）。
+  改布局需要布局期也选桶，随 P3 帧末 relayout 再评估）。存储端是三个嵌套 `Style` 字段，
+  绘制期按 `Widget` 已有的 `hovered` / `pressed` / `focused` 选桶，因此没有伪类字符串、
+  没有状态机、也不依赖事件传播。三桶可同时命中（对应 CSS 的层叠），合并/覆盖按桶内逐属性
+  递归（上条）。
 - **元素级基调**：没有「元素选择器」这个机制；同名基调就是一个常量
   （`pub let button_base : Style = ...`），组件在自己的默认值里引用它，使用者传 `class`
   即覆盖——效果与 CSS 的元素选择器一致，但可跳转、可补全。
@@ -147,8 +139,8 @@ token 名单**不另设一套**，就是 `Theme` 的 20 个颜色字段加一个
 > 形态：字段是 Option（`merge` 靠「非空才覆盖」、`apply` 靠「`None` 不动」），但**调用点不出现
 > `Some`、也不出现值类型构造名**——属性名 = CSS 属性名（连字符写下划线），值 = 基元，`Some`、
 > 单位、四边展开都关在 `style` 包里。构造走 kwargs：可选 labelled 参数（`width? : Double`）
-> 在调用点自动包 `Some`（§1.6 实测），所以属性名即参数名、值就是基元；记录字面量要写满
-> 全部字段，`with .. { }` 覆写与「裸 `T` 传显式 `T?` 参数」都不支持，逐条读数见 §1.6。
+> 在调用点自动包 `Some`（§1.6），所以属性名即参数名、值就是基元；记录字面量要写满
+> 全部字段，`with .. { }` 覆写与「裸 `T` 传显式 `T?` 参数」都不支持（§1.6）。
 
 ```moonbit
 pub enum Color { Hex(String) Named(String) Var(String) }
@@ -232,24 +224,23 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 
 ### 1.6 MoonBit 工具链边界（`moon 0.1.20260920 / moonc v0.10.14`）
 
-诊断来自 `moon check`，探针是仓库外的临时模块，不落仓：
+工具链边界决定 API 形态，读数随版本升级要重测：
 
 | 设想写法 | 结果 | 诊断 / 含义 |
 | --- | --- | --- |
 | 记录字面量省略字段 `T::{ color: Some("x") }` | ✗ | `[4044] Record fields padding, radius are undefined for type T`——字面量要写满全部字段 |
 | 字面量里 `..base` 填充剩余字段 | ✗ | `[3002] Parse error, unexpected token ..` |
 | `base with .. { f: v }` / `base with f: v` 记录覆写 | ✗ | `[3002] Parse error, unexpected token with` |
-| 裸 `T` 传给 `T?` 型 labelled 参数（指望自动包 `Some`） | ✗ | `[4014] has type: String / wanted: String?`——没有隐式提升，所以「参数收 `T?`」等于把 `Some` 摊回调用点（这是**显式 `T?` 类型**形态；可选 labelled 形态见下条，勿混） |
-| 可选 labelled 参数（`fn f(x? : Int)`），调用点给裸值 `f(x=1)` | ✓ | 自动包 `Some`（实测链 `S::new(width=100.0).hover(width=110.0)` 零警告、运行 `w=100 hover_w=110`，全省略得 `None`）——**kwargs 工厂形态的地基** |
+| 裸 `T` 传给 `T?` 型 labelled 参数（指望自动包 `Some`） | ✗ | `[4014] has type: String / wanted: String?`——**显式 `T?` 类型**形态没有隐式提升（与下条的可选 labelled 形态不同） |
+| 可选 labelled 参数（`fn f(x? : Int)`），调用点给裸值 `f(x=1)` | ✓ | 调用点自动包 `Some`，全省略得 `None`——kwargs 工厂形态的地基 |
 | 以类型名当构造函数调用 `S(w=None)` | ✗ | `[4021] Value S not found in package`——struct 没有函数式构造语法，工厂只能是自己定义的包级函数（`style(...)`） |
 | 数组展开字面量 `[..xs, y]` | ✓ | 追加/过滤重建的惯用形态（`items.update(fn(ts) { [..ts, t] })`）；`Array::filter` 返回**新数组**可直接作表达式 |
-| 链式 setter（方法收 `self`、就地写字段、返回自身） | ✓ | `Finished`，零警告（工具链事实存档；构造已改走 kwargs 工厂，调用点不出现 setter 链） |
+| 链式 setter（方法收 `self`、就地写字段、返回自身） | ✓ | 可用；kwargs 工厂形态下调用点不出现 setter 链 |
 | **方法名与字段名同名**（`Style` 有字段 `padding`，同时有方法 `Style::padding`） | ✓ | kwargs 形态下属性名转移到参数名上（见下两条） |
 | 方法返回值当语句用（`s.set_x(v)` 单独一行） | ✗ | `[4139] its value cannot be implicitly ignored`——只能写成链，包内 setter 体固定为「赋值 + 返回 self」 |
 | 字段有 `mut` 但没有对应 setter | 警告 | `[0015] The mutability of field 'padding' is never used`——零警告门禁逼着字段与属性一一对应，留不下死字段 |
 
-已实测：跨包 `S::new(...)` 与包级函数调用都可用（见上两行探针），调用点写 `@style.style(...)`。
-待验一条（动 P1 前补探针）：`pub alias` 能否给工厂再起一个更短的调用名。
+调用点写 `@style.style(...)`；`pub alias` 能否给工厂起更短的调用名，P1 动手前补探针定。
 
 ## 2. 组件层：前端化命名
 
@@ -314,7 +305,8 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
    "随这一代子树一起退订"的语义（应进订阅回收袋）。
 3. **帧末统一 relayout + redraw**：现有 `batch` 只合并通知、不合并重绘，一帧内多次 `set`
    会重复布局与绘制；补一个帧末队列（nextTick 对应物）。落点已有：`invalidate()` 是
-   全局单钩子（`core/node.mbt:56-71`）。flush 口径未定（回调尾同步 vs 跨拍队列），见 §6 未决 1。
+   全局单钩子（`core/node.mbt:56-71`）。flush 口径：同一事件回调内合并、回调尾同步
+   flush——跨拍队列会让反馈晚一帧。
 4. **`for_list` / `when` 两个薄入口**：`v-for` / `v-if` 的对应物，§1 到 §3 三层能独立用起来
    就靠这两个入口。
 
@@ -337,12 +329,17 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
    **`when` 就是 if/else**：`else=?` 可选——不给是单支（假时显隐），给了是双支常驻切显隐
    （`swap_node` 落地，`core/node.mbt:119`）；要**销毁重建**的场合（大子树省内存、重置内部
    状态如输入光标）仍走 `bind_node`（`:77-113`），两个原语原样保留，`when` 是它们上面的糖。
-   **入参收 `Signal`，不收 `.get()`**——上面示例的 `busy` / `has_items` 直接传信号，落
-   §6 未决 3 取向 ①。
+   **入参收 `Signal`，不收 `.get()`**——上面示例的 `busy` / `has_items` 直接传信号（绑定
+   语义通则见下第 5 条）。
    **`for_list` 与「对象属性」**：JS 的 `v-for` 能枚举对象属性，MoonBit 无反射、struct 字段
    是静态的（与下条不做字符串路径同一原因），没有「动态对象」可枚举；字典数据就是
    `Map[K, V]`，`entries()` 转条目列表进 `for_list`（条目是 `(K, V)` 值），不为对象单独开
    入口。下标就是回调第二参 `i`，写 `fn(t, _)` 即可忽略。
+5. **绑定语义通则**：输入类组件第一参数收可写 `Store[T]`（现状约 48 处，`ctx.draft` 即是）；
+   展示类组件一律「`x` 收值 + `x_dyn` 收 `Signal[T]`」（现状只有 `label_dyn`
+   （`ui/basic.mbt:127`）一条，P2 推广成通则）；`for_list` / `when` 入参收 `Signal`；
+   结构级整棵换内容走 `bind_node`（`core/node.mbt:77-113`）显式重建。**不做全树 patch**
+   ——列表项里改一格只重绘那一格，粒度由数据层（字段各自是 `Store`）承载。
 
 **不做**：san 的 `data.set("a.b", v)` 字符串路径。MoonBit 无反射，路径读写必须类型擦除，
 换来的是编译期查不出错的运行时失败。替代口径是：数据就是普通 struct，字段各自是
@@ -353,8 +350,8 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 
 - **v-model 双向绑定**：不用新增——input 类组件第一参数收可写 `Store[T]` 是现状口径
   （ui 里约 48 处），`ctx.draft` 即是。
-- **动态 class**（`:class="{ active: x }"`）：随 §6 未决 3 的 `_dyn` 通则一起定，是 P2
-  改名表「每个展示组件补不补 `_dyn` 列」的同一件事，不单开机制。
+- **动态 class**（`:class="{ active: x }"`）：就是第 5 条的 `_dyn` 通则，P2 改名时一并落，
+  不单开机制。
 - **生命周期钩子**（mounted / unmounted）：「随子树一起退订」的实质已被订阅回收袋
   （`sub_bag_*`）覆盖；要不要暴露显式钩子，等真实需求再进 P3。
 - **provide / inject**：不做——theme 是进程级单份、其余数据显式传参，值形态没有跨层
@@ -420,12 +417,11 @@ fn ctx_new() -> Ctx {
 }
 ```
 
-**render 怎么被调用**：挂载时调用**一次**，此后框架不再重跑它。响应不是「重跑 render」，
-而是 render 建出的树里**收 Signal 的入口自己订阅、自己差分**（§6 未决 3 取向 ①——
-`for_list` 管列表 keyed 差分、`when` 管显隐、`*_dyn` 管展示文本；真要整棵换内容走
-`bind_node` 显式重建）。全树 patch 形态（取向 ③）已裁定不做。挂载入口今天收静态节点数组
-（`hello-themed` / `sysmonitor` 就是这个形态：先建好树再传 `[nodes]`）；P3 给
-`mount_window` 补一个 `render` 槽，二选一：
+**render 怎么被调用**：挂载时调用**一次**，此后框架不再重跑它。响应靠 render 建出的树里
+**收 Signal 的入口自己订阅、自己差分**（§3 第 5 条通则：`for_list` 管列表 keyed 差分、
+`when` 管显隐、`*_dyn` 管展示文本）；整棵换内容走 `bind_node` 显式重建，不做全树 patch。
+挂载入口今天收静态节点数组（`hello-themed` / `sysmonitor` 就是这个形态：先建好树再传
+`[nodes]`）；P3 给 `mount_window` 补一个 `render` 槽，二选一：
 
 ```moonbit
 fn main {
@@ -492,10 +488,9 @@ fn render(ctx : Ctx) -> @core.Node {
 
 > 这段是 P1/P2/P3 落地后的**目标形态**：kwargs 样式与 `class` 来自 P1+P2，`for_list` /
 > `when` / `render` 槽来自 P3（数据与挂载见 §4.0），今天写出来还编译不过。`ctx.draft` 是
-> `Store[String]`（输入类组件现状口径），`ctx.has_items` / `ctx.busy` 是 `Signal[Bool]`
-> （`computed` 现成），传信号才响应——§6 未决 3 取向 ①。`ctx.add` / `ctx.remove` 里只写
-> Store，往后的差分、显隐、帧末合并重绘全是框架的事：这就是「写起来像改数据，动起来像改了
-> 那一块 UI」的整个设计。
+> `Store[String]`（输入类组件收 Store），`ctx.has_items` / `ctx.busy` 是 `Signal[Bool]`，
+> 传信号才响应（§3 第 5 条）。`ctx.add` / `ctx.remove` 里只写 Store，往后的差分、显隐、
+> 帧末合并重绘全是框架的事：这就是「写起来像改数据，动起来像改了那一块 UI」的整个设计。
 
 ### 4.1 模板的卖点，逐个看还剩什么
 
@@ -537,9 +532,9 @@ fn render(ctx : Ctx) -> @core.Node {
 | 批 | 内容 | 收口条件 |
 | --- | --- | --- |
 | P1 | 新建 `gui/style` 包：`Style` 字段集（含定位组 `position` / `top` / `right` / `bottom` / `left`——底层 yoga 现成，含百分比 inset 的能力后补入口）+ `Color` + kwargs 构造（`style(...)` 工厂属性名即参数名 + `.hover(...)` / `.active(...)` / `.focus(...)` 状态方法，§1.3，W3C 规则模型）+ `merge`（逐属性并集、状态桶递归）+ **全量**内置常量表（§2 每个组件的基调，`tokens.mbt`）+ `Widget` 上存 resolved `Style` 的位置 + `apply`；**yoga-mbt 补 `z_index`**（`set_z_index` + 布局输出按 z_index 稳定排序，Yoga 上游同构；gui 侧绘制按 resolved 值重排 kids，`Style` 同步开 `z_index` 字段）；顺带 `Widget::set_margin` labelled 化（同形统一） | 新包测试 + `Widget` 样式槽用例 + 定位字段落到 yoga 的布局用例 + yoga-mbt 模块 z_index 用例（正序/负值/并列稳定）+ `cd gui && moon check` 零错零警 |
-| P2 | 组件改名（按 §2 映射表，含 `_t` 合并）+ `on_*` 统一 + 散参数改名并折算成匿名 `Style`（排解析序列最前）+ **逐组件把 `on_draw` 从「读捕获的散参数」改成「读 `self` 上的样式并按状态选桶」** | 全仓 `moon check` 零错零警，910 处调用点全切完，观感逐页比对不回退 |
+| P2 | 组件改名（按 §2 映射表，含 `_t` 合并）+ `on_*` 统一 + 散参数改名并折算成匿名 `Style`（排解析序列最前）+ 展示类组件补 `_dyn` 信号版（§3 第 5 条通则）+ **逐组件把 `on_draw` 从「读捕获的散参数」改成「读 `self` 上的样式并按状态选桶」** | 全仓 `moon check` 零错零警，910 处调用点全切完，观感逐页比对不回退 |
 | P3 | 响应式补强：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` / `mount_window` 补 `render` 槽（挂载时调用一次建首帧，§4.0；与节点数组二选一） | 分包测试 + 现有 Store 用例不回归 + `hello-themed`/`sysmonitor` 静态挂载形态不回归 |
-| P4 | 绘制能力补齐：**`Painter` 全局 alpha 完整落地**（`opacity`：alpha 进绘制状态机，铺满填充 / 描边 / 文本 / 图片全路径，`Style` 开 `opacity` 字段——颜色级 alpha 已有，这次补的是整层）+ `box_shadow`（硬阴影档：偏移多层圆角矩形先行，模糊档随 blur 能力再评估） | 各自用例（opacity 含全路径覆盖验证）+ 回写 `docs/zh/adaptation.md` |
+| P4 | 绘制能力补齐：**`Painter` 全局 alpha**（`opacity`：alpha 进绘制状态机，铺满填充 / 描边 / 文本 / 图片全路径，`Style` 开 `opacity` 字段——颜色级 alpha 已有，本批补整层）+ `box_shadow`（硬阴影档：偏移多层圆角矩形先行，模糊档随 blur 能力再评估） | 各自用例（opacity 含全路径覆盖验证）+ 回写 `docs/zh/adaptation.md` |
 | P5 | 动画：`transition`（状态桶属性插值 + 帧驱动，复用 gif 的虚拟时钟与 `invalidate` 回路） | 各自用例 + 回写 `docs/zh/adaptation.md` |
 
 没有模板批，也没有 CSS 解析批（见 §1、§4）。`on_*` 与散参数改名都在 P2 的改名范围内，合批
@@ -548,32 +543,7 @@ fn render(ctx : Ctx) -> @core.Node {
 每批单独提交；实测坑按 `AGENTS.md` 规则 7 回写 `docs/zh/adaptation.md`；使用类说明写进
 `docs/zh/` 下的使用文档，不写进本文件。
 
-## 6. 未决（动相应批次之前要定）
+## 6. 待定（动相应批次前定）
 
-1. **帧末合并重绘的 flush 口径**（挡 P3 第 3 项）：取向「同一事件回调内合并、回调尾同步
-   flush」；跨拍队列会换来真机「点下去晚一帧才变」，那类反馈只能肉眼发现。
-2. **`Store` 要不要去重**（挡 P3 第 1 项）：去重要 `T: Eq` 约束，会顺着签名传播到所有组件
-   （`core/store.mbt:26` 现状明确不去重）；备选是加一个要求 `Eq` 的 `set_if_changed`，内核不动。
-3. **调用点的绑定语义：传值还是传信号**（挡 P2 的改名表，也挡 §4 那段成果到底会不会响应）。
-   §4 的 `for_list` / `when` 已按取向 ① 写成收 `Signal`；但展示类文本今天传的是值
-   （`label(text : String)`），`set` 之后这行字不会动；要让
-   文本跟着变，走的是另外三条入口之一：`label_dyn(sig : Signal[String])`（`ui/basic.mbt:127`，
-   **全仓只有这一条 `_dyn`**）、`bind_label` / `bind`（`ui/declarative.mbt:176`、`:194`）、
-   `bind_node` 整棵重挂。也就是说现状是三种约定并存：输入类组件第一参数收可写的 `Store[T]`
-   （ui 里约 48 处参数）、展示类「值版 + `_dyn` 信号版」只有一条、结构类靠整棵重建。三条候选：
-
-   - **① 把 `_dyn` 升成通则**：展示类组件一律「`x` 收值 + `x_dyn` 收 `Signal[T]`」，
-     `for_list` / `when` 的入参收 `Signal` 而不是值（§4 那段已按此口径写：
-     `@ui.when(ctx.busy, ...)` 收信号——收值的话 `when` 退化成一个 `if`）。零新机制、
-     与两条现有先例同向，且和 §3「字段各自是 `Store`」天然一对：
-     列表项里改一格只重绘那一格。代价是公开 API 数量翻倍 + 文档要解释后缀。
-   - **② 一个入口同时收值或信号**（`enum` 包一层或 trait）。最干净，但要先实测 MoonBit 能否
-     给外部类型实现 trait、labelled 参数有无隐式提升——§1.6 已测出「裸 `T` 自动升 `T?`」**不可
-     用**，方向不乐观，补一条探针即可判死。
-   - **③ 调用点全传值，框架把 `render` 包成 effect**：依赖变化时整棵重建 + keyed 复用。
-     Vue 直觉最近（模板里 `{{ title }}` 的「自动」本质就是这个），代价最大：P3 第 1 项要从
-     「列表差分」放大成「全树差分」，而且重建会丢原生侧的有状态东西——输入框光标、滚动偏移、
-     `focus_id` 重挂，这类「焦点丢了」的回归只能肉眼发现。
-
-   取向 ①；**③ 不进 P3**（`for_list` 的 keyed 差分只管列表，不做全树 patch）。这一条决定
-   P2 改名表要不要给每个展示组件补 `_dyn` 一列，所以排在 P2 之前。
+1. **`Store` 要不要去重**（挡 P3 第 1 项）：默认不去重（`core/store.mbt:26` 现状口径）；
+   如需避免重复通知，加一个要求 `T: Eq` 的 `set_if_changed`，内核不动。
