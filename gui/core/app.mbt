@@ -199,6 +199,15 @@ pub fn App::is_primary(self : App) -> Bool {
 }
 
 ///|
+/// 本窗的窗口层门面。控件层本来就拿不到窗口（`set_fullscreen` 因此收在宿主）；
+/// 标题/尺寸/无边框/最小尺寸这类**窗口级**动作，上层（示例、应用代码）经这里
+/// 取 `@win.Window` 自己调——`@win` 是公开包，方法即公开 API。关窗后的调用
+/// 由 win 层自消化（no-op），不需调用方判空。
+pub fn App::window(self : App) -> @win.Window {
+  self.window
+}
+
+///|
 /// 本窗全屏开关（播放器「铺满整屏」这类窗口级动作）。控件层拿不到窗口，
 /// 所以由宿主把请求转到这里；尺寸变化照常走 allocate，调用方不用自己重算。
 pub fn App::set_fullscreen(self : App, on : Bool) -> Unit {
