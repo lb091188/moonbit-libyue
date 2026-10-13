@@ -84,6 +84,12 @@ pub(all) struct Widget {
   mut kids : Array[Widget]
   mut rect : Rect
   mut visible : Bool
+  /// 最近一次「真的被画到」的帧号（见 `paint_epoch`）：宿主每帧在绘制入口
+  /// `bump_paint_epoch`，遍历经过本控件时写下当前帧号。子控件**没有指向父控件的
+  /// 引用**（父子互指是引用环，本工具链断不掉），所以「我所在的整块被藏起来了吗」
+  /// 只能靠这个读数回答：`is_painted()` 在本帧没被画过 = 被祖先隐藏或在视口外。
+  /// 自转型组件（轮播、动图）据此停掉无效重绘。
+  mut paint_epoch : Int
   /// 绘制回调：入参是**已平移到本控件原点、已裁剪到本控件矩形**的绘制器，
   /// 以及本控件的绝对矩形（取宽高用；坐标请一律按本地写）。
   /// 绘制回调：第一个参数是控件本身（读 `hovered`/`pressed`/`rect` 等状态用），
@@ -155,6 +161,7 @@ pub fn Widget::new() -> Widget {
     kids: [],
     rect: { x: 0.0, y: 0.0, w: 0.0, h: 0.0, },
     visible: true,
+    paint_epoch: 0,
     on_draw: None,
     on_pointer: None,
     on_key: None,
@@ -175,6 +182,29 @@ pub fn Widget::new() -> Widget {
     z_index_paint: 0.0,
     alpha_paint: 1.0,
   }
+}
+
+///|
+/// 绘制轮次（进程级）：宿主每帧在绘制入口 `bump_paint_epoch` 一次，遍历经过的控件
+/// 把当时的轮次记进 `Widget.paint_epoch`。无头测试自己派帧时也要手动 bump 才算一帧。
+let paint_epoch_ref : Ref[Int] = Ref(0)
+
+///|
+pub fn bump_paint_epoch() -> Int {
+  paint_epoch_ref.val = paint_epoch_ref.val + 1
+  paint_epoch_ref.val
+}
+
+///|
+/// 当前绘制轮次。
+pub fn paint_epoch() -> Int {
+  paint_epoch_ref.val
+}
+
+///|
+/// 本控件在**当前这一帧**被画过吗（被祖先隐藏、被视口剔除、或还没画到 → false）。
+pub fn Widget::is_painted(self : Widget) -> Bool {
+  self.paint_epoch == paint_epoch_ref.val
 }
 
 ///|
@@ -803,6 +833,7 @@ pub fn Widget::paint_at(self : Widget, p : @render.Painter, ox : Double, oy : Do
     true => return ()
     false => ()
   }
+  self.paint_epoch = paint_epoch_ref.val
   p.save()
   p.translate(self.rect.x - ox, self.rect.y - oy)
   p.clip_rect(0.0, 0.0, self.rect.w, self.rect.h)

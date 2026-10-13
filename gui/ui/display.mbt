@@ -1059,7 +1059,8 @@ pub fn carousel(
         tick.val = fn() {
           rotation.timer.val = @core.set_timeout(interval_ms, fn() {
             if rotation.running.val {
-              if !rotation.paused.val {
+              // 所在页被隐藏（这一帧没被画到）时不切页也不置脏：整窗重绘白做
+              if !rotation.paused.val && w.is_painted() {
                 do_switch(cur.val + 1)
               }
               (tick.val)()

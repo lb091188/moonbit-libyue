@@ -82,6 +82,11 @@ pub fn gif(
           if !h.running {
             return
           }
+          // 所在页被隐藏（这一帧没被画到）：不推进帧、不置脏，只留着排下一拍
+          if !w.is_painted() {
+            timer.val = @core.set_timeout(a.delay_ms(), fn() { (step.val)() })
+            return
+          }
           if a.advance() {
             h.frames = h.frames + 1
             keep.val = a.current()

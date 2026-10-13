@@ -429,11 +429,16 @@ test "动图组件：按帧时长自转换帧、暂停不再换帧、play 续上
     fn(_id : Int) -> Unit { () },
   )
   let h = GifHandle::make()
-  let (_r, w) = mounted(
+  let (r, w) = mounted(
     gif(gif_asset(), state=h),
     160.0,
     160.0,
   )
+  // 自转换帧的前提是「这一帧被画到」：先画一帧，动图才算挂在看得见的地方
+  let bm_seen = @render.Bitmap::new(160, 160)
+  let p_seen = @render.Painter::new(bm_seen)
+  r.paint(p_seen)
+  p_seen.end()
   // 尺寸取自动图本身（未显式给宽高的分支）
   assert_eq((w.rect.w, w.rect.h), (120.0, 120.0))
   assert_eq(delays.val.length(), 1)

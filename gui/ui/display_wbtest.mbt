@@ -291,13 +291,22 @@ test "轮播自转走宿主延时通道：暂停不前进、stop 断链并取消
     fn(id : Int) -> Unit { cancelled.val.push(id) },
   )
   let h = CarouselHandle::make()
-  let _ = carousel(
+  let host = @core.Widget::new()
+  host.set_size(160.0, 100.0)
+  host.set_column()
+  let c = carousel(
     [text("一"), text("二"), text("三")],
     width=120.0,
     height=60.0,
     interval_ms=100,
     rotation=h,
-  ).mount_into(@core.Widget::new())
+  ).mount_into(host)
+  host.relayout(160.0, 100.0)
+  // 自转的前提是「这一帧被画到」：先画一帧（无宿主时绘制轮次不涨，记的是当轮）
+  let bm_seen = @render.Bitmap::new(160, 100)
+  let p_seen = @render.Painter::new(bm_seen)
+  c.paint(p_seen)
+  p_seen.end()
   assert_eq(delays.val.length(), 1)
   assert_eq(delays.val[0], 100)
 
@@ -471,4 +480,68 @@ test "展示族只读样式槽：token 落色等于主题取色、class 覆盖�
     }
   }
   assert_true(green > 100)
+}
+
+///|
+/// 自转组件的无效重绘闸门：控件没有指向父控件的引用（父子互指是引用环），
+/// 「我这一帧被画到了吗」读的是 core 的绘制轮次（`bump_paint_epoch` 每帧一格，
+/// 遍历经过谁就记谁）。被祖先藏起来的轮播不得再切页、不得再置脏。
+test "轮播自转只在本帧被画到时推进：整块隐藏就不驱动重绘，复现后继续" {
+  let queue : Ref[Array[() -> Unit]] = Ref([])
+  @core.set_timer_hooks(fn(_ms : Int, f : () -> Unit) -> Int {
+    queue.val.push(f)
+    queue.val.length()
+  }, fn(_id : Int) -> Unit { () })
+  let repaints : Ref[Int] = Ref(0)
+  @core.set_repaint_hook(fn() -> Unit { repaints.val = repaints.val + 1 })
+  let h = CarouselHandle::make()
+  let root = @core.Widget::new()
+  root.set_size(220.0, 140.0)
+  root.set_column()
+  let _ = carousel(
+    [text("一"), text("二"), text("三")],
+    width=200.0,
+    height=80.0,
+    interval_ms=100,
+    rotation=h,
+  ).mount_into(root)
+  root.relayout(220.0, 140.0)
+  let fire = fn() -> Unit {
+    let q = queue.val
+    let f = q[q.length() - 1]
+    q.truncate(q.length() - 1)
+    f()
+  }
+  let bm = @render.Bitmap::new(220, 140)
+  let paint_once = fn() -> Unit {
+    let _ = @core.bump_paint_epoch()
+    let p = @render.Painter::new(bm)
+    root.paint(p)
+    p.end()
+  }
+
+  // ① 挂着且没画过（首帧还没到）：不推进——挂载时排的那一拍先吃掉
+  paint_once()
+  fire()
+  assert_eq(h.index(), 1)
+  assert_true(repaints.val > 0)
+  let after_show = repaints.val
+
+  // ② 整块被祖先隐藏：这一帧不再经过它 → 不切页、不置脏（但链子还留着）
+  root.set_visible(false)
+  paint_once()
+  fire()
+  assert_eq(h.index(), 1)
+  assert_eq(repaints.val, after_show)
+
+  // ③ 恢复可见：下一帧又被画到 → 自转继续
+  root.set_visible(true)
+  paint_once()
+  fire()
+  assert_eq(h.index(), 2)
+  assert_true(repaints.val > after_show)
+
+  carousel_stop(h)
+  @core.set_repaint_hook(fn() -> Unit { () })
+  @core.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
 }

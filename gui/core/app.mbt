@@ -671,6 +671,8 @@ pub fn App::pump_ime(self : App) -> Unit {
 /// 脏区非整窗时把绘制器裁到脏区——控件遍历的视口剔除按当前裁剪框判交，
 /// 裁剪外整块跳过；位图按窗复用保留上一帧内容，裁剪外像素即上一帧。
 pub fn App::paint_frame(self : App) -> Unit {
+  // 帧号先进一格：被画到的控件在这一格里记账，自转组件据此判断「这帧有没有我」
+  let _ = bump_paint_epoch()
   self.dirty = false
   let clip = self.dirty_rect
   self.dirty_rect = None
