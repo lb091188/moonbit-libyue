@@ -137,3 +137,18 @@ test "resolve_color：Var 现取当前主题，Hex/Named 原样" {
   assert_true(resolve_color(Var("primary")) == @theme.theme_primary())
   assert_true(theme_token_value("nope") == "")
 }
+
+///|
+test "基调表：块构造可用、简写与状态桶就位（token 不认识会在构造即 abort）" {
+  assert_true(button_base.height == Some(@theme.control_height))
+  match button_base.hover {
+    Some(h) => assert_true(h.background_color is Some(Var("primary")))
+    None => fail("soft 档应有 hover 桶（亮档翻主色）")
+  }
+  assert_true(primary.cursor == Some(@core.CURSOR_HAND))
+  assert_true(card.padding_left == Some(12.0))
+  assert_true(table_row_base.hover is Some(_))
+  // merge 拼出的 textarea 块继承 input 皮肤
+  assert_true(textarea_base.border_color is Some(Var("border")))
+  assert_true(textarea_base.padding_top == Some(4.0))
+}
