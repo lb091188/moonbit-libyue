@@ -30,7 +30,8 @@ pub fn TableColumn::make(
 ///|
 /// 排序状态：`column` 是列下标（`< 0` 表示不排序），`asc` 为升序。
 /// 组件在表头点击时切换它并画箭头；**数据由使用方订阅本 Store 后自行排序并写回
-/// `rows`**（排序口径因业务而异：数字、字典序、自定义比较都归使用方）。
+/// `rows`**（排序口径因业务而异：数字、字典序、自定义比较都归使用方）——
+/// 参考实现见 `sort_rows`（数值优先的稳定排序），两三行接线即可。
 pub(all) struct TableSort {
   column : Int
   asc : Bool
@@ -98,6 +99,106 @@ fn cell_of(row : TableRow, i : Int) -> TableCell {
   } else {
     CellText("")
   }
+}
+
+///|
+/// 单元格的文本投影（缺位给空串）：标签取文字、色块取色值、多行取首行。
+/// 给使用方写排序比较用——组件自己不做排序，但要能拿到「这一格是什么字」。
+pub fn cell_text(row : TableRow, i : Int) -> String {
+  match cell_of(row, i) {
+    CellText(s) => s
+    CellTag(s, _) => s
+    CellColorBox(s, _) => s
+    CellLines(ls) => if ls.length() > 0 { ls[0] } else { "" }
+  }
+}
+
+///|
+/// 摘出字符串开头的（可带负号的）十进制整数；没有数字给 `None`。
+fn leading_int(c : String) -> Int? {
+  let cs = c.to_array()
+  let n = cs.length()
+  let mut i = 0
+  let mut neg = false
+  if n > 0 && cs[0] == '-' {
+    neg = true
+    i = 1
+  }
+  let mut v = 0
+  let mut any = false
+  while i < n && cs[i] >= '0' && cs[i] <= '9' {
+    v = v * 10 + (cs[i].to_int() - 48)
+    any = true
+    i = i + 1
+  }
+  if !any {
+    None
+  } else if neg {
+    Some(0 - v)
+  } else {
+    Some(v)
+  }
+}
+
+///|
+/// 两格文本比较：**都能摘出前导整数就按数值比**，否则按字典序（数值相等也回落
+/// 字典序，保证全序）。演示数据是「数字 + 单位」混排（`12 处` / `6 处`、
+/// `虚拟行 3`），纯字典序会把 `12` 排在 `6` 前面、看着像没排序，故先试数值。
+pub fn compare_cells(a : String, b : String) -> Int {
+  let c = match (leading_int(a), leading_int(b)) {
+    (Some(x), Some(y)) =>
+      if x < y {
+        -1
+      } else if x > y {
+        1
+      } else {
+        0
+      }
+    _ => 0
+  }
+  if c != 0 {
+    c
+  } else {
+    a.lexical_compare(b)
+  }
+}
+
+///|
+/// 按 `TableSort` 排一份数据行（**纯函数**，不改入参，返回新表）。
+///
+/// 组件本身仍不替调用方排序（口径见 `TableSort` 注释），这里是给使用方的参考
+/// 实现：订阅 `sort` Store、把结果 `set` 回 `rows` 即可，两三行就能让表头点击
+/// 真的改变行序。
+/// - `column < 0`（表头第三次点击的「取消排序」）或越界 → 原样返回；
+/// - 比较走 `compare_cells`（数值优先，再字典序）；
+/// - **稳定**：同键保持原相对顺序（下标做次键——标准库的 `sort_by` 不保证稳定，
+///   而「按状态列排」这种同键成片的场景不稳定会看着乱跳）。
+pub fn sort_rows(rows : Array[TableRow], sort : TableSort) -> Array[TableRow] {
+  let out = rows.copy()
+  let j = sort.column
+  if j < 0 {
+    return out
+  }
+  let order : Array[Int] = []
+  for i = 0; i < out.length(); i = i + 1 {
+    order.push(i)
+  }
+  order.sort_by(fn(a : Int, b : Int) -> Int {
+    let mut c = compare_cells(cell_text(out[a], j), cell_text(out[b], j))
+    if !sort.asc {
+      c = 0 - c
+    }
+    if c != 0 {
+      c
+    } else {
+      a - b
+    }
+  })
+  let res : Array[TableRow] = []
+  for i in order {
+    res.push(out[i])
+  }
+  res
 }
 
 ///|

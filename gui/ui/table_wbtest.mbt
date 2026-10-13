@@ -230,3 +230,51 @@ test "表格：表头边界拖动改列宽，相邻两列此消彼长且有最�
   root.relayout(400.0, 300.0)
   assert_eq(head.children()[0].rect.w, 180.0)
 }
+
+///|
+test "排序口径：数值优先（12 排在 6 之后）、字典序兜底、升降序与取消" {
+  // 数值优先：纯字典序会把 "12 处" 排到 "6 处" 前面
+  assert_true(compare_cells("12 处", "6 处") > 0)
+  assert_true(compare_cells("6 处", "12 处") < 0)
+  // 数字与单位混排、带符号
+  assert_true(compare_cells("虚拟行 3", "虚拟行 12") < 0)
+  assert_true(compare_cells("-4", "2") < 0)
+  // 摘不出数字的按字典序
+  assert_true(compare_cells("待修", "通过") < 0)
+  // 数值相等回落字典序（全序，不会因相等键乱序）
+  assert_true(compare_cells("3", "3 处") < 0)
+  assert_eq(compare_cells("同一个", "同一个"), 0)
+
+  let rows = table_rows([["丙", "12 处"], ["甲", "6 处"], ["乙", "24 处"]])
+  let names = fn(rs : Array[TableRow]) -> Array[String] {
+    let out : Array[String] = []
+    for r in rs {
+      out.push(cell_text(r, 0))
+    }
+    out
+  }
+  // 升序：6 < 12 < 24 → 甲/丙/乙
+  assert_eq(names(sort_rows(rows, { column: 1, asc: true })), ["甲", "丙", "乙"])
+  // 降序翻转
+  assert_eq(names(sort_rows(rows, { column: 1, asc: false })), ["乙", "丙", "甲"])
+  // column < 0 = 取消排序：原样（且入参未被改动）
+  assert_eq(names(sort_rows(rows, { column: -1, asc: true })), ["丙", "甲", "乙"])
+  assert_eq(names(rows), ["丙", "甲", "乙"])
+  // 列越界（比列数大）不越界读：全空键 → 保持原序
+  assert_eq(names(sort_rows(rows, { column: 9, asc: true })), ["丙", "甲", "乙"])
+}
+
+///|
+test "排序稳定性：同键保持原相对顺序" {
+  let rows = table_rows([["甲", "就绪"], ["乙", "排队"], ["丙", "就绪"], ["丁", "排队"]])
+  let names = fn(rs : Array[TableRow]) -> Array[String] {
+    let out : Array[String] = []
+    for r in rs {
+      out.push(cell_text(r, 0))
+    }
+    out
+  }
+  // 状态列同键成片：升序后两组内部仍是原顺序（就绪 < 排队）
+  assert_eq(names(sort_rows(rows, { column: 1, asc: true })), ["甲", "丙", "乙", "丁"])
+  assert_eq(names(sort_rows(rows, { column: 1, asc: false })), ["乙", "丁", "甲", "丙"])
+}

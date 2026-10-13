@@ -1581,6 +1581,17 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **验证**:纯 C 探针 `experiment/img_probe/img_backend_probe.c`(独立于 moon 工具链,`cl /W4 /utf-8` 直编,include 进 `render/stub.c` 直喂 `img_*` 入口)末行 **`IMG-BACKEND-OK`**,60 条断言全过:PNG 文件/内存两入口尺寸一致且预乘不越界、坏图/NULL/零长/越界句柄/不存在文件全给 0、`dot.gif` 静态首帧 120×120、动图 4 帧 + 延时 400ms + 逐帧前进帧号单调 + 不同帧像素确实不同 + 回绕后显示帧与首帧逐字节一致、释放幂等且释放后全空操作、PNG 经动图入口 `is_static=1` 且 `advance` 恒 0、**子矩形帧合成**(`experiment/img_probe/assets/subrect.gif` 第二帧 12×12@(14,14):画布仍是 40×40、(0,0) 保留第 0 帧的黑、框内偏红)。跑法:先 `cl` 编出 exe 再在仓库根执行 `experiment/img_probe/img_backend_probe.exe .`(资产重建脚本 `make_asset.py` 用 ffmpeg 现场生成 subrect.gif)。`moon check` 库模块零警告。
 - **本批未做且不假装完成**:macOS 后端(仍是占位);`looping=false` 的「帧号归零」语义(跨平台既有行为,要改得同时动 `ui/gif.mbt` 与 `image_wbtest` 断言);JPEG/BMP/TIFF 未逐格式单独验(走同一条 `CreateDecoderFromFilename` 嗅探路径,PNG/GIF 已实证);真机观感(showcase 卡片/媒体页的图片区、动图是否在动)归 `_人工测试清单.md`。
 
+### 自维持重绘环:present 与 expose 互相点火(2026-10-13 真机反馈)
+
+- **现象**:`examples/native-app` 真机「整体卡顿,滚动/点击/悬浮都有 300–500ms 延迟」,同时「图表推点按钮点了没反应、表格点表头不排序、虚拟表格滚不动」。看代码像三个不相干的 bug,实际是**一个根因 + 一处示例漏接线**。
+- **根因(两分支同形)**:`wm_present` 每帧都请系统重画(`_WIN32` 侧 `InvalidateRect(NULL,FALSE)`、GTK 侧 `gtk_widget_queue_draw`),而系统的重画回调(`WM_PAINT` / `wm_on_draw`)又置 `need_draw = 1` → MoonBit 侧 `poll_event` 收到 `NeedsDraw` → `dirty = true` → 全帧重画 → `present` → ……**永动环**。于是:(1) 应用**永不空闲**,`wm_wait` 永远立刻返回(队列里总有 paint 消息),每一拍都在画 1400×3520 ≈ 490 万像素,输入只能排在一整帧之后——这就是 300–500ms 延迟;(2) 一帧里攒下的鼠标移动(高回报率鼠标轻松上百条)把 64 槽事件队列塞满,`wm_push` 的「满了丢弃」把**随后的抬起与滚轮整批丢掉**——这就是「点了没反应/不排序/滚不动」。注意这三条症状在**同一帧里同时成立**:点击的 `Down` 进了队列、`Up` 被丢了,控件停在按下态,看着就是「按钮坏了」。
+- **修法(两分支同批改,保持对称)**:重画回调只**贴缓存帧**、不再请求重绘(`WM_PAINT` 只在还没有任何帧可贴时置一次 `need_draw`;`wm_on_draw` 同理)。重绘请求的唯一来源回到 MoonBit 侧的 `schedule_paint`(`@core.invalidate` / `App::schedule_paint`),这也正是本栈既定的契约——**「内容变了才画」**。首帧不受影响:`wm_show` 本来就置 `need_draw = 1`(`wm_mark_draw`)。
+- **另一半:队列里合并连续移动**。`wm_push` 里若队列最后一条也是**未消费**的移动,直接替换成新的(位置是状态不是流水)。只在「最后一条也是移动」时替换,中间夹着按下/抬起就不动它,FIFO 语义不破。这一条即使修好永动环也要留着:任何一帧(现在仍有百毫秒量级)期间移动都能攒下几十上百条。
+- **窗口高 3520 → 900(示例侧)**:视口剔除(`widget_cull_skip`)只画屏内那部分,**窗口高直接决定每帧像素量**;`enable_root_scroll` 落地后「一屏装下整页」的长柱只剩代价。改成 `APP_WIN_H` 常量,要「一屏看全」改回 3520 即可。
+- **表格排序不生效是示例漏接线,不是组件 bug**:表头点击只切 `TableSort` Store(组件**不替使用方排序**,口径早写在 `TableSort` 注释里),示例没订阅它把行序写回 `rows`。补一个 `@ui.sort_rows` 作参考口径(**前导数字优先比数值**——演示数据是「12 处/6 处」这种混排,纯字典序会把 12 排在 6 前面、看着像没排;加**稳定排序**,同键成片时不会乱跳),示例两三行订阅即可。
+- **教训**:「永不空闲」类 bug 在真机上表现为**一堆互不相干的功能失效**,而不像性能问题。下次见到「点了没反应 + 卡 + 滚不动」同时出现,先看事件队列的**入队速率与消费速率**,再看有没有自维持的重绘环——两者都会造成「事件被静默丢弃」,而丢弃是没有任何日志的。
+- **验证**:`moon check --deny-warn` 库模块与 `examples` 模块零警告(两处注入式探针确认门禁确实覆盖这两个模块);`gui/win/stub.c` 用 MSVC(`cl /c /W4 /utf-8`)单编通过、警告数与改动前逐字持平(仅 2 条既有 C4996);新增 `table_wbtest.mbt` 2 条(排序口径 + 稳定性)。**真机行为(延迟是否真的降到「一帧」、点击是否不再丢)归 `_Windows真机测试清单.md` 复验**。
+
 ## macOS(CI 构建链已验,GUI 待真机)
 
 - libyue v0.15.6 发行包含 ARC / no-ARC 双库:Darwin 链接参数 = 主库 + `-lyue_mbt_noarc`(no-ARC 符号被主库引用,须排其后)+ AppKit / Carbon / IOKit / Security / WebKit / OpenDirectory 框架 + `-lobjc -lc++ -lpthread -lbsm -Wl,-dead_strip`;prebuild Darwin 分支已按此预修。

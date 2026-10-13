@@ -317,6 +317,18 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$MSVC/bin/Hostx64/x64/cl.exe" \
 
 > 提交口径沿用仓库规则：每批完成即提交推送（见 §4「例外扩散警戒」），故 W20b/W20d 可各自独立成Commit；W20a 建议等 §6.5「待收口」第 1、2 项补齐后连同探针一起提交。
 
+### 6.6 性能批（2026-10-13 真机反馈立项）
+
+真机反馈原文：「native-app 整体感觉卡顿，滚动、点击、悬浮都有 300–500ms 的延迟，点线分布图推点按钮没用，表格排序不生效，虚拟表格滚动失效」。前三条是**一个根因**、第四条是**示例漏接线**，见下。
+
+- [x] **自维持重绘环**（2026-10-13 已修，Win + GTK 两分支）：`wm_present` 每帧都 `InvalidateRect` / `gtk_widget_queue_draw`，而 `WM_PAINT` / `draw` 回调又置 `need_draw` —— 构成「present → expose → 置脏 → MoonBit 全帧重画 → present」的永动环，**应用永不空闲**：输入只能排在一帧（真机 300–500ms）之后（悬浮/点击/滚轮的延迟就是这个），且一帧里攒下的上百条鼠标移动把 64 槽事件队列塞满，随后的**抬起与滚轮被整批丢掉**（表现正是「按钮点了没反应、表头点了不排序、滚轮不滚」）。修法：expose/draw 只贴缓存帧、**不再请求重绘**（只在还没有帧可贴时请求一次）；另在 `wm_push` 里**合并连续移动事件**（位置是状态不是流水），队列任何时刻最多一条移动。重绘请求一律由 MoonBit 侧 `schedule_paint`（`@core.invalidate`）发起。
+- [x] **native-app 窗口高 3520 → 900**（2026-10-13）：视口剔除（`widget_cull_skip`）只画屏内那部分，**窗口高直接决定每帧像素量**（1400×3520 ≈ 490 万 → 1400×900 ≈ 126 万）。`enable_root_scroll` 落地后长柱本来就能滚到，3520 只剩代价没有收益（改成 `APP_WIN_H` 常量，要「一屏看全」改回 3520 即可）。
+- [x] **表格排序不生效 = 示例漏接线**（2026-10-13）：表头点击只切 `TableSort` Store（组件**不替使用方排序**，口径见 `ui/table.mbt`），示例没订阅它把行序写回去，于是「箭头动、行不动」。补 `@ui.sort_rows`（前导数字优先比数值 + 稳定排序，纯函数）作参考口径，示例两三行订阅即可；两条回归落 `table_wbtest.mbt`。
+- [ ] **脏矩形重绘**（未做）：`@core.invalidate()` 无参 = 全窗脏；悬停/点击其实知道受影响的控件矩形（`route_pointer` 的 hover 变更点、按下的捕获者），做成 damage rect 后悬浮反馈可从「一帧」降到毫秒级（**滚动仍要全视口重画**，收益在悬停与点击）。前置：`App` 复用帧 Bitmap（现在每帧 `Bitmap::new` 一张 1400×900×4 ≈ 5MB）。
+- [ ] **光栅微优化**（未做）：`raster.mbt` / `raster_fill.mbt` 每次 fill/stroke 都新分配一条 width 长的 `cov` 数组（每帧数百次）；不透明实心填充可走「无覆盖率」快路径；`raster.mbt` 里根背景那 126 万像素的全窗填充占单帧成本的可观一份。
+- [ ] **文本布局缓存**（未做，单帧成本里最重的一块）：`text/dwrite_text.cpp` 的 `ptw_session_layout` 每次 `rt_measure` / `rt_draw` 都新建 `IDWriteTextFormat` + `IDWriteTextLayout`（**同一条文本一帧建两次**），`AttributedText::rt()` 每个文本节点每帧开两个会话，且 `rt_new`/`rt_free` 每帧重来、无跨帧缓存；`ui` 的 label/button/表格单元格一律走这条路。布局（yoga）每帧还会为**全树**文本节点各测一次，屏外的也照测。
+- [ ] **量出来再优化**：上面三条都还没在真机上分档计时（`experiment/text_bench` 已有先例可扩展）。建议先做一个「单帧成本分解」探针（根背景填充 / 控件绘制 / 文本 / memcpy+StretchDIBits 各占多少），再决定动哪一块。
+
 ## 4. 已知边界与风险
 
 - 自绘文本的**无障碍**（ATK / UIA / NSAccessibility）本栈暂不含，只记不办。

@@ -1978,11 +1978,21 @@ fn rect_str(r : @core.Rect) -> String {
 }
 
 ///|
+/// 主窗尺寸。**高 900 而不是「一屏装下整页」的 3520**：本页把十几页叠成一根
+/// 数千像素高的长柱，早先直接开 3520 高（整页一屏可见），但那等于每帧都重画
+/// 1400×3520 ≈ 490 万像素——真机实测单帧 300–500ms，而输入只能排在一帧之后，
+/// 于是滚动/点击/悬浮全像卡住。`enable_root_scroll` 落地后长柱本来就能滚到，
+/// 3520 这个尺寸只剩代价没有收益：降到 900（贴常见屏高）后每帧只画 126 万像素
+/// （视口剔除只画屏内那部分），要「一屏看全」把这里改回 3520 即可。
+const APP_WIN_W : Int = 1400
+const APP_WIN_H : Int = 900
+
+///|
 fn main {
   // 输入框的 Ctrl+C/X/V 接系统剪贴板（默认关：测试里的 Ctrl+X 不该动使用者
   // 的剪贴板）；探测不可用（Linux 无 xclip 等）时自动保持内部剪贴板
   @ui.use_system_clipboard(true)
-  let app = match @core.App::new(1400, 3520, "MoonBit App 宿主 (批次1)") {
+  let app = match @core.App::new(APP_WIN_W, APP_WIN_H, "MoonBit App 宿主 (批次1)") {
     Some(a) => a
     None => {
       println("NATIVE-APP-SKIP: 本平台无窗口后端或没有显示服务")
@@ -2268,15 +2278,27 @@ fn main {
   let dpk_w : Ref[@core.Widget?] = Ref(None)
   let drg_w : Ref[@core.Widget?] = Ref(None)
   let trg_w : Ref[@core.Widget?] = Ref(None)
-  let tb_rows = @core.Store::new(make_table_rows())
+  // 表头点击只切「排序状态」这个 Store（组件**不替使用方排序**，口径见
+  // ui/table.mbt 的 TableSort 注释）——不订阅它把行序写回去，表头箭头会动、
+  // 行序不动（真机反馈的「表格排序不生效」正是漏了这一步）。`sort_rows` 是
+  // 组件给的参考口径（前导数字优先比数值 + 稳定），一行接线即可。
+  let tb_base = make_table_rows()
+  let tb_rows = @core.Store::new(tb_base)
   let tb_sel : @core.Store[Array[Int]] = @core.Store::new([])
   let tb_sort : @core.Store[@ui.TableSort] = @core.Store::new({ column: -1, asc: true })
   let tb_w : Ref[@core.Widget?] = Ref(None)
-  let vt_rows = @core.Store::new(make_virt_rows())
+  let _ = tb_sort.signal().subscribe(fn(s : @ui.TableSort) -> Unit {
+    tb_rows.set(@ui.sort_rows(tb_base, s))
+  })
+  let vt_base = make_virt_rows()
+  let vt_rows = @core.Store::new(vt_base)
   let vt_sel : @core.Store[Array[Int]] = @core.Store::new([])
   let vt_sort : @core.Store[@ui.TableSort] = @core.Store::new({ column: -1, asc: true })
   let vt_clicks = Ref(0)
   let vt_w : Ref[@core.Widget?] = Ref(None)
+  let _ = vt_sort.signal().subscribe(fn(s : @ui.TableSort) -> Unit {
+    vt_rows.set(@ui.sort_rows(vt_base, s))
+  })
   let sticky = @ui.StickyList::new()
   let sticky_w : Ref[@core.Widget?] = Ref(None)
   let spl_w : Ref[@core.Widget?] = Ref(None)
@@ -3023,7 +3045,7 @@ fn main {
     None => -1
   }
   println(
-    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' cmb='\{frm_cmb.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val} ta='\{flat(frm_ta.get())}' tacur=\{ta_caret} dcl=\{dcl_n.get()} lblw=\{dcl_w0.round().to_int()}/\{dcl_w1.round().to_int()} cur=\{cur_seen.val.0}/\{cur_seen.val.1}/\{cur_seen.val.2}/\{cur_seen.val.3} gif=\{gif_h.frame_count()} ib=\{ib_hits.val} sys='\{@core.sys_color_scheme()}/\{@core.sys_accent()}' fing=\{@theme.theme_fingerprint_of(@theme.theme_current())} ln=\{ch_lin.get()[0].points.length()}/\{ch_lin.get()[0].points[ch_lin.get()[0].points.length() - 1].round().to_int()} chp=\{ch_pushes.val}'"
+    "NATIVE-APP-OK frames=\{ctr.frames} clicks=\{ctr.clicks} t1='\{f1.ed.get_text()}' c1=\{f1.ed.caret_pos()} t2='\{f2.ed.get_text()}' focus=\{focus_str} fam=\{ctr.fam_count} use='\{ctr.use_family}' lhm=\{ctr.lh_mixed} decl=\{decl.get()} kids=\{root.children().length()}/\{decl_kids_before + 1} band=d\{ctr.down}/u\{ctr.up}/m\{ctr.moved} comp=\{ctr.comp} form=\{agreed.get()}/\{sound.get()}/\{level.get().round().to_int()}/\{count.get()} t3='\{t3.get()}' closed=\{ctr.closed} car=\{spin.index()} auto=\{car_sample.val.1} date='\{date_str}' seg='\{seg_sel.get()}' crumb='\{crumb_sel.get()}' page=\{page_cur.get()} step=\{step_cur.get()} fold='\{fold_str}' menu='\{menu_sel.get()}' tab=\{tab_sel.get()} tree=\{tree_str} xfer=\{xfer_left.get().length()}/\{xfer_right.get().length()} scr=\{scr.offset_y().round().to_int()}/\{scr.max().round().to_int()} ov=\{@core.overlay_count()} pick=\{ov_pick.val} dlg=\{dlg_ok.val} ctx=\{ctx_pick.val} toast=\{toast_n.val} dpk='\{dpk_str}' tsort=\{tb_sort.get().column}/\{tb_sort.get().asc} trow='\{if tb_rows.get().length() > 0 { @ui.cell_text(tb_rows.get()[0], 0) } else { "-" }}' tsel=\{tb_sel.get().length()} vt=\{vt_sel.get().length()}/\{vt_clicks.val} sticky='\{sticky.cur_group}' split=\{split_first_w.round().to_int()} drg='\{drg_str}' trg='\{trg_str}' btn=\{frm_btn.val} lnk=\{frm_lnk.val} rate=\{frm_rate.get()} ferr=\{if frm_err.get().length() > 0 { 1 } else { 0 }} sel='\{frm_pick.val}/\{frm_sel.get()}' cmb='\{frm_cmb.get()}' col='\{frm_col.get()}' ovmax=\{frm_ov_max.val} ta='\{flat(frm_ta.get())}' tacur=\{ta_caret} dcl=\{dcl_n.get()} lblw=\{dcl_w0.round().to_int()}/\{dcl_w1.round().to_int()} cur=\{cur_seen.val.0}/\{cur_seen.val.1}/\{cur_seen.val.2}/\{cur_seen.val.3} gif=\{gif_h.frame_count()} ib=\{ib_hits.val} sys='\{@core.sys_color_scheme()}/\{@core.sys_accent()}' fing=\{@theme.theme_fingerprint_of(@theme.theme_current())} ln=\{ch_lin.get()[0].points.length()}/\{ch_lin.get()[0].points[ch_lin.get()[0].points.length() - 1].round().to_int()} chp=\{ch_pushes.val}'"
   )
   // 机器可读的几何行：本例是 GUI 侧的**累积验证页**，后续每加一节都要靠
   // xdotool 按坐标注入回证，这一行就是坐标依据（免得按截图猜点位）
