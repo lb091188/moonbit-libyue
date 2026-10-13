@@ -112,6 +112,8 @@ pub fn page_system(app : @shared.App) -> @core.Node {
   let ticks : @core.Store[Int] = @core.Store::new(0)
   let tray_note : @core.Store[String] = @core.Store::new("（还没建托盘）")
   let tray_clicks : @core.Store[Int] = @core.Store::new(0)
+  // 托盘句柄（挂载闭包里建托盘时填入）：挂菜单 / 改提示要拿它
+  let tray_holder : Ref[@core.Tray?] = Ref(None)
   let auto_state : @core.Store[String] = @core.Store::new("（未读）")
   let ext_out : @core.Store[String] = @core.Store::new("（还没打开过外部）")
   let si_out : @core.Store[String] = @core.Store::new("（点「刷新」读一次）")
@@ -403,7 +405,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
     @shared.section(
       "托盘",
       "系统托盘",
-      "托盘图标左键计数、右键由宿主菜单派发；dispatch 走 200ms 轮询表（宿主循环没有每帧钩子）。图标是运行期生成的 32px BGRA 位图。菜单模型接线见 TODO §6（随菜单栏批次）。",
+      "托盘图标左键计数、右键弹菜单（「挂菜单」后）；dispatch 走 200ms 轮询表（宿主循环没有每帧钩子）。图标是运行期生成的 32px BGRA 位图，菜单复用 W20a 菜单模型。",
       [
         // 零尺寸挂载钩子：段首次选中时建托盘 + 起派发表
         @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
@@ -417,6 +419,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
                     tray_clicks.update(fn(n) { n + 1 })
                     app.toast_push("托盘左键被点了", @ui.Info)
                   })
+                  tray_holder.val = Some(t)
                   tray_note.set("已建（\{t.backend_name()}）")
                 }
                 Err(e) => {
@@ -431,7 +434,38 @@ pub fn page_system(app : @shared.App) -> @core.Node {
         @ui.hbox(
           [
             @ui.button_t("改提示", variant=@ui.Soft, on_click=fn() {
-              tray_note.set("提示已改（悬停托盘图标可见）")
+              match tray_holder.val {
+                Some(t) => {
+                  t.set_tooltip("libyue 演示板", "提示已改 · \{tray_clicks.get()} 次左键")
+                  tray_note.set("提示已改（悬停托盘图标可见）")
+                }
+                None => tray_note.set("托盘未建，改不了提示")
+              }
+            }),
+            // 右键菜单：复用 W20a 菜单模型（Tray::set_menu）；菜单项点击
+            // 经同一条 dispatch_menu_command 派发链回到回调（main 挂了表）
+            @ui.button_t("挂菜单", variant=@ui.Soft, on_click=fn() {
+              match tray_holder.val {
+                Some(t) => {
+                  let menu = @core.Menu::new(title="托盘")
+                  let _ = menu.add_item("冒个提示").set_on_click(fn() {
+                    app.toast_push("来自托盘菜单", @ui.Info)
+                  })
+                  let _ = menu.add_item("回首页").set_on_click(fn() {
+                    app.selected.set("基础组件")
+                  })
+                  let _ = menu.add_separator()
+                  let _ = menu.add_item("退出").set_on_click(fn() {
+                    match app.host.val {
+                      Some(a) => a.quit()
+                      None => ()
+                    }
+                  })
+                  t.set_menu(menu)
+                  tray_note.set("菜单已挂（右键托盘图标）")
+                }
+                None => tray_note.set("托盘未建，挂不了菜单")
+              }
             }),
           ],
           column_gap=8.0,
@@ -445,6 +479,9 @@ pub fn page_system(app : @shared.App) -> @core.Node {
         "  Ok(t) => {",
         "    t.set_tooltip(\"libyue 演示板\", \"左键计数\")",
         "    t.on_click(fn() { clicks.val = clicks.val + 1 })",
+        "    // 右键菜单：菜单模型翻译成弹出菜单挂上，",
+        "    // 选中项经 dispatch_menu_command 回到 on_click",
+        "    t.set_menu(menu)",
         "  }",
         "  Err(e) => ...",
         "}",

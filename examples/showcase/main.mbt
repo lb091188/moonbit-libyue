@@ -13,8 +13,11 @@
 //     改为「跟随开关 + 每 2 秒读一次系统偏好」：手动选色/切深浅先把开关关掉，
 //     否则下一拍就被盖回去。系统偏好读数用 `@win.sys_color_scheme/sys_accent`
 //     （与 `App::follow_system_theme` 内部同一来源，示例要能手动覆盖故自己开表）。
-//   - 菜单栏 / 托盘 / 单实例尚未迁入（它们各自随「系统集成」页进来，
-//     或在 `examples/native-app` 已有对照演示）。
+//   - 菜单栏 / 单实例已接线（2026-10-13 第十五批）：菜单栏是 W20a 的模型
+//     翻译（`MenuBar::apply_to` → 原生菜单栏，点击经 `dispatch_menu_command`
+//     派发到模型回调，100ms 轮询表挂在宿主）；单实例是 dbus 层的
+//     `claim_name` + Wake（无会话总线的环境降级为不做，只打印说明）；
+//     D-Bus 的排期通道与 200ms 泵都由宿主给。托盘菜单在系统集成页托盘段。
 //   - 待迁页：全部迁完（见 TODO.md；表单组件页 2026-10-12 已迁，事件与布局/
 //     窗口/系统集成/图标库/画布与富文本/浏览器六页 2026-10-13 已迁）。
 
@@ -57,6 +60,43 @@ fn theme_toggle_button(app : @shared.App) -> @core.Node {
 }
 
 ///|
+/// 菜单栏模型（第十五批接线）：动作全部真实有效——「导航」切页、「主题」
+/// 拨深浅与跟随开关、「帮助」关于冒提示 / 退出角色项走 `App::quit`。
+/// 项点击经原生菜单派发链（`dispatch_menu_command`）回到这些回调。
+fn build_menu_bar(app : @shared.App) -> @core.MenuBar {
+  let bar = @core.MenuBar::new()
+  let nav = bar.add_menu("导航")
+  for name in ["基础组件", "表单组件", "数据展示", "系统集成", "浏览器"] {
+    let page = name
+    let _ = nav.add_item(page).set_on_click(fn() { app.selected.set(page) })
+  }
+  let theme = bar.add_menu("主题")
+  let _ = theme.add_check_item("跟随系统").set_on_click(fn() {
+    app.follow.update(fn(v) { !v })
+  })
+  let _ = theme.add_item("浅色").set_on_click(fn() {
+    app.follow.set(false)
+    app.dark_mode.set(false)
+  })
+  let _ = theme.add_item("深色").set_on_click(fn() {
+    app.follow.set(false)
+    app.dark_mode.set(true)
+  })
+  let help = bar.add_menu("帮助")
+  let _ = help.add_item("关于").set_on_click(fn() {
+    app.toast_push("libyue 组件库演示板 V" + SHOWCASE_VERSION, @ui.Info)
+  })
+  let _ = help.add_separator()
+  let _ = help.add_role_item(@core.MenuRole::Quit).set_on_click(fn() {
+    match app.host.val {
+      Some(a) => a.quit()
+      None => ()
+    }
+  })
+  bar
+}
+
+///|
 fn main {
   let selected : @core.Store[String] = @core.Store::new("基础组件")
   let toast_push = @ui.toast_layer(duration_ms=2600)
@@ -95,6 +135,22 @@ fn main {
   app.dark_mode.subscribe(fn(_v) { apply_theme(app) })
   app.accent.subscribe(fn(_a) { apply_theme(app) })
   apply_theme(app)
+  // 单实例（dbus 层）：先声称总线名；已有实例就唤起它并退出。
+  // 无会话总线的环境（如 Windows 桌面）Err 降级为不做，只打印说明。
+  match @dbus.claim_name("com.moonbitlibyue.showcase") {
+    Ok(@dbus.PrimaryOwner) | Ok(@dbus.AlreadyOwner) =>
+      // 首实例：注册 Wake 回调——切回首页并冒提示
+      @dbus.on_wake(fn(_args : Array[String]) -> Unit {
+        selected.set("基础组件")
+        app.toast_push("已被第二实例唤起", @ui.Info)
+      })
+    Ok(@dbus.AlreadyExists) | Ok(@dbus.InQueue) => {
+      let _ = @dbus.wake_existing("com.moonbitlibyue.showcase", [])
+      println("SHOWCASE-INST: 已有实例，已唤起并退出")
+      return
+    }
+    Err(e) => println("SHOWCASE-INST: 单实例降级（\{e}）")
+  }
   let slot : Ref[@core.App?] = Ref(None)
   let mounted = @ui.mount_window(
     [
@@ -202,6 +258,30 @@ fn main {
       slot.val = Some(a)
       // 窗口页/快捷键页经 `app.host` 取宿主（页函数体跑完时还没挂载，这里填）
       app.host.val = Some(a)
+      // 单实例的 D-Bus 接线：排期通道与 200ms 泵都由宿主给（dbus 不引 GUI
+      // 核心层）。无总线时 pump 空转，无副作用。
+      @dbus.dbus_set_post_delayed(fn(ms : Int, f : () -> Unit) -> Unit {
+        let _ = a.timer(ms, f)
+      })
+      let pump : Ref[() -> Unit] = Ref(fn() { () })
+      pump.val = fn() -> Unit {
+        @dbus.dbus_pump()
+        let _ = a.timer(200, pump.val)
+      }
+      (pump.val)()
+      // 原生菜单栏：模型翻译成原生菜单挂窗口；项点击经 WM_COMMAND 回收，
+      // 100ms 轮询表派发到模型回调（托盘菜单项走同一条派发链）
+      let bar = build_menu_bar(app)
+      if bar.apply_to(a.window) {
+        let menu_tick : Ref[() -> Unit] = Ref(fn() { () })
+        menu_tick.val = fn() -> Unit {
+          let _ = @core.dispatch_menu_command()
+          let _ = a.timer(100, menu_tick.val)
+        }
+        (menu_tick.val)()
+      } else {
+        println("SHOWCASE-MENU: 菜单栏挂载失败（后端不支持或建菜单失败）")
+      }
       // 「跟随系统」轮询：开关打开时每 2 秒读一次系统深浅与主色，
       // 变了就写进 App（App 的 subscribe 再落成 theme_apply）
       let tick : Ref[() -> Unit] = Ref(fn() { () })
