@@ -20,6 +20,15 @@
 #include <pango/pangocairo.h>
 #include <cairo.h>
 #include <stdint.h>
+
+/* 文本渲染统计（性能诊断）：Pango 把文本直接画进 cairo 表面，没有 DWrite
+ * 路径的「D2D 提交 / WIC 读回混合」两段，恒 0。 */
+int pt_render_stats(int64_t *calls, int64_t *d2d_us, int64_t *read_us) {
+  (void)calls;
+  (void)d2d_us;
+  (void)read_us;
+  return 1;
+}
 #include <string.h>
 
 static PangoLayout *pt_make_layout(const char *text, int len, double size,
@@ -927,6 +936,11 @@ int pt_measure(const char *text, int len, double size, const char *family,
   (void)text; (void)len; (void)size; (void)family; (void)max_width;
   (void)ellipsize; (void)wrap; (void)out_w; (void)out_h; (void)out_baseline;
   return 0;
+}
+
+int pt_render_stats(int64_t *calls, int64_t *d2d_us, int64_t *read_us) {
+  (void)calls; (void)d2d_us; (void)read_us;
+  return 1;
 }
 
 int pt_font_line_height(double size, const char *family, int weight,

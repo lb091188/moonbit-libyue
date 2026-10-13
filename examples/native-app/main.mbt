@@ -2987,7 +2987,11 @@ fn main {
   // 终端无输出），落一份文件兜底：绝对路径（cwd = 运行目录）
   let prof = @core.paint_profile_summary()
   println("NATIVE-APP-PROF " + prof)
-  let body = "NATIVE-APP-PROF " + prof + "\n"
+  // 文本渲染统计：每段文本的 prep/D2D 提交/读回混合三段耗时（性能诊断）
+  let (rc, rp, rd, rr) = @text.render_stats()
+  let render_line = "NATIVE-APP-RENDER calls=" + rc.to_string() + " prep_us=" + rp.to_string() + " d2d_us=" + rd.to_string() + " read_us=" + rr.to_string()
+  println(render_line)
+  let body = "NATIVE-APP-PROF " + prof + "\n" + render_line + "\n"
   let cwd = @sys.current_dir()
   let _ = if cwd == "" {
     @sys.sys_write_text_file("native-app-prof.txt", body)

@@ -678,3 +678,24 @@ pub fn draw_text_at(
 ) -> Bool {
   draw_at(p, x, y, text, Font::new(family, size), color)
 }
+
+///|
+/// 文本渲染统计（性能诊断）：DWrite 路径 ptw_render 的 [调用数, 准备微秒,
+/// D2D 提交微秒, 读回混合微秒]；非 Windows 后端恒 0。
+pub fn render_stats() -> (Int64, Int64, Int64, Int64) {
+  let calls : Ref[Int64] = Ref(0L)
+  let prep : Ref[Int64] = Ref(0L)
+  let d2d : Ref[Int64] = Ref(0L)
+  let read : Ref[Int64] = Ref(0L)
+  let _ = pt_render_stats(calls, prep, d2d, read)
+  (calls.val, prep.val, d2d.val, read.val)
+}
+
+///|
+#borrow(calls, prep_us, d2d_us, read_us)
+extern "c" fn pt_render_stats(
+  calls : Ref[Int64],
+  prep_us : Ref[Int64],
+  d2d_us : Ref[Int64],
+  read_us : Ref[Int64],
+) -> Int = "pt_render_stats"

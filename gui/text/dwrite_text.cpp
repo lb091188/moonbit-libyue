@@ -534,6 +534,27 @@ struct PtwCanvas {
 
 PtwCanvas g_canvas = {0, 0, nullptr, nullptr, nullptr};
 
+// ---------------------------------------------------------------------------
+// 渲染统计（性能诊断）：ptw_render 的调用数与三段耗时（微秒）——prep（度量
+// 与画笔准备）/ d2d（BeginDraw→EndDraw 提交）/ read（WIC 读回 + 逐像素混合）。
+// 单线程无锁；宿主退出时经 pt_render_stats 读取。
+// ---------------------------------------------------------------------------
+static long long g_st_calls = 0;
+static long long g_st_prep_us = 0;
+static long long g_st_d2d_us = 0;
+static long long g_st_read_us = 0;
+
+static double ptw_now_us() {
+  static LARGE_INTEGER f = [] {
+    LARGE_INTEGER fr;
+    QueryPerformanceFrequency(&fr);
+    return fr;
+  }();
+  LARGE_INTEGER c;
+  QueryPerformanceCounter(&c);
+  return (double)c.QuadPart * 1e6 / (double)f.QuadPart;
+}
+
 void ptw_canvas_reset() {
   if (g_canvas.brush != nullptr) {
     g_canvas.brush->Release();
@@ -628,6 +649,8 @@ int ptw_render(IDWriteTextLayout *layout, float ox, float oy,
   if (!ptw_canvas_ensure(buf_w, buf_h)) {
     return 0;
   }
+  const double st_t0 = ptw_now_us();
+  g_st_calls++;
   // 只清/画/读回/混合「文本自身那一小块」：Clear、WIC 读回与逐像素混合曾都
   // 吃全窗（每段文本一次 5MB 级读回+混合，一帧几百段就是几百次全窗——实测
   // native-app 一帧 paint 235ms 的真身）。布局度量已含墨迹范围（left/top 是
@@ -698,6 +721,8 @@ int ptw_render(IDWriteTextLayout *layout, float ox, float oy,
       cbrushes[nb++] = cb;
     }
   }
+  const double st_t1 = ptw_now_us();
+  g_st_prep_us += (long long)(st_t1 - st_t0);
   g_canvas.rt->BeginDraw();
   // 清本次要用的那块：**必须用 Clear**——「透明色 FillRectangle」在源覆盖语义
   // 下是空操作（实测：缓存画布上旧内容累积，Center/End 对齐的墨迹从 x=0 起）。
@@ -712,11 +737,14 @@ int ptw_render(IDWriteTextLayout *layout, float ox, float oy,
   for (int i = 0; i < nb; i++) {
     cbrushes[i]->Release();
   }
+  const double st_t2 = ptw_now_us();
+  g_st_d2d_us += (long long)(st_t2 - st_t1);
   const int ok = SUCCEEDED(hr) ? 1 : 0;
   if (ok) {
     // 读回 WIC 位图（绘制后必须走 Lock；自持位图的内容就在这里）并做
     // 预乘 BGRA over：out = src + dst·(1 − srcA)（两缓冲同为预乘域）。
     // 只读回文本矩形，混合落在 data 的同一绝对坐标上。
+    const double st_t3 = ptw_now_us();
     WICRect wr = {rx0, ry0, rx1 - rx0, ry1 - ry0};
     IWICBitmapLock *lock = nullptr;
     if (SUCCEEDED(g_canvas.wic->Lock(&wr, WICBitmapLockRead, &lock))) {
@@ -749,7 +777,9 @@ int ptw_render(IDWriteTextLayout *layout, float ox, float oy,
         }
       }
       lock->Release();
+      g_st_read_us += (long long)(ptw_now_us() - st_t3);
     } else {
+      g_st_read_us += (long long)(ptw_now_us() - st_t3);
       return 0;
     }
   }
@@ -1127,6 +1157,23 @@ extern "C" int rt_draw_cr(int64_t cr_id, int64_t h, double x, double y,
   (void)cr_id; (void)h; (void)x; (void)y; (void)box_w; (void)box_h; (void)r0;
   (void)g0; (void)b0; (void)a0;
   return 0; // Windows 无 cairo 会话（同 pt_draw_box_cr）
+}
+
+extern "C" int pt_render_stats(int64_t *calls, int64_t *prep_us,
+                               int64_t *d2d_us, int64_t *read_us) {
+  if (calls != nullptr) {
+    *calls = g_st_calls;
+  }
+  if (prep_us != nullptr) {
+    *prep_us = g_st_prep_us;
+  }
+  if (d2d_us != nullptr) {
+    *d2d_us = g_st_d2d_us;
+  }
+  if (read_us != nullptr) {
+    *read_us = g_st_read_us;
+  }
+  return 1;
 }
 
 #endif // _WIN32
