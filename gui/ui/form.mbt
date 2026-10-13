@@ -46,6 +46,7 @@ pub fn checkbox(
   disabled? : Bool = false,
   enabled? : Enabled? = None,
   size? : Double = 13.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   follow_store(state)
@@ -87,6 +88,7 @@ pub fn checkbox(
     let _ = (text(content, size=size)).mount_into(row)
     row.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
+    fold_style(row, @style.empty_style(), class)
     handle(row)
     row
   })
@@ -216,6 +218,7 @@ pub fn slider(
   step? : Double = 0.0,
   width? : Double = 160.0,
   disabled? : Bool = false,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   follow_store(state)
@@ -284,6 +287,7 @@ pub fn slider(
         @core.Leave => false
       }
     })
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -297,6 +301,7 @@ pub fn progress(
   width? : Double = 200.0,
   height? : Double = 6.0,
   color? : String = "",
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   follow_store(state)
@@ -320,6 +325,7 @@ pub fn progress(
       })
       p.fill_rect(0.0, 0.0, r.w * ratio, r.h)
     })
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -460,6 +466,7 @@ pub fn button(
   focus_id? : Int = 0,
   disabled? : Bool = false,
   enabled? : Enabled? = None,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let src = text_source(text, size=size, align=@text.Center)
@@ -551,6 +558,7 @@ pub fn button(
         @core.Leave => false
       }
     })
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -562,6 +570,7 @@ pub fn link(
   text : String,
   on_click : () -> Unit,
   size? : Double = 13.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let font = @text.Font::new("", size)
@@ -598,6 +607,7 @@ pub fn link(
         _ => false
       }
     })
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -705,6 +715,7 @@ pub fn rate(
   on_change? : (Int) -> Unit = fn(_v : Int) -> Unit { () },
   size? : Double = 22.0,
   gap? : Double = 4.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   follow_store(value)
@@ -768,6 +779,7 @@ pub fn rate(
         }
       }
     })
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -865,6 +877,7 @@ pub fn select(
   width? : Double = 200.0,
   focus_id? : Int = 0,
   editable? : Bool = false,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   if editable {
@@ -930,6 +943,7 @@ pub fn select(
         }
       },
     )
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -949,6 +963,7 @@ pub fn color_picker(
   on_change? : (String) -> Unit = fn(_s : String) -> Unit { () },
   width? : Double = 200.0,
   focus_id? : Int = 0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   follow_store(value)
@@ -1013,6 +1028,7 @@ pub fn color_picker(
         }
       },
     )
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })

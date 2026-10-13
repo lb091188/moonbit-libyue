@@ -17,14 +17,28 @@ pub fn view(
   width? : Double = 0.0,
   height? : Double = 0.0,
   grow? : Double = 0.0,
-  bg? : String = "",
-  border? : String = "",
+  background_color? : String = "",
+  border_color? : String = "",
   align_items? : @yoga.AlignItems = @yoga.AlignItems::Stretch,
   justify_content? : @yoga.JustifyContent = @yoga.JustifyContent::FlexStart,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
+  let blocks : Array[@style.Style] = [
+    match bg_block(background_color) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+    match border_block(border_color) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+  ]
+  let anon = @style.merge_all(blocks)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
+    // 样式先落（class 覆盖散参数由数组顺序保证），再读 resolved 供绘制
+    fold_style(w, anon, class)
     w.node.set_flex_direction(direction)
     w.node.set_align_items(align_items)
     w.node.set_justify_content(justify_content)
@@ -46,17 +60,25 @@ pub fn view(
       w.node.set_min_width(@yoga.fixed(0.0))
       w.node.set_min_height(@yoga.fixed(0.0))
     }
+    let resolved_bg = match @style.resolved(w).background_color {
+      Some(c) => @style.resolve_color(c)
+      None => ""
+    }
+    let resolved_bd = match @style.resolved(w).border_color {
+      Some(c) => @style.resolve_color(c)
+      None => ""
+    }
     w.on_draw = Some(fn(
       _self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      if bg.length() > 0 {
-        p.set_fill_color(bg)
+      if resolved_bg.length() > 0 {
+        p.set_fill_color(resolved_bg)
         p.fill_rect(0.0, 0.0, r.w, r.h)
       }
-      if border.length() > 0 {
-        p.set_stroke_color(border)
+      if resolved_bd.length() > 0 {
+        p.set_stroke_color(resolved_bd)
         p.set_line_width(1.0)
         p.stroke_rect(0.0, 0.0, r.w, r.h)
       }
@@ -85,8 +107,8 @@ pub fn panel(
     padding=padding,
     row_gap=row_gap,
     width=width,
-    bg=@theme.theme_bg_panel(),
-    border=@theme.theme_border(),
+    background_color=@theme.theme_bg_panel(),
+    border_color=@theme.theme_border(),
   )
 }
 
@@ -292,6 +314,7 @@ pub fn icon(
   kind : @icons.IconKind,
   size? : Double = 16.0,
   color? : String = "",
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
@@ -306,6 +329,7 @@ pub fn icon(
       let c = if color.length() > 0 { color } else { @theme.theme_text_regular() }
       @icons.draw_icon(p, kind, r.w / 2.0, r.h / 2.0, size, c)
     })
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -326,6 +350,7 @@ pub fn icon_button(
   color? : String = "",
   disabled? : Bool = false,
   enabled? : Enabled? = None,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
@@ -371,6 +396,7 @@ pub fn icon_button(
         @core.Leave => false
       }
     })
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })

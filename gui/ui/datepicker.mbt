@@ -373,6 +373,7 @@ pub fn date_picker(
   clearable? : Bool = true,
   today? : DateYMD = today_date(),
   width? : Double = 180.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   follow_store(value)
@@ -434,6 +435,7 @@ pub fn date_picker(
         }
       },
     )
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })

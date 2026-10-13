@@ -202,3 +202,62 @@ pub fn relabel(w : @core.Widget, src : TextSource, text : String) -> Unit {
   attach_text_measure(w, src)
   @core.invalidate()
 }
+
+///|
+/// 颜色散参数→`Color`：`#` 开头按 hex、命名色按 named、其余按 theme token 名
+/// （落色画期现取，§1.4）。空串=没给。
+pub fn parse_style_color(hex : String) -> @style.Color? {
+  if hex.length() == 0 {
+    None
+  } else if hex.has_prefix("#") || @style.is_named_color(hex) {
+    Some(@style.parse_color(hex))
+  } else {
+    Some(@style.Var(hex))
+  }
+}
+
+///|
+/// 散参数折块（§1.5「散参数是糖，只有一条去向」）：把一条颜色属性折进匿名块。
+pub fn fold_color(
+  hex : String,
+  set : (@style.Style, @style.Color) -> Unit,
+) -> @style.Style? {
+  match parse_style_color(hex) {
+    Some(c) => {
+      let s = @style.empty_style()
+      set(s, c)
+      Some(s)
+    }
+    None => None
+  }
+}
+
+///|
+/// 三个颜色属性的折块快捷入口（对应散参数 `background_color` / `color` /
+/// `border_color`）。
+pub fn bg_block(hex : String) -> @style.Style? {
+  fold_color(hex, fn(s, c) { s.background_color = Some(c) })
+}
+
+///|
+pub fn fg_block(hex : String) -> @style.Style? {
+  fold_color(hex, fn(s, c) { s.color = Some(c) })
+}
+
+///|
+pub fn border_block(hex : String) -> @style.Style? {
+  fold_color(hex, fn(s, c) { s.border_color = Some(c) })
+}
+
+///|
+/// 组件统一收口（§2「散参数是糖，只有一条去向」）：散参数折成的匿名块排最前，
+/// `class` 在后（数组尾赢 ⇒ `class` > 散参数，不需要第二条优先级规则），
+/// 一次 `merge_all` + `apply` 落到控件样式槽与 Yoga。
+pub fn fold_style(
+  w : @core.Widget,
+  anon : @style.Style,
+  class : Array[@style.Style],
+) -> Unit {
+  @style.apply(w, @style.merge_all([anon] + class))
+}
+

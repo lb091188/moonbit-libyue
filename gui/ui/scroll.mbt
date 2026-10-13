@@ -157,6 +157,7 @@ pub fn scroll_view(
   state : ScrollState,
   width? : Double = 0.0,
   height? : Double = 0.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   @core.node_of_new(fn(viewport : @core.Widget) -> @core.Widget {
@@ -203,6 +204,7 @@ pub fn scroll_view(
       state.scroll_by(0.0 - ev.dy * 30.0)
       state.offset != before
     })
+    fold_style(viewport, @style.empty_style(), class)
     handle(viewport)
     viewport
   })

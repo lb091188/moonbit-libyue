@@ -188,10 +188,10 @@ pub fn page_data(app : @shared.App) -> @core.Node {
         ),
         @ui.row(
           [
-            @ui.avatar("M", size=44.0, bg="#2D68C4"),
-            @ui.avatar("N", size=36.0, bg="#2E9E5B"),
-            @ui.avatar("X", size=30.0, bg="#D64550"),
-            @ui.avatar("L", size=26.0, bg="#D9822B"),
+            @ui.avatar("M", size=44.0, background_color="#2D68C4"),
+            @ui.avatar("N", size=36.0, background_color="#2E9E5B"),
+            @ui.avatar("X", size=30.0, background_color="#D64550"),
+            @ui.avatar("L", size=26.0, background_color="#D9822B"),
           ],
           column_gap=10.0,
         ),
@@ -199,7 +199,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       code=[
         "@ui.tag_of_type(\"Primary\", @ui.Primary)",
         "@ui.tag(\"自定义实底\", \"#2D68C4\")",
-        "@ui.avatar(\"M\", size=44.0, bg=\"#2D68C4\")",
+        "@ui.avatar(\"M\", size=44.0, background_color=\"#2D68C4\")",
       ],
     ),
     @shared.section(

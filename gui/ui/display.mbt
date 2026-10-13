@@ -145,7 +145,7 @@ pub fn badge_dot(size? : Double = 8.0, color? : String = "") -> @core.Node {
 
 ///|
 /// 头像：取文本首字符居中（无图时的占位形态）。
-pub fn avatar(text : String, size? : Double = 32.0, bg? : String = "") -> @core.Node {
+pub fn avatar(text : String, size? : Double = 32.0, background_color? : String = "") -> @core.Node {
   let d = size
   let font = @text.Font::new("", size * 0.45)
   let head = text.to_array()
@@ -159,7 +159,7 @@ pub fn avatar(text : String, size? : Double = 32.0, bg? : String = "") -> @core.
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(if bg.length() > 0 { bg } else { @theme.theme_info_light() })
+      p.set_fill_color(if background_color.length() > 0 { background_color } else { @theme.theme_info_light() })
       p.fill_rect(0.0, 0.0, r.w, r.h)
       let tw = text_width(one, font)
       let th = @text.line_height_font(font).unwrap_or(14).to_double()
@@ -287,8 +287,8 @@ pub fn card(
     body,
     padding=padding,
     row_gap=row_gap,
-    bg=@theme.theme_bg_panel(),
-    border=@theme.theme_border(),
+    background_color=@theme.theme_bg_panel(),
+    border_color=@theme.theme_border(),
   )
 }
 
@@ -534,6 +534,7 @@ pub fn carousel(
   height? : Double = 180.0,
   interval_ms? : Int = 3000,
   rotation? : CarouselHandle = CarouselHandle::make(),
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let n = pages.length()
@@ -703,6 +704,7 @@ pub fn carousel(
         (tick.val)()
       }
     }
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })

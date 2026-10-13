@@ -59,6 +59,7 @@ pub fn popover(
   content : @core.Node,
   width? : Double = 0.0,
   height? : Double = 0.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
@@ -89,6 +90,7 @@ pub fn popover(
         _ => false
       }
     })
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -153,6 +155,7 @@ pub fn dropdown(
   items : Array[String],
   on_select? : (Int) -> Unit = fn(_i : Int) -> Unit { () },
   width? : Double = 150.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let font = @text.Font::new("", 13.0)
@@ -234,6 +237,7 @@ pub fn dropdown(
         _ => false
       }
     })
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -282,6 +286,7 @@ pub fn tooltip(
   content : @core.Node,
   tip : String,
   delay_ms? : Int = 500,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let font = @text.Font::new("", 12.0)
@@ -315,6 +320,7 @@ pub fn tooltip(
         }
       }
     })
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -338,6 +344,7 @@ pub fn dialog(
   on_cancel? : () -> Unit = fn() -> Unit { () },
   close_on_mask? : Bool = false,
   width? : Double = 420.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   // 用显式 mount 而不是 `node_of_new`：后者的 finish 在**构造期**就跑
@@ -564,6 +571,7 @@ pub fn dialog(
       open()
     }
     parent.append_child(anchor)
+    fold_style(anchor, @style.empty_style(), class)
     anchor
     },
   }

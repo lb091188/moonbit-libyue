@@ -594,6 +594,7 @@ pub fn table(
   selection? : @core.Store[Array[Int]],
   sort? : @core.Store[TableSort],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i : Int, _r : TableRow) -> Unit { () },
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let head_h = 40.0
@@ -674,6 +675,7 @@ pub fn table(
     })
     @core.sub_bag_register(fn() { rows.signal().remove(sid) })
     render_all()
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })

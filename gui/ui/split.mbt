@@ -48,6 +48,7 @@ fn splitter_handle_draw(
 /// 分隔布局实现：`horizontal=true` 左右两栏（把手纵向拖动改首栏宽），
 /// `false` 上下两栏（把手横向拖动改首栏高）。
 fn splitter_impl(
+  class : Array[@style.Style],
   horizontal : Bool,
   first : @core.Node,
   second : @core.Node,
@@ -162,6 +163,7 @@ fn splitter_impl(
     w.append_child(first_wrap)
     w.append_child(bar)
     w.append_child(second_wrap)
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -186,6 +188,7 @@ pub fn split(
   // 缺省下限按方向分档（同现状 hsplit 80 / vsplit 60）；None=未给,现场折算
   min_first? : Double = 0.0,
   min_second? : Double = 0.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let horiz = match direction {
@@ -194,7 +197,7 @@ pub fn split(
   }
   let mf = if min_first > 0.0 { min_first } else { if horiz { 80.0 } else { 60.0 } }
   let ms = if min_second > 0.0 { min_second } else { if horiz { 80.0 } else { 60.0 } }
-  splitter_impl(horiz, first, second, ratio, mf, ms, handle=handle)
+  splitter_impl(class, horiz, first, second, ratio, mf, ms, handle=handle)
 }
 
 

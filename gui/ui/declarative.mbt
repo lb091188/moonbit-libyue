@@ -34,9 +34,10 @@ pub fn col(
   width? : Double = 0.0,
   height? : Double = 0.0,
   grow? : Double = 0.0,
-  bg? : String = "",
-  border? : String = "",
+  background_color? : String = "",
+  border_color? : String = "",
   align_items? : @yoga.AlignItems = @yoga.AlignItems::Stretch,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   view(
@@ -47,9 +48,10 @@ pub fn col(
     width=width,
     height=height,
     grow=grow,
-    bg=bg,
-    border=border,
+    background_color=background_color,
+    border_color=border_color,
     align_items=align_items,
+    class=class,
     handle=handle,
   )
 }
@@ -63,9 +65,10 @@ pub fn row(
   width? : Double = 0.0,
   height? : Double = 0.0,
   grow? : Double = 0.0,
-  bg? : String = "",
-  border? : String = "",
+  background_color? : String = "",
+  border_color? : String = "",
   align_items? : @yoga.AlignItems = @yoga.AlignItems::Center,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   view(
@@ -76,9 +79,10 @@ pub fn row(
     width=width,
     height=height,
     grow=grow,
-    bg=bg,
-    border=border,
+    background_color=background_color,
+    border_color=border_color,
     align_items=align_items,
+    class=class,
     handle=handle,
   )
 }
@@ -158,11 +162,12 @@ pub fn hover_group(
   padding? : Double = 8.0,
   row_gap? : Double = 4.0,
   width? : Double = 0.0,
-  bg? : String = "",
+  background_color? : String = "",
   hover_bg? : String = "",
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
-  let base_bg = bg
+  let base_bg = background_color
   let lit_bg = hover_bg
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
@@ -212,6 +217,7 @@ pub fn hover_group(
       }
     })
     @core.mount_children(w, children)
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })

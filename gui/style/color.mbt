@@ -236,6 +236,12 @@ pub fn unknown_token_message(name : String) -> String {
 }
 
 ///|
+/// 命名色判定（大小写不敏感），供「原样颜色串直接入块、不走 token 校验」的调用方。
+pub fn is_named_color(s : String) -> Bool {
+  named_color_hit(s)
+}
+
+///|
 /// 校验 `Var` token 名：认识返回原值，不认识当场 **abort**（应用启动构造样式表
 /// 时一次性出声，不留到绘制期静默回退，design.md §1.5 末条）。
 pub fn check_color(c : Color) -> Color {

@@ -508,6 +508,7 @@ pub fn calendar(
   on_pick? : (DateYMD) -> Unit = fn(_d : DateYMD) -> Unit { () },
   value? : @core.Store[DateYMD?],
   today? : DateYMD = today_date(),
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let t = today
@@ -548,6 +549,7 @@ pub fn calendar(
       Some(s) => follow_store(s)
       None => ()
     }
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })

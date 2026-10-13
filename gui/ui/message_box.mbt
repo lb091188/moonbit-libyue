@@ -103,6 +103,7 @@ pub fn message_box(
   on_dismiss? : () -> Unit = fn() -> Unit { () },
   close_on_mask? : Bool = false,
   width? : Double = 420.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   // 用显式 mount 而不是 `node_of_new`：后者的 finish 在构造期就跑，而「按 Store
@@ -434,6 +435,7 @@ pub fn message_box(
         open()
       }
       parent.append_child(anchor)
+      fold_style(anchor, @style.empty_style(), class)
       anchor
     },
   }

@@ -178,6 +178,7 @@ pub fn textarea(
   focus_id? : Int = 0,
   caret_on? : () -> Bool = fn() -> Bool { true },
   on_change? : (String) -> Unit = fn(_s : String) -> Unit { () },
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let ed = @input.Editor::new()
@@ -523,6 +524,7 @@ pub fn textarea(
       }
     })
     @core.sub_bag_register(fn() { store.remove(sid) })
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })

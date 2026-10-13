@@ -409,8 +409,8 @@ fn panel(
     row_gap=4.0,
     padding=8.0,
     align_items=@yoga.AlignItems::FlexStart,
-    bg=@theme.theme_bg_panel(),
-    border=@theme.theme_border(),
+    background_color=@theme.theme_bg_panel(),
+    border_color=@theme.theme_border(),
   )
 }
 

@@ -113,6 +113,7 @@ fn hover_bg(w : @core.Widget, color : String) -> String {
 pub fn segmented(
   options : Array[String],
   selected : @core.Store[String],
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   follow_store(selected)
@@ -149,7 +150,8 @@ pub fn segmented(
     column_gap=4.0,
     padding=2.0,
     align_items=@yoga.AlignItems::Center,
-    bg=@theme.theme_border(),
+    background_color=@theme.theme_border(),
+    class=class,
     handle=handle,
   )
 }
@@ -160,6 +162,7 @@ pub fn segmented(
 pub fn breadcrumb(
   items : Array[String],
   selected : @core.Store[String],
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   follow_store(selected)
@@ -207,6 +210,7 @@ pub fn breadcrumb(
     nodes,
     direction=@yoga.Row,
     align_items=@yoga.AlignItems::Center,
+    class=class,
     handle=handle,
   )
 }
@@ -217,6 +221,7 @@ pub fn breadcrumb(
 pub fn pagination(
   current : @core.Store[Int],
   pages : Int,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   follow_store(current)
@@ -306,6 +311,7 @@ pub fn pagination(
     direction=@yoga.Row,
     column_gap=4.0,
     align_items=@yoga.AlignItems::Center,
+    class=class,
     handle=handle,
   )
 }
@@ -316,6 +322,7 @@ pub fn pagination(
 pub fn steps(
   items : Array[String],
   current : @core.Store[Int],
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   follow_store(current)
@@ -417,6 +424,7 @@ pub fn steps(
     column_gap=6.0,
     height=40.0,
     align_items=@yoga.AlignItems::Center,
+    class=class,
     handle=handle,
   )
 }
@@ -426,6 +434,7 @@ pub fn steps(
 /// 默认只有第一个展开。
 pub fn collapse(
   panels : Array[(String, Array[@core.Node])],
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let blocks : Array[@core.Node] = []
@@ -434,7 +443,7 @@ pub fn collapse(
     let input = panels[i]
     blocks.push(collapse_panel(input.0, input.1, i == 0))
   }
-  view(blocks, row_gap=2.0, handle=handle)
+  view(blocks, row_gap=2.0, class=class, handle=handle)
 }
 
 ///|
@@ -628,6 +637,7 @@ pub fn menu(
   selected : @core.Store[String],
   icons? : Array[(String, @icons.IconKind)] = [],
   width? : Double = 180.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   follow_store(selected)
@@ -641,6 +651,7 @@ pub fn menu(
     row_gap=2.0,
     padding=6.0,
     align_items=@yoga.AlignItems::FlexStart,
+    class=class,
     handle=handle,
   )
 }
@@ -819,6 +830,7 @@ fn build_tree_rows(
 /// 树形控件：`root` 是顶层节点表，逐层缩进，点有子节点的行展开/收起。
 pub fn tree(
   root : Array[TreeNode],
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
@@ -826,6 +838,7 @@ pub fn tree(
     w.node.set_flex_direction(@yoga.Column)
     w.node.set_width(@yoga.percent(100.0))
     build_tree_rows(w, root, 0)
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -838,6 +851,7 @@ pub fn tree(
 pub fn tabs(
   pages : Array[(String, @core.Node)],
   selected? : @core.Store[Int],
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let n = pages.length()
@@ -936,6 +950,7 @@ pub fn tabs(
     }
     let sid = sel.signal().subscribe(fn(i : Int) -> Unit { show(i) })
     @core.sub_bag_register(fn() { sel.signal().remove(sid) })
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -951,6 +966,7 @@ pub fn transfer(
   right_items : @core.Store[Array[String]],
   width? : Double = 160.0,
   item_height? : Double = 24.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
@@ -1153,6 +1169,7 @@ pub fn transfer(
     w.append_child(mid_btn(false))
     w.append_child(right_box)
     render_all()
+    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
