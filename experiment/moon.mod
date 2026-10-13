@@ -13,3 +13,7 @@ repository = "https://github.com/lb091188/moonbit-native-gui"
 import {
   "NoahLiu/native-gui@0.1.0",
 }
+
+options(
+  "--moonbit-unstable-prebuild": "scripts/prebuild.py",
+)

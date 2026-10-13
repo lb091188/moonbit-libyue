@@ -23,14 +23,16 @@ import sys
 from pathlib import Path
 
 MODULE_ROOT = Path(__file__).resolve().parent.parent  # gui/（库模块根）
-REPO_ROOT = MODULE_ROOT.parent  # 仓库根：跨模块资产（experiment 的探针桩）在这里
 BUILD_DIR = MODULE_ROOT / "build"
 
 # Linux 系统库清单：GTK3 是新栈锁定的后端（零新增运行期依赖，本仓此前已在用），
 # 探针与后续 win 都从这里拿 cflags/libs。
 LINUX_PKG_CONFIG_LIBS = ["gtk+-3.0", "pangoft2", "pangocairo", "fontconfig", "x11"]
 
-IME_PROBE_PACKAGE = "NoahLiu/native-gui-experiment/ime_probe"
+# ime_probe 的链接条目已随包搬回 experiment 模块自己的 prebuild
+# （experiment/scripts/prebuild.py）：experiment 拆独立模块后，moon 按模块
+# 校验 link_configs 包名归属，跨模块条目在此报
+# 「does not match any package in module」、堵死所有 moon test。
 SYS_PACKAGE = "NoahLiu/native-gui/sys"
 WIN_PACKAGE = "NoahLiu/native-gui/win"
 RENDER_PACKAGE = "NoahLiu/native-gui/render"
@@ -98,36 +100,6 @@ def compile_stub(
     if run.returncode != 0:
         print(f"stub: {' '.join(cmd)} 失败\n{run.stderr}", file=sys.stderr)
         return ""
-    return lib.as_posix()
-
-
-def build_ime_probe_stub() -> str:
-    """G0 输入法探针（MoonBit 原生 GUI 栈首个 spike）的 C 端编译。"""
-    src = REPO_ROOT / "experiment" / "ime_probe" / "ime_probe_stub.c"
-    if not src.exists():
-        return ""
-    obj = BUILD_DIR / "ime_probe_stub.o"
-    lib = BUILD_DIR / "libime_probe_stub.a"  # ld 的 -l 命名约定
-    if lib.exists() and lib.stat().st_mtime >= src.stat().st_mtime:
-        return lib.as_posix()
-    cflags: list[str] = []
-    for name in LINUX_PKG_CONFIG_LIBS:
-        got = pkg_config([name], "--cflags")
-        # 空输出是合法的（`--cflags x11` 就是空），只有 None 才是包不存在
-        if got is None:
-            print(f"ime_probe: 缺少 {name} 开发包", file=sys.stderr)
-            return ""
-        cflags.extend(got)
-    BUILD_DIR.mkdir(parents=True, exist_ok=True)
-    cc = shutil.which("cc") or shutil.which("gcc") or "cc"
-    for cmd in (
-        [cc, "-c", "-O0", "-fPIC", "-o", obj.as_posix(), src.as_posix()] + cflags,
-        ["ar", "rcs", lib.as_posix(), obj.as_posix()],
-    ):
-        run = subprocess.run(cmd, capture_output=True, text=True)
-        if run.returncode != 0:
-            print(f"ime_probe: {' '.join(cmd)} 失败\n{run.stderr}", file=sys.stderr)
-            return ""
     return lib.as_posix()
 
 
@@ -220,14 +192,6 @@ def link_configs() -> dict:
                 "package": TEXT_PACKAGE,
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_text_pango "
                 "-lrender_cairo_stub "
-                + " ".join([*libs, *sys_libs]),
-            })
-        stub = build_ime_probe_stub()
-        if stub:
-            entries.append({
-                "package": IME_PROBE_PACKAGE,
-                # 顺序要紧：先库后系统库（GNU ld 单遍扫描）。
-                "link_flags": f"-L{BUILD_DIR.as_posix()} -lime_probe_stub "
                 + " ".join([*libs, *sys_libs]),
             })
     elif system == "Windows":

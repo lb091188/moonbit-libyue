@@ -2,6 +2,7 @@
 /vendor/
 /build/
 /shim/build/
+/experiment/build/
 /.prepare/
 
 # moon 构建产物
