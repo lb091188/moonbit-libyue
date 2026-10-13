@@ -1599,7 +1599,8 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **修法(纯光栅后端,render 包)**:①`composite_solid_span`——纯色**不透明**源 + Normal 算子的整段直写(免逐像素取源/预乘/混合函数调用,预乘 BGRA 序不透明源即原色);②`Raster::fill_device_rect` 先试快路径再走通用 cov 合成;③`Raster::fill_round_rect` **解析填充**——不走路径扫描,按行求墨迹:中段整行(快路径),角部条带像素按「像素中心到角圆心的距离」求覆盖(圆外 0/圆边 AA/圆内 256),轴对齐且 x/y 等比(角仍是圆)才适用,斜矩阵/非等比退通用路径(`fill_round_rect` 返回 Bool,Painter 侧退 `trace_round_rect+fill`)。
 - **陷阱(实测踩过)**:快路径入口**必须先 `apply_fill()`**——直接调 `raster.fill_round_rect` 绕过了 Painter::fill 的设源步骤,画出来的是上一次的源色(表格色块/浮层面板两条像素断言立刻红,即此因)。
 - **实测(paint_probe 同口径复跑)**:单张圆角 20ms→**1ms(20×)**、60 张卡片 432→**23ms(19×)**、直角 60 张 110→**10ms(11×)**、虚拟表格 22→**5ms(4×)**;图表排 56→36ms(矢量路径/stroke 仍是下一大头)。分包 866+ 全绿(仅 virtlist 样式槽 1 条为前端化会话既有红)。
-- **未做**:stroke_round_rect/图表矢量路径(stroke_polys)仍是通用路径——图表页与卡片描边是剩余大头;斜矩阵与非等比缩放下的圆角(椭圆角)仍走通用路径。
+- **收官实测(native-app 真机,五批优化全量后)**:`frames=4421 paint=144299ms`——**全帧 paint 232ms→32.6ms(7.1×)**,max_frame 344→188ms;文本占 paint ~28%(d2d 9.3ms/帧),剩余大头为图表矢量路径与 stroke。布局 0.23ms/帧、present 0.5ms/帧均可忽略。
+- **未做**:stroke_round_rect/图表矢量路径(stroke_polys)仍是通用路径——图表页与卡片描边是剩余大头;斜矩阵与非等比缩放下的圆角(椭圆角)仍走通用路径;DWrite 逐段 BeginDraw/EndDraw 的按帧合并(文本 9.3ms/帧的下一步)。
 
 ### 自维持重绘环:present 与 expose 互相点火(2026-10-13 真机反馈)
 
