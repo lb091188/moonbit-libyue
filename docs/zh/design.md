@@ -187,6 +187,11 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
   进去会把「画的时候」和「量的时候」搅在一起。
   几态同时命中时按 **hover < focus < active** 层叠（后并入的赢，与 CSS 的 `:active` 盖过
   `:hover` 同向）：按下必然也在悬停里，反过来的话按下反馈永远画不出来。
+- **组件的内置皮肤也走同一条槽**：变体配色（按钮的 solid/soft/…）折成「基块 + 状态桶」，
+  存的是 **token 名**而非某一刻的色值，所以换主题后绘制期现取。由此两条覆盖路径分工清楚：
+  散参数（`color=` / `background_color=`）覆盖的是**所有状态**（基块与状态桶取同一个值，
+  悬停不再变色）；`class` 只覆盖它写到的那些属性，点亮态仍由内置桶决定——要把悬停态也
+  定死就写 `.hover(...)`，这与 CSS 的 `.btn` / `.btn:hover` 分层同向。
 - **不挂运算符**：组合只写 `@style.merge(a, b)`。
 - **`Widget` 需要一个存放 resolved `Style` 的位置**：现有 `Widget` 只有 `node` / `kids` /
   `rect` / `visible` / 各回调 / `hovered` / `pressed` / `focused` / `cursor` / `focus_id`，

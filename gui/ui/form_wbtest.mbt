@@ -569,3 +569,81 @@ test "可编辑下拉：点开全量候选、提交文本即过滤、上下键�
   let _ = root.dispatch_commit(1, "丙")
   assert_eq(@core.overlay_count(), 0)
 }
+
+///|
+/// P2-e 口径：按钮皮肤折进样式槽——变体底色存 token 名（随主题现取），
+/// 点亮态来自 hover/active 桶，`class` 覆盖后「所有状态一致」的旧口径照旧。
+test "按钮皮肤走样式槽：hover 桶点亮、class 覆盖、语义色随主题现取" {
+  let b = button("确定", variant=Solid, min_width=80.0)
+  let root = mount_root([b], 200.0, 60.0)
+  let w = kid(root, 0)
+  let corner : () -> (Int, Int, Int, Int) = fn() -> (Int, Int, Int, Int) {
+    // 左下角是内边距区，必是底色而非文字
+    let bm = @render.Bitmap::new(200, 60)
+    let p = @render.Painter::new(bm)
+    root.paint(p)
+    p.end()
+    color_of(bm, (w.rect.x + 2.0).round().to_int(), (w.rect.y + w.rect.h - 3.0).round().to_int())
+  }
+  let base_c = corner()
+  assert_true(base_c != (0, 0, 0, 0))
+  assert_eq(base_c, colour_of_token("primary"))
+  w.hovered = true
+  assert_eq(corner(), colour_of_token("primary_hover"))
+  w.hovered = false
+  w.pressed = true
+  assert_eq(corner(), colour_of_token("primary_hover"))
+  w.pressed = false
+  // 同一棵树不重建，换主题后现取新主色
+  @theme.theme_apply(@theme.dark_theme())
+  let dark_c = corner()
+  @theme.theme_apply(@theme.default_theme())
+  assert_true(dark_c != base_c)
+
+  // 数「红底像素」：class 与散参数两条覆盖路径都用它
+  let red_count : (@core.Node, Bool) -> Int = fn(node : @core.Node, lit : Bool) -> Int {
+    let r = mount_root([node], 200.0, 60.0)
+    let wt = kid(r, 0)
+    wt.hovered = lit
+    let bm = @render.Bitmap::new(200, 60)
+    let p = @render.Painter::new(bm)
+    r.paint(p)
+    p.end()
+    let mut n = 0
+    for y = 0; y < 60; y = y + 1 {
+      for x = 0; x < 200; x = x + 1 {
+        let c = color_of(bm, x, y)
+        if c.0 > 128 && c.1 < 64 && c.2 < 64 {
+          n = n + 1
+        }
+      }
+    }
+    n
+  }
+  let by_param = button("取消", variant=Solid, min_width=80.0, background_color="#ff0000")
+  // 散参数显式覆盖底色：常态与点亮态同色（旧口径「覆盖后悬停不变色」）
+  assert_true(red_count(by_param, false) > 40)
+  assert_true(red_count(by_param, true) > 40)
+  // class 覆盖常态底色：常态变红，点亮态仍取内置皮肤的状态桶（与 CSS 同向）
+  let by_class = button(
+    "取消",
+    variant=Solid,
+    min_width=80.0,
+    class=[@style.style(background_color="#ff0000")],
+  )
+  assert_true(red_count(by_class, false) > 40)
+  assert_true(red_count(by_class, true) < 40)
+}
+
+///|
+/// 参照色：token 名 → 当前主题的落色像素（用绘制层同一套解析）。
+fn colour_of_token(name : String) -> (Int, Int, Int, Int) {
+  let hex = @style.resolve_color(@style.Var(name))
+  let bm = @render.Bitmap::new(4, 4)
+  let p = @render.Painter::new(bm)
+  p.set_fill_color(hex)
+  p.fill_rect(0.0, 0.0, 4.0, 4.0)
+  p.end()
+  let c = bm.pixel(2, 2)
+  (c.r, c.g, c.b, c.a)
+}

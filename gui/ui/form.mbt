@@ -418,35 +418,46 @@ pub(all) enum ButtonVariant {
 }
 
 ///|
+/// 按钮内置皮肤的 **token 名**表（§1.4：token 名单就是 theme 的颜色字段）：
+/// `button` 折进样式槽用的是这份，所以换主题后绘制期现取；`lit` = 点亮态
+/// （悬停或按下）。`#ffffff` 是实底上的白字，不是主题字段，原样给。
+pub fn button_skin_token(variant : ButtonVariant, lit : Bool) -> (String, String) {
+  let fg = match variant {
+    Solid | Danger => "#ffffff"
+    Soft => if lit { "#ffffff" } else { "primary" }
+    Border | Text => "primary"
+  }
+  let bg = match variant {
+    Solid => if lit { "primary_hover" } else { "primary" }
+    Soft => if lit { "primary" } else { "primary_light" }
+    Border => "bg_panel"
+    Text => if lit { "fill_hover" } else { "" }
+    Danger => if lit { "danger_hover" } else { "danger" }
+  }
+  (fg, bg)
+}
+
+///|
 /// 按钮配色求解（纯函数）：`color`/`background_color` 传非空即显式覆盖，
 /// 且**所有状态一致**（悬停不再变色）；未传按变体 + 悬停走预设。返回
-/// `(文字色, 底色)`，底色为空串表示不画底。
+/// `(文字色, 底色)`，底色为空串表示不画底。预设取自 [button_skin_token]
+/// 再落色，所以与样式槽那条路吃同一张表。
 pub fn button_skin(
   variant : ButtonVariant,
   lit : Bool,
   color : String,
   background_color : String,
 ) -> (String, String) {
-  let fg = if color.length() > 0 {
-    color
-  } else {
-    match variant {
-      Solid | Danger => "#ffffff"
-      Soft => if lit { "#ffffff" } else { @theme.theme_primary() }
-      Border | Text => @theme.theme_primary()
+  let (tf, tb) = button_skin_token(variant, lit)
+  let fg = if color.length() > 0 { color } else { @style.resolve_color(@style.parse_color(tf)) }
+  let bg =
+    if background_color.length() > 0 {
+      background_color
+    } else if tb.length() > 0 {
+      @style.resolve_color(@style.parse_color(tb))
+    } else {
+      ""
     }
-  }
-  let bg = if background_color.length() > 0 {
-    background_color
-  } else {
-    match variant {
-      Solid => if lit { @theme.theme_primary_hover() } else { @theme.theme_primary() }
-      Soft => if lit { @theme.theme_primary() } else { @theme.theme_primary_light() }
-      Border => @theme.theme_bg_panel()
-      Text => if lit { @theme.theme_fill_hover() } else { "" }
-      Danger => if lit { @theme.theme_danger_hover() } else { @theme.theme_danger() }
-    }
-  }
   (fg, bg)
 }
 
@@ -470,6 +481,45 @@ pub fn button(
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let src = text_source(text, size=size, align=@text.Center)
+  // 变体皮肤折进样式槽：基块=常态，`hover`/`active` 桶=点亮态（旧口径
+  // `lit = hovered || pressed`，两桶同值）；散参数显式覆盖会让两态取到同一色，
+  // 「覆盖后悬停不再变色」这条现状由 [button_skin_token] 的取值顺序天然保持。
+  let (fg0, bg0) = button_skin_token(variant, false)
+  let (fg1, bg1) = button_skin_token(variant, true)
+  let base_fg = if color.length() > 0 { color } else { fg0 }
+  let base_bg = if background_color.length() > 0 { background_color } else { bg0 }
+  let lit_fg = if color.length() > 0 { color } else { fg1 }
+  let lit_bg = if background_color.length() > 0 { background_color } else { bg1 }
+  let blocks : Array[@style.Style] = [
+    match fg_block(base_fg) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+    match bg_block(base_bg) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+  ]
+  let lit_blocks : Array[@style.Style] = [
+    match fg_block(lit_fg) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+    match bg_block(lit_bg) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+  ]
+  let skin = if variant is Border {
+    @style.merge_all(
+      blocks + [@style.style(border_color="border", border_width=1.0)],
+    )
+  } else {
+    @style.merge_all(blocks)
+  }
+  let lit = @style.merge_all(lit_blocks)
+  skin.hover = Some(lit)
+  skin.active = Some(lit)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     let off = enabled_cell(enabled, disabled)
@@ -483,19 +533,20 @@ pub fn button(
     w.node.set_flex_shrink(0.0)
     w.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
     attach_text_measure(w, src)
+    fold_style(w, skin, class)
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      let (fg0, bg0) = button_skin(
-        variant,
-        self.hovered || self.pressed,
-        color,
-        background_color,
-      )
-      let fg = if off.off { @theme.theme_text_secondary() } else { fg0 }
-      let bg = if off.off { @theme.theme_fill_hover() } else { bg0 }
+      let s = @style.style_for(self)
+      // 禁用态是组件语义，不走样式：文字转次要色、底色统一浅灰
+      let fg = if off.off {
+        @theme.theme_text_secondary()
+      } else {
+        @style.color_of(s.color, "")
+      }
+      let bg = if off.off { @theme.theme_fill_hover() } else { @style.color_of(s.background_color, "") }
       if bg.length() > 0 {
         p.set_fill_color(bg)
         p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -513,18 +564,12 @@ pub fn button(
         valign=@text.Center,
         wrap=false,
       )
-      match variant {
-        Border => {
-          // 边框档常描 1px border 色(内缩 0.5 同浮层口径)
-          p.set_stroke_color(if off.off {
-            @theme.theme_border()
-          } else {
-            @theme.theme_border()
-          })
-          p.set_line_width(1.0)
-          p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
-        }
-        _ => ()
+      // 描边只看样式给没给（Border 档折了一条 1px `border`，其余档没有）
+      let bd = @style.color_of(s.border_color, "")
+      if bd.length() > 0 {
+        p.set_stroke_color(bd)
+        p.set_line_width(@style.number_of(s.border_width, 1.0))
+        p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
       }
       if self.focused {
         match variant {
@@ -558,7 +603,6 @@ pub fn button(
         @core.Leave => false
       }
     })
-    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
