@@ -97,6 +97,8 @@
 
 > ⚠️ 本入口与入口 2 **同名不同物**：入口 2 是 `examples/systemprobe`（原 `native-sys`，系统能力累积验证页，读数前缀 `SYSPROBE-*`）；本入口是独立示例模块 `modules/gui-examples` 里的 7 页探针（读数前缀 `PROBE-*`）。回报时请写明是哪一个。
 
+> 🚫 **启动前置（2026-10-13 定位）**：本入口的 exe 在加载期硬依赖 5 个 ffmpeg dll —— `avcodec-63` / `avformat-63` / `avutil-61` / `swscale-10` / `swresample-7`（`ffmpeg-mbt` 的 C 桩是真绑定，Windows 用 `vendor/*.lib` 导入库链接，见该模块 README）。**缺 dll 时不是媒体页报错，而是进程起不来**：窗口从不出现、控制台一闪就退（Git Bash 退出码 127、零输出）。dll 放 **exe 同目录**或**加进 PATH** 后再跑本入口。Gyan 的 `-full_build` 是静态构建（`bin/` 只有 exe），不能当来源。
+
 - [ ] 探针 Q1 系统能力报告（21 族里 16 族走真调；未接的 5 族以说明行替代）
 - [ ] 探针 Q2 命令与状态
 - [ ] 探针 Q3 视频播放（需 ffmpeg dll 进 PATH）
@@ -108,6 +110,8 @@
 - [ ] 注：本入口的「Q1–Q8」与入口 6 的「平台批 Q1–Q9」在 `_人工测试清单.md` 里**同名不同源**，回报请带前缀（`探针 Q3` / `平台批 Q5`）。
 
 ### 入口 6 · `moon run modules/gui-examples/native-web`（平台批，P0）
+
+> 🚫 **启动前置**：与入口 5 同一个 exe 形态（都链 `ffmpeg-mbt`），**缺 ffmpeg dll 则进程起不来、窗口从不出现**（dll 清单与放法见入口 5 的启动前置框）。另需 WebView2 运行时。
 
 - [ ] 平台批 Q1 网页加载
 - [ ] 平台批 Q2 自定义协议本地内容（中文无乱码、后退真回到桥接页）

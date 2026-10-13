@@ -216,11 +216,13 @@ fn left_pane(app : App, view : @core.Store[ViewId]) -> @core.Node {
   cards.push(
     res_card(@icons.TableIcon, "进程", app.card_proc, None, view, VProc),
   )
+  // 左栏宽度固定 292，**不能**再挂 `flex_grow`：外壳修好后这一行的父容器有了
+  // 确定宽度，左栏一旦也 grow 就会和右栏平分剩余空间，左栏被拉宽、右栏被挤窄。
+  // 竖直方向靠父 hbox 的 `align_items: Stretch` 撑满，本组件不需要额外处理。
   @ui.scroll(
     [@ui.vbox(cards, padding=10.0, row_gap=10.0)],
     @ui.ScrollState::new(),
     width=292.0,
-    handle=fn(v) { v.node.set_flex_grow(1.0) },
   )
 }
 
@@ -310,7 +312,23 @@ fn page_mem_detail(app : App) -> @core.Node {
 /// 组内任意位置（含卡片子控件）都是手型。
 fn app_shell(app : App) -> @core.Node {
   let view : @core.Store[ViewId] = @core.Store::new(VCpu)
+  // 壳必须自己撑满窗口。`cursor_group` 只是 `container` 的壳，**本身既没有
+  // `flex_grow` 也没有宽度**，而它外层那个 hbox 是 Row：不补下面这两句，整棵树
+  // 就退化成「按内容撑」——主轴（水平）缩到内容宽，交叉轴（垂直）又被外层 hbox
+  // 默认的 `align_items: Center` 居中。真机上表现为「内容缩在窗口左侧一小块、
+  // 右半屏与上下全空」，右栏详情页更是只剩标签文字那么宽（2026-10-13 真机反馈
+  // 「sysmonitor 样式错乱」的根因）。主轴靠 `flex_grow`、交叉轴靠 `align_self`。
   @ui.cursor_group(
-    [@ui.hbox([left_pane(app, view), view_area(app, view)], grow=1.0)],
+    [
+      @ui.hbox(
+        [left_pane(app, view), view_area(app, view)],
+        grow=1.0,
+        align_items=@yoga.AlignItems::Stretch,
+      ),
+    ],
+    handle=fn(w : @core.Widget) -> Unit {
+      w.node.set_flex_grow(1.0)
+      w.node.set_align_self(Some(@yoga.AlignItems::Stretch))
+    },
   )
 }
