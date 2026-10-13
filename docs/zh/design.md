@@ -50,20 +50,20 @@ ui 只管组件，三包职责不混。
 后代/子代/兄弟选择器、id 与属性选择器、通配符、
 `!important`、CSS 的**自动继承**。
 
-`Style` 里没有对应字段，setter 也没有同名方法，调用点写不出来。搬迁旧 `.css` 或对照前端
-经验时按下表替换：
+`Style` 里没有对应字段，setter 也没有同名方法，调用点写不出来。这些属性分两类：**已排进
+§5 计划的**见下面引注，落地后就能写；**永远没有的**按下表替换：
 
-> 定位、层序、阴影、透明、动画**能做、已排进 §5 计划**：`position` / `top` / `right` /
-> `bottom` / `left` 并入 P1 字段集（底层 `set_position` / `set_top` … 现成，框架内部滚动条 /
-> 吸顶条 / 关闭按钮 / 覆盖层已在用）；`z_index` 由 yoga-mbt 随 P1 补齐（上游有据可依）；
-> `box_shadow` 进 P4；`opacity` 进 P4 且**完整落地**（整层 global alpha 铺满绘制全路径，
-> 落地即开 `Style.opacity` 字段，不做只支持部分绘制路径的半成品）；`transition` 进 P5。
+> 定位、层序、阴影、透明、动画**能做、已排进 §5 计划**（不在下表——下表只收永远没有的）：
+> `position` / `top` / `right` / `bottom` / `left` 并入 P1 字段集（底层 `set_position` /
+> `set_top` … 现成，框架内部滚动条 / 吸顶条 / 关闭按钮 / 覆盖层已在用）；`z_index` 由
+> yoga-mbt 随 P1 补齐（上游有据可依，落地前层序按 kids 数组序，后者盖上）；`box_shadow` 进
+> P4；`opacity` 进 P4 且**完整落地**（整层 global alpha 铺满绘制全路径，落地即开
+> `Style.opacity` 字段，不做只支持部分绘制路径的半成品）；`transition` 进 P5（落地前状态
+> 变化是直接切换，§1.3 状态桶）。
 
 | 写不出来的东西 | 替代写法 |
 | --- | --- |
 | `grid_template_*` / `grid_area` | `col` / `row` + `gap`；等分用 `flex`（grow） |
-| `z_index` | P1 落地：yoga-mbt 补 `set_z_index` + 子项层序稳定排序（上游同构），gui 绘制按 resolved 值重排 kids；落地前层序就是 kids 数组序（后者盖上，滚动条 / 吸顶条即此形态），跨层浮层走 `@core.overlay`（弹窗/悬浮提示那条既有通道） |
-| `transition` / `animation` | 随 P5 动画批（帧驱动复用 gif 的虚拟时钟与 `invalidate` 回路）；落地前状态变化是直接切换（`hover`/`active`/`focus` 桶，§1.3） |
 | `@media` | **不做**（设计决策）：断点由使用者自己读窗口尺寸，落到不同的 `Style` 常量 |
 | 后代/子代/兄弟选择器、id 与属性选择器、通配符 | 具名 `Style` 常量 + `class=[...]` 组合 |
 | `!important` | 靠数组顺序（§1.3 覆盖顺序），后写的赢 |
