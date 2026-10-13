@@ -647,3 +647,93 @@ fn colour_of_token(name : String) -> (Int, Int, Int, Int) {
   let c = bm.pixel(2, 2)
   (c.r, c.g, c.b, c.a)
 }
+
+///|
+/// P2-e 口径：class 落在宿主上，标记画在内层子控件上——`paint_subset` 把 class 的
+/// 绘制期属性（只这几条，布局属性不外溢）叠到标记控件的内置基调之上。
+test "表单族只读样式槽：class 的绘制色落到标记控件" {
+  let warm = fn(bm : @render.Bitmap, x0 : Int, y0 : Int, w : Int, h : Int) -> Int {
+    let mut n = 0
+    for y = y0; y < y0 + h; y = y + 1 {
+      for x = x0; x < x0 + w; x = x + 1 {
+        let c = color_of(bm, x, y)
+        if c.0 > 128 && c.1 < 64 && c.2 < 64 {
+          n = n + 1
+        }
+      }
+    }
+    n
+  }
+  let cool = fn(bm : @render.Bitmap, x0 : Int, y0 : Int, w : Int, h : Int) -> Int {
+    let mut n = 0
+    for y = y0; y < y0 + h; y = y + 1 {
+      for x = x0; x < x0 + w; x = x + 1 {
+        let c = color_of(bm, x, y)
+        if c.2 > 128 && c.0 < 64 && c.1 < 64 {
+          n = n + 1
+        }
+      }
+    }
+    n
+  }
+  // 复选框：勾（color）与未选框（border_color）各吃一条 class 属性
+  let on = @core.Store::new(true)
+  let root = mount_root(
+    [checkbox("同意", on, class=[@style.style(color="#ff0000", border_color="#0000ff")])],
+    200.0,
+    40.0,
+  )
+  let box = kid(root, 0).children()[0]
+  let bm = @render.Bitmap::new(200, 40)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  let bx = box.rect.x.round().to_int()
+  let by = box.rect.y.round().to_int()
+  // 选中：勾与框都取强调色（class 的 color）
+  assert_true(warm(bm, bx, by, 14, 14) > 4)
+  let off_box = @core.Store::new(false)
+  let root_off = mount_root(
+    [checkbox("不同意", off_box, class=[@style.style(color="#ff0000", border_color="#0000ff")])],
+    200.0,
+    40.0,
+  )
+  let ob = kid(root_off, 0).children()[0]
+  let bm_off = @render.Bitmap::new(200, 40)
+  let pp = @render.Painter::new(bm_off)
+  root_off.paint(pp)
+  pp.end()
+  // 未选：框描边取 class 的 border_color
+  assert_true(cool(bm_off, ob.rect.x.round().to_int(), ob.rect.y.round().to_int(), 14, 14) > 10)
+
+  // 开关：开态底色吃 class 的 background_color，滑珠仍内置白
+  let sw = @core.Store::new(true)
+  let root2 = mount_root(
+    [switch(sw, class=[@style.style(background_color="#ff0000")])],
+    200.0,
+    40.0,
+  )
+  let pill = kid(root2, 0).children()[0]
+  let bm2 = @render.Bitmap::new(200, 40)
+  let p2 = @render.Painter::new(bm2)
+  root2.paint(p2)
+  p2.end()
+  let px0 = pill.rect.x.round().to_int()
+  let py0 = pill.rect.y.round().to_int()
+  // 胶囊左半（滑珠在右）整片是底色
+  assert_true(warm(bm2, px0 + 1, py0 + 1, 14, 18) > 100)
+
+  // 滑块：强调色吃 class 的 color（轨道底仍内置 border 色）
+  let v = @core.Store::new(80.0)
+  let root3 = mount_root(
+    [slider(v, min=0.0, max=100.0, width=120.0, class=[@style.style(color="#ff0000")])],
+    200.0,
+    40.0,
+  )
+  let bar = kid(root3, 0)
+  let bm3 = @render.Bitmap::new(200, 40)
+  let p3 = @render.Painter::new(bm3)
+  root3.paint(p3)
+  p3.end()
+  assert_true(warm(bm3, bar.rect.x.round().to_int(), 0, 120, 40) > 60)
+}

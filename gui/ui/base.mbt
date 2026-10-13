@@ -286,3 +286,24 @@ pub fn fold_style(
   @style.apply(w, @style.merge_all([anon] + class))
 }
 
+///|
+/// 标记控件的取色口径（§1.5「只有读 resolved Style 一条路径」的收尾）：勾选点、
+/// 单选环、开关滑珠、滑块拇指这类标记画在**子控件**上，而 `class` 落在外层宿主；
+/// 子控件的 `on_draw` 只读自己的样式槽，所以建树时从 `class` 里**只摘绘制期属性**
+/// （`color` / `background_color` / `border_color` / `border_width` / `border_radius`
+/// 与三个状态桶）叠在组件内置基调之上。布局属性（宽度、内边距那批）不外溢给标记，
+/// 一个「组」的 class 于是同时管得住整行排版与标记配色。
+pub fn paint_subset(class : Array[@style.Style]) -> @style.Style {
+  let s = @style.merge_all(class)
+  let out = @style.empty_style()
+  out.color = s.color
+  out.background_color = s.background_color
+  out.border_color = s.border_color
+  out.border_width = s.border_width
+  out.border_radius = s.border_radius
+  out.hover = s.hover
+  out.active = s.active
+  out.focus = s.focus
+  out
+}
+

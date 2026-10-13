@@ -55,25 +55,28 @@ pub fn checkbox(
     let box = @core.Widget::new()
     box.node.set_width(@yoga.fixed(14.0))
     box.node.set_height(@yoga.fixed(14.0))
+    // 标记的内置基调存 token 名（随主题现取）：强调色=primary，未选框色=border
+    @style.apply(
+      box,
+      @style.merge_all([@style.style(color="primary", border_color="border"), paint_subset(class)]),
+    )
     box.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       _r : @core.Rect,
     ) -> Unit {
+      let s = @style.style_for(self)
+      let accent = @style.color_of(s.color, "")
+      let edge = @style.color_of(s.border_color, "")
       let checked = state.get()
-      let edge = if checked && !off.off {
-        @theme.theme_primary()
-      } else {
-        @theme.theme_border()
-      }
-      p.set_stroke_color(edge)
+      p.set_stroke_color(if checked && !off.off { accent } else { edge })
       p.set_line_width(1.0)
       p.stroke_rect(0.0, 0.0, 14.0, 14.0)
       if checked {
         p.set_stroke_color(if off.off {
           @theme.theme_text_secondary()
         } else {
-          @theme.theme_primary()
+          accent
         })
         p.move_to(3.0, 7.5)
         p.line_to(6.0, 10.5)
@@ -102,6 +105,7 @@ pub fn radio_group(
   disabled? : Bool = false,
   direction? : @yoga.FlexDirection = @yoga.Row,
   gap? : Double = 12.0,
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   follow_store(state)
   let is_row = match direction {
@@ -114,17 +118,20 @@ pub fn radio_group(
     let dot = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
       w.node.set_width(@yoga.fixed(14.0))
       w.node.set_height(@yoga.fixed(14.0))
+      // 内置基调存 token 名：选中=primary，未选环=border
+      @style.apply(
+        w,
+        @style.merge_all([@style.style(color="primary", border_color="border"), paint_subset(class)]),
+      )
       w.on_draw = Some(fn(
-        _self : @core.Widget,
+        self : @core.Widget,
         p : @render.Painter,
         _r : @core.Rect,
       ) -> Unit {
+        let s = @style.style_for(self)
+        let accent = @style.color_of(s.color, "")
         let picked = state.get() == idx
-        p.set_stroke_color(if picked && !disabled {
-          @theme.theme_primary()
-        } else {
-          @theme.theme_border()
-        })
+        p.set_stroke_color(if picked && !disabled { accent } else { @style.color_of(s.border_color, "") })
         p.set_line_width(1.0)
         p.move_to(13.0, 7.0)
         p.arc(7.0, 7.0, 6.0, 0.0, 6.283185307179586)
@@ -133,7 +140,7 @@ pub fn radio_group(
           p.set_fill_color(if disabled {
             @theme.theme_text_secondary()
           } else {
-            @theme.theme_primary()
+            accent
           })
           p.move_to(10.0, 7.0)
           p.arc(7.0, 7.0, 3.5, 0.0, 6.283185307179586)
@@ -148,6 +155,7 @@ pub fn radio_group(
         direction=@yoga.Row,
         column_gap=6.0,
         align_items=@yoga.AlignItems::Center,
+        class=class,
         handle=fn(w : @core.Widget) -> Unit {
           attach_toggle(w, fn() { state.set(idx) }, Enabled::new(disabled))
         },
@@ -170,6 +178,7 @@ pub fn switch(
   on_text? : String = "",
   off_text? : String = "",
   disabled? : Bool = false,
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   follow_store(state)
   @core.node_of_new(fn(row : @core.Widget) -> @core.Widget {
@@ -177,21 +186,32 @@ pub fn switch(
     let pill = @core.Widget::new()
     pill.node.set_width(@yoga.fixed(40.0))
     pill.node.set_height(@yoga.fixed(20.0))
+    // 标记控件的基调存 token 名：开态底色=primary，关态=border，滑珠=白
+    @style.apply(
+      pill,
+      @style.merge_all([
+        @style.style(color="#ffffff", background_color="primary", border_color="border"),
+        paint_subset(class),
+      ]),
+    )
     pill.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
+      let s = @style.style_for(self)
       let on = state.get()
-      p.set_fill_color(if off.off {
+      // 禁用态底色是组件语义（不随 class），仍走主题浅灰
+      let body = if off.off {
         @theme.theme_fill_hover()
       } else if on {
-        @theme.theme_primary()
+        @style.color_of(s.background_color, "")
       } else {
-        @theme.theme_border()
-      })
+        @style.color_of(s.border_color, "")
+      }
+      p.set_fill_color(body)
       p.fill_rect(0.0, 0.0, r.w, r.h)
-      p.set_fill_color("#ffffff")
+      p.set_fill_color(@style.color_of(s.color, "#ffffff"))
       let kx = if on { r.w - 18.0 } else { 2.0 }
       p.fill_rect(kx, 2.0, 16.0, 16.0)
     })
@@ -205,6 +225,7 @@ pub fn switch(
     }
     row.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
+    fold_style(row, @style.empty_style(), class)
     row
   })
 }
@@ -242,23 +263,25 @@ pub fn slider(
       state.set(v.clamp(min=lo, max=hi))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
+      // 强调色（已填充段与拇指）=样式 color，轨道底=border_color
+      let s = @style.style_for(self)
       let track = (r.w - 12.0).max(1.0)
       let ratio = ((state.get() - lo) / (hi - lo)).clamp(min=0.0, max=1.0)
       let cy = r.h / 2.0
       p.set_fill_color(if off.off {
         @theme.theme_fill_hover()
       } else {
-        @theme.theme_border()
+        @style.color_of(s.border_color, @theme.theme_border())
       })
       p.fill_rect(0.0, cy - 2.0, r.w, 4.0)
       p.set_fill_color(if off.off {
         @theme.theme_text_secondary()
       } else {
-        @theme.theme_primary()
+        @style.color_of(s.color, @theme.theme_primary())
       })
       p.fill_rect(0.0, cy - 2.0, 6.0 + track * ratio, 4.0)
       p.fill_rect(2.0 + track * ratio, cy - 6.0, 12.0, 12.0)
@@ -287,7 +310,7 @@ pub fn slider(
         @core.Leave => false
       }
     })
-    fold_style(w, @style.empty_style(), class)
+    fold_style(w, @style.style(color="primary", border_color="border"), class)
     handle(w)
     w
   })
@@ -306,26 +329,32 @@ pub fn progress(
 ) -> @core.Node {
   follow_store(state)
   let hi = if max > 0.0 { max } else { 1.0 }
+  let blocks : Array[@style.Style] = [
+    @style.style(background_color="fill_zebra"),
+    match fg_block(if color.length() > 0 { color } else { "primary" }) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+  ]
+  let anon = @style.merge_all(blocks)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(height))
+    fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
+      // 槽底=background_color，进度段=color（散参数 color 折块，class 覆盖同一条路）
+      let s = @style.style_for(self)
       let ratio = (state.get() / hi).clamp(min=0.0, max=1.0)
-      p.set_fill_color(@theme.theme_fill_zebra())
+      p.set_fill_color(@style.color_of(s.background_color, @theme.theme_fill_zebra()))
       p.fill_rect(0.0, 0.0, r.w, r.h)
-      p.set_fill_color(if color.length() > 0 {
-        color
-      } else {
-        @theme.theme_primary()
-      })
+      p.set_fill_color(@style.color_of(s.color, ""))
       p.fill_rect(0.0, 0.0, r.w * ratio, r.h)
     })
-    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -339,6 +368,7 @@ pub fn stepper(
   min? : Int = 0,
   max? : Int = 999,
   step? : Int = 1,
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   let lo = min
   let hi = if max > min { max } else { min }
@@ -353,13 +383,18 @@ pub fn stepper(
   let value = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     w.node.set_width(@yoga.fixed(44.0))
     w.node.set_height(@yoga.fixed(@theme.control_height))
+    @style.apply(
+      w,
+      @style.merge_all([@style.style(border_color="border", color="text_regular"), paint_subset(class)]),
+    )
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_stroke_color(@theme.theme_border())
-      p.set_line_width(1.0)
+      let st = @style.style_for(self)
+      p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+      p.set_line_width(@style.number_of(st.border_width, 1.0))
       p.stroke_rect(0.0, 0.0, r.w, r.h)
       let txt = state.get().to_string()
       let tw = match @text.measure(txt, 13.0) {
@@ -372,7 +407,7 @@ pub fn stepper(
         7.0,
         txt,
         13.0,
-        @theme.theme_text_regular(),
+        @style.color_of(st.color, @theme.theme_text_regular()),
       )
     })
     w
@@ -403,6 +438,7 @@ pub fn stepper(
     ],
     direction=@yoga.Row,
     align_items=@yoga.AlignItems::Center,
+    class=class,
   )
 }
 
@@ -630,9 +666,11 @@ pub fn link(
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      let _ = @text.draw_at(p, 0.0, 0.0, text, font, @theme.theme_primary())
+      let s = @style.style_for(self)
+      let hue = @style.color_of(s.color, @theme.theme_primary())
+      let _ = @text.draw_at(p, 0.0, 0.0, text, font, hue)
       if self.hovered {
-        p.set_fill_color(@theme.theme_primary())
+        p.set_fill_color(hue)
         p.fill_rect(0.0, r.h - 1.0, r.w, 1.0)
       }
     })
@@ -801,10 +839,13 @@ pub fn rate(
       }
     })
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       _r : @core.Rect,
     ) -> Unit {
+      let st = @style.style_for(self)
+      let lit_c = @style.color_of(st.color, @theme.theme_primary())
+      let dim_c = @style.color_of(st.border_color, @theme.theme_border())
       let cur = value.get()
       for i = 1; i <= n; i = i + 1 {
         let cx = (i - 1).to_double() * (size + gap) + size / 2.0
@@ -812,18 +853,18 @@ pub fn rate(
         // 悬停预亮优先于当前值（离开时 hover_n 归 0）
         let lit = if hover_n.val > 0 { i <= hover_n.val } else { i <= cur }
         if lit {
-          p.set_fill_color(@theme.theme_primary())
+          p.set_fill_color(lit_c)
           star_path(p, cx, cy, size / 2.0 - 1.0)
           p.fill()
         } else {
-          p.set_stroke_color(@theme.theme_border())
+          p.set_stroke_color(dim_c)
           p.set_line_width(1.0)
           star_path(p, cx, cy, size / 2.0 - 1.0)
           p.stroke()
         }
       }
     })
-    fold_style(w, @style.empty_style(), class)
+    fold_style(w, @style.style(color="primary", border_color="border"), class)
     handle(w)
     w
   })
@@ -840,17 +881,24 @@ fn select_row(opt : String, selected : () -> Bool, on_pick : () -> Unit) -> @cor
     w.node.set_height(@yoga.fixed(28.0))
     w.node.set_flex_shrink(0.0)
     w.cursor = @core.CURSOR_HAND
+    // 内置基调：常态文字 text_regular，悬停底 fill_hover（选中态见下方注释）
+    @style.apply(
+      w,
+      @style.style(color="text_regular").hover(background_color="fill_hover"),
+    )
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
+      let st = @style.style_for(self)
       let act = selected()
       if act {
         p.set_fill_color(@theme.theme_primary_light())
         p.fill_rect(0.0, 0.0, r.w, r.h)
-      } else if self.hovered {
-        p.set_fill_color(@theme.theme_fill_hover())
+      } else if st.background_color is Some(_) {
+        // 悬停底色来自 hover 桶（样式没给就不画底）
+        p.set_fill_color(@style.color_of(st.background_color, ""))
         p.fill_rect(0.0, 0.0, r.w, r.h)
       }
       let _ = @text.draw_box_at(
@@ -861,7 +909,7 @@ fn select_row(opt : String, selected : () -> Bool, on_pick : () -> Unit) -> @cor
         r.h,
         opt,
         font,
-        if act { @theme.theme_primary() } else { @theme.theme_text_regular() },
+        if act { @theme.theme_primary() } else { @style.color_of(st.color, @theme.theme_text_regular()) },
         align=@text.Start,
         valign=@text.Center,
       )
@@ -1094,14 +1142,17 @@ fn color_swatch(
     w.node.set_flex_shrink(0.0)
     w.cursor = @core.CURSOR_HAND
     w.set_margin(right=gap)
+    // 格子的色是数据不是样式，但仍走同一条槽：折成 background_color 供绘制期读
+    @style.apply(w, @style.style(background_color=c))
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(c)
+      let st = @style.style_for(self)
+      p.set_fill_color(@style.color_of(st.background_color, c))
       p.fill_rect(0.0, 0.0, r.w, r.h)
-      p.set_stroke_color(@theme.theme_border())
+      p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
       p.set_line_width(1.0)
       p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
       if selected() {
