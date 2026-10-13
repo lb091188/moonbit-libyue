@@ -41,7 +41,7 @@ test {
   // 分离式启动：命令名为空与命令不存在都失败，`true` 交得出去。
   // Windows 侧正例走 ShellExecuteW，成功即真的拉起一个进程（`true.exe` 在
   // PATH 里不一定存在，取决于是否从 Git Bash 起），故只断负例；正例与
-  // 「不阻塞」由 examples/native-sys 的按钮在真机回证（设置类动作归使用者）。
+  // 「不阻塞」由 examples/systemprobe 的按钮在真机回证（设置类动作归使用者）。
   assert_true(spawn_detached("", "x") is Err(_))
   assert_true(spawn_detached("launcher_no_such_bin_zzz", "x") is Err(_))
   if sys_platform() == "windows" {

@@ -1,7 +1,7 @@
-// examples/native-sys —— 系统能力（`sys`）的**累积**验证示例：每落地一族
+// examples/systemprobe —— 系统能力（`sys`）的**累积**验证示例：每落地一族
 // 就把读数接进本页，同族不另开示例（GUI 侧的累计页是 `examples/native-app`）。
 //
-// 跑法：`moon run examples/native-sys`（需显示服务），12 秒后自动退出并打印
+// 跑法：`moon run examples/systemprobe`（需显示服务），12 秒后自动退出并打印
 // 状态行。屏上每行一个**只读**探测；「重新探测」按钮也是只读（注入回证用它），
 // 「打开链接」「打开目录」是设置类——点了才交给系统，观感由使用者复验。
 
@@ -448,21 +448,21 @@ fn main {
   match @dbus.claim_name(app_id) {
     Ok(PrimaryOwner) | Ok(AlreadyOwner) =>
       @dbus.on_wake(fn(_args : Array[String]) -> Unit {
-        println("NATIVE-SYS-INST: 收到第二实例的唤起")
+        println("SYSPROBE-INST: 收到第二实例的唤起")
       })
     Ok(AlreadyExists) | Ok(InQueue) => {
       match @dbus.wake_existing(app_id, []) {
-        Ok(_) => println("NATIVE-SYS-INST: 已有实例，已唤起并退出")
-        Err(e) => println("NATIVE-SYS-INST: 唤起失败(\{e})，退出")
+        Ok(_) => println("SYSPROBE-INST: 已有实例，已唤起并退出")
+        Err(e) => println("SYSPROBE-INST: 唤起失败(\{e})，退出")
       }
       return
     }
-    Err(e) => println("NATIVE-SYS-INST: 单实例降级（\{e}）")
+    Err(e) => println("SYSPROBE-INST: 单实例降级（\{e}）")
   }
-  let app = match @core.App::new(1200, 1180, "MoonBit 系统能力 (native-sys)") {
+  let app = match @core.App::new(1200, 1180, "MoonBit 系统能力 (systemprobe)") {
     Some(a) => a
     None => {
-      println("NATIVE-SYS-SKIP: 本平台无窗口后端或没有显示服务")
+      println("SYSPROBE-SKIP: 本平台无窗口后端或没有显示服务")
       return
     }
   }
@@ -492,7 +492,7 @@ fn main {
   let hist_store = @core.Store::new(join_lines(probe_history(counts)))
   let wins_store = @core.Store::new(join_lines(probe_windows(counts)))
   // W21d 开机自启：设置类（写盘 / 写注册表），只给按钮；初值只做只读定位
-  let auto_id = "com.moonbit.libyue.nativesys"
+  let auto_id = "com.moonbit.libyue.systemprobe"
   let auto_on_hits = @core.Store::new(0)
   let auto_state = @core.Store::new(
     match @sys.autostart_path(auto_id) {
@@ -631,7 +631,7 @@ fn main {
             let pct = if n >= 3 { 90 } else { 30 * (n + 1) }
             match
               @dbus.notify_send(
-                "MoonBit native-sys",
+                "MoonBit systemprobe",
                 "系统能力验证页",
                 "第 " + (n + 1).to_string() + " 击，进度 " + pct.to_string() + "%",
                 progress=pct,
@@ -660,7 +660,7 @@ fn main {
                 tray_state.set("托盘：已移除")
               }
               None => {
-                match @dbus.Item::create("native-sys", "") {
+                match @dbus.Item::create("systemprobe", "") {
                   Ok(it) => {
                     it.set_title("MoonBit 系统能力页")
                     it.set_tooltip("MoonBit", "点一下计数（窗口里看）")
@@ -762,7 +762,7 @@ fn main {
     Some(it) => it.unregister()
     None => ()
   }
-  let mut geo = "NATIVE-SYS-GEO"
+  let mut geo = "SYSPROBE-GEO"
   for kv in [
     ("probe", btn_probe),
     ("open", btn_open),
@@ -781,7 +781,7 @@ fn main {
   println(geo)
   let c = counts.val
   println(
-    "NATIVE-SYS-STAT os=\{c.os_id} de=\{c.desktop} mon=\{c.monitors} " +
+    "SYSPROBE-STAT os=\{c.os_id} de=\{c.desktop} mon=\{c.monitors} " +
       "wp=\{c.wallpaper} vol=\{c.volume} prof=\{c.profile} mime=\{c.mime} " +
       "def=\{c.default_app} apps=\{c.apps} recent=\{c.recent} " +
       "hist=\{c.hist} dl=\{c.downloads} bm=\{c.bookmarks} ffx=\{c.firefox} " +
@@ -794,7 +794,7 @@ fn main {
   // W21d 自启动回证：支持性 / 当前启用态 / 当前 exe / 落点 / 按钮命中数。
   // is_enabled 是即时读盘 / 读注册表，关窗后照读（与窗口读数不同）。
   println(
-    "NATIVE-SYS-AUTOSTART supported=" +
+    "SYSPROBE-AUTOSTART supported=" +
     (if @sys.autostart_supported() { "1" } else { "0" }) +
     " enabled=" +
     (match @sys.autostart_is_enabled(auto_id) {
@@ -816,7 +816,7 @@ fn main {
   )
   // W21e 空闲回证：支持性 / 当次读数（关窗后照读）/ 按钮命中数 / 状态行。
   println(
-    "NATIVE-SYS-IDLE supported=" +
+    "SYSPROBE-IDLE supported=" +
     (if @sys.idle_supported() { "1" } else { "0" }) +
     " seconds=" +
     (match @sys.idle_seconds() {

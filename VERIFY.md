@@ -13,7 +13,7 @@
 ```sh
 moon run examples/native-web      # 已去掉自杀点：不再自己退，关窗即退
 moon run examples/native-app
-moon run examples/native-sys
+moon run examples/systemprobe
 moon run examples/native-window
 ```
 
@@ -63,7 +63,7 @@ moon run examples/native-window
 | A3-5 | 切系统深浅 / 主色（XFCE 无此通道时按亮色预设走，属已知降级） | 有通道的桌面下界面实时联动；无通道时保持亮色不刷屏 | 扫一眼 | |
 | A3-6 | 十族组件扫一遍（基础/表单/导航/数据/反馈/浮层/日期/表格/虚拟表/粘性列表/Markdown） | 没有明显画错、错位、点不动 | 扫一眼 | |
 
-### A4 native-sys · 系统能力 / 托盘 / 文件对话框
+### A4 systemprobe · 系统能力 / 托盘 / 文件对话框
 
 | # | 操作 | 期望 | 级别 | 结果 |
 |---|---|---|---|---|
