@@ -240,3 +240,61 @@ test "Store 被外部改动会回灌内核；焦点标志由宿主同步" {
   root.set_focused_by_focus(8)
   assert_false(w.focused)
 }
+
+///|
+/// P2-e 口径：输入框的底色/描边/文字色与焦点框色都走样式槽——内置皮肤先折进槽
+/// （常态 + focus 桶），`class` 的同名属性覆盖；选区、preedit、占位符、禁用态是
+/// 编辑器的语义态，按 §1.5 留内置配色当回落值。
+test "输入框只读样式槽：class 覆盖底与描边，焦点框色来自 focus 桶" {
+  if !ui_text_guard() {
+    return
+  }
+  let v = @core.Store::new("内容")
+  let root = mount_root(
+    [input(
+      v,
+      width=120.0,
+      class=[@style.style(background_color="#ff0000", border_color="#0000ff")],
+    )],
+    200.0,
+    60.0,
+  )
+  let w = kid(root, 0)
+  let bm = @render.Bitmap::new(200, 60)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  let mut red = 0
+  let mut cool = 0
+  for y = 0; y < w.rect.h.to_int(); y = y + 1 {
+    for x = 0; x < w.rect.w.to_int(); x = x + 1 {
+      let c = color_of(bm, x, y)
+      if c.0 > 128 && c.1 < 64 && c.2 < 64 {
+        red = red + 1
+      }
+      if c.2 > 128 && c.0 < 64 && c.1 < 64 {
+        cool = cool + 1
+      }
+    }
+  }
+  assert_true(red > 100)
+  // 描边是 class 的蓝色（上下两条边）
+  assert_true(cool > 40)
+
+  // 焦点态：内置 focus 桶给主色描边，与未聚焦的描边灰不同
+  let v2 = @core.Store::new("甲")
+  let root2 = mount_root([input(v2, width=120.0)], 200.0, 60.0)
+  let w2 = kid(root2, 0)
+  let edge : () -> (Int, Int, Int, Int) = fn() -> (Int, Int, Int, Int) {
+    let b = @render.Bitmap::new(200, 60)
+    let pp = @render.Painter::new(b)
+    root2.paint(pp)
+    pp.end()
+    color_of(b, w2.rect.x.round().to_int() + 4, w2.rect.y.round().to_int())
+  }
+  let plain_edge = edge()
+  w2.focused = true
+  let focus_edge = edge()
+  assert_true(plain_edge != focus_edge)
+  w2.focused = false
+}

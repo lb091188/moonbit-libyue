@@ -135,7 +135,8 @@ pub fn input(
     ) -> Unit {
       let lh = @text.line_height_font(font).unwrap_or(18).to_double()
       let ty = ((r.h - lh) / 2.0).max(0.0)
-      p.set_fill_color(@theme.theme_bg_panel())
+      let st = @style.style_for(self)
+      p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
       p.fill_rect(0.0, 0.0, r.w, r.h)
       match ed.selection() {
         Some((s, e)) => {
@@ -146,12 +147,9 @@ pub fn input(
         }
         None => ()
       }
-      p.set_stroke_color(if self.focused {
-        @theme.theme_primary()
-      } else {
-        @theme.theme_border()
-      })
-      p.set_line_width(1.0)
+      // 焦点框色改由 focus 桶供（样式没给就回落到主题描边色）
+      p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+      p.set_line_width(@style.number_of(st.border_width, 1.0))
       p.stroke_rect(0.0, 0.0, r.w, r.h)
       let txt = show_text()
       let pe = ed.preedit_text()
@@ -164,7 +162,7 @@ pub fn input(
           let _ = @text.draw_at(p, pad, ty, txt, font, if off.off {
             @theme.theme_text_secondary()
           } else {
-            @theme.theme_text_regular()
+            @style.color_of(st.color, @theme.theme_text_regular())
           })
         }
         if pe.length() > 0 {
@@ -275,7 +273,12 @@ pub fn input(
       }
     })
     @core.sub_bag_register(fn() { store.remove(sid) })
-    fold_style(w, @style.empty_style(), class)
+    // 内置皮肤（底色/描边/文字色 + 焦点框色）先折槽，class 同名属性覆盖
+    fold_style(
+      w,
+      @style.style(background_color="bg_panel", border_color="border", border_width=1.0, color="text_regular").focus(border_color="primary"),
+      class,
+    )
     handle(w)
     w
   })

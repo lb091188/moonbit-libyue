@@ -290,7 +290,8 @@ pub fn textarea(
       // 几何抄进状态（滚动条比例与夹取都用它）：内容高 = 行数 × 行高
       st.view_h = (r.h - pad).max(1.0)
       st.content_h = lines.length().to_double() * line_h + pad * 2.0
-      p.set_fill_color(@theme.theme_bg_panel())
+      let sty = @style.style_for(self)
+      p.set_fill_color(@style.color_of(sty.background_color, @theme.theme_bg_panel()))
       p.fill_rect(0.0, 0.0, r.w, r.h)
       let sel = ed.selection()
       let caret = ed.caret_pos()
@@ -325,7 +326,11 @@ pub fn textarea(
             y,
             byte_slice(t, ln.start, ln.end),
             font,
-            if off.off { @theme.theme_text_secondary() } else { @theme.theme_text_regular() },
+            if off.off {
+              @theme.theme_text_secondary()
+            } else {
+              @style.color_of(sty.color, @theme.theme_text_regular())
+            },
           )
         }
       }
@@ -343,12 +348,9 @@ pub fn textarea(
         p.set_fill_color(@theme.theme_text_primary())
         p.fill_rect(cx, cy, 1.0, line_h)
       }
-      p.set_stroke_color(if self.focused {
-        @theme.theme_primary()
-      } else {
-        @theme.theme_border()
-      })
-      p.set_line_width(1.0)
+      // 焦点框色由 focus 桶供（样式没给就回落主题描边色）
+      p.set_stroke_color(@style.color_of(sty.border_color, @theme.theme_border()))
+      p.set_line_width(@style.number_of(sty.border_width, 1.0))
       p.stroke_rect(0.0, 0.0, r.w, r.h)
     })
     w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
@@ -524,7 +526,11 @@ pub fn textarea(
       }
     })
     @core.sub_bag_register(fn() { store.remove(sid) })
-    fold_style(w, @style.empty_style(), class)
+    fold_style(
+      w,
+      @style.style(background_color="bg_panel", border_color="border", border_width=1.0, color="text_regular").focus(border_color="primary"),
+      class,
+    )
     handle(w)
     w
   })
