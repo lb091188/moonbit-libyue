@@ -18,6 +18,12 @@
 // - `cursor_group` 在旧链路要把光标递归设到组根与**全部子孙**（GTK 光标按原生
 //   窗口生效，只设容器盖不住有独立窗口的子件）；本栈光标是窗口级的一层，宿主按
 //   悬停路径取「最深的那个请求」，所以组只设自己一处，子孙没提请求时自然回退到它。
+//
+// §2「事件参数统一 on_*」审计口径（P2-b）：组件库全部**事件**回调参数已是
+// `on_*` 形态（on_click/on_change/on_enter/on_pick/on_response/on_dismiss/
+// on_link/on_drop…）；`handle?` 保留为句柄逃生舱（不是事件）。非事件函数参数
+// 只剩谓词/能力型五个：drag 的 `payload`/`accept`、输入框的 `caret_on`、
+// core 定时器钩子的 `cancel`，不进 on_* 改名。
 
 ///|
 /// 垂直布局容器（`container` 的 Column 形态）。
