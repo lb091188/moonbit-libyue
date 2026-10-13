@@ -194,7 +194,7 @@
   - `sysmonitor`（6 页）/ `systemprobe`（8 页，`modules/gui-examples`）/ `gui-examples` 待迁
 - [ ] 文档：中英使用文档按新栈重写（`components`/`components-ui`/`declarative`/`layout`/`relink`/`system-capabilities`/`tutorial`），README 挂新截图
 - [ ] 发布：mooncakes 新版本；旧 `bin-*`/`vendor-*` 预构建发布链退役
-- [ ] CI：三平台构建与测试脚本随新栈调整（当前分支构建预期为红）
+- [x] CI：三平台构建与测试脚本随新栈调整（2026-10-12 重写为分层门禁：`ci.yml` Linux job 全门禁 + Windows job 编译/链接门禁，不设 macOS job；`release-bin.yml` 矩阵 linux-x64/windows-x64、Windows 侧校验 Subsystem==2；`vendor-native.yml`/`experiment-win-gui.yml` 两份失效 workflow 已删）
 - [ ] 真机验证矩阵：Ubuntu GNOME / KDE / XFCE；Windows 10 / 11；macOS（前置：取得设备）
 - [x] **媒体回到独立模块（2026-10-12）**：`yue/media` → `modules/gui-media/media`（媒体因此对主模块消费者恢复「**模块级可选**」），`examples/native-web` → `modules/gui-examples/native-web`，根 `moon.mod` 摘掉 `NoahLiu/ffmpeg-mbt@0.1.0`，miniaudio 系统库链接参数搬到 `modules/gui-media/prebuild.py`。回证：`moon tree` 根闭包不再列 ffmpeg-mbt、全仓红点 287/68 未变（详见中英 adaptation.md「媒体回到独立模块」节）
 - [x] **媒体音频后端跨平台化：单调时钟三平台（2026-10-12）**：`audio_stub.c` 的 `mbt_now_ms` 从 POSIX 专有的 `CLOCK_MONOTONIC` 改为三平台分支（`_WIN32` 走 QueryPerformanceCounter / `__APPLE__` 走 mach_absolute_time / 其余 POSIX 原样），`media/` 与 `src/` 两份逐字节同步改。回证：纯 C 探针 `experiment/media_probe/audio_backend_probe.c` 末行 `AUDIO-BACKEND-OK`（48 条断言，含真设备分支实测 `played_bytes=35280`）；另实测 `miniaudio.h` 在 MSVC 下可编（除其自身一处 C4244）。**边界**：`audio_stub.c` 在 Windows 上可编可跑，但 `moon test ./modules/gui-media/media` 仍跑不起来——测试可执行文件会链 `ffmpeg_stub.c`，它要 libavformat 头（`ffmpeg-mbt` 非 Linux 后端未接）
