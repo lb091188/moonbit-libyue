@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- 项目名称：native-gui（原 moonbit-libyue 更名）
+- 项目名称：native-gui
 - 参赛者：刘斌（NoahLiu）
 - 联系方式：<lbpeter0911@163.com>
 - GitHub：<https://github.com/lb091188/moonbit-libyue>
@@ -11,7 +11,7 @@
 
 ## 项目简介
 
-native-gui 是为 MoonBit 生态打造的**原生跨平台桌面 GUI 库**——窗口、像素、事件循环、布局与控件**全部用纯 MoonBit 自绘实现**，一套代码在 Windows ✅ / Linux ✅ 原生运行。`moon add NoahLiu/native-gui` 后零配置直接 `moon run`。
+native-gui 是为 MoonBit 生态打造的**原生跨平台桌面 GUI 库**——窗口、像素、事件循环、布局与控件**全部用纯 MoonBit 自绘实现**，一套代码在 Windows ✅ / Linux ✅ 原生运行。`moon add NoahLiu/native-gui` 后零配置直接 `moon run`。项目从 Yue / libyue 的 MoonBit 绑定起步，一路长成了今天的纯 MoonBit 自绘框架——来时的路还留在仓库名里。
 
 - **全栈自绘**：观感跨平台一致、不依赖平台皮肤，深浅色与系统强调色默认跟随，主题是普通值可整体覆盖；平台差异收敛在窗口与文字两处薄层，其余全部纯 MoonBit
 - **响应式与声明式**：状态放 `Store` / `Signal`，绑定点随数据自动刷新；界面以树描述、`mount_window` 一步挂载（写法见下）
@@ -116,6 +116,6 @@ let count : @core.Store[Int] = @core.Store::new(0)
 
 ## 移植或参考说明
 
-- 是否为移植项目：否。项目从 libyue 的 MoonBit 绑定起步，现为纯 MoonBit 自绘重写
+- 是否为移植项目：否
 - 参考对象：Yue / libyue（<https://github.com/yue/yue> ，LGPL 2.1）；Yoga（<https://github.com/facebook/yoga> ，MIT）
 - 本项目许可证：MIT
