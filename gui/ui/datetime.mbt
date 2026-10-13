@@ -296,6 +296,7 @@ fn build_calendar(
   today : DateYMD,
   state_of : (DateYMD) -> CalCell,
   on_cell : (DateYMD) -> Unit,
+  skin~ : @style.Style = @style.empty_style(),
 ) -> () -> Unit {
   let cell_w = 36.0
   let cell_h = 30.0
@@ -309,15 +310,23 @@ fn build_calendar(
     @yoga.fixed(16.0 + head_h + 4.0 + week_h + 6.0 * cell_h),
   )
   panel.set_padding(top=8.0, left=8.0)
+  @style.apply(
+    panel,
+    @style.merge_all([
+      @style.style(background_color="bg_panel", border_color="border", border_width=1.0),
+      skin,
+    ]),
+  )
   panel.on_draw = Some(fn(
-    _self : @core.Widget,
+    self : @core.Widget,
     p : @render.Painter,
     r : @core.Rect,
   ) -> Unit {
-    p.set_fill_color(@theme.theme_bg_panel())
+    let st = @style.style_for(self)
+    p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
     p.fill_rect(0.0, 0.0, r.w, r.h)
-    p.set_stroke_color(@theme.theme_border())
-    p.set_line_width(1.0)
+    p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+    p.set_line_width(@style.number_of(st.border_width, 1.0))
     p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
   })
   let view_y = Ref(today.y)
@@ -335,13 +344,22 @@ fn build_calendar(
     let b = @core.Widget::new()
     b.node.set_width(@yoga.fixed(28.0))
     b.node.set_height(@yoga.fixed(head_h))
+    @style.apply(
+      b,
+      @style.merge_all([
+        @style.style(color="text_regular").hover(background_color="fill_hover"),
+        skin,
+      ]),
+    )
     b.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      if self.hovered {
-        p.set_fill_color(@theme.theme_fill_hover())
+      let st = @style.style_for(self)
+      let bg = @style.color_of(st.background_color, "")
+      if bg.length() > 0 {
+        p.set_fill_color(bg)
         p.fill_rect(0.0, 0.0, r.w, r.h)
       }
       draw_chevron(
@@ -350,7 +368,7 @@ fn build_calendar(
         r.h / 2.0,
         4.0,
         right,
-        @theme.theme_text_regular(),
+        @style.color_of(st.color, @theme.theme_text_regular()),
       )
     })
     let delta = if right { 1 } else { -1 }
@@ -375,11 +393,13 @@ fn build_calendar(
   let title = @core.Widget::new()
   title.node.set_flex_grow(1.0)
   title.node.set_height(@yoga.fixed(head_h))
+  @style.apply(title, @style.merge_all([@style.style(color="text_primary"), skin]))
   title.on_draw = Some(fn(
-    _self : @core.Widget,
+    self : @core.Widget,
     p : @render.Painter,
     r : @core.Rect,
   ) -> Unit {
+    let tst = @style.style_for(self)
     let _ = @text.draw_box_at(
       p,
       0.0,
@@ -388,7 +408,7 @@ fn build_calendar(
       r.h,
       view_y.val.to_string() + " 年 " + view_m.val.to_string() + " 月",
       head_font,
-      @theme.theme_text_primary(),
+      @style.color_of(tst.color, @theme.theme_text_primary()),
       align=@text.Center,
       valign=@text.Center,
     )
@@ -405,11 +425,13 @@ fn build_calendar(
     c.node.set_width(@yoga.fixed(cell_w))
     c.node.set_height(@yoga.fixed(week_h))
     let label = name
+    @style.apply(c, @style.merge_all([@style.style(color="text_secondary"), skin]))
     c.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
+      let wst = @style.style_for(self)
       let _ = @text.draw_box_at(
         p,
         0.0,
@@ -418,7 +440,7 @@ fn build_calendar(
         r.h,
         label,
         cell_font,
-        @theme.theme_text_secondary(),
+        @style.color_of(wst.color, @theme.theme_text_secondary()),
         align=@text.Center,
         valign=@text.Center,
       )
@@ -439,11 +461,16 @@ fn build_calendar(
       let c = @core.Widget::new()
       c.node.set_width(@yoga.fixed(cell_w))
       c.node.set_height(@yoga.fixed(cell_h))
+      @style.apply(
+        c,
+        @style.merge_all([@style.style().hover(background_color="fill_hover"), skin]),
+      )
       c.on_draw = Some(fn(
         self : @core.Widget,
         p : @render.Painter,
         r : @core.Rect,
       ) -> Unit {
+        let sty = @style.style_for(self)
         let d = dref.val
         let st = state_of(d)
         let solid = cell_solid(st)
@@ -454,9 +481,13 @@ fn build_calendar(
         if band {
           p.set_fill_color(@theme.theme_primary_light())
           p.fill_rect(0.0, 0.0, r.w, r.h)
-        } else if self.hovered && inm.val {
-          p.set_fill_color(@theme.theme_fill_hover())
-          p.fill_rect(0.0, 0.0, r.w, r.h)
+        } else if inm.val {
+          // 悬停底来自 hover 桶（「本月内」是数据态条件，留在代码里）
+          let hbg = @style.color_of(sty.background_color, "")
+          if hbg.length() > 0 {
+            p.set_fill_color(hbg)
+            p.fill_rect(0.0, 0.0, r.w, r.h)
+          }
         }
         let txt = d.d.to_string()
         if solid {
@@ -570,6 +601,7 @@ pub fn calendar(
     let _refresh = build_calendar(
       w,
       t,
+      skin=paint_subset(class),
       fn(d : DateYMD) -> CalCell {
         match read_sel() {
           Some(s) => if DateYMD::same(s, d) { Selected } else { Plain }

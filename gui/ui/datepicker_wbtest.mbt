@@ -199,3 +199,61 @@ test "日期时间区间：日期走日历、时间走步进，两侧各写各�
   }
   assert_eq(changes.length(), 2)
 }
+
+///|
+/// P2-e 口径：日期选择的字段、日历面板、箭头与日期格都只读样式槽——
+/// 内置皮肤先折进槽，`class` 的同名属性覆盖；日期格的悬停底走 hover 桶，
+/// 「选中 / 区间内 / 今天」这些数据态配色留内置当回落值。
+test "日期选择只读样式槽：class 覆盖字段底、日历面板与箭头悬停底" {
+  if !ui_text_guard() {
+    return
+  }
+  let red_count = fn(bm : @render.Bitmap, w : Int, h : Int) -> Int {
+    let mut n = 0
+    for y = 0; y < h; y = y + 1 {
+      for x = 0; x < w; x = x + 1 {
+        let c = bm.pixel(x, y)
+        if c.r > 128 && c.g < 64 && c.b < 64 {
+          n = n + 1
+        }
+      }
+    }
+    n
+  }
+  let paint_count = fn(node : @core.Node, open_it : Bool) -> Int {
+    let (root, field) = mounted_with_overlay(node, 420.0, 360.0)
+    if open_it {
+      let _ = root.dispatch_pointer({
+        kind: @core.Down,
+        x: field.rect.x + 40.0,
+        y: field.rect.y + 16.0,
+        button: 1,
+        mods: 0,
+      })
+      let _ = root.dispatch_pointer({
+        kind: @core.Up,
+        x: field.rect.x + 40.0,
+        y: field.rect.y + 16.0,
+        button: 1,
+        mods: 0,
+      })
+      root.relayout(420.0, 360.0)
+    }
+    let bm = @render.Bitmap::new(420, 360)
+    let p = @render.Painter::new(bm)
+    root.paint(p)
+    p.end()
+    red_count(bm, 420, 360)
+  }
+  let v : @core.Store[DateYMD?] = @core.Store::new(None)
+  let mk = fn(cls : Array[@style.Style]) -> @core.Node {
+    date_picker(v, today=d(2026, 11, 11), width=180.0, class=cls)
+  }
+  // 字段底色：内置是 bg_panel（无红），class 换成红
+  assert_true(paint_count(mk([]), false) == 0)
+  assert_true(paint_count(mk([@style.style(background_color="#ff0000")]), false) > 200)
+  // 展开的日历面板底色也吃同一份 class 投影（skin 透进弹层）
+  assert_true(
+    paint_count(mk([@style.style(background_color="#ff0000")]), true) > 1000,
+  )
+}

@@ -196,11 +196,16 @@ pub fn message_box(
         title_bar.node.set_height(@yoga.fixed(40.0))
         title_bar.node.set_align_items(@yoga.AlignItems::Center)
         title_bar.set_padding(left=16.0)
+        @style.apply(
+          title_bar,
+          @style.merge_all([@style.style(color="text_primary"), paint_subset(class)]),
+        )
         title_bar.on_draw = Some(fn(
-          _s : @core.Widget,
+          self : @core.Widget,
           p : @render.Painter,
           r : @core.Rect,
         ) -> Unit {
+          let st = @style.style_for(self)
           let _ = @text.draw_box_at(
             p,
             16.0,
@@ -209,7 +214,7 @@ pub fn message_box(
             r.h,
             title,
             title_font,
-            @theme.theme_text_primary(),
+            @style.color_of(st.color, @theme.theme_text_primary()),
             align=@text.Start,
             valign=@text.Center,
           )
@@ -221,16 +226,25 @@ pub fn message_box(
         close_btn.node.set_width(@yoga.fixed(24.0))
         close_btn.node.set_height(@yoga.fixed(24.0))
         close_btn.cursor = @core.CURSOR_HAND
+        @style.apply(
+          close_btn,
+          @style.merge_all([
+            @style.style(color="text_secondary", border_radius=4.0).hover(background_color="fill_hover"),
+            paint_subset(class),
+          ]),
+        )
         close_btn.on_draw = Some(fn(
           self : @core.Widget,
           p : @render.Painter,
           r : @core.Rect,
         ) -> Unit {
-          if self.hovered {
-            p.set_fill_color(@theme.theme_fill_hover())
-            fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
+          let st = @style.style_for(self)
+          let bg = @style.color_of(st.background_color, "")
+          if bg.length() > 0 {
+            p.set_fill_color(bg)
+            fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
           }
-          p.set_stroke_color(@theme.theme_text_secondary())
+          p.set_stroke_color(@style.color_of(st.color, @theme.theme_text_secondary()))
           p.set_line_width(1.4)
           p.begin_path()
           p.move_to(8.0, 8.0)
@@ -264,12 +278,24 @@ pub fn message_box(
         icon_w.node.set_height(@yoga.fixed(24.0))
         icon_w.node.set_flex_shrink(0.0)
         icon_w.set_margin(right=2.0)
+        // 语义图标色按 kind 定（数据态），折成 color 供绘制期读；class 给了 color 就盖过
+        @style.apply(
+          icon_w,
+          @style.merge_all([
+            match fg_block(icon_color) {
+              Some(b) => b
+              None => @style.empty_style()
+            },
+            paint_subset(class),
+          ]),
+        )
         icon_w.on_draw = Some(fn(
-          _s : @core.Widget,
+          self : @core.Widget,
           p : @render.Painter,
           r : @core.Rect,
         ) -> Unit {
-          @icons.draw_icon(p, icon_kind, r.w / 2.0, r.h / 2.0, 11.0, icon_color)
+          let st = @style.style_for(self)
+          @icons.draw_icon(p, icon_kind, r.w / 2.0, r.h / 2.0, 11.0, @style.color_of(st.color, icon_color))
         })
         let col = @core.Widget::new()
         col.node.set_flex_direction(@yoga.Column)
@@ -313,27 +339,40 @@ pub fn message_box(
           b.node.set_height(@yoga.fixed(30.0))
           b.node.set_flex_shrink(0.0)
           b.cursor = @core.CURSOR_HAND
+          // 主/次两档皮肤折进槽：基块=常态、hover 桶=点亮态（与对话框底钮同形）
+          let skin = if primary {
+            @style.style(
+              color="#ffffff",
+              background_color="primary",
+              border_color="border",
+              border_width=1.0,
+              border_radius=4.0,
+            ).hover(background_color="primary_hover")
+          } else {
+            @style.style(
+              color="text_regular",
+              background_color="bg_panel",
+              border_color="border",
+              border_width=1.0,
+              border_radius=4.0,
+            ).hover(background_color="fill_hover")
+          }
+          @style.apply(b, @style.merge_all([skin, paint_subset(class)]))
           b.on_draw = Some(fn(
             self : @core.Widget,
             p : @render.Painter,
             r : @core.Rect,
           ) -> Unit {
+            let st = @style.style_for(self)
             p.set_fill_color(
-              if primary {
-                if self.hovered {
-                  @theme.theme_primary_hover()
-                } else {
-                  @theme.theme_primary()
-                }
-              } else if self.hovered {
-                @theme.theme_fill_hover()
-              } else {
-                @theme.theme_bg_panel()
-              },
+              @style.color_of(
+                st.background_color,
+                if primary { @theme.theme_primary() } else { @theme.theme_bg_panel() },
+              ),
             )
-            fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
-            p.set_stroke_color(@theme.theme_border())
-            p.set_line_width(1.0)
+            fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
+            p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+            p.set_line_width(@style.number_of(st.border_width, 1.0))
             p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
             let _ = @text.draw_box_at(
               p,
@@ -343,7 +382,10 @@ pub fn message_box(
               r.h,
               input.0,
               btn_font,
-              if primary { "#ffffff" } else { @theme.theme_text_regular() },
+              @style.color_of(
+                st.color,
+                if primary { "#ffffff" } else { @theme.theme_text_regular() },
+              ),
               align=@text.Center,
               valign=@text.Center,
             )
@@ -366,15 +408,28 @@ pub fn message_box(
         // 面板：主题面板底 + 描边 + 圆角，固定宽、按内容高
         panel.node.set_flex_direction(@yoga.Column)
         panel.node.set_width(@yoga.fixed(width))
+        @style.apply(
+          panel,
+          @style.merge_all([
+            @style.style(
+              background_color="bg_panel",
+              border_color="border",
+              border_width=1.0,
+              border_radius=6.0,
+            ),
+            paint_subset(class),
+          ]),
+        )
         panel.on_draw = Some(fn(
-          _s : @core.Widget,
+          self : @core.Widget,
           p : @render.Painter,
           r : @core.Rect,
         ) -> Unit {
-          p.set_fill_color(@theme.theme_bg_panel())
-          fill_round_rect(p, 0.0, 0.0, r.w, r.h, 6.0)
-          p.set_stroke_color(@theme.theme_border())
-          p.set_line_width(1.0)
+          let st = @style.style_for(self)
+          p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
+          fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 6.0))
+          p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+          p.set_line_width(@style.number_of(st.border_width, 1.0))
           p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
         })
         // Esc 收起、Enter 触发默认钮：键盘事件按焦点投递，面板自己就是焦点控件

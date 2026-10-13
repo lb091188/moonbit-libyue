@@ -18,21 +18,36 @@ fn setup_picker_field(
   filled : () -> Bool,
   clearable : Bool,
   on_click : (Double) -> Unit,
+  skin~ : @style.Style = @style.empty_style(),
 ) -> Unit {
   let font = @text.Font::new("", 13.0)
   watch_theme()
   w.node.set_width(@yoga.fixed(width))
   w.node.set_height(@yoga.fixed(32.0))
   w.cursor = @core.CURSOR_HAND
+  // 字段底色/描边/文字色先折内置再读槽；「有没有填值」是数据态，留在 filled() 分支当回落
+  @style.apply(
+    w,
+    @style.merge_all([
+      @style.style(
+        background_color="bg_panel",
+        border_color="border",
+        border_width=1.0,
+        color="text_primary",
+      ).hover(background_color="fill_hover"),
+      skin,
+    ]),
+  )
   w.on_draw = Some(fn(
     self : @core.Widget,
     p : @render.Painter,
     r : @core.Rect,
   ) -> Unit {
-    p.set_fill_color(@theme.theme_bg_panel())
+    let st = @style.style_for(self)
+    p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
     p.fill_rect(0.0, 0.0, r.w, r.h)
-    p.set_stroke_color(@theme.theme_border())
-    p.set_line_width(1.0)
+    p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+    p.set_line_width(@style.number_of(st.border_width, 1.0))
     p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
     let txt = text_of()
     let _ = @text.draw_box_at(
@@ -44,7 +59,7 @@ fn setup_picker_field(
       txt,
       font,
       if filled() {
-        @theme.theme_text_primary()
+        @style.color_of(st.color, @theme.theme_text_primary())
       } else {
         @theme.theme_text_secondary()
       },
@@ -98,9 +113,10 @@ fn calendar_popup(
   today : DateYMD,
   state_of : (DateYMD) -> CalCell,
   on_cell : (DateYMD) -> Unit,
+  skin~ : @style.Style = @style.empty_style(),
 ) -> @core.Node {
   @core.node_of_new(fn(panel : @core.Widget) -> @core.Widget {
-    let _ = build_calendar(panel, today, state_of, on_cell)
+    let _ = build_calendar(panel, today, state_of, on_cell, skin=skin)
     panel
   })
 }
@@ -111,6 +127,7 @@ fn time_popup(
   initial : TimeHM,
   on_confirm : (TimeHM) -> Unit,
   on_cancel : () -> Unit,
+  skin~ : @style.Style = @style.empty_style(),
 ) -> @core.Node {
   let cur : Ref[TimeHM] = Ref(initial)
   @core.node_of_new(fn(panel : @core.Widget) -> @core.Widget {
@@ -119,15 +136,23 @@ fn time_popup(
     panel.node.set_flex_direction(@yoga.Column)
     panel.node.set_width(@yoga.fixed(180.0))
     panel.set_padding(top=10.0, left=10.0)
+    @style.apply(
+      panel,
+      @style.merge_all([
+        @style.style(background_color="bg_panel", border_color="border", border_width=1.0),
+        skin,
+      ]),
+    )
     panel.on_draw = Some(fn(
-      _s : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(@theme.theme_bg_panel())
+      let st = @style.style_for(self)
+      p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
       p.fill_rect(0.0, 0.0, r.w, r.h)
-      p.set_stroke_color(@theme.theme_border())
-      p.set_line_width(1.0)
+      p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+      p.set_line_width(@style.number_of(st.border_width, 1.0))
       p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
       let _ = @text.draw_box_at(
         p,
@@ -137,7 +162,7 @@ fn time_popup(
         28.0,
         cur.val.format(),
         font,
-        @theme.theme_text_primary(),
+        @style.color_of(st.color, @theme.theme_text_primary()),
         align=@text.Center,
         valign=@text.Center,
       )
@@ -150,23 +175,31 @@ fn time_popup(
             watch_theme()
             b.node.set_width(@yoga.fixed(30.0))
             b.node.set_height(@yoga.fixed(28.0))
+            @style.apply(
+              b,
+              @style.merge_all([
+                @style.style(
+                  background_color="bg_panel",
+                  border_color="border",
+                  border_width=1.0,
+                  border_radius=4.0,
+                  color="text_regular",
+                ).hover(background_color="fill_hover"),
+                skin,
+              ]),
+            )
             b.on_draw = Some(fn(
               self : @core.Widget,
               p : @render.Painter,
               r : @core.Rect,
             ) -> Unit {
-              p.set_fill_color(
-                if self.hovered {
-                  @theme.theme_fill_hover()
-                } else {
-                  @theme.theme_bg_panel()
-                },
-              )
-              fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
-              p.set_stroke_color(@theme.theme_border())
-              p.set_line_width(1.0)
+              let st = @style.style_for(self)
+              p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
+              fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
+              p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+              p.set_line_width(@style.number_of(st.border_width, 1.0))
               p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
-              p.set_stroke_color(@theme.theme_text_regular())
+              p.set_stroke_color(@style.color_of(st.color, @theme.theme_text_regular()))
               p.set_line_width(1.4)
               p.begin_path()
               p.move_to(10.0, r.h / 2.0)
@@ -195,23 +228,31 @@ fn time_popup(
             watch_theme()
             b.node.set_width(@yoga.fixed(30.0))
             b.node.set_height(@yoga.fixed(28.0))
+            @style.apply(
+              b,
+              @style.merge_all([
+                @style.style(
+                  background_color="bg_panel",
+                  border_color="border",
+                  border_width=1.0,
+                  border_radius=4.0,
+                  color="text_regular",
+                ).hover(background_color="fill_hover"),
+                skin,
+              ]),
+            )
             b.on_draw = Some(fn(
               self : @core.Widget,
               p : @render.Painter,
               r : @core.Rect,
             ) -> Unit {
-              p.set_fill_color(
-                if self.hovered {
-                  @theme.theme_fill_hover()
-                } else {
-                  @theme.theme_bg_panel()
-                },
-              )
-              fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
-              p.set_stroke_color(@theme.theme_border())
-              p.set_line_width(1.0)
+              let st = @style.style_for(self)
+              p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
+              fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
+              p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+              p.set_line_width(@style.number_of(st.border_width, 1.0))
               p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
-              p.set_stroke_color(@theme.theme_text_regular())
+              p.set_stroke_color(@style.color_of(st.color, @theme.theme_text_regular()))
               p.set_line_width(1.4)
               p.begin_path()
               p.move_to(10.0, r.h / 2.0)
@@ -259,21 +300,29 @@ fn time_popup(
           watch_theme()
           b.node.set_width(@yoga.fixed(70.0))
           b.node.set_height(@yoga.fixed(28.0))
+          @style.apply(
+            b,
+            @style.merge_all([
+              @style.style(
+                background_color="bg_panel",
+                border_color="border",
+                border_width=1.0,
+                border_radius=4.0,
+                color="text_regular",
+              ).hover(background_color="fill_hover"),
+              skin,
+            ]),
+          )
           b.on_draw = Some(fn(
             self : @core.Widget,
             p : @render.Painter,
             r : @core.Rect,
           ) -> Unit {
-            p.set_fill_color(
-              if self.hovered {
-                @theme.theme_fill_hover()
-              } else {
-                @theme.theme_bg_panel()
-              },
-            )
-            fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
-            p.set_stroke_color(@theme.theme_border())
-            p.set_line_width(1.0)
+            let st = @style.style_for(self)
+            p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
+            fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
+            p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+            p.set_line_width(@style.number_of(st.border_width, 1.0))
             p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
             let f = @text.Font::new("", 12.0)
             let _ = @text.draw_box_at(
@@ -284,7 +333,7 @@ fn time_popup(
               r.h,
               "取消",
               f,
-              @theme.theme_text_regular(),
+              @style.color_of(st.color, @theme.theme_text_regular()),
               align=@text.Center,
               valign=@text.Center,
             )
@@ -309,19 +358,25 @@ fn time_popup(
           watch_theme()
           b.node.set_width(@yoga.fixed(70.0))
           b.node.set_height(@yoga.fixed(28.0))
+          @style.apply(
+            b,
+            @style.merge_all([
+              @style.style(
+                background_color="primary",
+                border_radius=4.0,
+                color="#ffffff",
+              ).hover(background_color="primary_hover"),
+              skin,
+            ]),
+          )
           b.on_draw = Some(fn(
             self : @core.Widget,
             p : @render.Painter,
             r : @core.Rect,
           ) -> Unit {
-            p.set_fill_color(
-              if self.hovered {
-                @theme.theme_primary_hover()
-              } else {
-                @theme.theme_primary()
-              },
-            )
-            fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
+            let st = @style.style_for(self)
+            p.set_fill_color(@style.color_of(st.background_color, @theme.theme_primary()))
+            fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
             let f = @text.Font::new("", 12.0)
             let _ = @text.draw_box_at(
               p,
@@ -403,6 +458,7 @@ pub fn date_picker(
         }
       },
       clearable,
+      skin=paint_subset(class),
       fn(local_x : Double) -> Unit {
         let filled = match value.get() {
           Some(_) => true
@@ -428,6 +484,7 @@ pub fn date_picker(
                 on_change(d)
                 close_pop()
               },
+              skin=paint_subset(class),
             ),
             w.rect.x,
             w.rect.y + w.rect.h + 2.0,
