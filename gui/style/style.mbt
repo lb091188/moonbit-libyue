@@ -490,3 +490,14 @@ pub fn Style::set_focus(self : Style, v : Style?) -> Style {
   self.focus = v
   self
 }
+
+///|
+/// 按序合并一组样式块（组件侧 `class : Array[Style]` 的解析通道：散参数折成
+/// 匿名块排最前、class 在后，优先级由数组顺序直接成立，design.md §1.5）。
+pub fn merge_all(blocks : Array[Style]) -> Style {
+  let mut acc = empty_style()
+  for b in blocks {
+    acc = merge(acc, b)
+  }
+  acc
+}

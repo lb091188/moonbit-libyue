@@ -152,3 +152,17 @@ test "基调表：块构造可用、简写与状态桶就位（token 不认识�
   assert_true(textarea_base.border_color is Some(Var("border")))
   assert_true(textarea_base.padding_top == Some(4.0))
 }
+
+///|
+test "merge_all：class 数组按序合并、尾赢" {
+  let a = style(padding=14.0, background_color="bg_panel")
+  let b = style(padding=4.0)
+  let m = merge_all([a, b])
+  assert_true(m.padding_left == Some(4.0))
+  match m.background_color {
+    Some(Var(t)) => assert_eq(t, "bg_panel")
+    _ => fail("未覆盖属性应保留")
+  }
+  let e = merge_all([])
+  assert_true(e.padding_left is None && e.color is None && e.hover is None)
+}

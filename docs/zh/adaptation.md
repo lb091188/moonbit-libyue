@@ -1729,6 +1729,22 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 设计取舍:**用显式态而非 `pos>=duration` 启发式**——播放中 target 超时长但尚未 EOF 时 pos 会被 clamp 到 duration(启发式假阳性,「暂停在末尾再播放」会被误判成重播回 0);且容器无时长头(duration=0)时启发式完全失效,显式态两种场景都对。
 - 验证:白盒对照——把 video_player.mbt 暂存回修复前跑 `moon test -p gui-media`,新增两条用例精确失败(播完→play 的 is_playing 断言、stop→play 的音轨 decode_pcm 断言),恢复修复后 11/11 通过;全仓 `moon check --deny-warn` 零警告 + `moon test` 641 全绿(较此前 636 新增 5 条:循环 EOF→vp_restart、播完→play、播完态 seek→play、stop→play、音量钳制)。真机交互(播完再点播放、stop 后重播的观感)由用户复验。
 
+## 前端化 P1:gui/style 样式包与 yoga-mbt z_index(2026-10-13)
+
+工具链边界(moon 0.1.20260920 / moonc v0.10.14,读数随升级要重测,同步 design.md §1.6):
+- **`alias` / `abbrev` 都是保留字,没有函数或类型别名语法**;类型短名只能 `using @pkg {type X}` 引,且该声明是**包级**的——两个文件各写一遍会撞 `[4051] declared twice`,正确形态是在一个文件里 `pub using` 一次、全包与外部共用短名。
+- **labelled 参数没有任何透传通道**:`f(width=width)` 类型不符(体内可选参数是 `T?`)、`f(width?)` / `f(width!)` / `f(...)` 全 `[3002]` 不解析、`pub let g = f` 绑函数值再 `g(width=1.0)` 报 `[4117] labelled 函数只能直接应用`;`moon.pkg` 的 import 不收键值形态(`unexpected token :`),包短名也配不了。结论:样式工厂调用点定死 `@style.style(...)`,状态方法 `.hover/.active/.focus` 的绘制期构造体三处各写一遍。
+- `priv` 只修饰 `let`/`fn` 之外的声明形态,顶格 `priv named_x = ...` 解析失败——包内值直接写 `let`。
+- `Array::contains` 要 `T: Eq`;`Option` 判含有值用 `is Some(_)`(`is_some()` 已废弃告警);`Map::new()` 已废弃,写 `Map([])` 字面量。
+- `for i in 0..n`(半开)与 `0..=n` 在 for 之外都不可用,范围循环要求 `for i in (0..<n)` 形态或直接改 `while`;本包统一退回 `while`。
+
+架构口径:
+- **core 不能依赖 style**(style 依赖 core 的 Widget/yoga 落点,反向成环)。Widget 的 resolved Style 槽落为 `@style` 包内**进程级侧表** `Map[控件 id, Style]`(与 overlay_native 的进程级句柄表同款先例),`apply` 写入、绘制期 `resolved(w)` / `style_for(w)`(按 `hovered/pressed/focused` 选桶)读出;从未 apply 过的控件读回空样式。侧表随控件回收的清理随 P2 接线时补(现状:建树期一次性写入,动态换树会留残账,量级为样式表大小)。
+- **cursor 是绘制期属性,状态桶可携带**;控件的**静态** `cursor` 字段由 `apply` 直接落,状态桶里的 cursor 由 P2 的悬停路径下发读 `style_for`。
+- yoga-mbt 的 `z_index` 纯绘制期:setter 不 `mark_changed`(几何无关)、引擎**不物理重排 children**(增量布局按下标缓存),给 `Node::paint_order` 下标投影;gui 侧 `Widget.z_index_paint` 由 `apply` 写入,`widget_paint_order` 插入排序稳定重排 kids(全 0 时恒等序,现有示例逐帧不变)。
+
+验证:style 18/18、yoga-mbt 100/100(基线 95+新增 5)、core 120/120、`cd gui && moon check --deny-warn` 与全仓 `moon check` 零错零警;set_margin labelled 化 14 处调用点整批改完,库测试 858 条 856 过(2 条红为 W9/排序批既有缺口,stash 纯净态复跑同红)。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。
