@@ -2156,7 +2156,7 @@ fn main {
     @ui.view(
       [
         @ui.text("组件层", size=13.0),
-        @ui.separator(vertical=true),
+        @ui.divider(vertical=true),
         @ui.icon(
           @icons.IconKind::MediumCircleFill, size=18.0, color=@theme.theme_success(),
         ),

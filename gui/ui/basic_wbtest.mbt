@@ -225,7 +225,7 @@ test "按钮：悬停与按下态由宿主置位，配色随状态变化" {
 
 ///|
 test "容器 / 分组 / 分隔线：几何与主题取色都按建树口径" {
-  let line = separator()
+  let line = divider()
   let inner = view([text("内容")], padding=4.0, bg=@theme.theme_bg_page())
   let g = panel("标题", [text("一行"), text("两行")], width=160.0)
   let root = mount_root([g, line, inner], 200.0, 300.0)

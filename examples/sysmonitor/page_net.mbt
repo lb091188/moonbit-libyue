@@ -173,7 +173,7 @@ fn page_net(app : App) -> @core.Node {
     [
       @ui.text("收发速率（不含 lo）", role=@ui.Section),
       @charts.line_chart_t(total, height=220.0, area=true),
-      @ui.separator(),
+      @ui.divider(),
       draw_rows(net_n, fn(p, w) { draw_net_rows(p, w, page.rows.get()) }),
     ],
     padding=12.0,

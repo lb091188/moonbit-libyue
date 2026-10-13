@@ -87,14 +87,7 @@ pub fn row(
 /// §2 合并:`scroll` 旧包装删除——滚动容器唯一入口就是 `ui/scroll.mbt` 的 `scroll_view`。
 
 ///|
-/// 页签（`tabs` 的旧名）：`pages` 是 (标题, 内容)。
-pub fn tab(
-  pages : Array[(String, @core.Node)],
-  selected? : @core.Store[Int],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  tabs(pages, selected?, handle=handle)
-}
+/// §2 合并：`tab` 旧入口消失，页签唯一入口是 `tabs`。
 
 ///|
 /// §2 合并:`date_picker` 就是真身(原声明式包装删除,调用点直接用 `@ui.date_picker`)。

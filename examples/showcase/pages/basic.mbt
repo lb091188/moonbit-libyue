@@ -144,7 +144,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
       ],
       code=[
         "@ui.divider()",
-        "@ui.separator(vertical=true)",
+        "@ui.divider(vertical=true)",
         "@ui.tooltip(@ui.button(\"悬停看提示\"), \"原生 tooltip：系统样式\")",
       ],
     ),

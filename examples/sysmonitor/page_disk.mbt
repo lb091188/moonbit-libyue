@@ -103,7 +103,7 @@ fn page_disk(app : App) -> @core.Node {
     [
       @ui.text("根分区读写", role=@ui.Section),
       @charts.line_chart_t(io, height=220.0, area=true),
-      @ui.separator(),
+      @ui.divider(),
       draw_rows(disk_n, fn(p, w) { draw_disk_rows(p, w, app.disks.get()) }),
     ],
     padding=12.0,

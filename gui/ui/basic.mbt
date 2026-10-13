@@ -91,8 +91,11 @@ pub fn panel(
 }
 
 ///|
-/// 分隔线：默认横线（沿交叉轴撑满），`vertical=true` 为竖线。
-pub fn separator(vertical? : Bool = false, color? : String = "") -> @core.Node {
+/// 分隔线本体（§2 合并后公开入口是 [divider]，`text=` 给文字即带字档）。
+/// 默认横线（沿交叉轴撑满），`vertical=true` 为竖线。
+fn separator_impl(vertical~ : Option[Bool], color~ : Option[String]) -> @core.Node {
+  let vertical = vertical.unwrap_or(false)
+  let color = color.unwrap_or("")
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     if vertical {
@@ -208,6 +211,50 @@ pub fn text(
     shrink_by_role=has_role(role),
     handle=handle,
   )
+}
+
+///|
+/// 分隔线（§2 合并：原 `separator` + 带字 `divider` 一台）：`text` 空=直线档
+/// （横线/竖线由 `vertical` 定，沿交叉轴撑满），给文字=居中断线档（12 号字、
+/// 两侧断线、`color` 不作用于文字档）。
+pub fn divider(
+  text? : String = "",
+  vertical? : Bool = false,
+  color? : String = "",
+) -> @core.Node {
+  if text.length() == 0 {
+    separator_impl(vertical=Some(vertical), color=Some(color))
+  } else {
+    let font = @text.Font::new("", 12.0)
+    @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+      watch_theme()
+      w.node.set_height(@yoga.fixed(20.0))
+      w.node.set_width(@yoga.percent(100.0))
+      w.on_draw = Some(fn(
+        _self : @core.Widget,
+        p : @render.Painter,
+        r : @core.Rect,
+      ) -> Unit {
+        let tw = text_width(text, font)
+        let cy = r.h / 2.0
+        let gap = 8.0
+        p.set_fill_color(@theme.theme_border())
+        p.fill_rect(0.0, cy, ((r.w - tw) / 2.0 - gap).max(0.0), 1.0)
+        let right_x = (r.w + tw) / 2.0 + gap
+        p.fill_rect(right_x, cy, (r.w - right_x).max(0.0), 1.0)
+        let th = @text.line_height_font(font).unwrap_or(16).to_double()
+        let _ = @text.draw_at(
+          p,
+          (r.w - tw) / 2.0,
+          cy - th / 2.0,
+          text,
+          font,
+          @theme.theme_text_secondary(),
+        )
+      })
+      w
+    })
+  }
 }
 
 ///|

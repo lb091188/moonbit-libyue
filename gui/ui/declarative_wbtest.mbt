@@ -131,7 +131,7 @@ test "旧名构造器落到新组件上：select 点开浮层、scroll 出滚动
 
   let sel = @core.Store::new(0)
   let (_r3, tabs) = mounted(
-    tab([("页一", text("第一页内容")), ("页二", text("第二页内容"))], selected=sel),
+    tabs([("页一", text("第一页内容")), ("页二", text("第二页内容"))], selected=sel),
     300.0,
     160.0,
   )

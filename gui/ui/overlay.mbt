@@ -98,7 +98,7 @@ pub fn popover(
 /// 下拉菜单一行（28 高，悬停高亮；`"-"` 画成分隔线）。
 fn menu_row(text : String, on_pick : () -> Unit) -> @core.Node {
   if text == "-" {
-    return separator()
+    return divider()
   }
   let font = @text.Font::new("", 13.0)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {

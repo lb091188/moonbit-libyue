@@ -145,7 +145,7 @@ fn page_sensors(app : App) -> @core.Node {
       @charts.line_chart_t(app.gpu_vram_hists[i], height=220.0, area=true),
     )
   }
-  nodes.push(@ui.separator())
+  nodes.push(@ui.divider())
   nodes.push(@ui.text("温度传感器", role=@ui.Section))
   // 空态:无可用温度来源(非 N 卡无厂商 SDK / 机器无 hwmon 节点)是
   // 合法状态,给一行说明而不是空白

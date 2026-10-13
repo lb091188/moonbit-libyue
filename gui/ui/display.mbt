@@ -214,42 +214,7 @@ pub fn statistic(
 }
 
 ///|
-/// 带文字的居中分隔线。
-pub fn divider(text? : String = "") -> @core.Node {
-  if text.length() == 0 {
-    separator()
-  } else {
-    let font = @text.Font::new("", 12.0)
-    @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
-      watch_theme()
-      w.node.set_height(@yoga.fixed(20.0))
-      w.node.set_width(@yoga.percent(100.0))
-      w.on_draw = Some(fn(
-        _self : @core.Widget,
-        p : @render.Painter,
-        r : @core.Rect,
-      ) -> Unit {
-        let tw = text_width(text, font)
-        let cy = r.h / 2.0
-        let gap = 8.0
-        p.set_fill_color(@theme.theme_border())
-        p.fill_rect(0.0, cy, ((r.w - tw) / 2.0 - gap).max(0.0), 1.0)
-        let right_x = (r.w + tw) / 2.0 + gap
-        p.fill_rect(right_x, cy, (r.w - right_x).max(0.0), 1.0)
-        let th = @text.line_height_font(font).unwrap_or(16).to_double()
-        let _ = @text.draw_at(
-          p,
-          (r.w - tw) / 2.0,
-          cy - th / 2.0,
-          text,
-          font,
-          @theme.theme_text_secondary(),
-        )
-      })
-      w
-    })
-  }
-}
+/// §2 合并：带字分隔线并入 `ui/basic.mbt` 的 `divider`（`text=` 即本档）。
 
 ///|
 /// 提示条：语义色浅底 + 主色标题与描述。
@@ -313,7 +278,7 @@ pub fn card(
     body.push(
       text(title, size=14.0, weight=@text.SemiBold, color=@theme.theme_text_primary()),
     )
-    body.push(separator())
+    body.push(divider())
   }
   for c in children {
     body.push(c)

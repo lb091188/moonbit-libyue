@@ -518,7 +518,7 @@ fn md_table(
     cells
   }
   let nodes : Array[@core.Node] = [@ui.row(cells_of(header, true))]
-  nodes.push(@ui.separator())
+  nodes.push(@ui.divider())
   for row in rows {
     nodes.push(@ui.row(cells_of(row, false)))
   }
@@ -641,7 +641,7 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.No
         for n in md_render_blocks([block], ctx) {
           nodes.push(n)
         }
-      ThematicBreak(..) => nodes.push(@ui.separator())
+      ThematicBreak(..) => nodes.push(@ui.divider())
       HtmlBlock(..) | BlankLines(..) | FootnoteDefinition(..) => ()
     }
   }
@@ -842,7 +842,7 @@ pub fn markdown_view(
       }
     }
     if fd.length() > 0 {
-      nodes.push(@ui.separator())
+      nodes.push(@ui.divider())
       for lbl in foot.order {
         match fd.get(lbl) {
           Some(children) => {
