@@ -431,8 +431,8 @@ pub fn collapse(
   let blocks : Array[@core.Node] = []
   let n = panels.length()
   for i = 0; i < n; i = i + 1 {
-    let entry = panels[i]
-    blocks.push(collapse_panel(entry.0, entry.1, i == 0))
+    let input = panels[i]
+    blocks.push(collapse_panel(input.0, input.1, i == 0))
   }
   view(blocks, row_gap=2.0, handle=handle)
 }
@@ -623,7 +623,7 @@ fn icon_for(icons : Array[(String, @icons.IconKind)], name : String) -> @icons.I
 ///|
 /// 侧边导航菜单（EP Menu）：悬停浅灰、选中主题浅底 + 主题色文字 + 左缘强调条。
 /// `selected` 是共享状态，主区可以订阅同一个 Store 做页面联动。
-pub fn side_menu(
+pub fn menu(
   items : Array[String],
   selected : @core.Store[String],
   icons? : Array[(String, @icons.IconKind)] = [],
@@ -648,7 +648,7 @@ pub fn side_menu(
 ///|
 /// 分组侧边菜单：组标题行（次要色小字 + 折叠箭头）+ 组内菜单项。
 /// `foldable=true` 时点标题收起/展开组内项（默认全展开）。
-pub fn side_menu_sections(
+pub fn menu_sections(
   sections : Array[(String, Array[String])],
   selected : @core.Store[String],
   icons? : Array[(String, @icons.IconKind)] = [],
@@ -835,7 +835,7 @@ pub fn tree(
 /// 页签（EP Tabs，顶部形态）：页签头行（选中主题色文字 + 底部 2px 指示条，
 /// 悬停变深）+ 内容区预建、靠显隐切换。`selected` 是页序号 Store（0 起始），
 /// 不传则内部建一个。
-pub fn tabs_t(
+pub fn tabs(
   pages : Array[(String, @core.Node)],
   selected? : @core.Store[Int],
   handle? : (@core.Widget) -> Unit = default_handle,

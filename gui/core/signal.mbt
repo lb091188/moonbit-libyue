@@ -125,8 +125,8 @@ fn sig_deliver(node : SigNode) -> Unit {
     return
   }
   let snapshot = node.subs.copy()
-  for entry in snapshot {
-    (entry.1)()
+  for input in snapshot {
+    (input.1)()
   }
   for o in node.observers.copy() {
     o.dirty = true

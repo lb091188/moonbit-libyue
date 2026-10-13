@@ -219,7 +219,7 @@ fn left_pane(app : App, view : @core.Store[ViewId]) -> @core.Node {
   // 左栏宽度固定 292，**不能**再挂 `flex_grow`：外壳修好后这一行的父容器有了
   // 确定宽度，左栏一旦也 grow 就会和右栏平分剩余空间，左栏被拉宽、右栏被挤窄。
   // 竖直方向靠父 hbox 的 `align_items: Stretch` 撑满，本组件不需要额外处理。
-  @ui.scroll(
+  @ui.scroll_view(
     [@ui.col(cards, padding=10.0, row_gap=10.0)],
     @ui.ScrollState::new(),
     width=292.0,
@@ -252,7 +252,7 @@ fn view_area(app : App, view : @core.Store[ViewId]) -> @core.Node {
         pc.node.set_min_height(@yoga.fixed(0.0))
         pc.set_visible(view_index(item.0) == view_index(view.get()))
         // 页面内容整页滚动，超窗不裁切
-        let sc = @ui.scroll([node], @ui.ScrollState::new())
+        let sc = @ui.scroll_view([node], @ui.ScrollState::new())
         let _ = sc.mount_into(pc)
         area.append_child(pc)
         boxes.push(pc)

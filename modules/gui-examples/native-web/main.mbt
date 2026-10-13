@@ -74,7 +74,7 @@ fn main {
     @ui.text("webview pane（批 B）：一窗多区，每区一个 owner", size=15.0),
     @ui.view(
       [
-        @ui.entry(addr, placeholder="地址", focus_id=31, width=420.0),
+        @ui.input(addr, placeholder="地址", focus_id=31, width=420.0),
         @ui.button(
           "载入",
           on_click=fn() {

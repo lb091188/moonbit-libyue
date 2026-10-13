@@ -15,7 +15,7 @@ test "日期选择器：字段显示占位、点开日历、点选回填并收�
   let v : @core.Store[DateYMD?] = @core.Store::new(None)
   let changes : Array[String] = []
   let (root, field) = mounted_with_overlay(
-    date_picker_t(
+    date_picker(
       v,
       on_change=fn(d : DateYMD) -> Unit { changes.push(d.format()) },
       today=d(2026, 10, 11),

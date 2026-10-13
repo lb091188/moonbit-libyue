@@ -50,7 +50,7 @@ fn apply_theme(app : @shared.App) -> Unit {
 ///|
 /// 侧栏里的深/浅切换按钮：手动改即视为「不跟随系统」。
 fn theme_toggle_button(app : @shared.App) -> @core.Node {
-  @ui.icon_button_t(
+  @ui.icon_button(
     @icons.Moon,
     on_click=fn() {
       app.follow.set(false)
@@ -159,9 +159,9 @@ fn main {
           // 侧栏：可滚动的分组菜单（窗口矮时滚到底部项）+ 底部主题切换 + 版本号
           @ui.col(
             [
-              @ui.scroll_v(
+              @ui.scroll_view(
                 [
-                  @ui.side_menu_sections(
+                  @ui.menu_sections(
                     [("组件", ["基础组件", "表单组件", "导航组件", "数据展示", "图表", "代码文档", "Store", "反馈组件", "事件与布局", "窗口", "系统集成", "图标库", "画布与富文本", "浏览器"])],
                     selected,
                     icons=[
@@ -215,7 +215,7 @@ fn main {
               @shared.nav_page("画布与富文本", selected, @pages.page_canvas(app)),
               @shared.nav_page("浏览器", selected, @pages.page_browser(app)),
               // 对话框挂窗口根：锚点自己是 0 尺寸占位，可见性只由 Store 驱动
-              @ui.dialog_t(
+              @ui.dialog(
                 app.dlg_basic,
                 "删除确认",
                 [
@@ -231,14 +231,14 @@ fn main {
                 on_confirm=fn() { app.dlg_result.set("已确认删除") },
                 close_on_mask=true,
               ),
-              @ui.dialog_t(
+              @ui.dialog(
                 app.dlg_form,
                 "新建连接",
                 [
                   @ui.text("名称", role=@ui.Body),
-                  @ui.entry(app.dlg_name, placeholder="例如：开发库", width=320.0),
+                  @ui.input(app.dlg_name, placeholder="例如：开发库", width=320.0),
                   @ui.text("地址", role=@ui.Body),
-                  @ui.entry(@core.Store::new(""), placeholder="host:port", width=320.0),
+                  @ui.input(@core.Store::new(""), placeholder="host:port", width=320.0),
                 ],
                 on_confirm=fn() { app.dlg_result.set(app.dlg_name.get()) },
                 width=380.0,

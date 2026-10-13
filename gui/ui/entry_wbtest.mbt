@@ -50,7 +50,7 @@ fn mounted_entry(
   read_only? : Bool = false,
 ) -> (@core.Widget, @core.Widget, @core.Store[String]) {
   let store = @core.Store::new(text)
-  let e = entry(
+  let e = input(
     store,
     placeholder=placeholder,
     password=password,
@@ -222,7 +222,7 @@ test "placeholder：空文本画出占位，Store 仍是空" {
 ///|
 test "Store 被外部改动会回灌内核；焦点标志由宿主同步" {
   let store = @core.Store::new("初值")
-  let e = entry(store, width=160.0, focus_id=7)
+  let e = input(store, width=160.0, focus_id=7)
   let root = @core.Widget::new()
   root.set_size(200.0, 60.0)
   root.set_column()

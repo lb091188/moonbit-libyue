@@ -143,7 +143,7 @@ test "折叠面板：默认只开第一块，各块独立开合、收起即不�
 test "侧边菜单：项宽跟随容器、点项写 Store、选中项底色与未选不同" {
   let sel = @core.Store::new("首页")
   let (root, menu) = mounted(
-    side_menu(["首页", "报表", "设置"], sel, icons=[("报表", @icons.IconKind::Box)]),
+    menu(["首页", "报表", "设置"], sel, icons=[("报表", @icons.IconKind::Box)]),
     300.0,
     200.0,
   )
@@ -169,7 +169,7 @@ test "侧边菜单：项宽跟随容器、点项写 Store、选中项底色与�
 test "分组侧边菜单：标题行收起/展开只影响本组" {
   let sel = @core.Store::new("甲一")
   let (root, menu) = mounted(
-    side_menu_sections([
+    menu_sections([
       ("组一", ["甲一", "甲二"]),
       ("组二", ["乙一", "乙二"]),
     ], sel),
@@ -229,7 +229,7 @@ test "树：子层预建即收起，点父行展开、点叶子行不动作" {
 test "页签：预建三页只显当前页，点页签与外部改 Store 都换页" {
   let sel = @core.Store::new(0)
   let (root, tabs) = mounted(
-    tabs_t(
+    tabs(
       [("概览", text("概览页")), ("明细", text("明细页")), ("设置", text("设置页"))],
       selected=sel,
     ),

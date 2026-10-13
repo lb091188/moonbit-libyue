@@ -313,7 +313,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       [
         @ui.col(
           [
-            @ui.table_t(
+            @ui.table(
               [
                 @ui.TableColumn::make("语言", 140.0),
                 @ui.TableColumn::make("首发", 90.0, align=@text.Center),
@@ -353,7 +353,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
         "  @ui.TableRow::make([\"MoonBit\", \"2023\", \"多范式\"]),",
         "])",
         "let sort = @core.Store::new({ column: -1, asc: true })",
-        "@ui.table_t(",
+        "@ui.table(",
         "  [",
         "    @ui.TableColumn::make(\"语言\", 140.0),",
         "    @ui.TableColumn::make(\"首发\", 90.0, align=@text.Center),",
@@ -371,7 +371,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       [
         @ui.col(
           [
-            @ui.table_t(
+            @ui.table(
               [
                 @ui.TableColumn::make("语言", 120.0),
                 @ui.TableColumn::make("类型", 100.0, sortable=false),
@@ -391,7 +391,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       ],
       code=[
         "let sel : @core.Store[Array[Int]] = @core.Store::new([])",
-        "@ui.table_t(columns, rows, selection=sel, width=460.0)",
+        "@ui.table(columns, rows, selection=sel, width=460.0)",
         "@ui.bind(sel.signal(), fn(s) { \"已选 \\{s.length()} 行\" })",
       ],
     ),
@@ -400,7 +400,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       "Table 虚拟滚动",
       "整面自绘只画可见行，万行流畅；点击表头排序（序号列按数值），拖动列边界调整列宽；滚轮/拖右侧滚动条/键盘翻页。",
       [
-        @ui.table_v_t(
+        @ui.table_v(
           [
             @ui.TableColumn::make("序号", 90.0, align=@text.End),
             @ui.TableColumn::make("名称", 160.0),
@@ -416,7 +416,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       code=[
         "let data : Array[@ui.TableRow] = []",
         "for i in 0..<10000 { data.push(@ui.TableRow::make([(i + 1).to_string(), \"条目 \\{i + 1}\"])) }",
-        "@ui.table_v_t(columns, @core.Store::new(data), width=520.0, height=220.0)",
+        "@ui.table_v(columns, @core.Store::new(data), width=520.0, height=220.0)",
       ],
     ),
     @shared.section(
@@ -450,7 +450,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
         @ui.row(
           [
             @ui.transfer(transfer_left, transfer_right),
-            @ui.carousel_t(
+            @ui.carousel(
               [
                 @ui.text("第一屏：轮播内容可为任意 Node。", role=@ui.Body),
                 @ui.text("第二屏：自动轮播 3s 一切。", role=@ui.Body),
@@ -468,7 +468,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
         "let left = @core.Store::new([\"北京\", \"上海\", \"广州\"])",
         "let right = @core.Store::new([\"深圳\"])",
         "@ui.transfer(left, right)",
-        "@ui.carousel_t([@ui.text(\"第一屏\")], width=320.0, height=80.0)",
+        "@ui.carousel([@ui.text(\"第一屏\")], width=320.0, height=80.0)",
       ],
     ),
     @shared.section(

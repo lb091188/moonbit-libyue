@@ -496,7 +496,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       [
         @ui.row(
           [
-            @ui.switch_t(auto_on, on_text="开启自启", off_text="关闭自启"),
+            @ui.switch(auto_on, on_text="开启自启", off_text="关闭自启"),
             @ui.bind_label(auto_state, fn(s) { s }),
           ],
           column_gap=10.0,

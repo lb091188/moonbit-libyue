@@ -493,9 +493,9 @@ pub fn timeline(
   let rows : Array[@core.Node] = []
   let n = items.length()
   for i = 0; i < n; i = i + 1 {
-    let entry = items[i]
+    let input = items[i]
     rows.push(
-      timeline_row(entry.0, entry.1, entry.2, i == 0, i == n - 1, item_height),
+      timeline_row(input.0, input.1, input.2, i == 0, i == n - 1, item_height),
     )
   }
   view(rows, row_gap=gap)
@@ -503,7 +503,7 @@ pub fn timeline(
 
 ///|
 /// 轮播句柄：自动轮播开关、待触发的延时句柄、当前页、悬停暂停标志与切换入口。
-/// `carousel_t` 挂载后会把 `switch` 接到真实切页函数，句柄因此可以在挂载前后
+/// `carousel` 挂载后会把 `switch` 接到真实切页函数，句柄因此可以在挂载前后
 /// 同一份用（调用方拿着它随时切页/停转，不必再找控件）。
 pub(all) struct CarouselHandle {
   running : Ref[Bool]
@@ -545,7 +545,7 @@ pub fn carousel_goto(handle : CarouselHandle, i : Int) -> Unit {
 
 ///|
 /// 手动暂停/恢复自动轮播。页面内容自己吃掉了全部指针事件（连移动与离开都不冒泡
-/// 上来）时用这个自己控制，组件默认的悬停暂停见 `carousel_t`。
+/// 上来）时用这个自己控制，组件默认的悬停暂停见 `carousel`。
 pub fn carousel_pause(handle : CarouselHandle, v : Bool) -> Unit {
   handle.paused.val = v
 }
@@ -563,7 +563,7 @@ pub fn carousel_stop(handle : CarouselHandle) -> Unit {
 /// 轮播（EP Carousel）：面板序列 + 左右箭头 + 底部指示点。
 /// `interval_ms > 0` 且页数大于 1 时自动轮播（每 `interval_ms` 毫秒前进一页，
 /// 指针停在轮播上暂停、离开恢复）；面板全部预建，切页只翻显隐。
-pub fn carousel_t(
+pub fn carousel(
   pages : Array[@core.Node],
   width? : Double = 360.0,
   height? : Double = 180.0,

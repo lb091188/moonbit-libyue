@@ -30,7 +30,7 @@ pub(all) struct App {
   /// 对话框可见性（反馈页的按钮是触发方，两个对话框挂在 main 的窗口根）
   dlg_basic : @core.Store[Bool]
   dlg_form : @core.Store[Bool]
-  /// 表单对话框里的名称框（Store 是文本状态的唯一权威，`entry` 直连）
+  /// 表单对话框里的名称框（Store 是文本状态的唯一权威，`input` 直连）
   dlg_name : @core.Store[String]
   /// 最近一次对话框确认的回显（与 `dlg_name` 分开，避免确认把输入框内容改掉）
   dlg_result : @core.Store[String]

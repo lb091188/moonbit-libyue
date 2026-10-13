@@ -25,7 +25,7 @@ fn paint(root : @core.Widget, w : Int, h : Int) -> @render.Bitmap {
 test "滚动容器：视口/内容几何来自布局，滚轮改偏移并两端夹取" {
   let st = ScrollState::new()
   let (root, vp) = mounted(
-    scroll_v(scroll_rows(20, 20.0, @theme.theme_bg_panel()), st, width=200.0, height=100.0),
+    scroll_view(scroll_rows(20, 20.0, @theme.theme_bg_panel()), st, width=200.0, height=100.0),
     240.0,
     140.0,
   )
@@ -69,7 +69,7 @@ test "滚动容器：视口/内容几何来自布局，滚轮改偏移并两端�
 test "滚动容器：内容随偏移整体上移，滚动条在内容之上" {
   let st = ScrollState::new()
   let (root, vp) = mounted(
-    scroll_v(scroll_rows(10, 20.0, @theme.theme_bg_panel()), st, width=200.0, height=100.0),
+    scroll_view(scroll_rows(10, 20.0, @theme.theme_bg_panel()), st, width=200.0, height=100.0),
     240.0,
     140.0,
   )
@@ -96,7 +96,7 @@ test "滚动容器：内容随偏移整体上移，滚动条在内容之上" {
 test "滚动容器：点轨道跳转与拖动拇指（松手后移动不再跟手）" {
   let st = ScrollState::new()
   let (root, vp) = mounted(
-    scroll_v(scroll_rows(20, 20.0, @theme.theme_bg_panel()), st, width=200.0, height=100.0),
+    scroll_view(scroll_rows(20, 20.0, @theme.theme_bg_panel()), st, width=200.0, height=100.0),
     240.0,
     140.0,
   )
@@ -144,7 +144,7 @@ test "滚动容器：点轨道跳转与拖动拇指（松手后移动不再跟�
 test "滚动容器：内容不足一屏不滚、也不画滚动条" {
   let st = ScrollState::new()
   let (root, vp) = mounted(
-    scroll_v(scroll_rows(3, 20.0, "#334455"), st, width=200.0, height=100.0),
+    scroll_view(scroll_rows(3, 20.0, "#334455"), st, width=200.0, height=100.0),
     240.0,
     140.0,
   )

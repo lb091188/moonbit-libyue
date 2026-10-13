@@ -117,7 +117,7 @@ fn section_body(s : Section, selected : @core.Store[String]) -> @core.Node {
   // 本容器是显隐切换对象；滚动视口在 handle 里撑满剩余高度
   @ui.col(
     [
-      @ui.scroll_v(
+      @ui.scroll_view(
         [@ui.col(inner, row_gap=6.0, padding=14.0)],
         @ui.ScrollState::new(),
         handle=fn(v) { v.node.set_flex_grow(1.0) },

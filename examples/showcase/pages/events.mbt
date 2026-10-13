@@ -178,7 +178,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
   let evt_mouse : @core.Store[String] = @core.Store::new("(移入色块区操作)")
   let evt_dbl : @core.Store[String] = @core.Store::new("(在操作区快速连点两次)")
   let dbl_n : Ref[Int] = Ref(0)
-  // 双击判定与 entry 的「双击选词」同一口径：400ms + 4px（monotonic 时钟）
+  // 双击判定与 input 的「双击选词」同一口径：400ms + 4px（monotonic 时钟）
   let last_down : Ref[(Int64, Double, Double)] = Ref((0L, 0.0, 0.0))
   // ---- 段二：悬停秒表（on_hover_change 起停 200ms 自重排定时器） ----
   // 自停上限 100 拍（20s）：切页后悬停态可能滞留（隐藏控件不参与命中，但宿主
@@ -463,11 +463,11 @@ pub fn page_events(app : @shared.App) -> @core.Node {
     @shared.section(
       "布局",
       "嵌套布局与三种宽度",
-      "固定 / 百分比 / flex 三种宽度模型；8px 把手可拖动调整占比（hsplit，首栏最小 120、次栏最小 80，拖动期靠宿主的按下捕获不丢事件）。全集见 docs/zh/layout.md。",
+      "固定 / 百分比 / flex 三种宽度模型；8px 把手可拖动调整占比（split，首栏最小 120、次栏最小 80，拖动期靠宿主的按下捕获不丢事件）。全集见 docs/zh/layout.md。",
       [
         @ui.col(
           [
-            @ui.hsplit(
+            @ui.split(
               @ui.tree([
                 {
                   label: "组件",
@@ -532,7 +532,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "@ui.hsplit(@ui.tree(root), detail, min_first=120.0)  // 拖动 8px 把手改占比",
+        "@ui.split(@ui.tree(root), detail, min_first=120.0)  // 拖动 8px 把手改占比",
         "@ui.view([...], width=80.0, height=40.0)        // 固定",
         "// 百分比：容器没接这个参数，handle 里对布局节点写",
         "handle=fn(w) { w.node.set_width(@yoga.percent(50.0)) }",

@@ -83,7 +83,7 @@ const SCROLL_BAR_W : Double = 8.0
 ///|
 /// 滚动条控件（贴在视口右缘、与视口同高）：轨道 + 拇指（长度按视口/内容比例、
 /// 下限 16px 便于抓），点轨道跳转、按住拖动（拇指中心跟随指针）、松手即止。
-/// `scroll_v` 与 `virt_list` 共用。
+/// `scroll_view` 与 `virt_list` 共用。
 fn scroll_bar(state : ScrollState) -> @core.Widget {
   let bar = @core.Widget::new()
   bar.node.set_position(@yoga.Absolute)
@@ -152,7 +152,7 @@ fn scroll_bar(state : ScrollState) -> @core.Widget {
 ///|
 /// 垂直滚动容器：`height` 是视口高（0 = 由父容器给），内容按自然高度排布并可
 /// 超出视口；超出部分被裁剪，滚动条画在右缘。
-pub fn scroll_v(
+pub fn scroll_view(
   children : Array[@core.Node],
   state : ScrollState,
   width? : Double = 0.0,

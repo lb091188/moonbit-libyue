@@ -1,9 +1,9 @@
-// 表格：`TableColumn`/`TableRow` 模型 + `table_t`（表头排序指示、斑马纹、悬停、
+// 表格：`TableColumn`/`TableRow` 模型 + `table`（表头排序指示、斑马纹、悬停、
 // 行选择、按列宽排布），列宽与排序状态都走 `Store`（组件只切状态与画箭头，
 // **不替调用方排序**——排序口径由使用方决定，见 `TableSort` 注释）。
 //
 // 行是「重建式列表」（与 `transfer` 同款）：数据 Store 一变就清空子控件按新值再挂，
-// 行级不持订阅，所以重建次数与订阅数量解耦；万行级形态见 `table_v_t`（虚拟滚动，
+// 行级不持订阅，所以重建次数与订阅数量解耦；万行级形态见 `table_v`（虚拟滚动，
 // 随「虚拟列表」一批落地）。
 
 ///|
@@ -291,7 +291,7 @@ fn draw_cell(
 
 ///|
 /// 表头行：每列一个格（底色 + 底边线 + 标题按列对齐 + 排序指示）。
-/// `sort` 为 None 时不画箭头、点击无效；`table_t` 与 `table_v_t` 共用。
+/// `sort` 为 None 时不画箭头、点击无效；`table` 与 `table_v` 共用。
 fn table_header(
   columns : Array[TableColumn],
   widths : Ref[Array[Double]],
@@ -586,7 +586,7 @@ fn table_row_widget(
 /// 表格（EP Table）：表头（标题 + 排序指示，点击可排序列切「新列升序 / 同列升降
 /// 序反转 / 同列第三次取消」）+ 斑马纹数据行；`selection` 给定时行可点选（按下
 /// 抬起同一行才生效），选中行主题浅底 + 左缘强调条。
-pub fn table_t(
+pub fn table(
   columns : Array[TableColumn],
   rows : @core.Store[Array[TableRow]],
   width? : Double = 560.0,

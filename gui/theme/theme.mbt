@@ -219,8 +219,8 @@ pub fn off_theme_change(handle : Int) -> Unit {
 pub fn theme_apply(t : Theme) -> Unit {
   theme_box.t = t
   let snapshot = theme_box.subs.copy()
-  for entry in snapshot {
-    (entry.1)()
+  for input in snapshot {
+    (input.1)()
   }
 }
 

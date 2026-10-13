@@ -5,7 +5,7 @@
 // 与 master 的两条差（记档）：① 旧链路弹层是原生 Popover（`@yue.Popover`），本栈
 // 用自绘面板；② 旧链路的时间是「时/分两个 input_number 输入框」，本栈改成
 // 「时/分步进器」（自绘栈里没有原生输入框语义，键盘编辑要另配一套焦点与输入法
-// 通道，性价比低——需要键盘输入的多行文本请用 `entry`/`textarea`）。
+// 通道，性价比低——需要键盘输入的多行文本请用 `input`/`textarea`）。
 
 ///|
 /// 把控件配成选择器字段（EP DatePicker 的输入框样式）：面板底 + 描边 + 文本 +
@@ -93,7 +93,7 @@ fn clear_hit(local_x : Double, width : Double, clearable : Bool, filled : Bool) 
 }
 
 ///|
-/// 日历弹层（面板形态与 `calendar_t` 相同，但开在浮层图层上）。
+/// 日历弹层（面板形态与 `calendar` 相同，但开在浮层图层上）。
 fn calendar_popup(
   today : DateYMD,
   state_of : (DateYMD) -> CalCell,
@@ -366,7 +366,7 @@ fn time_popup(
 ///|
 /// 日期选择器（EP DatePicker）：字段 + 日历弹层，点选回填并收起；`clearable`
 /// 时字段悬停且有值显示 ✕，点它清空（清空不触发 `on_change`，与 master 同）。
-pub fn date_picker_t(
+pub fn date_picker(
   value : @core.Store[DateYMD?],
   on_change? : (DateYMD) -> Unit = fn(_d : DateYMD) -> Unit { () },
   placeholder? : String = "请选择日期",

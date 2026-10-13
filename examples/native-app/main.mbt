@@ -411,7 +411,7 @@ fn make_split_section(slot : Ref[@core.Widget?]) -> @core.Node {
   @ui.view(
     [
       @ui.text("分隔布局与文本族：把手常显点纹，悬停浅底、拖动主题色", size=13.0),
-      @ui.hsplit(
+      @ui.split(
         pane("左栏 Title", Title, @theme.theme_bg_panel()),
         pane("右栏 Accent", Accent, @theme.theme_fill_zebra()),
         ratio=0.5,
@@ -570,7 +570,7 @@ fn make_form_section(
             focus_id=25,
             handle=fn(w : @core.Widget) -> Unit { cmb_slot.val = Some(w) },
           ),
-          @ui.color_picker_t(
+          @ui.color_picker(
             col,
             width=160.0,
             focus_id=23,
@@ -597,7 +597,7 @@ fn make_form_section(
         row_gap=4.0,
         align_items=@yoga.AlignItems::FlexStart,
       ),
-      @ui.rate_t(
+      @ui.rate(
         rate,
         max=5,
         handle=fn(w : @core.Widget) -> Unit { rate_slot.val = Some(w) },
@@ -672,7 +672,7 @@ fn make_media_section(
       @ui.row(
         [
           @ui.icon(@icons.CheckCircleFill, size=20.0),
-          @ui.icon_button_t(
+          @ui.icon_button(
             @icons.Close2,
             on_click=fn() -> Unit { ib.val = ib.val + 1 },
             handle=fn(w : @core.Widget) -> Unit { ib_slot.val = Some(w) },
@@ -847,7 +847,7 @@ fn make_drawn_message_box_section(
         column_gap=8.0,
         align_items=@yoga.AlignItems::Center,
       ),
-      @ui.message_box_t(
+      @ui.message_box(
         vis_info,
         "构建完成",
         "3 个目标已产出。",
@@ -856,7 +856,7 @@ fn make_drawn_message_box_section(
         on_response=respond,
         on_dismiss=dismiss,
       ),
-      @ui.message_box_t(
+      @ui.message_box(
         vis_warn,
         "构建告警",
         "2 个目标有告警。",
@@ -867,7 +867,7 @@ fn make_drawn_message_box_section(
         on_dismiss=dismiss,
         width=460.0,
       ),
-      @ui.message_box_t(
+      @ui.message_box(
         vis_err,
         "构建失败",
         "3 个目标失败，是否继续？",
@@ -1870,7 +1870,7 @@ fn make_virt_section(
   @ui.view(
     [
       @ui.text("虚拟表格：200 行只挂可见区间（滚轮 / 拖滚动条，退出状态行报挂载数）", size=13.0),
-      @ui.table_v_t(
+      @ui.table_v(
         [
           @ui.TableColumn::make("名称", 160.0),
           @ui.TableColumn::make("数值", 100.0, align=@text.End),
@@ -1922,7 +1922,7 @@ fn make_table_section(
   @ui.view(
     [
       @ui.text("表格：点表头排序（新列升序 / 同列翻转 / 第三次取消）、点行选中", size=13.0),
-      @ui.table_t(
+      @ui.table(
         [
           @ui.TableColumn::make("组件", 140.0),
           @ui.TableColumn::make("规模", 100.0, align=@text.End),
@@ -2090,7 +2090,7 @@ fn main {
             min_width=180.0,
             handle=fn(w : @core.Widget) -> Unit { mw_sub_btn.val = Some(w) },
           ),
-          @ui.entry(
+          @ui.input(
             sub_text,
             placeholder="字打进这扇窗的栈里",
             focus_id=101,
@@ -2184,7 +2184,7 @@ fn main {
     @ui.view(
       [
         @ui.checkbox("同意", agreed),
-        @ui.switch_t(sound, on_text="开", off_text="关"),
+        @ui.switch(sound, on_text="开", off_text="关"),
         @ui.slider(level, width=120.0, step=5.0),
         @ui.stepper(count, min=0, max=3),
         @ui.progress(level, width=80.0, max=100.0),
@@ -2553,7 +2553,7 @@ fn main {
         ),
         @ui.view(
           [
-            @ui.carousel_t(
+            @ui.carousel(
               [
                 @ui.text("轮播第一页：点右侧箭头或末指示点", size=13.0),
                 @ui.text("轮播第二页", size=13.0),
@@ -2566,7 +2566,7 @@ fn main {
               rotation=spin,
               handle=fn(w : @core.Widget) -> Unit { car_w.val = Some(w) },
             ),
-            @ui.carousel_t(
+            @ui.carousel(
               [
                 @ui.text("自转页 A", size=13.0),
                 @ui.text("自转页 B", size=13.0),
@@ -2598,7 +2598,7 @@ fn main {
               }),
               size=13.0,
             ),
-            @ui.calendar_t(
+            @ui.calendar(
               value=picked_date,
               today=@ui.today_date(),
               handle=fn(w : @core.Widget) -> Unit { cal_w.val = Some(w) },
@@ -2659,13 +2659,13 @@ fn main {
         @ui.view(
           [
             @ui.text("浮层首批", size=13.0),
-            @ui.dropdown_menu(
+            @ui.dropdown(
               "操作",
               ["重命名", "复制", "-", "删除"],
               on_select=fn(i : Int) -> Unit { ov_pick.val = i + 1 },
               handle=fn(w : @core.Widget) -> Unit { ov_dd.val = Some(w) },
             ),
-            @ui.popover_t(
+            @ui.popover(
               @ui.button("气泡", min_width=70.0),
               @ui.view(
                 [@ui.text("气泡内容", size=12.0), @ui.text("点外面收起", size=11.0)],
@@ -2675,7 +2675,7 @@ fn main {
               width=130.0,
               handle=fn(w : @core.Widget) -> Unit { ov_pop.val = Some(w) },
             ),
-            @ui.tooltip_t(
+            @ui.tooltip(
               @ui.button("悬我", min_width=70.0),
               "延时 500ms 的自绘气泡",
               delay_ms=300,
@@ -2692,7 +2692,7 @@ fn main {
         @ui.view(
           [
             @ui.text("滚动容器", size=13.0),
-            @ui.scroll_v(
+            @ui.scroll_view(
               make_scroll_rows(),
               scr,
               width=190.0,
@@ -2711,7 +2711,7 @@ fn main {
         @ui.view(
           [
             @ui.text("导航族次批", size=13.0),
-            @ui.side_menu(
+            @ui.menu(
               ["首页", "报表", "设置"],
               menu_sel,
               icons=[("报表", @icons.IconKind::Box)],
@@ -2737,7 +2737,7 @@ fn main {
               width=64.0,
               handle=fn(w : @core.Widget) -> Unit { nav2_xfer.val = Some(w) },
             ),
-            @ui.tabs_t(
+            @ui.tabs(
               [
                 ("页一", @ui.text("页一内容：随页签切换显隐", size=12.0)),
                 ("页二", @ui.text("页二内容", size=12.0)),
@@ -2756,7 +2756,7 @@ fn main {
         @ui.view(
           [
             @ui.text("日期族选择器", size=13.0),
-            @ui.date_picker_t(
+            @ui.date_picker(
               dpk,
               today=@ui.today_date(),
               width=180.0,
@@ -2790,7 +2790,7 @@ fn main {
               min_width=70.0,
               handle=fn(w : @core.Widget) -> Unit { ov2_dlgbtn.val = Some(w) },
             ),
-            @ui.dialog_t(
+            @ui.dialog(
               dlg_open,
               "确认操作",
               [@ui.text("对话框在浮层图层上开，遮罩铺满整窗", size=12.0)],
@@ -2837,10 +2837,10 @@ fn main {
       border=@theme.theme_border(),
     ),
   ])
-  // 批次 5d（输入框全语义）：整只框由 `@ui.entry` 提供——键入、选区、双击选词、
+  // 批次 5d（输入框全语义）：整只框由 `@ui.input` 提供——键入、选区、双击选词、
   // 拖动、undo、输入法提交与 preedit 都在组件里，宿主只按焦点投递。
   let t3 = @core.Store::new("组件框")
-  let _ = (@ui.entry(
+  let _ = (@ui.input(
     t3,
     width=200.0,
     focus_id=4,

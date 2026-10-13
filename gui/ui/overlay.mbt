@@ -5,7 +5,7 @@
 // 不占位、也不需要隐藏态），这与「预建 + 显隐」的切换式组件是两条路：浮层是瞬时
 // 的，重建成本换掉了一整族隐藏态与状态同步。
 //
-// 与 master 的一条差（记档）：`tooltip_t` 在旧链路走 GTK 原生 tooltip
+// 与 master 的一条差（记档）：`tooltip` 在旧链路走 GTK 原生 tooltip
 // （`ffi_view_set_tooltip`），本栈全自绘、没有原生 tooltip 通道，所以改成
 // 「悬停延时后开一层自绘气泡」——观感可控（吃主题），代价是要自己管延时与收起。
 
@@ -54,7 +54,7 @@ fn overlay_alive(id : Int) -> Bool {
 ///|
 /// 气泡弹层（EP Popover）：点 trigger 在它下方弹出任意内容，再点一次收起；
 /// 点浮层外由图层收起。width/height 传 0 表示按内容定尺寸。
-pub fn popover_t(
+pub fn popover(
   trigger : @core.Node,
   content : @core.Node,
   width? : Double = 0.0,
@@ -148,7 +148,7 @@ fn menu_row(text : String, on_pick : () -> Unit) -> @core.Node {
 ///|
 /// 下拉菜单（EP Dropdown）：触发文字 + 下拉箭头，点开菜单项列表，悬停高亮，
 /// 选中回调序号并收起。
-pub fn dropdown_menu(
+pub fn dropdown(
   trigger : String,
   items : Array[String],
   on_select? : (Int) -> Unit = fn(_i : Int) -> Unit { () },
@@ -278,7 +278,7 @@ fn tooltip_pane(tip : String, font : @text.Font) -> @core.Node {
 /// 悬停走宿主的 `on_hover_change` 而不是「等子控件的移动事件冒泡上来」：子控件
 /// 可能自己消费移动（按钮就是这样，`Move => !is_off()`），包在外面的组件就再也
 /// 收不到通知；宿主维护的悬停态带父链语义（与 CSS `:hover` 同义），包住谁都成立。
-pub fn tooltip_t(
+pub fn tooltip(
   content : @core.Node,
   tip : String,
   delay_ms? : Int = 500,
@@ -328,7 +328,7 @@ pub fn tooltip_t(
 /// 与 master 的一条差（记档）：旧链路把遮罩做成**页面内的绝对定位层**（同一份
 /// `Node` 常驻页面树、靠 `set_visible` 弹收）；本栈改开在浮层图层上——对话框
 /// 天然要压过所有内容与其它浮层，图层正是这个语义，而且不需要常驻一棵隐藏树。
-pub fn dialog_t(
+pub fn dialog(
   visible : @core.Store[Bool],
   title : String,
   children : Array[@core.Node],
@@ -683,11 +683,11 @@ pub fn context_menu_for(
           } else {
             let rows : Array[@core.Node] = []
             for i = 0; i < items.length(); i = i + 1 {
-              let entry = items[i]
+              let input = items[i]
               rows.push(
-                menu_row(entry.0, fn() -> Unit {
+                menu_row(input.0, fn() -> Unit {
                   @core.overlay_hide_top()
-                  (entry.1)()
+                  (input.1)()
                 }),
               )
             }

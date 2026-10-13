@@ -55,15 +55,15 @@ test "autostart_escape_exec：双引号包裹 + 反斜杠/引号转义 + % 翻�
 
 ///|
 test "autostart_desktop_entry / desktop_enabled：内容与解析两态" {
-  let entry = autostart_desktop_entry("/usr/bin/app", "com.example.App")
-  assert_true(entry.has_prefix("[Desktop Entry]\n"))
-  assert_true(entry.contains("Type=Application"))
-  assert_true(entry.contains("Name=com.example.App"))
-  assert_true(entry.contains("Exec=\"/usr/bin/app\""))
-  assert_true(entry.contains("Hidden=false"))
-  assert_true(entry.contains("X-GNOME-Autostart-enabled=true"))
+  let input = autostart_desktop_entry("/usr/bin/app", "com.example.App")
+  assert_true(input.has_prefix("[Desktop Entry]\n"))
+  assert_true(input.contains("Type=Application"))
+  assert_true(input.contains("Name=com.example.App"))
+  assert_true(input.contains("Exec=\"/usr/bin/app\""))
+  assert_true(input.contains("Hidden=false"))
+  assert_true(input.contains("X-GNOME-Autostart-enabled=true"))
   // 默认形态判启用
-  assert_true(autostart_desktop_enabled(entry))
+  assert_true(autostart_desktop_enabled(input))
   // 系统侧开关位两态
   assert_false(autostart_desktop_enabled("Hidden=true\n"))
   assert_false(

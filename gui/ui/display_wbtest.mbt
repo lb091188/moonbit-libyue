@@ -248,7 +248,7 @@ test "轮播：面板预建只显示当前页，箭头与指示点切页、越�
     text("第三页", size=14.0),
   ]
   let (root, c) = mounted(
-    carousel_t(pages, width=200.0, height=80.0, interval_ms=0, rotation=h),
+    carousel(pages, width=200.0, height=80.0, interval_ms=0, rotation=h),
     260.0,
     160.0,
   )
@@ -291,7 +291,7 @@ test "轮播自转走宿主延时通道：暂停不前进、stop 断链并取消
     fn(id : Int) -> Unit { cancelled.val.push(id) },
   )
   let h = CarouselHandle::make()
-  let _ = carousel_t(
+  let _ = carousel(
     [text("一"), text("二"), text("三")],
     width=120.0,
     height=60.0,
@@ -335,7 +335,7 @@ test "空条目：时间线零行、空轮播不出面板也不排自转" {
   let (_, tl) = mounted(timeline([]), 200.0, 60.0)
   assert_eq(tl.children().length(), 0)
   let h = CarouselHandle::make()
-  let (_, c) = mounted(carousel_t([], width=100.0, height=40.0, rotation=h), 200.0, 80.0)
+  let (_, c) = mounted(carousel([], width=100.0, height=40.0, rotation=h), 200.0, 80.0)
   assert_eq(c.children().length(), 0)
   carousel_goto(h, 1)
   assert_eq(h.index(), 0)

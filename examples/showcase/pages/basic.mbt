@@ -6,7 +6,7 @@
 // G7 迁移记档（旧链路 → 本栈的四处机械差）：
 // ① `style=[("marginTop", n)]` 一律删——段正文容器已带 `row_gap`，间距是
 //    布局容器的属性而不是控件自己的；
-// ② `input_t`（无状态文本框）在本栈没有对应物，语义上就是 `entry`（Store
+// ② `input_t`（无状态文本框）在本栈没有对应物，语义上就是 `input`（Store
 //    是文本状态的唯一权威），故「组内输入框」各配一个页内 Store；
 // ③ `hover_group`/`cursor_group` 的 `on_change`（手动设光标）与 `radius`
 //    在本栈已内建：悬停态本就是父链语义、光标取悬停路径最深请求、
@@ -129,15 +129,15 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
     @shared.section(
       "分隔提示",
       "Divider 与 Tooltip",
-      "水平（默认）/竖直 1px 主题边框色；tooltip_t 给任意节点包原生悬浮提示（系统样式，主题化气泡见反馈页 Popover）。",
+      "水平（默认）/竖直 1px 主题边框色；tooltip 给任意节点包原生悬浮提示（系统样式，主题化气泡见反馈页 Popover）。",
       [
         @ui.text("上方内容", role=Body),
         @ui.divider(),
         @ui.text("下方内容", role=Body),
         @ui.row(
           [
-            @ui.tooltip_t(@ui.button_t("悬停看提示"), "原生 tooltip：系统样式"),
-            @ui.tooltip_t(@ui.button_t("再来一个", variant=@ui.Soft), "第二个提示"),
+            @ui.tooltip(@ui.button_t("悬停看提示"), "原生 tooltip：系统样式"),
+            @ui.tooltip(@ui.button_t("再来一个", variant=@ui.Soft), "第二个提示"),
           ],
           column_gap=10.0,
         ),
@@ -145,7 +145,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
       code=[
         "@ui.divider()",
         "@ui.separator(vertical=true)",
-        "@ui.tooltip_t(@ui.button_t(\"悬停看提示\"), \"原生 tooltip：系统样式\")",
+        "@ui.tooltip(@ui.button_t(\"悬停看提示\"), \"原生 tooltip：系统样式\")",
       ],
     ),
     @shared.section(
@@ -157,7 +157,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
           [
             @ui.text("组标题：悬停我，或下面的子控件", role=@ui.Section),
             @ui.row(
-              [@ui.entry(box_a, width=200.0), @ui.button_t("组内按钮")],
+              [@ui.input(box_a, width=200.0), @ui.button_t("组内按钮")],
               column_gap=10.0,
             ),
             @ui.text("子控件触发的事件同样改变组的样式", role=@ui.Secondary),
@@ -170,7 +170,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
         "@ui.hover_group(",
         "  [",
         "    @ui.text(\"组标题\", role=@ui.Section),",
-        "    @ui.row([@ui.entry(box, width=200.0), @ui.button_t(\"组内按钮\")], column_gap=10.0),",
+        "    @ui.row([@ui.input(box, width=200.0), @ui.button_t(\"组内按钮\")], column_gap=10.0),",
         "  ],",
         "  padding=14.0,",
         "  row_gap=8.0,",
@@ -186,7 +186,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
           [
             @ui.text("整组都是手型：移入试试，或移到子控件上", role=@ui.Section),
             @ui.row(
-              [@ui.entry(box_b, width=200.0), @ui.button_t("组内按钮")],
+              [@ui.input(box_b, width=200.0), @ui.button_t("组内按钮")],
               column_gap=10.0,
             ),
           ],
@@ -198,7 +198,7 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
         "@ui.cursor_group(",
         "  [",
         "    @ui.text(\"整组都是手型\", role=@ui.Section),",
-        "    @ui.entry(box, width=200.0),",
+        "    @ui.input(box, width=200.0),",
         "    @ui.button_t(\"组内按钮\"),",
         "  ],",
         "  padding=14.0,",

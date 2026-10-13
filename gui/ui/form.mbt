@@ -163,7 +163,7 @@ pub fn radio_group(
 ///|
 /// 开关：40×20 胶囊 + 16 圆滑块（胶囊自身按圆角矩形近似，直角先记档），
 /// 可带开/关文案。
-pub fn switch_t(
+pub fn switch(
   state : @core.Store[Bool],
   on_text? : String = "",
   off_text? : String = "",
@@ -683,7 +683,7 @@ fn star_path(p : @render.Painter, cx : Double, cy : Double, r_out : Double) -> U
 /// 评分：`max` 颗五角星，选中实心主题色、未选中描边灰；悬停预亮到第 N 颗，
 /// 点击写入 `value`（1..max）并回调 `on_change`（外部写值不回调，与本栈其它
 /// 组件同口径）。
-pub fn rate_t(
+pub fn rate(
   value : @core.Store[Int],
   max? : Int = 5,
   on_change? : (Int) -> Unit = fn(_v : Int) -> Unit { () },
@@ -828,7 +828,7 @@ fn list_popup(rows : Array[@core.Node], n : Int, width : Double) -> @core.Node {
   let want = n.to_double() * 28.0 + 8.0
   let list_h = if want > 300.0 { 300.0 } else { want }
   let st = ScrollState::new()
-  overlay_pane([scroll_v(rows, st, width=width, height=list_h)], width, list_h)
+  overlay_pane([scroll_view(rows, st, width=width, height=list_h)], width, list_h)
 }
 
 ///|
@@ -909,7 +909,7 @@ pub fn select_t(
 /// 取色器（EP ColorPicker 下拉形态）：触发字段（当前色块 + hex + 箭头）点开
 /// 预设色板（每行 5 格，选中格主色描边 + 白勾），点色块写入 `value`（`#RRGGBB`）
 /// 并收起。字段与弹层同 `select_t`：开在浮层图层上，点外面由图层收起。
-pub fn color_picker_t(
+pub fn color_picker(
   value : @core.Store[String],
   colors? : Array[String] = [
     "#2D68C4", "#2E9E5B", "#D9822B", "#D64550", "#6B7480", "#1E4FA3", "#3F6E9E",
@@ -1046,7 +1046,7 @@ fn color_swatch(
 ///|
 /// 可编辑下拉（EP Combobox 形态）：文本框 + 随输入过滤的候选浮层。
 /// 打字即过滤并开层，↑/↓ 移动高亮、回车取高亮、Esc 收层，点候选行直接回填；
-/// 编辑语义（选区/双击选词/undo/输入法）全在里面的 `entry`，本组件只加「候选」这一层。
+/// 编辑语义（选区/双击选词/undo/输入法）全在里面的 `input`，本组件只加「候选」这一层。
 ///
 /// 与 master 的一条差（记档）：旧链路的 combo 是原生可编辑组合框（GTK
 /// `ComboBoxEntry`），本栈全自绘——浮层开在浮层图层上，收层同样由图层负责。
@@ -1126,7 +1126,7 @@ pub fn combo(
       }
     }
 
-    let box = entry(
+    let box = input(
       value,
       placeholder=placeholder,
       width=width,

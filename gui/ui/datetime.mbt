@@ -1,4 +1,4 @@
-// 日期族首批：日期/时间值模型 + 自绘日历面板 + `calendar_t`。
+// 日期族首批：日期/时间值模型 + 自绘日历面板 + `calendar`。
 //
 // 两条与 master 的差（记档）：① CSS `style` 通道同样未接，只留类型化参数；
 // ② 「今天」不由组件直接问平台，而是 `@core.local_ymd()` 转派，并且可以显式
@@ -504,7 +504,7 @@ fn build_calendar(
 /// 日历面板（EP DatePicker 的面板形态，全自绘）：`‹`/`›` 切月 + 星期行 +
 /// 42 格月网格，跨月日期灰显且不可选，「今天」用主题色，选中日期实心主题色方块。
 /// 松开当月日期即写入 `value`（若有）并回调 `on_pick`。
-pub fn calendar_t(
+pub fn calendar(
   on_pick? : (DateYMD) -> Unit = fn(_d : DateYMD) -> Unit { () },
   value? : @core.Store[DateYMD?],
   today? : DateYMD = today_date(),

@@ -14,7 +14,7 @@ pub fn use_system_clipboard(enable : Bool) -> Unit {
 }
 
 ///|
-/// 按开关与探测结果给内核装槽（entry/textarea 构造时调；包内函数）。
+/// 按开关与探测结果给内核装槽（input/textarea 构造时调；包内函数）。
 fn attach_system_clipboard(ed : @input.Editor) -> Unit {
   if g_sys_clipboard.val && @sys.clipboard_available() {
     ed.set_clipboard(

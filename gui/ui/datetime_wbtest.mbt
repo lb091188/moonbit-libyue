@@ -133,7 +133,7 @@ test "日历面板：点当月格选中并写 Store，跨月格与格外松开�
   let picked : Array[String] = []
   let v = @core.Store::new(None)
   let (root, panel) = mounted(
-    calendar_t(
+    calendar(
       on_pick=fn(x : DateYMD) -> Unit { picked.push(x.format()) },
       value=v,
       today=d(2026, 10, 11),
@@ -176,7 +176,7 @@ test "日历面板：切月后可选日期跟着换，选中格画实心方块" 
   let picked : Array[String] = []
   let v = @core.Store::new(None)
   let (root, panel) = mounted(
-    calendar_t(
+    calendar(
       on_pick=fn(x : DateYMD) -> Unit { picked.push(x.format()) },
       value=v,
       today=d(2026, 10, 11),
@@ -224,7 +224,7 @@ test "日历面板：切月后可选日期跟着换，选中格画实心方块" 
 test "外部改 Store 即换选中格；区间格子映射端点实心、中间浅底" {
   let v = @core.Store::new(None)
   let (root, panel) = mounted(
-    calendar_t(value=v, today=d(2026, 10, 11)),
+    calendar(value=v, today=d(2026, 10, 11)),
     300.0,
     300.0,
   )

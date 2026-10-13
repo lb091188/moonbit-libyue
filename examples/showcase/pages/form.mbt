@@ -2,7 +2,7 @@
 // 组件写回即状态变化），展示端 bind_label/bind 直连派生。
 //
 // G7 迁移记档（与 master 的差异）：
-// ① `input_t` → `entry`（Store 驱动，`clearable` 未迁，清空走全选+删除）；
+// ① `input_t` → `input`（Store 驱动，`clearable` 未迁，清空走全选+删除）；
 // ② `input_number`（Double）→ `stepper`（Int 步进器——自绘栈无原生输入框语义）；
 // ③ `radio_group` 的值从「选项字符串」换成「索引 Store[Int]」；
 // ④ `checkbox` 从「on_change 写回信号」换成「Store 即状态源」，语义等价；
@@ -25,12 +25,12 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
     @shared.section(
       "输入",
       "输入框与多行",
-      "单行 entry（Store 驱动，密码态逐字符遮罩）+ 多行 textarea（自动折行、超宽滚动）。",
+      "单行 input（Store 驱动，密码态逐字符遮罩）+ 多行 textarea（自动折行、超宽滚动）。",
       [
         @ui.col(
           [
-            @ui.entry(@core.Store::new(""), placeholder="输入点什么…", width=300.0),
-            @ui.entry(
+            @ui.input(@core.Store::new(""), placeholder="输入点什么…", width=300.0),
+            @ui.input(
               @core.Store::new(""),
               placeholder="密码框",
               password=true,
@@ -47,8 +47,8 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "@ui.entry(@core.Store::new(\"\"), placeholder=\"输入点什么…\", width=300.0)",
-        "@ui.entry(@core.Store::new(\"\"), placeholder=\"密码框\", password=true, width=300.0)",
+        "@ui.input(@core.Store::new(\"\"), placeholder=\"输入点什么…\", width=300.0)",
+        "@ui.input(@core.Store::new(\"\"), placeholder=\"密码框\", password=true, width=300.0)",
         "@ui.textarea(@core.Store::new(\"多行文本输入演示。\\n第二行内容。\"), rows=3, width=300.0)",
       ],
     ),
@@ -61,7 +61,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         @ui.bind_label(qty, fn(v) { "当前数量：\{v}" }),
         @ui.slider(slider_val, min=0.0, max=100.0, step=5.0, width=200.0),
         @ui.bind_label(slider_val, fn(v) { "当前值：\{v.round()}" }),
-        @ui.rate_t(rate_val),
+        @ui.rate(rate_val),
         @ui.bind_label(rate_val, fn(v) { "评分：\{v} 星" }),
       ],
       code=[
@@ -71,7 +71,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         "let slider_val : @core.Store[Double] = @core.Store::new(30.0)",
         "@ui.slider(slider_val, min=0.0, max=100.0, step=5.0, width=200.0)",
         "let rate_val : @core.Store[Int] = @core.Store::new(3)",
-        "@ui.rate_t(rate_val)",
+        "@ui.rate(rate_val)",
       ],
     ),
     @shared.section(
@@ -87,7 +87,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
               clearable=true,
               width=170.0,
             ),
-            @ui.color_picker_t(picked_color),
+            @ui.color_picker(picked_color),
             @ui.bind_label(picked_color, fn(c) { c }),
           ],
           row_gap=10.0,
@@ -96,7 +96,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
       ],
       code=[
         "@ui.select_t([\"杭州\", \"北京\", \"上海\", \"深圳\", \"广州\"], city, clearable=true, width=170.0)",
-        "@ui.color_picker_t(color)",
+        "@ui.color_picker(color)",
         "@ui.bind_label(color, fn(c) { c })",
       ],
     ),
@@ -125,9 +125,9 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
             ),
             @ui.row(
               [
-                @ui.switch_t(wifi_on),
+                @ui.switch(wifi_on),
                 @ui.bind_label(wifi_on, fn(v) { if v { "已开启" } else { "已关闭" } }),
-                @ui.switch_t(locked, disabled=true),
+                @ui.switch(locked, disabled=true),
                 @ui.text("禁用", role=@ui.Body),
               ],
               column_gap=12.0,
@@ -144,18 +144,18 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         "let theme_idx : @core.Store[Int] = @core.Store::new(1)",
         "@ui.radio_group([\"浅色\", \"深色\", \"跟随系统\"], theme_idx)",
         "let wifi_on : @core.Store[Bool] = @core.Store::new(true)",
-        "@ui.switch_t(wifi_on)",
-        "@ui.switch_t(@core.Store::new(false), disabled=true)",
+        "@ui.switch(wifi_on)",
+        "@ui.switch(@core.Store::new(false), disabled=true)",
       ],
     ),
     @shared.section(
       "日期",
       "日期与时间选择",
-      "全自绘月历（‹/› 切月）+ 内联 calendar_t；日期区间与日期时间区间选择器，选中值住 Store。",
+      "全自绘月历（‹/› 切月）+ 内联 calendar；日期区间与日期时间区间选择器，选中值住 Store。",
       [
         @ui.col(
           [
-            @ui.date_picker_t(dp_val, clearable=true, width=170.0),
+            @ui.date_picker(dp_val, clearable=true, width=170.0),
             @ui.row(
               [
                 @ui.text("选中：", role=@ui.Body),
@@ -172,7 +172,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
           row_gap=10.0,
           align_items=@yoga.AlignItems::FlexStart,
         ),
-        @ui.calendar_t(),
+        @ui.calendar(),
         @ui.col([
           @ui.datetime_range_picker_t(dtr),
           @ui.bind_label(dtr, fn(r) {
@@ -186,9 +186,9 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
       ],
       code=[
         "let dp : @core.Store[@ui.DateYMD?] = @core.Store::new(None)",
-        "@ui.date_picker_t(dp, clearable=true, width=170.0)",
+        "@ui.date_picker(dp, clearable=true, width=170.0)",
         "@ui.bind(dp.signal(), fn(d) { match d { Some(v) => v.format()  None -> \"未选\" } })",
-        "@ui.calendar_t()",
+        "@ui.calendar()",
         "let dtr : @core.Store[@ui.DateTimeRange] = @core.Store::new({ start: None, end: None })",
         "@ui.datetime_range_picker_t(dtr)",
       ],
@@ -199,14 +199,14 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
       "form_item 行布局（标签右对齐 + 控件区）+ form 分组标题。",
       [
         @ui.form("用户设置", [
-          @ui.form_item("用户名", @ui.entry(@core.Store::new("moonbit"), width=200.0)),
-          @ui.form_item("城市", @ui.entry(@core.Store::new("杭州"), width=200.0)),
+          @ui.form_item("用户名", @ui.input(@core.Store::new("moonbit"), width=200.0)),
+          @ui.form_item("城市", @ui.input(@core.Store::new("杭州"), width=200.0)),
           @ui.form_item("数量", @ui.stepper(qty2, min=1, max=9)),
         ]),
       ],
       code=[
         "@ui.form(\"用户设置\", [",
-        "  @ui.form_item(\"用户名\", @ui.entry(@core.Store::new(\"moonbit\"), width=200.0)),",
+        "  @ui.form_item(\"用户名\", @ui.input(@core.Store::new(\"moonbit\"), width=200.0)),",
         "  @ui.form_item(\"数量\", @ui.stepper(qty2, min=1, max=9)),",
         "])",
       ],

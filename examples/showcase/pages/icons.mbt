@@ -2,7 +2,7 @@
 // 本页由 scripts/gen_showcase_icons.py 生成,勿手改;分组定义见该脚本 GROUPS。
 // 网格为竖排 vbox 包行(每行 24 个)——外层容器必须 vbox,否则行组被
 // 水平排布、超宽截断(图标墙首版即此 bug)。G7 新栈口径:图标走 @ui.icon、
-// 悬停名走 @ui.tooltip_t、间距走容器参数(column_gap/row_gap)。
+// 悬停名走 @ui.tooltip、间距走容器参数(column_gap/row_gap)。
 
 ///|
 /// 一组图标的网格:vbox 包行,每行 per_row 个,悬停 tooltip 显示名称。
@@ -14,7 +14,7 @@ fn icon_grid(kinds : Array[@icons.IconKind], per_row : Int) -> @core.Node {
       let idx = row * per_row + col
       if idx < kinds.length() {
         items.push(
-          @ui.tooltip_t(
+          @ui.tooltip(
             @ui.icon(kinds[idx], size=30.0),
             @icons.icon_name(kinds[idx]),
           ),
@@ -50,7 +50,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.TreeTable, size=18.0),",
         "  @ui.icon(@icons.TextField, size=18.0),",
         "  @ui.icon(@icons.SelectField, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.TreeTable, size=18.0), @icons.icon_name(@icons.TreeTable)),",
+        "  @ui.tooltip(@ui.icon(@icons.TreeTable, size=18.0), @icons.icon_name(@icons.TreeTable)),",
       ],
     ),
     @shared.section(
@@ -81,7 +81,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.Bold, size=18.0),",
         "  @ui.icon(@icons.Strikethrough, size=18.0),",
         "  @ui.icon(@icons.Undo, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.Bold, size=18.0), @icons.icon_name(@icons.Bold)),",
+        "  @ui.tooltip(@ui.icon(@icons.Bold, size=18.0), @icons.icon_name(@icons.Bold)),",
       ],
     ),
     @shared.section(
@@ -112,7 +112,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.CaretRightSmall, size=18.0),",
         "  @ui.icon(@icons.ArrowUp, size=18.0),",
         "  @ui.icon(@icons.ToTop, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.CaretRightSmall, size=18.0), @icons.icon_name(@icons.CaretRightSmall)),",
+        "  @ui.tooltip(@ui.icon(@icons.CaretRightSmall, size=18.0), @icons.icon_name(@icons.CaretRightSmall)),",
       ],
     ),
     @shared.section(
@@ -146,7 +146,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.Appstore, size=18.0),",
         "  @ui.icon(@icons.BorderInner, size=18.0),",
         "  @ui.icon(@icons.Layers, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.Appstore, size=18.0), @icons.icon_name(@icons.Appstore)),",
+        "  @ui.tooltip(@ui.icon(@icons.Appstore, size=18.0), @icons.icon_name(@icons.Appstore)),",
       ],
     ),
     @shared.section(
@@ -186,7 +186,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.FilePdf, size=18.0),",
         "  @ui.icon(@icons.FolderOpen, size=18.0),",
         "  @ui.icon(@icons.Snippets, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.FilePdf, size=18.0), @icons.icon_name(@icons.FilePdf)),",
+        "  @ui.tooltip(@ui.icon(@icons.FilePdf, size=18.0), @icons.icon_name(@icons.FilePdf)),",
       ],
     ),
     @shared.section(
@@ -214,7 +214,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.CloudServer, size=18.0),",
         "  @ui.icon(@icons.Qrcode, size=18.0),",
         "  @ui.icon(@icons.Database, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.CloudServer, size=18.0), @icons.icon_name(@icons.CloudServer)),",
+        "  @ui.tooltip(@ui.icon(@icons.CloudServer, size=18.0), @icons.icon_name(@icons.CloudServer)),",
       ],
     ),
     @shared.section(
@@ -241,7 +241,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.Laptop, size=18.0),",
         "  @ui.icon(@icons.Printer, size=18.0),",
         "  @ui.icon(@icons.VideoCamera, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.Laptop, size=18.0), @icons.icon_name(@icons.Laptop)),",
+        "  @ui.tooltip(@ui.icon(@icons.Laptop, size=18.0), @icons.icon_name(@icons.Laptop)),",
       ],
     ),
     @shared.section(
@@ -269,7 +269,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.AreaChart, size=18.0),",
         "  @ui.icon(@icons.PieChart, size=18.0),",
         "  @ui.icon(@icons.Dashboard, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.AreaChart, size=18.0), @icons.icon_name(@icons.AreaChart)),",
+        "  @ui.tooltip(@ui.icon(@icons.AreaChart, size=18.0), @icons.icon_name(@icons.AreaChart)),",
       ],
     ),
     @shared.section(
@@ -296,7 +296,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.Message, size=18.0),",
         "  @ui.icon(@icons.Bell, size=18.0),",
         "  @ui.icon(@icons.Share2, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.Message, size=18.0), @icons.icon_name(@icons.Message)),",
+        "  @ui.tooltip(@ui.icon(@icons.Message, size=18.0), @icons.icon_name(@icons.Message)),",
       ],
     ),
     @shared.section(
@@ -320,7 +320,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.User1, size=18.0),",
         "  @ui.icon(@icons.Team, size=18.0),",
         "  @ui.icon(@icons.Adduser, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.User1, size=18.0), @icons.icon_name(@icons.User1)),",
+        "  @ui.tooltip(@ui.icon(@icons.User1, size=18.0), @icons.icon_name(@icons.User1)),",
       ],
     ),
     @shared.section(
@@ -345,7 +345,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.Lock, size=18.0),",
         "  @ui.icon(@icons.Eye, size=18.0),",
         "  @ui.icon(@icons.Safetycertificate, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.Lock, size=18.0), @icons.icon_name(@icons.Lock)),",
+        "  @ui.tooltip(@ui.icon(@icons.Lock, size=18.0), @icons.icon_name(@icons.Lock)),",
       ],
     ),
     @shared.section(
@@ -369,7 +369,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.Time, size=18.0),",
         "  @ui.icon(@icons.CalendarCheck, size=18.0),",
         "  @ui.icon(@icons.Loading, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.Time, size=18.0), @icons.icon_name(@icons.Time)),",
+        "  @ui.tooltip(@ui.icon(@icons.Time, size=18.0), @icons.icon_name(@icons.Time)),",
       ],
     ),
     @shared.section(
@@ -408,7 +408,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.CheckCircleFill, size=18.0),",
         "  @ui.icon(@icons.CloseCircleFill, size=18.0),",
         "  @ui.icon(@icons.Smile, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.CheckCircleFill, size=18.0), @icons.icon_name(@icons.CheckCircleFill)),",
+        "  @ui.tooltip(@ui.icon(@icons.CheckCircleFill, size=18.0), @icons.icon_name(@icons.CheckCircleFill)),",
       ],
     ),
     @shared.section(
@@ -445,7 +445,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.DollarCircleFill, size=18.0),",
         "  @ui.icon(@icons.Wallet, size=18.0),",
         "  @ui.icon(@icons.Creditcard, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.DollarCircleFill, size=18.0), @icons.icon_name(@icons.DollarCircleFill)),",
+        "  @ui.tooltip(@ui.icon(@icons.DollarCircleFill, size=18.0), @icons.icon_name(@icons.DollarCircleFill)),",
       ],
     ),
     @shared.section(
@@ -488,7 +488,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.Login, size=18.0),",
         "  @ui.icon(@icons.SettingFill, size=18.0),",
         "  @ui.icon(@icons.Filter, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.Login, size=18.0), @icons.icon_name(@icons.Login)),",
+        "  @ui.tooltip(@ui.icon(@icons.Login, size=18.0), @icons.icon_name(@icons.Login)),",
       ],
     ),
     @shared.section(
@@ -522,7 +522,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.Sunny, size=18.0),",
         "  @ui.icon(@icons.Cloudy, size=18.0),",
         "  @ui.icon(@icons.CoffeeCup, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.Sunny, size=18.0), @icons.icon_name(@icons.Sunny)),",
+        "  @ui.tooltip(@ui.icon(@icons.Sunny, size=18.0), @icons.icon_name(@icons.Sunny)),",
       ],
     ),
     @shared.section(
@@ -553,7 +553,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.ImageIcon, size=18.0),",
         "  @ui.icon(@icons.Car, size=18.0),",
         "  @ui.icon(@icons.Compass, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.ImageIcon, size=18.0), @icons.icon_name(@icons.ImageIcon)),",
+        "  @ui.tooltip(@ui.icon(@icons.ImageIcon, size=18.0), @icons.icon_name(@icons.ImageIcon)),",
       ],
     ),
     @shared.section(
@@ -587,7 +587,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.Wechat, size=18.0),",
         "  @ui.icon(@icons.GithubFill, size=18.0),",
         "  @ui.icon(@icons.Chrome, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.Wechat, size=18.0), @icons.icon_name(@icons.Wechat)),",
+        "  @ui.tooltip(@ui.icon(@icons.Wechat, size=18.0), @icons.icon_name(@icons.Wechat)),",
       ],
     ),
     @shared.section(
@@ -643,7 +643,7 @@ pub fn page_icons(_app : @shared.App) -> @core.Node {
         "  @ui.icon(@icons.Shangduiqi, size=18.0),",
         "  @ui.icon(@icons.Youduiqi, size=18.0),",
         "  @ui.icon(@icons.Zuoduiqi, size=18.0),",
-        "  @ui.tooltip_t(@ui.icon(@icons.Shangduiqi, size=18.0), @icons.icon_name(@icons.Shangduiqi)),",
+        "  @ui.tooltip(@ui.icon(@icons.Shangduiqi, size=18.0), @icons.icon_name(@icons.Shangduiqi)),",
       ],
     ),
   ])

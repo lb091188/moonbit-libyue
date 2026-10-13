@@ -1,4 +1,4 @@
-// 进程页（U3）：table_v_t 虚拟表格（千行级）+ 搜索过滤 + 列头排序 +
+// 进程页（U3）：table_v 虚拟表格（千行级）+ 搜索过滤 + 列头排序 +
 // 选中 kill（SIGTERM 失败 SIGKILL）/ renice，1Hz 增量刷新。
 // 选择按 pid 重映射：每次刷新把旧选中行号经 pid 数组映射到新行号，
 // 排序变化（CPU% 实时变动）不会让选中漂到别的进程。数据来自 main.mbt
@@ -129,7 +129,7 @@ fn sort_of_col(j : Int) -> ProcSort? {
 
 ///|
 /// 页面状态：派生表格数据 + 过滤 / 排序条件 + 操作消息。
-/// 排序条件走 @ui.TableSort Store（表头点击由 table_v_t 组件内切换，
+/// 排序条件走 @ui.TableSort Store（表头点击由 table_v 组件内切换，
 /// 本页订阅后重建数据），箭头显示与点击切换因此对组件透明。
 struct ProcPage {
   rows : @core.Store[Array[@ui.TableRow]]
@@ -296,7 +296,7 @@ fn page_process(app : App) -> @core.Node {
   // 初始数据 + 订阅 1Hz 刷新（增量：只重算派生数据，不重建视图树）
   page.rebuild(app.procs.get())
   app.procs.subscribe(fn(procs) { page.rebuild(procs) })
-  // 表头排序点击（table_v_t 组件内切换 Store）→ 重建数据
+  // 表头排序点击（table_v 组件内切换 Store）→ 重建数据
   page.sort.subscribe(fn(_s) { page.rebuild(app.procs.get()) })
 
   let query_store : @core.Store[String] = @core.Store::new("")
@@ -304,7 +304,7 @@ fn page_process(app : App) -> @core.Node {
   let tools : Array[@core.Node] = [
     @ui.text("搜索", color=@theme.theme_text_secondary(), role=Body),
     // 搜索框：文本经 store 双向投影，on_change 里重建派生数据
-    @ui.entry(
+    @ui.input(
       query_store,
       placeholder="进程名 / pid",
       width=220.0,
@@ -337,7 +337,7 @@ fn page_process(app : App) -> @core.Node {
     }
   }
   tools.push(
-    @ui.entry(nice_store, width=72.0, on_change=fn(s) { page.nice_text = s }),
+    @ui.input(nice_store, width=72.0, on_change=fn(s) { page.nice_text = s }),
   )
   tools.push(
     @ui.button_t(prio_btn, variant=@ui.Soft, on_click=fn() {
@@ -363,7 +363,7 @@ fn page_process(app : App) -> @core.Node {
         page.msg.signal(),
         color=@theme.theme_text_secondary(),
       ),
-      @ui.table_v_t(
+      @ui.table_v(
         columns,
         page.rows,
         width=880.0,

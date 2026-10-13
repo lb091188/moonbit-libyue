@@ -1,4 +1,4 @@
-// 可拖动分隔布局：`hsplit`（左右两栏）/ `vsplit`（上下两栏）。
+// 可拖动分隔布局：`split`（direction=Horizontal 左右 / Vertical 上下）。
 //
 // 与 master 的一条差（记档）：旧链路拖动后**直写 bounds + 双写样式**（GTK 上运行期
 // 改布局属性重排不落地，见其 probe-splitter 条）；本栈每帧从根重排、样式改完下一
@@ -168,28 +168,33 @@ fn splitter_impl(
 }
 
 ///|
-/// 水平分隔：左右两栏，中间纵向把手左右拖动（首栏最小 `min_first`、
-/// 次栏最小 `min_second`，拖动全程受这两个下限夹取）。
-pub fn hsplit(
-  first : @core.Node,
-  second : @core.Node,
-  ratio? : Double = 0.5,
-  min_first? : Double = 80.0,
-  min_second? : Double = 80.0,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  splitter_impl(true, first, second, ratio, min_first, min_second, handle=handle)
+/// 分隔布局（§2 合并：原 `hsplit` / `vsplit` 一台）：`direction=Horizontal`
+/// 左右两栏、把手左右拖动，`direction=Vertical` 上下两栏、把手上下拖动；
+/// 首栏最小 `min_first`、次栏最小 `min_second`，拖动全程受这两个下限夹取
+/// （缺省下限按方向取 80 / 60，同现状两档）。
+pub(all) enum SplitDirection {
+  Horizontal
+  Vertical
 }
 
 ///|
-/// 垂直分隔：上下两栏，中间横向把手上下拖动。
-pub fn vsplit(
+pub fn split(
   first : @core.Node,
   second : @core.Node,
+  direction? : SplitDirection = Horizontal,
   ratio? : Double = 0.5,
-  min_first? : Double = 60.0,
-  min_second? : Double = 60.0,
+  // 缺省下限按方向分档（同现状 hsplit 80 / vsplit 60）；None=未给,现场折算
+  min_first? : Double = 0.0,
+  min_second? : Double = 0.0,
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
-  splitter_impl(false, first, second, ratio, min_first, min_second, handle=handle)
+  let horiz = match direction {
+    Horizontal => true
+    Vertical => false
+  }
+  let mf = if min_first > 0.0 { min_first } else { if horiz { 80.0 } else { 60.0 } }
+  let ms = if min_second > 0.0 { min_second } else { if horiz { 80.0 } else { 60.0 } }
+  splitter_impl(horiz, first, second, ratio, mf, ms, handle=handle)
 }
+
+

@@ -173,7 +173,7 @@ pub let link_base : Style = style(color="primary", font_size=13.0)
 // ---- 输入族 ----
 
 ///|
-/// 单行输入 `input`（现状 `entry`：面板底 + 1px 边框 + 13 号 `text_regular`；
+/// 单行输入 `input`（现状 `input`：面板底 + 1px 边框 + 13 号 `text_regular`；
 /// 焦点边框转主色，禁用走 `text_secondary`）。
 pub let input_base : Style = style(
   background_color="bg_panel",

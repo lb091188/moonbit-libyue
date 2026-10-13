@@ -68,13 +68,13 @@ pub fn hwmon_sensors() -> Array[TempSensor]? {
     Some(names) => names
   }
   let out : Array[TempSensor] = []
-  for entry in chips {
-    if !entry.has_prefix("hwmon") {
+  for input in chips {
+    if !input.has_prefix("hwmon") {
       continue
     }
-    let base = "/sys/class/hwmon/\{entry}"
+    let base = "/sys/class/hwmon/\{input}"
     let chip = match read_text_file("\{base}/name") {
-      None => entry
+      None => input
       Some(t) => t.trim().to_owned()
     }
     let files = match list_dir(base) {
@@ -452,13 +452,13 @@ fn dm_name_for_mapper(mapper : String) -> String? {
     None => return None
     Some(names) => names
   }
-  for entry in blocks {
-    if !entry.has_prefix("dm-") {
+  for input in blocks {
+    if !input.has_prefix("dm-") {
       continue
     }
-    match read_text_file("/sys/block/\{entry}/dm/name") {
+    match read_text_file("/sys/block/\{input}/dm/name") {
       None => ()
-      Some(t) => if t.trim().to_owned() == mapper { return Some(entry) }
+      Some(t) => if t.trim().to_owned() == mapper { return Some(input) }
     }
   }
   None
@@ -1180,11 +1180,11 @@ fn gpu_hwmon_temp(base : String) -> Double? {
     None => return None
     Some(names) => names
   }
-  for entry in hwmons {
-    if !entry.has_prefix("hwmon") {
+  for input in hwmons {
+    if !input.has_prefix("hwmon") {
       continue
     }
-    match read_text_file("\{base}/hwmon/\{entry}/temp1_input") {
+    match read_text_file("\{base}/hwmon/\{input}/temp1_input") {
       None => ()
       Some(t) =>
         match parse_temp_input(t) {

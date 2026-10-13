@@ -52,7 +52,7 @@ test "消息框：Store 驱动弹收，按钮回调响应编号并收起" {
   let got : Array[Int] = []
   let dismissed = Ref(0)
   let (root, _anchor) = mounted_with_overlay(
-    message_box_t(
+    message_box(
       vis,
       "删除确认",
       "要删掉这一条吗？",
@@ -122,7 +122,7 @@ test "消息框：✕ 与 Esc 走 dismiss（不给响应编号），Enter 走默
   let got : Array[Int] = []
   let dismissed = Ref(0)
   let (_root, _a) = mounted_with_overlay(
-    message_box_t(
+    message_box(
       vis,
       "提示",
       "正文",
@@ -169,7 +169,7 @@ test "消息框：close_on_mask=false 时点遮罩不收，但 ✕ 收（走 dis
   let got : Array[Int] = []
   let dismissed = Ref(0)
   let (root, _a) = mounted_with_overlay(
-    message_box_t(
+    message_box(
       vis,
       "标题",
       "内容",
@@ -208,7 +208,7 @@ test "消息框：close_on_mask=true 时点遮罩收起且走 dismiss" {
   let vis = @core.Store::new(true)
   let dismissed = Ref(0)
   let (root, _a) = mounted_with_overlay(
-    message_box_t(
+    message_box(
       vis,
       "标题",
       "内容",
@@ -233,7 +233,7 @@ test "消息框：close_on_mask=true 时点遮罩收起且走 dismiss" {
   let vis2 = @core.Store::new(true)
   let dismissed2 = Ref(0)
   let (root2, _b) = mounted_with_overlay(
-    message_box_t(
+    message_box(
       vis2,
       "标题",
       "内容",
@@ -262,7 +262,7 @@ test "消息框：informative 为空时不占副行；空文案按钮跳过" {
   }
   let vis = @core.Store::new(true)
   let (_root, _a) = mounted_with_overlay(
-    message_box_t(
+    message_box(
       vis,
       "标题",
       "只有正文",

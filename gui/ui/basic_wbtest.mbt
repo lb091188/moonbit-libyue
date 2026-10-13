@@ -227,7 +227,7 @@ test "按钮：悬停与按下态由宿主置位，配色随状态变化" {
 test "容器 / 分组 / 分隔线：几何与主题取色都按建树口径" {
   let line = separator()
   let inner = view([text("内容")], padding=4.0, bg=@theme.theme_bg_page())
-  let g = group("标题", [text("一行"), text("两行")], width=160.0)
+  let g = panel("标题", [text("一行"), text("两行")], width=160.0)
   let root = mount_root([g, line, inner], 200.0, 300.0)
   let grp = kid(root, 0)
   // 分组的第一项是标题，其后是传入的两项
@@ -360,7 +360,7 @@ fn ink_in_box(bm : @render.Bitmap, x1 : Int, y1 : Int) -> Int {
 test "图标按钮：尺寸固定、悬停换底色、点击在抬起且落在框内、禁用不吃事件" {
   let mut hits = 0
   let root = mount_root(
-    [icon_button_t(@icons.Close2, on_click=fn() { hits = hits + 1 }, box_size=24.0)],
+    [icon_button(@icons.Close2, on_click=fn() { hits = hits + 1 }, box_size=24.0)],
     120.0,
     60.0,
   )
@@ -388,7 +388,7 @@ test "图标按钮：尺寸固定、悬停换底色、点击在抬起且落在�
   assert_eq(hits, 1)
   let mut off_hits = 0
   let root2 = mount_root(
-    [icon_button_t(@icons.Close2, on_click=fn() { off_hits = off_hits + 1 }, disabled=true)],
+    [icon_button(@icons.Close2, on_click=fn() { off_hits = off_hits + 1 }, disabled=true)],
     120.0,
     60.0,
   )

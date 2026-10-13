@@ -781,8 +781,8 @@ fn rf_parse_xbel(xml : String) -> Result[Array[RfEntry], String] {
           sc.pos = sc.pos + 2
           if sc.read_name() == Some("bookmark") {
             match cur {
-              Some(entry) => {
-                out.push(entry)
+              Some(input) => {
+                out.push(input)
                 cur = None
               }
               None => ()
@@ -800,8 +800,8 @@ fn rf_parse_xbel(xml : String) -> Result[Array[RfEntry], String] {
                 if closed {
                   // 自闭合 bookmark（无 info 子节点）：立即成条
                   match cur {
-                    Some(entry) => {
-                      out.push(entry)
+                    Some(input) => {
+                      out.push(input)
                       cur = None
                     }
                     None => ()
@@ -811,7 +811,7 @@ fn rf_parse_xbel(xml : String) -> Result[Array[RfEntry], String] {
                 match rf_attr(attrs, "name") {
                   Some(app) =>
                     match cur {
-                      Some(entry) => entry.apps.push(app)
+                      Some(input) => input.apps.push(app)
                       None => ()
                     }
                   None => ()
@@ -820,7 +820,7 @@ fn rf_parse_xbel(xml : String) -> Result[Array[RfEntry], String] {
                 match rf_attr(attrs, "type") {
                   Some(t) =>
                     match cur {
-                      Some(entry) if entry.mime is None => entry.mime = Some(t)
+                      Some(input) if input.mime is None => input.mime = Some(t)
                       _ => ()
                     }
                   None => ()

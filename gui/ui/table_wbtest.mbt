@@ -32,7 +32,7 @@ test "表格：表头列数、斑马纹、行点选与取消、行回调带源�
   let sel : @core.Store[Array[Int]] = @core.Store::new([])
   let clicks : Array[Int] = []
   let (root, tb) = mounted(
-    table_t(
+    table(
       [TableColumn::make("名称", 120.0), TableColumn::make("值", 100.0)],
       rows,
       width=260.0,
@@ -81,7 +81,7 @@ test "表格：表头排序状态机（新列升序 / 同列翻转 / 同列第�
   let rows = @core.Store::new(table_rows([["甲", "1"], ["乙", "2"]]))
   let sort = @core.Store::new({ column: -1, asc: true })
   let (root, tb) = mounted(
-    table_t(
+    table(
       [
         TableColumn::make("名称", 120.0),
         TableColumn::make("值", 100.0, align=@text.End),
@@ -115,7 +115,7 @@ test "表格：单元格类型（标签 / 色块 / 多行）都出像素，数�
     { cells: [CellText("行一"), CellTag("成功", Success), CellColorBox("#ff8800", "橙"), CellLines(["第一行", "第二行"])] },
   ])
   let (root, tb) = mounted(
-    table_t(
+    table(
       [
         TableColumn::make("名", 80.0, sortable=false),
         TableColumn::make("态", 80.0, sortable=false),
@@ -162,7 +162,7 @@ test "表格：单元格类型（标签 / 色块 / 多行）都出像素，数�
 test "表格：表头边界拖动改列宽，相邻两列此消彼长且有最小列宽" {
   let rows = @core.Store::new(table_rows([["甲", "1"], ["乙", "2"]]))
   let (root, tb) = mounted(
-    table_t(
+    table(
       [
         // 可排序列：单元格会消费按下，边界那 3px 必须让给表头才拖得动
         TableColumn::make("名", 120.0),

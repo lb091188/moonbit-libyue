@@ -27,7 +27,7 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
       ],
       code=[
         "let selected = @core.Store::new(\"基础组件\")",
-        "@ui.side_menu_sections(",
+        "@ui.menu_sections(",
         "  [(\"组件\", [\"基础组件\", \"表单组件\"]), (\"系统能力\", [\"系统集成\"])],",
         "  selected,",
         "  icons=[(\"基础组件\", @icons.Appstore), (\"系统集成\", @icons.Setting1)],",
@@ -37,7 +37,7 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
     @shared.section(
       "菜单",
       "右键菜单与下拉菜单",
-      "context_menu_for 包右键弹出主题化菜单（悬停高亮 + 点击）；dropdown_menu 点字段顶部展开候选——两套用途不同：前者右键显隐，后者顶部展开。",
+      "context_menu_for 包右键弹出主题化菜单（悬停高亮 + 点击）；dropdown 点字段顶部展开候选——两套用途不同：前者右键显隐，后者顶部展开。",
       [
         @ui.row(
           [
@@ -50,7 +50,7 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
                 ("删除", fn() { last_op.set("已删除") }),
               ],
             ),
-            @ui.dropdown_menu(
+            @ui.dropdown(
               "操作",
               ["打开", "保存", "-", "复制链接", "删除"],
               on_select=fn(_i) { last_op.set("菜单项已选") },
@@ -69,7 +69,7 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
         "    (\"删除\", fn() { last_op.set(\"已删除\") }),",
         "  ],",
         ")",
-        "@ui.dropdown_menu(\"操作\", [\"打开\", \"保存\", \"-\", \"删除\"], on_select=fn(_i) { () })",
+        "@ui.dropdown(\"操作\", [\"打开\", \"保存\", \"-\", \"删除\"], on_select=fn(_i) { () })",
       ],
     ),
     @shared.section(
@@ -113,14 +113,14 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
       "Tabs 页签",
       "顶部页签形态：选中主题色文字 + 底部指示条，内容区切换（子区预建 + 显隐，不重建）。",
       [
-        @ui.tabs_t([
+        @ui.tabs([
           ("概览", @ui.text("这里是概览页内容。", role=@ui.Body)),
           ("配置", @ui.text("这里是配置页内容。", role=@ui.Body)),
           ("日志", @ui.text("这里是日志页内容。", role=@ui.Body)),
         ]),
       ],
       code=[
-        "@ui.tabs_t([",
+        "@ui.tabs([",
         "  (\"概览\", @ui.text(\"这里是概览页内容。\", role=@ui.Body)),",
         "  (\"配置\", @ui.text(\"这里是配置页内容。\", role=@ui.Body)),",
         "])",

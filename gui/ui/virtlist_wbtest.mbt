@@ -1,5 +1,5 @@
 // 虚拟列表/虚拟表格回归：只挂可见区间、滚动后窗口跟着平移、上下占位把总高撑对、
-// 表头固定不滚、虚拟表格的行点选与 table_t 同口径。
+// 表头固定不滚、虚拟表格的行点选与 table 同口径。
 
 ///|
 fn virt_items(n : Int) -> @core.Store[Array[Int]] {
@@ -92,7 +92,7 @@ test "虚拟列表：拖滚动条改偏移、数据变短偏移夹回上界" {
 }
 
 ///|
-test "虚拟表格：表头固定不滚、行只挂可见区间、点选与 table_t 同口径" {
+test "虚拟表格：表头固定不滚、行只挂可见区间、点选与 table 同口径" {
   let data : Array[TableRow] = []
   for i = 0; i < 200; i = i + 1 {
     data.push(TableRow::make(["行 " + i.to_string(), (i * 2).to_string()]))
@@ -103,7 +103,7 @@ test "虚拟表格：表头固定不滚、行只挂可见区间、点选与 tabl
   let sort = @core.Store::new({ column: -1, asc: true })
   let clicks : Array[Int] = []
   let (root, tv) = mounted(
-    table_v_t(
+    table_v(
       [TableColumn::make("名", 140.0), TableColumn::make("值", 0.0)],
       rows,
       width=260.0,
@@ -123,7 +123,7 @@ test "虚拟表格：表头固定不滚、行只挂可见区间、点选与 tabl
   // 视口 150 / 行高 30 = 5 行 + 预挂
   let inner = list.children()[0]
   assert_true(inner.children().length() <= 12 && inner.children().length() >= 6)
-  // 表头排序仍可用（与 table_t 同源构造）
+  // 表头排序仍可用（与 table 同源构造）
   click_at(root, head.children()[0], 20.0, 20.0)
   assert_eq((sort.get().column, sort.get().asc), (0, true))
   // 点第一行：选中并回调源下标 0

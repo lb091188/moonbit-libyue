@@ -1,4 +1,4 @@
-// 多行输入框（textarea）：换行布局 + 垂直滚动 + 与单行 `entry` 同源的编辑语义。
+// 多行输入框（textarea）：换行布局 + 垂直滚动 + 与单行 `input` 同源的编辑语义。
 //
 // 文本权威仍是 `@input.Editor`（组件不另存一份），`Store[String]` 是它的对外投影；
 // 与宿主的接缝还是那五个回调（`on_key`/`on_commit`/`on_preedit`/`im_context`/

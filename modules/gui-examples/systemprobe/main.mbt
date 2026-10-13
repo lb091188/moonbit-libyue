@@ -35,9 +35,9 @@ fn main {
           // 侧栏：分组菜单 + 说明
           @ui.col(
             [
-              @ui.scroll_v(
+              @ui.scroll_view(
                 [
-                  @ui.side_menu_sections(
+                  @ui.menu_sections(
                     [
                       ("能力", ["系统能力", "命令与状态"]),
                       ("媒体", ["视频播放", "音频播放"]),

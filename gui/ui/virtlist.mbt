@@ -1,9 +1,9 @@
 // 虚拟列表与虚拟表格：视口固定的行高列表，**只挂载可见区间（±overscan）的行**，
-// 滚轮与滚动条都驱动同一个 `ScrollState`（与 `scroll_v` 同款，共用 `scroll_bar`）。
+// 滚轮与滚动条都驱动同一个 `ScrollState`（与 `scroll_view` 同款，共用 `scroll_bar`）。
 //
-// 与「整列重建」的 `table_t` 相比，这里换掉的是「数据多大就挂多少行」：万行级数据
+// 与「整列重建」的 `table` 相比，这里换掉的是「数据多大就挂多少行」：万行级数据
 // 只挂十来个控件，命中/绘制/布局都只跟可见行有关。代价是行高必须固定（等距窗口
-// 才能从偏移直接算出下标）；非等距行请回 `scroll_v` + 重建式列表。
+// 才能从偏移直接算出下标）；非等距行请回 `scroll_view` + 重建式列表。
 
 ///|
 /// 虚拟列表：`items` 变、窗口滚过一行边界、视口尺寸变化都会重挂可见区间。
@@ -121,9 +121,9 @@ pub fn[T] virt_list(
 }
 
 ///|
-/// 虚拟表格（`table_t` 的万行级形态）：表头固定不滚，数据行走 `virt_list`，
-/// 单元格画法与 `table_t` 完全一致（同一份 `table_row_widget`）。
-pub fn table_v_t(
+/// 虚拟表格（`table` 的万行级形态）：表头固定不滚，数据行走 `virt_list`，
+/// 单元格画法与 `table` 完全一致（同一份 `table_row_widget`）。
+pub fn table_v(
   columns : Array[TableColumn],
   rows : @core.Store[Array[TableRow]],
   width? : Double = 560.0,
@@ -217,7 +217,7 @@ pub fn StickyList::new() -> StickyList {
 /// 标题，滚过组边界就换文字），组内行照常滚走。
 ///
 /// 实现口径：吸顶标题是视口里的一个**绝对定位悬浮条**，内容整块跟着偏移走
-/// （与 `scroll_v` 同一套相对定位平移）；「当前组」不是靠滚动位置硬算，而是每帧
+/// （与 `scroll_view` 同一套相对定位平移）；「当前组」不是靠滚动位置硬算，而是每帧
 /// 布局后读各组控件的矩形反推——组高由内容决定（行数/换行都可能变），读布局结果
 /// 比事先累加高度稳。
 pub fn sticky_list(

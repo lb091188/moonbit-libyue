@@ -14,7 +14,7 @@
 //     主题切换重绘同样走 invalidate（on_draw 每次实时读 theme_current）。
 //   - 手型光标从「逐子控件 set_cursor」换成 cursor_group（宿主取
 //     悬停路径最深的非零请求，组内一处即可盖住全部）。
-//   - 图表 fill=true 换 area=true；表格 table_v_t 的固定 width 参数
+//   - 图表 fill=true 换 area=true；表格 table_v 的固定 width 参数
 //     按右栏实际宽度传入（本栈无 fill 形态）。
 
 ///|

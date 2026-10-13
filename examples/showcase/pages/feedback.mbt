@@ -1,5 +1,5 @@
 // 反馈组件页：Store/Signal 驱动。两个对话框的可见性挂窗口根（状态在 App，
-// 由 main.mbt 把 `dialog_t` 挂进窗口根），反馈页的按钮只是触发方；
+// 由 main.mbt 把 `dialog` 挂进窗口根），反馈页的按钮只是触发方；
 // Toast 推送函数经 App 传入（新栈的 toast 自己开在浮层图层上，页面里不必
 // 再常驻一棵空树，与 master 的一条差）。
 //
@@ -7,7 +7,7 @@
 // ① `alert_closeable` 在本栈并入 `alert`（`closable=true`），不再另出一个函数；
 // ② `result` 在本栈只吃（标题, 副标题, 语义类型），操作区由调用方在旁边摆
 //    ——旧链路把它作为数组参数传，本栈按「组件只给形状、操作区是内容」拆开；
-// ③ `input_t` → `entry`（Store 驱动）。
+// ③ `input_t` → `input`（Store 驱动）。
 
 ///|
 pub fn page_feedback(app : @shared.App) -> @core.Node {
@@ -81,9 +81,9 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
     @shared.section(
       "气泡",
       "Popover 气泡弹层",
-      "popover_t 给任意节点包点击弹层：内容为任意 Node，再次点击收起。",
+      "popover 给任意节点包点击弹层：内容为任意 Node，再次点击收起。",
       [
-        @ui.popover_t(
+        @ui.popover(
           @ui.button_t("打开气泡"),
           @ui.text("气泡内容：任意 Node。", role=@ui.Body),
           width=180.0,
@@ -91,7 +91,7 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "@ui.popover_t(",
+        "@ui.popover(",
         "  @ui.button_t(\"打开气泡\"),",
         "  @ui.text(\"气泡内容：任意 Node。\", role=@ui.Body),",
         "  180.0,",
@@ -157,12 +157,12 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
       code=[
         "let visible : @core.Store[Bool] = @core.Store::new(false)",
         "let name : @core.Store[String] = @core.Store::new(\"\")",
-        "@ui.dialog_t(",
+        "@ui.dialog(",
         "  visible,",
         "  \"新建连接\",",
         "  [",
         "    @ui.text(\"名称\", role=@ui.Body),",
-        "    @ui.entry(name, placeholder=\"例如：开发库\", width=320.0),",
+        "    @ui.input(name, placeholder=\"例如：开发库\", width=320.0),",
         "  ],",
         ")",
         "visible.set(true)",

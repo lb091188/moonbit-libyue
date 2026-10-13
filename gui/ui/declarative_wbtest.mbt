@@ -122,7 +122,7 @@ test "旧名构造器落到新组件上：picker 点开浮层、scroll 出滚动
   for i = 0; i < 20; i = i + 1 {
     rows_in.push(view([text("行 " + i.to_string())], height=22.0))
   }
-  let (_r2, view) = mounted(scroll(rows_in, st, width=160.0, height=80.0), 220.0, 200.0)
+  let (_r2, view) = mounted(scroll_view(rows_in, st, width=160.0, height=80.0), 220.0, 200.0)
   let (bm, _, _) = shot(view)
   // 内容超视口 → 右缘画得出滚动条（轨道色不是透明）
   let bx = view.rect.w.round().to_int() - 4
@@ -152,13 +152,13 @@ test "光标形状请求：按钮手型、输入框文本形、分隔把手横�
   assert_eq(card.children()[1].cursor_request(), @core.CURSOR_HAND)
   // 悬停在卡片空白处也是手型（组的请求回退生效）
   assert_eq(root.cursor_at(card.rect.x + 4.0, card.rect.y + 4.0), @core.CURSOR_HAND)
-  let (_r2, box1) = mounted(entry(@core.Store::new("x"), focus_id=1), 200.0, 60.0)
+  let (_r2, box1) = mounted(input(@core.Store::new("x"), focus_id=1), 200.0, 60.0)
   assert_eq(box1.cursor, @core.CURSOR_TEXT)
   let (_r3, area) = mounted(textarea(@core.Store::new("y")), 260.0, 90.0)
   assert_eq(area.cursor, @core.CURSOR_TEXT)
-  let (_r4, hs) = mounted(hsplit(text("甲"), text("乙")), 220.0, 80.0)
+  let (_r4, hs) = mounted(split(text("甲"), text("乙")), 220.0, 80.0)
   assert_eq(hs.children()[1].cursor, @core.CURSOR_RESIZE_H)
-  let (_r5, vs) = mounted(vsplit(text("甲"), text("乙")), 220.0, 120.0)
+  let (_r5, vs) = mounted(split(text("甲"), text("乙"), direction=Vertical), 220.0, 120.0)
   assert_eq(vs.children()[1].cursor, @core.CURSOR_RESIZE_V)
   let (_r6, cg) = mounted(
     cursor_group([text("缩放热区")], cursor=@core.CURSOR_RESIZE_V, width=120.0),

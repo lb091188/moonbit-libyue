@@ -3,10 +3,10 @@
 //  - 原生档：系统外观、系统模态、阻塞返回编号，但**只有 Win32 有**（macOS 留桩）；
 //  - 本档：自绘外观（吃主题）、**非阻塞**（点按钮回调编号）、三平台同一份代码。
 //
-// 与 `dialog_t`（EP Dialog）的关系：两者都开在 `core/overlay.mbt` 的浮层图层
+// 与 `dialog`（EP Dialog）的关系：两者都开在 `core/overlay.mbt` 的浮层图层
 // 上，共享同一套遮罩/居中/点外收起机制；差在**语义面**——
-//  - `dialog_t` 是「内容对话框」：调用方给任意内容树 + 确定/取消两个出口；
-//  - `message_box_t` 是「消息框」：图标（按消息种类）+ 正文 + informative 副行 +
+//  - `dialog` 是「内容对话框」：调用方给任意内容树 + 确定/取消两个出口；
+//  - `message_box` 是「消息框」：图标（按消息种类）+ 正文 + informative 副行 +
 //    任意多个按钮（每个带自己的响应编号），对应旧链路 `MessageBox` 的
 //    `set_title`/`set_text`/`set_informative_text`/`add_button(title, response)`/
 //    `on_response` 语义面。
@@ -81,7 +81,7 @@ fn msgbox_alloc_focus_id() -> Int {
 ///|
 /// 自绘消息框（模态，开在浮层图层上）。
 ///
-/// - `visible`：`Store[Bool]` 驱动弹收（与 `dialog_t` 同制；开着时被图层收起也会
+/// - `visible`：`Store[Bool]` 驱动弹收（与 `dialog` 同制；开着时被图层收起也会
 ///   同步回 Store）。
 /// - `kind`：决定左侧图标与取色。
 /// - `text` 是正文；`informative` 是副行（次要色，可空）——对应旧链路的
@@ -92,7 +92,7 @@ fn msgbox_alloc_focus_id() -> Int {
 /// - `on_dismiss`：✕ / Esc / 点遮罩（`close_on_mask=true` 时）收起，不给编号。
 /// - `close_on_mask`：点遮罩空白处是否收起（默认否——消息框通常要求显式作答）。
 /// - `width`：面板固定宽（正文按它折行）。
-pub fn message_box_t(
+pub fn message_box(
   visible : @core.Store[Bool],
   title : String,
   content : String,
@@ -106,7 +106,7 @@ pub fn message_box_t(
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   // 用显式 mount 而不是 `node_of_new`：后者的 finish 在构造期就跑，而「按 Store
-  // 立刻开层」要求浮层宿主已经就位（宿主是 App 建窗时装的）。同 `dialog_t`。
+  // 立刻开层」要求浮层宿主已经就位（宿主是 App 建窗时装的）。同 `dialog`。
   {
     mount: fn(parent : @core.Widget) -> @core.Widget {
       let anchor = @core.Widget::new()
@@ -146,7 +146,7 @@ pub fn message_box_t(
       }
       let respond = fn(code : Int) -> Unit {
         // 先直接收层（不依赖 Store 真值到假值的跳变），再同步 Store（订阅里再收一次
-        // 是幂等的），最后回调——口径与 `dialog_t` 的「三个出口都先收起再回调」一致
+        // 是幂等的），最后回调——口径与 `dialog` 的「三个出口都先收起再回调」一致
         teardown_open()
         visible.set(false)
         on_response(code)
@@ -301,14 +301,14 @@ pub fn message_box_t(
         footer.node.set_gap(0.0, 8.0)
         footer.set_padding(left=16.0)
         for i = 0; i < buttons.length(); i = i + 1 {
-          let entry = buttons[i]
-          let code = entry.1
-          if entry.0 == "" {
+          let input = buttons[i]
+          let code = input.1
+          if input.0 == "" {
             continue
           }
           let primary = i == 0
           let b = @core.Widget::new()
-          b.node.set_width(@yoga.fixed(text_width(entry.0, btn_font) + 30.0))
+          b.node.set_width(@yoga.fixed(text_width(input.0, btn_font) + 30.0))
           b.node.set_height(@yoga.fixed(30.0))
           b.node.set_flex_shrink(0.0)
           b.cursor = @core.CURSOR_HAND
@@ -340,7 +340,7 @@ pub fn message_box_t(
               0.0,
               r.w,
               r.h,
-              entry.0,
+              input.0,
               btn_font,
               if primary { "#ffffff" } else { @theme.theme_text_regular() },
               align=@text.Center,

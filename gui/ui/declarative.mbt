@@ -1,7 +1,7 @@
 // 声明式层 L1 构造器：让页面与示例「调用点不变、只换实现」的那一层。
 //
 // 新栈的组件本身就返回 `@core.Node`，所以与组件**同名**的构造器（`label` /
-// `button` / `entry` / `checkbox` / `container` / `group` / `separator` /
+// `button` / `input` / `checkbox` / `container` / `group` / `separator` /
 // `image` / `icon` / `radio_group` / `slider` / `progress`）不再另包一层——
 // 直接用组件即可。这里只补三类东西：
 // ① 与 master 名字不同的构造器（`vbox`/`hbox`/`text_edit`/`picker`/`scroll`/
@@ -13,7 +13,7 @@
 // - `hover_group` 在旧链路靠**全局指针轮询**（GTK 指针事件不冒泡，子控件的
 //   事件窗口会独占，祖先容器收不到 enter）；本栈宿主的悬停态本来就是父链语义
 //   （指针在子项上时父项也算悬停），所以这里没有定时器、没有轮询，读 `hovered` 即可。
-// - `overlay_scroll`（旧链路的悬浮滚动条）在本栈就是 `scroll_v`：滚动条一直是
+// - `overlay_scroll`（旧链路的悬浮滚动条）在本栈就是 `scroll_view`：滚动条一直是
 //   视口的绝对定位子控件、覆盖在内容之上，不需要第二套形态。
 // - `cursor_group` 在旧链路要把光标递归设到组根与**全部子孙**（GTK 光标按原生
 //   窗口生效，只设容器盖不住有独立窗口的子件）；本栈光标是窗口级的一层，宿主按
@@ -78,30 +78,7 @@ pub fn row(
 }
 
 ///|
-/// 多行文本框（`textarea` 的旧名）。
-pub fn text_edit(
-  store : @core.Store[String],
-  placeholder? : String = "",
-  rows? : Int = 3,
-  width? : Double = 260.0,
-  height? : Double = 0.0,
-  read_only? : Bool = false,
-  focus_id? : Int = 0,
-  on_change? : (String) -> Unit = fn(_s : String) -> Unit { () },
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  textarea(
-    store,
-    placeholder=placeholder,
-    rows=rows,
-    width=width,
-    height=height,
-    read_only=read_only,
-    focus_id=focus_id,
-    on_change=on_change,
-    handle=handle,
-  )
-}
+/// §2 合并:`text_edit` 就是真身(原声明式包装删除,调用点直接用 `@ui.textarea`)。
 
 ///|
 /// 下拉选择器（`select_t` 的旧名）。
@@ -128,46 +105,20 @@ pub fn picker(
 }
 
 ///|
-/// 滚动容器（`scroll_v` 的旧名）。
-pub fn scroll(
-  children : Array[@core.Node],
-  state : ScrollState,
-  width? : Double = 0.0,
-  height? : Double = 0.0,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  scroll_v(children, state, width=width, height=height, handle=handle)
-}
+/// §2 合并:`scroll` 旧包装删除——滚动容器唯一入口就是 `ui/scroll.mbt` 的 `scroll_view`。
 
 ///|
-/// 页签（`tabs_t` 的旧名）：`pages` 是 (标题, 内容)。
+/// 页签（`tabs` 的旧名）：`pages` 是 (标题, 内容)。
 pub fn tab(
   pages : Array[(String, @core.Node)],
   selected? : @core.Store[Int],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
-  tabs_t(pages, selected?, handle=handle)
+  tabs(pages, selected?, handle=handle)
 }
 
 ///|
-/// 日期选择器（`date_picker_t` 的旧名）。
-pub fn date_picker(
-  value : @core.Store[DateYMD?],
-  on_change? : (DateYMD) -> Unit = fn(_d : DateYMD) -> Unit { () },
-  placeholder? : String = "请选择日期",
-  clearable? : Bool = true,
-  width? : Double = 180.0,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  date_picker_t(
-    value,
-    on_change=on_change,
-    placeholder=placeholder,
-    clearable=clearable,
-    width=width,
-    handle=handle,
-  )
-}
+/// §2 合并:`date_picker` 就是真身(原声明式包装删除,调用点直接用 `@ui.date_picker`)。
 
 ///|
 /// 声明式文本绑定：初值 `f(store.get())`，之后每次 `set` 就地更新文本并重测

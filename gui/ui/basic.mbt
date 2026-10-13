@@ -79,7 +79,7 @@ pub fn view(
 
 ///|
 /// 带标题的面板（标题在上、内容在下，面板底 + 描边）。
-pub fn group(
+pub fn panel(
   title : String,
   children : Array[@core.Node],
   padding? : Double = 10.0,
@@ -381,8 +381,8 @@ pub fn button(
 
 ///|
 /// 图标按钮：只有图标的按钮（悬停浅底、按下更深、禁用不吃事件）。
-/// 需要文字提示时由调用方在外面包 `tooltip_t`（本组件不重复管提示）。
-pub fn icon_button_t(
+/// 需要文字提示时由调用方在外面包 `tooltip`（本组件不重复管提示）。
+pub fn icon_button(
   kind : @icons.IconKind,
   on_click? : () -> Unit = fn() -> Unit { () },
   icon_size? : Double = 16.0,

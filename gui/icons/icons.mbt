@@ -4,7 +4,7 @@
 // 字体字形(字形图标 Windows 渲染发虚、跨平台不一致,GTK align=Center 无效,
 // 矢量顺带解决居中);全库填充型(iconfont 轮廓一次 fill)。
 // 本文件自 master 线 icons/icons.mbt 平移,族内只依赖 @render.Painter;
-// 声明式包装 icon/icon_button_t 依赖声明式层,留到组件接线那一批(G7)。
+// 声明式包装 icon/icon_button 依赖声明式层,留到组件接线那一批(G7)。
 
 ///|
 /// 图标种类(线条风格为主,个别实心)。绘制语义:中心 (cx,cy)、

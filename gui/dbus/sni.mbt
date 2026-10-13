@@ -365,14 +365,14 @@ fn Item::emit_layout_updated(self : Item) -> Unit {
 
 ///|
 /// 条目属性对列表（DBusMenu 约定的属性名），外层按需包 a{sv}。
-fn menu_entry_prop_pairs(entry : MenuEntry) -> Array[DVal] {
+fn menu_entry_prop_pairs(input : MenuEntry) -> Array[DVal] {
   let props : Array[DVal] = []
-  if entry.is_separator {
+  if input.is_separator {
     props.push(VStruct([VString("type"), VVariant(VString("separator"))]))
   } else {
-    props.push(VStruct([VString("label"), VVariant(VString(entry.label))]))
+    props.push(VStruct([VString("label"), VVariant(VString(input.label))]))
   }
-  props.push(VStruct([VString("enabled"), VVariant(VBool(entry.enabled))]))
+  props.push(VStruct([VString("enabled"), VVariant(VBool(input.enabled))]))
   props.push(VStruct([VString("visible"), VVariant(VBool(true))]))
   props
 }
@@ -387,8 +387,8 @@ fn Item::menu_layout(self : Item, id : Int, depth : Int) -> DVal {
     )
   } else {
     match self.menu_items.get(id - 1) {
-      Some(entry) => {
-        let pairs = menu_entry_prop_pairs(entry)
+      Some(input) => {
+        let pairs = menu_entry_prop_pairs(input)
         for pair in pairs {
           props.push(pair)
         }
@@ -398,9 +398,9 @@ fn Item::menu_layout(self : Item, id : Int, depth : Int) -> DVal {
   }
   let children : Array[DVal] = []
   if id == 0 && depth != 0 {
-    for entry in self.menu_items {
+    for input in self.menu_items {
       let child_depth = if depth > 0 { depth - 1 } else { 0 }
-      children.push(VVariant(self.menu_layout(entry.id, child_depth)))
+      children.push(VVariant(self.menu_layout(input.id, child_depth)))
     }
   }
   VStruct([VI32(id), VArray("{sv}", props), VArray("v", children)])
@@ -411,7 +411,7 @@ fn Item::menu_layout(self : Item, id : Int, depth : Int) -> DVal {
 fn Item::dispatch_menu_click(self : Item, id : Int) -> Unit {
   if id >= 1 {
     match self.menu_items.get(id - 1) {
-      Some(entry) => if !entry.is_separator { (entry.on_click)() }
+      Some(input) => if !input.is_separator { (input.on_click)() }
       None => ()
     }
   }
@@ -534,11 +534,11 @@ fn Conn::handle_menu_call(self : Conn, item : Item, msg : Msg) -> Unit {
             }
             if id >= 1 {
               match item.menu_items.get(id - 1) {
-                Some(entry) =>
+                Some(input) =>
                   entries.push(
                     VStruct([
                       VI32(id),
-                      VArray("{sv}", menu_entry_prop_pairs(entry)),
+                      VArray("{sv}", menu_entry_prop_pairs(input)),
                     ]),
                   )
                 None => entries.push(VStruct([VI32(id), VArray("{sv}", [])]))

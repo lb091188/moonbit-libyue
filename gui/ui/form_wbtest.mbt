@@ -69,7 +69,7 @@ test "单选组：点第几项就写第几项，横向排列" {
 ///|
 test "开关：胶囊尺寸固定，点击换值，绘制跟随 Store 现值" {
   let on = @core.Store::new(false)
-  let root = mount_root([switch_t(on, on_text="开", off_text="关")], 240.0, 60.0)
+  let root = mount_root([switch(on, on_text="开", off_text="关")], 240.0, 60.0)
   let row = kid(root, 0)
   let pill = row.children()[0]
   assert_eq((pill.rect.w, pill.rect.h), (40.0, 20.0))
@@ -360,7 +360,7 @@ test "评分：星顶点几何、点击写值并回调、悬停只预亮不改�
 
   let value = @core.Store::new(0)
   let mut cb = -1
-  let root = mount_root([rate_t(value, max=5, on_change=fn(v) { cb = v })], 300.0, 60.0)
+  let root = mount_root([rate(value, max=5, on_change=fn(v) { cb = v })], 300.0, 60.0)
   let w = kid(root, 0)
   assert_eq((w.rect.w, w.rect.h), (22.0 * 5.0 + 4.0 * 4.0, 22.0))
   // 第 2 颗星：x=48 → ((48+2)/26 取整)+1 = 2
@@ -479,7 +479,7 @@ test "取色器：字段点开色板网格、点色块写值并收起、选中�
   let v = @core.Store::new("#333333")
   let changes : Array[String] = []
   let (root, field) = mounted_with_overlay(
-    color_picker_t(v, colors=cs, on_change=fn(c : String) -> Unit { changes.push(c) }, width=180.0),
+    color_picker(v, colors=cs, on_change=fn(c : String) -> Unit { changes.push(c) }, width=180.0),
     460.0,
     320.0,
   )

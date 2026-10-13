@@ -79,7 +79,7 @@ fn word_range(text : String, at : Int) -> (Int, Int) {
 ///|
 /// 单行输入框。文本经 `store` 双向投影；`focus_id` 决定它能否吃键盘焦点
 /// （宿主的 Tab 环绕与按键投递都按它走）。
-pub fn entry(
+pub fn input(
   store : @core.Store[String],
   placeholder? : String = "",
   password? : Bool = false,

@@ -265,7 +265,7 @@ test "DBusMenu GetLayout 应答构造" {
 
 ///|
 test "scratch3: GetLayout 应答字节" {
-  let entry = VStruct([
+  let input = VStruct([
     VI32(1),
     VArray("{sv}", [
       VStruct([VString("label"), VVariant(VString("退出"))]),
@@ -279,7 +279,7 @@ test "scratch3: GetLayout 应答字节" {
     VArray("{sv}", [
       VStruct([VString("children-display"), VVariant(VString("submenu"))]),
     ]),
-    VArray("v", [VVariant(entry)]),
+    VArray("v", [VVariant(input)]),
   ])
   match
     build_reply(1, 2, ":1.32", "(u(ia{sv}av))", [VStruct([VU32(3), root])]) {

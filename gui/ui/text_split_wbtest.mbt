@@ -65,7 +65,7 @@ test "主题化标签：按 max_width 折行（高度随之变高），固定色
 ///|
 test "水平分隔：把手拖动改首栏宽，两端按最小尺寸夹取" {
   let (root, sp) = mounted(
-    hsplit(
+    split(
       view([text("左")], bg=@theme.theme_bg_panel()),
       view([text("右")], bg=@theme.theme_fill_zebra()),
       ratio=0.5,
@@ -139,9 +139,10 @@ test "水平分隔：把手拖动改首栏宽，两端按最小尺寸夹取" {
 ///|
 test "垂直分隔：把手上下拖动改首栏高，按最小高度夹取" {
   let (root, sp) = mounted(
-    vsplit(
+    split(
       view([text("上")], bg=@theme.theme_bg_panel()),
       view([text("下")], bg=@theme.theme_fill_zebra()),
+      direction=Vertical,
       ratio=0.5,
       min_first=50.0,
       min_second=50.0,
