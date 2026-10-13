@@ -217,6 +217,25 @@ fn Raster::fill_device_rect(
   if rx0 < 0 || ry0 < 0 || rx1 > self.bitmap.width || ry1 > self.bitmap.height {
     return
   }
+  // 纯色不透明源整段直写（背景填充最大宗；实测比逐像素 blend 快 ~10 倍）
+  let fast = match (blend_mode_id(self.op) == 0, self.source) {
+    (true, SrcSolid(c)) => c.a >= 255
+    _ => false
+  }
+  if fast {
+    for y = ry0; y < ry1; y = y + 1 {
+      let _ = composite_solid_span(
+        self.bitmap.data,
+        self.bitmap.width,
+        y,
+        rx0,
+        rx1,
+        self.op,
+        self.source,
+      )
+    }
+    return
+  }
   let cov : FixedArray[Int] = FixedArray::make(self.bitmap.width, 0)
   for y = ry0; y < ry1; y = y + 1 {
     for i = rx0; i < rx1; i = i + 1 {
@@ -227,10 +246,135 @@ fn Raster::fill_device_rect(
 }
 
 ///|
+/// 圆角矩形解析填充：不走通用路径扫描（路径化 + 多边形 AA 实测单张 400×120
+/// 要 20ms，是全帧 paint 的最大单项）。按行求墨迹：中段整行（纯色不透明源走
+/// 直写快路径），角部条带像素按圆方程求覆盖（边界 AA）。轴对齐且 x/y 等比
+/// （角仍是圆）才适用，返回 false 时调用方退通用路径。
+pub fn Raster::fill_round_rect(
+  self : Raster,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+  radius : Double,
+) -> Bool {
+  if !self.m.axis_aligned() {
+    return false
+  }
+  let ax = self.m.a.abs()
+  let ay = self.m.d.abs()
+  if ax < 0.000000001 || ay < 0.000000001 {
+    return false
+  }
+  if (ax - ay).abs() / (ax + ay) > 0.001 {
+    return false
+  }
+  match self.rect_device(x, y, w, h) {
+    None => return false
+    Some((ix0, iy0, ix1, iy1)) => {
+      let rx0 = raster_max_i(ix0, self.clip_x0)
+      let ry0 = raster_max_i(iy0, self.clip_y0)
+      let rx1 = raster_min_i(ix1, self.clip_x1)
+      let ry1 = raster_min_i(iy1, self.clip_y1)
+      if rx1 <= rx0 || ry1 <= ry0 {
+        return true
+      }
+      if rx0 < 0 ||
+        ry0 < 0 ||
+        rx1 > self.bitmap.width ||
+        ry1 > self.bitmap.height {
+        return true
+      }
+      let rr_d = clamp_radius(radius, w, h) * ax
+      let rr_lim = (ix1 - ix0).to_double().min((iy1 - iy0).to_double()) / 2.0
+      let rr = if rr_d > rr_lim { rr_lim } else { rr_d }
+      if rr <= 0.0 {
+        self.fill_device_rect(ix0, iy0, ix1, iy1)
+        return true
+      }
+      let fast = match (blend_mode_id(self.op) == 0, self.source) {
+        (true, SrcSolid(c)) => c.a >= 255
+        _ => false
+      }
+      let cov : FixedArray[Int] = FixedArray::make(self.bitmap.width, 0)
+      let mid0 = raster_min_i((iy0.to_double() + rr).ceil().to_int(), ry1)
+      let mid1 = raster_max_i((iy1.to_double() - rr).floor().to_int(), ry0)
+      for j = ry0; j < ry1; j = j + 1 {
+        let in_mid = j >= mid0 && j < mid1
+        if in_mid && fast {
+          let _ = composite_solid_span(
+            self.bitmap.data,
+            self.bitmap.width,
+            j,
+            rx0,
+            rx1,
+            self.op,
+            self.source,
+          )
+          continue
+        }
+        // 覆盖数组：中段条带恒 256，两侧角部条带按「像素中心到角圆心的距离」
+        // 求覆盖（圆外 0、圆边 AA、圆内 256）
+        for i = rx0; i < rx1; i = i + 1 {
+          cov[i] = 256
+        }
+        if !in_mid {
+          let cy = if j.to_double() + 0.5 < iy0.to_double() + rr {
+            iy0.to_double() + rr
+          } else {
+            iy1.to_double() - rr
+          }
+          let dy = (j.to_double() + 0.5) - cy
+          let dy2 = dy * dy
+          // 左角条带
+          let ls1 = raster_min_i(rx1, (ix0.to_double() + rr).ceil().to_int())
+          for i = rx0; i < ls1; i = i + 1 {
+            let dx = (ix0.to_double() + rr) - (i.to_double() + 0.5)
+            let dist = (dx * dx + dy2).sqrt()
+            let cv = ((rr - dist) * 256.0).to_int()
+            cov[i] = if cv < 0 {
+              0
+            } else if cv > 256 {
+              256
+            } else {
+              cv
+            }
+          }
+          // 右角条带
+          let rs0 = raster_max_i(rx0, (ix1.to_double() - rr).floor().to_int())
+          for i = rs0; i < rx1; i = i + 1 {
+            let dx = (i.to_double() + 0.5) - (ix1.to_double() - rr)
+            let dist = (dx * dx + dy2).sqrt()
+            let cv = ((rr - dist) * 256.0).to_int()
+            cov[i] = if cv < 0 {
+              0
+            } else if cv > 256 {
+              256
+            } else {
+              cv
+            }
+          }
+        }
+        composite_span(
+          self.bitmap.data,
+          self.bitmap.width,
+          j,
+          rx0,
+          rx1,
+          cov,
+          self.op,
+          self.source,
+        )
+      }
+      true
+    }
+  }
+}
+
+///|
 /// 用户矩形 → 设备空间取整矩形（轴对齐才成立，斜切/旋转返回 false——
 /// cr_rect_device 同口径：取整语义对斜矩形无意义，交给抗锯齿）。
-fn Raster::rect_device(
-  self : Raster,
+fn Raster::rect_device(  self : Raster,
   x : Double,
   y : Double,
   w : Double,

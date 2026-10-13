@@ -381,6 +381,47 @@ fn to_byte01(v : Double) -> Int {
 }
 
 ///|
+/// 纯色**不透明**源 + Normal 算子的整段直写快路径：免掉逐像素取源/预乘/
+/// 混合的函数调用（背景填充是每帧最大宗的绘制，实测 400×120 一张 1.8ms，
+/// 通用路径逐像素 blend 是热点）。不适用（非 Normal、透明或非纯色源）返回
+/// false 走 composite_span。
+fn composite_solid_span(
+  d : FixedArray[Byte],
+  width : Int,
+  y : Int,
+  x0 : Int,
+  x1 : Int,
+  op : BlendMode,
+  src : RSource,
+) -> Bool {
+  if blend_mode_id(op) != 0 {
+    return false
+  }
+  match src {
+    SrcSolid(c) =>
+      if c.a >= 255 {
+        // 预乘 BGRA 字节序：不透明源预乘即原色
+        let b = c.b.to_byte()
+        let g = c.g.to_byte()
+        let r = c.r.to_byte()
+        let a = c.a.to_byte()
+        let mut i = (y * width + x0) * 4
+        let end = (y * width + x1) * 4
+        while i < end {
+          d[i] = b
+          d[i + 1] = g
+          d[i + 2] = r
+          d[i + 3] = a
+          i += 4
+        }
+        return true
+      }
+    _ => ()
+  }
+  false
+}
+
+///|
 /// 一行像素的合成：cov 为每像素 0..256 覆盖，x0..x1 为列区间（已含裁剪）。
 /// 源色按设备像素求值（渐变），op 决定合成式。out 为位图数据句柄（B,G,R,A
 /// 预乘序），width 为位图宽。

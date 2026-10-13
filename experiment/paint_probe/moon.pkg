@@ -1,0 +1,14 @@
+import {
+  "NoahLiu/yoga-mbt/src" @yoga,
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/render",
+  "NoahLiu/native-gui/ui",
+  "NoahLiu/native-gui/chart",
+  "NoahLiu/native-gui/text",
+  "NoahLiu/native-gui/mdview",
+  "NoahLiu/native-gui/win",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"

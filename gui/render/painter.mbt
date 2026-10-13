@@ -229,9 +229,24 @@ pub fn Painter::fill_round_rect(
   h : Double,
   r : Double,
 ) -> Unit {
-  self.begin_path()
-  self.trace_round_rect(x, y, w, h, r)
-  self.fill()
+  match self.backend {
+    Some(CairoBackend(_c)) => {
+      self.begin_path()
+      self.trace_round_rect(x, y, w, h, r)
+      self.fill()
+    }
+    Some(PureBackend(raster)) => {
+      self.apply_fill()
+      // 解析填充快路径（路径扫描实测单张 400×120 要 20ms）；不适用（斜矩阵/
+      // 非等比缩放）退通用路径（fill 内再 apply_fill 同源同算子，无副作用）
+      if !raster.fill_round_rect(x, y, w, h, r) {
+        self.begin_path()
+        self.trace_round_rect(x, y, w, h, r)
+        self.fill()
+      }
+    }
+    None => ()
+  }
 }
 
 ///|
