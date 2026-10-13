@@ -321,8 +321,12 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
    `Map[K, V]`，`entries()` 转条目列表进 `for_list`（条目是 `(K, V)` 值），不为对象单独开
    入口。下标就是回调第二参 `i`，写 `fn(t, _)` 即可忽略。
 5. **绑定语义通则**：输入类组件第一参数收可写 `Store[T]`（现状约 48 处，`ctx.draft` 即是）；
-   展示类组件一律「`x` 收值 + `x_dyn` 收 `Signal[T]`」（现状只有 `label_dyn`
-   （`ui/basic.mbt:127`）一条，P2 推广成通则）；`for_list` / `when` 入参收 `Signal`；
+   展示类组件一律「`x` 收值 + `x_dyn` 收 `Signal[T]`」——叶子展示件已齐（`text_dyn`、
+   `tag_dyn` / `tag_of_type_dyn`、`badge_count_dyn`、`avatar_dyn`、`statistic_dyn`，
+   值变就地改字并按内容重算宽度，退订随本代回收袋）；容器类（`card` / `descriptions` /
+   `alert` / `timeline` / `empty` / `result`）收子节点数组，内容变了走 `for_list` /
+   `when` / `bind_node`，不再叠一层 `*_dyn`；`progress` 一族本就直接读 `Store`，已是动态形态；
+   `for_list` / `when` 入参收 `Signal`；
    结构级整棵换内容走 `bind_node`（`core/node.mbt:77-113`）显式重建。**不做全树 patch**
    ——列表项里改一格只重绘那一格，粒度由数据层（字段各自是 `Store`）承载。
 

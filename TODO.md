@@ -64,6 +64,7 @@
   - [x] §2 改名与 `_t` 合并全部完成（`view/row/col/text/input/textarea/select(switch editable)/switch/tabs/table/table_v/dialog/tooltip/popover/dropdown/menu/scroll_view/split(direction)/divider/panel/icon_button/rate/color_picker/date_picker/calendar/carousel/message_box/button(variant)`），全仓旧名调用点清零、不留别名；
   - [x] 事件参数统一 `on_*` 审计（组件库事件回调已全部 `on_*`；`handle?` 是句柄逃生舱非事件）；
   - [~] 散参数改名（`bg→background_color`、`fg→color`、`border→border_color` 已落；`size→font_size` 与 nav 回调形态 `bg?/fg?:(Widget)->String` 随 P2-e 收进 resolved Style）+ 34 个组件收 `class? : Array[Style]` 并在挂载点 fold；
+  - [x] 展示类组件 `_dyn` 信号版（§3 第 5 条通则落地）：`tag_dyn` / `tag_of_type_dyn` / `badge_count_dyn` / `avatar_dyn` / `statistic_dyn` 补齐（`text_dyn` 原型同款——值变就地改字、按内容重算宽度、退订随本代回收袋；`chip`/`statistic`/`avatar` 抽成收 `bind?` 钩子的内核，静态与信号两条入口共用一份画法）；容器类收子节点数组、内容变化走 `for_list`/`when`/`bind_node`，`progress` 一族本就直读 `Store`，都不再叠 `_dyn`；
   - [ ] **P2-e 逐组件 on_draw 改读 resolved Style 并按状态选桶**（现状：只有 `view` 的底色/描边走 `@style.resolved`；其余组件仍读捕获的散参数；nav 回调色、`text` 的 `src` 色、button 皮肤等待改造）；
   - [ ] 观感逐页比对不回退（真机由用户复验，`examples/hello`、`hello-themed`、`showcase`、`native-app`、`sysmonitor`）。
 - [ ] **P3 响应式补强**：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` / `mount_window` 补 `render` 槽（动工前先定 design.md §6 唯一待定：`Store` 去重与否）。

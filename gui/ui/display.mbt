@@ -61,7 +61,23 @@ pub fn text_width(text : String, font : @text.Font) -> Double {
 }
 
 ///|
-/// 定宽定高的色块标签：`width` 传 0 表示按文本测量。
+/// `*_dyn` 的共用接线：订阅信号、把新值映射成内核要的文本喂给 `set`，退订随本代
+/// 回收袋（重挂不留死订阅，同 `text_dyn` 的口径）。
+fn[T] bind_value(sig : @core.Signal[T], of_value : (T) -> String, set : (String) -> Unit) -> Unit {
+  let sid = sig.subscribe(fn(v : T) -> Unit { set(of_value(v)) })
+  @core.sub_bag_register(fn() { sig.remove(sid) })
+}
+
+///|
+/// 文本就是值的场合（`tag` / `avatar` 那类）直接走这条。
+fn bind_text(sig : @core.Signal[String], set : (String) -> Unit) -> Unit {
+  bind_value(sig, fn(v : String) -> String { v }, set)
+}
+
+///|
+/// 色块标签内核：文本与其测量宽放在 `Ref` 里——静态版一次性写定，`*_dyn` 版由订阅
+/// 改写（宽度跟着重算、绘制读现值）。`bind~` 收到「新文本怎么落进来」的钩子，
+/// 静态调用不传即可。宽度只在挂载与订阅回调里改，不在绘制回调里改布局。
 fn chip(
   text : String,
   fg : String,
@@ -72,13 +88,17 @@ fn chip(
   width : Double,
   on_click : () -> Unit,
   clickable : Bool,
+  bind? : ((String) -> Unit) -> Unit = fn(_set : (String) -> Unit) -> Unit { () },
 ) -> @core.Node {
   let font = @text.Font::new("", size)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
-    let tw = text_width(text, font)
-    let box_w = if width > 0.0 { width } else { tw + h_pad * 2.0 }
-    w.node.set_width(@yoga.fixed(box_w))
+    let txt : Ref[String] = Ref(text)
+    let tw : Ref[Double] = Ref(text_width(text, font))
+    let sync_width : () -> Unit = fn() -> Unit {
+      w.node.set_width(@yoga.fixed(if width > 0.0 { width } else { tw.val + h_pad * 2.0 }))
+    }
+    sync_width()
     w.node.set_height(@yoga.fixed(height))
     w.on_draw = Some(fn(
       _self : @core.Widget,
@@ -87,7 +107,14 @@ fn chip(
     ) -> Unit {
       p.set_fill_color(bg)
       p.fill_rect(0.0, 0.0, r.w, r.h)
-      let _ = @text.draw_at(p, (r.w - tw) / 2.0, ((r.h - font.size * 1.5) / 2.0).max(0.0), text, font, fg)
+      let _ = @text.draw_at(
+        p,
+        (r.w - tw.val) / 2.0,
+        ((r.h - font.size * 1.5) / 2.0).max(0.0),
+        txt.val,
+        font,
+        fg,
+      )
     })
     if clickable {
       w.on_pointer = Some(fn(
@@ -106,6 +133,12 @@ fn chip(
         }
       })
     }
+    bind(fn(v : String) -> Unit {
+      txt.val = v
+      tw.val = text_width(v, font)
+      sync_width()
+      @core.invalidate()
+    })
     w
   })
 }
@@ -117,20 +150,87 @@ pub fn tag_of_type(text : String, t : SemanticType, size? : Double = 12.0) -> @c
 }
 
 ///|
+/// 语义色标签的信号版（§3 通则：`x` 收值 + `x_dyn` 收 `Signal[T]`）：文本变了就地
+/// 改字并重算宽度，不重建子树。
+pub fn tag_of_type_dyn(
+  text : @core.Signal[String],
+  t : SemanticType,
+  size? : Double = 12.0,
+) -> @core.Node {
+  chip(
+    text.get(),
+    type_color(t),
+    type_light_color(t),
+    24.0,
+    size,
+    8.0,
+    0.0,
+    fn() { () },
+    false,
+    bind=fn(set : (String) -> Unit) -> Unit { bind_text(text, set) },
+  )
+}
+
+///|
 /// 自定色标签（实底 + 白字）。
 pub fn tag(text : String, color : String, size? : Double = 12.0) -> @core.Node {
   chip(text, "#ffffff", color, 24.0, size, 8.0, 0.0, fn() { () }, false)
 }
 
 ///|
+/// 自定色标签的信号版：用法同 [tag_of_type_dyn]。
+pub fn tag_dyn(text : @core.Signal[String], color : String, size? : Double = 12.0) -> @core.Node {
+  chip(
+    text.get(),
+    "#ffffff",
+    color,
+    24.0,
+    size,
+    8.0,
+    0.0,
+    fn() { () },
+    false,
+    bind=fn(set : (String) -> Unit) -> Unit { bind_text(text, set) },
+  )
+}
+
+///|
+/// 徽标文本：超过 `max` 显示「max+」。
+fn badge_text(value : Int, max : Int) -> String {
+  if value > max { max.to_string() + "+" } else { value.to_string() }
+}
+
+///|
 /// 数字徽标：超过 `max` 显示「max+」。
 pub fn badge_count(value : Int, max? : Int = 99, color? : String = "") -> @core.Node {
-  let txt = if value > max { max.to_string() + "+" } else { value.to_string() }
-  chip(txt, "#ffffff", if color.length() > 0 {
+  chip(badge_text(value, max), "#ffffff", if color.length() > 0 {
     color
   } else {
     @theme.theme_danger()
   }, 18.0, 11.0, 5.0, 0.0, fn() { () }, false)
+}
+
+///|
+/// 数字徽标的信号版：未读数这类整数源直接进 `Signal[Int]`，截断规则与静态版同一份。
+pub fn badge_count_dyn(
+  value : @core.Signal[Int],
+  max? : Int = 99,
+  color? : String = "",
+) -> @core.Node {
+  chip(
+    badge_text(value.get(), max),
+    "#ffffff",
+    if color.length() > 0 { color } else { @theme.theme_danger() },
+    18.0,
+    11.0,
+    5.0,
+    0.0,
+    fn() { () },
+    false,
+    bind=fn(set : (String) -> Unit) -> Unit {
+      bind_value(value, fn(v : Int) -> String { badge_text(v, max) }, set)
+    },
+  )
 }
 
 ///|
@@ -155,14 +255,26 @@ pub fn badge_dot(size? : Double = 8.0, color? : String = "") -> @core.Node {
 }
 
 ///|
-/// 头像：取文本首字符居中（无图时的占位形态）。
-pub fn avatar(text : String, size? : Double = 32.0, background_color? : String = "") -> @core.Node {
+/// 头像取首字符（空串给「?」）。
+fn first_char(text : String) -> String {
+  let head = text.to_array()
+  if head.length() > 0 { head[0].to_string() } else { "?" }
+}
+
+///|
+/// 头像内核：字符放 `Ref` 里，静态版一次写定、`*_dyn` 版由订阅改写（尺寸固定，
+/// 不用重算布局）。
+fn avatar_of(
+  one : String,
+  size : Double,
+  background_color : String,
+  bind? : ((String) -> Unit) -> Unit = fn(_set : (String) -> Unit) -> Unit { () },
+) -> @core.Node {
   let d = size
   let font = @text.Font::new("", size * 0.45)
-  let head = text.to_array()
-  let one = if head.length() > 0 { head[0].to_string() } else { "?" }
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
+    let ch : Ref[String] = Ref(one)
     w.node.set_width(@yoga.fixed(d))
     w.node.set_height(@yoga.fixed(d))
     w.on_draw = Some(fn(
@@ -172,16 +284,82 @@ pub fn avatar(text : String, size? : Double = 32.0, background_color? : String =
     ) -> Unit {
       p.set_fill_color(if background_color.length() > 0 { background_color } else { @theme.theme_info_light() })
       p.fill_rect(0.0, 0.0, r.w, r.h)
-      let tw = text_width(one, font)
+      let tw = text_width(ch.val, font)
       let th = @text.line_height_font(font).unwrap_or(14).to_double()
+      let _ = @text.draw_at(p, (r.w - tw) / 2.0, (r.h - th) / 2.0, ch.val, font, @theme.theme_text_regular())
+    })
+    bind(fn(v : String) -> Unit {
+      ch.val = v
+      @core.invalidate()
+    })
+    w
+  })
+}
+
+///|
+/// 头像：取文本首字符居中（无图时的占位形态）。
+pub fn avatar(text : String, size? : Double = 32.0, background_color? : String = "") -> @core.Node {
+  avatar_of(first_char(text), size, background_color)
+}
+
+///|
+/// 头像的信号版：昵称/用户名换了就换首字符，尺寸不变。
+pub fn avatar_dyn(
+  text : @core.Signal[String],
+  size? : Double = 32.0,
+  background_color? : String = "",
+) -> @core.Node {
+  avatar_of(
+    first_char(text.get()),
+    size,
+    background_color,
+    bind=fn(set : (String) -> Unit) -> Unit {
+      bind_value(text, fn(v : String) -> String { first_char(v) }, set)
+    },
+  )
+}
+
+///|
+/// 统计数字内核：数值行的文本与宽度放 `Ref`（`*_dyn` 版由订阅改写并跟着重算宽度）。
+fn statistic_of(
+  title : String,
+  line : String,
+  precision_color : String,
+  bind? : ((String) -> Unit) -> Unit = fn(_set : (String) -> Unit) -> Unit { () },
+) -> @core.Node {
+  let vfont = @text.Font::new("", 22.0)
+  let tfont = @text.Font::new("", 12.0)
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    let txt : Ref[String] = Ref(line)
+    // 宽度在挂载与订阅回调里按测量算定（绘制回调里改布局会把 paint 变成布局的写入方）
+    let vw : Ref[Double] = Ref(text_width(line, vfont))
+    let title_w = text_width(title, tfont) + 4.0
+    let sync_width : () -> Unit = fn() -> Unit {
+      w.node.set_width(@yoga.fixed((vw.val + 4.0).max(title_w)))
+    }
+    sync_width()
+    w.node.set_height(@yoga.fixed(56.0))
+    w.on_draw = Some(fn(
+      _self : @core.Widget,
+      p : @render.Painter,
+      _r : @core.Rect,
+    ) -> Unit {
+      let _ = @text.draw_at(p, 0.0, 2.0, title, tfont, @theme.theme_text_secondary())
       let _ = @text.draw_at(
         p,
-        (r.w - tw) / 2.0,
-        (r.h - th) / 2.0,
-        one,
-        font,
-        @theme.theme_text_regular(),
+        0.0,
+        22.0,
+        txt.val,
+        vfont,
+        if precision_color.length() > 0 { precision_color } else { @theme.theme_text_primary() },
       )
+    })
+    bind(fn(v : String) -> Unit {
+      txt.val = v
+      vw.val = text_width(v, vfont)
+      sync_width()
+      @core.invalidate()
     })
     w
   })
@@ -195,33 +373,26 @@ pub fn statistic(
   precision_color? : String = "",
   prefix? : String = "",
 ) -> @core.Node {
-  let vfont = @text.Font::new("", 22.0)
-  let tfont = @text.Font::new("", 12.0)
-  let line = prefix + value
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
-    watch_theme()
-    // 宽度在挂载时按测量算定（绘制回调里改布局会把 paint 变成布局的写入方）
-    let vw = text_width(line, vfont)
-    let tw2 = text_width(title, tfont)
-    w.node.set_width(@yoga.fixed((vw + 4.0).max(tw2 + 4.0)))
-    w.node.set_height(@yoga.fixed(56.0))
-    w.on_draw = Some(fn(
-      _self : @core.Widget,
-      p : @render.Painter,
-      _r : @core.Rect,
-    ) -> Unit {
-      let _ = @text.draw_at(p, 0.0, 2.0, title, tfont, @theme.theme_text_secondary())
-      let _ = @text.draw_at(
-        p,
-        0.0,
-        22.0,
-        line,
-        vfont,
-        if precision_color.length() > 0 { precision_color } else { @theme.theme_text_primary() },
-      )
-    })
-    w
-  })
+  statistic_of(title, prefix + value, precision_color)
+}
+
+///|
+/// 统计数字的信号版：数值走 `Signal[String]`（KPI 这类每轮刷新要换数的场合），
+/// 标题与前缀建树时定死。
+pub fn statistic_dyn(
+  title : String,
+  value : @core.Signal[String],
+  precision_color? : String = "",
+  prefix? : String = "",
+) -> @core.Node {
+  statistic_of(
+    title,
+    prefix + value.get(),
+    precision_color,
+    bind=fn(set : (String) -> Unit) -> Unit {
+      bind_value(value, fn(v : String) -> String { prefix + v }, set)
+    },
+  )
 }
 
 ///|

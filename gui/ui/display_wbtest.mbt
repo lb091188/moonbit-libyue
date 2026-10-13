@@ -342,3 +342,48 @@ test "空条目：时间线零行、空轮播不出面板也不排自转" {
   carousel_stop(h)
   assert_eq(h.is_running(), false)
 }
+
+///|
+test "展示族 *_dyn：值变就地改字、按内容重算宽度" {
+  if !ui_text_guard() {
+    return
+  }
+  // 徽标：5 → 150（显示成「99+」），宽度跟着长
+  let unread = @core.Store::new(5)
+  let (root_b, bd) = mounted(badge_count_dyn(unread.signal(), max=99), 120.0, 40.0)
+  let w_small = bd.rect.w
+  unread.set(150)
+  root_b.relayout(120.0, 40.0)
+  assert_true(bd.rect.w > w_small)
+  // 标签：文本变长就变宽（tag / tag_of_type 两条入口共用内核）
+  let label = @core.Signal::new("新")
+  let (root_t, tg) = mounted(tag_dyn(label, "#337ecc"), 200.0, 60.0)
+  let w_short = tg.rect.w
+  label.set("很长的一段标签文字")
+  root_t.relayout(200.0, 60.0)
+  assert_true(tg.rect.w > w_short + 40.0)
+  let (root_t2, tg2) = mounted(tag_of_type_dyn(label, Success), 200.0, 60.0)
+  let w_t2 = tg2.rect.w
+  label.set("更长的一段标签文字啊")
+  root_t2.relayout(200.0, 60.0)
+  assert_true(tg2.rect.w > w_t2)
+  // 统计块：数值行走信号，标题与前缀建树时定死
+  let hits = @core.Store::new("1,234")
+  let (root_s, st) = mounted(statistic_dyn("访问量", hits.signal()), 240.0, 80.0)
+  let w_num = st.rect.w
+  hits.set("12,345,678")
+  root_s.relayout(240.0, 80.0)
+  assert_true(st.rect.w > w_num)
+  assert_eq(st.rect.h, 56.0)
+  // 头像：尺寸不随文本变，换名后仍画得出像素
+  let name = @core.Signal::new("刘斌")
+  let (root_a, av) = mounted(avatar_dyn(name), 60.0, 60.0)
+  assert_eq((av.rect.w, av.rect.h), (32.0, 32.0))
+  name.set("李雷")
+  root_a.relayout(60.0, 60.0)
+  let bm = @render.Bitmap::new(60, 60)
+  let p = @render.Painter::new(bm)
+  av.paint(p)
+  p.end()
+  assert_true(ink_count(bm, 60, 60) > 20)
+}
