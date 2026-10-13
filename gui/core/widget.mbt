@@ -700,12 +700,30 @@ pub fn Widget::set_column(self : Widget) -> Unit {
 }
 
 ///|
-/// 外边距（上/下/左/右），逻辑像素。
-pub fn Widget::set_margin(self : Widget, top : Double, bottom : Double, left : Double, right : Double) -> Unit {
+/// 外边距（上/右/下/左），逻辑像素；没给的边按 0 处理。
+/// 四边同值用 [Widget::set_margin_all]（对应 CSS `margin: 14px` 的一值简写）。
+/// labelled 形态与 [Widget::set_padding] 同构（design.md §1.5 第九条）：
+/// 位置参数四路全 `Double`，错序编译期查不出。
+pub fn Widget::set_margin(
+  self : Widget,
+  top? : Double = 0.0,
+  right? : Double = 0.0,
+  bottom? : Double = 0.0,
+  left? : Double = 0.0,
+) -> Unit {
   self.node.set_margin_top(@yoga.fixed(top))
+  self.node.set_margin_right(@yoga.fixed(right))
   self.node.set_margin_bottom(@yoga.fixed(bottom))
   self.node.set_margin_left(@yoga.fixed(left))
-  self.node.set_margin_right(@yoga.fixed(right))
+}
+
+///|
+/// 外边距四边同值，逻辑像素。
+pub fn Widget::set_margin_all(self : Widget, v : Double) -> Unit {
+  self.node.set_margin_top(@yoga.fixed(v))
+  self.node.set_margin_right(@yoga.fixed(v))
+  self.node.set_margin_bottom(@yoga.fixed(v))
+  self.node.set_margin_left(@yoga.fixed(v))
 }
 
 ///|

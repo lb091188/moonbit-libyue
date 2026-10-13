@@ -262,7 +262,7 @@ pub fn message_box_t(
         icon_w.node.set_width(@yoga.fixed(24.0))
         icon_w.node.set_height(@yoga.fixed(24.0))
         icon_w.node.set_flex_shrink(0.0)
-        icon_w.set_margin(0.0, 0.0, 0.0, 2.0)
+        icon_w.set_margin(right=2.0)
         icon_w.on_draw = Some(fn(
           _s : @core.Widget,
           p : @render.Painter,

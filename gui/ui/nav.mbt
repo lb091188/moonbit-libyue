@@ -747,7 +747,7 @@ fn build_tree_rows(
     row.node.set_flex_direction(@yoga.Row)
     row.node.set_width(@yoga.fixed(260.0))
     row.node.set_height(@yoga.fixed(32.0))
-    row.set_margin(0.0, 0.0, level.to_double() * 18.0, 0.0)
+    row.set_margin(left=level.to_double() * 18.0)
     row.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
@@ -878,7 +878,7 @@ pub fn tabs_t(
       let tab = @core.Widget::new()
       tab.node.set_width(@yoga.fixed(tw + 28.0))
       tab.node.set_height(@yoga.fixed(36.0))
-      tab.set_margin(0.0, 0.0, 0.0, 8.0)
+      tab.set_margin(right=8.0)
       tab.on_draw = Some(fn(
         self : @core.Widget,
         p : @render.Painter,

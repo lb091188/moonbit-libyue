@@ -289,7 +289,7 @@ fn build_calendar(
   let head = @core.Widget::new()
   head.node.set_flex_direction(@yoga.Row)
   head.node.set_height(@yoga.fixed(head_h))
-  head.set_margin(0.0, 4.0, 0.0, 0.0)
+  head.set_margin(bottom=4.0)
 
   fn chevron(right : Bool) -> @core.Widget {
     let b = @core.Widget::new()

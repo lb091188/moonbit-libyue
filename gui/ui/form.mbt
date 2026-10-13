@@ -626,7 +626,7 @@ pub fn form_item(
         [label_dyn(err_store.signal(), size=12.0, color=@theme.theme_danger(), wrap=false)],
         direction=@yoga.Row,
         height=18.0,
-        handle=fn(w : @core.Widget) -> Unit { w.set_margin(0.0, 0.0, label_width + 12.0, 0.0) },
+        handle=fn(w : @core.Widget) -> Unit { w.set_margin(left=label_width + 12.0) },
       ),
     ],
     direction=@yoga.Column,
@@ -1003,7 +1003,7 @@ fn color_swatch(
     w.node.set_height(@yoga.fixed(size))
     w.node.set_flex_shrink(0.0)
     w.cursor = @core.CURSOR_HAND
-    w.set_margin(0.0, 0.0, 0.0, gap)
+    w.set_margin(right=gap)
     w.on_draw = Some(fn(
       _self : @core.Widget,
       p : @render.Painter,

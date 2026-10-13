@@ -84,7 +84,7 @@ fn make_field(
   let w = @core.Widget::new()
   w.focus_id = id
   w.set_size(240.0, 26.0)
-  w.set_margin(top, 0.0, 0.0, 0.0)
+  w.set_margin(top=top)
   w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
     let focused = app.focus.is_focused(id)
     p.set_fill_color(@theme.theme_bg_panel())
@@ -177,7 +177,7 @@ fn make_button(app : @core.App, ctr : Ctr, id : Int, top : Double) -> @core.Widg
   let w = @core.Widget::new()
   w.focus_id = id
   w.set_size(200.0, 28.0)
-  w.set_margin(top, 0.0, 0.0, 0.0)
+  w.set_margin(top=top)
   w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
     let focused = app.focus.is_focused(id)
     p.set_fill_color(if focused {
@@ -225,7 +225,7 @@ fn text_line(
 ) -> @core.Widget {
   let w = @core.Widget::new()
   w.set_size(360.0, height)
-  w.set_margin(top, 0.0, 0.0, 0.0)
+  w.set_margin(top=top)
   w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, _r : @core.Rect) -> Unit {
     p.flush()
     let _ = @text.draw_text_at(p, 0.0, 0.0, text, FONT, color)
@@ -260,7 +260,7 @@ fn live_counter(text_of : () -> String, width? : Double = 560.0) -> @core.Widget
 fn make_font_row(ctr : Ctr) -> @core.Widget {
   let w = @core.Widget::new()
   w.set_size(388.0, 72.0)
-  w.set_margin(12.0, 0.0, 0.0, 0.0)
+  w.set_margin(top=12.0)
   w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
     p.set_fill_color(@theme.theme_bg_panel())
     p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -308,7 +308,7 @@ fn make_decl_row(store : @core.Store[Int]) -> @core.Node {
   @core.bind_node(store.signal(), fn(v : Int) -> @core.Node {
     @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
       w.set_size(388.0, 30.0)
-      w.set_margin(10.0, 0.0, 0.0, 0.0)
+      w.set_margin(top=10.0)
       w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
         p.set_fill_color(if v % 2 == 0 {
           @theme.theme_fill_hover()
@@ -347,7 +347,7 @@ fn make_decl_row(store : @core.Store[Int]) -> @core.Node {
 fn make_band(ctr : Ctr) -> @core.Widget {
   let w = @core.Widget::new()
   w.set_size(120.0, 22.0)
-  w.set_margin(8.0, 0.0, 0.0, 0.0)
+  w.set_margin(top=8.0)
   w.on_draw = Some(fn(w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
     // 悬停/按下态由宿主统一维护，控件只读
     p.set_fill_color(if w.pressed {

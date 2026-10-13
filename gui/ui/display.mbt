@@ -671,7 +671,7 @@ pub fn carousel_t(
         let dot = @core.Widget::new()
         dot.node.set_width(@yoga.fixed(8.0))
         dot.node.set_height(@yoga.fixed(8.0))
-        dot.set_margin(8.0, 0.0, 4.0, 4.0)
+        dot.set_margin(top=8.0, bottom=4.0, left=4.0, right=4.0)
         let di = i
         dot.on_draw = Some(fn(
           _self : @core.Widget,

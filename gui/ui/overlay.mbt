@@ -603,7 +603,7 @@ pub fn toast_layer(
         let bar = @core.Widget::new()
         bar.node.set_width(@yoga.fixed(text_width(text, font) + 46.0))
         bar.node.set_height(@yoga.fixed(34.0))
-        bar.set_margin(0.0, 8.0, 0.0, 0.0)
+        bar.set_margin(bottom=8.0)
         bar.on_draw = Some(fn(
           _s : @core.Widget,
           p : @render.Painter,
