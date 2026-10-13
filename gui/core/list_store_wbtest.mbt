@@ -2,11 +2,6 @@
 // 重复 key 以新为准、不给 key 走下标对齐、订阅随回收袋退订。
 
 ///|
-fn eq_str(a : String, b : String) -> Bool {
-  a == b
-}
-
-///|
 test "ListStore：push/remove/update/splice 的表内容与返回值" {
   let ls = ListStore::new()
   let _ = ls.push({ id: 1, name: "甲" })
