@@ -586,13 +586,19 @@ pub fn App::paint_frame(self : App) -> Unit {
     Some(id) => self.root.set_focused_by_focus(id)
     None => self.root.set_focused_by_focus(0)
   }
+  let t0 = @win.now_ms()
   let bm = @render.Bitmap::new(w, h)
   let p = @render.Painter::new(bm)
   self.root.set_size(w.to_double(), h.to_double())
   self.root.relayout(w.to_double(), h.to_double())
+  let t1 = @win.now_ms()
   self.root.paint(p)
   p.end()
+  let t2 = @win.now_ms()
   self.window.present(bm.data, bm.width, bm.height)
+  let t3 = @win.now_ms()
+  // 分段账本：位图分配计入 total 不计入单段，避免把「分配」混进「布局」
+  prof_record(t1 - t0, t2 - t1, t3 - t2, t3 - t0)
 }
 
 ///|

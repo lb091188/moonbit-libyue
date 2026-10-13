@@ -2980,6 +2980,8 @@ fn main {
   app.enable_root_scroll()
 
   app.run()
+  // 帧耗时分段账本：布局/绘制/上屏的实测占比（性能诊断，见 gui/core/prof.mbt）
+  println("NATIVE-APP-PROF " + @core.paint_profile_summary())
   // 卸载前停转（自排链不认识视图已移除；本例循环已 quit，这里是示范正确收尾）
   @ui.carousel_stop(auto)
   @ui.carousel_stop(spin)
