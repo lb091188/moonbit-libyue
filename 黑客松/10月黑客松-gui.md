@@ -111,8 +111,10 @@ let count : @core.Store[Int] = @core.Store::new(0)
 ## 预期验收产物
 
 - 可运行示例（`moon run` 直接启动）：
-  - 主模块 7 个：`examples/hello` 最小窗口、`hello-themed` 主题控件族、`showcase` 全功能演示板（17 页覆盖上列组件与系统能力）、`sysmonitor` 系统监视器（进程管理 + 硬件监控）、`native-app` / `native-sys` / `native-window` 三个族级示例；
-  - 独立示例模块：`systemprobe` 系统能力本机实测面板、`native-web` 内嵌 WebView 演示。
+  - `examples/hello` 最小窗口、`hello-themed` 主题控件族、`showcase` 全功能演示板（17 页覆盖上列组件与系统能力）；
+  - 完整的浏览器演示：以内嵌 WebView 为主的独立示例——地址栏导航与历史、自定义协议装载本地站点、JS↔原生互操作、DOM 内容抓取、新窗 / 权限 / 下载策略实测；
+  - 完整的音频演示：播放器组件驱动——播放 / 暂停 / 进度与音量、循环、倍速下音画同步；
+  - 完整的视频演示：帧渲染播放器——进度拖拽 seek、倍速、外挂与容器内嵌字幕轨、音画同步观测读数。
 - CI 分层门禁：GitHub Actions 分层门禁（库包测试门禁 / 示例构建 / release 产物校验），Linux + Windows 触发，结果公开可查；`moon check` 全仓零错误零警告、`moon test` 957 用例全绿为提交门槛。
 
 ## 移植或参考说明
