@@ -69,8 +69,8 @@
   - [ ] P2-e 记档两条边界（本批只迁样式通道，不改画法）：`badge_dot` 名叫圆点实际画方角 `fill_rect`（要圆角得给 `border_radius` 并走圆角填充，属观感变更，单独一批定）；`chip` 的 `class` 只吃颜色与显式宽度——字号在挂载期参与测量宽，class 改字号不会跟着改宽，真要改字号请调用方给 `width=`/`class=[style(width=…)]`；
   - [ ] §2 映射表外的命名尾巴：`date_range_picker_t` / `time_range_picker_t` / `datetime_range_picker_t` 三个入口仍带 `_t`（映射表只收了 `date_picker`/`color_picker`/`select`，这三条没进表），与 `date_picker` 不同形；改名要连 `datepicker_wbtest` 与 examples/native-app 的调用点一起切，单独一批做。
   - [ ] 观感逐页比对不回退（真机由用户复验，`examples/hello`、`hello-themed`、`showcase`、`native-app`、`sysmonitor`）。
-- [ ] **P3 响应式补强**：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` / `mount_window` 补 `render` 槽（动工前先定 design.md §6 唯一待定：`Store` 去重与否）。
-- [ ] **P4 绘制能力**：`Painter` 全局 alpha（opacity 全路径）+ `box_shadow` 硬阴影档。
+- [x] **P3 响应式补强**（2026-10-14 落地）：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘（`tick`）/ `for_list`+`when` / `mount_window_render` 的 `render` 槽 / `Store` 内建去重（`T : Eq` 走 `set_eq`，已定案）全部落地。
+- [x] **P4 绘制能力**：`Painter` 全局 alpha（opacity 全路径）+ `box_shadow` 硬阴影档（真机观感复验归 `_人工测试清单.md`；模糊档待 blur 能力再评估）。
 - [ ] **P5 动画（已改排到性能批之后，2026-10-14 定）**：`transition` 本质是连续置脏重绘，纯软件光栅路径上「没有脏矩形 = 每帧一次全窗重绘」；先做 §6.6「脏矩形重绘 + 文本布局缓存」，量出局部变化一帧 < 16ms 再开工（判据见 design.md §5 末与 adaptation）。P4 的 opacity/box_shadow 是静态属性，不受此闸门影响，已先行落地。
 
 ### 控件（一律自绘，不再引入原生控件皮肤；家族名对应 master `yue/components/` 九个源文件）
