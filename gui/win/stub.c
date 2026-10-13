@@ -304,6 +304,19 @@ void wm_set_wheel_probe(int64_t (*fn)(int64_t sx, int64_t sy)) {
 }
 
 static void wm_push(WmWindow *w, const WmEv *ev) {
+  // 指针移动先合并：队列里最后一条也是**未消费**的移动时直接替换（位置是状态、
+  // 不是流水，只留最新一条语义不丢）。一帧（真机 300–500ms 量级）里能攒下上百条
+  // 移动事件，64 槽的队列会被它们塞满，随后的抬起/滚轮就整批丢掉——真机表现正是
+  // 「按钮点了没反应、表头点了不排序、滚轮不滚」。合并后队列里任何时刻最多一条
+  // 移动，抬起与滚轮不会再被挤掉。只在「最后一条也是移动」时替换：中间夹着
+  // 按下/抬起就不动它，FIFO 语义不破。
+  if (ev->code == 4u && w->ev_count > 0) {
+    int last = (w->ev_head + w->ev_count - 1) % 64;
+    if (w->evs[last].code == 4u) {
+      w->evs[last] = *ev;
+      return;
+    }
+  }
   if (w->ev_count >= 64) {
     return; // 满了丢弃而不是覆盖：宁可丢一个事件，不能把 FIFO 打乱
   }
@@ -485,16 +498,21 @@ static LRESULT CALLBACK wm_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
       return 0;
     }
     case WM_PAINT: {
-      // 与 GTK 的 draw 回调同口径：expose 即标脏，交 MoonBit 重画；同时把
-      // 手里已有的缓冲贴出去（首帧前的那一下不至于黑屏闪没）
+      // 有帧就贴帧、**不置 need_draw**。这条曾经置脏（「expose 即标脏，交 MoonBit
+      // 重画」），但 present 自己每帧都 InvalidateRect，于是构成自维持环：
+      // present → WM_PAINT → 置脏 → MoonBit 全帧重画 → present → …
+      // 应用永不空闲，输入事件只能排在一帧之后（真机：1400×3520 的一帧 300–500ms，
+      // 滚动/点击/悬浮全像卡住，且事件队列被鼠标移动塞满后开始丢抬起与滚轮）。
+      // 重绘请求一律由 MoonBit 侧的 schedule_paint（`@core.invalidate`）发起；
+      // 这里只在「还没有任何帧可贴」（首帧之前）时才要一次。
       WmWindow *w = wm_of(hwnd);
       PAINTSTRUCT ps;
       HDC dc = BeginPaint(hwnd, &ps);
       if (w != NULL) {
-        w->need_draw = 1;
         if (w->frame != NULL && w->pending_w > 0 && w->pending_h > 0) {
           wm_blit(dc, w);
         } else {
+          w->need_draw = 1;
           HBRUSH b = CreateSolidBrush(RGB(0, 0, 0));
           FillRect(dc, &ps.rcPaint, b);
           DeleteObject(b);
@@ -2645,6 +2663,19 @@ static guint32 wm_mods(guint state) {
 }
 
 static void wm_push(WmWindow *w, const WmEv *ev) {
+  // 指针移动先合并：队列里最后一条也是**未消费**的移动时直接替换（位置是状态、
+  // 不是流水，只留最新一条语义不丢）。一帧（真机 300–500ms 量级）里能攒下上百条
+  // 移动事件，64 槽的队列会被它们塞满，随后的抬起/滚轮就整批丢掉——真机表现正是
+  // 「按钮点了没反应、表头点了不排序、滚轮不滚」。合并后队列里任何时刻最多一条
+  // 移动，抬起与滚轮不会再被挤掉。只在「最后一条也是移动」时替换：中间夹着
+  // 按下/抬起就不动它，FIFO 语义不破。
+  if (ev->code == 4u && w->ev_count > 0) {
+    int last = (w->ev_head + w->ev_count - 1) % 64;
+    if (w->evs[last].code == 4u) {
+      w->evs[last] = *ev;
+      return;
+    }
+  }
   if (w->ev_count >= 64) {
     return; // 满了丢弃而不是覆盖：宁可丢一个事件，不能把 FIFO 打乱
   }
@@ -2754,10 +2785,12 @@ static void wm_mark_draw(WmWindow *w) {
 static gboolean wm_on_draw(GtkWidget *area, cairo_t *cr, gpointer data) {
   (void)area;
   WmWindow *w = (WmWindow *)data;
-  w->need_draw = 1;
   // 只在这里贴像素：GdkWindow 的生命周期由 GTK/WM 管，在 draw 之外拿它的
   // cairo 画会在窗口被销毁后打到死窗口上（实测 X 错误 RenderBadPicture）
   if (w->pending != NULL && w->pending_w > 0 && w->pending_h > 0) {
+    // 有帧就贴帧、**不置 need_draw**：present 自己每帧都 queue_draw，这里再置脏
+    // 就成自维持环（present → draw → 置脏 → 全帧重画 → present → …），应用永不
+    // 空闲、输入只能排在一帧之后。重绘请求一律由 MoonBit 侧 schedule_paint 发起。
     cairo_surface_t *surf = cairo_image_surface_create_for_data(
         (unsigned char *)w->pending, CAIRO_FORMAT_ARGB32, w->pending_w,
         w->pending_h, w->pending_w * 4);
@@ -2766,6 +2799,8 @@ static gboolean wm_on_draw(GtkWidget *area, cairo_t *cr, gpointer data) {
       cairo_paint(cr);
     }
     cairo_surface_destroy(surf);
+  } else {
+    w->need_draw = 1; // 还没有帧可贴：请 MoonBit 画第一帧
   }
   return FALSE;
 }
