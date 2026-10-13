@@ -56,8 +56,8 @@ let count : @core.Store[Int] = @core.Store::new(0)
 - **跨平台系统集成**：系统托盘、桌面通知、原生菜单栏、全局快捷键、消息框、窗口图标、运行中改标题 / 最小尺寸 / 无边框拖拽、应用内拖放、用户空闲检测、开机自启
 - **内嵌 WebView**：布局树内嵌与自绘控件同树混排、导航与历史、JS 互操作（执行取回结果 / 脚本注入 / 双向绑定）、DOM 内容抓取、Cookie 与 profile 持久化、新窗 / 权限 / 下载策略（默认拦下并回报、可切换）、崩溃回报、自定义协议本地站点、能力探测与语义化降级
 - **媒体引擎**：ffmpeg 解码 + miniaudio 输出、内嵌字幕轨（外挂 / 容器内嵌双来源）、倍速音画同步
-- **示例迁移收口**：hello / hello-themed / showcase（17 页）/ sysmonitor / systemprobe 全部迁到新栈，使用方真机复验九条清单通过
-- **质量门禁**：`moon check` 全仓零错误零警告、`moon test` 957/957 全绿为提交门槛，CI 分层门禁（库包测试 / 示例构建 / release 校验）
+- **示例迁移收口**：hello / hello-themed / showcase（14 页）/ sysmonitor / systemprobe 全部迁到新栈，使用方真机复验九条清单通过
+- **质量门禁**：`moon check` 全仓零错误零警告、`moon test` 全仓用例全绿为提交门槛，CI 分层门禁（库包测试 / 示例构建 / release 校验）
 
 ## 核心功能范围
 
@@ -108,14 +108,13 @@ let count : @core.Store[Int] = @core.Store::new(0)
 ## 预期验收产物
 
 - 可运行示例（`moon run` 直接启动）：
-  - 基础：`hello` 最小窗口、`hello-themed` 主题控件族、`showcase` 全功能演示板（17 页）；
+  - 基础：`hello` 最小窗口、`hello-themed` 主题控件族、`showcase` 全功能演示板（14 页）；
   - 浏览器演示：地址栏导航与历史、自定义协议本地站点、JS↔原生互操作、DOM 抓取、新窗 / 权限 / 下载策略；
   - 音频演示：播放 / 暂停 / 进度与音量、循环、倍速音画同步；
   - 视频演示：进度拖拽 seek、倍速、外挂 / 内嵌字幕轨、音画同步。
-- CI 门禁：GitHub Actions 分层门禁（库包测试 / 示例构建 / release 校验），Linux + Windows 触发、结果公开可查；`moon check` 全仓零错误零警告、`moon test` 957 用例全绿为提交门槛。
+- CI 门禁：GitHub Actions 分层门禁（库包测试 / 示例构建 / release 校验），Linux + Windows 触发、结果公开可查；`moon check` 全仓零错误零警告、`moon test` 全仓用例全绿为提交门槛。
 
 ## 移植或参考说明
 
-- 是否为移植项目：否
 - 参考对象：Yue / libyue（<https://github.com/yue/yue> ，LGPL 2.1）；Yoga（<https://github.com/facebook/yoga> ，MIT）
 - 本项目许可证：MIT
