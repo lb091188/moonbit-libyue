@@ -1,24 +1,27 @@
-# prepare.py 产物
+# prepare.py 产物(vendor 仅根级:modules/ffmpeg-mbt/vendor 是模块必需的 vendored 头文件与导入库,勿升级为 **/vendor/)
 /vendor/
-/build/
-/shim/build/
-/experiment/build/
-/.prepare/
+**/.prepare/
 
 # moon 构建产物
-/_build/
-/target/
+**/_build/
+**/target/
 *.core
 *.generated.mbti
 
+# C/C++ 构建产物目录(prebuild、CMake 等)
+**/build/
+
 # mooncakes 依赖缓存(moon install 下载,勿入库)
-/.mooncakes/
+**/.mooncakes/
+
+# 文档站依赖缓存
+**/node_modules/
 
 # WebView2 loader(prepare.py 复制到仓库根,运行期按工作目录搜索)
 /WebView2Loader.dll
 
 # Python 缓存(moon package 与 git 同样排除)
-__pycache__/
+**/__pycache__/
 
 # 发布包排除(文件已在版本库,gitignore 只影响未跟踪文件,git 照常跟踪)
 /AGENTS.md
@@ -27,6 +30,3 @@ __pycache__/
 # AI 助手工作区记忆(非构建产物,不入库)
 /.workbuddy/
 /.workbuddy-ai/
-
-# prebuild 产物（gui 模块内构建目录）
-/gui/build/
