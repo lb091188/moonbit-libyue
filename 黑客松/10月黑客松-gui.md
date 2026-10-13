@@ -13,13 +13,10 @@
 
 native-gui 是为 MoonBit 生态打造的**原生跨平台桌面 GUI 库**——窗口、像素、事件循环、布局与控件**全部用纯 MoonBit 自绘实现**，一套代码在 Windows ✅ / Linux ✅ 原生运行。`moon add NoahLiu/native-gui` 后零配置直接 `moon run`。
 
-- **全栈自绘**：库自带光栅化器，控件观感跨平台一致，不依赖平台皮肤；深浅色与系统强调色默认跟随，主题是普通值可整体覆盖
-- **响应式与声明式**：状态放 `Store` / `Signal`，绑定点在数据变化时自动刷新；界面以树描述、`mount_window` 一步挂载
-- **13 个库包按需取用**：`core` / `ui` / `render` / `text` / `theme` / `icons` / `sys` / `input` / `win` / `dbus` / `chart` / `mdview` / `web`——不 import 的包不进二进制,不依赖的重能力模块（`gui-media、gui-markdown、gui-webview`）不进依赖闭包
-- **跨平台系统能力门面**：托盘、桌面通知、全局快捷键、原生菜单、剪贴板、文件对话框、拖放、自启动、用户空闲检测，以及 OS 查询族（音量 / 亮度 / 电源 / 打印机 / 显示器 / 浏览器历史 / 已装应用 / 壁纸…）——对外只暴露跨平台抽象 API，能力探测 + 语义化降级（不支持的组合给结构化 `Unsupported`，不静默失败）；平台专属能力规划为独立能力包按需引入，不进主库门面
-- **自绘图表族与富内容**：折线 / 柱状 / 饼 / 仪表 / 散点之外新增雷达 / 热力 / K 线 / 漏斗 / 箱线 / 桑基 / 树 / 矩形树 / 旭日等，配横向交互层；Markdown 全量渲染视图（GFM）
-- **内嵌 WebView**（Windows WebView2 / Linux WebKitGTK）与**音视频引擎**（ffmpeg 解码 + miniaudio 输出，含内嵌字幕轨、倍速音画同步）
-- **平台差异收敛在两处薄层**：窗口后端（Win32 / GTK3 C 桩）与文字后端（Pango / DirectWrite）；Linux 系统能力走 DBus / SNI 协议栈，其余全部纯 MoonBit
+- **全栈自绘**：观感跨平台一致、不依赖平台皮肤，深浅色与系统强调色默认跟随，主题是普通值可整体覆盖；平台差异收敛在窗口与文字两处薄层，其余全部纯 MoonBit
+- **响应式与声明式**：状态放 `Store` / `Signal`，绑定点随数据自动刷新；界面以树描述、`mount_window` 一步挂载（写法见下）
+- **开箱能力齐全**：组件库、图表族、Markdown 视图、内嵌 WebView、音视频引擎与系统能力门面（托盘 / 通知 / 快捷键 / OS 查询等），全部只暴露跨平台抽象 API，能力探测 + 语义化降级
+- **按需取用**：功能各自成包、不 import 不进二进制；媒体等重能力拆独立模块、不进默认依赖闭包
 
 ### 写法对比
 
@@ -119,11 +116,11 @@ let count : @core.Store[Int] = @core.Store::new(0)
 
 ## 移植或参考说明
 
-- 参考对象（设计思路与 API 形状对照）：Yue / libyue（<https://github.com/yue/yue> ，LGPL 2.1）与 Yoga（<https://github.com/facebook/yoga> ，MIT）
+- 参考对象：Yue / libyue（<https://github.com/yue/yue> ，LGPL 2.1）与 Yoga（<https://github.com/facebook/yoga> ，MIT）
 - 本项目许可证：MIT
 
-本项目为独立设计与实现，**未复制参考项目源码，当前栈不依赖、不分发二者的任何代码或二进制**（vendored libyue 已删除）：
+本项目为独立设计与实现，**未复制参考项目源码**：
 
-- 窗口、事件循环、Flexbox 布局、控件、光栅化器、主题系统、图表族全部为纯 MoonBit 自绘实现；布局引擎按 W3C CSS Flexbox 规范逐条实现（对照材料为规范文本）；
-- Linux 系统能力基于自研纯 MoonBit DBus / SNI 协议栈实现；平台薄层为本项目自写的 Win32 / GTK3 C 桩与 Pango / DirectWrite 文字后端调用；
+- 窗口、事件循环、Flexbox 布局、控件、光栅化器、主题系统、图表族全部为纯 MoonBit 自绘实现；布局引擎按 W3C CSS Flexbox 规范逐条实现；
+- Linux 系统能力基于纯 MoonBit DBus / SNI 协议栈实现；平台薄层为本项目自写的 Win32 / GTK3 C 桩与 Pango / DirectWrite 文字后端调用；
 - 与参考项目相比的扩展：声明式 API 与响应式状态（Store / Signal）、13 包按需取用的模块化、跨平台系统集成门面（托盘 / 通知 / 快捷键 / 原生菜单 / 拖放 / 自启动等）、系统能力族（25+ 项 OS 查询）、15+ 图型自绘图表族、Markdown 视图、内嵌 WebView、音视频引擎。
