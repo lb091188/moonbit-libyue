@@ -168,3 +168,22 @@ test "光标形状请求：按钮手型、输入框文本形、分隔把手横�
   assert_eq(cg.cursor, @core.CURSOR_RESIZE_V)
   assert_eq(cg.children()[0].cursor, @core.CURSOR_DEFAULT)
 }
+
+///|
+test "mount_window_render：render 至多调用一次（无显示服务时零次）" {
+  let runs : Ref[Int] = Ref(0)
+  let app = mount_window_render(
+    fn() -> Array[@core.Node] {
+      runs.val += 1
+      [text("任务")]
+    },
+    title="渲染槽",
+  )
+  // 无后端/无显示服务的环境拿不到 app，render 一次都不该跑；
+  // 有显示服务时首帧建完即止——两种形态都只要求「不超过一次」。
+  assert_true(runs.val <= 1)
+  match app {
+    None => assert_eq(runs.val, 0)
+    Some(_a) => assert_eq(runs.val, 1)
+  }
+}

@@ -249,6 +249,21 @@ pub fn mount_window(
 }
 
 ///|
+/// 挂载一扇窗（**render 槽**形态，design.md §4.0 与静态节点数组二选一）：
+/// `render` 在挂载时调用**一次**建首帧，此后框架不再重跑它——响应全靠树里
+/// 收 Signal 的入口自订阅自差分（`for_list` 管列表差分、`when` 管显隐、
+/// `*_dyn` 管展示文本），整棵换内容才走 `bind_node`。
+pub fn mount_window_render(
+  render : () -> Array[@core.Node],
+  title? : String = "",
+  width? : Int = 800,
+  height? : Int = 600,
+  handle? : (@core.App) -> Unit = fn(_a : @core.App) -> Unit { () },
+) -> @core.App? {
+  mount_window(render(), title=title, width=width, height=height, handle=handle)
+}
+
+///|
 /// 光标组：组内任意位置都用 `cursor` 指定的形状（默认手型）。
 /// 宿主取的是悬停路径上**最深的那个非零请求**，所以组内某个子件自己提了形状
 /// （比如卡片里那颗按钮）时以它为准，其余位置回退到组的形状——不需要像旧链路

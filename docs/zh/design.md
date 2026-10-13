@@ -392,13 +392,14 @@ fn ctx_new() -> Ctx {
 **收 Signal 的入口自己订阅、自己差分**（§3 第 5 条通则：`for_list` 管列表 keyed 差分、
 `when` 管显隐、`*_dyn` 管展示文本）；整棵换内容走 `bind_node` 显式重建，不做全树 patch。
 挂载入口今天收静态节点数组（`hello-themed` / `sysmonitor` 就是这个形态：先建好树再传
-`[nodes]`）；P3 给 `mount_window` 补一个 `render` 槽，二选一：
+`[nodes]`）；P3 补 `mount_window_render`（render 槽入口），二选一——`mount_window` 的
+`children` 保持首位位置参数（数百示例调用点不动）：
 
 ```moonbit
 fn main {
   let ctx = ctx_new()
-  let app = match @ui.mount_window(
-    render=fn() { [render(ctx)] },   // 挂载时调用一次建首帧；此后由各入口自响应
+  let app = match @ui.mount_window_render(   // render 槽入口(与节点数组二选一)
+    fn() { [render(ctx)] },   // 挂载时调用一次建首帧；此后由各入口自响应
     title="任务",
     width=420,
     height=560,
