@@ -195,3 +195,66 @@ test "粘性列表：滚动跨过组边界时吸顶标题换文字，组内行�
   p3.end()
   assert_eq(st.cur_group, "组三")
 }
+
+///|
+test "缺陷钉桩：滚动后可见行必须落在视口内（非整行偏移也要跟手）" {
+  let items = virt_items(200)
+  let (root, vp) = mounted(
+    virt_list(
+      items,
+      150.0,
+      30.0,
+      fn(i : Int, _x : Int) -> @core.Node {
+        view([text("行 " + i.to_string())], height=30.0)
+      },
+      width=260.0,
+      overscan=0,
+    ),
+    320.0,
+    240.0,
+  )
+  root.relayout(320.0, 240.0)
+  // 先画一帧：视口高与可滚上界都在布局/绘制之后才拿得到
+  let bm = @render.Bitmap::new(320, 240)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  let inner = vp.children()[0]
+  // 滚 45px（=1.5 行）：视口第一行应是源下标 1 且顶部对齐到 -15（半行跟随）
+  let _ = root.dispatch_scroll({
+    x: vp.rect.x + 40.0,
+    y: vp.rect.y + 40.0,
+    dx: 0.0,
+    dy: -1.5,
+    mods: 0,
+  })
+  root.relayout(320.0, 240.0)
+  // 上占位（1 行）+ 可见行 1..6 + 下占位
+  assert_eq(inner.children().length(), 8)
+  assert_eq(inner.children()[0].rect.h, 30.0)
+  // 整块平移量 = 偏移
+  assert_eq(vp.rect.y - inner.rect.y, 45.0)
+  let row0 = inner.children()[1]
+  // 行必须出现在视口内：上沿 = vp.rect.y - 15，且仍在视口范围内
+  assert_eq(vp.rect.y - row0.rect.y, 15.0)
+  assert_true(row0.rect.y + row0.rect.h > vp.rect.y)
+  assert_true(row0.rect.y < vp.rect.y + vp.rect.h)
+  // 深滚到底：视口内仍要有 5 行（原缺陷=占位把可见行推出视口，从顶部开始一路空白）
+  let _ = root.dispatch_scroll({
+    x: vp.rect.x + 40.0,
+    y: vp.rect.y + 40.0,
+    dx: 0.0,
+    dy: -200.0,
+    mods: 0,
+  })
+  root.relayout(320.0, 240.0)
+  let mut visible = 0
+  let kids = inner.children()
+  for i = 0; i < kids.length(); i = i + 1 {
+    let k = kids[i]
+    if k.rect.y < vp.rect.y + vp.rect.h && k.rect.y + k.rect.h > vp.rect.y {
+      visible += 1
+    }
+  }
+  assert_eq(visible, 5)
+}

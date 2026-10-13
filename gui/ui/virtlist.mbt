@@ -30,13 +30,20 @@ pub fn[T] virt_list(
     let inner = @core.Widget::new()
     inner.node.set_flex_direction(@yoga.Column)
     inner.node.set_width(@yoga.percent(100.0))
+    // 整块跟着偏移平移（与 `scroll_view` 同一套相对定位）：上占位只补「窗口第一行
+    // 到内容原点」的差额，真偏移量由 top 承担——少了这步，占位会把可见行越推越下，
+    // 视口上沿先空、随后整屏空白。
+    inner.node.set_position(@yoga.Relative)
     inner.node.set_flex_shrink(0.0)
+    inner.node.set_top(@yoga.fixed(0.0 - state.offset))
     viewport.append_child(inner)
     // 当前窗口（源下标区间）与窗口重建
     let win_first : Ref[Int] = Ref(-1)
     let win_last : Ref[Int] = Ref(-1)
     let total : Ref[Int] = Ref(0)
     let render_window = fn(force : Bool) -> Unit {
+      // 偏移先落布局：窗口区间没变但偏移在行内变化（半行滚动）时也要跟手
+      inner.node.set_top(@yoga.fixed(0.0 - state.offset))
       let count = items.get().length()
       total.val = count
       state.content_h = count.to_double() * rh
