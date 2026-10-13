@@ -634,6 +634,9 @@ pub fn App::step(self : App) -> Bool {
   for a in host_windows() {
     a.drain_events()
   }
+  // 事件批尾冲刷 next_tick（§3 第 3 项:回调尾同步 flush,反馈不晚一帧），
+  // 排在绘制之前——这批回调改的 Store 仍在本帧生效。
+  tick_flush()
   if !self.is_running() {
     return false
   }

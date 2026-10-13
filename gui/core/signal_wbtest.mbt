@@ -212,3 +212,25 @@ test "订阅回收袋:无袋时订阅不入袋(subscribe 常态不退化)" {
   s.set(7)
   inspect(seen.map(fn(v) { v.to_string() }).join(","), content="7")
 }
+
+///|
+test "next_tick：批尾冲刷、途中新排队进下一批、clear 丢队列" {
+  let log : Array[String] = []
+  let push = fn(s : String) -> Unit {
+    let _ = log.push(s)
+  }
+  next_tick(fn() -> Unit {
+    push("a")
+    next_tick(fn() -> Unit { push("b") }) // 冲刷途中排的不进本批
+  })
+  next_tick(fn() -> Unit { push("c") })
+  assert_eq(tick_pending(), 2)
+  tick_flush()
+  assert_eq(tick_pending(), 1)
+  tick_flush()
+  assert_eq(tick_pending(), 0)
+  next_tick(fn() -> Unit { push("never") })
+  tick_clear()
+  tick_flush()
+  assert_true(log.length() == 3)
+}
