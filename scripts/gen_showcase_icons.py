@@ -2,16 +2,18 @@
 """重写 examples/showcase/pages/icons.mbt:按主题组铺全量图标墙。
 
 用法: python3 scripts/gen_showcase_icons.py
-读取 icons/icons.mbt 的生成标记区(变体+中文名),按 GROUPS 分组输出,
-未分组的落入「其他」。页面结构(icon_grid/icon_group_code/@ui.page)
-与原页一致,只换图标清单与分组。
+读取 gui/icons/icons.mbt 的生成标记区(变体+font-class),按 GROUPS 分组输出,
+未分组的落入「其他」。G7 起页面面向新栈:图标走 @ui.icon(矢量自绘)、悬停名走
+@ui.tooltip_t、间距走容器参数(column_gap/row_gap),段装配走 shared 的
+section/page(旧链路的 @yue.* 与 @components.* 已随旧链删除)。
 """
 
+import os
 import re
 
-REPO = __file__.rsplit("/scripts/", 1)[0]
-ICONS_MBT = REPO + "/yue/icons/icons.mbt"
-PAGE = REPO + "/examples/showcase/pages/icons.mbt"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ICONS_MBT = os.path.join(REPO, "gui", "icons", "icons.mbt")
+PAGE = os.path.join(REPO, "examples", "showcase", "pages", "icons.mbt")
 
 # (组名, 中文标题, 一句描述, [font_class...])
 GROUPS = [
@@ -241,52 +243,39 @@ def main():
 
     total = sum(len(s[2]) for s in sections)
     out = []
-    out.append("// 图标库页:全量 %d 个矢量图标(iconfont 生成)按分组展示,悬停看名称。" % total)
+    out.append("// 图标库页:全量 %d 个矢量图标(矢量自绘,非字体字形)按分组展示,悬停看名称。" % total)
     out.append("// 本页由 scripts/gen_showcase_icons.py 生成,勿手改;分组定义见该脚本 GROUPS。")
     out.append("// 网格为竖排 vbox 包行(每行 24 个)——外层容器必须 vbox,否则行组被")
-    out.append("// 水平排布、超宽截断(图标墙首版即此 bug)。")
+    out.append("// 水平排布、超宽截断(图标墙首版即此 bug)。G7 新栈口径:图标走 @ui.icon、")
+    out.append("// 悬停名走 @ui.tooltip_t、间距走容器参数(column_gap/row_gap)。")
     out.append("")
     out.append("///|")
     out.append("/// 一组图标的网格:vbox 包行,每行 per_row 个,悬停 tooltip 显示名称。")
-    out.append("fn icon_grid(kinds : Array[@icons.IconKind], per_row : Int) -> @yue.Node {")
-    out.append("  let rows : Array[@yue.Node] = []")
+    out.append("fn icon_grid(kinds : Array[@icons.IconKind], per_row : Int) -> @core.Node {")
+    out.append("  let rows : Array[@core.Node] = []")
     out.append("  for row in 0..<((kinds.length() + per_row - 1) / per_row) {")
-    out.append("    let items : Array[@yue.Node] = []")
+    out.append("    let items : Array[@core.Node] = []")
     out.append("    for col in 0..<per_row {")
     out.append("      let idx = row * per_row + col")
     out.append("      if idx < kinds.length() {")
     out.append("        items.push(")
-    out.append("          @components.tooltip_t(")
-    out.append("            @icons.icon(kinds[idx], size=30.0),")
+    out.append("          @ui.tooltip_t(")
+    out.append("            @ui.icon(kinds[idx], size=30.0),")
     out.append("            @icons.icon_name(kinds[idx]),")
     out.append("          ),")
     out.append("        )")
     out.append("      }")
     out.append("    }")
-    out.append("    rows.push(@yue.hbox(items, style=[(\"gap\", 10.0)]))")
+    out.append("    rows.push(@ui.hbox(items, column_gap=10.0))")
     out.append("  }")
-    out.append("  @yue.vbox(rows, style=[(\"gap\", 8.0)])")
+    out.append("  @ui.vbox(rows, row_gap=8.0)")
     out.append("}")
     out.append("")
     out.append("///|")
-    out.append("/// 图标页各分组共用的演示代码形态:icon 画矢量图标,悬停 tooltip 显名。")
-    out.append("fn icon_group_code(sample : Array[String]) -> Array[String] {")
-    out.append("  let head : Array[String] = [")
-    out.append("    \"@yue.hbox([\",")
-    out.append("  ]")
-    out.append("  for line in sample {")
-    out.append("    head.push(line)")
-    out.append("  }")
-    out.append("  head.push(\"  // …本组其余图标同构\")")
-    out.append("  head.push(\"], style=[(\\\"gap\\\", 10.0)])\")")
-    out.append("  head")
-    out.append("}")
-    out.append("")
-    out.append("///|")
-    out.append("pub fn page_icons(_app : @ui.App) -> @yue.Node {")
-    out.append("  @ui.page([")
+    out.append("pub fn page_icons(_app : @shared.App) -> @core.Node {")
+    out.append("  @shared.page([")
     for title, desc, kinds, samples in sections:
-        out.append("    @ui.section(")
+        out.append("    @shared.section(")
         out.append("      \"%s\"," % title)
         out.append("      \"%s\"," % title)
         out.append("      \"%s\"," % desc)
@@ -300,16 +289,14 @@ def main():
         out.append("          24,")
         out.append("        ),")
         out.append("      ],")
-        code_lines = []
+        out.append("      code=[")
         if samples:
-            for s in samples[:3]:
-                code_lines.append("        \"  @icons.icon(@icons.%s, size=18.0),\"," % s)
-            code_lines.append(
-                "        \"  @components.tooltip_t(@icons.icon(@icons.%s, size=18.0), @icons.icon_name(@icons.%s)),\","
+            for smp in samples[:3]:
+                out.append("        \"  @ui.icon(@icons.%s, size=18.0),\"," % smp)
+            out.append(
+                "        \"  @ui.tooltip_t(@ui.icon(@icons.%s, size=18.0), @icons.icon_name(@icons.%s)),\","
                 % (samples[0], samples[0]))
-        out.append("      code=icon_group_code([")
-        out.extend(code_lines)
-        out.append("      ]),")
+        out.append("      ],")
         out.append("    ),")
     out.append("  ])")
     out.append("}")
