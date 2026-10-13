@@ -856,7 +856,7 @@ fn list_popup(rows : Array[@core.Node], n : Int, width : Double) -> @core.Node {
 /// 与 master 的两条差（记档）：① 弹层是浮层图层上的自绘面板，不是原生 Popover，
 /// 「点外面收起」由图层负责，组件不再自己跟踪；② master 靠字段失焦收起，本栈
 /// 字段是否可聚焦由调用方给 `focus_id` 决定，收起只走「点外面 / 再点字段」两条路。
-pub fn select_t(
+pub fn select(
   options : Array[String],
   value : @core.Store[String],
   on_change? : (String) -> Unit = fn(_s : String) -> Unit { () },
@@ -864,8 +864,22 @@ pub fn select_t(
   placeholder? : String = "",
   width? : Double = 200.0,
   focus_id? : Int = 0,
+  editable? : Bool = false,
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
+  if editable {
+    // §2 合并:`combo`(可输入)就是 select 的 editable 档,原实现整体复用
+    // (labelled 参数没有透传通道,combo_impl 收显式 Option 形参)
+    return combo_impl(
+      options,
+      value,
+      on_change=Some(on_change),
+      placeholder=Some(placeholder),
+      width=Some(width),
+      focus_id=Some(focus_id),
+      handle=Some(handle),
+    )
+  }
   follow_store(value)
   let opts = options
   let ph = placeholder
@@ -1066,15 +1080,20 @@ fn color_swatch(
 ///
 /// 与 master 的一条差（记档）：旧链路的 combo 是原生可编辑组合框（GTK
 /// `ComboBoxEntry`），本栈全自绘——浮层开在浮层图层上，收层同样由图层负责。
-pub fn combo(
+fn combo_impl(
   options : Array[String],
   value : @core.Store[String],
-  on_change? : (String) -> Unit = fn(_s : String) -> Unit { () },
-  placeholder? : String = "",
-  width? : Double = 200.0,
-  focus_id? : Int = 0,
-  handle? : (@core.Widget) -> Unit = default_handle,
+  on_change~ : Option[(String) -> Unit],
+  placeholder~ : Option[String],
+  width~ : Option[Double],
+  focus_id~ : Option[Int],
+  handle~ : Option[(@core.Widget) -> Unit],
 ) -> @core.Node {
+  let on_change = on_change.unwrap_or(fn(_s : String) -> Unit { () })
+  let placeholder = placeholder.unwrap_or("")
+  let width = width.unwrap_or(200.0)
+  let focus_id = focus_id.unwrap_or(0)
+  let handle = handle.unwrap_or(default_handle)
   follow_store(value)
   let opts = options
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {

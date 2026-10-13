@@ -4,7 +4,7 @@
 // `button` / `input` / `checkbox` / `container` / `group` / `separator` /
 // `image` / `icon` / `radio_group` / `slider` / `progress`）不再另包一层——
 // 直接用组件即可。这里只补三类东西：
-// ① 与 master 名字不同的构造器（`vbox`/`hbox`/`text_edit`/`picker`/`scroll`/
+// ① 与 master 名字不同的构造器（`vbox`/`hbox`/`text_edit`/`select`/`scroll`/
 //    `tab`/`date_picker`），旧调用点原样跑在新栈上；
 // ② 声明式入口（`mount_window`）与文本绑定（`bind_label`/`bind`）；
 // ③ `hover_group`（悬停组）。
@@ -81,28 +81,7 @@ pub fn row(
 /// §2 合并:`text_edit` 就是真身(原声明式包装删除,调用点直接用 `@ui.textarea`)。
 
 ///|
-/// 下拉选择器（`select_t` 的旧名）。
-pub fn picker(
-  options : Array[String],
-  value : @core.Store[String],
-  on_change? : (String) -> Unit = fn(_s : String) -> Unit { () },
-  clearable? : Bool = false,
-  placeholder? : String = "",
-  width? : Double = 200.0,
-  focus_id? : Int = 0,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  select_t(
-    options,
-    value,
-    on_change=on_change,
-    clearable=clearable,
-    placeholder=placeholder,
-    width=width,
-    focus_id=focus_id,
-    handle=handle,
-  )
-}
+/// §2 合并:`select`/`combo` 旧入口消失,选择器唯一入口是 `select`（可输入走 `editable=true`）。
 
 ///|
 /// §2 合并:`scroll` 旧包装删除——滚动容器唯一入口就是 `ui/scroll.mbt` 的 `scroll_view`。

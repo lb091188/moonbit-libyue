@@ -548,7 +548,7 @@ fn make_form_section(
       ),
       @ui.view(
         [
-          @ui.select_t(
+          @ui.select(
             ["选项甲", "选项乙", "选项丙"],
             sel,
             on_change=fn(v : String) -> Unit {
@@ -562,12 +562,13 @@ fn make_form_section(
             focus_id=22,
             handle=fn(w : @core.Widget) -> Unit { sel_slot.val = Some(w) },
           ),
-          @ui.combo(
+          @ui.select(
             ["组件甲", "组件乙", "组件丙"],
             cmb,
             placeholder="可输入过滤",
             width=150.0,
             focus_id=25,
+            editable=true,
             handle=fn(w : @core.Widget) -> Unit { cmb_slot.val = Some(w) },
           ),
           @ui.color_picker(

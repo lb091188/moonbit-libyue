@@ -81,7 +81,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
       [
         @ui.col(
           [
-            @ui.select_t(
+            @ui.select(
               ["杭州", "北京", "上海", "深圳", "广州"],
               @core.Store::new(""),
               clearable=true,
@@ -95,7 +95,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "@ui.select_t([\"杭州\", \"北京\", \"上海\", \"深圳\", \"广州\"], city, clearable=true, width=170.0)",
+        "@ui.select([\"杭州\", \"北京\", \"上海\", \"深圳\", \"广州\"], city, clearable=true, width=170.0)",
         "@ui.color_picker(color)",
         "@ui.bind_label(color, fn(c) { c })",
       ],

@@ -1,5 +1,5 @@
 // 声明式层 L1 构造器回归：vbox/hbox 的方向与间距、bind_label 就地改文本、
-// hover_group 的父链悬停与点击、旧名构造器（picker/scroll/tab）确实落到新组件上。
+// hover_group 的父链悬停与点击、旧名构造器（select/scroll/tab）确实落到新组件上。
 
 ///|
 test "vbox / hbox：方向与间距来自参数，交叉轴按 align_items" {
@@ -106,9 +106,9 @@ test "hover_group：子控件悬停即整组换底色，松开在组内才算一
 }
 
 ///|
-test "旧名构造器落到新组件上：picker 点开浮层、scroll 出滚动条、tab 按 Store 切页" {
+test "旧名构造器落到新组件上：select 点开浮层、scroll 出滚动条、tab 按 Store 切页" {
   let v = @core.Store::new("")
-  let (root, field) = mounted_with_overlay(picker(["甲", "乙"], v, width=140.0), 400.0, 300.0)
+  let (root, field) = mounted_with_overlay(select(["甲", "乙"], v, width=140.0), 400.0, 300.0)
   click_at(root, field, 30.0, 16.0)
   assert_eq(@core.overlay_count(), 1)
   root.relayout(400.0, 300.0)

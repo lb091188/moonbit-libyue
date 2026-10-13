@@ -407,7 +407,7 @@ test "下拉选择：点开列表、点选项回填并收起、✕ 清空、选�
   let v = @core.Store::new("")
   let changes : Array[String] = []
   let (root, field) = mounted_with_overlay(
-    select_t(["甲", "乙", "丙"], v, on_change=fn(s : String) -> Unit { changes.push(s) }, clearable=true, width=160.0),
+    select(["甲", "乙", "丙"], v, on_change=fn(s : String) -> Unit { changes.push(s) }, clearable=true, width=160.0),
     420.0,
     300.0,
   )
@@ -457,7 +457,7 @@ test "下拉选择：点开列表、点选项回填并收起、✕ 清空、选�
 test "下拉选择：点浮层外收起后，再点字段立刻能重开（句柄活性）" {
   let v = @core.Store::new("甲")
   let (root, field) = mounted_with_overlay(
-    select_t(["甲", "乙"], v, width=140.0),
+    select(["甲", "乙"], v, width=140.0),
     420.0,
     300.0,
   )
@@ -524,12 +524,14 @@ test "可编辑下拉：点开全量候选、提交文本即过滤、上下键�
   let v = @core.Store::new("")
   let changes : Array[String] = []
   let (root, w) = mounted_with_overlay(
-    combo(
+    select(
       ["甲一", "甲二", "乙三"],
       v,
       on_change=fn(s : String) -> Unit { changes.push(s) },
       width=140.0,
       focus_id=1,
+      editable=true,
+      clearable=false,
     ),
     420.0,
     320.0,
