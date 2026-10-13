@@ -5,8 +5,9 @@
 //
 // 批次 1（App 宿主 + TextEditorHost 收口）：整窗由 `@core.App` 驱动——循环、
 // 事件翻译、焦点栈、输入法四条件、脏标上屏都在宿主里，界面内容只是一棵
-// `@core.Widget` 树。跑法：moon run examples/native-app（需显示服务），12 秒后
-// 自动退出并打印状态行（注入点位多，留够一轮全交互的时间）。
+// `@core.Widget` 树。跑法：moon run examples/native-app（需显示服务）；状态行
+// （含 NATIVE-APP-PROF 帧耗时账本）在退出时统一打印——平时交互测试直接关窗
+// 即可，10 分钟兜底定时器只防忘关。
 //
 // 批次 3（字体）：末尾一行演示「族名回退 + 混排行高」，两个盒子的盒高都来自
 // `@text.AttributedText::line_height`。
