@@ -84,10 +84,14 @@ ui 只管组件，三包职责不混。
   不是整块互换。承载优先级的只有调用点的数组顺序：常量彼此的定义先后不承载优先级。
 - **样式表粒度**：**App 级一份**，与 `theme` 同为进程级单份（参照 `theme/theme.mbt` 的
   `theme_box`），不提供每窗各叠一份。`class` 是值、随调用点传，不需要注册表。
-- **状态**：`hover` / `active` / `focus` 三个嵌套字段，绘制期按 `Widget` 已有的
-  `hovered` / `pressed` / `focused`（`core/widget.mbt:100-104`）选桶——组件的 `on_draw`
-  本来就在读 `self.hovered`（`ui/declarative.mbt:257`），因此没有伪类字符串、没有状态机、
-  也不依赖事件传播。
+- **状态**：`hover` / `active` / `focus` 三个状态桶，**构造端的主形态是状态前缀糖**——
+  `hover_background_color("primary_hover")` 读法同 `.primary:hover { background-color }`，
+  对标 Tailwind 的 `hover:` 前缀，`active_` / `focus_` 同形；糖铺满绘制期属性（§1.1 表中
+  「绘制时读」的各组），布局属性与「一次换一组观感」走嵌套 `hover(Style)`。存储端就是三个
+  嵌套 `Style` 字段，绘制期按 `Widget` 已有的 `hovered` / `pressed` / `focused`
+  （`core/widget.mbt:100-104`）选桶——组件的 `on_draw` 本来就在读 `self.hovered`
+  （`ui/declarative.mbt:257`），因此没有伪类字符串、没有状态机、也不依赖事件传播。三桶
+  可同时命中（对应 CSS 的层叠），合并/覆盖按桶内逐属性递归（上条）。
 - **元素级基调**：没有「元素选择器」这个机制；同名基调就是一个常量
   （`pub let button_base : Style = ...`），组件在自己的默认值里引用它，使用者传 `class`
   即覆盖——效果与 CSS 的元素选择器一致，但可跳转、可补全。
@@ -101,13 +105,19 @@ ui 只管组件，三包职责不混。
 // class=[card, primary]：数组尾赢，逐属性取并集
 @ui.button("保存", class=[@style.card, @style.primary], on_click=on_save)
 
-// 状态桶：hover 换底色（前端对照：`.primary:hover { background-color: … }`）
+// 状态样式主形态：前缀即伪类（前端对照 Tailwind `hover:` / `.primary:hover { … }`）
 pub let primary : Style = Style::new()
-  .background_color("primary")        // token 名；`#` 开头按 hex、命名色按 named（§1.4）
+  .background_color("primary")              // 基态：token 名；`#` 开头按 hex、命名色按 named（§1.4）
   .color("#fff")
   .border_radius(4.0)
   .cursor(@core.CURSOR_HAND)
-  .hover(Style::new().background_color("primary_hover"))
+  .hover_background_color("primary_hover")  // hover 换底色；active_ / focus_ 前缀同形
+
+// 底层形态（同一条链里混用也行）：嵌套 Style，用于具名子样式复用与整组替换
+pub let card_hover : Style = Style::new().background_color("primary_hover")
+pub let primary_v2 : Style = Style::new()
+  .background_color("primary")
+  .hover(@style.card_hover)
 ```
 
 ### 1.4 主题联动
@@ -149,7 +159,7 @@ pub struct Style {
   mut padding_bottom : Double?
   mut cursor : Int?
   mut visibility : Visibility?
-  // 状态桶
+  // 状态桶（构造端主形态是状态前缀糖 hover_*，§1.3）
   mut hover : Style?
   mut active : Style?
   mut focus : Style?
@@ -181,6 +191,9 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit          // 布局字段走 Yo
 - 散参数（`font_size=` / `background_color=` 那批）是糖，只有一条去向：折成一个匿名 `Style`
   排在解析序列**最前**，`class` 在后，于是「`class` > 散参数」由数组顺序直接成立，不需要第二
   条优先级规则；组件内部也只有「读 resolved Style」一条路径。改名对齐 CSS 属性名并进 §2 那批。
+- **状态前缀糖是包内糖，不动机制**：`hover_x(v)` 的实现就是往 `hover` 桶写属性 x（桶不存在
+  就建一个），存储与 `merge` 完全不感知糖的存在；糖只覆盖绘制期读的属性——布局属性进状态桶
+  会把「画的时候」混成「量的时候」，不给糖，走嵌套 `hover(Style)`。
 - **不挂运算符**：组合只写 `Style::merge(a, b)` 或链式。
 - **`Widget` 需要一个存放 resolved `Style` 的位置**：现有 `Widget` 只有 `node` / `kids` /
   `rect` / `visible` / 各回调 / `hovered` / `pressed` / `focused` / `cursor` / `focus_id`，
@@ -372,7 +385,7 @@ fn render(ctx : Ctx) -> @core.Node {
 
 | 批 | 内容 | 收口条件 |
 | --- | --- | --- |
-| P1 | 新建 `gui/style` 包：`Style` 字段集（含定位组 `position` / `top` / `right` / `bottom` / `left`——底层 yoga 现成，含百分比 inset 的能力后补入口）+ `Color` + 链式 setter（属性名即方法名）+ `merge`（逐属性并集、状态桶递归）+ **全量**内置常量表（§2 每个组件的基调，`tokens.mbt`）+ `Widget` 上存 resolved `Style` 的位置 + `apply`；**yoga-mbt 补 `z_index`**（`set_z_index` + 布局输出按 z_index 稳定排序，Yoga 上游同构；gui 侧绘制按 resolved 值重排 kids，`Style` 同步开 `z_index` 字段）；顺带 `Widget::set_margin` labelled 化（同形统一） | 新包测试 + `Widget` 样式槽用例 + 定位字段落到 yoga 的布局用例 + yoga-mbt 模块 z_index 用例（正序/负值/并列稳定）+ `cd gui && moon check` 零错零警 |
+| P1 | 新建 `gui/style` 包：`Style` 字段集（含定位组 `position` / `top` / `right` / `bottom` / `left`——底层 yoga 现成，含百分比 inset 的能力后补入口）+ `Color` + 链式 setter（属性名即方法名）+ 状态前缀糖（`hover_` / `active_` / `focus_` 铺满绘制期属性，§1.3）+ `merge`（逐属性并集、状态桶递归）+ **全量**内置常量表（§2 每个组件的基调，`tokens.mbt`）+ `Widget` 上存 resolved `Style` 的位置 + `apply`；**yoga-mbt 补 `z_index`**（`set_z_index` + 布局输出按 z_index 稳定排序，Yoga 上游同构；gui 侧绘制按 resolved 值重排 kids，`Style` 同步开 `z_index` 字段）；顺带 `Widget::set_margin` labelled 化（同形统一） | 新包测试 + `Widget` 样式槽用例 + 定位字段落到 yoga 的布局用例 + yoga-mbt 模块 z_index 用例（正序/负值/并列稳定）+ `cd gui && moon check` 零错零警 |
 | P2 | 组件改名（按 §2 映射表，含 `_t` 合并）+ `on_*` 统一 + 散参数改名并折算成匿名 `Style`（排解析序列最前）+ **逐组件把 `on_draw` 从「读捕获的散参数」改成「读 `self` 上的样式并按状态选桶」** | 全仓 `moon check` 零错零警，910 处调用点全切完，观感逐页比对不回退 |
 | P3 | 响应式补强：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` | 分包测试 + 现有 Store 用例不回归 |
 | P4 | 绘制能力补齐：**`Painter` 全局 alpha 完整落地**（`opacity`：alpha 进绘制状态机，铺满填充 / 描边 / 文本 / 图片全路径，`Style` 开 `opacity` 字段——颜色级 alpha 已有，这次补的是整层）+ `box_shadow`（硬阴影档：偏移多层圆角矩形先行，模糊档随 blur 能力再评估） | 各自用例（opacity 含全路径覆盖验证）+ 回写 `docs/zh/adaptation.md` |
