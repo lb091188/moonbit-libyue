@@ -24,6 +24,7 @@ fn fake_app() -> @core.App {
     capture: -1,
     cursor_kind: 0,
     canvas: None,
+    dirty_rect: None,
   }
 }
 

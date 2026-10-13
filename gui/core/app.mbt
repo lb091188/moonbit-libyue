@@ -28,6 +28,9 @@ pub(all) struct App {
   /// 已拆过窗（close_window/shutdown 幂等）
   mut closed : Bool
   mut dirty : Bool
+  /// 脏区（窗口坐标，None = 整窗）：事件路由只并涉事控件的小矩形，浮层
+  /// 打开与结构性变更走 `schedule_paint` 整窗兜底；paint_frame 消费后清空
+  mut dirty_rect : Rect?
   mut running : Bool
   /// 上一次投递给焦点控件的组合串（相同内容不重复投递，避免每拍置脏）
   mut last_preedit : (String, Int)
@@ -143,6 +146,7 @@ fn app_window(
         capture: -1,
         cursor_kind: 0,
         canvas: None,
+        dirty_rect: None,
       }
       // 弹层形态要在 show 之前定（类型提示与 transient 关系在映射时生效）
       match popup_of {
@@ -304,10 +308,60 @@ pub fn App::enable_root_scroll(self : App) -> Unit {
 }
 
 ///|
-/// 标脏并唤醒等待中的平台泵（供控件回调与定时器使用）。
+/// 标脏并唤醒等待中的平台泵（供控件回调与定时器使用）。整窗语义：浮层
+/// 打开、结构性变更（重挂/换页/主题）与一切拿不准的回退都走这里。
 pub fn App::schedule_paint(self : App) -> Unit {
   self.dirty = true
+  self.dirty_rect = None
   @win.wake()
+}
+
+///|
+/// 两矩形并集（脏区累积用）。
+fn rect_union(a : Rect?, b : Rect) -> Rect {
+  match a {
+    None => b
+    Some(r) => {
+      let x0 = if r.x < b.x { r.x } else { b.x }
+      let y0 = if r.y < b.y { r.y } else { b.y }
+      let r1x = r.x + r.w
+      let b1x = b.x + b.w
+      let x1 = if r1x > b1x { r1x } else { b1x }
+      let r1y = r.y + r.h
+      let b1y = b.y + b.h
+      let y1 = if r1y > b1y { r1y } else { b1y }
+      { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+    }
+  }
+}
+
+///|
+/// 局部置脏：把一个控件的绝对矩形并入脏区并唤醒。
+fn App::mark_widget_rect(self : App, w : Widget) -> Unit {
+  self.dirty = true
+  self.dirty_rect = Some(rect_union(self.dirty_rect, w.rect))
+  @win.wake()
+}
+
+///|
+/// 焦点 id 版（焦点栈存的是 Int?）：None 表示本就无焦点，无事可做。
+fn App::mark_focus_rect(self : App, id : Int?) -> Unit {
+  match id {
+    Some(i) => self.mark_id_rect(i)
+    None => ()
+  }
+}
+
+///|
+/// 按实例 id 局部置脏。找不到（已卸载/隐藏）回退整窗——宁可多画，不可漏画。
+fn App::mark_id_rect(self : App, id : Int) -> Unit {
+  if id <= 0 {
+    return
+  }
+  match self.root.by_id(id) {
+    Some(w) => self.mark_widget_rect(w)
+    None => self.schedule_paint()
+  }
 }
 
 ///|
@@ -387,7 +441,9 @@ pub fn App::move_focus(self : App, backward : Bool) -> Unit {
     self.flush_ime_for_switch(prev)
   }
   self.window.request_focus()
-  self.schedule_paint()
+  // 焦点环只在旧/新两控件上走，局部置脏；flush 里若整窗置脏则并集即整窗
+  self.mark_focus_rect(prev)
+  self.mark_focus_rect(next)
 }
 
 ///|
@@ -453,6 +509,8 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
   ) {
     Ignored => ()
     Pointer(pev) => {
+      let old_hover = self.hover_id
+      let old_cap = self.capture
       let r = route_pointer(self.root, pev, self.hover_id, self.capture)
       self.hover_id = r.0
       self.capture = r.1
@@ -482,7 +540,9 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
                 let prev = self.focus.current()
                 if self.focus.focus(id) {
                   self.flush_ime_for_switch(prev)
+                  self.mark_focus_rect(prev)
                 }
+                self.mark_id_rect(id)
               }
             None => ()
           }
@@ -490,7 +550,17 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
         _ => ()
       }
       if r.2 || r.3 {
-        self.schedule_paint()
+        // 局部置脏：变化范围 = 旧/新悬停 + 旧/新捕获（悬停高亮、按下态、
+        // 事件消费者的自绘都在这些控件上）；浮层开着（菜单/提示可能盖到
+        // 任何位置）回退整窗。
+        if self.host.layer.visible {
+          self.schedule_paint()
+        } else {
+          self.mark_id_rect(old_hover)
+          self.mark_id_rect(self.hover_id)
+          self.mark_id_rect(old_cap)
+          self.mark_id_rect(self.capture)
+        }
       }
     }
     Scroll(sev) => {
@@ -517,7 +587,19 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
         None => false
       }
       if consumed {
-        self.schedule_paint()
+        // 键处理只落在焦点控件与其带 on_key 的祖先链上，标记这条链；
+        // 浮层开着回退整窗
+        if self.host.layer.visible {
+          self.schedule_paint()
+        } else {
+          match self.focus.current() {
+            Some(id) =>
+              for w in self.root.key_targets(id) {
+                self.mark_widget_rect(w)
+              }
+            None => self.schedule_paint()
+          }
+        }
       }
     }
   }
@@ -559,11 +641,15 @@ pub fn App::pump_ime(self : App) -> Unit {
       let mut more = true
       while more {
         match self.window.take_commit() {
-          Some(t) => {
+          Some(t) =>
+            // 提交文本画在焦点控件自己的盒内，局部置脏（entry 这类提交后
+            // 有跨控件反应的组件自己会 invalidate 整窗兜底）
             if self.root.dispatch_commit(cur, t) {
-              self.schedule_paint()
+              match self.root.by_id(cur) {
+                Some(w) => self.mark_widget_rect(w)
+                None => self.schedule_paint()
+              }
             }
-          }
           None => more = false
         }
       }
@@ -571,7 +657,10 @@ pub fn App::pump_ime(self : App) -> Unit {
       if st.text != self.last_preedit.0 || st.caret != self.last_preedit.1 {
         self.last_preedit = (st.text, st.caret)
         self.root.dispatch_preedit(cur, st.text, st.caret)
-        self.schedule_paint()
+        match self.root.by_id(cur) {
+          Some(w) => self.mark_widget_rect(w)
+          None => self.schedule_paint()
+        }
       }
     }
   }
@@ -579,8 +668,12 @@ pub fn App::pump_ime(self : App) -> Unit {
 
 ///|
 /// 一帧的绘制：根控件恒等尺寸取窗口内容尺寸，布局→绘制→上屏。
+/// 脏区非整窗时把绘制器裁到脏区——控件遍历的视口剔除按当前裁剪框判交，
+/// 裁剪外整块跳过；位图按窗复用保留上一帧内容，裁剪外像素即上一帧。
 pub fn App::paint_frame(self : App) -> Unit {
   self.dirty = false
+  let clip = self.dirty_rect
+  self.dirty_rect = None
   let (w, h) = self.window.size()
   if w < 1 || h < 1 {
     return ()
@@ -603,6 +696,23 @@ pub fn App::paint_frame(self : App) -> Unit {
     }
   }
   let p = @render.Painter::new(bm)
+  match clip {
+    None => ()
+    Some(r) => {
+      // 与窗口边界求交后裁剪；空矩形整帧无事可做
+      let x0 = if r.x < 0.0 { 0.0 } else { r.x }
+      let y0 = if r.y < 0.0 { 0.0 } else { r.y }
+      let wd = w.to_double()
+      let hd = h.to_double()
+      let x1 = if r.x + r.w > wd { wd } else { r.x + r.w }
+      let y1 = if r.y + r.h > hd { hd } else { r.y + r.h }
+      if x1 > x0 && y1 > y0 {
+        p.clip_rect(x0, y0, x1 - x0, y1 - y0)
+      } else {
+        return
+      }
+    }
+  }
   self.root.set_size(w.to_double(), h.to_double())
   self.root.relayout(w.to_double(), h.to_double())
   let t1 = @win.now_ms()
@@ -661,8 +771,8 @@ fn App::drain_events(self : App) -> Unit {
         self.close_window()
         keep = false
       }
-      @win.NeedsDraw => self.dirty = true
-      @win.Resized => self.dirty = true
+      @win.NeedsDraw => self.schedule_paint()
+      @win.Resized => self.schedule_paint()
       @win.LostFocus => {
         // 键盘焦点被拿走（点进网页子件、浮层或别的窗口接管）：把输入法这一会话
         // 交还给系统——在途 commit 归当前控件、清掉组合串显示、打断引擎侧未完成的
@@ -678,7 +788,7 @@ fn App::drain_events(self : App) -> Unit {
         match self.window.focus_owner() {
           @win.ChildSurface => {
             self.focus.drop_current()
-            self.dirty = true
+            self.schedule_paint()
           }
           _ => ()
         }

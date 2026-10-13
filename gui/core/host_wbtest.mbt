@@ -25,6 +25,7 @@ fn fake_app() -> App {
     capture: -1,
     cursor_kind: 0,
     canvas: None,
+    dirty_rect: None,
   }
 }
 

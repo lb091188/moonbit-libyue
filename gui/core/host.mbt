@@ -115,9 +115,11 @@ pub fn host_mark_active(app : App) -> Unit {
 
 ///|
 /// 广播置脏 + 唤醒等待中的平台泵（`invalidate()` 的宿主侧落点）。
+/// 整窗语义：跨窗共享的信号变化拿不准各窗哪些区域受影响，一律全量。
 pub fn host_repaint_all() -> Unit {
   for a in g_windows.val {
     a.dirty = true
+    a.dirty_rect = None
   }
   @win.wake()
 }

@@ -662,6 +662,21 @@ pub fn Widget::dispatch_key(
 }
 
 ///|
+/// 焦点控件与其带 `on_key` 的祖先链：键处理只可能落在这条链上，
+/// 是按键置脏的标记范围。
+pub fn Widget::key_targets(self : Widget, focus_id : Int) -> Array[Widget] {
+  let path = path_to_id(self, focus_id, [])
+  let out : Array[Widget] = []
+  for w in path {
+    match w.on_key {
+      Some(_) => out.push(w)
+      None => ()
+    }
+  }
+  out
+}
+
+///|
 fn path_to_id(w : Widget, id : Int, acc : Array[Widget]) -> Array[Widget] {
   if !w.visible {
     return []
