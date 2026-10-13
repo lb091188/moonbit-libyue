@@ -55,9 +55,9 @@ let count : @core.Store[Int] = @core.Store::new(0)
 ## 10 月开发计划
 
 - **脱离 C++ 依赖的全面原生化**：删除 libyue 绑定包、vendored libyue（52MB）与全部旧链示例，模块更名 `NoahLiu/native-gui`（0.1.0）；窗口、事件循环、布局（Flexbox）、控件、光栅化全部 MoonBit 自绘
-- **新栈 13 包定型**：库模块 `gui/` 含 core / ui / render / text / theme / icons / sys / input / win / dbus / chart / mdview / web，包路径与 mooncakes 一致；重能力拆独立模块（`gui-media` 媒体引擎、`ffmpeg-mbt` / `yoga-mbt`）
+- **库按功能分层定型**：应用宿主与事件循环、控件与组件库、光栅化绘制、文字排印、主题与图标、系统能力、平台桥接、图表、Markdown 富文本视图、内嵌 WebView 各自成包、按需取用——不 import 的包不进二进制；媒体引擎、FFmpeg 解码绑定、Flexbox 布局引擎等重能力拆为独立模块，不进默认依赖闭包
 - **跨平台系统集成**：系统托盘、桌面通知、原生菜单栏、全局快捷键、消息框、窗口图标、运行中改标题 / 最小尺寸 / 无边框拖拽、应用内拖放、用户空闲检测、开机自启
-- **web 包**：内嵌 WebView——布局树内嵌（与自绘控件同树混排）、导航与历史（加载 / 重载 / 后退前进 / 事件流水 / 结构化失败原因）、JS 互操作（执行并取回结果、用户脚本注入、JS↔原生双向绑定）、DOM 内容抓取、Cookie 与 profile 持久化、策略面（新窗 / 权限 / 下载，默认拦截并回报、可切换）、web 进程崩溃回报、自定义协议本地内容通道；能力探测 + 语义化降级贯穿
+- **web 包**：内嵌 WebView——布局树内嵌（与自绘控件同树混排）、导航与历史、JS 互操作（执行并取回结果、用户脚本注入、JS↔原生双向绑定）、DOM 内容抓取、Cookie 与 profile 持久化、策略面（新窗 / 权限 / 下载，默认拦截并回报、可切换）、web 进程崩溃回报、自定义协议本地内容通道；能力探测 + 语义化降级贯穿
 - **媒体引擎**：ffmpeg 解码 + miniaudio 输出，内嵌字幕轨（容器内嵌 / 外挂文本双来源、mov_text 时长谎报修正）、倍速音画同步
 - **示例迁移全线收口**：hello / hello-themed / showcase（17 页：基础、表单、导航、数据展示、图表、代码与文档、画布与富文本、图标库、系统集成、窗口、事件与布局、浏览器、Store 对照等）/ sysmonitor / systemprobe 全部迁到新栈，使用方真机复验九条清单通过（2026-10-12）
 - **质量门禁**：`moon check` 全仓零错误零警告（旧链 287 errors / 68 warnings 红点基线清零）、`moon test` 全仓 957/957 全绿为提交门槛，CI 重写为分层门禁（library 门禁 / 示例构建 / release 校验）
