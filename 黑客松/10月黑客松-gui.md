@@ -57,7 +57,7 @@ let count : @core.Store[Int] = @core.Store::new(0)
 - **脱离 C++ 依赖的全面原生化**：删除 libyue 绑定包、vendored libyue（52MB）与全部旧链示例，模块更名 `NoahLiu/native-gui`（0.1.0）；窗口、事件循环、布局（Flexbox）、控件、光栅化全部 MoonBit 自绘
 - **新栈 13 包定型**：库模块 `gui/` 含 core / ui / render / text / theme / icons / sys / input / win / dbus / chart / mdview / web，包路径与 mooncakes 一致；重能力拆独立模块（`gui-media` 媒体引擎、`ffmpeg-mbt` / `yoga-mbt`）
 - **跨平台系统集成**：系统托盘、桌面通知、原生菜单栏、全局快捷键、消息框、窗口图标、运行中改标题 / 最小尺寸 / 无边框拖拽、应用内拖放、用户空闲检测、开机自启
-- **web 包**：内嵌 WebView 与自定义协议
+- **web 包**：内嵌 WebView——布局树内嵌（与自绘控件同树混排）、导航与历史（加载 / 重载 / 后退前进 / 事件流水 / 结构化失败原因）、JS 互操作（执行并取回结果、用户脚本注入、JS↔原生双向绑定）、DOM 内容抓取、Cookie 与 profile 持久化、策略面（新窗 / 权限 / 下载，默认拦截并回报、可切换）、web 进程崩溃回报、自定义协议本地内容通道；能力探测 + 语义化降级贯穿
 - **媒体引擎**：ffmpeg 解码 + miniaudio 输出，内嵌字幕轨（容器内嵌 / 外挂文本双来源、mov_text 时长谎报修正）、倍速音画同步
 - **示例迁移全线收口**：hello / hello-themed / showcase（17 页：基础、表单、导航、数据展示、图表、代码与文档、画布与富文本、图标库、系统集成、窗口、事件与布局、浏览器、Store 对照等）/ sysmonitor / systemprobe 全部迁到新栈，使用方真机复验九条清单通过（2026-10-12）
 - **质量门禁**：`moon check` 全仓零错误零警告（旧链 287 errors / 68 warnings 红点基线清零）、`moon test` 全仓 957/957 全绿为提交门槛，CI 重写为分层门禁（library 门禁 / 示例构建 / release 校验）
@@ -95,7 +95,16 @@ let count : @core.Store[Int] = @core.Store::new(0)
   - logind / upower / MPRIS 媒体 / 网络 / 屏保
 - 窗口后端（@win）：平台窗口桩层——门面之下的平台实现（表面 / 图标 / IME 等），对外能力一律经跨平台门面暴露
 - 图表（@chart）：折线 / 柱状 / 饼 / 仪表 / 散点 / 雷达 / 热力 / K 线 / 漏斗 / 箱线 / 桑基 / 树 / 矩形树 / 旭日 + 横向交互层
-- WebView（@web）：内嵌浏览器 / 自定义协议（预声明收口）/ 历史与导航
+- WebView（@web）
+  - 布局树内嵌（pane 模型，与自绘控件同树混排，矩形由布局给出）
+  - 导航与历史：加载 / 重载 / 后退前进 / 可退可进查询 / 标题与 URL 读数
+  - 导航事件流水（消费式取）与结构化加载失败原因（域 / 错误码 / 地址）
+  - JS 互操作：执行并取回结果 / 用户脚本注入 / JS↔原生双向绑定
+  - DOM 内容抓取（多档快照与解析）
+  - Cookie 读取与 profile 持久化档位（持久 / 随用随弃探测）
+  - 策略面：新窗 / 权限 / 下载——默认拦截并回报、可切换
+  - 自定义协议本地内容通道（名字先预声明、根目录挂载、注销顶替）
+  - 能力探测 / web 进程崩溃回报 / 句柄存活判据
 - 媒体（gui-media）：音频 / 视频播放器组件 / 字幕轨（外挂 + 容器内嵌）/ 倍速
 - 布局（yoga-mbt）：纯 MoonBit Flexbox（W3C 规范逐条实现）
 
