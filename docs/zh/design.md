@@ -181,6 +181,12 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 - 散参数（`font_size=` / `background_color=` 那批）是糖，只有一条去向：折成一个匿名 `Style`
   排在解析序列**最前**，`class` 在后，于是「`class` > 散参数」由数组顺序直接成立，不需要第二
   条优先级规则；组件内部也只有「读 resolved Style」一条路径。改名对齐 CSS 属性名并进 §2 那批。
+  **布局散参数（`width` / `height` / `padding` / `row_gap` / `column_gap` / `grow` / `direction` /
+  `align_items` / `justify_content`）走同一条折法**：折进匿名块后由 `apply` 落到 Yoga，控件节点上
+  不留第二条写入路径——否则 `class` 给的宽与内边距会被散参数覆写。
+- **class 落点分两层**：组件的**主根控件**吃完整 `class`（布局属性 + 绘制属性）；内部件（勾选点、
+  滑块拇指、子行、开在浮层图层上的面板）只吃 `class` 的**绘制期投影**（`paint_subset`），布局属性
+  不外溢给标记——一个组件的 `class` 因此同时管得住整体排版与细节配色。
 - **状态块两条入口，分工不同**：工厂状态参数收**整块**（`hover=@style.card_hover`，具名块
   复用），状态方法 `.hover(...)` 收**属性参数**（现场开块）；状态方法签名里只有绘制期属性
   ——布局参数不在签名中，布局值进状态块编译都过不了。状态桶是绘制期消费的，布局属性混

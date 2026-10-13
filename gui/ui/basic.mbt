@@ -24,7 +24,36 @@ pub fn view(
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
+  // 散参数（颜色与布局同规则）全部折进匿名块：`class` 在后 ⇒ class > 散参数
+  // 由数组顺序直接成立，节点上不再留第二条写入路径（§1.5）
+  let lay = @style.empty_style()
+  lay.flex_direction = Some(direction)
+  lay.align_items = Some(align_items)
+  lay.justify_content = Some(justify_content)
+  if row_gap > 0.0 || column_gap > 0.0 {
+    lay.row_gap = Some(row_gap)
+    lay.column_gap = Some(column_gap)
+  }
+  if padding > 0.0 {
+    lay.padding_left = Some(padding)
+    lay.padding_right = Some(padding)
+    lay.padding_top = Some(padding)
+    lay.padding_bottom = Some(padding)
+  }
+  if width > 0.0 {
+    lay.width = Some(width)
+  }
+  if height > 0.0 {
+    lay.height = Some(height)
+  }
+  if grow > 0.0 {
+    lay.flex = Some(grow)
+    // 弹性项默认 min 尺寸按内容，不显式清零就缩不进比内容小的空间
+    lay.min_width = Some(0.0)
+    lay.min_height = Some(0.0)
+  }
   let blocks : Array[@style.Style] = [
+    lay,
     match bg_block(background_color) {
       Some(b) => b
       None => @style.empty_style()
@@ -39,27 +68,6 @@ pub fn view(
     watch_theme()
     // 样式先落（class 覆盖散参数由数组顺序保证），再读 resolved 供绘制
     fold_style(w, anon, class)
-    w.node.set_flex_direction(direction)
-    w.node.set_align_items(align_items)
-    w.node.set_justify_content(justify_content)
-    if row_gap > 0.0 || column_gap > 0.0 {
-      w.node.set_gap(row_gap, column_gap)
-    }
-    if padding > 0.0 {
-      w.set_padding_all(padding)
-    }
-    if width > 0.0 {
-      w.node.set_width(@yoga.fixed(width))
-    }
-    if height > 0.0 {
-      w.node.set_height(@yoga.fixed(height))
-    }
-    if grow > 0.0 {
-      w.node.set_flex_grow(grow)
-      // 弹性项默认 min 尺寸按内容，不显式清零就缩不进比内容小的空间
-      w.node.set_min_width(@yoga.fixed(0.0))
-      w.node.set_min_height(@yoga.fixed(0.0))
-    }
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,

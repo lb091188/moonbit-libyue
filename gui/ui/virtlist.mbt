@@ -22,11 +22,13 @@ pub fn[T] virt_list(
   let rh = if row_height > 0.0 { row_height } else { 1.0 }
   @core.node_of_new(fn(viewport : @core.Widget) -> @core.Widget {
     watch_theme()
-    viewport.node.set_flex_direction(@yoga.Column)
+    let lay = @style.empty_style()
+    lay.flex_direction = Some(@yoga.Column)
     if width > 0.0 {
-      viewport.node.set_width(@yoga.fixed(width))
+      lay.width = Some(width)
     }
-    viewport.node.set_height(@yoga.fixed(height))
+    lay.height = Some(height)
+    @style.apply(viewport, @style.merge_all([lay, @style.merge_all(class)]))
     let state = ScrollState::new()
     let inner = @core.Widget::new()
     inner.node.set_flex_direction(@yoga.Column)
@@ -172,7 +174,7 @@ pub fn table_v(
       w,
       @style.merge_all([
         @style.style(background_color="bg_panel", border_color="border", border_width=1.0),
-        paint_subset(class),
+        @style.merge_all(class),
       ]),
     )
     w.on_draw = Some(fn(
@@ -261,13 +263,15 @@ pub fn sticky_list(
   let hh = head_h
   @core.node_of_new(fn(viewport : @core.Widget) -> @core.Widget {
     watch_theme()
-    viewport.node.set_flex_direction(@yoga.Column)
+    let lay = @style.empty_style()
+    lay.flex_direction = Some(@yoga.Column)
     if width > 0.0 {
-      viewport.node.set_width(@yoga.fixed(width))
+      lay.width = Some(width)
     }
     if height > 0.0 {
-      viewport.node.set_height(@yoga.fixed(height))
+      lay.height = Some(height)
     }
+    @style.apply(viewport, @style.merge_all([lay, @style.merge_all(class)]))
     // 内容：整块跟着偏移平移（相对定位偏移只改落位、不改流内占位）
     let content = @core.Widget::new()
     content.node.set_flex_direction(@yoga.Column)

@@ -163,12 +163,15 @@ pub fn scroll_view(
   @core.node_of_new(fn(viewport : @core.Widget) -> @core.Widget {
     watch_theme()
     viewport.node.set_flex_direction(@yoga.Column)
+    // 散参数折进匿名块（class 在后即覆盖，§1.5 唯一去向）
+    let lay = @style.empty_style()
     if width > 0.0 {
-      viewport.node.set_width(@yoga.fixed(width))
+      lay.width = Some(width)
     }
     if height > 0.0 {
-      viewport.node.set_height(@yoga.fixed(height))
+      lay.height = Some(height)
     }
+    fold_style(viewport, lay, class)
     let content = @core.Widget::new()
     content.node.set_flex_direction(@yoga.Column)
     content.node.set_width(@yoga.percent(100.0))
@@ -209,7 +212,6 @@ pub fn scroll_view(
       state.scroll_by(0.0 - ev.dy * 30.0)
       state.offset != before
     })
-    fold_style(viewport, @style.empty_style(), class)
     handle(viewport)
     viewport
   })

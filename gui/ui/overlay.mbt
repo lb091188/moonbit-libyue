@@ -200,7 +200,7 @@ pub fn dropdown(
           border_width=1.0,
           border_radius=4.0,
         ).hover(background_color="fill_hover"),
-        paint_subset(class),
+        @style.merge_all(class),
       ]),
     )
     w.on_draw = Some(fn(

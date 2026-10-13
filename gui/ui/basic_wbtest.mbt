@@ -671,3 +671,36 @@ test "内置皮肤也走样式槽：图标按钮悬停/按下有底、divider �
   }
   assert_true(green > 20)
 }
+
+///|
+/// §1.5「散参数只有一条去向」的布局半边：`width` / `padding` 这类散参数折进匿名块，
+/// `class` 排在后面 ⇒ 同名属性由 class 赢，节点上没有第二条写入路径。
+test "布局散参数也折进匿名块：class 的宽与内边距盖过散参数" {
+  let inner_node = view([], width=40.0, height=10.0)
+  let loose = mount_root(
+    [view([inner_node], padding=4.0, width=120.0, height=60.0)],
+    260.0,
+    120.0,
+  )
+  let box = kid(loose, 0)
+  assert_eq(box.rect.w, 120.0)
+  // 内边距 4 ⇒ 子项落在 (4,4)
+  assert_eq((box.children()[0].rect.x - box.rect.x).round(), 4.0)
+
+  let strict = mount_root(
+    [
+      view(
+        [view([], width=40.0, height=10.0)],
+        padding=4.0,
+        width=120.0,
+        height=60.0,
+        class=[@style.style(padding=20.0, width=300.0)],
+      ),
+    ],
+    360.0,
+    120.0,
+  )
+  let box2 = kid(strict, 0)
+  assert_eq(box2.rect.w, 300.0)
+  assert_eq((box2.children()[0].rect.x - box2.rect.x).round(), 20.0)
+}
