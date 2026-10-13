@@ -27,6 +27,12 @@ cd modules/gui-examples && moon run systemprobe
 
 **缺 dll 时的表现不是「媒体页报错」，而是进程根本启动不了**：Windows 加载器在 `main` 之前就拒绝加载，窗口从不出现，控制台一闪就退（Git Bash 下退出码 127，无任何输出）。探针页、图表页同样起不来——它们和媒体页在同一个 exe 里。
 
-把 dll 放到 **exe 同目录**或**加进 PATH** 即可（大版本须与 `vendor/` 导入库一致，取自同一份 BtbN/gyan win64-lgpl-shared 构建的 `bin/`）。注意 Gyan 的 `-full_build` 是**静态**构建，`bin/` 里只有 exe、没有 dll，不能拿它当来源。
+把 dll 放到 **exe 同目录**或**加进 PATH** 即可（大版本须与 `vendor/` 导入库一致，取自同一份 BtbN/gyan win64-lgpl-shared 构建的 `bin/`）。
+
+**怎么取（Windows 惯例 + 本仓的最短路径）**：
+
+- Windows 没有 unix 那种「装一个 dev 包就全局可见」的机制，惯例是 **app-local 部署**——把依赖 dll 与 exe 放同一目录（加载器第一顺位就找 exe 所在目录），发布时随包带出去。放 PATH 只适合开发机；静态链接则与 `vendor/*.lib`（导入库）不兼容，且 LGPL 静态链接还要额外满足「可重链接」义务，本仓不走这条。winget/scoop/choco 这类包管理器只是把文件放到某处，**并不能让 dll 被找到**，仍要 app-local 或 PATH。
+- **本仓最短路径**：winget 有与 `vendor/` **同源**的包 —— `BtbN.FFmpeg.LGPL.Shared.9.0`（BtbN / LGPL / **shared** / 9.0 分支，与 vendor 导入库出处一致）。装完 dll 落在该包目录的 `bin/`；winget 的 portable 包通常会把该 `bin` 加进 PATH，用 `where avcodec-63.dll` 确认，没有就手工把该目录加进 PATH。
+- ⚠️ **别拿 `Gyan.FFmpeg` 当来源**：那是**静态**构建（`bin/` 只有 ffmpeg/ffplay/ffprobe 三个 exe、每个约 228MB，整个包目录零 dll）——静态 exe 把 ffmpeg 编进去了，不可能把库借给别的进程。同理 BtbN 的 `*.GPL`（static）分支也不行，要 `Shared`。
 
 Linux 侧需系统 ffmpeg 开发包（`libav*-dev`，`pkg-config` 探测）。
