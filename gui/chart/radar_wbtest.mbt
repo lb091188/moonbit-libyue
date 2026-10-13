@@ -164,7 +164,7 @@ test "RadarIndicator / RadarSeries 构造与 Store 驱动" {
   ])
   let hits = Ref(0)
   let sid = sers.subscribe_id(fn(_v) { hits.val = hits.val + 1 })
-  sers.set([RadarSeries::make("s3", [7.0, 8.0, 9.0])])
+  sers.set_always([RadarSeries::make("s3", [7.0, 8.0, 9.0])])
   sers.remove(sid)
   assert_eq(hits.val, 1)
   assert_eq(sers.get().length(), 1)
@@ -192,11 +192,11 @@ test "雷达图组件：出像素、换系列画面变、维度不足提示不�
   assert_eq((w.rect.w, w.rect.h), (280.0, 200.0))
   let plain = bm_of(w)
   assert_true(ink_of(plain) > 800)
-  sers.set([RadarSeries::make("单系列", [30.0, 40.0, 50.0, 60.0])])
+  sers.set_always([RadarSeries::make("单系列", [30.0, 40.0, 50.0, 60.0])])
   let _ = root.relayout(320.0, 220.0)
   assert_true(diff_of(bm_of(w), plain) > 50)
   // 维度 < 3：画提示不崩
-  inds.set([RadarIndicator::make("一维", 10.0)])
+  inds.set_always([RadarIndicator::make("一维", 10.0)])
   let _ = root.relayout(320.0, 220.0)
   let _ = bm_of(w)
 }

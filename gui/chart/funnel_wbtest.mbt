@@ -135,7 +135,7 @@ test "漏斗图组件：出像素、换数据画面变" {
   assert_eq((w.rect.w, w.rect.h), (300.0, 150.0))
   let plain = bm_of(w)
   assert_true(ink_of(plain) > 800)
-  d.set([BarItem::make("只有一层", 50.0)])
+  d.set_always([BarItem::make("只有一层", 50.0)])
   let _ = root.relayout(340.0, 170.0)
   assert_true(diff_of(bm_of(w), plain) > 50)
 }

@@ -101,7 +101,7 @@ fn SensorPage::rebuild(self : SensorPage, sensors : Array[TempSensor]) -> Unit {
     self.hist.set(key, h)
     out.push({ chip: s.chip, label: s.label, celsius: s.celsius, hist: h, })
   }
-  self.rows.set(out)
+  self.rows.set_always(out)
 }
 
 ///|

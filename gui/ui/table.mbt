@@ -38,6 +38,36 @@ pub(all) struct TableSort {
 }
 
 ///|
+pub impl Eq for TableSort with fn equal(self, other) {
+  self.column == other.column && self.asc == other.asc
+}
+
+///|
+pub extend TableSort with Eq::{not_equal, equal}
+
+///|
+pub impl Eq for TableCell with fn equal(self, other) {
+  match (self, other) {
+    (CellText(a), CellText(b)) => a == b
+    (CellTag(a, ta), CellTag(b, tb)) => a == b && ta == tb
+    (CellColorBox(a, ca), CellColorBox(b, cb)) => a == b && ca == cb
+    (CellLines(a), CellLines(b)) => a == b
+    _ => false
+  }
+}
+
+///|
+pub extend TableCell with Eq::{not_equal, equal}
+
+///|
+pub impl Eq for TableRow with fn equal(self, other) {
+  self.cells == other.cells
+}
+
+///|
+pub extend TableRow with Eq::{not_equal, equal}
+
+///|
 /// 单元格内容：纯文本 / 语义标签 / 颜色块 / 多行文本。
 pub(all) enum TableCell {
   CellText(String)

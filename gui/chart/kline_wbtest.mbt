@@ -130,7 +130,7 @@ test "K 线组件：出像素、涨红跌绿、换数据画面变" {
   let (root, w) = mounted(candlestick_t(cs, width=280.0, height=150.0), 320.0, 170.0)
   let plain = bm_of(w)
   assert_true(ink_of(plain) > 400)
-  cs.set([Candle::make(5.0, 8.0, 4.0, 7.0)])
+  cs.set_always([Candle::make(5.0, 8.0, 4.0, 7.0)])
   let _ = root.relayout(320.0, 170.0)
   assert_true(diff_of(bm_of(w), plain) > 50)
 }

@@ -344,7 +344,7 @@ test "桑基图组件：出像素、换数据画面变" {
   let (root, w) = mounted(sankey_t(d, width=300.0, height=160.0), 340.0, 180.0)
   let plain = bm_of(w)
   assert_true(ink_of(plain) > 500)
-  d.set(
+  d.set_always(
     SankeyData::make([SankeyNode::make("单节点")], []),
   )
   let _ = root.relayout(340.0, 180.0)

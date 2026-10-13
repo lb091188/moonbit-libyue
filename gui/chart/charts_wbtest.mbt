@@ -196,7 +196,7 @@ test "折线图：Store 推点后画面变化、空窗只画网格与提示" {
   let (root, w) = mounted(line_chart_t(s, height=120.0), 320.0, 140.0)
   assert_eq((w.rect.w, w.rect.h), (320.0, 120.0))
   let empty = bm_of(w)
-  s.set([LineSeries::make("a", max_points=50).with_points([1.0, 4.0, 2.0, 7.0, 5.0])])
+  s.set_always([LineSeries::make("a", max_points=50).with_points([1.0, 4.0, 2.0, 7.0, 5.0])])
   let _ = root.relayout(320.0, 140.0)
   assert_true(diff_of(bm_of(w), empty) > 200)
   // 密集：点数远多于像素列时仍出图（按列矩形，不逐段描边）
@@ -204,7 +204,7 @@ test "折线图：Store 推点后画面变化、空窗只画网格与提示" {
   for i = 0; i < 900; i = i + 1 {
     many.push((i % 37).to_double())
   }
-  s.set([LineSeries::make("a").with_points(many)])
+  s.set_always([LineSeries::make("a").with_points(many)])
   let _ = root.relayout(320.0, 140.0)
   assert_true(diff_of(bm_of(w), empty) > 200)
 }

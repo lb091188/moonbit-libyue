@@ -253,6 +253,16 @@ pub fn[T] Signal::set(self : Signal[T], value : T) -> Unit {
 }
 
 ///|
+/// 去重写入：`T : Eq` 且新旧值相等时**只存不发**（订阅者不被空唤醒）。
+/// `set` 的语义保持「无条件通知」，`Store` 层的内建去重走这里。
+pub fn[T : Eq] Signal::set_eq(self : Signal[T], value : T) -> Unit {
+  if self.value == value {
+    return ()
+  }
+  self.set(value)
+}
+
+///|
 /// 用函数更新:set(f(get()))。
 pub fn[T] Signal::update(self : Signal[T], f : (T) -> T) -> Unit {
   self.set(f(self.get()))

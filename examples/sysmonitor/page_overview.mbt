@@ -129,7 +129,7 @@ fn res_card(
         match ev.kind {
           @core.Down =>
             if ev.button == 1 {
-              view.set(target)
+              view.set_always(target)
               true
             } else {
               false

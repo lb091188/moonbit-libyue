@@ -62,7 +62,7 @@ pub fn series_push(series : @core.Store[Array[LineSeries]], i : Int, v : Double)
   let out = cur.copy()
   let s = out[i]
   out[i] = { ..s, points: win_push(s.points, s.max_points, v) }
-  series.set(out)
+  series.set_always(out) // 折线窗口整体替换:数据点无 Eq,去重代价高于收益
 }
 
 ///|

@@ -1729,6 +1729,14 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 设计取舍:**用显式态而非 `pos>=duration` 启发式**——播放中 target 超时长但尚未 EOF 时 pos 会被 clamp 到 duration(启发式假阳性,「暂停在末尾再播放」会被误判成重播回 0);且容器无时长头(duration=0)时启发式完全失效,显式态两种场景都对。
 - 验证:白盒对照——把 video_player.mbt 暂存回修复前跑 `moon test -p gui-media`,新增两条用例精确失败(播完→play 的 is_playing 断言、stop→play 的音轨 decode_pcm 断言),恢复修复后 11/11 通过;全仓 `moon check --deny-warn` 零警告 + `moon test` 641 全绿(较此前 636 新增 5 条:循环 EOF→vp_restart、播完→play、播完态 seek→play、stop→play、音量钳制)。真机交互(播完再点播放、stop 后重播的观感)由用户复验。
 
+### Store 内建去重与 `T : Eq` 限定实现（2026-10-13，前端化 P3 第 0 步）
+
+- 口径：`Store::set` / `Store::update` 给 `pub fn[T : Eq]` 限定实现（相同值只存不发，走 `Signal::set_eq`）；`Signal::set` 本体与通知发射不动，`Store::signal()` 仍可直连 `Signal::set` 强发。需要无条件重发用 `set_always` / `update_always`。
+- 坑①：**同名限定实现会盖过通用实现**——无约束的 `Store::update` 体内调 `self.set(...)` 会撞 `Type T does not implement Eq`，因为名字只绑到限定那条；跨约束复用逻辑要直调底层（`sig.set_eq` / `sig.update`），不能经公共名。
+- 坑②：去重要求**元素类型有 Eq**：`Array[T]` 的 Eq 由 `T : Eq` 派生。复合值类型补 `pub impl Eq for X with fn equal` + `pub extend X with Eq::{not_equal, equal}`（不带 extend 会吃 `implicit_impl_as_method` 废弃警告，同 W21c 先例）；`impl Eq for (T,T)` 二元组 core 已有，重复定义报「already defined」。
+- 坑③：图表数据窗口（`Array[LineSeries]`、`TreeItem`、`GeoRect` 等）元素无 Eq 且整窗比较代价高于收益——chart 与示例一律 `set_always`，共 33 处调用点由编译器逐点钉出。
+- 验证：core 121/121（新增去重回归 1 条：同值不发/异值发一次/`set_always` 强发/`update` 走同口径）；全仓 `moon check --deny-warn` 零错零警；库测试 861 条 859 过（2 条红为 W9/排序既有基线）。
+
 ## 前端化 P1:gui/style 样式包与 yoga-mbt z_index(2026-10-13)
 
 工具链边界(moon 0.1.20260920 / moonc v0.10.14,读数随升级要重测,同步 design.md §1.6):

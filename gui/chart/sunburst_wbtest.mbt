@@ -396,7 +396,7 @@ test "SunItem Store 驱动：set 换树根 / 订阅通知一次" {
   assert_eq(s.get().name, "空")
   let hits = Ref(0)
   s.subscribe(fn(_v) { hits.val = hits.val + 1 })
-  s.set(
+  s.set_always(
     SunItem::make("根", children=[
       SunItem::make("华东", value=Some(30.0)),
       SunItem::make("华南", value=Some(70.0)),
@@ -427,7 +427,7 @@ test "旭日图组件：出像素、换数据画面变" {
   let (root, w) = mounted(sun_chart_t(d, width=280.0, height=220.0), 320.0, 240.0)
   let plain = bm_of(w)
   assert_true(ink_of(plain) > 1500)
-  d.set(mk("独子", 9.0))
+  d.set_always(mk("独子", 9.0))
   let _ = root.relayout(320.0, 240.0)
   assert_true(diff_of(bm_of(w), plain) > 100)
 }

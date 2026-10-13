@@ -134,11 +134,11 @@ test "热力图组件：出像素、换数据画面变、空矩阵提示不崩" 
   assert_eq((w.rect.w, w.rect.h), (280.0, 170.0))
   let plain = bm_of(w)
   assert_true(ink_of(plain) > 1000)
-  d.set(HeatGrid::make(["x"], ["y"], [[5.0]]))
+  d.set_always(HeatGrid::make(["x"], ["y"], [[5.0]]))
   let _ = root.relayout(320.0, 190.0)
   assert_true(diff_of(bm_of(w), plain) > 100)
   // 空矩阵：只画提示，不崩
-  d.set(HeatGrid::make([], [], []))
+  d.set_always(HeatGrid::make([], [], []))
   let _ = root.relayout(320.0, 190.0)
   let _ = bm_of(w)
 }

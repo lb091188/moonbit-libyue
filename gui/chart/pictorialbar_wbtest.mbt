@@ -294,7 +294,7 @@ test "象形柱图组件：出像素、两形态、换数据画面变" {
     180.0,
   )
   assert_true(ink_of(bm_of(w2)) > 600)
-  d.set([BarItem::make("独", 30.0)])
+  d.set_always([BarItem::make("独", 30.0)])
   let _ = root.relayout(320.0, 180.0)
   assert_true(diff_of(bm_of(w), plain) > 50)
 }

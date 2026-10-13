@@ -17,6 +17,17 @@ pub(all) enum SemanticType {
 }
 
 ///|
+pub impl Eq for SemanticType with fn equal(self, other) {
+  match (self, other) {
+    (Primary, Primary) | (Success, Success) | (Warning, Warning) | (Danger, Danger) | (Info, Info) => true
+    _ => false
+  }
+}
+
+///|
+pub extend SemanticType with Eq::{not_equal, equal}
+
+///|
 /// 语义主色（实底/文字用）。
 pub fn type_color(t : SemanticType) -> String {
   match t {

@@ -16,6 +16,46 @@ pub(all) struct DateYMD {
 }
 
 ///|
+pub impl Eq for DateYMD with fn equal(self, other) {
+  self.y == other.y && self.m == other.m && self.d == other.d
+}
+
+///|
+pub extend DateYMD with Eq::{not_equal, equal}
+
+///|
+pub impl Eq for TimeHM with fn equal(self, other) {
+  self.h == other.h && self.m == other.m
+}
+
+///|
+pub extend TimeHM with Eq::{not_equal, equal}
+
+///|
+pub impl Eq for DateRange with fn equal(self, other) {
+  self.start == other.start && self.end == other.end
+}
+
+///|
+pub extend DateRange with Eq::{not_equal, equal}
+
+///|
+pub impl Eq for TimeRange with fn equal(self, other) {
+  self.start == other.start && self.end == other.end
+}
+
+///|
+pub extend TimeRange with Eq::{not_equal, equal}
+
+///|
+pub impl Eq for DateTimeRange with fn equal(self, other) {
+  self.start == other.start && self.end == other.end
+}
+
+///|
+pub extend DateTimeRange with Eq::{not_equal, equal}
+
+///|
 /// 闰年（格里高利历）。
 pub fn date_leap(y : Int) -> Bool {
   y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)

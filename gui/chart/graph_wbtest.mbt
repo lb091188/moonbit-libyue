@@ -364,7 +364,7 @@ test "关系图组件：出像素、换数据画面变（布局缓存失效）" 
   let plain = bm_of(w)
   assert_true(ink_of(plain) > 600)
   // 数据变更 → 布局缓存置 None → 重新收敛 → 画面变
-  d.set(
+  d.set_always(
     GraphData::make([GraphNode::make("丁", value=40.0)], []),
   )
   let _ = root.relayout(320.0, 200.0)

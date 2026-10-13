@@ -200,7 +200,7 @@ test "ParAxis 构造 / 量程省略与显式 / Store 驱动" {
   let hits = Ref(0)
   axes.subscribe(fn(_a) { hits.val = hits.val + 1 })
   data.subscribe(fn(_r) { hits.val = hits.val + 1 })
-  axes.set([ParAxis::make("x"), ParAxis::make("y")])
+  axes.set_always([ParAxis::make("x"), ParAxis::make("y")])
   data.set([[1.0, 2.0], [3.0, 4.0]])
   assert_eq(hits.val, 2)
   assert_eq(axes.get().length(), 2)

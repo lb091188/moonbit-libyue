@@ -494,7 +494,11 @@ fn render(ctx : Ctx) -> @core.Node {
 每批单独提交；实测坑按 `AGENTS.md` 规则 7 回写 `docs/zh/adaptation.md`；使用类说明写进
 `docs/zh/` 下的使用文档，不写进本文件。
 
-## 6. 待定（动相应批次前定）
+## 6. 口径记录
 
-1. **`Store` 要不要去重**（挡 P3 第 1 项）：默认不去重（`core/store.mbt:26` 现状口径）；
-   如需避免重复通知，加一个要求 `T: Eq` 的 `set_if_changed`，内核不动。
+1. **`Store` 内建去重**（2026-10-13 定案，原 §6 唯一待定项）：`T : Eq` 的 Store，`set` /
+   `update` 写相同值时**只存不发**（`Signal::set_eq`，通知发射器 `sig_deliver` 不动，
+   `Signal::set` 仍无条件通知）；没有 `Eq` 或需要「同值也重发」的场合走 `set_always` /
+   `update_always`。复合值类型（`DateYMD`/`DateRange`/`TableSort`/`SemanticType` 等）补了
+   `impl Eq`；图表数据窗口（`Array[LineSeries]` 等元素无 `Eq` 且比较代价高于收益）在
+   chart 与示例里一律走 `set_always`。

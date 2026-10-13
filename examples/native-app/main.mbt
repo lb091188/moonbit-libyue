@@ -1487,7 +1487,7 @@ fn make_chart_it_section(
   for i = 0; i < 60; i = i + 1 {
     vals.push(((i * 17) % 41).to_double() + 3.0)
   }
-  lin.set([
+  lin.set_always([
     @chart.LineSeries::make("负载", max_points=80).with_points(vals),
     @chart.LineSeries::make("延迟", max_points=80).with_points(
       vals.map(fn(v) { v * 0.6 }),
@@ -1499,8 +1499,8 @@ fn make_chart_it_section(
       @chart.BarItem::make("c\{i}", ((i * 13) % 29).to_double() - 4.0),
     )
   }
-  bars.set(bar_items)
-  rings.set([
+  bars.set_always(bar_items)
+  rings.set_always([
     @chart.DonutSlice::make("已完成", 46.0),
     @chart.DonutSlice::make("进行中", 33.0),
     @chart.DonutSlice::make("待办", 21.0),
@@ -1771,7 +1771,7 @@ fn make_chart_section(
   for i = 0; i < 24; i = i + 1 {
     vals.push(((i * 13) % 37).to_double() + 4.0)
   }
-  lin.set([@chart.LineSeries::make("负载", max_points=40).with_points(vals)])
+  lin.set_always([@chart.LineSeries::make("负载", max_points=40).with_points(vals)])
   let bars = @core.Store::new([
     @chart.BarItem::make("组件", 48.0),
     @chart.BarItem::make("布局", 30.0),

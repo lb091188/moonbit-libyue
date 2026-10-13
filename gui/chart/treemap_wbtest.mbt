@@ -345,7 +345,7 @@ test "TmItem 数据经 Store 驱动：set 换表 + 订阅通知" {
   ])
   let hits = Ref(0)
   st.subscribe(fn(_v) { hits.val = hits.val + 1 })
-  st.set([TmItem::make("C", value=5.0)])
+  st.set_always([TmItem::make("C", value=5.0)])
   assert_eq(hits.val, 1)
   assert_eq(st.get().length(), 1)
   assert_eq(st.get()[0].name, "C")
@@ -408,7 +408,7 @@ test "矩形树图组件：出像素、hover 提亮、换数据画面变" {
     mods: 0,
   })
   assert_eq(diff_of(bm_of(w), plain), 0)
-  d.set([TmItem::make("独", value=100.0)])
+  d.set_always([TmItem::make("独", value=100.0)])
   let _ = root.relayout(320.0, 190.0)
   assert_true(diff_of(bm_of(w), plain) > 100)
 }

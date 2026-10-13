@@ -392,7 +392,7 @@ test "地图组件：区域与飞线出像素、换区域画面变" {
   )
   let plain = bm_of(w)
   let empty : Array[GeoRegion] = []
-  regions.set(empty)
+  regions.set_always(empty)
   let _ = root.relayout(320.0, 200.0)
   assert_true(diff_of(bm_of(w), plain) > 50)
 }

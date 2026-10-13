@@ -154,13 +154,13 @@ fn sample_once(app : App) -> Unit {
       for i, u in per_core {
         bars.push(@charts.BarItem::make("\{i}", u * 100.0))
       }
-      app.core_bars.set(bars)
+      app.core_bars.set_always(bars)
     }
   }
   match hwmon_sensors() {
     None => cpu_text = with_temp(cpu_text, None)
     Some(sensors) => {
-      app.sensors.set(sensors)
+      app.sensors.set_always(sensors)
       let mut hottest : TempSensor? = None
       for s in sensors {
         match hottest {
@@ -190,14 +190,14 @@ fn sample_once(app : App) -> Unit {
   match app.proc.tick() {
     None => ()
     Some(procs) => {
-      app.procs.set(procs)
+      app.procs.set_always(procs)
       app.card_proc.set("\{procs.length()}")
     }
   }
   match app.gpu.tick() {
     None => ()
     Some(gpus) => {
-      app.gpus.set(gpus)
+      app.gpus.set_always(gpus)
       // 数量以启动枚举为准，超界（极端热插拔）只跳过，不重建视图
       for i, g in gpus {
         if i >= app.gpu_busy_hists.length() {
@@ -226,7 +226,7 @@ fn sample_once(app : App) -> Unit {
   match app.disk.tick() {
     None => ()
     Some(disks) => {
-      app.disks.set(disks)
+      app.disks.set_always(disks)
       // 数量以启动枚举为准（根分区必在），热插拔只跳过不重建视图
       for i, d in disks {
         if i >= app.disk_hists.length() {
@@ -242,7 +242,7 @@ fn sample_once(app : App) -> Unit {
   match app.net.tick() {
     None => ()
     Some(nets) => {
-      app.nets.set(nets)
+      app.nets.set_always(nets)
       let mut rx = 0.0
       let mut tx = 0.0
       for n in nets {

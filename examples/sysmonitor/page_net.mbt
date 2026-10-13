@@ -40,7 +40,7 @@ fn NetPage::rebuild(self : NetPage, nets : Array[NetInfo]) -> Unit {
       tx_hist: tx_h,
     })
   }
-  self.rows.set(out)
+  self.rows.set_always(out)
 }
 
 ///|

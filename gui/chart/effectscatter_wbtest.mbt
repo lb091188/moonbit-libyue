@@ -279,7 +279,7 @@ test "涟漪散点组件：出像素、相位推进画面变、eff_stop 后静�
   let plain = bm_of(w)
   assert_true(ink_of(plain) > 300)
   // 相位推进 → 涟漪半径变化 → 画面变（无头手动灌相位）
-  pts.set([EffPoint::make(1.0, 2.0, size=8.0), EffPoint::make(5.0, 1.0, size=20.0)])
+  pts.set_always([EffPoint::make(1.0, 2.0, size=8.0), EffPoint::make(5.0, 1.0, size=20.0)])
   let _ = root.relayout(320.0, 180.0)
   assert_true(diff_of(bm_of(w), plain) > 30)
   // 停止句柄：运行位翻 false 且定时器取消，is_running 报 false

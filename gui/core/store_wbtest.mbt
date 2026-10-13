@@ -69,3 +69,30 @@ test "store signal().subscribe 句柄经 store.remove 退订" {
   s.set(2)
   inspect(seen.map(fn(v) { v.to_string() }).join(","), content="1")
 }
+
+///|
+test "Store 内建去重：T:Eq 相同值只存不发，异值照发；set_always 无条件发" {
+  let s = Store::new(1)
+  let mut hits = 0
+  let mut last = -1
+  let _ = s.subscribe_id(fn(v : Int) -> Unit {
+    hits += 1
+    last = v
+  })
+  s.set(1) // 同值：不通知，但值已在
+  assert_eq(hits, 0)
+  assert_eq(s.get(), 1)
+  s.set(2) // 异值：通知一次
+  assert_eq(hits, 1)
+  assert_eq(last, 2)
+  s.set(2) // 又同值：不通知
+  assert_eq(hits, 1)
+  s.set_always(2) // 逃生舱：相同值也重发
+  assert_eq(hits, 2)
+  // update 走 set 口径（结果值不同才发）
+  s.update(fn(v : Int) -> Int { v })
+  assert_eq(hits, 2)
+  s.update(fn(v : Int) -> Int { v + 3 })
+  assert_eq(hits, 3)
+  assert_eq(s.get(), 5)
+}

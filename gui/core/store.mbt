@@ -22,14 +22,28 @@ pub fn[T] Store::get(self : Store[T]) -> T {
 }
 
 ///|
-/// 写新值并通知订阅者(不去重:相同值也会通知)。
-pub fn[T] Store::set(self : Store[T], value : T) -> Unit {
+/// 写新值并通知订阅者。**内建去重**（design.md §6 于 2026-10-13 定案）：
+/// `T : Eq` 时相同值只存不发（见 [Signal::set_eq]）；`T` 没有 `Eq` 的 Store
+/// 落不到这条限定实现，走下方无条件通知的通用形态。
+pub fn[T : Eq] Store::set(self : Store[T], value : T) -> Unit {
+  self.sig.set_eq(value)
+}
+
+///|
+/// 无条件写入并通知（去重口径的逃生舱：相同值也要重发的场景用它）。
+pub fn[T] Store::set_always(self : Store[T], value : T) -> Unit {
   self.sig.set(value)
 }
 
 ///|
-/// 用函数更新:set(f(get()))。
-pub fn[T] Store::update(self : Store[T], f : (T) -> T) -> Unit {
+/// 用函数更新:set(f(get()))——`T : Eq` 时经 [Store::set] 的去重口径。
+pub fn[T : Eq] Store::update(self : Store[T], f : (T) -> T) -> Unit {
+  self.sig.set_eq(f(self.get()))
+}
+
+///|
+/// 无条件函数更新（不去重）：结果值与旧值相同也通知。
+pub fn[T] Store::update_always(self : Store[T], f : (T) -> T) -> Unit {
   self.sig.update(f)
 }
 

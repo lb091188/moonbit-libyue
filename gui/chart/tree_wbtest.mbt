@@ -37,8 +37,8 @@ test "TreeItem 构造 / 子列表可变 / Store 驱动" {
   let st : @core.Store[TreeItem] = @core.Store::new(solo)
   let hits = Ref(0)
   st.subscribe(fn(_r) { hits.val = hits.val + 1 })
-  st.set(with_val)
-  st.set(tree_sample())
+  st.set_always(with_val)
+  st.set_always(tree_sample())
   assert_eq(hits.val, 2)
   assert_eq(st.get().name, "root")
   assert_eq(st.get().children.length(), 2)
@@ -282,7 +282,7 @@ test "树图组件：两形态出像素、换数据画面变" {
     value: None,
     children: [mk("独子", 1.0)],
   }
-  root.set(fresh)
+  root.set_always(fresh)
   let _ = r1.relayout(320.0, 170.0)
   assert_true(diff_of(bm_of(w1), plain) > 50)
 }
