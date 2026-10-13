@@ -621,16 +621,55 @@ bool ptw_canvas_ensure(int w, int h) {
 int ptw_render(IDWriteTextLayout *layout, float ox, float oy,
                unsigned char *data, int buf_w, int buf_h, int r, int g, int b,
                int a, const PtwColorRange *cranges, int nc,
-               const PtwFontRange *franges, int nf) {
+               const PtwFontRange *franges, int nf, int layout_w_int) {
   if (layout == nullptr || data == nullptr || buf_w < 1 || buf_h < 1) {
     return 0;
   }
   if (!ptw_canvas_ensure(buf_w, buf_h)) {
     return 0;
   }
-  const D2D1_RECT_F box =
-      D2D1::RectF(0.0f, 0.0f, static_cast<FLOAT>(buf_w),
-                  static_cast<FLOAT>(buf_h));
+  // 只清/画/读回/混合「文本自身那一小块」：Clear、WIC 读回与逐像素混合曾都
+  // 吃全窗（每段文本一次 5MB 级读回+混合，一帧几百段就是几百次全窗——实测
+  // native-app 一帧 paint 235ms 的真身）。布局度量已含墨迹范围（left/top 是
+  // 相对布局原点的墨迹偏移），四周补 4px 防悬挂/下划线溢出。文本整块落在
+  // 窗外时无墨可画，按成功处理。
+  DWRITE_TEXT_METRICS tm;
+  if (FAILED(layout->GetMetrics(&tm))) {
+    return 0;
+  }
+  // 有宽约束（换行/省略）时对齐由布局管，墨迹分布在布局盒内——矩形直接取
+  // 布局盒（layout_w_int 由调用方按 wrapped_axis 传入，0 = 无约束）；无约束
+  // 用文本度量（left/top 是相对布局原点的墨迹偏移）。四周补 4px 防悬挂/
+  // 下划线溢出。
+  const int constrained = layout_w_int > 0;
+  const double ink_x0 = constrained ? (double)ox : (double)(ox + tm.left);
+  const double ink_x1 =
+      constrained
+          ? (double)(ox + layout_w_int)
+          : (double)(ox + tm.left + tm.widthIncludingTrailingWhitespace);
+  int rx0 = (int)floorf((float)ink_x0) - 4;
+  int ry0 = (int)floorf(oy + tm.top) - 4;
+  int rx1 = (int)ceilf((float)ink_x1) + 4;
+  int ry1 = (int)ceilf(oy + tm.top + tm.height) + 4;
+  if (rx0 < 0) {
+    rx0 = 0;
+  }
+  if (ry0 < 0) {
+    ry0 = 0;
+  }
+  if (rx1 > buf_w) {
+    rx1 = buf_w;
+  }
+  if (ry1 > buf_h) {
+    ry1 = buf_h;
+  }
+  if (rx1 <= rx0 || ry1 <= ry0) {
+    return 1;
+  }
+  const D2D1_RECT_F box = D2D1::RectF(static_cast<FLOAT>(rx0),
+                                      static_cast<FLOAT>(ry0),
+                                      static_cast<FLOAT>(rx1),
+                                      static_cast<FLOAT>(ry1));
   HRESULT hr = S_OK;
   g_canvas.brush->SetColor(
       D2D1::ColorF(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f));
@@ -676,8 +715,9 @@ int ptw_render(IDWriteTextLayout *layout, float ox, float oy,
   const int ok = SUCCEEDED(hr) ? 1 : 0;
   if (ok) {
     // 读回 WIC 位图（绘制后必须走 Lock；自持位图的内容就在这里）并做
-    // 预乘 BGRA over：out = src + dst·(1 − srcA)（两缓冲同为预乘域）
-    WICRect wr = {0, 0, buf_w, buf_h};
+    // 预乘 BGRA over：out = src + dst·(1 − srcA)（两缓冲同为预乘域）。
+    // 只读回文本矩形，混合落在 data 的同一绝对坐标上。
+    WICRect wr = {rx0, ry0, rx1 - rx0, ry1 - ry0};
     IWICBitmapLock *lock = nullptr;
     if (SUCCEEDED(g_canvas.wic->Lock(&wr, WICBitmapLockRead, &lock))) {
       UINT stride = 0;
@@ -685,10 +725,13 @@ int ptw_render(IDWriteTextLayout *layout, float ox, float oy,
       BYTE *pixels = nullptr;
       if (SUCCEEDED(lock->GetStride(&stride)) &&
           SUCCEEDED(lock->GetDataPointer(&cb, &pixels)) && pixels != nullptr) {
-        for (int y = 0; y < buf_h; y++) {
+        const int rw = rx1 - rx0;
+        const int rh = ry1 - ry0;
+        for (int y = 0; y < rh; y++) {
           const unsigned char *srow = pixels + size_t(y) * stride;
-          unsigned char *drow = data + size_t(y) * size_t(buf_w) * 4;
-          for (int x = 0; x < buf_w; x++) {
+          unsigned char *drow =
+              data + size_t(ry0 + y) * size_t(buf_w) * 4 + size_t(rx0) * 4;
+          for (int x = 0; x < rw; x++) {
             const unsigned sa = srow[x * 4 + 3];
             if (sa == 0) {
               continue;
@@ -756,7 +799,9 @@ extern "C" int pt_draw(unsigned char *data, int buf_w, int buf_h, double x,
     return 0;
   }
   return ptw_render(layout, static_cast<float>(x), static_cast<float>(y), data,
-                    buf_w, buf_h, r, g, b, a, nullptr, 0, nullptr, 0);
+                    buf_w, buf_h, r, g, b, a, nullptr, 0, nullptr, 0,
+                    max_width > 0 && (wrap != 0 || ellipsize != 0) ? max_width
+                                                                   : 0);
 }
 
 extern "C" int pt_draw_box(unsigned char *data, int buf_w, int buf_h, double x,
@@ -781,7 +826,8 @@ extern "C" int pt_draw_box(unsigned char *data, int buf_w, int buf_h, double x,
   ptw_box_offsets(layout, align, valign, box_w, box_h, wrapped_axis, &dx, &dy);
   return ptw_render(layout, static_cast<float>(x + dx),
                     static_cast<float>(y + dy), data, buf_w, buf_h, r, g, b, a,
-                    nullptr, 0, nullptr, 0);
+                    nullptr, 0, nullptr, 0,
+                    wrapped_axis ? static_cast<int>(box_w) : 0);
 }
 
 extern "C" int pt_draw_box_cr(int64_t cr_id, double x, double y, double box_w,
@@ -1070,7 +1116,7 @@ extern "C" int rt_draw(int64_t h, unsigned char *data, int buf_w, int buf_h,
   const int ok = ptw_render(layout, static_cast<float>(x + dx),
                             static_cast<float>(y + dy), data, buf_w, buf_h, r0,
                             g0, b0, a0, nc > 0 ? wcolors : nullptr, nc, nullptr,
-                            0);
+                            0, 0);
   layout->Release();
   return ok;
 }
