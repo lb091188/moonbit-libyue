@@ -198,3 +198,100 @@ test "缩放绘制：源矩形按比例映到目标矩形（等比与缩小都�
   }
   assert_true(ink > 1500)
 }
+
+///|
+test "set_global_alpha：钳到 0..1，填充/描边/渐变/图片全路径按系数落像素" {
+  let bm = Bitmap::new(10, 10)
+  let p = Painter::new(bm)
+  p.set_global_alpha(1.5)
+  assert_eq(p.global_alpha(), 1.0)
+  p.set_global_alpha(-1.0)
+  assert_eq(p.global_alpha(), 0.0)
+  // 判据用同机对照:先 1.0 全不透明落一版,再半透明落一版比 alpha
+  p.set_global_alpha(1.0)
+  p.set_fill_color("#ff0000")
+  p.fill_rect(0.0, 0.0, 10.0, 10.0)
+  let full = bm.pixel(5, 5)
+  assert_true(full.a > 200)
+  let bm2 = Bitmap::new(10, 10)
+  let p2 = Painter::new(bm2)
+  p2.set_fill_color("#ff0000")
+  p2.set_global_alpha(0.5)
+  p2.fill_rect(0.0, 0.0, 10.0, 10.0)
+  let half = bm2.pixel(5, 5)
+  // 半透明那一版必须比全不透明淡（两后端同判据：alpha 约为半）
+  assert_true(half.a > 0 && half.a < full.a)
+  let ratio = half.a.to_double() / full.a.to_double()
+  assert_true(ratio > 0.25 && ratio < 0.8)
+  p2.end()
+  // 图片/画布路径：源像素 alpha 同样乘系数（透明目标上判,alpha=0 应无痕）
+  let src = Bitmap::new(4, 4)
+  let sp = Painter::new(src)
+  sp.set_fill_color("#00ff00")
+  sp.fill_rect(0.0, 0.0, 4.0, 4.0)
+  sp.end()
+  let bm3 = Bitmap::new(10, 10)
+  let p3 = Painter::new(bm3)
+  p3.set_global_alpha(0.0)
+  p3.draw_canvas({ bitmap: src }, 0.0, 0.0, 4.0, 4.0)
+  assert_eq(bm3.pixel(1, 1).a, 0)
+  p3.set_global_alpha(1.0)
+  p3.draw_canvas({ bitmap: src }, 0.0, 0.0, 4.0, 4.0)
+  assert_true(bm3.pixel(1, 1).a > 200)
+  p3.end()
+  // 渐变路径：stop alpha 同乘（透明目标上判）
+  let grad = Gradient::linear(0.0, 0.0, 10.0, 0.0)
+  grad.add_stop(0.0, "#ff0000")
+  grad.add_stop(1.0, "#ff0000")
+  let bm4 = Bitmap::new(10, 10)
+  let p4 = Painter::new(bm4)
+  p4.set_fill_gradient(grad)
+  p4.fill_rect(0.0, 0.0, 10.0, 10.0)
+  let full_g = bm4.pixel(5, 5)
+  let bm5 = Bitmap::new(10, 10)
+  let p5 = Painter::new(bm5)
+  p5.set_global_alpha(0.25)
+  p5.set_fill_gradient(grad)
+  p5.fill_rect(0.0, 0.0, 10.0, 10.0)
+  let g25 = bm5.pixel(5, 5)
+  assert_true(
+    full_g.a > 200 && g25.a > 0 && g25.a < 100,
+  )
+  p4.end()
+  p5.end()
+  p.end()
+}
+
+///|
+test "fill_round_rect：四角不填、中心填；半径钳到短边一半" {
+  let bm = Bitmap::new(20, 20)
+  let p = Painter::new(bm)
+  p.set_fill_color("#334455")
+  p.fill_round_rect(0.0, 0.0, 20.0, 20.0, 6.0)
+  assert_eq(bm.pixel(10, 10).a, 255)
+  // 左上角点在对角线外侧（圆角外），应保持透明
+  assert_eq(bm.pixel(0, 0).a, 0)
+  // r 超短边一半：钳到 10 后仍填满中心
+  p.fill_round_rect(0.0, 0.0, 20.0, 20.0, 99.0)
+  assert_eq(bm.pixel(10, 10).a, 255)
+  p.end()
+}
+
+///|
+test "box_shadow：硬阴影环画在矩形外圈，本体像素不被阴影着色" {
+  let bm = Bitmap::new(30, 30)
+  let p = Painter::new(bm)
+  p.set_fill_color("#000000")
+  p.box_shadow(10.0, 10.0, 10.0, 10.0, 2.0, 6.0, 3)
+  // 外扩最远 6px 处(4,10) 附近应有阴影像素,远处没有
+  let mut hit = false
+  for x in 2..<8 {
+    if bm.pixel(x, 15).a > 0 {
+      hit = true
+    }
+  }
+  assert_true(hit)
+  assert_eq(bm.pixel(0, 0).a, 0)
+  assert_eq(bm.pixel(29, 29).a, 0)
+  p.end()
+}

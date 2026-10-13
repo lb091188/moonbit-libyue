@@ -138,6 +138,9 @@ pub(all) struct Widget {
   /// 绘制层序键（resolved `z_index` 的落点，design.md §5 P1）：`@style.apply`
   /// 写入，绘制遍历按它**稳定重排** kids（同值保持数组序，尾赢），默认 0.0。
   mut z_index_paint : Double
+  /// 整层透明度（resolved `Style.opacity` 的落点，design.md §5 P4）：绘制遍历
+  /// 进本控件时把「祖先累乘 × 自身」塞进 Painter 的 `global_alpha`，默认 1.0。
+  mut alpha_paint : Double
 }
 
 ///|
@@ -170,6 +173,7 @@ pub fn Widget::new() -> Widget {
     drag_payload: None,
     on_drop: None,
     z_index_paint: 0.0,
+    alpha_paint: 1.0,
   }
 }
 
@@ -802,6 +806,12 @@ pub fn Widget::paint_at(self : Widget, p : @render.Painter, ox : Double, oy : Do
   p.save()
   p.translate(self.rect.x - ox, self.rect.y - oy)
   p.clip_rect(0.0, 0.0, self.rect.w, self.rect.h)
+  // 整层透明度:祖先累乘 × 自身(on_draw 与其子树都在这段 alpha 内绘制)
+  let inherited = p.global_alpha()
+  let own = self.alpha_paint
+  if own < 1.0 || inherited < 1.0 {
+    p.set_global_alpha(inherited * own)
+  }
   match self.on_draw {
     Some(f) => f(self, p, self.rect)
     None => ()
@@ -812,6 +822,7 @@ pub fn Widget::paint_at(self : Widget, p : @render.Painter, ox : Double, oy : Do
   for k in widget_paint_order(self.kids) {
     k.paint_at(p, self.rect.x, self.rect.y)
   }
+  p.set_global_alpha(inherited)
   p.restore()
 }
 

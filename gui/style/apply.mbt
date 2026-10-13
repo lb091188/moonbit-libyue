@@ -142,6 +142,11 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit {
     Some(Hidden) => w.set_visible(false)
     None => ()
   }
+  match s.opacity {
+    // 整层透明度不进侧表快照以外的路径：绘制遍历经 @style.paint_alpha 读取
+    Some(v) => w.alpha_paint = v
+    None => ()
+  }
   match s.cursor {
     Some(c) => w.cursor = c
     None => ()

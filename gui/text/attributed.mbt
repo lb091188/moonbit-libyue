@@ -443,10 +443,14 @@ pub fn AttributedText::draw_at(
     return false
   }
   let base = match @render.Color::parse(
-    match self.color {
-      Some(c) => c
-      None => "#000"
-    },
+    // 全局透明度：颜色串先经会话折算（Painter::paint_color），文本与其余
+    // 绘制路径同一口径（design.md §5 P4）
+    p.paint_color(
+      match self.color {
+        Some(c) => c
+        None => "#000"
+      },
+    ),
   ) {
     Some(c) => c
     None => { r: 0, g: 0, b: 0, a: 255 }

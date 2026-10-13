@@ -1737,6 +1737,14 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - 坑③：图表数据窗口（`Array[LineSeries]`、`TreeItem`、`GeoRect` 等）元素无 Eq 且整窗比较代价高于收益——chart 与示例一律 `set_always`，共 33 处调用点由编译器逐点钉出。
 - 验证：core 121/121（新增去重回归 1 条：同值不发/异值发一次/`set_always` 强发/`update` 走同口径）；全仓 `moon check --deny-warn` 零错零警；库测试 861 条 859 过（2 条红为 W9/排序既有基线）。
 
+### 前端化 P4:Painter 全局 alpha 与硬阴影(2026-10-13)
+
+- 全局 alpha 收在**门面状态机**(`PainterState.global_alpha`,save/restore 随栈):填充/描边(含渐变 stop)在 `apply_fill/apply_stroke` 折算色 alpha;文本经 `Painter::paint_color`(画期把串解析→乘系数→回写 hex);图片/画布在 `global_alpha < 1` 时走 `dim_bitmap` 逐像素降 alpha 再 blit。两后端(cairo/纯光栅)零改动即全路径生效——门面是唯一入口。
+- 坑①:**叠加断言量错通道**——不透明目标上再叠 50% 红,像素 alpha 仍是 255(alpha 合成只改颜色不改覆盖度),`alpha==0` 这类判据必须落在**透明目标**上;渐变同理,要在空白位图上比 `full.a` vs `0.25.a`。
+- 坑②:`round_rect_path` 自带 `begin_path` 时,阴影「外环+内环」两子路径会被第二个调用清掉——tracer 拆成 `trace_round_rect`/`round_rect_path_ccw`(不开新路径),环=一外一圈+一内逆时针圈,非零环绕只描环不叠色。
+- `Style.opacity` 通道:`apply` 落 `Widget.alpha_paint`,绘制遍历进控件时 `p.set_global_alpha(继承 × 自身)`、子树画完还原(CSS 式盒树累乘);`box_shadow` 现给**硬阴影**档(偏移多层圆角矩形、`layers` 等步长描环),模糊档随 blur 能力再评估。
+- 验证:render 新增 3 条(全路径系数/圆角/阴影环),render 45/46(1 红为既有 W9 基线);`ui` 的 `fill_round_rect` 上收门面后 ui/nav 行为零改;全仓 `moon check --deny-warn` 零错零警、库测试 882 条 880 过(2 红同基线)。真机观感(opacity 演示页/阴影卡片)归 `_人工测试清单.md`。
+
 ## 前端化 P1:gui/style 样式包与 yoga-mbt z_index(2026-10-13)
 
 工具链边界(moon 0.1.20260920 / moonc v0.10.14,读数随升级要重测,同步 design.md §1.6):

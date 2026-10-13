@@ -1440,6 +1440,14 @@ First full local-chain verification environment: Windows 10 19045 + VS BuildTool
 - Pit 3: chart data windows (`Array[LineSeries]`, `TreeItem`, `GeoRect`...) have no Eq on elements and full-window comparison costs more than it saves - chart and examples use `set_always` throughout; 33 call sites were pinned one by one by the compiler.
 - Verification: core 121/121 (new dedup regression: same value silent, changed value fires once, `set_always` forces, `update` follows the same policy); repo-wide `moon check --deny-warn` clean; library tests 859/861 (2 reds are the pre-existing W9/sort baseline).
 
+### Declarative frontend P4: Painter global alpha and hard shadow (2026-10-13)
+
+- Global alpha lives in the **facade state machine** (`PainterState.global_alpha`, save/restore stack): fills/strokes (incl. gradient stops) scale color alpha in `apply_fill/apply_stroke`; text goes through `Painter::paint_color` (parse -> scale -> re-emit hex at draw time); images/canvases run `dim_bitmap` (per-pixel alpha scale) before blit when `global_alpha < 1`. Both backends (cairo / pure raster) get full-path coverage with zero backend changes because the facade is the only entry.
+- Pit 1: **asserting on the wrong channel** - layering 50% red over an opaque target keeps pixel alpha at 255 (alpha compositing changes color, not coverage); `alpha == 0` style checks must run on a **transparent** target, and gradients must be compared `full.a` vs `0.25.a` on blank bitmaps.
+- Pit 2: `round_rect_path` calling `begin_path` internally wiped the outer ring when the shadow traced outer+inner subpaths - split into `trace_round_rect` / `round_rect_path_ccw` (no begin_path), so a ring = one outer loop + one reversed inner loop, nonzero winding paints only the annulus with no overlap darkening.
+- `Style.opacity` channel: `apply` writes `Widget.alpha_paint`; the paint traversal sets `p.set_global_alpha(inherited * own)` on entry and restores after the subtree (CSS-like box-tree accumulation). `box_shadow` ships the **hard** tier (offset rounded-rect rings, `layers` equal steps); the blur tier waits for a blur capability.
+- Verification: 3 new render tests (full-path scaling / rounded rect / shadow ring), render 45/46 (1 red is the pre-existing W9 baseline); ui's `fill_round_rect` moved into the facade with behavior unchanged; repo-wide `moon check --deny-warn` clean; library tests 880/882 (2 reds baseline). Visual checks (opacity demo, shadowed cards) go to `_人工测试清单.md`.
+
 ## Declarative frontend P1: gui/style package and yoga-mbt z_index (2026-10-13)
 
 Toolchain boundaries (moon 0.1.20260920 / moonc v0.10.14 line; re-measure after upgrades, mirrored in design.md §1.6):

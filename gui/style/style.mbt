@@ -52,6 +52,9 @@ pub(all) struct Style {
   mut bottom : Double?
   mut left : Double?
   mut z_index : Int?
+  // —— P4：整层透明度（0..1，画期把 global alpha 乘进全路径）与硬阴影
+  mut opacity : Double?
+  mut box_shadow : Double?
   // —— 其它（落宿主 Widget）
   mut visibility : Visibility?
   mut cursor : Int?
@@ -108,6 +111,8 @@ pub fn empty_style() -> Style {
     bottom: None,
     left: None,
     z_index: None,
+    opacity: None,
+    box_shadow: None,
     visibility: None,
     cursor: None,
     hover: None,
@@ -192,6 +197,8 @@ pub fn merge(base : Style, over : Style) -> Style {
   s.bottom = pick(base.bottom, over.bottom)
   s.left = pick(base.left, over.left)
   s.z_index = pick(base.z_index, over.z_index)
+  s.opacity = pick(base.opacity, over.opacity)
+  s.box_shadow = pick(base.box_shadow, over.box_shadow)
   s.visibility = pick(base.visibility, over.visibility)
   s.cursor = pick(base.cursor, over.cursor)
   s.hover = pick_style(base.hover, over.hover)
@@ -500,4 +507,16 @@ pub fn merge_all(blocks : Array[Style]) -> Style {
     acc = merge(acc, b)
   }
   acc
+}
+
+///|
+pub fn Style::set_opacity(self : Style, v : Double?) -> Style {
+  self.opacity = v
+  self
+}
+
+///|
+pub fn Style::set_box_shadow(self : Style, v : Double?) -> Style {
+  self.box_shadow = v
+  self
 }

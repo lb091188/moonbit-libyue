@@ -36,6 +36,9 @@ pub(all) struct PainterState {
   mut fill_grad : Gradient?
   mut stroke_grad : Gradient?
   mut line_width : Double
+  /// 全局透明度（0..1，默认 1）：进绘制状态机，铺满填充/描边（含渐变）、文本、
+  /// 图片/画布全路径——`Style.opacity` 的落点（design.md §5 P4）。
+  mut global_alpha : Double
 }
 
 ///|
@@ -68,6 +71,7 @@ fn snapshot(s : PainterState) -> PainterState {
     fill_grad: s.fill_grad,
     stroke_grad: s.stroke_grad,
     line_width: s.line_width,
+    global_alpha: s.global_alpha,
   }
 }
 
@@ -84,6 +88,7 @@ fn load_state(target : PainterState, from : PainterState) -> Unit {
   target.fill_grad = from.fill_grad
   target.stroke_grad = from.stroke_grad
   target.line_width = from.line_width
+  target.global_alpha = from.global_alpha
 }
 
 ///|
@@ -118,6 +123,7 @@ pub fn Painter::new(bitmap : Bitmap) -> Painter {
       fill_grad: None,
       stroke_grad: None,
       line_width: 1.0,
+      global_alpha: 1.0,
     },
     stack: [],
   }
@@ -154,17 +160,255 @@ pub fn Painter::flush(self : Painter) -> Unit {
 
 ///|
 /// 把当前填充状态（颜色或渐变）落到后端 source 上。
+///|
+/// 全局透明度：钳到 0..1，对后续绘制生效（两后端同语义——色 alpha 与渐变
+/// stop alpha 在门面折算，图片/画布走像素 alpha 缩放）。
+pub fn Painter::set_global_alpha(self : Painter, a : Double) -> Unit {
+  self.state.global_alpha =
+    if a < 0.0 {
+      0.0
+    } else if a > 1.0 {
+      1.0
+    } else {
+      a
+    }
+}
+
+///|
+pub fn Painter::global_alpha(self : Painter) -> Double {
+  self.state.global_alpha
+}
+
+///|
+/// 文本等跨模块绘制方共用的一条通道：把颜色的 alpha 乘上会话的全局透明度。
+pub fn Painter::paint_color(self : Painter, hex : String) -> String {
+  match Color::parse(hex) {
+    Some(c) => color_to_hex(scale_color(c, self.state.global_alpha))
+    None => hex
+  }
+}
+
+///|
+fn hex2(v : Int) -> String {
+  let digits : Array[Char] = [
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
+  ]
+  let x = if v < 0 { 0 } else if v > 255 { 255 } else { v }
+  String::from_array([digits[x / 16], digits[x % 16]])
+}
+
+fn color_to_hex(c : Color) -> String {
+  let body =
+    "#" + hex2(c.r) + hex2(c.g) + hex2(c.b)
+  if c.a >= 255 {
+    body
+  } else {
+    body + hex2(c.a)
+  }
+}
+
+pub fn Painter::round_rect_path(
+  self : Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+  r : Double,
+) -> Unit {
+  self.begin_path()
+  self.trace_round_rect(x, y, w, h, r)
+}
+
+///|
+/// 圆角矩形填充（路径 + 当前填充色；全局透明度照常生效）。
+pub fn Painter::fill_round_rect(
+  self : Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+  r : Double,
+) -> Unit {
+  self.begin_path()
+  self.trace_round_rect(x, y, w, h, r)
+  self.fill()
+}
+
+///|
+fn Painter::trace_round_rect(
+  self : Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+  r : Double,
+) -> Unit {
+  if w <= 0.0 || h <= 0.0 {
+    return ()
+  }
+  let rr = clamp_radius(r, w, h)
+  let q = 1.5707963267948966
+  if rr <= 0.0 {
+    self.move_to(x, y)
+    self.line_to(x + w, y)
+    self.line_to(x + w, y + h)
+    self.line_to(x, y + h)
+    self.close_path()
+    return ()
+  }
+  self.move_to(x + rr, y)
+  self.line_to(x + w - rr, y)
+  self.arc(x + w - rr, y + rr, rr, 3.0 * q, 4.0 * q)
+  self.line_to(x + w, y + h - rr)
+  self.arc(x + w - rr, y + h - rr, rr, 0.0, q)
+  self.line_to(x + rr, y + h)
+  self.arc(x + rr, y + h - rr, rr, q, 2.0 * q)
+  self.line_to(x, y + rr)
+  self.arc(x + rr, y + rr, rr, 2.0 * q, 3.0 * q)
+  self.close_path()
+}
+
+///|
+fn clamp_radius(r : Double, w : Double, h : Double) -> Double {
+  if r < 0.0 {
+    0.0
+  } else if r > w / 2.0 {
+    w / 2.0
+  } else if r > h / 2.0 {
+    h / 2.0
+  } else {
+    r
+  }
+}
+
+///|
+/// 硬阴影档（design.md §5 P4：偏移多层圆角矩形先行，模糊随 blur 能力再评估）：
+/// 当前色 alpha 的 `layers` 层等步长外扩，画在目标矩形**之下**（调用方先画阴影
+/// 再画本体）。各层只描环（弧角递增 + 逆时针内环），层间零重叠——单层成本约
+/// 为实心方案的 1/layers，且深底上不会叠出黑边。
+pub fn Painter::box_shadow(
+  self : Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+  radius : Double,
+  spread : Double,
+  layers : Int,
+) -> Unit {
+  if spread <= 0.0 || layers < 1 || w <= 0.0 || h <= 0.0 {
+    return ()
+  }
+  let step = spread / layers.to_double()
+  self.set_line_width(step)
+  for i in 1..=layers {
+    let e = step * i.to_double()
+    let r = radius + e
+    // 外环逆时针(整圈) + 内环顺时针:两向异侧 → fill 只落环形区域
+    self.begin_path()
+    self.round_rect_path(x - e, y - e, w + 2.0 * e, h + 2.0 * e, r)
+    self.round_rect_path_ccw(
+      x - e + step,
+      y - e + step,
+      w + 2.0 * (e - step),
+      h + 2.0 * (e - step),
+      r,
+    )
+    self.fill()
+  }
+}
+
+///|
+/// 顺时针圆角矩形子路径（内环用，与 [Painter::round_rect_path] 反向；不开新
+/// 路径——它接在外环之后，两层方向相反，`fill` 按非零环绕只落环形区域）。
+fn Painter::round_rect_path_ccw(
+  self : Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+  r : Double,
+) -> Unit {
+  if w <= 0.0 || h <= 0.0 {
+    return ()
+  }
+  let rr = clamp_radius(r, w, h)
+  let q = 1.5707963267948966
+  if rr <= 0.0 {
+    self.move_to(x, y)
+    self.line_to(x, y + h)
+    self.line_to(x + w, y + h)
+    self.line_to(x + w, y)
+    self.close_path()
+    return ()
+  }
+  self.move_to(x + rr, y)
+  self.arc(x + rr, y + rr, rr, 3.0 * q, 2.0 * q)
+  self.line_to(x, y + h - rr)
+  self.arc(x + rr, y + h - rr, rr, 2.0 * q, q)
+  self.line_to(x + w - rr, y + h)
+  self.arc(x + w - rr, y + h - rr, rr, q, 0.0)
+  self.line_to(x + w, y + rr)
+  self.arc(x + w - rr, y + rr, rr, 0.0, 3.0 * q)
+  self.close_path()
+}
+
+
+///|
+fn scale_color(c : Color, g : Double) -> Color {
+  if g >= 1.0 {
+    c
+  } else {
+    { r: c.r, g: c.g, b: c.b, a: (c.a.to_double() * g).round().to_int() }
+  }
+}
+
+///|
+fn scale_grad(g : Gradient, f : Double) -> Gradient {
+  if f >= 1.0 {
+    g
+  } else {
+    let stops : Array[(Double, Color)] = []
+    for pr in g.stops {
+      let _ = stops.push((pr.0, scale_color(pr.1, f)))
+    }
+    { kind: g.kind, stops }
+  }
+}
+
+///|
+/// 位图整层降透明：逐像素把 alpha 乘系数（走 `Bitmap::pixel`/`paint` 的解码与
+/// 预乘通道，两后端通用；只在 global_alpha < 1 时发生，代价换正确性）。
+fn dim_bitmap(bm : Bitmap, f : Double) -> Bitmap {
+  let out = Bitmap::new(bm.width, bm.height)
+  let mut y = 0
+  while y < bm.height {
+    let mut x = 0
+    while x < bm.width {
+      let c = bm.pixel(x, y)
+      out.paint(
+        x,
+        y,
+        { r: c.r, g: c.g, b: c.b, a: (c.a.to_double() * f).round().to_int() },
+      )
+      x += 1
+    }
+    y += 1
+  }
+  out
+}
+
 fn Painter::apply_fill(self : Painter) -> Unit {
   match self.backend {
     Some(CairoBackend(c)) =>
       match self.state.fill_grad {
-        Some(g) => c.set_fill_gradient(g)
-        None => c.source_rgba(self.state.fill)
+        Some(g) => c.set_fill_gradient(scale_grad(g, self.state.global_alpha))
+        None => c.source_rgba(scale_color(self.state.fill, self.state.global_alpha))
       }
     Some(PureBackend(r)) =>
       match self.state.fill_grad {
-        Some(g) => r.set_gradient(g)
-        None => r.source_rgba(self.state.fill)
+        Some(g) => r.set_gradient(scale_grad(g, self.state.global_alpha))
+        None => r.source_rgba(scale_color(self.state.fill, self.state.global_alpha))
       }
     None => ()
   }
@@ -175,13 +419,13 @@ fn Painter::apply_stroke(self : Painter) -> Unit {
   match self.backend {
     Some(CairoBackend(c)) =>
       match self.state.stroke_grad {
-        Some(g) => c.set_stroke_gradient(g)
-        None => c.source_rgba(self.state.stroke)
+        Some(g) => c.set_stroke_gradient(scale_grad(g, self.state.global_alpha))
+        None => c.source_rgba(scale_color(self.state.stroke, self.state.global_alpha))
       }
     Some(PureBackend(r)) =>
       match self.state.stroke_grad {
-        Some(g) => r.set_gradient(g)
-        None => r.source_rgba(self.state.stroke)
+        Some(g) => r.set_gradient(scale_grad(g, self.state.global_alpha))
+        None => r.source_rgba(scale_color(self.state.stroke, self.state.global_alpha))
       }
     None => ()
   }
@@ -474,7 +718,8 @@ pub fn Painter::draw_canvas(
   w : Double,
   h : Double,
 ) -> Unit {
-  let bm = canvas.bitmap
+  let ga = self.state.global_alpha
+  let bm = if ga < 1.0 { dim_bitmap(canvas.bitmap, ga) } else { canvas.bitmap }
   match self.backend {
     Some(CairoBackend(c)) =>
       c.blit(
@@ -518,9 +763,11 @@ pub fn Painter::draw_canvas_from_rect(
   dw : Double,
   dh : Double,
 ) -> Unit {
+  let ga = self.state.global_alpha
+  let bm = if ga < 1.0 { dim_bitmap(canvas.bitmap, ga) } else { canvas.bitmap }
   match self.backend {
-    Some(CairoBackend(c)) => c.blit(canvas.bitmap, sx, sy, sw, sh, dx, dy, dw, dh)
-    Some(PureBackend(r)) => r.blit(canvas.bitmap, sx, sy, sw, sh, dx, dy, dw, dh)
+    Some(CairoBackend(c)) => c.blit(bm, sx, sy, sw, sh, dx, dy, dw, dh)
+    Some(PureBackend(r)) => r.blit(bm, sx, sy, sw, sh, dx, dy, dw, dh)
     None => ()
   }
 }

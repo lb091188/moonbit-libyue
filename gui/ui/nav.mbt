@@ -517,8 +517,8 @@ fn collapse_panel(
 // ---- 导航族次批：侧边菜单 / 分组侧边菜单 / 树 / 页签 ----
 
 ///|
-/// 圆角矩形填充（菜单与页签的 4px 圆角档）。Painter 门面没有原生圆角，
-/// 按「四段直线 + 四个 90° 弧」拼路径；弧角递增（逆时针参数在两层后端都不可用）。
+/// 圆角矩形填充（4px 圆角档的共用入口）：实现已上收门面
+/// `@render.Painter::fill_round_rect`，这里保留组件层惯用名。
 pub fn fill_round_rect(
   p : @render.Painter,
   x : Double,
@@ -527,19 +527,7 @@ pub fn fill_round_rect(
   h : Double,
   r : Double,
 ) -> Unit {
-  let q = 1.5707963267948966
-  p.begin_path()
-  p.move_to(x + r, y)
-  p.line_to(x + w - r, y)
-  p.arc(x + w - r, y + r, r, 3.0 * q, 4.0 * q)
-  p.line_to(x + w, y + h - r)
-  p.arc(x + w - r, y + h - r, r, 0.0, q)
-  p.line_to(x + r, y + h)
-  p.arc(x + r, y + h - r, r, q, 2.0 * q)
-  p.line_to(x, y + r)
-  p.arc(x + r, y + r, r, 2.0 * q, 3.0 * q)
-  p.close_path()
-  p.fill()
+  p.fill_round_rect(x, y, w, h, r)
 }
 
 ///|
