@@ -1,0 +1,10 @@
+import {
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/render",
+  "NoahLiu/native-gui/ui",
+  "NoahLiu/native-gui/win",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"
