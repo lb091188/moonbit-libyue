@@ -47,6 +47,7 @@ fn nav_item(
     @theme.theme_text_regular()
   },
   on_click? : () -> Unit = fn() -> Unit { () },
+  skin? : @style.Style = @style.empty_style(),
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let font = @text.Font::new("", size, weight=weight)
@@ -56,12 +57,16 @@ fn nav_item(
     let box_w = if width > 0.0 { width } else { tw + pad_x * 2.0 }
     w.node.set_width(@yoga.fixed(box_w))
     w.node.set_height(@yoga.fixed(height))
+    @style.apply(w, skin)
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      let c = bg(self)
+      // 「选中 × 悬停」两轴的取色分支是数据态（不是状态桶，§1.5），留在调用方的
+      // 调色回调里；样式槽给了同名属性就以样式为准（class 覆盖内置皮肤）
+      let st = @style.style_for(self)
+      let c = @style.color_of(st.background_color, bg(self))
       if c.length() > 0 {
         p.set_fill_color(c)
         p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -74,7 +79,7 @@ fn nav_item(
         r.h,
         text,
         font,
-        fg(self),
+        @style.color_of(st.color, fg(self)),
         align=@text.Center,
         valign=@text.Center,
       )
@@ -141,6 +146,7 @@ pub fn segmented(
           }
         },
         on_click=fn() -> Unit { selected.set(mine) },
+        skin=paint_subset(class),
       ),
     )
   }
@@ -179,6 +185,7 @@ pub fn breadcrumb(
           bg=fn(_w : @core.Widget) -> String { "" },
           fg=fn(_w : @core.Widget) -> String { @theme.theme_text_secondary() },
           on_click=fn() -> Unit { () },
+          skin=paint_subset(class),
         ),
       )
     }
@@ -203,6 +210,7 @@ pub fn breadcrumb(
         on_click=fn() -> Unit {
           if !is_last { selected.set(mine) }
         },
+        skin=paint_subset(class),
       ),
     )
   }
@@ -233,13 +241,21 @@ pub fn pagination(
       watch_theme()
       w.node.set_width(@yoga.fixed(28.0))
       w.node.set_height(@yoga.fixed(28.0))
+      @style.apply(
+        w,
+        @style.style(color="text_regular").hover(background_color="primary_light")
+      )
+      @style.apply(w, paint_subset(class))
       w.on_draw = Some(fn(
         self : @core.Widget,
         p : @render.Painter,
         r : @core.Rect,
       ) -> Unit {
-        if self.hovered {
-          p.set_fill_color(@theme.theme_primary_light())
+        // 悬停底色由 hover 桶供（样式没给就是不铺底）
+        let st = @style.style_for(self)
+        let bg = @style.color_of(st.background_color, "")
+        if bg.length() > 0 {
+          p.set_fill_color(bg)
           p.fill_rect(0.0, 0.0, r.w, r.h)
         }
         draw_chevron(
@@ -248,7 +264,7 @@ pub fn pagination(
           r.h / 2.0,
           4.0,
           right,
-          @theme.theme_text_regular(),
+          @style.color_of(st.color, @theme.theme_text_regular()),
         )
       })
       w.cursor = @core.CURSOR_HAND
@@ -302,6 +318,7 @@ pub fn pagination(
           }
         },
         on_click=fn() -> Unit { current.set(page) },
+        skin=paint_subset(class),
       ),
     )
   }
@@ -337,17 +354,22 @@ pub fn steps(
           w.node.set_flex_grow(1.0)
           w.node.set_min_width(@yoga.fixed(8.0))
           w.node.set_height(@yoga.fixed(2.0))
+          @style.apply(w, paint_subset(class))
           w.on_draw = Some(fn(
-            _self : @core.Widget,
+            self : @core.Widget,
             p : @render.Painter,
             r : @core.Rect,
           ) -> Unit {
+            let st = @style.style_for(self)
             p.set_fill_color(
-              if current.get() >= idx {
-                @theme.theme_primary()
-              } else {
-                @theme.theme_border()
-              },
+              @style.color_of(
+                st.background_color,
+                if current.get() >= idx {
+                  @theme.theme_primary()
+                } else {
+                  @theme.theme_border()
+                },
+              ),
             )
             p.fill_rect(0.0, 0.0, r.w, r.h)
           })
@@ -381,6 +403,7 @@ pub fn steps(
           }
         },
         on_click=fn() -> Unit { () },
+        skin=paint_subset(class),
       ),
     )
     let mine = items[i]
@@ -392,11 +415,13 @@ pub fn steps(
         // 宽度在挂载时按测量定（绘制回调里改布局会把 paint 变成布局的写入方）
         w.node.set_width(@yoga.fixed(text_width(mine, font) + 6.0))
         w.node.set_height(@yoga.fixed(24.0))
+        @style.apply(w, paint_subset(class))
         w.on_draw = Some(fn(
-          _self : @core.Widget,
+          self : @core.Widget,
           p : @render.Painter,
           r : @core.Rect,
         ) -> Unit {
+          let st = @style.style_for(self)
           let _ = @text.draw_box_at(
             p,
             0.0,
@@ -405,11 +430,14 @@ pub fn steps(
             r.h,
             mine,
             font,
-            if idx <= current.get() {
-              @theme.theme_text_primary()
-            } else {
-              @theme.theme_text_secondary()
-            },
+            @style.color_of(
+              st.color,
+              if idx <= current.get() {
+                @theme.theme_text_primary()
+              } else {
+                @theme.theme_text_secondary()
+              },
+            ),
             align=@text.Center,
             valign=@text.Center,
           )
@@ -441,7 +469,7 @@ pub fn collapse(
   let n = panels.length()
   for i = 0; i < n; i = i + 1 {
     let input = panels[i]
-    blocks.push(collapse_panel(input.0, input.1, i == 0))
+    blocks.push(collapse_panel(input.0, input.1, i == 0, skin=paint_subset(class)))
   }
   view(blocks, row_gap=2.0, class=class, handle=handle)
 }
@@ -452,6 +480,7 @@ fn collapse_panel(
   title : String,
   body : Array[@core.Node],
   open0 : Bool,
+  skin~ : @style.Style = @style.empty_style(),
 ) -> @core.Node {
   let open = Ref(open0)
   let head_font = @text.Font::new("", 13.0, weight=@text.SemiBold)
@@ -469,18 +498,20 @@ fn collapse_panel(
     head.node.set_flex_direction(@yoga.Row)
     head.node.set_width(@yoga.percent(100.0))
     head.node.set_height(@yoga.fixed(34.0))
+    // 常态底=info_light、悬停底=primary_light 交给样式桶；箭头是组件记号，留内置
+    @style.apply(
+      head,
+      @style.style(color="text_primary", background_color="info_light")
+        .hover(background_color="primary_light")
+    )
+    @style.apply(head, skin)
     head.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(
-        if self.hovered {
-          @theme.theme_primary_light()
-        } else {
-          @theme.theme_info_light()
-        },
-      )
+      let st = @style.style_for(self)
+      p.set_fill_color(@style.color_of(st.background_color, @theme.theme_info_light()))
       p.fill_rect(0.0, 0.0, r.w, r.h)
       fold_arrow(p, 14.0, r.h / 2.0, 4.0, open.val, @theme.theme_primary())
       let _ = @text.draw_at(
@@ -489,7 +520,7 @@ fn collapse_panel(
         (r.h - 18.0) / 2.0,
         title,
         head_font,
-        @theme.theme_text_primary(),
+        @style.color_of(st.color, @theme.theme_text_primary()),
       )
     })
     head.cursor = @core.CURSOR_HAND
@@ -537,29 +568,39 @@ fn menu_item(
   width : Double,
   selected : @core.Store[String],
   icon : @icons.IconKind?,
+  skin~ : @style.Style = @style.empty_style(),
 ) -> @core.Node {
   let font = @text.Font::new("", 13.0)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(40.0))
+    // 常态文字色与悬停底走样式（选中态是数据态：底色/文字/强调条留内置配色）
+    @style.apply(
+      w,
+      @style.style(color="text_primary", border_radius=4.0).hover(background_color="fill_hover")
+    )
+    @style.apply(w, skin)
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
+      let st = @style.style_for(self)
+      let rad = @style.number_of(st.border_radius, 4.0)
       let act = selected.get() == text
       let fg = if act {
         @theme.theme_primary()
       } else {
-        @theme.theme_text_primary()
+        @style.color_of(st.color, @theme.theme_text_primary())
       }
+      let bg = @style.color_of(st.background_color, "")
       if act {
         p.set_fill_color(@theme.theme_primary_light())
-        fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
-      } else if self.hovered {
-        p.set_fill_color(@theme.theme_fill_hover())
-        fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
+        fill_round_rect(p, 0.0, 0.0, r.w, r.h, rad)
+      } else if bg.length() > 0 {
+        p.set_fill_color(bg)
+        fill_round_rect(p, 0.0, 0.0, r.w, r.h, rad)
       }
       if act {
         p.set_fill_color(fg)
@@ -631,7 +672,15 @@ pub fn menu(
   follow_store(selected)
   let nodes : Array[@core.Node] = []
   for it in items {
-    nodes.push(menu_item(it, width - 12.0, selected, icon_for(icons, it)))
+    nodes.push(
+      menu_item(
+        it,
+        width - 12.0,
+        selected,
+        icon_for(icons, it),
+        skin=paint_subset(class),
+      ),
+    )
   }
   view(
     nodes,
@@ -653,6 +702,7 @@ pub fn menu_sections(
   icons? : Array[(String, @icons.IconKind)] = [],
   foldable? : Bool = true,
   width? : Double = 180.0,
+  class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   follow_store(selected)
@@ -661,8 +711,11 @@ pub fn menu_sections(
     let title = sec.0
     let items = sec.1
     let nodes : Array[@core.Node] = []
+    let skin = paint_subset(class)
     for it in items {
-      nodes.push(menu_item(it, width - 12.0, selected, icon_for(icons, it)))
+      nodes.push(
+        menu_item(it, width - 12.0, selected, icon_for(icons, it), skin=skin),
+      )
     }
     let open = Ref(true)
     let head_font = @text.Font::new("", 12.0)
@@ -676,11 +729,14 @@ pub fn menu_sections(
       watch_theme()
       w.node.set_width(@yoga.fixed(width - 12.0))
       w.node.set_height(@yoga.fixed(24.0))
+      @style.apply(w, @style.style(color="text_secondary"))
+      @style.apply(w, paint_subset(class))
       w.on_draw = Some(fn(
-        _self : @core.Widget,
+        self : @core.Widget,
         p : @render.Painter,
         r : @core.Rect,
       ) -> Unit {
+        let st = @style.style_for(self)
         let _ = @text.draw_box_at(
           p,
           4.0,
@@ -689,7 +745,7 @@ pub fn menu_sections(
           r.h,
           title,
           head_font,
-          @theme.theme_text_secondary(),
+          @style.color_of(st.color, @theme.theme_text_secondary()),
           align=@text.Start,
           valign=@text.Center,
         )
@@ -721,7 +777,7 @@ pub fn menu_sections(
     blocks.push(head)
     blocks.push(@core.node_of(body))
   }
-  view(blocks, row_gap=2.0, padding=6.0, width=width, handle=handle)
+  view(blocks, row_gap=2.0, padding=6.0, width=width, class=class, handle=handle)
 }
 
 ///|
@@ -737,6 +793,7 @@ fn build_tree_rows(
   into : @core.Widget,
   nodes : Array[TreeNode],
   level : Int,
+  skin~ : @style.Style = @style.empty_style(),
 ) -> Unit {
   let font = @text.Font::new("", 13.0)
   for nd in nodes {
@@ -747,13 +804,21 @@ fn build_tree_rows(
     row.node.set_width(@yoga.fixed(260.0))
     row.node.set_height(@yoga.fixed(32.0))
     row.set_margin(left=level.to_double() * 18.0)
+    // 标签色与悬停底走样式（箭头记号与「有才悬停」的条件留组件语义）
+    @style.apply(
+      row,
+      @style.style(color="text_primary").hover(background_color="fill_hover")
+    )
+    @style.apply(row, skin)
     row.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      if self.hovered && has_kids {
-        p.set_fill_color(@theme.theme_fill_hover())
+      let st = @style.style_for(self)
+      let bg = @style.color_of(st.background_color, "")
+      if has_kids && bg.length() > 0 {
+        p.set_fill_color(bg)
         p.fill_rect(0.0, 0.0, r.w, r.h)
       }
       if has_kids {
@@ -780,7 +845,7 @@ fn build_tree_rows(
         r.h,
         nd.label,
         font,
-        @theme.theme_text_primary(),
+        @style.color_of(st.color, @theme.theme_text_primary()),
         align=@text.Start,
         valign=@text.Center,
       )
@@ -789,7 +854,7 @@ fn build_tree_rows(
     kids.node.set_flex_direction(@yoga.Column)
     kids.set_visible(false)
     if has_kids {
-      build_tree_rows(kids, nd.children, level + 1)
+      build_tree_rows(kids, nd.children, level + 1, skin=skin)
     }
     row.cursor = @core.CURSOR_HAND
     row.on_pointer = Some(fn(
@@ -825,7 +890,7 @@ pub fn tree(
     watch_theme()
     w.node.set_flex_direction(@yoga.Column)
     w.node.set_width(@yoga.percent(100.0))
-    build_tree_rows(w, root, 0)
+    build_tree_rows(w, root, 0, skin=paint_subset(class))
     fold_style(w, @style.empty_style(), class)
     handle(w)
     w
@@ -881,18 +946,23 @@ pub fn tabs(
       tab.node.set_width(@yoga.fixed(tw + 28.0))
       tab.node.set_height(@yoga.fixed(36.0))
       tab.set_margin(right=8.0)
+      // 未选中文字的常态色/悬停色交给样式基块与 hover 桶；选中态（含下划线）是数据态
+      @style.apply(
+        tab,
+        @style.style(color="text_secondary").hover(color="text_regular")
+      )
+      @style.apply(tab, paint_subset(class))
       tab.on_draw = Some(fn(
         self : @core.Widget,
         p : @render.Painter,
         r : @core.Rect,
       ) -> Unit {
+        let st = @style.style_for(self)
         let act = sel.get() == idx
         let color = if act {
           @theme.theme_primary()
-        } else if self.hovered {
-          @theme.theme_text_regular()
         } else {
-          @theme.theme_text_secondary()
+          @style.color_of(st.color, @theme.theme_text_secondary())
         }
         let _ = @text.draw_box_at(
           p,
@@ -972,15 +1042,21 @@ pub fn transfer(
     for box in [left_box, right_box] {
       box.node.set_width(@yoga.fixed(width))
       box.node.set_min_height(@yoga.fixed(60.0))
+      @style.apply(
+        box,
+        @style.style(background_color="bg_panel", border_color="border", border_width=1.0)
+      )
+      @style.apply(box, paint_subset(class))
       box.on_draw = Some(fn(
-        _self : @core.Widget,
+        self : @core.Widget,
         p : @render.Painter,
         r : @core.Rect,
       ) -> Unit {
-        p.set_fill_color(@theme.theme_bg_panel())
+        let st = @style.style_for(self)
+        p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
         p.fill_rect(0.0, 0.0, r.w, r.h)
-        p.set_stroke_color(@theme.theme_border())
-        p.set_line_width(1.0)
+        p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+        p.set_line_width(@style.number_of(st.border_width, 1.0))
         p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
       })
     }
@@ -1020,14 +1096,21 @@ pub fn transfer(
         let row_w = @core.Widget::new()
         row_w.node.set_width(@yoga.percent(100.0))
         row_w.node.set_height(@yoga.fixed(item_height))
+        @style.apply(
+          row_w,
+          @style.style(color="text_regular").hover(background_color="fill_hover")
+        )
+        @style.apply(row_w, paint_subset(class))
         row_w.on_draw = Some(fn(
           self : @core.Widget,
           p : @render.Painter,
           r : @core.Rect,
         ) -> Unit {
+          let st = @style.style_for(self)
           let on = contains(sel.val, mine)
-          if self.hovered {
-            p.set_fill_color(@theme.theme_fill_hover())
+          let bg = @style.color_of(st.background_color, "")
+          if bg.length() > 0 {
+            p.set_fill_color(bg)
             p.fill_rect(0.0, 0.0, r.w, r.h)
           }
           p.set_fill_color(
@@ -1046,7 +1129,7 @@ pub fn transfer(
             r.h,
             mine,
             font,
-            @theme.theme_text_regular(),
+            @style.color_of(st.color, @theme.theme_text_regular()),
             align=@text.Start,
             valign=@text.Center,
           )
@@ -1116,20 +1199,21 @@ pub fn transfer(
       let b = @core.Widget::new()
       b.node.set_width(@yoga.fixed(32.0))
       b.node.set_height(@yoga.fixed(28.0))
+      @style.apply(
+        b,
+        @style.style(color="text_regular", background_color="info_light")
+          .hover(background_color="primary_light")
+      )
+      @style.apply(b, paint_subset(class))
       b.on_draw = Some(fn(
         self : @core.Widget,
         p : @render.Painter,
         r : @core.Rect,
       ) -> Unit {
-        p.set_fill_color(
-          if self.hovered {
-            @theme.theme_primary_light()
-          } else {
-            @theme.theme_info_light()
-          },
-        )
+        let st = @style.style_for(self)
+        p.set_fill_color(@style.color_of(st.background_color, @theme.theme_info_light()))
         p.fill_rect(0.0, 0.0, r.w, r.h)
-        draw_chevron(p, r.w / 2.0, r.h / 2.0, 4.0, to_right, @theme.theme_text_regular())
+        draw_chevron(p, r.w / 2.0, r.h / 2.0, 4.0, to_right, @style.color_of(st.color, @theme.theme_text_regular()))
       })
       b.cursor = @core.CURSOR_HAND
       b.on_pointer = Some(fn(

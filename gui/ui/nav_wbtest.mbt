@@ -283,3 +283,75 @@ test "穿梭框：点行选中、箭头搬运、搬完清空选中、外部改�
   right.set(["外", "部", "两", "项"])
   assert_eq(rbox.children().length(), 4)
 }
+
+///|
+/// P2-e 口径：导航族的项也走样式槽——class 的绘制期属性（经 `paint_subset` 投影）
+/// 覆盖内置皮肤；「选中 × 悬停」的取色分支是数据态，留在调色回调里当回落值。
+test "导航族只读样式槽：class 覆盖分段底色、页签字色与穿梭框描边" {
+  if !ui_text_guard() {
+    return
+  }
+  let warm_of = fn(node : @core.Node, w : Double, h : Double) -> Int {
+    let root = @core.Widget::new()
+    root.set_size(w, h)
+    root.set_column()
+    let _ = node.mount_into(root)
+    root.relayout(w, h)
+    let bm = @render.Bitmap::new(w.to_int(), h.to_int())
+    let p = @render.Painter::new(bm)
+    root.paint(p)
+    p.end()
+    let mut n = 0
+    for y = 0; y < h.to_int(); y = y + 1 {
+      for x = 0; x < w.to_int(); x = x + 1 {
+        let c = bm.pixel(x, y)
+        if c.r > 128 && c.g < 64 && c.b < 64 {
+          n = n + 1
+        }
+      }
+    }
+    n
+  }
+  // 分段：内置皮肤只有选中段铺底，class 的底色铺进每一段
+  let plain_seg = warm_of(segmented(["甲", "乙"], @core.Store::new("甲")), 300.0, 60.0)
+  let classed_seg = warm_of(
+    segmented(["甲", "乙"], @core.Store::new("甲"), class=[@style.style(background_color="#ff0000")]),
+    300.0,
+    60.0,
+  )
+  assert_true(plain_seg == 0)
+  assert_true(classed_seg > 100)
+
+  // 页签：未选中页签的文字色吃 class 的 color
+  let plain_tab = warm_of(
+    tabs([("概览", text("概览页")), ("明细", text("明细页"))], selected=@core.Store::new(0)),
+    320.0,
+    120.0,
+  )
+  let classed_tab = warm_of(
+    tabs(
+      [("概览", text("概览页")), ("明细", text("明细页"))],
+      selected=@core.Store::new(0),
+      class=[@style.style(color="#ff0000")],
+    ),
+    320.0,
+    120.0,
+  )
+  assert_true(classed_tab > plain_tab)
+
+  // 穿梭框：列表框的描边色与宽度吃 class（内置是 1px 主题描边色）
+  let left = @core.Store::new(["甲", "乙"])
+  let right : @core.Store[Array[String]] = @core.Store::new([])
+  let plain_tr = warm_of(transfer(left, right, width=100.0), 320.0, 120.0)
+  let classed_tr = warm_of(
+    transfer(
+      left,
+      right,
+      width=100.0,
+      class=[@style.style(border_color="#ff0000", border_width=4.0)],
+    ),
+    320.0,
+    120.0,
+  )
+  assert_true(classed_tr > plain_tr)
+}
