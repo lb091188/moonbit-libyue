@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitepress'
 
-const gh = 'https://github.com/lb091188/moonbit-libyue'
+const gh = 'https://github.com/lb091188/moonbit-native-gui'
 
 // 落地页语言自动选择:首次访问根路径时,浏览器语言为中文则跳转 /zh/,
 // 其余语言留在默认英文;用户手动切换过语言(localStorage 有记录)后不再跳转。

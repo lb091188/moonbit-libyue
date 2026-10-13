@@ -10,4 +10,4 @@ keywords = [ "flexbox", "layout", "css", "gui", "native" ]
 
 license = "MIT"
 
-repository = "https://github.com/lb091188/moonbit-libyue"
+repository = "https://github.com/lb091188/moonbit-native-gui"

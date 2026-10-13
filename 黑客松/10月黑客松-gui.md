@@ -5,7 +5,7 @@
 - 项目名称：native-gui
 - 参赛者：刘斌（NoahLiu）
 - 联系方式：<lbpeter0911@163.com>
-- GitHub：<https://github.com/lb091188/moonbit-libyue>
+- GitHub：<https://github.com/lb091188/moonbit-native-gui>
 - 项目方向：MoonBit 原生跨平台桌面 GUI 开发框架
 - 是否为移植项目：否
 

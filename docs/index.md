@@ -10,7 +10,7 @@ hero:
       link: /README
     - theme: alt
       text: GitHub
-      link: https://github.com/lb091188/moonbit-libyue
+      link: https://github.com/lb091188/moonbit-native-gui
 features:
   - title: Self-drawn, one theme everywhere
     details: Windows, pixels, the event loop, layout and widgets are all pure MoonBit, so widgets look the same on every platform and follow the system accent colour and light / dark mode.

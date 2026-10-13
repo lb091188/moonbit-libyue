@@ -8,7 +8,7 @@ description = "native-gui 平台后端探针与微基准（开发工具集，非
 
 license = "MIT"
 
-repository = "https://github.com/lb091188/moonbit-libyue"
+repository = "https://github.com/lb091188/moonbit-native-gui"
 
 import {
   "NoahLiu/native-gui@0.1.0",

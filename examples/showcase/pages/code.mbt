@@ -13,7 +13,7 @@ fn demo_md_lines() -> Array[String] {
     "# MoonBit × native-gui",
     "## GFM 渲染演示",
     "",
-    "支持 **粗体**、*斜体*、***粗斜体***、~~删除线~~、`行内代码` 与 [链接](https://github.com/lb091188/moonbit-libyue),",
+    "支持 **粗体**、*斜体*、***粗斜体***、~~删除线~~、`行内代码` 与 [链接](https://github.com/lb091188/moonbit-native-gui),",
     "自动链接 <https://libyue.com>,引用式链接见[主页][home]。",
     "",
     "Emoji 👍 之后的 **样式** 与 `区间` 仍应对齐。",

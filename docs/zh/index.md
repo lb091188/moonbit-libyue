@@ -10,7 +10,7 @@ hero:
       link: /zh/README
     - theme: alt
       text: GitHub
-      link: https://github.com/lb091188/moonbit-libyue
+      link: https://github.com/lb091188/moonbit-native-gui
 features:
   - title: 自绘控件,一套主题走全平台
     details: 窗口、像素、事件循环、布局与控件全部纯 MoonBit 实现,各平台外观一致,并跟随系统主色强调色与明暗模式。

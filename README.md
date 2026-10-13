@@ -1,4 +1,4 @@
-# moonbit-libyue [![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
+# moonbit-libyue [![CI](https://github.com/lb091188/moonbit-native-gui/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-native-gui/actions/workflows/ci.yml)
 
 > **⚠ Renamed** — the mooncakes package is now **`NoahLiu/native-gui`** (formerly `NoahLiu/moonbit-libyue`; the old name will be marked deprecated once the stack stabilizes); sub-modules `NoahLiu/yue-media` → **`NoahLiu/gui-media`**, `NoahLiu/yue-examples` → **`NoahLiu/gui-examples`**. 
 
@@ -6,11 +6,11 @@
 
 A **native cross-platform desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — windows, pixels, the event loop, layout and widgets are all written in pure MoonBit. One codebase runs native windows on Windows ✅ / Linux ✅, macOS backend not yet developed; zero config after `moon add`.
 
-English | [简体中文](https://github.com/lb091188/moonbit-libyue/blob/master/README_ZH.md)
+English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/master/README_ZH.md)
 
-![Component showcase](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-main.png)
+![Component showcase](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/images/showcase-main.png)
 
-![Live demo on Linux (XFCE)](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-anim-linux.webp) ![Live demo on Windows](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-anim-windows.webp)
+![Live demo on Linux (XFCE)](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/images/showcase-anim-linux.webp) ![Live demo on Windows](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/images/showcase-anim-windows.webp)
 
 *Left: Linux (XFCE) · Right: Windows — one MoonBit codebase*
 

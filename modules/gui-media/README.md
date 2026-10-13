@@ -58,7 +58,7 @@ vp.play()
 
 ## 示例
 
-完整用法见 [gui-examples](https://github.com/lb091188/moonbit-libyue/tree/master/modules/gui-examples) 的 systemprobe（媒体页）。
+完整用法见 [gui-examples](https://github.com/lb091188/moonbit-native-gui/tree/master/modules/gui-examples) 的 systemprobe（媒体页）。
 
 ## 许可
 

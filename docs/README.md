@@ -62,6 +62,6 @@ moon run examples/showcase       # full demo board: component library + system c
 | [tray.md](tray.md) | Linux tray: SNI protocol-stack design, architecture, backend fallback, desktop compatibility |
 | [zh/system-capabilities.md](/zh/system-capabilities.md) (Chinese) | System capabilities (`@sys`): brightness / backlight / volume / media control / night light / wallpaper / monitors / window control / clipboard watch / disk volumes / power & sessions / Bluetooth / printers / sensors / env / recent files / browser bookmarks & history / installed-app lookup / VS Code history…, with a unified `Result` semantics |
 
-For the project overview and quick start, see the repository root [README.md](https://github.com/lb091188/moonbit-libyue/#readme).
+For the project overview and quick start, see the repository root [README.md](https://github.com/lb091188/moonbit-native-gui/#readme).
 
 [中文版文档索引](/zh/README.md)

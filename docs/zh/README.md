@@ -63,4 +63,4 @@ moon run examples/showcase       # 完整演示板：组件库 + 系统能力
 | [tray.md](tray.md) | Linux 托盘方案：SNI 协议栈设计、架构、后端降级、桌面兼容性 |
 | [system-capabilities.md](system-capabilities.md) | 系统能力（包 `@sys`）：屏幕亮度 / 键盘背光 / 系统音量 / 媒体控制 / 夜间色温 / 壁纸 / 显示器配置 / 系统窗口管理 / 剪贴板监听 / 磁盘卷 / 电源与登录会话 / 系统信息 / 蓝牙 / 传感器 / 打印机 / 进程内环境变量与目录枚举 / 最近文件 / 浏览器书签与历史 / 应用查找 / VS Code 历史…，统一 Result 语义；含子进程执行（procrun）与通用 D-Bus 调用层两块共享基建 |
 
-项目总览与快速开始入口见仓库根 [README_ZH.md](https://github.com/lb091188/moonbit-libyue/blob/master/README_ZH.md)。
+项目总览与快速开始入口见仓库根 [README_ZH.md](https://github.com/lb091188/moonbit-native-gui/blob/master/README_ZH.md)。

@@ -10,7 +10,7 @@ keywords = [ "ffmpeg", "audio", "video", "media", "native" ]
 
 license = "MIT"
 
-repository = "https://github.com/lb091188/moonbit-libyue"
+repository = "https://github.com/lb091188/moonbit-native-gui"
 
 options(
   "--moonbit-unstable-prebuild": "prebuild.py"

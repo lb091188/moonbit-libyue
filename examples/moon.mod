@@ -8,7 +8,7 @@ description = "native-gui 独立示例模块：hello / 主题 / 原生窗口 / �
 
 license = "MIT"
 
-repository = "https://github.com/lb091188/moonbit-libyue"
+repository = "https://github.com/lb091188/moonbit-native-gui"
 
 import {
   "NoahLiu/native-gui@0.1.0",

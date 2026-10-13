@@ -12,7 +12,7 @@ keywords = [ "gui", "desktop", "native", "cross-platform", "moonbit" ]
 
 license = "MIT"
 
-repository = "https://github.com/lb091188/moonbit-libyue"
+repository = "https://github.com/lb091188/moonbit-native-gui"
 
 import {
   "NoahLiu/yoga-mbt@0.1.0",
@@ -21,6 +21,6 @@ import {
 }
 
 options(
-  homepage: "https://github.com/lb091188/moonbit-libyue",
+  homepage: "https://github.com/lb091188/moonbit-native-gui",
   "--moonbit-unstable-prebuild": "scripts/prebuild.py",
 )

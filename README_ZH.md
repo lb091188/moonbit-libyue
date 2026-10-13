@@ -1,4 +1,4 @@
-# moonbit-libyue [![CI](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-libyue/actions/workflows/ci.yml)
+# moonbit-libyue [![CI](https://github.com/lb091188/moonbit-native-gui/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-native-gui/actions/workflows/ci.yml)
 
 > **⚠ 已更名**——mooncakes 包名改为 **`NoahLiu/native-gui`**（原名 `NoahLiu/moonbit-libyue`；待自绘栈稳定后将旧名标记废弃）；子模块 `NoahLiu/yue-media` → **`NoahLiu/gui-media`**、`NoahLiu/yue-examples` → **`NoahLiu/gui-examples`**。
 
@@ -6,11 +6,11 @@
 
 [MoonBit](https://github.com/moonbitlang) 生态的**原生跨平台桌面 GUI 库**——窗口、像素、事件循环、布局与控件全部纯 MoonBit 实现。一套代码在 Windows ✅ / Linux ✅ 上跑原生窗口，macOS 后端暂未开发；`moon add` 后零配置直接运行。
 
-简体中文 | [English](https://github.com/lb091188/moonbit-libyue/blob/master/README.md)
+简体中文 | [English](https://github.com/lb091188/moonbit-native-gui/blob/master/README.md)
 
-![组件库演示板](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-main.png)
+![组件库演示板](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/images/showcase-main.png)
 
-![Linux(XFCE)实机演示](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-anim-linux.webp) ![Windows 实机演示](https://cdn.jsdelivr.net/gh/lb091188/moonbit-libyue@master/docs/images/showcase-anim-windows.webp)
+![Linux(XFCE)实机演示](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/images/showcase-anim-linux.webp) ![Windows 实机演示](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/images/showcase-anim-windows.webp)
 
 *图二 Linux(XFCE) · 图三:Windows —— 同一套 MoonBit 代码*
 
