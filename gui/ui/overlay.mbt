@@ -15,6 +15,7 @@ fn overlay_pane(
   children : Array[@core.Node],
   width : Double,
   height : Double,
+  skin~ : @style.Style = @style.empty_style(),
 ) -> @core.Node {
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
@@ -25,15 +26,23 @@ fn overlay_pane(
     if height > 0.0 {
       w.node.set_height(@yoga.fixed(height))
     }
+    @style.apply(
+      w,
+      @style.merge_all([
+        @style.style(background_color="bg_panel", border_color="border", border_width=1.0),
+        skin,
+      ]),
+    )
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(@theme.theme_bg_panel())
+      let st = @style.style_for(self)
+      p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
       p.fill_rect(0.0, 0.0, r.w, r.h)
-      p.set_stroke_color(@theme.theme_border())
-      p.set_line_width(1.0)
+      p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+      p.set_line_width(@style.number_of(st.border_width, 1.0))
       p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
     })
     @core.mount_children(w, children)
@@ -80,7 +89,7 @@ pub fn popover(
             open_id.val = 0
           } else {
             open_id.val = @core.overlay_show_at(
-              overlay_pane([content], width, height),
+              overlay_pane([content], width, height, skin=paint_subset(class)),
               self.rect.x,
               self.rect.y + self.rect.h + 2.0,
             )
@@ -98,7 +107,11 @@ pub fn popover(
 
 ///|
 /// 下拉菜单一行（28 高，悬停高亮；`"-"` 画成分隔线）。
-fn menu_row(text : String, on_pick : () -> Unit) -> @core.Node {
+fn menu_row(
+  text : String,
+  on_pick : () -> Unit,
+  skin~ : @style.Style = @style.empty_style(),
+) -> @core.Node {
   if text == "-" {
     return divider()
   }
@@ -108,13 +121,23 @@ fn menu_row(text : String, on_pick : () -> Unit) -> @core.Node {
     w.node.set_width(@yoga.percent(100.0))
     w.node.set_height(@yoga.fixed(28.0))
     w.cursor = @core.CURSOR_HAND
+    @style.apply(
+      w,
+      @style.merge_all([
+        @style.style(color="text_regular").hover(background_color="fill_hover"),
+        skin,
+      ]),
+    )
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      if self.hovered {
-        p.set_fill_color(@theme.theme_fill_hover())
+      let st = @style.style_for(self)
+      // 悬停底来自 hover 桶：没给就是不铺底
+      let bg = @style.color_of(st.background_color, "")
+      if bg.length() > 0 {
+        p.set_fill_color(bg)
         p.fill_rect(0.0, 0.0, r.w, r.h)
       }
       let _ = @text.draw_box_at(
@@ -125,7 +148,7 @@ fn menu_row(text : String, on_pick : () -> Unit) -> @core.Node {
         r.h,
         text,
         font,
-        @theme.theme_text_regular(),
+        @style.color_of(st.color, @theme.theme_text_regular()),
         align=@text.Start,
         valign=@text.Center,
       )
@@ -166,21 +189,30 @@ pub fn dropdown(
     w.node.set_height(@yoga.fixed(30.0))
     w.cursor = @core.CURSOR_HAND
     let open_id : Ref[Int] = Ref(0)
+    // 内置皮肤进槽（基块=常态、hover 桶=悬停底），class 的属性后落即覆盖
+    @style.apply(
+      w,
+      @style.merge_all([
+        @style.style(
+          color="text_regular",
+          background_color="bg_panel",
+          border_color="border",
+          border_width=1.0,
+          border_radius=4.0,
+        ).hover(background_color="fill_hover"),
+        paint_subset(class),
+      ]),
+    )
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(
-        if self.hovered {
-          @theme.theme_fill_hover()
-        } else {
-          @theme.theme_bg_panel()
-        },
-      )
-      fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
-      p.set_stroke_color(@theme.theme_border())
-      p.set_line_width(1.0)
+      let st = @style.style_for(self)
+      p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
+      fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
+      p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+      p.set_line_width(@style.number_of(st.border_width, 1.0))
       p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
       let _ = @text.draw_box_at(
         p,
@@ -190,7 +222,7 @@ pub fn dropdown(
         r.h,
         trigger,
         font,
-        @theme.theme_text_regular(),
+        @style.color_of(st.color, @theme.theme_text_regular()),
         align=@text.Start,
         valign=@text.Center,
       )
@@ -219,15 +251,19 @@ pub fn dropdown(
             for i = 0; i < items.length(); i = i + 1 {
               let idx = i
               rows.push(
-                menu_row(items[i], fn() -> Unit {
-                  @core.overlay_hide(open_id.val)
-                  open_id.val = 0
-                  on_select(idx)
-                }),
+                menu_row(
+                  items[i],
+                  fn() -> Unit {
+                    @core.overlay_hide(open_id.val)
+                    open_id.val = 0
+                    on_select(idx)
+                  },
+                  skin=paint_subset(class),
+                ),
               )
             }
             open_id.val = @core.overlay_show_at(
-              overlay_pane(rows, width, 0.0),
+              overlay_pane(rows, width, 0.0, skin=paint_subset(class)),
               self.rect.x,
               self.rect.y + self.rect.h + 2.0,
             )
@@ -245,19 +281,31 @@ pub fn dropdown(
 
 ///|
 /// 提示气泡（实底白字的圆角小条）。
-fn tooltip_pane(tip : String, font : @text.Font) -> @core.Node {
+fn tooltip_pane(
+  tip : String,
+  font : @text.Font,
+  skin~ : @style.Style = @style.empty_style(),
+) -> @core.Node {
   let text_w = text_width(tip, font)
   @core.node_of_new(fn(pane_w : @core.Widget) -> @core.Widget {
     watch_theme()
     pane_w.node.set_height(@yoga.fixed(24.0))
     pane_w.node.set_width(@yoga.fixed(text_w + 16.0))
+    @style.apply(
+      pane_w,
+      @style.merge_all([
+        @style.style(background_color="text_primary", color="#ffffff", border_radius=4.0),
+        skin,
+      ]),
+    )
     pane_w.on_draw = Some(fn(
-      _s : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      p.set_fill_color(@theme.theme_text_primary())
-      fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
+      let st = @style.style_for(self)
+      p.set_fill_color(@style.color_of(st.background_color, @theme.theme_text_primary()))
+      fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
       let _ = @text.draw_box_at(
         p,
         0.0,
@@ -266,7 +314,7 @@ fn tooltip_pane(tip : String, font : @text.Font) -> @core.Node {
         r.h,
         tip,
         font,
-        "#ffffff",
+        @style.color_of(st.color, "#ffffff"),
         align=@text.Center,
         valign=@text.Center,
       )
@@ -306,7 +354,11 @@ pub fn tooltip(
           let ay = self.rect.y + self.rect.h + 4.0
           timer.val = @core.set_timeout(delay_ms, fn() {
             timer.val = 0
-            tip_id.val = @core.overlay_show_at(tooltip_pane(tip, font), ax, ay)
+            tip_id.val = @core.overlay_show_at(
+              tooltip_pane(tip, font, skin=paint_subset(class)),
+              ax,
+              ay,
+            )
           })
         }
       } else {
@@ -402,11 +454,16 @@ pub fn dialog(
       title_bar.node.set_height(@yoga.fixed(40.0))
       title_bar.node.set_align_items(@yoga.AlignItems::Center)
       title_bar.set_padding(left=12.0)
+      @style.apply(
+        title_bar,
+        @style.merge_all([@style.style(color="text_primary"), paint_subset(class)]),
+      )
       title_bar.on_draw = Some(fn(
-        _s : @core.Widget,
+        self : @core.Widget,
         p : @render.Painter,
         r : @core.Rect,
       ) -> Unit {
+        let st = @style.style_for(self)
         let _ = @text.draw_box_at(
           p,
           12.0,
@@ -415,7 +472,7 @@ pub fn dialog(
           r.h,
           title,
           title_font,
-          @theme.theme_text_primary(),
+          @style.color_of(st.color, @theme.theme_text_primary()),
           align=@text.Start,
           valign=@text.Center,
         )
@@ -427,16 +484,26 @@ pub fn dialog(
       close_btn.node.set_width(@yoga.fixed(24.0))
       close_btn.node.set_height(@yoga.fixed(24.0))
       close_btn.cursor = @core.CURSOR_HAND
+      @style.apply(
+        close_btn,
+        @style.merge_all([
+          @style.style(color="text_secondary", border_radius=4.0)
+            .hover(background_color="fill_hover"),
+          paint_subset(class),
+        ]),
+      )
       close_btn.on_draw = Some(fn(
         self : @core.Widget,
         p : @render.Painter,
         r : @core.Rect,
       ) -> Unit {
-        if self.hovered {
-          p.set_fill_color(@theme.theme_fill_hover())
-          fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
+        let st = @style.style_for(self)
+        let bg = @style.color_of(st.background_color, "")
+        if bg.length() > 0 {
+          p.set_fill_color(bg)
+          fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
         }
-        p.set_stroke_color(@theme.theme_text_secondary())
+        p.set_stroke_color(@style.color_of(st.color, @theme.theme_text_secondary()))
         p.set_line_width(1.4)
         p.begin_path()
         p.move_to(8.0, 8.0)
@@ -478,27 +545,37 @@ pub fn dialog(
         b.node.set_width(@yoga.fixed(text_width(text, title_font) + 28.0))
         b.node.set_height(@yoga.fixed(28.0))
         b.cursor = @core.CURSOR_HAND
+        // 两档皮肤都折进槽：主档 常态 primary / 悬停 primary_hover，
+        // 次档 常态 bg_panel / 悬停 fill_hover（悬停分支由 hover 桶承担）
+        let skin = if primary {
+          @style.style(color="#ffffff", background_color="primary", border_color="border", border_width=1.0, border_radius=4.0).hover(
+            background_color="primary_hover",
+          )
+        } else {
+          @style.style(color="text_regular", background_color="bg_panel", border_color="border", border_width=1.0, border_radius=4.0).hover(
+            background_color="fill_hover",
+          )
+        }
+        @style.apply(b, @style.merge_all([skin, paint_subset(class)]))
         b.on_draw = Some(fn(
           self : @core.Widget,
           p : @render.Painter,
           r : @core.Rect,
         ) -> Unit {
+          let st = @style.style_for(self)
           p.set_fill_color(
-            if primary {
-              if self.hovered {
-                @theme.theme_primary_hover()
-              } else {
+            @style.color_of(
+              st.background_color,
+              if primary {
                 @theme.theme_primary()
-              }
-            } else if self.hovered {
-              @theme.theme_fill_hover()
-            } else {
-              @theme.theme_bg_panel()
-            },
+              } else {
+                @theme.theme_bg_panel()
+              },
+            ),
           )
-          fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
-          p.set_stroke_color(@theme.theme_border())
-          p.set_line_width(1.0)
+          fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
+          p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+          p.set_line_width(@style.number_of(st.border_width, 1.0))
           p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
           let _ = @text.draw_box_at(
             p,
@@ -508,7 +585,10 @@ pub fn dialog(
             r.h,
             text,
             title_font,
-            if primary { "#ffffff" } else { @theme.theme_text_regular() },
+            @style.color_of(
+              st.color,
+              if primary { "#ffffff" } else { @theme.theme_text_regular() },
+            ),
             align=@text.Center,
             valign=@text.Center,
           )
@@ -535,15 +615,28 @@ pub fn dialog(
       panel.node.set_flex_direction(@yoga.Column)
       panel.node.set_width(@yoga.fixed(panel_w))
       panel.set_padding_all(0.0)
+      @style.apply(
+        panel,
+        @style.merge_all([
+          @style.style(
+            background_color="bg_panel",
+            border_color="border",
+            border_width=1.0,
+            border_radius=6.0,
+          ),
+          paint_subset(class),
+        ]),
+      )
       panel.on_draw = Some(fn(
-        _s : @core.Widget,
+        self : @core.Widget,
         p : @render.Painter,
         r : @core.Rect,
       ) -> Unit {
-        p.set_fill_color(@theme.theme_bg_panel())
-        fill_round_rect(p, 0.0, 0.0, r.w, r.h, 6.0)
-        p.set_stroke_color(@theme.theme_border())
-        p.set_line_width(1.0)
+        let st = @style.style_for(self)
+        p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
+        fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 6.0))
+        p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
+        p.set_line_width(@style.number_of(st.border_width, 1.0))
         p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
       })
       panel.append_child(title_bar)

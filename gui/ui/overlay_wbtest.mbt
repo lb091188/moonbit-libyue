@@ -386,3 +386,89 @@ test "轻提示开在对话框之上（图层条目后开者在上）" {
   )
   @core.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
 }
+
+///|
+/// P2-e 口径：浮层族也走样式槽——触发件、菜单行、气泡与对话框面板的内置底色/描边
+/// 先折进槽，`class` 的绘制期属性后落即覆盖（悬停底改由 hover 桶供）。
+test "浮层族只读样式槽：class 覆盖下拉触发件、菜单行文字与对话框面板" {
+  if !ui_text_guard() {
+    return
+  }
+  let ink_in = fn(bm : @render.Bitmap, w : Int, h : Int, pick : (Int, Int, Int) -> Bool) -> Int {
+    let mut n = 0
+    for y = 0; y < h; y = y + 1 {
+      for x = 0; x < w; x = x + 1 {
+        let c = bm.pixel(x, y)
+        if pick(c.r, c.g, c.b) {
+          n = n + 1
+        }
+      }
+    }
+    n
+  }
+  let red = fn(r : Int, g : Int, b : Int) -> Bool {
+    r > 128 && g < 64 && b < 64
+  }
+  let paint_count = fn(node : @core.Node, open_it : Bool) -> Int {
+    let (root, kid) = mounted_with_overlay(node, 300.0, 200.0)
+    if open_it {
+      let _ = root.dispatch_pointer({
+        kind: @core.Down,
+        x: kid.rect.x + 8.0,
+        y: kid.rect.y + 8.0,
+        button: 1,
+        mods: 0,
+      })
+      let _ = root.dispatch_pointer({
+        kind: @core.Up,
+        x: kid.rect.x + 8.0,
+        y: kid.rect.y + 8.0,
+        button: 1,
+        mods: 0,
+      })
+      root.relayout(300.0, 200.0)
+    }
+    let bm = @render.Bitmap::new(300, 200)
+    let p = @render.Painter::new(bm)
+    root.paint(p)
+    p.end()
+    ink_in(bm, 300, 200, red)
+  }
+  // 触发件：class 的底色盖过内置 bg_panel
+  let plain_closed = paint_count(
+    dropdown("选项", ["甲", "乙"], width=120.0),
+    false,
+  )
+  let classed_closed = paint_count(
+    dropdown("选项", ["甲", "乙"], width=120.0, class=[@style.style(background_color="#ff0000")]),
+    false,
+  )
+  assert_true(plain_closed == 0)
+  assert_true(classed_closed > 60)
+  // 展开后菜单行的文字色也吃同一份 class 的 color（skin 透进内部件）
+  let classed_open = paint_count(
+    dropdown(
+      "选项",
+      ["甲", "乙"],
+      width=120.0,
+      class=[@style.style(background_color="#ff0000", color="#ff0000")],
+    ),
+    true,
+  )
+  assert_true(classed_open > classed_closed)
+
+  // 对话框面板：底色与圆角吃 class（内置是 bg_panel / 6px）
+  let vis = @core.Store::new(true)
+  let dlg_plain = paint_count(dialog(vis, "标题", [text("内容")]), false)
+  let dlg_classed = paint_count(
+    dialog(
+      vis,
+      "标题",
+      [text("内容")],
+      class=[@style.style(background_color="#ff0000")],
+    ),
+    false,
+  )
+  assert_true(dlg_classed > dlg_plain)
+  @core.overlay_clear()
+}
