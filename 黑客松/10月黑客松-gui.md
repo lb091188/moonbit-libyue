@@ -116,11 +116,13 @@ let count : @core.Store[Int] = @core.Store::new(0)
 
 ## 移植或参考说明
 
-- 参考对象：Yue / libyue（<https://github.com/yue/yue> ，LGPL 2.1）与 Yoga（<https://github.com/facebook/yoga> ，MIT）
-- 本项目许可证：MIT
+- **是否为移植项目**：否——项目从 libyue 的 MoonBit 绑定起步，如今是一次彻底重写，libyue / Yoga 只剩思路来源
+- **参考对象**：Yue / libyue（<https://github.com/yue/yue> ，LGPL 2.1，仅作功能范围与 API 形状对照）；Yoga（<https://github.com/facebook/yoga> ，MIT，布局引擎实现时对照过其源码）
+- **本项目许可证**：MIT
+- **合规结论**：未复制参考项目源码，不依赖、不分发其任何代码或二进制（早期 vendored libyue 已删除），不触发其开源许可证义务
 
-本项目为独立设计与实现，**未复制参考项目源码**：
+哪些是自己的、哪些不是：
 
-- 窗口、事件循环、Flexbox 布局、控件、光栅化器、主题系统、图表族全部为纯 MoonBit 自绘实现；布局引擎按 W3C CSS Flexbox 规范逐条实现；
-- Linux 系统能力基于纯 MoonBit DBus / SNI 协议栈实现；平台薄层为本项目自写的 Win32 / GTK3 C 桩与 Pango / DirectWrite 文字后端调用；
-- 与参考项目相比的扩展：声明式 API 与响应式状态（Store / Signal）、13 包按需取用的模块化、跨平台系统集成门面（托盘 / 通知 / 快捷键 / 原生菜单 / 拖放 / 自启动等）、系统能力族（25+ 项 OS 查询）、15+ 图型自绘图表族、Markdown 视图、内嵌 WebView、音视频引擎。
+- **纯 MoonBit 自绘核心**：窗口、事件循环、Flexbox 布局（W3C 规范逐条实现）、控件、光栅化器、主题、图表
+- **自写平台薄层**：窗口平台 C 桩与文字后端调用为本项目自有代码；Linux 系统能力走纯 MoonBit DBus / SNI 协议栈
+- **参考项目没有的扩展**：声明式 API 与 Store / Signal 响应式、13 包按需取用的模块化、跨平台系统集成门面、25+ 项 OS 查询、15+ 图型图表、Markdown 视图、内嵌 WebView、音视频引擎
