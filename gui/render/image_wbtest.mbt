@@ -9,9 +9,9 @@ fn fill_color(p : Painter, hex : String, n : Int) -> Unit {
 }
 
 ///|
-/// 解码后端可用性探针：自产 1×1 PNG 解得回即可用。Windows/mac 的占位桩
-/// （W9 换 WIC/各自动图线前）返回空图——解码依赖的测试据此跳过，
-/// 环境缺件只跳过不硬断（macOS CI 教训同款口径）。
+/// 解码后端可用性探针：自产 1×1 PNG 解得回即可用。Linux（GdkPixbuf）与
+/// Windows（WIC，W9）都有后端，macOS 的解码桩还没实装、返回空图——解码依赖的
+/// 测试据此跳过，环境缺件只跳过不硬断（macOS CI 教训同款口径）。
 fn decode_available() -> Bool {
   let bm = Bitmap::new(1, 1)
   let p = Painter::new(bm)

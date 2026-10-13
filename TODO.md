@@ -46,7 +46,7 @@
 - [x] `Painter` 契约补齐（首批门面化 + 次批图片/画布/离屏见子条目；对照基准旧 `yue/painter.mbt`（58 法）与 `docs/zh/components.md` 已随旧链清理失效）
   - [x] 首批：门面化（Cairo 后端 + 无 Cairo 纯矩形降级，两路径逐像素一致）＋路径/曲线/弧/变换/裁剪/混合（25 模式映射 Cairo 算子，探针实测全部生效）/渐变（线性、径向）；`render` 25/25
   - [x] 次批：`draw_image(_from_rect)`、`draw_canvas(_from_rect)`、离屏 `Canvas`（子表面限制采样域防串色、blit 尊重混合模式）
-- [~] 图片：`Image`（`new_from_file`/`new_from_png`/`from_bitmap`/`resize`/`get_width|height`/`write_to_file`/`ImageSlot`）、GdkPixbuf 解码（PNG/JPEG/GIF 首帧）、`Canvas` 离屏与 PNG 落盘已落地；**GIF 动画已补**——`Animation`（`new_from_file`/`advance`/`delay_ms`/`frame`/`current`/`close`，迭代器 + 与真实时间同速的虚拟时钟）+ 组件 `gif`（`ui/gif.mbt`，自转/暂停/继续、静图退回一帧、槽位随回收袋释放），顺带修掉 `cr_blit` 的缩放路径（图案矩阵语义反了，等尺寸时恰好看不出）；缺口只剩 Windows/mac 解码后端
+- [~] 图片：`Image`（`new_from_file`/`new_from_png`/`from_bitmap`/`resize`/`get_width|height`/`write_to_file`/`ImageSlot`）、GdkPixbuf 解码（PNG/JPEG/GIF 首帧）、`Canvas` 离屏与 PNG 落盘已落地；**GIF 动画已补**——`Animation`（`new_from_file`/`advance`/`delay_ms`/`frame`/`current`/`close`，迭代器 + 与真实时间同速的虚拟时钟）+ 组件 `gif`（`ui/gif.mbt`，自转/暂停/继续、静图退回一帧、槽位随回收袋释放），顺带修掉 `cr_blit` 的缩放路径（图案矩阵语义反了，等尺寸时恰好看不出）；**Windows 解码后端已落（W9，走 WIC）**——`render` 桩 `_WIN32` 分支实装 `img_decode_bytes/file` + `img_anim_*`（静态首帧按 GIF 逻辑屏幕尺寸合成、动图逐帧按 disposal 收尾），prebuild 给 render 包下发 `windowscodecs.lib/ole32.lib/user32.lib`，纯 C 探针 `experiment/img_probe` 60 条断言全过（含子矩形帧合成回归）；缺口只剩 macOS 解码后端
 - [x] 图标（平移源 master `icons/icons.mbt` 4297 行已随旧链清理；绘制面平移 + 声明式包装见子条目）
   - [x] 绘制面平移（`icons`，自 master 前 4197 行逐行搬入、数据块零差异）：803 条定点路径串 + `fill_icon_path` 解释器 + `IconKind`/`icon_name`/`all_icons` + `draw_icon`（含全量出图扫描 4/4）
   - [x] `icon`/`icon_button_t` 两个声明式包装 + 主题取色跟随：`icon(kind, size, color?)` 颜色空即现取主题正文色并随主题变更重绘（`watch_theme`），`icon_button_t` 是只有图标的按钮（悬停浅底、按下更深、禁用不吃事件、手型光标）；两者都返回 `@core.Node`，与声明式层同形

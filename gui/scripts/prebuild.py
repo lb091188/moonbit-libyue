@@ -212,6 +212,15 @@ def link_configs() -> dict:
           "link_flags": "user32.lib gdi32.lib imm32.lib advapi32.lib "
           "windowscodecs.lib ole32.lib shell32.lib uuid.lib",
         })
+        # render 桩（render/stub.c 的 _WIN32 分支）由 moon native-stub 自编，
+        # 这里只下发系统库：图片解码（W9）走 WIC，GUID 常量（CLSID_WICImaging
+        # Factory1 / IID_IWICImagingFactory / GUID_WICPixelFormat32bppBGRA）
+        # 在 windowscodecs.lib，COM 初始化与 PropVariant* 在 ole32.lib。
+        # 光栅部分仍是占位（真渲染是纯 MoonBit 光栅器），故不需要 gdi32/d2d。
+        entries.append({
+            "package": RENDER_PACKAGE,
+            "link_flags": "windowscodecs.lib ole32.lib user32.lib",
+        })
         # sys 桩（sys/sys_stub.c 的 _WIN32 分支）要 COM：文件对话框走
         # IFileDialog（ole32 的 CoCreateInstance + shell32 的
         # SHCreateItemFromParsingName），GUID 常量 CLSID_FileOpenDialog /

@@ -7,11 +7,12 @@
 //                     拿不到 cairo 头路径（link_configs 只有链接期字段，实测
 //                     同 G0 探针），所以宏不传的那次编译必须编出空，防与
 //                     .a 双定义。
-//   其余平台        → 占位 no-op（Windows/mac，moon native-stub 编）。Windows
-//                     的真渲染走 yue/render 的**纯 MoonBit 光栅器**（plan 矩阵
-//                     定案，零第三方依赖）：运行时探针（cr_begin 返回 0）探到
-//                     占位即选纯路径，占位只保链接符号不断。图片解码占位至
-//                     W9 用 WIC（系统组件）实装。
+//   其余平台        → 光栅部分占位 no-op（Windows/mac，moon native-stub 编）。
+//                     Windows 的真渲染走 render 包的**纯 MoonBit 光栅器**（plan
+//                     矩阵定案，零第三方依赖）：运行时探针（cr_begin 返回 0）
+//                     探到占位即选纯路径，占位只保链接符号不断。图片解码则是
+//                     例外——**Windows 已实装**（W9）：光栅器不负责解码，走
+//                     WIC（系统组件）；macOS 仍占位，随 mac 窗口层落地。
 //
 // 像素缓冲归 MoonBit（yue/render 的 Bitmap，ARGB32 预乘布局与
 // CAIRO_FORMAT_ARGB32 一致），本层不拥有内存、不 free 数据；PNG 编解码本体
@@ -859,6 +860,10 @@ int fsw_write_file(const char *path, int plen, unsigned char *data, int dlen) {
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h> // fsw_write_file 的宽字符路径路由
+// 图片解码（W9）走 WIC：COM 初始化与 CoCreateInstance 在 objbase.h，GUID 常量由
+// wincodec.h 声明、链接期取 windowscodecs.lib（C 模式用不了 __uuidof，同 W20f）
+#include <objbase.h>
+#include <wincodec.h>
 #endif
 
 int64_t cr_begin(unsigned char *data, int width, int height) {
@@ -918,7 +923,705 @@ void cr_blit(int64_t id, unsigned char *src, int sw, int sh, double sx,
   (void)ssh; (void)dx; (void)dy; (void)dw; (void)dh;
 }
 
-// 图片解码与文件写入在其余平台同样占位（各自后端随窗口层落地时补）。
+// ---- 图片解码 ----
+// Windows 走 WIC（windowscodecs.lib，系统组件，零第三方依赖），与平台矩阵定案
+// 一致：渲染是纯 MoonBit 光栅器，只有解码借系统能力。macOS 仍占位（各自动图线
+// 随 mac 窗口层落地）。
+//
+// 三条实测事实（`experiment/img_probe` 探针在真 Windows SDK 下回证）：
+//  1. WIC 的 GIF 解码器给的是**原始子矩形帧**——`GetSize` 报帧矩形（实测
+//     12x12）、偏移在 `/imgdesc/Left|Top`（实测 14/14），它不替调用方合成；
+//     整幅合成是本层职责（Linux 侧 GdkPixbuf 的动画迭代器是替我们做了的）。
+//  2. 透明索引**已由 WIC 应用**（帧像素 alpha 实测 0 与 255 两档），所以本层
+//     只需「alpha==0 的像素不动画布」——GIF 的透明是「此处保留前帧」而非混合，
+//     非透明像素则整像素覆盖。
+//  3. `/grctlext/Delay` 单位是**厘秒**（GIF 规格），×10 才是毫秒。
+#if defined(_WIN32)
+
+#define IMG_MAX 8
+#define IMG_ANIM_MAX 8
+// 帧数上限只防病态文件：像素按需现解、不缓存，内存与帧数无关；但回绕时要从 0
+// 重放合成，超大帧数的 GIF 会让那一拍变慢，故留一道闸。
+#define IMG_MAX_FRAMES 4096
+
+typedef struct {
+  unsigned char *px; // straight BGRA（w*h*4），与 Linux 分支的 GdkPixbuf 中间态同形
+  int w;
+  int h;
+} WicImg;
+
+static WicImg img_slots[IMG_MAX];
+
+// WIC 工厂：进程级单例。COM 已初始化则复用（RPC_E_CHANGED_MODE 说明别的套间
+// 先初始化过，WIC 仍可用，同 W20f 图标加载）。
+static IWICImagingFactory *g_wic = NULL;
+static int g_wic_tried = 0;
+
+static IWICImagingFactory *wic_factory(void) {
+  if (g_wic != NULL) {
+    return g_wic;
+  }
+  if (g_wic_tried) {
+    return NULL;
+  }
+  g_wic_tried = 1;
+  HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+  if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
+    return NULL;
+  }
+  // 取 1 号工厂：头文件在 _WIN32_WINNT>=0x0602 时把 CLSID_WICImagingFactory
+  // 宏别名到 Win8 才有的 Factory2，显式取 1 号兼容旧系统（vtable 前缀一致，
+  // IID 仍用 v1）。C 模式用不了 __uuidof，GUID 常量链接期取（W20f 同款）。
+  IWICImagingFactory *f = NULL;
+  hr = CoCreateInstance(&CLSID_WICImagingFactory1, NULL, CLSCTX_INPROC_SERVER,
+                        &IID_IWICImagingFactory, (void **)&f);
+  if (FAILED(hr) || f == NULL) {
+    return NULL;
+  }
+  g_wic = f;
+  return g_wic;
+}
+
+// UTF-8 → UTF-16：WIC 的文件入口要宽字符，A 版按 ANSI 代码页解中文路径会错
+// （同 W14 sys 侧「路径一律 UTF-8 进、宽字符 API 出」的口径）。调用方 free。
+static wchar_t *wic_wide(const char *s, int len) {
+  if (s == NULL || len < 1) {
+    return NULL;
+  }
+  int n = MultiByteToWideChar(CP_UTF8, 0, s, len, NULL, 0);
+  if (n <= 0) {
+    return NULL;
+  }
+  wchar_t *w = (wchar_t *)malloc(((size_t)n + 1) * sizeof(wchar_t));
+  if (w == NULL) {
+    return NULL;
+  }
+  MultiByteToWideChar(CP_UTF8, 0, s, len, w, n);
+  w[n] = L'\0';
+  return w;
+}
+
+// PROPVARIANT → int；非整型变体给 -1。
+static int wic_prop_int(PROPVARIANT *v) {
+  switch (v->vt) {
+  case VT_UI1: return (int)v->bVal;
+  case VT_UI2: return (int)v->uiVal;
+  case VT_UI4: return (int)v->ulVal;
+  case VT_I1: return (int)v->cVal;
+  case VT_I2: return (int)v->iVal;
+  case VT_I4: return (int)v->lVal;
+  default: return -1;
+  }
+}
+
+static int wic_query_int(IWICMetadataQueryReader *r, const wchar_t *name, int *out) {
+  PROPVARIANT v;
+  PropVariantInit(&v);
+  HRESULT hr = r->lpVtbl->GetMetadataByName(r, name, &v);
+  int val = SUCCEEDED(hr) ? wic_prop_int(&v) : -1;
+  PropVariantClear(&v);
+  if (val < 0) {
+    return 0;
+  }
+  *out = val;
+  return 1;
+}
+
+// GIF 的**逻辑屏幕**尺寸（`/logscrdesc/*`）；非 GIF（PNG/JPEG…）没有这两个
+// 属性，给 0 让调用方退回帧尺寸。
+static void wic_screen_size(IWICBitmapDecoder *dec, UINT *w, UINT *h) {
+  *w = 0;
+  *h = 0;
+  IWICMetadataQueryReader *r = NULL;
+  if (FAILED(dec->lpVtbl->GetMetadataQueryReader(dec, &r)) || r == NULL) {
+    return;
+  }
+  int v = 0;
+  if (wic_query_int(r, L"/logscrdesc/Width", &v)) {
+    *w = (UINT)v;
+  }
+  if (wic_query_int(r, L"/logscrdesc/Height", &v)) {
+    *h = (UINT)v;
+  }
+  r->lpVtbl->Release(r);
+}
+
+// 一帧 → straight BGRA（w*h*4，行距 w*4）。失败给 NULL。
+static unsigned char *wic_frame_bgra(IWICImagingFactory *f,
+                                     IWICBitmapFrameDecode *frame, UINT *out_w,
+                                     UINT *out_h) {
+  IWICFormatConverter *conv = NULL;
+  unsigned char *px = NULL;
+  HRESULT hr = f->lpVtbl->CreateFormatConverter(f, &conv);
+  if (SUCCEEDED(hr)) {
+    hr = conv->lpVtbl->Initialize(conv, (IWICBitmapSource *)frame,
+                                  &GUID_WICPixelFormat32bppBGRA,
+                                  WICBitmapDitherTypeNone, NULL, 0.0,
+                                  WICBitmapPaletteTypeCustom);
+  }
+  if (SUCCEEDED(hr)) {
+    UINT w = 0;
+    UINT h = 0;
+    hr = conv->lpVtbl->GetSize(conv, &w, &h);
+    if (SUCCEEDED(hr) && w > 0 && h > 0) {
+      UINT stride = w * 4u;
+      px = (unsigned char *)malloc((size_t)stride * (size_t)h);
+      if (px != NULL) {
+        if (FAILED(conv->lpVtbl->CopyPixels(conv, NULL, stride, stride * h, px))) {
+          free(px);
+          px = NULL;
+        } else {
+          *out_w = w;
+          *out_h = h;
+        }
+      }
+    }
+  }
+  if (conv != NULL) {
+    conv->lpVtbl->Release(conv);
+  }
+  return px;
+}
+
+// 一帧的 GIF 元数据：帧停留（毫秒，缺省/0 统一成 100，与 Linux 分支同口径）、
+// disposal 方式、帧在逻辑屏幕里的偏移与尺寸。
+static void wic_frame_meta(IWICBitmapFrameDecode *frame, int *delay_ms,
+                           int *disposal, int *left, int *top, UINT *fw,
+                           UINT *fh) {
+  *delay_ms = 100;
+  *disposal = 0;
+  *left = 0;
+  *top = 0;
+  UINT w = 0;
+  UINT h = 0;
+  frame->lpVtbl->GetSize(frame, &w, &h);
+  *fw = w;
+  *fh = h;
+  IWICMetadataQueryReader *r = NULL;
+  if (FAILED(frame->lpVtbl->GetMetadataQueryReader(frame, &r)) || r == NULL) {
+    return;
+  }
+  int v = 0;
+  if (wic_query_int(r, L"/grctlext/Delay", &v) && v > 0) {
+    *delay_ms = v * 10; // 厘秒 → 毫秒
+  }
+  if (wic_query_int(r, L"/grctlext/Disposal", &v)) {
+    *disposal = v;
+  }
+  if (wic_query_int(r, L"/imgdesc/Left", &v)) {
+    *left = v;
+  }
+  if (wic_query_int(r, L"/imgdesc/Top", &v)) {
+    *top = v;
+  }
+  r->lpVtbl->Release(r);
+}
+
+// 把一帧画到整幅画布：alpha==0 的像素跳过（GIF 透明 = 保留前帧），其余整像素
+// 覆盖。越界像素丢弃（帧矩形允许超出逻辑屏幕）。
+static void wic_draw_frame(unsigned char *canvas, UINT cw, UINT ch,
+                           const unsigned char *px, UINT fw, UINT fh, int left,
+                           int top) {
+  for (UINT y = 0; y < fh; y++) {
+    int cy = top + (int)y;
+    if (cy < 0 || cy >= (int)ch) {
+      continue;
+    }
+    for (UINT x = 0; x < fw; x++) {
+      int cx = left + (int)x;
+      if (cx < 0 || cx >= (int)cw) {
+        continue;
+      }
+      const unsigned char *s = px + ((size_t)y * (size_t)fw + (size_t)x) * 4;
+      if (s[3] == 0) {
+        continue;
+      }
+      unsigned char *d = canvas + ((size_t)cy * (size_t)cw + (size_t)cx) * 4;
+      d[0] = s[0];
+      d[1] = s[1];
+      d[2] = s[2];
+      d[3] = s[3];
+    }
+  }
+}
+
+// disposal==2（restore to background）：把帧矩形清成全透明。
+static void wic_clear_rect(unsigned char *canvas, UINT cw, UINT ch, int left,
+                           int top, UINT fw, UINT fh) {
+  for (UINT y = 0; y < fh; y++) {
+    int cy = top + (int)y;
+    if (cy < 0 || cy >= (int)ch) {
+      continue;
+    }
+    for (UINT x = 0; x < fw; x++) {
+      int cx = left + (int)x;
+      if (cx < 0 || cx >= (int)cw) {
+        continue;
+      }
+      unsigned char *d = canvas + ((size_t)cy * (size_t)cw + (size_t)cx) * 4;
+      d[0] = 0;
+      d[1] = 0;
+      d[2] = 0;
+      d[3] = 0;
+    }
+  }
+}
+
+// 解码第一帧（静态图入口）。GIF 按**逻辑屏幕**尺寸合成——与 Linux 的
+// GdkPixbuf 一致（GdkPixbuf 的 gif 加载器给的就是屏幕尺寸的第一帧），
+// 首帧是子矩形时不会被裁成帧矩形大小。
+static unsigned char *wic_decode_first(IWICBitmapDecoder *dec, UINT *out_w,
+                                       UINT *out_h) {
+  IWICImagingFactory *f = wic_factory();
+  if (f == NULL) {
+    return NULL;
+  }
+  IWICBitmapFrameDecode *frame = NULL;
+  if (FAILED(dec->lpVtbl->GetFrame(dec, 0, &frame)) || frame == NULL) {
+    return NULL;
+  }
+  UINT fw = 0;
+  UINT fh = 0;
+  unsigned char *px = wic_frame_bgra(f, frame, &fw, &fh);
+  int delay = 0;
+  int disposal = 0;
+  int left = 0;
+  int top = 0;
+  wic_frame_meta(frame, &delay, &disposal, &left, &top, &fw, &fh);
+  frame->lpVtbl->Release(frame);
+  if (px == NULL) {
+    return NULL;
+  }
+  UINT sw = 0;
+  UINT sh = 0;
+  wic_screen_size(dec, &sw, &sh);
+  if (sw == 0 || sh == 0) {
+    sw = fw;
+    sh = fh;
+    left = 0;
+    top = 0;
+  }
+  if (left == 0 && top == 0 && sw == fw && sh == fh) {
+    *out_w = fw;
+    *out_h = fh;
+    return px; // 整幅即帧矩形，省一次拷贝
+  }
+  unsigned char *canvas = (unsigned char *)calloc((size_t)sw * (size_t)sh * 4, 1);
+  if (canvas == NULL) {
+    free(px);
+    return NULL;
+  }
+  wic_draw_frame(canvas, sw, sh, px, fw, fh, left, top);
+  free(px);
+  *out_w = sw;
+  *out_h = sh;
+  return canvas;
+}
+
+static int64_t img_take_px(unsigned char *px, UINT w, UINT h) {
+  if (px == NULL || w == 0 || h == 0) {
+    free(px);
+    return 0;
+  }
+  for (int i = 1; i < IMG_MAX; i++) {
+    if (img_slots[i].px == NULL) {
+      img_slots[i].px = px;
+      img_slots[i].w = (int)w;
+      img_slots[i].h = (int)h;
+      return i;
+    }
+  }
+  free(px);
+  return 0;
+}
+
+static WicImg *img_of(int64_t h) {
+  if (h > 0 && h < IMG_MAX && img_slots[h].px != NULL) {
+    return &img_slots[h];
+  }
+  return NULL;
+}
+
+int64_t img_decode_bytes(unsigned char *data, int len) {
+  if (data == NULL || len < 1) {
+    return 0;
+  }
+  IWICImagingFactory *f = wic_factory();
+  if (f == NULL) {
+    return 0;
+  }
+  IWICStream *st = NULL;
+  IWICBitmapDecoder *dec = NULL;
+  unsigned char *px = NULL;
+  UINT w = 0;
+  UINT h = 0;
+  if (SUCCEEDED(f->lpVtbl->CreateStream(f, &st)) && st != NULL &&
+      SUCCEEDED(st->lpVtbl->InitializeFromMemory(st, (BYTE *)data, (DWORD)len)) &&
+      SUCCEEDED(f->lpVtbl->CreateDecoderFromStream(
+          f, (IStream *)st, NULL, WICDecodeMetadataCacheOnDemand, &dec)) &&
+      dec != NULL) {
+    px = wic_decode_first(dec, &w, &h);
+  }
+  if (dec != NULL) {
+    dec->lpVtbl->Release(dec);
+  }
+  if (st != NULL) {
+    st->lpVtbl->Release(st);
+  }
+  return img_take_px(px, w, h);
+}
+
+int64_t img_decode_file(const char *path, int len) {
+  if (path == NULL || len < 1) {
+    return 0;
+  }
+  IWICImagingFactory *f = wic_factory();
+  if (f == NULL) {
+    return 0;
+  }
+  wchar_t *w = wic_wide(path, len);
+  if (w == NULL) {
+    return 0;
+  }
+  IWICBitmapDecoder *dec = NULL;
+  unsigned char *px = NULL;
+  UINT iw = 0;
+  UINT ih = 0;
+  if (SUCCEEDED(f->lpVtbl->CreateDecoderFromFilename(
+          f, w, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &dec)) &&
+      dec != NULL) {
+    px = wic_decode_first(dec, &iw, &ih);
+  }
+  if (dec != NULL) {
+    dec->lpVtbl->Release(dec);
+  }
+  free(w);
+  return img_take_px(px, iw, ih);
+}
+
+int img_w(int64_t h) {
+  WicImg *s = img_of(h);
+  return s == NULL ? 0 : s->w;
+}
+
+int img_h(int64_t h) {
+  WicImg *s = img_of(h);
+  return s == NULL ? 0 : s->h;
+}
+
+// 拷进调用方缓冲：ARGB32 预乘小端（字节 B,G,R,A），预乘取整与 Bitmap::paint
+// 同一口径（(c*a+127)/255）——与 Linux 分支逐字同式，保证「编码→解码→再编码」
+// 字节稳定。
+int img_copy(int64_t h, unsigned char *out) {
+  WicImg *s = img_of(h);
+  if (s == NULL || out == NULL) {
+    return 0;
+  }
+  for (int y = 0; y < s->h; y++) {
+    const unsigned char *src = s->px + (size_t)y * (size_t)s->w * 4;
+    unsigned char *d = out + (size_t)y * (size_t)s->w * 4;
+    for (int x = 0; x < s->w; x++) {
+      unsigned a = src[3];
+      d[0] = (unsigned char)((src[0] * a + 127) / 255);
+      d[1] = (unsigned char)((src[1] * a + 127) / 255);
+      d[2] = (unsigned char)((src[2] * a + 127) / 255);
+      d[3] = (unsigned char)a;
+      src += 4;
+      d += 4;
+    }
+  }
+  return 1;
+}
+
+void img_free(int64_t h) {
+  if (h > 0 && h < IMG_MAX && img_slots[h].px != NULL) {
+    free(img_slots[h].px);
+    img_slots[h].px = NULL;
+    img_slots[h].w = 0;
+    img_slots[h].h = 0;
+  }
+}
+
+// ---- 动图（GIF）----
+// 与 Linux 分支同接口同语义：解码时留在第一帧，组件每拍 advance 一次再取当前帧。
+// 像素**按需现解**（不把 N 帧全缓进内存），合成结果缓在 canvas 上——同一帧被反复
+// 取（每拍重绘）时不重复解码。
+typedef struct {
+  IWICBitmapDecoder *dec; // 持有文件句柄，帧现解；释放时一并关掉
+  int count;
+  int w;
+  int h;                 // 逻辑屏幕尺寸
+  unsigned char *canvas; // 当前合成结果（straight BGRA）
+  int canvas_frame;      // canvas 反映的帧号（-1 = 空）
+  unsigned char *snap;   // disposal==3（还原到前一帧）的快照
+  int64_t index;         // 单调递增的对外帧号（与 Linux 分支同口径，见 img_anim_frame）
+} WicAnim;
+
+static WicAnim *img_anims[IMG_ANIM_MAX];
+
+static int anim_slot(void) {
+  for (int i = 1; i < IMG_ANIM_MAX; i++) {
+    if (img_anims[i] == NULL) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+static WicAnim *anim_of(int64_t h) {
+  if (h <= 0 || h >= IMG_ANIM_MAX) {
+    return NULL;
+  }
+  return img_anims[h];
+}
+
+// 第 k 帧的元数据（不取像素，便宜）。
+static int anim_frame_info(WicAnim *a, int k, int *delay_ms, int *disposal,
+                           int *left, int *top, UINT *fw, UINT *fh) {
+  IWICBitmapFrameDecode *fr = NULL;
+  if (FAILED(a->dec->lpVtbl->GetFrame(a->dec, (UINT)k, &fr)) || fr == NULL) {
+    return 0;
+  }
+  wic_frame_meta(fr, delay_ms, disposal, left, top, fw, fh);
+  fr->lpVtbl->Release(fr);
+  return 1;
+}
+
+static unsigned char *anim_frame_px(WicAnim *a, int k, UINT *fw, UINT *fh) {
+  IWICImagingFactory *f = wic_factory();
+  if (f == NULL) {
+    return NULL;
+  }
+  IWICBitmapFrameDecode *fr = NULL;
+  if (FAILED(a->dec->lpVtbl->GetFrame(a->dec, (UINT)k, &fr)) || fr == NULL) {
+    return NULL;
+  }
+  unsigned char *px = wic_frame_bgra(f, fr, fw, fh);
+  fr->lpVtbl->Release(fr);
+  return px;
+}
+
+// 把 canvas 推进到显示帧 idx。逐帧前进走增量（只收尾上一帧的 disposal 再画本帧）；
+// 跳帧/回绕则从 0 重放（disposal==3 要「画本帧之前的画布」，重放天然给出）。
+static void anim_render(WicAnim *a, int idx) {
+  if (a->canvas_frame == idx) {
+    return;
+  }
+  size_t bytes = (size_t)a->w * (size_t)a->h * 4;
+  int k_first;
+  if (a->canvas_frame >= 0 && a->canvas_frame + 1 == idx) {
+    k_first = idx; // 本帧已在画布上，只需先按上一帧的 disposal 收尾
+  } else {
+    memset(a->canvas, 0, bytes);
+    a->canvas_frame = -1;
+    k_first = 0;
+  }
+  for (int k = k_first; k <= idx; k++) {
+    if (k > 0) {
+      // 上一帧（k-1）的收尾：只要 disposal 与矩形，延时用不上
+      int prev_delay = 0;
+      int d = 0;
+      int l = 0;
+      int t = 0;
+      UINT fw = 0;
+      UINT fh = 0;
+      if (anim_frame_info(a, k - 1, &prev_delay, &d, &l, &t, &fw, &fh)) {
+        if (d == 2) {
+          wic_clear_rect(a->canvas, (UINT)a->w, (UINT)a->h, l, t, fw, fh);
+        } else if (d == 3) {
+          memcpy(a->canvas, a->snap, bytes);
+        }
+      }
+    }
+    int delay = 0;
+    int disposal = 0;
+    int left = 0;
+    int top = 0;
+    UINT fw = 0;
+    UINT fh = 0;
+    if (!anim_frame_info(a, k, &delay, &disposal, &left, &top, &fw, &fh)) {
+      continue;
+    }
+    if (disposal == 3) {
+      memcpy(a->snap, a->canvas, bytes); // 要在画本帧**之前**存
+    }
+    UINT pw = 0;
+    UINT ph = 0;
+    unsigned char *px = anim_frame_px(a, k, &pw, &ph);
+    if (px != NULL) {
+      wic_draw_frame(a->canvas, (UINT)a->w, (UINT)a->h, px, pw, ph, left, top);
+      free(px);
+    }
+    a->canvas_frame = k;
+  }
+}
+
+int64_t img_anim_decode_file(const char *path, int len) {
+  if (path == NULL || len < 1) {
+    return 0;
+  }
+  IWICImagingFactory *f = wic_factory();
+  if (f == NULL) {
+    return 0;
+  }
+  wchar_t *w = wic_wide(path, len);
+  if (w == NULL) {
+    return 0;
+  }
+  IWICBitmapDecoder *dec = NULL;
+  HRESULT hr = f->lpVtbl->CreateDecoderFromFilename(
+      f, w, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &dec);
+  free(w);
+  if (FAILED(hr) || dec == NULL) {
+    return 0;
+  }
+  UINT count = 0;
+  dec->lpVtbl->GetFrameCount(dec, &count);
+  if (count < 1 || count > (UINT)IMG_MAX_FRAMES) {
+    dec->lpVtbl->Release(dec);
+    return 0;
+  }
+  UINT sw = 0;
+  UINT sh = 0;
+  wic_screen_size(dec, &sw, &sh);
+  if (sw == 0 || sh == 0) {
+    IWICBitmapFrameDecode *fr = NULL;
+    if (FAILED(dec->lpVtbl->GetFrame(dec, 0, &fr)) || fr == NULL) {
+      dec->lpVtbl->Release(dec);
+      return 0;
+    }
+    fr->lpVtbl->GetSize(fr, &sw, &sh);
+    fr->lpVtbl->Release(fr);
+  }
+  if (sw == 0 || sh == 0) {
+    dec->lpVtbl->Release(dec);
+    return 0;
+  }
+  int slot = anim_slot();
+  if (slot < 0) {
+    dec->lpVtbl->Release(dec);
+    return 0;
+  }
+  WicAnim *a = (WicAnim *)calloc(1, sizeof(WicAnim));
+  if (a == NULL) {
+    dec->lpVtbl->Release(dec);
+    return 0;
+  }
+  size_t bytes = (size_t)sw * (size_t)sh * 4;
+  a->dec = dec;
+  a->count = (int)count;
+  a->w = (int)sw;
+  a->h = (int)sh;
+  a->canvas = (unsigned char *)calloc(bytes, 1);
+  a->snap = (unsigned char *)malloc(bytes);
+  a->canvas_frame = -1;
+  a->index = 0;
+  if (a->canvas == NULL || a->snap == NULL) {
+    free(a->canvas);
+    free(a->snap);
+    free(a);
+    dec->lpVtbl->Release(dec);
+    return 0;
+  }
+  img_anims[slot] = a;
+  return (int64_t)slot;
+}
+
+// 单帧（PNG/JPEG 或单帧 GIF）算静图：组件按静帧画，不排自转。
+int img_anim_is_static(int64_t h) {
+  WicAnim *a = anim_of(h);
+  return (a == NULL || a->count <= 1) ? 1 : 0;
+}
+
+int img_anim_w(int64_t h) {
+  WicAnim *a = anim_of(h);
+  return a == NULL ? 0 : a->w;
+}
+
+int img_anim_h(int64_t h) {
+  WicAnim *a = anim_of(h);
+  return a == NULL ? 0 : a->h;
+}
+
+int img_anim_delay_ms(int64_t h) {
+  WicAnim *a = anim_of(h);
+  if (a == NULL) {
+    return 0;
+  }
+  int delay = 100;
+  int d = 0;
+  int l = 0;
+  int t = 0;
+  UINT fw = 0;
+  UINT fh = 0;
+  anim_frame_info(a, (int)(a->index % (int64_t)a->count), &delay, &d, &l, &t, &fw,
+                  &fh);
+  return delay;
+}
+
+// 单调递增、不回绕：与 Linux 分支同口径（GdkPixbuf 的迭代器同样只加不减），
+// 组件侧 `looping=false` 的「帧号回到 0」判据因此在两平台都不触发——本批不改
+// 这条既有语义，见 docs/zh/adaptation.md。
+int img_anim_frame(int64_t h) {
+  WicAnim *a = anim_of(h);
+  return a == NULL ? -1 : (int)a->index;
+}
+
+// 前进一帧：帧号 +1，显示帧取模。多帧动画每次都是真换帧（模空间里相邻两帧
+// 必不同），故恒回报 1；单帧恒 0。
+int img_anim_advance(int64_t h) {
+  WicAnim *a = anim_of(h);
+  if (a == NULL || a->count <= 1) {
+    return 0;
+  }
+  a->index = a->index + 1;
+  return 1;
+}
+
+int img_anim_copy(int64_t h, unsigned char *out) {
+  WicAnim *a = anim_of(h);
+  if (a == NULL || out == NULL) {
+    return 0;
+  }
+  int idx = (int)(a->index % (int64_t)a->count);
+  anim_render(a, idx);
+  if (a->canvas_frame != idx) {
+    return 0;
+  }
+  // straight BGRA → 预乘，与 img_copy 同式
+  for (int y = 0; y < a->h; y++) {
+    const unsigned char *src = a->canvas + (size_t)y * (size_t)a->w * 4;
+    unsigned char *d = out + (size_t)y * (size_t)a->w * 4;
+    for (int x = 0; x < a->w; x++) {
+      unsigned al = src[3];
+      d[0] = (unsigned char)((src[0] * al + 127) / 255);
+      d[1] = (unsigned char)((src[1] * al + 127) / 255);
+      d[2] = (unsigned char)((src[2] * al + 127) / 255);
+      d[3] = (unsigned char)al;
+      src += 4;
+      d += 4;
+    }
+  }
+  return 1;
+}
+
+void img_anim_free(int64_t h) {
+  WicAnim *a = anim_of(h);
+  if (a == NULL) {
+    return;
+  }
+  if (a->dec != NULL) {
+    a->dec->lpVtbl->Release(a->dec);
+  }
+  free(a->canvas);
+  free(a->snap);
+  free(a);
+  img_anims[h] = NULL;
+}
+
+#else
+
+// 其余平台（macOS）：各自动图线随 mac 窗口层落地时补。
 int64_t img_decode_bytes(unsigned char *data, int len) {
   (void)data; (void)len; return 0;
 }
@@ -930,7 +1633,7 @@ int img_h(int64_t h) { (void)h; return 0; }
 int img_copy(int64_t h, unsigned char *out) { (void)h; (void)out; return 0; }
 void img_free(int64_t h) { (void)h; }
 
-// 动图（GIF）：非 Linux 平台没有 GdkPixbuf，一律「解不出动图」，组件退回静帧
+// 动图（GIF）：无后端，一律「解不出动图」，组件退回静帧
 int64_t img_anim_decode_file(const char *path, int len) { (void)path; (void)len; return 0; }
 int img_anim_is_static(int64_t h) { (void)h; return 1; }
 int img_anim_w(int64_t h) { (void)h; return 0; }
@@ -940,6 +1643,8 @@ int img_anim_frame(int64_t h) { (void)h; return -1; }
 int img_anim_advance(int64_t h) { (void)h; return 0; }
 int img_anim_copy(int64_t h, unsigned char *out) { (void)h; (void)out; return 0; }
 void img_anim_free(int64_t h) { (void)h; }
+
+#endif
 // 落盘（PNG 导出用）：把内存里的字节写进 path（UTF-8 字节串）。这条路径
 // 不依赖任何图形后端——纯 MoonBit 的 png.mbt 出字节，本函数只管写字节，
 // 所以占位分支也要真实现（写死 return 0 会让图表导出在 Windows 上恒失败）。

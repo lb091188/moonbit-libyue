@@ -1,5 +1,6 @@
-// 图片：解码产物与绘制源。解码走 GdkPixbuf（PNG/JPEG/GIF 首帧等），像素统一
-// 转成本栈 Bitmap 布局（ARGB32 预乘），此后绘制与离屏画布走同一条 blit 通道。
+// 图片：解码产物与绘制源。解码走平台系统能力（Linux GdkPixbuf / Windows WIC），
+// PNG/JPEG/GIF 首帧等，像素统一转成本栈 Bitmap 布局（ARGB32 预乘），此后绘制与
+// 离屏画布走同一条 blit 通道。
 //
 // 尺寸语义照旧契约（libyue `image_gtk.cc:75-77`）：`get_width`/`get_height`
 // 返回**逻辑尺寸**（像素 / scale），`get_scale_factor` 返回记录的比例。

@@ -1566,6 +1566,21 @@ MPRIS(媒体控制)是这族里唯一「总线优先、命令兜底」的倒置�
 - **焦点事件透出为 kind 16/17(WebView2 独有)**:WebKitGTK 是同树 widget、宿主天然可感知,不发。
 - **调试插曲(教训)**:`python -c` 单行脚本对已存在大文件 `io.open(p,'w')` 传错 newline 值,ValueError 在 TextIOWrapper 初始化时抛出——但文件已按 'w' 截空,几百行改动全丢(git checkout 恢复后用 Edit 工具重做)。改大文件永远用 Edit 工具或先写脚本文件再跑,不用内联 python 单行写整文件。
 
+### MoonBit 原生 GUI 栈 · 图片解码后端(W9:Windows 走 WIC)
+
+- **为什么这条是「平台矩阵」的唯一例外**:Windows 的渲染是**纯 MoonBit 光栅器**(零第三方依赖,plan 矩阵定案),但光栅器不负责解码——图片解码只能借系统能力,**WIC**(`windowscodecs.lib`,系统组件,不是第三方包)。此前非 Linux 分支把 `img_*` 整组写成占位 no-op,于是 Windows 上 `Image::new_from_file` 恒返回空图、动图组件退成 0 尺寸;测试侧靠 `decode_available()` / `ui_decode_guard()` 探针跳过(不算红)。本批把 `gui/render/stub.c` 的 `_WIN32` 分支实装。
+- **三条 WIC 实测事实**(`experiment/img_probe` 纯 C 探针回证,与 MoonBit 运行时无关):
+  1. **WIC 的 GIF 解码器给的是「原始子矩形帧」,不替调用方合成**——`IWICBitmapFrameDecode::GetSize` 报的是**帧矩形**(探针实测 12×12),偏移在 `/imgdesc/Left|Top`(实测 14/14)。Linux 侧 GdkPixbuf 的 `GdkPixbufAnimationIter` 是替我们做了合成的,所以这条差异是本批新踩:整幅合成必须本层做——画布取 `/logscrdesc/Width|Height` 的逻辑屏幕,逐帧按 disposal 收尾(0/1 保留、2 清帧矩形、3 还原到「画本帧之前」的快照)。
+  2. **透明索引已由 WIC 应用**(帧像素 alpha 实测只有 0 与 255 两档)。GIF 的透明语义是「此处保留前帧」而非混合,所以合成规则就是「alpha==0 跳过、其余整像素覆盖」,不需要 alpha 混合。
+  3. **`/grctlext/Delay` 单位是厘秒**(GIF 规格),×10 才是毫秒;缺省/0 统一成 100ms,与 Linux 分支同口径。
+- **预乘口径与 Linux 逐字同式**:WIC 转 `GUID_WICPixelFormat32bppBGRA`(straight)后,本层按 `(c*a+127)/255` 预乘再交给 MoonBit——与 Linux 分支同一公式,保证「编码→解码→再编码」字节稳定(`image_wbtest` 的半透明往返断言就吃这条)。静态首帧的尺寸口径也向 Linux 对齐:**GIF 按逻辑屏幕尺寸合成**,首帧是子矩形时不会被裁成帧矩形大小。
+- **动图的内存策略**:像素**按需现解**(不把 N 帧全缓存),合成结果缓在 canvas 上——同一帧被反复取(每拍重绘)时不重复解码;逐帧前进走增量(只收尾上一帧的 disposal),回绕/跳帧才从 0 重放。帧数上限 4096 只防病态文件(内存与帧数无关,但回绕那一拍是 O(n))。
+- **帧号语义沿用 Linux 的单调口径**:`img_anim_frame()` 只增不减(显示帧 = 帧号 % 帧数)。因此组件侧 `gif(looping=false)` 的「帧号回到 0 就停」判据**在两个平台都不触发**——这是既有行为,`image_wbtest` 的「帧号等于成功次数」断言正依赖它,本批不改。顺带一条资产事实:showcase 用的 `examples/showcase/assets/dot.gif` 四帧的压缩数据**逐字节相同**、只有局部调色板不同(所以看起来是「同一个点变色」而非移动)。
+- **链接面**:`gui/scripts/prebuild.py` 的 Windows 分支新增 **RENDER_PACKAGE** 条目(`windowscodecs.lib ole32.lib user32.lib`)——此前 render 包在 Windows 一条 link_configs 都没有(桩全是 no-op,不需要外部符号),`render.whitebox_test.exe` 一旦调 WIC 就会缺符号。GUID 常量(`CLSID_WICImagingFactory1` / `IID_IWICImagingFactory` / `GUID_WICPixelFormat32bppBGRA`)与 W20f 图标加载同源,C 模式用不了 `__uuidof` 故链接期取。
+- **`/utf-8` 不必补**:render 桩的中文注释在 MSVC 按 GBK 误读下只出 2 条 C4819(与改动前逐字持平;`win/stub.c` 是 6 条),无吞行、无语法错——故不引入 `stub-cc-flags`(ffmpeg-mbt 那条是 vendor 头真中招才要)。
+- **验证**:纯 C 探针 `experiment/img_probe/img_backend_probe.c`(独立于 moon 工具链,`cl /W4 /utf-8` 直编,include 进 `render/stub.c` 直喂 `img_*` 入口)末行 **`IMG-BACKEND-OK`**,60 条断言全过:PNG 文件/内存两入口尺寸一致且预乘不越界、坏图/NULL/零长/越界句柄/不存在文件全给 0、`dot.gif` 静态首帧 120×120、动图 4 帧 + 延时 400ms + 逐帧前进帧号单调 + 不同帧像素确实不同 + 回绕后显示帧与首帧逐字节一致、释放幂等且释放后全空操作、PNG 经动图入口 `is_static=1` 且 `advance` 恒 0、**子矩形帧合成**(`experiment/img_probe/assets/subrect.gif` 第二帧 12×12@(14,14):画布仍是 40×40、(0,0) 保留第 0 帧的黑、框内偏红)。跑法:先 `cl` 编出 exe 再在仓库根执行 `experiment/img_probe/img_backend_probe.exe .`(资产重建脚本 `make_asset.py` 用 ffmpeg 现场生成 subrect.gif)。`moon check` 库模块零警告。
+- **本批未做且不假装完成**:macOS 后端(仍是占位);`looping=false` 的「帧号归零」语义(跨平台既有行为,要改得同时动 `ui/gif.mbt` 与 `image_wbtest` 断言);JPEG/BMP/TIFF 未逐格式单独验(走同一条 `CreateDecoderFromFilename` 嗅探路径,PNG/GIF 已实证);真机观感(showcase 卡片/媒体页的图片区、动图是否在动)归 `_人工测试清单.md`。
+
 ## macOS(CI 构建链已验,GUI 待真机)
 
 - libyue v0.15.6 发行包含 ARC / no-ARC 双库:Darwin 链接参数 = 主库 + `-lyue_mbt_noarc`(no-ARC 符号被主库引用,须排其后)+ AppKit / Carbon / IOKit / Security / WebKit / OpenDirectory 框架 + `-lobjc -lc++ -lpthread -lbsm -Wl,-dead_strip`;prebuild Darwin 分支已按此预修。

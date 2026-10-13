@@ -42,8 +42,8 @@ fn ui_text_guard() -> Bool {
 }
 
 ///|
-/// 图片解码后端的守卫：Windows/mac 的解码桩要到 W9（WIC）才实装，解不出
-/// 图时组件退成 0 尺寸，动图断言无从谈起——打印跳过。
+/// 图片解码后端的守卫：Linux 走 GdkPixbuf、Windows 走 WIC（W9），macOS 的解码桩
+/// 还没实装；解不出图时组件退成 0 尺寸，动图断言无从谈起——打印跳过。
 fn ui_decode_guard() -> Bool {
   let img = @render.Image::new_from_file("examples/showcase/assets/dot.gif")
   if img.get_width() > 0.0 {
