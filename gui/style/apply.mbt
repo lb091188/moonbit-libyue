@@ -170,16 +170,12 @@ pub fn resolved(w : @core.Widget) -> Style {
 
 ///|
 /// 按控件当前交互态选桶后的绘制样式：基块 → 依序并入命中的状态桶。
+/// 并存时的优先级是 hover < focus < active（后并入的赢，与 CSS 的 :active 盖过
+/// :hover 同向）——按下态必然也在悬停态里，反过来写就永远看不见按下反馈。
 /// 布局期不读它（状态桶签名里没有布局属性，§1.5 第五条）。
 pub fn style_for(w : @core.Widget) -> Style {
   let base = resolved(w)
   let mut out = base
-  if w.pressed {
-    match base.active {
-      Some(a) => out = merge(out, a)
-      None => ()
-    }
-  }
   if w.hovered {
     match base.hover {
       Some(h) => out = merge(out, h)
@@ -192,5 +188,39 @@ pub fn style_for(w : @core.Widget) -> Style {
       None => ()
     }
   }
+  if w.pressed {
+    match base.active {
+      Some(a) => out = merge(out, a)
+      None => ()
+    }
+  }
   out
+}
+
+///|
+/// 绘制期取一条颜色属性：样式给了就用（token 现取当前主题），没给用组件内置基调。
+/// 组件侧读样式只有 [style_for] + 这一条回落，外观散参数不在绘制期直接吃。
+pub fn color_of(c : Color?, fallback : String) -> String {
+  match c {
+    Some(v) => resolve_color(v)
+    None => fallback
+  }
+}
+
+///|
+/// 绘制期取一条长度属性（字号 / 圆角 / 边框宽 / 内边距），没给用内置基调。
+pub fn number_of(v : Double?, fallback : Double) -> Double {
+  match v {
+    Some(x) => x
+    None => fallback
+  }
+}
+
+///|
+/// 绘制期取一条字符串属性（字体名、图标色串那类），没给用内置基调。
+pub fn string_of(v : String?, fallback : String) -> String {
+  match v {
+    Some(x) => x
+    None => fallback
+  }
 }

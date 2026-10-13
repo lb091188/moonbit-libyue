@@ -506,3 +506,163 @@ test "动图组件：按帧时长自转换帧、暂停不再换帧、play 续上
   assert_eq((hs.frame_count(), hs.is_running(), _w2.rect.w), (0, true, 0.0))
   @core.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
 }
+
+///|
+/// P2-e 口径：绘制期只读样式槽并按状态选桶，`class` 的属性必须真的落进像素。
+test "样式槽是绘制期唯一入口：底色/圆角/边框宽与状态桶都照画" {
+  let rounded = view(
+    [],
+    width=60.0,
+    height=40.0,
+    class=[@style.style(background_color="#ff0000", border_radius=12.0)],
+  )
+  let root = mount_root([rounded], 100.0, 60.0)
+  let w = kid(root, 0)
+  assert_eq((w.rect.w, w.rect.h), (60.0, 40.0))
+  let bm = @render.Bitmap::new(100, 60)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  let red = fn(x : Int, y : Int) -> Bool {
+    let c = color_of(bm, x, y)
+    c.0 > 128 && c.1 < 64 && c.2 < 64
+  }
+  assert_true(red(30, 20))
+  // 左上角落在半径 12 的弧外：圆角真的裁剪了填充
+  assert_false(red(1, 1))
+
+  // 状态桶：hover / focus / active 各自换底色，并存时按 hover < focus < active
+  let src = view(
+    [],
+    width=40.0,
+    height=40.0,
+    class=[
+      @style.style(background_color="#00ff00")
+        .hover(background_color="#ff0000")
+        .focus(background_color="#ffff00")
+        .active(background_color="#0000ff"),
+    ],
+  )
+  let root2 = mount_root([src], 60.0, 60.0)
+  let w2 = kid(root2, 0)
+  let centre : () -> (Int, Int, Int, Int) = fn() -> (Int, Int, Int, Int) {
+    let b = @render.Bitmap::new(60, 60)
+    let pp = @render.Painter::new(b)
+    root2.paint(pp)
+    pp.end()
+    color_of(b, 20, 20)
+  }
+  let base_c = centre()
+  assert_true(base_c.1 > 128 && base_c.0 < 64)
+  w2.hovered = true
+  let hov = centre()
+  assert_true(hov.0 > 128 && hov != base_c)
+  // 按下必然也在悬停里：active 要盖过 hover 才看得见按下反馈
+  w2.pressed = true
+  let act = centre()
+  assert_true(act.2 > 128 && act != hov)
+  w2.pressed = false
+  w2.hovered = false
+  w2.focused = true
+  let foc = centre()
+  assert_true(foc.0 > 128 && foc.1 > 128 && foc.2 < 64)
+
+  // 边框宽是绘制期属性：class 给 4px 就比默认 1px 粗
+  let thin = view([], width=40.0, height=40.0, class=[
+    @style.style(border_color="#ff0000", border_width=1.0),
+  ])
+  let thick = view([], width=40.0, height=40.0, class=[
+    @style.style(border_color="#ff0000", border_width=5.0),
+  ])
+  let root3 = mount_root([thin, thick], 60.0, 120.0)
+  let ink_col = fn(bm : @render.Bitmap, y : Int) -> Int {
+    let mut n = 0
+    for x = 0; x < 40; x = x + 1 {
+      if color_of(bm, x, y).0 > 96 {
+        n = n + 1
+      }
+    }
+    n
+  }
+  let bm3 = @render.Bitmap::new(60, 120)
+  let p3 = @render.Painter::new(bm3)
+  root3.paint(p3)
+  p3.end()
+  assert_true(ink_col(bm3, 60) > ink_col(bm3, 20))
+}
+
+///|
+test "内置皮肤也走样式槽：图标按钮悬停/按下有底、divider 与 icon 能被 class 改色" {
+  let ib = icon_button(@icons.IconKind::MediumCircleFill, box_size=32.0)
+  let root = mount_root([ib], 60.0, 60.0)
+  let w = kid(root, 0)
+  let ink : () -> Int = fn() -> Int {
+    let b = @render.Bitmap::new(60, 60)
+    let pp = @render.Painter::new(b)
+    root.paint(pp)
+    pp.end()
+    let mut n = 0
+    for y = 0; y < 32; y = y + 1 {
+      for x = 0; x < 32; x = x + 1 {
+        if color_of(b, x, y).3 > 0 {
+          n = n + 1
+        }
+      }
+    }
+    n
+  }
+  let plain = ink()
+  w.hovered = true
+  assert_true(ink() > plain)
+  w.pressed = true
+  let pressed_ink = ink()
+  w.hovered = false
+  w.pressed = false
+  assert_true(pressed_ink > plain)
+
+  // divider 两档：直线档吃散参数，文字档的线与字各自吃 class 的 background_color / color
+  let d = divider(text="或", class=[
+    @style.style(background_color="#ff0000", color="#0000ff"),
+  ])
+  let root2 = mount_root([d], 200.0, 30.0)
+  assert_eq(kid(root2, 0).rect.h, 20.0)
+  let bm2 = @render.Bitmap::new(200, 30)
+  let p2 = @render.Painter::new(bm2)
+  root2.paint(p2)
+  p2.end()
+  let mut warm = 0
+  let mut cool = 0
+  for y = 0; y < 30; y = y + 1 {
+    for x = 0; x < 200; x = x + 1 {
+      let c = color_of(bm2, x, y)
+      if c.0 > 128 && c.2 < 64 {
+        warm = warm + 1
+      }
+      if c.2 > 128 && c.0 < 64 {
+        cool = cool + 1
+      }
+    }
+  }
+  assert_true(warm > 40)
+  assert_true(cool > 4)
+
+  // icon 的 class 色覆盖内置正文色
+  let ic = icon(@icons.IconKind::MediumCircleFill, size=24.0, class=[
+    @style.style(color="#00ff00"),
+  ])
+  let root3 = mount_root([ic], 40.0, 40.0)
+  let bm3 = @render.Bitmap::new(40, 40)
+  let p3 = @render.Painter::new(bm3)
+  root3.paint(p3)
+  p3.end()
+  let mut green = 0
+  for y = 0; y < 24; y = y + 1 {
+    for x = 0; x < 24; x = x + 1 {
+      let c = color_of(bm3, x, y)
+      if c.1 > 128 && c.0 < 64 && c.2 < 64 {
+        green = green + 1
+      }
+    }
+  }
+  assert_true(green > 20)
+}

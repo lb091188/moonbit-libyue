@@ -185,6 +185,8 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
   复用），状态方法 `.hover(...)` 收**属性参数**（现场开块）；状态方法签名里只有绘制期属性
   ——布局参数不在签名中，布局值进状态块编译都过不了。状态桶是绘制期消费的，布局属性混
   进去会把「画的时候」和「量的时候」搅在一起。
+  几态同时命中时按 **hover < focus < active** 层叠（后并入的赢，与 CSS 的 `:active` 盖过
+  `:hover` 同向）：按下必然也在悬停里，反过来的话按下反馈永远画不出来。
 - **不挂运算符**：组合只写 `@style.merge(a, b)`。
 - **`Widget` 需要一个存放 resolved `Style` 的位置**：现有 `Widget` 只有 `node` / `kids` /
   `rect` / `visible` / 各回调 / `hovered` / `pressed` / `focused` / `cursor` / `focus_id`，

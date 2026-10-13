@@ -60,27 +60,34 @@ pub fn view(
       w.node.set_min_width(@yoga.fixed(0.0))
       w.node.set_min_height(@yoga.fixed(0.0))
     }
-    let resolved_bg = match @style.resolved(w).background_color {
-      Some(c) => @style.resolve_color(c)
-      None => ""
-    }
-    let resolved_bd = match @style.resolved(w).border_color {
-      Some(c) => @style.resolve_color(c)
-      None => ""
-    }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      if resolved_bg.length() > 0 {
-        p.set_fill_color(resolved_bg)
-        p.fill_rect(0.0, 0.0, r.w, r.h)
+      // 绘制期只读样式槽并按状态选桶（§1.5 唯一路径）：散参数与 class 都在挂载时
+      // 折进槽里，`handle=` 里后 apply 的样式下一帧就生效
+      let s = @style.style_for(self)
+      let bg = @style.color_of(s.background_color, "")
+      let bd = @style.color_of(s.border_color, "")
+      let rad = @style.number_of(s.border_radius, 0.0)
+      if bg.length() > 0 {
+        p.set_fill_color(bg)
+        if rad > 0.0 {
+          fill_round_rect(p, 0.0, 0.0, r.w, r.h, rad)
+        } else {
+          p.fill_rect(0.0, 0.0, r.w, r.h)
+        }
       }
-      if resolved_bd.length() > 0 {
-        p.set_stroke_color(resolved_bd)
-        p.set_line_width(1.0)
-        p.stroke_rect(0.0, 0.0, r.w, r.h)
+      if bd.length() > 0 {
+        p.set_stroke_color(bd)
+        p.set_line_width(@style.number_of(s.border_width, 1.0))
+        if rad > 0.0 {
+          p.round_rect_path(0.5, 0.5, r.w - 1.0, r.h - 1.0, rad)
+          p.stroke()
+        } else {
+          p.stroke_rect(0.0, 0.0, r.w, r.h)
+        }
       }
     })
     @core.mount_children(w, children)
@@ -115,7 +122,11 @@ pub fn panel(
 ///|
 /// 分隔线本体（§2 合并后公开入口是 [divider]，`text=` 给文字即带字档）。
 /// 默认横线（沿交叉轴撑满），`vertical=true` 为竖线。
-fn separator_impl(vertical~ : Option[Bool], color~ : Option[String]) -> @core.Node {
+fn separator_impl(
+  vertical~ : Option[Bool],
+  color~ : Option[String],
+  class~ : Array[@style.Style] = [],
+) -> @core.Node {
   let vertical = vertical.unwrap_or(false)
   let color = color.unwrap_or("")
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
@@ -127,8 +138,19 @@ fn separator_impl(vertical~ : Option[Bool], color~ : Option[String]) -> @core.No
       w.node.set_height(@yoga.fixed(1.0))
       w.node.set_width(@yoga.percent(100.0))
     }
-    w.on_draw = Some(fn(_self : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
-      p.set_fill_color(if color.length() > 0 { color } else { @theme.theme_border() })
+    // 散参数折进样式槽（token 名因此在绘制期现取当前主题）
+    let anon = match bg_block(color) {
+      Some(b) => b
+      None => @style.empty_style()
+    }
+    fold_style(w, anon, class)
+    w.on_draw = Some(fn(
+      self : @core.Widget,
+      p : @render.Painter,
+      r : @core.Rect,
+    ) -> Unit {
+      let s = @style.style_for(self)
+      p.set_fill_color(@style.color_of(s.background_color, @theme.theme_border()))
       p.fill_rect(0.0, 0.0, r.w, r.h)
     })
     w
@@ -248,41 +270,41 @@ pub fn text(
 ///|
 /// 分隔线（§2 合并：原 `separator` + 带字 `divider` 一台）：`text` 空=直线档
 /// （横线/竖线由 `vertical` 定，沿交叉轴撑满），给文字=居中断线档（12 号字、
-/// 两侧断线、`color` 不作用于文字档）。
+/// 两侧断线）。散参数 `color` 只作用于直线档；文字档的线与字各自读样式槽的
+/// `background_color` / `color`（回落主题描边色与次要文字色），所以两条都能被
+/// `class` 覆盖。
 pub fn divider(
   text? : String = "",
   vertical? : Bool = false,
   color? : String = "",
+  class? : Array[@style.Style] = [],
 ) -> @core.Node {
   if text.length() == 0 {
-    separator_impl(vertical=Some(vertical), color=Some(color))
+    separator_impl(vertical=Some(vertical), color=Some(color), class=class)
   } else {
     let font = @text.Font::new("", 12.0)
     @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
       watch_theme()
       w.node.set_height(@yoga.fixed(20.0))
       w.node.set_width(@yoga.percent(100.0))
+      fold_style(w, @style.empty_style(), class)
       w.on_draw = Some(fn(
-        _self : @core.Widget,
+        self : @core.Widget,
         p : @render.Painter,
         r : @core.Rect,
       ) -> Unit {
+        let s = @style.style_for(self)
+        let line = @style.color_of(s.background_color, @theme.theme_border())
+        let label = @style.color_of(s.color, @theme.theme_text_secondary())
         let tw = text_width(text, font)
         let cy = r.h / 2.0
         let gap = 8.0
-        p.set_fill_color(@theme.theme_border())
+        p.set_fill_color(line)
         p.fill_rect(0.0, cy, ((r.w - tw) / 2.0 - gap).max(0.0), 1.0)
         let right_x = (r.w + tw) / 2.0 + gap
         p.fill_rect(right_x, cy, (r.w - right_x).max(0.0), 1.0)
         let th = @text.line_height_font(font).unwrap_or(16).to_double()
-        let _ = @text.draw_at(
-          p,
-          (r.w - tw) / 2.0,
-          cy - th / 2.0,
-          text,
-          font,
-          @theme.theme_text_secondary(),
-        )
+        let _ = @text.draw_at(p, (r.w - tw) / 2.0, cy - th / 2.0, text, font, label)
       })
       w
     })
@@ -327,19 +349,24 @@ pub fn icon(
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
+  let anon = match fg_block(color) {
+    Some(b) => b
+    None => @style.empty_style()
+  }
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     w.node.set_width(@yoga.fixed(size))
     w.node.set_height(@yoga.fixed(size))
+    fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      let c = if color.length() > 0 { color } else { @theme.theme_text_regular() }
+      let s = @style.style_for(self)
+      let c = @style.color_of(s.color, @theme.theme_text_regular())
       @icons.draw_icon(p, kind, r.w / 2.0, r.h / 2.0, size, c)
     })
-    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
@@ -363,6 +390,19 @@ pub fn icon_button(
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
+  // 内置皮肤（圆角 + 悬停浅底 + 按下更深）写成样式块：基块没有底色，
+  // 底色只从状态桶来，绘制期按 `self` 的态选桶即等价于旧的 hovered/pressed 分支
+  let skin = @style.style(border_radius=4.0).hover(background_color="fill_hover").active(
+    background_color="primary_light",
+  )
+  let blocks : Array[@style.Style] = [
+    skin,
+    match fg_block(color) {
+      Some(b) => b
+      None => @style.empty_style()
+    },
+  ]
+  let anon = @style.merge_all(blocks)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     let off = enabled_cell(enabled, disabled)
@@ -370,24 +410,24 @@ pub fn icon_button(
     w.node.set_height(@yoga.fixed(box_size))
     w.node.set_flex_shrink(0.0)
     w.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
+    fold_style(w, anon, class)
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
-      if !off.off && (self.hovered || self.pressed) {
-        p.set_fill_color(
-          if self.pressed { @theme.theme_primary_light() } else { @theme.theme_fill_hover() },
-        )
-        fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
+      let s = @style.style_for(self)
+      let bg = @style.color_of(s.background_color, "")
+      if !off.off && bg.length() > 0 {
+        p.set_fill_color(bg)
+        fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(s.border_radius, 4.0))
       }
-      let c = if color.length() > 0 {
-        color
-      } else if off.off {
+      let fallback = if off.off {
         @theme.theme_text_secondary()
       } else {
         @theme.theme_text_regular()
       }
+      let c = @style.color_of(s.color, fallback)
       @icons.draw_icon(p, kind, r.w / 2.0, r.h / 2.0, icon_size, c)
     })
     w.on_pointer = Some(fn(
@@ -406,7 +446,6 @@ pub fn icon_button(
         @core.Leave => false
       }
     })
-    fold_style(w, @style.empty_style(), class)
     handle(w)
     w
   })
