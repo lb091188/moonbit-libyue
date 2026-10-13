@@ -242,6 +242,7 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 | 裸 `T` 传给 `T?` 型 labelled 参数（指望自动包 `Some`） | ✗ | `[4014] has type: String / wanted: String?`——没有隐式提升，所以「参数收 `T?`」等于把 `Some` 摊回调用点（这是**显式 `T?` 类型**形态；可选 labelled 形态见下条，勿混） |
 | 可选 labelled 参数（`fn f(x? : Int)`），调用点给裸值 `f(x=1)` | ✓ | 自动包 `Some`（实测链 `S::new(width=100.0).hover(width=110.0)` 零警告、运行 `w=100 hover_w=110`，全省略得 `None`）——**kwargs 工厂形态的地基** |
 | 以类型名当构造函数调用 `S(w=None)` | ✗ | `[4021] Value S not found in package`——struct 没有函数式构造语法，工厂只能是自己定义的包级函数（`style(...)`） |
+| 数组展开字面量 `[..xs, y]` | ✓ | 追加/过滤重建的惯用形态（`items.update(fn(ts) { [..ts, t] })`）；`Array::filter` 返回**新数组**可直接作表达式 |
 | 链式 setter（方法收 `self`、就地写字段、返回自身） | ✓ | `Finished`，零警告（工具链事实存档；构造已改走 kwargs 工厂，调用点不出现 setter 链） |
 | **方法名与字段名同名**（`Style` 有字段 `padding`，同时有方法 `Style::padding`） | ✓ | kwargs 形态下属性名转移到参数名上（见下两条） |
 | 方法返回值当语句用（`s.set_x(v)` 单独一行） | ✗ | `[4139] its value cannot be implicitly ignored`——只能写成链，包内 setter 体固定为「赋值 + 返回 self」 |
@@ -365,7 +366,87 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 ## 4. 视图层：`render` 函数就是最终形态
 
 没有模板语言，也没有 `*.gui` 单文件组件：§1 到 §3 收口完之后，使用者手写的就是原本要生成的
-那段代码，形态同构、能力齐全，中间多放一个编译器只增加成本不增加能力。最终形态：
+那段代码，形态同构、能力齐全，中间多放一个编译器只增加成本不增加能力。
+
+### 4.0 数据与挂载：render 之前那两块
+
+**数据就是普通 struct**：会变的字段各自是 `Store`（§3 口径），派生值用 `computed`（依赖
+自动收集，现成实现），动作是普通函数——里面只写 `Store`，之后差分、显隐、合并重绘全是
+框架的事：
+
+```moonbit
+struct Task {
+  id : Int
+  title : String
+  done : Store[Bool]          // 会变的最小粒度单独开 Store：勾选只重绘那一格
+}
+
+struct Ctx {
+  // —— 可变状态：Store。输入类组件直接吃它（v-model 对应物，现状约 48 处参数口径）
+  draft : Store[String]
+  items : Store[Array[Task]]
+  busy : Store[Bool]
+  // —— 派生：computed 只读，任一依赖变化后失效、下次 get() 重算
+  has_items : Signal[Bool]
+  // —— 动作：普通函数
+  add : () -> Unit
+  remove : (Int) -> Unit
+}
+
+fn ctx_new() -> Ctx {
+  let next_id : Ref[Int] = Ref(1)
+  let draft : Store[String] = @core.Store::new("")
+  let items : Store[Array[Task]] = @core.Store::new([])
+  let busy : Store[Bool] = @core.Store::new(false)
+  {
+    draft,
+    items,
+    busy,
+    has_items: @core.Signal::computed(fn() { items.get().length() > 0 }),
+    add: fn() {
+      let title = draft.get().trim()
+      if title == "" { return }
+      let t = { id: next_id.val, title, done: @core.Store::new(false) }
+      next_id.val += 1
+      @core.batch(fn() {        // 多次 set 合并为出批时的一轮通知
+        draft.set("")
+        items.update(fn(ts) { [..ts, t] })
+      })
+    },
+    remove: fn(id) {
+      items.update(fn(ts) { ts.filter(fn(t) { t.id != id }) })
+    },
+  }
+}
+```
+
+**render 怎么被调用**：挂载时调用**一次**，此后框架不再重跑它。响应不是「重跑 render」，
+而是 render 建出的树里**收 Signal 的入口自己订阅、自己差分**（§6 未决 3 取向 ①——
+`for_list` 管列表 keyed 差分、`when` 管显隐、`*_dyn` 管展示文本；真要整棵换内容走
+`bind_node` 显式重建）。全树 patch 形态（取向 ③）已裁定不做。挂载入口今天收静态节点数组
+（`hello-themed` / `sysmonitor` 就是这个形态：先建好树再传 `[nodes]`）；P3 给
+`mount_window` 补一个 `render` 槽，二选一：
+
+```moonbit
+fn main {
+  let ctx = ctx_new()
+  let app = match @ui.mount_window(
+    render=fn() { [render(ctx)] },   // 挂载时调用一次建首帧；此后由各入口自响应
+    title="任务",
+    width=420,
+    height=560,
+  ) {
+    None => {
+      println("SKIP: 本平台没有窗口后端或没有显示服务")
+      return
+    }
+    Some(a) => a
+  }
+  app.run()
+}
+```
+
+最终形态的视图部分：
 
 ```moonbit
 // 目标形态：一个「任务页」——P1–P3 落地后可编译、可响应
@@ -410,10 +491,11 @@ fn render(ctx : Ctx) -> @core.Node {
 ```
 
 > 这段是 P1/P2/P3 落地后的**目标形态**：kwargs 样式与 `class` 来自 P1+P2，`for_list` /
-> `when` 来自 P3，今天写出来还编译不过。`ctx.draft` 是 `Store[String]`（输入类组件现状
-> 口径），`ctx.has_items` / `ctx.busy` 是 `Signal[Bool]`（`computed` 现成），传信号才响应
-> ——§6 未决 3 取向 ①。`ctx.add` / `ctx.remove` 里只写 Store，往后的差分、显隐、帧末合并
-> 重绘全是框架的事：这就是「写起来像改数据，动起来像改了那一块 UI」的整个设计。
+> `when` / `render` 槽来自 P3（数据与挂载见 §4.0），今天写出来还编译不过。`ctx.draft` 是
+> `Store[String]`（输入类组件现状口径），`ctx.has_items` / `ctx.busy` 是 `Signal[Bool]`
+> （`computed` 现成），传信号才响应——§6 未决 3 取向 ①。`ctx.add` / `ctx.remove` 里只写
+> Store，往后的差分、显隐、帧末合并重绘全是框架的事：这就是「写起来像改数据，动起来像改了
+> 那一块 UI」的整个设计。
 
 ### 4.1 模板的卖点，逐个看还剩什么
 
@@ -456,7 +538,7 @@ fn render(ctx : Ctx) -> @core.Node {
 | --- | --- | --- |
 | P1 | 新建 `gui/style` 包：`Style` 字段集（含定位组 `position` / `top` / `right` / `bottom` / `left`——底层 yoga 现成，含百分比 inset 的能力后补入口）+ `Color` + kwargs 构造（`style(...)` 工厂属性名即参数名 + `.hover(...)` / `.active(...)` / `.focus(...)` 状态方法，§1.3，W3C 规则模型）+ `merge`（逐属性并集、状态桶递归）+ **全量**内置常量表（§2 每个组件的基调，`tokens.mbt`）+ `Widget` 上存 resolved `Style` 的位置 + `apply`；**yoga-mbt 补 `z_index`**（`set_z_index` + 布局输出按 z_index 稳定排序，Yoga 上游同构；gui 侧绘制按 resolved 值重排 kids，`Style` 同步开 `z_index` 字段）；顺带 `Widget::set_margin` labelled 化（同形统一） | 新包测试 + `Widget` 样式槽用例 + 定位字段落到 yoga 的布局用例 + yoga-mbt 模块 z_index 用例（正序/负值/并列稳定）+ `cd gui && moon check` 零错零警 |
 | P2 | 组件改名（按 §2 映射表，含 `_t` 合并）+ `on_*` 统一 + 散参数改名并折算成匿名 `Style`（排解析序列最前）+ **逐组件把 `on_draw` 从「读捕获的散参数」改成「读 `self` 上的样式并按状态选桶」** | 全仓 `moon check` 零错零警，910 处调用点全切完，观感逐页比对不回退 |
-| P3 | 响应式补强：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` | 分包测试 + 现有 Store 用例不回归 |
+| P3 | 响应式补强：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` / `mount_window` 补 `render` 槽（挂载时调用一次建首帧，§4.0；与节点数组二选一） | 分包测试 + 现有 Store 用例不回归 + `hello-themed`/`sysmonitor` 静态挂载形态不回归 |
 | P4 | 绘制能力补齐：**`Painter` 全局 alpha 完整落地**（`opacity`：alpha 进绘制状态机，铺满填充 / 描边 / 文本 / 图片全路径，`Style` 开 `opacity` 字段——颜色级 alpha 已有，这次补的是整层）+ `box_shadow`（硬阴影档：偏移多层圆角矩形先行，模糊档随 blur 能力再评估） | 各自用例（opacity 含全路径覆盖验证）+ 回写 `docs/zh/adaptation.md` |
 | P5 | 动画：`transition`（状态桶属性插值 + 帧驱动，复用 gif 的虚拟时钟与 `invalidate` 回路） | 各自用例 + 回写 `docs/zh/adaptation.md` |
 
