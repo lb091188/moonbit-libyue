@@ -167,9 +167,16 @@ fn code_copy_row(lines : Array[String]) -> @core.Node {
         w.node.set_flex_grow(1.0)
       }),
       @ui.button("复制", variant=@ui.Text, on_click=fn() {
-        let _ = @sys.clipboard_set_text(lines.join("\n"))
+        // 提示必须跟真实结果：`clipboard_set_text` 的 Bool 就是「有没有写进去」，
+        // 原先 `let _ =` 把它丢了，失败也照样弹「已复制」
+        let ok = @sys.clipboard_set_text(lines.join("\n"))
         match code_toast.val {
-          Some(push) => push("代码已复制 ✓", @ui.Success)
+          Some(push) =>
+            if ok {
+              push("代码已复制 ✓", @ui.Success)
+            } else {
+              push("复制失败：剪贴板不可用", @ui.Danger)
+            }
           None => ()
         }
       }),
