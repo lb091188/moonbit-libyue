@@ -163,8 +163,9 @@ pub fn segmented(
 }
 
 ///|
-/// 面包屑（EP Breadcrumb）：层级之间插 `/`；当前项深色不可点，其余灰色可点、
-/// 悬停变主题色。
+/// 面包屑（EP Breadcrumb）：层级之间插 `/`；**当前项**（就是导航状态里那个值）
+/// 深色不可点，其余灰色可点、悬停变主题色。当前项按 `selected` 判、不按位置判——
+/// 按位置判会让末项永远点不动，而末项未必是当前页。
 pub fn breadcrumb(
   items : Array[String],
   selected : @core.Store[String],
@@ -190,7 +191,6 @@ pub fn breadcrumb(
       )
     }
     let mine = items[i]
-    let is_last = i == n - 1
     nodes.push(
       nav_item(
         mine,
@@ -199,7 +199,7 @@ pub fn breadcrumb(
         13.0,
         bg=fn(_w : @core.Widget) -> String { "" },
         fg=fn(w : @core.Widget) -> String {
-          if is_last || selected.get() == mine {
+          if selected.get() == mine {
             @theme.theme_text_primary()
           } else if w.hovered {
             @theme.theme_primary()
@@ -208,7 +208,9 @@ pub fn breadcrumb(
           }
         },
         on_click=fn() -> Unit {
-          if !is_last { selected.set(mine) }
+          if selected.get() != mine {
+            selected.set(mine)
+          }
         },
         skin=paint_subset(class),
       ),

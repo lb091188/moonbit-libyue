@@ -26,7 +26,7 @@ test "分段控制器：点某段即写 Store，选中段底色与其余段不�
 }
 
 ///|
-test "面包屑：分隔符占位、点非末项写 Store、末项不改值" {
+test "面包屑：点非当前项直达、当前项与分隔符不改值" {
   let sel = @core.Store::new("首页")
   let (root, crumb) = mounted(
     breadcrumb(["首页", "列表", "详情"], sel),
@@ -34,14 +34,21 @@ test "面包屑：分隔符占位、点非末项写 Store、末项不改值" {
     40.0,
   )
   // 3 项 + 2 个 "/"
-  assert_eq(crumb.children().length(), 5)
-  click_at(root, crumb.children()[1], 1.0, 10.0)
+  let kids = crumb.children()
+  assert_eq(kids.length(), 5)
+  // 分隔符不是链接
+  click_at(root, kids[1], 4.0, 10.0)
   assert_eq(sel.get(), "首页")
-  click_at(root, crumb.children()[2], 4.0, 10.0)
+  click_at(root, kids[2], 4.0, 10.0)
   assert_eq(sel.get(), "列表")
-  // 末项（详情）是当前层，点它不改值
-  click_at(root, crumb.children()[4], 4.0, 10.0)
-  assert_eq(sel.get(), "列表")
+  // 末项也照样直达：旧规则按位置把「末项」当当前页，末项不是当前页时永远点不动
+  click_at(root, kids[4], 4.0, 10.0)
+  assert_eq(sel.get(), "详情")
+  // 当前项（值等于导航状态的那一项）点它不改值
+  click_at(root, kids[4], 4.0, 10.0)
+  assert_eq(sel.get(), "详情")
+  click_at(root, kids[0], 4.0, 10.0)
+  assert_eq(sel.get(), "首页")
 }
 
 ///|
