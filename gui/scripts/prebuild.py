@@ -231,7 +231,7 @@ def link_configs() -> dict:
         # 平台批①电源方案直调要 powrprof（PowerGet/SetActiveScheme）。
         entries.append({
             "package": SYS_PACKAGE,
-            "link_flags": "ole32.lib shell32.lib uuid.lib user32.lib advapi32.lib powrprof.lib",
+            "link_flags": "ole32.lib shell32.lib uuid.lib user32.lib advapi32.lib powrprof.lib winspool.lib",
         })
         # 文本层（text/dwrite_text.cpp 的 Windows 分支）走系统 DirectWrite：
         # dwrite.lib 供 DWriteCreateFactory、d2d1.lib 供 D2D 的 DC 渲染目标
