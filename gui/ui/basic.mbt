@@ -360,7 +360,8 @@ pub fn image(
 }
 
 ///|
-/// 图标：定点路径数据按尺寸缩放绘制；颜色空 = 主题正文色。
+/// 图标：`size` 为盒子边长（方形），字形按盒子短边居中、留 88% 光学边距；
+/// 颜色空 = 主题正文色。
 pub fn icon(
   kind : @icons.IconKind,
   size? : Double = 16.0,
@@ -384,7 +385,8 @@ pub fn icon(
     ) -> Unit {
       let s = @style.style_for(self)
       let c = @style.color_of(s.color, @theme.theme_text_regular())
-      @icons.draw_icon(p, kind, r.w / 2.0, r.h / 2.0, size, c)
+      // 盒子短边的一半 = 内容半径：字形随盒子走，class 改过宽高也不会溢出
+      @icons.draw_icon(p, kind, r.w / 2.0, r.h / 2.0, r.w.min(r.h) / 2.0, c)
     })
     handle(w)
     w
@@ -397,6 +399,7 @@ pub fn icon(
 
 ///|
 /// 图标按钮：只有图标的按钮（悬停浅底、按下更深、禁用不吃事件）。
+/// `box_size` 是按钮方盒边长，`icon_size` 是字形盒边长（字形居中在盒内）。
 /// 需要文字提示时由调用方在外面包 `tooltip`（本组件不重复管提示）。
 pub fn icon_button(
   kind : @icons.IconKind,
@@ -447,7 +450,7 @@ pub fn icon_button(
         @theme.theme_text_regular()
       }
       let c = @style.color_of(s.color, fallback)
-      @icons.draw_icon(p, kind, r.w / 2.0, r.h / 2.0, icon_size, c)
+      @icons.draw_icon(p, kind, r.w / 2.0, r.h / 2.0, icon_size / 2.0, c)
     })
     w.on_pointer = Some(fn(
       self : @core.Widget,

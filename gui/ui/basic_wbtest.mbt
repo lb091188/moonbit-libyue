@@ -808,3 +808,69 @@ test "文本类样式属性真生效：对齐/换行/行高/下划线与硬阴�
   assert_eq(shadow_outside([]), 0)
   assert_true(shadow_outside([@style.style(box_shadow=6.0)]) > 10)
 }
+
+///|
+///|
+/// 回归：`size` 是盒子边长，字形须落在盒子内并居中。
+/// 曾经的口径错是把盒子边长当内容半径传给 `draw_icon`，字形画到盒子短边的
+/// 176%，被控件裁剪后四边各切掉一大块（见 adaptation 的图标尺寸条）。
+test "图标字形随盒子缩放、不溢出、居中" {
+  let ink_box = fn(bm : @render.Bitmap, x0 : Int, y0 : Int, x1 : Int, y1 : Int) -> (
+    Int,
+    Int,
+    Int,
+    Int,
+  ) {
+    let mut min_x = 1 << 30
+    let mut min_y = 1 << 30
+    let mut max_x = -1
+    let mut max_y = -1
+    for y = y0; y <= y1; y = y + 1 {
+      for x = x0; x <= x1; x = x + 1 {
+        let c = color_of(bm, x, y)
+        if c.0 > 128 && c.1 < 64 && c.2 < 64 {
+          if x < min_x { min_x = x }
+          if x > max_x { max_x = x }
+          if y < min_y { min_y = y }
+          if y > max_y { max_y = y }
+        }
+      }
+    }
+    (min_x, min_y, max_x, max_y)
+  }
+  let paint = fn(nodes : Array[@core.Node], w : Int, h : Int) -> @render.Bitmap {
+    let root = mount_root(nodes, w.to_double(), h.to_double())
+    let bm = @render.Bitmap::new(w, h)
+    let p = @render.Painter::new(bm)
+    root.paint(p)
+    p.end()
+    bm
+  }
+
+  // @ui.icon：24 的盒子，字形须短边内缩且居中在 (12,12)
+  let bm1 = paint([icon(@icons.IconKind::MediumCircleFill, size=24.0, color="#ff0000")], 48, 48)
+  let a = ink_box(bm1, 0, 0, 47, 47)
+  assert_true(a.0 >= 1 && a.1 >= 1)
+  assert_true(a.2 <= 22 && a.3 <= 22)
+  assert_true(a.2 - a.0 >= 16 && a.2 - a.0 <= 22)
+  assert_eq((a.0 + a.2) / 2, (a.1 + a.3) / 2)
+  assert_eq((a.0 + a.2) / 2, 11)
+
+  // icon_button：28 的按钮盒 + 16 的字形盒，字形居中在按钮中心 (14,14)
+  let bm2 = paint(
+    [
+      icon_button(
+        @icons.IconKind::MediumCircleFill,
+        color="#ff0000",
+        icon_size=16.0,
+        box_size=28.0,
+      ),
+    ],
+    48,
+    48,
+  )
+  let b = ink_box(bm2, 0, 0, 47, 47)
+  assert_true(b.0 >= 5 && b.1 >= 5 && b.2 <= 22 && b.3 <= 22)
+  assert_true(b.2 - b.0 >= 10 && b.2 - b.0 <= 17)
+  assert_eq((b.0 + b.2) / 2, (b.1 + b.3) / 2)
+}
