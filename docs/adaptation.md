@@ -1526,6 +1526,15 @@ Real-hardware report: "page switching in showcase lags, section widgets render l
 - **Same batch (same screenshot)**: the section description `@ui.text(s.desc, max_width=900.0)` had no `wrap=true`, so a long description was **one unwrapped 900 px line** whose tail was cut off. It now wraps, so the section container is no longer stretched by a single long line.
 - **Verification**: `cd examples && moon check showcase --deny-warn` clean, `cd gui && moon check --deny-warn` clean, library-wide 915/915 with no regression. Device check (user): open the charts page - both line canvases should climb one point every 0.5 s with an adaptive y axis and the latest value annotated, 暂停推点 should freeze and resume the curve, and the left gauge should sweep at 2 Hz.
 
+## yoga-mbt left the line gaps out of free space, so a grow item ate them and pushed the row out of its container (2026-10-14, real-hardware report: the copy button is still clipped)
+
+- **Symptom**: in a showcase section body the code row (left "代码" label + a growing spacer + the "复制" button on the right) had its button half clipped outside the window. That shape is used all over the app (`@ui.row([..., spacer, button], column_gap=...)`); elsewhere it only overflowed by a few pixels of margin, which nobody noticed.
+- **Root cause**: in this port, the §9.7 distribution computes `initial_free`, the loop's `remaining`, the auto-margin `free`, and justify-content's `free2` by subtracting only the sum of the items' outer sizes - **never the line's total gap** `gap x (n-1)` - while the positioning pass adds `main_gap` between items. So whenever an item grows, it over-grows by exactly `gap x (n-1)`.
+- **Minimal judge** (pinned in `modules/yoga-mbt/src/layout_wbtest.mbt`): row width 100, `column_gap=10`, children [fixed 30, grow 1] - the grow item must be 60; before the fix it came out 70 (row total 110).
+- **Fix**: compute `gap_total = main_gap x (line.length()-1)` once before the line is distributed and subtract it in all four free-space computations (spec: gaps occupy space and do not participate in grow/shrink).
+- **Measured** (headless probe over the real page tree; window 1010, sidebar 180, viewport 830): before, spacer=728 and the button at `x=962 w=50`, right edge 1012 - past both the window (1010) and the scrollbar (1002); after, spacer=712 and the button at `x=946..996`, exactly on the row's right edge (content 802 + 14 padding per side).
+- **Verification**: yoga-mbt `moon test src` 102/102 (including the new pin), library-wide 916/916, `cd gui && moon check --deny-warn` and the examples module clean, `moon build examples/showcase --target native` passes. This is a third, independent defect - stacked with the strip wrapping and the viewport min-size it produced the collapsed content plus clipped button seen on device.
+
 ## The section strip never wrapped: `Style` gains `flex_wrap` (2026-10-14)
 
 - **Symptom**: in showcase the top section strip (segmented) overflows horizontally and gets clipped once a page has many sections, even though `shared/section.mbt` documents "wraps when too wide".

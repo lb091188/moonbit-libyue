@@ -1823,6 +1823,15 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **同批一条(同一张截图看到的)**:段说明 `@ui.text(s.desc, max_width=900.0)` 没给 `wrap=true` ⇒ 长说明是**一条不折行的 900px 文本**,超出部分整片被裁(截图里折线段说明末尾断字)。改 `wrap=true`,段容器不再被单行长文本撑宽。
 - **验证**:`cd examples && moon check showcase --deny-warn` 零警告、`cd gui && moon check --deny-warn` 零警告、库全包 915/915 不回归。真机复验(用户):打开「图表」页 → 折线两幅应在 0.5s 一拍爬出三角波、y 轴随值自适应、右端有最新值标注;勾「暂停推点」曲线停住、取消勾选继续;仪表盘左环应 2Hz 平滑走。
 
+## yoga-mbt 自由空间漏减行间隙:grow 项吃掉 gap 把整行顶出容器(2026-10-14,真机反馈「复制按钮还是有问题」)
+
+- **现象**:showcase 段正文代码区那行(左「代码」+ 中间 grow 撑开的空文本 + 右「复制」)里,按钮右半边裁在窗口外。同类形态到处都在用(`@ui.row([..., spacer, 按钮], column_gap=...)`),只是别处溢出的是一点边距、没人注意。
+- **根因**:本端口的 §9.7 分配里,`initial_free`、循环内的 `remaining`、auto margin 的 `free`、justify-content 的 `free2` 都只减「子项外框之和」,**没减本行的间隙总和** `gap x (n-1)`;而定位阶段又逐项加 `main_gap` ⇒ 有 grow 项时它正好多吃 `gap x (n-1)`。
+- **最小判据**(钉在 `modules/yoga-mbt/src/layout_wbtest.mbt`):行宽 100、`column_gap=10`、子项 [固定 30, grow 1] ⇒ grow 项应为 60,修前算成 70(整行 110)。
+- **修复**:行分配前先算 `gap_total = main_gap x (line.length()-1)`,上述四处自由空间统一减它(规范:间隙占位、不参与 grow/shrink 分配)。
+- **实测**(无头探针挂真实页面树,窗口 1010、侧栏 180 → 视口 830):修前 spacer=728、按钮 `x=962 w=50` → 右边界 1012,越过窗口(1010)与滚动条(1002);修后 spacer=712、按钮 `x=946..996`,正好贴在行右界(内容 802 + 左右 padding 14)上。
+- **验证**:`moon test src`(yoga-mbt)102/102(含新增这条)、库全包 916/916、`cd gui && moon check --deny-warn` 与 examples 模块零警告、`moon build examples/showcase --target native` 通过。这条与「段条换行」「视口 min 0」是三个独立问题,叠在一起才造成用户看到的「正文塌 + 按钮裁一半」。
+
 ## 段条「超宽自动换行」是假口径:`Style` 补 `flex_wrap` 才真换行(2026-10-14)
 
 - **现象**:showcase 页面顶部的段条(segmented)段数一多就横向溢出被裁,而 `shared/section.mbt` 的注释写着「超宽自动换行」。

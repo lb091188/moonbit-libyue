@@ -1023,6 +1023,9 @@ fn layout_into_impl(
       it.size_main = it.hyp_main
       it.frozen = false
     }
+    // 本行间隙总和：自由空间一律先减它（规范 §9.7 / §9.9.1——间隙占位，
+    // 不参与 grow/shrink 分配）。漏减会让 grow 项吃掉间隙、整行溢出。
+    let gap_total = (main_gap * (line.length() - 1).to_double()).max(0.0)
     match inner_main {
       Some(im) =>
         // 按 CSS Flexbox §9.7 逐条实现：
@@ -1051,12 +1054,14 @@ fn layout_into_impl(
             let size = if it.frozen { it.size_main } else { it.base }
             size + it.m.start + it.m.end
           }
-          let initial_free = im - line.iter().fold(init=0.0, fn(acc, it) { acc + outer_of(it) })
+          let initial_free =
+            im - gap_total -
+            line.iter().fold(init=0.0, fn(acc, it) { acc + outer_of(it) })
           let mut done = line.iter().all(fn(it) { it.frozen })
           let mut rounds = 0
           while !done && rounds < line.length() + 2 {
             rounds = rounds + 1
-            let mut remaining = im -
+            let mut remaining = im - gap_total -
               line.iter().fold(init=0.0, fn(acc, it) { acc + outer_of(it) })
             let factor_sum = line.iter().fold(init=0.0, fn(acc, it) {
               if it.frozen {
@@ -1131,7 +1136,7 @@ fn layout_into_impl(
       acc + it.size_main + it.m.start + it.m.end
     })
     let free = match inner_main {
-      Some(im) => im - sum_fixed
+      Some(im) => im - gap_total - sum_fixed
       None => 0.0
     }
     let auto_count = line.iter().fold(init=0, fn(acc, it) {
@@ -1155,7 +1160,7 @@ fn layout_into_impl(
     // justify-content 定位
     let n = line.length()
     let free2 = match inner_main {
-      Some(im) => im - line.iter().fold(init=0.0, fn(acc, it) {
+      Some(im) => im - gap_total - line.iter().fold(init=0.0, fn(acc, it) {
         acc + it.size_main + it.m.start + it.m.end
       })
       None => 0.0

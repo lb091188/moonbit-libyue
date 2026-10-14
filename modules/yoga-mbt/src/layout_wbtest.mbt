@@ -1478,3 +1478,25 @@ test "换行容器作列子项：主轴 min:auto 等于 min-content 高，显式
   calculate_layout(root, Some(1000.0), Some(700.0))
   assert_eq(strip.layout().height, 30.0)
 }
+
+///|
+test "gap 计入剩余空间：grow 项不得吃掉间隙" {
+  // 行宽 100，间隙 10，两个子项：固定 30 + grow 1
+  // 规范 §9.7/§9.9.1：剩余空间 = 内主轴 − Σ基准 − 间隙总和 = 100-30-10 = 60
+  let root = Node::new()
+  root.set_width(fixed(100.0))
+  root.set_height(fixed(40.0))
+  root.set_flex_direction(Row)
+  root.set_column_gap(10.0)
+  let a = leaf(30.0, 20.0)
+  let b = Node::new()
+  b.set_height(fixed(20.0))
+  b.set_flex_grow(1.0)
+  root.append_child(a)
+  root.append_child(b)
+  calculate_layout(root, Some(100.0), Some(40.0))
+  assert_eq(a.layout().width, 30.0)
+  assert_eq(b.layout().left, 40.0)
+  assert_eq(b.layout().width, 60.0)
+  assert_eq(b.layout().left + b.layout().width, 100.0)
+}
