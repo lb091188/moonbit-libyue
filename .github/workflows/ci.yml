@@ -327,3 +327,20 @@ jobs:
             tail -c 6000 /tmp/mb.out
             exit 1
           fi
+
+      # 尽力冒烟：macOS runner 有登录会话与窗口服务，`hello` 这类常驻事件循环的
+      # 进程活着到超时就说明「窗口建出来了、循环转起来了」；退出码 124 = 存活。
+      # 标 continue-on-error：这一条不是门禁（真机目视仍按 AGENTS 规则 6 由使用者
+      # 做，见 `_人工测试清单.md` 的 T 节），但红/绿本身就是有用的证据。
+      - name: GUI 冒烟(hello 存活 20 秒即算通过,不卡门禁)
+        continue-on-error: true
+        run: |
+          set +e
+          timeout 20s moon run examples/hello 2>/tmp/smoke.err
+          code=$?
+          set -e
+          echo "hello 退出码 $code（124 = 存活到超时）"
+          tail -c 2000 /tmp/smoke.err || true
+          if [ "$code" != "124" ] && [ "$code" != "143" ]; then
+            echo "::warning title=macOS 冒烟未通过::退出码 $code，需真机复验 T1 节"
+          fi
