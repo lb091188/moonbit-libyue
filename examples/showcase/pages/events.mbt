@@ -109,6 +109,9 @@ fn skin_panel(w : @core.Widget) -> Unit {
 /// 挂载那一刻宿主才在。不注册的话点击时 `focus(id)` 在栈里找不到项，键盘焦点
 /// 交不进来（本栈焦点栈只认显式注册的 id）。
 fn key_focus_area(echo : @core.Store[String]) -> @core.Node {
+  // 诊断（真机一轮定位，拿到读数后删）：n 只走 stdout，与重绘链无关——
+  // stdout 里 n 在涨而屏幕上不更新 = 重绘链断；stdout 一条不涨 = 事件链断。
+  let n : Ref[Int] = Ref(0)
   {
     mount: fn(parent : @core.Widget) -> @core.Widget {
       let w = @core.Widget::new()
@@ -155,7 +158,14 @@ fn key_focus_area(echo : @core.Store[String]) -> @core.Node {
         }
       })
       w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
-        echo.set("\{key_name(ev.keysym)}（keysym \{ev.keysym}）mods=\{mods_label(ev.mods)} press=\{ev.press}")
+        n.val = n.val + 1
+        println(
+          "KEY-DIAG n=" + n.val.to_string() + " keysym=" + ev.keysym.to_string() +
+          " press=" + ev.press.to_string() + " mods=" + ev.mods.to_string()
+        )
+        echo.set(
+          "\{key_name(ev.keysym)}（keysym \{ev.keysym}）mods=\{mods_label(ev.mods)} press=\{ev.press} 第 \{n.val.to_string()} 键",
+        )
         true
       })
       parent.append_child(w)
