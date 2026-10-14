@@ -363,10 +363,25 @@ fn App::mark_widget_rect(self : App, w : Widget) -> Unit {
 
 ///|
 /// 焦点 id 版（焦点栈存的是 Int?）：None 表示本就无焦点，无事可做。
+/// 焦点栈记的是**焦点 id**（使用者给控件的序号），不是控件实例 id——拿它去
+/// `by_id` 查树会把脏区标到「实例 id 恰好等于那个序号」的另一个控件上，
+/// 新焦点的焦点环与光标因此可能整片不重画。
 fn App::mark_focus_rect(self : App, id : Int?) -> Unit {
   match id {
-    Some(i) => self.mark_id_rect(i)
+    Some(i) => self.mark_focus_id_rect(i)
     None => ()
+  }
+}
+
+///|
+/// 按焦点 id 局部置脏；树里没有这个焦点 id（未挂载/已隐藏）回退整窗。
+fn App::mark_focus_id_rect(self : App, focus_id : Int) -> Unit {
+  if focus_id <= 0 {
+    return
+  }
+  match self.root.find_by_focus_id(focus_id) {
+    Some(w) => self.mark_widget_rect(w)
+    None => self.schedule_paint()
   }
 }
 
@@ -560,7 +575,7 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
                   self.flush_ime_for_switch(prev)
                   self.mark_focus_rect(prev)
                 }
-                self.mark_id_rect(id)
+                self.mark_focus_id_rect(id)
               }
             None => ()
           }

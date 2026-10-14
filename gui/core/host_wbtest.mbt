@@ -281,3 +281,36 @@ test "整窗置脏之后同批的局部置脏不许收窄脏区" {
     None => fail("未请求整窗时该用累积脏区")
   }
 }
+
+///|
+/// 焦点变化标脏必须按**焦点 id** 查树：焦点栈记的是使用者给的序号，与控件实例
+/// id 是两个空间，混用会把脏区标到另一个控件上（新焦点格当帧不重画）。
+test "mark_focus_rect 按焦点 id 命中，不拿它当实例 id 用" {
+  host_reset()
+  let a = fake_open()
+  let decoy = Widget::new()
+  a.root.append_child(decoy)
+  let field = Widget::new()
+  field.focus_id = 9
+  a.root.append_child(field)
+  field.set_size(120.0, 28.0)
+  decoy.set_size(10.0, 10.0)
+  a.root.relayout(200.0, 200.0)
+  // 实例 id 撞上焦点号的那个控件（decoy 的实例 id 可能恰为 9）不该被标脏
+  a.mark_focus_rect(Some(9))
+  match a.dirty_rect {
+    Some(r) => {
+      assert_true(
+        r.w >= 120.0,
+        msg="脏区没落在焦点 id=9 的控件上（w=\{r.w}）：把焦点 id 当实例 id 用了",
+      )
+    }
+    None => fail("焦点标脏丢了脏区")
+  }
+  // 树里没有这个焦点号：整窗兜底（宁可多画不可漏画）
+  a.dirty_rect = None
+  a.dirty = false
+  a.mark_focus_rect(Some(4444))
+  assert_true(a.dirty_full, msg="未知焦点号应回退整窗置脏")
+  host_reset()
+}
