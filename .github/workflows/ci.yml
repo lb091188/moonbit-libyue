@@ -386,10 +386,16 @@ jobs:
 
       # 库模块全量构建 + hello 示例的 native 链接:后者顺带验证 prebuild 的
       # Darwin 分支下发的 framework 链接参数能传播到独立模块(示例模块不配 prebuild)。
+      # 这里逐包点名而不是裸 `moon build`:裸构建在 workspace 下等于构建**整个
+      # workspace**,连带 modules/ffmpeg-mbt 的 native-stub 也要编——macOS runner
+      # 没有 libavformat 头(brew 装 ffmpeg 是几百 MB 的代价,而这个 job 的职责只是
+      # 「证明本仓的原生层编得过、链得上」)。媒体线的 mac 落地另批做,届时由
+      # ffmpeg-mbt 自己的 prebuild 探测。
       - name: 构建(库模块 + hello 示例)
         run: |
           set +e
-          (cd gui && moon build --target native) >/tmp/mb.out 2>&1; c1=$?
+          (cd gui && moon build core ui render text theme icons sys input win dbus chart mdview web \
+            --target native) >/tmp/mb.out 2>&1; c1=$?
           moon build examples/hello --target native >>/tmp/mb.out 2>&1; c2=$?
           set -e
           if [ $c1 -ne 0 ] || [ $c2 -ne 0 ]; then
