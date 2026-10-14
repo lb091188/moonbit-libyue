@@ -64,12 +64,16 @@ pub fn page(secs : Array[Section]) -> @core.Node {
     )],
     padding=10.0,
     class=[flat],
+    // 段条是不可压缩的定高头部：正文够高时（Markdown 段整篇文档）压缩量
+    // 会全落到「min=0 且没设 flex_shrink=0」的这一层，实测 44px → 23.3px，
+    // 标签戳出条外。收缩的活儿交给下面的正文列（min=0 + grow）。
+    handle=fn(w : @core.Widget) -> Unit { w.node.set_flex_shrink(0.0) },
   )
   let bodies : Array[@core.Node] = []
   for s in secs {
     bodies.push(section_body(s, selected))
   }
-  @ui.col([strip, @ui.col(bodies, grow=1.0)], grow=1.0)
+  @ui.col([strip, @ui.col(bodies, grow=1.0, class=[flat])], grow=1.0)
 }
 
 ///|
