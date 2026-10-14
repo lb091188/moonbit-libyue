@@ -123,9 +123,29 @@ pub fn current_dir() -> String {
 }
 
 ///|
+///|
+/// Windows 直调：ShellExecuteW「open」打开 URL/文件（>32 成功的约定）。
+#borrow(target, ok)
+extern "c" fn ffi_shell_open(target : Bytes, ok : Ref[Int]) -> Int = "yue_sys_shell_open"
+
+///|
+/// Windows 直调：explorer /select,"path" 在文件管理器里定位。
+#borrow(path, ok)
+extern "c" fn ffi_shell_reveal(path : Bytes, ok : Ref[Int]) -> Int = "yue_sys_shell_reveal"
+
+///|
 /// 打开 URL 交给系统默认处理（http/https/mailto 等一律透传，不做校验）。
 pub fn open_url(url : String) -> Result[Unit, OpenUrlError] {
   match sys_platform() {
+    "windows" => {
+      let ok = Ref(0)
+      let _ = ffi_shell_open(@utf8.encode(url), ok)
+      if ok.val == 1 {
+        Ok(())
+      } else {
+        Err(SpawnFailed)
+      }
+    }
     "linux" =>
       match spawn_detached("xdg-open", url) {
         Ok(_) => Ok(())
@@ -143,6 +163,16 @@ pub fn reveal_in_file_manager(
   path : String,
 ) -> Result[Unit, FileManagerError] {
   match sys_platform() {
+    "windows" => {
+      let abs = launcher_abs_path(path, current_dir())
+      let ok = Ref(0)
+      let _ = ffi_shell_reveal(@utf8.encode(abs), ok)
+      if ok.val == 1 {
+        Ok(())
+      } else {
+        Err(SpawnFailed)
+      }
+    }
     "linux" => {
       let abs = launcher_abs_path(path, current_dir())
       match spawn_detached("xdg-open", parent_dir(abs)) {

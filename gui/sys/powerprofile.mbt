@@ -272,10 +272,45 @@ fn pp_available() -> Bool {
 // ---------------------------------------------------------------------------
 
 ///|
+///|
+/// Windows 直调：读当前活动电源方案的 GUID（标准小写串）。
+#borrow(ok)
+extern "c" fn ffi_pp_current_guid(ok : Ref[Int]) -> Bytes = "yue_sys_pp_current_guid"
+
+///|
+/// Windows 直调：按 GUID 串切换电源方案。
+#borrow(guid, ok)
+extern "c" fn ffi_pp_set(guid : Bytes, ok : Ref[Int]) -> Int = "yue_sys_pp_set"
+
+///|
 /// 当前系统是否支持电源计划（powerprofilesctl 存在且可查询）。每次调用
 /// 真实探测，高频场景请调用方自行缓存结果。
 pub fn pp_supported() -> Bool {
+  if sys_platform() == "windows" {
+    return true
+  }
   pp_available()
+}
+
+///|
+/// Windows 三经典方案 GUID（注册顺序视机器而定，缺席的 set 会失败）。
+fn pp_windows_guid_of(p : PowerProfile) -> String {
+  match p {
+    PPowerSaver => "a1841308-3541-4fab-bc81-f71556f20b4a"
+    PBalanced => "381b4222-f694-41f0-9685-ff5bb260df2e"
+    PPerformance => "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
+  }
+}
+
+///|
+/// GUID 串反查（前缀匹配足够——C 侧出的就是这批小写标准串）。
+fn pp_windows_profile_of(guid : String) -> PowerProfile? {
+  for p in [PPowerSaver, PBalanced, PPerformance] {
+    if guid.has_prefix(pp_windows_guid_of(p)) {
+      return Some(p)
+    }
+  }
+  None
 }
 
 ///|
@@ -283,7 +318,10 @@ pub fn pp_supported() -> Bool {
 /// daemon 未安装 → PpUnsupported；查询失败 → PpCommandFailed；输出中
 /// 解析不到任何计划 → PpParseFailed）。
 pub fn pp_profiles() -> Result[Array[PowerProfile], PowerProfileError] {
-  if !pr_available() {
+  if sys_platform() == "windows" {
+    // 推荐序与 Windows 设置一致：均衡在前
+    return Ok([PBalanced, PPerformance, PPowerSaver])
+  } else if !pr_available() {
     return Err(PpUnsupported)
   }
   match pp_run(["list"]) {
@@ -304,7 +342,18 @@ pub fn pp_profiles() -> Result[Array[PowerProfile], PowerProfileError] {
 /// → PpUnsupported；查询失败 → PpCommandFailed；输出不是已知计划名 →
 /// PpParseFailed）。
 pub fn pp_current() -> Result[PowerProfile, PowerProfileError] {
-  if !pr_available() {
+  if sys_platform() == "windows" {
+    let ok = Ref(0)
+    let b = ffi_pp_current_guid(ok)
+    if ok.val != 1 {
+      return Err(PpCommandFailed("PowerGetActiveScheme 失败"))
+    }
+    let guid = @utf8.decode_lossy(b)
+    match pp_windows_profile_of(guid) {
+      Some(p) => return Ok(p)
+      None => return Err(PpParseFailed("未知电源方案 GUID: \{guid}"))
+    }
+  } else if !pr_available() {
     return Err(PpUnsupported)
   }
   match pp_run(["get"]) {
@@ -323,7 +372,16 @@ pub fn pp_current() -> Result[PowerProfile, PowerProfileError] {
 /// 调用方自行走授权流程）。power-profiles-daemon 未安装 → PpUnsupported；
 /// 查询与执行失败 → PpCommandFailed。
 pub fn pp_set(profile : PowerProfile) -> Result[Unit, PowerProfileError] {
-  if !pr_available() {
+  if sys_platform() == "windows" {
+    let ok = Ref(0)
+    let _ = ffi_pp_set(@utf8.encode(pp_windows_guid_of(profile)), ok)
+    if ok.val == 1 {
+      return Ok(())
+    } else {
+      // 现代待机设备可能未注册高性能/节能方案
+      return Err(PpCommandFailed("PowerSetActiveScheme 失败（方案可能未注册）"))
+    }
+  } else if !pr_available() {
     return Err(PpUnsupported)
   }
   match pr_run("powerprofilesctl", pp_set_args(profile), timeout_ms=4000) {

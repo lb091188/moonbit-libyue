@@ -36,6 +36,12 @@ test {
 
 ///|
 test {
+  if sys_platform() == "windows" {
+    // Windows：desktop_detect 恒为显式成员（不读 XDG 环境变量）
+    assert_true(desktop_detect() is Windows)
+    assert_eq(desktop_name(), "Windows Shell")
+    return
+  }
   // 真实环境读数环：改 XDG_CURRENT_DESKTOP 后识别随之变化，随后复原
   let before = desktop_name()
   let saved = envx_get("XDG_CURRENT_DESKTOP")

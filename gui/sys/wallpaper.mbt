@@ -74,6 +74,17 @@ fn wp_split_lines(s : String) -> Array[String] {
 
 ///|
 /// 去首尾空白。
+///|
+/// Windows 直调：SPI_GETDESKWALLPAPER 读当前壁纸全路径（UTF-8 字节串）。
+#borrow(ok)
+extern "c" fn ffi_wallpaper_get(ok : Ref[Int]) -> Bytes = "yue_sys_wallpaper_get"
+
+///|
+/// Windows 直调：SPI_SETDESKWALLPAPER 写壁纸并广播。
+#borrow(path, ok)
+extern "c" fn ffi_wallpaper_set(path : Bytes, ok : Ref[Int]) -> Int = "yue_sys_wallpaper_set"
+
+///|
 fn wp_trim(s : String) -> String {
   let chars : Array[Char] = []
   for ch in s {
@@ -429,7 +440,20 @@ fn wp_apply(
 pub fn wp_get() -> Result[String, WallpaperError] {
   match sys_platform() {
     "linux" => wp_get_linux()
-    _ => Err(Unsupported) // Windows/macOS 直调随平台批
+    "windows" => {
+      let ok = Ref(0)
+      let b = ffi_wallpaper_get(ok)
+      if ok.val != 1 {
+        return Err(CommandFailed("SystemParametersInfo 读壁纸失败"))
+      }
+      let p = @utf8.decode_lossy(b)
+      if wp_trim(p) == "" {
+        Err(CommandFailed("壁纸路径为空"))
+      } else {
+        Ok(p)
+      }
+    }
+    _ => Err(Unsupported) // macOS 随平台批
   }
 }
 
@@ -458,7 +482,16 @@ pub fn wp_set(path : String) -> Result[Unit, WallpaperError] {
   }
   match sys_platform() {
     "linux" => wp_set_linux(path)
-    _ => Err(Unsupported) // Windows/macOS 直调随平台批
+    "windows" => {
+      let ok = Ref(0)
+      let _ = ffi_wallpaper_set(@utf8.encode(path), ok)
+      if ok.val == 1 {
+        Ok(())
+      } else {
+        Err(CommandFailed("SystemParametersInfo 写壁纸失败"))
+      }
+    }
+    _ => Err(Unsupported) // macOS 随平台批
   }
 }
 

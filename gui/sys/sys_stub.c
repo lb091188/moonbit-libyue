@@ -1915,3 +1915,163 @@ int64_t yue_sys_idle_seconds_ms(int32_t *ok) {
   return 0;
 #endif
 }
+
+// ---------------------------------------------------------------------------
+// 平台批①（Windows 直调）：wallpaper / shell open / reveal / powerprofile。
+// Linux 侧各模块走子进程（gsettings / xdg-open / powerprofilesctl）；Windows
+// 侧系统 API 直调零子进程。macOS 分支沿用桩口径（MoonBit 层给 Unsupported）。
+// ---------------------------------------------------------------------------
+
+// 壁纸读取：SPI_GETDESKWALLPAPER 返回当前壁纸全路径（UTF-8 字节串）。
+void *yue_sys_wallpaper_get(int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  wchar_t wpath[MAX_PATH + 1];
+  wpath[0] = L'\0';
+  if (SystemParametersInfoW(SPI_GETDESKWALLPAPER, MAX_PATH, wpath, 0) == 0) {
+    return moonbit_make_bytes(0, 0);
+  }
+  void *out = win_wide_bytes(wpath);
+  *ok = 1;
+  return out;
+#else
+  return moonbit_make_bytes(0, 0);
+#endif
+}
+
+// 壁纸设置：SPI_SETDESKWALLPAPER 并广播（写注册表 + 即时生效）。
+int32_t yue_sys_wallpaper_set(const char *path, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  wchar_t *wpath = win_utf8_wide(path, 0);
+  if (wpath == NULL) {
+    return 0;
+  }
+  if (SystemParametersInfoW(SPI_SETDESKWALLPAPER, 0, wpath,
+                            SPIF_UPDATEINIFILE | SPIF_SENDCHANGE) != 0) {
+    *ok = 1;
+  }
+  free(wpath);
+  return 0;
+#else
+  (void)path;
+  return 0;
+#endif
+}
+
+// 用系统默认方式打开 URL / 文件：ShellExecuteW「open」（>32 成功的约定）。
+int32_t yue_sys_shell_open(const char *target, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  wchar_t *wtarget = win_utf8_wide(target, 0);
+  if (wtarget == NULL) {
+    return 0;
+  }
+  HINSTANCE h =
+      ShellExecuteW(NULL, L"open", wtarget, NULL, NULL, SW_SHOWNORMAL);
+  free(wtarget);
+  if ((intptr_t)h > 32) {
+    *ok = 1;
+  }
+  return 0;
+#else
+  (void)target;
+  return 0;
+#endif
+}
+
+// 文件管理器里定位文件：explorer /select,"path"。
+int32_t yue_sys_shell_reveal(const char *path, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  wchar_t *wpath = win_utf8_wide(path, 0);
+  if (wpath == NULL) {
+    return 0;
+  }
+  wchar_t *args =
+      (wchar_t *)malloc(sizeof(wchar_t) * (wcslen(wpath) + 16));
+  if (args == NULL) {
+    free(wpath);
+    return 0;
+  }
+  wcscpy(args, L"/select,\"");
+  wcscat(args, wpath);
+  wcscat(args, L"\"");
+  HINSTANCE h = ShellExecuteW(NULL, L"open", L"explorer.exe", args, NULL,
+                              SW_SHOWNORMAL);
+  free(args);
+  free(wpath);
+  if ((intptr_t)h > 32) {
+    *ok = 1;
+  }
+  return 0;
+#else
+  (void)path;
+  return 0;
+#endif
+}
+
+// 电源方案：PowerGetActiveScheme/SetActiveScheme（powrprof）。GUID 以标准
+// 8-4-4-4-12 小写串与 MoonBit 互传，枚举三经典方案在 MoonBit 侧对表。
+static void sys_pp_guid_string(const GUID *g, char out[40]) {
+  snprintf(out, 40, "%08lx-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+           (unsigned long)g->Data1, g->Data2, g->Data3, g->Data4[0],
+           g->Data4[1], g->Data4[2], g->Data4[3], g->Data4[4], g->Data4[5],
+           g->Data4[6], g->Data4[7]);
+}
+
+static int sys_pp_parse_guid(const char *s, GUID *g) {
+  unsigned int d1 = 0;
+  unsigned int d2 = 0;
+  unsigned int d3 = 0;
+  unsigned int b[8];
+  if (sscanf(s, "%8x-%4x-%4x-%2x%2x-%2x%2x%2x%2x%2x%2x", &d1, &d2, &d3, &b[0],
+             &b[1], &b[2], &b[3], &b[4], &b[5], &b[6], &b[7]) != 11) {
+    return 0;
+  }
+  g->Data1 = d1;
+  g->Data2 = (unsigned short)d2;
+  g->Data3 = (unsigned short)d3;
+  for (int i = 0; i < 8; i++) {
+    g->Data4[i] = (unsigned char)b[i];
+  }
+  return 1;
+}
+
+// 当前活动电源方案的 GUID 串；取不到给空串。
+void *yue_sys_pp_current_guid(int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  GUID *pg = NULL;
+  if (PowerGetActiveScheme(NULL, &pg) != ERROR_SUCCESS || pg == NULL) {
+    return moonbit_make_bytes(0, 0);
+  }
+  char buf[40];
+  sys_pp_guid_string(pg, buf);
+  LocalFree(pg);
+  void *out = moonbit_make_bytes(36, 0);
+  memcpy(out, buf, 36);
+  *ok = 1;
+  return out;
+#else
+  return moonbit_make_bytes(0, 0);
+#endif
+}
+
+// 切换电源方案：guid 串解析失败给 0（MoonBit 层报 ParseFailed）。
+int32_t yue_sys_pp_set(const char *guid, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  GUID g;
+  if (!sys_pp_parse_guid(guid, &g)) {
+    return 0;
+  }
+  if (PowerSetActiveScheme(NULL, &g) == ERROR_SUCCESS) {
+    *ok = 1;
+  }
+  return 0;
+#else
+  (void)guid;
+  return 0;
+#endif
+}

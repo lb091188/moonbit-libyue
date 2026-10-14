@@ -300,3 +300,28 @@ test "wp 真机只读冒烟：已连接输出与 XFCE 读当前壁纸" {
     _ => println("wp: 读壁纸跳过（desktop = \{desktop_name()}）")
   }
 }
+
+///|
+test "wp Windows 直调读数环：get 非空路径 + 原值 round-trip set" {
+  if sys_platform() != "windows" {
+    println("wp: skip (windows-only 读数环)")
+    return
+  }
+  match wp_get() {
+    Ok(path) => {
+      assert_true(path.length() > 0)
+      // round-trip：写回当前壁纸（视觉无变化）验证 SPI_SET 通道
+      match wp_set(path) {
+        Ok(_) => println("wp: set round-trip ok")
+        Err(e) => {
+          println("wp_set failed: \{e}")
+          assert_true(false)
+        }
+      }
+    }
+    Err(e) => {
+      println("wp_get failed: \{e}")
+      assert_true(false)
+    }
+  }
+}

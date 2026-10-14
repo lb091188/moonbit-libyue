@@ -13,6 +13,8 @@ pub(all) enum DesktopEnv {
   Lxqt
   Unity
   Deepin
+  /// Windows 桌面（Explorer/Shell）——平台批①新增，非 XDG 世界的显式成员
+  Windows
   Unknown
 }
 
@@ -64,6 +66,9 @@ fn desktop_parse_env(value : String?) -> DesktopEnv {
 ///|
 /// 当前桌面环境（读 XDG_CURRENT_DESKTOP；未设置或认不出为 Unknown）。
 pub fn desktop_detect() -> DesktopEnv {
+  if sys_platform() == "windows" {
+    return Windows
+  }
   desktop_parse_env(envx_get("XDG_CURRENT_DESKTOP"))
 }
 
@@ -80,6 +85,7 @@ pub fn desktop_name() -> String {
     Lxqt => "LXQt"
     Unity => "Unity"
     Deepin => "Deepin"
+    Windows => "Windows Shell"
     Unknown => "unknown"
   }
 }
