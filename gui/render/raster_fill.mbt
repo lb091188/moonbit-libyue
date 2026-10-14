@@ -71,7 +71,7 @@ fn fill_polys(
   let x0 = raster_max_i(bx0.floor().to_int(), cx0)
   let y0 = raster_max_i(by0.floor().to_int(), cy0)
   let x1 = raster_min_i((bx1 + 1.0).ceil().to_int(), cx1)
-  let y1 = raster_min_i((by1 + 1.0).ceil().to_int(), cx1)
+  let y1 = raster_min_i((by1 + 1.0).ceil().to_int(), cy1)
   if x1 <= x0 || y1 <= y0 {
     return
   }
