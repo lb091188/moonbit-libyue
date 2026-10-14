@@ -28,6 +28,18 @@ from pathlib import Path
 MEDIA_PACKAGE = "NoahLiu/gui-media/media"
 SYS_LIBS = ["-lpthread", "-ldl", "-lm", "-lstdc++", "-latomic"]
 
+# macOS：miniaudio 的 CoreAudio 后端要的三个框架（AudioToolbox 供 AudioUnit 一族，
+# CoreAudio 供 AudioObject*，Foundation 供它用到的 CF/NSObject 桥）。**没有**
+# -ldl 与 -latomic——mac 的 dlopen 在 libSystem 里、-latomic 这个库压根不存在，
+# 照抄 Linux 那一串会在链接期报 library not found（这是与 Linux 分支唯一的差别，
+# 不是少装了东西）。
+MAC_FRAMEWORKS = [
+    "-framework", "CoreAudio",
+    "-framework", "AudioToolbox",
+    "-framework", "Foundation",
+]
+MAC_SYS_LIBS = ["-lpthread", "-lm"]
+
 # miniaudio.h 自 2026-10-14 起不再入库，改挂 GitHub Release 资产：构建时
 # 缺失即下载并校验 sha256；离线环境可提前手工放置（已存在不动）。
 _RELEASE_BASE = "https://github.com/lb091188/moonbit-native-gui/releases/download/vendor-v1"
@@ -65,9 +77,25 @@ def ensure_miniaudio() -> None:
 
 def link_configs() -> dict:
     ensure_miniaudio()
-    if platform.system() != "Linux":
+    system = platform.system()
+    if system == "Darwin":
         print(
-            "gui-media(prebuild): 非 Linux 平台降级为空 link_configs（媒体线随平台落地）",
+            "gui-media(prebuild): macOS 走 miniaudio 的 CoreAudio 后端"
+            "（CoreAudio/AudioToolbox/Foundation，不链 dl/atomic）",
+            file=sys.stderr,
+        )
+        return {
+            "link_configs": [
+                {
+                    "package": MEDIA_PACKAGE,
+                    "link_flags": " ".join([*MAC_SYS_LIBS, *MAC_FRAMEWORKS]),
+                }
+            ]
+        }
+    if system != "Linux":
+        print(
+            "gui-media(prebuild): 其余平台空 link_configs——Windows 实测 miniaudio 的"
+            " WASAPI/COM 全走运行期加载（LoadLibrary），零额外库，不是降级",
             file=sys.stderr,
         )
         return {"link_configs": []}

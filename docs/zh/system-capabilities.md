@@ -256,6 +256,8 @@ let _ = @sys.wp_set("/home/me/Pictures/wall.png")
 
 解码走 ffmpeg FFI（进程内动态链，格式随系统 ffmpeg：MP3/OGG/M4A/AAC/FLAC/WAV…），输出设备由内嵌 miniaudio 设备层直出（s16 PCM 队列，零重采样）。无输出设备环境（CI/headless）自动静音降级，状态机照常。
 
+三平台都要系统给得出 ffmpeg：Linux 用发行版的 dev 包（`apt install libav*-dev`），Windows 用 vendor 进仓库的头与导入库（运行期 dll 自行放置），macOS 用 `brew install ffmpeg`（`modules/ffmpeg-mbt/prebuild.py` 走 pkg-config 探测，探不到就非零退出并给出这一行安装提示——媒体线不静默造一份「看着能链、跑起来没解码器」的桩）。音频设备后端按平台由 miniaudio 选：Linux ALSA/Pulse、Windows WASAPI、macOS CoreAudio，所以 `gui-media` 在 mac 上要多链三个框架（CoreAudio/AudioToolbox/Foundation），**不链** `-ldl`/`-latomic`（mac 的 dlopen 在 libSystem 里，也没有 libatomic 这个库）。
+
 ### AudioPlayer（对标浏览器 `<audio>`）
 
 ```moonbit
