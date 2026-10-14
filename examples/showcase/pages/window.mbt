@@ -75,6 +75,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
   // 读回通道，态以按钮点击为准）
   let fs : Ref[Bool] = Ref(false)
   let bl : Ref[Bool] = Ref(false)
+  let sz : Ref[Int] = Ref(1280)
   // 快捷键：门面回查表在 core 里，页内只记自己注册过的句柄（注销用）
   let hotkeys : Ref[Array[@core.Hotkey]] = Ref([])
   let hk_status : @core.Store[String] = @core.Store::new("（未注册）")
@@ -85,7 +86,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
     @shared.section(
       "窗口",
       "窗口 API",
-      "运行期操作窗口：改标题 / 全屏 / 还原尺寸 / 无边框。「最大化/还原」「置顶」本栈未接（Win32 段没写 SC_MAXIMIZE / TOPMOST），按钮就不放——平台没有的能力不强推。",
+      "运行期操作窗口：改标题 / 全屏 / 尺寸切换（1280×720 ↔ 960×540）/ 无边框。「最大化/还原」「置顶」本栈未接（Win32 段没写 SC_MAXIMIZE / TOPMOST），按钮就不放——平台没有的能力不强推。",
       [
         @ui.row(
           [
@@ -96,8 +97,11 @@ pub fn page_window(app : @shared.App) -> @core.Node {
               fs.val = !fs.val
               w.set_fullscreen(fs.val)
             }),
-            win_button(app, last_op, "还原尺寸", fn(w : @win.Window) -> Unit {
-              w.set_size_pixels(1280, 720)
+            win_button(app, last_op, "尺寸切换", fn(w : @win.Window) -> Unit {
+              // 定死一个目标值会看着「没用」——启动尺寸就是它；两档来回切才看得见
+              sz.val = if sz.val == 1280 { 960 } else { 1280 }
+              let h = (sz.val.to_double() * 9.0 / 16.0).round().to_int()
+              w.set_size_pixels(sz.val, h)
             }),
             win_button(app, last_op, "无边框切换", fn(w : @win.Window) -> Unit {
               bl.val = !bl.val

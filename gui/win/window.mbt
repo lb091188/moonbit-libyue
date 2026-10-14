@@ -244,7 +244,8 @@ pub(all) enum IconTarget {
 }
 
 ///|
-/// 运行中改窗口标题（Win32 `SetWindowTextW`；非 Windows 后端空实现）。
+/// 运行中改窗口标题（Win32 `SetWindowTextW` / GTK `gtk_window_set_title`；
+/// macOS 后端空实现）。
 pub fn Window::set_title(self : Window, title : String) -> Unit {
   wm_set_title(self.id, @utf8.encode(title))
 }
@@ -293,6 +294,7 @@ pub fn Window::set_drag_rect(
 ///|
 /// 无边框开关（自绘标题栏形态）：去掉系统标题栏与边框、保留最小化，
 /// **客户区尺寸保持不变**（后端按新样式重算外框）。
+/// Win32 改样式位重算外框；GTK 走 `gtk_window_set_decorated`。
 pub fn Window::set_borderless(self : Window, on : Bool) -> Unit {
   wm_set_borderless(self.id, if on { 1 } else { 0 })
 }

@@ -3671,14 +3671,20 @@ void *wm_icon_handle(int slot) {
   return NULL;
 }
 
-/* ---- 窗口增强（W20e）GTK 分支占位：GTK 侧对应 gtk_window_set_title /
- * gtk_window_set_icon / gtk_window_set_geometry_hints（最小尺寸）/
- * gtk_window_begin_move_drag（自绘标题栏拖拽）/ gtk_window_set_decorated
- * （无边框），属 Linux 后端内部事务（按新口径不进路线图）；先给可编译的
- * 空实现，MoonBit 侧调用无害、反读恒 0/false。 */
+/* ---- 窗口增强（W20e）GTK 分支：改标题与无边框已实做（下面这两条）；
+ * 图标（GdkPixbuf 的源与 Windows 的 HICON 句柄不同宗）、最小尺寸
+ * （gtk_window_set_geometry_hints）、自绘标题栏拖拽（gtk_window_begin_move_drag
+ * 要按下时的指针与按钮号，本栈还没把这条请求送到窗口层）仍是可编译的空实现，
+ * MoonBit 侧调用无害、反读恒 0/false。 */
 void wm_set_title(int64_t id, const char *title) {
-  (void)id;
-  (void)title;
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *win = &wm_windows[id];
+  if (win->window == NULL || title == NULL) {
+    return;
+  }
+  gtk_window_set_title(GTK_WINDOW(win->window), title);
 }
 void wm_set_icon(int64_t id, int icon_slot, int which) {
   (void)id;
@@ -3698,8 +3704,14 @@ void wm_set_drag_rect(int64_t id, int x, int y, int w, int h) {
   (void)h;
 }
 void wm_set_borderless(int64_t id, int on) {
-  (void)id;
-  (void)on;
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *win = &wm_windows[id];
+  if (win->window == NULL) {
+    return;
+  }
+  gtk_window_set_decorated(GTK_WINDOW(win->window), on ? FALSE : TRUE);
 }
 void wm_get_min_size(int64_t id, int32_t *out_w, int32_t *out_h) {
   (void)id;
