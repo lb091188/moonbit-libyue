@@ -2552,3 +2552,101 @@ int32_t yue_sys_vol_write(int32_t mode, int32_t value, int32_t *ok) {
 }
 
 
+
+// ---------------------------------------------------------------------------
+// 平台批⑤：打印机（winspool 直调）。状态映射：PAUSED→2(暂停)、
+// PROCESSING/PRINTING→1(打印中)、ERROR/DOOR_OPEN/OFFLINE 等硬故障→3(停用)、
+// 其余→0(空闲)。
+// ---------------------------------------------------------------------------
+
+void *yue_sys_prt_list(int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  DWORD need = 0;
+  DWORD got = 0;
+  EnumPrintersW(PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS, NULL, 2, NULL,
+                0, &need, &got);
+  if (need == 0) {
+    return moonbit_make_bytes(0, 0);
+  }
+  BYTE *buf = (BYTE *)malloc(need);
+  if (buf == NULL) {
+    return moonbit_make_bytes(0, 0);
+  }
+  if (!EnumPrintersW(PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS, NULL, 2,
+                     buf, need, &need, &got)) {
+    free(buf);
+    return moonbit_make_bytes(0, 0);
+  }
+  PRINTER_INFO_2W *pi = (PRINTER_INFO_2W *)buf;
+  // 动态行缓冲
+  size_t cap = 4096;
+  size_t len = 0;
+  char *out = (char *)malloc(cap);
+  if (out == NULL) {
+    free(buf);
+    return moonbit_make_bytes(0, 0);
+  }
+  for (DWORD i = 0; i < got; i++) {
+    void *nb = win_wide_bytes(pi[i].pPrinterName);
+    if (nb == NULL) {
+      continue;
+    }
+    int code = 0;
+    DWORD st = pi[i].Status;
+    if (st & PRINTER_STATUS_PAUSED) {
+      code = 2;
+    } else if (st & (PRINTER_STATUS_PROCESSING | PRINTER_STATUS_PRINTING)) {
+      code = 1;
+    } else if (st != 0) {
+      // 硬故障族（缺纸/卡纸/门开/离线/错误）→ 停用
+      code = 3;
+    }
+    if (pi[i].Attributes & PRINTER_ATTRIBUTE_WORK_OFFLINE) {
+      code = 3;
+    }
+    char row[16];
+    int n = snprintf(row, sizeof(row), "%d\t", code);
+    if (len + strlen((const char *)nb) + n + 2 > cap) {
+      cap = (len + strlen((const char *)nb) + n + 2) * 2;
+      char *no = (char *)realloc(out, cap);
+      if (no == NULL) {
+        free(nb);
+        break;
+      }
+      out = no;
+    }
+    memcpy(out + len, nb, strlen((const char *)nb));
+    len += strlen((const char *)nb);
+    memcpy(out + len, row, (size_t)n);
+    len += (size_t)n;
+    out[len] = 0;
+    free(nb);
+  }
+  free(buf);
+  void *res = moonbit_make_bytes((int)len, 0);
+  memcpy(res, out, len);
+  free(out);
+  *ok = 1;
+  return res;
+#else
+  return moonbit_make_bytes(0, 0);
+#endif
+}
+
+// 默认打印机名（UTF-8）；未设给空串。
+void *yue_sys_prt_default(int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  wchar_t w[256];
+  DWORD n = 256;
+  if (!GetDefaultPrinterW(w, &n)) {
+    return moonbit_make_bytes(0, 0);
+  }
+  void *out = win_wide_bytes(w);
+  *ok = 1;
+  return out;
+#else
+  return moonbit_make_bytes(0, 0);
+#endif
+}

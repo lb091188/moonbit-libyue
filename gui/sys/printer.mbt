@@ -455,7 +455,35 @@ fn prt_lpstat(
 ///|
 /// 当前系统是否装有 CUPS 命令行工具（跑通只读的 lpstat -p 即为可用）。
 /// 每次调用真实探测，高频场景请调用方自行缓存结果。
+///|
+/// Windows 直调：打印机清单字节串「名称\t状态码」逐行。
+#borrow(ok)
+extern "c" fn ffi_prt_list(ok : Ref[Int]) -> Bytes = "yue_sys_prt_list"
+
+///|
+/// Windows 直调：默认打印机名。
+#borrow(ok)
+extern "c" fn ffi_prt_default(ok : Ref[Int]) -> Bytes = "yue_sys_prt_default"
+
+///|
+/// 状态码 → PrinterStatus（C 侧口径见 sys_stub.c 平台批⑤注释）。
+fn prt_win_status(code : Int) -> PrinterStatus {
+  match code {
+    1 => Printing
+    2 => Paused
+    3 => Disabled
+    _ => Idle
+  }
+}
+
+///|
 pub fn prt_supported() -> Bool {
+  if sys_platform() == "windows" {
+    // winspool 恒在；列表能取（哪怕空）即算可用
+    let ok = Ref(0)
+    let _ = ffi_prt_list(ok)
+    return ok.val == 1
+  }
   match prt_lpstat(["-p"], timeout_ms=3000) {
     Ok(_) => true
     Err(PrtUnsupported) => false
@@ -467,6 +495,29 @@ pub fn prt_supported() -> Bool {
 /// 列出全部打印机（CUPS 队列名 + 可用状态）；未装 CUPS → PrtUnsupported。
 /// 顺序保持 lpstat 返回序；空数组表示未配置任何打印机。
 pub fn prt_list() -> Result[Array[PrinterInfo], PrinterError] {
+  if sys_platform() == "windows" {
+    let ok = Ref(0)
+    let b = ffi_prt_list(ok)
+    if ok.val != 1 {
+      return Err(PrtCommandFailed("EnumPrinters 失败"))
+    }
+    let out : Array[PrinterInfo] = []
+    for line in @utf8.decode_lossy(b).split("\n") {
+      if line == "" {
+        continue
+      }
+      let parts = line.split("\t").to_array()
+      if parts.length() < 2 {
+        continue
+      }
+      let code = match win_parse_int(parts[1].to_owned()) {
+        Some(v) => v
+        None => 0
+      }
+      let _ = out.push({ name: parts[0].to_owned(), status: prt_win_status(code) })
+    }
+    return Ok(out)
+  }
   match prt_lpstat(["-p"]) {
     Ok(out) => Ok(prt_parse_printer_list(out))
     Err(e) => Err(e)
@@ -477,6 +528,18 @@ pub fn prt_list() -> Result[Array[PrinterInfo], PrinterError] {
 /// 读默认打印机名（`lpstat -d`）；类默认返回 "类名/成员名" 形态。
 /// 未装 CUPS → PrtUnsupported；未设默认目标或无输出 → PrtParseFailed。
 pub fn prt_default() -> Result[String, PrinterError] {
+  if sys_platform() == "windows" {
+    let ok = Ref(0)
+    let b = ffi_prt_default(ok)
+    if ok.val != 1 {
+      return Err(PrtParseFailed("GetDefaultPrinter 失败或未设默认"))
+    }
+    let name = @utf8.decode_lossy(b)
+    if name == "" {
+      return Err(PrtParseFailed("未设默认打印机"))
+    }
+    return Ok(name)
+  }
   match prt_lpstat(["-d"]) {
     Err(e) => Err(e)
     Ok(out) =>

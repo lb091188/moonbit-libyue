@@ -383,13 +383,6 @@ fn appfind_installed_impl(
 /// 数据目录约定）下的 .desktop，按 desktop id 去重（用户目录覆盖系统
 /// 目录），结果按 name 排序；不存在的目录跳过，全部扫描目录都不存在
 /// 时报 NoScanDir；非 Linux 给 [Unsupported]。
-///|
-/// Windows 直调：文件最后写入时间（Unix 毫秒；取不到 0）。
-#borrow(path)
-#borrow(ok)
-extern "c" fn ffi_file_mtime(path : Bytes, ok : Ref[Int]) -> Int64 = "yue_sys_file_mtime"
-
-///|
 /// Windows 开始菜单根目录（用户级 + 全机级），不存在的跳过。
 fn appfind_windows_dirs() -> Array[String] {
   let dirs : Array[String] = []
@@ -450,7 +443,7 @@ fn appfind_windows_entry(lnk : String) -> AppEntry {
     k += 1
   }
   let base = if fname.has_suffix(".lnk") {
-    fname.substring(start=0, end=fname.length() - 4)
+    fname[:fname.length() - 4].to_owned()
   } else {
     fname
   }
@@ -523,7 +516,7 @@ pub fn appfind_executable(name : String) -> Result[String, AppFindError] {
       match envx_get("PATH") {
         Some(path) =>
           for dir in path.split(";") {
-            let d = dir.to_string()
+            let d = dir.to_owned()
             if d == "" {
               continue
             }

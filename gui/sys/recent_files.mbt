@@ -925,8 +925,7 @@ pub fn rf_data_dir(xdg_data_home : String?, home : String?) -> String? {
 ///|
 ///|
 /// Windows 直调：文件最后写入时间（Unix 毫秒；取不到 0）。
-#borrow(path)
-#borrow(ok)
+#borrow(path, ok)
 extern "c" fn ffi_rf_file_mtime(path : Bytes, ok : Ref[Int]) -> Int64 = "yue_sys_file_mtime"
 
 ///|
