@@ -311,6 +311,18 @@ test "轻提示层：推送后挂一条、到点自动撤、宽度随文本" {
   assert_eq(strip.children().length(), 2)
   root.relayout(400.0, 200.0)
   assert_true(strip.children()[1].rect.w > w1)
+  // 层本身按内容尺寸开：不铺满窗口（铺满=一整块盖住窗口的板）
+  match @core.overlay_rect_of(@core.overlay_top_id()) {
+    Some(r) => {
+      assert_true(r.w > 0.0 && r.w < 400.0)
+      assert_true(r.h > 0.0 && r.h < 200.0)
+    }
+    None => assert_true(false)
+  }
+  // 居中摆位（窗口原点取不到时按 0 宽算，落点就是左上）
+  assert_eq(toast_left(400.0, 120.0), 140.0)
+  assert_eq(toast_left(100.0, 120.0), 0.0)
+  assert_eq(toast_left(0.0, 120.0), 0.0)
   // 到点自动撤：撤到最后一条时整层收起
   assert_eq(queue.val.length(), 2)
   (queue.val[0])()

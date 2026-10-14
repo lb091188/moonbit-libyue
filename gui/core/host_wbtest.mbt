@@ -174,6 +174,30 @@ test "浮层开在当前窗：切换当前窗后新层落进另一棵树的图�
 }
 
 ///|
+/// 图层档浮层可以移动（轻提示后来更宽的一条要按窗口宽重新居中）。
+test "overlay_set_pos 按窗口坐标搬动浮层，未知句柄返回 false" {
+  host_reset()
+  let a1 = fake_open()
+  install_host_hooks()
+  let id = overlay_show_at(empty_node(), 30.0, 12.0)
+  a1.root.relayout(200.0, 100.0)
+  match overlay_rect_of(id) {
+    Some(r) => assert_eq((r.x, r.y), (30.0, 12.0))
+    None => assert_true(false)
+  }
+  assert_true(overlay_set_pos(id, 55.0, 20.0))
+  a1.root.relayout(200.0, 100.0)
+  match overlay_rect_of(id) {
+    Some(r) => assert_eq((r.x, r.y), (55.0, 20.0))
+    None => assert_true(false)
+  }
+  // 不在当前窗浮层栈里的句柄：不动任何东西
+  assert_false(overlay_set_pos(id + 1, 0.0, 0.0))
+  overlay_clear()
+  host_reset()
+}
+
+///|
 test "mount 升的是本窗图层，不动别的窗" {
   host_reset()
   let a1 = fake_open()

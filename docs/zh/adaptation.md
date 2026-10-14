@@ -2082,6 +2082,17 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 
 验证:style 18/18、yoga-mbt 100/100(基线 95+新增 5)、core 120/120、`cd gui && moon check --deny-warn` 与全仓 `moon check` 零错零警;set_margin labelled 化 14 处调用点整批改完,库测试 858 条 856 过(2 条红为 W9/排序批既有缺口,stash 纯净态复跑同红)。
 
+## 轻提示带着整窗底色:浮层按内容尺寸开(2026-10-14,真机反馈)
+
+- **环境**:Ubuntu 24.04 + X11 + XFCE,`examples/showcase`(浏览器页与其余页同挂在一棵 `bind_node` 树里,网页区常驻)。
+- **现象**:弹 message 轻提示时,顶部那条提示之外**整扇窗口像被盖了一层不透明背景**(用户口径:「message 不应该有遮罩背景」)。
+- **根因**:`toast_layer` 用 `overlay_show_full` 开层。所在窗挂着原生子件(网页区)时浮层走**原生档**(`overlay_native_tier()` = `Window::has_child_surfaces()`),铺满档=按 owner 内容区大小开**一扇真窗口**,而每扇 `App` 的根控件默认 `on_draw` 铺 `theme_bg_page()`(`core/app.mbt`)——于是一整块页面底色的窗扣在主窗上,提示条只是它上面的圆角条。图层档同样把带子做成 `absolute` + 四边 0 的整窗包裹层(不画底色,但整窗命中都归它)。
+- **修复**:轻提示改按**内容尺寸**开(`overlay_show_at`,`y=0`、`x` 按窗口宽居中,居中算式抽成纯函数 `toast_left` 便于钉桩);带子不再 absolute,列 + `align-items: center` 让它的宽度自然等于最宽那一条。配套两条:
+  - core 加 `overlay_set_pos(id, x, y)`(窗口坐标搬动**图层档**浮层;原生档那扇窗开出来后位置归窗口系统管,对它返回 false、不搬)——后来又推来一条更宽的提示时,整组要重新居中。
+  - 原生档收框补一条口径:`overlay_fit_pass` 的三帧预算用尽后**仍放行放大**——内容长宽了框子不跟着长就会把多出来的部分切掉;收缩仍受三帧限制(宽度回环里不来回改尺寸)。
+- **没动的一条,记档**:图层是根控件的满窗 absolute 子控件,只要有任何浮层开着,浮层之外的按下仍被图层消费(`core/overlay.mbt` 的「点浮层外收起」)——轻提示在屏的那两秒里,点页面控件收不到这一击。这是浮层族的共同输入模型,本批只收视觉尺寸,派发不动;要不要让「本来就没有点外收起语义」的浮层(轻提示)放行点击,另批定。
+- **验证**:`moon test core ui` 299/299(core 新增 1 条:`overlay_set_pos` 搬动后 `overlay_rect_of` 落在新窗口坐标、未知句柄给 false;ui 轻提示用例补断言:浮层矩形宽高都小于窗口、`toast_left` 的居中与钳 0 三点)、库全包 914/914、`cd gui && moon check --deny-warn` 与 `cd examples && moon check --deny-warn` 零警告、`moon build showcase --target native` 链接通过。真机观感(提示条外不再有整窗底色、逐条推来宽度变化仍居中)归 `_人工测试清单.md` S18。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。
