@@ -240,12 +240,22 @@ test "动图解码：逐帧前进、每帧时长、当前帧成图、close 之�
   if decode_available() == false {
     return
   }
-  let anim = match test_asset("examples/showcase/assets/dot.gif") {
+  let dot = test_asset("examples/showcase/assets/dot.gif")
+  let anim = match dot {
     Some(p) => Animation::new_from_file(p)
     None => None
   }
   match anim {
-    None => assert_true(false)
+    None =>
+      // 素材缺失算失败；动图族「探测即不可用」的平台（macOS 首批口径）不算——
+      // 那条路上静图入口必须仍给出首帧，组件的「退回首帧静图」全靠它
+      match dot {
+        None => assert_true(false)
+        Some(p) => {
+          let still = Image::new_from_file(p)
+          assert_eq((still.get_width(), still.get_height()), (120.0, 120.0))
+        }
+      }
     Some(a) => {
       assert_eq((a.is_static, a.width, a.height), (false, 120, 120))
       assert_true(a.is_valid())

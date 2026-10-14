@@ -2126,6 +2126,10 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
   - **任务栏进度 macOS 给不支持**：dock 只有一枚文本角标，画不出进度条语义，不拿它冒充。
   - **webview**：`wb_signal_mask()` 在 mac 回 10——下载（要 macOS 15 的 `WKDownload`）与权限请求没有公开口，如实报「少哪几条回证」；`wb_persistence()` 按「macOS 14+ 且有 bundle id」探测，裸二进制回 0 并退非持久化存储。
 - **sys 各族的 mac 后端选择**：能用公开 CLI 的不进 C——`open`/`open -R`（揭示与选中）、`sw_vers`/`ioreg`/`sysctl`（系统信息）、`osascript` 的 `volume settings` 与 System Events 桌面图片（音量/壁纸）、LaunchAgents plist + `launchctl load/unload`（自启动）、`lpstat`/`lp`（macOS 自带 CUPS，与 Linux 同一条线，**这是声明过的选择不是漏跑到 Linux 分支**）；只有真要问内核的走桩（`hw.memsize`+`host_statistics64`、`kern.boottime`、`CGEventSourceSecondsSinceLastEventType` 的空闲读数）。四族**明确保持 Unsupported 并加平台门**：windowctl（Accessibility 要用户授权）、nightlight（CoreBrightness 私有）、powerprofile（`pmset` 对不上三值方案语义）、media（无 MPRIS 对等物）。
+- **macOS job 第一次真跑 `moon test`：851 项里 4 红，都是「口径没对齐」而不是链路坏**（这条最值钱——CI 第一次把 mac 侧的测试跑起来，证明前四批的降级声明有代码没跟上）：
+  1. **动图退回首帧静图，尺寸却没退**：`ui/gif.mbt` 在 `Animation::new_from_file` 给 None 时不设宽高，占位成 0×0——图本身解得出（`ui_decode_guard()` 在 mac 通过，ImageIO 的 GIF 首帧给 120×120），只是「画得出却摆不下」。None 分支改为跟随首帧静图的宽高；`render/image_wbtest` 与 `ui/basic_wbtest` 的动图断言改成**探测即分支**：解不出动图就验「静图入口给出首帧 + 组件不排自转 + 画得出墨」，有动图才走换帧节奏那串断言（Linux/Windows 覆盖不减）。
+  2. **下划线按行数比，行距一重合就平**：`text_decoration` 的断言原是「下划线多出一整行墨」，macOS 上那条 1px 线落进字形最后一行的行距里，行数不变就判红。改成比**墨像素数**——那才与「画没画下划线」同义，三平台同一条判据。
+  3. **launcher 的平台门过期**：测试还写着「非 Linux 一律 `Unsupported`」，而批⑤已给 macOS 上了 `open` 的真实现。现在 mac 与 Windows 同一形态：拿无效目标做探针，只验「不再给 Unsupported」（`Ok` 或 `SpawnFailed`），不开浏览器也不开 Finder。
 - **验证方式**：CI 的 macOS job 起手是**原生桩编译门禁**——用与 prebuild 同一串 clang 旗标（`-fsyntax-only -O2 -x objective-c -fobjc-arc -D<宏>`）对 win/render/text/web 四个 mac 桩加纯 C 的 sys 桩逐个过语法检查。这一步不能省：`moon check` 根本不编这些桩，形态错要等到 `moon test` 的链接期才炸，而且炸出来是一串 `Undefined symbols`（归档没编出来 → 链接条目整条不下发），看不出真正的原因。之后是 `moon check` + 12 包 `moon test` + `moon build --target native` + examples/hello 链接；真机按 `_人工测试清单.md` T 节走。**尚未回证的点**：T1-T6 全部目视项、显示器枚举的真机读数、plist/launchctl 的实际生效、osascript 的自动化授权、通知是否弹出、Retina 观感与拖窗期间的循环行为。
 
 ## 维护约定

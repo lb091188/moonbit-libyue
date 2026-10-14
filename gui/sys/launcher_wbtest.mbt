@@ -77,11 +77,14 @@ test {
     FileManagerError::SpawnFailed.to_string(),
     "FileManagerError::SpawnFailed",
   )
-  if sys_platform() == "windows" {
-    // Windows 直调落地（平台批①）：open/reveal 会真开浏览器/资源管理器，
-    // 有系统副作用——测试只验证「不再返回 Unsupported」，用无效目标的
-    // SpawnFailed 语义做探针（不弹窗）
-    assert_true(open_url("libyue-invalid-probe://no-such-scheme") is Ok(_) || open_url("libyue-invalid-probe://no-such-scheme") is Err(SpawnFailed))
+  if sys_platform() == "windows" || sys_platform() == "macos" {
+    // 两支都有真实现（Windows 直调 ShellExecuteW / macOS 的 `open`，平台批⑤）：
+    // 测试只验「不再返回 Unsupported」，用无效目标的 SpawnFailed 语义做探针
+    // （既不开浏览器也不开 Finder）
+    let u = open_url("libyue-invalid-probe://no-such-scheme")
+    assert_true(u is Ok(_) || u is Err(SpawnFailed))
+    let v = reveal_in_file_manager("/libyue-invalid-probe-no-such-path")
+    assert_true(v is Ok(_) || v is Err(SpawnFailed))
   } else if sys_platform() != "linux" {
     assert_true(open_url("https://libyue.com") is Err(Unsupported))
     assert_true(reveal_in_file_manager("/tmp") is Err(Unsupported))
