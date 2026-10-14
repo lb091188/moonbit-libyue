@@ -277,10 +277,17 @@ jobs:
         working-directory: gui
         run: |
           gate() {
-            printf '\033[36m==> %s (%s)\033[0m\n' "$1" "$2"
-            if ! xcrun clang -fsyntax-only -O2 -x objective-c -fobjc-arc \
-                 "-D$2" "$1"; then
-              echo "::error title=mac 桩编译失败::$1 的 $2 分支编不过(见上方 clang 诊断)"
+            src="$1"
+            define="$2"
+            lang="${3:-objective-c}"
+            args=()
+            if [ -n "$define" ]; then args+=("-D$define"); fi
+            if [ "$lang" = "objective-c" ]; then args+=("-fobjc-arc"); fi
+            printf '\033[36m==> %s (%s%s)\033[0m\n' "$src" "$lang" \
+              "${define:+, $define}"
+            if ! xcrun clang -fsyntax-only -O2 -x "$lang" "${args[@]}" "$src";
+            then
+              echo "::error title=mac 桩编译失败::$src 的 ${define:-默认} 分支编不过(见上方 clang 诊断)"
               exit 1
             fi
           }
@@ -288,7 +295,10 @@ jobs:
           gate render/stub.c WM_STUB_MAC
           gate text/stub.c WM_STUB_MAC
           gate web/webkit_stub.c WB_HAVE_WKWEBVIEW
-          echo "四个 macOS 桩全部编译通过"
+          # sys 桩是纯 C(moon native-stub 自编),但 __APPLE__ 分支里那些
+          # CoreGraphics 口同样在新 SDK 上被动过,一并做语法检查。
+          gate sys/sys_stub.c "" c
+          echo "五个 macOS 桩全部编译通过"
 
       # 新装 runner 的注册表索引里查不到 prowk/moonsqlitefile 与 mizchi/markdown
       # (三平台同一个报错: module was not found in the registry),先刷索引。

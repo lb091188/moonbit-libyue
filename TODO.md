@@ -396,7 +396,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$MSVC/bin/Hostx64/x64/cl.exe" \
 - [x] **批④ web**（WKWebView）——导航/标题/地址经 delegate + KVO 进 per-view 队列、`evaluateJavaScript` 按序号回 kind=7、`WKScriptMessageHandler` + 同形 shim 做页面→原生、公开 `WKURLSchemeHandler` 做自定义协议、`WKHTTPCookieStore` 回 kind=13；三条差异如实出声（不发 kind=9/10、运行期整串 UA 不接私有口、kind=4 由 decidePolicy 给）
 - [x] **批⑤ sys 与 core 分派**——揭示/系统信息/音量/壁纸/自启动走公开 CLI，空闲/内存/开机走桩的 `__APPLE__` 分支，打印族声明为「与 Linux 同走 CUPS」，windowctl/nightlight/powerprofile/media 加 mac 平台门（不再白发进程）；`core/hotkey.mbt` 开 mac 档（Carbon 已落）
 - [ ] **macOS GIF 动图分帧合成**：要逐帧读「帧矩形 + disposal」，disposal 不在 Apple 的 GIF 公开属性清单里——先真机用 experiment 探针把可得性回证，再补（当前 `img_anim_decode_file` 给 0，组件退回首帧静图）
-- [ ] **macOS 多显示器枚举**（`sys/monitor.mbt`）：CLI 侧 `system_profiler` 输出本地化敏感且拿不到逐屏原点，要落 CoreGraphics 的 `CGGetActiveDisplayList`/`CGDisplayBounds`/`CGDisplayCopyAllDisplayModes`；`MonitorInfo` 没有缩放比字段，Retina 口径要先定「新增字段还是复用 width」再动
+- [x] **macOS 多显示器枚举**（批⑧，`sys/monitor.mbt` + `sys_stub.c` 的 `__APPLE__` 分支）——CoreGraphics 一家打齐：`CGGetOnlineDisplayList`（只列在线屏，mac 侧不产 `connected=false`）、`CGDisplayBounds` + 「当前模式像素宽÷逻辑宽」导出倍率换物理像素、`CGDisplayCopyAllDisplayModes` 给模式表（按像素尺寸×刷新率去重，表给不出退当前档一条）、`CGDisplayScreenSize` 给毫米；名字与内建面板刷新率是公开 CG 口给不到的，按 `Built-in`/`Display-<id>` 与 0=未知如实给；`MonitorInfo` 不加缩放比字段（清单里已是物理像素）。解析纯函数 + 样例断言在 `monitor_wbtest.mbt`，真机读数待 T 节复验
 - [ ] **macOS 已明确不做的四族**：窗口管理（Accessibility 授权门槛）、夜间模式（CoreBrightness 私有）、电源方案（`pmset` 语义对不上三值方案）、媒体播放器枚举（无 MPRIS 对等物）——若将来要做，得先解决「授权弹窗由谁负责」的产品问题
 - [ ] **macOS 安装自启动的生效回证**：plist 写落点已通（纯函数有测试钉住），`launchctl load` 在新写入文件上的实际生效待真机确认（不通就换 `bootstrap gui/<uid>`，那要先给 sys 补一个取 uid 的口子）
 - [ ] **真机复验 T1-T6 全部目视项**（`_人工测试清单.md`）：CI 只证明「编得过、链得上」；Retina 观感、输入法内联、拖窗期间的循环、通知在非 bundle 进程下是否弹出，都要人看

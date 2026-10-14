@@ -47,6 +47,7 @@
                     // macOS 不给隐式声明的机会——ISO C99 起隐式函数声明是错误）
 #include <errno.h> // 逐级建目录判 EEXIST（mkdir -p 语义）
 #include <fcntl.h>
+#include <stdarg.h> // 显示器清单逐行拼装的变参（sys_mon_line）
 #include <sys/stat.h> // mkdir(2)
 #include <sys/wait.h>
 #include <unistd.h>
@@ -2763,5 +2764,189 @@ void *yue_sys_clipboard_gtk_get_text(int32_t *ok) {
 }
 int yue_sys_clipboard_gtk_set_text(const char *text) {
   return wm_clipboard_set_text(text);
+}
+#endif
+
+// ---------------------------------------------------------------------------
+// monitor（macOS）：显示器枚举。CoreGraphics 的公开显示口一家打齐——
+// CGGetOnlineDisplayList 列「在线」显示器（已接且通电；macOS 没有「接了但
+// 关掉」的公开清单，所以这里不产 disconnected 那种条目）、CGDisplayBounds 给
+// 逻辑点原点、CGDisplayCopyDisplayMode/CGDisplayCopyAllDisplayModes 给当前档
+// 与模式表、CGDisplayModeGetPixelWidth/Height 给像素尺寸（缩放模式只有在像素
+// 空间里才可比，故一律取像素），倍率由「当前模式像素宽 ÷ 逻辑宽」导出。
+//
+// 名字给不了：本桩是纯 C，NSScreen 的 localizedName 够不着，而 CG 侧没有公开
+// 的显示器名。于是按可辨识度给——内建屏叫 "Built-in"，其余叫
+// "Display-<CGDirectDisplayID>"（与另两平台的输出名同为「本机特定」串）。
+//
+// 输出行式清单（'\n' 分行、'\t' 分列），MoonBit 侧 mon_parse_mac 解析：
+//   MON\t<name>\t<primary>\t<x>\t<y>\t<mm_w>\t<mm_h>
+//   MODE\t<w>\t<h>\t<centi>\t<current>\t<preferred>
+// MODE 行紧跟所属 MON 行。坐标与分辨率都是**物理像素**（本栈口径）；mm 是
+// CGDisplayScreenSize 的物理毫米，引擎不给时 0；刷新率厘赫兹，
+// CGDisplayModeGetRefreshRate 给 0 时（内建面板常见）如实给 0=未知。
+// ---------------------------------------------------------------------------
+#if defined(__APPLE__)
+#define SYS_MON_MAX 32
+#define SYS_MON_DEDUPE 256
+
+typedef struct {
+  char *buf;
+  size_t len;
+  size_t cap;
+} sys_mon_blob_t;
+
+// 追加一行（vsnprintf 两遍：先量长度再写）。放不下就整行丢弃——清单宁缺
+// 毋滥，切一半的行会让上层解析错位。
+static void sys_mon_line(sys_mon_blob_t *b, const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  int need = vsnprintf(NULL, 0, fmt, ap);
+  va_end(ap);
+  if (need <= 0) {
+    return;
+  }
+  if (b->len + (size_t)need + 1 > b->cap) {
+    size_t nc = b->cap == 0 ? 4096 : b->cap;
+    while (nc < b->len + (size_t)need + 1) {
+      nc *= 2;
+    }
+    char *nb = (char *)realloc(b->buf, nc);
+    if (nb == NULL) {
+      return;
+    }
+    b->buf = nb;
+    b->cap = nc;
+  }
+  va_start(ap, fmt);
+  vsnprintf(b->buf + b->len, b->cap - b->len, fmt, ap);
+  va_end(ap);
+  b->len += (size_t)need;
+}
+
+static int sys_mon_round(double v) { return (int)(v < 0 ? v - 0.5 : v + 0.5); }
+
+void *yue_sys_mon_mac(int32_t *ok) {
+  *ok = 0;
+  CGDirectDisplayID ids[SYS_MON_MAX];
+  uint32_t n = 0;
+  if (CGGetOnlineDisplayList(SYS_MON_MAX, ids, &n) != kCGErrorSuccess ||
+      n == 0) {
+    return moonbit_make_bytes(0, 0);
+  }
+  sys_mon_blob_t blob;
+  blob.buf = NULL;
+  blob.len = 0;
+  blob.cap = 0;
+  for (uint32_t i = 0; i < n; i++) {
+    CGDirectDisplayID d = ids[i];
+    CGRect bounds = CGDisplayBounds(d);
+    CGSize mm = CGDisplayScreenSize(d);
+    CGDisplayModeRef cur = CGDisplayCopyDisplayMode(d);
+    double sc = 1.0;
+    if (cur != NULL) {
+      size_t pw = CGDisplayModeGetPixelWidth(cur);
+      size_t lw = CGDisplayModeGetWidth(cur);
+      if (pw > 0 && lw > 0) {
+        sc = (double)pw / (double)lw;
+      }
+    }
+    char name[40];
+    if (CGDisplayIsBuiltin(d) != 0) {
+      snprintf(name, sizeof(name), "Built-in");
+    } else {
+      snprintf(name, sizeof(name), "Display-%u", (unsigned)d);
+    }
+    sys_mon_line(&blob, "MON\t%s\t%d\t%d\t%d\t%d\t%d\n", name,
+                 CGDisplayIsMain(d) != 0 ? 1 : 0,
+                 sys_mon_round(bounds.origin.x * sc),
+                 sys_mon_round(bounds.origin.y * sc),
+                 sys_mon_round(mm.width), sys_mon_round(mm.height));
+    // 模式表：引擎给不出（受保护内容、或该屏由系统托管）时，至少把当前这一档
+    // 如实列出来，上层不至于拿到空表。同 (像素宽,像素高,刷新率) 只留一条——
+    // CG 的清单里同一像素尺寸可以有多份时序配置，重复项对布局没有意义。
+    struct {
+      size_t w;
+      size_t h;
+      int centi;
+    } seen[SYS_MON_DEDUPE];
+    int seen_n = 0;
+    int cur_emitted = 0;
+    CFArrayRef modes = CGDisplayCopyAllDisplayModes(d, NULL);
+    int modes_n = modes == NULL ? 0 : (int)CFArrayGetCount(modes);
+    for (int k = 0; k < modes_n; k++) {
+      CGDisplayModeRef m =
+          (CGDisplayModeRef)CFArrayGetValueAtIndex(modes, (CFIndex)k);
+      if (m == NULL) {
+        continue;
+      }
+      size_t mw = CGDisplayModeGetPixelWidth(m);
+      size_t mh = CGDisplayModeGetPixelHeight(m);
+      if (mw == 0) {
+        mw = CGDisplayModeGetWidth(m);
+      }
+      if (mh == 0) {
+        mh = CGDisplayModeGetHeight(m);
+      }
+      double hz = CGDisplayModeGetRefreshRate(m);
+      int centi = (int)(hz * 100.0 + 0.5);
+      int dup = 0;
+      for (int s = 0; s < seen_n; s++) {
+        if (seen[s].w == mw && seen[s].h == mh && seen[s].centi == centi) {
+          dup = 1;
+          break;
+        }
+      }
+      if (dup) {
+        continue;
+      }
+      if (seen_n < SYS_MON_DEDUPE) {
+        seen[seen_n].w = mw;
+        seen[seen_n].h = mh;
+        seen[seen_n].centi = centi;
+        seen_n++;
+      }
+      int is_cur = (cur != NULL && CGDisplayModeIsCurrentMode(d, m)) ? 1 : 0;
+      if (is_cur) {
+        cur_emitted = 1;
+      }
+      sys_mon_line(&blob, "MODE\t%zu\t%zu\t%d\t%d\t%d\n", mw, mh, centi, is_cur,
+                   CGDisplayModeIsPreferred(m) ? 1 : 0);
+    }
+    if (modes != NULL) {
+      CFRelease(modes);
+    }
+    if (!cur_emitted && cur != NULL) {
+      size_t mw = CGDisplayModeGetPixelWidth(cur);
+      size_t mh = CGDisplayModeGetPixelHeight(cur);
+      if (mw == 0) {
+        mw = CGDisplayModeGetWidth(cur);
+      }
+      if (mh == 0) {
+        mh = CGDisplayModeGetHeight(cur);
+      }
+      double hz = CGDisplayModeGetRefreshRate(cur);
+      sys_mon_line(&blob, "MODE\t%zu\t%zu\t%d\t1\t1\n", mw, mh,
+                   (int)(hz * 100.0 + 0.5));
+    }
+    if (cur != NULL) {
+      CGDisplayModeRelease(cur);
+    }
+  }
+  if (blob.buf == NULL) {
+    return moonbit_make_bytes(0, 0);
+  }
+  void *out = moonbit_make_bytes((int)blob.len, 0);
+  memcpy(out, blob.buf, blob.len);
+  free(blob.buf);
+  *ok = 1;
+  return out;
+}
+#else
+// 非 macOS：符号要在（MoonBit 侧的 extern 是无条件的，三平台同一套链接），
+// 探测一律给「不可用」，mon_list 随之退 Unsupported。
+void *yue_sys_mon_mac(int32_t *ok) {
+  *ok = 0;
+  return moonbit_make_bytes(0, 0);
 }
 #endif

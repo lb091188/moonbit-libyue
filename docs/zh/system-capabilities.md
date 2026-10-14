@@ -19,9 +19,9 @@
 | browser/vscode 数据 | ✅（LOCALAPPDATA 路径） | ✅ | ✅（`Library/Application Support/<厂商>/<产品>` 路径，平台批①-⑥ 时就已同步） |
 | sysmonitor 进程数据 | ✅（自带 stub/sysmon.c） | ✅ | 本批未动（示例模块自带桩，mac 路径按该模块的 stub 注释待验） |
 | 夜间色温（redshift/xrandr 命令线） | ❌ 无公开 API | ✅ | ❌ 无公开 API（CoreBrightness 私有） |
-| 显示器枚举（monitor） | ❌ | ✅（xrandr） | ❌ 待做：要落 CoreGraphics 的 `CGGetActiveDisplayList`，且 `MonitorInfo` 还没有缩放比字段（Retina 口径要先定） |
+| 显示器枚举（monitor） | ❌ | ✅（xrandr） | 🚧 已接（CoreGraphics 直调：`CGGetOnlineDisplayList` / `CGDisplayBounds` / `CGDisplayCopyAllDisplayModes`；只列「在线」屏，输出名给不了按 `Built-in` / `Display-<id>` 给；读数一律物理像素，故 `MonitorInfo` 不需要缩放比字段） |
 
-macOS 的公开口与底层（🚧 已接项）：`open`/`open -R`、`sw_vers`、`ioreg -rd1 -c IOPlatformExpertDevice`、`sysctl hw.model/hw.memsize/kern.boottime`、`osascript`（System Events 的 `volume settings` 与桌面图片）、`launchctl load/unload` + `~/Library/LaunchAgents/*.plist`、`lpstat`/`lp`，以及桩内的 `host_statistics64`、`CGEventSourceSecondsSinceLastEventType`。
+macOS 的公开口与底层（🚧 已接项）：`open`/`open -R`、`sw_vers`、`ioreg -rd1 -c IOPlatformExpertDevice`、`sysctl hw.model/hw.memsize/kern.boottime`、`osascript`（System Events 的 `volume settings` 与桌面图片）、`launchctl load/unload` + `~/Library/LaunchAgents/*.plist`、`lpstat`/`lp`，以及桩内的 `host_statistics64`、`CGEventSourceSecondsSinceLastEventType`、`CGGetOnlineDisplayList`/`CGDisplayBounds`/`CGDisplayCopyDisplayMode`/`CGDisplayCopyAllDisplayModes`/`CGDisplayScreenSize`。
 
 Windows 直调的底层：SystemParametersInfoW（壁纸）、ShellExecuteW（启动/定位/打印）、PowerGet/SetActiveScheme、注册表（产品与 DMI 信息）、GlobalMemoryStatusEx、GetTickCount64、EnumWindows、EnumPrintersW、IAudioEndpointVolume（COM）、GetLastInputInfo。踩坑与头文件/链接要求见 [adaptation.md](adaptation.md) 各平台批条目。
 
@@ -317,14 +317,16 @@ systemprobe 启动即自动载入演示播放器，播放/暂停/拖进度/音�
 
 ## 显示器配置
 
-解析 `xrandr --query` 输出，给出每个输出的名称 / 连接状态 / 当前分辨率 × 刷新率 / 位置 / 物理尺寸 / 支持的模式列表。刷新率以厘赫兹整数表示（×100，如 5995 = 59.95Hz），避免浮点解析与比较。
+Linux 解析 `xrandr --query` 输出，macOS 直调 CoreGraphics（`CGGetOnlineDisplayList` 一家），两处都给出每个输出的名称 / 连接状态 / 当前分辨率 × 刷新率 / 位置 / 物理尺寸 / 支持的模式列表；分辨率与位置都是**物理像素**。刷新率以厘赫兹整数表示（×100，如 5995 = 59.95Hz），避免浮点解析与比较。
 
 | 函数 | 说明 |
 |---|---|
-| `mon_list() -> Result[Array[MonitorInfo], MonitorError]` | 枚举全部输出（含未连接），保持 xrandr 顺序 |
+| `mon_list() -> Result[Array[MonitorInfo], MonitorError]` | 枚举显示器输出，保持后端顺序 |
 | `mon_current() -> Result[Array[CurrentOutput], MonitorError]` | 当前输出简化快照（已连接且有当前模式），不含模式列表 |
 
-`MonitorInfo{ name, connected, primary, width, height, refresh_centi, pos_x, pos_y, mm_width, mm_height, modes }`；`MonitorMode{ width, height, refresh_centi, preferred, current }`；`CurrentOutput{ name, width, height, refresh_centi, pos_x, pos_y }`。错误 `MonitorError`：`Unsupported`（非 Linux 或 xrandr 不可用）/ `CommandFailed(String)` / `ParseFailed(String)`（无任何输出条目）。
+`MonitorInfo{ name, connected, primary, width, height, refresh_centi, pos_x, pos_y, mm_width, mm_height, modes }`；`MonitorMode{ width, height, refresh_centi, preferred, current }`；`CurrentOutput{ name, width, height, refresh_centi, pos_x, pos_y }`。错误 `MonitorError`：`Unsupported`（Windows，或 macOS 上探不到在线显示器 / 非 macOS 平台的探测）/ `CommandFailed(String)`（Linux 的 xrandr 起不来或退出码非零）/ `ParseFailed(String)`（一条输出都没有）。
+
+macOS 侧三条读数差异：`connected` 恒真（macOS 没有「接了但关掉」的公开清单，离线屏不出现在表里）；`name` 是 `Built-in`（内建屏）或 `Display-<CGDirectDisplayID>`（其余）——公开的 CG 接口没有显示器名，`NSScreen.localizedName` 属于 ObjC 侧；`refresh_centi` 在内建面板的部分模式上给 0（后端报「未知」，不冒充数值），`mm_width`/`mm_height` 同档缺省时给 0。
 
 ```moonbit
 match @sys.mon_current() {

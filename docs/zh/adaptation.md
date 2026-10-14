@@ -2093,7 +2093,7 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **没动的一条,记档**:图层是根控件的满窗 absolute 子控件,只要有任何浮层开着,浮层之外的按下仍被图层消费(`core/overlay.mbt` 的「点浮层外收起」)——轻提示在屏的那两秒里,点页面控件收不到这一击。这是浮层族的共同输入模型,本批只收视觉尺寸,派发不动;要不要让「本来就没有点外收起语义」的浮层(轻提示)放行点击,另批定。
 - **验证**:`moon test core ui` 299/299(core 新增 1 条:`overlay_set_pos` 搬动后 `overlay_rect_of` 落在新窗口坐标、未知句柄给 false;ui 轻提示用例补断言:浮层矩形宽高都小于窗口、`toast_left` 的居中与钳 0 三点)、库全包 914/914、`cd gui && moon check --deny-warn` 与 `cd examples && moon check --deny-warn` 零警告、`moon build showcase --target native` 链接通过。真机观感(提示条外不再有整窗底色、逐条推来宽度变化仍居中)归 `_人工测试清单.md` S18。
 
-## macOS 后端首批（mac 平台批①-⑤，2026-10-15；编译与链接由 CI 的 macOS job 回证，真机项待复验）
+## macOS 后端首批（mac 平台批①-⑧，2026-10-15；编译与链接由 CI 的 macOS job 回证，真机项待复验）
 
 - **环境**：GitHub Actions `macos-latest`（Apple Silicon，Xcode CLT 自带 clang 与 SDK 框架）。**本地开发机是 Ubuntu/X11，摸不到 macOS 的窗口服务**，所以这一族的「编得过、链得上」全部由 CI 证明，「跑得起来、看起来对」按 AGENTS 规则 6 交真机（清单在 `_人工测试清单.md` 的 T 节）。
 - **分支形态（与 Linux/Windows 同一条「单一 stub.c 多分支 + prebuild 宏」）**：`win/stub.c` 的 `WM_STUB_MAC`（Cocoa，Objective-C）、`render/stub.c` 的 `WM_STUB_MAC`（ImageIO，纯 C）、`text/stub.c` 的 `WM_STUB_MAC`（CoreText，纯 C）、`web/webkit_stub.c` 的 `WB_HAVE_WKWEBVIEW`（WebKit，Objective-C）。**占位分支的条件一律加 `&& !defined(__APPLE__)` 闸**：macOS 上 native-stub 那次不带宏的编译必须编出空翻译单元，否则与 prebuild 归档双定义。prebuild 的 Darwin 分支用 `cc -x objective-c -fobjc-arc` 编归档（`link_configs` 没有编译期字段，`c_flags` 被静默忽略——同 GTK/Pango 那条实测），框架按 `-framework` 逐包下发。
@@ -2101,6 +2101,13 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
   1. CoreText 的函数**文本对象在前**——`CTLineDraw(line, ctx)`，与 CGContext 一族 `(ctx, ...)` 的直觉相反；
   2. `CFAttributedStringReplaceString` / `SetAttribute` 收的是 **`CFRange`**，不是 location+length 两个数，且长度要问 `CFAttributedStringGetLength`（拿 `CFStringGetLength` 编不过：类型不同名）；
   3. 顺带一条非 mac 的：`sys_stub.c` 的 POSIX 臂里 `kill` 在 Linux 上靠别的头顺带声明到，macOS 的 clang 把隐式函数声明直接当错误 → 显式 `#include <signal.h>`。
+- **实测坑（第二、三轮：新 SDK 上「已不再公开声明」与「名字记错」两类）**：
+  1. `setCanShowHiddenFiles:`（NSOpenPanel）、`setSendActionOn:`（NSStatusItem 的按钮）、`setApplicationNameForUserAgent:`（WKPreferences）在 macOS 26 的 SDK 上都不再公开声明（clang 分别报 `no visible @interface` / `no known instance method`），旧 SDK 上它们是真实存在的。统一处理形态：给 `NSObject` 写一段 **informal 声明**让 selector 编译期可见，调用点先 `respondsToSelector:` 再发——运行期没这一口就退回默认行为（保存/打开面板的「显示隐藏文件」开关、托盘右键触发、UA 后缀失灵），**不去猜新名字**。
+  2. `WKWebsiteDataStore` 没有 `dataStoreWithURLStoragePath:error:` 那个口（那是按 Linux 侧 `WEBKIT_DATA_DIR` 的语义想出来的名字，编不过）；公开的是 **`+[WKWebsiteDataStore dataStoreForIdentifier:]`**（macOS 14+，吃 `NSUUID` 且进程要有 bundle id，libyue 的 `nativeui/mac/browser_mac.mm:86` 用的正是它）。目录路径进不了这个口，于是由 data_dir 哈希出一个固定 UUID（FNV-1a 两条 64 位链，拼 RFC 4122 的版本/变体位，`NSUUID` 只认合法串）——同一目录跨运行拿到同一会话；兑现不了照旧退 `nonPersistentDataStore` 并由 `wb_persistence()` 出声。
+  3. `WKWebsiteDataStore` 的 cookie 存储在 ObjC 里叫 **`HTTPCookieStore`**（Swift 才写作 `httpCookieStore`），写 `.cookieStore` 报 property not found。
+  4. **ObjC 的形参不能叫 `id`**：`wb_evaluate(int64_t id, ...)` 把类型名 `id` 遮住了，块参数表 `^(id result, NSError *error)` 因此被当成变量声明解析，报错炸成一片（`type-id cannot have a name` + 一串 `undeclared identifier`），根因只在一个参数名。
+  5. 两条「警告级但真是错」的：`NSTextInputClient` 的协议方法是三段名 **`setMarkedText:selectedRange:replacementRange:`**（写成两段，clang 只给 `-Wprotocol` 警告，输入法组合串那条通道运行期接不上）；`resignFirstResponder` 的原型返回 **`BOOL`**（写成 `void` 是 `-Wmismatched-return-types`）。所以 macOS 桩的编译门禁把 warning 也一并读，不当噪声丢掉。
+- **显示器枚举（mac 平台批⑧，`sys/monitor.mbt` + `sys_stub.c` 的 `__APPLE__` 分支）**：CoreGraphics 一家打齐——`CGGetOnlineDisplayList`（只列「在线」的，即已接且通电；macOS 没有「接了但关掉」的公开清单，故 mac 侧不产 `connected=false` 那种条目）、`CGDisplayBounds` 给逻辑点原点、由「当前模式像素宽 ÷ 逻辑宽」导出倍率后把原点与尺寸换成**物理像素**、`CGDisplayCopyAllDisplayModes` 给模式表（按「像素宽×像素高×刷新率」去重：CG 的清单里同一像素尺寸可以有多份时序配置，重复档对布局没有意义；表给不出时退当前档一条）、`CGDisplayModeIsCurrentMode` / `CGDisplayModeIsPreferred` 标当前与首选、`CGDisplayScreenSize` 给物理毫米。三个给不了的如实说：名字（`NSScreen.localizedName` 在纯 C 桩里够不着，CG 侧无公开名 → 内建屏 `Built-in`、其余 `Display-<CGDirectDisplayID>`，与另两平台的输出名同为「本机特定」串）、毫米（引擎不给时 0）、内建面板刷新率（`CGDisplayModeGetRefreshRate` 对部分内建模式给 0=未知，照实传 0，不冒充 60Hz）。`MonitorInfo` 不需要新增缩放比字段：清单里的数字一律已是物理像素，与 xrandr 同口径。
 - **与另两平台刻意不同、且写进契约的点**：
   - **事件循环**：不用 `[NSApp run]`，`wm_wait` 走 `nextEventMatchingMask:untilDate:`（AppKit 自己的阻塞取事件），`wm_wakeup` 走 `postEvent:` 投一个 `NSApplicationDefined` 标记事件把它唤醒——本栈「循环归 MoonBit + 不做 C→MoonBit 回调」两条纪律在 mac 上的等价实现。已知限制：拖窗/实时缩放时 AppKit 进 tracking mode，我们的泵拿不到那段事件（T6b 专测）。
   - **像素尺度**：整栈物理像素，Cocoa 侧一律点，进出边界各按所在屏 `backingScaleFactor` 换算一次；绘制区视图**不设 `isFlipped`**（非翻转视图里 `CGContextDrawImage` 与 `CTLineDraw` 的落点正则是「内存首行=顶行」，翻反而会把字面画倒）。
@@ -2110,7 +2117,7 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
   - **任务栏进度 macOS 给不支持**：dock 只有一枚文本角标，画不出进度条语义，不拿它冒充。
   - **webview**：`wb_signal_mask()` 在 mac 回 10——下载（要 macOS 15 的 `WKDownload`）与权限请求没有公开口，如实报「少哪几条回证」；`wb_persistence()` 按「macOS 14+ 且有 bundle id」探测，裸二进制回 0 并退非持久化存储。
 - **sys 各族的 mac 后端选择**：能用公开 CLI 的不进 C——`open`/`open -R`（揭示与选中）、`sw_vers`/`ioreg`/`sysctl`（系统信息）、`osascript` 的 `volume settings` 与 System Events 桌面图片（音量/壁纸）、LaunchAgents plist + `launchctl load/unload`（自启动）、`lpstat`/`lp`（macOS 自带 CUPS，与 Linux 同一条线，**这是声明过的选择不是漏跑到 Linux 分支**）；只有真要问内核的走桩（`hw.memsize`+`host_statistics64`、`kern.boottime`、`CGEventSourceSecondsSinceLastEventType` 的空闲读数）。四族**明确保持 Unsupported 并加平台门**：windowctl（Accessibility 要用户授权）、nightlight（CoreBrightness 私有）、powerprofile（`pmset` 对不上三值方案语义）、media（无 MPRIS 对等物）。
-- **验证方式**：CI 的 macOS job（`moon check` + 12 包 `moon test` + `moon build --target native` + examples/hello 链接）；真机按 `_人工测试清单.md` T 节走。**尚未回证的点**：T1-T6 全部目视项、plist/launchctl 的实际生效、osascript 的自动化授权、通知是否弹出、Retina 观感与拖窗期间的循环行为。
+- **验证方式**：CI 的 macOS job 起手是**原生桩编译门禁**——用与 prebuild 同一串 clang 旗标（`-fsyntax-only -O2 -x objective-c -fobjc-arc -D<宏>`）对 win/render/text/web 四个 mac 桩加纯 C 的 sys 桩逐个过语法检查。这一步不能省：`moon check` 根本不编这些桩，形态错要等到 `moon test` 的链接期才炸，而且炸出来是一串 `Undefined symbols`（归档没编出来 → 链接条目整条不下发），看不出真正的原因。之后是 `moon check` + 12 包 `moon test` + `moon build --target native` + examples/hello 链接；真机按 `_人工测试清单.md` T 节走。**尚未回证的点**：T1-T6 全部目视项、显示器枚举的真机读数、plist/launchctl 的实际生效、osascript 的自动化授权、通知是否弹出、Retina 观感与拖窗期间的循环行为。
 
 ## 维护约定
 
