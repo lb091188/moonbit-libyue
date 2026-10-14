@@ -44,7 +44,11 @@ pub fn page_data(app : @shared.App) -> @core.Node {
     @ui.TableRow::make(["Go", "2012", "云原生后端"]),
     @ui.TableRow::make(["TypeScript", "2012", "前端大规模工程"]),
   ]
-  let table_rows : @core.Store[Array[@ui.TableRow]] = @core.Store::new(lang_base)
+  // 初值给一份**快照**：Store 的内建去重按值比，若存的就是 `lang_base` 这个对象，
+  // 「添加一行」原地 push 之后再 set，新旧值是同一个数组 ⇒ 通知被吞、整表不重建
+  let table_rows : @core.Store[Array[@ui.TableRow]] = @core.Store::new(
+    lang_base.copy(),
+  )
   let table_sort : @core.Store[@ui.TableSort] = @core.Store::new({ column: -1, asc: true })
   fn reorder_langs() -> Unit {
     let st = table_sort.get()

@@ -362,6 +362,26 @@ fn App::mark_widget_rect(self : App, w : Widget) -> Unit {
 }
 
 ///|
+/// 悬停/按下变化的标脏范围：指针底下那颗控件，**加上悬停链上每个自绘状态的祖先**。
+/// 只标最深那颗会漏——表格行的整行悬停底色由行控件画，脏区却只有鼠标那一格，
+/// 真机表现就是「悬停不是整行」。链上没有状态祖先时，代价仍只是一颗控件的矩形。
+fn App::mark_state_chain(self : App, id : Int) -> Unit {
+  if id <= 0 {
+    return
+  }
+  let path = path_to_widget(self.root, id, [])
+  if path.length() == 0 {
+    self.schedule_paint()
+    return
+  }
+  for w in path {
+    if w.id == id || w.paints_state {
+      self.mark_widget_rect(w)
+    }
+  }
+}
+
+///|
 /// 焦点 id 版（焦点栈存的是 Int?）：None 表示本就无焦点，无事可做。
 /// 焦点栈记的是**焦点 id**（使用者给控件的序号），不是控件实例 id——拿它去
 /// `by_id` 查树会把脏区标到「实例 id 恰好等于那个序号」的另一个控件上，
@@ -380,18 +400,6 @@ fn App::mark_focus_id_rect(self : App, focus_id : Int) -> Unit {
     return
   }
   match self.root.find_by_focus_id(focus_id) {
-    Some(w) => self.mark_widget_rect(w)
-    None => self.schedule_paint()
-  }
-}
-
-///|
-/// 按实例 id 局部置脏。找不到（已卸载/隐藏）回退整窗——宁可多画，不可漏画。
-fn App::mark_id_rect(self : App, id : Int) -> Unit {
-  if id <= 0 {
-    return
-  }
-  match self.root.by_id(id) {
     Some(w) => self.mark_widget_rect(w)
     None => self.schedule_paint()
   }
@@ -589,10 +597,10 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
         if self.host.layer.visible {
           self.schedule_paint()
         } else {
-          self.mark_id_rect(old_hover)
-          self.mark_id_rect(self.hover_id)
-          self.mark_id_rect(old_cap)
-          self.mark_id_rect(self.capture)
+          self.mark_state_chain(old_hover)
+          self.mark_state_chain(self.hover_id)
+          self.mark_state_chain(old_cap)
+          self.mark_state_chain(self.capture)
         }
       }
     }

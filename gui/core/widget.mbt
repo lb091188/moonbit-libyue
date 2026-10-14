@@ -151,6 +151,9 @@ pub(all) struct Widget {
   /// 四周各放大这么多，硬阴影才画得出盒外——与 CSS 同义（阴影画在 border-box 之外，
   /// 除非祖先 `overflow:hidden`，本栈里就是祖先自己的矩形把它裁掉）。
   mut shadow_paint : Double
+  /// 本控件的绘制是否随 `hovered` / `pressed` / `focused` 变化（样式带状态桶即为真，
+  /// 由 `@style.apply` 写入）。宿主据此决定悬停变化的标脏范围。
+  mut paints_state : Bool
 }
 
 ///|
@@ -186,6 +189,7 @@ pub fn Widget::new() -> Widget {
     z_index_paint: 0.0,
     alpha_paint: 1.0,
     shadow_paint: 0.0,
+    paints_state: false,
   }
 }
 

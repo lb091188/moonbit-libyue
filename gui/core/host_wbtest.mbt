@@ -314,3 +314,45 @@ test "mark_focus_rect 按焦点 id 命中，不拿它当实例 id 用" {
   assert_true(a.dirty_full, msg="未知焦点号应回退整窗置脏")
   host_reset()
 }
+
+///|
+/// 悬停标脏必须覆盖「自绘状态的祖先」：表格行的整行底色就是被漏掉的那类
+/// （行画了底，脏区却只有鼠标那一格 → 真机「悬停不是整行」）。
+test "mark_state_chain 只把带状态桶的祖先并进脏区" {
+  host_reset()
+  let a = fake_open()
+  let row = Widget::new()
+  row.set_size(200.0, 30.0)
+  row.paints_state = true
+  let cell = Widget::new()
+  cell.set_size(50.0, 30.0)
+  row.append_child(cell)
+  a.root.append_child(row)
+  a.root.relayout(200.0, 200.0)
+  a.mark_state_chain(cell.id)
+  match a.dirty_rect {
+    Some(r) => assert_true(
+      r.w >= 200.0,
+      msg="只标了鼠标那一格（宽 \{r.w}），整行悬停底色不会重画",
+    )
+    None => fail("悬停标脏丢了脏区")
+  }
+  // 链上没有状态祖先：代价仍只是最深那颗控件的矩形
+  let b = fake_open()
+  let plain_row = Widget::new()
+  plain_row.set_size(200.0, 30.0)
+  let leaf = Widget::new()
+  leaf.set_size(50.0, 30.0)
+  plain_row.append_child(leaf)
+  b.root.append_child(plain_row)
+  b.root.relayout(200.0, 200.0)
+  b.mark_state_chain(leaf.id)
+  match b.dirty_rect {
+    Some(r) => assert_true(
+      r.w <= 50.5,
+      msg="没有状态祖先却把整行并进了脏区（宽 \{r.w}）",
+    )
+    None => fail("悬停标脏丢了脏区")
+  }
+  host_reset()
+}

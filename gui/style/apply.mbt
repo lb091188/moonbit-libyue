@@ -186,7 +186,16 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit {
     Some(p) => p
     None => empty_style()
   }
-  resolved_table.set(w.id, merge(prev, s))
+  let merged = merge(prev, s)
+  resolved_table.set(w.id, merged)
+  // 带状态桶 = 绘制随悬停/按下/焦点变 → 告诉宿主「悬停变化时我的矩形也要重画」
+  let stateful = match (merged.hover, merged.active, merged.focus) {
+    (Some(_), _, _) | (_, Some(_), _) | (_, _, Some(_)) => true
+    _ => false
+  }
+  if stateful {
+    w.paints_state = true
+  }
 }
 
 ///|
