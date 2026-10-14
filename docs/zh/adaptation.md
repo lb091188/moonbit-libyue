@@ -1813,6 +1813,8 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **修复**:两条 helper 一起圈进 `#if defined(_WIN32) ... #endif`(它们只在 Windows 分支里被调用,Windows 侧行为零变化)。
 - **通用口径**:平台桩里**只要类型来自平台头**(GUID / HINSTANCE / PangoLayout…),函数本体就得整段进守卫,不能只守函数体而把签名露在外面;`static` helper 同样算。加完 C 代码后至少跑一次**非目标平台**的编译(`cd gui && moon check`),这条守卫漏没漏一眼就知道。
 - **验证**:`moon check sys ui --deny-warn` 过、`moon build showcase --target native` 链接过、库全包 924/924。
+- **同类复发(2026-10-14 windowctl 批)**:同一口径第二次踩——`sys_win_find_ctx_t`/`sys_win_find`/`sys_win_find_cb`/`sys_mon_find_t`/`sys_mon_find_cb`/`sys_monitor_index`/`sys_win_enum_cb`/`sys_wcs_icontains` 这批 `static` helper(签名带 `HWND`/`HMONITOR`/`BOOL CALLBACK`)照旧写在守卫外,Linux 侧 `moon test sys` 报 `sys_stub.c:2338: error: expected ‘=’, … before ‘sys_win_find_cb’`。修复仍是整块圈进 `#if defined(_WIN32)`(两块:枚举 helper、find+标题匹配 helper;`sys_win_blob_t`/`sys_win_blob_append`/`sys_win_enum_ctx_t` 只用 stdlib,留守卫外)。
+- **收口动作(不复发的前提)**:凡给单平台加过 C,**当批必须在对侧平台跑一次 `cd gui && moon test <该平台包> --target native`**——导出函数体有 `#else` 分支不会炸,只有守卫外的 helper 才炸,而这只有对侧编译器看得到;Windows-only 的 `sys` 批在 Linux 上跑,`win`/`dbus` 那类反向同理。本批 Linux 读数:`moon test sys` 182/182、库全包 928/928、`cd gui && moon check --deny-warn` 与 `cd examples && moon check --deny-warn` 零警告、`moon build showcase --target native` 链接通过。
 
 ## 表格悬停不是整行 & 「添加一行」没反应:脏区只标最深那颗 + 去重 Store 存了被原地改的数组(2026-10-14,真机反馈)
 

@@ -2189,6 +2189,8 @@ typedef struct {
   sys_win_blob_t blob;
 } sys_win_enum_ctx_t;
 
+// 以下枚举/查找 helper 只用 Win32 类型（HMONITOR/HWND/EnumWindows），整块进守卫。
+#if defined(_WIN32)
 typedef struct {
   HMONITOR target;
   int index;
@@ -2238,6 +2240,7 @@ static BOOL CALLBACK sys_win_enum_cb(HWND h, LPARAM lp) {
   sys_win_blob_append(&ctx->blob, "\n", 1);
   return TRUE;
 }
+#endif
 
 // 枚举可见顶层窗口：行「0xhwnd\tmonitor\ttitle\n」（UTF-8）。
 void *yue_sys_win_list(int32_t *ok) {
@@ -2279,6 +2282,8 @@ void *yue_sys_host_name(int32_t *ok) {
 #endif
 }
 
+// find 与标题匹配 helper 只在 Windows 分支用到（HWND/EnumWindows/GetWindowTextW），整块进守卫。
+#if defined(_WIN32)
 // 标题不区分大小写的子串匹配。
 static int sys_wcs_icontains(const wchar_t *hay, const wchar_t *needle) {
   size_t nl = wcslen(needle);
@@ -2351,6 +2356,7 @@ static BOOL CALLBACK sys_win_find_cb(HWND h, LPARAM lp) {
   }
   return TRUE;
 }
+#endif
 
 // 激活窗口：最小化先还原再置前。
 int32_t yue_sys_win_activate(const char *id_or_title, int32_t *ok) {
