@@ -361,8 +361,90 @@ pub fn progress(
 }
 
 ///|
-/// 步进器：`[-] 值 [+]`，按 step 增减并夹在区间内；触边界那一侧自动禁用
-/// （禁用态必须跟着值走，见 state.mbt 那条实测）。
+/// 步进器的一格 `+` / `-`：**与本体共用同一外框**（外框由行容器按样式槽画），
+/// 自己只画悬停/按下底、内容字与靠内侧的那条分隔线。
+fn step_cell(
+  glyph : String,
+  off : Enabled,
+  sep_right : Bool,
+  on_click : () -> Unit,
+  subset : @style.Style,
+) -> @core.Node {
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    watch_theme()
+    w.node.set_width(@yoga.fixed(32.0))
+    w.node.set_height(@yoga.fixed(@theme.control_height))
+    w.cursor = @core.CURSOR_HAND
+    fold_style(
+      w,
+      @style.empty_style().hover(background_color="fill_hover").active(
+        background_color="border",
+      ),
+      [subset],
+    )
+    w.on_draw = Some(fn(
+      self : @core.Widget,
+      p : @render.Painter,
+      r : @core.Rect,
+    ) -> Unit {
+      let st = @style.style_for(self)
+      let bg = @style.color_of(st.background_color, "")
+      if bg.length() > 0 && !off.off {
+        // 内缩 1px：别把共用外框盖掉
+        p.set_fill_color(bg)
+        p.fill_rect(1.0, 1.0, r.w - 2.0, r.h - 2.0)
+      }
+      p.set_stroke_color(@theme.theme_border())
+      p.set_line_width(1.0)
+      let sx = if sep_right { r.w - 1.0 } else { 0.0 }
+      p.begin_path()
+      p.move_to(sx, 1.0)
+      p.line_to(sx, r.h - 1.0)
+      p.stroke()
+      let _ = @text.draw_box_at(
+        p,
+        0.0,
+        0.0,
+        r.w,
+        r.h,
+        glyph,
+        @text.Font::new("", 13.0),
+        if off.off {
+          @theme.theme_text_secondary()
+        } else {
+          @theme.theme_text_regular()
+        },
+        align=@text.Center,
+        valign=@text.Center,
+        wrap=false,
+      )
+    })
+    w.on_pointer = Some(fn(
+      self : @core.Widget,
+      ev : @core.PointerEvent,
+    ) -> Bool {
+      match ev.kind {
+        @core.Down => !off.off
+        @core.Up => {
+          let inside = ev.x >= 0.0 && ev.x <= self.rect.w &&
+            ev.y >= 0.0 && ev.y <= self.rect.h
+          if !off.off && inside {
+            on_click()
+          }
+          false
+        }
+        @core.Move => !off.off
+        @core.Leave => false
+      }
+    })
+    w
+  })
+}
+
+///|
+/// 步进器：`[-] 值 [+]` 共框三段（外框由行容器画、格与格之间只有一条分隔线，
+/// 三格同高同边——各自画一圈边框会看着像三个没粘在一起的盒子），按 step 增减
+/// 并夹在区间内；触边界那一侧自动禁用（禁用态必须跟着值走，见 state.mbt 那条实测）。
 pub fn stepper(
   state : @core.Store[Int],
   min? : Int = 0,
@@ -383,65 +465,67 @@ pub fn stepper(
   let value = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     w.node.set_width(@yoga.fixed(44.0))
     w.node.set_height(@yoga.fixed(@theme.control_height))
-    @style.apply(
-      w,
-      @style.merge_all([@style.style(border_color="border", color="text_regular"), paint_subset(class)]),
-    )
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
       r : @core.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
-      p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
-      p.set_line_width(@style.number_of(st.border_width, 1.0))
-      p.stroke_rect(0.0, 0.0, r.w, r.h)
-      let txt = state.get().to_string()
-      let tw = match @text.measure(txt, 13.0) {
-        Some(m) => m.width.to_double()
-        None => 0.0
-      }
-      let _ = @text.draw_text_at(
+      let _ = @text.draw_box_at(
         p,
-        (r.w - tw) / 2.0,
-        7.0,
-        txt,
-        13.0,
+        0.0,
+        0.0,
+        r.w,
+        r.h,
+        state.get().to_string(),
+        @text.Font::new("", 13.0),
         @style.color_of(st.color, @theme.theme_text_regular()),
+        align=@text.Center,
+        valign=@text.Center,
+        wrap=false,
       )
     })
     w
   })
+  let subset = paint_subset(class)
   view(
     [
-      button(
+      step_cell(
         "-",
-        on_click=fn() {
+        minus_off,
+        true,
+        fn() {
           state.set((state.get() - inc).clamp(min=lo, max=hi))
           sync()
         },
-        variant=Border,
-        min_width=32.0,
-        enabled=Some(minus_off),
+        subset,
       ),
       value,
-      button(
+      step_cell(
         "+",
-        on_click=fn() {
+        plus_off,
+        false,
+        fn() {
           state.set((state.get() + inc).clamp(min=lo, max=hi))
           sync()
         },
-        variant=Border,
-        min_width=32.0,
-        enabled=Some(plus_off),
+        subset,
       ),
     ],
     direction=@yoga.Row,
+    width=108.0,
+    height=@theme.control_height,
     align_items=@yoga.AlignItems::Center,
-    class=class,
+    class=[
+      @style.style(
+        background_color="bg_panel",
+        border_color="border",
+        border_width=1.0,
+        border_radius=4.0,
+      ),
+    ] + class,
   )
 }
-
 ///|
 /// 按钮变体：Solid 主题色实底白字 / Soft 浅底主题色字 / Text 透明底主题色字 /
 /// Danger 红底白字。

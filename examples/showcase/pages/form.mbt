@@ -2,7 +2,7 @@
 // 组件写回即状态变化），展示端 bind_label/bind 直连派生。
 //
 // G7 迁移记档（与 master 的差异）：
-// ① `input_t` → `input`（Store 驱动，`clearable` 未迁，清空走全选+删除）；
+// ① `input_t` → `input`（Store 驱动）；`clearable` 同名参数已接（有内容且悬停/聚焦时右缘出 ✕，点它清空并回写 Store）；
 // ② `input_number`（Double）→ `stepper`（Int 步进器——自绘栈无原生输入框语义）；
 // ③ `radio_group` 的值从「选项字符串」换成「索引 Store[Int]」；
 // ④ `checkbox` 从「on_change 写回信号」换成「Store 即状态源」，语义等价；
@@ -29,7 +29,12 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
       [
         @ui.col(
           [
-            @ui.input(@core.Store::new(""), placeholder="输入点什么…", width=300.0),
+            @ui.input(
+              @core.Store::new(""),
+              placeholder="输入点什么…",
+              width=300.0,
+              clearable=true,
+            ),
             @ui.input(
               @core.Store::new(""),
               placeholder="密码框",
@@ -47,7 +52,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "@ui.input(@core.Store::new(\"\"), placeholder=\"输入点什么…\", width=300.0)",
+        "@ui.input(@core.Store::new(\"\"), placeholder=\"输入点什么…\", width=300.0, clearable=true)",
         "@ui.input(@core.Store::new(\"\"), placeholder=\"密码框\", password=true, width=300.0)",
         "@ui.textarea(@core.Store::new(\"多行文本输入演示。\\n第二行内容。\"), rows=3, width=300.0)",
       ],
@@ -199,14 +204,19 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
       "form_item 行布局（标签右对齐 + 控件区）+ form 分组标题。",
       [
         @ui.form("用户设置", [
-          @ui.form_item("用户名", @ui.input(@core.Store::new("moonbit"), width=200.0)),
+          @ui.form_item(
+            "用户名",
+            @ui.input(@core.Store::new("moonbit"), width=200.0, clearable=true),
+          ),
           @ui.form_item("城市", @ui.input(@core.Store::new("杭州"), width=200.0)),
           @ui.form_item("数量", @ui.stepper(qty2, min=1, max=9)),
         ]),
       ],
       code=[
         "@ui.form(\"用户设置\", [",
-        "  @ui.form_item(\"用户名\", @ui.input(@core.Store::new(\"moonbit\"), width=200.0)),",
+        "  @ui.form_item(\"用户名\", @ui.input(",
+        "    @core.Store::new(\"moonbit\"), width=200.0, clearable=true,",
+        "  )),",
         "  @ui.form_item(\"数量\", @ui.stepper(qty2, min=1, max=9)),",
         "])",
       ],

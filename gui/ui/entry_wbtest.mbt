@@ -68,6 +68,75 @@ fn mounted_entry(
 }
 
 ///|
+fn paint_of(root : @core.Widget) -> @render.Bitmap {
+  let bm = @render.Bitmap::new(220, 60)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  bm
+}
+
+///|
+test "clearable：悬停出清空标记，点它整框清空并回写 Store" {
+  let store = @core.Store::new("abc")
+  let root = @core.Widget::new()
+  root.set_size(220.0, 60.0)
+  root.set_column()
+  let w = input(store, width=200.0, clearable=true).mount_into(root)
+  root.relayout(220.0, 60.0)
+  // 判据用「那一块像素变了没有」：框底本就铺满不透明色，数墨点量不出标记
+  let idle = paint_of(root)
+  w.hovered = true
+  let lit = paint_of(root)
+  let mut diff = 0
+  for y = 9; y < 19; y = y + 1 {
+    for x = 184; x < 196; x = x + 1 {
+      let a = idle.pixel(x, y)
+      let b = lit.pixel(x, y)
+      if (a.r, a.g, a.b, a.a) != (b.r, b.g, b.b, b.a) {
+        diff = diff + 1
+      }
+    }
+  }
+  assert_true(diff > 4, msg="悬停时清空标记没出现（热区像素零变化）")
+  let _ = root.dispatch_pointer_to(w.id, {
+    kind: @core.Down, x: 189.0, y: 12.0, button: 1, mods: 0,
+  })
+  assert_eq(store.get(), "")
+}
+
+///|
+test "不给 focus_id 也自动可聚焦（输入框默认就该能点进能打）" {
+  let store = @core.Store::new("hi")
+  let root = @core.Widget::new()
+  root.set_size(220.0, 60.0)
+  root.set_column()
+  let w = input(store, width=200.0).mount_into(root)
+  root.relayout(220.0, 60.0)
+  assert_true(w.focus_id > 0, msg="focus_id 仍是 0（宿主判定为不可聚焦）")
+  match root.focusable_at(w.rect.x + 20.0, w.rect.y + 6.0) {
+    Some(id) => assert_eq(id, w.focus_id)
+    None => fail("点不进输入框：focusable_at 给 None")
+  }
+  key(root, w, 'a'.to_int(), 0)
+  assert_eq(store.get(), "hia")
+  let explicit = input(@core.Store::new(""), width=200.0, focus_id=77)
+  let root2 = @core.Widget::new()
+  root2.set_size(220.0, 60.0)
+  root2.set_column()
+  let fw = explicit.mount_into(root2)
+  root2.relayout(220.0, 60.0)
+  assert_eq(fw.focus_id, 77)
+  let other = input(@core.Store::new(""), width=200.0)
+  let root3 = @core.Widget::new()
+  root3.set_size(220.0, 60.0)
+  root3.set_column()
+  let bw = other.mount_into(root3)
+  root3.relayout(220.0, 60.0)
+  assert_true(bw.focus_id != w.focus_id, msg="两个自动 focus_id 撞号")
+}
+
+///|
 test "键入回写 Store，退格与 undo 照旧" {
   let (root, w, store) = mounted_entry("hi", 200.0)
   assert_eq(store.get(), "hi")

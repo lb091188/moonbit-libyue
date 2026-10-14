@@ -737,3 +737,42 @@ test "表单族只读样式槽：class 的绘制色落到标记控件" {
   p3.end()
   assert_true(warm(bm3, bar.rect.x.round().to_int(), 0, 120, 40) > 60)
 }
+
+///|
+test "步进器三格共框：同高、首尾相接、点 +/- 改值且触界禁用" {
+  let st = @core.Store::new(1)
+  let root = @core.Widget::new()
+  root.set_size(300.0, 80.0)
+  root.set_column()
+  let group = stepper(st, min=0, max=10).mount_into(root)
+  root.relayout(300.0, 80.0)
+  let cells = group.children()
+  assert_eq(cells.length(), 3)
+  let h = @theme.control_height
+  // 三格同高、且与整组同高（旧形态各画一圈边框，看着像三个没粘在一起的盒子）
+  assert_eq(group.rect.h, h)
+  let mut x = 0.0
+  for c in cells {
+    assert_eq(c.rect.h, h)
+    assert_eq(c.rect.x, x)
+    x = x + c.rect.w
+  }
+  assert_eq(group.rect.w, 108.0)
+  let tap = fn(i : Int) -> Unit {
+    let c = cells[i]
+    let _ = root.dispatch_pointer_to(c.id, {
+      kind: @core.Down, x: c.rect.x + 4.0, y: c.rect.y + 4.0, button: 1, mods: 0,
+    })
+    let _ = root.dispatch_pointer_to(c.id, {
+      kind: @core.Up, x: c.rect.x + 4.0, y: c.rect.y + 4.0, button: 1, mods: 0,
+    })
+  }
+  tap(2)
+  assert_eq(st.get(), 2)
+  tap(0)
+  assert_eq(st.get(), 1)
+  // 夹到区间端点：min 那一侧的钮不再改值（禁用态跟着值走）
+  st.set(0)
+  tap(0)
+  assert_eq(st.get(), 0)
+}

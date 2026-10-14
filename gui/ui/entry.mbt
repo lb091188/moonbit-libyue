@@ -77,8 +77,24 @@ fn word_range(text : String, at : Int) -> (Int, Int) {
 }
 
 ///|
+/// 没显式给 `focus_id` 时自动分配一个（从 1000000 起递增，避开使用者手写的
+/// 小序号）。宿主侧 `focus_id=0` 就是「不可聚焦」，让每个调用点自己想起给号，
+/// 等于把「输入框点不进、打不了字」埋进每一个示例。
+let next_auto_focus : Ref[Int] = Ref(1000000)
+
+pub fn auto_focus_id(explicit : Int) -> Int {
+  if explicit != 0 {
+    explicit
+  } else {
+    let v = next_auto_focus.val
+    next_auto_focus.val = v + 1
+    v
+  }
+}
+
+///|
 /// 单行输入框。文本经 `store` 双向投影；`focus_id` 决定它能否吃键盘焦点
-/// （宿主的 Tab 环绕与按键投递都按它走）。
+/// （宿主的 Tab 环绕与按键投递都按它走），**不给就自动分配**——输入框默认就该能点进能打字。
 pub fn input(
   store : @core.Store[String],
   placeholder? : String = "",
@@ -91,6 +107,7 @@ pub fn input(
   caret_on? : () -> Bool = fn() -> Bool { true },
   on_enter? : () -> Unit = fn() { () },
   on_change? : (String) -> Unit = fn(_s : String) { () },
+  clearable? : Bool = false,
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
@@ -104,6 +121,14 @@ pub fn input(
   let ph = placeholder
   let enter_cb = on_enter
   let change_cb = on_change
+  let can_clear = clearable
+  // 清空热区：右缘 14x14 一块（✕ 画在它中心）
+  let clear_box = fn(r : @core.Rect) -> (Double, Double, Double, Double) {
+    (r.w - 18.0, ((r.h - 14.0) / 2.0).max(0.0), 14.0, 14.0)
+  }
+  let clear_shown = fn(self : @core.Widget) -> Bool {
+    can_clear && !ro && ed.get_text().length() > 0 && (self.hovered || self.focused)
+  }
   let last_down = Ref(-1000000L)
   let last_x = Ref(-1000.0)
   let dragging = Ref(false)
@@ -120,7 +145,7 @@ pub fn input(
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     let off = enabled_cell(None, false)
-    w.focus_id = focus_id
+    w.focus_id = auto_focus_id(focus_id)
     w.cursor = @core.CURSOR_TEXT
     w.node.set_height(@yoga.fixed(@theme.control_height))
     if width > 0.0 {
@@ -181,6 +206,20 @@ pub fn input(
         p.set_fill_color(@theme.theme_text_primary())
         p.fill_rect(caret_x(), 4.0, 1.0, (r.h - 8.0).max(1.0))
       }
+      if clear_shown(self) && !off.off {
+        let (cx, cy, cw, ch) = clear_box(r)
+        // 先盖一小块底色，长文本不至于和 ✕ 叠成一团
+        p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
+        p.fill_rect(cx - 3.0, 1.0, cw + 5.0, r.h - 2.0)
+        p.set_stroke_color(@theme.theme_text_secondary())
+        p.set_line_width(1.0)
+        p.begin_path()
+        p.move_to(cx + 3.0, cy + 3.0)
+        p.line_to(cx + cw - 3.0, cy + ch - 3.0)
+        p.move_to(cx + cw - 3.0, cy + 3.0)
+        p.line_to(cx + 3.0, cy + ch - 3.0)
+        p.stroke()
+      }
     })
     w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
       if !ev.press || off.off {
@@ -222,6 +261,17 @@ pub fn input(
     w.on_pointer = Some(fn(_self : @core.Widget, ev : @core.PointerEvent) -> Bool {
       match ev.kind {
         @core.Down => {
+          if clear_shown(_self) && !off.off {
+            let (cx, cy, cw, ch) = clear_box(_self.rect)
+            if ev.x >= cx && ev.x <= cx + cw && ev.y >= cy && ev.y <= cy + ch {
+              // 点清空：整框清空并回写 Store，这一次按下不再定位光标
+              ed.set_text("")
+              push()
+              dragging.val = false
+              @core.invalidate()
+              return true
+            }
+          }
           let now = @core.now_ms()
           let dbl = (now - last_down.val) < 400L && (ev.x - last_x.val).abs() < 4.0
           last_down.val = now

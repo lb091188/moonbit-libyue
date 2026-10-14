@@ -1806,6 +1806,17 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **通用口径**:`Option` 承载「两种不同的无」迟早出这类事故——同一个 `None` 表示「整窗」又表示「空集」时,任何「往累积里并一笔」的操作都会把强语义写成弱语义。要么加一位标志(本批做法),要么换成显式枚举(`Whole | Region(Rect)`)。
 - **验证**:core 新增 1 条纯函数回归(未请求整窗时照常累积成并集;已请求整窗时局部置脏不得写成小矩形;裁剪框整窗优先),`moon test core` 133/133、分包全跑 882/882(13 包逐个绿)、`cd gui && moon check --deny-warn` 零警告。真机复验(用户执行):showcase 切段/切页后**鼠标不动**应立即看到新页,复跑 `moon run examples/showcase` 退出贴 `SHOWCASE-PROF` 行(`frames` 不应因这一改动上涨——只在同批已有整窗请求时维持整窗语义)。
 
+## 输入框默认吃不到键盘焦点:`focus_id=0` 的口径要收在库里(2026-10-14,真机反馈)
+
+- **现象**:showcase「表单组件」页的输入框点不进、打不了字;同页缺 EP 那个清空 ✕;「数据输入」的步进器三格高度看着不齐、没粘成一块。
+- **根因①(点不进)**:宿主按「命中路径上第一个非零 `focus_id`」判可聚焦(`Widget::focusable_at`),而 `input` / `textarea` 的 `focus_id?` 默认 **0** —— 不显式给号就是**永久不可聚焦**。示例与使用者都得自己记得给号,等于把「输入框打不了字」埋进每个调用点(探针实测:不给 focus_id 时 `focus_id=0`、`focusable_at` 返回 `None`)。
+- **修复①**:文本类组件默认**自动分配**焦点号(`auto_focus_id`:未给就从 1000000 起递增,避开使用者手写的 21/101 那类小序号;显式给了仍以它为准)。Tab 环绕按注册顺序=挂载顺序,与树序一致。`select` / `button` 的 `focus_id` 保持原口径(它们的可聚焦是刻意 opt-in,涉及浮层与激活键语义,不在这个批里动)。
+- **根因②(焦点环/光标不重画)**:`App::mark_focus_rect` 把**焦点栈的 id** 直接喂给 `mark_id_rect`,而后者按**控件实例 id** 查树(`root.by_id`)——两个 id 空间不是一回事:命中不到就整窗兜底(白画),恰好撞上某个实例 id 就把脏区标到**别的控件**上,新焦点格的焦点环与光标当帧不重画。
+- **修复②**:新增 `App::mark_focus_id_rect`,走 `find_by_focus_id` 查树(查不到才整窗兜底);Down 里那次 `mark_id_rect(id)` 同步切过去。
+- **`clearable`(清空 ✕)**:`input` 补同名参数(与 EP 一致**默认关**):有内容且「悬停或已聚焦」时右缘画一块 14×14 的 ✕(先盖一小块底色,长文本不与之叠字),点它整框清空并回写 Store、这一次按下不再定位光标;禁用态与只读态都不画。密码框按 EP 不给清空口。
+- **步进器共框**:旧形态 `[-] 值 [+]` 各画一圈边框(左右圆角、中间方角),看着就是三个没粘住的盒子——**布局量出来其实三格同高**(都等于 `control_height`),不齐的是边框。改法:外框交给行容器按样式槽画一次(底色/描边/圆角/1px),三格只画自己的悬停底(内缩 1px 不盖外框)、内容字与靠内侧那条分隔线;整组宽 108 固定,不再随父容器拉伸。
+- **验证**:`moon test ui` 154/154,新增 3 条——不给 focus_id 也能被 `focusable_at` 命中且键入回写 Store(并验显式号优先、两个自动号不撞号)、`clearable` 悬停时热区像素确有变化且点它 Store 归空、步进器三格同高同边首尾相接 + 点 +/- 改值 + 触界不再改值;库全包 918/918、`cd gui && moon check --deny-warn` 与 examples 模块零警告。真机复验:表单页输入框能点进能打、悬停出 ✕ 点它清空、步进器三格粘成一块。
+
 ## 文本帧级批的三件桩双定义:Linux 链接失败(2026-10-14,`moon run examples/showcase` 当场报)
 
 - **现象**:`/usr/bin/ld: ... multiple definition of pt_flush`(以及 `pt_flush_if_overlap`/`pt_set_batching`),两处分别是 `gui/build/libyue_text_pango.a(stub.o)` 与 `_build/native/debug/build/NoahLiu/native-gui/text/libtext-*.a(stub.o)`——同一个 `stub.c` 的两个编译产物。
