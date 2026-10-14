@@ -446,10 +446,22 @@ def link_configs() -> dict:
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_text_mac "
                 + " ".join(MAC_TEXT_FRAMEWORKS),
             })
-        # web 的 macOS 后端（WKWebView）自成一批：它的桩在拿到自己的
-        # WB_HAVE_WKWEBVIEW 分支之前仍由 native-stub 编占位分支，本批不下发
-        # 对应归档——否则占位分支会被编两遍（native-stub 一趟 + 本脚本一趟），
-        # 链接期报重复定义。
+        # web：WKWebView（系统自带引擎，没有 Linux 那条「缺开发包」的退路）。
+        # 顺序上 -lyue_web_mac 在 -lyue_win_stub_mac 前：它引用 win 桩的
+        # wm_surface_container。
+        if win_lib:
+            web_lib = compile_mac_stub(
+                MODULE_ROOT / "web" / "webkit_stub.c",
+                "libyue_web_mac.a",
+                ["-DWB_HAVE_WKWEBVIEW"],
+            )
+            if web_lib:
+                entries.append({
+                    "package": WEB_PACKAGE,
+                    "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_web_mac "
+                    "-lyue_win_stub_mac "
+                    + " ".join([*MAC_WEB_FRAMEWORKS, *MAC_WIN_FRAMEWORKS]),
+                })
     return {"link_configs": entries}
 
 

@@ -841,7 +841,1119 @@ void wb_destroy(int64_t id) {
   memset(v, 0, sizeof(WbView));
 }
 
-#elif !defined(__linux__) && !defined(_WIN32)
+#elif defined(WB_HAVE_WKWEBVIEW)
+
+// ---------------- macOS 后端（WKWebView，prebuild 专编） ----------------
+//
+// 这一支是 Objective-C：本文件由 scripts/prebuild.py 的 Darwin 分支带
+// `-DWB_HAVE_WKWEBVIEW -x objective-c -fobjc-arc` 编成 build/libyue_web_mac.a，
+// 与 win 桩的归档一起经 link_flags 传入（子件容器符号 wm_surface_container 在
+// win 归档里）。WebKit 是系统框架，没有 Linux 那条「发行版缺包」的退路，但形态
+// 照旧：**探测 + 语义化降级**，探不到引擎时 wb_available() 给 0。
+//
+// 与另两平台的差异（都写进 docs/zh/adaptation.md，不静默）：
+// - **kind=10 下载 / kind=9 权限请求不发**：WKWebView 到 macOS 15 才有公开的
+//   下载与权限请求口（`WKDownload` / `WKUIDelegate` 的媒体授权仍只到文件面板），
+//   本层不接私有 API。`wb_signal_mask()` 如实回 10（=进程终止 2 | 新窗 8）。
+// - **kind=4 导航提交**由 `decidePolicyForNavigationAction`（放行那一刻）给出，
+//   WebKit 侧是引擎自己的 COMMITTED 状态、Windows 侧是 ContentLoading——三家都是
+//   「最接近提交」的公开口，不是同一时刻。
+// - **data_dir 的持久化**：`WKWebsiteDataStore dataStoreWithURLStoragePath:`
+//   要 macOS 14+ **且**进程有 bundle id；裸二进制（本仓示例的形态）拿不到，
+//   于是 `wb_persistence()` 按实际能不能兑现给 1/0，兑现不了时退回
+//   `nonPersistentDataStore`（会话不落盘，与「指定 profile 目录」的语义不合，
+//   所以由探测出声而不是默默换个存储）。
+// - **wb_set_size 的像素↔点换算在这里做**：容器 NSView 的 frame 由 win 桩按
+//   物理像素换好，webview 填容器要给点，所以本函数把 w/h 除以所在屏的比例。
+
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+
+#import <Cocoa/Cocoa.h>
+#import <WebKit/WebKit.h>
+#import <CoreFoundation/CoreFoundation.h>
+
+extern void *wm_surface_container(int64_t surface_id);
+
+#define WB_MAX_VIEWS 32
+#define WB_EVQ 32
+#define WB_EV_TEXT 768
+#define WB_MAX_SCHEMES 16
+#define WB_SCHEME_NAME 40
+#define WB_ROOT_PATH 512
+#define WB_DATA_DIR 512
+#define WB_MAX_BINDINGS 16
+
+typedef struct {
+  int kind;
+  int64_t num;
+  char text[WB_EV_TEXT];
+} WbEv;
+
+@interface WMBSchemeHandler : NSObject <WKURLSchemeHandler> {
+@public
+  int wsid;
+  char wscheme[WB_SCHEME_NAME];
+}
+@end
+
+@interface WMBView : NSObject <WKNavigationDelegate, WKUIDelegate> {
+@public
+  int sid;
+  int64_t surface_id;
+  int new_window_in_place;
+  int permission_allow;
+  int download_allow;
+  int crashed;
+  int64_t eval_seq;
+  int observing;
+  WbEv evs[WB_EVQ];
+  int head, count;
+  WbEv last;
+  char data_dir[WB_DATA_DIR];
+  char scheme_name[WB_MAX_SCHEMES][WB_SCHEME_NAME];
+  char scheme_root[WB_MAX_SCHEMES][WB_ROOT_PATH];
+  char binding_names[WB_MAX_BINDINGS][WB_SCHEME_NAME];
+}
+@property(nonatomic, strong) WKWebView *view;
+@property(nonatomic, strong) WKUserContentController *ucc;
+// scheme handler 对象要活到视图销毁（configuration 里是弱引用语义）
+@property(nonatomic, strong) NSMutableArray<WMBSchemeHandler *> *scheme_handlers;
+@property(nonatomic, strong) NSMutableArray<id> *message_handlers;
+@end
+
+@interface WMBMessageHandler : NSObject <WKScriptMessageHandler> {
+@public
+  int msid;
+}
+@end
+
+static WMBView *wb_views[WB_MAX_VIEWS];
+static int wb_next_id = 1;
+static char wb_predeclared[WB_MAX_SCHEMES][WB_SCHEME_NAME];
+static int wb_predeclared_n = 0;
+static int wb_sealed = 0;
+
+// ---- 队列与读数 ----
+
+static void wb_push(WMBView *v, int kind, int64_t num, const char *text) {
+  if (v == nil) {
+    return;
+  }
+  if (v->count >= WB_EVQ) {
+    // 事件是提示不是账本：满了丢最旧的一条，而不是丢新的
+    v->head = (v->head + 1) % WB_EVQ;
+    v->count--;
+  }
+  int slot = (v->head + v->count) % WB_EVQ;
+  v->evs[slot].kind = kind;
+  v->evs[slot].num = num;
+  v->evs[slot].text[0] = '\0';
+  if (text != NULL) {
+    strncpy(v->evs[slot].text, text, WB_EV_TEXT - 1);
+    v->evs[slot].text[WB_EV_TEXT - 1] = '\0';
+  }
+  v->count++;
+}
+
+static WMBView *wb_get(int64_t id) {
+  if (id <= 0 || id >= WB_MAX_VIEWS) {
+    return nil;
+  }
+  WMBView *v = wb_views[(int)id];
+  if (v == nil || v.view == nil) {
+    return nil;
+  }
+  // 容器没了就说明视图已随那棵窗口树一起拆掉（win 桩拆窗时会把子件槽整格清空）
+  if (wm_surface_container(v->surface_id) == NULL) {
+    return nil;
+  }
+  return v;
+}
+
+static int wb_copy(int64_t id, char *out, int cap, const char *src) {
+  if (out == NULL || cap <= 0) {
+    return 0;
+  }
+  if (src == NULL) {
+    out[0] = '\0';
+    return 0;
+  }
+  size_t n = strlen(src);
+  if (n >= (size_t)cap) {
+    n = (size_t)(cap - 1);
+  }
+  memcpy(out, src, n);
+  out[n] = '\0';
+  (void)id;
+  return (int)n;
+}
+
+static NSString *wb_ns(const char *s) {
+  if (s == NULL) {
+    return nil;
+  }
+  return [[NSString alloc] initWithBytes:s
+                                  length:strlen(s)
+                                encoding:NSUTF8StringEncoding];
+}
+
+// ---- MIME（与 Linux/Windows 两支同一张表）----
+
+static const char *wb_mime_of(const char *path) {
+  const char *dot = strrchr(path, '.');
+  if (dot == NULL) {
+    return "application/octet-stream";
+  }
+  // 文本类一律钉 utf-8：协议通道只给 MIME，引擎没别的口径可猜
+  if (strcasecmp(dot, ".html") == 0 || strcasecmp(dot, ".htm") == 0) {
+    return "text/html; charset=utf-8";
+  }
+  if (strcasecmp(dot, ".css") == 0) {
+    return "text/css; charset=utf-8";
+  }
+  if (strcasecmp(dot, ".js") == 0 || strcasecmp(dot, ".mjs") == 0) {
+    return "application/javascript; charset=utf-8";
+  }
+  if (strcasecmp(dot, ".json") == 0) {
+    return "application/json; charset=utf-8";
+  }
+  if (strcasecmp(dot, ".txt") == 0) {
+    return "text/plain; charset=utf-8";
+  }
+  if (strcasecmp(dot, ".svg") == 0) {
+    return "image/svg+xml";
+  }
+  if (strcasecmp(dot, ".png") == 0) {
+    return "image/png";
+  }
+  if (strcasecmp(dot, ".jpg") == 0 || strcasecmp(dot, ".jpeg") == 0) {
+    return "image/jpeg";
+  }
+  if (strcasecmp(dot, ".gif") == 0) {
+    return "image/gif";
+  }
+  if (strcasecmp(dot, ".woff") == 0 || strcasecmp(dot, ".woff2") == 0) {
+    return "font/woff2";
+  }
+  return "application/octet-stream";
+}
+
+static int wb_scheme_slot(WMBView *v, const char *scheme) {
+  for (int i = 0; i < WB_MAX_SCHEMES; i++) {
+    if (v->scheme_name[i][0] != '\0' &&
+        strcasecmp(v->scheme_name[i], scheme) == 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+// ---- 自定义协议 ----
+
+@implementation WMBSchemeHandler
+
+- (void)webView:(WKWebView *)webView
+    startURLSchemeTask:(id<WKURLSchemeTask>)task {
+  (void)webView;
+  int sid = self->wsid;
+  if (sid <= 0 || sid >= WB_MAX_VIEWS || wb_views[sid] == nil) {
+    [task didFailWithError:[NSError errorWithDomain:@"native-gui"
+                                               code:-1
+                                           userInfo:@{NSLocalizedDescriptionKey : @"view gone"}]];
+    return;
+  }
+  WMBView *v = wb_views[sid];
+  NSURL *url = [[task request] URL];
+  NSString *path = [url path];
+  if (path == nil || [path length] == 0) {
+    path = @"/";
+  }
+  int idx = wb_scheme_slot(v, [[url scheme] UTF8String]);
+  if (idx < 0) {
+    [task didFailWithError:[NSError errorWithDomain:@"native-gui"
+                                               code:-2
+                                           userInfo:@{NSLocalizedDescriptionKey
+                                                          : @"scheme unregistered"}]];
+    return;
+  }
+  if (v->scheme_root[idx][0] == '\0') {
+    [task didFailWithError:[NSError errorWithDomain:@"native-gui"
+                                               code:-3
+                                           userInfo:@{NSLocalizedDescriptionKey
+                                                          : @"scheme unregistered"}]];
+    return;
+  }
+  const char *p = [path UTF8String];
+  if (p != NULL && strstr(p, "..") != NULL) {
+    // 路径穿越：与 Linux/Windows 两支同一道闸
+    [task didFailWithError:[NSError errorWithDomain:@"native-gui"
+                                               code:-4
+                                           userInfo:@{NSLocalizedDescriptionKey
+                                                          : @"path traversal denied"}]];
+    return;
+  }
+  char full[WB_ROOT_PATH + 4096];
+  int n = snprintf(full, sizeof(full), "%s%s", v->scheme_root[idx],
+                   (p != NULL && p[0] == '/') ? p : "/");
+  if (n < 1 || n >= (int)sizeof(full)) {
+    [task didFailWithError:[NSError errorWithDomain:@"native-gui"
+                                               code:-5
+                                           userInfo:@{NSLocalizedDescriptionKey
+                                                          : @"path too long"}]];
+    return;
+  }
+  FILE *f = fopen(full, "rb");
+  if (f == NULL) {
+    [task didFailWithError:[NSError errorWithDomain:@"native-gui"
+                                               code:-6
+                                           userInfo:@{NSLocalizedDescriptionKey
+                                                          : @"not found"}]];
+    return;
+  }
+  fseek(f, 0, SEEK_END);
+  long size = ftell(f);
+  fseek(f, 0, SEEK_SET);
+  if (size < 0) {
+    fclose(f);
+    [task didFailWithError:[NSError errorWithDomain:@"native-gui"
+                                               code:-7
+                                           userInfo:@{NSLocalizedDescriptionKey
+                                                          : @"not a regular file"}]];
+    return;
+  }
+  NSMutableData *data = [NSMutableData dataWithLength:(size_t)size];
+  if (size > 0 && fread([data mutableBytes], 1, (size_t)size, f) != (size_t)size) {
+    fclose(f);
+    [task didFailWithError:[NSError errorWithDomain:@"native-gui"
+                                               code:-8
+                                           userInfo:@{NSLocalizedDescriptionKey
+                                                          : @"read failed"}]];
+    return;
+  }
+  fclose(f);
+  NSString *mime = [NSString stringWithUTF8String:wb_mime_of(full)];
+  NSHTTPURLResponse *resp = [[NSHTTPURLResponse alloc]
+      initWithURL:url
+         statusCode:200
+        HTTPVersion:@"HTTP/1.1"
+       headerFields:@{@"Content-Type" : mime,
+                      @"Cache-Control" : @"no-store"}];
+  if (resp == nil) {
+    [task didFailWithError:[NSError errorWithDomain:@"native-gui"
+                                               code:-9
+                                           userInfo:@{NSLocalizedDescriptionKey
+                                                          : @"response failed"}]];
+    return;
+  }
+  [task didReceiveResponse:resp];
+  [task didReceiveData:data];
+  [task didFinish];
+}
+
+- (void)webView:(WKWebView *)webView
+    stopURLSchemeTask:(id<WKURLSchemeTask>)task {
+  (void)webView;
+  (void)task; // 全同步回包：这里没有进行中的读取要取消
+}
+
+@end
+
+// ---- 页面→原生的绑定通道（shim 把 window.<name>(payload) 变成消息）----
+
+@implementation WMBMessageHandler
+
+- (void)userContentController:(WKUserContentController *)ucc
+      didReceiveScriptMessage:(WKScriptMessage *)message {
+  (void)ucc;
+  int sid = self->msid;
+  if (sid <= 0 || sid >= WB_MAX_VIEWS) {
+    return;
+  }
+  WMBView *v = wb_views[sid];
+  if (v == nil || wb_get(sid) == nil) {
+    return;
+  }
+  id body = [message body];
+  NSString *text = nil;
+  if ([body isKindOfClass:[NSString class]]) {
+    text = (NSString *)body;
+  } else {
+    // 非字符串载荷按 JSON 文本给（与两支的 shim 约定一致：载荷本身就是 JSON）
+    NSData *d = [NSJSONSerialization dataWithJSONObject:body
+                                                options:0
+                                                  error:nil];
+    if (d != nil) {
+      text = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding];
+    }
+  }
+  wb_push(v, 6, 0, text != nil ? [text UTF8String] : "");
+}
+
+@end
+
+@implementation WMBView
+
+- (void)dealloc {
+  [self stopObserving];
+}
+
+- (void)startObserving {
+  if (self.observing || self.view == nil) {
+    return;
+  }
+  // KVO 是标题/地址变化的唯一可靠口（导航 delegate 只给「这页加载完了」）
+  [self.view addObserver:self forKeyPath:@"title"
+                 options:NSKeyValueObservingOptionNew
+                 context:nil];
+  [self.view addObserver:self forKeyPath:@"URL"
+                 options:NSKeyValueObservingOptionNew
+                 context:nil];
+  self->observing = 1;
+}
+
+- (void)stopObserving {
+  if (!self.observing || self.view == nil) {
+    return;
+  }
+  @try {
+    [self.view removeObserver:self forKeyPath:@"title"];
+    [self.view removeObserver:self forKeyPath:@"URL"];
+  } @catch (NSException *e) {
+    // 重复摘除：忽略（引擎侧有时已经摘过）
+    (void)e;
+  }
+  self->observing = 0;
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary *)change
+                       context:(void *)context {
+  (void)object;
+  (void)change;
+  (void)context;
+  WMBView *v = wb_get(self->sid);
+  if (v == nil) {
+    return;
+  }
+  if ([keyPath isEqualToString:@"title"]) {
+    NSString *t = [self.view title];
+    wb_push(v, 1, 0, t != nil ? [t UTF8String] : "");
+  } else if ([keyPath isEqualToString:@"URL"]) {
+    NSString *u = [[self.view URL] absoluteString];
+    wb_push(v, 2, 0, u != nil ? [u UTF8String] : "");
+  }
+}
+
+// 导航开始/提交/完成/失败
+- (void)webView:(WKWebView *)webView
+    didStartProvisionalNavigation:(WKNavigation *)navigation {
+  (void)webView; (void)navigation;
+  WMBView *v = wb_get(self->sid);
+  if (v == nil) {
+    return;
+  }
+  NSString *u = [[v.view URL] absoluteString];
+  wb_push(v, 3, 0, u != nil ? [u UTF8String] : "");
+}
+
+- (void)webView:(WKWebView *)webView
+    decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction
+                    decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
+  (void)webView;
+  WMBView *v = wb_get(self->sid);
+  if (v != nil) {
+    NSString *u = [[[navigationAction request] URL] absoluteString];
+    wb_push(v, 4, 0, u != nil ? [u UTF8String] : "");
+  }
+  decisionHandler(WKNavigationActionPolicyAllow);
+}
+
+- (void)webView:(WKWebView *)webView
+    didFinishNavigation:(WKNavigation *)navigation {
+  (void)webView; (void)navigation;
+  WMBView *v = wb_get(self->sid);
+  if (v == nil) {
+    return;
+  }
+  NSString *u = [[v.view URL] absoluteString];
+  wb_push(v, 5, 0, u != nil ? [u UTF8String] : "");
+}
+
+- (void)wb_fail:(NSError *)err {
+  WMBView *v = wb_get(self->sid);
+  if (v == nil || err == nil) {
+    return;
+  }
+  NSString *u = [[v.view URL] absoluteString];
+  char buf[WB_EV_TEXT];
+  // 载荷四段 uri|domain|code|message（与两支同形；解析在 scheme.mbt）
+  snprintf(buf, sizeof(buf), "%s|webkit|%ld|%s",
+           u != nil ? [u UTF8String] : "", (long)[err code],
+           [[err localizedDescription] UTF8String] ?: "");
+  wb_push(v, 14, 0, buf);
+}
+
+- (void)webView:(WKWebView *)webView
+    didFailProvisionalNavigation:(WKNavigation *)navigation
+                       withError:(NSError *)error {
+  (void)webView; (void)navigation;
+  [self wb_fail:error];
+}
+
+- (void)webView:(WKWebView *)webView
+        didFailNavigation:(WKNavigation *)navigation
+                withError:(NSError *)error {
+  (void)webView; (void)navigation;
+  [self wb_fail:error];
+}
+
+// web 进程终止：kind=11 + crashed 旗标
+- (void)webViewWebContentProcessDidTerminate:(WKWebView *)webView {
+  (void)webView;
+  WMBView *v = wb_views[self->sid];
+  if (v == nil) {
+    return;
+  }
+  v->crashed = 1;
+  wb_push(v, 11, 0, "reason=1");
+}
+
+// 新窗请求：kind=8，再按策略丢弃或在当前 pane 里导航过去
+- (WKWebView *)webView:(WKWebView *)webView
+    createWebViewWithConfiguration:(WKWebViewConfiguration *)configuration
+               forNavigationAction:(WKNavigationAction *)navigationAction
+                    windowFeatures:(WKWindowFeatures *)features {
+  (void)configuration; (void)features;
+  WMBView *v = wb_get(self->sid);
+  NSString *u = [[[navigationAction request] URL] absoluteString];
+  if (v != nil) {
+    wb_push(v, 8, 0, u != nil ? [u UTF8String] : "");
+    if (v->new_window_in_place && u != nil) {
+      [v.view loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:u]]];
+    }
+  } else if (webView != nil && u != nil) {
+    [webView loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:u]]];
+  }
+  // WKWebView 的契约：不返回新视图时由调用方自己处理这次导航
+  return nil;
+}
+
+@end
+
+// ---- 全局探测 ----
+
+int wb_available(void) {
+  @autoreleasepool {
+    return NSClassFromString(@"WKWebView") != nil ? 1 : 0;
+  }
+}
+
+// 持久化能力：dataStoreWithURLStoragePath 要 macOS 14+ 且有 bundle id
+// （裸二进制拿不到），兑现不了就如实给 0——上层按「profile 参数会落空」降级。
+int wb_persistence(void) {
+  @autoreleasepool {
+    if ([[NSBundle mainBundle] bundleIdentifier] == nil) {
+      return 0;
+    }
+    if (@available(macOS 14.0, *)) {
+      return 1;
+    }
+    return 0;
+  }
+}
+
+// bit0 下载、bit1 进程终止、bit2 权限、bit3 新窗
+int wb_signal_mask(void) {
+  return 2 | 8;
+}
+
+void wb_predeclare_scheme(const char *scheme) {
+  if (scheme == NULL || scheme[0] == '\0') {
+    return;
+  }
+  if (wb_sealed) {
+    return; // 封版后不再收（与 Windows 同一道闸：建视图前必须定完）
+  }
+  for (int i = 0; i < wb_predeclared_n; i++) {
+    if (strcasecmp(wb_predeclared[i], scheme) == 0) {
+      return;
+    }
+  }
+  if (wb_predeclared_n >= WB_MAX_SCHEMES) {
+    return;
+  }
+  strncpy(wb_predeclared[wb_predeclared_n], scheme, WB_SCHEME_NAME - 1);
+  wb_predeclared[wb_predeclared_n][WB_SCHEME_NAME - 1] = '\0';
+  wb_predeclared_n++;
+}
+
+// ---- 生命周期 ----
+
+int64_t wb_create(int64_t surface_id, int w, int h, const char *uri,
+                  const char *data_dir, const char *user_agent) {
+  @autoreleasepool {
+    if (!wb_available()) {
+      return 0;
+    }
+    void *container = wm_surface_container(surface_id);
+    if (container == NULL) {
+      return 0;
+    }
+    NSView *host = (__bridge NSView *)container;
+    if (wb_next_id >= WB_MAX_VIEWS) {
+      return 0; // 池尽：句柄号不复用，与两支同一条口径
+    }
+    int id = wb_next_id++;
+    wb_sealed = 1;
+    WMBView *v = [[WMBView alloc] init];
+    v->sid = id;
+    v->surface_id = surface_id;
+    v->download_allow = 1;
+    v->new_window_in_place = 0;
+    v->permission_allow = 0;
+
+    WKWebViewConfiguration *cfg = [[WKWebViewConfiguration alloc] init];
+    WKUserContentController *ucc = [[WKUserContentController alloc] init];
+    [cfg setUserContentController:ucc];
+    v.ucc = ucc;
+    v.scheme_handlers = [NSMutableArray array];
+    v.message_handlers = [NSMutableArray array];
+    if (user_agent != NULL && user_agent[0] != '\0') {
+      // 10.11+ 的 applicationNameForUserAgent（拼在引擎 UA 尾部）
+      [[cfg preferences] setApplicationNameForUserAgent:wb_ns(user_agent)];
+    }
+    // 自定义协议必须在建视图前挂上（引擎的硬约束，两支同一形态）
+    for (int i = 0; i < wb_predeclared_n; i++) {
+      WMBSchemeHandler *sh = [[WMBSchemeHandler alloc] init];
+      sh->wsid = id;
+      strncpy(sh->wscheme, wb_predeclared[i], WB_SCHEME_NAME - 1);
+      [cfg setURLSchemeHandler:sh forURLScheme:wb_ns(wb_predeclared[i])];
+      [v.scheme_handlers addObject:sh];
+      int slot = i;
+      if (slot < WB_MAX_SCHEMES) {
+        strncpy(v->scheme_name[slot], wb_predeclared[i], WB_SCHEME_NAME - 1);
+      }
+    }
+    // 存储：给了 data_dir 且平台兑现得了，就指到那个目录；否则非持久化
+    if (data_dir != NULL && data_dir[0] != '\0') {
+      strncpy(v->data_dir, data_dir, sizeof(v->data_dir) - 1);
+      if (wb_persistence() == 1) {
+        if (@available(macOS 14.0, *)) {
+          NSURL *u = [NSURL fileURLWithPath:wb_ns(data_dir)];
+          WKWebsiteDataStore *ds =
+              [WKWebsiteDataStore dataStoreWithURLStoragePath:u error:nil];
+          if (ds != nil) {
+            [cfg setWebsiteDataStore:ds];
+          }
+        }
+      } else {
+        [cfg setWebsiteDataStore:[WKWebsiteDataStore nonPersistentDataStore]];
+      }
+    }
+    NSRect frame = [host bounds];
+    if (w > 1 && h > 1) {
+      CGFloat sc0 = [[NSScreen mainScreen] backingScaleFactor];
+      if (sc0 <= 0) {
+        sc0 = 1.0;
+      }
+      frame = NSMakeRect(0, 0, (CGFloat)w / sc0, (CGFloat)h / sc0);
+    }
+    WKWebView *view = [[WKWebView alloc] initWithFrame:frame configuration:cfg];
+    if (view == nil) {
+      return 0;
+    }
+    [view setNavigationDelegate:v];
+    [view setUIDelegate:v];
+    // 背景不透明由页面自己盖；这里不设 wantsLayer（引擎自带 layer-backed）
+    [host addSubview:view];
+    v.view = view;
+    wb_views[id] = v;
+    [v startObserving];
+    if (uri != NULL && uri[0] != '\0') {
+      NSString *u = wb_ns(uri);
+      [view loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:u]]];
+    } else if (uri != NULL) {
+      [view loadRequest:[NSURLRequest
+                            requestWithURL:[NSURL URLWithString:@"about:blank"]]];
+    }
+    return (int64_t)id;
+  }
+}
+
+int wb_alive(int64_t id) {
+  @autoreleasepool {
+    return wb_get(id) != nil ? 1 : 0;
+  }
+}
+
+void wb_destroy(int64_t id) {
+  @autoreleasepool {
+    if (id <= 0 || id >= WB_MAX_VIEWS) {
+      return;
+    }
+    WMBView *v = wb_views[(int)id];
+    if (v == nil) {
+      return;
+    }
+    [v stopObserving];
+    if (v.view != nil) {
+      [v.view setNavigationDelegate:nil];
+      [v.view setUIDelegate:nil];
+      [v.view removeFromSuperview];
+    }
+    v.view = nil;
+    wb_views[(int)id] = nil; // ARC 随表位清掉 ucc/handlers
+  }
+}
+
+// ---- 导航 ----
+
+void wb_load_uri(int64_t id, const char *uri) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v == nil) {
+      return;
+    }
+    NSString *u = (uri == NULL || uri[0] == '\0') ? @"about:blank" : wb_ns(uri);
+    NSURL *url = [NSURL URLWithString:u];
+    if (url != nil) {
+      [v.view loadRequest:[NSURLRequest requestWithURL:url]];
+    }
+  }
+}
+
+void wb_load_html(int64_t id, const char *html, const char *base_uri) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v == nil) {
+      return;
+    }
+    NSURL *base = nil;
+    if (base_uri != NULL && base_uri[0] != '\0') {
+      base = [NSURL URLWithString:wb_ns(base_uri)];
+    }
+    if (base == nil) {
+      base = [NSURL URLWithString:@"about:blank"];
+    }
+    // loadHTMLString 是否进前进/后退历史，Apple 无文档承诺（真机复验清单里
+    // 有一条专测它；与 Linux 实测「不入历史」、Windows 明写「不改历史」对照）
+    [v.view loadHTMLString:(html != NULL ? wb_ns(html) : @"") baseURL:base];
+  }
+}
+
+void wb_reload(int64_t id) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v != nil) {
+      [v.view reload];
+    }
+  }
+}
+
+void wb_stop(int64_t id) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v != nil) {
+      [v.view stopLoading];
+    }
+  }
+}
+
+void wb_go_back(int64_t id) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v != nil && [v.view canGoBack]) {
+      [v.view goBack];
+    }
+  }
+}
+
+void wb_go_forward(int64_t id) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v != nil && [v.view canGoForward]) {
+      [v.view goForward];
+    }
+  }
+}
+
+int wb_can_go_back(int64_t id) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    return (v != nil && [v.view canGoBack]) ? 1 : 0;
+  }
+}
+
+int wb_can_go_forward(int64_t id) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    return (v != nil && [v.view canGoForward]) ? 1 : 0;
+  }
+}
+
+int wb_is_loading(int64_t id) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    return (v != nil && [v.view isLoading]) ? 1 : 0;
+  }
+}
+
+int wb_is_crashed(int64_t id) {
+  if (id <= 0 || id >= WB_MAX_VIEWS) {
+    return 0;
+  }
+  WMBView *v = wb_views[(int)id];
+  return (v != nil && v->crashed) ? 1 : 0;
+}
+
+// ---- 读数 ----
+
+int wb_uri(int64_t id, char *out, int cap) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id); // 严格口径（同 Linux）：容器没了就空串
+    if (v == nil) {
+      return wb_copy(id, out, cap, "");
+    }
+    NSString *u = [[v.view URL] absoluteString];
+    return wb_copy(id, out, cap, u != nil ? [u UTF8String] : "");
+  }
+}
+
+int wb_title(int64_t id, char *out, int cap) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v == nil) {
+      return wb_copy(id, out, cap, "");
+    }
+    NSString *t = [v.view title];
+    return wb_copy(id, out, cap, t != nil ? [t UTF8String] : "");
+  }
+}
+
+// ---- JS 求值与页面通道 ----
+
+int64_t wb_evaluate(int64_t id, const char *script) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v == nil || script == NULL) {
+      return -1;
+    }
+    int64_t seq = ++v->eval_seq;
+    int sid = v->sid;
+    [v.view
+        evaluateJavaScript:wb_ns(script)
+         completionHandler:^(id result, NSError *error) {
+           WMBView *vv = wb_get(sid);
+           if (vv == nil) {
+             return; // 视图已拆：回包没人收，丢弃（与两支同形态）
+           }
+           if (error != nil) {
+             wb_push(vv, 7, seq, [[error localizedDescription] UTF8String] ?: "");
+             return;
+           }
+           NSString *text = nil;
+           if ([result isKindOfClass:[NSString class]]) {
+             // 字符串结果不带引号（与 WebKit 的 jsc_value_to_string 同观感）
+             text = (NSString *)result;
+           } else if (result != nil &&
+                      [NSJSONSerialization isValidJSONObject:result]) {
+             NSData *d = [NSJSONSerialization dataWithJSONObject:result
+                                                         options:0
+                                                           error:nil];
+             if (d != nil) {
+               text = [[NSString alloc] initWithData:d
+                                            encoding:NSUTF8StringEncoding];
+             }
+           } else if (result != nil) {
+             text = [result description];
+           }
+           wb_push(vv, 7, seq, text != nil ? [text UTF8String] : "");
+         }];
+    return seq;
+  }
+}
+
+static NSString *wb_binding_shim(const char *name) {
+  // 与两支同一份 shim：把 window.<name>(payload) 变成 JSON 文本消息
+  return [NSString stringWithFormat:
+                        @"(function(){"
+                        @"if (window['%s']) { return; }"
+                        @"window['%s'] = function(payload){"
+                        @"try{"
+                        @"window.webkit.messageHandlers['%s'].postMessage("
+                        @"JSON.stringify(payload === undefined ? null : payload));"
+                        @"}catch(e){}"
+                        @"};"
+                        @"})();",
+                        name, name, name];
+}
+
+void wb_add_user_script(int64_t id, const char *source) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v == nil || source == NULL) {
+      return;
+    }
+    WKUserScript *us = [[WKUserScript alloc]
+           initWithSource:wb_ns(source)
+            injectionTime:WKUserScriptInjectionTimeAtDocumentStart
+         forMainFrameOnly:NO];
+    [v.ucc addUserScript:us];
+  }
+}
+
+int wb_add_binding(int64_t id, const char *name) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v == nil || name == NULL || name[0] == '\0') {
+      return 0;
+    }
+    for (int i = 0; i < WB_MAX_BINDINGS; i++) {
+      if (v->binding_names[i][0] != '\0' &&
+          strcmp(v->binding_names[i], name) == 0) {
+        return 1; // 已登记：幂等成功（shim 里也有 if(window[...]) return）
+      }
+    }
+    int free_slot = -1;
+    for (int i = 0; i < WB_MAX_BINDINGS; i++) {
+      if (v->binding_names[i][0] == '\0') {
+        free_slot = i;
+        break;
+      }
+    }
+    if (free_slot < 0) {
+      return 0;
+    }
+    WMBMessageHandler *mh = [[WMBMessageHandler alloc] init];
+    mh->msid = v->sid;
+    @try {
+      [v.ucc addScriptMessageHandler:mh name:wb_ns(name)];
+    } @catch (NSException *e) {
+      // 同名重复注册引擎会抛异常：按失败出声（与 Linux 的重复名返 0 同档）
+      (void)e;
+      return 0;
+    }
+    [v.message_handlers addObject:mh];
+    strncpy(v->binding_names[free_slot], name, WB_SCHEME_NAME - 1);
+    wb_add_user_script(id, [wb_binding_shim(name) UTF8String]);
+    return 1;
+  }
+}
+
+// ---- 协议注册 ----
+
+int wb_register_scheme(int64_t id, const char *scheme, const char *root) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v == nil || scheme == NULL || scheme[0] == '\0' || root == NULL) {
+      return 0;
+    }
+    int idx = wb_scheme_slot(v, scheme);
+    if (idx < 0) {
+      for (int i = 0; i < WB_MAX_SCHEMES; i++) {
+        if (v->scheme_name[i][0] == '\0') {
+          idx = i;
+          strncpy(v->scheme_name[i], scheme, WB_SCHEME_NAME - 1);
+          break;
+        }
+      }
+    }
+    if (idx < 0) {
+      return 0;
+    }
+    strncpy(v->scheme_root[idx], root, WB_ROOT_PATH - 1);
+    v->scheme_root[idx][WB_ROOT_PATH - 1] = '\0';
+    return 1;
+  }
+}
+
+int wb_unregister_scheme(int64_t id, const char *scheme) {
+  WMBView *v = wb_get(id);
+  if (v == nil || scheme == NULL) {
+    return 0;
+  }
+  int idx = wb_scheme_slot(v, scheme);
+  if (idx < 0) {
+    return 0;
+  }
+  v->scheme_root[idx][0] = '\0'; // 「注销」= 清空根目录（引擎无真注销口）
+  return 1;
+}
+
+// ---- Cookie ----
+
+void wb_get_cookies(int64_t id, const char *uri) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v == nil) {
+      return;
+    }
+    int sid = v->sid;
+    WKHTTPCookieStore *store = [[v.view configuration] websiteDataStore].cookieStore;
+    if (store == nil) {
+      wb_push(v, 13, 1, "cookie store unavailable");
+      return;
+    }
+    (void)uri; // 引擎给的是整站 cookie 表，不按 uri 过滤（与两支同形态）
+    [store
+        getAllCookies:^(NSArray<NSHTTPCookie *> *cookies) {
+          WMBView *vv = wb_views[sid];
+          if (vv == nil) {
+            return;
+          }
+          char buf[WB_EV_TEXT];
+          int at = snprintf(buf, sizeof(buf), "[");
+          if (at < 0) {
+            at = 1;
+          }
+          for (NSUInteger i = 0; i < [cookies count]; i++) {
+            NSHTTPCookie *c = cookies[i];
+            const char *n = [[c name] UTF8String] ?: "";
+            const char *val = [[c value] UTF8String] ?: "";
+            const char *dm = [[c domain] UTF8String] ?: "";
+            char item[512];
+            int in = snprintf(item, sizeof(item), "%s{\"name\":\"%s\","
+                              "\"value\":\"%s\",\"domain\":\"%s\"}",
+                              at > 1 ? "," : "", n, val, dm);
+            if (in < 0 || at + in >= (int)sizeof(buf) - 96) {
+              break; // 缓冲塞不下就截到此条（与两支同一条护栏）
+            }
+            memcpy(buf + at, item, (size_t)in);
+            at += in;
+          }
+          if (at < (int)sizeof(buf) - 2) {
+            buf[at++] = ']';
+            buf[at] = '\0';
+          } else {
+            buf[WB_EV_TEXT - 1] = '\0';
+          }
+          wb_push(vv, 13, 1, buf);
+        }];
+  }
+}
+
+// ---- 策略开关与摆位 ----
+
+void wb_set_new_window_policy(int64_t id, int in_place) {
+  WMBView *v = wb_get(id);
+  if (v != nil) {
+    v->new_window_in_place = in_place != 0 ? 1 : 0;
+  }
+}
+
+void wb_set_permission_mode(int64_t id, int allow) {
+  WMBView *v = wb_get(id);
+  if (v != nil) {
+    v->permission_allow = allow != 0 ? 1 : 0;
+  }
+  // macOS 没有权限请求的公开口：旗标存着，kind=9 不发（掩码如实回 bit2=0）
+}
+
+void wb_set_download_mode(int64_t id, int allow) {
+  WMBView *v = wb_get(id);
+  if (v != nil) {
+    v->download_allow = allow != 0 ? 1 : 0;
+  }
+  // 同上：macOS 15 才有 WKDownload，本层不发 kind=10
+}
+
+int wb_has_download_signal(int64_t id) {
+  (void)id;
+  return 0;
+}
+
+int wb_has_create_signal(int64_t id) {
+  return wb_get(id) != nil ? 1 : 0;
+}
+
+void wb_set_user_agent(int64_t id, const char *ua) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v == nil || ua == NULL) {
+      return;
+    }
+    // WKWebView 的整串 UA 覆盖没有公开口（引擎只在 configuration 阶段收
+    // applicationNameForUserAgent，那是「追加在系统 UA 尾部」那一档）。
+    // 建视图时给过的 user_agent 已生效；运行期再改这一支不改，
+    // 缺口记 docs/zh/adaptation.md 的 macOS 差异，不接私有 setter。
+    (void)v;
+  }
+}
+
+void wb_focus(int64_t id) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v == nil) {
+      return;
+    }
+    NSWindow *win = [v.view window];
+    if (win != nil) {
+      [win makeFirstResponder:v.view];
+    }
+  }
+}
+
+void wb_set_visible(int64_t id, int visible) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v != nil) {
+      [v.view setHidden:visible == 0];
+    }
+  }
+}
+
+void wb_set_size(int64_t id, int w, int h) {
+  @autoreleasepool {
+    WMBView *v = wb_get(id);
+    if (v == nil) {
+      return;
+    }
+    CGFloat sc = 1.0;
+    NSScreen *sc0 = [[v.view window] screen];
+    if (sc0 != nil) {
+      sc = [sc0 backingScaleFactor];
+      if (sc <= 0) {
+        sc = 1.0;
+      }
+    }
+    int ww = w > 1 ? w : 1;
+    int hh = h > 1 ? h : 1;
+    [v.view setFrame:NSMakeRect(0, 0, ww / sc, hh / sc)];
+  }
+}
+
+// ---- 事件队列消费式取（next 先行，另两条读的是刚取出的那一条）----
+
+int wb_next_event(int64_t id) {
+  WMBView *v = wb_get(id);
+  if (v == nil || v->count <= 0) {
+    return -1;
+  }
+  v->last = v->evs[v->head];
+  v->head = (v->head + 1) % WB_EVQ;
+  v->count--;
+  return v->last.kind;
+}
+
+int64_t wb_event_num(int64_t id) {
+  WMBView *v = wb_get(id);
+  return v == nil ? 0 : v->last.num;
+}
+
+int wb_event_text(int64_t id, char *out, int cap) {
+  WMBView *v = wb_get(id);
+  if (v == nil) {
+    return wb_copy(id, out, cap, "");
+  }
+  return wb_copy(id, out, cap, v->last.text);
+}
+
+#elif !defined(__linux__) && !defined(_WIN32) && !defined(__APPLE__)
 
 // 其余平台占位（macOS 等后端随平台批）：符号必须在，能力探测返回不可用。
 // （Windows 的真实现在本包 webview2_stub.c——符号只有一份，这里必须空出。）

@@ -61,7 +61,7 @@ jobs:
       # 刚下载的那一批包，下一轮才看得见新下下来的。
       - name: 迁移依赖缓存里的旧式清单
         run: |
-          for i in $(seq 1 8); do
+          for i in $(seq 1 40); do
             if (cd gui && moon check >/tmp/resolve.log 2>&1); then
               echo "依赖图解析通过（第 $i 轮）"
               exit 0
@@ -75,7 +75,7 @@ jobs:
                   (cd "$(dirname "$f")" && moon fmt >/dev/null 2>&1) || true
                 done
           done
-          echo "::error title=依赖清单迁移没收敛::8 轮后仍报 no longer supported"
+          echo "::error title=依赖清单迁移没收敛::40 轮后仍报 no longer supported"
           tail -20 /tmp/resolve.log
           exit 1
 
@@ -158,7 +158,7 @@ jobs:
       - name: 迁移依赖缓存里的旧式清单
         shell: pwsh
         run: |
-          for ($i = 1; $i -le 8; $i++) {
+          for ($i = 1; $i -le 40; $i++) {
             Push-Location gui
             moon check *> ../resolve.log
             $code = $LASTEXITCODE
@@ -175,7 +175,7 @@ jobs:
                 Pop-Location
               }
           }
-          Write-Host "::error title=依赖清单迁移没收敛::8 轮后仍报 no longer supported"
+          Write-Host "::error title=依赖清单迁移没收敛::40 轮后仍报 no longer supported"
           Get-Content resolve.log -Tail 25
           exit 1
 
@@ -274,7 +274,7 @@ jobs:
       # macOS job 的价值全在这里之后——它才会真的走到 native-stub 与 prebuild 编 ObjC 那两步。
       - name: 迁移依赖缓存里的旧式清单
         run: |
-          for i in $(seq 1 8); do
+          for i in $(seq 1 40); do
             if (cd gui && moon check >/tmp/resolve.log 2>&1); then
               echo "依赖图解析通过（第 $i 轮）"
               exit 0
@@ -288,7 +288,7 @@ jobs:
                   (cd "$(dirname "$f")" && moon fmt >/dev/null 2>&1) || true
                 done
           done
-          echo "::error title=依赖清单迁移没收敛::8 轮后仍报 no longer supported"
+          echo "::error title=依赖清单迁移没收敛::40 轮后仍报 no longer supported"
           tail -30 /tmp/resolve.log
           exit 1
 
