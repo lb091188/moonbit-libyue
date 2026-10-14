@@ -2,6 +2,11 @@
 // gauge_t / scatter_t）。折线与仪表盘由 500ms 自重排延时通道实时驱动；
 // 暂停复选框只断数据流（定时器本身不停——新栈 set_timeout 是一次性句柄，
 // 循环靠回调尾自排，与 master 的重复定时器等价但机制不同，记档）。
+//
+// **第一拍挂在挂载回调上，不挂在页面构造期**：`set_timeout` 在宿主 `App`
+// 建好之前是空操作（`core/loop.mbt` 的进程级通道由 `App::new` 装），而页面
+// 函数是 `mount_window` 的实参、求值早于建窗——构造期排的那一拍永远不会响，
+// 循环也就永远起不来（真机症状：折线与仪表盘一直「暂无数据」）。
 pub fn page_charts(_app : @shared.App) -> @core.Node {
   // ---- 折线：3 序列定长窗口，500ms 推点（三角波模拟监控曲线），可暂停 ----
   let line_series : @core.Store[Array[@charts.LineSeries]] = @core.Store::new([
@@ -33,7 +38,6 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     let _ = @core.set_timeout(500, line_pump)
   }
 
-  let _ = @core.set_timeout(500, line_pump)
   // ---- 柱状：月度净值（含负值）+ Top 语言横向条 ----
   let bar_data : @core.Store[Array[@charts.BarItem]] = @core.Store::new([
     @charts.BarItem::make("1月", 12.0),
@@ -70,7 +74,6 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     let _ = @core.set_timeout(500, gauge_pump)
   }
 
-  let _ = @core.set_timeout(500, gauge_pump)
   let gauge_manual : @core.Store[Double] = @core.Store::new(0.35)
   // ---- 散点：2000 点确定性伪随机（LCG） ----
   let scatter_data : Array[(Double, Double)] = []
@@ -105,6 +108,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
           ],
           column_gap=16.0,
           align_items=@yoga.AlignItems::FlexStart,
+          handle=fn(_w : @core.Widget) -> Unit { line_pump() },
         ),
         @ui.row(
           [
@@ -123,7 +127,8 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
         "  @charts.series_push(series, 0, v)",
         "  let _ = @core.set_timeout(500, pump)  // 自重排循环",
         "}",
-        "let _ = @core.set_timeout(500, pump)",
+        "// 第一拍挂在挂载回调上：宿主建好之前 set_timeout 是空操作",
+        "@ui.row([chart], handle=fn(_) { pump() })",
         "@charts.line_chart_t(series, width=320.0, height=240.0)",
         "@charts.line_chart_t(series, area=true, width=320.0, height=240.0)",
       ],
@@ -180,6 +185,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
           ],
           column_gap=16.0,
           align_items=@yoga.AlignItems::FlexStart,
+          handle=fn(_w : @core.Widget) -> Unit { gauge_pump() },
         ),
       ],
       code=[

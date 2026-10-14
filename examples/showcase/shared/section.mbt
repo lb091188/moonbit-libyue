@@ -117,7 +117,10 @@ fn section_body(s : Section, selected : @core.Store[String]) -> @core.Node {
     @ui.text(s.title, role=@ui.Section),
   ]
   if s.desc.length() > 0 {
-    inner.push(@ui.text(s.desc, role=@ui.Secondary, max_width=900.0))
+    // 说明文字必须折行：单行不折会把段容器撑到可视区外（右侧整片裁字）
+    inner.push(
+      @ui.text(s.desc, role=@ui.Secondary, max_width=900.0, wrap=true),
+    )
   }
   inner.push(holder)
   if s.code.length() > 0 {

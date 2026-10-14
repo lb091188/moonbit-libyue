@@ -75,6 +75,7 @@
   - [ ] 观感逐页比对不回退（真机由用户复验，`examples/hello`、`hello-themed`、`showcase`、`native-app`、`sysmonitor`）。
 - [x] **P3 响应式补强**（2026-10-14 落地）：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘（`tick`）/ `for_list`+`when` / `mount_window_render` 的 `render` 槽 / `Store` 内建去重（`T : Eq` 走 `set_eq`，已定案）全部落地。
 - [x] **P4 绘制能力**：`Painter` 全局 alpha（opacity 全路径）+ `box_shadow` 硬阴影档（真机观感复验归 `_人工测试清单.md`；模糊档待 blur 能力再评估）。
+- [x] **图表页一直「暂无数据」**（2026-10-14，真机反馈）：`set_timeout` 的进程级通道由 `App::new` 装，无宿主时空操作返回 0；而 `page_charts(app)` 是 `mount_window` 的实参、求值早于建窗 ⇒ 构造期排的第一拍永不触发。改成挂在 `handle`（`mount_children` 之后跑）上；页内代码示例同步改口径。同批：段说明补 `wrap=true`（原来是一条 900px 不折行的文本，尾部整片裁字）。
 - [x] **段条「超宽自动换行」是假口径**（2026-10-14）：`ui` 从不写 `flex_wrap`、样式层也没这条属性 ⇒ 任何容器都是 NoWrap，段一多就横向溢出被裁。按「属性名 = CSS 属性名」给 `Style` 补 `flex_wrap`（工厂/merge/apply 全接线），showcase 段条改用 `class=[style(flex_wrap=Wrap, row_gap=4.0)]` 真换行。
 - [x] **滚动容器滚不动**（2026-10-14，真机反馈）：`scroll_view` 视口没写 `min-height`，Yoga flex 子项默认 min-size=auto ⇒ 视口被内容顶到自然高、`max()` 恒 0（实测 240×140 父里 viewport=676=content）。库级补 `min_height/min_width=0`，所有调用点（showcase 段正文与侧栏、native-app、virt_list 宿主）一起受益；显式 `height=` 不受影响。判据与对照读数见 adaptation 同批条。
 - [x] **Markdown 页两处缺陷**（2026-10-14，真机反馈）：① 富文本区间按 UTF-16 code unit 出、`AttributedText` 契约是 UTF-8 字节下标 ⇒ 中英混排样式整体前移、端点切进字符（豆腐块 + 压字）；② `md_rich_label` 从不折行、节点宽=整段自然宽（一段 656px 撑进 480 文档）⇒ 右边缘裁字、代码区「复制」被推出可视区。修：`md_byte_len` 出区间 + 构造期贪心折行（中文逐字/拉丁逐词/`\n` 硬换行/超长单元按字符硬切），一行一个 AttributedText，删除线与链接命中按行换算，列表/引用/脚注/表格单元格按各自可用宽收窄（`md_narrow`）。判据与「换回旧单位当场红」的对照实验见 `docs/zh/adaptation.md` 同批条。**待真机**：豆腐块/裁字/复制按钮是否消失、内容区纵向滚动是否恢复。
