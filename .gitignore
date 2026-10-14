@@ -36,3 +36,6 @@
 # AI 助手工作区记忆(非构建产物,不入库)
 /.workbuddy/
 /.workbuddy-ai/
+
+# render 白盒测试的落盘副产物（写在工作目录，三平台同一相对路径）
+/gui/moonbit-native-render-wbtest.png

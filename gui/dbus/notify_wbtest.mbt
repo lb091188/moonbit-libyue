@@ -76,9 +76,17 @@ test {
       assert_true(notify_supported())
     }
     Err(NfUnsupported) => println("notify: skip（会话总线/通知服务不可用）")
-    Err(e) => {
-      println("notify_caps failed: \{e}")
-      assert_true(false)
+    Err(NfFailed(m)) => {
+      // 总线在、通知服务没装（CI runner 与无桌面会话的机器就是这样）：那是环境
+      // 缺项，与上一条同一口径——打印跳过，不当成代码失败
+      let no_service =
+        m.contains("ServiceUnknown") || m.contains(".service files")
+      if no_service {
+        println("notify: skip（通知服务未安装：\{m}）")
+      } else {
+        println("notify_caps failed: \{m}")
+        assert_true(false)
+      }
     }
   }
 }

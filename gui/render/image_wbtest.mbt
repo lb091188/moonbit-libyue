@@ -207,8 +207,17 @@ test "PNG 落盘再读回：像素不变" {
     return
   }
   let cv = quad_canvas()
-  let path = "/tmp/moonbit-native-render-wbtest.png"
-  assert_eq(cv.write_to_file("png", path), true)
+  // 落盘位置用相对路径：`/tmp` 只有 POSIX 有，Windows 上这条路径落在
+  // `C:\tmp`（不存在）→ 写文件直接失败。moon test 的测试进程 cwd 是模块根，
+  // 相对路径三平台都可写、也可按同一串读回来（副产物已进 .gitignore）。
+  let path = "moonbit-native-render-wbtest.png"
+  let wrote = cv.write_to_file("png", path)
+  if !wrote {
+    // 失败时把落点打出来：这条判据在三个平台上分别栽过「没有 /tmp」与
+    // 「编码器不认这个格式」，报错行本身分不清是哪种
+    println("PNG 落盘失败：path=\{path}")
+  }
+  assert_eq(wrote, true)
   assert_eq(cv.write_to_file("bmp", path), false)
   let img = Image::new_from_file(path)
   assert_eq(img.is_empty(), false)

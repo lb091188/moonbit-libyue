@@ -24,9 +24,15 @@
 - **环境**：GitHub Actions 的 ubuntu-latest / windows-latest / macos-latest。开发机是 Ubuntu 24.04 + X11 + XFCE：有会话总线、有通知服务、有显示服务。runner 上这三样都不齐，于是「本机全绿」的测试第一次在 CI 上跑就分头炸出口径问题——每条各自取证，不是一条根因。
 - **通知门面（真口径问题，已修）**：runner 上会话总线在、通知服务没装，`@dbus.notify_caps()` 给 `NfFailed(ServiceUnknown)`，而 `notify_supported()` 说没有后端——原先的 `core/notify_caps()` 直接转 dbus 的错误码，两条探针就不一致了。改法：`notify_caps()` 先按 `notify_backend()` 定「有没有后端」，没有就 `Err(Unsupported)`，确认是 D-Bus 后端才去问 `GetCapabilities`。契约一句话：`notify_supported()` 为假时 `notify_caps()` 必给 `Unsupported`。
 - **声明式挂载（测试断言写的是开发机的巧合，已改）**：`mount_window_render(render, ...)` 的形态是 `mount_window(render(), ...)`——render **恰好跑一次，与建窗成败无关**。原测试还断言「拿不到 app 时 render 一次都不跑」，那只在开发机成立（那里建窗成功），无显示服务的机器上建窗失败但那一遍已经算过，CI 因此红。断言改为「恰好一次」。
-- **文本与布局那一族要真字体**：Pango 量不到尺寸时「文字宽=0」会连锁影响链接宽度、textarea 的显示行、mdview 的基线，报错处看不出起端。Linux job 起手加了一步「字体与 Pango 测量诊断」：打 `fc-list` 条数与 `fc-match`，再用一小段 C 探针实测 `"Sans 14"` 量 `"AAAA"` 的像素尺寸（开发机基线 48x23），量不到就在该步失败——先分清「代码坏了」还是「机器没字体」。apt 里同时补 `fonts-dejavu-core`，保证至少有一族字体。
+- **文本与布局那一族要真字体，而 runner 上是「字体不同」不是「没有字体」**：Linux job 的诊断步（fc-list 条数 + `fc-match` + 一小段 C 探针实测 `"Sans 14"` 量 `"AAAA"`）给出的读数是 **53 条字体、52x23**，本机同一条探针是 **48x23**（Noto Sans CJK vs runner 的 DejaVu）。所以这一族的红全是**判据按本机度量写死了**，四条各改成与字体无关的形态：
+  1. `text/range` 的「区间色落在第一个字形上」：原来要求「红块右缘 < 黑块左缘」，相邻字形的墨一挨就破——改比「红块宽度 < 黑块宽度」（左缘关系那条判据保留）；
+  2. `ui/form` 的链接悬停下划线：原来只探「底行那一格」，线落在第几行随降部变——改成比整块墨量（画没画线才是要验的）；
+  3. `ui/textarea` 的上下键：原来两行是 `ab` / `cd`，「记住的像素 x」在两行的映射点取决于哪个字串更宽（DejaVu 上第二行更窄，上键回到行中）——两行改成同样的 `ab`，验的是规则不是某字体的宽度关系；
+  4. `mdview` 的序号/正文基线：容差 ±2px → ±6px，并写下为什么——这条要防的是「标记格没注册测量、被居中摆到行中点」那种 10px 级错位（实测过 `rect=(0,111,18,0)` 的坏形态），不是逐字体对齐到 1px。
+- **`/tmp` 不是通用可写目录**：`render/image_wbtest` 的「PNG 落盘再读回」在 Windows 上红——`/tmp/...` 在 Windows 解析成 `C:\tmp`（不存在），`write_to_file` 直接给 false。落点改成相对路径（moon test 的进程 cwd 是模块根 `gui/`），副产物进 `.gitignore`，并在写失败时把 path 打进日志（这条判据在三个平台栽过两种原因：没目录、编码器不认格式，光看报错行分不清是哪种）。
+- **Windows 侧第一次跑到 `moon test`**：662 项 661 通过，唯一那条就是上面的落盘路径。三平台 CI 自此都能当「编译 + 测试」的门禁用了。
+- **验证方式**：本机对照实验 `env -u DISPLAY moon test core ui dbus sys`（551/551 通过）能复现 runner 的「无显示服务」形态；字体侧的结论来自 CI 诊断步的读数与本机 48x23 的对比。
 - **Windows 的清单迁移循环**：PowerShell 没有 `Select-String -QuietPattern` 这个参数名（要写 `-Pattern … -Quiet`）。写错时循环在**第一轮**就因参数绑定异常退出，报的是 PowerShell 的错，看起来像「迁移没收敛」，其实一行都没跑完。
-- **验证方式**：本机对照实验 `env -u DISPLAY moon test core ui dbus sys`（551/551 通过）能复现 runner 的「无显示服务」形态；文本那一族的判据等 CI 的诊断步回证。
 
 ### MoonBit cfg(platform=)
 
