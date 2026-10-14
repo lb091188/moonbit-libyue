@@ -71,7 +71,7 @@ fn main {
 
   // 顶部工具条（原生区）：地址 + 载入/重载/停止 + 摆法切换
   app.mount([
-    @ui.text("webview pane（批 B）：一窗多区，每区一个 owner", size=15.0),
+    @ui.text("webview pane（批 B）：一窗多区，每区一个 owner", font_size=15.0),
     @ui.view(
       [
         @ui.input(addr, placeholder="地址", focus_id=31, width=420.0),
@@ -201,7 +201,7 @@ fn main {
         })
         match @web.webview_open(win, @web.webview_options("about:blank")) {
           None => win.mount([
-            @ui.text("webview 引擎不在位：批 C 的桥接面需要 webkit2gtk-4.1", size=13.0),
+            @ui.text("webview 引擎不在位：批 C 的桥接面需要 webkit2gtk-4.1", font_size=13.0),
           ])
           Some(v) => {
             v.on_event = Some(fn(e : @web.WebEvent) -> Unit {
@@ -402,7 +402,7 @@ fn main {
                         let _ = @ui
                           .view(
                             [
-                              @ui.text("原生档浮层", size=12.0),
+                              @ui.text("原生档浮层", font_size=12.0),
                               @ui.button(
                                 "收起",
                                 on_click=fn() {
@@ -511,7 +511,7 @@ fn main {
   app.mount([
     @ui.view(
       [
-        @ui.text("批 C：JS 桥 / DOM 抓取 / 导航面（另开一窗，装本地页）", size=13.0),
+        @ui.text("批 C：JS 桥 / DOM 抓取 / 导航面（另开一窗，装本地页）", font_size=13.0),
         @ui.button(
           "开一扇桥接窗",
           on_click=fn() { open_bridge(app) },
@@ -570,7 +570,7 @@ fn main {
             "播放器：ffmpeg 软解出 RGBA → Bitmap → Painter 合成（字幕来源：" +
               (if embedded { "内嵌轨" } else { "外挂文本" }) +
               "）",
-            size=13.0,
+            font_size=13.0,
           ),
           @media.player_t(
             md_path,
@@ -618,7 +618,7 @@ fn main {
   app.mount([
     @ui.view(
       [
-        @ui.text("批 D：媒体播放器（另开一窗，播 ffmpeg 测试片 + 字幕叠加）", size=13.0),
+        @ui.text("批 D：媒体播放器（另开一窗，播 ffmpeg 测试片 + 字幕叠加）", font_size=13.0),
         @ui.button(
           "开一扇播放器窗",
           on_click=fn() { open_player(app, false) },
@@ -676,7 +676,7 @@ fn main {
           p.fill_rect(0.0, 0.0, r.w, r.h)
         })
         win.mount([
-          @ui.text("长素材回证：真片子看连续解码 / 深跳 seek / 倍速同轴", size=13.0),
+          @ui.text("长素材回证：真片子看连续解码 / 深跳 seek / 倍速同轴", font_size=13.0),
           @media.player_t(
             lv_path,
             width=960.0,
@@ -705,7 +705,7 @@ fn main {
           if lv_present { "批 D 长素材：/home/lkyh/下载/001.mp4（23 分钟）" } else {
             "批 D 长素材：这台机器没有 /home/lkyh/下载/001.mp4"
           },
-          size=13.0,
+          font_size=13.0,
         ),
         @ui.button(
           "开一扇本地视频窗",
@@ -746,7 +746,7 @@ fn main {
           p.stroke_rect(0.0, 0.0, r.w - 1.0, r.h - 1.0)
         })
         pop.mount([
-          @ui.text("原生弹层：真窗口，能盖住网页区", size=12.0),
+          @ui.text("原生弹层：真窗口，能盖住网页区", font_size=12.0),
           @ui.button(
             "菜单项甲",
             on_click=fn() {
@@ -772,7 +772,7 @@ fn main {
   app.mount([
     @ui.view(
       [
-        @ui.text("批 E：原生弹层（开在网页区之上，选完即关）", size=13.0),
+        @ui.text("批 E：原生弹层（开在网页区之上，选完即关）", font_size=13.0),
         @ui.button(
           "开原生弹层菜单",
           on_click=fn() { open_menu(app) },
@@ -825,7 +825,7 @@ fn main {
   app.mount([
     @ui.view(
       [
-        @ui.text("批 C 余项：本地协议（yuedemo:// 读临时目录里的真文件）", size=13.0),
+        @ui.text("批 C 余项：本地协议（yuedemo:// 读临时目录里的真文件）", font_size=13.0),
         @ui.button(
           "加载本地协议页",
           on_click=fn() { load_local_page() },
@@ -860,11 +860,11 @@ fn main {
       app.mount([
         @ui.view(
           [
-            @ui.text("webview 引擎不在位", size=14.0),
+            @ui.text("webview 引擎不在位", font_size=14.0),
             @ui.text(
               "本机缺 webkit2gtk-4.1（或非 Linux 平台）。pane 通道本身可用，" +
                 "页面区改画自绘内容；装上引擎后本页自动走 webview 分支。",
-              size=12.0,
+              font_size=12.0,
             ),
           ],
           padding=12.0,
@@ -880,9 +880,9 @@ fn main {
           [
             @ui.view(
               [
-                @ui.text("原生侧栏", size=13.0),
-                @ui.text("owner = 自绘 Painter", size=12.0),
-                @ui.text("这一侧的矩形与页面区不重叠", size=12.0),
+                @ui.text("原生侧栏", font_size=13.0),
+                @ui.text("owner = 自绘 Painter", font_size=12.0),
+                @ui.text("这一侧的矩形与页面区不重叠", font_size=12.0),
               ],
               width=240.0,
               padding=10.0,
