@@ -4457,7 +4457,9 @@ static int wm_clamp_cap(char *out, int cap, const char *s) {
 
 // 窗口所在屏的点↔像素比例（无窗退回主屏）
 static CGFloat wm_scale_of(WMState *s) {
-  NSScreen *sc = (s != nil && s->win != nil) ? [s->win screen] : nil;
+  // win/view 是 ObjC 属性（ARC 管理的对象引用），只能用点取，不能 `->`——
+  // 桩里其余 C 字段是 @public 裸字段，两种取法在同一个函数里并存，容易看串
+  NSScreen *sc = (s != nil && s.win != nil) ? [s.win screen] : nil;
   if (sc == nil) {
     sc = [NSScreen mainScreen];
   }
@@ -5052,11 +5054,11 @@ static WMAppDelegate *wm_app_delegate = nil;
 
 int wm_init(void) {
   @autoreleasepool {
-    // sharedApplication 在现 SDK 里是 void 形态的初始化入口，取回对象要问
-    // NSGetApplication（NSApp 宏展开成那次调用，不能拿来比较）
+    // 手工跑循环（不用 [NSApp run]），但必须先让 AppKit 建出共享应用对象，
+    // 之后所有事件与窗口都挂在这个单例上（NSApp 就是它的宏）
     [NSApplication sharedApplication];
-    if (NSGetApplication() == nil) {
-      return 0;
+    if (![NSThread isMainThread]) {
+      return 0; // AppKit 的类方法要从主线程调（MoonBit 宿主就在主线程，这条是护栏）
     }
     // 非 bundle 的裸二进制也要能被窗口服务接受：Regular 策略让本进程进
     // Dock 与菜单栏（不设为 Regular，NSWindow 建得出来但不会显示）。
@@ -5938,15 +5940,18 @@ void wm_file_dialog_set_options(int64_t id, int32_t options) {
     if (p == nil) {
       return;
     }
-    [p setAllowsMultipleSelection:(options & 2) != 0];
+    // 三个开关都只在「打开面板」上声明（NSSavePanel 天生单选、也没有
+    // canShowHiddenFiles）：多选/选文件夹/显示隐藏对保存面板无意义，
+    // 于是保存对话框只吃 FILE_OPTION_SHOW_HIDDEN 之外的语义（按 API 事实给）
     if (wm_dlg_is_open[(int)id - 1]) {
       NSOpenPanel *op = (NSOpenPanel *)p;
+      [op setAllowsMultipleSelection:(options & 2) != 0];
       [op setCanChooseDirectories:(options & 1) != 0];
       [op setCanChooseFiles:(options & 1) == 0];
       [op setTreatsFilePackagesAsDirectories:YES];
-    }
-    if (@available(macOS 10.9, *)) {
-      [p setCanShowHiddenFiles:(options & 4) != 0];
+      if (@available(macOS 10.9, *)) {
+        [op setCanShowHiddenFiles:(options & 4) != 0];
+      }
     }
   }
 }
@@ -6723,7 +6728,10 @@ static int wm_tray_alloc(int kind, int icon_slot, const char *tip) {
   }
   [btn setTarget:wm_tray_target];
   [btn setAction:@selector(wmTrayClicked:)];
-  [btn setSendActionOn:(NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp)];
+  // sendActionOn: 在 NSCell 上（NSControl/NSView 系的状态栏按钮没有这个口），
+  // 不给掩码就只在左键抬起触发动作，右键那条永远收不到
+  [[btn cell] setSendActionOn:(NSEventMaskLeftMouseUp |
+                              NSEventMaskRightMouseUp)];
   wm_clamp_cap(wm_tray_tips[slot], 128, tip != NULL ? tip : "");
   wm_tray_items[slot] = item;
   wm_tray_menus[slot] = nil;
