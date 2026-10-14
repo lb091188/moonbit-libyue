@@ -135,7 +135,7 @@ fn time_popup(
     let font = @text.Font::new("", 14.0)
     panel.node.set_flex_direction(@yoga.Column)
     panel.node.set_width(@yoga.fixed(180.0))
-    panel.set_padding(top=10.0, left=10.0)
+    panel.set_padding(top=10.0, left=10.0, right=10.0, bottom=10.0)
     @style.apply(
       panel,
       @style.merge_all([
@@ -154,19 +154,34 @@ fn time_popup(
       p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
       p.set_line_width(@style.number_of(st.border_width, 1.0))
       p.stroke_rect(0.0, 0.0, r.w, r.h)
-      let _ = @text.draw_box_at(
-        p,
-        0.0,
-        0.0,
-        r.w,
-        28.0,
-        cur.val.format(),
-        font,
-        @style.color_of(st.color, @theme.theme_text_primary()),
-        align=@text.Center,
-        valign=@text.Center,
-      )
     })
+    // 顶部时间显示是**占位的子控件**，不是画在面板上的浮层：画在 (0,0,28) 而子件
+    // 从内边距起排，第一行步进就被它压住（真机反馈「时间选择器位置不对」）。
+    let _ = @core.node_of_new(fn(hd : @core.Widget) -> @core.Widget {
+      watch_theme()
+      hd.node.set_width(@yoga.percent(100.0))
+      hd.node.set_height(@yoga.fixed(28.0))
+      hd.on_draw = Some(fn(
+        self : @core.Widget,
+        p : @render.Painter,
+        r : @core.Rect,
+      ) -> Unit {
+        let st = @style.style_for(self)
+        let _ = @text.draw_box_at(
+          p,
+          0.0,
+          0.0,
+          r.w,
+          r.h,
+          cur.val.format(),
+          font,
+          @style.color_of(st.color, @theme.theme_text_primary()),
+          align=@text.Center,
+          valign=@text.Center,
+        )
+      })
+      hd
+    }).mount_into(panel)
     // 步进行：[−] 标签 [+]
     fn stepper(label_text : String, step : (Int) -> TimeHM) -> @core.Node {
       view(

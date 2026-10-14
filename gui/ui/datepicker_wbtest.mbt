@@ -131,13 +131,14 @@ test "时间区间：步进器改值、确定写回、取消不改" {
   assert_eq(@core.overlay_count(), 1)
   root.relayout(400.0, 300.0)
   let panel = picker_panel(@core.overlay_top_id())
-  // 面板：标题 28 + 时步进 32 + 分步进 32 + 按钮行 32（子项顺序 = 追加顺序）
-  let hour_row = panel.children()[0]
+  // 面板子项：标题 28 / 时步进 32 / 分步进 32 / 按钮行 32（标题是占位子件，
+  // 所以步进行从索引 1 起）
+  let hour_row = panel.children()[1]
   let plus_hour = hour_row.children()[2]
   click_at(root, plus_hour, 15.0, 14.0)
   click_at(root, plus_hour, 15.0, 14.0)
   // 确定：按钮行第 2 个
-  let btn_row = panel.children()[2]
+  let btn_row = panel.children()[3]
   click_at(root, btn_row.children()[1], 30.0, 14.0)
   assert_eq(changes, ["11:00~-"])
   match v.get().start {
@@ -148,8 +149,8 @@ test "时间区间：步进器改值、确定写回、取消不改" {
   click_at(root, start_field, 40.0, 16.0)
   root.relayout(400.0, 300.0)
   let panel2 = picker_panel(@core.overlay_top_id())
-  click_at(root, panel2.children()[0].children()[2], 15.0, 14.0)
-  click_at(root, panel2.children()[2].children()[0], 30.0, 14.0)
+  click_at(root, panel2.children()[1].children()[2], 15.0, 14.0)
+  click_at(root, panel2.children()[3].children()[0], 30.0, 14.0)
   assert_eq(changes.length(), 1)
   match v.get().start {
     Some(t) => assert_eq(t.format(), "11:00")
@@ -191,8 +192,8 @@ test "日期时间区间：日期走日历、时间走步进，两侧各写各�
   click_at(root, start_time, 30.0, 16.0)
   root.relayout(500.0, 300.0)
   let panel = picker_panel(@core.overlay_top_id())
-  click_at(root, panel.children()[0].children()[2], 15.0, 14.0)
-  click_at(root, panel.children()[2].children()[1], 30.0, 14.0)
+  click_at(root, panel.children()[1].children()[2], 15.0, 14.0)
+  click_at(root, panel.children()[3].children()[1], 30.0, 14.0)
   match v.get().start {
     Some(p) => assert_eq(p.1.format(), "10:00")
     None => assert_true(false)
@@ -256,4 +257,24 @@ test "日期选择只读样式槽：class 覆盖字段底、日历面板与箭�
   assert_true(
     paint_count(mk([@style.style(background_color="#ff0000")]), true) > 1000,
   )
+}
+
+///|
+test "时间弹层：顶部时间是占位的子件，第一行步进不被压住" {
+  let n = time_popup(TimeHM::{ h: 9, m: 0 }, fn(_) { () }, fn() { () })
+  let root = @core.Widget::new()
+  root.set_size(300.0, 300.0)
+  root.set_column()
+  let panel = n.mount_into(root)
+  root.relayout(300.0, 300.0)
+  let kids = panel.children()
+  assert_eq(kids.length(), 4)
+  // 旧形态把时间画在面板 (0,0,28) 上、不占布局：第一行步进从 y=10 起被压住
+  assert_eq((kids[0].rect.y, kids[0].rect.h), (10.0, 28.0))
+  let mut prev_end = 0.0
+  for c in kids {
+    assert_true(c.rect.y >= prev_end, msg="弹层子件纵向重叠")
+    prev_end = c.rect.y + c.rect.h
+  }
+  assert_true(panel.rect.h >= prev_end + 10.0, msg="弹层高度没包住内容")
 }
