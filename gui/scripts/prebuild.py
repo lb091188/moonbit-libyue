@@ -42,6 +42,55 @@ WEB_PACKAGE = "NoahLiu/native-gui/web"
 # 缺包不算错：桩改编「无宏」的占位分支，wb_* 符号仍在、探测返回不可用。
 WEBKIT_PKG_CONFIG = "webkit2gtk-4.1"
 
+# ---------------------------------------------------------------------------
+# vendor 大文件改走 GitHub Release 资产（2026-10-14 起，仓库不再入库）：
+# WebView2 静态 Loader 与 SDK 头体积大且基本不更新，留在 git 里只会永久占用
+# 历史体积。构建时缺失即从 Release 下载并校验 sha256；离线环境可提前手工
+# 放置文件（本函数只做「缺失才下载」，已存在不动）。下载失败不中断 prebuild
+# （只报错），让后面的链接期给出明确的缺文件错误。
+# ---------------------------------------------------------------------------
+RELEASE_BASE = "https://github.com/lb091188/moonbit-native-gui/releases/download/vendor-v1"
+VENDOR_FILES = [
+    (
+        "web/lib/WebView2LoaderStatic.lib",
+        "e66284970876a616c82e7dcda75a17fd46d04827f9de81d4299b8862d34d25d6",
+    ),
+    (
+        "web/include/WebView2.h",
+        "dff1e3181ec7ec203a34ef6efa966590e0ef0ba1a5c3fe3b69da6508c2f8a02e",
+    ),
+]
+
+
+def ensure_release_files() -> None:
+    import hashlib
+    import urllib.request
+
+    for rel, sha in VENDOR_FILES:
+        dest = MODULE_ROOT / rel
+        if dest.exists():
+            continue
+        url = f"{RELEASE_BASE}/{dest.name}"
+        try:
+            print(f"prebuild: 下载 vendor 文件 {dest.name} ...", file=sys.stderr)
+            data = urllib.request.urlopen(url, timeout=180).read()
+        except Exception as e:  # noqa: BLE001——任何网络/URL 错误都只报错不炸
+            print(
+                f"prebuild: 下载失败：{url}（{e}）\n"
+                f"  离线环境请手动下载后放到 {dest}",
+                file=sys.stderr,
+            )
+            continue
+        if hashlib.sha256(data).hexdigest() != sha:
+            print(
+                f"prebuild: {dest.name} sha256 校验不符，拒绝写入（文件损坏或版本不对）",
+                file=sys.stderr,
+            )
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+        print(f"prebuild: 已就位 {dest}（sha256 校验通过）", file=sys.stderr)
+
 
 def pkg_config(args: list[str], flag: str) -> list[str] | None:
     """探包配置：返回 None 表示包不存在，返回空列表表示存在但该 flag 无输出
@@ -105,6 +154,7 @@ def compile_stub(
 
 def link_configs() -> dict:
     entries: list[dict] = []
+    ensure_release_files()
     system = platform.system()
     if system == "Linux":
         libs = []

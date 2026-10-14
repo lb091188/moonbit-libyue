@@ -18,15 +18,53 @@ ole32 等），零额外链接库——空 link_configs 即正确形态，不是
 
 from __future__ import annotations
 
+import hashlib
 import json
 import platform
 import sys
+import urllib.request
+from pathlib import Path
 
 MEDIA_PACKAGE = "NoahLiu/gui-media/media"
 SYS_LIBS = ["-lpthread", "-ldl", "-lm", "-lstdc++", "-latomic"]
 
+# miniaudio.h 自 2026-10-14 起不再入库，改挂 GitHub Release 资产：构建时
+# 缺失即下载并校验 sha256；离线环境可提前手工放置（已存在不动）。
+_RELEASE_BASE = "https://github.com/lb091188/moonbit-native-gui/releases/download/vendor-v1"
+_VENDOR_MINIAUDIO = (
+    "miniaudio.h",
+    Path(__file__).resolve().parent / "media" / "miniaudio.h",
+    "e9e742f8c4d7cdd0fc81ba7f1c47b719d98d45e0138849aa0ec1e574d554a1ee",
+)
+
+
+def ensure_miniaudio() -> None:
+    name, dest, sha = _VENDOR_MINIAUDIO
+    if dest.exists():
+        return
+    url = f"{_RELEASE_BASE}/{name}"
+    try:
+        print(f"gui-media(prebuild): 下载 vendor 文件 {name} ...", file=sys.stderr)
+        data = urllib.request.urlopen(url, timeout=180).read()
+    except Exception as e:  # noqa: BLE001——网络/URL 错误只报错不炸
+        print(
+            f"gui-media(prebuild): 下载失败：{url}（{e}）\n"
+            f"  离线环境请手动下载后放到 {dest}",
+            file=sys.stderr,
+        )
+        return
+    if hashlib.sha256(data).hexdigest() != sha:
+        print(
+            f"gui-media(prebuild): {name} sha256 校验不符，拒绝写入", file=sys.stderr
+        )
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(data)
+    print(f"gui-media(prebuild): 已就位 {dest}（sha256 校验通过）", file=sys.stderr)
+
 
 def link_configs() -> dict:
+    ensure_miniaudio()
     if platform.system() != "Linux":
         print(
             "gui-media(prebuild): 非 Linux 平台降级为空 link_configs（媒体线随平台落地）",
