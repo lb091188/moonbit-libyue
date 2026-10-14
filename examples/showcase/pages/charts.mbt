@@ -14,7 +14,8 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     @charts.LineSeries::make("内存", max_points=120),
     @charts.LineSeries::make("磁盘", max_points=120),
   ])
-  let line_running : @core.Store[Bool] = @core.Store::new(true)
+  // 复选框语义与标签同向：勾上 = 暂停（断数据流，定时器照跑）
+  let line_paused : @core.Store[Bool] = @core.Store::new(false)
   fn triangle(t : Int, period : Int, base : Double, amp : Double) -> Double {
     let phase = t % period
     let half = period / 2
@@ -28,13 +29,21 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
 
   let line_tick : Ref[Int] = Ref(0)
   fn line_pump() -> Unit {
-    if line_running.get() {
+    if !line_paused.get() {
       let t = line_tick.val + 1
       line_tick.val = t
       @charts.series_push(line_series, 0, triangle(t, 60, 35.0, 40.0))
       @charts.series_push(line_series, 1, triangle(t, 90, 45.0, 20.0))
       @charts.series_push(line_series, 2, triangle(t, 120, 20.0, 30.0))
     }
+    // 诊断（真机一轮定位，随本轮修复批加、拿到读数后删）：每拍一行 ticks 与
+    // 共用 Loop 的待跑项数。配合退出时的 SHOWCASE-PROF frames= 三档分流——
+    // ticks 不涨 = 定时器链断；ticks 涨而 frames 不涨 = 重绘链断；两者都涨 = 画法问题。
+    println(
+      "CHART-DIAG ticks=" + line_tick.val.to_string() +
+      " paused=" + line_paused.get().to_string() +
+      " pending=" + (@core.host_loop().pending()).to_string()
+    )
     let _ = @core.set_timeout(500, line_pump)
   }
 
@@ -112,7 +121,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
         ),
         @ui.row(
           [
-            @ui.checkbox("暂停推点", line_running),
+            @ui.checkbox("暂停推点", line_paused),
             @ui.text("窗口容量 120，推点频率 2Hz；暂停只断数据流，自排通道继续。", role=@ui.Secondary),
           ],
           column_gap=12.0,
