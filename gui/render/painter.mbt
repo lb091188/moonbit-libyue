@@ -351,10 +351,11 @@ fn clamp_radius(r : Double, w : Double, h : Double) -> Double {
 }
 
 ///|
-/// 硬阴影档（design.md §5 P4：偏移多层圆角矩形先行，模糊随 blur 能力再评估）：
-/// 当前色 alpha 的 `layers` 层等步长外扩，画在目标矩形**之下**（调用方先画阴影
-/// 再画本体）。各层只描环（弧角递增 + 逆时针内环），层间零重叠——单层成本约
-/// 为实心方案的 1/layers，且深底上不会叠出黑边。
+/// 硬阴影（design.md §5 P4）：沿圆角矩形外扩 `spread` 的一圈等浓度色带，用
+/// **当前描边色**画，画在目标矩形**之下**（调用方先画阴影再画本体）。
+/// 画法就是一条描边：线宽 = spread、中心线外扩 spread/2，正好铺满 [0, spread]。
+/// 不用「外环 + 反向内环挖洞」：两个后端都没有反向弧（`arc` 的 `ccw` 不可用，
+/// 递减角会被规范化成 270° 长弧），洞挖不出来，四个角会留下深色圆斑。
 pub fn Painter::box_shadow(
   self : Painter,
   x : Double,
@@ -363,65 +364,18 @@ pub fn Painter::box_shadow(
   h : Double,
   radius : Double,
   spread : Double,
-  layers : Int,
 ) -> Unit {
   self.raster_gate()
-  if spread <= 0.0 || layers < 1 || w <= 0.0 || h <= 0.0 {
+  if spread <= 0.0 || w <= 0.0 || h <= 0.0 {
     return ()
   }
-  let step = spread / layers.to_double()
-  self.set_line_width(step)
-  for i in 1..=layers {
-    let e = step * i.to_double()
-    let r = radius + e
-    // 外环逆时针(整圈) + 内环顺时针:两向异侧 → fill 只落环形区域
-    self.begin_path()
-    self.round_rect_path(x - e, y - e, w + 2.0 * e, h + 2.0 * e, r)
-    self.round_rect_path_ccw(
-      x - e + step,
-      y - e + step,
-      w + 2.0 * (e - step),
-      h + 2.0 * (e - step),
-      r,
-    )
-    self.fill()
-  }
+  let e = spread / 2.0
+  self.set_line_width(spread)
+  self.begin_path()
+  self.round_rect_path(x - e, y - e, w + spread, h + spread, radius + e)
+  self.stroke()
 }
 
-///|
-/// 顺时针圆角矩形子路径（内环用，与 [Painter::round_rect_path] 反向；不开新
-/// 路径——它接在外环之后，两层方向相反，`fill` 按非零环绕只落环形区域）。
-fn Painter::round_rect_path_ccw(
-  self : Painter,
-  x : Double,
-  y : Double,
-  w : Double,
-  h : Double,
-  r : Double,
-) -> Unit {
-  if w <= 0.0 || h <= 0.0 {
-    return ()
-  }
-  let rr = clamp_radius(r, w, h)
-  let q = 1.5707963267948966
-  if rr <= 0.0 {
-    self.move_to(x, y)
-    self.line_to(x, y + h)
-    self.line_to(x + w, y + h)
-    self.line_to(x + w, y)
-    self.close_path()
-    return ()
-  }
-  self.move_to(x + rr, y)
-  self.arc(x + rr, y + rr, rr, 3.0 * q, 2.0 * q)
-  self.line_to(x, y + h - rr)
-  self.arc(x + rr, y + h - rr, rr, 2.0 * q, q)
-  self.line_to(x + w - rr, y + h)
-  self.arc(x + w - rr, y + h - rr, rr, q, 0.0)
-  self.line_to(x + w, y + rr)
-  self.arc(x + w - rr, y + rr, rr, 0.0, 3.0 * q)
-  self.close_path()
-}
 
 
 ///|

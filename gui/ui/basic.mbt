@@ -83,11 +83,10 @@ pub fn view(
       // 用整层 alpha 压到 25%（模糊档随文本层之外的 blur 能力再评估）
       let spread = @style.number_of(s.box_shadow, 0.0)
       if spread > 0.0 {
-        let layers = (spread / 2.0).round().to_int().clamp(min=2, max=8)
         let keep = p.global_alpha()
-        p.set_fill_color("#000000")
+        p.set_stroke_color("#000000")
         p.set_global_alpha(keep * 0.25)
-        p.box_shadow(0.0, 0.0, r.w, r.h, rad, spread, layers)
+        p.box_shadow(0.0, 0.0, r.w, r.h, rad, spread)
         p.set_global_alpha(keep)
       }
       if bg.length() > 0 {

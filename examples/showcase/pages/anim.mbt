@@ -83,7 +83,20 @@ pub fn page_anim(_app : @shared.App) -> @core.Node {
               ],
             ),
             @ui.view(
-              [@ui.text("字号+底色", align=@text.Center)],
+              [
+                // 字号写在**文本控件自己**的槽上：状态桶按控件各算各的，父块的
+                // hover 不会替子件换字号。文本铺满整块（width=170），指针在块内
+                // 任意位置都命中文本，字号这一档才看得见。
+                @ui.text(
+                  "字号+底色",
+                  align=@text.Center,
+                  class=[
+                    @style.style(font_size=13.0, transition_ms=300.0).hover(
+                      font_size=17.0,
+                    ),
+                  ],
+                ),
+              ],
               width=170.0,
               height=48.0,
               align_items=@yoga.AlignItems::Center,
@@ -92,9 +105,8 @@ pub fn page_anim(_app : @shared.App) -> @core.Node {
                 @style.style(
                   background_color="bg_panel",
                   border_color="border",
-                  font_size=13.0,
                   transition_ms=300.0,
-                ).hover(font_size=17.0, background_color="warning"),
+                ).hover(background_color="warning"),
               ],
             ),
           ],

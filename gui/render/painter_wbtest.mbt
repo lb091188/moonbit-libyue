@@ -278,20 +278,22 @@ test "fill_round_rect：四角不填、中心填；半径钳到短边一半" {
 }
 
 ///|
-test "box_shadow：硬阴影环画在矩形外圈，本体像素不被阴影着色" {
-  let bm = Bitmap::new(30, 30)
+test "box_shadow：外圈色带等浓度，角上不缺、本体不被着色" {
+  let bm = Bitmap::new(200, 160)
   let p = Painter::new(bm)
-  p.set_fill_color("#000000")
-  p.box_shadow(10.0, 10.0, 10.0, 10.0, 2.0, 6.0, 3)
-  // 外扩最远 6px 处(4,10) 附近应有阴影像素,远处没有
-  let mut hit = false
-  for x in 2..<8 {
-    if bm.pixel(x, 15).a > 0 {
-      hit = true
-    }
-  }
-  assert_true(hit)
-  assert_eq(bm.pixel(0, 0).a, 0)
-  assert_eq(bm.pixel(29, 29).a, 0)
+  p.set_stroke_color("#000000")
+  p.box_shadow(40.0, 40.0, 120.0, 80.0, 8.0, 8.0)
+  // 直边中点：左边缘外 4px（色带铺满 [0,8]）
+  assert_true(bm.pixel(36, 80).a > 200)
+  // 四个角的 45° 方向：各角弧心半径 12 处（内外边界正中）也必须在色带里。
+  // 旧画法在这里挖不出洞——角上要么缺一块、要么叠成深色圆斑。
+  assert_true(bm.pixel(39, 39).a > 200)
+  assert_true(bm.pixel(161, 39).a > 200)
+  assert_true(bm.pixel(39, 121).a > 200)
+  assert_true(bm.pixel(161, 121).a > 200)
+  // 本体内部与远处都不该有阴影浓度
+  assert_eq(bm.pixel(100, 80).a, 0)
+  assert_eq(bm.pixel(20, 20).a, 0)
+  assert_eq(bm.pixel(180, 140).a, 0)
   p.end()
 }
