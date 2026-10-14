@@ -168,7 +168,10 @@ pub fn scroll_view(
     // 「内容超出窗口却滚不动」。
     viewport.node.set_min_height(@yoga.fixed(0.0))
     viewport.node.set_min_width(@yoga.fixed(0.0))
-    // 散参数折进匿名块（class 在后即覆盖，§1.5 唯一去向）
+    // 散参数折进匿名块（class 在后即覆盖，§1.5 唯一去向）。内置描边必须
+    // **折进同一趟合并**——曾经 fold 之后又无条件 apply 一次内置描边，后写
+    // 赢，把 class 给的 border_color 冲掉（class 覆盖语义被组件内后置 apply
+    // 破坏，virtlist_wbtest「class 覆盖视口描边」抓红即此因）。
     let lay = @style.empty_style()
     if width > 0.0 {
       lay.width = Some(width)
@@ -176,7 +179,14 @@ pub fn scroll_view(
     if height > 0.0 {
       lay.height = Some(height)
     }
-    fold_style(viewport, lay, class)
+    fold_style(
+      viewport,
+      @style.merge_all([
+        @style.style(border_color="border", border_width=1.0),
+        lay,
+      ]),
+      class,
+    )
     let content = @core.Widget::new()
     content.node.set_flex_direction(@yoga.Column)
     content.node.set_width(@yoga.percent(100.0))
@@ -192,10 +202,6 @@ pub fn scroll_view(
     }
 
     viewport.append_child(scroll_bar(state))
-    @style.apply(
-      viewport,
-      @style.style(border_color="border", border_width=1.0)
-    )
     viewport.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
