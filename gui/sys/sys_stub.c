@@ -2013,6 +2013,9 @@ int32_t yue_sys_shell_reveal(const char *path, int32_t *ok) {
 
 // 电源方案：PowerGetActiveScheme/SetActiveScheme（powrprof）。GUID 以标准
 // 8-4-4-4-12 小写串与 MoonBit 互传，枚举三经典方案在 MoonBit 侧对表。
+// 两条 helper 只在 _WIN32 分支里被调用，本身也圈进守卫：GUID 是 Windows 类型，
+// 放在守卫外会让非 Windows 侧连编译都过不去（static 且未调用也要过类型检查）。
+#if defined(_WIN32)
 static void sys_pp_guid_string(const GUID *g, char out[40]) {
   snprintf(out, 40, "%08lx-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
            (unsigned long)g->Data1, g->Data2, g->Data3, g->Data4[0],
@@ -2037,6 +2040,7 @@ static int sys_pp_parse_guid(const char *s, GUID *g) {
   }
   return 1;
 }
+#endif // _WIN32
 
 // 当前活动电源方案的 GUID 串；取不到给空串。
 void *yue_sys_pp_current_guid(int32_t *ok) {

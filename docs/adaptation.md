@@ -1509,6 +1509,14 @@ Real-hardware report: "page switching in showcase lags, section widgets render l
 - **General policy**: an `Option` standing for "two different kinds of nothing" invites exactly this bug - when one `None` means "everything" and another means "empty", any "merge one more entry in" operation overwrites the strong meaning with the weak one. Either add a flag (this batch) or use an explicit sum (`Whole | Region(Rect)`).
 - **Verification**: 1 new core regression on the pure helpers (without a whole-window request the rectangles still union; with one, a local mark must not become a small rectangle; the clip prefers whole-window), `moon test core` 133/133, all 13 library packages run individually 882/882, `cd gui && moon check --deny-warn` clean. Device re-check (user): switch sections/pages in showcase **without moving the mouse** and the new page appears; re-run prints a `SHOWCASE-PROF` line whose `frames` does not grow from this change (it only preserves whole-window semantics within a batch that already asked for it).
 
+## Windows-only `GUID` helpers sat outside the guard, so the library would not compile on non-Windows (2026-10-14)
+
+- **Symptom**: `moon run examples/showcase` / `moon test ui` died with `sys/sys_stub.c:2023:45: error: unknown type name 'GUID'` (the power-scheme code).
+- **Root cause**: the two exported functions (`yue_sys_pp_current_guid`, `yue_sys_pp_set`) do have `#if defined(_WIN32)` bodies, but the two `static` helpers they share (`sys_pp_guid_string` / `sys_pp_parse_guid`) take `GUID` in their signatures and sit **outside every guard** - a `static` function still has to type-check even when never called, and on Linux/mac `windows.h` is not included.
+- **Fix**: both helpers wrapped in `#if defined(_WIN32) ... #endif` (they are only used from the Windows branch, so Windows behaviour is unchanged).
+- **General rule**: in platform stubs, anything whose **types come from a platform header** (GUID, HINSTANCE, PangoLayout, ...) must be inside the guard wholesale - guarding only the body while exposing the signature does not count. After touching C, run a compile on a *non-target* platform (`cd gui && moon check`) - that is what reveals a missing guard immediately.
+- **Verification**: `moon check sys ui --deny-warn` passes, `moon build showcase --target native` links, library-wide 924/924.
+
 ## Table hover lit only one cell, and "add a row" did nothing: damage covered only the deepest widget, and a dedup Store held the array it mutates (2026-10-14, real-hardware report)
 
 - **Symptom ①**: hovering a single-selection table lit only the cell under the pointer instead of the whole row (the user confirmed every table variant behaves this way).

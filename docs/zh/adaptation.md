@@ -1806,6 +1806,14 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **通用口径**:`Option` 承载「两种不同的无」迟早出这类事故——同一个 `None` 表示「整窗」又表示「空集」时,任何「往累积里并一笔」的操作都会把强语义写成弱语义。要么加一位标志(本批做法),要么换成显式枚举(`Whole | Region(Rect)`)。
 - **验证**:core 新增 1 条纯函数回归(未请求整窗时照常累积成并集;已请求整窗时局部置脏不得写成小矩形;裁剪框整窗优先),`moon test core` 133/133、分包全跑 882/882(13 包逐个绿)、`cd gui && moon check --deny-warn` 零警告。真机复验(用户执行):showcase 切段/切页后**鼠标不动**应立即看到新页,复跑 `moon run examples/showcase` 退出贴 `SHOWCASE-PROF` 行(`frames` 不应因这一改动上涨——只在同批已有整窗请求时维持整窗语义)。
 
+## Windows-only 的 `GUID` helper 漏在守卫外:非 Windows 侧整个库编不过(2026-10-14)
+
+- **现象**:`moon run examples/showcase` / `moon test ui` 起不来,报 `sys/sys_stub.c:2023:45: error: unknown type name 'GUID'`(电源方案那批代码)。
+- **根因**:`yue_sys_pp_current_guid` / `yue_sys_pp_set` 两个导出函数体内都写了 `#if defined(_WIN32)` 分支 ✓,但它们共用的两条 `static` helper(`sys_pp_guid_string` / `sys_pp_parse_guid`)签名里带 `GUID`,却写在所有守卫之外——`static` 且未被调用也要过类型检查,Linux/mac 上 `windows.h` 没进来了就当场炸。
+- **修复**:两条 helper 一起圈进 `#if defined(_WIN32) ... #endif`(它们只在 Windows 分支里被调用,Windows 侧行为零变化)。
+- **通用口径**:平台桩里**只要类型来自平台头**(GUID / HINSTANCE / PangoLayout…),函数本体就得整段进守卫,不能只守函数体而把签名露在外面;`static` helper 同样算。加完 C 代码后至少跑一次**非目标平台**的编译(`cd gui && moon check`),这条守卫漏没漏一眼就知道。
+- **验证**:`moon check sys ui --deny-warn` 过、`moon build showcase --target native` 链接过、库全包 924/924。
+
 ## 表格悬停不是整行 & 「添加一行」没反应:脏区只标最深那颗 + 去重 Store 存了被原地改的数组(2026-10-14,真机反馈)
 
 - **现象①**:单选表格鼠标悬停时只有指针底下那一格变色,整行底色不亮(用户确认所有表格都有这问题)。
