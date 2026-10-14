@@ -77,16 +77,32 @@ fn fill_polys(
   }
   let width = bm.width
   let cov : FixedArray[Int] = FixedArray::make(width, 0)
-  let cross_x : Array[Double] = []
-  let cross_w : Array[Int] = []
+  // 跨点暂存（跨行/跨子采样复用，**零分配**）：x / 环绕方向 / 该边 x 随 y 斜率
+  // 三个刮擦数组 + 索引数组（Int 不装箱）。排序用 sort_by（O(n log n)）：描边
+  // 轮廓的跨点数 = 2×边数，旧插入排序 O(n²) 在 160+ 跨点 × 4 子采样 × 每行
+  // 重排下是折线/图表描边的主要开销；三元组直 push 会每跨点装箱一次（实测
+  // 5.7 万次分配/帧），刮擦数组 + 索引排序把分配降为零。
+  let mut total_edges = 0
+  for poly in polys {
+    let n = poly.pts.length()
+    if n >= 2 {
+      total_edges += n
+    }
+  }
+  let sx : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
+  let sw : FixedArray[Int] = FixedArray::make(total_edges + 1, 0)
+  let sl : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
+  let idx : Array[Int] = []
   for y = y0; y < y1; y = y + 1 {
     for i = x0; i < x1; i = i + 1 {
       cov[i] = 0
     }
+    let mut ink_l = x1
+    let mut ink_r = x0
     for sub = 0; sub < 4; sub = sub + 1 {
       let ys = y.to_double() + (sub.to_double() + 0.5) / 4.0
-      cross_x.clear()
-      cross_w.clear()
+      idx.clear()
+      let mut nc = 0
       for poly in polys {
         let pts = poly.pts
         let n = pts.length()
@@ -100,69 +116,116 @@ fn fill_polys(
           let (bx2, by2) = pts[if k + 1 < n { k + 1 } else { 0 }]
           if (ay <= ys) != (by2 <= ys) {
             let t = (ys - ay) / (by2 - ay)
-            cross_x.push(ax + (bx2 - ax) * t)
-            cross_w.push(if by2 > ay { 1 } else { -1 })
+            sx[nc] = ax + (bx2 - ax) * t
+            sw[nc] = if by2 > ay { 1 } else { -1 }
+            sl[nc] = (bx2 - ax) / (by2 - ay)
+            nc += 1
           }
         }
       }
-      let nc = cross_x.length()
+      for i = 0; i < nc; i = i + 1 {
+        let _ = idx.push(i)
+      }
       if nc == 0 {
         continue
       }
-      // 插入排序（跨点数小）
-      for i = 1; i < nc; i = i + 1 {
-        let xv = cross_x[i]
-        let wv = cross_w[i]
-        let mut j = i - 1
-        while j >= 0 && cross_x[j] > xv {
-          cross_x[j + 1] = cross_x[j]
-          cross_w[j + 1] = cross_w[j]
-          j = j - 1
-        }
-        cross_x[j + 1] = xv
-        cross_w[j + 1] = wv
-      }
-      // 扫描：非零区间计入覆盖（wind 回零处收区间）
+      idx.sort_by(fn(a, b) { sx[a].compare(sx[b]) })
+      // 扫描：非零区间计入覆盖（wind 回零处收区间）。
+      // pixman 同款口径：跨点区间内「四样本全入」的整段像素直取 256（免逐
+      // 样本判断），只有跨度两端的至多一个边界像素做采样；墨迹范围记录下来，
+      // 合成只扫有墨区间（bbox 宽度里通常九成是空的）。
       let mut wind = 0
       let mut xa = 0.0
-      for i = 0; i < nc; i = i + 1 {
-        if wind != 0 {
-          add_span_samples(cov, x0, x1, xa, cross_x[i])
+      for i2 = 0; i2 < nc; i2 = i2 + 1 {
+        let ci = idx[i2]
+        let xb = sx[ci]
+        if wind != 0 && xb > xa {
+          // 满覆盖内段：四样本全入的像素 [ceil(xa-0.125), ceil(xb-0.875))
+          let s0 = (xa - 0.125).ceil().to_int()
+          let s1 = (xb - 0.875).ceil().to_int() - 1
+          let mut t0 = -1
+          let mut t1 = -1
+          if s0 > s1 {
+            // 跨度不足一像素：单像素按采样计
+            let p0 = raster_max_i(xa.floor().to_int(), x0)
+            let p1 = raster_min_i(xa.floor().to_int() + 1, x1)
+            for px = p0; px < p1; px = px + 1 {
+              add_pixel_samples(cov, x0, x1, px, xa, xb)
+            }
+            if p1 > p0 {
+              t0 = p0
+              t1 = p1
+            }
+          } else {
+            let a0 = raster_max_i(s0, x0)
+            let a1 = raster_min_i(s1 + 1, x1)
+            for px = a0; px < a1; px = px + 1 {
+              cov[px] = 256
+            }
+            // 两端边界像素（各至多一个采样不满的像素）
+            add_pixel_samples(cov, x0, x1, s0 - 1, xa, xb)
+            add_pixel_samples(cov, x0, x1, s1 + 1, xa, xb)
+            if s0 - 1 >= x0 && s0 - 1 < a0 {
+              t0 = s0 - 1
+            }
+            if s1 + 1 < x1 && s1 + 1 > a1 - 1 {
+              t1 = s1 + 1
+            }
+            if t0 < 0 {
+              t0 = a0
+            }
+            if t1 < 0 {
+              t1 = a1
+            }
+            if a1 > t1 {
+              t1 = a1
+            }
+          }
+          if t1 > t0 {
+            if t0 < ink_l {
+              ink_l = t0
+            }
+            if t1 > ink_r {
+              ink_r = t1
+            }
+          }
         }
-        wind = wind + cross_w[i]
-        xa = cross_x[i]
+        wind = wind + sw[ci]
+        xa = xb
       }
     }
-    composite_span(bm.data, width, y, x0, x1, cov, op, src)
+    if ink_r > ink_l {
+      composite_span(bm.data, width, y, ink_l, ink_r, cov, op, src)
+    }
   }
 }
 
 ///|
-/// 区间 [xa, xb) 内的 x 样本（每像素 4 个）计入该样本行覆盖。
-fn add_span_samples(
+/// 单像素的 4 个 x 样本落入 [xa, xb) 的个数 ×16 计入覆盖（封顶 256）。
+/// 越界像素与零样本不计。
+fn add_pixel_samples(
   cov : FixedArray[Int],
   cx0 : Int,
   cx1 : Int,
+  px : Int,
   xa : Double,
   xb : Double,
 ) -> Unit {
-  let px0 = raster_max_i(xa.floor().to_int(), cx0)
-  let px1 = raster_min_i(xb.ceil().to_int(), cx1)
-  if px1 <= px0 {
+  if px < cx0 || px >= cx1 {
     return
   }
-  for px = px0; px < px1; px = px + 1 {
-    let mut cnt = 0
-    for j = 0; j < 4; j = j + 1 {
-      let xs = px.to_double() + (j.to_double() + 0.5) / 4.0
-      if xs >= xa && xs < xb {
-        cnt = cnt + 1
-      }
-    }
-    if cnt > 0 {
-      cov[px] = cov[px] + cnt * 16
+  let mut cnt = 0
+  for j = 0; j < 4; j = j + 1 {
+    let xs = px.to_double() + (j.to_double() + 0.5) / 4.0
+    if xs >= xa && xs < xb {
+      cnt = cnt + 1
     }
   }
+  if cnt <= 0 {
+    return
+  }
+  let nv = cov[px] + cnt * 16
+  cov[px] = if nv > 256 { 256 } else { nv }
 }
 
 ///|

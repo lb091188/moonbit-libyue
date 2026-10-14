@@ -437,6 +437,56 @@ fn composite_span(
 ) -> Unit {
   let mode_id = blend_mode_id(op)
   let yf = y.to_double() + 0.5
+  // 纯色不透明 + Normal：满覆盖段（cov==256 的连续 run）直写，免逐像素取源/
+  // 预乘/混合（图表与描边的墨迹内部都是这种段）
+  if mode_id == 0 {
+    match src {
+      SrcSolid(c) =>
+        if c.a >= 255 {
+          let b = c.b.to_byte()
+          let g = c.g.to_byte()
+          let r = c.r.to_byte()
+          let a = c.a.to_byte()
+          let mut i = x0
+          while i < x1 {
+            if cov[i] == 256 {
+              let mut j = i + 1
+              while j < x1 && cov[j] == 256 {
+                j += 1
+              }
+              let mut k = (y * width + i) * 4
+              let end = (y * width + j) * 4
+              while k < end {
+                d[k] = b
+                d[k + 1] = g
+                d[k + 2] = r
+                d[k + 3] = a
+                k += 4
+              }
+              i = j
+            } else if cov[i] <= 0 {
+              i += 1
+            } else {
+              // 部分覆盖：与通用分支同式（SrcSolid 不透明，premul_bytes 展开）
+              let c2 = cov[i]
+              let sa = (c2 * 255 + 128) / 256
+              let sr = (c.r * c2 + 128) / 256
+              let sg = (c.g * c2 + 128) / 256
+              let sb = (c.b * c2 + 128) / 256
+              let inv = 255 - sa
+              let pi = (y * width + i) * 4
+              d[pi] = (sb + (d[pi].to_int() * inv + 127) / 255).to_byte()
+              d[pi + 1] = (sg + (d[pi + 1].to_int() * inv + 127) / 255).to_byte()
+              d[pi + 2] = (sr + (d[pi + 2].to_int() * inv + 127) / 255).to_byte()
+              d[pi + 3] = (sa + (d[pi + 3].to_int() * inv + 127) / 255).to_byte()
+              i += 1
+            }
+          }
+          return
+        }
+      _ => ()
+    }
+  }
   for x = x0; x < x1; x = x + 1 {
     let c = cov[x]
     if c <= 0 {
