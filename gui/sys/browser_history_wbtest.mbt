@@ -261,3 +261,25 @@ test "bh_browsers / bh_history：本机浏览器历史端到端（存在才跑�
     Err(e) => fail("探测失败: \{e.to_string()}")
   }
 }
+
+///|
+test "bh Windows 读数环：枚举本机浏览器 profile（有则验路径，无则跳过）" {
+  if sys_platform() != "windows" {
+    println("bh: skip (windows-only 读数环)")
+    return
+  }
+  assert_true(bh_supported())
+  match bh_browsers() {
+    Ok(profiles) => {
+      for bp in profiles {
+        assert_true(bp.history_path != "")
+      }
+      println("bh: \{profiles.length()} profiles")
+    }
+    Err(BhNoBrowser) => println("bh: 本机无 Chrome/Edge History 库（合法）")
+    Err(e) => {
+      println("bh_browsers failed: \{e}")
+      assert_true(false)
+    }
+  }
+}

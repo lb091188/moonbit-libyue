@@ -283,3 +283,15 @@ test "vsc_local_history / vsc_recent：真实环境端到端（无 VS Code 数�
     Err(_) => assert_true(false)
   }
 }
+
+///|
+test "vscode Windows 读数环：本机 User data 探测（装了才断言）" {
+  if sys_platform() != "windows" {
+    println("vscode: skip (windows-only 读数环)")
+    return
+  }
+  match vsc_recent() {
+    Ok(paths) => println("vscode: \{paths.length()} recent")
+    Err(e) => println("vscode: \{e}（未装 VS Code 属合法）")
+  }
+}
