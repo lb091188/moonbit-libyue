@@ -1803,7 +1803,7 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - `for i in 0..n`(半开)与 `0..=n` 在 for 之外都不可用,范围循环要求 `for i in (0..<n)` 形态或直接改 `while`;本包统一退回 `while`。
 
 架构口径:
-- **core 不能依赖 style**(style 依赖 core 的 Widget/yoga 落点,反向成环)。Widget 的 resolved Style 槽落为 `@style` 包内**进程级侧表** `Map[控件 id, Style]`(与 overlay_native 的进程级句柄表同款先例),`apply` 写入、绘制期 `resolved(w)` / `style_for(w)`(按 `hovered/pressed/focused` 选桶)读出;从未 apply 过的控件读回空样式。侧表随控件回收的清理随 P2 接线时补(现状:建树期一次性写入,动态换树会留残账,量级为样式表大小)。
+- **core 不能依赖 style**(style 依赖 core 的 Widget/yoga 落点,反向成环)。Widget 的 resolved Style 槽落为 `@style` 包内**进程级侧表** `Map[控件 id, Style]`(与 overlay_native 的进程级句柄表同款先例),`apply` 写入、绘制期 `resolved(w)` / `style_for(w)`(按 `hovered/pressed/focused` 选桶)读出;从未 apply 过的控件读回空样式。**残账清理已落地(P2-e 收尾)**:core 加进程级「控件丢弃钩子」`set_widget_discard_hook`,`clear_children` 与 `remove_child` 把摘下的整棵子树逐只报出 id,`@style` 首次 `apply` 时自己装钩子把条目清掉——动态换树(`bind_node` 重挂、`for_list` 删行、虚拟列表重挂窗口、浮层收起)不再逐代累积。**口径:摘下来就是丢弃,挪位必须走 `move_child`**(core 不认识挪与丢的区别,钩子只看这两条 API)。判据是 `@style.resolved_count()`(诊断用),回归用例钉住「remove 一棵带子树的控件 ⇒ 条目数回落」。
 - **cursor 是绘制期属性,状态桶可携带**;控件的**静态** `cursor` 字段由 `apply` 直接落,状态桶里的 cursor 由 P2 的悬停路径下发读 `style_for`。
 - yoga-mbt 的 `z_index` 纯绘制期:setter 不 `mark_changed`(几何无关)、引擎**不物理重排 children**(增量布局按下标缓存),给 `Node::paint_order` 下标投影;gui 侧 `Widget.z_index_paint` 由 `apply` 写入,`widget_paint_order` 插入排序稳定重排 kids(全 0 时恒等序,现有示例逐帧不变)。
 

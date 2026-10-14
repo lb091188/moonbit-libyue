@@ -6,13 +6,34 @@
 // z_index 同步落 `Widget.z_index_paint`，core 的绘制遍历按它稳定重排 kids。
 
 ///|
+/// 外观字段的落点：进程级侧表 `Map[控件 id, Style]`（core 不能反向依赖本包，
+/// 槽放不进 `Widget`）。**只增不减会漏**——动态换树每换一代多留一批残账，所以
+/// 首次 `apply` 时把 core 的控件丢弃钩子装上，摘下的子树连带清掉它的条目。
 let resolved_table : Map[Int, Style] = Map([])
+let drop_hook_installed : Ref[Bool] = Ref(false)
+
+///|
+fn install_drop_hook() -> Unit {
+  if !drop_hook_installed.val {
+    drop_hook_installed.val = true
+    @core.set_widget_discard_hook(fn(id : Int) -> Unit {
+      let _ = resolved_table.remove(id)
+    })
+  }
+}
+
+///|
+/// 侧表当前条数（诊断用：残账清理的判据）。
+pub fn resolved_count() -> Int {
+  resolved_table.length()
+}
 
 ///|
 /// 把样式落到控件：布局字段进 Yoga 节点，外观字段进侧表；`visibility` 落宿主
 /// `set_visible`，`cursor` 落 `Widget.cursor`，`z_index` 落绘制层序键。
 /// 多次 apply 逐属性叠加（与 merge 同一规则：后写的属性赢）。
 pub fn apply(w : @core.Widget, s : Style) -> Unit {
+  install_drop_hook()
   let n = w.node
   match s.width {
     Some(v) => n.set_width(@yoga.fixed(v))

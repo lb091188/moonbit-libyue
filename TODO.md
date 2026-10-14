@@ -69,6 +69,7 @@
   - [ ] P2-e 记档两条边界（本批只迁样式通道，不改画法）：`badge_dot` 名叫圆点实际画方角 `fill_rect`（要圆角得给 `border_radius` 并走圆角填充，属观感变更，单独一批定）；`chip` 的 `class` 只吃颜色与显式宽度——字号在挂载期参与测量宽，class 改字号不会跟着改宽，真要改字号请调用方给 `width=`/`class=[style(width=…)]`；
   - [ ] §2 映射表外的命名尾巴：`date_range_picker_t` / `time_range_picker_t` / `datetime_range_picker_t` 三个入口仍带 `_t`（映射表只收了 `date_picker`/`color_picker`/`select`，这三条没进表），与 `date_picker` 不同形；改名要连 `datepicker_wbtest` 与 examples/native-app 的调用点一起切，单独一批做。
   - [x] 布局散参数折进匿名块（`view` / `scroll_view` / `virt_list` / `sticky_list` / `table_v`）：`class` 的 `width`/`padding` 等盖得过散参数，节点上不留第二条写入路径；class 落点定档两层——主根控件吃完整 class，内部件只吃 `paint_subset` 绘制投影（口径写进 design.md §1.5）。
+  - [x] 样式侧表残账清理（P1 记档「随 P2 接线时补」的欠账）：core 加进程级控件丢弃钩子，`clear_children`/`remove_child` 报整棵子树，`@style` 首次 apply 自装钩子清条目；口径「摘下来就是丢弃，挪位走 move_child」写进 adaptation。
   - [ ] 观感逐页比对不回退（真机由用户复验，`examples/hello`、`hello-themed`、`showcase`、`native-app`、`sysmonitor`）。
 - [x] **P3 响应式补强**（2026-10-14 落地）：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘（`tick`）/ `for_list`+`when` / `mount_window_render` 的 `render` 槽 / `Store` 内建去重（`T : Eq` 走 `set_eq`，已定案）全部落地。
 - [x] **P4 绘制能力**：`Painter` 全局 alpha（opacity 全路径）+ `box_shadow` 硬阴影档（真机观感复验归 `_人工测试清单.md`；模糊档待 blur 能力再评估）。

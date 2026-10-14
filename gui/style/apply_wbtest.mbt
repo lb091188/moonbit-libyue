@@ -129,3 +129,28 @@ test "apply 多次调用逐属性叠加，样式常量本体不被改动" {
   // 常量块本体不动
   assert_eq(base.padding_left, Some(14.0))
 }
+
+///|
+/// 侧表是进程级的，只增不减就是泄漏：动态换树（`bind_node` 重挂、`for_list` 删行、
+/// 虚拟列表重挂窗口、浮层收起）每换一代多留一批残账。core 的控件丢弃钩子负责清账，
+/// 本包首次 `apply` 时自己装上。
+test "样式侧表随控件丢弃清账（remove_child 连子树、clear_children 整批）" {
+  let base = resolved_count()
+  let parent = @core.Widget::new()
+  let a = @core.Widget::new()
+  let b = @core.Widget::new()
+  let leaf = @core.Widget::new()
+  parent.append_child(a)
+  parent.append_child(b)
+  a.append_child(leaf)
+  apply(a, style(background_color="#ff0000"))
+  apply(b, style(background_color="#00ff00"))
+  apply(leaf, style(color="#0000ff"))
+  assert_eq(resolved_count() - base, 3)
+  // 摘下来就是丢弃：a 连它的子树一起清
+  let _ = parent.remove_child(a)
+  assert_eq(resolved_count() - base, 1)
+  assert_true(resolved(a).background_color is None)
+  parent.clear_children()
+  assert_eq(resolved_count(), base)
+}

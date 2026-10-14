@@ -215,9 +215,39 @@ pub fn Widget::append_child(self : Widget, child : Widget) -> Unit {
 }
 
 ///|
+/// 控件丢弃钩子（进程级，默认空操作）：`clear_children` / `remove_child` 把被丢下的
+/// 整棵子树的控件 id 逐只报出去。用途只有一个——**按控件 id 持有的进程级附属表**
+/// （样式的 resolved 侧表）跟着清账；动态换树（`bind_node` 重挂、`for_list` 删行、
+/// 虚拟列表重挂窗口、浮层收起）每换一代就多留一份残账，不清就是进程级泄漏。
+/// 附属表的持有方自己装钩子（style 依赖 core，方向合规），core 不认识装钩子的是谁。
+/// **挪位不要走这两条**：`move_child` 才是挪，摘下来就是丢弃。
+let widget_discard_hook : Ref[(Int) -> Unit] = Ref(fn(_id : Int) -> Unit { () })
+
+///|
+pub fn set_widget_discard_hook(f : (Int) -> Unit) -> Unit {
+  widget_discard_hook.val = f
+}
+
+///|
+/// 递归报出一棵子树的控件 id（含根本身）。
+fn report_discard(w : Widget) -> Unit {
+  let h = widget_discard_hook.val
+  h(w.id)
+  let kids = w.kids
+  for i = 0; i < kids.length(); i = i + 1 {
+    report_discard(kids[i])
+  }
+}
+
+///|
 /// 移除全部子控件并重建布局树的子节点表（本层不做增量 remove，
 /// 控件重建走「清空 + 按新顺序追加」，与声明式层的整树重挂载一致）。
+/// 被清掉的每一棵子树都过一遍丢弃钩子。
 pub fn Widget::clear_children(self : Widget) -> Unit {
+  let kids = self.kids
+  for i = 0; i < kids.length(); i = i + 1 {
+    report_discard(kids[i])
+  }
   self.kids.clear()
   self.node.clear_children()
 }
@@ -249,6 +279,7 @@ pub fn Widget::remove_child(self : Widget, child : Widget) -> Bool {
   }
   let _ = self.kids.remove(found)
   let _ = self.node.remove_child_at(found)
+  report_discard(child)
   true
 }
 
