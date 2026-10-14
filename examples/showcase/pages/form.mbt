@@ -174,7 +174,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         ),
         @ui.calendar(),
         @ui.col([
-          @ui.datetime_range_picker_t(dtr),
+          @ui.datetime_range_picker(dtr),
           @ui.bind_label(dtr, fn(r) {
             match (r.start, r.end) {
               (Some((sd, st)), Some((ed, et))) =>
@@ -190,7 +190,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         "@ui.bind(dp.signal(), fn(d) { match d { Some(v) => v.format()  None -> \"未选\" } })",
         "@ui.calendar()",
         "let dtr : @core.Store[@ui.DateTimeRange] = @core.Store::new({ start: None, end: None })",
-        "@ui.datetime_range_picker_t(dtr)",
+        "@ui.datetime_range_picker(dtr)",
       ],
     ),
     @shared.section(

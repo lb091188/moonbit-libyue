@@ -2764,13 +2764,13 @@ fn main {
               width=180.0,
               handle=fn(w : @core.Widget) -> Unit { dpk_w.val = Some(w) },
             ),
-            @ui.date_range_picker_t(
+            @ui.date_range_picker(
               drg,
               today=@ui.today_date(),
               width=220.0,
               handle=fn(w : @core.Widget) -> Unit { drg_w.val = Some(w) },
             ),
-            @ui.time_range_picker_t(
+            @ui.time_range_picker(
               trg,
               width=100.0,
               handle=fn(w : @core.Widget) -> Unit { trg_w.val = Some(w) },

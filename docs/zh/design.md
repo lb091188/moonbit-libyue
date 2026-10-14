@@ -295,6 +295,9 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 | `rate` | `rate_t` | |
 | `color_picker` | `color_picker_t` | |
 | `date_picker` | `date_picker_t` | |
+| `date_range_picker` | `date_range_picker_t` | 三只区间选择器不在旧映射表里，`_t` 尾巴随改名批去掉，与 `date_picker` 同形 |
+| `time_range_picker` | `time_range_picker_t` | 同上 |
+| `datetime_range_picker` | `datetime_range_picker_t` | 同上 |
 | `calendar` | `calendar_t` | |
 | `carousel` | `carousel_t` | |
 | `message_box` | `message_box_t` | |

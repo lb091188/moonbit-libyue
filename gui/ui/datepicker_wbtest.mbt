@@ -70,7 +70,7 @@ test "日期区间选择器：先点起点再点终点，写回整段并收起" 
   let v : @core.Store[DateRange] = @core.Store::new({ start: None, end: None })
   let changes : Array[String] = []
   let (root, field) = mounted_with_overlay(
-    date_range_picker_t(
+    date_range_picker(
       v,
       on_change=fn(r : DateRange) -> Unit {
         let s = match r.start {
@@ -110,7 +110,7 @@ test "时间区间：步进器改值、确定写回、取消不改" {
   let v : @core.Store[TimeRange] = @core.Store::new({ start: Some(TimeHM::{ h: 9, m: 0 }), end: None })
   let changes : Array[String] = []
   let (root, row) = mounted_with_overlay(
-    time_range_picker_t(
+    time_range_picker(
       v,
       on_change=fn(r : TimeRange) -> Unit {
         let f = fn(t : TimeHM?) -> String {
@@ -162,7 +162,7 @@ test "日期时间区间：日期走日历、时间走步进，两侧各写各�
   let v : @core.Store[DateTimeRange] = @core.Store::new({ start: None, end: None })
   let changes : Array[Int] = []
   let (root, row) = mounted_with_overlay(
-    datetime_range_picker_t(
+    datetime_range_picker(
       v,
       on_change=fn(_r : DateTimeRange) -> Unit { changes.push(1) },
       today=d(2026, 10, 11),

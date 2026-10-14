@@ -501,7 +501,7 @@ pub fn date_picker(
 ///|
 /// 日期区间选择器（EP DatePicker 区间形态）：字段 + 日历弹层，两段式点击
 /// （先起点、再终点；已有完整区间时再从新起点开始），端点实心、区间内浅底。
-pub fn date_range_picker_t(
+pub fn date_range_picker(
   value : @core.Store[DateRange],
   on_change? : (DateRange) -> Unit = fn(_r : DateRange) -> Unit { () },
   placeholder? : String = "请选择日期区间",
@@ -652,7 +652,7 @@ fn time_field(
 
 ///|
 /// 时间区间选择器（EP TimePicker 区间形态）：起止两个时间字段（步进式弹层）。
-pub fn time_range_picker_t(
+pub fn time_range_picker(
   value : @core.Store[TimeRange],
   on_change? : (TimeRange) -> Unit = fn(_r : TimeRange) -> Unit { () },
   width? : Double = 110.0,
@@ -691,7 +691,7 @@ pub fn time_range_picker_t(
 ///|
 /// 日期时间区间选择器：起止各一对「日期字段 + 时间字段」，日期走日历弹层、
 /// 时间走步进弹层；任一侧任一维改动都会把整份区间写回 Store 并回调。
-pub fn datetime_range_picker_t(
+pub fn datetime_range_picker(
   value : @core.Store[DateTimeRange],
   on_change? : (DateTimeRange) -> Unit = fn(_r : DateTimeRange) -> Unit { () },
   today? : DateYMD = today_date(),
