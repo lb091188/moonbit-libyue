@@ -32,13 +32,13 @@ fn md_flat_par(src : String) -> Array[MDSpan] {
 
 ///|
 test {
-  // 码点→UTF-16 换算:BMP 内 1:1,emoji(非 BMP)1 码点 = 2 code unit
-  assert_eq(md_utf16_len(""), 0)
-  assert_eq(md_utf16_len("abc"), 3)
-  assert_eq(md_utf16_len("甲乙丙"), 3)
-  assert_eq(md_utf16_len("👍"), 2)
-  assert_eq(md_utf16_len("a👍b"), 4)
-  assert_eq(md_utf16_len("👍👍"), 4)
+  // UTF-8 字节数(AttributedText 区间口径):ASCII 1、CJK 3、emoji 4
+  assert_eq(md_byte_len(""), 0)
+  assert_eq(md_byte_len("abc"), 3)
+  assert_eq(md_byte_len("甲乙丙"), 9)
+  assert_eq(md_byte_len("👍"), 4)
+  assert_eq(md_byte_len("a👍b"), 6)
+  assert_eq(md_byte_len("👍👍"), 8)
 }
 
 ///|
@@ -231,9 +231,10 @@ test {
 
 ///|
 test {
-  // emoji 样式区间不错位(核心验收):"前👍中" 为 3 码点 / 4 个
-  // UTF-16 code unit,其后粗体区间按 UTF-16 计量应为 [4, 6);
-  // 旧实现按码点累计会错成 [3, 5),emoji 之后样式整体前移。
+  // 中英混排 + emoji 的样式区间按 **UTF-8 字节** 计量(AttributedText 契约):
+  // "前👍中" = 3+4+3 = 10 字节,其后粗体段 "后粗" 应落在 [10, 16)。
+  // 旧实现按 UTF-16 code unit 累计会给 [4, 6) —— 中英混排时整体前移,
+  // 样式落到前面的字符上(真机表现:粗体/代码/链接那几段出豆腐块并互相压字)。
   let spans = md_flat_par("前👍中**后粗**完毕")
   assert_eq(spans.length(), 3)
   assert_eq(spans[1].text, "后粗")
@@ -241,21 +242,52 @@ test {
   let marks = md_span_ranges(spans)
   let (s, e, sp) = marks[1]
   assert_eq(sp.text, "后粗")
-  assert_eq(s, 4)
-  assert_eq(e, 6)
-  // 区间表与总渲染文本的 UTF-16 长度自洽
+  assert_eq(s, 10)
+  assert_eq(e, 16)
+  // 区间表与总渲染文本的 UTF-8 字节数自洽
   let last = marks[marks.length() - 1]
   let all = StringBuilder()
   for x in spans {
     all.write_string(x.text)
   }
-  assert_eq(last.1, md_utf16_len(all.to_string()))
-  // 全 BMP 文本退化为码点计数,与旧行为一致
+  assert_eq(last.1, md_byte_len(all.to_string()))
+  // 全 BMP 中文:一段 3 字节,区间端点按字节而非字计数
   let bmp = md_flat_par("甲乙**丙丁**")
   let bmarks = md_span_ranges(bmp)
   let (bs, be, _) = bmarks[1]
-  assert_eq(bs, 2)
-  assert_eq(be, 4)
+  assert_eq(bs, 6)
+  assert_eq(be, 12)
+}
+
+///|
+test {
+  // 区间表必须**首尾相接**且每个端点都恰好停在字符边界上:端点若按
+  // UTF-16/码点计量,中英混排时就会切进字符中间,样式落到别的字上。
+  let spans = md_flat_par("前👍中**后粗**完毕`代码`~~删~~[链接](https://x.y)")
+  let all = StringBuilder()
+  for x in spans {
+    all.write_string(x.text)
+  }
+  let joined = all.to_string()
+  // 逐字符走一遍,记下所有合法边界
+  let bounds : Array[Bool] = Array::make(md_byte_len(joined) + 1, false)
+  let mut walk = 0
+  bounds[0] = true
+  for ch in joined {
+    walk += md_byte_len(ch.to_string())
+    bounds[walk] = true
+  }
+  assert_eq(walk, bounds.length() - 1)
+  let mut pos = 0
+  for (st, en, sp) in md_span_ranges(spans) {
+    assert_eq(st, pos)
+    assert_true(en > st)
+    assert_true(bounds[st], msg="区间起点切进字符内部: \{st}")
+    assert_true(bounds[en], msg="区间终点切进字符内部: \{en}")
+    assert_eq(en - st, md_byte_len(sp.text))
+    pos = en
+  }
+  assert_eq(pos, md_byte_len(joined))
 }
 
 ///|
@@ -550,4 +582,99 @@ test "有序列表：序号与正文落在同一条基线上" {
   assert_true(ct <= 9999, msg="正文没有落墨")
   let db = mb - cb
   assert_true(db <= 2 && db >= -2, msg="序号与正文基线差 \{db}px")
+}
+
+///|
+/// 折行与落色判据共用:把节点挂进定宽根、回一次布局。
+fn mount_doc(node : @core.Node, w : Double, h : Double) -> @core.Widget {
+  let root = @core.Widget::new()
+  root.set_size(w, h)
+  root.set_column()
+  root.node.set_align_items(@yoga.AlignItems::FlexStart)
+  let _ = node.mount_into(root)
+  root.relayout(w, h)
+  root
+}
+
+///|
+test {
+  // 长段落必须按文档宽折行:折完没有任何子孙比文档宽,段落高度多于一行。
+  // 旧实现 wrap=false 且节点宽=整段自然宽(实测 656px 撑进 480 文档),
+  // 真机表现:右边缘整片裁字、代码区「复制」按钮被推出可视区。
+  let src =
+    "支持 **粗体**、*斜体*、***粗斜体***、~~删除线~~、`行内代码` 与 [链接](https://github.com/lb091188/moonbit-native-gui)，自动链接 <https://libyue.com>。"
+  let doc_w = 300.0
+  let root = mount_doc(markdown_view(src, width=doc_w), 360.0, 400.0)
+  let widest = Ref(0.0)
+  let stack : Array[@core.Widget] = root.children()
+  while stack.length() > 0 {
+    let w = stack.pop().unwrap()
+    if w.rect.w > widest.val {
+      widest.val = w.rect.w
+    }
+    for c in w.children() {
+      stack.push(c)
+    }
+  }
+  assert_true(
+    widest.val <= doc_w + 0.5,
+    msg="有内容宽 \{widest.val} 超出文档宽 \{doc_w}（未折行）",
+  )
+  let para = root.children()[0].children()[0]
+  // 一行约 20px：折过之后必须明显高于一行
+  assert_true(para.rect.h > 30.0, msg="段落没有折成多行：高 \{para.rect.h}")
+}
+
+///|
+test {
+  // 单个超长单元(长 URL)也必须硬切,不许撑破容器
+  let src = "见 https://example.com/a/very/long/path/that/never/ends/at/all/ok"
+  let doc_w = 200.0
+  let root = mount_doc(markdown_view(src, width=doc_w), 260.0, 300.0)
+  let widest = Ref(0.0)
+  let stack : Array[@core.Widget] = root.children()
+  while stack.length() > 0 {
+    let w = stack.pop().unwrap()
+    if w.rect.w > widest.val {
+      widest.val = w.rect.w
+    }
+    for c in w.children() {
+      stack.push(c)
+    }
+  }
+  assert_true(
+    widest.val <= doc_w + 0.5,
+    msg="长 URL 没被硬切：最宽子孙 \{widest.val} > 文档宽 \{doc_w}",
+  )
+}
+
+///|
+test {
+  // 链接段的主题色要落在**自己那几个字**上:开头八个中文之后才是链接。
+  // 区间若按 UTF-16/码点计量会前移到开头的中文上(真机即豆腐块 + 互相压字)。
+  let spans = md_flat_par("甲甲甲甲甲甲甲甲[链接](https://x.y)")
+  let root = mount_doc(md_rich_label(spans, 13.0, md_test_ctx()), 400.0, 60.0)
+  let label = root.children()[0]
+  let bm = @render.Bitmap::new(400, 60)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  let mid = (label.rect.w / 2.0).round().to_int()
+  let mut left = 0
+  let mut right = 0
+  for y = 0; y < 60; y = y + 1 {
+    for x = 0; x < 400; x = x + 1 {
+      // 判据只比「是不是主题蓝」:主色 b 明显高于 r,正文灰 r≈g≈b,
+      // 抗锯齿会把两者一起淡化但不会把灰变蓝。
+      let c = bm.pixel(x, y)
+      if c.a > 0 && c.b > c.r + 20 {
+        if x < mid {
+          left += 1
+        } else {
+          right += 1
+        }
+      }
+    }
+  }
+  assert_true(right > left, msg="链接色没落在链接段上")
 }

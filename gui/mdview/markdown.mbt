@@ -10,8 +10,8 @@
 // 线,接入后由调用方转接)、自动链接、引用式链接、图片(行内降级
 // alt)、软换行→空格、硬换行→换行。行内 HTML / HTML 块默认不渲染。
 // 富文本行自绘:逐段测宽得区间像素坐标,删除线横线、链接命中与悬浮
-// 手型均按此换算;样式区间端点统一 UTF-16 code unit(md_utf16_len
-// 换算,emoji 等非 BMP 字符后样式不错位)。
+// 手型均按此换算;样式区间端点统一 UTF-8 字节下标(md_byte_len 换算,
+// 与 AttributedText 契约同源),中英混排与 emoji 之后样式都不错位。
 
 ///|
 /// 行内片段:一段带样式的文本。url 非空表示可点击链接(经 on_link
@@ -98,16 +98,21 @@ fn md_def_url(label : String, ctx : MDCtx) -> String {
 }
 
 ///|
-/// 码点→UTF-16 code unit 换算:一段文本的 UTF-16 长度。BMP 内码点计 1,
-/// 非 BMP(如 emoji)计 2。AttributedText 区间端点一律经此函数计量,
-/// 禁止按码点数累计(两者在含非 BMP 字符时不等,错位即由此而来)。
-fn md_utf16_len(text : String) -> Int {
+/// 一段文本的 UTF-8 字节数。`AttributedText` 的区间端点一律按**字节**计量
+/// （C 侧 Pango 直接用字节索引，DWrite 侧再换算），禁止按码点或 UTF-16 code
+/// unit 累计——中英混排时两者差 3 倍，样式会整体落到前面的字符上。
+fn md_byte_len(text : String) -> Int {
   let mut n = 0
   for ch in text {
-    n += if ch.to_int() >= 0x10000 {
-      2
-    } else {
+    let c = ch.to_int()
+    n += if c < 0x80 {
       1
+    } else if c < 0x800 {
+      2
+    } else if c < 0x10000 {
+      3
+    } else {
+      4
     }
   }
   n
@@ -189,14 +194,14 @@ fn md_flatten_inline(inlines : Array[@mdast.Inline], ctx : MDCtx) -> Array[MDSpa
 }
 
 ///|
-/// 展平片段 → 富文本区间表:[start, end) 为 UTF-16 code unit 端点
+/// 展平片段 → 富文本区间表:[start, end) 为 **UTF-8 字节**端点
 /// (AttributedText 区间语义),渲染与测试共用同一计量。
 fn md_span_ranges(spans : Array[MDSpan]) -> Array[(Int, Int, MDSpan)] {
   let marks : Array[(Int, Int, MDSpan)] = []
   let pos = Ref(0)
   for span in spans {
     let start = pos.val
-    pos.val += md_utf16_len(span.text)
+    pos.val += md_byte_len(span.text)
     marks.push((start, pos.val, span))
   }
   marks
@@ -649,16 +654,102 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.No
 }
 
 ///|
-/// 富文本行(自绘):构造期逐段测宽得区间像素坐标,整段拼一个
-/// AttributedText 画底,删除线段补画横线;区间端点为 UTF-16 code unit
-/// (md_span_ranges 计量)。带地址的链接段可点击(命中按像素区间换算,
-/// 经 ctx.on_link 回调交调用方),悬浮手型光标;sup 段用小一号字体;
-/// 链接/代码段主题色,主题指纹变化时重建(避免每帧重建)。
+/// 是否「宽字符」(CJK 与全角标点):这类字符自成一个断行单元——中文没有空格,
+/// 断点只能落在字与字之间;拉丁词整词为一个单元,不在词中间断开。
+fn md_is_wide(ch : Char) -> Bool {
+  let c = ch.to_int()
+  if c < 0x1100 {
+    false
+  } else if c <= 0x115f {
+    true
+  } else if c >= 0x2e80 && c <= 0xa4cf {
+    true
+  } else if c >= 0xac00 && c <= 0xd7a3 {
+    true
+  } else if c >= 0xf900 && c <= 0xfaff {
+    true
+  } else if c >= 0xfe30 && c <= 0xfe6f {
+    true
+  } else if c >= 0xff00 && c <= 0xff60 {
+    true
+  } else {
+    c >= 0xffe0 && c <= 0xffe6
+  }
+}
+
+///|
+/// 片段文本 → 断行单元:`\n` 出一个硬换行标记(单元文本就是 "\n"),宽字符
+/// 逐字成单元,其余按「词 + 尾随空格」成单元(断行只发生在单元之前)。
+fn md_units(text : String) -> Array[String] {
+  let out : Array[String] = []
+  let cur = Ref(StringBuilder())
+  fn flush() -> Unit {
+    let s = cur.val.to_string()
+    if s.length() > 0 {
+      out.push(s)
+      cur.val = StringBuilder()
+    }
+  }
+
+  for ch in text {
+    if ch == '\n' {
+      flush()
+      out.push("\n")
+    } else if md_is_wide(ch) {
+      flush()
+      out.push(ch.to_string())
+    } else if ch == ' ' {
+      // 空格挂在词尾:断行发生在下一单元之前
+      cur.val.write_char(ch)
+      flush()
+    } else {
+      if cur.val.to_string().has_suffix(" ") {
+        flush()
+      }
+      cur.val.write_char(ch)
+    }
+  }
+  flush()
+  out
+}
+
+///|
+/// 两片段样式是否相同(同一行内相邻同样式单元合并用)。
+fn md_style_key(
+  x : MDSpan,
+) -> (Bool, Bool, Bool, Bool, Bool, Bool, String) {
+  (x.bold, x.italic, x.code, x.link, x.strike, x.sup, x.url)
+}
+
+///|
+fn md_same_style(a : MDSpan, b : MDSpan) -> Bool {
+  md_style_key(a) == md_style_key(b)
+}
+
+///|
+/// 一行富文本的几何:`at` 是该行的绘制对象,`xs`/`ws` 是行内各片段的像素起点
+/// 与宽度(删除线横线与链接命中按它换算)。
+priv struct MDLine {
+  spans : Array[MDSpan]
+  xs : Array[Double]
+  ws : Array[Double]
+  w : Double
+  mut at : @text.AttributedText
+}
+
+///|
+/// 富文本行(自绘):先按可用宽度贪心折行(中文逐字、拉丁逐词、`\n` 硬换行),
+/// 每行拼一个 AttributedText;删除线段按该行像素区间补画横线;带地址的链接段
+/// 可点击(按行号 + 行内像素区间命中,经 ctx.on_link 交调用方),悬浮手型光标;
+/// sup 段用小一号字体;链接/代码段主题色,主题指纹变化时只重建绘制对象。
+/// 区间端点由 [md_span_ranges] 按 UTF-8 字节计量。
 fn md_rich_label(
   spans : Array[MDSpan],
   size : Double,
   ctx : MDCtx,
+  max_w? : Double = 0.0,
 ) -> @core.Node {
+  let limit = if max_w > 0.0 { max_w } else { ctx.width }
   let regular = @text.Font::new("", size)
   let bold = @text.Font::new("", size, weight=@text.Bold)
   let italic = @text.Font::new("", size, style=@text.Italic)
@@ -681,83 +772,185 @@ fn md_rich_label(
     }
   }
 
-  // 逐段测宽(同字体独立测量,与整体拼接排版像素宽一致量级),
-  // xs/ws 为文本自身坐标系(0 起)的段起点与段宽
-  let xs : Array[Double] = []
-  let ws : Array[Double] = []
-  let mut x = 0.0
-  for span in spans {
-    let probe = @text.AttributedText::new(span.text, wrap=false)
-    probe.set_font(font_of(span))
-    let w = probe.get_bounds_for(10000.0, 100.0).width
-    xs.push(x)
-    ws.push(w)
-    x += w
-  }
-  let row_w = if x < 1.0 { 1.0 } else { x }
-
-  fn build() -> @text.AttributedText {
-    let parts : Array[String] = []
-    for span in spans {
-      parts.push(span.text)
+  fn font_tag(span : MDSpan) -> String {
+    if span.sup {
+      "s"
+    } else if span.code {
+      "m"
+    } else if span.bold && span.italic {
+      "bi"
+    } else if span.bold {
+      "b"
+    } else if span.italic {
+      "i"
+    } else {
+      "r"
     }
-    let at = @text.AttributedText::new(parts.join(""), valign=@text.Center, wrap=false)
+  }
+
+  // 单元测宽:一次折行要测几十上百个单元,同名单元走本地缓存
+  let wcache : Map[String, Double] = Map([])
+  fn unit_w(unit : String, span : MDSpan) -> Double {
+    let key = font_tag(span) + "@" + unit
+    match wcache.get(key) {
+      Some(v) => v
+      None => {
+        let v = match @text.measure_font(
+          unit,
+          font_of(span),
+          max_width=0,
+          ellipsize=false,
+          wrap=false,
+        ) {
+          Some(m) => m.width.to_double()
+          None => 0.0
+        }
+        wcache.set(key, v)
+        v
+      }
+    }
+  }
+
+  // 贪心折行:单元放不下就整单元换行(不做词内断开)
+  let lines : Array[Array[MDSpan]] = []
+  let cur : Array[MDSpan] = []
+  let cur_w = Ref(0.0)
+  fn end_line() -> Unit {
+    if cur.length() > 0 {
+      lines.push(cur.copy())
+      cur.clear()
+      cur_w.val = 0.0
+    }
+  }
+
+  fn put(unit : String, span : MDSpan) -> Unit {
+    let uw = unit_w(unit, span)
+    if cur_w.val + uw > limit && cur.length() > 0 {
+      end_line()
+    }
+    let n = cur.length()
+    if n > 0 && md_same_style(cur[n - 1], span) {
+      cur[n - 1].text = cur[n - 1].text + unit
+    } else {
+      cur.push({ ..span, text: unit })
+    }
+    cur_w.val += uw
+  }
+
+  for span in spans {
+    for unit in md_units(span.text) {
+      if unit == "\n" {
+        end_line()
+      } else if unit_w(unit, span) > limit {
+        // 单个单元就比整行宽(长 URL / 长单词):按字符硬切,不然必然撑破容器
+        for ch in unit {
+          put(ch.to_string(), span)
+        }
+      } else {
+        put(unit, span)
+      }
+    }
+  }
+  if cur.length() > 0 || lines.length() == 0 {
+    lines.push(cur.copy())
+  }
+
+  fn build_at(line : Array[MDSpan]) -> @text.AttributedText {
+    let parts : Array[String] = []
+    for sp in line {
+      parts.push(sp.text)
+    }
+    let at = @text.AttributedText::new(
+      parts.join(""),
+      valign=@text.Center,
+      wrap=false,
+    )
     at.set_font(regular)
     at.set_color(@theme.theme_text_regular())
-    for mark in md_span_ranges(spans) {
-      let (s, e, span) = mark
-      if span.sup {
+    for mark in md_span_ranges(line) {
+      let (s, e, sp) = mark
+      if sp.sup {
         at.set_font_for(sup_font, s, e)
-      } else if span.bold && span.italic {
+      } else if sp.bold && sp.italic {
         at.set_font_for(bold_italic, s, e)
-      } else if span.bold {
+      } else if sp.bold {
         at.set_font_for(bold, s, e)
-      } else if span.italic {
+      } else if sp.italic {
         at.set_font_for(italic, s, e)
-      } else if span.code {
+      } else if sp.code {
         at.set_font_for(mono, s, e)
       }
-      if span.link || span.code {
+      if sp.link || sp.code {
         at.set_color_for(@theme.theme_primary(), s, e)
       }
     }
     at
   }
 
+  fn geo(line : Array[MDSpan]) -> MDLine {
+    let xs : Array[Double] = []
+    let ws : Array[Double] = []
+    let mut x = 0.0
+    for sp in line {
+      let w = unit_w(sp.text, sp)
+      xs.push(x)
+      ws.push(w)
+      x += w
+    }
+    let lw = if x < 1.0 { 1.0 } else { x }
+    { spans: line, xs: xs, ws: ws, w: lw, at: build_at(line) }
+  }
+
+  let rows : Array[MDLine] = []
+  for ln in lines {
+    rows.push(geo(ln))
+  }
+  let mut row_w = 1.0
+  for g in rows {
+    row_w = row_w.max(g.w)
+  }
+  let used_fonts : Array[@text.Font] = [regular]
+  for sp in spans {
+    used_fonts.push(font_of(sp))
+  }
+  let line_h = match @text.line_height_multi(used_fonts) {
+    Some(h) => h.to_double().max(1.0)
+    None => size * 1.5
+  }
+  let box_h = line_h * rows.length().to_double()
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     @ui.watch_theme()
-    // 主题指纹缓存:指纹变了才重建 AttributedText(链接/代码色随主题)
-    let at = Ref(build())
-    let fp = Ref("")
-    let line_h = match at.val.line_height() {
-      Some(h) => h.to_double().max(1.0)
-      None => size * 1.5
-    }
+    let fps = Ref("")
     w.node.set_width(@yoga.fixed(row_w))
-    w.node.set_height(@yoga.fixed(line_h))
+    w.node.set_height(@yoga.fixed(box_h))
     w.on_draw = Some(fn(
       _self : @core.Widget,
       p : @render.Painter,
       _r : @core.Rect,
     ) -> Unit {
-      let cur = @theme.theme_fingerprint_of(@theme.theme_current())
-      if cur != fp.val {
-        fp.val = cur
-        at.val = build()
-      }
-      let _ = at.val.draw_at(p, 0.0, 0.0, row_w, line_h)
-      p.set_stroke_color(@theme.theme_text_regular())
-      for i, span in spans {
-        if span.strike {
-          let y = line_h * 0.5
-          p.begin_path()
-          p.move_to(xs[i], y)
-          p.line_to(xs[i] + ws[i], y)
-          p.stroke()
+      let cur_fp = @theme.theme_fingerprint_of(@theme.theme_current())
+      if cur_fp != fps.val {
+        fps.val = cur_fp
+        for g in rows {
+          g.at = build_at(g.spans)
         }
       }
+      p.set_stroke_color(@theme.theme_text_regular())
+      let mut y = 0.0
+      for g in rows {
+        let _ = g.at.draw_at(p, 0.0, y, g.w, line_h)
+        for i, sp in g.spans {
+          if sp.strike {
+            p.begin_path()
+            p.move_to(g.xs[i], y + line_h * 0.5)
+            p.line_to(g.xs[i] + g.ws[i], y + line_h * 0.5)
+            p.stroke()
+          }
+        }
+        y += line_h
+      }
     })
-    // 链接交互:命中像素区间 → on_link 回调;悬浮换手型
+    // 链接交互:命中 = 先按 y 定行,再按该行像素区间定段 → on_link;悬浮手型
     let mut has_link = false
     for s in spans {
       if s.url != "" {
@@ -765,14 +958,21 @@ fn md_rich_label(
       }
     }
     if has_link {
-      fn hit_url(mx : Double) -> String {
-        for i, s in spans {
-          if s.url != "" && mx >= xs[i] && mx < xs[i] + ws[i] {
-            return s.url
+      fn hit_url(mx : Double, my : Double) -> String {
+        let li = (my / line_h).floor().to_int()
+        match rows.get(li) {
+          Some(g) => {
+            for j, s in g.spans {
+              if s.url != "" && mx >= g.xs[j] && mx < g.xs[j] + g.ws[j] {
+                return s.url
+              }
+            }
+            ""
           }
+          None => ""
         }
-        ""
       }
+
       let hover = Ref(false)
       w.on_pointer = Some(fn(
         _self : @core.Widget,
@@ -780,7 +980,7 @@ fn md_rich_label(
       ) -> Bool {
         match ev.kind {
           @core.Down => {
-            let u = hit_url(ev.x)
+            let u = hit_url(ev.x, ev.y)
             if u != "" {
               (ctx.on_link)(u)
               true
@@ -789,10 +989,10 @@ fn md_rich_label(
             }
           }
           @core.Move => {
-            let hit = hit_url(ev.x) != ""
-            if hit != hover.val {
-              hover.val = hit
-              w.cursor = if hit { @core.CURSOR_HAND } else { 0 }
+            let h = hit_url(ev.x, ev.y) != ""
+            if h != hover.val {
+              hover.val = h
+              w.cursor = if h { @core.CURSOR_HAND } else { 0 }
             }
             true
           }
