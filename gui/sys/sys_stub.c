@@ -2590,7 +2590,7 @@ void *yue_sys_prt_list(int32_t *ok) {
   }
   for (DWORD i = 0; i < got; i++) {
     void *nb = win_wide_bytes(pi[i].pPrinterName);
-    if (nb == NULL) {
+    if (nb == NULL || *(const char*)nb == 0) {
       continue;
     }
     int code = 0;
@@ -2606,23 +2606,22 @@ void *yue_sys_prt_list(int32_t *ok) {
     if (pi[i].Attributes & PRINTER_ATTRIBUTE_WORK_OFFLINE) {
       code = 3;
     }
-    char row[16];
-    int n = snprintf(row, sizeof(row), "%d\t", code);
-    if (len + strlen((const char *)nb) + n + 2 > cap) {
-      cap = (len + strlen((const char *)nb) + n + 2) * 2;
+    size_t nl = strlen((const char *)nb);
+    if (len + nl + 18 > cap) {
+      cap = (len + nl + 18) * 2;
       char *no = (char *)realloc(out, cap);
       if (no == NULL) {
-        free(nb);
         break;
       }
       out = no;
     }
-    memcpy(out + len, nb, strlen((const char *)nb));
-    len += strlen((const char *)nb);
+    memcpy(out + len, nb, nl);
+    len += nl;
+    char row[16];
+    int n = snprintf(row, sizeof(row), "\t%d\n", code);
     memcpy(out + len, row, (size_t)n);
     len += (size_t)n;
     out[len] = 0;
-    free(nb);
   }
   free(buf);
   void *res = moonbit_make_bytes((int)len, 0);
