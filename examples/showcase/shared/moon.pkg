@@ -4,6 +4,8 @@ import {
   "NoahLiu/native-gui/core",
   "NoahLiu/native-gui/ui",
   "NoahLiu/native-gui/sys",
+  "NoahLiu/native-gui/style" @style,
+  "NoahLiu/yoga-mbt/src" @yoga,
 }
 
 supported_targets = "native"

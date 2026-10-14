@@ -49,7 +49,17 @@ pub fn page(secs : Array[Section]) -> @core.Node {
   for s in secs {
     names.push(s.name)
   }
-  let strip = @ui.row([@ui.segmented(names, selected)], padding=10.0)
+  // 段条超宽真换行（flex_wrap 走样式槽；行距给 4，不然两行贴在一起）
+  let strip = @ui.row(
+    [
+      @ui.segmented(
+        names,
+        selected,
+        class=[@style.style(flex_wrap=@yoga.Wrap, row_gap=4.0)],
+      ),
+    ],
+    padding=10.0,
+  )
   let bodies : Array[@core.Node] = []
   for s in secs {
     bodies.push(section_body(s, selected))

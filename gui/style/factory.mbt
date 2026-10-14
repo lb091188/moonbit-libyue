@@ -52,6 +52,7 @@ pub fn style(
   // —— flex 布局
   display? : Display,
   flex_direction? : FlexDirection,
+  flex_wrap? : FlexWrap,
   justify_content? : JustifyContent,
   align_items? : AlignItems,
   align_self? : AlignItems,
@@ -163,6 +164,7 @@ pub fn style(
   s.border_radius = border_radius
   s.display = display
   s.flex_direction = flex_direction
+  s.flex_wrap = flex_wrap
   s.justify_content = justify_content
   s.align_items = align_items
   s.align_self = align_self

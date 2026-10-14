@@ -1805,6 +1805,13 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **通用口径**:`Option` 承载「两种不同的无」迟早出这类事故——同一个 `None` 表示「整窗」又表示「空集」时,任何「往累积里并一笔」的操作都会把强语义写成弱语义。要么加一位标志(本批做法),要么换成显式枚举(`Whole | Region(Rect)`)。
 - **验证**:core 新增 1 条纯函数回归(未请求整窗时照常累积成并集;已请求整窗时局部置脏不得写成小矩形;裁剪框整窗优先),`moon test core` 133/133、分包全跑 882/882(13 包逐个绿)、`cd gui && moon check --deny-warn` 零警告。真机复验(用户执行):showcase 切段/切页后**鼠标不动**应立即看到新页,复跑 `moon run examples/showcase` 退出贴 `SHOWCASE-PROF` 行(`frames` 不应因这一改动上涨——只在同批已有整窗请求时维持整窗语义)。
 
+## 段条「超宽自动换行」是假口径:`Style` 补 `flex_wrap` 才真换行(2026-10-14)
+
+- **现象**:showcase 页面顶部的段条(segmented)段数一多就横向溢出被裁,而 `shared/section.mbt` 的注释写着「超宽自动换行」。
+- **根因**:本栈 `ui` 从不写 `flex_wrap`,样式层也**没有这个属性**(CSS 有 `flex-wrap`,我们的 `Style` 少一条),所以任何容器都是 `NoWrap` —— 注释描述的是一个不存在的能力。
+- **修复(按「属性名 = CSS 属性名」补进样式层,而不是给组件开参数)**:`Style` 开 `flex_wrap : FlexWrap?`(`types.mbt` 用 `pub using @yoga {type FlexWrap}` 引类型短名),工厂收 `flex_wrap=`、`merge`/`empty_style`/setter 同步、`apply` 落 `Node::set_flex_wrap`;showcase 段条改成 `@ui.segmented(names, selected, class=[@style.style(flex_wrap=@yoga.Wrap, row_gap=4.0)])`(换行后行距必须给,不然两行贴在一起)。
+- **验证**:`moon test style` 26/26,新增 1 条布局钉桩——100 宽行内容器放两个 60 宽的子项:`NoWrap` 时第二项 `top=0`(挤在同一行、溢出容器),写 `flex_wrap=Wrap` 后 `top>=20`(真换到第二行);`cd gui && moon check --deny-warn` 与 examples 模块零警告。真机观感:切到段数多的页,段条应折成两行且每段都点得到。
+
 ## 滚动容器视口被内容撑高:内容超出窗口却滚不动(2026-10-14,真机反馈)
 
 - **现象**:showcase 段正文超出窗口高度,滚轮与滚动条都没有可滚的量(内容被底部直接截断)。

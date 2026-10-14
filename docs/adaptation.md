@@ -1508,6 +1508,13 @@ Real-hardware report: "page switching in showcase lags, section widgets render l
 - **General policy**: an `Option` standing for "two different kinds of nothing" invites exactly this bug - when one `None` means "everything" and another means "empty", any "merge one more entry in" operation overwrites the strong meaning with the weak one. Either add a flag (this batch) or use an explicit sum (`Whole | Region(Rect)`).
 - **Verification**: 1 new core regression on the pure helpers (without a whole-window request the rectangles still union; with one, a local mark must not become a small rectangle; the clip prefers whole-window), `moon test core` 133/133, all 13 library packages run individually 882/882, `cd gui && moon check --deny-warn` clean. Device re-check (user): switch sections/pages in showcase **without moving the mouse** and the new page appears; re-run prints a `SHOWCASE-PROF` line whose `frames` does not grow from this change (it only preserves whole-window semantics within a batch that already asked for it).
 
+## The section strip never wrapped: `Style` gains `flex_wrap` (2026-10-14)
+
+- **Symptom**: in showcase the top section strip (segmented) overflows horizontally and gets clipped once a page has many sections, even though `shared/section.mbt` documents "wraps when too wide".
+- **Root cause**: `ui` never writes `flex_wrap`, and the style layer had **no such property** (CSS has `flex-wrap`; our `Style` was missing it), so every container is `NoWrap` - the comment described a capability that does not exist.
+- **Fix (added to the style layer per "property name = CSS property name", not as another component parameter)**: `Style` gets `flex_wrap : FlexWrap?` (the short type name comes from `pub using @yoga {type FlexWrap}`), the factory takes `flex_wrap=`, `merge` / `empty_style` / the setter follow, and `apply` routes it to `Node::set_flex_wrap`. The showcase strip now passes `class=[@style.style(flex_wrap=@yoga.Wrap, row_gap=4.0)]` - the row gap is required after wrapping, otherwise the two rows touch.
+- **Verification**: `moon test style` 26/26 with 1 new layout pin - a 100-wide row container holding two 60-wide children: with `NoWrap` the second child stays at `top=0` (same line, overflowing), and with `flex_wrap=Wrap` it moves to `top>=20`. `cd gui && moon check --deny-warn` and the examples module are clean. Device check: on a page with many sections the strip should fold onto two rows with every segment reachable.
+
 ## Scroll viewport was stretched by its own content, so nothing could scroll (2026-10-14, real-hardware report)
 
 - **Symptom**: in showcase a section body taller than the window was simply cut off at the bottom - neither the wheel nor the scrollbar had anything to move.

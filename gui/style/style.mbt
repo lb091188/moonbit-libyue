@@ -39,6 +39,7 @@ pub(all) struct Style {
   // —— flex 布局
   mut display : Display?
   mut flex_direction : FlexDirection?
+  mut flex_wrap : FlexWrap?
   mut justify_content : JustifyContent?
   mut align_items : AlignItems?
   mut align_self : AlignItems?
@@ -101,6 +102,7 @@ pub fn empty_style() -> Style {
     border_radius: None,
     display: None,
     flex_direction: None,
+    flex_wrap: None,
     justify_content: None,
     align_items: None,
     align_self: None,
@@ -188,6 +190,7 @@ pub fn merge(base : Style, over : Style) -> Style {
   s.border_radius = pick(base.border_radius, over.border_radius)
   s.display = pick(base.display, over.display)
   s.flex_direction = pick(base.flex_direction, over.flex_direction)
+  s.flex_wrap = pick(base.flex_wrap, over.flex_wrap)
   s.justify_content = pick(base.justify_content, over.justify_content)
   s.align_items = pick(base.align_items, over.align_items)
   s.align_self = pick(base.align_self, over.align_self)
@@ -522,6 +525,12 @@ pub fn Style::set_opacity(self : Style, v : Double?) -> Style {
 ///|
 pub fn Style::set_box_shadow(self : Style, v : Double?) -> Style {
   self.box_shadow = v
+  self
+}
+
+///|
+pub fn Style::set_flex_wrap(self : Style, v : FlexWrap?) -> Style {
+  self.flex_wrap = v
   self
 }
 

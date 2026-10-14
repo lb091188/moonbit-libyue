@@ -108,6 +108,10 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit {
     Some(v) => n.set_flex_direction(v)
     None => ()
   }
+  match s.flex_wrap {
+    Some(v) => n.set_flex_wrap(v)
+    None => ()
+  }
   match s.justify_content {
     Some(v) => n.set_justify_content(v)
     None => ()

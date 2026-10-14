@@ -14,6 +14,7 @@ pub using @yoga {
   type FlexDirection,
   type JustifyContent,
   type AlignItems,
+  type FlexWrap,
 }
 
 ///|

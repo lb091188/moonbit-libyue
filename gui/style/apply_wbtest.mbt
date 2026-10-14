@@ -154,3 +154,25 @@ test "样式侧表随控件丢弃清账（remove_child 连子树、clear_childre
   parent.clear_children()
   assert_eq(resolved_count(), base)
 }
+
+///|
+test "apply：flex_wrap=Wrap 让子项换到第二行" {
+  let root = @core.Widget::new()
+  root.node.set_width(@yoga.fixed(100.0))
+  apply(root, style(flex_direction=@yoga.Row))
+  let a = @core.Widget::new()
+  let b = @core.Widget::new()
+  root.append_child(a)
+  root.append_child(b)
+  apply(a, style(width=60.0, height=20.0))
+  apply(b, style(width=60.0, height=20.0))
+  laid_out(root)
+  // 不换行：两项都在第一行（第二项挤出容器也留在同一行）
+  assert_eq(b.node.layout().top, 0.0)
+  apply(root, style(flex_wrap=@yoga.Wrap))
+  laid_out(root)
+  assert_true(
+    b.node.layout().top >= 20.0,
+    msg="flex_wrap=Wrap 没落到 Yoga：b.y=\{b.node.layout().top}",
+  )
+}

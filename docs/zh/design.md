@@ -39,7 +39,7 @@ ui 只管组件，三包职责不混。
 | 尺寸 | `width`、`height`、`min_width`、`min_height`、`max_width`、`max_height` | Yoga 节点（`set_width` / `set_min_width` …） |
 | 内外边距 | `padding`（**只表示四边同值**）、`padding_left/right/top/bottom`、`margin`、`margin_*` | Yoga（`set_padding` / `set_margin`）。**不做 CSS 的 2/3 值简写**（`padding: 8px 16px` 那种按边数变语义的写法）：要么四边同值，要么逐边单给，档位就这两档 |
 | 边框圆角 | `border_width`、`border_color`、`border_radius` | 绘制阶段；圆角矩形复用 `ui/basic.mbt` 的 `fill_round_rect` |
-| flex 布局 | `display`（`flex` / `none`）、`flex_direction`、`justify_content`、`align_items`、`align_self`、`flex`（grow）、`gap`、`row_gap`、`column_gap` | Yoga |
+| flex 布局 | `display`（`flex` / `none`）、`flex_direction`、`flex_wrap`（`nowrap` / `wrap` / `wrap-reverse`）、`justify_content`、`align_items`、`align_self`、`flex`（grow）、`gap`、`row_gap`、`column_gap` | Yoga |
 | 定位 | `position`（`relative` / `absolute`）、`top`、`right`、`bottom`、`left`、`z_index` | Yoga（`set_position` / `set_top` …底层现成，含百分比 inset；`z_index` 由 yoga-mbt 随 P1 补齐，见 §5）。Style 首批只开逻辑像素值，百分比入口同 `width_percent` 形态另开 |
 | 状态 | `hover`、`active`、`focus`（各是一个嵌套 `Style`） | 绘制期按控件状态选桶，见 §1.3 |
 | 效果 | `opacity`、`box_shadow`（硬阴影外扩量） | `opacity` 落 `Widget.alpha_paint`（绘制遍历累乘）；`box_shadow` 落 `Widget.shadow_paint`，绘制遍历时把**本控件的裁剪窗口**四周放大这么多，阴影才画得出盒外（祖先自己会把它裁掉，与 CSS `overflow:hidden` 同义）；本体由 `view` 在填充之前调 `Painter::box_shadow` |
