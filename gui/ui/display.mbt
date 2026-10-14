@@ -762,7 +762,11 @@ fn timeline_row(
   first : Bool,
   last : Bool,
   height : Double,
+  pad : Double,
 ) -> @core.Node {
+  // 行间距画进**本行**里（marker 与行盒一起长到 height+pad）：
+  // 用 `row_gap` 分行会让连接线在每一处间隙断开
+  let box_h = height + pad
   let blocks : Array[@style.Style] = [
     match bg_block(type_token(t)) {
       Some(b) => b
@@ -776,18 +780,18 @@ fn timeline_row(
   let anon = @style.merge_all(blocks)
   let mark = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     w.node.set_width(@yoga.fixed(20.0))
-    w.node.set_height(@yoga.fixed(height))
+    w.node.set_height(@yoga.fixed(box_h))
     fold_style(w, anon, [])
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      _r : @core.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
-      let cy = r.h / 2.0
-      // 首行从点心起、末行到点心止，中间行整条贯通（点块在行高中间）
+      let cy = height / 2.0
+      // 首行从点心起、末行到点心止，其余行整条贯通（含本行的行间距）
       let top = if first { cy } else { 0.0 }
-      let bottom = if last { cy } else { r.h }
+      let bottom = if last { cy } else { box_h }
       if bottom > top {
         p.set_fill_color(@style.color_of(s.border_color, @theme.theme_border()))
         p.fill_rect(9.0, top, 2.0, bottom - top)
@@ -810,12 +814,14 @@ fn timeline_row(
       ),
     ],
     direction=@yoga.Row,
-    height=height,
+    align_items=@yoga.AlignItems::FlexStart,
+    height=box_h,
   )
 }
 
 ///|
-/// 时间线（EP Timeline）：`items` 是 (标题, 描述, 语义色)，逐行等高排布。
+/// 时间线（EP Timeline）：`items` 是 (标题, 描述, 语义色)，逐行等高排布；
+/// 连接线首行从点心起、末行到点心止，中间（含行间距）不断线。
 pub fn timeline(
   items : Array[(String, String, SemanticType)],
   item_height? : Double = 56.0,
@@ -826,11 +832,20 @@ pub fn timeline(
   let n = items.length()
   for i = 0; i < n; i = i + 1 {
     let input = items[i]
+    let is_last = i == n - 1
     rows.push(
-      timeline_row(input.0, input.1, input.2, i == 0, i == n - 1, item_height),
+      timeline_row(
+        input.0,
+        input.1,
+        input.2,
+        i == 0,
+        is_last,
+        item_height,
+        if is_last { 0.0 } else { gap },
+      ),
     )
   }
-  view(rows, row_gap=gap, class=class)
+  view(rows, class=class)
 }
 
 ///|

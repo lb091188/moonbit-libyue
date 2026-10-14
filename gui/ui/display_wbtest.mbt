@@ -244,8 +244,8 @@ test "时间线：逐行等高、首末行的贯通线只到点心" {
   let rows = tl.children()
   assert_eq(rows.length(), 3)
   assert_eq(rows[0].children().length(), 2)
-  assert_eq(rows[0].rect.h, 56.0)
-  // 行间距 12：第二行落在 68，第三行落在 136
+  // 行间距 12 画进**本行**里（末行不带间距）：连接线才会在间隙处不断
+  assert_eq((rows[0].rect.h, rows[1].rect.h, rows[2].rect.h), (68.0, 68.0, 56.0))
   assert_eq((rows[1].rect.y, rows[2].rect.y), (68.0, 136.0))
 
   let bm = @render.Bitmap::new(240, 220)
@@ -260,6 +260,10 @@ test "时间线：逐行等高、首末行的贯通线只到点心" {
   assert_eq(bm.pixel(10, 180).a, 0)
   // 点与线不同色（点是语义主色，线是边框色）
   assert_true(px(bm, 10, 164) != px(bm, 10, 150))
+  // 行间隙处（56..68 与 124..136）线必须还在——旧形态用 row_gap 分行，
+  // 每处间隙都没有墨，真机看着就是一条断成几截的线
+  assert_true(bm.pixel(10, 60).a > 0, msg="第一处行间隙断线")
+  assert_true(bm.pixel(10, 130).a > 0, msg="第二处行间隙断线")
 }
 
 ///|
