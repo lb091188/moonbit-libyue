@@ -362,3 +362,15 @@ test "导航族只读样式槽：class 覆盖分段底色、页签字色与穿�
   )
   assert_true(classed_tr > plain_tr)
 }
+
+///|
+test "穿梭框：面板默认 200×160，height= 可覆，项少也占满面板高" {
+  let left = @core.Store::new(["甲"])
+  let right : @core.Store[Array[String]] = @core.Store::new([])
+  let (_, tr) = mounted(transfer(left, right), 460.0, 220.0)
+  let lbox = tr.children()[0]
+  assert_eq(lbox.rect.w, 200.0)
+  assert_true(lbox.rect.h >= 160.0, msg="面板没有默认 160 高：\{lbox.rect.h}")
+  let (_, tr2) = mounted(transfer(left, right, height=90.0), 460.0, 220.0)
+  assert_true(tr2.children()[0].rect.h >= 90.0)
+}

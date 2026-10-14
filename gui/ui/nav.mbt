@@ -1018,13 +1018,15 @@ pub fn tabs(
 
 ///|
 /// 穿梭框（EP Transfer）：左右两列，点行选中（方块标记），中间 `›`/`‹` 把选中项
-/// 在两列间移动。两列数据各由一个 `Store[Array[String]]` 驱动，外部改数据即整列
+/// 在两列间移动。两列面板至少 `height` 高（项多了自己长高，不会被裁），默认
+/// 200×160——原来 160×60 小得不像可操作的列表。两列数据各由一个 `Store[Array[String]]` 驱动，外部改数据即整列
 /// 重建；重建式列表的行不持订阅（选中集合是自持的两张表），所以重建次数不会
 /// 累积死订阅。
 pub fn transfer(
   left_items : @core.Store[Array[String]],
   right_items : @core.Store[Array[String]],
-  width? : Double = 160.0,
+  width? : Double = 200.0,
+  height? : Double = 160.0,
   item_height? : Double = 24.0,
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
@@ -1043,7 +1045,7 @@ pub fn transfer(
     right_box.node.set_flex_direction(@yoga.Column)
     for box in [left_box, right_box] {
       box.node.set_width(@yoga.fixed(width))
-      box.node.set_min_height(@yoga.fixed(60.0))
+      box.node.set_min_height(@yoga.fixed(height))
       @style.apply(
         box,
         @style.style(background_color="bg_panel", border_color="border", border_width=1.0)
