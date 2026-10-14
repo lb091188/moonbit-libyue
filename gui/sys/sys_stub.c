@@ -2480,6 +2480,8 @@ static int sys_vol_open(IAudioEndpointVolume **ev, wchar_t **devid) {
   return 1;
 }
 
+#endif /* 音量段 Windows-only 的 GUID 与 sys_vol_open 到此为止 */
+
 // 快照：返回「设备 id UTF-8\t百分比\t静音(0/1)」字节串（tab 分隔）。
 void *yue_sys_vol_get(int32_t *ok) {
   *ok = 0;
@@ -2549,4 +2551,4 @@ int32_t yue_sys_vol_write(int32_t mode, int32_t value, int32_t *ok) {
 #endif
 }
 
-#endif /* 平台批④音量段的 _WIN32 包裹 */
+

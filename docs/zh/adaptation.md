@@ -1815,6 +1815,8 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **验证**:`moon check sys ui --deny-warn` 过、`moon build showcase --target native` 链接过、库全包 924/924。
 - **同类复发(2026-10-14 windowctl 批)**:同一口径第二次踩——`sys_win_find_ctx_t`/`sys_win_find`/`sys_win_find_cb`/`sys_mon_find_t`/`sys_mon_find_cb`/`sys_monitor_index`/`sys_win_enum_cb`/`sys_wcs_icontains` 这批 `static` helper(签名带 `HWND`/`HMONITOR`/`BOOL CALLBACK`)照旧写在守卫外,Linux 侧 `moon test sys` 报 `sys_stub.c:2338: error: expected ‘=’, … before ‘sys_win_find_cb’`。修复仍是整块圈进 `#if defined(_WIN32)`(两块:枚举 helper、find+标题匹配 helper;`sys_win_blob_t`/`sys_win_blob_append`/`sys_win_enum_ctx_t` 只用 stdlib,留守卫外)。
 - **收口动作(不复发的前提)**:凡给单平台加过 C,**当批必须在对侧平台跑一次 `cd gui && moon test <该平台包> --target native`**——导出函数体有 `#else` 分支不会炸,只有守卫外的 helper 才炸,而这只有对侧编译器看得到;Windows-only 的 `sys` 批在 Linux 上跑,`win`/`dbus` 那类反向同理。本批 Linux 读数:`moon test sys` 182/182、库全包 928/928、`cd gui && moon check --deny-warn` 与 `cd examples && moon check --deny-warn` 零警告、`moon build showcase --target native` 链接通过。
+- **第三种踩法(2026-10-14 平台批④音量段)**:守卫范围**划过头**——整段(含 `yue_sys_vol_get` / `yue_sys_vol_write` 两个导出函数)一起被 `#if defined(_WIN32)` 圈住,而这两个函数体内已经各自写了 `#else` 退路。Linux 侧不是类型报错而是**链接报 undefined reference**(`sys.whitebox_test.o: undefined reference to yue_sys_vol_write`),因为 MoonBit 侧声明照写、C 侧整个符号没了。口径补一条:**导出函数本体恒留在守卫外**(它自带两分支),守卫只圈平台专属的 helper/常量/GUID 表;`#endif` 要收在 helper 段尾,不能盖到导出函数上。本批 Linux 读数:sys 185/185、库全包 932/932、`moon build showcase --target native` 链接通过。
+
 
 ## 表格悬停不是整行 & 「添加一行」没反应:脏区只标最深那颗 + 去重 Store 存了被原地改的数组(2026-10-14,真机反馈)
 
