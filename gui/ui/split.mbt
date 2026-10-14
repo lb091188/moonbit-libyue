@@ -114,13 +114,19 @@ fn splitter_impl(
       splitter_handle_draw(p, r, horizontal, self.hovered, dragging.val)
     })
     bar.on_pointer = Some(fn(
-      _s : @core.Widget,
+      s : @core.Widget,
       ev : @core.PointerEvent,
     ) -> Bool {
+      // 拖动量一律用**窗口坐标**（把手自己的局部坐标 + 把手的绝对位置）：
+      // 把手本身会随首栏变宽而平移，用局部坐标做增量会把上一帧的位移从这一帧
+      // 的增量里扣掉，实测表现为拖到一半又弹回来、不跟手。
+      let at = if horizontal { ev.x } else { ev.y }
+      let origin = if horizontal { s.rect.x } else { s.rect.y }
+      let win = at + origin
       match ev.kind {
         @core.Down => {
           dragging.val = true
-          drag_start.val = if horizontal { ev.x } else { ev.y }
+          drag_start.val = win
           drag_first0.val = if horizontal {
             first_wrap.rect.w
           } else {
@@ -130,7 +136,7 @@ fn splitter_impl(
         }
         @core.Move => {
           if dragging.val {
-            let cur = if horizontal { ev.x } else { ev.y }
+            let cur = win
             // 总量从三个控件的实际矩形读：不捕获父控件（父子互指是引用环）
             let total = if horizontal {
               first_wrap.rect.w + SPLITTER_HANDLE + second_wrap.rect.w
