@@ -39,6 +39,7 @@
 #include <shellapi.h>
 #include <mmdeviceapi.h>
 #include <endpointvolume.h>
+#include <winspool.h>
 #else
 #include <dirent.h>
 #include <dlfcn.h> // 空闲查询的 X11/XSS 运行期取符号（W21e）
