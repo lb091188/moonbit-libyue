@@ -2785,6 +2785,8 @@ int yue_sys_clipboard_gtk_set_text(const char *text) {
 // MODE 行紧跟所属 MON 行。坐标与分辨率都是**物理像素**（本栈口径）；mm 是
 // CGDisplayScreenSize 的物理毫米，引擎不给时 0；刷新率厘赫兹，
 // CGDisplayModeGetRefreshRate 给 0 时（内建面板常见）如实给 0=未知。
+// 「当前档」由与 CGDisplayCopyDisplayMode 的同尺寸同刷新率比对得出，
+// 「首选档」恒 0——那两个 Is* 谓词在当前 SDK 上已不声明（见循环内注释）。
 // ---------------------------------------------------------------------------
 #if defined(__APPLE__)
 #define SYS_MON_MAX 32
@@ -2872,6 +2874,21 @@ void *yue_sys_mon_mac(int32_t *ok) {
     } seen[SYS_MON_DEDUPE];
     int seen_n = 0;
     int cur_emitted = 0;
+    // 当前档的身份三元组（像素宽、像素高、厘赫兹），供下面的 is_cur 比对
+    size_t cw = 0;
+    size_t ch = 0;
+    int ccenti = -1;
+    if (cur != NULL) {
+      cw = CGDisplayModeGetPixelWidth(cur);
+      ch = CGDisplayModeGetPixelHeight(cur);
+      if (cw == 0) {
+        cw = CGDisplayModeGetWidth(cur);
+      }
+      if (ch == 0) {
+        ch = CGDisplayModeGetHeight(cur);
+      }
+      ccenti = (int)(CGDisplayModeGetRefreshRate(cur) * 100.0 + 0.5);
+    }
     CFArrayRef modes = CGDisplayCopyAllDisplayModes(d, NULL);
     int modes_n = modes == NULL ? 0 : (int)CFArrayGetCount(modes);
     for (int k = 0; k < modes_n; k++) {
@@ -2906,12 +2923,17 @@ void *yue_sys_mon_mac(int32_t *ok) {
         seen[seen_n].centi = centi;
         seen_n++;
       }
-      int is_cur = (cur != NULL && CGDisplayModeIsCurrentMode(d, m)) ? 1 : 0;
+      // 当前档：`CGDisplayModeIsCurrentMode` 在当前 SDK 已不声明，改用
+      // 「与 CGDisplayCopyDisplayMode 同像素尺寸同刷新率」判——去重后的清单里
+      // 这一档只会出现一次，判据与那个谓词等价到读数层面。
+      int is_cur = (cur != NULL && mw == cw && mh == ch && centi == ccenti) ? 1
+                                                                           : 0;
       if (is_cur) {
         cur_emitted = 1;
       }
-      sys_mon_line(&blob, "MODE\t%zu\t%zu\t%d\t%d\t%d\n", mw, mh, centi, is_cur,
-                   CGDisplayModeIsPreferred(m) ? 1 : 0);
+      // preferred 恒 0：`CGDisplayModeIsPreferred` 同样不再声明，当前 SDK 没有
+      // 公开的「首选/原生模式」信号，不给它编一个假值（缺口记 adaptation.md）。
+      sys_mon_line(&blob, "MODE\t%zu\t%zu\t%d\t%d\t0\n", mw, mh, centi, is_cur);
     }
     if (modes != NULL) {
       CFRelease(modes);
@@ -2926,7 +2948,7 @@ void *yue_sys_mon_mac(int32_t *ok) {
         mh = CGDisplayModeGetHeight(cur);
       }
       double hz = CGDisplayModeGetRefreshRate(cur);
-      sys_mon_line(&blob, "MODE\t%zu\t%zu\t%d\t1\t1\n", mw, mh,
+      sys_mon_line(&blob, "MODE\t%zu\t%zu\t%d\t1\t0\n", mw, mh,
                    (int)(hz * 100.0 + 0.5));
     }
     if (cur != NULL) {
