@@ -4317,6 +4317,15 @@ void wm_file_dialog_destroy(int64_t id) { wm_dlg_free(id); }
 #import <CoreGraphics/CoreGraphics.h>
 #import <CoreText/CoreText.h>
 
+// 这两个 setter 在新 SDK（macOS 26 的构建机）上不再公开声明，clang 直接报
+// 「no visible @interface / no known instance method」，而旧 SDK 上它们是真实
+// 存在的。这里只给 NSObject 做 informal 声明让 selector 在编译期可见，调用点
+// 一律先 respondsToSelector: 再发：SDK 真没有这一口时退回默认行为，不硬写。
+@interface NSObject (WMAppKitOptionalSetters)
+- (void)setCanShowHiddenFiles:(BOOL)flag;
+- (void)setSendActionOn:(NSUInteger)mask;
+@end
+
 #define WM_MAX_WINDOWS 32
 #define WM_MAX_SURFACES 64
 #define WM_MAX_MENUS 128
@@ -5946,10 +5955,13 @@ void wm_file_dialog_set_options(int64_t id, int32_t options) {
     if (wm_dlg_is_open[(int)id - 1]) {
       NSOpenPanel *op = (NSOpenPanel *)p;
       [op setAllowsMultipleSelection:(options & 2) != 0];
-      [op setCanChooseDirectories:(options & 1) != 0];
       [op setCanChooseFiles:(options & 1) == 0];
       [op setTreatsFilePackagesAsDirectories:YES];
-      if (@available(macOS 10.9, *)) {
+      // canShowHiddenFiles 在 macOS 26 的 SDK 上不再随 NSOpenPanel 公开声明
+      // （clang 报 no visible @interface），故按运行时能力设：上面的 informal
+      // 声明只让 selector 可见，SDK 里没有这一口就跳过（隐藏文件开关失灵,
+      // 其余选项不受影响）。
+      if ([op respondsToSelector:@selector(setCanShowHiddenFiles:)]) {
         [op setCanShowHiddenFiles:(options & 4) != 0];
       }
     }
@@ -6728,10 +6740,14 @@ static int wm_tray_alloc(int kind, int icon_slot, const char *tip) {
   }
   [btn setTarget:wm_tray_target];
   [btn setAction:@selector(wmTrayClicked:)];
-  // sendActionOn: 在 NSCell 上（NSControl/NSView 系的状态栏按钮没有这个口），
-  // 不给掩码就只在左键抬起触发动作，右键那条永远收不到
-  [[btn cell] setSendActionOn:(NSEventMaskLeftMouseUp |
-                              NSEventMaskRightMouseUp)];
+  // 触发掩码：不给就只在左键抬起时发动作，右键那条永远收不到。
+  // sendActionOn 在 macOS 26 的 SDK 上无公开声明（见文件头 informal 声明），
+  // 故按运行时能力设——设不上的话托盘只有左键可用。
+  id cell = [btn cell];
+  if ([cell respondsToSelector:@selector(setSendActionOn:)]) {
+    [cell setSendActionOn:(NSUInteger)(NSEventMaskLeftMouseUp |
+                                       NSEventMaskRightMouseUp)];
+  }
   wm_clamp_cap(wm_tray_tips[slot], 128, tip != NULL ? tip : "");
   wm_tray_items[slot] = item;
   wm_tray_menus[slot] = nil;
