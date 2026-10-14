@@ -671,38 +671,71 @@ pub fn dialog(
 }
 
 ///|
+/// 轻提示整组的左边界（窗口坐标）：按窗口宽居中，组宽不窄于窗口时钳到 0。
+fn toast_left(win_w : Double, group_w : Double) -> Double {
+  ((win_w - group_w) / 2.0).max(0.0)
+}
+
+///|
 /// 轻提示：返回推送函数 `push(text, t)`，每条 `duration_ms` 后自动移除，多条自上而下
-/// 堆叠（整条带子居中显示在窗口顶部）。
+/// 堆叠（整组居中显示在窗口顶部）。
 ///
 /// 与 master 的一条差（记档）：旧链路返回「层节点 + 推送函数」、由调用方把层挂进
 /// 页面树；本栈把这条带子开在**浮层图层**上（第一条推送时才开、最后一条撤下就收），
 /// 于是提示永远压在对话框与其它浮层之上，也不必在页面里常驻一棵空树。入口因此
 /// 只剩一个函数。没有浮层宿主时是空操作。
+///
+/// 浮层按**内容尺寸**开（`overlay_show_at`，整组按窗口宽居中），不走 `overlay_show_full`：
+/// 后者在「所在窗有原生子件（网页区）」那一档会开一扇**铺满内容区**的真窗口，
+/// 而那扇窗的根自带页面底色 —— 轻提示于是变成一整块盖住窗口的板（看着像遮罩）。
+/// 轻提示没有「点外收起」语义，也不需要占住整窗。
 pub fn toast_layer(
   duration_ms? : Int = 2600,
 ) -> (String, SemanticType) -> Unit {
   let strip : Ref[@core.Widget?] = Ref(None)
   let open_id : Ref[Int] = Ref(0)
   let alive : Ref[Int] = Ref(0)
+  let widest : Ref[Double] = Ref(0.0)
   let font = @text.Font::new("", 13.0)
+  // 列 + 交叉轴居中：宽度自然等于最宽那一条，浮层也就只开那么大
   let strip_w = @core.Widget::new()
-  strip_w.node.set_position(@yoga.Absolute)
-  strip_w.node.set_top(@yoga.fixed(0.0))
-  strip_w.node.set_left(@yoga.fixed(0.0))
-  strip_w.node.set_right(@yoga.fixed(0.0))
   strip_w.node.set_flex_direction(@yoga.Column)
   strip_w.node.set_align_items(@yoga.AlignItems::Center)
   strip_w.set_padding(top=8.0)
   strip.val = Some(strip_w)
+  // 窗口内容区宽（居中摆位用）；取不到宿主给 0（摆位退回左上）
+  let win_w = fn() -> Double {
+    match @core.host_active() {
+      Some(a) => {
+        let (w, _h) = a.window.size()
+        w.to_double()
+      }
+      None => 0.0
+    }
+  }
   let push : (String, SemanticType) -> Unit = fn(text : String, t : SemanticType) -> Unit {
     match strip.val {
       None => ()
       Some(c) => {
+        let bw = text_width(text, font) + 46.0
         if open_id.val == 0 {
-          open_id.val = @core.overlay_show_full(@core.node_of(c))
+          widest.val = bw
+          open_id.val = @core.overlay_show_at(
+            @core.node_of(c),
+            toast_left(win_w(), bw),
+            0.0,
+          )
+        } else if bw > widest.val {
+          // 新条更宽：整组还是居中，按新宽重摆包裹层
+          widest.val = bw
+          let _ = @core.overlay_set_pos(
+            open_id.val,
+            toast_left(win_w(), bw),
+            0.0,
+          )
         }
         let bar = @core.Widget::new()
-        bar.node.set_width(@yoga.fixed(text_width(text, font) + 46.0))
+        bar.node.set_width(@yoga.fixed(bw))
         bar.node.set_height(@yoga.fixed(34.0))
         bar.set_margin(bottom=8.0)
         bar.on_draw = Some(fn(

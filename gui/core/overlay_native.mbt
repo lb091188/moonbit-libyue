@@ -95,6 +95,8 @@ fn overlay_content_size(app : App) -> (Int, Int) {
 
 ///|
 /// 首帧后收框：宿主每拍调一次，同一浮层最多试三帧（布局可能因宽度变化再长高）。
+/// 三帧用尽后仍放行**放大**——内容后来长宽了（例如顶部轻提示又推来一条更宽的），
+/// 框子不跟着长就会把多出来的内容切掉；收缩仍受三帧限制，避免宽度回环里来回改尺寸。
 pub fn overlay_fit_pass(app : App) -> Unit {
   let hits : Array[Int] = []
   for cid, pop in g_native.val {
@@ -107,15 +109,18 @@ pub fn overlay_fit_pass(app : App) -> Unit {
       Some(n) => n
       None => 0
     }
-    if passes >= 3 {
-      continue
-    }
-    g_native_passes.val.set(cid, passes + 1)
     match g_native.val.get(cid) {
       None => ()
       Some(pop) => {
         let (w, h) = overlay_content_size(pop)
         let (cw, ch) = pop.window.size()
+        if passes >= 3 {
+          if w > cw || h > ch {
+            pop.window.set_size_pixels(w.max(cw), h.max(ch))
+          }
+          continue
+        }
+        g_native_passes.val.set(cid, passes + 1)
         if w > 1 && h > 1 && (w != cw || h != ch) {
           pop.window.set_size_pixels(w, h)
         }

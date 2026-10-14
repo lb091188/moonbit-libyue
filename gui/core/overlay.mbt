@@ -227,6 +227,29 @@ pub fn overlay_show_full(content : Node) -> Int {
 }
 
 ///|
+/// 移动一层浮层到窗口坐标 `(x, y)`（图层档）。原生档那扇弹层窗的位置开出来就归
+/// 窗口系统管，这里对它返回 false、不作移动。
+pub fn overlay_set_pos(id : Int, x : Double, y : Double) -> Bool {
+  match overlay_host() {
+    None => false
+    Some(h) => {
+      let mut ok = false
+      for it in h.items {
+        if it.0 == id {
+          it.1.node.set_left(@yoga.fixed(x - h.layer.rect.x))
+          it.1.node.set_top(@yoga.fixed(y - h.layer.rect.y))
+          ok = true
+        }
+      }
+      if ok {
+        invalidate()
+      }
+      ok
+    }
+  }
+}
+
+///|
 /// 关掉指定浮层（句柄 0 或不存在时空操作）；关完最后一层就收起图层。
 pub fn overlay_hide(id : Int) -> Unit {
   if overlay_native_close(id) {
