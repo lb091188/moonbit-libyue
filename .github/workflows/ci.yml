@@ -53,6 +53,32 @@ jobs:
       - name: 刷新注册表索引
         run: moon update
 
+      # 工具链 2026-10-12 起只认 `moon.mod`/`moon.pkg`，而注册表里已发布的第三方包
+      # 带的还是 `moon.mod.json`/`moon.pkg.json`：解析依赖图会在「下载依赖」这步报
+      # `... is no longer supported`（master 的 CI 从那天起就红，与本仓代码无关）。
+      # 注册表侧没有退路，这里在依赖缓存落地后就地迁移旧清单——只动 git 忽略的
+      # .mooncakes/ 下载缓存，不动仓库源码、不改依赖版本。逐轮跑：每轮只解到
+      # 刚下载的那一批包，下一轮才看得见新下下来的。
+      - name: 迁移依赖缓存里的旧式清单
+        run: |
+          for i in $(seq 1 8); do
+            if (cd gui && moon check >/tmp/resolve.log 2>&1); then
+              echo "依赖图解析通过（第 $i 轮）"
+              exit 0
+            fi
+            if ! grep -aq "no longer supported" /tmp/resolve.log; then
+              tail -20 /tmp/resolve.log
+              exit 1
+            fi
+            find .mooncakes \( -name moon.mod.json -o -name moon.pkg.json \) \
+              | while read -r f; do
+                  (cd "$(dirname "$f")" && moon fmt >/dev/null 2>&1) || true
+                done
+          done
+          echo "::error title=依赖清单迁移没收敛::8 轮后仍报 no longer supported"
+          tail -20 /tmp/resolve.log
+          exit 1
+
       - name: 静态检查(库模块)
         working-directory: gui
         run: moon check
@@ -126,6 +152,32 @@ jobs:
       - name: 刷新注册表索引(同 Linux job)
         shell: pwsh
         run: moon update
+
+      # 同 Linux job 的清单迁移:工具链 2026-10-12 起只认 moon.mod/moon.pkg,
+      # 注册表里已发布的包带的还是旧清单。只动 .mooncakes\ 下载缓存。
+      - name: 迁移依赖缓存里的旧式清单
+        shell: pwsh
+        run: |
+          for ($i = 1; $i -le 8; $i++) {
+            Push-Location gui
+            moon check *> ../resolve.log
+            $code = $LASTEXITCODE
+            Pop-Location
+            if ($code -eq 0) { Write-Host "依赖图解析通过（第 $i 轮）"; exit 0 }
+            if (-not (Select-String -Path resolve.log -QuietPattern "no longer supported")) {
+              Get-Content resolve.log -Tail 25
+              exit 1
+            }
+            Get-ChildItem -Path .mooncakes -Recurse -Include moon.mod.json, moon.pkg.json |
+              ForEach-Object {
+                Push-Location $_.Directory.FullName
+                moon fmt *> $null
+                Pop-Location
+              }
+          }
+          Write-Host "::error title=依赖清单迁移没收敛::8 轮后仍报 no longer supported"
+          Get-Content resolve.log -Tail 25
+          exit 1
 
       # vcvars64 用 vswhere 定位(不依赖 VS 具体版本/Edition 路径):moon 的
       # native-stub 与 --target native 都要 cl.exe/链接器在 PATH 里。
@@ -217,6 +269,28 @@ jobs:
       # (三平台同一个报错: module was not found in the registry),先刷索引。
       - name: 刷新注册表索引
         run: moon update
+
+      # 同 Linux job:迁移依赖缓存里的旧式清单(工具链 2026-10-12 起只认 moon.mod/moon.pkg)。
+      # macOS job 的价值全在这里之后——它才会真的走到 native-stub 与 prebuild 编 ObjC 那两步。
+      - name: 迁移依赖缓存里的旧式清单
+        run: |
+          for i in $(seq 1 8); do
+            if (cd gui && moon check >/tmp/resolve.log 2>&1); then
+              echo "依赖图解析通过（第 $i 轮）"
+              exit 0
+            fi
+            if ! grep -aq "no longer supported" /tmp/resolve.log; then
+              tail -30 /tmp/resolve.log
+              exit 1
+            fi
+            find .mooncakes \( -name moon.mod.json -o -name moon.pkg.json \) \
+              | while read -r f; do
+                  (cd "$(dirname "$f")" && moon fmt >/dev/null 2>&1) || true
+                done
+          done
+          echo "::error title=依赖清单迁移没收敛::8 轮后仍报 no longer supported"
+          tail -30 /tmp/resolve.log
+          exit 1
 
       - name: 静态检查(库模块)
         working-directory: gui

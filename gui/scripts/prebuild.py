@@ -432,10 +432,24 @@ def link_configs() -> dict:
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lrender_mac_stub "
                 + " ".join(MAC_RENDER_FRAMEWORKS),
             })
-        # text / web 的 macOS 后端各成一批：它们的桩在拿到自己的 WM_STUB_MAC
-        # （web 为 WB_HAVE_WKWEBVIEW）分支之前仍由 native-stub 编占位分支，本批
-        # 不下发对应归档——否则占位分支会被编两遍（native-stub 一趟 + 本脚本
-        # 一趟），链接期报重复定义。接入顺序 text → web，每批同时补这里的条目。
+        # text：CoreText。与 Linux 不同，这里不必再链 render 的归档——
+        # pt_draw_box_cr / rt_draw_cr 只在 Cairo 会话存在时才会被调用，macOS 走
+        # 纯光栅路径（cr_begin 探针返回 0），两支都是空桩返 0。
+        text_lib = compile_mac_stub(
+            MODULE_ROOT / "text" / "stub.c",
+            "libyue_text_mac.a",
+            ["-DWM_STUB_MAC"],
+        )
+        if text_lib:
+            entries.append({
+                "package": TEXT_PACKAGE,
+                "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_text_mac "
+                + " ".join(MAC_TEXT_FRAMEWORKS),
+            })
+        # web 的 macOS 后端（WKWebView）自成一批：它的桩在拿到自己的
+        # WB_HAVE_WKWEBVIEW 分支之前仍由 native-stub 编占位分支，本批不下发
+        # 对应归档——否则占位分支会被编两遍（native-stub 一趟 + 本脚本一趟），
+        # 链接期报重复定义。
     return {"link_configs": entries}
 
 
