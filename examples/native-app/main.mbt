@@ -1158,34 +1158,38 @@ fn make_tray_section(
     }
   }
   let create = fn() -> Unit {
-    match @win.icon_from_bgra(demo_icon_pixels(32), 32, 32) {
-      Some(ic) => {
-        match @core.Tray::new("libyue-demo-tray", icon=Some(ic)) {
-          Ok(t) => {
-            t.set_tooltip("libyue", "W20c 托盘演示")
-            t.on_click(fn() {
-              clicks.val = clicks.val + 1
-              note.val = "左键"
-            })
-            tray.val = Some(t)
-            icon_holder.val = Some(ic)
-            note.val = "已建(" + t.backend_name() + ")"
-          }
-          Err(@core.Unsupported) => {
-            note.val = "后端不可用"
-            ic.free()
-          }
-          Err(@core.IconLoadFailed) => {
-            note.val = "图标加载失败"
-            ic.free()
-          }
-          Err(@core.Backend(msg)) => {
-            note.val = "后端失败: " + msg
-            ic.free()
-          }
-        }
+    // 图标句柄只有 Win32 那一档要（HICON）；Linux 的 SNI 不读它，面板用库内置
+    // 位图显示——所以拿到什么照传、拿不到也照建，整段不再挂在 icon 成功之后。
+    let ic = @win.icon_from_bgra(demo_icon_pixels(32), 32, 32)
+    let free_ic = fn() -> Unit {
+      match ic {
+        Some(x) => x.free()
+        None => ()
       }
-      None => note.val = "建图标失败"
+    }
+    match @core.Tray::new("libyue-demo-tray", icon=ic) {
+      Ok(t) => {
+        t.set_tooltip("libyue", "W20c 托盘演示")
+        t.on_click(fn() {
+          clicks.val = clicks.val + 1
+          note.val = "左键"
+        })
+        tray.val = Some(t)
+        icon_holder.val = ic
+        note.val = "已建(" + t.backend_name() + ")"
+      }
+      Err(@core.Unsupported) => {
+        note.val = "后端不可用"
+        free_ic()
+      }
+      Err(@core.IconLoadFailed) => {
+        note.val = "图标加载失败"
+        free_ic()
+      }
+      Err(@core.Backend(msg)) => {
+        note.val = "后端失败: " + msg
+        free_ic()
+      }
     }
   }
   let retip = fn() -> Unit {

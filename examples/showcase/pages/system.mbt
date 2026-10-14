@@ -412,24 +412,28 @@ pub fn page_system(app : @shared.App) -> @core.Node {
         // 零尺寸挂载钩子：段首次选中时建托盘 + 起派发表
         @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
           tray_poll_loop()
-          match @win.icon_from_bgra(tray_icon_pixels(32), 32, 32) {
-            Some(ic) =>
-              match @core.Tray::new("libyue-showcase-tray", icon=Some(ic)) {
-                Ok(t) => {
-                  t.set_tooltip("libyue 演示板", "左键计数 · W 族门面")
-                  t.on_click(fn() {
-                    tray_clicks.update(fn(n) { n + 1 })
-                    app.toast_push("托盘左键被点了", @ui.Info)
-                  })
-                  tray_holder.val = Some(t)
-                  tray_note.set("已建（\{t.backend_name()}）")
-                }
-                Err(e) => {
-                  tray_note.set(tray_err_text(e))
-                  ic.free()
-                }
+          // 图标句柄只是 Win32 那一档要的东西（HICON），Linux 的 SNI 不读它、
+          // 面板用库内置位图显示——所以拿到什么照传、拿不到也照建。
+          // （旧写法把整段挂在 icon 成功之后，而 wm_icon_from_bgra 在 GTK 分支
+          //  是失败桩恒给句柄 0，于是 Linux 上托盘根本没起过。）
+          let ic = @win.icon_from_bgra(tray_icon_pixels(32), 32, 32)
+          match @core.Tray::new("libyue-showcase-tray", icon=ic) {
+            Ok(t) => {
+              t.set_tooltip("libyue 演示板", "左键计数 · W 族门面")
+              t.on_click(fn() {
+                tray_clicks.update(fn(n) { n + 1 })
+                app.toast_push("托盘左键被点了", @ui.Info)
+              })
+              tray_holder.val = Some(t)
+              tray_note.set("已建（\{t.backend_name()}）")
+            }
+            Err(e) => {
+              tray_note.set(tray_err_text(e))
+              match ic {
+                Some(x) => x.free()
+                None => ()
               }
-            None => tray_note.set("建图标失败")
+            }
           }
           w
         }),
