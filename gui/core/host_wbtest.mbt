@@ -229,6 +229,33 @@ test "弹层摆位：贴着屏幕边翻到锚点另一侧，未知屏幕只钳�
 }
 
 ///|
+/// 按控件 id 局部置脏：只标命中那扇窗的脏区，别的窗不沾；找不到才整窗兜底。
+test "invalidate_id 只标命中窗的局部脏区" {
+  host_reset()
+  let a1 = fake_open()
+  let a2 = fake_open()
+  let kid = Widget::new()
+  kid.set_size(20.0, 12.0)
+  a1.root.append_child(kid)
+  invalidate_id(kid.id)
+  assert_true(a1.dirty)
+  assert_false(a1.dirty_full)
+  match a1.dirty_rect {
+    Some(_) => ()
+    None => fail("命中控件应当落下局部脏区")
+  }
+  // 另一扇窗没被牵连（广播式 invalidate 会给它整窗脏）
+  assert_false(a2.dirty)
+  assert_true(a2.dirty_rect is None)
+  // 所有窗都没有这个 id：回退整窗广播
+  invalidate_id(987_654)
+  assert_true(a1.dirty_full)
+  assert_true(a2.dirty_full)
+  assert_true(a1.dirty_rect is None)
+  host_reset()
+}
+
+///|
 /// 整窗置脏（`full=true`）在同批内不可被局部置脏收窄成小矩形。
 test "整窗置脏之后同批的局部置脏不许收窄脏区" {
   let r1 = { x: 10.0, y: 10.0, w: 20.0, h: 20.0 }

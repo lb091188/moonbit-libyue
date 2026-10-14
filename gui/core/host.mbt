@@ -126,6 +126,29 @@ pub fn host_repaint_all() -> Unit {
 }
 
 ///|
+/// 按控件 id 局部置脏：命中哪扇窗就把该控件的矩形并进那扇窗的脏区（动画这类
+/// 「只影响一个控件」的自驱动用它，不必整窗广播）。
+/// 所有窗都找不到（已卸载/隐藏）回退整窗广播——宁可多画，不可漏画。
+pub fn invalidate_id(id : Int) -> Unit {
+  if id <= 0 {
+    return
+  }
+  let mut hit = false
+  for a in host_windows() {
+    match a.root.by_id(id) {
+      Some(w) => {
+        a.mark_widget_rect(w)
+        hit = true
+      }
+      None => ()
+    }
+  }
+  if !hit {
+    host_repaint_all()
+  }
+}
+
+///|
 /// 清空注册表并退回未起动态（`App::shutdown` 拆完窗之后调用，
 /// 于是同进程再开一窗又会成为主窗）。
 pub fn host_reset() -> Unit {

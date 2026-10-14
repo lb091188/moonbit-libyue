@@ -43,6 +43,7 @@ ui 只管组件，三包职责不混。
 | 定位 | `position`（`relative` / `absolute`）、`top`、`right`、`bottom`、`left`、`z_index` | Yoga（`set_position` / `set_top` …底层现成，含百分比 inset；`z_index` 由 yoga-mbt 随 P1 补齐，见 §5）。Style 首批只开逻辑像素值，百分比入口同 `width_percent` 形态另开 |
 | 状态 | `hover`、`active`、`focus`（各是一个嵌套 `Style`） | 绘制期按控件状态选桶，见 §1.3 |
 | 效果 | `opacity`、`box_shadow`（硬阴影外扩量） | `opacity` 落 `Widget.alpha_paint`（绘制遍历累乘）；`box_shadow` 落 `Widget.shadow_paint`，绘制遍历时把**本控件的裁剪窗口**四周放大这么多，阴影才画得出盒外（祖先自己会把它裁掉，与 CSS `overflow:hidden` 同义）；本体由 `view` 在填充之前调 `Painter::box_shadow` |
+| 过渡 | `transition_ms`（状态桶切换的时长，毫秒） | 只在**绘制期**生效：`style_for` 的出口按真实时间把「当前显示值 → 目标桶值」插一帧出来。参与插值的只有每帧从样式槽读出的属性——`color`、`background_color`、`border_color`、`border_width`、`border_radius`；进布局的属性（字号、行高、尺寸……）切换即生效，插值它们等于每帧重排。帧驱动走进程级定时器，每拍只给活动中的控件局部置脏，全部收敛即停表 |
 | 其它 | `visibility`、`cursor` | 宿主 `Widget`（`set_visible` / `cursor`） |
 
 ### 1.2 没有的属性（写不出来，而不是运行时报错）
@@ -522,15 +523,14 @@ fn render(ctx : Ctx) -> @core.Node {
 | P2 | 组件改名（按 §2 映射表，含 `_t` 合并）+ `on_*` 统一 + 散参数改名并折算成匿名 `Style`（排解析序列最前）+ 展示类组件补 `_dyn` 信号版（§3 第 5 条通则）+ **逐组件把 `on_draw` 从「读捕获的散参数」改成「读 `self` 上的样式并按状态选桶」** | 全仓 `moon check` 零错零警，910 处调用点全切完，观感逐页比对不回退 |
 | P3 | 响应式补强：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` / `mount_window` 补 `render` 槽（挂载时调用一次建首帧，§4.0；与节点数组二选一） | 分包测试 + 现有 Store 用例不回归 + `hello-themed`/`sysmonitor` 静态挂载形态不回归 |
 | P4 | 绘制能力补齐：**`Painter` 全局 alpha**（`opacity`：alpha 进绘制状态机，铺满填充 / 描边 / 文本 / 图片全路径，`Style` 开 `opacity` 字段——颜色级 alpha 已有，本批补整层）+ `box_shadow`（硬阴影档：偏移多层圆角矩形先行，模糊档随 blur 能力再评估） | 各自用例（opacity 含全路径覆盖验证）+ 回写 `docs/zh/adaptation.md` |
-| P5 | 动画：`transition`（状态桶属性插值 + 帧驱动，复用 gif 的虚拟时钟与 `invalidate` 回路）——**开工闸门见本表下方注** | 各自用例 + 回写 `docs/zh/adaptation.md` |
+| P5 | 动画：`transition`（状态桶属性插值 + 帧驱动）——`Style` 开 `transition_ms`，`style_for` 出口按真实时间插帧（插值集合见 §1.1「过渡」行），帧驱动复用进程级 `set_timeout`，每拍只给活动中的控件局部置脏（`invalidate_id`），全部收敛即停表 | 插值与状态机用例 + 真机观感（showcase「过渡与效果」页）+ 回写 `docs/zh/adaptation.md` |
 
 `on_*` 与散参数改名都在 P2 的改名范围内，合批做，P1 之前不加批。
 
-**P5 的开工闸门是性能，不是设计。** `transition` 的本质是「连续置脏重绘」，而本栈
-Windows/mac 走纯软件光栅：没有脏矩形之前，动画每一帧都是一次全窗重绘（§6.6 性能批
-的实测形态）。P4 的 `opacity` / `box_shadow` 是**静态属性**（画一帧就够），可以先行；
-P5 排在 §6.6「脏矩形重绘 + 文本布局缓存」落地并量出「局部变化一帧 < 16ms」之后。
-判据与读数写在 `docs/zh/adaptation.md` 与 TODO §6.6，不在此重复。
+**动画的代价就是「连续置脏重绘」每帧多少钱**，所以它排在脏矩形与文本布局缓存之后：
+局部脏区一帧的实测读数决定过渡能开多长，不决定它怎么设计（读数与判据写在
+`docs/zh/adaptation.md`，不在这里重复）。P4 的 `opacity` / `box_shadow` 是**静态属性**
+（画一帧就够），不参与插值集合。
 
 每批单独提交；实测坑按 `AGENTS.md` 规则 7 回写 `docs/zh/adaptation.md`；使用类说明写进
 `docs/zh/` 下的使用文档，不写进本文件。

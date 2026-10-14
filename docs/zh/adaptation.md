@@ -1804,6 +1804,19 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **通用口径**:`Option` 承载「两种不同的无」迟早出这类事故——同一个 `None` 表示「整窗」又表示「空集」时,任何「往累积里并一笔」的操作都会把强语义写成弱语义。要么加一位标志(本批做法),要么换成显式枚举(`Whole | Region(Rect)`)。
 - **验证**:core 新增 1 条纯函数回归(未请求整窗时照常累积成并集;已请求整窗时局部置脏不得写成小矩形;裁剪框整窗优先),`moon test core` 133/133、分包全跑 882/882(13 包逐个绿)、`cd gui && moon check --deny-warn` 零警告。真机复验(用户执行):showcase 切段/切页后**鼠标不动**应立即看到新页,复跑 `moon run examples/showcase` 退出贴 `SHOWCASE-PROF` 行(`frames` 不应因这一改动上涨——只在同批已有整窗请求时维持整窗语义)。
 
+## 前端化 P5:`transition` 属性过渡(状态桶插值 + 帧驱动,2026-10-14)
+
+- **插值集合按「每帧从样式槽读出」这条线划**:参与过渡的只有 `color` / `background_color` / `border_color` / `border_width` / `border_radius`。理由不是省事——进布局的属性(字号、行高、尺寸、边距)一旦插值,每一帧都要重排整树;`opacity` / `box_shadow` 的生效点在 `apply` 落 `Widget.alpha_paint` / `shadow_paint`,绘制遍历按的是宿主字段而不是槽,插值它们不会有效果。集合外的属性**切换即生效**,`step` 比较的是「插值字段投影」,投影相等就直接落定。
+- **状态机口径**:①第一次见到某条控件只记目标、不动画(否则建树与重挂会整片淡入);②目标中途变化时从**当前显示值**续接(`from = shown`,反向打断不跳变);③同一目标按原时钟继续,非插值字段跟着新目标走;④`transition_ms` 未写或 0 立刻落定,并且**不留账**(`style_for` 走 `forget_anim`)。缓动取 smoothstep(`t·t·(3-2t)`)。
+- **帧驱动只维持一条定时器**:进程级 `@core.set_timeout(16)` 起表,每拍只给活动中的控件调 `@core.invalidate_id(id)`(命中哪扇窗标哪扇窗的脏区,所有窗都找不到才整窗广播兜底),全部收敛即停表——不按控件各排一条,也不空转。插值按**真实经过时间**算而不是数拍数,所以掉帧/宿主忙只会少几帧,不会让动画变快变慢。隐藏中的账在超时那一拍补交终点值并标脏一次,不留长尾。
+- **颜色两端的取法**:`Var` token 现取当前主题再混色(`@theme.mix_hex`),所以过渡中途换主题,这一段动画的端点色停在换色前的值,下一次切换才跟上新主题——主题切换本就整窗置脏,不构成可见缺陷。任一端没写、或写法不是 hex(命名色那类)时 `mix_hex` 退成端点值,中间帧停在起点、终点仍是目标值,**不会画错颜色**。
+- 工具链读数(moon 0.1.20260920,`cd gui && moon check --deny-warn` 口径):
+  - **`pub(all) enum Color` 不带 `==`**:`Option[Color]` 参与的元组比较直接报 `[4018] Type Color does not implement trait Eq`。与既有记档同族(给值类型 `derive(Eq)` 会把 impl 方法隐式升成普通方法并告警),所以**状态比较一律走字符串投影**(按写法前缀 `#`/`n`/`@` 区分 Hex/Named/Var),不 derive。
+  - **包内私有结构必须写 `priv struct`**:裸 `struct Anim` 报 `missing_priv` 警告,在 `--deny-warn` 下即失败。
+  - **`}` 与下一段条件的 `{` 不能分行**:`} else if cond` 换行再写 `{` 报 `[3002] Unexpected line break here, missing {`——花括号必须跟在条件那一行行尾(与 `test "名字" {` 同一条纪律)。
+  - **`moon fmt` 会顺手改一堆无关文件**:本仓已提交内容**不是** fmt 的规范形态(`moon fmt style core` 一次改了 42 个文件,含 `keys.mbt` 里给每条 `pub const` 前插空行这类)。要格式化只按**本批文件**跑,且跑完逐行看 diff;本批按「只改自己写的行」收口。
+- **验证**:style 新增 6 条(插值端点/中点/单端缺省、状态机首帧不动画、150ms 三点读数 `#000000→#808080→#d7d7d7→#ffffff`、中途反向从 `#282828` 续接、集合外属性直接落定、没配过渡不留账)、core 新增 1 条(`invalidate_id` 只标命中窗、另一扇窗不牵连、未知 id 回退整窗),`moon test style core` 159/159、13 库包全绿合计 908/908、`cd gui && moon check --deny-warn` 零警告、`cd examples && moon check showcase --deny-warn` 零警告。观感页:showcase 新增「过渡与效果」页(0/150/600ms 三块对照 + 反向打断 + 文本与效果字段),真机复验归用户(悬停三块比较速度、中途移开看是否跳变)。
+
 ## 前端化 P1:gui/style 样式包与 yoga-mbt z_index(2026-10-13)
 
 工具链边界(moon 0.1.20260920 / moonc v0.10.14,读数随升级要重测,同步 design.md §1.6):

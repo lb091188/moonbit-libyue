@@ -69,6 +69,8 @@ pub fn style(
   // —— P4：整层透明度与硬阴影半径（逻辑像素；模糊档随 blur 能力再评估）
   opacity? : Double,
   box_shadow? : Double,
+  // —— P5：状态桶切换的过渡时长（毫秒；参与插值的字段见 §1.5）
+  transition_ms? : Double,
   // —— 其它
   visibility? : Visibility,
   cursor? : Int,
@@ -188,6 +190,7 @@ pub fn style(
   s.z_index = z_index
   s.opacity = opacity
   s.box_shadow = box_shadow
+  s.transition_ms = transition_ms
   s.visibility = visibility
   s.cursor = cursor
   s.hover = hover

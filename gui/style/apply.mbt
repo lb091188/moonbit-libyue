@@ -18,6 +18,7 @@ fn install_drop_hook() -> Unit {
     drop_hook_installed.val = true
     @core.set_widget_discard_hook(fn(id : Int) -> Unit {
       let _ = resolved_table.remove(id)
+      forget_anim(id)
     })
   }
 }
@@ -210,6 +211,8 @@ pub fn resolved_by_id(id : Int) -> Style {
 /// 并存时的优先级是 hover < focus < active（后并入的赢，与 CSS 的 :active 盖过
 /// :hover 同向）——按下态必然也在悬停态里，反过来写就永远看不见按下反馈。
 /// 布局期不读它（状态桶签名里没有布局属性，§1.5 第五条）。
+/// 写了 `transition_ms` 的块，出口再过一道按帧插值（§5 P5）：交出去的是
+/// 「这一帧该画的值」，不是目标值。
 pub fn style_for(w : @core.Widget) -> Style {
   let base = resolved(w)
   let mut out = base
@@ -231,7 +234,17 @@ pub fn style_for(w : @core.Widget) -> Style {
       None => ()
     }
   }
-  out
+  let animated = match out.transition_ms {
+    Some(v) => v > 0.0
+    None => false
+  }
+  if animated {
+    step(w.id, out, @core.now_ms())
+  } else {
+    // 没配过渡的控件不留账
+    forget_anim(w.id)
+    out
+  }
 }
 
 ///|

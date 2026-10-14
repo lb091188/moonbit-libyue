@@ -55,6 +55,8 @@ pub(all) struct Style {
   // —— P4：整层透明度（0..1，画期把 global alpha 乘进全路径）与硬阴影
   mut opacity : Double?
   mut box_shadow : Double?
+  // —— P5：状态桶切换的过渡时长（毫秒；不写或 0 = 直接切换）
+  mut transition_ms : Double?
   // —— 其它（落宿主 Widget）
   mut visibility : Visibility?
   mut cursor : Int?
@@ -113,6 +115,7 @@ pub fn empty_style() -> Style {
     z_index: None,
     opacity: None,
     box_shadow: None,
+    transition_ms: None,
     visibility: None,
     cursor: None,
     hover: None,
@@ -199,6 +202,7 @@ pub fn merge(base : Style, over : Style) -> Style {
   s.z_index = pick(base.z_index, over.z_index)
   s.opacity = pick(base.opacity, over.opacity)
   s.box_shadow = pick(base.box_shadow, over.box_shadow)
+  s.transition_ms = pick(base.transition_ms, over.transition_ms)
   s.visibility = pick(base.visibility, over.visibility)
   s.cursor = pick(base.cursor, over.cursor)
   s.hover = pick_style(base.hover, over.hover)
@@ -518,5 +522,13 @@ pub fn Style::set_opacity(self : Style, v : Double?) -> Style {
 ///|
 pub fn Style::set_box_shadow(self : Style, v : Double?) -> Style {
   self.box_shadow = v
+  self
+}
+
+///|
+/// 状态桶切换的过渡时长（毫秒）。参与插值的只有绘制期字段（§1.5），时长写在
+/// 基块上、由 class 逐属性覆盖；不写或 0 就是直接切换。
+pub fn Style::set_transition_ms(self : Style, v : Double?) -> Style {
+  self.transition_ms = v
   self
 }

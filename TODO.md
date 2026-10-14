@@ -74,7 +74,8 @@
   - [ ] 观感逐页比对不回退（真机由用户复验，`examples/hello`、`hello-themed`、`showcase`、`native-app`、`sysmonitor`）。
 - [x] **P3 响应式补强**（2026-10-14 落地）：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘（`tick`）/ `for_list`+`when` / `mount_window_render` 的 `render` 槽 / `Store` 内建去重（`T : Eq` 走 `set_eq`，已定案）全部落地。
 - [x] **P4 绘制能力**：`Painter` 全局 alpha（opacity 全路径）+ `box_shadow` 硬阴影档（真机观感复验归 `_人工测试清单.md`；模糊档待 blur 能力再评估）。
-- [ ] **P5 动画（已改排到性能批之后，2026-10-14 定）**：`transition` 本质是连续置脏重绘，纯软件光栅路径上「没有脏矩形 = 每帧一次全窗重绘」；先做 §6.6「脏矩形重绘 + 文本布局缓存」，量出局部变化一帧 < 16ms 再开工（判据见 design.md §5 末与 adaptation）。P4 的 opacity/box_shadow 是静态属性，不受此闸门影响，已先行落地。
+- [x] **P5 动画 `transition`**（2026-10-14 落地，脏矩形 + 文本缓存先行到位后开工）：`Style` 开 `transition_ms`（工厂 `transition_ms=` / `set_transition_ms`），`style_for` 出口按真实时间把「当前显示值 → 目标桶值」插一帧出来；插值集合=三条颜色 + `border_width` + `border_radius`（每帧从样式槽读出的那几条），进布局的属性切换即生效，`opacity`/`box_shadow` 是 `apply` 落宿主字段的静态属性也不插。帧驱动=进程级 `set_timeout(16)` 一条表，每拍只给活动中的控件 `invalidate_id` 局部置脏，全部收敛即停表；目标中途变化从当前帧值续接（反向打断不跳变），首次见到控件不动画。缓动 smoothstep。回归：style 6 条（端点/中点/续接/集合外属性/不留账）+ core 1 条（`invalidate_id` 只标命中窗）。观感页：showcase 新增「过渡与效果」页（0/150/600ms 三块对照 + 文本与效果字段）。
+
 
 ### 控件（一律自绘，不再引入原生控件皮肤；家族名对应 master `yue/components/` 九个源文件）
 - [~] 基础原语：`group`/`separator`/标签/图像/图标/按钮已落新包 **`ui`**（首批 7 件，另附 `container`；文本 measure/baseline 首次回灌布局引擎，`on_pointer`/`on_draw` 首参为控件本身以免自捕获引用环；`type=` 因是保留字改 `kind : ButtonKind`；`yue/components` 属旧链路红点，按批替换）；表单族 15 件已全部落 `ui/form.mbt` + `ui/entry.mbt` + `ui/textarea.mbt`；`tab` 已由 `ui/nav.mbt` 的 `tabs_t` 承担（页签头行 + 预建页区显隐），`scroll` 已落 `ui/scroll.mbt`（垂直滚动容器 + 自绘滚动条，平移用 yoga 新补的相对定位偏移），`splitter` 已落 `ui/split.mbt`（`hsplit`/`vsplit`）、`combo` 已落 `ui/form.mbt`
@@ -346,7 +347,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$MSVC/bin/Hostx64/x64/cl.exe" \
 - [x] **自转组件的无效重绘闸门**（2026-10-14）：轮播/动图原来只判 `paused`，**所在页被隐藏时照样每周期切页 + `invalidate()` ⇒ 整窗重绘白做**。core 加进程级绘制轮次（`bump_paint_epoch` / `Widget.paint_epoch` / `is_painted`：过了 visible 与视口剔除才记账），自转回调改成「本帧没被画到就只排下一拍」。控件没有指向父控件的引用（父子互指是引用环，断不掉），所以只能用「这帧有没有画到我」回答「我被藏了吗」。判据与配套测试坑（轮次是进程级的，派拍型测试必须先画一帧）见 `docs/zh/adaptation.md` 同批条。
 - [ ] **文本布局缓存的 1024 超限整表清空策略待 Windows 实测**（`323b537` 引入）：本机 Pango 路径 cold(1680 条不同文本) 与 warm 持平（3.35 vs 3.25 ms/帧），说明这条路径不吃亏；**Windows/DWrite 侧没量过**，而 showcase 这种上千条不同文本的页面正好踩在上限之上——若真机账本 `paint` 占比高且 `frames` 正常，就把整表清空换成按键淘汰。对照判据已留：`moon run experiment/showcase_cost_bench`（同树换版本），真机读数 `SHOWCASE-PROF` / `showcase-prof.txt`。
 - [x] **脏矩形重绘的收窄缺陷**（2026-10-14，真机反馈「切段/切页不刷新、要鼠标划过才更新」）：`dirty_rect=None` 一词双义（整窗 / 还没有脏区），同批里整窗请求后来一次 hover 局部置脏就被并成小矩形。加 `App.dirty_full` 闩（`accept_widget_rect` 只维持不收窄、`dirty_clip` 整窗优先，两个纯函数各钉回归），根因与判据见 `docs/zh/adaptation.md` 同批条。
-- [ ] **悬停/点击反馈的帧成本量化**（脏矩形已落地后的收益项，未量；**现在是 P5 动画的开工闸门**，见 §「前端化批次」与 design.md §5 末）：局部脏区一帧要花多少钱，由 `SHOWCASE-PROF` / `anim_cost_bench` 的小脏区档读数定档（滚动仍要全视口重画，收益在悬停与点击）。
+- [ ] **悬停/点击反馈的帧成本量化**（脏矩形已落地后的收益项，未量；P5 已按小脏区读数开工）：局部脏区一帧要花多少钱，由 `SHOWCASE-PROF` / `anim_cost_bench` 的小脏区档读数定档（滚动仍要全视口重画，收益在悬停与点击）。
 - [ ] **光栅微优化**（未做）：`raster.mbt` / `raster_fill.mbt` 每次 fill/stroke 都新分配一条 width 长的 `cov` 数组（每帧数百次）；不透明实心填充可走「无覆盖率」快路径；`raster.mbt` 里根背景那 126 万像素的全窗填充占单帧成本的可观一份。
 - [ ] **文本布局缓存**（未做，单帧成本里最重的一块）：`text/dwrite_text.cpp` 的 `ptw_session_layout` 每次 `rt_measure` / `rt_draw` 都新建 `IDWriteTextFormat` + `IDWriteTextLayout`（**同一条文本一帧建两次**），`AttributedText::rt()` 每个文本节点每帧开两个会话，且 `rt_new`/`rt_free` 每帧重来、无跨帧缓存；`ui` 的 label/button/表格单元格一律走这条路。布局（yoga）每帧还会为**全树**文本节点各测一次，屏外的也照测。
 - [ ] **量出来再优化**：上面三条都还没在真机上分档计时（`experiment/text_bench` 已有先例可扩展）。建议先做一个「单帧成本分解」探针（根背景填充 / 控件绘制 / 文本 / memcpy+StretchDIBits 各占多少），再决定动哪一块。
