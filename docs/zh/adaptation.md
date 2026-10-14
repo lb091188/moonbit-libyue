@@ -1804,6 +1804,12 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **通用口径**:`Option` 承载「两种不同的无」迟早出这类事故——同一个 `None` 表示「整窗」又表示「空集」时,任何「往累积里并一笔」的操作都会把强语义写成弱语义。要么加一位标志(本批做法),要么换成显式枚举(`Whole | Region(Rect)`)。
 - **验证**:core 新增 1 条纯函数回归(未请求整窗时照常累积成并集;已请求整窗时局部置脏不得写成小矩形;裁剪框整窗优先),`moon test core` 133/133、分包全跑 882/882(13 包逐个绿)、`cd gui && moon check --deny-warn` 零警告。真机复验(用户执行):showcase 切段/切页后**鼠标不动**应立即看到新页,复跑 `moon run examples/showcase` 退出贴 `SHOWCASE-PROF` 行(`frames` 不应因这一改动上涨——只在同批已有整窗请求时维持整窗语义)。
 
+## 观感修正:`badge_dot` 由方角改真圆点(2026-10-14)
+
+- **现象/根因**:`badge_dot` 注释与命名都是「圆点徽标」,但绘制走的是 `fill_rect`——出来是个 8×8 方角块。属前端化 P2-e 记档的边界项(当时只迁样式通道、不改画法)。
+- **修复**:改走 `Painter::fill_round_rect`,默认半径 = 短边一半(内切圆);`class` 给了 `border_radius` 就按它,并夹到短边一半以内——想要方角写 `border_radius=0.0`,旧画法这条路仍然可达。底色仍从样式槽现取(`color_of(s.background_color, "")`),主题切换照旧跟。
+- **验证**:`moon test ui` 150/150,新增 1 条像素回归——16×16 档下左上角那格无墨、中心有墨(内切圆判据),`class=[style(border_radius=0.0)]` 档左上角有墨。真机观感(`showcase` 数据展示页 / `native-app` 的圆点)归 `_人工测试清单.md`。
+
 ## 前端化 P5:`transition` 属性过渡(状态桶插值 + 帧驱动,2026-10-14)
 
 - **插值集合按「每帧从样式槽读出」这条线划**:参与过渡的只有 `color` / `background_color` / `border_color` / `border_width` / `border_radius`。理由不是省事——进布局的属性(字号、行高、尺寸、边距)一旦插值,每一帧都要重排整树;`opacity` / `box_shadow` 的生效点在 `apply` 落 `Widget.alpha_paint` / `shadow_paint`,绘制遍历按的是宿主字段而不是槽,插值它们不会有效果。集合外的属性**切换即生效**,`step` 比较的是「插值字段投影」,投影相等就直接落定。

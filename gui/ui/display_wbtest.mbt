@@ -68,6 +68,29 @@ test "标签与徽标按内容定宽，超上限显示 99+" {
 }
 
 ///|
+test "圆点徽标画圆：角上无墨中心有墨，class 给 border_radius=0 才是方角" {
+  let (_, round_dot) = mounted(badge_dot(size=16.0), 24.0, 24.0)
+  let bm = @render.Bitmap::new(24, 24)
+  let p = @render.Painter::new(bm)
+  round_dot.paint(p)
+  p.end()
+  // 内切圆：左上角那个像素离圆心 (8,8) 的距离 = 8*sqrt(2) > 半径 8
+  assert_eq(px(bm, 0, 0).3, 0)
+  assert_true(px(bm, 8, 8).3 > 0)
+  assert_true(ink_count(bm, 16, 16) > 0)
+  let (_, square_dot) = mounted(
+    badge_dot(size=16.0, class=[@style.style(border_radius=0.0)]),
+    24.0,
+    24.0,
+  )
+  let bm2 = @render.Bitmap::new(24, 24)
+  let p2 = @render.Painter::new(bm2)
+  square_dot.paint(p2)
+  p2.end()
+  assert_true(px(bm2, 0, 0).3 > 0)
+}
+
+///|
 test "头像取首字符、统计块按内容定宽" {
   if !ui_text_guard() {
     return

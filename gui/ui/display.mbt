@@ -350,7 +350,9 @@ pub fn badge_dot(
     ) -> Unit {
       let s = @style.style_for(self)
       p.set_fill_color(@style.color_of(s.background_color, ""))
-      p.fill_rect(0.0, 0.0, r.w, r.h)
+      // 圆点=直径的一半；class 给了 border_radius 就按它（要方角写 0）
+      let half = r.w.min(r.h) / 2.0
+      p.fill_round_rect(0.0, 0.0, r.w, r.h, @style.number_of(s.border_radius, half).min(half))
     })
     w
   })
