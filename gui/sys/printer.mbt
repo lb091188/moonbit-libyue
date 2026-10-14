@@ -477,6 +477,13 @@ fn prt_win_status(code : Int) -> PrinterStatus {
 }
 
 ///|
+///|
+/// Windows 直调：ShellExecuteW「print」动词打印文件。
+#borrow(path)
+#borrow(ok)
+extern "c" fn ffi_shell_print(path : Bytes, ok : Ref[Int]) -> Int = "yue_sys_shell_print"
+
+///|
 pub fn prt_supported() -> Bool {
   if sys_platform() == "windows" {
     // winspool 恒在；列表能取（哪怕空）即算可用
@@ -579,6 +586,19 @@ pub fn prt_print(
   }
   if copies < 1 {
     return Err(PrtInvalidParam("份数必须 ≥ 1：\{copies}"))
+  }
+  if sys_platform() == "windows" {
+    // ShellExecute「print」动词：交给文件关联应用、落默认打印机；
+    // copies > 1 不支持（关联应用不收份数参数）
+    if copies > 1 {
+      return Err(PrtInvalidParam("Windows 打印动词不支持份数参数（copies=\{copies}）"))
+    }
+    let ok = Ref(0)
+    let _ = ffi_shell_print(@utf8.encode(path), ok)
+    if ok.val == 1 {
+      return Ok(())
+    }
+    return Err(PrtCommandFailed("ShellExecute print 失败（该类型无关联打印应用）"))
   }
   match
     prt_run_tool("lp", prt_print_args(printer, path, copies), timeout_ms=10000) {

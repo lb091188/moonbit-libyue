@@ -1987,6 +1987,26 @@ int32_t yue_sys_shell_open(const char *target, int32_t *ok) {
 #endif
 }
 
+// 用文件的关联应用打印：ShellExecuteW「print」动词（走默认打印机）。
+int32_t yue_sys_shell_print(const char *path, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  wchar_t *wpath = win_utf8_wide(path, 0);
+  if (wpath == NULL) {
+    return 0;
+  }
+  HINSTANCE h = ShellExecuteW(NULL, L"print", wpath, NULL, NULL, SW_SHOWNORMAL);
+  free(wpath);
+  if ((intptr_t)h > 32) {
+    *ok = 1;
+  }
+  return 0;
+#else
+  (void)path;
+  return 0;
+#endif
+}
+
 // 文件管理器里定位文件：explorer /select,"path"。
 int32_t yue_sys_shell_reveal(const char *path, int32_t *ok) {
   *ok = 0;

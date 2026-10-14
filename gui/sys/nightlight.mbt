@@ -168,6 +168,11 @@ fn nl_backend() -> NlBackend? {
 /// 当前系统是否支持夜间色温调节（redshift 或 xrandr 任一可用）。
 /// 每次调用真实探测，高频场景请调用方自行缓存结果。
 pub fn nl_supported() -> Bool {
+  // Windows 无公开色温 API：夜间模式状态存 CloudStore 二进制 blob，
+  // 跨版本脆弱，本批不做 hack（诚实 Unsupported，gamma 直调另批评估）
+  if sys_platform() == "windows" {
+    return false
+  }
   nl_backend() is Some(_)
 }
 
