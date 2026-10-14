@@ -25,7 +25,7 @@
 
 ### 原生渲染/文本矩阵与文字三层差异(新栈定案,2026-10-11)
 
-- **平台矩阵**:Linux=GTK3 窗口 + cairo 光栅 + Pango 文本(系统库动态链,LGPL 无义务);Windows=纯 MoonBit 软件光栅器 + DirectWrite 文本 + WIC 图片解码(全部系统组件,零第三方依赖);macOS=CoreGraphics + CoreText(**桩占位,后端暂未开发**)。**sys 能力族双平台真实现(平台批①-⑥,2026-10-14)**:wallpaper/idle/launcher/desktop/powerprofile/sysinfo/windowctl/appfind/recent_files/volume/printer/print/browser/vscode 共 17 项,每项带真机读数环,sys 188/188;详见 system-capabilities.md 的平台状态表。曾评估 vcpkg 静态链 cairo/pango,因依赖重(glib/fontconfig/harfbuzz 全家)+ LGPL 静态链「提供重链接途径」义务,与本库「原生、轻量、无负担」定位相悖而弃。
+- **平台矩阵**:Linux=GTK3 窗口 + cairo 光栅 + Pango 文本(系统库动态链,LGPL 无义务);Windows=纯 MoonBit 软件光栅器 + DirectWrite 文本 + WIC 图片解码(全部系统组件,零第三方依赖);macOS=CoreGraphics + CoreText + ImageIO + WKWebView(**mac 平台批落地中,详见「macOS 后端首批」节**)。**sys 能力族双平台真实现(平台批①-⑥,2026-10-14)**:wallpaper/idle/launcher/desktop/powerprofile/sysinfo/windowctl/appfind/recent_files/volume/printer/print/browser/vscode 共 17 项,每项带真机读数环,sys 188/188;详见 system-capabilities.md 的平台状态表。曾评估 vcpkg 静态链 cairo/pango,因依赖重(glib/fontconfig/harfbuzz 全家)+ LGPL 静态链「提供重链接途径」义务,与本库「原生、轻量、无负担」定位相悖而弃。
 - **文字三层差异与对策**:①**高度**——行高统一为 `max(引擎自然行高, ceil(size×K))`,K 实测三平台覆盖最肥字体(微软雅黑)后定为常量,行高成为 size 的纯函数,回退字体不再影响行高,多出空间半行距上下居中、取整写死;异字体超地板时行高就地长高(优雅退化不裁字形)。②**宽度**——折行/截断/省略全部是 MoonBit 组件层决策(平台只供测量),textarea 的 wrap_units/layout_lines 纯函数不动;CJK advance≈em 实际无差,拉丁差一个词(折行/省略点边界),内容不丢失。③**像素**——矢量层(矩形/路径/AA/25 混合模式/渐变)由 MoonBit 光栅器三平台同一实现、逐位一致,断言跨平台共用;文字度量/像素分平台固有(旧栈即 Pango/DirectWrite/CoreText 三引擎),断言分「结构性(共用)/数值(平台基线目录)」两档,默认字体按平台显式编码进主题(Windows 钉雅黑系,Linux 跟 fontconfig)。
 - **Linux 红利**:cairo 与 MoonBit 光栅器可逐像素对拍,cairo 当标准答案验收自研引擎(渲染批 W4 的验收手段)。
 - **平台 C 桩组织**:单一 `stub.c` 多分支 + prebuild 宏(见「Windows 窗口地基 W2」小节的 win/stub.c 先例);render/text 的桩合并照此办理,Windows 侧不引任何 C 渲染/文本库(仅 WIC 属系统组件)。
@@ -2092,6 +2092,25 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
   - 原生档收框补一条口径:`overlay_fit_pass` 的三帧预算用尽后**仍放行放大**——内容长宽了框子不跟着长就会把多出来的部分切掉;收缩仍受三帧限制(宽度回环里不来回改尺寸)。
 - **没动的一条,记档**:图层是根控件的满窗 absolute 子控件,只要有任何浮层开着,浮层之外的按下仍被图层消费(`core/overlay.mbt` 的「点浮层外收起」)——轻提示在屏的那两秒里,点页面控件收不到这一击。这是浮层族的共同输入模型,本批只收视觉尺寸,派发不动;要不要让「本来就没有点外收起语义」的浮层(轻提示)放行点击,另批定。
 - **验证**:`moon test core ui` 299/299(core 新增 1 条:`overlay_set_pos` 搬动后 `overlay_rect_of` 落在新窗口坐标、未知句柄给 false;ui 轻提示用例补断言:浮层矩形宽高都小于窗口、`toast_left` 的居中与钳 0 三点)、库全包 914/914、`cd gui && moon check --deny-warn` 与 `cd examples && moon check --deny-warn` 零警告、`moon build showcase --target native` 链接通过。真机观感(提示条外不再有整窗底色、逐条推来宽度变化仍居中)归 `_人工测试清单.md` S18。
+
+## macOS 后端首批（mac 平台批①-⑤，2026-10-15；编译与链接由 CI 的 macOS job 回证，真机项待复验）
+
+- **环境**：GitHub Actions `macos-latest`（Apple Silicon，Xcode CLT 自带 clang 与 SDK 框架）。**本地开发机是 Ubuntu/X11，摸不到 macOS 的窗口服务**，所以这一族的「编得过、链得上」全部由 CI 证明，「跑得起来、看起来对」按 AGENTS 规则 6 交真机（清单在 `_人工测试清单.md` 的 T 节）。
+- **分支形态（与 Linux/Windows 同一条「单一 stub.c 多分支 + prebuild 宏」）**：`win/stub.c` 的 `WM_STUB_MAC`（Cocoa，Objective-C）、`render/stub.c` 的 `WM_STUB_MAC`（ImageIO，纯 C）、`text/stub.c` 的 `WM_STUB_MAC`（CoreText，纯 C）、`web/webkit_stub.c` 的 `WB_HAVE_WKWEBVIEW`（WebKit，Objective-C）。**占位分支的条件一律加 `&& !defined(__APPLE__)` 闸**：macOS 上 native-stub 那次不带宏的编译必须编出空翻译单元，否则与 prebuild 归档双定义。prebuild 的 Darwin 分支用 `cc -x objective-c -fobjc-arc` 编归档（`link_configs` 没有编译期字段，`c_flags` 被静默忽略——同 GTK/Pango 那条实测），框架按 `-framework` 逐包下发。
+- **实测坑（CI 第一轮就炸出来的两处 API 形态错，记下来免得再犯）**：
+  1. CoreText 的函数**文本对象在前**——`CTLineDraw(line, ctx)`，与 CGContext 一族 `(ctx, ...)` 的直觉相反；
+  2. `CFAttributedStringReplaceString` / `SetAttribute` 收的是 **`CFRange`**，不是 location+length 两个数，且长度要问 `CFAttributedStringGetLength`（拿 `CFStringGetLength` 编不过：类型不同名）；
+  3. 顺带一条非 mac 的：`sys_stub.c` 的 POSIX 臂里 `kill` 在 Linux 上靠别的头顺带声明到，macOS 的 clang 把隐式函数声明直接当错误 → 显式 `#include <signal.h>`。
+- **与另两平台刻意不同、且写进契约的点**：
+  - **事件循环**：不用 `[NSApp run]`，`wm_wait` 走 `nextEventMatchingMask:untilDate:`（AppKit 自己的阻塞取事件），`wm_wakeup` 走 `postEvent:` 投一个 `NSApplicationDefined` 标记事件把它唤醒——本栈「循环归 MoonBit + 不做 C→MoonBit 回调」两条纪律在 mac 上的等价实现。已知限制：拖窗/实时缩放时 AppKit 进 tracking mode，我们的泵拿不到那段事件（T6b 专测）。
+  - **像素尺度**：整栈物理像素，Cocoa 侧一律点，进出边界各按所在屏 `backingScaleFactor` 换算一次；绘制区视图**不设 `isFlipped`**（非翻转视图里 `CGContextDrawImage` 与 `CTLineDraw` 的落点正则是「内存首行=顶行」，翻反而会把字面画倒）。
+  - **文本预乘取整归 ImageIO/Quartz**：Quartz 只在预乘空间合成，RGB 画布拿不到非预乘形态，所以 mac 的像素不再走各平台那句 `(c*a+127)/255`——字节序与语义不变，舍入差 ±1 级，「编码→解码→再编码逐字节稳定」这条判据在 mac 上按「与 ImageIO 自身一致」看。
+  - **GIF 动图 macOS 退回静帧**：分帧合成要逐帧读「帧矩形 + disposal」，而 disposal 不在 Apple 的 GIF 公开属性清单里，无真机回证不硬写（`img_anim_decode_file` 给 0，组件退回首帧）。
+  - **菜单/托盘/通知是 App 级**：`wm_menu_apply` 落 `setMainMenu:`（菜单条属于应用不属于窗口，多窗后挂的赢）；托盘是 `NSStatusItem`；通知是 `NSUserNotification`——**非 bundle 的裸二进制能否弹出通知属待真机确认项**（T4e）。
+  - **任务栏进度 macOS 给不支持**：dock 只有一枚文本角标，画不出进度条语义，不拿它冒充。
+  - **webview**：`wb_signal_mask()` 在 mac 回 10——下载（要 macOS 15 的 `WKDownload`）与权限请求没有公开口，如实报「少哪几条回证」；`wb_persistence()` 按「macOS 14+ 且有 bundle id」探测，裸二进制回 0 并退非持久化存储。
+- **sys 各族的 mac 后端选择**：能用公开 CLI 的不进 C——`open`/`open -R`（揭示与选中）、`sw_vers`/`ioreg`/`sysctl`（系统信息）、`osascript` 的 `volume settings` 与 System Events 桌面图片（音量/壁纸）、LaunchAgents plist + `launchctl load/unload`（自启动）、`lpstat`/`lp`（macOS 自带 CUPS，与 Linux 同一条线，**这是声明过的选择不是漏跑到 Linux 分支**）；只有真要问内核的走桩（`hw.memsize`+`host_statistics64`、`kern.boottime`、`CGEventSourceSecondsSinceLastEventType` 的空闲读数）。四族**明确保持 Unsupported 并加平台门**：windowctl（Accessibility 要用户授权）、nightlight（CoreBrightness 私有）、powerprofile（`pmset` 对不上三值方案语义）、media（无 MPRIS 对等物）。
+- **验证方式**：CI 的 macOS job（`moon check` + 12 包 `moon test` + `moon build --target native` + examples/hello 链接）；真机按 `_人工测试清单.md` T 节走。**尚未回证的点**：T1-T6 全部目视项、plist/launchctl 的实际生效、osascript 的自动化授权、通知是否弹出、Retina 观感与拖窗期间的循环行为。
 
 ## 维护约定
 

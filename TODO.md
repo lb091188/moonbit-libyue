@@ -243,7 +243,7 @@
 
 - **M1** 新栈跑通一个完整 `showcase`（组件 + 图表 + 系统集成页），与旧链路逐页视觉对照 → 同时恢复全仓门禁
 - **M2** Windows 地基与输入通道（W1–W16 已落）＋ Win 基础能力（W20 批，§6）
-- **M3** macOS 地基（取得设备后）
+- **M3** macOS 地基：mac 平台批①-⑤ 已落（窗口/渲染/文本/webview/sys 各族），进度与缺口见 §7；真机目视复验待做
 - **M4** 发布新版本并冻结旧 `shim + libyue` 链路
 
 ## 6. 跨平台能力面（Win 基础能力 + MBT 通用能力）
@@ -385,3 +385,18 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$MSVC/bin/Hostx64/x64/cl.exe" \
 - **跨平台能力批次表（Win 基础能力 + MBT 通用门面）：本文件 §6**（2026-10-12 定；只跟踪跨平台能力，Linux-only 细节不再入表）
 - 旧栈 API 参照面（可平移资产）：`experiment/async_coexist/lab/.mooncakes/NoahLiu/native-gui/yue/`（`tray.mbt`/`menu.mbt`/`misc.mbt`/`widgets.mbt`，本机离线可用）
 - 人工复验清单：`_人工测试清单.md`（跑 `moon run examples/native-app`）
+
+## 7. mac 平台批（macOS 后端落地进度）
+
+> 口径同 §6：**门面定形态 + 各平台后端**。形态与坑记在 [docs/zh/adaptation.md](docs/zh/adaptation.md) 的「macOS 后端首批」节；真机复验清单在 `_人工测试清单.md` 的 T 节；编译/链接门禁是 `ci.yml` 的 macOS job（push 到 `mac` 分支即跑）。
+
+- [x] **批① 窗口后端**（`gui/win/stub.c` 的 `WM_STUB_MAC`，Cocoa）——NSApplication 自建循环（pump/wait/wakeup + `postEvent:` 唤醒位）、CGContext 贴像素、`NSTextInputClient` 输入法通道、原生子件与弹层、NSOpenPanel/NSSavePanel 文件对话框、NSPasteboard、NSMenu/NSStatusItem/NSUserNotification/NSAlert/Carbon 热键/NSImage 图标各自成段；占位分支加 `__APPLE__` 闸防双定义；prebuild 加 Darwin 分支（`-x objective-c -fobjc-arc` 专编归档 + 按包下发 `-framework`）
+- [x] **批② render**（ImageIO 静态图解码，PNG/JPEG/GIF 首帧）+ CI：macOS job 起手补 `moon update`/依赖清单迁移（工具链 2026-10-12 起只认 `moon.mod`/`moon.pkg`，注册表已发布包还带旧清单，三平台 CI 因此从那天起就红——迁移只动 `.mooncakes/` 缓存）
+- [x] **批③ text**（CoreText，纯 C）——自带段落排版器（UTF-8 解码 → 样式段 → 按词/CJK 按字/超长按字符断行 → 每行 CTLine），`pt_measure*`/`pt_font_line_height` 给行盒累加含 leading + 首行基线，`pt_draw*`/`rt_*` 按 `wrapped_axis` 同式对齐、区间色/区间字体「后设覆盖先设」按 UTF-8 字节下标落码点，字族表按字节序升序去重 `\n` 连接；`*_cr` 与批三件按 Windows 档做空桩；顺带把 `pt_render_stats` 纠正成 `.mbt` 声明的四出参形态
+- [x] **批④ web**（WKWebView）——导航/标题/地址经 delegate + KVO 进 per-view 队列、`evaluateJavaScript` 按序号回 kind=7、`WKScriptMessageHandler` + 同形 shim 做页面→原生、公开 `WKURLSchemeHandler` 做自定义协议、`WKHTTPCookieStore` 回 kind=13；三条差异如实出声（不发 kind=9/10、运行期整串 UA 不接私有口、kind=4 由 decidePolicy 给）
+- [x] **批⑤ sys 与 core 分派**——揭示/系统信息/音量/壁纸/自启动走公开 CLI，空闲/内存/开机走桩的 `__APPLE__` 分支，打印族声明为「与 Linux 同走 CUPS」，windowctl/nightlight/powerprofile/media 加 mac 平台门（不再白发进程）；`core/hotkey.mbt` 开 mac 档（Carbon 已落）
+- [ ] **macOS GIF 动图分帧合成**：要逐帧读「帧矩形 + disposal」，disposal 不在 Apple 的 GIF 公开属性清单里——先真机用 experiment 探针把可得性回证，再补（当前 `img_anim_decode_file` 给 0，组件退回首帧静图）
+- [ ] **macOS 多显示器枚举**（`sys/monitor.mbt`）：CLI 侧 `system_profiler` 输出本地化敏感且拿不到逐屏原点，要落 CoreGraphics 的 `CGGetActiveDisplayList`/`CGDisplayBounds`/`CGDisplayCopyAllDisplayModes`；`MonitorInfo` 没有缩放比字段，Retina 口径要先定「新增字段还是复用 width」再动
+- [ ] **macOS 已明确不做的四族**：窗口管理（Accessibility 授权门槛）、夜间模式（CoreBrightness 私有）、电源方案（`pmset` 语义对不上三值方案）、媒体播放器枚举（无 MPRIS 对等物）——若将来要做，得先解决「授权弹窗由谁负责」的产品问题
+- [ ] **macOS 安装自启动的生效回证**：plist 写落点已通（纯函数有测试钉住），`launchctl load` 在新写入文件上的实际生效待真机确认（不通就换 `bootstrap gui/<uid>`，那要先给 sys 补一个取 uid 的口子）
+- [ ] **真机复验 T1-T6 全部目视项**（`_人工测试清单.md`）：CI 只证明「编得过、链得上」；Retina 观感、输入法内联、拖窗期间的循环、通知在非 bundle 进程下是否弹出，都要人看

@@ -2,16 +2,26 @@
 
 系统能力族 API：系统音量、应用查找、夜间色温、壁纸、显示器配置、系统窗口管理、剪贴板监听、子进程执行、电源计划、系统信息、打印机、环境变量、目录枚举、最近文件、浏览器书签与 Firefox 历史、VS Code 本地历史。全部只读或经系统服务授权写入，统一返回 `Result`，不支持的环境给对应错误值而不是崩溃；`*_supported()` 每次调用真实探测当前环境。
 
-## 平台状态（2026-10-14，平台批①-⑥ 后）
+## 平台状态（2026-10-15，mac 平台批①-⑤ 后）
+
+> macOS 列的 **🚧 已接** = 代码在 `mac` 分支、CI 的 macOS job 证明编得过链得上，
+> **真机目视/读数额外未回证**（清单在 `_人工测试清单.md` 的 T 节）；**❌ Unsupported**
+> = 本批明确不做并让门面如实出声，两种都不等于「坏了」。
 
 | 能力 | Windows | Linux | macOS |
 |---|---|---|---|
-| 剪贴板 / 自启动 / 子进程 / 文件(fsx) / 环境变量(envx) | ✅ 直调 | ✅ | ❌ Unsupported |
-| 系统信息 / 窗口管理 / 壁纸 / 电源计划 / 启动器 | ✅ 直调 | ✅ | ❌ |
-| 应用查找 / 最近文件 / 音量 / 打印机(列表+默认+打印) | ✅ 直调 | ✅ | ❌ |
-| browser/vscode 数据 | ✅（LOCALAPPDATA 路径） | ✅ | ❌ |
-| sysmonitor 进程数据 | ✅（自带 stub/sysmon.c） | ✅ | ❌ |
-| 夜间色温（redshift/xrandr 命令线） | ❌ 无公开 API | ✅ | ❌ |
+| 剪贴板 / 自启动 / 子进程 / 文件(fsx) / 环境变量(envx) | ✅ 直调 | ✅ | 🚧 已接（pbpaste/pbcopy + NSPasteboard 桩；LaunchAgents plist + `launchctl load/unload`） |
+| 系统信息 / 壁纸 / 启动器（打开与定位） | ✅ 直调 | ✅ | 🚧 已接（`sw_vers`/`ioreg`/`sysctl` + 桩内 `host_statistics64`/`kern.boottime`；osascript 桌面图片，只动主屏；`open` / `open -R`） |
+| 音量 / 打印机(列表+默认+打印) | ✅ 直调 | ✅ | 🚧 已接（osascript 的 `volume settings`，sink 名这条口给不到按契约置空；macOS 自带 CUPS，与 Linux 同走 `lpstat`/`lp`——声明过的选择，不是漏跑到 Linux 分支） |
+| 用户空闲检测 | ✅ 直调 | ✅ | 🚧 已接（`CGEventSourceSecondsSinceLastEventType` 的 HID 系统态读数，不需辅助功能授权） |
+| 应用查找 / 最近文件 | ✅ 直调 | ✅ | ❌ Unsupported（`.app` + Info.plist 扫描、sharedfilelist 的私有格式，另批做） |
+| 窗口管理 / 电源计划 | ✅ 直调 | ✅ | ❌ Unsupported（Accessibility 要用户先授权 / `pmset` 对不上三值方案语义） |
+| browser/vscode 数据 | ✅（LOCALAPPDATA 路径） | ✅ | ✅（`Library/Application Support/<厂商>/<产品>` 路径，平台批①-⑥ 时就已同步） |
+| sysmonitor 进程数据 | ✅（自带 stub/sysmon.c） | ✅ | 本批未动（示例模块自带桩，mac 路径按该模块的 stub 注释待验） |
+| 夜间色温（redshift/xrandr 命令线） | ❌ 无公开 API | ✅ | ❌ 无公开 API（CoreBrightness 私有） |
+| 显示器枚举（monitor） | ❌ | ✅（xrandr） | ❌ 待做：要落 CoreGraphics 的 `CGGetActiveDisplayList`，且 `MonitorInfo` 还没有缩放比字段（Retina 口径要先定） |
+
+macOS 的公开口与底层（🚧 已接项）：`open`/`open -R`、`sw_vers`、`ioreg -rd1 -c IOPlatformExpertDevice`、`sysctl hw.model/hw.memsize/kern.boottime`、`osascript`（System Events 的 `volume settings` 与桌面图片）、`launchctl load/unload` + `~/Library/LaunchAgents/*.plist`、`lpstat`/`lp`，以及桩内的 `host_statistics64`、`CGEventSourceSecondsSinceLastEventType`。
 
 Windows 直调的底层：SystemParametersInfoW（壁纸）、ShellExecuteW（启动/定位/打印）、PowerGet/SetActiveScheme、注册表（产品与 DMI 信息）、GlobalMemoryStatusEx、GetTickCount64、EnumWindows、EnumPrintersW、IAudioEndpointVolume（COM）、GetLastInputInfo。踩坑与头文件/链接要求见 [adaptation.md](adaptation.md) 各平台批条目。
 
