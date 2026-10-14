@@ -543,3 +543,7 @@ fn render(ctx : Ctx) -> @core.Node {
    `update_always`。复合值类型（`DateYMD`/`DateRange`/`TableSort`/`SemanticType` 等）补了
    `impl Eq`；图表数据窗口（`Array[LineSeries]` 等元素无 `Eq` 且比较代价高于收益）在
    chart 与示例里一律走 `set_always`。
+2. **自重排的周期表：句柄每拍都要记回**（2026-10-14）：本栈的延时只有单次形态
+   （`Loop::timer` / `@core.set_timeout` 都是一次性），周期任务靠回调尾自己重排。
+   **重排拿到的新句柄必须覆盖调用方存着的那一份**，否则「停表」取消的是早已跑掉的
+   旧号，取消返回 true/false 都停不住（`core/loop_wbtest.mbt` 钉住这条语义）。

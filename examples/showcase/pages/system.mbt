@@ -364,7 +364,9 @@ pub fn page_system(app : @shared.App) -> @core.Node {
                     let tick : Ref[() -> Unit] = Ref(fn() { () })
                     tick.val = fn() -> Unit {
                       ticks.update(fn(n) { n + 1 })
-                      let _ = a.timer(1000, tick.val)
+                      // 自重排的周期表：每次重排都要把**新句柄**记回 tick_id，
+                      // 否则「停表」取消的是已经跑掉的那一号，表照旧在响
+                      tick_id.val = a.timer(1000, tick.val)
                     }
                     tick_id.val = a.timer(1000, tick.val)
                     timer_out.set("表已起（1s 一拍）")
@@ -397,7 +399,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
         "ignore(@core.set_timeout(1500, fn() {",
         "  app.toast_push(\"延时任务触发\", Success)",
         "}))",
-        "// 周期表：回调里自重排，句柄可停",
+        "// 周期表：回调里自重排，且每次都要记回新句柄才可停",
         "let id = a.timer(1000, tick)",
         "ignore(a.cancel_timer(id))",
       ],

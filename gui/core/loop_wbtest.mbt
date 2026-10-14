@@ -181,3 +181,49 @@ test "进程级延时通道：无宿主时空操作，装通道后转派与取�
   assert_eq(log, ["s:250", "c:1"])
   set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
 }
+
+///|
+/// 自重排的周期表：取消「早已跑掉的那一号」停不住表，必须记回最新句柄。
+/// 演示页踩过这条（重排时 `let _ = timer(...)` 把新句柄丢了，于是「停表」
+/// 按下去表照旧响），这条把语义钉住。
+test "自重排周期表：只有记回新句柄才停得住" {
+  let l = Loop::new()
+  l.start(0L)
+  let hits = Ref(0)
+  let first_id = Ref(0)
+  let latest = Ref(0)
+  let tick : Ref[() -> Unit] = Ref(fn() { () })
+  tick.val = fn() {
+    hits.val = hits.val + 1
+    let id = l.timer(10, tick.val)
+    if first_id.val == 0 {
+      first_id.val = id
+    }
+    latest.val = id
+  }
+  let _ = l.timer(10, tick.val)
+  let mut t = 0L
+  while t < 55L {
+    t = t + 10L
+    let _ = l.advance(t)
+  }
+  let n = hits.val
+  assert_true(n >= 3)
+  // 取消首号（早已跑掉）：表照旧响
+  let _ = l.cancel(first_id.val)
+  let mut t2 = 60L
+  while t2 < 100L {
+    t2 = t2 + 10L
+    let _ = l.advance(t2)
+  }
+  assert_true(hits.val > n)
+  // 取消最新句柄：停住
+  let _ = l.cancel(latest.val)
+  let m = hits.val
+  let mut t3 = 100L
+  while t3 < 160L {
+    t3 = t3 + 10L
+    let _ = l.advance(t3)
+  }
+  assert_eq(hits.val, m)
+}

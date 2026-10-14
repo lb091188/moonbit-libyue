@@ -1665,6 +1665,15 @@ Real-hardware report: "page switching in showcase lags, section widgets render l
 - **Ruled out along the way**: the two "✕" in the demo copy are **U+2715 characters inside running text**, and this machine covers that code point in DejaVu Sans and WenQuanYi Micro Hei (measured with `fc-list :charset=2715`) — they are not missing-glyph tofu; the three red rectangles in the screenshot are the user\'s own annotations.
 - **Pending real-hardware re-check** (user): the closable banner on the feedback page should now show a ✕ at its right end and dismiss when clicked; non-closable banners must show no mark.
 
+## The periodic timer could not be stopped: the self-rearm dropped the new handle, so cancel hit an already-fired id (2026-10-14, real-hardware report)
+
+- **Symptom**: in the timer block of the system-integration page, the "hint after 1.5s" one-shot worked and "start periodic (1s)" ticked, but pressing "stop" left the counter climbing.
+- **Root cause**: the demo's periodic timer is **self-rearming at the tail of the callback** (this stack's `timer` hands out one-shot handles), and the re-arm line read `let _ = a.timer(1000, tick.val)` - **the new handle was discarded**, while `tick_id` still held the very first one. That id had already been removed from the queue on the previous tick, so `cancel_timer(stale)` found nothing and cancelled nothing; the timer kept ringing. `Loop::cancel` is not at fault: it looks the id up and returns false when absent, which is the correct semantics.
+- **Fix**: record the handle on every re-arm (`tick_id.val = a.timer(1000, tick.val)`), same as the initial arming; the demo's code sample now says "re-arm each tick and store the new handle, otherwise it cannot be stopped".
+- **Rule**: one-shot handle + self-rearm means **the handle must be refreshed every tick**. Like the Store dedup rule, this is a constraint the shape itself carries, so it belongs in design.md section 6 and in the component samples, not only in a commit message.
+- **Verification**: a new `gui/core/loop_wbtest.mbt` test pins the semantics - after several ticks, (1) cancelling the first (already-fired) id leaves the timer ringing and (2) only cancelling the newest id stops it (`hits` stops growing). `moon test core` 137/137, library-wide 938/938, `cd gui && moon check --deny-warn` and `cd examples && moon check --deny-warn` clean, `moon build showcase --target native` links.
+- **Pending real-hardware re-check** (user): start the periodic timer, press stop - the counter should freeze at once; pressing stop again should report "not running"; restarting it should still be stoppable.
+
 ## Linux clipboard now goes through GtkClipboard - and that exposed a missing `moonbit_make_bytes` declaration truncating pointers in the win stub (2026-10-14, real-hardware report)
 
 - **Symptom**: on this machine (Ubuntu 24.04 / X11 / XFCE) the clipboard was reported unavailable - the read/write buttons on the system-integration page did nothing and Ctrl+C/X/V in inputs never reached the system clipboard.
