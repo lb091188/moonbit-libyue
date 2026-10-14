@@ -1,4 +1,4 @@
-# CI 流水线:Linux(完整门禁) + Windows(编译/链接门禁)
+# CI 流水线:Linux(完整门禁) + Windows(编译/链接门禁) + macOS(编译/链接门禁)
 #
 # 仓库结构(2026-10-12 目录定案,详见 AGENTS.md):
 #   gui/        库模块 `NoahLiu/native-gui`(13 个包)——moon.work 成员,也是发布单元
@@ -9,9 +9,10 @@
 # 门禁口径(AGENTS.md 规则 6):库门禁一律在 `gui/` 下按包路径限定。裸 `moon test`
 # 在 workspace 里会连带示例/探针/媒体模块(其中含既有的平台适配缺口),不作库门禁。
 #
-# 平台:Windows ✅ / Linux ✅(X11 + GTK3,当前主链路) / macOS 🚧 后端暂未开发
-#   (gui/win/stub.c 的 macOS 分支是占位空实现,建不出窗口,故不设 macOS job;
-#   口径与 README 平台表、docs/zh/adaptation.md 一致,不做无依据的承诺)。
+# 平台:Windows ✅ / Linux ✅(X11 + GTK3,当前主链路) / macOS 🚧 后端落地中
+#   (gui/win/stub.c 的 WM_STUB_MAC 分支是 Cocoa 真实现,由 mac 平台批逐族补齐;
+#   macOS job 只验「编得过、链得上」——runner 无窗口服务会话,视觉与交互验证
+#   按 AGENTS 规则 6 由使用者在真机做,批次口径见 TODO.md 的「mac 平台批」一节)。
 #
 # 链接参数由 `gui/scripts/prebuild.py`(`gui/moon.mod` 的 prebuild 钩子)按当前
 # 系统生成并传播;prebuild 只能给自己模块内的包下发配置(moon 拒绝外部包名),
@@ -22,7 +23,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, mac]
   pull_request:
 
 jobs:
@@ -174,3 +175,53 @@ jobs:
           && moon test media
           && cd ..\..
           && moon build examples/hello --target native
+
+  macos:
+    name: macOS(静态检查 + 测试 + 链接)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 安装 moon 工具链
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      # macOS 的原生层是 Objective-C(stub.c 的 WM_STUB_MAC 分支由 prebuild 带
+      # -x objective-c 专编成静态库),链接器与 SDK 头由 runner 自带的 Xcode
+      # Command Line Tools 提供,无需额外安装——这也是本 job 唯一的编译期依赖。
+      - name: 静态检查(库模块)
+        working-directory: gui
+        run: moon check
+
+      # 与 Windows job 同口径的平台排除:dbus 是 Linux 桌面基建,macOS 无会话总线。
+      # 失败时把关键行塞进 error 注解(匿名 API 可读),并回显输出尾部。
+      - name: 单元测试(库模块,12 包)
+        working-directory: gui
+        run: |
+          set +e
+          moon test \
+            core ui render text theme icons sys input win chart mdview web \
+            >/tmp/mt.out 2>&1
+          code=$?
+          set -e
+          if [ $code -ne 0 ]; then
+            echo "::error title=moon test 退出码 $code::$(grep -aiE 'failed|FAILED|error|panicked|expect' /tmp/mt.out | tail -c 1800 | sed ':a;N;$!ba;s/\n/%0A/g')"
+            tail -c 4000 /tmp/mt.out
+            exit 1
+          fi
+          grep -aE "Total tests" /tmp/mt.out | tail -1
+
+      # 库模块全量构建 + hello 示例的 native 链接:后者顺带验证 prebuild 的
+      # Darwin 分支下发的 framework 链接参数能传播到独立模块(示例模块不配 prebuild)。
+      - name: 构建(库模块 + hello 示例)
+        run: |
+          set +e
+          (cd gui && moon build --target native) >/tmp/mb.out 2>&1; c1=$?
+          moon build examples/hello --target native >>/tmp/mb.out 2>&1; c2=$?
+          set -e
+          if [ $c1 -ne 0 ] || [ $c2 -ne 0 ]; then
+            echo "::error title=moon build 退出码 $c1/$c2::$(grep -aiE 'error|undefined|failed|Undefined symbol|ld: ' /tmp/mb.out | tail -c 1800 | sed ':a;N;$!ba;s/\n/%0A/g')"
+            tail -c 6000 /tmp/mb.out
+            exit 1
+          fi
