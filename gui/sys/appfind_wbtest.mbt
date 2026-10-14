@@ -309,3 +309,25 @@ test "appfind_executable：真实目录探测与参数防御" {
   assert_true(appfind_executable("") is Err(NotFound("")))
   assert_true(appfind_executable("a/b") is Err(NotFound("a/b")))
 }
+
+///|
+test "appfind Windows 读数环：开始菜单扫到应用 + PATH 找得到 cmd" {
+  if sys_platform() != "windows" {
+    println("appfind: skip (windows-only 读数环)")
+    return
+  }
+  match appfind_installed() {
+    Ok(apps) => assert_true(apps.length() > 0)
+    Err(e) => {
+      println("appfind failed: \{e}")
+      assert_true(false)
+    }
+  }
+  match appfind_executable("cmd") {
+    Ok(p) => assert_true(p.has_suffix("cmd.exe"))
+    Err(e) => {
+      println("appfind_executable(cmd) failed: \{e}")
+      assert_true(false)
+    }
+  }
+}

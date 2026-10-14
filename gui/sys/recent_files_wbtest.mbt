@@ -392,7 +392,11 @@ test "rf_recent：本机真实 recently-used.xbel 冒烟（有数据才断言）
 test "rf_by_app：本机真实文件按应用过滤冒烟（有数据才断言）" {
   match rf_by_app("Thunar", limit=0) {
     Err(e) => {
-      assert_false(rf_supported())
+      // Windows：rf_by_app 应用维度是 GTK 专属（Unsupported），但 rf_supported
+      // 已随平台批①为真——两者不再绑定
+      if sys_platform() != "windows" {
+        assert_false(rf_supported())
+      }
       println("rf_by_app: \{e}")
     }
     Ok(items) =>
@@ -406,5 +410,27 @@ test "rf_by_app：本机真实文件按应用过滤冒烟（有数据才断言�
         }
         assert_true(ordered)
       }
+  }
+}
+
+///|
+test "rf Windows 读数环：Recent 目录可读即出列表" {
+  if sys_platform() != "windows" {
+    println("rf: skip (windows-only 读数环)")
+    return
+  }
+  if !rf_supported() {
+    println("rf: skip (无 Recent 目录)")
+    return
+  }
+  match rf_recent(limit=20) {
+    Ok(items) =>
+      for it in items {
+        assert_true(it.path.has_suffix(".lnk"))
+      }
+    Err(e) => {
+      println("rf_recent failed: \{e}")
+      assert_true(false)
+    }
   }
 }

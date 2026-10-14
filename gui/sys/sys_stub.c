@@ -2394,3 +2394,35 @@ int32_t yue_sys_win_close(const char *title, int32_t *ok) {
   return 0;
 #endif
 }
+
+// ---------------------------------------------------------------------------
+// 平台批③（Windows 直调）：文件修改时间（appfind/recent 的排序依据）。
+// ---------------------------------------------------------------------------
+
+// 文件最后写入时间（Unix 毫秒）；取不到给 0。
+int64_t yue_sys_file_mtime(const char *path, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  wchar_t *wpath = win_utf8_wide(path, 0);
+  if (wpath == NULL) {
+    return 0;
+  }
+  WIN32_FILE_ATTRIBUTE_DATA fa;
+  if (!GetFileAttributesExW(wpath, GetFileExInfoStandard, &fa)) {
+    free(wpath);
+    return 0;
+  }
+  free(wpath);
+  // FILETIME（1601-01-01 起 100ns）→ Unix 毫秒：差 11644473600 秒
+  ULARGE_INTEGER u;
+  u.HighPart = fa.ftLastWriteTime.dwHighDateTime;
+  u.LowPart = fa.ftLastWriteTime.dwLowDateTime;
+  if (u.QuadPart < 116444736000000000ULL) {
+    return 0;
+  }
+  *ok = 1;
+  return (int64_t)((u.QuadPart - 116444736000000000ULL) / 10000ULL);
+#else
+  return 0;
+#endif
+}

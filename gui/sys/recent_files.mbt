@@ -923,6 +923,63 @@ pub fn rf_data_dir(xdg_data_home : String?, home : String?) -> String? {
 }
 
 ///|
+///|
+/// Windows 直调：文件最后写入时间（Unix 毫秒；取不到 0）。
+#borrow(path)
+#borrow(ok)
+extern "c" fn ffi_rf_file_mtime(path : Bytes, ok : Ref[Int]) -> Int64 = "yue_sys_file_mtime"
+
+///|
+/// Windows 最近文档目录（%APPDATA%\Microsoft\Windows\Recent），不存在
+/// 给 None。
+fn rf_windows_dir() -> String? {
+  match envx_get("APPDATA") {
+    Some(a) if a != "" => {
+      let d = a + "\\Microsoft\\Windows\\Recent"
+      match fsx_list_dir(d) {
+        Ok(_) => Some(d)
+        Err(_) => None
+      }
+    }
+    _ => None
+  }
+}
+
+///|
+/// Windows 最近文档：Recent 目录的 .lnk 枚举（mtime 即最近使用时间；
+/// .lnk 本身就是文档的快捷方式，path 落在 .lnk 上——目标解析要
+/// IShellLink，随富集成批）。应用维度 GTK 专属，rf_by_app 不给 Windows。
+fn rf_windows_items() -> Result[Array[RecentItem], RecentError] {
+  let dir = match rf_windows_dir() {
+    Some(d) => d
+    None => return Err(RfNoDataDir)
+  }
+  let names = match fsx_list_dir(dir) {
+    Ok(n) => n
+    Err(_) => return Err(RfNoDataDir)
+  }
+  let out : Array[RecentItem] = []
+  for name in names {
+    if name.has_suffix(".lnk") == false {
+      continue
+    }
+    let full = dir + "\\" + name.to_string()
+    let ok = Ref(0)
+    let ms = ffi_rf_file_mtime(@utf8.encode(full), ok)
+    let t : Int64 = if ok.val == 1 { ms } else { 0L }
+    let _ = out.push({
+      uri: "file:///" + full,
+      path: full,
+      mime: None,
+      added: t,
+      modified: t,
+      app_count: 0,
+    })
+  }
+  Ok(out)
+}
+
+///|
 /// 本机 recently-used.xbel 路径（非 Linux 给 None）。
 fn rf_recent_file() -> String? {
   if sys_platform() != "linux" {
@@ -958,6 +1015,9 @@ fn rf_load_entries() -> Result[Array[RfEntry], RecentError] {
 /// 本机是否可读 GTK 最近文件（Linux 且 recently-used.xbel 可读）。
 /// 每次调用真实探测，高频场景请调用方自行缓存结果。
 pub fn rf_supported() -> Bool {
+  if sys_platform() == "windows" {
+    return rf_windows_dir() is Some(_)
+  }
   match rf_recent_file() {
     Some(p) => sys_read_text_file(p) is Some(_)
     None => false
@@ -968,10 +1028,17 @@ pub fn rf_supported() -> Bool {
 /// 最近文件列表：解析本机 recently-used.xbel，按 modified 倒序（并列按
 /// path 升序）取前 limit 项；limit 缺省 100，<= 0 取全部。
 pub fn rf_recent(limit? : Int = 100) -> Result[Array[RecentItem], RecentError] {
-  match rf_load_entries() {
+  if sys_platform() == "windows" {
+    match rf_windows_items() {
+      Err(e) => Err(e)
+      Ok(items) => Ok(rf_take(rf_sort_recent(items), limit))
+    }
+  } else {
+    match rf_load_entries() {
     Err(e) => Err(e)
     Ok(entries) =>
-      Ok(rf_take(rf_sort_recent(entries.map(rf_entry_to_item)), limit))
+        Ok(rf_take(rf_sort_recent(entries.map(rf_entry_to_item)), limit))
+    }
   }
 }
 

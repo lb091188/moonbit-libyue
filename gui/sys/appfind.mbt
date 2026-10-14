@@ -383,6 +383,87 @@ fn appfind_installed_impl(
 /// 数据目录约定）下的 .desktop，按 desktop id 去重（用户目录覆盖系统
 /// 目录），结果按 name 排序；不存在的目录跳过，全部扫描目录都不存在
 /// 时报 NoScanDir；非 Linux 给 [Unsupported]。
+///|
+/// Windows 直调：文件最后写入时间（Unix 毫秒；取不到 0）。
+#borrow(path)
+#borrow(ok)
+extern "c" fn ffi_file_mtime(path : Bytes, ok : Ref[Int]) -> Int64 = "yue_sys_file_mtime"
+
+///|
+/// Windows 开始菜单根目录（用户级 + 全机级），不存在的跳过。
+fn appfind_windows_dirs() -> Array[String] {
+  let dirs : Array[String] = []
+  for root in [envx_get("APPDATA"), envx_get("ProgramData")] {
+    match root {
+      Some(r) if r != "" => {
+        let d = r + "\\Microsoft\\Windows\\Start Menu\\Programs"
+        match fsx_list_dir(d) {
+          Ok(_) => {
+            let _ = dirs.push(d)
+          }
+          Err(_) => ()
+        }
+      }
+      _ => ()
+    }
+  }
+  dirs
+}
+
+///|
+/// 递归收集 dir 子树下的 .lnk 全路径（目录判定=能列出来）。
+fn appfind_windows_collect(dir : String, acc : Array[String]) -> Unit {
+  match fsx_list_dir(dir) {
+    Ok(names) =>
+      for name in names {
+        let lower = name.to_lower()
+        let full = dir + "\\" + name
+        if lower.has_suffix(".lnk") {
+          let _ = acc.push(full)
+        } else {
+          appfind_windows_collect(full, acc)
+        }
+      }
+    Err(_) => () // 文件或打不开的目录：不递归
+  }
+}
+
+///|
+/// .lnk 路径 → AppEntry：id/name 取文件名主干，exec=lnk 全路径
+///（ShellExecute 可直接启动），icon/categories Windows 構不建为空。
+fn appfind_windows_entry(lnk : String) -> AppEntry {
+  // 文件名 = 最后一个反斜杠之后；id/name = 主干（去 .lnk 后缀）
+  let mut cut = 0
+  let mut j = 0
+  for ch in lnk {
+    if ch == '\\' {
+      cut = j + 1
+    }
+    j += 1
+  }
+  let mut fname = ""
+  let mut k = 0
+  for ch in lnk {
+    if k >= cut {
+      fname = fname + ch.to_string()
+    }
+    k += 1
+  }
+  let base = if fname.has_suffix(".lnk") {
+    fname.substring(start=0, end=fname.length() - 4)
+  } else {
+    fname
+  }
+  {
+    id: base,
+    name: base,
+    locale_name: base,
+    exec: lnk,
+    icon: "",
+    categories: ["StartMenu"],
+  }
+}
+///|
 pub fn appfind_installed() -> Result[Array[AppEntry], AppFindError] {
   match sys_platform() {
     "linux" =>
@@ -390,6 +471,18 @@ pub fn appfind_installed() -> Result[Array[AppEntry], AppFindError] {
         appfind_scan_dirs(envx_get("XDG_DATA_HOME"), envx_get("HOME")),
         fn(path) { fsx_list_dir(path) },
       )
+    "windows" => {
+      // 开始菜单递归扫 .lnk（用户级 + 全机级）；扫描目录皆缺 → NoScanDir
+      let dirs = appfind_windows_dirs()
+      if dirs.length() == 0 {
+        return Err(NoScanDir)
+      }
+      let acc : Array[String] = []
+      for d in dirs {
+        appfind_windows_collect(d, acc)
+      }
+      Ok(acc.map(appfind_windows_entry))
+    }
     _ => Err(Unsupported)
   }
 }
@@ -422,6 +515,35 @@ pub fn appfind_installed_with(
 /// 内容；本包不校验执行权限位）。
 pub fn appfind_executable(name : String) -> Result[String, AppFindError] {
   match sys_platform() {
+    "windows" => {
+      // which 语义：按 PATH 各目录找 name / name.exe
+      if name == "" || name.contains("/") || name.contains("\\") {
+        return Err(NotFound(name))
+      }
+      match envx_get("PATH") {
+        Some(path) =>
+          for dir in path.split(";") {
+            let d = dir.to_string()
+            if d == "" {
+              continue
+            }
+            match fsx_list_dir(d) {
+              Ok(names) => {
+                for n in names {
+                  let ln = n.to_lower()
+                  let target = name.to_lower()
+                  if ln == target || ln == target + ".exe" {
+                    return Ok(d + "\\" + n.to_string())
+                  }
+                }
+              }
+              Err(_) => ()
+            }
+          }
+        None => ()
+      }
+      Err(NotFound(name))
+    }
     "linux" => {
       if name == "" || name.contains("/") {
         return Err(NotFound(name))
