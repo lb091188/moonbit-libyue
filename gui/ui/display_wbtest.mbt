@@ -22,6 +22,24 @@ fn ink_count(bm : @render.Bitmap, x1 : Int, y1 : Int) -> Int {
 }
 
 ///|
+/// 一块区域里「与横幅浅底不同」的像素数（浅底按左上角取；标记与强调条都算，
+/// 所以调用方给的范围要避开左缘 3px 强调条）
+fn mark_in(bm : @render.Bitmap, x0 : Int, y0 : Int, x1 : Int, y1 : Int) -> Int {
+  let base = bm.pixel(6, 6)
+  let mut n = 0
+  for y = y0; y < y1; y = y + 1 {
+    for x = x0; x < x1; x = x + 1 {
+      let c = bm.pixel(x, y)
+      let d = (c.r - base.r).abs() + (c.g - base.g).abs() + (c.b - base.b).abs()
+      if d > 30 {
+        n = n + 1
+      }
+    }
+  }
+  n
+}
+
+///|
 fn mounted(node : @core.Node, w : Double, h : Double) -> (@core.Widget, @core.Widget) {
   let root = @core.Widget::new()
   root.set_size(w, h)
@@ -126,7 +144,7 @@ test "带文字分隔线：整宽、文字两侧都有线" {
 }
 
 ///|
-test "提示条：有描述时更高，关闭热区只在右上角" {
+test "提示条：有描述时更高，关闭热区与标记都只在右上角" {
   let closes = Ref(0)
   let (root1, a1) = mounted(
     alert("标题", description="描述在这里", t=Warning, closable=true, on_close=fn() { closes.val = closes.val + 1 }),
@@ -167,6 +185,19 @@ test "提示条：有描述时更高，关闭热区只在右上角" {
 
   let (_, a2) = mounted(alert("只有标题"), 300.0, 80.0)
   assert_eq(a2.rect.h, 36.0)
+
+  // 标记要画出来：热区在右上角但看不见 ✕ 等于没有按钮（真机反馈）
+  let bm1 = @render.Bitmap::new(300, 80)
+  let p1 = @render.Painter::new(bm1)
+  root1.paint(p1)
+  p1.end()
+  assert_true(mark_in(bm1, 276, 0, 300, 24) > 8)
+  // 不可关闭的横幅不该在右上角留墨
+  let bm2 = @render.Bitmap::new(300, 80)
+  let p2 = @render.Painter::new(bm2)
+  a2.paint_at(p2, a2.rect.x, a2.rect.y)
+  p2.end()
+  assert_eq(mark_in(bm2, 276, 0, 300, 24), 0)
 }
 
 ///|

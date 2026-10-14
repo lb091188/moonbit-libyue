@@ -573,6 +573,11 @@ pub fn alert(
       p.fill_rect(0.0, 0.0, r.w, r.h)
       p.set_fill_color(main)
       p.fill_rect(0.0, 0.0, 3.0, r.h)
+      if closable {
+        // 关闭标记与热区同源：右上角 24×24 的中心 (12,12)，字形半径 6
+        // （落墨 ≈ 10.6px），颜色随横幅主色
+        @icons.draw_icon(p, @icons.IconKind::Close2, r.w - 12.0, 12.0, 6.0, main)
+      }
       let _ = @text.draw_at(p, 12.0, 6.0, title, tf, main)
       if description.length() > 0 {
         let _ = @text.draw_at(p, 12.0, 28.0, description, df, @theme.theme_text_regular())
