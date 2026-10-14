@@ -455,6 +455,58 @@ fn vol_run_capture(
   }
 }
 
+// ---- macOS 后端：osascript 的 `volume settings` ----
+//
+// System Events 的 AppleScript 字典里 `get volume settings` /
+// `set volume output volume N` / `output muted` 是公开口，量纲就是 0-100 的
+// 整数与布尔，和 wpctl/pactl/IAudioEndpointVolume 同一档语义。**sink 显示名
+// 这条口给不到**（契约里 sink 为次要信息、取不到置空串不影响音量与静音），
+// 另外首次调用可能被系统的自动化授权拦下（真机复验清单里有一条专测它）。
+
+fn vol_mac_ask(script : String) -> String? {
+  match vol_run_capture("osascript", ["-e", script], timeout_ms=6000) {
+    Ok((0, out)) => Some(vol_trim(out))
+    _ => None
+  }
+}
+
+fn vol_mac_do(script : String) -> Result[Unit, VolumeError] {
+  match vol_run_capture("osascript", ["-e", script], timeout_ms=6000) {
+    Ok((0, _)) => Ok(())
+    Ok((code, _)) => Err(CommandFailed("osascript: 退出码 \{code}"))
+    Err(e) => Err(e)
+  }
+}
+
+fn vol_get_mac() -> Result[VolumeInfo, VolumeError] {
+  match vol_mac_ask("output volume of (get volume settings)") {
+    None => Err(CommandFailed("osascript: 取音量失败"))
+    Some(text) =>
+      match win_parse_int(text) {
+        None => Err(ParseFailed("osascript 音量读数: \{text}"))
+        Some(v) => {
+          let muted =
+            match vol_mac_ask("output muted of (get volume settings)") {
+              Some(t) => t == "1"
+              None => false
+            }
+          Ok({ sink: "", volume: v, muted })
+        }
+      }
+  }
+}
+
+fn vol_set_mac(percent : Int) -> Result[Unit, VolumeError] {
+  let v = if percent < 0 { 0 } else if percent > 100 { 100 } else { percent }
+  vol_mac_do("set volume output volume " + v.to_string())
+}
+
+fn vol_set_mute_mac(mute : Bool) -> Result[Unit, VolumeError] {
+  vol_mac_do(
+    "set volume output muted " + (if mute { "true" } else { "false" }),
+  )
+}
+
 ///|
 /// 探测可用后端：能跑通只读查询（工具存在且音量服务在线）即视为可用，
 /// wpctl 优先。每次调用真实探测。
@@ -511,6 +563,9 @@ pub fn vol_supported() -> Bool {
   if sys_platform() == "windows" {
     return true
   }
+  if sys_platform() == "macos" {
+    return vol_mac_ask("output volume of (get volume settings)") is Some(_)
+  }
   vol_backend() is Some(_)
 }
 
@@ -522,6 +577,9 @@ pub fn vol_supported() -> Bool {
 pub fn vol_get() -> Result[VolumeInfo, VolumeError] {
   if sys_platform() == "windows" {
     return vol_get_windows()
+  }
+  if sys_platform() == "macos" {
+    return vol_get_mac()
   }
   match vol_backend() {
     None => Err(Unsupported)
@@ -607,6 +665,9 @@ fn vol_apply(prog : String, args : Array[String]) -> Result[Unit, VolumeError] {
 ///|
 /// 设绝对音量（0-100，出界钳制），作用于默认 sink。
 pub fn vol_set(percent : Int) -> Result[Unit, VolumeError] {
+  if sys_platform() == "macos" {
+    return vol_set_mac(percent)
+  }
   if sys_platform() == "windows" {
     let ok = Ref(0)
     let _ = ffi_vol_write(0, percent, ok)
@@ -625,7 +686,14 @@ pub fn vol_set(percent : Int) -> Result[Unit, VolumeError] {
 /// 相对增减音量（delta 为正增、为负减，作用于默认 sink；每步量取绝对
 /// 值交给工具的相对语法执行，最终音量由工具侧钳制）。
 pub fn vol_add(delta : Int) -> Result[Unit, VolumeError] {
-  if sys_platform() == "windows" {
+  if sys_platform() == "macos" {
+    // 与 Windows 同一条「读—钳—写」路（osascript 没有相对增减语法）
+    let r = match vol_get_mac() {
+      Ok(cur) => vol_set_mac(cur.volume + delta)
+      Err(e) => Err(e)
+    }
+    return r
+  } else if sys_platform() == "windows" {
     // 无相对语义的标量接口：读当前 → 钳制 → 写回
     match vol_get_windows() {
       Ok(cur) => {
@@ -650,6 +718,9 @@ pub fn vol_add(delta : Int) -> Result[Unit, VolumeError] {
 ///|
 /// 设 / 取消默认 sink 静音。
 pub fn vol_set_mute(mute : Bool) -> Result[Unit, VolumeError] {
+  if sys_platform() == "macos" {
+    return vol_set_mute_mac(mute)
+  }
   if sys_platform() == "windows" {
     let ok = Ref(0)
     let _ = ffi_vol_write(1, if mute { 1 } else { 0 }, ok)

@@ -1,8 +1,9 @@
-// 打开外部：URL 与文件管理器定位，单入口 + 单错误枚举。Linux 走
-// xdg-open（argv 直传不经 shell，分离式启动不阻塞调用方）；Windows 的
-// ShellExecuteW 与 macOS 的 NSWorkspace 分支随各自平台地基批接入，当前
-// 非 Linux 给 Unsupported。Ok 只表示「已交给系统」，系统侧能否打开由平台
-// 负责。
+// 打开外部：URL 与文件管理器定位，单入口 + 单错误枚举。三平台都是「交给系统
+// 的公开口」：Linux `xdg-open`（argv 直传不经 shell，分离式启动不阻塞调用方）、
+// Windows `ShellExecuteW` / `explorer /select`（extern 直链 sys 桩）、
+// macOS `open` / `open -R`（Launch Services CLI；选中态与 explorer /select 同档，
+// 不必为这一次调用引入 AppKit 归档）。Ok 只表示「已交给系统」，系统侧能否打开
+// 由平台负责。
 
 ///|
 /// 打开 URL 的错误类型。
@@ -135,6 +136,7 @@ extern "c" fn ffi_shell_reveal(path : Bytes, ok : Ref[Int]) -> Int = "yue_sys_sh
 
 ///|
 /// 打开 URL 交给系统默认处理（http/https/mailto 等一律透传，不做校验）。
+/// 三平台后端：Windows `ShellExecuteW` / Linux `xdg-open` / macOS `open`。
 pub fn open_url(url : String) -> Result[Unit, OpenUrlError] {
   match sys_platform() {
     "windows" => {
@@ -148,6 +150,12 @@ pub fn open_url(url : String) -> Result[Unit, OpenUrlError] {
     }
     "linux" =>
       match spawn_detached("xdg-open", url) {
+        Ok(_) => Ok(())
+        Err(_) => Err(SpawnFailed)
+      }
+    // macOS：Launch Services 的公开 CLI `open <url>`（单参数，走分离式启动不等待）
+    "macos" =>
+      match spawn_detached("open", url) {
         Ok(_) => Ok(())
         Err(_) => Err(SpawnFailed)
       }
@@ -179,6 +187,16 @@ pub fn reveal_in_file_manager(
       match spawn_detached("xdg-open", parent_dir(abs)) {
         Ok(_) => Ok(())
         Err(_) => Err(SpawnFailed)
+      }
+    }
+    // macOS：`open -R <路径>` = 打开父目录并**选中**该项（对标 explorer /select）。
+    // 两个 argv 项，`spawn_detached` 只带一个参数，所以走 pr_run 那条同步线
+    // （`open` 交完活就退出，等待成本是一次进程往返）。
+    "macos" => {
+      let abs = launcher_abs_path(path, current_dir())
+      match pr_run("open", ["-R", abs], timeout_ms=3000) {
+        Ok(o) if o.exit_code == 0 => Ok(())
+        _ => Err(SpawnFailed)
       }
     }
     _ => Err(Unsupported)

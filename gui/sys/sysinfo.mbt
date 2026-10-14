@@ -504,6 +504,113 @@ fn si_win_reg(subkey : String, value : String) -> String? {
 }
 
 ///|
+/// Windows 与 macOS 共用的内存读数：都走桩里的直调，只是失败时的说明不同。
+fn si_win_memory_via_ffi(what : String) -> Result[MemoryInfo, SysInfoError] {
+  let total = Ref(0L)
+  let avail = Ref(0L)
+  let ok = Ref(0)
+  let _ = ffi_memory_kb(total, avail, ok)
+  if ok.val != 1 {
+    return Err(SiReadFailed(what))
+  }
+  Ok({ total_kb: total.val.to_int(), available_kb: avail.val.to_int() })
+}
+
+///|
+/// Windows 与 macOS 共用的开机读数（桩里 GetTickCount64 / kern.boottime）。
+fn si_win_uptime_via_ffi(what : String) -> Result[Double, SysInfoError] {
+  let t = ffi_uptime_seconds()
+  if t <= 0.0 {
+    Err(SiParseFailed(what))
+  } else {
+    Ok(t)
+  }
+}
+
+///|
+/// macOS 读数（公开 CLI + 桩里的 BSD 直调）\n// ---- macOS 读数（公开 CLI + 桩里的 BSD 直调）----
+
+///|
+/// 跑一条只读命令并取 stdout（非零退出/启动失败给 None）。mac 臂统一走这条，
+/// 命令都是 Apple 自带的 CLI，argv 直传不经 shell。
+fn si_run_text(cmd : String, args : Array[String]) -> String? {
+  match pr_run(cmd, args, timeout_ms=6000) {
+    Ok(o) if o.exit_code == 0 => Some(o.stdout)
+    _ => None
+  }
+}
+
+///|
+/// `sw_vers` 的三行输出 → OsInfo。缺 ProductVersion 时只给产品名，
+/// 两个都缺判解析失败（不给半截数）。
+fn si_parse_sw_vers(text : String) -> OsInfo? {
+  // `sw_vers` 的行是「键: <TAB> 值」（不是 os-release 的 KEY=VALUE），
+  // 所以按第一个冒号拆，两侧都裁空白
+  let mut name = ""
+  let mut ver = ""
+  for line in si_split_lines(text) {
+    let chars : Array[Char] = []
+    for ch in line {
+      chars.push(ch)
+    }
+    let mut colon = -1
+    for i in 0..<chars.length() {
+      if chars[i] == ':' {
+        colon = i
+        break
+      }
+    }
+    if colon <= 0 {
+      continue
+    }
+    let kb = StringBuilder()
+    for i in 0..<colon {
+      kb.write_char(chars[i])
+    }
+    let vb = StringBuilder()
+    for i in (colon + 1)..<chars.length() {
+      vb.write_char(chars[i])
+    }
+    match si_trim(kb.to_string()) {
+      "ProductName" => name = si_trim(vb.to_string())
+      "ProductVersion" => ver = si_trim(vb.to_string())
+      _ => ()
+    }
+  }
+  if ver == "" && name == "" {
+    return None
+  }
+  let pretty =
+    if name == "" {
+      ver
+    } else if ver == "" {
+      name
+    } else {
+      name + " " + ver
+    }
+  Some({ pretty_name: pretty, id: "macos", version_id: ver })
+}
+
+/// 从 `ioreg -rd1 -c IOPlatformExpertDevice` 的「"键" = "值"」行里取值。
+/// 拆行与去引复用 `si_split_kv`，所以比键时要带上源文的引号形态。
+/// 只用于字符串值的键（厂商、序列号）；Data 形态的 `<hex>` 键不从这里取
+/// ——机型走 `sysctl -n hw.model`，那才是 ASCII 的稳定读数。
+fn si_parse_ioreg(text : String, key : String) -> String? {
+  let needle = "\"" + key + "\""
+  let mut found : String? = None
+  for line in si_split_lines(text) {
+    match si_split_kv(line) {
+      Some((k, v)) =>
+        if k == needle && v != "" && found is None {
+          found = Some(v)
+        }
+      None => ()
+    }
+  }
+  found
+}
+
+///|
 pub fn si_os() -> Result[OsInfo, SysInfoError] {
   match sys_platform() {
     "linux" =>
@@ -534,6 +641,16 @@ pub fn si_os() -> Result[OsInfo, SysInfoError] {
       let pretty = if ver == "" { name } else { name + " " + ver }
       Ok({ pretty_name: pretty, id: "windows", version_id: ver })
     }
+    // macOS：`sw_vers` 是三行 ASCII 读数，与 Windows 的注册表臂同档（一次进程往返）
+    "macos" =>
+      match si_run_text("sw_vers", []) {
+        None => Err(SiReadFailed("sw_vers"))
+        Some(text) =>
+          match si_parse_sw_vers(text) {
+            Some(info) => Ok(info)
+            None => Err(SiParseFailed("sw_vers: 缺 ProductName/ProductVersion"))
+          }
+      }
     _ => Err(SiUnsupported)
   }
 }
@@ -584,6 +701,27 @@ pub fn si_machine() -> Result[MachineInfo, SysInfoError] {
       }
       Ok({ vendor, product, serial, })
     }
+    // macOS：厂商与序列号读 ioreg 的字符串键，机型走 `sysctl -n hw.model`
+    // （ioreg 里的 model/product-name 是 Data 的 hex 形态，解它不值当）
+    "macos" => {
+      let reg = match si_run_text("ioreg", ["-rd1", "-c", "IOPlatformExpertDevice"]) {
+        None => return Err(SiReadFailed("ioreg IOPlatformExpertDevice"))
+        Some(t) => t
+      }
+      let vendor = match si_parse_ioreg(reg, "Manufacturer") {
+        Some(v) => v
+        None => return Err(SiReadFailed("ioreg: Manufacturer"))
+      }
+      let product = match si_run_text("sysctl", ["-n", "hw.model"]) {
+        Some(v) => si_trim(v)
+        None => return Err(SiReadFailed("sysctl hw.model"))
+      }
+      let serial = match si_parse_ioreg(reg, "IOPlatformSerialNumber") {
+        Some(v) => v
+        None => return Err(SiReadFailed("ioreg: IOPlatformSerialNumber"))
+      }
+      Ok({ vendor, product, serial })
+    }
     _ => Err(SiUnsupported)
   }
 }
@@ -603,6 +741,7 @@ pub fn si_memory() -> Result[MemoryInfo, SysInfoError] {
       }
       Ok({ total_kb: total.val.to_int(), available_kb: avail.val.to_int() })
     }
+    "macos" => si_win_memory_via_ffi("sysctl hw.memsize + host_statistics64")
     "linux" =>
       match sys_read_text_file("/proc/meminfo") {
         None => Err(SiReadFailed("/proc/meminfo"))
@@ -630,6 +769,7 @@ pub fn si_uptime() -> Result[Double, SysInfoError] {
         Ok(t)
       }
     }
+    "macos" => si_win_uptime_via_ffi("kern.boottime")
     "linux" =>
       match sys_read_text_file("/proc/uptime") {
         None => Err(SiReadFailed("/proc/uptime"))

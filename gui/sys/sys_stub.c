@@ -43,6 +43,8 @@
 #else
 #include <dirent.h>
 #include <dlfcn.h> // 空闲查询的 X11/XSS 运行期取符号（W21e）
+#include <signal.h> // kill(2)：子进程超时强杀（Linux 上由 signal.h 顺带声明到，
+                    // macOS 不给隐式声明的机会——ISO C99 起隐式函数声明是错误）
 #include <errno.h> // 逐级建目录判 EEXIST（mkdir -p 语义）
 #include <fcntl.h>
 #include <sys/stat.h> // mkdir(2)
@@ -50,6 +52,10 @@
 #include <unistd.h>
 #if defined(__APPLE__)
 #include <mach-o/dyld.h> // _NSGetExecutablePath（可执行文件路径，W21d）
+#include <mach/mach.h> // host_statistics64 / host_page_size（物理内存快照）
+#include <sys/sysctl.h> // hw.memsize、kern.boottime
+#include <sys/time.h> // gettimeofday（开机秒数的「现在」端）
+#include <CoreGraphics/CoreGraphics.h> // 空闲读数（HID 事件源的「距上次输入秒数」）
 #endif
 #endif
 
@@ -1877,6 +1883,10 @@ int32_t yue_sys_idle_supported(void) {
   }
   sys_idle_x11_init();
   return g_idle_x11.ok ? 1 : 0;
+#elif defined(__APPLE__)
+  // CGEventSource 的 HID 系统态读数在 mac 上恒可用（不需要辅助功能权限——
+  // 它只回「距上次输入多少秒」，不读事件内容）
+  return 1;
 #else
   return 0;
 #endif
@@ -1918,6 +1928,16 @@ int64_t yue_sys_idle_seconds_ms(int32_t *ok) {
   }
   *ok = 1;
   return ms;
+#elif defined(__APPLE__)
+  // 「距任意一次输入事件多少秒」×1000。事件掩码取 kCGAnyInputEventType，
+  // 覆盖键鼠；触控板的滚动也算 HID 事件，故与另两平台的「有输入就归零」同观。
+  double secs = CGEventSourceSecondsSinceLastEventType(
+      kCGEventSourceStateHIDSystemState, kCGAnyInputEventType);
+  if (!(secs >= 0.0)) { // NaN/负值都按查不到处理（引擎在无会话时给的就是这个）
+    return 0;
+  }
+  *ok = 1;
+  return (int64_t)(secs * 1000.0);
 #else
   return 0;
 #endif
@@ -2169,6 +2189,32 @@ int32_t yue_sys_memory_kb(int64_t *total_kb, int64_t *avail_kb, int32_t *ok) {
   *avail_kb = (int64_t)(m.ullAvailPhys / 1024);
   *ok = 1;
   return 0;
+#elif defined(__APPLE__)
+  uint64_t bytes = 0;
+  size_t len = sizeof(bytes);
+  int mib[2] = { CTL_HW, HW_MEMSIZE };
+  if (sysctl(mib, 2, &bytes, &len, NULL, 0) != 0 || bytes == 0) {
+    return 0;
+  }
+  vm_size_t page = 0;
+  if (host_page_size(mach_host_self(), &page) != KERN_SUCCESS || page == 0) {
+    return 0;
+  }
+  vm_statistics64_data_t vm;
+  mach_msg_type_number_t cnt = HOST_VM_INFO64_COUNT;
+  if (host_statistics64(mach_host_self(), HOST_VM_INFO64, (host_info_t)&vm,
+                        &cnt) != KERN_SUCCESS) {
+    return 0;
+  }
+  // 「还能拿来用」按 free + inactive + speculative 三档页算（macOS 的活动页
+  // 里有一部分是可压缩的，那部分不由我们判断——与 Linux 的 MemAvailable 只是
+  // 同档语义，不是同一算法，口径差写进 docs/zh/adaptation.md）
+  uint64_t usable = (uint64_t)vm.free_count + (uint64_t)vm.inactive_count +
+                    (uint64_t)vm.speculative_count;
+  *total_kb = (int64_t)(bytes / 1024ULL);
+  *avail_kb = (int64_t)(usable * (uint64_t)page / 1024ULL);
+  *ok = 1;
+  return 0;
 #else
   return 0;
 #endif
@@ -2178,6 +2224,23 @@ int32_t yue_sys_memory_kb(int64_t *total_kb, int64_t *avail_kb, int32_t *ok) {
 double yue_sys_uptime_seconds(void) {
 #if defined(_WIN32)
   return (double)(GetTickCount64() / 1000ULL);
+#elif defined(__APPLE__)
+  // 挂钟差：kern.boottime 是「启动那一刻的墙钟」，与 gettimeofday 相减得开机秒。
+  // 睡眠不计（mac 睡眠期间墙钟继续走，故这个数比 Linux 的 /proc/uptime——
+  // 也不计睡眠——同档；真正的差是夏令时/对时跳变会带来秒级抖动，读数用途可接受）
+  struct timeval boot;
+  size_t len = sizeof(boot);
+  int mib[2] = { CTL_KERN, KERN_BOOTTIME };
+  if (sysctl(mib, 2, &boot, &len, NULL, 0) != 0) {
+    return 0.0;
+  }
+  struct timeval now;
+  if (gettimeofday(&now, NULL) != 0) {
+    return 0.0;
+  }
+  double d = (double)(now.tv_sec - boot.tv_sec) +
+             (double)(now.tv_usec - boot.tv_usec) / 1000000.0;
+  return d > 0.0 ? d : 0.0;
 #else
   return 0.0;
 #endif

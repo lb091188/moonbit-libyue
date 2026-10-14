@@ -215,6 +215,7 @@ MAC_WIN_FRAMEWORKS = [
 ]
 MAC_SYS_FRAMEWORKS = [
     "-framework", "Cocoa",           # NSWorkspace（打开/揭示、壁纸）、NSFileManager
+    "-framework", "CoreGraphics",    # CGEventSourceSecondsSinceLastEventType（空闲读数）
     "-framework", "CoreServices",    # LSSharedFileList（自启动）、UTType
     "-framework", "IOKit",           # IOHIDSystem 空闲时间
     "-framework", "ApplicationServices",  # 打印机（CorePrint）

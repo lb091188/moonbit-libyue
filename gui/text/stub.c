@@ -1270,33 +1270,36 @@ static CTLineRef pt_line_create(PtPara *p, int with_ellipsis, int c0, int c1) {
     if (piece == NULL) {
       continue;
     }
-    CFIndex at = CFStringGetLength(str);
-    CFAttributedStringReplaceString(str, at, at, piece);
+    CFIndex at = CFAttributedStringGetLength(str);
+    CFRange piece_rng = CFRangeMake(at, 0);
+    CFAttributedStringReplaceString(str, piece_rng, piece);
     CFRelease(piece);
     PtStyle *st = &p->styles[sg->style < p->nstyle ? sg->style : 0];
-    CFIndex piece_len = CFStringGetLength(str) - at;
+    CFIndex piece_len = CFAttributedStringGetLength(str) - at;
+    CFRange attr_rng = CFRangeMake(at, piece_len);
     if (st->font != NULL && piece_len > 0) {
-      CFAttributedStringSetAttribute(str, at, piece_len, kCTFontAttributeName,
+      CFAttributedStringSetAttribute(str, attr_rng, kCTFontAttributeName,
                                      st->font);
     }
     if (st->color != NULL && piece_len > 0) {
-      CFAttributedStringSetAttribute(str, at, piece_len,
+      CFAttributedStringSetAttribute(str, attr_rng,
                                      kCTForegroundColorAttributeName, st->color);
     }
   }
   // 省略号接在截断段之后（挂默认样式，与 Pango 的观察一致）
   if (with_ellipsis) {
-    CFIndex at = CFStringGetLength(str);
+    CFIndex at = CFAttributedStringGetLength(str);
     CFStringRef e = pt_ellipsis();
     if (e != NULL) {
-      CFAttributedStringReplaceString(str, at, at, e);
+      CFAttributedStringReplaceString(str, CFRangeMake(at, 0), e);
       PtStyle *st = p->nstyle > 0 ? &p->styles[0] : NULL;
+      CFRange one = CFRangeMake(at, 1);
       if (st != NULL && st->font != NULL) {
-        CFAttributedStringSetAttribute(str, at, 1, kCTFontAttributeName,
+        CFAttributedStringSetAttribute(str, one, kCTFontAttributeName,
                                        st->font);
       }
       if (st != NULL && st->color != NULL) {
-        CFAttributedStringSetAttribute(str, at, 1,
+        CFAttributedStringSetAttribute(str, one,
                                        kCTForegroundColorAttributeName,
                                        st->color);
       }
@@ -1550,7 +1553,7 @@ static void pt_draw_para(PtPara *p, unsigned char *data, int buf_w, int buf_h,
       // 顶原点的 (x,y) → CGContext 的底原点
       double base_top = y + acc + p->lines[k].ascent;
       CGContextSetTextPosition(ctx, (CGFloat)(x + dx), (CGFloat)((double)buf_h - base_top));
-      CTLineDraw(ctx, l);
+      CTLineDraw(l, ctx);
       CFRelease(l);
     }
     double lh = p->lines[k].ascent + p->lines[k].descent + p->lines[k].leading;

@@ -264,11 +264,80 @@ fn autostart_win_remove(app_id : String) -> Result[Unit, AutostartError] {
 // 公开 API（运行时平台分派，无编译期条件）
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// macOS：LaunchAgents 的 plist（与 Linux 同一形态——面在 MoonBit，落点是一个
+// 文本文件，不需要 C）。启用/停用另要过一次 `launchctl`：这里用 `load` /
+// `unload` 这对**已废弃但仍在**的动词，因为新写法 `bootstrap gui/<uid>` 要
+// 用户的 uid，而本包没有暴露取 uid 的口子（取 uid 属另一族，不为这一条引入）。
+// ---------------------------------------------------------------------------
+
+fn autostart_mac_xml_escape(v : String) -> String {
+  let buf = StringBuilder()
+  for ch in v {
+    match ch {
+      '&' => buf.write_string("&amp;")
+      '<' => buf.write_string("&lt;")
+      '>' => buf.write_string("&gt;")
+      _ => buf.write_char(ch)
+    }
+  }
+  buf.to_string()
+}
+
 ///|
-/// 当前平台是否支持开机自启动（macOS 本批 Unsupported）。
+/// LaunchAgents 目录（HOME 未设为 None）；条目文件是它下面的 `<app_id>.plist`。
+fn autostart_mac_dir() -> String? {
+  match sys_getenv("HOME") {
+    Some(h) if h != "" => Some(h + "/Library/LaunchAgents")
+    _ => None
+  }
+}
+
+///|
+/// plist 正文：Label + ProgramArguments(单条可执行文件) + RunAtLoad。
+/// 与 Linux 侧的 `autostart_desktop_entry` 同位（纯函数、可直接钉测试）。
+pub fn autostart_mac_plist(app_id : String, exe : String) -> String {
+  let a = autostart_mac_xml_escape(app_id)
+  let e = autostart_mac_xml_escape(exe)
+  let lines : Array[String] = [
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+    "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">",
+    "<plist version=\"1.0\">",
+    "<dict>",
+    "  <key>Label</key>",
+    "  <string>" + a + "</string>",
+    "  <key>ProgramArguments</key>",
+    "  <array>",
+    "    <string>" + e + "</string>",
+    "  </array>",
+    "  <key>RunAtLoad</key>",
+    "  <true/>",
+    "</dict>",
+    "</plist>",
+  ]
+  let buf = StringBuilder()
+  for l in lines {
+    buf.write_string(l)
+    buf.write_char('\n')
+  }
+  buf.to_string()
+}
+
+///|
+/// 跑一条 launchctl（命令不存在/非零退出都算失败，交调用方归成语义化 Err）。
+fn autostart_mac_launchctl(verb : String, file : String) -> Bool {
+  match pr_run("launchctl", [verb, file], timeout_ms=8000) {
+    Ok(o) => o.exit_code == 0
+    _ => false
+  }
+}
+
+///|
+/// 当前平台是否支持开机自启动（三平台都有公开落点：Linux `.desktop`、
+/// Windows Run 键、macOS LaunchAgents plist）。
 pub fn autostart_supported() -> Bool {
   match sys_platform() {
-    "linux" | "windows" => true
+    "linux" | "windows" | "macos" => true
     _ => false
   }
 }
@@ -293,6 +362,11 @@ pub fn autostart_path(app_id : String) -> Result[String, AutostartError] {
       Ok(
         "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\" + app_id,
       )
+    "macos" =>
+      match autostart_mac_dir() {
+        Some(dir) => Ok(dir + "/" + app_id + ".plist")
+        None => Err(IoFailed("无法定位自启动目录(HOME 未设置)"))
+      }
     _ => Err(Unsupported)
   }
 }
@@ -315,6 +389,13 @@ pub fn autostart_is_enabled(app_id : String) -> Result[Bool, AutostartError] {
         // 文件不存在 = 未启用（目录是否存在由 enable 的写失败兜底报错）
         None => Ok(false)
       }
+    }
+    "macos" => {
+      let file = match autostart_path(app_id) {
+        Ok(f) => f
+        Err(e) => return Err(e)
+      }
+      Ok(sys_read_text_file(file) is Some(_))
     }
     "windows" =>
       match autostart_win_read(app_id) {
@@ -364,6 +445,27 @@ pub fn autostart_enable(app_id : String) -> Result[Unit, AutostartError] {
       Ok(())
     }
     "windows" => autostart_win_write(app_id, autostart_run_value(exe))
+    "macos" => {
+      let file = match autostart_path(app_id) {
+        Ok(f) => f
+        Err(e) => return Err(e)
+      }
+      let dir = match autostart_mac_dir() {
+        Some(d) => d
+        None => return Err(IoFailed("无法定位自启动目录(HOME 未设置)"))
+      }
+      if !sys_make_dirs(dir) {
+        return Err(IoFailed("无法创建自启动目录(目录不可写或无权限): " + dir))
+      }
+      if !sys_write_text_file(file, autostart_mac_plist(app_id, exe)) {
+        return Err(IoFailed("写入失败: " + file + " (目录不存在或无权限)"))
+      }
+      // 交给 launchd：load 失败不撤销文件（下次登录仍会生效），但如实报失败
+      if !autostart_mac_launchctl("load", file) {
+        return Err(IoFailed("launchctl load 失败: " + file))
+      }
+      Ok(())
+    }
     _ => Err(Unsupported)
   }
 }
@@ -388,6 +490,19 @@ pub fn autostart_disable(app_id : String) -> Result[Unit, AutostartError] {
       }
     }
     "windows" => autostart_win_remove(app_id)
+    "macos" => {
+      let file = match autostart_path(app_id) {
+        Ok(f) => f
+        Err(e) => return Err(e)
+      }
+      // 先 unload（没装载过也算成功，与「幂等删除」同档），再删 plist
+      let _ = autostart_mac_launchctl("unload", file)
+      if sys_remove_file(file) {
+        Ok(())
+      } else {
+        Err(IoFailed("删除失败: " + file))
+      }
+    }
     _ => Err(Unsupported)
   }
 }

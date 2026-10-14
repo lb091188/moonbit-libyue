@@ -279,3 +279,36 @@ test "si Windows 直调读数环：os/machine/memory/uptime 全通道" {
     }
   }
 }
+
+test "macOS 读数解析：sw_vers 三行与 ioreg 的带引号键" {
+  let os = si_parse_sw_vers(
+    "ProductName:\tmacOS\nProductVersion:\t15.2\nBuildVersion:\t24G84\n",
+  )
+  match os {
+    None => fail("sw_vers 解析失败")
+    Some(o) => {
+      assert_eq(o.id, "macos")
+      assert_eq(o.version_id, "15.2")
+      // 制表符与空格都要吞掉，展示名是「macOS 15.2」
+      assert_eq(o.pretty_name, "macOS 15.2")
+    }
+  }
+  match si_parse_sw_vers("ProductName:\tmacOS\n") {
+    None => fail("缺 ProductVersion 仍应给出条目")
+    Some(o) => assert_eq(o.pretty_name, "macOS")
+  }
+  assert_true(si_parse_sw_vers("random noise\n") is None)
+  let buf = StringBuilder()
+  buf.write_string("{\n")
+  buf.write_string("  \"IOPlatformExpertDevice\" = {\n")
+  buf.write_string("    \"compatible\" = <686937>\n")
+  buf.write_string("    \"Manufacturer\" = \"Apple Inc.\"\n")
+  buf.write_string("    \"IOPlatformSerialNumber\" = \"C02XL0ABMD6T\"\n")
+  buf.write_string("  }\n}\n")
+  let reg = buf.to_string()
+  assert_eq(si_parse_ioreg(reg, "Manufacturer"), Some("Apple Inc."))
+  assert_eq(si_parse_ioreg(reg, "IOPlatformSerialNumber"), Some("C02XL0ABMD6T"))
+  // 没这个键给 None（不是空串）——上层据此报读不到，不用空串糊弄
+  assert_true(si_parse_ioreg(reg, "board-id") is None)
+  assert_eq(si_trim("\t  \n"), "")
+}

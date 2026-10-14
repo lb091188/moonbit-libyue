@@ -4807,24 +4807,27 @@ static uint32_t wm_keysym_of(NSEvent *ev) {
   memset(&e, 0, sizeof(e));
   e.mods = wm_cocoa_mods([ev modifierFlags]);
   uint32_t ks = 0u;
-  // 修饰键自身的按下/释放：kVK 值与 X11 keysym 都按 Events.h / Xutil 的表给
+  // 修饰键自身的按下/释放：kVK 值与 X11 keysym 都按 Events.h / Xutil 的表给。
+  // 按下还是释放看**这一个键自己的位**在不在 flags 里——不能拿合成后的 mods
+  // 判（按住 Cmd 再松开 Shift，mods 仍非零，按 mods 判会把释放报成按下）。
+  NSUInteger flags = [ev modifierFlags];
+  NSUInteger own = 0;
   switch ([ev keyCode]) {
-    case 0x37: ks = 65515u; break; // kVK_Command      → XK_Super_L
-    case 0x36: ks = 65516u; break; // kVK_RightCommand → XK_Super_R
-    case 0x38: ks = 65505u; break; // kVK_Shift        → XK_Shift_L
-    case 0x3C: ks = 65506u; break; // kVK_RightShift   → XK_Shift_R
-    case 0x3B: ks = 65507u; break; // kVK_Control      → XK_Control_L
-    case 0x3E: ks = 65508u; break; // kVK_RightControl → XK_Control_R
-    case 0x3A: ks = 65406u; break; // kVK_Option       → XK_Alt_L
-    case 0x3D: ks = 65407u; break; // kVK_RightOption  → XK_Alt_R
+    case 0x37: ks = 65515u; own = NSEventModifierFlagCommand; break; // Super_L
+    case 0x36: ks = 65516u; own = NSEventModifierFlagCommand; break; // Super_R
+    case 0x38: ks = 65505u; own = NSEventModifierFlagShift; break;   // Shift_L
+    case 0x3C: ks = 65506u; own = NSEventModifierFlagShift; break;   // Shift_R
+    case 0x3B: ks = 65507u; own = NSEventModifierFlagControl; break; // Control_L
+    case 0x3E: ks = 65508u; own = NSEventModifierFlagControl; break; // Control_R
+    case 0x3A: ks = 65406u; own = NSEventModifierFlagOption; break;  // Alt_L
+    case 0x3D: ks = 65407u; own = NSEventModifierFlagOption; break;  // Alt_R
     default: break;
   }
   if (ks == 0u) {
     return;
   }
   e.keysym = ks;
-  // 位从有到无算释放，从无到有算按下
-  e.code = e.mods != 0u ? 0u : 1u;
+  e.code = (flags & own) != 0 ? 0u : 1u; // 自己的位还亮着 = 按下，灭了 = 释放
   [s pushEv:&e];
 }
 

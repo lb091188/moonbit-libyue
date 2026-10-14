@@ -286,6 +286,12 @@ extern "c" fn ffi_pp_set(guid : Bytes, ok : Ref[Int]) -> Int = "yue_sys_pp_set"
 /// 当前系统是否支持电源计划（powerprofilesctl 存在且可查询）。每次调用
 /// 真实探测，高频场景请调用方自行缓存结果。
 pub fn pp_supported() -> Bool {
+  // macOS 的电源方案没有可对齐的公开口：`pmset` 能读到 `lowpowermode`，
+  // 但「性能档」在 mac 上不是一套可枚举的 scheme（High Power Mode 机型限定、
+  // 写操作要多权限），三值语义对不上 → 按「没做」出声，不跑 powerprofilesctl。
+  if sys_platform() == "macos" {
+    return false
+  }
   if sys_platform() == "windows" {
     return true
   }
@@ -318,6 +324,12 @@ fn pp_windows_profile_of(guid : String) -> PowerProfile? {
 /// daemon 未安装 → PpUnsupported；查询失败 → PpCommandFailed；输出中
 /// 解析不到任何计划 → PpParseFailed）。
 pub fn pp_profiles() -> Result[Array[PowerProfile], PowerProfileError] {
+  // macOS 的电源方案没有可对齐的公开口：`pmset` 能读到 `lowpowermode`，
+  // 但「性能档」在 mac 上不是一套可枚举的 scheme（High Power Mode 机型限定、
+  // 写操作要多权限），三值语义对不上 → 按「没做」出声，不跑 powerprofilesctl。
+  if sys_platform() == "macos" {
+    return Err(PpUnsupported)
+  }
   if sys_platform() == "windows" {
     // 推荐序与 Windows 设置一致：均衡在前
     return Ok([PBalanced, PPerformance, PPowerSaver])
@@ -342,6 +354,12 @@ pub fn pp_profiles() -> Result[Array[PowerProfile], PowerProfileError] {
 /// → PpUnsupported；查询失败 → PpCommandFailed；输出不是已知计划名 →
 /// PpParseFailed）。
 pub fn pp_current() -> Result[PowerProfile, PowerProfileError] {
+  // macOS 的电源方案没有可对齐的公开口：`pmset` 能读到 `lowpowermode`，
+  // 但「性能档」在 mac 上不是一套可枚举的 scheme（High Power Mode 机型限定、
+  // 写操作要多权限），三值语义对不上 → 按「没做」出声，不跑 powerprofilesctl。
+  if sys_platform() == "macos" {
+    return Err(PpUnsupported)
+  }
   if sys_platform() == "windows" {
     let ok = Ref(0)
     let b = ffi_pp_current_guid(ok)
@@ -372,6 +390,12 @@ pub fn pp_current() -> Result[PowerProfile, PowerProfileError] {
 /// 调用方自行走授权流程）。power-profiles-daemon 未安装 → PpUnsupported；
 /// 查询与执行失败 → PpCommandFailed。
 pub fn pp_set(profile : PowerProfile) -> Result[Unit, PowerProfileError] {
+  // macOS 的电源方案没有可对齐的公开口：`pmset` 能读到 `lowpowermode`，
+  // 但「性能档」在 mac 上不是一套可枚举的 scheme（High Power Mode 机型限定、
+  // 写操作要多权限），三值语义对不上 → 按「没做」出声，不跑 powerprofilesctl。
+  if sys_platform() == "macos" {
+    return Err(PpUnsupported)
+  }
   if sys_platform() == "windows" {
     let ok = Ref(0)
     let _ = ffi_pp_set(@utf8.encode(pp_windows_guid_of(profile)), ok)

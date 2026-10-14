@@ -4,7 +4,7 @@
 
 > **来时的路**——本库最初是 [赵成(zcbenz)](https://github.com/zcbenz) 的 [Yue / libyue](https://github.com/yue/yue) 的 MoonBit 封装，布局沿用 [Yoga](https://github.com/facebook/yoga) 的 flexbox。如今这套栈已自绘、不再依赖二者——过去是**用**它们，现在是**学**它们留下的思路。也感谢 [MoonBit](https://github.com/moonbitlang)。
 
-[MoonBit](https://github.com/moonbitlang) 生态的**原生跨平台桌面 GUI 库**——窗口、像素、事件循环、布局与控件全部纯 MoonBit 实现。一套代码在 Windows ✅ / Linux ✅ 上跑原生窗口，macOS 后端暂未开发；`moon add` 后零配置直接运行。
+[MoonBit](https://github.com/moonbitlang) 生态的**原生跨平台桌面 GUI 库**——窗口、像素、事件循环、布局与控件全部纯 MoonBit 实现。一套代码在 Windows ✅ / Linux ✅ 上跑原生窗口，macOS 后端在 `mac` 分支落地中；`moon add` 后零配置直接运行。
 
 简体中文 | [English](https://github.com/lb091188/moonbit-native-gui/blob/master/README.md)
 
@@ -95,7 +95,7 @@ moon run examples/showcase       # 完整演示板：组件 + 系统能力
 
 ## 平台支持
 
-Ubuntu 24.04（XFCE / GNOME / KDE）✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🚧 后端暂未开发
+Ubuntu 24.04（XFCE / GNOME / KDE）✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🚧 `mac` 分支落地中（Cocoa / CoreText / ImageIO / WKWebView）
 
 Windows 上构建出的 exe 是 GUI 子系统二进制——双击运行不弹控制台窗口。
 
@@ -113,7 +113,7 @@ Windows 上构建出的 exe 是 GUI 子系统二进制——双击运行不弹�
 
 ## 参与贡献
 
-欢迎参与：报平台兼容问题、补控件、补文档都算——macOS 后端是最大的空缺（暂未开发，需要一台 Apple Silicon 机器）。几条基本要求：
+欢迎参与：报平台兼容问题、补控件、补文档都算——macOS 后端是最大的空缺（在 `mac` 分支落地中，需要一台 Apple Silicon 机器）。几条基本要求：
 
 - **提交门禁**：全仓 `moon check && moon test` 零错误零警告
 - **经验留档**：实测坑与修复写进 [adaptation.md](docs/adaptation.md)，不要只留在提交信息里

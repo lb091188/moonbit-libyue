@@ -4,7 +4,7 @@
 
 > **On origins** — this library started life as a MoonBit binding of [Cheng Zhao (zcbenz)](https://github.com/zcbenz)'s [Yue / libyue](https://github.com/yue/yue), with [Yoga](https://github.com/facebook/yoga)'s flexbox for layout. The stack is self-drawn now and depends on neither — what stays with us is what we learned from them. Thanks also to [MoonBit](https://github.com/moonbitlang).
 
-A **native cross-platform desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — windows, pixels, the event loop, layout and widgets are all written in pure MoonBit. One codebase runs native windows on Windows ✅ / Linux ✅, macOS backend not yet developed; zero config after `moon add`.
+A **native cross-platform desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — windows, pixels, the event loop, layout and widgets are all written in pure MoonBit. One codebase runs native windows on Windows ✅ / Linux ✅, with the macOS backend landing on the `mac` branch; zero config after `moon add`.
 
 English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/master/README_ZH.md)
 
@@ -95,7 +95,7 @@ moon run examples/showcase       # full demo board: components + system capabili
 
 ## Platform support
 
-Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🚧 backend not yet developed
+Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🚧 landing on the `mac` branch (Cocoa / CoreText / ImageIO / WKWebView)
 
 On Windows, exes are built as a GUI-subsystem binary — no console window on double-click.
 
@@ -113,7 +113,7 @@ On Windows, exes are built as a GUI-subsystem binary — no console window on do
 
 ## Contributing
 
-Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — the macOS backend is the largest open gap (not yet developed; it needs an Apple Silicon machine). A few basic requirements:
+Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — the macOS backend is the largest open gap (landing on the `mac` branch; it needs an Apple Silicon machine). A few basic requirements:
 
 - **Commit gate**: `moon check && moon test` zero errors and zero warnings repo-wide
 - **Experience on record**: write field-tested pitfalls together with their fixes into [adaptation.md](docs/adaptation.md) — not only in commit messages
