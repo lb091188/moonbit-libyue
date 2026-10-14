@@ -800,14 +800,23 @@ test "文本类样式属性真生效：对齐/换行/行高/下划线与硬阴�
   )
   assert_eq(kid(lh, 0).rect.h, 40.0)
 
-  // 4) text_decoration：下划线多出一整行的墨（按行数比）
+  // 4) text_decoration：下划线要额外多出一份墨（比墨量不比行数——线落进最后一行
+  //    的行距时行数是平的，而各后端的行盒高度本来就不一致）
   let (_pu, _pr, plain_ink) = ink_scan(text("下划线", class=[]), 120.0, 40.0)
   let (_uu, _ur, under_ink) = ink_scan(
     text("下划线", class=[@style.style(text_decoration=@style.TextDecoration::Underline)]),
     120.0,
     40.0,
   )
-  assert_true(under_ink > plain_ink)
+  let probe = match @text.measure_font("下划线", @text.Font::new("", 13.0),
+    wrap=false) {
+    Some(m) => "w=\{m.width} h=\{m.height} baseline=\{m.baseline}"
+    None => "None"
+  }
+  assert_true(
+    under_ink > plain_ink,
+    msg="下划线没多出墨：plain=\{plain_ink} under=\{under_ink} 行=\{_pr}/\{_ur} measure_font(13.0)=\{probe}",
+  )
 
   // 5) box_shadow：本体之外出现墨（不画阴影时盒外无墨）
   let shadow_outside = fn(cls : Array[@style.Style]) -> Int {

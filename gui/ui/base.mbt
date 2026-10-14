@@ -268,11 +268,13 @@ fn draw_underline(
   let tw = m.width.to_double()
   let th = m.height.to_double()
   let r = w.rect
-  let top = ((r.h - th) / 2.0).max(0.0)
-  let y = top + m.baseline.to_double() + 1.5
-  if y >= r.h {
+  if r.h <= 0.0 {
     return ()
   }
+  let top = ((r.h - th) / 2.0).max(0.0)
+  // 线必须落在盒内：后端给的行盒不够高（有的平台 height 只算到基线）时贴着
+  // 底边画，而不是把整条下划线丢掉——丢了就是「样式没生效」，比画低一格严重。
+  let y = (top + m.baseline.to_double() + 1.5).min(r.h - 1.0).max(0.0)
   let x = if align is @text.TextAlign::Center {
     ((box_w - tw) / 2.0).max(0.0)
   } else if align is @text.TextAlign::End {
