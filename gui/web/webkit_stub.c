@@ -1831,9 +1831,9 @@ void wb_get_cookies(int64_t id, const char *uri) {
       return;
     }
     int sid = v->sid;
-    // ObjC 侧这一口叫 HTTPCookieStore（Swift 才写作 httpCookieStore）
+    // 属性名就是 httpCookieStore（clang 的 fix-it 给的这个名字）
     WKHTTPCookieStore *store =
-        [[v.view configuration] websiteDataStore].HTTPCookieStore;
+        [[v.view configuration] websiteDataStore].httpCookieStore;
     if (store == nil) {
       wb_push(v, 13, 1, "cookie store unavailable");
       return;
