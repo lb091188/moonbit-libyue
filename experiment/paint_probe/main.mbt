@@ -210,4 +210,32 @@ fn main {
   let ms6 = @win.now_ms() - t5
   println("PAINT-PROB arcs(3个60半径14px圆弧) frames=\{n} \{ms6}ms(\{ms6 / n.to_int64()}ms/帧)")
   p.end()
+  // ⑩ 文本批对照：200 段互不重叠的短文本，逐段即绘（旧行为）vs 攒批一次冲刷
+  let tb = @render.Bitmap::new(w, h)
+  let t7 = @win.now_ms()
+  it = 0
+  while it < n {
+    let mut k = 0
+    while k < 200 {
+      let _ = @text.draw_to(tb, 20.0 + (k % 20).to_double() * 68.0, 10.0 + (k / 20).to_double() * 22.0, "标签 0123", 13.0, "#c8ccd8")
+      k += 1
+    }
+    it += 1
+  }
+  let ms7 = @win.now_ms() - t7
+  println("PAINT-PROB text_immediate(200段/帧 逐段提交) frames=\{n} \{ms7}ms(\{ms7 / n.to_int64()}ms/帧)")
+  @text.enable_batching()
+  let t8 = @win.now_ms()
+  it = 0
+  while it < n {
+    let mut k = 0
+    while k < 200 {
+      let _ = @text.draw_to(tb, 20.0 + (k % 20).to_double() * 68.0, 10.0 + (k / 20).to_double() * 22.0, "标签 0123", 13.0, "#c8ccd8")
+      k += 1
+    }
+    @text.flush_pending()
+    it += 1
+  }
+  let ms8 = @win.now_ms() - t8
+  println("PAINT-PROB text_batched(200段/帧 一次提交) frames=\{n} \{ms8}ms(\{ms8 / n.to_int64()}ms/帧)")
 }

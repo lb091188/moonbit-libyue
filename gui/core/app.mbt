@@ -685,10 +685,29 @@ pub fn App::pump_ime(self : App) -> Unit {
 }
 
 ///|
+let text_batch_done : Ref[Bool] = Ref(false)
+
+///|
+/// 文本帧级批的一次性接线：①注册光栅前置闸——任何写像素操作前按裁剪矩形
+/// 冲掉相交的待批文本（保「后画的盖住先画的」；不相交则继续攒批，卡片墙
+/// 这类「填充-文本-填充-文本」交错序列也能攒出长批）；②打开 C 侧批开关。
+/// 测试与探针不经过这里，文本批保持关闭、像素行为与旧路径逐位一致。
+fn text_batch_init() -> Unit {
+  if !text_batch_done.val {
+    text_batch_done.val = true
+    @render.set_raster_gate(fn(x0, y0, x1, y1) {
+      @text.flush_before_raster(x0, y0, x1, y1)
+    })
+    @text.enable_batching()
+  }
+}
+
+///|
 /// 一帧的绘制：根控件恒等尺寸取窗口内容尺寸，布局→绘制→上屏。
 /// 脏区非整窗时把绘制器裁到脏区——控件遍历的视口剔除按当前裁剪框判交，
 /// 裁剪外整块跳过；位图按窗复用保留上一帧内容，裁剪外像素即上一帧。
 pub fn App::paint_frame(self : App) -> Unit {
+  text_batch_init()
   // 帧号先进一格：被画到的控件在这一格里记账，自转组件据此判断「这帧有没有我」
   let _ = bump_paint_epoch()
   self.dirty = false
@@ -738,6 +757,9 @@ pub fn App::paint_frame(self : App) -> Unit {
   self.root.relayout(w.to_double(), h.to_double())
   let t1 = @win.now_ms()
   self.root.paint(p)
+  // 帧级文本批：整树画完先把待批段落位（C 侧一次 BeginDraw/EndDraw 提交 +
+  // 并集读回混合），present 读到的才是完整帧
+  @text.flush_pending()
   p.end()
   let t2 = @win.now_ms()
   self.window.present(bm.data, bm.width, bm.height)

@@ -14,5 +14,6 @@ import {
   "NoahLiu/native-gui/theme",
   "NoahLiu/native-gui/win",
   "NoahLiu/native-gui/sys" @sys,
+  "NoahLiu/native-gui/text",
   "NoahLiu/native-gui/dbus" @dbus,
 }

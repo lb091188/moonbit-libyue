@@ -638,6 +638,210 @@ bool ptw_canvas_ensure(int w, int h) {
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// 帧级文本批（DWrite 提交合并）：每段文本一次 BeginDraw→EndDraw 的固定提交
+// 开销是 NATIVE-APP-RENDER 里 d2d_us 的大头（实测 132us/段、8.2ms/帧）。连续
+// 的 pt_draw/pt_draw_box（同一目标位图）攒进批队列，冲刷时一次 BeginDraw →
+// Clear(并集) → 逐段 DrawTextLayout → EndDraw → 读回并集一次、逐像素混合
+// 一次。正确性：批内段按入队顺序绘制（与逐段立即渲染同序，D2D 自己合成重
+// 叠）；跨批顺序由三个冲刷触发保证——①目标/尺寸变化（多窗交替）②批满
+// ③显式 pt_flush（帧尾 present 前）/ pt_flush_if_overlap（光栅前置闸：与本
+// 批墨迹相交的写像素操作前，保「后画的盖住先画的」）。布局缓存可能整清，
+// 入队时 AddRef、冲刷后 Release，杜绝悬垂。
+// ---------------------------------------------------------------------------
+typedef struct {
+  IDWriteTextLayout *layout;
+  float x;
+  float y;
+  int r;
+  int g;
+  int b;
+  int a;
+  int rx0;
+  int ry0;
+  int rx1;
+  int ry1;
+} PtwBatchItem;
+
+#define PTW_BATCH_CAP 128
+static PtwBatchItem g_batch[PTW_BATCH_CAP];
+static int g_batch_len = 0;
+static unsigned char *g_batch_data = nullptr;
+static int g_batch_w = 0;
+static int g_batch_h = 0;
+static int g_batch_ux0 = 0;
+static int g_batch_uy0 = 0;
+static int g_batch_ux1 = 0;
+static int g_batch_uy1 = 0;
+static int g_batching = 0; // MoonBit 侧 pt_set_batching 打开（生产路径）
+
+static void ptw_batch_flush(void) {
+  const int n = g_batch_len;
+  if (n <= 0 || g_batch_data == nullptr) {
+    return;
+  }
+  if (!ptw_canvas_ensure(g_batch_w, g_batch_h)) {
+    for (int i = 0; i < n; i++) {
+      g_batch[i].layout->Release();
+    }
+    g_batch_len = 0;
+    return;
+  }
+  const D2D1_RECT_F ubox =
+      D2D1::RectF(static_cast<FLOAT>(g_batch_ux0), static_cast<FLOAT>(g_batch_uy0),
+                  static_cast<FLOAT>(g_batch_ux1), static_cast<FLOAT>(g_batch_uy1));
+  const double t0 = ptw_now_us();
+  HRESULT hr = S_OK;
+  g_canvas.rt->BeginDraw();
+  // 清并集一块：同 ptw_render 的口径——必须 Clear（透明 FillRectangle 在
+  // 覆盖语义下是空操作），轴对齐裁剪把 Clear 限制在并集内（画布可能更大，
+  // 并集外留着上一批的残影但读回只取并集，不受影响）。
+  g_canvas.rt->PushAxisAlignedClip(ubox, D2D1_ANTIALIAS_MODE_ALIASED);
+  g_canvas.rt->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+  g_canvas.rt->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+  for (int i = 0; i < n; i++) {
+    g_canvas.brush->SetColor(D2D1::ColorF(
+        g_batch[i].r / 255.0f, g_batch[i].g / 255.0f, g_batch[i].b / 255.0f,
+        g_batch[i].a / 255.0f));
+    g_canvas.rt->DrawTextLayout(
+        D2D1::Point2F(g_batch[i].x, g_batch[i].y), g_batch[i].layout,
+        g_canvas.brush, D2D1_DRAW_TEXT_OPTIONS_NONE);
+  }
+  g_canvas.rt->PopAxisAlignedClip();
+  hr = g_canvas.rt->EndDraw();
+  const double t1 = ptw_now_us();
+  g_st_d2d_us += (long long)(t1 - t0);
+  if (SUCCEEDED(hr)) {
+    // 读回并集一次（批内重叠段已由 D2D 合成，混合一遭即可），逐像素
+    // 预乘 BGRA over 落到 data 的同一绝对坐标。
+    const double t2 = ptw_now_us();
+    WICRect wr = {g_batch_ux0, g_batch_uy0, g_batch_ux1 - g_batch_ux0,
+                  g_batch_uy1 - g_batch_uy0};
+    IWICBitmapLock *lock = nullptr;
+    if (SUCCEEDED(g_canvas.wic->Lock(&wr, WICBitmapLockRead, &lock))) {
+      UINT stride = 0;
+      UINT cb = 0;
+      BYTE *pixels = nullptr;
+      if (SUCCEEDED(lock->GetStride(&stride)) &&
+          SUCCEEDED(lock->GetDataPointer(&cb, &pixels)) && pixels != nullptr) {
+        const int rw = g_batch_ux1 - g_batch_ux0;
+        const int rh = g_batch_uy1 - g_batch_uy0;
+        for (int y = 0; y < rh; y++) {
+          const unsigned char *srow = pixels + size_t(y) * stride;
+          unsigned char *drow = g_batch_data +
+                                size_t(g_batch_uy0 + y) * size_t(g_batch_w) * 4 +
+                                size_t(g_batch_ux0) * 4;
+          for (int x = 0; x < rw; x++) {
+            const unsigned sa = srow[x * 4 + 3];
+            if (sa == 0) {
+              continue;
+            }
+            const unsigned inv = 255u - sa;
+            drow[x * 4 + 0] = static_cast<unsigned char>(
+                srow[x * 4 + 0] + (unsigned(drow[x * 4 + 0]) * inv + 127) / 255);
+            drow[x * 4 + 1] = static_cast<unsigned char>(
+                srow[x * 4 + 1] + (unsigned(drow[x * 4 + 1]) * inv + 127) / 255);
+            drow[x * 4 + 2] = static_cast<unsigned char>(
+                srow[x * 4 + 2] + (unsigned(drow[x * 4 + 2]) * inv + 127) / 255);
+            drow[x * 4 + 3] = static_cast<unsigned char>(
+                sa + (unsigned(drow[x * 4 + 3]) * inv + 127) / 255);
+          }
+        }
+      }
+      lock->Release();
+      g_st_read_us += (long long)(ptw_now_us() - t2);
+    } else {
+      g_st_read_us += (long long)(ptw_now_us() - t2);
+    }
+  }
+  for (int i = 0; i < n; i++) {
+    g_batch[i].layout->Release();
+  }
+  g_batch_len = 0;
+}
+
+// 入队一段：算墨迹矩形（与 ptw_render 同式），无墨直接按成功返回。
+static int ptw_batch_queue(IDWriteTextLayout *layout, float ox, float oy,
+                           unsigned char *data, int buf_w, int buf_h, int r,
+                           int g, int b, int a, int layout_w_int) {
+  if (layout == nullptr || data == nullptr || buf_w < 1 || buf_h < 1) {
+    return 0;
+  }
+  DWRITE_TEXT_METRICS tm;
+  if (FAILED(layout->GetMetrics(&tm))) {
+    return 0;
+  }
+  const int constrained = layout_w_int > 0;
+  const double ink_x0 = constrained ? (double)ox : (double)(ox + tm.left);
+  const double ink_x1 =
+      constrained
+          ? (double)(ox + layout_w_int)
+          : (double)(ox + tm.left + tm.widthIncludingTrailingWhitespace);
+  int rx0 = (int)floorf((float)ink_x0) - 4;
+  int ry0 = (int)floorf(oy + tm.top) - 4;
+  int rx1 = (int)ceilf((float)ink_x1) + 4;
+  int ry1 = (int)ceilf(oy + tm.top + tm.height) + 4;
+  if (rx0 < 0) {
+    rx0 = 0;
+  }
+  if (ry0 < 0) {
+    ry0 = 0;
+  }
+  if (rx1 > buf_w) {
+    rx1 = buf_w;
+  }
+  if (ry1 > buf_h) {
+    ry1 = buf_h;
+  }
+  if (rx1 <= rx0 || ry1 <= ry0) {
+    return 1; // 整块出窗：无墨，按成功
+  }
+  if (g_batch_len > 0 &&
+      (data != g_batch_data || buf_w != g_batch_w || buf_h != g_batch_h)) {
+    ptw_batch_flush();
+  }
+  if (g_batch_len >= PTW_BATCH_CAP) {
+    ptw_batch_flush();
+  }
+  if (g_batch_len == 0) {
+    g_batch_data = data;
+    g_batch_w = buf_w;
+    g_batch_h = buf_h;
+    g_batch_ux0 = rx0;
+    g_batch_uy0 = ry0;
+    g_batch_ux1 = rx1;
+    g_batch_uy1 = ry1;
+  } else {
+    if (rx0 < g_batch_ux0) {
+      g_batch_ux0 = rx0;
+    }
+    if (ry0 < g_batch_uy0) {
+      g_batch_uy0 = ry0;
+    }
+    if (rx1 > g_batch_ux1) {
+      g_batch_ux1 = rx1;
+    }
+    if (ry1 > g_batch_uy1) {
+      g_batch_uy1 = ry1;
+    }
+  }
+  g_batch[g_batch_len].layout = layout;
+  layout->AddRef(); // 布局缓存整清可能发生在入队与冲刷之间，持引用防悬垂
+  g_batch[g_batch_len].x = ox;
+  g_batch[g_batch_len].y = oy;
+  g_batch[g_batch_len].r = r;
+  g_batch[g_batch_len].g = g;
+  g_batch[g_batch_len].b = b;
+  g_batch[g_batch_len].a = a;
+  g_batch[g_batch_len].rx0 = rx0;
+  g_batch[g_batch_len].ry0 = ry0;
+  g_batch[g_batch_len].rx1 = rx1;
+  g_batch[g_batch_len].ry1 = ry1;
+  g_batch_len++;
+  g_st_calls++;
+  return 1;
+}
+
 // 把 layout 画进 dst（预乘 BGRA，buf_w×buf_h）；区间颜色在渲染目标上建画笔
 int ptw_render(IDWriteTextLayout *layout, float ox, float oy,
                unsigned char *data, int buf_w, int buf_h, int r, int g, int b,
@@ -646,6 +850,9 @@ int ptw_render(IDWriteTextLayout *layout, float ox, float oy,
   if (layout == nullptr || data == nullptr || buf_w < 1 || buf_h < 1) {
     return 0;
   }
+  // 即时渲染（rt_* 富文本专用）前先冲掉待批：本段要与 data 上的既有内容
+  // 保持先后序，待批文本必须先落位。
+  ptw_batch_flush();
   if (!ptw_canvas_ensure(buf_w, buf_h)) {
     return 0;
   }
@@ -828,6 +1035,13 @@ extern "C" int pt_draw(unsigned char *data, int buf_w, int buf_h, double x,
   if (layout == nullptr) {
     return 0;
   }
+  if (g_batching) {
+    return ptw_batch_queue(layout, static_cast<float>(x), static_cast<float>(y),
+                           data, buf_w, buf_h, r, g, b, a,
+                           max_width > 0 && (wrap != 0 || ellipsize != 0)
+                               ? max_width
+                               : 0);
+  }
   return ptw_render(layout, static_cast<float>(x), static_cast<float>(y), data,
                     buf_w, buf_h, r, g, b, a, nullptr, 0, nullptr, 0,
                     max_width > 0 && (wrap != 0 || ellipsize != 0) ? max_width
@@ -854,6 +1068,11 @@ extern "C" int pt_draw_box(unsigned char *data, int buf_w, int buf_h, double x,
   double dx = 0.0;
   double dy = 0.0;
   ptw_box_offsets(layout, align, valign, box_w, box_h, wrapped_axis, &dx, &dy);
+  if (g_batching) {
+    return ptw_batch_queue(layout, static_cast<float>(x + dx),
+                           static_cast<float>(y + dy), data, buf_w, buf_h, r,
+                           g, b, a, wrapped_axis ? static_cast<int>(box_w) : 0);
+  }
   return ptw_render(layout, static_cast<float>(x + dx),
                     static_cast<float>(y + dy), data, buf_w, buf_h, r, g, b, a,
                     nullptr, 0, nullptr, 0,
@@ -870,6 +1089,26 @@ extern "C" int pt_draw_box_cr(int64_t cr_id, double x, double y, double box_w,
   (void)g; (void)b; (void)a; (void)align; (void)valign; (void)ellipsize;
   (void)wrap;
   return 0; // Windows 无 cairo 会话：MoonBit 侧按 cairo_id()==None 走光栅路径
+}
+
+extern "C" int pt_flush(void) {
+  ptw_batch_flush();
+  return 0;
+}
+
+extern "C" int pt_flush_if_overlap(int x0, int y0, int x1, int y1) {
+  if (g_batch_len > 0 && x1 > g_batch_ux0 && x0 < g_batch_ux1 &&
+      y1 > g_batch_uy0 && y0 < g_batch_uy1) {
+    ptw_batch_flush();
+  }
+  return 0;
+}
+
+extern "C" void pt_set_batching(int on) {
+  if (!on) {
+    ptw_batch_flush();
+  }
+  g_batching = on;
 }
 
 // ---------------------------------------------------------------------------

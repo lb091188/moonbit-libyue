@@ -50,6 +50,29 @@ pub(all) struct Painter {
 }
 
 ///|
+/// 光栅前置闸（进程级单槽，宿主层经 `set_raster_gate` 接线）：每个写像素的
+/// 绘制操作前以当前裁剪矩形调用——文本帧级批据此在「即将被覆盖」时冲掉
+/// 待批段，保「后画的盖住先画的」z 序；不相交则继续攒批。库内默认无闸
+/// （测试/工具直绘位图不走闸，文本批也不会开启）。
+let g_raster_gate : Ref[((Int, Int, Int, Int) -> Unit)?] = Ref(None)
+
+///|
+/// 注册光栅前置闸（幂等覆盖；宿主通常接文本批的 `flush_before_raster`）。
+pub fn set_raster_gate(f : (Int, Int, Int, Int) -> Unit) -> Unit {
+  g_raster_gate.val = Some(f)
+}
+
+///|
+fn Painter::raster_gate(self : Painter) -> Unit {
+  match g_raster_gate.val {
+    Some(f) =>
+      f(self.state.clip_x0, self.state.clip_y0, self.state.clip_x1,
+        self.state.clip_y1)
+    None => ()
+  }
+}
+
+///|
 /// 取整：+0.5 后向下取整（0.5 与 -0.5 分别进/退到 1 与 -1）。
 fn snap(v : Double) -> Int {
   (v + 0.5).floor().to_int()
@@ -229,6 +252,7 @@ pub fn Painter::fill_round_rect(
   h : Double,
   r : Double,
 ) -> Unit {
+  self.raster_gate()
   match self.backend {
     Some(CairoBackend(_c)) => {
       self.begin_path()
@@ -259,6 +283,7 @@ pub fn Painter::stroke_round_rect(
   h : Double,
   r : Double,
 ) -> Unit {
+  self.raster_gate()
   match self.backend {
     Some(CairoBackend(_c)) => {
       self.begin_path()
@@ -340,6 +365,7 @@ pub fn Painter::box_shadow(
   spread : Double,
   layers : Int,
 ) -> Unit {
+  self.raster_gate()
   if spread <= 0.0 || layers < 1 || w <= 0.0 || h <= 0.0 {
     return ()
   }
@@ -634,6 +660,7 @@ pub fn Painter::fill_rect(
   w : Double,
   h : Double,
 ) -> Unit {
+  self.raster_gate()
   match self.backend {
     Some(CairoBackend(c)) => {
       self.apply_fill()
@@ -657,6 +684,7 @@ pub fn Painter::stroke_rect(
   w : Double,
   h : Double,
 ) -> Unit {
+  self.raster_gate()
   match self.backend {
     Some(CairoBackend(c)) => {
       self.apply_stroke()
@@ -762,6 +790,7 @@ pub fn Painter::draw_canvas(
   w : Double,
   h : Double,
 ) -> Unit {
+  self.raster_gate()
   let ga = self.state.global_alpha
   let bm = if ga < 1.0 { dim_bitmap(canvas.bitmap, ga) } else { canvas.bitmap }
   match self.backend {
@@ -807,6 +836,7 @@ pub fn Painter::draw_canvas_from_rect(
   dw : Double,
   dh : Double,
 ) -> Unit {
+  self.raster_gate()
   let ga = self.state.global_alpha
   let bm = if ga < 1.0 { dim_bitmap(canvas.bitmap, ga) } else { canvas.bitmap }
   match self.backend {
@@ -826,6 +856,7 @@ pub fn Painter::draw_image(
   w : Double,
   h : Double,
 ) -> Unit {
+  self.raster_gate()
   if image.is_empty() {
     return ()
   }
@@ -852,6 +883,7 @@ pub fn Painter::draw_image_from_rect(
   dw : Double,
   dh : Double,
 ) -> Unit {
+  self.raster_gate()
   if image.is_empty() {
     return ()
   }
@@ -870,6 +902,7 @@ pub fn Painter::draw_image_from_rect(
 
 ///|
 pub fn Painter::fill(self : Painter) -> Unit {
+  self.raster_gate()
   match self.backend {
     Some(CairoBackend(c)) => {
       self.apply_fill()
@@ -885,6 +918,7 @@ pub fn Painter::fill(self : Painter) -> Unit {
 
 ///|
 pub fn Painter::stroke(self : Painter) -> Unit {
+  self.raster_gate()
   match self.backend {
     Some(CairoBackend(c)) => {
       self.apply_stroke()

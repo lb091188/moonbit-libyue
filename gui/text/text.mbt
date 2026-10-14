@@ -699,3 +699,44 @@ extern "c" fn pt_render_stats(
   d2d_us : Ref[Int64],
   read_us : Ref[Int64],
 ) -> Int = "pt_render_stats"
+
+///|
+/// 文本帧级批开关（生产路径由宿主打开；测试/探针默认关，走逐段即绘即混
+/// 的旧路径，像素行为逐位不变）。打开后 pt_draw/pt_draw_box 只入队，冲刷
+/// 时机：目标位图/尺寸变化、批满、pt_flush（帧尾）/ pt_flush_if_overlap
+/// （光栅前置闸）。
+pub fn enable_batching() -> Unit {
+  pt_set_batching(1)
+}
+
+///|
+/// 冲掉待批文本（帧尾 present 前调用；非 Windows 后端为空操作）。
+pub fn flush_pending() -> Unit {
+  let _ = pt_flush()
+}
+
+///|
+/// 光栅前置闸：待批文本与即将写入的矩形（裁剪框）相交时冲刷——保
+/// 「后画的盖住先画的」的 z 序；不相交则继续攒批。
+pub fn flush_before_raster(
+  x0 : Int,
+  y0 : Int,
+  x1 : Int,
+  y1 : Int,
+) -> Unit {
+  let _ = pt_flush_if_overlap(x0, y0, x1, y1)
+}
+
+///|
+extern "c" fn pt_set_batching(on : Int) -> Unit = "pt_set_batching"
+
+///|
+extern "c" fn pt_flush() -> Int = "pt_flush"
+
+///|
+extern "c" fn pt_flush_if_overlap(
+  x0 : Int,
+  y0 : Int,
+  x1 : Int,
+  y1 : Int,
+) -> Int = "pt_flush_if_overlap"

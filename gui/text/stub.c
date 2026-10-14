@@ -1048,5 +1048,27 @@ int rt_draw_cr(int64_t cr_id, int64_t h, double x, double y, double box_w,
 
 
 #endif
+
+#ifndef _WIN32
+// 帧级文本批的跨平台桩：Pango/mac 分支逐段即绘即混无批，冲刷为空操作
+//（Windows 的真实现取自 dwrite_text.cpp；本文件若与它同链会双定义，故
+// 用 _WIN32 排除）。
+int pt_flush(void) {
+  return 0;
+}
+
+int pt_flush_if_overlap(int x0, int y0, int x1, int y1) {
+  (void)x0;
+  (void)y0;
+  (void)x1;
+  (void)y1;
+  return 0;
+}
+
+void pt_set_batching(int on) {
+  (void)on;
+}
+#endif
+
 // Linux 上 native-stub 的那次编译（无 WM_STUB_PANGO、且 __linux__ 成立）落不进任何分支，
 // 编出空翻译单元——真实现由 prebuild 的归档提供，这里绝不能再定义一份（双定义）。
