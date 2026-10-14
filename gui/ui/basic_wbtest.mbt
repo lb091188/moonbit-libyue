@@ -75,7 +75,7 @@ test "标签尺寸来自 Pango 测量；文本随信号变化就重测" {
     return
   }
   let src_text = @core.Signal::new("Hello 基线")
-  let n = text_dyn(src_text, size=14.0)
+  let n = text_dyn(src_text, font_size=14.0)
   // 交叉轴不 stretch（列容器默认会把宽度拉到整行），才看得出测量给的真尺寸
   let root = mount_root([n], 240.0, 60.0)
   let w = kid(root, 0)
@@ -98,7 +98,7 @@ test "两个字号混排按基线对齐（文本测量回灌布局的直接结�
     return
   }
   let row = view(
-    [text("Ag", size=13.0), text("Ag", size=26.0)],
+    [text("Ag", font_size=13.0), text("Ag", font_size=26.0)],
     direction=@yoga.Row,
     align_items=@yoga.AlignItems::Baseline,
     height=48.0,
@@ -292,8 +292,8 @@ test "文本随控件原点落位并被裁剪（画在 Painter 会话上）" {
   if !ui_text_guard() {
     return
   }
-  let top = text("AAAA", size=20.0)
-  let bottom = text("BBBB", size=20.0)
+  let top = text("AAAA", font_size=20.0)
+  let bottom = text("BBBB", font_size=20.0)
   let root = @core.Widget::new()
   root.set_size(200.0, 200.0)
   root.set_column()
@@ -330,7 +330,7 @@ test "文本随控件原点落位并被裁剪（画在 Painter 会话上）" {
   // 裁剪：窄盒里的长文本不得画到盒外
   let narrow = @core.Widget::new()
   narrow.set_size(24.0, 24.0)
-  let src = text_source("WWWWWWWWWWWWWWWWWW", size=20.0, wrap=false)
+  let src = text_source("WWWWWWWWWWWWWWWWWW", font_size=20.0, wrap=false)
   narrow.on_draw = Some(fn(
     self : @core.Widget,
     pp : @render.Painter,

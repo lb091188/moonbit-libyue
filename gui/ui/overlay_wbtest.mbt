@@ -201,7 +201,7 @@ test "对话框：Store 驱动弹收，确定/取消/✕ 都先收起再回调" 
     dialog(
       vis,
       "确认操作",
-      [text("要删掉这一条吗？", size=12.0)],
+      [text("要删掉这一条吗？", font_size=12.0)],
       on_confirm=fn() -> Unit { acts.push("ok") },
       on_cancel=fn() -> Unit { acts.push("cancel") },
     ),

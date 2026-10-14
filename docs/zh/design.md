@@ -262,6 +262,10 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 - **散参数改名对齐 CSS 属性名**：`bg` → `background_color`、`fg` → `color`、
   `size` → `font_size`，与 §1.1 的 `Style` 字段同名。labelled 参数名本身进 IDE 补全，
   这一步不引入任何新机制就拿到前端直觉。
+  **改的判据是「这个数是字号还是几何尺寸」**：字号才叫 `font_size`（`text` / `text_dyn` /
+  `input` / `textarea` / `button` / `checkbox` / `link` / `tag*` / `bind*` / `text_source`）；
+  图标与圆点的边长仍是 `size`（`icon` / `badge_dot` / `avatar` / `rate`），图标按钮本来就写成
+  `icon_size` / `box_size`——把几何尺寸也叫 `font_size` 才是错的。
 
 `_t` 后缀是历史上的 **themed（主题化变体）** 标记，与同名基础版是两套实现
 （`label` / `label_t`、`button` / `button_t`）。改名时**合并为单入口**，差异参数取并集。

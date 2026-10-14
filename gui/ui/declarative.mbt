@@ -109,14 +109,14 @@ pub fn row(
 pub fn[A] bind_label(
   store : @core.Store[A],
   f : (A) -> String,
-  size? : Double = 13.0,
+  font_size? : Double = 13.0,
   color? : String = "",
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   bind(
     store.signal(),
     f,
-    size=size,
+    font_size=font_size,
     color=color,
     handle=handle,
   )
@@ -127,11 +127,11 @@ pub fn[A] bind_label(
 pub fn[A] bind(
   sig : @core.Signal[A],
   f : (A) -> String,
-  size? : Double = 13.0,
+  font_size? : Double = 13.0,
   color? : String = "",
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
-  let src = text_source(f(sig.get()), size=size, color=color, wrap=false)
+  let src = text_source(f(sig.get()), font_size=font_size, color=color, wrap=false)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     attach_text_measure(w, src)

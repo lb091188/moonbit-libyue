@@ -172,7 +172,7 @@ pub fn textarea(
   rows? : Int = 3,
   width? : Double = 260.0,
   height? : Double = 0.0,
-  size? : Double = 13.0,
+  font_size? : Double = 13.0,
   family? : String = "",
   read_only? : Bool = false,
   focus_id? : Int = 0,
@@ -184,7 +184,7 @@ pub fn textarea(
   let ed = @input.Editor::new()
   attach_system_clipboard(ed)
   let _ = ed.insert_text(store.get())
-  let font = @text.Font::new(family, size)
+  let font = @text.Font::new(family, font_size)
   let pad = 4.0
   let ro = read_only
   let ph = placeholder

@@ -243,9 +243,9 @@ test "时间线：逐行等高、首末行的贯通线只到点心" {
 test "轮播：面板预建只显示当前页，箭头与指示点切页、越界回绕" {
   let h = CarouselHandle::make()
   let pages : Array[@core.Node] = [
-    text("第一页", size=14.0),
-    text("第二页", size=14.0),
-    text("第三页", size=14.0),
+    text("第一页", font_size=14.0),
+    text("第二页", font_size=14.0),
+    text("第三页", font_size=14.0),
   ]
   let (root, c) = mounted(
     carousel(pages, width=200.0, height=80.0, interval_ms=0, rotation=h),

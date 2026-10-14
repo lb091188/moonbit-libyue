@@ -42,7 +42,7 @@ fn page_of(idx : Int, label : (Int) -> String) -> @core.Node {
     @ui.divider(),
   ]
   for i = 0; i < TEXTS_PER_PAGE; i = i + 1 {
-    let _ = parts.push(@ui.text(label(i), size=13.0, role=@ui.Secondary))
+    let _ = parts.push(@ui.text(label(i), font_size=13.0, role=@ui.Secondary))
   }
   let _ = parts.push(@ui.statistic("访问量", "1,234"))
   let _ = parts.push(@ui.alert("提示", description="这一段描述用来带出提示条的画法", t=@ui.Info))

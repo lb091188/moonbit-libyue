@@ -84,7 +84,7 @@ pub fn input(
   placeholder? : String = "",
   password? : Bool = false,
   read_only? : Bool = false,
-  size? : Double = 13.0,
+  font_size? : Double = 13.0,
   family? : String = "",
   width? : Double = 0.0,
   focus_id? : Int = 0,
@@ -97,7 +97,7 @@ pub fn input(
   let ed = @input.Editor::new()
   attach_system_clipboard(ed)
   let _ = ed.insert_text(store.get())
-  let font = @text.Font::new(family, size)
+  let font = @text.Font::new(family, font_size)
   let pad = 4.0
   let mask = password
   let ro = read_only

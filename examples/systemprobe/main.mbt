@@ -402,8 +402,8 @@ fn panel(
 ) -> @core.Node {
   @ui.view(
     [
-      @ui.text(title, size=13.0, weight=@text.SemiBold),
-      @ui.text_dyn(lines, size=12.0, wrap=true, max_width=width - 20.0),
+      @ui.text(title, font_size=13.0, weight=@text.SemiBold),
+      @ui.text_dyn(lines, font_size=12.0, wrap=true, max_width=width - 20.0),
     ],
     width=width,
     row_gap=4.0,
@@ -550,12 +550,12 @@ fn main {
       [
         @ui.text(
           "系统能力（sys）：只读探测在一屏，设置类只给按钮",
-          size=15.0,
+          font_size=15.0,
           weight=@text.SemiBold,
         ),
         @ui.text(
           "「重新探测」也是只读；「打开链接 / 打开目录 / 发通知」会把动作交给系统，点了才有反应",
-          size=12.0,
+          font_size=12.0,
           color="text_secondary",
         ),
       ],
@@ -622,7 +622,7 @@ fn main {
                 (reveals.get()).to_string() + " 次"
             },
           ),
-          size=12.0,
+          font_size=12.0,
         ),
         @ui.button(
           "发通知(带进度)",
@@ -683,7 +683,7 @@ fn main {
           min_width=110.0,
           handle=fn(w : @core.Widget) -> Unit { btn_tray.val = Some(w) },
         ),
-        @ui.text_dyn(tray_state.signal(), size=12.0),
+        @ui.text_dyn(tray_state.signal(), font_size=12.0),
         @ui.button(
           "启用自启",
           on_click=fn() -> Unit {
@@ -719,7 +719,7 @@ fn main {
           min_width=110.0,
           handle=fn(w : @core.Widget) -> Unit { btn_auto_off.val = Some(w) },
         ),
-        @ui.text_dyn(auto_state.signal(), size=12.0),
+        @ui.text_dyn(auto_state.signal(), font_size=12.0),
         @ui.button(
           "读空闲",
           on_click=fn() -> Unit {
@@ -738,15 +738,15 @@ fn main {
           min_width=110.0,
           handle=fn(w : @core.Widget) -> Unit { btn_idle.val = Some(w) },
         ),
-        @ui.text_dyn(idle_state.signal(), size=12.0),
+        @ui.text_dyn(idle_state.signal(), font_size=12.0),
         @ui.text_dyn(
           tray_clicks.signal().map(fn(k : Int) -> String {
             "托盘点击 " + k.to_string() + " 次"
           }),
-          size=12.0,
+          font_size=12.0,
         ),
-        @ui.text_dyn(notify_state.signal(), size=12.0),
-        @ui.text_dyn(clip_view.signal(), size=12.0),
+        @ui.text_dyn(notify_state.signal(), font_size=12.0),
+        @ui.text_dyn(clip_view.signal(), font_size=12.0),
       ],
       direction=@yoga.Row,
       column_gap=8.0,

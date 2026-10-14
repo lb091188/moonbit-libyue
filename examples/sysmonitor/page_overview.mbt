@@ -100,7 +100,7 @@ fn res_card(
           // 给数值，比标题小两档，固定右缘不随文本回流换行
           @ui.text_dyn(
             value.signal(),
-            size=14.0,
+            font_size=14.0,
             weight=@text.SemiBold,
             color="text_primary",
             align=@text.End,

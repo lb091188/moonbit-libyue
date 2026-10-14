@@ -303,7 +303,7 @@ pub fn message_box(
         col.node.set_gap(6.0, 0.0)
         let _ = text(
           content,
-          size=13.0,
+          font_size=13.0,
           color="text_regular",
           wrap=true,
           max_width=inner_w,
@@ -311,7 +311,7 @@ pub fn message_box(
         if informative != "" {
           let _ = text(
             informative,
-            size=12.0,
+            font_size=12.0,
             color="text_secondary",
             wrap=true,
             max_width=inner_w,

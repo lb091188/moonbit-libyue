@@ -197,7 +197,7 @@ fn chip(
 pub fn tag_of_type(
   text : String,
   t : SemanticType,
-  size? : Double = 12.0,
+  font_size? : Double = 12.0,
   class? : Array[@style.Style] = [],
 ) -> @core.Node {
   chip(
@@ -205,7 +205,7 @@ pub fn tag_of_type(
     type_token(t),
     type_light_token(t),
     24.0,
-    size,
+    font_size,
     8.0,
     0.0,
     fn() { () },
@@ -220,7 +220,7 @@ pub fn tag_of_type(
 pub fn tag_of_type_dyn(
   text : @core.Signal[String],
   t : SemanticType,
-  size? : Double = 12.0,
+  font_size? : Double = 12.0,
   class? : Array[@style.Style] = [],
 ) -> @core.Node {
   chip(
@@ -228,7 +228,7 @@ pub fn tag_of_type_dyn(
     type_token(t),
     type_light_token(t),
     24.0,
-    size,
+    font_size,
     8.0,
     0.0,
     fn() { () },
@@ -243,10 +243,10 @@ pub fn tag_of_type_dyn(
 pub fn tag(
   text : String,
   color : String,
-  size? : Double = 12.0,
+  font_size? : Double = 12.0,
   class? : Array[@style.Style] = [],
 ) -> @core.Node {
-  chip(text, "#ffffff", color, 24.0, size, 8.0, 0.0, fn() { () }, false, class=class)
+  chip(text, "#ffffff", color, 24.0, font_size, 8.0, 0.0, fn() { () }, false, class=class)
 }
 
 ///|
@@ -254,7 +254,7 @@ pub fn tag(
 pub fn tag_dyn(
   text : @core.Signal[String],
   color : String,
-  size? : Double = 12.0,
+  font_size? : Double = 12.0,
   class? : Array[@style.Style] = [],
 ) -> @core.Node {
   chip(
@@ -262,7 +262,7 @@ pub fn tag_dyn(
     "#ffffff",
     color,
     24.0,
-    size,
+    font_size,
     8.0,
     0.0,
     fn() { () },
@@ -608,7 +608,7 @@ pub fn card(
   let body : Array[@core.Node] = []
   if title.length() > 0 {
     body.push(
-      text(title, size=14.0, weight=@text.SemiBold, color="text_primary"),
+      text(title, font_size=14.0, weight=@text.SemiBold, color="text_primary"),
     )
     body.push(divider())
   }
@@ -635,16 +635,16 @@ pub fn descriptions(
 ) -> @core.Node {
   let rows : Array[@core.Node] = []
   if title.length() > 0 {
-    rows.push(text(title, size=14.0, weight=@text.SemiBold))
+    rows.push(text(title, font_size=14.0, weight=@text.SemiBold))
   }
   for kv in items {
     rows.push(
       view(
         [
-          text(kv.0, size=12.0, color="text_secondary"),
+          text(kv.0, font_size=12.0, color="text_secondary"),
           text(
             kv.1,
-            size=12.0,
+            font_size=12.0,
             handle=fn(w : @core.Widget) -> Unit {
               w.node.set_min_width(@yoga.fixed(label_width))
             },
@@ -667,7 +667,7 @@ pub fn empty(
   view(
     [
       icon(@icons.IconKind::Box, size=42.0, color="border"),
-      text(description, size=12.0, color="text_secondary", align=@text.Center),
+      text(description, font_size=12.0, color="text_secondary", align=@text.Center),
     ],
     padding=16.0,
     row_gap=8.0,
@@ -694,10 +694,10 @@ pub fn result(
   view(
     [
       icon(kind, size=40.0, color=type_token(t)),
-      text(title, size=16.0, weight=@text.SemiBold, align=@text.Center),
+      text(title, font_size=16.0, weight=@text.SemiBold, align=@text.Center),
       text(
         subtitle,
-        size=12.0,
+        font_size=12.0,
         color="text_secondary",
         align=@text.Center,
       ),
@@ -800,8 +800,8 @@ fn timeline_row(
       mark,
       view(
         [
-          text(title, size=13.0, weight=@text.SemiBold, color="text_primary"),
-          text(desc, size=12.0, color="text_secondary"),
+          text(title, font_size=13.0, weight=@text.SemiBold, color="text_primary"),
+          text(desc, font_size=12.0, color="text_secondary"),
         ],
         grow=1.0,
         handle=fn(w : @core.Widget) -> Unit { w.set_padding(top=2.0, left=8.0) },

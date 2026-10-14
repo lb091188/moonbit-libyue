@@ -45,7 +45,7 @@ pub fn checkbox(
   state : @core.Store[Bool],
   disabled? : Bool = false,
   enabled? : Enabled? = None,
-  size? : Double = 13.0,
+  font_size? : Double = 13.0,
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
@@ -88,7 +88,7 @@ pub fn checkbox(
     row.node.set_align_items(@yoga.AlignItems::Center)
     row.node.set_column_gap(6.0)
     row.append_child(box)
-    let _ = (text(content, size=size)).mount_into(row)
+    let _ = (text(content, font_size=font_size)).mount_into(row)
     row.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
     fold_style(row, @style.empty_style(), class)
@@ -508,7 +508,7 @@ pub fn button(
   variant? : ButtonVariant = Soft,
   color? : String = "",
   background_color? : String = "",
-  size? : Double = 13.0,
+  font_size? : Double = 13.0,
   min_width? : Double = 0.0,
   focus_id? : Int = 0,
   disabled? : Bool = false,
@@ -516,7 +516,7 @@ pub fn button(
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
-  let src = text_source(text, size=size, align=@text.Center)
+  let src = text_source(text, font_size=font_size, align=@text.Center)
   // 变体皮肤折进样式槽：基块=常态，`hover`/`active` 桶=点亮态（旧口径
   // `lit = hovered || pressed`，两桶同值）；散参数显式覆盖会让两态取到同一色，
   // 「覆盖后悬停不再变色」这条现状由 [button_skin_token] 的取值顺序天然保持。
@@ -649,11 +649,11 @@ pub fn button(
 pub fn link(
   text : String,
   on_click : () -> Unit,
-  size? : Double = 13.0,
+  font_size? : Double = 13.0,
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
-  let font = @text.Font::new("", size)
+  let font = @text.Font::new("", font_size)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     let tw = text_width(text, font)
@@ -714,7 +714,7 @@ pub fn form_item(
             [
               text(
                 label_text,
-                size=13.0,
+                font_size=13.0,
                 color="text_secondary",
                 align=@text.End,
               ),
@@ -731,7 +731,7 @@ pub fn form_item(
         align_items=@yoga.AlignItems::Center,
       ),
       view(
-        [text_dyn(err_store.signal(), size=12.0, color="danger", wrap=false)],
+        [text_dyn(err_store.signal(), font_size=12.0, color="danger", wrap=false)],
         direction=@yoga.Row,
         height=18.0,
         handle=fn(w : @core.Widget) -> Unit { w.set_margin(left=label_width + 12.0) },

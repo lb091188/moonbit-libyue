@@ -113,7 +113,7 @@ pub fn panel(
   row_gap? : Double = 6.0,
   width? : Double = 0.0,
 ) -> @core.Node {
-  let body : Array[@core.Node] = [text(title, size=12.0, color="text_secondary")]
+  let body : Array[@core.Node] = [text(title, font_size=12.0, color="text_secondary")]
   for c in children {
     body.push(c)
   }
@@ -173,7 +173,7 @@ fn separator_impl(
 pub fn text_dyn(
   sig : @core.Signal[String],
   role? : TextRole = Plain,
-  size? : Double = 13.0,
+  font_size? : Double = 13.0,
   color? : String = "",
   weight? : @text.FontWeight = @text.Normal,
   family? : String = "",
@@ -189,7 +189,7 @@ pub fn text_dyn(
   let src = text_source(
     sig.get(),
     role=role,
-    size=size,
+    font_size=font_size,
     color=color,
     weight=weight,
     family=family,
@@ -230,7 +230,7 @@ pub fn text_dyn(
 pub fn text(
   content : String,
   role? : TextRole = Plain,
-  size? : Double = 13.0,
+  font_size? : Double = 13.0,
   color? : String = "",
   weight? : @text.FontWeight = @text.Normal,
   family? : String = "",
@@ -242,7 +242,7 @@ pub fn text(
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   let f = role_font(role)
-  let eff_size = if has_role(role) { f.size } else { size }
+  let eff_size = if has_role(role) { f.size } else { font_size }
   let eff_weight =
     if has_role(role) {
       match role {
@@ -260,7 +260,7 @@ pub fn text(
   text_dyn(
     @core.Signal::new(content),
     role=role,
-    size=eff_size,
+    font_size=eff_size,
     color=color,
     weight=eff_weight,
     family=family,

@@ -150,7 +150,7 @@ test "粘性列表：滚动跨过组边界时吸顶标题换文字，组内行�
   let rows_of = fn(prefix : String) -> Array[@core.Node] {
     let out : Array[@core.Node] = []
     for i = 1; i <= 4; i = i + 1 {
-      out.push(view([text(prefix + i.to_string(), size=12.0)], height=20.0))
+      out.push(view([text(prefix + i.to_string(), font_size=12.0)], height=20.0))
     }
     out
   }

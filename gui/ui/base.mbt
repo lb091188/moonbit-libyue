@@ -90,7 +90,7 @@ pub(all) struct TextSource {
 pub fn text_source(
   text : String,
   role? : TextRole = Plain,
-  size? : Double = 13.0,
+  font_size? : Double = 13.0,
   color? : String = "",
   weight? : @text.FontWeight = @text.Normal,
   style? : @text.FontStyle = @text.Roman,
@@ -103,7 +103,7 @@ pub fn text_source(
   {
     text,
     role,
-    font: @text.Font::new(family, size, weight=weight, style=style),
+    font: @text.Font::new(family, font_size, weight=weight, style=style),
     color,
     align,
     wrap,
