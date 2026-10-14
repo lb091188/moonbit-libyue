@@ -154,5 +154,60 @@ fn main {
   }
   let ms3 = @win.now_ms() - t2
   println("PAINT-PROB round_rect_x1(400x120) frames=\{n} \{ms3}ms(\{ms3 / n.to_int64()}ms/帧)")
+  // ⑦ 描边：60 张 400×120 圆角卡片描边（卡片 border 的实际密度）
+  let t3 = @win.now_ms()
+  it = 0
+  while it < n {
+    let mut k = 0
+    while k < 60 {
+      p.set_stroke_color("#3a3d4a")
+      p.set_line_width(1.0)
+      p.stroke_round_rect(((k % 3) * 460).to_double(), ((k / 3) * 130).to_double(), 400.0, 120.0, 6.0)
+      k += 1
+    }
+    it += 1
+  }
+  let ms4 = @win.now_ms() - t3
+  println("PAINT-PROB strokes_rr(60张400x120圆角描边) frames=\{n} \{ms4}ms(\{ms4 / n.to_int64()}ms/帧)")
+  // ⑧ 折线：单条 80 段折线 stroke（图表线的实际形状）
+  let t4 = @win.now_ms()
+  it = 0
+  while it < n {
+    p.set_stroke_color("#2D68C4")
+    p.set_line_width(2.0)
+    p.begin_path()
+    let mut i2 = 0
+    while i2 < 80 {
+      let xx = 20.0 + i2.to_double() * 5.0
+      let yy = 20.0 + ((i2 * 17) % 90).to_double()
+      if i2 == 0 {
+        p.move_to(xx, yy)
+      } else {
+        p.line_to(xx, yy)
+      }
+      i2 += 1
+    }
+    p.stroke()
+    it += 1
+  }
+  let ms5 = @win.now_ms() - t4
+  println("PAINT-PROB polyline(80段2px折线) frames=\{n} \{ms5}ms(\{ms5 / n.to_int64()}ms/帧)")
+  // ⑨ 圆弧：3 个 130 半径圆环（donut 同款）
+  let t5 = @win.now_ms()
+  it = 0
+  while it < n {
+    p.set_stroke_color("#2D68C4")
+    p.set_line_width(14.0)
+    let mut d2 = 0
+    while d2 < 3 {
+      p.begin_path()
+      p.arc(220.0 + d2.to_double() * 300.0, 220.0, 60.0, 0.0, 4.7)
+      p.stroke()
+      d2 += 1
+    }
+    it += 1
+  }
+  let ms6 = @win.now_ms() - t5
+  println("PAINT-PROB arcs(3个60半径14px圆弧) frames=\{n} \{ms6}ms(\{ms6 / n.to_int64()}ms/帧)")
   p.end()
 }

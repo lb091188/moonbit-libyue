@@ -372,6 +372,141 @@ pub fn Raster::fill_round_rect(
 }
 
 ///|
+/// 圆角矩形**解析描边**：环带 = 外圈圆角矩形减内圈。像素按中心唯一分区——
+/// 直段（上下左右四条带）按行/列与 `[边-hw, 边+hw]` 的重叠求覆盖（亚像素
+/// AA），角部象限逐像素「到角圆心距离」SDF 求环覆盖（`|dist-rr| ≤ hw`，
+/// 线宽 ≥ 2×圆角时内孔自然消失、角部实心）。轴对齐 + 等比 + 纯色不透明 +
+/// Normal 才适用，返回 false 时调用方退通用路径描边。
+pub fn Raster::stroke_round_rect(
+  self : Raster,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+  radius : Double,
+) -> Bool {
+  if !self.m.axis_aligned() {
+    return false
+  }
+  let ax = self.m.a.abs()
+  let ay = self.m.d.abs()
+  if ax < 0.000000001 || ay < 0.000000001 {
+    return false
+  }
+  if (ax - ay).abs() / (ax + ay) > 0.001 {
+    return false
+  }
+  if blend_mode_id(self.op) != 0 {
+    return false
+  }
+  let sc = match self.source {
+    SrcSolid(c) => c
+    _ => return false
+  }
+  if sc.a < 255 {
+    return false
+  }
+  let hw = self.line_width * ax / 2.0
+  if hw <= 0.0 {
+    return false
+  }
+  match self.rect_device(x, y, w, h) {
+    None => return false
+    Some((ix0, iy0, ix1, iy1)) => {
+      let rr_d = clamp_radius(radius, w, h) * ax
+      let rr_lim = (ix1 - ix0).to_double().min((iy1 - iy0).to_double()) / 2.0
+      let rr = if rr_d > rr_lim { rr_lim } else { rr_d }
+      // 外扩 hw 的环带包围盒（环在矩形边缘内外各占一半线宽）
+      let rx0 = raster_max_i((ix0.to_double() - hw).floor().to_int(), self.clip_x0)
+      let ry0 = raster_max_i((iy0.to_double() - hw).floor().to_int(), self.clip_y0)
+      let rx1 = raster_min_i((ix1.to_double() + hw).ceil().to_int(), self.clip_x1)
+      let ry1 = raster_min_i((iy1.to_double() + hw).ceil().to_int(), self.clip_y1)
+      if rx1 <= rx0 || ry1 <= ry0 {
+        return true
+      }
+      if rx0 < 0 ||
+        ry0 < 0 ||
+        rx1 > self.bitmap.width ||
+        ry1 > self.bitmap.height {
+        return true
+      }
+      // 直段/角部分区界（像素中心 +0.5 与之比较）
+      let mx0 = ix0.to_double() + rr
+      let mx1 = ix1.to_double() - rr
+      let my0 = iy0.to_double() + rr
+      let my1 = iy1.to_double() - rr
+      let cov : FixedArray[Int] = FixedArray::make(self.bitmap.width, 0)
+      for j = ry0; j < ry1; j = j + 1 {
+        let ycen = j.to_double() + 0.5
+        let in_mid_y = ycen >= my0 && ycen < my1
+        for i = rx0; i < rx1; i = i + 1 {
+          let xcen = i.to_double() + 0.5
+          let in_mid_x = xcen >= mx0 && xcen < mx1
+          let cv = if in_mid_x && in_mid_y {
+            // 矩形内部：不属于环
+            0
+          } else if in_mid_x {
+            // 上下直段：与 [边-hw, 边+hw] 的垂直重叠
+            let edge = if ycen < my0 { iy0.to_double() } else { iy1.to_double() }
+            let d = hw - (ycen - edge).abs()
+            if d < 0.0 {
+              0
+            } else {
+              let v = (d * 256.0).to_int()
+              if v > 256 { 256 } else { v }
+            }
+          } else if in_mid_y {
+            // 左右直段：与 [边-hw, 边+hw] 的水平重叠
+            let edge = if xcen < mx0 { ix0.to_double() } else { ix1.to_double() }
+            let d = hw - (xcen - edge).abs()
+            if d < 0.0 {
+              0
+            } else {
+              let v = (d * 256.0).to_int()
+              if v > 256 { 256 } else { v }
+            }
+          } else {
+            // 角部象限：环 = |dist - rr| ≤ hw（dist 到角圆心）
+            let ccx = if xcen < mx0 {
+              ix0.to_double() + rr
+            } else {
+              ix1.to_double() - rr
+            }
+            let ccy = if ycen < my0 {
+              iy0.to_double() + rr
+            } else {
+              iy1.to_double() - rr
+            }
+            let dx = xcen - ccx
+            let dy = ycen - ccy
+            let dist = (dx * dx + dy * dy).sqrt()
+            let d = hw - (dist - rr).abs()
+            if d < 0.0 {
+              0
+            } else {
+              let v = (d * 256.0).to_int()
+              if v > 256 { 256 } else { v }
+            }
+          }
+          cov[i] = cv
+        }
+        composite_span(
+          self.bitmap.data,
+          self.bitmap.width,
+          j,
+          rx0,
+          rx1,
+          cov,
+          self.op,
+          self.source,
+        )
+      }
+      true
+    }
+  }
+}
+
+///|
 /// 用户矩形 → 设备空间取整矩形（轴对齐才成立，斜切/旋转返回 false——
 /// cr_rect_device 同口径：取整语义对斜矩形无意义，交给抗锯齿）。
 fn Raster::rect_device(  self : Raster,

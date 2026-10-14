@@ -250,6 +250,35 @@ pub fn Painter::fill_round_rect(
 }
 
 ///|
+/// 圆角矩形描边（线宽取当前 `line_width`；与 `fill_round_rect` 对称）。
+pub fn Painter::stroke_round_rect(
+  self : Painter,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+  r : Double,
+) -> Unit {
+  match self.backend {
+    Some(CairoBackend(_c)) => {
+      self.begin_path()
+      self.trace_round_rect(x, y, w, h, r)
+      self.stroke()
+    }
+    Some(PureBackend(raster)) => {
+      self.apply_stroke()
+      // 解析描边快路径（环带按行/列重叠 + 角部 SDF）；不适用退通用路径
+      if !raster.stroke_round_rect(x, y, w, h, r) {
+        self.begin_path()
+        self.trace_round_rect(x, y, w, h, r)
+        self.stroke()
+      }
+    }
+    None => ()
+  }
+}
+
+///|
 fn Painter::trace_round_rect(
   self : Painter,
   x : Double,
