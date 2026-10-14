@@ -147,6 +147,10 @@ pub(all) struct Widget {
   /// 整层透明度（resolved `Style.opacity` 的落点，design.md §5 P4）：绘制遍历
   /// 进本控件时把「祖先累乘 × 自身」塞进 Painter 的 `global_alpha`，默认 1.0。
   mut alpha_paint : Double
+  /// 阴影外扩量（`@style` 的 `box_shadow` 由 `apply` 落进来）：>0 时本控件的裁剪窗口
+  /// 四周各放大这么多，硬阴影才画得出盒外——与 CSS 同义（阴影画在 border-box 之外，
+  /// 除非祖先 `overflow:hidden`，本栈里就是祖先自己的矩形把它裁掉）。
+  mut shadow_paint : Double
 }
 
 ///|
@@ -181,6 +185,7 @@ pub fn Widget::new() -> Widget {
     on_drop: None,
     z_index_paint: 0.0,
     alpha_paint: 1.0,
+    shadow_paint: 0.0,
   }
 }
 
@@ -867,7 +872,8 @@ pub fn Widget::paint_at(self : Widget, p : @render.Painter, ox : Double, oy : Do
   self.paint_epoch = paint_epoch_ref.val
   p.save()
   p.translate(self.rect.x - ox, self.rect.y - oy)
-  p.clip_rect(0.0, 0.0, self.rect.w, self.rect.h)
+  let sh = self.shadow_paint
+  p.clip_rect(0.0 - sh, 0.0 - sh, self.rect.w + sh * 2.0, self.rect.h + sh * 2.0)
   // 整层透明度:祖先累乘 × 自身(on_draw 与其子树都在这段 alpha 内绘制)
   let inherited = p.global_alpha()
   let own = self.alpha_paint

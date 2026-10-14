@@ -123,14 +123,60 @@ pub fn TextSource::fg(self : TextSource) -> String {
 }
 
 ///|
+/// 文本类样式的合流（§1.1「文本与颜色」那半张表的真去处）：样式槽给了就用样式的，
+/// 没给回落 `src`。五个返回值 = 生效字体 / 对齐 / 是否折行 / 行高（0=不设）/ 下划线。
+/// `st` 由调用方决定读哪一层：**绘制期**传 `style_for(w)`（含状态桶），
+/// **测量期**传 `resolved_by_id(id)`（只看基块——状态桶不带布局属性，§1.3）。
+fn text_eff(
+  st : @style.Style,
+  src : TextSource,
+) -> (@text.Font, @text.TextAlign, Bool, Double, Bool) {
+  let f0 = src.font
+  let fam = match st.font_family {
+    Some(v) => v
+    None => f0.name
+  }
+  let sz = match st.font_size {
+    Some(v) => v
+    None => f0.size
+  }
+  let wt = match st.font_weight {
+    Some(v) => v
+    None => f0.weight
+  }
+  let font = @text.Font::new(fam, sz, weight=wt, style=f0.style)
+  let align = match st.text_align {
+    Some(v) => v
+    None => src.align
+  }
+  let wrap = match st.white_space {
+    Some(@style.WhiteSpace::NoWrap) => false
+    Some(@style.WhiteSpace::Normal) => true
+    None => src.wrap
+  }
+  let line_h = match st.line_height {
+    Some(v) => v
+    None => 0.0
+  }
+  let underline = match st.text_decoration {
+    Some(@style.TextDecoration::Underline) => true
+    _ => false
+  }
+  (font, align, wrap, line_h, underline)
+}
+
+///|
 /// 把文本状态接到布局引擎的测量面：内容尺寸来自 Pango，基线同源。
 /// 近似口径（记档）：min-content 探询（请求轴 `Some(0.0)`）按「不受约束」处理
 /// ——本层还没有按 min-content 定宽的弹性场景，接进省略号自适应时再细化。
 fn attach_text_measure(w : @core.Widget, src : TextSource) -> Unit {
+  // 只记 id，不记句柄：回调挂在布局节点上，捕获控件就成了引用环
+  let id = w.id
   w.node.set_measure(fn(avail_w : Double?, _avail_h : Double?) -> (
     Double,
     Double,
   ) {
+    let (font, _align, wrap, line_h, _u) = text_eff(@style.resolved_by_id(id), src)
     // 有盒宽上限就用它，否则用父给的可用宽（0 视为不约束）
     let cap = if src.max_width > 0.0 {
       src.max_width
@@ -141,20 +187,30 @@ fn attach_text_measure(w : @core.Widget, src : TextSource) -> Unit {
       }
     }
     let box_w = cap.floor().to_int()
-    let wrap = src.wrap && box_w > 0
+    let do_wrap = wrap && box_w > 0
     match @text.measure_font(
       src.text,
-      src.font,
+      font,
       max_width=box_w,
       ellipsize=src.ellipsis,
-      wrap=wrap,
+      wrap=do_wrap,
     ) {
-      Some(m) => (m.width.to_double(), m.height.to_double())
+      Some(m) => {
+        // `line_height` 是行盒高：单行档精确生效；折行档要多行行距，那要等
+        // 文本层开行距接口（记档在 design.md §1.1），这里只在单行时覆盖
+        let h = if line_h > 0.0 && !do_wrap {
+          line_h
+        } else {
+          m.height.to_double()
+        }
+        (m.width.to_double(), h)
+      }
       None => (0.0, 0.0)
     }
   })
   w.node.set_baseline(fn(_a : Double?, _b : Double?) -> Double? {
-    @text.line_ascent_font(src.font).map(fn(v : Int) -> Double { v.to_double() })
+    let (font, _align, _wrap, _lh, _u) = text_eff(@style.resolved_by_id(id), src)
+    @text.line_ascent_font(font).map(fn(v : Int) -> Double { v.to_double() })
   })
 }
 
@@ -171,25 +227,8 @@ fn draw_text_in(w : @core.Widget, p : @render.Painter, src : TextSource) -> Bool
     Some(c) => @style.resolve_color(c)
     None => src.fg()
   }
-  let font1 = match (st.font_size, st.font_weight, st.font_family) {
-    (fs, fw, ff) => {
-      let f0 = src.font
-      let fam = match ff {
-        Some(v) => v
-        None => f0.name
-      }
-      let sz = match fs {
-        Some(v) => v
-        None => f0.size
-      }
-      let wt = match fw {
-        Some(v) => v
-        None => f0.weight
-      }
-      @text.Font::new(fam, sz, weight=wt, style=f0.style)
-    }
-  }
-  @text.draw_box_at(
+  let (font1, align1, wrap1, _line_h, underline) = text_eff(st, src)
+  let drew = @text.draw_box_at(
     p,
     0.0,
     0.0,
@@ -198,11 +237,51 @@ fn draw_text_in(w : @core.Widget, p : @render.Painter, src : TextSource) -> Bool
     src.text,
     font1,
     fg1,
-    align=src.align,
+    align=align1,
     valign=@text.Center,
     ellipsize=src.ellipsis,
-    wrap=src.wrap,
+    wrap=wrap1,
   )
+  if underline && src.text.length() > 0 {
+    // 下划线按测量宽自绘（文本层的 range 属性只有 font+color，没有下划线接口，
+    // 与 `link` 的悬停下划线同一手法）：单行档精确，折行档只落最后一行下方
+    draw_underline(p, w, src, font1, box_w, fg1, align1)
+  }
+  drew
+}
+
+///|
+/// 单行下划线：基线下方 1.5px 起一条 1px 线，宽度与左右位置按对齐算。
+fn draw_underline(
+  p : @render.Painter,
+  w : @core.Widget,
+  src : TextSource,
+  font : @text.Font,
+  box_w : Double,
+  color : String,
+  align : @text.TextAlign,
+) -> Unit {
+  let m = match @text.measure_font(src.text, font, wrap=false) {
+    Some(m) => m
+    None => return ()
+  }
+  let tw = m.width.to_double()
+  let th = m.height.to_double()
+  let r = w.rect
+  let top = ((r.h - th) / 2.0).max(0.0)
+  let y = top + m.baseline.to_double() + 1.5
+  if y >= r.h {
+    return ()
+  }
+  let x = if align is @text.TextAlign::Center {
+    ((box_w - tw) / 2.0).max(0.0)
+  } else if align is @text.TextAlign::End {
+    (box_w - tw).max(0.0)
+  } else {
+    0.0
+  }
+  p.set_fill_color(color)
+  p.fill_rect(x, y, tw.max(1.0), 1.0)
 }
 
 // ---- 主题跟随 ----

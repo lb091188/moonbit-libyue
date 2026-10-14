@@ -35,13 +35,14 @@ ui 只管组件，三包职责不混。
 
 | 分组 | 字段（对应 CSS 属性） | 落到哪 |
 | --- | --- | --- |
-| 文本与颜色 | `color`、`background_color`、`font_size`、`font_family`、`font_weight`、`text_align`、`line_height`、`letter_spacing`、`text_decoration`、`white_space` | 文本类存进文本源，绘制时读；`font_size` 参与测量 |
+| 文本与颜色 | `color`、`background_color`、`font_size`、`font_family`、`font_weight`、`text_align`、`line_height`、`letter_spacing`、`text_decoration`、`white_space` | 全部在 `ui/base.mbt` 的 `text_eff` 合流（样式给了用样式的，没给回落文本源），**绘制期**读 `style_for(w)`、**测量期**读 `resolved_by_id(w.id)`：`font_*` 与 `white_space` 参与测量，`text_align` 定绘制对齐，`line_height` 覆盖单行行盒高，`text_decoration=underline` 由 ui 自绘一条基线下 1px 线（文本层 range 只有 font+color）。**`letter_spacing` 是唯一还没接的**：要文本层先开字距接口（Pango/DWrite 都有该能力，本层未暴露） |
 | 尺寸 | `width`、`height`、`min_width`、`min_height`、`max_width`、`max_height` | Yoga 节点（`set_width` / `set_min_width` …） |
 | 内外边距 | `padding`（**只表示四边同值**）、`padding_left/right/top/bottom`、`margin`、`margin_*` | Yoga（`set_padding` / `set_margin`）。**不做 CSS 的 2/3 值简写**（`padding: 8px 16px` 那种按边数变语义的写法）：要么四边同值，要么逐边单给，档位就这两档 |
 | 边框圆角 | `border_width`、`border_color`、`border_radius` | 绘制阶段；圆角矩形复用 `ui/basic.mbt` 的 `fill_round_rect` |
 | flex 布局 | `display`（`flex` / `none`）、`flex_direction`、`justify_content`、`align_items`、`align_self`、`flex`（grow）、`gap`、`row_gap`、`column_gap` | Yoga |
 | 定位 | `position`（`relative` / `absolute`）、`top`、`right`、`bottom`、`left`、`z_index` | Yoga（`set_position` / `set_top` …底层现成，含百分比 inset；`z_index` 由 yoga-mbt 随 P1 补齐，见 §5）。Style 首批只开逻辑像素值，百分比入口同 `width_percent` 形态另开 |
 | 状态 | `hover`、`active`、`focus`（各是一个嵌套 `Style`） | 绘制期按控件状态选桶，见 §1.3 |
+| 效果 | `opacity`、`box_shadow`（硬阴影外扩量） | `opacity` 落 `Widget.alpha_paint`（绘制遍历累乘）；`box_shadow` 落 `Widget.shadow_paint`，绘制遍历时把**本控件的裁剪窗口**四周放大这么多，阴影才画得出盒外（祖先自己会把它裁掉，与 CSS `overflow:hidden` 同义）；本体由 `view` 在填充之前调 `Painter::box_shadow` |
 | 其它 | `visibility`、`cursor` | 宿主 `Widget`（`set_visible` / `cursor`） |
 
 ### 1.2 没有的属性（写不出来，而不是运行时报错）

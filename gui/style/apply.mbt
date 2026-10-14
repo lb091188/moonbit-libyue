@@ -172,6 +172,11 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit {
     Some(c) => w.cursor = c
     None => ()
   }
+  match s.box_shadow {
+    // 阴影外扩量：绘制遍历时把本控件的裁剪窗口放大（core 的 shadow_paint）
+    Some(v) => w.shadow_paint = v
+    None => ()
+  }
   let prev = match resolved_table.get(w.id) {
     Some(p) => p
     None => empty_style()
@@ -185,6 +190,17 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit {
 pub fn resolved(w : @core.Widget) -> Style {
   match resolved_table.get(w.id) {
     Some(s) => s
+    None => empty_style()
+  }
+}
+
+///|
+/// 按**控件 id** 读基块（不选桶）。测量回调只需要 id：回调存在布局节点上，
+/// 抓住控件句柄就成了「控件 → 节点 → 回调 → 控件」的引用环（计数式回收断不掉）。
+/// 布局属性只存在于基块里（状态桶签名里没有它们，§1.3），所以测量期读基块是完整的。
+pub fn resolved_by_id(id : Int) -> Style {
+  match resolved_table.get(id) {
+    Some(st) => st
     None => empty_style()
   }
 }

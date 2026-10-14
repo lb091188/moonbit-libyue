@@ -704,3 +704,107 @@ test "布局散参数也折进匿名块：class 的宽与内边距盖过散参�
   assert_eq(box2.rect.w, 300.0)
   assert_eq((box2.children()[0].rect.x - box2.rect.x).round(), 20.0)
 }
+
+///|
+/// §1.1「文本与颜色」那半张表接上真生效路径：`text_align` / `white_space` /
+/// `line_height` / `text_decoration` 由样式槽驱动测量与绘制，`box_shadow` 由 `view` 落。
+test "文本类样式属性真生效：对齐/换行/行高/下划线与硬阴影" {
+  if !ui_text_guard() {
+    return
+  }
+  // 返回（首墨列, 有墨行数）：对齐比首列，折行/下划线比行数与墨量
+  let ink_scan = fn(node : @core.Node, w : Double, h : Double) -> (Int, Int) {
+    let root = mount_root([node], w, h)
+    let bm = @render.Bitmap::new(w.to_int(), h.to_int())
+    let p = @render.Painter::new(bm)
+    root.paint(p)
+    p.end()
+    let mut first = -1
+    let mut rows = 0
+    for y = 0; y < h.to_int(); y = y + 1 {
+      let mut row_ink = 0
+      for x = 0; x < w.to_int(); x = x + 1 {
+        if bm.pixel(x, y).a > 0 {
+          row_ink = row_ink + 1
+          if first < 0 {
+            first = x
+          }
+        }
+      }
+      if row_ink > 0 {
+        rows = rows + 1
+      }
+    }
+    (first, rows)
+  }
+  let long_text = "一行中文文本用来比较左右位置与折行行数"
+  // 1) text_align：同一盒宽下，居中的首墨列比左对齐靠右（文本明显窄于盒）
+  let box_of = fn(t : @core.Node) -> @core.Node {
+    view([t], width=220.0, height=24.0)
+  }
+  let (start_col, _sr) = ink_scan(
+    box_of(text("短文本", class=[@style.style(text_align=@text.Start)])),
+    240.0,
+    30.0,
+  )
+  let (center_col, _cr) = ink_scan(
+    box_of(text("短文本", class=[@style.style(text_align=@text.Center)])),
+    240.0,
+    30.0,
+  )
+  assert_true(center_col > start_col + 20)
+
+  // 2) white_space：可折行的有墨行数明显多于不折行
+  let (_wx, wrap_rows) = ink_scan(
+    text(long_text, max_width=80.0, class=[@style.style(white_space=@style.WhiteSpace::Normal)]),
+    120.0,
+    120.0,
+  )
+  let (_nx, nowrap_rows) = ink_scan(
+    text(long_text, max_width=80.0, class=[@style.style(white_space=@style.WhiteSpace::NoWrap)]),
+    120.0,
+    120.0,
+  )
+  assert_true(wrap_rows > nowrap_rows)
+
+  // 3) line_height 单行档：测量高就是行高
+  let lh = mount_root(
+    [text("行高", class=[@style.style(line_height=40.0)])],
+    120.0,
+    60.0,
+  )
+  assert_eq(kid(lh, 0).rect.h, 40.0)
+
+  // 4) text_decoration：下划线多出一整行的墨（按行数比）
+  let (_pu, plain_rows) = ink_scan(text("下划线", class=[]), 120.0, 40.0)
+  let (_uu, under_rows) = ink_scan(
+    text("下划线", class=[@style.style(text_decoration=@style.TextDecoration::Underline)]),
+    120.0,
+    40.0,
+  )
+  assert_true(under_rows > plain_rows)
+
+  // 5) box_shadow：本体之外出现墨（不画阴影时盒外无墨）
+  let shadow_outside = fn(cls : Array[@style.Style]) -> Int {
+    let root = mount_root(
+      [view([], width=40.0, height=20.0, background_color="bg_panel", class=cls)],
+      120.0,
+      80.0,
+    )
+    let bm = @render.Bitmap::new(120, 80)
+    let p = @render.Painter::new(bm)
+    root.paint(p)
+    p.end()
+    let mut n = 0
+    for y = 0; y < 80; y = y + 1 {
+      for x = 42; x < 120; x = x + 1 {
+        if bm.pixel(x, y).a > 0 {
+          n = n + 1
+        }
+      }
+    }
+    n
+  }
+  assert_eq(shadow_outside([]), 0)
+  assert_true(shadow_outside([@style.style(box_shadow=6.0)]) > 10)
+}

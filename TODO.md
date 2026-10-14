@@ -70,6 +70,7 @@
   - [x] §2 映射表外的命名尾巴收掉：`date_range_picker_t` / `time_range_picker_t` / `datetime_range_picker_t` → 去 `_t`（与 `date_picker` 同形），三条补进 §2 映射表；调用点连 `datepicker_wbtest`、`examples/native-app`、`examples/showcase/pages/form.mbt` 与中英 adaptation 的提及一起切。
   - [x] 布局散参数折进匿名块（`view` / `scroll_view` / `virt_list` / `sticky_list` / `table_v`）：`class` 的 `width`/`padding` 等盖得过散参数，节点上不留第二条写入路径；class 落点定档两层——主根控件吃完整 class，内部件只吃 `paint_subset` 绘制投影（口径写进 design.md §1.5）。
   - [x] 样式侧表残账清理（P1 记档「随 P2 接线时补」的欠账）：core 加进程级控件丢弃钩子，`clear_children`/`remove_child` 报整棵子树，`@style` 首次 apply 自装钩子清条目；口径「摘下来就是丢弃，挪位走 move_child」写进 adaptation。
+  - [x] §1.1「文本与颜色」表里此前无人消费的字段接上真生效路径（`text_eff` 合流：绘制读 `style_for`、测量读 `resolved_by_id`——测量回调只拿 id，拿句柄就是引用环）：`text_align` 定对齐、`white_space` 定折行并参与测量、`line_height` 覆盖单行行盒高、`text_decoration=underline` 自绘基线下 1px 线（文本层 range 只有 font+color）；`box_shadow` 开 `Widget.shadow_paint` 通道，绘制遍历按它放大本控件裁剪窗口，阴影才画得出盒外（与 CSS 同义）。**仅剩 `letter_spacing` 未接**：要文本层先开字距接口（Pango/DWrite 都有该能力，本层未暴露），属文本层能力批。
   - [ ] 观感逐页比对不回退（真机由用户复验，`examples/hello`、`hello-themed`、`showcase`、`native-app`、`sysmonitor`）。
 - [x] **P3 响应式补强**（2026-10-14 落地）：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘（`tick`）/ `for_list`+`when` / `mount_window_render` 的 `render` 槽 / `Store` 内建去重（`T : Eq` 走 `set_eq`，已定案）全部落地。
 - [x] **P4 绘制能力**：`Painter` 全局 alpha（opacity 全路径）+ `box_shadow` 硬阴影档（真机观感复验归 `_人工测试清单.md`；模糊档待 blur 能力再评估）。
