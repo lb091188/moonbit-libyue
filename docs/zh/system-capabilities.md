@@ -14,7 +14,8 @@
 | 系统信息 / 壁纸 / 启动器（打开与定位） | ✅ 直调 | ✅ | 🚧 已接（`sw_vers`/`ioreg`/`sysctl` + 桩内 `host_statistics64`/`kern.boottime`；osascript 桌面图片，只动主屏；`open` / `open -R`） |
 | 音量 / 打印机(列表+默认+打印) | ✅ 直调 | ✅ | 🚧 已接（osascript 的 `volume settings`，sink 名这条口给不到按契约置空；macOS 自带 CUPS，与 Linux 同走 `lpstat`/`lp`——声明过的选择，不是漏跑到 Linux 分支） |
 | 用户空闲检测 | ✅ 直调 | ✅ | 🚧 已接（`CGEventSourceSecondsSinceLastEventType` 的 HID 系统态读数，不需辅助功能授权） |
-| 应用查找 / 最近文件 | ✅ 直调 | ✅ | ❌ Unsupported（`.app` + Info.plist 扫描、sharedfilelist 的私有格式，另批做） |
+| 应用查找 | ✅ 直调 | ✅ | 🚧 已接（`.app` 包扫描 + `Contents/Info.plist` 公开键；`categories` 与本地化名没有公开对等物，按空/回退给） |
+| 最近文件 | ✅ 直调 | ✅ | ❌ Unsupported（sharedfilelist 是私有格式，另批做） |
 | 窗口管理 / 电源计划 | ✅ 直调 | ✅ | ❌ Unsupported（Accessibility 要用户先授权 / `pmset` 对不上三值方案语义） |
 | browser/vscode 数据 | ✅（LOCALAPPDATA 路径） | ✅ | ✅（`Library/Application Support/<厂商>/<产品>` 路径，平台批①-⑥ 时就已同步） |
 | sysmonitor 进程数据 | ✅（自带 stub/sysmon.c） | ✅ | 本批未动（示例模块自带桩，mac 路径按该模块的 stub 注释待验） |
@@ -56,13 +57,13 @@ let _ = @sys.vol_set_mute(false)
 
 ## 应用查找
 
-两部分：已装应用清单与应用二进制查找。Linux 扫描 XDG `.desktop` 条目（用户目录覆盖系统目录）；Windows 递归扫描开始菜单（用户级 + 全机级）的 `.lnk`，条目的 exec 为 lnk 全路径（ShellExecute 可直接启动）、categories 标 `StartMenu`；macOS `Unsupported`。
+两部分：已装应用清单与应用二进制查找。Linux 扫描 XDG `.desktop` 条目（用户目录覆盖系统目录）；Windows 递归扫描开始菜单（用户级 + 全机级）的 `.lnk`，条目的 exec 为 lnk 全路径（ShellExecute 可直接启动）、categories 标 `StartMenu`；macOS 扫 `/System/Applications`、`/Applications`（各带 `Utilities` 一层）与 `~/Applications` 下的 `.app` 包，读 `Contents/Info.plist` 的公开键：`name` 取 CFBundleDisplayName → CFBundleName → 包目录名，`id` 取 CFBundleIdentifier（缺则包名），`exec` 是 `Contents/MacOS/<CFBundleExecutable>`，`icon` 是 `Contents/Resources/<CFBundleIconFile>`（无扩展名补 `.icns`，无该键给空串）；二进制 plist 或读不到的包按包名给条目，不从清单里消失。macOS 侧两个字段是空的：`categories`（没有 desktop Categories 的对等物）与本地化名（在 `.lproj` 里，公开 plist 键给不到，`locale_name` 与 `name` 同值）。
 
 | 函数 | 说明 |
 |---|---|
 | `appfind_installed() -> Result[Array[AppEntry], AppFindError]` | 已装应用清单（真实扫描；全部扫描目录都不存在给 `NoScanDir`） |
 | `appfind_installed_with(list_dir) -> Result[Array[AppEntry], AppFindError]` | 同上，目录枚举由调用方注入（供无 fsx 层的调用方与测试；仅 Linux 分支） |
-| `appfind_executable(name) -> Result[String, AppFindError]` | Linux 在 `~/.local/bin`、`/usr/local/bin`、`/usr/bin`、`/bin`、`/usr/sbin`、`/sbin` 按序找；Windows 按 `PATH` 各目录找 name / name.exe；找不到给 `NotFound` |
+| `appfind_executable(name) -> Result[String, AppFindError]` | Linux 在 `~/.local/bin`、`/usr/local/bin`、`/usr/bin`、`/bin`、`/usr/sbin`、`/sbin` 按序找；Windows 按 `PATH` 各目录找 name / name.exe；macOS 先按 `PATH` 各段（`:` 分隔，取绝对路径）再补 `~/.local/bin`、`/usr/local/bin`、`/opt/homebrew/{bin,sbin}`、`/usr/bin`、`/bin`、`/usr/sbin`、`/sbin`；找不到给 `NotFound` |
 
 `AppEntry{ id, name, locale_name, exec, icon, categories }`：id 为 desktop id（.desktop 文件名去扩展名）、name 为显示名、locale_name 为本地化名（`Name[zh_CN]` 优先回退 Name）、exec / icon 原样、categories 按分号拆分。结果按 desktop id 去重（用户目录覆盖系统目录）、按 name 排序；Type 非 Application、NoDisplay=true、缺 Name 的条目已滤除。
 
