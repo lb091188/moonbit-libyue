@@ -858,11 +858,11 @@ void wb_destroy(int64_t id) {
 // - **kind=4 导航提交**由 `decidePolicyForNavigationAction`（放行那一刻）给出，
 //   WebKit 侧是引擎自己的 COMMITTED 状态、Windows 侧是 ContentLoading——三家都是
 //   「最接近提交」的公开口，不是同一时刻。
-// - **data_dir 的持久化**：`WKWebsiteDataStore dataStoreWithURLStoragePath:`
-//   要 macOS 14+ **且**进程有 bundle id；裸二进制（本仓示例的形态）拿不到，
-//   于是 `wb_persistence()` 按实际能不能兑现给 1/0，兑现不了时退回
-//   `nonPersistentDataStore`（会话不落盘，与「指定 profile 目录」的语义不合，
-//   所以由探测出声而不是默默换个存储）。
+// - **data_dir 的持久化**：公开口是 `+[WKWebsiteDataStore dataStoreForIdentifier:]`
+//   （macOS 14+，吃 UUID 而不是路径，且进程要有 bundle id）；裸二进制（本仓示例
+//   的形态）拿不到，于是 `wb_persistence()` 按实际能不能兑现给 1/0，兑现不了时
+//   退回 `nonPersistentDataStore`（会话不落盘，与「指定 profile 目录」的语义不合，
+//   所以由探测出声而不是默默换个存储）。路径→UUID 见 wb_uuid_for_dir。
 // - **wb_set_size 的像素↔点换算在这里做**：容器 NSView 的 frame 由 win 桩按
 //   物理像素换好，webview 填容器要给点，所以本函数把 w/h 除以所在屏的比例。
 
@@ -877,6 +877,13 @@ void wb_destroy(int64_t id) {
 #import <CoreFoundation/CoreFoundation.h>
 
 extern void *wm_surface_container(int64_t surface_id);
+
+// applicationNameForUserAgent 在 macOS 26 的 SDK 上不再随 WKPreferences 公开
+// 声明（clang 报 no visible @interface），旧 SDK 上它是真实存在的。这里只做
+// informal 声明让 selector 编译期可见，调用点先 respondsToSelector: 再发。
+@interface NSObject (WMWKOptionalSetters)
+- (void)setApplicationNameForUserAgent:(NSString *)name;
+@end
 
 #define WB_MAX_VIEWS 32
 #define WB_EVQ 32
@@ -1202,7 +1209,7 @@ static int wb_scheme_slot(WMBView *v, const char *scheme) {
 }
 
 - (void)startObserving {
-  if (self.observing || self.view == nil) {
+  if (self->observing || self.view == nil) {
     return;
   }
   // KVO 是标题/地址变化的唯一可靠口（导航 delegate 只给「这页加载完了」）
@@ -1216,7 +1223,7 @@ static int wb_scheme_slot(WMBView *v, const char *scheme) {
 }
 
 - (void)stopObserving {
-  if (!self.observing || self.view == nil) {
+  if (!self->observing || self.view == nil) {
     return;
   }
   @try {
@@ -1353,8 +1360,9 @@ int wb_available(void) {
   }
 }
 
-// 持久化能力：dataStoreWithURLStoragePath 要 macOS 14+ 且有 bundle id
-// （裸二进制拿不到），兑现不了就如实给 0——上层按「profile 参数会落空」降级。
+// 持久化能力：按目录命名会话的公开口是 `+[WKWebsiteDataStore
+// dataStoreForIdentifier:]`，要 macOS 14+ **且**进程有 bundle id（裸二进制
+// 拿不到），兑现不了就如实给 0——上层按「profile 参数会落空」降级。
 int wb_persistence(void) {
   @autoreleasepool {
     if ([[NSBundle mainBundle] bundleIdentifier] == nil) {
@@ -1365,6 +1373,39 @@ int wb_persistence(void) {
     }
     return 0;
   }
+}
+
+// data_dir → 稳定的会话标识：那个公开口吃的是 NSUUID 而不是路径，于是从路径
+// 哈希出一个固定 UUID——同一目录每次给出同一个，会话因此在多次运行之间延续。
+// 哈希走 FNV-1a 两条 64 位链，拼成 RFC 4122 的版本/变体位（NSUUID 只认合法串）。
+static NSUUID *wb_uuid_for_dir(const char *dir) {
+  unsigned long long h1 = 0xcbf29ce484222325ULL;
+  unsigned long long h2 = 0x9e3779b97f4a7c15ULL;
+  for (const unsigned char *p = (const unsigned char *)dir; *p != '\0'; p++) {
+    h1 = (h1 ^ (unsigned long long)*p) * 0x100000001b3ULL;
+    h2 = ((h2 ^ (unsigned long long)*p) * 0x100000001b3ULL) ^ (h2 >> 29);
+  }
+  char s[37];
+  snprintf(s, sizeof(s), "%08llx-%04llx-%04llx-%04llx-%012llx",
+           (h1 >> 32) & 0xffffffffULL, (h1 >> 16) & 0xffffULL,
+           0x4000ULL | (h1 & 0x0fffULL), 0x8000ULL | ((h2 >> 48) & 0x3fffULL),
+           h2 & 0xffffffffffffULL);
+  return [[NSUUID alloc]
+      initWithUUIDString:[[NSString alloc] initWithUTF8String:s]];
+}
+
+// 给了 data_dir 时选哪个存储：平台兑现得了就按目录命名一个持久会话，
+// 兑现不了给「这一会话不落盘」的独立内存存储（不落盘这件事由
+// wb_persistence() 先出声，上层据此告诉用户 profile 不会持久，而不是静默
+// 换成本来就在磁盘上的共享默认存储）。
+static WKWebsiteDataStore *wb_store_for_dir(const char *dir) {
+  if (wb_persistence() == 1 && @available(macOS 14.0, *)) {
+    NSUUID *u = wb_uuid_for_dir(dir);
+    if (u != nil) {
+      return [WKWebsiteDataStore dataStoreForIdentifier:u];
+    }
+  }
+  return [WKWebsiteDataStore nonPersistentDataStore];
 }
 
 // bit0 下载、bit1 进程终止、bit2 权限、bit3 新窗
@@ -1424,8 +1465,13 @@ int64_t wb_create(int64_t surface_id, int w, int h, const char *uri,
     v.scheme_handlers = [NSMutableArray array];
     v.message_handlers = [NSMutableArray array];
     if (user_agent != NULL && user_agent[0] != '\0') {
-      // 10.11+ 的 applicationNameForUserAgent（拼在引擎 UA 尾部）
-      [[cfg preferences] setApplicationNameForUserAgent:wb_ns(user_agent)];
+      // applicationNameForUserAgent 是「追加在系统 UA 尾部」那一档（整串覆盖
+      // 没有公开口，见 wb_set_user_agent）。新 SDK 的 WKPreferences 不再公开
+      // 声明这个 setter，故按运行时能力设：设不上就是默认 UA。
+      WKPreferences *prefs = [cfg preferences];
+      if ([prefs respondsToSelector:@selector(setApplicationNameForUserAgent:)]) {
+        [prefs setApplicationNameForUserAgent:wb_ns(user_agent)];
+      }
     }
     // 自定义协议必须在建视图前挂上（引擎的硬约束，两支同一形态）
     for (int i = 0; i < wb_predeclared_n; i++) {
@@ -1439,21 +1485,10 @@ int64_t wb_create(int64_t surface_id, int w, int h, const char *uri,
         strncpy(v->scheme_name[slot], wb_predeclared[i], WB_SCHEME_NAME - 1);
       }
     }
-    // 存储：给了 data_dir 且平台兑现得了，就指到那个目录；否则非持久化
+    // 存储：给了 data_dir 就按它选会话存储（见 wb_store_for_dir）
     if (data_dir != NULL && data_dir[0] != '\0') {
       strncpy(v->data_dir, data_dir, sizeof(v->data_dir) - 1);
-      if (wb_persistence() == 1) {
-        if (@available(macOS 14.0, *)) {
-          NSURL *u = [NSURL fileURLWithPath:wb_ns(data_dir)];
-          WKWebsiteDataStore *ds =
-              [WKWebsiteDataStore dataStoreWithURLStoragePath:u error:nil];
-          if (ds != nil) {
-            [cfg setWebsiteDataStore:ds];
-          }
-        }
-      } else {
-        [cfg setWebsiteDataStore:[WKWebsiteDataStore nonPersistentDataStore]];
-      }
+      [cfg setWebsiteDataStore:wb_store_for_dir(data_dir)];
     }
     NSRect frame = [host bounds];
     if (w > 1 && h > 1) {
@@ -1637,9 +1672,11 @@ int wb_title(int64_t id, char *out, int cap) {
 
 // ---- JS 求值与页面通道 ----
 
-int64_t wb_evaluate(int64_t id, const char *script) {
+int64_t wb_evaluate(int64_t wid, const char *script) {
   @autoreleasepool {
-    WMBView *v = wb_get(id);
+    // 形参不叫 id：ObjC 里 `id` 是类型名，函数内再拿它当变量名会把块参数表
+    // 里的 `(id result, ...)` 解析成「变量声明」，整块代码报一串莫名的错。
+    WMBView *v = wb_get(wid);
     if (v == nil || script == NULL) {
       return -1;
     }

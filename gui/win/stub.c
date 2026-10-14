@@ -4400,6 +4400,7 @@ typedef struct {
 @property(nonatomic, strong) NSWindow *win;
 @property(nonatomic, strong) WMView *view;
 - (void)pushEv:(const WmEv *)e;
+- (void)syncSize;
 @end
 
 static WMState *wm_windows[WM_MAX_WINDOWS];
@@ -4574,9 +4575,9 @@ static uint32_t wm_keysym_of(NSEvent *ev) {
 - (void)pushEv:(const WmEv *)e {
   // 指针移动先合并（与 GTK/Win32 支同一条：位置是状态不是流水，只留最新一条）。
   if (e->code == 4u && ev_count > 0) {
-    int last = (ev_head + ev_count - 1) % 64;
-    if (evs[last].code == 4u) {
-      evs[last] = *e;
+    int prev = (ev_head + ev_count - 1) % 64;
+    if (evs[prev].code == 4u) {
+      evs[prev] = *e;
       return;
     }
   }
@@ -4588,8 +4589,9 @@ static uint32_t wm_keysym_of(NSEvent *ev) {
   ev_count++;
 }
 
-- (void)windowDidResize:(NSNotification *)note {
-  (void)note;
+// 尺寸同步：从 contentView 的边界点尺寸 × 所在屏缩放算出物理像素。
+// 全屏切换通知也走这里（那条同样带非空 note，但复用逻辑比 nil 参数干净）。
+- (void)syncSize {
   if (self.view == nil) {
     return;
   }
@@ -4602,9 +4604,14 @@ static uint32_t wm_keysym_of(NSEvent *ev) {
   [self.view updateTrackingAreas];
 }
 
+- (void)windowDidResize:(NSNotification *)note {
+  (void)note;
+  [self syncSize];
+}
+
 - (void)windowDidExitFullScreen:(NSNotification *)note {
   (void)note;
-  [self windowDidResize:nil];
+  [self syncSize];
 }
 
 - (BOOL)windowShouldClose:(NSWindow *)sender {
@@ -4930,7 +4937,10 @@ static uint32_t wm_keysym_of(NSEvent *ev) {
   (void)selector; // 组合中的回车/退格由输入法定，本层不额外投键（与 GTK 一致）
 }
 
-- (void)setMarkedText:(id)markedText selectedRange:(NSRange)selRange {
+- (void)setMarkedText:(id)markedText
+                 selectedRange:(NSRange)selRange
+            replacementRange:(NSRange)replacementRange {
+  (void)replacementRange; // 本层没有选区可替换：组合串总是整体覆写 preedit
   WMState *s = wm_state(vsid);
   if (s == nil) {
     return;
@@ -4990,7 +5000,7 @@ static uint32_t wm_keysym_of(NSEvent *ev) {
   return @[];
 }
 
-- (void)resignFirstResponder {
+- (BOOL)resignFirstResponder {
   WMState *s = wm_state(vsid);
   if (s != nil && [self.window isKeyWindow]) {
     // 焦点还在本窗内转移（用户点了本窗的网页子件）→ 浮层「点外收起」
@@ -5001,7 +5011,7 @@ static uint32_t wm_keysym_of(NSEvent *ev) {
     s->preedit_len = 0;
     s->preedit[0] = '\0';
   }
-  [super resignFirstResponder];
+  return [super resignFirstResponder];
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
