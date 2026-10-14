@@ -1,7 +1,8 @@
 // 系统剪贴板（W16）：Windows 走 Win32 的 CF_UNICODETEXT（桩在 sys_stub.c 的
-// _WIN32 分支）；**Linux 优先走 GtkClipboard**（桩在 win/stub.c 的 GTK 分支，
-// sys 的 extern 直链 win 桩、与文件对话框 `wm_file_*` 同一条先例），没跑过
-// gtk_init 的纯命令行进程探测给 0、退回命令线 xclip；macOS 走 pbpaste|pbcopy。
+// _WIN32 分支）；**Linux 优先走 GtkClipboard**（真实现住 win/stub.c 的 GTK
+// 分支，经 sys_stub.c 的 yue_sys_clipboard_gtk_* 转发层进链接——sys 不跨包
+// 直链 win 桩符号），没跑过 gtk_init 的纯命令行进程探测给 0、退回命令线
+// xclip；macOS 走 pbpaste|pbcopy。
 // 统一「探测 + 语义化降级」：不可用给 false/None，调用方回退到自己的内部
 // 剪贴板（无头测试与没装 xclip 的环境行为不变）。
 //
@@ -17,17 +18,17 @@ extern "c" fn ffi_clipboard_get_text(ok : Ref[Int]) -> Bytes = "yue_sys_clipboar
 extern "c" fn ffi_clipboard_set_text(text : Bytes) -> Int = "yue_sys_clipboard_set_text"
 
 ///|
-/// Linux 原生落点（win 桩的 GtkClipboard 三符号）。`available` 在没有显示
-/// 服务或本进程没跑过 gtk_init 时给 0——那是无头消费者的正常形态。
-extern "c" fn ffi_clipboard_gtk_available() -> Int = "wm_clipboard_available"
+/// Linux 原生落点（sys_stub.c 转发层 → win 桩 GTK 分支）。`available` 在
+/// 没有显示服务或本进程没跑过 gtk_init 时给 0——那是无头消费者的正常形态。
+extern "c" fn ffi_clipboard_gtk_available() -> Int = "yue_sys_clipboard_gtk_available"
 
 ///|
 #borrow(ok)
-extern "c" fn ffi_clipboard_gtk_get_text(ok : Ref[Int]) -> Bytes = "wm_clipboard_get_text"
+extern "c" fn ffi_clipboard_gtk_get_text(ok : Ref[Int]) -> Bytes = "yue_sys_clipboard_gtk_get_text"
 
 ///|
 #borrow(text)
-extern "c" fn ffi_clipboard_gtk_set_text(text : Bytes) -> Int = "wm_clipboard_set_text"
+extern "c" fn ffi_clipboard_gtk_set_text(text : Bytes) -> Int = "yue_sys_clipboard_gtk_set_text"
 
 ///|
 /// Linux 这一趟走不走 GtkClipboard（每次真判，与下面的探测同口径）。

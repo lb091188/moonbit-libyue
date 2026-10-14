@@ -127,8 +127,7 @@ moon test -p NoahLiu/moonbit-libyue/yue/sys       # 期望 166/166（Windows 分
 | `wm_window_set_popup` / `move` / `origin` | 占位 | 原生弹层窗口（下拉/右键菜单/浮层原生的那档）在 Windows 上开不出来 |
 | `wm_surface_new/set_rect/close/container` | 占位 | webview pane 放不进窗口（要 WebView2 子 HWND） |
 | 图片解码 PNG/JPEG/GIF | 已补（W9） | Linux GdkPixbuf、Windows WIC；macOS 仍缺 |
-| `windowctl`/`monitor`/`wallpaper`/`defaultapps`/`clipboard_watch` | 无 Windows 实现 | 这些是 wmctrl/xrandr/xclip 命令行线 |
-| `appfind`/`recent_files`/`launcher` 的 Windows 分支 | 待补 | TODO 记为「随平台批」 |
+| `monitor` | 无 Windows 实现 | xrandr 命令线（windowctl/wallpaper/clipboard_watch/appfind/recent_files/launcher 已随平台批补上 Windows 直调；defaultapps 能力已删） |
 | sensor/bluetooth/disk、`locale_sys` 的 timedatectl 半、`idle` | 无对应通道 | Linux/DBus 专有，Windows 另议 |
 
 > 上面前五个是纯 Win32 就能写完的（`SetWindowPos` / `ShowWindow` / 无边框 + `WS_EX_NOACTIVATE` / WIC），我没法在这台机器验——**要不要我在这边先写完、你到 Windows 直接编译验**？说一声我就开工。

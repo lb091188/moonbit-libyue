@@ -2670,3 +2670,35 @@ void *yue_sys_prt_default(int32_t *ok) {
   return moonbit_make_bytes(0, 0);
 #endif
 }
+
+// ---------------------------------------------------------------------------
+// GtkClipboard 三符号的转发层（clipboard.mbt 的 Linux 分支用）：真实现住
+// win/stub.c 的 GTK 分支（要 GTK 头，由 prebuild 编静态库、经 SYS_PACKAGE
+// 的 -lyue_win_stub 进链接）。sys 桩拿不到 GTK 头，但转发只需要 extern
+// 声明——Linux 由归档解析符号；Windows/macOS 给哑实现（Windows 的真路径
+// 是本桩自己的 CF_UNICODETEXT，Linux 之外的分支不会调到这里），这样
+// sys 的测试与可执行文件不再跨包直链 win 桩符号（0ca845c 的直链在
+// Windows 侧 sys 测试 exe 上 LNK2019 的修正）。
+// ---------------------------------------------------------------------------
+#if defined(_WIN32)
+int yue_sys_clipboard_gtk_available(void) { return 0; }
+void *yue_sys_clipboard_gtk_get_text(int32_t *ok) {
+  *ok = 0;
+  return moonbit_make_bytes(0, 0);
+}
+int yue_sys_clipboard_gtk_set_text(const char *text) {
+  (void)text;
+  return 0;
+}
+#else
+extern int wm_clipboard_available(void);
+extern void *wm_clipboard_get_text(int32_t *ok);
+extern int wm_clipboard_set_text(const char *text);
+int yue_sys_clipboard_gtk_available(void) { return wm_clipboard_available(); }
+void *yue_sys_clipboard_gtk_get_text(int32_t *ok) {
+  return wm_clipboard_get_text(ok);
+}
+int yue_sys_clipboard_gtk_set_text(const char *text) {
+  return wm_clipboard_set_text(text);
+}
+#endif

@@ -51,22 +51,6 @@ fn sysprobe_collect() -> String {
       )
     Err(e) => buf.write_string("不可用: \{e}\n")
   }
-  buf.write_string("\n== 屏幕亮度 ==\n")
-  match @sys.brightness_devices() {
-    Ok(devs) => {
-      if devs.is_empty() {
-        buf.write_string("无背光设备\n")
-      }
-      for d in devs {
-        let cur = match @sys.brightness_get(d) {
-          Ok(p) => "\{p}%"
-          Err(e) => "读取失败(\{e})"
-        }
-        buf.write_string("\{d.name}(量程 \{d.max}): \{cur}\n")
-      }
-    }
-    Err(e) => buf.write_string("不可用: \{e}\n")
-  }
   buf.write_string("\n== 浏览器历史(前 6 条) ==\n")
   match @sys.bh_history(limit=6) {
     Ok(items) => {
@@ -113,27 +97,6 @@ fn sysprobe_collect() -> String {
       Ok(p) => buf.write_string("\{name} -> \{p}\n")
       Err(_) => buf.write_string("\{name} -> 未找到\n")
     }
-  }
-  buf.write_string("\n== 默认应用查询(只读) ==\n")
-  if @sys.da_supported() {
-    match @sys.da_file_type("/etc/hostname") {
-      Ok(mime) => {
-        buf.write_string("/etc/hostname 类型: \{mime}\n")
-        match @sys.da_default_for(mime) {
-          Ok(d) => buf.write_string("默认应用: \{d}\n")
-          Err(e) => buf.write_string("默认应用: 未登记(\{e})\n")
-        }
-        let htmls = @sys.da_associations_for("text/html")
-        if htmls.is_empty() {
-          buf.write_string("text/html 关联: 无\n")
-        } else {
-          buf.write_string("text/html 关联: \{htmls.join(", ")}\n")
-        }
-      }
-      Err(e) => buf.write_string("文件类型查询失败: \{e}\n")
-    }
-  } else {
-    buf.write_string("xdg-mime 不可用，跳过\n")
   }
   buf.write_string("\n== 媒体播放(MPRIS,只读) ==\n")
   match @dbus.media_players() {
@@ -198,7 +161,6 @@ fn sysprobe_collect() -> String {
     Ok(t) => buf.write_string("当前文本: \{trunc_str(t, 60)}\n")
     Err(e) => buf.write_string("不可用: \{e}\n")
   }
-  buf.write_string("\n== 磁盘卷 / 时区与语言 / 蓝牙 / 传感器 / logind 电源 ==\n本栈尚未平移这五族探针（旧链 Linux 专属），整段说明替代，随各自能力批补齐。\n")
   buf.write_string("\n== 电源计划(powerprofilesctl,只读) ==\n")
   match @sys.pp_profiles() {
     Ok(profs) => {
@@ -241,7 +203,7 @@ fn sysprobe_collect() -> String {
       )
     Err(e) => buf.write_string("开机时长读取失败: \{e}\n")
   }
-  buf.write_string("\n== 打印机(CUPS,只读) ==\n")
+  buf.write_string("\n== 打印机(只读) ==\n")
   if @sys.prt_supported() {
     match @sys.prt_list() {
       Ok(ps) => {
@@ -256,24 +218,11 @@ fn sysprobe_collect() -> String {
       Err(e) => buf.write_string("打印机列表读取失败: \{e}\n")
     }
     match @sys.prt_default() {
-      Ok(d) => {
-        buf.write_string("默认打印机: \{d}\n")
-        match @sys.prt_queue(d) {
-          Ok(jobs) => {
-            if jobs.is_empty() {
-              buf.write_string("打印队列为空\n")
-            }
-            for j in jobs {
-              buf.write_string("  任务 \{j.id}: \{j.name}\n")
-            }
-          }
-          Err(e) => buf.write_string("打印队列读取失败: \{e}\n")
-        }
-      }
+      Ok(d) => buf.write_string("默认打印机: \{d}\n")
       Err(_) => buf.write_string("未设置默认打印机\n")
     }
   } else {
-    buf.write_string("不可用: 未装 CUPS(lpstat 缺失)或非 Linux\n")
+    buf.write_string("不可用: winspool/lpstat 都取不到列表\n")
   }
   buf.write_string("\n== 环境变量(常用 + XDG_*) ==\n")
   let envs = @sys.envx_common()

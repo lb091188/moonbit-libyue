@@ -14,10 +14,10 @@
 | `.../native-gui/text` | `@text` | 文本层：字体族、字体、富文本与区间属性（Pango / DirectWrite） |
 | `.../native-gui/theme` | `@theme` | 主题系统：色板派生 + 变更订阅 |
 | `.../native-gui/icons` | `@icons` | 矢量图标系统 |
-| `.../native-gui/sys` | `@sys` | 系统能力：自启动、空闲、子进程、环境、文件、JSON、对话框、浏览器历史 / 书签、最近文件、壁纸、音量、亮度、电源、打印机、显示器、窗口控制、应用查找… |
+| `.../native-gui/sys` | `@sys` | 系统能力：自启动、空闲、子进程、环境、文件、JSON、对话框、浏览器历史 / 书签、最近文件、壁纸、音量、电源、打印机、显示器、窗口控制、应用查找… |
 | `.../native-gui/input` | `@input` | 编辑内核与键码 |
 | `.../native-gui/win` | `@win` | 平台窗口后端（Win32 / GTK3 的 C 桩）：快捷键、图标、输入法、消息框、通知、托盘、surface |
-| `.../native-gui/dbus` | `@dbus` | Linux D-Bus 桥（托盘 SNI、通知、亮度、logind / upower、媒体、网络、屏保…） |
+| `.../native-gui/dbus` | `@dbus` | Linux D-Bus 桥（托盘 SNI、通知、logind / upower、媒体、网络、屏保…） |
 | `.../native-gui/chart` | `@chart` | 图表 + 横切交互层 |
 | `.../native-gui/mdview` | `@mdview` | Markdown 渲染视图 |
 | `.../native-gui/web` | `@web` | 内嵌 WebView |
@@ -61,6 +61,6 @@ moon run examples/showcase       # 完整演示板：组件库 + 系统能力
 | [adaptation.md](adaptation.md) | 平台适配经验：各平台实测坑、根因与验证结论（持续更新） |
 | [autostart.md](autostart.md) | 开机自启动：Linux 写 XDG .desktop、Windows 写 HKCU Run 键，is_enabled / enable / disable 统一语义 |
 | [tray.md](tray.md) | Linux 托盘方案：SNI 协议栈设计、架构、后端降级、桌面兼容性 |
-| [system-capabilities.md](system-capabilities.md) | 系统能力（包 `@sys`）：屏幕亮度 / 键盘背光 / 系统音量 / 媒体控制 / 夜间色温 / 壁纸 / 显示器配置 / 系统窗口管理 / 剪贴板监听 / 磁盘卷 / 电源与登录会话 / 系统信息 / 蓝牙 / 传感器 / 打印机 / 进程内环境变量与目录枚举 / 最近文件 / 浏览器书签与历史 / 应用查找 / VS Code 历史…，统一 Result 语义；含子进程执行（procrun）与通用 D-Bus 调用层两块共享基建 |
+| [system-capabilities.md](system-capabilities.md) | 系统能力（包 `@sys`）：系统音量 / 应用查找 / 夜间色温 / 壁纸 / 显示器配置 / 系统窗口管理 / 剪贴板监听 / 系统信息 / 打印机 / 进程内环境变量与目录枚举 / 最近文件 / 浏览器书签与历史 / VS Code 历史…，统一 Result 语义；含子进程执行（procrun）与通用 D-Bus 调用层两块共享基建 |
 
 项目总览与快速开始入口见仓库根 [README_ZH.md](https://github.com/lb091188/moonbit-native-gui/blob/master/README_ZH.md)。

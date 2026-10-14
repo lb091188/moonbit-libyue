@@ -1,20 +1,5 @@
-// 接线层与单实例的白盒测试：logind 亮度注入后 `sys` 的门与探针一致；
-// 单实例名字声称走真总线（本进程内两次声称 → 首个 PrimaryOwner、再来
-// AlreadyOwner——幂等语义）。
-
-///|
-test {
-  // 注入前 sys 的亮度门是「未接入」的假；注入后等于 logind 在线与否
-  let logind = logind_available()
-  install_logind_brightness()
-  assert_eq(@sys.brightness_supported(), logind)
-  println("bridge: logind_available=\{logind}")
-  // 设备枚举只读 sysfs，与 logind 无关，注入不改它
-  match @sys.brightness_devices() {
-    Ok(list) => println("bridge: backlight devices=\{list.length()}")
-    Err(e) => println("bridge: devices err \{e}")
-  }
-}
+// 单实例接线层的白盒测试：名字声称走真总线（本进程内两次声称 → 首个
+// PrimaryOwner、再来 AlreadyOwner——幂等语义）。
 
 ///|
 test {

@@ -1,11 +1,11 @@
-// 打印机（CUPS）：经 procrun 的 [pr_run] 调 lpstat 三条只读命令——
-// `-p` 打印机列表（名称 / 可用状态）、`-d` 默认打印机、`-o <打印机>`
-// 任务队列——以及 lp 提交打印任务的命令构造。子进程环境由 procrun 固定
-// C locale，lpstat 输出语言恒定可解析。lpstat 缺失（系统未装 CUPS，
-// shell 以退出码 127 呈现）→ PrtUnsupported，属合法降级；lp 有副作用
-// （真实提交打印任务），仅实现不执行，wbtest 只断言其参数表。lpstat
-// 输出解析与 lp 参数构造为纯函数（prt_ 前缀），printer_wbtest.mbt 白盒
-// 覆盖（真实样例取自本机 CUPS 的 C locale 输出）。
+// 打印机：Windows 走 winspool 直调（EnumPrintersW 列表 +
+// GetDefaultPrinterW 默认名）与 ShellExecuteW「print」动词；Linux 经
+// procrun 的 [pr_run] 调 lpstat 两条只读命令——`-p` 打印机列表（名称 /
+// 可用状态）、`-d` 默认打印机——以及 lp 提交打印任务的命令构造。子进程
+// 环境由 procrun 固定 C locale，lpstat 输出语言恒定可解析。lpstat 缺失
+// （系统未装 CUPS，shell 以退出码 127 呈现）→ PrtUnsupported，属合法
+// 降级；lp 有副作用（真实提交打印任务），仅实现不执行，wbtest 只断言其
+// 参数表。lpstat 输出解析与 lp 参数构造为纯函数（prt_ 前缀）。
 //
 // 典型用法：
 //   match prt_default() {
@@ -55,26 +55,6 @@ pub impl Show for PrinterInfo with fn output(self, logger) {
 
 ///|
 pub extend PrinterInfo with Show::{to_string, output}
-
-///|
-/// 任务队列项：name 为 CUPS 作业名（"目标名-编号" 形态，如
-/// "Gprinter-GP-9034T-12"），id 为作业编号。
-pub(all) struct PrinterJob {
-  name : String
-  id : Int
-}
-
-///|
-pub impl Show for PrinterJob with fn output(self, logger) {
-  logger.write_string("PrinterJob { name: ")
-  logger.write_string(self.name)
-  logger.write_string(", id: ")
-  logger.write_string(self.id.to_string())
-  logger.write_string(" }")
-}
-
-///|
-pub extend PrinterJob with Show::{to_string, output}
 
 ///|
 pub(all) enum PrinterError {
@@ -203,33 +183,6 @@ fn prt_first_line(s : String) -> String {
 }
 
 ///|
-/// 文本是否无符号十进制整数（"12" 为真；空串 / 负号 / 非数字为假）。
-fn prt_is_digits(s : String) -> Bool {
-  if s == "" {
-    return false
-  }
-  for ch in s {
-    if ch < '0' || ch > '9' {
-      return false
-    }
-  }
-  true
-}
-
-///|
-/// 无符号十进制整数文本 → 整数（空串或含非数字为 None）。
-fn prt_parse_uint(s : String) -> Int? {
-  if !prt_is_digits(s) {
-    return None
-  }
-  let mut v = 0
-  for ch in s {
-    v = v * 10 + (ch.to_int() - 48)
-  }
-  Some(v)
-}
-
-///|
 /// 该状态是否可提交任务（Idle 空闲 / Printing 打印中均可送纸）。
 pub fn prt_status_available(status : PrinterStatus) -> Bool {
   match status {
@@ -332,55 +285,6 @@ fn prt_parse_default(out : String) -> String? {
     }
   }
   None
-}
-
-///|
-/// 解析 `lpstat -o` 单行："NAME-ID USER SIZE DATE" → 任务项，
-/// 其中 NAME-ID 为 CUPS 作业名（目标名与编号以最后一段 '-' 分隔，
-/// 打印机名本身可含 '-'，如 Gprinter-GP-9034T-12 拆出作业 12）。
-/// 无 '-' 分隔或编号非数字的行返回 None 跳过。
-fn prt_parse_job_line(line : String) -> PrinterJob? {
-  let toks = prt_split_ws(line)
-  if toks.length() == 0 {
-    return None
-  }
-  let label = toks[0]
-  // 找最后一个 '-'，其后必须是全数字作业编号
-  let chars : Array[Char] = []
-  for ch in label {
-    chars.push(ch)
-  }
-  let mut split = -1
-  for i in 0..<chars.length() {
-    if chars[i] == '-' {
-      split = i
-    }
-  }
-  if split <= 0 || split >= chars.length() - 1 {
-    return None
-  }
-  let digits = StringBuilder()
-  let lo = split + 1
-  for j in lo..<chars.length() {
-    digits.write_char(chars[j])
-  }
-  match prt_parse_uint(digits.to_string()) {
-    None => None
-    Some(id) => Some({ name: label, id, })
-  }
-}
-
-///|
-/// 解析 `lpstat -o` 全文：逐行取任务项，空输出（队列为空）为空数组。
-fn prt_parse_queue(out : String) -> Array[PrinterJob] {
-  let jobs : Array[PrinterJob] = []
-  for line in prt_split_lines(out) {
-    match prt_parse_job_line(prt_trim(line)) {
-      Some(job) => jobs.push(job)
-      None => ()
-    }
-  }
-  jobs
 }
 
 ///|
@@ -553,20 +457,6 @@ pub fn prt_default() -> Result[String, PrinterError] {
         Some(name) => Ok(name)
         None => Err(PrtParseFailed("lpstat -d: \{prt_first_line(out)}"))
       }
-  }
-}
-
-///|
-/// 列出指定打印机队列上的任务（作业名 + 编号）；printer 为空串
-/// → PrtInvalidParam；未装 CUPS → PrtUnsupported；目标不存在等
-/// lpstat 非零退出 → PrtCommandFailed；空数组表示队列为空。
-pub fn prt_queue(printer : String) -> Result[Array[PrinterJob], PrinterError] {
-  if printer == "" {
-    return Err(PrtInvalidParam("打印机名为空"))
-  }
-  match prt_lpstat(["-o", printer]) {
-    Ok(out) => Ok(prt_parse_queue(out))
-    Err(e) => Err(e)
   }
 }
 

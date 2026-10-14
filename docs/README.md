@@ -14,10 +14,10 @@ This directory holds the documentation for **moonbit-libyue** — a native, cros
 | `.../native-gui/text` | `@text` | Text layer: font families, fonts, attributed text and range attributes (Pango / DirectWrite) |
 | `.../native-gui/theme` | `@theme` | Theme system: palette derivation + change subscription |
 | `.../native-gui/icons` | `@icons` | Vector icon system |
-| `.../native-gui/sys` | `@sys` | OS capabilities: autostart, idle, subprocess, env, files, JSON, dialogs, browser history / bookmarks, recent files, wallpaper, volume, brightness, power, printers, monitors, window control, app lookup… |
+| `.../native-gui/sys` | `@sys` | OS capabilities: autostart, idle, subprocess, env, files, JSON, dialogs, browser history / bookmarks, recent files, wallpaper, volume, power, printers, monitors, window control, app lookup… |
 | `.../native-gui/input` | `@input` | Editing core and key codes |
 | `.../native-gui/win` | `@win` | Platform window backend (Win32 / GTK3 C stubs): hotkeys, icons, IME, message boxes, notifications, trays, surfaces |
-| `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge (tray SNI, notifications, brightness, logind / upower, media, network, screensaver…) |
+| `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge (tray SNI, notifications, logind / upower, media, network, screensaver…) |
 | `.../native-gui/chart` | `@chart` | Charts, plus the cross-cutting interactive layer |
 | `.../native-gui/mdview` | `@mdview` | Markdown rendering view |
 | `.../native-gui/web` | `@web` | Embedded WebView |
@@ -60,7 +60,7 @@ moon run examples/showcase       # full demo board: component library + system c
 | [adaptation.md](adaptation.md) | Platform adaptation notes: field-tested pitfalls and fixes, per platform (continuously updated) |
 | [autostart.md](autostart.md) | Cross-platform autostart: XDG `.desktop` on Linux / HKCU Run key on Windows, one `is_enabled` / `enable` / `disable` API |
 | [tray.md](tray.md) | Linux tray: SNI protocol-stack design, architecture, backend fallback, desktop compatibility |
-| [zh/system-capabilities.md](/zh/system-capabilities.md) (Chinese) | System capabilities (`@sys`): brightness / backlight / volume / media control / night light / wallpaper / monitors / window control / clipboard watch / disk volumes / power & sessions / Bluetooth / printers / sensors / env / recent files / browser bookmarks & history / installed-app lookup / VS Code history…, with a unified `Result` semantics |
+| [zh/system-capabilities.md](/zh/system-capabilities.md) (Chinese) | System capabilities (`@sys`): volume / app lookup / night light / wallpaper / monitors / window control / clipboard watch / power profiles / printers / env / recent files / browser bookmarks & history / VS Code history…, with a unified `Result` semantics |
 
 For the project overview and quick start, see the repository root [README.md](https://github.com/lb091188/moonbit-native-gui/#readme).
 

@@ -40,7 +40,7 @@ fn main {
 
 **⚡ Reactive state** — keep state in `Store` / `Signal` (from `@core`); bound spots refresh themselves when the data changes.
 
-**🖥 Desktop-grade system integration** — tray, notifications, global shortcuts, clipboard, native menus, file dialogs, drag & drop, autostart, media keys, and OS queries (volume, brightness, power, browser history, installed apps…) sit behind one `@sys` API.
+**🖥 Desktop-grade system integration** — tray, notifications, global shortcuts, clipboard, native menus, file dialogs, drag & drop, autostart, media keys, and OS queries (volume, power, browser history, installed apps…) sit behind one `@sys` API.
 
 **📊 Self-drawn charts & rich content** — charts (line / bar / pie / gauge / scatter plus radar, heatmap, candlestick, funnel, boxplot, sankey, tree, treemap, sunburst, map and more, with a cross-cutting interactive layer) and a Markdown view, drawn by the same rasterizer.
 
@@ -58,10 +58,10 @@ fn main {
 | `.../native-gui/text` | `@text` | Text layer: font families, fonts, attributed text and range attributes (Pango / DirectWrite) |
 | `.../native-gui/theme` | `@theme` | Theme system: palette derivation + change subscription |
 | `.../native-gui/icons` | `@icons` | Vector icon system |
-| `.../native-gui/sys` | `@sys` | OS capabilities: autostart, idle, subprocess, env, files, JSON, dialogs, browser history / bookmarks, recent files, wallpaper, volume, brightness, power, printers, monitors, window control, app lookup… |
+| `.../native-gui/sys` | `@sys` | OS capabilities: autostart, idle, subprocess, env, files, JSON, dialogs, browser history / bookmarks, recent files, wallpaper, volume, power, printers, monitors, window control, app lookup… |
 | `.../native-gui/input` | `@input` | Editing core and key codes |
 | `.../native-gui/win` | `@win` | Platform window backend (Win32 / GTK3 C stubs): hotkeys, icons, IME, message boxes, notifications, trays, surfaces |
-| `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge (tray SNI, notifications, brightness, logind / upower, media, network, screensaver…) |
+| `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge (tray SNI, notifications, logind / upower, media, network, screensaver…) |
 | `.../native-gui/chart` | `@chart` | Charts, plus the cross-cutting interactive layer |
 | `.../native-gui/mdview` | `@mdview` | Markdown rendering view |
 | `.../native-gui/web` | `@web` | Embedded WebView |

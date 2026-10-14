@@ -13,8 +13,6 @@ priv struct Counts {
   mut wallpaper : String
   mut volume : Int
   mut profile : String
-  mut mime : String
-  mut default_app : String
   mut apps : Int
   mut recent : Int
   mut hist : Int
@@ -35,8 +33,6 @@ fn empty_counts() -> Counts {
     wallpaper: "-",
     volume: -1,
     profile: "-",
-    mime: "-",
-    default_app: "-",
     apps: 0,
     recent: 0,
     hist: 0,
@@ -200,19 +196,6 @@ fn probe_desktop(counts : Ref[Counts]) -> Array[(String, String)] {
     }
     Err(e) => rows.push(("电源计划", e.to_string()))
   }
-  rows.push(
-    (
-      "亮度",
-      if @sys.brightness_supported() {
-        match @sys.brightness_devices() {
-          Ok(list) => "设备 " + (list.length()).to_string() + " 个"
-          Err(e) => e.to_string()
-        }
-      } else {
-        "无 backlight 设备"
-      },
-    ),
-  )
   rows.push(("夜灯", if @sys.nl_supported() { "可用（redshift/gamma 在）" } else { "不可用" }))
   rows.push(
     (
@@ -245,26 +228,6 @@ fn probe_apps(counts : Ref[Counts]) -> Array[(String, String)] {
       )
     }
     Err(e) => rows.push(("已装应用", e.to_string()))
-  }
-  if @sys.da_supported() {
-    match @sys.da_file_type("/etc/hostname") {
-      Ok(mime) => {
-        counts.val.mime = mime
-        rows.push(
-          ("文件类型（/etc/hostname）", mime),
-        )
-      }
-      Err(e) => rows.push(("文件类型（/etc/hostname）", e.to_string()))
-    }
-    match @sys.da_default_for("text/plain") {
-      Ok(name) => {
-        counts.val.default_app = name
-        rows.push(("text/plain 默认应用", name))
-      }
-      Err(e) => rows.push(("text/plain 默认应用", e.to_string()))
-    }
-  } else {
-    rows.push(("xdg-mime", "不在 PATH"))
   }
   rows
 }
@@ -466,8 +429,6 @@ fn main {
       return
     }
   }
-  // 把 logind 的亮度写能力装进 sys 的注入槽（sys 不引 D-Bus）
-  @dbus.install_logind_brightness()
   let counts : Ref[Counts] = Ref(empty_counts())
   let probes = @core.Store::new(0)
   let opens = @core.Store::new(0)
@@ -782,8 +743,8 @@ fn main {
   let c = counts.val
   println(
     "SYSPROBE-STAT os=\{c.os_id} de=\{c.desktop} mon=\{c.monitors} " +
-      "wp=\{c.wallpaper} vol=\{c.volume} prof=\{c.profile} mime=\{c.mime} " +
-      "def=\{c.default_app} apps=\{c.apps} recent=\{c.recent} " +
+      "wp=\{c.wallpaper} vol=\{c.volume} prof=\{c.profile} " +
+      "apps=\{c.apps} recent=\{c.recent} " +
       "hist=\{c.hist} dl=\{c.downloads} bm=\{c.bookmarks} ffx=\{c.firefox} " +
       "vsc=\{c.vscode} wins=\{c.windows} clip=\{c.clipboard} " +
       "probes=\{probes.get()} opens=\{opens.get()} reveals=\{reveals.get()} " +
