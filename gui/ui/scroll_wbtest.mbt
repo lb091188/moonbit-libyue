@@ -165,3 +165,29 @@ test "滚动容器：内容不足一屏不滚、也不画滚动条" {
   let c = px(bm, x, y)
   assert_eq(c, (0x33, 0x44, 0x55, 0xFF))
 }
+
+///|
+test "滚动容器：只给 grow 不给高度时视口不被内容撑高" {
+  // 真机症状「内容超出窗口却滚不动」的根因钉桩：Yoga 的 flex 子项默认
+  // min-size=auto，视口不写 min 0 就会被内容顶到自然高，max() 恒为 0。
+  let st = ScrollState::new()
+  let root = @core.Widget::new()
+  root.set_size(240.0, 140.0)
+  root.set_column()
+  let vp = scroll_view(
+    scroll_rows(20, 20.0, @theme.theme_bg_panel()),
+    st,
+    handle=fn(v : @core.Widget) -> Unit { v.node.set_flex_grow(1.0) },
+  ).mount_into(root)
+  root.relayout(240.0, 140.0)
+  let _ = paint(root, 240, 140)
+  assert_true(vp.rect.h <= 140.0, msg="视口被内容撑高：\{vp.rect.h}")
+  assert_eq(st.content_h, 400.0)
+  assert_eq(st.view_h, 140.0)
+  assert_true(st.max() > 200.0, msg="max 为 0（滚不动）")
+  let content = vp.children()[0]
+  let y0 = content.rect.y
+  st.scroll_by(60.0)
+  root.relayout(240.0, 140.0)
+  assert_true(content.rect.y < y0 - 50.0, msg="偏移变了内容没上移")
+}

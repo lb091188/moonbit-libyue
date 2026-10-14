@@ -163,6 +163,11 @@ pub fn scroll_view(
   @core.node_of_new(fn(viewport : @core.Widget) -> @core.Widget {
     watch_theme()
     viewport.node.set_flex_direction(@yoga.Column)
+    // 视口必须能缩到父给的尺寸：Yoga 的 flex 子项默认 min-size 为 auto，不写这两条
+    // 视口会被内容顶到自然高（内容多高它就多高），`max()` 恒为 0——真机表现就是
+    // 「内容超出窗口却滚不动」。
+    viewport.node.set_min_height(@yoga.fixed(0.0))
+    viewport.node.set_min_width(@yoga.fixed(0.0))
     // 散参数折进匿名块（class 在后即覆盖，§1.5 唯一去向）
     let lay = @style.empty_style()
     if width > 0.0 {
