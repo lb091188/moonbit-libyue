@@ -117,7 +117,7 @@ fn sysprobe_collect() -> String {
     }
     Err(e) => buf.write_string("不可用: \{e}\n")
   }
-  buf.write_string("\n== 显示器(xrandr,只读) ==\n")
+  buf.write_string("\n== 显示器(只读) ==\n")
   match @sys.mon_current() {
     Ok(outs) => {
       if outs.is_empty() {
