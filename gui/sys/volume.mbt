@@ -478,7 +478,41 @@ fn vol_backend() -> VolBackend? {
 ///|
 /// 当前系统是否支持音量控制（wpctl 或 pactl 任一可用）。每次调用真实
 /// 探测，高频场景请调用方自行缓存结果。
+///|
+/// Windows 直调：快照字节串「设备 id\t百分比\t静音」。
+#borrow(ok)
+extern "c" fn ffi_vol_get(ok : Ref[Int]) -> Bytes = "yue_sys_vol_get"
+
+///|
+/// Windows 直调：mode 0=设音量 1=设静音。
+#borrow(ok)
+extern "c" fn ffi_vol_write(mode : Int, value : Int, ok : Ref[Int]) -> Int = "yue_sys_vol_write"
+
+///|
+/// Windows 分支：默认渲染端点读数。
+fn vol_get_windows() -> Result[VolumeInfo, VolumeError] {
+  let ok = Ref(0)
+  let b = ffi_vol_get(ok)
+  if ok.val != 1 {
+    return Err(CommandFailed("IAudioEndpointVolume 读取失败"))
+  }
+  let parts = @utf8.decode_lossy(b).split("\t").to_array()
+  if parts.length() < 3 {
+    return Err(ParseFailed("vol: 快照段数不足"))
+  }
+  let pct = match win_parse_int(parts[1].to_owned()) {
+    Some(v) => v
+    None => return Err(ParseFailed("vol: 百分比段非法"))
+  }
+  let muted = parts[2].to_owned() == "1"
+  Ok({ sink: parts[0].to_owned(), volume: pct, muted })
+}
+
+///|
 pub fn vol_supported() -> Bool {
+  if sys_platform() == "windows" {
+    return true
+  }
   vol_backend() is Some(_)
 }
 
@@ -488,6 +522,9 @@ pub fn vol_supported() -> Bool {
 /// 查询（get-default-sink + get-sink-volume + get-sink-mute）；sink 名
 /// 为次要信息，取不到置空串不影响音量与静音。
 pub fn vol_get() -> Result[VolumeInfo, VolumeError] {
+  if sys_platform() == "windows" {
+    return vol_get_windows()
+  }
   match vol_backend() {
     None => Err(Unsupported)
     Some(Wpctl) => vol_get_wpctl()
@@ -572,6 +609,14 @@ fn vol_apply(prog : String, args : Array[String]) -> Result[Unit, VolumeError] {
 ///|
 /// 设绝对音量（0-100，出界钳制），作用于默认 sink。
 pub fn vol_set(percent : Int) -> Result[Unit, VolumeError] {
+  if sys_platform() == "windows" {
+    let ok = Ref(0)
+    let _ = ffi_vol_write(0, percent, ok)
+    if ok.val == 1 {
+      return Ok(())
+    }
+    return Err(CommandFailed("SetMasterVolumeLevelScalar 失败"))
+  }
   match vol_backend() {
     None => Err(Unsupported)
     Some(b) => vol_apply(vol_prog(b), vol_set_args(b, percent))
@@ -582,6 +627,22 @@ pub fn vol_set(percent : Int) -> Result[Unit, VolumeError] {
 /// 相对增减音量（delta 为正增、为负减，作用于默认 sink；每步量取绝对
 /// 值交给工具的相对语法执行，最终音量由工具侧钳制）。
 pub fn vol_add(delta : Int) -> Result[Unit, VolumeError] {
+  if sys_platform() == "windows" {
+    // 无相对语义的标量接口：读当前 → 钳制 → 写回
+    match vol_get_windows() {
+      Ok(cur) => {
+        let mut t = cur.volume + delta
+        if t < 0 {
+          t = 0
+        }
+        if t > 100 {
+          t = 100
+        }
+        return vol_set(t)
+      }
+      Err(e) => return Err(e)
+    }
+  }
   match vol_backend() {
     None => Err(Unsupported)
     Some(b) => vol_apply(vol_prog(b), vol_add_args(b, delta))
@@ -591,6 +652,14 @@ pub fn vol_add(delta : Int) -> Result[Unit, VolumeError] {
 ///|
 /// 设 / 取消默认 sink 静音。
 pub fn vol_set_mute(mute : Bool) -> Result[Unit, VolumeError] {
+  if sys_platform() == "windows" {
+    let ok = Ref(0)
+    let _ = ffi_vol_write(1, if mute { 1 } else { 0 }, ok)
+    if ok.val == 1 {
+      return Ok(())
+    }
+    return Err(CommandFailed("SetMute 失败"))
+  }
   match vol_backend() {
     None => Err(Unsupported)
     Some(b) => vol_apply(vol_prog(b), vol_mute_args(b, mute))

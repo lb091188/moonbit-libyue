@@ -28,6 +28,8 @@
 #include <string.h>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
+#define COBJMACROS
+#define CINTERFACE
 #include <windows.h>
 #include <wchar.h>
 #include <wctype.h>
@@ -35,6 +37,8 @@
 #include <shlobj.h> // SHCreateItemFromParsingName
 // ShellExecuteW（分离式启动）不在 LEAN_AND_MEAN 的窗口头集合里
 #include <shellapi.h>
+#include <mmdeviceapi.h>
+#include <endpointvolume.h>
 #else
 #include <dirent.h>
 #include <dlfcn.h> // 空闲查询的 X11/XSS 运行期取符号（W21e）
@@ -2426,3 +2430,123 @@ int64_t yue_sys_file_mtime(const char *path, int32_t *ok) {
   return 0;
 #endif
 }
+
+// ---------------------------------------------------------------------------
+// 平台批④：音量（IAudioEndpointVolume 直调）。vtable 槽位按 mmdeviceapi.h
+// 排（QI/AddRef/Release 之后）：IMMDeviceEnumerator::GetDefaultAudioEndpoint
+// 在槽 4，IMMDevice::Activate 在槽 3、GetId 在槽 5；IAudioEndpointVolume 的
+// Set/GetMasterVolumeLevelScalar 在槽 7/9、Set/GetMute 在槽 14/15。GUID 手写
+// （C 模式取不到 __uuidof，这三个也不在 uuid.lib）。
+// ---------------------------------------------------------------------------
+
+#if defined(_WIN32)
+static const GUID sys_guid_mmenum = {0xBCDE0395, 0xE52F, 0x467C, {0x8E, 0x3D, 0xC4, 0x57, 0x92, 0x91, 0x69, 0x2E}};
+static const GUID sys_guid_immdev = {0xA95664D2, 0x9614, 0x4F35, {0xA7, 0x46, 0xDE, 0x8D, 0xB6, 0x36, 0x17, 0xE6}};
+static const GUID sys_guid_epvol = {0x5CDF2C82, 0x841E, 0x4546, {0x97, 0x22, 0x0C, 0xF7, 0x40, 0x78, 0x22, 0x9A}};
+
+// 默认渲染端点的 IAudioEndpointVolume + 设备 ID；失败返回 0。
+static int sys_vol_open(IAudioEndpointVolume **ev, wchar_t **devid) {
+  IMMDeviceEnumerator *en = NULL;
+  IMMDevice *dev = NULL;
+  *ev = NULL;
+  *devid = NULL;
+  if (CoCreateInstance(&sys_guid_mmenum, NULL, CLSCTX_ALL, &sys_guid_immdev,
+                       (void **)&en) != S_OK ||
+      en == NULL) {
+    return 0;
+  }
+  if (en->lpVtbl->GetDefaultAudioEndpoint(en, 0 /*eRender*/,
+                                          1 /*eMultimedia*/, &dev) != S_OK ||
+      dev == NULL) {
+    en->lpVtbl->Release(en);
+    return 0;
+  }
+  if (dev->lpVtbl->Activate(dev, &sys_guid_epvol, CLSCTX_ALL, NULL,
+                            (void **)ev) != S_OK ||
+      *ev == NULL) {
+    dev->lpVtbl->Release(dev);
+    en->lpVtbl->Release(en);
+    return 0;
+  }
+  if (dev->lpVtbl->GetId(dev, devid) != S_OK) {
+    (*ev)->lpVtbl->Release(*ev);
+    dev->lpVtbl->Release(dev);
+    en->lpVtbl->Release(en);
+    *ev = NULL;
+    return 0;
+  }
+  dev->lpVtbl->Release(dev);
+  en->lpVtbl->Release(en);
+  return 1;
+}
+
+// 快照：返回「设备 id UTF-8\t百分比\t静音(0/1)」字节串（tab 分隔）。
+void *yue_sys_vol_get(int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  HRESULT ci = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+  if (ci != S_OK && ci != S_FALSE && ci != RPC_E_CHANGED_MODE) {
+    return moonbit_make_bytes(0, 0);
+  }
+  IAudioEndpointVolume *ev = NULL;
+  wchar_t *devid = NULL;
+  if (!sys_vol_open(&ev, &devid)) {
+    return moonbit_make_bytes(0, 0);
+  }
+  float level = 0.0f;
+  int muted = 0;
+  int good = ev->lpVtbl->GetMasterVolumeLevelScalar(ev, &level) == S_OK &&
+             ev->lpVtbl->GetMute(ev, &muted) == S_OK;
+  void *out = moonbit_make_bytes(0, 0);
+  if (good) {
+    void *idb = win_wide_bytes(devid);
+    const char *id = idb ? (const char *)idb : "";
+    char row[600];
+    int n = snprintf(row, sizeof(row), "%s\t%d\t%d", id,
+                     (int)(level * 100.0f + 0.5f), muted ? 1 : 0);
+    out = moonbit_make_bytes(n, 0);
+    memcpy(out, row, (size_t)n);
+    *ok = 1;
+  }
+  CoTaskMemFree(devid);
+  ev->lpVtbl->Release(ev);
+  return out;
+#else
+  return moonbit_make_bytes(0, 0);
+#endif
+}
+
+// 写操作：mode 0=设音量(percent) 1=设静音(mute)。
+int32_t yue_sys_vol_write(int32_t mode, int32_t value, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  HRESULT ci = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+  if (ci != S_OK && ci != S_FALSE && ci != RPC_E_CHANGED_MODE) {
+    return 0;
+  }
+  IAudioEndpointVolume *ev = NULL;
+  wchar_t *devid = NULL;
+  if (!sys_vol_open(&ev, &devid)) {
+    return 0;
+  }
+  HRESULT hr = E_FAIL;
+  if (mode == 0) {
+    float f = value <= 0 ? 0.0f : (value >= 100 ? 1.0f : value / 100.0f);
+    hr = ev->lpVtbl->SetMasterVolumeLevelScalar(ev, f, NULL);
+  } else {
+    hr = ev->lpVtbl->SetMute(ev, value != 0, NULL);
+  }
+  CoTaskMemFree(devid);
+  ev->lpVtbl->Release(ev);
+  if (hr == S_OK) {
+    *ok = 1;
+  }
+  return 0;
+#else
+  (void)mode;
+  (void)value;
+  return 0;
+#endif
+}
+
+#endif /* 平台批④音量段的 _WIN32 包裹 */
