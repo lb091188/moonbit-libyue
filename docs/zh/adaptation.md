@@ -1806,6 +1806,14 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **通用口径**:`Option` 承载「两种不同的无」迟早出这类事故——同一个 `None` 表示「整窗」又表示「空集」时,任何「往累积里并一笔」的操作都会把强语义写成弱语义。要么加一位标志(本批做法),要么换成显式枚举(`Whole | Region(Rect)`)。
 - **验证**:core 新增 1 条纯函数回归(未请求整窗时照常累积成并集;已请求整窗时局部置脏不得写成小矩形;裁剪框整窗优先),`moon test core` 133/133、分包全跑 882/882(13 包逐个绿)、`cd gui && moon check --deny-warn` 零警告。真机复验(用户执行):showcase 切段/切页后**鼠标不动**应立即看到新页,复跑 `moon run examples/showcase` 退出贴 `SHOWCASE-PROF` 行(`frames` 不应因这一改动上涨——只在同批已有整窗请求时维持整窗语义)。
 
+## 文本帧级批的三件桩双定义:Linux 链接失败(2026-10-14,`moon run examples/showcase` 当场报)
+
+- **现象**:`/usr/bin/ld: ... multiple definition of pt_flush`(以及 `pt_flush_if_overlap`/`pt_set_batching`),两处分别是 `gui/build/libyue_text_pango.a(stub.o)` 与 `_build/native/debug/build/NoahLiu/native-gui/text/libtext-*.a(stub.o)`——同一个 `stub.c` 的两个编译产物。
+- **根因**:Linux 上 `gui/text/stub.c` **被编译两次**:prebuild 带 `-DWM_STUB_PANGO` 编进 `build/libyue_text_pango.a`(真实现),moon 的 native-stub 拿不到 pango 头、不带宏再编一次——那次**必须落空**(文件末尾的注释就写着这条纪律:落不进任何分支、编成空翻译单元,真实现由归档提供)。帧级文本批新增的三件写在文件最外层 `#endif` 之后的 `#ifndef _WIN32` 里,落在所有分支之外 ⇒ 两次编译各出一份。Windows 侧靠 `_WIN32` 排除躲过了,Linux 侧没躲过。
+- **修复**:三件挪进分支——`WM_STUB_PANGO` 分支一份(Pango 逐段即绘即混、不攒批,冲刷是空操作)、`#elif !defined(__linux__)` 分支一份(macOS 占位);Windows 的真实现仍只在 `dwrite_text.cpp`;Linux 的 native-stub 那次继续编成空 TU。
+- **通用口径**:往 `gui/text/stub.c`(同构的还有 `render`/`win` 等按「单一 stub.c 多分支 + prebuild 宏」组织的平台桩)加跨平台函数,只能加进**已有分支**或新开一条 `#elif`,写在最外层 `#endif` 之后就会与 prebuild 归档双定义。判据一条命令:`nm --defined-only _build/native/debug/build/NoahLiu/native-gui/text/libtext-*.a | grep -c <符号名>` 应为 **0**。
+- **验证**:`moon build examples/showcase --target native` 从 workspace 根与 `examples` 模块各跑一次都通过、`showcase.exe` 出件;`nm` 复验 moon 侧归档里 `pt_flush` 定义数 0;`cd gui && moon check --deny-warn` 零警告、text+core+ui+render 360/360。
+
 ## 页面构造期排的定时器永不触发:图表页一直「暂无数据」(2026-10-14,真机反馈)
 
 - **现象**:showcase「图表 → 折线」两段画布恒为「暂无数据」、y 轴停在 0..1,仪表盘也不动;「暂停推点」勾与不勾都没反应(这条正是早前那条「点线图推点按钮没用」反馈的剩余部分)。

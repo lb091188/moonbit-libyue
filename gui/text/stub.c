@@ -917,6 +917,27 @@ int pt_family_available(const char *name, int len) {
   return 0;
 }
 
+/* 帧级文本批的 Pango 侧：Pango 逐段即绘即混、没有攒批窗口，冲刷是空操作。
+ * 刻意定义在本分支内而不是文件末尾：Linux 上这个文件被编两次（prebuild 带
+ * -DWM_STUB_PANGO 编进 build/libyue_text_pango.a、moon 的 native-stub 不带宏
+ * 再编一次），写在分支外（如 #ifndef _WIN32）两边各出一份，链接期即
+ * multiple definition。 */
+int pt_flush(void) {
+  return 0;
+}
+
+int pt_flush_if_overlap(int x0, int y0, int x1, int y1) {
+  (void)x0;
+  (void)y0;
+  (void)x1;
+  (void)y1;
+  return 0;
+}
+
+void pt_set_batching(int on) {
+  (void)on;
+}
+
 #elif defined(_WIN32)
 
 // Windows 的 DirectWrite 实现住在同包的 dwrite_text.cpp：dwrite.h 在本 SDK 是
@@ -1047,12 +1068,7 @@ int rt_draw_cr(int64_t cr_id, int64_t h, double x, double y, double box_w,
 }
 
 
-#endif
-
-#ifndef _WIN32
-// 帧级文本批的跨平台桩：Pango/mac 分支逐段即绘即混无批，冲刷为空操作
-//（Windows 的真实现取自 dwrite_text.cpp；本文件若与它同链会双定义，故
-// 用 _WIN32 排除）。
+/* 占位三件：与上面 pt_* 占位同性质（CoreText 侧待真机）。同样必须落在分支内。 */
 int pt_flush(void) {
   return 0;
 }
@@ -1068,6 +1084,7 @@ int pt_flush_if_overlap(int x0, int y0, int x1, int y1) {
 void pt_set_batching(int on) {
   (void)on;
 }
+
 #endif
 
 // Linux 上 native-stub 的那次编译（无 WM_STUB_PANGO、且 __linux__ 成立）落不进任何分支，
