@@ -418,10 +418,24 @@ def link_configs() -> dict:
                 "package": SYS_PACKAGE,
                 "link_flags": win_flags + " " + " ".join(MAC_SYS_FRAMEWORKS),
             })
-        # render / text / web 三支的 macOS 后端各成一批：它们的桩在拿到
-        # 自己的 WM_STUB_MAC 分支之前仍由 native-stub 编占位分支，本批不下发
-        # 对应归档——否则占位分支会被编两遍（native-stub 一趟 + 本脚本一趟），
-        # 链接期报重复定义。接入顺序 render → text → web，每批同时补这里的条目。
+        # render：图片解码走 ImageIO（CGImageSource）+ 落盘。光栅部分仍是纯
+        # MoonBit 光栅器，cr_* 一族在 mac 分支是「探测即不可用」的桩，与 Windows
+        # 同口径。
+        render_lib = compile_mac_stub(
+            MODULE_ROOT / "render" / "stub.c",
+            "librender_mac_stub.a",
+            ["-DWM_STUB_MAC"],
+        )
+        if render_lib:
+            entries.append({
+                "package": RENDER_PACKAGE,
+                "link_flags": f"-L{BUILD_DIR.as_posix()} -lrender_mac_stub "
+                + " ".join(MAC_RENDER_FRAMEWORKS),
+            })
+        # text / web 的 macOS 后端各成一批：它们的桩在拿到自己的 WM_STUB_MAC
+        # （web 为 WB_HAVE_WKWEBVIEW）分支之前仍由 native-stub 编占位分支，本批
+        # 不下发对应归档——否则占位分支会被编两遍（native-stub 一趟 + 本脚本
+        # 一趟），链接期报重复定义。接入顺序 text → web，每批同时补这里的条目。
     return {"link_configs": entries}
 
 

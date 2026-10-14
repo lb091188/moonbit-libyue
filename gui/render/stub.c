@@ -849,7 +849,279 @@ int fsw_write_file(const char *path, int plen, unsigned char *data, int dlen) {
   return ok ? 1 : 0;
 }
 
-#elif !defined(__linux__)
+#elif defined(WM_STUB_MAC)
+
+// ---------------- macOS 后端（ImageIO 解码，prebuild 专编） ----------------
+//
+// 与 Windows 同一口径：光栅部分仍是纯 MoonBit 光栅器，`cr_*` 一族给「探测即
+// 不可用」的桩（`cr_begin` 返回 0 → painter 选纯路径）；只有解码借系统能力，
+// 走 ImageIO 的 `CGImageSource`（PNG/JPEG/GIF/WebP 随系统版本扩展，零第三方）。
+//
+// 一条与 Linux/Windows 不同的取整差（记档在 docs/zh/adaptation.md）：Quartz 的
+// 合成分全在**预乘**空间里做，本层拿不到非预乘的 32bpp RGB 画布
+// （CGBitmapContext 对 RGB 只认 Premultiplied*/NoneSkip*），所以像素直接以
+// 预乘 BGRA 落缓冲，不再走各平台那句 `(c*a+127)/255`。字节序与语义不变，
+// 只有预乘那一步的舍入归 Quartz——「编码→解码→再编码逐字节稳定」的判据在
+// macOS 侧按「与 ImageIO 自身一致」看，不能与另两平台逐字节对齐。
+
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#import <CoreFoundation/CoreFoundation.h>
+#import <CoreGraphics/CoreGraphics.h>
+#import <ImageIO/ImageIO.h>
+
+int64_t cr_begin(unsigned char *data, int width, int height) {
+  (void)data; (void)width; (void)height; return 0;
+}
+void cr_end(int64_t id) { (void)id; }
+void cr_begin_path(int64_t id) { (void)id; }
+void cr_close_path(int64_t id) { (void)id; }
+void cr_move_to(int64_t id, double x, double y) { (void)id; (void)x; (void)y; }
+void cr_line_to(int64_t id, double x, double y) { (void)id; (void)x; (void)y; }
+void cr_bezier_to(int64_t id, double a, double b, double c, double d, double e,
+                  double f) {
+  (void)id; (void)a; (void)b; (void)c; (void)d; (void)e; (void)f;
+}
+void cr_arc(int64_t id, double cx, double cy, double r, double a0, double a1) {
+  (void)id; (void)cx; (void)cy; (void)r; (void)a0; (void)a1;
+}
+void cr_fill(int64_t id) { (void)id; }
+void cr_stroke(int64_t id) { (void)id; }
+void cr_fill_rect(int64_t id, double x, double y, double w, double h) {
+  (void)id; (void)x; (void)y; (void)w; (void)h;
+}
+void cr_stroke_rect(int64_t id, double x, double y, double w, double h) {
+  (void)id; (void)x; (void)y; (void)w; (void)h;
+}
+void cr_set_fill_rgba(int64_t id, int r, int g, int b, int a) {
+  (void)id; (void)r; (void)g; (void)b; (void)a;
+}
+void cr_set_stroke_rgba(int64_t id, int r, int g, int b, int a) {
+  (void)id; (void)r; (void)g; (void)b; (void)a;
+}
+void cr_set_line_width(int64_t id, double w) { (void)id; (void)w; }
+void cr_save(int64_t id) { (void)id; }
+void cr_restore(int64_t id) { (void)id; }
+void cr_translate(int64_t id, double dx, double dy) { (void)id; (void)dx; (void)dy; }
+void cr_scale(int64_t id, double sx, double sy) { (void)id; (void)sx; (void)sy; }
+void cr_rotate(int64_t id, double rad) { (void)id; (void)rad; }
+void cr_clip_rect(int64_t id, double x, double y, double w, double h) {
+  (void)id; (void)x; (void)y; (void)w; (void)h;
+}
+void cr_set_operator(int64_t id, int mode) { (void)id; (void)mode; }
+int64_t cr_grad_linear(double x0, double y0, double x1, double y1) {
+  (void)x0; (void)y0; (void)x1; (void)y1; return 0;
+}
+int64_t cr_grad_radial(double cx, double cy, double r0, double r1) {
+  (void)cx; (void)cy; (void)r0; (void)r1; return 0;
+}
+void cr_grad_stop(int64_t pid, double offset, int r, int g, int b, int a) {
+  (void)pid; (void)offset; (void)r; (void)g; (void)b; (void)a;
+}
+void cr_grad_apply(int64_t id, int64_t pid) { (void)id; (void)pid; }
+void cr_grad_drop(int64_t pid) { (void)pid; }
+void cr_flush(int64_t id) { (void)id; }
+void cr_blit(int64_t id, unsigned char *src, int sw, int sh, double sx,
+             double sy, double ssw, double ssh, double dx, double dy,
+             double dw, double dh) {
+  (void)id; (void)src; (void)sw; (void)sh; (void)sx; (void)sy; (void)ssw;
+  (void)ssh; (void)dx; (void)dy; (void)dw; (void)dh;
+}
+
+// ---- 静态图 ----
+
+#define IMG_MAX 8
+
+typedef struct {
+  CGImageRef img; // +1 归本表，img_free 里 CGImageRelease
+  int w;
+  int h;
+} MacImg;
+
+static MacImg img_slots[IMG_MAX];
+
+static int64_t img_take(CGImageRef img, int w, int h) {
+  if (img == NULL || w < 1 || h < 1) {
+    if (img != NULL) {
+      CGImageRelease(img);
+    }
+    return 0;
+  }
+  for (int i = 1; i < IMG_MAX; i++) {
+    if (img_slots[i].img == NULL) {
+      img_slots[i].img = img;
+      img_slots[i].w = w;
+      img_slots[i].h = h;
+      return (int64_t)i;
+    }
+  }
+  CGImageRelease(img);
+  return 0;
+}
+
+static CGImageSourceRef source_from_bytes(const void *data, size_t len) {
+  CFDataRef d = CFDataCreate(NULL, (const UInt8 *)data, (CFIndex)len);
+  if (d == NULL) {
+    return NULL;
+  }
+  CGImageSourceRef s = CGImageSourceCreateWithData(d, NULL);
+  CFRelease(d);
+  return s;
+}
+
+static int64_t img_decode_with_source(CGImageSourceRef src) {
+  if (src == NULL) {
+    return 0;
+  }
+  CGImageRef img = CGImageSourceCreateImageAtIndex(src, 0, NULL);
+  int64_t h = 0;
+  if (img != NULL) {
+    h = img_take(img, (int)CGImageGetWidth(img), (int)CGImageGetHeight(img));
+  }
+  CFRelease(src);
+  return h;
+}
+
+int64_t img_decode_bytes(unsigned char *data, int len) {
+  if (data == NULL || len < 1) {
+    return 0;
+  }
+  return img_decode_with_source(source_from_bytes((const void *)data, (size_t)len));
+}
+
+int64_t img_decode_file(const char *path, int len) {
+  if (path == NULL || len < 1) {
+    return 0;
+  }
+  char buf[4096];
+  if (len >= (int)sizeof(buf)) {
+    return 0;
+  }
+  memcpy(buf, path, (size_t)len);
+  buf[len] = '\0';
+  CFStringRef p = CFStringCreateWithCString(NULL, buf, kCFStringEncodingUTF8);
+  if (p == NULL) {
+    return 0;
+  }
+  CFURLRef url = CFURLCreateWithFileSystemPath(NULL, p, kCFURLPOSIXPathStyle, false);
+  CGImageSourceRef src = url != NULL ? CGImageSourceCreateWithURL(url, NULL) : NULL;
+  if (url != NULL) {
+    CFRelease(url);
+  }
+  CFRelease(p);
+  return img_decode_with_source(src);
+}
+
+static CGImageRef img_of(int64_t h) {
+  if (h <= 0 || h >= IMG_MAX) {
+    return NULL;
+  }
+  return img_slots[h].img;
+}
+
+int img_w(int64_t h) {
+  if (h <= 0 || h >= IMG_MAX) {
+    return 0;
+  }
+  return img_slots[h].w;
+}
+
+int img_h(int64_t h) {
+  if (h <= 0 || h >= IMG_MAX) {
+    return 0;
+  }
+  return img_slots[h].h;
+}
+
+// 把 CGImage 画进调用方缓冲：预乘 BGRA（小端 B,G,R,A），与本栈 Bitmap 同源。
+// CGBitmapContext 的数据顺序是「内存首行 = 顶行」，而用户空间原点在左下，
+// 两者相互抵消，于是 CGContextDrawImage 直出正置像素（不需要翻 y）。
+static int draw_cg_to_bgra(CGImageRef img, unsigned char *out, int w, int h) {
+  if (img == NULL || out == NULL || w < 1 || h < 1) {
+    return 0;
+  }
+  CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+  CGContextRef ctx = CGBitmapContextCreate(
+      out, (size_t)w, (size_t)h, 8, (size_t)w * 4, cs,
+      (CGBitmapInfo)(kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little));
+  if (cs != NULL) {
+    CGColorSpaceRelease(cs);
+  }
+  if (ctx == NULL) {
+    return 0;
+  }
+  CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), img);
+  CGContextFlush(ctx);
+  CFRelease(ctx);
+  return 1;
+}
+
+int img_copy(int64_t h, unsigned char *out) {
+  if (h <= 0 || h >= IMG_MAX) {
+    return 0;
+  }
+  return draw_cg_to_bgra(img_slots[h].img, out, img_slots[h].w, img_slots[h].h);
+}
+
+void img_free(int64_t h) {
+  if (h > 0 && h < IMG_MAX && img_slots[h].img != NULL) {
+    CGImageRelease(img_slots[h].img);
+    img_slots[h].img = NULL;
+    img_slots[h].w = 0;
+    img_slots[h].h = 0;
+  }
+}
+
+// ---- 动图（GIF）：macOS 本批退回静帧 ----
+//
+// ImageIO 给的是**原始子矩形帧**（与 WIC 同一条事实：它不替调用方合成），整幅
+// 合成要逐帧读「帧矩形 + disposal」两项，而它们在 ImageIO 里的公开程度不够确定
+// （disposal 不在 Apple 的 GIF 属性清单上）。没有真机可回证时硬写，错的形态是
+// 「动图错位/残影」这类肉眼难判的画面问题，所以本批按平台既有降级口径走：
+// `img_anim_decode_file` 给 0 = 解不出动图，`ui/gif` 组件退回**首帧静图**
+// （静态解码那条路仍取首帧，图不丢）。缺口记 TODO.md「mac 平台批」，真机上用
+// experiment 探针把属性键回证后再补。
+int64_t img_anim_decode_file(const char *path, int len) {
+  (void)path; (void)len; return 0;
+}
+int img_anim_is_static(int64_t h) { (void)h; return 1; }
+int img_anim_w(int64_t h) { (void)h; return 0; }
+int img_anim_h(int64_t h) { (void)h; return 0; }
+int img_anim_delay_ms(int64_t h) { (void)h; return 0; }
+int img_anim_frame(int64_t h) { (void)h; return -1; }
+int img_anim_advance(int64_t h) { (void)h; return 0; }
+int img_anim_copy(int64_t h, unsigned char *out) { (void)h; (void)out; return 0; }
+void img_anim_free(int64_t h) { (void)h; }
+
+// 落盘（PNG 导出用）：纯写字节，与后端无关，POSIX 路径即可。
+int fsw_write_file(const char *path, int plen, unsigned char *data, int dlen) {
+  if (path == NULL || plen < 1 || dlen < 0) {
+    return 0;
+  }
+  char buf[4096];
+  if (plen >= (int)sizeof(buf)) {
+    return 0;
+  }
+  memcpy(buf, path, (size_t)plen);
+  buf[plen] = '\0';
+  FILE *f = fopen(buf, "wb");
+  if (f == NULL) {
+    return 0;
+  }
+  size_t written = dlen > 0 ? fwrite(data, 1, (size_t)dlen, f) : 0;
+  int ok = fclose(f) == 0 && written == (size_t)dlen;
+  return ok ? 1 : 0;
+}
+
+void *cr_session_context(int64_t id) {
+  (void)id;
+  return NULL;
+}
+
+#elif !defined(__linux__) && !defined(__APPLE__)
 
 // 其余平台的后端随各自窗口层落地时补。
 

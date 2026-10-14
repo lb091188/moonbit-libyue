@@ -3,14 +3,16 @@ import {
   "moonbitlang/core/math",
 }
 
-// stub.c 一个文件两条分支：WM_STUB_CAIRO 真实现（cairo 光栅 + GdkPixbuf 解码）
+// stub.c 一个文件三条分支：WM_STUB_CAIRO 真实现（cairo 光栅 + GdkPixbuf 解码）
 // 仅由 scripts/prebuild.py 在 Linux 带 -DWM_STUB_CAIRO + pkg-config 头编成
 // build/librender_cairo_stub.a 经 link_flags 传入（native-stub 拿不到 cairo 头
-// 路径，实测同 G0 探针）；非 Linux 走 native-stub 自编的那条分支——Windows 的
-// 光栅部分是占位（真渲染是纯 MoonBit 光栅器，plan 矩阵定案，运行时探针
-// cr_begin 返回 0 即选纯路径），**图片解码则已实装**（W9，走 WIC 系统组件，
-// 链接参数由 prebuild 下发）；macOS 两件都还是占位。链接参数按 AGENTS 规则 1
-// 全部由 prebuild 托管。
+// 路径，实测同 G0 探针）；WM_STUB_MAC 真解码（ImageIO，Objective-C）仅由
+// prebuild 在 Darwin 带 -x objective-c 编成 build/librender_mac_stub.a；非 Linux
+// 走 native-stub 自编的那条分支——Windows 与 macOS 的光栅部分都是占位（真渲染
+// 是纯 MoonBit 光栅器，plan 矩阵定案，运行时探针 cr_begin 返回 0 即选纯路径），
+// **图片解码两支都已实装**（Windows WIC / macOS ImageIO；macOS 的 GIF 动图暂退
+// 回静帧，缺口见 TODO.md「mac 平台批」）。链接参数按 AGENTS 规则 1 全部由
+// prebuild 托管。
 supported_targets = "native"
 
 options(

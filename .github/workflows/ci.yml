@@ -47,6 +47,12 @@ jobs:
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
+      # 新装 runner 的注册表索引里查不到 prowk/moonsqlitefile 与 mizchi/markdown
+      # （三平台同一个报错：module was not found in the registry），moon 自己
+      # 也给出口令 `you may need to run moon update`——先刷索引再解析依赖图。
+      - name: 刷新注册表索引
+        run: moon update
+
       - name: 静态检查(库模块)
         working-directory: gui
         run: moon check
@@ -116,6 +122,10 @@ jobs:
         run: |
           $py = (Get-Command python).Source
           Copy-Item $py "$env:USERPROFILE\.moon\bin\python3.exe"
+
+      - name: 刷新注册表索引(同 Linux job)
+        shell: pwsh
+        run: moon update
 
       # vcvars64 用 vswhere 定位(不依赖 VS 具体版本/Edition 路径):moon 的
       # native-stub 与 --target native 都要 cl.exe/链接器在 PATH 里。
@@ -190,6 +200,24 @@ jobs:
       # macOS 的原生层是 Objective-C(stub.c 的 WM_STUB_MAC 分支由 prebuild 带
       # -x objective-c 专编成静态库),链接器与 SDK 头由 runner 自带的 Xcode
       # Command Line Tools 提供,无需额外安装——这也是本 job 唯一的编译期依赖。
+      # 起手把依赖的框架列出来:缺哪个就在日志里直说,不用等编译报错再猜。
+      - name: 核对 SDK 框架齐备
+        run: |
+          xcrun --show-sdk-path
+          sdk="$(xcrun --show-sdk-path)/System/Library/Frameworks"
+          for f in Cocoa CoreGraphics CoreText ImageIO WebKit Carbon IOKit; do
+            if [ ! -d "$sdk/$f.framework" ]; then
+              echo "::error title=缺框架::$sdk/$f.framework 不存在"
+              exit 1
+            fi
+          done
+          echo "框架齐备: Cocoa/CoreGraphics/CoreText/ImageIO/WebKit/Carbon/IOKit"
+
+      # 新装 runner 的注册表索引里查不到 prowk/moonsqlitefile 与 mizchi/markdown
+      # (三平台同一个报错: module was not found in the registry),先刷索引。
+      - name: 刷新注册表索引
+        run: moon update
+
       - name: 静态检查(库模块)
         working-directory: gui
         run: moon check
