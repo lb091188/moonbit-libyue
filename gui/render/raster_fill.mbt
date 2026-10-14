@@ -71,17 +71,20 @@ fn fill_polys(
   let x0 = raster_max_i(bx0.floor().to_int(), cx0)
   let y0 = raster_max_i(by0.floor().to_int(), cy0)
   let x1 = raster_min_i((bx1 + 1.0).ceil().to_int(), cx1)
-  let y1 = raster_min_i((by1 + 1.0).ceil().to_int(), cy1)
+  let y1 = raster_min_i((by1 + 1.0).ceil().to_int(), cx1)
   if x1 <= x0 || y1 <= y0 {
     return
   }
   let width = bm.width
   let cov : FixedArray[Int] = FixedArray::make(width, 0)
-  // 跨点暂存（跨行/跨子采样复用，**零分配**）：x / 环绕方向 / 该边 x 随 y 斜率
-  // 三个刮擦数组 + 索引数组（Int 不装箱）。排序用 sort_by（O(n log n)）：描边
-  // 轮廓的跨点数 = 2×边数，旧插入排序 O(n²) 在 160+ 跨点 × 4 子采样 × 每行
-  // 重排下是折线/图表描边的主要开销；三元组直 push 会每跨点装箱一次（实测
-  // 5.7 万次分配/帧），刮擦数组 + 索引排序把分配降为零。
+  // ---- 增量活动边表（AET，pixman 同构）----
+  // GET（全局边表）按 y_lo 排序一次；扫描线推进时每子采样只做「失活压缩 /
+  // 新边激活 / x 全精度重算 + 近有序插入排序」，不再每子采样全边重扫（旧实
+  // 现 O(行×4×全边) 的遍历 + O(n²) 插入排序都在这里）。边激活区间 [y_lo,
+  // y_hi) 与旧跨点判定 (ay<=ys)!=(by<=ys) 逐位等价；水平边不跨样本行，建表
+  // 即排除。gx_t/gs/gx1/gy1 保存**原始遍历方向**的端点 (ax, ay, bx2, by2)：
+  // 激活/重算的 x 必须与旧跨点公式 ax + (bx-ax)×t 逐位一致（同一数学值的
+  // 不同表达式会有末位差，边界像素覆盖量化翻转，像素断言实测抓红）。
   let mut total_edges = 0
   for poly in polys {
     let n = poly.pts.length()
@@ -89,10 +92,48 @@ fn fill_polys(
       total_edges += n
     }
   }
-  let sx : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
-  let sw : FixedArray[Int] = FixedArray::make(total_edges + 1, 0)
-  let sl : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
-  let idx : Array[Int] = []
+  let gy_t : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
+  let gy_b : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
+  let gx_t : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
+  let gs : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
+  let gx1 : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
+  let gy1 : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
+  let gw : FixedArray[Int] = FixedArray::make(total_edges + 1, 0)
+  let gidx : Array[Int] = []
+  let mut ge = 0
+  for poly in polys {
+    let pts = poly.pts
+    let n = pts.length()
+    if n < 2 {
+      continue
+    }
+    // fill 语义：open 折线自动闭到首点——末边 pts[n-1]→pts[0] 就是环绕边，
+    // 两种形态都是 n 条边（open 写 n+1 会 pts[n] 越界，真窗口实测）
+    for k = 0; k < n; k = k + 1 {
+      let (ax, ay) = pts[k]
+      let (bx2, by2) = pts[if k + 1 < n { k + 1 } else { 0 }]
+      if ay == by2 {
+        continue
+      }
+      gy_t[ge] = if ay < by2 { ay } else { by2 }
+      gy_b[ge] = if ay < by2 { by2 } else { ay }
+      gx_t[ge] = ax
+      gs[ge] = ay
+      gx1[ge] = bx2
+      gy1[ge] = by2
+      gw[ge] = if by2 > ay { 1 } else { -1 }
+      ge += 1
+    }
+  }
+  for i = 0; i < ge; i = i + 1 {
+    let _ = gidx.push(i)
+  }
+  gidx.sort_by(fn(a, b) { gy_t[a].compare(gy_t[b]) })
+  // AET 并行数组：边号 + 当前子采样行的 x
+  let aet_e : FixedArray[Int] = FixedArray::make(total_edges + 1, 0)
+  let aet_x : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
+  let mut aet_len = 0
+  let mut gp = 0 // GET 激活指针（y_lo 单调递增，只前进）
   for y = y0; y < y1; y = y + 1 {
     for i = x0; i < x1; i = i + 1 {
       cov[i] = 0
@@ -101,54 +142,68 @@ fn fill_polys(
     let mut ink_r = x0
     for sub = 0; sub < 4; sub = sub + 1 {
       let ys = y.to_double() + (sub.to_double() + 0.5) / 4.0
-      idx.clear()
-      let mut nc = 0
-      for poly in polys {
-        let pts = poly.pts
-        let n = pts.length()
-        if n < 2 {
-          continue
-        }
-        // fill 语义：open 折线自动闭到首点——末边 pts[n-1]→pts[0] 就是环绕边，
-        // 两种形态都是 n 条边（open 写 n+1 会 pts[n] 越界，真窗口实测）
-        for k = 0; k < n; k = k + 1 {
-          let (ax, ay) = pts[k]
-          let (bx2, by2) = pts[if k + 1 < n { k + 1 } else { 0 }]
-          if (ay <= ys) != (by2 <= ys) {
-            let t = (ys - ay) / (by2 - ay)
-            sx[nc] = ax + (bx2 - ax) * t
-            sw[nc] = if by2 > ay { 1 } else { -1 }
-            sl[nc] = (bx2 - ax) / (by2 - ay)
-            nc += 1
-          }
+      // 老边重算 x：与旧跨点公式同式（x = ax + (bx-ax)×t）——不用增量步进，
+      // 步进的浮点漂移会让边界像素覆盖量化翻转（像素断言实测抓红）；AET 的
+      // 收益在「边不逐子采样全重扫」。
+      for i = 0; i < aet_len; i = i + 1 {
+        let e = aet_e[i]
+        let t = (ys - gs[e]) / (gy1[e] - gs[e])
+        aet_x[i] = gx_t[e] + (gx1[e] - gx_t[e]) * t
+      }
+      // 失活压缩：y_hi <= ys 的边出表
+      let mut w2 = 0
+      for i = 0; i < aet_len; i = i + 1 {
+        let e = aet_e[i]
+        if gy_b[e] > ys {
+          aet_e[w2] = e
+          aet_x[w2] = aet_x[i]
+          w2 += 1
         }
       }
-      for i = 0; i < nc; i = i + 1 {
-        let _ = idx.push(i)
+      aet_len = w2
+      // 激活：y_lo <= ys 且 y_hi > ys（GET 按 y_lo 排序后的 gidx 走指针）
+      while gp < ge {
+        let e = gidx[gp]
+        if gy_t[e] > ys {
+          break
+        }
+        if gy_b[e] > ys {
+          aet_e[aet_len] = e
+          let t = (ys - gs[e]) / (gy1[e] - gs[e])
+          aet_x[aet_len] = gx_t[e] + (gx1[e] - gx_t[e]) * t
+          aet_len += 1
+        }
+        gp += 1
       }
-      if nc == 0 {
-        continue
+      // 按 x 插入排序（AET 近有序，几乎线性；新激活边只在行首少量进入）
+      for i = 1; i < aet_len; i = i + 1 {
+        let xv = aet_x[i]
+        let ei = aet_e[i]
+        let mut j = i - 1
+        while j >= 0 && aet_x[j] > xv {
+          aet_x[j + 1] = aet_x[j]
+          aet_e[j + 1] = aet_e[j]
+          j -= 1
+        }
+        aet_x[j + 1] = xv
+        aet_e[j + 1] = ei
       }
-      idx.sort_by(fn(a, b) { sx[a].compare(sx[b]) })
-      // 扫描：非零区间计入覆盖（wind 回零处收区间）。
-      // pixman 同款口径：跨点区间内「四样本全入」的整段像素直取 256（免逐
-      // 样本判断），只有跨度两端的至多一个边界像素做采样；墨迹范围记录下来，
-      // 合成只扫有墨区间（bbox 宽度里通常九成是空的）。
+      // 环绕扫 span（非零环绕；口径与旧实现逐位一致）：满覆盖内段直取 256，
+      // 跨度两端的边界像素按采样计，墨迹范围记录下来只合成有墨区间
       let mut wind = 0
       let mut xa = 0.0
-      for i2 = 0; i2 < nc; i2 = i2 + 1 {
-        let ci = idx[i2]
-        let xb = sx[ci]
+      for i2 = 0; i2 < aet_len; i2 = i2 + 1 {
+        let xb = aet_x[i2]
         if wind != 0 && xb > xa {
-          // 满覆盖内段：四样本全入的像素 [ceil(xa-0.125), ceil(xb-0.875))
           let s0 = (xa - 0.125).ceil().to_int()
           let s1 = (xb - 0.875).ceil().to_int() - 1
           let mut t0 = -1
           let mut t1 = -1
           if s0 > s1 {
-            // 跨度不足一像素：单像素按采样计
+            // 跨度不足一像素：可能仍骑在两个像素上（如 [10.6, 11.4)），
+            // 覆盖范围 = [floor(xa), ceil(xb))，逐像素按采样计
             let p0 = raster_max_i(xa.floor().to_int(), x0)
-            let p1 = raster_min_i(xa.floor().to_int() + 1, x1)
+            let p1 = raster_min_i(xb.ceil().to_int(), x1)
             for px = p0; px < p1; px = px + 1 {
               add_pixel_samples(cov, x0, x1, px, xa, xb)
             }
@@ -168,8 +223,9 @@ fn fill_polys(
             if s0 - 1 >= x0 && s0 - 1 < a0 {
               t0 = s0 - 1
             }
+            // 右边界像素 s1+1 的合成上界是**开区间** s1+2
             if s1 + 1 < x1 && s1 + 1 > a1 - 1 {
-              t1 = s1 + 1
+              t1 = s1 + 2
             }
             if t0 < 0 {
               t0 = a0
@@ -190,7 +246,7 @@ fn fill_polys(
             }
           }
         }
-        wind = wind + sw[ci]
+        wind = wind + gw[aet_e[i2]]
         xa = xb
       }
     }
