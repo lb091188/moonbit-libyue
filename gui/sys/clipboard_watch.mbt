@@ -1,4 +1,5 @@
-// 剪贴板文本监听：经 xclip 只读轮询系统剪贴板（X11 CLIPBOARD 选区），
+// 剪贴板文本监听：Linux 优先经 GtkClipboard 只读轮询（与 `clipboard.mbt`
+// 同一档后端选择，进程内取值、无子进程开销），没有 GTK 时退回 xclip，
 // 文本内容变化时通过回调派发新文本。命令路线经 procrun 的 [pr_run]
 // （spawn → 限时回收 → 捕获 stdout），不自行 spawn。
 //
@@ -98,9 +99,25 @@ fn cbw_first_line(s : String) -> String {
 // ---------------------------------------------------------------------------
 
 ///|
-/// 读剪贴板当前文本（xclip -selection clipboard -o，只读；文本原样返回，
-/// 不做去空白）。xclip 缺失（退出码 127）或无 X 会话时为对应 Err。
+/// 读剪贴板当前文本（只读；文本原样返回，不做去空白）。Linux 有 GTK 后端时
+/// 走进程内取值，否则经 xclip；xclip 缺失（退出码 127）或无 X 会话时给
+/// `Unsupported`。
 pub fn cbw_get_text() -> Result[String, ClipboardError] {
+  if linux_on_gtk_clipboard() {
+    let ok = Ref(0)
+    let bytes = ffi_clipboard_gtk_get_text(ok)
+    if ok.val == 1 {
+      Ok(@utf8.decode_lossy(bytes))
+    } else {
+      Err(Unsupported)
+    }
+  } else {
+    cbw_get_text_xclip()
+  }
+}
+
+///|
+fn cbw_get_text_xclip() -> Result[String, ClipboardError] {
   match pr_run("xclip", ["-selection", "clipboard", "-o"], timeout_ms=2000) {
     Ok(o) => Ok(o.stdout)
     Err(NonZeroExit(127, _)) => Err(Unsupported)
@@ -116,8 +133,8 @@ pub fn cbw_get_text() -> Result[String, ClipboardError] {
 ///|
 /// 定时器一拍：读剪贴板 → 与基线比对 → 变化则回调新文本；返回是否继续
 /// 轮询（[ClipboardWatcher.active] 为 false 即 [cbw_stop] 之后的最后一
-/// 拍）。读失败静默跳过、继续轮询。轮询读为阻塞式子进程调用，默认
-/// 800ms 一拍的间隔已为子进程开销留出余量。
+/// 拍）。读失败静默跳过、继续轮询。退回命令线时轮询读是阻塞式子进程调用，
+/// 默认 800ms 一拍的间隔已为子进程开销留出余量。
 fn cbw_tick(watcher : ClipboardWatcher, cb : (String) -> Unit) -> Bool {
   if !watcher.active.val {
     false

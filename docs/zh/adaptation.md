@@ -90,7 +90,7 @@
 - **能力落 `sys`（新 `clipboard.mbt` + `sys_stub.c` 的 `_WIN32` 分支）**：Windows 走 `CF_UNICODETEXT`（`OpenClipboard`/`GetClipboardData`/`GlobalLock` 读，`GlobalAlloc(GMEM_MOVEABLE)`+`SetClipboardData` 写——**成功后所有权归系统，绝不能 `GlobalFree`**，这是 Win32 剪贴板的经典坑）；Linux/mac 走命令线（`xclip -selection clipboard` / `pbcopy`·`pbpaste`）。中文内容必须走宽串（`win_utf8_wide`）+ 宽→UTF-8，A 版 API 按 ANSI 代码页会把内容搅乱（同 W14 的环境变量一条）。
 - **命令线传文本要绕开引号地狱**：`pr_run` 不做 shell 解析，所以显式 `sh -c 'printf %s "$1" | xclip -selection clipboard' sh <文本>`——文本走 **argv 的第 4 个位置**（脚本里的 `$1`），不拼进脚本体，引号、换行、中文都无需转义。
 - **链接面漏过一处**：剪贴板 API 在 **user32.lib**，而 sys 包原先的 Windows 链接参数只有 `ole32.lib shell32.lib uuid.lib`——漏了就是 `LNK2019: __imp_SetClipboardData` 一串，已补（记档：Windows 侧每引一组新 API 都要核对它在哪个 .lib 里）。
-- **接线走「内核槽」而不是内核直连平台**：`input` 的 `Editor::set_clipboard(get, set)` 给内核留外部剪贴板槽——`copy`/`cut` 顺手写出去、`Ctrl+V` 现取（取不到回退内置 `clip`），内核本身仍不依赖任何平台层（无头可测）。**默认不装**：`ui` 的 `use_system_clipboard(true)` 由应用显式打开（`examples/native-app` 里一行）——测试里的 Ctrl+X 不该动使用者的剪贴板；探测不可用（Linux 没装 xclip）时自动保持内部剪贴板，属语义化降级。
+- **接线走「内核槽」而不是内核直连平台**：`input` 的 `Editor::set_clipboard(get, set)` 给内核留外部剪贴板槽——`copy`/`cut` 顺手写出去、`Ctrl+V` 现取（取不到回退内置 `clip`），内核本身仍不依赖任何平台层（无头可测）。**默认不装**：`ui` 的 `use_system_clipboard(true)` 由应用显式打开（`examples/native-app` 与 `examples/showcase` 各一行）——测试里的 Ctrl+X 不该动使用者的剪贴板；探测不可用时自动保持内部剪贴板，属语义化降级（Linux 的探测口径见「Linux 剪贴板」那条：GtkClipboard 优先，没跑过 gtk_init 的进程才退回 xclip）。
 - **测试**：sys 新增回环用例（中文 + 换行的 `set → get`），**写入前把原内容存档、断言完还原**（探针不在使用者的剪贴板里留痕）；Windows 本机 `moon test -p sys` **165/165**（新增 2 条），ui 110/110、input 10/10 无回归。真跨程序粘贴（复制出去、粘到记事本再粘回来）留使用者复验。
 
 ### MoonBit 原生 GUI 栈 · Windows 窗口「黑屏 + 未响应」复盘（W17a，五处根因与性能批）
@@ -1961,6 +1961,18 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **验证**:`moon test ui` 158/158,原「关闭热区只在右上角」扩成「热区与标记都只在右上角」,加两条判据——可关闭横幅右上角 24×24 里「与浅底不同」的像素 > 8,不可关闭横幅同区域必须 == 0(不许多画)。筛墨用「离浅底三通道差之和 > 30」,范围避开左缘 3px 强调条,不锁具体色值(换主题不假红)。**判据有效性已对照实验**:撤掉 `draw_icon` 那一行,标记判据当场红(`false` is not true),补回即绿。库全包 932/932、`cd examples && moon build showcase --target native` 链接通过。全仓 `--deny-warn` 仍被并行批 60e094e 的 5 条 sys 警告挡住(`appfind.mbt` 4 条、`recent_files.mbt` 1 条),非本批文件。
 - **顺带排除**:演示文案里那两个「✕」是**正文里的 U+2715 字符**,本机 DejaVu Sans 与文泉驿微米黑都覆盖该码位(`fc-list :charset=2715` 实测有),不是缺字豆腐块;截图里那三个红框是用户手绘标注。
 - **待真机复验**(用户执行):反馈组件页的可关闭横幅右侧应出现 ✕ 标记、点它整条收起;其余不可关闭的横幅不该出现标记。
+
+## Linux 剪贴板改走 GtkClipboard：顺带炸出 win 桩缺 `moonbit_make_bytes` 声明的指针截断（2026-10-14，真机反馈）
+
+- **现象**：本机（Ubuntu 24.04 / X11 / XFCE）报「剪贴板不可用」——系统集成页的读写按钮没反应，输入框的 Ctrl+C/X/V 也不接系统。
+- **根因一（能力缺口）**：Linux 唯一的后端是命令线 `xclip`，而本机**没装 xclip**（`which xclip` 为空），于是 `clipboard_available()` 恒 false，`ui` 的 `attach_system_clipboard` 不装槽、门面读写全部退回失败。
+- **修复一**：`win/stub.c` 的 GTK 分支补 `wm_clipboard_available / get_text / set_text`（GtkClipboard），sys 侧 extern 直链 win 桩——与文件对话框 `wm_file_*` 是**同一条先例**（MoonBit 层不引 win 包，链接由 prebuild 下发）。探测顺序 GTK → xclip；`set_text` 在 `gtk_clipboard_set_text` 后紧跟一次 **`gtk_clipboard_store`**（只登记所有权而不 store，应用退出后别处就读不到了）；监听侧 `cbw_get_text` 同口径改走 GTK（顺带省掉每拍一个子进程）。Win32 与占位分支给同名符号（Windows 的真路径仍在 `sys_stub.c` 自己的 CF_UNICODETEXT，不动它）。演示侧补 `@ui.use_system_clipboard(true)`（此前只有 native-app 开过）。
+- **根因二（ABI，被第一条炸出来的）**：**`win/stub.c` 用 `moonbit_make_bytes` 却没有声明**——本文件的 GTK 分支由 prebuild 直接编，拿不到 moon 的 `moonbit.h` 包含路径（`compile_stub` 只加 pkg-config cflags）。隐式声明按「返回 `int`」假定，x86-64 下返回值指针被截成低 32 位。**反汇编实证**：撤掉声明后 `wm_clipboard_get_text` 里出现 `mov %eax,%edi`（把 32 位返回值当 64 位指针参数往下传），而本机堆地址是 `0x61bc76xxxxx` 量级，截断即垃圾地址。补 `extern void *moonbit_make_bytes(int size, int value);`（与 `sys_stub.c:57` 同一行先例；签名与 `~/.moon/include/moonbit.h` 的 `moonbit_bytes_t moonbit_make_bytes(int32_t, int)` 逐位对齐）后该 TU 零隐式声明警告。
+- **顺带修掉一处既有隐患**：`wm_file_dialog_get_result`（Linux 文件对话框取回路径）一直在返回截断指针，只是从没被无头测试走到——要真选一次文件才触发。
+- **对照实验**：撤声明 + 强制重链 → `moon test sys` SIGSEGV；补回 → 188/188。**踩坑记档**：只改桩里的 C **不会**让 moon 重链测试可执行文件（它按 .mbt 包脏化），第一次对照实验因此「假通过」；必须 `touch` 一个 .mbt 源文件（或删掉归档再脏化包）才作数。
+- **读数与口径**：GTK 路径在本机真读到使用者剪贴板（watcher 测试打印 `cbw_get_text: Ok（13 字符）…`）。注意 `gdk_display_get_default()` 在**没跑过 gtk_init 的测试进程里也返回非空**（GDK 按 `$DISPLAY` 惰性开），所以 Linux 探测在无头测试里同样是 true——剪贴板回归因此必须写成「可用则做 save→set→get→restore 往返、不锁使用者内容」的形态（`clipboard_wbtest.mbt` 已是这形态，换后端不假红）。
+- **验证**：`cd gui && moon check --deny-warn` 与 `cd examples && moon check --deny-warn` 零错误零警告、库全包 937/937、`moon build showcase --target native` 链接通过。真机复验清单加 S11（系统集成页读写按钮、输入框 Ctrl+C/V 与外部应用互通）。
+- **待真机复验**（用户执行）：系统集成页「写入剪贴板」→ 到浏览器/终端里 Ctrl+V 应见同一段中文；页内读取按钮应回读到外部复制的内容；输入框内 Ctrl+C/X/V 与系统互通；退出应用后剪贴板内容仍在（靠那次 `store`）。
 
 ## 段条被正文高度挤塌:定高头部要 flex_shrink=0、可伸缩正文要 min=0(2026-10-14,真机反馈)
 

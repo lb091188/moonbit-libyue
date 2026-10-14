@@ -24,6 +24,12 @@
 // - 像素缓冲归 MoonBit：present 收到的就是 yue/render 的 Bitmap（ARGB32 预乘，
 //   小端字节序 B,G,R,A），本层只负责贴屏，与离屏快照同源。
 
+// MoonBit 运行时：造一个 Bytes 对象（桩里往外返回文本时用）。这里必须显式
+// 声明——本文件由 prebuild 直接编，拿不到 moon 的 moonbit.h 包含路径；不声明
+// 就是隐式声明，cc 会按「返回 int」假定，x86-64 下指针被截成 32 位，调用方拿
+// 到的是垃圾地址（实测 SIGSEGV）。签名与 ~/.moon/include/moonbit.h 逐位对齐。
+extern void *moonbit_make_bytes(int size, int value);
+
 #if defined(_WIN32)
 
 // ---------------- Win32 后端 ----------------
@@ -2565,6 +2571,18 @@ int wm_window_surface_count(int64_t id) {
   return 0;
 }
 
+/* 剪贴板三符号：Windows 的真路径在 sys 桩自己的 CF_UNICODETEXT
+ * （`sys/clipboard.mbt` 的 windows 分支不会调到这里），这里只保证符号不断。 */
+int wm_clipboard_available(void) { return 0; }
+void *wm_clipboard_get_text(int32_t *ok) {
+  *ok = 0;
+  return moonbit_make_bytes(0, 0);
+}
+int wm_clipboard_set_text(const char *text) {
+  (void)text;
+  return 0;
+}
+
 #elif defined(WM_STUB_GTK)
 
 // ---------------- GTK3 后端（Linux，prebuild 专编） ----------------
@@ -4223,10 +4241,62 @@ void *wm_file_dialog_get_result(int64_t id) {
   return out;
 }
 
+/* ---------- 剪贴板（sys/clipboard.mbt 的 Linux 落点）----------
+ * GtkClipboard 直接用：本归档已链 GTK3，sys 的 extern 直链 win 桩与
+ * `wm_file_*` 是同一条先例。没跑过 gtk_init 的纯命令行消费者（无头测试）
+ * 探测给 0，MoonBit 侧退回命令线 xclip——不在这里替宿主 gdk_init。 */
+int wm_clipboard_available(void) {
+  return gdk_display_get_default() != NULL ? 1 : 0;
+}
+
+// 读剪贴板文本（UTF-8）：没有显示服务或没有文本时 *ok=0、给空 Bytes。
+void *wm_clipboard_get_text(int32_t *ok) {
+  *ok = 0;
+  if (!wm_clipboard_available()) {
+    return moonbit_make_bytes(0, 0);
+  }
+  GtkClipboard *cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
+  gchar *t = gtk_clipboard_wait_for_text(cb);
+  if (t == NULL) {
+    return moonbit_make_bytes(0, 0);
+  }
+  size_t len = strlen(t);
+  void *out = moonbit_make_bytes((int)len, 0);
+  if (len > 0) {
+    memcpy(out, t, len);
+  }
+  g_free(t);
+  *ok = 1;
+  return out;
+}
+
+// 写剪贴板。set_text 只登记本进程为选区主人，所以紧跟一次 store 把内容
+// 交给会话里的剪贴板管理器——少了它，应用退出后别处就再也读不到。
+int wm_clipboard_set_text(const char *text) {
+  if (text == NULL || !wm_clipboard_available()) {
+    return 0;
+  }
+  GtkClipboard *cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
+  gtk_clipboard_set_text(cb, text, -1);
+  gtk_clipboard_store(cb);
+  return 1;
+}
+
 /* 关闭并释放对话框（run 之后调用；未 run 过也能安全释放）。 */
 void wm_file_dialog_destroy(int64_t id) { wm_dlg_free(id); }
 
 #elif !defined(__linux__)
+
+/* 剪贴板三符号（占位）：macOS 走 sys 自己的 pbpaste/pbcopy 命令线。 */
+int wm_clipboard_available(void) { return 0; }
+void *wm_clipboard_get_text(int32_t *ok) {
+  *ok = 0;
+  return moonbit_make_bytes(0, 0);
+}
+int wm_clipboard_set_text(const char *text) {
+  (void)text;
+  return 0;
+}
 
 // ---------------- 其余平台（macOS 等）占位 ----------------
 // 保证 `moon build --target native` 的符号不断；真后端随各自窗口层落地补。

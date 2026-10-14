@@ -303,6 +303,9 @@ fn main {
       return
     }
     Some(host) => {
+      // 输入框的 Ctrl+C/X/V 接系统剪贴板（演示板按真实使用形态开；探测不可用
+      // 时内核自动保持内部剪贴板，见 gui/ui/clipboard.mbt）
+      @ui.use_system_clipboard(true)
       println("SHOWCASE-READY title=\{SHOWCASE_TITLE} pages=14 follow=1")
       @core.paint_profile_reset()
       host.run()
