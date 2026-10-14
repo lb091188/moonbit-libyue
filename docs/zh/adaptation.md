@@ -1827,8 +1827,12 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 
 - **现象**:showcase 页面顶部的段条(segmented)段数一多就横向溢出被裁,而 `shared/section.mbt` 的注释写着「超宽自动换行」。
 - **根因**:本栈 `ui` 从不写 `flex_wrap`,样式层也**没有这个属性**(CSS 有 `flex-wrap`,我们的 `Style` 少一条),所以任何容器都是 `NoWrap` —— 注释描述的是一个不存在的能力。
-- **修复(按「属性名 = CSS 属性名」补进样式层,而不是给组件开参数)**:`Style` 开 `flex_wrap : FlexWrap?`(`types.mbt` 用 `pub using @yoga {type FlexWrap}` 引类型短名),工厂收 `flex_wrap=`、`merge`/`empty_style`/setter 同步、`apply` 落 `Node::set_flex_wrap`;showcase 段条改成 `@ui.segmented(names, selected, class=[@style.style(flex_wrap=@yoga.Wrap, row_gap=4.0)])`(换行后行距必须给,不然两行贴在一起)。
-- **验证**:`moon test style` 26/26,新增 1 条布局钉桩——100 宽行内容器放两个 60 宽的子项:`NoWrap` 时第二项 `top=0`(挤在同一行、溢出容器),写 `flex_wrap=Wrap` 后 `top>=20`(真换到第二行);`cd gui && moon check --deny-warn` 与 examples 模块零警告。真机观感:切到段数多的页,段条应折成两行且每段都点得到。
+- **修复(按「属性名 = CSS 属性名」补进样式层,而不是给组件开参数)**:`Style` 开 `flex_wrap : FlexWrap?`(`types.mbt` 用 `pub using @yoga {type FlexWrap}` 引类型短名),工厂收 `flex_wrap=`、`merge`/`empty_style`/setter 同步、`apply` 落 `Node::set_flex_wrap`。
+- **换行的两条必备配套(真机第一版只加了 `flex_wrap`,结果把正文压扁)**:
+  1. **段条放在列里,不要放在 row 里**:row 的交叉轴不拉伸,换行容器按内容定宽(实测 1000 可用只给到 450),段被折成六七行;列的交叉轴默认 stretch ⇒ 拿到整宽,段多才按整宽折。
+  2. **换行容器与父链每一层都显式 `min_height=0`(横向同理 `min_width=0`)**:规范 §4.5 里列内子项的 `min-height:auto` 取其 **min-content 高**,而可换行行容器的 min-content 高 = 全部子项堆叠(6 段 ×30 + 5 间隙 = 200)。这条下限沿父链一路上传——实测段条 224px、正文从 646 掉到 476。引擎行为符合规范、不是 bug:显式归零才是段条这类容器该有的写法。
+- **最终形态**:`strip = @ui.col([@ui.segmented(names, selected, class=[style(flex_wrap=Wrap, row_gap=4.0), style(min_height=0.0, min_width=0.0)])], padding=10.0, class=[style(min_height=0.0, min_width=0.0)])`。
+- **验证**:`moon test style` 26/26 新增 1 条布局钉桩(100 宽行内容器放两个 60 宽子项:`NoWrap` 时第二项 `top=0`,`flex_wrap=Wrap` 后 `top>=20`);`modules/yoga-mbt` 新增 1 条钉住 §4.5 那条下限与归零后的取值(同一棵树:min:auto 时 strip 高 200,显式 `min_height=0` 后 30)。修完用无头探针量真实页面树(1200×700):段条 54、正文容器 646、代码文档页视口 652 / 内容 808(可滚 155)——段条不再吃高度,正文有确定视口且内容超出即可滚。`cd gui && moon check --deny-warn` 零警告、库全包 915/915、yoga-mbt 全绿。
 
 ## 滚动容器视口被内容撑高:内容超出窗口却滚不动(2026-10-14,真机反馈)
 

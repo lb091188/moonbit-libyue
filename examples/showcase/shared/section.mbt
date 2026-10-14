@@ -50,15 +50,20 @@ pub fn page(secs : Array[Section]) -> @core.Node {
     names.push(s.name)
   }
   // 段条超宽真换行（flex_wrap 走样式槽；行距给 4，不然两行贴在一起）
-  let strip = @ui.row(
-    [
-      @ui.segmented(
-        names,
-        selected,
-        class=[@style.style(flex_wrap=@yoga.Wrap, row_gap=4.0)],
-      ),
-    ],
+  // 段条放在**列**里：列的交叉轴会把段条拉成整宽，段多才按整宽折行。
+  // （放在 row 里时段条按内容定宽，折行数会翻倍、把正文挤扁——实测 224px。）
+  // 段条与它的包裹容器都要显式 min=0：换行容器的「主轴 min:auto」按 CSS §4.5
+  // 等于 min-content 高（= 全部段堆叠），这条下限会沿父链一路传上去，
+  // 不归零段条会吃掉整块正文高度（实测 224px）。
+  let flat = @style.style(min_height=0.0, min_width=0.0)
+  let strip = @ui.col(
+    [@ui.segmented(
+      names,
+      selected,
+      class=[@style.style(flex_wrap=@yoga.Wrap, row_gap=4.0), flat],
+    )],
     padding=10.0,
+    class=[flat],
   )
   let bodies : Array[@core.Node] = []
   for s in secs {
