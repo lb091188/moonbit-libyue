@@ -809,7 +809,7 @@ pub fn draw_gauge(
 }
 
 ///|
-/// 散点图绘制（点列 + 可选最小二乘趋势线；绘制区裁剪）。
+/// 散点图绘制（点列 + 可选最小二乘趋势线；绘制区裁剪；点为半透明圆点）。
 pub fn draw_scatter(
   p : @render.Painter,
   w : Double,
@@ -877,13 +877,15 @@ pub fn draw_scatter(
   }
   let half = dot / 2.0
   p.set_fill_color(@theme.theme_primary())
+  // 圆点 + 半透明：方块在千点级会互相咬合成整块，圆点之间留缝，密处靠叠加显深
+  p.set_global_alpha(0.7)
   for pt in points {
     let px = map_xv(pt.0, xlo, xhi, x0, x1)
     let py = map_y(pt.1, ylo, yhi, y0, y1)
     if px < x0 - half || px > x1 + half || py < y0 - half || py > y1 + half {
       continue
     }
-    p.fill_rect(px - half, py - half, dot, dot)
+    p.fill_round_rect(px - half, py - half, dot, dot, half)
   }
   p.restore()
 }

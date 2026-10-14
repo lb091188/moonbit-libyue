@@ -304,3 +304,88 @@ test "散点图：点列与趋势线出像素、空数据只画网格与提示" 
   let _ = root.relayout(360.0, 200.0)
   assert_true(diff_of(bm_of(w), empty) > 100)
 }
+
+///|
+/// 回归：散点必须读作「散点」而不是糊成一块实心带。两条判据各钉一件事——
+/// ① 形状：单个大点（`dot=15`）的着色包围盒四角不沾墨、中心沾墨（圆点而非方块）；
+/// ② 实心度：2000 点按默认点径画完后，绘制区里「纯点色」像素要少（不透明方块
+///    会把整条带子涂成实心，纯点色像素能占到绘制区三成以上）。
+test "散点图：圆点形状与千点级实心度上限" {
+  let bg = match @theme.parse_hex(@theme.theme_bg_panel()) {
+    Some(c) => c
+    None => (255, 255, 255)
+  }
+  let target = match @theme.parse_hex(@theme.theme_primary()) {
+    Some(c) => c
+    None => (0, 0, 0)
+  }
+  // 「这一点像点色多过像面板底」：网格线与刻度都离底色更近，只有点阵满足这条
+  let inked = fn(bm : @render.Bitmap, x : Int, y : Int) -> Bool {
+    let c = bm.pixel(x, y)
+    let d_dot = (c.r - target.0).abs() + (c.g - target.1).abs() +
+    (c.b - target.2).abs()
+    let d_bg = (c.r - bg.0).abs() + (c.g - bg.1).abs() + (c.b - bg.2).abs()
+    d_dot < d_bg
+  }
+  let solid = fn(bm : @render.Bitmap, x : Int, y : Int) -> Bool {
+    let c = bm.pixel(x, y)
+    (c.r - target.0).abs() <= 6 && (c.g - target.1).abs() <= 6 &&
+    (c.b - target.2).abs() <= 6
+  }
+  let one = @core.Store::new([(5.0, 7.0)])
+  let (_r1, w1) = mounted(
+    scatter_t(one, dot=15.0, width=320.0, height=260.0),
+    320.0,
+    260.0,
+  )
+  let f1 = bm_of(w1)
+  let mut min_x = 1 << 30
+  let mut min_y = 1 << 30
+  let mut max_x = -1
+  let mut max_y = -1
+  for y = 12; y < 236; y = y + 1 {
+    for x = 46; x < 306; x = x + 1 {
+      if inked(f1, x, y) {
+        if x < min_x { min_x = x }
+        if x > max_x { max_x = x }
+        if y < min_y { min_y = y }
+        if y > max_y { max_y = y }
+      }
+    }
+  }
+  let bw = max_x - min_x + 1
+  let bh = max_y - min_y + 1
+  let cx = (min_x + max_x) / 2
+  let cy = (min_y + max_y) / 2
+  let many = @core.Store::new([])
+  let data : Array[(Double, Double)] = []
+  let mut s = 42
+  for _i in 0..<2000 {
+    s = (s * 1103515245 + 12345) & 0x7fff_ffff
+    let x = s.to_double() / 2147483647.0 * 100.0
+    s = (s * 1103515245 + 12345) & 0x7fff_ffff
+    let y = x * 0.6 + 20.0 + (s.to_double() / 2147483647.0 - 0.5) * 40.0
+    data.push((x, y))
+  }
+  many.set(data)
+  let (_r2, w2) = mounted(scatter_t(many, width=320.0, height=260.0), 320.0, 260.0)
+  let f2 = bm_of(w2)
+  let mut n_solid = 0
+  for y = 12; y < 236; y = y + 1 {
+    for x = 46; x < 306; x = x + 1 {
+      if solid(f2, x, y) {
+        n_solid = n_solid + 1
+      }
+    }
+  }
+  assert_true(bw >= 12 && bw <= 17 && bh >= 12 && bh <= 17)
+  assert_true(inked(f1, cx, cy))
+  // 方块会把包围盒四角一起涂墨，圆点不会（旧画法实测 corner=true）
+  assert_true(!inked(f1, min_x, min_y))
+  assert_true(!inked(f1, max_x, min_y))
+  assert_true(!inked(f1, min_x, max_y))
+  assert_true(!inked(f1, max_x, max_y))
+  // 实心度：旧画法（不透明 6px 方块）实测 20189 格纯点色 = 绘制区三成五，
+  // 半透明小圆点实测 201 格
+  assert_true(n_solid < 4000)
+}

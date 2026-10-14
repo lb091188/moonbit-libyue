@@ -88,9 +88,11 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
   let scatter_data : Array[(Double, Double)] = []
   let mut scatter_seed = 42
   for _i in 0..<2000 {
-    scatter_seed = (scatter_seed * 1103515245 + 12345) % 2147483647
+    // 取低 31 位而不是 `% 2147483647`：乘法溢出成负数后 MoonBit 的 `%` 跟着
+    // 被除数取号，x 会落到负半轴（真机读数：坐标轴成了 -100..100）
+    scatter_seed = (scatter_seed * 1103515245 + 12345) & 0x7fff_ffff
     let x = scatter_seed.to_double() / 2147483647.0 * 100.0
-    scatter_seed = (scatter_seed * 1103515245 + 12345) % 2147483647
+    scatter_seed = (scatter_seed * 1103515245 + 12345) & 0x7fff_ffff
     let y = x * 0.6 +
       20.0 +
       (scatter_seed.to_double() / 2147483647.0 - 0.5) * 40.0
@@ -211,7 +213,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     @shared.section(
       "散点",
       "Scatter 散点图",
-      "2000 点 x/y 点列（小方点），双轴自适应刻度 + 网格；右侧叠加最小二乘趋势线。",
+      "2000 点 x/y 点列（半透明小圆点），双轴自适应刻度 + 网格；右侧叠加最小二乘趋势线。",
       [
         @ui.row(
           [

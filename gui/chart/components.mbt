@@ -266,11 +266,12 @@ pub fn gauge_t(
 }
 
 ///|
-/// 散点图：x/y 点列 + 可选最小二乘趋势线；绘制区裁剪，点用方块（不依赖字形）。
+/// 散点图：x/y 点列 + 可选最小二乘趋势线；绘制区裁剪，点用半透明圆点（不依赖字形）。
+/// `dot` 是点直径（像素）：千点级要按「点面积 × 点数 ≤ 绘制区面积」取值，默认 3.0。
 pub fn scatter_t(
   points : @core.Store[Array[(Double, Double)]],
   trend? : Bool = false,
-  dot? : Double = 6.0,
+  dot? : Double = 3.0,
   width? : Double = 0.0,
   height? : Double = 200.0,
   handle? : (@core.Widget) -> Unit = @ui.default_handle,
