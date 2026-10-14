@@ -26,6 +26,7 @@ fn fake_app() -> App {
     cursor_kind: 0,
     canvas: None,
     dirty_rect: None,
+    dirty_full: false,
   }
 }
 
@@ -225,4 +226,31 @@ test "弹层摆位：贴着屏幕边翻到锚点另一侧，未知屏幕只钳�
   assert_eq(popup_place(1880, 980, 20, 30, 160, 100, 0, 0), (1900, 1010))
   // 负的原点（窗口被拖到屏幕外）不产生负坐标
   assert_eq(popup_place(-40, -20, 10, 10, 80, 40, 1920, 1080), (0, 0))
+}
+
+///|
+/// 整窗置脏（`full=true`）在同批内不可被局部置脏收窄成小矩形。
+test "整窗置脏之后同批的局部置脏不许收窄脏区" {
+  let r1 = { x: 10.0, y: 10.0, w: 20.0, h: 20.0 }
+  let r2 = { x: 40.0, y: 40.0, w: 8.0, h: 8.0 }
+  // 没请求整窗：局部置脏照常累积
+  let acc = accept_widget_rect(false, Some(r1), r2)
+  match acc {
+    Some(r) => {
+      assert_eq((r.x, r.y), (10.0, 10.0))
+      assert_eq((r.w, r.h), (38.0, 38.0))
+    }
+    None => fail("未请求整窗时应累积成矩形脏区")
+  }
+  // 已经请求整窗：局部置脏只能维持整窗（None），不得写成小矩形
+  assert_true(accept_widget_rect(true, None, r1) is None)
+  // 这一帧的裁剪框：整窗请求优先于累积的局部矩形
+  match dirty_clip(true, Some(r1)) {
+    Some(_) => fail("整窗请求不该带裁剪框")
+    None => ()
+  }
+  match dirty_clip(false, Some(r1)) {
+    Some(r) => assert_eq((r.w, r.h), (20.0, 20.0))
+    None => fail("未请求整窗时该用累积脏区")
+  }
 }

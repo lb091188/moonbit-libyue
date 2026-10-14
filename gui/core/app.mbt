@@ -31,6 +31,10 @@ pub(all) struct App {
   /// 脏区（窗口坐标，None = 整窗）：事件路由只并涉事控件的小矩形，浮层
   /// 打开与结构性变更走 `schedule_paint` 整窗兜底；paint_frame 消费后清空
   mut dirty_rect : Rect?
+  /// 「本批已请求整窗重绘」标志：`dirty_rect=None` 同时表示「整窗」与「还没有脏区」,
+  /// 区分不开,故整窗请求单独占一位。置位后同批内的局部置脏不收窄脏区,
+  /// `paint_frame` 取走这一帧的裁剪框后复位。
+  mut dirty_full : Bool
   mut running : Bool
   /// 上一次投递给焦点控件的组合串（相同内容不重复投递，避免每拍置脏）
   mut last_preedit : (String, Int)
@@ -147,6 +151,7 @@ fn app_window(
         cursor_kind: 0,
         canvas: None,
         dirty_rect: None,
+        dirty_full: false,
       }
       // 弹层形态要在 show 之前定（类型提示与 transient 关系在映射时生效）
       match popup_of {
@@ -312,6 +317,7 @@ pub fn App::enable_root_scroll(self : App) -> Unit {
 /// 打开、结构性变更（重挂/换页/主题）与一切拿不准的回退都走这里。
 pub fn App::schedule_paint(self : App) -> Unit {
   self.dirty = true
+  self.dirty_full = true
   self.dirty_rect = None
   @win.wake()
 }
@@ -336,10 +342,22 @@ fn rect_union(a : Rect?, b : Rect) -> Rect {
 }
 
 ///|
+/// 局部置脏的累积规则：`full` 为真表示本批已请求整窗重绘，此时局部矩形不改脏区。
+fn accept_widget_rect(full : Bool, cur : Rect?, r : Rect) -> Rect? {
+  if full { cur } else { Some(rect_union(cur, r)) }
+}
+
+///|
+/// 一帧的裁剪框：整窗请求时无裁剪（None），否则用累积的脏区。
+fn dirty_clip(full : Bool, rect : Rect?) -> Rect? {
+  if full { None } else { rect }
+}
+
+///|
 /// 局部置脏：把一个控件的绝对矩形并入脏区并唤醒。
 fn App::mark_widget_rect(self : App, w : Widget) -> Unit {
   self.dirty = true
-  self.dirty_rect = Some(rect_union(self.dirty_rect, w.rect))
+  self.dirty_rect = accept_widget_rect(self.dirty_full, self.dirty_rect, w.rect)
   @win.wake()
 }
 
@@ -674,7 +692,8 @@ pub fn App::paint_frame(self : App) -> Unit {
   // 帧号先进一格：被画到的控件在这一格里记账，自转组件据此判断「这帧有没有我」
   let _ = bump_paint_epoch()
   self.dirty = false
-  let clip = self.dirty_rect
+  let clip = dirty_clip(self.dirty_full, self.dirty_rect)
+  self.dirty_full = false
   self.dirty_rect = None
   let (w, h) = self.window.size()
   if w < 1 || h < 1 {

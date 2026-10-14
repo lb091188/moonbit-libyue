@@ -119,6 +119,7 @@ pub fn host_mark_active(app : App) -> Unit {
 pub fn host_repaint_all() -> Unit {
   for a in g_windows.val {
     a.dirty = true
+    a.dirty_full = true
     a.dirty_rect = None
   }
   @win.wake()

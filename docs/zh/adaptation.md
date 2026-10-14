@@ -1795,6 +1795,15 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **配套坑(测试侧,顺序敏感)**:轮次是**进程级**的,同包多条测试共用。原来那些「不画直接 `fire()` 派拍」的自转测试靠 `0 == 0` 蒙对——新测试一 bump 轮次就把它们变成假红。定则:**驱动自转的测试必须先画一帧**(与真实宿主同形),否则断言量的不是「被画到」而是初始零值。
 - **验证**:新增 1 条白盒(隐藏整块 → 派拍:不切页、`invalidate` 计数不涨;恢复可见 → 继续切页),`moon test ui` 140/140、库全包 872/872、`cd gui && moon check --deny-warn` 零警告;showcase 退出打 `SHOWCASE-PROF`(帧数/布局/绘制/上屏/最坏一帧)。`frames` 数还是异常高 = 仍有别的东西在空转(下一步就按这一格判)。
 
+## 脏区局部重绘的收窄缺陷:切段/切页不自动刷新(2026-10-14,真机反馈)
+
+- **环境**:真机走查 `examples/showcase`,在「脏区局部重绘」落地(帧位图复用 + 按裁剪框绘制)之后;账本由示例退出时的 `SHOWCASE-PROF` 行给出。
+- **现象**:切段/切页**页面不刷新**,要把鼠标悬浮到某个控件上,那块内容才跟着重画出来;`SHOWCASE-PROF`(615 帧 / 1323ms,均 2.2ms,最坏一帧 134ms)看不出异常——帧确实画了,只是只画了一小块。
+- **根因**:`App.dirty_rect : Rect?` 用 `None` **一词双义**——既表示「整窗脏」又表示「本批还没有脏区」。同批里先来一次整窗请求(`invalidate()` / `schedule_paint` / `host_repaint_all` 都只写 `dirty_rect = None`),随后指针路由按 hover 变更走了 `mark_widget_rect`,而它的形态是 `Some(rect_union(dirty_rect, w.rect))`,`rect_union(None, r) = r` ⇒ **整窗请求被收窄成鼠标底下的那个小矩形**,这一帧只重画那一格,其余部分保留上一帧像素。「悬浮才刷」就是收窄后的小矩形恰好盖住了鼠标底下那一格。
+- **修复**:`App` 加 `mut dirty_full : Bool`,整窗请求(`schedule_paint`、`host_repaint_all`)置位;局部置脏改走纯函数 `accept_widget_rect(full, cur, r)`——`full` 为真时**只维持不收窄**;`paint_frame` 用 `dirty_clip(full, rect)` 取这一帧的裁剪框(整窗请求 → `None` 即不裁),取完把标志与脏区一起复位。两个判定抽成纯函数是为了能钉桩:宿主 `App` 要真窗口,而这两个判断不需要。
+- **通用口径**:`Option` 承载「两种不同的无」迟早出这类事故——同一个 `None` 表示「整窗」又表示「空集」时,任何「往累积里并一笔」的操作都会把强语义写成弱语义。要么加一位标志(本批做法),要么换成显式枚举(`Whole | Region(Rect)`)。
+- **验证**:core 新增 1 条纯函数回归(未请求整窗时照常累积成并集;已请求整窗时局部置脏不得写成小矩形;裁剪框整窗优先),`moon test core` 133/133、分包全跑 882/882(13 包逐个绿)、`cd gui && moon check --deny-warn` 零警告。真机复验(用户执行):showcase 切段/切页后**鼠标不动**应立即看到新页,复跑 `moon run examples/showcase` 退出贴 `SHOWCASE-PROF` 行(`frames` 不应因这一改动上涨——只在同批已有整窗请求时维持整窗语义)。
+
 ## 前端化 P1:gui/style 样式包与 yoga-mbt z_index(2026-10-13)
 
 工具链边界(moon 0.1.20260920 / moonc v0.10.14,读数随升级要重测,同步 design.md §1.6):
