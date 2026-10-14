@@ -2,6 +2,21 @@
 
 系统能力族 API：屏幕亮度、键盘背光、系统音量（含输出设备与逐应用音量）、媒体播放控制、夜间色温、壁纸、显示器配置、系统窗口管理、剪贴板监听、子进程执行、磁盘卷、电源与登录会话、电源计划、系统信息、时区与本地语言、蓝牙、传感器、打印机、环境变量、目录枚举、最近文件、浏览器书签与 Firefox 历史、媒体状态监视与通知进度文本、音频播放、视频帧渲染。全部只读或经系统服务授权写入，统一返回 `Result`，不支持的环境给对应错误值而不是崩溃；`*_supported()` 每次调用真实探测当前环境。
 
+## 平台状态（2026-10-14，平台批①-⑥ 后）
+
+| 能力 | Windows | Linux | macOS |
+|---|---|---|---|
+| 剪贴板 / 自启动 / 子进程 / 文件(fsx) / 环境变量(envx) | ✅ 直调 | ✅ | ❌ Unsupported |
+| 系统信息 / 窗口管理 / 壁纸 / 电源计划 / 启动器 | ✅ 直调 | ✅ | ❌ |
+| 应用查找 / 最近文件 / 音量 / 打印机(列表+默认+打印) | ✅ 直调 | ✅ | ❌ |
+| browser/vscode 数据 | ✅（LOCALAPPDATA 路径） | ✅ | ❌ |
+| sysmonitor 进程数据 | ✅（自带 stub/sysmon.c） | ✅ | ❌ |
+| 亮度 / 夜间色温 | ❌（WMI 未做 / 无公开 API） | ✅ | ❌ |
+| 默认应用关联 | ❌（xdg 口径，待 AssocQueryString 重写） | ✅ | ❌ |
+| volx_ 增强组（设备枚举/逐应用流） / 打印队列枚举 | ❌ | ✅ | ❌ |
+
+Windows 直调的底层：SystemParametersInfoW（壁纸）、ShellExecuteW（启动/定位/打印）、PowerGet/SetActiveScheme、注册表（产品与 DMI 信息）、GlobalMemoryStatusEx、GetTickCount64、EnumWindows、EnumPrintersW、IAudioEndpointVolume（COM）、GetLastInputInfo。踩坑与头文件/链接要求见 [adaptation.md](adaptation.md) 各平台批条目。
+
 完整演示见 `moon run NoahLiu/gui-examples/systemprobe`——点「读取系统能力」逐项呈现本机真实结果，不支持的能力显示对应错误文本。各能力在不同发行版 / 桌面环境的实测结论与原理（logind 路径、wpctl/pactl 差异、SQLite 库直读等）见 [adaptation.md](adaptation.md)。
 
 ## 屏幕亮度
