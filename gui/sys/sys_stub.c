@@ -29,6 +29,8 @@
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <wchar.h>
+#include <wctype.h>
 #include <shobjidl.h>
 #include <shlobj.h> // SHCreateItemFromParsingName
 // ShellExecuteW（分离式启动）不在 LEAN_AND_MEAN 的窗口头集合里
@@ -2076,6 +2078,313 @@ int32_t yue_sys_pp_set(const char *guid, int32_t *ok) {
   return 0;
 #else
   (void)guid;
+  return 0;
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// 平台批②（Windows 直调）：sysinfo / windowctl。
+// sysinfo：os/machine 走注册表（ProductVersion + BIOS DMI 键），memory 走
+// GlobalMemoryStatusEx，uptime 走 GetTickCount64；windowctl：EnumWindows
+// 枚举可见顶层窗口（hwnd 十六进制 id + 显示器序号 + 标题），激活 =
+// SW_RESTORE + SetForegroundWindow，关闭 = WM_CLOSE（wmctrl 同语义）。
+// ---------------------------------------------------------------------------
+
+// 读 HKLM 下 REG_SZ 值（UTF-8 字节串）；键/值不存在给空串。
+void *yue_sys_reg_sz(const char *subkey, const char *value, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  wchar_t *wk = win_utf8_wide(subkey, 0);
+  wchar_t *wv = win_utf8_wide(value, 0);
+  if (wk == NULL || wv == NULL) {
+    free(wk);
+    free(wv);
+    return moonbit_make_bytes(0, 0);
+  }
+  DWORD cb = 0;
+  LONG r = RegGetValueW(HKEY_LOCAL_MACHINE, wk, wv, RRF_RT_REG_SZ, NULL, NULL,
+                        &cb);
+  if (r != ERROR_SUCCESS || cb == 0) {
+    free(wk);
+    free(wv);
+    return moonbit_make_bytes(0, 0);
+  }
+  wchar_t *buf = (wchar_t *)malloc(cb);
+  if (buf == NULL) {
+    free(wk);
+    free(wv);
+    return moonbit_make_bytes(0, 0);
+  }
+  r = RegGetValueW(HKEY_LOCAL_MACHINE, wk, wv, RRF_RT_REG_SZ, NULL, buf, &cb);
+  free(wk);
+  free(wv);
+  if (r != ERROR_SUCCESS) {
+    free(buf);
+    return moonbit_make_bytes(0, 0);
+  }
+  void *out = win_wide_bytes(buf);
+  free(buf);
+  *ok = 1;
+  return out;
+#else
+  return moonbit_make_bytes(0, 0);
+#endif
+}
+
+// 物理内存快照（KB）。
+int32_t yue_sys_memory_kb(int64_t *total_kb, int64_t *avail_kb, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  MEMORYSTATUSEX m;
+  m.dwLength = sizeof(m);
+  if (!GlobalMemoryStatusEx(&m)) {
+    return 0;
+  }
+  *total_kb = (int64_t)(m.ullTotalPhys / 1024);
+  *avail_kb = (int64_t)(m.ullAvailPhys / 1024);
+  *ok = 1;
+  return 0;
+#else
+  return 0;
+#endif
+}
+
+// 开机秒数。
+double yue_sys_uptime_seconds(void) {
+#if defined(_WIN32)
+  return (double)(GetTickCount64() / 1000ULL);
+#else
+  return 0.0;
+#endif
+}
+
+// ---- windowctl ----
+
+// 目标缓冲：行「hwnd_hex\tmonitor\ttitle\n」；按需扩容。
+typedef struct {
+  char *buf;
+  size_t len;
+  size_t cap;
+} sys_win_blob_t;
+
+static void sys_win_blob_append(sys_win_blob_t *b, const char *s, size_t n) {
+  if (b->len + n + 1 > b->cap) {
+    size_t nc = b->cap * 2;
+    while (nc < b->len + n + 1) {
+      nc *= 2;
+    }
+    char *nb = (char *)realloc(b->buf, nc);
+    if (nb == NULL) {
+      return;
+    }
+    b->buf = nb;
+    b->cap = nc;
+  }
+  memcpy(b->buf + b->len, s, n);
+  b->len += n;
+  b->buf[b->len] = 0;
+}
+
+typedef struct {
+  sys_win_blob_t blob;
+} sys_win_enum_ctx_t;
+
+typedef struct {
+  HMONITOR target;
+  int index;
+  int found;
+} sys_mon_find_t;
+
+static BOOL CALLBACK sys_mon_find_cb(HMONITOR hm, HDC dc, LPRECT r,
+                                     LPARAM lp) {
+  sys_mon_find_t *f = (sys_mon_find_t *)lp;
+  if (hm == f->target) {
+    f->found = 1;
+    return FALSE;
+  }
+  f->index++;
+  return TRUE;
+}
+
+static int sys_monitor_index(HWND h) {
+  HMONITOR hm = MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST);
+  sys_mon_find_t f;
+  f.target = hm;
+  f.index = 0;
+  f.found = 0;
+  EnumDisplayMonitors(NULL, NULL, sys_mon_find_cb, (LPARAM)&f);
+  return f.found ? f.index : 0;
+}
+
+static BOOL CALLBACK sys_win_enum_cb(HWND h, LPARAM lp) {
+  sys_win_enum_ctx_t *ctx = (sys_win_enum_ctx_t *)lp;
+  if (!IsWindowVisible(h)) {
+    return TRUE;
+  }
+  wchar_t t[256];
+  t[0] = L'\0';
+  if (GetWindowTextW(h, t, 256) <= 0) {
+    return TRUE;
+  }
+  void *tb = win_wide_bytes(t);
+  if (tb == NULL) {
+    return TRUE;
+  }
+  char row[768];
+  int n = snprintf(row, sizeof(row), "0x%llx\t%d\t",
+                   (unsigned long long)(uintptr_t)h, sys_monitor_index(h));
+  sys_win_blob_append(&ctx->blob, row, (size_t)n);
+  sys_win_blob_append(&ctx->blob, (const char *)tb, strlen((const char *)tb));
+  sys_win_blob_append(&ctx->blob, "\n", 1);
+  return TRUE;
+}
+
+// 枚举可见顶层窗口：行「0xhwnd\tmonitor\ttitle\n」（UTF-8）。
+void *yue_sys_win_list(int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  sys_win_enum_ctx_t ctx;
+  ctx.blob.buf = (char *)malloc(8192);
+  ctx.blob.cap = 8192;
+  ctx.blob.len = 0;
+  if (ctx.blob.buf == NULL) {
+    return moonbit_make_bytes(0, 0);
+  }
+  ctx.blob.buf[0] = 0;
+  EnumWindows(sys_win_enum_cb, (LPARAM)&ctx);
+  void *out = moonbit_make_bytes((int)ctx.blob.len, 0);
+  memcpy(out, ctx.blob.buf, ctx.blob.len);
+  free(ctx.blob.buf);
+  *ok = 1;
+  return out;
+#else
+  return moonbit_make_bytes(0, 0);
+#endif
+}
+
+// 本机名（host 字段；UTF-8）。
+void *yue_sys_host_name(int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  wchar_t w[MAX_COMPUTERNAME_LENGTH + 1];
+  DWORD n = MAX_COMPUTERNAME_LENGTH + 1;
+  if (!GetComputerNameW(w, &n)) {
+    return moonbit_make_bytes(0, 0);
+  }
+  void *out = win_wide_bytes(w);
+  *ok = 1;
+  return out;
+#else
+  return moonbit_make_bytes(0, 0);
+#endif
+}
+
+// 标题不区分大小写的子串匹配。
+static int sys_wcs_icontains(const wchar_t *hay, const wchar_t *needle) {
+  size_t nl = wcslen(needle);
+  if (nl == 0) {
+    return 1;
+  }
+  size_t hl = wcslen(hay);
+  if (hl < nl) {
+    return 0;
+  }
+  for (size_t i = 0; i + nl <= hl; i++) {
+    size_t j = 0;
+    while (j < nl && towlower(hay[i + j]) == towlower(needle[j])) {
+      j++;
+    }
+    if (j == nl) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+// find 用的收集上下文与回调（定义在本段后部，此处前置声明）
+typedef struct {
+  HWND target;
+  const wchar_t *needle;
+} sys_win_find_ctx_t;
+
+static BOOL CALLBACK sys_win_find_cb(HWND h, LPARAM lp);
+
+// 找目标窗口：id_or_title 以「0x」开头按 hwnd 十六进制解析（须 IsWindow），
+// 否则按标题子串不区分大小写匹配首个可见窗口；找不到返回 NULL。
+static HWND sys_win_find(const char *id_or_title) {
+  wchar_t *w = win_utf8_wide(id_or_title, 0);
+  if (w == NULL) {
+    return NULL;
+  }
+  HWND found = NULL;
+  if (w[0] == L'0' && (w[1] == L'x' || w[1] == L'X')) {
+    uintptr_t v = wcstoull(w + 2, NULL, 16);
+    if (v != 0 && IsWindow((HWND)v)) {
+      found = (HWND)v;
+    }
+  } else {
+    // 标题子串匹配：与 sys_win_find_cb 的布局一致（同字段序）
+    sys_win_find_ctx_t ectx;
+    ectx.target = NULL;
+    ectx.needle = w;
+    EnumWindows(sys_win_find_cb, (LPARAM)&ectx);
+    found = ectx.target;
+  }
+  free(w);
+  return found;
+}
+
+// find 用的回调：标题不区分大小写子串命中即记录并停。
+static BOOL CALLBACK sys_win_find_cb(HWND h, LPARAM lp) {
+  sys_win_find_ctx_t *ctx = (sys_win_find_ctx_t *)lp;
+  if (!IsWindowVisible(h)) {
+    return TRUE;
+  }
+  wchar_t t[256];
+  t[0] = L'\0';
+  if (GetWindowTextW(h, t, 256) <= 0) {
+    return TRUE;
+  }
+  if (sys_wcs_icontains(t, ctx->needle)) {
+    ctx->target = h;
+    return FALSE;
+  }
+  return TRUE;
+}
+
+// 激活窗口：最小化先还原再置前。
+int32_t yue_sys_win_activate(const char *id_or_title, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  HWND h = sys_win_find(id_or_title);
+  if (h == NULL) {
+    return 0;
+  }
+  if (IsIconic(h)) {
+    ShowWindow(h, SW_RESTORE);
+  }
+  SetForegroundWindow(h);
+  *ok = 1;
+  return 0;
+#else
+  (void)id_or_title;
+  return 0;
+#endif
+}
+
+// 关闭窗口（首个标题子串匹配；WM_CLOSE 走正常关闭流程，不强杀）。
+int32_t yue_sys_win_close(const char *title, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  HWND h = sys_win_find(title);
+  if (h == NULL) {
+    return 0;
+  }
+  PostMessageW(h, WM_CLOSE, 0, 0);
+  *ok = 1;
+  return 0;
+#else
+  (void)title;
   return 0;
 #endif
 }

@@ -470,6 +470,40 @@ fn si_read_dmi(name : String) -> String? {
 ///|
 /// 发行版标识（/etc/os-release 的 PRETTY_NAME / ID / VERSION_ID；文件
 /// 读不到 → SiReadFailed，格式不符 → SiParseFailed）。
+///|
+/// Windows 直调：读 HKLM 注册表 REG_SZ 值（UTF-8）。
+#borrow(subkey, value, ok)
+extern "c" fn ffi_reg_sz(subkey : Bytes, value : Bytes, ok : Ref[Int]) -> Bytes = "yue_sys_reg_sz"
+
+///|
+/// Windows 直调：物理内存快照（KB）。
+#borrow(total_kb, avail_kb, ok)
+extern "c" fn ffi_memory_kb(
+  total_kb : Ref[Int64],
+  avail_kb : Ref[Int64],
+  ok : Ref[Int],
+) -> Int = "yue_sys_memory_kb"
+
+///|
+/// Windows 直调：开机秒数。
+extern "c" fn ffi_uptime_seconds() -> Double = "yue_sys_uptime_seconds"
+
+///|
+fn si_win_reg(subkey : String, value : String) -> String? {
+  let ok = Ref(0)
+  let b = ffi_reg_sz(@utf8.encode(subkey), @utf8.encode(value), ok)
+  if ok.val != 1 {
+    return None
+  }
+  let v = @utf8.decode_lossy(b)
+  if v == "" {
+    None
+  } else {
+    Some(v)
+  }
+}
+
+///|
 pub fn si_os() -> Result[OsInfo, SysInfoError] {
   match sys_platform() {
     "linux" =>
@@ -481,6 +515,25 @@ pub fn si_os() -> Result[OsInfo, SysInfoError] {
             None => Err(SiParseFailed("/etc/os-release: 缺少 PRETTY_NAME"))
           }
       }
+    "windows" => {
+      // 注册表 CurrentVersion：ProductName（"Windows 11 Pro"）+ DisplayVersion（"24H2"）
+      let name = match si_win_reg(
+          "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+          "ProductName",
+        ) {
+        Some(v) => v
+        None => return Err(SiReadFailed("HKLM CurrentVersion:ProductName"))
+      }
+      let ver = match si_win_reg(
+          "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+          "DisplayVersion",
+        ) {
+        Some(v) => v
+        None => ""
+      }
+      let pretty = if ver == "" { name } else { name + " " + ver }
+      Ok({ pretty_name: pretty, id: "windows", version_id: ver })
+    }
     _ => Err(SiUnsupported)
   }
 }
@@ -506,6 +559,31 @@ pub fn si_machine() -> Result[MachineInfo, SysInfoError] {
       }
       Ok({ vendor, product, serial, })
     }
+    "windows" => {
+      // BIOS DMI 的注册表镜像（HKLM\HARDWARE\DESCRIPTION\System\BIOS）
+      let bios = "HARDWARE\\DESCRIPTION\\System\\BIOS"
+      let vendor = match si_win_reg(bios, "SystemManufacturer") {
+        Some(v) => v
+        None => return Err(SiReadFailed(bios + ":SystemManufacturer"))
+      }
+      let product = match si_win_reg(bios, "SystemProductName") {
+        Some(v) => v
+        None => return Err(SiReadFailed(bios + ":SystemProductName"))
+      }
+      // 序列号：BIOS SerialNumber 常缺（组装机），兜底 MachineGuid（机器唯一标识）
+      let serial = match si_win_reg(bios, "SerialNumber") {
+        Some(v) if v != "" => v
+        _ =>
+          match si_win_reg(
+              "SOFTWARE\\Microsoft\\Cryptography",
+              "MachineGuid",
+            ) {
+            Some(v) => v
+            None => return Err(SiReadFailed("BIOS SerialNumber/Cryptography MachineGuid"))
+          }
+      }
+      Ok({ vendor, product, serial, })
+    }
     _ => Err(SiUnsupported)
   }
 }
@@ -515,6 +593,16 @@ pub fn si_machine() -> Result[MachineInfo, SysInfoError] {
 /// 文件读不到 → SiReadFailed，关键行缺失 → SiParseFailed）。
 pub fn si_memory() -> Result[MemoryInfo, SysInfoError] {
   match sys_platform() {
+    "windows" => {
+      let total = Ref(0L)
+      let avail = Ref(0L)
+      let ok = Ref(0)
+      let _ = ffi_memory_kb(total, avail, ok)
+      if ok.val != 1 {
+        return Err(SiReadFailed("GlobalMemoryStatusEx"))
+      }
+      Ok({ total_kb: total.val.to_int(), available_kb: avail.val.to_int() })
+    }
     "linux" =>
       match sys_read_text_file("/proc/meminfo") {
         None => Err(SiReadFailed("/proc/meminfo"))
@@ -534,6 +622,14 @@ pub fn si_memory() -> Result[MemoryInfo, SysInfoError] {
 /// 格式不符 → SiParseFailed）。
 pub fn si_uptime() -> Result[Double, SysInfoError] {
   match sys_platform() {
+    "windows" => {
+      let t = ffi_uptime_seconds()
+      if t <= 0.0 {
+        Err(SiParseFailed("GetTickCount64"))
+      } else {
+        Ok(t)
+      }
+    }
     "linux" =>
       match sys_read_text_file("/proc/uptime") {
         None => Err(SiReadFailed("/proc/uptime"))

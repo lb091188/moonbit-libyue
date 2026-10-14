@@ -339,7 +339,72 @@ fn win_probe(prog : String) -> Bool {
 /// 当前系统是否支持窗口管理：Linux 且 wmctrl / xdotool 任一存在。
 /// 工具缺失是合法状态（返回 false，不是失败）。每次调用真实探测，高频
 /// 场景请调用方自行缓存结果。
+///|
+/// Windows 直调：枚举可见顶层窗口，行「0xhwnd\tmonitor\ttitle\n」。
+#borrow(ok)
+extern "c" fn ffi_win_list(ok : Ref[Int]) -> Bytes = "yue_sys_win_list"
+
+///|
+/// Windows 直调：本机名。
+#borrow(ok)
+extern "c" fn ffi_host_name(ok : Ref[Int]) -> Bytes = "yue_sys_host_name"
+
+///|
+/// Windows 直调：激活（0x id 或标题子串）。
+#borrow(id_or_title, ok)
+extern "c" fn ffi_win_activate(id_or_title : Bytes, ok : Ref[Int]) -> Int = "yue_sys_win_activate"
+
+///|
+/// Windows 直调：关闭（标题子串，首个匹配）。
+#borrow(title, ok)
+extern "c" fn ffi_win_close(title : Bytes, ok : Ref[Int]) -> Int = "yue_sys_win_close"
+
+///|
+fn win_win_host() -> String {
+  let ok = Ref(0)
+  let b = ffi_host_name(ok)
+  if ok.val == 1 {
+    @utf8.decode_lossy(b)
+  } else {
+    ""
+  }
+}
+
+///|
+fn win_win_parse_list(blob : String) -> Array[WindowInfo] {
+  let host = win_win_host()
+  let out : Array[WindowInfo] = []
+  for line in blob.split("\n") {
+    if line == "" {
+      continue
+    }
+    // 行格式：id\tdesktop\ttitle（标题本身可能含 tab：第三段起全部并回标题）
+    let parts = line.split("\t").to_array()
+    if parts.length() < 3 {
+      continue
+    }
+    let desktop = match win_parse_int(parts[1].to_owned()) {
+      Some(v) => v
+      None => 0
+    }
+    let mut title = parts[2].to_owned()
+    let mut k = 3
+    while k < parts.length() {
+      title = title + "\t" + parts[k].to_owned()
+      k = k + 1
+    }
+    if title == "" {
+      continue
+    }
+    let _ = out.push({ id: parts[0].to_owned(), desktop, host, title })
+  }
+  out
+}
+///|
 pub fn win_supported() -> Bool {
+  if sys_platform() == "windows" {
+    return true
+  }
   if !pr_available() {
     return false
   }
@@ -351,6 +416,14 @@ pub fn win_supported() -> Bool {
 /// 需要 X 会话；无会话时 wmctrl 以非零退出呈现，返回
 /// Err([WinError.CommandFailed])。
 pub fn win_list() -> Result[Array[WindowInfo], WinError] {
+  if sys_platform() == "windows" {
+    let ok = Ref(0)
+    let b = ffi_win_list(ok)
+    if ok.val != 1 {
+      return Err(CommandFailed("EnumWindows 失败"))
+    }
+    return Ok(win_win_parse_list(@utf8.decode_lossy(b)))
+  }
   match pr_run("wmctrl", ["-l"], timeout_ms=4000) {
     Ok(o) => win_parse_list(o.stdout)
     Err(e) => Err(win_map_err("wmctrl -l", e))
@@ -365,6 +438,14 @@ pub fn win_activate(id_or_title : String) -> Result[Unit, WinError] {
   if id_or_title == "" {
     return Err(InvalidParam("窗口 id 或标题为空"))
   }
+  if sys_platform() == "windows" {
+    let ok = Ref(0)
+    let _ = ffi_win_activate(@utf8.encode(id_or_title), ok)
+    if ok.val == 1 {
+      return Ok(())
+    }
+    return Err(CommandFailed("窗口不存在或激活失败"))
+  }
   win_apply(win_activate_args(id_or_title))
 }
 
@@ -374,6 +455,14 @@ pub fn win_activate(id_or_title : String) -> Result[Unit, WinError] {
 pub fn win_close(title : String) -> Result[Unit, WinError] {
   if title == "" {
     return Err(InvalidParam("窗口标题为空"))
+  }
+  if sys_platform() == "windows" {
+    let ok = Ref(0)
+    let _ = ffi_win_close(@utf8.encode(title), ok)
+    if ok.val == 1 {
+      return Ok(())
+    }
+    return Err(CommandFailed("窗口不存在"))
   }
   win_apply(win_close_args(title))
 }

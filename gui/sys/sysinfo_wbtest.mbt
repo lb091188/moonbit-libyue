@@ -243,3 +243,39 @@ test "本机 DMI:sys_vendor/product_name 可读,product_serial 可缺" {
     Err(_) => assert_true(false, msg="si_machine 只应给 ReadFailed/Unsupported 或 Ok")
   }
 }
+
+///|
+test "si Windows 直调读数环：os/machine/memory/uptime 全通道" {
+  if sys_platform() != "windows" {
+    println("si: skip (windows-only 读数环)")
+    return
+  }
+  match si_os() {
+    Ok(os) => assert_true(os.pretty_name.has_prefix("Windows") && os.id == "windows")
+    Err(e) => {
+      println("si_os failed: \{e}")
+      assert_true(false)
+    }
+  }
+  match si_machine() {
+    Ok(m) => assert_true(m.vendor != "" && m.product != "" && m.serial != "")
+    Err(e) => {
+      println("si_machine failed: \{e}")
+      assert_true(false)
+    }
+  }
+  match si_memory() {
+    Ok(m) => assert_true(m.total_kb > 0 && m.available_kb > 0 && m.available_kb <= m.total_kb)
+    Err(e) => {
+      println("si_memory failed: \{e}")
+      assert_true(false)
+    }
+  }
+  match si_uptime() {
+    Ok(t) => assert_true(t > 0.0)
+    Err(e) => {
+      println("si_uptime failed: \{e}")
+      assert_true(false)
+    }
+  }
+}

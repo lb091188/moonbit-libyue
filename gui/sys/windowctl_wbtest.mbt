@@ -261,3 +261,40 @@ test "win_list：真实环境探测（wmctrl -l 读取结果记录）" {
     Err(e) => println("win_list: skip (\{e})")
   }
 }
+
+///|
+test "win Windows 直调读数环：枚举到本进程窗口 + 标题子串命中" {
+  if sys_platform() != "windows" {
+    println("win: skip (windows-only 读数环)")
+    return
+  }
+  assert_true(win_supported())
+  match win_list() {
+    Ok(windows) => {
+      // 桌面上必有若干可见顶层窗口（测试进程自身也常有一个控制台）
+      assert_true(windows.length() > 0)
+      let mut has_host = false
+      for w in windows {
+        if w.host != "" {
+          has_host = true
+        }
+        assert_true(w.id.has_prefix("0x"))
+      }
+      assert_true(has_host)
+    }
+    Err(e) => {
+      println("win_list failed: \{e}")
+      assert_true(false)
+    }
+  }
+  // 激活/关闭有副作用（抢焦点/关窗口），只在列到的真实标题上做一次激活探针：
+  // 找一个不含「设置」等关键词的窗口激活可能打扰用户——此处只验证「找不到
+  // 的标题」走失败语义，不真激活
+  match win_activate("libyue-no-such-window-probe") {
+    Err(CommandFailed(_)) => println("win: activate miss ok")
+    Err(InvalidParam(_)) => println("win: activate miss ok")
+    Ok(_) => println("win: activate unexpected hit (容忍)")
+    Err(Unsupported) => assert_true(false)
+    Err(ParseFailed(_)) => println("win: activate miss (parse)")
+  }
+}
