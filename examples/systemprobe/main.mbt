@@ -605,7 +605,7 @@ fn main {
         @ui.button(
           "打开目录",
           on_click=fn() -> Unit {
-            let _ = @sys.reveal_in_file_manager("/tmp")
+            let _ = @core.reveal_in_file_manager("/tmp")
             reveals.update(fn(n : Int) -> Int { n + 1 })
             app.schedule_paint()
           },

@@ -156,9 +156,10 @@ pub fn open_url(url : String) -> Result[Unit, OpenUrlError] {
 }
 
 ///|
-/// 在文件管理器中打开路径所在目录（相对路径按工作目录解析）。文件管理器
-/// 总线通道的「打开并选中」随 DBus 线接入，当前一律落到打开父目录（选中
-/// 态丢失）。
+/// 在文件管理器中打开路径所在目录（相对路径按工作目录解析）。**这是命令行退路，
+/// 选中态丢失**：要「打开并选中」请调 `@core.reveal_in_file_manager`——它在
+/// Linux 上先走会话总线的 `FileManager1.ShowItems`（`@dbus` 依赖本包，两条通道
+/// 只能在 core 会师），不在线才退回这里。
 pub fn reveal_in_file_manager(
   path : String,
 ) -> Result[Unit, FileManagerError] {

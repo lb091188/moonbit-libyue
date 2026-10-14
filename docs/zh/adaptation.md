@@ -1962,6 +1962,16 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **顺带排除**:演示文案里那两个「✕」是**正文里的 U+2715 字符**,本机 DejaVu Sans 与文泉驿微米黑都覆盖该码位(`fc-list :charset=2715` 实测有),不是缺字豆腐块;截图里那三个红框是用户手绘标注。
 - **待真机复验**(用户执行):反馈组件页的可关闭横幅右侧应出现 ✕ 标记、点它整条收起;其余不可关闭的横幅不该出现标记。
 
+## 「在文件管理器显示」只开目录不选中：两条通道要在 core 会师（2026-10-14，真机反馈）
+
+- **现象**：XFCE 上点「在文件管理器显示 TODO.md」，Thunar 打开了那个目录，但 `TODO.md` 没有被选中。
+- **根因**：`@sys.reveal_in_file_manager` 的 Linux 分支就是 `xdg-open <父目录>`，它自己的文档注释写着「总线通道的『打开并选中』随 DBus 线接入，当前一律落到打开父目录（选中态丢失）」—— 而 `FileManager1.ShowItems` 那一半**早就住在 `@dbus`**（`filemanager_available` / `show_items` / `file_uri` 三条齐全，URI 百分号编码还有测试覆盖），只是**没人把两条接起来**。接不起来是分层决定的：`@dbus` 依赖 `@sys`，sys 不能反向 import dbus，会师点只能是 core。
+- **外测（本机）**：`gdbus` 问 `NameHasOwner org.freedesktop.FileManager1` → `(true,)`（Thunar 注册了它）；`thunar --help` 里**没有** `--select` 这类命令行开关 —— 总线是唯一能带选中的通道，退回 `xdg-open` 必然丢选中。
+- **修复**：新增 `gui/core/reveal.mbt`，`@core.reveal_in_file_manager(path)`：Linux 且 FileManager1 在线时走 `show_items([reveal_uri(path, cwd)])`，不在线或这次调用失败才退回 `@sys` 的命令行路径；Windows 仍由 sys 直调 `explorer /select`。纯函数 `reveal_uri(path, cwd)` 单独露出来钉测试（选中态成不成就看这一串：必须绝对化 + 百分号编码）。sys 那条的文档改成点名「这是退路，要选中走 `@core`」；演示两处（showcase 外部段、systemprobe 的 reveal）改调 core 版。
+- **验证**：core 新增 1 条 URI 回归（相对路径绝对化、空格、中文三段）→ `moon test core` 138/138、库全包 939/939、`cd gui` 与 `cd examples` 的 `--deny-warn` 零错误零警告、`moon build showcase`/`moon build systemprobe` 链接通过。真机可见结果（Thunar 里高亮那一项）按规则 6 归用户（清单 S14）。
+- **口径**：**两条通道分住两层时，会师点必须是同时看得见两者的那一层**，并且文档要点名退路会丢什么（这里丢「选中」）。否则能力其实齐备、行为却停在退路上，看起来就像「没做」。
+- **待真机复验**（用户执行）：showcase 外部段点「在文件管理器显示 TODO.md」→ Thunar 打开仓库根目录且 **TODO.md 处于选中态**；systemprobe 的 reveal（`/tmp`）应把 `/tmp` 本身选中。
+
 ## Linux 托盘「没启动」：演示把整段建托盘挂在图标句柄成功之后（2026-10-14，真机反馈）
 
 - **现象**：showcase / native-app 在 Linux 上托盘图标始终不出，页内回显停在「建图标失败」。

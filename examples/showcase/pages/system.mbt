@@ -523,7 +523,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
     @shared.section(
       "外部",
       "打开外部",
-      "把 URL 交给默认浏览器、把路径交给文件管理器。Ok 只表示已交给系统，之后归操作系统。",
+      "把 URL 交给默认浏览器、把路径交给文件管理器。路径走 `@core.reveal_in_file_manager`：Linux 先试会话总线的 `FileManager1.ShowItems`（打开并**选中**），不在线才退回 `xdg-open` 打开父目录（选中态丢失）。Ok 只表示已交给系统，之后归操作系统。",
       [
         @ui.row(
           [
@@ -534,7 +534,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
               }
             }),
             @ui.button("在文件管理器显示 TODO.md", variant=@ui.Soft, on_click=fn() {
-              match @sys.reveal_in_file_manager("TODO.md") {
+              match @core.reveal_in_file_manager("TODO.md") {
                 Ok(_) => ext_out.set("已交给文件管理器")
                 Err(e) => ext_out.set("显示失败：\{e}")
               }
@@ -549,7 +549,8 @@ pub fn page_system(app : @shared.App) -> @core.Node {
         "  Ok(_) => println(\"已交给默认浏览器\")",
         "  Err(e) => println(\"失败: \\{e}\")",
         "}",
-        "match @sys.reveal_in_file_manager(\"TODO.md\") { ... }",
+        "// 打开并选中：Linux 走 FileManager1.ShowItems，退回 xdg-open 父目录\n",
+        "match @core.reveal_in_file_manager(\"TODO.md\") { ... }",
       ],
     ),
     @shared.section(
