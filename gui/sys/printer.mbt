@@ -479,8 +479,7 @@ fn prt_win_status(code : Int) -> PrinterStatus {
 ///|
 ///|
 /// Windows 直调：ShellExecuteW「print」动词打印文件。
-#borrow(path)
-#borrow(ok)
+#borrow(path, ok)
 extern "c" fn ffi_shell_print(path : Bytes, ok : Ref[Int]) -> Int = "yue_sys_shell_print"
 
 ///|
