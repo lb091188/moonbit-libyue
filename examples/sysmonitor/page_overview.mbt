@@ -120,7 +120,7 @@ fn res_card(
         p.fill_rect(0.0, 0.0, r.w, r.h)
         p.set_stroke_color(if act { t.primary } else { t.border })
         p.set_line_width(1.0)
-        p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+        p.stroke_rect(0.0, 0.0, r.w, r.h)
       })
       // 主题切换 / 选中态变化都只请求一次全窗重绘
       ignore(@theme.on_theme_change(fn() { @core.invalidate() }))

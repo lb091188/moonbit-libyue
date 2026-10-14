@@ -143,7 +143,7 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
             p.fill_rect(0.0, 0.0, r.w, r.h)
             p.set_stroke_color(@theme.theme_border())
             p.set_line_width(1.0)
-            p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+            p.stroke_rect(0.0, 0.0, r.w, r.h)
             p.flush()
             let _ = rt.draw_at(p, 10.0, 20.0, r.w - 20.0, r.h - 30.0)
           })

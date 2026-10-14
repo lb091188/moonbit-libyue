@@ -287,7 +287,7 @@ fn draw_cell(
       fill_round_rect(p, 10.0, (r.h - 14.0) / 2.0, 14.0, 14.0, 3.0)
       p.set_stroke_color(@theme.theme_border())
       p.set_line_width(1.0)
-      p.stroke_rect(10.5, (r.h - 14.0) / 2.0 + 0.5, 13.0, 13.0)
+      p.stroke_rect(10.0, (r.h - 14.0) / 2.0, 14.0, 14.0)
       let _ = @text.draw_box_at(
         p,
         30.0,
@@ -688,7 +688,7 @@ pub fn table(
       p.fill_rect(0.0, 0.0, r.w, r.h)
       p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
       p.set_line_width(@style.number_of(st.border_width, 1.0))
-      p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+      p.stroke_rect(0.0, 0.0, r.w, r.h)
     })
     // ---- 表头（共用构造） ----
     w.append_child(

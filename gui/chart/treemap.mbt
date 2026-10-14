@@ -415,18 +415,18 @@ fn tm_draw_nodes(
     if hot {
       p.set_stroke_color(@theme.theme_text_primary())
       p.stroke_rect(
-        cell.x + 0.5,
-        cell.y + 0.5,
-        (cell.width - 1.0).max(0.0),
-        (cell.height - 1.0).max(0.0),
+        cell.x,
+        cell.y,
+        cell.width.max(0.0),
+        cell.height.max(0.0),
       )
     } else if expand {
       p.set_stroke_color(@theme.theme_border())
       p.stroke_rect(
-        cell.x + 0.5,
-        cell.y + 0.5,
-        (cell.width - 1.0).max(0.0),
-        (cell.height - 1.0).max(0.0),
+        cell.x,
+        cell.y,
+        cell.width.max(0.0),
+        cell.height.max(0.0),
       )
     }
     let header = if cell.height > tm_header_h { tm_header_h } else { 0.0 }

@@ -279,13 +279,14 @@ test "主题化按钮：宽度随文本、抬起落在框内才算点击、焦�
   })
   assert_eq(hits, 1)
 
-  // 焦点环：未聚焦时整块是浅底，聚焦后 1px 环落在第二列（描边中心在 0.5）
+  // 焦点环：未聚焦时是浅底，聚焦后 1px 环落在**第 0 列**——`stroke_rect` 是
+  // 内侧描边（门面口径），整圈贴着盒子边缘，左右上下同宽
   let mid_y = (w.rect.h / 2.0).round().to_int()
   let (bm0, ox, oy) = shot(w)
-  let edge0 = color_of(bm0, ox + 1, oy + mid_y)
+  let edge0 = color_of(bm0, ox, oy + mid_y)
   let _ = root.set_focused_by_focus(7)
   let (bm1, _, _) = shot(w)
-  let edge1 = color_of(bm1, ox + 1, oy + mid_y)
+  let edge1 = color_of(bm1, ox, oy + mid_y)
   assert_true(edge0 != edge1)
   // 禁用：不消费事件、不回调
   let mut off_hits = 0
@@ -775,4 +776,25 @@ test "步进器三格共框：同高、首尾相接、点 +/- 改值且触界禁
   st.set(0)
   tap(0)
   assert_eq(st.get(), 0)
+}
+
+///|
+test "色板描边贴盒边：内侧描边口径下左右上下同列" {
+  let sel = fn() -> Bool { false }
+  let root = mount_root(
+    [color_swatch("#2D68C4", 26.0, 6.0, sel, fn() { () })],
+    60.0,
+    40.0,
+  )
+  let w = kid(root, 0)
+  let (bm, _, _) = shot(w)
+  let mid = 13
+  let left = color_of(bm, 0, mid)
+  let right = color_of(bm, 25, mid)
+  let top = color_of(bm, mid, 0)
+  let bottom = color_of(bm, mid, 25)
+  let inner = color_of(bm, mid, mid)
+  assert_true(left == right, msg="描边左右不对称（整圈往右下偏）")
+  assert_true(top == bottom, msg="描边上下不对称（整圈往右下偏）")
+  assert_true(left != inner, msg="描边没落在盒子边缘")
 }

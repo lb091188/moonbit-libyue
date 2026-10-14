@@ -373,7 +373,7 @@ pub fn message_box(
             fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
             p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
             p.set_line_width(@style.number_of(st.border_width, 1.0))
-            p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+            p.stroke_rect(0.0, 0.0, r.w, r.h)
             let _ = @text.draw_box_at(
               p,
               0.0,
@@ -430,7 +430,7 @@ pub fn message_box(
           fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 6.0))
           p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
           p.set_line_width(@style.number_of(st.border_width, 1.0))
-          p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+          p.stroke_rect(0.0, 0.0, r.w, r.h)
         })
         // Esc 收起、Enter 触发默认钮：键盘事件按焦点投递，面板自己就是焦点控件
         // （层级上它比遮罩深，键先到它这里）

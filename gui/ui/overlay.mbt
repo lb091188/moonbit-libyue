@@ -43,7 +43,7 @@ fn overlay_pane(
       p.fill_rect(0.0, 0.0, r.w, r.h)
       p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
       p.set_line_width(@style.number_of(st.border_width, 1.0))
-      p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+      p.stroke_rect(0.0, 0.0, r.w, r.h)
     })
     @core.mount_children(w, children)
     w
@@ -213,7 +213,7 @@ pub fn dropdown(
       fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
       p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
       p.set_line_width(@style.number_of(st.border_width, 1.0))
-      p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+      p.stroke_rect(0.0, 0.0, r.w, r.h)
       let _ = @text.draw_box_at(
         p,
         10.0,
@@ -576,7 +576,7 @@ pub fn dialog(
           fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
           p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
           p.set_line_width(@style.number_of(st.border_width, 1.0))
-          p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+          p.stroke_rect(0.0, 0.0, r.w, r.h)
           let _ = @text.draw_box_at(
             p,
             0.0,
@@ -637,7 +637,7 @@ pub fn dialog(
         fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 6.0))
         p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
         p.set_line_width(@style.number_of(st.border_width, 1.0))
-        p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+        p.stroke_rect(0.0, 0.0, r.w, r.h)
       })
       panel.append_child(title_bar)
       panel.append_child(close_btn)
@@ -714,7 +714,7 @@ pub fn toast_layer(
           fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
           p.set_stroke_color(@theme.theme_border())
           p.set_line_width(1.0)
-          p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+          p.stroke_rect(0.0, 0.0, r.w, r.h)
           let kind : @icons.IconKind = match t {
             Primary | Info => @icons.IconKind::InfoCircleFill
             Success => @icons.IconKind::CheckCircleFill

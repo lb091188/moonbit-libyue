@@ -75,6 +75,7 @@
   - [ ] 观感逐页比对不回退（真机由用户复验，`examples/hello`、`hello-themed`、`showcase`、`native-app`、`sysmonitor`）。
 - [x] **P3 响应式补强**（2026-10-14 落地）：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘（`tick`）/ `for_list`+`when` / `mount_window_render` 的 `render` 槽 / `Store` 内建去重（`T : Eq` 走 `set_eq`，已定案）全部落地。
 - [x] **P4 绘制能力**：`Painter` 全局 alpha（opacity 全路径）+ `box_shadow` 硬阴影档（真机观感复验归 `_人工测试清单.md`；模糊档待 blur 能力再评估）。
+- [x] **描边口径统一（2026-10-14，真机反馈「色板边框偏移」）**：门面契约是「`stroke_rect` 落在矩形**内侧**」（两后端同实现），但全仓 28 处调用点按居中习惯给 `(0.5, 0.5, w-1, h-1)` ⇒ 环整体往右下偏 1px（左/上露一条色底）。换算 `(x-lw/2, y-lw/2, w+lw, h+lw)` 并全仓切过（ui + chart + 示例）；按钮焦点环那条测试原本照着错几何采第 1 列，改采第 0 列，另加色板四边对称钉桩。
 - [x] **表单页三件**（2026-10-14，真机反馈）：① 输入框默认吃不到键盘焦点（`focus_id?` 默认 0 = 宿主判「不可聚焦」）⇒ `input`/`textarea` 未给号时自动分配（1000000 起，显式号仍优先）；② 焦点变化标脏把**焦点 id** 当**实例 id** 查树（`mark_focus_rect`→`mark_id_rect`）⇒ 新增 `mark_focus_id_rect` 走 `find_by_focus_id`；③ `input` 补 `clearable`（EP 同名，默认关，悬停/聚焦出 ✕，点它清空回写）；④ 步进器 `[-] 值 [+]` 改共框（外框由行容器画一次，格内只画悬停底+分隔线；旧形态三圈边框看着没粘住，实测三格本就同高）。
 - [x] **图表页一直「暂无数据」**（2026-10-14，真机反馈）：`set_timeout` 的进程级通道由 `App::new` 装，无宿主时空操作返回 0；而 `page_charts(app)` 是 `mount_window` 的实参、求值早于建窗 ⇒ 构造期排的第一拍永不触发。改成挂在 `handle`（`mount_children` 之后跑）上；页内代码示例同步改口径。同批：段说明补 `wrap=true`（原来是一条 900px 不折行的文本，尾部整片裁字）。
 - [x] **yoga-mbt 自由空间漏减行间隙**（2026-10-14，真机反馈「复制按钮还是有问题」）：§9.7 分配里 `initial_free` / `remaining` / auto-margin `free` / justify `free2` 只减子项外框和、没减 `gap x (n-1)`，而定位又逐项加 gap ⇒ grow 项多吃间隙、整行溢出容器（判据：行宽 100 + gap 10 + [固定 30, grow 1] 应为 60，修前 70）。四处统一先减 `gap_total`。

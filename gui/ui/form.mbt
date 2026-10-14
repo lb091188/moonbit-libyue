@@ -689,7 +689,7 @@ pub fn button(
       if bd.length() > 0 {
         p.set_stroke_color(bd)
         p.set_line_width(@style.number_of(s.border_width, 1.0))
-        p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+        p.stroke_rect(0.0, 0.0, r.w, r.h)
       }
       if self.focused {
         match variant {
@@ -697,12 +697,12 @@ pub fn button(
           Solid | Danger => {
             p.set_stroke_color("#ffffff")
             p.set_line_width(1.0)
-            p.stroke_rect(1.5, 1.5, r.w - 3.0, r.h - 3.0)
+            p.stroke_rect(1.0, 1.0, r.w - 2.0, r.h - 2.0)
           }
           _ => {
             p.set_stroke_color(@theme.theme_primary())
             p.set_line_width(1.0)
-            p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+            p.stroke_rect(0.0, 0.0, r.w, r.h)
           }
         }
       }
@@ -1238,10 +1238,10 @@ fn color_swatch(
       p.fill_rect(0.0, 0.0, r.w, r.h)
       p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
       p.set_line_width(1.0)
-      p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+      p.stroke_rect(0.0, 0.0, r.w, r.h)
       if selected() {
         p.set_stroke_color(@theme.theme_primary())
-        p.stroke_rect(1.5, 1.5, r.w - 3.0, r.h - 3.0)
+        p.stroke_rect(1.0, 1.0, r.w - 2.0, r.h - 2.0)
         p.set_stroke_color("#ffffff")
         p.set_line_width(1.4)
         p.begin_path()

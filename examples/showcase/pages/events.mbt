@@ -97,7 +97,7 @@ fn skin_panel(w : @core.Widget) -> Unit {
     p.fill_rect(0.0, 0.0, r.w, r.h)
     p.set_stroke_color(@theme.theme_border())
     p.set_line_width(1.0)
-    p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+    p.stroke_rect(0.0, 0.0, r.w, r.h)
   })
 }
 
@@ -131,7 +131,7 @@ fn key_focus_area(echo : @core.Store[String]) -> @core.Node {
           @theme.theme_border()
         })
         p.set_line_width(1.0)
-        p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+        p.stroke_rect(0.0, 0.0, r.w, r.h)
         // 文本走 text 自己的 Cairo 会话，与 Painter 会话交替前刷一次
         p.flush()
         let _ = @text.draw_box_at(

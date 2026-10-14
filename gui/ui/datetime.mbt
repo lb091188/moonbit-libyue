@@ -327,7 +327,7 @@ fn build_calendar(
     p.fill_rect(0.0, 0.0, r.w, r.h)
     p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
     p.set_line_width(@style.number_of(st.border_width, 1.0))
-    p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+    p.stroke_rect(0.0, 0.0, r.w, r.h)
   })
   let view_y = Ref(today.y)
   let view_m = Ref(today.m)

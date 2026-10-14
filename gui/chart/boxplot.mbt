@@ -256,7 +256,7 @@ fn draw_boxplot(
     p.set_fill_color(with_alpha(color, "33"))
     p.fill_rect(bx, yq3, bw, box_h)
     p.set_stroke_color(color)
-    p.stroke_rect(bx + 0.5, yq3 + 0.5, bw - 1.0, box_h - 1.0)
+    p.stroke_rect(bx, yq3, bw, box_h)
     // 中位线（3px 实心）
     let ymed = map_y(s.median, lo, hi, y0, y1)
     p.set_fill_color(color)

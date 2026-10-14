@@ -136,7 +136,7 @@ pub fn ci_tip_draw(
   p.set_fill_color(ci_tip_bg)
   p.fill_rect(x, y, tw, th)
   p.set_stroke_color(ci_tip_border)
-  p.stroke_rect(x + 0.5, y + 0.5, tw - 1.0, th - 1.0)
+  p.stroke_rect(x, y, tw, th)
   let f = label_font()
   let mut ly = y + 8.0
   if tip.title != "" {

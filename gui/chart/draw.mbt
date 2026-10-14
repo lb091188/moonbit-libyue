@@ -417,7 +417,7 @@ pub fn draw_bar_chart(
         p.set_fill_color(light_color)
         p.fill_rect(bx, top, bw, bh)
         p.set_stroke_color(base_color)
-        p.stroke_rect(bx + 0.5, top + 0.5, (bw - 1.0).max(1.0), (bh - 1.0).max(1.0))
+        p.stroke_rect(bx, top, bw.max(1.0), bh.max(1.0))
       } else {
         p.set_fill_color(base_color)
         p.fill_rect(bx, top, bw, bh)
@@ -489,7 +489,7 @@ pub fn draw_bar_chart(
         p.set_fill_color(light_color)
         p.fill_rect(left, by, bw, bh)
         p.set_stroke_color(base_color)
-        p.stroke_rect(left + 0.5, by + 0.5, (bw - 1.0).max(1.0), (bh - 1.0).max(1.0))
+        p.stroke_rect(left, by, bw.max(1.0), bh.max(1.0))
       } else {
         p.set_fill_color(base_color)
         p.fill_rect(left, by, bw, bh)
