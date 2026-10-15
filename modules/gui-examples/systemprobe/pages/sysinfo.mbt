@@ -1,6 +1,6 @@
 // 系统能力页：真实读取本机数据。G7 新栈迁移记档（与 master 旧页的差）：
-// ① 21 族探针里本栈已平移的 16 族走 `@sys` 真调（音量/亮度/浏览器历史与
-//    下载/VS Code/应用查找/默认应用/显示器/窗口/剪贴板/电源计划/系统信息/
+// ① 21 族探针里本栈已平移的 14 族走 `@sys` 真调（音量/浏览器历史与
+//    下载/VS Code/应用查找/显示器/窗口/剪贴板/电源计划/系统信息/
 //    打印机/环境变量/书签/Firefox 历史/最近文件）+ MPRIS 媒体走 `@dbus`；
 //    本栈未接的 5 族（磁盘卷 udisks2/时区语言 timedatectl/蓝牙 bluez/
 //    传感器 iio-sensor-proxy/logind 电源会话）以说明行替代，整段不迁；
@@ -299,7 +299,7 @@ fn sysprobe_collect() -> String {
 /// 系统能力页：读取按钮把快照写进报告标签。
 pub fn page_sysinfo(_app : @shared.ProbeApp) -> @core.Node {
   let report : @core.Store[String] = @core.Store::new(
-    "(点击按钮后此处显示 音量/亮度/浏览器历史/VS Code/应用查找/媒体/显示器/窗口/剪贴板/电源计划/系统信息/打印机/环境变量/书签/Firefox/最近文件 的读取结果)",
+    "(点击按钮后此处显示 音量/浏览器历史/VS Code/应用查找/媒体/显示器/窗口/剪贴板/电源计划/系统信息/打印机/环境变量/书签/Firefox/最近文件 的读取结果)",
   )
   @shared.page([
     @shared.section(

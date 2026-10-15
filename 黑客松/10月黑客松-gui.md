@@ -26,7 +26,7 @@ native-gui 是为 MoonBit 生态打造的**原生跨平台桌面 GUI 库**——
 // 声明式挂载：一个库调用完成窗口创建、控件挂载、事件循环启动
 fn main {
   let app = match @ui.mount_window(
-    [@ui.label("Hello, MoonBit!", size=18.0)],
+    [@ui.text("Hello, MoonBit!", font_size=18.0)],
     title="Hello, MoonBit!",
     width=400,
     height=300,
@@ -86,9 +86,9 @@ let count : @core.Store[Int] = @core.Store::new(0)
   - 自启动 / 用户空闲检测 / 子进程 / 环境变量
   - 文件 / JSON / 文件对话框 / 最近文件
   - 浏览器历史与书签 / 已装应用查找
-  - 壁纸 / 音量 / 亮度 / 电源 / 打印机 / 显示器 / 窗口控制
+  - 壁纸 / 音量 / 电源 / 打印机 / 显示器 / 窗口控制
 - Linux 桥（@dbus，纯 MoonBit 协议栈）
-  - 托盘 SNI / 通知 / 亮度
+  - 托盘 SNI / 通知
   - logind / upower / MPRIS 媒体 / 网络 / 屏保
 - 窗口后端（@win）：平台窗口桩层——门面之下的平台实现（表面 / 图标 / IME 等），对外能力一律经跨平台门面暴露
 - 图表（@chart）：折线 / 柱状 / 饼 / 仪表 / 散点 / 雷达 / 热力 / K 线 / 漏斗 / 箱线 / 桑基 / 树 / 矩形树 / 旭日 + 横向交互层

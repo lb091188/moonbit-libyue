@@ -1,6 +1,6 @@
 # 文档索引
 
-本目录是 **moonbit-libyue** 的使用文档——[MoonBit](https://github.com/moonbitlang) 生态的原生跨平台桌面 GUI 库：窗口、像素、事件循环、布局与控件全部纯 MoonBit 实现，mooncakes 包名为 `NoahLiu/native-gui`。
+本目录是 **native-gui** 的使用文档——[MoonBit](https://github.com/moonbitlang) 生态的原生跨平台桌面 GUI 库：窗口、像素、事件循环、布局与控件全部纯 MoonBit 实现，mooncakes 包名为 `NoahLiu/native-gui`。
 
 ## 包结构
 
@@ -21,6 +21,7 @@
 | `.../native-gui/chart` | `@chart` | 图表 + 横切交互层 |
 | `.../native-gui/mdview` | `@mdview` | Markdown 渲染视图 |
 | `.../native-gui/web` | `@web` | 内嵌 WebView |
+| `.../native-gui/style` | `@style` | 样式层：样式表写成 MoonBit 值（`Style` 规则块 + 具名 class 常量、hover / active / focus 状态、过渡） |
 
 较重的可选能力放在**独立模块**里，而不是主模块的子包——`moon add NoahLiu/native-gui` 不会把它们拉进来：
 
@@ -41,7 +42,7 @@ moon run examples/hello-themed   # 主题控件集
 moon run examples/showcase       # 完整演示板：组件库 + 系统能力
 ```
 
-`examples/showcase` 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 / 反馈 / 代码与文档 / 事件与布局 / Store 对照 + 画布与富文本 + 系统集成；左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。每页源码独立成文件（`examples/showcase/pages/*.mbt`），是最好的复制粘贴素材库；组件库各组件的截图：
+`examples/showcase` 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 / 反馈 / 代码与文档 / 事件与布局 / Store 对照 / 窗口 + 画布与富文本 + 系统集成 + 过渡与效果；左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。每页源码独立成文件（`examples/showcase/pages/*.mbt`），是最好的复制粘贴素材库；组件库各组件的截图：
 
 ![基础组件](/images/showcase-basic.png)
 

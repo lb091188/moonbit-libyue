@@ -1,6 +1,6 @@
 # Linux Tray Design
 
-The tray is the area with the largest platform differences in moonbit-libyue: Linux has no tray runtime library that can be depended on directly, so the library implements the StatusNotifierItem (SNI) protocol stack in pure MoonBit (`dbus/sni.mbt`), connecting to the panel directly over the session bus with zero AppIndicator dependency. This document covers the design, backend selection, menu handling and desktop compatibility; pitfalls and real-desktop verification conclusions are recorded in [docs/adaptation.md](adaptation.md).
+The tray is the area with the largest platform differences in native-gui: Linux has no tray runtime library that can be depended on directly, so the library implements the StatusNotifierItem (SNI) protocol stack in pure MoonBit (`dbus/sni.mbt`), connecting to the panel directly over the session bus with zero AppIndicator dependency. This document covers the design, backend selection, menu handling and desktop compatibility; pitfalls and real-desktop verification conclusions are recorded in [docs/adaptation.md](adaptation.md).
 
 ## Background and constraints
 

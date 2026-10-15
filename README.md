@@ -1,6 +1,6 @@
-# moonbit-libyue [![CI](https://github.com/lb091188/moonbit-native-gui/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-native-gui/actions/workflows/ci.yml)
+# native-gui [![CI](https://github.com/lb091188/moonbit-native-gui/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-native-gui/actions/workflows/ci.yml)
 
-> **⚠ Renamed** — the mooncakes package is now **`NoahLiu/native-gui`** (formerly `NoahLiu/moonbit-libyue`; the old name will be marked deprecated once the stack stabilizes); sub-modules `NoahLiu/yue-media` → **`NoahLiu/gui-media`**, `NoahLiu/yue-examples` → **`NoahLiu/gui-examples`**. 
+> **⚠ Renamed** — this project is now **native-gui** (formerly `moonbit-libyue`): the mooncakes package is **`NoahLiu/native-gui`** (the old name will be marked deprecated once the stack stabilizes); sub-modules `NoahLiu/yue-media` → **`NoahLiu/gui-media`**, `NoahLiu/yue-examples` → **`NoahLiu/gui-examples`**. 
 
 > **On origins** — this library started life as a MoonBit binding of [Cheng Zhao (zcbenz)](https://github.com/zcbenz)'s [Yue / libyue](https://github.com/yue/yue), with [Yoga](https://github.com/facebook/yoga)'s flexbox for layout. The stack is self-drawn now and depends on neither — what stays with us is what we learned from them. Thanks also to [MoonBit](https://github.com/moonbitlang).
 
@@ -8,9 +8,9 @@ A **native cross-platform desktop GUI library** for the [MoonBit](https://github
 
 English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/master/README_ZH.md)
 
-![Component showcase](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/images/showcase-main.png)
+![Component showcase](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/public/images/showcase-main.png)
 
-![Live demo on Linux (XFCE)](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/images/showcase-anim-linux.webp) ![Live demo on Windows](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/images/showcase-anim-windows.webp)
+![Live demo on Linux (XFCE)](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/public/images/showcase-anim-linux.webp) ![Live demo on Windows](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/public/images/showcase-anim-windows.webp)
 
 *Left: Linux (XFCE) · Right: Windows — one MoonBit codebase*
 
@@ -23,7 +23,7 @@ English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/mas
 ```moonbit
 fn main {
   let app = match @ui.mount_window(
-    [@ui.label("Hello, MoonBit!", size=18.0)],
+    [@ui.text("Hello, MoonBit!", font_size=18.0)],
     title="Hello, MoonBit!",
     width=400,
     height=300,
@@ -65,6 +65,7 @@ fn main {
 | `.../native-gui/chart` | `@chart` | Charts, plus the cross-cutting interactive layer |
 | `.../native-gui/mdview` | `@mdview` | Markdown rendering view |
 | `.../native-gui/web` | `@web` | Embedded WebView |
+| `.../native-gui/style` | `@style` | Style layer: stylesheets as MoonBit values — `Style` rule blocks and named class constants, hover / active / focus states, transitions |
 
 Heavier optional capabilities live in **separate modules**, so a plain `moon add` never drags them in:
 
@@ -109,13 +110,15 @@ On Windows, exes are built as a GUI-subsystem binary — no console window on do
 | [docs/adaptation.md](docs/adaptation.md) | Platform adaptation notes: field-tested pitfalls and fixes, per platform |
 | [docs/autostart.md](docs/autostart.md) | Cross-platform autostart |
 | [docs/tray.md](docs/tray.md) | Linux tray: SNI protocol-stack design |
+| [docs/zh/adaptation.md](docs/zh/adaptation.md) | 平台适配经验(中文版) |
 | [docs/zh/system-capabilities.md](docs/zh/system-capabilities.md) | System capabilities overview (Chinese) |
+| [docs/zh/design.md](docs/zh/design.md) | Frontend-layer design notes (Chinese) |
 
 ## Contributing
 
 Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — the macOS backend is the largest open gap (not yet developed; it needs an Apple Silicon machine). A few basic requirements:
 
-- **Commit gate**: `moon check && moon test` zero errors and zero warnings repo-wide
+- **Commit gate**: the MoonBit native toolchain, then `cd gui && moon check && moon test core ui render text theme icons sys input win dbus chart mdview web style` — zero errors, zero warnings
 - **Experience on record**: write field-tested pitfalls together with their fixes into [adaptation.md](docs/adaptation.md) — not only in commit messages
 - **Small batches**: one cohesive change per commit, short commit messages
 
@@ -123,7 +126,7 @@ The full process for adding widgets, CI and releases is in [AGENTS.md](AGENTS.md
 
 ## License
 
-`moonbit-libyue` is released under the [MIT License](LICENSE).
+`native-gui` is released under the [MIT License](LICENSE).
 
 ## References
 

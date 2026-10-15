@@ -1,6 +1,6 @@
 # Linux 托盘方案
 
-托盘是 moonbit-libyue 平台差异最大的一块：Linux 没有可直接依赖的托盘运行库，本项目为此用纯 MoonBit 实现了 StatusNotifierItem（SNI）协议栈（`dbus/sni.mbt`），会话总线直连面板，不依赖任何 AppIndicator 运行库。本文讲清方案的设计、后端选择、菜单处理与桌面兼容性；真实桌面实测出的坑与验证结论统一记录在 [docs/adaptation.md](adaptation.md)。
+托盘是 native-gui 平台差异最大的一块：Linux 没有可直接依赖的托盘运行库，本项目为此用纯 MoonBit 实现了 StatusNotifierItem（SNI）协议栈（`dbus/sni.mbt`），会话总线直连面板，不依赖任何 AppIndicator 运行库。本文讲清方案的设计、后端选择、菜单处理与桌面兼容性；真实桌面实测出的坑与验证结论统一记录在 [docs/adaptation.md](adaptation.md)。
 
 ## 背景与约束
 

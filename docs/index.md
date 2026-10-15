@@ -1,7 +1,7 @@
 ---
 layout: home
 hero:
-  name: moonbit-libyue
+  name: native-gui
   text: Native desktop GUI for MoonBit
   tagline: One MoonBit codebase, native windows on Windows / Linux — widgets, layout and the event loop all self-drawn. Zero config after moon add.
   actions:
@@ -15,7 +15,7 @@ features:
   - title: Self-drawn, one theme everywhere
     details: Windows, pixels, the event loop, layout and widgets are all pure MoonBit, so widgets look the same on every platform and follow the system accent colour and light / dark mode.
   - title: Import only what you use
-    details: Core, UI, render, text, theme, icons, sys, input, win, dbus, chart, mdview and web are separate packages; unused ones never enter your binary.
+    details: Core, UI, render, text, theme, icons, sys, input, win, dbus, chart, mdview, web and style are separate packages; unused ones never enter your binary.
   - title: Platform differences absorbed
     details: Tray, autostart, power, volume, media keys and more share one API; the library takes care of the Linux / Windows differences.
 ---
@@ -29,7 +29,7 @@ moon add NoahLiu/native-gui
 ```moonbit
 fn main {
   let app = match @ui.mount_window(
-    [@ui.label("Hello, MoonBit!", size=18.0)],
+    [@ui.text("Hello, MoonBit!", font_size=18.0)],
     title="Hello, MoonBit!",
     width=400,
     height=300,

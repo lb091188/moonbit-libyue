@@ -1,6 +1,6 @@
 # NoahLiu/yoga-mbt
 
-纯 MoonBit 实现的 Flexbox 布局引擎。目标是为 moonbit-libyue 的 MoonBit 化
+纯 MoonBit 实现的 Flexbox 布局引擎。目标是为 native-gui 的 MoonBit 化
 复刻提供布局层（替代内嵌的 C++ Yoga），同时作为独立子包可单独发布与消费。
 
 ## 定位

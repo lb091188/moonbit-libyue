@@ -1,6 +1,6 @@
 # Documentation Index
 
-This directory holds the documentation for **moonbit-libyue** — a native, cross-platform desktop GUI library for [MoonBit](https://github.com/moonbitlang). Windows, pixels, the event loop, layout and widgets are all pure MoonBit; the mooncakes package is `NoahLiu/native-gui`.
+This directory holds the documentation for **native-gui** — a native, cross-platform desktop GUI library for [MoonBit](https://github.com/moonbitlang). Windows, pixels, the event loop, layout and widgets are all pure MoonBit; the mooncakes package is `NoahLiu/native-gui`.
 
 ## Packages
 
@@ -21,6 +21,7 @@ This directory holds the documentation for **moonbit-libyue** — a native, cros
 | `.../native-gui/chart` | `@chart` | Charts, plus the cross-cutting interactive layer |
 | `.../native-gui/mdview` | `@mdview` | Markdown rendering view |
 | `.../native-gui/web` | `@web` | Embedded WebView |
+| `.../native-gui/style` | `@style` | Style layer: stylesheets as MoonBit values — `Style` rule blocks and named class constants, hover / active / focus states, transitions |
 
 Heavier optional capabilities live in **separate modules**, so a plain `moon add` never drags them in:
 
@@ -41,7 +42,7 @@ moon run examples/hello-themed   # the themed widget set
 moon run examples/showcase       # full demo board: component library + system capabilities
 ```
 
-`examples/showcase` covers Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store, plus canvas & rich text and system integration, with a collapsible grouped side menu. Each page's source is its own file (`examples/showcase/pages/*.mbt`) — the best copy-paste material library.
+`examples/showcase` covers Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store / Window, plus canvas & rich text, system integration and transitions & effects, with a collapsible grouped side menu. Each page's source is its own file (`examples/showcase/pages/*.mbt`) — the best copy-paste material library.
 
 ![Basic components](/images/showcase-basic.png)
 
@@ -61,6 +62,7 @@ moon run examples/showcase       # full demo board: component library + system c
 | [autostart.md](autostart.md) | Cross-platform autostart: XDG `.desktop` on Linux / HKCU Run key on Windows, one `is_enabled` / `enable` / `disable` API |
 | [tray.md](tray.md) | Linux tray: SNI protocol-stack design, architecture, backend fallback, desktop compatibility |
 | [zh/system-capabilities.md](/zh/system-capabilities.md) (Chinese) | System capabilities (`@sys`): volume / app lookup / night light / wallpaper / monitors / window control / clipboard watch / power profiles / printers / env / recent files / browser bookmarks & history / VS Code history…, with a unified `Result` semantics |
+| [zh/design.md](/zh/design.md) (Chinese) | Frontend-layer design notes: style sheets as MoonBit values (`Style` + named class constants, CSS as an import channel), component naming mapping, reactivity and view-layer decisions |
 
 For the project overview and quick start, see the repository root [README.md](https://github.com/lb091188/moonbit-native-gui/#readme).
 

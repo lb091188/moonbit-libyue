@@ -63,7 +63,7 @@ const moonbitGrammar = {
 }
 
 export default defineConfig({
-  title: 'moonbit-libyue',
+  title: 'native-gui',
   description: 'MoonBit 原生跨平台桌面 GUI 库:自绘控件 + 自定义主题',
   cleanUrls: true,
   lastUpdated: true,
