@@ -331,6 +331,20 @@ test "轻提示层：推送后挂一条、到点自动撤、宽度随文本" {
   (queue.val[1])()
   assert_eq(strip.children().length(), 0)
   assert_eq(@core.overlay_count(), 0)
+  // 第二轮推送：收层之后必须还能再开（真机反馈过「提示一个之后就无法触发」）
+  push("第二轮", Info)
+  assert_eq(@core.overlay_count(), 1)
+  root.relayout(400.0, 200.0)
+  match @core.overlay_root_of(@core.overlay_top_id()) {
+    Some(w) => assert_eq(w.children()[0].children().length(), 1)
+    None => assert_true(false)
+  }
+  match @core.overlay_rect_of(@core.overlay_top_id()) {
+    Some(r) => assert_true(r.w > 0.0 && r.h > 0.0)
+    None => assert_true(false)
+  }
+  (queue.val[2])()
+  assert_eq(@core.overlay_count(), 0)
   @core.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
 }
 
@@ -482,5 +496,62 @@ test "浮层族只读样式槽：class 覆盖下拉触发件、菜单行文字�
     false,
   )
   assert_true(dlg_classed > dlg_plain)
+  @core.overlay_clear()
+}
+
+///|
+/// 对话框观感回归：遮罩把面板外的底色压暗（视觉模态，EP 同款半透明黑）；
+/// 面板圆角之外不再有直角描边墨（fill_round_rect 配 stroke_rect 的旧口径
+/// 把圆角面板框成方角，真机截图反馈）。
+test "对话框：遮罩暗化、面板圆角外无描边墨" {
+  if !ui_text_guard() {
+    return
+  }
+  let vis = @core.Store::new(true)
+  let (root, _kid) = mounted_with_overlay(
+    dialog(vis, "标题", [text("内容")], width=200.0),
+    400.0,
+    300.0,
+  )
+  // 根先铺白底：遮罩外角落才有「页面底色」可压暗（无头根默认不画底）
+  root.on_draw = Some(fn(
+    _w : @core.Widget,
+    p : @render.Painter,
+    r : @core.Rect,
+  ) -> Unit {
+    p.set_fill_color("#ffffff")
+    p.fill_rect(0.0, 0.0, r.w, r.h)
+  })
+  root.relayout(400.0, 300.0)
+  let bm = @render.Bitmap::new(400, 300)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  // 窗口角落（面板外）：白底被半透明黑罩压暗，不再是白（无遮罩时三和 ≈765）
+  let (mr, mg, mb, _ma) = color_of(bm, 4, 4)
+  assert_true(mr + mg + mb < 600)
+  // 扫面板（纯白 bg_panel）包围盒：左上角真原点在圆角外，应露出遮罩色；
+  // 旧口径直角描边会在角上落一圈浅灰边框墨（三和 ≈660）
+  let mut min_x = -1
+  let mut min_y = -1
+  let mut max_x = -1
+  for y = 0; y < 300; y = y + 1 {
+    for x = 0; x < 400; x = x + 1 {
+      let (cr, cg, cb, _ca) = color_of(bm, x, y)
+      if cr > 250 && cg > 250 && cb > 250 {
+        if min_x < 0 {
+          min_x = x
+          min_y = y
+        }
+        max_x = x
+      }
+    }
+  }
+  assert_true(min_x > 2 && max_x < 397)
+  let (cr, cg, cb, _ca) = color_of(bm, min_x - 2, min_y - 2)
+  assert_true(cr + cg + cb < 500)
+  // 圆角内侧应是面板底色（白）
+  let (ir, ig, ib, _ia) = color_of(bm, min_x + 2, min_y + 2)
+  assert_true(ir > 250 && ig > 250 && ib > 250)
   @core.overlay_clear()
 }

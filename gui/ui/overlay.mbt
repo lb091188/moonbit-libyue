@@ -409,7 +409,8 @@ pub fn dialog(
     // 锚点自己是个 0 尺寸占位：对话框的可见性只由 Store 驱动
     anchor.node.set_height(@yoga.fixed(0.0))
     let open_id : Ref[Int] = Ref(0)
-    let title_font = @text.Font::new("", 14.0, weight=@text.SemiBold)
+    let title_font = @text.Font::new("", 16.0, weight=@text.SemiBold)
+    let btn_font = @text.Font::new("", 14.0)
     let close = fn(v : Bool) -> Unit { visible.set(v) }
     let open = fn() -> Unit {
       if open_id.val != 0 {
@@ -444,6 +445,17 @@ pub fn dialog(
             }
             _ => false
           }
+        })
+        s.on_draw = Some(fn(
+          _s : @core.Widget,
+          p : @render.Painter,
+          r : @core.Rect,
+        ) -> Unit {
+          // 半透明黑罩（EP 同款 rgba(0,0,0,.5)）：内容面板之外先压一层暗底
+          p.set_fill_color("#000000")
+          p.set_global_alpha(0.5)
+          p.fill_rect(0.0, 0.0, r.w, r.h)
+          p.set_global_alpha(1.0)
         })
         let _ = panel_node.mount_into(s)
         s
@@ -528,7 +540,9 @@ pub fn dialog(
       let body = @core.Widget::new()
       body.node.set_flex_direction(@yoga.Column)
       body.node.set_width(@yoga.percent(100.0))
-      body.set_padding(left=14.0)
+      // 四边留空 + 相邻内容间一档呼吸位：正文不顶标题栏/底栏，输入类内容不贴缘
+      body.node.set_gap(0.0, 10.0)
+      body.set_padding(left=16.0, right=16.0, top=8.0, bottom=8.0)
       @core.mount_children(body, children)
       let footer = @core.Widget::new()
       footer.node.set_flex_direction(@yoga.Row)
@@ -536,13 +550,13 @@ pub fn dialog(
       footer.node.set_justify_content(@yoga.JustifyContent::FlexEnd)
       footer.node.set_align_items(@yoga.AlignItems::Center)
       footer.node.set_gap(0.0, 8.0)
-      footer.set_padding(left=12.0)
+      footer.set_padding(right=12.0)
       fn footer_btn(text : String, primary : Bool, act : () -> Unit) -> Unit {
         if text.length() == 0 {
           return
         }
         let b = @core.Widget::new()
-        b.node.set_width(@yoga.fixed(text_width(text, title_font) + 28.0))
+        b.node.set_width(@yoga.fixed(text_width(text, btn_font) + 28.0))
         b.node.set_height(@yoga.fixed(28.0))
         b.cursor = @core.CURSOR_HAND
         // 两档皮肤都折进槽：主档 常态 primary / 悬停 primary_hover，
@@ -576,7 +590,13 @@ pub fn dialog(
           fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 4.0))
           p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
           p.set_line_width(@style.number_of(st.border_width, 1.0))
-          p.stroke_rect(0.0, 0.0, r.w, r.h)
+          p.stroke_round_rect(
+            0.0,
+            0.0,
+            r.w,
+            r.h,
+            @style.number_of(st.border_radius, 4.0),
+          )
           let _ = @text.draw_box_at(
             p,
             0.0,
@@ -584,7 +604,7 @@ pub fn dialog(
             r.w,
             r.h,
             text,
-            title_font,
+            btn_font,
             @style.color_of(
               st.color,
               if primary { "#ffffff" } else { @theme.theme_text_regular() },
@@ -637,7 +657,13 @@ pub fn dialog(
         fill_round_rect(p, 0.0, 0.0, r.w, r.h, @style.number_of(st.border_radius, 6.0))
         p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
         p.set_line_width(@style.number_of(st.border_width, 1.0))
-        p.stroke_rect(0.0, 0.0, r.w, r.h)
+        p.stroke_round_rect(
+          0.0,
+          0.0,
+          r.w,
+          r.h,
+          @style.number_of(st.border_radius, 6.0),
+        )
       })
       panel.append_child(title_bar)
       panel.append_child(close_btn)
