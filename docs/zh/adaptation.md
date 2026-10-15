@@ -2228,6 +2228,13 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
   - `wm_window_set_fullscreen`:进屏先记现场(样式 + `WINDOWPLACEMENT`),样式剥掉 `WS_OVERLAPPEDWINDOW` 换 `WS_POPUP`,`SetWindowPos` 摆到最近显示器(`MonitorFromWindow` + `GetMonitorInfoW`)整屏;退屏原样还原样式与位置。同值重复调用直接返回(幂等)。
 - **验证方式**:`experiment/window_probe/window_enhance_probe.c` 新增两节——`set_size` 后 `GetClientRect` 读回目标尺寸、`wm_windows[].resized` 置位、`wm_size` 读回一致;全屏进屏窗口矩形 == 显示器矩形且客户区记账同步、退屏位置与样式逐值还原、重复进出幂等、越界 id 不崩。全量 `WIN-ENHANCE-OK`(本机 Windows 1920×1080)。探针编译顺带补了两条缺件:`shell32.lib`(托盘 `Shell_NotifyIconW` 已进符号面)与 `moonbit_make_bytes` 的 malloc 兜底(剪贴板空壳引用运行时分配符号),编法更新在探针头注释与 `build.bat`。`moon test win` 28/28、`cd gui && moon check --deny-warn` 零警告、`cd examples && moon build hello --target native` 链接通过。真机复验归 `_人工测试清单.md` S23。
 
+## 全局快捷键按了没反应:轮询表挂在构造期钩子里,宿主就绪前跑完第一拍就死了(2026-10-15,真机反馈 Windows)
+
+- **现象**:showcase「窗口」页点「注册 Ctrl+Alt+C」状态显示已注册成功,切到别的程序按组合键,「命中 N 次」永远不动。
+- **根因**:库侧链路(注册 → 泵截 WM_HOTKEY → poll 抽取)都是好的——`experiment/window_probe` 用 `PostThreadMessageW` 打真实 WM_HOTKEY 的同一条路全绿;坏在 showcase 的轮询表挂错了时机:「零尺寸挂载钩子」写在 `node_of_new` 的 finish 里,而 finish 是**构造期**执行(`core/node.mbt` 记档),页面函数又是 `mount_window` 的实参、求值早于建窗——第一拍 `hotkey_poll()` 跑在空 timer 通道上,`app.host.val` 还是 None,**循环不再重排,当场死掉**,之后泵里截获的 WM_HOTKEY 没人来抽。与图表页推点(52119a4)同一条坑的第 2 处,页面里那句「零尺寸挂载钩子」注释承诺的是挂载期、用的却是构造期 API。
+- **修复**(`examples/showcase/pages/window.mbt`):钩子改挂 `Node::on_mount`——段正文惰性挂载、首次选中本段时才跑,那时宿主已就绪;200ms 自重排表照旧。轮询表「宿主未就绪即永久死掉」的脆弱形态(尾拍 `app.host` 为 None 就不再重排)是示例侧现状,属可加固点(另批)。
+- **验证方式**:`experiment/window_probe` 新增热键节——注册 → `PostThreadMessageW` 投 WM_HOTKEY → `wm_pump` 截获 → `wm_hotkey_poll` 取出、同批重复投递只记一次、同组合重复注册被系统拒绝、注销后同 id 不再置位,全量 `WIN-ENHANCE-OK`。`cd examples && moon check --deny-warn` 零警告、`moon build showcase --target native` 链接通过。真机复验归 `_人工测试清单.md` S24(真实按键触发只能人来)。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。

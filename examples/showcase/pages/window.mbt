@@ -137,11 +137,13 @@ pub fn page_window(app : @shared.App) -> @core.Node {
       "全局快捷键",
       "应用外生效的系统快捷键（Ctrl+Alt+C，仅 Windows；别的平台注册即返回 Unsupported）。门面持有 id→加速串回查表，轮询命中直接给 Hotkey。",
       [
-        // 零尺寸挂载钩子：段首次选中时启动轮询表（见 hotkey_poll_loop）
-        @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
-          hotkey_poll_loop(app, hk_hits)
-          w
-        }),
+        // 零尺寸挂载钩子：段首次选中时启动轮询表（见 hotkey_poll_loop）。
+        // 首拍必须挂真·挂载时机（Node::on_mount）——node_of_new 的 finish 是
+        // 构造期执行、那时宿主还没建好，timer 是空通道，表会当场死掉不再重排
+        // （与图表页推点同一条坑，见 charts.mbt 头注释）。
+        @core.node_of_new(fn(w : @core.Widget) -> @core.Widget { w }).on_mount(
+          fn() -> Unit { hotkey_poll_loop(app, hk_hits) },
+        ),
         @ui.row(
           [
             @ui.button("注册 Ctrl+Alt+C", on_click=fn() {

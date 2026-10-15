@@ -205,7 +205,7 @@ int main(void) {
     check("重复关闭 borderless 幂等", wm_is_borderless(id), 0);
   }
 
-  /* ⑦ wm_window_set_size：客户区收到目标尺寸（WM_SIZE 记账置 resized） */
+  /* ⑥ wm_window_set_size：客户区收到目标尺寸（WM_SIZE 记账置 resized） */
   {
     wm_windows[id].resized = 0;
     wm_window_set_size(id, 800, 600);
@@ -224,7 +224,7 @@ int main(void) {
     wm_window_set_size(id, 640, 480);
   }
 
-  /* ⑧ wm_window_set_fullscreen：进屏铺满最近显示器、退屏还原现场 */
+  /* ⑦ wm_window_set_fullscreen：进屏铺满最近显示器、退屏还原现场 */
   {
     RECT before;
     GetWindowRect(hwnd, &before);
@@ -274,7 +274,29 @@ int main(void) {
     check("重复退全屏幂等", wm_windows[id].fullscreen, 0);
   }
 
-  /* ⑥ 非法句柄不崩、读回给 0 */
+  /* ⑨ 全局快捷键（W20b）：注册 → 线程队列投 WM_HOTKEY → wm_pump 截获 → poll
+   * 取出。系统真实按键也是把 WM_HOTKEY 投到注册线程的队列（RegisterHotKey
+   * 用 NULL hwnd），这里用 PostThreadMessageW 打同一条路，不依赖真按键。 */
+  {
+    int hid = wm_hotkey_register(2 | 4, 0x79); /* Ctrl+Alt+F9（内部位序 2=ctrl 4=alt）*/
+    check_true("RegisterHotKey 成功（Ctrl+Alt+F9）", hid > 0);
+    check("无触发时 poll 给 0", wm_hotkey_poll(), 0);
+    /* 重复投两条只记一次（每注册一个 WM_HOTKEY 只置位一次） */
+    PostThreadMessageW(GetCurrentThreadId(), WM_HOTKEY, (WPARAM)hid, 0);
+    PostThreadMessageW(GetCurrentThreadId(), WM_HOTKEY, (WPARAM)hid, 0);
+    wm_pump();
+    check("wm_pump 截获后 poll 取出该 id", wm_hotkey_poll(), hid);
+    check("同批第二条不重复报", wm_hotkey_poll(), 0);
+    /* 系统排他：同一组合第二次注册必须失败 */
+    check("同组合重复注册被系统拒绝", wm_hotkey_register(2 | 4, 0x79), 0);
+    /* 注销后同 id 的 WM_HOTKEY 不再置位 */
+    wm_hotkey_unregister(hid);
+    PostThreadMessageW(GetCurrentThreadId(), WM_HOTKEY, (WPARAM)hid, 0);
+    wm_pump();
+    check("注销后同 id 的 WM_HOTKEY 不置位", wm_hotkey_poll(), 0);
+  }
+
+  /* ⑩ 非法句柄不崩、读回给 0 */
   wm_set_title(9999, "x");
   wm_set_icon(9999, 1, 2);
   wm_set_min_size(9999, 100, 100);
