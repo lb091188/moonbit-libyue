@@ -3687,10 +3687,21 @@ typedef struct {
   WmEv last;
   int ev_head;
   int ev_count;
+  // 系统级拖放（W23a/b）：挂接标志、MoonBit 写回的效果（DND flag 0/1/2/4）与
+  // 四个信号 handler id。会话级状态（载荷缓存、起拖事件）在进程级单份——同一
+  // 时刻只有一条拖放会话，与 core 侧 drag_current 单例同口径。
+  int dnd_dest_on;
+  int dnd_effect_wanted;
+  gulong dnd_sigs[4];
 } WmWindow;
 
 static WmWindow wm_windows[WM_MAX_WINDOWS];
 static int wm_next_id = 1;
+
+// 系统级拖出（W23b）的按下事件副本：起拖发生在指针 Move 的处置里，那已不在
+// GTK 派发栈内（gtk_get_current_event 取不到），按下那一刻 copy 存档、抬起释放。
+// 同一时刻只有一条拖出会话，进程级单份（使用见「系统级拖放」节）。
+static GdkEvent *wm_dnd_press;
 
 // 原生子件槽：一个 GtkFixed 容器，能力层（yue/browser 的 webkit 桩等）通过
 // wm_surface_container() 拿到它把自己的控件 put 进去。句柄 = 槽号（1 起）。
@@ -3908,8 +3919,19 @@ static gboolean wm_on_button(GtkWidget *widget, GdkEventButton *ev,
   // code: 0 键按下 1 键释放 2 按钮按下 3 按钮释放 4 指针移动 5 滚轮
   if (ev->type == GDK_BUTTON_RELEASE) {
     e.code = 3u;
+    // 按下事件副本随抬起释放（拖出起拖只在「按钮仍按下」时合法）
+    if (wm_dnd_press != NULL) {
+      gdk_event_free(wm_dnd_press);
+      wm_dnd_press = NULL;
+    }
   } else {
     e.code = 2u; // 双击对上层同样先是一次按下，双击语义由上层按时间判
+    if (ev->type == GDK_BUTTON_PRESS && ev->button == 1 &&
+        wm_dnd_press == NULL) {
+      // 系统级拖出（W23b）要在指针 Move 处置里起拖——那已不在 GTK 派发栈内，
+      // gtk_get_current_event() 取不到；按下那一刻把事件 copy 一份存档
+      wm_dnd_press = gdk_event_copy((GdkEvent *)ev);
+    }
   }
   e.x = (gint32)ev->x;
   e.y = (gint32)ev->y;
@@ -4184,6 +4206,9 @@ void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
   gtk_widget_queue_draw(w->area);
 }
 
+static void wm_dnd_session_clear(void); // 定义见「系统级拖放」节
+static int wm_dnd_active_slot;          // 拖入会话归属窗（0 = 无，定义同上）
+
 void wm_close(int64_t id) {
   if (id <= 0 || id >= WM_MAX_WINDOWS) {
     return;
@@ -4206,6 +4231,15 @@ void wm_close(int64_t id) {
   // 帧缓冲是后端 malloc 的，槽位复用前必须还掉（memset 只会把指针清没、
   // 留下泄漏，下一扇窗复用同一槽时 cap 也一起归零）
   free(w->backing);
+  // 拖放挂接与按下事件副本随窗口一起清（信号挂在 window 上、销毁即断）
+  if (wm_dnd_active_slot == (int)id) {
+    wm_dnd_session_clear();
+  }
+  if (wm_dnd_press != NULL) {
+    gdk_event_free(wm_dnd_press);
+    wm_dnd_press = NULL;
+  }
+  w->dnd_dest_on = 0;
   memset(w, 0, sizeof(WmWindow));
 }
 
@@ -4817,48 +4851,520 @@ int wm_window_title(int64_t id, char *out, int cap) {
   return 0;
 }
 
-/* ---- 外部拖入（W23a）GTK 分支占位：Linux 侧的跨进程拖入要挂
- * gtk_drag_dest_set + 三个处理器，随平台批落。失败桩口径与托盘一致：
- * supported 恒 0 ⇒ 门面给「本平台没有外部拖入后端」的结构化报错，
- * 绝不静默半可用。 */
-int wm_dragdnd_supported(void) { return 0; }
-int wm_dragdnd_enable(int64_t id) {
-  (void)id;
+/* ---- 系统级拖放（W23a 拖入 / W23b 拖出）GTK 分支真实现 ----
+ * 拖入：gtk_drag_dest_set 挂在 GtkWindow 上（坐标即客户区坐标），四个信号——
+ *   drag-motion（两段式答 gdk_drag_status + 首次异步取载荷）、drag-leave（收
+ *   会话）、drag-drop（只置「投递待载荷」，放行 GTK_DEST_DEFAULT_DROP 的默认
+ *   handler 去请求数据）、drag-data-received（motion 期缓存载荷并发 ENTER，
+ *   drop 期发 DROP 并 gtk_drag_finish）。
+ * 拖出：gtk_drag_begin_with_coordinates 用按下事件的存档起拖（Move 处置里已
+ *   不在 GTK 派发栈内，gtk_get_current_event 取不到），drag-data-get 提供数据、
+ *   drag-end 收口；wm_dragdnd_send 嵌套跑 gtk_main_iteration 阻塞到 drag-end
+ *   ——与 Windows 分支 SHDoDragDrop 的阻塞语义同构。
+ * 事件进进程级环形队列，MoonBit 每拍 wm_dragdnd_poll 抽；载荷单缓冲（同一时刻
+ * 只有一条会话，与 core 侧 drag_current 单例同口径）。效果标志沿用门面的
+ * DND flag（0/1/2/4，同 DROPEFFECT_*），与 GDK_ACTION_*（0/2/4/8）显式互转。 */
+#define WM_DND_Q 64
+#define WM_DND_PAYLOAD_MAX 65536
+
+typedef struct {
+  int slot, kind, x, y;
+} WmDndEv;
+
+static WmDndEv wm_dnd_q[WM_DND_Q];
+static int wm_dnd_qh = 0, wm_dnd_qc = 0;
+static char wm_dnd_buf[WM_DND_PAYLOAD_MAX]; // 当前会话载荷（线形状）
+static int wm_dnd_buf_len;
+static int wm_dnd_active_slot;  // 拖入会话归属窗（0 = 无）
+static int wm_dnd_have_payload; // motion 期载荷已缓存
+static int wm_dnd_enter_sent;
+static int wm_dnd_asked; // motion 期已请求过数据（失败不重试，答禁止）
+static int wm_dnd_drop_armed;
+// 拖出载荷缓存（wm_dragdnd_send 存、drag-data-get 读）
+static char wm_dnd_src[WM_DND_PAYLOAD_MAX];
+static int wm_dnd_src_len, wm_dnd_src_kind, wm_dnd_src_done, wm_dnd_src_action;
+
+static void wm_dnd_push(int slot, int kind, int x, int y) {
+  if (wm_dnd_qc >= WM_DND_Q) {
+    return; // 满了丢最旧会乱序，宁可丢新的（同窗口事件队列口径）
+  }
+  WmDndEv *e = &wm_dnd_q[(wm_dnd_qh + wm_dnd_qc) % WM_DND_Q];
+  e->slot = slot;
+  e->kind = kind;
+  e->x = x;
+  e->y = y;
+  wm_dnd_qc++;
+}
+
+static void wm_dnd_set_payload(const char *data, int len) {
+  if (len < 0) {
+    len = 0;
+  }
+  if (len > WM_DND_PAYLOAD_MAX) {
+    len = WM_DND_PAYLOAD_MAX;
+  }
+  memmove(wm_dnd_buf, data, len);
+  wm_dnd_buf_len = len;
+}
+
+static guint wm_dnd_flag_to_gdk(int flag) {
+  guint a = 0;
+  if (flag & 1) {
+    a |= GDK_ACTION_COPY;
+  }
+  if (flag & 2) {
+    a |= GDK_ACTION_MOVE;
+  }
+  if (flag & 4) {
+    a |= GDK_ACTION_LINK;
+  }
+  return a;
+}
+
+// 只认单一动作；多位同亮按「没成交」（0）——与 core 侧 drag_effect_of_flag
+// 只认 1/2/4 的口径一致，不猜。
+static int wm_dnd_gdk_to_flag(guint action) {
+  if (action == GDK_ACTION_COPY) {
+    return 1;
+  }
+  if (action == GDK_ACTION_MOVE) {
+    return 2;
+  }
+  if (action == GDK_ACTION_LINK) {
+    return 4;
+  }
   return 0;
 }
-void wm_dragdnd_disable(int64_t id) { (void)id; }
+
+static int wm_dnd_encode(char *out, int cap, int kind, const char *body,
+                         int blen) {
+  if (cap < 4 || blen > cap - 4 || blen < 0) {
+    return 0;
+  }
+  out[0] = (char)(kind & 255);
+  out[1] = (char)((kind >> 8) & 255);
+  out[2] = (char)((kind >> 16) & 255);
+  out[3] = (char)((kind >> 24) & 255);
+  memmove(out + 4, body, blen);
+  return 4 + blen;
+}
+
+// text/uri-list → Paths 正文（\n 连接本地路径）：跳过 # 注释行与空行，
+// g_filename_from_uri 解不出（网络 URI 等）的行丢弃。
+static int wm_dnd_uris_to_body(const guchar *data, gint len, char *body,
+                               int cap) {
+  int used = 0;
+  gint i = 0;
+  while (i < len) {
+    gint j = i;
+    while (j < len && data[j] != '\n') {
+      j++;
+    }
+    gint end = j;
+    if (end > i && data[end - 1] == '\r') {
+      end--;
+    }
+    if (end > i && data[i] != '#') {
+      gchar *line = g_strndup((const gchar *)&data[i], (gsize)(end - i));
+      gchar *path = line != NULL ? g_filename_from_uri(line, NULL, NULL) : NULL;
+      g_free(line);
+      if (path != NULL) {
+        int pl = (int)strlen(path);
+        if (used > 0 && used < cap) {
+          body[used++] = '\n';
+        }
+        if (pl > cap - used - 1) {
+          pl = cap - used - 1;
+        }
+        if (pl > 0) {
+          memmove(body + used, path, (size_t)pl);
+          used += pl;
+        }
+        g_free(path);
+      }
+    }
+    i = j + 1;
+  }
+  body[used < cap ? used : cap - 1] = '\0';
+  return used;
+}
+
+static void wm_dnd_session_clear(void) {
+  wm_dnd_active_slot = 0;
+  wm_dnd_have_payload = 0;
+  wm_dnd_enter_sent = 0;
+  wm_dnd_asked = 0;
+  wm_dnd_drop_armed = 0;
+}
+
+// 拖入目标表：info 0 = uri-list（→Paths）、1 = 文本（→Text）
+static const GtkTargetEntry wm_dnd_targets[] = {
+    {"text/uri-list", 0, 0},
+    {"UTF8_STRING", 0, 1},
+    {"text/plain;charset=utf-8", 0, 1},
+    {"STRING", 0, 1},
+};
+
+// 按源的 target 列表挑要请求的目标：优先 uri-list，否则文本任一形态。
+// 返回 GDK_NONE = 源一样都不给（答禁止）。
+static GdkAtom wm_dnd_pick_target(GdkDragContext *ctx) {
+  GList *ts = gdk_drag_context_list_targets(ctx);
+  GdkAtom text = GDK_NONE;
+  for (GList *p = ts; p != NULL; p = p->next) {
+    gchar *name = gdk_atom_name(GDK_POINTER_TO_ATOM(p->data));
+    if (name == NULL) {
+      continue;
+    }
+    GdkAtom hit = GDK_NONE;
+    if (strstr(name, "text/uri-list") != NULL) {
+      hit = GDK_POINTER_TO_ATOM(p->data);
+    } else if (text == GDK_NONE && (strcmp(name, "UTF8_STRING") == 0 ||
+                                    strcmp(name, "text/plain;charset=utf-8") == 0 ||
+                                    strcmp(name, "STRING") == 0)) {
+      text = GDK_POINTER_TO_ATOM(p->data);
+    }
+    g_free(name);
+    if (hit != GDK_NONE) {
+      return hit;
+    }
+  }
+  return text;
+}
+
+static gboolean wm_dnd_on_motion(GtkWidget *widget, GdkDragContext *ctx,
+                                 gint x, gint y, guint time, gpointer data) {
+  (void)x;
+  (void)y;
+  WmWindow *w = (WmWindow *)data;
+  int slot = (int)(w - wm_windows);
+  wm_dnd_active_slot = slot;
+  guint answer;
+  if (wm_dnd_have_payload) {
+    // 会话已在跑：发 OVER、答 MoonBit 上一拍写回的效果
+    wm_dnd_push(slot, 1, (int)x, (int)y);
+    answer = wm_dnd_flag_to_gdk(w->dnd_effect_wanted);
+  } else if (wm_dnd_asked) {
+    answer = 0; // 请求过了仍没载荷：认不出，禁止光标
+  } else {
+    // 首次进入：异步请求载荷（到达走 drag-data-received），承诺 COPY
+    GdkAtom want = wm_dnd_pick_target(ctx);
+    if (want != GDK_NONE) {
+      wm_dnd_asked = 1;
+      gtk_drag_get_data(widget, ctx, want, time);
+      answer = GDK_ACTION_COPY;
+    } else {
+      wm_dnd_asked = 1;
+      answer = 0;
+    }
+  }
+  gdk_drag_status(ctx, answer, time);
+  return TRUE; // 自答 status（未用 GTK_DEST_DEFAULT_MOTION）
+}
+
+static void wm_dnd_on_leave(GtkWidget *widget, GdkDragContext *ctx,
+                            guint time, gpointer data) {
+  (void)widget;
+  (void)ctx;
+  (void)time;
+  WmWindow *w = (WmWindow *)data;
+  int slot = (int)(w - wm_windows);
+  if (wm_dnd_active_slot == slot && wm_dnd_enter_sent) {
+    wm_dnd_push(slot, 2, 0, 0);
+  }
+  wm_dnd_session_clear();
+}
+
+static gboolean wm_dnd_on_drop(GtkWidget *widget, GdkDragContext *ctx,
+                               gint x, gint y, guint time, gpointer data) {
+  (void)ctx;
+  (void)x;
+  (void)y;
+  (void)time;
+  WmWindow *w = (WmWindow *)data;
+  wm_dnd_active_slot = (int)(w - wm_windows);
+  wm_dnd_drop_armed = 1; // 数据到达走 data-received 的投递分支
+  return FALSE;          // 放行默认 handler（GTK_DEST_DEFAULT_DROP 请求数据）
+}
+
+static void wm_dnd_on_received(GtkWidget *widget, GdkDragContext *ctx,
+                               gint x, gint y, GtkSelectionData *sel,
+                               guint info, guint time, gpointer data) {
+  (void)widget;
+  WmWindow *w = (WmWindow *)data;
+  int slot = (int)(w - wm_windows);
+  char enc[WM_DND_PAYLOAD_MAX];
+  int n = 0;
+  gint len = gtk_selection_data_get_length(sel);
+  if (sel != NULL && len > 0) {
+    if (info == 0) {
+      char body[WM_DND_PAYLOAD_MAX];
+      int blen = wm_dnd_uris_to_body(gtk_selection_data_get_data(sel), len,
+                                     body, (int)sizeof(body) - 1);
+      if (blen > 0) {
+        n = wm_dnd_encode(enc, (int)sizeof(enc), 4, body, blen);
+      }
+    } else {
+      n = wm_dnd_encode(enc, (int)sizeof(enc), 1,
+                        (const char *)gtk_selection_data_get_data(sel), len);
+    }
+  }
+  if (wm_dnd_drop_armed) {
+    // 投递：载荷此刻才到手（或仍没有——发 DROP、载荷保持旧值，core 侧按空
+    // 载荷不开会话/不投递），收会话并答系统成功
+    if (n > 0) {
+      wm_dnd_set_payload(enc, n);
+    }
+    wm_dnd_push(slot, 3, (int)x, (int)y);
+    wm_dnd_session_clear();
+    gtk_drag_finish(ctx, n > 0, FALSE, time);
+    return;
+  }
+  if (n > 0) {
+    // motion 期的异步请求结果：缓存载荷并补发 ENTER（指针不动也不会再有
+    // motion，ENTER 不能等）
+    wm_dnd_set_payload(enc, n);
+    wm_dnd_have_payload = 1;
+    if (!wm_dnd_enter_sent) {
+      wm_dnd_enter_sent = 1;
+      wm_dnd_push(slot, 0, (int)x, (int)y);
+    }
+  }
+}
+
+int wm_dragdnd_supported(void) {
+  return gtk_init_check(NULL, NULL) ? 1 : 0; // 与文件对话框同一条惰性探测
+}
+
+int wm_dragdnd_enable(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->window == NULL) {
+    return 0;
+  }
+  if (w->dnd_dest_on) {
+    return 1; // 幂等
+  }
+  gtk_drag_dest_set(w->window, GTK_DEST_DEFAULT_DROP, wm_dnd_targets,
+                    (gint)G_N_ELEMENTS(wm_dnd_targets),
+                    GDK_ACTION_COPY | GDK_ACTION_MOVE | GDK_ACTION_LINK);
+  w->dnd_effect_wanted = 1; // 进门承诺 COPY，MoonBit 下一拍起接管
+  w->dnd_sigs[0] = g_signal_connect(w->window, "drag-motion",
+                                    G_CALLBACK(wm_dnd_on_motion), w);
+  w->dnd_sigs[1] = g_signal_connect(w->window, "drag-leave",
+                                    G_CALLBACK(wm_dnd_on_leave), w);
+  w->dnd_sigs[2] = g_signal_connect(w->window, "drag-drop",
+                                    G_CALLBACK(wm_dnd_on_drop), w);
+  w->dnd_sigs[3] = g_signal_connect(w->window, "drag-data-received",
+                                    G_CALLBACK(wm_dnd_on_received), w);
+  w->dnd_dest_on = 1;
+  return 1;
+}
+
+void wm_dragdnd_disable(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (!w->dnd_dest_on) {
+    return;
+  }
+  for (int i = 0; i < 4; i++) {
+    if (w->dnd_sigs[i] != 0) {
+      g_signal_handler_disconnect(w->window, w->dnd_sigs[i]);
+      w->dnd_sigs[i] = 0;
+    }
+  }
+  gtk_drag_dest_unset(w->window);
+  w->dnd_dest_on = 0;
+  if (wm_dnd_active_slot == (int)id) {
+    wm_dnd_session_clear();
+  }
+}
+
 int wm_dragdnd_poll(int32_t *out_slot, int32_t *out_kind, int32_t *out_x,
                     int32_t *out_y) {
-  (void)out_slot;
-  (void)out_kind;
-  (void)out_x;
-  (void)out_y;
-  return 0;
+  if (wm_dnd_qc == 0) {
+    return 0;
+  }
+  WmDndEv *e = &wm_dnd_q[wm_dnd_qh];
+  wm_dnd_qh = (wm_dnd_qh + 1) % WM_DND_Q;
+  wm_dnd_qc--;
+  if (out_slot != NULL) {
+    *out_slot = (int32_t)e->slot;
+  }
+  if (out_kind != NULL) {
+    *out_kind = (int32_t)e->kind;
+  }
+  if (out_x != NULL) {
+    *out_x = (int32_t)e->x;
+  }
+  if (out_y != NULL) {
+    *out_y = (int32_t)e->y;
+  }
+  return 1;
 }
+
 int wm_dragdnd_payload(char *out, int cap) {
-  (void)out;
-  (void)cap;
-  return 0;
+  if (out == NULL || cap <= 0 || wm_dnd_buf_len <= 0) {
+    return 0;
+  }
+  int n = wm_dnd_buf_len < cap ? wm_dnd_buf_len : cap;
+  memmove(out, wm_dnd_buf, (size_t)n);
+  return wm_dnd_buf_len;
 }
+
 void wm_dragdnd_set_effect(int64_t id, int effect) {
-  (void)id;
-  (void)effect;
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  wm_windows[id].dnd_effect_wanted = effect; // DND flag（0/1/2/4）
 }
+
 int wm_dragdnd_effect(int64_t id) {
-  (void)id;
-  return -1;
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return -1;
+  }
+  WmWindow *w = &wm_windows[id];
+  return w->dnd_dest_on ? w->dnd_effect_wanted : -1;
 }
-int wm_dragdnd_count(void) { return 0; }
+
+int wm_dragdnd_count(void) {
+  int n = 0;
+  for (int i = 1; i < WM_MAX_WINDOWS; i++) {
+    if (wm_windows[i].dnd_dest_on) {
+      n++;
+    }
+  }
+  return n;
+}
+
+// 拖出：对方程序要数据时按载荷种类提供（Text→set_text、Paths→绝对化后
+// set_uris）
+static void wm_dnd_on_data_get(GtkWidget *widget, GdkDragContext *ctx,
+                               GtkSelectionData *sel, guint info, guint time,
+                               gpointer data) {
+  (void)widget;
+  (void)ctx;
+  (void)info;
+  (void)time;
+  if (sel == NULL || wm_dnd_src_len <= 4) {
+    return;
+  }
+  const char *body = wm_dnd_src + 4;
+  int blen = wm_dnd_src_len - 4;
+  char tmp[WM_DND_PAYLOAD_MAX];
+  int n = blen < (int)sizeof(tmp) - 1 ? blen : (int)sizeof(tmp) - 1;
+  memmove(tmp, body, (size_t)n);
+  tmp[n] = '\0';
+  if (wm_dnd_src_kind == 1) {
+    gtk_selection_data_set_text(sel, tmp, n);
+    return;
+  }
+  gchar **parts = g_strsplit(tmp, "\n", 0);
+  if (parts == NULL) {
+    return;
+  }
+  int cnt = (int)g_strv_length(parts);
+  gchar **uris = g_new0(gchar *, (gsize)cnt + 1);
+  int m = 0;
+  for (int i = 0; i < cnt; i++) {
+    if (parts[i][0] == '\0') {
+      continue;
+    }
+    // 相对路径绝对化（g_canonicalize_filename 以 cwd 为基），对方拿到完整位置
+    gchar *abs = g_canonicalize_filename(parts[i], NULL);
+    gchar *uri = g_filename_to_uri(abs != NULL ? abs : parts[i], NULL, NULL);
+    g_free(abs);
+    if (uri != NULL) {
+      uris[m++] = uri;
+    }
+  }
+  if (m > 0) {
+    gtk_selection_data_set_uris(sel, uris);
+  }
+  for (int i = 0; i < m; i++) {
+    g_free(uris[i]);
+  }
+  g_free(uris);
+  g_strfreev(parts);
+}
+
+static void wm_dnd_on_drag_end(GtkWidget *widget, GdkDragContext *ctx,
+                               gpointer data) {
+  (void)widget;
+  (void)data;
+  // selected_action 在 drag-end 时仍可读；映射回 DND flag（多位/未知 → 0）
+  wm_dnd_src_action = wm_dnd_gdk_to_flag(
+      gdk_drag_context_get_selected_action(ctx));
+  wm_dnd_src_done = 1;
+}
+
+static gboolean wm_dnd_src_timeout(gpointer data) {
+  (void)data;
+  wm_dnd_src_done = 1; // 救场：协议异常丢了 drag-end 也不能永久卡死调用方
+  return G_SOURCE_REMOVE;
+}
+
 int wm_dragdnd_send(int64_t id, const char *payload, int len, int allowed,
                     int32_t *out_effect) {
-  (void)id;
-  (void)payload;
-  (void)len;
-  (void)allowed;
   if (out_effect != NULL) {
     *out_effect = 0;
   }
-  return 0;
+  if (id <= 0 || id >= WM_MAX_WINDOWS || payload == NULL || len < 4 ||
+      len > WM_DND_PAYLOAD_MAX) {
+    return 0;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->window == NULL || wm_dnd_press == NULL) {
+    return 0; // 无窗口 / 不在「按钮按下」窗口内（须过阈值那一刻调）
+  }
+  int kind = (unsigned char)payload[0] | ((unsigned char)payload[1] << 8) |
+             ((unsigned char)payload[2] << 16) | ((unsigned char)payload[3] << 24);
+  if (kind != 1 && kind != 4) {
+    return 0; // Html/Img 无系统级形态（与门面判据一致，双保险）
+  }
+  guint actions = wm_dnd_flag_to_gdk(allowed);
+  if (actions == 0) {
+    return 0;
+  }
+  memmove(wm_dnd_src, payload, (size_t)len);
+  wm_dnd_src_len = len;
+  wm_dnd_src_kind = kind;
+  wm_dnd_src_done = 0;
+  wm_dnd_src_action = 0;
+  GtkTargetList *targets = gtk_target_list_new(NULL, 0);
+  if (kind == 1) {
+    gtk_target_list_add_text_targets(targets, 0);
+  } else {
+    gtk_target_list_add_uri_targets(targets, 0);
+  }
+  gulong s_get = g_signal_connect(w->window, "drag-data-get",
+                                  G_CALLBACK(wm_dnd_on_data_get), w);
+  gulong s_end = g_signal_connect(w->window, "drag-end",
+                                  G_CALLBACK(wm_dnd_on_drag_end), w);
+  GdkDragContext *ctx = gtk_drag_begin_with_coordinates(
+      w->window, targets, actions, 1, wm_dnd_press, -1, -1);
+  gtk_target_list_unref(targets);
+  if (ctx == NULL) {
+    g_signal_handler_disconnect(w->window, s_get);
+    g_signal_handler_disconnect(w->window, s_end);
+    return 0;
+  }
+  // 阻塞到 drag-end（嵌套主循环，xdnd 协议在这里被 GTK 代跑）；60 秒超时
+  // 救场，防止协议异常丢了 drag-end 把调用方永久挂住
+  guint timer = g_timeout_add_seconds(60, wm_dnd_src_timeout, w);
+  while (!wm_dnd_src_done) {
+    gtk_main_iteration();
+  }
+  g_source_remove(timer);
+  g_signal_handler_disconnect(w->window, s_get);
+  g_signal_handler_disconnect(w->window, s_end);
+  if (out_effect != NULL) {
+    *out_effect = (int32_t)wm_dnd_src_action;
+  }
+  return 1;
 }
 
 /* ---- 系统托盘（W20c）GTK 分支占位：Linux 的托盘走纯 MoonBit 的 SNI 协议栈

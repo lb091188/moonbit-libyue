@@ -1,7 +1,7 @@
 // 系统级拖放（W23a 拖入 / W23b 拖出）的平台门面：把 stub.c 的 `wm_dragdnd_*` 包成
-// MoonBit 侧可用的形态。OLE 的 `IDropTarget` 回调打在**本线程的消息派发**里，与
-// 托盘/菜单/热键同制——C 侧压进程级队列，宿主每拍调 `dragdnd_poll` 抽，不做
-// C→MoonBit 回调。
+// MoonBit 侧可用的形态。事件都是**消费式抽取**——Windows 的 OLE `IDropTarget`
+// 回调打在本线程的消息派发里、Linux/GTK 的 `drag-motion` 等信号打在 GTK 派发里，
+// 两边都由 C 侧压进程级队列、宿主每拍调 `dragdnd_poll` 抽，不做 C→MoonBit 回调。
 //
 // 效果标志是两段式的：`DragEnter` 由 C 按「认不认得这份格式」先给个承诺值
 // （认识给 COPY、不认识给 NONE），之后每次 `DragOver`/`Drop` 读 MoonBit 上一拍
@@ -9,7 +9,9 @@
 // 系统光标，而不需要在回调里同步问 MoonBit。
 //
 // `core/drag.mbt` 的门面在此之上建「跨平台后端选择 + 会话派发」，一般调用方不
-// 直接碰这一层。GTK/macOS 分支是失败桩（`dragdnd_supported` 恒 false）。
+// 直接碰这一层。macOS 分支是失败桩（`dragdnd_supported` 恒 0）。
+// Linux/GTK 分支的真实现见 stub.c「系统级拖放」节（四信号喂队列 + 嵌套主循环
+// 阻塞起拖，效果两段式与 Windows 同构）。
 
 ///|
 /// 外部拖入后端是否可用（Win32 要 OLE 起得来才算数，探测一次缓存）。
@@ -123,7 +125,9 @@ pub fn dragdnd_count() -> Int {
 /// OLE 走完了这趟（效果 0 表示取消或没落成交点）、`None` = 没走成（后端不可用、
 /// 载荷种类没有系统级形态、窗口越界）。
 ///
-/// 这一支**阻塞**到松手或取消才返回（`SHDoDragDrop` 自己跑一趟消息循环）；期间
+/// 这一支**阻塞**到松手或取消才返回（Windows 的 `SHDoDragDrop` 自己跑一趟消息
+/// 循环；Linux/GTK 起拖后嵌套跑 `gtk_main_iteration` 到 `drag-end`，同一条阻塞
+/// 语义，60 秒超时兜底）；期间
 /// 本窗的拖入回调照常打进 C 队列，返回后的下一拍由宿主抽取。要在鼠标键仍按下
 /// 时调用（过阈值那一刻），按钮抬起后再调系统不认。
 pub fn dragdnd_send(

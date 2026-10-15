@@ -2323,6 +2323,18 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **修复**:判据改两后端同口径——「实心」断言从直径六格收紧到**中段四格(5..9)全过 200**(cairo 下 255 满墨、raster 下亦满),直径两端「有墨」由阈值 60 的既有形态断言覆盖;注释写明两种口径与不进判据的理由。
 - **验证方式**:本机 Linux `moon test ui` **180/180**、库全量 14 包 **968/968** 零红、`cd gui && moon check --deny-warn` 零警告;判据收紧端(raster)仍被 Windows CI 覆盖(5..9 ⊆ 4..10 全满读数)。
 
+## Linux 系统级拖放接上(W23 平台批):四信号喂同一条会话、press 存档起拖、阻塞语义靠嵌套主循环(2026-10-15,用户提需求)
+
+- **环境**:Ubuntu 24.04(X11/XFCE,GTK3),W23a/b 此前只接了 Windows 半边,GTK 分支是失败桩(`supported` 恒 0);本批补 Linux 侧,门面/事件泵/回落语义/showcase 全部零改动。
+- **设计(与 Windows 分支同构的接线)**:拖入 `gtk_drag_dest_set` 挂在 GtkWindow 上(坐标即客户区坐标),四个信号——`drag-motion`(答 `gdk_drag_status` 两段式 + 首次**异步**取载荷)、`drag-leave`(收会话)、`drag-drop`(只置「投递待载荷」,放行 `GTK_DEST_DEFAULT_DROP` 默认 handler 去请求数据)、`drag-data-received`(motion 期缓存载荷并补发 ENTER,drop 期发 DROP + `gtk_drag_finish`)。事件压进程级队列、宿主每拍 `wm_dragdnd_poll` 抽,`core/drag.mbt` 的 `drag_external_pump` 一行不改。
+- **坑①(motion 期载荷是异步的)**:X11/XDND 下拖到一半时目标**拿不到 selection 数据**,必须 `gtk_drag_get_data` 请求、数据到达走 `data-received`(GTK 随后会再发一次 motion)。ENTER 事件从 `data-received` 里补发——指针停住不动不会再有 motion,ENTER 不能等;请求失败(源一样都不给)置 `asked` 标志答禁止,不重试。载荷单缓冲进程级一份(同一时刻只有一条会话,与 core 侧 `drag_current` 单例同口径)。
+- **坑②(起拖要 GdkEvent,而处置链不在 GTK 派发栈内)**:`gtk_drag_begin_with_coordinates` 要一个按钮事件,但本栈的起拖发生在 MoonBit 处置指针 Move 那一拍——早已离开 GTK 信号派发,`gtk_get_current_event()` 返回 NULL。按下那一刻 `gdk_event_copy` 存档、抬起即释放;没有存档(测试/键盘发起)直接失败——`Err(Failed)` 自动回落应用内,恰好是三平台同一份代码的口径。
+- **坑③(阻塞语义)**:Windows 侧 `SHDoDragDrop` 自跑消息循环阻塞到松手;GTK 的 `gtk_drag_begin` 立即返回,本批在 C 侧嵌套跑 `gtk_main_iteration()` 直到 `drag-end` 信号(60 秒 `g_timeout` 兜底,防协议异常丢了 `drag-end` 把调用方永久挂住),效果从 `drag-end` 时的 `gdk_drag_context_get_selected_action` 读回。
+- **坑④(效果位值两套)**:`GDK_ACTION_COPY/MOVE/LINK` 是 2/4/8,与门面沿用 Win32 的 `DROPEFFECT_*`(1/2/4)不同套——显式互转,多位同亮按「没成交」(0)不猜,与 core 侧 `drag_effect_of_flag` 只认 1/2/4 同口径。
+- **为什么没有合成探针**:Windows 侧 `drag_probe` 能纯 C 合成全链路,是因为 OLE 的 COM 接口可以直接喂对象;XDND 的 motion 由**指针**驱动,合成不了跨进程拖拽——Linux 侧验证层次是「编译 + 真环境读数测试(`win/dragdnd_wbtest`:挂接/幂等/计数/效果写回,无头打印跳过)+ 冒烟 + 真机清单 S26/S27」。
+- **顺带两条 C 层小坑**:`GPOINTER_TO_ATOM` 不存在(GDK 的是 `GDK_POINTER_TO_ATOM`);`gtk_target_list_add_text_targets`/`add_uri_targets` 必须带 `info` 参数(C 编译期报错,好抓)。
+- **验证方式**:`moon test win` **29/29**(新增 1 条环境读数)、库全量 14 包 **975/975** 零红、`cd gui && moon check --deny-warn` 零警告、showcase 构建链接 + 本机 8 秒冒烟存活;跨进程真拖(Thunar/gedit ↔ 窗口)归 `_人工测试清单.md` S26/S27 的 Linux 项。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。

@@ -8,11 +8,12 @@
 // - **已做（Windows，W23a）**：**系统级拖入**——从资源管理器/编辑器把文件或文本
 //   拖进窗口，落到同一个会话里（每拍 `drag_external_pump`，见本文件尾）。落点命中、
 //   悬停高亮、`accept` 判据全部复用应用内那一套，调用方的 `@ui.drop_target` 不用改。
+// - **已做（Linux/GTK，W23a-b 平台批）**：系统级拖入/拖出同两条门面——GTK 后端
+//   把 `drag-motion`/`drag-data-received` 等信号喂进同一条会话链、`gtk_drag_begin`
+//   起拖出（阻塞语义同 Windows）；macOS 的 `NSDraggingSource` 仍随后续批。
 // - **已做（Windows，W23b）**：**系统级拖出**——`drag_external_send` 把 `Text`/`Paths`
 //   交给 OLE 拖放（见本文件尾的「系统级拖出」节）。`drag_source(external=true)` 在
 //   过阈值那一刻起这趟；后端不支持或种类没有系统级形态时自动回落到应用内会话。
-// - **未做（随平台批）**：Linux GTK/XDG DnD 与 macOS `NSDraggingSource`（这两档的
-//   后端桩恒报不可用，不假装能用）。
 // - 参照面是旧栈的 `yue/view.mbt`（`DataKind` / `DragData` / `register_dragged_types`
 //   / `handle_drag_enter`/`handle_drag_update`/`handle_drop`/`on_drag_leave`）。
 //   本批把「拖入三回调」收成一个 `on_drop`（自绘档不需要 enter/update/leave 三件：
@@ -418,8 +419,8 @@ pub fn Widget::drag_wants(self : Widget, data : DragData) -> Bool {
 }
 
 ///|
-/// 系统级拖入是否可用（运行时探测：Windows 要 OLE 起得来才算数，其余后端恒
-/// false）。不可用时下面的挂载与抽取全部静默失败，应用内拖放照常。
+/// 系统级拖入是否可用（运行时探测：Windows 要 OLE 起得来、Linux 要有显示服务，
+/// 其余后端恒 false）。不可用时下面的挂载与抽取全部静默失败，应用内拖放照常。
 pub fn drag_external_supported() -> Bool {
   @win.dragdnd_supported()
 }

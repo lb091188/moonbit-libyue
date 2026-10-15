@@ -10,7 +10,7 @@
 //    注册收 `Result`，命中经 `hotkey_poll` 抽（id→加速串回查表在门面里，页内
 //    不自己持表——只记注册时返回的句柄用于注销）；轮询表挂宿主 200ms 一拍；
 // ③ 拖放：旧链路的「跨应用系统级」（register_dragged_types + enter/update/drop
-//    三回调）在本栈拆成两段——应用内那条三平台同构，系统级两档 Windows 已接：
+//    三回调）在本栈拆成两段——应用内那条三平台同构，系统级两档 Windows/Linux 已接：
 //    拖入走 `core/drag.mbt` 的 `drag_external_*`（旧三回调收成 `on_drop` 一个 +
 //    悬停期一次 `accept` 查询），拖出走 `drag_external_send`（`drag_source`
 //    的 `external=true`，本机没后端时自动回落应用内）。Linux/mac 的系统级两档
@@ -212,7 +212,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
     @shared.section(
       "拖放",
       "应用内拖放 + 系统级拖入 / 拖出",
-      "按住左边色块拖出 4px 即开拖，拖到右边面板上会描主色边，松手成交——这条三平台同构，同一棵树上能连着拖多少次都行。系统级**拖入**（从资源管理器拖文件、从编辑器拖文本进窗口）Windows 已接：外部事件每拍喂进同一条会话，落点命中、悬停描边、`accept` 判据全部复用，不收的落点系统光标直接显示禁止。系统级**拖出**（Windows）也走通：`drag_source(external=true)` 在过阈值那一刻把这趟交给系统，对方程序拿到标准的复制/移动/链接语义（Ctrl/Shift/Alt 定夺），本机没这条后端时自动回落到上面那条应用内会话。Linux/mac 的系统级两档随平台批。",
+      "按住左边色块拖出 4px 即开拖，拖到右边面板上会描主色边，松手成交——这条三平台同构，同一棵树上能连着拖多少次都行。系统级**拖入**（从文件管理器拖文件、从编辑器拖文本进窗口）Windows/Linux 已接：外部事件每拍喂进同一条会话，落点命中、悬停描边、`accept` 判据全部复用，不收的落点系统光标直接显示禁止。系统级**拖出**（Windows/Linux）也走通：`drag_source(external=true)` 在过阈值那一刻把这趟交给系统，对方程序拿到标准的复制/移动/链接语义（Ctrl/Shift/Alt 定夺），本机没这条后端时自动回落到上面那条应用内会话。macOS 的系统级两档随平台批。",
       [
         @ui.row(
           [
@@ -364,10 +364,10 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         "    }",
         "  },",
         ")",
-        "// 系统级拖入（Windows）：建窗自动挂投放目标，宿主每拍抽事件喂进同一条",
+        "// 系统级拖入（Windows/Linux）：建窗自动挂投放目标，宿主每拍抽事件喂进同一条",
         "// 会话；运行时探测决定这台机器能不能用（非 Windows 给 false）",
         "if @core.drag_external_supported() { ... }",
-        "// 系统级拖出（Windows）：过阈值那一刻把这趟交给系统，阻塞到松手/取消；",
+        "// 系统级拖出（Windows/Linux）：过阈值那一刻把这趟交给系统，阻塞到松手/取消；",
         "// 本机后端没接或这趟起不来时自动回落到应用内会话",
         "@ui.drag_source(",
         "  tile,",
