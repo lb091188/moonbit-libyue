@@ -78,12 +78,13 @@ pub fn checkbox(
         } else {
           accent
         })
-        // 勾比框粗：14px 的框里 1px 折线只剩几个像素，看不出是个勾。
+        // 勾比框粗：14px 的框里 1px 折线只剩几个像素，看不出是个勾；
+        // 两端离框边各留 2px 以上，否则与框线糊在一起。
         p.set_line_width(2.0)
         p.begin_path()
-        p.move_to(3.2, 7.3)
-        p.line_to(5.8, 10.0)
-        p.line_to(10.9, 3.9)
+        p.move_to(3.4, 7.4)
+        p.line_to(5.9, 9.9)
+        p.line_to(10.5, 4.3)
         p.stroke()
       }
     })
@@ -135,7 +136,7 @@ pub fn radio_group(
         let accent = @style.color_of(s.color, "")
         let picked = state.get() == idx
         p.set_stroke_color(if picked && !disabled { accent } else { @style.color_of(s.border_color, "") })
-        p.set_line_width(1.0)
+        p.set_line_width(1.2)
         p.begin_path()
         p.move_to(13.0, 7.0)
         p.arc(7.0, 7.0, 6.0, 0.0, 6.283185307179586)
@@ -146,9 +147,11 @@ pub fn radio_group(
           } else {
             accent
           })
+          // 圆心收到 2.8：环的内沿在 5.4，两者之间留得出一条空白，
+          // 否则 14px 的标记上环与心糊成一整块实心板
           p.begin_path()
-          p.move_to(10.0, 7.0)
-          p.arc(7.0, 7.0, 3.5, 0.0, 6.283185307179586)
+          p.move_to(9.8, 7.0)
+          p.arc(7.0, 7.0, 2.8, 0.0, 6.283185307179586)
           p.fill()
         }
       })
@@ -176,8 +179,7 @@ pub fn radio_group(
 }
 
 ///|
-/// 开关：40×20 胶囊 + 16 圆滑块（胶囊自身按圆角矩形近似，直角先记档），
-/// 可带开/关文案。
+/// 开关：40×20 胶囊（圆角半径=半高）+ 16 圆滑珠，可带开/关文案。
 pub fn switch(
   state : @core.Store[Bool],
   on_text? : String = "",
@@ -215,10 +217,14 @@ pub fn switch(
         @style.color_of(s.border_color, "")
       }
       p.set_fill_color(body)
-      p.fill_rect(0.0, 0.0, r.w, r.h)
+      p.fill_round_rect(0.0, 0.0, r.w, r.h, r.h / 2.0)
       p.set_fill_color(@style.color_of(s.color, "#ffffff"))
-      let kx = if on { r.w - 18.0 } else { 2.0 }
-      p.fill_rect(kx, 2.0, 16.0, 16.0)
+      // 滑珠是圆：圆心离两端各一个半高，半径 8 → 珠沿与胶囊壁齐平
+      let cx = if on { r.w - 10.0 } else { 10.0 }
+      p.begin_path()
+      p.move_to(cx + 8.0, r.h / 2.0)
+      p.arc(cx, r.h / 2.0, 8.0, 0.0, 6.283185307179586)
+      p.fill()
     })
     row.node.set_flex_direction(@yoga.Row)
     row.node.set_align_items(@yoga.AlignItems::Center)
