@@ -77,13 +77,24 @@ test {
     FileManagerError::SpawnFailed.to_string(),
     "FileManagerError::SpawnFailed",
   )
-  if sys_platform() == "windows" {
-    // Windows 直调落地（平台批①）：open/reveal 会真开浏览器/资源管理器，
-    // 有系统副作用——测试只验证「不再返回 Unsupported」，用无效目标的
-    // SpawnFailed 语义做探针（不弹窗）
-    assert_true(open_url("libyue-invalid-probe://no-such-scheme") is Ok(_) || open_url("libyue-invalid-probe://no-such-scheme") is Err(SpawnFailed))
-  } else if sys_platform() != "linux" {
+  if open_supported() {
+    // 后端在（Windows 直调 / Linux xdg-open / macOS open）。**不在这里真调
+    // open_url / open_file / reveal**：`ShellExecuteW` 对未注册的协议**不返错**，
+    // 而是把系统「需要使用新应用以打开…」的选择器拉起来——旧版这里拿
+    // `libyue-invalid-probe://` 当"无效目标探针"，注释写着「不弹窗」是错的，
+    // 每跑一次 `moon test sys` 就在开发者机器上弹一次窗（用户实测）。
+    // 真开动作有系统副作用，只归示例与真机复验（S28）；这里只断纯判据 + 负例。
+    assert_true(open_supported())
+    assert_true(open_file("") is Err(NotFound))
+    // reveal 的 macOS 分支还没接（只 windows/linux），所以那里给 Unsupported
+    assert_true(
+      reveal_in_file_manager("") is Err(NotFound) ||
+        reveal_in_file_manager("") is Err(Unsupported),
+    )
+    assert_true(open_file_with("", "TODO.md") is Err(SpawnFailed))
+  } else {
     assert_true(open_url("https://libyue.com") is Err(Unsupported))
+    assert_true(open_file("TODO.md") is Err(Unsupported))
     assert_true(reveal_in_file_manager("/tmp") is Err(Unsupported))
   }
 }

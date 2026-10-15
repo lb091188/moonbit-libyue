@@ -288,7 +288,21 @@ pub fn open_file_with(
 }
 
 ///|
+/// 本机有没有「把 URL/文件交给系统打开」的后端（Windows `ShellExecuteW`、
+/// Linux `xdg-open`、macOS `open`）。运行时探测，纯判据、不碰系统。
+/// 用途：示例用它决定按钮文案；测试用它避开真的开窗动作——`ShellExecuteW` 对
+/// **未注册的协议**不会返错，而是把系统「你要用什么应用打开」的选择器拉起来，
+/// 在测试里调一次就弹一次窗（真踩过），这类动作只归示例与真机复验。
+pub fn open_supported() -> Bool {
+  match sys_platform() {
+    "windows" | "linux" | "macos" => true
+    _ => false
+  }
+}
+
+///|
 /// 打开 URL 交给系统默认处理（http/https/mailto 等一律透传，不做校验）。
+/// 有真实系统副作用（会拉起浏览器/协议处理程序），不要在测试里调。
 pub fn open_url(url : String) -> Result[Unit, OpenUrlError] {
   match sys_platform() {
     "windows" => {
@@ -302,6 +316,11 @@ pub fn open_url(url : String) -> Result[Unit, OpenUrlError] {
     }
     "linux" =>
       match spawn_detached("xdg-open", url) {
+        Ok(_) => Ok(())
+        Err(_) => Err(SpawnFailed)
+      }
+    "macos" =>
+      match spawn_detached("open", url) {
         Ok(_) => Ok(())
         Err(_) => Err(SpawnFailed)
       }

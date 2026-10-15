@@ -2350,6 +2350,14 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **口径同步**：showcase 段名「集合外属性 / 不参与插值的属性」改为「插值范围 / 哪些属性会渐变」并改写正文；`docs/zh/design.md` §1.1「过渡」行重写（字号与行高进集合、测量期同读一份值、这两条改走整窗置脏、理由从「每帧重排」改成「每帧本来就重排」）；P5 那节的「待真机复验」补了口径变更指针，避免后人照旧文案判 bug。
 - **验证方式**：`gui/style/transition_wbtest.mbt` 改 1 条 + 新增 2 条——`lerp_style` 中帧 12→16 给 14、行高 16→20 给 18（旧口径两条都取目标），集合外的 `opacity` 仍直取目标；`step` 只改字号也起表，25/50/100ms 读数 12.625 / 14.0 / 16.0（smoothstep），中途换回原值时反向段从当前 14.0 续接不跳端点，且 `anim_needs_full_paint` 为真（只改颜色的那条账为假）；只改行高同样起表并给 18.0；`resolved_for_measure` 与同帧 `style_for` 的字号与行高**同值**、两值分别落在 [13,17] 与 [20,28] 内、且 `resolved_by_id` 的基块没被写坏。旧实现下这几条全红。`moon test style ui core` **354/354**，真机观感归 `_人工测试清单.md` S30。
 
+## 库测试每跑一次就弹一次「需要使用新应用以打开 …」：ShellExecuteW 对未注册协议不返错（2026-10-15,用户报）
+
+- **环境**：Windows 10 19044 开发机，跑 `cd gui && moon test sys`（或全包测试）时反复弹系统对话框。
+- **现象**：用户反馈「你测试的时候总是提示『需要使用新应用以打开 libyue-invalid-probe 链接』」。
+- **根因**：`sys/launcher_wbtest.mbt` 里有一条 Windows 探针 `open_url("libyue-invalid-probe://no-such-scheme")`，注释写着「用无效目标的 SpawnFailed 语义做探针（**不弹窗**）」——这句是错的。`ShellExecuteW` 走的是系统关联/协议分发：**未注册的协议不返回 `SE_ERR_*`**，而是把「你要用哪个应用打开」的选择器交给用户（等价于成功），所以既拿不到期望的 `SpawnFailed`，又每次跑测试都在开发者桌面上弹窗。测试有真实系统副作用，还违反「真机动作归用户复验」的分工（规则 6）。
+- **修复**：新增纯判据 `open_supported()`（Windows/Linux/macOS 为真，运行时探测、不碰系统），测试改成只断它 + **在交出去之前就返回**的负例（`open_file("")`→`NotFound`、`open_file_with("", …)`→`SpawnFailed`、`reveal_in_file_manager("")`→`NotFound`/macOS 的 `Unsupported`），真开动作只留在示例按钮里（S28 由用户复验）。顺带把 `open_url` 的 macOS 分支补上（`open` 一条，与 `open_file` 同口径），`open_supported` 与三条面的分派表因此一致。
+- **口径**：库测试里**不许**出现 `ShellExecute*` / `xdg-open` / `open` 的真实目标调用；要验「后端接没接上」用纯判据，要验「真开出来是什么」写进 `_人工测试清单.md` 让人跑。以后再有「拿无效目标探错误档」的想法，先确认该无效性能在**不启动系统 UI** 的前提下返错——协议的无效性恰恰不满足这条。
+- **验证方式**：`moon test sys` **186/187**（唯一红仍是 `si_machine` 读 BIOS 注册表的本机环境基线），跑测试期间桌面不再出现任何对话框；`cd gui && moon check --deny-warn` 与 examples 零警告。
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。
