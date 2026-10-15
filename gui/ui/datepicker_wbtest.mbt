@@ -278,3 +278,20 @@ test "时间弹层：顶部时间是占位的子件，第一行步进不被压�
   }
   assert_true(panel.rect.h >= prev_end + 10.0, msg="弹层高度没包住内容")
 }
+
+///|
+test "键盘可及性：日期字段回车/空格开日历、Esc 收起" {
+  let v : @core.Store[DateYMD?] = @core.Store::new(None)
+  let (root, w) = mounted_with_overlay(date_picker(v), 400.0, 400.0)
+  assert_true(w.focus_id > 0)
+  let _ = root.dispatch_key(w.focus_id, { press: true, keysym: @core.KS_RETURN, mods: 0, })
+  root.relayout(400.0, 400.0)
+  assert_eq(@core.overlay_count(), 1)
+  let _ = root.dispatch_key(w.focus_id, { press: true, keysym: @core.KS_ESCAPE, mods: 0, })
+  assert_eq(@core.overlay_count(), 0)
+  assert_true(match v.get() {
+    None => true
+    Some(_) => false
+  })
+  @core.overlay_clear()
+}

@@ -374,3 +374,27 @@ test "穿梭框：面板默认 200×160，height= 可覆，项少也占满面板
   let (_, tr2) = mounted(transfer(left, right, height=90.0), 460.0, 220.0)
   assert_true(tr2.children()[0].rect.h >= 90.0)
 }
+
+///|
+test "键盘可及性：分段空格/回车选中本段，左右键在段间移动选中" {
+  let sel = @core.Store::new("甲")
+  let root = mount_root([segmented(["甲", "乙", "丙"], sel)], 300.0, 60.0)
+  let seg = kid(root, 0)
+  assert_eq(seg.kids.length(), 3)
+  let item1 = seg.kids[1]
+  assert_true(item1.focus_id > 0)
+  let key = fn(ks : Int) -> Unit {
+    let _ = root.dispatch_key(item1.focus_id, { press: true, keysym: ks, mods: 0, })
+  }
+  key(@core.KS_SPACE)
+  assert_eq(sel.get(), "乙")
+  key(@core.KS_LEFT)
+  assert_eq(sel.get(), "甲")
+  key(@core.KS_RIGHT)
+  assert_eq(sel.get(), "丙")
+  key(@core.KS_UP)
+  assert_eq(sel.get(), "甲")
+  // 回车/空格都是激活焦点段（乙），不是「确认当前选中」
+  key(@core.KS_RETURN)
+  assert_eq(sel.get(), "乙")
+}

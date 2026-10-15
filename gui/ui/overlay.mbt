@@ -107,9 +107,11 @@ pub fn popover(
 
 ///|
 /// 下拉菜单一行（28 高，悬停高亮；`"-"` 画成分隔线）。
+/// `selected` 是键盘高亮（↑/↓ 移动的那行）：浅蓝底 + 主色字，与 select_row 同视觉。
 fn menu_row(
   text : String,
   on_pick : () -> Unit,
+  selected? : () -> Bool = fn() -> Bool { false },
   skin~ : @style.Style = @style.empty_style(),
 ) -> @core.Node {
   if text == "-" {
@@ -134,11 +136,17 @@ fn menu_row(
       r : @core.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
-      // 悬停底来自 hover 桶：没给就是不铺底
-      let bg = @style.color_of(st.background_color, "")
-      if bg.length() > 0 {
-        p.set_fill_color(bg)
+      let act = selected()
+      if act {
+        p.set_fill_color(@theme.theme_primary_light())
         p.fill_rect(0.0, 0.0, r.w, r.h)
+      } else {
+        // 悬停底来自 hover 桶：没给就是不铺底
+        let bg = @style.color_of(st.background_color, "")
+        if bg.length() > 0 {
+          p.set_fill_color(bg)
+          p.fill_rect(0.0, 0.0, r.w, r.h)
+        }
       }
       let _ = @text.draw_box_at(
         p,
@@ -148,7 +156,11 @@ fn menu_row(
         r.h,
         text,
         font,
-        @style.color_of(st.color, @theme.theme_text_regular()),
+        if act {
+          @theme.theme_primary()
+        } else {
+          @style.color_of(st.color, @theme.theme_text_regular())
+        },
         align=@text.Start,
         valign=@text.Center,
       )
@@ -172,12 +184,14 @@ fn menu_row(
 
 ///|
 /// 下拉菜单（EP Dropdown）：触发文字 + 下拉箭头，点开菜单项列表，悬停高亮，
-/// 选中回调序号并收起。
+/// 选中回调序号并收起。键盘口径：空格/回车/↓ 开菜单，↑/↓ 移高亮（分隔线跳过）、
+/// 回车/空格取高亮、Esc 收起；触发件自动进 Tab 链，聚焦时描边转主题色。
 pub fn dropdown(
   trigger : String,
   items : Array[String],
   on_select? : (Int) -> Unit = fn(_i : Int) -> Unit { () },
   width? : Double = 150.0,
+  focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
@@ -188,7 +202,50 @@ pub fn dropdown(
     w.node.set_width(@yoga.fixed(tw + 40.0))
     w.node.set_height(@yoga.fixed(30.0))
     w.cursor = @core.CURSOR_HAND
+    w.focus_id = auto_focus_id(focus_id)
     let open_id : Ref[Int] = Ref(0)
+    let hi : Ref[Int] = Ref(0)
+    // 可选中的行号（分隔线 "-" 不占高亮位）：picks 里存的是 items 下标
+    let picks : Ref[Array[Int]] = Ref([])
+    let close_pop = fn() -> Unit {
+      if open_id.val != 0 {
+        @core.overlay_hide(open_id.val)
+        open_id.val = 0
+      }
+    }
+    let open_pop = fn() -> Unit {
+      hi.val = 0
+      let rows : Array[@core.Node] = []
+      let pick_rows : Array[Int] = []
+      for i = 0; i < items.length(); i = i + 1 {
+        if items[i] == "-" {
+          rows.push(divider())
+          continue
+        }
+        let idx = i
+        let row_idx = pick_rows.length()
+        pick_rows.push(idx)
+        rows.push(
+          menu_row(
+            items[idx],
+            fn() -> Unit {
+              close_pop()
+              on_select(idx)
+            },
+            selected=fn() -> Bool {
+              overlay_alive(open_id.val) && hi.val == row_idx
+            },
+            skin=paint_subset(class),
+          ),
+        )
+      }
+      picks.val = pick_rows
+      open_id.val = @core.overlay_show_at(
+        overlay_pane(rows, width, 0.0, skin=paint_subset(class)),
+        w.rect.x,
+        w.rect.y + w.rect.h + 2.0,
+      )
+    }
     // 内置皮肤进槽（基块=常态、hover 桶=悬停底），class 的属性后落即覆盖
     @style.apply(
       w,
@@ -214,6 +271,10 @@ pub fn dropdown(
       p.set_stroke_color(@style.color_of(st.border_color, @theme.theme_border()))
       p.set_line_width(@style.number_of(st.border_width, 1.0))
       p.stroke_rect(0.0, 0.0, r.w, r.h)
+      if self.focused {
+        p.set_stroke_color(@theme.theme_primary())
+        p.stroke_rect(0.0, 0.0, r.w, r.h)
+      }
       let _ = @text.draw_box_at(
         p,
         10.0,
@@ -237,40 +298,55 @@ pub fn dropdown(
       )
     })
     w.on_pointer = Some(fn(
-      self : @core.Widget,
+      _self : @core.Widget,
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @core.Down => true
         @core.Up => {
           if overlay_alive(open_id.val) {
-            @core.overlay_hide(open_id.val)
-            open_id.val = 0
+            close_pop()
           } else {
-            let rows : Array[@core.Node] = []
-            for i = 0; i < items.length(); i = i + 1 {
-              let idx = i
-              rows.push(
-                menu_row(
-                  items[i],
-                  fn() -> Unit {
-                    @core.overlay_hide(open_id.val)
-                    open_id.val = 0
-                    on_select(idx)
-                  },
-                  skin=paint_subset(class),
-                ),
-              )
-            }
-            open_id.val = @core.overlay_show_at(
-              overlay_pane(rows, width, 0.0, skin=paint_subset(class)),
-              self.rect.x,
-              self.rect.y + self.rect.h + 2.0,
-            )
+            open_pop()
           }
           false
         }
         _ => false
+      }
+    })
+    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+      if !ev.press {
+        return false
+      }
+      let ks = ev.keysym
+      if overlay_alive(open_id.val) {
+        let n = picks.val.length()
+        if ks == @core.KS_ESCAPE {
+          close_pop()
+          true
+        } else if n > 0 && (ks == @core.KS_RETURN || ks == @core.KS_SPACE) {
+          let idx = picks.val[hi.val.clamp(min=0, max=n - 1)]
+          close_pop()
+          on_select(idx)
+          true
+        } else if n > 0 && ks == @core.KS_DOWN {
+          hi.val = (hi.val + 1) % n
+          @core.invalidate()
+          true
+        } else if n > 0 && ks == @core.KS_UP {
+          hi.val = (hi.val + n - 1) % n
+          @core.invalidate()
+          true
+        } else {
+          false
+        }
+      } else if ks == @core.KS_RETURN ||
+        ks == @core.KS_SPACE ||
+        ks == @core.KS_DOWN {
+        open_pop()
+        true
+      } else {
+        false
       }
     })
     fold_style(w, @style.empty_style(), class)

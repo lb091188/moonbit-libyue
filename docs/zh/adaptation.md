@@ -17,6 +17,7 @@
 - 新版 moon 弃用 trait 方法隐式提升:调用写显式静态形式 `ViewLike::method(obj)`;`impl Trait for X` 声明点须补 `pub extend X with Trait::{...}`(方法清单从 `moon check --no-render` 输出生成,勿手抄);黑盒测试内引用包内符号须限定 `@<包>.xxx`。此类警告增量编译漏报,clean 全量才见全量。
 - mooncakes 包页 README 渲染器只显示绝对 URL 外链图片(0.5.3~0.5.5 连发实测:包内相对路径图片无论纯 md 语法还是 HTML 一律不渲染,HTML 块更被整段丢弃,而外链 CI badge 正常显示);门面图改 jsdelivr 绝对 URL(`cdn.jsdelivr.net/gh/<user>/<repo>@master/...`,国内外可达性均衡,@master 引用有数小时缓存延迟),GitHub 侧经 camo 代理显示不受影响。
 - 工具链三件套(moon/moonc/core)必须配套同版本(0.5.3 发布实测):非交互终端跑 `moon upgrade` 半途报 `IO error: not a terminal` 时只换了二进制、`~/.moon/lib/core` 未动,落得 moonc 0.10.14 + core 0.10.12 混搭——core 无 `StringView::exact_view`(sysdata 报 4 处 no method),且升号改 moon.mod 触发的全量重查才暴露,之前的增量 `moon check`/`moon test` 全绿是假绿;nightly 版本号当日即滚动下架(CLI 服务器对指名历史版本一律 403),`MOONBIT_INSTALL_VERSION` 钉版本不可行,唯一修复路径是无参重跑 `install/unix.sh` 装 latest 全家桶(二进制与 core 同批换)对齐 CI;验证:`moon version --all` 与 `~/.moon/lib/core/moon.mod` 的版本一致后升号触发全量重查,133 测全绿。
+- **mooncakes 构建器对已发布包跑旧清单迁移的真实后果(0.1.0 发布实测,2026-10-15)**:`native-gui@0.1.0` 发布后,包页为 **Build failed / Documentation failed for this version**(文档不生成,API 文档缺失,包仍可安装)。构建日志(公开 API 可取:`https://mooncakes.io/api/v0/builds/log?module=<owner>/<name>&version=<ver>`)显示四个目标 native / wasm-gc / wasm / js **全红且同一根因**——依赖 `NoahLiu/yoga-mbt@0.1.0` 已发布归档里仍是 `moon.pkg.json`(`moon.pkg.json ... is no longer supported. Run moon fmt to migrate`),构建器在依赖图上就失败(`Failed to calculate build plan / Failed when discovering packages`),压根到不了本包代码。这就是 CI「依赖缓存就地迁移」循环绕过的同一条坑——**CI 迁的是本机 `.mooncakes` 下载缓存,发布到注册表的包迁不动**,消费方和构建器必然踩到。修法:**把该依赖模块(仓库里 `moon.pkg` 已在)重新发布一次,再发依赖它的包**——发布链上游必须先修。验证方式:重发 yoga-mbt 后单开零依赖包验证构建器出队转绿,再发 native-gui 看包页 `build_status`;诊断入口即上面那条日志 API(登录后的包页按钮走的同一接口)。
 - **mizchi/markdown@0.8.3 引入与传递依赖发布链定案(MD1,2026-10)**:根 moon.mod import 钉 `mizchi/markdown@0.8.3`,独立控制台探针 `examples/probe-markdown` 实证 parse / render_html / serialize 三调用(`moon run examples/probe-markdown --target native` 输出 PROBE-OK:parse 11 块含标题/围栏代码/表格/引用/列表各 1,render_html 出 h1/strong/em/code/a/ul/li/pre/blockquote/table 且链接地址保留,serialize 往返重解析重渲染全过;moon check 零警告 + moon test 576 全绿)。native 支持有据:registry 索引 0.8.0 仅 js+wasm,**0.8.1 起才加 native**,0.8.2 起加 wasm-gc,钉 0.8.3(supported-targets=js+wasm+wasm-gc+native)是支持矩阵的第一个稳妥点;其 src/moon.pkg import 实验性 `moonbitlang/core/v128`(包内注释自述仅 linear-memory 目标可达),native 属 linear-memory,探针编译通过即实证可用,无需任何额外开关。**依赖闭包名义 5 项、实际 21 包**:直接依赖 moonbitlang/async@0.20.3 / moonbitlang/parser@0.3.18 / moonbitlang/x@0.5.1 / mizchi/syntree@0.2.4 / mizchi/moomaid@0.4.0,经各包 moon.mod 二级展开实装 .mooncakes 共 21 外部包(parser→lexer/moon_config/prettyprinter;moomaid→tui/signals/svg/font/css/crater-layout/crater-core 及其下级 tui-terminal-buffer/brotli/zlib/pixelmatch/layout);x 与 syntree 存在上游多版本声明共置(markdown 要 x@0.5.1、parser 要 0.4.39、moomaid 要 0.4.47;syntree 0.2.4/0.2.3),mooncakes 单版本空间取高版本一份实装——上游各自发版漂移时闭包版本由 moon 择高,升级 markdown 须留意级联。**moon add 传递机制实测**:消费方 `moon add mizchi/markdown@0.8.3` 只写入直接依赖一行,传递闭包不进 moon.mod、安装期按 registry 索引递归解析拉取(临时模块实测输出 Using cached mizchi/syntree 等)——即本仓发布后消费方 add 本模块时构建器自动拉全闭包,依赖面成本纯安装/编译期。**定案:接受传递,不拆独立模块**(MD2 起 markdown_view 桥接 mizchi/markdown 随主模块走);依据:闭包全为纯 MoonBit 源码包,无 native stub 无链接面,不碰 prebuild 托管,对消费方零 ABI/平台矩阵/发布物体积风险,与 ffmpeg-mbt 因二进制矩阵+许可+体积拆独立模块的性质不同;降级路径预留——消费方依赖面反馈过重或上游 0.x API 波及时,再下沉独立模块(库模块退回零 markdown 依赖,仿媒体三层拆分)。注意:模块内子包(如旧链的 browser 子包模式)解决不了依赖面——mooncakes deps 是模块级声明,子包 import 一样进发布闭包,browser 模式隔离的是链接 flags 层,两者机理不同勿混用。
 
 ### CI runner 环境与开发机的差别（2026-10-15，Linux/Windows job 第一次跑到测试步骤）
@@ -2202,6 +2203,21 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **根因**:`alert` 的关闭**热区与回调链路本身是好的**(白盒测试里点热区 `on_close` 确实被调),坏在语义分层——`on_close` 的默认值是空函数,showcase 恰好没传回调,而组件本体又没实现「收起」这个本体行为:点 ✕ 等于调用一个空函数,什么都不发生。组件页文案写的「这里留默认(只收起)」承诺的正是这个没实现的行为。
 - **修复**(`gui/ui/display.mbt`):✕ 的本体行为进组件——点热区一律 `set_visible(false)`(与 yoga `Display::None` 同步,布局自然回流)+ `@core.invalidate()`(全窗置脏:收起会让下方内容整列回流,局部脏区盖不住);`on_close` 降级为收起之外的**可选通知**,传不传都收起。`native-app` 里传了计数回调的用法顺带获得一致行为(横幅收起 + 计数加一)。
 - **验证方式**:`ui` 既有提示条回归改写——打开态先画图断言 ✕ 标记存在,点热区后断言回调被调 + `visible == false` + 重排重绘后整幅无墨;非热区点击不收起。库全包 918/923(同上基线)、`cd examples && moon check --deny-warn` 零警告。真机复验归 `_人工测试清单.md` S8。
+
+## 表单族控件 Tab 不上、没有键盘交互:焦点号 opt-in 口径把整族控件关在 Tab 链外(2026-10-15,用户反馈)
+
+- **现象**:步进器、滑杆、评分、选择(普通/颜色/日期/时间)、开关、多选、单选都无法 Tab 选中,按空格/方向/回车没任何反应;按钮、菜单、段分组同样。
+- **根因**:焦点基础设施(焦点栈、Tab 环绕、`dispatch_key` 沿焦点控件祖先链投递、`focus_ids` 树序对齐)都是现成的,2026-10-14 批只给输入框自动领号,`select`/`button` 等当时的口径是「可聚焦是刻意 opt-in」(见《键盘焦点全线失效》批末尾那条注)——因为当时「焦点 + 激活键」语义还没做,默认聚焦会出「Tab 得上去、回车什么都不干」的半截功能。本批把激活语义补齐,口径翻转:表单族/导航族/菜单**默认自动领号进 Tab 链**(`auto_focus_id`,显式号仍优先),不再需要调用点逐个给号。
+- **修复**(键语义逐控件):
+  - `button`/`checkbox`/`switch`/单选项/分段项:空格/回车激活(切换或选中);
+  - `radio_group`/`segmented`:方向键按**焦点项下标**换选(不是相对当前值),到头环绕;回车/空格是激活焦点项;
+  - `slider`:←/↓ 减、→/↑ 加(无 step 按百分之一量程),Home/End 到两端;
+  - `stepper`:←/↓ 减、→/↑ 加,触界侧吃掉键不改值;
+  - `rate`:方向键加减一星、Home/End 到两端,写值与点击同回调;
+  - `select`(非可编辑)/`color_picker`/`dropdown`:空格/回车/↓ 开层,↑/↓(色板是 ←→ 移一格、↑↓ 移一行)移高亮,回车/空格取高亮,Esc 收层;`dropdown` 的分隔线 `-` 不占高亮位;
+  - `date_picker`/`date_range_picker`/时间字段:空格/回车/↓ 开层、回车/Esc 收层(`attach_field_toggle_key`;日历内部的方向键导航未做,弹层里仍只点选);
+  - 焦点环:输入框/选择器字段描边聚焦时转主题色(覆盖在常态描边上),标记控件(复选框线、单选环、开关胶囊、步进器外框、评分/分段/滑块)画主题色描边圈,按钮沿用原焦点环。绘制按控件矩形裁剪,环一律画在控件矩形**内**。
+- **验证方式**:`ui` 新增 8 条无头回归(标记控件空格/回车/禁用不吃键 + `focus_ids` 收录、单选环绕换选、滑块/步进器/评分键调值、按钮空格/回车、select 键盘全流程、取色器网格导航、dropdown 分隔线跳过、分段换选、日期字段开合)。`moon test ui` 176/176、库全包 934/935(1 条红为本机 Windows 环境基线)、`cd gui && moon check --deny-warn` 与 examples 模块零警告。真机复验归 `_人工测试清单.md` S22。
 
 ## 维护约定
 

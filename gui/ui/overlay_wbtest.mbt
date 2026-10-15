@@ -555,3 +555,35 @@ test "对话框：遮罩暗化、面板圆角外无描边墨" {
   assert_true(ir > 250 && ig > 250 && ib > 250)
   @core.overlay_clear()
 }
+
+///|
+test "键盘可及性：下拉菜单下键开菜单、上下移高亮（分隔线不占位）、回车取项、Esc 收起" {
+  let picks : Array[Int] = []
+  let (root, w) = mounted_with_overlay(
+    dropdown(
+      "菜单",
+      ["甲", "-", "乙"],
+      on_select=fn(i : Int) -> Unit { picks.push(i) },
+      width=120.0,
+    ),
+    300.0,
+    240.0,
+  )
+  assert_true(w.focus_id > 0)
+  let key = fn(ks : Int) -> Unit {
+    let _ = root.dispatch_key(w.focus_id, { press: true, keysym: ks, mods: 0, })
+  }
+  key(@core.KS_DOWN)
+  root.relayout(300.0, 240.0)
+  assert_eq(@core.overlay_count(), 1)
+  key(@core.KS_DOWN)
+  key(@core.KS_RETURN)
+  // 高亮按行序（分隔线不占位），picks 存的是 items 下标：第 2 行=「乙」=items[2]
+  assert_eq((picks, @core.overlay_count()), ([2], 0))
+  key(@core.KS_SPACE)
+  root.relayout(300.0, 240.0)
+  assert_eq(@core.overlay_count(), 1)
+  key(@core.KS_ESCAPE)
+  assert_eq(@core.overlay_count(), 0)
+  @core.overlay_clear()
+}

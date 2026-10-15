@@ -1,6 +1,7 @@
 // 日期/时间选择器四只：字段 + 弹层。弹层一律开在浮层图层上（`overlay.mbt` 那套：
 // 整窗图层、空则不可见、点外收起），日历面板与网格复用 `datetime.mbt` 的
-// `build_calendar`/`month_grid`/`range_state_of`。
+// `build_calendar`/`month_grid`/`range_state_of`。字段自动进 Tab 链，键盘开合
+// 走 `attach_field_toggle_key`（空格/回车/↓ 开层、回车/Esc 收层）。
 //
 // 与 master 的两条差（记档）：① 旧链路弹层是原生 Popover（`@yue.Popover`），本栈
 // 用自绘面板；② 旧链路的时间是「时/分两个 input_number 输入框」，本栈改成
@@ -84,6 +85,11 @@ fn setup_picker_field(
       p.line_to(r.w - 33.0, r.h / 2.0 + 3.5)
       p.stroke()
     }
+    // 聚焦指示与输入框同口径：描边转主题色（覆盖在常态描边之上）
+    if self.focused {
+      p.set_stroke_color(@theme.theme_primary())
+      p.stroke_rect(0.0, 0.0, r.w, r.h)
+    }
   })
   w.on_pointer = Some(fn(
     _self : @core.Widget,
@@ -105,6 +111,40 @@ fn setup_picker_field(
 /// ✕ 热区（箭头左侧 20px 带宽）。
 fn clear_hit(local_x : Double, width : Double, clearable : Bool, filled : Bool) -> Bool {
   clearable && filled && local_x >= width - 40.0 && local_x <= width - 20.0
+}
+
+///|
+/// 选择器字段的键盘开合：关着时空格/回车/↓ 开层，开着时回车/空格/Esc 收层
+/// （日历内部的方向键导航不在这层做，日历弹层里只保留点选）。
+fn attach_field_toggle_key(
+  w : @core.Widget,
+  open_id : Ref[Int],
+  open_pop : () -> Unit,
+  close_pop : () -> Unit,
+) -> Unit {
+  w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+    if !ev.press {
+      return false
+    }
+    let ks = ev.keysym
+    if overlay_alive(open_id.val) {
+      if ks == @core.KS_RETURN ||
+        ks == @core.KS_SPACE ||
+        ks == @core.KS_ESCAPE {
+        close_pop()
+        true
+      } else {
+        false
+      }
+    } else if ks == @core.KS_RETURN ||
+      ks == @core.KS_SPACE ||
+      ks == @core.KS_DOWN {
+      open_pop()
+      true
+    } else {
+      false
+    }
+  })
 }
 
 ///|
@@ -436,6 +476,8 @@ fn time_popup(
 ///|
 /// 日期选择器（EP DatePicker）：字段 + 日历弹层，点选回填并收起；`clearable`
 /// 时字段悬停且有值显示 ✕，点它清空（清空不触发 `on_change`，与 master 同）。
+/// 键盘口径：空格/回车/↓ 开层、回车/Esc 收层（见 `attach_field_toggle_key`）；
+/// 字段自动进 Tab 链。
 pub fn date_picker(
   value : @core.Store[DateYMD?],
   on_change? : (DateYMD) -> Unit = fn(_d : DateYMD) -> Unit { () },
@@ -443,6 +485,7 @@ pub fn date_picker(
   clearable? : Bool = true,
   today? : DateYMD = today_date(),
   width? : Double = 180.0,
+  focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
@@ -450,11 +493,33 @@ pub fn date_picker(
   let t = today
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     let open_id : Ref[Int] = Ref(0)
+    w.focus_id = auto_focus_id(focus_id)
     let close_pop = fn() -> Unit {
       if open_id.val != 0 {
         @core.overlay_hide(open_id.val)
         open_id.val = 0
       }
+    }
+    let open_pop = fn() -> Unit {
+      open_id.val = @core.overlay_show_at(
+        calendar_popup(
+          t,
+          fn(d : DateYMD) -> CalCell {
+            match value.get() {
+              Some(s) => if DateYMD::same(s, d) { Selected } else { Plain }
+              None => Plain
+            }
+          },
+          fn(d : DateYMD) -> Unit {
+            value.set(Some(d))
+            on_change(d)
+            close_pop()
+          },
+          skin=paint_subset(class),
+        ),
+        w.rect.x,
+        w.rect.y + w.rect.h + 2.0,
+      )
     }
 
     setup_picker_field(
@@ -485,28 +550,11 @@ pub fn date_picker(
         } else if overlay_alive(open_id.val) {
           close_pop()
         } else {
-          open_id.val = @core.overlay_show_at(
-            calendar_popup(
-              t,
-              fn(d : DateYMD) -> CalCell {
-                match value.get() {
-                  Some(s) => if DateYMD::same(s, d) { Selected } else { Plain }
-                  None => Plain
-                }
-              },
-              fn(d : DateYMD) -> Unit {
-                value.set(Some(d))
-                on_change(d)
-                close_pop()
-              },
-              skin=paint_subset(class),
-            ),
-            w.rect.x,
-            w.rect.y + w.rect.h + 2.0,
-          )
+          open_pop()
         }
       },
     )
+    attach_field_toggle_key(w, open_id, open_pop, close_pop)
     fold_style(w, @style.empty_style(), class)
     handle(w)
     w
@@ -516,6 +564,7 @@ pub fn date_picker(
 ///|
 /// 日期区间选择器（EP DatePicker 区间形态）：字段 + 日历弹层，两段式点击
 /// （先起点、再终点；已有完整区间时再从新起点开始），端点实心、区间内浅底。
+/// 键盘口径同 `date_picker`（开/收层），字段自动进 Tab 链。
 pub fn date_range_picker(
   value : @core.Store[DateRange],
   on_change? : (DateRange) -> Unit = fn(_r : DateRange) -> Unit { () },
@@ -529,11 +578,34 @@ pub fn date_range_picker(
   let t = today
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     let open_id : Ref[Int] = Ref(0)
+    w.focus_id = auto_focus_id(0)
     let close_pop = fn() -> Unit {
       if open_id.val != 0 {
         @core.overlay_hide(open_id.val)
         open_id.val = 0
       }
+    }
+    let open_pop = fn() -> Unit {
+      open_id.val = @core.overlay_show_at(
+        calendar_popup(
+          t,
+          fn(d : DateYMD) -> CalCell { range_state_of(value.get(), d) },
+          fn(d : DateYMD) -> Unit {
+            let r = value.get()
+            match (r.start, r.end) {
+              (None, _) => value.set({ start: Some(d), end: None })
+              (Some(_), None) => {
+                value.set({ start: r.start, end: Some(d) })
+                on_change(value.get())
+                close_pop()
+              }
+              (Some(_), Some(_)) => value.set({ start: Some(d), end: None })
+            }
+          },
+        ),
+        w.rect.x,
+        w.rect.y + w.rect.h + 2.0,
+      )
     }
 
     setup_picker_field(
@@ -576,29 +648,11 @@ pub fn date_range_picker(
         } else if overlay_alive(open_id.val) {
           close_pop()
         } else {
-          open_id.val = @core.overlay_show_at(
-            calendar_popup(
-              t,
-              fn(d : DateYMD) -> CalCell { range_state_of(value.get(), d) },
-              fn(d : DateYMD) -> Unit {
-                let r = value.get()
-                match (r.start, r.end) {
-                  (None, _) => value.set({ start: Some(d), end: None })
-                  (Some(_), None) => {
-                    value.set({ start: r.start, end: Some(d) })
-                    on_change(value.get())
-                    close_pop()
-                  }
-                  (Some(_), Some(_)) => value.set({ start: Some(d), end: None })
-                }
-              },
-            ),
-            w.rect.x,
-            w.rect.y + w.rect.h + 2.0,
-          )
+          open_pop()
         }
       },
     )
+    attach_field_toggle_key(w, open_id, open_pop, close_pop)
     handle(w)
     w
   })
@@ -606,6 +660,7 @@ pub fn date_range_picker(
 
 ///|
 /// 一行「标签 + 时间字段」：点字段开时间弹层，确定后写回。
+/// 键盘口径同 `date_picker`（空格/回车/↓ 开、回车/Esc 收），字段自动进 Tab 链。
 fn time_field(
   width : Double,
   get : () -> TimeHM?,
@@ -614,11 +669,30 @@ fn time_field(
 ) -> @core.Node {
   @core.node_of_new(fn(field : @core.Widget) -> @core.Widget {
     let open_id : Ref[Int] = Ref(0)
+    field.focus_id = auto_focus_id(0)
     let close_pop = fn() -> Unit {
       if open_id.val != 0 {
         @core.overlay_hide(open_id.val)
         open_id.val = 0
       }
+    }
+    let open_pop = fn() -> Unit {
+      let init = match get() {
+        Some(t) => t
+        None => TimeHM::{ h: 9, m: 0 }
+      }
+      open_id.val = @core.overlay_show_at(
+        time_popup(
+          init,
+          fn(t : TimeHM) -> Unit {
+            set(t)
+            close_pop()
+          },
+          close_pop,
+        ),
+        field.rect.x - 40.0,
+        field.rect.y + field.rect.h + 2.0,
+      )
     }
 
     // 字段本体（标签由外层容器画）
@@ -642,25 +716,11 @@ fn time_field(
         if overlay_alive(open_id.val) {
           close_pop()
         } else {
-          let init = match get() {
-            Some(t) => t
-            None => TimeHM::{ h: 9, m: 0 }
-          }
-          open_id.val = @core.overlay_show_at(
-            time_popup(
-              init,
-              fn(t : TimeHM) -> Unit {
-                set(t)
-                close_pop()
-              },
-              close_pop,
-            ),
-            field.rect.x - 40.0,
-            field.rect.y + field.rect.h + 2.0,
-          )
+          open_pop()
         }
       },
     )
+    attach_field_toggle_key(field, open_id, open_pop, close_pop)
     field
   })
 }
@@ -724,11 +784,46 @@ pub fn datetime_range_picker(
     fn date_field(is_start : Bool) -> @core.Node {
       @core.node_of_new(fn(field : @core.Widget) -> @core.Widget {
         let open_id : Ref[Int] = Ref(0)
+        field.focus_id = auto_focus_id(0)
         let close_pop = fn() -> Unit {
           if open_id.val != 0 {
             @core.overlay_hide(open_id.val)
             open_id.val = 0
           }
+        }
+        let open_pop = fn() -> Unit {
+          open_id.val = @core.overlay_show_at(
+            calendar_popup(
+              t,
+              fn(d : DateYMD) -> CalCell {
+                let pair = if is_start { value.get().start } else { value.get().end }
+                match pair {
+                  Some(p) => if DateYMD::same(p.0, d) { Selected } else { Plain }
+                  None => Plain
+                }
+              },
+              fn(d : DateYMD) -> Unit {
+                let r = value.get()
+                if is_start {
+                  let tm = match r.start {
+                    Some(p) => p.1
+                    None => TimeHM::{ h: 9, m: 0 }
+                  }
+                  value.set({ start: Some((d, tm)), end: r.end })
+                } else {
+                  let tm = match r.end {
+                    Some(p) => p.1
+                    None => TimeHM::{ h: 18, m: 0 }
+                  }
+                  value.set({ start: r.start, end: Some((d, tm)) })
+                }
+                on_change(value.get())
+                close_pop()
+              },
+            ),
+            field.rect.x,
+            field.rect.y + field.rect.h + 2.0,
+          )
         }
 
         setup_picker_field(
@@ -752,41 +847,11 @@ pub fn datetime_range_picker(
             if overlay_alive(open_id.val) {
               close_pop()
             } else {
-              open_id.val = @core.overlay_show_at(
-                calendar_popup(
-                  t,
-                  fn(d : DateYMD) -> CalCell {
-                    let pair = if is_start { value.get().start } else { value.get().end }
-                    match pair {
-                      Some(p) => if DateYMD::same(p.0, d) { Selected } else { Plain }
-                      None => Plain
-                    }
-                  },
-                  fn(d : DateYMD) -> Unit {
-                    let r = value.get()
-                    if is_start {
-                      let tm = match r.start {
-                        Some(p) => p.1
-                        None => TimeHM::{ h: 9, m: 0 }
-                      }
-                      value.set({ start: Some((d, tm)), end: r.end })
-                    } else {
-                      let tm = match r.end {
-                        Some(p) => p.1
-                        None => TimeHM::{ h: 18, m: 0 }
-                      }
-                      value.set({ start: r.start, end: Some((d, tm)) })
-                    }
-                    on_change(value.get())
-                    close_pop()
-                  },
-                ),
-                field.rect.x,
-                field.rect.y + field.rect.h + 2.0,
-              )
+              open_pop()
             }
           },
         )
+        attach_field_toggle_key(field, open_id, open_pop, close_pop)
         field
       })
     }

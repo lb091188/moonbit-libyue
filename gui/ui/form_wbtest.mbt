@@ -1001,3 +1001,198 @@ test "复选框框线四边四角都满墨" {
     assert_true(a(dx, dy) > 200, msg="框线在 \{dx},\{dy} 没落满墨")
   }
 }
+
+///|
+/// 键盘可及性（本批口径）：控件默认自动领焦点号进 Tab 链，空格/回车激活、
+/// 方向键调值。键只在按下投递（宿主口径），测试直接 `dispatch_key`。
+test "键盘可及性：复选/开关自动领号进 Tab 链，空格与回车切换，禁用不吃键" {
+  let on = @core.Store::new(false)
+  let sw = @core.Store::new(false)
+  let dis = @core.Store::new(false)
+  let root = mount_root(
+    [checkbox("甲", on), switch(sw), checkbox("乙", dis, disabled=true)],
+    300.0,
+    140.0,
+  )
+  let cb = kid(root, 0)
+  let st = kid(root, 1)
+  let dc = kid(root, 2)
+  assert_true(cb.focus_id > 0 && st.focus_id > 0 && cb.focus_id != st.focus_id)
+  // 两只都在 Tab 链里（树序读数收得到）
+  let ids = root.focus_ids()
+  let has = fn(id : Int) -> Bool {
+    let mut found = false
+    for v in ids {
+      if v == id {
+        found = true
+      }
+    }
+    found
+  }
+  assert_true(has(cb.focus_id) && has(st.focus_id))
+  // 空格开、回车关
+  let _ = root.dispatch_key(cb.focus_id, { press: true, keysym: @core.KS_SPACE, mods: 0, })
+  assert_true(on.get())
+  let _ = root.dispatch_key(cb.focus_id, { press: true, keysym: @core.KS_RETURN, mods: 0, })
+  assert_eq(on.get(), false)
+  // 开关同口径
+  let _ = root.dispatch_key(st.focus_id, { press: true, keysym: @core.KS_SPACE, mods: 0, })
+  assert_true(sw.get())
+  // 禁用态不吃键
+  let _ = root.dispatch_key(dc.focus_id, { press: true, keysym: @core.KS_SPACE, mods: 0, })
+  assert_eq(dis.get(), false)
+}
+
+///|
+test "键盘可及性：单选空格选中本项，左右键在组内环绕换选" {
+  let v = @core.Store::new(0)
+  let root = mount_root([radio_group(["甲", "乙", "丙"], v)], 300.0, 120.0)
+  let group = kid(root, 0)
+  assert_eq(group.kids.length(), 3)
+  let item0 = group.kids[0]
+  let item2 = group.kids[2]
+  assert_true(item0.focus_id > 0 && item2.focus_id > 0)
+  let key = fn(w : @core.Widget, ks : Int) -> Unit {
+    let _ = root.dispatch_key(w.focus_id, { press: true, keysym: ks, mods: 0, })
+  }
+  key(item2, @core.KS_SPACE)
+  assert_eq(v.get(), 2)
+  // ←/↑/→/↓ 都按「焦点项的下标」换选（不是相对当前值），到头环绕
+  key(item2, @core.KS_LEFT)
+  assert_eq(v.get(), 1)
+  key(item2, @core.KS_RIGHT)
+  assert_eq(v.get(), 0)
+  // 换选只看焦点项的下标：焦点还在丙（idx 2），→ 恒给 0、↑ 给 1
+  key(item2, @core.KS_RIGHT)
+  assert_eq(v.get(), 0)
+  key(item2, @core.KS_UP)
+  assert_eq(v.get(), 1)
+  key(item0, @core.KS_RETURN)
+  assert_eq(v.get(), 0)
+}
+
+///|
+test "键盘可及性：滑块方向键增减与 Home/End、步进器左右加减、评分箭头改星" {
+  let key = fn(root : @core.Widget, w : @core.Widget, ks : Int) -> Unit {
+    let _ = root.dispatch_key(w.focus_id, { press: true, keysym: ks, mods: 0, })
+  }
+  let sv = @core.Store::new(50.0)
+  let root = mount_root([slider(sv, step=10.0)], 300.0, 60.0)
+  let sl = kid(root, 0)
+  assert_true(sl.focus_id > 0)
+  key(root, sl, @core.KS_RIGHT)
+  assert_eq(sv.get(), 60.0)
+  key(root, sl, @core.KS_LEFT)
+  assert_eq(sv.get(), 50.0)
+  key(root, sl, @core.KS_END)
+  assert_eq(sv.get(), 100.0)
+  key(root, sl, @core.KS_HOME)
+  assert_eq(sv.get(), 0.0)
+  let nv = @core.Store::new(5)
+  let root2 = mount_root([stepper(nv, min=0, max=10, step=2)], 300.0, 60.0)
+  let sp = kid(root2, 0)
+  assert_true(sp.focus_id > 0)
+  key(root2, sp, @core.KS_RIGHT)
+  assert_eq(nv.get(), 7)
+  key(root2, sp, @core.KS_LEFT)
+  assert_eq(nv.get(), 5)
+  // 步进器只吃方向键（Home/End 走滑块），触界侧吃掉键但不改值
+  key(root2, sp, @core.KS_HOME)
+  assert_eq(nv.get(), 5)
+  key(root2, sp, @core.KS_LEFT)
+  key(root2, sp, @core.KS_LEFT)
+  assert_eq(nv.get(), 1)
+  key(root2, sp, @core.KS_LEFT)
+  assert_eq(nv.get(), 0)
+  key(root2, sp, @core.KS_LEFT)
+  assert_eq(nv.get(), 0)
+  let rv = @core.Store::new(3)
+  let changes : Array[Int] = []
+  let root3 = mount_root(
+    [rate(rv, on_change=fn(x : Int) -> Unit { changes.push(x) })],
+    200.0,
+    40.0,
+  )
+  let rt = kid(root3, 0)
+  assert_true(rt.focus_id > 0)
+  key(root3, rt, @core.KS_RIGHT)
+  assert_eq((rv.get(), changes.length()), (4, 1))
+  key(root3, rt, @core.KS_END)
+  assert_eq(rv.get(), 5)
+  key(root3, rt, @core.KS_LEFT)
+  assert_eq(rv.get(), 4)
+  key(root3, rt, @core.KS_HOME)
+  assert_eq(rv.get(), 1)
+}
+
+///|
+test "键盘可及性：按钮空格/回车激活，禁用不吃键" {
+  let n = Ref(0)
+  let root = mount_root(
+    [
+      button("确定", on_click=fn() -> Unit { n.val = n.val + 1 }),
+      button("禁用", disabled=true, on_click=fn() -> Unit { n.val = n.val + 10 }),
+    ],
+    300.0,
+    60.0,
+  )
+  let b0 = kid(root, 0)
+  let b1 = kid(root, 1)
+  assert_true(b0.focus_id > 0 && b1.focus_id > 0)
+  let _ = root.dispatch_key(b0.focus_id, { press: true, keysym: @core.KS_RETURN, mods: 0, })
+  assert_eq(n.val, 1)
+  let _ = root.dispatch_key(b0.focus_id, { press: true, keysym: @core.KS_SPACE, mods: 0, })
+  assert_eq(n.val, 2)
+  let _ = root.dispatch_key(b1.focus_id, { press: true, keysym: @core.KS_SPACE, mods: 0, })
+  assert_eq(n.val, 2)
+}
+
+///|
+test "键盘可及性：下拉选择空格开层、上下移高亮、回车回填、Esc 收层" {
+  let v = @core.Store::new("")
+  let (root, w) = mounted_with_overlay(
+    select(["甲", "乙", "丙"], v, width=140.0),
+    420.0,
+    320.0,
+  )
+  assert_true(w.focus_id > 0)
+  let key = fn(ks : Int) -> Unit {
+    let _ = root.dispatch_key(w.focus_id, { press: true, keysym: ks, mods: 0, })
+  }
+  // 关着时下键也能开层
+  key(@core.KS_DOWN)
+  root.relayout(420.0, 320.0)
+  assert_eq(@core.overlay_count(), 1)
+  // ↓ 移到第 2 行，回车取高亮
+  key(@core.KS_DOWN)
+  key(@core.KS_RETURN)
+  assert_eq((v.get(), @core.overlay_count()), ("乙", 0))
+  // 空格再开（高亮先对到当前值所在行），Esc 收层不改值
+  key(@core.KS_SPACE)
+  root.relayout(420.0, 320.0)
+  assert_eq(@core.overlay_count(), 1)
+  key(@core.KS_ESCAPE)
+  assert_eq((v.get(), @core.overlay_count()), ("乙", 0))
+  @core.overlay_clear()
+}
+
+///|
+test "键盘可及性：取色器回车开层、方向键移格、回车取色" {
+  let v = @core.Store::new("")
+  let (root, w) = mounted_with_overlay(
+    color_picker(v, colors=["#111111", "#222222", "#333333"], width=160.0),
+    420.0,
+    320.0,
+  )
+  assert_true(w.focus_id > 0)
+  let key = fn(ks : Int) -> Unit {
+    let _ = root.dispatch_key(w.focus_id, { press: true, keysym: ks, mods: 0, })
+  }
+  key(@core.KS_RETURN)
+  root.relayout(420.0, 320.0)
+  assert_eq(@core.overlay_count(), 1)
+  key(@core.KS_RIGHT)
+  key(@core.KS_RETURN)
+  assert_eq((v.get(), @core.overlay_count()), ("#222222", 0))
+  @core.overlay_clear()
+}

@@ -35,6 +35,8 @@ fn fold_arrow(
 ///|
 /// 一行「文字 + 底色 + 点击」的导航项：底色与文字色由回调现取（入参是本控件，
 /// 用来读宿主维护的 `hovered`），`width` 传 0 表示按文本测量定宽。
+/// `focusable` 时自动领号进 Tab 链：空格/回车触发 `on_click`，←/↑/→/↓ 调
+/// `on_step(∓1)`（由调用方决定方向键换选谁），聚焦时画一圈主题色描边。
 fn nav_item(
   text : String,
   height : Double,
@@ -47,6 +49,8 @@ fn nav_item(
     @theme.theme_text_regular()
   },
   on_click? : () -> Unit = fn() -> Unit { () },
+  focusable? : Bool = false,
+  on_step? : (Int) -> Unit = fn(_d : Int) -> Unit { () },
   skin? : @style.Style = @style.empty_style(),
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
@@ -57,6 +61,28 @@ fn nav_item(
     let box_w = if width > 0.0 { width } else { tw + pad_x * 2.0 }
     w.node.set_width(@yoga.fixed(box_w))
     w.node.set_height(@yoga.fixed(height))
+    if focusable {
+      w.focus_id = auto_focus_id(0)
+      w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+        if !ev.press {
+          return false
+        }
+        let ks = ev.keysym
+        if ks == @core.KS_SPACE || ks == @core.KS_RETURN {
+          on_click()
+          @core.invalidate()
+          true
+        } else if ks == @core.KS_LEFT || ks == @core.KS_UP {
+          on_step(-1)
+          true
+        } else if ks == @core.KS_RIGHT || ks == @core.KS_DOWN {
+          on_step(1)
+          true
+        } else {
+          false
+        }
+      })
+    }
     @style.apply(w, skin)
     w.on_draw = Some(fn(
       self : @core.Widget,
@@ -83,6 +109,11 @@ fn nav_item(
         align=@text.Center,
         valign=@text.Center,
       )
+      if self.focused {
+        p.set_stroke_color(@theme.theme_primary())
+        p.set_line_width(1.0)
+        p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+      }
     })
     w.cursor = @core.CURSOR_HAND
     w.on_pointer = Some(fn(
@@ -115,6 +146,8 @@ fn hover_bg(w : @core.Widget, color : String) -> String {
 
 ///|
 /// 分段控制器 / 顶栏导航（EP Segmented）：选中面板底 + 主题色文字，悬停灰底。
+/// 键盘口径：每段各自进 Tab 链，空格/回车选中本段，←/↑ 上一段、→/↓ 下一段
+/// （到头环绕，选中随键走；焦点停在按键那一段）。
 pub fn segmented(
   options : Array[String],
   selected : @core.Store[String],
@@ -123,29 +156,35 @@ pub fn segmented(
 ) -> @core.Node {
   follow_store(selected)
   let items : Array[@core.Node] = []
-  for opt in options {
-    let mine = opt
+  let n = options.length()
+  for i = 0; i < n; i = i + 1 {
+    let opt = options[i]
+    let idx = i
     items.push(
       nav_item(
-        mine,
+        opt,
         30.0,
         16.0,
         13.0,
         bg=fn(w : @core.Widget) -> String {
-          if selected.get() == mine {
+          if selected.get() == opt {
             @theme.theme_bg_panel()
           } else {
             hover_bg(w, @theme.theme_border())
           }
         },
         fg=fn(_w : @core.Widget) -> String {
-          if selected.get() == mine {
+          if selected.get() == opt {
             @theme.theme_primary()
           } else {
             @theme.theme_text_regular()
           }
         },
-        on_click=fn() -> Unit { selected.set(mine) },
+        on_click=fn() -> Unit { selected.set(opt) },
+        focusable=true,
+        on_step=fn(d : Int) -> Unit {
+          selected.set(options[((idx + d) % n + n) % n])
+        },
         skin=paint_subset(class),
       ),
     )

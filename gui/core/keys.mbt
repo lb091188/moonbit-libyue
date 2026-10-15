@@ -15,6 +15,8 @@ pub const KS_BACKSPACE : Int = 65288
 ///|
 pub const KS_TAB : Int = 65289
 ///|
+pub const KS_SPACE : Int = 32
+///|
 pub const KS_RETURN : Int = 65293
 ///|
 pub const KS_ESCAPE : Int = 65307

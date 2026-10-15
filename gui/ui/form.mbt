@@ -40,11 +40,13 @@ fn attach_toggle(
 
 ///|
 /// 复选框 + 文本标签（点标签同样生效，整行是点击区）。
+/// 键盘口径：空格/回车切换；未给 `focus_id` 时自动领号进 Tab 链，聚焦时框线转主题色。
 pub fn checkbox(
   content : String,
   state : @core.Store[Bool],
   disabled? : Bool = false,
   enabled? : Enabled? = None,
+  focus_id? : Int = 0,
   font_size? : Double = 13.0,
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
@@ -52,6 +54,7 @@ pub fn checkbox(
   follow_store(state)
   @core.node_of_new(fn(row : @core.Widget) -> @core.Widget {
     let off = enabled_cell(enabled, disabled)
+    row.focus_id = auto_focus_id(focus_id)
     let box = @core.Widget::new()
     box.node.set_width(@yoga.fixed(14.0))
     box.node.set_height(@yoga.fixed(14.0))
@@ -69,7 +72,16 @@ pub fn checkbox(
       let accent = @style.color_of(s.color, "")
       let edge = @style.color_of(s.border_color, "")
       let checked = state.get()
-      p.set_stroke_color(if checked && !off.off { accent } else { edge })
+      p.set_stroke_color(
+        if checked && !off.off {
+          accent
+        } else if row.focused && !off.off {
+          // 聚焦指示与输入框同口径：描边转主题色
+          @theme.theme_primary()
+        } else {
+          edge
+        },
+      )
       p.set_line_width(1.0)
       // 框线走内描边：按设备格取整，14×14 的框在任意原点都是锐利的 1px
       p.stroke_rect(0.0, 0.0, 14.0, 14.0)
@@ -96,6 +108,17 @@ pub fn checkbox(
     let _ = (text(content, font_size=font_size)).mount_into(row)
     row.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
+    row.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+      if !ev.press || off.off {
+        return false
+      }
+      if ev.keysym == @core.KS_SPACE || ev.keysym == @core.KS_RETURN {
+        state.set(!state.get())
+        true
+      } else {
+        false
+      }
+    })
     fold_style(row, @style.empty_style(), class)
     handle(row)
     row
@@ -104,6 +127,8 @@ pub fn checkbox(
 
 ///|
 /// 单选组：`options` 依次对应值 0..n-1，写回 `state`；点已选中项不改值。
+/// 键盘口径：空格/回车选中本项，←/↑ 上一项、→/↓ 下一项（到头环绕）；
+/// 每项各自进 Tab 链（自动领号），聚焦时环转主题色。
 pub fn radio_group(
   options : Array[String],
   state : @core.Store[Int],
@@ -162,7 +187,47 @@ pub fn radio_group(
         align_items=@yoga.AlignItems::Center,
         class=class,
         handle=fn(w : @core.Widget) -> Unit {
+          w.focus_id = auto_focus_id(0)
           attach_toggle(w, fn() { state.set(idx) }, Enabled::new(disabled))
+          // 聚焦环画在 dot 上（行本身不铺底）：包一层原绘制，末尾补一圈主题色
+          if w.kids.length() > 0 {
+            let dot_w = w.kids[0]
+            let prev = dot_w.on_draw
+            dot_w.on_draw = Some(fn(
+              self : @core.Widget,
+              p : @render.Painter,
+              r : @core.Rect,
+            ) -> Unit {
+              match prev {
+                Some(f) => f(self, p, r)
+                None => ()
+              }
+              if w.focused && !disabled {
+                p.set_stroke_color(@theme.theme_primary())
+                p.set_line_width(1.0)
+                p.stroke_round_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0, r.h / 2.0)
+              }
+            })
+          }
+          let n = options.length()
+          w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+            if !ev.press || disabled {
+              return false
+            }
+            let ks = ev.keysym
+            if ks == @core.KS_SPACE || ks == @core.KS_RETURN {
+              state.set(idx)
+              true
+            } else if ks == @core.KS_LEFT || ks == @core.KS_UP {
+              state.set((idx + n - 1) % n)
+              true
+            } else if ks == @core.KS_RIGHT || ks == @core.KS_DOWN {
+              state.set((idx + 1) % n)
+              true
+            } else {
+              false
+            }
+          })
         },
       ),
     )
@@ -177,16 +242,19 @@ pub fn radio_group(
 
 ///|
 /// 开关：40×20 胶囊（圆角半径=半高）+ 16 圆滑珠，可带开/关文案。
+/// 键盘口径：空格/回车切换，自动进 Tab 链，聚焦时胶囊描边转主题色。
 pub fn switch(
   state : @core.Store[Bool],
   on_text? : String = "",
   off_text? : String = "",
   disabled? : Bool = false,
+  focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
 ) -> @core.Node {
   follow_store(state)
   @core.node_of_new(fn(row : @core.Widget) -> @core.Widget {
     let off = enabled_cell(None, disabled)
+    row.focus_id = auto_focus_id(focus_id)
     let pill = @core.Widget::new()
     pill.node.set_width(@yoga.fixed(40.0))
     pill.node.set_height(@yoga.fixed(20.0))
@@ -219,6 +287,11 @@ pub fn switch(
       // 滑珠是圆：圆心离两端各一个半高，半径 8 → 珠沿与胶囊壁齐平
       let cx = if on { r.w - 10.0 } else { 10.0 }
       p.fill_round_rect(cx - 8.0, r.h / 2.0 - 8.0, 16.0, 16.0, 8.0)
+      if row.focused {
+        p.set_stroke_color(@theme.theme_primary())
+        p.set_line_width(1.0)
+        p.stroke_round_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0, r.h / 2.0 - 0.5)
+      }
     })
     row.node.set_flex_direction(@yoga.Row)
     row.node.set_align_items(@yoga.AlignItems::Center)
@@ -230,6 +303,17 @@ pub fn switch(
     }
     row.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
+    row.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+      if !ev.press || off.off {
+        return false
+      }
+      if ev.keysym == @core.KS_SPACE || ev.keysym == @core.KS_RETURN {
+        state.set(!state.get())
+        true
+      } else {
+        false
+      }
+    })
     fold_style(row, @style.empty_style(), class)
     row
   })
@@ -237,6 +321,8 @@ pub fn switch(
 
 ///|
 /// 滑块：按下即取值，拖动跟手（含拖出轨道），`step>0` 按刻度吸附。
+/// 键盘口径：←/↓ 减、→/↑ 加（无 step 时按百分之一量程）、Home/End 到两端；
+/// 自动进 Tab 链，聚焦时拇指外围一圈主题色。
 pub fn slider(
   state : @core.Store[Double],
   min? : Double = 0.0,
@@ -244,6 +330,7 @@ pub fn slider(
   step? : Double = 0.0,
   width? : Double = 160.0,
   disabled? : Bool = false,
+  focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
@@ -257,6 +344,7 @@ pub fn slider(
     // 拖动状态自己持有：宿主维护的 `pressed` 只在真实事件流里置位，组件要在
     // 任何投递路径下都能把拖动做完（也才测得到）
     let dragging = Ref(false)
+    w.focus_id = auto_focus_id(focus_id)
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(@theme.control_height))
     w.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
@@ -289,7 +377,16 @@ pub fn slider(
         @style.color_of(s.color, @theme.theme_primary())
       })
       p.fill_rect(0.0, cy - 2.0, 6.0 + track * ratio, 4.0)
-      p.fill_rect(2.0 + track * ratio, cy - 6.0, 12.0, 12.0)
+      let tx = 2.0 + track * ratio
+      p.fill_rect(tx, cy - 6.0, 12.0, 12.0)
+      if self.focused {
+        // 拇指聚焦环：整圈画进控件矩形内（绘制按控件矩形裁剪），贴边时夹住
+        p.set_stroke_color(@theme.theme_primary())
+        p.set_line_width(1.0)
+        let x0 = (tx - 2.0).max(0.0)
+        let x1 = (tx + 14.0).min(r.w)
+        p.stroke_rect(x0, cy - 8.0, (x1 - x0).max(1.0), 16.0)
+      }
     })
     w.on_pointer = Some(fn(
       self : @core.Widget,
@@ -313,6 +410,28 @@ pub fn slider(
           false
         }
         @core.Leave => false
+      }
+    })
+    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+      if !ev.press || off.off {
+        return false
+      }
+      let dv = if st > 0.0 { st } else { (hi - lo) / 100.0 }
+      let ks = ev.keysym
+      if ks == @core.KS_LEFT || ks == @core.KS_DOWN {
+        state.set((state.get() - dv).clamp(min=lo, max=hi))
+        true
+      } else if ks == @core.KS_RIGHT || ks == @core.KS_UP {
+        state.set((state.get() + dv).clamp(min=lo, max=hi))
+        true
+      } else if ks == @core.KS_HOME {
+        state.set(lo)
+        true
+      } else if ks == @core.KS_END {
+        state.set(hi)
+        true
+      } else {
+        false
       }
     })
     fold_style(w, @style.style(color="primary", border_color="border"), class)
@@ -450,11 +569,14 @@ fn step_cell(
 /// 步进器：`[-] 值 [+]` 共框三段（外框由行容器画、格与格之间只有一条分隔线，
 /// 三格同高同边——各自画一圈边框会看着像三个没粘在一起的盒子），按 step 增减
 /// 并夹在区间内；触边界那一侧自动禁用（禁用态必须跟着值走，见 state.mbt 那条实测）。
+/// 键盘口径：←/↓ 减、→/↑ 加（触界侧吃掉键但不改值），自动进 Tab 链，
+/// 聚焦时外框描边转主题色。
 pub fn stepper(
   state : @core.Store[Int],
   min? : Int = 0,
   max? : Int = 999,
   step? : Int = 1,
+  focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
 ) -> @core.Node {
   let lo = min
@@ -529,6 +651,47 @@ pub fn stepper(
         border_radius=4.0,
       ),
     ] + class,
+    handle=fn(w : @core.Widget) -> Unit {
+      w.focus_id = auto_focus_id(focus_id)
+      // 外框底/描边是 view 的内置绘制：包一层，聚焦时末尾补一圈主题色
+      let prev = w.on_draw
+      w.on_draw = Some(fn(
+        self : @core.Widget,
+        p : @render.Painter,
+        r : @core.Rect,
+      ) -> Unit {
+        match prev {
+          Some(f) => f(self, p, r)
+          None => ()
+        }
+        if self.focused {
+          p.set_stroke_color(@theme.theme_primary())
+          p.set_line_width(1.0)
+          p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+        }
+      })
+      w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+        if !ev.press {
+          return false
+        }
+        let ks = ev.keysym
+        if ks == @core.KS_LEFT || ks == @core.KS_DOWN {
+          if !minus_off.off {
+            state.set((state.get() - inc).clamp(min=lo, max=hi))
+            sync()
+          }
+          true
+        } else if ks == @core.KS_RIGHT || ks == @core.KS_UP {
+          if !plus_off.off {
+            state.set((state.get() + inc).clamp(min=lo, max=hi))
+            sync()
+          }
+          true
+        } else {
+          false
+        }
+      })
+    },
   )
 }
 ///|
@@ -609,6 +772,7 @@ pub fn button(
   // 变体皮肤折进样式槽：基块=常态，`hover`/`active` 桶=点亮态（旧口径
   // `lit = hovered || pressed`，两桶同值）；散参数显式覆盖会让两态取到同一色，
   // 「覆盖后悬停不再变色」这条现状由 [button_skin_token] 的取值顺序天然保持。
+  // 键盘口径：空格/回车激活；未给 `focus_id` 时自动领号进 Tab 链（焦点环已画）。
   let (fg0, bg0) = button_skin_token(variant, false)
   let (fg1, bg1) = button_skin_token(variant, true)
   let base_fg = if color.length() > 0 { color } else { fg0 }
@@ -648,7 +812,7 @@ pub fn button(
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     let off = enabled_cell(enabled, disabled)
-    w.focus_id = focus_id
+    w.focus_id = auto_focus_id(focus_id)
     w.node.set_height(@yoga.fixed(@theme.control_height))
     if min_width > 0.0 {
       w.node.set_min_width(@yoga.fixed(min_width))
@@ -726,6 +890,17 @@ pub fn button(
         }
         @core.Move => !off.off
         @core.Leave => false
+      }
+    })
+    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+      if !ev.press || off.off {
+        return false
+      }
+      if ev.keysym == @core.KS_SPACE || ev.keysym == @core.KS_RETURN {
+        on_click()
+        true
+      } else {
+        false
       }
     })
     handle(w)
@@ -879,13 +1054,15 @@ fn star_path(p : @render.Painter, cx : Double, cy : Double, r_out : Double) -> U
 ///|
 /// 评分：`max` 颗五角星，选中实心主题色、未选中描边灰；悬停预亮到第 N 颗，
 /// 点击写入 `value`（1..max）并回调 `on_change`（外部写值不回调，与本栈其它
-/// 组件同口径）。
+/// 组件同口径）。键盘口径：→/↑ 加一星、←/↓ 减一星、Home/End 到两端，
+/// 写值同点击（回调 on_change）；自动进 Tab 链，聚焦时整圈主题色描边。
 pub fn rate(
   value : @core.Store[Int],
   max? : Int = 5,
   on_change? : (Int) -> Unit = fn(_v : Int) -> Unit { () },
   size? : Double = 22.0,
   gap? : Double = 4.0,
+  focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
@@ -894,6 +1071,7 @@ pub fn rate(
   let hover_n : Ref[Int] = Ref(0)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
+    w.focus_id = auto_focus_id(focus_id)
     w.node.set_width(@yoga.fixed(size * n.to_double() + gap * (n - 1).to_double()))
     w.node.set_height(@yoga.fixed(size))
     w.node.set_flex_shrink(0.0)
@@ -930,7 +1108,7 @@ pub fn rate(
     w.on_draw = Some(fn(
       self : @core.Widget,
       p : @render.Painter,
-      _r : @core.Rect,
+      r : @core.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       let lit_c = @style.color_of(st.color, @theme.theme_primary())
@@ -951,6 +1129,34 @@ pub fn rate(
           star_path(p, cx, cy, size / 2.0 - 1.0)
           p.stroke()
         }
+      }
+      if self.focused {
+        p.set_stroke_color(@theme.theme_primary())
+        p.set_line_width(1.0)
+        p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
+      }
+    })
+    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+      if !ev.press {
+        return false
+      }
+      let cur = value.get()
+      let setv = fn(v : Int) -> Bool {
+        value.set(v)
+        on_change(v)
+        true
+      }
+      let ks = ev.keysym
+      if ks == @core.KS_RIGHT || ks == @core.KS_UP {
+        setv((cur + 1).clamp(min=1, max=n))
+      } else if ks == @core.KS_LEFT || ks == @core.KS_DOWN {
+        setv((cur - 1).clamp(min=1, max=n))
+      } else if ks == @core.KS_HOME {
+        setv(1)
+      } else if ks == @core.KS_END {
+        setv(n)
+      } else {
+        false
       }
     })
     fold_style(w, @style.style(color="primary", border_color="border"), class)
@@ -1048,7 +1254,9 @@ fn list_popup(rows : Array[@core.Node], n : Int, width : Double) -> @core.Node {
 ///
 /// 与 master 的两条差（记档）：① 弹层是浮层图层上的自绘面板，不是原生 Popover，
 /// 「点外面收起」由图层负责，组件不再自己跟踪；② master 靠字段失焦收起，本栈
-/// 字段是否可聚焦由调用方给 `focus_id` 决定，收起只走「点外面 / 再点字段」两条路。
+/// 收起走「点外面 / 再点字段 / Esc」三条路。键盘口径：空格/回车/↓ 开层，
+/// ↑/↓ 移高亮、回车/空格取高亮、Esc 收层（字段自动进 Tab 链，聚焦时描边转
+/// 主题色，见 `setup_picker_field`）。
 pub fn select(
   options : Array[String],
   value : @core.Store[String],
@@ -1080,11 +1288,57 @@ pub fn select(
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     let open_id : Ref[Int] = Ref(0)
-    w.focus_id = focus_id
+    let hi : Ref[Int] = Ref(0)
+    let shown : Ref[Array[String]] = Ref([])
+    w.focus_id = auto_focus_id(focus_id)
     let close_pop = fn() -> Unit {
       if open_id.val != 0 {
         @core.overlay_hide(open_id.val)
         open_id.val = 0
+      }
+    }
+    let open_pop = fn() -> Unit {
+      // 高亮先对到当前值所在行
+      let cur = value.get()
+      hi.val = 0
+      for i = 0; i < opts.length(); i = i + 1 {
+        if opts[i] == cur {
+          hi.val = i
+        }
+      }
+      shown.val = opts
+      let rows : Array[@core.Node] = []
+      for i = 0; i < opts.length(); i = i + 1 {
+        let opt = opts[i]
+        rows.push(
+          select_row(
+            opt,
+            // 选中✓跟当前值走；高亮行（浅底）跟 hi 走，两者共用同一视觉
+            fn() -> Bool {
+              value.get() == opt ||
+              (hi.val < shown.val.length() && shown.val[hi.val] == opt)
+            },
+            fn() -> Unit {
+              value.set(opt)
+              on_change(opt)
+              close_pop()
+            },
+          ),
+        )
+      }
+      open_id.val = @core.overlay_show_at(
+        list_popup(rows, opts.length(), width),
+        w.rect.x,
+        w.rect.y + w.rect.h + 2.0,
+      )
+    }
+    let pick_hi = fn() -> Unit {
+      let n = shown.val.length()
+      if n > 0 {
+        let opt = shown.val[hi.val.clamp(min=0, max=n - 1)]
+        value.set(opt)
+        on_change(opt)
+        close_pop()
       }
     }
 
@@ -1105,25 +1359,43 @@ pub fn select(
         } else if overlay_alive(open_id.val) {
           close_pop()
         } else {
-          let rows : Array[@core.Node] = []
-          for i = 0; i < opts.length(); i = i + 1 {
-            let opt = opts[i]
-            rows.push(
-              select_row(opt, fn() -> Bool { value.get() == opt }, fn() -> Unit {
-                value.set(opt)
-                on_change(opt)
-                close_pop()
-              }),
-            )
-          }
-          open_id.val = @core.overlay_show_at(
-            list_popup(rows, opts.length(), width),
-            w.rect.x,
-            w.rect.y + w.rect.h + 2.0,
-          )
+          open_pop()
         }
       },
     )
+    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+      if !ev.press {
+        return false
+      }
+      let ks = ev.keysym
+      if overlay_alive(open_id.val) {
+        let n = shown.val.length()
+        if ks == @core.KS_RETURN || ks == @core.KS_SPACE {
+          pick_hi()
+          true
+        } else if ks == @core.KS_ESCAPE {
+          close_pop()
+          true
+        } else if n > 0 && ks == @core.KS_DOWN {
+          hi.val = (hi.val + 1) % n
+          @core.invalidate()
+          true
+        } else if n > 0 && ks == @core.KS_UP {
+          hi.val = (hi.val + n - 1) % n
+          @core.invalidate()
+          true
+        } else {
+          false
+        }
+      } else if ks == @core.KS_RETURN ||
+        ks == @core.KS_SPACE ||
+        ks == @core.KS_DOWN {
+        open_pop()
+        true
+      } else {
+        false
+      }
+    })
     fold_style(w, @style.empty_style(), class)
     handle(w)
     w
@@ -1134,6 +1406,8 @@ pub fn select(
 /// 取色器（EP ColorPicker 下拉形态）：触发字段（当前色块 + hex + 箭头）点开
 /// 预设色板（每行 5 格，选中格主色描边 + 白勾），点色块写入 `value`（`#RRGGBB`）
 /// 并收起。字段与弹层同 `select_t`：开在浮层图层上，点外面由图层收起。
+/// 键盘口径：空格/回车/↓ 开层，←/→ 移一格、↑/↓ 移一行（夹在色板范围内），
+/// 回车/空格取色、Esc 收层。
 pub fn color_picker(
   value : @core.Store[String],
   colors? : Array[String] = [
@@ -1155,11 +1429,71 @@ pub fn color_picker(
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     let open_id : Ref[Int] = Ref(0)
-    w.focus_id = focus_id
+    let hi : Ref[Int] = Ref(0)
+    w.focus_id = auto_focus_id(focus_id)
     let close_pop = fn() -> Unit {
       if open_id.val != 0 {
         @core.overlay_hide(open_id.val)
         open_id.val = 0
+      }
+    }
+    let open_pop = fn() -> Unit {
+      // 高亮先对到当前色所在格
+      let cur = value.get()
+      hi.val = 0
+      for i = 0; i < cs.length(); i = i + 1 {
+        if cs[i] == cur {
+          hi.val = i
+        }
+      }
+      let rows : Array[@core.Node] = []
+      let mut line : Array[@core.Node] = []
+      for i = 0; i < cs.length(); i = i + 1 {
+        let c = cs[i]
+        line.push(
+          color_swatch(
+            c,
+            swatch,
+            cell_gap,
+            fn() -> Bool {
+              value.get() == c || (hi.val < cs.length() && cs[hi.val] == c)
+            },
+            fn() -> Unit {
+              value.set(c)
+              on_change(c)
+              close_pop()
+            },
+          ),
+        )
+        if (i + 1) % per_row == 0 || i + 1 == cs.length() {
+          rows.push(
+            view(
+              line,
+              direction=@yoga.Row,
+              height=swatch + cell_gap,
+              align_items=@yoga.AlignItems::FlexStart,
+            ),
+          )
+          line = []
+        }
+      }
+      let rows_n = ((cs.length() + per_row - 1) / per_row).to_double()
+      open_id.val = @core.overlay_show_at(
+        overlay_pane(
+          [view(rows, direction=@yoga.Column, row_gap=0.0, padding=8.0)],
+          per_row.to_double() * (swatch + cell_gap) + 16.0,
+          16.0 + rows_n * (swatch + cell_gap),
+        ),
+        w.rect.x,
+        w.rect.y + w.rect.h + 2.0,
+      )
+    }
+    let pick_hi = fn() -> Unit {
+      if cs.length() > 0 {
+        let c = cs[hi.val.clamp(min=0, max=cs.length() - 1)]
+        value.set(c)
+        on_change(c)
+        close_pop()
       }
     }
 
@@ -1173,42 +1507,51 @@ pub fn color_picker(
         if overlay_alive(open_id.val) {
           close_pop()
         } else {
-          let rows : Array[@core.Node] = []
-          let mut line : Array[@core.Node] = []
-          for i = 0; i < cs.length(); i = i + 1 {
-            let c = cs[i]
-            line.push(
-              color_swatch(c, swatch, cell_gap, fn() -> Bool { value.get() == c }, fn() -> Unit {
-                value.set(c)
-                on_change(c)
-                close_pop()
-              }),
-            )
-            if (i + 1) % per_row == 0 || i + 1 == cs.length() {
-              rows.push(
-                view(
-                  line,
-                  direction=@yoga.Row,
-                  height=swatch + cell_gap,
-                  align_items=@yoga.AlignItems::FlexStart,
-                ),
-              )
-              line = []
-            }
-          }
-          let rows_n = ((cs.length() + per_row - 1) / per_row).to_double()
-          open_id.val = @core.overlay_show_at(
-            overlay_pane(
-              [view(rows, direction=@yoga.Column, row_gap=0.0, padding=8.0)],
-              per_row.to_double() * (swatch + cell_gap) + 16.0,
-              16.0 + rows_n * (swatch + cell_gap),
-            ),
-            w.rect.x,
-            w.rect.y + w.rect.h + 2.0,
-          )
+          open_pop()
         }
       },
     )
+    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+      if !ev.press {
+        return false
+      }
+      let ks = ev.keysym
+      if overlay_alive(open_id.val) {
+        let n = cs.length()
+        if ks == @core.KS_RETURN || ks == @core.KS_SPACE {
+          pick_hi()
+          true
+        } else if ks == @core.KS_ESCAPE {
+          close_pop()
+          true
+        } else if n > 0 && ks == @core.KS_LEFT {
+          hi.val = (hi.val - 1).clamp(min=0, max=n - 1)
+          @core.invalidate()
+          true
+        } else if n > 0 && ks == @core.KS_RIGHT {
+          hi.val = (hi.val + 1).clamp(min=0, max=n - 1)
+          @core.invalidate()
+          true
+        } else if n > 0 && ks == @core.KS_UP {
+          hi.val = (hi.val - per_row).clamp(min=0, max=n - 1)
+          @core.invalidate()
+          true
+        } else if n > 0 && ks == @core.KS_DOWN {
+          hi.val = (hi.val + per_row).clamp(min=0, max=n - 1)
+          @core.invalidate()
+          true
+        } else {
+          false
+        }
+      } else if ks == @core.KS_RETURN ||
+        ks == @core.KS_SPACE ||
+        ks == @core.KS_DOWN {
+        open_pop()
+        true
+      } else {
+        false
+      }
+    })
     fold_style(w, @style.empty_style(), class)
     handle(w)
     w
