@@ -5121,9 +5121,11 @@ static void wm_dnd_on_received(GtkWidget *widget, GdkDragContext *ctx,
   }
   if (n > 0) {
     // motion 期的异步请求结果：缓存载荷并补发 ENTER（指针不动也不会再有
-    // motion，ENTER 不能等）
+    // motion，ENTER 不能等）。承诺 COPY 记进效果账（同 Windows 的 DragEnter），
+    // MoonBit 下一拍写回覆盖
     wm_dnd_set_payload(enc, n);
     wm_dnd_have_payload = 1;
+    w->dnd_effect_wanted = 1;
     if (!wm_dnd_enter_sent) {
       wm_dnd_enter_sent = 1;
       wm_dnd_push(slot, 0, (int)x, (int)y);
@@ -5149,7 +5151,8 @@ int wm_dragdnd_enable(int64_t id) {
   gtk_drag_dest_set(w->window, GTK_DEST_DEFAULT_DROP, wm_dnd_targets,
                     (gint)G_N_ELEMENTS(wm_dnd_targets),
                     GDK_ACTION_COPY | GDK_ACTION_MOVE | GDK_ACTION_LINK);
-  w->dnd_effect_wanted = 1; // 进门承诺 COPY，MoonBit 下一拍起接管
+  // 效果记账零值 0（与 Windows 分支同口径：承诺 COPY 随 ENTER 置、
+  // MoonBit 写回随后覆盖，挂上而未有会话时读 0）
   w->dnd_sigs[0] = g_signal_connect(w->window, "drag-motion",
                                     G_CALLBACK(wm_dnd_on_motion), w);
   w->dnd_sigs[1] = g_signal_connect(w->window, "drag-leave",

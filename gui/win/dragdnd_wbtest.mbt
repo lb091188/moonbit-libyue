@@ -14,9 +14,9 @@ test "拖放后端：挂接幂等与计数（有显示环境）" {
     assert_true(dragdnd_enable(id))
     assert_true(dragdnd_enable(id)) // 幂等：重复挂仍给 true
     assert_eq(dragdnd_count(), 1)
-    assert_eq(dragdnd_effect(id), 1) // 挂上初值 = COPY 承诺
-    dragdnd_set_effect(id, 0)
-    assert_eq(dragdnd_effect(id), 0) // MoonBit 写回的「落点不收」
+    assert_eq(dragdnd_effect(id), 0) // 挂上未有会话读 0（承诺 COPY 随 ENTER 置，Windows/GTK 同口径）
+    dragdnd_set_effect(id, 1)
+    assert_eq(dragdnd_effect(id), 1) // MoonBit 写回读得回
     dragdnd_disable(id)
     assert_eq(dragdnd_count(), 0)
     assert_eq(dragdnd_effect(id), -1) // 撤销后读回 -1
