@@ -1,20 +1,27 @@
 # native-gui
 
-MoonBit 生态的原生跨平台桌面 GUI 库——**窗口、像素、事件循环、布局与控件全部纯 MoonBit 实现**（自绘，不依赖 libyue），一套代码在 Windows / Linux 上跑原生窗口，`moon add` 之后零配置。原名 `moonbit-libyue`（2026-10 更名），mooncakes 包名为 **`NoahLiu/native-gui`**。
+A **native, cross-platform desktop GUI library for the MoonBit ecosystem** — the position GTK, WinForms or AppKit hold in their own ecosystems, built for MoonBit. Windows, pixels, the event loop, layout and every widget are owned by the library itself and written in pure MoonBit (self-drawn, no libyue dependency); platform specifics converge in a handful of thin C layers for windows, text, image decoding, WebView and media. One codebase runs native windows on Windows and Linux; `moon add` and go, zero configuration.
 
-本目录是**库模块**（`moon.mod` 的 name 为 `NoahLiu/native-gui`），包含全部 **14 个库包**：
+> Formerly `moonbit-libyue` (renamed 2026-10). The mooncakes package is **`NoahLiu/native-gui`** and all existing import paths are unchanged.
 
-`core` / `ui` / `render` / `text` / `theme` / `icons` / `sys` / `input` / `win` / `dbus` / `chart` / `mdview` / `web` / `style`
+![Demo board](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/public/images/showcase-main.png)
 
-**包路径与 mooncakes 上一致**（`NoahLiu/native-gui/core` …），本目录名只是仓库内的文件系统布局，不进入包标识，因此 `moon add NoahLiu/native-gui` 的既有 import 不受影响。
+## Highlights
 
-![演示板](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/public/images/showcase-main.png)
+- **Self-drawn widgets, one look everywhere** — controls are drawn by the library's own rasterizer, so they render identically on every platform; light/dark mode and the system accent colour are followed by default, and a theme is a plain value you can override wholesale.
+- **Declarative UI with reactive state** — describe the interface as a tree of `@core.Node` values and mount it with one `mount_window` call; keep state in `Store` / `Signal` and bound spots refresh themselves.
+- **Desktop-grade system integration** — tray, notifications, native menus, global shortcuts, message boxes, file dialogs, drag & drop (in-app and cross-application), clipboard, autostart, idle detection and OS queries (volume, power, monitors, browser history, installed apps…) behind one `@sys` / `@core` facade.
+- **Content batteries included** — 20 chart types with a cross-cutting interactive layer, a GFM Markdown view, multi-language code highlighting, an embedded WebView (JS interop, custom protocols, DOM capture, policy hooks) and an audio/video engine with subtitles and speed control.
+- **Honest degradation** — every capability family exposes a probe and returns a structured `Unsupported` / `NotFound` on environments that lack it, instead of crashing or pretending success.
+- **Pay only for what you import** — 14 packages in this module; an unimported package never enters your binary. Heavier optional capabilities (the media engine) live in their own modules, outside the default dependency closure entirely.
 
-## 快速开始
+## Usage
 
 ```sh
 moon add NoahLiu/native-gui
 ```
+
+Import the packages you need in `moon.pkg` (e.g. `NoahLiu/native-gui/ui` as `@ui`) and mount a window:
 
 ```moonbit
 fn main {
@@ -24,23 +31,74 @@ fn main {
     width=400,
     height=300,
   ) {
-    None => return // 无窗口后端或无显示服务
+    None => return // no window backend or no display service on this host
     Some(a) => a
   }
   app.run()
 }
 ```
 
-自带示例（仓库内运行）：`moon run examples/hello`（最小窗口）、`moon run examples/hello-themed`（主题控件集）、`moon run examples/showcase`（全功能演示板：组件库 + 系统能力，14 页）。
+Runnable examples in this repository, from shallow to deep:
 
-## 平台支持
+```sh
+moon run examples/hello          # a minimal window
+moon run examples/hello-themed   # the themed widget set
+moon run examples/showcase       # full demo board: components + system capabilities, 14 pages
+```
 
-Ubuntu 24.04（XFCE / GNOME / KDE）✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🚧 后端暂未开发。Windows 上构建出的 exe 是 GUI 子系统二进制，双击运行不弹控制台窗口。
+Each showcase page is its own source file under `examples/showcase/pages/` — the best copy-paste material library.
 
-## 文档
+## Packages
 
-- 仓库根 [README](https://github.com/lb091188/moonbit-native-gui)——项目主文档（架构、包结构、平台矩阵、贡献与门禁）
-- [在线文档站](https://moonbit-libyue.pages.dev/)——使用文档，中文版在 [`/zh/`](https://moonbit-libyue.pages.dev/zh/)
-- [平台适配经验](https://github.com/lb091188/moonbit-native-gui/blob/master/docs/zh/adaptation.md)——各平台实测坑、根因与验证结论
+| Import | Alias | Contents |
+|---|---|---|
+| `NoahLiu/native-gui/core` | `@core` | App host, event loop, focus / keys / pointer, menus, notifications, tray, overlays, drag & drop, `Store` / `Signal` |
+| `.../native-gui/ui` | `@ui` | Self-drawn widgets and the component library: forms, display, navigation, date, tables & virtual lists, entries, scroll, overlays, code view, declarative layer |
+| `.../native-gui/render` | `@render` | Rasterizer — a pure-MoonBit software raster (path / fill / blend / gradient) plus a Cairo backend; bitmaps, canvas, images, PNG |
+| `.../native-gui/text` | `@text` | Text layer: font families, fonts, attributed text and range attributes (Pango / DirectWrite) |
+| `.../native-gui/theme` | `@theme` | Theme system: palette derivation + change subscription |
+| `.../native-gui/icons` | `@icons` | Vector icon system (800+ icons) |
+| `.../native-gui/sys` | `@sys` | OS capabilities facade |
+| `.../native-gui/input` | `@input` | Editing core and key codes |
+| `.../native-gui/win` | `@win` | Platform window backend (Win32 / GTK3 C stubs) |
+| `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge (tray SNI, notifications, logind / upower, media, network…) |
+| `.../native-gui/chart` | `@chart` | Charts plus the interactive layer |
+| `.../native-gui/mdview` | `@mdview` | Markdown rendering view |
+| `.../native-gui/web` | `@web` | Embedded WebView |
+| `.../native-gui/style` | `@style` | Style layer: stylesheets as MoonBit values — `Style` rule blocks, hover / active / focus states, transitions |
 
-MIT License。
+Optional capabilities in **separate modules** (a plain `moon add` of this module never drags them in):
+
+| Module | Contents |
+|---|---|
+| `NoahLiu/gui-media` | Audio/video engine (ffmpeg decode + miniaudio output) and the player component |
+| `NoahLiu/gui-examples` | Standalone example module (systemprobe, native-web) depending on `gui-media` |
+
+## Platform support
+
+| | Windows | Linux | macOS |
+|---|---|---|---|
+| Status | ✅ 10 / 11 | ✅ X11 mainline | 🚧 landing |
+| Notes | GUI-subsystem exe — double-click with no console window | committed span **deepin 20 ~ Ubuntu 26**, staying on GTK3; Wayland sessions run with X11-dependent capabilities degrading per session | the backend (window / text / image decode / WebView / system capabilities) is developed on the `mac` branch, not yet merged into master; on master macOS calls degrade to `Unsupported` |
+
+## Roadmap
+
+Where this library is heading, in order of current effort (see the public roadmap for the full picture):
+
+1. **Lower the barrier to entry** — a shortest path from "install moon" to "a window on screen" on the docs homepage, per-platform prerequisites in one sentence, build errors that carry their own fix hints.
+2. **Credibility** — CI gates on Linux and Windows for every batch, on-device verification checklists, and a version promise: the stable-surface list (what will not break within 1.x) and the 1.0 cut-off are being defined.
+3. **Content** — usage documentation rewritten for the self-drawn stack (tutorials, a per-component guide with screenshots), continuously expanded examples.
+4. **Platform coverage** — merging the macOS backend once on-device verification closes; verifying the Linux compatibility span floor by floor (deepin 20 as the floor, Ubuntu 26 as the ceiling).
+
+Explicit non-goals: accessibility APIs, GTK4 / Qt backends, and platform-native widget skins — the self-drawn stack is the product.
+
+**Versioning**: at `0.x` the interfaces still evolve per batch; breaking changes are recorded in commit messages and the docs ship in the same batch.
+
+## Documentation
+
+- Repository root [README](https://github.com/lb091188/moonbit-native-gui) — architecture, package map, contributing and gates
+- [Documentation site](https://moonbit-libyue.pages.dev/) — usage docs, Chinese version under [`/zh/`](https://moonbit-libyue.pages.dev/zh/)
+- [Platform adaptation notes](https://github.com/lb091188/moonbit-native-gui/blob/master/docs/zh/adaptation.md) — field-tested pitfalls, root causes and fixes per platform
+- [Public roadmap](https://github.com/lb091188/moonbit-native-gui/blob/master/docs/zh/roadmap.md) — positioning, support matrix, commitments, non-goals
+
+MIT License.
