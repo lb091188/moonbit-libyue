@@ -146,6 +146,64 @@ test "拖放：没过阈值当普通点击（不开会话）、投到空白处�
 }
 
 ///|
+test "拖放：同一拖源连着拖两次都成立，载荷每次现取" {
+  let hits : Ref[Int] = Ref(0)
+  let last : Ref[String] = Ref("-")
+  // 载荷由 `payload()` 每次开拖时现取——会话不缓存，第二次拖要拿到新值
+  let seq : Ref[Int] = Ref(0)
+  let src = drag_source(
+    plain_box(80.0, 30.0),
+    payload=fn() -> @core.DragData? {
+      seq.val = seq.val + 1
+      Some(@core.DragData::Text("第 \{seq.val} 次"))
+    },
+  )
+  let tgt = drop_target(plain_box(80.0, 30.0), on_drop=fn(
+    d : @core.DragData,
+    _x : Double,
+    _y : Double,
+  ) -> Unit {
+    hits.val = hits.val + 1
+    last.val = match d {
+      @core.DragData::Text(t) => t
+      _ => "非文本"
+    }
+  })
+  let (root, wrap) = mounted(
+    view([src, tgt], row_gap=40.0, align_items=@yoga.AlignItems::FlexStart),
+    320.0,
+    200.0,
+  )
+  @core.set_drag_root(root)
+  let sw = wrap.children()[0]
+  let tw = wrap.children()[1]
+  let sx = sw.rect.x + 8.0
+  let sy = sw.rect.y + 8.0
+  let tx = tw.rect.x + 8.0
+  let ty = tw.rect.y + 8.0
+  // 一整趟拖放（按下 → 过阈值 → 移到目标 → 松手）跑两遍：第二遍的起点态
+  // 就是第一遍的终点态，会话与按下捕获都必须已经清干净
+  let mut hover = -1
+  let mut cap = -1
+  for i = 0; i < 2; i = i + 1 {
+    let (h1, c1) = drag_step(root, @core.Down, sx, sy, hover, cap)
+    let (h2, c2) = drag_step(root, @core.Move, sx + 10.0, sy, h1, c1)
+    assert_true(@core.drag_active())
+    let (h3, c3) = drag_step(root, @core.Move, tx, ty, h2, c2)
+    assert_eq(@core.drag_hover(), tw.id)
+    let (h4, c4) = drag_step(root, @core.Up, tx, ty, h3, c3)
+    assert_false(@core.drag_active())
+    // 松手必须把按下捕获放掉，否则下一次的 Down 会被上一个拖源的捕获牵着走
+    assert_eq(c4, -1)
+    assert_eq(hits.val, i + 1)
+    hover = h4
+    cap = c4
+  }
+  assert_eq(last.val, "第 2 次")
+  @core.clear_drag_root()
+}
+
+///|
 test "拖放：accept 判收不收——拒绝时回调不跑、返回不被接受" {
   let dropped : Ref[String] = Ref("-")
   let src = drag_source(
@@ -197,4 +255,21 @@ test "拖放：payload 给 None 时按普通按下处理，不产生会话" {
   assert_eq(h2, h1)
   assert_eq(cap2, cap)
   @core.clear_drag_root()
+}
+
+///|
+/// `accept` 除了松手时判收不收，还要挂成悬停查询——系统级拖入的拖拽光标按它答
+/// （`@core.drag_wants`），这里钉住接线。
+test "拖放：drop_target 的 accept 同时是悬停查询" {
+  let tgt = drop_target(
+    plain_box(80.0, 30.0),
+    accept=fn(d : @core.DragData) -> Bool { d.kind() == @core.FilePaths },
+  )
+  let (_root, w) = mounted(tgt, 200.0, 120.0)
+  assert_true(w.drag_wants(@core.DragData::Paths(["/a"])))
+  assert_false(w.drag_wants(@core.DragData::Text("t")))
+  // 没装 accept 的投放目标按「收」处理
+  let plain = drop_target(plain_box(60.0, 20.0))
+  let (_r2, w2) = mounted(plain, 200.0, 120.0)
+  assert_true(w2.drag_wants(@core.DragData::Text("t")))
 }

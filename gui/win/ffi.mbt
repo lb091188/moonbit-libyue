@@ -336,6 +336,39 @@ extern "c" fn wm_tray_tooltip(slot : Int, out : Bytes, cap : Int) -> Int =
   "wm_tray_tooltip"
 
 ///|
+extern "c" fn wm_dragdnd_supported() -> Int = "wm_dragdnd_supported"
+
+///|
+extern "c" fn wm_dragdnd_enable(id : Int64) -> Int = "wm_dragdnd_enable"
+
+///|
+extern "c" fn wm_dragdnd_disable(id : Int64) -> Unit = "wm_dragdnd_disable"
+
+///|
+#borrow(out_slot, out_kind, out_x, out_y)
+extern "c" fn wm_dragdnd_poll(
+  out_slot : Ref[Int],
+  out_kind : Ref[Int],
+  out_x : Ref[Int],
+  out_y : Ref[Int],
+) -> Int = "wm_dragdnd_poll"
+
+///|
+#borrow(out)
+extern "c" fn wm_dragdnd_payload(out : Bytes, cap : Int) -> Int =
+  "wm_dragdnd_payload"
+
+///|
+extern "c" fn wm_dragdnd_set_effect(id : Int64, effect : Int) -> Unit =
+  "wm_dragdnd_set_effect"
+
+///|
+extern "c" fn wm_dragdnd_effect(id : Int64) -> Int = "wm_dragdnd_effect"
+
+///|
+extern "c" fn wm_dragdnd_count() -> Int = "wm_dragdnd_count"
+
+///|
 extern "c" fn wm_menu_popup_new() -> Int = "wm_menu_popup_new"
 
 ///|

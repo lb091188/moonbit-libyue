@@ -5,14 +5,16 @@
 // - **已做**：同一进程、同一控件树内的拖放——拖源按住拖出内容、指针移动时实时
 //   算出落点、松手投给命中的投放目标。新栈全自绘，命中与绘制都在自己手里，这条
 //   路不需要任何平台接口，**三平台同构**。
-// - **未做（随平台批）**：**跨应用**的系统级拖放（Win32 `IDropTarget`/`DoDragDrop`、
-//   Linux GTK/XDG DnD、macOS `NSDraggingSource`）。接口形状已按本批定好
-//   （`Widget::set_draggable` / `Widget::set_on_drop`），后端接上后调用方不用改。
-//   在此之前**不假装**系统级拖放能用：`DragData` 只在应用内流转。
+// - **已做（Windows，W23a）**：**系统级拖入**——从资源管理器/编辑器把文件或文本
+//   拖进窗口，落到同一个会话里（每拍 `drag_external_pump`，见本文件尾）。落点命中、
+//   悬停高亮、`accept` 判据全部复用应用内那一套，调用方的 `@ui.drop_target` 不用改。
+// - **未做（随平台批）**：**拖出到外部**（Win32 `DoDragDrop`，另批）、Linux
+//   GTK/XDG DnD 与 macOS `NSDraggingSource`（这两档的后端桩恒报不可用，不假装能用）。
 // - 参照面是旧栈的 `yue/view.mbt`（`DataKind` / `DragData` / `register_dragged_types`
 //   / `handle_drag_enter`/`handle_drag_update`/`handle_drop`/`on_drag_leave`）。
 //   本批把「拖入三回调」收成一个 `on_drop`（自绘档不需要 enter/update/leave 三件：
-//   悬停高亮靠读 `drag_hover()`，见下），编号与旧栈逐值相同。
+//   悬停高亮靠读 `drag_hover()`，见下），编号与旧栈逐值相同。系统级拖入要问
+//   「这个落点收不收」又不触发投递，故另开 `drag_accept` 查询钩子（见下）。
 //
 // 数据线形状：`[kind:i32 LE][payload]`——与旧栈拖拽/剪贴板共用的编码同形，
 // 为将来 core 侧剪贴板预留（`Paths` 载荷用 `\n` 连接路径，同旧栈）。
@@ -177,6 +179,19 @@ let drag_current : Ref[DragSession?] = Ref(None)
 let drag_root_slot : Ref[() -> Widget?] = Ref(fn() -> Widget? { None })
 
 ///|
+/// 正在跑外部拖入的窗口（平台窗口 id；0 = 没有）。外部拖入与应用内拖拽共用同
+/// 一个会话单例，这条标志用来判断「会话是谁的」，避免互相劫持。
+let drag_ext_window : Ref[Int] = Ref(0)
+
+///|
+/// 外部拖入的落点树（按事件所属窗找到那扇窗的根）；None = 沿用宿主 provider。
+let drag_ext_root : Ref[Widget?] = Ref(None)
+
+///|
+/// MoonBit 侧最近一次答给系统的外部拖入效果（1 = 复制、0 = 不收）。
+let drag_ext_effect : Ref[Int] = Ref(0)
+
+///|
 pub fn set_drag_root_provider(f : () -> Widget?) -> Unit {
   drag_root_slot.val = f
 }
@@ -193,7 +208,11 @@ pub fn clear_drag_root() -> Unit {
 
 ///|
 fn drag_root() -> Widget? {
-  (drag_root_slot.val)()
+  match drag_ext_root.val {
+    // 外部拖入按事件所属窗定位落点树（多窗时每窗一棵树）
+    Some(w) => Some(w)
+    None => (drag_root_slot.val)()
+  }
 }
 
 ///|
@@ -371,4 +390,169 @@ pub fn drag_cancel() -> Unit {
     drag_current.val = None
     invalidate()
   }
+}
+
+///|
+/// 装「这份数据收不收」的查询钩子（悬停期问，不触发投递）。`@ui.drop_target`
+/// 的 `accept` 参数会填这里；`on_drop` 那条才是真正投递。
+pub fn Widget::set_drag_accept(self : Widget, f : (DragData) -> Bool) -> Unit {
+  self.drag_accept = Some(f)
+}
+
+///|
+/// 取消查询钩子（回到「是投放目标就收」）。
+pub fn Widget::clear_drag_accept(self : Widget) -> Unit {
+  self.drag_accept = None
+}
+
+///|
+/// 这份数据落在我身上收不收（悬停查询）。
+pub fn Widget::drag_wants(self : Widget, data : DragData) -> Bool {
+  match self.drag_accept {
+    Some(f) => f(data)
+    None => true
+  }
+}
+
+///|
+/// 系统级拖入是否可用（运行时探测：Windows 要 OLE 起得来才算数，其余后端恒
+/// false）。不可用时下面的挂载与抽取全部静默失败，应用内拖放照常。
+pub fn drag_external_supported() -> Bool {
+  @win.dragdnd_supported()
+}
+
+///|
+/// 给一扇窗挂上系统投放目标（`App` 建窗时自动调；重复调幂等）。true = 已挂上。
+pub fn drag_external_enable(id : Int64) -> Bool {
+  @win.dragdnd_enable(id)
+}
+
+///|
+/// 撤销挂接（拆窗时 C 侧自动做，这里给显式撤的路）。
+pub fn drag_external_disable(id : Int64) -> Unit {
+  @win.dragdnd_disable(id)
+}
+
+///|
+/// 按平台窗口 id 找到那扇窗的根控件（找不到给 None，落点退回宿主 provider）。
+fn drag_window_root_of(slot : Int) -> Widget? {
+  let mut found : Widget? = None
+  for a in host_windows() {
+    if a.window.id.to_int() == slot {
+      found = Some(a.root)
+    }
+  }
+  found
+}
+
+///|
+/// 把「当前落点收不收」写回系统（决定拖拽光标）。收给 COPY（1），不收给
+/// NONE（0）。本批只做「复制」一档：移动/链接要读按键修饰位，随拖出批一起接。
+/// 写回的值同时记在 MoonBit 侧一份（`drag_external_effect()` 读回，无头测试与
+/// 诊断用——后端没挂上时 ffi 那次写是静默丢弃的）。
+fn drag_external_answer(slot : Int, data : DragData) -> Unit {
+  let ok = match drag_current.val {
+    None => false
+    Some(s) =>
+      if s.hover == 0 {
+        false
+      } else {
+        match drag_root() {
+          None => false
+          Some(r) =>
+            match r.by_id(s.hover) {
+              Some(w) => w.drag_wants(data)
+              None => false
+            }
+        }
+      }
+  }
+  let effect = if ok { @win.DRAGDND_COPY } else { @win.DRAGDND_NONE }
+  drag_ext_effect.val = effect
+  @win.dragdnd_set_effect(slot.to_int64(), effect)
+}
+
+///|
+/// 当前效果标志（1 = 复制、0 = 落点不收；没有外部拖入在跑时为 0）。
+pub fn drag_external_effect() -> Int {
+  drag_ext_effect.val
+}
+
+///|
+/// 一条外部拖入事件喂给会话。`data` 是「进入/移动」时已经解码好的载荷（认不出
+/// 的格式给 None，这一条直接跳过）；离开/投递不看它。
+/// 进入/移动走「开会话或更新落点 → 答效果」，离开/投递结束时才会话与落点树一起
+/// 收掉。落点命中、悬停高亮、松手投递复用应用内那一条链。
+fn drag_external_feed(
+  slot : Int,
+  kind : Int,
+  x : Double,
+  y : Double,
+  data : DragData?,
+) -> Unit {
+  if kind == @win.DRAGDND_LEAVE || kind == @win.DRAGDND_DROP {
+    if drag_ext_window.val == slot {
+      if kind == @win.DRAGDND_DROP {
+        // 载荷在 C 侧 Drop 返回前仍可读，会话里的数据是进入时就取好的那份
+        let _ = drag_drop(x, y)
+      } else {
+        drag_cancel()
+      }
+      drag_ext_window.val = 0
+      drag_ext_root.val = None
+      drag_ext_effect.val = 0
+    }
+    return ()
+  }
+  // 别的窗正在跑外部拖入：不抢它的会话
+  if drag_ext_window.val != 0 && drag_ext_window.val != slot {
+    return ()
+  }
+  // 应用内拖拽正在跑：外部事件不劫持（两条会话同一时刻只能有一条）
+  if drag_ext_window.val == 0 && drag_current.val is Some(_) {
+    return ()
+  }
+  match data {
+    None =>
+      // 认不出的格式：不开会话，进入这一拍直接把效果答成 NONE（光标显示禁止）
+      if kind == @win.DRAGDND_ENTER {
+        @win.dragdnd_set_effect(slot.to_int64(), @win.DRAGDND_NONE)
+      }
+    Some(d) => {
+      if drag_ext_window.val == 0 {
+        drag_ext_window.val = slot
+        drag_ext_root.val = drag_window_root_of(slot)
+      }
+      if !drag_begin(d, 0, x, y) {
+        let _ = drag_move(x, y)
+      }
+      drag_external_answer(slot, d)
+    }
+  }
+}
+
+///|
+/// 每拍抽干外部拖入队列并喂给会话（宿主 `App::step` 每拍调）。返回本轮是否抽到
+/// 事件。
+pub fn drag_external_pump() -> Bool {
+  if !@win.dragdnd_supported() {
+    return false
+  }
+  let mut got = false
+  let mut more = true
+  while more {
+    match @win.dragdnd_poll() {
+      None => more = false
+      Some((slot, kind, x, y)) => {
+        got = true
+        let data = if kind == @win.DRAGDND_LEAVE || kind == @win.DRAGDND_DROP {
+          None
+        } else {
+          drag_decode(@win.dragdnd_payload())
+        }
+        drag_external_feed(slot, kind, x.to_double(), y.to_double(), data)
+      }
+    }
+  }
+  got
 }

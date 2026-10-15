@@ -206,3 +206,75 @@ test "没装拖拽根时：会话能开能关，落点恒为无（不静默出�
   assert_false(drag_drop(1.0, 2.0))
   assert_false(drag_active())
 }
+
+///|
+/// 系统级拖入回归：直接喂 `drag_external_feed`（不经真后端的 OLE 队列，那半截由
+/// `experiment/drag_probe` 在 C 侧钉住），验「进入开会话 → 移动换落点 → 按落点的
+/// accept 答效果 → 松手投递 → 会话与效果一起收掉」，以及认不出的格式不开会话、
+/// 离开即取消、应用内拖拽不被外部事件劫持。
+test "系统级拖入：喂事件驱动会话，效果按落点的收不收答" {
+  let root = Widget::new()
+  root.set_size(300.0, 200.0)
+  root.set_column()
+  let got : Ref[String] = Ref("-")
+  let yes = Widget::new()
+  yes.set_size(100.0, 60.0)
+  yes.set_on_drop(fn(d : DragData, _x : Double, _y : Double) -> Bool {
+    got.val = d.as_text().unwrap_or("非文本")
+    true
+  })
+  yes.set_drag_accept(fn(d : DragData) -> Bool { d.is_kind(FilePaths) })
+  let no = Widget::new()
+  no.set_size(100.0, 60.0)
+  no.set_on_drop(fn(_d : DragData, _x : Double, _y : Double) -> Bool { false })
+  // 这一只什么都不收：悬停时系统光标要显示禁止
+  no.set_drag_accept(fn(_d : DragData) -> Bool { false })
+  root.append_child(yes)
+  root.append_child(no)
+  root.relayout(300.0, 200.0)
+  set_drag_root(root)
+  let files = DragData::Paths(["/a.txt", "/b.txt"])
+  let slot = 7
+  // 进入「收」的那只：开会话、落点命中、答 COPY
+  drag_external_feed(slot, @win.DRAGDND_ENTER, 10.0, 10.0, Some(files))
+  assert_true(drag_active())
+  assert_eq(drag_source(), 0)
+  assert_eq(drag_hover(), yes.id)
+  assert_eq(drag_external_effect(), 1)
+  // 移到「不收」的那只：落点变了，效果跟着变 NONE（系统光标显示禁止）
+  drag_external_feed(slot, @win.DRAGDND_OVER, 10.0, 90.0, Some(files))
+  assert_eq(drag_hover(), no.id)
+  assert_eq(drag_external_effect(), 0)
+  // 移回来：又答 COPY
+  drag_external_feed(slot, @win.DRAGDND_OVER, 12.0, 12.0, Some(files))
+  assert_eq(drag_hover(), yes.id)
+  assert_eq(drag_external_effect(), 1)
+  // 认不出的格式（载荷解不出来）：不开新会话、不动现有会话
+  drag_external_feed(slot, @win.DRAGDND_ENTER, 10.0, 10.0, None)
+  assert_eq(drag_hover(), yes.id)
+  // 松手：投给落点、拿到数据、会话与效果一起收掉
+  drag_external_feed(slot, @win.DRAGDND_DROP, 10.0, 10.0, None)
+  assert_eq(got.val, "/a.txt\n/b.txt")
+  assert_false(drag_active())
+  assert_eq(drag_external_effect(), 0)
+  // 离开：会话取消，不投递
+  got.val = "-"
+  drag_external_feed(slot, @win.DRAGDND_ENTER, 10.0, 10.0, Some(files))
+  assert_true(drag_active())
+  drag_external_feed(slot, @win.DRAGDND_LEAVE, 0.0, 0.0, None)
+  assert_false(drag_active())
+  assert_eq(got.val, "-")
+  assert_eq(drag_external_effect(), 0)
+  // 别的窗的事件不抢会话（会话只认开头那一扇窗）
+  drag_external_feed(slot, @win.DRAGDND_ENTER, 10.0, 10.0, Some(files))
+  drag_external_feed(slot + 1, @win.DRAGDND_OVER, 10.0, 90.0, Some(files))
+  assert_eq(drag_hover(), yes.id)
+  // 应用内拖拽正在跑时，外部进入事件不劫持
+  drag_external_feed(slot, @win.DRAGDND_LEAVE, 0.0, 0.0, None)
+  assert_true(drag_begin(DragData::Text("内部"), 42, 10.0, 90.0))
+  drag_external_feed(slot, @win.DRAGDND_ENTER, 10.0, 10.0, Some(files))
+  assert_eq(drag_source(), 42)
+  assert_eq(drag_hover(), no.id)
+  drag_cancel()
+  clear_drag_root()
+}

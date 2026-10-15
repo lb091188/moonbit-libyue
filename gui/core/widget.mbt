@@ -139,6 +139,10 @@ pub(all) struct Widget {
   /// 投放回调（W21c）：拖拽松手且本控件是**最深命中者**时调用，返回是否接受。
   /// 悬停高亮不靠回调：绘制方读 `@core.drag_hover() == self.id` 自判（见 drag.mbt）。
   mut on_drop : Option[(DragData, Double, Double) -> Bool]
+  /// 悬停期的「收不收」查询（W23a 系统级拖入用）：系统要在拖拽**过程中**就知道
+  /// 落点接不接这份数据（决定光标），而 `on_drop` 一调就真投了，所以查询另开一条。
+  /// 没装时按「是投放目标就收」处理。
+  mut drag_accept : Option[(DragData) -> Bool]
   /// resolved `Style` 本体不进 core（core 依赖 style 会成环）：由 `@style` 包的
   /// 进程级侧表按控件 id 持有，绘制期 `@style.resolved(self)` 读取。
   /// 绘制层序键（resolved `z_index` 的落点，design.md §5 P1）：`@style.apply`
@@ -186,6 +190,7 @@ pub fn Widget::new() -> Widget {
     cursor_fn: None,
     drag_payload: None,
     on_drop: None,
+    drag_accept: None,
     z_index_paint: 0.0,
     alpha_paint: 1.0,
     shadow_paint: 0.0,

@@ -60,6 +60,7 @@ extern void *moonbit_make_bytes(int size, int value);
 // 与 CoCreateInstance 在 objbase.h。GUID 常量由 wincodec.h 声明、链接期取
 // windowscodecs.lib / uuid.lib（C 模式用不了 __uuidof，与 W14 文件对话框同条坑）。
 #include <objbase.h>
+#include <ole2.h> // 跨进程拖放：IDropTarget/IDataObject 与 RegisterDragDrop 在 ole2.h
 #include <wincodec.h>
 // 任务栏进度（§6.3）：ITaskbarList3 与 TBPF_* 在 shobjidl.h；GUID 常量
 // （CLSID_TaskbarList / IID_ITaskbarList3）经 uuid.lib 链接期取符号
@@ -143,6 +144,9 @@ static HWND wm_waker = NULL; // 仅消息窗口：wm_wakeup 的投递目标（�
 static WCHAR *wm_utf8_to_wide(const char *s);
 /* 前置声明：图标表取句柄（W20f 的图标表定义在窗口增强之后）。 */
 static HICON wm_icon_get(int slot);
+/* 前置声明：拆窗时撤销外部拖入挂接（W23a 的拖入段定义在窗口之后，RevokeDragDrop
+ * 必须在 DestroyWindow 之前）。 */
+void wm_dragdnd_disable(int64_t id);
 
 /* 菜单句柄表（W20a）：下标即对外句柄（1 起）。每个槽存一个 HMENU——菜单条或
  * 子菜单都占一个槽；子菜单的 HMENU 由 CreatePopupMenu 建、AppendMenuW(MF_POPUP)
@@ -947,6 +951,7 @@ void wm_close(int64_t id) {
   if (w->hwnd != NULL) {
     HWND hwnd = w->hwnd;
     w->hwnd = NULL; // WM_DESTROY 里还会再清一次；先摘钩防重入
+    wm_dragdnd_disable(id); // 拖放挂接要在 HWND 还活着时撤（OLE 按 hwnd 记账）
     DestroyWindow(hwnd);
   }
   // 拆掉本次会话建的所有菜单（W20a）：HMENU 归桩所有，随窗口销毁一起放
@@ -1622,6 +1627,429 @@ int wm_notify_title(int slot, char *out, int cap) {
   }
   out[n] = '\0';
   return n - 1;
+}
+
+/* ---- 外部拖入（W23a：跨进程拖放的「拖入」侧）-----------------------------
+ * RegisterDragDrop 给窗口挂一个自建的 IDropTarget，OLE 在别的程序往本窗拖东西
+ * 的过程中回调它的 DragEnter/DragOver/DragLeave/Drop。回调跑在**本线程的消息
+ * 派发**里（wm_pump 转起来才有），所以照旧不向 MoonBit 蹦床：C 只把事件压进
+ * 队列，MoonBit 每拍 wm_dragdnd_poll 抽——与托盘/菜单/热键同制。
+ * 载荷现取现编码成线形状 `[kind:i32 LE][payload]`（与 core 的 drag_encode 同
+ * 一条编码：FilePaths=4 用 '\n' 连接、Text=1 直给 UTF-8）。格式优先级
+ * CF_HDROP > CF_UNICODETEXT；CF_HTML 未接（给 CF_HTML 的程序都同时给纯文本，
+ * 走纯文本档），Img 要 CF_DIB 转换另批。
+ * 「收不收」分两段回答：DragEnter 先按「格式认不认」给一个承诺效果，之后的
+ * 每一次 DragOver/Drop 都读 MoonBit 上一拍写回的 per-window 标志位
+ * （wm_dragdnd_set_effect）——于是应用侧 accept 的判断能反映到系统光标与最终
+ * 效果上，而 C 仍然不认识 MoonBit。
+ * 只做 Win32：Linux 的 GTK DnD（gtk_drag_dest_*）与 macOS 随平台批，那两分支
+ * wm_dragdnd_supported 恒 0，门面据此结构化报错，不假装能用。 */
+
+#define WM_DND_EV_MAX 64
+// 载荷上限：路径串（UTF-8）+ 4 字节头。文本也走同一块缓冲。
+#define WM_DND_PAYLOAD_MAX 65536
+// 事件种类：0 进入（带载荷）/1 移动/2 离开（清载荷）/3 松手投递（带载荷）
+#define WM_DND_ENTER 0
+#define WM_DND_OVER 1
+#define WM_DND_LEAVE 2
+#define WM_DND_DROP 3
+// 线形状里的种类编号（与 core/drag.mbt 的 data_kind_id 逐值相同）
+#define WM_DND_KIND_TEXT 1
+#define WM_DND_KIND_PATHS 4
+
+typedef struct {
+  IDropTarget iface; // 首成员即 COM 对象（lpVtbl 由 C 侧静态表填）
+  HWND hwnd;
+  int slot;
+  int registered;
+  int effect; // MoonBit 每拍写回的效果；DragOver/Drop 读它答 OLE
+} WmDropTarget;
+
+typedef struct {
+  int slot;
+  int kind;
+  int x;
+  int y;
+} WmDndEv;
+
+static WmDropTarget wm_dnd[WM_MAX_WINDOWS]; // 槽 0 未用，与窗口槽号对齐
+static WmDndEv wm_dnd_evs[WM_DND_EV_MAX];
+static int wm_dnd_head = 0;
+static int wm_dnd_count = 0;
+static unsigned char wm_dnd_payload[WM_DND_PAYLOAD_MAX];
+static int wm_dnd_payload_len = 0; // 0 = 当前没有可用载荷
+static int wm_dnd_at = 0;          // 编码写入位置（含 4 字节头）
+static WCHAR wm_dnd_wbuf[8192];    // DragQueryFileW 的落地缓冲（长路径友好）
+static int wm_ole_ready = -1;      // -1 未试 / 0 不可用 / 1 可用
+
+/* OLE 惰性初始化（拖放要求 OLE 子系统起来）。已经跑过 CoInitializeEx(STA)
+ * 的线程（任务栏/WIC 那条路）再 OleInitialize 会得到 S_FALSE 或
+ * RPC_E_CHANGED_MODE，两者都当「已经起来了」。探测一次就不再重试。 */
+static int wm_dnd_ole_init(void) {
+  if (wm_ole_ready >= 0) {
+    return wm_ole_ready;
+  }
+  HRESULT hr = OleInitialize(NULL);
+  wm_ole_ready =
+      (hr == S_OK || hr == S_FALSE || hr == RPC_E_CHANGED_MODE) ? 1 : 0;
+  return wm_ole_ready;
+}
+
+static void wm_dnd_push(int slot, int kind, int x, int y) {
+  if (wm_dnd_count >= WM_DND_EV_MAX) {
+    wm_dnd_head = (wm_dnd_head + 1) % WM_DND_EV_MAX;
+    wm_dnd_count--;
+  }
+  int i = (wm_dnd_head + wm_dnd_count) % WM_DND_EV_MAX;
+  wm_dnd_evs[i].slot = slot;
+  wm_dnd_evs[i].kind = kind;
+  wm_dnd_evs[i].x = x;
+  wm_dnd_evs[i].y = y;
+  wm_dnd_count++;
+}
+
+/* 编码：先落 4 字节种类头，再逐段追加 UTF-8 正文（写不下给 0，调用方整条
+ * 放弃，不给半截载荷）。 */
+static void wm_dnd_put_kind(int id) {
+  wm_dnd_payload[0] = (unsigned char)(id & 255);
+  wm_dnd_payload[1] = (unsigned char)((id >> 8) & 255);
+  wm_dnd_payload[2] = (unsigned char)((id >> 16) & 255);
+  wm_dnd_payload[3] = (unsigned char)((id >> 24) & 255);
+  wm_dnd_at = 4;
+}
+
+static int wm_dnd_put_utf8(const WCHAR *w, int cch) {
+  if (cch < 0) {
+    cch = lstrlenW(w);
+  }
+  int need = WideCharToMultiByte(CP_UTF8, 0, w, cch, NULL, 0, NULL, NULL);
+  if (need <= 0 || wm_dnd_at + need > WM_DND_PAYLOAD_MAX) {
+    return 0;
+  }
+  int got = WideCharToMultiByte(CP_UTF8, 0, w, cch,
+                                (char *)wm_dnd_payload + wm_dnd_at,
+                                WM_DND_PAYLOAD_MAX - wm_dnd_at, NULL, NULL);
+  if (got <= 0) {
+    return 0;
+  }
+  wm_dnd_at += got;
+  return 1;
+}
+
+static int wm_dnd_put_raw(const char *s, int n) {
+  if (wm_dnd_at + n > WM_DND_PAYLOAD_MAX) {
+    return 0;
+  }
+  memcpy(wm_dnd_payload + wm_dnd_at, s, (size_t)n);
+  wm_dnd_at += n;
+  return 1;
+}
+
+/* 向数据对象「就地」取一份 TYMED_HGLOBAL：调用方先给一块空的 GMEM_MOVEABLE，
+ * 被调方在同一句柄里重分配填好——省掉 IMalloc 释放这条腿，取回的内存归我们
+ * GlobalFree。认不出/取不到给 NULL。 */
+static HGLOBAL wm_dnd_fetch(IDataObject *dob, CLIPFORMAT cf) {
+  FORMATETC fe;
+  fe.cfFormat = cf;
+  fe.ptd = NULL;
+  fe.dwAspect = DVASPECT_CONTENT;
+  fe.lindex = -1;
+  fe.tymed = TYMED_HGLOBAL;
+  if (dob == NULL || FAILED(dob->lpVtbl->QueryGetData(dob, &fe))) {
+    return NULL;
+  }
+  HGLOBAL g = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, 1);
+  if (g == NULL) {
+    return NULL;
+  }
+  STGMEDIUM stg;
+  memset(&stg, 0, sizeof(stg));
+  stg.tymed = TYMED_HGLOBAL;
+  stg.hGlobal = g;
+  stg.pUnkForRelease = NULL;
+  HRESULT hr = dob->lpVtbl->GetDataHere(dob, &fe, &stg);
+  if (FAILED(hr)) {
+    GlobalFree(g);
+    return NULL;
+  }
+  // GetDataHere 可能换掉句柄，以取回的那块为准
+  HGLOBAL out = stg.hGlobal;
+  if (out == NULL || GlobalSize(out) == 0) {
+    if (out != NULL) {
+      GlobalFree(out);
+    }
+    return NULL;
+  }
+  return out;
+}
+
+/* 把数据对象编码进 wm_dnd_payload，返回是否认出了格式（0 = 本趟拖的东西我们
+ * 不认识，效果直接给 DROPEFFECT_NONE）。 */
+static int wm_dnd_extract(IDataObject *dob) {
+  wm_dnd_payload_len = 0;
+  if (dob == NULL) {
+    return 0;
+  }
+  // ① CF_HDROP：资源管理器拖文件/文件夹（最常用的一条）
+  HGLOBAL hg = wm_dnd_fetch(dob, (CLIPFORMAT)CF_HDROP);
+  if (hg != NULL) {
+    HDROP h = (HDROP)GlobalLock(hg);
+    UINT n = h != NULL ? DragQueryFileW(h, 0xFFFFFFFF, NULL, 0) : 0;
+    int ok = n > 0 ? 1 : 0;
+    wm_dnd_put_kind(WM_DND_KIND_PATHS);
+    for (UINT i = 0; i < n && ok; i++) {
+      UINT cch = DragQueryFileW(h, i, wm_dnd_wbuf, 8192);
+      if (cch == 0 || cch >= 8192) {
+        ok = 0;
+        break;
+      }
+      if (i > 0 && !wm_dnd_put_raw("\n", 1)) {
+        ok = 0;
+        break;
+      }
+      if (!wm_dnd_put_utf8(wm_dnd_wbuf, (int)cch)) {
+        ok = 0;
+        break;
+      }
+    }
+    if (h != NULL) {
+      GlobalUnlock(hg);
+    }
+    GlobalFree(hg);
+    if (ok) {
+      wm_dnd_payload_len = wm_dnd_at;
+      return 1;
+    }
+    return 0;
+  }
+  // ② CF_UNICODETEXT：纯文本（编辑器、浏览器、文件名拖拽的兜底档）
+  hg = wm_dnd_fetch(dob, (CLIPFORMAT)CF_UNICODETEXT);
+  if (hg != NULL) {
+    WCHAR *t = (WCHAR *)GlobalLock(hg);
+    int ok = t != NULL ? 1 : 0;
+    wm_dnd_put_kind(WM_DND_KIND_TEXT);
+    if (ok && !wm_dnd_put_utf8(t, -1)) {
+      ok = 0;
+    }
+    if (t != NULL) {
+      GlobalUnlock(hg);
+    }
+    GlobalFree(hg);
+    if (ok) {
+      wm_dnd_payload_len = wm_dnd_at;
+      return 1;
+    }
+  }
+  return 0;
+}
+
+/* 屏幕坐标 → 本窗客户区坐标（与指针事件同一套坐标，控件矩形直接可用）。 */
+static void wm_dnd_local(WmDropTarget *t, POINTL pt, int *out_x, int *out_y) {
+  POINT p;
+  p.x = pt.x;
+  p.y = pt.y;
+  *out_x = 0;
+  *out_y = 0;
+  if (t->hwnd != NULL && ScreenToClient(t->hwnd, &p)) {
+    *out_x = p.x;
+    *out_y = p.y;
+  }
+}
+
+static HRESULT STDMETHODCALLTYPE wm_dt_QueryInterface(IDropTarget *This,
+                                                     REFIID riid, void **ppv) {
+  if (ppv == NULL) {
+    return E_POINTER;
+  }
+  if (riid != NULL && (IsEqualIID(riid, &IID_IUnknown) ||
+                       IsEqualIID(riid, &IID_IDropTarget))) {
+    *ppv = (void *)This;
+    return S_OK;
+  }
+  *ppv = NULL;
+  return E_NOINTERFACE;
+}
+
+/* 生命周期由槽表管（进程级静态对象），引用计数只是个 1——OLE 那边的 AddRef/
+ * Release 不构成所有权，RevokeDragDrop 才是拆解点。 */
+static ULONG STDMETHODCALLTYPE wm_dt_AddRef(IDropTarget *This) {
+  (void)This;
+  return 1;
+}
+
+static ULONG STDMETHODCALLTYPE wm_dt_Release(IDropTarget *This) {
+  (void)This;
+  return 0;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_dt_DragEnter(IDropTarget *This,
+                                                 IDataObject *dob,
+                                                 DWORD grfKeyState, POINTL pt,
+                                                 DWORD *pdwEffect) {
+  (void)grfKeyState;
+  WmDropTarget *t = (WmDropTarget *)This;
+  int x = 0;
+  int y = 0;
+  wm_dnd_local(t, pt, &x, &y);
+  int recognized = wm_dnd_extract(dob);
+  DWORD promised = recognized ? (DWORD)DROPEFFECT_COPY : (DWORD)DROPEFFECT_NONE;
+  t->effect = (int)promised; // 首拍 MoonBit 还没答，先用承诺值顶着
+  if (pdwEffect != NULL) {
+    *pdwEffect = promised;
+  }
+  wm_dnd_push(t->slot, WM_DND_ENTER, x, y);
+  return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_dt_DragOver(IDropTarget *This,
+                                                DWORD grfKeyState, POINTL pt,
+                                                DWORD *pdwEffect) {
+  (void)grfKeyState;
+  WmDropTarget *t = (WmDropTarget *)This;
+  int x = 0;
+  int y = 0;
+  wm_dnd_local(t, pt, &x, &y);
+  if (pdwEffect != NULL) {
+    *pdwEffect = (DWORD)t->effect; // 读 MoonBit 上一拍写回的判断
+  }
+  wm_dnd_push(t->slot, WM_DND_OVER, x, y);
+  return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_dt_DragLeave(IDropTarget *This) {
+  WmDropTarget *t = (WmDropTarget *)This;
+  t->effect = (int)DROPEFFECT_NONE;
+  wm_dnd_payload_len = 0;
+  wm_dnd_push(t->slot, WM_DND_LEAVE, 0, 0);
+  return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_dt_Drop(IDropTarget *This, IDataObject *dob,
+                                            DWORD grfKeyState, POINTL pt,
+                                            DWORD *pdwEffect) {
+  (void)grfKeyState;
+  WmDropTarget *t = (WmDropTarget *)This;
+  int x = 0;
+  int y = 0;
+  wm_dnd_local(t, pt, &x, &y);
+  // Drop 时再取一次：数据对象在返回后即失效，这里不取就没机会了
+  int recognized = wm_dnd_extract(dob);
+  DWORD eff = recognized ? (DWORD)t->effect : (DWORD)DROPEFFECT_NONE;
+  if (pdwEffect != NULL) {
+    *pdwEffect = eff;
+  }
+  t->effect = (int)DROPEFFECT_NONE;
+  wm_dnd_push(t->slot, WM_DND_DROP, x, y);
+  return S_OK;
+}
+
+static IDropTargetVtbl wm_droptarget_vtbl = {
+    wm_dt_QueryInterface, wm_dt_AddRef,   wm_dt_Release,
+    wm_dt_DragEnter,      wm_dt_DragOver, wm_dt_DragLeave,
+    wm_dt_Drop,
+};
+
+/* 拖入后端是否可用（OLE 起得来 + 这一档实现了它）。 */
+int wm_dragdnd_supported(void) { return wm_dnd_ole_init(); }
+
+/* 给窗口挂上投放目标（建窗后调；重复调幂等）。返回 1 = 挂上了。 */
+int wm_dragdnd_enable(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  WmWindow *w = &wm_windows[(int)id];
+  if (w->hwnd == NULL) {
+    return 0;
+  }
+  WmDropTarget *t = &wm_dnd[(int)id];
+  if (t->registered) {
+    return 1;
+  }
+  if (!wm_dnd_ole_init()) {
+    return 0;
+  }
+  t->iface.lpVtbl = &wm_droptarget_vtbl;
+  t->hwnd = w->hwnd;
+  t->slot = (int)id;
+  t->effect = (int)DROPEFFECT_NONE;
+  if (FAILED(RegisterDragDrop(w->hwnd, &t->iface))) {
+    return 0;
+  }
+  t->registered = 1;
+  return 1;
+}
+
+/* 撤销挂接（拆窗前调；未挂/越界静默）。 */
+void wm_dragdnd_disable(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmDropTarget *t = &wm_dnd[(int)id];
+  if (!t->registered) {
+    return;
+  }
+  RevokeDragDrop(t->hwnd);
+  t->registered = 0;
+  t->hwnd = NULL;
+  t->slot = 0;
+  t->effect = (int)DROPEFFECT_NONE;
+}
+
+/* 取一个待处理拖入事件：out 收窗口槽号 / 种类（0 进入 1 移动 2 离开 3 投递）/
+ * 客户区坐标，返回 1 = 取到、0 = 队列空。宿主每拍调。 */
+int wm_dragdnd_poll(int32_t *out_slot, int32_t *out_kind, int32_t *out_x,
+                    int32_t *out_y) {
+  if (wm_dnd_count <= 0 || out_slot == NULL || out_kind == NULL ||
+      out_x == NULL || out_y == NULL) {
+    return 0;
+  }
+  WmDndEv *ev = &wm_dnd_evs[wm_dnd_head];
+  *out_slot = ev->slot;
+  *out_kind = ev->kind;
+  *out_x = ev->x;
+  *out_y = ev->y;
+  wm_dnd_head = (wm_dnd_head + 1) % WM_DND_EV_MAX;
+  wm_dnd_count--;
+  return 1;
+}
+
+/* 把最近一次「进入/投递」编码好的载荷读进 out（线形状，不是 C 串，别补
+ * '\0'），返回字节数；0 = 当前没有可用载荷。cap 不足则截断。 */
+int wm_dragdnd_payload(char *out, int cap) {
+  if (out == NULL || cap <= 0 || wm_dnd_payload_len <= 0) {
+    return 0;
+  }
+  int n = wm_dnd_payload_len < cap ? wm_dnd_payload_len : cap;
+  memcpy(out, wm_dnd_payload, (size_t)n);
+  return n;
+}
+
+/* MoonBit 每拍写回本窗当前应有的效果（0 none/1 copy/2 move/4 link，与
+ * DROPEFFECT_* 同值）；下一次 DragOver/Drop 就按它答 OLE。越界/未挂静默。 */
+void wm_dragdnd_set_effect(int64_t id, int effect) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  wm_dnd[(int)id].effect = effect;
+}
+
+/* 读回当前效果（探针/调试用；未挂给 -1）。 */
+int wm_dragdnd_effect(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS || !wm_dnd[(int)id].registered) {
+    return -1;
+  }
+  return wm_dnd[(int)id].effect;
+}
+
+/* 在用投放目标数（探针读回）。 */
+int wm_dragdnd_count(void) {
+  int n = 0;
+  for (int i = 1; i < WM_MAX_WINDOWS; i++) {
+    if (wm_dnd[i].registered) {
+      n++;
+    }
+  }
+  return n;
 }
 
 /* ---- 任务栏进度（§6.3 接缝项：任务栏进度 / dock 徽标）-----------------------
@@ -3833,6 +4261,39 @@ int wm_window_title(int64_t id, char *out, int cap) {
   return 0;
 }
 
+/* ---- 外部拖入（W23a）GTK 分支占位：Linux 侧的跨进程拖入要挂
+ * gtk_drag_dest_set + 三个处理器，随平台批落。失败桩口径与托盘一致：
+ * supported 恒 0 ⇒ 门面给「本平台没有外部拖入后端」的结构化报错，
+ * 绝不静默半可用。 */
+int wm_dragdnd_supported(void) { return 0; }
+int wm_dragdnd_enable(int64_t id) {
+  (void)id;
+  return 0;
+}
+void wm_dragdnd_disable(int64_t id) { (void)id; }
+int wm_dragdnd_poll(int32_t *out_slot, int32_t *out_kind, int32_t *out_x,
+                    int32_t *out_y) {
+  (void)out_slot;
+  (void)out_kind;
+  (void)out_x;
+  (void)out_y;
+  return 0;
+}
+int wm_dragdnd_payload(char *out, int cap) {
+  (void)out;
+  (void)cap;
+  return 0;
+}
+void wm_dragdnd_set_effect(int64_t id, int effect) {
+  (void)id;
+  (void)effect;
+}
+int wm_dragdnd_effect(int64_t id) {
+  (void)id;
+  return -1;
+}
+int wm_dragdnd_count(void) { return 0; }
+
 /* ---- 系统托盘（W20c）GTK 分支占位：Linux 的托盘走纯 MoonBit 的 SNI 协议栈
  * （yue/dbus/sni.mbt，会话总线直连面板），不经 GTK 的 GtkStatusIcon（GTK3 里
  * 已弃用且面板不认）。这里给可编译的失败桩：supported 恒 0、建项恒 0，让
@@ -4580,6 +5041,38 @@ int wm_window_title(int64_t id, char *out, int cap) {
   }
   return 0;
 }
+
+/* W23a 外部拖入占位（macOS 等）：supported 恒 0、挂接恒 0 = 不可用，MoonBit
+ * 层走结构化报错（macOS 原生档是 NSView 的 registerDraggedTypes +
+ * prepareForNewContents，ObjC++ 单独 TU，将来随 mac 平台批补）。 */
+int wm_dragdnd_supported(void) { return 0; }
+int wm_dragdnd_enable(int64_t id) {
+  (void)id;
+  return 0;
+}
+void wm_dragdnd_disable(int64_t id) { (void)id; }
+int wm_dragdnd_poll(int32_t *out_slot, int32_t *out_kind, int32_t *out_x,
+                    int32_t *out_y) {
+  (void)out_slot;
+  (void)out_kind;
+  (void)out_x;
+  (void)out_y;
+  return 0;
+}
+int wm_dragdnd_payload(char *out, int cap) {
+  (void)out;
+  (void)cap;
+  return 0;
+}
+void wm_dragdnd_set_effect(int64_t id, int effect) {
+  (void)id;
+  (void)effect;
+}
+int wm_dragdnd_effect(int64_t id) {
+  (void)id;
+  return -1;
+}
+int wm_dragdnd_count(void) { return 0; }
 
 /* W20c 托盘占位（macOS 等）：supported 恒 0、建项恒 0 = 不可用，MoonBit 层
  * 走语义化降级（macOS 原生档是 NSStatusItem，ObjectC++ 单独 TU，将来随 mac

@@ -2244,6 +2244,26 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **验证方式**:`moon check --deny-warn`(examples)零警告、`moon build showcase --target native` 链接通过。库侧本批零改动,其托盘语义用 `experiment/tray_probe/tray_backend_probe.c`(纯 C,直接 `#include stub.c`)在本机重跑坐实:左键/右键回调消息入队与 `wm_tray_poll` 逐条抽出、`kind` 0/1 正确、非点击消息不入队、`wm_menu_popup_new` 的弹出根是真 HMENU 且挂上后 `wm_menu_add_item` 拿到命令 id、无菜单/非法槽的 `wm_tray_popup` 立刻返回 0 不阻塞、移除幂等——末行 `TRAY-BACKEND-OK`。探针编法同 window_probe 并补了 `build.bat`;整份 stub.c 编进来会带上剪贴板空壳引用的 `moonbit_make_bytes`,探针里用 malloc 兜底(头注释已记)。真机复验归 `_人工测试清单.md` S25:进「系统集成」页 → 左键计数递增并冒提示 → 点「挂菜单」→ 右键弹出三项 → 点项走 `dispatch_menu_command` 回回调。
 - **可加固点(另批)**:「宿主每拍抽一次」这条契约现在全靠调用方自觉,已连带踩中 3 处(图表推点 / 快捷键 / 托盘);把 `dispatch_menu_command` + `dispatch_tray_event` + `hotkey_poll` 统一收进宿主每拍(`App::step`)才是终结这条坑的做法,消费式队列允许多个抽取者并存(native-app 的显式调用不会与之抢事件)。
 
+## Windows 系统级拖入:OLE 回调住在消息派发里,效果要靠「两段式」回写(2026-10-15,用户提需求)
+
+- **环境**:Windows 10 19044 开发机,MSVC `/W4`,纯 C 探针直接 `#include ../../gui/win/stub.c`(不链 moon 运行时)。
+- **现象/动机**:用户提「拖放应该还有与外部的交互,拖入、拖出,内部也应该能支持多次拖放吧」。W21c 只落了应用内拖放,系统级(从资源管理器拖文件进窗口)当时明确记为「随平台批」。内部多次拖放经核实是**既有能力**(`route_pointer` 抬起即释放捕获,会话在 `drag_drop`/`drag_cancel` 里复位,不是一次性对象),本批补回归钉住;系统级**拖入**在本批落地,**拖出**(`DoDragDrop` + `IDropSource` + `IDataObject`)另批。
+- **根因/设计口径**(为什么长这样):
+  - OLE 的 `IDropTarget` 回调打在**本线程的消息派发**里,与托盘/菜单/热键同一条约束(规则 3:不做 C→MoonBit 回调)⇒ C 侧把 `DragEnter`/`DragOver`/`DragLeave`/`Drop` 压进进程级环形队列(64 槽),宿主每拍 `wm_dragdnd_poll` 抽。载荷不进队列,单独放一块 64KB 缓冲,`wm_dragdnd_payload` 按「进入/投递」时读回的最近一份取。
+  - **效果两段式**:`DragEnter` 时 MoonBit 还没机会判「这个落点收不收」(回调必须立刻给 `pdweffect`),所以 C 侧按「这份格式认不认得」先给承诺值(CF_HDROP/CF_UNICODETEXT 给 COPY,认不出给 NONE);之后每次 `DragOver`/`Drop` 读 MoonBit 上一拍 `wm_dragdnd_set_effect` 写回的 per-window 标志。于是应用侧的 `accept` 判断能反映到系统光标,而回调侧不需要同步问 MoonBit。
+  - **`accept` 必须另开一条钩子**:`on_drop` 一调就是真投递(有副作用),悬停期问「收不收」不能复用它 ⇒ `Widget::drag_accept` + `drag_wants`(没装钩子时按「收」),`@ui.drop_target(accept=)` 同时挂 `on_drop` 与 `drag_accept` 两处。
+  - **会话复用,不另建一套**:`core/drag.mbt` 的进程级单例 `drag_current` 是 App 内拖放已有的,外部事件按 ENTER→`drag_begin(data,0,x,y)`、OVER→`drag_move`、LEAVE→`drag_cancel`、DROP→`drag_drop` 喂进同一条,落点命中(`drop_target_at`)与高亮(`drag_hover`)全部复用;落点树按**事件所属窗**找(`drag_window_root_of` 遍历 `host_windows()` 比 `a.window.id`),`drag_root()` 在外部会话期间优先返回那张树。
+  - **双向不劫持**:`drag_ext_window` 记当前外部会话归属哪扇窗,LEAVE/DROP 只处理同窗事件;App 内已有内部会话在跑时,外部 ENTER 直接忽略(不抢正在拖的那次)。
+- **载荷线形状**:CF_HDROP **优先**(资源管理器拖文件给的就是它),`DragQueryFileW` 逐条宽字符、`\n` 连接 → `Paths`(kind 4);没有 HDROP 才取 CF_UNICODETEXT → `Text`(kind 1);两者都认不出 → 载荷空串、效果 NONE。文本一律 `WideCharToMultiByte(CP_UTF8)`,编成 `[kind:i32 LE][payload]`,与 `drag_encode` 同制,MoonBit 侧 `drag_decode` 直接吃。坐标 `ScreenToClient` 换成客户区像素(整栈物理像素口径)。
+- **坑(C 侧,逐条实测)**:
+  1. `IDataObjectVtbl::QueryGetData` **只有一个 `FORMATETC *` 参数**——按 `GetData` 的形状多写一位 `NULL` 直接 C2197「参数太多」(SDK `objidl.h` 实证)。
+  2. C 模式下 `GetCanonicalFormatEtc` 的第二参是 `FORMATETC *`,不是 C++ 别名 `DFORMATETC`(后者在 `#ifdef __cplusplus` 里),写了编译不过(C2143/C2081)。
+  3. `DROPFILES` 定义在 `um/ShlObj_core.h`,**不在 `shellapi.h`**——`#include <shlobj.h>` 才拿得到;`pFiles = sizeof(DROPFILES)` + `fWide = TRUE` + 双空结尾宽字符表,`DragQueryFileW` 才认。
+  4. COM 接口用 C 的「首成员放 iface + 静态 vtbl」实现;vtbl 定义**不能带 `const`**(`lpVtbl` 字段是非 const 指针,带 const 会 C2038 类赋值警告)。IID_*/CLSID_* 在 `uuid.lib`,拖放函数在 `shell32.lib`,`OleInitialize` 在 `ole32.lib`——这三个前批(图标/托盘/任务栏)就已在 prebuild 的 Windows 链接行里,本批零改动。
+  5. OLE 起来与否要**探测一次并缓存**:`OleInitialize` 返回 `S_OK`/`S_FALSE` 与 `RPC_E_CHANGED_MODE`(有人先 `CoInitialize` 过)都算「已起来」;`dragdnd_supported()` 恒 false 时上层静默跳过挂接,应用内拖放不受影响。
+- **坑(探针侧)**:OLE 送进 `DragEnter`/`DragOver` 的坐标是**屏幕**坐标,想在客户区 (20,30) 那一点验落点,要用 `ClientToScreen` **反推**屏幕点;拿屏幕原点 (0,0) 加偏移会把窗口自身位置算进去,落点整体偏一个窗口距离(实测差 -48/-84),看着像库错、其实探针用法错。
+- **验证方式**:`experiment/drag_probe/dragdnd_probe.c` 末行 **`DRAGDND-OK`**(40 条:挂/撤/幂等/越界 id/在用计数/效果初值;HDROP→Paths(4) 且两条路径逐字符一致;`set_effect` 被下一次 `DragOver`/`Drop` 读回;投递后载荷复位;HDROP 优先于文本;纯文本→Text(1);认不出的格式给 NONE 且载荷空;`DragLeave` 清载荷并入队 LEAVE;`disable` 后计数 0、效果 -1)。`core/drag_wbtest.mbt` 新增 1 条(喂事件驱动会话、COPY/NONE 按落点 `drag_wants` 答、`data=None` 不动现有会话、DROP 投递并复位、LEAVE 取消不投递、跨窗不抢、内部会话不被劫持);`ui/drag_wbtest.mbt` 新增 2 条(同一拖源连拖两次都成立且载荷每次现取、`accept` 同时挂成悬停查询)。`moon test core ui win` **351/351**、库全包 **937/938**(1 条红是 `si_machine` 读注册表 `SystemManufacturer` 失败,本机环境基线,与本批无关)、`cd gui && moon check --deny-warn` 与 examples 模块零警告、`moon build showcase --target native` 链接通过、本机起窗冒烟后正常终止。跨进程真拖(资源管理器 → 窗口)只能人来,归 `_人工测试清单.md` S26。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。

@@ -1,4 +1,4 @@
-// 窗口页：窗口 API × 全局快捷键 × 应用内拖放。
+// 窗口页：窗口 API × 全局快捷键 × 拖放（应用内 + 系统级拖入）。
 //
 // G7 迁移记档（与 master 旧页的三条差）：
 // ① 窗口段少了「最大化/还原」「置顶切换」两个按钮——本栈 Win32 段没写
@@ -9,10 +9,12 @@
 // ② 快捷键从 `@yue.register_global_shortcut` 切到 `@core.hotkey_*` 门面（W22）：
 //    注册收 `Result`，命中经 `hotkey_poll` 抽（id→加速串回查表在门面里，页内
 //    不自己持表——只记注册时返回的句柄用于注销）；轮询表挂宿主 200ms 一拍；
-// ③ 拖放从「跨应用系统级」（旧链路 register_dragged_types + enter/update/drop
-//    三回调）缩为「应用内」——core/drag.mbt 的口径：系统级（Win32 IDropTarget/
-//    DoDragDrop）接口形状已定、随平台批，接上后调用方不用改。本页演示已落地的
-//    那半：`drag_source`/`drop_target` 两个声明式钩子。
+// ③ 拖放：旧链路的「跨应用系统级」（register_dragged_types + enter/update/drop
+//    三回调）在本栈拆成两段——应用内那条三平台同构，系统级拖入 Windows 已接
+//    （W23a，`core/drag.mbt` 的 `drag_external_*`；旧三回调收成 `on_drop` 一个 +
+//    悬停期一次 `accept` 查询）。拖出到外部（DoDragDrop）与 Linux/mac 仍随平台批。
+//    本页两段都演示：`drag_source`/`drop_target` 两个声明式钩子 + 从资源管理器
+//    拖文件进「只收文件」那块。
 
 ///|
 /// 热键错误 → 可读串（门面的两档：没后端 / 有backend但这次没成）。
@@ -82,6 +84,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
   let hk_hits : @core.Store[Int] = @core.Store::new(0)
   // 拖放回显
   let dnd : @core.Store[String] = @core.Store::new("（还没投过）")
+  let ext : @core.Store[String] = @core.Store::new("（外部还没投过）")
   @shared.page([
     @shared.section(
       "窗口",
@@ -190,8 +193,8 @@ pub fn page_window(app : @shared.App) -> @core.Node {
     ),
     @shared.section(
       "拖放",
-      "应用内拖放",
-      "按住左边色块拖出 4px 即开拖，拖到右边面板上会描主色边，松手成交。本栈口径：**应用内**拖放三平台同构；**跨应用**系统级拖放（Win32 IDropTarget/DoDragDrop）接口形状已定、随平台批，接上后调用方不用改。",
+      "应用内拖放 + 系统级拖入",
+      "按住左边色块拖出 4px 即开拖，拖到右边面板上会描主色边，松手成交——这条三平台同构，同一棵树上能连着拖多少次都行。系统级**拖入**（从资源管理器拖文件、从编辑器拖文本进窗口）Windows 已接：外部事件每拍喂进同一条会话，落点命中、悬停描边、`accept` 判据全部复用，不收的落点系统光标直接显示禁止。拖出到外部与 Linux/mac 档随平台批。",
       [
         @ui.row(
           [
@@ -219,7 +222,11 @@ pub fn page_window(app : @shared.App) -> @core.Node {
               on_drop=fn(d : @core.DragData, _x : Double, _y : Double) -> Unit {
                 match d {
                   @core.DragData::Text(t) => dnd.set("收到文本：\{t}")
-                  _ => dnd.set("收到了非文本载荷")
+                  @core.DragData::Paths(ps) => {
+                    let joined = ps.join(" ; ")
+                    dnd.set("应用内投进 \{ps.length()} 个路径：\{joined}")
+                  }
+                  _ => dnd.set("收到了别的载荷")
                 }
               },
             ),
@@ -229,8 +236,46 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         ),
         @ui.row(
           [
+            @ui.drop_target(
+              @ui.view(
+                [@ui.text("只收文件（从资源管理器拖进来）", role=@ui.Secondary)],
+                background_color="bg_panel",
+                border_color="border",
+                width=220.0,
+                height=64.0,
+                padding=8.0,
+              ),
+              accept=fn(d : @core.DragData) -> Bool {
+                d.kind() == @core.FilePaths
+              },
+              on_drop=fn(d : @core.DragData, _x : Double, _y : Double) -> Unit {
+                match d {
+                  @core.DragData::Paths(ps) => {
+                    let joined = ps.join(" ; ")
+                    ext.set("外部投进 \{ps.length()} 个：\{joined}")
+                  }
+                  _ => ext.set("不该投到这里")
+                }
+              },
+            ),
+            @ui.text(
+              if @core.drag_external_supported() {
+                "系统级拖入：本机可用（试试从资源管理器拖文件）"
+              } else {
+                "系统级拖入：本机后端未接（拖放仍限应用内）"
+              },
+              role=@ui.Secondary,
+            ),
+          ],
+          column_gap=12.0,
+          align_items=@yoga.AlignItems::Center,
+        ),
+        @ui.row(
+          [
             @ui.text("投放回显：", role=@ui.Secondary),
             @ui.bind_label(dnd, fn(s) { s }),
+            @ui.text("外部回显：", role=@ui.Secondary),
+            @ui.bind_label(ext, fn(s) { s }),
           ],
           column_gap=6.0,
         ),
@@ -244,13 +289,17 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         "// 投放目标：悬停描主色边（读 drag_hover 自判，无 enter/leave 三回调）",
         "@ui.drop_target(",
         "  panel,",
+        "  accept=fn(d) { d.kind() == @core.FilePaths }, // 不收时系统光标显示禁止",
         "  on_drop=fn(d, _x, _y) {",
         "    match d {",
-        "      @core.DragData::Text(t) => ...",
+        "      @core.DragData::Paths(ps) => ...",
         "      _ => ...",
         "    }",
         "  },",
         ")",
+        "// 系统级拖入（Windows）：建窗自动挂投放目标，宿主每拍抽事件喂进同一条",
+        "// 会话；运行时探测决定这台机器能不能用（非 Windows 给 false）",
+        "if @core.drag_external_supported() { ... }",
       ],
     ),
   ])

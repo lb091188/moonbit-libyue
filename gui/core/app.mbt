@@ -166,6 +166,11 @@ fn app_window(
       window.show()
       window.request_focus()
       install_host_hooks()
+      // 建窗即挂系统投放目标（W23a）：后端不可用（非 Windows / OLE 起不来）时
+      // 这一步静默失败，应用内拖放照常
+      if @win.dragdnd_supported() {
+        let _ = @win.dragdnd_enable(window.id)
+      }
       Some(app)
     }
   }
@@ -803,7 +808,8 @@ pub fn App::paint_frame(self : App) -> Unit {
   prof_record(t1 - t0, t2 - t1, t3 - t2, t3 - t0)}
 
 ///|
-/// 走一圈：等事件 → 跑到期任务 → **逐窗**排空事件 → 逐窗喂输入法 → 脏窗上屏。
+/// 走一圈：等事件 → 跑到期任务 → **逐窗**排空事件 → 抽外部拖入 → 逐窗喂输入法 →
+/// 脏窗上屏。
 /// 返回是否继续（false = 已退出）。一扇窗被关（用户点关闭、或内容里调
 /// `App::close_window`）只摘掉它自己，主窗或最后一扇被关才整体退出。
 pub fn App::step(self : App) -> Bool {
@@ -822,6 +828,9 @@ pub fn App::step(self : App) -> Bool {
   for a in host_windows() {
     a.drain_events()
   }
+  // 外部拖入（W23a）：OLE 的 `IDropTarget` 回调打在消息派发里，这里每拍抽干队列
+  // 喂进与 App 内拖放同一条会话——落点命中、`accept` 判据、松手投递全部复用。
+  let _ = drag_external_pump()
   // 事件批尾冲刷 next_tick（§3 第 3 项:回调尾同步 flush,反馈不晚一帧），
   // 排在绘制之前——这批回调改的 Store 仍在本帧生效。
   tick_flush()
