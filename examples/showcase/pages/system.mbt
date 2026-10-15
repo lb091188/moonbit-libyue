@@ -554,36 +554,16 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       ],
     ),
     @shared.section(
-      "系统信息",
-      "系统信息",
-      "发行版 / 机器 / 内存 / 开机时长 + 桌面环境。替代旧页「电量网络」——电源与网络事件本栈未接（平台批）。",
+      "信息音量",
+      "系统信息与音量",
+      "信息：发行版 / 机器 / 内存 / 开机时长 + 桌面环境（替代旧页「电量网络」——电源与网络事件本栈未接，随平台批）。音量：读当前音量/静音、设百分比、切静音（Linux pactl / Windows CoreAudio），后端不可用时按钮明说。",
       [
         @ui.row(
           [
-            @ui.button("刷新", on_click=fn() {
+            @ui.button("刷新系统信息", on_click=fn() {
               si_out.set(read_sysinfo())
             }),
-          ],
-          column_gap=8.0,
-        ),
-        @ui.bind_label(si_out, fn(s) { s }),
-      ],
-      code=[
-        "match @sys.si_os() {",
-        "  Ok(o) => println(\"\\{o.pretty_name} \\{o.version_id}\")",
-        "  Err(_) => ...",
-        "}",
-        "// 同族：si_machine / si_memory / si_uptime / desktop_name",
-      ],
-    ),
-    @shared.section(
-      "音量",
-      "系统音量",
-      "读当前音量/静音、设百分比、切静音（Linux pactl / Windows CoreAudio）。后端不可用（无会话等）时按钮明说。",
-      [
-        @ui.row(
-          [
-            @ui.button("读取", on_click=fn() {
+            @ui.button("读音量", on_click=fn() {
               match @sys.vol_get() {
                 Ok(v) => vol_out.set("音量 \{v.volume}% 静音=\{v.muted}（\{v.sink}）")
                 Err(e) => vol_out.set("读取失败：\{e}")
@@ -608,9 +588,15 @@ pub fn page_system(app : @shared.App) -> @core.Node {
           ],
           column_gap=8.0,
         ),
+        @ui.bind_label(si_out, fn(s) { s }),
         @ui.bind_label(vol_out, fn(s) { s }),
       ],
       code=[
+        "match @sys.si_os() {",
+        "  Ok(o) => println(\"\\{o.pretty_name} \\{o.version_id}\")",
+        "  Err(_) => ...",
+        "}",
+        "// 同族：si_machine / si_memory / si_uptime / desktop_name",
         "match @sys.vol_get() {",
         "  Ok(v) => println(\"\\{v.volume}% muted=\\{v.muted}\")",
         "  Err(e) => ...",

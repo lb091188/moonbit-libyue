@@ -13,9 +13,9 @@ pub fn page_store_demo(_app : @shared.App) -> @core.Node {
   counter.subscribe(fn(n) { merged.set("计数 \{n},双倍 \{n * 2}") })
   @shared.page([
     @shared.section(
-      "计数器",
-      "手动计数器",
-      "Store::update 改源，bind_label 回显——「改值」与「刷新界面」已自动，但派生值全要手动接。",
+      "手动派生",
+      "手动计数器与三种派生接法",
+      "「改值」与「刷新界面」Store 已自动（update 改源、bind_label 回显），但派生值全要手动接，三种接法各有代价：①动作回调里顺手 set——改 A 必须记得改 B；②`Store::map`——一对一映射有现成糖；③跨 Store subscribe 同步——链一长就是胶水瀑布。",
       [
         @ui.row(
           [
@@ -25,48 +25,24 @@ pub fn page_store_demo(_app : @shared.App) -> @core.Node {
               //   doubled.set(counter.get() * 2)——信号版无此负担
             }),
             @ui.bind_label(counter, fn(n) { "计数：\{n}" }),
+            @ui.bind_label(doubled, fn(n) { "双倍（动作里 set + subscribe 接线）：\{n}" }),
           ],
           column_gap=12.0,
         ),
+        @ui.bind_label(text, fn(s) { s }),
+        @ui.bind_label(merged, fn(s) { s }),
       ],
-      code=[
-        "let counter = @core.Store::new(0)",
-        "@ui.button(\"计数 +1\", variant=@ui.Solid, on_click=fn() {",
-        "  counter.update(fn(n) { n + 1 })",
-        "})",
-        "@ui.bind_label(counter, fn(n) { \"计数：\\{n}\" })",
-      ],
-    ),
-    @shared.section(
-      "手动接线",
-      "手动派生：subscribe",
-      "counter.subscribe(fn(n) { doubled.set(n * 2) })——派生关系散落在动作代码各处，链一长就是胶水瀑布。",
-      [@ui.bind_label(doubled, fn(n) { "双倍（手动接线）：\{n}" })],
       code=[
         "let counter = @core.Store::new(0)",
         "let doubled = @core.Store::new(0)",
-        "counter.subscribe(fn(n) { doubled.set(n * 2) })",
-        "@ui.bind_label(doubled, fn(n) { \"双倍：\\{n}\" })",
-      ],
-    ),
-    @shared.section(
-      "map派生",
-      "手动派生：Store::map",
-      "一对一映射有现成糖（map 派生只读 Store），但两个以上源合成仍要 subscribe 手动同步。",
-      [
-        @ui.col(
-          [
-            @ui.bind_label(text, fn(s) { s }),
-            @ui.bind_label(merged, fn(s) { s }),
-          ],
-          row_gap=6.0,
-        ),
-      ],
-      code=[
-        "let text = counter.map(fn(n) { \"当前计数 \\{n}\" })",
-        "@ui.bind_label(text, fn(s) { s })",
+        "counter.subscribe(fn(n) { doubled.set(n * 2) })  // 派生关系散落在各处",
+        "@ui.button(\"计数 +1\", variant=@ui.Solid, on_click=fn() {",
+        "  counter.update(fn(n) { n + 1 })",
+        "})",
+        "let text = counter.map(fn(n) { \"当前计数 \\{n}\" })  // 一对一映射有现成糖",
         "let merged = @core.Store::new(\"\")",
-        "counter.subscribe(fn(n) { merged.set(\"计数 \\{n}\") })",
+        "counter.subscribe(fn(n) { merged.set(\"计数 \\{n},双倍 \\{n * 2}\") })",
+        "@ui.bind_label(counter, fn(n) { \"计数：\\{n}\" })",
       ],
     ),
     @shared.section(

@@ -20,6 +20,8 @@
 //     D-Bus 的排期通道与 200ms 泵都由宿主给。托盘菜单在系统集成页托盘段。
 //   - 待迁页：全部迁完（见 TODO.md；表单组件页 2026-10-12 已迁，事件与布局/
 //     窗口/系统集成/图标库/画布与富文本/浏览器六页 2026-10-13 已迁）。
+//   - 浏览器页 2026-10-15 拆出为独立示例 `examples/browser`（WebView 重控件
+//     不再随演示板起窗），showcase 侧栏与菜单栏同步摘除。
 
 ///|
 /// 窗口标题
@@ -66,7 +68,7 @@ fn theme_toggle_button(app : @shared.App) -> @core.Node {
 fn build_menu_bar(app : @shared.App) -> @core.MenuBar {
   let bar = @core.MenuBar::new()
   let nav = bar.add_menu("导航")
-  for name in ["基础组件", "表单组件", "数据展示", "系统集成", "浏览器"] {
+  for name in ["基础组件", "表单组件", "数据展示", "系统集成"] {
     let page = name
     let _ = nav.add_item(page).set_on_click(fn() { app.selected.set(page) })
   }
@@ -162,7 +164,7 @@ fn main {
               @ui.scroll_view(
                 [
                   @ui.menu_sections(
-                    [("组件", ["基础组件", "表单组件", "导航组件", "数据展示", "图表", "代码文档", "Store", "反馈组件", "事件与布局", "窗口", "系统集成", "图标库", "画布与富文本", "浏览器", "过渡与效果"])],
+                    [("组件", ["基础组件", "表单组件", "导航组件", "数据展示", "图表", "代码文档", "Store", "反馈组件", "事件与布局", "窗口", "系统集成", "图标库", "画布与富文本", "过渡与效果"])],
                     selected,
                     icons=[
                       ("基础组件", @icons.Appstore),
@@ -178,7 +180,6 @@ fn main {
                       ("系统集成", @icons.Cpu),
                       ("图标库", @icons.Layout),
                       ("画布与富文本", @icons.Brush),
-                      ("浏览器", @icons.Chrome),
                       ("过渡与效果", @icons.MagicStick),
                     ],
                     width=180.0,
@@ -214,7 +215,6 @@ fn main {
               @shared.nav_page("系统集成", selected, @pages.page_system(app)),
               @shared.nav_page("图标库", selected, @pages.page_icons(app)),
               @shared.nav_page("画布与富文本", selected, @pages.page_canvas(app)),
-              @shared.nav_page("浏览器", selected, @pages.page_browser(app)),
               @shared.nav_page("过渡与效果", selected, @pages.page_anim(app)),
               // 对话框挂窗口根：锚点自己是 0 尺寸占位，可见性只由 Store 驱动
               @ui.dialog(

@@ -79,8 +79,8 @@ pub fn page(secs : Array[Section]) -> @core.Node {
 ///|
 /// 主区导航页：挂载后订阅导航状态做 `set_visible` 切换（侧栏菜单 /
 /// segmented / 面包屑共享同一导航 Store）。页面内容**惰性挂载**：未选中过的
-/// 页只留空壳，首次选中才把 content 挂进占位——15 页全量挂载（浏览器页含
-/// WebKit 重控件）的启动开销不可行。
+/// 页只留空壳，首次选中才把 content 挂进占位——全量挂载的启动开销不可行
+/// （图标墙页要建 803 个图标控件，见 section_body 的同口径记档）。
 pub fn nav_page(
   name : String,
   selected : @core.Store[String],

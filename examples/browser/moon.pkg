@@ -1,0 +1,11 @@
+// 浏览器示例：WebView 全能力演示（原 showcase「浏览器」页独立成示例）。
+import {
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/ui",
+  "NoahLiu/native-gui/sys" @sys,
+  "NoahLiu/native-gui/web" @web,
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"

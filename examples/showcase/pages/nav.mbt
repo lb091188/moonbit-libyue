@@ -36,8 +36,8 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
     ),
     @shared.section(
       "菜单",
-      "右键菜单与下拉菜单",
-      "context_menu_for 包右键弹出主题化菜单（悬停高亮 + 点击）；dropdown 点字段顶部展开候选——两套用途不同：前者右键显隐，后者顶部展开。",
+      "右键菜单、下拉菜单与原生菜单栏",
+      "三套菜单形态各有用途：`context_menu_for` 包任意节点右键弹出主题化菜单（悬停高亮 + 点击显隐）；`dropdown` 点字段顶部展开候选；原生菜单栏（文件/编辑形态）已在 `examples/native-app` 接线演示（Win32 原生外观 + 状态行回证），此处示意其结构：MenuItem 支持快捷键 + 角色项 + 分隔线。",
       [
         @ui.row(
           [
@@ -59,6 +59,12 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
           ],
           column_gap=16.0,
         ),
+        @ui.descriptions([
+          ("快捷键", "item.set_accelerator(\"CmdOrCtrl+I\") 注册系统级加速键"),
+          ("角色项", "menu.add_role_item(role) 取平台原生文案"),
+          ("分隔线", "menu.add_separator() 插入不可点分隔线"),
+          ("挂载", "窗口由 main 经宿主菜单栏通道挂载（示例见 native-app 的菜单区块）"),
+        ]),
       ],
       code=[
         "@ui.context_menu_for(",
@@ -70,21 +76,7 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
         "  ],",
         ")",
         "@ui.dropdown(\"操作\", [\"打开\", \"保存\", \"-\", \"删除\"], on_select=fn(_i) { () })",
-      ],
-    ),
-    @shared.section(
-      "原生菜单栏",
-      "窗口菜单栏",
-      "窗口顶部原生菜单栏（文件/编辑/演示）已在 `examples/native-app` 接线演示（Win32 原生外观 + 状态行回证），此处示意结构：MenuItem 支持快捷键 + 角色项 + 分隔线。",
-      [
-        @ui.descriptions([
-          ("快捷键", "item.set_accelerator(\"CmdOrCtrl+I\") 注册系统级加速键"),
-          ("角色项", "menu.add_role_item(role) 取平台原生文案"),
-          ("分隔线", "menu.add_separator() 插入不可点分隔线"),
-          ("挂载", "窗口由 main 经宿主菜单栏通道挂载（示例见 native-app 的菜单区块）"),
-        ]),
-      ],
-      code=[
+        "// 原生菜单栏：模型翻译成原生菜单挂窗口",
         "let bar = @core.MenuBar::new()",
         "let file = bar.add_menu(\"文件\")",
         "let about = file.add_item(\"关于\")",

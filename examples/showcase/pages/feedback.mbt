@@ -15,25 +15,12 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
     @shared.section(
       "横幅",
       "Alert 提示横幅",
-      "四种语义类型：左侧色条 + 类型浅底 + 同族深字，文字垂直居中。",
+      "四种语义类型：左侧色条 + 类型浅底 + 同族深字，文字垂直居中；最后一条是 `closable` 可关闭形态——点右侧 ✕ 收起整条横幅，`on_close` 回调可选（不需要另一个函数）。",
       [
         @ui.alert("成功提示：配置已保存。", t=@ui.Success),
         @ui.alert("信息提示：有新版本可用。", t=@ui.Info),
         @ui.alert("警告提示：磁盘剩余空间不足。", t=@ui.Warning),
         @ui.alert("错误提示：网络连接已断开。", t=@ui.Danger),
-      ],
-      code=[
-        "@ui.alert(\"成功提示：配置已保存。\", t=@ui.Success)",
-        "@ui.alert(\"信息提示：有新版本可用。\", t=@ui.Info)",
-        "@ui.alert(\"警告提示：磁盘剩余空间不足。\", t=@ui.Warning)",
-        "@ui.alert(\"错误提示：网络连接已断开。\", t=@ui.Danger)",
-      ],
-    ),
-    @shared.section(
-      "可关闭",
-      "Alert 可关闭",
-      "点击右侧 ✕ 关闭整条横幅；`alert` 的 `closable` 开关，不需要另一个函数。",
-      [
         @ui.alert(
           "可关闭横幅：点我右侧的 ✕ 试试。",
           description="关闭回调可选，这里留默认（只收起）。",
@@ -42,6 +29,10 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
+        "@ui.alert(\"成功提示：配置已保存。\", t=@ui.Success)",
+        "@ui.alert(\"信息提示：有新版本可用。\", t=@ui.Info)",
+        "@ui.alert(\"警告提示：磁盘剩余空间不足。\", t=@ui.Warning)",
+        "@ui.alert(\"错误提示：网络连接已断开。\", t=@ui.Danger)",
         "@ui.alert(\"可关闭横幅：点我右侧的 ✕ 试试。\", t=@ui.Warning, closable=true)",
       ],
     ),

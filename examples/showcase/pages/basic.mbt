@@ -149,9 +149,9 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
       ],
     ),
     @shared.section(
-      "悬停组",
-      "HoverGroup 悬停组",
-      "组内任意位置（含子控件）悬停即整组进入 hover 态：把指针移到卡片里的按钮或输入框上，整张卡片同样高亮且光标变手型。旧链路要全局轮询指针才做得到（GTK 下子控件事件窗口独占，祖先收不到 enter）；本栈的悬停态本来就是父链语义，所以既不排定时器也不查指针。",
+      "悬停光标",
+      "HoverGroup 悬停组与 CursorGroup 光标组",
+      "上：组内任意位置（含子控件）悬停即整组进入 hover 态——把指针移到卡片里的按钮或输入框上，整张卡片同样高亮。旧链路要全局轮询指针才做得到（GTK 下子控件事件窗口独占，祖先收不到 enter）；本栈的悬停态本来就是父链语义，所以既不排定时器也不查指针。下：父设子随——指针落在组内任意位置（含输入框、按钮等子控件）都保持手型，移出恢复默认。旧链路要把光标递归设到组根与全部子孙（GTK 光标按原生窗口生效，只设容器盖不住有独立窗口的子件）；本栈光标是窗口级的一层，宿主按悬停路径取「最深的那个请求」，所以组只设自己一处即可。",
       [
         @ui.hover_group(
           [
@@ -161,6 +161,17 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
               column_gap=10.0,
             ),
             @ui.text("子控件触发的事件同样改变组的样式", role=@ui.Secondary),
+          ],
+          padding=14.0,
+          row_gap=8.0,
+        ),
+        @ui.cursor_group(
+          [
+            @ui.text("整组都是手型：移入试试，或移到子控件上", role=@ui.Section),
+            @ui.row(
+              [@ui.input(box_b, width=200.0), @ui.button("组内按钮")],
+              column_gap=10.0,
+            ),
           ],
           padding=14.0,
           row_gap=8.0,
@@ -175,26 +186,6 @@ pub fn page_basic(app : @shared.App) -> @core.Node {
         "  padding=14.0,",
         "  row_gap=8.0,",
         ")",
-      ],
-    ),
-    @shared.section(
-      "光标组",
-      "CursorGroup 光标组",
-      "父设子随：指针落在组内任意位置（含输入框、按钮等子控件）都保持手型，移出恢复默认。旧链路要把光标递归设到组根与全部子孙（GTK 光标按原生窗口生效，只设容器盖不住有独立窗口的子件）；本栈光标是窗口级的一层，宿主按悬停路径取「最深的那个请求」，所以组只设自己一处即可。",
-      [
-        @ui.cursor_group(
-          [
-            @ui.text("整组都是手型：移入试试，或移到子控件上", role=@ui.Section),
-            @ui.row(
-              [@ui.input(box_b, width=200.0), @ui.button("组内按钮")],
-              column_gap=10.0,
-            ),
-          ],
-          padding=14.0,
-          row_gap=8.0,
-        ),
-      ],
-      code=[
         "@ui.cursor_group(",
         "  [",
         "    @ui.text(\"整组都是手型\", role=@ui.Section),",

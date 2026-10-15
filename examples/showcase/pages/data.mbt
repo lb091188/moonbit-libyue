@@ -174,9 +174,9 @@ pub fn page_data(app : @shared.App) -> @core.Node {
   let transfer_right : @core.Store[Array[String]] = @core.Store::new(["深圳"])
   @shared.page([
     @shared.section(
-      "标签头像",
-      "Tag 标签与 Avatar 头像",
-      "五种语义 Tag（浅底深字）+ 自定义实底色；Avatar 方形实底 + 白色字母，四种尺寸。",
+      "标签徽标",
+      "Tag 标签、Avatar 头像与 Badge 徽标",
+      "五种语义 Tag（浅底深字）+ 自定义实底色；Avatar 方形实底 + 白色字母，四种尺寸；徽标有数字角标（红底白字，99+ 封顶）与圆点两种形态。",
       [
         @ui.row(
           [
@@ -199,18 +199,6 @@ pub fn page_data(app : @shared.App) -> @core.Node {
           ],
           column_gap=10.0,
         ),
-      ],
-      code=[
-        "@ui.tag_of_type(\"Primary\", @ui.Primary)",
-        "@ui.tag(\"自定义实底\", \"#2D68C4\")",
-        "@ui.avatar(\"M\", size=44.0, background_color=\"#2D68C4\")",
-      ],
-    ),
-    @shared.section(
-      "徽标",
-      "Badge 徽标",
-      "数字角标（红底白字，99+ 封顶）与圆点两种形态。",
-      [
         @ui.row(
           [
             @ui.badge_count(9),
@@ -222,7 +210,13 @@ pub fn page_data(app : @shared.App) -> @core.Node {
           column_gap=16.0,
         ),
       ],
-      code=["@ui.badge_count(9)", "@ui.badge_count(128)", "@ui.badge_dot()"],
+      code=[
+        "@ui.tag_of_type(\"Primary\", @ui.Primary)",
+        "@ui.tag(\"自定义实底\", \"#2D68C4\")",
+        "@ui.avatar(\"M\", size=44.0, background_color=\"#2D68C4\")",
+        "@ui.badge_count(9)",
+        "@ui.badge_dot()",
+      ],
     ),
     @shared.section(
       "统计进度",
@@ -311,9 +305,9 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       ],
     ),
     @shared.section(
-      "表格单选",
-      "Table 表格（单选）",
-      "表头 + 斑马纹 + 悬停底色，点击行单选；点击表头排序（升降序箭头，新列默认升序），拖动列边界调整列宽；Store 驱动「添加一行」整表重建，选中行回显。",
+      "表格",
+      "Table 表格（单选与多选）",
+      "表头 + 斑马纹 + 悬停底色，拖动列边界调整列宽，点击表头排序（升降序箭头，新列默认升序）。上表单选：点击行单选，Store 驱动「添加一行」整表重建，选中行回显；下表多选：复选框列，行点击勾选，表头全选/清空（部分选中画横条）。",
       [
         @ui.col(
           [
@@ -351,28 +345,6 @@ pub fn page_data(app : @shared.App) -> @core.Node {
           row_gap=8.0,
           align_items=@yoga.AlignItems::FlexStart,
         ),
-      ],
-      code=[
-        "let rows = @core.Store::new([",
-        "  @ui.TableRow::make([\"MoonBit\", \"2023\", \"多范式\"]),",
-        "])",
-        "let sort = @core.Store::new({ column: -1, asc: true })",
-        "@ui.table(",
-        "  [",
-        "    @ui.TableColumn::make(\"语言\", 140.0),",
-        "    @ui.TableColumn::make(\"首发\", 90.0, align=@text.Center),",
-        "    @ui.TableColumn::make(\"定位\", 0.0),  // 0 = 占满剩余宽",
-        "  ],",
-        "  rows, width=440.0, sort=sort,",
-        "  on_row_click=fn(i, _r) { () },",
-        ")",
-      ],
-    ),
-    @shared.section(
-      "表格多选",
-      "Table 表格（多选）",
-      "复选框列：行点击勾选，表头全选/清空（部分选中画横条）；「语言」列可点排序，拖动列边界调宽。",
-      [
         @ui.col(
           [
             @ui.table(
@@ -394,6 +366,21 @@ pub fn page_data(app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
+        "// 单选：点击行回显（on_row_click）",
+        "let rows = @core.Store::new([",
+        "  @ui.TableRow::make([\"MoonBit\", \"2023\", \"多范式\"]),",
+        "])",
+        "let sort = @core.Store::new({ column: -1, asc: true })",
+        "@ui.table(",
+        "  [",
+        "    @ui.TableColumn::make(\"语言\", 140.0),",
+        "    @ui.TableColumn::make(\"首发\", 90.0, align=@text.Center),",
+        "    @ui.TableColumn::make(\"定位\", 0.0),  // 0 = 占满剩余宽",
+        "  ],",
+        "  rows, width=440.0, sort=sort,",
+        "  on_row_click=fn(i, _r) { () },",
+        ")",
+        "// 多选：复选框列（selection）",
         "let sel : @core.Store[Array[Int]] = @core.Store::new([])",
         "@ui.table(columns, rows, selection=sel, width=460.0)",
         "@ui.bind(sel.signal(), fn(s) { \"已选 \\{s.length()} 行\" })",
