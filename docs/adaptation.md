@@ -2115,6 +2115,14 @@ Verification: style 18/18, yoga-mbt 100/100 (baseline 95 + 5 new), core 120/120,
 - **Fix 2**: `menu_item` gained `focusable`/`step` parameters (same keyboard contract as segmented): a declared `focus_id` enters the Tab chain, space/return select the item, arrows cycle within the group, and `on_draw` traces a theme-colored ring when focused; `menu_sections` wires all items.
 - **Verification**: `moon test ui` **182/182** (2 new: toast-layer outside clicks pass through without dismissing + the dismiss-overlay control still consumes and dismisses; the menu keyboard chain works and UP from the first item wraps to the last by design), full library 14 packages **978/978** zero red, `cd gui && moon check --deny-warn` clean, showcase links + 8-second smoke run alive; on-device re-verification belongs to S33 in `_人工测试清单.md`.
 
+## Renderer coverage-precision assertions went permanently red on CI Linux: single-backend readings hard-coded, again (2026-10-15, Linux CI)
+
+- **Environment**: the "deviation vs an independent analytic reference" assertions added by 610bf7f (third-layer rasterizer coverage fix) measured 1-2 levels for polygons and 7-9 for the circle on Windows (pure rasterizer), and the thresholds were written as <=4/<=12 from those readings; the CI Linux job runs the cairo backend - triangle measured 18, flat triangle 16, circle 21, **all over threshold**, red in a row.
+- **Root cause**: cairo's own AA algorithm differs from the "32x32 grid sampling + ray casting" reference by nature more on diagonal edges (16-21 levels) than the rasterizer does; the thresholds left headroom only for raster readings, so cairo cannot pass - the same family as the radio dot assertion (cairo area sampling vs raster pixel-cell calibers), the fourth occurrence in this repo.
+- **Fix**: thresholds now take the **intersection of both backends** - polygons <=20 (cairo 16-18 passes, the old implementation's 33-44 stays red), circle <=24 (cairo 21 passes, old 33-44 stays red), keeping the regression teeth; assertion messages carry the measured level count so the next red shows the magnitude at a glance; comments record both sides' readings.
+- **Verification**: local Linux `moon test render` **54/54**; the Windows side is re-verified by CI (raster readings 1-2/7-9 sit far below the new thresholds).
+- **Caliber (recorded once more)**: pixel- or numeric-level assertions must first ask "what is the other backend's reading" and take the intersection; this repo's assertion failures now run four-of-a-kind: the radio dot core, the launcher round-trip, the dragdnd effect initial value, and this coverage precision - all the same shape.
+
 ## Maintenance
 
 1. Add new conclusions to the matching section, recording only the pitfall and the fix; protocol-interop conclusions must come from the real bus and real panels — unit-test self-consistency does not count.
