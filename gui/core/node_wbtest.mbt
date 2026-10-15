@@ -141,3 +141,26 @@ test "invalidate：没装钩子时是空操作，重挂照常完成" {
   sig.set(2)
   assert_eq(parent.children().length(), 1)
 }
+
+///|
+test "on_mount：构造期不跑、mount_into 时在挂载之后跑" {
+  // view 的 handle 在 node_of_new 里构造期就执行（早于宿主建好）——需要推迟
+  // 到真·挂载时机的回调一律包 on_mount
+  let ran : Ref[Bool] = Ref(false)
+  let kids_at_fire : Ref[Int] = Ref(-1)
+  let parent = Widget::new()
+  let n = node_of_new(fn(w : Widget) -> Widget {
+        w.set_size(10.0, 10.0)
+        w
+      })
+      .on_mount(fn() -> Unit {
+        ran.val = true
+        kids_at_fire.val = parent.children().length()
+      })
+  // 构造完还没挂：回调不许跑
+  assert_false(ran.val)
+  let _ = (n.mount)(parent)
+  // 挂载回调跑在本体已挂进父之后
+  assert_true(ran.val)
+  assert_eq(kids_at_fire.val, 1)
+}

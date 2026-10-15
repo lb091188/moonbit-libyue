@@ -3,10 +3,13 @@
 // 暂停复选框只断数据流（定时器本身不停——新栈 set_timeout 是一次性句柄，
 // 循环靠回调尾自排，与 master 的重复定时器等价但机制不同，记档）。
 //
-// **第一拍挂在挂载回调上，不挂在页面构造期**：`set_timeout` 在宿主 `App`
-// 建好之前是空操作（`core/loop.mbt` 的进程级通道由 `App::new` 装），而页面
-// 函数是 `mount_window` 的实参、求值早于建窗——构造期排的那一拍永远不会响，
-// 循环也就永远起不来（真机症状：折线与仪表盘一直「暂无数据」）。
+// **第一拍挂在真·挂载时机（Node::on_mount），不挂 handle、不挂构造期**：
+// `set_timeout` 在宿主 `App` 建好之前是空操作（`core/loop.mbt` 的进程级通道
+// 由 `App::new` 装），而页面函数是 `mount_window` 的实参、求值早于建窗，且
+// `view` 的 `handle` 在 `node_of_new` 里**构造期就执行**、并不是挂载回调——
+// 两处排的首拍都进空通道（Windows 真机实证：探针 experiment/timer_probe，
+// 挂载回调里排的定时器 pending=0，宿主建好后再排的准点响）。on_mount 包的
+// mount 闭包在段正文惰性挂载、首次选中本段时才跑，那时宿主早已就绪。
 pub fn page_charts(_app : @shared.App) -> @core.Node {
   // ---- 折线：3 序列定长窗口，500ms 推点（三角波模拟监控曲线），可暂停 ----
   let line_series : @core.Store[Array[@charts.LineSeries]] = @core.Store::new([
@@ -36,14 +39,6 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
       @charts.series_push(line_series, 1, triangle(t, 90, 45.0, 20.0))
       @charts.series_push(line_series, 2, triangle(t, 120, 20.0, 30.0))
     }
-    // 诊断（真机一轮定位，随本轮修复批加、拿到读数后删）：每拍一行 ticks 与
-    // 共用 Loop 的待跑项数。配合退出时的 SHOWCASE-PROF frames= 三档分流——
-    // ticks 不涨 = 定时器链断；ticks 涨而 frames 不涨 = 重绘链断；两者都涨 = 画法问题。
-    println(
-      "CHART-DIAG ticks=" + line_tick.val.to_string() +
-      " paused=" + line_paused.get().to_string() +
-      " pending=" + (@core.host_loop().pending()).to_string()
-    )
     let _ = @core.set_timeout(500, line_pump)
   }
 
@@ -119,8 +114,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
           ],
           column_gap=16.0,
           align_items=@yoga.AlignItems::FlexStart,
-          handle=fn(_w : @core.Widget) -> Unit { line_pump() },
-        ),
+        ).on_mount(fn() -> Unit { line_pump() }),
         @ui.row(
           [
             @ui.checkbox("暂停推点", line_paused),
@@ -138,8 +132,8 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
         "  @charts.series_push(series, 0, v)",
         "  let _ = @core.set_timeout(500, pump)  // 自重排循环",
         "}",
-        "// 第一拍挂在挂载回调上：宿主建好之前 set_timeout 是空操作",
-        "@ui.row([chart], handle=fn(_) { pump() })",
+        "// 第一拍挂在真·挂载时机：handle 构造期就跑、那时宿主还没建好",
+        "@ui.row([chart]).on_mount(fn() { pump() })",
         "@charts.line_chart_t(series, width=320.0, height=240.0)",
         "@charts.line_chart_t(series, area=true, width=320.0, height=240.0)",
       ],
@@ -196,8 +190,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
           ],
           column_gap=16.0,
           align_items=@yoga.AlignItems::FlexStart,
-          handle=fn(_w : @core.Widget) -> Unit { gauge_pump() },
-        ),
+        ).on_mount(fn() -> Unit { gauge_pump() }),
       ],
       code=[
         "let gauge = @core.Store::new(0.35)",

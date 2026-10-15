@@ -44,6 +44,21 @@ pub fn node_of_new(finish : (Widget) -> Widget) -> Node {
 }
 
 ///|
+/// 包一层「挂进父控件**之后**跑一次 `f`」的节点：`node_of_new` 的 `finish`、
+/// `view` 的 `handle` 都是**构造期**就执行的（页面函数是 `mount_window` 的实参、
+/// 求值早于建窗），在那些回调里排 `set_timeout`/读宿主都是「没有宿主」形态
+/// （空操作）；真正的挂载时机由使用方的 `mount_into` 驱动（如惰性挂载在首次
+/// 选中时才挂），本方法把回调推迟到那一刻。挂载几次跑几次——重挂会重跑，
+/// 一次性启动类回调要由调用方保证只挂一次。
+pub fn Node::on_mount(self : Node, f : () -> Unit) -> Node {
+  { mount: fn(parent : Widget) -> Widget {
+      let w = (self.mount)(parent)
+      f()
+      w
+    } }
+}
+
+///|
 /// 一组节点按顺序挂进 parent。
 pub fn mount_children(parent : Widget, children : Array[Node]) -> Unit {
   for n in children {

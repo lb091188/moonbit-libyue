@@ -1906,10 +1906,19 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 
 - **现象**:showcase「图表 → 折线」两段画布恒为「暂无数据」、y 轴停在 0..1,仪表盘也不动;「暂停推点」勾与不勾都没反应(这条正是早前那条「点线图推点按钮没用」反馈的剩余部分)。
 - **根因**:`@core.set_timeout` 走的是**进程级**延时通道,这条通道由 `App::new`(内部 `install_host_hooks`)安装;没有宿主时它是**空操作并返回 0**(`core/loop.mbt` 的契约)。而示例里 `page_charts(app)` 是 `@ui.mount_window([...])` 的**实参**,求值早于建窗——所以「页面函数体最后一行排第一拍」这种写法排进的是空通道,回调永不触发,自重排的循环也就永远起不来。数据侧没问题:`series_push` 走 `set_always`(绕开 Store 去重)、画布在订阅回调里 `invalidate()`,都是通的。
-- **修复(示例侧口径)**:**第一拍挂在挂载回调上**——`@ui.row([...charts...], handle=fn(_) { line_pump() })`。`view` 的 `handle` 在 `mount_children` **之后**跑,而 `mount_window` 先建 App 再挂树,所以排定时器时通道已经装好、图表子件也已订阅到位。页面构造期那两行 `let _ = @core.set_timeout(...)` 删除;页内代码示例串同步改成挂载形态(不然演示文本继续教错写法)。
+- **修复(示例侧口径)**:**第一拍挂在挂载回调上**——`@ui.row([...charts...], handle=fn(_) { line_pump() })`。页面构造期那两行 `let _ = @core.set_timeout(...)` 删除;页内代码示例串同步改写(不然演示文本继续教错写法)。**〔更正 2026-10-15:本条把 `view` 的 `handle` 当成了挂载回调,口径是错的——`handle` 同样在构造期就跑,这次修复没有生效,见下一条。〕**
 - **通用口径**:任何在「页面/组件构造函数」里排的定时器、以及任何读 `set_timeout` 返回句柄去 cancel 的写法,都要放到挂载后(或宿主 App 建好之后);`set_timeout` 返回 0 就是「没有宿主」的信号,别把 0 当句柄存。
 - **同批一条(同一张截图看到的)**:段说明 `@ui.text(s.desc, max_width=900.0)` 没给 `wrap=true` ⇒ 长说明是**一条不折行的 900px 文本**,超出部分整片被裁(截图里折线段说明末尾断字)。改 `wrap=true`,段容器不再被单行长文本撑宽。
-- **验证**:`cd examples && moon check showcase --deny-warn` 零警告、`cd gui && moon check --deny-warn` 零警告、库全包 915/915 不回归。真机复验(用户):打开「图表」页 → 折线两幅应在 0.5s 一拍爬出三角波、y 轴随值自适应、右端有最新值标注;勾「暂停推点」曲线停住、取消勾选继续;仪表盘左环应 2Hz 平滑走。
+- **验证**:`cd examples && moon check showcase --deny-warn` 零警告、`cd gui && moon check --deny-warn` 零警告、库全包 915/915 不回归。真机复验(用户):打开「图表」页 → 折线两幅应在 0.5s 一拍爬出三角波、y 轴随值自适应、右端有最新值标注;勾「暂停推点」曲线停住、取消勾选继续;仪表盘左环应 2Hz 平滑走。**〔更正 2026-10-15:这条复验当时并未真正通过——推点链仍死,当时误判为已修。〕**
+
+## `view` 的 handle 不是挂载回调:图表页推点链在「修复」后仍死(2026-10-15,Windows 真机反馈 + 本机探针实证)
+
+- **现象**:上一条按「第一拍挂 `handle`」修复并记档后,图表页折线仍无推点;真机退出读数 `showcase-prof.txt` 里一条 `CHART-DIAG` 都没有(每拍一行,链活着必有),即自重排循环整条没起来。上一轮的「真机复验通过」结论是误判。
+- **根因**:`node_of_new(finish)` 的 `finish` 是**构造期急切执行**的(`gui/core/node.mbt`,等价于「先 new 再配置」),`view`(`ui/basic.mbt`)把 `handle(w)` 写在 `finish` 里 ⇒ `handle` 在**建树时**就跑,不是挂载回调。而 `page_charts(app)` 是 `@ui.mount_window([...])` 的实参、求值早于建窗 ⇒ `handle` 里排的 `set_timeout` 落在**空通道**——与构造期直接排是同一个坑,换个位置没换时机。
+- **实证**(`experiment/timer_probe`,Windows 本机,`moon run experiment/timer_probe`,读数落 `C:/tmp/timerprobe.log`):探针把首拍挂 `@ui.col(..., handle=...)`,日志 `ARMED pending=0`(挂载回调里排的定时器没进队列);`mount_window` 返回**之后**再排的定时器 `POST-ARM pending=1` 且 400ms 后准点响——钩子本身是好的,断的只是时机。
+- **修复**:`core` 新增 `Node::on_mount(f)`——包一层 Node,把 `f` 推迟到**真·挂载时机**(`mount_into` 把本体挂进父控件之后)跑;showcase 图表页折线/仪表盘两处首拍从 `handle=` 改为 `@ui.row([...]).on_mount(fn() { pump() })`,段正文惰性挂载在首次选中该段时才 `mount_into`,那时宿主早已就绪。页内代码示例串与 charts.mbt 头注释同步改成 on_mount 形态;CHART-DIAG 诊断行拿到读数后删除。
+- **通用口径**:`view`/`row`/`col` 的 `handle` 是**构造期**回调(适合做布局微调、订阅 Store 这类不依赖宿主的事);凡要等宿主的(排定时器、读宿主句柄),一律 `Node::on_mount` 或 `mount_window` 的 `handle(app)`(那是真·挂载后)。`on_mount` 挂载几次跑几次,一次性启动回调由调用方保证只挂一次(段正文的惰性挂载有 `mounted` 守卫,天然满足)。
+- **验证**:core 新增 1 条 on_mount 回归(构造期不跑、`mount_into` 时在本体已进父之后跑),`moon test core` 144/144;`cd gui && moon check --deny-warn` 零警告、`cd examples && moon check --deny-warn` 零警告、showcase 构建链接通过;库全包回归见当轮读数。真机复验归 P42:图表页折线 0.5s 一拍爬三角波、勾「暂停推点」停、取消恢复;仪表盘左环 2Hz 走。
 
 ## yoga-mbt 自由空间漏减行间隙:grow 项吃掉 gap 把整行顶出容器(2026-10-14,真机反馈「复制按钮还是有问题」)
 
