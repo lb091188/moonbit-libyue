@@ -61,6 +61,8 @@ typedef struct {
   IDataObject iface;
   HGLOBAL hdrop;
   HGLOBAL text;
+  int no_get_data_here; // 1 = 只实现 GetData（真资源管理器的形态）
+  int no_get_data;      // 1 = 两条都不给（负面用）
 } ProbeDo;
 
 static HGLOBAL probe_pick(ProbeDo *d, CLIPFORMAT cf) {
@@ -104,6 +106,9 @@ static HRESULT STDMETHODCALLTYPE pd_GetData(IDataObject *This, FORMATETC *fet,
     return E_POINTER;
   }
   memset(out, 0, sizeof(*out));
+  if (d->no_get_data) {
+    return E_NOTIMPL;
+  }
   HGLOBAL src = probe_pick(d, fet->cfFormat);
   if (src == NULL || fet->tymed != TYMED_HGLOBAL) {
     return DV_E_FORMATETC;
@@ -124,6 +129,10 @@ static HRESULT STDMETHODCALLTYPE pd_GetData(IDataObject *This, FORMATETC *fet,
 static HRESULT STDMETHODCALLTYPE pd_GetDataHere(IDataObject *This, FORMATETC *fet,
                                                 STGMEDIUM *io) {
   ProbeDo *d = (ProbeDo *)This;
+  if (d->no_get_data_here || d->no_get_data) {
+    // 真 shell 的数据对象对 CF_HDROP 常只给 GetData，就地取这条给 E_NOTIMPL
+    return E_NOTIMPL;
+  }
   HGLOBAL src = probe_pick(d, fet->cfFormat);
   if (src == NULL || fet->tymed != TYMED_HGLOBAL || io == NULL ||
       io->hGlobal == NULL) {
@@ -551,7 +560,41 @@ int main(void) {
     check("失败路径不写效果", seff, 0);
   }
 
-  /* ⑩ 拆窗即撤钩 */
+  /* ⑩ 真资源管理器的形态：数据对象**只实现 GetData**（就地取那条给 E_NOTIMPL）。
+   * 这条复现的是「从资源管理器拖文件进来显示禁止、什么也拖不进」——只走
+   * GetDataHere 时 QueryGetData 认得出格式、载荷却取不回来，效果就答成 NONE。 */
+  {
+    ProbeDo do5;
+    probe_fill(&do5, probe_make_hdrop(paths, 2), NULL);
+    do5.no_get_data_here = 1;
+    eff = 999;
+    check_true("只给 GetData 的对象 DragEnter 也成功",
+               SUCCEEDED(dt->lpVtbl->DragEnter(dt, &do5.iface, 0, pt, &eff)));
+    check("首拍承诺 COPY（不是禁止符）", eff, 1);
+    check("路径档取回 = Paths(4)", probe_payload_kind(), 4);
+    probe_payload_same("C:\\Temp\\甲文件.txt\nD:\\b.txt");
+    eff = 999;
+    dt->lpVtbl->DragOver(dt, 0, pt, &eff);
+    check("未写回前 DragOver 答的仍是承诺值 COPY", eff, 1);
+    ProbeDo do6;
+    probe_fill(&do6, NULL, probe_make_text(L"只给 GetData 的文本"));
+    do6.no_get_data_here = 1;
+    eff = 999;
+    dt->lpVtbl->DragEnter(dt, &do6.iface, 0, pt, &eff);
+    check("文本档也取得回 = Text(1)", probe_payload_kind(), 1);
+    probe_payload_same("只给 GetData 的文本");
+    // 负面：两条取法都不给（真取不到时该老实答 NONE，不假装能收）
+    ProbeDo do7;
+    probe_fill(&do7, probe_make_hdrop(paths, 1), NULL);
+    do7.no_get_data = 1;
+    eff = 999;
+    dt->lpVtbl->DragEnter(dt, &do7.iface, 0, pt, &eff);
+    check("两条都取不到时答 NONE", eff, 0);
+    check("两条都取不到时载荷为空", probe_payload_kind(), -1);
+    probe_drain();
+  }
+
+  /* ⑪ 拆窗即撤钩 */
   wm_dragdnd_disable(win);
   check("撤钩后计数 0", wm_dragdnd_count(), 0);
   check("撤钩后效果读回 -1（未挂）", wm_dragdnd_effect(win), -1);

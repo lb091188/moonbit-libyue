@@ -2281,6 +2281,16 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
   3. **`DROPFILES` 与 `SHDoDragDrop` 在库构建下取不到**:`gui/win/stub.c` 原先只引 `<shobjidl.h>`,探针自己额外引了 `<shlobj.h>` 所以一直是绿的;而 moon 的 cl 调用一编译 stub.c 就报 17 条 `C2065: "DROPFILES" 未声明`(`SHDoDragDrop` 反而只当隐式声明,不报硬错,最容易看漏)。补 `#include <shlobj.h>` 后两边同时通过——同一条「SDK 头文件按包含顺序/版本宏裁剪,探针绿不等于库绿」的坑,这次是**两条编译命令不一致**造成的。
 - **验证方式**:`experiment/drag_probe/dragdnd_probe.c` 末行 **`DRAGDND-OK`**(**84 条**,原拖入 40 条 + 拖出 44 条):`wm_dsrc_fill` 之后 `QueryGetData` 正/负;`GetData` 出来的 CF_HDROP 被 `DragQueryFileW` 逐条解析回**独立算出的**期望串、三条都在、相对路径已绝对化(断言 `第 2、3 字符 == L':' L'\\'`);`GetDataHere` 与 `GetData` 首条逐字符一致;枚举器 `Next`/`Reset`/`Skip` 到位、`Clone` 明确 `E_NOTIMPL`、`SetData` 失败;再把同一只对象喂回本窗 `IDropTarget`,抽出的载荷与原始编码逐字符一致(往返闭合)。文本档:宽字符逐字符一致 + `GlobalSize == (wlen+1)*2` + 往返 `Text`(1)。负面:kind 2/3 无系统级形态、空正文、失败后不留缓冲、`wm_dragdnd_send` 的越界 id/NULL 载荷/`len<4`/NULL `out_effect` 全部返回 0 且不写效果。探针源文件 `/W4` 零告警(修掉 C4389 有/无符号比较与两处 C4456 遮蔽),`stub.c` 只剩既有 2 条 C4996。MoonBit 侧:`core/drag_wbtest.mbt` +2(效果编号与 `DragEffect::flag` 往返、未知标志按 Rejected;只 Text/Paths 有系统级形态,无头起拖必然 `Err` 且不留半截会话)、`ui/drag_wbtest.mbt` +2(`external=true` 在后端起不来时回落应用内会话且仍完成投递、`on_external` 确实回报;`Html` 数据判为 `Unsupported` 后回落)。`moon test core ui win` **355/355**、库全包 **941/942**(唯一红是 `si_machine` 读注册表 `HARDWARE\DESCRIPTION\System\BIOS:SystemManufacturer` 失败,本机虚拟化环境的基线红,与本批无关),`cd gui && moon check --deny-warn` 与 examples 模块零警告,`moon build showcase --target native` 链接通过,本机起窗冒烟 4 秒存活后正常终止。真拖到桌面/记事本只能人来,归 `_人工测试清单.md` S27。
 
+## 真机复验 S26:从资源管理器拖文件进来显示「禁止」——只走 `GetDataHere` 取不到 shell 的载荷(2026-10-15,用户真机反馈)
+
+- **环境**:Windows 10 19044 真机,showcase「窗口」页拖放段,源是**资源管理器**(跨进程真 COM 对象)。
+- **现象**:文件拖进窗口时鼠标是**禁止符**、松手不收(= S26 第①项失败)。同一份代码在探针里是全绿的。
+- **根因**:`wm_dnd_fetch` 只走 `GetDataHere` 一条腿(当时的注释理由是「省掉 IMalloc 释放这条腿」)。**资源管理器的数据对象对 CF_HDROP 常只实现 `GetData`**,`GetDataHere` 直接给 `E_NOTIMPL`/`MK_E_UNAVAILABLE` ⇒ `QueryGetData` 明明认得出格式、载荷却取不回来 ⇒ `wm_dnd_extract` 判「这份东西我不认识」⇒ `DragEnter` 承诺 NONE,于是**一进来就是禁止符**,后面 MoonBit 再怎么写回都救不回来(效果初值就是 NONE)。
+- **修复**:取数据改**两条腿**——先 `GetDataHere`(我们递空 `GMEM_MOVEABLE`,取回的归我们 `GlobalFree`),**失败再退 `GetData`**(对方自己分配 medium,所有权在 medium,必须 `ReleaseStgMedium` 放、不能再 `GlobalFree`)。释放口径随取法走,故把返回从裸 `HGLOBAL` 换成 `WmDndBlob{h, via_medium, medium}` + `wm_dnd_blob_free`,`wm_dnd_extract` 的两个分支都改用它。
+- **为什么探针照绿**:探针那只合成数据对象**两条都实现**,所以「只走一条腿」这种错在合成对象上永远看不出来——正是规则 5 说的那类「单测自洽 ≠ 互操作通过」。现给 `ProbeDo` 加 `no_get_data_here`/`no_get_data` 两个开关,新增 9 条判据钉住「只实现 `GetData` 的对象也要认得出 Paths(4)/Text(1) 并承诺 COPY」,以及「两条都不给时才老实答 NONE、载荷为空」。
+- **顺带加的诊断落盘**(跨进程真拖只能真人跑,出问题要有读数):设环境变量 `NATIVEGUI_DND_LOG=<绝对路径>` 后,`gui/win/stub.c` 把拖放链关键节点逐条追加写进那个文件——`ole_init ready=…`、`enable slot=… hwnd=… ok/FAILED hr=…`、`enter slot=… recognized=… payload=… promised=… pt=…`、`over slot=… answered=…`(只在答的效果变了时落一行,不刷屏)、`set_effect slot=… effect=…`、`drop slot=… recognized=… eff=…`。没设变量时一个字节都不写。据此一眼分得清是「OLE 没起来」「没注册上」「载荷取不回」「MoonBit 答了 NONE」哪一环。
+- **验证方式**:探针 `experiment/drag_probe/dragdnd_probe.c` 末行 **`DRAGDND-OK`**,判据 **93 条**(84 → 93);`moon test core ui win` **355/355**、库全包 **941/942**(唯一红仍是 `si_machine` 的 BIOS 注册表读数,本机环境基线)、`cd gui && moon check --deny-warn` 零警告、`moon build showcase --target native` 链接通过。真机复验仍归 `_人工测试清单.md` S26(建议带 `NATIVEGUI_DND_LOG` 跑一次并把日志贴回)。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。

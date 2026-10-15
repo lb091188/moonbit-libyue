@@ -55,6 +55,7 @@ extern void *moonbit_make_bytes(int size, int value);
 // IME 段的宽串转 UTF-8 走 malloc/free，故 stdlib 也要
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h> // 拖放诊断落盘 wm_dnd_log 的可变参数（W23a/b 排查用）
 #include <wchar.h> // 菜单标签拼接用 wcsncpy/wcslen/wcsncat（W20a）
 // 图标加载（W20f）：PNG 无原生 Win32 入口，只能走 WIC 从内存解码；COM 初始化
 // 与 CoCreateInstance 在 objbase.h。GUID 常量由 wincodec.h 声明、链接期取
@@ -1686,6 +1687,38 @@ static int wm_dnd_at = 0;          // 编码写入位置（含 4 字节头）
 static WCHAR wm_dnd_wbuf[8192];    // DragQueryFileW 的落地缓冲（长路径友好）
 static int wm_ole_ready = -1;      // -1 未试 / 0 不可用 / 1 可用
 
+/* 真机诊断落盘（排查用，不是功能面）：设环境变量 NATIVEGUI_DND_LOG=<文件路径>
+ * 时，把拖放链上的关键节点逐条追加写进去——「OLE 起没起、注册成没成、DragEnter
+ * 认没认出这份载荷、效果答了什么、MoonBit 写回了什么」。跨进程真拖只能真人跑，
+ * 出问题时这一份日志就是把「哪一环答了 NONE」钉下来的读数；没设变量时一个字节
+ * 都不写。路径给绝对值最稳（Windows 上 `/tmp` 会解析成 `C:\tmp`）。 */
+static void wm_dnd_log(const char *fmt, ...) {
+  static char path[512];
+  static int tried = 0;
+  if (!tried) {
+    tried = 1;
+    DWORD n =
+        GetEnvironmentVariableA("NATIVEGUI_DND_LOG", path, (DWORD)sizeof(path) - 1);
+    if (n == 0 || n >= (DWORD)sizeof(path)) {
+      path[0] = '\0';
+    }
+  }
+  if (path[0] == '\0') {
+    return;
+  }
+  FILE *f = fopen(path, "a");
+  if (f == NULL) {
+    return;
+  }
+  fprintf(f, "[dnd %lu] ", (unsigned long)GetTickCount());
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(f, fmt, ap);
+  va_end(ap);
+  fputc('\n', f);
+  fclose(f);
+}
+
 /* OLE 惰性初始化（拖放要求 OLE 子系统起来）。已经跑过 CoInitializeEx(STA)
  * 的线程（任务栏/WIC 那条路）再 OleInitialize 会得到 S_FALSE 或
  * RPC_E_CHANGED_MODE，两者都当「已经起来了」。探测一次就不再重试。 */
@@ -1696,6 +1729,7 @@ static int wm_dnd_ole_init(void) {
   HRESULT hr = OleInitialize(NULL);
   wm_ole_ready =
       (hr == S_OK || hr == S_FALSE || hr == RPC_E_CHANGED_MODE) ? 1 : 0;
+  wm_dnd_log("ole_init ready=%d hr=0x%lx", wm_ole_ready, (unsigned long)hr);
   return wm_ole_ready;
 }
 
@@ -1749,42 +1783,83 @@ static int wm_dnd_put_raw(const char *s, int n) {
   return 1;
 }
 
-/* 向数据对象「就地」取一份 TYMED_HGLOBAL：调用方先给一块空的 GMEM_MOVEABLE，
- * 被调方在同一句柄里重分配填好——省掉 IMalloc 释放这条腿，取回的内存归我们
- * GlobalFree。认不出/取不到给 NULL。 */
-static HGLOBAL wm_dnd_fetch(IDataObject *dob, CLIPFORMAT cf) {
+/* 向数据对象取一份 TYMED_HGLOBAL。两条腿都要走：
+ * ① 先 `GetDataHere`——我们递一块空 GMEM_MOVEABLE，被调方在同一句柄里重分配填好，
+ *    取回的内存归我们 GlobalFree（省掉 IMalloc 释放这条腿）；
+ * ② **失败再退 `GetData`**——对方自己分配并返回 medium。这条不是可选的：
+ *    资源管理器的数据对象对 CF_HDROP 常只实现 `GetData`（`GetDataHere` 给
+ *    E_NOTIMPL/MK_E_UNAVAILABLE），只走①就等于「认不出这份载荷」，效果直接答
+ *    NONE ⇒ 系统光标显示禁止、什么也拖不进（真机踩过，探针那只合成对象两条都
+ *    实现所以照绿）。走②时所有权在 medium，必须 `ReleaseStgMedium` 释放，
+ *    不能再 GlobalFree。
+ * `via_medium` 记下这份是谁_alloc_ 的，释放口径跟着走。 */
+typedef struct {
+  HGLOBAL h;
+  int via_medium; // 1 = 用 ReleaseStgMedium 放，0 = 用 GlobalFree 放
+  STGMEDIUM medium;
+} WmDndBlob;
+
+static int wm_dnd_fetch(IDataObject *dob, CLIPFORMAT cf, WmDndBlob *out) {
   FORMATETC fe;
   fe.cfFormat = cf;
   fe.ptd = NULL;
   fe.dwAspect = DVASPECT_CONTENT;
   fe.lindex = -1;
   fe.tymed = TYMED_HGLOBAL;
+  out->h = NULL;
+  out->via_medium = 0;
+  memset(&out->medium, 0, sizeof(out->medium));
   if (dob == NULL || FAILED(dob->lpVtbl->QueryGetData(dob, &fe))) {
-    return NULL;
+    return 0;
   }
   HGLOBAL g = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, 1);
   if (g == NULL) {
-    return NULL;
+    return 0;
   }
   STGMEDIUM stg;
   memset(&stg, 0, sizeof(stg));
   stg.tymed = TYMED_HGLOBAL;
   stg.hGlobal = g;
   stg.pUnkForRelease = NULL;
-  HRESULT hr = dob->lpVtbl->GetDataHere(dob, &fe, &stg);
-  if (FAILED(hr)) {
-    GlobalFree(g);
-    return NULL;
-  }
-  // GetDataHere 可能换掉句柄，以取回的那块为准
-  HGLOBAL out = stg.hGlobal;
-  if (out == NULL || GlobalSize(out) == 0) {
-    if (out != NULL) {
-      GlobalFree(out);
+  if (SUCCEEDED(dob->lpVtbl->GetDataHere(dob, &fe, &stg))) {
+    // GetDataHere 可能换掉句柄，以取回的那块为准
+    if (stg.hGlobal != NULL && GlobalSize(stg.hGlobal) > 0) {
+      out->h = stg.hGlobal;
+      return 1;
     }
-    return NULL;
+    if (stg.hGlobal != NULL) {
+      GlobalFree(stg.hGlobal);
+    }
+    return 0;
   }
-  return out;
+  GlobalFree(g);
+  // ② 退到 GetData：对方自己分配 medium
+  memset(&stg, 0, sizeof(stg));
+  if (FAILED(dob->lpVtbl->GetData(dob, &fe, &stg))) {
+    return 0;
+  }
+  if (stg.tymed != TYMED_HGLOBAL || stg.hGlobal == NULL ||
+      GlobalSize(stg.hGlobal) == 0) {
+    ReleaseStgMedium(&stg);
+    return 0;
+  }
+  out->h = stg.hGlobal;
+  out->via_medium = 1;
+  out->medium = stg;
+  return 1;
+}
+
+static void wm_dnd_blob_free(WmDndBlob *b) {
+  if (b->h == NULL) {
+    return;
+  }
+  if (b->via_medium) {
+    b->medium.hGlobal = b->h;
+    ReleaseStgMedium(&b->medium);
+  } else {
+    GlobalFree(b->h);
+  }
+  b->h = NULL;
 }
 
 /* 把数据对象编码进 wm_dnd_payload，返回是否认出了格式（0 = 本趟拖的东西我们
@@ -1795,9 +1870,12 @@ static int wm_dnd_extract(IDataObject *dob) {
     return 0;
   }
   // ① CF_HDROP：资源管理器拖文件/文件夹（最常用的一条）
-  HGLOBAL hg = wm_dnd_fetch(dob, (CLIPFORMAT)CF_HDROP);
-  if (hg != NULL) {
-    HDROP h = (HDROP)GlobalLock(hg);
+  WmDndBlob blob;
+  if (!wm_dnd_fetch(dob, (CLIPFORMAT)CF_HDROP, &blob)) {
+    blob.h = NULL;
+  }
+  if (blob.h != NULL) {
+    HDROP h = (HDROP)GlobalLock(blob.h);
     UINT n = h != NULL ? DragQueryFileW(h, 0xFFFFFFFF, NULL, 0) : 0;
     int ok = n > 0 ? 1 : 0;
     wm_dnd_put_kind(WM_DND_KIND_PATHS);
@@ -1817,9 +1895,9 @@ static int wm_dnd_extract(IDataObject *dob) {
       }
     }
     if (h != NULL) {
-      GlobalUnlock(hg);
+      GlobalUnlock(blob.h);
     }
-    GlobalFree(hg);
+    wm_dnd_blob_free(&blob);
     if (ok) {
       wm_dnd_payload_len = wm_dnd_at;
       return 1;
@@ -1827,18 +1905,20 @@ static int wm_dnd_extract(IDataObject *dob) {
     return 0;
   }
   // ② CF_UNICODETEXT：纯文本（编辑器、浏览器、文件名拖拽的兜底档）
-  hg = wm_dnd_fetch(dob, (CLIPFORMAT)CF_UNICODETEXT);
-  if (hg != NULL) {
-    WCHAR *t = (WCHAR *)GlobalLock(hg);
+  if (!wm_dnd_fetch(dob, (CLIPFORMAT)CF_UNICODETEXT, &blob)) {
+    blob.h = NULL;
+  }
+  if (blob.h != NULL) {
+    WCHAR *t = (WCHAR *)GlobalLock(blob.h);
     int ok = t != NULL ? 1 : 0;
     wm_dnd_put_kind(WM_DND_KIND_TEXT);
     if (ok && !wm_dnd_put_utf8(t, -1)) {
       ok = 0;
     }
     if (t != NULL) {
-      GlobalUnlock(hg);
+      GlobalUnlock(blob.h);
     }
-    GlobalFree(hg);
+    wm_dnd_blob_free(&blob);
     if (ok) {
       wm_dnd_payload_len = wm_dnd_at;
       return 1;
@@ -1901,6 +1981,8 @@ static HRESULT STDMETHODCALLTYPE wm_dt_DragEnter(IDropTarget *This,
   if (pdwEffect != NULL) {
     *pdwEffect = promised;
   }
+  wm_dnd_log("enter slot=%d recognized=%d payload=%d promised=%d pt=(%d,%d)",
+             t->slot, recognized, wm_dnd_payload_len, (int)promised, x, y);
   wm_dnd_push(t->slot, WM_DND_ENTER, x, y);
   return S_OK;
 }
@@ -1915,6 +1997,14 @@ static HRESULT STDMETHODCALLTYPE wm_dt_DragOver(IDropTarget *This,
   wm_dnd_local(t, pt, &x, &y);
   if (pdwEffect != NULL) {
     *pdwEffect = (DWORD)t->effect; // 读 MoonBit 上一拍写回的判断
+  }
+  // DragOver 每动一下就来一次，只在「答的效果变了」时落一行，免得日志刷屏
+  {
+    static int last_answered = -1;
+    if (t->effect != last_answered) {
+      last_answered = t->effect;
+      wm_dnd_log("over slot=%d answered=%d pt=(%d,%d)", t->slot, t->effect, x, y);
+    }
   }
   wm_dnd_push(t->slot, WM_DND_OVER, x, y);
   return S_OK;
@@ -1942,6 +2032,8 @@ static HRESULT STDMETHODCALLTYPE wm_dt_Drop(IDropTarget *This, IDataObject *dob,
   if (pdwEffect != NULL) {
     *pdwEffect = eff;
   }
+  wm_dnd_log("drop slot=%d recognized=%d payload=%d eff=%d pt=(%d,%d)", t->slot,
+             recognized, wm_dnd_payload_len, (int)eff, x, y);
   t->effect = (int)DROPEFFECT_NONE;
   wm_dnd_push(t->slot, WM_DND_DROP, x, y);
   return S_OK;
@@ -1976,10 +2068,13 @@ int wm_dragdnd_enable(int64_t id) {
   t->hwnd = w->hwnd;
   t->slot = (int)id;
   t->effect = (int)DROPEFFECT_NONE;
-  if (FAILED(RegisterDragDrop(w->hwnd, &t->iface))) {
+  HRESULT hr = RegisterDragDrop(w->hwnd, &t->iface);
+  if (FAILED(hr)) {
+    wm_dnd_log("enable slot=%d FAILED hr=0x%lx", (int)id, (unsigned long)hr);
     return 0;
   }
   t->registered = 1;
+  wm_dnd_log("enable slot=%d hwnd=%p ok", (int)id, (void *)w->hwnd);
   return 1;
 }
 
@@ -2033,6 +2128,9 @@ int wm_dragdnd_payload(char *out, int cap) {
 void wm_dragdnd_set_effect(int64_t id, int effect) {
   if (id <= 0 || id >= WM_MAX_WINDOWS) {
     return;
+  }
+  if (wm_dnd[(int)id].effect != effect) {
+    wm_dnd_log("set_effect slot=%d effect=%d", (int)id, effect);
   }
   wm_dnd[(int)id].effect = effect;
 }
