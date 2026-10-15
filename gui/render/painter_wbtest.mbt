@@ -297,3 +297,38 @@ test "box_shadow：外圈色带等浓度，角上不缺、本体不被着色" {
   assert_eq(bm.pixel(180, 140).a, 0)
   p.end()
 }
+
+///|
+/// 两后端同口径：`fill()`/`stroke()` 落笔即清路径（cairo_fill/cairo_stroke 语义）。
+/// 不清的话，下一笔会把上一笔的子路径**按当前平移系**重画一遍——每只控件都在
+/// 自己的原点里画，跨控件漏过来的旧路径就成了画面上凭空多出的色块。
+test "fill 与 stroke 用完即清路径，第二笔不带上第一笔" {
+  let p = Painter::new(Bitmap::new(16, 16))
+  p.set_fill_color("#ff0000")
+  p.begin_path()
+  p.move_to(1.0, 1.0)
+  p.line_to(7.0, 1.0)
+  p.line_to(1.0, 7.0)
+  p.close_path()
+  p.fill()
+  assert_eq(rgba(p, 2, 2), (255, 0, 0, 255))
+  p.set_fill_color("#00ff00")
+  p.move_to(9.0, 9.0)
+  p.line_to(14.0, 9.0)
+  p.line_to(9.0, 14.0)
+  p.close_path()
+  p.fill()
+  // 第一笔的三角里仍是红：绿填充没把它连着重画
+  assert_eq(rgba(p, 2, 2), (255, 0, 0, 255))
+  assert_eq(rgba(p, 10, 10), (0, 255, 0, 255))
+  // 描边同样清：绿三角不该在红三角上留边
+  p.set_stroke_color("#0000ff")
+  p.set_line_width(1.0)
+  p.move_to(9.0, 9.0)
+  p.line_to(14.0, 9.0)
+  p.line_to(9.0, 14.0)
+  p.close_path()
+  p.stroke()
+  assert_eq(rgba(p, 2, 2), (255, 0, 0, 255))
+  p.end()
+}

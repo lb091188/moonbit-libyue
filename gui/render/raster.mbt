@@ -180,21 +180,29 @@ pub fn Raster::arc(
 }
 
 ///|
+/// 填充后清空路径（`cairo_fill` 同口径，见 `Painter` 头注释「两后端方法面逐条
+/// 同形」）：不清则上一笔的子路径会跟着下一笔一起落盘，而每只控件的绘制都在
+/// **自己的平移系**里——漏过来的旧路径被按当前原点重画，画面上就是控件上多出
+/// 一块与它无关的色块。
 pub fn Raster::fill(self : Raster) -> Unit {
   let polys = self.path.flatten(self.m)
   fill_polys(self.bitmap, polys, (self.clip_x0, self.clip_y0, self.clip_x1, self.clip_y1), self.op, self.source)
+  self.path.clear()
 }
 
 ///|
 /// 设备线宽 = 用户线宽 × sqrt(|det|)（非均匀缩放近似，记档）。
+/// 用完清空路径，口径同 `Raster::fill`（零线宽不落像素但同样清）。
 pub fn Raster::stroke(self : Raster) -> Unit {
   let det = self.m.det().abs().sqrt()
   let lw = self.line_width * det
   if lw <= 0.0 {
+    self.path.clear()
     return
   }
   let polys = stroke_polys(self.path.flatten(self.m), lw)
   fill_polys(self.bitmap, polys, (self.clip_x0, self.clip_y0, self.clip_x1, self.clip_y1), self.op, self.source)
+  self.path.clear()
 }
 
 ///|

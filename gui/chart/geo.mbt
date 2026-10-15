@@ -583,6 +583,24 @@ fn geo_draw_arrow(
 }
 
 ///|
+/// 把一条环折线铺成闭合路径（`begin_path` 起手）。填充与描边各铺一次：
+/// `fill()` 用完即清路径（两后端同口径），描边搭不了上一笔的顺风车。
+fn geo_ring_path(
+  p : @render.Painter,
+  ring : Array[(Double, Double)],
+  rect : GeoRect,
+) -> Unit {
+  p.begin_path()
+  let first = geo_project(ring[0].0, ring[0].1, rect)
+  p.move_to(first.0, first.1)
+  for i in 1..<ring.length() {
+    let pt = geo_project(ring[i].0, ring[i].1, rect)
+    p.line_to(pt.0, pt.1)
+  }
+  p.close_path()
+}
+
+///|
 /// 区域绘制（画布坐标）：每环按 geo_region_color 半透明填充 + 同色描边；
 /// show_labels 时在区域质心画区域名（按可用宽截断，标签盒放得下才画，
 /// 无名区域不画）。
@@ -599,16 +617,10 @@ fn geo_draw_regions(
         continue
       }
       p.set_fill_color(with_alpha(color, "33"))
-      p.begin_path()
-      let first = geo_project(ring[0].0, ring[0].1, rect)
-      p.move_to(first.0, first.1)
-      for i in 1..<ring.length() {
-        let pt = geo_project(ring[i].0, ring[i].1, rect)
-        p.line_to(pt.0, pt.1)
-      }
-      p.close_path()
+      geo_ring_path(p, ring, rect)
       p.fill()
       p.set_stroke_color(color)
+      geo_ring_path(p, ring, rect)
       p.stroke()
     }
     if show_labels {

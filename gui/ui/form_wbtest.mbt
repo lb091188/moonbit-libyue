@@ -798,3 +798,57 @@ test "色板描边贴盒边：内侧描边口径下左右上下同列" {
   assert_true(top == bottom, msg="描边上下不对称（整圈往右下偏）")
   assert_true(left != inner, msg="描边没落在盒子边缘")
 }
+
+///|
+/// 强调色像素计数（逐通道容差 48：AA 边缘的半覆盖不算，只数实心笔触）。
+fn accent_count(bm : @render.Bitmap, x0 : Int, y0 : Int, w : Int, h : Int) -> Int {
+  let acc = colour_of_token("primary")
+  let near = fn(a : Int, b : Int) -> Bool { (a - b).abs() < 48 }
+  let mut n = 0
+  for y = y0; y < y0 + h; y = y + 1 {
+    for x = x0; x < x0 + w; x = x + 1 {
+      let c = color_of(bm, x, y)
+      if near(c.0, acc.0) && near(c.1, acc.1) && near(c.2, acc.2) {
+        n = n + 1
+      }
+    }
+  }
+  n
+}
+
+///|
+/// 复选框标记区（14×14，去掉 1px 框线后的内部）。
+fn box_inside(bm : @render.Bitmap, box : @core.Widget) -> Int {
+  accent_count(bm, box.rect.x.round().to_int() + 1, box.rect.y.round().to_int() + 1, 12, 12)
+}
+
+///|
+/// 勾要看得出是个勾：实心笔触覆盖 20 个像素以上；未选的那只框内不许掺强调色
+/// （旧口径下上一只控件的圆弧路径会漏画进来，两只看起来都是实心块）。
+test "复选框：勾是粗笔触，未选框内不掺强调色" {
+  let on = @core.Store::new(true)
+  let off = @core.Store::new(false)
+  let root = mount_root([checkbox("甲", on), checkbox("乙", off)], 200.0, 60.0)
+  let bm = @render.Bitmap::new(200, 60)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  assert_true(box_inside(bm, kid(root, 0).children()[0]) > 20)
+  assert_eq(box_inside(bm, kid(root, 1).children()[0]), 0)
+}
+
+///|
+/// 单选组同理：选中项=强调色环 + 强调色实心圆心，未选中项圆内只有灰环。
+test "单选组：选中项是环加心，未选中项圆内干净" {
+  let pick = @core.Store::new(0)
+  let root = mount_root([radio_group(["甲", "乙", "丙"], pick)], 300.0, 40.0)
+  let bm = @render.Bitmap::new(300, 40)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  let g = kid(root, 0)
+  let dots = fn(i : Int) -> @core.Widget { g.children()[i].children()[0] }
+  assert_true(box_inside(bm, dots(0)) > 12)
+  assert_eq(box_inside(bm, dots(1)), 0)
+  assert_eq(box_inside(bm, dots(2)), 0)
+}

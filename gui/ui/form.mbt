@@ -78,9 +78,12 @@ pub fn checkbox(
         } else {
           accent
         })
-        p.move_to(3.0, 7.5)
-        p.line_to(6.0, 10.5)
-        p.line_to(11.0, 4.0)
+        // 勾比框粗：14px 的框里 1px 折线只剩几个像素，看不出是个勾。
+        p.set_line_width(2.0)
+        p.begin_path()
+        p.move_to(3.2, 7.3)
+        p.line_to(5.8, 10.0)
+        p.line_to(10.9, 3.9)
         p.stroke()
       }
     })
@@ -133,6 +136,7 @@ pub fn radio_group(
         let picked = state.get() == idx
         p.set_stroke_color(if picked && !disabled { accent } else { @style.color_of(s.border_color, "") })
         p.set_line_width(1.0)
+        p.begin_path()
         p.move_to(13.0, 7.0)
         p.arc(7.0, 7.0, 6.0, 0.0, 6.283185307179586)
         p.stroke()
@@ -142,6 +146,7 @@ pub fn radio_group(
           } else {
             accent
           })
+          p.begin_path()
           p.move_to(10.0, 7.0)
           p.arc(7.0, 7.0, 3.5, 0.0, 6.283185307179586)
           p.fill()
