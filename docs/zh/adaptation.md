@@ -2383,6 +2383,12 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **待真机读数的一条(本批未动)**:「侧边栏菜单能通过 Tab 获得焦点」——无头诊断显示侧栏 `menu_sections` 树 `focus_ids()` 为**空**(菜单项无 focus_id,本就不在 Tab 链),组件层无缺陷可修;复验时请按 Tab 后截图焦点环落在哪个元素上,按读数再定位。
 
 - **后续（同日，用户拍板撤除）**：分层羽化这版做出来自己看读数是对的（十档单调渐隐、角边同浓度、往下多投一个偏移），但**真机观感仍不如人意**——用户复验后说「阴影悬浮还是去掉吧」。于是整条撤除：`Style` 的 `box_shadow`/`shadow_x`/`shadow_y`/`shadow_color` 四字段与 setter、`shadow_of`、`Painter::drop_shadow`、`Widget.shadow_paint`（含裁剪窗口与视口剔除判交的外扩）一并删掉，showcase 的两张投影卡片与 design.md §1.1「效果」行、P4 行同步改口径；不留「写了不生效」的空字段（那等于假装能用）。教训记两条：①**数值判据自洽 ≠ 观感通过**——本项目里观感类改动一律以真机复验为准，读数只能帮我定位不能替我签字；②要重做投影，先解决**真高斯 blur**（分层近似在 1× 物理像素、无 HiDPI 放大的渲染里天然带台阶），别在近似上再叠 API。
+## 浏览器 DOM 四档抓取两平台全 ok=false:JS 求值回包被事件文本槽 768 截成半截 JSON(2026-10-15,Linux + Windows 真机同时)
+
+- **环境**:examples/browser 两平台真机,「抓正文/抓链接/抓 meta/抓结构」四档回显全部 `ok=false`。
+- **根因**:`capture_dom` 的回包走 `JSON.stringify({title,url,…})`(正文上限 4000 字、链接 200 条、meta 100 条),而 JS 求值回包当时走**事件通道**——事件文本槽 `WB_EV_TEXT=768`,`wb_push` 的 `strncpy` 硬截断,回包超 768 就成**半截 JSON**,MoonBit 侧 `vsc_json_parse` 必 None → `ok=false` 且 raw 是残文。两平台的桩是镜像实现、同一常数,所以 Linux(WebKitGTK)与 Windows(WebView2)同灭——「回包走事件槽」这个设计从写下那天起就装不下 DOM 档的量级,此前 showcase 时代没暴露是因为当时的演示回包恰好都短。
+- **修复**:JS 求值回包改走**每视图专用大缓冲**(上限 `WB_EVAL_TEXT_MAX=64KB`,与拖放载荷缓冲同制)——C 侧完成回调(GTK `evaluate_javascript_finish` / WebView2 `ExecuteScriptCompleted`)把全文存进 `WbView.eval_text`,事件 kind=7 只带序号、text 恒空;新 extern `wb_eval_text(id,out,cap)` 取全文(返回总长,>cap 即读到了截断的前段);MoonBit 侧泵的 kind=7 分支改读大缓冲(`WB_EVAL_CAP=65536`),其余事件仍走 768 槽(标题/URL 那类短文本足够)。mac 桩同步补空实现。
+- **验证方式**:`moon test web` **18/18**(新增 1 条长回包回归:4000 字正文与 200 条链接的完整 JSON 整体解析、截断链路下必红)、库全量 14 包 **978/978** 零红、`cd gui && moon check --deny-warn` 零警告、examples `--deny-warn` 零警告、browser 构建链接 + 本机 8 秒冒烟存活;两平台真机复验归 `_人工测试清单.md` S32。
 
 ## 维护约定
 

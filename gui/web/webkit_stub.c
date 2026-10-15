@@ -36,6 +36,9 @@ extern GtkWidget *wm_surface_container(int64_t surface_id);
 //       12 视图请求关闭 13 cookie 回包 14 加载失败
 #define WB_EVQ 32
 #define WB_EV_TEXT 768
+// JS 求值回包的专用大缓冲上限：DOM 抓取的 JSON（正文 4000 字 / 链接 200 条）
+// 远超事件槽 768，回包全文存这里、事件只带序号（kind=7 的 text 恒空）
+#define WB_EVAL_TEXT_MAX 65536
 
 typedef struct {
   int kind;
@@ -52,6 +55,8 @@ typedef struct {
   int download_allow;       // 0 拦下 / 1 交给引擎默认（默认允许）
   int crashed;
   int64_t eval_seq;
+  char *eval_text; // 最近一次求值回包全文（见 WB_EVAL_TEXT_MAX）
+  int eval_len;
   WbEv evs[WB_EVQ];
   int head, count;
   WbEv last;
@@ -174,13 +179,21 @@ static void wb_on_eval_done(GObject *src, GAsyncResult *res, gpointer data) {
   GError *err = NULL;
   JSCValue *val =
       webkit_web_view_evaluate_javascript_finish(WEBKIT_WEB_VIEW(src), res, &err);
+  // 回包全文进专用大缓冲（事件槽 768 装不下 DOM JSON，塞进去会被 strncpy 截成
+  // 半截 JSON，上层解析必失败），事件只带序号、text 恒空
   if (err != NULL) {
-    wb_push(v, 7, req->seq, err->message);
+    g_free(v->eval_text);
+    v->eval_text = g_strndup(err->message, WB_EVAL_TEXT_MAX);
+    v->eval_len = (int)strlen(v->eval_text);
+    wb_push(v, 7, req->seq, "");
     g_error_free(err);
   } else {
     char *s = val != NULL ? jsc_value_to_string(val) : NULL;
-    wb_push(v, 7, req->seq, s ? s : "");
+    g_free(v->eval_text);
+    v->eval_text = s != NULL ? g_strndup(s, WB_EVAL_TEXT_MAX) : NULL;
+    v->eval_len = v->eval_text != NULL ? (int)strlen(v->eval_text) : 0;
     g_free(s);
+    wb_push(v, 7, req->seq, "");
   }
   g_free(req);
 }
@@ -743,6 +756,18 @@ int wb_event_text(int64_t id, char *out, int cap) {
   return wb_copy(v ? v->last.text : "", out, cap);
 }
 
+// 取最近一次 JS 求值回包全文：拷进 out（cap 上限），返回全文总长（>cap 表示
+// 被截到 cap；<=0 = 没有回包）。事件 kind=7 的 text 恒空，全文在这里。
+int wb_eval_text(int64_t id, char *out, int cap) {
+  WbView *v = wb_get(id);
+  if (v == NULL || v->eval_text == NULL || out == NULL || cap <= 0) {
+    return 0;
+  }
+  int n = v->eval_len < cap ? v->eval_len : cap;
+  memmove(out, v->eval_text, (size_t)n);
+  return v->eval_len;
+}
+
 void wb_set_new_window_policy(int64_t id, int in_place) {
   WbView *v = wb_get(id);
   if (v != NULL) {
@@ -838,6 +863,7 @@ void wb_destroy(int64_t id) {
   // 容器没了就说明视图已经随那棵窗口树一起销毁，只还自己 alloc 的东西，
   // 不再碰那个悬垂指针
   g_free(v->data_dir);
+  g_free(v->eval_text);
   memset(v, 0, sizeof(WbView));
 }
 
@@ -887,6 +913,10 @@ int wb_title(int64_t id, char *out, int cap) {
 int64_t wb_evaluate(int64_t id, const char *script) {
   (void)id; (void)script;
   return -1;
+}
+int wb_eval_text(int64_t id, char *out, int cap) {
+  (void)id; (void)out; (void)cap;
+  return 0;
 }
 int wb_register_scheme(int64_t id, const char *scheme, const char *root) {
   (void)id; (void)scheme; (void)root;

@@ -86,6 +86,14 @@ extern "c" fn wb_title(id : Int64, out : Bytes, cap : Int) -> Int = "wb_title"
 extern "c" fn wb_evaluate(id : Int64, script : Bytes) -> Int64 = "wb_evaluate"
 
 ///|
+/// 取最近一次 JS 求值回包**全文**（回包走专用大缓冲，事件 kind=7 的 text 恒空，
+/// DOM 抓取的 JSON 远超事件槽 768）。返回全文总长（>cap 表示读到了截断的前
+/// cap 字节；<=0 = 没有回包）。
+#borrow(out)
+extern "c" fn wb_eval_text(id : Int64, out : Bytes, cap : Int) -> Int =
+  "wb_eval_text"
+
+///|
 #borrow(source)
 extern "c" fn wb_add_user_script(id : Int64, source : Bytes) -> Unit =
   "wb_add_user_script"

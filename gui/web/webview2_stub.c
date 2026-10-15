@@ -48,6 +48,9 @@ extern void *wm_surface_container(int64_t surface_id);
 //       WebKitGTK 是同树 widget、宿主天然可感知，不发）
 #define WB_EVQ 32
 #define WB_EV_TEXT 768
+// JS 求值回包的专用大缓冲上限：DOM 抓取的 JSON（正文 4000 字 / 链接 200 条）
+// 远超事件槽 768，回包全文存这里、事件只带序号（kind=7 的 text 恒空）
+#define WB_EVAL_TEXT_MAX 65536
 
 typedef struct {
   int kind;
@@ -94,6 +97,8 @@ struct WbView {
   int permission_allow;    // 0 默认拒绝 / 1 自动允许
   int download_allow;      // 0 拦下 / 1 交给引擎默认（默认允许）
   int64_t eval_seq;
+  char *eval_text; // 最近一次求值回包全文（见 WB_EVAL_TEXT_MAX）
+  int eval_len;
   WbEv evs[WB_EVQ];
   int head, count;
   WbEv last;
@@ -1611,25 +1616,55 @@ static HRESULT STDMETHODCALLTYPE WbEvalReq_inv(
   WbEvalReq *req = (WbEvalReq *)self;
   WbView *v = wb_get(req->id);
   if (v != NULL) {
+    // 回包全文进专用大缓冲（事件槽 768 装不下 DOM JSON，塞进去会被 strncpy
+    // 截成半截 JSON，上层解析必失败），事件只带序号、text 恒空
+    free(v->eval_text);
+    v->eval_text = NULL;
+    v->eval_len = 0;
     if (FAILED(errorResult)) {
       char buf[96];
       snprintf(buf, sizeof(buf), "evaluate failed (0x%08lx)",
                (unsigned long)errorResult);
-      wb_push(v, 7, req->seq, buf);
+      size_t bl = strlen(buf) + 1;
+      v->eval_text = (char *)malloc(bl);
+      if (v->eval_text != NULL) {
+        memcpy(v->eval_text, buf, bl);
+      }
     } else {
       char *u8 = wb_wide_to_utf8(resultObjectAsJson);
       if (u8 != NULL) {
         wb_json_unquote(u8);
+        int n = (int)strlen(u8);
+        if (n > WB_EVAL_TEXT_MAX) {
+          n = WB_EVAL_TEXT_MAX;
+          u8[n] = '\0';
+        }
+        v->eval_text = u8; // 所有权转移，不再 free
+        v->eval_len = n;
       }
-      wb_push(v, 7, req->seq, u8 ? u8 : "");
-      free(u8);
     }
+    if (v->eval_text != NULL && v->eval_len == 0) {
+      v->eval_len = (int)strlen(v->eval_text);
+    }
+    wb_push(v, 7, req->seq, "");
   }
   free(req);
   return S_OK;
 }
 static const ICoreWebView2ExecuteScriptCompletedHandlerVtbl wb_eval_vt = {
     WbEvalReq_qi, WbEvalReq_ref, WbEvalReq_rel, WbEvalReq_inv};
+
+// 取最近一次 JS 求值回包全文：拷进 out（cap 上限），返回全文总长（>cap 表示
+// 被截到 cap；<=0 = 没有回包）。事件 kind=7 的 text 恒空，全文在这里。
+int wb_eval_text(int64_t id, char *out, int cap) {
+  WbView *v = wb_get(id);
+  if (v == NULL || v->eval_text == NULL || out == NULL || cap <= 0) {
+    return 0;
+  }
+  int n = v->eval_len < cap ? v->eval_len : cap;
+  memmove(out, v->eval_text, (size_t)n);
+  return v->eval_len;
+}
 
 int64_t wb_evaluate(int64_t id, const char *script) {
   WbView *v = wb_get(id);
@@ -2031,6 +2066,7 @@ void wb_destroy(int64_t id) {
   free(v->data_dir);
   free(v->ua);
   free(v->pending_uri);
+  free(v->eval_text);
   memset(v, 0, sizeof(WbView));
 }
 

@@ -85,3 +85,30 @@ test "解析失败不静默：ok 归假且 raw 原样留着" {
   // 半包（语法不完整）同样归假，而不是给一个「看起来成功」的空快照
   assert_eq(dom_parse(Links, "{\"title\":\"甲\"").ok, false)
 }
+
+///|
+test "长回包解析不截断：4000 字正文与 200 条链接的完整 JSON 都过" {
+  // 回包全文走专用大缓冲（事件槽 768 装不下）——钉住「长 JSON 能整体解析」，
+  // 若链路退回 768 槽截断，这里拿到半截 JSON 必红
+  let mut body = ""
+  for i = 0; i < 400; i = i + 1 {
+    body = body + "0123456789"
+  }
+  let long1 = "{\"title\":\"页\",\"url\":\"https://x\",\"text\":\"" + body + "\"}"
+  let s1 = dom_parse(PageText, long1)
+  assert_eq(s1.ok, true, msg="长正文解析失败：ok=\{s1.ok} raw 长度=\{s1.raw.length()}")
+  assert_eq(s1.text.length(), 4000)
+  let items = "{\"title\":\"页\",\"url\":\"https://x\",\"links\":["
+  let mut arr = items
+  for i = 0; i < 200; i = i + 1 {
+    if i > 0 {
+      arr = arr + ","
+    }
+    arr = arr + "{\"href\":\"https://x/" + i.to_string() + "\",\"text\":\"链接\"}"
+  }
+  arr = arr + "]}"
+  let s2 = dom_parse(Links, arr)
+  assert_eq(s2.ok, true, msg="长链接解析失败：ok=\{s2.ok} raw 长度=\{s2.raw.length()}")
+  assert_eq(s2.links.length(), 200)
+  assert_eq(s2.links[199].href, "https://x/199")
+}

@@ -91,6 +91,10 @@ fn wb_str(f : (Int64, Bytes, Int) -> Int, id : Int64) -> String {
 const WB_TEXT_CAP = 768
 
 ///|
+/// JS 求值回包的读取缓冲（与 C 侧 WB_EVAL_TEXT_MAX 同口径）
+const WB_EVAL_CAP = 65536
+
+///|
 /// 一扇窗里的一个 webview 区（pane）。owner = 原生子件：它占一块由 yoga 算出的
 /// 矩形，矩形内是 WebKit 自己画的，我们的 Painter 不参与，也不被 `clip_rect` 裁。
 pub(all) struct Webview {
@@ -312,15 +316,27 @@ pub fn Webview::pump(self : Webview) -> Unit {
       break
     }
     let num = wb_event_num(self.handle)
-    let buf = Bytes::new(WB_TEXT_CAP)
-    let n = wb_event_text(self.handle, buf, WB_TEXT_CAP)
-    let text =
+    // kind=7（JS 求值回包）的全文在专用大缓冲里——事件槽只有 768 字节，
+    // DOM 抓取的 JSON 塞进去会被截成半截、上层解析必失败
+    let text = if kind == 7 {
+      let buf = Bytes::new(WB_EVAL_CAP)
+      let n = wb_eval_text(self.handle, buf, WB_EVAL_CAP)
+      if n <= 0 {
+        ""
+      } else {
+        let keep = if n > WB_EVAL_CAP - 1 { WB_EVAL_CAP - 1 } else { n }
+        @utf8.decode_lossy(buf[0:keep])
+      }
+    } else {
+      let buf = Bytes::new(WB_TEXT_CAP)
+      let n = wb_event_text(self.handle, buf, WB_TEXT_CAP)
       if n <= 0 {
         ""
       } else {
         let keep = if n > WB_TEXT_CAP - 1 { WB_TEXT_CAP - 1 } else { n }
         @utf8.decode_lossy(buf[0:keep])
       }
+    }
     self.dispatch(kind, num, text)
   }
 }
