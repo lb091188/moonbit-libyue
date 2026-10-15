@@ -101,9 +101,12 @@ test "多行框：回车插入换行、上下键按显示行移动并记住 x、
   key(root, w, 'a'.to_int(), 0)
   key(root, w, 'b'.to_int(), 0)
   key(root, w, @core.KS_RETURN, 0)
-  key(root, w, 'c'.to_int(), 0)
-  key(root, w, 'd'.to_int(), 0)
-  assert_eq(store.get(), "ab\ncd")
+  // 两行给同样的内容：上下键按「记住的像素 x」映射，两行字宽不等时落点随字体变
+  // （"ab\ncd" 在 DejaVu 上第二行更窄，上键就回到行中而不是行尾），而这里要验的是
+  // 「按显示行移动并记住 x」这条规则本身，不是某个字体的宽度关系
+  key(root, w, 'a'.to_int(), 0)
+  key(root, w, 'b'.to_int(), 0)
+  assert_eq(store.get(), "ab\nab")
   assert_eq(caret_of(w), 5)
   // 行布局：第 0 行 [0,2)，第 1 行 [3,5)
   let lines = layout_lines(store.get(), 200.0 - 8.0, area_font())
@@ -118,9 +121,9 @@ test "多行框：回车插入换行、上下键按显示行移动并记住 x、
   assert_eq(caret_of(w), 3)
   key(root, w, @core.KS_END, 0)
   assert_eq(caret_of(w), 5)
-  // Shift+Home 扩选到行首
+  // Shift+Home 扩选到行首（只扩选，内容不动）
   key(root, w, @core.KS_HOME, @core.MOD_SHIFT)
-  assert_eq(store.get(), "ab\ncd")
+  assert_eq(store.get(), "ab\nab")
   key(root, w, 'x'.to_int(), 0)
   assert_eq(store.get(), "ab\nx")
   // 回到行首再退格：删掉的是换行符，两行并回一行

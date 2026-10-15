@@ -170,20 +170,16 @@ test "光标形状请求：按钮手型、输入框文本形、分隔把手横�
 }
 
 ///|
-test "mount_window_render：render 至多调用一次（无显示服务时零次）" {
+test "mount_window_render：render 恰好调用一次" {
   let runs : Ref[Int] = Ref(0)
-  let app = mount_window_render(
+  let _app = mount_window_render(
     fn() -> Array[@core.Node] {
       runs.val += 1
       [text("任务")]
     },
     title="渲染槽",
   )
-  // 无后端/无显示服务的环境拿不到 app，render 一次都不该跑；
-  // 有显示服务时首帧建完即止——两种形态都只要求「不超过一次」。
-  assert_true(runs.val <= 1)
-  match app {
-    None => assert_eq(runs.val, 0)
-    Some(_a) => assert_eq(runs.val, 1)
-  }
+  // `mount_window(render(), ...)`：节点数组先算出来再交给挂载，所以 render
+  // 恰好跑一次，与挂载成败无关（无显示服务时建窗失败前那一遍也已经算过）。
+  assert_eq(runs.val, 1)
 }

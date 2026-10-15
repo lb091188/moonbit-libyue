@@ -581,7 +581,11 @@ test "有序列表：序号与正文落在同一条基线上" {
   assert_true(mt <= 9999, msg="序号没有落墨")
   assert_true(ct <= 9999, msg="正文没有落墨")
   let db = mb - cb
-  assert_true(db <= 2 && db >= -2, msg="序号与正文基线差 \{db}px")
+  // 「同一条基线」的容差按 6px 给：两格的字形不同（数字 vs 中文），降部随字体变，
+  // 本机 Noto 与 runner 的 DejaVu 实测差 -2px / -4px。这条要防的是「标记格没注册
+  // 测量、被居中摆到行中点」那种 10px 级错位（rect=(0,111,18,0) 的实测形态），
+  // 不是逐字体对齐到 1px。
+  assert_true(db <= 6 && db >= -6, msg="序号与正文基线差 \{db}px")
 }
 
 ///|

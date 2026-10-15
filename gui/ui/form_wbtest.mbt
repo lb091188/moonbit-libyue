@@ -309,12 +309,26 @@ test "链接：宽度就是文字宽、悬停出下划线、抬起才回调" {
   assert_eq(w.rect.w, text_width("查看详情", font))
   let _ = click(w, w.rect.x + 4.0, w.rect.y + 4.0)
   assert_eq(n, 1)
-  // 下划线只在悬停时画（底行像素从空变有）
-  let (bm0, ox, oy) = shot(w)
-  let base_row = color_of(bm0, ox + 2, oy + w.rect.h.round().to_int() - 1)
+  // 下划线只在悬停时画：比较整块墨量（原来只探「底行那一格」——线落在哪一行
+  // 随字体的降部变，换个字体就探空了，而「画没画线」与探哪一格无关）
+  let ink_in = fn(bm : @render.Bitmap) -> Int {
+    let wide = w.rect.w.round().to_int()
+    let tall = w.rect.h.round().to_int()
+    let mut n = 0
+    for y = 0; y < tall; y = y + 1 {
+      for x = 0; x < wide; x = x + 1 {
+        if bm.pixel(x, y).a > 0 {
+          n = n + 1
+        }
+      }
+    }
+    n
+  }
+  let (bm0, _, _) = shot(w)
+  let before = ink_in(bm0)
   root.set_hover(w.id)
   let (bm1, _, _) = shot(w)
-  assert_true(color_of(bm1, ox + 2, oy + w.rect.h.round().to_int() - 1) != base_row)
+  assert_true(ink_in(bm1) > before)
 }
 
 ///|
