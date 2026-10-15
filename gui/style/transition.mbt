@@ -1,8 +1,11 @@
 // `transition`：状态桶切换时的属性过渡（design.md §5 P5）。
 //
-// 插值集合只收「每帧从样式槽读出来」的绘制期字段：三条颜色 + 边框宽 + 圆角。
+// 插值集合收「每帧从样式槽读出来」的绘制期字段：三条颜色 + 边框宽 + 圆角 +
+// **字号 + 行高**。后两条是绘制与测量都要用的 `<length>`（CSS 里同样可动画），
+// 所以测量期也必须读同一份插值值（见 `resolved_for_measure`）——本栈每帧本来就
+// 走一圈 relayout，它们跟着长不额外排一次。
 // `opacity` / `box_shadow` 的生效点是 `apply` → `Widget` 字段（绘制遍历不逐帧读槽），
-// 布局字段参与插值等于每帧重排——两者都不在集合里。
+// 不在集合里。
 //
 // 帧驱动复用进程级 `@core.set_timeout`：每拍只给活动中的控件局部置脏
 // （`@core.invalidate_id`），全部收敛就停表，不空转。
@@ -92,7 +95,60 @@ pub fn lerp_style(from : Style, to : Style, t : Double) -> Style {
   out.border_color = lerp_color(from.border_color, to.border_color, tt)
   out.border_width = lerp_number(from.border_width, to.border_width, tt)
   out.border_radius = lerp_number(from.border_radius, to.border_radius, tt)
+  out.font_size = lerp_number(from.font_size, to.font_size, tt)
+  out.line_height = lerp_number(from.line_height, to.line_height, tt)
   out
+}
+
+///|
+/// 测量期读的字号：配了过渡的控件按「这一帧该画的值」量。`shown` 在落定后就是
+/// 目标值（含状态桶），所以悬停放大结束后盒子仍跟绘制一致。没配过渡的控件
+/// 没有账，给 None 让调用方回落基块。
+pub fn anim_shown_font_size(id : Int) -> Double? {
+  match anims.get(id) {
+    Some(a) => a.shown.font_size
+    None => None
+  }
+}
+
+///|
+/// 测量期读的行高（与字号同理：单行档的行盒高由它定，测量与绘制必须同值）。
+pub fn anim_shown_line_height(id : Int) -> Double? {
+  match anims.get(id) {
+    Some(a) => a.shown.line_height
+    None => None
+  }
+}
+
+///|
+/// 这条账正在改**影响测量的属性**吗（字号、行高）？一改，测量结果就变、控件矩形
+/// 会**长大**——而局部脏区是按标脏那一刻（上一帧）的矩形并进去的，新露出来的那圈
+/// 会被裁掉。所以这类过渡要改走整窗置脏；只改颜色/边框宽/圆角的仍按局部标
+/// （P5 那套局部置脏的优化不为它们让路）。
+///|
+/// 两个可选数不同吗（都没写算相同）。
+fn opt_ne(x : Double?, y : Double?) -> Bool {
+  match (x, y) {
+    (Some(p), Some(q)) => p != q
+    (None, None) => false
+    _ => true
+  }
+}
+
+fn grows_layout(a : Anim) -> Bool {
+  opt_ne(a.from.font_size, a.target.font_size) || opt_ne(
+    a.from.line_height,
+    a.target.line_height,
+  )
+}
+
+///|
+/// 这条账是否需要整窗重绘（诊断与测试用：字号/行高参与插值时矩形会长大）。
+pub fn anim_needs_full_paint(id : Int) -> Bool {
+  match anims.get(id) {
+    Some(a) => !a.finished && grows_layout(a)
+    None => false
+  }
 }
 
 ///|
@@ -108,13 +164,17 @@ fn color_key(c : Color?) -> String {
 
 ///|
 /// 插值字段的投影：两个目标的投影相等就认为「状态没变」，动画按原进度继续走。
-fn animatable_key(s : Style) -> (String, String, String, Double?, Double?) {
+fn animatable_key(
+  s : Style,
+) -> (String, String, String, Double?, Double?, Double?, Double?) {
   (
     color_key(s.color),
     color_key(s.background_color),
     color_key(s.border_color),
     s.border_width,
     s.border_radius,
+    s.font_size,
+    s.line_height,
   )
 }
 
@@ -189,6 +249,17 @@ pub fn step(id : Int, target : Style, now : Int64) -> Style {
 }
 
 ///|
+/// 一拍里给一条账标脏：字号/行高在变的走整窗（矩形会长大，局部脏区按上一帧的矩形并，
+/// 新露出的那圈会被裁掉），其余走局部置脏。
+fn mark_dirty(id : Int, a : Anim) -> Unit {
+  if grows_layout(a) {
+    @core.invalidate()
+  } else {
+    @core.invalidate_id(id)
+  }
+}
+
+///|
 /// 一拍：把还没落定的过渡各自标脏（只标自己那一块）。全部落定就停表。
 fn tick() -> Unit {
   let now = @core.now_ms()
@@ -199,9 +270,9 @@ fn tick() -> Unit {
       if (now - a.start).to_int() >= a.dur {
         a.shown = a.target
         a.finished = true
-        @core.invalidate_id(id)
+        mark_dirty(id, a)
       } else {
-        @core.invalidate_id(id)
+        mark_dirty(id, a)
         live += 1
       }
     }

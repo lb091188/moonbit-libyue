@@ -126,7 +126,8 @@ pub fn TextSource::fg(self : TextSource) -> String {
 /// 文本类样式的合流（§1.1「文本与颜色」那半张表的真去处）：样式槽给了就用样式的，
 /// 没给回落 `src`。五个返回值 = 生效字体 / 对齐 / 是否折行 / 行高（0=不设）/ 下划线。
 /// `st` 由调用方决定读哪一层：**绘制期**传 `style_for(w)`（含状态桶），
-/// **测量期**传 `resolved_by_id(id)`（只看基块——状态桶不带布局属性，§1.3）。
+/// **测量期**传 `resolved_for_measure(id)`（基块 + 插值中的字号——状态桶不带
+/// 布局属性，§1.3，但字号是绘制与测量共用的，动画期间两边必须同值）。
 fn text_eff(
   st : @style.Style,
   src : TextSource,
@@ -176,7 +177,7 @@ fn attach_text_measure(w : @core.Widget, src : TextSource) -> Unit {
     Double,
     Double,
   ) {
-    let (font, _align, wrap, line_h, _u) = text_eff(@style.resolved_by_id(id), src)
+    let (font, _align, wrap, line_h, _u) = text_eff(@style.resolved_for_measure(id), src)
     // 有盒宽上限就用它，否则用父给的可用宽（0 视为不约束）
     let cap = if src.max_width > 0.0 {
       src.max_width
@@ -209,7 +210,7 @@ fn attach_text_measure(w : @core.Widget, src : TextSource) -> Unit {
     }
   })
   w.node.set_baseline(fn(_a : Double?, _b : Double?) -> Double? {
-    let (font, _align, _wrap, _lh, _u) = text_eff(@style.resolved_by_id(id), src)
+    let (font, _align, _wrap, _lh, _u) = text_eff(@style.resolved_for_measure(id), src)
     @text.line_ascent_font(font).map(fn(v : Int) -> Double { v.to_double() })
   })
 }

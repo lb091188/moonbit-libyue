@@ -220,6 +220,34 @@ pub fn resolved_by_id(id : Int) -> Style {
 }
 
 ///|
+/// **测量期**读的样式：基块，但**字号与行高**按「这一帧该画的值」覆盖。
+/// 这两条是绘制与测量共用的属性——悬停放大时若测量还按基块量，盒子留在小字号的
+/// 尺寸、字画得比盒子大（看着像被裁/像跳变）。过渡账里的 `shown` 落定后即目标
+/// 值（含状态桶），所以动画结束盒子也和绘制一致。其余布局属性只在基块里
+/// （§1.3 口径不变），照旧取基块。没配过渡的控件没有账，直接返回基块。
+pub fn resolved_for_measure(id : Int) -> Style {
+  let st = resolved_by_id(id)
+  let fs = anim_shown_font_size(id)
+  let lh = anim_shown_line_height(id)
+  match (fs, lh) {
+    (None, None) => st
+    _ => {
+      // merge 造新值、不改表里的基块（那是同一份对象）
+      let c = merge(st, empty_style())
+      match fs {
+        Some(v) => c.font_size = Some(v)
+        None => ()
+      }
+      match lh {
+        Some(v) => c.line_height = Some(v)
+        None => ()
+      }
+      c
+    }
+  }
+}
+
+///|
 /// 按控件当前交互态选桶后的绘制样式：基块 → 依序并入命中的状态桶。
 /// 并存时的优先级是 hover < focus < active（后并入的赢，与 CSS 的 :active 盖过
 /// :hover 同向）——按下态必然也在悬停态里，反过来写就永远看不见按下反馈。
