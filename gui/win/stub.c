@@ -115,6 +115,10 @@ typedef struct {
   int drag_w;
   int drag_h;
   int borderless;
+  // 全屏现场（wm_window_set_fullscreen）：进屏前的样式与位置，退屏还原
+  int fullscreen;
+  LONG_PTR fs_style;
+  WINDOWPLACEMENT fs_wp;
   WmEv evs[64];
   WmEv last;
   int ev_head;
@@ -2564,8 +2568,69 @@ void wm_window_origin(int64_t id, int32_t *out_x, int32_t *out_y) {
   (void)id; (void)out_x; (void)out_y;
 }
 
-void wm_window_set_size(int64_t id, int w, int h) { (void)id; (void)w; (void)h; }
-void wm_window_set_fullscreen(int64_t id, int on) { (void)id; (void)on; }
+/* 改窗口尺寸（原生浮层要先量内容再定框，避免开一个空框再撑大）：参数是
+ * 客户区物理像素（整栈物理像素口径），按当前样式外扩成整窗尺寸再摆；
+ * WM_SIZE 的既有记账把 resized 置 1，MoonBit 侧照常收 Resized 事件，
+ * 不需要宿主自己算新矩形。 */
+void wm_window_set_size(int64_t id, int w, int h) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *win = &wm_windows[id];
+  if (win->hwnd == NULL) {
+    return;
+  }
+  int ww = w > 1 ? w : 1;
+  int hh = h > 1 ? h : 1;
+  DWORD st = (DWORD)GetWindowLongPtrW(win->hwnd, GWL_STYLE);
+  DWORD ex = (DWORD)GetWindowLongPtrW(win->hwnd, GWL_EXSTYLE);
+  RECT r = {0, 0, ww, hh};
+  AdjustWindowRectEx(&r, st, FALSE, ex);
+  SetWindowPos(win->hwnd, NULL, 0, 0, r.right - r.left, r.bottom - r.top,
+               SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+/* 全屏开关（播放器要的「铺满整屏」是窗口级动作，不是把控件尺寸改大）：
+ * 进屏先记现场（样式 + WINDOWPLACEMENT），样式剥掉装饰换 WS_POPUP 后摆到
+ * 最近显示器整屏；退屏原样还原。尺寸变化走 WM_SIZE 的既有记账。 */
+void wm_window_set_fullscreen(int64_t id, int on) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *win = &wm_windows[id];
+  if (win->hwnd == NULL || win->fullscreen == (on ? 1 : 0)) {
+    return;
+  }
+  if (on) {
+    MONITORINFO mi;
+    mi.cbSize = sizeof(mi);
+    if (!GetMonitorInfoW(MonitorFromWindow(win->hwnd, MONITOR_DEFAULTTONEAREST),
+                         &mi)) {
+      return;
+    }
+    win->fs_style = GetWindowLongPtrW(win->hwnd, GWL_STYLE);
+    WINDOWPLACEMENT wp;
+    wp.length = sizeof(wp);
+    if (!GetWindowPlacement(win->hwnd, &wp)) {
+      return;
+    }
+    win->fs_wp = wp;
+    SetWindowLongPtrW(win->hwnd, GWL_STYLE,
+                      (win->fs_style & ~WS_OVERLAPPEDWINDOW) | WS_POPUP);
+    SetWindowPos(win->hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
+                 mi.rcMonitor.right - mi.rcMonitor.left,
+                 mi.rcMonitor.bottom - mi.rcMonitor.top,
+                 SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    win->fullscreen = 1;
+  } else {
+    SetWindowLongPtrW(win->hwnd, GWL_STYLE, win->fs_style);
+    SetWindowPlacement(win->hwnd, &win->fs_wp);
+    SetWindowPos(win->hwnd, NULL, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER |
+                     SWP_FRAMECHANGED);
+    win->fullscreen = 0;
+  }
+}
 int wm_window_surface_count(int64_t id) {
   (void)id;
   return 0;

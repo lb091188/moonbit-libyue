@@ -2219,6 +2219,15 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
   - 焦点环:输入框/选择器字段描边聚焦时转主题色(覆盖在常态描边上),标记控件(复选框线、单选环、开关胶囊、步进器外框、评分/分段/滑块)画主题色描边圈,按钮沿用原焦点环。绘制按控件矩形裁剪,环一律画在控件矩形**内**。
 - **验证方式**:`ui` 新增 8 条无头回归(标记控件空格/回车/禁用不吃键 + `focus_ids` 收录、单选环绕换选、滑块/步进器/评分键调值、按钮空格/回车、select 键盘全流程、取色器网格导航、dropdown 分隔线跳过、分段换选、日期字段开合)。`moon test ui` 176/176、库全包 934/935(1 条红为本机 Windows 环境基线)、`cd gui && moon check --deny-warn` 与 examples 模块零警告。真机复验归 `_人工测试清单.md` S22。
 
+## Windows 全屏与尺寸切换无效:win 分支两符号是空壳桩,GTK 一直有真实现(2026-10-15,真机反馈 Windows)
+
+- **现象**:showcase「窗口」页的「全屏切换」「尺寸切换」按钮(以及一切经 `App::set_fullscreen` / `Window::set_size_pixels` 的调用)在 Windows 全部无效——点击不报错,窗口纹丝不动。
+- **根因**:`gui/win/stub.c` 的 Windows 分支里 `wm_window_set_size` / `wm_window_set_fullscreen` 是带符号的空壳桩(参数全 `(void)` 丢弃),GTK 分支早就接了 `gtk_window_resize` / `gtk_window_fullscreen`。符号存在所以链接不断、调用静默无效——「两后端方法面同形、真实现只落了一边」这条坑在 win 桩上又漏了一处(与此前 Raster 纯光栅器不清路径、圆角描边直段不落墨同型)。
+- **修复**(`gui/win/stub.c` Windows 分支):
+  - `wm_window_set_size`:参数是客户区物理像素(整栈物理像素口径),按当前样式 `AdjustWindowRectEx` 外扩成整窗尺寸再 `SetWindowPos(SWP_NOMOVE|SWP_NOZORDER|SWP_NOACTIVATE)`;宽高 <1 钳到 1(MoonBit 侧 `set_size_pixels` 已先拦 <1,这里是 C 侧兜底;实测有标题栏的窗口会被系统最小宽顶住,宽度钳制只对无边框形态可见)。WM_SIZE 的既有记账把 `resized` 置 1,MoonBit 侧照常收 `Resized` 事件,宿主不用自己算新矩形。
+  - `wm_window_set_fullscreen`:进屏先记现场(样式 + `WINDOWPLACEMENT`),样式剥掉 `WS_OVERLAPPEDWINDOW` 换 `WS_POPUP`,`SetWindowPos` 摆到最近显示器(`MonitorFromWindow` + `GetMonitorInfoW`)整屏;退屏原样还原样式与位置。同值重复调用直接返回(幂等)。
+- **验证方式**:`experiment/window_probe/window_enhance_probe.c` 新增两节——`set_size` 后 `GetClientRect` 读回目标尺寸、`wm_windows[].resized` 置位、`wm_size` 读回一致;全屏进屏窗口矩形 == 显示器矩形且客户区记账同步、退屏位置与样式逐值还原、重复进出幂等、越界 id 不崩。全量 `WIN-ENHANCE-OK`(本机 Windows 1920×1080)。探针编译顺带补了两条缺件:`shell32.lib`(托盘 `Shell_NotifyIconW` 已进符号面)与 `moonbit_make_bytes` 的 malloc 兜底(剪贴板空壳引用运行时分配符号),编法更新在探针头注释与 `build.bat`。`moon test win` 28/28、`cd gui && moon check --deny-warn` 零警告、`cd examples && moon build hello --target native` 链接通过。真机复验归 `_人工测试清单.md` S23。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。

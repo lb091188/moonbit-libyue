@@ -5,18 +5,28 @@
  * SendMessageW 主动发 WM_GETMINMAXINFO / WM_NCHITTEST 反读，或用
  * GetWindowTextW / WM_GETICON / GetWindowLongPtrW 反读状态。
  *
- * 编法（见 docs/zh/adaptation.md「Windows 基础能力首批」节）：
+ * 编法（见 experiment/window_probe/build.bat，或 docs/zh/adaptation.md
+ * 「Windows 基础能力首批」节）：
  *   cl /nologo /W4 /utf-8 /O2 /DWIN32 /D_WINDOWS /DUNICODE /D_UNICODE \
  *      window_enhance_probe.c /Fe:window_enhance_probe.exe \
- *      user32.lib gdi32.lib imm32.lib advapi32.lib windowscodecs.lib ole32.lib
+ *      user32.lib gdi32.lib imm32.lib advapi32.lib windowscodecs.lib ole32.lib \
+ *      shell32.lib
  *
  * 期望输出末行 WIN-ENHANCE-OK。
  */
 #include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "../../gui/win/stub.c"
+
+/* 探针不连 MoonBit 运行时：wm_clipboard_get_text 的空壳引用运行时分配
+ * 符号，这里给个 malloc 兜底（探针路径不会真走剪贴板）。 */
+void *moonbit_make_bytes(int length, int unused) {
+  (void)unused;
+  return malloc(length > 0 ? (size_t)length : 1);
+}
 
 static int g_fail = 0;
 
@@ -195,12 +205,83 @@ int main(void) {
     check("重复关闭 borderless 幂等", wm_is_borderless(id), 0);
   }
 
+  /* ⑦ wm_window_set_size：客户区收到目标尺寸（WM_SIZE 记账置 resized） */
+  {
+    wm_windows[id].resized = 0;
+    wm_window_set_size(id, 800, 600);
+    RECT cr;
+    GetClientRect(hwnd, &cr);
+    check("set_size 后客户区宽 800", cr.right - cr.left, 800);
+    check("set_size 后客户区高 600", cr.bottom - cr.top, 600);
+    check("WM_SIZE 记账置 resized", wm_windows[id].resized, 1);
+    check("wm_size 读回宽 800", wm_windows[id].width, 800);
+    check("wm_size 读回高 600", wm_windows[id].height, 600);
+    /* 下限钳制：宽高 <1 收敛到 1（生产路径 MoonBit 侧 set_size_pixels 先拦，
+     * 这里验 C 侧兜底；宽度会被系统「有标题栏的窗口最小宽」顶住，只验高）。 */
+    wm_window_set_size(id, 0, 0);
+    GetClientRect(hwnd, &cr);
+    check("0 尺寸钳到客户区高 1", cr.bottom - cr.top, 1);
+    wm_window_set_size(id, 640, 480);
+  }
+
+  /* ⑧ wm_window_set_fullscreen：进屏铺满最近显示器、退屏还原现场 */
+  {
+    RECT before;
+    GetWindowRect(hwnd, &before);
+    MONITORINFO mi;
+    mi.cbSize = sizeof(mi);
+    check_true("取最近显示器成功",
+               GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST),
+                               &mi) != 0);
+    wm_windows[id].resized = 0;
+    wm_window_set_fullscreen(id, 1);
+    check("进入全屏后 fullscreen == 1", wm_windows[id].fullscreen, 1);
+    check_true("全屏样式无 WS_CAPTION",
+               (GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_CAPTION) == 0);
+    check_true("全屏样式无 WS_THICKFRAME",
+               (GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_THICKFRAME) == 0);
+    RECT wr;
+    GetWindowRect(hwnd, &wr);
+    check("全屏窗口 x == 显示器 x", wr.left, mi.rcMonitor.left);
+    check("全屏窗口 y == 显示器 y", wr.top, mi.rcMonitor.top);
+    check("全屏窗口宽 == 显示器宽", wr.right - wr.left,
+          mi.rcMonitor.right - mi.rcMonitor.left);
+    check("全屏窗口高 == 显示器高", wr.bottom - wr.top,
+          mi.rcMonitor.bottom - mi.rcMonitor.top);
+    check("全屏 WM_SIZE 记账置 resized", wm_windows[id].resized, 1);
+    check("全屏客户区宽 == 显示器宽", wm_windows[id].width,
+          mi.rcMonitor.right - mi.rcMonitor.left);
+    check("全屏客户区高 == 显示器高", wm_windows[id].height,
+          mi.rcMonitor.bottom - mi.rcMonitor.top);
+    /* 幂等：重复进屏不折腾 */
+    wm_window_set_fullscreen(id, 1);
+    check("重复进全屏幂等", wm_windows[id].fullscreen, 1);
+    /* 退屏：样式与位置现场还原 */
+    wm_window_set_fullscreen(id, 0);
+    check("退出全屏后 fullscreen == 0", wm_windows[id].fullscreen, 0);
+    check_true("退出后有 WS_CAPTION",
+               (GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_CAPTION) != 0);
+    RECT after;
+    GetWindowRect(hwnd, &after);
+    check("退出后窗口 x 还原", after.left, before.left);
+    check("退出后窗口 y 还原", after.top, before.top);
+    check("退出后窗口宽还原", after.right - after.left,
+          before.right - before.left);
+    check("退出后窗口高还原", after.bottom - after.top,
+          before.bottom - before.top);
+    /* 重复退屏幂等 */
+    wm_window_set_fullscreen(id, 0);
+    check("重复退全屏幂等", wm_windows[id].fullscreen, 0);
+  }
+
   /* ⑥ 非法句柄不崩、读回给 0 */
   wm_set_title(9999, "x");
   wm_set_icon(9999, 1, 2);
   wm_set_min_size(9999, 100, 100);
   wm_set_drag_rect(9999, 0, 0, 10, 10);
   wm_set_borderless(9999, 1);
+  wm_window_set_size(9999, 100, 100);
+  wm_window_set_fullscreen(9999, 1);
   check("越界 id 的 borderless 读回 0", wm_is_borderless(9999), 0);
   {
     int32_t mw = -1, mh = -1;
