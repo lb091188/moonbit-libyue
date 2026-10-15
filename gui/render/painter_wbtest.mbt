@@ -278,23 +278,65 @@ test "fill_round_rect：四角不填、中心填；半径钳到短边一半" {
 }
 
 ///|
-test "box_shadow：外圈色带等浓度，角上不缺、本体不被着色" {
+/// 真投影（`drop_shadow` = 偏移 + 羽化）：分层同心外扩的填充，浓度从本体边向外
+/// 线性褪去。这条同时钉住三件事——**有方向**（dy>0 时下方比上方多出去一段）、
+/// **是软边**（沿距离出现多档浓度，不是等浓度的一圈）、**角与边同距离同浓度**
+/// （旧版靠「外环 + 反向内环挖洞」做不出来：两后端都没有反向弧，四角要么缺一块
+/// 要么叠成深色圆斑）。本体区域内会累积浓度，这是有意的——调用方随后把本体画在
+/// 上面盖住；本体背景透明时透出阴影，与 CSS 同义。
+test "drop_shadow：偏移有方向、边缘有梯度、角边同浓度" {
   let bm = Bitmap::new(200, 160)
   let p = Painter::new(bm)
-  p.set_stroke_color("#000000")
-  p.box_shadow(40.0, 40.0, 120.0, 80.0, 8.0, 8.0)
-  // 直边中点：左边缘外 4px（色带铺满 [0,8]）
-  assert_true(bm.pixel(36, 80).a > 200)
-  // 四个角的 45° 方向：各角弧心半径 12 处（内外边界正中）也必须在色带里。
-  // 旧画法在这里挖不出洞——角上要么缺一块、要么叠成深色圆斑。
-  assert_true(bm.pixel(39, 39).a > 200)
-  assert_true(bm.pixel(161, 39).a > 200)
-  assert_true(bm.pixel(39, 121).a > 200)
-  assert_true(bm.pixel(161, 121).a > 200)
-  // 本体内部与远处都不该有阴影浓度
-  assert_eq(bm.pixel(100, 80).a, 0)
-  assert_eq(bm.pixel(20, 20).a, 0)
-  assert_eq(bm.pixel(180, 140).a, 0)
+  // 本体 40,40,120x80 / 圆角 8，偏移 (0, 6)，模糊 8，颜色黑 25%
+  p.drop_shadow(40.0, 40.0, 120.0, 80.0, 8.0, 8.0, 0.0, 6.0, "#00000040")
+  // ① 方向：偏移后本体底边在 y=126，再往外 4px 仍有墨；顶边在 y=46，往上 10px
+  //    早该褪干净（46-8=38）——上下不对称就是"悬浮在下方"
+  assert_true(bm.pixel(100, 130).a > 0, msg="下方没有投出去")
+  assert_eq(bm.pixel(100, 30).a, 0)
+  // ② 梯度：左边 x=40 往外逐像素读，浓度单调不增且至少四档
+  let mut prev = 100000
+  let mut steps = 0
+  let seen : Array[Int] = []
+  for x = 39; x >= 32; x = x - 1 {
+    let a = bm.pixel(x, 86).a
+    assert_true(a <= prev, msg="左缘浓度往外反而变深：x=\{x}")
+    prev = a
+    if a > 0 && !seen.contains(a) {
+      let _ = seen.push(a)
+      steps += 1
+    }
+  }
+  assert_true(steps >= 4, msg="左缘只有 \{steps} 档浓度，不是软边")
+  assert_true(bm.pixel(38, 86).a > bm.pixel(33, 86).a, msg="贴边不浓、远处不淡")
+  assert_eq(bm.pixel(30, 86).a, 0, msg="超出模糊半径还有墨")
+  // ③ 角与边同距离同浓度：左边中点 (36,86) 距本体边 3.5px；左上角弧心 (48,54)
+  //    沿 45° 外推同样距离落在像素 (39,45)（实测距弧心 12.02 − 半径 8 ≈ 4）
+  let edge = bm.pixel(36, 86).a
+  let corner = bm.pixel(39, 45).a
+  assert_true(edge > 0 && corner > 0, msg="角或边缺墨：\{edge} / \{corner}")
+  assert_true((edge - corner).abs() <= 16, msg="角与边同距离浓度差太大：\{edge} vs \{corner}")
+  // ④ 本体区域内确有累积（分层填充覆盖它，本体随后盖住）
+  assert_true(bm.pixel(100, 86).a > 0)
+  p.end()
+}
+
+///|
+/// blur ≤ 0 / 尺寸非法 / 全透明颜色都不落墨；只给 blur 不给偏移就是 CSS 的
+/// 零偏移软边（四周对称）。
+test "drop_shadow：无投影的几种输入都不落墨" {
+  let p = Painter::new(Bitmap::new(40, 40))
+  p.drop_shadow(10.0, 10.0, 20.0, 20.0, 2.0, 0.0, 0.0, 4.0, "#00000040")
+  p.drop_shadow(10.0, 10.0, 0.0, 20.0, 2.0, 6.0, 0.0, 0.0, "#00000040")
+  p.drop_shadow(10.0, 10.0, 20.0, 20.0, 2.0, 6.0, 0.0, 0.0, "#00000000")
+  let mut ink = 0
+  for y = 0; y < 40; y = y + 1 {
+    for x = 0; x < 40; x = x + 1 {
+      if rgba(p, x, y).3 > 0 {
+        ink += 1
+      }
+    }
+  }
+  assert_eq(ink, 0)
   p.end()
 }
 

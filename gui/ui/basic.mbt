@@ -79,15 +79,21 @@ pub fn view(
       let bg = @style.color_of(s.background_color, "")
       let bd = @style.color_of(s.border_color, "")
       let rad = @style.number_of(s.border_radius, 0.0)
-      // 硬阴影档（§1.1 的 box_shadow = 外扩半径）：本体之下等步长描环，
-      // 用整层 alpha 压到 25%（模糊档随文本层之外的 blur 能力再评估）
-      let spread = @style.number_of(s.box_shadow, 0.0)
-      if spread > 0.0 {
-        let keep = p.global_alpha()
-        p.set_stroke_color("#000000")
-        p.set_global_alpha(keep * 0.25)
-        p.box_shadow(0.0, 0.0, r.w, r.h, rad, spread)
-        p.set_global_alpha(keep)
+      // 投影（§1.1 的 box_shadow = 模糊半径，shadow_x/shadow_y = 偏移）：画在本体
+      // 之下，浓度与软边都由 `drop_shadow` 的分层填充给出，颜色自带 alpha 就是浓度
+      match @style.shadow_of(s) {
+        None => ()
+        Some((blur, dx, dy, col)) => p.drop_shadow(
+          0.0,
+          0.0,
+          r.w,
+          r.h,
+          rad,
+          blur,
+          dx,
+          dy,
+          col,
+        )
       }
       if bg.length() > 0 {
         p.set_fill_color(bg)
