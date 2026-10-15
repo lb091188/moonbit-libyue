@@ -63,6 +63,7 @@ moon run examples/showcase       # full demo board: component library + system c
 | [tray.md](tray.md) | Linux tray: SNI protocol-stack design, architecture, backend fallback, desktop compatibility |
 | [zh/system-capabilities.md](/zh/system-capabilities.md) (Chinese) | System capabilities (`@sys`): volume / app lookup / night light / wallpaper / monitors / window control / clipboard watch / power profiles / printers / env / recent files / browser bookmarks & history / VS Code history…, with a unified `Result` semantics |
 | [zh/design.md](/zh/design.md) (Chinese) | Frontend-layer design notes: style sheets as MoonBit values (`Style` + named class constants, CSS as an import channel), component naming mapping, reactivity and view-layer decisions |
+| [zh/roadmap.md](/zh/roadmap.md) (Chinese) | Public roadmap: positioning, what you can use today, platform support matrix, stability commitment and versioning, next-phase directions, open decisions, explicit non-goals |
 
 For the project overview and quick start, see the repository root [README.md](https://github.com/lb091188/moonbit-native-gui/#readme).
 

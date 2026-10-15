@@ -128,3 +128,4 @@ cd modules/gui-examples && moon publish
 - CF 域名机制:Cloudflare 文档 Custom domains 页 <https://developers.cloudflare.com/pages/configuration/custom-domains/>。
 - 交接范例:`modules/yoga-mbt/HANDOFF.md`(模块级;格式可参照)。
 - 预演归档:仓库根 `_build/publish/`(本地,未入库)。
+- 对外优化方向(上手门槛 / 可信度 / 内容 / 治理 四方向 + 待定决策 + 明确不做):`docs/zh/roadmap.md`(2026-10-15 新增,已挂文档站侧栏与中英索引)。

@@ -58,6 +58,7 @@ moon run examples/showcase       # 完整演示板：组件库 + 系统能力
 
 | 文档 | 内容 |
 |---|---|
+| [roadmap.md](roadmap.md) | 对外路线图：定位、现在能拿到什么、平台支持矩阵、承诺与版本、下一阶段方向、待定决策、明确不做 |
 | [design.md](design.md) | 前端化设计口径：样式表（MoonBit 的 `Style` 值 + 具名 class 常量，CSS 作导入通道）、组件前端化命名映射、响应式补强四项、视图层定案（`render` 函数替代模板） |
 | [adaptation.md](adaptation.md) | 平台适配经验：各平台实测坑、根因与验证结论（持续更新） |
 | [autostart.md](autostart.md) | 开机自启动：Linux 写 XDG .desktop、Windows 写 HKCU Run 键，is_enabled / enable / disable 统一语义 |

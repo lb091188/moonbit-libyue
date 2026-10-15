@@ -122,6 +122,7 @@ export default defineConfig({
             text: '工程参考',
             items: [
               { text: '文档索引', link: '/zh/README' },
+              { text: '对外路线图', link: '/zh/roadmap' },
               { text: '前端化设计', link: '/zh/design' },
               { text: '平台适配经验', link: '/zh/adaptation' },
             ],
