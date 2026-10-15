@@ -1,15 +1,21 @@
-// 纯 MoonBit 光栅器的覆盖层：扫描线超采样填充 + 描边轮廓生成。
+// 纯 MoonBit 光栅器的覆盖层：扫描线**解析 x + 多子行**填充 + 描边轮廓生成。
 //
 // 口径：
-// - 4×4 超采样（每像素 16 个样本，覆盖 0..256，每样本 16）——同一输入的采样
-//   与累加全是确定的纯 MoonBit 算术，三平台逐位一致；与 cairo 的解析覆盖差
-//   落在 AA 容差带；
+// - 纵向 `RASTER_AA_SUB` 个子行、横向**精确跨度**（覆盖 = 跨度与本列相交的实际
+//   宽度 × 子行权重）——旧实现是 4×4 采样点计数，覆盖只有 17 档，实测一个
+//   r=6 的小圆边缘只剩 2 档灰级（真机看着就是像素画）。现在横向连续、
+//   纵向 1/8 步进（最细 32），圆/弧/斜边的台阶感消失，仍全是确定的纯 MoonBit
+//   算术，三平台逐位一致；与 cairo 的解析覆盖差落在 AA 容差带内；
 // - 非零环绕：跨点带方向（向下 +1），扫描累积非零即内（cairo_fill 默认同）；
 // - 跨点的半开区间判定 (p.y <= ys) != (q.y <= ys)，避免顶点重复计；
 // - 描边 = 折线偏移轮廓（cairo 默认 miter join 上限 10）：开放折线两侧缝成一条
 //   轮廓、两端 butt 帽；闭合折线（含首末点重合的整圆）两侧各成一条闭合轮廓，
 //   外圈正向 + 内圈反向，靠非零环绕挖孔；设备线宽 = 用户线宽 × sqrt(|det|)
 //   （非均匀缩放的笔帽按近似处理，容差带内，记档）。
+
+///|
+/// 纵向抗锯齿子行数（每子行权重 = 256 / 本值）。
+const RASTER_AA_SUB : Int = 8
 
 ///|
 /// 大到等于「无界」的坐标哨兵（不用科学计数法字面量，解析有坑）。
@@ -141,8 +147,8 @@ fn fill_polys(
     }
     let mut ink_l = x1
     let mut ink_r = x0
-    for sub = 0; sub < 4; sub = sub + 1 {
-      let ys = y.to_double() + (sub.to_double() + 0.5) / 4.0
+    for sub = 0; sub < RASTER_AA_SUB; sub = sub + 1 {
+      let ys = y.to_double() + (sub.to_double() + 0.5) / RASTER_AA_SUB.to_double()
       // 老边重算 x：与旧跨点公式同式（x = ax + (bx-ax)×t）——不用增量步进，
       // 步进的浮点漂移会让边界像素覆盖量化翻转（像素断言实测抓红）；AET 的
       // 收益在「边不逐子采样全重扫」。
@@ -189,61 +195,38 @@ fn fill_polys(
         aet_x[j + 1] = xv
         aet_e[j + 1] = ei
       }
-      // 环绕扫 span（非零环绕；口径与旧实现逐位一致）：满覆盖内段直取 256，
-      // 跨度两端的边界像素按采样计，墨迹范围记录下来只合成有墨区间
+      // 环绕扫 span（非零环绕）：满覆盖内段直取 256，两端各至多一个部分覆盖
+      // 像素按**精确相交宽度**计入（旧口径是数 4 个采样点，横向只有 4 档）；
+      // 墨迹范围按 [floor(xa), ceil(xb)) 记录，只合成有墨区间
       let mut wind = 0
       let mut xa = 0.0
       for i2 = 0; i2 < aet_len; i2 = i2 + 1 {
         let xb = aet_x[i2]
         if wind != 0 && xb > xa {
-          let s0 = (xa - 0.125).ceil().to_int()
-          let s1 = (xb - 0.875).ceil().to_int() - 1
-          let mut t0 = -1
-          let mut t1 = -1
-          if s0 > s1 {
-            // 跨度不足一像素：可能仍骑在两个像素上（如 [10.6, 11.4)），
-            // 覆盖范围 = [floor(xa), ceil(xb))，逐像素按采样计
-            let p0 = raster_max_i(xa.floor().to_int(), x0)
-            let p1 = raster_min_i(xb.ceil().to_int(), x1)
-            for px = p0; px < p1; px = px + 1 {
-              add_pixel_samples(cov, x0, x1, px, xa, xb)
+          let p0 = raster_max_i(xa.floor().to_int(), x0)
+          let p1 = raster_min_i(xb.ceil().to_int(), x1)
+          if p1 > p0 {
+            if p0 < ink_l {
+              ink_l = p0
             }
-            if p1 > p0 {
-              t0 = p0
-              t1 = p1
+            if p1 > ink_r {
+              ink_r = p1
             }
-          } else {
-            let a0 = raster_max_i(s0, x0)
-            let a1 = raster_min_i(s1 + 1, x1)
-            for px = a0; px < a1; px = px + 1 {
-              cov[px] = 256
-            }
-            // 两端边界像素（各至多一个采样不满的像素）
-            add_pixel_samples(cov, x0, x1, s0 - 1, xa, xb)
-            add_pixel_samples(cov, x0, x1, s1 + 1, xa, xb)
-            if s0 - 1 >= x0 && s0 - 1 < a0 {
-              t0 = s0 - 1
-            }
-            // 右边界像素 s1+1 的合成上界是**开区间** s1+2
-            if s1 + 1 < x1 && s1 + 1 > a1 - 1 {
-              t1 = s1 + 2
-            }
-            if t0 < 0 {
-              t0 = a0
-            }
-            if t1 < 0 {
-              t1 = a1
-            }
-            if a1 > t1 {
-              t1 = a1
-            }
-          }
-          if t1 > t0 {
-            if t0 < ink_l {
-              ink_l = t0
-            }
-            if t1 > ink_r {
-              ink_r = t1
+            let s0 = xa.ceil().to_int()
+            let s1 = xb.floor().to_int() - 1
+            if s0 > s1 {
+              // 跨度不足一像素（或正好骑在两个像素上）：逐像素按精确宽度计
+              for px = p0; px < p1; px = px + 1 {
+                add_pixel_span(cov, x0, x1, px, xa, xb)
+              }
+            } else {
+              add_pixel_span(cov, x0, x1, s0 - 1, xa, xb)
+              let a0 = raster_max_i(s0, x0)
+              let a1 = raster_min_i(s1 + 1, x1)
+              for px = a0; px < a1; px = px + 1 {
+                cov[px] = 256
+              }
+              add_pixel_span(cov, x0, x1, s1 + 1, xa, xb)
             }
           }
         }
@@ -258,9 +241,9 @@ fn fill_polys(
 }
 
 ///|
-/// 单像素的 4 个 x 样本落入 [xa, xb) 的个数 ×16 计入覆盖（封顶 256）。
-/// 越界像素与零样本不计。
-fn add_pixel_samples(
+/// 单个像素在**一个子行**里的覆盖：跨度 [xa, xb) 与本列 [px, px+1) 的精确相交
+/// 宽度 × 子行权重（256 / RASTER_AA_SUB）。越界与零相交不计。
+fn add_pixel_span(
   cov : FixedArray[Int],
   cx0 : Int,
   cx1 : Int,
@@ -271,17 +254,16 @@ fn add_pixel_samples(
   if px < cx0 || px >= cx1 {
     return
   }
-  let mut cnt = 0
-  for j = 0; j < 4; j = j + 1 {
-    let xs = px.to_double() + (j.to_double() + 0.5) / 4.0
-    if xs >= xa && xs < xb {
-      cnt = cnt + 1
-    }
-  }
-  if cnt <= 0 {
+  let left = if xa > px.to_double() { xa } else { px.to_double() }
+  let right = if xb < (px + 1).to_double() { xb } else { (px + 1).to_double() }
+  if right <= left {
     return
   }
-  let nv = cov[px] + cnt * 16
+  let add = ((right - left) * (256.0 / RASTER_AA_SUB.to_double())).round().to_int()
+  if add <= 0 {
+    return
+  }
+  let nv = cov[px] + add
   cov[px] = if nv > 256 { 256 } else { nv }
 }
 

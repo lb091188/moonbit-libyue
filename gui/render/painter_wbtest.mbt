@@ -428,3 +428,80 @@ test "fill_round_rect：分数边有边缘 AA 且不整体偏移" {
   assert_eq(rgba(p, 0, 0).3, 0)
   p.end()
 }
+
+///|
+/// 边缘灰级读数：一块画布里「半墨像素」的个数与**互不相同的 alpha 档数**。
+/// 档数是「像素画感」的直接度量——只有极少几档时，曲线沿线的明暗是跳变的。
+fn aa_levels(p : Painter, w : Int, h : Int) -> (Int, Int) {
+  let seen : Array[Int] = []
+  let mut n = 0
+  for y = 0; y < h; y = y + 1 {
+    for x = 0; x < w; x = x + 1 {
+      let a = rgba(p, x, y).3
+      if a > 0 && a < 255 {
+        n += 1
+        if !seen.contains(a) {
+          let _ = seen.push(a)
+        }
+      }
+    }
+  }
+  (n, seen.length())
+}
+
+///|
+/// 两后端同口径：**圆/弧/圆环的边缘要有足够多的中间灰级**。
+/// 光栅器原先是 4×4 采样点计数，覆盖只有 17 档、横向仅 4 档——实测 r=25 的
+/// 填充圆整圈只有 8 档、r=6 的小圆（开关滑珠、单选圆心就是这个尺寸）只有
+/// 2 档，真机看着是像素画。现改「纵向 8 子行 + 横向精确跨度」，这条按档数
+/// 钉住（旧实现下三条判据全红）。
+test "圆与圆环的边缘灰级（不再是像素画）" {
+  let p = red_painter(80, 80)
+  p.begin_path()
+  p.move_to(65.0, 40.0)
+  p.arc(40.0, 40.0, 25.0, 0.0, 6.283185307179586)
+  p.fill()
+  let (n25, l25) = aa_levels(p, 80, 80)
+  assert_true(n25 >= 60, msg="r=25 填充圆的边缘格太少：\{n25}")
+  assert_true(l25 >= 16, msg="r=25 填充圆的边缘只有 \{l25} 档灰级")
+  p.end()
+
+  let q = Painter::new(Bitmap::new(80, 80))
+  q.set_stroke_color("#ff0000")
+  q.set_line_width(2.0)
+  q.begin_path()
+  q.move_to(65.0, 40.0)
+  q.arc(40.0, 40.0, 25.0, 0.0, 6.283185307179586)
+  q.stroke()
+  let (_nring, lring) = aa_levels(q, 80, 80)
+  assert_true(lring >= 20, msg="lw=2 圆环沿线只有 \{lring} 档灰级")
+  q.end()
+
+  // 小尺寸才是真机最常见的（滑珠/圆心 r=6）：旧口径这里只有 2 档
+  let s = red_painter(24, 24)
+  s.begin_path()
+  s.move_to(18.0, 12.0)
+  s.arc(12.0, 12.0, 6.0, 0.0, 6.283185307179586)
+  s.fill()
+  let (_ns, ls) = aa_levels(s, 24, 24)
+  assert_true(ls >= 4, msg="r=6 小圆只有 \{ls} 档灰级")
+  s.end()
+}
+
+///|
+/// 浅角度斜边也要有连续灰级。**注意**：正好 45° 的直线段几何上每个像素的相对
+/// 位置相同，本来就只有约两档（实测 lw=1 与 lw=3 都是 2 档），那不是 AA 缺陷，
+/// 所以这条判据用 32° 的线段。
+test "浅角度斜线边缘的灰级连续" {
+  let p = Painter::new(Bitmap::new(40, 40))
+  p.set_stroke_color("#ff0000")
+  p.set_line_width(1.5)
+  p.begin_path()
+  p.move_to(4.0, 30.0)
+  p.line_to(36.0, 10.0)
+  p.stroke()
+  let (n, l) = aa_levels(p, 40, 40)
+  assert_true(n >= 30, msg="32° 描边的边缘格太少：\{n}")
+  assert_true(l >= 5, msg="32° 描边只有 \{l} 档灰级")
+  p.end()
+}
