@@ -4,8 +4,7 @@
 // **字号 + 行高**。后两条是绘制与测量都要用的 `<length>`（CSS 里同样可动画），
 // 所以测量期也必须读同一份插值值（见 `resolved_for_measure`）——本栈每帧本来就
 // 走一圈 relayout，它们跟着长不额外排一次。
-// `opacity` / `box_shadow` 的生效点是 `apply` → `Widget` 字段（绘制遍历不逐帧读槽），
-// 不在集合里。
+// `opacity` 的生效点是 `apply` → `Widget` 字段（绘制遍历不逐帧读槽），不在集合里。
 //
 // 帧驱动复用进程级 `@core.set_timeout`：每拍只给活动中的控件局部置脏
 // （`@core.invalidate_id`），全部收敛就停表，不空转。

@@ -42,8 +42,8 @@ ui 只管组件，三包职责不混。
 | flex 布局 | `display`（`flex` / `none`）、`flex_direction`、`flex_wrap`（`nowrap` / `wrap` / `wrap-reverse`）、`justify_content`、`align_items`、`align_self`、`flex`（grow）、`gap`、`row_gap`、`column_gap` | Yoga |
 | 定位 | `position`（`relative` / `absolute`）、`top`、`right`、`bottom`、`left`、`z_index` | Yoga（`set_position` / `set_top` …底层现成，含百分比 inset；`z_index` 由 yoga-mbt 随 P1 补齐，见 §5）。Style 首批只开逻辑像素值，百分比入口同 `width_percent` 形态另开 |
 | 状态 | `hover`、`active`、`focus`（各是一个嵌套 `Style`） | 绘制期按控件状态选桶，见 §1.3 |
-| 效果 | `opacity`、`box_shadow` + `shadow_x` / `shadow_y` / `shadow_color`（投影＝CSS `box-shadow` 的 blur / x / y / color 四位） | `opacity` 落 `Widget.alpha_paint`（绘制遍历累乘）；投影由 `apply` 把 **外扩量 = blur + |dx| + |dy|** 落进 `Widget.shadow_paint`，绘制遍历据此放大本控件的裁剪窗口**并同样放大视口剔除判交**（否则本体刚滑出视口时软边整圈消失；祖先自己会把它裁掉，与 CSS `overflow:hidden` 同义）；本体由 `view` 在填充之前调 `Painter::drop_shadow`——同心外扩的分层填充做羽化，不走「外环 + 反向内环挖洞」（两后端都没有反向弧，四角会叠成深色圆斑） |
-| 过渡 | `transition_ms`（状态桶切换的时长，毫秒） | 只在**绘制期**生效：`style_for` 的出口按真实时间把「当前显示值 → 目标桶值」插一帧出来。参与插值的是 `color`、`background_color`、`border_color`、`border_width`、`border_radius`、**字号 `font_size`** 与**行高 `line_height`**（后两条 2026-10-15 补：用户反馈「字号动画不是动画，是直接的变化」；CSS 里这两条都是可动画的 `<length>`）——字号/行高是绘制与测量共用的属性，测量期一并读同一份插值值（`resolved_for_measure`），否则字放大后盒子还按旧字号量、看着仍像跳变；本栈每帧本来就走一圈 relayout，插值它们不额外排一次。这两条在动画期间改走**整窗置脏**（局部脏区按上一帧的矩形并，长大那圈会被裁掉），其余属性仍局部置脏。`opacity` / `box_shadow` 的生效点在 `apply` 落 `Widget` 字段（绘制遍历不逐帧读槽），尺寸类布局属性切换即生效 |
+| 效果 | `opacity`（投影档 `box_shadow` 已于 2026-10-15 撤除） | `opacity` 落 `Widget.alpha_paint`（绘制遍历累乘）。投影曾做过两版：先是一圈等浓度描边（突兀），后改同心外扩分层填充 + CSS 四位 `blur/x/y/color`（[`Painter::drop_shadow`]），真机复验仍判「不如人意」，用户拍板整条撤掉——字段、渲染入口、`Widget.shadow_paint` 与裁剪/剔除放大一并删除，将来有真高斯 blur 再重新评估；过程与读数见 `docs/zh/adaptation.md`「阴影」节 |
+| 过渡 | `transition_ms`（状态桶切换的时长，毫秒） | 只在**绘制期**生效：`style_for` 的出口按真实时间把「当前显示值 → 目标桶值」插一帧出来。参与插值的是 `color`、`background_color`、`border_color`、`border_width`、`border_radius`、**字号 `font_size`** 与**行高 `line_height`**（后两条 2026-10-15 补：用户反馈「字号动画不是动画，是直接的变化」；CSS 里这两条都是可动画的 `<length>`）——字号/行高是绘制与测量共用的属性，测量期一并读同一份插值值（`resolved_for_measure`），否则字放大后盒子还按旧字号量、看着仍像跳变；本栈每帧本来就走一圈 relayout，插值它们不额外排一次。这两条在动画期间改走**整窗置脏**（局部脏区按上一帧的矩形并，长大那圈会被裁掉），其余属性仍局部置脏。`opacity` 的生效点在 `apply` 落 `Widget` 字段（绘制遍历不逐帧读槽），尺寸类布局属性切换即生效 |
 | 其它 | `visibility`、`cursor` | 宿主 `Widget`（`set_visible` / `cursor`） |
 
 ### 1.2 没有的属性（写不出来，而不是运行时报错）
@@ -522,14 +522,14 @@ fn render(ctx : Ctx) -> @core.Node {
 | P1 | 新建 `gui/style` 包：`Style` 字段集（含定位组 `position` / `top` / `right` / `bottom` / `left`——底层 yoga 现成，含百分比 inset 的能力后补入口）+ `Color` + kwargs 构造（`style(...)` 工厂属性名即参数名 + `.hover(...)` / `.active(...)` / `.focus(...)` 状态方法，§1.3，W3C 规则模型）+ `merge`（逐属性并集、状态桶递归）+ **全量**内置常量表（§2 每个组件的基调，`tokens.mbt`）+ `Widget` 上存 resolved `Style` 的位置 + `apply`；**yoga-mbt 补 `z_index`**（`set_z_index` + 布局输出按 z_index 稳定排序，Yoga 上游同构；gui 侧绘制按 resolved 值重排 kids，`Style` 同步开 `z_index` 字段）；顺带 `Widget::set_margin` labelled 化（同形统一） | 新包测试 + `Widget` 样式槽用例 + 定位字段落到 yoga 的布局用例 + yoga-mbt 模块 z_index 用例（正序/负值/并列稳定）+ `cd gui && moon check` 零错零警 |
 | P2 | 组件改名（按 §2 映射表，含 `_t` 合并）+ `on_*` 统一 + 散参数改名并折算成匿名 `Style`（排解析序列最前）+ 展示类组件补 `_dyn` 信号版（§3 第 5 条通则）+ **逐组件把 `on_draw` 从「读捕获的散参数」改成「读 `self` 上的样式并按状态选桶」** | 全仓 `moon check` 零错零警，910 处调用点全切完，观感逐页比对不回退 |
 | P3 | 响应式补强：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘 / `for_list`+`when` / `mount_window` 补 `render` 槽（挂载时调用一次建首帧，§4.0；与节点数组二选一） | 分包测试 + 现有 Store 用例不回归 + `hello-themed`/`sysmonitor` 静态挂载形态不回归 |
-| P4 | 绘制能力补齐：**`Painter` 全局 alpha**（`opacity`：alpha 进绘制状态机，铺满填充 / 描边 / 文本 / 图片全路径，`Style` 开 `opacity` 字段——颜色级 alpha 已有，本批补整层）+ `box_shadow`（阴影档：2026-10-15 由硬边描环改为**同心外扩分层填充**的软边投影，另开 `shadow_x`/`shadow_y`/`shadow_color` 三位对齐 CSS `box-shadow`；真高斯 blur 仍随渲染层的 blur 能力再评估） | 各自用例（opacity 含全路径覆盖验证）+ 回写 `docs/zh/adaptation.md` |
+| P4 | 绘制能力补齐：**`Painter` 全局 alpha**（`opacity`：alpha 进绘制状态机，铺满填充 / 描边 / 文本 / 图片全路径，`Style` 开 `opacity` 字段——颜色级 alpha 已有，本批补整层）+ `box_shadow`（阴影档：2026-10-15 曾由硬边描环改为同心外扩分层填充并补齐 CSS 四位，真机复验不过关，**同日整条撤除**——本栈当前不提供投影） | 各自用例（opacity 含全路径覆盖验证）+ 回写 `docs/zh/adaptation.md` |
 | P5 | 动画：`transition`（状态桶属性插值 + 帧驱动）——`Style` 开 `transition_ms`，`style_for` 出口按真实时间插帧（插值集合见 §1.1「过渡」行），帧驱动复用进程级 `set_timeout`，每拍只给活动中的控件局部置脏（`invalidate_id`），全部收敛即停表 | 插值与状态机用例 + 真机观感（showcase「过渡与效果」页）+ 回写 `docs/zh/adaptation.md` |
 
 `on_*` 与散参数改名都在 P2 的改名范围内，合批做，P1 之前不加批。
 
 **动画的代价就是「连续置脏重绘」每帧多少钱**，所以它排在脏矩形与文本布局缓存之后：
 局部脏区一帧的实测读数决定过渡能开多长，不决定它怎么设计（读数与判据写在
-`docs/zh/adaptation.md`，不在这里重复）。P4 的 `opacity` / `box_shadow` 是**静态属性**
+`docs/zh/adaptation.md`，不在这里重复）。P4 的 `opacity` 是**静态属性**
 （画一帧就够），不参与插值集合。
 
 每批单独提交；实测坑按 `AGENTS.md` 规则 7 回写 `docs/zh/adaptation.md`；使用类说明写进

@@ -67,12 +67,8 @@ pub fn style(
   bottom? : Double,
   left? : Double,
   z_index? : Int,
-  // —— P4：整层透明度与投影（CSS `box-shadow` 的四位：blur / x / y / color）
+  // —— P4：整层透明度（投影档已撤，见 style.mbt 的同名注释）
   opacity? : Double,
-  box_shadow? : Double,
-  shadow_x? : Double,
-  shadow_y? : Double,
-  shadow_color? : String,
   // —— P5：状态桶切换的过渡时长（毫秒；参与插值的字段见 §1.5）
   transition_ms? : Double,
   // —— 其它
@@ -194,13 +190,6 @@ pub fn style(
   s.left = left
   s.z_index = z_index
   s.opacity = opacity
-  s.box_shadow = box_shadow
-  s.shadow_x = shadow_x
-  s.shadow_y = shadow_y
-  match shadow_color {
-    Some(c) => s.shadow_color = Some(check_color(parse_color(c)))
-    None => ()
-  }
   s.transition_ms = transition_ms
   s.visibility = visibility
   s.cursor = cursor

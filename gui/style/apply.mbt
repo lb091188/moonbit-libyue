@@ -183,14 +183,6 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit {
   }
   let merged = merge(prev, s)
   resolved_table.set(w.id, merged)
-  match shadow_of(merged) {
-    // 阴影外扩量 = 模糊半径 + 偏移量：绘制遍历把本控件的裁剪窗口放大这么多，
-    // 投影才画得出盒外——与 CSS 同义（阴影画在 border-box 之外，除非祖先
-    // `overflow:hidden`，本栈里就是祖先自己的矩形把它裁掉）。按合并后的基块算，
-    // 所以后一次 apply 只补偏移时外扩量也跟着补上。
-    Some((b, dx, dy, _)) => w.shadow_paint = b + dx.abs() + dy.abs()
-    None => ()
-  }
   // 带状态桶 = 绘制随悬停/按下/焦点变 → 告诉宿主「悬停变化时我的矩形也要重画」
   let stateful = match (merged.hover, merged.active, merged.focus) {
     (Some(_), _, _) | (_, Some(_), _) | (_, _, Some(_)) => true
@@ -316,28 +308,5 @@ pub fn string_of(v : String?, fallback : String) -> String {
   match v {
     Some(x) => x
     None => fallback
-  }
-}
-
-///|
-/// 投影四件套（CSS `box-shadow: blur x y color` 的语义）：`box_shadow` 是模糊半径，
-/// 偏移未写按 0、颜色未写用内置基调（黑 25%）。模糊半径 ≤0 或没写 → None，
-/// 即「没有投影」，绘制方一条都不画。
-pub fn shadow_of(
-  s : Style,
-) -> (Double, Double, Double, String)? {
-  match s.box_shadow {
-    Some(b) =>
-      if b <= 0.0 {
-        None
-      } else {
-        Some((
-          b,
-          number_of(s.shadow_x, 0.0),
-          number_of(s.shadow_y, 0.0),
-          color_of(s.shadow_color, "#00000040"),
-        ))
-      }
-    None => None
   }
 }

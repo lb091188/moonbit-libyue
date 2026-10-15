@@ -707,8 +707,8 @@ test "布局散参数也折进匿名块：class 的宽与内边距盖过散参�
 
 ///|
 /// §1.1「文本与颜色」那半张表接上真生效路径：`text_align` / `white_space` /
-/// `line_height` / `text_decoration` 由样式槽驱动测量与绘制，`box_shadow` 由 `view` 落。
-test "文本类样式属性真生效：对齐/换行/行高/下划线与硬阴影" {
+/// `line_height` / `text_decoration` 由样式槽驱动测量与绘制（投影档已撤，见 style.mbt）。
+test "文本类样式属性真生效：对齐/换行/行高/下划线" {
   if !ui_text_guard() {
     return
   }
@@ -801,82 +801,6 @@ test "文本类样式属性真生效：对齐/换行/行高/下划线与硬阴�
     msg="下划线没多出墨：plain=\{plain_ink} under=\{under_ink} 行=\{_pr}/\{_ur} measure_font(13.0)=\{probe}",
   )
 
-  // 5) 投影：本体之外出现墨（不画投影时盒外无墨）
-  let shadow_outside = fn(cls : Array[@style.Style]) -> Int {
-    let root = mount_root(
-      [view([], width=40.0, height=20.0, background_color="bg_panel", class=cls)],
-      120.0,
-      80.0,
-    )
-    let bm = @render.Bitmap::new(120, 80)
-    let p = @render.Painter::new(bm)
-    root.paint(p)
-    p.end()
-    let mut n = 0
-    for y = 0; y < 80; y = y + 1 {
-      for x = 42; x < 120; x = x + 1 {
-        if bm.pixel(x, y).a > 0 {
-          n += 1
-        }
-      }
-    }
-    n
-  }
-  assert_eq(shadow_outside([]), 0)
-  assert_true(shadow_outside([@style.style(box_shadow=6.0)]) > 10)
-
-  // 6) 方向感（用户反馈「不是真的悬浮在元素下方」的落点）：先放一只 24 高的垫块
-  //    把带投影的卡片推到 y=24，再数卡片**上侧**与**下侧**盒外的墨格。
-  //    `shadow_y>0` 时墨要往下挪——上方变少、下方变多。
-  let shadow_bands = fn(cls : Array[@style.Style]) -> (Int, Int) {
-    let root = mount_root(
-      [
-        view([], width=40.0, height=24.0),
-        view(
-          [],
-          width=40.0,
-          height=20.0,
-          background_color="bg_panel",
-          class=cls,
-        ),
-      ],
-      120.0,
-      80.0,
-    )
-    let bm = @render.Bitmap::new(120, 80)
-    let p = @render.Painter::new(bm)
-    root.paint(p)
-    p.end()
-    let r = root.children()[1].rect
-    let mut above = 0
-    let mut below = 0
-    for y = 0; y < 80; y = y + 1 {
-      let in_band = y.to_double() >= r.y && y.to_double() < r.y + r.h
-      if !in_band {
-        for x = 0; x < 120; x = x + 1 {
-          if bm.pixel(x, y).a > 0 {
-            if y.to_double() < r.y {
-              above += 1
-            } else {
-              below += 1
-            }
-          }
-        }
-      }
-    }
-    (above, below)
-  }
-  let flat = shadow_bands([@style.style(box_shadow=6.0)])
-  let dropped = shadow_bands([@style.style(box_shadow=6.0, shadow_y=4.0)])
-  assert_true(flat.0 > 0 && flat.1 > 0, msg="上下都没地方数墨：上 \{flat.0} 下 \{flat.1}")
-  assert_true(
-    dropped.1 > flat.1,
-    msg="给了 shadow_y 下方却没多出去：\{flat.1} → \{dropped.1}",
-  )
-  assert_true(
-    dropped.0 < flat.0,
-    msg="给了 shadow_y 上方却没收回来：\{flat.0} → \{dropped.0}",
-  )
 }
 
 ///|

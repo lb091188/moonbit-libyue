@@ -350,60 +350,6 @@ fn clamp_radius(r : Double, w : Double, h : Double) -> Double {
   }
 }
 
-///|
-/// 真投影（design.md §5 P4 的模糊档）：把圆角矩形**偏移 (dx, dy) 再羽化 blur 像素**
-/// 投在本体之下，对应 CSS `box-shadow: dx dy blur color`。调用方先画它、再画本体。
-///
-/// 画法是**同心外扩的分层填充**：圆角矩形与半径 e 的圆盘做 Minkowski 和，结果仍是
-/// 圆角矩形（宽高各 +2e、半径 +e），于是从外到内画 `layers` 层同一形状，每层浓度 =
-/// 总浓度 / 层数（source-over 累积近似线性）——贴着本体边最浓、到 blur 处褪到近乎
-/// 没有，这就是「悬浮」的软边与方向感。不走「外环 + 反向内环挖洞」那条路：两后端
-/// 都没有可用的反向弧（`arc` 的 ccw 把递减角规范化成 270° 长弧），洞挖不干净，
-/// 旧版四角因此叠出深色圆斑；分层填充各向同性，**同一距离上角与边浓度相同**。
-/// 本体画在最内层之上，内层那部分过度累积正被本体遮住（背景透明的本体透出阴影
-/// 与 CSS 同义，不是缺陷）。
-pub fn Painter::drop_shadow(
-  self : Painter,
-  x : Double,
-  y : Double,
-  w : Double,
-  h : Double,
-  radius : Double,
-  blur : Double,
-  dx : Double,
-  dy : Double,
-  color : String,
-) -> Unit {
-  self.raster_gate()
-  if blur <= 0.0 || w <= 0.0 || h <= 0.0 {
-    return ()
-  }
-  // 层数≈每 1px 一档过渡带：blur 很小也要两层才有梯度，封顶 8 层控成本
-  let layers =
-    if blur <= 1.0 {
-      2
-    } else if blur >= 8.0 {
-      8
-    } else {
-      blur.round().to_int()
-    }
-  let n = layers.to_double()
-  let keep = self.state.global_alpha
-  self.set_fill_color(color)
-  // 由外向内：最外层外扩 blur，最内层只外扩 blur/层数（贴着偏移后的本体边）
-  for i = layers; i >= 1; i = i - 1 {
-    let e = blur * i.to_double() / n
-    self.set_global_alpha(keep / n)
-    self.fill_round_rect(
-      x + dx - e,
-      y + dy - e,
-      w + e * 2.0,
-      h + e * 2.0,
-      radius + e,
-    )
-  }
-  self.set_global_alpha(keep)
-}
 
 
 

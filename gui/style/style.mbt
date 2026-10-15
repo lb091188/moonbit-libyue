@@ -53,15 +53,10 @@ pub(all) struct Style {
   mut bottom : Double?
   mut left : Double?
   mut z_index : Int?
-  // —— P4：整层透明度（0..1，画期把 global alpha 乘进全路径）与投影
-  // `box_shadow` = 模糊半径（CSS `box-shadow` 的 blur 位，逻辑像素），
-  // `shadow_x` / `shadow_y` = 偏移（未写按 0），`shadow_color` = 颜色（自带 alpha
-  // 就是投影浓度；未写用内置基调 `#00000040`）。只写 blur 就是 CSS 的零偏移投影。
+  // —— P4：整层透明度（0..1，画期把 global alpha 乘进全路径）
+  // 投影档（box_shadow 那四位）已于 2026-10-15 真机复验后整条撤掉：分层近似的
+  // 软边在真机上仍不如人意，用户拍板不做——见 docs/zh/adaptation.md「阴影」节。
   mut opacity : Double?
-  mut box_shadow : Double?
-  mut shadow_x : Double?
-  mut shadow_y : Double?
-  mut shadow_color : Color?
   // —— P5：状态桶切换的过渡时长（毫秒；不写或 0 = 直接切换）
   mut transition_ms : Double?
   // —— 其它（落宿主 Widget）
@@ -122,10 +117,6 @@ pub fn empty_style() -> Style {
     left: None,
     z_index: None,
     opacity: None,
-    box_shadow: None,
-    shadow_x: None,
-    shadow_y: None,
-    shadow_color: None,
     transition_ms: None,
     visibility: None,
     cursor: None,
@@ -213,10 +204,6 @@ pub fn merge(base : Style, over : Style) -> Style {
   s.left = pick(base.left, over.left)
   s.z_index = pick(base.z_index, over.z_index)
   s.opacity = pick(base.opacity, over.opacity)
-  s.box_shadow = pick(base.box_shadow, over.box_shadow)
-  s.shadow_x = pick(base.shadow_x, over.shadow_x)
-  s.shadow_y = pick(base.shadow_y, over.shadow_y)
-  s.shadow_color = pick(base.shadow_color, over.shadow_color)
   s.transition_ms = pick(base.transition_ms, over.transition_ms)
   s.visibility = pick(base.visibility, over.visibility)
   s.cursor = pick(base.cursor, over.cursor)
@@ -531,30 +518,6 @@ pub fn merge_all(blocks : Array[Style]) -> Style {
 ///|
 pub fn Style::set_opacity(self : Style, v : Double?) -> Style {
   self.opacity = v
-  self
-}
-
-///|
-pub fn Style::set_box_shadow(self : Style, v : Double?) -> Style {
-  self.box_shadow = v
-  self
-}
-
-///|
-pub fn Style::set_shadow_x(self : Style, v : Double?) -> Style {
-  self.shadow_x = v
-  self
-}
-
-///|
-pub fn Style::set_shadow_y(self : Style, v : Double?) -> Style {
-  self.shadow_y = v
-  self
-}
-
-///|
-pub fn Style::set_shadow_color(self : Style, v : Color?) -> Style {
-  self.shadow_color = v
   self
 }
 

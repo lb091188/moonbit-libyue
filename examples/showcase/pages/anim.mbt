@@ -2,7 +2,7 @@
 //
 // 参与插值的是每帧从样式槽读出的绘制期属性：三条颜色 + 边框宽 + 圆角 + 字号 + 行高
 // （后两条与 CSS 同口径可动画，测量期读同一份插值值，见 `@style.transition`）。
-// `opacity` / `box_shadow` 的生效点是 `apply` 落宿主字段，不插值。
+// `opacity` 的生效点是 `apply` 落宿主字段，不插值。
 
 ///|
 fn hover_card(label : String, sub : String, dur : Double) -> @core.Node {
@@ -118,7 +118,7 @@ pub fn page_anim(_app : @shared.App) -> @core.Node {
     @shared.section(
       "文本与效果",
       "样式槽里的文本字段",
-      "`text_align` 定绘制对齐、`white_space` 定折行、`line_height` 抬高行盒、`text_decoration` 画下划线、`box_shadow` + `shadow_x` / `shadow_y` / `shadow_color` 投出带偏移的软边投影（对应 CSS `box-shadow` 的 blur / x / y / color 四位，颜色自带 alpha 就是浓度）。都是绘制期属性，写进 `class` 就生效，组件不必另开参数。",
+      "`text_align` 定绘制对齐、`white_space` 定折行、`line_height` 抬高行盒、`text_decoration` 画下划线。都是绘制期属性，写进 `class` 就生效，组件不必另开参数。（投影档试过分层羽化，真机观感不过关，已整条撤掉。）",
       [
         @ui.col(
           [
@@ -164,56 +164,6 @@ pub fn page_anim(_app : @shared.App) -> @core.Node {
               row_gap=8.0,
               align_items=@yoga.AlignItems::FlexStart,
             ),
-            @ui.view(
-              [
-                @ui.text("悬浮卡片（投影）", align=@text.Center),
-                @ui.text(
-                  "box_shadow=12 · shadow_y=6（往下投 + 羽化）",
-                  role=@ui.Secondary,
-                  align=@text.Center,
-                ),
-              ],
-              width=220.0,
-              height=64.0,
-              row_gap=2.0,
-              align_items=@yoga.AlignItems::Center,
-              justify_content=@yoga.JustifyContent::Center,
-              class=[
-                @style.style(
-                  background_color="bg_panel",
-                  border_color="border",
-                  border_radius=8.0,
-                  box_shadow=12.0,
-                  shadow_y=6.0,
-                ),
-              ],
-            ),
-            @ui.view(
-              [
-                @ui.text("自己定的浓度", align=@text.Center),
-                @ui.text(
-                  "box_shadow=16 · shadow_y=10 · shadow_color",
-                  role=@ui.Secondary,
-                  align=@text.Center,
-                ),
-              ],
-              width=220.0,
-              height=64.0,
-              row_gap=2.0,
-              align_items=@yoga.AlignItems::Center,
-              justify_content=@yoga.JustifyContent::Center,
-              class=[
-                @style.style(
-                  background_color="bg_panel",
-                  border_color="border",
-                  border_radius=12.0,
-                  box_shadow=16.0,
-                  shadow_x=0.0,
-                  shadow_y=10.0,
-                  shadow_color="#1e293b59",
-                ),
-              ],
-            ),
           ],
           row_gap=12.0,
           align_items=@yoga.AlignItems::FlexStart,
@@ -223,11 +173,6 @@ pub fn page_anim(_app : @shared.App) -> @core.Node {
         "@style.style(text_decoration=@style.Underline)",
         "@style.style(text_align=@text.End, line_height=32.0)",
         "@style.style(white_space=@style.Normal, max_width=300.0)",
-        "// 投影＝CSS 的四位：blur / x / y / color（color 自带 alpha 就是浓度）",
-        "@style.style(",
-        "  border_radius=8.0,",
-        "  box_shadow=12.0, shadow_y=6.0, shadow_color=\"#1e293b59\",",
-        ")",
       ],
     ),
   ])

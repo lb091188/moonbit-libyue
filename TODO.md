@@ -74,7 +74,7 @@
   - [x] §1.1「文本与颜色」表里此前无人消费的字段接上真生效路径（`text_eff` 合流：绘制读 `style_for`、测量读 `resolved_by_id`——测量回调只拿 id，拿句柄就是引用环）：`text_align` 定对齐、`white_space` 定折行并参与测量、`line_height` 覆盖单行行盒高、`text_decoration=underline` 自绘基线下 1px 线（文本层 range 只有 font+color）；`box_shadow` 开 `Widget.shadow_paint` 通道，绘制遍历按它放大本控件裁剪窗口，阴影才画得出盒外（与 CSS 同义）。**仅剩 `letter_spacing` 未接**：要文本层先开字距接口（Pango/DWrite 都有该能力，本层未暴露），属文本层能力批。
   - [ ] 观感逐页比对不回退（真机由用户复验，`examples/hello`、`hello-themed`、`showcase`、`native-app`、`sysmonitor`）。
 - [x] **P3 响应式补强**（2026-10-14 落地）：`ListStore` keyed 差分 / `effect`+`watch` / 帧末合并重绘（`tick`）/ `for_list`+`when` / `mount_window_render` 的 `render` 槽 / `Store` 内建去重（`T : Eq` 走 `set_eq`，已定案）全部落地。
-- [x] **P4 绘制能力**：`Painter` 全局 alpha（opacity 全路径）+ `box_shadow` 硬阴影档（真机观感复验归 `_人工测试清单.md`；模糊档待 blur 能力再评估）。
+- [x] **P4 绘制能力**：`Painter` 全局 alpha（opacity 全路径）+ `box_shadow` 硬阴影档（**2026-10-15 整条撤除**：先改同心外扩分层羽化 + CSS 四位，真机观感不过关，用户拍板砍掉；字段/渲染入口/`Widget.shadow_paint` 一并删除，见 `docs/zh/adaptation.md`「阴影」节)（真机观感复验归 `_人工测试清单.md`；模糊档待 blur 能力再评估）。
 - [x] **描边口径统一（2026-10-14，真机反馈「色板边框偏移」）**：门面契约是「`stroke_rect` 落在矩形**内侧**」（两后端同实现），但全仓 28 处调用点按居中习惯给 `(0.5, 0.5, w-1, h-1)` ⇒ 环整体往右下偏 1px（左/上露一条色底）。换算 `(x-lw/2, y-lw/2, w+lw, h+lw)` 并全仓切过（ui + chart + 示例）；按钮焦点环那条测试原本照着错几何采第 1 列，改采第 0 列，另加色板四边对称钉桩。
 - [x] **非 Windows 侧编不过**（2026-10-14）：sys 电源方案批把两条带 `GUID` 形参的 `static` helper 写在所有守卫外（`static` 未调用也要过类型检查），Linux 上 `unknown type name 'GUID'` 直接炸掉整仓构建；两条 helper 圈进 `#if defined(_WIN32)`。口径：类型来自平台头的函数整段进守卫，改完 C 至少跑一次非目标平台编译。
 - [x] **穿梭框面板太小**（2026-10-14，真机反馈）：默认 160×min 60 小得不像可操作列表 ⇒ 默认 200×160，并开 `height?` 参数（项多了仍自己长高，不裁行）。

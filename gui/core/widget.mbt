@@ -151,11 +151,6 @@ pub(all) struct Widget {
   /// 整层透明度（resolved `Style.opacity` 的落点，design.md §5 P4）：绘制遍历
   /// 进本控件时把「祖先累乘 × 自身」塞进 Painter 的 `global_alpha`，默认 1.0。
   mut alpha_paint : Double
-  /// 投影外扩量（= 模糊半径 + 偏移量，`@style` 的 `box_shadow`/`shadow_x`/`shadow_y`
-  /// 由 `apply` 算进来）：>0 时本控件的裁剪窗口与视口剔除判交都四周各放大这么多，
-  /// 投影才画得出盒外——与 CSS 同义（阴影画在 border-box 之外，除非祖先
-  /// `overflow:hidden`，本栈里就是祖先自己的矩形把它裁掉）。
-  mut shadow_paint : Double
   /// 本控件的绘制是否随 `hovered` / `pressed` / `focused` 变化（样式带状态桶即为真，
   /// 由 `@style.apply` 写入）。宿主据此决定悬停变化的标脏范围。
   mut paints_state : Bool
@@ -194,7 +189,6 @@ pub fn Widget::new() -> Widget {
     drag_accept: None,
     z_index_paint: 0.0,
     alpha_paint: 1.0,
-    shadow_paint: 0.0,
     paints_state: false,
   }
 }
@@ -902,15 +896,12 @@ pub fn Widget::paint_at(self : Widget, p : @render.Painter, ox : Double, oy : Do
   // 会话里是设备空间的真值（滚动的平移也在 CTM 里），所以这层判交天然把滚动
   // 视口算对。cairo 后端不查（那边没有可查的设备裁剪且本来快）；旋转矩阵下
   // 用两角包围盒近似（本栈的控件绘制只用平移，够用）。
-  // 判交要算上投影外扩量：本体刚滑出视口时它的软边还在屏内，按裸矩形剔就会
-  // 把那一圈墨整个吞掉（视口边缘的卡片"阴影忽然消失"）。与下面的裁剪窗口同源。
-  let cull_pad = self.shadow_paint
   match widget_cull_skip(
     p,
-    self.rect.x - ox - cull_pad,
-    self.rect.y - oy - cull_pad,
-    self.rect.w + cull_pad * 2.0,
-    self.rect.h + cull_pad * 2.0,
+    self.rect.x - ox,
+    self.rect.y - oy,
+    self.rect.w,
+    self.rect.h,
   ) {
     true => return ()
     false => ()
@@ -918,8 +909,7 @@ pub fn Widget::paint_at(self : Widget, p : @render.Painter, ox : Double, oy : Do
   self.paint_epoch = paint_epoch_ref.val
   p.save()
   p.translate(self.rect.x - ox, self.rect.y - oy)
-  let sh = self.shadow_paint
-  p.clip_rect(0.0 - sh, 0.0 - sh, self.rect.w + sh * 2.0, self.rect.h + sh * 2.0)
+  p.clip_rect(0.0, 0.0, self.rect.w, self.rect.h)
   // 整层透明度:祖先累乘 × 自身(on_draw 与其子树都在这段 alpha 内绘制)
   let inherited = p.global_alpha()
   let own = self.alpha_paint
