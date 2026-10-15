@@ -1,6 +1,6 @@
 # Declarative layer & reactivity (@core + @ui)
 
-The interface is described as a **tree of nodes**, state lives in `Store` / `Signal`, and the framework makes "data changed → UI follows". This page covers the wiring; styling is in [layout.md](layout.md) and [design.md](design.md), components in [components.md](components.md).
+The interface is described as a **tree of nodes**, state lives in `Store` / `Signal`, and the framework makes "data changed → UI follows". This page covers the wiring; styling is in [layout.md](layout.md) and [design.md (Chinese)](/zh/design), components in [components.md](components.md).
 
 ## 1. The node tree and mounting
 
@@ -123,5 +123,5 @@ Framework repaints route back to the host App via the process-level `@core.set_r
 
 - Components and parameters: [components.md](components.md)
 - Layout styling (`Style` values and the `class` channel): [layout.md](layout.md)
-- View-layer and reactivity design: [design.md](design.md) (§3 reactivity, §4 view layer)
+- View-layer and reactivity design: [design.md (Chinese)](/zh/design) (§3 reactivity, §4 view layer)
 - Five-minute tutorial: [tutorial.md](tutorial.md)

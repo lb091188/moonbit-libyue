@@ -138,7 +138,7 @@ handle=fn(a : @core.App) -> Unit {
 }
 ```
 
-Swapping `@ui.text` / `@ui.button` for themed forms (the four `button` `variant`s, `tag` / `alert` / `card`, …) is in [components.md](components.md); stylesheets (`Style` values plus `hover` / `active` / `focus` states and transitions) are in [design.md](design.md).
+Swapping `@ui.text` / `@ui.button` for themed forms (the four `button` `variant`s, `tag` / `alert` / `card`, …) is in [components.md](components.md); stylesheets (`Style` values plus `hover` / `active` / `focus` states and transitions) are in [design.md (Chinese)](/zh/design).
 
 **Copy from a working app** — the demo board is the material library:
 

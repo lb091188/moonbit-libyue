@@ -1,6 +1,6 @@
 # Layout styling (@style + yoga-mbt)
 
-The layout engine is the repository's own **yoga-mbt** (a pure-MoonBit CSS Flexbox Level-1 implementation), and styling is written as MoonBit values in the `@style` package (a `Style` struct whose field names are CSS property names with hyphens turned into underscores). Components take both loose parameters (`padding=` / `row_gap=` …) and a `class? : Array[@style.Style]` channel. This page is a quick reference for the layout surface; the full value model and state-bucket design are in [design.md](design.md).
+The layout engine is the repository's own **yoga-mbt** (a pure-MoonBit CSS Flexbox Level-1 implementation), and styling is written as MoonBit values in the `@style` package (a `Style` struct whose field names are CSS property names with hyphens turned into underscores). Components take both loose parameters (`padding=` / `row_gap=` …) and a `class? : Array[@style.Style]` channel. This page is a quick reference for the layout surface; the full value model and state-bucket design are in [design.md (Chinese)](/zh/design).
 
 ## Two write paths
 
@@ -71,5 +71,5 @@ Dirty-rect incremental relayout: all 39 setters plus structural/callback changes
 ## Related docs
 
 - Components and parameters: [components.md](components.md)
-- The `Style` value model, state buckets, transitions: [design.md](design.md)
+- The `Style` value model, state buckets, transitions: [design.md (Chinese)](/zh/design)
 - Declarative tree / `Store` / `Signal`: [declarative.md](declarative.md)

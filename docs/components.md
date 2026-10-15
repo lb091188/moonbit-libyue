@@ -6,7 +6,7 @@ Every self-drawn widget and component lives in `NoahLiu/native-gui/ui` (alias `@
 
 ## Conventions (read this first)
 
-**Typed parameters + a `class` style channel.** Components take typed parameters (size, colour, value), not CSS string tables; overriding the look goes two ways — loose parameters (e.g. `font_size` / `background_color`) or `class? : Array[@style.Style]` (layer `Style` value blocks on top, last array element wins). The full style layer is in [design.md](design.md).
+**Typed parameters + a `class` style channel.** Components take typed parameters (size, colour, value), not CSS string tables; overriding the look goes two ways — loose parameters (e.g. `font_size` / `background_color`) or `class? : Array[@style.Style]` (layer `Style` value blocks on top, last array element wins). The full style layer is in [design.md (Chinese)](/zh/design).
 
 **State lives in `Store`, no glue code.** Value-bearing controls (checkbox / radio / switch / slider / input / progress …) hold their current value in an `@core.Store[T]`: the component reads and writes it, and an external change refreshes the component. Display components additionally come in `x` (takes a value) + `x_dyn` (takes a `Signal[T]`) pairs, sharing one drawing path.
 

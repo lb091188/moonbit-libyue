@@ -87,9 +87,20 @@ export default defineConfig({
         ],
         sidebar: [
           {
-            text: 'Reference',
+            text: 'Guide',
             items: [
               { text: 'Doc index', link: '/README' },
+              { text: 'Tutorial', link: '/tutorial' },
+              { text: 'Components', link: '/components' },
+              { text: 'Declarative & reactivity', link: '/declarative' },
+              { text: 'Layout & styling', link: '/layout' },
+              { text: 'System capabilities', link: '/system-capabilities' },
+              { text: 'Build & linking', link: '/build' },
+            ],
+          },
+          {
+            text: 'Platform notes',
+            items: [
               { text: 'Platform adaptation', link: '/adaptation' },
               { text: 'Linux tray', link: '/tray' },
               { text: 'Autostart', link: '/autostart' },
@@ -113,15 +124,20 @@ export default defineConfig({
           {
             text: '指南',
             items: [
+              { text: '文档索引', link: '/zh/README' },
+              { text: '五分钟上手教程', link: '/zh/tutorial' },
+              { text: '组件速查', link: '/zh/components' },
+              { text: '声明式与响应式', link: '/zh/declarative' },
+              { text: '布局样式', link: '/zh/layout' },
               { text: '系统能力总览', link: '/zh/system-capabilities' },
-              { text: '开机自启动', link: '/zh/autostart' },
-              { text: 'Linux 托盘', link: '/zh/tray' },
+              { text: '构建与链接', link: '/zh/build' },
             ],
           },
           {
-            text: '工程参考',
+            text: '平台与工程',
             items: [
-              { text: '文档索引', link: '/zh/README' },
+              { text: '开机自启动', link: '/zh/autostart' },
+              { text: 'Linux 托盘', link: '/zh/tray' },
               { text: '对外路线图', link: '/zh/roadmap' },
               { text: '前端化设计', link: '/zh/design' },
               { text: '平台适配经验', link: '/zh/adaptation' },

@@ -58,6 +58,11 @@ moon run examples/showcase       # 完整演示板：组件库 + 系统能力
 
 | 文档 | 内容 |
 |---|---|
+| [tutorial.md](tutorial.md) | 五分钟上手教程：装工具链、建工程、从零做一扇带点击计数的窗口 |
+| [components.md](components.md) | 组件速查（`@ui`）：全部控件与组件构造器的入口签名与用途，按家族分（布局/文本/表单/展示/导航/表格/浮层/日期/响应式/拖放…） |
+| [declarative.md](declarative.md) | 声明式层与响应式（`@core` + `@ui`）：节点树与 `mount_window`、`Store` / `Signal`、`for_list` / `when`、原位替换 |
+| [layout.md](layout.md) | 布局样式：yoga-mbt（CSS Flexbox L1）+ `@style` 的 `Style` 字段集与 `class` 通道、min:auto 等必知口径 |
+| [build.md](build.md) | 构建与链接：prebuild 全权托管链接参数、改 C 桩不重链这一条坑的判别与处理（旧 relink 的新栈后继文） |
 | [roadmap.md](roadmap.md) | 对外路线图：定位、现在能拿到什么、平台支持矩阵、承诺与版本、下一阶段方向、待定决策、明确不做 |
 | [design.md](design.md) | 前端化设计口径：样式表（MoonBit 的 `Style` 值 + 具名 class 常量，CSS 作导入通道）、组件前端化命名映射、响应式补强四项、视图层定案（`render` 函数替代模板） |
 | [adaptation.md](adaptation.md) | 平台适配经验：各平台实测坑、根因与验证结论（持续更新） |

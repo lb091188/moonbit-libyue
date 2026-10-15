@@ -56,12 +56,29 @@ moon run examples/showcase       # full demo board: component library + system c
 
 ## Routing
 
+**Usage**
+
+| Document | Content |
+|---|---|
+| [tutorial.md](tutorial.md) | Five-minute tutorial: install the toolchain, create a project, build a first window with a click counter |
+| [components.md](components.md) | Component quick-reference (`@ui`): every widget/component constructor's signature and purpose, by family |
+| [declarative.md](declarative.md) | Declarative layer & reactivity: the `Node` tree, `mount_window`, `Store` / `Signal`, `for_list` / `when`, in-place replacement |
+| [layout.md](layout.md) | Layout styling: the `Style` field set and the `class` channel on yoga-mbt (CSS Flexbox L1) |
+| [system-capabilities.md](system-capabilities.md) | System capabilities (`@sys`): volume / app lookup / wallpaper / monitors / window control / clipboard watch / power profiles / printers / env / recent files / browser bookmarks & history / VS Code history…, with a unified `Result` semantics |
+| [build.md](build.md) | Build & linking: how prebuild hosts link flags, and the one pitfall — editing a C stub without relinking |
+
+**Platform notes**
+
 | Document | Content |
 |---|---|
 | [adaptation.md](adaptation.md) | Platform adaptation notes: field-tested pitfalls and fixes, per platform (continuously updated) |
 | [autostart.md](autostart.md) | Cross-platform autostart: XDG `.desktop` on Linux / HKCU Run key on Windows, one `is_enabled` / `enable` / `disable` API |
 | [tray.md](tray.md) | Linux tray: SNI protocol-stack design, architecture, backend fallback, desktop compatibility |
-| [zh/system-capabilities.md](/zh/system-capabilities.md) (Chinese) | System capabilities (`@sys`): volume / app lookup / night light / wallpaper / monitors / window control / clipboard watch / power profiles / printers / env / recent files / browser bookmarks & history / VS Code history…, with a unified `Result` semantics |
+
+**Project** (Chinese only)
+
+| Document | Content |
+|---|---|
 | [zh/design.md](/zh/design.md) (Chinese) | Frontend-layer design notes: style sheets as MoonBit values (`Style` + named class constants, CSS as an import channel), component naming mapping, reactivity and view-layer decisions |
 | [zh/roadmap.md](/zh/roadmap.md) (Chinese) | Public roadmap: positioning, what you can use today, platform support matrix, stability commitment and versioning, next-phase directions, open decisions, explicit non-goals |
 
