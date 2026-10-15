@@ -28,7 +28,7 @@
 | 模块 | 内容 |
 |---|---|
 | `NoahLiu/gui-media` | 音视频引擎（ffmpeg 解码 + miniaudio 输出）与播放器组件。 |
-| `NoahLiu/gui-examples` | 独立示例模块（systemprobe、native-web），依赖 `gui-media`。 |
+| `NoahLiu/gui-examples` | 独立示例模块（audio / video 播放示例），依赖 `gui-media`。 |
 
 **两种「可选」不要混**：没 import 的**子包**不进二进制（`moon.pkg` 的 import 是编译/链接边界）；没依赖的**模块**连解析与 prebuild 都不会发生（`moon.mod` 的 import 定义依赖闭包）。能力要做到后者，就必须住在自己的模块里。
 
@@ -39,10 +39,12 @@
 ```sh
 moon run examples/hello          # 最小窗口
 moon run examples/hello-themed   # 主题控件集
-moon run examples/showcase       # 完整演示板：组件库 + 系统能力
+moon run examples/showcase       # 完整演示板：组件库 + 系统集成 + 系统能力探测
+moon run examples/browser        # 内嵌 WebView 浏览器（演示菜单 + 状态栏）
+moon run examples/charts         # 扩展图表集（雷达 / 桑基 / 旭日 …）
 ```
 
-`examples/showcase` 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 / 反馈 / 代码与文档 / 事件与布局 / Store 对照 / 窗口 + 画布与富文本 + 系统集成 + 过渡与效果；左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。每页源码独立成文件（`examples/showcase/pages/*.mbt`），是最好的复制粘贴素材库；组件库各组件的截图：
+`examples/showcase` 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 / 反馈 / 代码与文档 / 事件与布局 / Store 对照 / 窗口 + 画布与富文本 + 系统集成 + 过渡与效果 + 只读**系统能力探测**页；左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。每页源码独立成文件（`examples/showcase/pages/*.mbt`），是最好的复制粘贴素材库；组件库各组件的截图：
 
 ![基础组件](/images/showcase-basic.png)
 

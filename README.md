@@ -72,7 +72,7 @@ Heavier optional capabilities live in **separate modules**, so a plain `moon add
 | Module | Contents |
 |---|---|
 | `NoahLiu/gui-media` | Audio/video engine (ffmpeg decode + miniaudio output) and the player component. |
-| `NoahLiu/gui-examples` | Standalone example module (systemprobe, native-web) that depends on `gui-media`. |
+| `NoahLiu/gui-examples` | Standalone example module (audio / video players) that depends on `gui-media`. |
 
 **Two layers of "optional"** — a sub-package you do not import costs nothing in your binary (the `moon.pkg` import is the compile/link boundary); a module you do not depend on is not even resolved or prebuilt (the `moon.mod` import defines the dependency closure).
 
@@ -91,7 +91,9 @@ Then run one of the bundled examples:
 ```sh
 moon run examples/hello          # a minimal window
 moon run examples/hello-themed   # the themed widget set
-moon run examples/showcase       # full demo board: components + system capabilities
+moon run examples/showcase       # full demo board: components + system integration + system probes
+moon run examples/browser        # embedded WebView browser (demo menu + status bar)
+moon run examples/charts         # extended charts gallery (radar / sankey / sunburst …)
 ```
 
 ## Platform support

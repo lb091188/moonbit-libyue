@@ -2,7 +2,7 @@ name = "NoahLiu/gui-examples"
 version = "0.1.0"
 preferred_target = "native"
 
-description = "native-gui 的独立示例模块：systemprobe 系统能力 + 扩展图表演示板（依赖 gui-media 媒体扩展）"
+description = "native-gui 的独立示例模块：音频 / 视频播放示例（gui-media player_t 播放列表 + 字幕双来源；依赖 gui-media 媒体扩展）"
 
 readme = "README.md"
 

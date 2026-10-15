@@ -15,7 +15,7 @@ The system-capability API family: system volume, application lookup, night-light
 
 The low-level calls used directly on Windows: SystemParametersInfoW (wallpaper), ShellExecuteW (launch/reveal/print), PowerGet/SetActiveScheme, registry (product and DMI info), GlobalMemoryStatusEx, GetTickCount64, EnumWindows, EnumPrintersW, IAudioEndpointVolume (COM), GetLastInputInfo. For pitfalls and header/link requirements see the platform-batch entries in [adaptation.md](adaptation.md).
 
-A full demo is available via `moon run NoahLiu/gui-examples/systemprobe` — press "Read system capabilities" to present the machine's real result for each item; unsupported capabilities show their corresponding error text. For per-capability conclusions and rationale on different distros / desktop environments (logind path, wpctl/pactl differences, direct SQLite reads, etc.) see [adaptation.md](adaptation.md).
+A full demo is available on the "System Probes" page of `moon run examples/showcase` — each group has a "re-probe" button that presents the machine's real results item by item; unsupported capabilities show their corresponding error text. For per-capability conclusions and rationale on different distros / desktop environments (logind path, wpctl/pactl differences, direct SQLite reads, etc.) see [adaptation.md](adaptation.md).
 
 ## System Volume
 
@@ -303,7 +303,7 @@ let view = @yuemedia.video_player_t(player)
 
 Control-bar component (video_player_t / audio_player_t share the same style): play/pause button, draggable progress bar (seeks 180ms after drag-release debouncing), time text (m:ss / m:ss), volume slider, loop toggle; the 50ms clock pumps + refreshes automatically, and the clock halts automatically after `free()`.
 
-systemprobe auto-loads the demo player on startup; play/pause/drag progress/volume/loop are all interactive.
+See `moon run modules/gui-examples/audio` / `moon run modules/gui-examples/video` for player demos — the default asset auto-loads on startup; play/pause/seek/volume/speed are all interactive.
 
 ## Monitor Configuration
 

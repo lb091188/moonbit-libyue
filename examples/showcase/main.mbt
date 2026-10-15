@@ -318,14 +318,6 @@ fn main {
   }
   println("SHOWCASE-DONE page=\{selected.get()}")
   // 帧耗时分段账本：切页/渲染卡顿归因用（布局 vs 绘制 vs 上屏，见 gui/core/prof.mbt）。
-  // Windows 的 GUI 进程 stdout 到不了 moon run 的捕获，落一份文件兜底（cwd=运行目录）
   let prof = @core.paint_profile_summary()
   println("SHOWCASE-PROF " + prof)
-  let body = "SHOWCASE-PROF " + prof + "\n"
-  let cwd = @sys.current_dir()
-  let _ = if cwd == "" {
-    @sys.sys_write_text_file("showcase-prof.txt", body)
-  } else {
-    @sys.sys_write_text_file(cwd + "/showcase-prof.txt", body)
-  }
 }

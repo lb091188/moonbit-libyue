@@ -7,7 +7,7 @@
 - **本分支不保留老 libyue 绑定**：`shim/`、`lib/` 预构建库、`scripts/prepare.py` 已删除；libyue 只作**老师**（行为参考、可平移资产来源、`patches/` 的真实 bug 语料）。
 - **旧链路的完成项与实测结论不在本文件重述**：代码在 `master`（`shim + libyue`，0.5.x 与 `bin-*`/`vendor-*` 发布照旧），踩坑与验收细节在 [docs/zh/adaptation.md](docs/zh/adaptation.md) 与 `git log`。**凡旧栈做过、新栈尚未重做的能力，本文件一律记为未完成。**
 - **门禁口径**：全仓 `moon check --deny-warn` 零错误零警告（2026-10-15 复核；2026-10-11 起曾为红基线 287 errors / 68 warnings，逐批清零）；库门禁在 `gui/` 下按包限定跑 `moon check` + 分包 `moon test`，`examples/`、`experiment/`、`modules/*` 各模块 `--deny-warn` 复核。
-- **验证示例归口**：GUI 侧的同类测试集中累积进 **`examples/native-app`**（宿主/控件/主题/图表/Markdown 各一页，不为单个特性新开示例）；系统能力侧集中进 **`examples/native-sys`**（已建）；webview 与媒体侧集中进 **`modules/gui-examples/native-web`**（批 B 起建，整页/分栏/桥接/播放器各一页；2026-10-12 从 `examples/` **整包迁到独立示例模块**——媒体包归 `NoahLiu/gui-media`，主模块不能再反向依赖它，否则重现发布环）；`examples/native-window` 冻结为 G2–G5 的历史冒烟基准，不再往里加新特性。
+- **验证示例归口（2026-10-16 收口）**：native-* 累积验证板已全部删除（`examples/native-app`、`examples/native-window`、`examples/systemprobe`、`modules/gui-examples/native-web`、`modules/gui-examples/systemprobe`），职能归正式示例——GUI 能力与系统能力只读探测归 `examples/showcase`（含第 15 页「系统能力探测」与任务栏进度/粘性列表/GIF/自绘消息框/字体回退/bind_node 各段）、浏览器归 `examples/browser`、媒体归 `modules/gui-examples/audio` / `video`、扩展图表归 `examples/charts`。后续新能力的演示一律直接进对应正式示例（或库测试），不再新开 native-* 验证板；本文件历史 `[x]` 条目里的 native-* 提及保持原样，不改写。
 - **跟踪口径（2026-10-12 定）**：本文件**只跟踪跨平台能力**（三平台同构的 API 面、或「一个门面 + 各平台后端」的形态）。**纯 Linux 依赖的实现细节不再列为待办**——xrandr / wmctrl / xclip / sysfs / wpctl / pactl / CUPS / redshift / xfconf / gsettings / xdg-* / D-Bus 等命令线与总线面的适配，属「Linux 后端内部事务」，随各自能力批处理时按需实现，不进路线图。判据：一个条目若只在一个平台有意义（换个平台没有对应 API 可做）→ 不进 TODO；若换个平台有对应 API（tray/hotkey/通知/剪贴板/文件对话框/菜单栏…）→ 进 TODO，且**以「门面定形态 + 各平台后端」记账**。
 
 

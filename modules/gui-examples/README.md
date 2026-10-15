@@ -2,17 +2,17 @@
 
 native-gui 的独立示例模块。这里的示例依赖媒体扩展等可选包，因此与主包的内置示例（`examples/`）分开维护。
 
-## systemprobe
+## audio / video（音视频播放示例）
 
-系统能力 + 扩展图表演示板（2026-10-13 起为 native-gui 新栈版，装配方式与 `examples/showcase` 同构）。侧栏三组七页：
+依赖 `gui-media` 的播放器组件 `player_t`（ffmpeg 解码 + miniaudio 设备直出，音视频一体），所以放在独立示例模块——主示例模块（`examples/`）不依赖 gui-media，`hello` 一类示例不会被 ffmpeg 链路拖累。
 
-- **能力**：系统能力（音量/浏览器历史与下载/VS Code/应用查找/显示器/窗口/剪贴板/电源计划/系统信息/打印机/环境变量/书签/Firefox/最近文件 + MPRIS 媒体，真读本机）、命令与状态（设置类命令只展示文本，只读状态真实读取）
-- **媒体**：视频播放 / 音频播放（gui-media `player_t` 音视频一体播放器组件；演示媒体由 ffmpeg lavfi 现场生成，本地文件走文件对话框）
-- **图表**：扩展图表（雷达/热力/K 线/漏斗/箱线/桑基）、新图表（关系图/平行坐标/象形柱/旭日/主题河流/树图/矩形树图/特效散点）、交互图表（line/bar 缩放平移 + donut）
+- **audio**：左侧播放列表（当前曲目高亮、点击换曲）+ 右侧播放器与状态区；控制条（播放/进度/音量/倍速）组件自带。载入路径：默认资产 `assets/1.mp3`（路径对工作目录稳健解析）、文件对话框选音频、目录对话框选文件夹后扫描成播放列表（无音频文件给空态）。
+- **video**：视频区为主 + 侧栏播放列表/信息；字幕双来源——容器内嵌轨自动读取，或「选外挂 .srt」读文本传入（`on_subtitle` 回报来源与条数，可清除回内嵌轨）。载入路径与 audio 同三条，默认资产 `assets/1.mp4`。
 
 ```sh
 # 仓库根（workspace 模式）
-cd modules/gui-examples && moon run systemprobe
+cd modules/gui-examples && moon run audio
+cd modules/gui-examples && moon run video
 ```
 
 依赖：[native-gui](https://mooncakes.io/docs/NoahLiu/native-gui)、[gui-media](https://mooncakes.io/docs/NoahLiu/gui-media)、[ffmpeg-mbt](https://mooncakes.io/docs/NoahLiu/ffmpeg-mbt)。
@@ -25,7 +25,7 @@ cd modules/gui-examples && moon run systemprobe
 
 （另 `avdevice-63.dll` / `avfilter-12.dll` 与 vendor 同版本配套，README 口径列全 7 个。）
 
-**缺 dll 时的表现不是「媒体页报错」，而是进程根本启动不了**：Windows 加载器在 `main` 之前就拒绝加载，窗口从不出现，控制台一闪就退（Git Bash 下退出码 127，无任何输出）。探针页、图表页同样起不来——它们和媒体页在同一个 exe 里。
+**缺 dll 时的表现不是「示例内报错」，而是进程根本启动不了**：Windows 加载器在 `main` 之前就拒绝加载，窗口从不出现，控制台一闪就退（Git Bash 下退出码 127，无任何输出）。audio 与 video 两个示例在同一个模块里，都吃这条前置。
 
 把 dll 放到 **exe 同目录**或**加进 PATH** 即可（大版本须与 `vendor/` 导入库一致，取自同一份 BtbN/gyan win64-lgpl-shared 构建的 `bin/`）。
 

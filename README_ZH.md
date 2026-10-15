@@ -44,7 +44,7 @@ fn main {
 
 **📊 自绘图表与富内容** —— 图表（折线 / 柱 / 饼 / 仪表 / 散点，另有雷达 / 热力 / 蜡烛 / 漏斗 / 箱线 / 桑基 / 树 / 矩形树 / 旭日 / 地图等，含横切交互层）与 Markdown 视图，由同一个光栅器绘制。
 
-> `moon run examples/showcase` —— 完整演示板：组件库 + 系统能力。
+> `moon run examples/showcase` —— 完整演示板：组件库 + 系统能力探测（15 页）。
 
 ## 包结构
 
@@ -72,7 +72,7 @@ fn main {
 | 模块 | 内容 |
 |---|---|
 | `NoahLiu/gui-media` | 音视频引擎（ffmpeg 解码 + miniaudio 输出）与播放器组件。 |
-| `NoahLiu/gui-examples` | 独立示例模块（systemprobe、native-web），依赖 `gui-media`。 |
+| `NoahLiu/gui-examples` | 独立示例模块（audio / video 播放示例），依赖 `gui-media`。 |
 
 **两层「可选」要分清** —— 不 import 的子包不占二进制体积（`moon.pkg` 的 import 是编译 / 链接边界）；不依赖的模块根本不会被解析或预构建（`moon.mod` 的 import 决定依赖闭包）。
 
@@ -91,7 +91,9 @@ moon add NoahLiu/native-gui
 ```sh
 moon run examples/hello          # 最小窗口
 moon run examples/hello-themed   # 主题控件集
-moon run examples/showcase       # 完整演示板：组件 + 系统能力
+moon run examples/showcase       # 完整演示板：组件 + 系统集成 + 系统能力探测
+moon run examples/browser        # 内嵌 WebView 浏览器（演示菜单 + 状态栏）
+moon run examples/charts         # 扩展图表集（雷达 / 桑基 / 旭日 …）
 ```
 
 ## 平台支持

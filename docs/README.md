@@ -28,7 +28,7 @@ Heavier optional capabilities live in **separate modules**, so a plain `moon add
 | Module | Contents |
 |---|---|
 | `NoahLiu/gui-media` | Audio/video engine (ffmpeg decode + miniaudio output) and the player component. |
-| `NoahLiu/gui-examples` | Standalone example module (systemprobe, native-web) that depends on `gui-media`. |
+| `NoahLiu/gui-examples` | Standalone example module (audio / video players) that depends on `gui-media`. |
 
 **Two layers of "optional"** — a sub-package you do not import costs nothing in your binary (the `moon.pkg` import is the compile/link boundary); a module you do not depend on is not even resolved or prebuilt (the `moon.mod` import defines the dependency closure). A capability can only reach the second layer by living in its own module.
 
@@ -39,10 +39,12 @@ Examples, from shallow to deep:
 ```sh
 moon run examples/hello          # a minimal window
 moon run examples/hello-themed   # the themed widget set
-moon run examples/showcase       # full demo board: component library + system capabilities
+moon run examples/showcase       # full demo board: component library + system probes
+moon run examples/browser        # embedded WebView browser (demo menu + status bar)
+moon run examples/charts         # extended charts gallery (radar / sankey / sunburst …)
 ```
 
-`examples/showcase` covers Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store / Window, plus canvas & rich text, system integration and transitions & effects, with a collapsible grouped side menu. Each page's source is its own file (`examples/showcase/pages/*.mbt`) — the best copy-paste material library.
+`examples/showcase` covers Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store / Window, plus canvas & rich text, system integration, transitions & effects and a read-only **system probe** page, with a collapsible grouped side menu. Each page's source is its own file (`examples/showcase/pages/*.mbt`) — the best copy-paste material library.
 
 ![Basic components](/images/showcase-basic.png)
 

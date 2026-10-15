@@ -7,7 +7,6 @@ import {
   "NoahLiu/native-gui/ui",
   "NoahLiu/native-gui/theme",
   "NoahLiu/native-gui/icons",
-  "NoahLiu/native-gui/sys",
   "NoahLiu/native-gui/win",
   "NoahLiu/native-gui/dbus" @dbus,
   "NoahLiu/native-gui-examples/showcase/shared",
