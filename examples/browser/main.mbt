@@ -1,11 +1,9 @@
-// 浏览器示例：WebView 全能力演示——原 showcase「浏览器」页独立成示例。
-// 布局：地址栏 + 导航行、演示按钮两行、webview 主体、底部状态区。
+// 浏览器示例：「正常的浏览器」形态——顶部工具栏（后退/前进/重载/停止/地址栏/
+// 进入/演示菜单）+ webview 主体 + 底部状态栏（常驻加载状态与 URL、事件流水、
+// 结果区：长结果截断、可展开看全文、可复制）。能力演示入口全部收进「演示」
+// 菜单（下拉组件，键盘可及：空格/回车/↓ 开、↑/↓ 移高亮、Esc 收起）。
 //
-// 覆盖：加载（URL / 本地 HTML / yuedemo:// 自定义协议 / 拒绝路径）、导航与
-// 能力查询、事件流水（on_event 一族）、JS 执行与结果回传、JS↔原生 raw
-// binding、Cookie 查询、DOM 抓取。
-//
-// 要点（与 showcase 旧页同口径）：
+// 要点（四条口径）：
 // ① scheme 名要在建第一扇 webview **之前**经 `webview_predeclare_schemes`
 //    声明（三平台取严）；自定义协议是「文件根目录」形态（register_protocol）；
 // ② 绑定与策略要有句柄才生效（挂载发生在第一次绘制）：排期重试；
@@ -13,52 +11,152 @@
 // ④ 引擎不在位时降级为自绘说明板（探测 + 降级，不静默）。
 
 ///|
-/// 协议页根目录：走系统 TEMP（拿不到回落当前目录），不往仓库里写。
+/// 协议页根目录：Windows 走 TEMP（回落 TMP）；Linux/macOS 走 XDG_RUNTIME_DIR
+/// （回落 /tmp）。不回落当前目录——示例跑完不能在使用者的工作目录里留垃圾。
 fn scheme_root() -> String {
-  match @sys.envx_get("TEMP") {
-    Some(t) => t + "/libyue-browser-scheme"
-    None => "libyue-browser-scheme"
+  match @sys.sys_platform() {
+    "windows" =>
+      match @sys.envx_get("TEMP") {
+        Some(t) => t + "/native-gui-browser-scheme"
+        None =>
+          match @sys.envx_get("TMP") {
+            Some(t) => t + "/native-gui-browser-scheme"
+            None => "C:/Windows/Temp/native-gui-browser-scheme"
+          }
+      }
+    _ =>
+      match @sys.envx_get("XDG_RUNTIME_DIR") {
+        Some(d) => d + "/native-gui-browser-scheme"
+        None => "/tmp/native-gui-browser-scheme"
+      }
   }
 }
 
 ///|
-/// 本地协议页内容（走 yuedemo:// 读取的真文件：HTML + CSS 两份）。
-const SCHEME_INDEX : String = "<!doctype html><html><head><meta charset=\"utf-8\"><title>本地协议页</title><link rel=\"stylesheet\" href=\"style.css\"></head><body><h1>来自 yuedemo:// 的标题</h1><p class=\"styled\">这段若带浅蓝底，说明 style.css 也是走协议取到的。</p><button onclick=\"demoBinding('来自协议页的调用')\">JS 调原生绑定</button><p id=r></p><script>function demoBinding(s){document.getElementById('r').textContent='已调用: '+s}</script></body></html>"
+/// 首页：走 yuedemo:// 读取的真文件（HTML + CSS 两份），无需外网。
+const SCHEME_INDEX : String = "<!doctype html><html><head><meta charset=\"utf-8\"><title>本地协议首页</title><link rel=\"stylesheet\" href=\"style.css\"></head><body><h1>yuedemo:// 本地协议页</h1><p class=\"lead\">这一页和它的样式表都由 <code>yuedemo://local/</code> 协议供给，目录在系统临时区，不落在仓库里。</p><div class=\"card\"><button onclick=\"callNative()\">JS 调原生绑定</button><button onclick=\"location.href='page2.html'\">去第二页</button><p id=\"r\" class=\"note\">点了按钮，回包会出现在窗口底部状态栏。</p></div><script>function callNative(){var r=document.getElementById('r');try{demoBinding('来自协议页的调用');r.textContent='已调用原生绑定（看窗口底部状态栏）';}catch(e){r.textContent='原生绑定不在位：'+e.message;}}</script></body></html>"
 
 ///|
-const SCHEME_CSS : String = ".styled { background: #cde; padding: 6px; } h1 { font-size: 20px; }"
+const SCHEME_PAGE2 : String = "<!doctype html><html><head><meta charset=\"utf-8\"><title>协议第二页</title><link rel=\"stylesheet\" href=\"style.css\"></head><body><h1>第二页</h1><p class=\"lead\">用来验证会话内历史：现在点「←」能回首页。</p><p><a href=\"index.html\">回首页</a></p></body></html>"
+
+///|
+const SCHEME_CSS : String = "body{font-family:sans-serif;margin:24px auto;max-width:560px;color:#222}h1{font-size:22px}.lead{color:#555;line-height:1.6}.card{border:1px solid #d5d9e0;border-radius:8px;padding:14px;margin-top:16px}button{font-size:14px;padding:6px 14px;margin-right:8px;border:1px solid #b0b6c0;border-radius:6px;background:#f5f7fa;cursor:pointer}button:hover{background:#e8ecf2}.note{color:#888;font-size:13px;margin-top:10px}a{color:#0366d6}"
 
 ///|
 /// 本地 HTML 片段（load_html 装的页面**不入历史**）。
-const LOCAL_HTML : String = "<html><body style='font-family:sans-serif;background:#fff;color:#222;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%'><h3>load_html 本地片段 ✓</h3><button onclick=\"demoBinding('来自网页的调用')\">JS 调原生绑定</button><p id=r></p><script>function demoBinding(s){document.getElementById('r').textContent='已调用: '+s}</script></body></html>"
+const LOCAL_HTML : String = "<html><head><meta charset=\"utf-8\"><title>本地片段</title></head><body style='font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%'><h3>load_html 本地片段 ✓</h3><button onclick=\"callNative()\">JS 调原生绑定</button><p id='r' style='color:#888'></p><script>function callNative(){var r=document.getElementById('r');try{demoBinding('来自网页的调用');r.textContent='已调用原生绑定（看窗口底部状态栏）';}catch(e){r.textContent='原生绑定不在位：'+e.message;}}</script></body></html>"
+
+///|
+/// 首页地址。
+const HOME_URL : String = "yuedemo://local/index.html"
+
+///|
+/// 按码点截断到前 n 个字符（超出补省略号），状态栏单行用。
+fn clip(s : String, n : Int) -> String {
+  if s.length() <= n {
+    return s
+  }
+  let buf = StringBuilder()
+  let mut i = 0
+  for ch in s {
+    if i >= n {
+      break
+    }
+    buf.write_char(ch)
+    i = i + 1
+  }
+  buf.write_string("…")
+  buf.to_string()
+}
+
+///|
+/// 加载状态（决定状态栏标签的语义色）：0 就绪 / 1 加载中 / 2 完成 / 3 失败。
+priv enum LoadKind {
+  Ready
+  Loading
+  Done
+  Failed
+}
 
 ///|
 fn main {
-  let url_in : @core.Store[String] = @core.Store::new("https://example.com")
-  let nav_state : @core.Store[String] = @core.Store::new("(导航状态)")
-  let nav_events : @core.Store[String] = @core.Store::new("(事件流水)")
-  let bind_state : @core.Store[String] = @core.Store::new("(raw binding)")
-  let js_state : @core.Store[String] = @core.Store::new("(JS 结果)")
-  let cookie_state : @core.Store[String] = @core.Store::new("(Cookie)")
-  let title_state : @core.Store[String] = @core.Store::new("(标题)")
-  let dom_state : @core.Store[String] = @core.Store::new("(DOM 快照)")
+  let toast = @ui.toast_layer(duration_ms=2200)
+  // 状态区四条线：加载标签（编码「kind|文本」，bind_node 重建换语义色）、
+  // 常驻 URL 与标题、事件流水、能力结果（截断 + 可展开）
+  let url_in : @core.Store[String] = @core.Store::new(HOME_URL)
+  let status : @core.Store[String] = @core.Store::new("0|就绪")
+  let cur_url : @core.Store[String] = @core.Store::new(HOME_URL)
+  let title_st : @core.Store[String] = @core.Store::new("（无标题）")
+  let ev_count : @core.Store[Int] = @core.Store::new(0)
+  let ev_line : @core.Store[String] = @core.Store::new("（事件流水显示在此）")
+  let result_full : @core.Store[String] = @core.Store::new("（能力结果显示在此）")
+  let result_open : @core.Store[Bool] = @core.Store::new(false)
+  let result_view : @core.Store[String] = @core.Store::new("（能力结果显示在此）")
   let wv : Ref[@web.Webview?] = Ref(None)
-  // webview 主体挂进这个占位（handle 阶段捕获，webview 建好后 mount）
   let holder : Ref[@core.Widget?] = Ref(None)
-
-  fn nav_to(u : String, note : String) -> Unit {
+  // 三类策略的当前档（false = 拦截；启动排期重试时统一落到拦截）
+  let pol_newwin : Ref[Bool] = Ref(false)
+  let pol_perm : Ref[Bool] = Ref(false)
+  let pol_dl : Ref[Bool] = Ref(false)
+  let ev_no : Ref[Int] = Ref(0)
+  fn set_status(k : LoadKind, text : String) -> Unit {
+    let tag = match k {
+      Ready => "0"
+      Loading => "1"
+      Done => "2"
+      Failed => "3"
+    }
+    status.set(tag + "|" + text)
+  }
+  fn ev(text : String) -> Unit {
+    ev_no.val = ev_no.val + 1
+    ev_count.set(ev_no.val)
+    ev_line.set(clip(text, 150))
+  }
+  fn sync_result_view() -> Unit {
+    let full = result_full.get()
+    result_view.set(
+      if result_open.get() || full.length() <= 150 { full } else { clip(full, 150) },
+    )
+  }
+  result_full.subscribe(fn(_s) { sync_result_view() })
+  result_open.subscribe(fn(_b) { sync_result_view() })
+  fn show_result(full : String) -> Unit {
+    result_open.set(false)
+    result_full.set(full)
+  }
+  fn nav_to(u : String) -> Unit {
     match wv.val {
       Some(v) => {
         v.load_url(u)
-        nav_state.set(note)
+        set_status(Loading, "加载中")
+        ev("导航开始 \{u}")
       }
       None => ()
     }
   }
-
   fn load_current() -> Unit {
     let u = url_in.get()
-    nav_to(u, "加载 \{u}")
+    if u.length() == 0 {
+      return
+    }
+    nav_to(u)
+  }
+  /// 写协议页文件并注册协议；返回是否就绪。
+  fn prepare_scheme(v : @web.Webview) -> Bool {
+    let root = scheme_root()
+    let _ = @sys.sys_make_dirs(root)
+    let a = @sys.sys_write_text_file(root + "/index.html", SCHEME_INDEX)
+    let b = @sys.sys_write_text_file(root + "/page2.html", SCHEME_PAGE2)
+    let c = @sys.sys_write_text_file(root + "/style.css", SCHEME_CSS)
+    a && b && c && v.register_protocol("yuedemo", root)
+  }
+  /// 三档策略当前态的可读串（策略切换后整组回显）。
+  fn policy_text() -> String {
+    let nw = if pol_newwin.val { "放行" } else { "拦截" }
+    let pm = if pol_perm.val { "放行" } else { "拦截" }
+    let dl = if pol_dl.val { "放行" } else { "拦截" }
+    "新窗：\{nw}\n权限：\{pm}\n下载：\{dl}"
   }
 
   // scheme 预声明：建第一扇 webview 前的最后声明机会（三平台取严）
@@ -66,251 +164,273 @@ fn main {
 
   let body = @ui.col(
     [
-      // 工具区：地址栏 + 导航 / 演示按钮两行
-      @ui.col(
+      // 工具栏：导航键 + 地址栏 + 进入 + 演示菜单
+      @ui.row(
         [
-          @ui.row(
-            [
-              @ui.button("←", on_click=fn() {
-                match wv.val {
-                  Some(v) =>
-                    if v.can_go_back() {
-                      v.go_back()
-                      nav_state.set("后退 → \{v.current_url()}")
-                    } else {
-                      nav_state.set("后退：无处可退（can_go_back=0）")
-                    }
-                  None => ()
+          @ui.button("←", on_click=fn() {
+            match wv.val {
+              Some(v) =>
+                if v.can_go_back() {
+                  v.go_back()
+                  ev("后退 → \{clip(v.current_url(), 90)}")
+                } else {
+                  ev("后退：无处可退（can_go_back=0；load_html 的页面不入历史）")
                 }
-              }),
-              @ui.button("→", variant=@ui.Soft, on_click=fn() {
-                match wv.val {
-                  Some(v) =>
-                    if v.can_go_forward() {
-                      v.go_forward()
-                      nav_state.set("前进 → \{v.current_url()}")
-                    } else {
-                      nav_state.set("前进：无可前进项（can_go_forward=0）")
-                    }
-                  None => ()
+              None => ()
+            }
+          }),
+          @ui.button("→", variant=@ui.Soft, on_click=fn() {
+            match wv.val {
+              Some(v) =>
+                if v.can_go_forward() {
+                  v.go_forward()
+                  ev("前进 → \{clip(v.current_url(), 90)}")
+                } else {
+                  ev("前进：无可前进项（can_go_forward=0）")
                 }
-              }),
-              @ui.button("刷新", on_click=fn() {
-                match wv.val {
-                  Some(v) => v.reload()
-                  None => ()
-                }
-              }),
-              @ui.button("停止", variant=@ui.Text, on_click=fn() {
-                match wv.val {
-                  Some(v) => v.stop()
-                  None => ()
-                }
-              }),
-              @ui.input(
-                url_in,
-                placeholder="输入 URL 回车加载",
-                on_enter=load_current,
-                handle=fn(w) { w.node.set_flex_grow(1.0) },
-              ),
-              @ui.button("加载", variant=@ui.Solid, on_click=load_current),
-            ],
-            column_gap=6.0,
+              None => ()
+            }
+          }),
+          @ui.button("⟳ 重载", variant=@ui.Soft, on_click=fn() {
+            match wv.val {
+              Some(v) => {
+                v.reload()
+                set_status(Loading, "加载中")
+              }
+              None => ()
+            }
+          }),
+          @ui.button("✕ 停止", variant=@ui.Text, on_click=fn() {
+            match wv.val {
+              Some(v) => {
+                v.stop()
+                set_status(Ready, "已停止")
+              }
+              None => ()
+            }
+          }),
+          @ui.input(
+            url_in,
+            placeholder="输入 URL，回车或点「进入」加载",
+            on_enter=load_current,
+            handle=fn(w) { w.node.set_flex_grow(1.0) },
           ),
-          @ui.row(
+          @ui.button("进入", variant=@ui.Solid, on_click=load_current),
+          @ui.dropdown(
+            "演示 ▾",
             [
-              @ui.button("example.com", on_click=fn() {
-                nav_to("https://example.com", "加载 example.com（需外网）")
-              }),
-              @ui.button("本地 HTML", variant=@ui.Soft, on_click=fn() {
-                match wv.val {
-                  Some(v) => {
+              "example.com（需外网）",
+              "本地协议页 yuedemo://",
+              "本地 HTML 片段",
+              "拒绝路径演示",
+              "-",
+              "JS 互操作三连",
+              "DOM 抓取·正文",
+              "DOM 抓取·链接",
+              "DOM 抓取·meta",
+              "DOM 抓取·结构",
+              "Cookie 查询",
+              "原生绑定 注册/移除",
+              "-",
+              "策略·新窗切换",
+              "策略·权限切换",
+              "策略·下载切换",
+            ],
+            on_select=fn(i : Int) {
+              match wv.val {
+                Some(v) =>
+                  if i == 0 {
+                    nav_to("https://example.com")
+                  } else if i == 1 {
+                    if prepare_scheme(v) {
+                      nav_to(HOME_URL)
+                      show_result("已注册 yuedemo:// 并加载首页（HTML+CSS+第二页都走协议）")
+                    } else {
+                      show_result("协议未就绪（文件写失败或引擎不支持）")
+                    }
+                  } else if i == 2 {
                     v.load_html(LOCAL_HTML)
-                    nav_state.set("load_html 完成（此页不入历史，后退无效）")
-                  }
-                  None => ()
-                }
-              }),
-              @ui.button("协议页", variant=@ui.Solid, on_click=fn() {
-                match wv.val {
-                  Some(v) => {
-                    let root = scheme_root()
-                    let _ = @sys.sys_make_dirs(root)
-                    let a = @sys.sys_write_text_file(root + "/index.html", SCHEME_INDEX)
-                    let b = @sys.sys_write_text_file(root + "/style.css", SCHEME_CSS)
-                    if a && b && v.register_protocol("yuedemo", root) {
-                      v.load_url("yuedemo://local/index.html")
-                      nav_state.set("已注册 yuedemo:// 并加载（HTML+CSS 走协议）")
-                    } else {
-                      nav_state.set("协议未就绪（文件写失败或引擎不支持）")
-                    }
-                  }
-                  None => ()
-                }
-              }),
-              @ui.button("拒绝路径", variant=@ui.Danger, on_click=fn() {
-                match wv.val {
-                  Some(v) => {
+                    set_status(Ready, "本地片段")
+                    ev("load_html 完成（此页不入历史，后退无效）")
+                  } else if i == 3 {
                     let _ = v.unregister_protocol("yuedemo")
-                    v.load_url("yuedemo://local/index.html")
-                    nav_state.set("已注销协议并重载（事件区应见加载失败）")
-                  }
-                  None => ()
-                }
-              }),
-              @ui.button("注册绑定", on_click=fn() {
-                match wv.val {
-                  Some(v) =>
-                    bind_state.set(
-                      if v.add_raw_binding("demoBinding") {
-                        "已注册 demoBinding"
-                      } else {
-                        "注册未生效（pane 未挂载？）"
-                      },
-                    )
-                  None => ()
-                }
-              }),
-              @ui.button("移除绑定", variant=@ui.Danger, on_click=fn() {
-                match wv.val {
-                  Some(v) =>
-                    bind_state.set(
-                      if v.remove_binding("demoBinding") {
-                        "已移除 demoBinding（has_bindings=\{v.has_bindings()}）"
-                      } else {
-                        "移除未生效"
-                      },
-                    )
-                  None => ()
-                }
-              }),
-              @ui.button("能力查询", variant=@ui.Soft, on_click=fn() {
-                match wv.val {
-                  Some(v) =>
-                    nav_state.set(
-                      "可后退=\{v.can_go_back()} 可前进=\{v.can_go_forward()} 加载中=\{v.is_loading()}",
-                    )
-                  None => ()
-                }
-              }),
-            ],
-            column_gap=6.0,
-          ),
-          @ui.row(
-            [
-              @ui.button("JS 1+41", on_click=fn() {
-                match wv.val {
-                  Some(v) =>
-                    ignore(
-                      v.execute_javascript_with_result(
+                    v.load_url(HOME_URL)
+                    ev("已注销协议并重载（等加载失败事件）")
+                  } else if i == 5 {
+                    // JS 互操作三连：回包顺序不定，逐条累积进结果区
+                    let lines : Array[String] = ["JS 互操作三连："]
+                    let add = fn(tag : String, r : String) -> Unit {
+                      lines.push(tag + r)
+                      show_result(lines.join("\n"))
+                    }
+                    let _ = v
+                      .execute_javascript_with_result(
                         "1 + 41",
-                        fn(r : String) -> Unit { js_state.set("JS 结果：\{r}") },
-                      ),
-                    )
-                  None => ()
-                }
-              }),
-              @ui.button("JS 读标题", variant=@ui.Soft, on_click=fn() {
-                match wv.val {
-                  Some(v) =>
-                    ignore(
-                      v.execute_javascript_with_result(
+                        fn(r : String) -> Unit { add("1+41 回包：", r) },
+                      )
+                    let _ = v
+                      .execute_javascript_with_result(
                         "document.title",
-                        fn(r : String) -> Unit { js_state.set("title=\{r}") },
-                      ),
-                    )
-                  None => ()
-                }
-              }),
-              @ui.button("JS 改标题", variant=@ui.Solid, on_click=fn() {
-                match wv.val {
-                  Some(v) => {
-                    v.execute_javascript("document.title='由原生 JS 设置 ✓'")
-                    js_state.set("已执行 document.title 赋值（看标题回显）")
-                  }
-                  None => ()
-                }
-              }),
-              @ui.button("查 Cookie", on_click=fn() {
-                match wv.val {
-                  Some(v) => {
+                        fn(r : String) -> Unit { add("document.title：", r) },
+                      )
+                    v.execute_javascript("document.title='由原生改写 ✓'")
+                    add("已执行：", "document.title='由原生改写 ✓'（看标题回显）")
+                  } else if i == 6 {
+                    let _ = v
+                      .capture_dom(@web.PageText, fn(s : @web.DomSnapshot) -> Unit {
+                        show_result(
+                          "正文 ok=\{s.ok} 标题=\{s.title}，正文 \{s.text.length()} 字符\n\n\{s.text}",
+                        )
+                      })
+                  } else if i == 7 {
+                    let _ = v
+                      .capture_dom(@web.Links, fn(s : @web.DomSnapshot) -> Unit {
+                        let buf = StringBuilder()
+                        buf.write_string("链接 ok=\{s.ok} 共 \{s.links.length()} 条\n")
+                        for l in s.links {
+                          buf.write_string("· \{clip(l.text, 40)} → \{l.href}\n")
+                        }
+                        show_result(buf.to_string())
+                      })
+                  } else if i == 8 {
+                    let _ = v
+                      .capture_dom(@web.Meta, fn(s : @web.DomSnapshot) -> Unit {
+                        let buf = StringBuilder()
+                        buf.write_string("meta ok=\{s.ok} 共 \{s.meta.length()} 条\n")
+                        for kv in s.meta {
+                          buf.write_string("· \{kv.0} = \{clip(kv.1, 80)}\n")
+                        }
+                        show_result(buf.to_string())
+                      })
+                  } else if i == 9 {
+                    let _ = v
+                      .capture_dom(@web.Structure, fn(s : @web.DomSnapshot) -> Unit {
+                        show_result(
+                          "结构 ok=\{s.ok} 元素=\{s.elements} 标题=\{s.title} 链接=\{s.links.length()} meta=\{s.meta.length()}",
+                        )
+                      })
+                  } else if i == 10 {
                     let u = v.current_url()
                     v.get_cookies_for_url(u)
-                    cookie_state.set("已请求 \{u} 的 cookie（回包走事件区）")
+                    show_result("已请求 \{u} 的 Cookie（回包走事件通道，到达后显示在这里）")
+                  } else if i == 11 {
+                    if v.has_bindings() {
+                      show_result(
+                        if v.remove_binding("demoBinding") {
+                          "已移除 demoBinding（has_bindings=\{v.has_bindings()}）；网页里点「JS 调原生绑定」会走 JS 兜底提示"
+                        } else {
+                          "移除未生效"
+                        },
+                      )
+                    } else {
+                      show_result(
+                        if v.add_raw_binding("demoBinding") {
+                          "已注册 demoBinding；网页里点「JS 调原生绑定」，回包进结果区"
+                        } else {
+                          "注册未生效（pane 未挂载？）"
+                        },
+                      )
+                    }
+                  } else if i == 13 {
+                    pol_newwin.val = !pol_newwin.val
+                    v.set_new_window_policy(pol_newwin.val)
+                    show_result("策略切换完成\n\{policy_text()}")
+                  } else if i == 14 {
+                    pol_perm.val = !pol_perm.val
+                    v.set_permission_mode(pol_perm.val)
+                    show_result("策略切换完成\n\{policy_text()}")
+                  } else if i == 15 {
+                    pol_dl.val = !pol_dl.val
+                    v.set_download_mode(pol_dl.val)
+                    show_result("策略切换完成\n\{policy_text()}")
+                  } else {
+                    ()
                   }
-                  None => ()
-                }
-              }),
-              @ui.button("抓正文", on_click=fn() {
-                match wv.val {
-                  Some(v) =>
-                    ignore(
-                      v.capture_dom(@web.PageText, fn(s : @web.DomSnapshot) -> Unit {
-                        dom_state.set(
-                          "正文 ok=\{s.ok} 标题=\{s.title} \{s.text.length()} 字符",
-                        )
-                      }),
-                    )
-                  None => ()
-                }
-              }),
-              @ui.button("抓链接", variant=@ui.Soft, on_click=fn() {
-                match wv.val {
-                  Some(v) =>
-                    ignore(
-                      v.capture_dom(@web.Links, fn(s : @web.DomSnapshot) -> Unit {
-                        dom_state.set("链接 ok=\{s.ok} 共 \{s.links.length()} 条")
-                      }),
-                    )
-                  None => ()
-                }
-              }),
-              @ui.button("抓 meta", variant=@ui.Soft, on_click=fn() {
-                match wv.val {
-                  Some(v) =>
-                    ignore(
-                      v.capture_dom(@web.Meta, fn(s : @web.DomSnapshot) -> Unit {
-                        dom_state.set("meta ok=\{s.ok} 共 \{s.meta.length()} 条")
-                      }),
-                    )
-                  None => ()
-                }
-              }),
-              @ui.button("抓结构", variant=@ui.Text, on_click=fn() {
-                match wv.val {
-                  Some(v) =>
-                    ignore(
-                      v.capture_dom(@web.Structure, fn(s : @web.DomSnapshot) -> Unit {
-                        dom_state.set(
-                          "结构 ok=\{s.ok} 元素=\{s.elements} 标题=\{s.title}",
-                        )
-                      }),
-                    )
-                  None => ()
-                }
-              }),
-            ],
-            column_gap=6.0,
+                None => show_result("webview 未就绪，演示不可用（引擎不在位？）")
+              }
+            },
+            width=208.0,
           ),
         ],
+        column_gap=6.0,
         padding=8.0,
-        row_gap=6.0,
+        align_items=@yoga.AlignItems::Center,
       ),
       // webview 主体（建好后 mount 进来；引擎不在位则降级说明板）
       @ui.col([], grow=1.0, handle=fn(c) { holder.val = Some(c) }),
-      // 底部状态区
+      // 状态栏：常驻加载状态与 URL / 事件流水 / 结果区（截断 + 展开 + 复制）
       @ui.col(
         [
-          @ui.bind_label(title_state, fn(s) { "标题：\{s}" }),
-          @ui.bind_label(nav_events, fn(s) { "事件：\{s}" }),
-          @ui.bind_label(nav_state, fn(s) { "导航：\{s}" }),
-          @ui.bind_label(bind_state, fn(s) { "绑定：\{s}" }),
-          @ui.bind_label(js_state, fn(s) { "JS：\{s}" }),
-          @ui.bind_label(cookie_state, fn(s) { "Cookie：\{s}" }),
-          @ui.bind_label(dom_state, fn(s) { "DOM：\{s}" }),
+          @ui.row(
+            [
+              @core.bind_node(
+                status.signal(),
+                fn(s : String) -> @core.Node {
+                  // 编码形如「k|文本」：首字符是状态档，其余是文本
+                  let tag = s[:1]
+                  let text = s[2:].to_owned()
+                  let t : @ui.SemanticType = if tag == "1" {
+                    @ui.Primary
+                  } else if tag == "2" {
+                    @ui.Success
+                  } else if tag == "3" {
+                    @ui.Danger
+                  } else {
+                    @ui.Info
+                  }
+                  @ui.tag_of_type(
+                    if tag == "1" { "加载中" } else { text },
+                    t,
+                  )
+                },
+              ),
+              @ui.bind_label(cur_url, fn(s) { clip(s, 96) }, handle=fn(w) {
+                w.node.set_flex_grow(1.0)
+              }),
+              @ui.bind_label(title_st, fn(s) { clip(s, 40) }, font_size=12.0, color="text_secondary"),
+            ],
+            column_gap=8.0,
+            align_items=@yoga.AlignItems::Center,
+          ),
+          @ui.row(
+            [
+              @ui.bind_label(ev_count, fn(n) { "事件\{n}" }, font_size=12.0, color="text_secondary"),
+              @ui.bind_label(ev_line, fn(s) { s }, font_size=12.0),
+            ],
+            column_gap=8.0,
+            align_items=@yoga.AlignItems::Center,
+          ),
+          @ui.row(
+            [
+              @ui.text("结果", role=@ui.Secondary, font_size=12.0),
+              @ui.text_dyn(
+                result_view.signal(),
+                font_size=12.0,
+                wrap=true,
+                max_width=820.0,
+                handle=fn(w) { w.node.set_flex_grow(1.0) },
+              ),
+              @core.bind_node(
+                result_open.signal(),
+                fn(open : Bool) -> @core.Node {
+                  @ui.button(
+                    if open { "收起" } else { "展开" },
+                    variant=@ui.Text,
+                    on_click=fn() { result_open.set(!result_open.get()) },
+                  )
+                },
+              ),
+              @ui.button("复制", variant=@ui.Text, on_click=fn() {
+                let _ = @sys.clipboard_set_text(result_full.get())
+                toast("结果已复制 ✓", @ui.Success)
+              }),
+            ],
+            column_gap=8.0,
+            align_items=@yoga.AlignItems::Center,
+          ),
         ],
         padding=8.0,
-        row_gap=2.0,
+        row_gap=4.0,
       ),
     ],
     grow=1.0,
@@ -318,8 +438,8 @@ fn main {
   let mounted = @ui.mount_window(
     [body],
     title="浏览器示例",
-    width=1100,
-    height=760,
+    width=1120,
+    height=780,
     handle=fn(a : @core.App) {
       // webview 建在首帧之后（宿主循环已跑、窗口已上屏，与 showcase 旧页
       // 「选中页才建」的时机同口径）
@@ -329,25 +449,54 @@ fn main {
             wv.val = Some(v)
             v.on_event = Some(fn(e : @web.WebEvent) -> Unit {
               match e {
-                @web.TitleChanged(t) => title_state.set(t)
-                @web.NavStarted(u) => nav_events.set("导航开始：\{u}")
-                @web.NavCommitted(u) => nav_events.set("导航提交：\{u}")
-                @web.NavFinished(u) => nav_events.set("导航完成：\{u}")
-                @web.LoadFailed(raw) =>
-                  match @web.nav_error_parse(raw) {
-                    None => nav_events.set("加载失败：\{raw}")
-                    Some(ne) =>
-                      nav_events.set("加载失败：\{ne.domain}/\{ne.code} \{ne.uri}")
+                @web.TitleChanged(t) => title_st.set(t)
+                @web.UrlChanged(u) => cur_url.set(u)
+                @web.NavStarted(u) => {
+                  set_status(Loading, "加载中")
+                  ev("导航开始 \{clip(u, 100)}")
+                }
+                @web.NavCommitted(u) => {
+                  cur_url.set(u)
+                  url_in.set(u)
+                  ev("导航提交 \{clip(u, 100)}")
+                }
+                @web.NavRedirected(u) => ev("重定向 \{clip(u, 100)}")
+                @web.NavFinished(u) => {
+                  set_status(Done, "完成")
+                  ev("导航完成 \{clip(u, 100)}")
+                }
+                @web.LoadFailed(raw) => {
+                  set_status(Failed, "加载失败")
+                  let reason = match @web.nav_error_parse(raw) {
+                    None => raw
+                    Some(ne) => "\{ne.domain}/\{ne.code} \{ne.uri}"
                   }
-                @web.NewWindow(u) => nav_events.set("新窗请求（默认拦下）：\{u}")
-                @web.Permission(c) => nav_events.set("权限请求（默认拒绝）：\{c}")
+                  ev("加载失败 \{clip(raw, 100)}")
+                  show_result("加载失败（结构化原因）\n\{reason}\n\n原始载荷：\n\{raw}")
+                }
+                @web.NewWindow(u) => {
+                  ev("新窗请求被策略拦下")
+                  show_result("新窗请求（默认拦下）：\n\{u}\n\n当前策略：\n\{policy_text()}")
+                }
+                @web.Permission(c) => {
+                  ev("权限请求被策略拒绝")
+                  show_result("权限请求（默认拒绝）：\{c}\n\n当前策略：\n\{policy_text()}")
+                }
+                @web.Download(d) => {
+                  ev("下载被策略拦下")
+                  show_result("下载请求（默认拦下）：\{d}\n\n当前策略：\n\{policy_text()}")
+                }
                 @web.Cookies(j) =>
-                  cookie_state.set("回包（\{j.length()} 字节）：\{j}")
+                  show_result("Cookie 回包（\{j.length()} 字节）\n\{j}")
+                @web.ProcessTerminated(r) => {
+                  set_status(Failed, "渲染进程退出")
+                  ev("渲染进程退出 \{clip(r, 100)}")
+                }
                 _ => ()
               }
             })
             v.on_invoke = Some(fn(payload : String) -> Unit {
-              bind_state.set("收到网页调用：\{payload}")
+              show_result("网页 → 原生（raw binding demoBinding）\n\{payload}")
             })
             match holder.val {
               Some(c) => { let _ = v.node(grow=1.0).mount_into(c) }
@@ -358,8 +507,9 @@ fn main {
             let tick : Ref[() -> Unit] = Ref(fn() { () })
             tick.val = fn() -> Unit {
               if v.add_raw_binding("demoBinding") {
-                v.set_new_window_policy(false)
-                v.set_permission_mode(false)
+                v.set_new_window_policy(pol_newwin.val)
+                v.set_permission_mode(pol_perm.val)
+                v.set_download_mode(pol_dl.val)
               } else {
                 tries.val = tries.val + 1
                 if tries.val < 60 {
@@ -368,6 +518,14 @@ fn main {
               }
             }
             let _ = a.timer(80, tick.val)
+            // 首页：本地协议页（无需外网）；协议就绪失败则停在 about:blank
+            if prepare_scheme(v) {
+              v.load_url(HOME_URL)
+              set_status(Loading, "加载中")
+            } else {
+              set_status(Ready, "协议注册失败，请在演示菜单重试或输入 URL")
+              ev("协议注册失败（prepare_scheme=0）")
+            }
           }
           None => {
             // 探测不到引擎：降级不静默

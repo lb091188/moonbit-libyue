@@ -254,7 +254,13 @@
 - **本批未做且不假装完成**：Linux 的任务栏进度另有 Unity LauncherEntry（DBus `com.canonical.Unity.LauncherEntry`）路径、macOS 是 dock 徽标（`NSDockTile`），都归后续跨平台门面批——GTK 分支与占位分支只给「supported 恒 0」的可编译失败桩；任务栏按钮的**真观感**（绿条 / 红条 / 黄条、 indeterminate 滚动）只能人看，归 `_人工测试清单.md` O 节。
 - **探针侧两条 C4996 是既有现象**：`wm_im_*` 段的 `wcsncpy` / `wcsncat`——探针自己 `#include <windows.h>` 会让桩内的 `_CRT_SECURE_NO_WARNINGS` 失效（W21d 记过同一条），真构建（moon 的 native-stub）无此告警。
 
-### 媒体回到独立模块：模块级可选恢复（2026-10-12，架构边界批）
+### 示例临时文件的落点选型：TEMP 之外的世界（2026-10-16，浏览器示例改版批）
+
+- **现象**：`examples/browser` 的 `scheme_root()` 只认 `TEMP` 环境变量、拿不到就回落**相对路径** `libyue-browser-scheme/`。Linux 桌面没有 `TEMP`（那是 Windows 惯例），于是每次跑示例都在**当前工作目录**落一个临时目录——从仓库根起跑时就是仓库根本身，留下一坨不入库的脏目录（本仓根下的 `libyue-browser-scheme/` 即其遗留）。
+- **根因**：临时目录选型按 Windows 单平台口径写死；「拿不到就回落当前目录」在 Windows 上近乎无害（`TEMP` 基本恒在），在 Linux 上却把「最不该写的地方」当了兜底。
+- **修复（`examples/browser/main.mbt` 的 `scheme_root`）**：按平台分流——Windows 走 `TEMP`，回落 `TMP`，再回落 `C:/Windows/Temp`（绝不回落相对路径）；Linux/macOS 走 `XDG_RUNTIME_DIR`（用户级运行时目录，登出即清），回落 `/tmp`。目录名同步更名 `native-gui-browser-scheme`（随仓更名，旧遗留目录直接删）。
+- **验证**：Ubuntu 24.04 冒烟后 `/run/user/<uid>/native-gui-browser-scheme/` 出现三份协议页文件（index.html / page2.html / style.css），仓库根无新增目录；`git status` 干净。
+- **口径**：示例要往盘上写中间产物时，落点必须「系统临时区三选一」（`XDG_RUNTIME_DIR` → `/tmp`；Windows `TEMP` → `TMP`），**禁止回落当前目录**——`moon run` 的工作目录是使用者的事，示例不能假设。
 
 - **引子**：`TODO.md` 里「旧链 `modules/gui-media` 下线」那句话被读成「不要 ffmpeg 了」。查证后确认 ffmpeg 一点没退场（新栈 `yue/media` 照旧 import `NoahLiu/ffmpeg-mbt/src`，是**解码后端**），但**带出一个真问题**：`yue/media` 住在主模块里，为让它 import 得动 ffmpeg-mbt，根 `moon.mod` 必须声明 `NoahLiu/ffmpeg-mbt@0.1.0`——于是**所有消费主模块的人都把 ffmpeg 拉进依赖闭包**，当初「媒体拆成独立模块＝可选依赖」的设计被抵消了。
 - **机制（moon 的硬约束）**：`moon.pkg` 的 import 必须先由 `moon.mod` 声明模块依赖（否则报 `containing module is not imported`）。因此「媒体包住在主模块内」与「模块级可选」**互斥**：想要可选，媒体只能整个挪出主模块。**要把两层分开**——**包级可选**（`moon.pkg` 的 import 决定编译/链接边界）一直在，不 import `yue/media` 就不会链 `-lav*`；丢的是**依赖闭包/构建期**那一层，两者不是同一件事。

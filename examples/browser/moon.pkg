@@ -1,5 +1,6 @@
-// 浏览器示例：WebView 全能力演示（原 showcase「浏览器」页独立成示例）。
+// 浏览器示例：WebView 全能力演示（「正常的浏览器」形态，能力演示收进演示菜单）。
 import {
+  "NoahLiu/yoga-mbt/src" @yoga,
   "NoahLiu/native-gui/core",
   "NoahLiu/native-gui/ui",
   "NoahLiu/native-gui/sys" @sys,
