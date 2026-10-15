@@ -2,6 +2,7 @@
 // 对照——派生关系要手动接线（动作里 set / subscribe 回调里 set），
 // 忘接线界面就静默不刷新；信号版见「基础组件」等页。
 pub fn page_store_demo(_app : @shared.App) -> @core.Node {
+  let rebuild_n : @core.Store[Int] = @core.Store::new(0)
   let counter : @core.Store[Int] = @core.Store::new(0)
   // 手动派生一：动作回调里顺手 set（改 A 必须记得改 B）
   let doubled : @core.Store[Int] = @core.Store::new(0)
@@ -62,6 +63,47 @@ pub fn page_store_demo(_app : @shared.App) -> @core.Node {
         "let sum = @core.Signal::computed(fn() { a.get() + b.get() })",
         "let doubled = a.map(fn(n) { n * 2 })",
         "@ui.bind(sum, fn(v) { \"和：\\{v}\" })",
+      ],
+    ),
+
+    @shared.section(
+      "原位重挂",
+      "bind_node 原位重建子树",
+      "一个 Store 驱动 `bind_node`：每次点击把这一棵子树**销毁重建**（底色随奇偶换、文字随计数换），兄弟项位置不动，旧代订阅随重建整袋退订。",
+      [
+        @ui.row(
+          [
+            @ui.text("兄弟项（重建时不动）", role=@ui.Secondary),
+            @core.bind_node(rebuild_n.signal(), fn(n : Int) -> @core.Node {
+              @ui.view(
+                [
+                  @ui.text("第 \{n} 代子树", role=@ui.Body),
+                  @ui.text(
+                    "这棵子树每次点击都是全新控件；旁边那行字没有被重挂。",
+                    role=@ui.Secondary,
+                    max_width=360.0,
+                  ),
+                ],
+                padding=10.0,
+                row_gap=4.0,
+                align_items=@yoga.AlignItems::FlexStart,
+                background_color=if n % 2 == 0 { "fill_hover" } else { "bg_panel" },
+                border_color="border",
+              )
+            }),
+            @ui.button("再挂一代", variant=@ui.Solid, on_click=fn() {
+              rebuild_n.update(fn(n : Int) { n + 1 })
+            }),
+          ],
+          column_gap=12.0,
+          align_items=@yoga.AlignItems::Center,
+        ),
+      ],
+      code=[
+        "@core.bind_node(store.signal(), fn(v) -> @core.Node {",
+        "  // 每次 set 都把返回的这棵子树原位换掉，兄弟项不受影响",
+        "  @ui.view([@ui.text(...)], ...),  // 返回的这棵按 v 现建",
+        "})",
       ],
     ),
   ])

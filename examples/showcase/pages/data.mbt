@@ -36,6 +36,18 @@ fn data_cmp_num_str(a : String, b : String) -> Int {
 }
 
 ///|
+
+///|
+/// 粘性列表演示行：每组四行普通文本行。
+fn sticky_rows(g : Int) -> Array[@core.Node] {
+  let rows : Array[@core.Node] = []
+  for i = 0; i < 4; i = i + 1 {
+    let label = "第 \{g} 组 · 第 \{i + 1} 行（滚动时看顶部吸顶条）"
+    rows.push(@ui.text(label, role=@ui.Body))
+  }
+  rows
+}
+
 pub fn page_data(app : @shared.App) -> @core.Node {
   // 语言表基础数据 + 排序显示数据（表头点击写 sort，订阅里重排）
   let lang_base : Array[@ui.TableRow] = [
@@ -470,6 +482,32 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       "占位图 + 说明文字。",
       [@ui.empty(description="这里还没有内容")],
       code=["@ui.empty(\"这里还没有内容\")"],
+    ),
+
+    @shared.section(
+      "粘性列表",
+      "吸顶分组列表",
+      "分组标题在滚动时吸顶——悬浮在视口顶部的那条始终显示「当前组」，滚过组边界就换文字；组高由内容决定，当前组是每帧读布局结果反推的，不是事先累加高度。",
+      [
+        @ui.sticky_list(
+          [
+            ("第一组 · 概览", sticky_rows(1)),
+            ("第二组 · 明细", sticky_rows(2)),
+            ("第三组 · 汇总", sticky_rows(3)),
+          ],
+          @ui.StickyList::new(),
+          width=520.0,
+          height=240.0,
+        ),
+      ],
+      code=[
+        "@ui.sticky_list(",
+        "  [(\"第一组\", rows_1), (\"第二组\", rows_2)],",
+        "  @ui.StickyList::new(),",
+        "  width=520.0,",
+        "  height=240.0,",
+        ")",
+      ],
     ),
   ])
 }

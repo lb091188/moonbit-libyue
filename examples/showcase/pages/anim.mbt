@@ -36,7 +36,21 @@ fn hover_card(label : String, sub : String, dur : Double) -> @core.Node {
 }
 
 ///|
+
+///|
+/// GIF 图源候选（moon run 可能从仓库根或 examples/ 目录起跑，逐个探测）。
+fn anim_gif_path() -> String {
+  for c in ["examples/showcase/assets/dot.gif", "assets/dot.gif", "showcase/assets/dot.gif"] {
+    if @sys.sys_path_exists(c) {
+      return c
+    }
+  }
+  "examples/showcase/assets/dot.gif"
+}
+
 pub fn page_anim(_app : @shared.App) -> @core.Node {
+  let gif_h : @ui.GifHandle = @ui.GifHandle::make()
+  let gif_note : @core.Store[String] = @core.Store::new("自转中")
   @shared.page([
     @shared.section(
       "属性过渡",
@@ -173,6 +187,45 @@ pub fn page_anim(_app : @shared.App) -> @core.Node {
         "@style.style(text_decoration=@style.Underline)",
         "@style.style(text_align=@text.End, line_height=32.0)",
         "@style.style(white_space=@style.Normal, max_width=300.0)",
+      ],
+    ),
+
+    @shared.section(
+      "动图",
+      "GIF 动图",
+      "按每帧时长自转的 GIF 组件（解码走 `render` 的动画通道，静图退回首帧）；句柄可暂停/继续、读已换帧数。",
+      [
+        @ui.row(
+          [
+            @ui.gif(
+              anim_gif_path(),
+              width=48.0,
+              height=48.0,
+              state=gif_h,
+            ),
+            @ui.button("暂停", variant=@ui.Soft, on_click=fn() {
+              gif_h.pause()
+              gif_note.set("已暂停（running=\{gif_h.running}）")
+            }),
+            @ui.button("继续", variant=@ui.Soft, on_click=fn() {
+              gif_h.play()
+              gif_note.set("已继续（running=\{gif_h.running}）")
+            }),
+            @ui.button("读帧数", variant=@ui.Text, on_click=fn() {
+              gif_note.set("已换 \{gif_h.frame_count()} 帧")
+            }),
+          ],
+          column_gap=10.0,
+          align_items=@yoga.AlignItems::Center,
+        ),
+        @ui.bind_label(gif_note, fn(s) { s }, font_size=12.0, color="text_secondary"),
+      ],
+      code=[
+        "let h = @ui.GifHandle::make()",
+        "@ui.gif(\"assets/dot.gif\", width=48.0, height=48.0, state=h)",
+        "h.pause()  // 暂停自转",
+        "h.play()   // 继续",
+        "h.frame_count()  // 已换过的帧数",
       ],
     ),
   ])

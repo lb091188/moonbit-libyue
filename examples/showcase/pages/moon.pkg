@@ -1,6 +1,7 @@
 // 演示板各页内容（G7 新栈）。每页一个文件；页内私有状态留在页函数体内，
 // 跨页共享状态从 `shared` 的 `App` 取。
 import {
+  "moonbitlang/core/encoding/utf8",
   "NoahLiu/yoga-mbt/src" @yoga,
   "NoahLiu/native-gui/core",
   "NoahLiu/native-gui/render" @render,
@@ -8,6 +9,7 @@ import {
   "NoahLiu/native-gui/ui",
   "NoahLiu/native-gui/win" @win,
   "NoahLiu/native-gui/sys" @sys,
+  "NoahLiu/native-gui/dbus" @dbus,
   "NoahLiu/native-gui/icons",
   "NoahLiu/native-gui/chart" @charts,
   "NoahLiu/native-gui/theme",

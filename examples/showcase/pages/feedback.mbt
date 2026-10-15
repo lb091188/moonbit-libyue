@@ -11,6 +11,11 @@
 
 ///|
 pub fn page_feedback(app : @shared.App) -> @core.Node {
+  let msg_open : @core.Store[Bool] = @core.Store::new(false)
+  let msg_kind : @core.Store[Int] = @core.Store::new(0)
+  let msg_text : @core.Store[String] = @core.Store::new("")
+  let msg_btns : @core.Store[Array[(String, Int)]] = @core.Store::new([("知道了", 1)])
+  let msg_resp : @core.Store[String] = @core.Store::new("（还没弹过自绘消息框）")
   @shared.page([
     @shared.section(
       "横幅",
@@ -157,6 +162,71 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
         "  ],",
         ")",
         "visible.set(true)",
+      ],
+    ),
+
+    @shared.section(
+      "消息框",
+      "自绘消息框",
+      "纯自绘消息框（三平台同构，Esc 收起、Enter 走默认钮）：与「系统集成」页的原生消息框并存。响应编号由调用方在 buttons 里定，回调收编号。",
+      [
+        @ui.row(
+          [
+            @ui.button("信息·单钮", on_click=fn() {
+              msg_kind.set(0)
+              msg_text.set("这是一条信息档的自绘消息框。")
+              msg_btns.set([("知道了", 1)])
+              msg_open.set(true)
+            }),
+            @ui.button("警告·是/否", variant=@ui.Soft, on_click=fn() {
+              msg_kind.set(1)
+              msg_text.set("要继续这个演示吗？")
+              msg_btns.set([("是", 1), ("否", 0)])
+              msg_open.set(true)
+            }),
+            @ui.button("错误·三钮", variant=@ui.Danger, on_click=fn() {
+              msg_kind.set(2)
+              msg_text.set("演示用的错误消息。")
+              msg_btns.set([("重试", 2), ("忽略", 1), ("取消", 0)])
+              msg_open.set(true)
+            }),
+          ],
+          column_gap=8.0,
+        ),
+        @ui.bind_label(msg_resp, fn(s) { s }),
+        @core.bind_node(
+          @core.Signal::computed(fn() {
+            (msg_kind.get(), msg_text.get(), msg_btns.get())
+          }),
+          fn(t : (Int, String, Array[(String, Int)])) -> @core.Node {
+            @ui.message_box(
+              msg_open,
+              "自绘消息框",
+              t.1,
+              kind=if t.0 == 1 {
+                @ui.Warning
+              } else if t.0 == 2 {
+                @ui.Error
+              } else {
+                @ui.Information
+              },
+              informative="Esc 收起 · Enter 走默认钮",
+              buttons=t.2,
+              on_response=fn(r : Int) {
+                msg_resp.set("自绘消息框响应：\{r}")
+              },
+            )
+          },
+        ),
+      ],
+      code=[
+        "@ui.message_box(",
+        "  open_store,          // 可见性：Store[Bool] 驱动",
+        "  \"标题\", \"正文\",",
+        "  kind=@ui.Warning,    // Default/Information/Warning/Question/Error",
+        "  buttons=[(\"是\", 1), (\"否\", 0)],",
+        "  on_response=fn(r) { ... },  // 收回按钮编号",
+        ")",
       ],
     ),
   ])

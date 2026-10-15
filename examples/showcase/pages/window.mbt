@@ -89,6 +89,25 @@ fn win_button(
 ///|
 /// 窗口页。页内私有状态（回显/热键句柄/两个切换态）不进共享 App。
 pub fn page_window(app : @shared.App) -> @core.Node {
+  let taskbar_out : @core.Store[String] = @core.Store::new("（还没写过任务栏进度）")
+  fn taskbar_pct(v : Int64, t : Int64, tag : String) -> Unit {
+    match app.host.val {
+      Some(a) =>
+        taskbar_out.set(
+          if a.window.set_taskbar_progress(v, t) { "已写进度 \{tag}" } else { "写失败（\{tag}，后端不在位？）" },
+        )
+      None => ()
+    }
+  }
+  fn taskbar_state(st : @win.TaskbarState, tag : String) -> Unit {
+    match app.host.val {
+      Some(a) =>
+        taskbar_out.set(
+          if a.window.set_taskbar_state(st) { "已写状态 \{tag}" } else { "写失败（\{tag}，后端不在位？）" },
+        )
+      None => ()
+    }
+  }
   let last_op : @core.Store[String] = @core.Store::new("（尚无操作）")
   // 两个切换态由按钮自己翻（窗口层没有 is_fullscreen/is_borderless 之外的
   // 读回通道，态以按钮点击为准）
@@ -375,6 +394,45 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         "  external=true,",
         "  on_external=fn(r) { ... }, // Ok(效果)=成交/取消，Err=没走成（已回落）",
         ")",
+      ],
+    ),
+
+    @shared.section(
+      "任务栏",
+      "任务栏进度",
+      "写任务栏按钮的进度条与状态（Windows 的 ITaskbarList3，只写不读；Linux/mac 后端未接时按钮如实回报写失败，不静默）。",
+      [
+        @ui.row(
+          [
+            @ui.button("10%", on_click=fn() { taskbar_pct(1, 10, "10%") }),
+            @ui.button("50%", on_click=fn() { taskbar_pct(5, 10, "50%") }),
+            @ui.button("100%", on_click=fn() { taskbar_pct(10, 10, "100%") }),
+            @ui.button("错误", variant=@ui.Danger, on_click=fn() {
+              taskbar_state(@win.TaskbarState::Error, "错误")
+            }),
+            @ui.button("暂停", variant=@ui.Soft, on_click=fn() {
+              taskbar_state(@win.TaskbarState::Paused, "暂停")
+            }),
+            @ui.button("不确定", variant=@ui.Soft, on_click=fn() {
+              taskbar_state(@win.TaskbarState::Indeterminate, "不确定")
+            }),
+            @ui.button("清除", variant=@ui.Text, on_click=fn() {
+              taskbar_state(@win.TaskbarState::NoProgress, "清除")
+            }),
+          ],
+          column_gap=8.0,
+        ),
+        @ui.bind_label(taskbar_out, fn(s) { s }),
+      ],
+      code=[
+        "// 宿主窗口门面上只有写入口（后端没有 getter，进度值由调用方自持）",
+        "match app.host.val {",
+        "  Some(a) => {",
+        "    let ok = a.window().set_taskbar_progress(5, 10) // 50%",
+        "    let ok2 = a.window().set_taskbar_state(TaskbarState::Error)",
+        "  }",
+        "  None => ()",
+        "}",
       ],
     ),
   ])

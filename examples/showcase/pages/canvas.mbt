@@ -13,6 +13,58 @@
 
 ///|
 /// 画布页。页内私有状态（色相偏移/渐变开关/富文本两个格式开关）不进共享 App。
+
+///|
+/// 字体演示的自绘块：左右两盒同一段文字，右盒把末尾「28」设成 28px 区间字体——
+/// 行盒必须按混排口径抬起来（盒高取 `AttributedText::line_height`），否则大字被裁；
+/// 下方一行演示族名回退（不存在的族退到 monospace）。
+fn font_mix_widget() -> @core.Node {
+  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    w.node.set_width(@yoga.fixed(400.0))
+    w.node.set_height(@yoga.fixed(96.0))
+    w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
+      p.set_fill_color(@theme.theme_bg_panel())
+      p.fill_rect(0.0, 0.0, r.w, r.h)
+      let base = @text.AttributedText::new("基准 Base 28")
+      let mixed = @text.AttributedText::new("基准 Base 28")
+      // 「28」是末尾两字节起、长 2 字节（字节下标口径，与编辑内核同源）
+      let nb = @utf8.encode("基准 Base 28")
+      let at = nb.length() - 2
+      mixed.set_font_for(@text.Font::new("", 28.0), at, nb.length())
+      let lh_base = match base.line_height() {
+        Some(v) => v.to_double()
+        None => 20.0
+      }
+      let lh_mixed = match mixed.line_height() {
+        Some(v) => v.to_double()
+        None => 20.0
+      }
+      // 两个盒子的边框：右盒没被抬起来就是行高口径错了
+      p.set_stroke_color(@theme.theme_border())
+      p.set_line_width(1.0)
+      p.stroke_rect(0.0, 0.0, 190.0, lh_base)
+      p.stroke_rect(198.0, 0.0, 190.0, lh_mixed)
+      p.flush()
+      let _ = base.draw_at(p, 4.0, 0.0, 186.0, lh_base)
+      let _ = mixed.draw_at(p, 202.0, 0.0, 186.0, lh_mixed)
+      let fam = @text.resolve_family(["绝对没有的族 Qzz", "monospace"])
+      let fam_count = match @text.families() {
+        Some(a) => a.length()
+        None => 0
+      }
+      let _ = @text.draw_text_at(
+        p,
+        4.0,
+        72.0,
+        "回退族名：" + fam + "（可用字体族 \{fam_count} 个）",
+        12.0,
+        @theme.theme_text_secondary(),
+      )
+    })
+    w
+  })
+}
+
 pub fn page_canvas(app : @shared.App) -> @core.Node {
   let hue : Ref[Int] = Ref(0)
   let grad_on : Ref[Bool] = Ref(false)
@@ -214,6 +266,22 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
         "rt.set_text(\"文本已替换 ✓（范围属性保留）\")",
         "// 画：Painter 会话里直接落位",
         "let _ = rt.draw_at(p, 10.0, 20.0, 600.0, 90.0)",
+      ],
+    ),
+
+    @shared.section(
+      "字体",
+      "字体回退与混排行高",
+      "左盒只有基准字体，右盒把末尾「28」换成 28px——两个盒子的盒高都取 `line_height()` 的混排口径，右盒必须被抬起来；不存在的族名经 `resolve_family` 回退（CSS 列表口径）。",
+      [
+        @ui.view([font_mix_widget()], background_color="bg_panel", border_color="border", padding=8.0),
+      ],
+      code=[
+        "let mixed = @text.AttributedText::new(\"基准 Base 28\")",
+        "// 区间属性：字节下标口径，后设覆盖先设",
+        "mixed.set_font_for(@text.Font::new(\"\", 28.0), at, at + 2)",
+        "mixed.line_height()  // 基准与区间字体一起算，行盒 = max ascent + max descent",
+        "@text.resolve_family([\"没有的族\", \"monospace\"])  // 回退",
       ],
     ),
   ])

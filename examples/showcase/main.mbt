@@ -164,7 +164,10 @@ fn main {
               @ui.scroll_view(
                 [
                   @ui.menu_sections(
-                    [("组件", ["基础组件", "表单组件", "导航组件", "数据展示", "图表", "代码文档", "Store", "反馈组件", "事件与布局", "窗口", "系统集成", "图标库", "画布与富文本", "过渡与效果"])],
+                    [
+                      ("组件", ["基础组件", "表单组件", "导航组件", "数据展示", "图表", "代码文档", "Store", "反馈组件", "事件与布局", "窗口", "系统集成", "图标库", "画布与富文本", "过渡与效果"]),
+                      ("系统", ["系统能力探测"]),
+                    ],
                     selected,
                     icons=[
                       ("基础组件", @icons.Appstore),
@@ -181,6 +184,7 @@ fn main {
                       ("图标库", @icons.Layout),
                       ("画布与富文本", @icons.Brush),
                       ("过渡与效果", @icons.MagicStick),
+                      ("系统能力探测", @icons.Monitor1),
                     ],
                     width=180.0,
                   ),
@@ -216,6 +220,7 @@ fn main {
               @shared.nav_page("图标库", selected, @pages.page_icons(app)),
               @shared.nav_page("画布与富文本", selected, @pages.page_canvas(app)),
               @shared.nav_page("过渡与效果", selected, @pages.page_anim(app)),
+              @shared.nav_page("系统能力探测", selected, @pages.page_sysprobe(app)),
               // 对话框挂窗口根：锚点自己是 0 尺寸占位，可见性只由 Store 驱动
               @ui.dialog(
                 app.dlg_basic,
@@ -306,7 +311,7 @@ fn main {
       // 输入框的 Ctrl+C/X/V 接系统剪贴板（演示板按真实使用形态开；探测不可用
       // 时内核自动保持内部剪贴板，见 gui/ui/clipboard.mbt）
       @ui.use_system_clipboard(true)
-      println("SHOWCASE-READY title=\{SHOWCASE_TITLE} pages=14 follow=1")
+      println("SHOWCASE-READY title=\{SHOWCASE_TITLE} pages=15 follow=1")
       @core.paint_profile_reset()
       host.run()
     }
