@@ -72,10 +72,12 @@ test "颜色区间：落在正确的字形上，其余保持基准色" {
   assert_eq(at.range_count(), 1)
   let bm = paint(at, 120, 32)
   match (bbox_where(bm, is_red), bbox_where(bm, is_black)) {
-    (Some((rx0, _, rx1, _)), Some((bx0, _, _, _))) => {
-      // 被染红的是最左边那个 A
+    (Some((rx0, _, rx1, _)), Some((bx0, _, bx1, _))) => {
+      // 被染红的是最左边那个 A：红墨的起点必须在黑墨之前；红色块的宽度必须
+      // 明显小于其余三字的黑块（字体不同字形宽窄不同，不拿「红块右缘 < 黑块
+      // 左缘」这种相邻字形一挨就破的判据）
       assert_eq(rx0 < bx0, true)
-      assert_eq(rx1 < bx0, true)
+      assert_eq(rx1 - rx0 < bx1 - bx0, true)
     }
     _ => assert_eq(true, false)
   }

@@ -135,34 +135,38 @@ pub fn notify_body_with_progress(body : String, pct : Int) -> String {
 }
 
 ///|
-/// 查通知能力。Linux 取服务端 `GetCapabilities`；Win32 合成一份（气泡只有
-/// 标题 + 正文，无动作/图标/持久化）。无后端给 `Err(Unsupported)`。
+/// 查通知能力。先按后端选择定「有没有后端」，再问能力，于是 `notify_caps()`
+/// 与 `notify_supported()` 同口径：会话总线在、但通知服务没装，那就是「没有
+/// 后端」（`Err(Unsupported)`），不拿总线错误码冒充「有后端却查不到」。
+/// - Linux/D-Bus：取服务端 `GetCapabilities`。
+/// - Win32：合成一份（气泡只有标题 + 正文，无动作/图标/持久化）。
 pub fn notify_caps() -> Result[NotifyCaps, NotifyError] {
-  match @dbus.notify_caps() {
-    Ok(c) =>
+  match notify_backend() {
+    None => Err(Unsupported)
+    Some(WinBalloon) =>
       Ok({
-        body: c.body,
-        actions: c.actions,
-        icon_static: c.icon_static,
-        icon_multi: c.icon_multi,
-        persistence: c.persistence,
-        raw: c.raw,
+        // 只有标题 + 正文（szInfoTitle / szInfo）
+        body: true,
+        actions: false,
+        icon_static: false,
+        icon_multi: false,
+        persistence: false,
+        raw: ["body"],
       })
-    Err(@dbus.NfUnsupported) =>
-      if @win.notify_supported() {
-        // Win32 气泡：只有标题 + 正文（szInfoTitle / szInfo）
-        Ok({
-          body: true,
-          actions: false,
-          icon_static: false,
-          icon_multi: false,
-          persistence: false,
-          raw: ["body"],
-        })
-      } else {
-        Err(Unsupported)
+    Some(Dbus) =>
+      match @dbus.notify_caps() {
+        Ok(c) =>
+          Ok({
+            body: c.body,
+            actions: c.actions,
+            icon_static: c.icon_static,
+            icon_multi: c.icon_multi,
+            persistence: c.persistence,
+            raw: c.raw,
+          })
+        Err(@dbus.NfUnsupported) => Err(Unsupported)
+        Err(@dbus.NfFailed(m)) => Err(Failed(m))
       }
-    Err(@dbus.NfFailed(m)) => Err(Failed(m))
   }
 }
 

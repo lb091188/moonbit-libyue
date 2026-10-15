@@ -712,8 +712,13 @@ test "文本类样式属性真生效：对齐/换行/行高/下划线与硬阴�
   if !ui_text_guard() {
     return
   }
-  // 返回（首墨列, 有墨行数）：对齐比首列，折行/下划线比行数与墨量
-  let ink_scan = fn(node : @core.Node, w : Double, h : Double) -> (Int, Int) {
+  // 返回（首墨列, 有墨行数, 墨像素数）：对齐比首列，折行比行数，
+  // 下划线比墨量（行距里落进最后一行的线不算「多一行」）
+  let ink_scan = fn(node : @core.Node, w : Double, h : Double) -> (
+    Int,
+    Int,
+    Int,
+  ) {
     let root = mount_root([node], w, h)
     let bm = @render.Bitmap::new(w.to_int(), h.to_int())
     let p = @render.Painter::new(bm)
@@ -721,11 +726,13 @@ test "文本类样式属性真生效：对齐/换行/行高/下划线与硬阴�
     p.end()
     let mut first = -1
     let mut rows = 0
+    let mut ink = 0
     for y = 0; y < h.to_int(); y = y + 1 {
       let mut row_ink = 0
       for x = 0; x < w.to_int(); x = x + 1 {
         if bm.pixel(x, y).a > 0 {
           row_ink = row_ink + 1
+          ink = ink + 1
           if first < 0 {
             first = x
           }
@@ -735,19 +742,19 @@ test "文本类样式属性真生效：对齐/换行/行高/下划线与硬阴�
         rows = rows + 1
       }
     }
-    (first, rows)
+    (first, rows, ink)
   }
   let long_text = "一行中文文本用来比较左右位置与折行行数"
   // 1) text_align：同一盒宽下，居中的首墨列比左对齐靠右（文本明显窄于盒）
   let box_of = fn(t : @core.Node) -> @core.Node {
     view([t], width=220.0, height=24.0)
   }
-  let (start_col, _sr) = ink_scan(
+  let (start_col, _sr, _si) = ink_scan(
     box_of(text("短文本", class=[@style.style(text_align=@text.Start)])),
     240.0,
     30.0,
   )
-  let (center_col, _cr) = ink_scan(
+  let (center_col, _cr, _ci) = ink_scan(
     box_of(text("短文本", class=[@style.style(text_align=@text.Center)])),
     240.0,
     30.0,
@@ -755,12 +762,12 @@ test "文本类样式属性真生效：对齐/换行/行高/下划线与硬阴�
   assert_true(center_col > start_col + 20)
 
   // 2) white_space：可折行的有墨行数明显多于不折行
-  let (_wx, wrap_rows) = ink_scan(
+  let (_wx, wrap_rows, _wi) = ink_scan(
     text(long_text, max_width=80.0, class=[@style.style(white_space=@style.WhiteSpace::Normal)]),
     120.0,
     120.0,
   )
-  let (_nx, nowrap_rows) = ink_scan(
+  let (_nx, nowrap_rows, _ni) = ink_scan(
     text(long_text, max_width=80.0, class=[@style.style(white_space=@style.WhiteSpace::NoWrap)]),
     120.0,
     120.0,
@@ -775,14 +782,24 @@ test "文本类样式属性真生效：对齐/换行/行高/下划线与硬阴�
   )
   assert_eq(kid(lh, 0).rect.h, 40.0)
 
-  // 4) text_decoration：下划线多出一整行的墨（按行数比）
-  let (_pu, plain_rows) = ink_scan(text("下划线", class=[]), 120.0, 40.0)
-  let (_uu, under_rows) = ink_scan(
+  // 4) text_decoration：下划线要额外多出一份墨（比墨量不比行数——线落进最后一行
+  //    的行距时行数是平的，而各后端的行盒高度本来就不一致）
+  let (_pu, _pr, plain_ink) = ink_scan(text("下划线", class=[]), 120.0, 40.0)
+  let (_uu, _ur, under_ink) = ink_scan(
     text("下划线", class=[@style.style(text_decoration=@style.TextDecoration::Underline)]),
     120.0,
     40.0,
   )
-  assert_true(under_rows > plain_rows)
+  let probe = match @text.measure_font("下划线", @text.Font::new("", 13.0),
+    wrap=false
+  ) {
+    Some(m) => "w=\{m.width} h=\{m.height} baseline=\{m.baseline}"
+    None => "None"
+  }
+  assert_true(
+    under_ink > plain_ink,
+    msg="下划线没多出墨：plain=\{plain_ink} under=\{under_ink} 行=\{_pr}/\{_ur} measure_font(13.0)=\{probe}",
+  )
 
   // 5) box_shadow：本体之外出现墨（不画阴影时盒外无墨）
   let shadow_outside = fn(cls : Array[@style.Style]) -> Int {
