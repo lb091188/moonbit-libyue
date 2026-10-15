@@ -1,6 +1,6 @@
 name = "NoahLiu/native-gui"
 
-version = "0.1.0"
+version = "0.1.1"
 
 preferred_target = "native"
 
@@ -15,7 +15,7 @@ license = "MIT"
 repository = "https://github.com/lb091188/moonbit-native-gui"
 
 import {
-  "NoahLiu/yoga-mbt@0.1.0",
+  "NoahLiu/yoga-mbt@0.1.1",
   "prowk/moonsqlitefile@0.8.0",
   "mizchi/markdown@0.8.3",
 }

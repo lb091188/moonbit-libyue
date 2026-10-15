@@ -30,8 +30,8 @@ const SHOWCASE_TITLE : String = "组件库演示板"
 ///|
 /// 侧栏底部的版本号。旧链路读 `@yue.VERSION`（主包常量，`scripts/prebuild.py`
 /// 在构建期校验它与 `moon.mod` 一致）；新栈示例不再 import 主包，故本地留一份
-/// ——它只用于显示，权威值仍是 `moon.mod` 与 `yue/version.mbt`。
-const SHOWCASE_VERSION : String = "0.1.0"
+/// ——它只用于显示，权威值仍是库模块 `gui/moon.mod` 的 version。
+const SHOWCASE_VERSION : String = "0.1.1"
 
 ///|
 /// 主题应用：主色空串用内置基准盘，非空按 HSL 公式派生；深浅随 `dark`。
@@ -86,7 +86,7 @@ fn build_menu_bar(app : @shared.App) -> @core.MenuBar {
   })
   let help = bar.add_menu("帮助")
   let _ = help.add_item("关于").set_on_click(fn() {
-    app.toast_push("libyue 组件库演示板 V" + SHOWCASE_VERSION, @ui.Info)
+    app.toast_push("native-gui 组件库演示板 V" + SHOWCASE_VERSION, @ui.Info)
   })
   let _ = help.add_separator()
   let _ = help.add_role_item(@core.MenuRole::Quit).set_on_click(fn() {

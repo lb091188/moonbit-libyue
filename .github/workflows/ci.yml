@@ -1,7 +1,7 @@
 # CI 流水线:Linux(完整门禁) + Windows(编译/链接门禁)
 #
 # 仓库结构(2026-10-12 目录定案,详见 AGENTS.md):
-#   gui/        库模块 `NoahLiu/native-gui`(13 个包)——moon.work 成员,也是发布单元
+#   gui/        库模块 `NoahLiu/native-gui`(14 个包)——moon.work 成员,也是发布单元
 #   examples/   独立示例模块 `NoahLiu/native-gui-examples`
 #   experiment/ 独立探针/微基准模块 `NoahLiu/native-gui-experiment`
 #   modules/    媒体(gui-media)、布局(yoga-mbt)、ffmpeg-mbt、扩展示例等独立模块
@@ -118,15 +118,15 @@ jobs:
         working-directory: gui
         run: moon check
 
-      # 13 个包全量;dbus 包走真实会话总线,CI 里由 dbus-run-session 提供
+      # 14 个包全量;dbus 包走真实会话总线,CI 里由 dbus-run-session 提供
       # (runner 默认只有系统总线)。失败时把关键行塞进 error 注解
       # (匿名 API 可读),并回显输出尾部。
-      - name: 单元测试(库模块,13 包)
+      - name: 单元测试(库模块,14 包)
         working-directory: gui
         run: |
           set +e
           dbus-run-session -- moon test \
-            core ui render text theme icons sys input win dbus chart mdview web \
+            core ui render text theme icons sys input win dbus chart mdview web style \
             >/tmp/mt.out 2>&1
           code=$?
           set -e
@@ -266,7 +266,7 @@ jobs:
           do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
           && cd gui
           && moon check
-          && moon test core ui render text theme icons input win chart mdview web
+          && moon test core ui render text theme icons input win chart mdview web style
           && moon build --target native
           && cd ..\modules\ffmpeg-mbt
           && moon test src
