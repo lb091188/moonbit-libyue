@@ -144,7 +144,7 @@ test "带文字分隔线：整宽、文字两侧都有线" {
 }
 
 ///|
-test "提示条：有描述时更高，关闭热区与标记都只在右上角" {
+test "提示条：有描述时更高，关闭热区与标记都只在右上角，点 ✕ 收起" {
   let closes = Ref(0)
   let (root1, a1) = mounted(
     alert("标题", description="描述在这里", t=Warning, closable=true, on_close=fn() { closes.val = closes.val + 1 }),
@@ -152,6 +152,13 @@ test "提示条：有描述时更高，关闭热区与标记都只在右上角" 
     80.0,
   )
   assert_eq(a1.rect.h, 56.0)
+  assert_eq(a1.visible, true)
+  // 标记要画出来：热区在右上角但看不见 ✕ 等于没有按钮（真机反馈）
+  let bm0 = @render.Bitmap::new(300, 80)
+  let p0 = @render.Painter::new(bm0)
+  root1.paint(p0)
+  p0.end()
+  assert_true(mark_in(bm0, 276, 0, 300, 24) > 8)
   let _ = root1.dispatch_pointer({
     kind: @core.Down,
     x: a1.rect.x + 20.0,
@@ -167,6 +174,7 @@ test "提示条：有描述时更高，关闭热区与标记都只在右上角" 
     mods: 0,
   })
   assert_eq(closes.val, 0)
+  assert_eq(a1.visible, true)
   let _ = root1.dispatch_pointer({
     kind: @core.Down,
     x: a1.rect.x + a1.rect.w - 8.0,
@@ -181,17 +189,19 @@ test "提示条：有描述时更高，关闭热区与标记都只在右上角" 
     button: 1,
     mods: 0,
   })
+  // 点 ✕：回调被通知，且横幅本体收起（✕ 的默认行为就是关掉这条横幅）
   assert_eq(closes.val, 1)
-
-  let (_, a2) = mounted(alert("只有标题"), 300.0, 80.0)
-  assert_eq(a2.rect.h, 36.0)
-
-  // 标记要画出来：热区在右上角但看不见 ✕ 等于没有按钮（真机反馈）
+  assert_eq(a1.visible, false)
+  root1.relayout(300.0, 80.0)
   let bm1 = @render.Bitmap::new(300, 80)
   let p1 = @render.Painter::new(bm1)
   root1.paint(p1)
   p1.end()
-  assert_true(mark_in(bm1, 276, 0, 300, 24) > 8)
+  assert_eq(ink_count(bm1, 300, 80), 0, msg="收起后横幅不该再落墨")
+
+  let (_, a2) = mounted(alert("只有标题"), 300.0, 80.0)
+  assert_eq(a2.rect.h, 36.0)
+
   // 不可关闭的横幅不该在右上角留墨
   let bm2 = @render.Bitmap::new(300, 80)
   let p2 = @render.Painter::new(bm2)

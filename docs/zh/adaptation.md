@@ -2178,6 +2178,22 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **验证方式**:`render` 新增 3 条两后端同口径回归——整圆描边沿线逐格扫(`r=6`、线宽 1.3,环带内不许有 1 格断墨)、直角接头 miter 顶到外角(`(17,17)` 必须满墨 255、外角格外 0)、`fill_round_rect` 分数边有边缘 AA(左直边那格落在 60~200 的半墨);三条**在旧实现下都是红**(逐条 `git stash` 回退验证:miter 那条旧值 128、环线那条旧值 1 格断口、分数边那条旧值 0)。`ui` 的两条形状回归按新读数改判据(单选中心行仍 `##..######..##` + 心 6 格实心;开关滑珠第 4/15 行实体 10 格)。`moon test render ui chart` 406/406、库全包 917/922(5 条红为本机 Windows 环境基线:sys 的 `.desktop`/目录枚举断言,与本批无关)、`cd gui && moon check --deny-warn` 零警告。真机观感归 `_人工测试清单.md` S20。
 - **仍待处理(另批)**:通用路径填充的 AA 仍是 4×4 超采样(16 级量化),斜边有轻微阶梯;`stroke_round_rect` 的居中式 1px 在半像素原点仍摊成两格;库里所有圆角背景上的边框一律走 `stroke_rect` 内描边(方角压圆角),要统一成圆角边框得先把控件对齐整数设备格。
 
+## 输入框敲空格没反馈:两个排版引擎都把行尾空白从测量宽里剪掉(2026-10-15,真机反馈 Windows)
+
+- **现象**:输入框里打空格,光标不动、什么反馈都没有;打下下一个非空字符时,之前那个空格连同新字一起「冒出来」。
+- **根因**:空格本身无墨,「空格显示出来」的可见信号就是**光标右移**——输入框光标位移全部来自 `@text.measure_font` 的前缀宽(`gui/ui/entry.mbt` 的 `prefix_width`)。而两个排版引擎的「文本宽度」按对齐口径都**不含行尾空白**:DWrite 的 `DWRITE_TEXT_METRICS.width` 定义上排除行尾空白(含空白的字段是 `widthIncludingTrailingWhitespace`,C 侧 `pt_measure_font` 取的是前者);Pango 自 1.44 起也把行尾空白从布局宽里剪掉(`pango_layout_get_pixel_size` 同样剪)。于是量 `"abc "` = `"abc"`,敲空格前后宽度不变、光标不动。绘制路径(`ptw_render`/批队列的墨迹矩形)用的是 `widthIncludingTrailingWhitespace`,所以空格在**行中**时一直正常——只有**行尾**那一个受影响,单测里量整串词也测不出来。
+- **修复**:
+  - DWrite(`gui/text/dwrite_text.cpp`):`pt_measure_font` 与 `rt_measure` 的宽度改取 `tm.widthIncludingTrailingWhitespace`;对齐用的 `ptw_box_offsets` 仍取 `tm.width`(居中/右对齐不该把行尾空白算进去),两条口径各归各。
+  - Pango(`gui/text/stub.c`):新增 `pt_width_with_trailing_ws`——文本以空白结尾(`g_unichar_isspace` 判末字符)且布局单行时,用 `pango_layout_index_to_pos(len)` 取**光标终点**(Pango 的光标位置覆盖行尾空白)补回宽度,与像素宽取大者;多行不补(末行终点不是总宽)。
+- **验证方式**:`text` 新增 1 条两后端同口径回归(`measure("ab ")` 必须宽于 `measure("ab")`、纯空格宽 > 0)。`moon test text` 30/30、库全包 918/923(5 条红为本机 Windows 环境基线:sys 的读数环与目录枚举断言,与本批无关)、`cd gui && moon check --deny-warn` 零警告。真机复验归 `_人工测试清单.md` S19 第⑧项。
+
+## 可关闭横幅点 ✕ 没反应:组件没实现「默认收起」,默认回调是空函数(2026-10-15,真机反馈 Windows)
+
+- **现象**:反馈组件页「可关闭」段的横幅点右上角 ✕,横幅纹丝不动。
+- **根因**:`alert` 的关闭**热区与回调链路本身是好的**(白盒测试里点热区 `on_close` 确实被调),坏在语义分层——`on_close` 的默认值是空函数,showcase 恰好没传回调,而组件本体又没实现「收起」这个本体行为:点 ✕ 等于调用一个空函数,什么都不发生。组件页文案写的「这里留默认(只收起)」承诺的正是这个没实现的行为。
+- **修复**(`gui/ui/display.mbt`):✕ 的本体行为进组件——点热区一律 `set_visible(false)`(与 yoga `Display::None` 同步,布局自然回流)+ `@core.invalidate()`(全窗置脏:收起会让下方内容整列回流,局部脏区盖不住);`on_close` 降级为收起之外的**可选通知**,传不传都收起。`native-app` 里传了计数回调的用法顺带获得一致行为(横幅收起 + 计数加一)。
+- **验证方式**:`ui` 既有提示条回归改写——打开态先画图断言 ✕ 标记存在,点热区后断言回调被调 + `visible == false` + 重排重绘后整幅无墨;非热区点击不收起。库全包 918/923(同上基线)、`cd examples && moon check --deny-warn` 零警告。真机复验归 `_人工测试清单.md` S8。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。

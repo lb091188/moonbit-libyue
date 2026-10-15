@@ -27,6 +27,16 @@ test "测量单调：文本更长更宽、字号更大更高" {
   }
 }
 
+test "测量含行尾空白：行尾空格要占宽（输入框光标位移靠它）" {
+  match (measure("ab", 14.0), measure("ab ", 14.0), measure(" ", 14.0)) {
+    (Some(base), Some(tail), Some(only)) => {
+      assert_eq(tail.width > base.width, true, msg="行尾空格没有计入测量宽度")
+      assert_eq(only.width > 0, true, msg="纯空格量出零宽")
+    }
+    _ => assert_eq(false, true)
+  }
+}
+
 test "行高取字体口径：随字号增长、不绑样例文本" {
   match (line_height(14.0), line_height(28.0), line_ascent(14.0)) {
     (Some(h14), Some(h28), Some(a14)) => {

@@ -285,13 +285,18 @@ extern "C" int pt_measure_font(const char *text, int len, double size,
   if (FAILED(layout->GetMetrics(&tm))) {
     return 0;
   }
+  // 宽取 widthIncludingTrailingWhitespace：tm.width 定义上不含行尾空白，
+  // 而测量的消费方（输入框光标位移、命中测试、布局盒宽）要的是「这段文本
+  // 占多宽」——少一个行尾空格的宽，敲空格光标就不动（真机踩过）。对齐
+  // slack 仍用 tm.width（对齐不该把行尾空白算进去），两处口径各归各。
   FLOAT baseline = 0.0f;
   DWRITE_LINE_METRICS lm;
   UINT32 got = 0;
   if (SUCCEEDED(layout->GetLineMetrics(&lm, 1, &got)) && got >= 1) {
     baseline = lm.baseline;
   }
-  *out_w = static_cast<int32_t>(tm.width + 0.5f);
+  *out_w =
+      static_cast<int32_t>(tm.widthIncludingTrailingWhitespace + 0.5f);
   *out_h = static_cast<int32_t>(tm.height + 0.5f);
   *out_baseline = static_cast<int32_t>(baseline + 0.5f);
   return 1;
@@ -1351,7 +1356,8 @@ extern "C" int rt_measure(int64_t h, double box_w, int32_t *out_w,
     baseline = lm.baseline;
   }
   layout->Release();
-  *out_w = static_cast<int32_t>(tm.width + 0.5f);
+  *out_w =
+      static_cast<int32_t>(tm.widthIncludingTrailingWhitespace + 0.5f);
   *out_h = static_cast<int32_t>(tm.height + 0.5f);
   *out_baseline = static_cast<int32_t>(baseline + 0.5f);
   return 1;

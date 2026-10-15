@@ -535,6 +535,8 @@ pub fn statistic_dyn(
 ///|
 /// 提示条：语义色浅底 + 主色标题与描述。浅底折进 `background_color`、主色（标题与
 /// 左缘 3px 强调条）折进 `color`，都存 token 名，所以换主题后现取；`class` 可覆盖。
+/// `closable` 时点右上角 ✕ **收起整条横幅**（这是 ✕ 的本体行为，默认回调就是
+/// 「只收起」）；`on_close` 是收起之外的可选通知，不负责收起本身。
 pub fn alert(
   title : String,
   description? : String = "",
@@ -591,8 +593,14 @@ pub fn alert(
         match ev.kind {
           @core.Down => true
           @core.Up => {
-            // 关闭热区在右上角 24×24
-            if ev.x >= self.rect.w - 24.0 && ev.y <= 24.0 { on_close() }
+            // 关闭热区在右上角 24×24。✕ 的本体行为是收起（回调留默认就是
+            // 「只收起」，真机反馈「点了不关」正是缺了这一步）；收起会让
+            // 下方内容整列回流，走全窗置脏
+            if ev.x >= self.rect.w - 24.0 && ev.y <= 24.0 {
+              self.set_visible(false)
+              @core.invalidate()
+              on_close()
+            }
             false
           }
           _ => false

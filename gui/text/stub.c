@@ -207,6 +207,31 @@ static PangoLayout *pt_plain_layout(const char *text, int len, double size,
   return layout;
 }
 
+/* 行尾空白的宽度补回：Pango 自 1.44 起把行尾空白从布局宽里剪掉（对齐口径），
+ * 但测量的消费方（输入框光标位移、命中测试、布局盒宽）要的是「这段文本占多
+ * 宽」——文本以空白结尾且单行时，用 index_to_pos(末尾) 取光标终点补回（Pango
+ * 的光标位置覆盖行尾空白）。多行不补（末行终点不是总宽）。 */
+static int pt_width_with_trailing_ws(PangoLayout *layout, const char *text,
+                                     int len, int w) {
+  if (text == NULL || len <= 0) {
+    return w;
+  }
+  int i = len - 1; /* 找最后一个 UTF-8 字符的起始字节 */
+  while (i > 0 && ((unsigned char)text[i] & 0xC0) == 0x80) {
+    i--;
+  }
+  if (!g_unichar_isspace(g_utf8_get_char(text + i))) {
+    return w;
+  }
+  if (pango_layout_get_line_count(layout) != 1) {
+    return w;
+  }
+  PangoRectangle rect;
+  pango_layout_index_to_pos(layout, len, &rect);
+  int end_x = (rect.x + PANGO_SCALE / 2) / PANGO_SCALE;
+  return end_x > w ? end_x : w;
+}
+
 // 测量：out = [width, height, baseline]（像素）。max_width <= 0 不约束；
 // ellipsize != 0 尾端省略；wrap != 0 按词断行。
 int pt_measure(const char *text, int len, double size, const char *family,
@@ -223,6 +248,7 @@ int pt_measure(const char *text, int len, double size, const char *family,
   }
   int w = 0, h = 0;
   pango_layout_get_pixel_size(layout, &w, &h);
+  w = pt_width_with_trailing_ws(layout, text, len, w);
   int baseline = pango_layout_get_baseline(layout);
   *out_w = w;
   *out_h = h;
@@ -326,6 +352,7 @@ int pt_measure_font(const char *text, int len, double size, const char *family,
   }
   int w = 0, h = 0;
   pango_layout_get_pixel_size(layout, &w, &h);
+  w = pt_width_with_trailing_ws(layout, text, len, w);
   int baseline = pango_layout_get_baseline(layout);
   *out_w = w;
   *out_h = h;
