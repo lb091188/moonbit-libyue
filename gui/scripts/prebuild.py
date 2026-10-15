@@ -301,9 +301,14 @@ def link_configs() -> dict:
         # 静态 Loader 的系统库依赖按官方 CMake 清单补（shlwapi 等）。
         wv2_lib = MODULE_ROOT / "web" / "lib" / "WebView2LoaderStatic.lib"
         if wv2_lib.exists():
+            # 路径整体加双引号：link_flags 会被按 shell 词法拆分，而用户名含单引号
+            # 的机器（如 noah'liu）里路径自带未配对引号，整条 link_flags 会被丢弃
+            # —— 实测症状是 web 包 5 条里唯一含路径的这条从未出现在链接命令行，
+            # 于是 shlwapi.lib 与静态 Loader 一起消失（LNK2019）。根因与判据见
+            # docs/zh/adaptation.md「同族第二条·撇号路径让整条 link_flags 静默消失」。
             entries.append({
                 "package": WEB_PACKAGE,
-                "link_flags": f"{wv2_lib.as_posix()} shlwapi.lib ole32.lib "
+                "link_flags": f'"{wv2_lib.as_posix()}" shlwapi.lib ole32.lib '
                 "oleaut32.lib uuid.lib user32.lib gdi32.lib advapi32.lib",
             })
         else:

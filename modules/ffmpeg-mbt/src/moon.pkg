@@ -16,7 +16,7 @@ options(
     ],
     link: {
         "native": {
-            "stub-cc-flags": "${build.FFMPEG_STUB_CC} -I${build.FFMPEG_INC}"
+            "stub-cc-flags": "${build.FFMPEG_STUB_CC} -I\"${build.FFMPEG_INC}\""
         }
     }
 )
