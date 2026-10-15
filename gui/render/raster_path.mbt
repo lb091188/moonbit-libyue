@@ -16,9 +16,9 @@ const RASTER_KAPPA : Double = 0.5522847498307936
 
 ///|
 /// 贝塞尔展平阈值（设备像素）：控制点到弦中点距离小于该值即停。
-/// cairo 默认 tolerance 0.1；这里取 0.25（4×4 超采样下两者像素级一致，
-/// 阈值差落在 AA 容差带内）。
-const RASTER_FLAT_TOLERANCE : Double = 0.25
+/// 与 cairo 默认 tolerance 同为 0.1；阈值放宽到 0.25 时小半径的圆只切成十二段，
+/// 段间接头在细描边上留下可见缺口。
+const RASTER_FLAT_TOLERANCE : Double = 0.1
 
 ///|
 pub(all) enum PathSeg {

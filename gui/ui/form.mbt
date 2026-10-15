@@ -81,7 +81,7 @@ pub fn checkbox(
         })
         // 勾比框粗：14px 的框里 1px 折线只剩几个像素，看不出是个勾；
         // 两端离框边各留 2px 以上，否则与框线糊在一起。
-        p.set_line_width(2.0)
+        p.set_line_width(2.4)
         p.begin_path()
         p.move_to(3.4, 7.4)
         p.line_to(5.9, 9.9)
@@ -137,23 +137,19 @@ pub fn radio_group(
         let accent = @style.color_of(s.color, "")
         let picked = state.get() == idx
         p.set_stroke_color(if picked && !disabled { accent } else { @style.color_of(s.border_color, "") })
-        p.set_line_width(1.2)
-        p.begin_path()
-        p.move_to(13.0, 7.0)
-        p.arc(7.0, 7.0, 6.0, 0.0, 6.283185307179586)
-        p.stroke()
+        p.set_line_width(1.3)
+        // 环与心都走解析圆（半径=边长一半）：像素按到圆心的距离求覆盖，
+        // 展平成折线再描边会在小半径上留下接头缺口
+        p.stroke_round_rect(1.0, 1.0, 12.0, 12.0, 6.0)
         if picked {
           p.set_fill_color(if disabled {
             @theme.theme_text_secondary()
           } else {
             accent
           })
-          // 圆心收到 2.8：环的内沿在 5.4，两者之间留得出一条空白，
+          // 心半径 3.0：环的内沿在 5.4，两者之间留得出一条空白，
           // 否则 14px 的标记上环与心糊成一整块实心板
-          p.begin_path()
-          p.move_to(9.8, 7.0)
-          p.arc(7.0, 7.0, 2.8, 0.0, 6.283185307179586)
-          p.fill()
+          p.fill_round_rect(4.0, 4.0, 6.0, 6.0, 3.0)
         }
       })
       w
@@ -222,10 +218,7 @@ pub fn switch(
       p.set_fill_color(@style.color_of(s.color, "#ffffff"))
       // 滑珠是圆：圆心离两端各一个半高，半径 8 → 珠沿与胶囊壁齐平
       let cx = if on { r.w - 10.0 } else { 10.0 }
-      p.begin_path()
-      p.move_to(cx + 8.0, r.h / 2.0)
-      p.arc(cx, r.h / 2.0, 8.0, 0.0, 6.283185307179586)
-      p.fill()
+      p.fill_round_rect(cx - 8.0, r.h / 2.0 - 8.0, 16.0, 16.0, 8.0)
     })
     row.node.set_flex_direction(@yoga.Row)
     row.node.set_align_items(@yoga.AlignItems::Center)

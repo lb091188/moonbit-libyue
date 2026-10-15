@@ -891,6 +891,15 @@ fn row_knob(bm : @render.Bitmap, y : Int, x0 : Int, n : Int) -> Array[String] {
   }
   out
 }
+///| 「实心墨」= 不透明度过 200：AA 的淡格不计，用来量环/心的实体宽度。
+fn ring_ink(bm : @render.Bitmap, y : Int, x0 : Int, n : Int) -> Array[String] {
+  let out : Array[String] = []
+  for i = 0; i < n; i = i + 1 {
+    let c = color_of(bm, x0 + i, y)
+    out.push(if c.3 > 200 { "#" } else { "." })
+  }
+  out
+}
 fn ink_span(row : Array[String], from : Int, to : Int) -> String {
   let mut s = ""
   for i = from; i < to; i = i + 1 {
@@ -904,7 +913,7 @@ fn ink_text(row : Array[String]) -> String {
 
 ///|
 /// 单选标记是「环—空白—心—空白—环」，不是糊成一片的实心板：中心行两端各
-/// 两格是环，紧挨着各两格必须留白，中间六格是圆心。
+/// 两格是环，紧挨着各两格必须留白，中间六格是圆心（且是实心的）。
 test "单选标记的环与心之间留得出一条空白" {
   let pick = @core.Store::new(0)
   let root = mount_root([radio_group(["甲"], pick)], 120.0, 30.0)
@@ -913,12 +922,24 @@ test "单选标记的环与心之间留得出一条空白" {
   root.paint(p)
   p.end()
   let dot = kid(root, 0).children()[0].children()[0]
-  let row = row_ink(bm, dot.rect.y.round().to_int() + 7, dot.rect.x.round().to_int(), 14)
+  let dy = dot.rect.y.round().to_int() + 7
+  let dx = dot.rect.x.round().to_int()
+  let row = row_ink(bm, dy, dx, 14)
   assert_eq(ink_span(row, 0, 2), "##", msg="环的左缘没落墨：\{ink_text(row)}")
   assert_eq(ink_span(row, 2, 4), "..", msg="环与心之间没留出空白：\{ink_text(row)}")
   assert_eq(ink_span(row, 4, 10), "######", msg="圆心没落在正中：\{ink_text(row)}")
   assert_eq(ink_span(row, 10, 12), "..", msg="心与环之间没留出空白：\{ink_text(row)}")
   assert_eq(ink_span(row, 12, 14), "##", msg="环的右缘没落墨：\{ink_text(row)}")
+  // 心是实心板（不透明度过 200 的连续六格），环沿线也不留空洞
+  assert_eq(
+    ink_span(ring_ink(bm, dy, dx, 14), 4, 10),
+    "######",
+    msg="圆心不是实心的",
+  )
+  for j in [1, 6, 7, 12] {
+    let r = row_ink(bm, dot.rect.y.round().to_int() + j, dx, 14)
+    assert_true(ink_text(r).contains("#"), msg="环的第 \{j} 行整行没墨")
+  }
 }
 
 ///|
@@ -938,14 +959,14 @@ test "开关是胶囊与圆珠，四角不落墨" {
   assert_true(alpha(0, 0) < 60, msg="左上角该在胶囊弧外，却落了墨")
   assert_true(alpha(39, 19) < 60, msg="右下角该在胶囊弧外，却落了墨")
   assert_true(alpha(20, 10) > 200, msg="胶囊正中没落墨")
-  // 关态滑珠贴左：圆心在 (10, 10)、半径 8 → 中缝满宽，上下边缘只剩中段
+  // 关态滑珠贴左：圆心在 (10, 10)、半径 8 → 中缝满宽，上下两行只剩中段
   let mid = row_knob(bm, py + 9, px, 40)
   assert_eq(ink_span(mid, 3, 17), "##############", msg="滑珠中缝不满宽：\{ink_text(mid)}")
-  for j in [2, 17] {
+  for j in [4, 15] {
     let edge = row_knob(bm, py + j, px, 40)
     assert_eq(
       ink_span(edge, 5, 15),
-      "..######..",
+      "##########",
       msg="滑珠第 \{j} 行不是圆的：\{ink_text(edge)}",
     )
   }

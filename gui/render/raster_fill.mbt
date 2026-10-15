@@ -6,9 +6,10 @@
 //   落在 AA 容差带；
 // - 非零环绕：跨点带方向（向下 +1），扫描累积非零即内（cairo_fill 默认同）；
 // - 跨点的半开区间判定 (p.y <= ys) != (q.y <= ys)，避免顶点重复计；
-// - 描边 = 折线偏移轮廓（cairo 默认 miter join 上限 10、butt cap）再走同一条
-//   填充管线；设备线宽 = 用户线宽 × sqrt(|det|)（非均匀缩放的笔帽按近似处理，
-//   容差带内，记档）。
+// - 描边 = 折线偏移轮廓（cairo 默认 miter join 上限 10）：开放折线两侧缝成一条
+//   轮廓、两端 butt 帽；闭合折线（含首末点重合的整圆）两侧各成一条闭合轮廓，
+//   外圈正向 + 内圈反向，靠非零环绕挖孔；设备线宽 = 用户线宽 × sqrt(|det|)
+//   （非均匀缩放的笔帽按近似处理，容差带内，记档）。
 
 ///|
 /// 大到等于「无界」的坐标哨兵（不用科学计数法字面量，解析有坑）。
@@ -285,7 +286,91 @@ fn add_pixel_samples(
 }
 
 ///|
-/// 描边轮廓：折线 → 闭合填充多边形（两侧偏移 + miter/bevel 接头 + butt 端帽）。
+/// 折线一侧的**闭合**偏移轮廓：逐顶点求相邻两条偏移线的交点（miter，超限退
+/// bevel）。零长边与重复点先剔除，末点回绕到首点，接缝顶点同样求交。
+/// `hw` 取正为左侧、取负为右侧。顶点不足三个时返回空。
+fn loop_offsets(
+  pts : Array[(Double, Double)],
+  hw : Double,
+  miter2 : Double,
+) -> Array[(Double, Double)] {
+  let res : Array[(Double, Double)] = []
+  let v : Array[(Double, Double)] = []
+  for p in pts {
+    let (px, py) = p
+    match v.last() {
+      None => v.push(p)
+      Some((lx, ly)) => {
+        if (px - lx).abs() > 0.000000001 || (py - ly).abs() > 0.000000001 {
+          v.push(p)
+        }
+      }
+    }
+  }
+  if v.length() > 1 {
+    let (fx, fy) = v[0]
+    match v.last() {
+      None => ()
+      Some((lx, ly)) => {
+        if (lx - fx).abs() < 0.000000001 && (ly - fy).abs() < 0.000000001 {
+          let _ = v.pop()
+        }
+      }
+    }
+  }
+  let m = v.length()
+  if m < 3 {
+    return res
+  }
+  let ux : Array[Double] = []
+  let uy : Array[Double] = []
+  for i = 0; i < m; i = i + 1 {
+    let (ax, ay) = v[i]
+    let (bx, by) = v[(i + 1) % m]
+    let dx = bx - ax
+    let dy = by - ay
+    let len = (dx * dx + dy * dy).sqrt()
+    ux.push(dx / len)
+    uy.push(dy / len)
+  }
+  for i = 0; i < m; i = i + 1 {
+    let (ax, ay) = v[i]
+    let (bx, by) = v[(i + 1) % m]
+    let prev = (i + m - 1) % m
+    let pux = ux[prev]
+    let puy = uy[prev]
+    let cu = ux[i]
+    let cv = uy[i]
+    let nx = -cv * hw
+    let ny = cu * hw
+    let pnx = -puy * hw
+    let pny = pux * hw
+    let det = pux * cv - puy * cu
+    if det.abs() < 0.000000001 {
+      res.push((ax + pnx, ay + pny))
+    } else {
+      let rx = nx - pnx
+      let ry = ny - pny
+      let s = (rx * cv - ry * cu) / det
+      let mx = ax + pnx + pux * s
+      let my = ay + pny + puy * s
+      let d1x = mx - (ax + nx)
+      let d1y = my - (ay + ny)
+      if d1x * d1x + d1y * d1y > miter2 {
+        res.push((ax + pnx, ay + pny))
+        res.push((ax + nx, ay + ny))
+      } else {
+        res.push((mx, my))
+      }
+    }
+    res.push((bx + nx, by + ny))
+  }
+  res
+}
+
+///|
+/// 描边轮廓：折线 → 闭合填充多边形。开放折线两侧缝成一条轮廓并加 butt 端帽；
+/// 闭合折线（含首末点重合的整圆）两侧各自成环，外圈正向、内圈反向。
 fn stroke_polys(
   polys : Array[Poly],
   lw : Double,
@@ -302,8 +387,31 @@ fn stroke_polys(
     if n < 2 {
       continue
     }
-    let edges = if poly.closed { n } else { n - 1 }
+    // 首末点重合的子路径（整圆 arc 不 close_path 就是这种）按闭线处理：接头求交、
+    // 不加端帽，否则缝合处两个 butt 端帽之间留出一道缝
+    let (fx, fy) = pts[0]
+    let (lx, ly) = pts[n - 1]
+    let is_loop =
+      poly.closed ||
+        (n >= 3 && (lx - fx).abs() < 0.000000001 && (ly - fy).abs() < 0.000000001)
+    let edges = if is_loop { n } else { n - 1 }
     if edges < 1 {
+      continue
+    }
+    if is_loop {
+      // 闭合折线：两侧各自是一条闭合轮廓——外圈正向、内圈反向，非零环绕自动
+      // 挖出中间的孔。早先把两条侧线缝成一条轮廓，缝合处两圈环绕相消，圆环
+      // 上就出现沿线的空洞（radio 外圈缺口的根因）。
+      let outer = loop_offsets(pts, half, miter2)
+      let inner = loop_offsets(pts, -half, miter2)
+      if outer.length() >= 3 && inner.length() >= 3 {
+        out.push({ pts: outer, closed: true })
+        let rev : Array[(Double, Double)] = []
+        for i = inner.length() - 1; i >= 0; i = i - 1 {
+          rev.push(inner[i])
+        }
+        out.push({ pts: rev, closed: true })
+      }
       continue
     }
     let side_a : Array[(Double, Double)] = []
@@ -342,12 +450,13 @@ fn stroke_polys(
         side_a.push((bx2 + nx, by2 + ny))
         side_b.push((bx2 - nx, by2 - ny))
       } else {
-        // 解 s·d1 = n − pn + t·d2：miter 点 = P + pn + s·d1（pn 为 prev 左法线）
+        // 两条偏移线求交：M = P + pn + s·prev（s 为沿 prev 的参数）。由
+        // s·prev − t·cur = n − pn 两边叉乘 cur 解得 s = cross(r, cur)/det。
         let pnx = -pdy * half
         let pny = pdx * half
         let rx = nx - pnx
         let ry = ny - pny
-        let s = (ux * ry - uy * rx) / det
+        let s = (rx * uy - ry * ux) / det
         let mx1 = ax + pnx + pdx * s
         let my1 = ay + pny + pdy * s
         // miter 长度 = 偏移角点到交点的距离，超限（ratio > 10）→ bevel

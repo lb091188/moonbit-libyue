@@ -356,3 +356,75 @@ test "stroke_round_rect：1px 圆角边框四条直段都落墨" {
   assert_true(rgba(p, 14, 4).3 > 60, msg="压整数边的 1px 描边直段没落墨")
   p.end()
 }
+
+///|
+/// 两后端同口径：**整圆描边沿线一圈不断**。闭合折线描边时两条侧线各自成环
+/// （外圈正向、内圈反向），缝成单条轮廓会在缝合处环绕相消——起点（角度 0）
+/// 沿线留下空洞；miter 交点符号写反还会在每个接头处多咬掉一块。
+test "整圆描边沿线一圈都有墨" {
+  let bm = Bitmap::new(18, 18)
+  let p = Painter::new(bm)
+  p.set_stroke_color("#ff0000")
+  p.set_line_width(1.3)
+  p.begin_path()
+  p.move_to(13.0, 9.0)
+  p.arc(9.0, 9.0, 6.0, 0.0, 6.283185307179586)
+  p.stroke()
+  // 环带（到圆心距离 5.35~6.65）逐格扫一遍：落在带中间的格子都必须有墨
+  let mut holes = 0
+  for y = 2; y < 16; y = y + 1 {
+    for x = 2; x < 16; x = x + 1 {
+      let dx = x.to_double() + 0.5 - 9.0
+      let dy = y.to_double() + 0.5 - 9.0
+      let d = (dx * dx + dy * dy).sqrt()
+      if d > 5.35 && d < 6.65 && rgba(p, x, y).3 <= 60 {
+        holes += 1
+      }
+    }
+  }
+  assert_eq(holes, 0, msg="环沿线有 \{holes} 格断了")
+  // 环心是空的：闭合两侧必须一正一反，否则整块填成实心板
+  assert_eq(rgba(p, 9, 9).3, 0)
+  p.end()
+}
+
+///|
+/// 两后端同口径：直角接头的 miter 顶到外角（线宽一半处），不咬进内侧。
+test "折线直角接头的 miter 顶到外角" {
+  let bm = Bitmap::new(24, 24)
+  let p = Painter::new(bm)
+  p.set_stroke_color("#ff0000")
+  p.set_line_width(4.0)
+  p.begin_path()
+  p.move_to(4.0, 16.0)
+  p.line_to(16.0, 16.0)
+  p.line_to(16.0, 4.0)
+  p.stroke()
+  // 两条臂的带内
+  assert_eq(rgba(p, 10, 16).3, 255)
+  assert_eq(rgba(p, 16, 10).3, 255)
+  // 外角：miter 补到 (18,18)，格 (17,17) 全在带内
+  assert_eq(rgba(p, 17, 17).3, 255)
+  assert_eq(rgba(p, 18, 18).3, 0)
+  // butt 端帽：起点之外的格子不落墨
+  assert_eq(rgba(p, 3, 16).3, 0)
+  assert_eq(rgba(p, 16, 3).3, 0)
+  p.end()
+}
+
+///|
+/// 两后端同口径：**分数坐标**的圆角矩形按精确设备边做边缘 AA——旧光栅器把
+/// 矩形取整到整数格，四条直边完全不 AA、几何还整体偏移半格（圆角看着像像素画）。
+test "fill_round_rect：分数边有边缘 AA 且不整体偏移" {
+  let bm = Bitmap::new(12, 12)
+  let p = Painter::new(bm)
+  p.set_fill_color("#ff0000")
+  p.fill_round_rect(0.5, 0.5, 10.0, 10.0, 3.0)
+  // 左边压在 x=0.5（格中心）：第 0 列该是半墨，而不是整列空白或被推到第 1 列
+  let a0 = rgba(p, 0, 5).3
+  assert_true(a0 > 60 && a0 < 200, msg="左直边没做边缘 AA：\{a0}")
+  assert_eq(rgba(p, 1, 5).3, 255)
+  // 左上角是圆角：角点在弧外
+  assert_eq(rgba(p, 0, 0).3, 0)
+  p.end()
+}
