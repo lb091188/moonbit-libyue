@@ -1,21 +1,27 @@
-// 纯 MoonBit 光栅器的覆盖层：扫描线**解析 x + 多子行**填充 + 描边轮廓生成。
+// 纯 MoonBit 光栅器的覆盖层：扫描线**逐带解析面积**填充 + 描边轮廓生成。
 //
 // 口径：
-// - 纵向 `RASTER_AA_SUB` 个子行、横向**精确跨度**（覆盖 = 跨度与本列相交的实际
-//   宽度 × 子行权重）——旧实现是 4×4 采样点计数，覆盖只有 17 档，实测一个
-//   r=6 的小圆边缘只剩 2 档灰级（真机看着就是像素画）。现在横向连续、
-//   纵向 1/8 步进（最细 32），圆/弧/斜边的台阶感消失，仍全是确定的纯 MoonBit
-//   算术，三平台逐位一致；与 cairo 的解析覆盖差落在 AA 容差带内；
+// - 纵向 `RASTER_AA_BANDS` 个带，每带内**解析积分**出「这条带与该像素列的精确
+//   相交面积」（左右边界在带顶/带底各线性求一次 x，被积函数分段线性、断点只在
+//   左右边界撞上列边界处，逐段梯形公式即精确），逐带**累加**——与 cairo 的解析
+//   覆盖同档，边缘是连续灰度而不是几档台阶；
+// - 历史口径两次都不对：最初是「4×4 数采样点」（覆盖只有 17 档），改「8 子行 +
+//   横向精确宽度」后横向连续了，但满覆盖内段仍写 `cov[px] = 256`——那是**赋值**
+//   且在带循环里，任何一带整列被包住就置满，纵向从未真正累加，所以近水平边（圆
+//   的顶/底）还是一格一格的。现在一律 `+= 带面积`，行尾统一量化一次；
 // - 非零环绕：跨点带方向（向下 +1），扫描累积非零即内（cairo_fill 默认同）；
-// - 跨点的半开区间判定 (p.y <= ys) != (q.y <= ys)，避免顶点重复计；
+// - 跨点的半开区间判定 (p.y <= ys) != (q.y <= ys)，避免顶点重复计（带心沿用
+//   这一 ys 做激活与排序，口径与旧实现逐位等价）；
 // - 描边 = 折线偏移轮廓（cairo 默认 miter join 上限 10）：开放折线两侧缝成一条
 //   轮廓、两端 butt 帽；闭合折线（含首末点重合的整圆）两侧各成一条闭合轮廓，
 //   外圈正向 + 内圈反向，靠非零环绕挖孔；设备线宽 = 用户线宽 × sqrt(|det|)
 //   （非均匀缩放的笔帽按近似处理，容差带内，记档）。
 
 ///|
-/// 纵向抗锯齿子行数（每子行权重 = 256 / 本值）。
-const RASTER_AA_SUB : Int = 8
+/// 纵向解析积分的带数（每带权重 = 256 / 本值）。带内已做精确面积，带数**不贡献
+/// 量化台阶**，只影响「同一带内两条边交叉重排」的误差；4 带已把圆/弧/斜边做到
+/// 与 cairo 解析覆盖同档，再多只是白花算力。
+const RASTER_AA_BANDS : Int = 4
 
 ///|
 /// 大到等于「无界」的坐标哨兵（不用科学计数法字面量，解析有坑）。
@@ -42,6 +48,13 @@ fn raster_max_i(a : Int, b : Int) -> Int {
 ///|
 /// 填充一组折线（open 的按自动闭线处理，cairo_fill 语义）。
 /// clip 为设备空间整数裁剪区（x0,y0,x1,y1，半开）。
+///
+/// 覆盖算法（解析面积，与 cairo 同档）：每行先把跨本行的边收进**行内活跃表**，
+/// 再用「抗锯齿带边界 ∪ 本行内每条边的端点」把这一行切成若干**切片**；切片内没有
+/// 顶点，左右边界都是 y 的线性函数，于是「这条 span 与某个像素列在这段高度里的
+/// 相交面积」有闭式解（见 `span_slice_cover`），逐片**累加**即精确覆盖。
+/// `RASTER_AA_BANDS` 在这里只用来限制「两条边在同一片内交叉重排」的误差，
+/// 不贡献量化台阶。
 fn fill_polys(
   bm : Bitmap,
   polys : Array[Poly],
@@ -84,14 +97,12 @@ fn fill_polys(
   }
   let width = bm.width
   let cov : FixedArray[Int] = FixedArray::make(width, 0)
-  // ---- 增量活动边表（AET，pixman 同构）----
-  // GET（全局边表）按 y_lo 排序一次；扫描线推进时每子采样只做「失活压缩 /
-  // 新边激活 / x 全精度重算 + 近有序插入排序」，不再每子采样全边重扫（旧实
-  // 现 O(行×4×全边) 的遍历 + O(n²) 插入排序都在这里）。边激活区间 [y_lo,
-  // y_hi) 与旧跨点判定 (ay<=ys)!=(by<=ys) 逐位等价；水平边不跨样本行，建表
-  // 即排除。gx_t/gs/gx1/gy1 保存**原始遍历方向**的端点 (ax, ay, bx2, by2)：
-  // 激活/重算的 x 必须与旧跨点公式 ax + (bx-ax)×t 逐位一致（同一数学值的
-  // 不同表达式会有末位差，边界像素覆盖量化翻转，像素断言实测抓红）。
+  // 覆盖按解析面积累进这条 Double 侧（0..256 制），行尾一次量化
+  let cov_f : FixedArray[Double] = FixedArray::make(width, 0.0)
+  // ---- 全局边表（GET）----
+  // 只登记非水平边；gy_t/gy_b 是两端 y 的下/上，gx_t/gs/gx1/gy1 保存**原始遍历
+  // 方向**的端点：x 一律按 `ax + (bx-ax)×t` 现算（同一数学值换写法会有末位差，
+  // 边界像素覆盖会翻转，像素断言实测抓红），gw 是环绕方向 ±1。
   let mut total_edges = 0
   for poly in polys {
     let n = poly.pts.length()
@@ -136,137 +147,261 @@ fn fill_polys(
     let _ = gidx.push(i)
   }
   gidx.sort_by(fn(a, b) { gy_t[a].compare(gy_t[b]) })
-  // AET 并行数组：边号 + 当前子采样行的 x
-  let aet_e : FixedArray[Int] = FixedArray::make(total_edges + 1, 0)
-  let aet_x : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
-  let mut aet_len = 0
-  let mut gp = 0 // GET 激活指针（y_lo 单调递增，只前进）
+  // 行内活跃表（跨本行的边）与切片用的三条 x（片顶/片底/片中）+ 环绕方向
+  let row_e : FixedArray[Int] = FixedArray::make(total_edges + 1, 0)
+  let mut row_len = 0
+  let sl_e : FixedArray[Int] = FixedArray::make(total_edges + 1, 0)
+  let sl_m : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
+  let sl_t : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
+  let sl_b : FixedArray[Double] = FixedArray::make(total_edges + 1, 0.0)
+  let sl_w : FixedArray[Int] = FixedArray::make(total_edges + 1, 0)
+  // 临界 y 缓冲：每条边贡献两个端点，加上带边界与行首尾
+  let cuts : FixedArray[Double] = FixedArray::make(total_edges * 2 + 8, 0.0)
+  let band_h = 1.0 / RASTER_AA_BANDS.to_double()
+  let mut gp = 0 // GET 指针（gy_t 升序，随行单调推进）
   for y = y0; y < y1; y = y + 1 {
     for i = x0; i < x1; i = i + 1 {
       cov[i] = 0
+      cov_f[i] = 0.0
     }
     let mut ink_l = x1
     let mut ink_r = x0
-    for sub = 0; sub < RASTER_AA_SUB; sub = sub + 1 {
-      let ys = y.to_double() + (sub.to_double() + 0.5) / RASTER_AA_SUB.to_double()
-      // 老边重算 x：与旧跨点公式同式（x = ax + (bx-ax)×t）——不用增量步进，
-      // 步进的浮点漂移会让边界像素覆盖量化翻转（像素断言实测抓红）；AET 的
-      // 收益在「边不逐子采样全重扫」。
-      for i = 0; i < aet_len; i = i + 1 {
-        let e = aet_e[i]
-        let t = (ys - gs[e]) / (gy1[e] - gs[e])
-        aet_x[i] = gx_t[e] + (gx1[e] - gx_t[e]) * t
+    let yr0 = y.to_double()
+    let yr1 = yr0 + 1.0
+    // 行内活跃表：先丢掉上端已过的边，再按 GET 收进下端未过行尾的边
+    let mut w = 0
+    for i = 0; i < row_len; i = i + 1 {
+      let e = row_e[i]
+      if gy_b[e] > yr0 {
+        row_e[w] = e
+        w += 1
       }
-      // 失活压缩：y_hi <= ys 的边出表
-      let mut w2 = 0
-      for i = 0; i < aet_len; i = i + 1 {
-        let e = aet_e[i]
-        if gy_b[e] > ys {
-          aet_e[w2] = e
-          aet_x[w2] = aet_x[i]
-          w2 += 1
+    }
+    row_len = w
+    while gp < ge {
+      let e = gidx[gp]
+      if gy_t[e] >= yr1 {
+        break
+      }
+      if gy_b[e] > yr0 {
+        row_e[row_len] = e
+        row_len += 1
+      }
+      gp += 1
+    }
+    if row_len < 2 {
+      continue
+    }
+    // 临界 y：行首末 + 带边界 + 每条活跃边被裁到本行内的两个端点
+    let mut nc = 0
+    cuts[nc] = yr0
+    nc += 1
+    for b = 1; b < RASTER_AA_BANDS; b = b + 1 {
+      cuts[nc] = yr0 + band_h * b.to_double()
+      nc += 1
+    }
+    cuts[nc] = yr1
+    nc += 1
+    for i = 0; i < row_len; i = i + 1 {
+      let e = row_e[i]
+      cuts[nc] = if gy_t[e] > yr0 { gy_t[e] } else { yr0 }
+      nc += 1
+      cuts[nc] = if gy_b[e] < yr1 { gy_b[e] } else { yr1 }
+      nc += 1
+    }
+    // 临界值就地插入排序（数量 = 带边界 + 每边两个端点，行内近有序，几乎线性）
+    let mut q = 1
+    while q < nc {
+      let vq = cuts[q]
+      let mut jq = q - 1
+      while jq >= 0 && cuts[jq] > vq {
+        cuts[jq + 1] = cuts[jq]
+        jq -= 1
+      }
+      cuts[jq + 1] = vq
+      q += 1
+    }
+    // 逐切片扫描（相邻重复的临界值退化成零高，跳过）
+    for k = 1; k < nc; k = k + 1 {
+      let s0 = cuts[k - 1]
+      let s1 = cuts[k]
+      let sh = s1 - s0
+      if sh <= 0.000000001 {
+        continue
+      }
+      let mid = (s0 + s1) * 0.5
+      let mut n_sl = 0
+      for i = 0; i < row_len; i = i + 1 {
+        let e = row_e[i]
+        if gy_t[e] <= mid && gy_b[e] > mid {
+          let dy = gy1[e] - gs[e]
+          let kk = gx1[e] - gx_t[e]
+          sl_e[n_sl] = e
+          sl_m[n_sl] = gx_t[e] + kk * ((mid - gs[e]) / dy)
+          sl_t[n_sl] = gx_t[e] + kk * ((s0 - gs[e]) / dy)
+          sl_b[n_sl] = gx_t[e] + kk * ((s1 - gs[e]) / dy)
+          sl_w[n_sl] = gw[e]
+          n_sl += 1
         }
       }
-      aet_len = w2
-      // 激活：y_lo <= ys 且 y_hi > ys（GET 按 y_lo 排序后的 gidx 走指针）
-      while gp < ge {
-        let e = gidx[gp]
-        if gy_t[e] > ys {
-          break
-        }
-        if gy_b[e] > ys {
-          aet_e[aet_len] = e
-          let t = (ys - gs[e]) / (gy1[e] - gs[e])
-          aet_x[aet_len] = gx_t[e] + (gx1[e] - gx_t[e]) * t
-          aet_len += 1
-        }
-        gp += 1
+      if n_sl < 2 {
+        continue
       }
-      // 按 x 插入排序（AET 近有序，几乎线性；新激活边只在行首少量进入）
-      for i = 1; i < aet_len; i = i + 1 {
-        let xv = aet_x[i]
-        let ei = aet_e[i]
+      // 按片中 x 插入排序（片内无顶点，序稳定；活跃表本就近有序，几乎线性）
+      for i = 1; i < n_sl; i = i + 1 {
+        let xm = sl_m[i]
+        let ei = sl_e[i]
+        let xt = sl_t[i]
+        let xb2 = sl_b[i]
+        let wi = sl_w[i]
         let mut j = i - 1
-        while j >= 0 && aet_x[j] > xv {
-          aet_x[j + 1] = aet_x[j]
-          aet_e[j + 1] = aet_e[j]
+        while j >= 0 && sl_m[j] > xm {
+          sl_m[j + 1] = sl_m[j]
+          sl_e[j + 1] = sl_e[j]
+          sl_t[j + 1] = sl_t[j]
+          sl_b[j + 1] = sl_b[j]
+          sl_w[j + 1] = sl_w[j]
           j -= 1
         }
-        aet_x[j + 1] = xv
-        aet_e[j + 1] = ei
+        sl_m[j + 1] = xm
+        sl_e[j + 1] = ei
+        sl_t[j + 1] = xt
+        sl_b[j + 1] = xb2
+        sl_w[j + 1] = wi
       }
-      // 环绕扫 span（非零环绕）：满覆盖内段直取 256，两端各至多一个部分覆盖
-      // 像素按**精确相交宽度**计入（旧口径是数 4 个采样点，横向只有 4 档）；
-      // 墨迹范围按 [floor(xa), ceil(xb)) 记录，只合成有墨区间
+      // 非零环绕配对成 span：wind 累计到本条为止（左边界 = 上一条交叉边）
       let mut wind = 0
-      let mut xa = 0.0
-      for i2 = 0; i2 < aet_len; i2 = i2 + 1 {
-        let xb = aet_x[i2]
-        if wind != 0 && xb > xa {
-          let p0 = raster_max_i(xa.floor().to_int(), x0)
-          let p1 = raster_min_i(xb.ceil().to_int(), x1)
-          if p1 > p0 {
-            if p0 < ink_l {
-              ink_l = p0
-            }
-            if p1 > ink_r {
-              ink_r = p1
-            }
-            let s0 = xa.ceil().to_int()
-            let s1 = xb.floor().to_int() - 1
-            if s0 > s1 {
-              // 跨度不足一像素（或正好骑在两个像素上）：逐像素按精确宽度计
-              for px = p0; px < p1; px = px + 1 {
-                add_pixel_span(cov, x0, x1, px, xa, xb)
-              }
-            } else {
-              add_pixel_span(cov, x0, x1, s0 - 1, xa, xb)
-              let a0 = raster_max_i(s0, x0)
-              let a1 = raster_min_i(s1 + 1, x1)
-              for px = a0; px < a1; px = px + 1 {
-                cov[px] = 256
-              }
-              add_pixel_span(cov, x0, x1, s1 + 1, xa, xb)
-            }
-          }
+      for i2 = 1; i2 < n_sl; i2 = i2 + 1 {
+        wind = wind + sl_w[i2 - 1]
+        if wind == 0 {
+          continue
         }
-        wind = wind + gw[aet_e[i2]]
-        xa = xb
+        let la0 = sl_t[i2 - 1]
+        let la1 = sl_b[i2 - 1]
+        let ra0 = sl_t[i2]
+        let ra1 = sl_b[i2]
+        // 不在这里过滤「片顶或片底两端重合」的退化 span：那正是顶点所在的片，
+        // 面积是个三角形而非零，交给下面的解析积分（它含 la=ra 这个断点）
+        let l_lo = if la0 < la1 { la0 } else { la1 }
+        let l_hi = if la0 < la1 { la1 } else { la0 }
+        let r_lo = if ra0 < ra1 { ra0 } else { ra1 }
+        let r_hi = if ra0 < ra1 { ra1 } else { ra0 }
+        let p0 = raster_max_i(l_lo.floor().to_int(), x0)
+        let p1 = raster_min_i(r_hi.ceil().to_int(), x1)
+        if p1 <= p0 {
+          continue
+        }
+        if p0 < ink_l {
+          ink_l = p0
+        }
+        if p1 > ink_r {
+          ink_r = p1
+        }
+        // 片顶与片底都把整列包住的列 ⇒ 覆盖就是这片的高度，免逐列积分
+        let f0 = raster_max_i(l_hi.ceil().to_int(), x0)
+        let f1 = raster_min_i(r_lo.floor().to_int(), x1)
+        let hs = sh * 256.0
+        let mut px = p0
+        while px < p1 {
+          if px >= f0 && px < f1 {
+            cov_f[px] = cov_f[px] + hs
+          } else {
+            cov_f[px] = cov_f[px] + span_slice_cover(px, la0, la1, ra0, ra1) * hs
+          }
+          px = px + 1
+        }
       }
     }
     if ink_r > ink_l {
+      let mut px = ink_l
+      while px < ink_r {
+        let v = cov_f[px]
+        cov[px] =
+          if v <= 0.0 {
+            0
+          } else if v >= 256.0 {
+            256
+          } else {
+            v.round().to_int()
+          }
+        px = px + 1
+      }
       composite_span(bm.data, width, y, ink_l, ink_r, cov, op, src)
     }
   }
 }
 
 ///|
-/// 单个像素在**一个子行**里的覆盖：跨度 [xa, xb) 与本列 [px, px+1) 的精确相交
-/// 宽度 × 子行权重（256 / RASTER_AA_SUB）。越界与零相交不计。
-fn add_pixel_span(
-  cov : FixedArray[Int],
-  cx0 : Int,
-  cx1 : Int,
+/// 一个切片内，span 的左右边界与像素列 [px, px+1) 的**精确相交面积占该片高度的
+/// 比例**（0..1）。左右边界都是片内 y 的线性函数（la0→la1、ra0→ra1，s∈[0,1]），
+/// 被积函数
+///   f(s) = min(right(s), px+1) − max(left(s), px)
+/// 分段线性，断点只可能出现在左右边界各撞上 px 或 px+1、以及两边重逢（span 收口）
+/// 处；把这些 s 排进断点表后逐段用梯形公式积分**就是精确值**（线性段积分无误差）。
+/// 整列被包住的情形由调用方走快路径，不进这里。
+fn span_slice_cover(
   px : Int,
-  xa : Double,
-  xb : Double,
-) -> Unit {
-  if px < cx0 || px >= cx1 {
-    return
+  la0 : Double,
+  la1 : Double,
+  ra0 : Double,
+  ra1 : Double,
+) -> Double {
+  let c0 = px.to_double()
+  let c1 = c0 + 1.0
+  let dl = la1 - la0
+  let dr = ra1 - ra0
+  let pts : Array[Double] = [0.0, 1.0]
+  if dl.abs() > 0.000000001 {
+    let t0 = (c0 - la0) / dl
+    let t1 = (c1 - la0) / dl
+    if t0 > 0.0 && t0 < 1.0 {
+      let _ = pts.push(t0)
+    }
+    if t1 > 0.0 && t1 < 1.0 {
+      let _ = pts.push(t1)
+    }
   }
-  let left = if xa > px.to_double() { xa } else { px.to_double() }
-  let right = if xb < (px + 1).to_double() { xb } else { (px + 1).to_double() }
-  if right <= left {
-    return
+  if dr.abs() > 0.000000001 {
+    let t0 = (c0 - ra0) / dr
+    let t1 = (c1 - ra0) / dr
+    if t0 > 0.0 && t0 < 1.0 {
+      let _ = pts.push(t0)
+    }
+    if t1 > 0.0 && t1 < 1.0 {
+      let _ = pts.push(t1)
+    }
   }
-  let add = ((right - left) * (256.0 / RASTER_AA_SUB.to_double())).round().to_int()
-  if add <= 0 {
-    return
+  let dd = dr - dl
+  if dd.abs() > 0.000000001 {
+    let t0 = (la0 - ra0) / dd
+    if t0 > 0.0 && t0 < 1.0 {
+      let _ = pts.push(t0)
+    }
   }
-  let nv = cov[px] + add
-  cov[px] = if nv > 256 { 256 } else { nv }
+  pts.sort()
+  let mut area = 0.0
+  for i = 1; i < pts.length(); i = i + 1 {
+    let sa = pts[i - 1]
+    let sb = pts[i]
+    if sb > sa {
+      let la = la0 + dl * sa
+      let lb = la0 + dl * sb
+      let ra = ra0 + dr * sa
+      let rb = ra0 + dr * sb
+      let fa = (if ra < c1 { ra } else { c1 }) - (if la > c0 { la } else { c0 })
+      let fb = (if rb < c1 { rb } else { c1 }) - (if lb > c0 { lb } else { c0 })
+      let d = (fa + fb) * 0.5 * (sb - sa)
+      if d > 0.0 {
+        area += d
+      }
+    }
+  }
+  if area > 1.0 {
+    1.0
+  } else {
+    area
+  }
 }
-
 ///|
 /// 折线一侧的**闭合**偏移轮廓：逐顶点求相邻两条偏移线的交点（miter，超限退
 /// bevel）。零长边与重复点先剔除，末点回绕到首点，接缝顶点同样求交。

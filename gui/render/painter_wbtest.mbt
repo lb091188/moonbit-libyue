@@ -485,3 +485,137 @@ test "浅角度斜线边缘的灰级连续" {
   assert_true(l >= 5, msg="32° 描边只有 \{l} 档灰级")
   p.end()
 }
+
+///|
+/// 独立参考覆盖：把像素 [px,px+1)×[py,py+1) 做 `n×n` 网格采样，逐点判多在多边形内
+/// （半开区间 `ay > y != by > y` 的射线法），得到 0..256 的**近似解析值**。
+/// 它与被测实现没有任何共享代码——用它量光栅器的覆盖精度，而不是拿实现自己的
+/// 输出当期望（那样坏实现照样绿）。
+fn ref_poly_cover(
+  px : Int,
+  py : Int,
+  pts : Array[(Double, Double)],
+  n : Int,
+) -> Double {
+  let mut hit = 0
+  for j = 0; j < n; j = j + 1 {
+    for i = 0; i < n; i = i + 1 {
+      let x = px.to_double() + (i.to_double() + 0.5) / n.to_double()
+      let y = py.to_double() + (j.to_double() + 0.5) / n.to_double()
+      let mut inside = false
+      let mut k = 0
+      while k < pts.length() {
+        let (ax, ay) = pts[k]
+        let (bx, by) = pts[(k + 1) % pts.length()]
+        if (ay > y) != (by > y) {
+          let t = (y - ay) / (by - ay)
+          if ax + (bx - ax) * t > x {
+            inside = !inside
+          }
+        }
+        k += 1
+      }
+      if inside {
+        hit += 1
+      }
+    }
+  }
+  (hit.to_double() * 256.0) / (n.to_double() * n.to_double())
+}
+
+///|
+/// 画一个多边形（同一批顶点），返回它与解析参考的**最大覆盖偏差**。
+fn worst_cover_gap(pts : Array[(Double, Double)], w : Int, h : Int) -> Int {
+  let p = red_painter(w, h)
+  p.begin_path()
+  let (fx, fy) = pts[0]
+  p.move_to(fx, fy)
+  for i = 1; i < pts.length(); i = i + 1 {
+    let (qx, qy) = pts[i]
+    p.line_to(qx, qy)
+  }
+  p.fill()
+  let mut worst = 0.0
+  for y = 0; y < h; y = y + 1 {
+    for x = 0; x < w; x = x + 1 {
+      let d = cover_gap(rgba(p, x, y).3, ref_poly_cover(x, y, pts, 32)).to_double()
+      if d > worst {
+        worst = d
+      }
+    }
+  }
+  p.end()
+  worst.round().to_int()
+}
+
+///|
+/// 两点覆盖差的绝对值（四舍五入到整数档）。
+fn cover_gap(got : Int, want : Double) -> Int {
+  let d = got.to_double() - want
+  let a = if d < 0.0 { 0.0 - d } else { d }
+  a.round().to_int()
+}
+
+///|
+/// 光栅器的覆盖必须是**解析面积级**：与独立参考的最大偏差 ≤4 档。
+/// 旧口径做不到——它把「满覆盖内段」写成 `cov[px] = 256` 且落在带循环里，
+/// 任何一带整列被包住就置满，纵向从未真正累加；近水平边与三角形角区实测
+/// 偏 33-44 档（真机上就是「曲线有像素感」）。
+test "覆盖精度：多边形与独立解析参考的偏差 ≤4 档" {
+  let rect_int = [(4.0, 4.0), (20.0, 4.0), (20.0, 18.0), (4.0, 18.0)]
+  let rect_frac = [(4.3, 4.6), (20.0, 4.6), (20.0, 18.4), (4.3, 18.4)]
+  let tri = [(2.0, 2.0), (22.0, 6.0), (8.0, 22.0)]
+  // 扁三角：那条近水平长边正是旧口径最差的形状
+  let flat = [(2.0, 4.0), (30.0, 6.0), (16.0, 14.0)]
+  assert_true(worst_cover_gap(rect_int, 24, 24) <= 4)
+  assert_true(worst_cover_gap(rect_frac, 24, 24) <= 4)
+  assert_true(worst_cover_gap(tri, 24, 24) <= 4)
+  assert_true(worst_cover_gap(flat, 32, 16) <= 4)
+}
+
+///|
+/// 圆/弧也按解析参考量一遍，容差放宽到 12：其中约 8 档来自**贝塞尔展平**本身
+/// （阈值 0.1 设备像素，与 cairo 默认同档），不是覆盖算法的误差。
+test "覆盖精度：圆与独立解析参考的偏差 ≤12 档" {
+  let p = red_painter(80, 80)
+  p.begin_path()
+  p.move_to(65.0, 40.0)
+  p.arc(40.0, 40.0, 25.0, 0.0, 6.283185307179586)
+  p.fill()
+  let mut worst = 0
+  for y = 10; y < 70; y = y + 1 {
+    for x = 10; x < 70; x = x + 1 {
+      let want = ref_circle_cover(x, y, 40.0, 40.0, 25.0)
+      let g = cover_gap(rgba(p, x, y).3, want)
+      if g > worst {
+        worst = g
+      }
+    }
+  }
+  p.end()
+  assert_true(worst <= 12, msg="r=25 的圆与解析参考偏 \{worst} 档")
+}
+
+///|
+/// 圆的解析参考（32×32 网格采样，逐点比半径）。
+fn ref_circle_cover(
+  px : Int,
+  py : Int,
+  cx : Double,
+  cy : Double,
+  r : Double,
+) -> Double {
+  let mut hit = 0
+  for j = 0; j < 32; j = j + 1 {
+    for i = 0; i < 32; i = i + 1 {
+      let x = px.to_double() + (i.to_double() + 0.5) / 32.0
+      let y = py.to_double() + (j.to_double() + 0.5) / 32.0
+      let dx = x - cx
+      let dy = y - cy
+      if dx * dx + dy * dy <= r * r {
+        hit += 1
+      }
+    }
+  }
+  (hit.to_double() * 256.0) / 1024.0
+}
