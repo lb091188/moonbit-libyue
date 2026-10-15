@@ -102,12 +102,9 @@ fn skin_panel(w : @core.Widget) -> Unit {
 }
 
 ///|
-/// 键盘焦点区：点击聚焦（宿主 Down → focusable_at → focus），`on_key` 回显。
-/// 焦点 id 在**挂载时**注册进宿主栈——页内容是惰性挂载的（`shared/nav_page` 与
-/// `section_body` 都只在首次选中时才 mount），而页函数体在 `App::new` 之前就跑完
-/// （`host_active()` 那时还是 None），所以注册点只能落在 Node 的 mount 闭包里：
-/// 挂载那一刻宿主才在。不注册的话点击时 `focus(id)` 在栈里找不到项，键盘焦点
-/// 交不进来（本栈焦点栈只认显式注册的 id）。
+/// 键盘焦点区：点击聚焦（宿主 Down → 焦点栈对齐控件树 → focusable_at → focus），
+/// `on_key` 回显。只需要声明 `focus_id`——宿主每回合把「在树里且未隐藏」的焦点号
+/// 对齐进栈（页内容是惰性挂载的，切走即隐藏、自动退出 Tab 次序），调用方不必注册。
 fn key_focus_area(echo : @core.Store[String]) -> @core.Node {
   // 诊断（真机一轮定位，拿到读数后删）：n 只走 stdout，与重绘链无关——
   // stdout 里 n 在涨而屏幕上不更新 = 重绘链断；stdout 一条不涨 = 事件链断。
@@ -169,10 +166,6 @@ fn key_focus_area(echo : @core.Store[String]) -> @core.Node {
         true
       })
       parent.append_child(w)
-      match @core.host_active() {
-        Some(a) => ignore(a.focus.register(KEY_AREA_FOCUS_ID))
-        None => ()
-      }
       w
     },
   }
@@ -452,22 +445,17 @@ pub fn page_events(app : @shared.App) -> @core.Node {
     @shared.section(
       "键盘",
       "键盘事件 KeyEvent",
-      "键只投给**当前焦点控件**：点击下方区域即聚焦（宿主 Down → focusable_at → focus）。宿主只投**按下**（抬起不投——防编辑内核把松手当字符）；Tab/Shift+Tab 被宿主消费去驱动焦点栈，到不了 on_key。`ev.mods` 是修饰键位掩码。",
+      "键只投给**当前焦点控件**：点击下方区域即聚焦（宿主 Down → 焦点栈对齐树 → focusable_at → focus）。宿主只投**按下**（抬起不投——防编辑内核把松手当字符）；Tab/Shift+Tab 被宿主消费去驱动焦点栈，到不了 on_key。`ev.mods` 是修饰键位掩码。",
       [
         key_focus_area(key_echo),
         @ui.bind_label(key_echo, fn(s) { s }),
       ],
       code=[
-        "w.focus_id = 910   // >0 才可聚焦；Tab 环绕由宿主驱动",
+        "w.focus_id = 910   // >0 即可聚焦、即可 Tab 到（宿主按树序对齐焦点栈）",
         "w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {",
         "  echo.set(\"\\{ev.keysym} mods=\\{ev.mods}\")",
         "  true",
         "})",
-        "// 焦点 id 挂载时注册进宿主栈（页内容惰性挂载，此时宿主已在）：",
-        "match @core.host_active() {",
-        "  Some(a) => ignore(a.focus.register(910))",
-        "  None => ()",
-        "}",
       ],
     ),
     @shared.section(

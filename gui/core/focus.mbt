@@ -4,6 +4,10 @@
 //
 // id 由上层分配（控件句柄/序号都行），栈只负责次序与环绕跳转；
 // 环绕语义与 Web 一致：Tab 到末尾回第一个，Shift+Tab 到首位回最后一个。
+//
+// 两条喂 id 的路：宿主每回合用 `sync` 按控件树对齐（声明了 `focus_id` 即在栈
+// 里，调用方不必注册），以及 `register`/`unregister` 手动插拔（不在树里的临时
+// 焦点，如消息框浮层）。
 
 ///|
 pub struct FocusStack {
@@ -118,6 +122,46 @@ pub fn FocusStack::move_focus(self : FocusStack, backward : Bool) -> Int? {
 /// `focus(id)` 才找得到项。与 `clear` 的区别就在这里，`clear` 是拆对象用的。
 pub fn FocusStack::drop_current(self : FocusStack) -> Unit {
   self.cur = -1
+}
+
+///|
+/// 用「当前该 Tab 到的号」整体对齐注册表（宿主在按下与 Tab 之前喂
+/// `Widget::focus_ids` 的读数）：树序即 Tab 序，掉出树的号随之注销。
+/// **当前焦点按号保留**——号还在列表里就还是它，被摘掉才置空；列表非空但
+/// 本来没有焦点时**不抢焦点**（`drop_current` 让位给网页子件之后，不能下一拍
+/// 又抢回来）。手动 `register` 的号若不在这一份列表里会被对齐掉，那是「焦点
+/// 归控件树」这条口径的代价：不在树里的临时焦点要每次对齐后再 `focus` 一次。
+pub fn FocusStack::sync(self : FocusStack, ids : Array[Int]) -> Unit {
+  let cur_id = match self.current() {
+    Some(v) => v
+    None => 0
+  }
+  while self.ids.length() > 0 {
+    let _ = self.ids.pop()
+  }
+  for v in ids {
+    if v > 0 {
+      let mut dup = false
+      for u in self.ids {
+        if u == v {
+          dup = true
+        }
+      }
+      if !dup {
+        self.ids.push(v)
+      }
+    }
+  }
+  self.cur = -1
+  if cur_id > 0 {
+    let mut i = 0
+    for v in self.ids {
+      if v == cur_id {
+        self.cur = i
+      }
+      i = i + 1
+    }
+  }
 }
 
 ///|

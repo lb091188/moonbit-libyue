@@ -474,8 +474,18 @@ fn App::flush_ime_for_switch(self : App, prev : Int?) -> Unit {
 }
 
 ///|
+/// 焦点栈对齐控件树：树里且未隐藏的 `focus_id` 全部进栈（树序即 Tab 序），
+/// 掉出树的自动注销。宿主在「按下要改焦点」与「Tab 要走栈」之前各对齐一次，
+/// 所以声明了 `focus_id` 的控件天然可聚焦——调用方不需要把号逐个交给
+/// `focus.register`（那仍是画布类自绘宿主与浮层临时焦点的口子）。
+fn App::sync_focus(self : App) -> Unit {
+  self.focus.sync(self.root.focus_ids())
+}
+
+///|
 /// 焦点栈移动 + 把键盘焦点重新要到窗口上 + 重绘。
 pub fn App::move_focus(self : App, backward : Bool) -> Unit {
+  self.sync_focus()
   let prev = self.focus.current()
   let next = self.focus.move_focus(backward)
   if next != prev {
@@ -569,6 +579,8 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
       }
       match pev.kind {
         Down => {
+          // 焦点栈先跟上这一回合的树（重挂/换页可能在上一拍改过控件）
+          self.sync_focus()
           // 本窗自绘区被点，键盘焦点必须回到本窗：GTK 不会替 GtkDrawingArea
           // 做这件事，而焦点一旦被网页子件拿走就再也不回来——真机实测症状是
           // 「点进网页再点回输入框，打字毫无反应」（键全被 webview 收走，

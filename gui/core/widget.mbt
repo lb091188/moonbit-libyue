@@ -481,6 +481,39 @@ pub fn Widget::focusable_at(self : Widget, x : Double, y : Double) -> Int? {
 }
 
 ///|
+/// 按树序收集在树且未被隐藏的可聚焦控件号（深度优先、子项按挂载次序，
+/// 同号去重，`focus_id` 为 0 或负数的不算）。宿主用它把焦点栈对齐控件树，
+/// 所以「声明 `focus_id`」就是「可聚焦、可 Tab 到」，调用方不必自己注册；
+/// 被藏起来的整块（隐藏页、收起的浮层）自然不在 Tab 次序里。
+pub fn Widget::focus_ids(self : Widget) -> Array[Int] {
+  let acc : Array[Int] = []
+  collect_focus_ids(self, acc)
+  acc
+}
+
+///|
+fn collect_focus_ids(w : Widget, acc : Array[Int]) -> Unit {
+  if !w.visible {
+    return ()
+  }
+  let id = w.focus_id
+  if id > 0 {
+    let mut dup = false
+    for v in acc {
+      if v == id {
+        dup = true
+      }
+    }
+    if !dup {
+      acc.push(id)
+    }
+  }
+  for k in w.kids {
+    collect_focus_ids(k, acc)
+  }
+}
+
+///|
 /// 沿给定路径投递指针事件：从最深往上，第一个返回 true 的处理器消费掉；
 /// 交给处理器前把窗口坐标平移为该控件的本地坐标。
 fn dispatch_on_path(path : Array[Widget], ev : PointerEvent) -> Bool {
