@@ -2236,6 +2236,14 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **修复**(`examples/showcase/pages/window.mbt`):钩子改挂 `Node::on_mount`——段正文惰性挂载、首次选中本段时才跑,那时宿主已就绪;200ms 自重排表照旧。轮询表「宿主未就绪即永久死掉」的脆弱形态(尾拍 `app.host` 为 None 就不再重排)是示例侧现状,属可加固点(另批)。
 - **验证方式**:`experiment/window_probe` 新增热键节——注册 → `PostThreadMessageW` 投 WM_HOTKEY → `wm_pump` 截获 → `wm_hotkey_poll` 取出、同批重复投递只记一次、同组合重复注册被系统拒绝、注销后同 id 不再置位,全量 `WIN-ENHANCE-OK`。`cd examples && moon check --deny-warn` 零警告、`moon build showcase --target native` 链接通过。真机复验归 `_人工测试清单.md` S24(真实按键触发只能人来)。
 
+## 托盘挂菜单与左右键点击全失效:同一构造期坑的第 3 处——派发表起表也写在 finish 里(2026-10-15,真机反馈 Windows)
+
+- **现象**:showcase「系统集成」页的托盘图标建出来了(图标可见、tooltip 能悬停出来),但左键点不动(计数恒 0、不冒提示)、「挂菜单」后右键也弹不出菜单。
+- **根因**:与上一节快捷键完全同形。库侧链路完好——`experiment/tray_probe/tray_backend_probe.c` 直喂 `wm_tray_*`,左/右键回调消息入队与 `wm_tray_poll` 抽取、`wm_menu_popup_new` + `wm_menu_add_item` 的挂菜单、非法槽与无菜单不阻塞,全绿。坏在示例侧:`tray_poll_loop()` 的**起表**写在 `node_of_new` 的 finish 里(构造期跑),首拍 `@core.host_active()` 还是 None ⇒ 200ms 表不再重排、当场死掉。于是 `dispatch_tray_event()` 从此没人调:左键回调抽不到,而 Win32 上「右键无 `on_context` 回调时自动弹已挂的菜单」这条也住在 `dispatch_tray_event` 里 ⇒ 用户看到的就是「菜单挂不上 + 点了没反应」。同一页的菜单项派发(`dispatch_menu_command`)反而没事,因为它的表起在宿主 `handle`(真·挂载期)。
+- **修复**(`examples/showcase/pages/system.mbt`):起表挪到 `Node::on_mount`(段正文惰性挂载、首次选中才跑,那时宿主已就绪),建托盘仍留在构造期(启动即出图标的既有形态不变)。页面注释按实情重写——原来那句「段首次选中时建托盘 + 起派发表」承诺的是挂载期、用的却是构造期 API,是这条坑连续第 3 次踩中的原因。
+- **验证方式**:`moon check --deny-warn`(examples)零警告、`moon build showcase --target native` 链接通过。库侧本批零改动,其托盘语义用 `experiment/tray_probe/tray_backend_probe.c`(纯 C,直接 `#include stub.c`)在本机重跑坐实:左键/右键回调消息入队与 `wm_tray_poll` 逐条抽出、`kind` 0/1 正确、非点击消息不入队、`wm_menu_popup_new` 的弹出根是真 HMENU 且挂上后 `wm_menu_add_item` 拿到命令 id、无菜单/非法槽的 `wm_tray_popup` 立刻返回 0 不阻塞、移除幂等——末行 `TRAY-BACKEND-OK`。探针编法同 window_probe 并补了 `build.bat`;整份 stub.c 编进来会带上剪贴板空壳引用的 `moonbit_make_bytes`,探针里用 malloc 兜底(头注释已记)。真机复验归 `_人工测试清单.md` S25:进「系统集成」页 → 左键计数递增并冒提示 → 点「挂菜单」→ 右键弹出三项 → 点项走 `dispatch_menu_command` 回回调。
+- **可加固点(另批)**:「宿主每拍抽一次」这条契约现在全靠调用方自觉,已连带踩中 3 处(图表推点 / 快捷键 / 托盘);把 `dispatch_menu_command` + `dispatch_tray_event` + `hotkey_poll` 统一收进宿主每拍(`App::step`)才是终结这条坑的做法,消费式队列允许多个抽取者并存(native-app 的显式调用不会与之抢事件)。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。

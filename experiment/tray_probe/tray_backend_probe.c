@@ -6,19 +6,29 @@
  * 来验证回调消息的落点与队列语义。右键弹出（TrackPopupMenuEx）是阻塞调用，
  * 需要真人点选，故只验「守卫路径」——无菜单/非法槽号必须立刻返回 0 不阻塞。
  *
- * 编法（见 docs/zh/adaptation.md「Windows 基础能力首批」节）：
+ * 编法：本目录 `build.bat`（call vcvars64 + cl 全参数）。手工 cl 同 window_probe：
  *   cl /nologo /W4 /utf-8 /O2 /DWIN32 /D_WINDOWS /DUNICODE /D_UNICODE \
  *      tray_backend_probe.c /Fe:tray_backend_probe.exe \
  *      user32.lib gdi32.lib imm32.lib advapi32.lib windowscodecs.lib \
  *      ole32.lib shell32.lib
+ * 两条缺件与 window_probe 同源（整份 stub.c 编进来，剪贴板空壳引用运行时分配
+ * 符号、托盘符号在 shell32）：`moonbit_make_bytes` 由下面 malloc 兜底、
+ * 链接补 `shell32.lib`。
  *
  * 期望输出末行 TRAY-BACKEND-OK。
  */
 #include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "../../gui/win/stub.c"
+
+// stub.c 的剪贴板空壳引用 MoonBit 运行时分配符号；探针不跑运行时，malloc 兜底
+void *moonbit_make_bytes(int length, int unused) {
+  (void)unused;
+  return malloc(length > 0 ? (size_t)length : 1);
+}
 
 static int g_fail = 0;
 

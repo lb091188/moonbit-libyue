@@ -409,9 +409,13 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       "系统托盘",
       "托盘图标左键计数、右键弹菜单（「挂菜单」后）；dispatch 走 200ms 轮询表（宿主循环没有每帧钩子）。图标是运行期生成的 32px BGRA 位图，菜单复用 W20a 菜单模型。",
       [
-        // 零尺寸挂载钩子：段首次选中时建托盘 + 起派发表
+        // 零尺寸挂载钩子：建托盘（启动即出图标）在构造期，派发表起表必须挂
+        // 真·挂载时机（Node::on_mount）——node_of_new 的 finish 是构造期执行，
+        // 那时宿主还没建好，tray_poll_loop 首拍读到 @core.host_active() 为 None
+        // 就永久不再重排，之后左右键事件全压在队列里没人抽，右键「自动弹出已挂
+        // 的菜单」也走不到；真机表现正是「图标在、点了没反应、菜单弹不出」。
+        // （与快捷键页轮询表、图表页推点同一条坑的第 3 处。）
         @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
-          tray_poll_loop()
           // 图标句柄只是 Win32 那一档要的东西（HICON），Linux 的 SNI 不读它、
           // 面板用库内置位图显示——所以拿到什么照传、拿不到也照建。
           // （旧写法把整段挂在 icon 成功之后，而 wm_icon_from_bgra 在 GTK 分支
@@ -436,6 +440,8 @@ pub fn page_system(app : @shared.App) -> @core.Node {
             }
           }
           w
+        }).on_mount(fn() -> Unit {
+          tray_poll_loop()
         }),
         @ui.row(
           [
