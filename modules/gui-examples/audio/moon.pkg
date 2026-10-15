@@ -1,0 +1,12 @@
+// 音频播放示例：gui-media player_t + 播放列表（选文件 / 选目录扫描）。
+import {
+  "NoahLiu/yoga-mbt/src" @yoga,
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/ui",
+  "NoahLiu/native-gui/sys" @sys,
+  "NoahLiu/gui-media/media" @media,
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"

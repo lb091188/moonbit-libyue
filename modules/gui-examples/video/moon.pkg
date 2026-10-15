@@ -1,0 +1,12 @@
+// 视频播放示例：gui-media player_t + 侧栏播放列表 + 字幕双来源。
+import {
+  "NoahLiu/yoga-mbt/src" @yoga,
+  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/ui",
+  "NoahLiu/native-gui/sys" @sys,
+  "NoahLiu/gui-media/media" @media,
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"
