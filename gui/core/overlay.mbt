@@ -5,9 +5,13 @@
 //    点击原样落到内容控件；一旦开了第一层就把图层置可见并**立刻重排一次**（图层
 //    此前不可见、矩形还是清零的，不重排就换算不出它自己的原点），这样浮层按窗口
 //    坐标摆位时能把图层原点扣掉。
-// ② **点浮层外收起最上面那层**——图层是浮层的父控件，浮层内部被点时最深的命中者
-//    是浮层里的控件（事件往上冒时图层会看到坐标落在子浮层内，于是不关）；点在所有
-//    子浮层之外时最深命中者就是图层本身，此时收起最上面一层并消费掉这次按下。
+// ② **点浮层外的策略随最上层浮层声明**——图层是浮层的父控件，浮层内部被点时
+//    最深的命中者是浮层里的控件（事件往上冒时图层会看到坐标落在子浮层内，于是
+//    不关）；点在所有子浮层之外时最深命中者就是图层本身。默认（菜单/对话框这类
+//    模态语义）**收起最上面一层并消费掉这次按下**；声明「放行」的浮层（轻提示这
+//    类无点外收起语义的）**不消费**，这一击穿到底下的页面控件——否则轻提示在屏
+//    那两秒点按钮既无反应、提示还被这一击误收（2026-10-15 真机反馈）。多层叠开
+//    只看最上层：轻提示压在对话框上时点外会穿到页面而不关对话框，记档取舍。
 //
 // 图层坐标口径：图层是根控件的绝对定位子控件（insets 全 0 → 铺满根的 padding 盒），
 // 所以「窗口坐标 → 图层坐标」只差一个图层原点。
@@ -27,7 +31,16 @@ fn overlay_cid() -> Int {
 pub(all) struct OverlayHost {
   root : Widget
   layer : Widget
-  mut items : Array[(Int, Widget)]
+  mut items : Array[OverlayItem]
+}
+
+///|
+/// 一层已开浮层：句柄、包裹控件、以及「点浮层外」的策略——`true` 收起并消费
+/// 这一击（菜单/对话框的模态语义），`false` 放行给底下的页面控件（轻提示）。
+pub(all) struct OverlayItem {
+  id : Int
+  w : Widget
+  dismiss : Bool
 }
 
 ///|
@@ -59,8 +72,15 @@ pub fn make_overlay_host(root : Widget) -> OverlayHost {
     }
     match ev.kind {
       // 按下与抬起都消费（不让这一击漏到内容里），**收起放在抬起**：
-      // 若放在按下，同一击的抬起会重新命中触发件、把刚关掉的浮层又打开
-      Down => true
+      // 若放在按下，同一击的抬起会重新命中触发件、把刚关掉的浮层又打开。
+      // 点在浮层之外且最上层声明「放行」时例外：按下就不消费——这一击会由
+      // 底下的页面控件接住（按下即捕获），图层的抬起分支自然不会再走到。
+      Down =>
+        if inside {
+          true
+        } else {
+          overlay_top_dismiss(self)
+        }
       Up => {
         if !inside {
           overlay_hide_top()
@@ -97,6 +117,21 @@ fn overlay_host() -> OverlayHost? {
 }
 
 ///|
+/// 最上层浮层是否「点外收起」。没有浮层时给 true（图层本不可见，防御值）。
+fn overlay_top_dismiss(layer : Widget) -> Bool {
+  let _ = layer
+  match overlay_host() {
+    None => true
+    Some(h) =>
+      if h.items.length() == 0 {
+        true
+      } else {
+        h.items[h.items.length() - 1].dismiss
+      }
+  }
+}
+
+///|
 /// 已开浮层数（诊断与测试用）。
 pub fn overlay_count() -> Int {
   let layer_n = match overlay_host() {
@@ -114,7 +149,7 @@ pub fn overlay_ids() -> Array[Int] {
     Some(h) => {
       let out : Array[Int] = []
       for it in h.items {
-        out.push(it.0)
+        out.push(it.id)
       }
       out
     }
@@ -128,7 +163,7 @@ pub fn overlay_top_id() -> Int {
   match overlay_host() {
     Some(h) =>
       if h.items.length() > 0 {
-        h.items[h.items.length() - 1].0
+        h.items[h.items.length() - 1].id
       } else {
         0
       }
@@ -150,7 +185,12 @@ pub fn overlay_visible() -> Bool {
 ///|
 /// 在窗口坐标 `(x, y)` 处开一层浮层，内容挂在图层里的一个绝对定位包裹控件上。
 /// 返回句柄；没有宿主时返回 0（浮层不出现）。
-pub fn overlay_show_at(content : Node, x : Double, y : Double) -> Int {
+pub fn overlay_show_at(
+  content : Node,
+  x : Double,
+  y : Double,
+  dismiss_on_outside? : Bool = true,
+) -> Int {
   match overlay_host() {
     None => 0
     Some(h) => {
@@ -171,7 +211,7 @@ pub fn overlay_show_at(content : Node, x : Double, y : Double) -> Int {
       wrap.node.set_top(@yoga.fixed(y - h.layer.rect.y))
       let _ = content.mount_into(wrap)
       h.layer.append_child(wrap)
-      h.items.push((cid, wrap))
+      h.items.push({ id: cid, w: wrap, dismiss: dismiss_on_outside })
       invalidate()
       cid
     }
@@ -219,7 +259,7 @@ pub fn overlay_show_full(content : Node) -> Int {
       wrap.node.set_bottom(@yoga.fixed(0.0))
       let _ = content.mount_into(wrap)
       h.layer.append_child(wrap)
-      h.items.push((cid, wrap))
+      h.items.push({ id: cid, w: wrap, dismiss: true })
       invalidate()
       cid
     }
@@ -235,9 +275,9 @@ pub fn overlay_set_pos(id : Int, x : Double, y : Double) -> Bool {
     Some(h) => {
       let mut ok = false
       for it in h.items {
-        if it.0 == id {
-          it.1.node.set_left(@yoga.fixed(x - h.layer.rect.x))
-          it.1.node.set_top(@yoga.fixed(y - h.layer.rect.y))
+        if it.id == id {
+          it.w.node.set_left(@yoga.fixed(x - h.layer.rect.x))
+          it.w.node.set_top(@yoga.fixed(y - h.layer.rect.y))
           ok = true
         }
       }
@@ -260,10 +300,10 @@ pub fn overlay_hide(id : Int) -> Unit {
   match overlay_host() {
     None => ()
     Some(h) => {
-      let kept : Array[(Int, Widget)] = []
+      let kept : Array[OverlayItem] = []
       for it in h.items {
-        if it.0 == id {
-          let _ = h.layer.remove_child(it.1)
+        if it.id == id {
+          let _ = h.layer.remove_child(it.w)
         } else {
           kept.push(it)
         }
@@ -283,7 +323,7 @@ pub fn overlay_hide_top() -> Unit {
   match overlay_host() {
     Some(h) =>
       if h.items.length() > 0 {
-        overlay_hide(h.items[h.items.length() - 1].0)
+        overlay_hide(h.items[h.items.length() - 1].id)
       }
     None => ()
   }
@@ -296,7 +336,7 @@ pub fn overlay_clear() -> Unit {
   match overlay_host() {
     Some(h) => {
       for it in h.items {
-        let _ = h.layer.remove_child(it.1)
+        let _ = h.layer.remove_child(it.w)
       }
       h.items = []
       h.layer.set_visible(false)
@@ -333,8 +373,8 @@ pub fn overlay_root_of(id : Int) -> Widget? {
   match overlay_host() {
     Some(h) => {
       for it in h.items {
-        if it.0 == id {
-          return Some(it.1)
+        if it.id == id {
+          return Some(it.w)
         }
       }
       None
@@ -349,8 +389,8 @@ pub fn overlay_rect_of(id : Int) -> Rect? {
   match overlay_host() {
     Some(h) => {
       for it in h.items {
-        if it.0 == id {
-          let r = it.1.rect
+        if it.id == id {
+          let r = it.w.rect
           return Some({
             x: r.x + h.layer.rect.x,
             y: r.y + h.layer.rect.y,

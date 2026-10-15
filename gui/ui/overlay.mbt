@@ -822,10 +822,14 @@ pub fn toast_layer(
         let bw = text_width(text, font) + 46.0
         if open_id.val == 0 {
           widest.val = bw
+          // dismiss_on_outside=false：轻提示没有「点外收起」语义——图层的默认
+          // 行为（点浮层外吞掉这一击并收起最上层）会把在屏那两秒的点击全吃掉，
+          // 提示还被这一击误收（2026-10-15 真机反馈）；放行后点击穿到页面控件
           open_id.val = @core.overlay_show_at(
             @core.node_of(c),
             toast_left(win_w(), bw),
             0.0,
+            dismiss_on_outside=false,
           )
         } else if bw > widest.val {
           // 新条更宽：整组还是居中，按新宽重摆包裹层

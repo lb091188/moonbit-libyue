@@ -398,3 +398,54 @@ test "键盘可及性：分段空格/回车选中本段，左右键在段间移�
   key(@core.KS_RETURN)
   assert_eq(sel.get(), "乙")
 }
+
+///|
+/// 侧栏菜单键盘可及：声明 focus_id 进 Tab 链、空格/回车选中本项、方向键组内
+/// 环绕换选（修复前 focus_ids 为空——Tab 进不了侧栏、也没有焦点环可画）。
+test "menu_sections：键盘链可达且空格/方向键有效" {
+  let selected = @core.Store::new("首页")
+  let root = mount_root(
+    [
+      menu_sections([ ("导航", [ "首页", "组件", "文档" ]), ("其它", []) ], selected, width=180.0),
+    ],
+    300.0,
+    500.0,
+  )
+  let ids = root.focus_ids()
+  assert_eq(ids.length(), 3, msg="三个菜单项都应进 Tab 链")
+  // 树里找第一个菜单项控件（focus_id 最小的树序项）
+  fn find_by_focus(w : @core.Widget, fid : Int) -> @core.Widget? {
+    if w.focus_id == fid {
+      return Some(w)
+    }
+    for k in w.kids {
+      match find_by_focus(k, fid) {
+        Some(hit) => return Some(hit)
+        None => ()
+      }
+    }
+    None
+  }
+  let first = find_by_focus(root, ids[0])
+  assert_true(first is Some(_))
+  match first {
+    None => ()
+    Some(m) => {
+      match m.on_key {
+        None => fail("菜单项应挂 on_key")
+        Some(k) => {
+          // 空格选中本项
+          assert_true(k({ press: true, keysym: @core.KS_SPACE, mods: 0 }))
+          assert_eq(selected.get(), "首页")
+          // 方向键 → 下一项（环绕取模）
+          assert_true(k({ press: true, keysym: @core.KS_DOWN, mods: 0 }))
+          assert_eq(selected.get(), "组件")
+          assert_true(k({ press: true, keysym: @core.KS_UP, mods: 0 }))
+          assert_eq(selected.get(), "文档") // 从第一项 UP 环绕到最后一项
+          // 修饰键组合的按键不误触（比如 Ctrl+X 的 X 不是这里的业务）
+          assert_false(k({ press: true, keysym: 120, mods: 2 }))
+        }
+      }
+    }
+  }
+}

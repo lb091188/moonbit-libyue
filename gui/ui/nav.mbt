@@ -610,12 +610,37 @@ fn menu_item(
   selected : @core.Store[String],
   icon : @icons.IconKind?,
   skin~ : @style.Style = @style.empty_style(),
+  focusable~ : Bool = false,
+  step~ : (Int) -> Unit = fn(_d : Int) { () },
 ) -> @core.Node {
   let font = @text.Font::new("", 13.0)
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
     watch_theme()
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(40.0))
+    if focusable {
+      // 导航菜单的键盘口径（与 segmented 同一条）：Tab 链内移动焦点，空格/
+      // 回车选中本项，↑/← 上一项、↓/→ 下一项（到头环绕由 step 的取模保证）
+      w.focus_id = auto_focus_id(0)
+      w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+        if !ev.press {
+          return false
+        }
+        if ev.keysym == @core.KS_SPACE || ev.keysym == @core.KS_RETURN {
+          selected.set(text)
+          @core.invalidate()
+          true
+        } else if ev.keysym == @core.KS_LEFT || ev.keysym == @core.KS_UP {
+          step(-1)
+          true
+        } else if ev.keysym == @core.KS_RIGHT || ev.keysym == @core.KS_DOWN {
+          step(1)
+          true
+        } else {
+          false
+        }
+      })
+    }
     // 常态文字色与悬停底走样式（选中态是数据态：底色/文字/强调条留内置配色）
     @style.apply(
       w,
@@ -667,6 +692,12 @@ fn menu_item(
         align=@text.Start,
         valign=@text.Center,
       )
+      // 聚焦时描一圈主题色（键盘可及性：能聚焦就得看得见焦点在哪）
+      if self.focused {
+        p.set_stroke_color(@theme.theme_primary())
+        p.set_line_width(1.0)
+        p.stroke_round_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0, 4.0)
+      }
     })
     w.cursor = @core.CURSOR_HAND
     w.on_pointer = Some(fn(
@@ -753,9 +784,24 @@ pub fn menu_sections(
     let items = sec.1
     let nodes : Array[@core.Node] = []
     let skin = paint_subset(class)
-    for it in items {
+    let n = items.length()
+    for i = 0; i < n; i = i + 1 {
+      let it = items[i]
+      let idx = i
       nodes.push(
-        menu_item(it, width - 12.0, selected, icon_for(icons, it), skin=skin),
+        menu_item(
+          it,
+          width - 12.0,
+          selected,
+          icon_for(icons, it),
+          skin=skin,
+          focusable=true,
+          step=fn(d : Int) {
+            // 组内环绕换选：方向键的落点与点击一致（换 selected 本身）
+            selected.set(items[((idx + d) % n + n) % n])
+            @core.invalidate()
+          },
+        ),
       )
     }
     let open = Ref(true)

@@ -587,3 +587,84 @@ test "键盘可及性：下拉菜单下键开菜单、上下移高亮（分隔�
   assert_eq(@core.overlay_count(), 0)
   @core.overlay_clear()
 }
+
+///|
+/// 轻提示在屏时点浮层外：点击放行给页面控件（toast 无「点外收起」语义，图层
+/// 不得吞掉这一击、也不得误收提示层）；对照：默认层（dismiss 语义）仍吞击收层。
+test "轻提示层不吞点外点击，普通浮层照旧点外收起" {
+  let got : Ref[Int] = Ref(0)
+  let btn = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    w.node.set_width(@yoga.fixed(120.0))
+    w.node.set_height(@yoga.fixed(40.0))
+    w.on_pointer = Some(fn(_s : @core.Widget, ev : @core.PointerEvent) -> Bool {
+      match ev.kind {
+        @core.Down => {
+          got.val = got.val + 1
+          true
+        }
+        _ => false
+      }
+    })
+    w
+  })
+  // 按钮垫高到 y=64..104：轻提示带占顶部 y=0..42，点击 (10,84) 落在提示外、按钮上
+  let pad = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    w.node.set_height(@yoga.fixed(64.0))
+    w
+  })
+  let (root, _host) = mounted(view([pad, btn], width=200.0, height=104.0), 400.0, 200.0)
+  with_overlay(root)
+  root.relayout(400.0, 200.0)
+  // 轻提示层（dismiss_on_outside=false）：开在顶部，点底部按钮（浮层外）
+  let queue : Ref[Array[() -> Unit]] = Ref([])
+  @core.set_timer_hooks(
+    fn(_ms : Int, f : () -> Unit) -> Int {
+      queue.val.push(f)
+      1
+    },
+    fn(_id : Int) -> Unit { () },
+  )
+  let push = toast_layer(duration_ms=60000)
+  push("保存成功", Success)
+  assert_eq(@core.overlay_count(), 1)
+  let _ = @core.route_pointer(
+    root,
+    { kind: @core.Down, x: 10.0, y: 84.0, button: 1, mods: 0 },
+    0,
+    0,
+  )
+  assert_eq(got.val, 1, msg="轻提示在屏时点外点击应放行给页面控件")
+  assert_eq(@core.overlay_count(), 1, msg="点外点击不得误收轻提示层")
+  // 普通层（默认 dismiss）：同样点外，点击被图层消费、页面控件收不到
+  let got2 : Ref[Int] = Ref(0)
+  let btn2 = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    w.node.set_width(@yoga.fixed(120.0))
+    w.node.set_height(@yoga.fixed(40.0))
+    w.on_pointer = Some(fn(_s : @core.Widget, ev : @core.PointerEvent) -> Bool {
+      match ev.kind {
+        @core.Down => {
+          got2.val = got2.val + 1
+          true
+        }
+        _ => false
+      }
+    })
+    w
+  })
+  let pad2 = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    w.node.set_height(@yoga.fixed(64.0))
+    w
+  })
+  let (root2, _h2) = mounted(view([pad2, btn2], width=200.0, height=104.0), 400.0, 200.0)
+  with_overlay(root2)
+  root2.relayout(400.0, 200.0)
+  let _ = @core.overlay_show_at(text("模态面板"), 150.0, 20.0)
+  assert_eq(@core.overlay_count(), 1)
+  let (_h3, _c3, _u3, _g3) = @core.route_pointer(
+    root2,
+    { kind: @core.Down, x: 10.0, y: 84.0, button: 1, mods: 0 },
+    0,
+    0,
+  )
+  assert_eq(got2.val, 0, msg="普通浮层的点外点击仍被图层消费")
+}

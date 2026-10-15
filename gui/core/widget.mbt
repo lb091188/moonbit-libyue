@@ -668,16 +668,49 @@ pub fn Widget::set_press(self : Widget, id : Int) -> Unit {
 ///   （指针离开也不丢抬起，按下态不会卡死，拖选与拖动插入点才有依据）；
 /// - 捕获期悬停不动，`Up` 之后按抬起位置重新判定悬停者；
 /// - 悬停者换了就给上一个补一次 `Leave`（窗口坐标）。
+///|
+/// 浮层图层的命中穿透（见 `route_pointer`）。命中不在图层上、图层不可见、
+/// 或最上层是「点外收起」语义（默认）时原样返回；穿透时临时把图层摘出命中
+/// （visible=false）重命中一次再恢复，布局不动、rect 保留。
+fn overlay_pass_through_hit(root : Widget, hit0 : Int, x : Double, y : Double) -> Int {
+  if hit0 < 0 {
+    return hit0
+  }
+  match overlay_host() {
+    None => hit0
+    Some(h) => {
+      if hit0 != h.layer.id || !h.layer.visible || h.items.length() == 0 {
+        return hit0
+      }
+      if h.items[h.items.length() - 1].dismiss {
+        return hit0
+      }
+      h.layer.set_visible(false)
+      let re = root.hit_test(x, y)
+      h.layer.set_visible(true)
+      match re {
+        Some(w) => w.id
+        None => -1
+      }
+    }
+  }
+}
+
+///|
 pub fn route_pointer(
   root : Widget,
   ev : PointerEvent,
   hover_id : Int,
   capture : Int,
 ) -> (Int, Int, Bool, Bool) {
-  let hit = match root.hit_test(ev.x, ev.y) {
+  let hit0 = match root.hit_test(ev.x, ev.y) {
     Some(w) => w.id
     None => -1
   }
+  // 浮层穿透：命中落在图层自身（不在任何子浮层内）且最上层声明「点外放行」
+  // （轻提示这类无点外收起语义的）时，这一击的命中穿到图层底下的页面控件——
+  // 图层满窗、命中又从后往前，不穿透的话页面控件永远排在命中链外
+  let hit = overlay_pass_through_hit(root, hit0, ev.x, ev.y)
   let mut hover = hover_id
   let mut cap = capture
   let mut changed = false
