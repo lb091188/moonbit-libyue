@@ -607,6 +607,12 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
         }
         _ => ()
       }
+      // 抬起（点击成交）必有跨控件涟漪：on_click 改的 Store 常影响悬停/捕获
+      // 链之外的兄弟控件（如 stepper 的数字——显示控件不订阅、绘制期现取），
+      // 局部置脏盖不住，整窗兜底一帧。点击是低频交互，整帧代价可接受。
+      if pev.kind is Up {
+        self.schedule_paint()
+      }
       if r.2 || r.3 {
         // 局部置脏：变化范围 = 旧/新悬停 + 旧/新捕获（悬停高亮、按下态、
         // 事件消费者的自绘都在这些控件上）；浮层开着（菜单/提示可能盖到
@@ -679,6 +685,10 @@ pub fn App::pump_ime(self : App) -> Unit {
     }
     self.ime_focus = cur
     self.last_preedit = ("", 0)
+    // 输入法焦点门同步给后端：焦点控件是输入框才让 IM 过滤按键——ibus 一类
+    // 会话里 IM 会把字符键全吃进 commit 通道，非输入框焦点时按键事件就只剩
+    // 修饰键（真机症状：键盘回显恒 65507 = Control_L）
+    self.window.set_im_active(self.root.im_context_of(cur) is Some(_))
   }
   if cur == 0 {
     return ()

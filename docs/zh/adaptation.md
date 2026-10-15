@@ -2372,6 +2372,15 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **仍待评估**：分层是**近似**（N 档台阶，blur≥8 时肉眼基本看不出台阶），真高斯 blur 等渲染层有 blur 能力再换；`box_shadow` 还在插值集合外（生效点是 `apply` 落 `Widget` 字段，绘制遍历不逐帧读槽），要做「hover 阴影渐变」得先把这三位挪进槽读取路径，随后续批。
 - **实测读数**（200×160、本体 40,40,120×80、圆角 8、blur 8、dy 6、`#00000040`）：左缘由内向外 `57 57 57 51 44 37 30 23 16 8 0`（单调递减、十档）；下方 y=124/128/132/136 = `57/44/16/0`，上方 y=48/40/36 = `57/23/0` ⇒ 下面比上面多投出偏移那 6px；同距离处角 `34` vs 边 `37`（旧版这里要么缺一块要么叠成深斑）；本体心 `57`（内层累积，随后被本体盖住）。
 - **验证方式**：`render/painter_wbtest.mbt` 换掉旧的 `box_shadow` 用例、新增 2 条（方向 + 梯度 + 角边同浓度；四种「没有投影」的输入一律不落墨）；`ui/basic_wbtest.mbt` 新增第 6 项判据（先放一只 24 高垫块把卡片推到 y=24，再数盒外**上带/下带**的墨格：给 `shadow_y` 后下方变多、上方变少）。`moon test render` **54/54**、`moon test ui` **180/180**、库全包 **976/977**（唯一红仍是 `si_machine` 的 BIOS 注册表读数）、`cd gui && moon check --deny-warn` 与 examples 零警告、`moon build showcase --target native` 链接通过、本机冒烟 4 秒存活后按 Windows pid 收尾。真机观感归 `_人工测试清单.md` S31。
+## 真机反馈四则(点击上屏延迟/键盘恒 65507/空格不激活/radio 圆圈被截):GTK 帧派发要当场跑、IM 要焦点门、点击涟漪要整窗兜底、标记行高不随字体塌陷(2026-10-15,Linux 真机反馈)
+
+- **环境**:Ubuntu 24.04(X11/XFCE,ibus 输入法会话),showcase 真机,用户报四条:①表单段 stepper 连点期间数字不动、停手 ~1s 才跳;②键盘测试段回显恒 65507(= X11 的 Control_L),按什么键都不变;③radio/checkbox 空格不改状态;④radio 圆圈渲染偏上被截。附带轻提示只显示第一次——与①同根。
+- **根因①(GTK 的 draw 信号要主循环迭代才派发)**:`wm_present` 存帧后只 `gtk_widget_queue_draw`,而本栈的泵 `wm_wait` 只在 **fd 就绪**时跑 `wm_pump()`——timer 到期/poll 超时那拍 `ready=0` 不迭代,帧一直躺在 GDK 队列里等下一个 X 事件。点击后若无后续事件,上屏就卡到下一个事件源(实测 ~1s)。**修复**:`wm_present` 在 queue_draw 后**当场非阻塞派发一轮**(`while gtk_events_pending() gtk_main_iteration_do(FALSE)`,上限 8 防意外重入;迭代里重入的 button/key 照旧入本窗队列、下一拍抽)。toast 第二条不显示同根:push 的 invalidate 画的帧同样躺在队列里。
+- **根因②③(ibus 把字符键吃进 commit 通道)**:`wm_on_key` 无条件 `gtk_im_context_filter_keypress`——挂着 ibus 的会话里 IM 消费全部字符键(经 commit 通道回报,非输入框焦点的 commit 被丢),按键事件只剩 IM 不吃的**修饰键**(65507=Control_L)。空格是字符键,radio/checkbox 的 `KS_SPACE` 激活自然收不到。**修复**:输入法焦点门——C 侧 `wm_im_set_active(id, on)` + `WmWindow.im_active`,仅 MoonBit 侧焦点控件是输入框(`im_context_of` 有值)时才让 IM 过滤;`App::pump_ime` 在焦点切换处同步。Windows 分支 IMM 不过滤普通按键,空桩保链接。
+- **根因④(标记行高随字体度量塌陷)**:radio/checkbox 的行高由文本行盒决定,测试宿主(Noto)行高 19 装得下 14px 标记;真机 XFCE 默认字体的行盒可比 14px 还矮,标记撑破行、圆圈顶被上方内容盖住(诊断读数:测试宿主下两组 dot 完全对称 y=2.5/h=14,排除布局结构问题)。**修复**:radio/checkbox 行 `set_min_height(fixed(20.0))`,标记高度不再依赖字体度量(switch 的胶囊 20px 固定、本就不塌,不改)。
+- **附带(core 层的点击涟漪缺陷,全平台)**:指针事件后只对悬停/捕获链做**局部置脏**,而 `on_click` 改的 Store 常影响链外兄弟(stepper 数字:显示控件不订阅、绘制期现取),脏区盖不住、上屏保留旧像素。**修复**:指针 **Up(点击成交)一律整窗置脏**兜底——点击是低频交互,整帧代价可接受;Move/Down 的局部脏保留。
+- **验证方式**:库全量 14 包 **975/975** 零红、`cd gui && moon check --deny-warn` 零警告、examples `--deny-warn` 零警告、showcase 构建链接 + 本机 8 秒冒烟存活;真机复验归 `_人工测试清单.md` S30。
+- **待真机读数的一条(本批未动)**:「侧边栏菜单能通过 Tab 获得焦点」——无头诊断显示侧栏 `menu_sections` 树 `focus_ids()` 为**空**(菜单项无 focus_id,本就不在 Tab 链),组件层无缺陷可修;复验时请按 Tab 后截图焦点环落在哪个元素上,按读数再定位。
 
 ## 维护约定
 

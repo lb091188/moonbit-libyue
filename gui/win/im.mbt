@@ -44,6 +44,15 @@ pub fn Window::im_reset(self : Window) -> Unit {
 }
 
 ///|
+/// 输入法焦点门：焦点控件是输入框（`im_context_of` 有值）时开。开着时按键
+/// 先过 `gtk_im_context_filter_keypress`——ibus 一类会话里 IM 会把字符键全
+/// 吃进 commit 通道，**非输入框焦点必须关**，否则按键事件只剩修饰键（真机
+/// 症状：键盘回显恒 65507 = Control_L）。宿主每拍在 `pump_ime` 里同步。
+pub fn Window::set_im_active(self : Window, on : Bool) -> Unit {
+  wm_im_set_active(self.id, if on { 1 } else { 0 })
+}
+
+///|
 /// 取一条已提交文本；没有则 None。取到即清后端缓冲（一次一条，循环调用排空）。
 pub fn Window::take_commit(self : Window) -> String? {
   let n = wm_im_commit_len(self.id)

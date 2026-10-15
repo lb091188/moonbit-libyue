@@ -104,6 +104,9 @@ pub fn checkbox(
     row.node.set_flex_direction(@yoga.Row)
     row.node.set_align_items(@yoga.AlignItems::Center)
     row.node.set_column_gap(6.0)
+    // 行高不随字体度量塌陷：文本行盒比 14px 标记矮的字体上标记会撑破行
+    //（真机 XFCE 默认字体实测），与 radio 行同一条 min_height 口径
+    row.node.set_min_height(@yoga.fixed(20.0))
     row.append_child(box)
     let _ = (text(content, font_size=font_size)).mount_into(row)
     row.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
@@ -187,6 +190,9 @@ pub fn radio_group(
         align_items=@yoga.AlignItems::Center,
         class=class,
         handle=fn(w : @core.Widget) -> Unit {
+          // 行高不随字体度量塌陷：文本行盒比 14px 标记还矮的字体上（真机
+          // XFCE 的默认字体实测如此），标记会把行撑破、圆圈顶被上一行盖住
+          w.node.set_min_height(@yoga.fixed(20.0))
           w.focus_id = auto_focus_id(0)
           attach_toggle(w, fn() { state.set(idx) }, Enabled::new(disabled))
           // 聚焦环画在 dot 上（行本身不铺底）：包一层原绘制，末尾补一圈主题色

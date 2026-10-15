@@ -2738,6 +2738,13 @@ void wm_im_set_cursor(int64_t id, int x, int y, int w, int h) {
   wm_im_apply_cursor(wm);
 }
 
+// 输入法焦点门（GTK 侧的 ibus 教训）：本分支键盘直接走消息泵、IMM 不过滤
+// 普通按键，无此问题——空桩保链接。
+void wm_im_set_active(int64_t id, int on) {
+  (void)id;
+  (void)on;
+}
+
 // 逻辑焦点切换时清输入法侧未完成的组合串：不清的话前一个框攒下的拼音会在
 // 后一个框拿到焦点后 commit 进去（GTK 侧同一条教训）；本侧缓存一并清。
 void wm_im_reset(int64_t id) {
@@ -3693,6 +3700,11 @@ typedef struct {
   int dnd_dest_on;
   int dnd_effect_wanted;
   gulong dnd_sigs[4];
+  // 输入法焦点门：MoonBit 侧焦点控件是输入框（im_context_of 有值）时为 1，
+  // 此时 key 事件先过 gtk_im_context_filter_keypress；否则 IM 不碰按键——
+  // 挂着 ibus 的会话里 IM 会把字符键全吃进 commit 通道，非输入框焦点时按键
+  // 事件就只剩修饰键（真机症状：键盘回显恒 65507 = Control_L）。
+  int im_active;
 } WmWindow;
 
 static WmWindow wm_windows[WM_MAX_WINDOWS];
@@ -3896,7 +3908,10 @@ static void wm_on_size_allocate(GtkWidget *area, GdkRectangle *alloc,
 static gboolean wm_on_key(GtkWidget *widget, GdkEventKey *ev, gpointer data) {
   (void)widget;
   WmWindow *w = (WmWindow *)data;
-  if (ev->type == GDK_KEY_PRESS && w->im != NULL &&
+  // 仅输入框焦点时让 IM 过滤（im_active 由 MoonBit 侧按焦点控件同步，见
+  // wm_im_set_active）——ibus 会话里 IM 把字符键吃进 commit 通道，键盘回显
+  // 之类的非输入框焦点就只剩修饰键了
+  if (ev->type == GDK_KEY_PRESS && w->im != NULL && w->im_active &&
       gtk_im_context_filter_keypress(w->im, ev)) {
     return TRUE; // 输入法吃掉了：不推按键事件，改由 commit/preedit 通道回报
   }
@@ -4204,6 +4219,14 @@ void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
   // 那时窗口一定活着、数据也一定还活着。
   wm_store_frame(w, rgba, width, height);
   gtk_widget_queue_draw(w->area);
+  // draw 信号要主循环迭代才派发，而本栈的泵只在**下一拍 wait** 里 pump、且
+  // 仅 fd 就绪才跑迭代——timer 到期/poll 超时那拍 ready=0 不 pump，帧就一直
+  // 躺在队列里等下一个 X 事件（真机症状：点击后数字 ~1s 才跳、键盘回显停在
+  // 第一条）。把「帧已就绪」当急务：当场非阻塞派发一轮（上限防意外重入）。
+  // 迭代里可能重入 button/key handler——事件照旧入本窗队列，下一拍照常抽。
+  for (int i = 0; i < 8 && gtk_events_pending(); i++) {
+    gtk_main_iteration_do(FALSE);
+  }
 }
 
 static void wm_dnd_session_clear(void); // 定义见「系统级拖放」节
@@ -4569,6 +4592,16 @@ void wm_im_set_surrounding(int64_t id, const char *text, int caret) {
   // 只喂已提交文本：组合串不进 surrounding，否则输入法按错上下文推断。
   // 用探针验证过的四参形态（text, len, cursor 为字节偏移），不走带 SelectionData 的新接口。
   gtk_im_context_set_surrounding(w->im, text, (gint)strlen(text), caret);
+}
+
+// 输入法焦点门：MoonBit 侧焦点控件是输入框时传 1。ibus 一类会话里
+// gtk_im_context_filter_keypress 会把字符键吃进 commit 通道——非输入框焦点
+// 时必须绕开它，否则按键事件只剩修饰键（真机症状：键盘回显恒 65507）。
+void wm_im_set_active(int64_t id, int on) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  wm_windows[id].im_active = on ? 1 : 0;
 }
 
 // 逻辑焦点从一个输入控件切到另一个时清掉输入法侧未完成的组合串：
@@ -5986,6 +6019,7 @@ void wm_set_cursor(int64_t id, int kind) {
 void wm_im_set_cursor(int64_t id, int x, int y, int w, int h) {
   (void)id; (void)x; (void)y; (void)w; (void)h;
 }
+void wm_im_set_active(int64_t id, int on) { (void)id; (void)on; }
 void wm_im_reset(int64_t id) { (void)id; }
 int wm_im_commit_len(int64_t id) { (void)id; return 0; }
 int wm_im_commit_byte(int64_t id, int index) { (void)id; (void)index; return 0; }
