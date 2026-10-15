@@ -32,19 +32,87 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: 安装系统依赖(GTK3/Pango/X11/WebKit 开发包 + xvfb + dbus)
+      # ffmpeg 开发包不是「主链路依赖」，而是工作区解析需要：`moon test` 在
+      # workspace 里会连带跑 modules/ffmpeg-mbt 自己的 prebuild，缺 pkg-config
+      # 探得到的 libav* 就直接失败（脚本打出的提示正是这一行 apt 命令）。
+      # fonts-dejavu-core 是给文本那一族测试的：runner 上没字体时 Pango 量出的
+      # 文字宽为 0，连锁影响链接宽度/textarea 显示行/mdview 基线。
+      - name: 安装系统依赖(GTK3/Pango/X11/WebKit + ffmpeg 开发包 + 字体 + xvfb + dbus)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential pkg-config \
             libgtk-3-dev libpango1.0-dev libfontconfig1-dev libx11-dev \
             libwebkit2gtk-4.1-dev \
+            libavformat-dev libavcodec-dev libswscale-dev \
+            libswresample-dev libavutil-dev \
+            fonts-dejavu-core \
             xvfb dbus
+
+      # 起手把环境读数打出来——fontconfig 里有多少字体、默认匹配是谁、Pango 实测
+      # 一段文本的像素尺寸（开发机基线 48x23，runner 上是 DejaVu 的 52x23）。
+      # 量不到就在该步失败，一眼分清「代码坏了」还是「机器没字体」。
+      - name: 字体与 Pango 测量诊断
+        run: |
+          echo "fc-list 条目数: $(fc-list 2>/dev/null | wc -l)"
+          fc-match 2>&1 | head -3
+          cat > /tmp/fontprobe.c <<'EOF'
+          #include <pango/pangocairo.h>
+          #include <stdio.h>
+          int main(void) {
+            cairo_surface_t *s =
+                cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 200, 60);
+            cairo_t *cr = cairo_create(s);
+            PangoLayout *l = pango_cairo_create_layout(cr);
+            PangoFontDescription *d = pango_font_description_from_string("Sans 14");
+            pango_layout_set_font_description(l, d);
+            pango_layout_set_text(l, "AAAA", -1);
+            int w = 0, h = 0;
+            pango_layout_get_pixel_size(l, &w, &h);
+            printf("pango \"Sans 14\" 量 \"AAAA\": %dx%d\n", w, h);
+            return (w > 0 && h > 0) ? 0 : 1;
+          }
+          EOF
+          cc /tmp/fontprobe.c -o /tmp/fontprobe \
+            $(pkg-config --cflags pangocairo) $(pkg-config --libs pangocairo cairo)
+          /tmp/fontprobe
 
       - name: 安装 moon 工具链
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      # 新装 runner 的注册表索引里查不到 prowk/moonsqlitefile 与 mizchi/markdown
+      # （报错 module was not found in the registry），moon 自己也给出口令
+      # `you may need to run moon update`——先刷索引再解析依赖图。
+      - name: 刷新注册表索引
+        run: moon update
+
+      # 工具链 2026-10-12 起只认 `moon.mod`/`moon.pkg`，而注册表里已发布的第三方包
+      # 带的还是 `moon.mod.json`/`moon.pkg.json`：解析依赖图会在「下载依赖」这步报
+      # `... is no longer supported`（CI 从那天起就红，与本仓代码无关）。
+      # 注册表侧没有退路，这里在依赖缓存落地后就地迁移旧清单——只动 git 忽略的
+      # .mooncakes/ 下载缓存，不动仓库源码、不改依赖版本。逐轮跑：每轮只解到
+      # 刚下载的那一批包，下一轮才看得见新下下来的。
+      - name: 迁移依赖缓存里的旧式清单
+        run: |
+          for i in $(seq 1 40); do
+            if (cd gui && moon check >/tmp/resolve.log 2>&1); then
+              echo "依赖图解析通过（第 $i 轮）"
+              exit 0
+            fi
+            if ! grep -aq "no longer supported" /tmp/resolve.log; then
+              tail -20 /tmp/resolve.log
+              exit 1
+            fi
+            find .mooncakes \( -name moon.mod.json -o -name moon.pkg.json \) \
+              | while read -r f; do
+                  (cd "$(dirname "$f")" && moon fmt >/dev/null 2>&1) || true
+                done
+          done
+          echo "::error title=依赖清单迁移没收敛::40 轮后仍报 no longer supported"
+          tail -20 /tmp/resolve.log
+          exit 1
 
       - name: 静态检查(库模块)
         working-directory: gui
@@ -115,6 +183,38 @@ jobs:
         run: |
           $py = (Get-Command python).Source
           Copy-Item $py "$env:USERPROFILE\.moon\bin\python3.exe"
+
+      - name: 刷新注册表索引(同 Linux job)
+        shell: pwsh
+        run: moon update
+
+      # 同 Linux job 的清单迁移:工具链 2026-10-12 起只认 moon.mod/moon.pkg,
+      # 注册表里已发布的包带的还是旧清单。只动 .mooncakes\ 下载缓存。
+      # (Select-String 要写 `-Pattern … -Quiet`,没有 -QuietPattern 这个参数名——
+      #  写错时循环在第一轮就因参数绑定异常退出,看着像「迁移没收敛」。)
+      - name: 迁移依赖缓存里的旧式清单
+        shell: pwsh
+        run: |
+          for ($i = 1; $i -le 40; $i++) {
+            Push-Location gui
+            moon check *> ../resolve.log
+            $code = $LASTEXITCODE
+            Pop-Location
+            if ($code -eq 0) { Write-Host "依赖图解析通过（第 $i 轮）"; exit 0 }
+            if (-not (Select-String -Path resolve.log -Pattern "no longer supported" -Quiet)) {
+              Get-Content resolve.log -Tail 25
+              exit 1
+            }
+            Get-ChildItem -Path .mooncakes -Recurse -Include moon.mod.json, moon.pkg.json |
+              ForEach-Object {
+                Push-Location $_.Directory.FullName
+                moon fmt *> $null
+                Pop-Location
+              }
+          }
+          Write-Host "::error title=依赖清单迁移没收敛::40 轮后仍报 no longer supported"
+          Get-Content resolve.log -Tail 25
+          exit 1
 
       # vcvars64 用 vswhere 定位(不依赖 VS 具体版本/Edition 路径):moon 的
       # native-stub 与 --target native 都要 cl.exe/链接器在 PATH 里。
