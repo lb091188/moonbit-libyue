@@ -110,6 +110,51 @@ test "表格：表头排序状态机（新列升序 / 同列翻转 / 同列第�
 }
 
 ///|
+test "表格：多选表头全选框（点击全选/清空、部分态出墨、标题区照旧排序）" {
+  let rows = @core.Store::new(table_rows([["甲", "1"], ["乙", "2"], ["丙", "3"]]))
+  let sel : @core.Store[Array[Int]] = @core.Store::new([])
+  let sort = @core.Store::new({ column: -1, asc: true })
+  let (root, tb) = mounted(
+    table(
+      [TableColumn::make("名", 120.0), TableColumn::make("值", 100.0)],
+      rows,
+      width=260.0,
+      selection=sel,
+      sort=sort,
+    ),
+    360.0,
+    300.0,
+  )
+  let head = tb.children()[0]
+  let body = tb.children()[1]
+  // 点全选框区（第一列前 28px）→ 全选 0..2；再点 → 清空
+  click_at(root, head.children()[0], 14.0, 20.0)
+  assert_eq(sel.get(), [0, 1, 2])
+  click_at(root, head.children()[0], 14.0, 20.0)
+  assert_eq(sel.get(), [])
+  // 部分态出墨：空框与「选中一行」的横条在复选框中心画得不一样
+  let bm0 = @render.Bitmap::new(360, 300)
+  let p0 = @render.Painter::new(bm0)
+  root.paint(p0)
+  p0.end()
+  click_at(root, body.children()[0], 30.0, 18.0)
+  assert_eq(sel.get(), [0])
+  let bm1 = @render.Bitmap::new(360, 300)
+  let p1 = @render.Painter::new(bm1)
+  root.paint(p1)
+  p1.end()
+  let hcell = head.children()[0].rect
+  // 复选框在第一列表头格的 (10..24, 居中)：中心 (x+17, y+h/2)
+  let cx = (hcell.x + 17.0).round().to_int()
+  let cy = (hcell.y + hcell.h / 2.0).round().to_int()
+  assert_true(px(bm0, cx, cy) != px(bm1, cx, cy))
+  // 标题区（x>28）照旧排序，不触发全选
+  click_at(root, head.children()[0], 60.0, 20.0)
+  assert_eq((sort.get().column, sort.get().asc), (0, true))
+  assert_eq(sel.get(), [0])
+}
+
+///|
 test "表格：单元格类型（标签 / 色块 / 多行）都出像素，数据变更整表重建" {
   let rows = @core.Store::new([
     { cells: [CellText("行一"), CellTag("成功", Success), CellColorBox("#ff8800", "橙"), CellLines(["第一行", "第二行"])] },

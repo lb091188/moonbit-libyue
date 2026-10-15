@@ -325,15 +325,34 @@ fn draw_cell(
 ///|
 /// 表头行：每列一个格（底色 + 底边线 + 标题按列对齐 + 排序指示）。
 /// `sort` 为 None 时不画箭头、点击无效；`table` 与 `table_v` 共用。
+/// `selection` 给定时（多选表），第一列表头左端画全选框：全选=勾、部分=横条、
+/// 无=空框，点框区（前 28px）切「全选/清空」，点标题区照旧排序。
 fn table_header(
   columns : Array[TableColumn],
   widths : Ref[Array[Double]],
   sort : @core.Store[TableSort]?,
   head_h : Double,
   on_resize? : ((Int, Double) -> Unit)? = None,
+  selection? : @core.Store[Array[Int]]? = None,
+  row_count? : () -> Int = fn() -> Int { 0 },
   skin~ : @style.Style = @style.empty_style(),
 ) -> @core.Widget {
   let head_font = @text.Font::new("", 13.0, weight=@text.SemiBold)
+  // 全选框切换：全选（或部分）→ 清空，未选 → 全选
+  fn toggle_all(sel : @core.Store[Array[Int]]) -> Unit {
+    let n = row_count()
+    let cur = sel.get()
+    if n > 0 && cur.length() >= n {
+      sel.set([])
+    } else {
+      let all : Array[Int] = []
+      for i = 0; i < n; i = i + 1 {
+        all.push(i)
+      }
+      sel.set(all)
+    }
+    @core.invalidate()
+  }
       let head = @core.Widget::new()
       head.node.set_flex_direction(@yoga.Row)
       head.node.set_height(@yoga.fixed(head_h))
@@ -341,6 +360,12 @@ fn table_header(
       for j = 0; j < columns.length(); j = j + 1 {
         let col = columns[j]
         let idx = j
+        // 多选表第一列带全选框（其余列/无多选不带）
+        let sel_here : @core.Store[Array[Int]]? = if j == 0 { selection } else { None }
+        let title_x = match sel_here {
+          Some(_) => 30.0
+          None => 10.0
+        }
         let cell = @core.Widget::new()
         cell.node.set_width(@yoga.fixed(widths.val[j]))
         cell.node.set_height(@yoga.fixed(head_h))
@@ -361,12 +386,43 @@ fn table_header(
           p.fill_rect(0.0, 0.0, r.w, r.h)
           p.set_fill_color(@style.color_of(st.border_color, @theme.theme_border()))
           p.fill_rect(0.0, r.h - 1.0, r.w, 1.0)
+          // 全选框：空框 / 横条（部分选中）/ 勾（全选），画法与 form 的复选框同口径
+          match sel_here {
+            Some(sel) => {
+              let n = row_count()
+              let sel_n = sel.get().length()
+              let all = n > 0 && sel_n >= n
+              let partial = sel_n > 0 && !all
+              let bx = 10.0
+              let by = (r.h - 14.0) / 2.0
+              p.set_stroke_color(if all {
+                @theme.theme_primary()
+              } else {
+                @theme.theme_border()
+              })
+              p.set_line_width(1.0)
+              p.stroke_rect(bx, by, 14.0, 14.0)
+              if all {
+                p.set_stroke_color(@theme.theme_primary())
+                p.set_line_width(2.4)
+                p.begin_path()
+                p.move_to(bx + 3.4, by + 7.4)
+                p.line_to(bx + 5.9, by + 9.9)
+                p.line_to(bx + 10.5, by + 4.3)
+                p.stroke()
+              } else if partial {
+                p.set_fill_color(@theme.theme_primary())
+                p.fill_rect(bx + 3.0, by + 6.0, 8.0, 2.0)
+              }
+            }
+            None => ()
+          }
           let pad_r = if col.sortable { 22.0 } else { 12.0 }
           let _ = @text.draw_box_at(
             p,
-            10.0,
+            title_x,
             0.0,
-            (r.w - pad_r - 10.0).max(1.0),
+            (r.w - pad_r - title_x).max(1.0),
             r.h,
             col.title,
             head_font,
@@ -417,6 +473,10 @@ fn table_header(
             }
           }
         })
+        let sel_clickable = match sel_here {
+          Some(_) => true
+          None => false
+        }
         if col.sortable {
           cell.cursor = @core.CURSOR_HAND
           cell.on_pointer = Some(fn(
@@ -430,6 +490,15 @@ fn table_header(
                 !((idx > 0 && ev.x <= 3.0) ||
                   (idx < columns.length() - 1 && ev.x >= self.rect.w - 3.0))
               @core.Up => {
+                // 全选框区（前 28px）优先于排序：点框切全选/清空，点标题照旧排序
+                match sel_here {
+                  Some(sel) =>
+                    if ev.x >= 0.0 && ev.x <= 28.0 {
+                      toggle_all(sel)
+                      return true
+                    }
+                  None => ()
+                }
                 match sort {
                   Some(s) => {
                     let st = s.get()
@@ -451,6 +520,25 @@ fn table_header(
               }
               _ => false
             }
+          })
+        } else if sel_clickable {
+          cell.cursor = @core.CURSOR_HAND
+          cell.on_pointer = Some(fn(
+            _self : @core.Widget,
+            ev : @core.PointerEvent,
+          ) -> Bool {
+            match ev.kind {
+              @core.Up =>
+                match sel_here {
+                  Some(sel) =>
+                    if ev.x >= 0.0 && ev.x <= 28.0 {
+                      toggle_all(sel)
+                    }
+                  None => ()
+                }
+              _ => ()
+            }
+            false
           })
         }
         head.append_child(cell)
@@ -648,7 +736,8 @@ fn table_row_widget(
 ///|
 /// 表格（EP Table）：表头（标题 + 排序指示，点击可排序列切「新列升序 / 同列升降
 /// 序反转 / 同列第三次取消」）+ 斑马纹数据行；`selection` 给定时行可点选（按下
-/// 抬起同一行才生效），选中行主题浅底 + 左缘强调条。
+/// 抬起同一行才生效），选中行主题浅底 + 左缘强调条，且第一列表头带全选框
+/// （点框区切全选/清空，部分选中画横条；点标题区照旧排序）。
 pub fn table(
   columns : Array[TableColumn],
   rows : @core.Store[Array[TableRow]],
@@ -697,7 +786,6 @@ pub fn table(
         widths,
         sort,
         head_h,
-        skin=paint_subset(class),
         on_resize=Some(fn(j : Int, nw : Double) -> Unit {
           for row_cells in body_cells.val {
             if j + 1 < row_cells.length() {
@@ -706,6 +794,9 @@ pub fn table(
             }
           }
         }),
+        selection=selection,
+        row_count=fn() -> Int { rows.get().length() },
+        skin=paint_subset(class),
       ),
     )
     // ---- 数据行（重建式） ----

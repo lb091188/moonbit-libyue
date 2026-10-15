@@ -53,7 +53,9 @@ pub fn page_data(app : @shared.App) -> @core.Node {
   fn reorder_langs() -> Unit {
     let st = table_sort.get()
     if st.column < 0 || st.column >= lang_base[0].cells.length() {
-      table_rows.set(lang_base)
+      // 必须给快照：把 lang_base 本体 set 进去的话，之后原地 push 再 set
+      // 新旧是同一个数组，Store 去重把通知吞掉，「添加一行」只在第一次生效
+      table_rows.set(lang_base.copy())
       return
     }
     let rows = lang_base.copy()
