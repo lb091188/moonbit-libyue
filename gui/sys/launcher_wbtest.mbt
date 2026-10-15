@@ -126,11 +126,18 @@ test {
 
 ///|
 test {
-  // 路径存在判据：真实读数（工作目录必在、拼一个不存在的名字必不在）
+  // 路径存在判据：真实读数（工作目录必在、拼一个不存在的名字必不在）。
+  // win_path 的回读只在 Windows 形态下断——它只在 Windows 平台分支交出去之前
+  // 用，Linux 上把 POSIX 路径换成反斜杠串后 stat 本来就不认（非 Windows 改验
+  // 绝对化归一不把存在的路径写坏）
   let cwd = current_dir()
   assert_true(cwd != "")
   assert_true(sys_path_exists(cwd))
-  assert_true(sys_path_exists(launcher_win_path(cwd)))
+  if sys_platform() == "windows" {
+    assert_true(sys_path_exists(launcher_win_path(cwd)))
+  } else {
+    assert_true(sys_path_exists(launcher_abs_path(cwd, cwd)))
+  }
   assert_false(sys_path_exists(cwd + "/launcher_no_such_file_zzz.md"))
   assert_false(sys_path_exists(""))
 }

@@ -2303,6 +2303,7 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **为什么之前没暴露**：`sys/launcher_wbtest.mbt` 的归一判据全用 POSIX 形状（`/a/b`、`/cwd`），Windows 形状一条都没写；`reveal` 的真机动作只归示例回证。教训口径：**路径归一的白盒判据要按平台形状各来一组**，否则「只认 `/`」这种错在测试里是隐形的。
 - **新增两条面**：`@sys.open_file(path)`（默认程序：Windows `ShellExecuteW "open"`、Linux `xdg-open`、macOS `open`）与 `@sys.open_file_with(app, path)`（指定程序：Windows 走新入口 `yue_sys_shell_open_with`，`lpFile`=程序、`lpParameters`=**带引号**的路径——路径含空格时对方 `argv[1]` 才是一整条；Linux/macOS 用 argv 直传的分离式启动，空格天然安全）。两条都是**平台门在前**（不支持的平台先给 `Unsupported`，再判路径），`app` 可以是 PATH 里的命令名（`notepad.exe`）也可以是完整可执行路径。macOS 那种「按应用名 `open -a TextEdit`」的形态未接（要给可执行文件路径），随 mac 平台批。
 - **验证方式**：`sys/launcher_wbtest.mbt` 新增 4 组判据——绝对三写法（`/`、盘符 + 冒号、`\\` 与 `\` 开头）且 `C:` 盘符相对不算绝对、Windows 绝对路径不被拼进 cwd、`launcher_win_path` 对中文/已正确串不变形（含 `launcher_abs_path` 与归一函数串起来用的混合输入）、`sys_path_exists` 真实读数（工作目录必在、拼个不存在的名字必不在、空串 false）、打开面三条**无系统副作用**的负例（空路径/不存在路径/空程序名）。`moon test sys core` **333/334**（唯一红仍是 `si_machine` 读 `HARDWARE\DESCRIPTION\System\BIOS:SystemManufacturer`，本机环境基线）、`cd gui && moon check --deny-warn` 与 examples 模块零警告、`moon build showcase --target native` 链接通过、本机冒烟 4 秒存活后按 Windows pid 正常终止。真机复验归 `_人工测试清单.md` S28。
+- **同批自检补漏（Linux，2026-10-15）**：上段判据里的「win_path 回读仍存在」（`sys_path_exists(launcher_win_path(cwd))`）按 Windows 文件系统行为写死——Windows 的 stat 两种分隔符都认，Linux 上 POSIX 路径换成反斜杠串后 stat 必不存在，CI Linux 必红。已改按 `sys_platform()` 运行时分派：Windows 断 win_path 回读，其余平台断 `launcher_abs_path` 归一回读（存在的路径不被归一写坏）；本节「白盒判据按平台形状各来一组」教训的第一处落地。
 
 ## 圆/弧/圆角的像素画感（第二层根因）：4×4 采样点计数只有 17 档覆盖，浅角度边缘实测只剩 2 档（2026-10-15,真机反馈）
 
