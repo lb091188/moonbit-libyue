@@ -2291,6 +2291,19 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **顺带加的诊断落盘**(跨进程真拖只能真人跑,出问题要有读数):设环境变量 `NATIVEGUI_DND_LOG=<绝对路径>` 后,`gui/win/stub.c` 把拖放链关键节点逐条追加写进那个文件——`ole_init ready=…`、`enable slot=… hwnd=… ok/FAILED hr=…`、`enter slot=… recognized=… payload=… promised=… pt=…`、`over slot=… answered=…`(只在答的效果变了时落一行,不刷屏)、`set_effect slot=… effect=…`、`drop slot=… recognized=… eff=…`。没设变量时一个字节都不写。据此一眼分得清是「OLE 没起来」「没注册上」「载荷取不回」「MoonBit 答了 NONE」哪一环。
 - **验证方式**:探针 `experiment/drag_probe/dragdnd_probe.c` 末行 **`DRAGDND-OK`**,判据 **93 条**(84 → 93);`moon test core ui win` **355/355**、库全包 **941/942**(唯一红仍是 `si_machine` 的 BIOS 注册表读数,本机环境基线)、`cd gui && moon check --deny-warn` 零警告、`moon build showcase --target native` 链接通过。真机复验仍归 `_人工测试清单.md` S26(建议带 `NATIVEGUI_DND_LOG` 跑一次并把日志贴回)。
 
+## 「在文件管理器显示 TODO.md」不生效：绝对判据只认前导 `/`，Windows 路径被拼成 `<cwd>/C:\…`（2026-10-15，真机反馈）
+
+- **环境**：Windows 10 19044 真机，showcase「系统集成」页「外部打开」段（按钮传的是相对路径 `TODO.md`）。
+- **现象**：点「在文件管理器显示 TODO.md」定位不出来（要么开个别处、要么什么也没发生）；同时用户指出面还缺两条——**用默认软件打开指定文件**、**用指定软件打开指定文件**。
+- **根因**（三条叠在一起）：
+  1. `launcher_abs_path` 只用「前导 `/`」判绝对，Windows 的 `C:\…`、UNC `\\srv\…` 全被当相对路径拼到 cwd 后面，产出 `<cwd>/C:\a\b.txt` 这种垃圾串。
+  2. 拼接一律用 `/`，而 `explorer /select,"…"` 对**混合分隔符**的路径**不选中**（往往只开一个文件夹，甚至开「文档」）——交出去之前要把 `/` 统一成 `\`。
+  3. `ShellExecuteW` 返回 >32 只说明「explorer 起来了」，所以 `Ok` 成了假承诺：路径不存在时系统侧**默默成功**。补一条 `yue_sys_path_exists`（Windows `GetFileAttributesW`、其余 `stat(2)`），交出去之前先判一次，不存在给新增的 `NotFound` 档（`FileManagerError` 与新的 `OpenFileError` 都有）。
+- **另炸出的一条工具链坑**：本工具链里 `String` 的下标返回的是 **UTF-16 码位（UInt16）**，按 `Char` 逐位重建字符串会把中文路径**写坏**（一个 UTF-8 三字节序列被重编码成三个 Char）。`launcher_win_path` 因此走 `@utf8.encode` 成 `Bytes` 逐字节替换，再解回串。
+- **为什么之前没暴露**：`sys/launcher_wbtest.mbt` 的归一判据全用 POSIX 形状（`/a/b`、`/cwd`），Windows 形状一条都没写；`reveal` 的真机动作只归示例回证。教训口径：**路径归一的白盒判据要按平台形状各来一组**，否则「只认 `/`」这种错在测试里是隐形的。
+- **新增两条面**：`@sys.open_file(path)`（默认程序：Windows `ShellExecuteW "open"`、Linux `xdg-open`、macOS `open`）与 `@sys.open_file_with(app, path)`（指定程序：Windows 走新入口 `yue_sys_shell_open_with`，`lpFile`=程序、`lpParameters`=**带引号**的路径——路径含空格时对方 `argv[1]` 才是一整条；Linux/macOS 用 argv 直传的分离式启动，空格天然安全）。两条都是**平台门在前**（不支持的平台先给 `Unsupported`，再判路径），`app` 可以是 PATH 里的命令名（`notepad.exe`）也可以是完整可执行路径。macOS 那种「按应用名 `open -a TextEdit`」的形态未接（要给可执行文件路径），随 mac 平台批。
+- **验证方式**：`sys/launcher_wbtest.mbt` 新增 4 组判据——绝对三写法（`/`、盘符 + 冒号、`\\` 与 `\` 开头）且 `C:` 盘符相对不算绝对、Windows 绝对路径不被拼进 cwd、`launcher_win_path` 对中文/已正确串不变形（含 `launcher_abs_path` 与归一函数串起来用的混合输入）、`sys_path_exists` 真实读数（工作目录必在、拼个不存在的名字必不在、空串 false）、打开面三条**无系统副作用**的负例（空路径/不存在路径/空程序名）。`moon test sys core` **333/334**（唯一红仍是 `si_machine` 读 `HARDWARE\DESCRIPTION\System\BIOS:SystemManufacturer`，本机环境基线）、`cd gui && moon check --deny-warn` 与 examples 模块零警告、`moon build showcase --target native` 链接通过、本机冒烟 4 秒存活后按 Windows pid 正常终止。真机复验归 `_人工测试清单.md` S28。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。

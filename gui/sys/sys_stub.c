@@ -2038,6 +2038,74 @@ int32_t yue_sys_shell_reveal(const char *path, int32_t *ok) {
 #endif
 }
 
+// 路径是否存在（文件或目录都算）：Windows 用 GetFileAttributesW，其余 stat(2)。
+// 「打开/定位」这一类交给系统的入口需要一个诚实的判据——路径不存在时
+// explorer /select 会默默开「文档」文件夹、ShellExecute 也会返回成功，
+// 于是「Ok」变成了假承诺（真机踩过）。空串一律 false。
+int32_t yue_sys_path_exists(const char *path) {
+  if (path == NULL || path[0] == '\0') {
+    return 0;
+  }
+#if defined(_WIN32)
+  wchar_t *wpath = win_utf8_wide(path, 0);
+  if (wpath == NULL) {
+    return 0;
+  }
+  DWORD attr = GetFileAttributesW(wpath);
+  free(wpath);
+  return attr != INVALID_FILE_ATTRIBUTES ? 1 : 0;
+#else
+  struct stat st;
+  return stat(path, &st) == 0 ? 1 : 0;
+#endif
+}
+
+// 用**指定程序**打开一个文件：ShellExecuteW 的 lpFile 给程序、lpParameters 给
+// 带引号的文件路径（路径里有空格时对方 argv 才拿到完整一条）。lpFile 可以是
+//  PATH 里的命令名（如 notepad.exe），ShellExecute 自己按系统搜索顺序解析。
+// 非 Windows 分支不做（POSIX 侧由 MoonBit 用 argv 直传的分离式启动覆盖）。
+int32_t yue_sys_shell_open_with(const char *app, const char *path, int32_t *ok) {
+  *ok = 0;
+#if defined(_WIN32)
+  if (app == NULL || app[0] == '\0' || path == NULL || path[0] == '\0') {
+    return 0;
+  }
+  wchar_t *wapp = win_utf8_wide(app, 0);
+  wchar_t *wpath = win_utf8_wide(path, 0);
+  if (wapp == NULL || wpath == NULL) {
+    if (wapp != NULL) {
+      free(wapp);
+    }
+    if (wpath != NULL) {
+      free(wpath);
+    }
+    return 0;
+  }
+  wchar_t *args = (wchar_t *)malloc(sizeof(wchar_t) * (wcslen(wpath) + 3));
+  if (args == NULL) {
+    free(wapp);
+    free(wpath);
+    return 0;
+  }
+  wcscpy(args, L"\"");
+  wcscat(args, wpath);
+  wcscat(args, L"\"");
+  HINSTANCE h =
+      ShellExecuteW(NULL, L"open", wapp, args, NULL, SW_SHOWNORMAL);
+  free(args);
+  free(wapp);
+  free(wpath);
+  if ((intptr_t)h > 32) {
+    *ok = 1;
+  }
+  return 0;
+#else
+  (void)app;
+  (void)path;
+  return 0;
+#endif
+}
+
 // 电源方案：PowerGetActiveScheme/SetActiveScheme（powrprof）。GUID 以标准
 // 8-4-4-4-12 小写串与 MoonBit 互传，枚举三经典方案在 MoonBit 侧对表。
 // 两条 helper 只在 _WIN32 分支里被调用，本身也圈进守卫：GUID 是 Windows 类型，

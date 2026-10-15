@@ -87,3 +87,79 @@ test {
     assert_true(reveal_in_file_manager("/tmp") is Err(Unsupported))
   }
 }
+
+///|
+test {
+  // 绝对判据要认三种写法：POSIX 的 /、Windows 的盘符与 UNC/当前盘根。
+  // 只看前导 '/' 会把 "C:\a\b.txt" 当相对路径拼进 cwd，产出
+  // "<cwd>/C:\a\b.txt" 这种垃圾（真机踩过：文件管理器定位与打开都不对）。
+  assert_true(launcher_path_absolute("/etc/passwd"))
+  assert_true(launcher_path_absolute("\\\\srv\\share\\x"))
+  assert_true(launcher_path_absolute("\\当前盘根\\x"))
+  assert_true(launcher_path_absolute("C:\\a\\b.txt"))
+  assert_true(launcher_path_absolute("d:/a/b.txt"))
+  assert_false(launcher_path_absolute("TODO.md"))
+  assert_false(launcher_path_absolute("文档/报告.doc"))
+  assert_false(launcher_path_absolute(""))
+  assert_false(launcher_path_absolute("C:")) // 盘符相对不算绝对
+  // 归一：已绝对的原样（含 Windows 三条），相对才拼 cwd
+  assert_eq(launcher_abs_path("C:\\a\\b.txt", "D:\\w"), "C:\\a\\b.txt")
+  assert_eq(launcher_abs_path("\\\\srv\\x", "/cwd"), "\\\\srv\\x")
+  assert_eq(launcher_abs_path("/a/b", "/cwd"), "/a/b")
+  assert_eq(launcher_abs_path("b", "/cwd"), "/cwd/b")
+  assert_eq(launcher_abs_path("b", ""), "b")
+  assert_eq(launcher_abs_path("", "/cwd"), "")
+}
+
+///|
+test {
+  // Windows 形态：分隔符统一成反斜杠，且中文与已正确的串都不被写坏
+  // （混着给时 explorer 的 /select 不选中，所以交出去之前先统一）
+  assert_eq(launcher_win_path("C:/Users/u/ proj/TODO.md"), "C:\\Users\\u\\ proj\\TODO.md")
+  assert_eq(launcher_win_path("C:\\a\\b.txt"), "C:\\a\\b.txt")
+  assert_eq(launcher_win_path("C:/文档/报告.doc"), "C:\\文档\\报告.doc")
+  assert_eq(launcher_win_path(""), "")
+  // 混合输入也一致（cwd 给反斜杠、用户给正斜杠）
+  let mixed = launcher_abs_path("docs/zh/adaptation.md", "C:\\repo")
+  assert_eq(launcher_win_path(mixed), "C:\\repo\\docs\\zh\\adaptation.md")
+}
+
+///|
+test {
+  // 路径存在判据：真实读数（工作目录必在、拼一个不存在的名字必不在）
+  let cwd = current_dir()
+  assert_true(cwd != "")
+  assert_true(sys_path_exists(cwd))
+  assert_true(sys_path_exists(launcher_win_path(cwd)))
+  assert_false(sys_path_exists(cwd + "/launcher_no_such_file_zzz.md"))
+  assert_false(sys_path_exists(""))
+}
+
+///|
+test {
+  // 打开面：只断「在交出去之前就能拦下的那些」——空路径、不存在的路径、空程序名，
+  // 三条都不该产生系统副作用（真开浏览器/编辑器的事交给示例与真机）
+  assert_true(open_file("") is Err(NotFound))
+  assert_true(
+    open_file("launcher_no_such_file_zzz.md") is Err(NotFound) ||
+      open_file("launcher_no_such_file_zzz.md") is Err(Unsupported),
+  )
+  assert_true(open_file_with("", "TODO.md") is Err(SpawnFailed))
+  assert_true(
+    open_file_with("notepad.exe", "launcher_no_such_file_zzz.md") is Err(NotFound) ||
+      open_file_with("notepad.exe", "launcher_no_such_file_zzz.md") is Err(Unsupported),
+  )
+  assert_eq(OpenFileError::Unsupported.to_string(), "OpenFileError::Unsupported")
+  assert_eq(OpenFileError::NotFound.to_string(), "OpenFileError::NotFound")
+  assert_eq(
+    OpenFileError::SpawnFailed.to_string(),
+    "OpenFileError::SpawnFailed",
+  )
+  assert_eq(FileManagerError::NotFound.to_string(), "FileManagerError::NotFound")
+  // 定位面同一条口径：不存在的路径不假装「已交给系统」
+  assert_true(reveal_in_file_manager("") is Err(NotFound) || reveal_in_file_manager("") is Err(Unsupported))
+  assert_true(
+    reveal_in_file_manager("launcher_no_such_file_zzz.md") is Err(NotFound) ||
+      reveal_in_file_manager("launcher_no_such_file_zzz.md") is Err(Unsupported),
+  )
+}

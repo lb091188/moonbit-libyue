@@ -77,6 +77,19 @@ fn tray_poll_loop() -> Unit {
 }
 
 ///|
+/// 「用指定程序打开」的演示对象：Windows 记事本、Linux gedit、macOS 给
+/// TextEdit 的可执行路径（这一档按 argv 直传，`open -a 应用名` 那种形态随
+/// mac 平台批再接）。挑不到的平台给空串，按钮直接演示 SpawnFailed。
+fn open_probe_app() -> String {
+  match @sys.sys_platform() {
+    "windows" => "notepad.exe"
+    "linux" => "gedit"
+    "macos" => "/System/Applications/TextEdit.app/Contents/MacOS/TextEdit"
+    _ => ""
+  }
+}
+
+///|
 /// 托盘错误 → 可读串（TrayError 三档：没后端 / 图标没建成 / 后端具体失败）。
 fn tray_err_text(e : @core.TrayError) -> String {
   match e {
@@ -529,7 +542,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
     @shared.section(
       "外部",
       "打开外部",
-      "把 URL 交给默认浏览器、把路径交给文件管理器。路径走 `@core.reveal_in_file_manager`：Linux 先试会话总线的 `FileManager1.ShowItems`（打开并**选中**），不在线才退回 `xdg-open` 打开父目录（选中态丢失）。Ok 只表示已交给系统，之后归操作系统。",
+      "把 URL 交给默认浏览器、把文件交给默认程序或指定程序、把路径交给文件管理器。文件走 `@sys.open_file` / `@sys.open_file_with`（相对路径按工作目录归一，路径不存在先给 `NotFound`，不把「打不开」说成「已交给系统」）；定位走 `@core.reveal_in_file_manager`：Linux 先试会话总线的 `FileManager1.ShowItems`（打开并**选中**），不在线才退回 `xdg-open` 打开父目录（选中态丢失），Windows 直调 `explorer /select`（分隔符统一成反斜杠才会选中）。Ok 只表示已交给系统，之后归操作系统。",
       [
         @ui.row(
           [
@@ -545,6 +558,25 @@ pub fn page_system(app : @shared.App) -> @core.Node {
                 Err(e) => ext_out.set("显示失败：\{e}")
               }
             }),
+            @ui.button("用默认程序打开 TODO.md", variant=@ui.Soft, on_click=fn() {
+              match @sys.open_file("TODO.md") {
+                Ok(_) => ext_out.set("已交给默认程序")
+                Err(e) => ext_out.set("默认程序打开失败：\{e}")
+              }
+            }),
+            @ui.button("用指定程序打开 TODO.md", variant=@ui.Soft, on_click=fn() {
+              let app = open_probe_app()
+              match @sys.open_file_with(app, "TODO.md") {
+                Ok(_) => ext_out.set("已交给 \{app}")
+                Err(e) => ext_out.set("指定程序（\{app}）打开失败：\{e}")
+              }
+            }),
+            @ui.button("用指定程序打开不存在的路径", variant=@ui.Soft, on_click=fn() {
+              match @sys.open_file_with(open_probe_app(), "no-such-file-zzz.md") {
+                Ok(_) => ext_out.set("已交给指定程序")
+                Err(e) => ext_out.set("按预期被拦下：\{e}")
+              }
+            }),
           ],
           column_gap=8.0,
         ),
@@ -557,6 +589,10 @@ pub fn page_system(app : @shared.App) -> @core.Node {
         "}",
         "// 打开并选中：Linux 走 FileManager1.ShowItems，退回 xdg-open 父目录\n",
         "match @core.reveal_in_file_manager(\"TODO.md\") { ... }",
+        "// 用默认程序打开（相对路径按工作目录归一，路径不存在先给 NotFound）",
+        "match @sys.open_file(\"TODO.md\") { ... }",
+        "// 用指定程序打开：app 可以是 PATH 里的命令名或完整可执行路径",
+        "match @sys.open_file_with(\"notepad.exe\", \"TODO.md\") { ... }",
       ],
     ),
     @shared.section(

@@ -202,6 +202,22 @@ pub fn sys_remove_file(path : String) -> Bool {
 }
 
 ///|
+/// 路径存在判据（文件与目录都算）。
+#borrow(path)
+extern "c" fn ffi_sys_path_exists(path : Bytes) -> Int = "yue_sys_path_exists"
+
+///|
+/// 路径是否存在（文件或目录都算，空串恒 false）。「交给系统打开/定位」这类
+/// 入口用它先判一次：路径不存在时系统侧往往**默默成功**（explorer /select 开
+/// 「文档」、ShellExecute 返回成功），不判就等于给了假承诺。
+pub fn sys_path_exists(path : String) -> Bool {
+  if path == "" {
+    return false
+  }
+  ffi_sys_path_exists(@utf8.encode(path)) == 1
+}
+
+///|
 /// C 层 getenv（进程实时环境——core/env 的表在部分实现里是启动快照，
 /// setenv 后读不到；此入口反映进程内写删的最新状态，测试与需要
 /// 「写后立即可见」语义的调用方用）。
