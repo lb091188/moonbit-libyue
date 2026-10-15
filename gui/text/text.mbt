@@ -491,6 +491,10 @@ fn draw_box_raster(
   ) {
     return false
   }
+  // 帧级批存的是目标位图像素缓冲的裸指针：`off` 一出作用域就随引用计数释放，
+  // 待批文本必须趁它还活着落位，否则冲刷时写进已释放的堆块（Windows 实测
+  // 表现为启动即堆损坏崩溃，见 docs/zh/adaptation.md）。
+  flush_pending()
   let dw = ow.to_double()
   let dh = oh.to_double()
   raster.blit(off, 0.0, 0.0, dw, dh, x, y, dw, dh)
@@ -705,6 +709,9 @@ extern "c" fn pt_render_stats(
 /// 的旧路径，像素行为逐位不变）。打开后 pt_draw/pt_draw_box 只入队，冲刷
 /// 时机：目标位图/尺寸变化、批满、pt_flush（帧尾）/ pt_flush_if_overlap
 /// （光栅前置闸）。
+/// 契约：**批存的是目标位图像素缓冲的裸指针**，调用方画的每一块目标都必须
+/// 活到下一次冲刷；画进临时位图（用完即释放）的通道要在释放前自己调
+/// `flush_pending()`（`draw_box_at` 的离屏通道就是这么做的）。
 pub fn enable_batching() -> Unit {
   pt_set_batching(1)
 }
