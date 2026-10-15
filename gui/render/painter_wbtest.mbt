@@ -332,3 +332,27 @@ test "fill 与 stroke 用完即清路径，第二笔不带上第一笔" {
   assert_eq(rgba(p, 2, 2), (255, 0, 0, 255))
   p.end()
 }
+
+///|
+/// 两后端同口径：1px 圆角描边是**居中式**描边，四条直段都必须有墨。
+/// 光栅器早先把矩形取整到整数边、覆盖又按像素中心量，`hw=0.5` 时中心到整数
+/// 边的重叠恒为 0 → 四条直段整段消失、只剩角部一圈（cairo 一直画得出）。
+test "stroke_round_rect：1px 圆角边框四条直段都落墨" {
+  let bm = Bitmap::new(40, 40)
+  let p = Painter::new(bm)
+  p.set_stroke_color("#ff0000")
+  p.set_line_width(1.0)
+  // 边压在格中心（0.5）→ 1px 描边正好落满一格：四边中点各一条实心
+  p.stroke_round_rect(0.5, 0.5, 30.0, 30.0, 4.0)
+  assert_eq(rgba(p, 15, 0).3, 255)
+  assert_eq(rgba(p, 15, 30).3, 255)
+  assert_eq(rgba(p, 0, 15).3, 255)
+  assert_eq(rgba(p, 30, 15).3, 255)
+  // 角弧外（左上角点离弧心 (4.5,4.5) 距离 5.66 > rr+hw）与框内都不该有墨
+  assert_eq(rgba(p, 0, 0).3, 0)
+  assert_eq(rgba(p, 15, 15).3, 0)
+  // 边压在整数边界（y=4.0）：环带跨 3、4 两行各摊一半墨，直段仍要在
+  p.stroke_round_rect(4.0, 4.0, 20.0, 20.0, 3.0)
+  assert_true(rgba(p, 14, 4).3 > 60, msg="压整数边的 1px 描边直段没落墨")
+  p.end()
+}

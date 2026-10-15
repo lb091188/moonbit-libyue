@@ -950,3 +950,33 @@ test "开关是胶囊与圆珠，四角不落墨" {
     )
   }
 }
+
+///|
+/// 复选框框线是内描边：四条边与四个角都落满一格。换成居中式描边就不行了—
+/// 标记在行里居中，原点常落在半像素上（14 高的标记放进 17 高的行 → y=1.5），
+/// 1px 会摊成两行各半墨，框看着发虚变淡。
+test "复选框框线四边四角都满墨" {
+  let st = @core.Store::new(false)
+  let root = mount_root([checkbox("甲", st)], 120.0, 30.0)
+  let bm = @render.Bitmap::new(120, 30)
+  let p = @render.Painter::new(bm)
+  root.paint(p)
+  p.end()
+  let box = kid(root, 0).children()[0]
+  let bx = box.rect.x.round().to_int()
+  let by = box.rect.y.round().to_int()
+  let a = fn(dx : Int, dy : Int) -> Int { (color_of(bm, bx + dx, by + dy)).3 }
+  let frame : Array[(Int, Int)] = [
+    (7, 0),
+    (7, 13),
+    (0, 7),
+    (13, 7),
+    (0, 0),
+    (13, 0),
+    (0, 13),
+    (13, 13),
+  ]
+  for (dx, dy) in frame {
+    assert_true(a(dx, dy) > 200, msg="框线在 \{dx},\{dy} 没落满墨")
+  }
+}

@@ -71,6 +71,7 @@ pub fn checkbox(
       let checked = state.get()
       p.set_stroke_color(if checked && !off.off { accent } else { edge })
       p.set_line_width(1.0)
+      // 框线走内描边：按设备格取整，14×14 的框在任意原点都是锐利的 1px
       p.stroke_rect(0.0, 0.0, 14.0, 14.0)
       if checked {
         p.set_stroke_color(if off.off {
