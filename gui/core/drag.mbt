@@ -8,8 +8,11 @@
 // - **已做（Windows，W23a）**：**系统级拖入**——从资源管理器/编辑器把文件或文本
 //   拖进窗口，落到同一个会话里（每拍 `drag_external_pump`，见本文件尾）。落点命中、
 //   悬停高亮、`accept` 判据全部复用应用内那一套，调用方的 `@ui.drop_target` 不用改。
-// - **未做（随平台批）**：**拖出到外部**（Win32 `DoDragDrop`，另批）、Linux
-//   GTK/XDG DnD 与 macOS `NSDraggingSource`（这两档的后端桩恒报不可用，不假装能用）。
+// - **已做（Windows，W23b）**：**系统级拖出**——`drag_external_send` 把 `Text`/`Paths`
+//   交给 OLE 拖放（见本文件尾的「系统级拖出」节）。`drag_source(external=true)` 在
+//   过阈值那一刻起这趟；后端不支持或种类没有系统级形态时自动回落到应用内会话。
+// - **未做（随平台批）**：Linux GTK/XDG DnD 与 macOS `NSDraggingSource`（这两档的
+//   后端桩恒报不可用，不假装能用）。
 // - 参照面是旧栈的 `yue/view.mbt`（`DataKind` / `DragData` / `register_dragged_types`
 //   / `handle_drag_enter`/`handle_drag_update`/`handle_drop`/`on_drag_leave`）。
 //   本批把「拖入三回调」收成一个 `on_drop`（自绘档不需要 enter/update/leave 三件：
@@ -447,9 +450,11 @@ fn drag_window_root_of(slot : Int) -> Widget? {
 
 ///|
 /// 把「当前落点收不收」写回系统（决定拖拽光标）。收给 COPY（1），不收给
-/// NONE（0）。本批只做「复制」一档：移动/链接要读按键修饰位，随拖出批一起接。
-/// 写回的值同时记在 MoonBit 侧一份（`drag_external_effect()` 读回，无头测试与
-/// 诊断用——后端没挂上时 ffi 那次写是静默丢弃的）。
+/// NONE（0）。悬停答值仍只有「复制/不收」两档——要答 MOVE/LINK 得把 OLE 的
+/// `grfKeyState`（Shift/Alt 修饰位）一起转发上来，`wm_dragdnd_poll` 目前只给
+/// 槽号/种类/坐标，那条随后续批。写回的值同时记在 MoonBit 侧一份
+/// （`drag_external_effect()` 读回，无头测试与诊断用——后端没挂上时 ffi 那次写
+/// 是静默丢弃的）。
 fn drag_external_answer(slot : Int, data : DragData) -> Unit {
   let ok = match drag_current.val {
     None => false
@@ -555,4 +560,96 @@ pub fn drag_external_pump() -> Bool {
     }
   }
   got
+}
+
+///|
+/// 拖出这趟最终答回来的效果（编号与 Win32 `DROPEFFECT_*` 同值）。落点不收或按
+/// Esc 取消都是 `Rejected`——取消不算错误，见 `drag_external_send`。
+pub(all) enum DragEffect {
+  Rejected
+  Copy
+  Move
+  Link
+}
+
+///|
+/// 效果 → 标志位（`Copy`=1、`Move`=2、`Link`=4，与 `@win.DRAGDND_*` 同值）。
+pub fn DragEffect::flag(self : DragEffect) -> Int {
+  match self {
+    Rejected => @win.DRAGDND_NONE
+    Copy => @win.DRAGDND_COPY
+    Move => @win.DRAGDND_MOVE
+    Link => @win.DRAGDND_LINK
+  }
+}
+
+///|
+/// 标志位 → 效果（认不出的组合按「没成交」处理，不猜）。
+pub fn drag_effect_of_flag(flag : Int) -> DragEffect {
+  match flag {
+    1 => Copy
+    2 => Move
+    4 => Link
+    _ => Rejected
+  }
+}
+
+///|
+/// 拖出失败的原因。
+pub(all) enum DragError {
+  /// 本机后端没有这条能力，或这份数据没有系统级形态（`Html`/`Img`）
+  Unsupported
+  /// 后端接了但这趟没走成（没有活动窗口、OLE 起不来、载荷装不出）
+  Failed(String)
+}
+
+///|
+/// 这份数据有没有系统级形态：`Text` 走 `CF_UNICODETEXT`、`Paths` 走 `CF_HDROP`
+/// （相对路径由后端绝对化）。`Html`/`Img` 本批不给系统级形态——`CF_HTML` 有自己的
+/// 源标记格式、位图要 `IDropTarget` 侧的 `METAFILEPICT`/`Bitmap`，都随后续批。
+pub fn drag_data_has_system_form(data : DragData) -> Bool {
+  match data {
+    Text(_) | Paths(_) => true
+    Html(_) | Img(_) => false
+  }
+}
+
+///|
+/// 系统级拖出是否可用（运行时探测，不含数据种类判断）。不可用时
+/// `drag_external_send` 直接给 `Err(Unsupported)`，`@ui.drag_source` 会回落到
+/// 应用内会话——也就是说这条返回 false 时，应用内拖放完全不受影响。
+pub fn drag_external_send_supported() -> Bool {
+  @win.dragdnd_supported()
+}
+
+///|
+/// 起一趟系统级**拖出**（Windows W23b）：把数据交给 OLE 拖放，对方程序（资源管理
+/// 器、桌面、编辑器）拿到的是标准的复制/移动/链接语义，效果由按住的修饰键定夺。
+/// 返回 `Ok(效果)`——`Ok(Rejected)` 表示用户取消或松手处没有成交点；`Err` 表示这趟
+/// 根本没起来。
+///
+/// 用法约束（不是 bug）：**必须在鼠标键仍按下时调用**，也就是拖拽过阈值那一刻；
+/// 按钮抬起后再调系统不认。这一支**阻塞**到松手或取消才返回，期间本窗的事件循环
+/// 由系统代跑，本窗自己的 `drop_target` 仍能收这份拖出的数据（拖回自己窗口成立），
+/// 但**拖拽途中没有应用内实时高亮**——那是应用内会话才有的待遇，两条会话同一时刻
+/// 只能跑一条。
+pub fn drag_external_send(data : DragData) -> Result[DragEffect, DragError] {
+  if !@win.dragdnd_supported() {
+    Err(Unsupported)
+  } else if !drag_data_has_system_form(data) {
+    Err(Unsupported)
+  } else {
+    match host_active() {
+      None => Err(Failed("当前没有活动窗口"))
+      Some(app) =>
+        match @win.dragdnd_send(
+          app.window.id,
+          drag_encode(data),
+          @win.DRAGDND_COPY | @win.DRAGDND_MOVE | @win.DRAGDND_LINK,
+        ) {
+          None => Err(Failed("系统未接这趟拖出"))
+          Some(flag) => Ok(drag_effect_of_flag(flag))
+        }
+    }
+  }
 }

@@ -369,6 +369,16 @@ extern "c" fn wm_dragdnd_effect(id : Int64) -> Int = "wm_dragdnd_effect"
 extern "c" fn wm_dragdnd_count() -> Int = "wm_dragdnd_count"
 
 ///|
+#borrow(payload, out_effect)
+extern "c" fn wm_dragdnd_send(
+  id : Int64,
+  payload : Bytes,
+  len : Int,
+  allowed : Int,
+  out_effect : Ref[Int],
+) -> Int = "wm_dragdnd_send"
+
+///|
 extern "c" fn wm_menu_popup_new() -> Int = "wm_menu_popup_new"
 
 ///|

@@ -1,4 +1,4 @@
-// 窗口页：窗口 API × 全局快捷键 × 拖放（应用内 + 系统级拖入）。
+// 窗口页：窗口 API × 全局快捷键 × 拖放（应用内 + 系统级拖入 / 拖出）。
 //
 // G7 迁移记档（与 master 旧页的三条差）：
 // ① 窗口段少了「最大化/还原」「置顶切换」两个按钮——本栈 Win32 段没写
@@ -10,11 +10,13 @@
 //    注册收 `Result`，命中经 `hotkey_poll` 抽（id→加速串回查表在门面里，页内
 //    不自己持表——只记注册时返回的句柄用于注销）；轮询表挂宿主 200ms 一拍；
 // ③ 拖放：旧链路的「跨应用系统级」（register_dragged_types + enter/update/drop
-//    三回调）在本栈拆成两段——应用内那条三平台同构，系统级拖入 Windows 已接
-//    （W23a，`core/drag.mbt` 的 `drag_external_*`；旧三回调收成 `on_drop` 一个 +
-//    悬停期一次 `accept` 查询）。拖出到外部（DoDragDrop）与 Linux/mac 仍随平台批。
-//    本页两段都演示：`drag_source`/`drop_target` 两个声明式钩子 + 从资源管理器
-//    拖文件进「只收文件」那块。
+//    三回调）在本栈拆成两段——应用内那条三平台同构，系统级两档 Windows 已接：
+//    拖入走 `core/drag.mbt` 的 `drag_external_*`（旧三回调收成 `on_drop` 一个 +
+//    悬停期一次 `accept` 查询），拖出走 `drag_external_send`（`drag_source`
+//    的 `external=true`，本机没后端时自动回落应用内）。Linux/mac 的系统级两档
+//    仍随平台批。
+//    本页三段都演示：`drag_source`/`drop_target` 两个声明式钩子 + 从资源管理器
+//    拖文件进「只收文件」那块 + 两块往外拖（文本、文件）。
 
 ///|
 /// 热键错误 → 可读串（门面的两档：没后端 / 有backend但这次没成）。
@@ -22,6 +24,21 @@ fn hotkey_err_text(e : @core.HotkeyError) -> String {
   match e {
     @core.Unsupported => "本平台没有全局快捷键后端（当前仅 Windows）"
     @core.Failed(why) => "注册失败：\{why}"
+  }
+}
+
+///|
+/// 拖出回报 → 可读串：成交档给效果，没走成时给原因（后端未接会自动回落应用内）。
+fn drag_send_text(r : Result[@core.DragEffect, @core.DragError]) -> String {
+  match r {
+    Ok(e) => match e {
+      @core.DragEffect::Copy => "已复制出去"
+      @core.DragEffect::Move => "已移动出去"
+      @core.DragEffect::Link => "已建立链接"
+      @core.DragEffect::Rejected => "取消或落点不收"
+    }
+    Err(@core.DragError::Unsupported) => "本机没有系统级拖出后端（已回落应用内拖放）"
+    Err(@core.DragError::Failed(why)) => "这趟没走成：\{why}（已回落应用内拖放）"
   }
 }
 
@@ -85,6 +102,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
   // 拖放回显
   let dnd : @core.Store[String] = @core.Store::new("（还没投过）")
   let ext : @core.Store[String] = @core.Store::new("（外部还没投过）")
+  let out : @core.Store[String] = @core.Store::new("（还没往外拖过）")
   @shared.page([
     @shared.section(
       "窗口",
@@ -193,8 +211,8 @@ pub fn page_window(app : @shared.App) -> @core.Node {
     ),
     @shared.section(
       "拖放",
-      "应用内拖放 + 系统级拖入",
-      "按住左边色块拖出 4px 即开拖，拖到右边面板上会描主色边，松手成交——这条三平台同构，同一棵树上能连着拖多少次都行。系统级**拖入**（从资源管理器拖文件、从编辑器拖文本进窗口）Windows 已接：外部事件每拍喂进同一条会话，落点命中、悬停描边、`accept` 判据全部复用，不收的落点系统光标直接显示禁止。拖出到外部与 Linux/mac 档随平台批。",
+      "应用内拖放 + 系统级拖入 / 拖出",
+      "按住左边色块拖出 4px 即开拖，拖到右边面板上会描主色边，松手成交——这条三平台同构，同一棵树上能连着拖多少次都行。系统级**拖入**（从资源管理器拖文件、从编辑器拖文本进窗口）Windows 已接：外部事件每拍喂进同一条会话，落点命中、悬停描边、`accept` 判据全部复用，不收的落点系统光标直接显示禁止。系统级**拖出**（Windows）也走通：`drag_source(external=true)` 在过阈值那一刻把这趟交给系统，对方程序拿到标准的复制/移动/链接语义（Ctrl/Shift/Alt 定夺），本机没这条后端时自动回落到上面那条应用内会话。Linux/mac 的系统级两档随平台批。",
       [
         @ui.row(
           [
@@ -272,11 +290,60 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         ),
         @ui.row(
           [
+            @ui.drag_source(
+              @ui.view(
+                [@ui.text("拖我出去\n（记事本/浏览器）", role=@ui.Body)],
+                background_color="primary_light",
+                border_color="primary",
+                width=120.0,
+                height=64.0,
+                padding=8.0,
+              ),
+              payload=fn() { Some(@core.DragData::Text("窗口页的拖放演示")) },
+              external=true,
+              on_external=fn(r) { out.set("文本拖出：\{drag_send_text(r)}") },
+            ),
+            @ui.drag_source(
+              @ui.view(
+                [@ui.text("拖文件出去\n（桌面/资源管理器）", role=@ui.Body)],
+                background_color="bg_panel",
+                border_color="primary",
+                width=150.0,
+                height=64.0,
+                padding=8.0,
+              ),
+              // 相对路径由后端绝对化（对方程序拿到的是完整位置）
+              payload=fn() {
+                Some(@core.DragData::Paths([ "README.md", "docs/zh/adaptation.md" ]))
+              },
+              external=true,
+              on_external=fn(r) { out.set("文件拖出：\{drag_send_text(r)}") },
+            ),
+            @ui.text(
+              if @core.drag_external_send_supported() {
+                "系统级拖出：本机可用（Ctrl 复制 / Shift 移动 / Alt 链接）"
+              } else {
+                "系统级拖出：本机后端未接（自动回落应用内拖放）"
+              },
+              role=@ui.Secondary,
+            ),
+          ],
+          column_gap=12.0,
+          align_items=@yoga.AlignItems::Center,
+        ),
+        @ui.row(
+          [
             @ui.text("投放回显：", role=@ui.Secondary),
             @ui.bind_label(dnd, fn(s) { s }),
             @ui.text("外部回显：", role=@ui.Secondary),
             @ui.bind_label(ext, fn(s) { s }),
           ],
+          column_gap=6.0,
+        ),
+        @ui.row(
+          [@ui.text("拖出回显：", role=@ui.Secondary), @ui.bind_label(out, fn(s) {
+            s
+          })],
           column_gap=6.0,
         ),
       ],
@@ -300,6 +367,14 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         "// 系统级拖入（Windows）：建窗自动挂投放目标，宿主每拍抽事件喂进同一条",
         "// 会话；运行时探测决定这台机器能不能用（非 Windows 给 false）",
         "if @core.drag_external_supported() { ... }",
+        "// 系统级拖出（Windows）：过阈值那一刻把这趟交给系统，阻塞到松手/取消；",
+        "// 本机后端没接或这趟起不来时自动回落到应用内会话",
+        "@ui.drag_source(",
+        "  tile,",
+        "  payload=fn() { Some(@core.DragData::Paths([ \"README.md\" ])) }, // 相对路径会被绝对化",
+        "  external=true,",
+        "  on_external=fn(r) { ... }, // Ok(效果)=成交/取消，Err=没走成（已回落）",
+        ")",
       ],
     ),
   ])

@@ -1,16 +1,20 @@
-/* W23a 外部拖入探针（纯 C，直接 #include stub.c）。
+/* W23a/W23b 跨进程拖放探针（纯 C，直接 #include stub.c）。
  *
  * 动机：跨进程拖放「另一头是谁」不由我们决定，能自动化的部分是**我们自己那一半
- * 的语义**——IDropTarget 的七个槽位填得对不对、格式认不认、载荷编码是不是本栈的
- * 线形状、效果标志位是不是真的被 DragOver/Drop 读回去。做法是造一个合成的
+ * 的语义**——拖入侧：IDropTarget 的七个槽位填得对不对、格式认不认、载荷编码是不是
+ * 本栈的线形状、效果标志位是不是真的被 DragOver/Drop 读回去。做法是造一个合成的
  * IDataObject（只实现取数据那几条）直喂已注册的 IDropTarget，等价于 OLE 在拖拽
  * 过程中打进来的那串回调，只是不需要第二个进程与真人鼠标。
- * 真·跨进程（从资源管理器拖文件进来、拖出去给记事本）只能真机验，见
- * _人工测试清单.md 的对应编号。
+ * 拖出侧（⑦⑧⑨）反过来验我们**交出去**的那只 IDataObject：格式问得出、GetData/
+ * GetDataHere 给得出、CF_HDROP 的表能被 DragQueryFileW 逐条解析回原路径（相对路径
+ * 已解析成绝对）、枚举器给得出这一条格式；再把同一只对象喂回本窗的 IDropTarget，
+ * 抽出的载荷须与原始编码逐字符一致。`SHDoDragDrop` 本体要真人按下鼠标键才走得动
+ * （OLE 的默认 IDropSource 轮询的是真实按键状态），所以那一趟与真·跨进程拖入一样
+ * 只能真机验，见 _人工测试清单.md 的对应编号。
  *
  * 编法：本目录 `build.bat`（call vcvars64 + cl 全参数）。整份 stub.c 编进来会
  * 带上剪贴板空壳引用的 `moonbit_make_bytes`，下面 malloc 兜底；托盘/拖放的
- * Shell_NotifyIconW 与 DragQueryFileW 在 shell32.lib。
+ * Shell_NotifyIconW、DragQueryFileW 与 SHDoDragDrop 在 shell32.lib。
  *
  * 期望输出末行 DRAGDND-OK。
  */
@@ -269,6 +273,39 @@ static void probe_drain(void) {
   }
 }
 
+/* ---- 拖出侧（W23b）用的三只小件 ---- */
+
+// 线形状组装：[kind:i32 LE][正文]，返回总长
+static int probe_wire(unsigned char *buf, int kind, const char *body) {
+  buf[0] = (unsigned char)(kind & 255);
+  buf[1] = 0;
+  buf[2] = 0;
+  buf[3] = 0;
+  int n = (int)strlen(body);
+  memcpy(buf + 4, body, (size_t)n);
+  return n + 4;
+}
+
+static FORMATETC probe_fe(CLIPFORMAT cf) {
+  FORMATETC fe;
+  fe.cfFormat = cf;
+  fe.ptd = NULL;
+  fe.dwAspect = DVASPECT_CONTENT;
+  fe.lindex = -1;
+  fe.tymed = TYMED_HGLOBAL;
+  return fe;
+}
+
+// 断言「本窗拖入侧当前读回的载荷正文」与期望串逐字符一致
+// （配合 probe_payload_kind 打印用）
+static void probe_payload_same(const char *want) {
+  char buf[4096];
+  int n = wm_dragdnd_payload(buf, (int)sizeof(buf) - 1);
+  int ok = n >= 4 && n - 4 == (int)strlen(want) &&
+           memcmp(buf + 4, want, (size_t)(n - 4)) == 0;
+  check_true("载荷正文与原始编码逐字符一致", ok);
+}
+
 int main(void) {
   check_true("wm_init 成功（有显示服务）", wm_init() == 1);
 
@@ -362,7 +399,159 @@ int main(void) {
   check("离开事件入队", wm_dragdnd_poll(&s, &k, &x, &y), 1);
   check("离开事件种类 = 2", k, WM_DND_LEAVE);
 
-  /* ⑦ 拆窗即撤钩 */
+  /* ⑦ 拖出：路径表 → CF_HDROP（W23b 的数据对象语义 + 与本窗拖入侧的往返）
+   * SHDoDragDrop 要真人按下鼠标键才走得动，所以这里验的是「我们造出来的那只
+   * 对象对不对」：格式问得出、取得出、DROPFILES 解析回原路径（相对路径已解析成
+   * 绝对）、枚举器给得出这一条格式；再把同一只对象喂进本窗的 IDropTarget，
+   * 抽出来的载荷必须与原始线形状逐字节一致——等价于「拖出去再拖回来一趟」。 */
+  {
+    unsigned char wire[4096];
+    const char *body = "C:\\Temp\\甲文件.txt\nrel\\乙.txt\nD:\\b.txt";
+    int blen = (int)strlen(body);
+    int wl = probe_wire(wire, WM_DND_KIND_PATHS, body);
+    check("线形状总长 = 4 字节头 + 正文", wl, blen + 4);
+    check_true("填路径表成功", wm_dsrc_fill(WM_DND_KIND_PATHS, wire + 4, blen) == 1);
+    wm_dsrc.iface.lpVtbl = &wm_dragsource_vtbl;
+    IDataObject *dob = &wm_dsrc.iface;
+    check_true("格式是 CF_HDROP", wm_dsrc.cf == (CLIPFORMAT)CF_HDROP);
+    FORMATETC fe_h = probe_fe((CLIPFORMAT)CF_HDROP);
+    FORMATETC fe_t = probe_fe((CLIPFORMAT)CF_UNICODETEXT);
+    check_true("QueryGetData 认 CF_HDROP", SUCCEEDED(dob->lpVtbl->QueryGetData(dob, &fe_h)));
+    check_true("QueryGetData 不认文本档", FAILED(dob->lpVtbl->QueryGetData(dob, &fe_t)));
+    STGMEDIUM stg;
+    memset(&stg, 0, sizeof(stg));
+    check_true("GetData 成功", SUCCEEDED(dob->lpVtbl->GetData(dob, &fe_h, &stg)));
+    check("取回的是 HGLOBAL", (int)stg.tymed, (int)TYMED_HGLOBAL);
+    HDROP hh = (HDROP)GlobalLock(stg.hGlobal);
+    check("DROPFILES 里 3 条路径", (long long)DragQueryFileW(hh, 0xFFFFFFFF, NULL, 0), 3);
+    WCHAR got[WM_DS_ONE_MAX];
+    // 期望值独立算：把原串自己转宽字符再 GetFullPathNameW，逐条比
+    const char *segs[3] = {"C:\\Temp\\甲文件.txt", "rel\\乙.txt", "D:\\b.txt"};
+    char expect[4096];
+    WCHAR want0[WM_DS_ONE_MAX];
+    int elen = 0;
+    expect[0] = '\0';
+    want0[0] = L'\0';
+    for (int i = 0; i < 3; i++) {
+      // 期望值自己算一遍，但**输入与输出用两块缓冲**：GetFullPathNameW 就地写回
+      // 同一块会把没读完的输入覆盖掉（这条坑在 stub 侧踩过，见 wm_dsrc_make_hdrop）
+      WCHAR srcw[WM_DS_ONE_MAX], want[WM_DS_ONE_MAX];
+      int cw = MultiByteToWideChar(CP_UTF8, 0, segs[i], -1, srcw, WM_DS_ONE_MAX);
+      DWORD fw = GetFullPathNameW(srcw, WM_DS_ONE_MAX, want, NULL);
+      char lbl[64];
+      sprintf_s(lbl, sizeof(lbl), "第 %d 条路径解析回原值", i + 1);
+      check_true(lbl, cw > 0 && fw > 0 && fw < WM_DS_ONE_MAX &&
+                          DragQueryFileW(hh, (UINT)i, got, WM_DS_ONE_MAX) ==
+                              (UINT)lstrlenW(want) &&
+                          lstrcmpW(got, want) == 0);
+      if (i > 0) {
+        expect[elen++] = '\n'; // 与拖出侧同一套分隔口径
+      } else {
+        lstrcpyW(want0, want); // 留给「就地取 vs 新建」那条比对用
+      }
+      int cn = WideCharToMultiByte(CP_UTF8, 0, want, -1, expect + elen,
+                                   (int)sizeof(expect) - elen, NULL, NULL);
+      if (cn > 0) {
+        elen += cn - 1; // 去掉转换补的结尾 NUL，最后统一收尾
+        expect[elen] = '\0';
+      }
+      if (i == 1) {
+        // 相对路径那条必须已被解析成绝对（对方程序照这个位置去拿文件）
+        check_true("相对路径已解析成绝对",
+                   DragQueryFileW(hh, 1, got, WM_DS_ONE_MAX) >= 3 && got[1] == L':' &&
+                       got[2] == L'\\');
+      }
+    }
+    GlobalUnlock(stg.hGlobal);
+    GlobalFree(stg.hGlobal);
+    // 就地取（拖入侧 wm_dnd_fetch 走的就是这条）
+    HGLOBAL inplace = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, 1);
+    STGMEDIUM stg2;
+    memset(&stg2, 0, sizeof(stg2));
+    stg2.tymed = TYMED_HGLOBAL;
+    stg2.hGlobal = inplace;
+    check_true("GetDataHere 成功", SUCCEEDED(dob->lpVtbl->GetDataHere(dob, &fe_h, &stg2)));
+    check("GetDataHere 后仍是 HGLOBAL", (int)stg2.tymed, (int)TYMED_HGLOBAL);
+    HDROP hi = (HDROP)GlobalLock(stg2.hGlobal);
+    WCHAR a0[WM_DS_ONE_MAX];
+    check("就地取的表也 3 条", (long long)DragQueryFileW(hi, 0xFFFFFFFF, NULL, 0), 3);
+    check_true("就地取的表首条与新建的一致",
+               DragQueryFileW(hi, 0, a0, WM_DS_ONE_MAX) == (UINT)lstrlenW(want0) &&
+                   lstrcmpW(a0, want0) == 0);
+    GlobalUnlock(stg2.hGlobal);
+    GlobalFree(stg2.hGlobal);
+    // 格式枚举器
+    IEnumFORMATETC *en = NULL;
+    check_true("EnumFormatEtc 成功", SUCCEEDED(dob->lpVtbl->EnumFormatEtc(dob, DATADIR_GET, &en)) && en != NULL);
+    FORMATETC listed;
+    ULONG fetched = 0;
+    check_true("枚举第一条给 S_OK", SUCCEEDED(en->lpVtbl->Next(en, 1, &listed, &fetched)));
+    check("枚举到的格式 = CF_HDROP", (long long)listed.cfFormat, (long long)CF_HDROP);
+    check("枚举第二条给 S_FALSE", (long long)en->lpVtbl->Next(en, 1, &listed, &fetched), (long long)S_FALSE);
+    check_true("Reset 成功", SUCCEEDED(en->lpVtbl->Reset(en)));
+    check_true("Skip(1) 成功", SUCCEEDED(en->lpVtbl->Skip(en, 1)));
+    check("Skip 之后再无元素", (long long)en->lpVtbl->Next(en, 1, &listed, &fetched), (long long)S_FALSE);
+    IEnumFORMATETC *clon = NULL;
+    check("Clone 明确不支持", (long long)en->lpVtbl->Clone(en, &clon), (long long)E_NOTIMPL);
+    check_true("SetData 明确不支持（只读对象）", FAILED(dob->lpVtbl->SetData(dob, &fe_h, &stg, 0)));
+    en->lpVtbl->Release(en);
+    // 端到端：这只对象喂进本窗的拖入侧，抽出的载荷与原始一致
+    dt->lpVtbl->DragEnter(dt, dob, 0, pt, &eff);
+    check("拖出对象喂回本窗仍认得（承诺 COPY）", eff, 1);
+    check("往返后种类仍是 Paths(4)", probe_payload_kind(), 4);
+    probe_payload_same(expect);
+    probe_drain();
+    wm_dsrc_release_buffers();
+  }
+
+  /* ⑧ 拖出：纯文本 → CF_UNICODETEXT（UTF-8 → UTF-16 往返 + 中文） */
+  {
+    const char *body = "拖出去的中文\t与第二行";
+    int blen = (int)strlen(body);
+    check_true("填文本成功", wm_dsrc_fill(WM_DND_KIND_TEXT, (const unsigned char *)body, blen) == 1);
+    wm_dsrc.iface.lpVtbl = &wm_dragsource_vtbl;
+    IDataObject *dob = &wm_dsrc.iface;
+    check_true("格式是 CF_UNICODETEXT", wm_dsrc.cf == (CLIPFORMAT)CF_UNICODETEXT);
+    FORMATETC fe_t = probe_fe((CLIPFORMAT)CF_UNICODETEXT);
+    STGMEDIUM stg;
+    memset(&stg, 0, sizeof(stg));
+    check_true("文本档 GetData 成功", SUCCEEDED(dob->lpVtbl->GetData(dob, &fe_t, &stg)));
+    WCHAR *w = (WCHAR *)GlobalLock(stg.hGlobal);
+    WCHAR want[1024];
+    int ww = MultiByteToWideChar(CP_UTF8, 0, body, blen, want, 1024);
+    want[ww] = L'\0';
+    check_true("宽字符正文逐字符一致且以单个 NUL 收尾",
+               w != NULL && lstrcmpW(w, want) == 0 &&
+                   GlobalSize(stg.hGlobal) == (SIZE_T)(ww + 1) * sizeof(WCHAR));
+    GlobalUnlock(stg.hGlobal);
+    GlobalFree(stg.hGlobal);
+    dt->lpVtbl->DragEnter(dt, dob, 0, pt, &eff);
+    check("文本档往返种类 = Text(1)", probe_payload_kind(), 1);
+    probe_payload_same(body);
+    probe_drain();
+    wm_dsrc_release_buffers();
+  }
+
+  /* ⑨ 拖出的负面：没有系统级形态的种类、空正文、越界/空指针一律不真起拖 */
+  {
+    unsigned char wire[64];
+    check("Html(3) 没有系统级形态", wm_dsrc_fill(3, (const unsigned char *)"x", 1), 0);
+    check("Img(2) 没有系统级形态", wm_dsrc_fill(2, (const unsigned char *)"x", 1), 0);
+    check("空正文不算成功", wm_dsrc_fill(WM_DND_KIND_TEXT, (const unsigned char *)"", 0), 0);
+    check("填失败后不留格式", wm_dsrc.cf, 0);
+    int32_t seff = 999;
+    int wl = probe_wire(wire, WM_DND_KIND_TEXT, "abc");
+    check("越界窗口不拖", wm_dragdnd_send(9999, (const char *)wire, wl, 7, &seff), 0);
+    check("载荷指针为空不拖", wm_dragdnd_send(win, NULL, wl, 7, &seff), 0);
+    check("长度不足 4 不拖", wm_dragdnd_send(win, (const char *)wire, 3, 7, &seff), 0);
+    check("out_effect 为空不拖", wm_dragdnd_send(win, (const char *)wire, wl, 7, NULL), 0);
+    unsigned char bad[8];
+    int bl = probe_wire(bad, 3, "abc"); // 种类没有系统级形态：fill 先失败，不会卡住鼠标
+    check("不支持的种类不拖", wm_dragdnd_send(win, (const char *)bad, bl, 7, &seff), 0);
+    check("失败路径不写效果", seff, 0);
+  }
+
+  /* ⑩ 拆窗即撤钩 */
   wm_dragdnd_disable(win);
   check("撤钩后计数 0", wm_dragdnd_count(), 0);
   check("撤钩后效果读回 -1（未挂）", wm_dragdnd_effect(win), -1);

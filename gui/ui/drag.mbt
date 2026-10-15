@@ -7,6 +7,8 @@
 // 绘制方读 `@core.drag_hover()` 自判（见 `drop_target`）。系统级**拖入**（Windows）
 // 复用的也是这一套：宿主每拍把外部事件喂进同一个会话，本文件的组件不用改；`accept`
 // 除了松手时判收不收，还用于悬停期回答系统光标（见 `@core.Widget::set_drag_accept`）。
+// 系统级**拖出**（Windows）走 `drag_source(external=true)`：过阈值那一步先问后端能不能
+// 把这趟交给系统，能就交给系统、不能就回落到上面这条应用内会话。
 //
 // 一个使用约束（不是 bug）：拖源内容里的**交互控件会先吃掉按下**（指针事件最深的
 // 先跑），那样就拖不动它——拖源里放展示件（文本/图标/缩略图），别放按钮。
@@ -15,10 +17,20 @@
 /// 拖源：包住 `content`，在其上按下并拖出 `threshold` 像素后调 `payload()` 取数据
 /// 开拖；`payload()` 返回 None（或不给）表示这一拖不成立（当作普通点击）。
 /// 拖拽期间只做「更新落点」，松手时投给落点（见 `@core.drag_drop`）。
+///
+/// `external=true` 时过阈值那一刻先试**系统级拖出**（拖给别的程序，Windows 已接）：
+/// 这趟走成了（成交或用户取消）就以 `on_external` 回报、不再开应用内会话；走不成
+/// （本机后端没这条能力、种类没有系统级形态、这趟起不来）就**自动回落到应用内
+/// 会话**，于是同一份代码三平台都能跑。这一支会**阻塞**到松手或取消，且必须在鼠标
+/// 键仍按下时发起（本组件正是在那一刻调），详见 `@core.drag_external_send`。
 pub fn drag_source(
   content : @core.Node,
   payload? : () -> @core.DragData? = fn() -> @core.DragData? { None },
   threshold? : Double = 4.0,
+  external? : Bool = false,
+  on_external? : (
+    Result[@core.DragEffect, @core.DragError],
+  ) -> Unit = fn(_ : Result[@core.DragEffect, @core.DragError]) -> Unit { () },
   handle? : (@core.Widget) -> Unit = default_handle,
 ) -> @core.Node {
   @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
@@ -59,7 +71,29 @@ pub fn drag_source(
               // 过阈值才算拖：没过阈值时按普通点击放行（内容里的选择/点击不受影响）
               match payload() {
                 Some(data) =>
-                  if @core.drag_begin(data, self.id, wx, wy) {
+                  if external {
+                    // 先试系统级拖出（这一支阻塞到松手/取消才回来）；没走成——后端
+                    // 没这条能力、这份数据没有系统级形态、或这趟根本起不来——就回落
+                    // 到应用内会话，于是三平台同一份代码照样能拖（`Ok` 那支绝不回落：
+                    // 用户已经松手/取消，此时再开应用内会话会凭空拖出一段）
+                    armed.val = false
+                    dragging.val = false
+                    match @core.drag_external_send(data) {
+                      Ok(e) => {
+                        on_external(Ok(e))
+                        true
+                      }
+                      Err(err) => {
+                        on_external(Err(err))
+                        if @core.drag_begin(data, self.id, wx, wy) {
+                          dragging.val = true
+                          true
+                        } else {
+                          false
+                        }
+                      }
+                    }
+                  } else if @core.drag_begin(data, self.id, wx, wy) {
                     dragging.val = true
                     armed.val = false
                     true

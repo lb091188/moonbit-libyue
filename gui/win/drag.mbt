@@ -1,6 +1,7 @@
-// 系统级拖入（W23a）的平台门面：把 stub.c 的 `wm_dragdnd_*` 包成 MoonBit 侧
-// 可用的形态。OLE 的 `IDropTarget` 回调打在**本线程的消息派发**里，与托盘/菜单/
-// 热键同制——C 侧压进程级队列，宿主每拍调 `dragdnd_poll` 抽，不做 C→MoonBit 回调。
+// 系统级拖放（W23a 拖入 / W23b 拖出）的平台门面：把 stub.c 的 `wm_dragdnd_*` 包成
+// MoonBit 侧可用的形态。OLE 的 `IDropTarget` 回调打在**本线程的消息派发**里，与
+// 托盘/菜单/热键同制——C 侧压进程级队列，宿主每拍调 `dragdnd_poll` 抽，不做
+// C→MoonBit 回调。
 //
 // 效果标志是两段式的：`DragEnter` 由 C 按「认不认得这份格式」先给个承诺值
 // （认识给 COPY、不认识给 NONE），之后每次 `DragOver`/`Drop` 读 MoonBit 上一拍
@@ -114,4 +115,26 @@ pub fn dragdnd_effect(id : Int64) -> Int {
 /// 在用的投放目标数（探针读回）。
 pub fn dragdnd_count() -> Int {
   wm_dragdnd_count()
+}
+
+///|
+/// 起一趟系统级**拖出**（W23b）：`payload` 是 `core` 侧 `drag_encode` 出来的线
+/// 形状，`allowed` 是 `DRAGDND_COPY`/`MOVE`/`LINK` 的按位或。返回 `Some(效果)` =
+/// OLE 走完了这趟（效果 0 表示取消或没落成交点）、`None` = 没走成（后端不可用、
+/// 载荷种类没有系统级形态、窗口越界）。
+///
+/// 这一支**阻塞**到松手或取消才返回（`SHDoDragDrop` 自己跑一趟消息循环）；期间
+/// 本窗的拖入回调照常打进 C 队列，返回后的下一拍由宿主抽取。要在鼠标键仍按下
+/// 时调用（过阈值那一刻），按钮抬起后再调系统不认。
+pub fn dragdnd_send(
+  id : Int64,
+  payload : Bytes,
+  allowed : Int,
+) -> Int? {
+  let out = Ref(0)
+  if wm_dragdnd_send(id, payload, payload.length(), allowed, out) != 0 {
+    Some(out.val)
+  } else {
+    None
+  }
 }

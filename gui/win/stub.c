@@ -65,6 +65,10 @@ extern void *moonbit_make_bytes(int size, int value);
 // 任务栏进度（§6.3）：ITaskbarList3 与 TBPF_* 在 shobjidl.h；GUID 常量
 // （CLSID_TaskbarList / IID_ITaskbarList3）经 uuid.lib 链接期取符号
 #include <shobjidl.h>
+// 拖出（W23b）：CF_HDROP 的内存布局 DROPFILES 与 SHDoDragDrop 走 shlobj.h——
+// 只引 shobjidl.h 时这两个在本工具链里取不到（实测 DROPFILES 报未声明），
+// shellapi.h 也不含（同探针头注释）。
+#include <shlobj.h>
 
 #define WM_MAX_WINDOWS 32
 
@@ -2050,6 +2054,460 @@ int wm_dragdnd_count(void) {
     }
   }
   return n;
+}
+
+/* ---- 外部拖出（W23b：把本应用的载荷交给系统）------------------------------
+ * 与拖入对称：造一个**只读**的数据对象（CF_UNICODETEXT / CF_HDROP），交给
+ * `SHDoDragDrop`（shell32）——它内部就是 DoDragDrop + 默认 IDropSource + 拖放
+ * 说明气泡（"复制到 桌面"那种），所以本栈不需要自己实现 IDropSource。
+ * 这条调用是**阻塞**的：OLE 自己跑一趟消息循环，直到松手或取消才返回，期间
+ * MoonBit 停在调用点上。本窗的 IDropTarget 回调照常打进 C（事件排队），返回后
+ * 的下一拍由宿主抽取——所以「拖出后又拖回自己窗口」仍然是通的，只是拖拽途中
+ * 没有应用内的实时高亮（效果用的是最后一次写回的承诺值）。
+ * 进来的载荷按线形状 `[kind:i32 LE][payload]`（与拖入同一条编码）。Paths 里的
+ * 相对路径用 `GetFullPathNameW` 就地解析成绝对路径——CF_HDROP 要求绝对路径，
+ * 对方程序才会真去那个位置拿文件。
+ * 只做 Win32：GTK/Cocoa 分支给失败桩。 */
+
+#define WM_DS_LIST_MAX 16384 // DROPFILES 之后的宽字符路径表上限（含结尾双空）
+#define WM_DS_ONE_MAX 8192   // 单条路径的宽字符缓冲
+
+typedef struct {
+  IDataObject iface; // 首成员即 COM 对象
+  HGLOBAL hdrop;
+  HGLOBAL text;
+  CLIPFORMAT cf; // 本次只提供这一种格式
+} WmDragSource;
+
+typedef struct {
+  IEnumFORMATETC iface;
+  ULONG at; // 0 = 还没给出去，1 = 已给（格式只有一条）
+} WmDragEnum;
+
+static WmDragSource wm_dsrc;
+static WmDragEnum wm_dsrc_enum;
+static WCHAR wm_dsrc_list[WM_DS_LIST_MAX];
+static WCHAR wm_dsrc_one[WM_DS_ONE_MAX];
+static WCHAR wm_dsrc_abs[WM_DS_ONE_MAX];
+
+/* 放手柄副本：拖完就回收（对方拿到的那份是 GetData 里另 Alloc 的，归它自己）。 */
+static void wm_dsrc_release_buffers(void) {
+  if (wm_dsrc.hdrop != NULL) {
+    GlobalFree(wm_dsrc.hdrop);
+    wm_dsrc.hdrop = NULL;
+  }
+  if (wm_dsrc.text != NULL) {
+    GlobalFree(wm_dsrc.text);
+    wm_dsrc.text = NULL;
+  }
+  wm_dsrc.cf = 0;
+}
+
+/* 本会话唯一的那条格式描述。 */
+static FORMATETC wm_dsrc_format(void) {
+  FORMATETC fe;
+  fe.cfFormat = wm_dsrc.cf;
+  fe.ptd = NULL;
+  fe.dwAspect = DVASPECT_CONTENT;
+  fe.lindex = -1;
+  fe.tymed = TYMED_HGLOBAL;
+  return fe;
+}
+
+static HGLOBAL wm_dsrc_pick(CLIPFORMAT cf) {
+  if (cf != (CLIPFORMAT)wm_dsrc.cf) {
+    return NULL;
+  }
+  return cf == (CLIPFORMAT)CF_HDROP ? wm_dsrc.hdrop : wm_dsrc.text;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_ds_QueryInterface(IDataObject *This,
+                                                     REFIID riid, void **ppv) {
+  (void)This;
+  if (ppv == NULL) {
+    return E_POINTER;
+  }
+  if (riid != NULL && (IsEqualIID(riid, &IID_IUnknown) ||
+                       IsEqualIID(riid, &IID_IDataObject))) {
+    *ppv = (void *)This;
+    return S_OK;
+  }
+  *ppv = NULL;
+  return E_NOINTERFACE;
+}
+
+/* 生命周期由调用点管（进程级静态对象，SHDoDragDrop 返回即回收缓冲），
+ * 引用计数只是个 1。 */
+static ULONG STDMETHODCALLTYPE wm_ds_AddRef(IDataObject *This) {
+  (void)This;
+  return 1;
+}
+
+static ULONG STDMETHODCALLTYPE wm_ds_Release(IDataObject *This) {
+  (void)This;
+  return 0;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_ds_GetData(IDataObject *This, FORMATETC *fet,
+                                              STGMEDIUM *out) {
+  (void)This;
+  if (fet == NULL || out == NULL) {
+    return E_POINTER;
+  }
+  memset(out, 0, sizeof(*out));
+  HGLOBAL src = wm_dsrc_pick(fet->cfFormat);
+  if (src == NULL || (fet->tymed & TYMED_HGLOBAL) == 0) {
+    return DV_E_FORMATETC;
+  }
+  SIZE_T n = GlobalSize(src);
+  HGLOBAL g = GlobalAlloc(GMEM_MOVEABLE, n);
+  if (g == NULL) {
+    return E_OUTOFMEMORY;
+  }
+  void *dst = GlobalLock(g);
+  void *from = GlobalLock(src);
+  if (dst == NULL || from == NULL) {
+    GlobalUnlock(g);
+    GlobalUnlock(src);
+    GlobalFree(g);
+    return E_OUTOFMEMORY;
+  }
+  memcpy(dst, from, n);
+  GlobalUnlock(g);
+  GlobalUnlock(src);
+  out->tymed = TYMED_HGLOBAL;
+  out->hGlobal = g;
+  out->pUnkForRelease = NULL;
+  return S_OK;
+}
+
+/* 就地填调用方给的 HGLOBAL（拖入侧 wm_dnd_fetch 用的就是这条）。 */
+static HRESULT STDMETHODCALLTYPE wm_ds_GetDataHere(IDataObject *This,
+                                                   FORMATETC *fet,
+                                                   STGMEDIUM *io) {
+  (void)This;
+  if (fet == NULL || io == NULL || io->hGlobal == NULL) {
+    return E_POINTER;
+  }
+  HGLOBAL src = wm_dsrc_pick(fet->cfFormat);
+  if (src == NULL || (fet->tymed & TYMED_HGLOBAL) == 0) {
+    return DV_E_FORMATETC;
+  }
+  SIZE_T n = GlobalSize(src);
+  HGLOBAL g = GlobalReAlloc(io->hGlobal, n, GMEM_MOVEABLE);
+  if (g == NULL) {
+    return E_OUTOFMEMORY;
+  }
+  void *dst = GlobalLock(g);
+  void *from = GlobalLock(src);
+  if (dst == NULL || from == NULL) {
+    GlobalUnlock(g);
+    GlobalUnlock(src);
+    io->hGlobal = g;
+    return E_OUTOFMEMORY;
+  }
+  memcpy(dst, from, n);
+  GlobalUnlock(g);
+  GlobalUnlock(src);
+  io->hGlobal = g;
+  io->tymed = TYMED_HGLOBAL;
+  return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_ds_QueryGetData(IDataObject *This,
+                                                   FORMATETC *fet) {
+  (void)This;
+  if (fet == NULL) {
+    return E_INVALIDARG;
+  }
+  return wm_dsrc_pick(fet->cfFormat) != NULL ? S_OK : DV_E_FORMATETC;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_ds_Canonical(IDataObject *This, FORMATETC *in,
+                                                 FORMATETC *out) {
+  (void)This;
+  (void)in;
+  if (out != NULL) {
+    *out = wm_dsrc_format();
+  }
+  return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_ds_SetData(IDataObject *This, FORMATETC *fet,
+                                               STGMEDIUM *stg, int fRelease) {
+  (void)This;
+  (void)fet;
+  (void)stg;
+  (void)fRelease;
+  return E_NOTIMPL; // 只读数据对象
+}
+
+/* ---- 格式枚举器（只有一条格式，够用）---- */
+static HRESULT STDMETHODCALLTYPE wm_en_QueryInterface(IEnumFORMATETC *This,
+                                                     REFIID riid, void **ppv) {
+  (void)This;
+  if (ppv == NULL) {
+    return E_POINTER;
+  }
+  if (riid != NULL && (IsEqualIID(riid, &IID_IUnknown) ||
+                       IsEqualIID(riid, &IID_IEnumFORMATETC))) {
+    *ppv = (void *)This;
+    return S_OK;
+  }
+  *ppv = NULL;
+  return E_NOINTERFACE;
+}
+
+static ULONG STDMETHODCALLTYPE wm_en_AddRef(IEnumFORMATETC *This) {
+  (void)This;
+  return 1;
+}
+
+static ULONG STDMETHODCALLTYPE wm_en_Release(IEnumFORMATETC *This) {
+  (void)This;
+  return 0;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_en_Next(IEnumFORMATETC *This, ULONG celt,
+                                           FORMATETC *rgelt,
+                                           ULONG *pceltFetched) {
+  (void)This;
+  if (rgelt == NULL || celt == 0) {
+    return E_INVALIDARG;
+  }
+  ULONG got = 0;
+  if (wm_dsrc_enum.at < 1) {
+    rgelt[0] = wm_dsrc_format();
+    wm_dsrc_enum.at = 1;
+    got = 1;
+  }
+  if (pceltFetched != NULL) {
+    *pceltFetched = got;
+  }
+  return got == celt ? S_OK : S_FALSE;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_en_Skip(IEnumFORMATETC *This, ULONG celt) {
+  (void)This;
+  if (celt > 0) {
+    wm_dsrc_enum.at = 1;
+  }
+  return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_en_Reset(IEnumFORMATETC *This) {
+  (void)This;
+  wm_dsrc_enum.at = 0;
+  return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_en_Clone(IEnumFORMATETC *This,
+                                            IEnumFORMATETC **out) {
+  (void)This;
+  if (out != NULL) {
+    *out = NULL;
+  }
+  return E_NOTIMPL; // 单格式枚举器不做分叉
+}
+
+static IEnumFORMATETCVtbl wm_dsrc_enum_vtbl = {
+    wm_en_QueryInterface, wm_en_AddRef,        wm_en_Release,
+    wm_en_Next,           wm_en_Skip,          wm_en_Reset,
+    wm_en_Clone,
+};
+
+static HRESULT STDMETHODCALLTYPE wm_ds_EnumFormatEtc(IDataObject *This, DWORD dir,
+                                                    IEnumFORMATETC **out) {
+  (void)This;
+  (void)dir;
+  if (out == NULL) {
+    return E_POINTER;
+  }
+  wm_dsrc_enum.iface.lpVtbl = &wm_dsrc_enum_vtbl;
+  wm_dsrc_enum.at = 0;
+  *out = &wm_dsrc_enum.iface;
+  return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_ds_DAdvise(IDataObject *This, FORMATETC *fet,
+                                               DWORD advf, IAdviseSink *sink,
+                                               DWORD *conn) {
+  (void)This;
+  (void)fet;
+  (void)advf;
+  (void)sink;
+  if (conn != NULL) {
+    *conn = 0;
+  }
+  return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_ds_DUnadvise(IDataObject *This, DWORD conn) {
+  (void)This;
+  (void)conn;
+  return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE wm_ds_EnumDAdvise(IDataObject *This,
+                                                   IEnumSTATDATA **out) {
+  (void)This;
+  if (out != NULL) {
+    *out = NULL;
+  }
+  return E_NOTIMPL;
+}
+
+static IDataObjectVtbl wm_dragsource_vtbl = {
+    wm_ds_QueryInterface,  wm_ds_AddRef,       wm_ds_Release,
+    wm_ds_GetData,         wm_ds_GetDataHere,  wm_ds_QueryGetData,
+    wm_ds_Canonical,       wm_ds_SetData,      wm_ds_EnumFormatEtc,
+    wm_ds_DAdvise,         wm_ds_DUnadvise,    wm_ds_EnumDAdvise,
+};
+
+/* CF_UNICODETEXT：正文是一段不带结尾 '\0' 的 UTF-8，转宽字符后再补一个 L'\0'
+ * （OLE 的文本格式按 NUL 结尾算）。 */
+static HGLOBAL wm_dsrc_make_text(const unsigned char *body, int n) {
+  int wlen = MultiByteToWideChar(CP_UTF8, 0, (const char *)body, n, NULL, 0);
+  if (wlen <= 0) {
+    return NULL;
+  }
+  HGLOBAL g = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT,
+                          (SIZE_T)(wlen + 1) * sizeof(WCHAR));
+  if (g == NULL) {
+    return NULL;
+  }
+  WCHAR *w = (WCHAR *)GlobalLock(g);
+  if (w == NULL) {
+    GlobalFree(g);
+    return NULL;
+  }
+  int got = MultiByteToWideChar(CP_UTF8, 0, (const char *)body, n, w, wlen);
+  GlobalUnlock(g);
+  if (got <= 0) {
+    GlobalFree(g);
+    return NULL;
+  }
+  w[got] = L'\0';
+  return g;
+}
+
+/* CF_HDROP：'\n' 分隔的 UTF-8 路径表 → DROPFILES{pFiles,fWide=TRUE} + 每条
+ * 一个 L'\0'、整表再补一个 L'\0'。相对路径先 GetFullPathNameW 解析（解析不动
+ * 就原样给，对方程序自己判）。 */
+static HGLOBAL wm_dsrc_make_hdrop(const unsigned char *body, int n) {
+  int used = 0; // 已写进 wm_dsrc_list 的 WCHAR 数（不含最后的第二空）
+  int i = 0;
+  while (i < n) {
+    int start = i;
+    while (i < n && body[i] != '\n') {
+      i++;
+    }
+    int seg = i - start;
+    i++; // 跳过分隔符
+    if (seg <= 0) {
+      continue;
+    }
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, (const char *)body + start, seg,
+                                   NULL, 0);
+    if (wlen <= 0 || wlen >= WM_DS_ONE_MAX) {
+      return NULL;
+    }
+    if (MultiByteToWideChar(CP_UTF8, 0, (const char *)body + start, seg,
+                            wm_dsrc_one, WM_DS_ONE_MAX - 1) != wlen) {
+      return NULL;
+    }
+    wm_dsrc_one[wlen] = L'\0';
+    // 绝对化：**输出必须用另一块缓冲**——GetFullPathNameW 就地写回同一块会把
+    // 还没读完的输入覆盖掉（实测把「rel\乙.txt」写成「<cwd>\<截断的 cwd>」这种
+    // 拼接串，对方程序拿到的是垃圾位置）。解析不动就原样给，不吞掉这条路径。
+    DWORD full = GetFullPathNameW(wm_dsrc_one, WM_DS_ONE_MAX, wm_dsrc_abs, NULL);
+    const WCHAR *out_path = full > 0 && full < WM_DS_ONE_MAX ? wm_dsrc_abs : wm_dsrc_one;
+    int out = lstrlenW(out_path);
+    if (used + out + 1 > WM_DS_LIST_MAX - 1) {
+      return NULL; // 装不下：整条放弃，不给半截表
+    }
+    memcpy(wm_dsrc_list + used, out_path, (size_t)(out + 1) * sizeof(WCHAR));
+    used += out + 1;
+  }
+  if (used == 0) {
+    return NULL;
+  }
+  size_t bytes = sizeof(DROPFILES) + (size_t)(used + 1) * sizeof(WCHAR);
+  HGLOBAL g = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, bytes);
+  if (g == NULL) {
+    return NULL;
+  }
+  unsigned char *p = (unsigned char *)GlobalLock(g);
+  if (p == NULL) {
+    GlobalFree(g);
+    return NULL;
+  }
+  DROPFILES *hdr = (DROPFILES *)p;
+  hdr->pFiles = (DWORD)sizeof(DROPFILES);
+  hdr->pt.x = 0;
+  hdr->pt.y = 0;
+  hdr->fNC = FALSE;
+  hdr->fWide = TRUE;
+  memcpy(p + sizeof(DROPFILES), wm_dsrc_list, (size_t)used * sizeof(WCHAR));
+  // 最后一格已由 GMEM_ZEROINIT 留空 → 整表以双 L'\0' 收尾
+  GlobalUnlock(g);
+  return g;
+}
+
+/* 按线形状填好数据对象（越界种类给 0）。拆出来是为了探针能在不真起拖的情况
+ * 下验这只对象——SHDoDragDrop 要真人按下鼠标键才走得动。 */
+static int wm_dsrc_fill(int kind, const unsigned char *body, int n) {
+  wm_dsrc_release_buffers();
+  if (body == NULL || n <= 0) {
+    return 0;
+  }
+  if (kind == WM_DND_KIND_TEXT) {
+    wm_dsrc.text = wm_dsrc_make_text(body, n);
+    wm_dsrc.cf = (CLIPFORMAT)CF_UNICODETEXT;
+    return wm_dsrc.text != NULL ? 1 : 0;
+  }
+  if (kind == WM_DND_KIND_PATHS) {
+    wm_dsrc.hdrop = wm_dsrc_make_hdrop(body, n);
+    wm_dsrc.cf = (CLIPFORMAT)CF_HDROP;
+    return wm_dsrc.hdrop != NULL ? 1 : 0;
+  }
+  return 0;
+}
+
+/* 起一趟系统级拖出：payload 是线形状，allowed 是 DROPEFFECT_* 掩码（1/2/4 的
+ * 组合），out_effect 收最终效果（取消给 0）。返回 1 = OLE 走完了这趟（不论
+ * 成交与否）、0 = 没走成（越界/种类没有系统级形态/OLE 没起来/调用失败）。
+ * **阻塞**直到松手或取消。 */
+int wm_dragdnd_send(int64_t id, const char *payload, int len, int allowed,
+                    int32_t *out_effect) {
+  if (out_effect != NULL) {
+    *out_effect = 0;
+  }
+  if (out_effect == NULL || id <= 0 || id >= WM_MAX_WINDOWS || payload == NULL ||
+      len < 4) {
+    return 0;
+  }
+  WmWindow *w = &wm_windows[(int)id];
+  if (w->hwnd == NULL || !wm_dnd_ole_init()) {
+    return 0;
+  }
+  int kind = (int)((unsigned char)payload[0] |
+                   ((unsigned char)payload[1] << 8) |
+                   ((unsigned char)payload[2] << 16) |
+                   ((unsigned char)payload[3] << 24));
+  if (!wm_dsrc_fill(kind, (const unsigned char *)payload + 4, len - 4)) {
+    return 0;
+  }
+  wm_dsrc.iface.lpVtbl = &wm_dragsource_vtbl;
+  DWORD effect = 0;
+  HRESULT hr = SHDoDragDrop(w->hwnd, &wm_dsrc.iface, NULL, (DWORD)allowed,
+                             &effect);
+  wm_dsrc_release_buffers();
+  if (hr != S_OK && hr != DRAGDROP_S_DROP && hr != DRAGDROP_S_CANCEL) {
+    return 0;
+  }
+  *out_effect = (int)effect;
+  return 1;
 }
 
 /* ---- 任务栏进度（§6.3 接缝项：任务栏进度 / dock 徽标）-----------------------
@@ -4293,6 +4751,17 @@ int wm_dragdnd_effect(int64_t id) {
   return -1;
 }
 int wm_dragdnd_count(void) { return 0; }
+int wm_dragdnd_send(int64_t id, const char *payload, int len, int allowed,
+                    int32_t *out_effect) {
+  (void)id;
+  (void)payload;
+  (void)len;
+  (void)allowed;
+  if (out_effect != NULL) {
+    *out_effect = 0;
+  }
+  return 0;
+}
 
 /* ---- 系统托盘（W20c）GTK 分支占位：Linux 的托盘走纯 MoonBit 的 SNI 协议栈
  * （yue/dbus/sni.mbt，会话总线直连面板），不经 GTK 的 GtkStatusIcon（GTK3 里
@@ -5073,6 +5542,17 @@ int wm_dragdnd_effect(int64_t id) {
   return -1;
 }
 int wm_dragdnd_count(void) { return 0; }
+int wm_dragdnd_send(int64_t id, const char *payload, int len, int allowed,
+                    int32_t *out_effect) {
+  (void)id;
+  (void)payload;
+  (void)len;
+  (void)allowed;
+  if (out_effect != NULL) {
+    *out_effect = 0;
+  }
+  return 0;
+}
 
 /* W20c 托盘占位（macOS 等）：supported 恒 0、建项恒 0 = 不可用，MoonBit 层
  * 走语义化降级（macOS 原生档是 NSStatusItem，ObjectC++ 单独 TU，将来随 mac

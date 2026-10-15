@@ -2264,6 +2264,23 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **坑(探针侧)**:OLE 送进 `DragEnter`/`DragOver` 的坐标是**屏幕**坐标,想在客户区 (20,30) 那一点验落点,要用 `ClientToScreen` **反推**屏幕点;拿屏幕原点 (0,0) 加偏移会把窗口自身位置算进去,落点整体偏一个窗口距离(实测差 -48/-84),看着像库错、其实探针用法错。
 - **验证方式**:`experiment/drag_probe/dragdnd_probe.c` 末行 **`DRAGDND-OK`**(40 条:挂/撤/幂等/越界 id/在用计数/效果初值;HDROP→Paths(4) 且两条路径逐字符一致;`set_effect` 被下一次 `DragOver`/`Drop` 读回;投递后载荷复位;HDROP 优先于文本;纯文本→Text(1);认不出的格式给 NONE 且载荷空;`DragLeave` 清载荷并入队 LEAVE;`disable` 后计数 0、效果 -1)。`core/drag_wbtest.mbt` 新增 1 条(喂事件驱动会话、COPY/NONE 按落点 `drag_wants` 答、`data=None` 不动现有会话、DROP 投递并复位、LEAVE 取消不投递、跨窗不抢、内部会话不被劫持);`ui/drag_wbtest.mbt` 新增 2 条(同一拖源连拖两次都成立且载荷每次现取、`accept` 同时挂成悬停查询)。`moon test core ui win` **351/351**、库全包 **937/938**(1 条红是 `si_machine` 读注册表 `SystemManufacturer` 失败,本机环境基线,与本批无关)、`cd gui && moon check --deny-warn` 与 examples 模块零警告、`moon build showcase --target native` 链接通过、本机起窗冒烟后正常终止。跨进程真拖(资源管理器 → 窗口)只能人来,归 `_人工测试清单.md` S26。
 
+## Windows 系统级拖出:只读 IDataObject + `SHDoDragDrop` 免掉一整支 IDropSource,而 `GetFullPathNameW` 不许就地写回(2026-10-15,用户提需求)
+
+- **环境**:Windows 10 19044 开发机,MSVC `/W4`;库构建走 moon 的 native-stub(cl 由工具链自己拼),探针走 `experiment/drag_probe/build.bat`(vcvars64 + 全参数 cl),两条编译命令的**宏与 include 路径不同**——这一点在下面第 2 条坑上要命。
+- **现象/动机**:承上一节,用户那句「拖放应该还有与外部的交互,拖入、拖出」里的「拖出」半句。目标是从本窗拖出去,对方程序(桌面、资源管理器、编辑器)拿到的是标准的复制/移动/链接语义,而不是只能在自己窗口里玩。
+- **根因/设计口径**(为什么长这样):
+  - **不做 `IDropSource`**:造一只只读 `IDataObject`(12 槽)+ 交给 `SHDoDragDrop(hwnd, pdata, NULL, dwEffect, &effect)`——第三参给 NULL 时系统用**默认 IDropSource**(自己轮询真实鼠标键与 Esc),于是省掉 `QueryContinueDrag`/`GiveFeedback` 那一整支 vtbl,还白得资源管理器那圈「复制到 X」拖放说明气泡。`SHDoDragDrop` 声明在 `um/ShlObj_core.h`,实现在 `shell32.lib`(前批已在 prebuild 的 Windows 链接行里)。
+  - **只读对象的取数据两条都要给**:拖入侧的 `wm_dnd_fetch` 走的是 `GetDataHere`(在调用方给定的 HGLOBAL 里就地写),而对方程序也常问 `GetData`;两条都实做,`EnumFormatEtc` 只给当前那一条格式(`DATADIR_GET`),`SetData`/`DAdvise`/`EnumDAdvise` 明确 `E_NOTIMPL`,`QueryGetData` 只认 `cfFormat` 相符的一条。
+  - **阻塞语义**:这一支**阻塞**到松手或取消才返回(OLE 在里面代跑消息循环),期间本窗的拖入回调照常打进 C 队列、返回后的下一拍由宿主抽取 ⇒ 「拖出去又拖回自己窗口」是通的,但**拖拽途中没有应用内实时高亮**(那是应用内会话的待遇,两条会话同一时刻只能跑一条)。而且**必须在鼠标键仍按下时调用**(过阈值那一刻),按钮抬起后再调系统不认——`@ui.drag_source` 正好发在 `Move` 分支里。
+  - **回落口径(重要)**:`@ui.drag_source(external=true)` 先试系统那一趟,`Err`(后端没接 / 种类没有系统级形态 / 这趟起不来)才**回落到应用内会话**,`Ok`(成交或用户取消)**绝不回落**——那时用户已经松手,再开一条会话会凭空拖出一段。于是同一份示例代码三平台都能跑,Linux/mac 的后端桩恒给 `Unsupported` 自然落回应用内。
+  - **效果编号**:`DragEffect`(Rejected/Copy/Move/Link)与 Win32 `DROPEFFECT_*` 逐值同制(0/1/2/4);`drag_effect_of_flag` 只认这四个值,多位的组合(3、7)与越界值一律按「没成交」,不猜成复制。起拖时给系统的 `dwEffect` 是 COPY|MOVE|LINK 全开,具体按 Ctrl/Shift/Alt 由系统定夺。
+  - **种类判据在起拖前**:`Text`→`CF_UNICODETEXT`、`Paths`→`CF_HDROP` 有系统级形态;`Html`(要 CF_HTML 的 `StartFragment`/`EndFragment` 源标记格式)与 `Img`(要位图/`METAFILEPICT`)本批不给,`drag_data_has_system_form` 直接拦下,不会误碰系统。
+- **坑(C 侧,逐条实测)**:
+  1. **`GetFullPathNameW` 不许就地写回同一块缓冲**。CF_HDROP 里要给绝对路径,原先写 `GetFullPathNameW(buf, size, buf, NULL)`,实测把「`rel\乙.txt`」这种相对串写成「`<cwd>\<被截断的串>`」这类拼接垃圾——就地写回会覆盖还没读完的输入,而对方程序拿到的正是这个。改成**输入/输出分两块**(`wm_dsrc_one` 转码、`wm_dsrc_abs` 绝对化),解析失败或超长就原样给(不吞掉整条路径)。
+  2. 更要命的是**探针当初用同一个就地调用算期望值**,于是「`DragQueryFileW` 逐条解析回原路径」这一条判据在坏实现下**照样绿**。修探针:转码与期望分缓冲(`srcw`/`want`),期望串自己拼,且**`\n` 分隔符必须在转换之前写进表里**(先写反过一次)。教训口径:合成探针里「用被测函数算期望」等于没测。
+  3. **`DROPFILES` 与 `SHDoDragDrop` 在库构建下取不到**:`gui/win/stub.c` 原先只引 `<shobjidl.h>`,探针自己额外引了 `<shlobj.h>` 所以一直是绿的;而 moon 的 cl 调用一编译 stub.c 就报 17 条 `C2065: "DROPFILES" 未声明`(`SHDoDragDrop` 反而只当隐式声明,不报硬错,最容易看漏)。补 `#include <shlobj.h>` 后两边同时通过——同一条「SDK 头文件按包含顺序/版本宏裁剪,探针绿不等于库绿」的坑,这次是**两条编译命令不一致**造成的。
+- **验证方式**:`experiment/drag_probe/dragdnd_probe.c` 末行 **`DRAGDND-OK`**(**84 条**,原拖入 40 条 + 拖出 44 条):`wm_dsrc_fill` 之后 `QueryGetData` 正/负;`GetData` 出来的 CF_HDROP 被 `DragQueryFileW` 逐条解析回**独立算出的**期望串、三条都在、相对路径已绝对化(断言 `第 2、3 字符 == L':' L'\\'`);`GetDataHere` 与 `GetData` 首条逐字符一致;枚举器 `Next`/`Reset`/`Skip` 到位、`Clone` 明确 `E_NOTIMPL`、`SetData` 失败;再把同一只对象喂回本窗 `IDropTarget`,抽出的载荷与原始编码逐字符一致(往返闭合)。文本档:宽字符逐字符一致 + `GlobalSize == (wlen+1)*2` + 往返 `Text`(1)。负面:kind 2/3 无系统级形态、空正文、失败后不留缓冲、`wm_dragdnd_send` 的越界 id/NULL 载荷/`len<4`/NULL `out_effect` 全部返回 0 且不写效果。探针源文件 `/W4` 零告警(修掉 C4389 有/无符号比较与两处 C4456 遮蔽),`stub.c` 只剩既有 2 条 C4996。MoonBit 侧:`core/drag_wbtest.mbt` +2(效果编号与 `DragEffect::flag` 往返、未知标志按 Rejected;只 Text/Paths 有系统级形态,无头起拖必然 `Err` 且不留半截会话)、`ui/drag_wbtest.mbt` +2(`external=true` 在后端起不来时回落应用内会话且仍完成投递、`on_external` 确实回报;`Html` 数据判为 `Unsupported` 后回落)。`moon test core ui win` **355/355**、库全包 **941/942**(唯一红是 `si_machine` 读注册表 `HARDWARE\DESCRIPTION\System\BIOS:SystemManufacturer` 失败,本机虚拟化环境的基线红,与本批无关),`cd gui && moon check --deny-warn` 与 examples 模块零警告,`moon build showcase --target native` 链接通过,本机起窗冒烟 4 秒存活后正常终止。真拖到桌面/记事本只能人来,归 `_人工测试清单.md` S27。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。

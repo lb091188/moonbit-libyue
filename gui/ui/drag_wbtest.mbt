@@ -273,3 +273,121 @@ test "拖放：drop_target 的 accept 同时是悬停查询" {
   let (_r2, w2) = mounted(plain, 200.0, 120.0)
   assert_true(w2.drag_wants(@core.DragData::Text("t")))
 }
+
+///|
+/// `external=true` 的那一支先试系统级拖出：无头环境这趟必然起不来（后端没接、或
+/// 当前没有活动窗口），于是**回落开应用内会话**——同一条链照旧投递。这条钉住
+/// 「三平台同一份代码」的回落口径，也钉住 `on_external` 确实被回调过。
+test "拖放：external=true 起不来时回落到应用内会话" {
+  let got : Ref[String] = Ref("-")
+  let said : Ref[String] = Ref("-")
+  let src = drag_source(
+    plain_box(80.0, 30.0),
+    payload=fn() -> @core.DragData? { Some(@core.DragData::Text("外拖")) },
+    external=true,
+    on_external=fn(r : Result[@core.DragEffect, @core.DragError]) -> Unit {
+      said.val = match r {
+        Ok(e) => "成交\{e.flag()}"
+        Err(@core.DragError::Unsupported) => "不支持"
+        Err(@core.DragError::Failed(_)) => "起不来"
+      }
+    },
+  )
+  let tgt = drop_target(plain_box(80.0, 30.0), on_drop=fn(
+    d : @core.DragData,
+    _x : Double,
+    _y : Double,
+  ) -> Unit {
+    got.val = match d {
+      @core.DragData::Text(t) => t
+      _ => "非文本"
+    }
+  })
+  let (root, wrap) = mounted(
+    view([src, tgt], row_gap=40.0, align_items=@yoga.AlignItems::FlexStart),
+    320.0,
+    200.0,
+  )
+  @core.set_drag_root(root)
+  let sw = wrap.children()[0]
+  let tw = wrap.children()[1]
+  let sx = sw.rect.x + 8.0
+  let sy = sw.rect.y + 8.0
+  let (h1, cap) = drag_step(root, @core.Down, sx, sy, -1, -1)
+  // 过阈值：系统那趟起不来 ⇒ 回落成应用内会话（源 id 仍记本控件）
+  let (h2, cap2) = drag_step(root, @core.Move, sx + 12.0, sy, h1, cap)
+  assert_true(@core.drag_active())
+  assert_eq(@core.drag_source(), sw.id)
+  assert_eq(@core.drag_hover(), 0)
+  assert_eq(said.val, if @core.drag_external_send_supported() {
+    "起不来"
+  } else {
+    "不支持"
+  })
+  // 后面完全走应用内那条链：移到目标 → 松手投递
+  let (h3, cap3) = drag_step(
+    root,
+    @core.Move,
+    tw.rect.x + 8.0,
+    tw.rect.y + 8.0,
+    h2,
+    cap2,
+  )
+  assert_eq(@core.drag_hover(), tw.id)
+  let (_h4, _cap4) = drag_step(
+    root,
+    @core.Up,
+    tw.rect.x + 8.0,
+    tw.rect.y + 8.0,
+    h3,
+    cap3,
+  )
+  assert_eq(got.val, "外拖")
+  assert_false(@core.drag_active())
+  @core.clear_drag_root()
+}
+
+///|
+/// `external=true` 但这份数据没有系统级形态（`Html`）：同样回落，且回报的是
+/// `Unsupported`——判据在起拖之前，不会误碰系统。
+test "拖放：external=true 遇无系统级形态的数据回落并回报 Unsupported" {
+  let got : Ref[String] = Ref("-")
+  let said : Ref[String] = Ref("-")
+  let src = drag_source(
+    plain_box(80.0, 30.0),
+    payload=fn() -> @core.DragData? { Some(@core.DragData::Html("<b>卡片</b>")) },
+    external=true,
+    on_external=fn(r : Result[@core.DragEffect, @core.DragError]) -> Unit {
+      said.val = match r {
+        Ok(_) => "成交"
+        Err(@core.DragError::Unsupported) => "不支持"
+        Err(@core.DragError::Failed(_)) => "起不来"
+      }
+    },
+  )
+  let tgt = drop_target(plain_box(80.0, 30.0), on_drop=fn(
+    d : @core.DragData,
+    _x : Double,
+    _y : Double,
+  ) -> Unit {
+    got.val = d.as_text().unwrap_or("非文本")
+  })
+  let (root, wrap) = mounted(
+    view([src, tgt], row_gap=40.0, align_items=@yoga.AlignItems::FlexStart),
+    320.0,
+    200.0,
+  )
+  @core.set_drag_root(root)
+  let sw = wrap.children()[0]
+  let tw = wrap.children()[1]
+  let (h1, cap) = drag_step(root, @core.Down, sw.rect.x + 8.0, sw.rect.y + 8.0, -1, -1)
+  let (h2, cap2) = drag_step(root, @core.Move, sw.rect.x + 20.0, sw.rect.y + 8.0, h1, cap)
+  assert_true(@core.drag_active())
+  assert_eq(said.val, "不支持")
+  let (h3, cap3) = drag_step(root, @core.Move, tw.rect.x + 8.0, tw.rect.y + 8.0, h2, cap2)
+  assert_eq(@core.drag_hover(), tw.id)
+  let _ = drag_step(root, @core.Up, tw.rect.x + 8.0, tw.rect.y + 8.0, h3, cap3)
+  assert_eq(got.val, "<b>卡片</b>")
+  assert_false(@core.drag_active())
+  @core.clear_drag_root()
+}

@@ -278,3 +278,47 @@ test "系统级拖入：喂事件驱动会话，效果按落点的收不收答" 
   drag_cancel()
   clear_drag_root()
 }
+
+///|
+test "拖出：效果编号与 `DragEffect::flag` 同 Win32 `DROPEFFECT_*` 口径" {
+  inspect(DragEffect::Rejected.flag(), content="0")
+  inspect(DragEffect::Copy.flag(), content="1")
+  inspect(DragEffect::Move.flag(), content="2")
+  inspect(DragEffect::Link.flag(), content="4")
+  // 标志 → 效果再回标志：四个已知值恒等
+  for f in [0, 1, 2, 4] {
+    inspect(drag_effect_of_flag(f).flag(), content="\{f}")
+  }
+  // 认不出的组合（多位、越界）一律按「没成交」，不猜成复制
+  inspect(drag_effect_of_flag(3).flag(), content="0")
+  inspect(drag_effect_of_flag(7).flag(), content="0")
+  inspect(drag_effect_of_flag(-1).flag(), content="0")
+}
+
+///|
+test "拖出：只 Text/Paths 有系统级形态；起不来时给 Err 且不动会话" {
+  assert_true(drag_data_has_system_form(DragData::Text("a")))
+  assert_true(drag_data_has_system_form(DragData::Paths([ "a.txt" ])))
+  assert_false(drag_data_has_system_form(DragData::Html("<b>a</b>")))
+  assert_false(drag_data_has_system_form(DragData::Img(b"png")))
+  // 无头跑：本机后端没这条能力给 Unsupported，后端可用但当前没有活动窗口给
+  // Failed——两种都是 Err，绝不假装成交，也不留下半截会话
+  match drag_external_send(DragData::Text("拖我")) {
+    Err(DragError::Unsupported) => ()
+    Err(DragError::Failed(_)) => ()
+    Ok(e) => fail("无头环境不该把拖出报成成交：\{e.flag()}")
+  }
+  assert_false(drag_active())
+  // 没有系统级形态的种类直接 Unsupported，不必等到真的起一趟
+  match drag_external_send(DragData::Html("<b>x</b>")) {
+    Err(DragError::Unsupported) => ()
+    Err(DragError::Failed(m)) => fail("Html 该先被种类判据拦下，不该走到起拖：\{m}")
+    Ok(_) => fail("Html 没有系统级形态却报成交")
+  }
+  assert_false(drag_external_send(DragData::Img(b"png")) is Ok(_))
+  // 探测与发送口径一致：探测说不可用时，发送必然 Unsupported
+  inspect(
+    if drag_external_send_supported() { "可用" } else { "不可用" },
+    content=if @win.dragdnd_supported() { "可用" } else { "不可用" },
+  )
+}
