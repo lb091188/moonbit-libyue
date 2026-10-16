@@ -1,49 +1,49 @@
 # Documentation Index
 
-This directory holds the documentation for **native-gui** — a native, cross-platform desktop GUI library for [MoonBit](https://github.com/moonbitlang). Windows, pixels, the event loop, layout and widgets are all pure MoonBit; the mooncakes package is `NoahLiu/native-gui`.
+**native-gui** is a lightweight cross-platform desktop GUI framework for MoonBit. Windows, pixels, the event loop, layout and widgets are all implemented in pure MoonBit; the mooncakes package is `NoahLiu/native-gui`.
 
-## Packages
+## Package structure
 
-`moon add NoahLiu/native-gui` brings the whole module, but MoonBit compiles and links only the packages you import — an unused package costs nothing in your binary:
+`moon add NoahLiu/native-gui` pulls in the whole module, but MoonBit compiles and links only the packages you import — anything you don't import stays out of your binary:
 
 | Import in `moon.pkg` | Alias | Contents |
 |---|---|---|
 | `NoahLiu/native-gui/core` | `@core` | App host, event loop, focus / keys / pointer, menus, notifications, tray, overlays, drag & drop, `Store` / `Signal` |
-| `.../native-gui/ui` | `@ui` | Self-drawn widgets and the component library: window mount, labels / buttons, forms, display, navigation, date, tables & virtual lists, entries, scroll, overlays, code view, declarative layer |
-| `.../native-gui/render` | `@render` | Rasterizer — a pure-MoonBit software raster (path / fill / blend / gradient) plus a Cairo backend; bitmaps, canvas, images, PNG |
-| `.../native-gui/text` | `@text` | Text layer: font families, fonts, attributed text and range attributes (Pango / DirectWrite) |
-| `.../native-gui/theme` | `@theme` | Theme system: palette derivation + change subscription |
+| `.../native-gui/ui` | `@ui` | Self-drawn widgets and the component library: window mounting, labels / buttons, forms, display, navigation, date, tables and virtual lists, text entries, scrolling, overlays, code view, declarative layer |
+| `.../native-gui/render` | `@render` | Rasterizer: a pure-MoonBit software raster plus a Cairo backend; bitmaps, canvas, images, PNG |
+| `.../native-gui/text` | `@text` | Text layer: font families, fonts, rich text and range attributes (Pango / DirectWrite) |
+| `.../native-gui/theme` | `@theme` | Theme system: palette derivation and change subscription |
 | `.../native-gui/icons` | `@icons` | Vector icon system |
-| `.../native-gui/sys` | `@sys` | OS capabilities: autostart, idle, subprocess, env, files, JSON, dialogs, browser history / bookmarks, recent files, wallpaper, volume, power, printers, monitors, window control, app lookup… |
+| `.../native-gui/sys` | `@sys` | OS capabilities: autostart, idle, subprocesses, environment, files, JSON, dialogs, browser history / bookmarks, recent files, wallpaper, volume, power, printers, monitors, window control, app lookup |
 | `.../native-gui/input` | `@input` | Editing core and key codes |
-| `.../native-gui/win` | `@win` | Platform window backend (Win32 / GTK3 C stubs): hotkeys, icons, IME, message boxes, notifications, trays, surfaces |
-| `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge (tray SNI, notifications, logind / upower, media, network, screensaver…) |
-| `.../native-gui/chart` | `@chart` | Charts, plus the cross-cutting interactive layer |
+| `.../native-gui/win` | `@win` | Platform window backends (Win32 / GTK3 C stubs): hotkeys, icons, IME, message boxes, notifications, tray, surfaces |
+| `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge: tray SNI, notifications, logind / upower, media, network, screensaver |
+| `.../native-gui/chart` | `@chart` | Charts and the cross-cutting interactive layer |
 | `.../native-gui/mdview` | `@mdview` | Markdown rendering view |
 | `.../native-gui/web` | `@web` | Embedded WebView |
-| `.../native-gui/style` | `@style` | Style layer: stylesheets as MoonBit values — `Style` rule blocks and named class constants, hover / active / focus states, transitions |
+| `.../native-gui/style` | `@style` | Style layer: stylesheets written as MoonBit values, with state classes and transitions |
 
-Heavier optional capabilities live in **separate modules**, so a plain `moon add` never drags them in:
+Heavier optional capabilities live in separate modules, and `moon add NoahLiu/native-gui` never pulls them in:
 
 | Module | Contents |
 |---|---|
-| `NoahLiu/gui-media` | Audio/video engine (ffmpeg decode + miniaudio output) and the player component. |
-| `NoahLiu/gui-examples` | Standalone example module (audio / video players) that depends on `gui-media`. |
+| `NoahLiu/gui-media` | Audio/video engine and the player component. |
+| `NoahLiu/gui-examples` | Standalone example module that depends on `gui-media`. |
 
-**Two layers of "optional"** — a sub-package you do not import costs nothing in your binary (the `moon.pkg` import is the compile/link boundary); a module you do not depend on is not even resolved or prebuilt (the `moon.mod` import defines the dependency closure). A capability can only reach the second layer by living in its own module.
+Don't confuse the two kinds of "optional": a sub-package you don't import stays out of your binary — the `moon.pkg` import is the compile/link boundary; a module you don't depend on is not even resolved or prebuilt — the `moon.mod` import decides the dependency closure. For a capability to reach the latter, it must live in its own module.
 
-## Demo
+## Demos
 
 Examples, from shallow to deep:
 
 ```sh
-moon run examples/hello          # a minimal window
-moon run examples/hello-themed   # the themed widget set
-moon run examples/showcase       # full demo board: component library + system probes + extended charts
-moon run examples/browser        # embedded WebView browser (demo menu + status bar)
+moon run examples/hello          # minimal window
+moon run examples/hello-themed   # themed widget set
+moon run examples/showcase       # full demo board
+moon run examples/browser        # embedded WebView browser
 ```
 
-`examples/showcase` covers Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store / Window, plus canvas & rich text, system integration, transitions & effects, a read-only **system probe** page and an extended-charts section (radar / sankey / sunburst …), with a collapsible grouped side menu. Each page's source is its own file (`examples/showcase/pages/*.mbt`) — the best copy-paste material library.
+`examples/showcase` covers every component family, charts, code & docs views, system integration and transitions, plus a read-only system capability probe page. Each page's source is its own file (`examples/showcase/pages/*.mbt`), ready to copy and adapt. Screenshots of the components:
 
 ![Basic components](/images/showcase-basic.png)
 
@@ -57,33 +57,21 @@ moon run examples/browser        # embedded WebView browser (demo menu + status 
 
 ## Routing
 
-**Usage**
-
 | Document | Content |
 |---|---|
-| [tutorial.md](tutorial.md) | Five-minute tutorial: install the toolchain, create a project, build a first window with a click counter |
-| [components.md](components.md) | Component quick-reference (`@ui`): every widget/component constructor's signature and purpose, by family |
-| [declarative.md](declarative.md) | Declarative layer & reactivity: the `Node` tree, `mount_window`, `Store` / `Signal`, `for_list` / `when`, in-place replacement |
-| [layout.md](layout.md) | Layout styling: the `Style` field set and the `class` channel on yoga-mbt (CSS Flexbox L1) |
-| [system-capabilities.md](system-capabilities.md) | System capabilities (`@sys`): volume / app lookup / wallpaper / monitors / window control / clipboard watch / power profiles / printers / env / recent files / browser bookmarks & history / VS Code history…, with a unified `Result` semantics |
-| [build.md](build.md) | Build & linking: how prebuild hosts link flags, and the one pitfall — editing a C stub without relinking |
+| [tutorial.md](tutorial.md) | Five-minute start: install the toolchain, create a project, and build your first window with a click counter |
+| [components.md](components.md) | Component quick-reference (`@ui`): constructor signatures and purposes for every widget, grouped by family |
+| [declarative.md](declarative.md) | Declarative layer and reactivity: the node tree and `mount_window`, `Store` / `Signal`, `for_list` / `when`, in-place replacement |
+| [layout.md](layout.md) | Layout: the Flexbox semantics of yoga-mbt, the `Style` field set of `@style`, and the `class` channel |
+| [build.md](build.md) | Build and linking: how prebuild hosts link flags, and how to spot and fix a C stub edited without relinking |
+| [zh/roadmap.md](zh/roadmap.md) | Public roadmap: positioning, what you can use today, platform and feature matrix, commitments and versioning, next steps, open decisions, explicit non-goals (Chinese only) |
+| [zh/design.md](zh/design.md) | Frontend-style design decisions: stylesheet shape, component naming mapping, reactivity enhancements, and a view layer that uses `render` functions instead of templates (Chinese only) |
+| [zh/module-structure.md](zh/module-structure.md) | Module-structure plan (draft): releasing `gui/web` as `gui-webview` and splitting `core` into `base` / `shell` / `widget` — batches, costs and risks, tracked in `TODO.md` §1 "G9 模块拆分" (module split; Chinese only) |
+| [adaptation.md](adaptation.md) | Platform adaptation notes: field-tested pitfalls, root causes and verification results per platform |
+| [autostart.md](autostart.md) | Autostart: XDG `.desktop` on Linux, HKCU Run key on Windows, one `is_enabled` / `enable` / `disable` API |
+| [tray.md](tray.md) | Linux tray: SNI protocol-stack design, architecture, backend fallback and desktop compatibility |
+| [system-capabilities.md](system-capabilities.md) | System capabilities overview (`@sys`): volume, app lookup, color temperature, wallpaper, monitors, window management, clipboard watch, system info, printers, recent files, browser history and more, with unified `Result` semantics; plus the shared subprocess and D-Bus call layers |
 
-**Platform notes**
+For the project overview and quick start, see [README.md](https://github.com/lb091188/moonbit-native-gui/#readme) at the repository root.
 
-| Document | Content |
-|---|---|
-| [adaptation.md](adaptation.md) | Platform adaptation notes: field-tested pitfalls and fixes, per platform (continuously updated) |
-| [autostart.md](autostart.md) | Cross-platform autostart: XDG `.desktop` on Linux / HKCU Run key on Windows, one `is_enabled` / `enable` / `disable` API |
-| [tray.md](tray.md) | Linux tray: SNI protocol-stack design, architecture, backend fallback, desktop compatibility |
-
-**Project** (Chinese only)
-
-| Document | Content |
-|---|---|
-| [zh/design.md](/zh/design.md) (Chinese) | Frontend-layer design notes: style sheets as MoonBit values (`Style` + named class constants, CSS as an import channel), component naming mapping, reactivity and view-layer decisions |
-| [zh/module-structure.md](/zh/module-structure.md) (Chinese) | Module-structure plan (draft): the criterion for "new module vs. sub-package", the target layout (`gui/web` out as `gui-webview`, `core` split into `base`/`shell`/`widget`), the two execution batches and their costs; tracked as `TODO.md` §1 "G9 模块拆分" |
-| [zh/roadmap.md](/zh/roadmap.md) (Chinese) | Public roadmap: positioning, what you can use today, platform support matrix, stability commitment and versioning, next-phase directions, open decisions, explicit non-goals |
-
-For the project overview and quick start, see the repository root [README.md](https://github.com/lb091188/moonbit-native-gui/#readme).
-
-[中文版文档索引](/zh/README.md)
+[中文文档索引](/zh/README.md)

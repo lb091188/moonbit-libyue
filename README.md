@@ -1,10 +1,10 @@
 # native-gui [![CI](https://github.com/lb091188/moonbit-native-gui/actions/workflows/ci.yml/badge.svg)](https://github.com/lb091188/moonbit-native-gui/actions/workflows/ci.yml)
 
-> **⚠ Renamed** — this project is now **native-gui** (formerly `moonbit-libyue`): the mooncakes package is **`NoahLiu/native-gui`** (the old name will be marked deprecated once the stack stabilizes); sub-modules `NoahLiu/yue-media` → **`NoahLiu/gui-media`**, `NoahLiu/yue-examples` → **`NoahLiu/gui-examples`**. 
+> **Renamed**: this project is now **native-gui**, formerly `moonbit-libyue`. The mooncakes package is **`NoahLiu/native-gui`**; the old name will be retired once the self-drawn stack stabilizes. Sub-modules rename in step: `NoahLiu/yue-media` → **`NoahLiu/gui-media`**, `NoahLiu/yue-examples` → **`NoahLiu/gui-examples`**.
 
-> **On origins** — this library started life as a MoonBit binding of [Cheng Zhao (zcbenz)](https://github.com/zcbenz)'s [Yue / libyue](https://github.com/yue/yue), with [Yoga](https://github.com/facebook/yoga)'s flexbox for layout. The stack is self-drawn now and depends on neither — what stays with us is what we learned from them. Thanks also to [MoonBit](https://github.com/moonbitlang).
+> **On origins**: this library began as a MoonBit binding of [Cheng Zhao (zcbenz)](https://github.com/zcbenz)'s [Yue / libyue](https://github.com/yue/yue), with [Yoga](https://github.com/facebook/yoga)'s flexbox for layout. Neither is a runtime dependency now — both stay as references for behavior and sources of material. Thanks also to [MoonBit](https://github.com/moonbitlang).
 
-A **lightweight cross-platform desktop GUI framework** for the [MoonBit](https://github.com/moonbitlang) ecosystem — **native-direct windowing, a self-drawn rendering pipeline, a complete component set, complete system interfaces**: windows and the event loop talk straight to the X11 / Win32 / Cocoa APIs with no third-party windowing library; raster, text and layout are pure MoonBit, every widget self-drawn, no Skia-class engine; widgets, themes, charts, a Markdown view and an embedded WebView ship in the box; tray, notifications, global shortcuts, IME, autostart and the rest of the desktop surface sit behind one facade. One codebase runs native windows on Windows ✅ / Linux ✅, with the macOS backend landing on the `mac` branch; zero config after `moon add`.
+A lightweight cross-platform desktop GUI framework for [MoonBit](https://github.com/moonbitlang) — native window hosts, a self-drawn rendering pipeline, a complete widget set, and full system integration. One codebase runs native windows on Windows ✅ / Linux ✅, with the macOS backend landing on the `mac` branch. Zero config after `moon add`.
 
 English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/master/README_ZH.md)
 
@@ -12,17 +12,17 @@ English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/mas
 
 ![Live demo on Linux (XFCE)](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/public/images/showcase-anim-linux.webp) ![Live demo on Windows](https://cdn.jsdelivr.net/gh/lb091188/moonbit-native-gui@master/docs/public/images/showcase-anim-windows.webp)
 
-*Left: Linux (XFCE) · Right: Windows — one MoonBit codebase*
+*Second image: Linux (XFCE) · Third image: Windows — the same MoonBit codebase*
 
 ## Core highlights
 
-**🖥 Desktop-grade system integration** — tray (SNI / NSStatusItem / Shell_NotifyIcon), notifications, global shortcuts, clipboard, native menus, file dialogs, drag & drop, autostart, idle detection, MPRIS media control (Linux), plus OS queries (volume, power, wallpaper, monitors, printers, browser history, installed apps…) behind one `@sys` / `@core` API — capability probing with semantic fallbacks, never silent.
+**🖥 Full system integration** — tray, notifications, global shortcuts, clipboard, native menus, file dialogs, drag & drop, autostart and idle detection, plus system queries for volume, power, wallpaper, monitors, printers, browser history and installed apps, all behind `@sys` / `@core`. The tray splits into three backends by platform: SNI, Shell_NotifyIcon and NSStatusItem. On Linux, D-Bus adds MPRIS media control. Capabilities are probed and degrade in a structured way — never silently.
 
-**🎨 Lightweight self-drawing, one theme everywhere** — rendered by the library's own pure-MoonBit software rasterizer (optional Cairo backend) with no Skia-class engine; the `hello` minimal window ships as a **1.1 MB** release binary that shows a window in ~0.1 s (measured on Linux; the 15-page `showcase` is 5.5 MB / ~1 s). Widgets look the same on every platform; light/dark and the system accent colour are followed by default, and the theme is a plain value you can override.
+**🎨 Self-drawn rendering pipeline** — rendering runs on the library's own pure-MoonBit software rasterizer, with an optional Cairo backend and no Skia-class engine. Measured on Linux: the minimal `hello` window ships as a **1.1 MB** release binary and shows a window in about 0.1 s; the 15-page `showcase` board is 5.5 MB and about 1 s. Widgets look the same on every platform, light/dark mode and the system accent colour are followed by default, and a theme is a plain value you can override.
 
-**📊 Charts & rich content** — charts (line / bar / pie / gauge / scatter plus radar, heatmap, candlestick, funnel, boxplot, sankey, tree, treemap, sunburst, map and more, with a cross-cutting interactive layer), a Markdown view and an embedded WebView share the same rasterizer and layout tree as regular widgets.
+**📊 A complete widget set** — five general chart types (line / bar / pie / gauge / scatter), plus specialised charts such as radar, heatmap, candlestick, funnel, boxplot, sankey, tree, treemap, sunburst and map, with a cross-cutting interaction layer. The Markdown view, the embedded WebView and the self-drawn widgets share one rasterizer and one layout tree.
 
-**📝 Declarative UI & reactive state** — describe the interface as a tree and let the library drive it; keep state in `Store` / `Signal` (from `@core`) and bound spots refresh themselves when the data changes:
+**📝 Declarative UI and reactive state** — the interface is described as a tree and mounted in one `mount_window` call; state lives in `Store` / `Signal`, and bound spots refresh with the data:
 
 ```moonbit
 fn main {
@@ -42,47 +42,45 @@ fn main {
 }
 ```
 
-> `moon run examples/showcase` — the full demo board: component library + system probes + extended charts (15 pages).
+> `moon run examples/showcase` — the 15-page demo board: the component library, system capability probes and extended charts.
 
 ## Ecosystem position
 
-GUI efforts in the MoonBit ecosystem each have their lane: [MoUI](https://github.com/wzzc-dev/MoUI) targets shared multi-platform logic (Skia / WebGPU rendering), and [Sun](https://github.com/wzzc-dev/sun) provides low-level 2D graphics and text rendering. native-gui shares no code with either and focuses on a third lane — **one-stop desktop apps**: deep OS integration plus ready-made desktop components (charts / Markdown / WebView).
+GUI efforts in the MoonBit ecosystem each have their lane: [MoUI](https://github.com/wzzc-dev/MoUI) targets shared logic across platforms, and [Sun](https://github.com/wzzc-dev/sun) provides the low level for graphics and text rendering. native-gui depends on neither and takes a third lane — **one-stop delivery for desktop apps**: system integration done deep, everyday desktop widgets made ready to use.
 
-## Packages
+## Package layout
 
-`moon add NoahLiu/native-gui` brings the whole module, but MoonBit compiles and links only the packages you import — an unused package costs nothing in your binary:
+`moon add NoahLiu/native-gui` brings in the whole module. MoonBit compiles and links only the packages you import, so unused packages add nothing to your binary:
 
 | Import in `moon.pkg` | Alias | Contents |
 |---|---|---|
 | `NoahLiu/native-gui/core` | `@core` | App host, event loop, focus / keys / pointer, menus, notifications, tray, hotkey facade, overlays, drag & drop, `Store` / `Signal` |
-| `.../native-gui/ui` | `@ui` | Self-drawn widgets and the component library: window mount, labels / buttons, forms, display, navigation, date, tables & virtual lists, entries, scroll, overlays, code view, declarative layer |
-| `.../native-gui/render` | `@render` | Rasterizer — a pure-MoonBit software raster (path / fill / blend / gradient) plus a Cairo backend; bitmaps, canvas, images, PNG |
-| `.../native-gui/text` | `@text` | Text layer: font families, fonts, attributed text and range attributes (Pango / DirectWrite) |
-| `.../native-gui/theme` | `@theme` | Theme system: palette derivation + change subscription |
+| `.../native-gui/ui` | `@ui` | Self-drawn controls and the component library: window mounting, labels / buttons, forms, display, navigation, date, tables and virtual lists, entries, scrolling, overlays, code view, declarative layer |
+| `.../native-gui/render` | `@render` | Rasterizer: pure-MoonBit software raster plus a Cairo backend; bitmaps, canvas, images, PNG |
+| `.../native-gui/text` | `@text` | Text layer: font families, fonts, rich text and range attributes (Pango / DirectWrite) |
+| `.../native-gui/theme` | `@theme` | Theme system: palette derivation and change subscription |
 | `.../native-gui/icons` | `@icons` | Vector icon system |
-| `.../native-gui/sys` | `@sys` | OS capabilities: autostart, idle, subprocess, env, files, JSON, dialogs, browser history / bookmarks, recent files, wallpaper, volume, power, printers, monitors, window control, app lookup… |
+| `.../native-gui/sys` | `@sys` | System capabilities: autostart, idle, subprocess, environment, files, JSON, dialogs, browser history / bookmarks, recent files, wallpaper, volume, power, printers, monitors, window control, app lookup |
 | `.../native-gui/input` | `@input` | Editing core and key codes |
-| `.../native-gui/win` | `@win` | Platform window backend (Win32 / GTK3 C stubs): hotkeys, icons, IME, message boxes, notifications, trays, surfaces |
-| `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge (tray SNI, notifications, logind / upower, media, network, screensaver…) |
-| `.../native-gui/chart` | `@chart` | Charts, plus the cross-cutting interactive layer |
+| `.../native-gui/win` | `@win` | Platform window backends, the Win32 / GTK3 C stubs: hotkeys, icons, input methods, message boxes, notifications, tray, surfaces |
+| `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge: tray SNI, notifications, logind / upower, media, network, screensaver |
+| `.../native-gui/chart` | `@chart` | Charts and the cross-cutting interaction layer |
 | `.../native-gui/mdview` | `@mdview` | Markdown rendering view |
 | `.../native-gui/web` | `@web` | Embedded WebView |
-| `.../native-gui/style` | `@style` | Style layer: stylesheets as MoonBit values — `Style` rule blocks and named class constants, hover / active / focus states, transitions |
+| `.../native-gui/style` | `@style` | Style layer: stylesheets as MoonBit values, with state classes and transitions |
 
-Heavier optional capabilities live in **separate modules**, so a plain `moon add` never drags them in:
+Heavier optional capabilities live in **separate modules**, so a plain `moon add` never pulls them in:
 
 | Module | Contents |
 |---|---|
-| `NoahLiu/gui-media` | Audio/video engine (ffmpeg decode + miniaudio output) and the player component. |
-| `NoahLiu/gui-examples` | Standalone example module (audio / video players) that depends on `gui-media`. |
+| `NoahLiu/gui-media` | Audio/video engine and the player component. |
+| `NoahLiu/gui-examples` | Standalone example module; depends on `gui-media`. |
 
-**Two layers of "optional"** — a sub-package you do not import costs nothing in your binary (the `moon.pkg` import is the compile/link boundary); a module you do not depend on is not even resolved or prebuilt (the `moon.mod` import defines the dependency closure).
+Two kinds of "optional" are at work: a sub-package you do not import costs nothing in your binary, because the `moon.pkg` import is the compile and link boundary; a module you do not depend on is never resolved or prebuilt, because the `moon.mod` import sets the dependency closure.
 
 ## Quick start
 
-New to MoonBit? The [documentation site](https://moonbit-libyue.pages.dev/) covers the toolchain and your first window.
-
-Prerequisite: the MoonBit native toolchain.
+New to MoonBit? The [documentation site](https://moonbit-libyue.pages.dev/) covers the toolchain and your first window. The prerequisite is the MoonBit native toolchain.
 
 ```sh
 moon add NoahLiu/native-gui
@@ -91,49 +89,49 @@ moon add NoahLiu/native-gui
 Then run one of the bundled examples:
 
 ```sh
-moon run examples/hello          # a minimal window
-moon run examples/hello-themed   # the themed widget set
-moon run examples/showcase       # full demo board: components + system probes + extended charts
-moon run examples/browser        # embedded WebView browser (demo menu + status bar)
+moon run examples/hello          # minimal window
+moon run examples/hello-themed   # themed widget set
+moon run examples/showcase       # full demo board
+moon run examples/browser        # embedded WebView browser
 ```
 
 ## Platform support
 
-Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🚧 landing on the `mac` branch (Cocoa / CoreText / ImageIO / WKWebView; CI green, pending on-device verification)
+| Platform | Status | Notes |
+|---|---|---|
+| Ubuntu 24.04 (XFCE / GNOME / KDE) | ✅ | X11 is the primary path |
+| Deepin 23 / 25 | ✅ | |
+| Windows 10 / 11 | ✅ | Built as a GUI-subsystem exe — double-clicking opens no console |
+| macOS | 🚧 | Landing on the `mac` branch: Cocoa / CoreText / ImageIO / WKWebView; CI green, on-device re-verification pending |
 
-On Windows, exes are built as a GUI-subsystem binary — no console window on double-click.
+## Documentation
 
-## Documentation index
-
-📚 **Online docs**: <https://moonbit-libyue.pages.dev/> — 中文版在 [`/zh/`](https://moonbit-libyue.pages.dev/zh/).
+📚 **Online docs**: <https://moonbit-libyue.pages.dev/> — Chinese version at [`/zh/`](https://moonbit-libyue.pages.dev/zh/).
 
 | Document | Content |
 |---|---|
 | [docs/README.md](docs/README.md) | Documentation index and package overview |
-| [docs/adaptation.md](docs/adaptation.md) | Platform adaptation notes: field-tested pitfalls and fixes, per platform |
+| [docs/adaptation.md](docs/adaptation.md) | Platform adaptation notes: field-tested pitfalls and fixes per platform |
 | [docs/autostart.md](docs/autostart.md) | Cross-platform autostart |
 | [docs/tray.md](docs/tray.md) | Linux tray: SNI protocol-stack design |
-| [docs/zh/adaptation.md](docs/zh/adaptation.md) | 平台适配经验(中文版) |
-| [docs/zh/system-capabilities.md](docs/zh/system-capabilities.md) | System capabilities overview (Chinese) |
-| [docs/zh/design.md](docs/zh/design.md) | Frontend-layer design notes (Chinese) |
+| [docs/system-capabilities.md](docs/system-capabilities.md) | System capabilities overview |
+| [docs/zh/design.md](docs/zh/design.md) | Frontend-oriented design notes (Chinese) |
 
 ## Contributing
 
-Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — the macOS backend has landed on the `mac` branch, and its on-device verification & merge is the largest open item (it needs an Apple Silicon machine). A few basic requirements:
+Platform-compatibility reports, new widgets and doc improvements are all welcome. The macOS backend has landed on the `mac` branch; on-device visual verification and the merge back are the biggest open items, and they need an Apple Silicon machine. The basic requirements:
 
-- **Commit gate**: the MoonBit native toolchain, then `cd gui && moon check && moon test core ui render text theme icons sys input win dbus chart mdview web style` — zero errors, zero warnings
-- **Experience on record**: write field-tested pitfalls together with their fixes into [adaptation.md](docs/adaptation.md) — not only in commit messages
+- **Commit gate**: from `gui/`, `moon check` plus `moon test core ui render text theme icons sys input win dbus chart mdview web style` — zero errors, zero warnings
+- **Experience on record**: field-tested pitfalls and their fixes go into [adaptation.md](docs/adaptation.md), not only into commit messages
 - **Small batches**: one cohesive change per commit, short commit messages
 
-The full process for adding widgets, CI and releases is in [AGENTS.md](AGENTS.md).
+The full process is in [AGENTS.md](AGENTS.md).
 
 ## License
 
-`native-gui` is released under the [MIT License](LICENSE).
-
-Third-party assets and their licenses: see [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) at the repo root (FFmpeg LGPL-3, WebView2 MIT, miniaudio public domain, mooncakes deps MIT/Apache-2.0).
+`native-gui` is released under the [MIT License](LICENSE). Third-party asset licenses and origins: see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) at the repo root.
 
 ## References
 
 - [MoonBit docs](https://docs.moonbitlang.cn/)
-- Ideas this library learned from: [Yue / libyue](https://github.com/yue/yue) · [Yoga](https://github.com/facebook/yoga)
+- Projects this library learned ideas from: [Yue / libyue](https://github.com/yue/yue) · [Yoga](https://github.com/facebook/yoga)

@@ -2,8 +2,8 @@
 layout: home
 hero:
   name: native-gui
-  text: Native desktop GUI for MoonBit
-  tagline: One MoonBit codebase, native windows on Windows / Linux — widgets, layout and the event loop all self-drawn. Zero config after moon add.
+  text: A lightweight cross-platform desktop GUI framework for MoonBit
+  tagline: Native window hosts, a self-drawn rendering pipeline, a complete widget set, and full system integration. One MoonBit codebase, native windows on Windows / Linux. Zero config after moon add.
   actions:
     - theme: brand
       text: Package structure
@@ -12,12 +12,12 @@ hero:
       text: GitHub
       link: https://github.com/lb091188/moonbit-native-gui
 features:
-  - title: Self-drawn, one theme everywhere
-    details: Windows, pixels, the event loop, layout and widgets are all pure MoonBit, so widgets look the same on every platform and follow the system accent colour and light / dark mode.
-  - title: Import only what you use
-    details: Core, UI, render, text, theme, icons, sys, input, win, dbus, chart, mdview, web and style are separate packages; unused ones never enter your binary.
-  - title: Platform differences absorbed
-    details: Tray, autostart, power, volume, media keys and more share one API; the library takes care of the Linux / Windows differences.
+  - title: Self-drawn widgets, one theme across all platforms
+    details: Windows, pixels, the event loop, layout and widgets are all pure MoonBit. Every platform looks the same, following the system accent color and light / dark mode.
+  - title: Import on demand
+    details: core / ui / render / text / theme / icons / sys / input / win / dbus / chart / mdview / web / style are each its own package; unused packages never enter your binary.
+  - title: Platform differences absorbed inside the library
+    details: Tray, autostart, power, volume, and media keys share one API; the library absorbs the Linux / Windows differences.
 ---
 
 ## Quick start
@@ -35,7 +35,7 @@ fn main {
     height=300,
   ) {
     None => {
-      // no window backend or no display service on this host
+      // no window backend or no display service on this platform
       return
     }
     Some(a) => a
@@ -44,4 +44,4 @@ fn main {
 }
 ```
 
-`@ui.*` comes from `NoahLiu/native-gui/ui` — the full package table is in the [doc index](/README).
+`@ui.*` comes from `NoahLiu/native-gui/ui` — the full package table is in the [documentation index](/README).

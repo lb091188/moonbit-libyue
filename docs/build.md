@@ -1,66 +1,55 @@
 # Build & linking
 
-This library's link parameters are **fully hosted by prebuild** — neither ordinary users nor contributors hand-write link flags. This page explains what that means for you, plus the one pitfall after editing a native stub: not relinking. The mechanism and per-platform field records are in [adaptation.md](adaptation.md) ("Build & linking").
+Link parameters are **fully hosted by prebuild** — neither users nor contributors hand-write link flags. This page explains what the mechanism means for you, and the one pitfall after editing a native stub: not relinking. The mechanism and the per-platform field records live in the "Build & linking" section of [adaptation.md](adaptation.md).
 
-## 1. Where linking comes from (not your concern)
+## 1. Where linking comes from
 
-- **At build time**: moon runs the library module's `gui/scripts/prebuild.py` (wired up in `gui/moon.mod`'s `options(--moonbit-unstable-prebuild)`). It emits `link_configs` for the **current system** and propagates them automatically to every main package that depends on this module.
-- **Probe & degrade**: prebuild probes system libraries — GTK3 / Pango / FontConfig / X11 on Linux, `webkit2gtk-4.1` for the embedded WebView, ffmpeg for the media module. If GTK is missing it exits non-zero with a fix hint; if webkit is missing, `@web` degrades to a placeholder implementation (the capability reports `Unsupported`) instead of failing the whole link.
-- **What you see**: `moon add NoahLiu/native-gui` then `moon run` with zero configuration — link flags are not written and should not be written.
+- moon runs the library module's `gui/scripts/prebuild.py` at build time, wired up via `options(--moonbit-unstable-prebuild)` in `gui/moon.mod`. It emits `link_configs` for the current system and propagates them automatically to every main package that depends on this library module.
+- prebuild also probes system libraries: on Linux it looks for GTK3 / Pango / FontConfig / X11, `webkit2gtk-4.1` for the embedded WebView, and ffmpeg for the media module. If GTK is not found, it exits non-zero with a fix hint; if webkit is not found, `@web` degrades to a placeholder implementation and the capability reports `Unsupported`, instead of failing the whole link.
+- The result: after `moon add NoahLiu/native-gui`, `moon run` works with zero configuration. Link flags are never written and should not be written.
 
-## 2. Contributors: no moon.pkg writes link flags
+## 2. Notes for contributors
 
-- **Library packages carry no `link` section** — moon would generate an `.exe` with no `main` and the build fails.
-- **Never hand-write `cc-link-flags`** — linking is emitted by prebuild; editing it by hand fights prebuild.
-- **New platform C capabilities** follow the "single `stub.c`, multi-branch + prebuild macros" layout (see `gui/win/stub.c`); the link flags still belong to prebuild.
+- Library packages carry no `link` section — moon would generate an `.exe` without a `main`, and the build fails.
+- Never hand-write `cc-link-flags` — linking is emitted entirely by prebuild; manual edits conflict with it.
+- New platform C capabilities follow the "single `stub.c`, multiple branches + prebuild macros" layout; see `gui/win/stub.c` for precedent. The link flags still belong to prebuild.
 
-(The FFI-declaration and trampoline-ABI rules are in the repository-root [AGENTS.md](https://github.com/lb091188/moonbit-native-gui/blob/master/AGENTS.md) and `.agents/skills/moonbit-c-binding/`.)
+The rules for aligning FFI declarations with trampolines are in the repository-root [AGENTS.md](https://github.com/lb091188/moonbit-native-gui/blob/master/AGENTS.md) and `.agents/skills/moonbit-c-binding/`.
 
 ## 3. The one pitfall: editing a C stub doesn't relink
 
-Once moon compiles a `.c` / `.cpp` native-stub into a static library, changing the stub code **may not trigger a relink**: `moon build` can report `no work to do` and keep running the old exe; `moon test` binaries behave the same, still linking the old archive. Before and after, the symptom is "changed the code, behavior didn't change" (an old crash even persists).
+moon compiles `.c` / `.cpp` native stubs into a static library, so changing stub code does not necessarily trigger a relink: `moon build` may report `no work to do` and keep running the old exe, and `moon test` binaries link the stale archive the same way. In both cases the symptom is "the code changed but the behavior didn't", and an old crash may still be there.
 
-**Tell**: you edited `gui/<pkg>/*.c` or `.cpp`, but `moon build` says nothing to do and it still behaves the old way — that's this.
+**Tell**: you edited `gui/<pkg>/*.c` or `.cpp`, but `moon build` says there is nothing to do and the behavior is unchanged.
 
-**Fix** (pick one):
+**Fix**, pick one:
 
 ```sh
-moon clean                 # full rebuild, the easy path
-# or delete just the relevant artifacts (paths vary with build layout and target):
-rm -rf gui/_build/native/**/build/<pkg>/                 # rebuild that package
-rm -rf _build/native/debug/build/examples/<example>/<example>   # relink that example
+moon clean                 # full rebuild, the easiest path
+# or delete only the matching artifacts (paths vary with build layout and target):
+rm -rf gui/_build/native/**/build/<pkg>/     # recompile this package
+rm -rf _build/native/debug/build/examples/<example>/<example>   # relink this example
 ```
 
-Then `moon build` / `moon test` recompiles the stub and links a fresh exe.
+Then run `moon build` / `moon test` again: the stub is recompiled and a fresh exe is linked.
 
-**Why it's worth "reproduce on a main target first"**: a brand-new target is always linked fresh — if "main is fine, the test crashes", you can almost conclude the test binary linked a stale archive, not a logic bug. This and the finer platform records (stepped on separately under GTK / Win32 / macOS) are in [adaptation.md](adaptation.md).
+When debugging, first reproduce with a new main target: a fresh target is always linked fresh. If main runs fine but the test crashes, the test binary almost certainly linked a stale archive, not a logic bug. The finer per-platform records are in [adaptation.md](adaptation.md).
 
-## 5. Vendored large files and mirrors
+## 4. Vendored large files and mirrors
 
-Three third-party files are kept out of git (committing them would permanently bloat the
-history) and are fetched by prebuild **only when missing**: `WebView2.h`,
-`WebView2LoaderStatic.lib`, `miniaudio.h` — about 18.6 MB in total.
+Three third-party files are kept out of git — committing them would permanently bloat the git history — and are downloaded by prebuild when missing: `WebView2.h`, `WebView2LoaderStatic.lib`, `miniaudio.h`, about 18.6 MB in total.
 
-- **Verification first**: a file is written only if its sha256 matches the constant in the
-  two prebuild scripts, so any mirror is verifiable;
-- **Mirrors are tried in order** (GitHub → Gitee) with no latency probing: measuring first
-  would make two machines fetch from different sources and cost us reproducibility, while
-  the order only ever affects speed;
-- **20 s per source**: a direct GitHub Release asset fetch from a CN network was measured at
-  "15 s, 0 bytes", so failing over fast beats waiting on one source;
-- **Adding a source**: one line in `VENDOR_BASES` in `gui/scripts/prebuild.py` and
-  `modules/gui-media/prebuild.py` (two copies on purpose — `gui-media` must publish
-  standalone and cannot reach back into the main module's `scripts/`);
-- **Intranet and offline**: set `NATIVE_GUI_VENDOR_BASE` to a single base URL or a
-  comma-separated list (tried first), or place the files at their target paths by hand —
-  prebuild never touches files that already exist;
-- If every source fails, prebuild does not abort: it prints the manual-placement hint and
-  lets the link step report the missing file.
+- **Verification first**: a file is written only if its sha256 matches the constants in the two prebuild scripts, so any mirror is verifiable.
+- **Mirrors are tried in order**: GitHub → Gitee, with no latency probing, so two machines never fetch different content from different sources.
+- **20 s per source**: a direct connection to a GitHub Release asset from a CN network can stall at zero bytes for a long time; failing over quickly beats waiting.
+- **Swapping or adding a source**: edit one line of `VENDOR_BASES` in `gui/scripts/prebuild.py` and in `modules/gui-media/prebuild.py`. The two copies are deliberate — `gui-media` must be able to publish standalone.
+- **Intranet and offline**: the `NATIVE_GUI_VENDOR_BASE` environment variable takes a single base or a comma-separated list, tried first. You can also place the files at their target paths by hand — prebuild only downloads when missing and never touches existing files.
+- If every source fails, prebuild does not abort; it prints the manual-placement hint and leaves the missing-file error to the link step.
 
-Licenses and provenance: [`THIRD-PARTY-NOTICES.md`](../THIRD-PARTY-NOTICES.md) at the repo root.
+Licenses and provenance: [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md) at the repository root.
 
-## 4. Related
+## 5. Related
 
 - Platform adaptation pitfalls and verification: [adaptation.md](adaptation.md)
-- Tutorial (environment setup and your first project): [tutorial.md](tutorial.md)
+- Environment setup and your first project: [tutorial.md](tutorial.md)
 - Components and API: [components.md](components.md)
