@@ -50,7 +50,7 @@ cd modules/gui-examples && moon publish
 - **就地发布**:`moon publish` 在模块根就地打包该模块内容;临时目录中转**不必要**(多一层拷贝反而引入漏文件风险;`moon.work` 只影响本地解析、不影响归档——定案见 1.1 所引口径条)。
 - **先上游后下游**:yoga-mbt 构建转绿前不要发 native-gui。
 - **预演归档**:仓库根 `_build/publish/`(本地,未入库)有本批 4 份预演 zip——`NoahLiu-yoga-mbt-0.1.1`、`NoahLiu-native-gui-0.1.1`、`NoahLiu-gui-media-0.1.0`、`NoahLiu-gui-examples-0.1.0`(另有 native-gui / yoga-mbt 的 **0.1.0 历史档**,别拿错)。核验口径 = 解包零 `.json` 旧清单、`moon.mod` / `moon.pkg` 就位。预演时点 `15afc5c`;其后仅 `1ea935f`(库侧零改动),结论仍有效,保险起见可在模块根重跑 `moon package` 再核对一次。
-- **包页 README**:`gui/README.md`(扩写版)已定稿保留(提交 `d6d4741`),随发布呈现为 mooncakes 包页 README。
+- **包页 README**:随发布呈现为 mooncakes 包页 README 的是 `gui/README.md` 扩写版。
 - **凭据**:Windows 工作机 `.moon/credentials.json` 不存在,`moon publish --dry-run` 止步于凭据检查——发布会话必须在已登录环境。
 - 发布后到 mooncakes 对应包页复核版本号、README 与依赖行。
 
@@ -97,7 +97,7 @@ cd modules/gui-examples && moon publish
 - 当前 `master` = `origin/master` = `1ea935f`(推送已完成)。
 - 版本快照:`gui/moon.mod` 0.1.1(钉 `yoga-mbt@0.1.1`)· `modules/yoga-mbt` 0.1.1 · `gui-media` / `gui-examples` 0.1.0(未发布过)· `ffmpeg-mbt` 0.1.0(干净)。
 - GitHub 侧无待办:远端与全仓链接均为 `lb091188/moonbit-native-gui`(API 核验未改名);MoonBit 模块名 `NoahLiu/native-gui` 不变(既有 import 不受影响)。
-- 门禁现状:全仓与 examples / gui-examples / gui-media / experiment / yoga-mbt 的 `moon check --deny-warn` 全绿(提交门槛);库全量测试未在 Windows 本机重跑(Windows 有已知测试基线红点,以 CI 为准);真机复验(S23 / S24 / S25…各批)已通过,挂账清单 `_人工测试清单.md`、`_Windows真机测试清单.md` 就此删除。
+- 门禁现状:全仓与 examples / gui-examples / gui-media / experiment / yoga-mbt 的 `moon check --deny-warn` 全绿(提交门槛);库全量测试未在 Windows 本机重跑(Windows 有已知测试基线红点,以 CI 为准);真机复验各批已全部通过。
 
 ## 4. 交接时刻的工作区快照(勿动项)
 
@@ -116,8 +116,6 @@ cd modules/gui-examples && moon publish
 
 - [ ] mooncakes 重发执行(§1;Windows 机发不了,换已登录环境)。
 - [ ] 文档站路线三选一(§2.2)+ 部署一次;若换域名,先同步 §2.4 再发 native-gui。
-- [x] `gui/README.md` 扩写版保留 or 回退(发布前定,§1.3)——已定稿保留、处理完成。
-- [x] 真机复验 S23 / S24 / S25 及后续各批——已通过,`_人工测试清单.md`、`_Windows真机测试清单.md` 就此删除。
 - [ ] 发布完成后:回写 `TODO.md` 的重发链条目,并把本文件的「待执行」状态改掉。
 
 ## 6. 参考
