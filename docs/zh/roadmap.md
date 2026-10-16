@@ -131,13 +131,55 @@ MoonBit 生态的**原生桌面 GUI 库**——目标位置是 GTK / WinForms / 
 | 容器与滚动 | ✅ | `ui/scroll.mbt`、`ui/split.mbt` | 垂直滚动 + 自绘滚动条、`hsplit`/`vsplit`、`enable_root_scroll` |
 | 键盘可及性 | ✅ | `ui` | 表单族与按钮全部进 Tab 链、空格/回车激活、焦点环按变体可见 |
 
+### 主题与声明式
+
+| 功能点 | 状态 | 落点 | 成什么样 |
+|---|---|---|---|
+| 主题色板与派生 | ✅ | `theme` | `Theme` 20 字段 + 明暗两套 + `theme_from_accent` 主色派生公式 + 变更订阅（`on`/`off`/`apply`）+ 20 个 getter + 控件高度常量 |
+| 跟随系统深浅与强调色 | ✅ | `theme`、`win`、`core` | 主题包收两个读数函数作参数（不依赖平台层）；gsettings 两级探测与主色查表在 `win`；轮询与重刷在 `App::follow_system_theme`，比对指纹变了才 apply |
+| 组件样式通道定案 | ✅ | `ui`、`style` | 定案**不做** CSS 式样式表下发：`on_draw` 现取色板 + 进程级 `watch_theme` 订阅，调用方覆盖走类型化参数或 `handle=` |
+| 声明式构造器全集（L1） | ✅ | `ui/declarative.mbt` | 旧 24 个构造器除与组件同名者外全部到位：`vbox`/`hbox`/`text_edit`/`picker`/`scroll`/`tab`/`date_picker`/`mount_window`/`bind`/`bind_label`/`hover_group`/`cursor_group`/`combo`/`gif` |
+| 信号与状态容器 | ✅ | `core/signal.mbt`、`core/store.mbt` | `Signal`/`Store`（9 方法）、`computed`/`batch`/`sub_bag`、store ↔ signal 互转；`Store` 内建去重 |
+| 节点重挂语义 | ✅ | `core/node.mbt` | `bind_node`/`swap_node`；relink 定案为**原位替换**（为此在布局与控件层加 `insert_child`/`remove_child_at`/`index_of`/`move_child`） |
+| 窗口光标通道 | ✅ | `win`、`core` | `wm_set_cursor` FFI + `Widget.cursor` 请求 + 宿主按悬停路径取「最深非零」下发 |
+| 组件库收口 | ✅ | `ui`、`mdview` | 约 55 个组件、十族 + Markdown 族，全部以 `@core.Node` 构造器形态提供 |
+| 富文本编辑器 | ⏳ | — | 远期 WYSIWYG 块编辑器 |
+| 代码高亮 / 终端 / WebGL 画布 | ⏳ | — | 旧栈即无，列为待评估 |
+
+### 图表与文档视图
+
+| 功能点 | 状态 | 落点 | 成什么样 |
+|---|---|---|---|
+| 共享算法层 | ✅ | `chart/algo.mbt` | 滚动窗口、坐标换算、1-2-5 刻度、单位换挡、柱槽与命中、扇区角度、仪表弧度、最小二乘、值域留白、截断、透明度合成 |
+| 五种通用图 | ✅ | `chart` | 折线/面积（像素列抽稀 + 末端值标注）、柱/条（正负基线 + 悬停高亮）、环形（中心汇总 + 图例百分比 + 命中判定）、仪表（阈值分段 + 定时器插值平滑）、散点（趋势线） |
+| 交互层与 tooltip | ✅ | `chart/interactive.mbt`、`chart/charts_it.mbt` | hover 浮层、可点击图例显隐、滚轮缩放与拖拽平移；`ci_zoom`/`ci_visual_map`/`ci_mark_line`/`ci_mark_area`/`ci_save`（PNG 离屏导出）/`ci_legend_hit`/`ci_filter_visible` |
+| 十五种专项图 | ✅ | `chart/*`（一图一文件 + wbtest） | boxplot / funnel / heatmap / radar / kline / sankey / treemap / tree / sunburst / graph（力导向）/ parallel / pictorialbar / effectscatter（涟漪动画）/ themeriver / geo |
+| 地图 | ✅ | `chart/geo.mbt` | 数据读取走 `@sys`、矩形本地化、世界投影 |
+| Markdown 视图 | ✅ | `mdview` | 17 种 block 变体 + GFM 面（表格对齐/任务列表/脚注/删除线/块级图片/可点击链接）；链接点击走 `on_link` 回调；富文本行按主题指纹缓存重建 |
+
 ### 系统集成
 
 | 功能点 | 状态 | 落点 | 成什么样 |
 |---|---|---|---|
+| 零依赖 JSON | ✅ | `sys/json.mbt` | 公共名不变、只换包前缀 |
+| 环境与文件原语 | ✅ | `sys/fsx.mbt`、`sys/envx.mbt` | 目录枚举、文本读写、幂等删除、`setenv` 后立即可读、平台标识；Windows 侧一律 UTF-8 进、宽字符 API 出 |
+| 子进程与分离式启动 | ✅ | `sys/procrun.mbt` | 三平台 `spawn`/`wait`/`getpid` 自带（已去掉第三方 subproc 依赖）；分离式启动走 fork→setsid→fork + CLOEXEC 回传 exec 成败，不阻塞、不留僵尸 |
+| 文件对话框 | ✅ | `sys/dialog.mbt` | GTK `GtkFileChooserDialog` 与 Windows `IFileDialog` 两后端同制（槽表、三个选项位、filters 解析）；父窗差异由 Windows 自带模态泵兜 |
+| 单实例 | ✅ | `dbus/instance.mbt` | 总线名 `RequestName` + 入站 `Wake`，二次启动唤起首实例后自行退出 |
+| 桌面环境识别 | ✅ | `sys/desktop.mbt` | `XDG_CURRENT_DESKTOP` 冒号多值取首个可识别值 |
+| 打开与定位 | ✅ | `sys/launcher.mbt` | `open_url` / `reveal` / `open_file` / `open_file_with`；Windows 绝对路径四类判据 + 分隔符归一 + `NotFound` 错误档；macOS `open -a` 形态未接（随 mac 平台批） |
+| 应用枚举 | ✅ | `sys/appfind.mbt` | `.desktop` 扫描按 id 去重、按 name 码点序；`which` 语义的固定目录查找 |
+| 壁纸与默认应用 | ✅ | `sys/wallpaper.mbt`、`sys/defaultapps.mbt` | 按 DE 分派 xfconf / gsettings / qdbus；`xdg-mime` + `mimeapps.list` 三层配置与段内替换写路径 |
+| 最近文件 | ✅ | `sys/recent_files.mbt` | 只读解析 `recently-used.xbel`（XBEL 扫描 + 实体 / 百分号 / ISO 8601 三只纯函数） |
+| 硬件族 | ✅ | `sys/{brightness,volume,nightlight,printer,powerprofile,monitor}.mbt` | 命令线与 sysfs 直读；写路径经注入槽（亮度走 logind、音量 wpctl/pactl、夜灯 redshift/gamma、打印 CUPS、电源 powerprofilesctl、显示器 xrandr） |
+| 浏览器与编辑器历史 | ✅ | `sys/{browser_history,browser_bookmarks,firefox_history,vscode_history}.mbt` | SQLite 直读磁盘文件（只读、不写、不复制原库）；三平台数据根与定义表按平台分流 |
+| 系统信息 | ✅ | `sys/sysinfo.mbt` | `os-release` / `meminfo` / `uptime` / DMI 纯文本读 |
+| 窗口控制与剪贴板监视 | ✅ | `sys/windowctl.mbt`、`sys/clipboard_watch.mbt` | `wmctrl` 列/激活/关闭；剪贴板只读轮询，排期能力作参数注入（`sys` 不引 GUI 核心层） |
+| 空闲检测 | ✅ | `sys/idle.mbt`（W21e 门面） | Windows `GetLastInputInfo` / Linux X11 XScreenSaver（运行期 dlopen）/ macOS 留桩 |
+| D-Bus 能力模块 | ✅ | `dbus` | wire + dbus + bus + socket 四桩；UPower / logind / network / screensaver / inhibit / MPRIS / notifications，真总线回证 |
 | 系统托盘 | ✅ | `dbus`（SNI + DBusMenu） | 真实总线与真实面板协议已回证；观感由使用者复验 |
-
-（本节其余族——系统能力门面 `@sys` 二十余族、D-Bus 能力模块、Wayland、全局热键/通知/菜单——待下一轮从 TODO §2「系统集成」与 §6 迁入。）
+| Wayland 会话分流 | ✅ | `sys/{idle,windowctl,clipboard_watch}` | 依赖 X11 的能力在 Wayland 会话给 `Unsupported` 而不是崩 |
+| 传感器 / 蓝牙 / 磁盘 | ❌ | — | iio-sensor-proxy / org.bluez / UDisks2 只在一个平台有对应面，按跟踪口径不进路线图（Linux 侧挂账留在 TODO §2） |
 
 ## 承诺与版本
 
