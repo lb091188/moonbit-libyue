@@ -39,12 +39,11 @@ Examples, from shallow to deep:
 ```sh
 moon run examples/hello          # a minimal window
 moon run examples/hello-themed   # the themed widget set
-moon run examples/showcase       # full demo board: component library + system probes
+moon run examples/showcase       # full demo board: component library + system probes + extended charts
 moon run examples/browser        # embedded WebView browser (demo menu + status bar)
-moon run examples/charts         # extended charts gallery (radar / sankey / sunburst …)
 ```
 
-`examples/showcase` covers Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store / Window, plus canvas & rich text, system integration, transitions & effects and a read-only **system probe** page, with a collapsible grouped side menu. Each page's source is its own file (`examples/showcase/pages/*.mbt`) — the best copy-paste material library.
+`examples/showcase` covers Basic / Icons / Form / Navigation / Data Display / Charts / Feedback / Code & Docs / Events & Layout / Store / Window, plus canvas & rich text, system integration, transitions & effects, a read-only **system probe** page and an extended-charts section (radar / sankey / sunburst …), with a collapsible grouped side menu. Each page's source is its own file (`examples/showcase/pages/*.mbt`) — the best copy-paste material library.
 
 ![Basic components](/images/showcase-basic.png)
 

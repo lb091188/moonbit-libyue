@@ -43,9 +43,8 @@ Runnable examples in this repository, from shallow to deep:
 ```sh
 moon run examples/hello          # a minimal window
 moon run examples/hello-themed   # the themed widget set
-moon run examples/showcase       # full demo board: components + system integration + system probes, 15 pages
+moon run examples/showcase       # full demo board: components + system probes + extended charts, 15 pages
 moon run examples/browser        # embedded WebView browser (demo menu + status bar)
-moon run examples/charts         # extended charts gallery (radar / sankey / sunburst …)
 ```
 
 Each showcase page is its own source file under `examples/showcase/pages/` — the best copy-paste material library.

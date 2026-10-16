@@ -4,7 +4,7 @@ version = "0.1.0"
 
 preferred_target = "native"
 
-description = "native-gui 独立示例模块：hello / 主题 / showcase（组件库+系统能力探测）/ 浏览器 / 扩展图表 / 系统监视器"
+description = "native-gui 独立示例模块：hello / 主题 / showcase（组件库+系统能力探测+扩展图表）/ 浏览器 / 系统监视器"
 
 license = "MIT"
 

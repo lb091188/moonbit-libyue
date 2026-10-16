@@ -91,9 +91,8 @@ moon add NoahLiu/native-gui
 ```sh
 moon run examples/hello          # 最小窗口
 moon run examples/hello-themed   # 主题控件集
-moon run examples/showcase       # 完整演示板：组件 + 系统集成 + 系统能力探测
+moon run examples/showcase       # 完整演示板：组件 + 系统探测 + 扩展图表
 moon run examples/browser        # 内嵌 WebView 浏览器（演示菜单 + 状态栏）
-moon run examples/charts         # 扩展图表集（雷达 / 桑基 / 旭日 …）
 ```
 
 ## 平台支持

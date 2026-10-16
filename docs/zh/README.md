@@ -39,12 +39,11 @@
 ```sh
 moon run examples/hello          # 最小窗口
 moon run examples/hello-themed   # 主题控件集
-moon run examples/showcase       # 完整演示板：组件库 + 系统集成 + 系统能力探测
+moon run examples/showcase       # 完整演示板：组件库 + 系统探测 + 扩展图表
 moon run examples/browser        # 内嵌 WebView 浏览器（演示菜单 + 状态栏）
-moon run examples/charts         # 扩展图表集（雷达 / 桑基 / 旭日 …）
 ```
 
-`examples/showcase` 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 / 反馈 / 代码与文档 / 事件与布局 / Store 对照 / 窗口 + 画布与富文本 + 系统集成 + 过渡与效果 + 只读**系统能力探测**页；左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。每页源码独立成文件（`examples/showcase/pages/*.mbt`），是最好的复制粘贴素材库；组件库各组件的截图：
+`examples/showcase` 覆盖：基础 / 图标库 / 表单 / 导航 / 数据展示 / 图表 / 反馈 / 代码与文档 / 事件与布局 / Store 对照 / 窗口 + 画布与富文本 + 系统集成 + 过渡与效果 + 只读**系统能力探测**页 + **扩展图表**段（雷达 / 桑基 / 旭日 …）；左侧分组可折叠菜单，底栏版本号与 moon.mod 同步。每页源码独立成文件（`examples/showcase/pages/*.mbt`），是最好的复制粘贴素材库；组件库各组件的截图：
 
 ![基础组件](/images/showcase-basic.png)
 
