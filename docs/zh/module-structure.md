@@ -50,7 +50,7 @@ moonbit-native-gui/                          # 根 workspace
 | 新子包 | 文件来源 | 下游依赖 |
 | --- | --- | --- |
 | `base` | signal, store, effect, keys, focus, list_store, prof, tick, node | 无 |
-| `shell` | loop, host, menu, hotkey, tray, notify, reveal, drag, app(开窗/泵/子件槽段) | win / sys / dbus |
+| `shell` | loop, host, menu, hotkey, tray, notify, reveal（drag 暂留 core，吃 Widget）；app 的开窗/泵/子件槽段随步骤 2·乙落地 | win / sys / dbus |
 | `widget` | widget, overlay, overlay_native, app(app.mbt:root.on_draw + paint_frame), text | render + yoga (不含 core 旧名空间) |
 
 其余子包 `style`, `theme`, `icons`, `input`, `text`, `chart`, `mdview`, `sys`, `dbus`, `win` 不动。
@@ -172,6 +172,8 @@ moonbit-native-gui/                          # 根 workspace
 3. **`pump_ime` 占 706-768 行，跨 `win` + `text` + `root` 三层**：IME 门控调 `@win`，文本批量初始化调 `text`，preedit/commit 投递调 root。建议 IME 整块留 widget——它服务的就是编辑控件；shell 只在 `step` 里调注入的 `on_frame`。
 
 **迁移顺序**：每步独立可编译、可回滚。
+
+0a. **步骤 2·甲（2026-10-17 已交付）**：`gui/shell` 收 menu/hotkey/tray/notify/reveal 五族（与控件树零耦合，只吃 win/sys/dbus）+ 五条 wbtest；core 加 `compat_shell.mbt` 转发。实测两条修正：① **枚举变体转发不了**——别名不导出构造子，且 `Unsupported`/`Failed` 在 TrayError/HotkeyError 里重名无法各自转值，所以外部消费方（showcase 的 system/window 页、menu_probe、hotkey_probe）直接改 `@shell.MenuRole::Copy` 这类全限定写法，这也是终态写法；② **drag.mbt 不在本刀**——它的 `drag_window_root_of`/`set_drag_root` 吃 Widget，留 core 随 widget 刀定归属。`base` 刀同批交付。
 
 1. 建 `base/`（2026-10-17 已交付）：搬 `signal`/`store`/`effect`/`keys`/`focus`/`list_store`/`prof`/`tick` 八文件 + 对应 wbtest。`node` 不在本刀——它的 `mount : (Widget) -> Widget` 直接吃 widget 层类型，落位归步骤 3 的 `widget/`；`node_wbtest` 两条读 `Signal` 内部字段 `node.subs` 的断言改走公开 `sub_count()`（跨包私有字段不可见，顺带把测试拉回公开 API）。`prof_record` 从包私有提为公开——core 的帧账本调用点跨包了。
 2. 建 `shell/`：搬 `loop`/`host`/`menu`/`hotkey`/`tray`/`notify`/`reveal`/`drag` + `app.mbt` 的 26 个 shell 定义；此步 `App` 一分为二、`ShellApp` 落地。

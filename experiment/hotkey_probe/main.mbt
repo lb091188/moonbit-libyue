@@ -96,16 +96,16 @@ fn main {
   //    （或 `xdotool key ctrl+alt+h` 注入）即打印命中；无人按键走 TIMEOUT
   //    （不算失败）。自动化验法：后台跑本探针，1 秒后另开终端注入按键，
   //    等 HOTKEY-CORE-FIRE 出现。
-  match @core.hotkey_register("Ctrl+Alt+H") {
+  match @shell.hotkey_register("Ctrl+Alt+H") {
     Err(e) => println("HOTKEY-CORE-REG ERR \{e}")
     Ok(h) => {
       println("HOTKEY-CORE-REG id=\{h.id} spec=\{h.spec} poll 6s…")
       let deadline = @win.now_ms() + 6000
-      let mut fired : @core.Hotkey? = None
+      let mut fired : @shell.Hotkey? = None
       let mut done = false
       while !done && @win.now_ms() < deadline {
         ignore(@win.wait(50))
-        match @core.hotkey_poll() {
+        match @shell.hotkey_poll() {
           Some(f) => {
             fired = Some(f)
             done = true
@@ -117,7 +117,7 @@ fn main {
         Some(f) => println("HOTKEY-CORE-FIRE id=\{f.id} spec=\{f.spec}")
         None => println("HOTKEY-CORE-TIMEOUT (6s 无按键)")
       }
-      ignore(@core.hotkey_unregister(h))
+      ignore(@shell.hotkey_unregister(h))
     }
   }
   println("HOTKEY-OK")

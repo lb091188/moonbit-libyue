@@ -9,7 +9,8 @@
 | Import in `moon.pkg` | Alias | Contents |
 |---|---|---|
 | `NoahLiu/native-gui/base` | `@base` | Platform-free primitives: `Store` / `Signal` / `ListStore`, the focus stack, key codes, end-of-frame batching and the frame ledger |
-| `NoahLiu/native-gui/core` | `@core` | App host, event loop, pointer, menus, notifications, tray, overlays, drag & drop (during the G9 Batch 2 migration `@base` names stay reachable via `@core`) |
+| `NoahLiu/native-gui/shell` | `@shell` | System-capability shell: menus, global hotkeys, tray, notifications, reveal |
+| `NoahLiu/native-gui/core` | `@core` | App host, event loop, pointer, overlays, drag & drop (during the G9 Batch 2 migration `@base`/`@shell` names stay reachable via `@core`) |
 | `.../native-gui/ui` | `@ui` | Self-drawn widgets and the component library: window mounting, labels / buttons, forms, display, navigation, date, tables and virtual lists, text entries, scrolling, overlays, code view, declarative layer |
 | `.../native-gui/render` | `@render` | Rasterizer: a pure-MoonBit software raster plus a Cairo backend; bitmaps, canvas, images, PNG |
 | `.../native-gui/text` | `@text` | Text layer: font families, fonts, rich text and range attributes (Pango / DirectWrite) |

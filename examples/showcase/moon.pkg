@@ -4,6 +4,7 @@
 import {
   "NoahLiu/yoga-mbt/src" @yoga,
   "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/shell" @shell,
   "NoahLiu/native-gui/ui",
   "NoahLiu/native-gui/theme",
   "NoahLiu/native-gui/icons",

@@ -1,0 +1,12 @@
+// 系统能力壳层（G9 Batch 2 第二刀·甲，从 `core` 提出）：菜单栏/右键菜单、全局
+// 热键门面、托盘（SNI/Win32）、通知、外部打开——五条与控件树零耦合的通道，
+// 只吃 base 常量与 win/sys/dbus 后端。路由（route/pump_ime）与浮层留在 core，
+// 随 shell/widget 后续刀次归位。
+
+supported_targets = "native"
+
+import {
+  "NoahLiu/native-gui/win",
+  "NoahLiu/native-gui/sys" @sys,
+  "NoahLiu/native-gui/dbus" @dbus,
+}

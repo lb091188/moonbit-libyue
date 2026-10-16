@@ -5,7 +5,7 @@
 // 跑法：moon run experiment/menu_probe
 
 ///|
-fn kind_id(k : @core.MenuItemKind) -> Int {
+fn kind_id(k : @shell.MenuItemKind) -> Int {
   match k {
     Command => 0
     Check => 1
@@ -15,19 +15,19 @@ fn kind_id(k : @core.MenuItemKind) -> Int {
 }
 
 ///|
-fn role_id(r : @core.MenuRole) -> Int {
-  @core.menu_role_id(r)
+fn role_id(r : @shell.MenuRole) -> Int {
+  @shell.menu_role_id(r)
 }
 
 fn main {
   // ① 建条 + 加菜单
-  let bar = @core.MenuBar::new()
+  let bar = @shell.MenuBar::new()
   let _file = bar.add_menu("文件")
   let edit = bar.add_menu("编辑")
   println("MENU bar_menus=\{bar.menu_count()}")
 
   // ② 各类项 + 计数
-  let file2 = @core.Menu::new(title="文件")
+  let file2 = @shell.Menu::new(title="文件")
   let _a = file2.add_item("新建")
   let _b = file2.add_check_item("自动保存")
   let _c = file2.add_radio_item("浅色")
@@ -52,21 +52,21 @@ fn main {
   println("MENU walk depth1=\{d1.val} depth2=\{d2.val}")
 
   // ④ 角色项默认标签/加速键/编号
-  let _rc = edit.add_role_item(@core.Copy)
+  let _rc = edit.add_role_item(@shell.MenuRole::Copy)
   let c = edit.items[0]
-  println("MENU role copy label=\{c.label} acc=\{c.accelerator} id=\{role_id(@core.Copy)}")
-  let q = edit.add_role_item(@core.Quit)
-  println("MENU role quit label=\{q.label} acc=\{q.accelerator} id=\{role_id(@core.Quit)}")
+  println("MENU role copy label=\{c.label} acc=\{c.accelerator} id=\{role_id(@shell.MenuRole::Copy)}")
+  let q = edit.add_role_item(@shell.MenuRole::Quit)
+  println("MENU role quit label=\{q.label} acc=\{q.accelerator} id=\{role_id(@shell.MenuRole::Quit)}")
 
   // ⑤ 整树项数
   println("MENU total_items=\{bar.total_item_count()}")
   // bar: 文件 0 项 + 编辑 2 项 = 2（file2 是独立 Menu，不在 bar 里）
-  let bar2 = @core.MenuBar::new()
+  let bar2 = @shell.MenuBar::new()
   let f = bar2.add_menu("文件")
   let _ = f.add_item("新建")
   let _ = f.add_item("打开")
   let ed = bar2.add_menu("编辑")
-  let _ = ed.add_role_item(@core.Copy)
+  let _ = ed.add_role_item(@shell.MenuRole::Copy)
   let s = ed.add_submenu("高级")
   let _ = s.add_item("设置")
   println("MENU bar2 total=\{bar2.total_item_count()} (预期 5)")
@@ -79,7 +79,7 @@ fn main {
   println("MENU mut checked=\{it.is_checked()} label=\{it.label} acc=\{it.accelerator}")
 
   // ⑦ 回调槽
-  let m = @core.Menu::new(title="测试")
+  let m = @shell.Menu::new(title="测试")
   let clickable = m.add_item("点我")
   let hits = Ref(0)
   clickable.set_on_click(fn() { hits.val = hits.val + 1 })

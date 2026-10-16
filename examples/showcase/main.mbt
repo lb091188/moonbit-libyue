@@ -65,8 +65,8 @@ fn theme_toggle_button(app : @shared.App) -> @core.Node {
 /// 菜单栏模型（第十五批接线）：动作全部真实有效——「导航」切页、「主题」
 /// 拨深浅与跟随开关、「帮助」关于冒提示 / 退出角色项走 `App::quit`。
 /// 项点击经原生菜单派发链（`dispatch_menu_command`）回到这些回调。
-fn build_menu_bar(app : @shared.App) -> @core.MenuBar {
-  let bar = @core.MenuBar::new()
+fn build_menu_bar(app : @shared.App) -> @shell.MenuBar {
+  let bar = @shell.MenuBar::new()
   let nav = bar.add_menu("导航")
   for name in ["基础组件", "表单组件", "数据展示", "系统集成"] {
     let page = name
@@ -89,7 +89,7 @@ fn build_menu_bar(app : @shared.App) -> @core.MenuBar {
     app.toast_push("native-gui 组件库演示板 V" + SHOWCASE_VERSION, @ui.Info)
   })
   let _ = help.add_separator()
-  let _ = help.add_role_item(@core.MenuRole::Quit).set_on_click(fn() {
+  let _ = help.add_role_item(@shell.MenuRole::Quit).set_on_click(fn() {
     match app.host.val {
       Some(a) => a.quit()
       None => ()
@@ -282,7 +282,7 @@ fn main {
       if bar.apply_to(a.window) {
         let menu_tick : Ref[() -> Unit] = Ref(fn() { () })
         menu_tick.val = fn() -> Unit {
-          let _ = @core.dispatch_menu_command()
+          let _ = @shell.dispatch_menu_command()
           let _ = a.timer(100, menu_tick.val)
         }
         (menu_tick.val)()

@@ -13,7 +13,7 @@ MoonBit 的**轻量跨平台桌面 GUI 框架**——窗口原生直连、渲染
 
 | 入口 | 内容 |
 |---|---|
-| 库 | `moon add NoahLiu/native-gui`——14 个子包（G9 Batch 2 拆出 base 后），另有 gui-media、gui-webview、gui-examples 三个可选独立模块 |
+| 库 | `moon add NoahLiu/native-gui`——15 个子包（G9 Batch 2 拆出 base/shell 后），另有 gui-media、gui-webview、gui-examples 三个可选独立模块 |
 | 示例 | `hello` 最小窗口、`hello-themed` 主题控件集、`showcase` 全功能演示板 |
 | 文档 | 中英双语文档站与各包文档，见[文档索引](README.md) |
 | CI | Linux 与 Windows 两条 job 每次推送全绿：库包测试、构建、虚拟显示下启动冒烟 |
@@ -120,7 +120,7 @@ Linux 列带 **X11** 的格只在 X11 会话成立，带 **DE** 的格行为随�
 | 主题系统与跟随系统明暗 / 强调色 | ✅ | ✅ | 🚧 |
 | 窗口级按键兜底通道 | ✅ | ✅ | 🚧 |
 | 上屏帧缓冲所有权 | 🚧 | ✅ | ❌ |
-| 模块拆分 | ⏳ | ⏳ | ⏳ |
+| 模块拆分 | 🚧 | 🚧 | 🚧 |
 | 窗口内按键路由补齐 | ⏳ |  | ⏳ |
 
 ### 绘图与资源

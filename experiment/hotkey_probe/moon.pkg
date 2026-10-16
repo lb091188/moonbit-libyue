@@ -1,5 +1,5 @@
 import {
-  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/shell" @shell,
   "NoahLiu/native-gui/win",
 }
 

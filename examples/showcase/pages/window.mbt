@@ -6,7 +6,7 @@
 //    文档的口径）；旧链路的 `set_content_size` 对应本栈 `set_size_pixels`；
 //    取窗口经宿主 `App::window()`（控件层本来就拿不到窗口，`set_fullscreen`
 //    因此收在宿主上；标题/尺寸/无边框这类窗口级动作由上层直调 `@win.Window`）；
-// ② 快捷键从 `@yue.register_global_shortcut` 切到 `@core.hotkey_*` 门面（W22）：
+// ② 快捷键从 `@yue.register_global_shortcut` 切到 `@shell.hotkey_*` 门面（W22）：
 //    注册收 `Result`，命中经 `hotkey_poll` 抽（id→加速串回查表在门面里，页内
 //    不自己持表——只记注册时返回的句柄用于注销）；轮询表挂宿主 200ms 一拍；
 // ③ 拖放：旧链路的「跨应用系统级」（register_dragged_types + enter/update/drop
@@ -20,10 +20,10 @@
 
 ///|
 /// 热键错误 → 可读串（门面的两档：没后端 / 有backend但这次没成）。
-fn hotkey_err_text(e : @core.HotkeyError) -> String {
+fn hotkey_err_text(e : @shell.HotkeyError) -> String {
   match e {
-    @core.Unsupported => "本平台没有全局快捷键后端（当前仅 Windows）"
-    @core.Failed(why) => "注册失败：\{why}"
+    @shell.HotkeyError::Unsupported => "本平台没有全局快捷键后端（当前仅 Windows）"
+    @shell.HotkeyError::Failed(why) => "注册失败：\{why}"
   }
 }
 
@@ -50,7 +50,7 @@ fn drag_send_text(r : Result[@core.DragEffect, @core.DragError]) -> String {
 fn hotkey_poll_loop(app : @shared.App, hits : @core.Store[Int]) -> Unit {
   let tick : Ref[() -> Unit] = Ref(fn() { () })
   tick.val = fn() -> Unit {
-    match @core.hotkey_poll() {
+    match @shell.hotkey_poll() {
       Some(hk) => {
         hits.update(fn(n) { n + 1 })
         app.toast_push("快捷键触发：\{hk.spec}", @ui.Success)
@@ -115,7 +115,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
   let bl : Ref[Bool] = Ref(false)
   let sz : Ref[Int] = Ref(1280)
   // 快捷键：门面回查表在 core 里，页内只记自己注册过的句柄（注销用）
-  let hotkeys : Ref[Array[@core.Hotkey]] = Ref([])
+  let hotkeys : Ref[Array[@shell.Hotkey]] = Ref([])
   let hk_status : @core.Store[String] = @core.Store::new("（未注册）")
   let hk_hits : @core.Store[Int] = @core.Store::new(0)
   // 拖放回显
@@ -187,7 +187,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         @ui.row(
           [
             @ui.button("注册 Ctrl+Alt+C", on_click=fn() {
-              match @core.hotkey_register("Ctrl+Alt+C") {
+              match @shell.hotkey_register("Ctrl+Alt+C") {
                 Ok(hk) => {
                   hotkeys.val.push(hk)
                   hk_status.set("已注册（切到别的窗口按一下）")
@@ -197,7 +197,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
             }),
             @ui.button("注销全部", variant=@ui.Soft, on_click=fn() {
               for hk in hotkeys.val {
-                ignore(@core.hotkey_unregister(hk))
+                ignore(@shell.hotkey_unregister(hk))
               }
               hotkeys.val = []
               hk_status.set("已全部注销")
@@ -215,17 +215,17 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "match @core.hotkey_register(\"Ctrl+Alt+C\") {",
+        "match @shell.hotkey_register(\"Ctrl+Alt+C\") {",
         "  Ok(hk) => // hk.id / hk.spec（回查表门面自持）",
         "  Err(Unsupported) => // 非 Windows",
         "  Err(Failed(why)) => // 组合被占用 / 表满",
         "}",
         "// 宿主每拍抽一次（本页 200ms 表；native-app 每帧）",
-        "match @core.hotkey_poll() {",
+        "match @shell.hotkey_poll() {",
         "  Some(hk) => println(\"触发：\\{hk.spec}\")",
         "  None => ()",
         "}",
-        "@core.hotkey_unregister(hk)",
+        "@shell.hotkey_unregister(hk)",
       ],
     ),
     @shared.section(

@@ -8,8 +8,8 @@
 //    电量与网络（无电源事件通道）——后四样随平台批；
 // ② 「电量网络」的位置换成本栈已有的「系统信息」（si_os/si_machine/si_memory/
 //    si_uptime + desktop_name），另补「音量」段（vol_* 三平台门面已在）；
-// ③ 通知从 `@yue.NotificationCenter` 切 `@core.notify_send`（W 族门面：探测 +
-//    结构化错误 + 后端名回显）；托盘从 `@yue.Tray` 切 `@core.Tray`（dispatch 由
+// ③ 通知从 `@yue.NotificationCenter` 切 `@shell.notify_send`（W 族门面：探测 +
+//    结构化错误 + 后端名回显）；托盘从 `@yue.Tray` 切 `@shell.Tray`（dispatch 由
 //    200ms 轮询表驱动——本栈宿主循环没有每帧钩子，native-app 同表）；
 // ④ 文件对话框 parent 传宿主窗口 id（`App::wid().to_int64()`），旧链路传 View。
 
@@ -67,7 +67,7 @@ fn tray_icon_pixels(n : Int) -> FixedArray[Byte] {
 fn tray_poll_loop() -> Unit {
   let tick : Ref[() -> Unit] = Ref(fn() { () })
   tick.val = fn() -> Unit {
-    let _ = @core.dispatch_tray_event()
+    let _ = @shell.dispatch_tray_event()
     match @core.host_active() {
       Some(a) => ignore(a.timer(200, tick.val))
       None => ()
@@ -91,11 +91,11 @@ fn open_probe_app() -> String {
 
 ///|
 /// 托盘错误 → 可读串（TrayError 三档：没后端 / 图标没建成 / 后端具体失败）。
-fn tray_err_text(e : @core.TrayError) -> String {
+fn tray_err_text(e : @shell.TrayError) -> String {
   match e {
-    @core.Unsupported => "本平台没有托盘后端"
-    @core.IconLoadFailed => "图标加载失败"
-    @core.Backend(msg) => "托盘后端失败：\{msg}"
+    @shell.TrayError::Unsupported => "本平台没有托盘后端"
+    @shell.TrayError::IconLoadFailed => "图标加载失败"
+    @shell.TrayError::Backend(msg) => "托盘后端失败：\{msg}"
   }
 }
 
@@ -126,7 +126,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
   let tray_note : @core.Store[String] = @core.Store::new("（还没建托盘）")
   let tray_clicks : @core.Store[Int] = @core.Store::new(0)
   // 托盘句柄（挂载闭包里建托盘时填入）：挂菜单 / 改提示要拿它
-  let tray_holder : Ref[@core.Tray?] = Ref(None)
+  let tray_holder : Ref[@shell.Tray?] = Ref(None)
   let auto_state : @core.Store[String] = @core.Store::new("（未读）")
   let ext_out : @core.Store[String] = @core.Store::new("（还没打开过外部）")
   let si_out : @core.Store[String] = @core.Store::new("（点「刷新」读一次）")
@@ -278,14 +278,14 @@ pub fn page_system(app : @shared.App) -> @core.Node {
         @ui.row(
           [
             @ui.button("普通通知", on_click=fn() {
-              match @core.notify_send("libyue 演示板", "构建完成", "3 个目标已产出") {
+              match @shell.notify_send("libyue 演示板", "构建完成", "3 个目标已产出") {
                 Ok(id) => nt_out.set("已发送 #\{id}")
                 Err(e) => nt_out.set("发送失败：\{e}")
               }
             }),
             @ui.button("带进度 60%", variant=@ui.Soft, on_click=fn() {
               match
-                @core.notify_send(
+                @shell.notify_send(
                   "libyue 演示板",
                   "同步中",
                   "已完成 60%",
@@ -301,7 +301,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
         ),
         @ui.bind_label(nt_out, fn(s) { s }),
         @ui.text(
-          if @core.notify_supported() {
+          if @shell.notify_supported() {
             "通知后端可用"
           } else {
             "通知后端不可用（按钮会报失败）"
@@ -310,7 +310,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "match @core.notify_send(",
+        "match @shell.notify_send(",
         "  \"libyue 演示板\", \"构建完成\", \"3 个目标已产出\") {",
         "  Ok(id) => println(\"已发送 #\\{id}\")",
         "  Err(e) => println(\"失败: \\{e}\")",
@@ -434,7 +434,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
           // （旧写法把整段挂在 icon 成功之后，而 wm_icon_from_bgra 在 GTK 分支
           //  是失败桩恒给句柄 0，于是 Linux 上托盘根本没起过。）
           let ic = @win.icon_from_bgra(tray_icon_pixels(32), 32, 32)
-          match @core.Tray::new("libyue-showcase-tray", icon=ic) {
+          match @shell.Tray::new("libyue-showcase-tray", icon=ic) {
             Ok(t) => {
               t.set_tooltip("libyue 演示板", "左键计数 · W 族门面")
               t.on_click(fn() {
@@ -472,7 +472,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
             @ui.button("挂菜单", variant=@ui.Soft, on_click=fn() {
               match tray_holder.val {
                 Some(t) => {
-                  let menu = @core.Menu::new(title="托盘")
+                  let menu = @shell.Menu::new(title="托盘")
                   let _ = menu.add_item("冒个提示").set_on_click(fn() {
                     app.toast_push("来自托盘菜单", @ui.Info)
                   })
@@ -500,7 +500,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       ],
       code=[
         "let ic = @win.icon_from_bgra(tray_icon_pixels(32), 32, 32)",
-        "match @core.Tray::new(\"libyue-showcase-tray\", icon=Some(ic)) {",
+        "match @shell.Tray::new(\"libyue-showcase-tray\", icon=Some(ic)) {",
         "  Ok(t) => {",
         "    t.set_tooltip(\"libyue 演示板\", \"左键计数\")",
         "    t.on_click(fn() { clicks.val = clicks.val + 1 })",
@@ -511,7 +511,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
         "  Err(e) => ...",
         "}",
         "// 派发表：宿主循环没有每帧钩子，示例自挂 200ms 表",
-        "let _ = @core.dispatch_tray_event()",
+        "let _ = @shell.dispatch_tray_event()",
       ],
     ),
     @shared.section(
@@ -542,7 +542,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
     @shared.section(
       "外部",
       "打开外部",
-      "把 URL 交给默认浏览器、把文件交给默认程序或指定程序、把路径交给文件管理器。文件走 `@sys.open_file` / `@sys.open_file_with`（相对路径按工作目录归一，路径不存在先给 `NotFound`，不把「打不开」说成「已交给系统」）；定位走 `@core.reveal_in_file_manager`：Linux 先试会话总线的 `FileManager1.ShowItems`（打开并**选中**），不在线才退回 `xdg-open` 打开父目录（选中态丢失），Windows 直调 `explorer /select`（分隔符统一成反斜杠才会选中）。Ok 只表示已交给系统，之后归操作系统。",
+      "把 URL 交给默认浏览器、把文件交给默认程序或指定程序、把路径交给文件管理器。文件走 `@sys.open_file` / `@sys.open_file_with`（相对路径按工作目录归一，路径不存在先给 `NotFound`，不把「打不开」说成「已交给系统」）；定位走 `@shell.reveal_in_file_manager`：Linux 先试会话总线的 `FileManager1.ShowItems`（打开并**选中**），不在线才退回 `xdg-open` 打开父目录（选中态丢失），Windows 直调 `explorer /select`（分隔符统一成反斜杠才会选中）。Ok 只表示已交给系统，之后归操作系统。",
       [
         @ui.row(
           [
@@ -553,7 +553,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
               }
             }),
             @ui.button("在文件管理器显示 TODO.md", variant=@ui.Soft, on_click=fn() {
-              match @core.reveal_in_file_manager("TODO.md") {
+              match @shell.reveal_in_file_manager("TODO.md") {
                 Ok(_) => ext_out.set("已交给文件管理器")
                 Err(e) => ext_out.set("显示失败：\{e}")
               }
@@ -588,7 +588,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
         "  Err(e) => println(\"失败: \\{e}\")",
         "}",
         "// 打开并选中：Linux 走 FileManager1.ShowItems，退回 xdg-open 父目录\n",
-        "match @core.reveal_in_file_manager(\"TODO.md\") { ... }",
+        "match @shell.reveal_in_file_manager(\"TODO.md\") { ... }",
         "// 用默认程序打开（相对路径按工作目录归一，路径不存在先给 NotFound）",
         "match @sys.open_file(\"TODO.md\") { ... }",
         "// 用指定程序打开：app 可以是 PATH 里的命令名或完整可执行路径",
