@@ -17,6 +17,12 @@ extern "c" fn wm_window_new(
 extern "c" fn wm_show(id : Int64) -> Unit = "wm_show"
 
 ///|
+extern "c" fn wm_hide(id : Int64) -> Unit = "wm_hide"
+
+///|
+extern "c" fn wm_is_hidden(id : Int64) -> Int = "wm_is_hidden"
+
+///|
 #borrow(out_w, out_h)
 extern "c" fn wm_size(
   id : Int64,

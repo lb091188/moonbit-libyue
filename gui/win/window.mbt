@@ -96,6 +96,20 @@ pub fn Window::show(self : Window) -> Unit {
 }
 
 ///|
+/// 隐藏驻留（W23）：窗口从屏幕上消失、WM 撤管，进程/托盘/单实例照活；不销毁
+/// 窗口，状态不丢。与最小化（XIconifyWindow 语义）不同——这里任务栏也不见。
+/// 幂等：已隐藏再调不重做。`show` 唤回 hide 前的位置并重新聚焦。
+pub fn Window::hide(self : Window) -> Unit {
+  wm_hide(self.id)
+}
+
+///|
+/// 当前是否处于隐藏驻留态。
+pub fn Window::is_hidden(self : Window) -> Bool {
+  wm_is_hidden(self.id) == 1
+}
+
+///|
 /// 焦点归属（见 `FocusOwner`）：上层据此决定「让位给本窗子件要不要清自绘控件
 /// 的焦点栈」。GTK 分支真判；Win32 分支目前固定报 `Area`（= 行为与本改动之前
 /// 一致，失焦只交还输入法不清栈），真正的判定随 W 线接；macOS 分支待平台批。

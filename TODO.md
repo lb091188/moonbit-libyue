@@ -138,9 +138,9 @@
 
 #### W23 · 窗口显隐：`Window::hide`（与既有 `show` / `request_focus` 对称）
 
-- [ ] **`Window::hide` 三平台门面**：X11 `XWithdrawWindow`（unmap+WM 撤管；注意区别于 `XIconifyWindow` 的最小化语义，且重新 map 后 WM 会重新摆放，唤起侧须接 `move_to` 复位位置——启动器类「Esc 隐藏驻留 + 唤回原位」的正解）；Windows `ShowWindow(SW_HIDE)`，唤起侧 `SW_SHOW` + `SetForegroundWindow`；macOS `orderOut:` / `makeKeyAndOrderFront:`（mac 档与 W22 的 mac 批同批，前置=有 mac 真机）。
+- [~] **`Window::hide` 门面已落，Linux 后端已接**（2026-10-16）：`win/stub.c` 三分支 + `Window::hide`/`Window::is_hidden`，`show` 唤回 hide 前的屏幕原点（GTK 分支 `gtk_widget_hide` + `XWithdrawWindow` 撤管，语义区别于 `XIconifyWindow` 最小化；Windows 分支 `SW_HIDE` 记客户区原点供 `SetWindowPos` 复位，**Linux 侧本机 wbtest 真开窗通过、Windows 分支未上机**）。macOS `orderOut:` / `makeKeyAndOrderFront:` 与 W22 的 mac 批同批，前置=有 mac 真机。
   - 动机：旗舰应用 moon-launcher（`lb091188/moon-launcher`）已把「Esc 隐藏驻留托盘」挂为其 README「已知边界」——发布包 0.1.1 只有 `show` 无 `hide`，启动器现在只能「Esc 清空→退出」。
-  - 验收判据：启动器 Esc 后窗口隐藏且托盘/DBus 单实例存活，Wake 或托盘点击唤回**原位置**并自动聚焦输入框；`hide` 幂等、hide 后 `request_focus` 不异常，三平台同一门面。
+  - 验收判据（本机判据已过：幂等、hide 后 `request_focus` 不异常；**真机肉眼项待用户复验**）：启动器 Esc 后窗口隐藏且托盘/DBus 单实例存活，Wake 或托盘点击唤回**原位置**并自动聚焦输入框。
 
 ### 6.3 与既有 §1/§2 的接缝（不改口径，仅指向）
 

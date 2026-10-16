@@ -125,6 +125,10 @@ typedef struct {
   int fullscreen;
   LONG_PTR fs_style;
   WINDOWPLACEMENT fs_wp;
+  // 隐藏驻留（W23 hide）：hide 前记下客户区左上角，show 时复位
+  int hidden;
+  int hidden_x;
+  int hidden_y;
   WmEv evs[64];
   WmEv last;
   int ev_head;
@@ -860,12 +864,46 @@ void wm_show(int64_t id) {
   }
   WmWindow *w = &wm_windows[id];
   if (w->hwnd != NULL) {
+    if (w->hidden) {
+      // 唤回原位（W23）：SW_HIDE 本身保留矩形，仍按 hide 前读数摆一次，
+      // 与 GTK 分支「重 map 后复位」同口径
+      SetWindowPos(w->hwnd, NULL, w->hidden_x, w->hidden_y, 0, 0,
+                   SWP_NOSIZE | SWP_NOZORDER);
+      w->hidden = 0;
+    }
     ShowWindow(w->hwnd, SW_SHOW);
     SetFocus(w->hwnd);
     // 与 GTK 桩同口径：把 map 后已就绪的消息跑掉，再标首帧
     wm_pump();
     w->need_draw = 1;
   }
+}
+
+/* 隐藏驻留（W23）：SW_HIDE + 记客户区左上角的屏幕坐标供 show 复位。
+ * 幂等：已隐藏再调直接返回。 */
+void wm_hide(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL || w->hidden) {
+    return;
+  }
+  RECT c;
+  GetClientRect(w->hwnd, &c);
+  POINT tl = {c.left, c.top};
+  ClientToScreen(w->hwnd, &tl);
+  w->hidden_x = tl.x;
+  w->hidden_y = tl.y;
+  w->hidden = 1;
+  ShowWindow(w->hwnd, SW_HIDE);
+}
+
+int wm_is_hidden(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  return wm_windows[id].hidden;
 }
 
 void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
@@ -3650,7 +3688,8 @@ int wm_clipboard_set_text(const char *text) {
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <X11/Xlib.h> // 全局热键 XGrabKey（W22 Linux 档）；x11 的 cflags/libs 已在 prebuild
+#include <X11/Xlib.h> // 全局热键 XGrabKey（W22 Linux 档）+ XWithdrawWindow（W23 hide）；x11 的 cflags/libs 已在 prebuild
+#include <gdk/gdkx.h> // GDK <-> X11 桥（hide 撤管用）
 
 #define WM_MAX_WINDOWS 32
 #define WM_MAX_FDS 64
@@ -3707,6 +3746,11 @@ typedef struct {
   // 挂着 ibus 的会话里 IM 会把字符键全吃进 commit 通道，非输入框焦点时按键
   // 事件就只剩修饰键（真机症状：键盘回显恒 65507 = Control_L）。
   int im_active;
+  // 隐藏驻留（W23 hide）：hide 前记下屏幕原点，show 时先摆回原位再 map——
+  // XWithdrawWindow 撤管后重 map，WM 会重新摆放窗口
+  int hidden;
+  int hidden_x;
+  int hidden_y;
 } WmWindow;
 
 static WmWindow wm_windows[WM_MAX_WINDOWS];
@@ -4112,6 +4156,12 @@ void wm_show(int64_t id) {
   }
   WmWindow *w = &wm_windows[id];
   if (w->window != NULL) {
+    if (w->hidden) {
+      // 重 map 前先把位置设回 hide 前的原点：XWithdrawWindow 撤管后重新 map，
+      // WM 会重新摆放（W23 验收=唤回原位）
+      gtk_window_move(GTK_WINDOW(w->window), w->hidden_x, w->hidden_y);
+      w->hidden = 0;
+    }
     gtk_widget_show_all(w->window);
     gtk_widget_grab_focus(w->area);
     // 必须把 map 请求推出去并跑一轮就绪事件：GDK 输出缓冲不 flush 的话，
@@ -4122,6 +4172,41 @@ void wm_show(int64_t id) {
     }
     wm_mark_draw(w);
   }
+}
+
+/* 隐藏驻留（W23）：gtk_widget_hide 撤 map + XWithdrawWindow 向 WM 撤管。
+ * 语义区别于 XIconifyWindow（最小化进任务栏），这里是完全消失、进程照活。
+ * 只在 X11 会话生效（本主链路口径）；幂等：已隐藏再调直接返回。 */
+void wm_hide(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return;
+  }
+  WmWindow *w = &wm_windows[id];
+  if (w->window == NULL || w->hidden) {
+    return;
+  }
+  gint x = 0;
+  gint y = 0;
+  GdkWindow *gw = gtk_widget_get_window(w->window);
+  if (gw != NULL) {
+    gdk_window_get_origin(gw, &x, &y); // 顶层窗 get_position 恒 (0,0)，问 GdkWindow
+  }
+  w->hidden_x = x;
+  w->hidden_y = y;
+  w->hidden = 1;
+  gtk_widget_hide(w->window);
+  if (gw != NULL && GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
+    XWithdrawWindow(gdk_x11_get_default_xdisplay(), gdk_x11_window_get_xid(gw),
+                    DefaultScreen(gdk_x11_get_default_xdisplay()));
+  }
+  gdk_display_flush(gdk_display_get_default());
+}
+
+int wm_is_hidden(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  return wm_windows[id].hidden;
 }
 
 void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
@@ -6114,6 +6199,13 @@ int64_t wm_window_new(int width, int height, const char *title) {
 
 void wm_show(int64_t id) {
   (void)id;
+}
+
+// 隐藏驻留（W23）macOS 占位：orderOut:/makeKeyAndOrderFront: 随 W22 mac 批落地
+void wm_hide(int64_t id) { (void)id; }
+int wm_is_hidden(int64_t id) {
+  (void)id;
+  return 0;
 }
 
 void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
