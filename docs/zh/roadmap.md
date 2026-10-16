@@ -1,8 +1,8 @@
 # 对外路线图
 
-本文回答三个问题：**现在能做什么**、**什么算承诺**、**接下来做什么、明确不做什么**。
+本文回答四个问题：**现在能做什么**、**都有什么功能点**、**什么算承诺**、**接下来做什么、明确不做什么**。
 
-内部施工单（批次、挂账、平台适配细节）在仓库根 [TODO.md](https://github.com/lb091188/moonbit-native-gui/blob/master/TODO.md)；本文只写对外口径，两者分工不混。
+分工（2026-10-16 定）：本文「功能面全景」收**全部功能点**——已交付的与计划中的都在这一张目录里；仓库根 [TODO.md](https://github.com/lb091188/moonbit-native-gui/blob/master/TODO.md) **只留未完成项**（挂账与排期）；批次过程、根因与实测细节在 [adaptation.md](adaptation.md) 与 `git log`，三处不互相复述。
 
 ## 定位
 
@@ -61,6 +61,38 @@ MoonBit 生态的**原生桌面 GUI 库**——目标位置是 GTK / WinForms / 
 - **工具链**：最新 moon 工具链在 glibc 2.28（Debian 10）上的可运行性——地板档构建的第一道闸。
 
 验证方式：构建与无头判据在 VM / 容器上跑，能不进 GUI 的都不进；托盘、通知外观、主题色这类需要人眼的项进人工清单。
+
+## 功能面全景
+
+图例：✅ 已交付并验证 · 🚧 部分（缺口见 TODO）· ⏳ 计划中 · ❌ 明确不做。
+
+本节是**能力目录**，不是施工记录：每条只回答「有什么、在哪、成什么样」。批次过程、根因与验收细节在 [adaptation.md](adaptation.md) 与 `git log`；未完成的排期在仓库根 [TODO.md](https://github.com/lb091188/moonbit-native-gui/blob/master/TODO.md)。
+
+### 地基与宿主
+
+| 功能点 | 状态 | 落点 | 成什么样 |
+|---|---|---|---|
+| 绘制契约与离屏像素回归 | ✅ | `render` | 纯 MoonBit 软件光栅（路径/填充/混合/渐变）+ Cairo 后端；位图、画布、图像、PNG 编解码；像素级判据可无头跑 |
+| 窗口地基与事件循环 | ✅ | `win`、`core/loop.mbt` | GTK3 / Win32 窗口 + 自研泵；循环归 MoonBit，平台库不再持有主循环 |
+| 文字排印 | ✅ | `text`、`render/cairo.mbt` | Pango（Linux）/ DirectWrite（Windows）字体族与富文本区间属性；文本 measure 与 baseline 回灌布局 |
+| 布局层 | ✅ | `modules/yoga-mbt`、`core/widget.mbt` | Flexbox 全量；脏区增量重排（子树版本 + 入参指纹跳过干净子树）；Yoga 真实 bug 语料已转回归用例 |
+| 焦点栈、键鼠接入与编辑内核 | ✅ | `core/focus.mbt`、`input` | Tab/Shift+Tab 由宿主驱动；按下即聚焦；跨平台同构的编辑内核（选区、撤销、IME 接缝） |
+| 平台输入映射层 | ✅ | `core/input_map.mbt` | 三平台修饰位折算、Win/mac 键码表、按钮号、IME 按键路由判据（纯函数 + 回归） |
+| 输入法通道 | ✅ | `win`、`text` | 四条件（preedit / commit / surrounding / caret）真机闭环；Linux 纯通道与 Windows `WM_IME_*` 两路；换焦点不串框 |
+| 应用宿主 | ✅ | `core/app.mbt` | 窗口 + `Loop` + 控件树 + 输入法通道 + 脏标上屏收在一处；原始事件 `raw_to_event` 独立可测 |
+| 自绘控件宿主 | ✅ | `core/widget.mbt` | 布局树 ↔ 控件树映射；绝对矩形单点折算；指针/滚轮/按键沿祖先链冒泡；绘制逐层平移 + 裁剪 |
+| 声明式层 | ✅ | `core/node.mbt`、`ui` | `Node` / `bind_node` / `swap_node` / `Store` / `Signal`；`mount_window` 挂进宿主；`render` 函数即视图（无模板语言） |
+| 样式层 | ✅ | `style` | 样式表写成 MoonBit 值（`Style` 规则块 + 具名 class 常量）、`hover/active/focus` 状态桶、`merge` 逐属性并集、过渡与阴影 |
+| 主题系统 | ✅ | `theme` | 色板派生 + 变更订阅；跟随系统明暗与强调色 |
+| 窗口级按键兜底通道 | ✅ | `core/app.mbt` | `App::add_key_fallthrough`：焦点链没消费或无焦点时按注册序问处理器，第一个 `true` 截断；摘掉的组件用 `Widget::is_painted()` 自证活体 |
+| 输入法通道补齐 | 🚧 | `win`、`text` | ibus 一套复验待确认；macOS `NSTextInputClient` 待真机；preedit 观感/候选窗位置等待肉眼确认 |
+| 原生子表面通道与其消费者 | ⏳ | `win/surface.mbt`、`web`、媒体 | 网页与视频作为纹理/子表面的统一形态，见 TODO §1「G8」 |
+| 模块拆分 | ⏳ | `modules/` | 判据与批次见 [module-structure.md](module-structure.md)；`gui/web` 出成 `gui-webview`、`core` 三刀 `base`/`shell`/`widget`，排期在 TODO §1「G9」 |
+| 窗口内按键路由补齐 | ⏳ | `core/app.mbt`、`ui` | 抬起事件投递、焦点链与兜底的优先级、方向键归属表、IM 门控复验——TODO §1「G10」 |
+
+### 控件与组件
+
+（逐节续写：绘图与资源 / 表单与交互 / 展示与导航 / 表格与列表 / 浮层与弹层 / 图表 / Markdown / 系统能力 / webview / 媒体 / 交付面 / 跨平台能力面。）
 
 ## 承诺与版本
 

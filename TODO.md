@@ -13,28 +13,12 @@
 
 ## 1. 地基（新栈自身进度）
 
-- [x] **G0** 输入法探针（`experiment/ime_probe`）— 纯通道四条件真机闭环（fcitx5）
-- [x] **G0b** 绑定层摘除与目录重排
-- [x] **G1** 绘制契约 + 离屏像素回归（`render`）
-- [x] **G2** GTK3 窗口地基 + 循环归 MoonBit（`win`、`core/loop.mbt`）
-- [x] **G3** Cairo 光栅 + Pango 文本（`render/cairo.mbt`、`text`）
-- [x] **G4** 焦点栈 + 键鼠接入 + 编辑内核（`core/focus.mbt`、`input`）
-- [x] **G5a** Linux 纯通道输入法接入（xdotool 注入验通中文提交）
+> 已完成的功能点全部收进 [docs/zh/roadmap.md](docs/zh/roadmap.md)「功能面全景」；本节只留未完成项。
+
 - [~] **G5b** 输入通道补齐
   - ibus 一套复验（探针侧归因 libpinyin display-style，待确认）
-  - [x] Windows 纯通道已落（W6）：`WM_IME_COMPOSITION` 读 `GCS_COMPSTR`→preedit（光标字符偏移换字节偏移）、`GCS_RESULTSTR`→commit，`ImmSetCompositionWindow`/`ImmSetCandidateWindow` 贴光标底边、`ImmNotifyIME(NI_COMPOSITIONSTR,CPS_CANCEL)` 复位并清本侧缓存，`WM_IME_SETCONTEXT` 滤掉系统组合窗（本栈 preedit 自绘）；探针 `experiment/ime_win_probe` 回证 API 通路，真实拼音端到端归 W7 注入（本机有微软拼音）。**兜底未启用**：`ImmAssociateContext` 优先 / 可见 `EDIT` 作可切换兜底，触发条件=只走 TSF 的 IME 在 legacy 通道打不出中文（本机未出现）
   - macOS：`NSTextInputClient`（前置：有 mac 真机）
   - 肉眼确认项：preedit 下划线观感、候选窗是否贴组合串末尾、caret 闪烁观感（点击定位已用 xdotool 客观验通：点控件最左端 caret 归 0、原位插字符）
-  - [x] **平台无关输入映射层落 `core/input_map.mbt`**（另线 #19 首批，纯函数 + 7 条回归）：三平台修饰位折算（`gtk_mods_to_mods`/`win_mods_to_mods`/`mac_mods_to_mods`）、两套键码表（`win_vk_to_keysym`/`mac_vk_to_keysym`，字母数字给未加 shift 的基码、`win_apply_shift` 补 shift/caps、OEM 符号键不硬编布局表而走 WM_CHAR/Unicode）、按钮号（`win_button_to_index`/`mac_button_to_index`）、按键路由 `ime_route`（组合中 → 光标键(带 Ctrl 也算、带 Alt 不算) → Tab → 快捷键 → 可打印 → 其余）与 `ime_should_reset`/`ime_should_feed_surrounding`；Win/mac 后端在 MoonBit 侧直接调这张表，Linux 的 `wm_mods` 与 `gtk_mods_to_mods` 逐位一致（两边注释互点名）
-  - [x] `TextEditorHost` 抽象收口：做成**焦点控件上的五个回调**（`on_key`/`on_commit`/`on_preedit`/`im_context`/`im_cursor`，input 已依赖 core 故不能反向持有 host），宿主按焦点投递；配套 `Window::im_reset()`——换焦点时先把排队的 commit 交还**旧**控件再 reset，实测修掉「A 框打的拼音 commit 进 B 框」
-- [x] **G6** 布局层承接
-  - [x] 脏区增量重排 + 测量/内在缓存跨布局驻留（YG3e）：39 个 setter 与结构/回调变更一律 `mark_changed`（全局时钟 + 节点 `rev`），入口 `scan_subtree_rev` 算子树版本（**不用父指针**——会与 children 成引用环、回收处理不了），`layout_into` 按「子树版本 + 入参指纹」跳过干净子树，两份缓存改按 `cache_rev` 作废并加 16 槽上限。同机 A/B（release µs/轮 @1121 节点）steady 3652→4、one_leaf 3656→78、全量路径 3664→3602 无回归，三场景校验值改前改后逐位相同；yoga-mbt 91/91（新增 10 条一律与「同状态从零全量布局」逐节点比对）。`App::paint_frame` 每帧 relayout 走的就是这条跳过路径，G7 接文本 measure 后 one_leaf 即实际形态
-  - [x] App 宿主（`core/app.mbt`）：窗口+`Loop`+控件树+输入法通道+脏标上屏收成一处；原始事件 `raw_to_event` 独立可测（code 0/1 键、2/3 按钮、4 移动、5 滚轮，按钮号走 `button`、滚轮纵向走 `axis`）；Tab/Shift+Tab 由宿主驱动焦点栈；按下时 `Widget::focusable_at` 把焦点交给命中的可聚焦控件（点已聚焦者不打断输入法）；`examples/native-app` 为 GUI 侧同类测试的**累积**验证页（注入回证：打字/Tab 环绕/按钮计数/点击定位/中文各归各框）
-  - [x] 控件宿主（`core/widget.mbt`）：布局树 ↔ 控件树映射、绝对矩形只在 `collect_abs` 一处折算、命中（最深+后画优先）、指针/滚轮/按键沿祖先链冒泡、绘制逐层 translate+clip；yoga-mbt 首次进主包依赖；真窗口用 xdotool 点击四格回证 `band_h=1/1/1/1`（core 22/22）
-  - [x] `patches/` 的 yoga bug 语料转回归用例：首条 `93078300` 已落成 `modules/yoga-mbt/src/patches_regression_wbtest.mbt`（守的是可观察契约——auto 高列容器下的弹性项隐藏/重显一轮后高度仍来自内容测量；本引擎无 Yoga 那条 computedFlexBasis 驻留路径）
-  - [x] 语料派生结案：Chrome 实测口径 = auto 主轴尺寸取各子项**假想主轴尺寸之和**（growth 不参与）；根因是引擎把子项基准读成了容器的 `flex_basis`（子项 flex-basis 全程失效），已修并落 7 行 Chrome 矩阵回归（`patches_regression_wbtest.mbt`）
-- [x] **自绘控件宿主的缺陷：命中区与渲染位置错位**（2026-10-12 抓到，同日复测**不成立**，按测量口径问题结案）：原观测是「桥接窗按钮行里点『后退』的渲染中心 (712,24) 触发的是『前进』」。本轮把同一行按截图逐盒量出边界后逐点注入复测（窗口原点同一次运行内固定，盒中心取自同一布局的截图）：x=55/137/213/290/372/468/564 七个中心**全部命中自己**——退出行 `dom_ok=4`（抓正文/抓链接/抓meta/抓结构 各一次）、`links=3`（页面正好三条链接）、`meta=1`、`headings=2`（h1+h2）、`elements=15`、`evals=1`、`cookie_bytes=2`，与「越靠右偏得越多」相反；更靠右的 639（后退）/700（前进）本轮早前也各命中一次。代码侧同形：命中与绘制都读 `Widget::rect`，而 `rect` 只在 `collect_abs`（跟着 yoga 布局）里写，滚动也只是 `content.node.set_top(-offset)` 让布局带着位移，两者不可能错开帧。**结论**：那条观测的坐标表取自另一时刻的布局（同一示例在 `App::enable_root_scroll` 合并前后按钮行整体位移过几十像素），拿旧坐标点去点新布局就会命中邻居。**下次要再见到，先立判据**：同一帧截图量出的盒边界 + 当场注入坐标，两者取自同一次运行；只有这时才谈得上「错位」。留此记录不删原观测。
-- [x] **webview 拆除期 GTK 断言**（2026-10-12 记，同日复现并修掉）：关主窗（挂着网页区那扇）退出时固定 5 行 `CRITICAL`——`webkit_web_view_is_loading/get_title/get_uri` 报 `WEBKIT_IS_WEB_VIEW(webView)` 断言失败，紧跟 `gtk_widget_get_parent`/`gtk_widget_destroy` 报 `GTK_IS_WIDGET` 失败；只关桥接窗则一条没有（对照实验把范围钉在「带网页区的窗被拆」）。根因如当初推断：`wm_close` 把子件槽整格清零并销毁 GtkWidget 树，但没人通知能力层，`Webview.handle` 仍是旧槽号、泵与轮询继续拿它查引擎，而桩里 `wb_get` 只看「槽位有没有 view」看不出「view 已随窗口销毁」。修法把存活判据放到知道拆除时刻的一侧：桩里 `wb_view_alive(v)` = 有 view **且** `wm_surface_container(v->surface_id) != NULL`，`wb_get` 一处过闸（所有查询自动变空操作，不必逐个补判据）、`wb_destroy` 同判据下只还资源不碰指针；MoonBit 侧加公开口 `Webview::is_alive()`，泵发现视图不在即停排期、句柄作废、丢掉 `eval_waiters`。验证：`web` 17/17（新增 1 条收口语义）、`--deny-warn` 零警告、全仓红点仍 287/68；真窗口同一条对照实验重跑 **CRITICAL 0 条**、进程自退、退出行读数照常，另回归两条确认活视图没被一起挡掉（桥接页照常从协议装载并读出中文标题；协议行 `reg=1 loads=1 files=2 unreg=1 fails=1` 与修复前逐字段一致）。原理与口径写进中英 adaptation「跨 FFI 句柄的活期」一节。
 - [~] **G7** 声明式层与组件宿主接线（`mount` 目标从 `View` 换 yoga-mbt 节点；恢复全仓门禁。宿主与声明式地基已就位：`@core.App` + `@core.Widget` 树 + `@core.Node`/`bind_node`/`swap_node`/`Store`/`Signal`，验证页 `examples/native-app`；剩组件与图表挂新 Painter）
 - [ ] **G8** 原生子表面通道与其消费者（见 §4「浏览器」「视频」）
 - [ ] **G9 模块拆分**（方案与判据见 [docs/zh/module-structure.md](docs/zh/module-structure.md)：外部重资产 + 必须强制下发链接参数 → 开模块；纯内部层 → 留子包）
@@ -46,7 +30,6 @@
   - [ ] **焦点链会抢走窗口级兜底**：`ui.button` 的键盘口径是「空格/回车激活」。于是用户 Tab 过任何一个按钮之后，空格就不再是播放器的「播放/暂停」而是「按下那个按钮」——与 Web 一致，但播放器用户预期相反。待定口径：播放器快捷键是否要**优先于**焦点链（给 `add_key_fallthrough` 加「抢占档」），还是把按钮激活键收成只 `Enter`（改 ui 公共行为，波及所有表单）。先立判据再动：同一窗内「Tab 到按钮 + 按空格」的期望行为写进契约与 wbtest。
   - [ ] **方向键与滚动/焦点导航的归属**：`←/→/↑/↓` 在 `ui.slider`、`ui.input`（光标移动）、滚动容器与本批的播放器音量键之间目前**没有优先级记录**——同一条键谁先吃，靠的是「焦点链先问、兜底后问」这条隐式规则。要把可达路径写成表（哪个控件在焦点上时四个方向键分别归谁）。
   - [ ] **输入法门控下的按键可达性复验**：非输入框焦点时，ibus/fcitx 会话里字符键可能被 IM 吃掉只剩修饰键（真机旧症状：回显恒 65507 = Control_L）。`App` 侧有 IM 焦点门，但**播放器快捷键全走 keysym 字符键之外的键**只是绕开、不是解决；要在带 IM 的真机跑一轮「焦点在播放器上按空格/方向键」的复验并记结果。
-  - [x] 已完成的地基：`App::add_key_fallthrough` 窗口级兜底通道（焦点链没消费或无焦点时按注册序问，第一个 true 截断；无宿主不挂），摘掉的组件用 `Widget::is_painted()` 自证活体——见中英 `adaptation.md` 同名节。
 
 ## 2. 框架能力域 — 全部待在新栈重做
 
