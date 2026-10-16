@@ -144,7 +144,7 @@ handle=fn(a : @core.App) -> Unit {
 
 ```sh
 git clone https://github.com/lb091188/moonbit-native-gui && cd moonbit-native-gui
-moon run examples/showcase    # 14 页：基础/表单/导航/数据展示/反馈/事件与布局/系统集成…
+moon run examples/showcase    # 15 页：基础/表单/导航/数据展示/反馈/事件与布局/系统集成…
 ```
 
 左边菜单选页、右边对着写，每页源码独立成文件（`examples/showcase/pages/*.mbt`），复制改写即可。想从小例子入手：`moon run examples/hello`（最小窗口）与 `moon run examples/hello-themed`（主题控件集）。
