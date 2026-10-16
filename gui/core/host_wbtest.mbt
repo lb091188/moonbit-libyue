@@ -283,8 +283,8 @@ test "invalidate_id 只标命中窗的局部脏区" {
 ///|
 /// 整窗置脏（`full=true`）在同批内不可被局部置脏收窄成小矩形。
 test "整窗置脏之后同批的局部置脏不许收窄脏区" {
-  let r1 = { x: 10.0, y: 10.0, w: 20.0, h: 20.0 }
-  let r2 = { x: 40.0, y: 40.0, w: 8.0, h: 8.0 }
+  let r1 : Rect = { x: 10.0, y: 10.0, w: 20.0, h: 20.0 }
+  let r2 : Rect = { x: 40.0, y: 40.0, w: 8.0, h: 8.0 }
   // 没请求整窗：局部置脏照常累积
   let acc = accept_widget_rect(false, Some(r1), r2)
   match acc {

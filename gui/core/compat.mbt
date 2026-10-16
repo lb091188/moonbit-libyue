@@ -19,6 +19,7 @@ pub type KeyDiff[T] = @base.KeyDiff[T]
 
 ///|
 pub type FocusStack = @base.FocusStack
+pub type Rect = @base.Rect
 
 ///|
 pub fn batch(f : () -> Unit) -> Unit {

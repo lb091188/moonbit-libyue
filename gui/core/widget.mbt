@@ -10,14 +10,6 @@
 // 所以控件的绘制回调只写本地坐标、也不需要自己裁剪。
 
 ///|
-pub(all) struct Rect {
-  x : Double
-  y : Double
-  w : Double
-  h : Double
-}
-
-///|
 /// 光标形状编号（`Widget.cursor` 与 `Window::set_cursor` 共用同一套码）。
 /// 全自绘栈没有原生控件，形状只能由宿主按悬停路径下发：取路径上**最深的那个
 /// 非零请求**，所以包住一整组的 `cursor_group` 会自然回退生效。
@@ -30,12 +22,6 @@ pub const CURSOR_TEXT : Int = 2
 pub const CURSOR_RESIZE_H : Int = 3
 ///|
 pub const CURSOR_RESIZE_V : Int = 4
-
-///|
-/// 半开区间判定：`px ∈ [x, x+w)`、`py ∈ [y, y+h)`；零宽/零高矩形不命中。
-pub fn Rect::contains(self : Rect, px : Double, py : Double) -> Bool {
-  self.w > 0.0 && self.h > 0.0 && px >= self.x && px < self.x + self.w && py >= self.y && py < self.y + self.h
-}
 
 ///|
 pub(all) enum PointerKind {

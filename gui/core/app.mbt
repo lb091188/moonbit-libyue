@@ -315,28 +315,13 @@ pub fn App::schedule_paint(self : App) -> Unit {
 }
 
 ///|
-/// 两矩形并集（脏区累积用）。
-fn rect_union(a : Rect?, b : Rect) -> Rect {
-  match a {
-    None => b
-    Some(r) => {
-      let x0 = if r.x < b.x { r.x } else { b.x }
-      let y0 = if r.y < b.y { r.y } else { b.y }
-      let r1x = r.x + r.w
-      let b1x = b.x + b.w
-      let x1 = if r1x > b1x { r1x } else { b1x }
-      let r1y = r.y + r.h
-      let b1y = b.y + b.h
-      let y1 = if r1y > b1y { r1y } else { b1y }
-      { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
-    }
-  }
-}
-
-///|
 /// 局部置脏的累积规则：`full` 为真表示本批已请求整窗重绘，此时局部矩形不改脏区。
 fn accept_widget_rect(full : Bool, cur : Rect?, r : Rect) -> Rect? {
-  if full { cur } else { Some(rect_union(cur, r)) }
+  if full {
+    cur
+  } else {
+    Some(match cur { None => r; Some(x) => x.union(r) })
+  }
 }
 
 ///|
