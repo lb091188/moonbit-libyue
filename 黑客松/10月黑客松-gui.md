@@ -1,6 +1,4 @@
-# native-gui 项目申报书（10 月·重报）
-
-> 重报说明：本版补充与生态内既有 GUI 能力（MoUI / Sun）的边界与定位差异、同一界面的操作案例；平台进展更新至 10 月中（macOS 平台批 / 扩展图表 / 系统能力探测页）。
+# native-gui(原 moonbit-libyue) 项目申报书
 
 ## 基本信息
 
@@ -8,24 +6,24 @@
 - 参赛者：刘斌（NoahLiu）
 - 联系方式：<lbpeter0911@163.com>
 - GitHub：<https://github.com/lb091188/moonbit-native-gui>
-- 项目方向：MoonBit 桌面 GUI 库——丰富的桌面系统 API + 轻量自有渲染栈
+- 项目方向：MoonBit 轻量原生跨平台桌面 GUI 库
 - 是否为移植项目：否
 
 ## 项目简介
 
-native-gui 是 MoonBit 生态的**桌面 GUI 库**，三个关键词：**系统 API 丰富、轻量、开箱即用**。
+native-gui 是 MoonBit 生态的**轻量原生跨平台 GUI 库**，主攻三个方向：**系统接口丰富、轻量、开箱即用**。
 
-- **系统 API 丰富**——让 MoonBit 应用作为完整的桌面应用活在操作系统里：托盘（Linux SNI / macOS NSStatusItem / Windows Shell_NotifyIcon）、桌面通知、全局快捷键、开机自启、剪贴板、原生菜单、文件对话框、拖放、空闲检测、MPRIS 媒体控制（Linux），以及壁纸 / 音量 / 电源 / 打印机 / 显示器 / 浏览器历史 / 已装应用等系统查询——统一门面，能力探测 + 结构化降级，不静默失败
-- **轻量**——渲染、布局（Flexbox）、控件全为纯 MoonBit，不依赖 Skia 等重型图形引擎；`hello` 最小窗口的 release 二进制 **1.1 MB**（Linux 实测）；不 import 的包不进二进制，音视频引擎等重能力拆独立模块
-- **开箱即用**——`moon add` 后零配置直接 `moon run`，无引擎初始化预热；组件库、14 种图表 + 交互层、Markdown 视图、内嵌 WebView 都是库内成品
+- **系统接口：** —— 托盘、桌面通知、全局快捷键、开机自启、剪贴板、原生菜单、文件对话框、拖放、空闲检测、媒体控制，以及壁纸 / 音量 / 电源 / 打印机 / 显示器 / 浏览器历史 / 已装应用等系统查询
+- **轻量：** —— 渲染、布局、控件均为纯 MoonBit 自绘（软件光栅器），不依赖 Skia 等外部图形引擎；`hello` 最小窗口的 release 二进制 **1.1 MB**、冷启动约 0.5 s 出窗，`showcase` 15 页全功能板 5.5 MB / 约 1 s（Linux 实测）；音视频引擎等重能力拆独立模块
+- **开箱即用：** —— `moon add` 后零配置直接 `moon run`；组件库、14 种图表 + 交互层、Markdown 视图、内嵌 WebView 都是库内成品
 
-平台状态：**Windows / Linux 已交付并经真机验证**；**macOS 后端已在 `mac` 分支落地**（Cocoa 窗口 / CoreText / ImageIO / WKWebView / 系统能力族 / 媒体线，17 个平台批，CI 三平台全绿），待真机目视复验后并线。
+平台状态：**🟩 Windows / 🟩 Linux / 🟨 macOS ** 
+ - 🟨 待真机测试（后端已在 `mac` 分支落地，CI 三平台全绿）
+ - 🟩 已真机测试
 
-## 与生态内既有 GUI 能力的关系
+## 与既有 GUI 能力的边界
 
-- **零代码依赖**：与 MoUI（wzzc-dev/moui）、Sun（wzzc-dev/sun）没有任何引用或代码复用；本库直接依赖只有 MoonBit 标准库与操作系统组件（GTK / Win32 / Cocoa / Pango / DirectWrite / CoreText）
-- **定位互补**：MoUI 面向多端共享逻辑（Skia / WebGPU 渲染主线，覆盖 Web 与移动）；Sun 是图形与文本渲染底层库；native-gui 专注桌面一条线——系统集成的深度与桌面成品组件。三者问题域不同
-- **独立重建的动机**：项目从 Yue / libyue 的 MoonBit 绑定起步，绑定路线受制于上游 C++ 构建链与维护节奏；重写为纯 MoonBit 自绘栈后零 vendor、`moon add` 即用。生态内此前没有以桌面系统集成为主线的 MoonBit GUI 库——这条线是空白，不是重复
+与 MoUI（wzzc-dev/moui）、Sun（wzzc-dev/sun）**零代码依赖**：本库直接依赖只有 MoonBit 标准库与操作系统组件（GTK / Win32 / Cocoa / Pango / DirectWrite / CoreText）。定位互补：MoUI 面向多端共享逻辑（Skia / WebGPU 渲染），Sun 是图形文本渲染底层，native-gui 专注桌面线——生态内此前没有以桌面系统集成为主线的 MoonBit GUI 库，此为独立重建的立足点。
 
 ## 差异化用户收益：同一界面的操作案例
 
@@ -119,13 +117,13 @@ match @core.Tray::new("my-player", icon=ic) {
 
 - 可运行示例（`moon run` 直接启动）：
   - 基础：`hello` 最小窗口、`hello-themed` 主题控件族、`showcase` 全功能演示板（15 页，含系统能力探测页）
-  - 系统集成：showcase 系统页（托盘 / 通知 / 快捷键 / 消息框 / 任务栏进度）、系统能力探测页、`sysmonitor` 系统监控器
   - 浏览器演示：地址栏导航与历史、自定义协议本地站点、JS↔原生互操作、DOM 抓取、新窗 / 权限 / 下载策略
   - 音频 / 视频演示：播放 / 进度 / 倍速、外挂与内嵌字幕、音画同步
-- CI 门禁：GitHub Actions 三平台（Linux / Windows / macOS），库包测试 / 示例构建 / release 校验分层，结果公开可查；`moon check` 全仓零错误零警告、`moon test` 全仓用例全绿为提交门槛
-- `mac` 分支：CI 三平台全绿（含真实 macOS runner 上的读数环与 `hello` 建窗存活冒烟）
+- CI 门禁：GitHub Actions 三平台（Linux / Windows / macOS），库包测试 / 示例构建 / release 校验分层；`moon check` 全仓零错误零警告、`moon test` 全仓用例全绿为提交门槛
 
 ## 移植或参考说明
 
-- 参考对象：Yue / libyue（<https://github.com/yue/yue>，LGPL 2.1）——本库起步于它的 MoonBit 绑定，现为独立实现，仅以之为行为参考；Yoga（<https://github.com/facebook/yoga>，MIT）——Flexbox 布局的规范参照，布局引擎为独立纯 MoonBit 实现
+- 参考对象：
+  - Yue / libyue（<https://github.com/yue/yue>，LGPL 2.1）——本库起步于它的 MoonBit 绑定，现为独立实现，仅以之为行为参考
+  - Yoga（<https://github.com/facebook/yoga>，MIT）——Flexbox 布局的规范参照，布局引擎为独立纯 MoonBit 实现
 - 本项目许可证：MIT
