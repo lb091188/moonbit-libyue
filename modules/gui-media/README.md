@@ -14,7 +14,7 @@
 
 | 包 | 内容 |
 |---|---|
-| `NoahLiu/gui-media/media` | ffmpeg 解码 + miniaudio 设备直出的引擎（`AudioPlayer` / `VideoPlayer` / `Demuxer` 之上的字幕层与 LRC 歌词层），以及两个节点组件 `video`（含音轨与字幕叠加）与 `audio`（纯音频，含歌词） |
+| `NoahLiu/gui-media/media` | ffmpeg 解码 + miniaudio 设备直出的引擎（`AudioPlayer` / `VideoPlayer` / `Demuxer` 之上的字幕层与 LRC 歌词层、纯 MoonBit 的实时频谱分析），以及两个节点组件 `video`（含音轨与字幕叠加）与 `audio`（纯音频，含歌词与频谱条） |
 
 两条时钟不同轴：`player_t` 的位置是墙钟 + 帧时间戳，`audio_player_t` 的是设备已消费字节。所以带视频轨的文件走前者、纯音频走后者，组件之间不互相代打。
 
@@ -51,6 +51,8 @@ let v = @media.video("demo.mp4", width=640.0, height=360.0, auto_play=true)
 两个组件都返回 `@core.Node`，直接挂进声明式树即可；观测口 `on_tick`/`on_speed`/`on_subtitle`/`on_lyric` 给位置、档位、字幕来源与歌词行数，调用方不必读引擎内部状态。打不开时不抛异常——画说明板并把原因经 `on_error` 交出去。
 
 外部文本（`.lrc` / `.srt`）由调用方读好喂进来，组件不做 IO；解析本身可单用：`@media.lrc_parse(text)` 给 `Lrc`（排好序的 `cues` + `ti/ar/al/by` 元信息），`@media.lrc_at(l, 秒)` 取当前行。
+
+频谱条默认开着（`spectrum=false` 关掉）：引擎在每段 PCM 推给设备前经 `pcm_tap` 转一份出来，`@media.Spectrum` 加 Hann 窗做 1024 点 radix-2 FFT、转 dB 后按对数频段分 24 条，快起慢落。取样点比耳朵快一个队列深度（约 0.23 秒），绘制时按 `AudioPlayer::queued_frames` 往回看同样多的帧补回来。
 
 引擎层（不用组件、自己驱动时钟时）：
 

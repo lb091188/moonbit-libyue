@@ -1803,6 +1803,14 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - 命名口径：按 `docs/zh/design.md` §2 改名批的既定方向去掉 `_t`（历史 themed 变体尾巴）并对齐 Web 元素——播放器组件 `player_t` → `video`，新组件叫 `audio`（gui-media 0.1.0 未发布过，改名零破坏）；共用件 `player_bar_hit`/`player_speed_at` 随之叫 `bar_hit`/`bar_speed_at`。**注意 `audio_player_t`/`video_player_t` 是已删旧链（`modules/gui-media/src`）的组件名**、签名收引擎实例，与本轮无关，本文与 `system-capabilities.md` 里那些历史条目保持原样不改名。
 - 验证：`moon test ./media` **25/25**（新增 `ap_skip` 用例）；`modules/gui-media` 与 `modules/gui-examples` 的 `moon check --deny-warn` 零警告、两示例 native 构建通过；全仓 `moon test` **1179/1179**。真机观感（是否出声、-5s/+5s 落点、倍速听感、换曲）由用户复验。
 
+### 音频频谱动画（纯 MoonBit FFT，零 C / 零 libavfilter，2026-10-16）
+
+- 形态：取样点在 `ap_fill` 的**重采样之后、入队之前**（引擎开一个 `pcm_tap` 回调，跑在主线程的 MoonBit 侧，不碰设备回调线程——规则 3「不做 C→MoonBit 回调」在组件内部同样成立）。样本环是 1024 点窗口 + 16384 帧回看深度，绘制时按 `queued_frames` 往回看同样多的帧再算，把「取样比耳朵快约 0.23 秒（高水位 40000 字节 ÷ 44.1kHz 立体声 s16 的 176400 B/s）」这条补回来；倍速下喂的是重采样后的流，与耳朵听到的同源。
+- 为什么不走 ffmpeg：`showspectrum`/`ebur128` 要先给绑定层搭一套 filter graph，新增的 C 面远大于收益；1024 点 radix-2 在 MoonBit 里百来行、30fps 下算力可忽略，符合「能用 MoonBit 解决的不进 C」。
+- 判据（全在无头层钉死）：FFT 本体用**直流输入**钉（只有 bin 0 有值、其余 bins < 1e-6）；分带用 440 Hz / 1000 Hz 正弦钉落点（24 段对数分带 40 Hz..16 kHz，440 Hz 在第 9 段附近）；立体声下混与单声道同形；喂两窗后回看一窗仍点亮同段。
+- 工具链坑：① **记录字段存闭包必须写成 `(self.tap)(...)`**，`self.tap(...)` 会被当方法解析、报 `Type AudioPlayer has no method tap`；② `String.trim()` 给的是 `StringView`，喂要 `String` 的函数得 `.to_owned()`（`s[0:n]` 同理）；③ 只改数组内容不整体重赋值时字段别标 `mut`，否则吃 `unused_mut` 警告（`--deny-warn` 下就是错误）。
+- 验证：`moon test ./media` **33/33**（新增 4 条频谱用例）、全仓 `moon test` **1187/1187**、`gui-media` 与 `gui-examples` `--deny-warn` 零警告、audio 示例 native 构建通过。真机观感（条子跟不跟得上节奏、seek 后闪不闪、静音降级环境下的空态）由用户复验。
+
 ### Store 内建去重与 `T : Eq` 限定实现（2026-10-13，前端化 P3 第 0 步）
 
 - 口径：`Store::set` / `Store::update` 给 `pub fn[T : Eq]` 限定实现（相同值只存不发，走 `Signal::set_eq`）；`Signal::set` 本体与通知发射不动，`Store::signal()` 仍可直连 `Signal::set` 强发。需要无条件重发用 `set_always` / `update_always`。

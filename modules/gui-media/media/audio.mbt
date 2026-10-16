@@ -136,6 +136,9 @@ pub(all) struct AudioPlayer {
   played_base : Ref[Int64]
   pos_base : Ref[Double]
   muted_ticks : Ref[Int]
+  /// PCM 旁路（频谱等消费者用）：每次推给设备前回调一段 s16 交错样本与声道数。
+  /// 在 MoonBit 侧、主线程上跑，不碰设备回调线程。
+  tap : (Bytes, Int) -> Unit
 }
 
 ///|
@@ -202,6 +205,21 @@ pub fn AudioPlayer::is_muted(self : AudioPlayer) -> Bool {
   match self.dev.val {
     Some(d) => mbt_adev_has_device(d) != 1
     None => true
+  }
+}
+
+///|
+/// 设备队列里还压着多少帧（无设备/未开给 0）：频谱用它把「取样时刻」换算回
+/// 「耳朵听到的时刻」。
+pub fn AudioPlayer::queued_frames(self : AudioPlayer) -> Int {
+  match self.dev.val {
+    Some(d) =>
+      if mbt_adev_has_device(d) == 1 && self.channels > 0 {
+        (mbt_adev_queued_bytes(d) / (self.channels * 2).to_int64()).to_int()
+      } else {
+        0
+      }
+    None => 0
   }
 }
 
@@ -394,8 +412,8 @@ fn AudioPlayer::ap_fill(self : AudioPlayer) -> Unit {
         match self.demuxer.decode_pcm() {
           Some(pcm) => {
             let out = media_resample_s16(pcm, self.channels, self.speed.val)
+            (self.tap)(out, self.channels)
             let _ = mbt_adev_push(d, out, out.length())
-            ()
           }
           None => {
             self.eof.val = true
@@ -447,6 +465,12 @@ pub fn AudioPlayer::make(
   path : String,
   volume? : Double = 0.8,
   looping? : Bool = false,
+  /// PCM 旁路回调（频谱动画用）：每段推给设备的 s16 交错样本都转一份出来，
+  /// 第二参是声道数。默认空操作——不用动画的人零代价。
+  pcm_tap? : (Bytes, Int) -> Unit = fn(
+    _pcm : Bytes,
+    _channels : Int,
+  ) -> Unit { () },
 ) -> Result[AudioPlayer, String] {
   let demuxer = match @ffmbt.Demuxer::open(path) {
     Ok(d) => d
@@ -481,6 +505,7 @@ pub fn AudioPlayer::make(
     played_base: Ref(0L),
     pos_base: Ref(0.0),
     muted_ticks: Ref(0),
+    tap: pcm_tap,
   })
 }
 

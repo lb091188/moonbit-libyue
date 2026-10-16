@@ -40,6 +40,8 @@ pub fn audio(
   auto_play? : Bool = false,
   volume? : Double = 0.8,
   looping? : Bool = false,
+  /// 舞台区画不画实时频谱条（关掉就是纯文字舞台，解码旁路也不再喂分析器）。
+  spectrum? : Bool = true,
   /// 每 tick 的观测口（位置秒 / 是否在播）：示例与回证靠它证明时钟在走。
   on_tick? : (Double, Bool) -> Unit = fn(
     _t : Double,
@@ -53,7 +55,17 @@ pub fn audio(
   on_error? : (String) -> Unit = fn(_s : String) -> Unit { () },
   handle? : (@core.Widget) -> Unit = fn(_w : @core.Widget) -> Unit { () },
 ) -> @core.Node {
-  let engine = match AudioPlayer::make(path, volume~, looping~) {
+  let sp = Spectrum::make()
+  let engine = match AudioPlayer::make(
+    path,
+    volume~,
+    looping~,
+    pcm_tap=fn(b : Bytes, ch : Int) -> Unit {
+      if spectrum {
+        sp.feed(b, ch)
+      }
+    },
+  ) {
     Ok(p) => p
     Err(e) => {
       on_error(e)
@@ -84,6 +96,25 @@ pub fn audio(
     }
     p.set_fill_color(@theme.theme_bg_panel())
     p.fill_rect(0.0, 0.0, r.w, r.h)
+    // 频谱条：底部对齐、等宽槽位，电平来自「回看队列深度」那一窗样本
+    if spectrum && r.h > 12.0 {
+      let lv = sp.levels(engine.queued_frames(), engine.sample_rate())
+      let n = lv.length()
+      let slot = r.w / n.to_double()
+      let bw = slot * 0.62
+      for b = 0; b < n; b = b + 1 {
+        let h = lv[b] * (r.h - 6.0)
+        if h > 0.5 {
+          p.set_fill_color(@theme.theme_primary())
+          p.fill_rect(
+            b.to_double() * slot + (slot - bw) / 2.0,
+            r.h - h,
+            bw,
+            h,
+          )
+        }
+      }
+    }
     let line = lrc_at(lrc, engine.current())
     if line.length() > 0 {
       p.flush()
@@ -196,6 +227,7 @@ pub fn audio(
             ap_skip_step
           }
           engine.seek(ap_skip(engine.current(), engine.duration(), delta))
+          sp.reset()
           @core.invalidate()
         } else if hit.0 == "speed" {
           speed_i.val = speed_i.val + 1
@@ -230,6 +262,7 @@ pub fn audio(
         if dragging.val {
           dragging.val = false
           engine.seek(drag_frac.val * engine.duration())
+          sp.reset()
           @core.invalidate()
         }
         vol_drag.val = false

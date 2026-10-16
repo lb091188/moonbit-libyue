@@ -13,6 +13,7 @@
 supported_targets = "native"
 
 import {
+  "moonbitlang/core/math",
   "NoahLiu/yoga-mbt/src" @yoga,
   "NoahLiu/ffmpeg-mbt/src" @ffmbt,
   "NoahLiu/native-gui/core",
