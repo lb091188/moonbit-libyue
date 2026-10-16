@@ -1,6 +1,6 @@
 # AGENTS.md — native-gui AI 协作规则(ZCode 读取仓库根 AGENTS.md)
 
-native-gui(`NoahLiu/native-gui`,2026-10-12 前名 moonbit-libyue):MoonBit **自绘**跨平台桌面 GUI 库——窗口/像素/事件循环/布局全自有,控件一律自绘,**不依赖 libyue**。
+native-gui(`NoahLiu/native-gui`,2026-10-12 前名 moonbit-libyue):MoonBit 的轻量跨平台桌面 **GUI 框架**——窗口原生直连、渲染管线自绘、界面组件齐全、系统接口完备(窗口/像素/事件循环/布局全自有,控件一律自绘,**不依赖 libyue**)。
 当前主链路:**Ubuntu 24.04 + X11 + XFCE**(其余平台状态见适配经验文档)。
 
 包布局(2026-10-12 定案): 库模块根 = `gui/`(`moon.mod` 在此,name 仍是 `NoahLiu/native-gui`,故 mooncakes 上包路径 `NoahLiu/native-gui/<包>` 与用户既有 import **全部不变**),14 个库包(`core`/`ui`/`render`/`text`/`theme`/`icons`/`sys`/`input`/`win`/`dbus`/`chart`/`mdview`/`web`/`style`)都在其下;`examples/`、`experiment/` 各为**独立模块**(`NoahLiu/native-gui-examples` / `NoahLiu/native-gui-experiment`),经 `moon.work` 本地解析依赖库模块——示例/探针的构建与测试不再牵连库门禁;媒体扩展独立模块 `modules/gui-media`(模块级可选),扩展示例模块 `modules/gui-examples`;旧链 `yue/` 已删除。libyue 只作**老师**(行为参考、可平移资产来源、`patches/` 的真实 bug 语料)。

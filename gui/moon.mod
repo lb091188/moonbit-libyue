@@ -4,7 +4,7 @@ version = "0.1.1"
 
 preferred_target = "native"
 
-description = "MoonBit 桌面 GUI 库：丰富的桌面系统 API（托盘/通知/快捷键/自启…）+ 轻量自绘栈；Windows / Linux 原生运行，macOS 后端在 mac 分支落地中"
+description = "MoonBit 轻量跨平台桌面 GUI 框架：窗口原生直连、渲染管线自绘、界面组件齐全、系统接口完备（托盘/通知/快捷键/输入法/自启…统一门面）；Windows / Linux 原生运行，macOS 后端在 mac 分支落地中"
 
 readme = "README.md"
 

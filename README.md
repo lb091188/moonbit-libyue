@@ -4,7 +4,7 @@
 
 > **On origins** — this library started life as a MoonBit binding of [Cheng Zhao (zcbenz)](https://github.com/zcbenz)'s [Yue / libyue](https://github.com/yue/yue), with [Yoga](https://github.com/facebook/yoga)'s flexbox for layout. The stack is self-drawn now and depends on neither — what stays with us is what we learned from them. Thanks also to [MoonBit](https://github.com/moonbitlang).
 
-A **desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — everything a desktop app needs from the OS (tray, notifications, shortcuts, autostart, D-Bus…) behind one API, with rendering, layout and widgets owned by a pure-MoonBit stack and no heavy engine like Skia. One codebase runs native windows on Windows ✅ / Linux ✅, with the macOS backend landing on the `mac` branch; zero config after `moon add`.
+A **lightweight cross-platform desktop GUI framework** for the [MoonBit](https://github.com/moonbitlang) ecosystem — **native-direct windowing, a self-drawn rendering pipeline, a complete component set, complete system interfaces**: windows and the event loop talk straight to the X11 / Win32 / Cocoa APIs with no third-party windowing library; raster, text and layout are pure MoonBit, every widget self-drawn, no Skia-class engine; widgets, themes, charts, a Markdown view and an embedded WebView ship in the box; tray, notifications, global shortcuts, IME, autostart and the rest of the desktop surface sit behind one facade. One codebase runs native windows on Windows ✅ / Linux ✅, with the macOS backend landing on the `mac` branch; zero config after `moon add`.
 
 English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/master/README_ZH.md)
 

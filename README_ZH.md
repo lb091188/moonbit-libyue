@@ -4,7 +4,7 @@
 
 > **来时的路**——本库最初是 [赵成(zcbenz)](https://github.com/zcbenz) 的 [Yue / libyue](https://github.com/yue/yue) 的 MoonBit 封装，布局沿用 [Yoga](https://github.com/facebook/yoga) 的 flexbox。如今这套栈已自绘、不再依赖二者——过去是**用**它们，现在是**学**它们留下的思路。也感谢 [MoonBit](https://github.com/moonbitlang)。
 
-[MoonBit](https://github.com/moonbitlang) 生态的**桌面 GUI 库**——把桌面应用需要的系统集成做全（托盘 / 通知 / 快捷键 / 自启 / D-Bus…），渲染、布局与控件由自有的纯 MoonBit 栈实现、不依赖 Skia 等重型图形引擎。一套代码跑 Windows ✅ / Linux ✅ 原生窗口，macOS 后端在 `mac` 分支落地中；`moon add` 后零配置直接运行。
+[MoonBit](https://github.com/moonbitlang) 生态的**轻量跨平台桌面 GUI 框架**——**窗口原生直连、渲染管线自绘、界面组件齐全、系统接口完备**：窗口与事件循环直接对接 X11 / Win32 / Cocoa 原生接口，不经过第三方窗口库；光栅、文字、布局由纯 MoonBit 实现，控件一律自绘、不依赖 Skia 等重型引擎；控件、主题、图表、Markdown 视图、内嵌 WebView 随库提供；托盘、通知、全局快捷键、输入法、自启动等系统能力统一门面。一套代码跑 Windows ✅ / Linux ✅ 原生窗口，macOS 后端在 `mac` 分支落地中；`moon add` 后零配置直接运行。
 
 简体中文 | [English](https://github.com/lb091188/moonbit-native-gui/blob/master/README.md)
 
