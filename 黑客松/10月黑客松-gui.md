@@ -65,11 +65,6 @@ match @core.Tray::new("my-player", icon=ic) {
 - **图表扩展**：雷达 / 热力 / K 线 / 漏斗 / 箱线 / 桑基 / 树 / 矩形树 / 旭日九种 + 横切交互层，并入 showcase 图表页
 - **质量门禁**：`moon check` 全仓零错误零警告、`moon test` 全绿为提交门槛；CI 三平台分层门禁；平台适配坑回写 adaptation 文档（中英双语）
 
-## 近期路线
-
-- **macOS 并线**：真机目视复验（Retina 观感 / 输入法 / 通知 / 多屏 / launchctl）后合入主分支
-- **Linux 全局快捷键**：X11 XGrabKey（libyue 有成熟先例可平移）
-
 ## 核心功能范围
 
 - 应用与窗口（@core）
