@@ -22,24 +22,10 @@ MoonBit 生态的**原生桌面 GUI 库**——目标位置是 GTK / WinForms / 
 | 文档 | 本文所在文档站（VitePress，中英双语）与各包文档，见[文档索引](README.md) |
 | CI | Linux 与 Windows 两条 job 每次推送全绿：库包测试（Linux 14 包 / Windows 12 包，dbus 与 sys 按平台能力排除）+ 构建 + 虚拟显示下启动冒烟，徽章见仓库 README |
 
-## 平台支持矩阵
-
-图例：✅ 已交付并验证 / 🚧 落地中 / ❌ 明确不做。
-
-| 能力域 | Windows | Linux | macOS |
-|---|---|---|---|
-| 窗口与事件循环（自绘宿主、自研泵） | ✅ | ✅（X11 + GTK3） | 🚧 |
-| 控件与组件库 / 主题 / 图标 / 图表 / Markdown 视图 | ✅ | ✅ | 🚧 |
-| 光栅与文字（自绘光栅 + Cairo / Pango / DirectWrite / CoreText） | ✅ | ✅ | 🚧 |
-| 内嵌 WebView（WebView2 / WebKitGTK / WKWebView） | ✅ | ✅ | 🚧 |
-| 系统能力门面 `@sys`（二十余族） | ✅ 系统 API 直调 | ✅ 命令线与文件直读 | 🚧 |
-| Linux 桥 `@dbus`（托盘 SNI / 通知 / logind·upower / MPRIS…） | — | ✅ | — |
-| 媒体（gui-media：ffmpeg 解码 + miniaudio 输出） | ✅ | ✅ | 🚧 |
-| 无障碍（ATK / UIA / NSAccessibility） | ❌ | ❌ | ❌ |
+## 平台状态注脚
 
 - **Linux**：X11 为主链路；Wayland 会话可运行（窗口后端自带 Wayland 支持），依赖 X11 的能力按会话探测降级（全局快捷键、空闲检测等给 `Unsupported`）。兼容跨度 **deepin 20 ~ Ubuntu 26**，工具包**留守 GTK3**（理由见「明确不做」）。
 - **macOS**：后端在 `mac` 分支落地中（窗口 / 文字 / 图像解码 / WebView / 系统能力族已有实现），**尚未合流 master**；master 上 macOS 走占位实现，门面一律语义化 `Unsupported`。合流前置是真机验证收口。
-
 ## Linux 兼容档位
 
 承诺跨度 deepin 20 ~ Ubuntu 26，验证按「库版本 × 桌面环境 × 会话类型」三元组选**代表档位**，不按发行版数量堆测：
@@ -64,122 +50,133 @@ MoonBit 生态的**原生桌面 GUI 库**——目标位置是 GTK / WinForms / 
 
 ## 功能面全景
 
-图例：✅ 已交付并验证 · 🚧 部分（缺口见 TODO）· ⏳ 计划中 · ❌ 明确不做。
+图例：✅ 已交付并验证 · 🚧 落地中（macOS 分支在 `mac` 上，未合流 master 前 master 走占位实现）· ❌ 未接 · — 该平台无对应面 · ？待核。
 
-本节是**能力目录**，不是施工记录：每条只回答「有什么、在哪、成什么样」。批次过程、根因与验收细节在 [adaptation.md](adaptation.md) 与 `git log`；未完成的排期在仓库根 [TODO.md](https://github.com/lb091188/moonbit-native-gui/blob/master/TODO.md)。
+状态只回答「这个功能点在某平台上成不成」；接口形态、验收细节与根因在 [adaptation.md](adaptation.md) 与各包文档，未完成排期在仓库根 [TODO.md](https://github.com/lb091188/moonbit-native-gui/blob/master/TODO.md)。
 
 ### 地基与宿主
 
-| 功能点 | 状态 | 落点 | 成什么样 |
+| 功能点 | Windows | Linux | macOS |
 |---|---|---|---|
-| 绘制契约与离屏像素回归 | ✅ | `render` | 纯 MoonBit 软件光栅（路径/填充/混合/渐变）+ Cairo 后端；位图、画布、图像、PNG 编解码；像素级判据可无头跑 |
-| 窗口地基与事件循环 | ✅ | `win`、`core/loop.mbt` | GTK3 / Win32 窗口 + 自研泵；循环归 MoonBit，平台库不再持有主循环 |
-| 文字排印 | ✅ | `text`、`render/cairo.mbt` | Pango（Linux）/ DirectWrite（Windows）字体族与富文本区间属性；文本 measure 与 baseline 回灌布局 |
-| 布局层 | ✅ | `modules/yoga-mbt`、`core/widget.mbt` | Flexbox 全量；脏区增量重排（子树版本 + 入参指纹跳过干净子树）；Yoga 真实 bug 语料已转回归用例 |
-| 焦点栈、键鼠接入与编辑内核 | ✅ | `core/focus.mbt`、`input` | Tab/Shift+Tab 由宿主驱动；按下即聚焦；跨平台同构的编辑内核（选区、撤销、IME 接缝） |
-| 平台输入映射层 | ✅ | `core/input_map.mbt` | 三平台修饰位折算、Win/mac 键码表、按钮号、IME 按键路由判据（纯函数 + 回归） |
-| 输入法通道 | ✅ | `win`、`text` | 四条件（preedit / commit / surrounding / caret）真机闭环；Linux 纯通道与 Windows `WM_IME_*` 两路；换焦点不串框 |
-| 应用宿主 | ✅ | `core/app.mbt` | 窗口 + `Loop` + 控件树 + 输入法通道 + 脏标上屏收在一处；原始事件 `raw_to_event` 独立可测 |
-| 自绘控件宿主 | ✅ | `core/widget.mbt` | 布局树 ↔ 控件树映射；绝对矩形单点折算；指针/滚轮/按键沿祖先链冒泡；绘制逐层平移 + 裁剪 |
-| 声明式层 | ✅ | `core/node.mbt`、`ui` | `Node` / `bind_node` / `swap_node` / `Store` / `Signal`；`mount_window` 挂进宿主；`render` 函数即视图（无模板语言） |
-| 样式层 | ✅ | `style` | 样式表写成 MoonBit 值（`Style` 规则块 + 具名 class 常量）、`hover/active/focus` 状态桶、`merge` 逐属性并集、过渡与阴影 |
-| 主题系统 | ✅ | `theme` | 色板派生 + 变更订阅；跟随系统明暗与强调色 |
-| 窗口级按键兜底通道 | ✅ | `core/app.mbt` | `App::add_key_fallthrough`：焦点链没消费或无焦点时按注册序问处理器，第一个 `true` 截断；摘掉的组件用 `Widget::is_painted()` 自证活体 |
-| 输入法通道补齐 | 🚧 | `win`、`text` | ibus 一套复验待确认；macOS `NSTextInputClient` 待真机；preedit 观感/候选窗位置等待肉眼确认 |
-| 原生子表面通道与其消费者 | ⏳ | `win/surface.mbt`、`web`、媒体 | 网页与视频作为纹理/子表面的统一形态，见 TODO §1「G8」 |
-| 模块拆分 | ⏳ | `modules/` | 判据与批次见 [module-structure.md](module-structure.md)；`gui/web` 出成 `gui-webview`、`core` 三刀 `base`/`shell`/`widget`，排期在 TODO §1「G9」 |
-| 窗口内按键路由补齐 | ⏳ | `core/app.mbt`、`ui` | 抬起事件投递、焦点链与兜底的优先级、方向键归属表、IM 门控复验——TODO §1「G10」 |
+| 窗口地基与事件循环（自研泵） | ✅ | ✅ | 🚧 |
+| 软件光栅与 Cairo 后端 | ✅ | ✅ | 🚧 |
+| 文字排印（DirectWrite / Pango / CoreText） | ✅ | ✅ | ❌ |
+| 图像解码（WIC / GdkPixbuf） | ✅ | ✅ | ❌ |
+| 布局（Flexbox + 脏区增量重排） | ✅ | ✅ | 🚧 |
+| 焦点栈、键鼠接入与编辑内核 | ✅ | ✅ | 🚧 |
+| 平台输入映射层（修饰位 / 键码 / 按钮号） | ✅ | ✅ | 🚧 |
+| 输入法通道（preedit / commit / surrounding / caret） | ✅ | ✅ | ❌ |
+| 应用宿主与多窗口 | ✅ | ✅ | 🚧 |
+| 自绘控件宿主（命中 / 冒泡 / 裁剪） | ✅ | ✅ | 🚧 |
+| 声明式层（`Node` / `bind_node` / `Store` / `Signal`） | ✅ | ✅ | 🚧 |
+| 样式层（`Style` 值 + 状态桶 + 过渡） | ✅ | ✅ | 🚧 |
+| 主题系统与跟随系统明暗 / 强调色 | ✅ | ✅ | 🚧 |
+| 窗口级按键兜底通道 | ✅ | ✅ | 🚧 |
+| 上屏帧缓冲所有权 | ✅ | ✅ | ？ |
+| 模块拆分（`base`/`shell`/`widget` + `gui-webview` 出模块） | ⏳ | ⏳ | ⏳ |
+| 窗口内按键路由补齐（抬起事件 / 优先级表） | ⏳ |  | ⏳ |
 
 ### 绘图与资源
 
-| 功能点 | 状态 | 落点 | 成什么样 |
+| 功能点 | Windows | Linux | macOS |
 |---|---|---|---|
-| 绘制门面与光栅 | ✅ | `render` | 路径/曲线/弧/变换/裁剪/25 种混合模式/线性与径向渐变；Cairo 后端与纯软件光栅两路径逐像素一致，无 Cairo 时降级 |
-| 图片与离屏画布 | ✅ | `render` | `Image`（文件 / PNG / 位图 / resize / 槽位）、`Canvas` 离屏与 PNG 落盘、子表面限制采样域防串色、blit 尊重混合模式 |
-| GIF 动画 | ✅ | `render`、`ui/gif.mbt` | `Animation`（迭代器 + 与真实时间同速的虚拟时钟）与 `gif` 组件（自转/暂停/继续，静图退回一帧） |
-| 图像解码后端 | 🚧 | `render` 桩 | Linux GdkPixbuf（PNG/JPEG/GIF 首帧）、Windows WIC（静态首帧 + 动图逐帧 disposal）；**macOS 解码后端未接** |
-| 矢量图标 | ✅ | `icons` | 803 条定点路径 + 解释器 + `IconKind`/`icon_name`/`all_icons` + `draw_icon`；`icon` / `icon_button` 随主题取色 |
-| 字体与富文本 | ✅ | `text` | 族名/字号/9 档字重/斜体；对齐、换行、省略；区间属性（UTF-8 字节下标）；字体枚举与 CSS 列表回退；混排行高 = max ascent + max descent |
-| 文字后端 | 🚧 | `text` 桩 | Pango（Linux）+ DirectWrite（Windows，含行高 K 地板与按平台探缺省字族）；**macOS CoreText 未接** |
-| 文本绘制口径 | ✅ | `text` | 新门面**不提供** `Painter::draw_text`，文本一律走 `text`，两后端走等价通道 |
+| 路径 / 曲线 / 弧 / 变换 / 裁剪 / 混合模式 / 渐变 | ✅ | ✅ | 🚧 |
+| 位图、画布、图像与 PNG 编解码 | ✅ | ✅ | 🚧 |
+| GIF 动画与 `gif` 组件 | ✅ | ✅ | ？ |
+| 矢量图标（803 条 + 解释器） | ✅ | ✅ | 🚧 |
+| 富文本与区间属性、字体枚举与回退 | ✅ | ✅ | ❌ |
 
 ### 组件层与前端化
 
-| 功能点 | 状态 | 落点 | 成什么样 |
+| 功能点 | Windows | Linux | macOS |
 |---|---|---|---|
-| 组件命名对齐 Web / Element Plus | ✅ | `ui` | 映射表全部落地、`_t` 尾巴清零、事件统一 `on_*`、散参数改名 `background_color`/`color`/`font_size`，34 个组件收 `class?` |
-| 样式通道逐组件收口 | ✅ | `ui` | 逐族 `on_draw` 改读 resolved Style 并按状态选桶（基础/展示/表单/导航/浮层/表格与虚拟列表/日期时间/消息框/输入框）；语义色存 token 名，随主题现取 |
-| 展示类信号版组件 | ✅ | `ui` | `text_dyn`/`tag_dyn`/`badge_count_dyn`/`avatar_dyn`/`statistic_dyn` 等；静态与信号两条入口共用一份画法 |
-| CSS 属性生效面 | 🚧 | `ui`、`style` | `text_align`/`white_space`/`line_height`/`text_decoration`/`box_shadow` 已接真路径（含测量联动）；**`letter_spacing` 未接**（要文本层先开字距接口） |
-| 响应式补强 | ✅ | `core`、`ui` | `ListStore` keyed 差分、`effect`/`watch`、帧末合并重绘、`for_list`/`when`、`mount_window` 的 `render` 槽、`Store` 内建去重 |
-| 全局 alpha 与硬阴影 | ✅ | `render`、`style` | 前端化 P4 绘制能力 |
-| 过渡动画 | ✅ | `style/transition.mbt` | 前端化 P5：帧驱动复用进程级延时通道，只给活动中的控件局部置脏 |
+| 组件命名对齐 Web / Element Plus（`_t` 清零） | ✅ | ✅ | ✅ |
+| 样式通道逐组件收口（按状态选桶） | ✅ | ✅ | ✅ |
+| 展示类信号版组件（`*_dyn`） | ✅ | ✅ | ✅ |
+| CSS 属性生效面（`text_align`/`white_space`/`line_height`/`text_decoration`/`box_shadow`） | ✅ | ✅ | ✅ |
+| `letter_spacing` 生效 | ❌ | ❌ | ❌ |
+| 响应式补强（`ListStore` keyed 差分 / `effect` / `for_list` / `when`） | ✅ | ✅ | ✅ |
+| 过渡动画 `transition` | ✅ | ✅ | 🚧 |
+| 全局 alpha 与硬阴影 | ✅ | ✅ | 🚧 |
 
 ### 控件与组件清单
 
-| 家族 | 状态 | 落点 | 内容 |
+| 家族 | Windows | Linux | macOS |
 |---|---|---|---|
-| 基础原语 | 🚧 | `ui` | 容器 `view`/`row`/`col`、`separator`/`divider`、`text`、`image`、`icon`、`button`（五档 variant）；剩余见 TODO §2「控件」 |
-| 文本族 | ✅ | `ui` | `text`/`text_dyn`/`link`/`bind`/`bind_label`/`text_source` |
-| 表单族 | ✅ | `ui` | 15 件：`input`/`textarea`/`checkbox`/`radio_group`/`switch`/`slider`/`stepper`/`rate`/`select`/`color_picker`/`date_picker`/`time_range_picker`/`datetime_range_picker`/`form`/`form_item` |
-| 输入框全语义 | ✅ | `ui/entry.mbt`、`ui/textarea.mbt` | 选区、剪贴板、撤销、光标闪烁、IME 内联、占位符、禁用态 |
-| 显示族 | ✅ | `ui` | 16 件：`tag`/`badge`/`avatar`/`statistic`/`descriptions`/`result`/`timeline`/`progress`/`empty`/`alert`/`card`/`carousel`/`code_view`… |
-| 日期族 | ✅ | `ui/datepicker.mbt` | `calendar`/`date_picker`/`date_range_picker`/`time_range_picker`/`datetime_range_picker`（区间三件已去 `_t`） |
-| 导航族 | ✅ | `ui/nav.mbt` | 10 件：`tabs`/`menu`（含分节）/`tree`/`transfer`/`steps`/`breadcrumb`/`pagination`/`collapse`/`segmented` |
-| 表格与列表 | ✅ | `ui/table.mbt`、`ui/virtlist.mbt` | `table`（排序/斑马纹/悬停整行）、`table_v`、`virt_list`、`sticky_list` |
-| 浮层族 | ✅ | `core/overlay*`、`ui` | `tooltip`/`popover`/`dialog`/`message_box`/`toast_layer`，含**原生档**（有网页区时整层走真窗口） |
-| 容器与滚动 | ✅ | `ui/scroll.mbt`、`ui/split.mbt` | 垂直滚动 + 自绘滚动条、`hsplit`/`vsplit`、`enable_root_scroll` |
-| 键盘可及性 | ✅ | `ui` | 表单族与按钮全部进 Tab 链、空格/回车激活、焦点环按变体可见 |
-
-### 主题与声明式
-
-| 功能点 | 状态 | 落点 | 成什么样 |
-|---|---|---|---|
-| 主题色板与派生 | ✅ | `theme` | `Theme` 20 字段 + 明暗两套 + `theme_from_accent` 主色派生公式 + 变更订阅（`on`/`off`/`apply`）+ 20 个 getter + 控件高度常量 |
-| 跟随系统深浅与强调色 | ✅ | `theme`、`win`、`core` | 主题包收两个读数函数作参数（不依赖平台层）；gsettings 两级探测与主色查表在 `win`；轮询与重刷在 `App::follow_system_theme`，比对指纹变了才 apply |
-| 组件样式通道定案 | ✅ | `ui`、`style` | 定案**不做** CSS 式样式表下发：`on_draw` 现取色板 + 进程级 `watch_theme` 订阅，调用方覆盖走类型化参数或 `handle=` |
-| 声明式构造器全集（L1） | ✅ | `ui/declarative.mbt` | 旧 24 个构造器除与组件同名者外全部到位：`vbox`/`hbox`/`text_edit`/`picker`/`scroll`/`tab`/`date_picker`/`mount_window`/`bind`/`bind_label`/`hover_group`/`cursor_group`/`combo`/`gif` |
-| 信号与状态容器 | ✅ | `core/signal.mbt`、`core/store.mbt` | `Signal`/`Store`（9 方法）、`computed`/`batch`/`sub_bag`、store ↔ signal 互转；`Store` 内建去重 |
-| 节点重挂语义 | ✅ | `core/node.mbt` | `bind_node`/`swap_node`；relink 定案为**原位替换**（为此在布局与控件层加 `insert_child`/`remove_child_at`/`index_of`/`move_child`） |
-| 窗口光标通道 | ✅ | `win`、`core` | `wm_set_cursor` FFI + `Widget.cursor` 请求 + 宿主按悬停路径取「最深非零」下发 |
-| 组件库收口 | ✅ | `ui`、`mdview` | 约 55 个组件、十族 + Markdown 族，全部以 `@core.Node` 构造器形态提供 |
-| 富文本编辑器 | ⏳ | — | 远期 WYSIWYG 块编辑器 |
-| 代码高亮 / 终端 / WebGL 画布 | ⏳ | — | 旧栈即无，列为待评估 |
+| 基础原语（容器 / 分隔 / 标签 / 图像 / 图标 / 按钮） | ✅ | ✅ | 🚧 |
+| 文本族 | ✅ | ✅ | 🚧 |
+| 表单族（15 件） | ✅ | ✅ | 🚧 |
+| 输入框全语义（选区 / 撤销 / IME 内联） | ✅ | ✅ | ❌ |
+| 显示族（16 件） | ✅ | ✅ | 🚧 |
+| 日期与时间族 | ✅ | ✅ | 🚧 |
+| 导航族（10 件） | ✅ | ✅ | 🚧 |
+| 表格与虚拟列表 | ✅ | ✅ | 🚧 |
+| 浮层族（tooltip / popover / dialog / toast / 消息框） | ✅ | ✅ | 🚧 |
+| 容器与滚动、分栏 | ✅ | ✅ | 🚧 |
+| 拖放（数据模型 + 系统级拖入拖出） | ✅ | ✅ | ❌ |
 
 ### 图表与文档视图
 
-| 功能点 | 状态 | 落点 | 成什么样 |
+| 功能点 | Windows | Linux | macOS |
 |---|---|---|---|
-| 共享算法层 | ✅ | `chart/algo.mbt` | 滚动窗口、坐标换算、1-2-5 刻度、单位换挡、柱槽与命中、扇区角度、仪表弧度、最小二乘、值域留白、截断、透明度合成 |
-| 五种通用图 | ✅ | `chart` | 折线/面积（像素列抽稀 + 末端值标注）、柱/条（正负基线 + 悬停高亮）、环形（中心汇总 + 图例百分比 + 命中判定）、仪表（阈值分段 + 定时器插值平滑）、散点（趋势线） |
-| 交互层与 tooltip | ✅ | `chart/interactive.mbt`、`chart/charts_it.mbt` | hover 浮层、可点击图例显隐、滚轮缩放与拖拽平移；`ci_zoom`/`ci_visual_map`/`ci_mark_line`/`ci_mark_area`/`ci_save`（PNG 离屏导出）/`ci_legend_hit`/`ci_filter_visible` |
-| 十五种专项图 | ✅ | `chart/*`（一图一文件 + wbtest） | boxplot / funnel / heatmap / radar / kline / sankey / treemap / tree / sunburst / graph（力导向）/ parallel / pictorialbar / effectscatter（涟漪动画）/ themeriver / geo |
-| 地图 | ✅ | `chart/geo.mbt` | 数据读取走 `@sys`、矩形本地化、世界投影 |
-| Markdown 视图 | ✅ | `mdview` | 17 种 block 变体 + GFM 面（表格对齐/任务列表/脚注/删除线/块级图片/可点击链接）；链接点击走 `on_link` 回调；富文本行按主题指纹缓存重建 |
+| 共享算法层 | ✅ | ✅ | 🚧 |
+| 五种通用图 | ✅ | ✅ | 🚧 |
+| 交互层与 tooltip、PNG 导出 | ✅ | ✅ | 🚧 |
+| 十五种专项图与地图 | ✅ | ✅ | 🚧 |
+| Markdown 视图 | ✅ | ✅ | 🚧 |
+| 代码高亮 / 终端 / WebGL 画布 | ❌ | ❌ | ❌ |
 
 ### 系统集成
 
-| 功能点 | 状态 | 落点 | 成什么样 |
+| 功能点 | Windows | Linux | macOS |
 |---|---|---|---|
-| 零依赖 JSON | ✅ | `sys/json.mbt` | 公共名不变、只换包前缀 |
-| 环境与文件原语 | ✅ | `sys/fsx.mbt`、`sys/envx.mbt` | 目录枚举、文本读写、幂等删除、`setenv` 后立即可读、平台标识；Windows 侧一律 UTF-8 进、宽字符 API 出 |
-| 子进程与分离式启动 | ✅ | `sys/procrun.mbt` | 三平台 `spawn`/`wait`/`getpid` 自带（已去掉第三方 subproc 依赖）；分离式启动走 fork→setsid→fork + CLOEXEC 回传 exec 成败，不阻塞、不留僵尸 |
-| 文件对话框 | ✅ | `sys/dialog.mbt` | GTK `GtkFileChooserDialog` 与 Windows `IFileDialog` 两后端同制（槽表、三个选项位、filters 解析）；父窗差异由 Windows 自带模态泵兜 |
-| 单实例 | ✅ | `dbus/instance.mbt` | 总线名 `RequestName` + 入站 `Wake`，二次启动唤起首实例后自行退出 |
-| 桌面环境识别 | ✅ | `sys/desktop.mbt` | `XDG_CURRENT_DESKTOP` 冒号多值取首个可识别值 |
-| 打开与定位 | ✅ | `sys/launcher.mbt` | `open_url` / `reveal` / `open_file` / `open_file_with`；Windows 绝对路径四类判据 + 分隔符归一 + `NotFound` 错误档；macOS `open -a` 形态未接（随 mac 平台批） |
-| 应用枚举 | ✅ | `sys/appfind.mbt` | `.desktop` 扫描按 id 去重、按 name 码点序；`which` 语义的固定目录查找 |
-| 壁纸与默认应用 | ✅ | `sys/wallpaper.mbt`、`sys/defaultapps.mbt` | 按 DE 分派 xfconf / gsettings / qdbus；`xdg-mime` + `mimeapps.list` 三层配置与段内替换写路径 |
-| 最近文件 | ✅ | `sys/recent_files.mbt` | 只读解析 `recently-used.xbel`（XBEL 扫描 + 实体 / 百分号 / ISO 8601 三只纯函数） |
-| 硬件族 | ✅ | `sys/{brightness,volume,nightlight,printer,powerprofile,monitor}.mbt` | 命令线与 sysfs 直读；写路径经注入槽（亮度走 logind、音量 wpctl/pactl、夜灯 redshift/gamma、打印 CUPS、电源 powerprofilesctl、显示器 xrandr） |
-| 浏览器与编辑器历史 | ✅ | `sys/{browser_history,browser_bookmarks,firefox_history,vscode_history}.mbt` | SQLite 直读磁盘文件（只读、不写、不复制原库）；三平台数据根与定义表按平台分流 |
-| 系统信息 | ✅ | `sys/sysinfo.mbt` | `os-release` / `meminfo` / `uptime` / DMI 纯文本读 |
-| 窗口控制与剪贴板监视 | ✅ | `sys/windowctl.mbt`、`sys/clipboard_watch.mbt` | `wmctrl` 列/激活/关闭；剪贴板只读轮询，排期能力作参数注入（`sys` 不引 GUI 核心层） |
-| 空闲检测 | ✅ | `sys/idle.mbt`（W21e 门面） | Windows `GetLastInputInfo` / Linux X11 XScreenSaver（运行期 dlopen）/ macOS 留桩 |
-| D-Bus 能力模块 | ✅ | `dbus` | wire + dbus + bus + socket 四桩；UPower / logind / network / screensaver / inhibit / MPRIS / notifications，真总线回证 |
-| 系统托盘 | ✅ | `dbus`（SNI + DBusMenu） | 真实总线与真实面板协议已回证；观感由使用者复验 |
-| Wayland 会话分流 | ✅ | `sys/{idle,windowctl,clipboard_watch}` | 依赖 X11 的能力在 Wayland 会话给 `Unsupported` 而不是崩 |
-| 传感器 / 蓝牙 / 磁盘 | ❌ | — | iio-sensor-proxy / org.bluez / UDisks2 只在一个平台有对应面，按跟踪口径不进路线图（Linux 侧挂账留在 TODO §2） |
+| 零依赖 JSON、环境与文件原语、子进程 | ✅ | ✅ | ✅ |
+| 文件对话框 | ✅ | ✅ | ❌ |
+| 打开与定位（`open_url`/`reveal`/`open_file`/`open_file_with`） | ✅ | ✅ | 🚧 |
+| 应用枚举、最近文件、壁纸、默认应用 | ？ | ✅ | ❌ |
+| 单实例 | ？ | ✅ | ❌ |
+| 桌面环境识别 | — | ✅ | — |
+| 硬件族（亮度 / 音量 / 夜灯 / 打印机 / 电源档位 / 显示器） | — | ✅ | — |
+| 浏览器与编辑器历史 | ✅ | ✅ | ✅ |
+| 系统信息 | ✅ | ✅ | ？ |
+| 窗口控制、剪贴板监视 | — | ✅ | — |
+| 空闲检测 | ✅ | ✅ | ❌ |
+| 开机自启 | ✅ | ✅ | ？ |
+| 通知 | ✅ | ✅ | ❌ |
+| 系统托盘 | ✅ | ✅ | ❌ |
+| 全局快捷键 | ✅ | ❌ | ❌ |
+| 原生消息框与自绘档 | ✅ | ✅ | 🚧 |
+| 原生菜单栏 | ✅ | ✅ | ？ |
+| 任务栏进度 | ✅ | — | — |
+| D-Bus 能力模块（UPower / logind / 网络 / 屏保 / 抑制 / MPRIS） | — | ✅ | — |
+| Wayland 会话分流 | — | ✅ | — |
+| 传感器 / 蓝牙 / 磁盘 | — | ✅ | — |
+
+### webview 与原生子表面
+
+| 功能点 | Windows | Linux | macOS |
+|---|---|---|---|
+| 多窗口宿主与 pane 模型 | ✅ | ✅ | 🚧 |
+| 内嵌 WebView | ✅ | ✅ | ❌ |
+| JS 双向通道、DOM 抓取、导航面与事件流 | ✅ | ✅ | ❌ |
+| 本地内容通道（自定义协议） | ✅ | ✅ | ❌ |
+| 引擎开关、profile 与策略面 | ✅ | ✅ | ❌ |
+| 浮层的原生档（真窗口层） | ？ | ✅ | ❌ |
+| 跨窗 cookie 同步 | ⏳ | ⏳ | ⏳ |
+| 浮层「点外收起」判据 | ⏳ | ⏳ | ⏳ |
+
+### 媒体播放
+
+| 功能点 | Windows | Linux | macOS |
+|---|---|---|---|
+| 解码引擎（ffmpeg 动态链） | ✅ | ✅ | ❌ |
+| 音频输出（miniaudio 设备层） | ✅ | ✅ | ❌ |
+| 播放器组件（`video` / `audio`） | ？ | ✅ | ❌ |
+| 字幕层（SRT / VTT / 内嵌轨） | ？ | ✅ | ❌ |
+| 歌词层（LRC） | ？ | ✅ | ❌ |
+| 实时频谱 | ？ | ✅ | ❌ |
+| 倍速 / 逐帧步进 / 缩放三档 / 全屏 / 快捷键 | ？ | ✅ | ❌ |
+| 硬解与 GPU 合成 | ❌ | ❌ | ❌ |
 
 ## 承诺与版本
 
